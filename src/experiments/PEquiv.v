@@ -34,30 +34,53 @@ Record HEmbed `(M:Mach X, N:Mach Y) :=
 
 
 
-CoInductive stream X :=
-| s_nil : stream X
-| s_cons : X -> stream X -> stream X.
+CoInductive stream X := 
+  { s_hd : X
+  ; s_tl : option (stream X)
+  }.
 
-CoFixpoint map_stream A B (f:A -> B) (s:stream A) : stream B :=
-  match s with
-  | s_nil _ => s_nil _
-  | s_cons a s' => s_cons (f a) (map_stream f s')
-  end.
+Definition stream_id {X} (s:stream X) : stream X :=
+  let 'Build_stream hd tl := s in
+  {| s_hd := hd; s_tl := tl |}.
 
-Arguments s_nil [_].
+Lemma stream_id_eq X : forall s : stream X,
+  s = stream_id s.
+Proof.
+  intro. destruct s. simpl. reflexivity.
+Qed.
 
 CoInductive trace {X} (M:Mach X) : stream X -> Prop :=
-| trace_one : forall x, 
+| trace_one : forall x,
   m_wf M x ->
   m_step M x = None -> 
-  trace M (s_cons x s_nil)
-| trace_cons : forall x x' s, 
+  trace M {| s_hd := x; s_tl := None |}
+| trace_cons : forall x s, 
   m_wf M x ->
-  m_step M x = Some x' -> 
-  trace M (s_cons x' s) ->
-  trace M (s_cons x (s_cons x' s)).
+  trace M s ->
+  m_step M x = Some (s_hd s) -> 
+  trace M {| s_hd := x; s_tl := Some s |}.
 
 Definition mtrace {X} M : Type := { s | @trace X M s }.
+
+CoFixpoint mktrace `(M:Mach X) (x:X) : stream X :=
+  {| s_hd := x
+   ; s_tl := option_map (mktrace M) (m_step M x)
+  |}.
+
+Lemma mktrace__trace `(M:Mach X) : forall x, 
+  m_wf M x -> trace M (mktrace M x).
+Proof.
+  cofix CIH. intros x Hwf.
+  rewrite stream_id_eq. simpl.
+  pose proof (m_pres M x Hwf) as Hpres.
+  destruct (m_step M x) eqn:Heq.
+  - simpl. constructor; simpl; auto. 
+  - simpl. constructor; assumption.
+Qed.
+
+Definition mkmtrace `(M:Mach X) (x:X) (Hwf:m_wf M x) : mtrace M :=
+  exist _ (mktrace M x) (mktrace__trace M _ Hwf).
+
 
 (* maybe it's hard to define an equivalence on traces without this representation? *)
 Record Equiv {A} (R:A -> A -> Prop) :=
@@ -67,34 +90,30 @@ Record Equiv {A} (R:A -> A -> Prop) :=
   }.
 
 
-Section FOO.
+Section MAIN.
 
 Variables (X Y:State) (M:Mach X) (N:Mach Y) (U:HEmbed M N).
 
-Definition lift_hembed (R:mtrace M -> mtrace M -> Prop) : mtrace N -> mtrace N -> Prop.
-  refine 
-    (fun s t =>
-       R (exist _ (map_stream (he_load U) (proj1_sig s)) _)
-         (exist _ (map_stream (he_load U) (proj1_sig t)) _)).
-  admit.
-  admit.
-Admitted.
+Definition conc (s:mtrace N) : mtrace M.
+Proof.
+  refine (mkmtrace M (he_load U (s_hd (proj1_sig s))) _).
+  abstract (apply he_load_wf; destruct s; simpl;
+            inversion t; subst; assumption).
+Defined.
 
-Definition lower_hembed (R:mtrace N -> mtrace N -> Prop) : mtrace M -> mtrace M -> Prop.
-  refine 
-    (fun s t =>
-       R (exist _ (map_stream (he_unload U) (proj1_sig s)) _)
-         (exist _ (map_stream (he_unload U) (proj1_sig t)) _)).
-  admit.
-  admit.
-Admitted.
+Definition abs (s:mtrace M) : mtrace N :=
+  refine (mkmtrace M (he_load U (s_hd (proj1_sig s))) _).
+  abstract (apply he_load_wf; destruct s; simpl;
+            inversion t; subst; assumption).
+  
+
+Definition liftrel (R:mtrace M -> mtrace M -> Prop) : mtrace N -> mtrace N -> Prop :=
+  fun s t => R (conc s) (conc t).
+
 
 
 Definition ueq (s t:mtrace M) : Prop :=
-  match proj1_sig s, proj1_sig t with
-  | s_nil, _ | _, s_nil => False
-  | s_cons x _, s_cons y _ => U x = U y
-  end.
+  U (s_hd (proj1_sig s)) = U (s_hd (proj1_sig t)).
 
 Parameter ueq_equiv : Equiv ueq.
 
