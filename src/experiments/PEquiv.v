@@ -1,3 +1,13 @@
+(* Notes
+- loading each state of a SOS execution produces an execution that technically
+  isn't a abstract machine execution -- suggests we might not want to limit
+  ourselves to the type of machine executions
+- alternatively, it might be necessary to define the machine induced by the
+  the SOS step relation on machine states. That is, where the step function is
+  load o SOS.step o unload
+*)
+
+
 Generalizable All Variables.
 Set Implicit Arguments.
 
@@ -31,17 +41,14 @@ Record HEmbed `(M:Mach X, N:Mach Y) :=
     option_map he_unload (m_step M x) = m_step N (he_unload x)
   }.
 
-
-
-
 CoInductive stream X := 
-  { s_hd : X
-  ; s_tl : option (stream X)
-  }.
+  Stream { s_hd : X
+         ; s_tl : option (stream X)
+         }.
 
 Definition stream_id {X} (s:stream X) : stream X :=
-  let 'Build_stream hd tl := s in
-  {| s_hd := hd; s_tl := tl |}.
+  let 'Stream hd tl := s in
+  Stream hd tl.
 
 Lemma stream_id_eq X : forall s : stream X,
   s = stream_id s.
@@ -49,40 +56,14 @@ Proof.
   intro. destruct s. simpl. reflexivity.
 Qed.
 
-CoInductive trace {X} (M:Mach X) : stream X -> Prop :=
-| trace_one : forall x,
-  m_wf M x ->
-  m_step M x = None -> 
-  trace M {| s_hd := x; s_tl := None |}
-| trace_cons : forall x s, 
-  m_wf M x ->
-  trace M s ->
-  m_step M x = Some (s_hd s) -> 
-  trace M {| s_hd := x; s_tl := Some s |}.
-
-Definition mtrace {X} M : Type := { s | @trace X M s }.
-
-CoFixpoint mktrace `(M:Mach X) (x:X) : stream X :=
-  {| s_hd := x
-   ; s_tl := option_map (mktrace M) (m_step M x)
-  |}.
-
-Lemma mktrace__trace `(M:Mach X) : forall x, 
-  m_wf M x -> trace M (mktrace M x).
-Proof.
-  cofix CIH. intros x Hwf.
-  rewrite stream_id_eq. simpl.
-  pose proof (m_pres M x Hwf) as Hpres.
-  destruct (m_step M x) eqn:Heq.
-  - simpl. constructor; simpl; auto. 
-  - simpl. constructor; assumption.
-Qed.
-
-Definition mkmtrace `(M:Mach X) (x:X) (Hwf:m_wf M x) : mtrace M :=
-  exist _ (mktrace M x) (mktrace__trace M _ Hwf).
+CoFixpoint map_stream {X Y} (f:X -> Y) (s:stream X) : stream Y :=
+  match s with
+  | Stream hd None => Stream (f hd) None
+  | Stream hd (Some tl) => Stream (f hd) (Some (map_stream f tl))
+  end.
 
 
-(* maybe it's hard to define an equivalence on traces without this representation? *)
+
 Record Equiv {A} (R:A -> A -> Prop) :=
   { equiv_refl : forall a, R a a
   ; equiv_sym : forall a b, R a b -> R b a
@@ -90,43 +71,88 @@ Record Equiv {A} (R:A -> A -> Prop) :=
   }.
 
 
+Inductive fbisim_step {X Y} (R:stream X -> stream X -> Prop) (U:X -> Y) 
+  : stream X -> stream X -> Prop :=
+| ueq_one : forall x x',
+    U x = U x' ->
+    fbisim_step R U {| s_hd := x; s_tl := None |} 
+                    {| s_hd := x'; s_tl := None |}
+| ueq_step : forall x x' s' t',
+    U x = U x' ->
+    R s' t' ->
+    fbisim_step R U {| s_hd := x; s_tl := Some s' |} 
+                    {| s_hd := x'; s_tl := Some t' |}.
+
+
+CoInductive fbisim {X Y} (U:X->Y) (s t:stream X) : Prop :=
+fbism_fix : 
+  fbisim_step (fbisim U) U s t ->
+  fbisim U s t.
+
+Section FBISIM_COIND.
+
+  Variables (X Y:Type) (U:X -> Y) (R:stream X -> stream X -> Prop).
+
+  Hypothesis H : forall s t, R s t -> fbisim_step R U s t.
+  
+  Lemma fbisim_coind : forall s t,
+    R s t -> fbisim U s t.
+  Proof.
+    cofix CIH.
+    intros s t Hrst. 
+    destruct s as [? [s'|]], t as [? [t'|]]; apply H in Hrst; inversion Hrst; subst.
+    - constructor. constructor. assumption. apply CIH. assumption.
+    - constructor. constructor. assumption.
+  Qed.
+
+End FBISIM_COIND.
+
 Section MAIN.
 
 Variables (X Y:State) (M:Mach X) (N:Mach Y) (U:HEmbed M N).
 
-Definition conc (s:mtrace N) : mtrace M.
+Definition liftrel (R:stream X -> stream X -> Prop) : stream Y -> stream Y -> Prop :=
+  fun s t => R (map_stream (he_load U) s) (map_stream (he_load U) t).
+    
+
+Variable R : stream X -> stream X -> Prop.
+
+Hypothesis Hequiv : Equiv R.
+
+Hypothesis Hincl : forall s t, fbisim U s t -> R s t.
+
+Lemma unload_load_R : forall s,
+  fbisim U (map_stream (he_load U) (map_stream U s)) s.
 Proof.
-  refine (mkmtrace M (he_load U (s_hd (proj1_sig s))) _).
-  abstract (apply he_load_wf; destruct s; simpl;
-            inversion t; subst; assumption).
-Defined.
+  intros s.
+  eapply fbisim_coind with (R:=fun s t => s = (map_stream (he_load U) (map_stream U t))).
+  - intros s' t ?; subst s'.
+    destruct t as [? [t'|]]. 
+    + rewrite stream_id_eq at 1. simpl. constructor.
+      rewrite (he_epi U). reflexivity. admit.
+      reflexivity.
+    + rewrite stream_id_eq at 1. simpl. constructor.
+      rewrite (he_epi U). reflexivity. admit.
+  - reflexivity.
+Admitted.    
 
-Definition abs (s:mtrace M) : mtrace N :=
-  refine (mkmtrace M (he_load U (s_hd (proj1_sig s))) _).
-  abstract (apply he_load_wf; destruct s; simpl;
-            inversion t; subst; assumption).
+(* TODO: need to assume s, t only contain wf states *)
+Theorem main :
+  Equiv (liftrel R) /\
+  forall s t, R s t <-> liftrel R (map_stream U s) (map_stream U t).
+Proof.
+  intros. split.
+  - admit.
+  - unfold liftrel. intros s t. split.
+    + intros HRst. 
+      eapply (equiv_trans Hequiv). apply Hincl. apply unload_load_R.
+      eapply (equiv_trans Hequiv). apply HRst.
+      eapply (equiv_sym Hequiv). apply Hincl. apply unload_load_R.
+    + intros HRst.
+      eapply (equiv_trans Hequiv). apply (equiv_sym Hequiv). apply Hincl. apply unload_load_R.
+      eapply (equiv_trans Hequiv). apply HRst.
+      apply Hincl. apply unload_load_R.
+Admitted.
   
 
-Definition liftrel (R:mtrace M -> mtrace M -> Prop) : mtrace N -> mtrace N -> Prop :=
-  fun s t => R (conc s) (conc t).
-
-
-
-Definition ueq (s t:mtrace M) : Prop :=
-  U (s_hd (proj1_sig s)) = U (s_hd (proj1_sig t)).
-
-Parameter ueq_equiv : Equiv ueq.
-
-Theorem main : forall
-  (R:mtrace M -> mtrace M -> Prop) (Hequiv:Equiv R)
-  (Hincl:forall s t, ueq s t -> R s t),
-  Equiv (lift_hembed R) /\
-  forall s t, R s t <-> (lift_hembed R) (he_unload U s) (he_unload U t).
-  
-
-
-
-
-  
-
-  
+End MAIN.
