@@ -15,30 +15,10 @@ Require Import Arith List.
 
 Import ListNotations.
 
-Record State :=
-  { st_ty :> Type
-  ; st_dec : forall (x y : st_ty), {x = y} + {x <> y}
-  }.
-
-Record Mach (X:State) :=
-  { m_step : X -> option X
-  ; m_wf : X -> Prop
-  ; m_pres : forall x, m_wf x -> 
-      match m_step x with 
-      | None => True 
-      | Some x' => m_wf x' 
-      end
-  }.
-
-
-Record HEmbed `(M:Mach X, N:Mach Y) :=
-  { he_unload :> X -> Y
-  ; he_unload_wf : forall x, m_wf M x -> m_wf N (he_unload x)
-  ; he_load : Y -> X
-  ; he_load_wf : forall y, m_wf N y -> m_wf M (he_load y)
-  ; he_epi : forall y, m_wf N y -> he_unload (he_load y) = y
-  ; he_spec : forall x, m_wf M x ->
-    option_map he_unload (m_step M x) = m_step N (he_unload x)
+Record Equiv {A} (R:A -> A -> Prop) :=
+  { equiv_refl : forall a, R a a
+  ; equiv_sym : forall a b, R a b -> R b a
+  ; equiv_trans : forall a b c, R a b -> R b c -> R a c
   }.
 
 CoInductive stream X := 
@@ -61,15 +41,6 @@ CoFixpoint map_stream {X Y} (f:X -> Y) (s:stream X) : stream Y :=
   | Stream hd None => Stream (f hd) None
   | Stream hd (Some tl) => Stream (f hd) (Some (map_stream f tl))
   end.
-
-
-
-Record Equiv {A} (R:A -> A -> Prop) :=
-  { equiv_refl : forall a, R a a
-  ; equiv_sym : forall a b, R a b -> R b a
-  ; equiv_trans : forall a b c, R a b -> R b c -> R a c
-  }.
-
 
 Inductive fbisim_step {X Y} (R:stream X -> stream X -> Prop) (U:X -> Y) 
   : stream X -> stream X -> Prop :=
@@ -107,52 +78,89 @@ Section FBISIM_COIND.
 
 End FBISIM_COIND.
 
-Section MAIN.
+Section STREAM_REL_QUOT.
 
-Variables (X Y:State) (M:Mach X) (N:Mach Y) (U:HEmbed M N).
-
-Definition liftrel (R:stream X -> stream X -> Prop) : stream Y -> stream Y -> Prop :=
-  fun s t => R (map_stream (he_load U) s) (map_stream (he_load U) t).
-    
-
-Variable R : stream X -> stream X -> Prop.
-
-Hypothesis Hequiv : Equiv R.
-
-Hypothesis Hincl : forall s t, fbisim U s t -> R s t.
+Variables (X Y:Type) (U:X -> Y) (L:Y -> X).
+Hypothesis Hepi : forall y, U (L y) = y.
 
 Lemma unload_load_R : forall s,
-  fbisim U (map_stream (he_load U) (map_stream U s)) s.
+  fbisim U (map_stream L (map_stream U s)) s.
 Proof.
   intros s.
-  eapply fbisim_coind with (R:=fun s t => s = (map_stream (he_load U) (map_stream U t))).
+  eapply fbisim_coind with (R:=fun s t => s = (map_stream L (map_stream U t))).
   - intros s' t ?; subst s'.
     destruct t as [? [t'|]]. 
     + rewrite stream_id_eq at 1. simpl. constructor.
-      rewrite (he_epi U). reflexivity. admit.
-      reflexivity.
+      rewrite Hepi. reflexivity. reflexivity.
     + rewrite stream_id_eq at 1. simpl. constructor.
-      rewrite (he_epi U). reflexivity. admit.
+      rewrite Hepi. reflexivity. 
   - reflexivity.
-Admitted.    
+Qed.
 
-(* TODO: need to assume s, t only contain wf states *)
-Theorem main :
-  Equiv (liftrel R) /\
-  forall s t, R s t <-> liftrel R (map_stream U s) (map_stream U t).
+Variable R : stream X -> stream X -> Prop.
+Hypothesis Hequiv : Equiv R.
+Hypothesis Hincl : forall s t, fbisim U s t -> R s t.
+
+Theorem stream_rel_quot :
+  forall s t, R s t <-> R (map_stream L (map_stream U s))
+                          (map_stream L (map_stream U t)).
 Proof.
-  intros. split.
-  - admit.
-  - unfold liftrel. intros s t. split.
-    + intros HRst. 
-      eapply (equiv_trans Hequiv). apply Hincl. apply unload_load_R.
-      eapply (equiv_trans Hequiv). apply HRst.
-      eapply (equiv_sym Hequiv). apply Hincl. apply unload_load_R.
-    + intros HRst.
-      eapply (equiv_trans Hequiv). apply (equiv_sym Hequiv). apply Hincl. apply unload_load_R.
-      eapply (equiv_trans Hequiv). apply HRst.
-      apply Hincl. apply unload_load_R.
-Admitted.
+  intros s t. split.
+  + intros HRst. 
+    eapply (equiv_trans Hequiv). apply Hincl. apply unload_load_R.
+    eapply (equiv_trans Hequiv). apply HRst.
+    eapply (equiv_sym Hequiv). apply Hincl. apply unload_load_R.
+  + intros HRst.
+    eapply (equiv_trans Hequiv). apply (equiv_sym Hequiv). apply Hincl. apply unload_load_R.
+    eapply (equiv_trans Hequiv). apply HRst.
+    apply Hincl. apply unload_load_R.
+Qed.
   
+End STREAM_REL_QUOT.
 
-End MAIN.
+(* This formulation of program equivalence isn't flexible enough to define, for
+   example, terminal states that act as input, or variations of applicative
+   similarity. *)
+
+Definition prog_eq {X} : Type := (X -> option X) -> X -> X -> Prop.
+
+
+
+
+Record State :=
+  { st_ty :> Type
+  ; st_dec : forall (x y : st_ty), {x = y} + {x <> y}
+  }.
+
+Record Mach (X:State) :=
+  { m_step : X -> option X
+  ; m_wf : X -> Prop
+  ; m_pres : forall x, m_wf x -> 
+      match m_step x with 
+      | None => True 
+      | Some x' => m_wf x' 
+      end
+  }.
+
+Record HEmbed `(M:Mach X, N:Mach Y) :=
+  { he_U :> X -> Y
+  ; he_U_wf : forall x, m_wf M x -> m_wf N (he_U x)
+  ; he_L : Y -> X
+  ; he_L_wf : forall y, m_wf N y -> m_wf M (he_L y)
+  ; he_epi : forall y, m_wf N y -> he_U (he_L y) = y
+  ; he_spec : forall x, m_wf M x ->
+    option_map he_U (m_step M x) = m_step N (he_U x)
+  }.
+
+CoInductive trace `(M:Mach X) : stream X -> Prop :=
+| trace_one : forall x,
+  m_wf M x ->
+  m_step M x = None ->
+  trace M (Stream x None)
+| trace_step : forall x x' s,
+  m_wf M x ->
+  m_step M x = Some x' ->
+  s_hd s = x' ->
+  trace M s ->
+  trace M (Stream x (Some s)).
+
