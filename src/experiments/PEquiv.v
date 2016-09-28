@@ -118,49 +118,87 @@ Qed.
   
 End STREAM_REL_QUOT.
 
-(* This formulation of program equivalence isn't flexible enough to define, for
-   example, terminal states that act as input, or variations of applicative
-   similarity. *)
-
-Definition prog_eq {X} : Type := (X -> option X) -> X -> X -> Prop.
-
-
-
+(* The above formulation of program equivalence isn't flexible enough to
+   define, for example, terminal states that act as input, or variations
+   of applicative similarity. It only inspects the sequence of states
+   starting from the intial state: the observer can't "call back into the
+   interpreter" to further examine terminal states. *)
 
 Record State :=
   { st_ty :> Type
   ; st_dec : forall (x y : st_ty), {x = y} + {x <> y}
+  ; st_wf : st_ty -> Prop
   }.
 
 Record Mach (X:State) :=
   { m_step : X -> option X
-  ; m_wf : X -> Prop
-  ; m_pres : forall x, m_wf x -> 
+  ; m_pres : forall x, st_wf X x -> 
       match m_step x with 
       | None => True 
-      | Some x' => m_wf x' 
+      | Some x' => st_wf X x' 
       end
   }.
 
 Record HEmbed `(M:Mach X, N:Mach Y) :=
-  { he_U :> X -> Y
-  ; he_U_wf : forall x, m_wf M x -> m_wf N (he_U x)
+  { he_U : X -> Y
+  ; he_U_wf : forall x, st_wf X x -> st_wf Y (he_U x)
   ; he_L : Y -> X
-  ; he_L_wf : forall y, m_wf N y -> m_wf M (he_L y)
-  ; he_epi : forall y, m_wf N y -> he_U (he_L y) = y
-  ; he_spec : forall x, m_wf M x ->
+  ; he_L_wf : forall y, st_wf Y y -> st_wf X (he_L y)
+  ; he_epi : forall y, st_wf Y y -> he_U (he_L y) = y
+  ; he_spec : forall x, st_wf X x ->
     option_map he_U (m_step M x) = m_step N (he_U x)
   }.
 
-CoInductive trace `(M:Mach X) : stream X -> Prop :=
-| trace_one : forall x,
-  m_wf M x ->
-  m_step M x = None ->
-  trace M (Stream x None)
-| trace_step : forall x x' s,
-  m_wf M x ->
-  m_step M x = Some x' ->
-  s_hd s = x' ->
-  trace M s ->
-  trace M (Stream x (Some s)).
 
+Definition usim {X Y} (U:X -> Y) (f g : X -> option X) : Prop :=
+  forall x x', U x = U x' -> option_map U (f x) = option_map U (g x').
+
+Infix "`o`" := Basics.compose (at level 70).
+
+
+Section GEN_PROG_EQ.
+
+Context `(M:Mach X, N:Mach Y, H:HEmbed M N).
+
+Variable PEq : (Mach X) -> X -> X -> Prop.
+
+Hypothesis HPeq_usim : forall (M M':Mach X) 
+    (Hsim : forall (x x':X) (Hwfx:st_wf X x) (Hwfx':st_wf X x'),
+            (he_U H) x = (he_U H) x' ->
+            option_map (he_U H) (m_step M x) = 
+            option_map (he_U H) (m_step M' x')),
+    forall (x x':X) (Hwfx:st_wf X x) (Hwfx':st_wf X x'),
+      PEq M x x' <-> PEq M' x x'.
+
+Let M' : Mach X.
+  refine
+    {| m_step x := option_map (he_L H) (m_step N (he_U H x)) |}.
+Proof.
+  abstract 
+    (intros; apply (he_U_wf H), (m_pres N) in H0;
+     destruct (m_step N (he_U H x)) eqn:Heqx;
+     [ simpl; apply (he_L_wf H) | ]; auto).
+Defined.
+
+Theorem gen_prog_eq : forall x x' 
+    (Hwfx:st_wf X x) (Hwfx':st_wf X x'),
+    (PEq M x x' <-> PEq M' x x').
+Proof.
+  split.
+  - eapply HPeq_usim; auto. clear x x' Hwfx Hwfx'.
+    intros. subst M'. simpl.
+    rewrite (he_spec H); auto.
+    rewrite H0.
+    apply (he_U_wf H) in Hwfx'.
+    apply (m_pres N) in Hwfx'.
+    destruct (m_step N (he_U H x')) as [y'|] eqn:Heqy; auto.
+    simpl. rewrite (he_epi H); auto.
+  - eapply HPeq_usim; auto. clear x x' Hwfx Hwfx'.
+    intros. subst M'. simpl.
+    rewrite (he_spec H); auto.
+    rewrite H0.
+    apply (he_U_wf H) in Hwfx'.
+    apply (m_pres N) in Hwfx'.
+    destruct (m_step N (he_U H x')) as [y'|] eqn:Heqy; auto.
+    simpl. rewrite (he_epi H); auto.
+Qed.
