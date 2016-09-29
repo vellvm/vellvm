@@ -150,25 +150,22 @@ Record HEmbed `(M:Mach X, N:Mach Y) :=
   }.
 
 
-Definition usim {X Y} (U:X -> Y) (f g : X -> option X) : Prop :=
-  forall x x', U x = U x' -> option_map U (f x) = option_map U (g x').
-
-Infix "`o`" := Basics.compose (at level 70).
+Definition PEq_respects X Y 
+           (PEq : Mach X -> X -> X -> Prop)
+           (U:X -> Y) : Prop :=
+  forall (M M':Mach X)
+    (Hsim : forall x x' (Hwfx:st_wf X x) (Hwfx':st_wf X x'),
+        U x = U x' -> 
+        option_map U (m_step M x) = option_map U (m_step M' x')),
+  forall x x' (Hwfx:st_wf X x) (Hwfx':st_wf X x'),
+    PEq M x x' <-> PEq M' x x'.
 
 
 Section GEN_PROG_EQ.
 
 Context `(M:Mach X, N:Mach Y, H:HEmbed M N).
 
-Variable PEq : (Mach X) -> X -> X -> Prop.
-
-Hypothesis HPeq_usim : forall (M M':Mach X) 
-    (Hsim : forall (x x':X) (Hwfx:st_wf X x) (Hwfx':st_wf X x'),
-            (he_U H) x = (he_U H) x' ->
-            option_map (he_U H) (m_step M x) = 
-            option_map (he_U H) (m_step M' x')),
-    forall (x x':X) (Hwfx:st_wf X x) (Hwfx':st_wf X x'),
-      PEq M x x' <-> PEq M' x x'.
+Variable PEq : Mach X -> X -> X -> Prop.
 
 Let M' : Mach X.
   refine
@@ -180,25 +177,25 @@ Proof.
      [ simpl; apply (he_L_wf H) | ]; auto).
 Defined.
 
-Theorem gen_prog_eq : forall x x' 
-    (Hwfx:st_wf X x) (Hwfx':st_wf X x'),
-    (PEq M x x' <-> PEq M' x x').
+Theorem gen_prog_eq : forall x x' (Hwfx:st_wf X x) (Hwfx':st_wf X x')
+    (HPeq_usim:PEq_respects PEq (he_U H)),
+    PEq M x x' <-> PEq M' x x'.
 Proof.
   split.
   - eapply HPeq_usim; auto. clear x x' Hwfx Hwfx'.
-    intros. subst M'. simpl.
-    rewrite (he_spec H); auto.
-    rewrite H0.
+    intros. subst M'. simpl. 
+    rewrite (he_spec H); auto. rewrite H0.
     apply (he_U_wf H) in Hwfx'.
     apply (m_pres N) in Hwfx'.
     destruct (m_step N (he_U H x')) as [y'|] eqn:Heqy; auto.
     simpl. rewrite (he_epi H); auto.
   - eapply HPeq_usim; auto. clear x x' Hwfx Hwfx'.
     intros. subst M'. simpl.
-    rewrite (he_spec H); auto.
-    rewrite H0.
+    rewrite (he_spec H); auto. rewrite H0.
     apply (he_U_wf H) in Hwfx'.
     apply (m_pres N) in Hwfx'.
     destruct (m_step N (he_U H x')) as [y'|] eqn:Heqy; auto.
     simpl. rewrite (he_epi H); auto.
 Qed.
+
+End GEN_PROG_EQ.
