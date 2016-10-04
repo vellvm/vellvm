@@ -154,27 +154,84 @@ Context `(SOS:Mach SOS_st,
           CFG:Mach CFG_st, 
           H:HEmbed CFG SOS (prod_curry CFG1.unload_full)).
 
+Definition return_st (s:CFG_st) (n:nat) : Prop :=
+  match s with 
+  | (P, (p,e,[])) =>
+    match CFG1.compile P p with
+    | Some (CFG0.RET o) => CFG0.eval_oval e o = PEAK.DNat n
+    | Some (CFG0.ORET a o o') => 
+      match CFG0.eval_oval e o, CFG0.eval_oval e o' with
+      | PEAK.DNat m, PEAK.DNat m' => eval_op a m m' = n
+      | _, _ => False
+      end
+    | _ => False
+    end
+  | _ => False
+  end.
+
+Definition return_tm (m:tm) (n:nat) : Prop :=
+  match m with
+  | Prd (Nat n) => True
+  | Aop a (Nat u) (Nat v) => eval_op a u v = n
+  | _ => False
+  end.
+
 Example peq0 (M:Mach CFG_st) (P Q:tm) : Prop :=
   forall n,
-    (exists i p e o,
-    option_iter (m_step M) (P, ([],[],[])) i = Some (P, (p,e,[])) /\
-    CFG1.compile P p = Some (CFG0.RET o) /\
-    CFG0.eval_oval e o = PEAK.DNat n)
+    (exists i s,
+        option_iter (m_step M) (P, ([],[],[])) i = Some s /\
+        return_st s n)
     <->
-    (exists i p e o,
-    option_iter (m_step M) (P, ([],[],[])) i = Some (Q, (p,e,[])) /\
-    CFG1.compile Q p = Some (CFG0.RET o) /\
-    CFG0.eval_oval e o = PEAK.DNat n).
+    (exists i s,
+        option_iter (m_step M) (Q, ([],[],[])) i = Some s /\
+        return_st s n).
 
-
-Lemma peq0__abs : forall m n,
-  peq0 CFG m n <-> peq0 (hembed_mach H) m n.
+Lemma return_state_unload : forall s m n,
+  prod_curry CFG1.unload_full s = Some m ->
+  return_tm m n ->
+  return_st s n.
 Proof.
-  intros m n.
-  apply p_quot_hembed with (P := fun M => peq0 M m n).
-  intros M M' Hsim. split.
-  - intros Heq.
-    unfold peq0. split.
+Admitted.
+
+Lemma mach_sim_iter_ex_iff : forall X (M N:Mach X) R,
+  mach_sim R M N ->
+  forall i x y, R x y ->
+     ((exists x', option_iter (m_step M) x i = Some x')
+     <->
+     (exists y', option_iter (m_step N) y i = Some y')).
+Proof.
+Admitted.    
+
+Lemma mach_sim_iter_R : forall X (M N:Mach X) R,
+  mach_sim R M N ->
+  forall i x y x' y', R x y ->
+    option_iter (m_step M) x i = Some x' ->
+    option_iter (m_step N) y i = Some y' ->
+    R x' y'.
+Proof.
+Admitted.    
+
+Lemma peq0__abs : forall m m',
+  peq0 CFG m m' <-> peq0 (hembed_mach H) m m'.
+Proof.
+  intros m m'.
+  apply p_quot_hembed with (P := fun M => peq0 M m m').
+  intros M M' Hsim.
+  split.
+  - unfold peq0. intros Heq n. split.
+    + intros [i [s [Hstep Hret]]].
+      pose proof (mach_sim_iter_ex_iff Hsim i (m, ([],[],[])) (m, ([],[],[]))) as Hstep'.
+      simpl in Hstep'. 
+      pattern s in Hstep.
+      specialize (Hstep' eq_refl).
+      pose proof (ex_intro _ s Hstep). apply Hstep' in H0 as [s' ?].
+      eapply Heq.
+      exists i, s'. split.
+      specialize (Heq n).
+      eapply Heq.
+
+      
+      eapply Hstep' in Hstep.
 Abort.
 
 End EXAMPLES.
