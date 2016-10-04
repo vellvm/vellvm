@@ -1,15 +1,12 @@
 Generalizable All Variables.
 Set Implicit Arguments.
 
+Add LoadPath "../../papers/ssa-semantics/coq".
+Require Import Util Mach.
+
 Require Import Arith List.
 
 Import ListNotations.
-
-Record Equiv {A} (R:A -> A -> Prop) :=
-  { equiv_refl : forall a, R a a
-  ; equiv_sym : forall a b, R a b -> R b a
-  ; equiv_trans : forall a b c, R a b -> R b c -> R a c
-  }.
 
 Record State :=
   { st_ty :> Type
@@ -19,22 +16,19 @@ Record State :=
 
 Record Mach (X:State) :=
   { m_step : X -> option X
-  ; m_pres : forall x, st_wf X x -> 
-      match m_step x with 
-      | None => True 
-      | Some x' => st_wf X x' 
-      end
+  ; m_pres : forall x x', st_wf X x -> m_step x = Some x' -> st_wf X x'
   }.
 
 (* Homomorphic embedding *)
-Record HEmbed `(M:Mach X, N:Mach Y) :=
-  { he_U : X -> Y
-  ; he_U_wf : forall x, st_wf X x -> st_wf Y (he_U x)
-  ; he_L : Y -> X
-  ; he_L_wf : forall y, st_wf Y y -> st_wf X (he_L y)
-  ; he_epi : forall y, st_wf Y y -> he_U (he_L y) = y
+Record HEmbed `(M:Mach X, N:Mach Y, U:X -> option Y) :=
+  { he_U_wf : forall x y, st_wf X x -> U x = Some y -> st_wf Y y
+  ; he_U_tot : forall x, st_wf X x -> exists y, U x = Some y
+  ; he_L : Y -> option X
+  ; he_L_wf : forall x y, st_wf Y y -> he_L y = Some x -> st_wf X x
+  ; he_L_tot : forall y, st_wf Y y -> exists x, he_L y = Some x
+  ; he_epi : forall y, st_wf Y y -> option_bind (he_L y) U = Some y
   ; he_spec : forall x, st_wf X x ->
-    option_map he_U (m_step M x) = m_step N (he_U x)
+    option_bind (m_step M x) U = option_bind (U x) (m_step N)
   }.
 
 (* Simulation between machines (partial fns on states) *)
@@ -54,37 +48,57 @@ Definition mach_sim {X:State} (R:X -> X -> Prop) (M M':Mach X) : Prop :=
    unloading is a simulation between M and hembed_mach H. *)
 Section HEMBED_SIM.
 
-Context `(M:Mach X, N:Mach Y, H:HEmbed M N).
+Context `(M:Mach X, N:Mach Y, H:HEmbed M N U).
 
 Definition hembed_mach : Mach X.
   refine
-    {| m_step x := option_map (he_L H) (m_step N (he_U H x)) |}.
+    {| m_step x := option_bind (option_bind (U x) (m_step N)) (he_L H) |}.
 Proof.
-  abstract 
-    (intros; apply (he_U_wf H), (m_pres N) in H0;
-     destruct (m_step N (he_U H x)) eqn:Heqx;
-     [ simpl; apply (he_L_wf H) | ]; auto).
+  abstract
+    (intros x x' Hwfx;
+     destruct (U x) as [y|] eqn:Heqy; simpl; [|inversion 1];
+     destruct (m_step N y) as [y'|] eqn:Heqy'; simpl; [|inversion 1];
+     intros Heqx';
+     apply he_L_wf in Heqx'; auto;
+     apply (m_pres N) in Heqy'; auto;
+     apply (he_U_wf H) in Heqy; auto).
 Defined.
 
 Lemma hembed_sim :
-  mach_sim (fun x x' => he_U H x = he_U H x') M hembed_mach.
+  mach_sim (fun x x' => U x = U x') M hembed_mach.
 Proof.
-  unfold hembed_mach, mach_sim. simpl.
-  intros ? ? Hx Hx' Hxx'.
-  destruct (m_step M x) eqn:Hstep, (m_step N (he_U H x')) eqn:Hstep';
-    simpl; auto.
-  - rewrite <- Hxx' in Hstep'.
+  unfold mach_sim. 
+  intros ? ? Hwfx Hwfx' Heqxx'.
+  destruct (m_step M x) eqn:Hstep, (m_step hembed_mach x') eqn:Hstep';
+    unfold hembed_mach in *; simpl in *.
+  - rewrite <- Heqxx' in Hstep'.
     rewrite <- (he_spec H) in Hstep'; auto.
-    rewrite Hstep in Hstep'. inversion Hstep'; subst s0.
-    rewrite (he_epi H); auto. 
-    eapply (he_U_wf H). 
-    apply (m_pres M) in Hx. rewrite Hstep in Hx. assumption.
-  - rewrite <- Hxx' in Hstep'.
+    rewrite Hstep in Hstep'. simpl in Hstep'.
+    destruct (U s) as [s'|] eqn:Heqs'; [|inversion Hstep'].
+    simpl in Hstep'. 
+    eapply f_equal with (f := fun x => option_bind x U) in Hstep'.
+    rewrite (he_epi H) in Hstep'. apply Hstep'.
+    apply (he_U_wf H) in Heqs'; auto.
+    eapply (m_pres M) with (x:=x); eauto.
+  - rewrite <- Heqxx' in Hstep'.
     rewrite <- (he_spec H) in Hstep'; auto.
-    rewrite Hstep in Hstep'. simpl in *. congruence.
-  - rewrite <- Hxx' in Hstep'.
+    rewrite Hstep in Hstep'. simpl in Hstep'.
+    destruct (U s) as [s'|] eqn:Heqs'; [|inversion Hstep'].
+    + simpl in Hstep'. 
+      eapply f_equal with (f := fun x => option_bind x U) in Hstep'.
+      simpl in *.
+      rewrite (he_epi H) in Hstep'. congruence. 
+      apply (he_U_wf H) in Heqs'; auto.
+      eapply (m_pres M) with (x:=x); eauto.
+    + apply m_pres, (he_U_tot H) in Hstep as [? ?]; auto. congruence.
+  - rewrite <- Heqxx' in Hstep'.
     rewrite <- (he_spec H) in Hstep'; auto.
-    rewrite Hstep in Hstep'. simpl in *. congruence.
+    rewrite Hstep in Hstep'. simpl in Hstep'.
+    destruct (U s) as [s'|] eqn:Heqs'; [|inversion Hstep'].
+    + simpl in Hstep'. 
+      eapply f_equal with (f := fun x => option_bind x U) in Hstep'.
+      simpl in *. congruence.
+  - auto.
 Qed.
 
 End HEMBED_SIM.
@@ -106,10 +120,10 @@ End HEMBED_SIM.
    have to worry about proving things about unloading. *)
 Section P_QUOT_HEMBED.
 
-Context `(P:Mach X -> Prop, M:Mach X, N:Mach Y, H:HEmbed M N).
+Context `(P:Mach X -> Prop, M:Mach X, N:Mach Y, H:HEmbed M N U).
 
 Hypothesis Pinv : forall (M M':Mach X),
-  mach_sim (fun x x' => he_U H x = he_U H x') M M' ->
+  mach_sim (fun x x' => U x = U x') M M' ->
   (P M <-> P M').
 
 Lemma p_quot_hembed : P M <-> P (hembed_mach H).
@@ -120,127 +134,47 @@ Qed.
 End P_QUOT_HEMBED.
 
 
-(* TODO: Actual CEK machine is a bit too tricky ... 
-   easier example from mini branch? *)
+
 Section EXAMPLES.
 
-Inductive tm :=
-| Var : nat -> tm
-| Lam : tm -> tm
-| App : tm -> tm -> tm.
+Definition admit {A} : A. Admitted.
 
-Scheme Equality for tm.
-
-Fixpoint csubst (x:nat) (m v:tm) : tm :=
-  match m with
-  | Var y => if eq_nat_dec x y then v else (Var y)
-  | Lam m => Lam (csubst (S x) m v)
-  | App m n => App (csubst x m v) (csubst x n v)
-  end.
-
-Fixpoint sos_step (m:tm) : option tm :=
-  match m with
-  | Var x => None
-  | Lam x => None
-  | App (Lam m) (Lam n) => Some (csubst 0 m (Lam n))
-  | App m (Lam n) => option_map (fun m' => App m' (Lam n)) (sos_step m)
-  | App m n => option_map (fun n' => App m n') (sos_step n) 
-  end.
-
-Fixpoint closed (x:nat) (m:tm) : bool :=
-  match m with
-  | Var y => leb (S y) x
-  | Lam m => closed (S x) m
-  | App m n => andb (closed x m) (closed x n)
-  end.
-
-Definition TM : State :=
+Definition SOS_st :=
   {| st_ty := tm
-   ; st_dec := tm_eq_dec
-   ; st_wf m := closed 0 m = true
-  |}.
+   ; st_dec := admit
+   ; st_wf m := tm_bwf Cmp m = true |}.
 
-Require Omega.
+Definition CFG_st :=
+  {| st_ty := tm * CFG1.st
+   ; st_dec := admit
+   ; st_wf := prod_curry CFG1.wf_st
+   |}.
 
-Lemma closed_weaken : forall m x,
-  closed x m = true ->
-  closed (S x) m = true.
+Context `(SOS:Mach SOS_st, 
+          CFG:Mach CFG_st, 
+          H:HEmbed CFG SOS (prod_curry CFG1.unload_full)).
+
+Example peq0 (M:Mach CFG_st) (P Q:tm) : Prop :=
+  forall n,
+    (exists i p e o,
+    option_iter (m_step M) (P, ([],[],[])) i = Some (P, (p,e,[])) /\
+    CFG1.compile P p = Some (CFG0.RET o) /\
+    CFG0.eval_oval e o = PEAK.DNat n)
+    <->
+    (exists i p e o,
+    option_iter (m_step M) (P, ([],[],[])) i = Some (Q, (p,e,[])) /\
+    CFG1.compile Q p = Some (CFG0.RET o) /\
+    CFG0.eval_oval e o = PEAK.DNat n).
+
+
+Lemma peq0__abs : forall m n,
+  peq0 CFG m n <-> peq0 (hembed_mach H) m n.
 Proof.
-  induction m.
-  - unfold closed. intros. apply leb_iff. apply leb_iff in H. omega.
-  - intros. apply IHm. simpl in H. assumption.
-  - intros. simpl. rewrite IHm1, IHm2; auto; simpl in *.
-    + destruct (closed x m2); auto.  destruct (closed x m1); inversion H. 
-    + destruct (closed x m1); auto.
-Qed.
-
-Lemma substitution : forall m n x,
-  closed x (Lam m) = true ->
-  closed x n = true ->
-  closed x (csubst x m n) = true.
-Proof.
-  induction m.
-  - intros.
-    unfold csubst. destruct (eq_nat_dec x n) as [Heqn|Heqn].
-    subst. assumption.
-    unfold closed. unfold closed in H. 
-    apply leb_iff. apply leb_iff in H. omega.
-  - simpl. intros. apply IHm; auto.
-    apply closed_weaken. assumption.
-  - simpl. intros. rewrite IHm1, IHm2; auto.
-    + simpl. destruct (closed (S x) m2); auto. 
-      destruct (closed (S x) m1); inversion H.
-    + simpl. destruct (closed (S x) m1); auto. 
-Qed.    
-
-Definition SOS : Mach TM.
-Proof.
-  refine (Build_Mach TM sos_step _).
-  induction x; simpl; auto.
-  intros Hwf.
-  destruct x1.
-  - inversion Hwf.
-  - destruct x2.
-    + simpl in Hwf. destruct (closed 1 x1); inversion Hwf.
-    + apply Bool.andb_true_iff in Hwf.
-      apply substitution; tauto.
-    + destruct (sos_step (App _ _)) eqn:Heq' in *.
-      apply Bool.andb_true_iff in Hwf.
-      simpl. apply Bool.andb_true_iff. split.
-      simpl in Hwf; tauto.
-      apply IHx2; tauto.
-      simpl; auto.
-  - destruct x2.
-    + simpl; auto.
-    + destruct (sos_step (App _ _)) eqn:Heq' in *.
-      apply Bool.andb_true_iff in Hwf.
-      simpl. apply Bool.andb_true_iff. tauto.
-      simpl. auto.
-    + destruct (sos_step (App x2_1 _)) eqn:Heq' in *.
-      apply Bool.andb_true_iff in Hwf.
-      simpl. apply Bool.andb_true_iff. tauto.
-      simpl. auto.
-Defined.
-
-
-Inductive clo := Clo : tm -> list clo -> clo.
-
-Inductive frame :=
-| farg : clo -> frame
-| ffun : clo -> frame.
-
-Definition cek := (clo * list frame)%type.
-
-Fixpoint cek_step (m:tm) (e:list clo) (k:list frame) : option cek :=
-  match m, k with
-  | Var x, _ => option_map (fun c => (c, k)) (nth_error e x)
-  | Lam f, farg (Clo m' e')::k' => 
-    Some (Clo m' e', ffun (Clo (Lam f) e)::k')
-  | Lam m', ffun (Clo (Lam f) e')::k' =>
-    Some (Clo f (Clo (Lam m') e::e'), k')
-  | App m' v, _ =>
-    Some (Clo m' e, (farg (Clo v e))::k)
-  | _, _ => None
-  end.
+  intros m n.
+  apply p_quot_hembed with (P := fun M => peq0 M m n).
+  intros M M' Hsim. split.
+  - intros Heq.
+    unfold peq0. split.
+Abort.
 
 End EXAMPLES.
