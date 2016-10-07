@@ -4,7 +4,7 @@ Set Implicit Arguments.
 Add LoadPath "../../papers/ssa-semantics/coq".
 Require Import Util Mach.
 
-Require Import Arith List.
+Require Import Arith List Relations RelationClasses.
 
 Import ListNotations.
 
@@ -60,7 +60,72 @@ Definition mach_sim {X:State} (R:X -> X -> Prop) (M M':Mach X) : Prop :=
   R x x' -> mach_sim_step M M' R x x'.
 
 
+(* We can't prove much about mach_sim alone, but restricted to step
+   functions that "respect R", we get that mach_sim is an equivalence
+   when R is.
 
+   TODO: the proof of transitivity uses symmetry -- is there a way to
+   avoid this in order to prove the lemma in terms of preorders? *)
+Section MACH_SIM_PROPS.
+
+Record MachR (X:State) (R:X -> X -> Prop) :=
+  { mr_mach :> Mach X
+  ; mr_sim : mach_sim R mr_mach mr_mach 
+  }.
+
+Definition mach_r_sim {X:State} (R:X -> X -> Prop) (M M':MachR X R) : Prop :=
+  mach_sim R M M'.
+Arguments mach_r_sim [_] _ _ _.
+
+Variables (X:State) (R:X -> X -> Prop).
+  
+Context (REq : Equivalence R).
+
+Instance MsimRefl : Reflexive (mach_r_sim R).
+Proof.
+  red. intros M. apply mr_sim.
+Qed.
+
+Instance MSimTrans : Transitive (mach_r_sim R).
+Proof.
+  red. intros L M N Hsim0 Hsim1.
+  red. intros x x' Hwfx Hwfx' Hrxx'.
+  pose proof (Hsim0 _ _ Hwfx Hwfx' Hrxx') as Hstep0.
+  pose proof (Hsim1 _ _ Hwfx Hwfx' Hrxx') as Hstep1.
+  assert (mach_sim R M M) as Hstep'. apply mr_sim.
+  symmetry in Hrxx'.
+  specialize (Hstep' _ _ Hwfx' Hwfx Hrxx').
+  inversion Hstep'; subst.
+  - inversion Hstep0; subst; try solve [congruence].
+    inversion Hstep1; subst; try solve [congruence].
+    eapply mach_sim_step_none; auto.
+  - inversion Hstep0; subst; try solve [congruence].
+    inversion Hstep1; subst; try solve [congruence].
+    assert (y'0 = y) by congruence. clear H3. subst.
+    assert (y1 = y') by congruence. clear H5. subst.
+    eapply mach_sim_step_one; eauto.
+    eapply transitivity. eauto.
+    eapply transitivity; eauto. 
+Qed.    
+  
+Instance MSimSym : Symmetric (mach_r_sim R).
+Proof.
+  red. intros M M' Hsim x x' Hwfx Hwfx' Hrxx'.
+  symmetry in Hrxx'.
+  specialize (Hsim _ _ Hwfx' Hwfx Hrxx').
+  inversion Hsim; subst.
+  apply mach_sim_step_none; auto.
+  eapply mach_sim_step_one; eauto.
+  apply symmetry. assumption.
+Qed.
+
+End MACH_SIM_PROPS.
+
+(* The main point is that when the "machine equivalence" diagram H
+   between a machine M and a "more abstract" machine N, we have an
+   induced machine "hembed_mach H" defined in terms of the transitions
+   N, loading and unloading, where the equivalence induced by
+   unloading is a simulation between M and hembed_mach H. *)
 
 (* Homomorphic embedding of machines (partial functions) *)
 Record HEmbed `(M:Mach X, N:Mach Y, U:X -> option Y) :=
@@ -78,14 +143,42 @@ Record HEmbed `(M:Mach X, N:Mach Y, U:X -> option Y) :=
     option_bind (m_step M x) U = option_bind (U x) (m_step N)
   }.
 
-(* The main point is that when the "machine equivalence" diagram H
-   between a machine M and a "more abstract" machine N, we have an
-   induced machine "hembed_mach H" defined in terms of the transitions
-   N, loading and unloading, where the equivalence induced by
-   unloading is a simulation between M and hembed_mach H. *)
 Section HEMBED_SIM.
 
 Context `(M:Mach X, N:Mach Y, H:HEmbed M N U).
+
+Definition unload_eq (x x':X) : Prop := U x = U x'.
+
+Instance UnloadEq : Equivalence unload_eq.
+Proof.
+  constructor.
+  - intro. reflexivity.
+  - intros x x' Heqx; red; auto.
+  - red. intros. red. congruence.
+Qed.
+
+Lemma M_resp_unload_eq : 
+  mach_sim unload_eq M M.
+Proof.
+  red. intros x x' Hwfx Hwfx' Hrxx'.
+  pose proof (he_spec H x Hwfx) as Hx.
+  pose proof (he_spec H x' Hwfx') as Hx'.
+  destruct (he_U_tot H x Hwfx) as [y Heqy].
+  rewrite Heqy in Hx. rewrite <- Hrxx', Heqy in Hx'.
+  simpl in *.
+  destruct (m_step N y) as [y'|] eqn:Hstepy.
+  - destruct (m_step M x) as [x0|] eqn:Hstepx; [|inversion Hx].
+    destruct (m_step M x') as [x0'|] eqn:Hstepx'; [|inversion Hx'].
+    eapply mach_sim_step_one; eauto. 
+    simpl in *. congruence.
+  - destruct (m_step M x) as [x0|] eqn:Hstepx.
+    apply m_pres, (he_U_tot H) in Hstepx as [? ?]; auto. 
+    simpl in Hx. congruence. 
+    destruct (m_step M x') as [x0'|] eqn:Hstepx'.
+    apply m_pres, (he_U_tot H) in Hstepx' as [? ?]; auto. 
+    simpl in Hx'. congruence.
+    eapply mach_sim_step_none; auto.
+Qed.    
 
 Definition hembed_mach : Mach X.
   refine
@@ -101,8 +194,28 @@ Proof.
      apply (he_U_wf H) in Heqy; auto).
 Defined.
 
+Lemma hembed_mach_resp_unload_eq : 
+  mach_sim unload_eq hembed_mach hembed_mach.
+Proof.
+  red. intros x x' Hwfx Hwfx' Hrxx'.
+  pose proof (he_spec H x Hwfx) as Hx.
+  pose proof (he_spec H x' Hwfx') as Hx'.
+  destruct (he_U_tot H _ Hwfx) as [y Heqy].
+  pose proof (he_U_wf H _ Hwfx Heqy) as Hwfy.
+  destruct (m_step N y) as [y'|] eqn:Hstepy.
+  - pose proof (m_pres N _ Hwfy Hstepy) as Hwfy'.
+    pose proof (he_L_tot H _ Hwfy') as [x'' Heqx''].
+    eapply mach_sim_step_one. 
+    simpl. rewrite Heqy; simpl; rewrite Hstepy. simpl. eauto.
+    simpl. rewrite <- Hrxx'. rewrite Heqy; simpl. 
+      rewrite Hstepy; simpl. eauto. reflexivity.
+  - apply mach_sim_step_none.
+    simpl. rewrite Heqy. simpl. rewrite Hstepy. auto.
+    simpl. rewrite <- Hrxx'. rewrite Heqy. simpl. rewrite Hstepy. auto.
+Qed.
+
 Lemma hembed_sim :
-  mach_sim (fun x x' => U x = U x') M hembed_mach.
+  mach_sim unload_eq M hembed_mach.
 Proof.
   unfold mach_sim. 
   intros ? ? Hwfx Hwfx' Heqxx'.
@@ -115,7 +228,8 @@ Proof.
     rewrite Hstep in Hstep'. simpl in Hstep'.
     destruct (U x0) as [y0 |] eqn:Heqs'; [|inversion Hstep'].
     apply f_equal with (f:= fun x => option_bind x U) in Hstep'.
-    simpl in Hstep'. rewrite (he_epi H) in Hstep'. auto.
+    simpl in Hstep'. rewrite (he_epi H) in Hstep'.
+    congruence.
     apply (he_U_wf H) in Heqs'; auto.
     eapply (m_pres M) with (x:=x); eauto.
   - exfalso.
@@ -139,6 +253,8 @@ Qed.
 
 End HEMBED_SIM.
 
+Arguments unload_eq {_ _} _ _ _.
+Arguments mach_r_sim {_} _ _ _.
 
 (* To use the above fact, for example to replace reasoning about
    equivalence of abstract machine programs with SOS, we would first
@@ -159,16 +275,26 @@ Section P_QUOT_HEMBED.
 Context `(P:Mach X -> Prop, M:Mach X, N:Mach Y, H:HEmbed M N U).
 
 Hypothesis Pinv : forall (M M':Mach X),
-  mach_sim (fun x x' => U x = U x') M M' ->
-  (P M <-> P M').
+  mach_sim (unload_eq U) M M' ->
+  (P M -> P M').
+
+Let M' : MachR X (unload_eq U) :=
+  {| mr_mach := M; mr_sim := M_resp_unload_eq H |}.
+  
+Let hembed_mach' : MachR X (unload_eq U) :=
+  {| mr_mach := hembed_mach H; mr_sim := hembed_mach_resp_unload_eq H |}.
 
 Lemma p_quot_hembed : P M <-> P (hembed_mach H).
 Proof.
-  apply Pinv. apply hembed_sim.
+  split.
+  - apply Pinv. apply hembed_sim.
+  - apply Pinv. 
+    cut (mach_r_sim (unload_eq U) hembed_mach' M'); auto.
+    apply MSimSym. exact UnloadEq.
+    red. simpl. apply hembed_sim.
 Qed.
 
 End P_QUOT_HEMBED.
-
 
 
 Section EXAMPLES.
@@ -252,7 +378,32 @@ Lemma peq0__abs : forall m m',
 Proof.
   intros m m'.
   apply p_quot_hembed with (P := fun M => peq0 M m m').
-  intros M M' Hsim.
+  intros M M' Hsim. unfold peq0. intros Heq n.
+  split.
+  - intros [i [s [Hstep Hret]]].
+    pose proof (mach_sim_iter_ex_iff Hsim) i 
+         (m, ([],[],[]))
+         (m, ([],[],[])) eq_refl as Hex. 
+    pattern s in Hstep.
+    apply (ex_intro _ s) in Hstep.
+    apply Hex in Hstep as [s' Hstep'].
+    cut (return_st s' n).
+    intros Hs'.
+    pose proof (conj Hstep' Hs') as HH.
+    pattern s' in HH.
+    pose proof (ex_intro _ s' HH) as HH'.
+    pattern i in HH'.
+    pose proof (ex_intro _ i HH') as HH''.
+    specialize (Heq n). destruct Heq as [Heq' _].
+    apply Heq' in HH''.
+    clear HH' HH Hs' Hstep'.
+
+    destruct Hex as [Hex _]. 
+    
+    specialize (Hex (exist _ s Hstep)).
+         (Equivalence_Reflexive UnloadEq).
+    apply H0 in Hstep.
+
   split.
   - unfold peq0. intros Heq n. split.
     + intros [i [s [Hstep Hret]]].
