@@ -1,0 +1,164 @@
+* Tasks
+
+** Vellvm IR
+*** Features
+**** Instructions / instruction classes
+  - external calls: malloc, etc.
+  - bitcasts
+  - floating point 
+
+**** Memory
+ - memory state: alloca, load, store
+ - structured types
+
+**** 
+ - type annotations 
+ - 'metadata' propagation 
+
+
+** Vellvm <-> LLVM connection
+*** Vellvm IR vs. LLVM AST
+ - branch targets <-> phi translation
+
+*** explicit vs. implicit fallthrough
+
+
+
+* LLVM Representation
+
+** CFG represenation
+  - as finite map path (option ins)
+  - not as "path -> option ins"
+
+** Phi instruction:
+  - branch target includes the phi nodes
+  - i.e. combine the PMOV and CBR instructions
+
+
+* SSA Semantics
+  - We currently expose _all_ "stuck" states of the CFG operational
+    semantics as "Error" but we could allow the error to include
+    the stuck state:
+
+#+BEGIN_SRC coq
+    Coinductive D (X:state) :=
+     | Ret of X                      
+     | Error of X                    
+     | Call of <....> * (ret -> D X) 
+#+END_SRC
+
+    This allows us to write predicates over the "final     
+
+
+* LLVM Facts
+** Call instruction
+  - 'musttail' return values can be bitcast
+  - tail calls can be followed by bitcast and ret (but nothing else?)
+
+
+* Typical LLVM program:
+
+@g1 = global ...
+@g2 = global ...
+...
+@gN = global ...
+
+define ret1 f_1(arg_11, ..., arg_1n1) {
+  blk_10
+  
+lbl_11:
+  blk_11
+
+lbl_12:
+  blk_12
+
+lbl_13:
+  blk_13
+
+...
+
+lbl1k:
+  blk_1k1
+}
+
+define ret2 f_2(arg_21, ..., arg_2n2) {
+  blk_20
+  
+lbl_21:
+  blk_21
+
+lbl_22:
+  blk_22
+
+lbl_23:
+  blk_23
+
+...
+
+lbl_2k2:
+  blk_2k2
+}
+
+...
+
+define retM f_M(arg_M1, ..., arg_MnM) {
+  blk_M0
+  
+lbl_M1:
+  blk_M1
+
+lbl_M2:
+  blk_M2
+
+lbl_M3:
+  blk_M3
+
+...
+
+lbl_Mk2:
+  blk_MkM
+}
+
+
+=================================================================
+COQ Representation:
+
+(* Mutually recursive globals? *)
+
+prd (rec G. {g1 = ..., .. , gN = ...}) to globals in
+prd (rec FUNS. 
+   <
+     prd rec FX. <
+       /* blk_10 */
+     ,
+     ...
+     ,
+       /* blk_1k1 */
+     > to FBODY in
+
+      /* f_1 entry */
+      pop arg_11;
+      ...
+      pop arg_1n1;
+      blk_10
+   , 
+   ...
+   ,
+     prd rec FX. <
+       /* blk_M0 */
+     ,
+     ...
+     ,
+       /* blk_MkM */
+     > to FBODY in
+
+      /* f_M entry */
+      pop arg_M1;
+      ...
+      pop arg_MnM;
+      blk_M0
+   >
+) 
+
+
+ 

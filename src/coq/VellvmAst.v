@@ -190,7 +190,7 @@ Inductive instr : Set :=
 | INSTR_FCmp (cmp:fcmp) (t:typ) (v1:value) (v2:value)
 | INSTR_Conversion (conv:conversion_type) (t_from:typ) (v:value) (t_to:typ)
 | INSTR_GetElementPtr (ptrval:tvalue) (idxs:list tvalue)
-| INSTR_ExtractElement (vec:tvalue) (idx:value)
+| INSTR_ExtractElement (vec:tvalue) (idx:tvalue)
 | INSTR_InsertElement (vec:tvalue) (elt:tvalue) (idx:tvalue)
 | INSTR_ShuffleVector (vec1:tvalue) (vec2:tvalue) (idxmask:tvalue)
 | INSTR_ExtractValue (vec:tvalue) (idxs:list int)
