@@ -181,7 +181,7 @@ Inductive value : Set :=
 | VALUE_Zero_initializer
 .
 
-Definition tvalue := (typ * value)%type.
+Definition tvalue : Set := typ * value.
 
 Inductive instr : Set :=
 | INSTR_IBinop (iop:ibinop) (t:typ) (v1:value) (v2:value)
@@ -211,84 +211,71 @@ Inductive instr : Set :=
 | INSTR_Invoke (fnptrval:tident) (args:list tvalue) (to_label:tident) (unwind_label:tident)
 | INSTR_Ret (v:tvalue)
 | INSTR_Ret_void
-| INSTR_Br (v:tvalue) (br1:tident) (br2:tident) (* types are constant *)
-| INSTR_Br_1 of tident
-| INSTR_Switch of tvalue * tident * (tvalue * tident) list
-| INSTR_IndirectBr of tvalue * tident list (* address
+(* Types in branches are TYPE_Label constant *)
+| INSTR_Br (v:tvalue) (br1:tident) (br2:tident) 
+| INSTR_Br_1 (br:tident)
+| INSTR_Switch (v:tvalue) (default_dest:tident) (brs: list (tvalue * tident))
+| INSTR_IndirectBr (v:tvalue) (brs:list tident) (* address
                                             * possible addresses (labels) *)
-| INSTR_Resume of tvalue
+| INSTR_Resume (v:tvalue)
 | INSTR_Unreachable
 
 (* Special `assign` instruction:
  * not a real LLVM instruction, allow to bind an identifier to an instruction *)
-| INSTR_Assign of ident * instr
+| INSTR_Assign (id:ident) (ins:instr)
+.
 
-and toplevelentry =
-  | TLE_Target of string
-  | TLE_Datalayout of string
-  | TLE_Declaration of declaration
-  | TLE_Definition of definition
-  | TLE_Type_decl of (ident * typ)
-  | TLE_Global of global
-  | TLE_Metadata of string * metadata
-  | TLE_Attribute_group of int * fn_attr list
+Inductive thread_local_storage : Set :=
+| TLS_Localdynamic
+| TLS_Initialexec
+| TLS_Localexec
+.
 
-and toplevelentries = toplevelentry list
+Record global : Set :=
+  mk_global {
+      g_ident: ident;
+      g_typ: typ;
+      g_constant: bool;
+      g_value: option value;
 
-and global = {
-  g_ident: ident;
-  g_typ: typ;
-  g_constant: bool;
-  g_value: value option;
+      g_linkage: option linkage;
+      g_visibility: option visibility;
+      g_dll_storage: option dll_storage;
+      g_thread_local: option thread_local_storage;
+      g_unnamed_addr: bool;
+      g_addrspace: option int;
+      g_externally_initialized: bool;
+      g_section: option string;
+      g_align: option int;
+}.
 
-  g_linkage: linkage option;
-  g_visibility: visibility option;
-  g_dll_storage: dll_storage option;
-  g_thread_local: thread_local_storage option;
-  g_unnamed_addr: bool;
-  g_addrspace: int option;
-  g_externally_initialized: bool;
-  g_section: string option;
-  g_align: int option;
-}
+Record declaration : Set :=
+  mk_declaration
+  {
+    dc_name: ident;
+    dc_type: typ; (* TYPE_Function (ret_t * args_t) *)
+    (* ret_attrs * args_attrs *)
+    dc_param_attrs: list param_attr * list (list param_attr);
+  }.
 
-and thread_local_storage = TLS_Localdynamic
-                         | TLS_Initialexec
-                         | TLS_Localexec
+Definition block : Set := string * list instr.
 
-and declaration = {
-  dc_name: ident;
-  dc_type: typ; (* TYPE_Function (ret_t * args_t) *)
-
-  (* ret_attrs * args_attrs *)
-  dc_param_attrs: param_attr list * param_attr list list;
-}
-
-and definition = {
+Record definition :=
+  mk_definition
+  {
   df_prototype: declaration;
-  df_args: ident list;
-  df_instrs: block list;
+  df_args: list ident;
+  df_instrs: list block;
 
-  df_linkage: linkage option;
-  df_visibility: visibility option;
-  df_dll_storage: dll_storage option;
-  df_cconv: cconv option;
-  df_attrs: fn_attr list;
-  df_section: string option;
-  df_align: int option;
-  df_gc: string option;
-}
-
-and block = string * instr list
-
-and modul = {
-  m_name: string;
-  m_target: toplevelentry;
-  m_datalayout: toplevelentry;
-  m_globals: (string * global) list;
-  m_declarations: (string * declaration) list;
-  m_definitions: (string * definition) list;
-}
+  df_linkage: option linkage;
+  df_visibility: option visibility;
+  df_dll_storage: option dll_storage;
+  df_cconv: option cconv;
+  df_attrs: list fn_attr;
+  df_section: option string;
+  df_align: option int;
+  df_gc: option string;
+}.
 
 Inductive metadata : Set :=
   | METADATA_Const (tv:tvalue)
@@ -298,4 +285,27 @@ Inductive metadata : Set :=
   | METADATA_Named (strs:list string)
   | METADATA_Node (mds:list metadata)
 .
-              
+
+Inductive toplevelentry : Set :=
+| TLE_Target (tgt:string)
+| TLE_Datalayout (layout:string)
+| TLE_Declaration (decl:declaration)
+| TLE_Definition (defn:definition)
+| TLE_Type_decl (id:ident) (t:typ)
+| TLE_Global (g:global)
+| TLE_Metadata (s:string) (md:metadata)
+| TLE_Attribute_group (i:int) (attrs:list fn_attr).
+
+Record modul : Set :=
+  mk_modul
+  {
+    m_name: string;
+    m_target: toplevelentry;
+    m_datalayout: toplevelentry;
+    m_globals: list (string * global);
+    m_declarations: list (string * declaration);
+    m_definitions: list (string * definition);
+  }.
+
+
+Definition toplevelentries : Set := list toplevelentry.
