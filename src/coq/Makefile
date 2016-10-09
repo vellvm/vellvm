@@ -1,6 +1,6 @@
 .PHONY: clean all extract
 
-MODULES := Vellvm VellvmAst Util Extract
+MODULES := Vellvm Ollvm_ast Transform Util Extract
 
 VFILES := $(MODULES:%=%.v)
 
@@ -8,7 +8,7 @@ all: Makefile.coq
 	$(MAKE) -f Makefile.coq
 
 Makefile.coq: Makefile
-	coq_makefile -R . Vellvm $(VFILES) -o Makefile.coq -extra-phony clean "" "rm -rf *.ml *.mli"
+	coq_makefile -R . "" $(VFILES) -o Makefile.coq -extra-phony clean "" "rm -rf *.ml *.mli"
 
 clean: Makefile.coq
 	$(MAKE) -f Makefile.coq clean

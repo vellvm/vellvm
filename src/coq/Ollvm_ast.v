@@ -291,6 +291,7 @@ Inductive toplevelentry : Set :=
 | TLE_Datalayout (layout:string)
 | TLE_Declaration (decl:declaration)
 | TLE_Definition (defn:definition)
+
 | TLE_Type_decl (id:ident) (t:typ)
 | TLE_Global (g:global)
 | TLE_Metadata (s:string) (md:metadata)

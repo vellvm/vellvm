@@ -13,9 +13,7 @@ extract: $(COQSRCDIR)/Makefile.coq
 
 ollvm_ast.cma: extract
 	cp $(COQSRCDIR)/*.ml* .
-	mv VellvmAst.ml ollvm_ast.ml
-	mv VellvmAst.mli ollvm_ast.mli
-	ocamlbuild ollvm_ast.cma
+	ocamlbuild Ollvm_ast.cma
 
 clean:
 	ocamlbuild -clean
