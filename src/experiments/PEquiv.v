@@ -1,8 +1,9 @@
 Generalizable All Variables.
 Set Implicit Arguments.
 
-Add LoadPath "../../papers/ssa-semantics/coq".
+Add LoadPath "../../papers/ssa-semantics/coq" as Top.
 Require Import Util Mach.
+Require CFG1Prop.
 
 Require Import Arith List Relations RelationClasses.
 
@@ -61,32 +62,36 @@ Definition mach_sim {X:State} (R:X -> X -> Prop) (M M':Mach X) : Prop :=
 
 
 (* We can't prove much about mach_sim alone, but restricted to step
-   functions that "respect R", we get that mach_sim is an equivalence
-   when R is.
+   functions that are well-defined on quotiented states, we get that
+   mach_sim is an equivalence when R is.
 
    TODO: the proof of transitivity uses symmetry -- is there a way to
    avoid this in order to prove the lemma in terms of preorders? *)
 Section MACH_SIM_PROPS.
 
+(* Machine bundled with a proof that m_step "respects R". When R is an
+   equivalence, this means m_step is a well-defined function on
+   quotiented states  *)
 Record MachR (X:State) (R:X -> X -> Prop) :=
   { mr_mach :> Mach X
   ; mr_sim : mach_sim R mr_mach mr_mach 
   }.
 
-Definition mach_r_sim {X:State} (R:X -> X -> Prop) (M M':MachR X R) : Prop :=
+Definition machr_sim {X:State} (R:X -> X -> Prop) (M M':MachR X R) : Prop :=
   mach_sim R M M'.
-Arguments mach_r_sim [_] _ _ _.
+Arguments machr_sim [_] _ _ _.
 
+(* Whenever R is an equivalence, so is mach_r_sim *)
 Variables (X:State) (R:X -> X -> Prop).
   
 Context (REq : Equivalence R).
 
-Instance MsimRefl : Reflexive (mach_r_sim R).
+Instance MsimRefl : Reflexive (machr_sim R).
 Proof.
   red. intros M. apply mr_sim.
 Qed.
 
-Instance MSimTrans : Transitive (mach_r_sim R).
+Instance MSimTrans : Transitive (machr_sim R).
 Proof.
   red. intros L M N Hsim0 Hsim1.
   red. intros x x' Hwfx Hwfx' Hrxx'.
@@ -108,7 +113,7 @@ Proof.
     eapply transitivity; eauto. 
 Qed.    
   
-Instance MSimSym : Symmetric (mach_r_sim R).
+Instance MSimSym : Symmetric (machr_sim R).
 Proof.
   red. intros M M' Hsim x x' Hwfx Hwfx' Hrxx'.
   symmetry in Hrxx'.
@@ -147,6 +152,20 @@ Section HEMBED_SIM.
 
 Context `(M:Mach X, N:Mach Y, H:HEmbed M N U).
 
+Definition induced_mach : Mach X.
+  refine
+    {| m_step x := option_bind (option_bind (U x) (m_step N)) (he_L H) |}.
+Proof.
+  abstract
+    (intros x x' Hwfx;
+     destruct (U x) as [y|] eqn:Heqy; simpl; [|inversion 1];
+     destruct (m_step N y) as [y'|] eqn:Heqy'; simpl; [|inversion 1];
+     intros Heqx';
+     apply he_L_wf in Heqx'; auto;
+     apply (m_pres N) in Heqy'; auto;
+     apply (he_U_wf H) in Heqy; auto).
+Defined.
+
 Definition unload_eq (x x':X) : Prop := U x = U x'.
 
 Instance UnloadEq : Equivalence unload_eq.
@@ -180,22 +199,8 @@ Proof.
     eapply mach_sim_step_none; auto.
 Qed.    
 
-Definition hembed_mach : Mach X.
-  refine
-    {| m_step x := option_bind (option_bind (U x) (m_step N)) (he_L H) |}.
-Proof.
-  abstract
-    (intros x x' Hwfx;
-     destruct (U x) as [y|] eqn:Heqy; simpl; [|inversion 1];
-     destruct (m_step N y) as [y'|] eqn:Heqy'; simpl; [|inversion 1];
-     intros Heqx';
-     apply he_L_wf in Heqx'; auto;
-     apply (m_pres N) in Heqy'; auto;
-     apply (he_U_wf H) in Heqy; auto).
-Defined.
-
 Lemma hembed_mach_resp_unload_eq : 
-  mach_sim unload_eq hembed_mach hembed_mach.
+  mach_sim unload_eq induced_mach induced_mach.
 Proof.
   red. intros x x' Hwfx Hwfx' Hrxx'.
   pose proof (he_spec H x Hwfx) as Hx.
@@ -215,13 +220,13 @@ Proof.
 Qed.
 
 Lemma hembed_sim :
-  mach_sim unload_eq M hembed_mach.
+  mach_sim unload_eq M induced_mach.
 Proof.
   unfold mach_sim. 
   intros ? ? Hwfx Hwfx' Heqxx'.
   destruct (m_step M x) as [x0|] eqn:Hstep, 
-           (m_step hembed_mach x') as [x0'|] eqn:Hstep';
-    unfold hembed_mach in Hstep'; simpl in Hstep'.
+           (m_step induced_mach x') as [x0'|] eqn:Hstep';
+    unfold induced_mach in Hstep'; simpl in Hstep'.
   - eapply mach_sim_step_one; eauto.
     rewrite <- Heqxx' in Hstep'.
     rewrite <- (he_spec H) in Hstep'; auto.
@@ -251,10 +256,20 @@ Proof.
   - eapply mach_sim_step_none; auto.
 Qed.
 
+Definition hembed_machr : MachR X unload_eq :=
+  {| mr_mach := M; mr_sim := M_resp_unload_eq |}.
+  
+Definition induced_machr : MachR X unload_eq :=
+  {| mr_mach := induced_mach; mr_sim := hembed_mach_resp_unload_eq |}.
+
+Definition hembed_simr : 
+  @machr_sim _ unload_eq hembed_machr induced_machr :=
+  hembed_sim.  
+
 End HEMBED_SIM.
 
 Arguments unload_eq {_ _} _ _ _.
-Arguments mach_r_sim {_} _ _ _.
+Arguments machr_sim {_} _ _ _.
 
 (* To use the above fact, for example to replace reasoning about
    equivalence of abstract machine programs with SOS, we would first
@@ -278,19 +293,13 @@ Hypothesis Pinv : forall (M M':Mach X),
   mach_sim (unload_eq U) M M' ->
   (P M -> P M').
 
-Let M' : MachR X (unload_eq U) :=
-  {| mr_mach := M; mr_sim := M_resp_unload_eq H |}.
-  
-Let hembed_mach' : MachR X (unload_eq U) :=
-  {| mr_mach := hembed_mach H; mr_sim := hembed_mach_resp_unload_eq H |}.
-
-Lemma p_quot_hembed : P M <-> P (hembed_mach H).
+Lemma p_quot_hembed : P M <-> P (induced_mach H).
 Proof.
   split.
   - apply Pinv. apply hembed_sim.
   - apply Pinv. 
-    cut (mach_r_sim (unload_eq U) hembed_mach' M'); auto.
-    apply MSimSym. exact UnloadEq.
+    cut (machr_sim (unload_eq U) (hembed_machr H) (induced_machr H));
+      auto. apply MSimSym. exact UnloadEq.
     red. simpl. apply hembed_sim.
 Qed.
 
@@ -312,9 +321,11 @@ Definition CFG_st :=
    ; st_wf := prod_curry CFG1.wf_st
    |}.
 
-Context `(SOS:Mach SOS_st, 
+Let U : CFG_st -> option SOS_st := prod_curry CFG1.unload_full.
+
+Context `(SOS:Mach SOS_st,
           CFG:Mach CFG_st, 
-          H:HEmbed CFG SOS (prod_curry CFG1.unload_full)).
+          H:HEmbed CFG SOS U).
 
 Definition return_st (s:CFG_st) (n:nat) : Prop :=
   match s with 
@@ -341,84 +352,149 @@ Definition return_tm (m:tm) (n:nat) : Prop :=
 Example peq0 (M:Mach CFG_st) (P Q:tm) : Prop :=
   forall n,
     (exists i s,
-        option_iter (m_step M) (P, ([],[],[])) i = Some s /\
+        option_iter (m_step M) (P, CFG1.load P) i = Some s /\
         return_st s n)
     <->
     (exists i s,
-        option_iter (m_step M) (Q, ([],[],[])) i = Some s /\
+        option_iter (m_step M) (Q, CFG1.load Q) i = Some s /\
         return_st s n).
 
-Lemma return_state_unload : forall s m n,
-  prod_curry CFG1.unload_full s = Some m ->
-  return_tm m n ->
-  return_st s n.
+Lemma return_st_unload : forall s m n,
+  st_wf CFG_st s ->
+  U s = Some m ->
+  (return_tm m n <-> return_st s n).
 Proof.
+  intros ? ? ? Hwf Hu. split.
+  - destruct m; simpl; try tauto.
+    + destruct m; try tauto. simpl in *.
+      intros _. admit.
+    + destruct m1; try tauto.
+      destruct m2; try tauto.
+      intros Heval. admit.
+  - admit.
 Admitted.
+
+Corollary return_st_unload_eq : forall s t n,
+  st_wf CFG_st s -> st_wf CFG_st t ->
+  unload_eq U s t ->
+  (return_st s n -> return_st t n).
+Proof.
+  intros ? ? ? Hwfs Hwft Hu Hret.
+  pose proof (he_U_tot H _ Hwfs) as [m Hus].
+  pose proof (he_U_tot H _ Hwft) as [m' Hut].
+  assert (m' = m) by congruence. subst m'.
+  eapply return_st_unload in Hret; eauto.
+  eapply return_st_unload; eauto.
+Qed.
 
 Lemma mach_sim_iter_ex_iff : forall X (M N:Mach X) R,
   mach_sim R M N ->
-  forall i x y, R x y ->
+  forall i x y, st_wf X x -> st_wf X y ->
+    R x y ->
      ((exists x', option_iter (m_step M) x i = Some x')
      <->
      (exists y', option_iter (m_step N) y i = Some y')).
 Proof.
-Admitted.    
+  intros ? ? ? ? Hsim ?.
+  induction i.
+  - intros x y Hwfx Hwfy Hr.
+    split;
+    (intros [x' Hstep]; red in Hsim; apply Hsim in Hr; auto;
+     inversion Hr; subst; simpl in *; eauto).
+  - intros x y Hwfx Hwfy Hr. 
+    apply Hsim in Hr; auto.
+    inversion Hr; subst; simpl in *.
+    + rewrite H0, H1. tauto.
+    + rewrite H0, H1. apply IHi; auto.
+      apply (m_pres M x); auto. 
+      apply (m_pres N y); auto. 
+Qed.
 
 Lemma mach_sim_iter_R : forall X (M N:Mach X) R,
   mach_sim R M N ->
-  forall i x y x' y', R x y ->
+  forall i x y x' y', st_wf X x -> st_wf X y ->
+    R x y ->
     option_iter (m_step M) x i = Some x' ->
     option_iter (m_step N) y i = Some y' ->
     R x' y'.
 Proof.
-Admitted.    
+  intros ? ? ? ? Hsim. induction i.
+  - simpl. congruence.
+  - intros ? ? ? ? ? ? Hr.
+    apply Hsim in Hr; auto. inversion Hr; subst.
+    + simpl. rewrite H2, H3. inversion 1.
+    + simpl. rewrite H2, H3. apply IHi; auto.
+      apply (m_pres M x); auto.
+      apply (m_pres N y); auto.
+Qed.
+
+Lemma option_iter_wf : forall X (M:Mach X) i s s',
+  option_iter (m_step M) s i = Some s' ->
+  st_wf X s ->
+  st_wf X s'.
+Proof.
+  induction i; simpl. 
+  - inversion 1; subst; auto.
+  - intros ? ? Hwf. destruct (m_step M s) eqn:Hstep.
+    + intros. eapply IHi; eauto. eapply (m_pres M); eauto.
+    + inversion Hwf.
+Qed.
 
 Lemma peq0__abs : forall m m',
-  peq0 CFG m m' <-> peq0 (hembed_mach H) m m'.
+  st_wf SOS_st m -> st_wf SOS_st m' ->
+  (peq0 CFG m m' <-> peq0 (induced_mach H) m m').
 Proof.
-  intros m m'.
+  intros m m' Hwfm Hwfm'.
+  assert (st_wf CFG_st (m, CFG1.load m)) as Hwfs.
+  { apply CFG1Prop.load_wf; auto. }
+  assert (st_wf CFG_st (m', CFG1.load m')) as Hwfs'.
+  { apply CFG1Prop.load_wf; auto. }
   apply p_quot_hembed with (P := fun M => peq0 M m m').
-  intros M M' Hsim. unfold peq0. intros Heq n.
+  intros M M' Hsim Heq n.
   split.
-  - intros [i [s [Hstep Hret]]].
-    pose proof (mach_sim_iter_ex_iff Hsim) i 
-         (m, ([],[],[]))
-         (m, ([],[],[])) eq_refl as Hex. 
-    pattern s in Hstep.
-    apply (ex_intro _ s) in Hstep.
-    apply Hex in Hstep as [s' Hstep'].
-    cut (return_st s' n).
-    intros Hs'.
-    pose proof (conj Hstep' Hs') as HH.
-    pattern s' in HH.
-    pose proof (ex_intro _ s' HH) as HH'.
-    pattern i in HH'.
-    pose proof (ex_intro _ i HH') as HH''.
-    specialize (Heq n). destruct Heq as [Heq' _].
-    apply Heq' in HH''.
-    clear HH' HH Hs' Hstep'.
-
-    destruct Hex as [Hex _]. 
-    
-    specialize (Hex (exist _ s Hstep)).
-         (Equivalence_Reflexive UnloadEq).
-    apply H0 in Hstep.
-
-  split.
-  - unfold peq0. intros Heq n. split.
-    + intros [i [s [Hstep Hret]]].
-      pose proof (mach_sim_iter_ex_iff Hsim i (m, ([],[],[])) (m, ([],[],[]))) as Hstep'.
-      simpl in Hstep'. 
-      pattern s in Hstep.
-      specialize (Hstep' eq_refl).
-      pose proof (ex_intro _ s Hstep). apply Hstep' in H0 as [s' ?].
-      eapply Heq.
-      exists i, s'. split.
-      specialize (Heq n).
-      eapply Heq.
-
-      
-      eapply Hstep' in Hstep.
-Abort.
+  - intros [i [s [Hsteps Hrets]]].
+    pose proof Hsteps as Hstept. 
+    pattern s in Hstept. apply (ex_intro _ s) in Hstept.
+    apply (mach_sim_iter_ex_iff Hsim i _ _ Hwfs Hwfs eq_refl)
+      in Hstept as [t Hstept].
+    cut (return_st t n). intros Hrett.
+    destruct (Heq n) as [[j [t' [Hstept' Hrett']]] _]; [solve [eauto]|].
+    pose proof Hstept' as Hsteps'.
+    pattern t' in Hsteps'. apply (ex_intro _ t') in Hsteps'.
+    apply (mach_sim_iter_ex_iff Hsim j _ _ Hwfs' Hwfs' eq_refl)
+      in Hsteps' as [s' Hsteps'].
+    exists j, s'. split; auto.
+    + eapply (@return_st_unload_eq t' s'); eauto.
+      eapply option_iter_wf; eauto. 
+      eapply option_iter_wf; eauto. 
+      eapply (mach_sim_iter_R Hsim _ _ _ Hwfs' Hwfs' eq_refl); eauto. 
+    + eapply (@return_st_unload_eq s t); eauto.
+      eapply option_iter_wf; eauto. 
+      eapply option_iter_wf; eauto. 
+      symmetry. 
+      eapply (mach_sim_iter_R Hsim _ _ _ Hwfs Hwfs eq_refl); eauto. 
+  - intros [i [s [Hsteps Hrets]]].
+    pose proof Hsteps as Hstept. 
+    pattern s in Hstept. apply (ex_intro _ s) in Hstept.
+    apply (mach_sim_iter_ex_iff Hsim i _ _ Hwfs' Hwfs' eq_refl) 
+      in Hstept as [t Hstept].
+    cut (return_st t n). intros Hrett.
+    destruct (Heq n) as [_ [j [t' [Hstept' Hrett']]]]; [solve [eauto]|].
+    pose proof Hstept' as Hsteps'.
+    pattern t' in Hsteps'. apply (ex_intro _ t') in Hsteps'.
+    apply (mach_sim_iter_ex_iff Hsim j _ _ Hwfs Hwfs eq_refl)
+      in Hsteps' as [s' Hsteps'].
+    exists j, s'. split; auto.
+    + eapply (@return_st_unload_eq t' s'); eauto.
+      eapply option_iter_wf; eauto.
+      eapply option_iter_wf; eauto.
+      eapply (mach_sim_iter_R Hsim _ _ _ Hwfs Hwfs); eauto.
+      reflexivity.
+    + eapply (@return_st_unload_eq s t); eauto.
+      eapply option_iter_wf; eauto.
+      eapply option_iter_wf; eauto.
+      symmetry. eapply (mach_sim_iter_R Hsim); eauto.
+      reflexivity.
+Qed.
 
 End EXAMPLES.
