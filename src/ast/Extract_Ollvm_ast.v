@@ -1,8 +1,7 @@
 Require Import Ascii String.
 Extraction Language Ocaml.
 
-Require Import Transform.
-
+Require Import Ollvm_ast.
 Require Import ExtrOcamlBasic.
 
 (* strings ------------------------------------------------------------------ *)
@@ -22,9 +21,8 @@ Extract Inlined Constant ascii_dec => "(=)".
 Extract Inductive string => "string" [ "str_nil" "str_cons" ].
 
 (* OCaml pervasive types ---------------------------------------------------- *)
-Extract Constant str_nil => "(String.make 0 ' ')".
-Extract Constant str_cons => "fun (c, s) -> (Char.escaped c) ^ s".
-Extract Inlined Constant str_cat => "(^)".
+Extract Inlined Constant int => "int".
+Extract Inlined Constant float => "float".
 
 (* Extraction Library Datatypes. *)
-Extraction Library Transform.
+Extraction Library Ollvm_ast.

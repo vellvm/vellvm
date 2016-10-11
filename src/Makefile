@@ -1,17 +1,15 @@
 # Eventually this will be the master Makefile
 
-SUBDIRS = coq ml ollvm
+SUBDIRS = ollvm ast coq ml
 
-.PHONY: clean all subdirs $(SUBDIRS)
+.PHONY: clean all ollvm
 
-subdirs: $(SUBDIRS)
-
-$(SUBDIRS):
-	$(MAKE) -C $@
-
-ollvm: ml
+all:
+	for dir in $(SUBDIRS); do \
+	  $(MAKE) -C $$dir ; \
+	done
 
 clean:
 	for dir in $(SUBDIRS); do \
 	  $(MAKE) -C $$dir clean; \
-	done	
+	done
