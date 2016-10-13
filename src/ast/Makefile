@@ -9,10 +9,10 @@ LIB := $(BASENAME).cmo $(BASENAME).cmx
 all: $(VO) $(ML) $(LIB)
 
 $(VO) : $(V)
-	coqc $(V)
+	coqc -Q "." "Vellvm" $(V)
 
 $(ML): $(VO) Extract_$(V)
-	coqc Extract_$(V)
+	coqc -Q "." "Vellvm" Extract_$(V)
 
 $(BASENAME).cmo: $(ML)
 	ocamlfind ocamlc -c $(ML)

@@ -1,7 +1,7 @@
 Require Import Ascii String.
 Extraction Language Ocaml.
 
-Require Import Ollvm_ast.
+Require Import Vellvm.Ollvm_ast.
 Require Import ExtrOcamlBasic.
 
 (* strings ------------------------------------------------------------------ *)

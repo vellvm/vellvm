@@ -1,5 +1,5 @@
 Require Import Ascii Strings.String.
-Require Import Ollvm_ast.
+Require Import Vellvm.Ollvm_ast.
 Open Scope string_scope.
 
 Check mk_declaration.
