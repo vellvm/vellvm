@@ -141,7 +141,6 @@ Inductive typ : Set :=
 
 
 Inductive icmp : Set := Eq|Ne|Ugt|Uge|Ult|Ule|Sgt|Sge|Slt|Sle.
-
 Inductive fcmp : Set := FFalse|FOeq|FOgt|FOge|FOlt|FOle|FOne|FOrd|FUno|FUeq|FUgt|FUge|FUlt|FUle|FUne|FTrue.
 
 
@@ -157,12 +156,15 @@ Inductive ibinop : Set :=
 | URem | SRem | And | Or | Xor
 .
 
-Inductive fbinop : Set := FAdd|FSub|FMul|FDiv|FRem.
+Inductive fbinop : Set :=
+  FAdd | FSub | FMul | FDiv | FRem.
 
-Inductive fast_math : Set := Nnan | Ninf | Nsz | Arcp | Fast.
+Inductive fast_math : Set :=
+  Nnan | Ninf | Nsz | Arcp | Fast.
 
-Inductive conversion_type : Set := Trunc|Zext|Sext|Fptrunc|Fpext|Uitofp|Sitofp|Fptoui
-                       |Fptosi|Inttoptr|Ptrtoint|Bitcast.
+Inductive conversion_type : Set :=
+  Trunc | Zext | Sext | Fptrunc | Fpext | Uitofp | Sitofp | Fptoui |
+  Fptosi | Inttoptr | Ptrtoint | Bitcast.
 
 Definition tident : Set := (typ * ident)%type.
 
@@ -195,13 +197,17 @@ Inductive instr : Set :=
 | INSTR_ShuffleVector (vec1:tvalue) (vec2:tvalue) (idxmask:tvalue)
 | INSTR_ExtractValue (vec:tvalue) (idxs:list int)
 | INSTR_InsertValue (vec:tvalue) (elt:tvalue) (idxs:list int)
+
 | INSTR_Call (fn:tident) (args:list tvalue)
+
 | INSTR_Alloca (t:typ) (nb: option tvalue) (align:option int) (* typ, nb el, align *)
 | INSTR_Load (volatile:bool) (ptr:tvalue) (align:option int) (* FIXME: use tident instead of value *)
 | INSTR_Phi (t:typ) (args:list (value * ident))
 | INSTR_Select (cnd:tvalue) (v1:tvalue) (v2:tvalue) (* if * then * else *)
+
 | INSTR_VAArg
 | INSTR_LandingPad
+
 | INSTR_Store (volatile:bool) (val:tvalue) (ptr:tident) (align:option int)
 | INSTR_Fence
 | INSTR_AtomicCmpXchg
@@ -215,8 +221,7 @@ Inductive instr : Set :=
 | INSTR_Br (v:tvalue) (br1:tident) (br2:tident) 
 | INSTR_Br_1 (br:tident)
 | INSTR_Switch (v:tvalue) (default_dest:tident) (brs: list (tvalue * tident))
-| INSTR_IndirectBr (v:tvalue) (brs:list tident) (* address
-                                            * possible addresses (labels) *)
+| INSTR_IndirectBr (v:tvalue) (brs:list tident) (* address * possible addresses (labels) *)
 | INSTR_Resume (v:tvalue)
 | INSTR_Unreachable
 
@@ -258,7 +263,12 @@ Record declaration : Set :=
     dc_param_attrs: list param_attr * list (list param_attr);
   }.
 
-Definition block : Set := string * list instr.
+Inductive block_label : Set :=
+| BAnon (n:int)
+| BName (s:string)
+.
+        
+Definition block : Set := block_label * list instr.
 
 Record definition :=
   mk_definition

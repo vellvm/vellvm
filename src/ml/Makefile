@@ -4,7 +4,7 @@ OLLVM_LIBDIR := $(BASE_DIR)/ollvm/src/ollvm
 ASTDIR := $(BASE_DIR)/ast
 LIBS := ollvm,unix,str
 
-.PHONY: clean all subdirs $(SUBDIRS)
+.PHONY: clean all subdirs main.native $(SUBDIRS)
 
 all:	vellvm
 
@@ -20,10 +20,14 @@ subdirs: $(SUBDIRS)
 $(SUBDIRS):
 	$(MAKE) -C $@
 
+test: vellvm
+	./vellvm --test
+
 clean:
 	for dir in $(SUBDIRS); do \
 	  $(MAKE) -C $$dir clean; \
 	done
 	ocamlbuild -clean
 	rm vellvm
+	rm -rf output
 

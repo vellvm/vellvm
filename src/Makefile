@@ -1,6 +1,6 @@
 # Eventually this will be the master Makefile
 
-SUBDIRS = ollvm ast coq ml
+SUBDIRS = ast ollvm coq ml
 
 .PHONY: clean all ollvm
 

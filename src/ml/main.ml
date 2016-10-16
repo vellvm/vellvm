@@ -1,11 +1,15 @@
 (* A main harness for Coq-extracted LLVM Transformations *)
 open Arg
+open Assert
 open Driver
 
 (* test harness ------------------------------------------------------------- *)
 exception Ran_tests
+let suite = ref Test.suite
 let exec_tests () =
-  Printf.printf "Stub for future test harness\n";
+  Platform.configure();
+  let outcome = run_suite !suite in
+  Printf.printf "%s\n" (outcome_to_string outcome);
   raise Ran_tests
 
 (* Use the --test option to run unit tests and the quit the program. *)
