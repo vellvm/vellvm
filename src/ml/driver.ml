@@ -26,11 +26,9 @@ let write_file (file:string) (out:string) =
   close_out channel
 
 let parse_file filename =
-  let program = read_file filename |> 
-                Lexing.from_string |>
-                Ollvm_parser.toplevelentries Ollvm_lexer.token
-  in
-  program
+  read_file filename
+  |> Lexing.from_string
+  |> Ollvm_lexer.parse
 
 let output_file filename ast =
   let open Ollvm_printer in

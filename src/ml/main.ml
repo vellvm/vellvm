@@ -12,9 +12,18 @@ let exec_tests () =
   Printf.printf "%s\n" (outcome_to_string outcome);
   raise Ran_tests
 
+let test_pp_dir dir =
+  Platform.configure();
+  let suite = [Test.pp_test_of_dir dir] in
+  let outcome = run_suite suite in
+  Printf.printf "%s\n" (outcome_to_string outcome);
+  raise Ran_tests
+
+
 (* Use the --test option to run unit tests and the quit the program. *)
 let args =
   [ ("--test", Unit exec_tests, "run the test suite, ignoring other inputs")
+  ; ("--test-pp-dir", String test_pp_dir, "run the parsing/pretty-printing tests on all .ll files in the given directory")
   ; ("-op", Set_string Platform.output_path, "set the path to the output files directory  [default='output']")
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")] 
 

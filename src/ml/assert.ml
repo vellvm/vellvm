@@ -55,13 +55,15 @@ let run_suite (s:suite):outcome =
 (* Reporting functions *)
 
 let result_test_to_string (name_pts:string) (r:result test): string =
-  let string_of_case (name, res) = 
-    "  " ^ name ^ ": " ^ (
-    begin match res with
-      | Pass     -> "passed"
-      | Fail msg -> "failed - " ^ msg
-    end
-    ) in
+  let string_of_case (name, res) =
+    let (p, m) =
+      begin match res with
+      | Pass     -> "passed", ""
+      | Fail msg -> "failed", ("\n\t   ERROR: " ^ msg)
+      end
+    in
+    Printf.sprintf "  %s - %s%s%!" p name m
+  in
   begin match r with
     | Test (_, cases) ->
       name_pts ^ ":" ^ 

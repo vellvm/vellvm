@@ -137,6 +137,7 @@ Inductive typ : Set :=
 | TYPE_Packed_struct (fields:list typ)
 | TYPE_Opaque
 | TYPE_Vector (sz:int) (t:typ)
+| TYPE_Identified (id:ident)
 .
 
 

@@ -29,7 +29,7 @@ let clang mode opt_level =
 let clang_cmd opt_level = clang !clang_ll_mode opt_level
 let as_cmd    opt_level = clang !as_mode opt_level
 let link_cmd  opt_level = clang !link_mode opt_level
-let clang_parse_cmd = clang "-S -emit-llvm" "-O0"
+let clang_parse_cmd = clang "-S -emit-llvm -w" "-O0"
 
 let pp_cmd = ref "cpp -E " 
 let rm_cmd = ref "rm -rf " 
