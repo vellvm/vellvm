@@ -7,7 +7,7 @@
                       [4 x %qtree*] [%qtree* null, %qtree* null, %qtree* null, %qtree* null] }]
 
 define i64 @main(i64 %argc, i8** %argv) {
-  %1 = getelementptr %qtrees* @gbl, i32 0, i32 0, i32 0, i32 1, i32 1
-  %2 = load i64* %1
+  %1 = getelementptr %qtrees, %qtrees* @gbl, i32 0, i32 0, i32 0, i32 1, i32 1
+  %2 = load i64, i64* %1
   ret i64 %2
 }

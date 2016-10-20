@@ -8,7 +8,7 @@ eq0:
    ret i64 %a
 
 neq0:
-    %2 = load i64* %1
+    %2 = load i64, i64* %1
     %3 = sub i64 %2, %b
     store i64 %3, i64* %1
     %cmp1 = icmp sgt i64 %3, %b

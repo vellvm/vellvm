@@ -18,7 +18,7 @@ define i64 @main(i64 %argc, i8** %arcv) {
   br i1 1, label %loop, label %loop
 
 loop:
-  %2   = load i64* %ctr
+  %2   = load i64, i64* %ctr
   %3   = add i64 %2, 1
   store i64 %3, i64* %ctr
   %4   = call i64 @one_iteration(i64 %2)

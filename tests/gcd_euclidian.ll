@@ -6,17 +6,17 @@ define i64 @main(i64 %argc, i8** %arcv) {
   br label %gcd
 
 gcd:
-  %3 = load i64* %1
+  %3 = load i64, i64* %1
   %4 = icmp eq i64 0, %3
   br i1 %4, label %ret_b, label %loop
 
 loop:
-  %5 = load i64* %2
+  %5 = load i64, i64* %2
   %6 = icmp eq i64 0, %5
   br i1 %6, label %ret_a, label %continue_loop
 
 continue_loop:
-  %7 = load i64* %1
+  %7 = load i64, i64* %1
   %8 = icmp sgt i64 %7, %5
   br i1 %8, label %if, label %else
   
@@ -31,10 +31,10 @@ else:
   br label %loop ; SHOULD BE LOOP 
 
 ret_a:
-  %11 = load i64* %1
+  %11 = load i64, i64* %1
   ret i64 %11
 
 ret_b:
-  %12 = load i64* %2
+  %12 = load i64, i64* %2
   ret i64 %12
 }

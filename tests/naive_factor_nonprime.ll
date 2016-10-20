@@ -4,14 +4,14 @@ define i64 @naive_mod(i64 %top, i64 %bottom) {
   br label %start
 
 start:
-  %1 = load i64* %product_sum
+  %1 = load i64, i64* %product_sum
   %plus = add i64 %bottom, %1
   store i64 %plus, i64* %product_sum
   %exceeded = icmp sgt i64 %plus, %top
   br i1 %exceeded, label %final, label %start
 
 final:
-  %2 = load i64* %product_sum
+  %2 = load i64, i64* %product_sum
   %un_exceeded = sub i64 %2, %bottom
   %out = sub i64 %top, %un_exceeded
   ret i64 %out
@@ -23,13 +23,13 @@ define i64 @naive_prime(i64 %n) {
   br label %loop
 
 loop:
-  %1 = load i64* %factor_attempt
+  %1 = load i64, i64* %factor_attempt
   %sqr = mul i64 %1, %1
   %exceed_cap = icmp sgt i64 %sqr, %n
   br i1 %exceed_cap, label %final_true, label %inc
 
 inc:
-  %2 = load i64* %factor_attempt
+  %2 = load i64, i64* %factor_attempt
   %plus = add i64 1, %1
   store i64 %plus, i64* %factor_attempt
   %mod_result = call i64 @naive_mod(i64 %n, i64 %2)

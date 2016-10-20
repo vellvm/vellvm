@@ -9,7 +9,7 @@ define i64 @foo(i64 %x, i64 %y) {
   %1 = alloca i64
   %2 = add i64 %x, %y
   store i64 %2, i64* %1
-  %3 = load i64* %1
+  %3 = load i64, i64* %1
   ret i64 %3
 }
 

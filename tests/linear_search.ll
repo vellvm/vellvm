@@ -6,13 +6,13 @@ define i64 @search(i64 %x, [5 x i64]* %list) {
   br label %loop
 
 loop:
-  %count = load i64* %i
+  %count = load i64, i64* %i
   %cmp1 = icmp eq i64 %count, 5
   br i1 %cmp1, label %false, label %check
 
 check:
-  %ptr = getelementptr [5 x i64]* %list, i64 0, i64 %count 
-  %val = load i64* %ptr
+  %ptr = getelementptr [5 x i64], [5 x i64]* %list, i64 0, i64 %count 
+  %val = load i64, i64* %ptr
   %cmp2 = icmp eq i64 %x, %val
   %a = add i64 1, %count
   store i64 %a, i64* %i

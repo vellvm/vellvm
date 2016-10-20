@@ -10,8 +10,8 @@
 @node8 = global %struct.Node { %struct.Node* null, %struct.Node* null, i64 1}
 
 define i64 @contains(%struct.Node* %root, i64 %value) {
-  %1 = getelementptr %struct.Node* %root, i32 0, i32 2
-  %2 = load i64* %1
+  %1 = getelementptr %struct.Node, %struct.Node* %root, i32 0, i32 2
+  %2 = load i64, i64* %1
   %3 = icmp eq i64 %2, %value
   br i1 %3, label %equal, label %notequal
 
@@ -23,8 +23,8 @@ notequal:
   br i1 %4, label %left, label %right
 
 left:
-  %5 = getelementptr %struct.Node* %root, i32 0, i32 0
-  %6 = load  %struct.Node** %5
+  %5 = getelementptr %struct.Node, %struct.Node* %root, i32 0, i32 0
+  %6 = load  %struct.Node*, %struct.Node** %5
   %7 = icmp eq %struct.Node* %6, null
   br i1 %7, label %none, label %left_next
 
@@ -33,8 +33,8 @@ left_next:
   ret i64 %8
 
 right:
-  %9 = getelementptr %struct.Node* %root, i32 0, i32 1
-  %10 = load %struct.Node** %9
+  %9 = getelementptr %struct.Node, %struct.Node* %root, i32 0, i32 1
+  %10 = load %struct.Node*, %struct.Node** %9
   %11 = icmp eq %struct.Node* %10, null
   br i1 %11, label %none, label %right_next
 

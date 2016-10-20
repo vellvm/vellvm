@@ -13,14 +13,14 @@ then:
   ret i64 0
 
 else: 
-  %2 = getelementptr %struct.Node* %t, i32 0, i32 2
-  %3 = load i64* %2
-  %4 = getelementptr %struct.Node* %t, i32 0, i32 1
-  %5 = load %struct.Node** %4
+  %2 = getelementptr %struct.Node, %struct.Node* %t, i32 0, i32 2
+  %3 = load i64, i64* %2
+  %4 = getelementptr %struct.Node, %struct.Node* %t, i32 0, i32 1
+  %5 = load %struct.Node*, %struct.Node** %4
   %6 = call i64 @sum_tree(%struct.Node* %5)
   %7 = add i64 %3, %6
-  %8 = getelementptr %struct.Node* %t, i32 0, i32 0
-  %9 = load %struct.Node** %8
+  %8 = getelementptr %struct.Node, %struct.Node* %t, i32 0, i32 0
+  %9 = load %struct.Node*, %struct.Node** %8
   %10 = call i64 @sum_tree(%struct.Node* %9)
   %11 = add i64 %7, %10
   ret i64 %11

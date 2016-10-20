@@ -19,7 +19,7 @@ define void @matmul(%mat* %a, %mat* %b, %mat* %c) {
   br label %starti
 
 starti:
-  %iv = load i64* %i
+  %iv = load i64, i64* %i
   %ic = icmp slt i64 %iv, 2
   br i1 %ic, label %theni, label %endi
 
@@ -28,22 +28,22 @@ theni:
   br label %startj
 
 startj:
-  %jv = load i64* %j
+  %jv = load i64, i64* %j
   %jc = icmp slt i64 %jv, 2
   br i1 %jc, label %thenj, label %endj
 
 thenj:
-  %r  = getelementptr %mat* %c, i64 0, i64 %iv, i64 %jv
+  %r  = getelementptr %mat, %mat* %c, i64 0, i64 %iv, i64 %jv
 
-  %a1 = getelementptr %mat* %a, i64 0, i64 %iv, i64   0
-  %b1 = getelementptr %mat* %b, i64 0, i64   0, i64 %jv
-  %a2 = getelementptr %mat* %a, i64 0, i64 %iv, i64   1
-  %b2 = getelementptr %mat* %b, i64 0, i64   1, i64 %jv
+  %a1 = getelementptr %mat, %mat* %a, i64 0, i64 %iv, i64   0
+  %b1 = getelementptr %mat, %mat* %b, i64 0, i64   0, i64 %jv
+  %a2 = getelementptr %mat, %mat* %a, i64 0, i64 %iv, i64   1
+  %b2 = getelementptr %mat, %mat* %b, i64 0, i64   1, i64 %jv
 
-  %a1v = load i64* %a1
-  %b1v = load i64* %b1
-  %a2v = load i64* %a2
-  %b2v = load i64* %b2
+  %a1v = load i64, i64* %a1
+  %b1v = load i64, i64* %b1
+  %a2v = load i64, i64* %a2
+  %b2v = load i64, i64* %b2
 
   %ab1 = mul i64 %a1v, %b1v
   %ab2 = mul i64 %a2v, %b2v
@@ -73,7 +73,7 @@ define i64 @mateq(%mat* %ma, %mat* %mb) {
   br label %starti1
 
 starti1:
-  %iv = load i64* %i
+  %iv = load i64, i64* %i
   %ic = icmp slt i64 %iv, 2
   br i1 %ic, label %theni1, label %endi1
 
@@ -82,18 +82,18 @@ theni1:
   br label %startj1
 
 startj1:
-  %jv = load i64* %j
+  %jv = load i64, i64* %j
   %jc = icmp slt i64 %jv, 2
   br i1 %jc, label %thenj1, label %endj1
 
 thenj1:
-  %a = getelementptr %mat* %ma, i64 0, i64 %iv, i64 %jv
-  %b = getelementptr %mat* %mb, i64 0, i64 %iv, i64 %jv
-  %av = load i64* %a
-  %bv = load i64* %b
+  %a = getelementptr %mat, %mat* %ma, i64 0, i64 %iv, i64 %jv
+  %b = getelementptr %mat, %mat* %mb, i64 0, i64 %iv, i64 %jv
+  %av = load i64, i64* %a
+  %bv = load i64, i64* %b
 
   %cmp = xor i64 %av, %bv
-  %rv = load i64* %r
+  %rv = load i64, i64* %r
   %tmp = or i64 %cmp, %rv
   store i64 %tmp, i64* %r
 
@@ -107,6 +107,6 @@ endj1:
   br label %starti1
 
 endi1:
-  %rv1 = load i64* %r
+  %rv1 = load i64, i64* %r
   ret i64 %rv1
 }

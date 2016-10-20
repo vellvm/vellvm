@@ -7,19 +7,19 @@
 @v1 = global %var1 { i64 0, i64* @gint }
 @v2 = global %var2 { i64 1, i8** null }
 
-define i32 @main(i32 %argc, i8** %argv) {
+define i64 @main(i32 %argc, i8** %argv) {
   %p0 = alloca i64
-  %p1 = getelementptr %var2* @v2, i32 0, i32 0
+  %p1 = getelementptr %var2, %var2* @v2, i32 0, i32 0
   store i64 5, i64* %p1
   %vb = bitcast %var2* @v2 to %disju*
   call void @foo(%disju* %vb)
-  %n1 = load i64* %p1
-  ret i32 %n1
+  %n1 = load i64, i64* %p1
+  ret i64 %n1
 }
 
 define void @foo(%disju* %pu) {
-  %p1 = getelementptr %disju* %pu, i32 0, i32 0
+  %p1 = getelementptr %disju, %disju* %pu, i32 0, i32 0
   store i64 6, i64* %p1
-  %n1 = load i64* %p1
+  %n1 = load i64, i64* %p1
   ret void
 }
