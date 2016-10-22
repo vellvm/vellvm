@@ -182,6 +182,7 @@ Inductive value : Set :=
 | VALUE_Array (elts: list (typ * value))
 | VALUE_Vector (elts: list (typ * value))
 | VALUE_Zero_initializer
+| VALUE_Cstring (s:string)
 .
 
 Definition tvalue : Set := typ * value.
@@ -192,7 +193,7 @@ Inductive instr : Set :=
 | INSTR_FBinop (fop:fbinop) (fm:list fast_math) (t:typ) (v1:value) (v2:value)
 | INSTR_FCmp (cmp:fcmp) (t:typ) (v1:value) (v2:value)
 | INSTR_Conversion (conv:conversion_type) (t_from:typ) (v:value) (t_to:typ)
-| INSTR_GetElementPtr (ptrval:tvalue) (idxs:list tvalue)
+| INSTR_GetElementPtr (t:typ) (ptrval:tvalue) (idxs:list tvalue)
 | INSTR_ExtractElement (vec:tvalue) (idx:tvalue)
 | INSTR_InsertElement (vec:tvalue) (elt:tvalue) (idx:tvalue)
 | INSTR_ShuffleVector (vec1:tvalue) (vec2:tvalue) (idxmask:tvalue)
@@ -202,7 +203,7 @@ Inductive instr : Set :=
 | INSTR_Call (fn:tident) (args:list tvalue)
 
 | INSTR_Alloca (t:typ) (nb: option tvalue) (align:option int) (* typ, nb el, align *)
-| INSTR_Load (volatile:bool) (ptr:tvalue) (align:option int) (* FIXME: use tident instead of value *)
+| INSTR_Load (volatile:bool) (t:typ) (ptr:tvalue) (align:option int) (* FIXME: use tident instead of value *)
 | INSTR_Phi (t:typ) (args:list (value * ident))
 | INSTR_Select (cnd:tvalue) (v1:tvalue) (v2:tvalue) (* if * then * else *)
 
@@ -297,7 +298,7 @@ Inductive metadata : Set :=
   | METADATA_Node (mds:list metadata)
 .
 
-Inductive toplevelentry : Set :=
+Inductive toplevel_entity : Set :=
 | TLE_Target (tgt:string)
 | TLE_Datalayout (layout:string)
 | TLE_Declaration (decl:declaration)
@@ -312,12 +313,12 @@ Record modul : Set :=
   mk_modul
   {
     m_name: string;
-    m_target: toplevelentry;
-    m_datalayout: toplevelentry;
+    m_target: toplevel_entity;
+    m_datalayout: toplevel_entity;
     m_globals: list (string * global);
     m_declarations: list (string * declaration);
     m_definitions: list (string * definition);
   }.
 
 
-Definition toplevelentries : Set := list toplevelentry.
+Definition toplevel_entities : Set := list toplevel_entity.

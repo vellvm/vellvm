@@ -49,11 +49,11 @@ Definition mangle_definition (d:definition) : definition :=
 .
 
 
-Definition mangle_toplevelentry (tle : toplevelentry) : toplevelentry :=
+Definition mangle_toplevel_entity (tle : toplevel_entity) : toplevel_entity :=
   match tle with
   | TLE_Definition d => TLE_Definition (mangle_definition d)
   | _ => tle
   end.
 
-Definition transform (prog: list toplevelentry) : list toplevelentry :=
-  List.map mangle_toplevelentry prog.
+Definition transform (prog: list toplevel_entity) : list toplevel_entity :=
+  List.map mangle_toplevel_entity prog.

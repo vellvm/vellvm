@@ -3,7 +3,7 @@ open Platform
 open Ollvm
 open Ast    
 
-let transform (prog : Ollvm_ast.toplevelentry list) : Ollvm_ast.toplevelentry list =
+let transform (prog : Ollvm_ast.toplevel_entity list) : Ollvm_ast.toplevel_entity list =
   Transform.transform prog
   
 let print_banner s =
@@ -33,7 +33,7 @@ let parse_file filename =
 let output_file filename ast =
   let open Ollvm_printer in
   let channel = open_out filename in
-  toplevelentries  (empty_env ()) (Format.formatter_of_out_channel channel) ast;
+  toplevel_entities  (empty_env ()) (Format.formatter_of_out_channel channel) ast;
   close_out channel
 
 
