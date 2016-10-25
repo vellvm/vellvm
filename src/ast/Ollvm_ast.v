@@ -303,8 +303,8 @@ Inductive toplevel_entity : Set :=
 | TLE_Datalayout (layout:string)
 | TLE_Declaration (decl:declaration)
 | TLE_Definition (defn:definition)
-
 | TLE_Type_decl (id:ident) (t:typ)
+| TLE_Source_filename (s:string)
 | TLE_Global (g:global)
 | TLE_Metadata (s:string) (md:metadata)
 | TLE_Attribute_group (i:int) (attrs:list fn_attr).
