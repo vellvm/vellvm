@@ -169,46 +169,55 @@ Inductive conversion_type : Set :=
 
 Definition tident : Set := (typ * ident)%type.
 
-(** FIXME: should be split into const/value? *)
+(* Should really be called operands or expresions *)
+(* NOTE: 
+   This datatype is more permissive than legal in LLVM:
+     - it allows identifiers to appear nested inside of "constant expressions"
+*)
 Inductive value : Set :=
-| VALUE_Ident (id:ident)
+| VALUE_Ident (id:ident)  
 | VALUE_Integer (x:int)
 | VALUE_Float (f:float)
 | VALUE_Bool (b:bool)
 | VALUE_Null
+| VALUE_Zero_initializer
+| VALUE_Cstring (s:string)
+| VALUE_None  (* "token" constant *)
 | VALUE_Undef
 | VALUE_Struct (fields: list (typ * value))
 | VALUE_Packed_struct (fields: list (typ * value))
 | VALUE_Array (elts: list (typ * value))
 | VALUE_Vector (elts: list (typ * value))
-| VALUE_Zero_initializer
-| VALUE_Cstring (s:string)
+| OP_IBinop (iop:ibinop) (t:typ) (v1:value) (v2:value)  
+| OP_ICmp (cmp:icmp) (t:typ) (v1:value) (v2:value)
+| OP_FBinop (fop:fbinop) (fm:list fast_math) (t:typ) (v1:value) (v2:value)
+| OP_FCmp (cmp:fcmp) (t:typ) (v1:value) (v2:value)
+| OP_Conversion (conv:conversion_type) (t_from:typ) (v:value) (t_to:typ)
+| OP_GetElementPtr (t:typ) (ptrval:(typ * value)) (idxs:list (typ * value))
+| OP_ExtractElement (vec:(typ * value)) (idx:(typ * value))
+| OP_InsertElement (vec:(typ * value)) (elt:(typ * value)) (idx:(typ * value))
+| OP_ShuffleVector (vec1:(typ * value)) (vec2:(typ * value)) (idxmask:(typ * value))
+| OP_ExtractValue (vec:(typ * value)) (idxs:list int)
+| OP_InsertValue (vec:(typ * value)) (elt:(typ * value)) (idxs:list int)
+| OP_Select (cnd:(typ * value)) (v1:(typ * value)) (v2:(typ * value)) (* if * then * else *)
 .
+
 
 Definition tvalue : Set := typ * value.
 
+Inductive instr_id : Set :=
+| IAnon (n:int)    (* Anonymous instruction value, must be in sequence: %1 %2 %3, etc. *)
+| IName (s:string) (* Explicitly named local value  %foo %bar etc. *)
+| IVoid (n:int)    (* "Void" return type, each with unique number *)
+.
+        
 Inductive instr : Set :=
-| INSTR_IBinop (iop:ibinop) (t:typ) (v1:value) (v2:value)
-| INSTR_ICmp (cmp:icmp) (t:typ) (v1:value) (v2:value)
-| INSTR_FBinop (fop:fbinop) (fm:list fast_math) (t:typ) (v1:value) (v2:value)
-| INSTR_FCmp (cmp:fcmp) (t:typ) (v1:value) (v2:value)
-| INSTR_Conversion (conv:conversion_type) (t_from:typ) (v:value) (t_to:typ)
-| INSTR_GetElementPtr (t:typ) (ptrval:tvalue) (idxs:list tvalue)
-| INSTR_ExtractElement (vec:tvalue) (idx:tvalue)
-| INSTR_InsertElement (vec:tvalue) (elt:tvalue) (idx:tvalue)
-| INSTR_ShuffleVector (vec1:tvalue) (vec2:tvalue) (idxmask:tvalue)
-| INSTR_ExtractValue (vec:tvalue) (idxs:list int)
-| INSTR_InsertValue (vec:tvalue) (elt:tvalue) (idxs:list int)
-
-| INSTR_Call (fn:tident) (args:list tvalue)
+| INSTR_Op (op:value)   (* INVARIANT: op must be of the form OP_... *)
+| INSTR_Call (fn:tident) (args:list tvalue)    (* corner case: if return type is void *)
+| INSTR_Phi (t:typ) (args:list (value * ident))
 
 | INSTR_Alloca (t:typ) (nb: option tvalue) (align:option int) (* typ, nb el, align *)
 | INSTR_Load (volatile:bool) (t:typ) (ptr:tvalue) (align:option int) (* FIXME: use tident instead of value *)
-| INSTR_Phi (t:typ) (args:list (value * ident))
-| INSTR_Select (cnd:tvalue) (v1:tvalue) (v2:tvalue) (* if * then * else *)
-
-| INSTR_VAArg
-| INSTR_LandingPad
 
 | INSTR_Store (volatile:bool) (val:tvalue) (ptr:tident) (align:option int)
 | INSTR_Fence
@@ -216,20 +225,20 @@ Inductive instr : Set :=
 | INSTR_AtomicRMW
 
 (* Terminators *)
+(* Types in branches are TYPE_Label constant *)
 | INSTR_Invoke (fnptrval:tident) (args:list tvalue) (to_label:tident) (unwind_label:tident)
 | INSTR_Ret (v:tvalue)
 | INSTR_Ret_void
-(* Types in branches are TYPE_Label constant *)
 | INSTR_Br (v:tvalue) (br1:tident) (br2:tident) 
 | INSTR_Br_1 (br:tident)
 | INSTR_Switch (v:tvalue) (default_dest:tident) (brs: list (tvalue * tident))
 | INSTR_IndirectBr (v:tvalue) (brs:list tident) (* address * possible addresses (labels) *)
 | INSTR_Resume (v:tvalue)
+
 | INSTR_Unreachable
 
-(* Special `assign` instruction:
- * not a real LLVM instruction, allow to bind an identifier to an instruction *)
-| INSTR_Assign (id:ident) (ins:instr)
+| INSTR_VAArg
+| INSTR_LandingPad
 .
 
 Inductive thread_local_storage : Set :=
@@ -270,7 +279,7 @@ Inductive block_label : Set :=
 | BName (s:string)
 .
         
-Definition block : Set := block_label * list instr.
+Definition block : Set := block_label * list (instr_id * instr).
 
 Record definition :=
   mk_definition

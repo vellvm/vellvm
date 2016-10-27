@@ -20,9 +20,8 @@ Definition mangle_declaration (d:declaration) : declaration :=
     (dc_param_attrs d)
 .
 
-Definition mangle_instr (i:instr) : instr :=
+Definition mangle_instr (i:instr_id * instr) : (instr_id * instr) :=
   match i with
-  | INSTR_Assign s j => INSTR_Assign (mangle_ident s) i
   | _ => i
   end.
 
