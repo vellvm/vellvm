@@ -7,10 +7,16 @@ Parameter str_cat : string -> string -> string.
 Parameter str_nil : string.
 Parameter str_cons : (ascii * string) -> string.
 
+Definition mangle_raw_id (id:raw_id) : raw_id :=
+  match id with
+  | Anon n => id
+  | Name s => Name (str_cat "_vellvm" s)
+  end.
+
 Definition mangle_ident (id:ident) : ident :=
   match id with
-  | ID_Global s => ID_Global (str_cat s "_vellvm")
-  | ID_Local s => ID_Local (str_cat s "_vellvm")
+  | ID_Global i => ID_Global (mangle_raw_id i)
+  | ID_Local i => ID_Local (mangle_raw_id i)
   end.
 
 Definition mangle_declaration (d:declaration) : declaration :=

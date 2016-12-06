@@ -24,5 +24,5 @@ Extract Inductive string => "string" [ "str_nil" "str_cons" ].
 Extract Inlined Constant int => "int".
 Extract Inlined Constant float => "float".
 
-(* Extraction Library Datatypes. *)
+Extraction Library Datatypes. 
 Extraction Library Ollvm_ast.

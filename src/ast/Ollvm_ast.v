@@ -112,10 +112,16 @@ Inductive fn_attr : Set :=
 | FNATTR_Key_value (kv : string * string) (* "unsafe-fp-math"="false" *)
 | FNATTR_Attr_grp (g:int)
 .
-                  
+
+
+Inductive raw_id : Set :=
+| Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, etc. *)  
+| Anon (n:int)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
+.
+       
 Inductive ident : Set :=
-| ID_Global (id:string)
-| ID_Local  (id:string)
+| ID_Global (id:raw_id)   (* %id *)
+| ID_Local  (id:raw_id)   (* @id *)
 .
               
 Inductive typ : Set :=
@@ -206,9 +212,8 @@ Inductive value : Set :=
 Definition tvalue : Set := typ * value.
 
 Inductive instr_id : Set :=
-| IAnon (n:int)    (* Anonymous instruction value, must be in sequence: %1 %2 %3, etc. *)
-| IName (s:string) (* Explicitly named local value  %foo %bar etc. *)
-| IVoid (n:int)    (* "Void" return type, each with unique number *)
+| IId   (id:raw_id)    (* Anonymous or explicitly named instructions *)
+| IVoid (n:int)        (* "Void" return type, each with unique number (NOTE: these are distinct from Anon raw_id)*)
 .
         
 Inductive instr : Set :=
@@ -274,10 +279,7 @@ Record declaration : Set :=
     dc_param_attrs: list param_attr * list (list param_attr);
   }.
 
-Inductive block_label : Set :=
-| BAnon (n:int)
-| BName (s:string)
-.
+Definition block_label : Set := raw_id.
         
 Definition block : Set := block_label * list (instr_id * instr).
 
@@ -301,7 +303,7 @@ Record definition :=
 Inductive metadata : Set :=
   | METADATA_Const (tv:tvalue)
   | METADATA_Null
-  | METADATA_Id (id:string)
+  | METADATA_Id (id:raw_id)
   | METADATA_String (str:string)
   | METADATA_Named (strs:list string)
   | METADATA_Node (mds:list metadata)
@@ -315,7 +317,7 @@ Inductive toplevel_entity : Set :=
 | TLE_Type_decl (id:ident) (t:typ)
 | TLE_Source_filename (s:string)
 | TLE_Global (g:global)
-| TLE_Metadata (s:string) (md:metadata)
+| TLE_Metadata (id:raw_id) (md:metadata)
 | TLE_Attribute_group (i:int) (attrs:list fn_attr).
 
 Record modul : Set :=
