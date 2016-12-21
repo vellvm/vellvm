@@ -273,7 +273,7 @@ Record global : Set :=
 Record declaration : Set :=
   mk_declaration
   {
-    dc_name: ident;
+    dc_name: ident;  (* SAZ: could be raw_id since this should always be an ID_Global *)
     dc_type: typ; (* TYPE_Function (ret_t * args_t) *)
     (* ret_attrs * args_attrs *)
     dc_param_attrs: list param_attr * list (list param_attr);
