@@ -26,10 +26,15 @@ let link_mode = ref ""
 let clang mode opt_level =
   Printf.sprintf "clang %s %s %s -o " mode opt_level !clang_flags
 
+let llc opt_level =
+  Printf.sprintf "llc %s" opt_level
+
 let clang_cmd opt_level = clang !clang_ll_mode opt_level
 let as_cmd    opt_level = clang !as_mode opt_level
 let link_cmd  opt_level = clang !link_mode opt_level
 let clang_parse_cmd = clang "-S -emit-llvm -w" "-O0"
+
+let llc_compile_cmd = llc "-O0"
 
 let pp_cmd = ref "cpp -E " 
 let rm_cmd = ref "rm -rf " 
@@ -112,6 +117,10 @@ let clang_compile (dot_ll:string) (dot_s:string) (opt_level:string) : unit =
 
 let clang_parse (in_dot_ll:string) (out_dot_ll:string) : unit =
   sh (sprintf "%s%s %s" clang_parse_cmd out_dot_ll in_dot_ll) raise_error
+
+let llc_compile (in_dot_ll:string) : unit =
+  sh (sprintf "%s %s" llc_compile_cmd in_dot_ll) raise_error
+
 
 let assemble (dot_s:string) (dot_o:string) (opt_level:string) : unit =
   sh (sprintf "%s%s %s" (as_cmd opt_level) dot_o dot_s) raise_error

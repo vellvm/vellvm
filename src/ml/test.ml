@@ -16,6 +16,8 @@ let parse_pp_test path =
   let prog = parse_file path in
   let _ = output_file vll_file prog in
   let _ = clang_parse vll_file clang_vll_file in
+  let _ = Printf.fprintf stderr "Running llc on: %s\n%!" vll_file in
+  let _ = llc_compile vll_file in
   ()
 
 

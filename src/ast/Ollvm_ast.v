@@ -175,40 +175,45 @@ Inductive conversion_type : Set :=
 
 Definition tident : Set := (typ * ident)%type.
 
-(* Should really be called operands or expresions *)
-(* NOTE: 
+
+(* NOTES: 
    This datatype is more permissive than legal in LLVM:
      - it allows identifiers to appear nested inside of "constant expressions"
-*)
-Inductive value : Set :=
-| VALUE_Ident (id:ident)  
+
+   Integer values should be OCaml int64 or some other machine-word compatible thing.
+ *)
+Inductive Expr (a:Set) : Set :=
+| VALUE_Ident   (id:ident)  
 | VALUE_Integer (x:int)
-| VALUE_Float (f:float)
-| VALUE_Bool (b:bool)
+| VALUE_Float   (f:float)
+| VALUE_Bool    (b:bool)
 | VALUE_Null
 | VALUE_Zero_initializer
 | VALUE_Cstring (s:string)
-| VALUE_None  (* "token" constant *)
+| VALUE_None                                       (* "token" constant *)
 | VALUE_Undef
-| VALUE_Struct (fields: list (typ * value))
-| VALUE_Packed_struct (fields: list (typ * value))
-| VALUE_Array (elts: list (typ * value))
-| VALUE_Vector (elts: list (typ * value))
-| OP_IBinop (iop:ibinop) (t:typ) (v1:value) (v2:value)  
-| OP_ICmp (cmp:icmp) (t:typ) (v1:value) (v2:value)
-| OP_FBinop (fop:fbinop) (fm:list fast_math) (t:typ) (v1:value) (v2:value)
-| OP_FCmp (cmp:fcmp) (t:typ) (v1:value) (v2:value)
-| OP_Conversion (conv:conversion_type) (t_from:typ) (v:value) (t_to:typ)
-| OP_GetElementPtr (t:typ) (ptrval:(typ * value)) (idxs:list (typ * value))
-| OP_ExtractElement (vec:(typ * value)) (idx:(typ * value))
-| OP_InsertElement (vec:(typ * value)) (elt:(typ * value)) (idx:(typ * value))
-| OP_ShuffleVector (vec1:(typ * value)) (vec2:(typ * value)) (idxmask:(typ * value))
-| OP_ExtractValue (vec:(typ * value)) (idxs:list int)
-| OP_InsertValue (vec:(typ * value)) (elt:(typ * value)) (idxs:list int)
-| OP_Select (cnd:(typ * value)) (v1:(typ * value)) (v2:(typ * value)) (* if * then * else *)
+| VALUE_Struct        (fields: list (typ * a))
+| VALUE_Packed_struct (fields: list (typ * a))
+| VALUE_Array         (elts: list (typ * a))
+| VALUE_Vector        (elts: list (typ * a))
+| OP_IBinop           (iop:ibinop) (t:typ) (v1:a) (v2:a)  
+| OP_ICmp             (cmp:icmp)   (t:typ) (v1:a) (v2:a)
+| OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:typ) (v1:a) (v2:a)
+| OP_FCmp             (cmp:fcmp)   (t:typ) (v1:a) (v2:a)
+| OP_Conversion     (conv:conversion_type) (t_from:typ) (v:a) (t_to:typ)
+| OP_GetElementPtr  (t:typ) (ptrval:(typ * a)) (idxs:list (typ * a))
+| OP_ExtractElement (vec:(typ * a)) (idx:(typ * a))
+| OP_InsertElement  (vec:(typ * a)) (elt:(typ * a)) (idx:(typ * a))
+| OP_ShuffleVector  (vec1:(typ * a)) (vec2:(typ * a)) (idxmask:(typ * a))
+| OP_ExtractValue   (vec:(typ * a)) (idxs:list int)
+| OP_InsertValue    (vec:(typ * a)) (elt:(typ * a)) (idxs:list int)
+| OP_Select         (cnd:(typ * a)) (v1:(typ * a)) (v2:(typ * a)) (* if * then * else *)
 .
 
-
+(* static values *)
+Inductive value : Set :=
+| SV : Expr value -> value.
+            
 Definition tvalue : Set := typ * value.
 
 Inductive instr_id : Set :=
