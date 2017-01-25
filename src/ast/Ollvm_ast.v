@@ -120,8 +120,8 @@ Inductive raw_id : Set :=
 .
        
 Inductive ident : Set :=
-| ID_Global (id:raw_id)   (* %id *)
-| ID_Local  (id:raw_id)   (* @id *)
+| ID_Global (id:raw_id)   (* @id *)
+| ID_Local  (id:raw_id)   (* %id *)
 .
               
 Inductive typ : Set :=
@@ -177,9 +177,17 @@ Definition tident : Set := (typ * ident)%type.
 
 
 (* NOTES: 
-   This datatype is more permissive than legal in LLVM:
+
+  This is the "functorial" presentation of the syntax.  Note that the 'value' type 
+  declared below actually creates the fixpoint.  Setting things up this way means 
+  that we can re-use this functor for defining the dynamic values (over in
+  StepSemantics.v) but we have to do some work to define appropriate induction
+  principles (see AstInd.v).
+
+  This datatype is more permissive than legal in LLVM:
      - it allows identifiers to appear nested inside of "constant expressions"
 
+  TODO:
    Integer values should be OCaml int64 or some other machine-word compatible thing.
  *)
 Inductive Expr (a:Set) : Set :=
@@ -200,14 +208,14 @@ Inductive Expr (a:Set) : Set :=
 | OP_ICmp             (cmp:icmp)   (t:typ) (v1:a) (v2:a)
 | OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:typ) (v1:a) (v2:a)
 | OP_FCmp             (cmp:fcmp)   (t:typ) (v1:a) (v2:a)
-| OP_Conversion     (conv:conversion_type) (t_from:typ) (v:a) (t_to:typ)
-| OP_GetElementPtr  (t:typ) (ptrval:(typ * a)) (idxs:list (typ * a))
-| OP_ExtractElement (vec:(typ * a)) (idx:(typ * a))
-| OP_InsertElement  (vec:(typ * a)) (elt:(typ * a)) (idx:(typ * a))
-| OP_ShuffleVector  (vec1:(typ * a)) (vec2:(typ * a)) (idxmask:(typ * a))
-| OP_ExtractValue   (vec:(typ * a)) (idxs:list int)
-| OP_InsertValue    (vec:(typ * a)) (elt:(typ * a)) (idxs:list int)
-| OP_Select         (cnd:(typ * a)) (v1:(typ * a)) (v2:(typ * a)) (* if * then * else *)
+| OP_Conversion       (conv:conversion_type) (t_from:typ) (v:a) (t_to:typ)
+| OP_GetElementPtr    (t:typ) (ptrval:(typ * a)) (idxs:list (typ * a))
+| OP_ExtractElement   (vec:(typ * a)) (idx:(typ * a))
+| OP_InsertElement    (vec:(typ * a)) (elt:(typ * a)) (idx:(typ * a))
+| OP_ShuffleVector    (vec1:(typ * a)) (vec2:(typ * a)) (idxmask:(typ * a))
+| OP_ExtractValue     (vec:(typ * a)) (idxs:list int)
+| OP_InsertValue      (vec:(typ * a)) (elt:(typ * a)) (idxs:list int)
+| OP_Select           (cnd:(typ * a)) (v1:(typ * a)) (v2:(typ * a)) (* if * then * else *)
 .
 
 (* static values *)
@@ -222,13 +230,13 @@ Inductive instr_id : Set :=
 .
         
 Inductive instr : Set :=
-| INSTR_Op (op:value)   (* INVARIANT: op must be of the form OP_... *)
-| INSTR_Call (fn:tident) (args:list tvalue)    (* corner case: if return type is void *)
-| INSTR_Phi (t:typ) (args:list (value * ident))
+| INSTR_Op   (op:value)                          (* INVARIANT: op must be of the form SV (OP_ ...) *)
+| INSTR_Call (fn:tident) (args:list tvalue)      (* CORNER CASE: return type is void treated specially *)
 
-| INSTR_Alloca (t:typ) (nb: option tvalue) (align:option int) (* typ, nb el, align *)
-| INSTR_Load (volatile:bool) (t:typ) (ptr:tvalue) (align:option int) (* FIXME: use tident instead of value *)
+| INSTR_Phi  (t:typ) (args:list (value * ident))
 
+| INSTR_Alloca (t:typ) (nb: option tvalue) (align:option int) 
+| INSTR_Load  (volatile:bool) (t:typ) (ptr:tvalue) (align:option int)       (* OLLVM FIXME: use tident instead of value? *)
 | INSTR_Store (volatile:bool) (val:tvalue) (ptr:tident) (align:option int)
 | INSTR_Fence
 | INSTR_AtomicCmpXchg
@@ -236,14 +244,14 @@ Inductive instr : Set :=
 
 (* Terminators *)
 (* Types in branches are TYPE_Label constant *)
-| INSTR_Invoke (fnptrval:tident) (args:list tvalue) (to_label:tident) (unwind_label:tident)
-| INSTR_Ret (v:tvalue)
+| INSTR_Invoke     (fnptrval:tident) (args:list tvalue) (to_label:tident) (unwind_label:tident)
+| INSTR_Ret        (v:tvalue)
 | INSTR_Ret_void
-| INSTR_Br (v:tvalue) (br1:tident) (br2:tident) 
-| INSTR_Br_1 (br:tident)
-| INSTR_Switch (v:tvalue) (default_dest:tident) (brs: list (tvalue * tident))
+| INSTR_Br         (v:tvalue) (br1:tident) (br2:tident) 
+| INSTR_Br_1       (br:tident)
+| INSTR_Switch     (v:tvalue) (default_dest:tident) (brs: list (tvalue * tident))
 | INSTR_IndirectBr (v:tvalue) (brs:list tident) (* address * possible addresses (labels) *)
-| INSTR_Resume (v:tvalue)
+| INSTR_Resume     (v:tvalue)
 
 | INSTR_Unreachable
 
@@ -278,10 +286,17 @@ Record global : Set :=
 Record declaration : Set :=
   mk_declaration
   {
-    dc_name: ident;  (* SAZ: could be raw_id since this should always be an ID_Global *)
-    dc_type: typ; (* TYPE_Function (ret_t * args_t) *)
-    (* ret_attrs * args_attrs *)
-    dc_param_attrs: list param_attr * list (list param_attr);
+    dc_name        : ident;  (* SAZ: could be raw_id since this should always be an ID_Global *)
+    dc_type        : typ;    (* INVARIANT: should be TYPE_Function (ret_t * args_t) *)
+    dc_param_attrs : list param_attr * list (list param_attr); (* ret_attrs * args_attrs *)
+    dc_linkage     : option linkage;
+    dc_visibility  : option visibility;
+    dc_dll_storage : option dll_storage;
+    dc_cconv       : option cconv;
+    dc_attrs       : list fn_attr;
+    dc_section     : option string;
+    dc_align       : option int;
+    dc_gc          : option string;
   }.
 
 Definition block_label : Set := raw_id.
@@ -291,39 +306,31 @@ Definition block : Set := block_label * list (instr_id * instr).
 Record definition :=
   mk_definition
   {
-  df_prototype: declaration;
-  df_args: list ident;
-  df_instrs: list block;
-
-  df_linkage: option linkage;
-  df_visibility: option visibility;
-  df_dll_storage: option dll_storage;
-  df_cconv: option cconv;
-  df_attrs: list fn_attr;
-  df_section: option string;
-  df_align: option int;
-  df_gc: option string;
-}.
+    df_prototype   : declaration;
+    df_args        : list ident;
+    df_instrs      : list block;
+  }.
 
 Inductive metadata : Set :=
-  | METADATA_Const (tv:tvalue)
+  | METADATA_Const  (tv:tvalue)
   | METADATA_Null
-  | METADATA_Id (id:raw_id)
+  | METADATA_Id     (id:raw_id)
   | METADATA_String (str:string)
-  | METADATA_Named (strs:list string)
-  | METADATA_Node (mds:list metadata)
+  | METADATA_Named  (strs:list string)
+  | METADATA_Node   (mds:list metadata)
 .
 
 Inductive toplevel_entity : Set :=
-| TLE_Target (tgt:string)
-| TLE_Datalayout (layout:string)
-| TLE_Declaration (decl:declaration)
-| TLE_Definition (defn:definition)
-| TLE_Type_decl (id:ident) (t:typ)
+| TLE_Target          (tgt:string)
+| TLE_Datalayout      (layout:string)
+| TLE_Declaration     (decl:declaration)
+| TLE_Definition      (defn:definition)
+| TLE_Type_decl       (id:ident) (t:typ)
 | TLE_Source_filename (s:string)
-| TLE_Global (g:global)
-| TLE_Metadata (id:raw_id) (md:metadata)
-| TLE_Attribute_group (i:int) (attrs:list fn_attr).
+| TLE_Global          (g:global)
+| TLE_Metadata        (id:raw_id) (md:metadata)
+| TLE_Attribute_group (i:int) (attrs:list fn_attr)
+.
 
 Record modul : Set :=
   mk_modul

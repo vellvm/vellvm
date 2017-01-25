@@ -80,9 +80,11 @@ let path_to_basename_ext (path:string) : string * string =
   let _ = if (List.length paths) = 0 then failwith @@ sprintf "bad path: %s" path in
   let filename = List.hd (List.rev paths) in
   match Str.split (Str.regexp_string ".") filename with
+  | [] -> failwith @@ sprintf "no filename found: %s" filename 
   | [root] -> root, ""
-  | [root; ext] -> root, ext
-  | _ -> failwith @@ sprintf "bad filename: %s" filename
+  | l ->
+    let ext::rst = List.rev l in
+    (String.concat "" (List.rev rst), ext)
 
 (* compilation and shell commands-------------------------------------------- *)
 
@@ -121,6 +123,8 @@ let clang_parse (in_dot_ll:string) (out_dot_ll:string) : unit =
 let llc_compile (in_dot_ll:string) : unit =
   sh (sprintf "%s %s" llc_compile_cmd in_dot_ll) raise_error
 
+let llc_parse (in_dot_ll:string) : unit =
+  sh (sprintf "%s -filetype=null %s" llc_compile_cmd in_dot_ll) raise_error
 
 let assemble (dot_s:string) (dot_o:string) (opt_level:string) : unit =
   sh (sprintf "%s%s %s" (as_cmd opt_level) dot_o dot_s) raise_error

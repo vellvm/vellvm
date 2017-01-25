@@ -19,13 +19,6 @@ Definition mangle_ident (id:ident) : ident :=
   | ID_Local i => ID_Local (mangle_raw_id i)
   end.
 
-Definition mangle_declaration (d:declaration) : declaration :=
-  mk_declaration
-    (mangle_ident (dc_name d))
-    (dc_type d)
-    (dc_param_attrs d)
-.
-
 Definition mangle_instr (i:instr_id * instr) : (instr_id * instr) :=
   match i with
   | _ => i
@@ -43,14 +36,6 @@ Definition mangle_definition (d:definition) : definition :=
   (df_prototype d)
   (df_args d)
   (mangle_blocks (df_instrs d))
-  (df_linkage d)
-  (df_visibility d)
-  (df_dll_storage d)
-  (df_cconv d)
-  (df_attrs d)
-  (df_section d)
-  (df_align d)
-  (df_gc d)
 .
 
 
