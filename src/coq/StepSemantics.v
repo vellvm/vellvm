@@ -15,24 +15,31 @@ Set Implicit Arguments.
 *)
 Definition path := (ident * instr_id)%type.
 
-Definition cont := option path.
-
-(* SAZ: is 'cmd' (command) a good name for the pair of an instruction and its continuation? *)
-Definition cmd  := (instr * cont)%type.
+Inductive cmd : Set :=
+| Step  (i:instr) (p:path)
+| Jump  (i:instr)
+| Phis  (phis : list (instr_id * instr)) (p:path)
+.                    
                           
 Definition cfg := path -> option cmd.
 
 
-(* The set of dynamic values manipulated by an LLVM program. *)
-Inductive dval : Set :=
-| DInt (n:nat)
-
+(* The set of dynamic values manipulated by an LLVM program. This datatype
+   uses the "Expr" functor from the Ollvm_ast definition, injecting new base values.
+   This allows the semantics to do 'symbolic' execution for things that we don't 
+   have a way of interpreting concretely (e.g. undef).   
+*)
+Inductive dvalue : Set :=
+| DV : Expr dvalue -> dvalue
+| DVALUE_CodePointer (p : path)
+| DVALUE_Addr (a:nat)
 .  
 
 (* global or local environments *)
-Definition env := list (raw_id * dval).
+Definition env  := list (raw_id * dvalue).
 Inductive frame : Set :=
-| KRet (e:env) (id:raw_id) (q:path)
+| KRet      (e:env) (id:raw_id) (q:path)
+| KRet_void (e:env) (q:path)
 .       
           
 
@@ -45,64 +52,58 @@ Definition id_of_path (p:path) : option raw_id :=
   | _ => None
   end.
 
-Definition lookup_env (e:env) (id:raw_id) : option dval :=
+Definition lookup_env (e:env) (id:raw_id) : option dvalue :=
   None.
 
-Fixpoint eval_op (e:env) (o:value) : option dval :=
+Fixpoint eval_op (e:env) (o:value) : option dvalue :=
   None.
 
 
 Fixpoint step (CFG:cfg) (s:state) : option state :=
   let '(p, e, k) := s in
   do cmd <- CFG p;
-    let '(i, q) := cmd in
-
-    match i, q  with
-    | INSTR_Op op, Some p' =>
+    match cmd with
+    | Phis _ _ => None  (* not handled here *)
+      
+    | Step (INSTR_Op op) p' =>
       match id_of_path p, eval_op e op with
       | Some id, Some dv => Some (p', (id, dv)::e, k)
       | _, _ => None
       end
+        
+    | Step (INSTR_Call f args) p' => None
+  
+    | Step (INSTR_Alloca t nb align) p' => None  (* typ, nb el, align *)
 
-    | INSTR_Call f args, Some p' =>
-      match id_of_path p, 
-      
+    | Step (INSTR_Load volatile t ptr align) p' => None
+    | Step (INSTR_Store volatile val ptr align) p' => None
 
-    (* PHI Evaluation is handled as part of jump *)
-    | INSTR_Phi t args, _ => None  (* Cannot directly execute a Phi *)
-
-                              
-    | INSTR_Alloca t nb align, _ => None  (* typ, nb el, align *)
-
-    | INSTR_Load volatile t ptr align, Some p' => None
-    | INSTR_Store volatile val ptr align, None (* SHOULD NOT DEFINE *) => None
-
-
-    | INSTR_Ret v, None =>
+    | Step (INSTR_Unreachable) _ => None
+                                                       
+    | Jump (INSTR_Ret v) =>
       None
 
-    | INSTR_Ret_void, None =>
+    | Jump (INSTR_Ret_void) =>
       None
 
-    | INSTR_Br v br1 br2, None =>
+    | Jump (INSTR_Br v br1 br2) =>
       None
         
-    | INSTR_Br_1 br, None =>
+    | Jump (INSTR_Br_1 br) =>
       None
         
-    | INSTR_Unreachable, _ => None
-
-    | INSTR_Switch v default_dest br, None => None
-    | INSTR_IndirectBr v brs, None => None  (* address * possible addresses (labels) *)
-    | INSTR_Resume v, None => None
-    | INSTR_Invoke fnptrval args to_label unwind_label, _ => None
+    | Jump (INSTR_Switch v default_dest br) => None
+    | Jump (INSTR_IndirectBr v brs) => None  (* address * possible addresses (labels) *)
+    | Jump (INSTR_Resume v) => None
+    | Jump (INSTR_Invoke fnptrval args to_label unwind_label) => None
                                                               
-    | ( INSTR_Fence
+    | Step (
+        INSTR_Fence
       | INSTR_AtomicCmpXchg
       | INSTR_AtomicRMW
       | INSTR_VAArg
-      | INSTR_LandingPad), _ => None
+      | INSTR_LandingPad) _ => None
 
                               
-    | _, _ => None
+    | _ => None
     end.

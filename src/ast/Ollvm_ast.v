@@ -236,8 +236,8 @@ Inductive instr : Set :=
 | INSTR_Phi  (t:typ) (args:list (value * ident))
 
 | INSTR_Alloca (t:typ) (nb: option tvalue) (align:option int) 
-| INSTR_Load  (volatile:bool) (t:typ) (ptr:tvalue) (align:option int)       (* OLLVM FIXME: use tident instead of value? *)
-| INSTR_Store (volatile:bool) (val:tvalue) (ptr:tident) (align:option int)
+| INSTR_Load  (volatile:bool) (t:typ) (ptr:tvalue) (align:option int)       
+| INSTR_Store (volatile:bool) (val:tvalue) (ptr:tvalue) (align:option int)
 | INSTR_Fence
 | INSTR_AtomicCmpXchg
 | INSTR_AtomicRMW
