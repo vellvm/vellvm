@@ -1,4 +1,4 @@
-Add Rec LoadPath "/Users/stevez/vellvm/lib/paco/src" as Paco.
+Add Rec LoadPath "/home/richard/vellvm/src/coq" as Vellvm.
 Require Import paco.
 Require Import List Bool String Ascii.
 Require Import Omega.
@@ -86,7 +86,8 @@ Inductive instr_id : Set :=
 Scheme Equality for instr_id.
 
 Inductive instr : Set :=
-| INSTR_Op   (op:value)                          (* INVARIANT: op must be of the form SV (OP_ ...) *)
+| INSTR_Op   (op:value)                          (* INVARIANT: op must be of the form SV (OP_ ...) 
+                                                  With this invariant, how do we assign constants? *)
 | INSTR_Call (fn:tident) (args:list tvalue)      (* CORNER CASE: return type is void treated specially *)
 
 | INSTR_Phi  (t:typ) (args:list (ident * value))
@@ -190,6 +191,131 @@ Record cfg := mkCFG
   blks : function_id -> block_id -> option block_entry;  
 }.
 
+Definition code_concrete := list (raw_id * list (raw_id * list (instr_id * cmd))).
+Definition funs_concrete := list (function_id * (list ident * block_id * instr_id)).
+Definition blks_concrete := list (raw_id * list (raw_id * block_entry)).
+
+Definition code_func cc p : option cmd :=
+  do blocks <- assoc raw_id_eq_dec (fn p) cc;
+  do instrs <- assoc raw_id_eq_dec (bn p) blocks;
+  assoc instr_id_eq_dec (ins p) instrs.
+
+Definition funs_func fc fid : option (list ident * block_id * instr_id) :=
+  assoc raw_id_eq_dec fid fc.
+
+Definition blks_func (bc : blks_concrete) fid bid : option (block_entry) :=
+  do blocks <- assoc local_id_eq_dec fid bc;
+  assoc local_id_eq_dec bid blocks.
+  
+Record concrete_cfg := mkConcreteCFG
+{
+  init_c : path;
+  code_c : code_concrete;
+  funs_c : funs_concrete;
+  blks_c : blks_concrete
+}.
+
+Definition cfg_of_concrete cc := {|
+  init := init_c cc;
+  code := code_func (code_c cc);
+  funs := funs_func (funs_c cc);
+  blks := blks_func (blks_c cc) |}.
+    
+Fixpoint cfold_val (d : value) : value :=
+  match d with
+    | SV s =>
+      match s with
+        | VALUE_Ident _ id => SV (VALUE_Ident value id)  
+        | VALUE_Integer _ x => SV (VALUE_Integer value x)
+        | VALUE_Bool _ b => SV (VALUE_Bool value b)
+        | VALUE_Null _ => SV (VALUE_Null value)
+        | VALUE_Undef _ => SV (VALUE_Undef value)
+        | OP_IBinop ib t v1 v2 =>
+          let cv1 := cfold_val v1 in
+          let cv2 := cfold_val v2 in
+          match cv1, cv2 with
+            | SV (VALUE_Integer _ x), SV (VALUE_Integer _ y) =>
+              match ib with
+                | Add => SV (VALUE_Integer value (x + y))
+                | Sub => SV (VALUE_Integer value (x - y))
+                | Mul => SV (VALUE_Integer value (x * y))
+              end
+            | _ , _ => SV (OP_IBinop ib t cv1 cv2)
+          end
+        | OP_ICmp ic t v1 v2 =>
+          let cv1 := cfold_val v1 in
+          let cv2 := cfold_val v2 in
+          match cv1, cv2 with
+            | SV (VALUE_Integer _ x), SV (VALUE_Integer _ y) =>
+              match ic with
+                | Eq => SV (VALUE_Bool value (nat_beq x y))
+                | Ule => SV (VALUE_Bool value (leb x y)) 
+              end
+            | _, _ => SV (OP_ICmp ic t cv1 cv2)
+          end
+      end
+  end.
+
+Definition cfold_instr i :=
+  match i with
+    | INSTR_Op o => INSTR_Op (cfold_val o)
+    | INSTR_Call fn args => INSTR_Call fn (map (fun p => (fst p, cfold_val (snd p))) args)
+    | INSTR_Phi t args => INSTR_Phi t (map (fun p => (fst p, cfold_val (snd p))) args)
+    | INSTR_Alloca t => INSTR_Alloca t
+    | INSTR_Load t (a, b) => INSTR_Load t (a, cfold_val b) 
+    | INSTR_Store (a, b) ptr => INSTR_Store (a, cfold_val b) ptr
+                                            
+    (* Terminators *)
+    | INSTR_Ret (a, b) => INSTR_Ret (a, cfold_val b)
+    | INSTR_Ret_void => INSTR_Ret_void
+    | INSTR_Br (a, b) v1 v2 => INSTR_Br (a, cfold_val b) v1 v2 
+    | INSTR_Br_1 b => INSTR_Br_1 b
+    | INSTR_Unreachable => INSTR_Unreachable
+  end.
+
+Definition cfold_cmd c :=
+  match c with
+    | Step i p => Step (cfold_instr i) p
+    | Jump p => Jump p
+  end.
+
+Definition cfold_phis (ps : list (local_id * instr)) :=
+  map (fun p => (fst p, cfold_instr (snd p))) ps.
+
+Definition cfold_block_entry b :=
+  match b with
+    | Phis ls p => Phis (cfold_phis ls) p
+  end.
+
+Definition cfold_code_concrete (cc : code_concrete) : code_concrete :=
+  map (fun p => (fst p, map (fun p => (fst p, map (fun p => (fst p, cfold_cmd (snd p))) (snd p))) (snd p))) cc.
+
+Definition cfold_blks_concrete (bc : blks_concrete) : blks_concrete :=
+  map (fun p => (fst p, map (fun p => (fst p, cfold_block_entry (snd p))) (snd p))) bc.
+
+Definition cfold_cfg cfg :=
+  {|
+    init_c := init_c cfg;
+    code_c := cfold_code_concrete (code_c cfg);
+    blks_c := cfold_blks_concrete (blks_c cfg);
+    funs_c := (funs_c cfg)
+  |}.
+
+Definition cfold cfg :=
+  {|
+    init := init cfg;
+    code := fun p => match (code cfg p) with
+                       | None => None
+                       | Some x => Some (cfold_cmd x)
+                     end;
+    funs := funs cfg;
+    blks := fun fid bid =>
+              match (blks cfg fid bid) with
+                | None => None
+                | Some x => Some (cfold_block_entry x)
+              end
+  |}.
+
 
 (* The set of dynamic values manipulated by an LLVM program. This datatype
    uses the "Expr" functor from the Ollvm_ast definition, injecting new base values.
@@ -262,6 +388,7 @@ Definition eval_expr {A:Set} (f:env -> A -> option dvalue) (e:env) (o:Expr A) : 
     do i <- raw_id_of_ident id;
       lookup_env e i
   | VALUE_Integer _ x => Some (DV (VALUE_Integer _ x))
+  | VALUE_Bool _ b => Some (DV (VALUE_Bool _ b)) (* Why is this missing? *)
   | VALUE_Null _  => Some (DV (VALUE_Null _))
   | VALUE_Undef _ => Some (DV (VALUE_Undef _))
   | OP_IBinop iop _ op1 op2 =>
@@ -272,8 +399,6 @@ Definition eval_expr {A:Set} (f:env -> A -> option dvalue) (e:env) (o:Expr A) : 
     do v1 <- f e op1;
     do v2 <- f e op2;
     (eval_icmp cmp) v1 v2
-
-  | _ => None
   end.
 
 Fixpoint eval_op (e:env) (o:value) : option dvalue :=
@@ -297,7 +422,7 @@ Fixpoint jump (CFG:cfg) (p:path) (e_init:env) (e:env) ps (q:path) (k:stack) : op
   | _ => None
   end.
 
-Fixpoint step (CFG:cfg) (s:state) : option state :=
+Definition step (CFG:cfg) (s:state) : option state :=
   let '(p, e, k) := s in
   do cmd <- (code CFG) p;
     match cmd with
@@ -365,6 +490,66 @@ Fixpoint step (CFG:cfg) (s:state) : option state :=
     | _ => None
     end.
 
+Lemma cfold_eval_op_correct :
+  forall v st, eval_op st (cfold_val v) = eval_op st v.
+Proof.
+  intros. induction v using value_ind'; eauto.
+  - simpl. rewrite <- IHv1. rewrite <- IHv2.
+    destruct (cfold_val v1); eauto.
+    destruct e; eauto.
+    destruct (cfold_val v2); eauto.
+    destruct e; eauto.
+    simpl. destruct iop; eauto.
+  - simpl. rewrite <- IHv1. rewrite <- IHv2.
+    destruct (cfold_val v1); eauto.
+    destruct e; eauto.
+    destruct (cfold_val v2); eauto.
+    destruct e; eauto.
+    simpl. destruct cmp; eauto. 
+Qed.
+
+Lemma cfold_jump_correct :
+  forall cfg p e_old e ps q k,
+    jump cfg p e_old e ps q k = jump (cfold cfg) p e_old e (cfold_phis ps) q k.
+Proof.
+  intros. generalize dependent e. induction ps; eauto. destruct a. simpl.
+  intros. destruct i; eauto.
+  - simpl. (* relies on cfold_eval_op *) admit.
+  - destruct ptr. eauto.
+  - destruct ptr. destruct val; eauto.
+  - destruct v; eauto.
+  - destruct v; eauto.
+Admitted.
+  
+Theorem cfold_correct :
+  forall cfg st, step cfg st = step (cfold cfg) st.
+Proof.
+  intros. destruct st. destruct p. simpl.
+  destruct (code cfg0 p); eauto. simpl.
+  destruct c; unfold cfold_cmd.
+  - destruct i; simpl; try (destruct ptr); try (destruct val); try (destruct v); eauto.
+    + destruct (def_id_of_path p); eauto; simpl.
+      rewrite cfold_eval_op_correct; eauto.
+    + destruct fn0. destruct i; eauto.
+      destruct (def_id_of_path p); eauto; simpl.
+      destruct (funs cfg0 id); eauto; simpl.
+      destruct p1. destruct p1.
+      destruct (map_option raw_id_of_ident l); eauto; simpl. admit.
+  - destruct i; simpl; eauto.
+    + destruct v. destruct br1. destruct br2.
+      destruct (eval_op e v); eauto. destruct d; eauto.
+      destruct e0; eauto. destruct b; simpl.
+      destruct (raw_id_of_ident i); simpl; eauto.
+      destruct (blks cfg0 (bn p) r); simpl; eauto.
+      * destruct b; simpl. eapply cfold_jump_correct. 
+      * destruct (raw_id_of_ident i0); simpl; eauto.
+        destruct (blks cfg0 (bn p) r); simpl; eauto.
+        destruct b; simpl. eapply cfold_jump_correct. 
+    + destruct br. destruct (raw_id_of_ident i); simpl; eauto.
+      destruct (blks cfg0 (bn p) r); simpl; eauto.
+      destruct b; simpl; eapply cfold_jump_correct.
+Abort.      
+   
 Definition addr := nat.
 
 Inductive mem d : Type :=
@@ -381,6 +566,27 @@ CoInductive D X :=
 | Tau : D X -> D X
 | Eff : mem (D X) -> D X
 .
+
+Section UNFOLDING.
+
+Definition id_match_d {A} (d:D A) : D A :=
+  match d with
+    | Ret a => Ret a
+    | Fin => Fin
+    | Err => Err
+    | Tau d' => Tau d'
+    | Eff m => Eff m
+  end.
+
+Lemma id_d_eq : forall A (d:D A),
+  d = id_match_d d.
+Proof.
+  destruct d; auto.
+Qed.
+
+End UNFOLDING.
+
+Arguments id_d_eq {_} _ .
 
 (* TODO: look at Gil's paco library and read the paper about extensible coinduction *)
 (*
@@ -432,10 +638,16 @@ Hint Constructors d_equiv_mem_step d_equiv_step.  (* d_equiv *)
 
 Definition d_equiv {A} (p q : D A) := paco2 (@d_equiv_step A) bot2 p q.
 Hint Unfold d_equiv.
+  
 Lemma d_equiv_gen_mon A : monotone2 (@d_equiv_step A).
   pmonauto.
 Proof.
-Admitted.
+  unfold monotone2. intros. induction IN; eauto.
+  eapply d_equiv_step_eff. induction H.
+  - constructor. eauto.
+  - constructor. eauto.
+  - constructor. eauto.
+Qed.
 
 Hint Resolve d_equiv_gen_mon : paco.
 
@@ -509,38 +721,90 @@ Fixpoint taus {A} (n:nat) (d:D A) : D A :=
   | S n => Tau (taus n d)
   end.
 
+Lemma stutter_helper : forall {A} (d1 d2 : D A), d_equiv (Tau d1) d2 -> d_equiv d1 d2.
+Proof.
+  intros. punfold H. remember (Tau d1). induction H; try (solve [inversion Heqd]).
+  - inversion Heqd; subst. pfold. constructor. unfold upaco2 in H.
+    destruct H; inversion H. eapply d_equiv_gen_mon.
+    eapply SIM. eapply LE.
+  - inversion Heqd; subst. pfold. eapply H.
+  - inversion Heqd; subst. pfold. constructor.
+    eapply IHd_equiv_step in H0. punfold H0.
+Qed. 
+
+Lemma stutter_simpl : forall {A} (d1 d2 : D A) n, d_equiv (taus n d1) d2 -> d_equiv d1 d2.
+Proof.
+  intros. induction n. punfold H.
+  eapply IHn. simpl in H. eapply stutter_helper. eapply H.
+Qed.
+
+Lemma d_equiv_refl : forall {A} (d : D A), d_equiv d d.
+Proof.
+  intro. pcofix CIH.
+  intros. pfold. destruct d; eauto.
+  destruct m; eauto. 
+Qed.
+
+Lemma d_equiv_symm : forall {A} (d1 d2 : D A), d_equiv d1 d2 -> d_equiv d2 d1.
+Proof.
+  intro. pcofix CIH.
+  intros d1 d2 H.
+  punfold H. remember (upaco2 d_equiv_step bot2).
+  induction H; eauto; subst.
+  - pfold. constructor. right. eapply CIH.
+    destruct H; eauto. inversion H. 
+  - pfold. constructor. punfold IHd_equiv_step.
+  - pfold. constructor. punfold IHd_equiv_step.
+  - pfold. constructor. inversion H; subst.
+    + constructor. intro. specialize (H0 a). destruct H0.
+      right. eapply CIH. eapply H0. inversion H0.
+    + constructor. intro. specialize (H0 dv). destruct H0.
+      right. eapply CIH. eapply H0. inversion H0.
+    + constructor. right. eapply CIH. destruct H0; eauto. inversion H0. 
+Qed.
+
+Lemma stutters_trans : forall {A} (d1 d2 d3 : D A), d_equiv d1 d2 -> d_equiv d2 d3 -> d_equiv d1 d3.
+Proof.
+  intro. pcofix CIH.
+  intros d1 d2 d3 He12 He23. punfold He12. punfold He23.
+  remember (upaco2 d_equiv_step bot2).
+  induction He12.
+  - remember (Ret a). induction He23; eauto; try (solve [inversion Heqd]).
+    subst. pfold. constructor. specialize (IHHe23 eq_refl).
+    punfold IHHe23.
+  - remember Fin. induction He23; eauto; try (solve [inversion Heqd]).
+    subst. pfold. constructor. specialize (IHHe23 eq_refl).
+    punfold IHHe23.
+  - remember Err. induction He23; eauto; try (solve [inversion Heqd]).
+    subst. pfold. constructor. specialize (IHHe23 eq_refl).
+    punfold IHHe23.
+  - remember (Tau d2). induction He23; eauto; try (solve [inversion Heqd]).
+    + inversion Heqd; subst. pfold. constructor. right.
+      destruct H; destruct H0; try (solve [inversion H]); try (solve [inversion H0]); eauto.
+    + inversion Heqd; subst. eauto. admit.
+    + inversion Heqd; subst. pfold. specialize (IHHe23 H0). punfold IHHe23.
+  - specialize (IHHe12 He23). pfold. constructor. punfold IHHe12.
+  - remember (Tau d2). induction He23; eauto; try (solve [inversion Heqd]).
+    + inversion Heqd; subst.  admit.
+    + admit.
+    + admit.
+  - inversion He23; subst.
+    + admit.
+    + pfold. constructor. 
+Abort.
+
 Lemma stutter : forall {A} (d1 d2 : D A) n m, d_equiv (taus n d1) (taus m d2) -> d_equiv d1 d2.
 Proof.
   intros.
-  generalize dependent m.
-  induction n.
-  induction m. simpl.
-  intros. assumption.
-  simpl. intros. apply IHm. simpl. 
-Admitted.  
+  eapply stutter_simpl.
+  eapply d_equiv_symm.
+  eapply stutter_simpl.
+  eapply d_equiv_symm.
+  eauto.
+Qed.
 
 Inductive Empty :=.
 Definition DLim := D Empty.
-
-Section UNFOLDING.
-
-Definition id_match_d {A} (d:D A) : D A :=
-  match d with
-    | Ret a => Ret a
-    | Fin => Fin
-    | Err => Err
-    | Tau d' => Tau d'
-    | Eff m => Eff m
-  end.
-
-Lemma id_d_eq : forall A (d:D A),
-  d = id_match_d d.
-Proof.
-  destruct d; auto.
-Qed.
-
-End UNFOLDING.
-Arguments id_d_eq {_} _ .
 
 Definition mem_map {A B} (f:A -> B) (m:mem A) : mem B :=
   match m with
