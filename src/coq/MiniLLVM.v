@@ -1,4 +1,4 @@
-Add Rec LoadPath "/home/richard/vellvm/src/coq" as Vellvm.
+Add Rec LoadPath "/home/richard/vellvm/lib/paco/src" as Paco.
 Require Import paco.
 Require Import List Bool String Ascii.
 Require Import Omega.
