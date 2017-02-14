@@ -1,4 +1,5 @@
 Add Rec LoadPath "/home/richard/vellvm/lib/paco/src" as Paco.
+Add Rec LoadPath "/home/richard/vellvm/src/coq" as Vellvm.
 Require Import paco.
 Require Import List Bool String Ascii.
 Require Import Omega.
@@ -191,36 +192,60 @@ Record cfg := mkCFG
   blks : function_id -> block_id -> option block_entry;  
 }.
 
-Definition code_concrete := list (raw_id * list (raw_id * list (instr_id * cmd))).
-Definition funs_concrete := list (function_id * (list ident * block_id * instr_id)).
-Definition blks_concrete := list (raw_id * list (raw_id * block_entry)).
+Fixpoint entities_to_init ets : option path :=
+  match ets with
+    | [] => None
+    | (TLE_Definition d) :: t =>
+      if raw_id_beq (dc_name (df_prototype d)) (Name "main") then
+        match df_instrs d with
+          | [] => None
+          | (bid, []) :: _ => None
+          | (bid, (iid, _)::t) :: _ =>
+            Some {| fn := Name "main";
+                    bn := bid;
+                    ins := iid |}
+        end
+      else entities_to_init t
+  end.
 
-Definition code_func cc p : option cmd :=
-  do blocks <- assoc raw_id_eq_dec (fn p) cc;
-  do instrs <- assoc raw_id_eq_dec (bn p) blocks;
-  assoc instr_id_eq_dec (ins p) instrs.
+Fixpoint entities_to_funs ets fid :=
+  match ets with
+    | [] => None
+    | (TLE_Definition d) :: t =>
+      if raw_id_beq (dc_name (df_prototype d)) fid then
+        match df_instrs d with
+          | [] => None
+          | (bid, [])::_ => None
+          | (bid, (iid, _)::t)::_ =>
+            Some (map (fun x => ID_Local x) (df_args d), bid, iid)
+        end
+      else entities_to_funs t fid
+  end.
 
-Definition funs_func fc fid : option (list ident * block_id * instr_id) :=
-  assoc raw_id_eq_dec fid fc.
-
-Definition blks_func (bc : blks_concrete) fid bid : option (block_entry) :=
-  do blocks <- assoc local_id_eq_dec fid bc;
-  assoc local_id_eq_dec bid blocks.
-  
-Record concrete_cfg := mkConcreteCFG
-{
-  init_c : path;
-  code_c : code_concrete;
-  funs_c : funs_concrete;
-  blks_c : blks_concrete
-}.
-
-Definition cfg_of_concrete cc := {|
-  init := init_c cc;
-  code := code_func (code_c cc);
-  funs := funs_func (funs_c cc);
-  blks := blks_func (blks_c cc) |}.
+Fixpoint entities_to_blks ets fid bid : option block_entry :=
+  match ets with
+    | [] => None
+    | (TLE_Definition d) :: t =>
+      if raw_id_beq (dc_name (df_prototype d)) fid then
+        do bs <- assoc raw_id_eq_dec bid (df_instrs d);
+        None (* Do something here *)
+      else entities_to_blks t fid bid
+  end.
     
+
+(*Fixpoint entities_to_code ets (p : path) : option cmd :=
+  match ets with
+    | [] => None
+    | (TLE_Definition d) :: t =>
+      if raw_id_beq (dc_name (df_prototype d)) (fn p) then
+        do bs <- assoc raw_id_eq_dec (bn p) (df_instrs d);
+        (* Need to get from instruction to cmd here - can't
+         * do this without examining instruction itself, really
+         *)
+        assoc instr_id_eq_dec (ins p) bs
+      else entities_to_code t p
+  end.*)
+
 Fixpoint cfold_val (d : value) : value :=
   match d with
     | SV s =>
@@ -286,20 +311,6 @@ Definition cfold_block_entry b :=
   match b with
     | Phis ls p => Phis (cfold_phis ls) p
   end.
-
-Definition cfold_code_concrete (cc : code_concrete) : code_concrete :=
-  map (fun p => (fst p, map (fun p => (fst p, map (fun p => (fst p, cfold_cmd (snd p))) (snd p))) (snd p))) cc.
-
-Definition cfold_blks_concrete (bc : blks_concrete) : blks_concrete :=
-  map (fun p => (fst p, map (fun p => (fst p, cfold_block_entry (snd p))) (snd p))) bc.
-
-Definition cfold_cfg cfg :=
-  {|
-    init_c := init_c cfg;
-    code_c := cfold_code_concrete (code_c cfg);
-    blks_c := cfold_blks_concrete (blks_c cfg);
-    funs_c := (funs_c cfg)
-  |}.
 
 Definition cfold cfg :=
   {|
@@ -763,7 +774,7 @@ Proof.
     + constructor. right. eapply CIH. destruct H0; eauto. inversion H0. 
 Qed.
 
-Lemma stutters_trans : forall {A} (d1 d2 d3 : D A), d_equiv d1 d2 -> d_equiv d2 d3 -> d_equiv d1 d3.
+(*Lemma stutters_trans : forall {A} (d1 d2 d3 : D A), d_equiv d1 d2 -> d_equiv d2 d3 -> d_equiv d1 d3.
 Proof.
   intro. pcofix CIH.
   intros d1 d2 d3 He12 He23. punfold He12. punfold He23.
@@ -791,7 +802,7 @@ Proof.
   - inversion He23; subst.
     + admit.
     + pfold. constructor. 
-Abort.
+Abort.*)
 
 Lemma stutter : forall {A} (d1 d2 : D A) n m, d_equiv (taus n d1) (taus m d2) -> d_equiv d1 d2.
 Proof.
@@ -844,25 +855,17 @@ Instance functor_mem_map : Functor (mem nat) :=
 Instance functor_d : Functor D (@d_equiv) :=
   { fmap := @d_map }.
 Proof.
-  - intros. 
-    set (R (d1 d2:D A) := d1 = d_map id d2).
-    apply d_equiv_coind with (R := R).
-    + subst R; simpl; auto.
-    + unfold R at 1. intros. subst d1.
-      destruct d2;
-        try solve [rewrite id_d_eq; rewrite id_d_eq at 1; simpl; constructor; unfold R; auto].
-(*
-  - intros. 
-    set (R (d1 d2:D C) := exists a, d1 =  d_map g (d_map f a) /\
-                                    d2 = d_map (fun a0 : A => g (f a0)) a).
-    apply d_equiv_coind with (R:=R).
-    + unfold R; eauto.
-    + unfold R at 1. intros ? ? [d [-> ->]].
-      destruct d;
-        try solve [rewrite id_d_eq at 1; rewrite id_d_eq; simpl; constructor; unfold R; eauto].
-Qed.
- *)
-Admitted.      
+  - intro. pcofix CIH. intros.
+    pfold. destruct a; try solve [rewrite id_d_eq; rewrite id_d_eq at 1; simpl; constructor; auto].
+    rewrite id_d_eq; rewrite id_d_eq at 1; simpl.
+    constructor. destruct m; simpl; constructor; try intro; right; eapply CIH.
+  - intros A B C f g. pcofix CIH. intros.
+    pfold. destruct a; try solve [rewrite id_d_eq at 1; rewrite id_d_eq; simpl; constructor; unfold R; eauto].
+    + rewrite id_d_eq; rewrite id_d_eq at 1; simpl. constructor.
+      right; eapply CIH.
+    + rewrite id_d_eq; rewrite id_d_eq at 1; simpl. constructor.
+      destruct m; simpl; constructor; try intro; right; eapply CIH.
+Qed.     
 
 (* Note: for guardedness, bind Ret introduces extra Tau *)
 Definition bind {A B} (m:D A) (f:A -> D B) : D B :=
@@ -1014,6 +1017,75 @@ Proof.
   unfold R in H. subst.
   apply dequiv_step_id.
   intros. unfold R. reflexivity.
+Qed.
+
+Lemma cfold_stepD_correct : forall CFG s, stepD CFG s = stepD (cfold CFG) s.
+Proof.
+  intros. destruct s. destruct p. destruct CFG. simpl.
+  destruct (code0 p); eauto; simpl.
+  destruct c; unfold cfold_cmd.
+  - destruct i; simpl; try (destruct ptr); try (destruct val); try (destruct v); eauto.
+    + destruct (def_id_of_path p); eauto; simpl.
+      rewrite cfold_eval_op_correct; eauto.
+    + destruct fn0. destruct i; eauto.
+      destruct (def_id_of_path p); eauto; simpl.
+      destruct (funs0 id); eauto; simpl.
+      destruct p1. destruct p1.
+      destruct (map_option raw_id_of_ident l); eauto; simpl. admit.
+    + rewrite cfold_eval_op_correct; eauto.
+    + rewrite cfold_eval_op_correct; eauto.
+  - destruct i; simpl; eauto.
+    + destruct v. destruct br1. destruct br2.
+      destruct (eval_op e v); eauto. destruct d; eauto.
+      destruct e0; eauto. destruct b; simpl.
+      destruct (raw_id_of_ident i); simpl; eauto.
+      destruct (blks0 (bn p) r); simpl; eauto.
+      * destruct b; simpl. rewrite cfold_jump_correct; eauto.
+      * destruct (raw_id_of_ident i0); simpl; eauto.
+        destruct (blks0 (bn p) r); simpl; eauto.
+        destruct b; simpl. rewrite cfold_jump_correct.  eauto.
+    + destruct br. destruct (raw_id_of_ident i); simpl; eauto.
+      destruct (blks0 (bn p) r); simpl; eauto.
+      destruct b; simpl; rewrite cfold_jump_correct; eauto.
+Admitted.
+
+Lemma cfold_init_state: forall CFG, init_state CFG = init_state (cfold CFG).
+Proof.
+  destruct CFG; eauto.
+Qed.
+
+Lemma CFG_cfold_bind_equiv :
+  forall d CFG, d_equiv (bind d (sem CFG)) (bind d (sem (cfold CFG))).
+Proof.
+  pcofix CIH. intros. pfold.
+  rewrite id_d_eq; rewrite id_d_eq at 1.
+  destruct d; try solve [constructor; eauto].
+  - constructor. rewrite sem_unfold. rewrite sem_unfold.
+    right. rewrite <- cfold_stepD_correct. apply CIH.
+  - constructor. fold (bind d (sem CFG)).
+    fold (bind d (sem (cfold CFG))). right; eapply CIH.
+  - constructor. destruct m.
+    + simpl. constructor. intro. right.
+      fold (bind (k a) (sem CFG)). fold (bind (k a) (sem (cfold CFG))).
+      eapply CIH.
+    + simpl. constructor. intro. right.
+      fold (bind (k dv) (sem CFG)). fold (bind (k dv) (sem (cfold CFG))).
+      eapply CIH.
+    + simpl. constructor. right.
+      fold (bind k (sem CFG)). fold (bind k (sem (cfold CFG))).
+      eapply CIH.
+Qed.
+
+Lemma CFG_cfold_sem_equiv : forall st CFG, d_equiv (sem CFG st) (sem (cfold CFG) st).
+Proof.
+  intros. repeat (rewrite sem_unfold). rewrite <- cfold_stepD_correct.
+  eapply CFG_cfold_bind_equiv.
+Qed.
+
+Theorem CFG_equiv_cfold : forall CFG, CFG_equiv CFG (cfold CFG).
+Proof.
+  intros. unfold CFG_equiv. rewrite <- cfold_init_state.
+  apply CFG_cfold_sem_equiv.
 Qed.
 
 
