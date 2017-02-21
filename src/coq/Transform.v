@@ -25,8 +25,7 @@ Definition mangle_instr (i:instr_id * instr) : (instr_id * instr) :=
   end.
 
 Definition mangle_block (blk:block) : block :=
-  let (name, instrs) := blk in
-  (name, List.map mangle_instr instrs).
+  mk_block (block_lbl blk) (List.map mangle_instr (block_insns blk)) (block_terminator blk).
 
 Definition mangle_blocks (blks:list block) : list block :=
   List.map mangle_block blks.

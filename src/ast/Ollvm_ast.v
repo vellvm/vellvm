@@ -241,22 +241,23 @@ Inductive instr : Set :=
 | INSTR_Fence
 | INSTR_AtomicCmpXchg
 | INSTR_AtomicRMW
-
-(* Terminators *)
-(* Types in branches are TYPE_Label constant *)
-| INSTR_Invoke     (fnptrval:tident) (args:list tvalue) (to_label:tident) (unwind_label:tident)
-| INSTR_Ret        (v:tvalue)
-| INSTR_Ret_void
-| INSTR_Br         (v:tvalue) (br1:tident) (br2:tident) 
-| INSTR_Br_1       (br:tident)
-| INSTR_Switch     (v:tvalue) (default_dest:tident) (brs: list (tvalue * tident))
-| INSTR_IndirectBr (v:tvalue) (brs:list tident) (* address * possible addresses (labels) *)
-| INSTR_Resume     (v:tvalue)
-
 | INSTR_Unreachable
 
 | INSTR_VAArg
 | INSTR_LandingPad
+.
+
+Inductive terminator : Set :=
+(* Terminators *)
+(* Types in branches are TYPE_Label constant *)
+| TERM_Ret        (v:tvalue)
+| TERM_Ret_void
+| TERM_Br         (v:tvalue) (br1:tident) (br2:tident) 
+| TERM_Br_1       (br:tident)
+| TERM_Switch     (v:tvalue) (default_dest:tident) (brs: list (tvalue * tident))
+| TERM_IndirectBr (v:tvalue) (brs:list tident) (* address * possible addresses (labels) *)
+| TERM_Resume     (v:tvalue)
+| TERM_Invoke     (fnptrval:tident) (args:list tvalue) (to_label:tident) (unwind_label:tident)
 .
 
 Inductive thread_local_storage : Set :=
@@ -299,9 +300,15 @@ Record declaration : Set :=
     dc_gc          : option string;
   }.
 
-Definition block_label : Set := raw_id.
-        
-Definition block : Set := block_label * list (instr_id * instr).
+Definition block_label := raw_id.
+
+Record block : Set :=
+  mk_block
+    {
+      block_lbl: block_label;
+      block_insns: list (instr_id * instr);
+      block_terminator: terminator;
+    }.
 
 Record definition :=
   mk_definition
