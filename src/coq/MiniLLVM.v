@@ -1,4 +1,5 @@
 Add Rec LoadPath "/home/richard/vellvm/lib/paco/src" as Paco.
+Add Rec LoadPath "/home/richard/vellvm/src/coq" as Vellvm.
 Require Import paco.
 Require Import List Bool String Ascii.
 Require Import Omega.
@@ -137,6 +138,50 @@ Definition toplevel_entities : Set := list toplevel_entity.
 Set Contextual Implicit.
 Generalizable All Variables.
 
+Fixpoint subst_value id v v' :=
+  match v' with
+    | SV (VALUE_Ident _ id') => if ident_beq id id' then v else SV (VALUE_Ident _ id')
+    | SV (OP_IBinop iop t vl vr) => SV (OP_IBinop iop t (subst_value id v vl) (subst_value id v vr))
+    | SV (OP_ICmp cmp t vl vr) => SV (OP_ICmp cmp t (subst_value id v vl) (subst_value id v vr))
+    | x => x
+  end.
+
+Definition subst_tvalue id v (tv : tvalue) :=
+  let '(t, v') := tv in (t, subst_value id v' v).
+
+Definition subst_instr id v (i : instr) :=
+  match i with
+    | INSTR_Op v' => INSTR_Op (subst_value id v v')
+    | INSTR_Call fn args => INSTR_Call fn (map (subst_tvalue id v) args)
+    | INSTR_Phi t args => INSTR_Phi t (map (fun x => (fst x, subst_value id v (snd x))) args)
+    | INSTR_Load t ptr => INSTR_Load t (subst_tvalue id v ptr)
+    | INSTR_Store val ptr => INSTR_Store (subst_tvalue id v val) ptr
+    | INSTR_Ret v' => INSTR_Ret (subst_tvalue id v v')
+    | INSTR_Br v' br1 br2 => INSTR_Br (subst_tvalue id v v') br1 br2
+    | _ => i
+  end.
+
+Fixpoint prop_const_block b :=
+  match b with
+    | [] => []
+    | (IId id, INSTR_Op (SV (VALUE_Integer _ i))) :: t =>
+      map (fun x => (fst x, subst_instr (ID_Local id) (SV (VALUE_Integer _ i)) (snd x))) (prop_const_block t)
+    | h :: t => h :: (prop_const_block t)
+  end.
+
+Definition prop_const_def d :=
+  {| df_prototype := df_prototype d;
+     df_args := df_args d;
+     df_instrs := map (fun x => (fst x, prop_const_block (snd x))) (df_instrs d)
+  |}.
+
+Definition prop_const_entity e :=
+  match e with
+    | TLE_Definition d => TLE_Definition (prop_const_def d)
+  end.
+
+Definition prop_const_entities es :=
+  map prop_const_entity es.
 
 (* induction principles ----------------------------------------------------- *)
 Section ValueInd.
@@ -277,6 +322,14 @@ Fixpoint entities_to_code ets (p : path) : option cmd :=
         cmd_from_block (ins p) (fn p) (bn p) is
       else entities_to_code t p
   end.
+
+Definition TLE_to_cfg tl :=
+  do init <- entities_to_init tl;
+  Some {| init := init;
+          code := entities_to_code tl;
+          blks := entities_to_blks tl;
+          funs := entities_to_funs tl
+       |}.
 
 Fixpoint cfold_val (d : value) : value :=
   match d with
@@ -465,74 +518,6 @@ Fixpoint jump (CFG:cfg) (p:path) (e_init:env) (e:env) ps (q:path) (k:stack) : op
   | _ => None
   end.
 
-Definition step (CFG:cfg) (s:state) : option state :=
-  let '(p, e, k) := s in
-  do cmd <- (code CFG) p;
-    match cmd with
-      
-    | Step (INSTR_Op op) p' =>
-      do id <- def_id_of_path p;
-      do dv <- eval_op e op;
-       Some (p', (id, dv)::e, k)
-        
-    | Step (INSTR_Call (ret_ty,ID_Global f) args) p' =>
-      do id <- def_id_of_path p;
-      do fn <- (funs CFG) f;
-      let '(ids, blk, i) := fn in
-      do ids' <- map_option raw_id_of_ident ids;
-      do dvs <-  map_option (eval_op e) (map snd args);
-      match ret_ty with
-      | TYPE_Void => Some (mk_path f blk i, combine ids' dvs, (KRet_void e p')::k)
-      | _ => Some (mk_path f blk i, combine ids' dvs, (KRet e id p')::k)
-      end
-
-(*        
-    | Step (INSTR_Alloca t) p'      => None
-    | Step (INSTR_Load t ptr) p'    => None
-    | Step (INSTR_Store val ptr) p' => None
- *)
-        
-    | Step (INSTR_Unreachable) _ => None
-                                                       
-    | Jump (INSTR_Ret (t, op)) =>
-      match k, eval_op e op with
-      | (KRet e' id p') :: k', Some dv => Some (p', (id, dv)::e', k')
-      | _, _ => None
-      end
-
-    | Jump (INSTR_Ret_void) =>
-      match k with
-      | (KRet_void e' p')::k' => Some (p', e', k')
-      | _ => None
-      end
-
-    | Jump (INSTR_Br (_,op) (_, br1) (_, br2)) =>
-      do br <-
-      match eval_op e op  with
-      | Some (DV (VALUE_Bool _ true))  => Some br1
-      | Some (DV (VALUE_Bool _ false)) => Some br2
-      | Some _ => None
-      | None => None
-      end;
-      do lbl <- raw_id_of_ident br;
-        match (blks CFG) (bn p) lbl with
-          | Some (Phis ps q) => 
-            jump CFG p e e ps q k
-          | None => None
-        end
-        
-    | Jump (INSTR_Br_1 (_, br)) =>
-      do lbl <- raw_id_of_ident br;
-        match (blks CFG) (bn p) lbl with
-          | Some (Phis ps q) => 
-            jump CFG p e e ps q k
-          | None => None
-        end
-      
-                              
-    | _ => None
-    end.
-
 Lemma cfold_eval_op_correct :
   forall v st, eval_op st (cfold_val v) = eval_op st v.
 Proof.
@@ -562,36 +547,7 @@ Proof.
   - destruct ptr. destruct val; eauto.
   - destruct v; eauto.
   - destruct v; eauto.
-Admitted.
-  
-Theorem cfold_correct :
-  forall cfg st, step cfg st = step (cfold cfg) st.
-Proof.
-  intros. destruct st. destruct p. simpl.
-  destruct (code cfg0 p); eauto. simpl.
-  destruct c; unfold cfold_cmd.
-  - destruct i; simpl; try (destruct ptr); try (destruct val); try (destruct v); eauto.
-    + destruct (def_id_of_path p); eauto; simpl.
-      rewrite cfold_eval_op_correct; eauto.
-    + destruct fn0. destruct i; eauto.
-      destruct (def_id_of_path p); eauto; simpl.
-      destruct (funs cfg0 id); eauto; simpl.
-      destruct p1. destruct p1.
-      destruct (map_option raw_id_of_ident l); eauto; simpl. admit.
-  - destruct i; simpl; eauto.
-    + destruct v. destruct br1. destruct br2.
-      destruct (eval_op e v); eauto. destruct d; eauto.
-      destruct e0; eauto. destruct b; simpl.
-      destruct (raw_id_of_ident i); simpl; eauto.
-      destruct (blks cfg0 (bn p) r); simpl; eauto.
-      * destruct b; simpl. eapply cfold_jump_correct. 
-      * destruct (raw_id_of_ident i0); simpl; eauto.
-        destruct (blks cfg0 (bn p) r); simpl; eauto.
-        destruct b; simpl. eapply cfold_jump_correct. 
-    + destruct br. destruct (raw_id_of_ident i); simpl; eauto.
-      destruct (blks cfg0 (bn p) r); simpl; eauto.
-      destruct b; simpl; eapply cfold_jump_correct.
-Abort.      
+Admitted.  
    
 Definition addr := nat.
 
@@ -924,7 +880,6 @@ Fixpoint stepD (CFG:cfg) (s:state) : D state :=
   let '(p, e, k) := s in
   do cmd <- (code CFG) p;
     match cmd with
-      
     | Step (INSTR_Op op) p' =>
       do id <- def_id_of_path p;
       do dv <- eval_op e op;
@@ -1120,6 +1075,46 @@ Proof.
   apply CFG_cfold_sem_equiv.
 Qed.
 
+Lemma const_prop_init_equal :
+  forall tles, entities_to_init tles = entities_to_init (prop_const_entities tles).
+Proof.
+  intros. induction tles; eauto.
+  simpl. destruct a; simpl. rewrite <- IHtles.
+  destruct (raw_id_beq (dc_name (df_prototype defn)) (Name "main")); eauto.
+  destruct (df_instrs defn); simpl; eauto.
+  destruct b; simpl.
+  induction l0; simpl; eauto.
+Abort.
+(* Same issue here as with the remove-NOP optimization *)
 
+Theorem CFG_equiv_const_prop :
+  forall tles cfg, Some cfg = TLE_to_cfg tles ->
+                   exists cfg', Some cfg' = TLE_to_cfg (prop_const_entities tles) /\
+                                CFG_equiv cfg cfg'.
+Proof.
+  intros. unfold TLE_to_cfg in H. remember (entities_to_init tles).
+  destruct o; try (solve [simpl in H; inversion H]).
+  simpl in H. inversion H; simpl. clear H.
+  unfold TLE_to_cfg.
+  simpl in *. 
+Abort.
 
-  
+(*Theorem CFG_equiv_nop_remove :
+  forall tles cfg, Some cfg = TLE_to_cfg tles ->
+                   exists cfg', Some cfg' = TLE_to_cfg (remove_nops_from_entities tles) /\
+                                CFG_equiv cfg cfg'.
+Proof.
+  intros.
+  induction tles. simpl in *.
+  - unfold TLE_to_cfg in H. simpl in *. inversion H.
+  - simpl in *. unfold TLE_to_cfg in *.  simpl in *.
+    eapply ex_intro. split.
+    +
+(* This isn't true because we could have transformed the main block 
+   from a block that is full of NOPs into one that is empty.
+
+   This might indicate a problem with the concretization of init? 
+   Of course this wouldn't have been a more problem with a more
+     realistic optimization, such as constant propagation.
+*)
+Abort.*)
