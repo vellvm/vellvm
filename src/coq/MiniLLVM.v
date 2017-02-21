@@ -1,5 +1,4 @@
 Add Rec LoadPath "/home/richard/vellvm/lib/paco/src" as Paco.
-Add Rec LoadPath "/home/richard/vellvm/src/coq" as Vellvm.
 Require Import paco.
 Require Import List Bool String Ascii.
 Require Import Omega.
@@ -222,29 +221,62 @@ Fixpoint entities_to_funs ets fid :=
       else entities_to_funs t fid
   end.
 
+Fixpoint phis_from_block fname bname (b : list (instr_id * instr)) : option block_entry :=
+  match b with
+    | [] => None
+    | (IId iid, INSTR_Phi i v as ins) :: t =>
+      do rest <- phis_from_block fname bname t;
+        match rest with
+          | Phis phis p => Some (Phis ((iid, ins)::phis) p) 
+        end
+    | (IVoid _, INSTR_Phi i v as ins) :: t => None
+    | (iid, ins) :: _ =>
+      Some (Phis [] {| fn := fname; bn := bname; ins := iid |})
+  end.
+
 Fixpoint entities_to_blks ets fid bid : option block_entry :=
   match ets with
     | [] => None
     | (TLE_Definition d) :: t =>
       if raw_id_beq (dc_name (df_prototype d)) fid then
         do bs <- assoc raw_id_eq_dec bid (df_instrs d);
-        None (* Do something here *)
+        phis_from_block fid bid bs
       else entities_to_blks t fid bid
+  end.
+
+Fixpoint cmd_from_block to_find fn bn is : option cmd :=
+  match is with
+    | [] => None
+    | (id, INSTR_Op _ as ins) :: ((next, _) :: t as rest)
+    | (id, INSTR_Phi _ _ as ins) :: ((next, _) :: t as rest)
+    | (id, INSTR_Alloca _ as ins) :: ((next, _) :: t as rest)
+    | (id, INSTR_Load _ _ as ins) :: ((next, _) :: t as rest)
+    | (id, INSTR_Store _ _ as ins) :: ((next, _) :: t as rest)
+    | (id, INSTR_Call _ _ as ins) :: ((next, _) :: t as rest) =>
+      if instr_id_eq_dec to_find id then Some (Step ins (mk_path fn bn next))
+      else cmd_from_block to_find fn bn rest
+                                            
+    (* Terminators *)
+    | (id, INSTR_Ret _ as ins) :: t
+    | (id, INSTR_Ret_void as ins) :: t
+    | (id, INSTR_Br _ _ _ as ins) :: t
+    | (id, INSTR_Br_1 _ as ins) :: t
+    | (id, INSTR_Unreachable as ins) :: t =>
+      if instr_id_eq_dec to_find id then Some (Jump ins)
+      else cmd_from_block to_find fn bn t
+    | _ => None
   end.
     
 
-(*Fixpoint entities_to_code ets (p : path) : option cmd :=
+Fixpoint entities_to_code ets (p : path) : option cmd :=
   match ets with
     | [] => None
     | (TLE_Definition d) :: t =>
       if raw_id_beq (dc_name (df_prototype d)) (fn p) then
-        do bs <- assoc raw_id_eq_dec (bn p) (df_instrs d);
-        (* Need to get from instruction to cmd here - can't
-         * do this without examining instruction itself, really
-         *)
-        assoc instr_id_eq_dec (ins p) bs
+        do is <- assoc raw_id_eq_dec (bn p) (df_instrs d);
+        cmd_from_block (ins p) (fn p) (bn p) is
       else entities_to_code t p
-  end.*)
+  end.
 
 Fixpoint cfold_val (d : value) : value :=
   match d with
