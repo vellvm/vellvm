@@ -854,3 +854,28 @@ Tactic Notation "inv_bind" hyp(H) :=
       let hy := fresh H in
       destruct o eqn:hy; [|discriminate]; simpl in H
     end.
+
+Definition find {A} (pred : A -> bool) (l : list A) : option A :=
+  match l with
+    | [] => None
+    | h :: t => if pred h then Some h else find pred t
+  end.
+
+Theorem assoc_map :
+  forall A B C eq_dec (x : A) (f : B -> C) l,
+    assoc eq_dec x (map (fun p => (fst p, f (snd p))) l) =
+    do v <- assoc eq_dec x l; Some (f v).
+Proof.
+  intros; induction l; eauto.
+  simpl. destruct a; simpl. rewrite IHl.
+  destruct (eq_dec x a); simpl; eauto.
+Qed.
+
+Theorem map_option_map :
+  forall A B C (f : B -> option C) (g : A -> B) (l : list A),
+    map_option f (map g l) = map_option (fun x => f (g x)) l.
+Proof.
+  intros. induction l; eauto.
+  simpl. rewrite IHl; eauto.
+Qed.
+

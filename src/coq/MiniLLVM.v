@@ -1,7 +1,8 @@
 Add Rec LoadPath "/home/richard/vellvm/lib/paco/src" as Paco.
 Add Rec LoadPath "/home/richard/vellvm/src/coq" as Vellvm.
 Require Import paco.
-Require Import List Bool String Ascii.
+Require Import Recdef.
+Require Import Bool String Ascii List.
 Require Import Omega.
 Require Import Vellvm.Util.
 Import ListNotations OptionNotations.
@@ -96,15 +97,16 @@ Inductive instr : Set :=
 | INSTR_Alloca (t:typ) 
 | INSTR_Load   (t:typ) (ptr:tvalue)     
 | INSTR_Store  (val:tvalue) (ptr:tident)
+| INSTR_Unreachable
+.
 
+Inductive terminator : Set :=               
 (* Terminators *)
 (* Types in branches are TYPE_Label constant *)
-| INSTR_Ret        (v:tvalue)
-| INSTR_Ret_void
-| INSTR_Br         (v:tvalue) (br1:tident) (br2:tident) 
-| INSTR_Br_1       (br:tident)
-
-| INSTR_Unreachable
+| TERM_Ret        (v:tvalue)
+| TERM_Ret_void
+| TERM_Br         (v:tvalue) (br1:tident) (br2:tident) 
+| TERM_Br_1       (br:tident)
 .
 
 Definition function_id := local_id.
@@ -118,7 +120,14 @@ Record declaration : Set :=
 
 Definition block_id : Set := local_id.
         
-Definition block : Set := block_id * list (instr_id * instr).
+Record block : Set :=
+  mk_block
+    {
+      blk_id : block_id;
+      blk_instrs : list (instr_id * instr);
+      blk_term : terminator;
+      blk_term_id : instr_id
+    }.
 
 Record definition :=
   mk_definition
@@ -156,23 +165,53 @@ Definition subst_instr id v (i : instr) :=
     | INSTR_Phi t args => INSTR_Phi t (map (fun x => (fst x, subst_value id v (snd x))) args)
     | INSTR_Load t ptr => INSTR_Load t (subst_tvalue id v ptr)
     | INSTR_Store val ptr => INSTR_Store (subst_tvalue id v val) ptr
-    | INSTR_Ret v' => INSTR_Ret (subst_tvalue id v v')
-    | INSTR_Br v' br1 br2 => INSTR_Br (subst_tvalue id v v') br1 br2
     | _ => i
   end.
 
-Fixpoint prop_const_block b :=
-  match b with
-    | [] => []
-    | (IId id, INSTR_Op (SV (VALUE_Integer _ i))) :: t =>
-      map (fun x => (fst x, subst_instr (ID_Local id) (SV (VALUE_Integer _ i)) (snd x))) (prop_const_block t)
-    | h :: t => h :: (prop_const_block t)
+Definition subst_term id v (t : terminator) :=
+  match t with
+    | TERM_Ret v' => TERM_Ret (subst_tvalue id v v')
+    | TERM_Br v' br1 br2 => TERM_Br (subst_tvalue id v v') br1 br2
+    | _ => t
   end.
+
+Function prop_const_block (b : block) {measure (fun b => length (blk_instrs b)) b} :=
+  match blk_instrs b with
+    | [] => b
+    | (IId id, INSTR_Op (SV (VALUE_Integer _ i) as val)) :: t =>
+      let l' := map (fun x => (fst x, subst_instr (ID_Local id) val (snd x))) t in
+      (prop_const_block {| blk_id := blk_id b;
+                           blk_instrs := l';
+                           blk_term_id := blk_term_id b;
+                           blk_term := (subst_term (ID_Local id) val) (blk_term b) |})
+    | h :: t =>
+      let rest := (prop_const_block {| blk_id := blk_id b;
+                                       blk_instrs := t;
+                                       blk_term_id := blk_term_id b;
+                                       blk_term := blk_term b |}) in
+      {| blk_id := blk_id rest; blk_instrs := h :: blk_instrs rest; blk_term := blk_term rest; blk_term_id := blk_term_id b |}
+  end.
+Proof.
+  intros; subst. simpl. rewrite teq; simpl. eauto.
+  intros; subst; simpl. rewrite teq; simpl. rewrite map_length. eauto.
+  intros; subst; simpl; rewrite teq; simpl; eauto.
+  intros; subst; simpl; rewrite teq; simpl; eauto.
+  intros; subst; simpl; rewrite teq; simpl; eauto.
+  intros; subst; simpl; rewrite teq; simpl; eauto.
+  intros; subst; simpl; rewrite teq; simpl; eauto.
+  intros; subst; simpl; rewrite teq; simpl; eauto.
+  intros; subst; simpl; rewrite teq; simpl; eauto.
+  intros; subst; simpl; rewrite teq; simpl; eauto.
+  intros; subst; simpl; rewrite teq; simpl; eauto.
+  intros; subst; simpl; rewrite teq; simpl; eauto.
+  intros; subst; simpl; rewrite teq; simpl; eauto.
+  intros; subst; simpl; rewrite teq; simpl; eauto.
+Qed.
 
 Definition prop_const_def d :=
   {| df_prototype := df_prototype d;
      df_args := df_args d;
-     df_instrs := map (fun x => (fst x, prop_const_block (snd x))) (df_instrs d)
+     df_instrs := map prop_const_block (df_instrs d)
   |}.
 
 Definition prop_const_entity e :=
@@ -221,7 +260,7 @@ Record path :=
 
 Inductive cmd : Set :=
 | Step  (i:instr) (p:path)
-| Jump  (i:instr)
+| Jump  (t:terminator)
 .                    
 
 Inductive block_entry : Set :=
@@ -241,13 +280,12 @@ Fixpoint entities_to_init ets : option path :=
     | [] => None
     | (TLE_Definition d) :: t =>
       if raw_id_beq (dc_name (df_prototype d)) (Name "main") then
-        match df_instrs d with
+        match (df_instrs d) with
           | [] => None
-          | (bid, []) :: _ => None
-          | (bid, (iid, _)::t) :: _ =>
-            Some {| fn := Name "main";
-                    bn := bid;
-                    ins := iid |}
+          | b :: _ => Some (match blk_instrs b with
+                        | [] => mk_path (Name "main") (blk_id b) (blk_term_id b)
+                        | (iid, _) :: t => mk_path (Name "main") (blk_id b) iid
+                            end)
         end
       else entities_to_init t
   end.
@@ -259,9 +297,10 @@ Fixpoint entities_to_funs ets fid :=
       if raw_id_beq (dc_name (df_prototype d)) fid then
         match df_instrs d with
           | [] => None
-          | (bid, [])::_ => None
-          | (bid, (iid, _)::t)::_ =>
-            Some (map (fun x => ID_Local x) (df_args d), bid, iid)
+          | b :: _ => Some (match blk_instrs b with
+                              | [] => (map (fun x => ID_Local x) (df_args d), blk_id b, blk_term_id b)
+                              | (iid, _) :: t => (map (fun x => ID_Local x) (df_args d), blk_id b, iid)
+                            end)
         end
       else entities_to_funs t fid
   end.
@@ -284,32 +323,35 @@ Fixpoint entities_to_blks ets fid bid : option block_entry :=
     | [] => None
     | (TLE_Definition d) :: t =>
       if raw_id_beq (dc_name (df_prototype d)) fid then
-        do bs <- assoc raw_id_eq_dec bid (df_instrs d);
-        phis_from_block fid bid bs
+        do bs <- find (fun b => raw_id_beq bid (blk_id b)) (df_instrs d);
+        phis_from_block fid bid (blk_instrs bs)
       else entities_to_blks t fid bid
   end.
 
 Fixpoint cmd_from_block to_find fn bn is : option cmd :=
   match is with
     | [] => None
-    | (id, INSTR_Op _ as ins) :: ((next, _) :: t as rest)
-    | (id, INSTR_Phi _ _ as ins) :: ((next, _) :: t as rest)
-    | (id, INSTR_Alloca _ as ins) :: ((next, _) :: t as rest)
-    | (id, INSTR_Load _ _ as ins) :: ((next, _) :: t as rest)
-    | (id, INSTR_Store _ _ as ins) :: ((next, _) :: t as rest)
-    | (id, INSTR_Call _ _ as ins) :: ((next, _) :: t as rest) =>
+    | (id, INSTR_Op _ as ins) :: ((next, _) :: _ as rest)
+    | (id, INSTR_Phi _ _ as ins) :: ((next, _) :: _ as rest)
+    | (id, INSTR_Alloca _ as ins) :: ((next, _) :: _ as rest)
+    | (id, INSTR_Load _ _ as ins) :: ((next, _) :: _ as rest)
+    | (id, INSTR_Store _ _ as ins) :: ((next, _) :: _ as rest)
+    | (id, INSTR_Unreachable as ins) :: ((next, _) :: _ as rest)
+    | (id, INSTR_Call _ _ as ins) :: ((next, _) :: _ as rest) =>
       if instr_id_eq_dec to_find id then Some (Step ins (mk_path fn bn next))
       else cmd_from_block to_find fn bn rest
-                                            
-    (* Terminators *)
-    | (id, INSTR_Ret _ as ins) :: t
-    | (id, INSTR_Ret_void as ins) :: t
-    | (id, INSTR_Br _ _ _ as ins) :: t
-    | (id, INSTR_Br_1 _ as ins) :: t
-    | (id, INSTR_Unreachable as ins) :: t =>
-      if instr_id_eq_dec to_find id then Some (Jump ins)
-      else cmd_from_block to_find fn bn t
     | _ => None
+  end.
+
+Fixpoint cmd_from_term to_find term_id term : option cmd :=
+  match term with
+    (* Terminators *)
+    | TERM_Ret _ as ins
+    | TERM_Ret_void as ins
+    | TERM_Br _ _ _ as ins
+    | TERM_Br_1 _ as ins =>
+      if instr_id_eq_dec to_find term_id then Some (Jump ins)
+      else None
   end.
     
 
@@ -318,8 +360,11 @@ Fixpoint entities_to_code ets (p : path) : option cmd :=
     | [] => None
     | (TLE_Definition d) :: t =>
       if raw_id_beq (dc_name (df_prototype d)) (fn p) then
-        do is <- assoc raw_id_eq_dec (bn p) (df_instrs d);
-        cmd_from_block (ins p) (fn p) (bn p) is
+        do b <- find (fun b => raw_id_beq (bn p) (blk_id b)) (df_instrs d);
+        match cmd_from_block (ins p) (fn p) (bn p) (blk_instrs b) with
+          | Some x => Some x
+          | None => cmd_from_term (ins p) (blk_term_id b) (blk_term b)
+        end
       else entities_to_code t p
   end.
 
@@ -374,19 +419,21 @@ Definition cfold_instr i :=
     | INSTR_Alloca t => INSTR_Alloca t
     | INSTR_Load t (a, b) => INSTR_Load t (a, cfold_val b) 
     | INSTR_Store (a, b) ptr => INSTR_Store (a, cfold_val b) ptr
-                                            
-    (* Terminators *)
-    | INSTR_Ret (a, b) => INSTR_Ret (a, cfold_val b)
-    | INSTR_Ret_void => INSTR_Ret_void
-    | INSTR_Br (a, b) v1 v2 => INSTR_Br (a, cfold_val b) v1 v2 
-    | INSTR_Br_1 b => INSTR_Br_1 b
     | INSTR_Unreachable => INSTR_Unreachable
+  end.
+
+Definition cfold_term t :=                                            
+  match t with
+    | TERM_Ret (a, b) => TERM_Ret (a, cfold_val b)
+    | TERM_Ret_void => TERM_Ret_void
+    | TERM_Br (a, b) v1 v2 => TERM_Br (a, cfold_val b) v1 v2 
+    | TERM_Br_1 b => TERM_Br_1 b
   end.
 
 Definition cfold_cmd c :=
   match c with
     | Step i p => Step (cfold_instr i) p
-    | Jump p => Jump p
+    | Jump t => Jump (cfold_term t)
   end.
 
 Definition cfold_phis (ps : list (local_id * instr)) :=
@@ -542,12 +589,13 @@ Lemma cfold_jump_correct :
 Proof.
   intros. generalize dependent e. induction ps; eauto. destruct a. simpl.
   intros. destruct i; eauto.
-  - simpl. (* relies on cfold_eval_op *) admit.
+  - simpl. rewrite assoc_map.
+    destruct (assoc ident_eq_dec (ID_Local (bn p)) args); simpl; eauto.
+    rewrite cfold_eval_op_correct; eauto.
+    destruct (eval_op e_old v); eauto. 
   - destruct ptr. eauto.
   - destruct ptr. destruct val; eauto.
-  - destruct v; eauto.
-  - destruct v; eauto.
-Admitted.  
+Qed.
    
 Definition addr := nat.
 
@@ -586,18 +634,6 @@ Qed.
 End UNFOLDING.
 
 Arguments id_d_eq {_} _ .
-
-(* TODO: look at Gil's paco library and read the paper about extensible coinduction *)
-(*
-(* Domain of semantics *)
-CoInductive D' (E:Type -> Type) (X:Type) : Type :=
-| Ret' : X -> D' E X
-| Fin' : D' E X
-| Err' : D' E X 
-| Tau' : D' E X -> D' E X
-| Eff' : forall (E':Type -> Type) (f: forall x, E x -> E' x), (E (D' E' X)) -> D' E X
-.
-*)
 
 Definition mtype := list dvalue.
 Definition undef := DV (VALUE_Undef _).
@@ -650,12 +686,6 @@ Qed.
 
 Hint Resolve d_equiv_gen_mon : paco.
 
-(*
-CoInductive d_equiv {A} : D A -> D A -> Prop :=
-| d_equiv_fix : forall d1 d2,
-  d_equiv_step d_equiv d1 d2 ->
-  d_equiv d1 d2.
-*)
 
 Ltac punfold' H := let x := fresh "_x_" in
   repeat red in H;
@@ -693,20 +723,6 @@ Section D_EQUIV_COIND.
       + constructor. intros. right. eauto. 
       + constructor. right. eauto. 
   Qed.
-(*
-    
-    cofix CIH.
-    intros ? ? Hr.
-    apply H in Hr. induction Hr; subst; try solve [clear CIH; auto].
-    - constructor. constructor. eapply CIH. apply H0. 
-    - constructor. constructor. eapply CIH. apply H0.
-    - constructor. constructor. eapply CIH. apply H0.
-    - constructor. constructor.
-      inversion H0; subst.
-      + constructor. intros. apply CIH. apply H1.
-      + constructor. intros. apply CIH. apply H1.
-      + constructor. apply CIH. assumption.
-*)
 
 End D_EQUIV_COIND.
 Arguments d_equiv_coind [_] _ [_ _] _ _.
@@ -761,36 +777,6 @@ Proof.
       right. eapply CIH. eapply H0. inversion H0.
     + constructor. right. eapply CIH. destruct H0; eauto. inversion H0. 
 Qed.
-
-(*Lemma stutters_trans : forall {A} (d1 d2 d3 : D A), d_equiv d1 d2 -> d_equiv d2 d3 -> d_equiv d1 d3.
-Proof.
-  intro. pcofix CIH.
-  intros d1 d2 d3 He12 He23. punfold He12. punfold He23.
-  remember (upaco2 d_equiv_step bot2).
-  induction He12.
-  - remember (Ret a). induction He23; eauto; try (solve [inversion Heqd]).
-    subst. pfold. constructor. specialize (IHHe23 eq_refl).
-    punfold IHHe23.
-  - remember Fin. induction He23; eauto; try (solve [inversion Heqd]).
-    subst. pfold. constructor. specialize (IHHe23 eq_refl).
-    punfold IHHe23.
-  - remember Err. induction He23; eauto; try (solve [inversion Heqd]).
-    subst. pfold. constructor. specialize (IHHe23 eq_refl).
-    punfold IHHe23.
-  - remember (Tau d2). induction He23; eauto; try (solve [inversion Heqd]).
-    + inversion Heqd; subst. pfold. constructor. right.
-      destruct H; destruct H0; try (solve [inversion H]); try (solve [inversion H0]); eauto.
-    + inversion Heqd; subst. eauto. admit.
-    + inversion Heqd; subst. pfold. specialize (IHHe23 H0). punfold IHHe23.
-  - specialize (IHHe12 He23). pfold. constructor. punfold IHHe12.
-  - remember (Tau d2). induction He23; eauto; try (solve [inversion Heqd]).
-    + inversion Heqd; subst.  admit.
-    + admit.
-    + admit.
-  - inversion He23; subst.
-    + admit.
-    + pfold. constructor. 
-Abort.*)
 
 Lemma stutter : forall {A} (d1 d2 : D A) n m, d_equiv (taus n d1) (taus m d2) -> d_equiv d1 d2.
 Proof.
@@ -898,21 +884,21 @@ Fixpoint stepD (CFG:cfg) (s:state) : D state :=
         
     | Step (INSTR_Unreachable) _ => Err
                                                        
-    | Jump (INSTR_Ret (t, op)) =>
+    | Jump (TERM_Ret (t, op)) =>
       match k, eval_op e op with
       | [], Some dv => Fin
       | (KRet e' id p') :: k', Some dv => Ret (p', (id, dv)::e', k')
       | _, _ => Err
       end
 
-    | Jump (INSTR_Ret_void) =>
+    | Jump (TERM_Ret_void) =>
       match k with
       | [] => Fin
       | (KRet_void e' p')::k' => Ret (p', e', k')
       | _ => Err
       end
         
-    | Jump (INSTR_Br (_,op) (_, br1) (_, br2)) =>
+    | Jump (TERM_Br (_,op) (_, br1) (_, br2)) =>
       do br <-
       match eval_op e op  with
       | Some (DV (VALUE_Bool _ true))  => Some br1
@@ -927,7 +913,7 @@ Fixpoint stepD (CFG:cfg) (s:state) : D state :=
           | None => Err
         end
         
-    | Jump (INSTR_Br_1 (_, br)) =>
+    | Jump (TERM_Br_1 (_, br)) =>
       do lbl <- raw_id_of_ident br;
         match (blks CFG) (bn p) lbl with
           | Some (Phis ps q) => 
@@ -1018,11 +1004,20 @@ Proof.
       destruct (def_id_of_path p); eauto; simpl.
       destruct (funs0 id); eauto; simpl.
       destruct p1. destruct p1.
-      destruct (map_option raw_id_of_ident l); eauto; simpl. admit.
+      destruct (map_option raw_id_of_ident l); eauto; simpl.
+      rewrite map_map.
+      rewrite map_option_map. rewrite map_option_map.
+      simpl.
+      assert (map_option (fun x => eval_op e (snd x)) args = map_option (fun x => eval_op e (cfold_val (snd x))) args).
+      induction args; eauto. simpl. rewrite cfold_eval_op_correct.
+      rewrite IHargs; eauto.
+      rewrite <- H; eauto. 
     + rewrite cfold_eval_op_correct; eauto.
     + rewrite cfold_eval_op_correct; eauto.
-  - destruct i; simpl; eauto.
+  - destruct t; simpl; eauto.
+    + destruct v. destruct s; rewrite cfold_eval_op_correct; eauto.
     + destruct v. destruct br1. destruct br2.
+      rewrite cfold_eval_op_correct; eauto.
       destruct (eval_op e v); eauto. destruct d; eauto.
       destruct e0; eauto. destruct b; simpl.
       destruct (raw_id_of_ident i); simpl; eauto.
@@ -1034,7 +1029,7 @@ Proof.
     + destruct br. destruct (raw_id_of_ident i); simpl; eauto.
       destruct (blks0 (bn p) r); simpl; eauto.
       destruct b; simpl; rewrite cfold_jump_correct; eauto.
-Admitted.
+Qed.
 
 Lemma cfold_init_state: forall CFG, init_state CFG = init_state (cfold CFG).
 Proof.
@@ -1083,7 +1078,6 @@ Proof.
   destruct (raw_id_beq (dc_name (df_prototype defn)) (Name "main")); eauto.
   destruct (df_instrs defn); simpl; eauto.
   destruct b; simpl.
-  induction l0; simpl; eauto.
 Abort.
 (* Same issue here as with the remove-NOP optimization *)
 
