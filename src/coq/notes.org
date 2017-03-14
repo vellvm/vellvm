@@ -20,8 +20,6 @@
 *** Vellvm IR vs. LLVM AST
  - branch targets <-> phi translation
 
-*** explicit vs. implicit fallthrough
-
 
 
 * LLVM Representation
@@ -55,6 +53,13 @@
   - 'musttail' return values can be bitcast
   - tail calls can be followed by bitcast and ret (but nothing else?)
 
+** Concurrency:
+  - fence argument is an ordering
+
+
+** Poison:
+  - result of overflow / underflow for arithmetic
+  - result of getelementptr when inbounds is set and bounds are false
 
 * Typical LLVM program:
 

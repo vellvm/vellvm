@@ -1,6 +1,6 @@
 Require Import ZArith.ZArith List.
 Require Import String Omega.
-Require Import Vellvm.Ollvm_ast Vellvm.lib.Classes.
+Require Import Vellvm.Ollvm_ast Vellvm.Classes.
 Require Import Equalities.
 Import ListNotations.
 

@@ -278,20 +278,20 @@ Inductive thread_local_storage : Set :=
 
 Record global : Set :=
   mk_global {
-      g_ident: global_id;
-      g_typ: typ;
-      g_constant: bool;
-      g_value: option value;
+      g_ident        : global_id;
+      g_typ          : typ;
+      g_constant     : bool;
+      g_value        : option value;
 
-      g_linkage: option linkage;
-      g_visibility: option visibility;
-      g_dll_storage: option dll_storage;
-      g_thread_local: option thread_local_storage;
-      g_unnamed_addr: bool;
-      g_addrspace: option int;
+      g_linkage      : option linkage;
+      g_visibility   : option visibility;
+      g_dll_storage  : option dll_storage;
+      g_thread_local : option thread_local_storage;
+      g_unnamed_addr : bool;
+      g_addrspace    : option int;
       g_externally_initialized: bool;
-      g_section: option string;
-      g_align: option int;
+      g_section      : option string;
+      g_align        : option int;
 }.
 
 Record declaration : Set :=
@@ -325,7 +325,7 @@ Record definition :=
   mk_definition
   {
     df_prototype   : declaration;
-    df_args        : list ident;
+    df_args        : list local_id;
     df_instrs      : list block;
   }.
 

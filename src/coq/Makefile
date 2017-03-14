@@ -1,6 +1,6 @@
 .PHONY: clean all extract
 
-MODULES := Util Classes AstLib Vellvm Transforma Extract  
+MODULES := Util Classes AstLib Vellvm Transform Extract  
 
 VFILES := $(MODULES:%=%.v)
 
