@@ -54,10 +54,30 @@ Module InstrID <: UsualDecidableTypeFull.
   Include HasEqDec2Bool.
 End InstrID.
 
-
 Instance eq_dec_instr_id : eq_dec instr_id := InstrID.eq_dec.
 
+Module Ident <: UsualDecidableTypeFull.
+  Definition t := ident.
+  Include HasUsualEq.
+  Include UsualIsEq.
+  Include UsualIsEqOrig.
 
+  Lemma eq_dec : forall (x y : ident), {x = y} + {x <> y}.
+  Proof.
+    intros x y.
+    destruct x as [xn | xn]; destruct y as [yn | yn].
+    - destruct (xn == yn). subst. left. reflexivity.
+      right. unfold not. intros. apply n. inversion H. auto.
+    - right. unfold not. intros. inversion H.
+    - right. unfold not. intros. inversion H.
+    - destruct (xn == yn).
+      left. subst. reflexivity.
+      right. unfold not. intros. apply n. inversion H. auto.
+  Qed.
+  Include HasEqDec2Bool.
+End Ident.
+  
+  
 (* Induction Principles ----------------------------------------------------- *)
 
 Section TypInd.
