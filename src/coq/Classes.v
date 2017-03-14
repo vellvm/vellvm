@@ -185,23 +185,23 @@ Notation "m ≫= f"  := (mbind m f) (at level 60, right associativity).
 Notation "( m ≫=)" := (mbind m) (only parsing).
 Notation "(≫= f )" := (fun m => mbind m f) (only parsing).
 Notation "(≫=)"    := (λ m f, mbind m f) (only parsing).
-Notation "x ← y ; z" := (y ≫= (λ x : _, z))
-  (at level 65, only parsing, right associativity).
-Notation "' ( x1 , x2 ) ← y ; z" :=
+Notation "' x <- y ; z" := (y ≫= (λ x : _, z))
+  (at level 65, x ident, only parsing, right associativity).
+Notation "' ( x1 , x2 ) <- y ; z" :=
   (y ≫= (λ x : _, let ' (x1, x2) := x in z))
-  (at level 65, only parsing, right associativity).
-Notation "' ( x1 , x2 , x3 ) ← y ; z" :=
+  (at level 65, x1 ident, x2 ident, only parsing, right associativity).
+Notation "' ( x1 , x2 , x3 ) <- y ; z" :=
   (y ≫= (λ x : _, let ' (x1,x2,x3) := x in z))
-  (at level 65, only parsing, right associativity).
-Notation "' ( x1 , x2 , x3  , x4 ) ← y ; z" :=
+  (at level 65, x1 ident, x2 ident, x3 ident, only parsing, right associativity).
+Notation "' ( x1 , x2 , x3  , x4 ) <- y ; z" :=
   (y ≫= (λ x : _, let ' (x1,x2,x3,x4) := x in z))
-  (at level 65, only parsing, right associativity).
-Notation "' ( x1 , x2 , x3  , x4 , x5 ) ← y ; z" :=
+  (at level 65, x1 ident, x2 ident, x3 ident, x4 ident, only parsing, right associativity).
+Notation "' ( x1 , x2 , x3  , x4 , x5 ) <- y ; z" :=
   (y ≫= (λ x : _, let ' (x1,x2,x3,x4,x5) := x in z))
-  (at level 65, only parsing, right associativity).
-Notation "' ( x1 , x2 , x3  , x4 , x5 , x6 ) ← y ; z" :=
+  (at level 65, x1 ident, x2 ident, x3 ident, x4 ident, x5 ident, only parsing, right associativity).
+Notation "' ( x1 , x2 , x3  , x4 , x5 , x6 ) <- y ; z" :=
   (y ≫= (λ x : _, let ' (x1,x2,x3,x4,x5,x6) := x in z))
-  (at level 65, only parsing, right associativity).
+  (at level 65, x1 ident, x2 ident, x3 ident, x4 ident, x5 ident, x6 ident, only parsing, right associativity).
 
 Class MonadLaws F `{Monad F} `{FunctorLaws F} :=
 {
