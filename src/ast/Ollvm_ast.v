@@ -25,10 +25,12 @@
 
 Require Import List. 
 Require Import String Ascii.
+Require Import ZArith.ZArith_base.
 Open Scope string_scope.
 Open Scope list_scope.
 
-Parameter int : Set.
+
+Definition int := positive.
 Parameter float : Set.
 
 Inductive linkage : Set :=
@@ -115,15 +117,22 @@ Inductive fn_attr : Set :=
 
 
 Inductive raw_id : Set :=
-| Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, etc. *)  
+| Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)  
 | Anon (n:int)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
 .
-       
+
 Inductive ident : Set :=
 | ID_Global (id:raw_id)   (* @id *)
 | ID_Local  (id:raw_id)   (* %id *)
 .
-              
+
+(* auxilliary definitions for when we know which case we're in already *)
+Definition local_id  := raw_id.
+Definition global_id := raw_id.
+
+Definition function_id := local_id.
+Definition block_id := local_id.
+
 Inductive typ : Set :=
 | TYPE_I (sz:int)
 | TYPE_Pointer (t:typ)
@@ -226,7 +235,8 @@ Definition tvalue : Set := typ * value.
 
 Inductive instr_id : Set :=
 | IId   (id:raw_id)    (* Anonymous or explicitly named instructions *)
-| IVoid (n:int)        (* "Void" return type, each with unique number (NOTE: these are distinct from Anon raw_id)*)
+| IVoid (n:int)        (* "Void" return type, for "store" "call" and terminators.
+                          Each with unique number (NOTE: these are distinct from Anon raw_id) *)
 .
         
 Inductive instr : Set :=
@@ -268,7 +278,7 @@ Inductive thread_local_storage : Set :=
 
 Record global : Set :=
   mk_global {
-      g_ident: ident;
+      g_ident: global_id;
       g_typ: typ;
       g_constant: bool;
       g_value: option value;
@@ -287,7 +297,7 @@ Record global : Set :=
 Record declaration : Set :=
   mk_declaration
   {
-    dc_name        : ident;  (* SAZ: could be raw_id since this should always be an ID_Global *)
+    dc_name        : function_id;  
     dc_type        : typ;    (* INVARIANT: should be TYPE_Function (ret_t * args_t) *)
     dc_param_attrs : list param_attr * list (list param_attr); (* ret_attrs * args_attrs *)
     dc_linkage     : option linkage;
@@ -300,14 +310,15 @@ Record declaration : Set :=
     dc_gc          : option string;
   }.
 
-Definition block_label := raw_id.
+
 
 Record block : Set :=
   mk_block
     {
-      block_lbl: block_label;
-      block_insns: list (instr_id * instr);
-      block_terminator: terminator;
+      blk_id      : block_id;
+      blk_instrs  : list (instr_id * instr);
+      blk_term    : terminator;
+      blk_term_id : instr_id;      
     }.
 
 Record definition :=
@@ -321,7 +332,7 @@ Record definition :=
 Inductive metadata : Set :=
   | METADATA_Const  (tv:tvalue)
   | METADATA_Null
-  | METADATA_Id     (id:raw_id)
+  | METADATA_Id     (id:raw_id)  (* local or global? *)
   | METADATA_String (str:string)
   | METADATA_Named  (strs:list string)
   | METADATA_Node   (mds:list metadata)
