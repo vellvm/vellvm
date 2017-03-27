@@ -1,5 +1,7 @@
 Require Import ZArith List String Omega.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.AstLib Vellvm.CFG.
+Add Rec LoadPath "../../lib/paco/src" as Paco. (* TODO: make user independent *)
+Require Import paco.
 Import ListNotations.
 Open Scope positive_scope.
 
@@ -10,14 +12,118 @@ Set Contextual Implicit.
    uses the "Expr" functor from the Ollvm_ast definition, injecting new base values.
    This allows the semantics to do 'symbolic' execution for things that we don't 
    have a way of interpreting concretely (e.g. undef).   
-*)
+ *)
+Parameter addr : Set.
+
 Inductive dvalue : Set :=
 | DV : Expr dvalue -> dvalue
 | DVALUE_CodePointer (p : path)
-| DVALUE_Addr (a:nat)
+| DVALUE_Addr (a:addr)
 .  
 
+(* TODO: Add other memory effects, such as synchronization operations *)
+(* Notes: 
+   - To allow the memory model to correctly model stack alloca deallocation,
+     we would also have to expose the "Ret" instruction. 
 
+   - What is the correct way to model global data? 
+*)
+Inductive effects (d:Type) : Type :=
+| Alloca (t:typ)  (k:dvalue -> d)        (* Stack allocation *)
+| Load   (a:addr) (k:dvalue -> d)
+| Store  (a:addr) (v:dvalue) (k:d)
+| Call   (v:dvalue) (k:dvalue -> d)
+.    
+
+
+Definition effects_map {A B} (f:A -> B) (m:effects A) : effects B :=
+  match m with
+  | Alloca t g => Alloca t (fun a => f (g a))
+  | Load a g  => Load a (fun dv => f (g dv))
+  | Store a dv d => Store a dv (f d)
+  | Call a d => Call a (fun dv => f (d dv))
+  end.
+
+Instance effects_functor: @Functor effects := fun A => fun B => @effects_map A B.
+Program Instance effects_functor_eq_laws : (@FunctorLaws effects) effects_functor (@eq).
+Next Obligation.
+  unfold fmap. unfold effects_functor. unfold effects_map. destruct a; reflexivity.
+Defined.
+Next Obligation.
+  unfold fmap. unfold effects_functor. unfold effects_map. destruct a; reflexivity.
+Defined.  
+
+(* Domain of semantics *)
+CoInductive D X :=
+| Ret : X -> D X
+| Fin : D X
+| Err : D X 
+| Tau : D X -> D X
+| Eff : effects (D X) -> D X
+.
+
+CoFixpoint d_map {A B} (f:A -> B) (d:D A) : D B :=
+  match d with
+    | Ret a => Ret (f a)
+    | Fin => Fin
+    | Err => Err
+    | Tau d' => Tau (d_map f d')
+    | Eff m => Eff (effects_map (d_map f) m)
+  end.
+
+Section UNFOLDING.
+
+Definition id_match_d {A} (d:D A) : D A :=
+  match d with
+    | Ret a => Ret a
+    | Fin => Fin
+    | Err => Err
+    | Tau d' => Tau d'
+    | Eff m => Eff m
+  end.
+
+Lemma id_d_eq : forall A (d:D A),
+  d = id_match_d d.
+Proof.
+  destruct d; auto.
+Qed.
+
+End UNFOLDING.
+
+Arguments id_d_eq {_} _ .
+
+
+Instance D_functor: @Functor D := fun A => fun B => @d_map A B.
+
+(* Probably a functor only up to stuttering equivalence. *)
+(*
+Program Instance D_functor_eq_laws : (@FunctorLaws D) D_functor (@eq).
+*)
+
+
+
+(* Note: for guardedness, bind Ret introduces extra Tau *)
+Definition bind {A B} (m:D A) (f:A -> D B) : D B :=
+  (cofix bindf m:= 
+     match m with
+       | Ret a => Tau (f a)
+       | Fin => Fin
+       | Err => Err
+       | Tau d' => Tau (bindf d')
+       | Eff m => Eff (effects_map bindf m)
+     end) m.
+
+Program Instance D_monad : (@Monad D) D_functor := _.
+Next Obligation.
+  split.
+  - intros. apply Ret. exact X.
+  - intros A B. apply bind.
+Defined.
+  
+
+
+(* TODO: add the global environment *)
+Definition genv := list (global_id * dvalue).
 Definition env  := list (local_id * dvalue).
 
 Inductive frame : Set :=
@@ -27,9 +133,8 @@ Inductive frame : Set :=
           
 Definition stack := list frame.
 Definition state := (path * env * stack)%type.
-
-
 Definition init_state (CFG:cfg) : state := (init CFG, [], []).
+
 
 Definition def_id_of_path (p:path) : option local_id :=
   match ins p with
@@ -43,14 +148,12 @@ Definition local_id_of_ident (i:ident) : option local_id :=
   | ID_Local i => Some i
   end.
 
-
 Definition lookup_env (e:env) (id:local_id) : option dvalue :=
   assoc RawID.eq_dec id e.
 
 
 (* Arithmetic Operations ---------------------------------------------------- *)
 (* TODO: implement LLVM semantics *)
-
 
 Definition eval_iop iop v1 v2 :=
   match v1, v2 with
@@ -78,33 +181,9 @@ Definition eval_icmp icmp v1 v2 :=
   | _, _ => None
   end.
 
-(*
-| VALUE_Ident   (id:ident)  
-| VALUE_Integer (x:int)
-| VALUE_Float   (f:float)
-| VALUE_Bool    (b:bool)
-| VALUE_Null
-| VALUE_Zero_initializer
-| VALUE_Cstring (s:string)
-| VALUE_None                                       (* "token" constant *)
-| VALUE_Undef
-| VALUE_Struct        (fields: list (typ * a))
-| VALUE_Packed_struct (fields: list (typ * a))
-| VALUE_Array         (elts: list (typ * a))
-| VALUE_Vector        (elts: list (typ * a))
-| OP_IBinop           (iop:ibinop) (t:typ) (v1:a) (v2:a)  
-| OP_ICmp             (cmp:icmp)   (t:typ) (v1:a) (v2:a)
-| OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:typ) (v1:a) (v2:a)
-| OP_FCmp             (cmp:fcmp)   (t:typ) (v1:a) (v2:a)
-| OP_Conversion       (conv:conversion_type) (t_from:typ) (v:a) (t_to:typ)
-| OP_GetElementPtr    (t:typ) (ptrval:(typ * a)) (idxs:list (typ * a))
-| OP_ExtractElement   (vec:(typ * a)) (idx:(typ * a))
-| OP_InsertElement    (vec:(typ * a)) (elt:(typ * a)) (idx:(typ * a))
-| OP_ShuffleVector    (vec1:(typ * a)) (vec2:(typ * a)) (idxmask:(typ * a))
-| OP_ExtractValue     (vec:(typ * a)) (idxs:list int)
-| OP_InsertValue      (vec:(typ * a)) (elt:(typ * a)) (idxs:list int)
-| OP_Select           (cnd:(typ * a)) (v1:(typ * a)) (v2:(typ * a)) (* if * then * else *)
-*)
+Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : option dvalue := None.
+
+Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : option dvalue := None.
 
 Definition eval_expr {A:Set} (f:env -> A -> option dvalue) (e:env) (o:Expr A) : option dvalue :=
   match o with
@@ -119,11 +198,13 @@ Definition eval_expr {A:Set} (f:env -> A -> option dvalue) (e:env) (o:Expr A) : 
   | VALUE_Cstring _ s => Some (DV (VALUE_Cstring _ s))
   | VALUE_None _      => Some (DV (VALUE_None _))
   | VALUE_Undef _     => Some (DV (VALUE_Undef _))
-  | VALUE_Struct _ fs =>
-    'vs <- map_option (map_option_snd (f e)) fs;
+
+  | VALUE_Struct _ es =>
+    'vs <- map_option (map_option_snd (f e)) es;
      Some (DV (VALUE_Struct _ vs))
-  | VALUE_Packed_struct _ fs =>
-    'vs <- map_option (map_option_snd (f e)) fs;
+
+  | VALUE_Packed_struct _ es =>
+    'vs <- map_option (map_option_snd (f e)) es;
      Some (DV (VALUE_Packed_struct _ vs))
     
   | VALUE_Array _ es =>
@@ -144,7 +225,55 @@ Definition eval_expr {A:Set} (f:env -> A -> option dvalue) (e:env) (o:Expr A) : 
     'v2 <- f e op2;
     (eval_icmp cmp) v1 v2
 
-  | _ => None
+  | OP_FBinop _ fop fm t op1 op2 =>
+    'v1 <- f e op1;
+    'v2 <- f e op2;
+    (eval_fop fop) v1 v2
+
+  | OP_FCmp _ fcmp t op1 op2 => 
+    'v1 <- f e op1;
+    'v2 <- f e op2;
+    (eval_fcmp fcmp) v1 v2
+              
+  | OP_Conversion _ conv t1 op t2 =>
+    f e op    (* TODO: is conversion a no-op semantically? *)
+      
+  | OP_GetElementPtr _ t ptrval idxs =>
+    'vptr <- map_option_snd (f e) ptrval;
+    'vs <- map_option (map_option_snd (f e)) idxs;
+    None  (* TODO: Getelementptr *)  
+    
+  | OP_ExtractElement _ vecop idx =>
+    'vec <- map_option_snd (f e) vecop;
+    'vidx <- map_option_snd (f e) idx;
+    None (* TODO: Extract Element *)
+      
+  | OP_InsertElement _ vecop eltop idx =>
+    'vec <- map_option_snd (f e) vecop;
+    'v <- map_option_snd (f e) eltop;
+    'vidx <- map_option_snd (f e) idx;
+    None (* TODO *)
+    
+  | OP_ShuffleVector _ vecop1 vecop2 idxmask =>
+    'vec1 <- map_option_snd (f e) vecop1;
+    'vec2 <- map_option_snd (f e) vecop2;      
+    'vidx <- map_option_snd (f e) idxmask;
+    None (* TODO *)
+
+  | OP_ExtractValue _ vecop idxs =>
+    'vec <- map_option_snd (f e) vecop;
+      None
+        
+  | OP_InsertValue _ vecop eltop idxs =>
+    'vec <- map_option_snd (f e) vecop;
+    'v <- map_option_snd (f e) eltop;
+    None
+    
+  | OP_Select _ cndop op1 op2 =>
+    'cnd <- map_option_snd (f e) cndop;
+    'v1 <- map_option_snd (f e) op1;
+    'v2 <- map_option_snd (f e) op2;      
+    None
   end.
 
 Fixpoint eval_op (e:env) (o:value) : option dvalue :=
@@ -152,6 +281,10 @@ Fixpoint eval_op (e:env) (o:value) : option dvalue :=
   | SV o' => eval_expr eval_op e o'
   end.
 
+(* Semantically, a jump at the LLVM IR level might not be "atomic" in the sense that
+   Phi nodes may be lowered into a sequence of non-atomic operations on registers.  However,
+   Phi's should never touch memory [is that true? can there be spills?], so modeling them
+   as atomic should be OK. *)
 Fixpoint jump (CFG:cfg) (p:path) (e_init:env) (e:env) ps (q:path) (k:stack) : option state :=
   match ps with
   | [] => Some (q, e, k)
@@ -165,3 +298,119 @@ Fixpoint jump (CFG:cfg) (p:path) (e_init:env) (e:env) ps (q:path) (k:stack) : op
     end
   | _ => None
   end.
+
+
+Definition lift_option_d {A B} (m:option A) (f: A -> D B) : D B :=
+  match m with
+    | None => Err
+    | Some b => f b
+  end.
+
+Notation "'do' x <- m ; f" := (lift_option_d m (fun x => f)) 
+   (at level 200, x ident, m at level 100, f at level 200).
+
+Fixpoint stepD (CFG:cfg) (s:state) : D state :=
+  let '(p, e, k) := s in
+  do cmd <- (code CFG) p;
+    match cmd with
+    | Step (INSTR_Op op) p' =>
+      do id <- def_id_of_path p;
+      do dv <- eval_op e op;
+       Ret (p', (id, dv)::e, k)
+
+    (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
+    | Step (INSTR_Call (ret_ty,ID_Global f) args) p' =>
+      do id <- def_id_of_path p;
+      do fn <- (funs CFG) f;
+      let '(ids, blk, i) := fn in
+      do ids' <- map_option local_id_of_ident ids;
+      do dvs <-  map_option (eval_op e) (map snd args);
+      match ret_ty with
+      | TYPE_Void => Ret (mk_path f blk i, combine ids' dvs, (KRet_void e p')::k)
+      | _ => Ret (mk_path f blk i, combine ids' dvs, (KRet e id p')::k)
+      end
+
+    | Step (INSTR_Call (_, ID_Local _) _) _ => Err
+        
+    | Step (INSTR_Unreachable) _ => Err
+                                                       
+    | Jump (TERM_Ret (t, op)) =>
+      match k, eval_op e op with
+      | [], Some dv => Fin
+      | (KRet e' id p') :: k', Some dv => Ret (p', (id, dv)::e', k')
+      | _, _ => Err
+      end
+
+    | Jump (TERM_Ret_void) =>
+      match k with
+      | [] => Fin
+      | (KRet_void e' p')::k' => Ret (p', e', k')
+      | _ => Err
+      end
+        
+    | Jump (TERM_Br (_,op) (_, br1) (_, br2)) =>
+      do br <-
+      match eval_op e op  with
+      | Some (DV (VALUE_Bool _ true))  => Some br1
+      | Some (DV (VALUE_Bool _ false)) => Some br2
+      | Some _ => None
+      | None => None
+      end;
+      do lbl <- local_id_of_ident br;
+        match (blks CFG) (bn p) lbl with
+          | Some (Phis ps q) => 
+            lift_option_d (jump CFG p e e ps q k) (@Ret state)
+          | None => Err
+        end
+        
+    | Jump (TERM_Br_1 (_, br)) =>
+      do lbl <- local_id_of_ident br;
+        match (blks CFG) (bn p) lbl with
+          | Some (Phis ps q) => 
+            lift_option_d (jump CFG p e e ps q k) (@Ret state)
+          | None => Err
+        end
+      
+    | Step (INSTR_Alloca t _ _) p' =>
+      do id <- def_id_of_path p;
+      Eff (Alloca t (fun (a:dvalue) => Ret (p', (id, a)::e, k)))
+        
+    | Step (INSTR_Load _ t (_,ptr) _) p' =>
+      do id <- def_id_of_path p;
+      do dv <- eval_op e ptr;
+      match dv with
+        | DVALUE_Addr a => Eff (Load a (fun dv => Ret (p', (id, dv)::e, k)))
+        | _ => Err
+      end
+        
+    | Step (INSTR_Store _ (_, val) (_, ptr) _) p' =>
+      match eval_op e val, eval_op e ptr with
+      | Some dv, Some (DVALUE_Addr a) => Eff (Store a dv (Ret (p', e, k)))
+      | _, _ => Err
+      end
+
+    | Step (INSTR_Phi _ _) p' => Err
+      (* We should never evaluate Phi nodes except in jump *)
+
+    (* Currently unhandled LLVM instructions *)
+    | Step INSTR_Fence p'
+    | Step INSTR_AtomicCmpXchg p'
+    | Step INSTR_AtomicRMW p'
+    | Step INSTR_VAArg p'
+    | Step INSTR_LandingPad p' => Err
+ 
+    (* Currently unhandled LLVM terminators *)                                  
+    | Jump (TERM_Switch _ _ _)
+    | Jump (TERM_IndirectBr _ _)
+    | Jump (TERM_Resume _)
+    | Jump (TERM_Invoke _ _ _ _) => Err
+    end.
+
+
+Inductive Empty :=.
+Definition DLim := D Empty.
+
+(* Note: codomain is D'  *)
+CoFixpoint sem (CFG:cfg) (s:state) : DLim :=
+  bind (stepD CFG s) (sem CFG).
+

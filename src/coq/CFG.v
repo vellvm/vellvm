@@ -10,6 +10,31 @@ Record path :=
       ins : instr_id;
     }.
 
+Require Import Equalities.
+Module PATH <: UsualDecidableTypeFull.
+  Definition t := path.
+  Include HasUsualEq.
+  Include UsualIsEq.
+  Include UsualIsEqOrig.
+  
+  Lemma eq_dec : forall (x y : path), {x = y} + {x <> y}.
+  Proof.
+    intros x y.
+    destruct x as [xf xb xi]; destruct y as [yf yb yi].
+    destruct (xf == yf).
+    - destruct (xb == yb).
+      + destruct (xi == yi).
+        * subst. left. reflexivity.
+        * right. unfold not. intros. apply n. inversion H. auto.
+      + right. unfold not. intros. apply n. inversion H. auto.
+    - right. unfold not. intros. apply n. inversion H. auto.
+  Qed.
+
+  Include HasEqDec2Bool.
+  
+End PATH.
+Instance eq_dec_path : eq_dec path := PATH.eq_dec.
+
 
 Inductive cmd : Set :=
 | Step  (i:instr) (p:path)
@@ -84,31 +109,45 @@ Fixpoint entities_to_blks ets fid bid : option block_entry :=
     | _ :: t => entities_to_blks t fid bid
   end.
 
-Fixpoint cmd_from_block to_find fn bn is : option cmd :=
+Definition next_or_term term_id (is : list (instr_id * instr)) : instr_id :=
   match is with
-    | [] => None
-    | (id, INSTR_Op _ as ins) :: ((next, _) :: _ as rest)
-    | (id, INSTR_Phi _ _ as ins) :: ((next, _) :: _ as rest)
-    | (id, INSTR_Alloca _ _ _ as ins) :: ((next, _) :: _ as rest)
-    | (id, INSTR_Load _ _ _ _ as ins) :: ((next, _) :: _ as rest)
-    | (id, INSTR_Store _ _ _ _ as ins) :: ((next, _) :: _ as rest)
-    | (id, INSTR_Unreachable as ins) :: ((next, _) :: _ as rest)
-    | (id, INSTR_Call _ _ as ins) :: ((next, _) :: _ as rest) =>
-      if to_find == id then Some (Step ins (mk_path fn bn next))
-      else cmd_from_block to_find fn bn rest
-    | _ => None
+  | [] => term_id
+  | (next, _)::_ => next
   end.
 
-Fixpoint cmd_from_term to_find term_id term : option cmd :=
+Fixpoint cmd_from_block to_find fn bn term_id is : option cmd :=
+  match is with
+    | [] => None
+    | (id, INSTR_Op _ as ins)          :: rest
+    | (id, INSTR_Phi _ _ as ins)       :: rest   (* should never be needed *)
+    | (id, INSTR_Alloca _ _ _ as ins)  :: rest
+    | (id, INSTR_Load _ _ _ _ as ins)  :: rest
+    | (id, INSTR_Store _ _ _ _ as ins) :: rest
+    | (id, INSTR_Unreachable as ins)   :: rest
+    | (id, INSTR_Call _ _ as ins)      :: rest
+    | (id, INSTR_Fence as ins)         :: rest
+    | (id, INSTR_AtomicCmpXchg as ins) :: rest
+    | (id, INSTR_AtomicRMW as ins)     :: rest
+    | (id, INSTR_VAArg as ins)         :: rest
+    | (id, INSTR_LandingPad as ins)    :: rest => 
+      if to_find == id then
+        Some (Step ins (mk_path fn bn (next_or_term term_id rest)))
+      else cmd_from_block to_find fn bn term_id rest
+  end.
+
+Fixpoint cmd_from_term to_find (term_id:instr_id) term : option cmd :=
   match term with
     (* Terminators *)
     | TERM_Ret _ as ins
     | TERM_Ret_void as ins
     | TERM_Br _ _ _ as ins
-    | TERM_Br_1 _ as ins =>
+    | TERM_Br_1 _ as ins 
+    | TERM_Switch _ _ _ as ins
+    | TERM_IndirectBr _ _  as ins
+    | TERM_Resume _  as ins
+    | TERM_Invoke _ _ _ _ as ins =>
       if to_find == term_id then Some (Jump ins)
       else None
-    | _ => None
   end.
     
 
@@ -118,7 +157,7 @@ Fixpoint entities_to_code ets (p : path) : option cmd :=
     | (TLE_Definition d) :: t =>
       if (dc_name (df_prototype d)) == (fn p) then
         'b <- find (fun b => RawID.eqb (bn p) (blk_id b)) (df_instrs d);
-        match cmd_from_block (ins p) (fn p) (bn p) (blk_instrs b) with
+        match cmd_from_block (ins p) (fn p) (bn p) (blk_term_id b) (blk_instrs b) with
           | Some x => Some x
           | None => cmd_from_term (ins p) (blk_term_id b) (blk_term b)
         end

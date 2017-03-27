@@ -196,8 +196,11 @@ Definition tident : Set := (typ * ident)%type.
   This datatype is more permissive than legal in LLVM:
      - it allows identifiers to appear nested inside of "constant expressions"
 
-  TODO:
-   Integer values should be OCaml int64 or some other machine-word compatible thing.
+  NOTES:
+   Integer values: llc parses large integer values and converts them to some 
+   internal form (based on integer size?)
+   
+   Why do we need Bool?  Why not i1 ?  Is that "real" llvm?
  *)
 Inductive Expr (a:Set) : Set :=
 | VALUE_Ident   (id:ident)  
@@ -234,9 +237,9 @@ Inductive value : Set :=
 Definition tvalue : Set := typ * value.
 
 Inductive instr_id : Set :=
-| IId   (id:raw_id)    (* Anonymous or explicitly named instructions *)
+| IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)
 | IVoid (n:int)        (* "Void" return type, for "store" "call" and terminators.
-                          Each with unique number (NOTE: these are distinct from Anon raw_id) *)
+                           Each with unique number (NOTE: these are distinct from Anon raw_id) *)
 .
         
 Inductive instr : Set :=
