@@ -1,15 +1,85 @@
-# Eventually this will be the master Makefile
+# Coq sources
+COQDIR = coq
+COQLIBDIR = ../lib
 
-SUBDIRS = ast ollvm coq ml
+# OCaml sources
+MLDIR = ml
+EXTRACTDIR = ml/extracted
+OLLVMDIR = ollvm/src/ollvm
 
-.PHONY: clean all ollvm
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm)  -R $(COQLIBDIR)/paco/src Paco -R $(EXTRACTDIR) Extract
+COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
+COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
+COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
+MENHIR=menhir
+CP=cp
+
+COQFILES := Ollvm_ast Util Classes AstLib CFG Effects StepSemantics Memory Transform
+OLLVMFILES := 
+
+VFILES := $(COQFILES:%=coq/%.v)
+VOFILES := $(COQFILES:%=coq/%.vo)
 
 all:
-	for dir in $(SUBDIRS); do \
-	  $(MAKE) -C $$dir ; \
-	done
+	@test -f .depend || $(MAKE) depend
+	$(MAKE) coq
+	$(MAKE) extracted
+	$(MAKE) vellvm
+
+coq: $(VOFILES)
+
+extracted: $(EXTRACTDIR)/STAMP
+
+$(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
+	@echo "Extracting"
+	rm -f $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
+	$(COQEXEC) $(EXTRACTDIR)/Extract.v
+	touch $(EXTRACTDIR)/STAMP
+
+
+%.vo: %.v
+	@rm -f doc/$(*F).glob
+	@echo "COQC $*.v"
+	@$(COQC) -dump-glob doc/$(*F).glob $*.v
+
+depend: $(VFILES) 
+	@echo "Analyzing Coq dependencies"
+	@$(COQDEP) $^ > .depend
+
+
+
+# Directories containing plain Caml code
+OCAMLDIRS= $(OLLVMDIR) $(EXTRACTDIR) $(MLDIR) 
+
+COMMA=,
+OCAMLINCLUDES=$(patsubst %,-I %, $(OCAMLDIRS))
+print-ocaml-includes:
+	@echo $(OCAMLINCLUDES)
+
+OCAMLLIBS := unix,str
+
+.PHONY: clean main.native test
+
+main.native: 
+	@echo "Compiling Vellvm"
+	ocamlbuild -r -use-menhir $(OCAMLINCLUDES) -libs $(OCAMLLIBS) main.native
+
+vellvm: main.native
+	cp main.native vellvm
+
+test: vellvm
+	./vellvm --test-pp-dir ../tests/ll
+
+print-includes:
+	@echo $(COQINCLUDES)
 
 clean:
-	for dir in $(SUBDIRS); do \
-	  $(MAKE) -C $$dir clean; \
-	done
+	rm -f .depend
+	rm -f $(VOFILES)
+	rm -rf doc/*.glob
+	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
+	ocamlbuild -clean
+	rm -rf output
+	rm -f vellvm
+
+-include .depend
