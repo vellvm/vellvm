@@ -3,14 +3,10 @@ Require Import Vellvm.Ollvm_ast.
 Open Scope string_scope.
 
 
-Parameter str_cat : string -> string -> string.
-Parameter str_nil : string.
-Parameter str_cons : (ascii * string) -> string.
-
 Definition mangle_raw_id (id:raw_id) : raw_id :=
   match id with
   | Anon n => id
-  | Name s => Name (str_cat "_vellvm" s)
+  | Name s => Name (append "_vellvm" s)
   end.
 
 Definition mangle_ident (id:ident) : ident :=

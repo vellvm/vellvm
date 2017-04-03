@@ -1,12 +1,8 @@
 Require Import Ascii String.
 Extraction Language Ocaml.
-Add Rec LoadPath "../../lib/paco/src" as Paco. (* TODO: make user independent *)
 
-Require Import Vellvm.Transform.
-Require Import Vellvm.StepSemantics.
-
+Require Import Vellvm.Ollvm_ast.
 Require Import ExtrOcamlBasic.
-
 
 (* strings ------------------------------------------------------------------ *)
 Extract Inductive ascii => char
@@ -25,10 +21,8 @@ Extract Inlined Constant ascii_dec => "(=)".
 Extract Inductive string => "string" [ "str_nil" "str_cons" ].
 
 (* OCaml pervasive types ---------------------------------------------------- *)
-Extract Constant str_nil => "(String.make 0 ' ')".
-Extract Constant str_cons => "fun (c, s) -> (Char.escaped c) ^ s".
-Extract Inlined Constant str_cat => "(^)".
+Extract Inlined Constant int => "int".
+Extract Inlined Constant float => "float".
 
-(* Extraction Library Datatypes. *)
-Extraction Library Transform.
-Extraction Library StepSemantics.
+Extraction Library Datatypes. 
+Extraction Library Ollvm_ast.

@@ -9,13 +9,14 @@ let parse_pp_test path =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let filename, ext = Platform.path_to_basename_ext path in
   let vll_file = Platform.gen_name !Platform.output_path filename ".v.ll" in
+  let dot_s = Platform.gen_name !Platform.output_path filename ".s" in
   let _ = Printf.fprintf stderr "Running llc on: %s\n%!" path in
   try 
-    let _ = llc_parse path in
+    let _ = llc_parse path dot_s in
     let prog = parse_file path in
     let _ = output_file vll_file prog in
     try
-      let _ = llc_parse vll_file in
+      let _ = llc_parse vll_file dot_s in
       ()
     with
     PlatformError _ -> failwith (Printf.sprintf "vellvm output bad file: %s" vll_file)

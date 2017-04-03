@@ -1,126 +1,36 @@
 Require Import ZArith List String Omega.
-Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util Vellvm.AstLib Vellvm.CFG.
-Add Rec LoadPath "../../lib/paco/src" as Paco. (* TODO: make user independent *)
-Require Import paco.
+Require Import  Vellvm.Classes Vellvm.Util.
+Require Import Vellvm.Ollvm_ast Vellvm.AstLib Vellvm.CFG.
 Import ListNotations.
 Open Scope positive_scope.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
 
+Require Import Vellvm.Effects.
+
+Module Type ADDR.
+  Parameter addr : Set.
+End ADDR.  
+
+Module StepSemantics(A:ADDR).
+  Module ET : Vellvm.Effects.EffT with Definition addr := A.addr with Definition typ := Ollvm_ast.typ.
+    Definition addr := A.addr.
+    Definition typ := Ollvm_ast.typ.
+  End ET.    
+  Module E := Vellvm.Effects.Effects(ET).
+  Export E.
+
 (* The set of dynamic values manipulated by an LLVM program. This datatype
    uses the "Expr" functor from the Ollvm_ast definition, injecting new base values.
    This allows the semantics to do 'symbolic' execution for things that we don't 
    have a way of interpreting concretely (e.g. undef).   
  *)
-Parameter addr : Set.
-
 Inductive dvalue : Set :=
 | DV : Expr dvalue -> dvalue
 | DVALUE_CodePointer (p : path)
 | DVALUE_Addr (a:addr)
 .  
-
-(* TODO: Add other memory effects, such as synchronization operations *)
-(* Notes: 
-   - To allow the memory model to correctly model stack alloca deallocation,
-     we would also have to expose the "Ret" instruction. 
-
-   - What is the correct way to model global data? 
-*)
-Inductive effects (d:Type) : Type :=
-| Alloca (t:typ)  (k:dvalue -> d)        (* Stack allocation *)
-| Load   (a:addr) (k:dvalue -> d)
-| Store  (a:addr) (v:dvalue) (k:d)
-| Call   (v:dvalue) (k:dvalue -> d)
-.    
-
-
-Definition effects_map {A B} (f:A -> B) (m:effects A) : effects B :=
-  match m with
-  | Alloca t g => Alloca t (fun a => f (g a))
-  | Load a g  => Load a (fun dv => f (g dv))
-  | Store a dv d => Store a dv (f d)
-  | Call a d => Call a (fun dv => f (d dv))
-  end.
-
-Instance effects_functor: @Functor effects := fun A => fun B => @effects_map A B.
-Program Instance effects_functor_eq_laws : (@FunctorLaws effects) effects_functor (@eq).
-Next Obligation.
-  unfold fmap. unfold effects_functor. unfold effects_map. destruct a; reflexivity.
-Defined.
-Next Obligation.
-  unfold fmap. unfold effects_functor. unfold effects_map. destruct a; reflexivity.
-Defined.  
-
-(* Domain of semantics *)
-CoInductive D X :=
-| Ret : X -> D X
-| Fin : D X
-| Err : D X 
-| Tau : D X -> D X
-| Eff : effects (D X) -> D X
-.
-
-CoFixpoint d_map {A B} (f:A -> B) (d:D A) : D B :=
-  match d with
-    | Ret a => Ret (f a)
-    | Fin => Fin
-    | Err => Err
-    | Tau d' => Tau (d_map f d')
-    | Eff m => Eff (effects_map (d_map f) m)
-  end.
-
-Section UNFOLDING.
-
-Definition id_match_d {A} (d:D A) : D A :=
-  match d with
-    | Ret a => Ret a
-    | Fin => Fin
-    | Err => Err
-    | Tau d' => Tau d'
-    | Eff m => Eff m
-  end.
-
-Lemma id_d_eq : forall A (d:D A),
-  d = id_match_d d.
-Proof.
-  destruct d; auto.
-Qed.
-
-End UNFOLDING.
-
-Arguments id_d_eq {_} _ .
-
-
-Instance D_functor: @Functor D := fun A => fun B => @d_map A B.
-
-(* Probably a functor only up to stuttering equivalence. *)
-(*
-Program Instance D_functor_eq_laws : (@FunctorLaws D) D_functor (@eq).
-*)
-
-
-
-(* Note: for guardedness, bind Ret introduces extra Tau *)
-Definition bind {A B} (m:D A) (f:A -> D B) : D B :=
-  (cofix bindf m:= 
-     match m with
-       | Ret a => Tau (f a)
-       | Fin => Fin
-       | Err => Err
-       | Tau d' => Tau (bindf d')
-       | Eff m => Eff (effects_map bindf m)
-     end) m.
-
-Program Instance D_monad : (@Monad D) D_functor := _.
-Next Obligation.
-  split.
-  - intros. apply Ret. exact X.
-  - intros A B. apply bind.
-Defined.
-  
-
 
 (* TODO: add the global environment *)
 Definition genv := list (global_id * dvalue).
@@ -300,7 +210,9 @@ Fixpoint jump (CFG:cfg) (p:path) (e_init:env) (e:env) ps (q:path) (k:stack) : op
   end.
 
 
-Definition lift_option_d {A B} (m:option A) (f: A -> D B) : D B :=
+Definition Obs := D dvalue.
+
+Definition lift_option_d {A B} (m:option A) (f: A -> Obs B) : Obs B :=
   match m with
     | None => Err
     | Some b => f b
@@ -309,7 +221,7 @@ Definition lift_option_d {A B} (m:option A) (f: A -> D B) : D B :=
 Notation "'do' x <- m ; f" := (lift_option_d m (fun x => f)) 
    (at level 200, x ident, m at level 100, f at level 200).
 
-Fixpoint stepD (CFG:cfg) (s:state) : D state :=
+Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
   let '(p, e, k) := s in
   do cmd <- (code CFG) p;
     match cmd with
@@ -359,7 +271,7 @@ Fixpoint stepD (CFG:cfg) (s:state) : D state :=
       do lbl <- local_id_of_ident br;
         match (blks CFG) (bn p) lbl with
           | Some (Phis ps q) => 
-            lift_option_d (jump CFG p e e ps q k) (@Ret state)
+            lift_option_d (jump CFG p e e ps q k) (@Ret _ state)
           | None => Err
         end
         
@@ -367,7 +279,7 @@ Fixpoint stepD (CFG:cfg) (s:state) : D state :=
       do lbl <- local_id_of_ident br;
         match (blks CFG) (bn p) lbl with
           | Some (Phis ps q) => 
-            lift_option_d (jump CFG p e e ps q k) (@Ret state)
+            lift_option_d (jump CFG p e e ps q k) (@Ret _ state)
           | None => Err
         end
       
@@ -407,10 +319,8 @@ Fixpoint stepD (CFG:cfg) (s:state) : D state :=
     end.
 
 
-Inductive Empty :=.
-Definition DLim := D Empty.
-
 (* Note: codomain is D'  *)
-CoFixpoint sem (CFG:cfg) (s:state) : DLim :=
+CoFixpoint sem (CFG:cfg) (s:state) : (Obs Empty) :=
   bind (stepD CFG s) (sem CFG).
 
+End StepSemantics.
