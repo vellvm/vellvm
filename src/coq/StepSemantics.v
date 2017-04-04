@@ -4,6 +4,7 @@ Require Import Vellvm.Ollvm_ast Vellvm.AstLib Vellvm.CFG.
 Import ListNotations.
 
 Open Scope Z_scope.
+Open Scope string_scope.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -87,6 +88,7 @@ Definition eval_icmp icmp v1 v2 :=
     match icmp with
     | Eq => Z.eqb i1 i2
     | Ule => Z.leb i1 i2
+    | Sgt => Z.gtb i1 i2
     |  _ => false 
     end))
   | _, _ => None
@@ -215,7 +217,7 @@ Definition Obs := D dvalue.
 
 Definition lift_option_d {A B} (m:option A) (f: A -> Obs B) : Obs B :=
   match m with
-    | None => Err
+    | None => Err "lift_option_d failed"
     | Some b => f b
   end.
 
@@ -243,22 +245,22 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
       | _ => Ret (mk_path f blk i, combine ids' dvs, (KRet e id p')::k)
       end
 
-    | Step (INSTR_Call (_, ID_Local _) _) _ => Err
+    | Step (INSTR_Call (_, ID_Local _) _) _ => (Err "INSTR_Call to local")
         
-    | Step (INSTR_Unreachable) _ => Err
+    | Step (INSTR_Unreachable) _ => Err "IMPOSSIBLE: unreachable"
                                                        
     | Jump (TERM_Ret (t, op)) =>
       match k, eval_op e op with
       | [], Some dv => Fin dv
       | (KRet e' id p') :: k', Some dv => Ret (p', (id, dv)::e', k')
-      | _, _ => Err
+      | _, _ => Err "IMPOSSIBLE: Ret op in non-return configuration"
       end
 
     | Jump (TERM_Ret_void) =>
       match k with
       | [] => Fin (DV (VALUE_Bool _ true))
       | (KRet_void e' p')::k' => Ret (p', e', k')
-      | _ => Err
+      | _ => Err "IMPOSSIBLE: Ret void in non-return configuration"
       end
         
     | Jump (TERM_Br (_,op) (_, br1) (_, br2)) =>
@@ -273,7 +275,7 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
         match (blks CFG) (bn p) lbl with
           | Some (Phis ps q) => 
             lift_option_d (jump CFG p e e ps q k) (@Ret _ state)
-          | None => Err
+          | None => Err "ERROR: Br lbl not found"
         end
         
     | Jump (TERM_Br_1 (_, br)) =>
@@ -281,7 +283,7 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
         match (blks CFG) (bn p) lbl with
           | Some (Phis ps q) => 
             lift_option_d (jump CFG p e e ps q k) (@Ret _ state)
-          | None => Err
+          | None => Err "ERROR: Br1 lbl not found"
         end
       
     | Step (INSTR_Alloca t _ _) p' =>
@@ -293,16 +295,16 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
       do dv <- eval_op e ptr;
       match dv with
         | DVALUE_Addr a => Eff (Load a (fun dv => Ret (p', (id, dv)::e, k)))
-        | _ => Err
+        | _ => Err "ERROR: Load got non-pointer value"
       end
         
     | Step (INSTR_Store _ (_, val) (_, ptr) _) p' =>
       match eval_op e val, eval_op e ptr with
       | Some dv, Some (DVALUE_Addr a) => Eff (Store a dv (Ret (p', e, k)))
-      | _, _ => Err
+      | _, _ => Err "ERROR: Store got non-pointer value"
       end
 
-    | Step (INSTR_Phi _ _) p' => Err
+    | Step (INSTR_Phi _ _) p' => Err "IMPOSSIBLE: Phi encountered in step"
       (* We should never evaluate Phi nodes except in jump *)
 
     (* Currently unhandled LLVM instructions *)
@@ -310,13 +312,13 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
     | Step INSTR_AtomicCmpXchg p'
     | Step INSTR_AtomicRMW p'
     | Step INSTR_VAArg p'
-    | Step INSTR_LandingPad p' => Err
+    | Step INSTR_LandingPad p' => Err "Unsupported LLVM intsruction"
  
     (* Currently unhandled LLVM terminators *)                                  
     | Jump (TERM_Switch _ _ _)
     | Jump (TERM_IndirectBr _ _)
     | Jump (TERM_Resume _)
-    | Jump (TERM_Invoke _ _ _ _) => Err
+    | Jump (TERM_Invoke _ _ _ _) => Err "Unsupport LLVM terminator"
     end.
 
 

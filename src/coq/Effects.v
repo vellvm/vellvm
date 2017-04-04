@@ -52,7 +52,7 @@ Defined.
 CoInductive D dvalue X :=
 | Ret : X -> D dvalue X
 | Fin : dvalue -> D dvalue X
-| Err : D dvalue X 
+| Err : string -> D dvalue X 
 | Tau : D dvalue X -> D dvalue X
 | Eff : effects dvalue (D dvalue X) -> D dvalue X
 .
@@ -61,7 +61,7 @@ CoFixpoint d_map {A B dvalue} (f:A -> B) (d:D dvalue A) : D dvalue B :=
   match d with
     | Ret a => Ret (f a)
     | Fin d => Fin d
-    | Err => Err
+    | Err s => Err s
     | Tau d' => Tau (d_map f d')
     | Eff m => Eff (effects_map (d_map f) m)
   end.
@@ -72,7 +72,7 @@ Definition id_match_d {A dvalue} (d:D dvalue A) : D dvalue A :=
   match d with
     | Ret a => Ret a
     | Fin d => Fin d
-    | Err => Err
+    | Err s => Err s
     | Tau d' => Tau d'
     | Eff m => Eff m
   end.
@@ -101,7 +101,7 @@ Definition bind {A B dvalue} (m:D dvalue A) (f:A -> D dvalue B) : D dvalue B :=
      match m with
        | Ret a => Tau (f a)
        | Fin d => Fin d
-       | Err => Err
+       | Err s => Err s
        | Tau d' => Tau (bindf d')
        | Eff m => Eff (effects_map bindf m)
      end) m.

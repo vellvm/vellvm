@@ -255,3 +255,26 @@ Inductive value : Set :=
 End ValueInd.
 
 
+(*
+Inductive raw_id : Set :=
+| Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)  
+| Anon (n:int)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
+.
+
+Inductive ident : Set :=
+| ID_Global (id:raw_id)   (* @id *)
+| ID_Local  (id:raw_id)   (* %id *)
+.
+*)
+
+Definition string_of_raw_id r : string :=
+  match r with
+  | Name s => s
+  | Anon n => "_"
+  end.
+
+Definition string_of_ident id : string :=
+  match id with
+  | ID_Global r => "@" ++ (string_of_raw_id r)
+  | ID_Local  r => "%" ++ (string_of_raw_id r)
+  end.

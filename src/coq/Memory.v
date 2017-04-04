@@ -23,10 +23,10 @@ CoFixpoint memD {A} (memory:mtype) (d:Obs A) : Obs A :=
   match d with
     | Ret a => ID_LAZY (Ret a)
     | Fin d => ID_LAZY (Fin d)
-    | Err => ID_LAZY Err
+    | Err s => ID_LAZY (Err s)
     | Tau d'            => Tau (memD memory d')
-    | Eff (Alloca t k)  => Tau (memD (memory ++ [undef]) (k (DVALUE_Addr (List.length memory))))
+    | Eff (Alloca t k)  => Tau (memD (memory ++ [undef])%list (k (DVALUE_Addr (List.length memory))))
     | Eff (Load a k)    => Tau (memD memory (k (nth_default undef memory a)))
     | Eff (Store a v k) => Tau (memD (replace memory a v) k)
-    | Eff (Call _ _) => Err
+    | Eff (Call d k) => Eff (Call d k)
   end.
