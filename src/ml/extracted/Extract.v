@@ -28,7 +28,7 @@ Extract Inductive string => "string" [ "str_nil" "str_cons" ].
 *)
 
 (* OCaml pervasive types ---------------------------------------------------- *)
-Extract Inlined Constant Ollvm_ast.int => "int".
+(* Extract Inlined Constant Ollvm_ast.int => "int". *)
 Extract Inlined Constant Ollvm_ast.float => "float".
 
 Extract Inlined Constant Memory.ID_LAZY => "lazy".

@@ -17,8 +17,8 @@
 
 open Datatypes
 open BinNums
-(* open BinNat *)
-(* open BinInt *)
+open BinNat
+open BinInt
 open BinPos
 (* open Floats *)
 
@@ -113,7 +113,6 @@ module P = struct
 end
 
 (* Coq's [N] type and some of its operations *)
-(*
 module N = struct
 
   type t = coq_N = N0 | Npos of positive
@@ -154,9 +153,8 @@ module N = struct
   let (>) = gt
   let (>=) = ge
 end
-*)
+
 (* Coq's [Z] type and some of its operations *)
-(*
 module Z = struct
 
   type t = coq_Z = Z0 | Zpos of positive | Zneg of positive
@@ -262,7 +260,7 @@ module Z = struct
   let (>) = gt
   let (>=) = ge
 end
-*)
+
 
 (* Alternate names *)
 (*

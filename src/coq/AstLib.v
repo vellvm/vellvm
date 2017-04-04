@@ -5,7 +5,7 @@ Require Import Equalities.
 Import ListNotations.
 
 (* Equalities --------------------------------------------------------------- *)
-Instance eq_dec_int : eq_dec int := positive_eq_dec.
+Instance eq_dec_int : eq_dec int := Z_eq_dec.
 
 Module RawID <: UsualDecidableTypeFull.
   Definition t := raw_id.

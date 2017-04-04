@@ -30,7 +30,7 @@ Open Scope string_scope.
 Open Scope list_scope.
 
 
-Definition int := positive.
+Definition int := Z.
 Parameter float : Set.
 
 Inductive linkage : Set :=

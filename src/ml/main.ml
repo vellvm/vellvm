@@ -25,6 +25,7 @@ let args =
   [ ("--test", Unit exec_tests, "run the test suite, ignoring other inputs")
   ; ("--test-pp-dir", String test_pp_dir, "run the parsing/pretty-printing tests on all .ll files in the given directory")
   ; ("-op", Set_string Platform.output_path, "set the path to the output files directory  [default='output']")
+  ; ("-interpret", Set Driver.interpret, "interpret ll program starting from 'main'")
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")] 
 
 let files = ref []

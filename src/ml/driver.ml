@@ -3,6 +3,8 @@ open Platform
 open Ollvm
 open Ast    
 
+let interpret = ref false
+
 let transform (prog : Ollvm_ast.toplevel_entity list) : Ollvm_ast.toplevel_entity list =
   Transform.transform prog
   
@@ -33,7 +35,7 @@ let parse_file filename =
 let output_file filename ast =
   let open Ollvm_printer in
   let channel = open_out filename in
-  toplevel_entities  (empty_env ()) (Format.formatter_of_out_channel channel) ast;
+  toplevel_entities (Format.formatter_of_out_channel channel) ast;
   close_out channel
 
 
@@ -56,6 +58,7 @@ let add_link_file path =
 let process_ll_file path file =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let ll_ast = parse_file path in
+  let _ = if !interpret then Interpreter.interpret ll_ast else () in
   let ll_ast' = transform ll_ast in
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
   let _ = output_file vll_file ll_ast' in

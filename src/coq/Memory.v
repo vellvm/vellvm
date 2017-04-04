@@ -22,7 +22,7 @@ Definition ID_LAZY {A:Type} (x:A) := x.
 CoFixpoint memD {A} (memory:mtype) (d:Obs A) : Obs A :=
   match d with
     | Ret a => ID_LAZY (Ret a)
-    | Fin => ID_LAZY Fin
+    | Fin d => ID_LAZY (Fin d)
     | Err => ID_LAZY Err
     | Tau d'            => Tau (memD memory d')
     | Eff (Alloca t k)  => Tau (memD (memory ++ [undef]) (k (DVALUE_Addr (List.length memory))))

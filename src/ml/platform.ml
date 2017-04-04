@@ -27,7 +27,7 @@ let clang mode opt_level =
   Printf.sprintf "clang %s %s %s -o " mode opt_level !clang_flags
 
 let llc opt_level =
-  Printf.sprintf "llc %s" opt_level
+  Printf.sprintf "llc %s -o " opt_level
 
 let clang_cmd opt_level = clang !clang_ll_mode opt_level
 let as_cmd    opt_level = clang !as_mode opt_level

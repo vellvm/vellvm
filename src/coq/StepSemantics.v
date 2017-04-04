@@ -2,7 +2,8 @@ Require Import ZArith List String Omega.
 Require Import  Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.Ollvm_ast Vellvm.AstLib Vellvm.CFG.
 Import ListNotations.
-Open Scope positive_scope.
+
+Open Scope Z_scope.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -70,10 +71,10 @@ Definition eval_iop iop v1 v2 :=
   | DV (VALUE_Integer _ i1), DV (VALUE_Integer _ i2) =>
     Some (DV (VALUE_Integer _
     match iop with
-    | Add _ _ => (i1 + i2)
-    | Sub _ _ => (i1 - i2)
-    | Mul _ _ => (i1 * i2)
-    | _ => 1
+    | Add _ _ => (i1 + i2)%Z
+    | Sub _ _ => (i1 - i2)%Z
+    | Mul _ _ => (i1 * i2)%Z
+    | _ => 1%Z
     end))
   | _, _ => None
   end.
@@ -84,8 +85,8 @@ Definition eval_icmp icmp v1 v2 :=
   | DV (VALUE_Integer _ i1), DV (VALUE_Integer _ i2) =>
     Some (DV (VALUE_Bool _
     match icmp with
-    | Eq => Pos.eqb i1 i2
-    | Ule => Pos.leb i1 i2
+    | Eq => Z.eqb i1 i2
+    | Ule => Z.leb i1 i2
     |  _ => false 
     end))
   | _, _ => None
@@ -248,14 +249,14 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
                                                        
     | Jump (TERM_Ret (t, op)) =>
       match k, eval_op e op with
-      | [], Some dv => Fin
+      | [], Some dv => Fin dv
       | (KRet e' id p') :: k', Some dv => Ret (p', (id, dv)::e', k')
       | _, _ => Err
       end
 
     | Jump (TERM_Ret_void) =>
       match k with
-      | [] => Fin
+      | [] => Fin (DV (VALUE_Bool _ true))
       | (KRet_void e' p')::k' => Ret (p', e', k')
       | _ => Err
       end
