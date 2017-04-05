@@ -10,7 +10,7 @@ let rec step m =
   match Lazy.force m with
   | SS.E.Tau x -> step x
   | SS.E.Fin v -> print_int_dvalue v
-  | SS.E.Err s -> failwith (Printf.sprintf "ERROR: %s\n" (Camlcoq.camlstring_of_coqstring s))
+  | SS.E.Err s -> failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
   | SS.E.Ret _ -> failwith "should be impossible"
   | SS.E.Eff (SS.E.Call(args, k)) -> ()
   | SS.E.Eff _ -> failwith "should have been handled by the memory model"  

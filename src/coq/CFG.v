@@ -10,7 +10,8 @@ Record path :=
       ins : instr_id;
     }.
 
-
+Definition string_of_path p : string :=
+  "@" ++ (string_of_raw_id (fn p)) ++ ":" ++ (string_of_raw_id (bn p)) ++ ":" ++ (string_of_instr_id (ins p)).
 
 
 Require Import Equalities.
@@ -88,17 +89,16 @@ Fixpoint entities_to_funs ets fid :=
     | _ :: t => entities_to_funs t fid
   end.
 
-Fixpoint phis_from_block fname bname (b : list (instr_id * instr)) : option block_entry :=
+Fixpoint phis_from_block fname bname term_id (b : list (instr_id * instr)) : option block_entry :=
   match b with
-    | [] => None
     | (IId iid, INSTR_Phi i v as ins) :: t =>
-       'rest <- phis_from_block fname bname t;
+       'rest <- phis_from_block fname bname term_id t;
         match rest with
           | Phis phis p => Some (Phis ((iid, ins)::phis) p) 
         end
     | (IVoid _, INSTR_Phi i v as ins) :: t => None
-    | (iid, ins) :: _ =>
-      Some (Phis [] {| fn := fname; bn := bname; ins := iid |})
+    | (next, _) :: _ => Some (Phis [] {| fn := fname; bn := bname; ins := next |})
+    | [] => Some (Phis [] {| fn := fname; bn := bname; ins := term_id |})
   end.
 
 Fixpoint entities_to_blks ets fid bid : option block_entry :=
@@ -107,7 +107,7 @@ Fixpoint entities_to_blks ets fid bid : option block_entry :=
     | (TLE_Definition d) :: t =>
       if (dc_name (df_prototype d)) == fid then
         'bs <- find (fun b => RawID.eqb bid (blk_id b)) (df_instrs d);
-        phis_from_block fid bid (blk_instrs bs)
+        phis_from_block fid bid (blk_term_id bs) (blk_instrs bs) 
       else entities_to_blks t fid bid
     | _ :: t => entities_to_blks t fid bid
   end.

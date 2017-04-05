@@ -156,6 +156,7 @@ Class FunctorLaws (F:Type -> Type) `{Functor F} `{eqiv:forall A, Equiv A}    :=
       g <$> (f <$> a) ≡ (g ∘ f) <$> a;
 }.
 
+
 Instance option_functor : @Functor option := option_map.
 Instance option_functor_eq_laws : (@FunctorLaws option) option_functor  (@eq).
 Proof.
@@ -211,6 +212,27 @@ Class MonadLaws F `{Monad F} `{FunctorLaws F} :=
       (a ≫= f) ≫= g ≡ a ≫= (fun x => f x ≫= g);
 }.
 
+Definition monad_app_fst `{Monad F} {A B C} (f : A -> F C) (p:A * B) : F (C * B)%type :=
+  let '(x,y) := p in
+  'z <- f x;
+    mret (z,y).
+
+Definition monad_app_snd `{Monad F} {A B C} (f : B -> F C) (p:A * B) : F (A * C)%type :=
+  let '(x,y) := p in
+  'z <- f y;
+    mret (x,z).
+
+Definition map_monad `{Monad F} {A B} (f:A -> F B) (l:list A) : F (list B) :=
+  let fix loop l :=
+      match l with
+      | [] => mret []
+      | a::l' =>
+        'b <- f a;
+        'bs <- loop l';
+        mret (b::bs)  
+      end
+  in loop l.
+
 Program Instance option_monad : (@Monad option) option_functor := _.
 Next Obligation.
   split.
@@ -252,6 +274,39 @@ Next Obligation.
      repeat (rewrite <- flat_map_concat_map).
      rewrite IHa. reflexivity.
 Defined.
+
+(* Binary Sums (for informative error messages) *)
+
+Definition sum_map {X A B} (f : A -> B) (s:X + A) : X + B :=
+  match s with
+  | inl x => inl x
+  | inr a => inr (f a)
+  end.
+
+Instance sum_functor {X:Type} : @Functor (sum X) := (@sum_map X).
+Instance sum_functor_eq_laws {X:Type} : (@FunctorLaws(sum X)) sum_functor (@eq).
+Proof.
+  intros. split.
+  intros. unfold fmap. unfold sum_functor. unfold sum_map. destruct a.
+  reflexivity. reflexivity.
+  intros. unfold fmap. unfold sum_functor. destruct a. simpl. reflexivity.
+  simpl. reflexivity.
+Qed.
+
+Program Instance sum_monad {X:Type} : (@Monad (sum X)) sum_functor := _.
+Next Obligation.
+  split.
+  - intros A a. exact (inr a).
+  - intros A B x f.  destruct x. left. exact x. apply f. exact a.
+Defined.
+
+Program Instance sum_monad_eq_laws {X:Type} : (@MonadLaws (sum X)) _ _ _ _ _.
+Next Obligation.
+  destruct a. reflexivity. reflexivity.
+Defined.
+Next Obligation.
+  destruct a; try reflexivity.
+Defined.  
 
 (* Continuations ------------------------------------------------------------ *)
 

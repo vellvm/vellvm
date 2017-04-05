@@ -48,85 +48,99 @@ Definition state := (path * env * stack)%type.
 Definition init_state (CFG:cfg) : state := (init CFG, [], []).
 
 
-Definition def_id_of_path (p:path) : option local_id :=
+Definition err := sum string.
+Definition failwith {A:Type} (s : string) : err A := inl s.
+Definition trywith {A:Type} (s:string) (o:option A) : err A :=
+  match o with
+  | Some x => mret x
+  | None => failwith s
+  end.
+
+Definition def_id_of_path (p:path) : err local_id :=
   match ins p with
-  | IId id => Some id
-  | _ => None
+  | IId id => mret id
+  | _ => failwith ("def_id_of_path: " ++ (string_of_path p))
   end.
 
-Definition local_id_of_ident (i:ident) : option local_id :=
+Definition local_id_of_ident (i:ident) : err local_id :=
   match i with
-  | ID_Global _ => None
-  | ID_Local i => Some i
+  | ID_Global _ => failwith ("local_id_of_ident: " ++ string_of_ident i)
+  | ID_Local i => mret i
   end.
 
-Definition lookup_env (e:env) (id:local_id) : option dvalue :=
-  assoc RawID.eq_dec id e.
+Fixpoint string_of_env (e:env) : string :=
+  match e with
+  | [] => ""
+  | (lid, _)::rest => (string_of_raw_id lid) ++ " " ++ (string_of_env rest)
+  end.
 
+Definition lookup_env (e:env) (id:local_id) : err dvalue :=
+  trywith ("lookup_env: id = " ++ (string_of_raw_id id) ++ " NOT IN env = " ++ (string_of_env e)) (assoc RawID.eq_dec id e).
 
 (* Arithmetic Operations ---------------------------------------------------- *)
 (* TODO: implement LLVM semantics *)
 
-Definition eval_iop iop v1 v2 :=
+
+Definition eval_iop iop v1 v2 : err dvalue :=
   match v1, v2 with
   | DV (VALUE_Integer _ i1), DV (VALUE_Integer _ i2) =>
-    Some (DV (VALUE_Integer _
+    mret (DV (VALUE_Integer _
     match iop with
     | Add _ _ => (i1 + i2)%Z
     | Sub _ _ => (i1 - i2)%Z
     | Mul _ _ => (i1 * i2)%Z
     | _ => 1%Z
     end))
-  | _, _ => None
+  | _, _ => failwith "eval_iop"
   end.
 
 
-Definition eval_icmp icmp v1 v2 :=
+Definition eval_icmp icmp v1 v2 : err dvalue :=
   match v1, v2 with
   | DV (VALUE_Integer _ i1), DV (VALUE_Integer _ i2) =>
-    Some (DV (VALUE_Bool _
+    mret (DV (VALUE_Bool _
     match icmp with
     | Eq => Z.eqb i1 i2
     | Ule => Z.leb i1 i2
     | Sgt => Z.gtb i1 i2
     |  _ => false 
     end))
-  | _, _ => None
+  | _, _ => failwith "eval_icmp"
   end.
 
-Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : option dvalue := None.
+Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : err dvalue := failwith "eval_fop not implemented".
 
-Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : option dvalue := None.
+Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : err dvalue := failwith "eval_fcmp not implemented".
 
-Definition eval_expr {A:Set} (f:env -> A -> option dvalue) (e:env) (o:Expr A) : option dvalue :=
+Definition eval_expr {A:Set} (f:env -> A -> err dvalue) (e:env) (o:Expr A) : err dvalue :=
   match o with
   | VALUE_Ident _ id => 
     'i <- local_id_of_ident id;
       lookup_env e i
-  | VALUE_Integer _ x => Some (DV (VALUE_Integer _ x))
-  | VALUE_Float _ x   => Some (DV (VALUE_Float _ x))
-  | VALUE_Bool _ b    => Some (DV (VALUE_Bool _ b)) 
-  | VALUE_Null _      => Some (DV (VALUE_Null _))
-  | VALUE_Zero_initializer _ => Some (DV (VALUE_Zero_initializer _))
-  | VALUE_Cstring _ s => Some (DV (VALUE_Cstring _ s))
-  | VALUE_None _      => Some (DV (VALUE_None _))
-  | VALUE_Undef _     => Some (DV (VALUE_Undef _))
+  | VALUE_Integer _ x => mret (DV (VALUE_Integer _ x))
+  | VALUE_Float _ x   => mret (DV (VALUE_Float _ x))
+  | VALUE_Bool _ b    => mret (DV (VALUE_Bool _ b)) 
+  | VALUE_Null _      => mret (DV (VALUE_Null _))
+  | VALUE_Zero_initializer _ => mret (DV (VALUE_Zero_initializer _))
+  | VALUE_Cstring _ s => mret (DV (VALUE_Cstring _ s))
+  | VALUE_None _      => mret (DV (VALUE_None _))
+  | VALUE_Undef _     => mret (DV (VALUE_Undef _))
 
   | VALUE_Struct _ es =>
-    'vs <- map_option (map_option_snd (f e)) es;
-     Some (DV (VALUE_Struct _ vs))
+    'vs <- map_monad (monad_app_snd (f e)) es;
+     mret (DV (VALUE_Struct _ vs))
 
   | VALUE_Packed_struct _ es =>
-    'vs <- map_option (map_option_snd (f e)) es;
-     Some (DV (VALUE_Packed_struct _ vs))
+    'vs <- map_monad (monad_app_snd (f e)) es;
+     mret (DV (VALUE_Packed_struct _ vs))
     
   | VALUE_Array _ es =>
-    'vs <- map_option (map_option_snd (f e)) es;
-     Some (DV (VALUE_Array _ vs))
+    'vs <- map_monad (monad_app_snd (f e)) es;
+     mret (DV (VALUE_Array _ vs))
     
   | VALUE_Vector _ es =>
-    'vs <- map_option (map_option_snd (f e)) es;
-     Some (DV (VALUE_Vector _ vs))
+    'vs <- map_monad (monad_app_snd (f e)) es;
+     mret (DV (VALUE_Vector _ vs))
 
   | OP_IBinop _ iop t op1 op2 =>
     'v1 <- f e op1;
@@ -152,44 +166,44 @@ Definition eval_expr {A:Set} (f:env -> A -> option dvalue) (e:env) (o:Expr A) : 
     f e op    (* TODO: is conversion a no-op semantically? *)
       
   | OP_GetElementPtr _ t ptrval idxs =>
-    'vptr <- map_option_snd (f e) ptrval;
-    'vs <- map_option (map_option_snd (f e)) idxs;
-    None  (* TODO: Getelementptr *)  
+    'vptr <- monad_app_snd (f e) ptrval;
+    'vs <- map_monad (monad_app_snd (f e)) idxs;
+    failwith "getelementptr not implemented"  (* TODO: Getelementptr *)  
     
   | OP_ExtractElement _ vecop idx =>
-    'vec <- map_option_snd (f e) vecop;
-    'vidx <- map_option_snd (f e) idx;
-    None (* TODO: Extract Element *)
+    'vec <- monad_app_snd (f e) vecop;
+    'vidx <- monad_app_snd (f e) idx;
+    failwith "extractelement not implemented" (* TODO: Extract Element *)
       
   | OP_InsertElement _ vecop eltop idx =>
-    'vec <- map_option_snd (f e) vecop;
-    'v <- map_option_snd (f e) eltop;
-    'vidx <- map_option_snd (f e) idx;
-    None (* TODO *)
+    'vec <- monad_app_snd (f e) vecop;
+    'v <- monad_app_snd (f e) eltop;
+    'vidx <- monad_app_snd (f e) idx;
+    failwith "insertelement not implemented" (* TODO *)
     
   | OP_ShuffleVector _ vecop1 vecop2 idxmask =>
-    'vec1 <- map_option_snd (f e) vecop1;
-    'vec2 <- map_option_snd (f e) vecop2;      
-    'vidx <- map_option_snd (f e) idxmask;
-    None (* TODO *)
+    'vec1 <- monad_app_snd (f e) vecop1;
+    'vec2 <- monad_app_snd (f e) vecop2;      
+    'vidx <- monad_app_snd (f e) idxmask;
+    failwith "shufflevector not implemented" (* TODO *)
 
   | OP_ExtractValue _ vecop idxs =>
-    'vec <- map_option_snd (f e) vecop;
-      None
+    'vec <- monad_app_snd (f e) vecop;
+    failwith "extractvalue not implemented"
         
   | OP_InsertValue _ vecop eltop idxs =>
-    'vec <- map_option_snd (f e) vecop;
-    'v <- map_option_snd (f e) eltop;
-    None
+    'vec <- monad_app_snd (f e) vecop;
+    'v <- monad_app_snd (f e) eltop;
+    failwith "insertvalue not implemented"
     
   | OP_Select _ cndop op1 op2 =>
-    'cnd <- map_option_snd (f e) cndop;
-    'v1 <- map_option_snd (f e) op1;
-    'v2 <- map_option_snd (f e) op2;      
-    None
+    'cnd <- monad_app_snd (f e) cndop;
+    'v1 <- monad_app_snd (f e) op1;
+    'v2 <- monad_app_snd (f e) op2;      
+    failwith "select not implemented"
   end.
 
-Fixpoint eval_op (e:env) (o:value) : option dvalue :=
+Fixpoint eval_op (e:env) (o:value) : err dvalue :=
   match o with
   | SV o' => eval_expr eval_op e o'
   end.
@@ -198,110 +212,115 @@ Fixpoint eval_op (e:env) (o:value) : option dvalue :=
    Phi nodes may be lowered into a sequence of non-atomic operations on registers.  However,
    Phi's should never touch memory [is that true? can there be spills?], so modeling them
    as atomic should be OK. *)
-Fixpoint jump (CFG:cfg) (p:path) (e_init:env) (e:env) ps (q:path) (k:stack) : option state :=
+Fixpoint jump (CFG:cfg) (p:path) (e_init:env) (e:env) ps (q:path) (k:stack) : err state :=
   match ps with
-  | [] => Some (q, e, k)
+  | [] => mret (q, e, k)
   | (id, (INSTR_Phi _ ls))::rest => 
     match assoc Ident.eq_dec (ID_Local (bn p)) ls with
-    | Some op => match eval_op e_init op with
-                | Some dv => jump CFG p e_init ((id,dv)::e) rest q k
-                | None => None
-                end
-    | None => None
+    | Some op =>
+      'dv <- eval_op e_init op;
+      jump CFG p e_init ((id,dv)::e) rest q k
+    | None => failwith ("jump: block name not found " ++ string_of_path p)
     end
-  | _ => None
+  | _ => failwith "jump: got non-phi instruction"
   end.
 
 
 Definition Obs := D dvalue.
 
-Definition lift_option_d {A B} (m:option A) (f: A -> Obs B) : Obs B :=
+Definition raise s p : (Obs state) :=
+  Err (s ++ ": " ++ (string_of_path p)).
+
+Definition lift_err_d {A B} (m:err A) (f: A -> Obs B) : Obs B :=
   match m with
-    | None => Err "lift_option_d failed"
-    | Some b => f b
+    | inl s => Err s
+    | inr b => f b
   end.
 
-Notation "'do' x <- m ; f" := (lift_option_d m (fun x => f)) 
+Notation "'do' x <- m ; f" := (lift_err_d m (fun x => f)) 
    (at level 200, x ident, m at level 100, f at level 200).
 
 Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
   let '(p, e, k) := s in
-  do cmd <- (code CFG) p;
+  do cmd <- trywith ("stepD: no cmd at path " ++ (string_of_path p)) (code CFG p); 
     match cmd with
     | Step (INSTR_Op op) p' =>
-      do id <- def_id_of_path p;
-      do dv <- eval_op e op;
+      do id <- def_id_of_path p; 
+      do dv <- eval_op e op;     
        Ret (p', (id, dv)::e, k)
 
     (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
     | Step (INSTR_Call (ret_ty,ID_Global f) args) p' =>
-      do id <- def_id_of_path p;
-      do fn <- (funs CFG) f;
+      do id <- def_id_of_path p; 
+      do fn <- trywith ("stepD: no function " ++ (string_of_raw_id f)) (funs CFG f);     
       let '(ids, blk, i) := fn in
-      do ids' <- map_option local_id_of_ident ids;
-      do dvs <-  map_option (eval_op e) (map snd args);
+      do ids' <- map_monad local_id_of_ident ids;  
+      do dvs <-  map_monad (eval_op e) (map snd args); 
       match ret_ty with
       | TYPE_Void => Ret (mk_path f blk i, combine ids' dvs, (KRet_void e p')::k)
       | _ => Ret (mk_path f blk i, combine ids' dvs, (KRet e id p')::k)
       end
 
-    | Step (INSTR_Call (_, ID_Local _) _) _ => (Err "INSTR_Call to local")
+    | Step (INSTR_Call (_, ID_Local _) _) _ => raise "INSTR_Call to local" p
         
-    | Step (INSTR_Unreachable) _ => Err "IMPOSSIBLE: unreachable"
+    | Step (INSTR_Unreachable) _ => raise "IMPOSSIBLE: unreachable" p
                                                        
     | Jump (TERM_Ret (t, op)) =>
-      match k, eval_op e op with
-      | [], Some dv => Fin dv
-      | (KRet e' id p') :: k', Some dv => Ret (p', (id, dv)::e', k')
-      | _, _ => Err "IMPOSSIBLE: Ret op in non-return configuration"
+      do dv <- eval_op e op;
+      match k with
+      | [] => Fin dv
+      | (KRet e' id p') :: k' => Ret (p', (id, dv)::e', k')
+      | _ => raise "IMPOSSIBLE: Ret op in non-return configuration" p
       end
 
     | Jump (TERM_Ret_void) =>
       match k with
       | [] => Fin (DV (VALUE_Bool _ true))
       | (KRet_void e' p')::k' => Ret (p', e', k')
-      | _ => Err "IMPOSSIBLE: Ret void in non-return configuration"
+      | _ => raise "IMPOSSIBLE: Ret void in non-return configuration" p
       end
         
     | Jump (TERM_Br (_,op) (_, br1) (_, br2)) =>
-      do br <-
-      match eval_op e op  with
-      | Some (DV (VALUE_Bool _ true))  => Some br1
-      | Some (DV (VALUE_Bool _ false)) => Some br2
-      | Some _ => None
-      | None => None
+      do dv <- eval_op e op;
+      do br <- match dv with 
+      | DV (VALUE_Bool _ true) => mret br1
+      | DV (VALUE_Bool _ false) => mret br2
+      | _ => failwith "Br got non-bool value"
       end;
-      do lbl <- local_id_of_ident br;
-        match (blks CFG) (bn p) lbl with
+      do lbl <- local_id_of_ident br; 
+        match (blks CFG) (fn p) lbl with
           | Some (Phis ps q) => 
-            lift_option_d (jump CFG p e e ps q k) (@Ret _ state)
-          | None => Err "ERROR: Br lbl not found"
+            lift_err_d (jump CFG p e e ps q k) (@Ret _ state)
+          | None => raise ("ERROR: Br lbl" ++ (AstLib.string_of_raw_id lbl) ++ " not found") p
         end
         
     | Jump (TERM_Br_1 (_, br)) =>
-      do lbl <- local_id_of_ident br;
-        match (blks CFG) (bn p) lbl with
+      do lbl <- local_id_of_ident br;  
+        match (blks CFG) (fn p) lbl with
           | Some (Phis ps q) => 
-            lift_option_d (jump CFG p e e ps q k) (@Ret _ state)
-          | None => Err "ERROR: Br1 lbl not found"
+            lift_err_d (jump CFG p e e ps q k) (@Ret _ state)
+          | None => raise ("ERROR: Br1 lbl " ++ (AstLib.string_of_raw_id lbl) ++ " not found") p
         end
       
     | Step (INSTR_Alloca t _ _) p' =>
-      do id <- def_id_of_path p;
+      do id <- def_id_of_path p;  
       Eff (Alloca t (fun (a:dvalue) => Ret (p', (id, a)::e, k)))
-        
+      
     | Step (INSTR_Load _ t (_,ptr) _) p' =>
-      do id <- def_id_of_path p;
-      do dv <- eval_op e ptr;
+      do id <- def_id_of_path p;  
+      do dv <- eval_op e ptr;     
       match dv with
-        | DVALUE_Addr a => Eff (Load a (fun dv => Ret (p', (id, dv)::e, k)))
-        | _ => Err "ERROR: Load got non-pointer value"
+      | DVALUE_Addr a => Eff (Load a (fun dv => Ret (p', (id, dv)::e, k))) 
+      | _ => raise "ERROR: Load got non-pointer value" p
       end
-        
-    | Step (INSTR_Store _ (_, val) (_, ptr) _) p' =>
-      match eval_op e val, eval_op e ptr with
-      | Some dv, Some (DVALUE_Addr a) => Eff (Store a dv (Ret (p', e, k)))
-      | _, _ => Err "ERROR: Store got non-pointer value"
+
+      
+    | Step (INSTR_Store _ (_, val) (_, ptr) _) p' => 
+      do dv <- eval_op e val;
+      do v <- eval_op e ptr;
+      match v with 
+      | DVALUE_Addr a => Eff (Store a dv (Ret (p', e, k)))
+      |  _ => raise "ERROR: Store got non-pointer value" p
       end
 
     | Step (INSTR_Phi _ _) p' => Err "IMPOSSIBLE: Phi encountered in step"
@@ -312,13 +331,13 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
     | Step INSTR_AtomicCmpXchg p'
     | Step INSTR_AtomicRMW p'
     | Step INSTR_VAArg p'
-    | Step INSTR_LandingPad p' => Err "Unsupported LLVM intsruction"
+    | Step INSTR_LandingPad p' => raise "Unsupported LLVM intsruction" p
  
     (* Currently unhandled LLVM terminators *)                                  
     | Jump (TERM_Switch _ _ _)
     | Jump (TERM_IndirectBr _ _)
     | Jump (TERM_Resume _)
-    | Jump (TERM_Invoke _ _ _ _) => Err "Unsupport LLVM terminator"
+    | Jump (TERM_Invoke _ _ _ _) => raise "Unsupport LLVM terminator" p
     end.
 
 

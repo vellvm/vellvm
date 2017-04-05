@@ -255,22 +255,40 @@ Inductive value : Set :=
 End ValueInd.
 
 
-(*
-Inductive raw_id : Set :=
-| Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)  
-| Anon (n:int)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
-.
+Definition digit_to_string (x:Z) : string :=
+  match x with
+  | Z0 => "0"
+  | Zpos (1%positive) => "1"
+  | Zpos (2%positive) => "2"
+  | Zpos (3%positive) => "3"
+  | Zpos (4%positive) => "4"
+  | Zpos (5%positive) => "5"
+  | Zpos (6%positive) => "6"
+  | Zpos (7%positive) => "7"
+  | Zpos (8%positive) => "8"
+  | Zpos (9%positive) => "9"
+  | _ => "ERR"
+  end.
 
-Inductive ident : Set :=
-| ID_Global (id:raw_id)   (* @id *)
-| ID_Local  (id:raw_id)   (* %id *)
-.
-*)
+Fixpoint to_string_b10' fuel (x:Z) : string :=
+  match fuel with
+  | 0 => "ERR: not enough fuel"
+  | S f => 
+    match x with
+    | Z0 => "0"
+    | _ => let '(q,r) := (Z.div_eucl x 10) in
+          if q == Z0 then (digit_to_string r) else
+          (to_string_b10' f q) ++ (digit_to_string r)
+    end
+  end.
+
+Definition to_string_b10 := to_string_b10' 10.
+
 
 Definition string_of_raw_id r : string :=
   match r with
   | Name s => s
-  | Anon n => "_"
+  | Anon n => to_string_b10 n
   end.
 
 Definition string_of_ident id : string :=
@@ -278,3 +296,12 @@ Definition string_of_ident id : string :=
   | ID_Global r => "@" ++ (string_of_raw_id r)
   | ID_Local  r => "%" ++ (string_of_raw_id r)
   end.
+
+Definition string_of_instr_id ins : string :=
+  match ins with
+  | IId id => (string_of_raw_id id)
+  | IVoid n => "void<" ++ (to_string_b10 n) ++ ">"
+  end.
+
+
+
