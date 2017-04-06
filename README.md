@@ -50,7 +50,7 @@ Assumes:
 
 Compilation:
 
-1. clone the vellvm2 git repo
+1. clone the vellvm git repo
 2. install 3rd party libraries in /lib  (currently just Paco)
 3. run `make` in the /src directory
 
