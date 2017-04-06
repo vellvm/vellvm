@@ -1,9 +1,0 @@
--R ../compcert-2.4/lib compcert.lib 
--R ../compcert-2.4/common compcert.common 
--R ../compcert-2.4/ia32 compcert.ia32 
--R ../compcert-2.4/backend compcert.backend 
--R ../compcert-2.4/cfrontend compcert.cfrontend 
--R ../compcert-2.4/driver compcert.driver 
--R ../compcert-2.4/flocq compcert.flocq 
--R ../compcert-2.4/exportclight compcert.exportclight 
--R ../compcert-2.4/cparser compcert.cparser
