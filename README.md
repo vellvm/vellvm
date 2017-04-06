@@ -38,15 +38,17 @@ See:  [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/)
 
 /lib/paco  
 
-/tests - various tests
+/tests - various LLVM source code tests
 
 # Installing / Compiling Vellvm
 
-Assumes
+Assumes:
  - coqc   : version 8.6   (and coqdep, etc.)
  - ocamlc : version 4.04  (probably works with 4.02 or later)
  - OPAM packages: ocamlbuild, menhir, llvm  (for llvm v. 3.8)
  - paco  library  in /lib/paco   [available here](http://plv.mpi-sws.org/paco/)
+
+Compilation:
 
 1. clone the vellvm2 git repo
 2. make sure that the ollvm submodule is cloned into /src/ollvm
@@ -54,4 +56,6 @@ Assumes
 
 # Running
 
-Do `vellvm -help` from the command line.
+Do `src/vellvm -help` from the command line.
+
+Try `src/vellvm -interpret tests/ll/factorial.ll`.
