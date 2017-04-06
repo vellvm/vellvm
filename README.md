@@ -1,6 +1,6 @@
-# Vellvm2
+# Vellvm II
 
-Vellvm2 is a Coq formalization of the semantics of (a subset of) the
+Vellvm II is a Coq formalization of the semantics of (a subset of) the
 LLVM compiler IR that is intended for _formal verification_ of
 LLVM-based software.  It is being developed at the
 University of Pennsylvania as part of the DeepSpec project.
@@ -11,9 +11,10 @@ See:  [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/)
 
 # Participants
  - Steve Zdancewic
+ - Dmitri Garbuzov 
  - William Mansky
- - Dmitri Garbuzov
  - Christine Rizkallah
+ - Richard Zhang
 
 ## Past Contributors
  - Vivien Durey 
@@ -25,22 +26,19 @@ See:  [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/)
 
 # Structure of the repository
 
-
 /src/coq  - Vellvm coq semantics
 
 /src/ml   - OCaml glue code for working with ollvm
 
 /src/ml/extracted - OCaml code extracted from the files in /src/coq directory
 
-/src/ollvm   - Vellvm fork of the ollvm project  (a git submodule)
-
-/src/experiments - various works in progress 
-
 /src/doc - coqdoq  [not useful yet]
 
 /lib  - for 3rd party libraries [separately installed]
 
 /lib/paco  
+
+/tests - various tests
 
 # Installing / Compiling Vellvm
 
