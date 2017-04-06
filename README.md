@@ -26,7 +26,7 @@ See:  [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/)
 
 # Structure of the repository
 
-/src/coq  - Vellvm coq semantics
+/src/coq  - Coq formalization (see StepSemantics.v)
 
 /src/ml   - OCaml glue code for working with ollvm
 
@@ -51,7 +51,7 @@ Assumes:
 Compilation:
 
 1. clone the vellvm2 git repo
-2. make sure that the ollvm submodule is cloned into /src/ollvm
+2. install 3rd party libraries in /lib  (currently just Paco)
 3. run `make` in the /src directory
 
 # Running
