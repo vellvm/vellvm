@@ -1,0 +1,46 @@
+**.vo
+**.v.d
+**.glob
+*.v#
+**.cmo
+**.cmi
+**.cmx
+**.null
+**/_build
+src/ml/main.native
+src/ml/vellvm
+src/ast/*.o
+src/ast/Ollvm_ast.ml
+src/ml/.merlin
+example.v
+SetsAndMapsTest.v
+Makefile.coq
+Makefile~
+*.v~
+*.log
+*.aux
+papers/CAV 2015/main.synctex.gz
+*.stackdump
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+papers/CAV 2015/main.pdf
+papers/CAV 2015/Presentation1.pptx
+papers/CAV 2015/memspec.pdf
+examples.ml
+minillvm_bitwise.ml
+*.ml~
+examples.mli
+*.mli
+papers/CAV 2015/meminterface/coq.zip
+papers/ITP 2015/coq/Makefile
+papers/VSTTE 2015/main.pdf
+*.gz
+papers/CAV 2015/main.out
+papers/POPL 2015 memory/main.pdf
+papers/PLDI 2016 memory/sigplanconf-guide.pdf
+papers/PLDI 2016 memory/main.pdf
+src/ml/extracted/*.ml
+src/ml/extracted/_build
+src/coq/*.ml

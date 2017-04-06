@@ -1,3 +1,7 @@
+(*  ------------------------------------------------------------------------- *)
+(* Adapted for use in Vellvm by Steve Zdancewic (c) 2017                      *)
+(*  ------------------------------------------------------------------------- *)
+
 open Format
 
 let str = Camlcoq.coqstring_of_camlstring

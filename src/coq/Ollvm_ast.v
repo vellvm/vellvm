@@ -17,11 +17,11 @@
   * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
   * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
-  * }}}                                                                      
+   }}}                                                                       *)
+(*  ------------------------------------------------------------------------- *)
+(* Adapted for use in Vellvm by Steve Zdancewic (c) 2017                      *)
+(*  ------------------------------------------------------------------------- *)
 
-  Ported from ollvm_ast.ml
-  Copyright (c) 2016 Steve Zdancewic <stevez@cis.upenn.edu>
-*)
 
 Require Import List. 
 Require Import String Ascii.

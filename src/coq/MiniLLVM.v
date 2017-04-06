@@ -1,5 +1,14 @@
-Add Rec LoadPath "/home/richard/vellvm/lib/paco/src" as Paco.
-Add Rec LoadPath "/home/richard/vellvm/src/coq" as Vellvm.
+(* -------------------------------------------------------------------------- *
+ *                     Vellvm - the Verified LLVM project                     *
+ *                                                                            *
+ *     Copyright (c) 2017 Richard Zhang <rmzhang@seas.upenn.edu>              *
+ *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
+ *                                                                            *
+ *   This file is distributed under the terms of the GNU General Public       *
+ *   License as published by the Free Software Foundation, either version     *
+ *   3 of the License, or (at your option) any later version.                 *
+ ---------------------------------------------------------------------------- *)
+
 Require Import paco.
 Require Import Recdef.
 Require Import Bool String Ascii List.

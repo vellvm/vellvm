@@ -18,6 +18,10 @@
   * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
   * }}}                                                                      *)
 
+(*  ------------------------------------------------------------------------- *)
+(* Adapted for use in Vellvm by Steve Zdancewic (c) 2017                      *)
+(*  ------------------------------------------------------------------------- *)
+
 {
   open Ollvm_parser
   let str = Camlcoq.coqstring_of_camlstring
