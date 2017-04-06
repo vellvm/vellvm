@@ -5,7 +5,6 @@ COQLIBDIR = ../lib
 # OCaml sources
 MLDIR = ml
 EXTRACTDIR = ml/extracted
-OLLVMDIR = ollvm/src/ollvm
 
 COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm)  -R $(COQLIBDIR)/paco/src Paco -R $(EXTRACTDIR) Extract
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
@@ -49,7 +48,7 @@ depend: $(VFILES)
 
 
 # Directories containing plain Caml code
-OCAMLDIRS= $(OLLVMDIR) $(EXTRACTDIR) $(MLDIR) 
+OCAMLDIRS= $(EXTRACTDIR) $(MLDIR) 
 
 COMMA=,
 OCAMLINCLUDES=$(patsubst %,-I %, $(OCAMLDIRS))

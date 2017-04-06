@@ -89,21 +89,32 @@ Definition eval_iop iop v1 v2 : err dvalue :=
     | Add _ _ => (i1 + i2)%Z
     | Sub _ _ => (i1 - i2)%Z
     | Mul _ _ => (i1 * i2)%Z
-    | _ => 1%Z
+    | Shl _ _ 
+    | UDiv _
+    | SDiv _
+    | LShr _
+    | AShr _
+    | URem | SRem | And | Or | Xor => 0%Z
     end))
   | _, _ => failwith "eval_iop"
   end.
 
-
+(* TODO: replace Coq Z with appropriate i64, i32, i1 values *)
 Definition eval_icmp icmp v1 v2 : err dvalue :=
   match v1, v2 with
   | DV (VALUE_Integer _ i1), DV (VALUE_Integer _ i2) =>
     mret (DV (VALUE_Bool _
     match icmp with
     | Eq => Z.eqb i1 i2
+    | Ne => negb (Z.eqb i1 i2)
+    | Ugt => Z.gtb i1 i2
+    | Uge => Z.leb i2 i1
+    | Ult => Z.gtb i2 i1
     | Ule => Z.leb i1 i2
     | Sgt => Z.gtb i1 i2
-    |  _ => false 
+    | Sge => Z.leb i2 i1
+    | Slt => Z.ltb i1 i2
+    | Sle => Z.leb i1 i2
     end))
   | _, _ => failwith "eval_icmp"
   end.
