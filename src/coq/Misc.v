@@ -8,7 +8,9 @@
  *   License as published by the Free Software Foundation, either version     *
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
-
+Require Import Basics.
+Require Import List.
+Require Import Vellvm.Util.
 
 Definition opt_compose {A B C} (g:B -> C) (f:A -> option B) : A -> option C :=
   fun a => option_map g (f a).
@@ -84,7 +86,7 @@ Definition map_prod {A B C D} (p:A * B) (f:A -> C) (g:B -> D) : (C * D) :=
 Definition flip := @Basics.flip.
 Definition comp := @Basics.compose.
 
-Notation "g `o` f" := (comp g f) 
+Notation "g `o` f" := (Basics.compose g f) 
   (at level 40, left associativity).
 
 Lemma map_prod_distr_comp : forall A B C D E F
