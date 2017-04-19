@@ -6,7 +6,7 @@
  *                                                                            *
  *   This file is distributed under the terms of the GNU General Public       *
  *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
+b *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
 
@@ -745,6 +745,17 @@ Definition map_option {A B} (f:A -> option B) (l:list A) : option (list B) :=
         end
       end
   in loop l.
+
+Lemma map_option_map : forall A B C (f:A -> option B) (g:C -> A) (l:list C),
+    map_option f (map g l) = map_option (fun x => f (g x)) l.
+Proof.
+  intros A B C f g l.
+  induction l; simpl.
+  - reflexivity.
+  - destruct (f (g a)).
+    +  rewrite IHl. reflexivity.
+    + reflexivity.
+Qed.      
 
 Lemma map_option_nth : forall A B (f : A -> option B) l l',
   map_option f l = Some l' ->

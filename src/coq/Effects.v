@@ -12,7 +12,6 @@ Require Import ZArith List String Omega.
 Require Import  Vellvm.Classes Vellvm.Util.
 Require Import paco.
 Import ListNotations.
-Open Scope positive_scope.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -22,6 +21,8 @@ Module Type EffT.
    memory model's notion of addresses. *)
   Parameter typ : Set.
   Parameter addr : Set.
+  Parameter value : Set.
+  Parameter inj_addr: addr -> value.
 End EffT.
 
 Module Effects(ET:EffT).
@@ -34,14 +35,14 @@ Export ET.
 
    - What is the correct way to model global data? 
 *)
-Inductive effects (dvalue:Type) (d:Type) : Type :=
-| Alloca (t:typ)  (k:dvalue -> d)        (* Stack allocation *)
-| Load   (a:addr) (k:dvalue -> d)
-| Store  (a:addr) (v:dvalue) (k:d)
-| Call   (v:dvalue) (k:dvalue -> d)
+Inductive effects (d:Type) : Type :=
+| Alloca (t:typ)  (k:value -> d)        (* Stack allocation *)
+| Load   (a:addr) (k:value -> d)
+| Store  (a:addr) (v:value) (k:d)
+| Call   (v:value) (k:value -> d)
 .    
 
-Definition effects_map {A B dvalue} (f:A -> B) (m:effects dvalue A) : effects dvalue B :=
+Definition effects_map {A B} (f:A -> B) (m:effects A) : effects B :=
   match m with
   | Alloca t g => Alloca t (fun a => f (g a))
   | Load a g  => Load a (fun dv => f (g dv))
@@ -49,8 +50,8 @@ Definition effects_map {A B dvalue} (f:A -> B) (m:effects dvalue A) : effects dv
   | Call a d => Call a (fun dv => f (d dv))
   end.
 
-Instance effects_functor (dvalue:Type) : @Functor (effects dvalue) := fun A => fun B => @effects_map A B dvalue.
-Program Instance effects_functor_eq_laws (dvalue:Type) : (@FunctorLaws (effects dvalue)) (@effects_functor dvalue) (@eq).
+Instance effects_functor : Functor effects := fun A => fun B => @effects_map A B.
+Program Instance effects_functor_eq_laws : (@FunctorLaws effects) effects_functor (@eq).
 Next Obligation.
   unfold fmap. unfold effects_functor. unfold effects_map. destruct a; reflexivity.
 Defined.
@@ -59,15 +60,15 @@ Next Obligation.
 Defined.  
 
 (* Domain of semantics *)
-CoInductive D dvalue X :=
-| Ret : X -> D dvalue X
-| Fin : dvalue -> D dvalue X
-| Err : string -> D dvalue X 
-| Tau : D dvalue X -> D dvalue X
-| Eff : effects dvalue (D dvalue X) -> D dvalue X
+CoInductive D X :=
+| Ret : X -> D X
+| Fin : value -> D X
+| Err : string -> D X 
+| Tau : D X -> D X
+| Eff : effects (D X) -> D X 
 .
 
-CoFixpoint d_map {A B dvalue} (f:A -> B) (d:D dvalue A) : D dvalue B :=
+CoFixpoint d_map {A B} (f:A -> B) (d:D A) : D B :=
   match d with
     | Ret a => Ret (f a)
     | Fin d => Fin d
@@ -78,7 +79,7 @@ CoFixpoint d_map {A B dvalue} (f:A -> B) (d:D dvalue A) : D dvalue B :=
 
 Section UNFOLDING.
 
-Definition id_match_d {A dvalue} (d:D dvalue A) : D dvalue A :=
+Definition id_match_d {A} (d:D A) : D A :=
   match d with
     | Ret a => Ret a
     | Fin d => Fin d
@@ -87,7 +88,7 @@ Definition id_match_d {A dvalue} (d:D dvalue A) : D dvalue A :=
     | Eff m => Eff m
   end.
 
-Lemma id_d_eq : forall A dvalue (d:D dvalue A),
+Lemma id_d_eq : forall A (d:D A),
   d = id_match_d d.
 Proof.
   destruct d; auto.
@@ -95,10 +96,37 @@ Qed.
 
 End UNFOLDING.
 
-Arguments id_d_eq {_ _} _ .
+Arguments id_d_eq {_} _ .
 
 
-Instance D_functor (dvalue:Type) : @Functor (D dvalue) := fun A => fun B => @d_map A B dvalue.
+(*
+  This relation doesn't allow any variation in the relations for the memory model.  A more parametric version would:
+    - have an address relation  A : addr -> addr -> Prop  
+    - have a value relation  V : value -> value -> Prop
+*)
+Inductive d_equiv_mem_step {A} (R: D A -> D A -> Prop) : effects (D A) -> effects (D A) -> Prop :=
+| d_equiv_mem_Alloca : forall t f g, (forall (a:addr), R (f (inj_addr a)) (g (inj_addr a))) -> d_equiv_mem_step R (Alloca t f) (Alloca t g)
+| d_equiv_mem_Load  : forall a f g, (forall (dv:value), R (f dv) (g dv)) -> d_equiv_mem_step R (Load a f) (Load a g)
+| d_equiv_mem_Store : forall a n d1 d2, (R d1 d2) -> d_equiv_mem_step R (Store a n d1) (Store a n d2)
+| d_equiv_mem_Call  : forall v f g, (forall (dv:value), R (f dv) (g dv)) -> d_equiv_mem_step R (Call v f) (Call v g)
+.    
+
+Inductive d_equiv_step {A} (R:D A -> D A -> Prop) : D A -> D A -> Prop :=
+| d_equiv_step_ret : forall a, d_equiv_step R (Ret a) (Ret a)
+| d_equiv_step_fin : forall v, d_equiv_step R (Fin v) (Fin v)
+| d_equiv_step_err : forall s1 s2, d_equiv_step R (Err s1) (Err s2)
+| d_equiv_step_tau : forall d1 d2, R d1 d2 -> d_equiv_step R (Tau d1) (Tau d2)
+| d_equiv_step_lft : forall d1 d2, d_equiv_step R d1 d2 -> d_equiv_step R (Tau d1) d2
+| d_equiv_step_rgt : forall d1 d2, d_equiv_step R d1 d2 -> d_equiv_step R d1 (Tau d2)
+| d_equiv_step_eff : forall m1 m2, d_equiv_mem_step R m1 m2 -> d_equiv_step R (Eff m1) (Eff m2)
+.    
+
+Hint Constructors d_equiv_mem_step d_equiv_step.  (* d_equiv *)
+
+Definition d_equiv {A} (p q : D A) := paco2 (@d_equiv_step A) bot2 p q.
+Hint Unfold d_equiv.
+
+Instance D_functor : @Functor D := fun A => fun B => @d_map A B.
 
 (* Probably a functor only up to stuttering equivalence. *)
 (*
@@ -106,7 +134,7 @@ Program Instance D_functor_eq_laws : (@FunctorLaws D) D_functor (@eq).
 *)
 
 (* Note: for guardedness, bind Ret introduces extra Tau *)
-Definition bind {A B dvalue} (m:D dvalue A) (f:A -> D dvalue B) : D dvalue B :=
+Definition bind {A B} (m:D A) (f:A -> D B) : D B :=
   (cofix bindf m:= 
      match m with
        | Ret a => Tau (f a)
@@ -116,13 +144,128 @@ Definition bind {A B dvalue} (m:D dvalue A) (f:A -> D dvalue B) : D dvalue B :=
        | Eff m => Eff (effects_map bindf m)
      end) m.
 
-Program Instance D_monad (dvalue:Type) : (@Monad (D dvalue)) (@D_functor dvalue) := _.
+Program Instance D_monad : (@Monad D) (@D_functor) := _.
 Next Obligation.
   split.
   - intros. apply Ret. exact X.
   - intros A B. apply bind.
 Defined.
+
+Lemma d_equiv_gen_mon A : monotone2 (@d_equiv_step A).
+  pmonauto.
+Proof.
+  unfold monotone2. intros. induction IN; eauto.
+  eapply d_equiv_step_eff. induction H.
+  - constructor. eauto.
+  - constructor. eauto.
+  - constructor. eauto.
+  - constructor. eauto.
+Qed.
+
+Hint Resolve d_equiv_gen_mon : paco.
+
+
+Ltac punfold' H := let x := fresh "_x_" in
+  repeat red in H;
+  let G := type of H in paco_class G (@pacounfold);
+  intro x; match goal with [x:=?lem|-_] => clear x; eapply lem in H end.
+
+
+Section D_EQUIV_COIND.
+
+  Variable A : Type.
+  Variable R : D A -> D A -> Prop.
+
+  Variables (p:D A) (q:D A).
+  Hypothesis Hrpq : R p q.
+  Hypothesis H : forall d1 d2,
+    R d1 d2 -> d_equiv_step R d1 d2.
   
-Inductive Empty :=.
+  Theorem d_equiv_coind :
+    d_equiv p q.
+  Proof.
+    revert p q Hrpq.
+    pcofix CIH.
+    intros ? ? Hr.
+    apply H in Hr. revert r CIH. induction Hr; intros; subst; try solve [clear CIH; auto].
+    - pfold. constructor. right. auto.
+    - pfold. constructor. specialize (IHHr r CIH).
+      punfold IHHr.
+    - pfold. constructor. specialize (IHHr r CIH).
+      punfold IHHr.
+    - pfold.
+      constructor. 
+      inversion H0; subst.
+      + constructor. intros. right. eauto. 
+      + constructor. intros. right. eauto. 
+      + constructor. right. eauto. 
+      + constructor. intros. right. eauto.
+  Qed.
+
+End D_EQUIV_COIND.
+Arguments d_equiv_coind [_] _ [_ _] _ _.
+
+Check d_equiv_coind.
+
+
+Fixpoint taus {A} (n:nat) (d:D A) : D A :=
+  match n with
+  | 0 => d
+  | S n => Tau (taus n d)
+  end.
+
+Lemma stutter_helper : forall {A} (d1 d2 : D A), d_equiv (Tau d1) d2 -> d_equiv d1 d2.
+Proof.
+  intros. punfold H. remember (Tau d1). induction H; try (solve [inversion Heqd]).
+  - inversion Heqd; subst. pfold. constructor. unfold upaco2 in H.
+    destruct H; inversion H. eapply d_equiv_gen_mon.
+    eapply SIM. eapply LE.
+  - inversion Heqd; subst. pfold. eapply H.
+  - inversion Heqd; subst. pfold. constructor.
+    eapply IHd_equiv_step in H0. punfold H0.
+Qed. 
+
+Lemma stutter_simpl : forall {A} (d1 d2 : D A) n, d_equiv (taus n d1) d2 -> d_equiv d1 d2.
+Proof.
+  intros. induction n. punfold H.
+  eapply IHn. simpl in H. eapply stutter_helper. eapply H.
+Qed.
+
+Lemma d_equiv_refl : forall {A} (d : D A), d_equiv d d.
+Proof.
+  intro. pcofix CIH.
+  intros. pfold. destruct d; eauto.
+  destruct e; eauto. 
+Qed.
+
+Lemma d_equiv_symm : forall {A} (d1 d2 : D A), d_equiv d1 d2 -> d_equiv d2 d1.
+Proof.
+  intro. pcofix CIH.
+  intros d1 d2 H.
+  punfold H. remember (upaco2 d_equiv_step bot2).
+  induction H; eauto; subst.
+  - pfold. constructor. right. eapply CIH.
+    destruct H; eauto. inversion H. 
+  - pfold. constructor. punfold IHd_equiv_step.
+  - pfold. constructor. punfold IHd_equiv_step.
+  - pfold. constructor. inversion H; subst.
+    + constructor. intro. specialize (H0 a). destruct H0.
+      right. eapply CIH. eapply H0. inversion H0.
+    + constructor. intro. specialize (H0 dv). destruct H0.
+      right. eapply CIH. eapply H0. inversion H0.
+    + constructor. right. eapply CIH. destruct H0; eauto. inversion H0. 
+    + constructor. intro. specialize (H0 dv). destruct H0.
+      right. eapply CIH. eapply H0. inversion H0.
+Qed.
+
+Lemma stutter : forall {A} (d1 d2 : D A) n m, d_equiv (taus n d1) (taus m d2) -> d_equiv d1 d2.
+Proof.
+  intros.
+  eapply stutter_simpl.
+  eapply d_equiv_symm.
+  eapply stutter_simpl.
+  eapply d_equiv_symm.
+  eauto.
+Qed.
 
 End Effects.

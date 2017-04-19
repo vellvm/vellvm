@@ -26,114 +26,118 @@ Module Type ADDR.
 End ADDR.  
 
 Module StepSemantics(A:ADDR).
-  Module ET : Vellvm.Effects.EffT with Definition addr := A.addr with Definition typ := Ollvm_ast.typ.
+
+  (* The set of dynamic values manipulated by an LLVM program. This
+   datatype uses the "Expr" functor from the Ollvm_ast definition,
+   injecting new base values.  This allows the semantics to do
+   'symbolic' execution for things that we don't have a way of
+   interpreting concretely (e.g. undef).  *)
+    Inductive dvalue : Set :=
+    | DV : Expr dvalue -> dvalue
+    | DVALUE_CodePointer (p : path)
+    | DVALUE_Addr (a:A.addr)
+    .
+  
+  Module ET : Vellvm.Effects.EffT with Definition addr := A.addr with Definition typ := Ollvm_ast.typ with Definition value := dvalue.
     Definition addr := A.addr.
     Definition typ := Ollvm_ast.typ.
+    Definition value := dvalue.
+    Definition inj_addr := DVALUE_Addr.
+    
   End ET.    
   Module E := Vellvm.Effects.Effects(ET).
   Export E.
 
-(* The set of dynamic values manipulated by an LLVM program. This datatype
-   uses the "Expr" functor from the Ollvm_ast definition, injecting new base values.
-   This allows the semantics to do 'symbolic' execution for things that we don't 
-   have a way of interpreting concretely (e.g. undef).   
- *)
-Inductive dvalue : Set :=
-| DV : Expr dvalue -> dvalue
-| DVALUE_CodePointer (p : path)
-| DVALUE_Addr (a:addr)
-.  
+  (* TODO: add the global environment *)
+  Definition genv := list (global_id * value).
+  Definition env  := list (local_id * value).
 
-(* TODO: add the global environment *)
-Definition genv := list (global_id * dvalue).
-Definition env  := list (local_id * dvalue).
-
-Inductive frame : Set :=
-| KRet      (e:env) (id:local_id) (q:path)
-| KRet_void (e:env) (q:path)
-.       
-          
-Definition stack := list frame.
-Definition state := (path * env * stack)%type.
-Definition init_state (CFG:cfg) : state := (init CFG, [], []).
+  Inductive frame : Set :=
+  | KRet      (e:env) (id:local_id) (q:path)
+  | KRet_void (e:env) (q:path)
+  .       
+  
+  Definition stack := list frame.
+  Definition state := (path * env * stack)%type.
+  Definition init_state (CFG:cfg) : state := (init CFG, [], []).
 
 
-Definition err := sum string.
-Definition failwith {A:Type} (s : string) : err A := inl s.
-Definition trywith {A:Type} (s:string) (o:option A) : err A :=
-  match o with
-  | Some x => mret x
-  | None => failwith s
-  end.
+  Definition err := sum string.
+  Definition failwith {A:Type} (s : string) : err A := inl s.
+  Definition trywith {A:Type} (s:string) (o:option A) : err A :=
+    match o with
+    | Some x => mret x
+    | None => failwith s
+    end.
 
-Definition def_id_of_path (p:path) : err local_id :=
-  match ins p with
-  | IId id => mret id
-  | _ => failwith ("def_id_of_path: " ++ (string_of_path p))
-  end.
+  Definition def_id_of_path (p:path) : err local_id :=
+    match ins p with
+    | IId id => mret id
+    | _ => failwith ("def_id_of_path: " ++ (string_of_path p))
+    end.
 
-Definition local_id_of_ident (i:ident) : err local_id :=
-  match i with
-  | ID_Global _ => failwith ("local_id_of_ident: " ++ string_of_ident i)
-  | ID_Local i => mret i
-  end.
+  Definition local_id_of_ident (i:ident) : err local_id :=
+    match i with
+    | ID_Global _ => failwith ("local_id_of_ident: " ++ string_of_ident i)
+    | ID_Local i => mret i
+    end.
 
-Fixpoint string_of_env (e:env) : string :=
-  match e with
-  | [] => ""
-  | (lid, _)::rest => (string_of_raw_id lid) ++ " " ++ (string_of_env rest)
-  end.
+  Fixpoint string_of_env (e:env) : string :=
+    match e with
+    | [] => ""
+    | (lid, _)::rest => (string_of_raw_id lid) ++ " " ++ (string_of_env rest)
+    end.
 
-Definition lookup_env (e:env) (id:local_id) : err dvalue :=
-  trywith ("lookup_env: id = " ++ (string_of_raw_id id) ++ " NOT IN env = " ++ (string_of_env e)) (assoc RawID.eq_dec id e).
+  Definition lookup_env (e:env) (id:local_id) : err value :=
+    trywith ("lookup_env: id = " ++ (string_of_raw_id id) ++ " NOT IN env = " ++ (string_of_env e)) (assoc RawID.eq_dec id e).
 
-(* Arithmetic Operations ---------------------------------------------------- *)
-(* TODO: implement LLVM semantics *)
+  (* Arithmetic Operations ---------------------------------------------------- *)
+  (* TODO: implement LLVM semantics *)
 
 
-Definition eval_iop iop v1 v2 : err dvalue :=
-  match v1, v2 with
-  | DV (VALUE_Integer _ i1), DV (VALUE_Integer _ i2) =>
-    mret (DV (VALUE_Integer _
-    match iop with
-    | Add _ _ => (i1 + i2)%Z
-    | Sub _ _ => (i1 - i2)%Z
-    | Mul _ _ => (i1 * i2)%Z
-    | Shl _ _ 
-    | UDiv _
-    | SDiv _
-    | LShr _
-    | AShr _
-    | URem | SRem | And | Or | Xor => 0%Z
-    end))
-  | _, _ => failwith "eval_iop"
-  end.
+  Definition eval_iop iop v1 v2 : err value :=
+    match v1, v2 with
+    | DV (VALUE_Integer _ i1), DV (VALUE_Integer _ i2) =>
+      mret (DV (VALUE_Integer _
+                              match iop with
+                              | Add _ _ => (i1 + i2)%Z
+                              | Sub _ _ => (i1 - i2)%Z
+                              | Mul _ _ => (i1 * i2)%Z
+                              | Shl _ _ 
+                              | UDiv _
+                              | SDiv _
+                              | LShr _
+                              | AShr _
+                              | URem | SRem | And | Or | Xor => 0%Z
+                              end))
+    | _, _ => failwith "eval_iop"
+    end.
 
-(* TODO: replace Coq Z with appropriate i64, i32, i1 values *)
-Definition eval_icmp icmp v1 v2 : err dvalue :=
-  match v1, v2 with
-  | DV (VALUE_Integer _ i1), DV (VALUE_Integer _ i2) =>
-    mret (DV (VALUE_Bool _
-    match icmp with
-    | Eq => Z.eqb i1 i2
-    | Ne => negb (Z.eqb i1 i2)
-    | Ugt => Z.gtb i1 i2
-    | Uge => Z.leb i2 i1
-    | Ult => Z.gtb i2 i1
-    | Ule => Z.leb i1 i2
-    | Sgt => Z.gtb i1 i2
-    | Sge => Z.leb i2 i1
-    | Slt => Z.ltb i1 i2
-    | Sle => Z.leb i1 i2
-    end))
-  | _, _ => failwith "eval_icmp"
-  end.
+  (* TODO: replace Coq Z with appropriate i64, i32, i1 values *)
+  Definition eval_icmp icmp v1 v2 : err value :=
+    match v1, v2 with
+    | DV (VALUE_Integer _ i1), DV (VALUE_Integer _ i2) =>
+      mret (DV (VALUE_Bool _
+                           match icmp with
+                           | Eq => Z.eqb i1 i2
+                           | Ne => negb (Z.eqb i1 i2)
+                           | Ugt => Z.gtb i1 i2
+                           | Uge => Z.leb i2 i1
+                           | Ult => Z.gtb i2 i1
+                           | Ule => Z.leb i1 i2
+                           | Sgt => Z.gtb i1 i2
+                           | Sge => Z.leb i2 i1
+                           | Slt => Z.ltb i1 i2
+                           | Sle => Z.leb i1 i2
+                           end))
+    | _, _ => failwith "eval_icmp"
+    end.
 
-Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : err dvalue := failwith "eval_fop not implemented".
+  Definition eval_fop (fop:fbinop) (v1:value) (v2:value) : err value := failwith "eval_fop not implemented".
 
-Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : err dvalue := failwith "eval_fcmp not implemented".
+  Definition eval_fcmp (fcmp:fcmp) (v1:value) (v2:value) : err value := failwith "eval_fcmp not implemented".
 
-Definition eval_expr {A:Set} (f:env -> A -> err dvalue) (e:env) (o:Expr A) : err dvalue :=
+Definition eval_expr {A:Set} (f:env -> A -> err value) (e:env) (o:Expr A) : err value :=
   match o with
   | VALUE_Ident _ id => 
     'i <- local_id_of_ident id;
@@ -224,7 +228,7 @@ Definition eval_expr {A:Set} (f:env -> A -> err dvalue) (e:env) (o:Expr A) : err
     failwith "select not implemented"
   end.
 
-Fixpoint eval_op (e:env) (o:value) : err dvalue :=
+Fixpoint eval_op (e:env) (o:Ollvm_ast.value) : err value :=
   match o with
   | SV o' => eval_expr eval_op e o'
   end.
@@ -247,7 +251,7 @@ Fixpoint jump (CFG:cfg) (p:path) (e_init:env) (e:env) ps (q:path) (k:stack) : er
   end.
 
 
-Definition Obs := D dvalue.
+Definition Obs := D.
 
 Definition raise s p : (Obs state) :=
   Err (s ++ ": " ++ (string_of_path p)).
@@ -311,7 +315,7 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
       do lbl <- local_id_of_ident br; 
         match (blks CFG) (fn p) lbl with
           | Some (Phis ps q) => 
-            lift_err_d (jump CFG p e e ps q k) (@Ret _ state)
+            lift_err_d (jump CFG p e e ps q k) (@Ret state)
           | None => raise ("ERROR: Br lbl" ++ (AstLib.string_of_raw_id lbl) ++ " not found") p
         end
         
@@ -319,13 +323,13 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
       do lbl <- local_id_of_ident br;  
         match (blks CFG) (fn p) lbl with
           | Some (Phis ps q) => 
-            lift_err_d (jump CFG p e e ps q k) (@Ret _ state)
+            lift_err_d (jump CFG p e e ps q k) (@Ret state)
           | None => raise ("ERROR: Br1 lbl " ++ (AstLib.string_of_raw_id lbl) ++ " not found") p
         end
       
     | Step (INSTR_Alloca t _ _) p' =>
       do id <- def_id_of_path p;  
-      Eff (Alloca t (fun (a:dvalue) => Ret (p', (id, a)::e, k)))
+      Eff (Alloca t (fun (a:value) => Ret (p', (id, a)::e, k)))
       
     | Step (INSTR_Load _ t (_,ptr) _) p' =>
       do id <- def_id_of_path p;  
@@ -361,6 +365,7 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
     | Jump (TERM_Invoke _ _ _ _) => raise "Unsupport LLVM terminator" p
     end.
 
+Inductive Empty := .
 
 (* Note: codomain is D'  *)
 CoFixpoint sem (CFG:cfg) (s:state) : (Obs Empty) :=

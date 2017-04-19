@@ -14,7 +14,7 @@ Require Import Recdef.
 Require Import Bool String Ascii List.
 Require Import Omega.
 Require Import Vellvm.Util.
-Import ListNotations OptionNotations.
+Import ListNotations. 
 
 Set Implicit Arguments.
 
@@ -313,6 +313,16 @@ Fixpoint entities_to_funs ets fid :=
         end
       else entities_to_funs t fid
   end.
+
+Definition bind_option {A B} (m:option A) (f:A -> option B) : option B :=
+  match m with
+  | None => None
+  | Some a => f a
+  end.
+
+Notation "'do' x <- m ; f" := (bind_option m (fun x => f)) 
+   (at level 200, x ident, m at level 100, f at level 200).
+
 
 Fixpoint phis_from_block fname bname (b : list (instr_id * instr)) : option block_entry :=
   match b with
