@@ -143,7 +143,7 @@ Inductive typ : Set :=
 | TYPE_X86_fp80
 | TYPE_Fp128
 | TYPE_Ppc_fp128
-| TYPE_Label
+(* | TYPE_Label  label is not really a type *)
 | TYPE_Metadata
 | TYPE_X86_mmx
 | TYPE_Array (sz:int) (t:typ)
@@ -238,7 +238,7 @@ Definition tvalue : Set := typ * value.
 
 Inductive instr_id : Set :=
 | IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)
-| IVoid (n:int)        (* "Void" return type, for "store" "call" and terminators.
+| IVoid (n:int)        (* "Void" return type, for "store",  "void call", and terminators.
                            Each with unique number (NOTE: these are distinct from Anon raw_id) *)
 .
         
@@ -265,12 +265,12 @@ Inductive terminator : Set :=
 (* Types in branches are TYPE_Label constant *)
 | TERM_Ret        (v:tvalue)
 | TERM_Ret_void
-| TERM_Br         (v:tvalue) (br1:tident) (br2:tident) 
-| TERM_Br_1       (br:tident)
-| TERM_Switch     (v:tvalue) (default_dest:tident) (brs: list (tvalue * tident))
-| TERM_IndirectBr (v:tvalue) (brs:list tident) (* address * possible addresses (labels) *)
+| TERM_Br         (v:tvalue) (br1:block_id) (br2:block_id) 
+| TERM_Br_1       (br:block_id)
+| TERM_Switch     (v:tvalue) (default_dest:block_id) (brs: list (tvalue * block_id))
+| TERM_IndirectBr (v:tvalue) (brs:list block_id) (* address * possible addresses (labels) *)
 | TERM_Resume     (v:tvalue)
-| TERM_Invoke     (fnptrval:tident) (args:list tvalue) (to_label:tident) (unwind_label:tident)
+| TERM_Invoke     (fnptrval:tident) (args:list tvalue) (to_label:block_id) (unwind_label:block_id)
 .
 
 Inductive thread_local_storage : Set :=

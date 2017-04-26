@@ -413,7 +413,6 @@ typ:
   | KW_X86_FP80                                       { TYPE_X86_fp80         }
   | KW_FP128                                          { TYPE_Fp128            }
   | KW_PPC_FP128                                      { TYPE_Ppc_fp128        }
-  | KW_LABEL                                          { TYPE_Label            }
   | KW_METADATA                                       { TYPE_Metadata         }
   | KW_X86_MMX                                        { TYPE_X86_mmx          }
   | t=typ STAR                                        { TYPE_Pointer t        }
@@ -654,6 +653,8 @@ instr:
   | KW_UNREACHABLE
     { INSTR_Unreachable }
 
+branch_label:
+  KW_LABEL o=LOCAL  { o }
   
 terminator:  
   | KW_RET t=typ o=value
@@ -662,18 +663,18 @@ terminator:
   | KW_RET KW_VOID
     { TERM_Ret_void }
 
-  | KW_BR c=tvalue COMMA o1=tident COMMA o2=tident
+  | KW_BR c=tvalue COMMA o1=branch_label COMMA o2=branch_label
     { TERM_Br (c, o1, o2) }
 
-  | KW_BR b=tident
+  | KW_BR b=branch_label
     { TERM_Br_1 b }
 
   | KW_SWITCH c=tvalue COMMA
-    def=tident LSQUARE EOL? table=list(switch_table_entry) RSQUARE
+    def=branch_label LSQUARE EOL? table=list(switch_table_entry) RSQUARE
     { TERM_Switch (c, def, table) }
 
   | KW_INDIRECTBR tv=tvalue
-    COMMA LSQUARE til=separated_list(csep, tident)  RSQUARE
+    COMMA LSQUARE til=separated_list(csep, branch_label)  RSQUARE
     { TERM_IndirectBr (tv, til) }
 
   | KW_RESUME tv=tvalue
@@ -681,7 +682,7 @@ terminator:
 
   | KW_INVOKE cconv? ret=tident
     LPAREN a=separated_list(csep, call_arg) RPAREN
-    list(fn_attr) KW_TO l1=tident KW_UNWIND l2=tident
+    list(fn_attr) KW_TO l1=branch_label KW_UNWIND l2=branch_label
     { TERM_Invoke (ret, a, l1, l2)  }
 
 id_instr:
@@ -696,7 +697,7 @@ phi_table_entry:
   | LSQUARE v=value COMMA l=ident RSQUARE { (l, v) }
 
 switch_table_entry:
-  | v=tvalue COMMA i=tident EOL? { (v, i) }
+  | v=tvalue COMMA i=branch_label EOL? { (v, i) }
 
 csep:
   COMMA EOL* { () }

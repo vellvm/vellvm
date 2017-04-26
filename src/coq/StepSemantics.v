@@ -38,13 +38,17 @@ Module StepSemantics(A:ADDR).
     | DVALUE_Addr (a:A.addr)
     .
   
-  Module ET : Vellvm.Effects.EffT with Definition addr := A.addr with Definition typ := Ollvm_ast.typ with Definition value := dvalue.
-    Definition addr := A.addr.
-    Definition typ := Ollvm_ast.typ.
-    Definition value := dvalue.
-    Definition inj_addr := DVALUE_Addr.
+    Module ET : Vellvm.Effects.EffT
+        with Definition addr := A.addr
+        with Definition typ := Ollvm_ast.typ
+        with Definition value := dvalue.
+
+      Definition addr := A.addr.
+      Definition typ := Ollvm_ast.typ.
+      Definition value := dvalue.
+      Definition inj_addr := DVALUE_Addr.
     
-  End ET.    
+    End ET.    
   Module E := Vellvm.Effects.Effects(ET).
   Export E.
 
@@ -280,11 +284,12 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
       do fn <- trywith ("stepD: no function " ++ (string_of_raw_id f)) (funs CFG f);     
       let '(ids, blk, i) := fn in
       do ids' <- map_monad local_id_of_ident ids;  
-      do dvs <-  map_monad (eval_op e) (map snd args); 
-      match ret_ty with
-      | TYPE_Void => Ret (mk_path f blk i, combine ids' dvs, (KRet_void e p')::k)
-      | _ => Ret (mk_path f blk i, combine ids' dvs, (KRet e id p')::k)
-      end
+      do dvs <-  map_monad (eval_op e) (map snd args);
+      Ret (mk_path f blk i, combine ids' dvs, 
+          match ret_ty with
+          | TYPE_Void => (KRet_void e p')::k
+          | _ =>         (KRet e id p')::k
+          end)
 
     | Step (INSTR_Call (_, ID_Local _) _) _ => raise "INSTR_Call to local" p
         
@@ -305,26 +310,24 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
       | _ => raise "IMPOSSIBLE: Ret void in non-return configuration" p
       end
         
-    | Jump (TERM_Br (_,op) (_, br1) (_, br2)) =>
+    | Jump (TERM_Br (_,op) br1 br2) =>
       do dv <- eval_op e op;
       do br <- match dv with 
       | DV (VALUE_Bool _ true) => mret br1
       | DV (VALUE_Bool _ false) => mret br2
       | _ => failwith "Br got non-bool value"
       end;
-      do lbl <- local_id_of_ident br; 
-        match (blks CFG) (fn p) lbl with
-          | Some (Phis ps q) => 
-            lift_err_d (jump CFG p e e ps q k) (@Ret state)
-          | None => raise ("ERROR: Br lbl" ++ (AstLib.string_of_raw_id lbl) ++ " not found") p
-        end
+      match (blks CFG) (fn p) br with
+      | Some (Phis ps q) => 
+        lift_err_d (jump CFG p e e ps q k) (@Ret state)
+      | None => raise ("ERROR: Br " ++ (AstLib.string_of_raw_id br) ++ " not found") p
+      end
         
-    | Jump (TERM_Br_1 (_, br)) =>
-      do lbl <- local_id_of_ident br;  
-        match (blks CFG) (fn p) lbl with
+    | Jump (TERM_Br_1 br) =>
+        match (blks CFG) (fn p) br with
           | Some (Phis ps q) => 
             lift_err_d (jump CFG p e e ps q k) (@Ret state)
-          | None => raise ("ERROR: Br1 lbl " ++ (AstLib.string_of_raw_id lbl) ++ " not found") p
+          | None => raise ("ERROR: Br1  " ++ (AstLib.string_of_raw_id br) ++ " not found") p
         end
       
     | Step (INSTR_Alloca t _ _) p' =>

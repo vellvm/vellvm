@@ -13,6 +13,8 @@ Require Import Vellvm.AstLib Vellvm.Ollvm_ast.
 Require Import Vellvm.Classes.
 Import ListNotations.
 
+(* paths into a program ----------------------------------------------------- *)
+
 Record path :=
   mk_path {
       fn  : function_id;
@@ -50,6 +52,9 @@ End PATH.
 Instance eq_dec_path : eq_dec path := PATH.eq_dec.
 
 
+(* control flow graphs (CFGs) ----------------------------------------------- *)
+
+(* The path p in the step is the "fallthrough" to the next instruction. *)
 Inductive cmd : Set :=
 | Step  (i:instr) (p:path)
 | Jump  (t:terminator)
@@ -66,6 +71,48 @@ Record cfg := mkCFG
   funs : function_id -> option (list ident * block_id * instr_id);  
   blks : function_id -> block_id -> option block_entry;  
 }.
+
+(* structurally well-formed CFGs 
+   - the initial path denotes a command  
+   - fallthrough closure: each fallthrough path maps to a command 
+   - jump closure: each label used in a terminator leads to a
+     block within the same function body.
+*)
+
+Definition path_exists (CFG : cfg) (p:path) : Prop :=
+  exists cmd, (code CFG p) = Some cmd.
+
+Definition lbls (t:terminator) : list block_id :=
+  match t with
+  | TERM_Ret _        
+  | TERM_Ret_void   => []
+  | TERM_Br _ l1 l2 => [l1; l2] 
+  | TERM_Br_1 l => [l] 
+  | TERM_Switch _ l brs => l::(List.map (fun x => snd x) brs)
+  | TERM_IndirectBr _ brs => brs
+  | TERM_Resume _    => []
+  | TERM_Invoke  _ _ l1 l2 => [l1; l2] 
+  end.
+
+
+Definition wf_cfg (CFG : cfg) : Prop :=
+  path_exists CFG (init CFG) 
+  /\ (forall fn args bn ins, (funs CFG fn) = Some (args, bn, ins) -> path_exists CFG (mk_path fn bn ins)) 
+  /\ (forall p q i, (code CFG p) = Some (Step i q) -> path_exists CFG q)
+  /\ (forall p t, (code CFG p) = Some (Jump t) ->
+    Forall (fun bn => exists phis, exists q, (blks CFG (fn p) bn) = Some (Phis phis q) /\ path_exists CFG q) (lbls t)).
+
+
+
+
+
+
+
+
+
+
+
+(* creating CFGs from syntax ------------------------------------------------ *)
 
 Fixpoint entities_to_init ets : option path :=
   match ets with
@@ -131,38 +178,14 @@ Definition next_or_term term_id (is : list (instr_id * instr)) : instr_id :=
 Fixpoint cmd_from_block to_find fn bn term_id is : option cmd :=
   match is with
     | [] => None
-    | (id, INSTR_Op _ as ins)          :: rest
-    | (id, INSTR_Phi _ _ as ins)       :: rest   (* should never be needed *)
-    | (id, INSTR_Alloca _ _ _ as ins)  :: rest
-    | (id, INSTR_Load _ _ _ _ as ins)  :: rest
-    | (id, INSTR_Store _ _ _ _ as ins) :: rest
-    | (id, INSTR_Unreachable as ins)   :: rest
-    | (id, INSTR_Call _ _ as ins)      :: rest
-    | (id, INSTR_Fence as ins)         :: rest
-    | (id, INSTR_AtomicCmpXchg as ins) :: rest
-    | (id, INSTR_AtomicRMW as ins)     :: rest
-    | (id, INSTR_VAArg as ins)         :: rest
-    | (id, INSTR_LandingPad as ins)    :: rest => 
+    | (id, ins) :: rest =>
       if to_find == id then
         Some (Step ins (mk_path fn bn (next_or_term term_id rest)))
       else cmd_from_block to_find fn bn term_id rest
   end.
 
 Fixpoint cmd_from_term to_find (term_id:instr_id) term : option cmd :=
-  match term with
-    (* Terminators *)
-    | TERM_Ret _ as ins
-    | TERM_Ret_void as ins
-    | TERM_Br _ _ _ as ins
-    | TERM_Br_1 _ as ins 
-    | TERM_Switch _ _ _ as ins
-    | TERM_IndirectBr _ _  as ins
-    | TERM_Resume _  as ins
-    | TERM_Invoke _ _ _ _ as ins =>
-      if to_find == term_id then Some (Jump ins)
-      else None
-  end.
-    
+  if to_find == term_id then Some (Jump term) else None.
 
 Fixpoint entities_to_code ets (p : path) : option cmd :=
   match ets with

@@ -102,7 +102,6 @@ Hypothesis IH_Double     : P(TYPE_Double).
 Hypothesis IH_X86_fp80   : P(TYPE_X86_fp80).
 Hypothesis IH_Fp128      : P(TYPE_Fp128).
 Hypothesis IH_Ppc_fp128  : P(TYPE_Ppc_fp128).
-Hypothesis IH_Label      : P(TYPE_Label).
 Hypothesis IH_Metadata   : P(TYPE_Metadata).
 Hypothesis IH_X86_mmx    : P(TYPE_X86_mmx).
 Hypothesis IH_Array      : forall sz t, P t -> P(TYPE_Array sz t).
@@ -125,7 +124,6 @@ Lemma typ_ind' : forall (t:typ), P t.
   - apply IH_X86_fp80.
   - apply IH_Fp128.
   - apply IH_Ppc_fp128.
-  - apply IH_Label.
   - apply IH_Metadata.
   - apply IH_X86_mmx.
   - apply IH_Array. apply IH.

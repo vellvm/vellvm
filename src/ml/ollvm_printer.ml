@@ -149,7 +149,6 @@ and typ : Format.formatter -> Ollvm_ast.typ -> unit =
   | TYPE_Half             -> fprintf ppf "half"
   | TYPE_Float            -> fprintf ppf "float"
   | TYPE_Double           -> fprintf ppf "double"
-  | TYPE_Label            -> fprintf ppf "label"
   | TYPE_X86_fp80         -> fprintf ppf "x86_fp80"
   | TYPE_Fp128            -> fprintf ppf "fp128"
   | TYPE_Ppc_fp128        -> fprintf ppf "ppc_fp128"
@@ -508,6 +507,10 @@ and instr : Format.formatter -> Ollvm_ast.instr -> unit =
   | INSTR_Unreachable -> pp_print_string ppf "unreachable"
 
 
+and branch_label : Format.formatter -> Ollvm_ast.raw_id -> unit =
+  fun ppf id ->
+    pp_print_string ppf "label "; pp_print_string ppf (str_of_raw_id id)
+    
 
 and terminator : Format.formatter -> Ollvm_ast.terminator -> unit =
   fun ppf ->
@@ -518,32 +521,32 @@ and terminator : Format.formatter -> Ollvm_ast.terminator -> unit =
   | TERM_Ret_void         -> pp_print_string ppf "ret void"
 
   | TERM_Br (c, i1, i2)   ->
-     fprintf ppf "br %a, %a, %a" tvalue c tident i1 tident i2
+     fprintf ppf "br %a, %a, %a" tvalue c branch_label i1 branch_label i2
 
-  | TERM_Br_1 (t, i)       -> fprintf ppf "br %a %a" typ t ident i
+  | TERM_Br_1 i          -> fprintf ppf "br %a" branch_label i
 
   | TERM_Switch (c, def, cases) ->
      fprintf ppf "switch %a, %a [%a]"
              tvalue c
-             tident def
+             branch_label def
              (pp_print_list ~pp_sep:pp_space
                             (fun ppf (v, i) -> tvalue ppf v ;
                                                pp_print_string ppf ", " ;
-                                               tident ppf i)) cases
+                                               branch_label ppf i)) cases
 
   | TERM_Resume (t, v) -> fprintf ppf "resume %a" tvalue (t, v)
 
   | TERM_IndirectBr (tv, til) ->
     fprintf ppf "indirectbr %a, [%a]"
       tvalue tv
-      (pp_print_list ~pp_sep:pp_comma_space tident) til
+      (pp_print_list ~pp_sep:pp_comma_space branch_label) til
 
   | TERM_Invoke (ti, tvl, i2, i3) ->
      fprintf ppf "invoke %a(%a) to %a unwind %a"
              tident ti
              (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
-             tident i2
-             tident i3
+             branch_label i2
+             branch_label i3
 
 and id_instr : Format.formatter -> (Ollvm_ast.instr_id * Ollvm_ast.instr) -> unit =
   fun ppf ->
