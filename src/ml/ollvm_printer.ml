@@ -509,7 +509,7 @@ and instr : Format.formatter -> Ollvm_ast.instr -> unit =
 
 and branch_label : Format.formatter -> Ollvm_ast.raw_id -> unit =
   fun ppf id ->
-    pp_print_string ppf "label "; pp_print_string ppf (str_of_raw_id id)
+    pp_print_string ppf "label %"; pp_print_string ppf (str_of_raw_id id)
     
 
 and terminator : Format.formatter -> Ollvm_ast.terminator -> unit =

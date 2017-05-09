@@ -34,7 +34,7 @@ Module StepSemantics(A:ADDR).
    interpreting concretely (e.g. undef).  *)
     Inductive dvalue : Set :=
     | DV : Expr dvalue -> dvalue
-    | DVALUE_CodePointer (p : path)
+    | DVALUE_CodePointer (p : pc)
     | DVALUE_Addr (a:A.addr)
     .
   
@@ -57,13 +57,12 @@ Module StepSemantics(A:ADDR).
   Definition env  := list (local_id * value).
 
   Inductive frame : Set :=
-  | KRet      (e:env) (id:local_id) (q:path)
-  | KRet_void (e:env) (q:path)
+  | KRet      (e:env) (id:local_id) (q:pc)
+  | KRet_void (e:env) (q:pc)
   .       
   
   Definition stack := list frame.
-  Definition state := (path * env * stack)%type.
-  Definition init_state (CFG:cfg) : state := (init CFG, [], []).
+  Definition state := (pc * env * stack)%type.
 
 
   Definition err := sum string.
@@ -73,11 +72,11 @@ Module StepSemantics(A:ADDR).
     | Some x => mret x
     | None => failwith s
     end.
-
-  Definition def_id_of_path (p:path) : err local_id :=
+  
+  Definition def_id_of_pc (p:pc) : err local_id :=
     match ins p with
     | IId id => mret id
-    | _ => failwith ("def_id_of_path: " ++ (string_of_path p))
+    | _ => failwith ("def_id_of_pc: " ++ (string_of_pc p))
     end.
 
   Definition local_id_of_ident (i:ident) : err local_id :=
@@ -241,24 +240,23 @@ Fixpoint eval_op (e:env) (o:Ollvm_ast.value) : err value :=
    Phi nodes may be lowered into a sequence of non-atomic operations on registers.  However,
    Phi's should never touch memory [is that true? can there be spills?], so modeling them
    as atomic should be OK. *)
-Fixpoint jump (CFG:cfg) (p:path) (e_init:env) (e:env) ps (q:path) (k:stack) : err state :=
+Fixpoint jump (CFG:cfg) (bn:block_id) (e_init:env) (e:env) ps (q:pc) (k:stack) : err state :=
   match ps with
   | [] => mret (q, e, k)
   | (id, (INSTR_Phi _ ls))::rest => 
-    match assoc Ident.eq_dec (ID_Local (bn p)) ls with
+    match assoc Ident.eq_dec (ID_Local bn) ls with
     | Some op =>
       'dv <- eval_op e_init op;
-      jump CFG p e_init ((id,dv)::e) rest q k
-    | None => failwith ("jump: block name not found " ++ string_of_path p)
+      jump CFG bn e_init ((id,dv)::e) rest q k
+    | None => failwith ("jump: block name not found " ++ string_of_raw_id bn)
     end
   | _ => failwith "jump: got non-phi instruction"
   end.
 
-
 Definition Obs := D.
 
 Definition raise s p : (Obs state) :=
-  Err (s ++ ": " ++ (string_of_path p)).
+  Err (s ++ ": " ++ (string_of_pc p)).
 
 Definition lift_err_d {A B} (m:err A) (f: A -> Obs B) : Obs B :=
   match m with
@@ -269,33 +267,39 @@ Definition lift_err_d {A B} (m:err A) (f: A -> Obs B) : Obs B :=
 Notation "'do' x <- m ; f" := (lift_err_d m (fun x => f)) 
    (at level 200, x ident, m at level 100, f at level 200).
 
-Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
+Definition fcode (CFG : fcfg) p :=
+  'x <- CFG (fn p);
+  let '(_, cfg) := x in
+  (code cfg (ins p)).
+
+Fixpoint stepD (CFG:fcfg) (s:state) : Obs state :=
   let '(p, e, k) := s in
-  do cmd <- trywith ("stepD: no cmd at path " ++ (string_of_path p)) (code CFG p); 
+  let pc_of_pt pt := mk_pc (fn p) pt in
+  do cmd <- trywith ("stepD: no cmd at pc " ++ (string_of_pc p)) (fcode CFG p);
     match cmd with
     | Step (INSTR_Op op) p' =>
-      do id <- def_id_of_path p; 
+      do id <- def_id_of_pc p; 
       do dv <- eval_op e op;     
-       Ret (p', (id, dv)::e, k)
+       Ret (pc_of_pt p', (id, dv)::e, k)
 
     (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
     | Step (INSTR_Call (ret_ty,ID_Global f) args) p' =>
-      do id <- def_id_of_path p; 
-      do fn <- trywith ("stepD: no function " ++ (string_of_raw_id f)) (funs CFG f);     
-      let '(ids, blk, i) := fn in
+      do id <- def_id_of_pc p; 
+      do fn <- trywith ("stepD: no function " ++ (string_of_raw_id f)) (CFG f);     
+      let '(ids, cfg) := fn in
       do ids' <- map_monad local_id_of_ident ids;  
       do dvs <-  map_monad (eval_op e) (map snd args);
-      Ret (mk_path f blk i, combine ids' dvs, 
+      Ret (mk_pc f (init cfg), combine ids' dvs, 
           match ret_ty with
-          | TYPE_Void => (KRet_void e p')::k
-          | _ =>         (KRet e id p')::k
+          | TYPE_Void => (KRet_void e (pc_of_pt p'))::k
+          | _ =>         (KRet e id (pc_of_pt p'))::k
           end)
 
     | Step (INSTR_Call (_, ID_Local _) _) _ => raise "INSTR_Call to local" p
         
     | Step (INSTR_Unreachable) _ => raise "IMPOSSIBLE: unreachable" p
                                                        
-    | Jump (TERM_Ret (t, op)) =>
+    | Jump _ (TERM_Ret (t, op)) =>
       do dv <- eval_op e op;
       match k with
       | [] => Fin dv
@@ -303,42 +307,46 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
       | _ => raise "IMPOSSIBLE: Ret op in non-return configuration" p
       end
 
-    | Jump (TERM_Ret_void) =>
+    | Jump _ (TERM_Ret_void) =>
       match k with
       | [] => Fin (DV (VALUE_Bool _ true))
       | (KRet_void e' p')::k' => Ret (p', e', k')
       | _ => raise "IMPOSSIBLE: Ret void in non-return configuration" p
       end
         
-    | Jump (TERM_Br (_,op) br1 br2) =>
+    | Jump current_block (TERM_Br (_,op) br1 br2) =>
       do dv <- eval_op e op;
       do br <- match dv with 
       | DV (VALUE_Bool _ true) => mret br1
       | DV (VALUE_Bool _ false) => mret br2
       | _ => failwith "Br got non-bool value"
       end;
-      match (blks CFG) (fn p) br with
+      do x <- trywith "cfg_not_found" (CFG (fn p));
+      let '(_, cfg) := x in
+      match (phis cfg br) with
       | Some (Phis ps q) => 
-        lift_err_d (jump CFG p e e ps q k) (@Ret state)
+        lift_err_d (jump cfg current_block e e ps (pc_of_pt q) k) (@Ret state)
       | None => raise ("ERROR: Br " ++ (AstLib.string_of_raw_id br) ++ " not found") p
       end
         
-    | Jump (TERM_Br_1 br) =>
-        match (blks CFG) (fn p) br with
+    | Jump current_block (TERM_Br_1 br) =>
+      do x <- trywith "cfg_not_found" (CFG (fn p));
+      let '(_, cfg) := x in
+        match (phis cfg br) with
           | Some (Phis ps q) => 
-            lift_err_d (jump CFG p e e ps q k) (@Ret state)
+            lift_err_d (jump cfg current_block e e ps (pc_of_pt q) k) (@Ret state)
           | None => raise ("ERROR: Br1  " ++ (AstLib.string_of_raw_id br) ++ " not found") p
         end
       
     | Step (INSTR_Alloca t _ _) p' =>
-      do id <- def_id_of_path p;  
-      Eff (Alloca t (fun (a:value) => Ret (p', (id, a)::e, k)))
+      do id <- def_id_of_pc p;  
+      Eff (Alloca t (fun (a:value) => Ret (pc_of_pt p', (id, a)::e, k)))
       
     | Step (INSTR_Load _ t (_,ptr) _) p' =>
-      do id <- def_id_of_path p;  
+      do id <- def_id_of_pc p;  
       do dv <- eval_op e ptr;     
       match dv with
-      | DVALUE_Addr a => Eff (Load a (fun dv => Ret (p', (id, dv)::e, k))) 
+      | DVALUE_Addr a => Eff (Load a (fun dv => Ret (pc_of_pt p', (id, dv)::e, k))) 
       | _ => raise "ERROR: Load got non-pointer value" p
       end
 
@@ -347,7 +355,7 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
       do dv <- eval_op e val;
       do v <- eval_op e ptr;
       match v with 
-      | DVALUE_Addr a => Eff (Store a dv (Ret (p', e, k)))
+      | DVALUE_Addr a => Eff (Store a dv (Ret (pc_of_pt p', e, k)))
       |  _ => raise "ERROR: Store got non-pointer value" p
       end
 
@@ -362,16 +370,21 @@ Fixpoint stepD (CFG:cfg) (s:state) : Obs state :=
     | Step INSTR_LandingPad p' => raise "Unsupported LLVM intsruction" p
  
     (* Currently unhandled LLVM terminators *)                                  
-    | Jump (TERM_Switch _ _ _)
-    | Jump (TERM_IndirectBr _ _)
-    | Jump (TERM_Resume _)
-    | Jump (TERM_Invoke _ _ _ _) => raise "Unsupport LLVM terminator" p
+    | Jump _ (TERM_Switch _ _ _)
+    | Jump _ (TERM_IndirectBr _ _)
+    | Jump _ (TERM_Resume _)
+    | Jump _ (TERM_Invoke _ _ _ _) => raise "Unsupport LLVM terminator" p
     end.
 
 Inductive Empty := .
 
+Definition init_state (CFG:fcfg) : option state :=
+  'x <- CFG (Name "main");
+  let '(args, cfg) := x in
+  Some ((mk_pc (Name "main") (init cfg)), [], []).
+
 (* Note: codomain is D'  *)
-CoFixpoint sem (CFG:cfg) (s:state) : (Obs Empty) :=
+CoFixpoint sem (CFG:fcfg) (s:state) : (Obs Empty) :=
   bind (stepD CFG s) (sem CFG).
 
 End StepSemantics.

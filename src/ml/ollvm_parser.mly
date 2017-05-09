@@ -325,27 +325,23 @@ definition:
 
         } }
 
-df_blocks:
-  | bs=pair(terminated(LABEL, EOL+)?, pair(terminated(id_instr, EOL+)*, terminated(terminator, EOL+)))*
-  { let _ = anon_ctr.reset () in
-    let _ = void_ctr.reset () in
-    List.map (fun (lbl, (instrs, term)) ->
-    	     let l = match lbl with
-      	     	     | None -> Anon (anon_ctr.get ())
-                     | Some s -> Name (str s)
-	     in let iis = List.map (fun (id, inst) ->
-                                   match id with 
-                                   | None -> (id_of inst, inst)
-                                   | Some s -> (IId s, inst)
-              ) instrs in
-	      {blk_id=l; blk_instrs=iis; blk_term=term; blk_term_id=IVoid (void_ctr.get ())})
-        bs }		     
-(*
-  | hd_lbl=terminated(LABEL, EOL+)? hd=terminated(instr, EOL+)+
-    tl=pair(terminated(LABEL, EOL+), terminated(instr, EOL+)+)*
-  { let hb_lbl=match hd_lbl with Some x -> BName x | _ -> BAnon  in
-    (hb_lbl, hd) :: tl}
-*)
+df_blocks: 
+  | bs=pair(terminated(LABEL, EOL+)?, pair(terminated(id_instr, EOL+)*, terminated(terminator, EOL+)))+
+    { let _ = anon_ctr.reset () in
+      let _ = void_ctr.reset () in
+      List.map (fun (lbl, (instrs, blk_term)) ->
+                let l = match lbl with
+                        | None -> Anon (anon_ctr.get ())
+                        | Some s -> Name (str s)
+                in let blk_instrs = List.map (fun (id, inst) ->
+                                    match id with 
+                                    | None -> (id_of inst, inst)
+                                    | Some s -> (IId s, inst))
+                       instrs
+                in
+                {blk_id = l; blk_instrs; blk_term; blk_term_id=IVoid (void_ctr.get ())})
+	bs
+    }
 
 df_pre_attr:
   | a=linkage                            { OPT_linkage a     }

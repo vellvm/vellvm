@@ -27,10 +27,11 @@ let rec step m =
       
 
 let interpret (prog:Ollvm_ast.toplevel_entity list) =
-  match CFG.coq_TLE_to_cfg prog with
-  | None -> failwith "Vellvm interpreter got bad control-flow graph"
-  | Some cfg ->
-    let sem = SS.sem cfg (SS.init_state cfg) in
+  let fcfg = CFG.entities_to_funs prog in
+  match SS.init_state fcfg with
+  | None -> failwith "bad initial state"
+  | Some s -> 
+    let sem = SS.sem fcfg s in
     let mem = memD [] sem in
     step mem
   
