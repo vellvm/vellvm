@@ -485,7 +485,7 @@ and instr : Format.formatter -> Ollvm_ast.instr -> unit =
              (pp_print_list ~pp_sep:(pp_sep "], [")
                             (fun ppf (i, v) -> value ppf v ;
                                                pp_print_string ppf ", " ;
-                                               ident ppf i)) vil
+                                               lident ppf i)) vil
 
 
   | INSTR_VAArg -> pp_print_string ppf "vaarg"

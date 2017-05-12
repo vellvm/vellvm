@@ -244,7 +244,7 @@ Fixpoint jump (CFG:cfg) (bn:block_id) (e_init:env) (e:env) ps (q:pc) (k:stack) :
   match ps with
   | [] => mret (q, e, k)
   | (id, (INSTR_Phi _ ls))::rest => 
-    match assoc Ident.eq_dec (ID_Local bn) ls with
+    match assoc RawID.eq_dec bn ls with
     | Some op =>
       'dv <- eval_op e_init op;
       jump CFG bn e_init ((id,dv)::e) rest q k
@@ -287,9 +287,8 @@ Fixpoint stepD (CFG:fcfg) (s:state) : Obs state :=
       do id <- def_id_of_pc p; 
       do fn <- trywith ("stepD: no function " ++ (string_of_raw_id f)) (CFG f);     
       let '(ids, cfg) := fn in
-      do ids' <- map_monad local_id_of_ident ids;  
       do dvs <-  map_monad (eval_op e) (map snd args);
-      Ret (mk_pc f (init cfg), combine ids' dvs, 
+      Ret (mk_pc f (init cfg), combine ids dvs, 
           match ret_ty with
           | TYPE_Void => (KRet_void e (pc_of_pt p'))::k
           | _ =>         (KRet e id (pc_of_pt p'))::k
@@ -324,7 +323,7 @@ Fixpoint stepD (CFG:fcfg) (s:state) : Obs state :=
       do x <- trywith "cfg_not_found" (CFG (fn p));
       let '(_, cfg) := x in
       match (phis cfg br) with
-      | Some (Phis ps q) => 
+      | Some (Phis _ ps q) => 
         lift_err_d (jump cfg current_block e e ps (pc_of_pt q) k) (@Ret state)
       | None => raise ("ERROR: Br " ++ (AstLib.string_of_raw_id br) ++ " not found") p
       end
@@ -333,7 +332,7 @@ Fixpoint stepD (CFG:fcfg) (s:state) : Obs state :=
       do x <- trywith "cfg_not_found" (CFG (fn p));
       let '(_, cfg) := x in
         match (phis cfg br) with
-          | Some (Phis ps q) => 
+          | Some (Phis _ ps q) => 
             lift_err_d (jump cfg current_block e e ps (pc_of_pt q) k) (@Ret state)
           | None => raise ("ERROR: Br1  " ++ (AstLib.string_of_raw_id br) ++ " not found") p
         end

@@ -1,4 +1,13 @@
-
+(* -------------------------------------------------------------------------- *
+ *                     Vellvm - the Verified LLVM project                     *
+ *                                                                            *
+ *     Copyright (c) 2017 Dmitri Garbuzov <dgarbuzov@gmail.com>               *
+ *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
+ *                                                                            *
+ *   This file is distributed under the terms of the GNU General Public       *
+ *   License as published by the Free Software Foundation, either version     *
+ *   3 of the License, or (at your option) any later version.                 *
+ ---------------------------------------------------------------------------- *)
 
 (** Reasoning about dominators in a graph. *)
 
@@ -147,15 +156,15 @@ End BoundedSet.
 (** Interface for a nonempty graph [t] with: 
      - a set of _vertices_ of type [V]
      - a distinguished _entry vertex_
-     - an _edge relation_ [Succ]
+     - an _edge relation_ [edge]
 *)
 
 Module Type GRAPH.
   Parameter Inline t V : Type.
   
   Parameter Inline entry : t -> V.
-  Parameter Inline Succ : t -> V -> V -> Prop.
-  Parameter Inline Mem : t -> V -> Prop.
+  Parameter Inline edge : t -> V -> V -> Prop.
+  Parameter Inline mem : t -> V -> Prop.
 End GRAPH.
 
 (** ** Specification of Dominators *)
@@ -166,9 +175,9 @@ Module Spec (Import G:GRAPH).
 
   Inductive Path (g:G.t) : V -> V -> list V -> Prop :=
   | path_nil : forall v, 
-      Mem g v -> Path g v v [v]
+      mem g v -> Path g v v [v]
   | path_cons : forall v1 v2 v3 vs,
-      Path g v1 v2 vs -> Mem g v3 -> Succ g v2 v3 
+      Path g v1 v2 vs -> mem g v3 -> edge g v2 v3 
       -> Path g v1 v3 (v3::vs).
 
 (** *** Definition of domination *)
@@ -180,14 +189,12 @@ Module Spec (Import G:GRAPH).
     v1 <> v2 /\ Dom g v1 v2.
 
   Lemma dom_step : forall g v1 v2,
-    Mem g v2 -> Succ g v1 v2 -> forall v', SDom g v' v2 -> Dom g v' v1.
-(* FOLD *)
+    mem g v2 -> edge g v1 v2 -> forall v', SDom g v' v2 -> Dom g v' v1.
   Proof.
     unfold SDom, Dom. intros g v1 v2 Hmem Hsucc v' [Hneq Hdom] p Hp.
     cut (In v' (v2::p)). inversion 1; subst; intuition. 
     apply Hdom. eapply path_cons; eauto. 
   Qed.
-(* /FOLD *)
 
 End Spec.
 
@@ -208,7 +215,7 @@ Module Type Algdom (Import G:GRAPH).
 
   Axiom successors_sound : forall g sdom n1 n2,
     calc_sdom g = Some sdom ->
-    Mem g n1 -> Mem g n2 -> Succ g n1 n2 -> 
+    mem g n1 -> mem g n2 -> edge g n1 n2 -> 
     L.union (L.singleton n1) (sdom n1) <= sdom n2.
 
   Axiom complete : forall g sdom n1 n2,
@@ -223,7 +230,6 @@ Module AlgdomProperties (Import G:GRAPH) (Import A : Algdom G).
   Lemma sound : forall g sdom n1 n2,
     calc_sdom g = Some sdom ->              
     L.In n1 (sdom n2) -> Dom g n1 n2.
-(* FOLD *)
   Proof.
     red; intros. remember (entry g). induction H1. subst.
     pose proof entry_sound g sdom H. 
@@ -244,7 +250,6 @@ Module AlgdomProperties (Import G:GRAPH) (Import A : Algdom G).
     destruct (sdom v3). apply Hss; inversion H1; eauto.
     exfalso. apply Hss; inversion H1; eauto.
   Qed.
-(* /FOLD *)
 
 End AlgdomProperties.
 

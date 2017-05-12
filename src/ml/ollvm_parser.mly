@@ -690,7 +690,7 @@ alloca_opt:
   | nb=tvalue a=preceded(COMMA, align)? { (Some nb, a) }
 
 phi_table_entry:
-  | LSQUARE v=value COMMA l=ident RSQUARE { (l, v) }
+  | LSQUARE v=value COMMA l=lident RSQUARE { (l, v) }
 
 switch_table_entry:
   | v=tvalue COMMA i=branch_label EOL? { (v, i) }

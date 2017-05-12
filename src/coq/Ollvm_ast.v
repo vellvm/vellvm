@@ -246,7 +246,7 @@ Inductive instr : Set :=
 | INSTR_Op   (op:value)                          (* INVARIANT: op must be of the form SV (OP_ ...) *)
 | INSTR_Call (fn:tident) (args:list tvalue)      (* CORNER CASE: return type is void treated specially *)
 
-| INSTR_Phi  (t:typ) (args:list (ident * value))
+| INSTR_Phi  (t:typ) (args:list (block_id * value))
 
 | INSTR_Alloca (t:typ) (nb: option tvalue) (align:option int) 
 | INSTR_Load  (volatile:bool) (t:typ) (ptr:tvalue) (align:option int)       
