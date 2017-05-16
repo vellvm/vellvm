@@ -14,7 +14,7 @@ Module SS := StepSemantics.StepSemantics(A).
 Import SS.
 
 Definition mtype := list dvalue.
-Definition undef := DV (VALUE_Undef _).
+Definition undef := DV VALUE_Undef.
 
 (* HACK: extract ID_LAZY to lazy to fix broken cofixpoint extraction.  See Memory.ml *)
 Definition ID_LAZY {A:Type} (x:A) := x.

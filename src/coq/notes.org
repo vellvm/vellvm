@@ -1,13 +1,26 @@
 * Tasks
 
+** Test the representation for reasoning about optimizations
+   - prove dead instr optimization:
+   - optimization applies only "locally" (e.g. to one function
+     definition) but semantics applies to an "FCFG"
+   - generalize semantics to a Module
+     
+** Subset the development for the DSSS 
+   - find minimal interesting subset
+   - define IMP -> Vellvm compiler
+   - prove correct
+
 ** Vellvm IR
+
+
 *** Features
 **** Instructions / instruction classes
-  - external calls: malloc, etc.
+  - true i64 / i32 semantics
   - bitcasts
   - floating point 
 
-**** Memory
+**** Memory Model
  - memory state: alloca, load, store
  - structured types
 
@@ -45,7 +58,7 @@
      | Call of <....> * (ret -> D X) 
 #+END_SRC
 
-    This allows us to write predicates over the "final     
+    This allows us to write predicates over the "final" state
 
 
 * LLVM Facts

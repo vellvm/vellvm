@@ -8,6 +8,12 @@ let str = Camlcoq.coqstring_of_camlstring
 let of_str = Camlcoq.camlstring_of_coqstring
 let to_int = Camlcoq.Z.to_int
 
+(* TODO: Use pp_option everywhere instead of inlined matching *)
+let pp_option ppf f o =
+  match o with
+  | None -> ()
+  | Some x -> f ppf x
+
 (* Backward compatibility with 4.01.0 *)
 let rec pp_print_list ?(pp_sep = Format.pp_print_cut) pp_v ppf = function
 | [] -> ()
@@ -564,11 +570,11 @@ and tvalue ppf (t, v) = fprintf ppf "%a %a" typ t value v
 
 and tident ppf (t, v) = fprintf ppf "%a %a" typ t ident v
 
-and toplevel_entities : Format.formatter -> Ollvm_ast.toplevel_entities -> unit =
+and toplevel_entities : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.toplevel_entities -> unit =
   fun ppf entries ->
   pp_print_list ~pp_sep:pp_force_newline toplevel_entity ppf entries
 
-and toplevel_entity : Format.formatter -> Ollvm_ast.toplevel_entity -> unit =
+and toplevel_entity : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.toplevel_entity -> unit =
   fun ppf ->
   function
   | TLE_Target s               -> fprintf ppf "target triple = \"%s\"" (of_str s)
@@ -668,7 +674,7 @@ and declaration : Format.formatter -> Ollvm_ast.declaration -> unit =
     (match dc_gc with
        Some x -> fprintf ppf "gc \"%s\" " (of_str x) | _ -> ()) 
     
-and definition : Format.formatter -> Ollvm_ast.definition -> unit =
+and definition : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.definition -> unit =
   fun ppf ->
   fun ({ df_prototype =
            { dc_name = i
@@ -744,32 +750,25 @@ and block : Format.formatter -> Ollvm_ast.block -> unit =
     terminator ppf t;
     pp_close_box ppf ()
 
-and modul : Format.formatter -> Ollvm_ast.modul -> unit =
+and modul : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.modul -> unit =
   fun ppf m ->
 
-  fprintf ppf "; ModuleID = '%s'" (of_str m.m_name) ;
+  pp_option ppf (fun ppf x -> fprintf ppf "; ModuleID = '%s'" (of_str x)) m.m_name ;
   pp_force_newline ppf () ;
 
-  toplevel_entity ppf m.m_target ;
+  pp_option ppf (fun ppf x -> fprintf ppf "target triple = \"%s\"" (of_str x)) m.m_target;
   pp_force_newline ppf () ;
 
-  toplevel_entity ppf m.m_datalayout ;
+  pp_option ppf (fun ppf x -> fprintf ppf "target datalayout = \"%s\"" (of_str x)) m.m_datalayout ;
   pp_force_newline ppf () ;
 
-  pp_print_list ~pp_sep:pp_force_newline global ppf
-                (List.map snd m.m_globals) ;
+  pp_print_list ~pp_sep:pp_force_newline global ppf m.m_globals;
   pp_force_newline ppf () ;
 
   (* Print function declaration only if there is no corresponding
      function definition *)
-  pp_print_list
-    ~pp_sep:pp_force_newline declaration ppf
-    (List.filter (fun (n, _) -> not (List.mem_assoc n m.m_definitions))
-                 m.m_declarations
-     |> List.map snd) ;
+  pp_print_list ~pp_sep:pp_force_newline declaration ppf m.m_declarations;
   pp_force_newline ppf () ;
 
-  pp_print_list
-    ~pp_sep:pp_force_newline definition ppf
-    (List.map snd m.m_definitions) ;
+  pp_print_list ~pp_sep:pp_force_newline definition ppf m.m_definitions;
   pp_force_newline ppf ()

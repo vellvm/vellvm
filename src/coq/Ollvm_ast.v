@@ -26,9 +26,10 @@
 Require Import List. 
 Require Import String Ascii.
 Require Import ZArith.ZArith_base.
+Require Import Vellvm.Util.
+Import ListNotations.
 Open Scope string_scope.
 Open Scope list_scope.
-
 
 Definition int := Z.
 Parameter float : Set.
@@ -230,6 +231,33 @@ Inductive Expr (a:Set) : Set :=
 | OP_Select           (cnd:(typ * a)) (v1:(typ * a)) (v2:(typ * a)) (* if * then * else *)
 .
 
+Arguments VALUE_Ident {_} _.
+Arguments VALUE_Integer {_} _.
+Arguments VALUE_Float {_} _.
+Arguments VALUE_Bool {_} _.
+Arguments VALUE_Null {_}.
+Arguments VALUE_Zero_initializer {_}.
+Arguments VALUE_Cstring {_} _.
+Arguments VALUE_None {_}.
+Arguments VALUE_Undef {_}.
+Arguments VALUE_Struct {_} _.
+Arguments VALUE_Packed_struct {_} _.
+Arguments VALUE_Array {_} _.
+Arguments VALUE_Vector {_} _.
+Arguments OP_IBinop {_} _.
+Arguments OP_ICmp {_} _ _ _ _.
+Arguments OP_FBinop {_} _ _ _ _ _.
+Arguments OP_FCmp {_} _ _ _ _.
+Arguments OP_Conversion {_} _ _ _ _.
+Arguments OP_GetElementPtr {_} _ _ _.
+Arguments OP_ExtractElement {_} _ _.
+Arguments OP_InsertElement {_} _ _ _.
+Arguments OP_ShuffleVector {_} _ _ _.
+Arguments OP_ExtractValue {_} _ _.
+Arguments OP_InsertValue {_} _ _ _.
+Arguments OP_Select {_} _ _ _.
+
+
 (* static values *)
 Inductive value : Set :=
 | SV : Expr value -> value.
@@ -324,13 +352,17 @@ Record block : Set :=
       blk_term_id : instr_id;      
     }.
 
-Record definition :=
+Record definition (FnBody:Set) :=
   mk_definition
   {
     df_prototype   : declaration;
     df_args        : list local_id;
-    df_instrs      : list block;
+    df_instrs      : FnBody;
   }.
+
+Arguments df_prototype {_} _.
+Arguments df_args {_} _.
+Arguments df_instrs {_} _.
 
 Inductive metadata : Set :=
   | METADATA_Const  (tv:tvalue)
@@ -341,28 +373,45 @@ Inductive metadata : Set :=
   | METADATA_Node   (mds:list metadata)
 .
 
-Inductive toplevel_entity : Set :=
+Inductive toplevel_entity (FnBody:Set) : Set :=
 | TLE_Target          (tgt:string)
 | TLE_Datalayout      (layout:string)
 | TLE_Declaration     (decl:declaration)
-| TLE_Definition      (defn:definition)
+| TLE_Definition      (defn:definition FnBody)
 | TLE_Type_decl       (id:ident) (t:typ)
 | TLE_Source_filename (s:string)
 | TLE_Global          (g:global)
 | TLE_Metadata        (id:raw_id) (md:metadata)
 | TLE_Attribute_group (i:int) (attrs:list fn_attr)
 .
+Arguments TLE_Target {_} _.
+Arguments TLE_Datalayout {_} _.
+Arguments TLE_Declaration {_} _.
+Arguments TLE_Definition {_} _.
+Arguments TLE_Type_decl {_} _.
+Arguments TLE_Source_filename {_} _.
+Arguments TLE_Global {_} _.
+Arguments TLE_Metadata {_} _.
+Arguments TLE_Attribute_group {_} _ _.
 
-Record modul : Set :=
+Definition toplevel_entities (FnBody:Set) : Set := list (toplevel_entity FnBody).
+
+Record modul (FnBody:Set) : Set :=
   mk_modul
   {
-    m_name: string;
-    m_target: toplevel_entity;
-    m_datalayout: toplevel_entity;
-    m_globals: list (string * global);
-    m_declarations: list (string * declaration);
-    m_definitions: list (string * definition);
+    m_name: option string;
+    m_target: option string;
+    m_datalayout: option string;
+    m_globals: list global;
+    m_declarations: list declaration;
+    m_definitions: list (definition FnBody);
   }.
 
+Arguments m_name {_} _.
+Arguments m_target {_} _.
+Arguments m_datalayout {_} _.
+Arguments m_globals {_} _.
+Arguments m_declarations {_} _.
+Arguments m_definitions {_} _.
 
-Definition toplevel_entities : Set := list toplevel_entity.
+

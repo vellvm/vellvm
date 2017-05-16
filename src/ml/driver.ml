@@ -15,7 +15,7 @@ open Ast
 
 let interpret = ref false
 
-let transform (prog : Ollvm_ast.toplevel_entity list) : Ollvm_ast.toplevel_entity list =
+let transform (prog : (Ollvm_ast.block list) Ollvm_ast.toplevel_entity list) : (Ollvm_ast.block list) Ollvm_ast.toplevel_entity list =
   Transform.transform prog
   
 let print_banner s =

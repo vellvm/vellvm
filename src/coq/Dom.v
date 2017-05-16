@@ -11,7 +11,7 @@
 
 (** Reasoning about dominators in a graph. *)
 
-Require Import List Equalities Orders RelationClasses.
+Require Import List Equalities Orders RelationClasses Omega.
 Require Import FSets FMaps.
 Import ListNotations.
 Require Import Vellvm.Util.
@@ -161,7 +161,7 @@ End BoundedSet.
 
 Module Type GRAPH.
   Parameter Inline t V : Type.
-  
+  Parameter Inline eq_dec_V : forall (v1 v2:V), {v1 = v2} + {v1 <> v2}.  
   Parameter Inline entry : t -> V.
   Parameter Inline edge : t -> V -> V -> Prop.
   Parameter Inline mem : t -> V -> Prop.
@@ -180,6 +180,8 @@ Module Spec (Import G:GRAPH).
       Path g v1 v2 vs -> mem g v3 -> edge g v2 v3 
       -> Path g v1 v3 (v3::vs).
 
+Hint Constructors Path.
+  
 (** *** Definition of domination *)
 
   Definition Dom (g:G.t) (v1 v2: V) : Prop :=
@@ -188,6 +190,122 @@ Module Spec (Import G:GRAPH).
   Definition SDom (g:G.t) (v1 v2 : V) : Prop :=
     v1 <> v2 /\ Dom g v1 v2.
 
+  Definition IDom (g:G.t) (v1 v2 : V) : Prop :=
+    SDom g v1 v2 /\ forall v3, SDom g v3 v2 -> Dom g v3 v1.
+
+  Definition reachable (g:G.t) (v : V) : Prop :=
+    exists p, Path g (entry g) v p.
+
+
+  Lemma start_in_path: forall (g:G.t) (v1 v2 : V) p,
+      Path g v1 v2 p -> In v1 p.
+  Proof.
+    intros g v1 v2 p H.
+    induction H.
+    - simpl. left. reflexivity.
+    - simpl. right. exact IHPath.
+  Qed.
+
+  
+  Lemma end_in_path: forall (g:G.t) (v1 v2 : V) p,
+      Path g v1 v2 p -> In v2 p.
+  Proof.
+    intros g v1 v2 p H.
+    destruct H; left; reflexivity.
+  Qed.
+    
+  Lemma acyclic_path_exists: forall (g:G.t) (v1 v2 v3 : V) p,
+      Path g v1 v2 p -> In v3 p -> exists q, Path g v1 v3 (v3::q) /\ ~ In v3 q.
+  Proof.
+    intros g v1 v2 v3 p Hp Hin.
+    generalize dependent v3.
+    induction Hp; simpl; intros u Hin.
+    - destruct Hin. subst. exists []. split.
+      * apply path_nil. exact H.
+      * simpl. auto.
+      * inversion H0.
+    - destruct Hin. subst.
+      * destruct (in_dec eq_dec_V u vs).
+      + apply IHHp in i. exact i.
+      + exists vs. split. eapply path_cons; eauto. auto.
+      * apply IHHp in H1. exact H1.
+  Qed.            
+
+  Lemma path_splits: forall (g:G.t) (v1 v2 v3 : V) p,
+      Path g v1 v2 p -> In v3 p ->
+      exists p1, exists p2, Path g v1 v3 (v3::p1)
+                  /\ Path g v3 v2 (v2::p2)
+                  /\ p = (v2::p2 ++ p1).
+  Proof.
+    intros g v1 v2 v3 p Hp Hin.
+    generalize dependent v3.
+    induction Hp; simpl; intros u Hin.
+    - destruct Hin. subst.
+      * exists []. exists []. repeat split;auto.
+      * destruct H0.
+    - destruct Hin. subst.
+      * exists vs. exists []. split.
+        eapply path_cons; eauto.
+        split. apply path_nil; eauto. simpl. reflexivity.
+      * eapply IHHp in H1.
+        destruct H1 as [p1 [p2 [Hp1 [Hp2 Heq]]]].
+        exists p1. exists (v2::p2). split; auto. split.
+        eapply path_cons; eauto. subst. reflexivity.
+  Qed.        
+
+  Lemma Dom_reflexive : forall (g:G.t) (v : V),
+      Dom g v v.
+  Proof.
+    intros g v.
+    unfold Dom.
+    intros vs Hp.
+    eapply end_in_path. apply Hp.
+  Qed.
+  
+  Lemma Dom_antisymmetric : forall (g:G.t) (v1 v2 : V),
+      reachable g v1 -> 
+      Dom g v1 v2 -> Dom g v2 v1 -> v1 = v2.
+  Proof.
+    intros g v1 v2 H1 D1 D2.
+    unfold Dom in *.
+    destruct H1 as [p Hp].
+    assert (In v1 p). eapply end_in_path. apply Hp.
+    destruct (acyclic_path_exists g (entry g) v1 v1 p Hp H) as [p' [Hp' Hin]].
+    assert (In v2 (v1 :: p')) as Hin'. eapply D2. apply Hp'.
+    destruct (path_splits g (entry g) v1 v2 (v1::p') Hp' Hin') as [q1 [q2 [HQ1 [HQ2 Heq]]]].
+    inversion Heq. subst. clear Heq.
+    eapply D1 in HQ1.
+    destruct (in_inv HQ1). auto.
+    contradiction Hin. eapply in_or_app. right. apply H0.
+  Qed.
+
+  Lemma Dom_transitive : forall (g:G.t) (v1 v2 v3 : V),
+      Dom g v1 v2 -> Dom g v2 v3 -> Dom g v1 v3.
+  Proof.
+    intros g v1 v2 v3 D1 D2.
+    unfold Dom in *.
+    intros vs Hp.
+    destruct (path_splits g (entry g) v3 v2 vs) as [q1 [q2 [HQ1 [HQ2 Heq]]]]; auto. 
+    apply D1 in HQ1.
+    inversion HQ1.
+    - subst. rewrite app_comm_cons.
+      apply in_or_app. left. eapply start_in_path. apply HQ2.
+    - subst. simpl. right. apply in_or_app. right. exact H.
+  Qed.
+    
+  Lemma IDom_unique : forall (g:G.t) (v1 v2 v : V),
+      reachable g v1 ->
+      IDom g v1 v -> IDom g v2 v -> v1 = v2.
+  Proof.
+    intros g v1 v2 v H H1 H2.
+    destruct H1 as [S1 H1].
+    destruct H2 as [S2 H2].
+    apply H1 in S2.
+    apply H2 in S1.
+    eapply Dom_antisymmetric; eauto.
+  Qed.
+  
+    
   Lemma dom_step : forall g v1 v2,
     mem g v2 -> edge g v1 v2 -> forall v', SDom g v' v2 -> Dom g v' v1.
   Proof.

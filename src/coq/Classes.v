@@ -137,6 +137,9 @@ Proof.
   decide_eq_dec.
 Defined.
 
+Require Import ZArith.ZArith.
+Instance eq_dec_z : eq_dec Z := Z_eq_dec.
+
 Instance eq_dec_pair {A B} `(EA:eq_dec A) `(EB:eq_dec B) : eq_dec (A * B)%type.
 Proof.
   decide_eq_dec.
@@ -395,7 +398,62 @@ Next Obligation.
 Defined.
 
 
+(* Show typeclasses *)
+Require Import String.
 
+Class StringOf (T:Type) := string_of : T -> string.
+Open Scope string_scope.
+
+Instance string_of_string : StringOf string := fun s => s.
+
+Instance string_of_bool : StringOf bool := fun (b:bool) => if b then "true" else "false".
+
+Instance string_of_pair {A B} `(SA:StringOf A) `(SB:StringOf B) : StringOf (A * B)%type :=
+  fun p => "(" ++ string_of (fst p) ++ ", " ++ string_of (snd p) ++ ")".
+  
+Instance string_of_option {A} `(SA:StringOf A) : StringOf (option A) :=
+  fun opt => match opt with None => "None" | Some x => "Some " ++ (string_of x) end.
+
+Fixpoint string_of_list_contents {A} `{SA:StringOf A} (l:list A) : string :=
+  match l with
+  | [] => ""
+  | x::[] => string_of x
+  | x::rest => string_of x ++ "; " ++ (string_of_list_contents rest)
+  end.
+
+Instance string_of_list {A} `(SA: StringOf A) : StringOf (list A) :=
+  fun l => "[" ++ (string_of_list_contents l) ++ "]".
+
+
+Definition digit_to_string (x:Z) : string :=
+  match x with
+  | Z0 => "0"
+  | Zpos (1%positive) => "1"
+  | Zpos (2%positive) => "2"
+  | Zpos (3%positive) => "3"
+  | Zpos (4%positive) => "4"
+  | Zpos (5%positive) => "5"
+  | Zpos (6%positive) => "6"
+  | Zpos (7%positive) => "7"
+  | Zpos (8%positive) => "8"
+  | Zpos (9%positive) => "9"
+  | _ => "ERR"
+  end.
+
+Fixpoint to_string_b10' fuel (x:Z) : string :=
+  match fuel with
+  | 0 => "ERR: not enough fuel"
+  | S f => 
+    match x with
+    | Z0 => "0"
+    | _ => let '(q,r) := (Z.div_eucl x 10) in
+          if q == Z0 then (digit_to_string r) else
+          (to_string_b10' f q) ++ (digit_to_string r)
+    end
+  end.
+
+Definition to_string_b10 := to_string_b10' 10.
+Instance string_of_Z : StringOf Z := to_string_b10.
 
 
 

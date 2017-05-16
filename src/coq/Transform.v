@@ -36,19 +36,19 @@ Definition mangle_block (blk:block) : block :=
 Definition mangle_blocks (blks:list block) : list block :=
   List.map mangle_block blks.
 
-Definition mangle_definition (d:definition) : definition :=
-  mk_definition
+Definition mangle_definition (d:definition (list block)) : definition (list block) :=
+  mk_definition _
   (df_prototype d)
   (df_args d)
   (mangle_blocks (df_instrs d))
 .
 
 
-Definition mangle_toplevel_entity (tle : toplevel_entity) : toplevel_entity :=
+Definition mangle_toplevel_entity (tle : toplevel_entity (list block)) : toplevel_entity (list block) :=
   match tle with
   | TLE_Definition d => TLE_Definition (mangle_definition d)
   | _ => tle
   end.
 
-Definition transform (prog: list toplevel_entity) : list toplevel_entity :=
+Definition transform (prog: list (toplevel_entity (list block))) : list (toplevel_entity (list block)) :=
   List.map mangle_toplevel_entity prog.

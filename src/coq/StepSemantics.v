@@ -76,32 +76,33 @@ Module StepSemantics(A:ADDR).
   Definition def_id_of_pc (p:pc) : err local_id :=
     match ins p with
     | IId id => mret id
-    | _ => failwith ("def_id_of_pc: " ++ (string_of_pc p))
+    | _ => failwith ("def_id_of_pc: " ++ (string_of p))
     end.
 
   Definition local_id_of_ident (i:ident) : err local_id :=
     match i with
-    | ID_Global _ => failwith ("local_id_of_ident: " ++ string_of_ident i)
+    | ID_Global _ => failwith ("local_id_of_ident: " ++ string_of i)
     | ID_Local i => mret i
     end.
 
-  Fixpoint string_of_env (e:env) : string :=
+  Fixpoint string_of_env' (e:env) : string :=
     match e with
     | [] => ""
-    | (lid, _)::rest => (string_of_raw_id lid) ++ " " ++ (string_of_env rest)
+    | (lid, _)::rest => (string_of_raw_id lid) ++ " " ++ (string_of_env' rest)
     end.
 
+  Instance string_of_env : StringOf env := string_of_env'.
+  
   Definition lookup_env (e:env) (id:local_id) : err value :=
-    trywith ("lookup_env: id = " ++ (string_of_raw_id id) ++ " NOT IN env = " ++ (string_of_env e)) (assoc RawID.eq_dec id e).
+    trywith ("lookup_env: id = " ++ (string_of id) ++ " NOT IN env = " ++ (string_of e)) (assoc RawID.eq_dec id e).
 
   (* Arithmetic Operations ---------------------------------------------------- *)
   (* TODO: implement LLVM semantics *)
 
-
   Definition eval_iop iop v1 v2 : err value :=
     match v1, v2 with
-    | DV (VALUE_Integer _ i1), DV (VALUE_Integer _ i2) =>
-      mret (DV (VALUE_Integer _
+    | DV (VALUE_Integer i1), DV (VALUE_Integer i2) =>
+      mret (DV (VALUE_Integer
                               match iop with
                               | Add _ _ => (i1 + i2)%Z
                               | Sub _ _ => (i1 - i2)%Z
@@ -119,8 +120,8 @@ Module StepSemantics(A:ADDR).
   (* TODO: replace Coq Z with appropriate i64, i32, i1 values *)
   Definition eval_icmp icmp v1 v2 : err value :=
     match v1, v2 with
-    | DV (VALUE_Integer _ i1), DV (VALUE_Integer _ i2) =>
-      mret (DV (VALUE_Bool _
+    | DV (VALUE_Integer i1), DV (VALUE_Integer i2) =>
+      mret (DV (VALUE_Bool 
                            match icmp with
                            | Eq => Z.eqb i1 i2
                            | Ne => negb (Z.eqb i1 i2)
@@ -142,89 +143,89 @@ Module StepSemantics(A:ADDR).
 
 Definition eval_expr {A:Set} (f:env -> A -> err value) (e:env) (o:Expr A) : err value :=
   match o with
-  | VALUE_Ident _ id => 
+  | VALUE_Ident id => 
     'i <- local_id_of_ident id;
       lookup_env e i
-  | VALUE_Integer _ x => mret (DV (VALUE_Integer _ x))
-  | VALUE_Float _ x   => mret (DV (VALUE_Float _ x))
-  | VALUE_Bool _ b    => mret (DV (VALUE_Bool _ b)) 
-  | VALUE_Null _      => mret (DV (VALUE_Null _))
-  | VALUE_Zero_initializer _ => mret (DV (VALUE_Zero_initializer _))
-  | VALUE_Cstring _ s => mret (DV (VALUE_Cstring _ s))
-  | VALUE_None _      => mret (DV (VALUE_None _))
-  | VALUE_Undef _     => mret (DV (VALUE_Undef _))
+  | VALUE_Integer x => mret (DV (VALUE_Integer x))
+  | VALUE_Float x   => mret (DV (VALUE_Float x))
+  | VALUE_Bool b    => mret (DV (VALUE_Bool b)) 
+  | VALUE_Null      => mret (DV (VALUE_Null))
+  | VALUE_Zero_initializer => mret (DV (VALUE_Zero_initializer))
+  | VALUE_Cstring s => mret (DV (VALUE_Cstring s))
+  | VALUE_None      => mret (DV (VALUE_None))
+  | VALUE_Undef     => mret (DV (VALUE_Undef))
 
-  | VALUE_Struct _ es =>
+  | VALUE_Struct es =>
     'vs <- map_monad (monad_app_snd (f e)) es;
-     mret (DV (VALUE_Struct _ vs))
+     mret (DV (VALUE_Struct vs))
 
-  | VALUE_Packed_struct _ es =>
+  | VALUE_Packed_struct es =>
     'vs <- map_monad (monad_app_snd (f e)) es;
-     mret (DV (VALUE_Packed_struct _ vs))
+     mret (DV (VALUE_Packed_struct vs))
     
-  | VALUE_Array _ es =>
+  | VALUE_Array es =>
     'vs <- map_monad (monad_app_snd (f e)) es;
-     mret (DV (VALUE_Array _ vs))
+     mret (DV (VALUE_Array vs))
     
-  | VALUE_Vector _ es =>
+  | VALUE_Vector es =>
     'vs <- map_monad (monad_app_snd (f e)) es;
-     mret (DV (VALUE_Vector _ vs))
+     mret (DV (VALUE_Vector vs))
 
-  | OP_IBinop _ iop t op1 op2 =>
+  | OP_IBinop iop t op1 op2 =>
     'v1 <- f e op1;
     'v2 <- f e op2;
     (eval_iop iop) v1 v2
 
-  | OP_ICmp _ cmp t op1 op2 => 
+  | OP_ICmp cmp t op1 op2 => 
     'v1 <- f e op1;
     'v2 <- f e op2;
     (eval_icmp cmp) v1 v2
 
-  | OP_FBinop _ fop fm t op1 op2 =>
+  | OP_FBinop fop fm t op1 op2 =>
     'v1 <- f e op1;
     'v2 <- f e op2;
     (eval_fop fop) v1 v2
 
-  | OP_FCmp _ fcmp t op1 op2 => 
+  | OP_FCmp fcmp t op1 op2 => 
     'v1 <- f e op1;
     'v2 <- f e op2;
     (eval_fcmp fcmp) v1 v2
               
-  | OP_Conversion _ conv t1 op t2 =>
+  | OP_Conversion conv t1 op t2 =>
     f e op    (* TODO: is conversion a no-op semantically? *)
       
-  | OP_GetElementPtr _ t ptrval idxs =>
+  | OP_GetElementPtr t ptrval idxs =>
     'vptr <- monad_app_snd (f e) ptrval;
     'vs <- map_monad (monad_app_snd (f e)) idxs;
     failwith "getelementptr not implemented"  (* TODO: Getelementptr *)  
     
-  | OP_ExtractElement _ vecop idx =>
+  | OP_ExtractElement vecop idx =>
     'vec <- monad_app_snd (f e) vecop;
     'vidx <- monad_app_snd (f e) idx;
     failwith "extractelement not implemented" (* TODO: Extract Element *)
       
-  | OP_InsertElement _ vecop eltop idx =>
+  | OP_InsertElement vecop eltop idx =>
     'vec <- monad_app_snd (f e) vecop;
     'v <- monad_app_snd (f e) eltop;
     'vidx <- monad_app_snd (f e) idx;
     failwith "insertelement not implemented" (* TODO *)
     
-  | OP_ShuffleVector _ vecop1 vecop2 idxmask =>
+  | OP_ShuffleVector vecop1 vecop2 idxmask =>
     'vec1 <- monad_app_snd (f e) vecop1;
     'vec2 <- monad_app_snd (f e) vecop2;      
     'vidx <- monad_app_snd (f e) idxmask;
     failwith "shufflevector not implemented" (* TODO *)
 
-  | OP_ExtractValue _ vecop idxs =>
+  | OP_ExtractValue vecop idxs =>
     'vec <- monad_app_snd (f e) vecop;
     failwith "extractvalue not implemented"
         
-  | OP_InsertValue _ vecop eltop idxs =>
+  | OP_InsertValue vecop eltop idxs =>
     'vec <- monad_app_snd (f e) vecop;
     'v <- monad_app_snd (f e) eltop;
     failwith "insertvalue not implemented"
     
-  | OP_Select _ cndop op1 op2 =>
+  | OP_Select cndop op1 op2 =>
     'cnd <- monad_app_snd (f e) cndop;
     'v1 <- monad_app_snd (f e) op1;
     'v2 <- monad_app_snd (f e) op2;      
@@ -267,15 +268,10 @@ Definition lift_err_d {A B} (m:err A) (f: A -> Obs B) : Obs B :=
 Notation "'do' x <- m ; f" := (lift_err_d m (fun x => f)) 
    (at level 200, x ident, m at level 100, f at level 200).
 
-Definition fcode (CFG : fcfg) p :=
-  'x <- CFG (fn p);
-  let '(_, cfg) := x in
-  (code cfg (ins p)).
-
-Fixpoint stepD (CFG:fcfg) (s:state) : Obs state :=
+Fixpoint stepD (CFG:mcfg) (s:state) : Obs state :=
   let '(p, e, k) := s in
   let pc_of_pt pt := mk_pc (fn p) pt in
-  do cmd <- trywith ("stepD: no cmd at pc " ++ (string_of_pc p)) (fcode CFG p);
+  do cmd <- trywith ("stepD: no cmd at pc " ++ (string_of p)) (fetch CFG p);
     match cmd with
     | Step (INSTR_Op op) p' =>
       do id <- def_id_of_pc p; 
@@ -285,8 +281,9 @@ Fixpoint stepD (CFG:fcfg) (s:state) : Obs state :=
     (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
     | Step (INSTR_Call (ret_ty,ID_Global f) args) p' =>
       do id <- def_id_of_pc p; 
-      do fn <- trywith ("stepD: no function " ++ (string_of_raw_id f)) (CFG f);     
-      let '(ids, cfg) := fn in
+      do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
+      let ids := (df_args fdef) in  
+      let cfg := df_instrs fdef in
       do dvs <-  map_monad (eval_op e) (map snd args);
       Ret (mk_pc f (init cfg), combine ids dvs, 
           match ret_ty with
@@ -308,7 +305,7 @@ Fixpoint stepD (CFG:fcfg) (s:state) : Obs state :=
 
     | Jump _ (TERM_Ret_void) =>
       match k with
-      | [] => Fin (DV (VALUE_Bool _ true))
+      | [] => Fin (DV (VALUE_Bool true))
       | (KRet_void e' p')::k' => Ret (p', e', k')
       | _ => raise "IMPOSSIBLE: Ret void in non-return configuration" p
       end
@@ -316,25 +313,25 @@ Fixpoint stepD (CFG:fcfg) (s:state) : Obs state :=
     | Jump current_block (TERM_Br (_,op) br1 br2) =>
       do dv <- eval_op e op;
       do br <- match dv with 
-      | DV (VALUE_Bool _ true) => mret br1
-      | DV (VALUE_Bool _ false) => mret br2
-      | _ => failwith "Br got non-bool value"
+               | DV (VALUE_Bool true) => mret br1
+               | DV (VALUE_Bool false) => mret br2
+               | _ => failwith "Br got non-bool value"
       end;
-      do x <- trywith "cfg_not_found" (CFG (fn p));
-      let '(_, cfg) := x in
+      do fdef <- trywith ("stepD: no function " ++ (string_of (fn p))) (find_function CFG (fn p));
+      let cfg := (df_instrs fdef) in
       match (phis cfg br) with
       | Some (Phis _ ps q) => 
         lift_err_d (jump cfg current_block e e ps (pc_of_pt q) k) (@Ret state)
-      | None => raise ("ERROR: Br " ++ (AstLib.string_of_raw_id br) ++ " not found") p
+      | None => raise ("ERROR: Br " ++ (string_of br) ++ " not found") p
       end
         
     | Jump current_block (TERM_Br_1 br) =>
-      do x <- trywith "cfg_not_found" (CFG (fn p));
-      let '(_, cfg) := x in
+      do fdef <- trywith ("stepD: no function " ++ (string_of (fn p))) (find_function CFG (fn p));
+      let cfg := (df_instrs fdef) in
         match (phis cfg br) with
           | Some (Phis _ ps q) => 
             lift_err_d (jump cfg current_block e e ps (pc_of_pt q) k) (@Ret state)
-          | None => raise ("ERROR: Br1  " ++ (AstLib.string_of_raw_id br) ++ " not found") p
+          | None => raise ("ERROR: Br1  " ++ (string_of br) ++ " not found") p
         end
       
     | Step (INSTR_Alloca t _ _) p' =>
@@ -377,13 +374,14 @@ Fixpoint stepD (CFG:fcfg) (s:state) : Obs state :=
 
 Inductive Empty := .
 
-Definition init_state (CFG:fcfg) : option state :=
-  'x <- CFG (Name "main");
-  let '(args, cfg) := x in
-  Some ((mk_pc (Name "main") (init cfg)), [], []).
+Definition init_state (CFG:mcfg) : Obs state :=
+  do fdef <- trywith ("stepD: no main function ") (find_function CFG (Name "main"));
+    let args := (df_args fdef) in  
+    let cfg := df_instrs fdef in
+    Ret ((mk_pc (Name "main") (init cfg)), [], []).
 
 (* Note: codomain is D'  *)
-CoFixpoint sem (CFG:fcfg) (s:state) : (Obs Empty) :=
+CoFixpoint sem (CFG:mcfg) (s:state) : (Obs Empty) :=
   bind (stepD CFG s) (sem CFG).
 
 End StepSemantics.

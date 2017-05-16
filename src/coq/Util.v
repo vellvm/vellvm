@@ -788,15 +788,18 @@ Proof.
     simpl; rewrite IHl; auto.
 Qed.
 
-
-Definition find {A} (pred : A -> bool) (l : list A) : option A :=
-  match l with
-    | [] => None
-    | h :: t => if pred h then Some h else find pred t
-  end.
-
 Definition map_option_snd {A B C} (f : B -> option C) (p:A * B) : option (A * C) :=
   let '(x,y) := p in
   'z <- f y;
     Some (x,z).
+
+
+Fixpoint find_map {A B} (f : A -> option B) (l : list A) : option B :=
+  match l with
+  | [] => None
+  | x::xs => match (f x) with
+            | None => find_map f xs
+            | Some ans => Some ans
+            end
+  end.
 

@@ -26,13 +26,17 @@ let rec step m =
   | SS.E.Eff _ -> failwith "should have been handled by the memory model"  
       
 
-let interpret (prog:Ollvm_ast.toplevel_entity list) =
-  let fcfg = CFG.entities_to_funs prog in
-  match SS.init_state fcfg with
-  | None -> failwith "bad initial state"
-  | Some s -> 
-    let sem = SS.sem fcfg s in
-    let mem = memD [] sem in
-    step mem
-  
+let interpret (prog:(Ollvm_ast.block list) Ollvm_ast.toplevel_entity list) =
+  let scfg = AstLib.modul_of_toplevel_entities prog in
+  match CFG.mfg_of_modul scfg with
+  | None -> failwith "bad module"
+  | Some mcfg ->
+    begin match Lazy.force (SS.init_state mcfg) with
+    | SS.E.Err s -> failwith (Camlcoq.camlstring_of_coqstring s)
+    | SS.E.Ret s -> 
+      let sem = SS.sem mcfg s in
+      let mem = memD [] sem in
+      step mem
+    | _ -> failwith "bad initial state"
+    end
   

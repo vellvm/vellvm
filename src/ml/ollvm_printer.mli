@@ -20,11 +20,11 @@ val value : Format.formatter -> Ollvm_ast.value -> unit
 val tvalue : Format.formatter -> Ollvm_ast.tvalue -> unit
 val tident : Format.formatter -> Ollvm_ast.tident -> unit
 val toplevel_entities :
-  Format.formatter -> Ollvm_ast.toplevel_entities -> unit
-val toplevel_entity : Format.formatter -> Ollvm_ast.toplevel_entity -> unit
+  Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.toplevel_entities -> unit
+val toplevel_entity : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.toplevel_entity -> unit
 val metadata : Format.formatter -> Ollvm_ast.metadata -> unit
 val global : Format.formatter -> Ollvm_ast.global -> unit
 val declaration : Format.formatter -> Ollvm_ast.declaration -> unit
-val definition : Format.formatter -> Ollvm_ast.definition -> unit
+val definition : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.definition -> unit
 val block : Format.formatter -> Ollvm_ast.block -> unit
-val modul : Format.formatter -> Ollvm_ast.modul -> unit
+val modul : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.modul -> unit

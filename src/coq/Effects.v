@@ -205,9 +205,6 @@ Section D_EQUIV_COIND.
 End D_EQUIV_COIND.
 Arguments d_equiv_coind [_] _ [_ _] _ _.
 
-Check d_equiv_coind.
-
-
 Fixpoint taus {A} (n:nat) (d:D A) : D A :=
   match n with
   | 0 => d

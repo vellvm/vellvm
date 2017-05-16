@@ -11,7 +11,7 @@
 
 Require Import ZArith.ZArith List.
 Require Import String Omega.
-Require Import Vellvm.Ollvm_ast Vellvm.Classes.
+Require Import Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util.
 Require Import Equalities.
 Import ListNotations.
 
@@ -86,8 +86,9 @@ Module Ident <: UsualDecidableTypeFull.
   Qed.
   Include HasEqDec2Bool.
 End Ident.
-  
-  
+Instance eq_dec_ident : eq_dec ident := Ident.eq_dec.  
+
+
 (* Induction Principles ----------------------------------------------------- *)
 
 Section TypInd.
@@ -183,34 +184,34 @@ Inductive value : Set :=
 | SV : Expr value -> value.
 *)
   Variable P : value -> Prop.
-  Hypothesis IH_Ident   : forall (id:ident), P (SV (VALUE_Ident _ id)).
-  Hypothesis IH_Integer : forall (x:int), P (SV (VALUE_Integer _ x)).
-  Hypothesis IH_Float   : forall (f:float), P (SV (VALUE_Float _ f)).
-  Hypothesis IH_Bool    : forall (b:bool), P (SV (VALUE_Bool _ b)).
-  Hypothesis IH_Null    : P (SV (VALUE_Null _ )).
-  Hypothesis IH_Zero_initializer : P (SV (VALUE_Zero_initializer _)).
-  Hypothesis IH_Cstring : forall (s:string), P (SV (VALUE_Cstring _ s)).
-  Hypothesis IH_None    : P (SV (VALUE_None _ )).
-  Hypothesis IH_Undef   : P (SV (VALUE_Undef _ )).
-  Hypothesis IH_Struct  : forall (fields: list (typ * value)), (forall p, In p fields -> P (snd p)) -> P (SV (VALUE_Struct _ fields)).
-  Hypothesis IH_Packed_struct : forall (fields: list (typ * value)), (forall p, In p fields -> P (snd p)) -> P (SV (VALUE_Packed_struct _ fields)).
-  Hypothesis IH_Array   : forall (elts: list (typ * value)), (forall p, In p elts -> P (snd p)) -> P (SV (VALUE_Array _ elts)).
-  Hypothesis IH_Vector  : forall (elts: list (typ * value)), (forall p, In p elts -> P (snd p)) -> P (SV (VALUE_Vector _ elts)).
-  Hypothesis IH_IBinop  : forall (iop:ibinop) (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P (SV (OP_IBinop _ iop t v1 v2)).
-  Hypothesis IH_ICmp    : forall (cmp:icmp)   (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P (SV (OP_ICmp _ cmp t v1 v2)).
-  Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P (SV (OP_FBinop _ fop fm t v1 v2)).
-  Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P (SV (OP_FCmp _ cmp t v1 v2)).
-  Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:typ) (v:value) (t_to:typ), P v -> P (SV (OP_Conversion _ conv t_from v t_to)).
+  Hypothesis IH_Ident   : forall (id:ident), P (SV (VALUE_Ident id)).
+  Hypothesis IH_Integer : forall (x:int), P (SV (VALUE_Integer x)).
+  Hypothesis IH_Float   : forall (f:float), P (SV (VALUE_Float f)).
+  Hypothesis IH_Bool    : forall (b:bool), P (SV (VALUE_Bool b)).
+  Hypothesis IH_Null    : P (SV (VALUE_Null )).
+  Hypothesis IH_Zero_initializer : P (SV (VALUE_Zero_initializer )).
+  Hypothesis IH_Cstring : forall (s:string), P (SV (VALUE_Cstring s)).
+  Hypothesis IH_None    : P (SV (VALUE_None )).
+  Hypothesis IH_Undef   : P (SV (VALUE_Undef )).
+  Hypothesis IH_Struct  : forall (fields: list (typ * value)), (forall p, In p fields -> P (snd p)) -> P (SV (VALUE_Struct fields)).
+  Hypothesis IH_Packed_struct : forall (fields: list (typ * value)), (forall p, In p fields -> P (snd p)) -> P (SV (VALUE_Packed_struct fields)).
+  Hypothesis IH_Array   : forall (elts: list (typ * value)), (forall p, In p elts -> P (snd p)) -> P (SV (VALUE_Array elts)).
+  Hypothesis IH_Vector  : forall (elts: list (typ * value)), (forall p, In p elts -> P (snd p)) -> P (SV (VALUE_Vector elts)).
+  Hypothesis IH_IBinop  : forall (iop:ibinop) (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P (SV (OP_IBinop iop t v1 v2)).
+  Hypothesis IH_ICmp    : forall (cmp:icmp)   (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P (SV (OP_ICmp cmp t v1 v2)).
+  Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P (SV (OP_FBinop fop fm t v1 v2)).
+  Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P (SV (OP_FCmp cmp t v1 v2)).
+  Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:typ) (v:value) (t_to:typ), P v -> P (SV (OP_Conversion conv t_from v t_to)).
   Hypothesis IH_GetElementPtr : forall (t:typ) (ptrval:(typ * value)) (idxs:list (typ * value)),
-      P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P (SV (OP_GetElementPtr _ t ptrval idxs)).
-  Hypothesis IH_ExtractElement: forall (vec:(typ * value)) (idx:(typ * value)), P (snd vec) -> P (snd idx) -> P (SV (OP_ExtractElement _ vec idx)).
+      P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P (SV (OP_GetElementPtr t ptrval idxs)).
+  Hypothesis IH_ExtractElement: forall (vec:(typ * value)) (idx:(typ * value)), P (snd vec) -> P (snd idx) -> P (SV (OP_ExtractElement vec idx)).
   Hypothesis IH_InsertElement : forall (vec:(typ * value)) (elt:(typ * value)) (idx:(typ * value)),
-      P (snd vec) -> P (snd elt) -> P (snd idx) -> P (SV (OP_InsertElement _ vec elt idx)).
+      P (snd vec) -> P (snd elt) -> P (snd idx) -> P (SV (OP_InsertElement vec elt idx)).
   Hypothesis IH_ShuffleVector : forall (vec1:(typ * value)) (vec2:(typ * value)) (idxmask:(typ * value)),
-      P (snd vec1) -> P (snd vec2 ) -> P (snd idxmask) -> P (SV (OP_ShuffleVector _ vec1 vec2 idxmask)).
-  Hypothesis IH_ExtractValue  : forall (vec:(typ * value)) (idxs:list int), P (snd vec) -> P (SV (OP_ExtractValue _ vec idxs)).
-  Hypothesis IH_InsertValue   : forall (vec:(typ * value)) (elt:(typ * value)) (idxs:list int), P (snd vec) -> P (snd elt) -> P (SV (OP_InsertValue _ vec elt idxs)).
-  Hypothesis IH_Select        : forall (cnd:(typ * value)) (v1:(typ * value)) (v2:(typ * value)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P (SV (OP_Select _ cnd v1 v2)).
+      P (snd vec1) -> P (snd vec2 ) -> P (snd idxmask) -> P (SV (OP_ShuffleVector vec1 vec2 idxmask)).
+  Hypothesis IH_ExtractValue  : forall (vec:(typ * value)) (idxs:list int), P (snd vec) -> P (SV (OP_ExtractValue vec idxs)).
+  Hypothesis IH_InsertValue   : forall (vec:(typ * value)) (elt:(typ * value)) (idxs:list int), P (snd vec) -> P (snd elt) -> P (SV (OP_InsertValue vec elt idxs)).
+  Hypothesis IH_Select        : forall (cnd:(typ * value)) (v1:(typ * value)) (v2:(typ * value)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P (SV (OP_Select cnd v1 v2)).
 
   Lemma value_ind' : forall (v:value), P v.
     fix IH 1.
@@ -264,53 +265,89 @@ Inductive value : Set :=
 End ValueInd.
 
 
-Definition digit_to_string (x:Z) : string :=
-  match x with
-  | Z0 => "0"
-  | Zpos (1%positive) => "1"
-  | Zpos (2%positive) => "2"
-  | Zpos (3%positive) => "3"
-  | Zpos (4%positive) => "4"
-  | Zpos (5%positive) => "5"
-  | Zpos (6%positive) => "6"
-  | Zpos (7%positive) => "7"
-  | Zpos (8%positive) => "8"
-  | Zpos (9%positive) => "9"
-  | _ => "ERR"
-  end.
-
-Fixpoint to_string_b10' fuel (x:Z) : string :=
-  match fuel with
-  | 0 => "ERR: not enough fuel"
-  | S f => 
-    match x with
-    | Z0 => "0"
-    | _ => let '(q,r) := (Z.div_eucl x 10) in
-          if q == Z0 then (digit_to_string r) else
-          (to_string_b10' f q) ++ (digit_to_string r)
-    end
-  end.
-
-Definition to_string_b10 := to_string_b10' 10.
+(* Display *)
 
 
-Definition string_of_raw_id r : string :=
+Instance string_of_raw_id : StringOf raw_id := fun r =>
   match r with
   | Name s => s
   | Anon n => to_string_b10 n
   end.
 
-Definition string_of_ident id : string :=
+
+Instance string_of_ident : StringOf ident :=  fun id =>
   match id with
   | ID_Global r => "@" ++ (string_of_raw_id r)
   | ID_Local  r => "%" ++ (string_of_raw_id r)
   end.
 
-Definition string_of_instr_id ins : string :=
+Instance string_of_instr_id : StringOf instr_id := fun ins =>
   match ins with
   | IId id => (string_of_raw_id id)
   | IVoid n => "void<" ++ (to_string_b10 n) ++ ">"
   end.
 
 
+Definition target_of {X} (tle : toplevel_entity X) : option string :=
+  match tle with
+  | TLE_Target tgt => Some tgt
+  | _ => None
+  end.
+
+Definition datalayout_of {X} (tle : toplevel_entity X) : option string :=
+  match tle with
+  | TLE_Datalayout l => Some l
+  | _ => None
+  end.
+
+Definition filename_of {X} (tle : toplevel_entity X) : option string :=
+  match tle with
+  | TLE_Source_filename l => Some l
+  | _ => None
+  end.
+
+Definition globals_of {X} (tle : toplevel_entity X) : list global  :=
+  match tle with
+  | TLE_Global g => [g]
+  | _ => []
+  end.
+
+Definition declarations_of {X} (tle : toplevel_entity X) : list declaration :=
+  match tle with
+  | TLE_Declaration d => [d]
+  | _ => []
+  end.
+
+Definition definitions_of {X} (tle : toplevel_entity X) : list (definition X) :=
+  match tle with
+  | TLE_Definition d => [d]
+  | _ => []
+  end.
+
+Definition modul_of_toplevel_entities {X} (tles : list (toplevel_entity X)) : modul X :=
+  {|
+    m_name := find_map filename_of tles;
+    m_target := find_map target_of tles;
+    m_datalayout := find_map datalayout_of tles;
+    m_globals := flat_map globals_of tles;
+    m_declarations := flat_map declarations_of tles;
+    m_definitions := flat_map definitions_of tles;
+  |}.
+
+
+
+
+(* Identifiers ----------------------------------------------------------- *)
+Class Ident (X:Set) := ident_of : X -> ident.
+
+Instance ident_of_block : Ident block := fun (b:block) => ID_Local (blk_id b).
+Instance ident_of_global : Ident global := fun (g:global) => ID_Global (g_ident g).
+Instance ident_of_declaration : Ident declaration := fun (d:declaration) => ID_Global (dc_name d).
+Instance ident_of_definition : forall X, Ident (definition X) := fun X => fun (d:definition X) => ident_of (df_prototype d).
+
+
+Definition globals {X} (m:modul X) : list ident := 
+           map ident_of (m_globals m)
+        ++ map ident_of (m_declarations m)
+        ++ map ident_of (m_definitions m).
 
