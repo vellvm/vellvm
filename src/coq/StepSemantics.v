@@ -36,6 +36,7 @@ Module StepSemantics(A:ADDR).
     | DV : Expr dvalue -> dvalue
     | DVALUE_CodePointer (p : pc)
     | DVALUE_Addr (a:A.addr)
+    | DVALUE_I32 (x:CompCert.I32)
     .
   
     Module ET : Vellvm.Effects.EffT
@@ -104,7 +105,7 @@ Module StepSemantics(A:ADDR).
     | DV (VALUE_Integer i1), DV (VALUE_Integer i2) =>
       mret (DV (VALUE_Integer
                               match iop with
-                              | Add _ _ => (i1 + i2)%Z
+                              | Add _ _ => (i1 + i2)%Zb
                               | Sub _ _ => (i1 - i2)%Z
                               | Mul _ _ => (i1 * i2)%Z
                               | Shl _ _ 

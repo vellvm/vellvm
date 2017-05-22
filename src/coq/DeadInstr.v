@@ -10,7 +10,7 @@
 
 Require Import ZArith List String Omega.
 Require Import  Vellvm.Classes Vellvm.Util.
-Require Import Vellvm.Ollvm_ast Vellvm.AstLib Vellvm.CFG.
+Require Import Vellvm.Ollvm_ast Vellvm.AstLib Vellvm.CFG Vellvm.CFGProp.
 Import ListNotations.
 Open Scope Z_scope.
 Open Scope string_scope.
@@ -18,14 +18,36 @@ Open Scope string_scope.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Require Import Vellvm.Effects.
+Require Import Vellvm.Memory.
+Import SS.
+
+Definition optimization := definition (list block) -> definition (list block).
+
+Definition optimize (m:modul (list block)) (o:optimization) : modul (list block) :=
+ {|
+  m_name := (m_name m);
+  m_target := (m_target m);
+  m_datalayout := (m_datalayout m);
+  m_globals := (m_globals m);
+  m_declarations := (m_declarations m);
+  m_definitions := map o (m_definitions m);
+  |}.
 
 
+Definition correct (P : modul (list block) -> Prop) (o:optimization) :=
+  forall (m:modul (list block)) m_semantic m_opt_semantic,
+    P m ->
+    mfg_of_modul m = Some m_semantic ->
+    mfg_of_modul (optimize m o) = Some m_opt_semantic ->
+    forall (s:state),
+      E.d_error_free (sem m_semantic s) ->
+      E.d_equiv (sem m_semantic s) (sem m_opt_semantic s).
+      
 Class RemoveInstr X := remove_instr : instr_id -> X -> X.
 
 Definition remove_instr_block (id:instr_id) (b:block) : block :=
   {| blk_id := blk_id b;
-     blk_instrs := List.filter (fun x => negb (if (fst x == id) then true else false)) (blk_instrs b);
+     blk_instrs := List.filter (fun x => negb (if (fst x == id) then false else true)) (blk_instrs b);
      blk_term := blk_term b;
      blk_term_id := blk_term_id b;
   |}.
@@ -40,19 +62,48 @@ Definition remove_instr_defn (id:instr_id) (d:definition (list block)) : definit
 
 Instance rem_instr_defn : RemoveInstr (definition (list block)) := remove_instr_defn.
 
-Definition remove_instr_tle (id:instr_id) (tle:toplevel_entity (list block)) : toplevel_entity (list block) :=
-  match tle with
-  | TLE_Definition d => TLE_Definition (remove_instr id d)
-  | _ => tle
-  end.
-
-Instance rem_instr_tle : RemoveInstr (toplevel_entity (list block)) := remove_instr_tle.
-
-(*
 Definition dead (g:cfg) (inst:instr_id) : Prop :=
   match inst with
   | IVoid _ => False
   | IId id => forall pt, ~ (cmd_uses_local g pt id)
   end.
-*)
+
+Inductive remove_instr_applies (inst:instr_id) (d:definition (list block)) : Prop :=
+| remove_instr_applies_intro:
+    forall glbls g, cfg_of_definition glbls d = Some g ->
+               dead g inst ->
+               remove_instr_applies inst d.
+
+Definition remove_instr_applies_module (instr:instr_id) (m:modul (list block)) : Prop :=
+  Forall (remove_instr_applies instr) (m_definitions m).
+
+Require Import paco.
+
+Lemma d_error_free_inv :
+  forall (m:mcfg) (s:state), 
+    E.d_error_free (sem m s) ->
+    (exists dv, sem m s = E.Fin dv) \/
+    (exists s', stepD m s = E.Ret s' /\ E.d_error_free (sem m s')).
+Proof.
+  intros m s H.
+  punfold H. remember (upaco1 d_error_free_step bot1). remember (sem m s) as d. induction H. 
+  - left. exists v. reflexivity.
+  - unfold sem in Heqd.
+    unfold bind in Heqd.
+    inversion Heqd. subst. 
+    
+  
+    
+
+Lemma remove_instr_correct:
+  forall (instr:instr_id), correct (remove_instr_applies_module instr) (remove_instr_defn instr).
+Proof.
+  intros instr.
+  unfold correct.
+  intros m m_semantic m_opt_semantic Happlies H0 H1 s Herr.
+  unfold optimize in H1.
+  punfold Herr.
+
+  
+  
 

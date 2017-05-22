@@ -9,7 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import ZArith List String Omega.
-Require Import Vellvm.CFG Vellvm.Dom.
+Require Import Vellvm.Ollvm_ast Vellvm.CFG Vellvm.Dom.
 Require Import Vellvm.Classes.
 Import ListNotations.
 
@@ -26,32 +26,32 @@ Definition pt_defines (p:pt) (lid:local_id) :=
 (* Which identifiers does an instruction use? *)
 Fixpoint value_uses (v:value) : list ident :=
   match v with
-  | SV (VALUE_Ident _ id) => [id]
-  | SV (VALUE_Integer _ _)
-  | SV (VALUE_Float _ _ )
-  | SV (VALUE_Bool _ _)
-  | SV (VALUE_Null _)
-  | SV (VALUE_Zero_initializer _)
-  | SV (VALUE_Cstring _ _)
-  | SV (VALUE_None _)
-  | SV (VALUE_Undef _) => []
+  | SV (VALUE_Ident id) => [id]
+  | SV (VALUE_Integer _)
+  | SV (VALUE_Float _ )
+  | SV (VALUE_Bool _)
+  | SV (VALUE_Null)
+  | SV (VALUE_Zero_initializer)
+  | SV (VALUE_Cstring _)
+  | SV (VALUE_None)
+  | SV (VALUE_Undef) => []
 
-  | SV (VALUE_Struct _ l)
-  | SV (VALUE_Packed_struct _ l)
-  | SV (VALUE_Array _ l)
-  | SV (VALUE_Vector _ l) => List.flat_map (fun x => value_uses (snd x)) l
-  | SV (OP_IBinop _ _ _ v1 v2) 
-  | SV (OP_ICmp _ _ _ v1 v2)
-  | SV (OP_FBinop _ _ _ _ v1 v2) 
-  | SV (OP_FCmp _ _ _ v1 v2) => (value_uses v1) ++ (value_uses v2)
-  | SV (OP_Conversion _ _ _ v _) => value_uses v
-  | SV (OP_GetElementPtr _ _ (_,ptr) idxs) => (value_uses ptr) ++ (List.flat_map (fun x => value_uses (snd x)) idxs)
-  | SV (OP_ExtractElement _  (_,vec) (_,idx)) => (value_uses vec) ++ (value_uses idx)
-  | SV (OP_InsertElement _ (_,vec) (_,elt) (_,idx)) => (value_uses vec) ++ (value_uses elt) ++ (value_uses idx)
-  | SV (OP_ShuffleVector _ (_, vec1) (_,vec2) (_,idxmask)) => (value_uses vec1) ++ (value_uses vec2) ++ (value_uses idxmask)
-  | SV (OP_ExtractValue _ (_,vec) _) => value_uses vec
-  | SV (OP_InsertValue _ (_,vec) (_,elt) _) => (value_uses vec) ++ (value_uses elt)
-  | SV (OP_Select _ (_,cnd) (_,v1) (_,v2)) => (value_uses cnd) ++ (value_uses v1) ++ (value_uses v2)
+  | SV (VALUE_Struct l)
+  | SV (VALUE_Packed_struct l)
+  | SV (VALUE_Array l)
+  | SV (VALUE_Vector l) => List.flat_map (fun x => value_uses (snd x)) l
+  | SV (OP_IBinop _ _ v1 v2) 
+  | SV (OP_ICmp _ _ v1 v2)
+  | SV (OP_FBinop _ _ _ v1 v2) 
+  | SV (OP_FCmp _ _ v1 v2) => (value_uses v1) ++ (value_uses v2)
+  | SV (OP_Conversion _ _ v _) => value_uses v
+  | SV (OP_GetElementPtr _ (_,ptr) idxs) => (value_uses ptr) ++ (List.flat_map (fun x => value_uses (snd x)) idxs)
+  | SV (OP_ExtractElement  (_,vec) (_,idx)) => (value_uses vec) ++ (value_uses idx)
+  | SV (OP_InsertElement (_,vec) (_,elt) (_,idx)) => (value_uses vec) ++ (value_uses elt) ++ (value_uses idx)
+  | SV (OP_ShuffleVector (_, vec1) (_,vec2) (_,idxmask)) => (value_uses vec1) ++ (value_uses vec2) ++ (value_uses idxmask)
+  | SV (OP_ExtractValue (_,vec) _) => value_uses vec
+  | SV (OP_InsertValue (_,vec) (_,elt) _) => (value_uses vec) ++ (value_uses elt)
+  | SV (OP_Select (_,cnd) (_,v1) (_,v2)) => (value_uses cnd) ++ (value_uses v1) ++ (value_uses v2)
   end.
 
 Definition tvalue_uses (tv:tvalue) : list ident := value_uses (snd tv).
@@ -140,7 +140,7 @@ Module PtGraph <: GRAPH.
   Definition entry g := init g.
   Definition edge := edge_pt.
   Definition mem := pt_exists.
-  Definition eq_dec_V := eq_dec_instr_id.
+  Definition eq_dec_V := AstLib.eq_dec_instr_id.
 End PtGraph.
 
 Module Export Dom := Dom.Spec PtGraph.
