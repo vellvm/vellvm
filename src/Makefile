@@ -61,7 +61,7 @@ OCAMLLIBS := unix,str
 
 main.native: 
 	@echo "Compiling Vellvm"
-	ocamlbuild -r -use-menhir $(OCAMLINCLUDES) -libs $(OCAMLLIBS) main.native
+	ocamlbuild -r -use-menhir -yaccflag --explain $(OCAMLINCLUDES) -libs $(OCAMLLIBS) main.native
 
 vellvm: main.native
 	cp main.native vellvm
