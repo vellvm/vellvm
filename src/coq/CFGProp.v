@@ -11,6 +11,7 @@
 Require Import ZArith List String Omega.
 Require Import Vellvm.Ollvm_ast Vellvm.CFG Vellvm.Dom.
 Require Import Vellvm.Classes.
+Require AstLib.
 Import ListNotations.
 
 

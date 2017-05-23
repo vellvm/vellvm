@@ -1,4 +1,4 @@
-# Vellvm II
+# Vellvm for DSSS
 
 Vellvm II is a Coq formalization of the semantics of (a subset of) the
 LLVM compiler IR that is intended for _formal verification_ of
@@ -28,7 +28,7 @@ See:  [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/)
 
 /src/coq  - Coq formalization (see StepSemantics.v)
 
-/src/ml   - OCaml glue code for working with ollvm
+/src/ml   - OCaml glue code for working with llvm
 
 /src/ml/extracted - OCaml code extracted from the files in /src/coq directory
 
@@ -36,7 +36,8 @@ See:  [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/)
 
 /lib  - for 3rd party libraries [separately installed]
 
-/lib/paco  
+/lib/paco
+/lib/lf
 
 /tests - various LLVM source code tests
 
@@ -47,11 +48,14 @@ Assumes:
  - ocamlc : version 4.04  (probably works with 4.02 or later)
  - OPAM packages: ocamlbuild, menhir, llvm  (for llvm v. 3.8)
  - paco  library  in /lib/paco   [available here](http://plv.mpi-sws.org/paco/)
+ - lf : [Logical Foundations](http://www.cis.upenn.edu/~bcpierce/sf/current/index.html)
 
 Compilation:
 
 1. clone the vellvm git repo
-2. install 3rd party libraries in /lib  (currently just Paco)
+2. install 3rd party libraries in /lib
+- /lib/paco  should contain the paco library
+- /lib/lf    should contain the Logical Foundations development 
 3. run `make` in the /src directory
 
 # Running
