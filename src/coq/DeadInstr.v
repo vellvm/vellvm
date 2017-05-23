@@ -91,7 +91,7 @@ Proof.
   - unfold sem in Heqd.
     unfold bind in Heqd.
     inversion Heqd. subst. 
-    
+Abort.    
   
     
 
@@ -103,7 +103,7 @@ Proof.
   intros m m_semantic m_opt_semantic Happlies H0 H1 s Herr.
   unfold optimize in H1.
   punfold Herr.
-
+Abort.
   
   
 

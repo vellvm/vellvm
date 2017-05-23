@@ -168,169 +168,18 @@ Hint Resolve d_equiv_gen_mon : paco.
 Definition d_equiv {A} (p q : D A) := paco2 (@d_equiv_step A) bot2 p q.
 Hint Unfold d_equiv.
 
-
-Inductive d_equiv_step' {A} (R:D A -> D A -> Prop) : D A -> D A -> Prop :=
-| d_equiv_step'_ret : forall a, d_equiv_step' R (Ret a) (Ret a)
-| d_equiv_step'_fin : forall v, d_equiv_step' R (Fin v) (Fin v)
-| d_equiv_step'_err : forall s1 s2, d_equiv_step' R (Err s1) (Err s2)
-| d_equiv_step'_tau : forall d1 d2, R d1 d2 -> d_equiv_step' R (Tau d1) (Tau d2)
-| d_equiv_step'_lft : forall d1 d2, R d1 d2 -> d_equiv_step' R (Tau d1) d2
-| d_equiv_step'_rgt : forall d1 d2, R d1 d2 -> d_equiv_step' R d1 (Tau d2)
-| d_equiv_step'_eff : forall m1 m2, d_equiv_mem_step R m1 m2 -> d_equiv_step' R (Eff m1) (Eff m2)
-.    
-
-Hint Constructors d_equiv_step'.
-Lemma d_equiv_gen_mon' A : monotone2 (@d_equiv_step' A).
-Proof.
-  unfold monotone2. intros. induction IN; eauto.
-  eapply d_equiv_step'_eff. induction H.
-  - constructor. eauto.
-  - constructor. eauto.
-  - constructor. eauto.
-  - constructor. eauto.
-Qed.
-Hint Resolve d_equiv_gen_mon' : paco.
-
-Definition d_equiv' {A} (p q : D A) := paco2 (@d_equiv_step' A) bot2 p q.
-Hint Unfold d_equiv'.
-
-Lemma d_equivalent : forall A (p q : D A), d_equiv p q -> d_equiv' p q.
-Proof.
-  intros A. 
-  pcofix CIH. intros p q H.
-  pfold.
-  punfold H. remember (upaco2 d_equiv_step bot2).
-  induction H; subst; eauto.
-  - apply d_equiv_step'_tau. right. apply CIH. inversion H. apply H0. inversion H0.
-  - apply d_equiv_step'_eff. remember (upaco2 d_equiv_step bot2).
-    induction H.
-    + constructor. intros. right. apply CIH. subst. specialize (H a). destruct H. exact H. inversion H.
-    + constructor. intros. right. apply CIH. subst. specialize (H dv). destruct H. exact H. inversion H.
-    + constructor. intros. right. apply CIH. subst. destruct H. exact H. inversion H.      
-    + constructor. intros. right. apply CIH. subst. specialize (H dv). destruct H. exact H. inversion H.      
-Qed.
-
 Fixpoint taus {A} (n:nat) (d:D A) : D A :=
   match n with
   | 0 => d
   | S n => Tau (taus n d)
   end.
 
-Lemma d_equivalent' : forall A (p q : D A), d_equiv' p q -> d_equiv p q.
-Proof.
-  intros A.
-  pcofix CIH. intros p q H.
-  pfold.  
-  punfold H. simpl. remember (upaco2 d_equiv_step' bot2).
-  destruct H; subst; eauto.
-  + constructor. right. apply CIH. destruct H. exact H. inversion H.
-  + constructor. destruct H. destruct H. destruct SIM; subst; eauto.
-      * constructor. apply LE in H. right. apply CIH. destruct H. exact H. inversion H.
-      * constructor. apply LE in H. destruct H. apply CIH in H. 
-    
-
-    
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-      
-
-
 Instance D_functor : @Functor D := fun A => fun B => @d_map A B.
 
 
-
-(* Probably a functor only up to stuttering equivalence. *)
+(* A functor only up to stuttering equivalence. *)
 (*
-Program Instance D_functor_eq_laws : (@FunctorLaws D) D_functor (@eq).
+Program Instance D_functor_eq_laws : (@FunctorLaws D) D_functor (@d_equiv).
 *)
 Lemma d_equiv_refl : forall {A} (d : D A), d_equiv d d.
 Proof.
@@ -360,7 +209,7 @@ Proof.
 Qed.
 
 (* Note: for guardedness, bind Ret introduces extra Tau *)
-Definition bind {A B} (f:A -> D B) : D A -> D B :=
+Definition bind {A B} (m : D A) (f:A -> D B) : D B :=
   (cofix bindf := fun m => 
      match m with
        | Ret a => Tau (f a)
@@ -368,22 +217,21 @@ Definition bind {A B} (f:A -> D B) : D A -> D B :=
        | Err s => Err s
        | Tau d' => Tau (bindf d')
        | Eff m => Eff (effects_map bindf m)
-     end).
+     end) m.
 
 Lemma bind_unfold : forall {A B} (m:D A) (f:A -> D B),
-    d_equiv (bind f m)
+    d_equiv (bind m f)
     (match m with
     | Ret a => Tau (f a)
     | Fin d => Fin d
     | Err s => Err s
-    | Tau d' => Tau (bind f d')
-    | Eff e => Eff (effects_map (bind f) e)
+    | Tau d' => Tau (bind d' f)
+    | Eff e => Eff (effects_map (fun m => bind m f) e)
     end).
 Proof.
   intros A B.
   pcofix CIH. intros m f.
-  pfold. rewrite (id_d_eq (bind f m)). simpl.
-  destruct m; simpl; auto. apply d_equiv_step_tau. right.
+Abort.
   
   
   

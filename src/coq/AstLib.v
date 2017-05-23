@@ -18,12 +18,8 @@ Import ListNotations.
 (* Equalities --------------------------------------------------------------- *)
 Instance eq_dec_int : eq_dec int := Z_eq_dec.
 
-Module RawID <: UsualDecidableTypeFull.
+Module RawIDDec <: MiniDecidableType.
   Definition t := raw_id.
-  Include HasUsualEq.
-  Include UsualIsEq.
-  Include UsualIsEqOrig.
-  
   Lemma eq_dec : forall (x y : raw_id), {x = y} + {x <> y}.
   Proof.
     intros x y.
@@ -36,18 +32,13 @@ Module RawID <: UsualDecidableTypeFull.
       left. subst. reflexivity.
       right. unfold not. intros. apply n. inversion H. auto.
   Qed.
-
-  Include HasEqDec2Bool.
+End RawIDDec.
   
-End RawID.
+Module RawID := Make_UDT(RawIDDec). 
 Instance eq_dec_raw_id : eq_dec raw_id := RawID.eq_dec.
 
-
-Module InstrID <: UsualDecidableTypeFull.
+Module InstrIDDec <: MiniDecidableType.
   Definition t := instr_id.
-  Include HasUsualEq.
-  Include UsualIsEq.
-  Include UsualIsEqOrig.
   
   Lemma eq_dec : forall (x y : instr_id), {x = y} + {x <> y}.
   Proof.
@@ -61,16 +52,13 @@ Module InstrID <: UsualDecidableTypeFull.
       left. subst. reflexivity.
       right. unfold not. intros. apply n. inversion H. auto.
   Qed.
-  Include HasEqDec2Bool.
-End InstrID.
+End InstrIDDec.
+Module InstrID := Make_UDT(InstrIDDec).
 
 Instance eq_dec_instr_id : eq_dec instr_id := InstrID.eq_dec.
 
-Module Ident <: UsualDecidableTypeFull.
+Module IdentDec <: MiniDecidableType.
   Definition t := ident.
-  Include HasUsualEq.
-  Include UsualIsEq.
-  Include UsualIsEqOrig.
 
   Lemma eq_dec : forall (x y : ident), {x = y} + {x <> y}.
   Proof.
@@ -84,10 +72,9 @@ Module Ident <: UsualDecidableTypeFull.
       left. subst. reflexivity.
       right. unfold not. intros. apply n. inversion H. auto.
   Qed.
-  Include HasEqDec2Bool.
-End Ident.
+End IdentDec.
+Module Ident := Make_UDT(IdentDec).
 Instance eq_dec_ident : eq_dec ident := Ident.eq_dec.  
-
 
 (* Induction Principles ----------------------------------------------------- *)
 
