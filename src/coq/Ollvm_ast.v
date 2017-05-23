@@ -25,7 +25,7 @@
 
 Require Import List. 
 Require Import String Ascii.
-Require Import ZArith.ZArith_base.
+Require Import ZArith.
 Require Import Vellvm.Util.
 Import ListNotations.
 Open Scope string_scope.

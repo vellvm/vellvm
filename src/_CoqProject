@@ -1,3 +1,4 @@
 -Q coq Vellvm
 -R ../lib/paco/src Paco
 -R coq Vellvm
+-R ../lib/lf ""

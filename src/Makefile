@@ -6,14 +6,14 @@ COQLIBDIR = ../lib
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm)  -R $(COQLIBDIR)/paco/src Paco -R $(EXTRACTDIR) Extract
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm)  -R $(COQLIBDIR)/paco/src Paco -R $(COQLIBDIR)/lf "" -R $(EXTRACTDIR) Extract
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform
+COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform Compiler
 OLLVMFILES := 
 
 VFILES := $(COQFILES:%=coq/%.v)
