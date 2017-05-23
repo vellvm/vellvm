@@ -12,7 +12,8 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 Global Generalizable All Variables.
 Global Set Automatic Coercions Import.
-From Coq Require Export Morphisms RelationClasses List Bool Utf8 Setoid.
+From Coq Require Export Morphisms RelationClasses Setoid.
+Require Import List Bool String Utf8. 
 Export ListNotations.
 From Coq.Program Require Export Basics Syntax.
 
@@ -136,6 +137,8 @@ Instance eq_dec_nat : eq_dec nat.
 Proof.
   decide_eq_dec.
 Defined.
+
+Instance eq_dec_string : eq_dec string := string_dec.
 
 Require Import ZArith.ZArith.
 Instance eq_dec_z : eq_dec Z := Z_eq_dec.
@@ -399,7 +402,6 @@ Defined.
 
 
 (* Show typeclasses *)
-Require Import String.
 
 Class StringOf (T:Type) := string_of : T -> string.
 Open Scope string_scope.
