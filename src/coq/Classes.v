@@ -400,8 +400,23 @@ Next Obligation.
   reflexivity.
 Defined.
 
+(* Monads with error -------------------------------------------------------- *)
 
-(* Show typeclasses *)
+Class ExceptionMonad E F `{Monad F} := raise : forall {A}, E -> F A.
+
+Definition err := sum string.
+Instance err_error : (@ExceptionMonad string err _ _) := fun _ (s:string) => inl s.
+
+Definition trywith {A:Type} {F} `{ExceptionMonad string F} (s:string) (o:option A) : F A :=
+    match o with
+    | Some x => mret x
+    | None => raise s
+    end.
+
+Definition failwith {A:Type} {F} `{ExceptionMonad string F} (s:string) : F A := raise s.
+
+
+(* Show typeclasses --------------------------------------------------------- *)
 
 Class StringOf (T:Type) := string_of : T -> string.
 Open Scope string_scope.

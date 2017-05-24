@@ -65,15 +65,6 @@ Module StepSemantics(A:ADDR).
   Definition stack := list frame.
   Definition state := (pc * env * stack)%type.
 
-
-  Definition err := sum string.
-  Definition failwith {A:Type} (s : string) : err A := inl s.
-  Definition trywith {A:Type} (s:string) (o:option A) : err A :=
-    match o with
-    | Some x => mret x
-    | None => failwith s
-    end.
-  
   Definition def_id_of_pc (p:pc) : err local_id :=
     match ins p with
     | IId id => mret id

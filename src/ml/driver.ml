@@ -13,6 +13,8 @@ open Platform
 open Ollvm
 open Ast    
 
+let of_str = Camlcoq.camlstring_of_coqstring
+               
 let interpret = ref false
 
 let transform (prog : (Ollvm_ast.block list) Ollvm_ast.toplevel_entity list) : (Ollvm_ast.block list) Ollvm_ast.toplevel_entity list =
@@ -83,8 +85,8 @@ let process_imp_file path file =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let imp_ast = imp_parse_file path in
   let ll_ast = match Compiler.compile imp_ast with
-    | Some d -> [TLE_Definition d]
-    | None -> failwith "Extracted compiler failed!"
+    | Datatypes.Coq_inr d -> d
+    | Datatypes.Coq_inl m -> failwith ("Extracted compiler failed: " ^ (of_str m))
   in
   let _ = if !interpret then Interpreter.interpret ll_ast else () in
   let ll_ast' = transform ll_ast in
