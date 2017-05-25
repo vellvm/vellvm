@@ -167,12 +167,15 @@ Definition val_of_nat (n:nat) : value :=
 Definition val_of_ident (id:ident) : value :=
   SV (VALUE_Ident id).
 
-Definition val_of_bool (b:bool) : value :=
-  SV (VALUE_Bool b).
+Definition local (lid:local_id) : value := val_of_ident (ID_Local lid).
+
+Definition val_of_bool (b:bool) : value := SV (VALUE_Bool b).
 
 Definition i1 := TYPE_I (1)%Z.
 Definition i64 := TYPE_I (64)%Z.
 Definition i64ptr := TYPE_Pointer i64.
+
+Definition binop lid op t v1 v2 := I (IId lid) (INSTR_Op (SV (OP_IBinop op t v1 v2))).
 
 (* Note: list of instructions in code is generated in reverse order *)
 Fixpoint compile_aexp (g:ctxt) (a:aexp) : GenSym (value * list elt) :=
@@ -180,7 +183,7 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : GenSym (value * list elt) :=
       '(v1, code1) <- compile_aexp g a1;
       '(v2, code2) <- compile_aexp g a2;
       'lid <- gensym ();
-      mret (val_of_ident (ID_Local lid), code1 ++ code2 ++ [I (IId lid) (INSTR_Op (SV (OP_IBinop op i64 v1 v2)))])
+      mret (local lid, code1 ++ code2 ++ [binop lid op i64 v1 v2])
   in
   match a with
   | ANum n => mret (val_of_nat n, [])
@@ -188,7 +191,7 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : GenSym (value * list elt) :=
   | AId x =>
     'uid <- lift "AId ident not found" (g x);
     'lid <- gensym ();
-     mret (val_of_ident (ID_Local lid), [I (IId lid) (INSTR_Load false i64 (i64ptr, val_of_ident uid) None)])
+     mret (local lid, [I (IId lid) (INSTR_Load false i64 (i64ptr, val_of_ident uid) None)])
 
   | APlus a1 a2 => compile_binop (Add false false) a1 a2
   | AMinus a1 a2 => compile_binop (Sub false false) a1 a2
@@ -201,22 +204,24 @@ Fixpoint compile_bexp (g:ctxt) (b:bexp) : GenSym (value * list elt) :=
       '(v1, code1) <- compile_aexp g a1;
       '(v2, code2) <- compile_aexp g a2;
       'lid <- gensym ();
-      mret (val_of_ident (ID_Local lid), code1 ++ code2 ++ [I (IId lid) (INSTR_Op (SV (OP_ICmp cmp i64 v1 v2)))])
+      mret (local lid, code1 ++ code2 ++ [I (IId lid) (INSTR_Op (SV (OP_ICmp cmp i64 v1 v2)))])
   in
   match b with
-  | BTrue => mret (val_of_bool true, [])
-  | BFalse => mret (val_of_bool false, [])
+  | BTrue     => mret (val_of_bool true, [])
+  | BFalse    => mret (val_of_bool false, [])
   | BEq a1 a2 => compile_icmp Eq a1 a2
   | BLe a1 a2 => compile_icmp Ule a1 a2
+
   | BNot b =>
     '(v, code) <- compile_bexp g b;
     'lid <- gensym ();
-    mret (val_of_ident (ID_Local lid), code ++ [I (IId lid) (INSTR_Op (SV (OP_IBinop Xor i1 v (val_of_bool true))))])
+    mret (local lid, code ++ [binop lid Xor i1 v (val_of_bool true)])
+
   | BAnd b1 b2 =>
     '(v1, code1) <- compile_bexp g b1;
     '(v2, code2) <- compile_bexp g b2;
     'lid <- gensym ();
-    mret (val_of_ident (ID_Local lid), code1 ++ code2 ++ [I (IId lid) (INSTR_Op (SV (OP_IBinop And i1 v1 v2)))])
+    mret (local lid, code1 ++ code2 ++ [binop lid And i1 v1 v2])
   end.
 
 Fixpoint compile_com (g:ctxt) (c:com) : GenSym (list elt) :=
