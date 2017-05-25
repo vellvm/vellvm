@@ -16,7 +16,7 @@ Require Import Vellvm.Compiler Vellvm.Memory.
 (* Logical Foundations dependencies *)
 Require Import Imp Maps.
 
-
+(*
 Definition imp_compiler_correct (p:Imp.com) : bool :=
   let fvs := IDSet.elements (fv p) in
   match compile p with
@@ -30,5 +30,5 @@ Definition imp_compiler_correct (p:Imp.com) : bool :=
     let ans_state = List.map imp_state fvs in
     final_state == ans_state
   end.
-
+*)
 

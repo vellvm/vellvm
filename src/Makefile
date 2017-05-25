@@ -3,17 +3,18 @@ COQDIR = coq
 COQLIBDIR = ../lib
 
 # OCaml sources
-MLDIR = ml
+MLDIR = ml imp
 EXTRACTDIR = ml/extracted
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm)  -R $(COQLIBDIR)/paco/src Paco -R $(COQLIBDIR)/lf "" -R $(EXTRACTDIR) Extract
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(COQLIBDIR)/paco/src Paco -R $(EXTRACTDIR) Extract
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform Compiler CompilerProp
+IMPCOQFILES := Imp Maps Compiler CompilerProp
+COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform $(IMPCOQFILES)
 OLLVMFILES := 
 
 VFILES := $(COQFILES:%=coq/%.v)
