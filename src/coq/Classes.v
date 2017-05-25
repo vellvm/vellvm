@@ -202,6 +202,8 @@ Notation "m ≫= f"  := (mbind m f) (at level 60, right associativity).
 Notation "( m ≫=)" := (mbind m) (only parsing).
 Notation "(≫= f )" := (fun m => mbind m f) (only parsing).
 Notation "(≫=)"    := (λ m f, mbind m f) (only parsing).
+Notation "'; y ; z" := (y ≫= (λ _ : (), z))
+  (at level 65, only parsing, right associativity).
 Notation "' x <- y ; z" := (y ≫= (λ x : _, z))
   (at level 65, x ident, only parsing, right associativity).
 Notation "' ( x1 , x2 ) <- y ; z" :=

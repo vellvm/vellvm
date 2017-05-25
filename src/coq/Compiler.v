@@ -110,56 +110,62 @@ Instance FV_com : FV com := fv_com.
 
 (* LLVM Identifier generation monad ----------------------------------------- *)
 
-Definition GenSym A := ST (int*int) (err A).
+Definition LLVM A := ST (int * int * list elt) (err A).
 
-Definition gensym_map (A B:Type) (f:A->B) (g:GenSym A) : GenSym B :=
+Definition llvm_map (A B:Type) (f:A->B) (g:LLVM A) : LLVM B :=
   fun s =>
-    let '(n, x) := g s in
+    let '(st, x) := g s in
     match x with
-    | inl e  => (n, inl e)
-    | inr a => (n, inr (f a))
+    | inl e  => (st, inl e)
+    | inr a => (st, inr (f a))
     end.
 
-Instance gensym_functor : @Functor GenSym := gensym_map.
+Instance llvm_functor : @Functor LLVM := llvm_map.
 
-Definition gensym_ret (A:Type) (x:A) : GenSym A :=
+Definition llvm_ret (A:Type) (x:A) : LLVM A :=
   fun s => (s, inr x).
 
-Definition gensym_bind (A B:Type) (g:GenSym A) (f:A -> GenSym B) : GenSym B :=
+Definition llvm_bind (A B:Type) (g:LLVM A) (f:A -> LLVM B) : LLVM B :=
   fun s =>
-    let '(n, x) := g s in
+    let '(st, x) := g s in
     match x with
-    | inl e => (n, inl e)
-    | inr a => (f a) n
+    | inl e => (st, inl e)
+    | inr a => (f a) st
     end.
-Program Instance gensym_monad : (@Monad GenSym) gensym_functor := _.
+Program Instance llvm_monad : (@Monad LLVM) llvm_functor := _.
 Next Obligation.
   split.
-  - exact gensym_ret.
-  - exact gensym_bind.
+  - exact llvm_ret.
+  - exact llvm_bind.
 Defined.    
 
-Instance gensym_err : (@ExceptionMonad string GenSym _ _) := fun _ e => fun s => (s, inl e).
+Instance llvm_err : (@ExceptionMonad string LLVM _ _) := fun _ e => fun s => (s, inl e).
 
 (* Start the counters at 1 so that 0 can be used at the toplevel *)
-Definition run {A} (g : GenSym A) : err A :=
-  let '(_, x) := g (1,1)%Z in x.
+Definition run {A} (g : LLVM A) : err (A * list elt) :=
+  let '((_,_,c), x) := g (1,1,[])%Z in
+  match x with
+  | inl e => inl e
+  | inr a => inr (a, List.rev c)
+  end.
 
-Definition lift {A} (e:string) (m:option A) : GenSym A :=
+Definition lift {A} (e:string) (m:option A) : LLVM A :=
   fun s => (s, trywith e m).
 
-Definition gensym : () -> GenSym (local_id) :=
-  fun _ => fun '(n,m) => ((1+n,m), mret (Name ("x"++(string_of n))))%Z.
+Definition lid_of_Z (n:int) : local_id := Name ("x"++(string_of n))%string.
 
-Definition genvoid : () -> GenSym (instr_id) :=
-  fun _ => fun '(n,m) => ((n,1+m), mret (IVoid m))%Z.
+Definition genlabel : () -> LLVM (local_id) :=
+  fun _ => fun '(n,m,c) => ((1+n,m,c), mret (lid_of_Z n))%Z.
+
+Definition genvoid : () -> LLVM (instr_id) :=
+  fun _ => fun '(n,m,c) => ((n,1+m,c), mret (IVoid m))%Z.
 
 (* A context maps Imp variables to Vellvm identifiers
    Invariant: 
       storage space for an Imp variable is represented as an alloca'ed 
-      ctxt (Id X) is the identifier for the pointer to the storage for X.
+      ctxt (Id X) is the pointer to the storage for X.
 *)
-Definition ctxt := partial_map ident.
+Definition ctxt := partial_map value.
 
 Definition val_of_nat (n:nat) : value :=
   SV (VALUE_Integer (Z.of_nat n)).
@@ -175,132 +181,159 @@ Definition i1 := TYPE_I (1)%Z.
 Definition i64 := TYPE_I (64)%Z.
 Definition i64ptr := TYPE_Pointer i64.
 
-Definition binop lid op t v1 v2 := I (IId lid) (INSTR_Op (SV (OP_IBinop op t v1 v2))).
+Definition emit instr : LLVM local_id :=
+  fun '(n,m,c) =>
+    let lid := lid_of_Z n in
+    ((1+n,m, (I (IId lid) instr)::c), mret lid)%Z.
+  
+Definition binop op t v1 v2 : LLVM local_id :=
+  emit (INSTR_Op (SV (OP_IBinop op t v1 v2))).
+
+Definition load v : LLVM local_id := 
+  emit (INSTR_Load false i64 (i64ptr, v) None).
+
+Definition comp cmp v1 v2 : LLVM local_id :=
+  emit (INSTR_Op (SV (OP_ICmp cmp i64 v1 v2))).
+
+Definition alloca : () -> LLVM local_id :=
+  fun _ => emit (INSTR_Alloca i64 None None).
+
+Definition term t : LLVM () := 
+  fun '(n,m,c) =>
+    let tid := (IVoid m) in
+    ((n,1+m,((T tid t)::c)), mret ())%Z.
+
+Definition emitvoid instr : LLVM () := 
+  fun '(n,m,c) =>
+    let tid := (IVoid m) in
+    ((n,1+m,((I tid instr)::c)), mret ())%Z.
+
+
+Definition store v vptr : LLVM () :=
+  emitvoid (INSTR_Store false (i64, v) (i64ptr, vptr) None).
+
+Definition label l : LLVM () :=
+  fun '(n,m,c) => ((n,m,(L l)::c), mret ()).
 
 (* Note: list of instructions in code is generated in reverse order *)
-Fixpoint compile_aexp (g:ctxt) (a:aexp) : GenSym (value * list elt) :=
+Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
   let compile_binop (op:ibinop) (a1 a2:aexp) :=
-      '(v1, code1) <- compile_aexp g a1;
-      '(v2, code2) <- compile_aexp g a2;
-      'lid <- gensym ();
-      mret (local lid, code1 ++ code2 ++ [binop lid op i64 v1 v2])
+      'v1 <- compile_aexp g a1;
+      'v2 <- compile_aexp g a2;
+      'lid <- binop op i64 v1 v2;
+      mret (local lid)
   in
   match a with
-  | ANum n => mret (val_of_nat n, [])
+  | ANum n => mret (val_of_nat n)
 
   | AId x =>
-    'uid <- lift "AId ident not found" (g x);
-    'lid <- gensym ();
-     mret (local lid, [I (IId lid) (INSTR_Load false i64 (i64ptr, val_of_ident uid) None)])
+    'ptr <- lift "AId ident not found" (g x);
+    'lid <- load ptr;
+     mret (local lid)
 
-  | APlus a1 a2 => compile_binop (Add false false) a1 a2
+  | APlus a1 a2  => compile_binop (Add false false) a1 a2
   | AMinus a1 a2 => compile_binop (Sub false false) a1 a2
-  | AMult a1 a2 => compile_binop (Mul false false) a1 a2
+  | AMult a1 a2  => compile_binop (Mul false false) a1 a2
   end.
 
     
-Fixpoint compile_bexp (g:ctxt) (b:bexp) : GenSym (value * list elt) :=
+Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
   let compile_icmp (cmp:icmp) (a1 a2:aexp) :=
-      '(v1, code1) <- compile_aexp g a1;
-      '(v2, code2) <- compile_aexp g a2;
-      'lid <- gensym ();
-      mret (local lid, code1 ++ code2 ++ [I (IId lid) (INSTR_Op (SV (OP_ICmp cmp i64 v1 v2)))])
+      'v1 <- compile_aexp g a1;
+      'v2 <- compile_aexp g a2;
+      'lid <- comp cmp v1 v2;
+      mret (local lid)
   in
   match b with
-  | BTrue     => mret (val_of_bool true, [])
-  | BFalse    => mret (val_of_bool false, [])
+  | BTrue     => mret (val_of_bool true)
+  | BFalse    => mret (val_of_bool false)
   | BEq a1 a2 => compile_icmp Eq a1 a2
   | BLe a1 a2 => compile_icmp Ule a1 a2
 
   | BNot b =>
-    '(v, code) <- compile_bexp g b;
-    'lid <- gensym ();
-    mret (local lid, code ++ [binop lid Xor i1 v (val_of_bool true)])
+    'v <- compile_bexp g b;
+    'lid <- binop Xor i1 v (val_of_bool true);
+    mret (local lid)
 
   | BAnd b1 b2 =>
-    '(v1, code1) <- compile_bexp g b1;
-    '(v2, code2) <- compile_bexp g b2;
-    'lid <- gensym ();
-    mret (local lid, code1 ++ code2 ++ [binop lid And i1 v1 v2])
+    'v1 <- compile_bexp g b1;
+    'v2 <- compile_bexp g b2;
+    'lid <- binop And i1 v1 v2;
+    mret (local lid)
   end.
 
-Fixpoint compile_com (g:ctxt) (c:com) : GenSym (list elt) :=
+
+Fixpoint compile_com (g:ctxt) (c:com) : LLVM () :=
   match c with
-  | CSkip => mret []
+  | CSkip => mret ()
 
   | CAss x a =>
-    '(v, code) <- compile_aexp g a;
-    'uid <- lift "CAss ident not found" (g x);
-    'vid <- genvoid ();
-    mret (code ++ [I vid (INSTR_Store false (i64, v) (i64ptr, val_of_ident uid) None)])
+    'v <- compile_aexp g a;
+    'ptr <- lift "CAss ident not found" (g x);
+    '; store v ptr;
+    mret ()
 
   | CSeq c1 c2 =>
     'code1 <- compile_com g c1;
     'code2 <- compile_com g c2;
-    mret (code1 ++ code2)
+    mret ()
 
   | CIf b c1 c2 =>
-    '(v, codeb) <- compile_bexp g b;
-    'code1 <- compile_com g c1;
-    'code2 <- compile_com g c2;
-    'br1 <- gensym ();
-    'br2 <- gensym ();
-    'merge <- gensym ();
-    'vid <- genvoid ();
-    'vb1 <- genvoid ();
-    'vb2 <- genvoid ();
-    mret (codeb
-          ++ [T vid (TERM_Br (i1, v) br1 br2)]
-          ++ [L br1] ++ code1 ++ [T vb1 (TERM_Br_1 merge)]
-          ++ [L br2] ++ code2 ++ [T vb2 (TERM_Br_1 merge)]
-          ++ [L merge] )
+    'br1 <- genlabel ();
+    'br2 <- genlabel ();
+    'merge <- genlabel ();    
+    'v <- compile_bexp g b;
+    '; term (TERM_Br (i1, v) br1 br2);
+    '; label br1;
+    '; compile_com g c1;
+    '; term (TERM_Br_1 merge);
+    '; label br2;
+    '; compile_com g c2;
+    '; term (TERM_Br_1 merge);
+    '; label merge;
+    mret ()    
 
   | CWhile b c =>
-    '(v, codeb) <- compile_bexp g b;
-    'code <- compile_com g c;
-    'entry <- gensym (); 
-    'body <- gensym (); 
-    'exit <- gensym ();
-    'vidbody <- genvoid ();
-    'videntry <- genvoid ();
-    'vidheader <- genvoid ();
-    mret ([T vidheader (TERM_Br_1 entry)]
-            ++ [L entry] ++ codeb ++ [T videntry (TERM_Br (i1, v) body exit)]
-            ++ [L body] ++ code ++ [T vidbody (TERM_Br_1 entry)]
-            ++ [L exit])
-
+    'entry <- genlabel (); 
+    'body <- genlabel (); 
+    'exit <- genlabel ();
+    '; term (TERM_Br_1 entry);
+    '; label entry;
+    'v <- compile_bexp g b;
+    '; term (TERM_Br (i1, v) body exit);
+    '; label body;
+    '; compile_com g c;    
+    '; term (TERM_Br_1 entry);
+    '; label exit;
+    mret ()    
   end.
 
-Fixpoint compile_fv (l:list id) : GenSym (ctxt * list elt) :=
+Fixpoint compile_fv (l:list id) : LLVM ctxt :=
   match l with
-  | [] => mret (empty, [])
+  | [] => mret empty
   | x::xs =>
-    '(g, code) <- compile_fv xs;
-      'uid <- gensym ();
-      'vid <- genvoid ();
-      mret (update g x (ID_Local uid),
-            [I (IId uid) (INSTR_Alloca i64 None None)]
-              ++ [I vid (INSTR_Store false (i64, val_of_nat 0) (i64ptr, val_of_ident (ID_Local uid)) None)]
-              ++ code)  
+    'g <- compile_fv xs;
+    'uid <- alloca ();
+    '; store (val_of_nat 0) (local uid);
+    mret (update g x (local uid))
   end.
 
-Definition print_imp_id (x:id) (g:ctxt) : GenSym (list elt) :=
+Definition print_imp_id (x:id) (g:ctxt) : LLVM () :=
   let 'Id s := x in
   let fn_name := ("print_" ++ s)%string in
-  'uid <- lift "AId ident not found" (g x);
-  'lid <- gensym ();
-  'vid <- genvoid ();
-  mret ([I (IId lid) (INSTR_Load false i64 (i64ptr, val_of_ident uid) None)]
-      ++ [I vid (INSTR_Call (TYPE_Void, ID_Global(Name fn_name)) [(i64, val_of_ident (ID_Local lid))])])
-.  
+  'ptr <- lift "AId ident not found" (g x);
+  'lid <- load ptr;
+  '; emitvoid (INSTR_Call (TYPE_Void, ID_Global(Name fn_name)) [(i64, local lid)]);
+  mret ().
+    
 
-Fixpoint print_fv (l:list id) (g:ctxt) : GenSym (list elt) :=
+Fixpoint print_fv (l:list id) (g:ctxt) : LLVM () :=
   match l with
-  | [] => mret []
+  | [] => mret ()
   | x::xs =>
-    'codexs <- print_fv xs g;
-    'codex <- print_imp_id x g;
-      mret (codex ++ codexs)
+    '; print_fv xs g;
+    '; print_imp_id x g;
+      mret ()
   end.
 
 Definition imp_prog_type := TYPE_Function TYPE_Void [].
@@ -338,14 +371,11 @@ Definition compile (c:com) : err (toplevel_entities (list block)) :=
   '(fvs, elts) <-
           run (
             let fvs := IDSet.elements (fv c) in
-            '(g, code_fv) <- compile_fv fvs;
-              'code <- compile_com g c;
-              'print_code <- print_fv fvs g;
-              mret (fvs,
-                    code_fv
-                      ++ code
-                      ++ print_code
-                      ++ [T (IVoid 0)%Z (TERM_Ret_void)])
+            'g <- compile_fv fvs;
+            '; compile_com g c;
+            '; print_fv fvs g;
+            '; term TERM_Ret_void;    
+            mret fvs
           );
   'blocks <- blocks_of_elts (Anon 0)%Z elts;
   mret
