@@ -23,13 +23,6 @@ Inductive elt :=
 | T (id:instr_id) (t:terminator)
 .    
 
-Fixpoint monad_fold_left {A B} `{Monad M} (f : A -> B -> M A) (l:list B) (a:A) : M A :=
-  match l with
-  | [] => mret a
-  | x::xs =>
-    'y <- monad_fold_left f xs a;
-      f y x
-  end.
 
 Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list block) :=
   '(insns, term_opt, blks) <-
@@ -208,12 +201,12 @@ Definition emitvoid instr : LLVM () :=
     let tid := (IVoid m) in
     ((n,1+m,((I tid instr)::c)), mret ())%Z.
 
-
 Definition store v vptr : LLVM () :=
   emitvoid (INSTR_Store false (i64, v) (i64ptr, vptr) None).
 
 Definition label l : LLVM () :=
   fun '(n,m,c) => ((n,m,(L l)::c), mret ()).
+
 
 (* Note: list of instructions in code is generated in reverse order *)
 Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=

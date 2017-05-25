@@ -417,6 +417,14 @@ Definition trywith {A:Type} {F} `{ExceptionMonad string F} (s:string) (o:option 
 
 Definition failwith {A:Type} {F} `{ExceptionMonad string F} (s:string) : F A := raise s.
 
+(* Monad operations *)
+Fixpoint monad_fold_left {A B} `{Monad M} (f : A -> B -> M A) (l:list B) (a:A) : M A :=
+  match l with
+  | [] => mret a
+  | x::xs =>
+    'y <- monad_fold_left f xs a;
+      f y x
+  end.
 
 (* Show typeclasses --------------------------------------------------------- *)
 

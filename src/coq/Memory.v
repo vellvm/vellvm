@@ -30,3 +30,20 @@ CoFixpoint memD {A} (memory:mtype) (d:Obs A) : Obs A :=
     | Eff (Store a v k) => Tau (memD (replace memory a v) k)
     | Eff (Call d k) => Eff (Call d k)
   end.
+
+Fixpoint MemDFin {A} (memory:mtype) (d:Obs A) (steps:nat) : option mtype :=
+  match steps with
+  | O => None
+  | S x =>
+    match d with
+    | Ret a => None
+    | Fin d => Some memory
+    | Err s => None
+    | Tau d' => MemDFin memory d' x
+    | Eff (Alloca t k)  => MemDFin (memory ++ [undef])%list (k (DVALUE_Addr (pred (List.length memory)))) x
+    | Eff (Load a k)    => MemDFin memory (k (nth_default undef memory a)) x
+    | Eff (Store a v k) => MemDFin (replace memory a v) k x
+    | Eff (Call d k)    => None
+    end
+  end%N.
+
