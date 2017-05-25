@@ -18,14 +18,15 @@ Require Import Vellvm.Imp Vellvm.Maps.
 Import ListNotations.
 
 
-(* Equality for the "final states".  This should probably be made more general *)
+(* Equality for the imp final memory states. *)
 
+(* These definitions should probably go in a library *)
 Definition dvalue_of_nat (n:nat) : value :=
   DV (VALUE_Integer (Z.of_nat n)).
 
 Definition imp_val_eqb (v1 v2 : dvalue) : bool :=
   match v1, v2 with
-  | (DV (VALUE_Integer z1)), (DV (VALUE_Integer z2)) => true
+  | (DV (VALUE_Integer z1)), (DV (VALUE_Integer z2)) => Z.eqb z1 z2
   | _, _ => false
   end.
 
@@ -36,6 +37,15 @@ Fixpoint imp_memory_eqb (m1 : list dvalue) (m2 : list dvalue) : bool :=
   | _, _ => false 
   end.  
 
+(* The executable test function for compiler correctnes. *)
+
+(* TODO: 
+     Add a 'run' function to Imp to execute n steps of the
+     Imp operational semantics starting from a given state.
+
+     One possible testing issue: the Vellvm code of a given
+     imp program will take many more steps.
+*)
 Definition imp_compiler_correct (p:Imp.com) : bool :=
   let fvs := IDSet.elements (fv p) in
   match compile p with

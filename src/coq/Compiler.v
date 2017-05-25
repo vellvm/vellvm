@@ -366,7 +366,7 @@ Definition compile (c:com) : err (toplevel_entities (list block)) :=
             let fvs := IDSet.elements (fv c) in
             'g <- compile_fv fvs;
             '; compile_com g c;
-            '; print_fv fvs g;
+(*            '; print_fv fvs g;  (* UNCOMMENT to enable imp state printing *) *)
             '; term TERM_Ret_void;    
             mret fvs
           );
