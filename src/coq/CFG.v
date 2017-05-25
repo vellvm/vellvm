@@ -167,7 +167,7 @@ Definition cfg_of_definition (g:list ident) (d:definition (list block)) : option
          |}.
 
 
-Definition mfg_of_modul (m:modul (list block)) : option mcfg :=
+Definition mcfg_of_modul (m:modul (list block)) : option mcfg :=
   let glbls := globals m in
   'defns <- map_option
                 (fun d =>

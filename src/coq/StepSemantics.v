@@ -366,11 +366,12 @@ Fixpoint stepD (CFG:mcfg) (s:state) : Obs state :=
 
 Inductive Empty := .
 
-Definition init_state (CFG:mcfg) : Obs state :=
-  do fdef <- trywith ("stepD: no main function ") (find_function CFG (Name "main"));
-    let args := (df_args fdef) in  
+(* Assumes that the entry-point function is named "fn" and that it takes
+   no parameters *)
+Definition init_state (CFG:mcfg) (fn:string) : err state :=
+  'fdef <- trywith ("stepD: no main function ") (find_function CFG (Name fn));
     let cfg := df_instrs fdef in
-    Ret ((mk_pc (Name "main") (init cfg)), [], []).
+    mret ((mk_pc (Name fn) (init cfg)), [], []).
 
 (* Note: codomain is D'  *)
 CoFixpoint sem (CFG:mcfg) (s:state) : (Obs Empty) :=

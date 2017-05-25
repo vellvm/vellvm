@@ -36,7 +36,7 @@ See:  [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/)
 
 /lib  - for 3rd party libraries [separately installed]
 
-/lib/paco  
+/lib/paco
 
 /tests - various LLVM source code tests
 

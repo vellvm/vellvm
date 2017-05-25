@@ -11,7 +11,7 @@ Module A : Vellvm.StepSemantics.ADDR with Definition addr := nat.
 End A.  
 
 Module SS := StepSemantics.StepSemantics(A).
-Import SS.
+Export SS.
 
 Definition mtype := list dvalue.
 Definition undef := DV VALUE_Undef.

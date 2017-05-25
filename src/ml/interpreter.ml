@@ -28,15 +28,14 @@ let rec step m =
 
 let interpret (prog:(Ollvm_ast.block list) Ollvm_ast.toplevel_entity list) =
   let scfg = AstLib.modul_of_toplevel_entities prog in
-  match CFG.mfg_of_modul scfg with
+  match CFG.mcfg_of_modul scfg with
   | None -> failwith "bad module"
   | Some mcfg ->
-    begin match Lazy.force (SS.init_state mcfg) with
-    | SS.E.Err s -> failwith (Camlcoq.camlstring_of_coqstring s)
-    | SS.E.Ret s -> 
-      let sem = SS.sem mcfg s in
-      let mem = memD [] sem in
-      step mem
-    | _ -> failwith "bad initial state"
+    begin match SS.init_state mcfg (Camlcoq.coqstring_of_camlstring "main") with
+      | Datatypes.Coq_inl err -> failwith (Camlcoq.camlstring_of_coqstring err)
+      | Datatypes.Coq_inr s ->
+        let sem = SS.sem mcfg s in
+        let mem = memD [] sem in
+        step mem
     end
   

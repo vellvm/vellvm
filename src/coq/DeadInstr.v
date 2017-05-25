@@ -37,8 +37,8 @@ Definition optimize (m:modul (list block)) (o:optimization) : modul (list block)
 Definition correct (P : modul (list block) -> Prop) (o:optimization) :=
   forall (m:modul (list block)) m_semantic m_opt_semantic,
     P m ->
-    mfg_of_modul m = Some m_semantic ->
-    mfg_of_modul (optimize m o) = Some m_opt_semantic ->
+    mcfg_of_modul m = Some m_semantic ->
+    mcfg_of_modul (optimize m o) = Some m_opt_semantic ->
     forall (s:state),
       E.d_error_free (sem m_semantic s) ->
       E.d_equiv (sem m_semantic s) (sem m_opt_semantic s).
