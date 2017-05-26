@@ -14,7 +14,7 @@ Require Import ZArith String Omega List Equalities MSets.
 Require Import Vellvm.Ollvm_ast Vellvm.Compiler Vellvm.AstLib Vellvm.CFG Vellvm.StepSemantics Vellvm.Memory.
 
 (* Logical Foundations dependencies *)
-Require Import Vellvm.Imp Vellvm.Maps.
+Require Import Vellvm.Imp Vellvm.Maps Vellvm.ImpCEvalFun.
 Import ListNotations.
 
 
@@ -60,11 +60,16 @@ Definition imp_compiler_correct (p:Imp.com) : bool :=
       | inr initial_state =>
         let semantics := sem mcfg initial_state in
         match MemDFin [] semantics 1000 with
-            | None => false
-            | Some final_state => 
-              let imp_state := (* Imp.run p empty 1000 *) fun _ => 0%nat in
-              let ans_state := List.map (fun x => dvalue_of_nat (imp_state x)) fvs in
-              imp_memory_eqb final_state ans_state
+        | None => true
+        | Some final_state =>
+          (* let imp_state := (* Imp.run p empty 1000 *) fun _ => 0%nat in *)          
+          let imp_state := ceval_step empty_state p 10000 in
+          match imp_state with
+          | None => false
+          | Some final_imp_state => 
+            let ans_state := List.map (fun x => dvalue_of_nat (final_imp_state x)) fvs in
+            imp_memory_eqb final_state ans_state
+          end
         end
       end
     end
