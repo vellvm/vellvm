@@ -363,7 +363,16 @@ Fixpoint shrink_com_with_constant_folding_func
 Instance com_shrinker : Shrink com :=
   {| shrink := shrink_com_with_constant_folding_func shrink_aexp_func shrink_bexp_func |}.
 
+Check collect.
 
 
-QuickChick (forAll arbitrary imp_compiler_correct).
+QuickChick (forAll arbitrary
+                   (fun prog => let (res_string, res_val) := imp_compiler_correct_aux prog in
+                             res_val)).
 
+
+Example prog1 := X ::= APlus (AId W) (AId W).
+
+Definition result1 := imp_compiler_correct_aux prog1.
+(* Recursive Extraction result1.  *)
+(* Eval vm_compute in (imp_compiler_correct_aux prog1). *)

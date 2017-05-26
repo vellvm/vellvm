@@ -8,6 +8,15 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
+Require Import Vellvm.Maps Vellvm.Imp.
+
+Require Import QuickChick.QuickChick.
+Import QcDefaultNotation. Open Scope qc_scope.
+Require Import List ZArith.
+Import ListNotations.
+Require Import String.
+
+
 Require Import ZArith String Omega List Equalities MSets.
 
 (* Vellvm dependencies *)
@@ -45,34 +54,68 @@ Fixpoint imp_memory_eqb (m1 : list dvalue) (m2 : list dvalue) : bool :=
 
      One possible testing issue: the Vellvm code of a given
      imp program will take many more steps.
-*)
-Definition imp_compiler_correct (p:Imp.com) : bool :=
+ *)
+Require Import List.
+Check fold_left.
+
+
+Check show_nat.
+
+Definition state_to_string (st : state) (fv : list id) : string :=
+  fold_left (fun acc x => (match x with
+                        | Id ident => (ident ++ ": " ++ show_nat (st x) ++ ", ")%string
+                        end)) fv "".
+
+
+
+Definition imp_compiler_correct_aux (p:Imp.com) : string * bool :=
   let fvs := IDSet.elements (fv p) in
   match compile p with
-  | inl e => false
+  | inl e => ("Compilation failed", false)
   | inr ll_prog =>
     let m := modul_of_toplevel_entities ll_prog in
     match mcfg_of_modul m with
-    | None => false
+    | None => ("Compilation failed", false)
     | Some mcfg =>
       match init_state mcfg "imp_command" with
-      | inl e => false
+      | inl e => ("init failed", false)
       | inr initial_state =>
         let semantics := sem mcfg initial_state in
-        match MemDFin [] semantics 1000 with
-        | None => true
-        | Some final_state =>
-          (* let imp_state := (* Imp.run p empty 1000 *) fun _ => 0%nat in *)          
-          let imp_state := ceval_step empty_state p 10000 in
-          match imp_state with
-          | None => false
-          | Some final_imp_state => 
-            let ans_state := List.map (fun x => dvalue_of_nat (final_imp_state x)) fvs in
-            imp_memory_eqb final_state ans_state
-          end
-        end
+        let llvm_final_state := MemDFin [] semantics 10 in
+        let imp_state := ceval_step empty_state p 10 in
+        match (llvm_final_state, imp_state) with
+        | (None, None) => ("both out of gas", true)
+        | (Some llvm_st, None) => ("imp out of gas", false)
+        | (None, Some imp_st) => ("llvm out of gas", false)
+        | (Some llvm_st, Some imp_st) => 
+          let ans_state := List.map (fun x => dvalue_of_nat (imp_st x)) fvs in
+          ("Success", imp_memory_eqb llvm_st ans_state)
+        end        
       end
     end
   end.
 
+Definition another_imp_compiler_correct (p:Imp.com) : string * bool :=
+  let fvs := IDSet.elements (fv p) in
+  match compile p with
+  | inl e => ("Compilation failed", false)
+  | inr ll_prog =>
+    (*
+    let m := modul_of_toplevel_entities ll_prog in
+    match mcfg_of_modul m with
+    | None => ("Compilation failed", false)
+    | Some mcfg =>
+      match init_state mcfg "imp_command" with
+      | inl e => ("init failed", false)
+      | inr initial_state =>
+        let semantics := sem mcfg initial_state in
+        ("Success", true)
+      end        
+    end*)
+    ("Success", true)
+  end.
 
+Example prog1 := W ::= AId W.
+Example prog2 := X ::= APlus (AId W) (AId W).
+
+(* Eval vm_compute in (another_imp_compiler_correct prog1). *)
