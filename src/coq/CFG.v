@@ -43,7 +43,7 @@ Module PC <: UsualDecidableTypeFull.
         * subst. left. reflexivity.
         * right. unfold not. intros. apply n. inversion H. auto.
       + right. unfold not. intros. apply n. inversion H. auto.
-  Qed.
+  Defined.
 
   Include HasEqDec2Bool.
   

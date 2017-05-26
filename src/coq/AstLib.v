@@ -31,7 +31,7 @@ Module RawIDDec <: MiniDecidableType.
     - destruct (xn == yn).
       left. subst. reflexivity.
       right. unfold not. intros. apply n. inversion H. auto.
-  Qed.
+  Defined.
 End RawIDDec.
   
 Module RawID := Make_UDT(RawIDDec). 
@@ -51,7 +51,7 @@ Module InstrIDDec <: MiniDecidableType.
     - destruct (xn == yn).
       left. subst. reflexivity.
       right. unfold not. intros. apply n. inversion H. auto.
-  Qed.
+  Defined.
 End InstrIDDec.
 Module InstrID := Make_UDT(InstrIDDec).
 
@@ -71,7 +71,7 @@ Module IdentDec <: MiniDecidableType.
     - destruct (xn == yn).
       left. subst. reflexivity.
       right. unfold not. intros. apply n. inversion H. auto.
-  Qed.
+  Defined.
 End IdentDec.
 Module Ident := Make_UDT(IdentDec).
 Instance eq_dec_ident : eq_dec ident := Ident.eq_dec.  

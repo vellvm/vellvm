@@ -10,8 +10,8 @@
 
 Require Import Vellvm.Maps Vellvm.Imp.
 
-Require Import QuickChick.QuickChick.
-Import QcDefaultNotation. Open Scope qc_scope.
+(* Require Import QuickChick.QuickChick. *)
+(* Import QcDefaultNotation. Open Scope qc_scope. *)
 Require Import List ZArith.
 Import ListNotations.
 Require Import String.
@@ -56,16 +56,13 @@ Fixpoint imp_memory_eqb (m1 : list dvalue) (m2 : list dvalue) : bool :=
      imp program will take many more steps.
  *)
 Require Import List.
-Check fold_left.
 
-
-Check show_nat.
-
+(*
 Definition state_to_string (st : state) (fv : list id) : string :=
   fold_left (fun acc x => (match x with
-                        | Id ident => (ident ++ ": " ++ show_nat (st x) ++ ", ")%string
+                        | Id ident => (ident ++ ": " ++ string_of (st x) ++ ", ")%string
                         end)) fv "".
-
+*)
 
 
 Definition imp_compiler_correct_aux (p:Imp.com) : string * bool :=
@@ -118,4 +115,6 @@ Definition another_imp_compiler_correct (p:Imp.com) : string * bool :=
 Example prog1 := W ::= AId W.
 Example prog2 := X ::= APlus (AId W) (AId W).
 
-(* Eval vm_compute in (another_imp_compiler_correct prog1). *)
+Eval vm_compute in (compile prog2).
+
+Eval vm_compute in (another_imp_compiler_correct prog1).

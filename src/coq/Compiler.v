@@ -59,7 +59,7 @@ Module IDDec <: MiniDecidableType.
     destruct x as [s]. destruct y as [t].
     destruct (s == t); subst; auto.
     right. unfold not. intros H. apply n. inversion H; auto.
-  Qed.
+  Defined.
 End IDDec.
 Module ID := Make_UDT(IDDec).
 Instance eq_dec_id : eq_dec id := ID.eq_dec.
@@ -260,11 +260,12 @@ Fixpoint compile_com (g:ctxt) (c:com) : LLVM () :=
   match c with
   | CSkip => mret ()
 
-  | CAss x a =>
+  | CAss x a => failwith "todo"
+(*                        
     'v <- compile_aexp g a;
     'ptr <- lift "CAss ident not found" (g x);
     '; store v ptr;
-    mret ()
+    mret () *)
 
   | CSeq c1 c2 =>
     'code1 <- compile_com g c1;
@@ -308,7 +309,7 @@ Fixpoint compile_fv (l:list id) : LLVM ctxt :=
     'g <- compile_fv xs;
     'uid <- alloca ();
     '; store (val_of_nat 0) (local uid);
-    mret (update g x (local uid))
+    mret (update g x (local uid)) 
   end.
 
 Definition print_imp_id (x:id) (g:ctxt) : LLVM () :=
@@ -364,8 +365,8 @@ Definition compile (c:com) : err (toplevel_entities (list block)) :=
   '(fvs, elts) <-
           run (
             let fvs := IDSet.elements (fv c) in
-            'g <- compile_fv fvs;
-            '; compile_com g c;
+            'g <- compile_fv fvs;  
+(*            '; compile_com g c; *)
 (*            '; print_fv fvs g;  (* UNCOMMENT to enable imp state printing *) *)
             '; term TERM_Ret_void;    
             mret fvs
