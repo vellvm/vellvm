@@ -95,7 +95,7 @@ Definition imp_compiler_correct_aux (p:Imp.com) :=
     end
   end.
 
-(*
+
 Definition another_imp_compiler_correct (p:Imp.com) : string * bool :=
   let fvs := IDSet.elements (fv p) in
   match compile p with
@@ -115,9 +115,10 @@ Definition another_imp_compiler_correct (p:Imp.com) : string * bool :=
     end*)
     ("Success", true)
   end.
-*)
 
 Example prog1 := W ::= AId W.
 Example prog2 := X ::= APlus (AId W) (AId W).
 
+(* Example that runs out of memory when compiling: *)
 (* Eval vm_compute in (another_imp_compiler_correct prog1). *)
+
