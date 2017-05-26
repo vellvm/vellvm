@@ -65,32 +65,33 @@ Definition state_to_string (st : state) (fv : list id) : string :=
 *)
 
 
-Definition imp_compiler_correct_aux (p:Imp.com) : string * bool :=
+Definition imp_compiler_correct_aux (p:Imp.com) :=
   let fvs := IDSet.elements (fv p) in
   match compile p with
-  | inl e => ("Compilation failed", false)
+  | inl e => whenFail "Compilation failed" false
   | inr ll_prog =>
     let m := modul_of_toplevel_entities ll_prog in
     match mcfg_of_modul m with
-    | None => ("Compilation failed", false)
+    | None => whenFail "Compilation failed" false
     | Some mcfg =>
       match init_state mcfg "imp_command" with
-      | inl e => ("init failed", false)
+      | inl e => whenFail "init failed" false
       | inr initial_state =>
         let semantics := sem mcfg initial_state in
         let llvm_final_state := MemDFin [] semantics 10 in
         let imp_state := ceval_step empty_state p 10 in
         match (llvm_final_state, imp_state) with
-        | (None, None) => ("both out of gas", true)
-        | (Some llvm_st, None) => ("imp out of gas", false)
-        | (None, Some imp_st) => ("llvm out of gas", false)
+        | (None, None) => whenFail "both out of gas" true
+        | (Some llvm_st, None) => whenFail "imp out of gas" false
+        | (None, Some imp_st) => whenFail "llvm out of gas" false
         | (Some llvm_st, Some imp_st) => 
           let ans_state := List.map (fun x => dvalue_of_nat (imp_st x)) fvs in
-          ("Success", imp_memory_eqb llvm_st ans_state)
+          checker (imp_memory_eqb llvm_st ans_state)
         end        
       end
     end
   end.
+
 
 Definition another_imp_compiler_correct (p:Imp.com) : string * bool :=
   let fvs := IDSet.elements (fv p) in
@@ -115,6 +116,9 @@ Definition another_imp_compiler_correct (p:Imp.com) : string * bool :=
 Example prog1 := W ::= AId W.
 Example prog2 := X ::= APlus (AId W) (AId W).
 
+
 Eval vm_compute in (compile prog2).
 
 Eval vm_compute in (another_imp_compiler_correct prog1).
+
+
