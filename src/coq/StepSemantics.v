@@ -246,8 +246,6 @@ Fixpoint jump (CFG:cfg) (bn:block_id) (e_init:env) (e:env) ps (q:pc) (k:stack) :
   | _ => failwith "jump: got non-phi instruction"
   end.
 
-Definition Obs := D.
-
 Definition raise s p : (Obs state) :=
   Err (s ++ ": " ++ (string_of_pc p)).
 

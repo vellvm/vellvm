@@ -59,16 +59,16 @@ Next Obligation.
   unfold fmap. unfold effects_functor. unfold effects_map. destruct a; reflexivity.
 Defined.  
 
-(* Domain of semantics *)
-CoInductive D X :=
-| Ret : X -> D X        (* Unfinished trace *)
-| Fin : value -> D X    (* Finished trace *) 
-| Err : string -> D X   (* Abort with an error *)
-| Tau : D X -> D X      (* Internal step of computation *)
-| Eff : effects (D X) -> D X    (* Externally visible step of computation *)
+(* Observations of a computation X. *)
+CoInductive Obs X :=
+| Ret : X -> Obs X        (* Unfinished trace *)
+| Fin : value -> Obs X    (* Finished trace *) 
+| Err : string -> Obs X   (* Abort with an error *)
+| Tau : Obs X -> Obs X      (* Internal step of computation *)
+| Eff : effects (Obs X) -> Obs X    (* Externally visible step of computation *)
 .
 
-CoFixpoint d_map {A B} (f:A -> B) (d:D A) : D B :=
+CoFixpoint d_map {A B} (f:A -> B) (d:Obs A) : Obs B :=
   match d with
     | Ret a => Ret (f a)
     | Fin d => Fin d
@@ -79,7 +79,7 @@ CoFixpoint d_map {A B} (f:A -> B) (d:D A) : D B :=
 
 Section UNFOLDING.
 
-Definition id_match_d {A} (d:D A) : D A :=
+Definition id_match_d {A} (d:Obs A) : Obs A :=
   match d with
     | Ret a => Ret a
     | Fin d => Fin d
@@ -88,7 +88,7 @@ Definition id_match_d {A} (d:D A) : D A :=
     | Eff m => Eff m
   end.
 
-Lemma id_d_eq : forall A (d:D A),
+Lemma id_d_eq : forall A (d:Obs A),
   d = id_match_d d.
 Proof.
   destruct d; auto.
@@ -100,7 +100,7 @@ Arguments id_d_eq {_} _ .
 
 
 (* Error predicate, which says whether an observation trace leads to an error allong *)
-Inductive d_error_free_mem_step {A} (R: D A -> Prop) : effects (D A) -> Prop :=
+Inductive d_error_free_mem_step {A} (R: Obs A -> Prop) : effects (Obs A) -> Prop :=
 | d_error_free_mem_Alloca : forall t f, (forall (a:addr), R (f (inj_addr a))) -> d_error_free_mem_step R (Alloca t f)
 | d_error_free_mem_Load   : forall a f, (forall (dv:value), R (f dv)) -> d_error_free_mem_step R (Load a f)
 | d_error_free_mem_Store  : forall a n d, R d -> d_error_free_mem_step R (Store a n d)
@@ -111,7 +111,7 @@ Inductive d_error_free_mem_step {A} (R: D A -> Prop) : effects (D A) -> Prop :=
    Ret means an "unfinished" computation (and shouldn't arise in the semantics of a CFG program)
    Err definitely has an error, which this predicate rules out
 *)
-Inductive d_error_free_step {A} (R: D A -> Prop) : D A -> Prop :=
+Inductive d_error_free_step {A} (R:Obs A -> Prop) : Obs A -> Prop :=
 | d_error_free_step_fin : forall v, d_error_free_step R (Fin v)
 | d_error_free_step_tau : forall d, R d -> d_error_free_step R (Tau d)
 | d_error_free_step_eff : forall m, d_error_free_mem_step R m -> d_error_free_step R (Eff m)
@@ -135,14 +135,14 @@ Hint Resolve d_error_free_gen_mon : paco.
     - have an address relation  A : addr -> addr -> Prop  
     - have a value relation  V : value -> value -> Prop
 *)
-Inductive d_equiv_mem_step {A} (R: D A -> D A -> Prop) : effects (D A) -> effects (D A) -> Prop :=
+Inductive d_equiv_mem_step {A} (R:Obs A -> Obs A -> Prop) : effects (Obs A) -> effects (Obs A) -> Prop :=
 | d_equiv_mem_Alloca : forall t f g, (forall (a:addr), R (f (inj_addr a)) (g (inj_addr a))) -> d_equiv_mem_step R (Alloca t f) (Alloca t g)
 | d_equiv_mem_Load  : forall a f g, (forall (dv:value), R (f dv) (g dv)) -> d_equiv_mem_step R (Load a f) (Load a g)
 | d_equiv_mem_Store : forall a n d1 d2, (R d1 d2) -> d_equiv_mem_step R (Store a n d1) (Store a n d2)
 | d_equiv_mem_Call  : forall v f g, (forall (dv:value), R (f dv) (g dv)) -> d_equiv_mem_step R (Call v f) (Call v g)
 .    
 
-Inductive d_equiv_step {A} (R:D A -> D A -> Prop) : D A -> D A -> Prop :=
+Inductive d_equiv_step {A} (R:Obs A -> Obs A -> Prop) : Obs A -> Obs A -> Prop :=
 | d_equiv_step_ret : forall a, d_equiv_step R (Ret a) (Ret a)
 | d_equiv_step_fin : forall v, d_equiv_step R (Fin v) (Fin v)
 | d_equiv_step_err : forall s1 s2, d_equiv_step R (Err s1) (Err s2)
@@ -165,30 +165,30 @@ Proof.
 Qed.
 Hint Resolve d_equiv_gen_mon : paco.
 
-Definition d_equiv {A} (p q : D A) := paco2 (@d_equiv_step A) bot2 p q.
+Definition d_equiv {A} (p q: Obs A) := paco2 (@d_equiv_step A) bot2 p q.
 Hint Unfold d_equiv.
 
-Fixpoint taus {A} (n:nat) (d:D A) : D A :=
+Fixpoint taus {A} (n:nat) (d:Obs A) : Obs A :=
   match n with
   | 0 => d
   | S n => Tau (taus n d)
   end.
 
-Instance D_functor : @Functor D := fun A => fun B => @d_map A B.
+Instance D_functor : @Functor Obs := fun A => fun B => @d_map A B.
 
 
 (* A functor only up to stuttering equivalence. *)
 (*
 Program Instance D_functor_eq_laws : (@FunctorLaws D) D_functor (@d_equiv).
 *)
-Lemma d_equiv_refl : forall {A} (d : D A), d_equiv d d.
+Lemma d_equiv_refl : forall {A} (d : Obs A), d_equiv d d.
 Proof.
   intro. pcofix CIH.
   intros. pfold. destruct d; eauto.
   destruct e; eauto. 
 Qed.
 
-Lemma d_equiv_symm : forall {A} (d1 d2 : D A), d_equiv d1 d2 -> d_equiv d2 d1.
+Lemma d_equiv_symm : forall {A} (d1 d2 : Obs A), d_equiv d1 d2 -> d_equiv d2 d1.
 Proof.
   intro. pcofix CIH.
   intros d1 d2 H.
@@ -209,7 +209,7 @@ Proof.
 Qed.
 
 (* Note: for guardedness, bind Ret introduces extra Tau *)
-Definition bind {A B} (m : D A) (f:A -> D B) : D B :=
+Definition bind {A B} (m:Obs A) (f:A -> Obs B) : Obs B :=
   (cofix bindf := fun m => 
      match m with
        | Ret a => Tau (f a)
@@ -219,7 +219,7 @@ Definition bind {A B} (m : D A) (f:A -> D B) : D B :=
        | Eff m => Eff (effects_map bindf m)
      end) m.
 
-Lemma bind_unfold : forall {A B} (m:D A) (f:A -> D B),
+Lemma bind_unfold : forall {A B} (m:Obs A) (f:A -> Obs B),
     d_equiv (bind m f)
     (match m with
     | Ret a => Tau (f a)
@@ -233,10 +233,7 @@ Proof.
   pcofix CIH. intros m f.
 Abort.
   
-  
-  
-
-Program Instance D_monad : (@Monad D) (@D_functor) := _.
+Program Instance Obs_monad : (@Monad Obs) (@Obs_functor) := _.
 Next Obligation.
   split.
   - intros. apply Ret. exact X.
@@ -250,12 +247,12 @@ Ltac punfold' H := let x := fresh "_x_" in
   intro x; match goal with [x:=?lem|-_] => clear x; eapply lem in H end.
 
 
-Section D_EQUIV_COIND.
+Section OBS_EQUIV_COIND.
 
   Variable A : Type.
-  Variable R : D A -> D A -> Prop.
+  Variable R : Obs A -> Obs A -> Prop.
 
-  Variables (p:D A) (q:D A).
+  Variables (p:Obs A) (q:Obs A).
   Hypothesis Hrpq : R p q.
   Hypothesis H : forall d1 d2,
     R d1 d2 -> d_equiv_step R d1 d2.
@@ -281,29 +278,29 @@ Section D_EQUIV_COIND.
       + constructor. intros. right. eauto.
   Qed.
 
-End D_EQUIV_COIND.
+End OBS_EQUIV_COIND.
 Arguments d_equiv_coind [_] _ [_ _] _ _.
 
 
-Lemma stutter_helper : forall {A} (d1 d2 : D A), d_equiv (Tau d1) d2 -> d_equiv d1 d2.
+Lemma stutter_helper : forall {A} (d1 d2: Obs A), d_equiv (Tau d1) d2 -> d_equiv d1 d2.
 Proof.
-  intros. punfold H. remember (Tau d1). induction H; try (solve [inversion Heqd]).
-  - inversion Heqd; subst. pfold. constructor. unfold upaco2 in H.
+  intros A d1 d2 H.  punfold H. remember (Tau d1). induction H; try (solve [inversion Heqo]).
+  - inversion Heqo; subst. pfold. constructor. unfold upaco2 in H.
     destruct H; inversion H. eapply d_equiv_gen_mon.
     eapply SIM. eapply LE.
-  - inversion Heqd; subst. pfold. eapply H.
-  - inversion Heqd; subst. pfold. constructor.
+  - inversion Heqo; subst. pfold. eapply H.
+  - inversion Heqo; subst. pfold. constructor.
     eapply IHd_equiv_step in H0. punfold H0.
 Qed. 
 
-Lemma stutter_simpl : forall {A} (d1 d2 : D A) n, d_equiv (taus n d1) d2 -> d_equiv d1 d2.
+Lemma stutter_simpl : forall {A} (d1 d2: Obs A) n, d_equiv (taus n d1) d2 -> d_equiv d1 d2.
 Proof.
   intros. induction n. punfold H.
   eapply IHn. simpl in H. eapply stutter_helper. eapply H.
 Qed.
 
 
-Lemma stutter : forall {A} (d1 d2 : D A) n m, d_equiv (taus n d1) (taus m d2) -> d_equiv d1 d2.
+Lemma stutter : forall {A} (d1 d2: Obs A) n m, d_equiv (taus n d1) (taus m d2) -> d_equiv d1 d2.
 Proof.
   intros.
   eapply stutter_simpl.
