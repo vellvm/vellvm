@@ -40,8 +40,8 @@ Definition correct (P : modul (list block) -> Prop) (o:optimization) :=
     mcfg_of_modul m = Some m_semantic ->
     mcfg_of_modul (optimize m o) = Some m_opt_semantic ->
     forall (s:state),
-      E.d_error_free (sem m_semantic s) ->
-      E.d_equiv (sem m_semantic s) (sem m_opt_semantic s).
+      E.obs_error_free (sem m_semantic s) ->
+      E.obs_equiv (sem m_semantic s) (sem m_opt_semantic s).
       
 Class RemoveInstr X := remove_instr : instr_id -> X -> X.
 
@@ -79,14 +79,14 @@ Definition remove_instr_applies_module (instr:instr_id) (m:modul (list block)) :
 
 Require Import paco.
 
-Lemma d_error_free_inv :
+Lemma obs_error_free_inv :
   forall (m:mcfg) (s:state), 
-    E.d_error_free (sem m s) ->
+    E.obs_error_free (sem m s) ->
     (exists dv, sem m s = E.Fin dv) \/
-    (exists s', stepD m s = E.Ret s' /\ E.d_error_free (sem m s')).
+    (exists s', stepD m s = E.Ret s' /\ E.obs_error_free (sem m s')).
 Proof.
   intros m s H.
-  punfold H. remember (upaco1 d_error_free_step bot1). remember (sem m s) as d. induction H. 
+  punfold H. remember (upaco1 obs_error_free_step bot1). remember (sem m s) as d. induction H. 
   - left. exists v. reflexivity.
   - unfold sem in Heqd.
     unfold bind in Heqd.
