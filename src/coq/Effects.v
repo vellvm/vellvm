@@ -625,7 +625,6 @@ Hint Resolve obs_error_free_gen_mon : paco.
 
 
 (* Note: for guardedness, bind Ret introduces extra Tau *)
-(*
 Definition bind {A B} (m:Obs A) (f:A -> Obs B) : Obs B :=
   (cofix bindf := fun m => 
      match m with
@@ -635,8 +634,8 @@ Definition bind {A B} (m:Obs A) (f:A -> Obs B) : Obs B :=
        | Tau d' => Tau (bindf d')
        | Eff m => Eff (effects_map bindf m)
      end) m.
-*)
 
+(*
 CoFixpoint bind {A B} (m:Obs A) (f:A -> Obs B) : Obs B :=
   match m with
   | Ret a => Tau (f a)
@@ -645,6 +644,7 @@ CoFixpoint bind {A B} (m:Obs A) (f:A -> Obs B) : Obs B :=
   | Tau d' => Tau (bind d' f)
   | Eff e => Eff (effects_map (fun x => bind x f) e)
   end.
+*)
 
 Lemma bind_id_eq : forall {A B} (m:Obs A) (f:A -> Obs B),
   bind m f =

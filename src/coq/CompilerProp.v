@@ -114,8 +114,8 @@ Definition another_imp_compiler_correct (p:Imp.com) : string * bool :=
 Example prog1 := W ::= AId W.
 Example prog2 := X ::= APlus (AId W) (AId W).
 
-
+(*
 Eval vm_compute in (compile prog2).
 Eval vm_compute in (another_imp_compiler_correct prog1).
-
+*)
 
