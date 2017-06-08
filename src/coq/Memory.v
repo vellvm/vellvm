@@ -19,7 +19,7 @@ Definition undef := DV VALUE_Undef.
 (* HACK: extract ID_LAZY to lazy to fix broken cofixpoint extraction.  See Memory.ml *)
 Definition ID_LAZY {A:Type} (x:A) := x.
 
-CoFixpoint memD (memory:mtype) (d:Obs) : Obs :=
+CoFixpoint memD (memory:mtype) (d:Trace) : Trace :=
   match d with
     | Tau d'            => Tau (memD memory d')
     | Vis (Eff (Alloca t k))  => Tau (memD (memory ++ [undef])%list (k (DVALUE_Addr (pred (List.length memory)))))
@@ -29,7 +29,7 @@ CoFixpoint memD (memory:mtype) (d:Obs) : Obs :=
     | Vis x => Vis x
   end.
 
-Fixpoint MemDFin (memory:mtype) (d:Obs) (steps:nat) : option mtype :=
+Fixpoint MemDFin (memory:mtype) (d:Trace) (steps:nat) : option mtype :=
   match steps with
   | O => None
   | S x =>

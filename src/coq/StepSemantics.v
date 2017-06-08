@@ -372,7 +372,7 @@ Definition init_state (CFG:mcfg) (fn:string) : err state :=
     mret ((mk_pc (Name fn) (init cfg)), [], []).
 
 (* Note: codomain is D'  *)
-CoFixpoint sem (CFG:mcfg) (s:state) : Obs :=
+CoFixpoint sem (CFG:mcfg) (s:state) : Trace :=
   match (stepD CFG s) with
   | inl s => Tau (sem CFG s)
   | inr (Err s) => Vis (Err s)
