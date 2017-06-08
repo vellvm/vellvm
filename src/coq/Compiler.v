@@ -14,7 +14,7 @@ Require Import ZArith String Omega List Equalities MSets.
 Require Import Vellvm.Classes Vellvm.Ollvm_ast Vellvm.AstLib.
 
 (* Logical Foundations dependencies *)
-Require Import Imp Maps.
+Require Import Vellvm.Imp Vellvm.Maps.
 
 (* "Flattened" representation of Vellvm code *)
 Inductive elt :=
@@ -23,10 +23,17 @@ Inductive elt :=
 | T (id:instr_id) (t:terminator)
 .    
 
+Instance string_of_elt : StringOf elt :=
+  fun elt =>
+    match elt with
+    | L lbl => ("Block " ++ (string_of lbl) ++ ": ")%string
+    | I id ins => ("Instr " ++ (string_of id) ++ ": " ++ (string_of ins))%string
+    | T id t => ("Terminator " ++ (string_of id) ++ ": " ++ (string_of t))%string
+    end.
 
 Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list block) :=
   '(insns, term_opt, blks) <-
-   monad_fold_left
+   monad_fold_right
    (fun '(insns, term_opt, blks) e =>
       match e with
       | L l =>
@@ -100,6 +107,7 @@ Fixpoint fv_com (c:com) : IDSet.t :=
   | CWhile b c => IDSet.union (fv b) (fv_com c)
   end.
 Instance FV_com : FV com := fv_com.
+
 
 (* LLVM Identifier generation monad ----------------------------------------- *)
 
@@ -259,7 +267,6 @@ Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
 Fixpoint compile_com (g:ctxt) (c:com) : LLVM () :=
   match c with
   | CSkip => mret ()
-
   | CAss x a => 
     'v <- compile_aexp g a;
     'ptr <- lift "CAss ident not found" (g x);
@@ -359,7 +366,6 @@ Definition print_decl (fn:string) : declaration :=
      dc_gc := None
   |}.
 
-
 Definition compile (c:com) : err (toplevel_entities (list block)) :=
   '(fvs, elts) <-
           run (
@@ -368,7 +374,7 @@ Definition compile (c:com) : err (toplevel_entities (list block)) :=
             '; compile_com g c; 
 (*            '; print_fv fvs g;  (* UNCOMMENT to enable imp state printing *) *)
             '; term TERM_Ret_void;    
-            mret fvs
+              mret fvs              
           );
   'blocks <- blocks_of_elts (Anon 0)%Z elts;
   mret
@@ -380,3 +386,14 @@ Definition compile (c:com) : err (toplevel_entities (list block)) :=
     df_args := [];
     df_instrs := blocks
   |}]).
+
+
+
+(* Testing infrastructure *)
+
+Definition compile_aexp_wrapper (a : aexp) :=
+  run (let fvs := IDSet.elements (fv a) in
+       'g <- compile_fv fvs;
+         compile_aexp g a).
+
+
