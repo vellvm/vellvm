@@ -181,7 +181,7 @@ Proof.
   reflexivity. reflexivity.
   intros. unfold fmap. unfold option_functor. destruct a. simpl. reflexivity.
   simpl. reflexivity.
-Qed.
+Defined. (* CHKoh: Originally Qed. *)
 
 Instance list_functor: @Functor list := List.map.
 Instance list_functor_eq_laws : (@FunctorLaws list) list_functor (@eq).
@@ -189,7 +189,7 @@ Proof.
   split.
   - apply List.map_id.
   - apply List.map_map.
-Qed.    
+Defined. (* CHKoh: Originally Qed. *)    
 
 (** ** Monads ------------------------------------------------------------------- *)
 Class Monad F `{Functor F} :=
@@ -309,7 +309,7 @@ Proof.
   reflexivity. reflexivity.
   intros. unfold fmap. unfold sum_functor. destruct a. simpl. reflexivity.
   simpl. reflexivity.
-Qed.
+Defined. (* CHKoh: Originally Qed. *)
 
 Program Instance sum_monad {X:Type} : (@Monad (sum X)) sum_functor := _.
 Next Obligation.
@@ -418,11 +418,13 @@ Definition trywith {A:Type} {F} `{ExceptionMonad string F} (s:string) (o:option 
 Definition failwith {A:Type} {F} `{ExceptionMonad string F} (s:string) : F A := raise s.
 
 (* Monad operations *)
-Fixpoint monad_fold_left {A B} `{Monad M} (f : A -> B -> M A) (l:list B) (a:A) : M A :=
+
+(* CHKoh: renamed monad_fold_left to monad_fold_right *)
+Fixpoint monad_fold_right {A B} `{Monad M} (f : A -> B -> M A) (l:list B) (a:A) : M A :=
   match l with
   | [] => mret a
   | x::xs =>
-    'y <- monad_fold_left f xs a;
+    'y <- monad_fold_right f xs a;
       f y x
   end.
 

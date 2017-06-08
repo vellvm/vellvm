@@ -275,6 +275,97 @@ Instance string_of_instr_id : StringOf instr_id := fun ins =>
   end.
 
 
+(* String of *)
+
+Instance string_of_ibinop : StringOf ibinop :=
+  fun binop =>
+    match binop with
+    | Add nuw nsw => "add"
+    | Sub nuw nsw => "sub"
+    | Mul nuw nsw => "mul"
+    | Shl nuw nsw => "shl"
+    | UDiv flag => "udiv"
+    | SDiv flag => "sdiv"
+    | LShr flag => "lshr"
+    | AShr flag => "ashr"
+    | URem | SRem => "rem"
+    | And => "and"
+    | Or => "or"
+    | Xor => "xor"
+    end.
+
+Fixpoint string_of_typ' typ := 
+  match typ with
+  | TYPE_I sz => ("i" ++ (string_of sz))%string
+  | TYPE_Pointer t => ((string_of_typ' t) ++ "*")%string
+  | _ => "(string_of_typ todo)"
+  end.
+
+Instance string_of_typ : StringOf typ := string_of_typ'.
+
+
+Fixpoint string_of_value' (v : value) :=
+  match v with
+  | SV expr =>
+    match expr with
+    | VALUE_Ident id => string_of id
+    | VALUE_Integer x => string_of x
+    | VALUE_Bool b => string_of b
+    | OP_IBinop iop t v1 v2 =>
+      ((string_of iop) ++ " " ++ (string_of t)
+                       ++ " " ++ (string_of_value' v1)
+                       ++ " " ++ (string_of_value' v2))%string
+    | _ => "string_of_value' todo"
+    end
+  end.
+
+Instance string_of_value : StringOf value := string_of_value'.
+
+Instance string_of_instr : StringOf instr :=
+  fun instr =>
+    match instr with
+    | INSTR_Op op => string_of op
+    | INSTR_Load vol t ptr align =>
+      ("load " ++ (string_of t) ++ " " ++ (string_of ptr)
+               ++ ", align " ++ (string_of align))%string
+    | INSTR_Store vol tval ptr align =>
+      ("store " ++ (string_of tval) ++ " " ++ (string_of ptr)
+                ++ ", align " ++ (string_of align))%string
+    | INSTR_Alloca t nb align =>
+      ("alloca " ++ (string_of t) ++ ", align " ++ (string_of align))%string
+        (* 
+    | INSTR_Call
+    | INSTR_Phi
+    | INSTR_Alloca
+         *)
+    | _ => "string_of_instr todo"
+    end.
+
+Instance string_of_terminator : StringOf terminator :=
+  fun t =>
+    match t with
+    | TERM_Ret v => ("ret " ++ (string_of v))%string
+    | TERM_Ret_void => "ret"
+    | _ => "string_of_terminator todo"
+    end.
+
+Instance string_of_block : StringOf block :=
+  fun block =>
+    ("Block " ++ (string_of (blk_id block)) ++ ": "
+              ++ (string_of (blk_instrs block)))%string.
+
+
+Instance string_of_definition_list_block : StringOf (definition (list block)) :=
+  fun defn => ("defn: " ++ string_of (df_instrs defn))%string.
+
+Instance string_of_tle_list_block : StringOf (toplevel_entity (list block)) :=
+  fun tle =>
+    match tle with
+    | TLE_Definition defn => string_of defn
+    | _ => "string_of_tle_list_block todo"
+    end.
+
+
 Definition target_of {X} (tle : toplevel_entity X) : option string :=
   match tle with
   | TLE_Target tgt => Some tgt
