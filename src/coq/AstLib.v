@@ -294,6 +294,22 @@ Instance string_of_ibinop : StringOf ibinop :=
     | Xor => "xor"
     end.
 
+Instance string_of_icmp : StringOf icmp :=
+  fun cmp =>
+    "icmp " ++ 
+            match cmp with
+            | Eq => "eq"
+            | Ne => "ne" 
+            | Ugt => "ugt"
+            | Uge => "uge"
+            | Ult => "ult"
+            | Ule => "ule"
+            | Sgt => "sgt"
+            | Sge => "sge"
+            | Slt => "slt"
+            | Sle => "sle"
+            end.
+        
 Fixpoint string_of_typ' typ := 
   match typ with
   | TYPE_I sz => ("i" ++ (string_of sz))%string
@@ -303,7 +319,6 @@ Fixpoint string_of_typ' typ :=
 
 Instance string_of_typ : StringOf typ := string_of_typ'.
 
-
 Fixpoint string_of_value' (v : value) :=
   match v with
   | SV expr =>
@@ -311,10 +326,21 @@ Fixpoint string_of_value' (v : value) :=
     | VALUE_Ident id => string_of id
     | VALUE_Integer x => string_of x
     | VALUE_Bool b => string_of b
+    | VALUE_Null => "null"
+    | VALUE_Zero_initializer => "zero initializer"
+    | VALUE_Cstring s => s
+    | VALUE_None => "none" 
+    | VALUE_Undef => "undef"                                
     | OP_IBinop iop t v1 v2 =>
       ((string_of iop) ++ " " ++ (string_of t)
                        ++ " " ++ (string_of_value' v1)
                        ++ " " ++ (string_of_value' v2))%string
+    | OP_ICmp cmp t v1 v2 =>
+      ((string_of cmp) ++ " " ++ (string_of t)
+                       ++ " " ++ (string_of_value' v1)
+                       ++ " " ++ (string_of_value' v2))%string
+    | OP_GetElementPtr t ptrval idxs =>
+      "getelementptr"                                                       
     | _ => "string_of_value' todo"
     end
   end.
