@@ -109,14 +109,6 @@ Instance string_of_IDSet_elt : StringOf IDSet.elt :=
     | Id name => name
     end.
 
-(*
-Instance string_of_elems : StringOf (list IDSet.elt) :=
-  fun (elements : list IDSet.elt) =>
-    fold_left (fun s elem => (s ++ ", " ++ (string_of elem)))%string
-              elements
-              "".
-*)
-
 Definition imp_compiler_correct_aux (p:Imp.com) :=
   let fvs := IDSet.elements (fv p) in
   match compile p with
@@ -151,7 +143,3 @@ Definition imp_compiler_correct_aux (p:Imp.com) :=
       end
     end
   end.
-
-
-
-
