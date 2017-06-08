@@ -9,6 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import ZArith List String Omega.
+Require Import Program.
 Require Import  Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.Ollvm_ast Vellvm.AstLib Vellvm.CFG Vellvm.CFGProp.
 Import ListNotations.
@@ -33,6 +34,8 @@ Definition optimize (m:modul (list block)) (o:optimization) : modul (list block)
   m_definitions := map o (m_definitions m);
   |}.
 
+
+(*
 
 Definition correct (P : modul (list block) -> Prop) (o:optimization) :=
   forall (m:modul (list block)) m_semantic m_opt_semantic,
@@ -79,6 +82,7 @@ Definition remove_instr_applies_module (instr:instr_id) (m:modul (list block)) :
 
 Require Import paco.
 
+(*
 Lemma obs_error_free_inv :
   forall (m:mcfg) (s:state), 
     E.obs_error_free (sem m s) ->
@@ -88,11 +92,15 @@ Proof.
   intros m s H.
   punfold H. remember (upaco1 obs_error_free_step bot1). remember (sem m s) as d. induction H. 
   - left. exists v. reflexivity.
-  - unfold sem in Heqd.
-    unfold bind in Heqd.
-    inversion Heqd. subst. 
+  - rewrite sem_match_id in Heqd. unfold sem in Heqd.
+    unfold bind in Heqd. 
+    destruct (stepD m s).
+    + right. exists s0. split; eauto. subst. inversion Heqd. pclearbot. punfold H. subst. pfold. apply H.
+    + inversion Heqd.
+    + inversion Heqd.
+    + 
 Abort.    
-  
+*)  
     
 
 Lemma remove_instr_correct:
@@ -100,10 +108,11 @@ Lemma remove_instr_correct:
 Proof.
   intros instr.
   unfold correct.
-  intros m m_semantic m_opt_semantic Happlies H0 H1 s Herr.
-  unfold optimize in H1.
-  punfold Herr.
+  intros m m_semantic m_opt_semantic Happlies H0 H1 s Herr. revert s Herr.
+  pcofix CIH.
+  intros s Herr.
+  
 Abort.
   
   
-
+*)

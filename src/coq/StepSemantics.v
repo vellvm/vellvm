@@ -246,19 +246,19 @@ Fixpoint jump (CFG:cfg) (bn:block_id) (e_init:env) (e:env) ps (q:pc) (k:stack) :
   | _ => failwith "jump: got non-phi instruction"
   end.
 
-Definition raise s p : (Obs state) :=
-  Err (s ++ ": " ++ (string_of_pc p)).
+Definition raise s p : state + (Event state) :=
+  inr (Err (s ++ ": " ++ (string_of_pc p))).
 
-Definition lift_err_d {A B} (m:err A) (f: A -> Obs B) : Obs B :=
+Definition lift_err_d {A B} (m:err A) (f: A -> (state + Event B)) : (state + Event B) :=
   match m with
-    | inl s => Err s
+    | inl s => inr (Err s)
     | inr b => f b
   end.
 
 Notation "'do' x <- m ; f" := (lift_err_d m (fun x => f)) 
    (at level 200, x ident, m at level 100, f at level 200).
 
-Fixpoint stepD (CFG:mcfg) (s:state) : Obs state :=
+Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
   let '(p, e, k) := s in
   let pc_of_pt pt := mk_pc (fn p) pt in
   do cmd <- trywith ("stepD: no cmd at pc " ++ (string_of p)) (fetch CFG p);
@@ -266,7 +266,7 @@ Fixpoint stepD (CFG:mcfg) (s:state) : Obs state :=
     | Step (INSTR_Op op) p' =>
       do id <- def_id_of_pc p; 
       do dv <- eval_op e op;     
-       Ret (pc_of_pt p', (id, dv)::e, k)
+       inl (pc_of_pt p', (id, dv)::e, k)
 
     (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
     | Step (INSTR_Call (ret_ty,ID_Global f) args) p' =>
@@ -275,7 +275,7 @@ Fixpoint stepD (CFG:mcfg) (s:state) : Obs state :=
       let ids := (df_args fdef) in  
       let cfg := df_instrs fdef in
       do dvs <-  map_monad (eval_op e) (map snd args);
-      Ret (mk_pc f (init cfg), combine ids dvs, 
+      inl (mk_pc f (init cfg), combine ids dvs, 
           match ret_ty with
           | TYPE_Void => (KRet_void e (pc_of_pt p'))::k
           | _ =>         (KRet e id (pc_of_pt p'))::k
@@ -288,15 +288,15 @@ Fixpoint stepD (CFG:mcfg) (s:state) : Obs state :=
     | Jump _ (TERM_Ret (t, op)) =>
       do dv <- eval_op e op;
       match k with
-      | [] => Fin dv
-      | (KRet e' id p') :: k' => Ret (p', (id, dv)::e', k')
+      | [] => inr (Fin dv)
+      | (KRet e' id p') :: k' => inl (p', (id, dv)::e', k')
       | _ => raise "IMPOSSIBLE: Ret op in non-return configuration" p
       end
 
     | Jump _ (TERM_Ret_void) =>
       match k with
-      | [] => Fin (DV (VALUE_Bool true))
-      | (KRet_void e' p')::k' => Ret (p', e', k')
+      | [] => inr (Fin (DV (VALUE_Bool true)))
+      | (KRet_void e' p')::k' => inl (p', e', k')
       | _ => raise "IMPOSSIBLE: Ret void in non-return configuration" p
       end
         
@@ -311,7 +311,7 @@ Fixpoint stepD (CFG:mcfg) (s:state) : Obs state :=
       let cfg := (df_instrs fdef) in
       match (phis cfg br) with
       | Some (Phis _ ps q) => 
-        lift_err_d (jump cfg current_block e e ps (pc_of_pt q) k) (@Ret state)
+        lift_err_d (jump cfg current_block e e ps (pc_of_pt q) k) inl
       | None => raise ("ERROR: Br " ++ (string_of br) ++ " not found") p
       end
         
@@ -320,19 +320,19 @@ Fixpoint stepD (CFG:mcfg) (s:state) : Obs state :=
       let cfg := (df_instrs fdef) in
         match (phis cfg br) with
           | Some (Phis _ ps q) => 
-            lift_err_d (jump cfg current_block e e ps (pc_of_pt q) k) (@Ret state)
+            lift_err_d (jump cfg current_block e e ps (pc_of_pt q) k) inl
           | None => raise ("ERROR: Br1  " ++ (string_of br) ++ " not found") p
         end
       
     | Step (INSTR_Alloca t _ _) p' =>
       do id <- def_id_of_pc p;  
-      Eff (Alloca t (fun (a:value) => Ret (pc_of_pt p', (id, a)::e, k)))
+      inr (Eff (Alloca t (fun (a:value) =>  (pc_of_pt p', (id, a)::e, k))))
       
     | Step (INSTR_Load _ t (_,ptr) _) p' =>
       do id <- def_id_of_pc p;  
       do dv <- eval_op e ptr;     
       match dv with
-      | DVALUE_Addr a => Eff (Load a (fun dv => Ret (pc_of_pt p', (id, dv)::e, k))) 
+      | DVALUE_Addr a => inr (Eff (Load a (fun dv => (pc_of_pt p', (id, dv)::e, k))))
       | _ => raise "ERROR: Load got non-pointer value" p
       end
 
@@ -341,11 +341,11 @@ Fixpoint stepD (CFG:mcfg) (s:state) : Obs state :=
       do dv <- eval_op e val;
       do v <- eval_op e ptr;
       match v with 
-      | DVALUE_Addr a => Eff (Store a dv (Ret (pc_of_pt p', e, k)))
+      | DVALUE_Addr a => inr (Eff (Store a dv (pc_of_pt p', e, k)))
       |  _ => raise "ERROR: Store got non-pointer value" p
       end
 
-    | Step (INSTR_Phi _ _) p' => Err "IMPOSSIBLE: Phi encountered in step"
+    | Step (INSTR_Phi _ _) p' => inr (Err "IMPOSSIBLE: Phi encountered in step")
       (* We should never evaluate Phi nodes except in jump *)
 
     (* Currently unhandled LLVM instructions *)
@@ -367,12 +367,18 @@ Inductive Empty := .
 (* Assumes that the entry-point function is named "fn" and that it takes
    no parameters *)
 Definition init_state (CFG:mcfg) (fn:string) : err state :=
-  'fdef <- trywith ("stepD: no main function ") (find_function CFG (Name fn));
+  'fdef <- trywith ("stepD: no function named " ++ fn) (find_function CFG (Name fn));
     let cfg := df_instrs fdef in
     mret ((mk_pc (Name fn) (init cfg)), [], []).
 
 (* Note: codomain is D'  *)
-CoFixpoint sem (CFG:mcfg) (s:state) : (Obs Empty) :=
-  bind (stepD CFG s) (sem CFG).
+CoFixpoint sem (CFG:mcfg) (s:state) : Obs :=
+  match (stepD CFG s) with
+  | inl s => Tau (sem CFG s)
+  | inr (Err s) => Vis (Err s)
+  | inr (Fin s) => Vis (Fin s)
+  | inr (Eff m) => Vis (Eff (effects_map (sem CFG) m))
+  end.
+
 
 End StepSemantics.
