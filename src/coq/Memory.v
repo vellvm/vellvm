@@ -44,3 +44,22 @@ Fixpoint MemDFin (memory:mtype) (d:Trace) (steps:nat) : option mtype :=
     end
   end%N.
 
+
+(*
+Previous bug: 
+Fixpoint MemDFin {A} (memory:mtype) (d:Obs A) (steps:nat) : option mtype :=
+  match steps with
+  | O => None
+  | S x =>
+    match d with
+    | Ret a => None
+    | Fin d => Some memory
+    | Err s => None
+    | Tau d' => MemDFin memory d' x
+    | Eff (Alloca t k)  => MemDFin (memory ++ [undef])%list (k (DVALUE_Addr (pred (List.length memory)))) x
+    | Eff (Load a k)    => MemDFin memory (k (nth_default undef memory a)) x
+    | Eff (Store a v k) => MemDFin (replace memory a v) k x
+    | Eff (Call d ds k)    => None
+    end
+  end%N.
+*)

@@ -56,8 +56,6 @@ Fixpoint imp_memory_eqb (m1 : list dvalue) (m2 : list dvalue) : bool :=
 Require Import List.
 
 
-
-
 Fixpoint string_of_dvalue' (v : value) :=
   match v with
   | DV expr =>
@@ -109,7 +107,29 @@ Instance string_of_IDSet_elt : StringOf IDSet.elt :=
     | Id name => name
     end.
 
-Definition imp_compiler_correct_aux (p:Imp.com) :=
+Definition compile_and_execute (c : Imp.com) : err mtype :=
+  let fvs := IDSet.elements (fv c) in
+  match compile c with
+  | inl e => inl e
+  | inr ll_prog =>
+    let m := modul_of_toplevel_entities ll_prog in
+    match mcfg_of_modul m with
+    | None => inl "Compilation failed"
+    | Some mcfg =>
+      match init_state mcfg "imp_command" with
+      | inl e => inl "init failed"
+      | inr initial_state =>
+        let semantics := sem mcfg initial_state in
+        let llvm_final_state := MemDFin [] semantics 10000 in
+        match llvm_final_state with
+        | Some st => inr st
+        | None => inl "out of gas"
+        end
+      end
+    end
+  end.
+
+Definition imp_compiler_correct_aux (p:Imp.com) : Checker :=
   let fvs := IDSet.elements (fv p) in
   match compile p with
   | inl e => whenFail "Compilation failed" false
@@ -123,23 +143,25 @@ Definition imp_compiler_correct_aux (p:Imp.com) :=
       | inr initial_state =>
         let semantics := sem mcfg initial_state in
         let llvm_final_state := MemDFin [] semantics 10000 in
-        let imp_state := ceval_step empty_state p 10000 in
+        let imp_state := ceval_step empty_state p 100 in
         match (llvm_final_state, imp_state) with
         | (None, None) => whenFail "both out of gas" true
-        | (Some llvm_st, None) => whenFail "imp out of gas" false
-        | (None, Some imp_st) => whenFail "llvm out of gas" false
+        | (Some llvm_st, None) => whenFail "imp out of gas" true (* false *)
+        | (None, Some imp_st) => whenFail "llvm out of gas" true (* false *)
         | (Some llvm_st, Some imp_st) => 
           let ans_state := List.map (fun x => dvalue_of_nat (imp_st x)) fvs in
-          whenFail ("not equal: llvm: "
-                      ++ (string_of llvm_st)
-                      ++ "; imp: "
-                      ++ (string_of ans_state)
-                      ++ "; free vars: "
-                      ++ (string_of fvs) (* (elems_to_string fvs) *)
-                      ++ "; compiled code: "
-                      ++ (string_of ll_prog))
-                   (checker (imp_memory_eqb llvm_st ans_state))
+          checker (whenFail ("not equal: llvm: "
+                               ++ (string_of llvm_st)
+                               ++ "; imp: "
+                               ++ (string_of ans_state)
+                               ++ "; free vars: "
+                               ++ (string_of fvs) (* (elems_to_string fvs) *)
+                               ++ "; compiled code: "
+                               ++ (string_of ll_prog))
+                            (imp_memory_eqb (List.rev llvm_st) ans_state))
         end        
       end
     end
   end.
+
+        

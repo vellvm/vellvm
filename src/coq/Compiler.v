@@ -396,4 +396,7 @@ Definition compile_aexp_wrapper (a : aexp) :=
        'g <- compile_fv fvs;
          compile_aexp g a).
 
-
+Definition compile_bexp_wrapper (b : bexp) :=
+  run (let fvs := IDSet.elements (fv b) in
+       'g <- compile_fv fvs;
+         compile_bexp g b).

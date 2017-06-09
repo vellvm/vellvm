@@ -13,9 +13,6 @@ Require Import String.
 Require Import Vellvm.Classes Vellvm.Ollvm_ast.
 
 
-
-Check compile_aexp.
-
 Example empty_ctxt : ctxt := t_empty (None : option Ollvm_ast.value).
 Example test_ctxt :=
   t_update (t_update empty_ctxt
@@ -37,42 +34,24 @@ Definition test_compiled_aexp := compile_aexp test_ctxt (APlus (AId idX) (ANum 3
 
 Check fold_left.
 
-(*
-Definition compile (c:com) : err (toplevel_entities (list block)) :=
-  '(fvs, elts) <-
-          run (
-            let fvs := IDSet.elements (fv c) in
-            'g <- compile_fv fvs;  
-(*            '; compile_com g c; *)
-(*            '; print_fv fvs g;  (* UNCOMMENT to enable imp state printing *) *)
-            '; term TERM_Ret_void;    
-            mret fvs
-          );
-  'blocks <- blocks_of_elts (Anon 0)%Z elts;
-  mret
-   ((List.map (fun x => let 'Id s := x in TLE_Declaration (print_decl ("print_" ++ s))) fvs) ++
-   [
-    TLE_Definition
-    {|
-    df_prototype := imp_decl;
-    df_args := [];
-    df_instrs := blocks
-  |}]).
+(* Fails compilation because of wrongly-correct monad_fold_left *)
+Example prog1 := (idX ::= ANum 1).
+Example prog2 := (idW ::= AId idW).
 
-Print toplevel_entity.
+(* Fails compilation because of off-by-one in Alloca for MemDFin *)
+Example prog3 := idX ::= ANum 1 ;; idY ::= ANum 2 ;; idZ ::= ANum 3 ;; idW ::= ANum 4.
+Example prog4 := idX ::= AId idY.
+Example prog5 := idX ::= APlus (AId idW) (AId idX).
 
-Definition ctxt_generator := 
-*)
-                                                
+(* Fails compilation because of memory allocation of free vars in reverse order
+   during compilation *)
+Example prog6 := idY ::= APlus (AId idZ) (ANum 4).
 
-(* Example program that fails imp_compiler_correct here:
-Eample prog1 := X ::= APlus (AId W) (AId W).
- *)
-
-Example prog1 := (X ::= ANum 1).
-Example prog2 := (W ::= AId W).
-Example prog3 := X ::= APlus (AId W) (AId W).
-Example prog4 := X ::= APlus (AId W) (AId X). (* fails compilation because not VALUE_Integer *)
+Example prog7 :=
+  IFB (BEq (AMult (ANum 10) (AId idW)) (AMult (ANum 6) (ANum 5))) THEN
+    X ::= (APlus (AId idY) (AMult (APlus (ANum 1) (ANum 5)) (APlus (ANum 1) (ANum 0))))
+  ELSE Y ::= (APlus (AId idY) (APlus (AMinus (ANum 3) (ANum 4)) (ANum 2))) FI.
+  
 
 Eval vm_compute in (compile prog2).
 
@@ -82,7 +61,12 @@ Definition show_aexp_compilation_result (result : err (value * list elt)) :=
   | inr (_, elts) => string_of elts
   end.
 
-Check (compile prog4).
+Definition show_bexp_compilation_result (result : err (value * list elt)) :=
+  match result with
+  | inl _ => "err"
+  | inr (_ , elts) => string_of elts
+  end.
+
 
 Definition show_result (result : err (toplevel_entities (list block))) :=
   match result with
@@ -90,15 +74,24 @@ Definition show_result (result : err (toplevel_entities (list block))) :=
   | inr l => fold_left (fun s tle_blk => (s ++ "; " ++ (string_of tle_blk))%string) l ""
   end.
 
+
 Compute (show_aexp_compilation_result
            (compile_aexp_wrapper (AMult (AId idX) (APlus (ANum 1) (ANum 2))))).
 
-Compute (show_result (compile prog4)).
+Compute (show_bexp_compilation_result
+           (compile_bexp_wrapper (BEq (ANum 5) (APlus (ANum 2) (ANum 3))))).
 
+Compute (show_result (compile prog3)).
+Compute (show_result (compile prog4)).
+Compute (show_result (compile prog6)).
+
+Compute (compile_and_execute prog3).
+Compute (compile_and_execute prog4).
+Compute (compile_and_execute prog5).
+Compute (compile_and_execute prog7).
 
 QuickChick (forAll arbitrary
                    imp_compiler_correct_aux).
-
 
 
 Compute (imp_compiler_correct_aux prog1).
