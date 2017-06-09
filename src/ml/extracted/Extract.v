@@ -33,8 +33,6 @@ Extract Inductive string => "string" [ "str_nil" "str_cons" ].
 (* Extract Inlined Constant Ollvm_ast.int => "int". *)
 Extract Inlined Constant Ollvm_ast.float => "float".
 
-Extract Inlined Constant Memory.ID_LAZY => "lazy".
-
 Set Extraction AccessOpaque.
 (* NOTE: assumes that this file is compiled from /src *)
 Cd "ml/extracted".
