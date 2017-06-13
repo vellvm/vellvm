@@ -391,12 +391,13 @@ Definition compile (c:com) : err (toplevel_entities (list block)) :=
 
 (* Testing infrastructure *)
 
-Definition compile_aexp_wrapper (a : aexp) :=
+Definition compile_aexp_wrapper (a : aexp) : err (value * list elt) :=
   run (let fvs := IDSet.elements (fv a) in
        'g <- compile_fv fvs;
          compile_aexp g a).
 
-Definition compile_bexp_wrapper (b : bexp) :=
+
+Definition compile_bexp_wrapper (b : bexp) : err (value * list elt) :=
   run (let fvs := IDSet.elements (fv b) in
        'g <- compile_fv fvs;
          compile_bexp g b).

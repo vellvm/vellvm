@@ -6,8 +6,6 @@ Require Import List ZArith.
 Import ListNotations.
 Require Import String.
 
-
-
 Instance state_shrinker : Shrink state :=
   {| shrink := fun _ => [] |}.
 
@@ -23,7 +21,6 @@ Definition test_id_gen_restricted :=
   frequency (returnGen idX) [(6, returnGen idX) ; (4, returnGen idY)].
 
 Instance id_gen : Gen id := {| arbitrary := test_id_gen |}.
-
 
 Definition show_state_func (st : state) : string :=
   "W = " ++ (show_nat (st idW)) ++ ", " ++
@@ -89,7 +86,8 @@ Fixpoint aexp_gen_func (num_gen : G nat) (id_gen: G id) (n : nat) : G aexp :=
                                  (aexp_gen_func num_gen id_gen n')
                                  (aexp_gen_func num_gen id_gen n'))
     in 
-       oneOf [var_gen; plus_gen; minus_gen; mult_gen; liftGen ANum num_gen]
+    (* oneOf [var_gen; plus_gen; minus_gen; mult_gen; liftGen ANum num_gen] *)
+    oneOf [var_gen; plus_gen; mult_gen; liftGen ANum num_gen]
   end.
 
 Fixpoint simple_aexp_gen_func (num_gen : G nat) (id_gen : G id) (n : nat) : G aexp :=
@@ -98,11 +96,19 @@ Fixpoint simple_aexp_gen_func (num_gen : G nat) (id_gen : G id) (n : nat) : G ae
   | S n' =>
     let plus_gen := (liftGen2 APlus
                               (liftGen AId id_gen)
-                              (aexp_gen_func num_gen id_gen n')) in
+                              (simple_aexp_gen_func num_gen id_gen n')) in
     plus_gen
   end.
 
+Derive Arbitrary for aexp.
 
+(*
+Instance aexp_generator_sized : GenSized aexp :=
+  {| arbitrarySized := aexp_gen_func test_nat_gen test_id_gen |}.
+*)
+
+
+(*
 Fixpoint shrink_aexp_func (a : aexp) : list aexp :=
   let shrink_helper op a1 a2 :=
       [a1] ++ [a2]
@@ -120,6 +126,7 @@ Fixpoint shrink_aexp_func (a : aexp) : list aexp :=
                    
 Instance aexp_shrinker : Shrink aexp :=
   {| shrink := shrink_aexp_func |}.
+ *)
 
 
 (**** Boolean expressions ****)
@@ -149,6 +156,15 @@ Fixpoint bexp_gen_func (aexp_sized_gen : nat -> G aexp) (n : nat) : G bexp :=
        oneOf [ beq_gen ; ble_gen ; bnot_gen ; band_gen ]
   end.
 
+(*
+Instance bexp_generator_sized : GenSized bexp :=
+  {| arbitrarySized n :=
+       bexp_gen_func (aexp_gen_func test_nat_gen test_id_gen) n |}.
+ *)
+
+Derive Arbitrary for bexp.
+
+(*
 Fixpoint shrink_bexp_func (b : bexp) : list bexp :=
   match b with
   | BTrue | BFalse => []
@@ -164,7 +180,7 @@ Fixpoint shrink_bexp_func (b : bexp) : list bexp :=
 
 Instance bexp_shrinker : Shrink bexp :=
   {| shrink := shrink_bexp_func |}.
-
+*)
 
 (**** Commands ****)
 
@@ -195,16 +211,33 @@ Fixpoint com_gen_func
   end.
 
 
-
-
 Instance com_gen : GenSized com := 
   {| arbitrarySized n :=
        let aexp_sized_gen := aexp_gen_func test_nat_gen test_id_gen in
-       (* let aexp_gen := aexp_sized_gen 3 in *)
-       let aexp_gen := simple_aexp_gen_func (choose (0, 5)) test_id_gen 3 in
+       let aexp_gen := aexp_sized_gen 3 in
+       (* let aexp_gen := simple_aexp_gen_func (choose (0, 5)) test_id_gen 3 in *)
        let bexp_gen := bexp_gen_func aexp_sized_gen 3 in
        com_gen_func test_id_gen aexp_gen bexp_gen n |}.
 
+Fixpoint shrink_com_func `{Shrink aexp} `{Shrink bexp} (c : com) : list com :=
+  match c with
+  | CSkip => []
+  | x ::= a => map (fun a' => CAss x a') (shrink a)
+  | CSeq c1 c2 => [c1] ++ [c2]
+                       ++ (map (fun c2' => CSeq c1 c2') (shrink_com_func c2))
+                       ++ (map (fun c1' => CSeq c1' c2) (shrink_com_func c1))
+  | CWhile b c => let shrunk_b_list := shrink b in
+                  (map (fun b' => CWhile b' c) shrunk_b_list)
+                    ++ (map (fun c' => CWhile b c') (shrink_com_func c))
+                    ++ [c] 
+  | CIf b c1 c2 =>
+    [c1] ++ [c2]
+         ++ (map (fun b' => CIf b' c1 c2) (shrink b))
+         ++ (map (fun c1' => CIf b c1' c2) (shrink_com_func c1))
+         ++ (map (fun c2' => CIf b c1 c2) (shrink_com_func c2))
+  end.
+
+(*
 Fixpoint shrink_com_func
          (shrink_aexp : aexp -> list aexp)
          (shrink_bexp : bexp -> list bexp)
@@ -226,7 +259,7 @@ Fixpoint shrink_com_func
          ++ (map (fun c1' => CIf b c1' c2) (rec_shrink c1))
          ++ (map (fun c2' => CIf b c1 c2) (rec_shrink c2))
   end.
-
+*)
 
 Require Import Nat.
 
@@ -333,6 +366,8 @@ Fixpoint fold_constants_and_clear_deadcode (c : com) : com :=
     end
   end.
 
+
+(*
 Fixpoint shrink_com_with_constant_folding_func
          (shrink_aexp : aexp -> list aexp)
          (shrink_bexp : bexp -> list bexp)
@@ -358,7 +393,12 @@ Fixpoint shrink_com_with_constant_folding_func
          ++ (map (fun c1' => CIf clean_b c1' c2) (rec_shrink c1))
          ++ (map (fun c2' => CIf clean_b c1 c2) (rec_shrink c2))
   end.
+ *)
 
-
+(*
 Instance com_shrinker : Shrink com :=
   {| shrink := shrink_com_with_constant_folding_func shrink_aexp_func shrink_bexp_func |}.
+ *)
+
+Instance com_shrinker : Shrink com :=
+  {| shrink := shrink_com_func |}.
