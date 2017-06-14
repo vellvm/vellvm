@@ -1,0 +1,29 @@
+Handling Mutant 0.
+Writing to file: /tmp/QuickChickb53610.v
+QuickChecking: (forAllShrink (test_com_gen 3) (@shrink com shrcom) imp_compiler_correct_aux)
+Extracted ML file: /tmp/QuickChickdc7909.ml
+Compile command: ocamlopt -rectypes -w a -I /tmp -I /home/eigenvector/.opam/4.03.0/lib/coq/user-contrib/QuickChick /home/eigenvector/.opam/4.03.0/lib/coq/user-contrib/QuickChick/quickChickLib.cmx /tmp/QuickChickdc7909.ml -o /tmp/QuickChickdc7909
+While (X = ANum 1) do W := ANum 0 endWhile
+not equal: llvm: [2] [0; undef]; imp: [2] [0; 0]; free vars: [W; X]; compiled code: [string_of_tle_list_block todo; string_of_tle_list_block todo; defn: [Block 0: [(x1, alloca i64, align None); (void<1>, store (i64, 0) (i64*, %x1), align None); (x2, alloca i64, align None); (void<2>, store (i64, 0) (i64*, %x2), align None)]; Block x3: [(x6, load i64 (i64*, %x1), align None); (x7, icmp eq i64 %x6 1)]; Block x4: [(void<5>, store (i64, 0) (i64*, %x2), align None)]; Block x5: []]]
+1 : 
+*** Failed! After 2 tests and 16 shrinks
+
+Handling Mutant 1.
+Writing to file: /tmp/QuickChickb58185.v
+QuickChecking: (forAllShrink (test_com_gen 3) (@shrink com shrcom) imp_compiler_correct_aux)
+Extracted ML file: /tmp/QuickChickb824fc.ml
+Compile command: ocamlopt -rectypes -w a -I /tmp -I /home/eigenvector/.opam/4.03.0/lib/coq/user-contrib/QuickChick /home/eigenvector/.opam/4.03.0/lib/coq/user-contrib/QuickChick/quickChickLib.cmx /tmp/QuickChickb824fc.ml -o /tmp/QuickChickb824fc
+W := W;
+Z := ANum 1
+not equal: llvm: [2] [0; 1]; imp: [2] [1; 0]; free vars: [Z; W]; compiled code: [string_of_tle_list_block todo; string_of_tle_list_block todo; defn: [Block 0: [(x1, alloca i64, align None); (void<1>, store (i64, 0) (i64*, %x1), align None); (x2, alloca i64, align None); (void<2>, store (i64, 0) (i64*, %x2), align None); (x3, load i64 (i64*, %x1), align None); (void<3>, store (i64, %x3) (i64*, %x1), align None); (void<4>, store (i64, 1) (i64*, %x2), align None)]]]
+14 : 
+*** Failed! After 15 tests and 4 shrinks
+
+Handling Mutant 2.
+Writing to file: /tmp/QuickChickbde7a0.v
+QuickChecking: (forAllShrink (test_com_gen 3) (@shrink com shrcom) imp_compiler_correct_aux)
+Extracted ML file: /tmp/QuickChickad25d5.ml
+Compile command: ocamlopt -rectypes -w a -I /tmp -I /home/eigenvector/.opam/4.03.0/lib/coq/user-contrib/QuickChick /home/eigenvector/.opam/4.03.0/lib/coq/user-contrib/QuickChick/quickChickLib.cmx /tmp/QuickChickad25d5.ml -o /tmp/QuickChickad25d5
+X := Y
+not equal: llvm: [2] [0; undef]; imp: [2] [0; 0]; free vars: [Y; X]; compiled code: [string_of_tle_list_block todo; string_of_tle_list_block todo; defn: [Block 0: [(x1, alloca i64, align None); (void<1>, store (i64, 0) (i64*, %x1), align None); (x2, alloca i64, align None); (void<2>, store (i64, 0) (i64*, %x2), align None); (x3, load i64 (i64*, %x2), align None); (void<3>, store (i64, %x3) (i64*, %x1), align None)]]]
+*** Failed! After 1 tests and 30 shrinks

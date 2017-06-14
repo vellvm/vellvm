@@ -16,13 +16,13 @@ Export SS.
 Definition mtype := list dvalue.
 Definition undef := DV VALUE_Undef.
 
-
+(*! Section Memory *)
 
 CoFixpoint memD (memory:mtype) (d:Trace) : Trace :=
   match d with
     | Tau d'            => Tau (memD memory d')
     | Vis (Eff (Alloca t k))  => Tau (memD (memory ++ [undef])%list
-                                          (k (DVALUE_Addr (*!*)(List.length memory))))(*!(pred (List.length memory))*)
+                                          (k (DVALUE_Addr (**!*)(List.length memory)(**!(pred (List.length memory))*))))
     | Vis (Eff (Load a k))    => Tau (memD memory (k (nth_default undef memory a)))
     | Vis (Eff (Store a v k)) => Tau (memD (replace memory a v) k)
     | Vis (Eff (Call d ds k)) => Vis (Eff (Call d ds k))
@@ -37,7 +37,11 @@ Fixpoint MemDFin (memory:mtype) (d:Trace) (steps:nat) : option mtype :=
     | Vis (Fin d) => Some memory
     | Vis (Err s) => None
     | Tau d' => MemDFin memory d' x
-    | Vis (Eff (Alloca t k))  => MemDFin (memory ++ [undef])%list (k (DVALUE_Addr (List.length memory))) x
+    | Vis (Eff (Alloca t k))  =>
+      MemDFin (memory ++ [undef])%list (k (DVALUE_Addr
+                                             (*!*) (List.length memory)
+                                             (*! (pred (List.length memory)) *)
+                                       )) x
     | Vis (Eff (Load a k))    => MemDFin memory (k (nth_default undef memory a)) x
     | Vis (Eff (Store a v k)) => MemDFin (replace memory a v) k x
     | Vis (Eff (Call d ds k)) => None

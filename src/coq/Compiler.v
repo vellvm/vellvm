@@ -39,7 +39,7 @@ Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list blo
       | L l =>
         match term_opt with
         | None => 
-          if (List.length insns) == 0 then mret ([], None, blks)
+          if (List.length insns) == 0%nat then mret ([], None, blks)
           else failwith "terminator not found"
         | Some (id, t) =>
           mret ([], None, (mk_block l insns t id)::blks)
