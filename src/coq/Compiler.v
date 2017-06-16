@@ -44,7 +44,7 @@ Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list blo
       | L l =>
         match term_opt with
         | None => 
-          if (List.length insns) == 0 then mret ([], None, blks)
+          if (List.length insns) == 0%nat then mret ([], None, blks)
           else failwith "terminator not found"
         | Some (id, t) =>
           mret ([], None, (mk_block l insns t id)::blks)
@@ -175,7 +175,7 @@ Definition ctxt := partial_map value.
 Definition val_of_nat (n:nat) : value :=
   SV (VALUE_Integer (Z.of_nat n)).
 
-Definition val_of_i64 (i:int64) : value :=
+Definition val_of_int64 (i:int64) : value :=
   SV (VALUE_Integer (Int64.signed i)).
 
 Definition val_of_ident (id:ident) : value :=
@@ -232,7 +232,7 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
       mret (local lid)
   in
   match a with
-  | ANum n => mret (val_of_i64 n)
+  | ANum n => mret (val_of_int64 n)
 
   | AId x =>
     'ptr <- lift "AId ident not found" (g x);

@@ -34,8 +34,10 @@ Require Import compcert.lib.Integers.
 (* /IMPORTS *)
 
 (* Setup for Compcert Int64 *)
+(*
 Module Int64 := Integers.Int64.
 Definition int64 := Int64.int.
+*)
 Definition toi64 n := Int64.repr n.
 
 

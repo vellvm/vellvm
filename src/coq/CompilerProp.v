@@ -33,6 +33,9 @@ Import ListNotations.
 
 Require Import Vellvm.ImpQuickChick.
 
+
+Require Import compcert.lib.Integers.
+
 (* Equality for the imp final memory states. *)
 
 (* These definitions should probably go in a library *)
@@ -40,8 +43,8 @@ Require Import Vellvm.ImpQuickChick.
 Definition dvalue_of_nat (n:nat) : dvalue :=
   DV (VALUE_Integer (Z.of_nat n)).
 
-Definition dvalue_of_i64 (n:int64) : dvalue :=
-  DV (VALUE_Integer (Imp.Int64.unsigned n)).
+Definition dvalue_of_int64 (n:int64) : dvalue :=
+  DV (VALUE_Integer (Int64.unsigned n)).
 
 Definition imp_val_eqb (v1 v2 : dvalue) : bool :=
   match v1, v2 with
@@ -154,7 +157,7 @@ Definition imp_compiler_correct_aux (p:Imp.com) : Checker :=
         | (Some llvm_st, None) => whenFail "imp out of gas" true
         | (None, Some imp_st) => whenFail "llvm out of gas" false
         | (Some llvm_st, Some imp_st) => 
-          let ans_state := List.map (fun x => dvalue_of_i64 (imp_st x)) fvs in
+          let ans_state := List.map (fun x => dvalue_of_int64 (imp_st x)) fvs in
           checker (whenFail ("not equal: llvm: "
                                ++ (string_of llvm_st)
                                ++ "; imp: "
@@ -190,7 +193,7 @@ Definition imp_compiler_correct_bool (p:Imp.com) : bool :=
         | (Some llvm_st, None) => true
         | (None, Some imp_st) => true
         | (Some llvm_st, Some imp_st) => 
-          let ans_state := List.map (fun x => dvalue_of_i64 (imp_st x)) fvs in
+          let ans_state := List.map (fun x => dvalue_of_int64 (imp_st x)) fvs in
           imp_memory_eqb (List.rev llvm_st) ans_state
         end        
       end
@@ -285,6 +288,7 @@ Example prog8 :=
 Example prog9 :=
   Y ::= (AMinus (ANum (Int64.repr 3)) (ANum (Int64.repr 4))).
 
+(*
 Compute (show_result (compile prog3)).
 Compute (show_result (compile prog4)).
 Compute (show_result (compile prog6)).
@@ -294,7 +298,7 @@ Compute (compile_and_execute prog5).
 Compute (compile_and_execute prog7).
 Compute (compile_and_execute prog8).
 Compute (compile_and_execute prog9).
-
+*)
 
 (* QuickChick (forAll arbitrary
                    imp_compiler_correct_aux). *)

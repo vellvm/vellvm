@@ -69,7 +69,7 @@ Instance gen_state : GenSized state :=
   {| arbitrarySized := gen_state_func test_i64_gen test_id_gen |}.
 
 Definition test_state_gen := gen_state_func test_i64_gen test_id_gen 5.
-Sample test_state_gen.
+(* Sample test_state_gen. *)
 
 Instance shrink_state : Shrink state :=
   {| shrink := fun _ => [] |}.
@@ -126,7 +126,7 @@ Fixpoint gen_simple_aexp_func (i64_gen : G int64) (id_gen : G id) (n : nat) : G 
 Definition test_aexp_gen := gen_aexp_func test_i64_gen test_id_gen 3.
 
 Derive Arbitrary for aexp.
-Sample (@arbitrarySized aexp genSaexp 4).
+(* Sample (@arbitrarySized aexp genSaexp 4). *)
 
 (**** Boolean expressions ****)
 
