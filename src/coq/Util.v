@@ -644,6 +644,27 @@ Proof.
     apply IHl.
 Qed.
 
+Lemma assoc_hd : forall A B (a:A) (b:B) l a_dec,
+  assoc a_dec a ((a,b)::l) = Some b.
+Proof.
+  intros A B a b l a_dec.
+  simpl. destruct (a_dec a a); auto.
+  - contradiction n. reflexivity.
+Qed.
+
+
+Lemma assoc_tl : forall A B (a c:A) (b:B) l a_dec
+    (Hneq : a <> c),
+    assoc a_dec a ((c,b)::l) =
+    assoc a_dec a l.
+Proof.
+  destruct l; intros; simpl in *.
+  - destruct (a_dec a c). contradiction Hneq. reflexivity.
+  - destruct p.
+    destruct (a_dec a c). contradiction Hneq.
+    reflexivity.
+Qed.
+
 Lemma assoc_In_snd : forall A B (l:list (A * B)) eq_dec a b,
   assoc eq_dec a l = Some b ->
   In b (map (@snd _ _) l).

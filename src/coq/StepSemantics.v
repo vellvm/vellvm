@@ -78,7 +78,7 @@ Module StepSemantics(A:ADDR).
       Definition typ := Ollvm_ast.typ.
       Definition value := dvalue.
       Definition inj_addr := DVALUE_Addr.
-    
+      Definition no_value := DV (VALUE_None).
     End ET.    
   Module E := Vellvm.Effects.Effects(ET).
   Export E.
@@ -118,6 +118,8 @@ Module StepSemantics(A:ADDR).
   Definition lookup_env (e:env) (id:local_id) : err value :=
     trywith ("lookup_env: id = " ++ (string_of id) ++ " NOT IN env = " ++ (string_of e)) (assoc RawID.eq_dec id e).
 
+  Definition add_env id dv (e:env) := (id,dv)::e.
+  
   (* Arithmetic Operations ---------------------------------------------------- *)
   (* TODO: implement LLVM semantics *)
 
@@ -701,7 +703,7 @@ Fixpoint jump (CFG:cfg) (bn:block_id) (e_init:env) (e:env) ps (q:pc) (k:stack) :
     match assoc RawID.eq_dec bn ls with
     | Some op =>
       'dv <- eval_op e_init op;
-      jump CFG bn e_init ((id,dv)::e) rest q k
+      jump CFG bn e_init (add_env id dv e) rest q k
     | None => failwith ("jump: block name not found " ++ string_of_raw_id bn)
     end
   | _ => failwith "jump: got non-phi instruction"
@@ -750,7 +752,7 @@ Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
       do dv <- eval_op e op;
       match k with
       | [] => inr (Fin dv)
-      | (KRet e' id p') :: k' => inl (p', (id, dv)::e', k')
+      | (KRet e' id p') :: k' => inl (p', add_env id dv e', k')
       | _ => raise "IMPOSSIBLE: Ret op in non-return configuration" p
       end
 
@@ -787,13 +789,13 @@ Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
       
     | Step (INSTR_Alloca t _ _) p' =>
       do id <- def_id_of_pc p;  
-      inr (Eff (Alloca t (fun (a:value) =>  (pc_of_pt p', (id, a)::e, k))))
+      inr (Eff (Alloca t (fun (a:value) =>  (pc_of_pt p', add_env id a e, k))))
       
     | Step (INSTR_Load _ t (_,ptr) _) p' =>
       do id <- def_id_of_pc p;  
       do dv <- eval_op e ptr;     
       match dv with
-      | DVALUE_Addr a => inr (Eff (Load a (fun dv => (pc_of_pt p', (id, dv)::e, k))))
+      | DVALUE_Addr a => inr (Eff (Load a (fun dv => (pc_of_pt p', add_env id dv e, k))))
       | _ => raise "ERROR: Load got non-pointer value" p
       end
 
@@ -802,7 +804,7 @@ Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
       do dv <- eval_op e val;
       do v <- eval_op e ptr;
       match v with 
-      | DVALUE_Addr a => inr (Eff (Store a dv (pc_of_pt p', e, k)))
+      | DVALUE_Addr a => inr (Eff (Store a dv (fun _ => (pc_of_pt p', e, k))))
       |  _ => raise "ERROR: Store got non-pointer value" p
       end
 

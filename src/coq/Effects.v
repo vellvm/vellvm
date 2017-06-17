@@ -24,6 +24,7 @@ Module Type EffT.
   Parameter addr : Set.
   Parameter value : Set.
   Parameter inj_addr: addr -> value.
+  Parameter no_value : value.  (* Morally DV VALUE_None *)
 End EffT.
 
 Module Effects(ET:EffT).
@@ -40,7 +41,7 @@ Export ET.
 Inductive effects (d:Type) : Type :=
 | Alloca (t:typ)  (k:value -> d)        (* Stack allocation *)
 | Load   (a:addr) (k:value -> d)
-| Store  (a:addr) (v:value) (k:d)
+| Store  (a:addr) (v:value) (k:value -> d)
 | Call   (v:value) (args:list value) (k:value -> d)
 .    
 
@@ -48,7 +49,7 @@ Definition effects_map {A B} (f:A -> B) (m:effects A) : effects B :=
   match m with
   | Alloca t g => Alloca t (fun a => f (g a))
   | Load a g  => Load a (fun dv => f (g dv))
-  | Store a dv d => Store a dv (f d)
+  | Store a dv d => Store a dv (fun dv => f (d dv))
   | Call v args d => Call v args (fun dv => f (d dv))
   end.
 
@@ -170,14 +171,14 @@ Section RELATED_EFFECTS.
       forall a1 a2 v1 v2 k1 k2
         (HRa : a1 = a2)
         (HRv : v1 = v2)
-        (HRk : R k1 k2),
+        (HRk : R (k1 no_value) (k2 no_value)),
         related_effect_step (Store a1 v1 k1) (Store a2 v2 k2)
 
   | related_effect_Call :
       forall v1 v2 vs1 vs2 k1 k2
         (HRv : v1 = v2)
         (HRvs : vs1 = vs2)
-        (HRk : (forall (rv1 rv2:value), rv1 = rv2 -> R (k1 v1) (k2 v2))),
+        (HRk : (forall (rv1 rv2:value), rv1 = rv2 -> R (k1 rv1) (k2 rv2))),
         related_effect_step (Call v1 vs1 k1) (Call v2 vs2 k2)
   .
   Hint Constructors related_effect_step.
@@ -189,6 +190,7 @@ Section RELATED_EFFECTS.
     destruct x; eauto.
     - econstructor. intros a1 a2 H. subst. eauto.
     - econstructor; eauto. intros v1 v2 H. subst. eauto.
+    - econstructor; intros; subst; eauto.
   Qed.      
 
   Lemma related_effect_symm : (symmetric _ R) -> symmetric _ related_effect_step.
@@ -339,7 +341,7 @@ Proof.
     + intros. specialize (HRk a2 a1 (sym_eq H1)). pclearbot. right. eauto.
     + intros. specialize (HRk v2 v1 (sym_eq H1)). pclearbot. right. eauto.
     + pclearbot. right.  eauto.
-    + intros. specialize (HRk v2 v1 (sym_eq HRv)). pclearbot. right. eauto.
+    + intros. specialize (HRk rv2 rv1 (sym_eq H1)). pclearbot. right. eauto.
   - pclearbot. right. eauto.
   - punfold IHtrace_equiv_step.
   - punfold IHtrace_equiv_step.
@@ -684,7 +686,7 @@ Section PREDICATE_EFFECTS.
 
   | predicate_effect_Store  :
       forall a v k
-        (HRk : R k),
+        (HRk : R (k no_value)),
         predicate_effect_step (Store a v k)
 
   | predicate_effect_Call :
