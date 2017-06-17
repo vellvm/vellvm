@@ -1,3 +1,4 @@
 -R ../lib/paco/src Paco
 -Q coq Vellvm
 -R coq Vellvm
+-R ../lib/CompCert/ compcert

@@ -17,6 +17,8 @@
     of _program equivalence_ and introduce _Hoare Logic_, a widely
     used logic for reasoning about imperative programs. *)
 
+(* Edit to produce 64 bit numbers *)
+
 (* IMPORTS *)
 Set Warnings "-notation-overridden,-parsing".
 Require Import Coq.Bool.Bool.
@@ -27,8 +29,17 @@ Require Import Coq.Lists.List.
 Require Import Coq.omega.Omega.
 Import ListNotations.
 
-Require Import Maps.
+Require Import Vellvm.Maps.
+Require Import compcert.lib.Integers.
 (* /IMPORTS *)
+
+(* Setup for Compcert Int64 *)
+(*
+Module Int64 := Integers.Int64.
+Definition int64 := Int64.int.
+*)
+Definition toi64 n := Int64.repr n.
+
 
 (* ################################################################# *)
 (** * Arithmetic and Boolean Expressions *)
@@ -47,7 +58,7 @@ Module AExp.
     arithmetic and boolean expressions. *)
 
 Inductive aexp : Type :=
-  | ANum : nat -> aexp
+  | ANum : int64 -> aexp
   | APlus : aexp -> aexp -> aexp
   | AMinus : aexp -> aexp -> aexp
   | AMult : aexp -> aexp -> aexp.
@@ -127,16 +138,16 @@ Inductive bexp : Type :=
 
 (** _Evaluating_ an arithmetic expression produces a number. *)
 
-Fixpoint aeval (a : aexp) : nat :=
+Fixpoint aeval (a : aexp) : int64 :=
   match a with
   | ANum n => n
-  | APlus a1 a2 => (aeval a1) + (aeval a2)
-  | AMinus a1 a2  => (aeval a1) - (aeval a2)
-  | AMult a1 a2 => (aeval a1) * (aeval a2)
+  | APlus a1 a2 => Int64.add (aeval a1) (aeval a2)
+  | AMinus a1 a2  => Int64.sub (aeval a1) (aeval a2)
+  | AMult a1 a2 => Int64.mul (aeval a1) (aeval a2)
   end.
 
 Example test_aeval1:
-  aeval (APlus (ANum 2) (ANum 2)) = 4.
+  aeval (APlus (ANum (toi64 2)) (ANum (toi64 2))) = toi64 4.
 Proof. reflexivity. Qed.
 
 (** Similarly, evaluating a boolean expression yields a boolean. *)
@@ -145,8 +156,8 @@ Fixpoint beval (b : bexp) : bool :=
   match b with
   | BTrue       => true
   | BFalse      => false
-  | BEq a1 a2   => beq_nat (aeval a1) (aeval a2)
-  | BLe a1 a2   => leb (aeval a1) (aeval a2)
+  | BEq a1 a2   => Int64.eq (aeval a1) (aeval a2)
+  | BLe a1 a2   => Int64.cmp Cle (aeval a1) (aeval a2)
   | BNot b1     => negb (beval b1)
   | BAnd b1 b2  => andb (beval b1) (beval b2)
   end.
@@ -160,12 +171,18 @@ Fixpoint beval (b : bexp) : bool :=
     changing every occurrence of [0+e] (i.e., [(APlus (ANum 0) e])
     into just [e]. *)
 
+
+
 Fixpoint optimize_0plus (a:aexp) : aexp :=
   match a with
   | ANum n =>
       ANum n
-  | APlus (ANum 0) e2 =>
+  | APlus (ANum e1) e2 =>
+    match Int64.unsigned e1 with
+    | Z0 => 
       optimize_0plus e2
+    | _ => APlus (ANum e1) (optimize_0plus e2)
+    end
   | APlus e1 e2 =>
       APlus (optimize_0plus e1) (optimize_0plus e2)
   | AMinus e1 e2 =>
@@ -178,10 +195,10 @@ Fixpoint optimize_0plus (a:aexp) : aexp :=
     can test it on some examples and see if the output looks OK. *)
 
 Example test_optimize_0plus:
-  optimize_0plus (APlus (ANum 2)
-                        (APlus (ANum 0)
-                               (APlus (ANum 0) (ANum 1))))
-  = APlus (ANum 2) (ANum 1).
+  optimize_0plus (APlus (ANum (toi64 2))
+                        (APlus (ANum (toi64 0))
+                               (APlus (ANum (toi64 0)) (ANum (toi64 1)))))
+  = APlus (ANum (toi64 2)) (ANum (toi64 1)).
 Proof. reflexivity. Qed.
 
 (** But if we want to be sure the optimization is correct --
@@ -193,10 +210,22 @@ Theorem optimize_0plus_sound: forall a,
 Proof.
   intros a. induction a.
   - (* ANum *) reflexivity.
-  - (* APlus *) destruct a1.
-    + (* a1 = ANum n *) destruct n.
-      * (* n = 0 *)  simpl. apply IHa2.
-      * (* n <> 0 *) simpl. rewrite IHa2. reflexivity.
+  - (* APlus *) induction a1.
+    + (* a1 = ANum i *)
+      destruct (Int64.eq i Int64.zero) eqn:Hi;
+        pose proof Int64.eq_spec i Int64.zero as Hi'; rewrite Hi in Hi';
+          subst; simpl.
+      * (* i = 0 *)
+        assert (Int64.unsigned Int64.zero = 0%Z).
+        { unfold Int64.zero. unfold Int64.unsigned. reflexivity. }
+        rewrite H. rewrite Int64.add_zero_l. 
+        rewrite IHa2. reflexivity.
+      * (* i != 0 *)
+        destruct (Int64.unsigned i) eqn:Hiu; try (simpl; rewrite IHa2; reflexivity).
+        (* i != 0 and i = 0 *)
+        assert (Int64.eq i Int64.zero = true).
+        { unfold Int64.zero. unfold Int64.eq. rewrite Hiu. reflexivity. }
+        rewrite H in Hi. inversion Hi. 
     + (* a1 = APlus a1_1 a1_2 *)
       simpl. simpl in IHa1. rewrite IHa1.
       rewrite IHa2. reflexivity.
@@ -311,8 +340,22 @@ Proof.
        case, we have to destruct [n] (to see whether
        the optimization applies) and rewrite with the
        induction hypothesis. *)
-    + (* a1 = ANum n *) destruct n;
-      simpl; rewrite IHa2; reflexivity.   Qed.
+    + (* a1 = ANum i *)
+      destruct (Int64.eq i Int64.zero) eqn:Hi;
+        pose proof Int64.eq_spec i Int64.zero as Hi'; rewrite Hi in Hi';
+          subst; simpl.
+      * (* i = 0 *)
+        assert (Int64.unsigned Int64.zero = 0%Z).
+        { unfold Int64.zero. unfold Int64.unsigned. reflexivity. }
+        rewrite H. rewrite Int64.add_zero_l. 
+        rewrite IHa2. reflexivity.
+      * (* i != 0 *)
+        destruct (Int64.unsigned i) eqn:Hiu; try (simpl; rewrite IHa2; reflexivity).
+        (* i != 0 and i = 0 *)
+        assert (Int64.eq i Int64.zero = true).
+        { unfold Int64.zero. unfold Int64.eq. rewrite Hiu. reflexivity. }
+        rewrite H in Hi. inversion Hi.       
+Qed.
 
 (** Coq experts often use this "[...; try... ]" idiom after a tactic
     like [induction] to take care of many similar cases all at once.
@@ -376,8 +419,21 @@ Proof.
   - (* APlus *)
     destruct a1; try (simpl; simpl in IHa1; rewrite IHa1;
                       rewrite IHa2; reflexivity).
-    + (* a1 = ANum n *) destruct n;
-      simpl; rewrite IHa2; reflexivity. Qed.
+    + (* a1 = ANum n *) (* a1 = ANum i *)
+      destruct (Int64.eq i Int64.zero) eqn:Hi;
+        pose proof Int64.eq_spec i Int64.zero as Hi'; rewrite Hi in Hi';
+          subst; simpl.
+      * (* i = 0 *)
+        assert (Int64.unsigned Int64.zero = 0%Z).
+        { unfold Int64.zero. unfold Int64.unsigned. reflexivity. }
+        rewrite H. rewrite Int64.add_zero_l. 
+        rewrite IHa2. reflexivity.
+      * (* i != 0 *)
+        destruct (Int64.unsigned i) eqn:Hiu; try (simpl; rewrite IHa2; reflexivity).
+        (* i != 0 and i = 0 *)
+        assert (Int64.eq i Int64.zero = true).
+        { unfold Int64.zero. unfold Int64.eq. rewrite Hiu. reflexivity. }
+        rewrite H in Hi. inversion Hi.  Qed.
 
 (* ----------------------------------------------------------------- *)
 (** *** The [;] Tactical (General Form) *)
@@ -568,7 +624,7 @@ Qed.
     will see is often more flexible -- is as a _relation_ between
     expressions and their values.  This leads naturally to [Inductive]
     definitions like the following one for arithmetic expressions... *)
-
+(* Comment out rest, so that we can use Int64 right away 
 Module aevalR_first_try.
 
 Inductive aevalR : aexp -> nat -> Prop :=
@@ -626,7 +682,7 @@ Inductive aevalR : aexp -> nat -> Prop :=
       (e1 \\ n1) -> (e2 \\ n2) -> (AMult e1 e2) \\ (n1 * n2)
 
   where "e '\\' n" := (aevalR e n) : type_scope.
-
+*)
 (* ================================================================= *)
 (** ** Inference Rule Notation *)
 
@@ -693,7 +749,7 @@ Inductive aevalR : aexp -> nat -> Prop :=
 
 (** It is straightforward to prove that the relational and functional
     definitions of evaluation agree: *)
-
+(*
 Theorem aeval_iff_aevalR : forall a n,
   (a \\ n) <-> aeval a = n.
 Proof.
@@ -758,7 +814,7 @@ Lemma beval_iff_bevalR : forall b bv,
 Proof.
   (* FILL IN HERE *) Admitted.
 (** [] *)
-
+*)
 End AExp.
 
 (* ================================================================= *)
@@ -902,10 +958,10 @@ End aevalR_extended.
     mapping from identifiers to [nat].  For more complex programming
     languages, the state might have more structure. *)
 
-Definition state := total_map nat.
+Definition state := total_map int64.
 
 Definition empty_state : state :=
-  t_empty 0.
+  t_empty Int64.zero.
 
 (* ================================================================= *)
 (** ** Syntax  *)
@@ -914,7 +970,7 @@ Definition empty_state : state :=
     simply adding one more constructor: *)
 
 Inductive aexp : Type :=
-  | ANum : nat -> aexp
+  | ANum : int64 -> aexp
   | AId : id -> aexp                (* <----- NEW *)
   | APlus : aexp -> aexp -> aexp
   | AMinus : aexp -> aexp -> aexp
@@ -951,34 +1007,34 @@ Inductive bexp : Type :=
     variables in the obvious way, taking a state as an extra
     argument: *)
 
-Fixpoint aeval (st : state) (a : aexp) : nat :=
+Fixpoint aeval (st : state) (a : aexp) : int64 :=
   match a with
   | ANum n => n
+  | APlus a1 a2 => Int64.add (aeval st a1) (aeval st a2)
+  | AMinus a1 a2  => Int64.sub (aeval st a1) (aeval st a2)
+  | AMult a1 a2 => Int64.mul (aeval st a1) (aeval st a2)
   | AId x => st x                                (* <----- NEW *)
-  | APlus a1 a2 => (aeval st a1) + (aeval st a2)
-  | AMinus a1 a2  => (aeval st a1) - (aeval st a2)
-  | AMult a1 a2 => (aeval st a1) * (aeval st a2)
   end.
 
 Fixpoint beval (st : state) (b : bexp) : bool :=
   match b with
   | BTrue       => true
   | BFalse      => false
-  | BEq a1 a2   => beq_nat (aeval st a1) (aeval st a2)
-  | BLe a1 a2   => leb (aeval st a1) (aeval st a2)
+  | BEq a1 a2   => Int64.eq (aeval st a1) (aeval st a2)
+  | BLe a1 a2   => Int64.cmp Cle (aeval st a1) (aeval st a2)
   | BNot b1     => negb (beval st b1)
   | BAnd b1 b2  => andb (beval st b1) (beval st b2)
   end.
 
 Example aexp1 :
-  aeval (t_update empty_state X 5)
-        (APlus (ANum 3) (AMult (AId X) (ANum 2)))
-  = 13.
+  aeval (t_update empty_state X (toi64 5))
+        (APlus (ANum (toi64 3)) (AMult (AId X) (ANum (toi64 2))))
+  = (toi64 13).
 Proof. reflexivity. Qed.
 
 Example bexp1 :
-  beval (t_update empty_state X 5)
-        (BAnd BTrue (BNot (BLe (AId X) (ANum 4))))
+  beval (t_update empty_state X (toi64 5))
+        (BAnd BTrue (BNot (BLe (AId X) (ANum (toi64 4)))))
   = true.
 Proof. reflexivity. Qed.
 
@@ -1045,10 +1101,10 @@ Notation "'IFB' c1 'THEN' c2 'ELSE' c3 'FI'" :=
 
 Definition fact_in_coq : com :=
   Z ::= AId X;;
-  Y ::= ANum 1;;
-  WHILE BNot (BEq (AId Z) (ANum 0)) DO
+  Y ::= ANum (toi64 1);;
+  WHILE BNot (BEq (AId Z) (ANum (toi64 0))) DO
     Y ::= AMult (AId Y) (AId Z);;
-    Z ::= AMinus (AId Z) (ANum 1)
+    Z ::= AMinus (AId Z) (ANum (toi64 1))
   END.
 
 (* ================================================================= *)
@@ -1057,26 +1113,26 @@ Definition fact_in_coq : com :=
 (** Assignment: *)
 
 Definition plus2 : com :=
-  X ::= (APlus (AId X) (ANum 2)).
+  X ::= (APlus (AId X) (ANum (toi64 2))).
 
 Definition XtimesYinZ : com :=
   Z ::= (AMult (AId X) (AId Y)).
 
 Definition subtract_slowly_body : com :=
-  Z ::= AMinus (AId Z) (ANum 1) ;;
-  X ::= AMinus (AId X) (ANum 1).
+  Z ::= AMinus (AId Z) (ANum (toi64 1)) ;;
+  X ::= AMinus (AId X) (ANum (toi64 1)).
 
 (* ----------------------------------------------------------------- *)
 (** *** Loops *)
 
 Definition subtract_slowly : com :=
-  WHILE BNot (BEq (AId X) (ANum 0)) DO
+  WHILE BNot (BEq (AId X) (ANum (toi64 0))) DO
     subtract_slowly_body
   END.
 
 Definition subtract_3_from_5_slowly : com :=
-  X ::= ANum 3 ;;
-  Z ::= ANum 5 ;;
+  X ::= ANum (toi64 3) ;;
+  Z ::= ANum (toi64 5) ;;
   subtract_slowly.
 
 (* ----------------------------------------------------------------- *)
@@ -1251,16 +1307,16 @@ Inductive ceval : com -> state -> state -> Prop :=
     Coq's computation mechanism do it for us. *)
 
 Example ceval_example1:
-    (X ::= ANum 2;;
-     IFB BLe (AId X) (ANum 1)
-       THEN Y ::= ANum 3
-       ELSE Z ::= ANum 4
+    (X ::= ANum (toi64 2);;
+     IFB BLe (AId X) (ANum (toi64 1))
+       THEN Y ::= ANum (toi64 3)
+       ELSE Z ::= ANum (toi64 4)
      FI)
    / empty_state
-   \\ (t_update (t_update empty_state X 2) Z 4).
+   \\ (t_update (t_update empty_state X (toi64 2)) Z (toi64 4)).
 Proof.
   (* We must supply the intermediate state *)
-  apply E_Seq with (t_update empty_state X 2).
+  apply E_Seq with (t_update empty_state X (toi64 2)).
   - (* assignment command *)
     apply E_Ass. reflexivity.
   - (* if command *)
@@ -1270,8 +1326,8 @@ Proof.
 
 (** **** Exercise: 2 stars (ceval_example2)  *)
 Example ceval_example2:
-    (X ::= ANum 0;; Y ::= ANum 1;; Z ::= ANum 2) / empty_state \\
-    (t_update (t_update (t_update empty_state X 0) Y 1) Z 2).
+    (X ::= ANum (toi64 0);; Y ::= ANum (toi64 1);; Z ::= ANum (toi64 2)) / empty_state \\
+    (t_update (t_update (t_update empty_state X (toi64 0)) Y (toi64 1)) Z (toi64 2)).
 Proof.
   (* FILL IN HERE *) Admitted.
 (** [] *)
@@ -1286,9 +1342,9 @@ Definition pup_to_n : com := CSkip.
   (* REPLACE THIS LINE WITH ":= _your_definition_ ." *) (* Admitted. *)
 
 Theorem pup_to_2_ceval :
-  pup_to_n / (t_update empty_state X 2) \\
+  pup_to_n / (t_update empty_state X (toi64 2)) \\
     t_update (t_update (t_update (t_update (t_update (t_update empty_state
-      X 2) Y 0) Y 2) X 1) Y 3) X 0.
+      X (toi64 2)) Y (toi64 0)) Y (toi64 2)) X (toi64 1)) Y (toi64 3)) X (toi64 0).
 Proof.
   (* FILL IN HERE *) Admitted.
 (** [] *)
@@ -1354,7 +1410,7 @@ Proof.
 Theorem plus2_spec : forall st n st',
   st X = n ->
   plus2 / st \\ st' ->
-  st' X = n + 2.
+  st' X = Int64.add n (toi64 2).
 Proof.
   intros st n st' HX Heval.
 
@@ -1491,20 +1547,20 @@ Inductive sinstr : Type :=
 
 Fixpoint s_execute (st : state) (stack : list nat)
                    (prog : list sinstr)
-                 : list nat
+                 : list int64
   := [].
   (* REPLACE THIS LINE WITH ":= _your_definition_ ." *) (* Admitted. *)
 
 Example s_execute1 :
      s_execute empty_state []
        [SPush 5; SPush 3; SPush 1; SMinus]
-   = [2; 5].
+   = [(toi64 2); (toi64 5)].
 (* FILL IN HERE *) Admitted.
 
 Example s_execute2 :
-     s_execute (t_update empty_state X 3) [3;4]
+     s_execute (t_update empty_state X (toi64 3)) [3;4]
        [SPush 4; SLoad X; SMult; SPlus]
-   = [15; 4].
+   = [(toi64 15); (toi64 4)].
 (* FILL IN HERE *) Admitted.
 
 (** Next, write a function that compiles an [aexp] into a stack
@@ -1518,7 +1574,7 @@ Fixpoint s_compile (e : aexp) : list sinstr := [].
     that it works. *)
 
 Example s_compile1 :
-    s_compile (AMinus (AId X) (AMult (ANum 2) (AId Y)))
+    s_compile (AMinus (AId X) (AMult (ANum (toi64 2)) (AId Y)))
   = [SLoad X; SPush 2; SLoad Y; SMult; SMinus].
 (* FILL IN HERE *) Admitted.
 (** [] *)

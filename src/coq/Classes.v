@@ -494,7 +494,7 @@ Fixpoint to_string_b10' fuel (x:Z) : string :=
   end.
 
 (* Definition to_string_b10 := to_string_b10' 10. *)
-Definition to_string_b10 := to_string_b10' 1000.
+Definition to_string_b10 := to_string_b10' 10000.
 
 Instance string_of_Z : StringOf Z := to_string_b10.
 

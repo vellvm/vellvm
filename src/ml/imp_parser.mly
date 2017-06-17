@@ -9,9 +9,12 @@
  ---------------------------------------------------------------------------- *)
 %{
 open Imp
+open Integers
 
 let str = Camlcoq.coqstring_of_camlstring
-let coq_of_int = Camlcoq.Nat.of_int
+(* let coq_of_int = Camlcoq.Nat.of_int *)
+(* let coq_of_int n = Imp.Int64.signed (Camlcoq.Z.of_sint n) *)
+let coq_of_int n = Int64.repr (Camlcoq.Z.of_sint n)
 
 %}
 

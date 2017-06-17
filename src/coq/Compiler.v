@@ -10,11 +10,15 @@
 
 Require Import ZArith String Omega List Equalities MSets.
 
+(* CompCert *)
+Require Import compcert.lib.Integers.
+
 (* Vellvm dependencies *)
 Require Import Vellvm.Classes Vellvm.Ollvm_ast Vellvm.AstLib.
 
 (* Logical Foundations dependencies *)
 Require Import Vellvm.Imp Vellvm.Maps.
+
 
 (* "Flattened" representation of Vellvm code *)
 Inductive elt :=
@@ -31,6 +35,7 @@ Instance string_of_elt : StringOf elt :=
     | T id t => ("Terminator " ++ (string_of id) ++ ": " ++ (string_of t))%string
     end.
 
+
 Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list block) :=
   '(insns, term_opt, blks) <-
    monad_fold_right
@@ -39,7 +44,7 @@ Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list blo
       | L l =>
         match term_opt with
         | None => 
-          if (List.length insns) == 0 then mret ([], None, blks)
+          if (List.length insns) == 0%nat then mret ([], None, blks)
           else failwith "terminator not found"
         | Some (id, t) =>
           mret ([], None, (mk_block l insns t id)::blks)
@@ -95,7 +100,7 @@ Fixpoint fv_bexp (b:bexp) : IDSet.t :=
   | BLe a1 a2 => IDSet.union (fv a1) (fv a2)
   | BNot b => fv_bexp b
   | BAnd b1 b2 => IDSet.union (fv_bexp b1) (fv_bexp b2)
-  end.
+  end. 
 Instance FV_bexp : FV bexp := fv_bexp.
 
 Fixpoint fv_com (c:com) : IDSet.t :=
@@ -107,7 +112,6 @@ Fixpoint fv_com (c:com) : IDSet.t :=
   | CWhile b c => IDSet.union (fv b) (fv_com c)
   end.
 Instance FV_com : FV com := fv_com.
-
 
 (* LLVM Identifier generation monad ----------------------------------------- *)
 
@@ -184,6 +188,9 @@ Definition ctxt := partial_map value.
 Definition val_of_nat (n:nat) : value :=
   SV (VALUE_Integer (Z.of_nat n)).
 
+Definition val_of_int64 (i:int64) : value :=
+  SV (VALUE_Integer (Int64.signed i)).
+
 Definition val_of_ident (id:ident) : value :=
   SV (VALUE_Ident id).
 
@@ -238,7 +245,7 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
       mret (local lid)
   in
   match a with
-  | ANum n => mret (val_of_nat n)
+  | ANum n => mret (val_of_int64 n)
 
   | AId x =>
     'ptr <- lift "AId ident not found" (g x);
@@ -280,6 +287,7 @@ Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
 Fixpoint compile_com (g:ctxt) (c:com) : LLVM () :=
   match c with
   | CSkip => mret ()
+
   | CAss x a => 
     'v <- compile_aexp g a;
     'ptr <- lift "CAss ident not found" (g x);
@@ -379,6 +387,7 @@ Definition print_decl (fn:string) : declaration :=
      dc_gc := None
   |}.
 
+
 Definition compile (c:com) : err (toplevel_entities (list block)) :=
   '(fvs, elts) <-
           run (
@@ -387,7 +396,7 @@ Definition compile (c:com) : err (toplevel_entities (list block)) :=
             '; compile_com g c; 
 (*            '; print_fv fvs g;  (* UNCOMMENT to enable imp state printing *) *)
             '; term TERM_Ret_void;    
-              mret fvs              
+            mret fvs
           );
   'blocks <- blocks_of_elts (Anon 0)%Z elts;
   mret
@@ -399,17 +408,3 @@ Definition compile (c:com) : err (toplevel_entities (list block)) :=
     df_args := [];
     df_instrs := blocks
   |}]).
-
-
-
-(* Testing infrastructure *)
-
-Definition compile_aexp_wrapper (a : aexp) :=
-  run (let fvs := IDSet.elements (fv a) in
-       'g <- compile_fv fvs;
-         compile_aexp g a).
-
-Definition compile_bexp_wrapper (b : bexp) :=
-  run (let fvs := IDSet.elements (fv b) in
-       'g <- compile_fv fvs;
-         compile_bexp g b).

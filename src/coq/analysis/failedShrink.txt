@@ -1,0 +1,22 @@
+Handling Mutant 0.
+Writing to file: /tmp/QuickChick511b1b.v
+QuickChecking: (forAllShrink (test_com_gen 3) (@shrink com shrcom) imp_compiler_correct_aux)
+
+Handling Mutant 1.
+Writing to file: /tmp/QuickChickebc828.v
+QuickChecking: (forAllShrink (test_com_gen 3) (@shrink com shrcom) imp_compiler_correct_aux)
+While (W = ANum -1) do Skip;
+Y := ANum 4;
+If (Z = ANum 0) then Skip else W := (Z + W) endIf endWhile
+llvm out of gas
+*** Failed! After 1 tests and 1000 shrinks
+
+Handling Mutant 2.
+Writing to file: /tmp/QuickChick606bb6.v
+QuickChecking: (forAllShrink (test_com_gen 3) (@shrink com shrcom) imp_compiler_correct_aux)
+While (Y = ANum -1) do If ((((ANum 1 + ANum 3) + (ANum -1 * ANum 0)) + X) = ANum 3) then X := ((Y * (ANum -4 * ANum 6)) * (ANum -7 * Y));
+Z := Z else W := (((ANum 1 + ANum 8) + W) + (ANum -7 + ANum -9));
+W := ((ANum 2 + (ANum 7 * ANum -8)) * ((ANum 6 + ANum 1) + (ANum -1 + ANum 2))) endIf endWhile
+llvm out of gas
+1 : 
+*** Failed! After 2 tests and 1000 shrinks

@@ -1,3 +1,84 @@
+(******** Memory.v ********)
+
+
+Require Import ZArith.
+Require Import List.
+Require Import String.
+Require Import Omega.
+Require Import Vellvm.Ollvm_ast.
+Require Import Vellvm.Classes.
+Require Import Vellvm.Util.
+Require Import Vellvm.StepSemantics.
+Import ListNotations.
+
+Set Implicit Arguments.
+Set Contextual Implicit.
+
+Module A : Vellvm.StepSemantics.ADDR with Definition addr := nat.
+  Definition addr := nat.
+End A.  
+
+Module SS := StepSemantics.StepSemantics(A).
+Export SS.
+
+Definition mtype := list dvalue.
+Definition undef := DV VALUE_Undef.
+
+CoFixpoint memD (memory:mtype) (d:Trace) : Trace :=
+  match d with
+    | Tau d'            => Tau (memD memory d')
+    | Vis (Eff (Alloca t k))  => Tau (memD (memory ++ [undef])%list
+                                          (k (DVALUE_Addr (**!*)(List.length memory)(**!(pred (List.length memory))*))))
+    | Vis (Eff (Load a k))    => Tau (memD memory (k (nth_default undef memory a)))
+    | Vis (Eff (Store a v k)) => Tau (memD (replace memory a v) k)
+    | Vis (Eff (Call d ds k)) => Vis (Eff (Call d ds k))
+    | Vis x => Vis x
+  end.
+
+Fixpoint MemDFin (memory:mtype) (d:Trace) (steps:nat) : option mtype :=
+  match steps with
+  | O => None
+  | S x =>
+    match d with
+    | Vis (Fin d) => Some memory
+    | Vis (Err s) => None
+    | Tau d' => MemDFin memory d' x
+    | Vis (Eff (Alloca t k))  =>
+      MemDFin (memory ++ [undef])%list (k (DVALUE_Addr
+                                             (*!*) (*  (List.length memory) *) 
+                                             (*! *)  (pred (List.length memory)) (*  *)
+                                       )) x
+    | Vis (Eff (Load a k))    => MemDFin memory (k (nth_default undef memory a)) x
+    | Vis (Eff (Store a v k)) => MemDFin (replace memory a v) k x
+    | Vis (Eff (Call d ds k)) => None
+    end
+  end%N.
+
+
+(*
+Previous bug: 
+Fixpoint MemDFin {A} (memory:mtype) (d:Obs A) (steps:nat) : option mtype :=
+  match steps with
+  | O => None
+  | S x =>
+    match d with
+    | Ret a => None
+    | Fin d => Some memory
+    | Err s => None
+    | Tau d' => MemDFin memory d' x
+    | Eff (Alloca t k)  => MemDFin (memory ++ [undef])%list (k (DVALUE_Addr (pred (List.length memory)))) x
+    | Eff (Load a k)    => MemDFin memory (k (nth_default undef memory a)) x
+    | Eff (Store a v k) => MemDFin (replace memory a v) k x
+    | Eff (Call d ds k)    => None
+    end
+  end%N.
+*)
+(******** End of Memory.v ********)
+
+
+(******** CompilerProp.v ********)
+
+
 (* -------------------------------------------------------------------------- *
  *                     Vellvm - the Verified LLVM project                     *
  *                                                                            *
@@ -8,12 +89,18 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-Require Import Vellvm.Maps Vellvm.Imp.
+Require Import Vellvm.Maps.
+Require Import Vellvm.Imp.
 
 Require Import QuickChick.QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
 
-Require Import ZArith String Omega List Equalities MSets.
+Require Import ZArith.
+Require Import String.
+Require Import Omega.
+Require Import List.
+Require Import Equalities.
+Require Import MSets.
 Import ListNotations.
 
 (* Vellvm dependencies *)
@@ -98,7 +185,7 @@ Fixpoint string_of_dvalue' (v : dvalue) :=
 
 Instance string_of_value : StringOf dvalue := string_of_dvalue'.
 
-Instance string_of_mem : StringOf memory :=
+Instance string_of_mem : StringOf mtype :=
   fun mem => ("[" ++ show_nat (List.length mem) ++ "] " ++ string_of mem)%string.
 
 
@@ -113,7 +200,7 @@ Instance string_of_IDSet_elt : StringOf IDSet.elt :=
     | Id name => name
     end.
 
-Definition compile_and_execute (c : Imp.com) : err memory :=
+Definition compile_and_execute (c : Imp.com) : err mtype :=
   let fvs := IDSet.elements (fv c) in
   match compile c with
   | inl e => inl e
@@ -134,8 +221,6 @@ Definition compile_and_execute (c : Imp.com) : err memory :=
       end
     end
   end.
-
-(*! Section CompilerProp *)
 
 Definition imp_compiler_correct_aux (p:Imp.com) : Checker :=
   let fvs := IDSet.elements (fv p) in
@@ -166,7 +251,7 @@ Definition imp_compiler_correct_aux (p:Imp.com) : Checker :=
                                ++ (string_of fvs) (* (elems_to_string fvs) *)
                                ++ "; compiled code: "
                                ++ (string_of ll_prog))
-                            (imp_memory_eqb (*!*) (List.rev llvm_st) (*! llvm_st *) ans_state))
+                            (imp_memory_eqb (*!*) (*  (List.rev llvm_st) *)  (*! *)  llvm_st (*  *) ans_state))
         end        
       end
     end
@@ -356,10 +441,7 @@ Compute (show_result (compile prog16)).
 
 (* Compute (imp_compiler_correct_bool prog17). *)
 
-(*
-Unshrunk example: 
-If (ANum 0 <= ANum 0) then If (W <= W) then X := (Y * ((ANum 0 * ANum 1) + Y)) else Skip endIf else X := (((ANum 9 * ANum 10) * (ANum -2 * ANum 8)) * X);
-*)
+(*! QuickChick*) QuickChick  (forAllShrink (test_com_gen 3) (@shrink com shrcom) 
+                   imp_compiler_correct_aux). (* *)
 
-(*! QuickChick (forAllShrink (test_com_gen 3) (@shrink com shrcom) 
-                   imp_compiler_correct_aux). *)
+(******** End of CompilerProp.v ********)

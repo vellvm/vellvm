@@ -13,8 +13,8 @@
 (* IMPORTS *)
 Require Import Coq.omega.Omega.
 Require Import Coq.Arith.Arith.
-Require Import Imp.
-Require Import Maps.
+Require Import Vellvm.Imp.
+Require Import Vellvm.Maps.
 (* /IMPORTS *)
 
 (** Here was our first try at an evaluation function for commands,
