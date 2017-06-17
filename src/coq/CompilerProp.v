@@ -241,117 +241,7 @@ Definition show_result (result : err (toplevel_entities (list block))) :=
 
 Extract Constant Test.defNumTests => "100".
 
-(* Fails compilation because of wrongly-corrected monad_fold_left *)
-
-
-Example prog1 := (idX ::= ANum (Int64.repr 1)).
-Example prog2 := (idW ::= AId idW).
-
-(* Fails compilation because of off-by-one in Alloca for MemDFin *)
-Example prog3 :=
-  idX ::= ANum (Int64.repr 1) ;;
-  idY ::= ANum (Int64.repr 2) ;;
-  idZ ::= ANum (Int64.repr 3) ;;
-  idW ::= ANum (Int64.repr 4).
-
-Example prog4 := idX ::= AId idY.
-Example prog5 := idX ::= APlus (AId idW) (AId idX).
-
-(* Fails compilation because of memory allocation of free vars in reverse order
-   during compilation *)
-Example prog6 := idY ::= APlus (AId idZ) (ANum (Int64.repr 4)).
-
-(* Fails because of N semantics in Imp but Z semantics for Vellvm *)
-Example prog7 :=
-  IFB (BEq (AMult (ANum (Int64.repr 10)) (AId idW))
-           (AMult (ANum (Int64.repr 6)) (ANum (Int64.repr 5))))
-  THEN
-  X ::= (APlus (AId idY) (AMult (APlus (ANum (Int64.repr 1)) (ANum (Int64.repr 5)))
-                                (APlus (ANum (Int64.repr 1)) (ANum (Int64.repr 0)))))
-  ELSE
-  Y ::= (APlus (AId idY)
-               (APlus (AMinus (ANum (Int64.repr 3))
-                              (ANum (Int64.repr 4)))
-                      (ANum (Int64.repr 2)))) FI.
-  (* IF (10 * W == 6 * 5) THEN
-       X = Y + ( (1 + 5) * (1 + 0) )
-     ELSE
-       Y = Y + ((3 - 4) + 2)
-     END *)
-
-Example prog8 :=
-  IFB (BFalse) THEN
-    X ::= ANum (Int64.repr 10)
-  ELSE Y ::= (AMinus (ANum (Int64.repr 3)) (ANum (Int64.repr 4))) FI.
-
-Example prog9 :=
-  Y ::= (AMinus (ANum (Int64.repr 3)) (ANum (Int64.repr 4))).
-
 (*
-Compute (show_result (compile prog3)).
-Compute (show_result (compile prog4)).
-Compute (show_result (compile prog6)).
-Compute (compile_and_execute prog3).
-Compute (compile_and_execute prog4).
-Compute (compile_and_execute prog5).
-Compute (compile_and_execute prog7).
-Compute (compile_and_execute prog8).
-Compute (compile_and_execute prog9).
-*)
-
-(* QuickChick (forAllShrink (arbitrarySized 2) shrink imp_compiler_correct_aux). *)
-(* QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
-
-Definition prog10 :=
-  IFB (BNot (BNot (BLe (AMult (ANum (Int64.repr 6)) (ANum (Int64.repr 6))) (AId Y))))
-  THEN idY ::= AId idX
-  ELSE idZ ::= AId idZ FI.
-
-Definition prog11 :=
-  IFB (BLe (AMult (ANum (Int64.repr 6)) (ANum (Int64.repr 6))) (AId Y))
-  THEN idY ::= AId idX
-  ELSE idZ ::= AId idZ FI.
-
-Definition prog12 :=
-  IFB (BNot (BNot (BLe (ANum (Int64.repr 0)) (AId Y))))
-  THEN idY ::= AId idX
-  ELSE idZ ::= AId idZ FI.
-
-Definition prog13 :=
-  IFB (BNot (BNot (BEq (ANum (Int64.repr 0)) (AId Y))))
-  THEN SKIP
-  ELSE SKIP FI.
-
-Definition prog14 :=
-  IFB (BNot (BEq (ANum (Int64.repr 0)) (AId Y)))
-  THEN SKIP
-  ELSE SKIP FI.
-
-Definition prog15 :=
-  IFB (BEq (ANum (Int64.repr 0)) (AId Y))
-  THEN SKIP
-  ELSE SKIP FI.
-
-Definition prog16 :=
-  IFB (BNot BTrue)
-  THEN SKIP
-  ELSE SKIP FI.
-
-Definition prog17 :=
-  WHILE (BEq (AId idX) (ANum (Int64.repr 1))) DO idW ::= ANum (Int64.repr 0) END.
-
-(*
-Compute (compile_and_execute prog16).
-Compute (show_result (compile prog16)).
- *)
-
-(* Compute (imp_compiler_correct_bool prog17). *)
-
-(*
-Unshrunk example: 
-If (ANum 0 <= ANum 0) then If (W <= W) then X := (Y * ((ANum 0 * ANum 1) + Y)) else Skip endIf else X := (((ANum 9 * ANum 10) * (ANum -2 * ANum 8)) * X);
- *)
-
 Definition prog_unshrunk :=
   IFB (BLe (ANum (Int64.repr 0)) (ANum (Int64.repr 0))) THEN
     IFB (BLe (AId idW) (AId W)) THEN
@@ -365,12 +255,37 @@ Definition prog_unshrunk :=
                    (AMult (AMult (ANum (Int64.repr (-2))) (ANum (Int64.repr 8)))
                           (AId idX)))
   FI.
-
-Compute (nth 0 (@shrink com shrcom prog_unshrunk) SKIP).
-
-(*
-Check @shrink aexp shraexp prog_unshrunk.
-
-QuickChick (forAllShrink (test_com_gen 3) (@shrink com shrcom) 
-                         imp_compiler_correct_aux). 
 *)
+
+(*! Section TestSingleCom *)
+
+Existing Instance gen_seq_and_assgn_com.
+Existing Instance gen_bexp_with_small_aexp.
+Existing Instance gen_adhoc_aexp.
+Existing Instance gen_small_nonneg_i64.
+
+(*! QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
+(* Shrinking is slow: 
+   QuickChick (forAllShrink (arbitrarySized 0) shrink imp_compiler_correct_aux).
+ *)
+
+(* QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
+
+Example prog1 :=
+  idW ::= (APlus (AMult (AId idX) (ANum (Int64.repr 2)))
+                 (AMult (ANum (Int64.repr 1)) (AId idX))).
+
+(* Compute (compile_and_execute prog1). *)
+
+Remove Hints gen_seq_and_assgn_com : typeclass_instances.
+Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
+Remove Hints gen_adhoc_aexp : typeclass_instances.
+Remove Hints gen_small_nonneg_i64 : typeclass_instances.
+
+(* End TestSingleCom !*)
+
+
+(*! Section TestMultipleCom *)
+
+
+(* End TestMultipleCom *)

@@ -8,14 +8,21 @@ Require Import List ZArith.
 Import ListNotations.
 Require Import String.
 
-
 (* i64 *)
 
 Definition show_int64 (n : int64) := show_int (Int64.signed n).
 
 Instance show_i64 : Show int64 := {| show := show_int64 |}.
 
-Instance gen_i64 : GenSized int64 :=
+
+Instance gen_large_i64 : GenSized int64 :=
+  {| arbitrarySized n :=
+       let n' := if leb n 1000 then n else 1000 in
+       let genZ := (let z := Z.of_nat n' in choose (900, 1000)%Z) in
+       bindGen genZ (fun z => returnGen (Int64.repr z))
+  |}.
+
+Instance gen_i64 : GenSized int64 | 100 :=
   {| arbitrarySized n := 
        let genZ := (let z := Z.of_nat n in choose (-z, z)%Z) in
        bindGen genZ (fun z => returnGen (Int64.repr z)) 
@@ -27,13 +34,15 @@ Instance gen_nonneg_i64 : GenSized int64 :=
        bindGen genZ (fun z => returnGen (Int64.repr z))
   |}.
 
-Instance gen_small_i64 : GenSized int64 :=
+Instance gen_small_nonneg_i64 : GenSized int64 :=
   {| arbitrarySized n :=
        let n' := if leb n 10 then n else 10 in
        let genZ := (let z := Z.of_nat n' in choose (0, z)%Z) in
        bindGen genZ (fun z => returnGen (Int64.repr z))
   |}.
 
+
+(*
 Instance gen_i64_with_extremes : GenSized int64 :=
   {| arbitrarySized n := 
      let genZ := (let z := Z.of_nat n in choose (-z, z)%Z) in
@@ -41,14 +50,21 @@ Instance gen_i64_with_extremes : GenSized int64 :=
      let extremities_gen := freq [(1, returnGen (Int64.repr (Int64.max_signed)));
                                     (1, returnGen (Int64.repr (Int64.min_signed)))] in
      freq [(9, symmetric_int64_gen); (1, extremities_gen)] |}.
-
-
+*)
 
 Instance shrink_i64 : Shrink int64 :=
   {| shrink n := [Int64.repr 0%Z;
                   Int64.repr (Int64.max_signed); 
                   Int64.repr (Int64.min_signed)] |}.
 
+(* 
+  We force the tester to register manually 
+  when there are multiple possibilities. 
+ *)
+Remove Hints gen_i64 : typeclass_instances. 
+Remove Hints gen_nonneg_i64 : typeclass_instances. 
+Remove Hints gen_small_nonneg_i64 : typeclass_instances. 
+Remove Hints gen_large_i64 : typeclass_instances. 
 
 (* Id *)
 Derive Show for id.
@@ -113,9 +129,7 @@ Instance show_aexp `{Show int64} : Show aexp :=
            end)%string
   |}.
 
-Derive Arbitrary for aexp.
-
-Instance gen_aexp `{Gen int64} `{Gen id} : GenSized aexp :=
+Instance gen_adhoc_aexp `{Gen int64} `{Gen id} : GenSized aexp :=
   {| arbitrarySized := 
        fix gen_aexp_func n :=
          match n with
@@ -137,7 +151,7 @@ Instance gen_aexp `{Gen int64} `{Gen id} : GenSized aexp :=
          end
   |}.
 
-Instance gen_plus_aexp_func `{Gen int64} `{Gen id} : GenSized aexp :=
+Instance gen_plus_aexp `{Gen int64} `{Gen id} : GenSized aexp :=
   {| arbitrarySized :=
        fix gen_plus_aexp_func n :=
          match n with
@@ -167,6 +181,22 @@ Instance shr_aexp : Shrink aexp :=
          end
   |}.
 
+(* 
+  We force the tester to register manually 
+  when there are multiple possibilities. 
+ *)
+Existing Instance gen_i64.
+Derive Arbitrary for aexp.
+Remove Hints gen_i64 : typeclass_instances.
+
+Remove Hints genSaexp : typeclass_instances.
+Remove Hints gen_plus_aexp : typeclass_instances.
+Remove Hints gen_adhoc_aexp : typeclass_instances.
+
+Remove Hints shraexp : typeclass_instances.
+
+Print Hint GenSized.
+
 (**** Boolean expressions ****)
 
 Instance show_bexp `{Show aexp} : Show bexp :=
@@ -181,8 +211,6 @@ Instance show_bexp `{Show aexp} : Show bexp :=
          | BAnd b1 b2 => (show_bexp_func b1) ++ " /\ " ++ (show_bexp_func b2)
          end)%string
   |}.
-
-Derive Arbitrary for bexp.
 
 Instance gen_bexp_with_proportional_aexp `{GenSized aexp} : GenSized bexp :=
   {| arbitrarySized :=
@@ -199,7 +227,7 @@ Instance gen_bexp_with_proportional_aexp `{GenSized aexp} : GenSized bexp :=
          end
   |}.
 
-Instance gen_bexp_with_small_aexp `{GenSized aexp} : GenSized bexp :=
+Instance gen_bexp_with_small_aexp `{GenSized aexp} : GenSized bexp | 0 :=
   {| arbitrarySized :=
        fix gen_bexp_func n :=
          match n with
@@ -214,11 +242,20 @@ Instance gen_bexp_with_small_aexp `{GenSized aexp} : GenSized bexp :=
          end
   |}.
 
+(* 
+  We force the tester to register manually 
+  when there are multiple possibilities. 
+ *)
+Existing Instance genSaexp.
+Derive Arbitrary for bexp.
+Remove Hints genSaexp : typeclass_instances.
+
+Remove Hints gen_bexp_with_proportional_aexp : typeclass_instances.
+Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
 
 (**** Commands ****)
 
 Derive Show for com.
-Derive Arbitrary for com.
 
 Instance show_com `{Show aexp} `{Show bexp} : Show com :=
   {| show :=
@@ -248,7 +285,7 @@ Instance gen_all_com `{Gen id} `{Gen aexp} `{Gen bexp} : GenSized com :=
   |}.
 
 
-Instance gen_if_com `{Gen id} `{Gen aexp} `{Gen bexp} : GenSized com :=
+Instance gen_if_com `{Gen id} `{Gen aexp} `{Gen bexp} : GenSized com | 0 :=
   {| arbitrarySized :=
        fix com_gen_func n :=
          match n with
@@ -280,23 +317,19 @@ Instance adhoc_com_gen : GenSized com :=
   |}.
  *)
 
-Existing Instance gen_i64 | 10.
-Existing Instance gen_nonneg_i64 | 7.
-Existing Instance gen_small_i64 | 4.
-Existing Instance gen_i64_with_extremes | 20. (* Un-usable because cannot print for now*)
+(* 
+  We force the tester to register manually 
+  when there are multiple possibilities. 
+ *)
+Existing Instance genSaexp.
+Existing Instance genSbexp.
+Derive Arbitrary for com.
+Remove Hints genSaexp : typeclass_instances.
+Remove Hints genSbexp : typeclass_instances.
 
-Existing Instance genSaexp | 10.
-Existing Instance shraexp | 10.
-Existing Instance gen_plus_aexp_func | 1.
-Existing Instance gen_aexp | 2.
+Remove Hints gen_seq_and_assgn_com : typeclass_instances.
+Remove Hints gen_all_com : typeclass_instances.
+Remove Hints gen_if_com : typeclass_instances.
+Remove Hints genScom : typeclass_instances.
 
-Existing Instance genSbexp | 10.
-Existing Instance gen_bexp_with_proportional_aexp | 9.
-Existing Instance gen_bexp_with_small_aexp | 1.
-
-Existing Instance showcom | 1.
-Existing Instance genScom | 10.
-Existing Instance gen_seq_and_assgn_com | 0.
-Existing Instance gen_all_com | 9.
-Existing Instance gen_if_com | 5.
-Existing Instance shrcom | 10.
+(* Print Hint GenSized. *)
