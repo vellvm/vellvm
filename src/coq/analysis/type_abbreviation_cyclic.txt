@@ -1,0 +1,4 @@
+File "./QuickChick11cc34_tmptmp.ml", line 6125, characters 2-20:
+Error: The type abbreviation int is cyclic
+File "./QuickChick11cc34_tmptmp.ml", line 6125, characters 2-20:
+Error: The type abbreviation int is cyclic

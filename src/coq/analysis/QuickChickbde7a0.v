@@ -19,8 +19,6 @@ Export SS.
 Definition mtype := list dvalue.
 Definition undef := DV VALUE_Undef.
 
-(*! Section Memory *)
-
 CoFixpoint memD (memory:mtype) (d:Trace) : Trace :=
   match d with
     | Tau d'            => Tau (memD memory d')
@@ -42,8 +40,8 @@ Fixpoint MemDFin (memory:mtype) (d:Trace) (steps:nat) : option mtype :=
     | Tau d' => MemDFin memory d' x
     | Vis (Eff (Alloca t k))  =>
       MemDFin (memory ++ [undef])%list (k (DVALUE_Addr
-                                             (*!*) (List.length memory)
-                                             (*! (pred (List.length memory)) *)
+                                             (*!*) (*  (List.length memory) *) 
+                                             (*! *)  (pred (List.length memory)) (*  *)
                                        )) x
     | Vis (Eff (Load a k))    => MemDFin memory (k (nth_default undef memory a)) x
     | Vis (Eff (Store a v k)) => MemDFin (replace memory a v) k x
@@ -622,9 +620,6 @@ Definition compile_and_execute (c : Imp.com) : err mtype :=
     end
   end.
 
-
-(*! Section CompilerProp *)
-
 Definition imp_compiler_correct_aux (p:Imp.com) : Checker :=
   let fvs := IDSet.elements (fv p) in
   match compile p with
@@ -654,7 +649,7 @@ Definition imp_compiler_correct_aux (p:Imp.com) : Checker :=
                                ++ (string_of fvs) (* (elems_to_string fvs) *)
                                ++ "; compiled code: "
                                ++ (string_of ll_prog))
-                            (imp_memory_eqb (*!*) (List.rev llvm_st) (*! llvm_st *) ans_state))
+                            (imp_memory_eqb (*!*) (*  (List.rev llvm_st) *)  (*! *)  llvm_st (*  *) ans_state))
         end        
       end
     end
@@ -846,11 +841,9 @@ Compute (show_result (compile prog16)).
 *)
 
 (*!
-QuickChick (forAllShrink (test_com_gen 3) (@shrink com shrcom) 
-                   imp_compiler_correct_aux).
+QuickChick*) QuickChick  (forAllShrink (test_com_gen 3) (@shrink com shrcom) 
+                   imp_compiler_correct_aux). (*
 *)
 
 
 (******** End of CompilerProp.v ********)
-
-
