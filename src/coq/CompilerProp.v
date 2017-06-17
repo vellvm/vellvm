@@ -356,5 +356,10 @@ Compute (show_result (compile prog16)).
 
 (* Compute (imp_compiler_correct_bool prog17). *)
 
+(*
+Unshrunk example: 
+If (ANum 0 <= ANum 0) then If (W <= W) then X := (Y * ((ANum 0 * ANum 1) + Y)) else Skip endIf else X := (((ANum 9 * ANum 10) * (ANum -2 * ANum 8)) * X);
+*)
+
 (*! QuickChick (forAllShrink (test_com_gen 3) (@shrink com shrcom) 
                    imp_compiler_correct_aux). *)
