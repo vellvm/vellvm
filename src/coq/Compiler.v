@@ -125,6 +125,8 @@ Instance llvm_functor : @Functor LLVM := llvm_map.
 
 Definition llvm_ret (A:Type) (x:A) : LLVM A :=
   fun s => (s, inr x).
+Hint Unfold llvm_ret.
+
 
 Definition llvm_bind (A B:Type) (g:LLVM A) (f:A -> LLVM B) : LLVM B :=
   fun s =>
@@ -133,6 +135,7 @@ Definition llvm_bind (A B:Type) (g:LLVM A) (f:A -> LLVM B) : LLVM B :=
     | inl e => (st, inl e)
     | inr a => (f a) st
     end.
+Hint Unfold llvm_bind.
 Program Instance llvm_monad : (@Monad LLVM) llvm_functor := _.
 Next Obligation.
   split.
@@ -141,6 +144,7 @@ Next Obligation.
 Defined.    
 
 Instance llvm_err : (@ExceptionMonad string LLVM _ _) := fun _ e => fun s => (s, inl e).
+Hint Unfold llvm_err.
 
 (* Start the counters at 1 so that 0 can be used at the toplevel *)
 Definition run {A} (g : LLVM A) : err (A * list elt) :=
@@ -152,14 +156,23 @@ Definition run {A} (g : LLVM A) : err (A * list elt) :=
 
 Definition lift {A} (e:string) (m:option A) : LLVM A :=
   fun s => (s, trywith e m).
+Hint Unfold lift.
 
 Definition lid_of_Z (n:int) : local_id := Name ("x"++(string_of n))%string.
 
+Lemma lid_of_Z_inj: forall n1 n2, n1 <> n2 -> lid_of_Z n1 <> lid_of_Z n2.
+(* Technically, can't prove this because string_of n is not injective -- too large of numbers
+   become the same error message *)
+Proof.
+Admitted.
+
 Definition genlabel : () -> LLVM (local_id) :=
   fun _ => fun '(n,m,c) => ((1+n,m,c), mret (lid_of_Z n))%Z.
+Hint Unfold genlabel.
 
 Definition genvoid : () -> LLVM (instr_id) :=
   fun _ => fun '(n,m,c) => ((n,1+m,c), mret (IVoid m))%Z.
+Hint Unfold genvoid.
 
 (* A context maps Imp variables to Vellvm identifiers
    Invariant: 

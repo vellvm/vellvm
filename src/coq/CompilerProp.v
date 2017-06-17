@@ -82,7 +82,7 @@ Fixpoint string_of_dvalue' (v : value) :=
 
 Instance string_of_value : StringOf dvalue := string_of_dvalue'.
 
-Instance string_of_mem : StringOf mtype :=
+Instance string_of_mem : StringOf memory :=
   fun mem => ("[" ++ show_nat (List.length mem) ++ "] " ++ string_of mem)%string.
 (*
   fun (mem: mtype) =>
@@ -107,7 +107,7 @@ Instance string_of_IDSet_elt : StringOf IDSet.elt :=
     | Id name => name
     end.
 
-Definition compile_and_execute (c : Imp.com) : err mtype :=
+Definition compile_and_execute (c : Imp.com) : err memory :=
   let fvs := IDSet.elements (fv c) in
   match compile c with
   | inl e => inl e
