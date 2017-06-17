@@ -101,7 +101,6 @@ Instance string_of_value : StringOf dvalue := string_of_dvalue'.
 Instance string_of_mem : StringOf mtype :=
   fun mem => ("[" ++ show_nat (List.length mem) ++ "] " ++ string_of mem)%string.
 
-
 Definition state_to_string (fv : list id) (st : state) : string :=
   fold_left (fun acc x => (match x with
                         | Id ident => (ident ++ ": " ++ show_int64 (st x) ++ ", ")%string
@@ -155,7 +154,7 @@ Definition imp_compiler_correct_aux (p:Imp.com) : Checker :=
         match (llvm_final_state, imp_state) with
         | (None, None) => whenFail "both out of gas" true
         | (Some llvm_st, None) => whenFail "imp out of gas" true
-        | (None, Some imp_st) => whenFail "llvm out of gas" false
+        | (None, Some imp_st) => whenFail "llvm out of gas" false 
         | (Some llvm_st, Some imp_st) => 
           let ans_state := List.map (fun x => dvalue_of_int64 (imp_st x)) fvs in
           checker (whenFail ("not equal: llvm: "
@@ -300,16 +299,8 @@ Compute (compile_and_execute prog8).
 Compute (compile_and_execute prog9).
 *)
 
-(* QuickChick (forAll arbitrary
-                   imp_compiler_correct_aux). *)
-
-(* QuickChick (forAll (test_com_gen 2) imp_compiler_correct_aux). *)
-
-(* QuickChick (forAll (test_aexp_gen) compile_aexp_correct). *)
-(* QuickChick (forAll (test_bexp_gen) compile_bexp_correct). *)
-(* QuickChick (forAll (test_aexp_gen) compile_aexp_correct_bool). *)
-(* QuickChick (forAll (test_bexp_gen) compile_bexp_correct_bool). *)
-
+(* QuickChick (forAllShrink (arbitrarySized 2) shrink imp_compiler_correct_aux). *)
+(* QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
 
 Definition prog10 :=
   IFB (BNot (BNot (BLe (AMult (ANum (Int64.repr 6)) (ANum (Int64.repr 6))) (AId Y))))
@@ -359,7 +350,27 @@ Compute (show_result (compile prog16)).
 (*
 Unshrunk example: 
 If (ANum 0 <= ANum 0) then If (W <= W) then X := (Y * ((ANum 0 * ANum 1) + Y)) else Skip endIf else X := (((ANum 9 * ANum 10) * (ANum -2 * ANum 8)) * X);
-*)
+ *)
 
-(*! QuickChick (forAllShrink (test_com_gen 3) (@shrink com shrcom) 
-                   imp_compiler_correct_aux). *)
+Definition prog_unshrunk :=
+  IFB (BLe (ANum (Int64.repr 0)) (ANum (Int64.repr 0))) THEN
+    IFB (BLe (AId idW) (AId W)) THEN
+      idX ::= (AMult (AId idY)
+                     (APlus (AMult (ANum (Int64.repr 0)) (ANum (Int64.repr 1)))
+                            (AId idY)))
+    ELSE SKIP
+    FI
+  ELSE
+    idX ::= (AMult (AMult (ANum (Int64.repr 9)) (ANum (Int64.repr 10)))
+                   (AMult (AMult (ANum (Int64.repr (-2))) (ANum (Int64.repr 8)))
+                          (AId idX)))
+  FI.
+
+Compute (nth 0 (@shrink com shrcom prog_unshrunk) SKIP).
+
+(*
+Check @shrink aexp shraexp prog_unshrunk.
+
+QuickChick (forAllShrink (test_com_gen 3) (@shrink com shrcom) 
+                         imp_compiler_correct_aux). 
+*)

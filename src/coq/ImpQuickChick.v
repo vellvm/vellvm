@@ -10,23 +10,45 @@ Require Import String.
 
 
 (* i64 *)
-Definition show_int64 n := show_int (Int64.signed n).
-Instance show__int64 : Show int64 := {| show := show_int64 |}.
-Definition gen_i64_func (n : nat) :=
-  let genZ := @arbitrarySized Z genZSized n in
-  let symmetric_int64_gen := bindGen genZ (fun z => returnGen (Int64.repr z)) in
-  let extremities_gen := freq [(1, returnGen (Int64.repr (Int64.max_signed)));
-                               (1, returnGen (Int64.repr (Int64.min_signed)))] in
-  freq [(9, symmetric_int64_gen); (1, extremities_gen)].
 
-Instance gen_i64 : GenSized int64 := {| arbitrarySized := gen_i64_func |}.
+Definition show_int64 (n : int64) := show_int (Int64.signed n).
 
-Definition test_i64_gen := gen_i64_func 10.
+Instance show_i64 : Show int64 := {| show := show_int64 |}.
+
+Instance gen_i64 : GenSized int64 :=
+  {| arbitrarySized n := 
+       let genZ := (let z := Z.of_nat n in choose (-z, z)%Z) in
+       bindGen genZ (fun z => returnGen (Int64.repr z)) 
+  |}.
+
+Instance gen_nonneg_i64 : GenSized int64 :=
+  {| arbitrarySized n := 
+       let genZ := (let z := Z.of_nat n in choose (0, z)%Z) in
+       bindGen genZ (fun z => returnGen (Int64.repr z))
+  |}.
+
+Instance gen_small_i64 : GenSized int64 :=
+  {| arbitrarySized n :=
+       let n' := if leb n 10 then n else 10 in
+       let genZ := (let z := Z.of_nat n' in choose (0, z)%Z) in
+       bindGen genZ (fun z => returnGen (Int64.repr z))
+  |}.
+
+Instance gen_i64_with_extremes : GenSized int64 :=
+  {| arbitrarySized n := 
+     let genZ := (let z := Z.of_nat n in choose (-z, z)%Z) in
+     let symmetric_int64_gen := bindGen genZ (fun z => returnGen (Int64.repr z)) in
+     let extremities_gen := freq [(1, returnGen (Int64.repr (Int64.max_signed)));
+                                    (1, returnGen (Int64.repr (Int64.min_signed)))] in
+     freq [(9, symmetric_int64_gen); (1, extremities_gen)] |}.
+
+
 
 Instance shrink_i64 : Shrink int64 :=
   {| shrink n := [Int64.repr 0%Z;
                   Int64.repr (Int64.max_signed); 
                   Int64.repr (Int64.min_signed)] |}.
+
 
 (* Id *)
 Derive Show for id.
@@ -46,14 +68,14 @@ Instance shrink_id : Shrink id := {| shrink := fun _ => [] |}.
 
 (* State *)
 
-Definition show_state_func (st : state) : string :=
-  "W = " ++ (show_int64 (st idW)) ++ ", " ++
-  "X = " ++ (show_int64 (st idX)) ++ ", " ++
-  "Y = " ++ (show_int64 (st idY)) ++ ", " ++
-  "Z = " ++ (show_int64 (st idZ)) ++ ", ".
-
-Instance show_state: Show state := {| show := show_state_func |}.
-
+Instance show_state `{Show int64}: Show state :=
+  {| show st := (
+       "W = " ++ (show (st idW)) ++ ", " ++
+       "X = " ++ (show (st idX)) ++ ", " ++
+       "Y = " ++ (show (st idY)) ++ ", " ++
+       "Z = " ++ (show (st idZ)) ++ ", ")%string
+  |}.
+       
 Fixpoint gen_state_func (num_gen : G int64) (id_gen : G id) (n : nat) : G state :=
   match n with
   | 0 => returnGen empty_state
@@ -65,143 +87,216 @@ Fixpoint gen_state_func (num_gen : G int64) (id_gen : G id) (n : nat) : G state 
                returnGen (t_update st id val))))
   end.
 
-Instance gen_state : GenSized state :=
-  {| arbitrarySized := gen_state_func test_i64_gen test_id_gen |}.
-
-Definition test_state_gen := gen_state_func test_i64_gen test_id_gen 5.
-(* Sample test_state_gen. *)
+Instance gen_state `{GenSized int64}: GenSized state :=
+  {| arbitrarySized n := gen_state_func (arbitrarySized n) test_id_gen n |}.
 
 Instance shrink_state : Shrink state :=
   {| shrink := fun _ => [] |}.
 
-
 (**** Arithmetic Expressions ****)
 
-Fixpoint show_aexp_func (a : aexp) : string :=
-  match a with
-  | ANum n => "ANum " ++ (show_int64 n)
-  | AId ident =>
-    match ident with
-    | Id name => name
-    end
-  | APlus a1 a2 => "(" ++ (show_aexp_func a1) ++ " + " ++
-                       (show_aexp_func a2) ++ ")"
-  | AMinus a1 a2 => "(" ++ (show_aexp_func a1) ++ " - " ++
-                        (show_aexp_func a2) ++ ")"
-  | AMult a1 a2 => "(" ++ (show_aexp_func a1) ++ " * " ++
-                        (show_aexp_func a2) ++ ")"
-  end.
-
-Instance show_aexp : Show aexp := {| show := show_aexp_func |}.
-
-Fixpoint gen_aexp_func (i64_gen : G int64) (id_gen: G id) (n : nat) : G aexp :=
-  match n with
-  | 0 => liftGen ANum i64_gen
-  | S n' =>
-    let var_gen := (liftGen AId id_gen) in
-    let plus_gen := (liftGen2 APlus
-                              (gen_aexp_func i64_gen id_gen n')
-                              (gen_aexp_func i64_gen id_gen n')) in
-    let minus_gen := (liftGen2 AMinus
-                                  (gen_aexp_func i64_gen id_gen n')
-                                  (gen_aexp_func i64_gen id_gen n')) in
-    let mult_gen := (liftGen2 AMult
-                                 (gen_aexp_func i64_gen id_gen n')
-                                 (gen_aexp_func i64_gen id_gen n'))
-    in 
-    (* oneOf [var_gen; plus_gen; minus_gen; mult_gen; liftGen ANum i64_gen] *)
-    oneOf [var_gen; plus_gen; mult_gen; liftGen ANum i64_gen]
-  end.
-
-Fixpoint gen_simple_aexp_func (i64_gen : G int64) (id_gen : G id) (n : nat) : G aexp :=
-  match n with
-  | 0 => liftGen ANum i64_gen
-  | S n' =>
-    let plus_gen := (liftGen2 APlus
-                              (liftGen AId id_gen)
-                              (gen_simple_aexp_func i64_gen id_gen n')) in
-    plus_gen
-  end.
-
-Definition test_aexp_gen := gen_aexp_func test_i64_gen test_id_gen 3.
+Instance show_aexp `{Show int64} : Show aexp :=
+  {| show := (
+       fix show_aexp_func a :=
+           match a with
+           | ANum n => "ANum " ++ (show n)
+           | AId ident =>
+             match ident with
+             | Id name => name
+             end
+           | APlus a1 a2 => "(" ++ (show_aexp_func a1) ++ " + " ++
+                               (show_aexp_func a2) ++ ")"
+           | AMinus a1 a2 => "(" ++ (show_aexp_func a1) ++ " - " ++
+                                (show_aexp_func a2) ++ ")"
+           | AMult a1 a2 => "(" ++ (show_aexp_func a1) ++ " * " ++
+                               (show_aexp_func a2) ++ ")"
+           end)%string
+  |}.
 
 Derive Arbitrary for aexp.
-(* Sample (@arbitrarySized aexp genSaexp 4). *)
+
+Instance gen_aexp `{Gen int64} `{Gen id} : GenSized aexp :=
+  {| arbitrarySized := 
+       fix gen_aexp_func n :=
+         match n with
+         | 0 => liftGen ANum arbitrary
+         | S n' =>
+           let var_gen := (liftGen AId arbitrary) in
+           let plus_gen := (liftGen2 APlus
+                                     (gen_aexp_func n')
+                                     (gen_aexp_func n')) in
+           let minus_gen := (liftGen2 AMinus
+                                      (gen_aexp_func n')
+                                      (gen_aexp_func n')) in
+           let mult_gen := (liftGen2 AMult
+                                     (gen_aexp_func n')
+                                     (gen_aexp_func n'))
+           in 
+           (* oneOf [var_gen; plus_gen; minus_gen; mult_gen; liftGen ANum arbitrary] *)
+           oneOf [var_gen; plus_gen; mult_gen; liftGen ANum arbitrary]
+         end
+  |}.
+
+Instance gen_plus_aexp_func `{Gen int64} `{Gen id} : GenSized aexp :=
+  {| arbitrarySized :=
+       fix gen_plus_aexp_func n :=
+         match n with
+         | 0 => liftGen ANum arbitrary
+         | S n' =>
+           let plus_gen :=
+               (liftGen2 APlus
+                         (liftGen AId arbitrary)
+                         (gen_plus_aexp_func n')) in
+           plus_gen
+         end
+  |}.
+
+Instance shr_aexp : Shrink aexp :=
+  {| shrink :=
+       fix shrink_aexp_func expr := 
+         let shrink_binop binop a1 a2 :=
+             (List.map (fun a2' => binop a1 a2') (shrink_aexp_func a2))
+               ++ (List.map (fun a1' => binop a1' a2) (shrink_aexp_func a1))
+               ++ [a1 ; a2] in
+         match expr with
+         | AId _ => []
+         | ANum n => List.map ANum (shrink n)
+         | APlus a1 a2 => shrink_binop APlus a1 a2
+         | AMinus a1 a2 => shrink_binop AMinus a1 a2
+         | AMult a1 a2 => shrink_binop AMult a1 a2
+         end
+  |}.
 
 (**** Boolean expressions ****)
 
-Fixpoint show_bexp_func (b : bexp) : string :=
-  match b with
-  | BTrue => "true" 
-  | BFalse => "false"
-  | BEq a1 a2 => (show_aexp_func a1) ++ " = " ++ (show_aexp_func a2)
-  | BLe a1 a2 => (show_aexp_func a1) ++ " <= " ++ (show_aexp_func a2)
-  | BNot b => "~(" ++ (show_bexp_func b) ++ ")"
-  | BAnd b1 b2 => (show_bexp_func b1) ++ " /\ " ++ (show_bexp_func b2)
-  end.
-
-Instance show_bexp : Show bexp := {| show := show_bexp_func |}.
-
-Fixpoint gen_bexp_func (aexp_sized_gen : nat -> G aexp) (n : nat) : G bexp :=
-  match n with
-  | 0 => elems [BTrue ; BFalse]
-  | S n' =>
-    let beq_gen := liftGen2 BEq (aexp_sized_gen n) (aexp_sized_gen n) in
-    let ble_gen := liftGen2 BLe (aexp_sized_gen n) (aexp_sized_gen n) in
-    let bnot_gen := liftGen BNot (gen_bexp_func aexp_sized_gen n') in
-    let band_gen := liftGen2 BAnd (gen_bexp_func aexp_sized_gen n') 
-                                  (gen_bexp_func aexp_sized_gen n')
-    in
-       oneOf [ beq_gen ; ble_gen ; bnot_gen ; band_gen ]
-  end.
-
-Definition test_bexp_gen := gen_bexp_func (gen_aexp_func test_i64_gen test_id_gen) 3.
+Instance show_bexp `{Show aexp} : Show bexp :=
+  {| show :=
+       fix show_bexp_func b := (
+         match b with
+         | BTrue => "true" 
+         | BFalse => "false"
+         | BEq a1 a2 => (show a1) ++ " = " ++ (show a2)
+         | BLe a1 a2 => (show a1) ++ " <= " ++ (show a2)
+         | BNot b => "~(" ++ (show_bexp_func b) ++ ")"
+         | BAnd b1 b2 => (show_bexp_func b1) ++ " /\ " ++ (show_bexp_func b2)
+         end)%string
+  |}.
 
 Derive Arbitrary for bexp.
 
+Instance gen_bexp_with_proportional_aexp `{GenSized aexp} : GenSized bexp :=
+  {| arbitrarySized :=
+       fix gen_bexp_func n :=
+         match n with
+         | 0 => elems [BTrue ; BFalse]
+         | S n' =>
+           let beq_gen := liftGen2 BEq (arbitrarySized n) (arbitrarySized n) in
+           let ble_gen := liftGen2 BLe (arbitrarySized n) (arbitrarySized n) in
+           let bnot_gen := liftGen BNot (gen_bexp_func n') in
+           let band_gen := liftGen2 BAnd (gen_bexp_func n') (gen_bexp_func n')
+           in
+           oneOf [ beq_gen ; ble_gen ; bnot_gen ; band_gen ]
+         end
+  |}.
+
+Instance gen_bexp_with_small_aexp `{GenSized aexp} : GenSized bexp :=
+  {| arbitrarySized :=
+       fix gen_bexp_func n :=
+         match n with
+         | 0 => elems [BTrue ; BFalse]
+         | S n' =>
+           let beq_gen := liftGen2 BEq (arbitrarySized 1) (arbitrarySized 1) in
+           let ble_gen := liftGen2 BLe (arbitrarySized 1) (arbitrarySized 1) in
+           let bnot_gen := liftGen BNot (gen_bexp_func n') in
+           let band_gen := liftGen2 BAnd (gen_bexp_func n') (gen_bexp_func n')
+           in
+           oneOf [ beq_gen ; ble_gen ; bnot_gen ; band_gen ]
+         end
+  |}.
+
+
 (**** Commands ****)
 
-Fixpoint show_com_func (c : com) : string :=
-  match c with
-  | CSkip => "Skip"
-  | x ::= a => match x with | Id ident => ident ++ " := " ++ (show_aexp_func a) end
-  | CSeq c1 c2 => (show_com_func c1) ++ ";" ++ newline ++ (show_com_func c2)
-  | CIf b c1 c2 => "If (" ++ (show_bexp_func b) ++ ") then "
-                          ++ (show_com_func c1) ++ " else "
-                          ++ (show_com_func c2) ++ " endIf"
-  | CWhile b c => "While (" ++ (show_bexp_func b) ++ ") do "
-                            ++ (show_com_func c) ++ " endWhile"
-  end.
-
-Instance show_com : Show com := {| show := show_com_func |}.
- 
-Fixpoint com_gen_func 
-         (id_gen : G id)
-         (aexp_gen : G aexp) (bexp_gen : G bexp) (n : nat) : G com :=
-  match n with
-  | 0 => freq [(2, returnGen CSkip) ; (6, liftGen2 CAss id_gen aexp_gen)]
-  | S n' =>
-    let gen := com_gen_func id_gen aexp_gen bexp_gen n' in
-    oneOf [liftGen3 CIf bexp_gen gen gen;
-             liftGen2 CWhile bexp_gen gen; liftGen2 CSeq gen gen]
-  end.
-
-Fixpoint com_if_gen_func 
-         (id_gen : G id)
-         (aexp_gen : G aexp) (bexp_gen : G bexp) (n : nat) : G com :=
-  match n with
-  | 0 => frequency (returnGen CSkip)
-                  [(2, returnGen CSkip) ; (6, liftGen2 CAss id_gen aexp_gen)]
-  | S n' =>
-    let gen := com_gen_func id_gen aexp_gen bexp_gen n' in
-    oneOf [liftGen3 CIf bexp_gen gen gen; liftGen2 CSeq gen gen]
-  end.
-
+Derive Show for com.
 Derive Arbitrary for com.
 
-Definition test_com_gen n :=
-  let aexp_sized_gen := gen_aexp_func test_i64_gen test_id_gen in
-  let aexp_gen := aexp_sized_gen 3 in
-  (* let aexp_gen := simple_aexp_gen_func (choose (0, 5)) test_id_gen 3 in *)
-  let bexp_gen := gen_bexp_func aexp_sized_gen 3 in
-  com_gen_func test_id_gen aexp_gen bexp_gen n.
+Instance show_com `{Show aexp} `{Show bexp} : Show com :=
+  {| show :=
+       fix show_com_func c := (
+         match c with
+         | CSkip => "Skip"
+         | x ::= a => match x with | Id ident => ident ++ " := " ++ (show a) end
+               | CSeq c1 c2 => (show_com_func c1) ++ ";" ++ newline ++ (show_com_func c2)
+               | CIf b c1 c2 => "If (" ++ (show b) ++ ") then "
+                                      ++ (show_com_func c1) ++ " else "
+                                      ++ (show_com_func c2) ++ " endIf"
+               | CWhile b c => "While (" ++ (show b) ++ ") do "
+                                        ++ (show_com_func c) ++ " endWhile"
+         end)%string
+  |}.
+
+Instance gen_all_com `{Gen id} `{Gen aexp} `{Gen bexp} : GenSized com :=
+  {| arbitrarySized :=
+       fix com_gen_func n :=
+         match n with
+         | 0 => freq [(2, returnGen CSkip) ; (6, liftGen2 CAss arbitrary arbitrary)]
+         | S n' =>
+           let gen := com_gen_func n' in
+           oneOf [liftGen3 CIf arbitrary gen gen;
+                    liftGen2 CWhile arbitrary gen; liftGen2 CSeq gen gen]
+         end
+  |}.
+
+
+Instance gen_if_com `{Gen id} `{Gen aexp} `{Gen bexp} : GenSized com :=
+  {| arbitrarySized :=
+       fix com_gen_func n :=
+         match n with
+         | 0 => freq [(2, returnGen CSkip) ; (6, liftGen2 CAss arbitrary arbitrary)]
+         | S n' =>
+           let gen := com_gen_func n' in
+           oneOf [liftGen3 CIf arbitrary gen gen; liftGen2 CSeq gen gen]
+         end
+  |}.
+
+Instance gen_seq_and_assgn_com `{Gen id} `{Gen aexp} `{Gen bexp} : GenSized com :=
+  {| arbitrarySized :=
+       fix com_gen_func n :=
+         match n with
+         | 0 => liftGen2 CAss arbitrary arbitrary
+         | S n' =>
+           let gen := com_gen_func n' in
+           liftGen2 CSeq gen gen
+         end
+  |}.
+
+(*
+Instance adhoc_com_gen : GenSized com :=
+  {| arbitrarySized :=
+       let aexp_gen := @arbitrarySized aexp gen_aexp 3 in
+       (* let aexp_gen := simple_aexp_gen_func (choose (0, 5)) test_id_gen 3 in *)
+       let bexp_gen := @arbitrarySized bexp gen_bexp_with_small_aexp 3 in
+       @com_gen _ aexp_gen bexp_gen
+  |}.
+ *)
+
+Existing Instance gen_i64 | 10.
+Existing Instance gen_nonneg_i64 | 7.
+Existing Instance gen_small_i64 | 4.
+Existing Instance gen_i64_with_extremes | 20. (* Un-usable because cannot print for now*)
+
+Existing Instance genSaexp | 10.
+Existing Instance shraexp | 10.
+Existing Instance gen_plus_aexp_func | 1.
+Existing Instance gen_aexp | 2.
+
+Existing Instance genSbexp | 10.
+Existing Instance gen_bexp_with_proportional_aexp | 9.
+Existing Instance gen_bexp_with_small_aexp | 1.
+
+Existing Instance showcom | 1.
+Existing Instance genScom | 10.
+Existing Instance gen_seq_and_assgn_com | 0.
+Existing Instance gen_all_com | 9.
+Existing Instance gen_if_com | 5.
+Existing Instance shrcom | 10.
