@@ -235,7 +235,6 @@ Definition store v vptr : LLVM () :=
 Definition label l : LLVM () :=
   fun '(n,m,c) => ((n,m,(L l)::c), mret ()).
 
-
 (* Note: list of instructions in code is generated in reverse order *)
 Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
   let compile_binop (op:ibinop) (a1 a2:aexp) :=
@@ -245,7 +244,9 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
       mret (local lid)
   in
   match a with
-  | ANum n => mret (val_of_int64 n)
+  | ANum n => (* mret (val_of_int64 n) *)
+    'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_nat 0);
+      mret (local lid)
 
   | AId x =>
     'ptr <- lift "AId ident not found" (g x);
@@ -256,7 +257,6 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
   | AMinus a1 a2 => compile_binop (Sub false false) a1 a2
   | AMult a1 a2  => compile_binop (Mul false false) a1 a2
   end.
-
     
 Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
   let compile_icmp (cmp:icmp) (a1 a2:aexp) :=
@@ -335,7 +335,10 @@ Fixpoint compile_fv (l:list id) : LLVM ctxt :=
   | x::xs =>
     'g <- compile_fv xs;
     'uid <- alloca ();
-    '; store (val_of_nat 0) (local uid);
+    (* '; store (val_of_nat 0) (local uid); *)
+    (* CHKoh: is the following right? *)
+    'v <- compile_aexp g (APlus (ANum (Int64.repr 0%Z)) (ANum (Int64.repr 0%Z))); 
+    '; store v (local uid);
     mret (update g x (local uid)) 
   end.
 

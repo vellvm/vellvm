@@ -45,7 +45,8 @@ Check Int64.eq_dec.
 Definition dvalue_of_nat (n:nat) : dvalue :=
   DV (VALUE_Integer (Z.of_nat n)).
 
-Definition dvalue_of_int64 (n: int64) : dvalue := DVALUE_I64 n.
+Definition dvalue_of_int64 (n: int64) : dvalue :=
+  (*!*) DVALUE_I64 n. (*!  DV (VALUE_Integer (Int64.unsigned n)). *)
 
 Definition imp_val_eqb (v1 v2 : dvalue) : bool :=
   match v1, v2 with
@@ -245,12 +246,12 @@ Definition imp_compiler_correct_bool (p:Imp.com) : bool :=
       | inl e => false
       | inr initial_state =>
         let semantics := sem mcfg initial_state in
-        let llvm_final_state := MemDFin [] semantics 15000 in
+        let llvm_final_state := MemDFin [] semantics 10000 in
         let imp_state := ceval_step empty_state p 100 in
         match (llvm_final_state, imp_state) with
         | (None, None) => true
         | (Some llvm_st, None) => true
-        | (None, Some imp_st) => true
+        | (None, Some imp_st) => false
         | (Some llvm_st, Some imp_st) => 
           let ans_state := List.map (fun x => dvalue_of_int64 (imp_st x)) fvs in
           imp_memory_eqb (List.rev llvm_st) ans_state
@@ -317,7 +318,7 @@ Definition prog_unshrunk :=
   FI.
 *)
 
-(*! Section TestSingleCom *)
+(*! Section TestSingleAssignmentNonNegNoMinus *)
 
 Existing Instance gen_seq_and_assgn_com.
 Existing Instance gen_bexp_with_small_aexp.
@@ -329,43 +330,85 @@ Existing Instance gen_small_nonneg_i64.
    QuickChick (forAllShrink (arbitrarySized 0) shrink imp_compiler_correct_aux).
  *)
 
-(* QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
-
-(* Failure because of wrong statement in imp_compiler_correct. *)
-Example prog1 :=
+(* Failure because of 
+   (1) wrong dvalue_of_int64 in imp_compiler_correct
+   (2) compiler compiles literals to DV (VALUE_Integer _) instead of a dummy 
+       binary operation following LLVM programs. Modified compilation of 
+       free variables and compilation of literals. 
+*)
+Example prog_literal1 :=
   idW ::= (APlus (AMult (AId idX) (ANum (Int64.repr 2)))
                  (AMult (ANum (Int64.repr 1)) (AId idX))).
 
-Example prog2 :=
+Example prog_literal2 :=
   idW ::= APlus (ANum (Int64.repr 0)) (ANum (Int64.repr 0)).
 
-Example prog3 :=
+Example prog_literal3 :=
   idW ::= ANum (Int64.repr 0).
 
-Compute (imp_compiler_correct_bool prog2).
-Compute (imp_compiler_correct_bool prog3).
+(*
+Compute (imp_compiler_correct_bool prog_literal2).
+Compute (imp_compiler_correct_bool prog_literal3).
+ *)
 
-Compute (compile_and_execute prog2 1).
-Compute (compile_and_execute prog2 2).
-Compute (compile_and_execute prog2 3).
-Compute (compile_and_execute prog2 4).
-
-Compute (compile prog2).
-
-Compute (compile_and_execute prog3 1).
-
-Compute (compile prog2).
-Compute (compile prog3).
+(* QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). Passed tests. *)
 
 Remove Hints gen_seq_and_assgn_com : typeclass_instances.
 Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
 Remove Hints gen_adhoc_aexp : typeclass_instances.
 Remove Hints gen_small_nonneg_i64 : typeclass_instances.
 
-(* End TestSingleCom !*)
+(* End TestSingleAssignmentNonnegNoMinus !*)
 
+(*! Section TestMultAssignmentNonnegNoMinus *)
 
-(*! Section TestMultipleCom *)
+Existing Instance gen_seq_and_assgn_com.
+Existing Instance gen_bexp_with_small_aexp.
+Existing Instance gen_adhoc_aexp.
+Existing Instance gen_small_nonneg_i64.
+
+(* QuickChick (forAll (arbitrarySized 8) imp_compiler_correct_aux). Passed tests *)
+
+Remove Hints gen_seq_and_assgn_com : typeclass_instances.
+Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
+Remove Hints gen_adhoc_aexp : typeclass_instances.
+Remove Hints gen_small_nonneg_i64 : typeclass_instances.
+
+(*! Section TestIf *)
+
+Existing Instance gen_if_com.
+Existing Instance gen_bexp_with_small_aexp.
+Existing Instance gen_adhoc_aexp.
+Existing Instance gen_small_nonneg_i64.
+
+(* QuickChick (forAllShrink (arbitrarySized 1) shrink imp_compiler_correct_aux). *)
+
+Example prog1 :=
+  IFB (BEq (AId idW) (ANum (Int64.repr 0))) THEN SKIP ELSE SKIP FI.
+
+Example prog2 :=
+  IFB (BNot BTrue) THEN SKIP ELSE SKIP FI.
+
+Example prog3 :=
+  IFB BFalse THEN SKIP ELSE SKIP FI.
+
+(*
+Compute (imp_compiler_correct_bool prog1).
+Compute (imp_compiler_correct_bool prog2).
+Compute (imp_compiler_correct_bool prog3).
+Compute (compile prog2).
+Compute (compile_and_execute prog2 1000).
+*)
+
+(*
+If ((ANum 0 + ANum 0) <= (ANum 1 * ANum 0)) then W := (ANum 2 * ANum 0) else X := Y endIf
+If (Z <= (ANum 0 * ANum 0)) then Z := ANum 0 else Skip endIf <- incomplete shrinking?
+ *)
+
+Remove Hints gen_if_com : typeclass_instances.
+Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
+Remove Hints gen_adhoc_aexp : typeclass_instances.
+Remove Hints gen_small_nonneg_i64 : typeclass_instances.
 
 
 (* End TestMultipleCom *)
