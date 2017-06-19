@@ -40,15 +40,16 @@ Require Import compcert.lib.Integers.
 
 (* These definitions should probably go in a library *)
 
+Check Int64.eq_dec.
+
 Definition dvalue_of_nat (n:nat) : dvalue :=
   DV (VALUE_Integer (Z.of_nat n)).
 
-Definition dvalue_of_int64 (n:int64) : dvalue :=
-  DV (VALUE_Integer (Int64.unsigned n)).
+Definition dvalue_of_int64 (n: int64) : dvalue := DVALUE_I64 n.
 
 Definition imp_val_eqb (v1 v2 : dvalue) : bool :=
   match v1, v2 with
-  | (DV (VALUE_Integer z1)), (DV (VALUE_Integer z2)) => Z.eqb z1 z2
+  | (DVALUE_I64 z1), (DVALUE_I64 z2) => Int64.eq z1 z2
   | _, _ => false
   end.
 
@@ -112,23 +113,82 @@ Instance string_of_IDSet_elt : StringOf IDSet.elt :=
     | Id name => name
     end.
 
-Definition compile_and_execute (c : Imp.com) : err memory :=
+Fixpoint get_first_n_cmds (c : Imp.com) (n : nat) : nat * option Imp.com :=
+  match n with
+  | O => (O, None)
+  | S n' =>
+    match c with
+    | SKIP => (n', Some SKIP)
+    | x ::= a => (n', Some (x ::= a))
+    | c1 ;; c2 =>
+      let (steps_left1, executed_1) := get_first_n_cmds c1 n in
+      match steps_left1 with
+      | O => (O, executed_1)
+      | S m =>
+        let (steps_left2, executed_2) := get_first_n_cmds c2 m in
+        match executed_2 with
+        | None => (steps_left2, Some c1)
+        | Some c2' => (steps_left2, Some (c1 ;; c2'))
+        end
+      end
+    | IFB b THEN c1 ELSE c2 FI => (O, None)
+    | WHILE b DO c END => (O, None)
+    end
+  end.
+
+
+Fixpoint get_n_instrs_from_blocks (l : list block) (n : nat) : list block :=
+  match l with 
+  | [] => []
+  | first_block :: rest =>
+    let instrs := List.firstn n (blk_instrs first_block) in
+    let steps_left := (n - (List.length instrs))%nat in
+    match steps_left with
+    | O => [mk_block (blk_id first_block)
+                    instrs
+                    (blk_term first_block)
+                    (blk_term_id first_block)]
+    | S n' =>
+      first_block :: get_n_instrs_from_blocks rest steps_left 
+    end
+  end.
+
+Fixpoint reduce_to_n_instrs (ll_prog : toplevel_entities (list block)) (n : nat):=
+  match ll_prog with
+  | [] => []
+  | TLE_Definition defn :: other_tles =>
+    (TLE_Definition
+       (mk_definition (list block)
+                      (df_prototype defn)
+                      (df_args defn)
+                      (get_n_instrs_from_blocks (df_instrs defn) n)))
+      :: other_tles (* Assuming only one definition *)
+  | tle :: other_tles => tle :: (reduce_to_n_instrs other_tles n)
+  end.
+  
+Definition compile_and_execute (c : Imp.com) (n : nat) : err memory :=
   let fvs := IDSet.elements (fv c) in
-  match compile c with
-  | inl e => inl e
-  | inr ll_prog =>
-    let m := modul_of_toplevel_entities ll_prog in
-    match mcfg_of_modul m with
-    | None => inl "Compilation failed"
-    | Some mcfg =>
-      match init_state mcfg "imp_command" with
-      | inl e => inl "init failed"
-      | inr initial_state =>
-        let semantics := sem mcfg initial_state in
-        let llvm_final_state := MemDFin [] semantics 10000 in
-        match llvm_final_state with
-        | Some st => inr st
-        | None => inl "out of gas"
+  let (n', executed) := get_first_n_cmds c n in
+  match executed with
+  | None => inl "Not enough steps"
+  | Some c => 
+    match compile c with
+    | inl e => inl e
+    | inr ll_prog =>
+      let ll_prog := reduce_to_n_instrs ll_prog n in 
+      let m := modul_of_toplevel_entities ll_prog in
+      match mcfg_of_modul m with
+      | None => inl "Compilation failed"
+      | Some mcfg =>
+        match init_state mcfg "imp_command" with
+        | inl e => inl "init failed"
+        | inr initial_state =>
+          let semantics := sem mcfg initial_state in
+          let llvm_final_state := MemDFin [] semantics 10000 in
+          match llvm_final_state with
+          | Some st => inr st
+          | None => inl "out of gas"
+          end
         end
       end
     end
@@ -264,18 +324,38 @@ Existing Instance gen_bexp_with_small_aexp.
 Existing Instance gen_adhoc_aexp.
 Existing Instance gen_small_nonneg_i64.
 
-(*! QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
+(**! QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
 (* Shrinking is slow: 
    QuickChick (forAllShrink (arbitrarySized 0) shrink imp_compiler_correct_aux).
  *)
 
 (* QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
 
+(* Failure because of wrong statement in imp_compiler_correct. *)
 Example prog1 :=
   idW ::= (APlus (AMult (AId idX) (ANum (Int64.repr 2)))
                  (AMult (ANum (Int64.repr 1)) (AId idX))).
 
-(* Compute (compile_and_execute prog1). *)
+Example prog2 :=
+  idW ::= APlus (ANum (Int64.repr 0)) (ANum (Int64.repr 0)).
+
+Example prog3 :=
+  idW ::= ANum (Int64.repr 0).
+
+Compute (imp_compiler_correct_bool prog2).
+Compute (imp_compiler_correct_bool prog3).
+
+Compute (compile_and_execute prog2 1).
+Compute (compile_and_execute prog2 2).
+Compute (compile_and_execute prog2 3).
+Compute (compile_and_execute prog2 4).
+
+Compute (compile prog2).
+
+Compute (compile_and_execute prog3 1).
+
+Compute (compile prog2).
+Compute (compile prog3).
 
 Remove Hints gen_seq_and_assgn_com : typeclass_instances.
 Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
