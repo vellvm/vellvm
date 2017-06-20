@@ -169,31 +169,94 @@ Fixpoint reduce_to_n_instrs (ll_prog : toplevel_entities (list block)) (n : nat)
   
 Definition compile_and_execute (c : Imp.com) (n : nat) : err memory :=
   let fvs := IDSet.elements (fv c) in
-  let (n', executed) := get_first_n_cmds c n in
-  match executed with
-  | None => inl "Not enough steps"
-  | Some c => 
-    match compile c with
-    | inl e => inl e
-    | inr ll_prog =>
-      let ll_prog := reduce_to_n_instrs ll_prog n in 
-      let m := modul_of_toplevel_entities ll_prog in
-      match mcfg_of_modul m with
-      | None => inl "Compilation failed"
-      | Some mcfg =>
-        match init_state mcfg "imp_command" with
-        | inl e => inl "init failed"
-        | inr initial_state =>
-          let semantics := sem mcfg initial_state in
-          let llvm_final_state := MemDFin [] semantics 10000 in
-          match llvm_final_state with
-          | Some st => inr st
-          | None => inl "out of gas"
-          end
+  match compile c with
+  | inl e => inl e
+  | inr ll_prog =>
+    let ll_prog := reduce_to_n_instrs ll_prog n in 
+    let m := modul_of_toplevel_entities ll_prog in
+    match mcfg_of_modul m with
+    | None => inl "Compilation failed"
+    | Some mcfg =>
+      match init_state mcfg "imp_command" with
+      | inl e => inl "init failed"
+      | inr initial_state =>
+        let semantics := sem mcfg initial_state in
+        let llvm_final_state := MemDFin [] semantics 10000 in
+        match llvm_final_state with
+        | Some st => inr st
+        | None => inl "out of gas"
         end
       end
     end
   end.
+
+CoInductive FullTrace :=
+| FT_Tau : SS.state -> FullTrace -> FullTrace (* label silent event with state *)
+| FT_Vis : Event FullTrace -> FullTrace.
+
+(* Insert state label as breadcrumbs *)
+CoFixpoint sem_all_visible (CFG : mcfg) (st : SS.state) : FullTrace :=
+  match (stepD CFG st) with
+  | inl st' => FT_Tau st' (sem_all_visible CFG st')
+  | inr (Err s) => FT_Tau st (FT_Vis (Err s))
+  | inr (Fin s) => FT_Tau st (FT_Vis (Fin s))
+  | inr (Eff m) =>
+    FT_Vis (Eff (
+      match m with
+      | Alloca t k =>
+        Alloca t (fun a => FT_Tau (k a) (sem_all_visible CFG (k a)))
+      | Load a k =>
+        Load a (fun dv => FT_Tau (k dv) (sem_all_visible CFG (k dv)))
+      | Store a v k =>
+        Store a v (fun dv => FT_Tau (k dv) (sem_all_visible CFG (k dv)))
+      | Call v args d =>
+        Call v args (fun dv => FT_Tau (d dv) (sem_all_visible CFG (d dv)))
+      end
+    ))
+  end.
+
+Fixpoint MemDFullTrace (m:memory) (d:FullTrace) (steps:nat) : option (SS.state * memory) :=
+  match steps with
+  | O =>
+    match d with
+    | FT_Tau st d' => Some (st, m) (* Expose results here *)
+    | _  => None
+    end    
+  | S x =>
+    match d with
+    | FT_Vis (Fin d) => None (* stop one step before! *)
+    | FT_Vis (Err s) => None (* stop one step before! *)
+    | FT_Tau st d' => MemDFullTrace m d' x
+    | FT_Vis (Eff e)  =>
+      match mem_step e m with
+      | inr (m', v, k) => MemDFullTrace m' (k v) x
+      | inl _ => None
+      end
+    end
+  end%N.
+
+Fixpoint debug (c : com) (steps:nat) : err (SS.state * memory) :=
+  let fvs := IDSet.elements (fv c) in
+  match compile c with
+  | inl e => inl e
+  | inr ll_prog =>
+    let m := modul_of_toplevel_entities ll_prog in
+    match mcfg_of_modul m with
+    | None => inl "Compilation failed"
+    | Some mcfg =>
+      match init_state mcfg "imp_command" with
+      | inl e => inl "init failed"
+      | inr initial_state =>
+        let semantics := sem_all_visible mcfg initial_state in
+        let llvm_curr_state := MemDFullTrace [] semantics steps in
+        match llvm_curr_state with
+        | Some (curr_st, curr_mem) => inr (curr_st, curr_mem)
+        | None => inl "debug failed"
+        end
+      end
+    end
+  end.
+
 
 (*! Section CompilerProp *)
 
@@ -232,42 +295,44 @@ Definition imp_compiler_correct_aux (p:Imp.com) : Checker :=
     end
   end.
 
-
-Definition imp_compiler_correct_bool (p:Imp.com) : bool :=
+Definition run_imp_compiler_correct (p:Imp.com) : string :=
   let fvs := IDSet.elements (fv p) in
   match compile p with
-  | inl e => false
+  | inl e => "Compilation failed"
   | inr ll_prog =>
     let m := modul_of_toplevel_entities ll_prog in
     match mcfg_of_modul m with
-    | None => false
+    | None => "No cfg"
     | Some mcfg =>
       match init_state mcfg "imp_command" with
-      | inl e => false
+      | inl e => "no imp_command"
       | inr initial_state =>
         let semantics := sem mcfg initial_state in
         let llvm_final_state := MemDFin [] semantics 10000 in
         let imp_state := ceval_step empty_state p 100 in
         match (llvm_final_state, imp_state) with
-        | (None, None) => true
-        | (Some llvm_st, None) => true
-        | (None, Some imp_st) => false
+        | (None, None) => "both out of gas"
+        | (Some llvm_st, None) => "imp out of gas"
+        | (None, Some imp_st) => "llvm out of gas"
         | (Some llvm_st, Some imp_st) => 
           let ans_state := List.map (fun x => dvalue_of_int64 (imp_st x)) fvs in
-          imp_memory_eqb (List.rev llvm_st) ans_state
+          match imp_memory_eqb (List.rev llvm_st) ans_state with
+          | true => "test passed"
+          | false => "different!"
+          end
         end        
       end
     end
   end.
 
-Definition compile_aexp_correct_bool (a:aexp) : bool :=
+Definition compile_aexp_correct_bool (a:aexp) : string :=
   let p := (Id "fresh_var" ::= a) in
-  imp_compiler_correct_bool p.  
+  run_imp_compiler_correct p.  
 
 
-Definition compile_bexp_correct_bool (b:bexp) : bool :=
+Definition compile_bexp_correct_bool (b:bexp) : string :=
   let p := (IFB b THEN idX ::= ANum (Int64.repr 1) ELSE idY ::= ANum (Int64.repr 2) FI) in
-  imp_compiler_correct_bool p.  
+  run_imp_compiler_correct p.  
 
 Definition compile_aexp_correct (a:aexp) : Checker :=
   let p := (Id "fresh_var" ::= a) in
@@ -297,6 +362,25 @@ Definition show_result (result : err (toplevel_entities (list block))) :=
   | inl _ => "error"
   | inr l => fold_left (fun s tle_blk => (s ++ "; " ++ (string_of tle_blk))%string) l ""
   end.
+
+(*
+Fixpoint stepD_n_steps (cfg : mcg) (state : SS.state) (n : nat) :
+  SS.state + Event SS.state :=
+  match n with
+  | O => inl state
+  | S n' =>
+    match stepD cfg state with
+    | inl state' => stepD_n_steps state' n
+    | inr event =>
+      match event with
+      | Fin v => inr (Fin v)
+      | Err s => inr (Err s)
+      | Eff eff =>
+        match eff with
+        | Alloca 
+        stepD_n_steps cfg (
+ *)
+
 
 (* Tests *)
 
@@ -347,9 +431,9 @@ Example prog_literal3 :=
   idW ::= ANum (Int64.repr 0).
 
 (*
-Compute (imp_compiler_correct_bool prog_literal2).
-Compute (imp_compiler_correct_bool prog_literal3).
- *)
+Compute (run_imp_compiler_correct prog_literal2).
+Compute (run_imp_compiler_correct prog_literal3).
+*)
 
 (* QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). Passed tests. *)
 
@@ -392,12 +476,46 @@ Example prog2 :=
 Example prog3 :=
   IFB BFalse THEN SKIP ELSE SKIP FI.
 
-(*
-Compute (imp_compiler_correct_bool prog1).
-Compute (imp_compiler_correct_bool prog2).
-Compute (imp_compiler_correct_bool prog3).
+Compute (run_imp_compiler_correct prog1).
+Compute (run_imp_compiler_correct prog2).
+Compute (run_imp_compiler_correct prog3).
+Compute (compile prog1).
 Compute (compile prog2).
-Compute (compile_and_execute prog2 1000).
+Compute (debug prog2 0).
+Compute (debug prog2 1).
+Compute (debug prog2 2).
+Compute (debug prog3 3).
+
+Definition run_eval_expr (expr : Expr Ollvm_ast.value) :=
+  let c := prog2 in
+  let fvs := IDSet.elements (fv c) in
+  match compile c with
+  | inl e => inl e
+  | inr ll_prog =>
+    let m := modul_of_toplevel_entities ll_prog in
+    match mcfg_of_modul m with
+    | None => inl "Compilation failed"
+    | Some mcfg =>
+      match (init_state mcfg "imp_command") with
+      | inl e => inl e
+      | inr initial_state =>
+        let '(pc, e, stk) := initial_state in
+        inr (eval_expr eval_op e expr)
+      end
+    end
+  end.
+
+(*
+Example cmp_for_true := OP_ICmp Eq (TYPE_I 64) (SV (VALUE_Integer 0)) (SV (VALUE_Integer 0)).
+Example cmp_for_false := OP_ICmp Eq (TYPE_I 64) (SV (VALUE_Integer 1)) (SV (VALUE_Integer 0)).
+Compute (run_eval_expr cmp_for_true).
+Compute (run_eval_expr cmp_for_false).
+
+Example xor_for_not := OP_IBinop Xor (TYPE_I 1)
+                                 (SV (VALUE_Integer 0))
+                                 (SV (VALUE_Integer 0)).
+
+Compute (run_eval_expr xor_for_not).
 *)
 
 (*
