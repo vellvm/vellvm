@@ -244,10 +244,9 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
       mret (local lid)
   in
   match a with
-  | ANum n => (* CHKoh: mret (val_of_int64 n) *)
-    'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_nat 0);
-      mret (local lid)
-
+  | ANum n => (*!*) mret (val_of_int64 n)
+    (**! 'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_nat 0);
+      mret (local lid) *)
   | AId x =>
     'ptr <- lift "AId ident not found" (g x);
     'lid <- load ptr;
@@ -266,21 +265,21 @@ Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
       mret (local lid)
   in
   match b with
-  | BTrue     => (* CHKoh: mret (val_of_bool true) *)
+  | BTrue     => (* TO SEE: CHKoh: mret (val_of_bool true) *)
     'lid <- comp Eq (val_of_int64 (Int64.repr 0)) (val_of_int64 (Int64.repr 0));
     mret (local lid)
-  | BFalse    => (* CHKoh: mret (val_of_bool false) *)
+  | BFalse    => (* TO SEE: CHKoh: mret (val_of_bool false) *)
     'lid <- comp Eq (val_of_int64 (Int64.repr 1)) (val_of_int64 (Int64.repr 0));
     mret (local lid)
   | BEq a1 a2 => compile_icmp Eq a1 a2
   | BLe a1 a2 => compile_icmp Ule a1 a2
-
   | BNot b =>
     'v <- compile_bexp g b;
-      (* CHKOh: 'lid <- binop Xor i1 v (val_of_bool true); *)
-    't <- comp Eq (val_of_int64 (Int64.repr 1)) (val_of_int64 (Int64.repr 0));
+      (* TO SEE: CHKoh: 'lid <- binop Xor i1 v (val_of_bool true); *)
+    (*!*) 't <- comp Eq (val_of_int64 (Int64.repr 0)) (val_of_int64 (Int64.repr 0));
+    (*! 't <- comp Eq (val_of_int64 (Int64.repr 1)) (val_of_int64 (Int64.repr 0)); *)
     'lid <- binop Xor i1 v (local t);
-    mret (local lid)
+    mret (local lid) 
 
   | BAnd b1 b2 =>
     'v1 <- compile_bexp g b1;

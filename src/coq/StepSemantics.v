@@ -352,6 +352,14 @@ Module StepSemantics(A:ADDR).
       mret (DV (VALUE_Vector val))
     | _, _, _ => (eval_bop_integer t (fun t => eval_iop_integer_h t iop)) v1 v2
     end.
+
+  Definition cast_boolean_literal_if_needed (v : dvalue) : err value :=
+    match v with
+    | DV (VALUE_Bool true) => mret (DVALUE_I1 Int1.one)
+    | DV (VALUE_Bool false) => mret (DVALUE_I1 Int1.zero)
+    | DV _ => failwith "Not a castable boolean"
+    | _ => mret v
+    end.
   
   Definition eval_i1_icmp icmp x y : value :=
     if match icmp with
@@ -692,6 +700,57 @@ Fixpoint eval_op (e:env) (o:Ollvm_ast.value) : err value :=
   | SV o' => eval_expr eval_op e o'
   end.
 
+
+Definition eval_op_for_store (e:env) (t:typ) (o:Ollvm_ast.value)
+  : err value :=
+  match o with
+  | SV o' => 
+    match t, o' with 
+    | TYPE_I 1, VALUE_Integer i => mret (DVALUE_I1 (Int1.repr i))
+    | TYPE_I 32, VALUE_Integer i => mret (DVALUE_I32 (Int32.repr i))
+    | TYPE_I 64, VALUE_Integer i => mret (DVALUE_I64 (Int64.repr i))
+
+    | _, OP_IBinop _ _ _ _
+    | _, OP_ICmp _ _ _ _
+    | _, OP_FBinop _ _ _ _ _
+    | _, OP_FCmp _ _ _ _
+    | _, OP_Conversion _ _ _ _
+    | _, OP_GetElementPtr _ _ _
+    | _, OP_ExtractElement _ _
+    | _, OP_InsertElement _ _ _
+    | _, OP_ShuffleVector _ _ _
+    | _, OP_ExtractValue _ _
+    | _, OP_InsertValue _ _ _
+    | _, OP_Select _ _ _ => failwith "invalid operand for store"
+                                             
+    | _, _ => eval_op e o
+    end
+  end.
+
+Definition eval_cond (e:env) (o:Ollvm_ast.value) : err value :=
+  match o with
+  | SV o' =>
+    match o' with
+    | VALUE_Bool true => mret (DVALUE_I1 (Int1.one))
+    | VALUE_Bool false => mret (DVALUE_I1 (Int1.zero))
+
+    | OP_IBinop _ _ _ _
+    | OP_ICmp _ _ _ _
+    | OP_FBinop _ _ _ _ _
+    | OP_FCmp _ _ _ _
+    | OP_Conversion _ _ _ _
+    | OP_GetElementPtr _ _ _
+    | OP_ExtractElement _ _
+    | OP_InsertElement _ _ _
+    | OP_ShuffleVector _ _ _
+    | OP_ExtractValue _ _
+    | OP_InsertValue _ _ _
+    | OP_Select _ _ _ => failwith "invalid conditional"
+
+    | _ => eval_op e o
+    end
+  end.
+
 (* Semantically, a jump at the LLVM IR level might not be "atomic" in the sense that
    Phi nodes may be lowered into a sequence of non-atomic operations on registers.  However,
    Phi's should never touch memory [is that true? can there be spills?], so modeling them
@@ -764,9 +823,10 @@ Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
       end
         
     | Jump current_block (TERM_Br (_,op) br1 br2) =>
-      do dv <- eval_op e op;
+      (* CHKoh: do dv <- eval_op e op; *)
+      do dv <- eval_cond e op; (* TO SEE *)
       do br <- match dv with 
-               (* CHKoh: | DV (VALUE_Bool true) => mret br1
+              (* CHKoh: | DV (VALUE_Bool true) => mret br1
                | DV (VALUE_Bool false) => mret br2 *)
               | DVALUE_I1 comparison_bit =>
                 if Int1.eq comparison_bit Int1.one then
@@ -803,13 +863,14 @@ Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
       | DVALUE_Addr a => inr (Eff (Load a (fun dv => (pc_of_pt p', add_env id dv e, k))))
       | _ => raise "ERROR: Load got non-pointer value" p
       end
-
       
-    | Step (INSTR_Store _ (_, val) (_, ptr) _) p' => 
-      do dv <- eval_op e val;
-      do v <- eval_op e ptr;
-      match v with 
-      | DVALUE_Addr a => inr (Eff (Store a dv (fun _ => (pc_of_pt p', e, k))))
+    | Step (INSTR_Store _ (t, val) (_, ptr) _) p' =>
+      do dv <- eval_op_for_store e t val; (* TO SEE: Added new function *)
+      (* CHKoh: do dv <- eval_op e val; *)
+      do ptr_val <- eval_op e ptr;
+      match ptr_val with 
+      | DVALUE_Addr a =>
+        inr (Eff (Store a dv (fun _ => (pc_of_pt p', e, k))))
       |  _ => raise "ERROR: Store got non-pointer value" p
       end
 

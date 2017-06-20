@@ -433,9 +433,9 @@ Existing Instance gen_small_nonneg_i64.
 
 (* Failure because of 
    (1) wrong dvalue_of_int64 in imp_compiler_correct
-   (2) compiler compiles literals to DV (VALUE_Integer _) instead of a dummy 
-       binary operation following LLVM programs. Modified compilation of 
-       free variables and compilation of literals. 
+   (2) store semantics is incorrect. It should be possible to have something like
+       "store i64 0, %ptr", and this is indeed what the IMP compiler compiles to;
+       however, Ollvm_ast's VALUE_Integers get stuck in eval_expr. 
 *)
 Example prog_literal1 :=
   idW ::= (APlus (AMult (AId idX) (ANum (Int64.repr 2)))
@@ -450,11 +450,16 @@ Example prog_literal3 :=
 (*
 Compute (run_imp_compiler_correct prog_literal2).
 Compute (run_imp_compiler_correct prog_literal3).
+Compute (compile prog_literal3).
 Compute (debug prog_literal3 1).
 Compute (debug prog_literal3 2).
 Compute (debug prog_literal3 3).
 Compute (debug prog_literal3 4).
 Compute (debug prog_literal3 5).
+Compute (debug prog_literal3 6).
+Compute (debug prog_literal3 7).
+Compute (debug prog_literal3 8).
+Compute (debug prog_literal3 9).
 *)
 
 (* QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). Passed tests. *)
@@ -489,12 +494,18 @@ Existing Instance gen_small_nonneg_i64.
 
 (* QuickChick (forAllShrink (arbitrarySized 1) shrink imp_compiler_correct_aux). *)
 
-(* Failure because of 
-   (1) Semantics was using VALUE_Bool directly, and hence gets stuck when them
-       boolean condition has to be evaluated (turning into DVALUE_I1). 
-       Modified to work on DVALUE_I1.
-   (2) Compilation of bexp expressions was injecting VALUE_Bool in some places. 
-       Modified to plumb through an injected LLVM instruction. 
+(* Failure because:
+   (1) Branch semantics was expecting eval_expr in StepSemantics to evaluate 
+       Ollvm_ast's values to DV (VALUE_Bool ..). Hence the evaluation gets stuck 
+       when the boolean condition has to be evaluated (i.e. not just a 
+       (VALUE_Bool)).
+
+       Modified semantics to evaluate the conditional, including possibly 
+       an i1 like VALUE_Bool true, into a DVALUE_I1, and the branch matches on
+       that instead.
+
+   (2) Compilation of bexp expressions was injecting VALUE_Bool directly in 
+       some places. Modified to plumb through an injected LLVM instruction. 
 *)
 
 Example prog_eval_bexp_cond1 :=
@@ -509,6 +520,11 @@ Example prog_eval_bexp_cond3 :=
 (*
 Compute (run_imp_compiler_correct prog_eval_bexp_cond1).
 Compute (run_imp_compiler_correct prog_eval_bexp_cond2).
+
+Compute (compile prog_eval_bexp_cond2).
+Compute (debug prog_eval_bexp_cond2 1).
+Compute (debug prog_eval_bexp_cond2 2).
+
 Compute (run_imp_compiler_correct prog_eval_bexp_cond3).
 *)
 
@@ -519,15 +535,50 @@ If (Z <= (ANum 0 * ANum 0)) then Z := ANum 0 else Skip endIf <- incomplete shrin
 
 (* QuickChick (forAll (arbitrarySized 1) imp_compiler_correct_aux). *)
 
+(* Failure in the presence of triple negations. 
+   - Compilation for BNot has a bug! Xor'ed with false instead of with true. 
+ *)
+
 (* If (~(~(~(ANum 4 = Y /\ ~(false))))) then Y := ANum 1 else X := ANum 5 endIf *)
+Example prog_xor_false1 :=
+  IFB (BNot (BNot (BNot (BAnd (BEq (ANum (Int64.repr 4)) (AId idY)) (BNot (BFalse)))))) THEN
+    idY ::= ANum (Int64.repr 1)
+  ELSE
+    idX ::= ANum (Int64.repr 5) FI.
+
+Example prog_xor_false2 :=
+  IFB (BNot (BNot (BNot BTrue))) THEN
+    idY ::= ANum (Int64.repr 1)
+  ELSE
+    idX ::= ANum (Int64.repr 5) FI.
+
+Example prog_xor_false3 :=
+  IFB (BNot (BNot BFalse)) THEN
+    idY ::= ANum (Int64.repr 1)
+  ELSE
+    idX ::= ANum (Int64.repr 5) FI.
+
+(*
+Compute (run_imp_compiler_correct prog_xor_false1).
+Compute (run_imp_compiler_correct prog_xor_false2).
+Compute (run_imp_compiler_correct prog_xor_false3).
+*)
 
 (* QuickChick (forAllShrink (arbitrarySized 1) shrink imp_compiler_correct_aux). *)
 
+QuickChick (forAll (arbitrarySized 8) imp_compiler_correct_aux). 
+
+(*
+Compile command: ocamlopt -rectypes -w a -I /tmp -I /home/eigenvector/.opam/4.03.0/lib/coq/user-contrib/QuickChick /home/eigenvector/.opam/4.03.0/lib/coq/user-contrib/QuickChick/quickChickLib.cmx /tmp/QuickChick94353c.ml -o /tmp/QuickChick94353c
+Segmentation fault (core dumped)
+*)
 
 Remove Hints gen_if_com : typeclass_instances.
 Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
 Remove Hints gen_adhoc_aexp : typeclass_instances.
 Remove Hints gen_small_nonneg_i64 : typeclass_instances.
 
+(* End TestIf *)
 
-(* End TestMultipleCom *)
+
+
