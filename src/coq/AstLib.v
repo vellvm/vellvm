@@ -378,7 +378,7 @@ Instance string_of_terminator : StringOf terminator :=
 Instance string_of_block : StringOf block :=
   fun block =>
     ("Block " ++ (string_of (blk_id block)) ++ ": "
-              ++ (string_of (blk_instrs block)))%string.
+              ++ (string_of (blk_code block)))%string.
 
 
 Instance string_of_definition_list_block : StringOf (definition (list block)) :=

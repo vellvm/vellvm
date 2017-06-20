@@ -46,8 +46,8 @@ Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list blo
         | None => 
           if (List.length insns) == 0%nat then mret ([], None, blks)
           else failwith "terminator not found"
-        | Some (id, t) =>
-          mret ([], None, (mk_block l insns t id)::blks)
+        | Some tm =>
+          mret ([], None, (mk_block l [] insns tm)::blks)
         end
       | T id t  => mret ([], Some (id, t), blks)
       | I uid insn => mret ((uid,insn)::insns, term_opt, blks)
@@ -56,8 +56,8 @@ Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list blo
   ;
     match term_opt with
     | None => failwith "terminator not found"
-    | Some (id, t) =>
-      mret ((mk_block entry_label insns t id) :: blks)
+    | Some tm =>
+      mret ((mk_block entry_label [] insns tm) :: blks)
     end.
 
 
@@ -245,7 +245,9 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
       mret (local lid)
   in
   match a with
-  | ANum n => mret (val_of_int64 n)
+  | ANum n =>
+    'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_int64 Int64.zero);
+     mret (local lid)
 
   | AId x =>
     'ptr <- lift "AId ident not found" (g x);

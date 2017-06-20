@@ -11,18 +11,19 @@
 Require Import ZArith List String Omega.
 Require Import Vellvm.Ollvm_ast Vellvm.CFG Vellvm.Dom.
 Require Import Vellvm.Classes.
-Require AstLib.
+Require Vellvm.AstLib.
 Import ListNotations.
 
 
 (* well formedness ---------------------------------------------------------- *)
-
+(*
 (* When does a cfg program point define a given local_id. *)
 Definition pt_defines (p:pt) (lid:local_id) :=
   match p with
   | IId id => if id == lid then True else False
   | IVoid _ => False
   end.
+*)
 
 (* Which identifiers does an instruction use? *)
 Fixpoint value_uses (v:value) : list ident :=
@@ -57,12 +58,16 @@ Fixpoint value_uses (v:value) : list ident :=
 
 Definition tvalue_uses (tv:tvalue) : list ident := value_uses (snd tv).
 
+Definition phi_uses (i:phi) : (list ident) :=
+  match i with
+  | Phi  t args => List.flat_map (fun x => value_uses (snd x)) args
+  end.
+
 (* over-approximation: may include the same identifier more than once *)
 Definition instr_uses (i:instr) : (list ident) :=
   match i with
   | INSTR_Op op => value_uses op                         
   | INSTR_Call (_, fid) args => [fid] ++ (List.flat_map tvalue_uses args)
-  | INSTR_Phi  t args => List.flat_map (fun x => value_uses (snd x)) args
   | INSTR_Alloca t None align => []
   | INSTR_Alloca t (Some tv) align => tvalue_uses tv
   | INSTR_Load  volatile t ptr align => tvalue_uses ptr
@@ -87,13 +92,14 @@ Definition terminator_uses (t:terminator) : list ident :=
   | TERM_Invoke (_,fid) args _ _ => [fid] ++ (List.flat_map tvalue_uses args)
   end.
 
+(*
 Definition cmd_uses_local (g:cfg) (p:pt) (id:local_id) : Prop :=
   match (code g) p with
   | Some (Step ins _) => In (ID_Local id) (instr_uses ins)
   | Some (Jump _ t) => In (ID_Local id) (terminator_uses t)
   | None => False
   end.
-             
+*)             
 
 (* Which labels does a terminator mention *)
 Definition lbls (t:terminator) : list block_id :=
@@ -108,6 +114,7 @@ Definition lbls (t:terminator) : list block_id :=
   | TERM_Invoke  _ _ l1 l2 => [l1; l2] 
   end.
 
+(*
 
 (* Well-formed SSA-form CFGs 
    - the initial pt denotes a command  
@@ -270,3 +277,4 @@ Qed.
 
 
 
+*)

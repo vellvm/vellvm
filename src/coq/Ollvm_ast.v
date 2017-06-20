@@ -130,9 +130,9 @@ Inductive ident : Set :=
 (* auxilliary definitions for when we know which case we're in already *)
 Definition local_id  := raw_id.
 Definition global_id := raw_id.
-
+Definition block_id := raw_id.
 Definition function_id := global_id.
-Definition block_id := local_id.
+
 
 Inductive typ : Set :=
 | TYPE_I (sz:int)
@@ -269,13 +269,14 @@ Inductive instr_id : Set :=
 | IVoid (n:int)        (* "Void" return type, for "store",  "void call", and terminators.
                            Each with unique number (NOTE: these are distinct from Anon raw_id) *)
 .
-        
+
+Inductive phi : Set :=
+| Phi  (t:typ) (args:list (block_id * value))
+.
+       
 Inductive instr : Set :=
 | INSTR_Op   (op:value)                          (* INVARIANT: op must be of the form SV (OP_ ...) *)
 | INSTR_Call (fn:tident) (args:list tvalue)      (* CORNER CASE: return type is void treated specially *)
-
-| INSTR_Phi  (t:typ) (args:list (block_id * value))
-
 | INSTR_Alloca (t:typ) (nb: option tvalue) (align:option int) 
 | INSTR_Load  (volatile:bool) (t:typ) (ptr:tvalue) (align:option int)       
 | INSTR_Store (volatile:bool) (val:tvalue) (ptr:tvalue) (align:option int)
@@ -342,14 +343,15 @@ Record declaration : Set :=
   }.
 
 
+Definition code := list (instr_id * instr).
 
 Record block : Set :=
   mk_block
     {
-      blk_id      : block_id;
-      blk_instrs  : list (instr_id * instr);
-      blk_term    : terminator;
-      blk_term_id : instr_id;      
+      blk_id    : block_id;
+      blk_phis  : list (local_id * phi);
+      blk_code  : code;
+      blk_term  : instr_id * terminator;
     }.
 
 Record definition (FnBody:Set) :=
