@@ -215,22 +215,22 @@ CoFixpoint sem_all_visible (CFG : mcfg) (st : SS.state) : FullTrace :=
     ))
   end.
 
-Fixpoint MemDFullTrace (m:memory) (d:FullTrace) (steps:nat) : option (SS.state * memory) :=
+Fixpoint MemDFullTrace (m:memory) (d:FullTrace) (steps:nat) : err (SS.state * memory) :=
   match steps with
   | O =>
     match d with
-    | FT_Tau st d' => Some (st, m) (* Expose results here *)
-    | _  => None
+    | FT_Tau st d' => inr (st, m) (* Expose results here *)
+    | _  => inl "Out of steps"
     end    
   | S x =>
     match d with
-    | FT_Vis (Fin d) => None (* stop one step before! *)
-    | FT_Vis (Err s) => None (* stop one step before! *)
+    | FT_Vis (Fin d) => inl "Finished, stop one step before!"
+    | FT_Vis (Err s) => inl ("Err: " ++ s ++ ". Stop one step before!")%string
     | FT_Tau st d' => MemDFullTrace m d' x
     | FT_Vis (Eff e)  =>
       match mem_step e m with
       | inr (m', v, k) => MemDFullTrace m' (k v) x
-      | inl _ => None
+      | inl _ => inl "Stuck!"
       end
     end
   end%N.
@@ -250,8 +250,8 @@ Fixpoint debug (c : com) (steps:nat) : err (SS.state * memory) :=
         let semantics := sem_all_visible mcfg initial_state in
         let llvm_curr_state := MemDFullTrace [] semantics steps in
         match llvm_curr_state with
-        | Some (curr_st, curr_mem) => inr (curr_st, curr_mem)
-        | None => inl "debug failed"
+        | inr (curr_st, curr_mem) => inr (curr_st, curr_mem)
+        | inl msg => inl msg
         end
       end
     end
@@ -476,6 +476,7 @@ Example prog2 :=
 Example prog3 :=
   IFB BFalse THEN SKIP ELSE SKIP FI.
 
+(*
 Compute (run_imp_compiler_correct prog1).
 Compute (run_imp_compiler_correct prog2).
 Compute (run_imp_compiler_correct prog3).
@@ -485,6 +486,7 @@ Compute (debug prog2 0).
 Compute (debug prog2 1).
 Compute (debug prog2 2).
 Compute (debug prog3 3).
+ *)
 
 Definition run_eval_expr (expr : Expr Ollvm_ast.value) :=
   let c := prog2 in
