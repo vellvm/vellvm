@@ -244,7 +244,7 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
       mret (local lid)
   in
   match a with
-  | ANum n => (* mret (val_of_int64 n) *)
+  | ANum n => (* CHKoh: mret (val_of_int64 n) *)
     'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_nat 0);
       mret (local lid)
 
@@ -266,14 +266,20 @@ Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
       mret (local lid)
   in
   match b with
-  | BTrue     => mret (val_of_bool true)
-  | BFalse    => mret (val_of_bool false)
+  | BTrue     => (* CHKoh: mret (val_of_bool true) *)
+    'lid <- comp Eq (val_of_int64 (Int64.repr 0)) (val_of_int64 (Int64.repr 0));
+    mret (local lid)
+  | BFalse    => (* CHKoh: mret (val_of_bool false) *)
+    'lid <- comp Eq (val_of_int64 (Int64.repr 1)) (val_of_int64 (Int64.repr 0));
+    mret (local lid)
   | BEq a1 a2 => compile_icmp Eq a1 a2
   | BLe a1 a2 => compile_icmp Ule a1 a2
 
   | BNot b =>
     'v <- compile_bexp g b;
-    'lid <- binop Xor i1 v (val_of_bool true);
+      (* CHKOh: 'lid <- binop Xor i1 v (val_of_bool true); *)
+    't <- comp Eq (val_of_int64 (Int64.repr 1)) (val_of_int64 (Int64.repr 0));
+    'lid <- binop Xor i1 v (local t);
     mret (local lid)
 
   | BAnd b1 b2 =>
@@ -337,8 +343,9 @@ Fixpoint compile_fv (l:list id) : LLVM ctxt :=
     'uid <- alloca ();
     (* '; store (val_of_nat 0) (local uid); *)
     (* CHKoh: is the following right? *)
-    'v <- compile_aexp g (APlus (ANum (Int64.repr 0%Z)) (ANum (Int64.repr 0%Z))); 
+    'v <- compile_aexp g (ANum (Int64.repr 0%Z)); 
     '; store v (local uid);
+      
     mret (update g x (local uid)) 
   end.
 

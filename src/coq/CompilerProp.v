@@ -220,7 +220,7 @@ Fixpoint MemDFullTrace (m:memory) (d:FullTrace) (steps:nat) : err (SS.state * me
   | O =>
     match d with
     | FT_Tau st d' => inr (st, m) (* Expose results here *)
-    | _  => inl "Out of steps"
+    | _  => inl "More steps needed"
     end    
   | S x =>
     match d with
@@ -257,6 +257,23 @@ Fixpoint debug (c : com) (steps:nat) : err (SS.state * memory) :=
     end
   end.
 
+Definition untrusted_run_eval_expr (c : com) (expr : Expr Ollvm_ast.value) :=
+  let fvs := IDSet.elements (fv c) in
+  match compile c with
+  | inl e => inl e
+  | inr ll_prog =>
+    let m := modul_of_toplevel_entities ll_prog in
+    match mcfg_of_modul m with
+    | None => inl "Compilation failed"
+    | Some mcfg =>
+      match (init_state mcfg "imp_command") with
+      | inl e => inl e
+      | inr initial_state =>
+        let '(pc, e, stk) := initial_state in
+        inr (eval_expr eval_op e expr)
+      end
+    end
+  end.
 
 (*! Section CompilerProp *)
 
@@ -409,7 +426,7 @@ Existing Instance gen_bexp_with_small_aexp.
 Existing Instance gen_adhoc_aexp.
 Existing Instance gen_small_nonneg_i64.
 
-(**! QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
+(*! QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
 (* Shrinking is slow: 
    QuickChick (forAllShrink (arbitrarySized 0) shrink imp_compiler_correct_aux).
  *)
@@ -433,6 +450,11 @@ Example prog_literal3 :=
 (*
 Compute (run_imp_compiler_correct prog_literal2).
 Compute (run_imp_compiler_correct prog_literal3).
+Compute (debug prog_literal3 1).
+Compute (debug prog_literal3 2).
+Compute (debug prog_literal3 3).
+Compute (debug prog_literal3 4).
+Compute (debug prog_literal3 5).
 *)
 
 (* QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). Passed tests. *)
@@ -467,63 +489,40 @@ Existing Instance gen_small_nonneg_i64.
 
 (* QuickChick (forAllShrink (arbitrarySized 1) shrink imp_compiler_correct_aux). *)
 
-Example prog1 :=
+(* Failure because of 
+   (1) Semantics was using VALUE_Bool directly, and hence gets stuck when them
+       boolean condition has to be evaluated (turning into DVALUE_I1). 
+       Modified to work on DVALUE_I1.
+   (2) Compilation of bexp expressions was injecting VALUE_Bool in some places. 
+       Modified to plumb through an injected LLVM instruction. 
+*)
+
+Example prog_eval_bexp_cond1 :=
   IFB (BEq (AId idW) (ANum (Int64.repr 0))) THEN SKIP ELSE SKIP FI.
 
-Example prog2 :=
+Example prog_eval_bexp_cond2 :=
   IFB (BNot BTrue) THEN SKIP ELSE SKIP FI.
 
-Example prog3 :=
+Example prog_eval_bexp_cond3 :=
   IFB BFalse THEN SKIP ELSE SKIP FI.
 
 (*
-Compute (run_imp_compiler_correct prog1).
-Compute (run_imp_compiler_correct prog2).
-Compute (run_imp_compiler_correct prog3).
-Compute (compile prog1).
-Compute (compile prog2).
-Compute (debug prog2 0).
-Compute (debug prog2 1).
-Compute (debug prog2 2).
-Compute (debug prog3 3).
- *)
-
-Definition run_eval_expr (expr : Expr Ollvm_ast.value) :=
-  let c := prog2 in
-  let fvs := IDSet.elements (fv c) in
-  match compile c with
-  | inl e => inl e
-  | inr ll_prog =>
-    let m := modul_of_toplevel_entities ll_prog in
-    match mcfg_of_modul m with
-    | None => inl "Compilation failed"
-    | Some mcfg =>
-      match (init_state mcfg "imp_command") with
-      | inl e => inl e
-      | inr initial_state =>
-        let '(pc, e, stk) := initial_state in
-        inr (eval_expr eval_op e expr)
-      end
-    end
-  end.
-
-(*
-Example cmp_for_true := OP_ICmp Eq (TYPE_I 64) (SV (VALUE_Integer 0)) (SV (VALUE_Integer 0)).
-Example cmp_for_false := OP_ICmp Eq (TYPE_I 64) (SV (VALUE_Integer 1)) (SV (VALUE_Integer 0)).
-Compute (run_eval_expr cmp_for_true).
-Compute (run_eval_expr cmp_for_false).
-
-Example xor_for_not := OP_IBinop Xor (TYPE_I 1)
-                                 (SV (VALUE_Integer 0))
-                                 (SV (VALUE_Integer 0)).
-
-Compute (run_eval_expr xor_for_not).
+Compute (run_imp_compiler_correct prog_eval_bexp_cond1).
+Compute (run_imp_compiler_correct prog_eval_bexp_cond2).
+Compute (run_imp_compiler_correct prog_eval_bexp_cond3).
 *)
 
 (*
 If ((ANum 0 + ANum 0) <= (ANum 1 * ANum 0)) then W := (ANum 2 * ANum 0) else X := Y endIf
 If (Z <= (ANum 0 * ANum 0)) then Z := ANum 0 else Skip endIf <- incomplete shrinking?
  *)
+
+(* QuickChick (forAll (arbitrarySized 1) imp_compiler_correct_aux). *)
+
+(* If (~(~(~(ANum 4 = Y /\ ~(false))))) then Y := ANum 1 else X := ANum 5 endIf *)
+
+(* QuickChick (forAllShrink (arbitrarySized 1) shrink imp_compiler_correct_aux). *)
+
 
 Remove Hints gen_if_com : typeclass_instances.
 Remove Hints gen_bexp_with_small_aexp : typeclass_instances.

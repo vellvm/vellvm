@@ -766,9 +766,14 @@ Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
     | Jump current_block (TERM_Br (_,op) br1 br2) =>
       do dv <- eval_op e op;
       do br <- match dv with 
-               | DV (VALUE_Bool true) => mret br1
-               | DV (VALUE_Bool false) => mret br2
-               | _ => failwith "Br got non-bool value"
+               (* CHKoh: | DV (VALUE_Bool true) => mret br1
+               | DV (VALUE_Bool false) => mret br2 *)
+              | DVALUE_I1 comparison_bit =>
+                if Int1.eq comparison_bit Int1.one then
+                  mret br1
+                else
+                  mret br2
+              | _ => failwith "Br got non-bool value"
       end;
       do fdef <- trywith ("stepD: no function " ++ (string_of (fn p))) (find_function CFG (fn p));
       let cfg := (df_instrs fdef) in
