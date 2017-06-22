@@ -17,6 +17,7 @@ Require Import List Bool String Utf8.
 Export ListNotations.
 From Coq.Program Require Export Basics Syntax.
 
+Arguments String.append _ _ : simpl never.
 
 Notation "t $ r" := (t r)
   (at level 65, right associativity, only parsing).

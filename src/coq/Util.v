@@ -665,6 +665,19 @@ Proof.
     reflexivity.
 Qed.
 
+Lemma assoc_cons_inv :
+  forall A B (a c:A) (b d:B) l a_dec
+    (Hl: assoc a_dec a ((c,b)::l) = Some d),
+    (a = c /\ b = d) \/ (a <> c /\ assoc a_dec a l = Some d).
+Proof.
+  intros A B a c b d l a_dec Hl.
+  simpl in Hl.
+  destruct (a_dec a c).
+  left. inversion Hl. tauto.
+  right. tauto.
+Qed.    
+                         
+
 Lemma assoc_In_snd : forall A B (l:list (A * B)) eq_dec a b,
   assoc eq_dec a l = Some b ->
   In b (map (@snd _ _) l).

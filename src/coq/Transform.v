@@ -17,6 +17,7 @@ Definition mangle_raw_id (id:raw_id) : raw_id :=
   match id with
   | Anon n => id
   | Name s => Name (append "_vellvm" s)
+  | Raw n => id
   end.
 
 Definition mangle_ident (id:ident) : ident :=

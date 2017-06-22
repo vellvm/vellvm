@@ -98,6 +98,9 @@ Module StepSemantics(A:ADDR).
         fn : function_id;
         bk : block;  
       }.
+
+  Definition fetch (p:pc) : code :=
+    blk_code (bk p).
   
   Inductive frame : Set :=
   | KRet      (e:env) (id:local_id) (q:pc)
@@ -116,14 +119,6 @@ Module StepSemantics(A:ADDR).
   Definition stack_of (s:state) :=
     let '(p, e, k) := s in k.
   
-(*  
-  Definition def_id_of_pc (p:pc) : err local_id :=
-    match ins p with
-    | IId id => mret id
-    | _ => failwith ("def_id_of_pc: " ++ (string_of p))
-    end.
-*)
-
   Definition local_id_of_ident (i:ident) : err local_id :=
     match i with
     | ID_Global _ => failwith ("local_id_of_ident: " ++ string_of i)
@@ -138,8 +133,8 @@ Module StepSemantics(A:ADDR).
 
   Instance string_of_env : StringOf env := string_of_env'.
   
-  Definition lookup_env (e:env) (id:local_id) : err value :=
-    trywith ("lookup_env: id = " ++ (string_of id) ++ " NOT IN env = " ++ (string_of e)) (assoc RawID.eq_dec id e).
+  Definition lookup_env (e:env) (id:raw_id) : option value :=
+    assoc RawID.eq_dec id e.
 
   Definition add_env id dv (e:env) := (id,dv)::e.
   
@@ -627,7 +622,10 @@ Definition eval_expr {A:Set} (f:env -> A -> err value) (e:env) (o:Expr A) : err 
   match o with
   | VALUE_Ident id => 
     'i <- local_id_of_ident id;
-      lookup_env e i
+      match lookup_env e i with
+      | None => failwith ("lookup_env: id = " ++ (string_of i) ++ " NOT IN env = " ++ (string_of e))
+      | Some v => mret v
+      end
   | VALUE_Integer x => mret (DV (VALUE_Integer x))
   | VALUE_Float x   => mret (DV (VALUE_Float x))
   | VALUE_Bool b    => mret (DV (VALUE_Bool b)) 
@@ -759,21 +757,7 @@ Fixpoint jump (CFG:cfg) (from:block_id) (e_init:env) (e:env) (to:block) (k:stack
   end.
 *)
 
-Definition raise s : state + (Event state) :=
-  inr (Err s). 
-
-Definition raise_p (p:instr_id) s := raise (s ++ ": " ++ (string_of p)).
-
-Definition lift_err_d {A B} (m:err A) (f: A -> (state + Event B)) : (state + Event B) :=
-  match m with
-    | inl s => inr (Err s)
-    | inr b => f b
-  end.
-
-Notation "'do' x <- m ; f" := (lift_err_d m (fun x => f)) 
-   (at level 200, x ident, m at level 100, f at level 200).
-
-Definition jump (fn:function_id) (from:block_id) (e_init:env) (k:stack) (tgt:block) : state + Event state :=
+Definition jump (fn:function_id) (from:block_id) (e_init:env) (k:stack) (tgt:block) : err state :=
   let eval_phi (e:env) '(lid, Phi _ ls) :=
       match assoc RawID.eq_dec from ls with
       | Some op =>
@@ -782,9 +766,8 @@ Definition jump (fn:function_id) (from:block_id) (e_init:env) (k:stack) (tgt:blo
       | None => failwith ("jump: block " ++ string_of from ++ " not found in " ++ string_of lid)
       end
   in
-  do e_out <- monad_fold_right eval_phi (blk_phis tgt) e_init;
-  inl (mk_pc fn tgt, e_out, k).
-
+  'e_out <- monad_fold_right eval_phi (blk_phis tgt) e_init;
+  mret (mk_pc fn tgt, e_out, k).
 
 Definition incr_pc (p:pc) : pc :=
   let 'mk_pc f b := p in
@@ -795,30 +778,54 @@ Definition incr_pc (p:pc) : pc :=
     blk_term := blk_term b;
   |}.
 
+Inductive transition X :=
+| Step (s:X)
+| Jump (s:X)
+| Obs  (m:Event X)
+.
 
-Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
+Definition lift_err_d {A} (m:err A) (f: A -> transition state) : transition state :=
+  match m with
+    | inl s => Obs (Err s)
+    | inr b => f b
+  end.
+
+Notation "'do' x <- m ; f" := (lift_err_d m (fun x => f)) 
+   (at level 200, x ident, m at level 100, f at level 200).
+
+Definition raise s : transition state :=
+  Obs (Err s). 
+
+Definition raise_p (p:instr_id) s := raise (s ++ ": " ++ (string_of p)).
+
+(* TODO:  clean up the pc abstraction a little bit: 
+   - replace blk_term (bk pc) with an accessor like 'fetch'
+*)
+
+
+Definition stepD (CFG:mcfg) (s:state) : transition state :=
   let '(pc, e, k) := s in
-  let 'mk_pc f b := pc in
-  match blk_code b with
+  match fetch pc with
   | [] =>   (* terminator *)
-    let '(tmid, tm) := blk_term b in
+    let '(tmid, tm) := blk_term (bk pc) in
     match tm with
     | TERM_Ret (t, op) =>
       do dv <- eval_op e op;
         match k with
-        | [] => inr (Fin dv)
-        | (KRet e' id p') :: k' => inl (p', add_env id dv e', k')
+        | [] => Obs (Fin dv)
+        | (KRet e' id p') :: k' => Jump (p', add_env id dv e', k')
         | _ => raise_p tmid "IMPOSSIBLE: Ret op in non-return configuration" 
         end
 
     | TERM_Ret_void =>
       match k with
-      | [] => inr (Fin (DV (VALUE_Bool true)))
-      | (KRet_void e' p')::k' => inl (p', e', k')
+      | [] => Obs (Fin (DV (VALUE_Bool true)))
+      | (KRet_void e' p')::k' => Jump (p', e', k')
       | _ => raise_p tmid "IMPOSSIBLE: Ret void in non-return configuration"
       end
         
     | TERM_Br (_,op) br1 br2 =>
+      let f := fn pc in
       do dv <- eval_op e op;
       do br <- match dv with 
               | DV (VALUE_Bool true) => mret br1
@@ -828,14 +835,17 @@ Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
       do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
       let bs := (df_instrs fdef) in
       do btgt <- trywith ("ERROR: Br " ++ (string_of br) ++ " not found") (blks bs br);
-        jump f (blk_id b) e k btgt
+      do st <- jump f (blk_id (bk pc)) e k btgt;
+      Jump st     
 
         
     | TERM_Br_1 br =>
+      let f := fn pc in
       do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
       let bs := (df_instrs fdef) in
       do btgt <- trywith ("ERROR: Br " ++ (string_of br) ++ " not found") (blks bs br);
-        jump f (blk_id b) e k btgt
+      do st <- jump f (blk_id (bk pc)) e k btgt;
+      Jump st  
 
     (* Currently unhandled LLVM terminators *)                                  
     | TERM_Switch _ _ _
@@ -848,7 +858,7 @@ Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
     match insn with
     | INSTR_Op op =>
       do dv <- eval_op e op;     
-        inl (incr_pc pc, add_env id dv e, k)
+        Step (incr_pc pc, add_env id dv e, k)
 
     (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
     | INSTR_Call (ret_ty,ID_Global f) args =>
@@ -859,7 +869,7 @@ Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
       do btgt <- trywith ("stepD: no entry block") ((blks cfg) (init cfg));
       match ret_ty with
           | TYPE_Void => raise "ERROR: non-void id for void function call" 
-          | _ =>         inl (mk_pc f btgt, combine ids dvs, (KRet e id (incr_pc pc))::k)
+          | _ =>         Step (mk_pc f btgt, combine ids dvs, (KRet e id (incr_pc pc))::k)
           end        
 
     | INSTR_Call (_, ID_Local _) _ => raise "INSTR_Call to local"
@@ -868,23 +878,18 @@ Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
                                                        
 
     | INSTR_Alloca t _ _ =>
-      inr (Eff (Alloca t (fun (a:value) =>  (incr_pc pc, add_env id a e, k))))
+      Obs (Eff (Alloca t (fun (a:value) =>  (incr_pc pc, add_env id a e, k))))
       
     | INSTR_Load _ t (_,ptr) _ =>
       do dv <- eval_op e ptr;     
       match dv with
-      | DVALUE_Addr a => inr (Eff (Load a (fun dv => (incr_pc pc, add_env id dv e, k))))
+      | DVALUE_Addr a => Obs (Eff (Load a (fun dv => (incr_pc pc, add_env id dv e, k))))
       | _ => raise "ERROR: Load got non-pointer value" 
       end
 
       
-    | INSTR_Store _ (_, val) (_, ptr) _ => 
-      do dv <- eval_op e val;
-      do v <- eval_op e ptr;
-      match v with 
-      | DVALUE_Addr a => inr (Eff (Store a dv (fun _ => (incr_pc pc, e, k))))
-      |  _ => raise "ERROR: Store got non-pointer value" 
-      end
+    | INSTR_Store _ _ _ _ =>
+      raise "ERROR: Store to non-void ID" 
 
     (* Currently unhandled LLVM instructions *)
     | INSTR_Fence 
@@ -903,7 +908,7 @@ Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
       do dvs <-  map_monad (eval_op e) (map snd args);
       do btgt <- trywith ("stepD: no entry block") ((blks cfg) (init cfg));
       match ret_ty with
-        | TYPE_Void => inl ((mk_pc f btgt), (combine ids dvs), (KRet_void e (incr_pc pc))::k)
+        | TYPE_Void => Step ((mk_pc f btgt), (combine ids dvs), (KRet_void e (incr_pc pc))::k)
         | _ =>  raise "ERROR: void instruction for non-void call"
       end
 
@@ -911,14 +916,13 @@ Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
       do dv <- eval_op e val;
       do v <- eval_op e ptr;
       match v with 
-      | DVALUE_Addr a => inr (Eff (Store a dv (fun _ => (incr_pc pc, e, k))))
+      | DVALUE_Addr a => Obs (Eff (Store a dv (fun _ => (incr_pc pc, e, k))))
       |  _ => raise "ERROR: Store got non-pointer value" 
       end
     | _ => raise "ERROR: void id for non-void instruction"
     end      
   end.
 
-Inductive Empty := .
 
 (* Assumes that the entry-point function is named "fn" and that it takes
    no parameters *)
@@ -929,13 +933,15 @@ Definition init_state (CFG:mcfg) (fn:string) : err state :=
     mret ((mk_pc (Name fn) btgt), [], []).
 
 (* Note: codomain is D'  *)
-CoFixpoint sem (CFG:mcfg) (s:state) : Trace :=
+CoFixpoint step_sem (CFG:mcfg) (s:state) : Trace state :=
   match (stepD CFG s) with
-  | inl s => Tau (sem CFG s)
-  | inr (Err s) => Vis (Err s)
-  | inr (Fin s) => Vis (Fin s)
-  | inr (Eff m) => Vis (Eff (effects_map (sem CFG) m))
+  | Step s' => Tau s (step_sem CFG s')
+  | Jump s' => Tau s (step_sem CFG s')
+  | Obs (Err s) => Vis (Err s)
+  | Obs (Fin s) => Vis (Fin s)
+  | Obs (Eff m) => Vis (Eff (effects_map (step_sem CFG) m))
   end.
 
+Definition sem (CFG:mcfg) (s:state) : Trace () := hide_taus (step_sem CFG s).
 
 End StepSemantics.

@@ -126,6 +126,7 @@ and str_of_raw_id : Ollvm_ast.raw_id -> string =
     function
     | Anon i -> Printf.sprintf "%d" (to_int i)
     | Name s -> (of_str s)
+    | Raw i -> Printf.sprintf "_RAW_%d" (to_int i)
 
 and lident : Format.formatter -> Ollvm_ast.local_id -> unit =
   fun ppf i -> pp_print_char ppf '%' ; pp_print_string ppf (str_of_raw_id i)
@@ -750,6 +751,7 @@ and block : Format.formatter -> Ollvm_ast.block -> unit =
     begin match lbl with
       | Anon i -> fprintf ppf "; <label> %d" (to_int i)
       | Name s -> (pp_print_string ppf (of_str s); pp_print_char ppf ':')
+      | Raw i -> fprintf ppf "_RAW_%d:" (to_int i)
     end;
     pp_force_newline ppf () ;
     pp_print_string ppf "  ";

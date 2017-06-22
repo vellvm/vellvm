@@ -162,13 +162,19 @@ Definition lift {A} (e:string) (m:option A) : LLVM A :=
   fun s => (s, trywith e m).
 Hint Unfold lift.
 
-Definition lid_of_Z (n:int) : local_id := Name ("x"++(string_of n))%string.
+Definition lid_of_Z (n:int) : local_id := Raw n.
 
 Lemma lid_of_Z_inj: forall n1 n2, n1 <> n2 -> lid_of_Z n1 <> lid_of_Z n2.
-(* Technically, can't prove this because string_of n is not injective -- too large of numbers
-   become the same error message *)
 Proof.
-Admitted.
+  intros. unfold lid_of_Z. unfold not. intros. apply H. inversion H0. reflexivity.
+Qed.
+
+Lemma lid_of_Z_inj2: forall n1 n2, lid_of_Z n1 = lid_of_Z n2 -> n1 = n2.
+Proof.
+  intros n1 n2 H.
+  inversion H.
+  reflexivity.
+Qed.  
 
 Definition genlabel : () -> LLVM (local_id) :=
   fun _ => fun '(n,m,c) => ((1+n,m,c), mret (lid_of_Z n))%Z.

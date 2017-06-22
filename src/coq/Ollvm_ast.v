@@ -120,6 +120,7 @@ Inductive fn_attr : Set :=
 Inductive raw_id : Set :=
 | Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)  
 | Anon (n:int)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
+| Raw  (n:int)        (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
 .
 
 Inductive ident : Set :=

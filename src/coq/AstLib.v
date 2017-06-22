@@ -22,15 +22,10 @@ Module RawIDDec <: MiniDecidableType.
   Definition t := raw_id.
   Lemma eq_dec : forall (x y : raw_id), {x = y} + {x <> y}.
   Proof.
-    intros x y.
-    destruct x as [xn | xn]; destruct y as [yn | yn].
-    - destruct (string_dec xn yn). subst. left. reflexivity.
-      right. unfold not. intros. apply n. inversion H. auto.
-    - right. unfold not. intros. inversion H.
-    - right. unfold not. intros. inversion H.
-    - destruct (xn == yn).
-      left. subst. reflexivity.
-      right. unfold not. intros. apply n. inversion H. auto.
+    decide equality.
+    - destruct (string_dec s s0); tauto.
+    - destruct (n == n0); tauto.
+    - destruct (n == n0); tauto.
   Defined.
 End RawIDDec.
   
@@ -259,6 +254,7 @@ Instance string_of_raw_id : StringOf raw_id := fun r =>
   match r with
   | Name s => s
   | Anon n => to_string_b10 n
+  | Raw  n => "_RAW_" ++ (to_string_b10 n)                           
   end.
 
 
