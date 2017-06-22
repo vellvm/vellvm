@@ -126,14 +126,26 @@ Definition add_env_Z n dv (e:env) := add_env (lid_of_Z n) dv e.
 
 
 (* Related final values *)
-Definition  Rv (v:value) (i:int64) : Prop :=
+Definition  Rv64 (v:value) (i:int64) : Prop :=
     v = DVALUE_I64 i.
-Hint Unfold Rv.
+Hint Unfold Rv64.
 
-(* Life Rv to error terms *)
-Inductive Rve : err value -> int64 -> Prop :=
-| Rve_inr : forall v i, Rv v i -> Rve (inr v) i.
-Hint Constructors Rve.
+(* For IMP, bexps compute Coq bools, so we relate those *)
+Definition  Rv1 (v:value) (b:bool) : Prop :=
+  if b then v = (DVALUE_I1 Int1.one) else v = (DVALUE_I1 Int1.zero).
+Hint Unfold Rv1.
+
+
+(* Lift Rv64 to error terms *)
+Inductive Rv64e : err value -> int64 -> Prop :=
+| Rv64e_inr : forall v i, Rv64 v i -> Rv64e (inr v) i.
+Hint Constructors Rv64e.
+
+(* Lift Rv1 to error terms *)
+Inductive Rv1e : err value -> bool -> Prop :=
+| Rv1e_inr : forall v i, Rv1 v i -> Rv1e (inr v) i.
+Hint Constructors Rv1e.
+
 
 (* StepSemanticsProp.v *)
 Lemma lookup_env_hd : forall id dv e, lookup_env (add_env id dv e) id = Some dv.
@@ -157,7 +169,7 @@ Definition memory_invariant (g:ctxt) (e:env) (m:memory) (st:Imp.state) : Prop :=
   forall x v, g x = Some v ->
          exists n, (v = (local (lid_of_Z n)) /\
                exists a, (lookup_env e (lid_of_Z n) = Some (DVALUE_Addr a) /\
-                     Rv (nth_default undef m a) (st x))).
+                     Rv64 (nth_default undef m a) (st x))).
 
 Inductive env_lt (n:int) : env -> Prop :=
 | env_lt_nil : env_lt n []
@@ -721,7 +733,7 @@ Lemma compile_aexp_correct :
            let '(pc', e', k') := s' in
            pc' = slc_pc fn bid phis term [] /\
            memory_invariant g e' mem' st /\
-           Rve (eval_op e' (Some (TYPE_I 64)) v) ans /\
+           Rv64e (eval_op e' (Some (TYPE_I 64)) v) ans /\
            env_extends e e' /\
            env_lt n' e'
         )
@@ -1041,3 +1053,40 @@ Proof.
            eapply env_extends_lt. apply Hlte2. 
         ++ apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
 Qed.
+
+
+Lemma compile_bexp_correct :
+  forall 
+    (b:bexp) (st:Imp.state) (ans:bool)
+    (HAexp: beval st b = ans)
+
+    (g:ctxt)
+    (n m:int) (cd:list elt)
+    (n' m':int) (cd':list elt)
+    (v : Ollvm_ast.value)
+    (Hcomp : compile_bexp g b (n,m,cd) = ((n',m',cd'),inr v)),
+
+  exists cd_a c_a,
+    cd' = cd_a ++ cd
+    /\ compiled_code cd_a c_a
+    /\ straight c_a
+    /\ forall
+    (e:env)
+    (mem:memory) (Hlt:env_lt n e)
+    (HM: memory_invariant g e mem st)
+    (k:stack)
+    (CFG : mcfg) (fn : function_id) (bid: block_id) phis term,
+      step_code
+        CFG
+        (fun s' mem' =>
+           let '(pc', e', k') := s' in
+           pc' = slc_pc fn bid phis term [] /\
+           memory_invariant g e' mem' st /\
+           Rv1e (eval_op e' (Some (TYPE_I 1)) v) ans /\
+           env_extends e e' /\
+           env_lt n' e'
+        )
+        (List.rev c_a)
+        (slc_pc fn bid phis term (List.rev c_a), e, k) mem.
+Proof.
+Admitted.
