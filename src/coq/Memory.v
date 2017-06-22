@@ -35,26 +35,25 @@ Definition mem_step {X} (e:effects X) (m:memory) :=
   | Call _ _ _ => inl e
   end.
 
-CoFixpoint memD (m:memory) (d:Trace) : Trace :=
+CoFixpoint memD (m:memory) (d:Trace ()) : Trace () :=
   match d with
-  | Tau d'            => Tau (memD m d')
+  | Tau x d'            => Tau x (memD m d')
   | Vis (Eff e) =>
     match mem_step e m with
-    | inr (m', v, k) => Tau (memD m' (k v))
+    | inr (m', v, k) => Tau tt (memD m' (k v))
     | inl e => Vis (Eff e)
     end
   | Vis x => Vis x
   end.
                             
-
-Fixpoint MemDFin (m:memory) (d:Trace) (steps:nat) : option memory :=
+Fixpoint MemDFin (m:memory) (d:Trace ()) (steps:nat) : option memory :=
   match steps with
   | O => None
   | S x =>
     match d with
     | Vis (Fin d) => Some m
     | Vis (Err s) => None
-    | Tau d' => MemDFin m d' x
+    | Tau _ d' => MemDFin m d' x
     | Vis (Eff e)  =>
       match mem_step e m with
       | inr (m', v, k) => MemDFin m' (k v) x

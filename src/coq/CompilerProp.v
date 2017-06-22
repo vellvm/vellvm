@@ -142,13 +142,14 @@ Fixpoint get_n_instrs_from_blocks (l : list block) (n : nat) : list block :=
   match l with 
   | [] => []
   | first_block :: rest =>
-    let instrs := List.firstn n (blk_instrs first_block) in
+    let instrs := List.firstn n (blk_code first_block) in
     let steps_left := (n - (List.length instrs))%nat in
     match steps_left with
     | O => [mk_block (blk_id first_block)
+                    (blk_phis first_block)
                     instrs
                     (blk_term first_block)
-                    (blk_term_id first_block)]
+                    ]
     | S n' =>
       first_block :: get_n_instrs_from_blocks rest steps_left 
     end
@@ -197,10 +198,11 @@ CoInductive FullTrace :=
 (* Insert state label as breadcrumbs *)
 CoFixpoint sem_all_visible (CFG : mcfg) (st : SS.state) : FullTrace :=
   match (stepD CFG st) with
-  | inl st' => FT_Tau st' (sem_all_visible CFG st')
-  | inr (Err s) => FT_Tau st (FT_Vis (Err s))
-  | inr (Fin s) => FT_Tau st (FT_Vis (Fin s))
-  | inr (Eff m) =>
+  | Step st' => FT_Tau st' (sem_all_visible CFG st')
+  | Jump st' => FT_Tau st' (sem_all_visible CFG st')                      
+  | Obs (Err s) => FT_Tau st (FT_Vis (Err s))
+  | Obs (Fin s) => FT_Tau st (FT_Vis (Fin s))
+  | Obs (Eff m) =>
     FT_Vis (Eff (
       match m with
       | Alloca t k =>

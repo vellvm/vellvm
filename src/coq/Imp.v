@@ -26,7 +26,6 @@ Require Import Coq.Arith.Arith.
 Require Import Coq.Arith.EqNat.
 Require Import Coq.omega.Omega.
 Require Import Coq.Lists.List.
-Require Import Coq.omega.Omega.
 Import ListNotations.
 
 Require Import Vellvm.Maps.

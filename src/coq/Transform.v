@@ -17,6 +17,7 @@ Definition mangle_raw_id (id:raw_id) : raw_id :=
   match id with
   | Anon n => id
   | Name s => Name (append "_vellvm" s)
+  | Raw n => id
   end.
 
 Definition mangle_ident (id:ident) : ident :=
@@ -31,7 +32,7 @@ Definition mangle_instr (i:instr_id * instr) : (instr_id * instr) :=
   end.
 
 Definition mangle_block (blk:block) : block :=
-  mk_block (blk_id blk) (List.map mangle_instr (blk_instrs blk)) (blk_term blk) (blk_term_id blk).
+  blk.
 
 Definition mangle_blocks (blks:list block) : list block :=
   List.map mangle_block blks.

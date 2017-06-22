@@ -126,6 +126,7 @@ and str_of_raw_id : Ollvm_ast.raw_id -> string =
     function
     | Anon i -> Printf.sprintf "%d" (to_int i)
     | Name s -> (of_str s)
+    | Raw i -> Printf.sprintf "_RAW_%d" (to_int i)
 
 and lident : Format.formatter -> Ollvm_ast.local_id -> unit =
   fun ppf i -> pp_print_char ppf '%' ; pp_print_string ppf (str_of_raw_id i)
@@ -458,6 +459,18 @@ and inst_value : Format.formatter -> Ollvm_ast.value -> unit =
              tvalue mask
 
 
+and phi : Format.formatter -> Ollvm_ast.phi -> unit =
+  fun ppf ->
+  function
+  | Phi (t, vil) ->
+     fprintf ppf "phi %a [%a]"
+             typ t
+             (pp_print_list ~pp_sep:(pp_sep "], [")
+                            (fun ppf (i, v) -> value ppf v ;
+                                               pp_print_string ppf ", " ;
+                                               lident ppf i)) vil
+
+
 and instr : Format.formatter -> Ollvm_ast.instr -> unit =
   fun ppf ->
   function
@@ -484,15 +497,6 @@ and instr : Format.formatter -> Ollvm_ast.instr -> unit =
      tvalue ppf tv ;
      (match a with None -> ()
                  | Some a -> fprintf ppf ", align %d" (to_int a))
-
-  | INSTR_Phi (t, vil) ->
-     fprintf ppf "phi %a [%a]"
-             typ t
-             (pp_print_list ~pp_sep:(pp_sep "], [")
-                            (fun ppf (i, v) -> value ppf v ;
-                                               pp_print_string ppf ", " ;
-                                               lident ppf i)) vil
-
 
   | INSTR_VAArg -> pp_print_string ppf "vaarg"
 
@@ -558,6 +562,12 @@ and id_instr : Format.formatter -> (Ollvm_ast.instr_id * Ollvm_ast.instr) -> uni
   fun ppf ->
     function (id, inst) ->
       fprintf ppf "%a%a" instr_id id instr inst
+
+and id_phi : Format.formatter -> (Ollvm_ast.local_id * Ollvm_ast.phi) -> unit =
+  fun ppf ->
+    function (id, p) ->
+      fprintf ppf "%a%a" lident id phi p
+
 
 and instr_id : Format.formatter -> Ollvm_ast.instr_id -> unit =
   fun ppf ->
@@ -737,14 +747,16 @@ and definition : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.definition
     pp_print_char ppf '}' ;
 
 and block : Format.formatter -> Ollvm_ast.block -> unit =
-  fun ppf {blk_id=lbl; blk_instrs=b; blk_term=t} ->
+  fun ppf {blk_id=lbl; blk_phis=phis; blk_code=b; blk_term=(_,t)} ->
     begin match lbl with
       | Anon i -> fprintf ppf "; <label> %d" (to_int i)
       | Name s -> (pp_print_string ppf (of_str s); pp_print_char ppf ':')
+      | Raw i -> fprintf ppf "_RAW_%d:" (to_int i)
     end;
     pp_force_newline ppf () ;
     pp_print_string ppf "  ";
     pp_open_box ppf 0 ;
+    pp_print_list ~pp_sep:pp_force_newline id_phi ppf phis ;
     pp_print_list ~pp_sep:pp_force_newline id_instr ppf b ;
     pp_force_newline ppf () ;
     terminator ppf t;

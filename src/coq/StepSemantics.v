@@ -59,7 +59,7 @@ Module StepSemantics(A:ADDR).
    interpreting concretely (e.g. undef).  *)
     Inductive dvalue : Set :=
     | DV : Expr dvalue -> dvalue
-    | DVALUE_CodePointer (p : pc)
+    | DVALUE_CodePointer (p : instr_id)
     | DVALUE_Addr (a:A.addr)
     | DVALUE_I1 (x:int1)
     | DVALUE_I32 (x:int32)
@@ -87,20 +87,38 @@ Module StepSemantics(A:ADDR).
   Definition genv := list (global_id * value).
   Definition env  := list (local_id * value).
 
+  (* 
+     Invariant: the block here represents the state of the program counter of the LLVM machine.
+      - the phis component is ignored in stepD, it is used only when jumping
+      - whenever the phis component is empty, the program is executing the code within the block 
+      - whenever both phis and code are both empty, the pc is at the terminator
+  *)
+  Record pc :=
+    mk_pc {
+        fn : function_id;
+        bk : block;  
+      }.
+
+  Definition fetch (p:pc) : code :=
+    blk_code (bk p).
+  
   Inductive frame : Set :=
   | KRet      (e:env) (id:local_id) (q:pc)
-  | KRet_void (e:env) (q:pc)
+  | KRet_void (e:env) (p:pc)
   .       
   
   Definition stack := list frame.
   Definition state := (pc * env * stack)%type.
 
-  Definition def_id_of_pc (p:pc) : err local_id :=
-    match ins p with
-    | IId id => mret id
-    | _ => failwith ("def_id_of_pc: " ++ (string_of p))
-    end.
+  Definition pc_of (s:state) :=
+    let '(p, e, k) := s in p.
 
+  Definition env_of (s:state) :=
+    let '(p, e, k) := s in e.
+
+  Definition stack_of (s:state) :=
+    let '(p, e, k) := s in k.
+  
   Definition local_id_of_ident (i:ident) : err local_id :=
     match i with
     | ID_Global _ => failwith ("local_id_of_ident: " ++ string_of i)
@@ -115,8 +133,8 @@ Module StepSemantics(A:ADDR).
 
   Instance string_of_env : StringOf env := string_of_env'.
   
-  Definition lookup_env (e:env) (id:local_id) : err value :=
-    trywith ("lookup_env: id = " ++ (string_of id) ++ " NOT IN env = " ++ (string_of e)) (assoc RawID.eq_dec id e).
+  Definition lookup_env (e:env) (id:raw_id) : option value :=
+    assoc RawID.eq_dec id e.
 
   Definition add_env id dv (e:env) := (id,dv)::e.
   
@@ -163,7 +181,9 @@ Module StepSemantics(A:ADDR).
     | Xor =>
       DVALUE_I1 (Int1.xor x y)
     end.
+  Arguments eval_i1_op _ _ _ : simpl nomatch.
 
+  
   Definition eval_i32_op (iop:ibinop) (x y:inttyp 32) : value:=
     match iop with
     | Add nuw nsw =>
@@ -220,7 +240,8 @@ Module StepSemantics(A:ADDR).
     | Xor =>
       DVALUE_I32 (Int32.xor x y)
     end.
-
+  Arguments eval_i32_op _ _ _ : simpl nomatch.
+  
   Definition eval_i64_op (iop:ibinop) (x y:inttyp 64) : value:=
     (* This needs to be tested *)
     match iop with
@@ -281,7 +302,8 @@ Module StepSemantics(A:ADDR).
     | Xor =>
       DVALUE_I64 (Int64.xor x y)
     end.
-
+  Arguments eval_i64_op _ _ _ : simpl nomatch.
+  
   (* Evaluate the given iop on the given arguments according to the bitsize *)
   Definition integer_op (bits:Z) (iop:ibinop) (x y:inttyp bits) : err value:=
     match bits, x, y with
@@ -290,7 +312,8 @@ Module StepSemantics(A:ADDR).
     | 64, x, y => mret (eval_i64_op iop x y)
     | _, _, _ => failwith "unsupported bitsize"
     end.
-
+  Arguments integer_op _ _ _ _ : simpl nomatch.
+  
   (* Convert written integer constant to corresponding integer with bitsize bits.
      Takes the integer modulo 2^bits. *)
   Definition coerce_integer_to_int (bits:Z) (i:Z) : err dvalue :=
@@ -300,6 +323,7 @@ Module StepSemantics(A:ADDR).
     | 64 => mret (DVALUE_I64 (Int64.repr i))
     | _ => failwith "unsupported integer size"
     end.
+  Arguments coerce_integer_to_int _ _ : simpl nomatch.
   
   (* Helper for looping 2 argument evaluation over vectors, producing a vector *)
   Fixpoint vec_loop (f:dvalue -> dvalue -> err dvalue)
@@ -322,7 +346,8 @@ Module StepSemantics(A:ADDR).
     | TYPE_I 64, DVALUE_I64 i1, DVALUE_I64 i2 => integer_op 64 iop i1 i2
     | _, _, _ => failwith "ill_typed-iop"
     end.
-
+  Arguments eval_iop_integer_h _ _ _ _ : simpl nomatch.
+  
   (* Handles the written constant cases for ops *)
   Definition eval_bop_integer t op v1 v2 : err value :=
     match t, v1, v2 with
@@ -338,7 +363,8 @@ Module StepSemantics(A:ADDR).
       op t v1 v2
     | _,  v1, v2 => op t v1 v2
     end.
-
+  Arguments eval_bop_integer _ _ _ _ : simpl nomatch.
+  
   (* I split the definition between the vector and other evaluations because
      otherwise eval_iop should be recursive to allow for vector calculations, 
      but coq can't find a fixpoint. *)
@@ -352,6 +378,8 @@ Module StepSemantics(A:ADDR).
       mret (DV (VALUE_Vector val))
     | _, _, _ => (eval_bop_integer t (fun t => eval_iop_integer_h t iop)) v1 v2
     end.
+  Arguments eval_iop _ _ _ _ : simpl nomatch.
+
 
   Definition cast_boolean_literal_if_needed (v : dvalue) : err value :=
     match v with
@@ -375,7 +403,8 @@ Module StepSemantics(A:ADDR).
        | Sle => Int1.cmp Cle x y
        end
     then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
-
+  Arguments eval_i1_icmp _ _ _ : simpl nomatch.
+  
   Definition eval_i32_icmp icmp x y : value :=
     if match icmp with
        | Eq => Int32.cmp Ceq x y
@@ -390,7 +419,8 @@ Module StepSemantics(A:ADDR).
        | Sle => Int32.cmp Cle x y
        end
     then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
-
+  Arguments eval_i32_icmp _ _ _ : simpl nomatch.
+  
   Definition eval_i64_icmp icmp x y : value :=
     if match icmp with
        | Eq => Int64.cmp Ceq x y
@@ -405,6 +435,7 @@ Module StepSemantics(A:ADDR).
        | Sle => Int64.cmp Cle x y
        end
     then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
+  Arguments eval_i64_icmp _ _ _ : simpl nomatch.
   
   Definition integer_cmp bits icmp (x y:inttyp bits) : err value :=
     match bits, x, y with
@@ -413,7 +444,8 @@ Module StepSemantics(A:ADDR).
     | 64, x, y => mret (eval_i64_icmp icmp x y)
     | _, _, _ => failwith "unsupported bitsize"
     end.
-
+  Arguments integer_cmp _ _ _ _ : simpl nomatch.
+  
   (*Helper defined in order to prevent 
     eval_icmp from being recursive. *)
   Definition eval_icmp_h t icmp v1 v2 : err value :=
@@ -423,6 +455,7 @@ Module StepSemantics(A:ADDR).
     | TYPE_I 64, DVALUE_I64 i1, DVALUE_I64 i2 => integer_cmp 64 icmp i1 i2
     | _, _, _ => failwith "ill_typed-icmp"
     end.
+  Arguments eval_icmp_h _ _ _ _ : simpl nomatch.
   
   Definition eval_icmp t icmp v1 v2 : err value :=
     eval_bop_integer t (fun t => eval_icmp_h t icmp) v1 v2.
@@ -509,6 +542,7 @@ Module StepSemantics(A:ADDR).
     | Fptoui
     | Fptosi => failwith "unimplemented conv"
     end.
+  Arguments eval_conv_h _ _ _ _ : simpl nomatch.
   
   Definition eval_conv conv t1 x t2 : err value :=
     match t1, x with
@@ -520,7 +554,9 @@ Module StepSemantics(A:ADDR).
       failwith "vectors unimplemented"
     | _, _ => eval_conv_h conv t1 x t2
     end.
+  Arguments eval_conv _ _ _ _ : simpl nomatch.
 
+  
   (* Same deal as above with the helper *)
   Definition eval_select_h cnd v1 v2 : err value :=
     match cnd with
@@ -528,7 +564,9 @@ Module StepSemantics(A:ADDR).
       mret (if Int1.unsigned i =? 1 then v1 else v2)
     | _ => failwith "ill_typed-select"
     end.
+  Arguments eval_select_h _ _ _ : simpl nomatch.
 
+  
   Definition eval_select t cnd t' v1 v2 : err value :=
     match t, t', cnd, v1, v2 with
     | TYPE_Vector _ t, TYPE_Vector _ t', DV (VALUE_Vector es),
@@ -550,7 +588,8 @@ Module StepSemantics(A:ADDR).
       mret (DV (VALUE_Vector val))
     | _, _, _, _, _ => eval_select_h cnd v1 v2
     end.
-
+  Arguments eval_select _ _ _ _ _ : simpl nomatch.
+  
   (* Helper function for indexding into a structured datatype 
      for extractvalue and insertvalue *)
   Definition index_into_str (v:value) (idx:Ollvm_ast.int) : err (typ * value) :=
@@ -565,7 +604,8 @@ Module StepSemantics(A:ADDR).
     | DV (VALUE_Array e) => loop e idx
     | _ => failwith "invalid aggregate data"
     end.
-
+  Arguments index_into_str _ _ : simpl nomatch.
+  
   (* Helper function for indexding into a structured datatype 
      for insertvalue *)
   Definition insert_into_str (str:value) (v:value) (idx:Ollvm_ast.int) : err value :=
@@ -585,12 +625,16 @@ Module StepSemantics(A:ADDR).
       mret (DV (VALUE_Array v))
     | _ => failwith "invalid aggregate data"
     end.
-
+  Arguments insert_into_str _ _ _ : simpl nomatch.
+  
 Definition eval_expr {A:Set} (f:env -> A -> err value) (e:env) (o:Expr A) : err value :=
   match o with
   | VALUE_Ident id => 
     'i <- local_id_of_ident id;
-      lookup_env e i
+      match lookup_env e i with
+      | None => failwith ("lookup_env: id = " ++ (string_of i) ++ " NOT IN env = " ++ (string_of e))
+      | Some v => mret v
+      end
   | VALUE_Integer x => mret (DV (VALUE_Integer x))
   | VALUE_Float x   => mret (DV (VALUE_Float x))
   | VALUE_Bool b    => mret (DV (VALUE_Bool b)) 
@@ -694,12 +738,13 @@ Definition eval_expr {A:Set} (f:env -> A -> err value) (e:env) (o:Expr A) : err 
     '(t2, v2) <- monad_app_snd (f e) op2;
     eval_select t cnd t1 v1 v2
   end.
+Arguments eval_expr _ _ _ _ : simpl nomatch.
 
 Fixpoint eval_op (e:env) (o:Ollvm_ast.value) : err value :=
   match o with
   | SV o' => eval_expr eval_op e o'
   end.
-
+Arguments eval_op _ _ : simpl nomatch.
 
 Definition eval_op_for_store (e:env) (t:typ) (o:Ollvm_ast.value)
   : err value :=
@@ -751,11 +796,13 @@ Definition eval_cond (e:env) (o:Ollvm_ast.value) : err value :=
     end
   end.
 
+
+(*
 (* Semantically, a jump at the LLVM IR level might not be "atomic" in the sense that
    Phi nodes may be lowered into a sequence of non-atomic operations on registers.  However,
    Phi's should never touch memory [is that true? can there be spills?], so modeling them
    as atomic should be OK. *)
-Fixpoint jump (CFG:cfg) (bn:block_id) (e_init:env) (e:env) ps (q:pc) (k:stack) : err state :=
+Fixpoint jump (CFG:cfg) (from:block_id) (e_init:env) (e:env) (to:block) (k:stack) : err state :=
   match ps with
   | [] => mret (q, e, k)
   | (id, (INSTR_Phi _ ls))::rest => 
@@ -767,63 +814,77 @@ Fixpoint jump (CFG:cfg) (bn:block_id) (e_init:env) (e:env) ps (q:pc) (k:stack) :
     end
   | _ => failwith "jump: got non-phi instruction"
   end.
+*)
 
-Definition raise s p : state + (Event state) :=
-  inr (Err (s ++ ": " ++ (string_of_pc p))).
+Definition jump (fn:function_id) (from:block_id) (e_init:env) (k:stack) (tgt:block) : err state :=
+  let eval_phi (e:env) '(lid, Phi _ ls) :=
+      match assoc RawID.eq_dec from ls with
+      | Some op =>
+        'dv <- eval_op e_init op;
+          mret (add_env lid dv e)
+      | None => failwith ("jump: block " ++ string_of from ++ " not found in " ++ string_of lid)
+      end
+  in
+  'e_out <- monad_fold_right eval_phi (blk_phis tgt) e_init;
+  mret (mk_pc fn tgt, e_out, k).
 
-Definition lift_err_d {A B} (m:err A) (f: A -> (state + Event B)) : (state + Event B) :=
+Definition incr_pc (p:pc) : pc :=
+  let 'mk_pc f b := p in
+  mk_pc f
+  {| blk_id := blk_id b;
+    blk_phis := blk_phis b;
+    blk_code := List.tl (blk_code b);
+    blk_term := blk_term b;
+  |}.
+
+Inductive transition X :=
+| Step (s:X)
+| Jump (s:X)
+| Obs  (m:Event X)
+.
+
+Definition lift_err_d {A} (m:err A) (f: A -> transition state) : transition state :=
   match m with
-    | inl s => inr (Err s)
+    | inl s => Obs (Err s)
     | inr b => f b
   end.
 
 Notation "'do' x <- m ; f" := (lift_err_d m (fun x => f)) 
    (at level 200, x ident, m at level 100, f at level 200).
 
-Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
-  let '(p, e, k) := s in
-  let pc_of_pt pt := mk_pc (fn p) pt in
-  do cmd <- trywith ("stepD: no cmd at pc " ++ (string_of p)) (fetch CFG p);
-    match cmd with
-    | Step (INSTR_Op op) p' =>
-      do id <- def_id_of_pc p; 
-      do dv <- eval_op e op;     
-       inl (pc_of_pt p', (id, dv)::e, k)
+Definition raise s : transition state :=
+  Obs (Err s). 
 
-    (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
-    | Step (INSTR_Call (ret_ty,ID_Global f) args) p' =>
-      do id <- def_id_of_pc p; 
-      do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
-      let ids := (df_args fdef) in  
-      let cfg := df_instrs fdef in
-      do dvs <-  map_monad (eval_op e) (map snd args);
-      inl (mk_pc f (init cfg), combine ids dvs, 
-          match ret_ty with
-          | TYPE_Void => (KRet_void e (pc_of_pt p'))::k
-          | _ =>         (KRet e id (pc_of_pt p'))::k
-          end)
+Definition raise_p (p:instr_id) s := raise (s ++ ": " ++ (string_of p)).
 
-    | Step (INSTR_Call (_, ID_Local _) _) _ => raise "INSTR_Call to local" p
-        
-    | Step (INSTR_Unreachable) _ => raise "IMPOSSIBLE: unreachable" p
-                                                       
-    | Jump _ (TERM_Ret (t, op)) =>
+(* TODO:  clean up the pc abstraction a little bit: 
+   - replace blk_term (bk pc) with an accessor like 'fetch'
+*)
+
+
+Definition stepD (CFG:mcfg) (s:state) : transition state :=
+  let '(pc, e, k) := s in
+  match fetch pc with
+  | [] =>   (* terminator *)
+    let '(tmid, tm) := blk_term (bk pc) in
+    match tm with
+    | TERM_Ret (t, op) =>
       do dv <- eval_op e op;
-      match k with
-      | [] => inr (Fin dv)
-      | (KRet e' id p') :: k' => inl (p', add_env id dv e', k')
-      | _ => raise "IMPOSSIBLE: Ret op in non-return configuration" p
-      end
+        match k with
+        | [] => Obs (Fin dv)
+        | (KRet e' id p') :: k' => Jump (p', add_env id dv e', k')
+        | _ => raise_p tmid "IMPOSSIBLE: Ret op in non-return configuration" 
+        end
 
-    | Jump _ (TERM_Ret_void) =>
+    | TERM_Ret_void =>
       match k with
-      | [] => inr (Fin (DV (VALUE_Bool true)))
-      | (KRet_void e' p')::k' => inl (p', e', k')
-      | _ => raise "IMPOSSIBLE: Ret void in non-return configuration" p
+      | [] => Obs (Fin (DV (VALUE_Bool true)))
+      | (KRet_void e' p')::k' => Jump (p', e', k')
+      | _ => raise_p tmid "IMPOSSIBLE: Ret void in non-return configuration"
       end
         
-    | Jump current_block (TERM_Br (_,op) br1 br2) =>
-      (* CHKoh: do dv <- eval_op e op; *)
+    | TERM_Br (_,op) br1 br2 =>
+      let f := fn pc in
       do dv <- eval_cond e op; (* TO SEE *)
       do br <- match dv with 
               (* CHKoh: | DV (VALUE_Bool true) => mret br1
@@ -835,79 +896,116 @@ Definition stepD (CFG:mcfg) (s:state) : state + (Event state) :=
                   mret br2
               | _ => failwith "Br got non-bool value"
       end;
-      do fdef <- trywith ("stepD: no function " ++ (string_of (fn p))) (find_function CFG (fn p));
-      let cfg := (df_instrs fdef) in
-      match (phis cfg br) with
-      | Some (Phis _ ps q) => 
-        lift_err_d (jump cfg current_block e e ps (pc_of_pt q) k) inl
-      | None => raise ("ERROR: Br " ++ (string_of br) ++ " not found") p
-      end
+      do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
+      let bs := (df_instrs fdef) in
+      do btgt <- trywith ("ERROR: Br " ++ (string_of br) ++ " not found") (blks bs br);
+      do st <- jump f (blk_id (bk pc)) e k btgt;
+      Jump st     
+
         
-    | Jump current_block (TERM_Br_1 br) =>
-      do fdef <- trywith ("stepD: no function " ++ (string_of (fn p))) (find_function CFG (fn p));
-      let cfg := (df_instrs fdef) in
-        match (phis cfg br) with
-          | Some (Phis _ ps q) => 
-            lift_err_d (jump cfg current_block e e ps (pc_of_pt q) k) inl
-          | None => raise ("ERROR: Br1  " ++ (string_of br) ++ " not found") p
-        end
+    | TERM_Br_1 br =>
+      let f := fn pc in
+      do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
+      let bs := (df_instrs fdef) in
+      do btgt <- trywith ("ERROR: Br " ++ (string_of br) ++ " not found") (blks bs br);
+      do st <- jump f (blk_id (bk pc)) e k btgt;
+      Jump st  
+
+    (* Currently unhandled LLVM terminators *)                                  
+    | TERM_Switch _ _ _
+    | TERM_IndirectBr _ _
+    | TERM_Resume _
+    | TERM_Invoke _ _ _ _ => raise "Unsupport LLVM terminator" 
+    end
+
+  | (IId id, insn)::_ =>  (* instruction *)
+    match insn with
+    | INSTR_Op op =>
+      do dv <- eval_op e op;     
+        Step (incr_pc pc, add_env id dv e, k)
+
+    (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
+    | INSTR_Call (ret_ty,ID_Global f) args =>
+      do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
+      let ids := (df_args fdef) in  
+      let cfg := df_instrs fdef in
+      do dvs <-  map_monad (eval_op e) (map snd args);
+      do btgt <- trywith ("stepD: no entry block") ((blks cfg) (init cfg));
+      match ret_ty with
+          | TYPE_Void => raise "ERROR: non-void id for void function call" 
+          | _ =>         Step (mk_pc f btgt, combine ids dvs, (KRet e id (incr_pc pc))::k)
+          end        
+
+    | INSTR_Call (_, ID_Local _) _ => raise "INSTR_Call to local"
+        
+    | INSTR_Unreachable => raise "IMPOSSIBLE: unreachable" 
+                                                       
+
+    | INSTR_Alloca t _ _ =>
+      Obs (Eff (Alloca t (fun (a:value) =>  (incr_pc pc, add_env id a e, k))))
       
-    | Step (INSTR_Alloca t _ _) p' =>
-      do id <- def_id_of_pc p;  
-      inr (Eff (Alloca t (fun (a:value) =>  (pc_of_pt p', add_env id a e, k))))
-      
-    | Step (INSTR_Load _ t (_,ptr) _) p' =>
-      do id <- def_id_of_pc p;  
+    | INSTR_Load _ t (_,ptr) _ =>
       do dv <- eval_op e ptr;     
       match dv with
-      | DVALUE_Addr a => inr (Eff (Load a (fun dv => (pc_of_pt p', add_env id dv e, k))))
-      | _ => raise "ERROR: Load got non-pointer value" p
+      | DVALUE_Addr a => Obs (Eff (Load a (fun dv => (incr_pc pc, add_env id dv e, k))))
+      | _ => raise "ERROR: Load got non-pointer value" 
       end
       
-    | Step (INSTR_Store _ (t, val) (_, ptr) _) p' =>
-      do dv <- eval_op_for_store e t val; (* TO SEE: Added new function *)
-      (* CHKoh: do dv <- eval_op e val; *)
-      do ptr_val <- eval_op e ptr;
-      match ptr_val with 
-      | DVALUE_Addr a =>
-        inr (Eff (Store a dv (fun _ => (pc_of_pt p', e, k))))
-      |  _ => raise "ERROR: Store got non-pointer value" p
-      end
-
-    | Step (INSTR_Phi _ _) p' => inr (Err "IMPOSSIBLE: Phi encountered in step")
-      (* We should never evaluate Phi nodes except in jump *)
+    | INSTR_Store _ _ _ _ =>
+      raise "ERROR: Store to non-void ID" 
 
     (* Currently unhandled LLVM instructions *)
-    | Step INSTR_Fence p'
-    | Step INSTR_AtomicCmpXchg p'
-    | Step INSTR_AtomicRMW p'
-    | Step INSTR_VAArg p'
-    | Step INSTR_LandingPad p' => raise "Unsupported LLVM intsruction" p
- 
-    (* Currently unhandled LLVM terminators *)                                  
-    | Jump _ (TERM_Switch _ _ _)
-    | Jump _ (TERM_IndirectBr _ _)
-    | Jump _ (TERM_Resume _)
-    | Jump _ (TERM_Invoke _ _ _ _) => raise "Unsupport LLVM terminator" p
-    end.
+    | INSTR_Fence 
+    | INSTR_AtomicCmpXchg 
+    | INSTR_AtomicRMW
+    | INSTR_VAArg 
+    | INSTR_LandingPad => raise "Unsupported LLVM intsruction" 
+    end
+  | (IVoid _, insn)::_ =>
+    match insn with
+    (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
+    | INSTR_Call (ret_ty,ID_Global f) args =>
+      do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
+      let ids := (df_args fdef) in  
+      let cfg := df_instrs fdef in
+      do dvs <-  map_monad (eval_op e) (map snd args);
+      do btgt <- trywith ("stepD: no entry block") ((blks cfg) (init cfg));
+      match ret_ty with
+        | TYPE_Void => Step ((mk_pc f btgt), (combine ids dvs), (KRet_void e (incr_pc pc))::k)
+        | _ =>  raise "ERROR: void instruction for non-void call"
+      end
 
-Inductive Empty := .
+    | INSTR_Store _ (t, val) (_, ptr) _ => 
+      do dv <- eval_op_for_store e t val; (* TO SEE: Added new function *)
+      (* CHKoh: do dv <- eval_op e val; *)
+      do v <- eval_op e ptr;
+      match v with 
+      | DVALUE_Addr a => Obs (Eff (Store a dv (fun _ => (incr_pc pc, e, k))))
+      |  _ => raise "ERROR: Store got non-pointer value" 
+      end
+    | _ => raise "ERROR: void id for non-void instruction"
+    end      
+  end.
+
 
 (* Assumes that the entry-point function is named "fn" and that it takes
    no parameters *)
 Definition init_state (CFG:mcfg) (fn:string) : err state :=
   'fdef <- trywith ("stepD: no function named " ++ fn) (find_function CFG (Name fn));
-    let cfg := df_instrs fdef in
-    mret ((mk_pc (Name fn) (init cfg)), [], []).
+  let cfg := df_instrs fdef in
+  'btgt <- trywith ("init_state: no entry block") ((blks cfg) (init cfg));
+    mret ((mk_pc (Name fn) btgt), [], []).
 
 (* Note: codomain is D'  *)
-CoFixpoint sem (CFG:mcfg) (s:state) : Trace :=
+CoFixpoint step_sem (CFG:mcfg) (s:state) : Trace state :=
   match (stepD CFG s) with
-  | inl s => Tau (sem CFG s)
-  | inr (Err s) => Vis (Err s)
-  | inr (Fin s) => Vis (Fin s)
-  | inr (Eff m) => Vis (Eff (effects_map (sem CFG) m))
+  | Step s' => Tau s (step_sem CFG s')
+  | Jump s' => Tau s (step_sem CFG s')
+  | Obs (Err s) => Vis (Err s)
+  | Obs (Fin s) => Vis (Fin s)
+  | Obs (Eff m) => Vis (Eff (effects_map (step_sem CFG) m))
   end.
 
+Definition sem (CFG:mcfg) (s:state) : Trace () := hide_taus (step_sem CFG s).
 
 End StepSemantics.

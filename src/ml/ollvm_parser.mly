@@ -104,8 +104,17 @@ let mk_counter () =
 
 let anon_ctr = mk_counter ()
 let void_ctr = mk_counter ()             
-  
-  
+
+let raw_id_of s : raw_id =
+   match s with
+   | None -> Anon (anon_ctr.get ())
+   | Some s -> Name (str s)
+
+let phi_id s : raw_id =
+   match s with
+   | None -> Anon (anon_ctr.get ())
+   | Some s -> s
+
 let id_of = function
   | INSTR_Store _
   | INSTR_Unreachable
@@ -115,7 +124,6 @@ let id_of = function
 
   | INSTR_Op _
   | INSTR_Call _
-  | INSTR_Phi _
   | INSTR_Alloca _
   | INSTR_Load _
   | INSTR_AtomicCmpXchg
@@ -326,20 +334,21 @@ definition:
         } }
 
 df_blocks: 
-  | bs=pair(terminated(LABEL, EOL+)?, pair(terminated(id_instr, EOL+)*, terminated(terminator, EOL+)))+
+  | bs=pair(terminated(LABEL, EOL+)?, pair(terminated(id_phi, EOL+)*, pair(terminated(id_instr, EOL+)*, terminated(terminator, EOL+))))+
     { let _ = anon_ctr.reset () in
       let _ = void_ctr.reset () in
-      List.map (fun (lbl, (instrs, blk_term)) ->
-                let l = match lbl with
-                        | None -> Anon (anon_ctr.get ())
-                        | Some s -> Name (str s)
-                in let blk_instrs = List.map (fun (id, inst) ->
+      List.map (fun (lbl, (phis, (instrs, term))) ->
+                let l = raw_id_of lbl 
+		in let blk_phis = List.map (fun (id, phi) ->
+		                  (phi_id id, phi))
+		       phis
+                in let blk_code = List.map (fun (id, inst) ->
                                     match id with 
                                     | None -> (id_of inst, inst)
                                     | Some s -> (IId s, inst))
                        instrs
                 in
-                {blk_id = l; blk_instrs; blk_term; blk_term_id=IVoid (void_ctr.get ())})
+                {blk_id = l; blk_phis; blk_code; blk_term=(IVoid (void_ctr.get ()), term)})
 	bs
     }
 
@@ -616,6 +625,17 @@ value:
   | eo=expr_op { eo }
   | ev=expr_val { ev }
 
+phi:
+  | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry)
+    { Phi (t, table) }
+
+phi_table_entry:
+  | LSQUARE v=value COMMA l=lident RSQUARE { (l, v) }
+
+id_phi:
+  | id=lident EQ p=phi { (Some id, p) }
+  | p=phi              { (None, p) }
+
 
 instr:
   | eo=instr_op { INSTR_Op eo }
@@ -631,9 +651,6 @@ instr:
 
   | KW_LOAD vol=KW_VOLATILE? t=typ COMMA tv=tvalue a=preceded(COMMA, align)?
     { INSTR_Load (vol<>None, t, tv, a) }
-
-  | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry)
-    { INSTR_Phi (t, table) }
 
 
   | KW_VAARG  { failwith"INSTR_VAArg"  }
@@ -689,8 +706,6 @@ alloca_opt:
   | a=align                             { (None, Some a) }
   | nb=tvalue a=preceded(COMMA, align)? { (Some nb, a) }
 
-phi_table_entry:
-  | LSQUARE v=value COMMA l=lident RSQUARE { (l, v) }
 
 switch_table_entry:
   | v=tvalue COMMA i=branch_label EOL? { (v, i) }

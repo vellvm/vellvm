@@ -16,8 +16,7 @@ Import ListNotations.
 
 (* program counter is a function plus instruction id ------------------------ *)
 
-Definition pt := instr_id.
-
+(*
 Record pc :=
   mk_pc {
       fn  : function_id;
@@ -57,17 +56,19 @@ Inductive cmd : Set :=
 | Step  (i:instr) (next:pt)
 | Jump  (bn:block_id) (t:terminator)
 .                    
+*)
 
+(*
 Inductive block_entry : Set :=
 | Phis (entry:pt) (phis : list (local_id * instr)) (next:pt)
 .
+*)
 
 (* each function definition corresponds to a control-flow graph *)
 Record cfg := mkCFG
 {
-  init : pt;
-  code : pt -> option cmd; 
-  phis : block_id -> option block_entry;
+  init : block_id;
+  blks : block_id -> option block;
   glbl : list ident;   (* identifiers defined on entry to this CFG, 
                           including globals and local function parameters *)
 }.
@@ -81,6 +82,7 @@ Definition find_defn {X:Set} (fid:function_id) (d:definition X) : option (defini
 Definition find_function {X:Set} (CFG : modul X) (fid:function_id) : option (definition X) :=
   find_map (find_defn fid) (m_definitions CFG).
 
+(*
 Definition fetch (CFG : mcfg) (p:pc) :=
   'fdefn <- find_function CFG (fn p);
   (code (df_instrs fdefn) (ins p)).
@@ -113,22 +115,26 @@ Fixpoint phis_from_block entry term_id (b : list (instr_id * instr)) : option bl
     | [] => Some (Phis entry [] term_id)
   end.
 
+
 Fixpoint block_to_phis (b:block) : option block_entry :=
   phis_from_block (blk_entry b) (blk_term_id b) (blk_instrs b).
+*)
   
 Fixpoint lookup_block bs block_id : option block :=
   find (fun b => if (blk_id b) == block_id then true else false) bs.
 
-Fixpoint lookup_instr (p:pt) term_id (insns : list (instr_id * instr)) : option cmd :=
+
+Fixpoint lookup_instr (p:instr_id) (insns : code) : code :=
   match insns with
-  | [] =>  None
+  | [] =>  []
   | (x,ins)::rest =>
     if p == x then
-      Some (Step ins (fallthrough term_id rest))
+      insns
     else
-      lookup_instr p term_id rest
+      lookup_instr p rest
   end.
 
+(*
 Definition cmd_from_block (p:pt) (b:block) : option cmd :=
   if (blk_term_id b == p) then
     Some (Jump (blk_id b) (blk_term b))
@@ -145,7 +151,8 @@ match bs with
     | Some cmd => Some cmd
     end
   end.
-
+*)
+(*
 Definition code_of_definition (d:definition (list block)) (p:pt) : option cmd :=
   cmd_from_blocks p (df_instrs d).
   
@@ -156,13 +163,20 @@ Definition blks_of_definition (d:definition (list block)) block_id : option pt :
 Definition phis_of_definition (d:definition (list block)) block_id : option block_entry :=
   'b <- lookup_block (df_instrs d) block_id;
   block_to_phis b.
+*)
+
+Definition init_of_definition d : option block_id :=
+  match (df_instrs d) with
+  | [] => None
+  | b :: _ => Some (blk_id b)
+  end.
+
 
 Definition cfg_of_definition (g:list ident) (d:definition (list block)) : option cfg :=
   'init <- init_of_definition d;
     let args := List.map (fun x => ID_Local x) (df_args d) in
     Some {| init := init;
-            code := code_of_definition d;
-            phis := phis_of_definition d;
+            blks := lookup_block (df_instrs d);
             glbl := g++args;
          |}.
 
