@@ -627,7 +627,7 @@ Module StepSemantics(A:ADDR).
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
   
-Definition eval_expr {A:Set} (f:env -> A -> err value) (e:env) (o:Expr A) : err value :=
+Definition eval_expr {A:Set} (f:env -> option typ -> A -> err value) (e:env) (top:option typ) (o:Expr A) : err value :=
   match o with
   | VALUE_Ident id => 
     'i <- local_id_of_ident id;
@@ -645,69 +645,70 @@ Definition eval_expr {A:Set} (f:env -> A -> err value) (e:env) (o:Expr A) : err 
   | VALUE_Undef     => mret (DV (VALUE_Undef))
 
   | VALUE_Struct es =>
-    'vs <- map_monad (monad_app_snd (f e)) es;
+    'vs <- map_monad (monad_app_snd (f e top)) es;
      mret (DV (VALUE_Struct vs))
 
   | VALUE_Packed_struct es =>
-    'vs <- map_monad (monad_app_snd (f e)) es;
+    'vs <- map_monad (monad_app_snd (f e top)) es;
      mret (DV (VALUE_Packed_struct vs))
     
   | VALUE_Array es =>
-    'vs <- map_monad (monad_app_snd (f e)) es;
+    'vs <- map_monad (monad_app_snd (f e top)) es;
      mret (DV (VALUE_Array vs))
     
   | VALUE_Vector es =>
-    'vs <- map_monad (monad_app_snd (f e)) es;
+    'vs <- map_monad (monad_app_snd (f e top)) es;
      mret (DV (VALUE_Vector vs))
 
   | OP_IBinop iop t op1 op2 =>
-    'v1 <- f e op1;
-    'v2 <- f e op2;
+    'v1 <- f e (Some t) op1;
+    'v2 <- f e (Some t) op2;
     (eval_iop t iop) v1 v2
 
   | OP_ICmp cmp t op1 op2 => 
-    'v1 <- f e op1;                   
-    'v2 <- f e op2;
+    'v1 <- f e (Some t) op1;                   
+    'v2 <- f e (Some t) op2;
     (eval_icmp t cmp) v1 v2
 
   | OP_FBinop fop fm t op1 op2 =>
-    'v1 <- f e op1;
-    'v2 <- f e op2;
+    'v1 <- f e (Some t) op1;
+    'v2 <- f e (Some t) op2;
     (eval_fop t fop) v1 v2
 
   | OP_FCmp fcmp t op1 op2 => 
-    'v1 <- f e op1;
-    'v2 <- f e op2;
+    'v1 <- f e (Some t) op1;
+    'v2 <- f e (Some t) op2;
     (eval_fcmp fcmp) v1 v2
               
   | OP_Conversion conv t1 op t2 =>
-    'v <- f e op;
+    'v <- f e (Some t1) op;
     (eval_conv conv) t1 v t2
                        
   | OP_GetElementPtr t ptrval idxs =>
-    'vptr <- monad_app_snd (f e) ptrval;
-    'vs <- map_monad (monad_app_snd (f e)) idxs;
+    'vptr <- monad_app_snd (f e (Some t) ) ptrval;
+    'vs <- map_monad (monad_app_snd (f e (Some (TYPE_I 32)))) idxs;
     failwith "getelementptr not implemented"  (* TODO: Getelementptr *)  
     
   | OP_ExtractElement vecop idx =>
-    'vec <- monad_app_snd (f e) vecop;
-    'vidx <- monad_app_snd (f e) idx;
-    failwith "extractelement not implemented" (* TODO: Extract Element *)
+(*    'vec <- monad_app_snd (f e) vecop;
+    'vidx <- monad_app_snd (f e) idx;  *)
+    failwith "extractelement not implemented" (* TODO: Extract Element *) 
       
   | OP_InsertElement vecop eltop idx =>
-    'vec <- monad_app_snd (f e) vecop;
+(*    'vec <- monad_app_snd (f e) vecop;
     'v <- monad_app_snd (f e) eltop;
-    'vidx <- monad_app_snd (f e) idx;
+    'vidx <- monad_app_snd (f e) idx; *)
     failwith "insertelement not implemented" (* TODO *)
     
   | OP_ShuffleVector vecop1 vecop2 idxmask =>
-    'vec1 <- monad_app_snd (f e) vecop1;
+(*    'vec1 <- monad_app_snd (f e) vecop1;
     'vec2 <- monad_app_snd (f e) vecop2;      
-    'vidx <- monad_app_snd (f e) idxmask;
+    'vidx <- monad_app_snd (f e) idxmask; *)
     failwith "shufflevector not implemented" (* TODO *)
 
   | OP_ExtractValue strop idxs =>
-    '(_, str) <- monad_app_snd (f e) strop;
+    let '(t, str) := strop in
+    'str <- f e (Some t) str;
     let fix loop str idxs : err dvalue :=
         match idxs with
         | [] => mret str
@@ -718,6 +719,7 @@ Definition eval_expr {A:Set} (f:env -> A -> err value) (e:env) (o:Expr A) : err 
     loop str idxs
         
   | OP_InsertValue strop eltop idxs =>
+    (*
     '(t1, str) <- monad_app_snd (f e) strop;
     '(t2, v) <- monad_app_snd (f e) eltop;
     let fix loop str idxs : err dvalue :=
@@ -730,22 +732,27 @@ Definition eval_expr {A:Set} (f:env -> A -> err value) (e:env) (o:Expr A) : err 
           'v <- loop v tl;
           insert_into_str str v i
         end in
-    loop str idxs
+    loop str idxs*)
+    failwith "TODO"
     
   | OP_Select cndop op1 op2 => (* Do this *)
+    (*
     '(t, cnd) <- monad_app_snd (f e) cndop;
     '(t1, v1) <- monad_app_snd (f e) op1;
     '(t2, v2) <- monad_app_snd (f e) op2;
     eval_select t cnd t1 v1 v2
+     *)
+    failwith "TODO"
   end.
-Arguments eval_expr _ _ _ _ : simpl nomatch.
+Arguments eval_expr _ _ _ _ _ : simpl nomatch.
 
-Fixpoint eval_op (e:env) (o:Ollvm_ast.value) : err value :=
+Fixpoint eval_op (e:env) (top:option typ) (o:Ollvm_ast.value) : err value :=
   match o with
-  | SV o' => eval_expr eval_op e o'
+  | SV o' => eval_expr eval_op e top o'
   end.
-Arguments eval_op _ _ : simpl nomatch.
+Arguments eval_op _ _ _ : simpl nomatch.
 
+(*
 Definition eval_op_for_store (e:env) (t:typ) (o:Ollvm_ast.value)
   : err value :=
   match o with
@@ -768,7 +775,7 @@ Definition eval_op_for_store (e:env) (t:typ) (o:Ollvm_ast.value)
     | _, OP_InsertValue _ _ _
     | _, OP_Select _ _ _ => failwith "invalid operand for store"
                                              
-    | _, _ => eval_op e o
+    | _, _ => eval_op e (Some t) o
     end
   end.
 
@@ -792,10 +799,10 @@ Definition eval_cond (e:env) (o:Ollvm_ast.value) : err value :=
     | OP_InsertValue _ _ _
     | OP_Select _ _ _ => failwith "invalid conditional"
 
-    | _ => eval_op e o
+    | _ => eval_op e None o
     end
   end.
-
+*)
 
 (*
 (* Semantically, a jump at the LLVM IR level might not be "atomic" in the sense that
@@ -817,10 +824,10 @@ Fixpoint jump (CFG:cfg) (from:block_id) (e_init:env) (e:env) (to:block) (k:stack
 *)
 
 Definition jump (fn:function_id) (from:block_id) (e_init:env) (k:stack) (tgt:block) : err state :=
-  let eval_phi (e:env) '(lid, Phi _ ls) :=
+  let eval_phi (e:env) '(lid, Phi t ls) :=
       match assoc RawID.eq_dec from ls with
       | Some op =>
-        'dv <- eval_op e_init op;
+        'dv <- eval_op e_init (Some t) op;
           mret (add_env lid dv e)
       | None => failwith ("jump: block " ++ string_of from ++ " not found in " ++ string_of lid)
       end
@@ -869,7 +876,7 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
     let '(tmid, tm) := blk_term (bk pc) in
     match tm with
     | TERM_Ret (t, op) =>
-      do dv <- eval_op e op;
+      do dv <- eval_op e (Some t) op;
         match k with
         | [] => Obs (Fin dv)
         | (KRet e' id p') :: k' => Jump (p', add_env id dv e', k')
@@ -883,9 +890,9 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
       | _ => raise_p tmid "IMPOSSIBLE: Ret void in non-return configuration"
       end
         
-    | TERM_Br (_,op) br1 br2 =>
+    | TERM_Br (t,op) br1 br2 =>
       let f := fn pc in
-      do dv <- eval_cond e op; (* TO SEE *)
+      do dv <- eval_op e (Some t) op; (* TO SEE *)
       do br <- match dv with 
               (* CHKoh: | DV (VALUE_Bool true) => mret br1
                | DV (VALUE_Bool false) => mret br2 *)
@@ -921,7 +928,7 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
   | (IId id, insn)::_ =>  (* instruction *)
     match insn with
     | INSTR_Op op =>
-      do dv <- eval_op e op;     
+      do dv <- eval_op e None op;     
         Step (incr_pc pc, add_env id dv e, k)
 
     (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
@@ -929,7 +936,7 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
       do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
       let ids := (df_args fdef) in  
       let cfg := df_instrs fdef in
-      do dvs <-  map_monad (eval_op e) (map snd args);
+      do dvs <-  map_monad (fun '(t, op) => (eval_op e (Some t) op)) args;
       do btgt <- trywith ("stepD: no entry block") ((blks cfg) (init cfg));
       match ret_ty with
           | TYPE_Void => raise "ERROR: non-void id for void function call" 
@@ -944,8 +951,8 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
     | INSTR_Alloca t _ _ =>
       Obs (Eff (Alloca t (fun (a:value) =>  (incr_pc pc, add_env id a e, k))))
       
-    | INSTR_Load _ t (_,ptr) _ =>
-      do dv <- eval_op e ptr;     
+    | INSTR_Load _ t (u,ptr) _ =>
+      do dv <- eval_op e (Some u) ptr;     
       match dv with
       | DVALUE_Addr a => Obs (Eff (Load a (fun dv => (incr_pc pc, add_env id dv e, k))))
       | _ => raise "ERROR: Load got non-pointer value" 
@@ -968,17 +975,17 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
       do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
       let ids := (df_args fdef) in  
       let cfg := df_instrs fdef in
-      do dvs <-  map_monad (eval_op e) (map snd args);
+      do dvs <-  map_monad (fun '(t, op) => (eval_op e (Some t) op)) args;      
       do btgt <- trywith ("stepD: no entry block") ((blks cfg) (init cfg));
       match ret_ty with
         | TYPE_Void => Step ((mk_pc f btgt), (combine ids dvs), (KRet_void e (incr_pc pc))::k)
         | _ =>  raise "ERROR: void instruction for non-void call"
       end
 
-    | INSTR_Store _ (t, val) (_, ptr) _ => 
-      do dv <- eval_op_for_store e t val; (* TO SEE: Added new function *)
+    | INSTR_Store _ (t, val) (u, ptr) _ => 
+      do dv <- eval_op e (Some t) val; (* TO SEE: Added new function *)
       (* CHKoh: do dv <- eval_op e val; *)
-      do v <- eval_op e ptr;
+      do v <- eval_op e (Some u) ptr;
       match v with 
       | DVALUE_Addr a => Obs (Eff (Store a dv (fun _ => (incr_pc pc, e, k))))
       |  _ => raise "ERROR: Store got non-pointer value" 

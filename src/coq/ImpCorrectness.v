@@ -124,80 +124,6 @@ Qed.
 Definition iid n (id:instr_id) : Prop := (IId (lid_of_Z n)) = id.
 Definition add_env_Z n dv (e:env) := add_env (lid_of_Z n) dv e.
 
-(* 
-  The compiler emits code in "reverse" order, so when loaded into a CFG machine 
-  
-
-Inductive code_at (CFG:mcfg) (f:function_id) (id_start:instr_id) : instr_id -> list elt -> Prop :=
-| code_at_nil : code_at CFG f id_start id_start []
-| code_at_uid :                         
-    forall id i id_next code
-      (HF: fetch CFG (mk_pc f id) = Some (Step i id_next))
-      (IHC: code_at CFG f id_start id code),
-      code_at CFG f id_start id_next ((I id i)::code).
-Hint Constructors code_at.
-*)
-(*
-Inductive code_at (CFG:mcfg) (f:function_id) : list elt -> Prop := 
-| code_at_nil : code_at CFG f []
-| code_at_uid :                         
-    forall id i id' code
-      (HF: fetch CFG (mk_pc f id) = Some (Step i id'))
-      (IHC: code_at CFG f code),
-      code_at CFG f ((I id i)::code)
-| code_at_term :
-    forall id bid term code
-      (HF: fetch CFG (mk_pc f id) = Some (Jump bid term))
-      (IHC: code_at CFG f code),
-      code_at CFG f ((T id term)::code)
-| code_at_label :
-    forall bid code
-      (ICH: code_at CFG f code),
-      code_at CFG f ((L bid)::code)
-.
-*)
-(*
-Lemma code_at_append_1 :
-  forall (CFG:mcfg) (f:function_id) (code1 code2:list elt) k2 k0 (H:code_at CFG f k2 k0 (code1 ++ code2)),
-    exists k1, code_at CFG f k1 k0 code1.
-Proof.
-  intros CFG f code1 code2 k2 k0 H.
-  remember (code1 ++ code2) as code. generalize dependent code2. revert code1.
-  induction H; intros code1 code2 Heqcode.
-  - apply eq_sym in Heqcode; apply app_eq_nil in Heqcode;
-    destruct Heqcode as [H1 H2].
-    exists k2. subst.  apply code_at_nil.
-  -  destruct code1 as [|code1_tl].
-     + exists id. apply code_at_nil.
-     + simpl in Heqcode. inversion Heqcode.  subst. 
-       edestruct IHcode_at as [k1 Heq].
-       reflexivity.
-       exists k1. eapply code_at_uid. apply HF. exact Heq.
-Qed.
-
-
-Lemma code_at_append_2 :
-  forall (CFG:mcfg) (f:function_id) (code1 code2:list elt) k2 k0 (H:code_at CFG f k2 k0 (code1 ++ code2)),
-    exists k1, code_at CFG f k2 k1 code2.
-Proof.
-  intros CFG f code1.
-  induction code1; intros code2 k2 k0 H; simpl in *; inversion H; subst; eauto.
-Qed.    
-
-Lemma code_at_cons_id : forall CFG f k1 k0 id i code,
-    code_at CFG f k1 k0 ((I id i)::code) -> id = k0.
-Proof.
-  intros CFG f k1 k0 id i code H.
-  inversion H. reflexivity.
-Qed.  
-*)
-(* These definitions should probably go in a library *)
-
-(*
-Definition dvalue_of_nat (n:nat) : value :=
-  DVALUE_I64 (toi64 (Z.of_nat n)).
-Hint Unfold dvalue_of_nat.
-*)
 
 (* Related final values *)
 Definition  Rv (v:value) (i:int64) : Prop :=
@@ -209,6 +135,7 @@ Inductive Rve : err value -> int64 -> Prop :=
 | Rve_inr : forall v i, Rv v i -> Rve (inr v) i.
 Hint Constructors Rve.
 
+(* StepSemanticsProp.v *)
 Lemma lookup_env_hd : forall id dv e, lookup_env (add_env id dv e) id = Some dv.
 Proof.
   intros id dv e.  unfold lookup_env. 
@@ -216,6 +143,7 @@ Proof.
   rewrite Util.assoc_hd. reflexivity.
 Qed.  
 
+(* StepSemanticsProp.v *)
 Lemma lookup_env_tl : forall id1 v1 e id2,
     id1 <> id2 -> lookup_env (add_env id1 v1 e) id2 = lookup_env e id2.
 Proof.
@@ -263,6 +191,7 @@ Proof.
     eapply  IHHenv. unfold lookup_env. apply Hl.
 Qed.    
 
+(* StepSemanticsProp.v *)
 Lemma lookup_add_env_inv :
   forall id1 v e id2 u
     (Hl: lookup_env (add_env id1 v e) id2 = Some u),
@@ -315,10 +244,13 @@ Proof.
   unfold not. intros. subst. omega. exact Ha.
 Qed.  
 
+(* StepSemanticsProp.v *)
 Inductive is_Op : instr -> Prop :=
-| is_Op_intro : forall v, is_Op (INSTR_Op v).
+| is_Op_intro : forall v, is_Op (INSTR_Op v)
+.
 Hint Constructors is_Op.
 
+(* StepSemanticsProp.v *)
 Inductive is_Eff : instr -> Prop :=
 | is_Alloca : forall t nb a, is_Eff (INSTR_Alloca t nb a)
 | is_Load : forall v t p a, is_Eff (INSTR_Load v t p a)
@@ -326,6 +258,7 @@ Inductive is_Eff : instr -> Prop :=
 .
 Hint Constructors is_Eff.
 
+(* AstProp.v *)
 Inductive straight : code -> Prop :=
 | straight_nil : straight []
 | straight_Op : forall id i tl
@@ -338,6 +271,7 @@ Inductive straight : code -> Prop :=
     straight ((id,i)::tl)
 .             
 
+(* AstProp.v *)
 Lemma straight_app : forall cd1 cd2,
     straight cd1 ->
     straight cd2 ->
@@ -368,12 +302,14 @@ Proof.
   induction H; intros x2 cd2 H0; simpl; auto; try solve [constructor; eauto].
 Qed.  
 
+(* AstProp.v *)
 Inductive pc_prefix (p:pc) (cd:code) : Prop :=
 | pc_prefix_intro :
     forall cd'
       (H: fetch p = cd ++ cd'),
       pc_prefix p cd.
 
+(* AstProp.v *)
 Lemma pc_prefix_app :
   forall p cd1 cd2
     (HP: pc_prefix p (cd1 ++ cd2)),
@@ -419,14 +355,16 @@ Inductive step_code (CFG:mcfg) (R : SS.state -> memory -> Prop) : code -> SS.sta
       step_code CFG R ((id,i)::cd) s m
 .
 
+(* AstProp.v *)
 Definition slc_pc fn bid phis term cd :=
   mk_pc fn (mk_block bid phis cd term).
 
+(* AstProp.v *)
 Definition pc_app (p:pc) (c:code) :=
   let b := bk p in
   mk_pc (fn p) (mk_block (blk_id b) (blk_phis b) ((blk_code b) ++ c) (blk_term b)).
 
-
+(* AstProp.v *)
 Lemma pc_app_nil :
   forall (p:pc) (c:code)
     (Hnil : fetch p = []),
@@ -438,86 +376,7 @@ Proof.
   subst. reflexivity.
 Qed.    
 
-(*
-Lemma stepD_eff_inversion :
-  forall CFG s m
-    (HS: stepD CFG s = Obs (Eff m)),
-    blk_code (bk (pc_of s)) <> [].
-Proof.
-  intros.
-  destruct s as [[[f b] e] k].
-  simpl.
-  simpl in HS.
-  destruct (blk_code b).
-  - destruct (blk_term b); destruct t; try solve [unfold SS.raise in HS; inversion HS].
-    + destruct v. destruct (eval_op e v); destruct k; try inversion HS. destruct f0; inversion H0.
-    + destruct k; try inversion HS. destruct f0; inversion H0.
-    + destruct v. destruct (eval_op e v). simpl in HS. inversion HS. simpl in HS.
-      destruct v0; inversion HS. destruct e0; inversion H0.
-      destruct b0.
-      * simpl in H1. unfold trywith in H1.  destruct (find_function CFG f). simpl in H1.
-        destruct (blks (df_instrs d) br1). simpl in H1.
-        destruct (jump f (blk_id b) e k b0); inversion H1.
-        simpl in H1. inversion H1.
-        simpl in H1. inversion H1.
-      * simpl in H1. unfold trywith in H1.  destruct (find_function CFG f); try solve [inversion H1]. 
-        simpl in H1. destruct (blks (df_instrs d) br2). 
-        simpl in H1. destruct (jump f (blk_id b) e k b0); inversion H1.
-        simpl in H1. inversion H1.
-    + simpl in HS. unfold trywith in HS.  destruct (find_function CFG f); try solve [inversion HS].
-      simpl in HS. destruct (blks (df_instrs d) br). simpl in HS.
-      destruct (jump f (blk_id b) e k b0); inversion HS.
-      simpl in HS. inversion HS.
-
-  - auto.
-Qed.    
-
-Lemma stepD_step_inversion :
-  forall CFG s s'
-    (HS: stepD CFG s = Step s'),
-    blk_code (bk (pc_of s)) <> [].
-Proof.
-  intros CFG s s' HS.
-  destruct s as [[[f b] e] k].
-  simpl.
-  simpl in HS.
-  destruct (blk_code b); simpl; auto.
-  - destruct (blk_term b); destruct t; try solve [unfold SS.raise in HS; inversion HS].
-    + destruct v. destruct (eval_op e v); destruct k; try inversion HS. destruct f0; inversion H0.
-    + destruct k; try inversion HS. destruct f0; inversion H0.
-    + destruct v. destruct (eval_op e v). simpl in HS. inversion HS. simpl in HS.
-      destruct v0; inversion HS. destruct e0; inversion H0.
-      destruct b0.
-      * simpl in H1. unfold trywith in H1.  destruct (find_function CFG f). simpl in H1.
-        destruct (blks (df_instrs d) br1). simpl in H1.
-        destruct (jump f (blk_id b) e k b0); inversion H1.
-        simpl in H1. inversion H1.
-        simpl in H1. inversion H1.
-      * simpl in H1. unfold trywith in H1.  destruct (find_function CFG f); try solve [inversion H1]. 
-        simpl in H1. destruct (blks (df_instrs d) br2). 
-        simpl in H1. destruct (jump f (blk_id b) e k b0); inversion H1.
-        simpl in H1. inversion H1.
-    + simpl in HS. unfold trywith in HS.  destruct (find_function CFG f); try solve [inversion HS].
-      simpl in HS. destruct (blks (df_instrs d) br). simpl in HS.
-      destruct (jump f (blk_id b) e k b0); inversion HS.
-      simpl in HS. inversion HS.
-Qed.
-    
-Lemma step_star_inversion_nil :
-  forall CFG fn bid phis term,
-    let slc := slc_pc fn bid phis term in
-    
-    forall s mem R (HR: step_star_invariant CFG R s mem)
-      (Hpc: pc_of s = slc []), 
-      R s mem.
-Proof.
-  intros CFG fn0 bid phis term slc s mem R HR Hpc.
-  inversion HR; subst; auto.
-  - apply stepD_step_inversion in HS. rewrite Hpc in HS. simpl in HS. tauto.
-  - apply stepD_eff_inversion in HS.  rewrite Hpc in HS. simpl in HS. tauto.
-Qed.    
-*)
-
+(* StepSemanticsProp.v *)
 Lemma stepD_Op_inversion :
   forall CFG fn bid phis term,
     let slc := slc_pc fn bid phis term in
@@ -535,7 +394,7 @@ Proof.
   inversion HS1.
 Qed.
 
-
+(* StepSemanticsProp.v *)
 Lemma stepD_Eff_weakening :
   forall CFG fn bid phis term,
     let slc := slc_pc fn bid phis term in
@@ -561,6 +420,7 @@ Proof.
     reflexivity.
 Qed.    
 
+(* StepSemanticsProp.v *)
 Lemma stepD_Eff_Alloca_inversion :
   forall CFG fn bid phis term,
     let slc := slc_pc fn bid phis term in
@@ -579,6 +439,7 @@ Proof.
   inversion H0.
 Qed.
 
+(* StepSemanticsProp.v *)
 Lemma stepD_Eff_Load_inversion :
   forall CFG fn bid phis term,
     let slc := slc_pc fn bid phis term in
@@ -601,6 +462,7 @@ Proof.
   inversion HS1.
 Qed.
 
+(* StepSemanticsProp.v *)
 Lemma stepD_Eff_Store_inversion :
   forall CFG fn bid phis term,
     let slc := slc_pc fn bid phis term in
@@ -625,7 +487,7 @@ Proof.
      subst. split; auto.
 Qed.
 
-
+(* StepSemanticsProp.v *)
 Lemma stepD_Op_weakening :
   forall CFG fn bid phis term,
     let slc := slc_pc fn bid phis term in
@@ -761,16 +623,6 @@ Proof.
 Qed.
         
   
-Definition finish_pc (p:pc) : pc :=
-  let 'mk_pc f b := p in
-  mk_pc f
-  {| blk_id := blk_id b;
-    blk_phis := [];
-    blk_code := List.tl (blk_code b);
-    blk_term := blk_term b;
-  |}.
-
-
 Definition env_extends (e e':env) : Prop :=
   forall op dv, eval_op e op = inr dv -> eval_op e' op  = inr dv.
 

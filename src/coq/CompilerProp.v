@@ -272,7 +272,7 @@ Definition untrusted_run_eval_expr (c : com) (expr : Expr Ollvm_ast.value) :=
       | inl e => inl e
       | inr initial_state =>
         let '(pc, e, stk) := initial_state in
-        inr (eval_expr eval_op e expr)
+        inr (eval_expr eval_op e None expr)
       end
     end
   end.
