@@ -390,7 +390,7 @@ Proof.
   subst.
   simpl in HS1.
   destruct id; simpl in *.
-  destruct (eval_op e1 v); inversion HS1; auto.
+  destruct (eval_op e1 None v); inversion HS1; auto.
   inversion HS1.
 Qed.
 
@@ -407,13 +407,13 @@ Proof.
   intros CFG fn0 bid phis term slc cd1 e1 k1 id i eff Hi HS1 cd2.
   inversion Hi; subst; simpl in HS1; destruct id; simpl in *; inversion HS1; simpl.
   - reflexivity.
-  - destruct p as [f ptr]; destruct (eval_op e1 ptr).  simpl in HS1. inversion HS1. simpl in HS1.
+  - destruct p as [u ptr]; destruct (eval_op e1 (Some u) ptr).  simpl in HS1. inversion HS1. simpl in HS1.
     destruct v0; try solve [inversion HS1].
     simpl in *. inversion HS1.
     reflexivity.
   - destruct val as [t val]; destruct p as [u p].
-    destruct (eval_op_for_store e1 t val); try solve [inversion HS1].
-    destruct (eval_op e1 p); try solve [inversion HS1].
+    destruct (eval_op e1 (Some t) val); try solve [inversion HS1].
+    destruct (eval_op e1 (Some u) p); try solve [inversion HS1].
     simpl in *.
     destruct v1; try solve [inversion HS1].
     inversion HS1.
@@ -455,7 +455,7 @@ Proof.
   destruct id as [lid | lv].
   exists lid.
   destruct p as [u p].
-  destruct (eval_op e p); try solve [inversion H0].
+  destruct (eval_op e (Some u) p); try solve [inversion H0].
   destruct v0; try solve [inversion H0].
   simpl in H0.
   exists a. split; auto. inversion H0. reflexivity.
@@ -479,8 +479,8 @@ Proof.
   - exists lvid.
     destruct val as [u val].
     destruct p as [w p].
-    destruct (eval_op_for_store e u val); try solve [inversion HS1].
-    destruct (eval_op e p); try solve [inversion HS1].
+    destruct (eval_op e (Some u) val); try solve [inversion HS1].
+    destruct (eval_op e (Some w) p); try solve [inversion HS1].
     simpl in HS1.
     destruct v1; try solve [inversion HS1].
     exists a. exists v0. inversion HS1.
@@ -502,7 +502,7 @@ Proof.
   subst.
   simpl in HS.
   destruct id; simpl in *.
-  destruct (eval_op e1 v); inversion HS; auto.
+  destruct (eval_op e1 None v); inversion HS; auto.
   inversion HS.
 Qed.
 
@@ -624,7 +624,7 @@ Qed.
         
   
 Definition env_extends (e e':env) : Prop :=
-  forall op dv, eval_op e op = inr dv -> eval_op e' op  = inr dv.
+  forall op t dv, eval_op e t op = inr dv -> eval_op e' t op  = inr dv.
 
 Lemma env_extends_trans :
   forall (e1 e2 e3:env)
@@ -642,6 +642,7 @@ Lemma env_extends_lt :
     (Henv: env_lt n e),
     env_extends e (add_env_Z n dv e).
 Proof.
+(*  
   intros e n dv Henv o.
   induction o using value_ind'; simpl in *; try inversion Hev; intros; subst; auto.
   - destruct id; try solve [inversion H].
@@ -658,11 +659,11 @@ Proof.
   - admit.
   - admit.
   - unfold eval_expr in *. simpl in *.
-    destruct (eval_op e o1); try solve [inversion H].
-    destruct (eval_op e o2); try solve [inversion H].
+    destruct (eval_op e (Some t) o1); try solve [inversion H].
+    destruct (eval_op e (Some t) o2); try solve [inversion H].
     erewrite IHo1; try solve [reflexivity].
     erewrite IHo2; try solve [reflexivity].
-    assumption.
+    exact H.
   - unfold eval_expr in *. simpl in *.
     destruct (eval_op e o1); try solve [inversion H].
     destruct (eval_op e o2); try solve [inversion H].
@@ -688,10 +689,11 @@ Proof.
   - admit.
   - admit.
     
-    
+*)    
     (* maybe cut down on cases from eval_expr to simplify for now. *)
 Admitted.    
-    
+
+
 Lemma compile_aexp_correct :
   forall 
     (a:aexp) (st:Imp.state) (ans:int64)
@@ -719,7 +721,7 @@ Lemma compile_aexp_correct :
            let '(pc', e', k') := s' in
            pc' = slc_pc fn bid phis term [] /\
            memory_invariant g e' mem' st /\
-           Rve (eval_op e' v) ans /\
+           Rve (eval_op e' (Some (TYPE_I 64)) v) ans /\
            env_extends e e' /\
            env_lt n' e'
         )
@@ -775,7 +777,7 @@ Proof.
   - simpl in Hcomp;
     unfold_llvm Hcomp;
     specialize IHHAexp1 with (g:=g)(n:=n)(m:=m)(cd:=cd).
-    remember (compile_aexp g a1 (n, m, cd)) as f;
+    remember (compile_aexp g a1 (n, m, cd)) as f.
     destruct f as [[[n1 m1] cd1] [err1|v1]];
     try solve [inversion Hcomp].
     specialize IHHAexp1 with (n':=n1)(m':=m1)(cd':=cd1)(v:=v1).
@@ -845,10 +847,10 @@ Proof.
       * simpl.
         inversion Hr1. subst. inversion Hr2. subst.
         symmetry in H.
-        assert (eval_op e2 v1 = inr v).
+        assert (eval_op e2 (Some (TYPE_I 64)) v1 = inr v).
         apply He2; auto.
         simpl.
-        unfold eval_expr. simpl.
+        unfold eval_expr. simpl. unfold i64.
         rewrite H3. rewrite <- H1. simpl.
         inversion H0. inversion H2. simpl.
         eauto.
@@ -934,10 +936,10 @@ Proof.
       * simpl.
         inversion Hr1. subst. inversion Hr2. subst.
         symmetry in H.
-        assert (eval_op e2 v1 = inr v).
+        assert (eval_op e2 (Some (TYPE_I 64)) v1 = inr v).
         apply He2; auto.
         simpl.
-        unfold eval_expr. simpl.
+        unfold eval_expr. simpl. unfold i64.
         rewrite H3. rewrite <- H1. simpl.
         inversion H0. inversion H2. simpl.
         eauto.
@@ -1023,10 +1025,10 @@ Proof.
       * simpl.
         inversion Hr1. subst. inversion Hr2. subst.
         symmetry in H.
-        assert (eval_op e2 v1 = inr v).
+        assert (eval_op e2 (Some (TYPE_I 64)) v1 = inr v).
         apply He2; auto.
         simpl.
-        unfold eval_expr. simpl.
+        unfold eval_expr. simpl. unfold i64.
         rewrite H3. rewrite <- H1. simpl.
         inversion H0. inversion H2. simpl.
         eauto.
