@@ -31,7 +31,6 @@ Ltac unfold_llvm H :=
 
 Arguments Z.add _ _ : simpl nomatch.
 
-
 (* relational specification of aeval ---------------------------------------- *)
 
 Inductive aevalR : Imp.state -> aexp -> int64 -> Prop :=
@@ -61,7 +60,39 @@ Proof.
     induction a; intros an H; simpl in H; subst; auto.
   - intros H.
     induction H; subst; simpl; auto.
-Qed.    
+Qed.
+
+Inductive bevalR : Imp.state -> bexp -> bool -> Prop :=
+  | E_BTrue : forall s,
+      bevalR s BTrue true
+  | E_BFalse : forall s,
+      bevalR s BFalse false
+  | E_BEq : forall s a1 a2 ans1 ans2,
+      aevalR s a1 ans1 ->
+      aevalR s a2 ans2 ->
+      bevalR s (BEq a1 a2) (Int64.eq ans1 ans2)
+  | E_BLe : forall s a1 a2 ans1 ans2,
+      aevalR s a1 ans1 ->
+      aevalR s a2 ans2 ->
+      bevalR s (BLe a1 a2) (Int64.cmp Integers.Cle ans1 ans2)
+  | E_BNot : forall s b1 ans,
+      bevalR s b1 ans ->
+      bevalR s (BNot b1) (negb ans)
+  | E_BAnd : forall s b1 b2 ans1 ans2,
+      bevalR s b1 ans1 ->
+      bevalR s b2 ans2 ->
+      bevalR s (BAnd b1 b2) (ans1 && ans2).
+Hint Constructors bevalR.
+
+Lemma beval_iff_bevalR : forall s b ans, beval s b = ans <-> bevalR s b ans.
+Proof.
+  split; generalize dependent ans.
+  - induction b; intros; rewrite <- H; simpl; try constructor; try rewrite <- aeval_iff_aevalR;
+      auto; reflexivity.
+  - induction b; intros; inversion H; subst; try rewrite <- aeval_iff_aevalR in *;
+      subst; try reflexivity; simpl; try apply IHb in H2; try rewrite H2; auto.
+    apply IHb1 in H3. apply IHb2 in H5. rewrite H3. rewrite H5. reflexivity.
+Qed.  
 
 
 Ltac compile_aexp_monotonic_case X :=
@@ -1089,18 +1120,16 @@ Lemma compile_bexp_correct :
         (List.rev c_a)
         (slc_pc fn bid phis term (List.rev c_a), e, k) mem.
 Proof.
-Admitted.
-  (*
-intros a st ans HAexp.
-  rewrite aeval_iff_aevalR in HAexp.
+  intros b st ans HAexp.
+  rewrite beval_iff_bevalR in HAexp.
 
   induction HAexp; intros g n m cd n' m' cd' v Hcomp.
   - simpl in Hcomp. unfold_llvm Hcomp. simpl in Hcomp.
     inversion Hcomp. clear Hcomp.
     exists [I (IId (lid_of_Z n))
-         (INSTR_Op (SV (OP_IBinop (Add false false) i1 (val_of_int1 ans) (val_of_int1 Integers.Int1.zero))))].
+         (INSTR_Op (SV (OP_IBinop (ICmp Eq) i1 (val_of_int1 ans) (val_of_int1 Int1.zero))))].
     exists [((IId (lid_of_Z n)),
-         (INSTR_Op (SV (OP_IBinop (Add false false) i1 (val_of_int1 ans) (val_of_int1 Integers.Int1.zero)))))].
+         (INSTR_Op (SV (OP_IBinop (Add false false) i1 (val_of_int1 ans) (val_of_int1 Int1.zero)))))].
     repeat split; auto.
     * repeat econstructor.
     
@@ -1403,4 +1432,4 @@ intros a st ans HAexp.
            eapply env_extends_trans. apply He2.
            eapply env_extends_lt. apply Hlte2. 
         ++ apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
-Qed.*)
+Qed.
