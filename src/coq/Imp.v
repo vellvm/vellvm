@@ -1300,6 +1300,52 @@ Inductive ceval : com -> state -> state -> Prop :=
 
   where "c1 '/' st '\\' st'" := (ceval c1 st st').
 
+Reserved Notation "c1 '/' st1 '==>' co '/' st2"
+         (at level 40, st1 at level 39, co at level 39, st2 at level 39).
+
+Reserved Notation "c1 '/' st1 '==>' - '/' st2"
+         (at level 40, st1 at level 39, st2 at level 38).
+
+Inductive ceval_small : com -> state -> (option com) -> state -> Prop :=
+| S_Skip : forall st,
+             SKIP / st ==> - / st
+
+| S_Ass : forall st a1 n x,
+    aeval st a1 = n ->
+    (x ::= a1) / st ==> - / (t_update st x n)
+
+| S_Seq1 : forall c1 c1' c2 st st',
+    c1 / st ==> c1' / st' ->
+    (c1 ;; c2) / st ==> (c1' ;; c2) / st'
+
+| S_Seq2 : forall c1 c2 st st',
+    c1 / st ==> - / st' ->
+    (c1 ;; c2) / st ==> c2 / st'
+
+| S_IfTrue : forall st b c1 c2,
+    beval st b = true ->
+    (IFB b THEN c1 ELSE c2 FI) / st ==> c1 / st
+
+| S_IfFalse : forall st b c1 c2,
+    beval st b = false ->
+    (IFB b THEN c1 ELSE c2 FI) / st ==> c2 / st
+
+| S_WhileEnd : forall b st c,
+    beval st b = false ->
+    (WHILE b DO c END) / st ==> - / st
+
+| S_WhileLoop : forall b st c,
+    beval st b = true ->
+    (WHILE b DO c END) / st ==> (c ;; WHILE b DO c END) / st
+                               
+  where "c1 '/' st1 '==>' co '/' st2" := (ceval_small c1 st1 (Some co) st2)
+  and "c1 '/' st1 '==>' - '/' st2"  := (ceval_small c1 st1 None st2)
+.             
+
+
+
+
+
 (** The cost of defining evaluation as a relation instead of a
     function is that we now need to construct _proofs_ that some
     program evaluates to some result state, rather than just letting

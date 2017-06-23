@@ -27,7 +27,7 @@ Require Import Program.
 
 (* Move to Compiler.v *)
 Ltac unfold_llvm H :=
-  progress (unfold llvm_bind in H; unfold llvm_ret in H; unfold lift in H).
+  progress (simpl in H; unfold llvm_bind in H; unfold llvm_ret in H; unfold lift in H).
 
 Arguments Z.add _ _ : simpl nomatch.
 
@@ -74,7 +74,6 @@ Ltac compile_aexp_monotonic_case X :=
          n <= n' /\ m <= m' /\ (exists code'' : list elt, code' = code'' ++ code),
   Hcomp : compile_aexp ?g (_ ?a1 ?a2) (?n1, ?m1, ?code1) = (?n2, ?m2, ?code2, ?inr ?v)
   |- _ ] =>
-    simpl in Hcomp;
     unfold_llvm Hcomp;
     specialize IHa1 with (n:=n1)(m:=m1)(code:=code1);
     destruct (compile_aexp g a1 (n1, m1, code1)) as [[[n1' m1'] code1']  [err1|v1']];
@@ -104,13 +103,12 @@ Lemma compile_aexp_monotonic :
 Proof.
   intros g a.
   induction a; intros n1 m1 code1 v n2 m2 code2 Hcomp.  simpl in Hcomp.
-  - simpl in Hcomp.
-    unfold_llvm Hcomp. simpl in Hcomp.
+  - unfold_llvm Hcomp. 
     inversion Hcomp. repeat split; try omega.
-     exists [I (IId (lid_of_Z n1)) (INSTR_Op (SV (OP_IBinop (Add false false) i64 (val_of_int64 i) (val_of_int64 Integers.Int64.zero))))]. simpl; auto.
+    exists [I (IId (lid_of_Z n1)) (INSTR_Op (SV (OP_IBinop (Add false false) i64 (val_of_int64 i) (val_of_int64 Integers.Int64.zero))))].
+    simpl; auto.
 
-  - simpl in Hcomp.
-    unfold_llvm Hcomp.
+  - unfold_llvm Hcomp.
     destruct (g i); simpl in Hcomp; try inversion Hcomp.
     repeat split; try omega.
     exists [I (IId (lid_of_Z n1)) (INSTR_Load false i64 (i64ptr, v0) None)]. simpl. reflexivity.
@@ -743,9 +741,8 @@ Proof.
   intros a st ans HAexp.
   rewrite aeval_iff_aevalR in HAexp.
 
-  induction HAexp; intros g n m cd n' m' cd' v Hcomp.
-  - simpl in Hcomp. unfold_llvm Hcomp. simpl in Hcomp.
-    inversion Hcomp. clear Hcomp.
+  induction HAexp; intros g n m cd n' m' cd' v Hcomp; unfold_llvm Hcomp.
+  - inversion_clear Hcomp. 
     exists [I (IId (lid_of_Z n))
          (INSTR_Op (SV (OP_IBinop (Add false false) i64 (val_of_int64 ans) (val_of_int64 Integers.Int64.zero))))].
     exists [((IId (lid_of_Z n)),
@@ -756,35 +753,32 @@ Proof.
     * intros e mem Hlt HM k CFG fn0 bid phis term. 
       eapply step_tau; auto.
       apply pc_prefix_id.
-      simpl.
-    eapply step_zero. repeat split; auto.
+      eapply step_zero. repeat split; auto.
     + eapply memory_invariant_extension; eauto; try omega.
-    + unfold eval_expr.  simpl. rewrite lookup_env_hd.
+    + simpl. unfold eval_expr. simpl. rewrite lookup_env_hd.
       repeat rewrite Int64.repr_signed. rewrite Int64.add_zero. auto.
     + eapply env_extends_lt. apply Hlt. 
-    + apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
+    + apply env_lt_cons; [omega | eapply env_lt_weaken; eauto; omega].
 
-  - simpl in Hcomp. unfold_llvm Hcomp.
-    unfold trywith in Hcomp.
+  - unfold trywith in Hcomp.
     remember (g id) as X.
-    destruct X; simpl in Hcomp; try inversion Hcomp.
-    clear Hcomp.
+    destruct X; simpl in Hcomp; inversion_clear Hcomp.
     exists [I (IId (lid_of_Z n)) (INSTR_Load false i64 (i64ptr, v0) None)].
     exists [(IId (lid_of_Z n), (INSTR_Load false i64 (i64ptr, v0) None))].
     simpl. repeat split; auto.
-    * apply straight_Eff; auto. econstructor.
+    * apply straight_Eff; auto; econstructor.
     * intros e mem Hlt HM k CFG fn0 bid phis term.
      destruct HM with (x:=id)(v:=v0) as [n1 [Hlt1 [a [Hlookup HRa]]]]; auto.
      eapply step_eff; auto.
     + apply pc_prefix_id.
     + subst; simpl; unfold eval_expr; simpl; rewrite Hlookup; simpl;  eauto.
-    + simpl. eauto.
+    + eauto.
     + eapply step_zero.
       repeat split; auto.
       -- eapply memory_invariant_extension; eauto. 
       -- unfold eval_expr; simpl; rewrite lookup_env_hd; auto.
       -- eapply env_extends_lt; eauto. 
-      -- apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
+      -- apply env_lt_cons; [omega | eapply env_lt_weaken; eauto; omega].
         
   - simpl in Hcomp;
     unfold_llvm Hcomp;
