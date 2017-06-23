@@ -1127,9 +1127,11 @@ Proof.
   - simpl in Hcomp. unfold_llvm Hcomp. simpl in Hcomp.
     inversion Hcomp. clear Hcomp.
     exists [I (IId (lid_of_Z n))
-         (INSTR_Op (SV (OP_IBinop (ICmp Eq) i1 (val_of_int1 ans) (val_of_int1 Int1.zero))))].
+         (INSTR_Op (SV (OP_ICmp Eq i64 (val_of_int64 (Integers.Int64.repr 0))
+                  (val_of_int64 (Integers.Int64.repr 0)))))].
     exists [((IId (lid_of_Z n)),
-         (INSTR_Op (SV (OP_IBinop (Add false false) i1 (val_of_int1 ans) (val_of_int1 Int1.zero)))))].
+         (INSTR_Op (SV (OP_ICmp Eq i64 (val_of_int64 (Integers.Int64.repr 0))
+                  (val_of_int64 (Integers.Int64.repr 0))))))].
     repeat split; auto.
     * repeat econstructor.
     
@@ -1140,31 +1142,31 @@ Proof.
     eapply step_zero. repeat split; auto.
     + eapply memory_invariant_extension; eauto; try omega.
     + unfold eval_expr.  simpl. rewrite lookup_env_hd.
-      repeat rewrite Int1.repr_signed. rewrite Int1.add_zero. auto.
+      repeat rewrite Int1.repr_signed. auto.
     + eapply env_extends_lt. apply Hlt. 
     + apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
 
-  - simpl in Hcomp. unfold_llvm Hcomp.
-    unfold trywith in Hcomp.
-    remember (g id) as X.
-    destruct X; simpl in Hcomp; try inversion Hcomp.
-    clear Hcomp.
-    exists [I (IId (lid_of_Z n)) (INSTR_Load false i1 (i1ptr, v0) None)].
-    exists [(IId (lid_of_Z n), (INSTR_Load false i1 (i1ptr, v0) None))].
-    simpl. repeat split; auto.
-    * apply straight_Eff; auto. econstructor.
-    * intros e mem Hlt HM k CFG fn0 bid phis term.
-     destruct HM with (x:=id)(v:=v0) as [n1 [Hlt1 [a [Hlookup HRa]]]]; auto.
-     eapply step_eff; auto.
-    + apply pc_prefix_id.
-    + subst; simpl; unfold eval_expr; simpl; rewrite Hlookup; simpl;  eauto.
-    + simpl. eauto.
-    + eapply step_zero.
-      repeat split; auto.
-      -- eapply memory_invariant_extension; eauto. 
-      -- unfold eval_expr; simpl; rewrite lookup_env_hd; auto.
-      -- eapply env_extends_lt; eauto. 
-      -- apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
+  - simpl in Hcomp. unfold_llvm Hcomp. simpl in Hcomp.
+    inversion Hcomp. clear Hcomp.
+    exists [I (IId (lid_of_Z n))
+         (INSTR_Op (SV (OP_ICmp Eq i64 (val_of_int64 (Integers.Int64.repr 1))
+                  (val_of_int64 (Integers.Int64.repr 0)))))].
+    exists [((IId (lid_of_Z n)),
+         (INSTR_Op (SV (OP_ICmp Eq i64 (val_of_int64 (Integers.Int64.repr 1))
+                  (val_of_int64 (Integers.Int64.repr 0))))))].
+    repeat split; auto.
+    * repeat econstructor.
+    
+    * intros e mem Hlt HM k CFG fn0 bid phis term. 
+      eapply step_tau; auto.
+      apply pc_prefix_id.
+      simpl.
+    eapply step_zero. repeat split; auto.
+    + eapply memory_invariant_extension; eauto; try omega.
+    + unfold eval_expr.  simpl. rewrite lookup_env_hd.
+      repeat rewrite Int1.repr_signed. auto.
+    + eapply env_extends_lt. apply Hlt. 
+    + apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
         
   - simpl in Hcomp;
     unfold_llvm Hcomp;
