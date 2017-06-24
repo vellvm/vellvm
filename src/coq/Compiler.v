@@ -292,13 +292,10 @@ Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
     'lid <- comp Eq (val_of_int64 (Int64.repr 1)) (val_of_int64 (Int64.repr 0));
     mret (local lid)
   | BEq a1 a2 => compile_icmp Eq a1 a2
-  | BLe a1 a2 => compile_icmp Ule a1 a2
+  | BLe a1 a2 => compile_icmp Sle a1 a2
   | BNot b =>
     'v <- compile_bexp g b;
-      (* TO SEE: CHKoh: 'lid <- binop Xor i1 v (val_of_bool true); *)
-    (*!*) 't <- comp Eq (val_of_int1 (Int1.repr 0)) v;
-    (*! 't <- comp Eq (val_of_int1 (Int1.repr 1)) (val_of_int1 (Int1.repr 0)); *)
-    'lid <- binop Xor i1 v (local t);
+    'lid <- emit (INSTR_Op (SV (OP_ICmp Eq i1 (val_of_int1 (Int1.repr 0)) v)));
     mret (local lid) 
 
   | BAnd b1 b2 =>
