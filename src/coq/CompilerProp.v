@@ -46,7 +46,7 @@ Definition dvalue_of_nat (n:nat) : dvalue :=
   DV (VALUE_Integer (Z.of_nat n)).
 
 Definition dvalue_of_int64 (n: int64) : dvalue :=
-  (*!*) DVALUE_I64 n. (*!  DV (VALUE_Integer (Int64.unsigned n)). *)
+  (**!*) DVALUE_I64 n. (**!  DV (VALUE_Integer (Int64.unsigned n)). *)
 
 Definition imp_val_eqb (v1 v2 : dvalue) : bool :=
   match v1, v2 with
@@ -277,8 +277,6 @@ Definition untrusted_run_eval_expr (c : com) (expr : Expr Ollvm_ast.value) :=
     end
   end.
 
-(*! Section CompilerProp *)
-
 Definition imp_compiler_correct_aux (p:Imp.com) : Checker :=
   let fvs := IDSet.elements (fv p) in
   match compile p with
@@ -308,11 +306,14 @@ Definition imp_compiler_correct_aux (p:Imp.com) : Checker :=
                                ++ (string_of fvs) (* (elems_to_string fvs) *)
                                ++ "; compiled code: "
                                ++ (string_of ll_prog))
-                            (imp_memory_eqb (*!*) (List.rev llvm_st) (*! llvm_st *) ans_state))
+                            (imp_memory_eqb (**!*) (List.rev llvm_st) (**! llvm_st *) ans_state))
         end        
       end
     end
   end.
+
+Definition check_imp_compiler_correct_with_stats : com -> Checker :=
+  (fun c : com => collect c (imp_compiler_correct_aux c)).
 
 Definition run_imp_compiler_correct (p:Imp.com) : string :=
   let fvs := IDSet.elements (fv p) in
@@ -357,11 +358,9 @@ Definition compile_aexp_correct (a:aexp) : Checker :=
   let p := (Id "fresh_var" ::= a) in
   imp_compiler_correct_aux p.  
 
-
 Definition compile_bexp_correct (b:bexp) : Checker :=
   let p := (IFB b THEN idX ::= ANum (Int64.repr 1) ELSE idY ::= ANum (Int64.repr 2) FI) in
   imp_compiler_correct_aux p.  
-
 
 Definition show_aexp_compilation_result (result : err (Ollvm_ast.value * list elt)) :=
   match result with
@@ -375,33 +374,16 @@ Definition show_bexp_compilation_result (result : err (Ollvm_ast.value * list el
   | inr (_ , elts) => string_of elts
   end.
 
-
 Definition show_result (result : err (toplevel_entities (list block))) :=
   match result with
   | inl _ => "error"
   | inr l => fold_left (fun s tle_blk => (s ++ "; " ++ (string_of tle_blk))%string) l ""
   end.
 
-(*
-Fixpoint stepD_n_steps (cfg : mcg) (state : SS.state) (n : nat) :
-  SS.state + Event SS.state :=
-  match n with
-  | O => inl state
-  | S n' =>
-    match stepD cfg state with
-    | inl state' => stepD_n_steps state' n
-    | inr event =>
-      match event with
-      | Fin v => inr (Fin v)
-      | Err s => inr (Err s)
-      | Eff eff =>
-        match eff with
-        | Alloca 
-        stepD_n_steps cfg (
- *)
+(**** Top Level Tests that directly test for compiler correctness ****)
+Module TopLevelTests.
 
-
-(* Tests *)
+(******** Tests *)
 
 Extract Constant Test.defNumTests => "100".
 
@@ -464,7 +446,9 @@ Compute (debug prog_literal3 8).
 Compute (debug prog_literal3 9).
 *)
 
-(* QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). Passed tests. *)
+(* QuickChick (forAll (arbitrarySized 0) check_imp_compiler_correct_with_stats). *)
+
+(*! QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
 
 Remove Hints gen_seq_and_assgn_com : typeclass_instances.
 Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
@@ -480,7 +464,7 @@ Existing Instance gen_bexp_with_small_aexp.
 Existing Instance gen_adhoc_aexp.
 Existing Instance gen_small_nonneg_i64.
 
-(* QuickChick (forAll (arbitrarySized 8) imp_compiler_correct_aux). Passed tests *)
+(*! QuickChick (forAll (arbitrarySized 8) imp_compiler_correct_aux). *)
 
 Remove Hints gen_seq_and_assgn_com : typeclass_instances.
 Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
@@ -568,7 +552,7 @@ Compute (run_imp_compiler_correct prog_xor_false3).
 
 (* QuickChick (forAllShrink (arbitrarySized 1) shrink imp_compiler_correct_aux). *)
 
-QuickChick (forAll (arbitrarySized 8) imp_compiler_correct_aux). 
+(*! QuickChick (forAll (arbitrarySized 8) imp_compiler_correct_aux). *)
 
 (*
 Compile command: ocamlopt -rectypes -w a -I /tmp -I /home/eigenvector/.opam/4.03.0/lib/coq/user-contrib/QuickChick /home/eigenvector/.opam/4.03.0/lib/coq/user-contrib/QuickChick/quickChickLib.cmx /tmp/QuickChick94353c.ml -o /tmp/QuickChick94353c
@@ -583,4 +567,40 @@ Remove Hints gen_small_nonneg_i64 : typeclass_instances.
 (* End TestIf *)
 
 
+(*! Section TestWhile *) (*! extends Compiler *)
 
+(* Print Hint GenSized. *)
+
+Existing Instance gen_while_com.
+Existing Instance gen_bexp_with_proportional_aexp.
+Existing Instance gen_adhoc_aexp.
+Existing Instance gen_small_nonneg_i64.
+
+(* Sample (@arbitrarySized com gen_while_com 3). *)
+(**! QuickChick (forAllShrink (arbitrarySized 8) shrink imp_compiler_correct_aux). *)
+(*! QuickChick (forAll (arbitrarySized 6) check_imp_compiler_correct_with_stats). *)
+
+
+Remove Hints gen_while_com: typeclass_instances.
+Remove Hints gen_bexp_with_small_aexp: typeclass_instances.
+Remove Hints gen_adhoc_aexp: typeclass_instances.
+Remove Hints gen_small_nonneg_i64: typeclass_instances.
+
+(* End TestWhile *)
+
+End TopLevelTests.
+
+Module CorrectnessLemmas.
+  
+
+
+
+
+
+
+
+
+
+
+
+End CorrectnessLemmas.

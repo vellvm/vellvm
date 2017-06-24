@@ -78,6 +78,15 @@ Definition test_id_gen := elems [idX; idY; idZ; idW].
 Definition test_id_gen_restricted :=
   freq [(6, returnGen idX) ; (4, returnGen idY)].
 
+Definition test_state :=
+  t_update
+    (t_update
+       (t_update
+          (t_update empty_state idX Int64.zero)
+          idY Int64.zero)
+       idZ Int64.zero)
+    idW Int64.zero.
+
 Instance gen_id : Gen id := {| arbitrary := test_id_gen |}.
 
 Instance shrink_id : Shrink id := {| shrink := fun _ => [] |}.
@@ -146,8 +155,8 @@ Instance gen_adhoc_aexp `{Gen int64} `{Gen id} : GenSized aexp :=
                                      (gen_aexp_func n')
                                      (gen_aexp_func n'))
            in 
-           (* oneOf [var_gen; plus_gen; minus_gen; mult_gen; liftGen ANum arbitrary] *)
-           oneOf [var_gen; plus_gen; mult_gen; liftGen ANum arbitrary]
+           oneOf [var_gen; plus_gen; minus_gen; mult_gen; liftGen ANum arbitrary]
+           (* oneOf [var_gen; plus_gen; mult_gen; liftGen ANum arbitrary] *)
          end
   |}.
 
@@ -195,8 +204,6 @@ Remove Hints gen_adhoc_aexp : typeclass_instances.
 
 Remove Hints shraexp : typeclass_instances.
 
-Print Hint GenSized.
-
 (**** Boolean expressions ****)
 
 Instance show_bexp `{Show aexp} : Show bexp :=
@@ -227,7 +234,7 @@ Instance gen_bexp_with_proportional_aexp `{GenSized aexp} : GenSized bexp :=
          end
   |}.
 
-Instance gen_bexp_with_small_aexp `{GenSized aexp} : GenSized bexp | 0 :=
+Instance gen_bexp_with_small_aexp `{GenSized aexp} : GenSized bexp :=
   {| arbitrarySized :=
        fix gen_bexp_func n :=
          match n with
@@ -242,6 +249,22 @@ Instance gen_bexp_with_small_aexp `{GenSized aexp} : GenSized bexp | 0 :=
          end
   |}.
 
+Instance gen_small_bexp_small_aexp_with_high_prob `{GenSized aexp} : GenSized bexp :=
+  {| arbitrarySized :=
+       fix gen_bexp_func n :=
+         match n with
+         | 0 => elems [BTrue ; BFalse]
+         | S n' => 
+           let beq_gen := liftGen2 BEq (arbitrarySized 3) (arbitrarySized 3) in
+           let ble_gen := liftGen2 BLe (arbitrarySized 3) (arbitrarySized 3) in
+           let bnot_gen := liftGen BNot (gen_bexp_func n') in
+           let band_gen := liftGen2 BAnd (gen_bexp_func n') (gen_bexp_func n')
+           in
+           oneOf [ returnGen BTrue; returnGen BFalse;
+                     beq_gen ; ble_gen ; bnot_gen ; band_gen ]
+         end
+  |}.
+
 (* 
   We force the tester to register manually 
   when there are multiple possibilities. 
@@ -252,6 +275,8 @@ Remove Hints genSaexp : typeclass_instances.
 
 Remove Hints gen_bexp_with_proportional_aexp : typeclass_instances.
 Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
+Remove Hints gen_small_bexp_small_aexp_with_high_prob : typeclass_instances.
+Remove Hints genSbexp : typeclass_instances.
 
 (**** Commands ****)
 
@@ -284,18 +309,6 @@ Instance gen_all_com `{Gen id} `{Gen aexp} `{Gen bexp} : GenSized com :=
          end
   |}.
 
-
-Instance gen_if_com `{Gen id} `{Gen aexp} `{Gen bexp} : GenSized com | 0 :=
-  {| arbitrarySized :=
-       fix com_gen_func n :=
-         match n with
-         | 0 => freq [(2, returnGen CSkip) ; (6, liftGen2 CAss arbitrary arbitrary)]
-         | S n' =>
-           let gen := com_gen_func n' in
-           oneOf [liftGen3 CIf arbitrary gen gen; liftGen2 CSeq gen gen]
-         end
-  |}.
-
 Instance gen_seq_and_assgn_com `{Gen id} `{Gen aexp} `{Gen bexp} : GenSized com :=
   {| arbitrarySized :=
        fix com_gen_func n :=
@@ -304,6 +317,18 @@ Instance gen_seq_and_assgn_com `{Gen id} `{Gen aexp} `{Gen bexp} : GenSized com 
          | S n' =>
            let gen := com_gen_func n' in
            liftGen2 CSeq gen gen
+         end
+  |}.
+
+Instance gen_if_com `{Gen id} `{Gen aexp} `{Gen bexp} : GenSized com :=
+  {| arbitrarySized :=
+       fix com_gen_func n :=
+         match n with
+         | 0 => freq [(2, returnGen CSkip) ;
+                       (6, liftGen2 CAss arbitrary arbitrary)]
+         | S n' =>
+           let gen := com_gen_func n' in
+           oneOf [liftGen3 CIf arbitrary gen gen; liftGen2 CSeq gen gen]
          end
   |}.
 
@@ -316,6 +341,20 @@ Instance adhoc_com_gen : GenSized com :=
        @com_gen _ aexp_gen bexp_gen
   |}.
  *)
+
+Instance gen_while_com `{Gen aexp} `{Gen bexp} : GenSized com :=
+  {| arbitrarySized :=
+       fix com_gen_func n :=
+         match n with
+         | 0 => liftGen2 CAss arbitrary arbitrary
+         | S n' =>
+           let gen := com_gen_func n' in
+           oneOf [liftGen2 CWhile arbitrary gen;
+                    liftGen3 CIf arbitrary gen gen;
+                    liftGen2 CSeq gen gen]
+         end
+  |}.
+
 
 (* 
   We force the tester to register manually 
@@ -330,6 +369,7 @@ Remove Hints genSbexp : typeclass_instances.
 Remove Hints gen_seq_and_assgn_com : typeclass_instances.
 Remove Hints gen_all_com : typeclass_instances.
 Remove Hints gen_if_com : typeclass_instances.
+Remove Hints gen_while_com : typeclass_instances.
 Remove Hints genScom : typeclass_instances.
 
 (* Print Hint GenSized. *)

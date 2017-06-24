@@ -241,6 +241,9 @@ Definition store v vptr : LLVM () :=
 Definition label l : LLVM () :=
   fun '(n,m,c) => ((n,m,(L l)::c), mret ()).
 
+
+(*! Section Compiler *)
+
 (* Note: list of instructions in code is generated in reverse order *)
 Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
   let compile_binop (op:ibinop) (a1 a2:aexp) :=
@@ -250,10 +253,10 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
       mret (local lid)
   in
   match a with
-  | ANum n =>
-    'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_nat 0);
+  | ANum n => (* TO SEE: mret (val_of_int64 n) *)
+    (*! *) 'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_nat 0);
       mret (local lid)
-      (*! mret (val_of_int64 n) *)
+    (*! mret (val_of_int64 n) *)
   | AId x =>
     'ptr <- lift "AId ident not found" (g x);
     'lid <- load ptr;
@@ -273,11 +276,13 @@ Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
   in
   match b with
   | BTrue     => (* TO SEE: CHKoh: mret (val_of_bool true) *)
-    'lid <- comp Eq (val_of_int64 (Int64.repr 0)) (val_of_int64 (Int64.repr 0));
-    mret (local lid)
+    (*! *) 'lid <- comp Eq (val_of_int64 (Int64.repr 0)) (val_of_int64 (Int64.repr 0));
+            mret (local lid)
+    (*! mret (val_of_bool true) *)             
   | BFalse    => (* TO SEE: CHKoh: mret (val_of_bool false) *)
-    'lid <- comp Eq (val_of_int64 (Int64.repr 1)) (val_of_int64 (Int64.repr 0));
-    mret (local lid)
+    (*!*) 'lid <- comp Eq (val_of_int64 (Int64.repr 1)) (val_of_int64 (Int64.repr 0));
+            mret (local lid)
+    (*! mret (val_of_bool false) *)                 
   | BEq a1 a2 => compile_icmp Eq a1 a2
   | BLe a1 a2 => compile_icmp Ule a1 a2
   | BNot b =>
