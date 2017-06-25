@@ -36,7 +36,7 @@ Instance string_of_elt : StringOf elt :=
     end.
 
 
-Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list block) :=
+Definition blocks_of_elts (entry_label:block_id) (code:list elt) (term:instr_id * terminator) : err (list block) :=
   '(insns, term_opt, blks) <-
    monad_fold_right
    (fun '(insns, term_opt, blks) e =>
@@ -52,7 +52,7 @@ Definition blocks_of_elts (entry_label:block_id) (code:list elt) : err (list blo
       | T id t  => mret ([], Some (id, t), blks)
       | I uid insn => mret ((uid,insn)::insns, term_opt, blks)
       end
-   ) code ([], None, []) 
+   ) code ([], Some term, []) 
   ;
     match term_opt with
     | None => failwith "terminator not found"
@@ -151,11 +151,13 @@ Instance llvm_err : (@ExceptionMonad string LLVM _ _) := fun _ e => fun s => (s,
 Hint Unfold llvm_err.
 
 (* Start the counters at 1 so that 0 can be used at the toplevel *)
-Definition run {A} (g : LLVM A) : err (A * list elt) :=
-  let '((_,_,c), x) := g (1,1,[])%Z in
+Definition run {A} (g : LLVM A) : err (A * list block) :=
+  let '((_,m,c), x) := g (1,1,[])%Z in
   match x with
   | inl e => inl e
-  | inr a => inr (a, List.rev c)
+  | inr a =>
+    'blocks <- blocks_of_elts (Anon 0%Z) (List.rev c) (IVoid m, TERM_Ret_void);
+    mret (a, blocks)
   end.
 
 Definition lift {A} (e:string) (m:option A) : LLVM A :=
@@ -405,16 +407,14 @@ Definition print_decl (fn:string) : declaration :=
 
 
 Definition compile (c:com) : err (toplevel_entities (list block)) :=
-  '(fvs, elts) <-
+  '(fvs, blocks) <-
           run (
             let fvs := IDSet.elements (fv c) in
             'g <- compile_fv fvs;  
             '; compile_com g c; 
 (*            '; print_fv fvs g;  (* UNCOMMENT to enable imp state printing *) *)
-            '; term TERM_Ret_void;    
             mret fvs
           );
-  'blocks <- blocks_of_elts (Anon 0)%Z elts;
   mret
    ((List.map (fun x => let 'Id s := x in TLE_Declaration (print_decl ("print_" ++ s))) fvs) ++
    [

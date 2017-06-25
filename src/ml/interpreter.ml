@@ -9,8 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 ;; open Memory
-
-
+ 
 let print_int_dvalue dv : unit =
   match dv with
   | SS.DV (Ollvm_ast.VALUE_Integer i) -> Printf.printf "Program terminated with: %d\n" (Camlcoq.Z.to_int i)

@@ -340,7 +340,39 @@ Qed.
   Runs a piece of straight code from some starting state to arrive at a state satisfying R.
   Note: there may be more straightline code available to continue with, unless
         fetch (pc_of s) = []
-*)
+ *)
+Inductive step_code2 (CFG:mcfg) (R : SS.state -> memory -> Prop) : SS.state -> memory -> Prop :=
+| step_zero2 :
+    forall s m
+      (HR : R s m),
+      step_code2 CFG R s m
+    
+| step_tau2 :
+    forall id i cd s s' m
+      (Hi : is_Op i)
+      (Hpc : pc_prefix (pc_of s) ((id,i)::cd))
+      (HS :  stepD CFG s = Step s')
+      (Hstep : step_code2 CFG R s' m),
+      step_code2 CFG R s m
+
+| step_eff2 :
+    forall id i cd s e m m' v k
+      (Hi : is_Eff i)
+      (Hpc : pc_prefix (pc_of s) ((id,i)::cd))
+      (HS : stepD CFG s = Obs (Eff e))
+      (HM : mem_step e m = inr (m', v, k))
+      (Hstep : step_code2 CFG R (k v) m'),
+      step_code2 CFG R s m
+
+| step_jump :
+    forall s m s' 
+      (Hpc : fetch (pc_of s) = [])
+      (HS : stepD CFG s = Jump s')
+      (HStep : step_code2 CFG R s' m),
+      step_code2 CFG R s m
+.
+
+
 Inductive step_code (CFG:mcfg) (R : SS.state -> memory -> Prop) : code -> SS.state -> memory -> Prop :=
 | step_zero :
     forall s m
@@ -780,9 +812,7 @@ Proof.
       -- eapply env_extends_lt; eauto. 
       -- apply env_lt_cons; [omega | eapply env_lt_weaken; eauto; omega].
         
-  - simpl in Hcomp;
-    unfold_llvm Hcomp;
-    specialize IHHAexp1 with (g:=g)(n:=n)(m:=m)(cd:=cd).
+  - specialize IHHAexp1 with (g:=g)(n:=n)(m:=m)(cd:=cd).
     remember (compile_aexp g a1 (n, m, cd)) as f.
     destruct f as [[[n1 m1] cd1] [err1|v1]];
     try solve [inversion Hcomp].
@@ -869,9 +899,7 @@ Proof.
            eapply env_extends_lt. apply Hlte2. 
         ++ apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
 
-  - simpl in Hcomp;
-    unfold_llvm Hcomp;
-    specialize IHHAexp1 with (g:=g)(n:=n)(m:=m)(cd:=cd).
+  - specialize IHHAexp1 with (g:=g)(n:=n)(m:=m)(cd:=cd).
     remember (compile_aexp g a1 (n, m, cd)) as f;
     destruct f as [[[n1 m1] cd1] [err1|v1]];
     try solve [inversion Hcomp].
@@ -958,9 +986,7 @@ Proof.
            eapply env_extends_lt. apply Hlte2. 
         ++ apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
 
-  - simpl in Hcomp;
-    unfold_llvm Hcomp;
-    specialize IHHAexp1 with (g:=g)(n:=n)(m:=m)(cd:=cd).
+  - specialize IHHAexp1 with (g:=g)(n:=n)(m:=m)(cd:=cd).
     remember (compile_aexp g a1 (n, m, cd)) as f;
     destruct f as [[[n1 m1] cd1] [err1|v1]];
     try solve [inversion Hcomp].
@@ -1052,7 +1078,7 @@ Qed.
 Lemma compile_bexp_correct :
   forall 
     (b:bexp) (st:Imp.state) (ans:bool)
-    (HAexp: beval st b = ans)
+    (HBexp: beval st b = ans)
 
     (g:ctxt)
     (n m:int) (cd:list elt)
@@ -1084,3 +1110,128 @@ Lemma compile_bexp_correct :
         (slc_pc fn bid phis term (List.rev c_a), e, k) mem.
 Proof.
 Admitted.
+
+
+Inductive step_code2 (CFG:mcfg) (R : SS.state -> memory -> Prop) : SS.state -> memory -> Prop :=
+| step_zero2 :
+    forall s m
+      (HR : R s m),
+      step_code2 CFG R s m
+    
+| step_tau2 :
+    forall id i cd s s' m
+      (Hi : is_Op i)
+      (Hpc : pc_prefix (pc_of s) ((id,i)::cd))
+      (HS :  stepD CFG s = Step s')
+      (Hstep : step_code2 CFG R s' m),
+      step_code2 CFG R s m
+
+| step_eff2 :
+    forall id i cd s e m m' v k
+      (Hi : is_Eff i)
+      (Hpc : pc_prefix (pc_of s) ((id,i)::cd))
+      (HS : stepD CFG s = Obs (Eff e))
+      (HM : mem_step e m = inr (m', v, k))
+      (Hstep : step_code2 CFG R (k v) m'),
+      step_code2 CFG R s m
+
+| step_jump :
+    forall s m s' 
+      (Hpc : fetch (pc_of s) = [])
+      (HS : stepD CFG s = Jump s')
+      (HStep : step_code2 CFG R s' m),
+      step_code2 CFG R s m
+.
+
+Inductive cfg_has_blocks (CFG:mcfg) (fn:function_id) (bs:list Ollvm_ast.block) : Prop :=
+| cfg_has_blocks_intro :
+    forall bid b fdef 
+      (Hblk: lookup_block bs bid = Some b)
+      (Hfind: find_function CFG fn = Some fdef)
+      (Hlookup: (blks (df_instrs fdef) bid) = Some b),
+      cfg_has_blocks CFG fn bs.
+
+Inductive related_configuration (g:ctxt) (cmd:com) (st:state) (CFG:mcfg) (fn:function_id) s mem : Prop :=
+| rc_intro:
+    forall n m cd
+      n' m' cd'
+      (Hcomp : compile_com g cmd (n,m,cd) = ((n',m',cd'), inr()))
+      cd_a
+      (Hcd: cd' = cd_a ++ cd)
+      bid term blk blks
+      (Hblks: blocks_of_elts bid cd_a (IVoid m', term) = inr (blk::blks))
+      (Hmem:memory_invariant g (env_of s) mem st)
+      (Hpc: (pc_of s) = mk_pc fn blk),
+      related_configuration g cmd st CFG fn s mem.
+
+Lemma compile_com_correct :
+  forall (cmd:com) (res:option com) (st st':Imp.state)
+    (HStep: ceval_small cmd st res st')
+    (g:ctxt) (CFG:mcfg) (fn:function_id)
+    s mem
+    (Hrelated: related_configuration g cmd st CFG fn s mem),
+    step_code2 CFG (fun s' mem' =>
+                      (res = None /\
+                       let '(pc', e', k') := s' in
+                       exists m' bid term,
+                         pc' = slc_pc fn bid [] (IVoid m', term) [] /\
+                         memory_invariant g e' mem' st)
+                      \/ exists cmd',
+                        res = Some cmd' /\
+                        related_configuration g cmd' st' CFG fn s' mem'
+                   )
+               s mem.
+Proof.
+  intros cmd res st st' Hceval.
+  induction Hceval; intros g CFG fn s mem Hrel; inversion Hrel; clear Hrel; subst; auto.
+
+  - unfold_llvm Hcomp.
+    inversion Hcomp; subst.
+    eapply step_zero2. left.
+    split; auto.
+    destruct s as [[pc e] k].
+    simpl in Hpc.
+    rewrite <- app_nil_l in H2 at 1.
+    apply app_inv_tail in H2.
+    subst. simpl in *.
+    unfold blocks_of_elts in Hblks.
+    simpl in Hblks. inversion Hblks. subst.
+    exists m'. exists bid. exists term.
+    split; auto.
+
+  - unfold_llvm Hcomp.
+    remember (compile_aexp
+
+
+Lemma compile_com_correct :
+  forall 
+    (cmd:com) (res:option com) (st st':Imp.state)
+    (HStep: ceval_small cmd st res st')
+
+    (g:ctxt)
+    (n m:int) (cd:list elt)
+    (n' m':int) (cd':list elt)
+    (Hcomp : compile_com g cmd (n,m,cd) = ((n',m',cd'),inr ())),
+
+  exists cd_a,
+    cd' = cd_a ++ cd
+    /\ forall (bid: block_id) term,
+      exists blk, exists blks,
+        blocks_of_elts bid cd_a (IVoid m', term) = inr (blk :: blks)
+        /\ forall (e:env) (mem:memory)
+            (HM: memory_invariant g e mem st)
+            (k:stack)
+            (CFG : mcfg) (fn : function_id) 
+            (HCFG: cfg_has_blocks CFG fn (blk::blks)),
+            step_code2
+        CFG
+        (fun s' mem' =>
+           let '(pc', e', k') := s' in
+           pc' = slc_pc fn bid [] (IVoid m', term) [] /\
+           memory_invariant g e' mem' st 
+        )
+        (mk_pc fn blk, e, k) mem.
+Proof.
+  intros cmd res st st' Hceval.
+  
+  
