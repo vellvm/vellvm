@@ -380,10 +380,8 @@ Definition show_result (result : err (toplevel_entities (list block))) :=
   | inr l => fold_left (fun s tle_blk => (s ++ "; " ++ (string_of tle_blk))%string) l ""
   end.
 
-(**** Top Level Tests that directly test for compiler correctness ****)
-Module TopLevelTests.
 
-(******** Tests *)
+(******** Tests ********)
 
 Extract Constant Test.defNumTests => "100".
 
@@ -555,7 +553,7 @@ Compute (run_imp_compiler_correct prog_xor_false3).
 (*! QuickChick (forAll (arbitrarySized 8) imp_compiler_correct_aux). *)
 
 (*
-Compile command: ocamlopt -rectypes -w a -I /tmp -I /home/eigenvector/.opam/4.03.0/lib/coq/user-contrib/QuickChick /home/eigenvector/.opam/4.03.0/lib/coq/user-contrib/QuickChick/quickChickLib.cmx /tmp/QuickChick94353c.ml -o /tmp/QuickChick94353c
+Compile command: ocamlopt -rectypes -w a -I /tmp -I <>/.opam/4.03.0/lib/coq/user-contrib/QuickChick <>/.opam/4.03.0/lib/coq/user-contrib/QuickChick/quickChickLib.cmx /tmp/QuickChick94353c.ml -o /tmp/QuickChick94353c
 Segmentation fault (core dumped)
 *)
 
@@ -587,20 +585,3 @@ Remove Hints gen_adhoc_aexp: typeclass_instances.
 Remove Hints gen_small_nonneg_i64: typeclass_instances.
 
 (* End TestWhile *)
-
-End TopLevelTests.
-
-Module CorrectnessLemmas.
-  
-
-
-
-
-
-
-
-
-
-
-
-End CorrectnessLemmas.

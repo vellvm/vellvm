@@ -15,7 +15,7 @@ CP=cp
 
 QUICKCHICKFILES := ImpQuickChick 
 IMPCOQFILES := Maps Imp ImpCEvalFun Compiler CompilerProp ImpCorrectness ImpOptimizer ImpCorrectnessTest
-COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform $(IMPCOQFILES) $(QUICKCHICKFILES)
+COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality $(IMPCOQFILES) $(QUICKCHICKFILES)
 OLLVMFILES := 
 
 VFILES := $(COQFILES:%=coq/%.v)
