@@ -32,7 +32,9 @@ Open Scope string_scope.
 Open Scope list_scope.
 
 Definition int := Z.
-Parameter float : Set.
+
+(* Parameter float : Set. *)
+Definition float := string. (* CHKoh: Hack for now. UNSAFE! *)
 
 Inductive linkage : Set :=
 | LINKAGE_Private
