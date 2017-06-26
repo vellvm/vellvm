@@ -1124,7 +1124,8 @@ Proof.
   rewrite beval_iff_bevalR in HAexp.
 
   induction HAexp; intros g n m cd n' m' cd' v Hcomp.
-  - simpl in Hcomp. unfold_llvm Hcomp. simpl in Hcomp.
+  - (* E_BTrue *)
+    simpl in Hcomp. unfold_llvm Hcomp. simpl in Hcomp.
     inversion Hcomp. clear Hcomp.
     exists [I (IId (lid_of_Z n))
          (INSTR_Op (SV (OP_ICmp Eq i64 (val_of_int64 (Integers.Int64.repr 0))
@@ -1146,7 +1147,8 @@ Proof.
     + eapply env_extends_lt. apply Hlt. 
     + apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
 
-  - simpl in Hcomp. unfold_llvm Hcomp. simpl in Hcomp.
+  - (* E_BFalse *)
+    simpl in Hcomp. unfold_llvm Hcomp. simpl in Hcomp.
     inversion Hcomp. clear Hcomp.
     exists [I (IId (lid_of_Z n))
          (INSTR_Op (SV (OP_ICmp Eq i64 (val_of_int64 (Integers.Int64.repr 1))
@@ -1168,7 +1170,8 @@ Proof.
     + eapply env_extends_lt. apply Hlt. 
     + apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
         
-  - simpl in Hcomp.
+  - (* E_Beq *)
+    simpl in Hcomp.
     unfold_llvm Hcomp.
     rewrite <- aeval_iff_aevalR in H, H0.
     remember (compile_aexp g a1 (n, m, cd)) as f.
@@ -1263,7 +1266,8 @@ Proof.
     + symmetry. apply Heqf2.
     + symmetry. apply Heqf.
 
-  - simpl in Hcomp.
+  - (* E_BLe *)
+    simpl in Hcomp.
     unfold_llvm Hcomp.
     rewrite <- aeval_iff_aevalR in H, H0.
     remember (compile_aexp g a1 (n, m, cd)) as f.
@@ -1358,7 +1362,8 @@ Proof.
     + symmetry. apply Heqf2.
     + symmetry. apply Heqf.
 
-  - simpl in Hcomp;
+  - (* E_BNot *)
+    simpl in Hcomp;
     unfold_llvm Hcomp;
     specialize IHHAexp with (g:=g)(n:=n)(m:=m)(cd:=cd).
     remember (compile_bexp g b1 (n, m, cd)) as f.
@@ -1392,19 +1397,110 @@ Proof.
       simpl.
       rewrite pc_app_slc. simpl.
 
-      eapply step_tau; auto.
+      simpl. inversion Hr1. subst.
+      unfold Rv1 in H0. unfold i1.
+      
+      eapply step_tau with (s':=({| fn := fn; bk := {| blk_id := bid; blk_phis := phis; blk_code := []; blk_term := term |} |},
+    add_env (lid_of_Z n1)
+      (eval_i1_icmp Eq Int1.zero (if ans then Int1.one else Int1.zero)) e1, k1)); auto.
       * simpl. unfold pc_app. simpl. apply pc_prefix_id.
-      * simpl; inversion Hr1; subst. 
-        unfold eval_expr. unfold Rv1 in H0. unfold i1.
-        
-        
+      * unfold eval_expr. 
+
+        simpl. unfold eval_expr. simpl.
+        rewrite <- H.
+        simpl.
+        destruct ans; subst; reflexivity.
       * simpl. eapply step_zero.
         repeat split; auto.
         ++ eapply memory_invariant_extension; eauto. 
-        ++ unfold eval_expr; simpl; rewrite lookup_env_hd; auto.
+        ++ unfold eval_expr; simpl;rewrite lookup_env_hd.
+           destruct ans; unfold eval_i1_icmp; simpl; apply Rv1e_inr; reflexivity.
+        ++ eapply env_extends_trans. apply He1.
+           eapply env_extends_lt. apply Hlte1. 
+        ++ apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
+  - (* E_BAnd *)
+    simpl in Hcomp.
+    unfold_llvm Hcomp.
+    rewrite <- beval_iff_bevalR in HAexp1, HAexp2.
+    remember (compile_bexp g b1 (n, m, cd)) as f.
+    destruct f as [[[n1 m1] cd1] [err1|v1]];
+      try solve [inversion Hcomp].
+
+    remember (compile_bexp g b2 (n1, m1, cd1)) as f2;
+    destruct f2 as [[[n2 m2] cd2] [err2|v2]];
+    try solve [inversion Hcomp].
+
+    simpl in Hcomp.
+    inversion Hcomp. clear Hcomp.
+
+    symmetry in Heqf.
+    apply IHHAexp1
+    with (g:=g) (n:=n) (m:=m) (cd:=cd) (n':= n1) (m':=m1) (cd':=cd1) (v:=v1) in Heqf.
+    clear IHHAexp1.
+    destruct Heqf as [cd_a1 [c_a1 [Hcd_eq1 [Hcc1 [HSlc1 IHHAexp1]]]]].
+
+    symmetry in Heqf2.
+    apply IHHAexp2
+    with (g:=g) (n:=n1) (m:=m1) (cd:=cd1) (n':= n2) (m':=m2) (cd':=cd2) (v:=v2) in Heqf2.
+    clear IHHAexp2.
+    destruct Heqf2 as [cd_a2 [c_a2 [Hcd_eq2 [Hcc2 [HSlc2 IHHAexp2]]]]].
+
+    subst.
+    exists (I (IId (lid_of_Z n2)) (INSTR_Op (SV (OP_IBinop And i1 v1 v2)))::cd_a2 ++ cd_a1).
+    exists (((IId (lid_of_Z n2)),(INSTR_Op (SV (OP_IBinop And i1 v1 v2))))::c_a2 ++ c_a1).
+    simpl. repeat split; auto.
+    + rewrite app_assoc. reflexivity.
+    + apply cc_cons_Op. apply compiled_code_app; auto.
+    + apply straight_Op; auto. apply straight_app; auto.
+    + intros e mem Hlt Hmem k CFG fn bid phis term.
+      rewrite rev_app_distr.
+      specialize IHHAexp1 with (e:=e)(mem:=mem).
+      lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+      lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+      specialize IHHAexp1 with (k:=k)(CFG:=CFG)(fn:=fn)(bid:=bid)(phis:=phis)(term:=term).
+
+      rewrite <- app_assoc.
+      eapply step_code_app. apply IHHAexp1. clear IHHAexp1.
+      intros st1 mem1 H. 
+      destruct st1 as [[pc1 e1] k1].
+      destruct H as [Hpc1 [Hmem1 [Hr1 [He1 Hlte1]]]].
+      split; subst; auto.
+
+      specialize IHHAexp2 with (e:=e1)(mem:=mem1).
+      lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+      lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+      specialize IHHAexp2 with (k:=k1)(CFG:=CFG)(fn:=fn)(bid:=bid)(phis:=phis)(term:=term).
+
+      simpl.
+      rewrite pc_app_slc. simpl.
+      eapply step_code_app.
+      apply IHHAexp2.
+      intros st2 mem2 H2.
+      destruct st2 as [[pc2 e2] k2].
+      destruct H2 as [Hpc2 [Hmem2 [Hr2 [He2 Hlte2]]]].
+      split; subst; auto.
+      
+      eapply step_tau with (s' := ({| fn := fn; bk := {| blk_id := bid; blk_phis := phis; blk_code := []; blk_term := term |} |},
+    add_env (lid_of_Z n2) (eval_i1_op And (if beval s b1 then Int1.one else Int1.zero) (if beval s b2 then Int1.one else Int1.zero)) e2, k2)); auto.
+      * simpl. unfold pc_app. simpl. apply pc_prefix_id.
+      * simpl.
+        inversion Hr1. subst. inversion Hr2. subst.
+        symmetry in H.
+        assert (eval_op e2 (Some (TYPE_I 1)) v1 = inr v).
+        apply He2; auto.
+        simpl.
+        unfold eval_expr. simpl. unfold i1.
+        
+        rewrite H3. rewrite <- H1.
+        unfold Rv1 in *. destruct (beval s b1); destruct (beval s b2); subst; auto.        
+      * simpl. eapply step_zero.
+        repeat split; auto.
+        ++ eapply memory_invariant_extension; eauto. 
+        ++ unfold eval_expr; simpl; rewrite lookup_env_hd; auto. unfold eval_i64_icmp.
+           apply Rv1e_inr. simpl. unfold Rv1. simpl.
+           destruct (beval s b1); destruct (beval s b2); reflexivity.
         ++ eapply env_extends_trans. apply He1.
            eapply env_extends_trans. apply He2.
            eapply env_extends_lt. apply Hlte2. 
         ++ apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
-
 Qed.
