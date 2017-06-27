@@ -19,6 +19,16 @@ Require Import Vellvm.Classes Vellvm.Ollvm_ast Vellvm.AstLib.
 (* Logical Foundations dependencies *)
 Require Import Vellvm.Imp Vellvm.Maps.
 
+(* Setup for 1bit integers *)
+Module Wordsize1.
+  Definition wordsize := 1%nat.
+  Remark wordsize_not_zero: wordsize <> 0%nat.
+  Proof. unfold wordsize; congruence. Qed.
+End Wordsize1.
+
+Module Int1 := Make(Wordsize1).
+
+Definition int1 := Int1.int.
 
 (* "Flattened" representation of Vellvm code *)
 Inductive elt :=
@@ -199,6 +209,9 @@ Definition val_of_nat (n:nat) : value :=
 Definition val_of_int64 (i:int64) : value :=
   SV (VALUE_Integer (Int64.signed i)).
 
+Definition val_of_int1 (i:int1) : value :=
+  SV (VALUE_Integer (Int1.signed i)).
+
 Definition val_of_ident (id:ident) : value :=
   SV (VALUE_Ident id).
 
@@ -243,6 +256,9 @@ Definition store v vptr : LLVM () :=
 Definition label l : LLVM () :=
   fun '(n,m,c) => ((n,m,(L l)::c), mret ()).
 
+
+(*! Section Compiler *)
+
 (* Note: list of instructions in code is generated in reverse order *)
 Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
   let compile_binop (op:ibinop) (a1 a2:aexp) :=
@@ -252,10 +268,10 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
       mret (local lid)
   in
   match a with
-  | ANum n =>
-    'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_nat 0);
+  | ANum n => (* TO SEE: mret (val_of_int64 n) *)
+    (*! *) 'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_nat 0);
       mret (local lid)
-      (*! mret (val_of_int64 n) *)
+    (*! mret (val_of_int64 n) *)
   | AId x =>
     'ptr <- lift "AId ident not found" (g x);
     'lid <- load ptr;
@@ -274,20 +290,17 @@ Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
       mret (local lid)
   in
   match b with
-  | BTrue     => (* TO SEE: CHKoh: mret (val_of_bool true) *)
+  | BTrue     => 
     'lid <- comp Eq (val_of_int64 (Int64.repr 0)) (val_of_int64 (Int64.repr 0));
     mret (local lid)
-  | BFalse    => (* TO SEE: CHKoh: mret (val_of_bool false) *)
+  | BFalse    => 
     'lid <- comp Eq (val_of_int64 (Int64.repr 1)) (val_of_int64 (Int64.repr 0));
     mret (local lid)
   | BEq a1 a2 => compile_icmp Eq a1 a2
-  | BLe a1 a2 => compile_icmp Ule a1 a2
+  | BLe a1 a2 => compile_icmp Sle a1 a2
   | BNot b =>
     'v <- compile_bexp g b;
-      (* TO SEE: CHKoh: 'lid <- binop Xor i1 v (val_of_bool true); *)
-    (*!*) 't <- comp Eq (val_of_int64 (Int64.repr 0)) (val_of_int64 (Int64.repr 0));
-    (*! 't <- comp Eq (val_of_int64 (Int64.repr 1)) (val_of_int64 (Int64.repr 0)); *)
-    'lid <- binop Xor i1 v (local t);
+    'lid <- emit (INSTR_Op (SV (OP_ICmp Eq i1 (val_of_int1 (Int1.repr 0)) v)));
     mret (local lid) 
 
   | BAnd b1 b2 =>
