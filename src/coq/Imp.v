@@ -1308,44 +1308,47 @@ Reserved Notation "c1 '/' st1 '==>' - '/' st2"
 
 Hint Constructors ceval.
 
-Inductive ceval_small : com -> state -> (option com) -> state -> Prop :=
-| S_Skip : forall st,
-             SKIP / st ==> - / st
+Inductive cont :=
+| KStop 
+| KSeq (c:com) (k:cont)
+.       
 
-| S_Ass : forall st a1 n x,
+Reserved Notation "c1 '/' k1 '/' st1 '==>' c2 '/' k2 '/' st2"
+         (at level 40, c2 at level 39, k1 at level 39, k2 at level 29, st1 at level 39, st2 at level 39).
+
+
+Inductive ceval_small : com -> cont -> state -> com -> cont -> state -> Prop :=
+| S_Skip : forall st c k,
+    SKIP / (KSeq c k) / st ==> c / k / st
+                  
+| S_Ass : forall st a1 n x k,
     aeval st a1 = n ->
-    (x ::= a1) / st ==> - / (t_update st x n)
+    (x ::= a1) / k / st ==> SKIP / k / (t_update st x n)
 
-| S_Seq1 : forall c1 c1' c2 st st',
-    c1 / st ==> c1' / st' ->
-    (c1 ;; c2) / st ==> (c1' ;; c2) / st'
+| S_Seq1 : forall c1 c2 k st st',
+    (c1 ;; c2) / k / st ==> c1 / KSeq c2 k / st'
 
-| S_Seq2 : forall c1 c2 st st',
-    c1 / st ==> - / st' ->
-    (c1 ;; c2) / st ==> c2 / st'
-
-| S_IfTrue : forall st b c1 c2,
+| S_IfTrue : forall st b k c1 c2,
     beval st b = true ->
-    (IFB b THEN c1 ELSE c2 FI) / st ==> c1 / st
+    (IFB b THEN c1 ELSE c2 FI) / k / st ==> c1 / k / st
 
-| S_IfFalse : forall st b c1 c2,
+| S_IfFalse : forall st b c1 c2 k,
     beval st b = false ->
-    (IFB b THEN c1 ELSE c2 FI) / st ==> c2 / st
+    (IFB b THEN c1 ELSE c2 FI) / k / st ==> c2 / k / st
 
-| S_WhileEnd : forall b st c,
+| S_WhileEnd : forall b st c k,
     beval st b = false ->
-    (WHILE b DO c END) / st ==> - / st
+    (WHILE b DO c END) / k / st ==> SKIP / k / st
 
-| S_WhileLoop : forall b st c,
+| S_WhileLoop : forall b st c k,
     beval st b = true ->
-    (WHILE b DO c END) / st ==> (c ;; WHILE b DO c END) / st
+    (WHILE b DO c END) / k / st ==> c / KSeq (WHILE b DO c END) k / st
                                
-  where "c1 '/' st1 '==>' co '/' st2" := (ceval_small c1 st1 (Some co) st2)
-  and "c1 '/' st1 '==>' - '/' st2"  := (ceval_small c1 st1 None st2)
+  where "c1 '/' k1 '/' st1 '==>' c2 '/' k2 '/' st2" := (ceval_small c1 k1 st1 c2 k2 st2)
 .             
-
 Hint Constructors ceval_small.
 
+(*
 Inductive ceval_small_N : nat -> com -> state -> state -> Prop :=
 | small0 : forall c st1 st2,
     c / st1 ==> - / st2 ->
@@ -1444,7 +1447,7 @@ Proof.
     inversion IHceval_small_N. subst.
     eapply E_WhileLoop; eauto.
 Qed.    
-
+*)
 
 (** The cost of defining evaluation as a relation instead of a
     function is that we now need to construct _proofs_ that some

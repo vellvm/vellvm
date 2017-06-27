@@ -1525,6 +1525,16 @@ Inductive step_code2 (CFG:mcfg) (R : SS.state -> memory -> Prop) : SS.state -> m
       (HStep : step_code2 CFG R s' m),
       step_code2 CFG R s m
 .
+Hint Constructors step_code2.
+
+Lemma step_code_step_code2 : forall CFG R cd s m,
+    step_code CFG R cd s m -> step_code2 CFG R s m.
+Proof.
+  intros CFG R cd s m H.
+  induction H; auto.
+  - inversion Hi. subst. eapply step_tau2; eauto.
+  - eapply step_eff2; eauto.
+Qed.    
 
 Inductive cfg_has_blocks (CFG:mcfg) (fn:function_id) (bs:list Ollvm_ast.block) : Prop :=
 | cfg_has_blocks_intro :
@@ -1534,34 +1544,52 @@ Inductive cfg_has_blocks (CFG:mcfg) (fn:function_id) (bs:list Ollvm_ast.block) :
       (Hlookup: (blks (df_instrs fdef) bid) = Some b),
       cfg_has_blocks CFG fn bs.
 
-Inductive related_configuration (g:ctxt) (cmd:com) (st:state) (CFG:mcfg) (fn:function_id) s mem : Prop :=
-| rc_intro:
-    forall n m cd
-      n' m' cd'
-      (Hcomp : compile_com g cmd (n,m,cd) = ((n',m',cd'), inr()))
+Inductive related_pc : com -> Imp.cont -> Ollvm_ast.block -> Prop := 
+| related_pc_done: forall bid vid, related_pc SKIP KStop (mk_block bid [] [] (IVoid vid, TERM_Ret_void))
+| related_pc_next:
+    forall c k blk
+    (HR:related_pc c k blk),
+    related_pc SKIP (KSeq c k) blk
+| related_nontriv:
+    forall c k g n m cd n' m' cd'
+      (Hc: c <> SKIP)
+      (Hcomp: compile_com g c (n,m,cd) = ((n',m',cd'), inr()))
       cd_a
       (Hcd: cd' = cd_a ++ cd)
       bid term blk blks
-      (Hblks: blocks_of_elts bid cd_a (IVoid m', term) = inr (blk::blks))
-      (Hmem:memory_invariant g (env_of s) mem st)
-      (Hpc: (pc_of s) = mk_pc fn blk),
-      related_configuration g cmd st CFG fn s mem.
+      (Hb: blocks_of_elts bid cd_a (IVoid m', term) = inr (blk::blks)),
+      related_pc c k blk.
+               
+
+Definition CFG_has_compilation_of CFG fn g c :=
+  exists n m cd cd_c n' m' cd' bid term blks,
+    compile_com g c (n,m,cd) = ((n',m',cd'), inr ())
+    /\ cd' = cd_c ++ cd
+    /\ blocks_of_elts bid cd_c (IVoid m', term) = inr blks
+    /\ cfg_has_blocks CFG fn blks.
+                                   
+  
+                                        
+
+
+Inductive related_configuration (g:ctxt) (cmd:com) (k:Imp.cont) (st:state) CFG (fn:function_id) s mem : Prop :=
+| rc_intro:
+    forall
+    (Hmem:memory_invariant g (env_of s) mem st)
+    blk
+    (Hpc: (pc_of s) = mk_pc fn blk)
+    (HR: related_pc cmd k blk),
+      related_configuration g cmd k st CFG fn s mem.
 
 Lemma compile_com_correct :
-  forall (cmd:com) (res:option com) (st st':Imp.state)
-    (HStep: ceval_small cmd st res st')
+  forall (cmd:com) (k:Imp.cont) (st:Imp.st) cmd' k' st'
+    (HStep: cmd / k / st ==> cmd / k / st')
     (g:ctxt) (CFG:mcfg) (fn:function_id)
     s mem
-    (Hrelated: related_configuration g cmd st CFG fn s mem),
+    (Hrelated: related_configuration g cmd k st fn s mem),
     step_code2 CFG (fun s' mem' =>
-                      (res = None /\
-                       let '(pc', e', k') := s' in
-                       exists m' bid term,
-                         pc' = slc_pc fn bid [] (IVoid m', term) [] /\
-                         memory_invariant g e' mem' st)
-                      \/ exists cmd',
-                        res = Some cmd' /\
-                        related_configuration g cmd' st' CFG fn s' mem'
+                      let '(pc', e', k') := s' in
+                      related_configuration g cmd' st' fn s' mem'
                    )
                s mem.
 Proof.
