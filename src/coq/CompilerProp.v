@@ -578,6 +578,9 @@ Existing Instance gen_small_nonneg_i64.
 (**! QuickChick (forAllShrink (arbitrarySized 8) shrink imp_compiler_correct_aux). *)
 (*! QuickChick (forAll (arbitrarySized 6) check_imp_compiler_correct_with_stats). *)
 
+Definition test_term := QuickChick.Test.quickCheck (forAll (arbitrarySized 6) check_imp_compiler_correct_with_stats).
+
+(* Separate Extraction *)
 
 Remove Hints gen_while_com: typeclass_instances.
 Remove Hints gen_bexp_with_small_aexp: typeclass_instances.

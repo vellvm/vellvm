@@ -22,7 +22,7 @@ Instance gen_large_i64 : GenSized int64 :=
        bindGen genZ (fun z => returnGen (Int64.repr z))
   |}.
 
-Instance gen_i64 : GenSized int64 | 100 :=
+Instance gen_i64 : GenSized int64 :=
   {| arbitrarySized n := 
        let genZ := (let z := Z.of_nat n in choose (-z, z)%Z) in
        bindGen genZ (fun z => returnGen (Int64.repr z)) 
@@ -53,9 +53,9 @@ Instance gen_i64_with_extremes : GenSized int64 :=
 *)
 
 Instance shrink_i64 : Shrink int64 :=
-  {| shrink n := [Int64.repr 0%Z;
-                  Int64.repr (Int64.max_signed); 
-                  Int64.repr (Int64.min_signed)] |}.
+  {| shrink n := [Int64.zero; Int64.one;
+                    Int64.repr (Int64.max_signed); 
+                    Int64.repr (Int64.min_signed)] |}.
 
 (* 
   We force the tester to register manually 

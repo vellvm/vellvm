@@ -1,3 +1,7 @@
+(* QuickChick dependencies *)
+Require Import QuickChick.QuickChick.
+Import QcDefaultNotation. Open Scope qc_scope.
+
 Require Import ZArith.
 
 (* CompCert dependencies *)
@@ -9,17 +13,15 @@ Require Import Vellvm.Classes.
 Require Import Vellvm.AstLib.
 Require Import Vellvm.DecidableEquality.
 
+(* Source and Target QuickChick dependencies *)
+Require Import Vellvm.ImpQuickChick.
+Require Import Vellvm.OllvmQuickChick.
+Require Import Vellvm.MemoryQuickChick.
+
 (* Logical Foundations dependencies *)
 Require Import Vellvm.Imp Vellvm.Maps Vellvm.ImpCEvalFun.
 Open Scope list_scope.
 Require Import Program.
-
-(* QuickChick dependencies *)
-Require Import QuickChick.QuickChick.
-Import QcDefaultNotation. Open Scope qc_scope.
-
-(* Imp QuickChick dependencies *)
-Require Import Vellvm.ImpQuickChick.
 
 (* Verification File *)
 Require Import Vellvm.ImpCorrectness.
@@ -47,8 +49,6 @@ Definition compile_aexp_monotonic_aux
                     (is_prefix_of (List.rev code) (List.rev code'))
     end.
 
-Print ctxt. Check compile_fv.
-
 Definition test_compile_aexp_monotonic (a : aexp) (n m : int) :=
   let fvs := IDSet.elements (fv a) in
   let g := compile_fv fvs in (* using this as initial context and code for now *)
@@ -66,37 +66,53 @@ Existing Instance genSaexp.
 
 (*! QuickChick (forAll arbitrary test_compile_aexp_monotonic). *)
 
+Remove Hints genSaexp : typeclass_instances.
 (* End Section *)
 
 
+(*
+Open Scope nat.
+Inductive is_even : nat -> Prop :=
+| even_O: is_even O
+| even_S: forall n : nat, is_even n -> is_even (S (S n)).
+Derive ArbitrarySizedSuchThat for (fun n => is_even n).
 
+Remove Hints gen_small_typ : typeclass_instances.
+
+
+Derive ArbitrarySizedSuchThat for (fun instr => is_Op instr).
+Print GenSizedSuchThatis_Op.
+Sample (genST (fun i => is_Op i)).
+Sample (@arbitraryST 
+
+Instance gen_instr_op : GenSizedSuchThat instr (fun instr => is_Op instr) :=
+  {| arbitrarySizeST n :=
+       (liftGen Some (liftGen INSTR_Op (arbitrarySized n)))
+  |}.
+
+Sample (genST (fun i => is_Op i)).
+*)
+
+
+
+(* Derive ArbitrarySizedSuchThat for (fun env => env_lt n env). *)
 
 (*
-(* StepSemanticsProp.v *)
-Lemma lookup_env_hd : forall id dv e, lookup_env (add_env id dv e) id = Some dv.
-Proof.
-  intros id dv e.  unfold lookup_env. 
-  unfold add_env.
-  rewrite Util.assoc_hd. reflexivity.
-Qed.  
+Import Vellvm.ImpCorrectness.
+Require Import Vellvm.MemoryQuickChick.
+Sample (@arbitrarySizeST _ (fun x => is_Op x) GenSizedSuchThatis_Op 3).
 
-(* StepSemanticsProp.v *)
-Lemma lookup_env_tl : forall id1 v1 e id2,
-    id1 <> id2 -> lookup_env (add_env id1 v1 e) id2 = lookup_env e id2.
-Proof.
-  unfold lookup_env.
-  intros id1 v1 e id2 H.
-  unfold add_env. 
-  rewrite Util.assoc_tl; auto.
-Qed.  
+Sample (genST (fun i => is_Op i)).
+
+Derive ArbitrarySizedSuchThat for (fun instr => is_Eff instr).
+Derive ArbitrarySizedSuchThat for (fun instr => is_Op instr).
+Derive ArbitrarySizedSuchThat for (fun instr => is_Op instr).
+Derive ArbitrarySizedSuchThat for (fun instr => is_Op instr).
 
 
 
-(*! Section TestEnvExtendsLt *)
 
 (* Print env_lt. *)
-
-
 
 From QuickChick Require Import QuickChick.
 Local Open Scope nat.
@@ -121,3 +137,4 @@ Lemma env_extends_lt :
     (Henv: env_lt n e),
     env_extends e (add_env_Z n dv e).
 *)
+
