@@ -14,6 +14,10 @@ Require Import Vellvm.Classes.
 Require Vellvm.AstLib.
 Import ListNotations.
 
+(* syntactic structure ------------------------------------------------------ *)
+
+
+
 
 (* well formedness ---------------------------------------------------------- *)
 (*

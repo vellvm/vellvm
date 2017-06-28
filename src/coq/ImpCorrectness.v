@@ -678,56 +678,12 @@ Proof.
   intros op dv Heq; eauto.
 Qed.
 
-Lemma env_extends_monad_app_snd :
-   forall e dv n t a (tv:Ollvm_ast.typ) (v:Ollvm_ast.value)
-    (H :forall (t : option typ) (a : value),
-        eval_op e t v = inr a -> eval_op (add_env_Z n dv e) t v = inr a),
-    monad_app_snd (eval_op e t) (tv, v) = inr a ->
-    monad_app_snd (eval_op (add_env_Z n dv e) t) (tv, v) = inr a.
-Proof.
-  intros. simpl in *.
-  
-  destruct (eval_op e t v) eqn:He. inversion H0.
-  inversion H0. subst. apply H in He. rewrite He; reflexivity.
-Qed.
-  
-Lemma env_extends_map_monad :
-  forall e dv n fields t a
-    (H : forall p : Ollvm_ast.typ * Ollvm_ast.value,
-        In p fields ->
-        forall (t : option typ) (a : value),
-          eval_op e t (snd p) = inr a -> eval_op (add_env_Z n dv e) t (snd p) = inr a),
-    map_monad (monad_app_snd (eval_op e t)) fields = inr a ->
-    map_monad (monad_app_snd (eval_op (add_env_Z n dv e) t)) fields = inr a.
-Proof.
-  induction fields; intros; simpl in *; try assumption.
-  
-  destruct (monad_app_snd (eval_op e t) a) eqn:Hm1. inversion H0.
-  destruct (map_monad (monad_app_snd (eval_op e t)) fields) eqn:Hm2. inversion H0.
-
-  assert (forall p, In p fields ->
-      forall (t0 : option typ) (a0 : value),
-              eval_op e t0 (snd p) = inr a0 -> eval_op (add_env_Z n dv e) t0 (snd p) = inr a0).
-  intros. apply H; try right; assumption.
-
-  destruct a.
-  
-  assert (monad_app_snd (eval_op (add_env_Z n dv e) t) (t0, v) = inr p).
-  { apply env_extends_monad_app_snd.
-    - specialize H with (p:=(t0, v)). apply H. left; reflexivity.
-    - assumption. }
-
-  eapply IHfields in H1.
-  - rewrite <- H0. rewrite H1.
-    inversion H0. rewrite H2. reflexivity.
-  - assumption.
-Qed. 
-  
 Lemma env_extends_lt :
   forall e n dv
     (Henv: env_lt n e),
     env_extends e (add_env_Z n dv e).
-Proof. 
+Proof.
+(*  
   intros e n dv Henv o.
   induction o using value_ind'; simpl in *; try inversion Hev; intros; subst; auto.
   - destruct id; try solve [inversion H].
@@ -738,58 +694,46 @@ Proof.
     unfold not. intros. symmetry in H0. eapply env_lt_lookup_neq in H0; eauto.
     destruct (lookup_env e id); inversion H; auto.
     
-  - unfold eval_expr in *. simpl in *. 
-    destruct (map_monad (monad_app_snd (eval_op e t)) fields) eqn:Hm. inversion H0.
-    eapply env_extends_map_monad in H. rewrite H. rewrite H0. reflexivity.
-    assumption.
-  - unfold eval_expr in *. simpl in *. 
-    destruct (map_monad (monad_app_snd (eval_op e t)) fields) eqn:Hm. inversion H0.
-    eapply env_extends_map_monad in H. rewrite H. rewrite H0. reflexivity.
-    assumption.
-  - unfold eval_expr in *. simpl in *. 
-    destruct (map_monad (monad_app_snd (eval_op e t)) elts) eqn:Hm. inversion H0.
-    eapply env_extends_map_monad in H. rewrite H. rewrite H0. reflexivity.
-    assumption.
-  - unfold eval_expr in *. simpl in *. 
-    destruct (map_monad (monad_app_snd (eval_op e t)) elts) eqn:Hm. inversion H0.
-    eapply env_extends_map_monad in H. rewrite H. rewrite H0. reflexivity.
-    assumption.
-  - unfold eval_expr in *. simpl in *.
-    destruct (eval_op e (Some t) o1) eqn:He1; try solve [inversion H].
-    destruct (eval_op e (Some t) o2) eqn:He2; try solve [inversion H].
-    erewrite IHo1; try solve [reflexivity].
-    erewrite IHo2; try solve [reflexivity].
-    exact H. auto. auto.    
-  - unfold eval_expr in *. simpl in *.
-    destruct (eval_op e (Some t) o1) eqn:He1; try solve [inversion H].
-    destruct (eval_op e (Some t) o2) eqn:He2; try solve [inversion H].
-    erewrite IHo1; try solve [reflexivity].
-    erewrite IHo2; try solve [reflexivity].
-    exact H. auto. auto.
+  - unfold eval_expr in *. simpl in *.   (* Need a lemma about the interaction of map_monad and H *)
+    admit.
+  - admit.
+  - admit.
+  - admit.
   - unfold eval_expr in *. simpl in *.
     destruct (eval_op e (Some t) o1); try solve [inversion H].
     destruct (eval_op e (Some t) o2); try solve [inversion H].
+    erewrite IHo1; try solve [reflexivity].
+    erewrite IHo2; try solve [reflexivity].
+    exact H.
   - unfold eval_expr in *. simpl in *.
-    destruct (eval_op e (Some t) o1); try solve [inversion H].
-    destruct (eval_op e (Some t) o2); try solve [inversion H].
+    destruct (eval_op e o1); try solve [inversion H].
+    destruct (eval_op e o2); try solve [inversion H].
+    erewrite IHo1; try solve [reflexivity].
+    erewrite IHo2; try solve [reflexivity].
+    assumption.
   - unfold eval_expr in *. simpl in *.
-    destruct (eval_op e (Some t_from) o) eqn:He; try solve [inversion H].
+    destruct (eval_op e o1); try solve [inversion H].
+    destruct (eval_op e o2); try solve [inversion H].
+  - unfold eval_expr in *. simpl in *.
+    destruct (eval_op e o1); try solve [inversion H].
+    destruct (eval_op e o2); try solve [inversion H].
+  - unfold eval_expr in *. simpl in *.
+    destruct (eval_op e o); try solve [inversion H].
     erewrite  IHo; try solve [reflexivity].
-    apply H. auto.
-  - unfold eval_expr in *. simpl in *. 
-    destruct (monad_app_snd (eval_op e (Some t)) ptrval) eqn:Hm1. inversion H0.    
-    destruct ptrval eqn:Hptrval.
-    eapply env_extends_monad_app_snd with (a:=p) in IHo. rewrite IHo.
-    destruct (map_monad (monad_app_snd (eval_op e (Some (TYPE_I 32)))) idxs) eqn:Hm2.
-    inversion H0.
-    eapply env_extends_map_monad in H. rewrite H. assumption.
-    apply Hm2.
     assumption.
-  - destruct vec. unfold eval_expr in *. simpl in *.
-    destruct (eval_op e (Some t0) v) eqn:He1. inversion H.
-    apply IHo in He1.
-    induction idxs; rewrite He1; auto.
-Qed.
+  - unfold eval_expr in *. simpl in *.  (* Need lemma about monad_app_snd *)
+    admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
+    
+*)    
+    (* maybe cut down on cases from eval_expr to simplify for now. *)
+Admitted.    
+
 
 Lemma compile_aexp_correct :
   forall 
@@ -1625,17 +1569,14 @@ Definition CFG_has_compilation_of CFG fn g c :=
     /\ cfg_has_blocks CFG fn blks.
                                    
   
-                                        
-
-
-Inductive related_configuration (g:ctxt) (cmd:com) (k:Imp.cont) (st:state) CFG (fn:function_id) s mem : Prop :=
+Inductive related_configuration (g:ctxt) (cmd:com) (k:Imp.cont) (st:state) (fn:function_id) s mem : Prop :=
 | rc_intro:
     forall
     (Hmem:memory_invariant g (env_of s) mem st)
     blk
     (Hpc: (pc_of s) = mk_pc fn blk)
     (HR: related_pc cmd k blk),
-      related_configuration g cmd k st CFG fn s mem.
+      related_configuration g cmd k st fn s mem.
 
 Lemma compile_com_correct :
   forall (cmd:com) (k:Imp.cont) (st:Imp.st) cmd' k' st'

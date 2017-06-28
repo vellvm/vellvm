@@ -87,21 +87,6 @@ Module StepSemantics(A:ADDR).
   Definition genv := list (global_id * value).
   Definition env  := list (local_id * value).
 
-  (* 
-     Invariant: the block here represents the state of the program counter of the LLVM machine.
-      - the phis component is ignored in stepD, it is used only when jumping
-      - whenever the phis component is empty, the program is executing the code within the block 
-      - whenever both phis and code are both empty, the pc is at the terminator
-  *)
-  Record pc :=
-    mk_pc {
-        fn : function_id;
-        bk : block;  
-      }.
-
-  Definition fetch (p:pc) : code :=
-    blk_code (bk p).
-  
   Inductive frame : Set :=
   | KRet      (e:env) (id:local_id) (q:pc)
   | KRet_void (e:env) (p:pc)
@@ -823,26 +808,23 @@ Fixpoint jump (CFG:cfg) (from:block_id) (e_init:env) (e:env) (to:block) (k:stack
   end.
 *)
 
-Definition jump (fn:function_id) (from:block_id) (e_init:env) (k:stack) (tgt:block) : err state :=
-  let eval_phi (e:env) '(lid, Phi t ls) :=
-      match assoc RawID.eq_dec from ls with
+
+Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (e_init:env) (k:stack)  : err state :=
+  let eval_phi (e:env) '(iid, Phi t ls) :=
+      match assoc RawID.eq_dec bid_src ls with
       | Some op =>
         'dv <- eval_op e_init (Some t) op;
-          mret (add_env lid dv e)
-      | None => failwith ("jump: block " ++ string_of from ++ " not found in " ++ string_of lid)
+          mret (add_env iid dv e)
+      | None => failwith ("jump: block " ++ string_of bid_src ++ " not found in " ++ string_of iid)
       end
   in
-  'e_out <- monad_fold_right eval_phi (blk_phis tgt) e_init;
-  mret (mk_pc fn tgt, e_out, k).
+  match find_block_entry CFG fid bid_tgt with
+  | None => failwith ("jump: target block " ++ string_of bid_tgt ++ " not found")
+  | Some (BlockEntry phis pc_next) =>
+    'e_out <- monad_fold_right eval_phi phis e_init;
+      mret (pc_next, e_out, k)
+  end.
 
-Definition incr_pc (p:pc) : pc :=
-  let 'mk_pc f b := p in
-  mk_pc f
-  {| blk_id := blk_id b;
-    blk_phis := blk_phis b;
-    blk_code := List.tl (blk_code b);
-    blk_term := blk_term b;
-  |}.
 
 Inductive transition X :=
 | Step (s:X)
@@ -859,149 +841,125 @@ Definition lift_err_d {A} (m:err A) (f: A -> transition state) : transition stat
 Notation "'do' x <- m ; f" := (lift_err_d m (fun x => f)) 
    (at level 200, x ident, m at level 100, f at level 200).
 
-Definition raise s : transition state :=
+Definition t_raise s : transition state :=
   Obs (Err s). 
 
-Definition raise_p (p:instr_id) s := raise (s ++ ": " ++ (string_of p)).
+Definition t_raise_p (p:pc) s := t_raise (s ++ ": " ++ (string_of p)).
 
-(* TODO:  clean up the pc abstraction a little bit: 
+(* TODO:  clean up the pc abstraction: 
    - replace blk_term (bk pc) with an accessor like 'fetch'
 *)
 
 
 Definition stepD (CFG:mcfg) (s:state) : transition state :=
   let '(pc, e, k) := s in
-  match fetch pc with
-  | [] =>   (* terminator *)
-    let '(tmid, tm) := blk_term (bk pc) in
-    match tm with
-    | TERM_Ret (t, op) =>
-      do dv <- eval_op e (Some t) op;
-        match k with
-        | [] => Obs (Fin dv)
-        | (KRet e' id p') :: k' => Jump (p', add_env id dv e', k')
-        | _ => raise_p tmid "IMPOSSIBLE: Ret op in non-return configuration" 
-        end
-
-    | TERM_Ret_void =>
+  do cmd <- trywith ("CFG has no instruction at " ++ string_of pc) (fetch CFG pc);
+  match cmd with
+  | Term (TERM_Ret (t, op)) =>
+    do dv <- eval_op e (Some t) op;
       match k with
-      | [] => Obs (Fin (DV (VALUE_Bool true)))
-      | (KRet_void e' p')::k' => Jump (p', e', k')
-      | _ => raise_p tmid "IMPOSSIBLE: Ret void in non-return configuration"
+      | [] => Obs (Fin dv)
+      | (KRet e' id p') :: k' => Jump (p', add_env id dv e', k')
+      | _ => t_raise_p pc "IMPOSSIBLE: Ret op in non-return configuration" 
       end
-        
-    | TERM_Br (t,op) br1 br2 =>
-      let f := fn pc in
-      do dv <- eval_op e (Some t) op; (* TO SEE *)
+
+  | Term TERM_Ret_void =>
+    match k with
+    | [] => Obs (Fin (DV (VALUE_Bool true)))
+    | (KRet_void e' p')::k' => Jump (p', e', k')
+    | _ => t_raise_p pc "IMPOSSIBLE: Ret void in non-return configuration"
+    end
+          
+  | Term (TERM_Br (t,op) br1 br2) =>
+    do dv <- eval_op e (Some t) op; (* TO SEE *)
       do br <- match dv with 
               (* CHKoh: | DV (VALUE_Bool true) => mret br1
-               | DV (VALUE_Bool false) => mret br2 *)
+                 | DV (VALUE_Bool false) => mret br2 *)
               | DVALUE_I1 comparison_bit =>
                 if Int1.eq comparison_bit Int1.one then
                   mret br1
                 else
                   mret br2
               | _ => failwith "Br got non-bool value"
-      end;
-      do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
-      let bs := (df_instrs fdef) in
-      do btgt <- trywith ("ERROR: Br " ++ (string_of br) ++ " not found") (blks bs br);
-      do st <- jump f (blk_id (bk pc)) e k btgt;
-      Jump st     
+              end;
+      do st <- jump CFG (fn pc) (bk pc) br e k;
+      Jump st
+             
+                 
+  | Term (TERM_Br_1 br) =>
+    do st <- jump CFG (fn pc) (bk pc) br e k;
+    Jump st
+             
+  (* Currently unhandled LLVM terminators *)                                  
+  | Term (TERM_Switch _ _ _)
+  | Term (TERM_IndirectBr _ _)
+  | Term (TERM_Resume _)
+  | Term (TERM_Invoke _ _ _ _) => t_raise "Unsupport LLVM terminator" 
+  
 
-        
-    | TERM_Br_1 br =>
-      let f := fn pc in
-      do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
-      let bs := (df_instrs fdef) in
-      do btgt <- trywith ("ERROR: Br " ++ (string_of br) ++ " not found") (blks bs br);
-      do st <- jump f (blk_id (bk pc)) e k btgt;
-      Jump st  
+  | CFG.Step insn =>  (* instruction *)
+    do pc_next <- trywith "no fallthrough intsruction" (incr_pc CFG pc);
+      match (pt pc), insn  with
+      | IId id, INSTR_Op op =>
+        do dv <- eval_op e None op;     
+          Step (pc_next, add_env id dv e, k)
 
-    (* Currently unhandled LLVM terminators *)                                  
-    | TERM_Switch _ _ _
-    | TERM_IndirectBr _ _
-    | TERM_Resume _
-    | TERM_Invoke _ _ _ _ => raise "Unsupport LLVM terminator" 
-    end
+      | IId id, INSTR_Alloca t _ _ =>
+        Obs (Eff (Alloca t (fun (a:value) =>  (pc_next, add_env id a e, k))))
+                
+      | IId id, INSTR_Load _ t (u,ptr) _ =>
+        do dv <- eval_op e (Some u) ptr;     
+          match dv with
+          | DVALUE_Addr a => Obs (Eff (Load a (fun dv => (pc_next, add_env id dv e, k))))
+          | _ => t_raise "ERROR: Load got non-pointer value" 
+          end
+            
+      | IVoid _, INSTR_Store _ (t, val) (u, ptr) _ => 
+        do dv <- eval_op e (Some t) val; (* TO SEE: Added new function *)
+          (* CHKoh: do dv <- eval_op e val; *)
+          do v <- eval_op e (Some u) ptr;
+          match v with 
+          | DVALUE_Addr a => Obs (Eff (Store a dv (fun _ => (pc_next, e, k))))
+          |  _ => t_raise "ERROR: Store got non-pointer value" 
+          end
 
-  | (IId id, insn)::_ =>  (* instruction *)
-    match insn with
-    | INSTR_Op op =>
-      do dv <- eval_op e None op;     
-        Step (incr_pc pc, add_env id dv e, k)
-
-    (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
-    | INSTR_Call (ret_ty,ID_Global f) args =>
-      do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
-      let ids := (df_args fdef) in  
-      let cfg := df_instrs fdef in
-      do dvs <-  map_monad (fun '(t, op) => (eval_op e (Some t) op)) args;
-      do btgt <- trywith ("stepD: no entry block") ((blks cfg) (init cfg));
-      match ret_ty with
-          | TYPE_Void => raise "ERROR: non-void id for void function call" 
-          | _ =>         Step (mk_pc f btgt, combine ids dvs, (KRet e id (incr_pc pc))::k)
+      | _, INSTR_Store _ _ _ _ => t_raise "ERROR: Store to non-void ID" 
+            
+      (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
+      | pt, INSTR_Call (ret_ty, ID_Global fid) args =>
+        do fnentry <- trywith ("stepD: no function " ++ (string_of fid)) (find_function_entry CFG fid); 
+        let 'FunctionEntry ids pc_f := fnentry in
+        do dvs <-  map_monad (fun '(t, op) => (eval_op e (Some t) op)) args;
+          match pt, ret_ty with
+              | IVoid _, TYPE_Void => Step (pc_f, combine ids dvs, (KRet_void e pc_next::k))
+              | IId id, _ =>          Step (pc_f, combine ids dvs, (KRet e id pc_next::k))
+              | _, _ => t_raise "Call mismatch void/non-void"
           end        
+                
+      | _, INSTR_Call (_, ID_Local _) _ => t_raise "INSTR_Call to local"
 
-    | INSTR_Call (_, ID_Local _) _ => raise "INSTR_Call to local"
-        
-    | INSTR_Unreachable => raise "IMPOSSIBLE: unreachable" 
-                                                       
+      | _, INSTR_Unreachable => t_raise "IMPOSSIBLE: unreachable" 
 
-    | INSTR_Alloca t _ _ =>
-      Obs (Eff (Alloca t (fun (a:value) =>  (incr_pc pc, add_env id a e, k))))
-      
-    | INSTR_Load _ t (u,ptr) _ =>
-      do dv <- eval_op e (Some u) ptr;     
-      match dv with
-      | DVALUE_Addr a => Obs (Eff (Load a (fun dv => (incr_pc pc, add_env id dv e, k))))
-      | _ => raise "ERROR: Load got non-pointer value" 
+        (* Currently unhandled LLVM instructions *)
+      | _, INSTR_Fence 
+      | _, INSTR_AtomicCmpXchg 
+      | _, INSTR_AtomicRMW
+      | _, INSTR_VAArg 
+      | _, INSTR_LandingPad => t_raise "Unsupported LLVM intsruction" 
+
+      (* Error states *)                                     
+      | _, _ => t_raise "ID / Instr mismatch void/non-void"
       end
-      
-    | INSTR_Store _ _ _ _ =>
-      raise "ERROR: Store to non-void ID" 
-
-    (* Currently unhandled LLVM instructions *)
-    | INSTR_Fence 
-    | INSTR_AtomicCmpXchg 
-    | INSTR_AtomicRMW
-    | INSTR_VAArg 
-    | INSTR_LandingPad => raise "Unsupported LLVM intsruction" 
-    end
-  | (IVoid _, insn)::_ =>
-    match insn with
-    (* NOTE : this doesn't yet correctly handle external calls or function pointers *)
-    | INSTR_Call (ret_ty,ID_Global f) args =>
-      do fdef <- trywith ("stepD: no function " ++ (string_of f)) (find_function CFG f);
-      let ids := (df_args fdef) in  
-      let cfg := df_instrs fdef in
-      do dvs <-  map_monad (fun '(t, op) => (eval_op e (Some t) op)) args;      
-      do btgt <- trywith ("stepD: no entry block") ((blks cfg) (init cfg));
-      match ret_ty with
-        | TYPE_Void => Step ((mk_pc f btgt), (combine ids dvs), (KRet_void e (incr_pc pc))::k)
-        | _ =>  raise "ERROR: void instruction for non-void call"
-      end
-
-    | INSTR_Store _ (t, val) (u, ptr) _ => 
-      do dv <- eval_op e (Some t) val; (* TO SEE: Added new function *)
-      (* CHKoh: do dv <- eval_op e val; *)
-      do v <- eval_op e (Some u) ptr;
-      match v with 
-      | DVALUE_Addr a => Obs (Eff (Store a dv (fun _ => (incr_pc pc, e, k))))
-      |  _ => raise "ERROR: Store got non-pointer value" 
-      end
-    | _ => raise "ERROR: void id for non-void instruction"
-    end      
   end.
 
+    
 
 (* Assumes that the entry-point function is named "fn" and that it takes
    no parameters *)
-Definition init_state (CFG:mcfg) (fn:string) : err state :=
-  'fdef <- trywith ("stepD: no function named " ++ fn) (find_function CFG (Name fn));
-  let cfg := df_instrs fdef in
-  'btgt <- trywith ("init_state: no entry block") ((blks cfg) (init cfg));
-    mret ((mk_pc (Name fn) btgt), [], []).
+Definition init_state (CFG:mcfg) (fname:string) : err state :=
+  'fentry <- trywith ("INIT: no function named " ++ fname) (find_function_entry CFG (Name fname));
+  let 'FunctionEntry ids pc_f := fentry in
+    mret (pc_f, [], []).
 
 (* Note: codomain is D'  *)
 CoFixpoint step_sem (CFG:mcfg) (s:state) : Trace state :=
