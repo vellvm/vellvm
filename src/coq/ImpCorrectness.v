@@ -14,8 +14,9 @@ Require Import ZArith String Omega List Equalities MSets RelationClasses.
 Import ListNotations.
 
 (* Vellvm dependencies *)
-Require Import Vellvm.Ollvm_ast Vellvm.Compiler Vellvm.AstLib Vellvm.CFG Vellvm.StepSemantics Vellvm.Memory.
+Require Import Vellvm.Ollvm_ast Vellvm.CFGProp Vellvm.Compiler Vellvm.AstLib Vellvm.CFG Vellvm.StepSemantics Vellvm.Memory.
 Require Import Vellvm.Classes.
+
 
 (* Logical Foundations dependencies *)
 Require Import Vellvm.Imp Vellvm.Maps Vellvm.ImpCEvalFun.
@@ -134,10 +135,8 @@ Lemma compile_aexp_monotonic :
 Proof.
   intros g a.
   induction a; intros n1 m1 code1 v n2 m2 code2 Hcomp.  simpl in Hcomp.
-  - unfold_llvm Hcomp. 
-    inversion Hcomp. repeat split; try omega.
-    exists [I (IId (lid_of_Z n1)) (INSTR_Op (SV (OP_IBinop (Add false false) i64 (val_of_int64 i) (val_of_int64 Integers.Int64.zero))))].
-    simpl; auto.
+  - unfold_llvm Hcomp.
+    inversion Hcomp; subst. repeat split; try omega. exists []. simpl. reflexivity.
 
   - unfold_llvm Hcomp.
     destruct (g i); simpl in Hcomp; try inversion Hcomp.
@@ -176,23 +175,6 @@ Inductive Rv1e : err value -> bool -> Prop :=
 Hint Constructors Rv1e.
 
 
-(* StepSemanticsProp.v *)
-Lemma lookup_env_hd : forall id dv e, lookup_env (add_env id dv e) id = Some dv.
-Proof.
-  intros id dv e.  unfold lookup_env. 
-  unfold add_env.
-  rewrite Util.assoc_hd. reflexivity.
-Qed.  
-
-(* StepSemanticsProp.v *)
-Lemma lookup_env_tl : forall id1 v1 e id2,
-    id1 <> id2 -> lookup_env (add_env id1 v1 e) id2 = lookup_env e id2.
-Proof.
-  unfold lookup_env.
-  intros id1 v1 e id2 H.
-  unfold add_env. 
-  rewrite Util.assoc_tl; auto.
-Qed.  
 
 Definition memory_invariant (g:ctxt) (e:env) (m:memory) (st:Imp.state) : Prop :=
   forall x v, g x = Some v ->
@@ -232,25 +214,6 @@ Proof.
     eapply  IHHenv. unfold lookup_env. apply Hl.
 Qed.    
 
-(* StepSemanticsProp.v *)
-Lemma lookup_add_env_inv :
-  forall id1 v e id2 u
-    (Hl: lookup_env (add_env id1 v e) id2 = Some u),
-    (id1 = id2 /\ v = u) \/ (lookup_env e id2 = Some u).
-Proof.
-  intros id1 v e id2 u Hl.
-  unfold add_env in Hl.
-  unfold lookup_env in Hl.
-  remember (Util.assoc RawID.eq_dec id2 ((id1, v)::e)) as res.
-  destruct res; simpl in Hl; try solve [inversion Hl].
-  symmetry in Heqres.
-  apply Util.assoc_cons_inv in Heqres.
-  destruct Heqres as [[H1 H2]|[H1 H2]]. subst; auto.
-  (* destruct (@Util.assoc_cons_inv raw_id value id2 id1 v v0 e RawID.eq_dec)  *)
-  inversion Hl. tauto. 
-  right. inversion Hl. subst. unfold lookup_env. exact H2.
-Qed.
-
 Lemma env_lt_lookup_inv :
   forall n n' e v
     (Henv: env_lt n e)
@@ -262,11 +225,10 @@ Proof.
   induction Henv; intros n' v Hl.
   - unfold lookup_env in Hl. simpl in Hl. inversion Hl.
   - unfold add_env_Z in Hl.
-    destruct (lookup_add_env_inv (lid_of_Z m) dv e (lid_of_Z n') v) as [[H1 H2]|H1]. assumption.
+    destruct lookup_add_env_inv with (id1:=lid_of_Z m)(v:=dv)(e:=e)(id2:=lid_of_Z n')(u:=v) as [[H1 H2]|H1]. assumption.
     apply lid_of_Z_inj2 in H1. subst. assumption.
     apply IHHenv with (v:=v). exact H1.
 Qed.    
-    
 
 Lemma memory_invariant_extension :
   forall g e n mem st dv
@@ -285,19 +247,6 @@ Proof.
   unfold not. intros. subst. omega. exact Ha.
 Qed.  
 
-(* StepSemanticsProp.v *)
-Inductive is_Op : instr -> Prop :=
-| is_Op_intro : forall v, is_Op (INSTR_Op v)
-.
-Hint Constructors is_Op.
-
-(* StepSemanticsProp.v *)
-Inductive is_Eff : instr -> Prop :=
-| is_Alloca : forall t nb a, is_Eff (INSTR_Alloca t nb a)
-| is_Load : forall v t p a, is_Eff (INSTR_Load v t p a)
-| is_Store : forall v val p a, is_Eff (INSTR_Store v val p a)
-.
-Hint Constructors is_Eff.
 
 (* AstProp.v *)
 Inductive straight : code -> Prop :=
@@ -311,6 +260,7 @@ Inductive straight : code -> Prop :=
     (Hi: is_Eff i),
     straight ((id,i)::tl)
 .             
+Hint Constructors straight.
 
 (* AstProp.v *)
 Lemma straight_app : forall cd1 cd2,
@@ -343,6 +293,7 @@ Proof.
   induction H; intros x2 cd2 H0; simpl; auto; try solve [constructor; eauto].
 Qed.  
 
+(*
 (* AstProp.v *)
 Inductive pc_prefix (p:pc) (cd:code) : Prop :=
 | pc_prefix_intro :
@@ -366,40 +317,46 @@ Proof.
     eapply pc_prefix_intro. simpl. rewrite <- app_assoc in H.
     apply H.
 Qed.  
+ *)
 
 (*
-  Runs a piece of straight code from some starting state to arrive at a state satisfying R.
-  Note: there may be more straightline code available to continue with, unless
-        fetch (pc_of s) = []
+  Holds if the machine runs in zero or more steps to a configuration that satisfies R
  *)
-Inductive step_code (CFG:mcfg) (R : SS.state -> memory -> Prop) : code -> SS.state -> memory -> Prop :=
+Inductive step_star (CFG:mcfg) (R : SS.state -> memory -> Prop) : SS.state -> memory -> Prop :=
 | step_zero :
     forall s m
       (HR : R s m),
-      step_code CFG R [] s m
+      step_star CFG R s m
     
 | step_tau :
-    forall id i cd s s' m
-      (Hi : is_Op i)
-      (Hpc : pc_prefix (pc_of s) ((id,i)::cd))
-      (HS :  stepD CFG s = Step s')
-      (Hstep : step_code CFG R cd s' m),
-      step_code CFG R ((id,i)::cd) s m
+    forall s m s'
+      (HS: stepD CFG s = Step s')
+      (IH: step_star CFG R s' m),
+      step_star CFG R s m
 
 | step_eff :
-    forall id i cd s e m m' v k
-      (Hi : is_Eff i)
-      (Hpc : pc_prefix (pc_of s) ((id,i)::cd))
+    forall s m e m' v k
       (HS : stepD CFG s = Obs (Eff e))
       (HM : mem_step e m = inr (m', v, k))
-      (Hstep : step_code CFG R cd (k v) m'),
-      step_code CFG R ((id,i)::cd) s m
+      (Hstep : step_star CFG R (k v) m'),
+      step_star CFG R s m
 .
 
-(* AstProp.v *)
-Definition slc_pc fn bid phis term cd :=
-  mk_pc fn (mk_block bid phis cd term).
+Lemma step_star_app :
+  forall (CFG:mcfg) R1 s1 m1
+    (HS1: step_star CFG R1 s1 m1)
+    R2
+    (HS2: forall s2 m2, R1 s2 m2 -> step_star CFG R2 s2 m2),
+    step_star CFG R2 s1 m1.
+Proof.
+  intros CFG R1 s1 m1 HS1.
+  induction HS1; intros R2 HS2; eauto.
+  - eapply step_tau; eauto.
+  - eapply step_eff; eauto.
+Qed.    
 
+    
+(*
 (* AstProp.v *)
 Definition pc_app (p:pc) (c:code) :=
   let b := bk p in
@@ -417,135 +374,6 @@ Proof.
   subst. reflexivity.
 Qed.    
 
-(* StepSemanticsProp.v *)
-Lemma stepD_Op_inversion :
-  forall CFG fn bid phis term,
-    let slc := slc_pc fn bid phis term in
-    forall cd1 e1 k1 id i pc2 e2 k2 
-      (Hi: is_Op i)
-      (HS1 : stepD CFG (slc ((id,i)::cd1), e1, k1) = Step (pc2, e2, k2)),
-      pc2 = slc cd1.
-Proof.
-  intros CFG fn0 bid phis term slc cd1 e1 k1 id i pc2 e2 k2 Hi HS1.
-  inversion Hi.
-  subst.
-  simpl in HS1.
-  destruct id; simpl in *.
-  destruct (eval_op e1 None v); inversion HS1; auto.
-  inversion HS1.
-Qed.
-
-(* StepSemanticsProp.v *)
-Lemma stepD_Eff_weakening :
-  forall CFG fn bid phis term,
-    let slc := slc_pc fn bid phis term in
-    forall cd1 e1 k1 id i eff
-      (Hi: is_Eff i)
-      (HS1 : stepD CFG (slc ((id,i)::cd1), e1, k1) = Obs (Eff eff))
-      cd2,
-      stepD CFG (pc_app (slc ((id,i)::cd1)) cd2, e1, k1) = Obs (Eff (fmap (fun st => (pc_app (pc_of st) cd2, env_of st, stack_of st)) eff)).
-Proof.
-  intros CFG fn0 bid phis term slc cd1 e1 k1 id i eff Hi HS1 cd2.
-  inversion Hi; subst; simpl in HS1; destruct id; simpl in *; inversion HS1; simpl.
-  - reflexivity.
-  - destruct p as [u ptr]; destruct (eval_op e1 (Some u) ptr).  simpl in HS1. inversion HS1. simpl in HS1.
-    destruct v0; try solve [inversion HS1].
-    simpl in *. inversion HS1.
-    reflexivity.
-  - destruct val as [t val]; destruct p as [u p].
-    destruct (eval_op e1 (Some t) val); try solve [inversion HS1].
-    destruct (eval_op e1 (Some u) p); try solve [inversion HS1].
-    simpl in *.
-    destruct v1; try solve [inversion HS1].
-    inversion HS1.
-    reflexivity.
-Qed.    
-
-(* StepSemanticsProp.v *)
-Lemma stepD_Eff_Alloca_inversion :
-  forall CFG fn bid phis term,
-    let slc := slc_pc fn bid phis term in
-    forall cd e k id t nb al eff
-      (HS1 : stepD CFG (slc ((id,INSTR_Alloca t nb al)::cd), e, k) = Obs (Eff eff)),
-    exists lid,
-      id = IId lid /\
-      eff = Alloca t (fun (a:value) => (slc cd, add_env lid a e, k)).
-Proof.
-  intros CFG fn0 bid phis term slc cd e k id t nb al eff HS1.
-  simpl in HS1.
-  inversion HS1.
-  destruct id as [lid | lv].
-  exists lid. split; auto. inversion H0.
-  reflexivity.
-  inversion H0.
-Qed.
-
-(* StepSemanticsProp.v *)
-Lemma stepD_Eff_Load_inversion :
-  forall CFG fn bid phis term,
-    let slc := slc_pc fn bid phis term in
-    forall cd e k id v t p al eff
-      (HS1 : stepD CFG (slc ((id,INSTR_Load v t p al)::cd), e, k) = Obs (Eff eff)),
-    exists lid a, 
-      id = IId lid /\
-      eff = (Load a (fun dv => (slc cd, add_env lid dv e, k))).
-Proof.
-  intros CFG fn0 bid phis term slc cd e k id v t p al eff HS1. 
-  simpl in HS1.
-  inversion HS1.
-  destruct id as [lid | lv].
-  exists lid.
-  destruct p as [u p].
-  destruct (eval_op e (Some u) p); try solve [inversion H0].
-  destruct v0; try solve [inversion H0].
-  simpl in H0.
-  exists a. split; auto. inversion H0. reflexivity.
-  inversion HS1.
-Qed.
-
-(* StepSemanticsProp.v *)
-Lemma stepD_Eff_Store_inversion :
-  forall CFG fn bid phis term,
-    let slc := slc_pc fn bid phis term in
-    forall cd e k id v val p al eff
-      (HS1 : stepD CFG (slc ((id,INSTR_Store v val p al)::cd), e, k) = Obs (Eff eff)),
-    exists vid a dv, 
-      id = IVoid vid /\
-      eff = (Store a dv (fun _ => (slc cd, e, k))).
-Proof.
-  intros CFG fn0 bid phis term slc cd e k id v val p al eff HS1. 
-  simpl in HS1.
-  destruct id as [lid | lvid].
-  - inversion HS1.
-  - exists lvid.
-    destruct val as [u val].
-    destruct p as [w p].
-    destruct (eval_op e (Some u) val); try solve [inversion HS1].
-    destruct (eval_op e (Some w) p); try solve [inversion HS1].
-    simpl in HS1.
-    destruct v1; try solve [inversion HS1].
-    exists a. exists v0. inversion HS1.
-     subst. split; auto.
-Qed.
-
-(* StepSemanticsProp.v *)
-Lemma stepD_Op_weakening :
-  forall CFG fn bid phis term,
-    let slc := slc_pc fn bid phis term in
-    forall id i cd1 e1 k1 pc2 e2 k2
-    (Hi : is_Op i)
-    (HS : stepD CFG (slc ((id,i)::cd1), e1, k1) = Step (pc2, e2, k2))
-    cd2,
-    stepD CFG (pc_app (slc ((id,i)::cd1)) cd2, e1, k1) = Step (pc_app pc2 cd2, e2, k2).
-Proof.
-  intros CFG fn0 bid phis term slc id i cd1 e1 k1 pc2 e2 k2 Hi HS cd2.
-  inversion Hi.
-  subst.
-  simpl in HS.
-  destruct id; simpl in *.
-  destruct (eval_op e1 None v); inversion HS; auto.
-  inversion HS.
-Qed.
 
 Lemma pc_app_slc :
     forall fn bid phis term,
@@ -576,9 +404,9 @@ Proof.
   apply pc_prefix_intro with (cd' := []).
   rewrite app_nil_r. reflexivity.
 Qed.  
-  
+*)  
 
-
+(*
 Lemma step_code_app :
   forall CFG fn bid phis term,
     let slc := slc_pc fn bid phis term in
@@ -662,7 +490,7 @@ Proof.
         simpl in HM. inversion HM. reflexivity.
       * eapply IHHS1; auto. rewrite Heq in HM. inversion HM. subst. reflexivity.
 Qed.
-        
+*)        
   
 Definition env_extends (e e':env) : Prop :=
   forall op t dv, eval_op e t op = inr dv -> eval_op e' t op  = inr dv.
@@ -677,6 +505,12 @@ Proof.
   unfold env_extends in *.
   intros op dv Heq; eauto.
 Qed.
+
+Lemma env_extends_refl :
+  forall e, env_extends e e.
+Proof.
+  intros e.  unfold env_extends; auto.
+Qed.  
 
 Lemma env_extends_lt :
   forall e n dv
@@ -734,6 +568,47 @@ Proof.
     (* maybe cut down on cases from eval_expr to simplify for now. *)
 Admitted.    
 
+Lemma rev_nil_inv : forall {A} (l:list A), rev l = [] -> l = [].
+Proof.
+  destruct l; intros; auto.
+  simpl in H.  apply app_eq_nil in H. destruct H. inversion H0.
+Qed.  
+
+Ltac simplify_lists :=
+  repeat (match goal with
+          | [H : rev ?x = [] |- _] => apply rev_nil_inv in H; inversion H; subst; clear H
+          | [H : ?x ++ [?y] = [] |- _ ] => apply app_eq_nil in H; let y := fresh in destruct H as [_ y]; inversion y
+          | [H : [] = ?x ++ [?y] |- _ ] => symmetry in H
+          | [H : [] <> [] |- _] => contradiction H
+          | [H : ?x::?l = [] |- _] => inversion H
+          | [H : [] = ?x::?l |- _] => inversion H
+          | [H : CFG_has_code_at _ _ _ [] |- _] => inversion H
+          | [H : context[rev[]] |- _] => simpl in H
+          | [H : [] = [] |- _ ] => clear H
+          | [H : ?x = [] |- _ ] => subst
+          end).
+
+
+Ltac simplify_step :=
+  repeat (match goal with
+          | [H : context[i64] |- _] => unfold i64 in H
+          | [  |- context[i64] ] => unfold i64
+          | [H : Rv64e ?E _ |- context[match ?E with _ => _ end ]] => inversion_clear H; simpl
+          | [H : Rv64 _ _ |- _ ] => inversion_clear H; simpl 
+          | [H : ?E = ?V |- context[do _ <- trywith _ ?E; _]] => rewrite H; simpl
+          | [H : ?E = ?V |- context[match ?E with _ => _ end]] => rewrite H; simpl
+          | [H : _ |- context[do _ <- eval_expr _ _ _ _; _]] => unfold eval_expr; simpl      
+          end).
+
+Ltac instantiate_H :=
+  match goal with
+  | [ (* H1 : forall g n m cd n' m' cd' v, compile_aexp g ?A (n, m, cd) = _ -> _ , *)
+      H2 : context[match compile_aexp ?G ?A (?N, ?M, ?CD) with _ => _ end] |- _
+    ] =>
+    let F := fresh "X" in
+    remember (compile_aexp G A (N, M, CD)) as F 
+  end.
+
 
 Lemma compile_aexp_correct :
   forall 
@@ -753,43 +628,32 @@ Lemma compile_aexp_correct :
     /\ forall
     (e:env)
     (mem:memory) (Hlt:env_lt n e)
-    (HM: memory_invariant g e mem st)
-    (k:stack)
-    (CFG : mcfg) (fn : function_id) (bid: block_id) phis term,
-      step_code
-        CFG
-        (fun s' mem' =>
-           let '(pc', e', k') := s' in
-           pc' = slc_pc fn bid phis term [] /\
-           memory_invariant g e' mem' st /\
-           Rv64e (eval_op e' (Some (TYPE_I 64)) v) ans /\
-           env_extends e e' /\
-           env_lt n' e'
-        )
-        (List.rev c_a)
-        (slc_pc fn bid phis term (List.rev c_a), e, k) mem.
+    (HM: memory_invariant g e mem st),
+        (c_a = [] /\ Rv64e (eval_op e (Some (TYPE_I 64)) v) ans)
+        \/
+        (c_a <> []) /\
+        forall (CFG : mcfg) (p:pc) (k:stack) (p':pc)
+          (HCFG: CFG_has_code_at CFG (fun pc => pc = p') p (List.rev c_a)),
+          step_star CFG
+                    (fun '(pc', e', k') mem' =>
+                       pc' = p' /\
+                       memory_invariant g e' mem' st /\
+                       Rv64e (eval_op e' (Some (TYPE_I 64)) v) ans /\
+                       env_extends e e' /\
+                       env_lt n' e'
+                    )
+                    (p, e, k) mem.
 Proof.
   intros a st ans HAexp.
   rewrite aeval_iff_aevalR in HAexp.
 
   induction HAexp; intros g n m cd n' m' cd' v Hcomp; unfold_llvm Hcomp.
   - inversion_clear Hcomp. 
-    exists [I (IId (lid_of_Z n))
-         (INSTR_Op (SV (OP_IBinop (Add false false) i64 (val_of_int64 ans) (val_of_int64 Integers.Int64.zero))))].
-    exists [((IId (lid_of_Z n)),
-         (INSTR_Op (SV (OP_IBinop (Add false false) i64 (val_of_int64 ans) (val_of_int64 Integers.Int64.zero)))))].
+    exists []. exists [].
     repeat split; auto.
-    * repeat econstructor.
-    
-    * intros e mem Hlt HM k CFG fn0 bid phis term. 
-      eapply step_tau; auto.
-      apply pc_prefix_id.
-      eapply step_zero. repeat split; auto.
-    + eapply memory_invariant_extension; eauto; try omega.
-    + simpl. unfold eval_expr. simpl. rewrite lookup_env_hd.
-      repeat rewrite Int64.repr_signed. rewrite Int64.add_zero. auto.
-    + eapply env_extends_lt. apply Hlt. 
-    + apply env_lt_cons; [omega | eapply env_lt_weaken; eauto; omega].
+    + intros e mem Hlt HM.
+      left.
+      repeat split; auto; rewrite Int64.repr_signed; auto.
 
   - unfold trywith in Hcomp.
     remember (g id) as X.
@@ -798,7 +662,331 @@ Proof.
     exists [(IId (lid_of_Z n), (INSTR_Load false i64 (i64ptr, v0) None))].
     simpl. repeat split; auto.
     * apply straight_Eff; auto; econstructor.
-    * intros e mem Hlt HM k CFG fn0 bid phis term.
+    * intros e mem Hlt Hmem.
+      right.
+      split; auto.
+      intros CFG p k p' Hcode.
+      inversion_clear Hcode. 
+    + unfold memory_invariant in Hmem.
+      destruct (Hmem id v0) as [nv [Hv [a [Ha Hr]]]]; auto. subst.
+      eapply step_eff.
+      simpl.
+      simplify_step.
+      reflexivity.
+      simpl. reflexivity.
+      apply step_zero.
+      repeat split; auto.
+      -- eapply memory_invariant_extension; eauto.
+      -- unfold eval_expr; simpl. rewrite lookup_env_hd. eauto.
+      -- eapply env_extends_lt; eauto.
+      -- apply env_lt_cons; [omega | eapply env_lt_weaken; eauto; omega].
+    + inversion Hcd.
+
+  - 
+
+
+
+
+
+
+    specialize IHHAexp1 with (g:=g)(n:=n)(m:=m)(cd:=cd).
+    remember (compile_aexp g a1 (n, m, cd)) as f.
+    destruct f as [[[n1 m1] cd1] [err1|v1]];
+    try solve [inversion Hcomp].      
+    specialize IHHAexp1 with (n':=n1)(m':=m1)(cd':=cd1)(v:=v1).
+    lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+    destruct IHHAexp1 as [cd_a1 [c_a1 [Hcd_eq1 [Hcc1 [HSlc1 IHHAexp1]]]]].
+
+    symmetry in Heqf;
+    apply compile_aexp_monotonic in Heqf;
+    destruct Heqf as [ltn1 [ltm1 [cd1' Heq_cd1]]].
+
+    specialize IHHAexp2 with (g:=g)(n:=n1)(m:=m1)(cd:=cd1).
+    remember (compile_aexp g a2 (n1, m1, cd1)) as f2;
+    destruct f2 as [[[n2 m2] cd2] [err2|v2]];
+    try solve [inversion Hcomp].
+    specialize IHHAexp2 with (n':=n2)(m':=m2)(cd':=cd2)(v:=v2).
+    lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+    destruct IHHAexp2 as [cd_a2 [c_a2 [Hcd_eq2 [Hcc2 [HSlc2 IHHAexp2]]]]].
+
+    symmetry in Heqf2;
+    apply compile_aexp_monotonic in Heqf2;
+    destruct Heqf2 as [ltn2 [ltm2 [cd2' Heq_cd2]]].
+    
+    simpl in Hcomp.
+    inversion_clear Hcomp.
+
+    subst.
+    exists (I (IId (lid_of_Z n2)) (INSTR_Op (SV (OP_IBinop (Add false false) i64 v1 v2)))::cd2' ++ cd1').
+    exists (((IId (lid_of_Z n2)),(INSTR_Op (SV (OP_IBinop (Add false false) i64 v1 v2))))::c_a2 ++ c_a1).
+    simpl. repeat split; auto.
+    + rewrite app_assoc. reflexivity.
+    + apply cc_cons_Op. apply compiled_code_app; auto.
+      apply app_inv_tail in Hcd_eq2. rewrite Hcd_eq2. auto.
+      apply app_inv_tail in Hcd_eq1. rewrite Hcd_eq1. auto.
+    + apply straight_Op; auto. apply straight_app; auto. simpl. auto.
+    + intros e mem Hlt Hmem.
+      right. split; auto.
+      intros CFG p k p' Hcode.
+      rewrite rev_app_distr in Hcode. rewrite <- app_assoc in Hcode.
+      apply CFG_has_code_app_inv in Hcode.
+      destruct Hcode as [[Hc1 Hcode] | [[Hc1 _] | [pc1 [Ha1 Hb1]]]]; simplify_lists.
+      *  (* c_a = [] *)
+
+        apply CFG_has_code_app_inv in Hcode.
+        destruct Hcode as [[Hc2 Hcode] | [[Hc2 _] | [pc2 [Ha2 Hb2]]]]; simplify_lists.
+        ++ (* c_b = [] *)
+        specialize IHHAexp1 with (e:=e)(mem:=mem).
+        lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+        lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+        destruct IHHAexp1 as [[_ Heval1] | [Hl _]]; simplify_lists; auto.
+
+        specialize IHHAexp2 with (e:=e)(mem:=mem).
+        lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+        lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+        destruct IHHAexp2 as [[_ Heval2] | [Hl2 _]]; simplify_lists; auto.
+
+        inversion Hcode; simplify_lists.
+        eapply step_tau.
+        simpl.
+        simplify_step.
+        reflexivity.
+        eapply step_zero.
+        repeat split; auto.
+        -- eapply memory_invariant_extension; eauto.
+           eapply env_lt_weaken; eauto. omega.
+        -- unfold eval_expr; simpl. rewrite lookup_env_hd. eauto.
+        -- eapply env_extends_lt; eauto.  eapply env_lt_weaken; eauto. omega.
+        -- apply env_lt_cons; [omega | eapply env_lt_weaken; eauto; omega].
+        -- eapply env_lt_weaken; eauto. 
+
+        ++ (* c_b <> [] *)
+        specialize IHHAexp1 with (e:=e)(mem:=mem).
+        lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+        lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+        destruct IHHAexp1 as [[_ Heval1] | [Hl _]]; simplify_lists; auto.
+
+        specialize IHHAexp2 with (e:=e)(mem:=mem).
+        lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+        lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+        destruct IHHAexp2 as [[Hl _] | [_ IHHAexp2]]; simplify_lists; auto.
+
+        specialize IHHAexp2 with (CFG:=CFG)(p:=p)(k:=k)(p':=pc2).
+        lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+
+        eapply step_star_app.
+
+
+        apply IHHAexp2.
+        intros [[pc1 e2] k2] mem2 [Hpc [Hmem2 [Heval2 [Hext2 Hlt2]]]].
+        subst.
+
+        inversion Hb2; simplify_lists.
+        subst.
+        eapply step_tau.
+        simpl. simplify_step.
+        inversion Heval1. unfold env_extends in Hext2. symmetry in H. apply Hext2 in H.
+        rewrite H.
+        simplify_step.
+        reflexivity.
+        eapply step_zero.
+        repeat split; auto.
+        -- eapply memory_invariant_extension; eauto.
+        -- unfold eval_expr; simpl. rewrite lookup_env_hd. eauto.
+        -- eapply env_extends_trans.  eauto.
+           eapply env_extends_lt. auto.
+        -- apply env_lt_cons; [omega | eapply env_lt_weaken; eauto; omega].
+        -- eapply env_lt_weaken; eauto. 
+        
+     *  apply CFG_has_code_app_inv in Hb1.
+        destruct Hb1 as [[Hc2 Hcode] | [[Hc2 _] | [pc2 [Ha2 Hb2]]]]; simplify_lists.
+        ++ (* c_b = [] *)
+          specialize IHHAexp1 with (e:=e)(mem:=mem).
+          lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+          lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+          destruct IHHAexp1 as [[Hl _] | [_ IHHAexp1]]; simplify_lists; auto.
+          specialize IHHAexp1 with (CFG:=CFG)(p:=p)(k:=k)(p':=pc1).
+          lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+
+          eapply step_star_app.
+          apply IHHAexp1.
+          intros [[pc2 e1] k1] mem1 [Hpc [Hmem1 [Heval1 [Hext1 Hlt1]]]].
+          subst.
+
+          specialize IHHAexp2 with (e:=e1)(mem:=mem1).
+          lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+          lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+          destruct IHHAexp2 as [[_ Heval2] | [Hl _]]; simplify_lists; auto.
+
+          inversion Hcode; simplify_lists.
+          subst.
+          eapply step_tau.
+          simpl.
+          simplify_step.
+          reflexivity.
+          eapply step_zero.
+          repeat split; auto.
+        -- eapply memory_invariant_extension; eauto. eapply env_lt_weaken; eauto.
+        -- unfold eval_expr; simpl. rewrite lookup_env_hd. eauto.
+        -- eapply env_extends_trans.  eauto.
+           eapply env_extends_lt. eapply env_lt_weaken; eauto.
+        -- apply env_lt_cons; [omega | eapply env_lt_weaken; eauto; omega].
+
+       ++ (* c_b <> [] *)
+          specialize IHHAexp1 with (e:=e)(mem:=mem).
+          lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+          lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+          destruct IHHAexp1 as [[Hl _] | [_ IHHAexp1]]; simplify_lists; auto.
+          specialize IHHAexp1 with (CFG:=CFG)(p:=p)(k:=k)(p':=pc1).
+          lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+         
+          eapply step_star_app.
+          apply IHHAexp1.
+          intros [[pc2' e1] k1] mem1 [Hpc [Hmem1 [Heval1 [Hext1 Hlt1]]]].
+          subst.
+
+          specialize IHHAexp2 with (e:=e1)(mem:=mem1).
+          lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+          lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+          destruct IHHAexp2 as [[Hl _] | [_ IHHAexp2]]; simplify_lists; auto.
+          specialize IHHAexp2 with (CFG:=CFG)(p:=pc1)(k:=k1)(p':=pc2).
+          lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+
+          eapply step_star_app.
+          apply IHHAexp2.
+          intros [[pc2' e2] k2] mem2 [Hpc [Hmem2 [Heval2 [Hext2 Hlt2]]]].
+
+          inversion Hb2; simplify_lists.
+          subst.
+          eapply step_tau.
+          simpl.
+          simplify_step.
+          inversion Heval1. unfold env_extends in Hext2. symmetry in H. apply Hext2 in H.
+          rewrite H.
+          simplify_step.
+          reflexivity.
+
+          eapply step_zero.
+          repeat split; auto.
+          -- eapply memory_invariant_extension; eauto.
+          -- unfold eval_expr; simpl. rewrite lookup_env_hd. eauto.
+          -- eapply env_extends_trans.  eauto. eapply env_extends_trans. eauto.
+             eapply env_extends_lt. auto.
+          -- apply env_lt_cons; [omega | eapply env_lt_weaken; eauto; omega].
+          
+          
+          
+        
+        ** subst. simpl in Hcode.
+           inversion Hcode; simplify_lists.
+           eapply step_tau.
+           ++ simpl.
+              simplify_step.
+              inversion_clear Heval1 as [vv i HX HI HJ].
+
+
+              inversion Heval2.
+              unfold eval_expr.
+              unfold i64.
+              rewrite <- H1. simpl.
+              rewrite <- H6. simpl.
+              inversion H4. inversion H7.
+              unfold eval_bop_integer. simpl.
+              reflexivity.
+           ++ eapply step_zero.
+              repeat split; auto.
+              -- eapply memory_invariant_extension; eauto. eapply env_lt_weaken; eauto. omega.
+              -- unfold eval_expr; simpl; rewrite lookup_env_hd; auto.
+              -- eapply env_extends_trans. apply env_extends_refl.
+                 eapply env_extends_lt. eapply env_lt_weaken; eauto. omega.
+              -- apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
+
+       ** apply CFG_has_code_app_inv in Hcode.
+          destruct Hcode as [[Hc2 Hcode] | [[Hc2 _] | [pc2 [Ha2 Hb2]]]]; simplify_lists.
+          eapply step_star_app.
+          -- specialize IHHAexp2 with (CFG:=CFG)(p:=p)(k:=k)(p':=pc2).
+             lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+             
+
+             apply IHHAexp2.
+             admit.  (* CFG_has_code_at weakening *)
+
+          -- 
+             subst.
+             inversion Hb2.
+             eapply step_tau.
+             simpl.
+             simplify_step.
+             inversion Heval1.
+             inversion Heval2.
+             unfold eval_expr.
+             unfold i64. simpl.
+             unfold env_extends in Hext2. erewrite Hext2; eauto.
+             rewrite <- H6. simpl.
+             inversion H4. inversion H7.
+              unfold eval_bop_integer. simpl.
+              reflexivity.
+              eapply step_zero.
+              repeat split; auto.
+              ++ eapply memory_invariant_extension; eauto. 
+              ++ unfold eval_expr; simpl; rewrite lookup_env_hd; auto.
+              ++ eapply env_extends_trans; eauto.
+                 eapply env_extends_lt. eapply env_lt_weaken; eauto. omega.
+              ++ apply env_lt_cons. omega. eapply env_lt_weaken; eauto. omega.
+              ++ inversion Hcd.
+      ** eapply env_lt_weaken; eauto.
+
+   * specialize IHHAexp1 with (e:=e)(mem:=mem).
+      lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+      lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+
+      apply CFG_has_code_app_inv in Hb1.
+      destruct Hb1 as [[Hc2 Hcode] | [[Hc2 _] | [pc2 [Ha2 Hb2]]]]; simplify_lists.
+
+      ** destruct IHHAexp1 as [[Hl _] | [_ IHHAexp1]]; subst; simplify_lists. 
+         
+
+         
+      subst. simpl in Ha1. inversion Ha1. (*automate*)
+
+      specialize IHHAexp1 with (CFG:=CFG)(p:=p)(k:=k)(p':=pc1).
+      lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
+
+      eapply step_star_app. 
+      apply IHHAexp1.
+      intros [[pc1' e2] k2] mem2 [Hpc [Hmem2 [Heval2 [Hext2 Hlt2]]]].
+      subst.
+      specialize IHHAexp2 with (e:=e2)(mem:=mem2).
+      lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+      lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+
+      specialize IHHAexp2 with (k:=k1)(CFG:=CFG)(p:=p).
+           lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | idtac ].
+
+
+      specialize IHHAexp1 with (k:=k)(CFG:=CFG)(p:=p).
+        lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | idtac ].
+
+        apply CFG_has_code_app_inv in Hcfg.
+        destruct Hcfg as [[Hc2 Hcfg] | [[Hc2 _] | [pc2 [Ha2 Hb2]]]].
+        -- eapply step_star_app. apply IHHAexp1.
+           intros [[pc1 e1] k1] mem1 [Hmem1 [Heval1 [Hext1 Hlt1]]].
+      
+           specialize IHHAexp2 with (e:=e1)(mem:=mem1).
+
+           lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
+           specialize IHHAexp2 with (k:=k1)(CFG:=CFG)(p:=p).
+           lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | idtac ].
+           eapply step_star_app. apply IHHAexp2.
+          
+           inversion Hcfg. subst.
+           eapply step_tau.
+           simpl.
+      
+      
+      Focus 2. inversion Hcd.
+
+      
      destruct HM with (x:=id)(v:=v0) as [n1 [Hlt1 [a [Hlookup HRa]]]]; auto.
      eapply step_eff; auto.
     + apply pc_prefix_id.
@@ -811,39 +999,12 @@ Proof.
       -- eapply env_extends_lt; eauto. 
       -- apply env_lt_cons; [omega | eapply env_lt_weaken; eauto; omega].
         
-  - specialize IHHAexp1 with (g:=g)(n:=n)(m:=m)(cd:=cd).
-    remember (compile_aexp g a1 (n, m, cd)) as f.
-    destruct f as [[[n1 m1] cd1] [err1|v1]];
-    try solve [inversion Hcomp].
-    specialize IHHAexp1 with (n':=n1)(m':=m1)(cd':=cd1)(v:=v1).
-    lapply IHHAexp1; clear IHHAexp1; [intros IHHAexp1 | auto].
-    destruct IHHAexp1 as [cd_a1 [c_a1 [Hcd_eq1 [Hcc1 [HSlc1 IHHAexp1]]]]].
+  - 
 
-    symmetry in Heqf;
-    apply compile_aexp_monotonic in Heqf;
-    destruct Heqf as [ltn1 [ltm1 [cd1' Heq_cd1]]].
 
     
-    specialize IHHAexp2 with (g:=g)(n:=n1)(m:=m1)(cd:=cd1).
-    remember (compile_aexp g a2 (n1, m1, cd1)) as f2;
-    destruct f2 as [[[n2 m2] cd2] [err2|v2]];
-    try solve [inversion Hcomp].
-    specialize IHHAexp2 with (n':=n2)(m':=m2)(cd':=cd2)(v:=v2).
-    lapply IHHAexp2; clear IHHAexp2; [intros IHHAexp2 | auto].
-    destruct IHHAexp2 as [cd_a2 [c_a2 [Hcd_eq2 [Hcc2 [HSlc2 IHHAexp2]]]]].
-
-    symmetry in Heqf2;
-    apply compile_aexp_monotonic in Heqf2;
-    destruct Heqf2 as [ltn2 [ltm2 [cd2' Heq_cd2]]].
 
 
-    simpl in Hcomp.
-    inversion Hcomp. clear Hcomp.
-
-    subst.
-    exists (I (IId (lid_of_Z n2)) (INSTR_Op (SV (OP_IBinop (Add false false) i64 v1 v2)))::cd2' ++ cd1').
-    exists (((IId (lid_of_Z n2)),(INSTR_Op (SV (OP_IBinop (Add false false) i64 v1 v2))))::c_a2 ++ c_a1).
-    simpl. repeat split; auto.
     + rewrite app_assoc. reflexivity.
     + apply cc_cons_Op. apply compiled_code_app; auto.
       apply app_inv_tail in Hcd_eq2. rewrite Hcd_eq2. auto.

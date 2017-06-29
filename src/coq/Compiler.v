@@ -268,9 +268,9 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
       mret (local lid)
   in
   match a with
-  | ANum n => (* TO SEE: mret (val_of_int64 n) *)
-    (*! *) 'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_nat 0);
-      mret (local lid)
+  | ANum n => mret (val_of_int64 n)
+    (*! *) (* 'lid <- binop (Add false false) i64 (val_of_int64 n) (val_of_nat 0);
+      mret (local lid) *)
     (*! mret (val_of_int64 n) *)
   | AId x =>
     'ptr <- lift "AId ident not found" (g x);

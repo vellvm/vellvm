@@ -620,7 +620,12 @@ Definition eval_expr {A:Set} (f:env -> option typ -> A -> err value) (e:env) (to
       | None => failwith ("lookup_env: id = " ++ (string_of i) ++ " NOT IN env = " ++ (string_of e))
       | Some v => mret v
       end
-  | VALUE_Integer x => mret (DV (VALUE_Integer x))
+  | VALUE_Integer x =>
+    match top with
+    | None =>  mret (DV (VALUE_Integer x))
+    | Some (TYPE_I bits) => coerce_integer_to_int bits x
+    | _ => failwith "bad type for constant int"
+    end
   | VALUE_Float x   => mret (DV (VALUE_Float x))
   | VALUE_Bool b    => mret (DV (VALUE_Bool b)) 
   | VALUE_Null      => mret (DV (VALUE_Null))
@@ -972,5 +977,99 @@ CoFixpoint step_sem (CFG:mcfg) (s:state) : Trace state :=
   end.
 
 Definition sem (CFG:mcfg) (s:state) : Trace () := hide_taus (step_sem CFG s).
+
+
+Section Properties.
+(* environment facts -------------------------------------------------------- *)
+  Lemma lookup_env_hd : forall id dv e, lookup_env (add_env id dv e) id = Some dv.
+  Proof.
+    intros id dv e.  unfold lookup_env. 
+    unfold add_env.
+    rewrite Util.assoc_hd. reflexivity.
+  Qed.  
+
+  Lemma lookup_env_tl : forall id1 v1 e id2,
+      id1 <> id2 -> lookup_env (add_env id1 v1 e) id2 = lookup_env e id2.
+  Proof.
+    unfold lookup_env.
+    intros id1 v1 e id2 H.
+    unfold add_env. 
+    rewrite Util.assoc_tl; auto.
+  Qed.  
+
+
+  Lemma lookup_add_env_inv :
+    forall id1 v e id2 u
+      (Hl: lookup_env (add_env id1 v e) id2 = Some u),
+      (id1 = id2 /\ v = u) \/ (lookup_env e id2 = Some u).
+  Proof.
+    intros id1 v e id2 u Hl.
+    unfold add_env in Hl.
+    unfold lookup_env in Hl.
+    remember (Util.assoc RawID.eq_dec id2 ((id1, v)::e)) as res.
+    destruct res; simpl in Hl; try solve [inversion Hl].
+    symmetry in Heqres.
+    apply Util.assoc_cons_inv in Heqres.
+    destruct Heqres as [[H1 H2]|[H1 H2]]. subst; auto.
+    (* destruct (@Util.assoc_cons_inv raw_id value id2 id1 v v0 e RawID.eq_dec)  *)
+    inversion Hl. tauto. 
+    right. inversion Hl. subst. unfold lookup_env. exact H2.
+  Qed.
+
+  Definition pc_satisfies (CFG:mcfg) (p:pc) (P:cmd -> Prop) : Prop :=
+    forall cmd, fetch CFG p = Some cmd -> P cmd.
+
+
+  (* Move to AstLib.v ? *)
+  Definition is_Op (i:instr) : Prop :=
+    match i with
+    | INSTR_Op _ => True
+    | _ => False
+    end.
+
+  Definition is_Eff (i:instr) : Prop :=
+    match i with 
+    | INSTR_Alloca t nb a => True
+    | INSTR_Load v t p a => True
+    | INSTR_Store v val p a => True
+    | _ => False    (* TODO: Think about call *)
+    end.
+  
+  Definition is_Call (i:instr) : Prop :=
+    match i with
+    | INSTR_Call _ _ => True
+    | _ => False
+    end.
+  
+  Definition pc_non_call (CFG:mcfg) (p:pc) : Prop :=
+    pc_satisfies CFG p (fun c => exists i, not (is_Call i) /\ c = CFG.Step i).
+
+  Ltac stepD_destruct :=
+    repeat (match goal with
+            | [ H : context[do _ <- trywith _ ?E; _] |- _ ] => destruct E; [simpl in H | solve [inversion H]]
+            | [ H : context[do _ <- ?E; _] |- _ ] => destruct E; [solve [inversion H] | simpl in H]
+            | [ H : context[match ?E with _ => _ end] |- _ ] => destruct E; try solve [inversion H]; simpl in H
+            | [ H : Step (?p, _ , _) = Step (?q, _, _) |- Some ?p = Some ?q ] => inversion H; auto
+            | [ H : ~ (is_Call (INSTR_Call _ _)) |- _ ] => simpl in H; contradiction
+            end).
+
+  (* Not true for Call *)
+  Lemma stepD_pc_incr_inversion:
+    forall CFG pc1 e1 k1 pc2 e2 k2
+      (Hpc: pc_non_call CFG pc1)
+      (Hstep: stepD CFG (pc1, e1, k1) = Step (pc2, e2, k2)),
+      incr_pc CFG pc1 = Some pc2.
+  Proof.
+    intros CFG pc1 e1 k1 pc2 e2 k2 Hpc Hstep.
+    simpl in Hstep.
+    unfold pc_non_call in Hpc. unfold pc_satisfies in Hpc.
+    destruct (fetch CFG pc1); try solve [inversion Hstep]; simpl in Hstep.
+    specialize Hpc with (cmd0 := c). destruct Hpc as [i [Hi Hc]]; auto.
+    subst.
+    destruct (incr_pc CFG pc1); [simpl in Hstep | solve [inversion Hstep]].
+    stepD_destruct.
+  Qed.    
+
+End Properties.
 
 End StepSemantics.
