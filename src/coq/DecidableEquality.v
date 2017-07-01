@@ -146,13 +146,20 @@ Ltac lift_decide_eq_from_inside_sv :=
   end.
 
 
-(*
-Instance eq_dec_raw_id : eq_dec raw_id.
+Instance eq_dec_global_id : eq_dec global_id.
+Proof. lift_decide_eq. Defined.
+
+Instance eq_dec_function_id : eq_dec function_id.
+Proof. lift_decide_eq. Defined.
+
+Instance eq_dec_block_id : eq_dec block_id.
+Proof. lift_decide_eq. Defined.
+
+Instance eq_dec_local_id : eq_dec local_id.
 Proof. lift_decide_eq. Defined.
 
 Instance eq_dec_instr_id : eq_dec instr_id.
 Proof. lift_decide_eq. Defined.
-*)
 
 Definition typ_strong_ind: forall P : Ollvm_ast.typ -> Set,
     (forall sz : int, P (TYPE_I sz)) ->
@@ -552,11 +559,9 @@ Proof.
     try (lift_decide_eq);
     try destruct e; unfold Decidable;
       try (right; intro H; inversion H; tauto);
-      try (lift_decide_eq_from_inside_dv).
-  - left; auto.
-  - left; auto.
-  - left; auto.
-  - left; auto.
+      try (lift_decide_eq_from_inside_dv);
+      try solve [left; auto];
+      try solve [lift_decide_eq].
 
   (* DV (VALUE_Struct ...) *)
   - destruct fields; auto.
@@ -874,13 +879,6 @@ Proof.
     { intros H; inversion H; apply v1_t_neq; subst; auto. }    
     { intros H; inversion H; apply cnd_v_neq; subst; auto. }
     { intros H; inversion H; apply cnd_t_neq; subst; auto. }
-
-  - lift_decide_eq.
-  - lift_decide_eq.
-  - lift_decide_eq.
-  - lift_decide_eq.
-  - lift_decide_eq.
-  - left; auto.
 Defined.
 
 Definition expr_svalue_ind: forall P : Ollvm_ast.value -> Set,
@@ -1072,11 +1070,8 @@ Proof.
     try (lift_decide_eq);
     try destruct e; unfold Decidable;
       try (right; intro H; inversion H; tauto);
-      try (lift_decide_eq_from_inside_sv).
-  - left; auto.
-  - left; auto.
-  - left; auto.
-  - left; auto.
+      try (lift_decide_eq_from_inside_sv);
+      try solve [left; auto].
 
   (* SV (VALUE_Struct ...) *)
   - destruct fields; auto.
@@ -1410,3 +1405,30 @@ Instance eq_dec_elt : eq_dec elt.
 Proof.
   lift_decide_eq; left; auto.
 Defined.
+
+Instance eq_dec_phi : eq_dec Ollvm_ast.phi.
+Proof. lift_decide_eq. Defined.
+
+Instance eq_dec_code : eq_dec code.
+Proof.
+  unfold code; lift_decide_eq;
+  left; auto.
+Defined.
+
+Instance eq_dec_block : eq_dec block.
+Proof. lift_decide_eq. Defined.
+
+Instance eq_dec_pc : eq_dec pc.
+Proof. lift_decide_eq. Defined.
+
+Instance eq_dec_frame : eq_dec frame.
+Proof. lift_decide_eq. Defined.
+
+Instance eq_dec_SS_state : eq_dec SS.state.
+Proof. lift_decide_eq. Defined.
+
+(*
+The following are not true. 
+Instance eq_dec_effects `{eq_dec D} : eq_dec (effects D).
+Instance eq_dec_transition `{eq_dec X} : eq_dec (transition X).
+*)
