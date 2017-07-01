@@ -13,6 +13,72 @@ Require Import Vellvm.Ollvm_ast Vellvm.CFG Vellvm.Dom.
 Require Import Vellvm.Classes.
 Require Vellvm.AstLib.
 Import ListNotations.
+Open Scope list_scope.
+
+(* syntactic structure ------------------------------------------------------ *)
+
+Inductive CFG_has_code_at (CFG:mcfg) (P:pc -> Prop) : pc -> code -> Prop :=
+| has_code_last :
+    forall p iid instr pc_next
+      (HF: fetch CFG p = Some (Step instr))
+      (Hiid: (pt p) = iid)
+      (Hincr: incr_pc CFG p = Some pc_next)
+      (HP: P pc_next),
+      CFG_has_code_at CFG P p [(iid, instr)]
+| has_code_cons :
+    forall p iid instr pc_next cd
+      (HF: fetch CFG p = Some (Step instr))
+      (Hiid: (pt p) = iid)
+      (Hincr: incr_pc CFG p = Some pc_next)
+      (Hcd: CFG_has_code_at CFG P pc_next cd),
+      CFG_has_code_at CFG P p ((iid,instr)::cd).
+Hint Constructors CFG_has_code_at.
+
+Lemma CFG_has_code_app_inv :
+  forall CFG P pc1 (cd1 cd2:code)
+    (H:CFG_has_code_at CFG P pc1 (cd1 ++ cd2)),
+  (cd1 = [] /\ CFG_has_code_at CFG P pc1 cd2)
+  \/
+  (cd2 = [] /\ CFG_has_code_at CFG P pc1 cd1)
+  \/
+  exists pc2,
+    CFG_has_code_at CFG (fun p => p = pc2) pc1 cd1 /\
+    CFG_has_code_at CFG P pc2 cd2.
+Proof.
+  intros CFG P pc1 cd1.
+  revert pc1.
+  induction cd1; intros pc1 cd2 H; try solve [contradiction]; inversion H; subst; simpl in *; auto.
+  - rewrite <- H3 in H.
+    symmetry in H3. destruct (app_eq_nil cd1 cd2) as [Ha Hb]; auto.
+    right. left. rewrite Ha. tauto.
+  - destruct (IHcd1 pc_next cd2) as [[Ha H2]|[[Ha H2]|[pc2 [Ha Hb]]]]; auto.
+    + right. right. exists pc_next.
+      split; auto.
+      subst. eapply has_code_last; eauto.
+    + right. left.
+      split; auto.
+      subst. eapply has_code_cons; eauto.
+    + right. right.
+      exists pc2.
+      split; auto.
+      eapply has_code_cons; eauto.
+Qed.      
+
+Lemma CFG_Has_code_app :
+  forall CFG P (cd1 cd2:code) (pc1 pc2:pc)
+    (H1: CFG_has_code_at CFG (fun p => p = pc2) pc1 cd1)
+    (H2: CFG_has_code_at CFG P pc2 cd2),
+    CFG_has_code_at CFG P pc1 (cd1 ++ cd2).
+Proof.
+  intros CFG P cd1 cd2 pc1 pc2 H1.
+  remember (fun p => p = pc2) as Q.
+  revert cd2.
+  induction H1; intros cd2 H2; simpl in *.
+  - eapply has_code_cons; eauto.
+    subst. rewrite HP. assumption.
+  - eapply has_code_cons; eauto.
+Qed.    
+      
 
 
 (* well formedness ---------------------------------------------------------- *)

@@ -14,17 +14,16 @@ Require Import Vellvm.Classes.
 Require Import Vellvm.Util.
 Import ListNotations.
 
-(* program counter is a function plus instruction id ------------------------ *)
-
-(*
+(* program counter denotes an instruction with a block of a function -------- *)
 Record pc :=
   mk_pc {
-      fn  : function_id;
-      ins : pt;
+      fn : function_id;
+      bk : block_id;
+      pt : instr_id;
     }.
 
 Instance string_of_pc : StringOf pc :=
-  fun p => "@" ++ (string_of_raw_id (fn p)) ++ ":" ++ (string_of_instr_id (ins p)).
+  fun p => "@" ++ (string_of (fn p)) ++ ":" ++ (string_of (bk p)) ++ ":" ++ (string_of (pt p)).
 
 Require Import Equalities.
 Module PC <: UsualDecidableTypeFull.
@@ -36,12 +35,14 @@ Module PC <: UsualDecidableTypeFull.
   Lemma eq_dec : forall (x y : pc), {x = y} + {x <> y}.
   Proof.
     intros x y.
-    destruct x as [xf xi]; destruct y as [yf yi].
+    destruct x as [xf xi xp]; destruct y as [yf yi yp].
     destruct (xf == yf).
-      + destruct (xi == yi).
+    - destruct (xi == yi).
+     + destruct (xp == yp).
         * subst. left. reflexivity.
         * right. unfold not. intros. apply n. inversion H. auto.
-      + right. unfold not. intros. apply n. inversion H. auto.
+     + right. unfold not. intros. apply n. inversion H. auto.
+    - right. unfold not. intros. apply n. inversion H. auto.
   Defined.
 
   Include HasEqDec2Bool.
@@ -53,22 +54,19 @@ Instance eq_dec_pc : eq_dec pc := PC.eq_dec.
 (* control flow graphs (CFGs) ----------------------------------------------- *)
 
 Inductive cmd : Set :=
-| Step  (i:instr) (next:pt)
-| Jump  (bn:block_id) (t:terminator)
+| Step (i:instr) 
+| Term (t:terminator)
 .                    
-*)
 
-(*
-Inductive block_entry : Set :=
-| Phis (entry:pt) (phis : list (local_id * instr)) (next:pt)
-.
-*)
 
 (* each function definition corresponds to a control-flow graph *)
+(* NOTE: I'm not sure where to put the scoping information for globals 
+   They may belong elsewhere, in which case we can remove the glbl list.
+*)
 Record cfg := mkCFG
 {
   init : block_id;
-  blks : block_id -> option block;
+  blks : list block;
   glbl : list ident;   (* identifiers defined on entry to this CFG, 
                           including globals and local function parameters *)
 }.
@@ -79,79 +77,79 @@ Definition mcfg : Set := modul cfg.
 Definition find_defn {X:Set} (fid:function_id) (d:definition X) : option (definition X) :=
   if (ident_of d) == (ID_Global fid) then Some d else None.
 
-Definition find_function {X:Set} (CFG : modul X) (fid:function_id) : option (definition X) :=
+Definition find_function (CFG : mcfg) (fid:function_id) : option (definition cfg) :=
   find_map (find_defn fid) (m_definitions CFG).
 
-(*
-Definition fetch (CFG : mcfg) (p:pc) :=
-  'fdefn <- find_function CFG (fn p);
-  (code (df_instrs fdefn) (ins p)).
 
-(* creating CFGs from syntax ------------------------------------------------ *)
-
-Definition fallthrough term_id (is : list (instr_id * instr)) : instr_id :=
-  match is with
+Definition fallthrough (cd: code) term_id : instr_id :=
+  match cd with
   | [] => term_id
   | (next, _)::_ => next
   end.
 
-Definition blk_entry (b:block) := fallthrough (blk_term_id b) (blk_instrs b). 
+Definition blk_term_id b := fst (blk_term b).
 
-Definition init_of_definition d : option pt :=
-  match (df_instrs d) with
-  | [] => None
-  | b :: _ => Some (blk_entry b)
-  end.
+Definition blk_entry_id (b:block) : instr_id := fallthrough (blk_code b) (blk_term_id b). 
 
-Fixpoint phis_from_block entry term_id (b : list (instr_id * instr)) : option block_entry :=
-  match b with
-    | (IId iid, INSTR_Phi i v as ins) :: t =>
-       'rest <- phis_from_block entry term_id t;
-        match rest with
-          | Phis _ phis p => Some (Phis entry ((iid, ins)::phis) p) 
-        end
-    | (IVoid _, INSTR_Phi i v as ins) :: t => None
-    | (next, _) :: _ => Some (Phis entry [] next)
-    | [] => Some (Phis entry [] term_id)
-  end.
-
-
-Fixpoint block_to_phis (b:block) : option block_entry :=
-  phis_from_block (blk_entry b) (blk_term_id b) (blk_instrs b).
-*)
   
-Fixpoint lookup_block bs block_id : option block :=
+Fixpoint find_block bs block_id : option block :=
   find (fun b => if (blk_id b) == block_id then true else false) bs.
 
-
-Fixpoint lookup_instr (p:instr_id) (insns : code) : code :=
-  match insns with
-  | [] =>  []
-  | (x,ins)::rest =>
+Fixpoint find_instr (cd : code) (p:instr_id) (t:instr_id) : option (cmd * option instr_id) :=
+  match cd with
+  | [] =>  None
+  | (x,i)::cd =>
     if p == x then
-      insns
+      Some (Step i, Some (fallthrough cd t))
     else
-      lookup_instr p rest
+      find_instr cd p t
   end.
 
-(*
-Definition cmd_from_block (p:pt) (b:block) : option cmd :=
-  if (blk_term_id b == p) then
-    Some (Jump (blk_id b) (blk_term b))
+Definition block_to_cmd (b:block) (p:instr_id) : option (cmd * option instr_id) :=
+  let term_id := blk_term_id b in 
+  if term_id == p then
+    Some (Term (snd (blk_term b)), None)
   else
-    lookup_instr p (blk_term_id b) (blk_instrs b).
+    find_instr (blk_code b) p term_id 
+.
+               
+Definition fetch (CFG : mcfg) (p:pc) : option cmd :=
+  let 'mk_pc fid bid iid := p in 
+  'cfg <- find_function CFG fid;
+  'blk <- find_block (blks (df_instrs cfg)) bid;
+  '(c, _) <- block_to_cmd blk iid;
+  mret c.
+   
+Definition incr_pc (CFG:mcfg) (p:pc) : option pc :=
+  let 'mk_pc fid bid iid := p in 
+  'cfg <- find_function CFG fid;
+  'blk <- find_block (blks (df_instrs cfg)) bid;
+  '(c, n) <- block_to_cmd blk iid;
+  'iid_next <- n;
+  mret (mk_pc fid bid iid_next).
+
+Inductive block_entry : Set :=
+| BlockEntry (phis:list (local_id * phi)) (p:pc).
+
+Fixpoint block_to_entry (fn:function_id) (b:block) : block_entry :=
+  BlockEntry (blk_phis b) (mk_pc fn (blk_id b) (blk_entry_id b)).
+
+Definition find_block_entry (CFG:mcfg) (fid:function_id) (bid:block_id) : option block_entry :=
+  'cfg <- find_function CFG fid;
+  'blk <- find_block (blks (df_instrs cfg)) bid;
+  mret (block_to_entry fid blk).  
+
+Inductive function_entry : Set :=
+| FunctionEntry (args:list local_id) (p:pc).
 
 
-Fixpoint cmd_from_blocks (p:pt) (bs:list block) : option cmd := 
-match bs with
-  | [] => None
-  | b :: bs =>
-    match cmd_from_block p b with
-    | None => cmd_from_blocks p bs
-    | Some cmd => Some cmd
-    end
-  end.
-*)
+Definition find_function_entry (CFG:mcfg) (fid:function_id) : option function_entry :=
+  'dfn <- find_function CFG fid;
+  let cfg := df_instrs dfn in
+  'blk <- find_block (blks cfg) (init cfg);
+  mret (FunctionEntry (df_args dfn) (mk_pc fid (init cfg) (blk_entry_id blk))).  
+
+
 (*
 Definition code_of_definition (d:definition (list block)) (p:pt) : option cmd :=
   cmd_from_blocks p (df_instrs d).
@@ -176,7 +174,7 @@ Definition cfg_of_definition (g:list ident) (d:definition (list block)) : option
   'init <- init_of_definition d;
     let args := List.map (fun x => ID_Local x) (df_args d) in
     Some {| init := init;
-            blks := lookup_block (df_instrs d);
+            blks := df_instrs d;
             glbl := g++args;
          |}.
 
@@ -199,4 +197,8 @@ Definition mcfg_of_modul (m:modul (list block)) : option mcfg :=
     m_declarations := m_declarations m;
     m_definitions := defns
   |}.
+
+
+(*  ------------------------------------------------------------------------- *)
+
 

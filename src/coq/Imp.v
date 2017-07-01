@@ -1306,45 +1306,148 @@ Reserved Notation "c1 '/' st1 '==>' co '/' st2"
 Reserved Notation "c1 '/' st1 '==>' - '/' st2"
          (at level 40, st1 at level 39, st2 at level 38).
 
-Inductive ceval_small : com -> state -> (option com) -> state -> Prop :=
-| S_Skip : forall st,
-             SKIP / st ==> - / st
+Hint Constructors ceval.
 
-| S_Ass : forall st a1 n x,
+Inductive cont :=
+| KStop 
+| KSeq (c:com) (k:cont)
+.       
+
+Reserved Notation "c1 '/' k1 '/' st1 '==>' c2 '/' k2 '/' st2"
+         (at level 40, c2 at level 39, k1 at level 39, k2 at level 29, st1 at level 39, st2 at level 39).
+
+
+Inductive ceval_small : com -> cont -> state -> com -> cont -> state -> Prop :=
+| S_Skip : forall st c k,
+    SKIP / (KSeq c k) / st ==> c / k / st
+                  
+| S_Ass : forall st a1 n x k,
     aeval st a1 = n ->
-    (x ::= a1) / st ==> - / (t_update st x n)
+    (x ::= a1) / k / st ==> SKIP / k / (t_update st x n)
 
-| S_Seq1 : forall c1 c1' c2 st st',
-    c1 / st ==> c1' / st' ->
-    (c1 ;; c2) / st ==> (c1' ;; c2) / st'
+| S_Seq1 : forall c1 c2 k st st',
+    (c1 ;; c2) / k / st ==> c1 / KSeq c2 k / st'
 
-| S_Seq2 : forall c1 c2 st st',
-    c1 / st ==> - / st' ->
-    (c1 ;; c2) / st ==> c2 / st'
-
-| S_IfTrue : forall st b c1 c2,
+| S_IfTrue : forall st b k c1 c2,
     beval st b = true ->
-    (IFB b THEN c1 ELSE c2 FI) / st ==> c1 / st
+    (IFB b THEN c1 ELSE c2 FI) / k / st ==> c1 / k / st
 
-| S_IfFalse : forall st b c1 c2,
+| S_IfFalse : forall st b c1 c2 k,
     beval st b = false ->
-    (IFB b THEN c1 ELSE c2 FI) / st ==> c2 / st
+    (IFB b THEN c1 ELSE c2 FI) / k / st ==> c2 / k / st
 
-| S_WhileEnd : forall b st c,
+| S_WhileEnd : forall b st c k,
     beval st b = false ->
-    (WHILE b DO c END) / st ==> - / st
+    (WHILE b DO c END) / k / st ==> SKIP / k / st
 
-| S_WhileLoop : forall b st c,
+| S_WhileLoop : forall b st c k,
     beval st b = true ->
-    (WHILE b DO c END) / st ==> (c ;; WHILE b DO c END) / st
+    (WHILE b DO c END) / k / st ==> c / KSeq (WHILE b DO c END) k / st
                                
-  where "c1 '/' st1 '==>' co '/' st2" := (ceval_small c1 st1 (Some co) st2)
-  and "c1 '/' st1 '==>' - '/' st2"  := (ceval_small c1 st1 None st2)
+  where "c1 '/' k1 '/' st1 '==>' c2 '/' k2 '/' st2" := (ceval_small c1 k1 st1 c2 k2 st2)
 .             
+Hint Constructors ceval_small.
 
+(*
+Inductive ceval_small_N : nat -> com -> state -> state -> Prop :=
+| small0 : forall c st1 st2,
+    c / st1 ==> - / st2 ->
+    ceval_small_N 0 c st1 st2
+| smallS : forall n c1 c2 st1 st2 st3,
+    c1 / st1 ==> c2 / st2 ->
+    ceval_small_N n c2 st2 st3 ->
+    ceval_small_N (S n) c1 st1 st3
+.
+Hint Constructors ceval_small_N.
 
+Lemma ceval_small_seq : forall c1 c2 st1 st2 st3 n1 n2,
+    ceval_small_N n1 c1 st1 st2 ->
+    ceval_small_N n2 c2 st2 st3 ->
+    ceval_small_N (1+(n1+n2)) (c1 ;; c2) st1 st3.
+Proof.
+  intros c1 c2 st1 st2 st3 n1 n2 H12.
+  revert c2 st3 n2.
+  induction H12; intros c2' st3' n2' H23.
+  - simpl. eauto.
+  - apply smallS with (c2:=(c2;;c2'))(st2:=st2). apply S_Seq1. apply H.
+    apply IHceval_small_N. exact H23.
+Qed.    
 
+Lemma ceval_big_small : forall c st1 st2,
+    c / st1 \\ st2 -> exists n, ceval_small_N n c st1 st2.
+Proof.
+  intros c st1 st2 H.
+  induction H.
+  - exists 0; auto.
+  - exists 0; auto.
+  - destruct IHceval1 as [n1 Hsm1].
+    destruct IHceval2 as [n2 Hsm2].
+    exists (1+(n1+n2)). eapply ceval_small_seq; eauto.
+  - destruct IHceval as [n1 Hsm1].
+    exists (1+n1). eauto.
+  - destruct IHceval as [n1 Hsm1].
+    exists (1+n1). eauto.
+  - exists 0; auto.
+  - destruct IHceval1 as [n1 Hsm1].
+    destruct IHceval2 as [n2 Hsm2].
+    exists (2+(n1+n2)). eapply smallS. eauto.
+    eapply ceval_small_seq; eauto.
+Qed.
 
+Lemma ceval_assoc : forall c1 c2 c3 s s',
+    (c1 ;; (c2 ;; c3)) / s \\ s' <->
+    ((c1 ;; c2) ;; c3) / s \\ s'.
+Proof.
+  intros c1 c2 c3 s s'.
+  split; intros H.
+  - inversion H; subst.
+    inversion H5; subst.
+    eauto.
+  - inversion H; subst.
+    inversion H2; subst.
+    eauto.
+Qed.  
+
+Lemma ceval_small_big : forall c1 c2 c3 st1 st2 st3
+    (Hs : c1 / st1 ==> c2 / st2)
+    (Hbig : (c2 ;; c3) / st2 \\ st3),
+    (c1 ;; c3) / st1 \\ st3.
+Proof.
+  induction c1; intros c2 c3 st1 st2 st3 Hs Hbig; try solve [inversion Hs].
+  - inversion Hs; subst.
+    + apply ceval_assoc.
+      apply ceval_assoc in Hbig.
+      eapply IHc1_1. apply H4. apply Hbig.
+    + apply ceval_assoc.
+      inversion H4; subst.
+      * eapply E_Seq; eauto.
+      * eapply E_Seq; eauto. eauto.
+      * eapply E_Seq; eauto.
+  - inversion Hs; subst.
+    + inversion Hbig; subst.
+      eapply E_Seq; eauto.
+    + inversion Hbig; subst.
+      eapply E_Seq; eauto.
+  - inversion Hs; subst.
+    inversion Hbig; subst.
+    inversion H1. subst.
+    eapply E_Seq.
+    eapply E_WhileLoop; eauto. apply H5.
+Qed.    
+    
+Lemma ceval_small_N_ceval : forall n c st1 st2,
+    ceval_small_N n c st1 st2 -> c / st1 \\ st2.
+Proof.
+  intros n c st1 st2 H.
+  induction H.
+  - inversion H; subst; auto.
+  - inversion H; subst; auto.
+    eapply ceval_small_big; eauto.
+    inversion H4; subst; eapply E_Seq; eauto. eauto.
+    inversion IHceval_small_N. subst.
+    eapply E_WhileLoop; eauto.
+Qed.    
+*)
 
 (** The cost of defining evaluation as a relation instead of a
     function is that we now need to construct _proofs_ that some
