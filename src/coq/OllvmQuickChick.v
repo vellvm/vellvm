@@ -7,7 +7,6 @@ Require Import String.
 Require Import compcert.lib.Integers.
 Require Import Vellvm.Ollvm_ast.
 
-
 Instance gen_numeric_literal_string : Gen string :=
   {| arbitrary := bindGen (@arbitrarySized nat genNatSized 3)
                           (fun n => returnGen ("id" ++ show_nat n)%string) |}.
@@ -31,6 +30,7 @@ Derive Arbitrary for param_attr.
 Derive Show for param_attr.
 Derive Arbitrary for fn_attr.
 Derive Show for fn_attr.
+
 Derive Arbitrary for raw_id.
 Derive Show for raw_id.
 Derive Arbitrary for ident.
@@ -82,11 +82,11 @@ Instance gen_typ : GenSized typ :=
        fix generate_typ n :=
          let g := freq
                     [(5, bindGen gen_regular_typ_size (fun n => returnGen (TYPE_I n)));
+                       (*                       
                        (5, returnGen (TYPE_Void));
                        (5, returnGen (TYPE_Half));
                        (5, returnGen (TYPE_Float));
                        (5, returnGen (TYPE_Double));
-                       (*
                        (1, returnGen (TYPE_X86_fp80));
                        (1, returnGen (TYPE_Fp128));
                        (2, returnGen (TYPE_Metadata));
@@ -99,14 +99,14 @@ Instance gen_typ : GenSized typ :=
          match n with
          | 0 => g
          | S n' =>
-           freq [(5, liftGen TYPE_Pointer (generate_typ n'));
-                   (4, liftGen2 TYPE_Array gen_regular_typ_size (generate_typ n'));
-                   (4, liftGen2 TYPE_Function
+           freq [(0, liftGen TYPE_Pointer (generate_typ n'));
+                   (0, liftGen2 TYPE_Array gen_regular_typ_size (generate_typ n'));
+                   (0, liftGen2 TYPE_Function
                                 (generate_typ n')
                                 (listOf (generate_typ n'))) ;
-                   (4, liftGen TYPE_Struct (listOf (generate_typ n')));
-                   (4, liftGen TYPE_Packed_struct (listOf (generate_typ n')));
-                   (4, liftGen2 TYPE_Vector gen_regular_typ_size (generate_typ n'));
+                   (0, liftGen TYPE_Struct (listOf (generate_typ n')));
+                   (0, liftGen TYPE_Packed_struct (listOf (generate_typ n')));
+                   (0, liftGen2 TYPE_Vector gen_regular_typ_size (generate_typ n'));
                    (3, g)]
          end
   |}.
@@ -114,7 +114,7 @@ Instance gen_typ : GenSized typ :=
 (* Large types don't scale! *)
 Instance gen_small_typ : GenSized typ :=
   {| arbitrarySized n :=
-       if Nat.leb n 3 then (arbitrarySized n) else 
+       if Nat.leb n 2 then (arbitrarySized n) else 
          (arbitrarySized 3)
   |}.
 
@@ -156,6 +156,8 @@ Instance show_typ : Show typ :=
          end )%string
   |}.
 
+Derive Arbitrary for icmp.
+
 Instance show_icmp : Show icmp :=
   {| show cmp :=
        match cmp with 
@@ -171,8 +173,6 @@ Instance show_icmp : Show icmp :=
        | Sle => "sle"
        end
   |}.
-
-Derive Arbitrary for icmp.
 
 Derive Arbitrary for fcmp.
 Derive Show for fcmp.
@@ -193,23 +193,25 @@ Instance gen_static_value : GenSized Ollvm_ast.value :=
   {| arbitrarySized :=
        fix gen_sv n :=
          let g := freq [(5, liftGen VALUE_Ident arbitrary);
-                          (5, liftGen VALUE_Integer arbitrary);
+                          (5, liftGen VALUE_Integer arbitrary)
+                          (*
                           (5, liftGen VALUE_Float arbitrary);
                           (5, liftGen VALUE_Bool arbitrary);
                           (5, returnGen VALUE_Null);
                           (3, returnGen VALUE_Zero_initializer);
                           (5, liftGen VALUE_Cstring arbitrary);
                           (1, returnGen VALUE_None);
-                          (1, returnGen VALUE_Undef)]
+                          (1, returnGen VALUE_Undef) *)]
          in
          match n with
          | 0 => liftGen SV g
          | S n' =>
            let next_g :=
-               freq [(5, liftGen VALUE_Struct (listOf (liftGen2 pair arbitrary (gen_sv n'))));
-                       (5, liftGen VALUE_Struct (listOf (liftGen2 pair arbitrary (gen_sv n'))));
+               freq [(* (5, liftGen VALUE_Struct (listOf (liftGen2 pair arbitrary (gen_sv n'))));
+                       (5, liftGen VALUE_Struct (listOf (liftGen2 pair arbitrary (gen_sv n')))); *)
                        (5, liftGen4 OP_IBinop arbitrary arbitrary (gen_sv n') (gen_sv n'));
-                       (5, liftGen4 OP_ICmp arbitrary arbitrary (gen_sv n') (gen_sv n'));
+                       (5, liftGen4 OP_ICmp arbitrary arbitrary (gen_sv n') (gen_sv n'))
+                       (*
                        (5, liftGen4 OP_Conversion arbitrary arbitrary (gen_sv n') arbitrary);
                        (5, liftGen3 OP_GetElementPtr
                                     arbitrary
@@ -222,10 +224,10 @@ Instance gen_static_value : GenSized Ollvm_ast.value :=
                                     (liftGen2 pair arbitrary (gen_sv n'))
                                     (liftGen2 pair arbitrary (gen_sv n'))
                                     (liftGen2 pair arbitrary (gen_sv n')));
-                       (* (2, liftGen3 OP_ShuffleVector
+                       (2, liftGen3 OP_ShuffleVector
                                     (liftGen2 pair arbitrary (gen_sv n'))
                                     (liftGen2 pair arbitrary (gen_sv n'))
-                                    (liftGen2 pair arbitrary (gen_sv n'))); *)
+                                    (liftGen2 pair arbitrary (gen_sv n')));
                        (5, liftGen2 OP_ExtractValue
                                     (liftGen2 pair arbitrary (gen_sv n'))
                                     arbitrary);
@@ -237,6 +239,7 @@ Instance gen_static_value : GenSized Ollvm_ast.value :=
                                     (liftGen2 pair arbitrary (gen_sv n'))
                                     (liftGen2 pair arbitrary (gen_sv n'))
                                     (liftGen2 pair arbitrary (gen_sv n')))
+                       *)
                     ]
            in
            freq [(3, liftGen SV next_g); (1, liftGen SV g)]
@@ -340,8 +343,88 @@ Remove Hints gen_static_value : typeclass_instances.
 
 (* Sample (@arbitrary Ollvm_ast.value _). *)
 
+Instance gen_tvalue : GenSized tvalue.
+Proof. unfold tvalue. auto with typeclass_instances. Defined.
 
-(**** Instr ****)
+Instance show_tvalue : Show tvalue.
+Proof. unfold tvalue. auto with typeclass_instances. Defined.
+
+Derive Arbitrary for instr_id.
+Derive Show for instr_id.
+Derive Arbitrary for phi.
+Derive Show for phi.
+
+(******** Instr ********)
 
 Derive Arbitrary for instr.
 Derive Show for instr.
+
+
+(******** End of Instr ********)
+(******** Terminator ********)
+
+Derive Arbitrary for terminator.
+Derive Show for terminator.
+
+(******** End of Terminator ********)
+
+Derive Arbitrary for thread_local_storage.
+Derive Show for thread_local_storage.
+
+Derive Arbitrary for global.
+Derive Show for global.
+
+(******** Declaration ********)
+
+Derive Arbitrary for declaration.
+Derive Show for declaration.
+
+(* Sample (@arbitrary declaration _). *)
+
+(******** End of Declaration ********)
+
+(******** Code ********)
+
+Instance gen_code : Gen code.
+Proof. unfold code. auto with typeclass_instances. Defined.
+
+(* Sample (@arbitrary code _). *)
+
+(******** End of Code ********)
+
+(******** Block ********)
+
+Derive Arbitrary for block.
+Derive Show for block.
+
+(******** End of Block ********)
+
+
+Instance gen_metadata : GenSized metadata :=
+  {| arbitrarySized :=
+       let g := freq [(5, liftGen METADATA_Const arbitrary);
+                      (2, returnGen METADATA_Null);
+                      (5, liftGen METADATA_Id arbitrary);
+                      (5, liftGen METADATA_String arbitrary)] in
+       let fix gen_md n :=
+           match n with
+           | 0 => g
+           | S n' =>
+             freq [(5, liftGen METADATA_Node (vectorOf n' (gen_md n')));
+                   (5, liftGen METADATA_Named (vectorOf n' arbitrary));
+                   (2, g)]
+           end in
+       gen_md
+  |}.
+
+Instance shrink_metadata : Shrink metadata :=
+  {| shrink x := [] |}.
+
+
+
+
+
+
+
+
+

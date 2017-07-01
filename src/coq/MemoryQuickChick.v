@@ -62,14 +62,14 @@ Existing Instance show_i64.
 
 Fixpoint gen_dvalue (n : nat) : G dvalue :=
   let g_expr := freq [(5, liftGen VALUE_Ident arbitrary);
-                        (5, liftGen VALUE_Integer arbitrary);
-                        (5, liftGen VALUE_Float arbitrary);
+                        (5, liftGen VALUE_Integer arbitrary)
+                        (* (5, liftGen VALUE_Float arbitrary);
                         (5, liftGen VALUE_Bool arbitrary);
                         (5, returnGen VALUE_Null);
                         (3, returnGen VALUE_Zero_initializer);
                         (5, liftGen VALUE_Cstring arbitrary);
                         (1, returnGen VALUE_None);
-                        (1, returnGen VALUE_Undef)] in
+                        (1, returnGen VALUE_Undef) *)] in
   let g_base := freq [(5, liftGen DVALUE_CodePointer arbitrary);
                         (5, liftGen DVALUE_Addr arbitrary);
                         (5, liftGen DVALUE_I1 arbitrary);
@@ -81,10 +81,11 @@ Fixpoint gen_dvalue (n : nat) : G dvalue :=
   | 0 => freq [(5, liftGen DV g_expr); (5, g_base)]
   | S n' =>
     let next_g :=
-        freq [(5, liftGen VALUE_Struct (listOf (liftGen2 pair arbitrary (gen_dvalue n'))));
+        freq [(* (5, liftGen VALUE_Struct (listOf (liftGen2 pair arbitrary (gen_dvalue n')))); *)
                 (5, liftGen4 OP_IBinop arbitrary arbitrary (gen_dvalue n') (gen_dvalue n'));
                 (5, liftGen4 OP_ICmp arbitrary arbitrary (gen_dvalue n') (gen_dvalue n'));
-                (5, liftGen4 OP_Conversion arbitrary arbitrary (gen_dvalue n') arbitrary);
+                (5, liftGen4 OP_Conversion arbitrary arbitrary (gen_dvalue n') arbitrary)
+                (*
                 (5, liftGen3 OP_GetElementPtr
                              arbitrary
                              (liftGen2 pair arbitrary (gen_dvalue n'))
@@ -96,10 +97,10 @@ Fixpoint gen_dvalue (n : nat) : G dvalue :=
                              (liftGen2 pair arbitrary (gen_dvalue n'))
                              (liftGen2 pair arbitrary (gen_dvalue n'))
                              (liftGen2 pair arbitrary (gen_dvalue n')));
-                (* (2, liftGen3 OP_ShuffleVector
-                                    (liftGen2 pair arbitrary (gen_dvalue n'))
-                                    (liftGen2 pair arbitrary (gen_dvalue n'))
-                                    (liftGen2 pair arbitrary (gen_dvalue n'))); *)
+                (2, liftGen3 OP_ShuffleVector
+                             (liftGen2 pair arbitrary (gen_dvalue n'))
+                             (liftGen2 pair arbitrary (gen_dvalue n'))
+                             (liftGen2 pair arbitrary (gen_dvalue n')));
                 (5, liftGen2 OP_ExtractValue
                              (liftGen2 pair arbitrary (gen_dvalue n'))
                              arbitrary);
@@ -110,7 +111,7 @@ Fixpoint gen_dvalue (n : nat) : G dvalue :=
                 (5, liftGen3 OP_Select
                              (liftGen2 pair arbitrary (gen_dvalue n'))
                              (liftGen2 pair arbitrary (gen_dvalue n'))
-                             (liftGen2 pair arbitrary (gen_dvalue n')))
+                             (liftGen2 pair arbitrary (gen_dvalue n'))) *)
              ]
     in
     freq [(3, liftGen DV next_g); (1, liftGen DV g_expr)]
@@ -220,3 +221,32 @@ Instance gen_small_env : GenSized env :=
        if leb n 2 then vectorOf n arbitrary else
          vectorOf n arbitrary
   |}.
+
+Instance gen_small_global_env : GenSized genv :=
+  {| arbitrarySized n :=
+       if leb n 2 then vectorOf n arbitrary else
+         vectorOf n arbitrary
+  |}.
+
+Instance shrink_env : Shrink env :=
+  {| shrink x := [] |}.
+
+Instance shrink_genv : Shrink genv :=
+  {| shrink x := [] |}.
+
+Derive Arbitrary for pc.
+Derive Show for pc.
+
+(* Sample (@arbitrary pc _). type abbreviation cyclic? *)
+
+Derive Arbitrary for frame.
+Derive Show for frame.
+
+Instance gen_small_stack : GenSized stack :=
+  {| arbitrarySized n :=
+       if leb n 2 then vectorOf n arbitrary else
+         vectorOf n arbitrary
+  |}.
+
+Instance gen_state : GenSized state.
+Proof. unfold state. auto with typeclass_instances. Defined.
