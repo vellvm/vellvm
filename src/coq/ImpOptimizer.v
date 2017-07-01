@@ -75,7 +75,10 @@ Definition fold_constants_aexp_ok (a : aexp) :=
 Existing Instance gen_small_nonneg_i64.
 Existing Instance genSaexp.
 
-(*! QuickChick (forAll arbitrary fold_constants_aexp_ok). *)
+Definition test_fold_constants :=
+  forAll arbitrary fold_constants_aexp_ok.
+
+(*! QuickChick test_fold_constants. *)
 
 Remove Hints gen_small_nonneg_i64 : typeclass_instances.
 Remove Hints genSaexp : typeclass_instances.

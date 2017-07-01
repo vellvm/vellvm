@@ -408,7 +408,10 @@ Existing Instance gen_bexp_with_small_aexp.
 Existing Instance gen_adhoc_aexp.
 Existing Instance gen_small_nonneg_i64.
 
-(*! QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
+Definition test_single_assignment_nonneg_no_minus :=
+  forAll (arbitrarySized 0) imp_compiler_correct_aux.
+
+(*! QuickChick test_single_assignment_nonneg_no_minus. *)
 (* Shrinking is slow: 
    QuickChick (forAllShrink (arbitrarySized 0) shrink imp_compiler_correct_aux).
  *)
@@ -444,10 +447,6 @@ Compute (debug prog_literal3 8).
 Compute (debug prog_literal3 9).
 *)
 
-(* QuickChick (forAll (arbitrarySized 0) check_imp_compiler_correct_with_stats). *)
-
-(*! QuickChick (forAll (arbitrarySized 0) imp_compiler_correct_aux). *)
-
 Remove Hints gen_seq_and_assgn_com : typeclass_instances.
 Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
 Remove Hints gen_adhoc_aexp : typeclass_instances.
@@ -462,7 +461,10 @@ Existing Instance gen_bexp_with_small_aexp.
 Existing Instance gen_adhoc_aexp.
 Existing Instance gen_small_nonneg_i64.
 
-(*! QuickChick (forAll (arbitrarySized 8) imp_compiler_correct_aux). *)
+Definition test_multiple_assignments_nonneg_no_minus :=
+  forAll (arbitrarySized 8) imp_compiler_correct_aux.
+
+(*! QuickChick test_multiple_assignments_nonneg_no_minus. *)
 
 Remove Hints gen_seq_and_assgn_com : typeclass_instances.
 Remove Hints gen_bexp_with_small_aexp : typeclass_instances.
@@ -550,7 +552,9 @@ Compute (run_imp_compiler_correct prog_xor_false3).
 
 (* QuickChick (forAllShrink (arbitrarySized 1) shrink imp_compiler_correct_aux). *)
 
-(*! QuickChick (forAll (arbitrarySized 8) imp_compiler_correct_aux). *)
+Definition test_if := forAll (arbitrarySized 8) imp_compiler_correct_aux.
+
+(*! QuickChick test_if. *)
 
 (*
 Compile command: ocamlopt -rectypes -w a -I /tmp -I <>/.opam/4.03.0/lib/coq/user-contrib/QuickChick <>/.opam/4.03.0/lib/coq/user-contrib/QuickChick/quickChickLib.cmx /tmp/QuickChick94353c.ml -o /tmp/QuickChick94353c
@@ -576,9 +580,14 @@ Existing Instance gen_small_nonneg_i64.
 
 (* Sample (@arbitrarySized com gen_while_com 3). *)
 (**! QuickChick (forAllShrink (arbitrarySized 8) shrink imp_compiler_correct_aux). *)
-(*! QuickChick (forAll (arbitrarySized 6) check_imp_compiler_correct_with_stats). *)
 
+Definition test_while := forAll (arbitrarySized 6) check_imp_compiler_correct_with_stats.
+
+(*! QuickChick test_while. *)
+
+(*
 Definition test_term := QuickChick.Test.quickCheck (forAll (arbitrarySized 6) check_imp_compiler_correct_with_stats).
+ *)
 
 (* Separate Extraction *)
 
