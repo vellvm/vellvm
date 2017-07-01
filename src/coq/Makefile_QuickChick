@@ -1,0 +1,47 @@
+# Coq sources
+COQLIBDIR = ../../../lib
+
+# OCaml sources
+
+COQINCLUDES=-R . Vellvm -R $(COQLIBDIR)/paco/src Paco -R $(COQLIBDIR)/CompCert compcert
+COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
+COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
+
+QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick
+IMPCOQFILES := Maps Imp ImpCEvalFun Compiler CompilerProp ImpCorrectness ImpOptimizer ImpCorrectnessTest
+COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality $(IMPCOQFILES) $(QUICKCHICKFILES) QuickChickTop
+OLLVMFILES := 
+
+VFILES := $(COQFILES:%=%.v)
+VOFILES := $(COQFILES:%=%.vo)
+
+all: _CoqProject
+	@test -f .depend || $(MAKE) depend
+	$(MAKE) coq
+
+coq: $(VOFILES)
+
+%.vo: %.v
+	@rm -f doc/$(*F).glob
+	@echo "$(COQC) $*.v"
+	@$(COQC) $*.v
+
+depend: $(VFILES) 
+	@echo "Analyzing Coq dependencies"
+	@$(COQDEP) $^ > .depend
+
+.PHONY: clean
+
+print-includes:
+	@echo $(COQINCLUDES)
+
+clean:
+	rm -f .depend
+	rm -f $(VOFILES)
+	rm -rf doc/*.glob
+	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
+	ocamlbuild -clean
+	rm -rf output
+	rm -f vellvm
+
+-include .depend
