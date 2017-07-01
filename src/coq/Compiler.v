@@ -290,12 +290,8 @@ Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
       mret (local lid)
   in
   match b with
-  | BTrue     => 
-    'lid <- comp Eq (val_of_int64 (Int64.repr 0)) (val_of_int64 (Int64.repr 0));
-    mret (local lid)
-  | BFalse    => 
-    'lid <- comp Eq (val_of_int64 (Int64.repr 1)) (val_of_int64 (Int64.repr 0));
-    mret (local lid)
+  | BTrue     => mret (val_of_int1 (Int1.repr 1))
+  | BFalse    => mret (val_of_int1 (Int1.repr 0))
   | BEq a1 a2 => compile_icmp Eq a1 a2
   | BLe a1 a2 => compile_icmp Sle a1 a2
   | BNot b =>
