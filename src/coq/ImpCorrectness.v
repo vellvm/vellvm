@@ -340,6 +340,12 @@ Inductive step_star (CFG:mcfg) (R : SS.state -> memory -> Prop) : SS.state -> me
       (HM : mem_step e m = inr (m', v, k))
       (Hstep : step_star CFG R (k v) m'),
       step_star CFG R s m
+
+| step_jump :
+    forall s m s'
+      (HS : stepD CFG s = Jump s')
+      (IH : step_star CFG R s' m),
+      step_star CFG R s m
 .
 
 Lemma step_star_app :
@@ -353,8 +359,8 @@ Proof.
   induction HS1; intros R2 HS2; eauto.
   - eapply step_tau; eauto.
   - eapply step_eff; eauto.
+  - eapply step_jump; eauto.
 Qed.    
-
     
 (*
 (* AstProp.v *)
@@ -678,9 +684,9 @@ Ltac exploit_CFG_code :=
             let PC := fresh "pc" in
             let HL := fresh "HL" in
             let HR := fresh "HR" in
-            destruct H as [[HC H] | [[HC H] | [PC [HL HR]]]]; simplify_lists
+            destruct H as [PC [HL HR]]; simplify_lists
 
-          | [H : CFG_has_code_at _ _ _ [] |- _] => inversion H
+          | [H : CFG_has_code_at _ _ _ [] |- _] => inversion_clear H
 
           | [H : CFG_has_code_at _ _ _ (?X::_) |- _] => inversion_clear H
           end).
@@ -710,6 +716,7 @@ Ltac weakening :=
           | [ H : ?E |- ?E ] => assumption
           | [ H : env_lt ?N ?E |- env_lt ?M ?E ] => eapply env_lt_weaken; [exact H | omega]
           | [ |- env_lt _ (add_env _ _ _) ] => apply env_lt_cons; [omega | weakening]
+          | [ |- env_extends ?E ?E ] => eapply env_extends_refl
           | [ |- env_extends ?E1 (add_env _ _ ?E1) ] => apply env_extends_lt; weakening
           | [ H : env_extends ?E1 ?E2 |- env_extends ?E1 ?E3 ] => apply (env_extends_trans E1 E2 E3); weakening
           | [ H : memory_invariant ?G ?E ?MEM ?S  |- memory_invariant ?G (add_env _ _ ?E) ?MEM ?S ] =>
@@ -748,14 +755,11 @@ Lemma compile_aexp_correct :
     (e:env)
     (mem:memory) (Hlt:env_lt n e)
     (HM: memory_invariant g e mem st),
-        (c_a = [] /\ Rv64e (eval_op e (Some (TYPE_I 64)) v) ans)
-        \/
-        (c_a <> []) /\
-        forall (CFG : mcfg) (p:pc) (k:stack) (p':pc)
-          (HCFG: CFG_has_code_at CFG (fun pc => pc = p') p (List.rev c_a)),
+        forall (CFG : mcfg) (p:pc) (k:stack) (P:pc -> Prop)
+          (HCFG: CFG_has_code_at CFG P p (List.rev c_a)),
           step_star CFG
                     (fun '(pc', e', k') mem' =>
-                       pc' = p' /\
+                       P pc' /\
                        memory_invariant g e' mem' st /\
                        Rv64e (eval_op e' (Some (TYPE_I 64)) v) ans /\
                        env_extends e e' /\
@@ -771,8 +775,12 @@ Proof.
     exists []. exists [].
     repeat split; auto.
     + intros e mem Hlt HM.
-      left.
-      repeat split; auto; rewrite Int64.repr_signed; auto.
+      intros CFG p k P HCFG.
+      simpl in HCFG.
+      exploit_CFG_code.
+      eapply step_zero.
+      repeat split; auto.  rewrite Int64.repr_signed; auto.
+      weakening.
 
   - unfold trywith in Hcomp.
     remember (g id) as X.
@@ -780,110 +788,86 @@ Proof.
     exists [I (IId (lid_of_Z n)) (INSTR_Load false i64 (i64ptr, v0) None)].
     exists [(IId (lid_of_Z n), (INSTR_Load false i64 (i64ptr, v0) None))].
     simpl. repeat split; auto.
-    * intros e mem Hlt Hmem.
-      right.
-      split; auto.
-      intros CFG p k p' Hcode.
-      exploit_CFG_code.
+    intros e mem Hlt Hmem.
+    intros CFG p k P HCFG.
+    exploit_CFG_code.
 
-    + destruct (Hmem id v0) as [nv [Hv [a [Ha Hr]]]]; auto. subst.
-      eapply step_eff.
-      simplify_step. 
-      reflexivity.
-      simpl. reflexivity.
+    destruct (Hmem id v0) as [nv [Hv [a [Ha Hr]]]]; auto. subst.
+    eapply step_eff.
+    simplify_step. 
+    reflexivity.
+    simpl. reflexivity.
       
-      apply step_zero.
-      repeat split; auto; weakening.
-      unfold eval_expr; simpl. rewrite lookup_env_hd; eauto. 
+    apply step_zero.
+    repeat split; auto; weakening.
+    unfold eval_expr; simpl. rewrite lookup_env_hd; eauto. 
 
   - instantiate_H.
     intros e mem Hlt HM.
-    right. split; auto.
-    intros CFG p k p' HCFG.
+    intros CFG p k P HCFG.
     normalize_lists.
     exploit_CFG_code.
 
-    * subst.
-      eapply step_tau.
-      (* HF: fetch CFG p = Some (CFG.Step (Instr_Op _ _ _ _)) |- step_star CFG _ (p, _, _) _ *)
-      simplify_step.
+    eapply step_star_app.
+    eapply IHHAexp1; weakening; eauto.
+    intros [[pc1 e1] k1] mem1 [Hpc1 [Hmem1 [Heval1 [Hext1 [Hlt1 Hk1]]]]].
+    subst.
+    eapply step_star_app.
+    eapply IHHAexp2; weakening; eauto.
+    intros [[pc2 e2] k2] mem2 [Hpc2 [Hmem2 [Heval2 [Hext2 [Hlt2 Hk2]]]]].    
+    subst;
+    eapply step_tau;
+    simplify_step.
+    reflexivity.
 
-      (* H : context[eval_op E (Some T) V] *)
-      specialize_IH IHHAexp1 e mem.
-      simplify_step.
+    eapply step_zero.
+    repeat split; auto; weakening.
+    simpl. unfold eval_expr. simpl. rewrite lookup_env_hd. eauto.
       
-      specialize_IH IHHAexp2 e mem.
-      simplify_step.
-      reflexivity.
+  - instantiate_H.
+    intros e mem Hlt HM.
+    intros CFG p k P HCFG.
+    normalize_lists.
+    exploit_CFG_code.
 
-      (* |- step_star CFG (fun _ _ => _ = PC /\ _) (PC, _, _) _ *)
-      
-      eapply step_zero;
-      repeat split; auto; weakening;
-      simpl; unfold eval_expr; simpl; rewrite lookup_env_hd; eauto.
+    eapply step_star_app.
+    eapply IHHAexp1; weakening; eauto.
+    intros [[pc1 e1] k1] mem1 [Hpc1 [Hmem1 [Heval1 [Hext1 [Hlt1 Hk1]]]]].
+    subst.
+    eapply step_star_app.
+    eapply IHHAexp2; weakening; eauto.
+    intros [[pc2 e2] k2] mem2 [Hpc2 [Hmem2 [Heval2 [Hext2 [Hlt2 Hk2]]]]].    
+    subst;
+    eapply step_tau;
+    simplify_step.
+    reflexivity.
 
-    * subst.
+    eapply step_zero.
+    repeat split; auto; weakening.
+    simpl. unfold eval_expr. simpl. rewrite lookup_env_hd. eauto.
 
-      specialize_IH IHHAexp1 e mem.
-      specialize_IH IHHAexp2 e mem.
+  - instantiate_H.
+    intros e mem Hlt HM.
+    intros CFG p k P HCFG.
+    normalize_lists.
+    exploit_CFG_code.
 
-      eapply step_star_app.
-      eapply K with (p':=pc); eauto.
-      intros [[pc2 e2] k2] mem2 [Hpc2 [Hmem2 [Heval2 [Hext2 [Hlt2 Hk2]]]]].
-      
-      subst;
-      eapply step_tau;
-      simplify_step.
-      reflexivity.
+    eapply step_star_app.
+    eapply IHHAexp1; weakening; eauto.
+    intros [[pc1 e1] k1] mem1 [Hpc1 [Hmem1 [Heval1 [Hext1 [Hlt1 Hk1]]]]].
+    subst.
+    eapply step_star_app.
+    eapply IHHAexp2; weakening; eauto.
+    intros [[pc2 e2] k2] mem2 [Hpc2 [Hmem2 [Heval2 [Hext2 [Hlt2 Hk2]]]]].    
+    subst;
+    eapply step_tau;
+    simplify_step.
+    reflexivity.
 
-      eapply step_zero.
-      repeat split; auto; weakening.
-      simpl. unfold eval_expr. simpl. rewrite lookup_env_hd. eauto.
-
-
-    * specialize_IH IHHAexp1 e mem.
-
-      eapply step_star_app.
-      eapply K with (p':=pc); eauto.
-      intros [[pc1 e1] k1] mem1 [Hpc1 [Hmem1 [Heval1 [Hext1 [Hlt1 Hk1]]]]].
-
-      specialize_IH IHHAexp2 e1 mem1.
-      
-      subst;
-      eapply step_tau;
-      simplify_step.
-      reflexivity.
-
-      eapply step_zero.
-      repeat split; auto; weakening.
-      simpl. unfold eval_expr. simpl. rewrite lookup_env_hd. auto.
-      
-      
-    * specialize_IH IHHAexp1 e mem.
-      
-      eapply step_star_app.
-      eapply K with (p':=pc); eauto.
-      intros [[pc1 e1] k1] mem1 [Hpc1 [Hmem1 [Heval1 [Hext1 [Hlt1 Hk1]]]]].
-
-      specialize_IH IHHAexp2 e1 mem1.
-
-      eapply step_star_app.
-      eapply K0 with (p':=pc0); eauto.
-      intros [[pc2 e2] k2] mem2 [Hpc2 [Hmem2 [Heval2 [Hext2 [Hlt2 Hk2]]]]].
-
-      subst;
-      eapply step_tau;
-      simplify_step.
-      reflexivity.
-
-      eapply step_zero.
-      repeat split; auto; weakening.
-      simpl. unfold eval_expr. simpl. rewrite lookup_env_hd. eauto.
-
-      
-  - admit. (* Same as previous *)
-  - admit. (* Same as previous *)
-Admitted.    
+    eapply step_zero.
+    repeat split; auto; weakening.
+    simpl. unfold eval_expr. simpl. rewrite lookup_env_hd. eauto.
+Qed.
 
 
 Lemma compile_bexp_correct :
@@ -904,14 +888,11 @@ Lemma compile_bexp_correct :
     (e:env)
     (mem:memory) (Hlt:env_lt n e)
     (HM: memory_invariant g e mem st),
-        (c_a = [] /\ Rv1e (eval_op e (Some (TYPE_I 1)) v) ans)
-        \/
-        (c_a <> []) /\
-        forall (CFG : mcfg) (p:pc) (k:stack) (p':pc)
-          (HCFG: CFG_has_code_at CFG (fun pc => pc = p') p (List.rev c_a)),
+        forall (CFG : mcfg) (p:pc) (k:stack) (P:pc -> Prop)
+          (HCFG: CFG_has_code_at CFG P p (List.rev c_a)),
           step_star CFG
                     (fun '(pc', e', k') mem' =>
-                       pc' = p' /\
+                       P pc' /\
                        memory_invariant g e' mem' st /\
                        Rv1e (eval_op e' (Some (TYPE_I 1)) v) ans /\
                        env_extends e e' /\
@@ -923,57 +904,21 @@ Admitted.
 
 
 
-
-(*
-Inductive cfg_has_blocks (CFG:mcfg) (fn:function_id) (bs:list Ollvm_ast.block) : Prop :=
-| cfg_has_blocks_intro :
-    forall bid b fdef 
-      (Hblk: lookup_block bs bid = Some b)
-      (Hfind: find_function CFG fn = Some fdef)
-      (Hlookup: (blks (df_instrs fdef) bid) = Some b),
-      cfg_has_blocks CFG fn bs.
-
-Inductive related_pc : com -> Imp.cont -> Ollvm_ast.block -> Prop := 
-| related_pc_done: forall bid vid, related_pc SKIP KStop (mk_block bid [] [] (IVoid vid, TERM_Ret_void))
-| related_pc_next:
-    forall c k blk
-    (HR:related_pc c k blk),
-    related_pc SKIP (KSeq c k) blk
-| related_nontriv:
-    forall c k g n m cd n' m' cd'
-      (Hc: c <> SKIP)
-      (Hcomp: compile_com g c (n,m,cd) = ((n',m',cd'), inr()))
-      cd_a
-      (Hcd: cd' = cd_a ++ cd)
-      bid term blk blks
-      (Hb: blocks_of_elts bid cd_a (IVoid m', term) = inr (blk::blks)),
-      related_pc c k blk.
-               
-
-Definition CFG_has_compilation_of CFG fn g c :=
+Definition CFG_has_compilation_of CFG fid g cmd :=
   exists n m cd cd_c n' m' cd' bid term blks,
-    compile_com g c (n,m,cd) = ((n',m',cd'), inr ())
+    compile_com g cmd (n,m,cd) = ((n',m',cd'), inr ())
     /\ cd' = cd_c ++ cd
     /\ blocks_of_elts bid cd_c (IVoid m', term) = inr blks
-    /\ cfg_has_blocks CFG fn blks.
-                                   
-  
-Inductive related_configuration (g:ctxt) (cmd:com) (k:Imp.cont) (st:state) (fn:function_id) s mem : Prop :=
-| rc_intro:
-    forall
-    (Hmem:memory_invariant g (env_of s) mem st)
-    blk
-    (Hpc: (pc_of s) = mk_pc fn blk)
-    (HR: related_pc cmd k blk),
-      related_configuration g cmd k st fn s mem.
-
+    /\ CFG_fun_has_blocks CFG fid blks.
+               
+(*
 Lemma compile_com_correct :
-  forall (cmd:com) (k:Imp.cont) (st:Imp.st) cmd' k' st'
-    (HStep: cmd / k / st ==> cmd / k / st')
+  forall (cmd:com) (k:Imp.cont) (st:Imp.state) cmd' k' st'
+    (HStep: cmd / k / st ==> cmd' / k' / st')
     (g:ctxt) (CFG:mcfg) (fn:function_id)
     s mem
     (Hrelated: related_configuration g cmd k st fn s mem),
-    step_code2 CFG (fun s' mem' =>
+    step_star CFG (fun s' mem' =>
                       let '(pc', e', k') := s' in
                       related_configuration g cmd' st' fn s' mem'
                    )
