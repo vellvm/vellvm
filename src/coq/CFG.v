@@ -14,9 +14,7 @@ Require Import Vellvm.Classes.
 Require Import Vellvm.Util.
 Import ListNotations.
 
-(* program counter is a function plus instruction id ------------------------ *)
-
-
+(* program counter denotes an instruction with a block of a function -------- *)
 Record pc :=
   mk_pc {
       fn : function_id;
