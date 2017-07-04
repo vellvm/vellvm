@@ -30,47 +30,6 @@ Module Int1 := Make(Wordsize1).
 
 Definition int1 := Int1.int.
 
-(* "Flattened" representation of Vellvm code *)
-Inductive elt :=
-| L (lbl:block_id)
-| I (id:instr_id) (ins:instr)
-| T (id:instr_id) (t:terminator)
-.    
-
-Instance string_of_elt : StringOf elt :=
-  fun elt =>
-    match elt with
-    | L lbl => ("Block " ++ (string_of lbl) ++ ": ")%string
-    | I id ins => ("Instr " ++ (string_of id) ++ ": " ++ (string_of ins))%string
-    | T id t => ("Terminator " ++ (string_of id) ++ ": " ++ (string_of t))%string
-    end.
-
-
-Definition blocks_of_elts (entry_label:block_id) (code:list elt) (term:instr_id * terminator) : err (list block) :=
-  '(insns, term_opt, blks) <-
-   monad_fold_right
-   (fun '(insns, term_opt, blks) e =>
-      match e with
-      | L l =>
-        match term_opt with
-        | None => 
-          if (List.length insns) == 0%nat then mret ([], None, blks)
-          else failwith "terminator not found"
-        | Some tm =>
-          mret ([], None, (mk_block l [] insns tm)::blks)
-        end
-      | T id t  => mret ([], Some (id, t), blks)
-      | I uid insn => mret ((uid,insn)::insns, term_opt, blks)
-      end
-   ) code ([], Some term, []) 
-  ;
-    match term_opt with
-    | None => failwith "terminator not found"
-    | Some tm =>
-      mret ((mk_block entry_label [] insns tm) :: blks)
-    end.
-
-
 (* Auxilliary definitions for working with Identifiers ---------------------- *)
 
 Module IDDec <: MiniDecidableType.
@@ -123,85 +82,11 @@ Fixpoint fv_com (c:com) : IDSet.t :=
   end.
 Instance FV_com : FV com := fv_com.
 
-(* LLVM Identifier generation monad ----------------------------------------- *)
+(* LLVM values -------------------------------------------------------------- *)
 
-Definition LLVM A := ST (int * int * list elt) (err A).
-
-Definition llvm_map (A B:Type) (f:A->B) (g:LLVM A) : LLVM B :=
-  fun s =>
-    let '(st, x) := g s in
-    match x with
-    | inl e  => (st, inl e)
-    | inr a => (st, inr (f a))
-    end.
-
-Instance llvm_functor : @Functor LLVM := llvm_map.
-
-Definition llvm_ret (A:Type) (x:A) : LLVM A :=
-  fun s => (s, inr x).
-Hint Unfold llvm_ret.
-
-
-Definition llvm_bind (A B:Type) (g:LLVM A) (f:A -> LLVM B) : LLVM B :=
-  fun s =>
-    let '(st, x) := g s in
-    match x with
-    | inl e => (st, inl e)
-    | inr a => (f a) st
-    end.
-Hint Unfold llvm_bind.
-Program Instance llvm_monad : (@Monad LLVM) llvm_functor := _.
-Next Obligation.
-  split.
-  - exact llvm_ret.
-  - exact llvm_bind.
-Defined.    
-
-Instance llvm_err : (@ExceptionMonad string LLVM _ _) := fun _ e => fun s => (s, inl e).
-Hint Unfold llvm_err.
-
-(* Start the counters at 1 so that 0 can be used at the toplevel *)
-Definition run {A} (g : LLVM A) : err (A * list block) :=
-  let '((_,m,c), x) := g (1,1,[])%Z in
-  match x with
-  | inl e => inl e
-  | inr a =>
-    'blocks <- blocks_of_elts (Anon 0%Z) (List.rev c) (IVoid m, TERM_Ret_void);
-    mret (a, blocks)
-  end.
-
-Definition lift {A} (e:string) (m:option A) : LLVM A :=
-  fun s => (s, trywith e m).
-Hint Unfold lift.
-
-Definition lid_of_Z (n:int) : local_id := Raw n.
-
-Lemma lid_of_Z_inj: forall n1 n2, n1 <> n2 -> lid_of_Z n1 <> lid_of_Z n2.
-Proof.
-  intros. unfold lid_of_Z. unfold not. intros. apply H. inversion H0. reflexivity.
-Qed.
-
-Lemma lid_of_Z_inj2: forall n1 n2, lid_of_Z n1 = lid_of_Z n2 -> n1 = n2.
-Proof.
-  intros n1 n2 H.
-  inversion H.
-  reflexivity.
-Qed.  
-
-Definition genlabel : () -> LLVM (local_id) :=
-  fun _ => fun '(n,m,c) => ((1+n,m,c), mret (lid_of_Z n))%Z.
-Hint Unfold genlabel.
-
-Definition genvoid : () -> LLVM (instr_id) :=
-  fun _ => fun '(n,m,c) => ((n,1+m,c), mret (IVoid m))%Z.
-Hint Unfold genvoid.
-
-(* A context maps Imp variables to Vellvm identifiers
-   Invariant: 
-      storage space for an Imp variable is represented as an alloca'ed 
-      ctxt (Id X) is the pointer to the storage for X.
-*)
-Definition ctxt := partial_map value.
+Definition i1 := TYPE_I (1)%Z.
+Definition i64 := TYPE_I (64)%Z.
+Definition i64ptr := TYPE_Pointer i64.
 
 Definition val_of_nat (n:nat) : value :=
   SV (VALUE_Integer (Z.of_nat n)).
@@ -217,50 +102,189 @@ Definition val_of_ident (id:ident) : value :=
 
 Definition local (lid:local_id) : value := val_of_ident (ID_Local lid).
 
-Definition val_of_bool (b:bool) : value := SV (VALUE_Bool b).
+Definition lid_of_Z (n:int) : local_id := Raw n.
 
-Definition i1 := TYPE_I (1)%Z.
-Definition i64 := TYPE_I (64)%Z.
-Definition i64ptr := TYPE_Pointer i64.
+Lemma lid_of_Z_inj: forall n1 n2, n1 <> n2 -> lid_of_Z n1 <> lid_of_Z n2.
+Proof.
+  intros. unfold lid_of_Z. unfold not. intros. apply H. inversion H0. reflexivity.
+Qed.
 
-Definition emit instr : LLVM local_id :=
-  fun '(n,m,c) =>
+Lemma lid_of_Z_inj2: forall n1 n2, lid_of_Z n1 = lid_of_Z n2 -> n1 = n2.
+Proof.
+  intros n1 n2 H.
+  inversion H.
+  reflexivity.
+Qed.  
+
+(* LLVM compiler monads ----------------------------------------- *)
+
+(* 
+  Compiler state for expressions
+    n - IId counter 
+    is - instructions
+*)
+Definition EXP A := ST (int * code) (err A).
+
+Definition exp_map (A B:Type) (f:A->B) (g:EXP A) : EXP B :=
+  fun s =>
+    let '(st, x) := g s in
+    match x with
+    | inl e  => (st, inl e)
+    | inr a => (st, inr (f a))
+    end.
+
+Instance exp_functor : @Functor EXP := exp_map.
+
+Definition exp_ret (A:Type) (x:A) : EXP A :=
+  fun s => (s, inr x).
+
+Definition exp_bind (A B:Type) (g:EXP A) (f:A -> EXP B) : EXP B :=
+  fun s =>
+    let '(st, x) := g s in
+    match x with
+    | inl e => (st, inl e)
+    | inr a => (f a) st
+    end.
+Program Instance exp_monad : (@Monad EXP) exp_functor := _.
+Next Obligation.
+  split.
+  - exact exp_ret.
+  - exact exp_bind.
+Defined.    
+
+Instance exp_err : (@ExceptionMonad string EXP _ _) := fun _ e => fun s => (s, inl e).
+
+Definition lift_exp {A} (e:string) (m:option A) : EXP A :=
+  fun s => (s, trywith e m).
+
+Definition emit instr : EXP local_id :=
+  fun '(n, is) =>
     let lid := lid_of_Z n in
-    ((1+n,m, (I (IId lid) instr)::c), mret lid)%Z.
+    ((1+n, ((IId lid, instr)::is)), mret lid)%Z.
   
-Definition binop op t v1 v2 : LLVM local_id :=
+Definition binop op t v1 v2 : EXP local_id :=
   emit (INSTR_Op (SV (OP_IBinop op t v1 v2))).
 
-Definition load v : LLVM local_id := 
+Definition load v : EXP local_id := 
   emit (INSTR_Load false i64 (i64ptr, v) None).
 
-Definition comp cmp v1 v2 : LLVM local_id :=
+Definition comp cmp v1 v2 : EXP local_id :=
   emit (INSTR_Op (SV (OP_ICmp cmp i64 v1 v2))).
 
-Definition alloca : () -> LLVM local_id :=
-  fun _ => emit (INSTR_Alloca i64 None None).
 
-Definition term t : LLVM () := 
-  fun '(n,m,c) =>
-    let tid := (IVoid m) in
-    ((n,1+m,((T tid t)::c)), mret ())%Z.
+(* 
+  Compiler state for commands
+    n  - IId counter
+    m  - IVoid counter 
+    // state of the partially completed basic block:
+    is - code of current block; instructions emitted here in reverse order
+    tm - the terminator for the current block
+    bs - list of completed blocks 
+*)
+Record cmd_state :=
+  mk_cs {
+      n : int;                
+      m : int;                
+      is : code;             
+      tm : terminator;
+      bs : list block;      
+    }.
 
-Definition emitvoid instr : LLVM () := 
-  fun '(n,m,c) =>
-    let tid := (IVoid m) in
-    ((n,1+m,((I tid instr)::c)), mret ())%Z.
+Definition CMD A := ST cmd_state (err A).
 
-Definition store v vptr : LLVM () :=
+Definition cmd_map (A B:Type) (f:A->B) (g:CMD A) : CMD B :=
+  fun s =>
+    let '(st, x) := g s in
+    match x with
+    | inl e  => (st, inl e)
+    | inr a => (st, inr (f a))
+    end.
+
+Instance cmd_functor : @Functor CMD := cmd_map.
+
+Definition cmd_ret (A:Type) (x:A) : CMD A :=
+  fun s => (s, inr x).
+
+Definition cmd_bind (A B:Type) (g:CMD A) (f:A -> CMD B) : CMD B :=
+  fun s =>
+    let '(st, x) := g s in
+    match x with
+    | inl e => (st, inl e)
+    | inr a => (f a) st
+    end.
+
+Program Instance cmd_monad : (@Monad CMD) cmd_functor := _.
+Next Obligation.
+  split.
+  - exact cmd_ret.
+  - exact cmd_bind.
+Defined.    
+
+Instance cmd_err : (@ExceptionMonad string CMD _ _) := fun _ e => fun s => (s, inl e).
+
+Definition cmd_of_exp {A} (exp : EXP A) : CMD (code * A) :=
+  fun '(mk_cs n m is tm bs) =>
+    let '((n', ise), v) := exp (n, []) in
+    match v with
+    | inl e => (mk_cs n m is tm bs, inl e)
+    | inr ans => (mk_cs n' m is tm bs, inr (ise, ans))
+    end.
+
+Definition inject_code (ise:code) : CMD () :=
+    fun '(mk_cs n m is tm bs) => (mk_cs n m (ise++is) tm bs, mret ()).
+
+Definition lift_cmd {A} (e:string) (m:option A) : CMD A :=
+  fun s => (s, trywith e m).
+
+Definition emit_cmd instr : CMD local_id :=
+  fun '(mk_cs n m is tm bs) =>
+    let lid := lid_of_Z n in
+    (mk_cs (1+n) m ((IId lid, instr)::is) tm bs, mret lid)%Z.
+
+Definition alloca : () -> CMD local_id :=
+   fun _ => emit_cmd (INSTR_Alloca i64 None None).
+    
+Definition emitvoid instr : CMD () :=
+    fun '(mk_cs n m is tm bs) =>
+      let tid := (IVoid m) in
+      (mk_cs n (1+m) ((tid, instr)::is) tm bs, mret ())%Z.
+    
+Definition store v vptr : CMD () :=
   emitvoid (INSTR_Store false (i64, v) (i64ptr, vptr) None).
 
-Definition label l : LLVM () :=
-  fun '(n,m,c) => ((n,m,(L l)::c), mret ()).
+Definition gen_label : () -> CMD local_id :=
+ fun _ => fun '(mk_cs n m is tm bs) =>
+    let lid := lid_of_Z n in
+    (mk_cs (1+n) m is tm bs, mret lid)%Z.
+  
+Definition close_block (bid:block_id) (tm_new:terminator) : CMD () :=
+  fun '(mk_cs n m is tm bs) =>
+    let blk := mk_block bid [] (rev is) ((IVoid m), tm) in
+    (mk_cs n (1+m) [] tm_new (blk::bs), mret ())%Z.
+
+
+Definition run {A} (g : CMD A) : err (A * block_id * list block) :=
+  let '(mk_cs n m is tm bs, x) := g (mk_cs 0 0 [] TERM_Ret_void [])%Z in
+  match x with
+  | inl e => inl e
+  | inr a =>
+    let bid := lid_of_Z n in
+    let blk := mk_block bid [] (rev is) ((IVoid m), tm) in
+    inr (a, bid, blk::bs)
+  end.
 
 
 (*! Section Compiler *)
 
-(* Note: list of instructions in code is generated in reverse order *)
-Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
+(* A context maps Imp variables to Vellvm identifiers
+   Invariant: 
+      storage space for an Imp variable is represented as an alloca'ed 
+      ctxt (Id X) is the pointer to the storage for X.
+*)
+Definition ctxt := partial_map value.
+
+
+Fixpoint compile_aexp (g:ctxt) (a:aexp) : EXP value :=
   let compile_binop (op:ibinop) (a1 a2:aexp) :=
       'v1 <- compile_aexp g a1;
       'v2 <- compile_aexp g a2;
@@ -273,7 +297,7 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
       mret (local lid) *)
     (*! mret (val_of_int64 n) *)
   | AId x =>
-    'ptr <- lift "AId ident not found" (g x);
+    'ptr <- lift_exp "AId ident not found" (g x);
     'lid <- load ptr;
      mret (local lid)
 
@@ -282,7 +306,7 @@ Fixpoint compile_aexp (g:ctxt) (a:aexp) : LLVM value :=
   | AMult a1 a2  => compile_binop (Mul false false) a1 a2
   end.
     
-Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
+Fixpoint compile_bexp (g:ctxt) (b:bexp) : EXP value :=
   let compile_icmp (cmp:icmp) (a1 a2:aexp) :=
       'v1 <- compile_aexp g a1;
       'v2 <- compile_aexp g a2;
@@ -307,52 +331,52 @@ Fixpoint compile_bexp (g:ctxt) (b:bexp) : LLVM value :=
   end.
 
 
-Fixpoint compile_com (g:ctxt) (c:com) : LLVM () :=
+Fixpoint compile_com (g:ctxt) (c:com) : CMD () :=
   match c with
-  | CSkip => mret ()
+  | CSkip => mret ()   
 
   | CAss x a => 
-    'v <- compile_aexp g a;
-    'ptr <- lift "CAss ident not found" (g x);
+    '(cd, v) <- cmd_of_exp (compile_aexp g a);
+    '_ <- inject_code cd;
+    'ptr <- lift_cmd "CAss ident not found" (g x);
     '; store v ptr;
-    mret () 
+    mret ()           
 
   | CSeq c1 c2 =>
-    'code1 <- compile_com g c1;
-    'code2 <- compile_com g c2;
+    '_ <- compile_com g c2;  
+    '_ <- compile_com g c1;  
     mret ()
 
   | CIf b c1 c2 =>
-    'br1 <- genlabel ();
-    'br2 <- genlabel ();
-    'merge <- genlabel ();    
-    'v <- compile_bexp g b;
-    '; term (TERM_Br (i1, v) br1 br2);
-    '; label br1;
-    '; compile_com g c1;
-    '; term (TERM_Br_1 merge);
-    '; label br2;
-    '; compile_com g c2;
-    '; term (TERM_Br_1 merge);
-    '; label merge;
-    mret ()    
+    'br1 <- gen_label ();
+    'br2 <- gen_label ();
+    'merge <- gen_label ();    
+
+    '_ <- close_block merge (TERM_Br_1 merge);
+    '_ <- compile_com g c2;
+    '_ <- close_block br2 (TERM_Br_1 merge);
+    '_ <- compile_com g c1;
+    '(cdb, v) <- cmd_of_exp (compile_bexp g b);
+    '_ <- close_block br1 (TERM_Br (i1, v) br1 br2);
+    '_ <- inject_code cdb;
+    mret ()
 
   | CWhile b c =>
-    'entry <- genlabel (); 
-    'body <- genlabel (); 
-    'exit <- genlabel ();
-    '; term (TERM_Br_1 entry);
-    '; label entry;
-    'v <- compile_bexp g b;
-    '; term (TERM_Br (i1, v) body exit);
-    '; label body;
-    '; compile_com g c;    
-    '; term (TERM_Br_1 entry);
-    '; label exit;
+    'entry <- gen_label (); 
+    'body <- gen_label (); 
+    'exit <- gen_label ();
+
+    '_ <- close_block exit (TERM_Br_1 entry);
+    '_ <- compile_com g c;
+    '(cdb, v) <- cmd_of_exp (compile_bexp g b);      
+
+    '_ <- close_block body (TERM_Br (i1, v) body exit);
+    '_ <- inject_code cdb;
+    '_ <- close_block entry (TERM_Br_1 entry);
     mret ()    
   end.
 
-Fixpoint compile_fv (l:list id) : LLVM ctxt :=
+Fixpoint compile_fv (l:list id) : CMD ctxt :=
   match l with
   | [] => mret empty
   | x::xs =>
@@ -360,22 +384,24 @@ Fixpoint compile_fv (l:list id) : LLVM ctxt :=
     'uid <- alloca ();
     (* '; store (val_of_nat 0) (local uid); *)
     (* CHKoh: is the following right? *)
-    'v <- compile_aexp g (ANum (Int64.repr 0%Z)); 
-    '; store v (local uid);
+    (* 'v <- compile_aexp g (ANum (Int64.repr 0%Z));  *)
+    '; store (val_of_nat 0) (local uid);
       
     mret (update g x (local uid)) 
   end.
 
-Definition print_imp_id (x:id) (g:ctxt) : LLVM () :=
+(* TODO: Adjust for cmd/exp distinction *)
+(*
+Definition print_imp_id (x:id) (g:ctxt) : CMD () :=
   let 'Id s := x in
   let fn_name := ("print_" ++ s)%string in
-  'ptr <- lift "AId ident not found" (g x);
+  'ptr <- lift_cmd "AId ident not found" (g x);
   'lid <- load ptr;
   '; emitvoid (INSTR_Call (TYPE_Void, ID_Global(Name fn_name)) [(i64, local lid)]);
   mret ().
     
 
-Fixpoint print_fv (l:list id) (g:ctxt) : LLVM () :=
+Fixpoint print_fv (l:list id) (g:ctxt) : CMD () :=
   match l with
   | [] => mret ()
   | x::xs =>
@@ -383,7 +409,8 @@ Fixpoint print_fv (l:list id) (g:ctxt) : LLVM () :=
     '; print_imp_id x g;
       mret ()
   end.
-
+*)
+  
 Definition imp_prog_type := TYPE_Function TYPE_Void [].
 Definition imp_decl : declaration :=
   {| dc_name := Name "imp_command";
@@ -416,14 +443,15 @@ Definition print_decl (fn:string) : declaration :=
 
 
 Definition compile (c:com) : err (toplevel_entities (list block)) :=
-  '(fvs, blocks) <-
+  '(fvs, bid, blocks) <-
           run (
             let fvs := IDSet.elements (fv c) in
             'g <- compile_fv fvs;  
             '; compile_com g c; 
 (*            '; print_fv fvs g;  (* UNCOMMENT to enable imp state printing *) *)
             mret fvs
-          );
+          )
+  ;
   mret
    ((List.map (fun x => let 'Id s := x in TLE_Declaration (print_decl ("print_" ++ s))) fvs) ++
    [

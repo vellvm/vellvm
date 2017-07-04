@@ -1308,6 +1308,7 @@ Reserved Notation "c1 '/' st1 '==>' - '/' st2"
 
 Hint Constructors ceval.
 
+(* 
 Inductive cont :=
 | KStop 
 | KSeq (c:com) (k:cont)
@@ -1347,12 +1348,48 @@ Inductive ceval_small : com -> cont -> state -> com -> cont -> state -> Prop :=
   where "c1 '/' k1 '/' st1 '==>' c2 '/' k2 '/' st2" := (ceval_small c1 k1 st1 c2 k2 st2)
 .             
 Hint Constructors ceval_small.
+*)
 
-(*
+Reserved Notation "c1 '/' st1 '==>' c2 '/' st2"
+         (at level 40, c2 at level 39, st1 at level 39, st2 at level 39).
+
+Inductive ceval_small : com -> state -> com -> state -> Prop :=
+| S_Ass : forall st a1 n x,
+    aeval st a1 = n ->
+    (x ::= a1) / st ==> SKIP / (t_update st x n)
+
+| S_Seq1 : forall c1 c2 st c1' st'
+    (HSearch: c1 / st ==> c1' / st'),
+    (c1 ;; c2) / st ==> (c1' ;; c2) / st'
+
+| S_Seq2 : forall c2 st,
+    (SKIP ;; c2) / st ==> c2 / st
+    
+| S_IfTrue : forall st b c1 c2,
+    beval st b = true ->
+    (IFB b THEN c1 ELSE c2 FI) / st ==> c1 / st
+
+| S_IfFalse : forall st b c1 c2,
+    beval st b = false ->
+    (IFB b THEN c1 ELSE c2 FI) / st ==> c2 / st
+
+| S_WhileEnd : forall b st c,
+    beval st b = false ->
+    (WHILE b DO c END) / st ==> SKIP / st
+
+| S_WhileLoop : forall b st c,
+    beval st b = true ->
+    (WHILE b DO c END) / st ==> (c ;; (WHILE b DO c END)) / st
+                               
+  where "c1 '/' st1 '==>' c2 '/' st2" := (ceval_small c1 st1 c2 st2)
+.             
+Hint Constructors ceval_small.
+
+
+
 Inductive ceval_small_N : nat -> com -> state -> state -> Prop :=
-| small0 : forall c st1 st2,
-    c / st1 ==> - / st2 ->
-    ceval_small_N 0 c st1 st2
+| small0 : forall st,
+    ceval_small_N 0 SKIP st st
 | smallS : forall n c1 c2 st1 st2 st3,
     c1 / st1 ==> c2 / st2 ->
     ceval_small_N n c2 st2 st3 ->
@@ -1368,7 +1405,7 @@ Proof.
   intros c1 c2 st1 st2 st3 n1 n2 H12.
   revert c2 st3 n2.
   induction H12; intros c2' st3' n2' H23.
-  - simpl. eauto.
+  - simpl. eapply smallS; eauto.
   - apply smallS with (c2:=(c2;;c2'))(st2:=st2). apply S_Seq1. apply H.
     apply IHceval_small_N. exact H23.
 Qed.    
@@ -1379,7 +1416,7 @@ Proof.
   intros c st1 st2 H.
   induction H.
   - exists 0; auto.
-  - exists 0; auto.
+  - exists 1; eauto. eapply smallS. apply S_Ass. eauto. eauto.
   - destruct IHceval1 as [n1 Hsm1].
     destruct IHceval2 as [n2 Hsm2].
     exists (1+(n1+n2)). eapply ceval_small_seq; eauto.
@@ -1387,7 +1424,7 @@ Proof.
     exists (1+n1). eauto.
   - destruct IHceval as [n1 Hsm1].
     exists (1+n1). eauto.
-  - exists 0; auto.
+  - exists 1; eauto.
   - destruct IHceval1 as [n1 Hsm1].
     destruct IHceval2 as [n2 Hsm2].
     exists (2+(n1+n2)). eapply smallS. eauto.
@@ -1408,46 +1445,23 @@ Proof.
     eauto.
 Qed.  
 
-Lemma ceval_small_big : forall c1 c2 c3 st1 st2 st3
+Lemma ceval_small_big : forall c1 c2 st1 st2 st3
     (Hs : c1 / st1 ==> c2 / st2)
-    (Hbig : (c2 ;; c3) / st2 \\ st3),
-    (c1 ;; c3) / st1 \\ st3.
+    (Hbig : c2 / st2 \\ st3),
+    c1 / st1 \\ st3.
 Proof.
-  induction c1; intros c2 c3 st1 st2 st3 Hs Hbig; try solve [inversion Hs].
-  - inversion Hs; subst.
-    + apply ceval_assoc.
-      apply ceval_assoc in Hbig.
-      eapply IHc1_1. apply H4. apply Hbig.
-    + apply ceval_assoc.
-      inversion H4; subst.
-      * eapply E_Seq; eauto.
-      * eapply E_Seq; eauto. eauto.
-      * eapply E_Seq; eauto.
-  - inversion Hs; subst.
-    + inversion Hbig; subst.
-      eapply E_Seq; eauto.
-    + inversion Hbig; subst.
-      eapply E_Seq; eauto.
-  - inversion Hs; subst.
-    inversion Hbig; subst.
-    inversion H1. subst.
-    eapply E_Seq.
-    eapply E_WhileLoop; eauto. apply H5.
+  intros c1 c2 st1 st2 st3 HS.  revert st3.
+  induction HS; intros st3 Hbig; inversion Hbig; subst; eauto.
 Qed.    
-    
+  
 Lemma ceval_small_N_ceval : forall n c st1 st2,
     ceval_small_N n c st1 st2 -> c / st1 \\ st2.
 Proof.
   intros n c st1 st2 H.
-  induction H.
-  - inversion H; subst; auto.
-  - inversion H; subst; auto.
-    eapply ceval_small_big; eauto.
-    inversion H4; subst; eapply E_Seq; eauto. eauto.
-    inversion IHceval_small_N. subst.
-    eapply E_WhileLoop; eauto.
+  induction H; eauto.
+  - eapply ceval_small_big; eauto.
 Qed.    
-*)
+
 
 (** The cost of defining evaluation as a relation instead of a
     function is that we now need to construct _proofs_ that some

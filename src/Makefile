@@ -14,7 +14,7 @@ MENHIR=menhir
 CP=cp
 
 QUICKCHICKFILES := ImpQuickChick 
-IMPCOQFILES := Maps Imp ImpCEvalFun Compiler CompilerProp ImpCorrectness ImpOptimizer ImpCorrectnessTest
+IMPCOQFILES := Maps Imp ImpCEvalFun Compiler CompilerProp ImpOptimizer ImpCorrectness #ImpCorrectnessTest
 COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality $(IMPCOQFILES) $(QUICKCHICKFILES)
 OLLVMFILES := 
 

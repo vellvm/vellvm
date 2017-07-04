@@ -1405,8 +1405,3 @@ Instance eq_dec_terminator : eq_dec terminator.
 Proof.
   lift_decide_eq; left; auto.
 Defined.
-
-Instance eq_dec_elt : eq_dec elt.
-Proof.
-  lift_decide_eq; left; auto.
-Defined.
