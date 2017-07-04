@@ -9,6 +9,4 @@ Require Import Vellvm.Compiler.
 
 Require Import Vellvm.OllvmQuickChick.
 
-Derive Arbitrary for elt.
-Derive Show for elt.
 
