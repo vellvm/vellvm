@@ -27,16 +27,10 @@ Module Type ADDR.
   Parameter addr : Set.
 End ADDR.  
 
-(* Set up for i1, i32, and i64 *)
-Module Wordsize1.
-  Definition wordsize := 1%nat.
-  Remark wordsize_not_zero: wordsize <> 0%nat.
-  Proof. unfold wordsize; congruence. Qed.
-End Wordsize1.
-
+(* Set up for i1, i32, and i64 *) 
 Module Int64 := Integers.Int64.
 Module Int32 := Integers.Int.
-Module Int1 := Make(Wordsize1).
+Module Int1 := Ollvm_ast.Int1.
 
 Definition int1 := Int1.int.
 Definition int32 := Int32.int.

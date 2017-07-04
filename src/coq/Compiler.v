@@ -19,15 +19,7 @@ Require Import Vellvm.Classes Vellvm.Ollvm_ast Vellvm.AstLib.
 (* Logical Foundations dependencies *)
 Require Import Vellvm.Imp Vellvm.Maps.
 
-(* Setup for 1bit integers *)
-Module Wordsize1.
-  Definition wordsize := 1%nat.
-  Remark wordsize_not_zero: wordsize <> 0%nat.
-  Proof. unfold wordsize; congruence. Qed.
-End Wordsize1.
-
-Module Int1 := Make(Wordsize1).
-
+Module Int1 := Ollvm_ast.Int1.
 Definition int1 := Int1.int.
 
 (* "Flattened" representation of Vellvm code *)

@@ -22,6 +22,7 @@
 (* Adapted for use in Vellvm by Steve Zdancewic (c) 2017                      *)
 (*  ------------------------------------------------------------------------- *)
 
+Require Import compcert.lib.Integers.
 
 Require Import List. 
 Require Import String Ascii.
@@ -32,6 +33,14 @@ Open Scope string_scope.
 Open Scope list_scope.
 
 Definition int := Z.
+
+Module Wordsize1.
+  Definition wordsize := 1%nat.
+  Remark wordsize_not_zero: wordsize <> 0%nat.
+  Proof. unfold wordsize; congruence. Qed.
+End Wordsize1.
+
+Module Int1 := Make(Wordsize1).
 
 (* Parameter float : Set. *)
 Definition float := string. (* CHKoh: Hack for now. UNSAFE! *)
