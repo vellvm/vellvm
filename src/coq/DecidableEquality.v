@@ -5,9 +5,12 @@ Require Import ZArith.
 Require Import compcert.lib.Integers.
 
 (* Vellvm dependencies *)
-Require Import Vellvm.Ollvm_ast Vellvm.Compiler Vellvm.AstLib Vellvm.CFG Vellvm.StepSemantics Vellvm.Memory.
+Require Import Vellvm.Ollvm_ast Vellvm.CFG Vellvm.StepSemantics Vellvm.Memory.
+Require Import Vellvm.Compiler.
 Require Import Vellvm.Classes.
 Require Import Vellvm.AstLib.
+
+(** ** Decidable Equality *) 
 
 Instance eq_dec_int : eq_dec (BinNums.Z) := Z.eq_dec.
 
@@ -1432,3 +1435,43 @@ The following are not true.
 Instance eq_dec_effects `{eq_dec D} : eq_dec (effects D).
 Instance eq_dec_transition `{eq_dec X} : eq_dec (transition X).
 *)
+
+
+(** ** Basic Propositions *) 
+
+Inductive prefix_of {A : Type}: list A -> list A -> Prop :=
+| prefix_nil : forall l : list A, prefix_of [] l
+| prefix_cons_same : forall a l1 l2, prefix_of l1 l2 -> prefix_of (a :: l1) (a :: l2).
+
+Inductive suffix_of {A : Type}: list A -> list A -> Prop :=
+| suffix_nil : forall l : list A, suffix_of l []
+| suffix_app : forall a l1 l2, suffix_of l1 l2 -> suffix_of (l1 ++ [a]) (l2 ++ [a]).
+
+Instance dec_prefix_of : forall A `{eq_dec A} (l1 l2 : list A), Decidable (prefix_of l1 l2).
+Proof.
+  intros A A_decidable.
+  induction l1 as [| a l1']; unfold Decidable.
+  - intros [| a l2']; left; constructor.
+  - intros [| b l2']; try solve [right; intros H; inversion H].
+    refine
+      (match a == b with
+       | left _ =>
+         match decide (prefix_of l1' l2') with
+         | left tail_eq => _
+         | right tail_neq => right _
+         end
+       | right head_neq => right _
+       end).
+    { subst; constructor. constructor. tauto. }
+    { intros H. apply tail_neq. inversion H; subst; auto. }
+    { intros H. apply head_neq. inversion H; subst; auto. }
+Defined.
+
+Instance dec_Z_leq : forall n m : int, Decidable (n <= m)%Z.
+Proof.
+  unfold Decidable. intros n m.
+  destruct (n <=? m)%Z eqn:n_m.
+  - left; rewrite Z.leb_le in n_m; auto.
+  - right; intros H; rewrite <- Z.leb_le in H;
+      rewrite n_m in H; inversion H.
+Defined.
