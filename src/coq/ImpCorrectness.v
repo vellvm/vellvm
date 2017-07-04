@@ -348,7 +348,12 @@ Hint Constructors Rv1e.
 Section Correctness.
 
   Variable (g:ctxt).
-  Variable g_inj : forall (x y:id), (beq_id x y = false) -> (g x) <> (g y).
+  Variable g_inj :
+    forall (x y:id) a b
+      (Hid: beq_id x y = false)
+      (Hx: g x = Some a)
+      (Hy: g y = Some b),
+      a <> b.
 
 Definition memory_invariant (e:env) (m:memory) (st:Imp.state) : Prop :=
   forall x v, g x = Some v ->
