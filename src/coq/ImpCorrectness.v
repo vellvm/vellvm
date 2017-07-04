@@ -345,9 +345,12 @@ Inductive Rv1e : err value -> bool -> Prop :=
 | Rv1e_inr : forall v i, Rv1 v i -> Rv1e (inr v) i.
 Hint Constructors Rv1e.
 
+Section Correctness.
 
+  Parameter (g:ctxt).
+  Parameter g_inj : forall (x y:id), (beq_id x y = false) -> (g x) <> (g y).
 
-Definition memory_invariant (g:ctxt) (e:env) (m:memory) (st:Imp.state) : Prop :=
+Definition memory_invariant (e:env) (m:memory) (st:Imp.state) : Prop :=
   forall x v, g x = Some v ->
          exists n, (v = (local (lid_of_Z n)) /\
                exists a, (lookup_env e (lid_of_Z n) = Some (DVALUE_Addr a) /\
@@ -402,12 +405,12 @@ Proof.
 Qed.    
 
 Lemma memory_invariant_extension :
-  forall g e n mem st dv
+  forall e n mem st dv
     (Henv: env_lt n e)
-    (Hmem: memory_invariant g e mem st),
-    memory_invariant g (add_env_Z n dv e) mem st.
+    (Hmem: memory_invariant e mem st),
+    memory_invariant (add_env_Z n dv e) mem st.
 Proof.
-  intros g e n mem st dv Henv Hmem.
+  intros e n mem st dv Henv Hmem.
   unfold memory_invariant in *.
   intros x v Hg.
   apply Hmem in Hg. clear Hmem.
@@ -705,7 +708,7 @@ Lemma compile_aexp_correct :
 
 Lemma compile_aexp_correct :
   forall (a:aexp) (st:Imp.state) 
-    (g:ctxt) n0 cd0 n1 cd1 (v : Ollvm_ast.value)
+    n0 cd0 n1 cd1 (v : Ollvm_ast.value)
     (Hcomp : (n1, cd1, inr v) = compile_aexp g a (n0, cd0)),
     exists cd2,
       cd1 = cd2 ++ cd0 /\
@@ -713,11 +716,11 @@ Lemma compile_aexp_correct :
         (CFG : mcfg) P (p1:pc) (e:env) (k:stack) 
         (Hcfg: CFG_has_code_at CFG P p1 (rev cd2))
         (mem:memory) (* (Hlt:env_lt n0 e) *)
-        (HM: memory_invariant g e mem st),
+        (HM: memory_invariant e mem st),
         step_star CFG
                   (fun '(pc', e', k') mem' =>
                      P pc' /\ (fn pc' = fn p1) /\
-                     memory_invariant g e' mem' st /\
+                     memory_invariant e' mem' st /\
                      Rv64e (eval_op e' (Some (TYPE_I 64)) v) (aeval st a) /\
                      env_extends e e' /\
 (*                     env_lt n1 e' /\ *)
@@ -864,7 +867,7 @@ Admitted.
 
 Lemma compile_bexp_correct :
   forall (b:bexp) (st:Imp.state) 
-    (g:ctxt) n0 cd0 n1 cd1 (v : Ollvm_ast.value)
+    n0 cd0 n1 cd1 (v : Ollvm_ast.value)
     (Hcomp : (n1, cd1, inr v) = compile_bexp g b (n0, cd0)),
     exists cd2,
       cd1 = cd2 ++ cd0 /\
@@ -872,11 +875,11 @@ Lemma compile_bexp_correct :
         (CFG : mcfg) P (p1:pc) (e:env) (k:stack) 
         (Hcfg: CFG_has_code_at CFG P p1 (rev cd2))
         (mem:memory) (* (Hlt:env_lt n0 e) *)
-        (HM: memory_invariant g e mem st),
+        (HM: memory_invariant e mem st),
         step_star CFG
                   (fun '(pc', e', k') mem' =>
                      P pc' /\ (fn pc' = fn p1) /\
-                     memory_invariant g e' mem' st /\
+                     memory_invariant e' mem' st /\
                      Rv1e (eval_op e' (Some (TYPE_I 1)) v) (beval st b) /\
                      env_extends e e' /\
 (*                     env_lt n1 e' /\ *)
@@ -888,84 +891,119 @@ Admitted.
 
 
 
-Inductive matching_state (CFG:mcfg) (g:ctxt) (fid:function_id) (P:pc -> Prop) : pc -> com -> Prop :=
+Inductive matching_state (CFG:mcfg) (fid:function_id) (P:pc -> Prop) : pc -> com -> Prop :=
 | match_skip:
     forall p
       (Hp: P p),
-      matching_state CFG g fid P p SKIP
+      matching_state CFG fid P p SKIP
 
 | match_assn:
     forall p a x n v cd n' m ptr
       (Ha: ((n',cd), inr v) = compile_aexp g a (n, []))
       (Hx: (g x) = Some ptr)
       (HCFG: CFG_has_code_at CFG P p (rev ((IVoid m, (INSTR_Store false (i64, v) (i64ptr, ptr) None))::cd))),
-      matching_state CFG g fid P p (CAss x a)
+      matching_state CFG fid P p (CAss x a)
 
-| CSeq:
+| match_seq:
     forall p q c1 c2 
-      (Hc1: matching_state CFG g fid (fun pc => pc = q) p c1)
-      (Hc2: matching_state CFG g fid P q c2),
-      matching_state CFG g fid P p (CSeq c1 c2) 
+      (Hc1: matching_state CFG fid (fun pc => pc = q \/ exists b, fetch CFG pc = Some (Term (TERM_Br_1 b)) /\ CFG_fun_has_block_id CFG fid b [] q) p c1)
+      (Hc2: matching_state CFG fid P q c2),
+      matching_state CFG fid P p (CSeq c1 c2) 
                      
-| CIf:
+| match_if:
     forall p b n v cd n' br1 br2 merge c1 c2 p1 p2 pmerge
       (Ha: ((n', cd), inr v) = compile_bexp g b (n, []))
       (HCFG: CFG_has_code_at CFG (fun q => fetch CFG q = Some (Term (TERM_Br (i1, v) br1 br2)))
                              p (rev cd))
-      (HBR1: CFG_fun_has_block_id CFG fid br1 p1)
-      (IH1: matching_state CFG g fid (fun q => fetch CFG q = Some (Term (TERM_Br_1 merge))) p1 c1)
-      (HBR2: CFG_fun_has_block_id CFG fid br2 p2)
-      (IH2: matching_state CFG g fid (fun q => fetch CFG q = Some (Term (TERM_Br_1 merge))) p2 c2)
-      (Hmerge: CFG_fun_has_block_id CFG fid merge pmerge)
-      (IHmerge: matching_state CFG g fid P pmerge SKIP),
-      matching_state CFG g fid P p (CIf b c1 c2)
+      (HBR1: CFG_fun_has_block_id CFG fid br1 [] p1)
+      (*      (IH1: matching_state CFG g fid (fun q => fetch CFG q = Some (Term (TERM_Br_1 merge))) p1 c1) *)
+      (IH1: matching_state CFG fid P p1 c1) 
+      (HBR2: CFG_fun_has_block_id CFG fid br2 [] p2)
+      (IH2: matching_state CFG fid P p2 c2)
+      (Hmerge: CFG_fun_has_block_id CFG fid merge [] pmerge)
+      (IHmerge: matching_state CFG fid P pmerge SKIP),
+      matching_state CFG fid P p (CIf b c1 c2)
 
-| CWhile:
+| match_while0:
     forall p b n v cd n' body entry exit c pentry pbody pexit
       (Hpcd: fetch CFG p = Some (Term (TERM_Br_1 entry)))
-      (Hentry: CFG_fun_has_block_id CFG fid entry pentry)
+      (Hentry: CFG_fun_has_block_id CFG fid entry [] pentry)
       (Ha: ((n', cd), inr v) = compile_bexp g b (n, []))
       (HCFG: CFG_has_code_at CFG (fun q => fetch CFG q = Some (Term (TERM_Br (i1, v) body exit)))
                            pentry (rev cd))
-      (Hbody: CFG_fun_has_block_id CFG fid body pbody)
-      (IH1: matching_state CFG g fid (fun q => fetch CFG q = Some (Term (TERM_Br_1 entry))) pbody c)
-      (Hexit: CFG_fun_has_block_id CFG fid exit pexit)
-      (IHexit: matching_state CFG g fid P pexit SKIP),
-      matching_state CFG g fid P p (CWhile b c)
+      (Hbody: CFG_fun_has_block_id CFG fid body [] pbody)
+      (IH1: matching_state CFG fid (fun q => fetch CFG q = Some (Term (TERM_Br_1 entry))) pbody c)
+      (Hexit: CFG_fun_has_block_id CFG fid exit [] pexit)
+      (IHexit: matching_state CFG fid P pexit SKIP),
+      matching_state CFG fid P p (CWhile b c)
+
+| match_while1:
+    forall p b n v cd n' body entry exit c pbody pexit
+      (Hentry: CFG_fun_has_block_id CFG fid entry [] p)
+      (Ha: ((n', cd), inr v) = compile_bexp g b (n, []))
+      (HCFG: CFG_has_code_at CFG (fun q => fetch CFG q = Some (Term (TERM_Br (i1, v) body exit)))
+                           p (rev cd))
+      (Hbody: CFG_fun_has_block_id CFG fid body [] pbody)
+      (IH1: matching_state CFG fid (fun q => fetch CFG q = Some (Term (TERM_Br_1 entry))) pbody c)
+      (Hexit: CFG_fun_has_block_id CFG fid exit [] pexit)
+      (IHexit: matching_state CFG fid P pexit SKIP),
+      matching_state CFG fid P p (CWhile b c)
+
 .
 Hint Constructors matching_state.  
 
+Lemma CFG_has_code_at_weakening : 
+  forall CFG (P:pc -> Prop) (Q:pc -> Prop) p cd
+    (HP: forall q, P q -> Q q)
+    (Hc: CFG_has_code_at CFG P p cd),
+    CFG_has_code_at CFG Q p cd.
+Proof.
+  intros CFG P Q p cd HP Hc.
+  induction Hc; eauto.
+Qed.  
+    
+    
+Lemma matching_state_weakening :
+  forall CFG fid (P:pc -> Prop) (Q:pc -> Prop) p cmd
+    (HP: forall q, P q -> Q q)
+    (Hm: matching_state CFG fid P p cmd),
+    matching_state CFG fid Q p cmd.
+Proof.
+  intros CFG fid P Q p cmd HP Hm.
+  induction Hm; intros; eauto.
+  eapply match_assn. eauto. eauto. eapply CFG_has_code_at_weakening. eauto. eauto.
+Qed.  
+  
 
-Inductive related_configuration (CFG:mcfg) fid g (cmd:com) (st:Imp.state) (s:SS.state) (mem:memory) P : Prop :=
+
+Inductive related_configuration (CFG:mcfg) fid (cmd:com) (st:Imp.state) (s:SS.state) (mem:memory) P : Prop :=
 | config_intro :
     forall p e k
     (Hs: s = (p, e, k))
-    (Hmem : memory_invariant g e mem st)
-    (Hcfg: matching_state CFG g fid P p cmd)
+    (Hmem : memory_invariant e mem st)
+    (Hcfg: matching_state CFG fid P p cmd)
     (Hpc: (fn p) = fid)
     ,
-    related_configuration CFG fid g cmd st s mem P.
+    related_configuration CFG fid cmd st s mem P.
 Hint Constructors related_configuration.    
 
 Lemma compile_com_correct :
   forall (cmd1 cmd2:com) (st1 st2:Imp.state)
     (HStep: cmd1 / st1 ==> cmd2 / st2)
-    (g:ctxt) (CFG:mcfg) (fid:function_id) (s1:SS.state) (mem1:memory) P
-    (Hrel: related_configuration CFG fid g cmd1 st1 s1 mem1 P),
+    (CFG:mcfg) (fid:function_id) (s1:SS.state) (mem1:memory) P
+    (Hrel: related_configuration CFG fid cmd1 st1 s1 mem1 P),
     step_star CFG (fun s2 mem2 =>
-                     related_configuration CFG fid g cmd2 st2 s2 mem2 P
+                     related_configuration CFG fid cmd2 st2 s2 mem2 P
                   )
               s1 mem1.
 Proof.
-Admitted.
-(*
   intros cmd1 cmd2 st1 st2 HStep.
   induction HStep; intros.
 
   - inversion Hrel. inversion Hcfg; subst.
     simpl in HCFG.
     exploit_CFG_code.
-    pose (compile_aexp_correct a1 st g n0 [] n' cd v ltac:(auto)) as K; clearbody K.
+    pose (compile_aexp_correct a1 st n0 [] n' cd v ltac:(auto)) as K; clearbody K.
     destruct K as [cd2 [Heqcd K]].
     rewrite app_nil_r in Heqcd. subst.
     pose (K CFG _ p e k HL mem1 ltac:(auto)) as HA; clearbody HA; clear K.
@@ -997,60 +1035,201 @@ Admitted.
       subst. 
       inversion Heval.
       subst.
-      inversion H4.
-      unfold Rv64.
       inversion H5.
+      unfold Rv64.
+      inversion H6.
       (* Needs injectivity of g and some other facts about nth_default and replace *)
       admit.
 
-      eauto. rewrite <- Hfn.
+      eauto. rewrite <- Hfn. apply incr_pc_in_block in Hincr. destruct Hincr. rewrite H1. reflexivity.
+
+      (*
+      eapply step_jump.
+      simpl. rewrite Hp. simpl.
+      unfold jump. inversion Hb. rewrite H. simpl. reflexivity.
+      eapply step_zero. eapply config_intro. reflexivity. inversion Hcfg. subst. *)
 
   - inversion Hrel.
     inversion Hcfg. subst.
     
     eapply step_star_app.
     eapply IHHStep.
-    econstructor. reflexivity. eauto. apply Hc1.
+    econstructor. reflexivity. eauto. apply Hc1. reflexivity.
     intros [[pc2 e2] k2]. intros mem2 HR.
     inversion HR. 
     eapply step_zero.
     econstructor.  exact Hs. eauto.
-    econstructor. eauto. eauto.
+    econstructor. eauto. eauto. eauto.
 
   - inversion Hrel.
     inversion Hcfg.
-    inversion Hc1. subst.
+    inversion Hc1.
+
     subst.
-    eapply step_zero.
-    econstructor; eauto.
+    destruct Hp. subst.
+    + eapply step_zero.
+      econstructor; eauto.
+
+    + destruct H as [b [Hf Hh]].
+      eapply step_jump.
+      simpl.
+      rewrite Hf. simpl.
+      unfold jump.
+      inversion Hh. rewrite H. simpl. reflexivity.
+      eapply step_zero.
+      econstructor; eauto. inversion Hh. apply find_block_same_fid in H. auto.
 
   - inversion Hrel.
     inversion Hcfg.
     subst.
     eapply step_star_app.
-    pose (compile_bexp_correct b st g n [] n' cd v ltac:(auto)) as K; clearbody K.
+    pose (compile_bexp_correct b st n [] n' cd v ltac:(auto)) as K; clearbody K.
     destruct K as [cd2 [Heqcd K]].
     rewrite app_nil_r in Heqcd. subst.
     pose (K CFG _ p e k HCFG mem1 ltac:(auto)) as HA; clearbody HA; clear K.
-    eapply step_star_app.
     eapply HA.
-    intros [[pc2 e2] k2]. intros mem2. intros [Heq [Hmem2 [Heval [Hext Hk2]]]].
+    intros [[pc2 e2] k2]. intros mem2. intros [Heq [Hpc [Hmem2 [Heval [Hext Hk2]]]]].
     subst.
 
+    inversion HBR1.
+    inversion Heval. subst. 
+    unfold Rv1 in H3.
+    rewrite H in H3.
     eapply step_jump.
     simplify_step.
-    inversion Heval. subst. unfold i1.  rewrite <- H0.
-    simpl. unfold Rv1 in H1.
-    destruct (beval st b).
-    subst. simpl.
+    unfold i1. rewrite <- H2. simpl. subst. simpl.
     unfold jump.
+    rewrite Hpc. 
+    rewrite H0.
+    simpl.
+    reflexivity.
+    eapply step_zero.
+    eapply config_intro. reflexivity. eauto. 
     
+    subst. simpl.
+    unfold jump. eauto.
+    apply find_block_same_fid in H0. auto.
+
+  -  admit. (* Similar to previous case *)
+
+  - inversion Hrel.
+    + inversion Hcfg.
+    subst.
+    eapply step_star_app.
+    eapply step_jump.
+    simpl.
+    rewrite Hpcd. simpl.
+    unfold jump.
+    inversion Hentry.
+    rewrite H0.
+    simpl.
+    reflexivity.
+    pose (compile_bexp_correct b st n [] n' cd v ltac:(auto)) as K; clearbody K.
+    destruct K as [cd2 [Heqcd K]].
+    rewrite app_nil_r in Heqcd. subst.
+    pose (K CFG _ pentry e k HCFG mem1 ltac:(auto)) as HA; clearbody HA; clear K.
+    eapply HA.
+    intros [[pc2 e2] k2]. intros mem2. intros [Heq [Hpc [Hmem2 [Heval [Hext Hk2]]]]].
+    subst.
+    eapply step_jump.
+    simpl.
+    rewrite Heq. simpl. unfold i1. inversion Heval. subst. unfold Rv1 in H1. rewrite H in H1. subst. simpl.
+    unfold jump.
+    inversion Hexit. inversion Hentry. apply find_block_same_fid in H3. rewrite Hpc. rewrite H3. rewrite H1.
+    simpl. reflexivity.
+    eapply step_zero.
+    eapply config_intro. reflexivity. eauto. econstructor.  inversion IHexit. subst. auto.
+    inversion Hexit. apply find_block_same_fid in H0. auto.
+
+    subst.
+    eapply step_star_app.
+    pose (compile_bexp_correct b st n [] n' cd v ltac:(auto)) as K; clearbody K.
+    destruct K as [cd2 [Heqcd K]].
+    rewrite app_nil_r in Heqcd. subst.
+    pose (K CFG _ p e k HCFG mem1 ltac:(auto)) as HA; clearbody HA; clear K.
+    eapply HA.
+    intros [[pc2 e2] k2]. intros mem2. intros [Heq [Hpc [Hmem2 [Heval [Hext Hk2]]]]].
+    subst.
+    eapply step_jump.
+    simpl.
+    rewrite Heq. simpl. unfold i1. inversion Heval. subst. unfold Rv1 in H1. rewrite H in H1. subst. simpl.
+    unfold jump.
+    inversion Hexit. inversion Hentry. apply find_block_same_fid in H3. rewrite Hpc. rewrite H1. 
+    simpl. reflexivity.
+    eapply step_zero.
+    eapply config_intro. reflexivity. eauto. econstructor.  inversion IHexit. subst. auto.
+    inversion Hexit. apply find_block_same_fid in H0. auto.
+    
+  - inversion Hrel.
+    inversion Hcfg; subst.
+    +
+    eapply step_star_app.
+    eapply step_jump.
+    simpl.
+    rewrite Hpcd. simpl.
+    unfold jump.
+    inversion Hentry.
+    rewrite H0.
+    simpl.
+    reflexivity.
+    pose (compile_bexp_correct b st n [] n' cd v ltac:(auto)) as K; clearbody K.
+    destruct K as [cd2 [Heqcd K]].
+    rewrite app_nil_r in Heqcd. subst.
+    pose (K CFG _ pentry e k HCFG mem1 ltac:(auto)) as HA; clearbody HA; clear K.
+    eapply HA.
+    intros [[pc2 e2] k2]. intros mem2. intros [Heq [Hpc [Hmem2 [Heval [Hext Hk2]]]]].
+    subst.
+    eapply step_jump.
+    simpl. rewrite Heq.
+    simpl. simpl. unfold i1. inversion Heval. subst. unfold Rv1 in H1. rewrite H in H1. subst. simpl.
+    unfold jump.
+    inversion Hbody. inversion Hentry. apply find_block_same_fid in H3. rewrite Hpc. rewrite H3. rewrite H1.
+    simpl.
+    reflexivity.
+    inversion Hbody.
+    
+    eapply step_zero.
+    eapply config_intro. reflexivity. eauto. econstructor.
+    Focus 2. eapply match_while1. apply Hentry. eauto. eapply HCFG. eapply Hbody. eapply IH1. eapply Hexit.
+    inversion IHexit. subst. econstructor. exact Hp.
+    
+    eapply matching_state_weakening with (P:= (fun q : pc => fetch CFG q = Some (Term (TERM_Br_1 entry)))).
+    intros.
+    right. exists entry. split; auto. apply IH1.
+    apply find_block_same_fid in H0. exact H0.
+
+    + eapply step_star_app.
+      pose (compile_bexp_correct b st n [] n' cd v ltac:(auto)) as K; clearbody K.
+      destruct K as [cd2 [Heqcd K]].
+      rewrite app_nil_r in Heqcd. subst.
+      pose (K CFG _ p e k HCFG mem1 ltac:(auto)) as HA; clearbody HA; clear K.
+      eapply HA.
+      intros [[pc2 e2] k2]. intros mem2. intros [Heq [Hpc [Hmem2 [Heval [Hext Hk2]]]]].
+      subst.
+      eapply step_jump.
+      simpl.
+      rewrite Heq. simpl. unfold i1. inversion Heval.  subst. simpl. unfold Rv1 in H1. rewrite Hpc. rewrite H in H1. subst.
+      simpl. unfold jump.
+      inversion Hbody. rewrite H1. simpl. reflexivity.
+      eapply step_zero.
+      eapply config_intro. reflexivity. eauto. econstructor.
+      Focus 2. eapply match_while1. apply Hentry. eauto. eapply HCFG. eapply Hbody. eapply IH1. eapply Hexit.
+      inversion IHexit. subst. econstructor. exact Hp.
+    
+      eapply matching_state_weakening with (P:= (fun q : pc => fetch CFG q = Some (Term (TERM_Br_1 entry)))).
+      intros.
+      right. exists entry. split; auto. apply IH1.
+      inversion Hbody.
+      apply find_block_same_fid in H0. exact H0.
+Admitted.      
+      
 
       
+    
       
       
 
-
+(*
 Lemma compile_com_correct :
   forall 
     (cmd:com) (res:option com) (st st':Imp.state)

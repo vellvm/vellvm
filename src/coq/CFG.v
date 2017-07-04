@@ -137,7 +137,7 @@ Definition incr_pc (CFG:mcfg) (p:pc) : option pc :=
 Inductive block_entry : Set :=
 | BlockEntry (phis:list (local_id * phi)) (p:pc).
 
-Fixpoint block_to_entry (fid:function_id) (b:block) : block_entry :=
+Definition block_to_entry (fid:function_id) (b:block) : block_entry :=
   BlockEntry (blk_phis b) (blk_entry_pc fid b).
 
 Definition find_block_entry (CFG:mcfg) (fid:function_id) (bid:block_id) : option block_entry :=
