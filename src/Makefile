@@ -13,9 +13,9 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick
+QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick CompilerQuickChick
 IMPCOQFILES := Maps Imp ImpCEvalFun Compiler CompilerProp ImpCorrectness ImpOptimizer ImpCorrectnessTest
-COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality $(IMPCOQFILES) $(QUICKCHICKFILES)
+COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp $(IMPCOQFILES) $(QUICKCHICKFILES)
 OLLVMFILES := 
 
 VFILES := $(COQFILES:%=coq/%.v)

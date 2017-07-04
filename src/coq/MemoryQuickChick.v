@@ -8,6 +8,7 @@ Require Import compcert.lib.Integers.
 Require Import Vellvm.Ollvm_ast.
 Require Import Vellvm.StepSemantics.
 Require Import Vellvm.Memory.
+Require Import Vellvm.CFG.
 
 Require Import Vellvm.OllvmQuickChick.
 Require Import Vellvm.ImpQuickChick.
@@ -58,7 +59,6 @@ Instance shrink_i32 : Shrink int32 :=
 Instance show_i32 : Show int32 := {| show n := show_int (Int32.signed n) |}.
 
 Existing Instance gen_small_nonneg_i64.
-Existing Instance show_i64.
 
 Fixpoint gen_dvalue (n : nat) : G dvalue :=
   let g_expr := freq [(5, liftGen VALUE_Ident arbitrary);
@@ -116,6 +116,8 @@ Fixpoint gen_dvalue (n : nat) : G dvalue :=
     in
     freq [(3, liftGen DV next_g); (1, liftGen DV g_expr)]
   end.
+
+Remove Hints gen_small_nonneg_i64 : typeclass_instances.
 
 Instance gen_small_dvalue : GenSized dvalue :=
   {| arbitrarySized n :=
