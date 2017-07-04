@@ -102,9 +102,11 @@ Instance string_of_mem : StringOf memory :=
   fun mem => ("[" ++ show_nat (List.length mem) ++ "] " ++ string_of mem)%string.
 
 Definition state_to_string (fv : list id) (st : state) : string :=
-  fold_left (fun acc x => (match x with
-                        | Id ident => (ident ++ ": " ++ show_int64 (st x) ++ ", ")%string
-                        end)) fv "".
+  fold_left
+    (fun acc x =>
+       (match x with
+        | Id ident => (ident ++ ": " ++ show_int64 (st x) ++ ", ")%string
+        end)) fv "".
 
 Instance string_of_IDSet_elt : StringOf IDSet.elt :=
   fun elem => 
@@ -153,7 +155,8 @@ Fixpoint get_n_instrs_from_blocks (l : list block) (n : nat) : list block :=
     end
   end.
 
-Fixpoint reduce_to_n_instrs (ll_prog : toplevel_entities (list block)) (n : nat):=
+Fixpoint reduce_to_n_instrs
+         (ll_prog : toplevel_entities (list block)) (n : nat):=
   match ll_prog with
   | [] => []
   | TLE_Definition defn :: other_tles =>
@@ -190,7 +193,8 @@ Definition compile_and_execute (c : Imp.com) (n : nat) : err memory :=
   end.
 
 CoInductive FullTrace :=
-| FT_Tau : SS.state -> FullTrace -> FullTrace (* label silent event with state *)
+(* label silent event with state *)
+| FT_Tau : SS.state -> FullTrace -> FullTrace
 | FT_Vis : Event FullTrace -> FullTrace.
 
 (* Insert state label as breadcrumbs *)
@@ -215,7 +219,8 @@ CoFixpoint sem_all_visible (CFG : mcfg) (st : SS.state) : FullTrace :=
     ))
   end.
 
-Fixpoint MemDFullTrace (m:memory) (d:FullTrace) (steps:nat) : err (SS.state * memory) :=
+Fixpoint MemDFullTrace (m:memory) (d:FullTrace) (steps:nat) :
+  err (SS.state * memory) :=
   match steps with
   | O =>
     match d with
@@ -296,21 +301,23 @@ Definition imp_compiler_correct_aux (p:Imp.com) : Checker :=
         | (None, Some imp_st) => whenFail "llvm out of gas" false 
         | (Some llvm_st, Some imp_st) => 
           let ans_state := List.map (fun x => dvalue_of_int64 (imp_st x)) fvs in
-          checker (whenFail ("not equal: llvm: "
-                               ++ (string_of llvm_st)
-                               ++ "; imp: "
-                               ++ (string_of ans_state)
-                               ++ "; free vars: "
-                               ++ (string_of fvs) (* (elems_to_string fvs) *)
-                               ++ "; compiled code: "
-                               ++ (string_of ll_prog))
-                            (imp_memory_eqb (**!*) (List.rev llvm_st) (**! llvm_st *) ans_state))
+          checker
+            (whenFail ("not equal: llvm: "
+                         ++ (string_of llvm_st)
+                         ++ "; imp: "
+                         ++ (string_of ans_state)
+                         ++ "; free vars: "
+                         ++ (string_of fvs) (* (elems_to_string fvs) *)
+                         ++ "; compiled code: "
+                         ++ (string_of ll_prog))
+                      (imp_memory_eqb (**!*) (List.rev llvm_st)
+                                      (**! llvm_st *) ans_state))
         end        
       end
     end
   end.
 
-Definition check_imp_compiler_correct_with_stats : com -> Checker :=
+Definition run_imp_compiler_correct_with_stats : com -> Checker :=
   (fun c : com => collect c (imp_compiler_correct_aux c)).
 
 Definition run_imp_compiler_correct (p:Imp.com) : string :=
@@ -416,9 +423,9 @@ Definition test_single_assignment_nonneg_no_minus :=
 
 (* Failure because of 
    (1) wrong dvalue_of_int64 in imp_compiler_correct
-   (2) store semantics is incorrect. It should be possible to have something like
-       "store i64 0, %ptr", and this is indeed what the IMP compiler compiles to;
-       however, Ollvm_ast's VALUE_Integers get stuck in eval_expr. 
+   (2) store semantics is incorrect. It should be possible to have something 
+       like "store i64 0, %ptr", and this is indeed what the IMP compiler 
+       compiles to; however, Ollvm_ast's VALUE_Integers get stuck in eval_expr. 
 *)
 Example prog_literal1 :=
   idW ::= (APlus (AMult (AId idX) (ANum (Int64.repr 2)))
@@ -476,7 +483,8 @@ Existing Instance gen_bexp_with_small_aexp.
 Existing Instance gen_adhoc_aexp.
 Existing Instance gen_small_nonneg_i64.
 
-(* QuickChick (forAllShrink (arbitrarySized 1) shrink imp_compiler_correct_aux). *)
+(* QuickChick (forAllShrink (arbitrarySized 1) 
+                         shrink imp_compiler_correct_aux). *)
 
 (* Failure because:
    (1) Branch semantics was expecting eval_expr in StepSemantics to evaluate 
@@ -525,7 +533,8 @@ If (Z <= (ANum 0 * ANum 0)) then Z := ANum 0 else Skip endIf <- incomplete shrin
 
 (* If (~(~(~(ANum 4 = Y /\ ~(false))))) then Y := ANum 1 else X := ANum 5 endIf *)
 Example prog_xor_false1 :=
-  IFB (BNot (BNot (BNot (BAnd (BEq (ANum (Int64.repr 4)) (AId idY)) (BNot (BFalse)))))) THEN
+  IFB (BNot (BNot (BNot (BAnd (BEq (ANum (Int64.repr 4)) (AId idY))
+                              (BNot (BFalse)))))) THEN
     idY ::= ANum (Int64.repr 1)
   ELSE
     idX ::= ANum (Int64.repr 5) FI.
@@ -579,12 +588,18 @@ Existing Instance gen_small_nonneg_i64.
 (* Sample (@arbitrarySized com gen_while_com 3). *)
 (**! QuickChick (forAllShrink (arbitrarySized 8) shrink imp_compiler_correct_aux). *)
 
-Definition test_while := forAll (arbitrarySized 6) check_imp_compiler_correct_with_stats.
+Definition test_while_noisy :=
+  forAll (arbitrarySized 6) run_imp_compiler_correct_with_stats.
+
+Definition test_while :=
+  forAll (arbitrarySized 6) imp_compiler_correct_aux.
 
 (*! QuickChick test_while. *)
 
 (*
-Definition test_term := QuickChick.Test.quickCheck (forAll (arbitrarySized 6) check_imp_compiler_correct_with_stats).
+Definition test_term := 
+QuickChick.Test.quickCheck 
+(forAll (arbitrarySized 6) check_imp_compiler_correct_with_stats).
  *)
 
 (* Separate Extraction *)

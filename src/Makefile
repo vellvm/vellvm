@@ -21,6 +21,8 @@ OLLVMFILES :=
 VFILES := $(COQFILES:%=coq/%.v)
 VOFILES := $(COQFILES:%=coq/%.vo)
 
+EXPERIMENT_FILES := MiniLLVM Vellvm Extract_Haskell_Ollvm_ast Experiments
+
 all:
 	@test -f .depend || $(MAKE) depend
 	$(MAKE) coq
@@ -59,7 +61,7 @@ print-ocaml-includes:
 
 OCAMLLIBS := unix,str
 
-.PHONY: clean main.native test
+.PHONY: clean main.native test qc restore
 
 main.native: 
 	@echo "Compiling Vellvm"
@@ -82,5 +84,17 @@ clean:
 	ocamlbuild -clean
 	rm -rf output
 	rm -f vellvm
+
+qc:
+	cp coq/Makefile_QuickChick coq/Makefile
+	cp coq/_CoqProject_QuickChick coq/_CoqProject
+	$(foreach f, $(EXPERIMENT_FILES), mv coq/$(f).v coq/$(f).bak;)
+	cd coq; echo "Entering coq/"; quickChick -top Vellvm
+	$(foreach f, $(EXPERIMENT_FILES), mv coq/$(f).bak coq/$(f).v;)
+
+restore:
+	rm coq/Makefile
+	rm coq/_CoqProject
+	$(foreach f, $(EXPERIMENT_FILES), mv coq/$(f).bak coq/$(f).v;)
 
 -include .depend
