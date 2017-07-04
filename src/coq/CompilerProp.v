@@ -367,6 +367,7 @@ Definition compile_bexp_correct (b:bexp) : Checker :=
   let p := (IFB b THEN idX ::= ANum (Int64.repr 1) ELSE idY ::= ANum (Int64.repr 2) FI) in
   imp_compiler_correct_aux p.  
 
+(*
 Definition show_aexp_compilation_result (result : err (Ollvm_ast.value * list elt)) :=
   match result with
   | inl _ => "err" 
@@ -378,7 +379,7 @@ Definition show_bexp_compilation_result (result : err (Ollvm_ast.value * list el
   | inl _ => "err"
   | inr (_ , elts) => string_of elts
   end.
-
+*)
 Definition show_result (result : err (toplevel_entities (list block))) :=
   match result with
   | inl _ => "error"

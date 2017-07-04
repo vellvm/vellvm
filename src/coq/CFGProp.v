@@ -18,13 +18,8 @@ Open Scope list_scope.
 (* syntactic structure ------------------------------------------------------ *)
 
 Inductive CFG_has_code_at (CFG:mcfg) (P:pc -> Prop) : pc -> code -> Prop :=
-| has_code_last :
-    forall p iid instr pc_next
-      (HF: fetch CFG p = Some (Step instr))
-      (Hiid: (pt p) = iid)
-      (Hincr: incr_pc CFG p = Some pc_next)
-      (HP: P pc_next),
-      CFG_has_code_at CFG P p [(iid, instr)]
+| has_code_nil :
+    forall p, P p -> CFG_has_code_at CFG P p []
 | has_code_cons :
     forall p iid instr pc_next cd
       (HF: fetch CFG p = Some (Step instr))
@@ -34,37 +29,7 @@ Inductive CFG_has_code_at (CFG:mcfg) (P:pc -> Prop) : pc -> code -> Prop :=
       CFG_has_code_at CFG P p ((iid,instr)::cd).
 Hint Constructors CFG_has_code_at.
 
-Lemma CFG_has_code_app_inv :
-  forall CFG P pc1 (cd1 cd2:code)
-    (H:CFG_has_code_at CFG P pc1 (cd1 ++ cd2)),
-  (cd1 = [] /\ CFG_has_code_at CFG P pc1 cd2)
-  \/
-  (cd2 = [] /\ CFG_has_code_at CFG P pc1 cd1)
-  \/
-  exists pc2,
-    CFG_has_code_at CFG (fun p => p = pc2) pc1 cd1 /\
-    CFG_has_code_at CFG P pc2 cd2.
-Proof.
-  intros CFG P pc1 cd1.
-  revert pc1.
-  induction cd1; intros pc1 cd2 H; try solve [contradiction]; inversion H; subst; simpl in *; auto.
-  - rewrite <- H3 in H.
-    symmetry in H3. destruct (app_eq_nil cd1 cd2) as [Ha Hb]; auto.
-    right. left. rewrite Ha. tauto.
-  - destruct (IHcd1 pc_next cd2) as [[Ha H2]|[[Ha H2]|[pc2 [Ha Hb]]]]; auto.
-    + right. right. exists pc_next.
-      split; auto.
-      subst. eapply has_code_last; eauto.
-    + right. left.
-      split; auto.
-      subst. eapply has_code_cons; eauto.
-    + right. right.
-      exists pc2.
-      split; auto.
-      eapply has_code_cons; eauto.
-Qed.      
-
-Lemma CFG_Has_code_app :
+Lemma CFG_has_code_app :
   forall CFG P (cd1 cd2:code) (pc1 pc2:pc)
     (H1: CFG_has_code_at CFG (fun p => p = pc2) pc1 cd1)
     (H2: CFG_has_code_at CFG P pc2 cd2),
@@ -73,12 +38,79 @@ Proof.
   intros CFG P cd1 cd2 pc1 pc2 H1.
   remember (fun p => p = pc2) as Q.
   revert cd2.
-  induction H1; intros cd2 H2; simpl in *.
-  - eapply has_code_cons; eauto.
-    subst. rewrite HP. assumption.
+  induction H1; intros cd2 H2; simpl in *; auto.
+  - subst. subst. auto.
   - eapply has_code_cons; eauto.
 Qed.    
-      
+
+Lemma CFG_has_code_app_inv :
+  forall CFG P pc1 (cd1 cd2:code)
+    (H:CFG_has_code_at CFG P pc1 (cd1 ++ cd2)),
+  exists pc2,
+    CFG_has_code_at CFG (fun p => p = pc2) pc1 cd1 /\
+    CFG_has_code_at CFG P pc2 cd2.
+Proof.
+  intros CFG P pc1 cd1.
+  revert pc1.
+  induction cd1; intros pc1 cd2 H; inversion H; subst; simpl in *; auto.
+  - exists pc1. split; eauto.
+  - exists pc1. subst. split; eauto.
+  - apply IHcd1 in Hcd.
+    destruct Hcd as [pc2 [HA HB]].
+    exists pc2. split; eauto.
+Qed.
+
+
+Definition CFG_has_pc (CFG:mcfg) (p:pc) : Prop :=
+  exists cmd, fetch CFG p = Some cmd.
+
+Definition CFG_fun_has_block_id (CFG:mcfg) (fid:function_id) (bid:block_id) (p:pc) : Prop :=
+  exists phis, find_block_entry CFG fid bid = Some (BlockEntry phis p) /\ CFG_has_pc CFG p. 
+
+
+Inductive CFG_fun_has_terminator_lbls (CFG:mcfg) (fid:function_id) : terminator -> Prop :=
+| lbls_Ret : forall v, CFG_fun_has_terminator_lbls CFG fid (TERM_Ret v)
+| lbls_Ret_void : CFG_fun_has_terminator_lbls CFG fid TERM_Ret_void
+| lbls_TERM_Br :
+    forall v br1 p1 br2 p2
+      (Hbr1 : CFG_fun_has_block_id CFG fid br1 p1)
+      (Hbr2 : CFG_fun_has_block_id CFG fid br2 p2),
+      CFG_fun_has_terminator_lbls CFG fid (TERM_Br v br1 br2)
+| lbls_TERM_Br_1 :
+    forall br p
+      (Hbr : CFG_fun_has_block_id CFG fid br p),
+      CFG_fun_has_terminator_lbls CFG fid (TERM_Br_1 br)
+| lbls_Resume : forall v, CFG_fun_has_terminator_lbls CFG fid (TERM_Resume v)
+.
+(* TODO:  Add these cases:
+  | TERM_Switch     (v:tvalue) (default_dest:block_id) (brs: list (tvalue * block_id))
+  | TERM_IndirectBr 
+  | TERM_Invoke     (fnptrval:tident) (args:list tvalue) (to_label:block_id) (unwind_label:block_id)
+  .
+*)
+
+
+Inductive CFG_has_terminator_at (CFG:mcfg) : pc -> instr_id -> terminator -> Prop :=
+| CFG_has_termintator_intro :
+    forall p iid t
+      (HF: fetch CFG p = Some (Term t))
+      (Hiid: (pt p) = iid)
+      (Hbrs: CFG_fun_has_terminator_lbls CFG (fn p) t),
+      CFG_has_terminator_at CFG p iid t.
+
+
+Inductive CFG_fun_has_block (CFG:mcfg) (fid:function_id) (b:block) : Prop :=
+| CFG_fun_has_block_intro:
+    forall phis 
+      (HFind: find_block_entry CFG fid (blk_id b) = Some (BlockEntry phis (blk_entry_pc fid b)))      
+      (Hcode: CFG_has_code_at CFG (fun q => q = blk_term_pc fid b) (blk_entry_pc fid b) (blk_code b))
+      (Hterm: CFG_has_terminator_at CFG (blk_term_pc fid b) (blk_term_id b) (blk_terminator b))
+    ,
+      CFG_fun_has_block CFG fid b.
+
+
+Definition CFG_fun_has_blocks (CFG:mcfg) (fid:function_id) (bs:list block) : Prop :=
+  Forall (fun b => CFG_fun_has_block CFG fid b /\ CFG_fun_has_terminator_lbls CFG fid (snd (blk_term b))) bs.
 
 
 (* well formedness ---------------------------------------------------------- *)

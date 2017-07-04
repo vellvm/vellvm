@@ -14,6 +14,7 @@ Require Import Vellvm.DecidableEquality.
 
 (** ** Basic Propositions *)
 
+(*
 Instance dec_compiled:
   forall elts c, Decidable (compiled_code (elts : list elt) (c : code)).
 Proof.
@@ -33,7 +34,7 @@ Proof.
     try solve [left; rewrite iid_eq; rewrite instr_eq;
                constructor; auto].
 Defined.
-
+*)
 Instance dec_is_Op : forall (i : instr), Decidable (is_Op i).
 Proof.
   intros i; unfold Decidable; destruct i;

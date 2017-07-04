@@ -1402,12 +1402,6 @@ Defined.
 Instance eq_dec_terminator : eq_dec terminator.
 Proof.
   lift_decide_eq; left; auto.
-Defined.
-
-Instance eq_dec_elt : eq_dec elt.
-Proof.
-  lift_decide_eq; left; auto.
-Defined.
 
 Instance eq_dec_phi : eq_dec Ollvm_ast.phi.
 Proof. lift_decide_eq. Defined.
@@ -1417,7 +1411,7 @@ Proof.
   unfold code; lift_decide_eq;
   left; auto.
 Defined.
-
+(*
 Instance eq_dec_block : eq_dec block.
 Proof. lift_decide_eq. Defined.
 
@@ -1429,7 +1423,7 @@ Proof. lift_decide_eq. Defined.
 
 Instance eq_dec_SS_state : eq_dec SS.state.
 Proof. lift_decide_eq. Defined.
-
+*)
 (*
 The following are not true. 
 Instance eq_dec_effects `{eq_dec D} : eq_dec (effects D).
