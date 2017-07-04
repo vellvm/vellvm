@@ -7,9 +7,9 @@ COQINCLUDES=-R . Vellvm -R $(COQLIBDIR)/paco/src Paco -R $(COQLIBDIR)/CompCert c
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 
-QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick
+QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick CompilerQuickChick
 IMPCOQFILES := Maps Imp ImpCEvalFun Compiler CompilerProp ImpCorrectness ImpOptimizer ImpCorrectnessTest
-COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality $(IMPCOQFILES) $(QUICKCHICKFILES) QuickChickTop
+COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp $(IMPCOQFILES) $(QUICKCHICKFILES) QuickChickTop
 OLLVMFILES := 
 
 VFILES := $(COQFILES:%=%.v)
