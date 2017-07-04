@@ -78,14 +78,12 @@ Definition test_id_gen := elems [idX; idY; idZ; idW].
 Definition test_id_gen_restricted :=
   freq [(6, returnGen idX) ; (4, returnGen idY)].
 
+Definition test_state1 x := t_update empty_state idX x.
+Definition test_state2 x y := t_update (test_state1 x) idY y.
+Definition test_state3 x y z := t_update (test_state2 x y) idZ z.
+Definition test_state4 x y z w := t_update (test_state3 x y z) idW w.
 Definition test_state :=
-  t_update
-    (t_update
-       (t_update
-          (t_update empty_state idX Int64.zero)
-          idY Int64.zero)
-       idZ Int64.zero)
-    idW Int64.zero.
+  test_state4 Int64.zero Int64.zero Int64.zero Int64.zero.
 
 Instance gen_id : Gen id := {| arbitrary := test_id_gen |}.
 
@@ -100,20 +98,30 @@ Instance show_state `{Show int64}: Show state :=
        "Y = " ++ (show (st idY)) ++ ", " ++
        "Z = " ++ (show (st idZ)) ++ ", ")%string
   |}.
-       
-Fixpoint gen_state_func (num_gen : G int64) (id_gen : G id) (n : nat) : G state :=
-  match n with
-  | 0 => returnGen empty_state
-  | S n' =>
-    bindGen id_gen (fun id =>
-    bindGen num_gen (fun val => 
-    bindGen (gen_state_func num_gen id_gen n')
-            (fun st =>
-               returnGen (t_update st id val))))
-  end.
 
 Instance gen_state `{GenSized int64}: GenSized state :=
-  {| arbitrarySized n := gen_state_func (arbitrarySized n) test_id_gen n |}.
+  {| arbitrarySized n :=
+       bindGen arbitrary (fun x =>
+       bindGen arbitrary (fun y => 
+       bindGen arbitrary (fun z =>
+       bindGen arbitrary (fun w => 
+       match n with
+       | 0 => returnGen empty_state
+       | S n1 =>
+         match n1 with
+         | 0 => returnGen (test_state1 x)
+         | S n2 =>
+           match n2 with
+           | 0 => returnGen (test_state2 x y)
+           | S n3 =>
+             match n3 with
+             | 0 => returnGen (test_state3 x y z)
+             | S n4 => returnGen (test_state4 x y z w)
+             end
+           end
+         end
+       end))))
+  |}.
 
 Instance shrink_state : Shrink state :=
   {| shrink := fun _ => [] |}.

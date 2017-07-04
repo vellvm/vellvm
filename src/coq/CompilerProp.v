@@ -40,8 +40,6 @@ Require Import compcert.lib.Integers.
 
 (* These definitions should probably go in a library *)
 
-Check Int64.eq_dec.
-
 Definition dvalue_of_nat (n:nat) : dvalue :=
   DV (VALUE_Integer (Z.of_nat n)).
 
