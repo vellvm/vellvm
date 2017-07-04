@@ -347,8 +347,8 @@ Hint Constructors Rv1e.
 
 Section Correctness.
 
-  Parameter (g:ctxt).
-  Parameter g_inj : forall (x y:id), (beq_id x y = false) -> (g x) <> (g y).
+  Variable (g:ctxt).
+  Variable g_inj : forall (x y:id), (beq_id x y = false) -> (g x) <> (g y).
 
 Definition memory_invariant (e:env) (m:memory) (st:Imp.state) : Prop :=
   forall x v, g x = Some v ->
@@ -1038,6 +1038,7 @@ Proof.
       inversion H5.
       unfold Rv64.
       inversion H6.
+      inversion H4.
       (* Needs injectivity of g and some other facts about nth_default and replace *)
       admit.
 
@@ -1224,9 +1225,9 @@ Proof.
 Admitted.      
       
 
-      
-    
-      
+End Correctness.      
+
+
       
 
 (*
