@@ -46,12 +46,20 @@ Assumes:
  - coqc   : version 8.6   (and coqdep, etc.)
  - ocamlc : version 4.04  (probably works with 4.02 or later)
  - OPAM packages: ocamlbuild, menhir, llvm  (for llvm v. 3.8)
+BCP: llvm might not be needed?
  - paco  library  in /lib/paco   [available here](http://plv.mpi-sws.org/paco/)
+
+BCP 6/29/17: Also...
+ - compcert 
+     - download CompCert 3.0.1 from http://compcert.inria.fr/download.html
+     - untar, rename to CompCert, and put in /vellvm/lib directory
+     ./configure x86_64-macosx    [or whatever]
+     make
 
 Compilation:
 
 1. clone the vellvm git repo
-2. install 3rd party libraries in /lib  (currently just Paco)
+2. install 3rd party libraries in /lib  (Paco and CompCert)
 3. run `make` in the /src directory
 
 # Running
