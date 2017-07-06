@@ -52,7 +52,7 @@ Instance eq_dec_pc : eq_dec pc := PC.eq_dec.
 
 
 (* control flow graphs (CFGs) ----------------------------------------------- *)
-
+(* TODO: rename Step to Inst *)
 Inductive cmd : Set :=
 | Step (i:instr) 
 | Term (t:terminator)

@@ -197,25 +197,51 @@ Lemma exp_state_le_antireflexive : forall s1 s2, exp_state_le s1 s2 -> exp_state
 Proof.
 Admitted.  
 
+Definition tm_le : (instr_id * terminator) -> (instr_id * terminator) -> Prop :=
+  fun t1 t2 => exists m1 m2, fst t1 = IVoid m1 /\ fst t2 = IVoid m2 /\ m1 <= m2.
 
+Definition block_le (b1 b2:Ollvm_ast.block) : Prop :=
+  (blk_id b1) = (blk_id b2) /\
+  (blk_phis b1) = (blk_phis b2) /\
+  (list_le (blk_code b1) (blk_code b2)) /\
+  (blk_term b1) = (blk_term b2).
+
+Lemma block_le_refl : forall b, block_le b b.
+Proof.
+  destruct b; unfold block_le; simpl; repeat split; auto.
+  apply list_le_refl.
+Qed.
+
+Ltac general_inversion :=
+  repeat (match goal with
+          | [ H : ?X /\ ?Y |- _ ] => let X := fresh "X" in destruct H as [X H]
+          end).
+
+Lemma block_le_trans : forall b1 b2 b3, block_le b1 b2 -> block_le b2 b3 -> block_le b1 b3.
+Proof.
+  unfold block_le; intros.
+  destruct b1; destruct b2; destruct b3; simpl in *.
+  general_inversion. subst.
+  repeat split; try tauto.
+  eapply list_le_trans; eauto.
+Qed.  
 
 Inductive  cmd_state_le : cmd_state -> cmd_state -> Prop :=
 | cmd_same_block :
-    forall n1 m1 is1 t1 bs1 n2 m2 is2 t2 bs2
+    forall n1 b1 bs1 n2 b2 bs2
       (Hn: n1 <= n2)
-      (Hm: m1 <= m2)
-      (His: list_le is1 is2)
-      (Ht: t1 = t2)
+      (Hb: block_le b1 b2)
       (Hbs: bs1 = bs2),
-      cmd_state_le (mk_cs n1 m1 is1 t1 bs1) (mk_cs n2 m2 is2 t2 bs2)
+      cmd_state_le (mk_cs n1 b1 bs1)
+                   (mk_cs n2 b2 bs2)
 | cmd_new_block :
-    forall n1 m1 is1 t1 bs1 n2 m2 is2 t2 bs2
+    forall n1 bid1 is1 t1 bs1 n2 b2 bs2
       (Hn: n1 <= n2)
-      (Hm: m1 <= m2)
-      (Hcd: exists n, n1 <= n /\ n <= n2 /\ exists m, m1 <= m /\ m <= m2 /\
-            exists is', list_le ((mk_block (lid_of_Z n) [] (rev (is' ++ is1)) (IVoid m, t1))::bs1) bs2),
+      (Hbid: raw_id_le bid1 (blk_id b2))
+      (Htm: tm_le t1 (blk_term b2))
+      (Hcd: exists is', list_le ((mk_block bid1 [] (is' ++ is1) t1)::bs1) (b2::bs2)),
       
-      cmd_state_le (mk_cs n1 m1 is1 t1 bs1) (mk_cs n2 m2 is2 t2 bs2)
+      cmd_state_le (mk_cs n1 (mk_block bid1 [] is1 t1) bs1) (mk_cs n2 b2 bs2)
 .
 
 Ltac exploit_cmd_state_le :=
@@ -229,12 +255,15 @@ Ltac exploit_cmd_state_le :=
 Lemma cmd_state_le_refl : forall (cs:cmd_state), cmd_state_le cs cs.
 Proof.
   destruct cs.
-  eapply cmd_same_block; eauto; try omega; try apply list_le_refl.
+  destruct b.
+  eapply cmd_same_block; eauto; try omega; try apply block_le_refl.
 Qed.  
   
-
 Lemma cmd_state_le_trans : forall s1 s2 s3, cmd_state_le s1 s2 -> cmd_state_le s2 s3 -> cmd_state_le s1 s3.
 Proof.
+  (* TODO : FIX THIS *)
+Admitted.
+(*
   intros s1 s2 s3 H12 H23.
   destruct s1. destruct s2. destruct s3.
   inversion H12; subst; auto.
@@ -264,6 +293,7 @@ Proof.
      :: cd').
       simpl. rewrite <- app_assoc. reflexivity.
 Qed.      
+*)
       
 
 (*
@@ -926,7 +956,7 @@ Inductive matching_state (CFG:mcfg) (fid:function_id) (P:pc -> Prop) : pc -> com
       (HBR2: CFG_fun_has_block_id CFG fid br2 [] p2)
       (IH2: matching_state CFG fid P p2 c2)
       (Hmerge: CFG_fun_has_block_id CFG fid merge [] pmerge)
-      (IHmerge: matching_state CFG fid P pmerge SKIP),
+      (IHmerge: P pmerge),
       matching_state CFG fid P p (CIf b c1 c2)
 
 | match_while0:
@@ -939,7 +969,7 @@ Inductive matching_state (CFG:mcfg) (fid:function_id) (P:pc -> Prop) : pc -> com
       (Hbody: CFG_fun_has_block_id CFG fid body [] pbody)
       (IH1: matching_state CFG fid (fun q => fetch CFG q = Some (Term (TERM_Br_1 entry))) pbody c)
       (Hexit: CFG_fun_has_block_id CFG fid exit [] pexit)
-      (IHexit: matching_state CFG fid P pexit SKIP),
+      (IHexit: P pexit),
       matching_state CFG fid P p (CWhile b c)
 
 | match_while1:
@@ -951,7 +981,7 @@ Inductive matching_state (CFG:mcfg) (fid:function_id) (P:pc -> Prop) : pc -> com
       (Hbody: CFG_fun_has_block_id CFG fid body [] pbody)
       (IH1: matching_state CFG fid (fun q => fetch CFG q = Some (Term (TERM_Br_1 entry))) pbody c)
       (Hexit: CFG_fun_has_block_id CFG fid exit [] pexit)
-      (IHexit: matching_state CFG fid P pexit SKIP),
+      (IHexit: P pexit),
       matching_state CFG fid P p (CWhile b c)
 
 .
@@ -992,7 +1022,7 @@ Inductive related_configuration (CFG:mcfg) fid (cmd:com) (st:Imp.state) (s:SS.st
     related_configuration CFG fid cmd st s mem P.
 Hint Constructors related_configuration.    
 
-Lemma compile_com_correct :
+Lemma step_simulation :
   forall (cmd1 cmd2:com) (st1 st2:Imp.state)
     (HStep: cmd1 / st1 ==> cmd2 / st2)
     (CFG:mcfg) (fid:function_id) (s1:SS.state) (mem1:memory) P
@@ -1144,7 +1174,7 @@ Proof.
     inversion Hexit. inversion Hentry. apply find_block_same_fid in H3. rewrite Hpc. rewrite H3. rewrite H1.
     simpl. reflexivity.
     eapply step_zero.
-    eapply config_intro. reflexivity. eauto. econstructor.  inversion IHexit. subst. auto.
+    eapply config_intro. reflexivity. eauto. econstructor.  exact IHexit. 
     inversion Hexit. apply find_block_same_fid in H0. auto.
 
     subst.
@@ -1163,7 +1193,7 @@ Proof.
     inversion Hexit. inversion Hentry. apply find_block_same_fid in H3. rewrite Hpc. rewrite H1. 
     simpl. reflexivity.
     eapply step_zero.
-    eapply config_intro. reflexivity. eauto. econstructor.  inversion IHexit. subst. auto.
+    eapply config_intro. reflexivity. eauto. econstructor.  exact IHexit. subst. auto.
     inversion Hexit. apply find_block_same_fid in H0. auto.
     
   - inversion Hrel.
@@ -1197,7 +1227,7 @@ Proof.
     eapply step_zero.
     eapply config_intro. reflexivity. eauto. econstructor.
     Focus 2. eapply match_while1. apply Hentry. eauto. eapply HCFG. eapply Hbody. eapply IH1. eapply Hexit.
-    inversion IHexit. subst. econstructor. exact Hp.
+    exact IHexit. 
     
     eapply matching_state_weakening with (P:= (fun q : pc => fetch CFG q = Some (Term (TERM_Br_1 entry)))).
     intros.
@@ -1220,7 +1250,7 @@ Proof.
       eapply step_zero.
       eapply config_intro. reflexivity. eauto. econstructor.
       Focus 2. eapply match_while1. apply Hentry. eauto. eapply HCFG. eapply Hbody. eapply IH1. eapply Hexit.
-      inversion IHexit. subst. econstructor. exact Hp.
+      exact IHexit. 
     
       eapply matching_state_weakening with (P:= (fun q : pc => fetch CFG q = Some (Term (TERM_Br_1 entry)))).
       intros.
@@ -1228,7 +1258,149 @@ Proof.
       inversion Hbody.
       apply find_block_same_fid in H0. exact H0.
 Admitted.      
-      
+
+
+Ltac exploit_cc :=
+  repeat (match goal with
+          | [ H : context[match compile_aexp ?g ?a ?cs with _ => _ end] |- _ ] =>
+            let CA := fresh "CA" in
+            let EQCA := fresh "EQCA" in
+            remember (compile_aexp g a cs) as CA eqn:EQCA; destruct CA; simpl in H
+
+          | [ H : context[compile_com _ _ _] |- _ ] => unfold compile_com in H; simpl in H
+
+          | [ H : context[cmd_bind _ _] |- _] => unfold cmd_bind in H; simpl in H
+
+          | [ H : context[cmd_ret _] |- _] => unfold cmd_ret in H; simpl in H
+                                                                                  
+          | [ H : context[inject_code ?cd] |- _] => unfold inject_code in H; simpl in H
+
+          | [ p : int * code |- _ ] =>
+            let n := fresh "n" in
+            let cd := fresh "cd" in destruct p as [n cd]
+
+          | [ e : err Ollvm_ast.value |- _ ] =>
+            let v := fresh "v" in
+            destruct e as [v | v]
+
+          | [ H : context[trywith _ (?g ?i)] |- _ ] =>
+            let ptr := fresh "ptr" in
+            let EQptr := fresh "EQptr" in
+            remember (g i) as ptr eqn:EQptr; destruct ptr; simpl in H
+                            
+          | [ H : (?cs, ?ans1) = ((mk_cs ?n2 ?m2 ?is2 ?tm2 ?bs2), ?ans2) |- _ ] =>
+            inversion H; clear H; subst
+
+                                    
+          end
+         ).
+
+Definition CFG_has_compiler_state CFG fid cs p := 
+    (fn p) = fid /\
+    (bk p) = blk_id (b cs) /\
+    (pt p) = fallthrough (blk_code (b cs)) (fst (blk_term (b cs))) /\
+    exists b', block_le (b cs) b' /\
+     CFG_fun_has_blocks CFG fid (b'::(bs cs))
+.
+
+Lemma compiled_state_matches :
+  forall cmd CFG fid n bid is tm blks cs'
+    (Hcomp: (cs', inr ()) = compile_com g cmd (mk_cs n (mk_block bid [] is tm) blks))
+    (p:pc) 
+    (HCFG: CFG_has_compiler_state CFG fid cs' p),
+    exists P ,
+    matching_state CFG fid P p cmd.
+Proof.
+  induction cmd; intros.
+
+  - exists (fun q => q = p).
+    econstructor. eauto.
+    
+  - exploit_cc.
+    + inversion Hcomp.
+    + inversion Hcomp.  subst. clear Hcomp.
+    destruct HCFG as [Hfn [Hbk [Hpt [b [Hb HCFG]]]]]. simpl in *.
+    inversion HCFG.
+    clear HCFG. clear H2. clear H0.
+    destruct H1 as [phis [CFGcd CFGtm]].
+    inversion CFGcd.
+    unfold block_le in Hb. simpl in Hb.
+    general_inversion.
+    
+
+(*
+  NEED: 
+  Lemma:
+    - CFG_has_code_at CFG fid P p (blk_code b)  
+    - block_le b' b
+    then CFG_has_code_at CFG fid (fun q => True) p (blk_code b')
+
+  Lemma: 
+    - 
+
+*)
+    
+    
+    exists (fun q => q = (mk_pc fid (bk p) (fst tm))).
+    econstructor; eauto.
+    simpl. subst.
+    unfold block_le in Hb. simpl in Hb. general_inversion.
+    subst.
+    
+    destruct Hb as [id0 H].
+    unfold blk_code in Hcode. rewrite HeqB in Hcode at 2. 
+    apply CFG_has_code_app_inv in Hcode.
+    destruct Hcode as [pc2 [_ Hcode]].
+    replace (rev cd ++ (IVoid m, INSTR_Store false (i64, v) (i64ptr, v0) None) :: is ) with
+    ((rev cd ++ [(IVoid m,    INSTR_Store false (i64, v) (i64ptr, v0) None)]) ++ is ) in Hcode.
+    apply CFG_has_code_app_inv in Hcode.
+    destruct Hcode as [pc3 [Hcode _]].
+
+    Lemma CFG_has_code_at_inv_pt : forall CFG P pc cd, 
+    
+    
+    
+
+  - simpl in Hcomp.
+    unfold cmd_bind in Hcomp.
+    econstructor.
+    Focus 2.
+    remember (compile_com g cmd2 {| n := n; m := m; is := []; tm := tm; bs := [] |}) as C.
+    destruct C. destruct c. destruct e. inversion Hcomp. destruct u.
+    apply (IHcmd2 CFG fid) in HeqC. 
+    eapply IHcmd2 with (CFG:=CFG)(fid:=fid)(n:=n)(m:=m)(tm:=tm)(n':=n0). eapply HeqC.
+    
+
+    destruct u. reflexivity.
+    
+    
+    
+    eapply IHcmd2.
+    remember (compile_com g cmd2 {| n := n; m := m; is := []; tm := tm; bs := [] |}) as C2 eqn:HC2.
+    destruct C2. destruct e. inversion Hcomp.
+    destruct c.
+    inversion HCFG. destruct H1. destruct H1.
+    eapply HC2.
+    
+    eapply matching_state_weakening. Focus 2.
+    eapply IHcmd1.
+    
+    
+    
+    exploit_cc.
+    
+    
+    match goal with 
+    | [ H : context[match compile_aexp ?g ?a ?cs with _ => _ end] |- _ ] => pose (1 = 2) 
+    end.
+
+    simpl in Hcomp. unfold cmd_of_exp in Hcomp.
+    unfold cmd_bind in Hcomp.
+    remember (compile_aexp g a (n, [])) as C.
+    destruct C. destruct p. destruct e. simpl in Hcomp. inversion Hcomp.
+    unfold inject_code in Hcomp. simpl in Hcomp. destruct (g i). simpl in Hcomp.
+    unfold cmd_ret in Hcomp. inversion Hcomp. subst.
+    econstructor. eauto.
 
 End Correctness.      
 

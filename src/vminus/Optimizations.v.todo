@@ -1,0 +1,699 @@
+Require Import Arith List SfLib.
+Import ListNotations.
+
+Require Import Vminus Sequences Util.
+
+Module Import V := Vminus.Make ListCFG.
+Import ListCFG.
+Notation cfg := ListCFG.t.
+
+Unset Printing Records.
+
+Infix "<p=" := le_pc (at level 70).
+Notation "i @ [ f , pc ]" := (insn_at_pc f pc i) 
+  (at level 70, format "i @ [ f ,  pc ]").
+
+Parameter eq_pc_dec : forall (p q:pc), {p = q} + {p <> q}.
+Parameter block_eq_dec : forall (b c:block), {b = c} + {b <> c}.
+
+(* TODO: insn_uses from Vminus.v doesn't include phi args ... *)
+Definition insn_uses' (i:insn) : list val :=
+  match i with
+    | (_, cmd_bop _ v1 v2) => [v1; v2]
+    | (_, cmd_tmn (tmn_cbr v _ _)) => [v]
+    | (_, cmd_store _ v) => [v]
+    | (_, cmd_phi pas) => map (@snd _ _) pas
+    | _ => []
+  end.
+
+Definition backsim_step (R:state -> state -> Prop) (g1 g2:cfg) := 
+  forall st1 st2 st2',
+  step g2 st2 st2' -> R st1 st2 ->
+  exists st1',
+    star (step g1) st1 st1' /\ R st1' st2'.
+
+Module Delete.
+
+Section DELETE.
+
+Variable g : cfg.
+Variable u : uid.
+Variable upc : pc.
+
+Hypothesis HWFG : wf_prog g.
+Hypothesis UDEF : def_at_pc g upc u.
+
+Inductive insns_rel : list insn -> list insn -> Prop :=
+| insns_rel_left : forall c is1 is2,
+    insns_rel is1 is2 ->
+    insns_rel ((u,c)::is1) (is2)
+| insns_rel_lock : forall v c is1 is2,
+    v <> u ->
+    insns_rel is1 is2 ->
+    insns_rel ((v,c)::is1) ((v,c)::is2)
+| insns_rel_tmn : forall t1 t2, 
+    is_tmn t1 -> is_tmn t2 ->
+    insns_rel [t1] [t2].
+
+Inductive block_rel : block -> block -> Prop :=
+| block_rel_intro : forall l is1 is2,
+    insns_rel is1 is2 ->
+    block_rel (l, is1) (l, is2).
+
+Inductive cfg_rel : cfg -> cfg -> Prop :=
+| cfg_rel_intro : forall e bs1 bs2,
+    Forall2 block_rel bs1 bs2 ->
+    cfg_rel (e, bs1) (e, bs2).
+
+Variable f : cfg -> cfg.
+Let g' := f g.
+Hypothesis HWFG' : wf_prog g'.  (* need to typecheck *)
+Hypothesis GREL : cfg_rel g g'.
+Hypothesis USESU : forall p i, 
+  insn_at_pc g p i -> ~ In (val_uid u) (insn_uses' i).
+
+Definition loc_rel (loc1 loc2:loc) : Prop :=
+  forall v, v <> u -> loc1 v = loc2 v.
+
+Inductive pc_rel : pc -> pc -> Prop :=
+| pc_rel_gt : forall pc1 pc2,
+    upc <p= pc2 -> 
+    pc1 = incr_pc pc2 ->
+    pc_rel pc1 pc2
+| pc_rel_ngt : forall pc,
+    ~ upc <p= pc ->
+    pc_rel pc pc.
+
+Inductive state_rel : state -> state -> Prop :=
+| state_rel_intro : forall st1 st2,
+    loc_rel (st_loc st1) (st_loc st2) ->
+    loc_rel (st_ploc st1) (st_ploc st2) ->
+    lbl_of (st_ppc st1) = lbl_of (st_ppc st2) ->
+    st_mem st1 = st_mem st2 ->
+    state_rel st1 st2.
+
+Definition sim_rel (st1 st2:state) : Prop :=
+  state_rel st1 st2 /\ 
+  pc_rel (st_pc st1) (st_pc st2) /\
+  wf_state g st1.
+
+Require Import RelationClasses.
+
+Instance loc_rel_trans : Transitive loc_rel.
+Proof.
+  red; unfold loc_rel; intros. transitivity (y v); auto.
+Qed.
+
+Instance loc_rel_symm : Symmetric loc_rel.
+Proof.
+  red; unfold loc_rel; intros. rewrite H; auto.
+Qed.
+
+Instance state_rel_transitive : Transitive state_rel.
+Proof.
+  red; intros. inversion H; inversion H0; subst.
+  constructor; etransitivity; eauto.
+Qed.
+
+Lemma insn_at_diff_contra : forall g i j pc,
+  wf_prog g ->
+  i@[g, pc] -> j@[g, pc] -> i <> j -> False.
+Proof.
+  intros. contradict H2. inversion H; eapply insn_at_pc_func; eauto.
+Qed.
+
+(* TODO: can define GREL in terms of insn_at? *)
+  
+Lemma in_cfg_rel : forall l is,
+  In (l, is) (snd g) ->
+  exists is', In (l, is') (snd g') /\ block_rel (l, is) (l, is').
+Proof.
+  intros. inversion GREL; subst. simpl in *.
+  clear - H H2.
+  induction H2. inversion H.
+
+  destruct (block_eq_dec (l, is) x); subst.
+  inversion H0; subst.
+  exists is2. split. left; auto. auto.
+  inversion H. contradict n; auto.
+  ecase IHForall2 as [b' [? ?]]; auto. 
+  eexists; intuition eauto. right; auto.
+Qed.
+
+Lemma in_cfg_rel' : forall l is',
+  In (l, is') (snd g') ->
+  exists is, In (l, is) (snd g) /\ block_rel (l, is) (l, is').
+Proof.
+  intros. inversion GREL; subst.
+  rewrite <- H0 in H. simpl in *.
+  clear - H H2.
+  induction H2. inversion H.
+  
+  destruct (block_eq_dec (l, is') y); subst.
+  inversion H0; subst.
+  exists is1. split. left; auto. auto.
+  inversion H. contradict n; auto.
+  ecase IHForall2 as [b' [? ?]]; auto.
+  eexists; intuition eauto. right; auto.
+Qed.
+
+(* Lemma pc_insns_rel : forall is1 is2 *)
+(*   (His: insns_rel is1 is2) l n m *)
+(*   (Hpc: pc_rel (l, n) (l, m)) i, *)
+(*   Nth i is2 m <-> Nth i is1 n. *)
+(* Proof. *)
+(*   intros ? ? ? ?. *)
+(*   induction His as [? is1'| |]. *)
+
+(*   Case "insns_rel_left". admit. *)
+(*   Case "insns_rel_lock". admit. *)
+(*   Case "insns_rel_tmn". admit. *)
+(* Qed. *)
+
+Lemma pc_insns_rel : forall e1 e2 bs1 bs2 l n m is1 is2 i,
+  wf_cfg (e1, bs1) ->
+  wf_cfg (e2, bs2) ->
+  In (l, is1) bs1 -> 
+  In (l, is2) bs2 ->
+  pc_rel (l, n) (l, m) ->
+  insns_rel is1 is2 ->
+  (Nth i is2 m <-> Nth i is1 n).
+Proof.
+Admitted.
+
+Lemma pc_rel_insn_at : forall pc1 pc2,
+  wf_pc g pc1 ->
+  pc_rel pc1 pc2 ->
+  exists i, i@[g', pc2] /\ i@[g, pc1].
+Proof.
+  intros ? ? Hwf Hrel.
+  apply wf_pc_insn in Hwf as [i Hi].
+  exists i. split; auto.
+  clear - Hi Hrel GREL HWFG HWFG'.
+
+  unfold insn_at_pc in *. destruct pc1, pc2.
+  replace t1 with t0 in *.
+  destruct Hi as [b [Hin Hnth]].
+  ecase in_cfg_rel as [b' [Hin' Hb']]; eauto. 
+  eexists. split; eauto.
+  
+  inversion Hb'; eapply pc_insns_rel with (is1:=b) (is2:=b'); eauto.
+
+  inversion HWFG; rewrite <- surjective_pairing; auto. 
+  inversion HWFG'; rewrite <- surjective_pairing; auto.
+
+  inversion Hrel; subst; auto. inversion H0; auto. 
+  inversion HWFG; auto.
+Qed.
+  
+Lemma pc_rel_lbl_eq : forall pc1 pc2,
+  pc_rel pc1 pc2 ->
+  lbl_of pc1 = lbl_of pc2.
+Proof.
+  inversion 1 as [[? ?] [? ?] ? Heq |]; [inversion Heq|]; auto.
+Qed.
+
+Lemma pc_rel_lbl_eq' : forall l1 l2 n1 n2,
+  pc_rel (l1, n1) (l2, n2) ->
+  l1 = l2.
+Proof. 
+  inversion 1 as [? ? ? Heq |]; [inversion Heq |]; auto. 
+Qed.
+
+Ltac split_tac H :=
+  match goal with
+    | |- ?A /\ ?B => assert A as H; [|split; [exact H|]]
+  end.
+Tactic Notation "split'" := let H := fresh in split_tac H.
+Tactic Notation "split'" "as" ident(H) := split_tac H.
+
+
+Lemma pc_rel_insn_at_bi : forall pc1 pc2,
+  pc_rel pc1 pc2 ->
+  forall i, i@[g, pc1] <-> i@[g', pc2].
+Proof.
+  intros [l1 n1] [l2 n2] Hpc i.
+  replace l2 with l1 in *.
+
+  split; unfold insn_at_pc in *.
+
+  intros [is [Hin Hnth]].
+  pose proof Hin as Hin'.
+  apply in_cfg_rel in Hin' as [is' [Hin' Hrel']].
+  exists is'. inversion Hrel'. split; auto. 
+  eapply pc_insns_rel with (is1:=is) (is2:=is'); eauto.
+  inversion HWFG; rewrite <- surjective_pairing; eauto.
+  inversion HWFG'; rewrite <- surjective_pairing; eauto.
+
+  intros [is' [Hin' Hnth']].
+  pose proof Hin' as Hin.
+  apply in_cfg_rel' in Hin as [is [Hin Hrel]].
+  exists is. inversion Hrel. split; auto. 
+  eapply pc_insns_rel with (m:=n2) (is1:=is) (is2:=is'); intros; eauto.
+  inversion HWFG; rewrite <- surjective_pairing; eauto.
+  inversion HWFG'; rewrite <- surjective_pairing; eauto.
+
+  change l1 with (lbl_of (l1, n1)).
+  change l2 with (lbl_of (l2, n2)).
+  eapply pc_rel_lbl_eq; eauto.
+Qed.
+  
+Lemma pc_rel_insn_at_eq : forall pc1 pc2 i1 i2,
+  pc_rel pc1 pc2 ->
+  i1@[g, pc1] -> i2@[g', pc2] ->
+  i1 = i2.
+Proof.
+  intros.
+  inversion HWFG; eapply insn_at_pc_func; eauto.
+  eapply pc_rel_insn_at_bi; eauto.
+Qed.
+
+Lemma loc_rel_update : forall loc1 loc2 v n,
+  loc_rel loc1 loc2 ->
+  loc_rel (Locals.update loc1 v n) (Locals.update loc2 v n).
+Proof.
+  red; intros. destruct (Uid.eq_dec v v0).
+    repeat rewrite Locals.update_eq; eauto. 
+    repeat rewrite Locals.update_neq; eauto.
+Qed.
+
+Lemma loc_rel_eval_val : forall v loc1 loc2,
+  v <> (val_uid u) ->
+  loc_rel loc1 loc2 ->
+  eval_val loc1 v = eval_val loc2 v.
+Proof.
+  intros until 2.
+  destruct v; auto; simpl.
+  rewrite H0; auto.
+  contradict H; subst; auto.
+Qed.  
+
+Lemma loc_rel_eval_bop : forall x bop v1 v2 loc1 loc2 n,
+  ~ In (val_uid u) (insn_uses' (x, cmd_bop bop v1 v2)) ->
+  loc_rel loc1 loc2 ->
+  Some n = eval_bop loc1 bop v1 v2 ->
+  Some n = eval_bop loc2 bop v1 v2.
+Proof.
+  intros until 2. simpl in H. unfold eval_bop. 
+  rewrite 2 loc_rel_eval_val with (loc1:=loc1) (loc2:=loc2); auto.
+Qed.
+
+Lemma loc_rel_eval_bop_eq : forall x bop v1 v2 loc1 loc2 n1 n2,
+  ~ In (val_uid u) (insn_uses' (x, cmd_bop bop v1 v2)) ->
+  loc_rel loc1 loc2 ->
+  Some n1 = eval_bop loc1 bop v1 v2 ->
+  Some n2 = eval_bop loc2 bop v1 v2 -> 
+  n1 = n2.
+Proof.
+  intros. eapply loc_rel_eval_bop in H1; eauto.
+  rewrite <- H1 in H2. injection H2; auto.
+Qed.
+
+Lemma loc_rel_eval_phi : forall x l pas loc1 loc2 n,
+  ~ In (val_uid u) (insn_uses' (x, cmd_phi pas)) ->
+  loc_rel loc1 loc2 ->
+  Some n = eval_phi loc1 l pas ->
+  Some n = eval_phi loc2 l pas.
+Proof.
+  intros until 2. unfold eval_phi. 
+  destruct (assoc _ _ _) eqn:Hassoc; try discriminate.
+  rewrite loc_rel_eval_val with (loc1:=loc1) (loc2:=loc2); auto.
+  apply assoc_in in Hassoc. simpl in H. contradict H. subst.
+  change (val_uid u) with (snd (l, val_uid u)).
+  apply in_map; auto.
+Qed.
+
+Lemma loc_rel_eval_phi_eq : forall x l pas loc1 loc2 n1 n2,
+  ~ In (val_uid u) (insn_uses' (x, cmd_phi pas)) ->
+  loc_rel loc1 loc2 ->
+  Some n1 = eval_phi loc1 l pas ->
+  Some n2 = eval_phi loc2 l pas ->
+  n1 = n2.
+Proof.
+  intros. eapply loc_rel_eval_phi in H1; eauto.
+  rewrite <- H1 in H2. injection H2; auto.
+Qed.
+
+Lemma loc_rel_eval_tmn : forall x loc1 loc2 l t,
+  ~ In (val_uid u) (insn_uses' (x, cmd_tmn t)) ->
+  loc_rel loc1 loc2 ->
+  Some l = eval_tmn loc1 t ->
+  Some l = eval_tmn loc2 t.
+Proof.
+  intros until 2. unfold eval_tmn.
+  destruct t0; try solve [inversion 1]; auto. simpl in H.
+  rewrite loc_rel_eval_val with (loc1:=loc1) (loc2:=loc2); auto.
+Qed.
+
+Lemma loc_rel_eval_tmn_eq : forall x loc1 loc2 l1 l2 t,
+  ~ In (val_uid u) (insn_uses' (x, cmd_tmn t)) ->
+  loc_rel loc1 loc2 ->
+  Some l1 = eval_tmn loc1 t ->
+  Some l2 = eval_tmn loc2 t ->
+  l1 = l2.
+Proof.
+  intros. eapply loc_rel_eval_tmn in H1; eauto.
+  rewrite <- H1 in H2. injection H2; auto.
+Qed.
+
+Require Import LtacDebug.
+
+Ltac not_eq p q := (constr_eq p q; fail 1) || idtac.
+
+Lemma insn_at_pc_func' : forall g, wf_prog g -> 
+  forall i j pc, i@[g, pc] -> j@[g, pc] -> i = j.
+Proof.
+  intros. inversion H. eapply (insn_at_pc_func g0); eauto.
+Qed.
+
+Ltac unify_insn :=
+match goal with
+  | Hg : wf_prog ?g, H1 : ?i@[?g, ?p], H2 : ?j@[?g, ?p] |- _ => 
+    not_eq i j; let h := fresh "TMP" in
+    pose proof (insn_at_pc_func' g Hg i j p H1 H2) as h;
+    inversion h; clear H1; try subst; try clear h
+end.
+
+Lemma not_le_pc_entry : forall p l,
+  p <> block_entry l ->
+  ~ p <p= block_entry l.
+Proof.
+  intros. contradict H.
+  inversion H; subst.
+  unfold block_entry.
+  f_equal; auto with arith.
+Qed.
+
+Theorem state_rel_preserved : forall i st1 st2 st1' st2',
+  state_rel st1 st2 ->
+  i@[g, st_pc st1] -> i@[g', st_pc st2] ->
+  step g st1 st1' -> step g' st2 st2' ->
+  lbl_of st1.(st_pc) = lbl_of st2.(st_pc) ->
+  state_rel st1' st2'.
+Proof.
+  intros.
+  inversion H; subst.
+  destruct i as [x c]. 
+
+  destruct c;
+  inversion H2; subst; simpl in *;
+  try (exfalso; eapply insn_at_diff_contra 
+                with (g:=g) (j:=(uid, _)); 
+       eauto; discriminate);
+  inversion H3; subst; simpl in *;
+  try (exfalso; eapply insn_at_diff_contra 
+                with (g:=g') (j:=(uid0, _)); 
+       eauto; discriminate);
+  repeat unify_insn.
+
+  Case "cmd_bop".
+  constructor; simpl; auto. replace n0 with n. apply loc_rel_update; auto.
+  eapply loc_rel_eval_bop_eq with (loc1:=loc) (loc2:=loc0); eauto.
+  Case "cmd_phi".
+  rewrite H7 in *.
+  constructor; simpl; auto. replace n0 with n. apply loc_rel_update; auto.
+  eapply loc_rel_eval_phi_eq with (loc1:=ploc) (loc2:=ploc0); eauto.
+  Case "cmd_tmn".
+  constructor; simpl; auto. 
+  Case "cmd_load".
+  constructor; simpl; auto. apply loc_rel_update; auto.
+  Case "cmd_store".
+  constructor; simpl; auto. replace n0 with n; auto. 
+  cut (Some n = Some n0). intro Heq. injection Heq; auto.
+  rewrite H12, H10. apply loc_rel_eval_val; auto. 
+  specialize (USESU _ _ H0). simpl in USESU. auto.
+Qed.
+
+Theorem state_rel_progress : forall st1 st2 st2' i,
+  state_rel st1 st2 ->
+  i@[g, st_pc st1] -> i@[g', st_pc st2] -> 
+  step g' st2 st2' ->
+  exists st1', step g st1 st1'.
+Proof.
+  intros.
+  inversion H; subst.
+
+  destruct st1 as [mem1 pc1 loc1 ploc1 ppc1].
+  inversion H2; subst; simpl in *; unify_insn.
+
+  Case "step_bop".
+  eexists. eapply step_bop. eauto. 
+  eapply loc_rel_eval_bop; eauto. symmetry; auto.
+
+  Case "step_phi".
+  eexists. eapply step_phi. eauto.
+  rewrite H5 in *.
+  eapply loc_rel_eval_phi; eauto. symmetry; auto.
+
+  Case "step_tmn".
+  eexists. eapply step_tmn; eauto.
+  eapply loc_rel_eval_tmn; eauto. symmetry; auto.
+
+  Case "step_load".
+  eexists. eapply step_load; eauto.
+
+  Case "step_store".
+  eexists. eapply step_store; eauto.
+  erewrite loc_rel_eval_val; eauto.
+  specialize (USESU _ _ H0). simpl in USESU. auto.
+Qed.
+
+Lemma step_pc_incr : forall g i st st',
+  wf_prog g ->                     
+  i@[g, st_pc st] ->
+  ~ is_tmn i ->
+  step g st st' ->
+  incr_pc (st_pc st) = st_pc st'.
+Proof.
+  intros.
+  inversion H2; subst; simpl in *; auto.
+  cut (i = (uid, cmd_tmn tmn)).
+  intro. subst i. contradict H1; simpl; trivial.
+  eapply insn_at_pc_func'; eauto.
+Qed.
+
+Lemma pc_rel_incr : forall pc1 pc2,
+  pc_rel pc1 pc2 ->
+  upc <> incr_pc pc2 ->
+  pc_rel (incr_pc pc1) (incr_pc pc2).
+Proof.
+  intros. inversion H; subst.
+  apply pc_rel_gt; auto. inversion H1; constructor; omega.
+  apply pc_rel_ngt. intro Hpc. contradict H1.
+  destruct pc2. inversion Hpc; subst; simpl in *. constructor. 
+  cut (n1 <> S n). omega. contradict H0. rewrite H0. auto.
+Qed.
+  
+Theorem pc_rel_preserved : forall st1 st2 st1' st2',
+  upc <> st_pc st2' ->
+  loc_rel (st_loc st1) (st_loc st2) ->
+  pc_rel (st_pc st1) (st_pc st2) ->
+  step g st1 st1' -> step g' st2 st2' ->
+  pc_rel (st_pc st1') (st_pc st2').
+Proof.
+  intros.
+  pose proof (pc_rel_insn_at_bi _ _ H1) as Hrel.
+  intros. inversion H2; subst st1; simpl in *.
+
+  Case "insn_bop".
+  replace (st_pc st2') with (incr_pc (st_pc st2)) in *.
+  eapply pc_rel_incr; auto.
+  eapply step_pc_incr; eauto.
+  apply Hrel; eauto. auto.
+  
+  Case "insn_phi".
+  replace (st_pc st2') with (incr_pc (st_pc st2)) in *.
+  eapply pc_rel_incr; auto.
+  eapply step_pc_incr; eauto.
+  apply Hrel; eauto. auto.
+
+  Case "insn_tmn".
+  replace (st_pc st2') with (block_entry l') in *. 
+  apply pc_rel_ngt. apply not_le_pc_entry; auto.
+
+  inversion H3; subst; simpl in *; 
+  try solve [exfalso; eapply Hrel in H4; 
+             eapply insn_at_diff_contra with (j:=(uid, _)); eauto; discriminate].
+  cut ((uid0, cmd_tmn tmn0) = (uid, cmd_tmn tmn)). inversion 1; subst.
+  replace l'0 with l' in *; auto.
+  eapply loc_rel_eval_tmn_eq; eauto.
+  symmetry. eapply pc_rel_insn_at_eq; eauto.
+
+  Case "insn_store".
+  replace (st_pc st2') with (incr_pc (st_pc st2)) in *.
+  eapply pc_rel_incr; auto.
+  eapply step_pc_incr; eauto.
+  apply Hrel; eauto. auto.
+  
+  Case "insn_load".
+  replace (st_pc st2') with (incr_pc (st_pc st2)) in *.
+  eapply pc_rel_incr; auto.
+  eapply step_pc_incr; eauto.
+  apply Hrel; eauto. auto.
+Qed.
+
+Definition is_tmn_dec : forall i, {is_tmn i} + {~ is_tmn i}.
+  destruct i as [x []]; simpl; auto.
+Defined.
+
+(* this is a bit subtle:
+   st1 and st2 could be related by pc_rel_gt even though we know
+   st2 steps to st2' and st2'.(st_pc) = upc. This is because st1 and st2
+   could jump back to the same block, the first instruction of which may
+   be the removed instruction!
+   Luckily we only have to worry about this edge case when we are at a
+   terminator -- otherwise pc_rel st1.pc st2.pc -> (st1.pc = st2.pc). *)
+Lemma step_u_eq_pc : forall st1 st2 st1u st2',
+  loc_rel (st_loc st1) (st_loc st2) ->
+  pc_rel (st_pc st1) (st_pc st2) ->
+  step g st1 st1u ->
+  step g' st2 st2' ->
+  upc = st_pc st2' ->
+  upc = st_pc st1u.
+Proof.
+  intros.
+  assert (exists i, i@[g, st_pc st1]) as [i Hati] by (inversion H1; eauto).
+  destruct (is_tmn_dec i) as [Htmn|Htmn].
+  Case "is_tmn i".
+  pose proof Hati as Hati'. eapply pc_rel_insn_at_bi in Hati'; eauto.
+  destruct i as [x []]; try contradiction.
+  inversion H1; subst st1; simpl in *; try solve 
+    [exfalso; eapply insn_at_diff_contra with (g:=g) (j:=(uid, _)); 
+     eauto; discriminate].
+  inversion H2; subst st2; simpl in *; try solve 
+    [exfalso; eapply insn_at_diff_contra with (g:=g') (j:=(uid0, _)); 
+     eauto; discriminate].
+  repeat unify_insn. subst t0 x. simpl. replace l'0 with l'; auto.
+  eapply loc_rel_eval_tmn_eq; eauto.
+  Case "~ is_tmn i".
+  replace (st_pc st2') with (incr_pc (st_pc st2)) in *.
+  inversion H0.
+  subst upc. destruct (st_pc st2). inversion H4; omega.
+  replace (st_pc st1u) with (incr_pc (st_pc st1)) in *. rewrite H3, H4; auto.
+  eapply step_pc_incr with (g:=g); eauto.
+  eapply step_pc_incr with (g:=g'); eauto.
+    eapply pc_rel_insn_at_bi; eauto.
+Qed.
+
+Lemma step_u_not_final : forall st1 st2 st1u st2',
+  loc_rel (st_loc st1) (st_loc st2) ->
+  pc_rel (st_pc st1) (st_pc st2) ->
+  step g st1 st1u ->
+  step g' st2 st2' ->
+  upc = st_pc st2' ->
+  ~ FinalState g st1u.
+Proof.
+  intros.
+  cut (st_pc st1u = upc). intro Hupc'.
+
+  unfold FinalState. rewrite Hupc'. intros [x Hatx].
+  destruct UDEF as [c [Hatu Hdefs]].
+  contradict Hdefs.
+  replace (u, c) with (x, cmd_tmn tmn_ret). auto.
+  eapply insn_at_pc_func' with (g:=g); eauto.
+  symmetry. eapply step_u_eq_pc; eauto.
+Qed.
+
+
+(* stepping over removed insn preserves state_rel *)
+Theorem state_rel_u_step_preserved : forall st1u st1' st2',
+  upc = st_pc st1u ->
+  step g st1u st1' ->
+  state_rel st1u st2' ->
+  state_rel st1' st2'.
+Proof.
+  intros ? ? ? Hupc Hstep Hrel. 
+  
+  inversion Hstep; inversion Hrel; subst; simpl in *;
+  destruct UDEF as [c [? Hdef]]; unify_insn.
+  
+  Case "step_bop".
+  constructor; simpl; auto.
+  intros v Hneqv. rewrite Locals.update_neq; auto. 
+
+  Case "step_phi".
+  constructor; simpl; auto.
+  intros v Hneqv. rewrite Locals.update_neq; auto.
+
+  Case "step_tmn". inversion Hdef.
+
+  Case "step_load".
+  constructor; simpl; auto.
+  intros v Hneqv. rewrite Locals.update_neq; auto.
+
+  Case "step_store". inversion Hdef.
+Qed.
+
+Theorem pc_rel_u_step_preserved : forall st1 st2 st1u st1' st2',
+  loc_rel (st_loc st1) (st_loc st2) ->
+  upc = st_pc st2' ->
+  pc_rel (st_pc st1) (st_pc st2) ->
+  step g st1 st1u ->
+  step g st1u st1' ->
+  step g' st2 st2' ->
+  pc_rel (st_pc st1') (st_pc st2').
+Proof.
+  intros ? ? ? ? ? Hloc Hupc Hrel Hstep1 Hstepu Hstep2.
+  assert (upc = st_pc st1u) as Hupcu by (eapply step_u_eq_pc; eauto).
+
+  replace (st_pc st1') with (incr_pc (st_pc st1u)).
+  constructor. rewrite Hupc. destruct (st_pc st2'); constructor; auto.
+  rewrite <- Hupcu, <- Hupc; auto.
+  
+  destruct UDEF as [c [Hatu Hdef]].
+  eapply step_pc_incr with (g:=g); eauto.
+  rewrite <- Hupcu; eauto.
+  destruct c; try solve [inversion Hdef]; auto.
+Qed.
+
+Theorem del_backsim_step : backsim_step sim_rel g g'.
+Proof.
+  unfold backsim_step; intros ? ? ? Hstep Hrel.
+
+  destruct (eq_pc_dec upc st2'.(st_pc)) as [Hupc|Hupc].
+
+  Case "next pc is removed pc, g steps twice".
+  cut (exists st1u st1', step g st1 st1u
+                       /\ step g st1u st1'
+                       /\ sim_rel st1' st2').
+  intros (st1u & st1' & Hstepu & Hstep' & Hrel').
+  eexists; split. eapply star_step; eauto. apply star_one; eauto. auto.
+  
+  inversion Hrel as [? [? Hst]].
+  ecase pc_rel_insn_at as [i [Hat1 Hat2]]; eauto. inversion Hst; auto.
+  ecase state_rel_progress as [st1u Hstepu]; eauto.
+  
+  ecase progress with (s:=st1u) (g:=g) as [contra | [st1' Hstep']]; eauto.
+  eapply preservation; eauto.
+  contradict contra. eapply step_u_not_final; eauto. inversion Hrel as [[] ?]; auto.
+
+  exists st1u, st1'. 
+  split; auto. split; auto.
+  split. cut (state_rel st1u st2').
+  apply state_rel_u_step_preserved; auto.
+  inversion H; eapply step_u_eq_pc; eauto.
+  eapply state_rel_preserved; eauto. 
+  eapply pc_rel_lbl_eq; auto.
+  split. inversion H; eapply pc_rel_u_step_preserved; eauto.
+  cut (wf_state g st1u). intro Hwfu.
+  eapply preservation; eauto.
+  eapply preservation; eauto.
+
+  Case "next pc is not removed pc, g steps once".
+  cut (exists st1', step g st1 st1' /\ sim_rel st1' st2').
+  intros [st1' [Hstep' Hrel']]. eexists; split.
+  apply star_one; eauto. auto.
+
+  inversion Hrel as [? [? Hst]].
+  ecase pc_rel_insn_at as [i [Hat1 Hat2]]; eauto. inversion Hst; auto.
+  ecase state_rel_progress as [st1' Hstep']; eauto.
+  eexists; split; eauto. 
+  split. eapply state_rel_preserved; eauto.
+  eapply pc_rel_lbl_eq; auto.
+  split. inversion H; eapply pc_rel_preserved; eauto.
+  eapply preservation; eauto.
+Qed.
+
+End DELETE.
+  
+End Delete.

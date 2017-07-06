@@ -165,63 +165,25 @@ Definition comp cmp v1 v2 : EXP local_id :=
 
 (* initialization monad ----------------------------------------------------- *)
 
-Definition INIT A := ST (int * int * code) (err A).
-
-Definition init_map (A B:Type) (f:A->B) (g:INIT A) : INIT B :=
-  fun s =>
-    let '(st, x) := g s in
-    match x with
-    | inl e  => (st, inl e)
-    | inr a => (st, inr (f a))
-    end.
-
-Instance init_functor : @Functor INIT := init_map.
-
-Definition init_ret (A:Type) (x:A) : INIT A :=
-  fun s => (s, inr x).
-
-Definition init_bind (A B:Type) (g:INIT A) (f:A -> INIT B) : INIT B :=
-  fun s =>
-    let '(st, x) := g s in
-    match x with
-    | inl e => (st, inl e)
-    | inr a => (f a) st
-    end.
-Program Instance init_monad : (@Monad INIT) init_functor := _.
-Next Obligation.
-  split.
-  - exact init_ret.
-  - exact init_bind.
-Defined.    
-
-Instance init_err : (@ExceptionMonad string INIT _ _) := fun _ e => fun s => (s, inl e).
-
-Definition lift_init {A} (e:string) (m:option A) : INIT A :=
-  fun s => (s, trywith e m).
-
-
+Definition INIT := EXP.
 Definition alloca : () -> INIT local_id :=
-  fun _ => fun '(n, m, is) =>
+  fun _ => fun '(n, is) =>
     let lid := lid_of_Z n in
-    let vid := IVoid m in
-    ((1+n, 1+m, ((vid, INSTR_Store false (i64, val_of_nat 0) (i64ptr, local lid) None) :: (IId lid, INSTR_Alloca i64 None None)::is)), mret lid)%Z.
-  
+    let vid := IVoid (1+n)%Z in
+    ((2+n, ((vid, INSTR_Store false (i64, val_of_nat 0) (i64ptr, local lid) None) :: (IId lid, INSTR_Alloca i64 None None)::is)), mret lid)%Z.
+
 
 (* 
   Compiler state for commands
-    n  - IId counter
-    m  - IVoid counter 
+    n  - id counter
     // state of the partially completed basic block:
-    is - code of current block; instructions emitted here in reverse order
-    tm - the terminator for the current block
+    b  - block   NOTE: this block is "partial" in the sense that instructions are being added to it
     bs - list of completed blocks 
 *)
 Record cmd_state :=
   mk_cs {
       n : int;                
-      m : int;                
-      is : code;             
-      tm : terminator;
+      b : block;
       bs : list block;      
     }.
 
@@ -258,32 +220,26 @@ Defined.
 Instance cmd_err : (@ExceptionMonad string CMD _ _) := fun _ e => fun s => (s, inl e).
 
 Definition cmd_of_exp {A} (exp : EXP A) : CMD (code * A) :=
-  fun '(mk_cs n m is tm bs) =>
+  fun '(mk_cs n b bs) =>
     let '((n', ise), v) := exp (n, []) in
     match v with
-    | inl e => (mk_cs n m is tm bs, inl e)
-    | inr ans => (mk_cs n' m is tm bs, inr (ise, ans))
+    | inl e => (mk_cs n b bs, inl e)
+    | inr ans => (mk_cs n' b bs, inr (ise, ans))
     end.
 
-Definition cmd_of_init {A} (init : INIT A) : CMD (code * A) :=
-  fun '(mk_cs n m is tm bs) =>
-    let '((n', m', ise), v) := init (n, m, []) in
-    match v with
-    | inl e => (mk_cs n m is tm bs, inl e)
-    | inr ans => (mk_cs n' m' is tm bs, inr (ise, ans))
-    end.
-  
+Definition cmd_of_init {A} (init : INIT A) : CMD (code * A) := cmd_of_exp init.
 
 Definition inject_code (ise:code) : CMD () :=
-    fun '(mk_cs n m is tm bs) => (mk_cs n m (ise++is) tm bs, mret ()).
+  fun '(mk_cs n (mk_block bid phis is tm) bs) =>
+     (mk_cs n (mk_block bid phis ((rev ise)++is) tm) bs, mret ()).
 
 Definition lift_cmd {A} (e:string) (m:option A) : CMD A :=
   fun s => (s, trywith e m).
 
 Definition emit_cmd instr : CMD local_id :=
-  fun '(mk_cs n m is tm bs) =>
+  fun '(mk_cs n (mk_block bid phis is tm) bs) =>
     let lid := lid_of_Z n in
-    (mk_cs (1+n) m ((IId lid, instr)::is) tm bs, mret lid)%Z.
+    (mk_cs (1+n) (mk_block bid phis ((IId lid, instr)::is) tm) bs, mret lid)%Z.
 
 (*
 Definition alloca : () -> CMD local_id :=
@@ -291,32 +247,29 @@ Definition alloca : () -> CMD local_id :=
 *)  
   
 Definition emitvoid instr : CMD () :=
-    fun '(mk_cs n m is tm bs) =>
-      let tid := (IVoid m) in
-      (mk_cs n (1+m) ((tid, instr)::is) tm bs, mret ())%Z.
+    fun '(mk_cs n (mk_block bid phis is tm) bs) =>
+      let tid := (IVoid n) in
+      (mk_cs (1+n) (mk_block bid phis ((tid, instr)::is) tm) bs, mret ())%Z.
     
 Definition store v vptr : CMD () :=
   emitvoid (INSTR_Store false (i64, v) (i64ptr, vptr) None).
 
 Definition gen_label : () -> CMD local_id :=
- fun _ => fun '(mk_cs n m is tm bs) =>
+ fun _ => fun '(mk_cs n b bs) =>
     let lid := lid_of_Z n in
-    (mk_cs (1+n) m is tm bs, mret lid)%Z.
+    (mk_cs (1+n) b bs, mret lid)%Z.
   
 Definition close_block (bid:block_id) (tm_new:terminator) : CMD () :=
-  fun '(mk_cs n m is tm bs) =>
-    let blk := mk_block bid [] (rev is) ((IVoid m), tm) in
-    (mk_cs n (1+m) [] tm_new (blk::bs), mret ())%Z.
+  fun '(mk_cs n b bs) =>
+    (mk_cs (1+n) (mk_block bid [] [] (IVoid n, tm_new)) (b::bs), mret ())%Z.
 
 
-Definition run {A} (g : CMD A) : err (A * block_id * list block) :=
-  let '(mk_cs n m is tm bs, x) := g (mk_cs 0 0 [] TERM_Ret_void [])%Z in
+Definition run {A} (g : CMD A) : err (A * list block) :=
+  let '(mk_cs n b bs, x) := g (mk_cs 2 (mk_block (lid_of_Z 0) [] [] (IVoid 1, TERM_Ret_void)) [])%Z in
   match x with
   | inl e => inl e
   | inr a =>
-    let bid := lid_of_Z n in
-    let blk := mk_block bid [] (rev is) ((IVoid m), tm) in
-    inr (a, bid, blk::bs)
+    inr (a, b::bs)
   end.
 
 
@@ -382,9 +335,9 @@ Fixpoint compile_com (g:ctxt) (c:com) : CMD () :=
 
   | CAss x a => 
     '(cd, v) <- cmd_of_exp (compile_aexp g a);
-    '_ <- inject_code cd;
     'ptr <- lift_cmd "CAss ident not found" (g x);
     '; store v ptr;
+    '_ <- inject_code cd;
     mret ()           
 
   | CSeq c1 c2 =>
@@ -488,7 +441,7 @@ Definition print_decl (fn:string) : declaration :=
 
 
 Definition compile (c:com) : err (toplevel_entities (list block)) :=
-  '(fvs, bid, blocks) <-
+  '(fvs, blocks) <-
           run (
             let fvs := IDSet.elements (fv c) in
             '(cd, g) <- cmd_of_init (compile_fv fvs);  
