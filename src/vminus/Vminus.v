@@ -262,8 +262,18 @@ Module Type CFG.
 
   Parameter insn_at_pc : cfg -> pc -> insn -> Prop.
 
+  (*
+  Parameter fetch : cfg -> pc -> option insn.
+  *)
+
   Definition uid_at_pc (g:cfg) (p:pc) (uid:uid) : Prop :=
     exists c, insn_at_pc g p (uid, c).
+
+  (* 
+  Axiom insn_at_pc_fetch :
+    forall g pc i, wf_cfg g ->
+              insn_at_pc g pc i <-> fetch g pc = Some i.
+   *)
 
   Axiom insn_at_pc_func : forall g, wf_cfg g ->
     functional (insn_at_pc g).
