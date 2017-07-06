@@ -79,6 +79,16 @@ Section LIST.
     exists (S n). auto.
   Qed.
 
+  Lemma nth_error_iff_Nth: forall (l : list A) (offset: nat) (a : A),
+      nth_error l offset = Some a <-> Nth a l offset.
+  Proof.
+    induction l as [| a l].
+    - intros [| offset] a; split; simpl; intros H; try inversion H.
+    - induction offset; intros a'.
+      { split; simpl; intros H; inversion H; auto. }
+      { simpl. rewrite IHl; reflexivity. }
+  Qed.
+  
 End LIST.
 
 Section NODUP.

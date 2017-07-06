@@ -1165,77 +1165,96 @@ Module ListCFG <: CFG.
     | None => None
     end.
 
-  (*
-  Lemma find_block_ok: forall (blks: list (lbl * list insn)) found_instrs (label: lbl), 
+  Print NoDup.
+  
+  Lemma find_block_ok: forall (blks: list (lbl * list insn)) found_instrs (label: lbl),
+      NoDup (List.map fst blks) -> 
       find_block blks label = Some found_instrs <->
       In (label, found_instrs) blks.
   Proof.
-    intros blks found_instrs label.
+    intros blks found_instrs label nodups.
     induction blks as [| blk other_blks].
-    { simpl. split; intros H; inversion H. }
-    { simpl; split.
-      { intros H. destruct blk as [this_label this_insns].
-        destruct (Lbl.eq_dec this_label label) as [label_eq | label_neq].
-        - inversion H.
-          subst; left; trivial.
-        - right. apply IHother_blks.
-          trivial.
+    { simpl; split; intros H; inversion H. }
+    { simpl; destruct blk as [this_label this_insns].
+      destruct (Lbl.eq_dec this_label label) as [label_eq | label_neq].
+      { split; intros H;
+          [inversion H as [found_this] | idtac].
+        - subst; left; auto.
+        - destruct H as [found_here | found_in_others].
+          + inversion found_here; subst; trivial.
+          + simpl in nodups.
+            (* Want the following as lemma *)
+            replace (this_label :: map fst other_blks) with
+                ([] ++ (this_label :: map fst other_blks)) in nodups
+              by auto.
+            apply NoDup_remove in nodups.
+            inversion nodups as [? not_found_in_others].
+            apply in_map with (f := fst) in found_in_others.
+            simpl in found_in_others.
+            contradiction not_found_in_others.
+            simpl; subst; apply found_in_others.
       } 
-      { intros [this_blk_works | in_other_blks];
-          destruct blk as [this_label this_insns];
-          destruct (Lbl.eq_dec this_label label) as [label_eq | label_neq].
-        - inversion this_blk_works; subst; reflexivity.
-        - inversion this_blk_works; subst; contradiction label_neq;
-            reflexivity.
-        - apply 
-      } 
-          
-          
+      { simpl in nodups.
+        replace (this_label :: map fst other_blks) with
+            ([] ++ (this_label :: map fst other_blks)) in nodups
+          by auto.
+        apply NoDup_remove in nodups.
+        inversion nodups as [nodups_in_others this_label_in_others].
+        generalize (IHother_blks nodups_in_others) as IH; intros IH.
+        rewrite IH.
+        split; auto.
+        intros [Hcontra | ?]; auto.
+        contradiction label_neq.
+        inversion Hcontra; auto.
+      }
+    } 
+  Qed.
+      
   Lemma find_block_iff_in_cfg: forall entry_label blks trgt_label trgt_offset i,
+      NoDup (map fst blks) -> 
       fetch (entry_label, blks) (trgt_label, trgt_offset) = Some i <->
       exists instrs, In (trgt_label, instrs) blks /\ Nth i instrs trgt_offset.
   Proof.
-    intros entry_label blks trgt_label trgt_offset i.
-    induction blks as [| blk blks].
-    { simpl; split; try solve [intros H; inversion H].
-      intros [_ [Hcontra _]]; exfalso; apply Hcontra.
+    intros entry_label blks trgt_label trgt_offset i nodup.
+    unfold fetch.
+    destruct (find_block blks trgt_label) eqn:found.
+    { apply find_block_ok in found; auto.
+      split.
+      { intros H; exists l; split; trivial.
+        rewrite nth_error_iff_Nth in H.
+        trivial.
+      }
+      { intros [instrs [trgt_blk_found trgt_instr_found]].
+        rewrite <- nth_error_iff_Nth in trgt_instr_found.
+        replace l with instrs; auto.
+        eapply NoDup_assoc_func.
+        apply nodup.
+        apply trgt_blk_found.
+        trivial.
+      }         
     } 
-    { split.
-      { simpl. destruct blk as [l instrs].
-        destruct (Lbl.eq_dec l trgt_label) as [l_eq | l_neq].
-        Focus 2.
-        
-        
-
-      fetch (l, blks) (trgt_label, trgt_offset) = Some i <->
-      exists instrs: In (trgt_label, instrs) blks /\ Nth i instrs trgt_offset 
-   *)  
-  
+    { split; intros H; [inversion H | idtac].
+      destruct H as [instrs [trgt_label_found trgt_instr_found]].
+      rewrite <- nth_error_iff_Nth in trgt_instr_found.
+      rewrite <- find_block_ok in trgt_label_found; auto.
+      rewrite trgt_label_found in found; inversion found.
+    }
+  Qed.
   
   (* Added *)
   Lemma insn_at_pc_fetch :
     forall g pc i, wf_cfg g ->
               insn_at_pc g pc i <-> fetch g pc = Some i.
   Proof.
-    intros [l blks] pc i g_well_formed.
-    split.
-    { unfold insn_at_pc.
-      intros H.
-      destruct pc as [trgt_label trgt_offset].
-      destruct H as [trgt_insns [trgt_insns_good trgt_offset_good]].
-      simpl in trgt_insns_good.
-
-
-
-      inversion g_well_formed as 
-          [l' blks' uniq_blk_labels uniq_uids l_in_blk_labels no_empty_blk];
-        subst.
-      clear uniq_uids uniq_blk_labels g_well_formed.
-      
-      
-      
-  Admitted.
-      
+    intros [l blks] pc i wf_g.
+    Print wf_cfg'.
+    inversion wf_g as
+        [l' blks' nodup nodup_uid l_in_blks blks_not_empty [l_l' blks_blk]].
+    destruct pc as [curr_label curr_offset].
+    rewrite find_block_iff_in_cfg; auto.
+    simpl.
+    split; auto.
+  Qed.      
     
 End ListCFG.
 
