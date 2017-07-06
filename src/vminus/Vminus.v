@@ -26,7 +26,7 @@
 
 Require Import Arith List.
 Import ListNotations.
-Require Import Atom Dom Env Imp Util.
+Require Import Vminus.Atom Vminus.Dom Vminus.Env Vminus.Imp Vminus.Util.
 
 (* ####################################################### *)
 (** ** Vminus Overview *)
@@ -261,19 +261,16 @@ Module Type CFG.
   (** Program points are associated with unique instructions. *)
 
   Parameter insn_at_pc : cfg -> pc -> insn -> Prop.
-
-  (*
+  
   Parameter fetch : cfg -> pc -> option insn.
-  *)
-
+  
   Definition uid_at_pc (g:cfg) (p:pc) (uid:uid) : Prop :=
     exists c, insn_at_pc g p (uid, c).
 
-  (* 
+
   Axiom insn_at_pc_fetch :
     forall g pc i, wf_cfg g ->
               insn_at_pc g pc i <-> fetch g pc = Some i.
-   *)
 
   Axiom insn_at_pc_func : forall g, wf_cfg g ->
     functional (insn_at_pc g).
@@ -391,17 +388,6 @@ Module Opsem.
              (mkst mem (incr_pc pc) 
                        (update loc uid (Some n)) ppc ploc)
 
-
-
-
-
-
-
-
-
-
-
-
   (** Evaluate the right-hand side in the predecessor's 
      local environment. [lbl_of ppc] is the control-flow 
      edge that we jumped from. *)
@@ -412,15 +398,6 @@ Module Opsem.
              (mkst mem (incr_pc pc) 
                        (update loc uid (Some n)) ppc ploc)
 
-
-
-
-
-
-
-
-
-
   (** Find the successor block (if any), update the pc. 
       Record the current pc and locals as the "predecessor" state. *)
   | step_tmn : forall mem pc l' loc tmn uid ppc ploc, 
@@ -429,15 +406,7 @@ Module Opsem.
       step g (mkst mem pc loc ppc ploc)
              (mkst mem (block_entry l') loc pc loc)
 
-
-
-
-
-
-
-
-
-
+  (** Loads and stores **)
   | step_load : forall mem pc loc uid addr ppc ploc,
       insn_at_pc g pc (uid, cmd_load addr) ->
       step g (mkst mem pc loc ppc ploc)
@@ -1178,6 +1147,95 @@ Module ListCFG <: CFG.
   Qed.
   (* /FOLD *)
 
+  (* Added *)
+  Fixpoint find_block {A : Type} (lst : list (lbl * A)) (trgt_label : lbl) :=
+    match lst with
+    | [] => None
+    | (label, data) :: other_blks =>
+      if Lbl.eq_dec label trgt_label then
+        Some data 
+      else find_block other_blks trgt_label
+    end.
+      
+  Definition fetch (g : cfg) (p: pc): option insn :=
+    let '(entry_label, blocks) := g in
+    let '(trgt_block, offset) := p in
+    match (find_block blocks trgt_block) with
+    | Some found_block => nth_error found_block offset
+    | None => None
+    end.
 
+  (*
+  Lemma find_block_ok: forall (blks: list (lbl * list insn)) found_instrs (label: lbl), 
+      find_block blks label = Some found_instrs <->
+      In (label, found_instrs) blks.
+  Proof.
+    intros blks found_instrs label.
+    induction blks as [| blk other_blks].
+    { simpl. split; intros H; inversion H. }
+    { simpl; split.
+      { intros H. destruct blk as [this_label this_insns].
+        destruct (Lbl.eq_dec this_label label) as [label_eq | label_neq].
+        - inversion H.
+          subst; left; trivial.
+        - right. apply IHother_blks.
+          trivial.
+      } 
+      { intros [this_blk_works | in_other_blks];
+          destruct blk as [this_label this_insns];
+          destruct (Lbl.eq_dec this_label label) as [label_eq | label_neq].
+        - inversion this_blk_works; subst; reflexivity.
+        - inversion this_blk_works; subst; contradiction label_neq;
+            reflexivity.
+        - apply 
+      } 
+          
+          
+  Lemma find_block_iff_in_cfg: forall entry_label blks trgt_label trgt_offset i,
+      fetch (entry_label, blks) (trgt_label, trgt_offset) = Some i <->
+      exists instrs, In (trgt_label, instrs) blks /\ Nth i instrs trgt_offset.
+  Proof.
+    intros entry_label blks trgt_label trgt_offset i.
+    induction blks as [| blk blks].
+    { simpl; split; try solve [intros H; inversion H].
+      intros [_ [Hcontra _]]; exfalso; apply Hcontra.
+    } 
+    { split.
+      { simpl. destruct blk as [l instrs].
+        destruct (Lbl.eq_dec l trgt_label) as [l_eq | l_neq].
+        Focus 2.
+        
+        
+
+      fetch (l, blks) (trgt_label, trgt_offset) = Some i <->
+      exists instrs: In (trgt_label, instrs) blks /\ Nth i instrs trgt_offset 
+   *)  
+  
+  
+  (* Added *)
+  Lemma insn_at_pc_fetch :
+    forall g pc i, wf_cfg g ->
+              insn_at_pc g pc i <-> fetch g pc = Some i.
+  Proof.
+    intros [l blks] pc i g_well_formed.
+    split.
+    { unfold insn_at_pc.
+      intros H.
+      destruct pc as [trgt_label trgt_offset].
+      destruct H as [trgt_insns [trgt_insns_good trgt_offset_good]].
+      simpl in trgt_insns_good.
+
+
+
+      inversion g_well_formed as 
+          [l' blks' uniq_blk_labels uniq_uids l_in_blk_labels no_empty_blk];
+        subst.
+      clear uniq_uids uniq_blk_labels g_well_formed.
+      
+      
+      
+  Admitted.
+      
+    
 End ListCFG.
 
