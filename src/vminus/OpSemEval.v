@@ -60,6 +60,19 @@ Module Evaluator.
     | None => inl "no instruction fetched"%string
     end.
 
+  Fixpoint eval_until_pc (g : Cfg.t) (s : state)
+           (target_pc: pc)
+           (fuel : nat): err state :=
+    match fuel with
+    | 0 => inl "eval out of fuel"%string
+    | S n' =>
+      if (eq_dec_pc (st_pc s) target_pc) then inr s
+      else match eval_step g s with
+           | inl err => inl err
+           | inr s' => eval_until_pc g s' target_pc n'
+           end
+    end.
+
 End Evaluator.
 
 Module EvaluatorCorrect.
@@ -123,7 +136,6 @@ Module EvaluatorCorrect.
       wf_cfg g -> step g s s' -> eval_step g s = inr s'.
   Proof.
     intros g s s' wf_g step_rel.
-    Print step.
     inversion step_rel as
         [mem pc loc bop v1 v2 uid n ppc ploc insn_at_pc_is eval_insn_ok s_eq s'_eq |
          mem pc loc pas uid n ppc ploc insn_at_pc_is eval_insn_ok s_eq s'_eq |
