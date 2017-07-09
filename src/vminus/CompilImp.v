@@ -57,14 +57,18 @@ Definition comp_bop (b:bop) (e1 e2: ectmon (val * list insn))
 
 (** Compile an arithmetic expression. *)
 
+(**! Section compiler *)
+
 Fixpoint comp_aexp (a:aexp) : ectmon (val * list insn) :=
   match a with
     | ANum n => ret (val_nat n, [])
     | AId i => do r <- fresh; ret (val_uid r, [(r, cmd_load i)])
-    | APlus a1 a2 => comp_bop bop_add (comp_aexp a1) (comp_aexp a2)
-    | AMinus a1 a2 => (*! *) comp_bop bop_sub (comp_aexp a1) (comp_aexp a2)
-                     (*! comp_bop bop_sub (comp_aexp a1) (comp_aexp a1) *)
-    | AMult a1 a2 => comp_bop bop_mul (comp_aexp a1) (comp_aexp a2)
+    | APlus a1 a2 => (**! *) comp_bop bop_add (comp_aexp a1) (comp_aexp a2)
+                    (**! comp_bop bop_add (comp_aexp a1) (comp_aexp a1) *)         
+    | AMinus a1 a2 => (**! *) comp_bop bop_sub (comp_aexp a1) (comp_aexp a2)
+                     (**! comp_bop bop_sub (comp_aexp a1) (comp_aexp a1) *)
+    | AMult a1 a2 => (**! *) comp_bop bop_mul (comp_aexp a1) (comp_aexp a2)
+                    (**! comp_bop bop_mul (comp_aexp a1) (comp_aexp a1) *)
   end.
 
 (** ** Compiling boolean expressions. *)
@@ -74,12 +78,15 @@ Fixpoint comp_aexp (a:aexp) : ectmon (val * list insn) :=
 (* /HIDE *)
 Fixpoint comp_bexp (b:bexp) : ectmon (val * list insn) :=
   match b with
-    | BTrue => ret (val_nat 1, [])
+    | BTrue => (*! *)ret (val_nat 1, []) (*! ret (val_nat 0, []) *)
     | BFalse => ret (val_nat 0, [])
     | BEq a1 a2 => comp_bop bop_eq (comp_aexp a1) (comp_aexp a2)
-    | BLe a1 a2 => comp_bop bop_le (comp_aexp a1) (comp_aexp a2) 
-    | BAnd b1 b2 => comp_bop bop_and (comp_bexp b1) (comp_bexp b2)
-    | BNot b1 => comp_bop bop_eq (comp_bexp b1) (ret (val_nat 0, []))
+    | BLe a1 a2 => (**!*) comp_bop bop_le (comp_aexp a1) (comp_aexp a2)
+                  (**! comp_bop bop_le (comp_aexp a1) (comp_aexp a1) *)
+    | BAnd b1 b2 => (*!*) comp_bop bop_and (comp_bexp b1) (comp_bexp b2)
+                   (*! comp_bop bop_and (comp_bexp b1) (comp_bexp b1) *)
+    | BNot b1 => (**!*) comp_bop bop_eq (comp_bexp b1) (ret (val_nat 0, []))
+                (**! comp_bop bop_eq (comp_bexp b1) (ret (val_nat 1, [])) *)
   end.
 
 (** ** Correspondence between concrete and abstract CFGs. *)
@@ -144,6 +151,8 @@ Ltac bind_step H :=
         destruct (ma s) as [?cs1 [?rl1 ?rr1]] eqn:?Hc1
   end.
 
+
+(** * Proofs start here; commented out because of QuickChick for now  *)
 Definition comp_correct (comp : ectmon (val * list insn))
                         (eval : mem -> nat) : Prop :=
   forall cs cs' g st is k v,

@@ -35,7 +35,7 @@ Instance show_id: Show id :=
 Derive Arbitrary for aexp.
 Derive Show for aexp.
 
-Instance show_aexp `{Show nat} `{Show id}: Show aexp :=
+Instance show_aexp: Show aexp :=
   {| show := (
        fix show_aexp_func a :=
            match a with
@@ -71,7 +71,7 @@ Instance gen_plus_aexp `{Gen nat} `{Gen id} : GenSized aexp :=
 Derive Arbitrary for bexp.
 Derive Show for bexp.
 
-Instance show_bexp `{Show aexp} : Show bexp :=
+Instance show_bexp: Show bexp :=
   {| show :=
        fix show_bexp_func b := (
          match b with

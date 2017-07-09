@@ -108,29 +108,32 @@ Lemma comp_cond_correct :
 *)
 
 Fixpoint memory_on_domain_checker
-         (dom: list addr) (st1 st2 : V.Opsem.state) : Checker :=
+         (dom: list addr) (mem1 mem2 : V.Opsem.mem) : Checker :=
   match dom with
   | [] => checker true
   | (a :: l) =>
-    if Nat.eqb (V.Opsem.st_mem st1 a) (V.Opsem.st_mem st2 a) then
-      memory_on_domain_checker l st1 st2
+    if Nat.eqb (mem1 a) (mem2 a) then
+      memory_on_domain_checker l mem1 mem2
     else
       whenFail
         ("memory_equal: memory at " ++ (Atom.string_of a)
-                                    ++ " not equal")%string
+                                    ++ " not equal:"
+                                    ++ " mem1 has " ++ (show (mem1 a))
+                                    ++ "; mem2 has " ++ (show (mem2 a))
+        )%string
         false
   end.
 
 Fixpoint loc_on_domain_checker
-         (dom: list uid) (st1 st2 : V.Opsem.state) : Checker :=
+         (dom: list uid) (loc1 loc2 : V.Opsem.loc) : Checker :=
   match dom with
   | [] => checker true
   | (a :: l) =>
-    match V.Opsem.st_loc st1 a, V.Opsem.st_loc st2 a with
+    match loc1 a, loc2 a with
     | Some n1, Some n2 =>
-      if Nat.eqb n1 n2 then loc_on_domain_checker l st1 st2
+      if Nat.eqb n1 n2 then loc_on_domain_checker l loc1 loc2
       else whenFail "loc_equal: locs disagree" false
-    | None, None => loc_on_domain_checker l st1 st2
+    | None, None => loc_on_domain_checker l loc1 loc2
     | _, _ => whenFail "loc_equal: locs disagree" false
     end
   end.
@@ -165,15 +168,16 @@ Definition eval_equal_checker
   | None => whenFail "eval_equal: run did not obtain any value" false
   end.
 
-Definition ids_preserved_checker (cs : list addr) (st st': V.Opsem.state)
-  : Checker := loc_on_domain_checker cs st st'.
+Definition ids_preserved_checker (cs : list uid) (st st': V.Opsem.state)
+  : Checker :=
+  loc_on_domain_checker cs (V.Opsem.st_loc st) (V.Opsem.st_loc st').
 
 Definition expression_step_checker
            (eval: V.Opsem.mem -> nat)
            (g: cfg)
            (initial_state final_state: V.Opsem.state)
            (k: list insn) (end_of_expr: pc)
-           (cs cs': list addr)
+           (cs cs': list uid)
            (v : val) : Checker :=
   conjoin [ids_preserved_checker cs initial_state final_state;
              insns_at_pc_checker g end_of_expr k;
@@ -227,12 +231,15 @@ Definition comp_correct_checker
 (*
 Lemma comp_aexp_correct : forall (a:aexp),
   comp_correct (comp_aexp a) (aeval a).
-*)
+ *)
+
+(**! Section test_compile_aexp extends compiler *)
+
 Definition comp_aexp_correct_checker :=
   forAll arbitrary (fun a: aexp =>
-    (comp_correct_checker (comp_aexp a) (aeval a))).
+    (* collect a ( *) comp_correct_checker (comp_aexp a) (aeval a)).
 
-(*! QuickChick comp_aexp_correct_checker. *)
+(**! QuickChick comp_aexp_correct_checker. *)
 
 (*
 Lemma comp_bop_correct : forall b comp1 comp2 eval1 eval2
@@ -242,15 +249,72 @@ Lemma comp_bop_correct : forall b comp1 comp2 eval1 eval2
                  (fun m => bop_denote b (eval1 m) (eval2 m)).
  *)
 
+(**! Section test_compile_bexp extends compiler *)
+
+(* Fatal error with stack overflow 
 Definition comp_bop_correct_checker: Checker :=
   forAll arbitrary (fun (a1: aexp) =>
   forAll arbitrary (fun (a2: aexp) =>
   forAll arbitrary (fun (binop: bop) => 
-    comp_correct_checker 
+    collect (binop, a1, a2) (comp_correct_checker 
       (comp_bop binop (comp_aexp a1) (comp_aexp a2))
-      (fun m => V.Opsem.bop_denote binop (aeval a1 m) (aeval a2 m))))).
+      (fun m => V.Opsem.bop_denote binop (aeval a1 m) (aeval a2 m)))))).
+ *)
+
+Definition comp_bop_correct_checker: Checker :=
+  forAll arbitrary (fun (a1: aexp) =>
+  forAll arbitrary (fun (a2: aexp) =>
+  forAll arbitrary (fun (binop: bop) => 
+    collect binop (comp_correct_checker 
+      (comp_bop binop (comp_aexp a1) (comp_aexp a2))
+      (fun m => V.Opsem.bop_denote binop (aeval a1 m) (aeval a2 m)))))).
 
 (*! QuickChick comp_bop_correct_checker. *)
+
+(*
+Check comp_store_correct.
+Check comp_store.
+Print block_entry.
+Check wrap_code_in_cfg.
+Check V.Opsem.mkst.
+Print V.Opsem.state.
+Check eval_until_pc.
+Check V.Opsem.Memory.update.
+Check memory_on_domain_checker.
+ *)
+
+(* generate cfg g such that its instruction *)
+Definition comp_store_correct_checker_inner
+           (a : aexp) (v: addr) (lr le: lbl) (cs: list uid)
+           (stm: state_with_meta)
+  : Checker :=
+  let st := V.Opsem.mkst (stm_mem stm) (block_entry le) (stm_loc stm)
+                         (stm_ppc stm) (stm_ploc stm) in
+  let '(g, end_pc) :=
+      wrap_code_in_cfg (block_entry le)
+                       (Stmon.steval (comp_store a v lr) cs) [] in
+  match (eval_until_pc g st (block_entry lr) 1000) with
+  | inl err => whenFail "evaluator failed" false
+  | inr st' =>
+    if (eq_dec_pc (V.Opsem.st_pc st') (block_entry lr)) then
+      memory_on_domain_checker
+        (v :: stm_mem_dom stm) (V.Opsem.st_mem st')
+        (V.Opsem.Memory.update (V.Opsem.st_mem st)
+                               v
+                               (aeval a (V.Opsem.st_mem st)))
+    else whenFail "comp_store_correct: pc not expected" false
+  end.
+  
+Definition comp_store_correct_checker: Checker :=
+  forAll arbitrary (fun (a: aexp) =>
+  forAll arbitrary (fun (v: addr) =>
+  forAll arbitrary (fun (lr: lbl) =>
+  forAll arbitrary (fun (le: lbl) =>
+  forAll arbitrary (fun (cs: list uid) =>
+  forAll arbitrary (fun (stm: state_with_meta) =>
+    comp_store_correct_checker_inner a v lr le cs stm)))))).
+
+(* QuickChick comp_store_correct_checker. *)
 
 (*
   Lemma comp_store_correct : 
