@@ -210,6 +210,20 @@ Inductive le_pc : pc -> pc -> Prop :=
 Definition lt_pc (p1 p2:pc) : Prop :=
   le_pc p1 (incr_pc p2).
 
+Definition eq_dec_pc: forall p1 p2: pc, {p1 = p2} + {~(p1 = p2)}.
+Proof.
+  intros (addr1, offset1) (addr2, offset2);
+    pose (offset1 =? offset2) as b.
+  destruct (Atom.eq_dec addr1 addr2) as [addr_eq | addr_neq];
+    try solve [right; intros H; inversion H;
+               exfalso; apply addr_neq; trivial].
+  subst.
+  destruct b eqn:b_eq; subst b;
+    [apply beq_nat_true in b_eq; subst; left; reflexivity |
+     apply beq_nat_false in b_eq; right; intros H; inversion H;
+     apply b_eq; trivial].
+Defined.
+
 (** The entry point of a block is offset [0]. *)
 
 Definition block_entry (l:lbl) : pc := (l, 0).
