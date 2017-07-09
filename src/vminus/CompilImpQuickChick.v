@@ -7,10 +7,18 @@ Import QcDefaultNotation. Open Scope qc_scope.
 
 Require Import Vminus.Atom.
 Require Import Vminus.CompilImp.
+Require Import Vminus.Vminus.
 
 Require Import Vminus.AtomQuickChick.
 Require Import Vminus.VminusQuickChick.
 
+Generalizable All Variables.
+
+Definition show_image_given_domain `{Show A}
+           (f: Atom.t -> A) (l: list Atom.t) := (
+  (List.fold_left (fun accum atom => accum ++ "(" ++ (Atom.string_of atom) ++ ", "
+                                        ++ show (f atom) ++ ") ")
+                  l "[") ++ "]")%string.
 
 (** Opsem **)
 
@@ -48,7 +56,21 @@ Instance show_loc `{Show Atom.t} `{Show nat}:
 Sample (@arbitrary (list Atom.t * V.Opsem.loc) _).
  *)
 
-Definition gen_loc_from_atom_list (atom_list : list Atom.t) : G V.Opsem.loc :=
+Record state_with_meta : Type :=
+  mk_st_with_meta {
+    stm_mem: V.Opsem.mem;
+    stm_mem_dom: list Atom.t;
+    stm_pc: Vminus.pc;
+    stm_loc: V.Opsem.loc;
+    stm_loc_dom: list Atom.t;
+    stm_ppc: Vminus.pc;
+    stm_ploc: V.Opsem.loc;
+    stm_ploc_dom: list Atom.t
+  }.
+
+Definition gen_loc_from_atom_list
+           `{Gen nat}
+           (atom_list : list Atom.t) : G V.Opsem.loc :=
   bindGen (vectorOf (List.length atom_list) arbitrary) (fun nat_list => 
   returnGen (fun (a : Atom.t) =>
                match (index_of_atom_in_list a atom_list) with
@@ -57,22 +79,56 @@ Definition gen_loc_from_atom_list (atom_list : list Atom.t) : G V.Opsem.loc :=
                  List.nth_error nat_list i
                end)).
 
-Instance gen_opsem_state `{Gen V.Opsem.mem} `{Gen V.Opsem.loc} `{Gen Vminus.pc}
-  : Gen V.Opsem.state :=
-  {| arbitrary :=
-       liftGen5 V.Opsem.mkst
-                arbitrary
-                arbitrary
-                arbitrary
-                arbitrary
-                arbitrary
+Definition gen_mem_from_atom_list
+           `{Gen nat}
+           (atom_list : list Atom.t) : G (V.Opsem.mem) :=
+  bindGen (vectorOf (List.length atom_list) arbitrary) (fun nat_list => 
+  returnGen (fun (a : Atom.t) =>
+               match (index_of_atom_in_list a atom_list) with
+               | None => 0
+               | Some i =>
+                 List.nth i nat_list 0
+               end)).
+
+Instance gen_opsem_state_with_meta `{Gen pc}: GenSized state_with_meta :=
+  {| arbitrarySized n :=
+       let mem_dom := get_fresh_atoms n [] in
+       let loc_dom := get_fresh_atoms n [] in
+       let gmem := gen_mem_from_atom_list mem_dom in
+       let gloc := gen_loc_from_atom_list mem_dom in
+
+       bindGen gmem (fun mem =>
+       bindGen arbitrary (fun pc =>
+       bindGen gloc (fun loc =>
+       bindGen arbitrary (fun ppc =>
+       bindGen gloc (fun prev_loc =>
+         returnGen
+           (mk_st_with_meta mem mem_dom
+                            pc
+                            loc loc_dom
+                            ppc
+                            prev_loc loc_dom))))))
   |}.
 
-(* Print V.Opsem.state. *)
+Instance show_state_with_meta `{Show pc} : Show state_with_meta :=
+  {| show st :=
+       let 'mk_st_with_meta mem mem_dom
+                            pc
+                            loc loc_dom
+                            ppc
+                            prev_loc prev_loc_dom := st in
+       ("mem: " ++ show_image_given_domain mem mem_dom ++ ", " ++
+        "pc: " ++ show pc ++ ", " ++
+        "loc: " ++ show_image_given_domain loc loc_dom ++ ", " ++
+        "ppc: " ++ show ppc ++ ", " ++
+        "prev_loc: " ++ show_image_given_domain prev_loc prev_loc_dom)%string
+  |}.
 
+Definition state_of (stm: state_with_meta) :=
+  V.Opsem.mkst (stm_mem stm) (stm_pc stm) (stm_loc stm)
+               (stm_ppc stm) (stm_ploc stm).
 
-
-(* Sample (@arbitrary V.Opsem.state _). *)
+(* Sample (@arbitrary state_with_meta _). *)
 
 
 

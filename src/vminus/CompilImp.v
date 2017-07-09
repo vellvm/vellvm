@@ -62,7 +62,8 @@ Fixpoint comp_aexp (a:aexp) : ectmon (val * list insn) :=
     | ANum n => ret (val_nat n, [])
     | AId i => do r <- fresh; ret (val_uid r, [(r, cmd_load i)])
     | APlus a1 a2 => comp_bop bop_add (comp_aexp a1) (comp_aexp a2)
-    | AMinus a1 a2 => comp_bop bop_sub (comp_aexp a1) (comp_aexp a2)
+    | AMinus a1 a2 => (*! *) comp_bop bop_sub (comp_aexp a1) (comp_aexp a2)
+                     (*! comp_bop bop_sub (comp_aexp a1) (comp_aexp a1) *)
     | AMult a1 a2 => comp_bop bop_mul (comp_aexp a1) (comp_aexp a2)
   end.
 
