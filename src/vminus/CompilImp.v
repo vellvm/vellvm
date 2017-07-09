@@ -18,7 +18,7 @@
 Require Import Arith List RelationClasses.
 Import ListNotations.
 
-Require Import Imp Vminus Sequences Stmon Util.
+Require Import Vminus.Imp Vminus.Vminus Vminus.Sequences Vminus.Stmon Vminus.Util.
 Require Import FunctionalExtensionality. (* TODO: don't really need this *)
 
 Module Import V := Vminus.Make ListCFG.

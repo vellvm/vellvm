@@ -11,9 +11,10 @@
       - a way of generating _fresh_ atoms
 *)
 
-
-
 Require Import Arith List Equalities PeanoNat.
+Require Import String.
+
+Require Import QuickChick.QuickChick.
 
 (** ** ATOM *)
 
@@ -23,6 +24,7 @@ Module Type ATOM <: UsualDecidableType.
   Parameter eq_dec : forall (x y:t), {x = y} + {x <> y}.
   Parameter fresh : list t -> t.
   Parameter fresh_not_in : forall l, ~ In (fresh l) l.
+  Parameter string_of: t -> string.
 
   Include HasUsualEq <+ UsualIsEq.
 
@@ -51,7 +53,7 @@ Module Atom : ATOM.
   Proof.
     intros. induction al. inversion H.
       inversion H; subst; simpl. apply Nat.le_max_l.
-      eapply le_trans; auto with arith. apply Nat.le_max_r.
+      eapply le_trans; auto with arith. (* apply Nat.le_max_r. *)
   Qed.
 (* /FOLD *)
     
@@ -67,6 +69,8 @@ Module Atom : ATOM.
 
   Include HasUsualEq <+ UsualIsEq.
 
+  Definition string_of a := show_nat a.
+  
 End Atom.
 
 (* Automatically unfold Atom.eq *)

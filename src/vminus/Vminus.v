@@ -45,12 +45,14 @@ Require Import Vminus.Atom Vminus.Dom Vminus.Env Vminus.Imp Vminus.Util.
 
 (** Basic block labels *)
 
-Module Lbl : ATOM := Atom.
+(* Module Lbl : ATOM := Atom. Opaque modules cannot be generated... *)
+Module Lbl := Atom.
 Notation lbl := Lbl.t.
 
 (** Local unique identifiers *)
 
-Module Uid : ATOM := Atom.
+(* Module Uid : ATOM := Atom. *)
+Module Uid := Atom.
 Notation uid := Uid.t.
 
 (** Mutable (integer) addresses *)
@@ -1164,8 +1166,6 @@ Module ListCFG <: CFG.
     | Some found_block => nth_error found_block offset
     | None => None
     end.
-
-  Print NoDup.
   
   Lemma find_block_ok: forall (blks: list (lbl * list insn)) found_instrs (label: lbl),
       NoDup (List.map fst blks) -> 
@@ -1247,7 +1247,6 @@ Module ListCFG <: CFG.
               insn_at_pc g pc i <-> fetch g pc = Some i.
   Proof.
     intros [l blks] pc i wf_g.
-    Print wf_cfg'.
     inversion wf_g as
         [l' blks' nodup nodup_uid l_in_blks blks_not_empty [l_l' blks_blk]].
     destruct pc as [curr_label curr_offset].
