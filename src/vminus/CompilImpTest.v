@@ -117,7 +117,7 @@ Fixpoint memory_on_domain_checker
       memory_on_domain_checker l mem1 mem2
     else
       whenFail
-        ("memory_equal: memory at " ++ (Atom.string_of a)
+        ("memory_equal: memory at " ++ (show a)
                                     ++ " not equal:"
                                     ++ " mem1 has " ++ (show (mem1 a))
                                     ++ "; mem2 has " ++ (show (mem2 a))

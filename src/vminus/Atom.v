@@ -24,7 +24,7 @@ Module Type ATOM <: UsualDecidableType.
   Parameter eq_dec : forall (x y:t), {x = y} + {x <> y}.
   Parameter fresh : list t -> t.
   Parameter fresh_not_in : forall l, ~ In (fresh l) l.
-  Parameter string_of: t -> string.
+  Parameter nat_of: t -> nat.
 
   Include HasUsualEq <+ UsualIsEq.
 
@@ -69,7 +69,7 @@ Module Atom : ATOM.
 
   Include HasUsualEq <+ UsualIsEq.
 
-  Definition string_of a := show_nat a.
+  Definition nat_of (a : nat) := a.
   
 End Atom.
 

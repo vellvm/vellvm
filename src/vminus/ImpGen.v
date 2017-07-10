@@ -26,7 +26,7 @@ Instance shrink_id : Shrink id := {| shrink x := [] |}.
 
 Instance show_id: Show id :=
   {| show x :=
-       ("Id "%string ++ (Atom.string_of x) ++ "")%string |}.
+       ("Id "%string ++ (show x) ++ "")%string |}.
 
 (* Sample (@arbitrary id _). *)
 

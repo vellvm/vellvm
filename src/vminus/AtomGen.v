@@ -7,7 +7,7 @@ Import QcDefaultNotation. Open Scope qc_scope.
 Require Import Vminus.Atom.
 
 Instance show_atom : Show Atom.t :=
-  {| show := Atom.string_of |}.
+  {| show x := show (Atom.nat_of x) |}.
 
 Fixpoint get_fresh_atoms n l :=
   match n with
