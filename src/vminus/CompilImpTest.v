@@ -253,7 +253,18 @@ Definition comp_bop_correct_checker: Checker :=
 
 (* QuickChick comp_bop_correct_checker. *)
 
-Definition comp_store_correct_checker_inner
+(*
+Lemma comp_store_correct : 
+  forall g a v le lr cs st,
+  insns_at_pc g (block_entry le) (steval (comp_store a v lr) cs) ->
+  st_pc st = (block_entry le) ->
+  exists st',
+    plus (step g) st st' /\
+    st_pc st' = (block_entry lr) /\
+    st_mem st' = (Memory.update (st_mem st) v (aeval a (st_mem st))).
+*)
+
+Definition comp_store_correct_checker_inner'
            (a : aexp) (v: addr) (lr le: lbl) (cs: list uid)
            (stm: state_with_meta)
   : Checker :=
@@ -271,10 +282,10 @@ Definition comp_store_correct_checker_inner
   match (eval_until_pc g st (block_entry lr) 1000) with
   | inl err => whenFail "comp_store_correct: evaluator failed" false
   | inr st' =>
-    if (eq_dec_pc (V.Opsem.st_pc st') (block_entry lr)) then
-      if (eq_dec_lbl lr le) then
-        checker true (* need to execute at least one step *)
-      else 
+    if (eq_dec_lbl le le) then
+      checker true (* need to execute at least one step *)
+    else 
+      if (eq_dec_pc (V.Opsem.st_pc st') (block_entry lr)) then
         let new_dom := (v :: stm_mem_dom stm) in
         whenFail ("::: cfg is: " ++ show g ++
                  " ::: initial state pc: " ++ show (stm_pc stm) ++
@@ -290,9 +301,34 @@ Definition comp_store_correct_checker_inner
             (V.Opsem.st_mem st')
             (V.Opsem.Memory.update (V.Opsem.st_mem st) v
                                    (aeval a (V.Opsem.st_mem st))))
-    else whenFail "comp_store_correct: pc not expected" false
+      else whenFail "comp_store_correct: pc not expected" false
   end.
-  
+
+Definition comp_store_correct_checker_inner
+           (a : aexp) (v: addr) (lr le: lbl) (cs: list uid)
+           (stm: state_with_meta)
+  : Checker :=
+  let st := V.Opsem.mkst (stm_mem stm) (block_entry le) (stm_loc stm)
+                         (stm_ppc stm) (stm_ploc stm) in
+  let '(g, end_pc) :=
+      wrap_code_in_cfg (block_entry le)
+                       (Stmon.steval (comp_store a v lr) cs) [] in
+  match (eval_until_pc g st (block_entry lr) 1000) with
+  | inl err => whenFail "comp_store_correct: evaluator failed" false
+  | inr st' =>
+    if (eq_dec_lbl le le) then
+      checker true (* need to execute at least one step *)
+    else
+      if (eq_dec_pc (V.Opsem.st_pc st') (block_entry lr)) then
+        let new_dom := (v :: stm_mem_dom stm) in
+        whenFail "comp_store_correct: memories mismatch"
+          (memory_on_domain_checker new_dom
+            (V.Opsem.st_mem st')
+            (V.Opsem.Memory.update (V.Opsem.st_mem st) v
+                                   (aeval a (V.Opsem.st_mem st))))
+      else whenFail "comp_store_correct: pc not expected" false
+  end.
+
 Definition comp_store_correct_checker: Checker :=
   forAll arbitrary (fun (a: aexp) =>
   forAll arbitrary (fun (v: addr) =>
@@ -301,7 +337,6 @@ Definition comp_store_correct_checker: Checker :=
   forAll arbitrary (fun (cs: list uid) =>
   forAll arbitrary (fun (stm: state_with_meta) =>
     comp_store_correct_checker_inner a v lr le cs stm)))))).
-
 
 (* QuickChick comp_store_correct_checker. *)
 
@@ -315,6 +350,41 @@ Lemma comp_cond_correct :
     st_pc st' = block_entry (if beval b (st_mem st) then l1 else l2) /\
     st_mem st = st_mem st'.
 *)
+
+Definition comp_cond_correct_checker_inner
+           (b: bexp) (cs: list uid) (le l1 l2: lbl)
+           (stm: state_with_meta)
+  : Checker :=
+  let st := V.Opsem.mkst (stm_mem stm) (block_entry le) (stm_loc stm)
+                         (stm_ppc stm) (stm_ploc stm) in
+  let '(g, end_pc) :=
+      wrap_code_in_cfg (block_entry le)
+                       (Stmon.steval (comp_cond b l1 l2) cs) [] in
+  match (eval_until_pc g st end_pc 1000) with
+  | inl err => whenFail "comp_cond_correct: evaluator failed" false
+  | inr st' =>
+    if (eq_dec_lbl le le) then
+      checker true (* need to execute at least one step *)
+    else
+      let l := (if beval b (V.Opsem.st_mem st) then l1 else l2) in
+      if (eq_dec_pc (V.Opsem.st_pc st') (block_entry l)) then 
+        whenFail "comp_store_correct: memories mismatch"
+                 (memory_on_domain_checker (stm_mem_dom stm)
+                                           (V.Opsem.st_mem st)
+                                           (V.Opsem.st_mem st'))
+    else whenFail "comp_cond_correct: pc not expected" false
+  end.
+
+Definition comp_cond_correct_checker : Checker :=
+  forAll arbitrary (fun (b: bexp) =>
+  forAll arbitrary (fun (le: lbl) =>
+  forAll arbitrary (fun (l1: lbl) =>
+  forAll arbitrary (fun (l2: lbl) =>
+  forAll arbitrary (fun (cs: list uid) =>
+  forAll arbitrary (fun (stm: state_with_meta) =>
+    comp_cond_correct_checker_inner b cs le l1 l2 stm)))))).
+
+(* QuickChick comp_cond_correct_checker. *)
 
 
 (*
