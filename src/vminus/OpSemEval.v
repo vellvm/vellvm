@@ -1,11 +1,15 @@
 (** ** Evaluator for Vminus *)
 
+Require Import List.
 Require Import String.
 Require Import Vminus.Vminus.
 
 Require Import Vminus.CompilImp.
 Import ListCFG.
 Import V.Opsem.
+
+Require Import Vminus.Atom.
+Require Import Vminus.AtomQuickChick.
 
 (* Some monadic set-up *)
 
@@ -70,6 +74,12 @@ Fixpoint eval_until_pc (g : cfg) (s : state)
          end
   end.
 
+Definition eval_past_pc (g : cfg) (s : state)
+           (target_pc : pc) (fuel : nat) : err state :=
+  match eval_until_pc g s target_pc fuel with
+  | inl err => inl err
+  | inr s' => eval_step g s'
+  end.
 
 Ltac eval_step_with_step next_state constructor_rule
      cfg_well_formed fetched :=
