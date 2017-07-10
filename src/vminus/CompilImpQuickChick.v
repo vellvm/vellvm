@@ -166,6 +166,8 @@ Definition generate_dummy_insns n: list insn :=
   in List.rev (helper n).
 
 (* TODO: proper generator *)
+(* Returns a CFG with a single block containing instrs ++ instrs_after, 
+    and the pc in that block that begins at instrs_after *)
 Definition wrap_code_in_cfg (p: pc) (instrs instrs_after: list insn)
   : cfg * pc :=
   let empty_cfg := [] in
