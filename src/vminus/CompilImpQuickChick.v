@@ -15,11 +15,14 @@ Require Import Vminus.VminusQuickChick.
 Generalizable All Variables.
 
 Definition show_image_given_domain `{Show A}
-           (f: Atom.t -> A) (l: list Atom.t) := (
-  (List.fold_left (fun accum atom => accum ++ "(" ++ (Atom.string_of atom) ++ ", "
-                                        ++ show (f atom) ++ ") ")
-                  l "[") ++ "]")%string.
-
+           (f: Atom.t -> A) (l: list Atom.t)
+           (prefix: string) : string := 
+  ((List.fold_left
+      (fun accum atom =>
+         accum ++ "(" ++ prefix ++ " " ++ (Atom.string_of atom) ++ ", "
+               ++ show (f atom) ++ ") ")
+      l "[") ++ "]")%string.
+                   
 (** Opsem **)
 
 (*
@@ -117,11 +120,12 @@ Instance show_state_with_meta `{Show pc} : Show state_with_meta :=
                             loc loc_dom
                             ppc
                             prev_loc prev_loc_dom := st in
-       ("mem: " ++ show_image_given_domain mem mem_dom ++ ", " ++
+       ("mem: " ++ show_image_given_domain mem mem_dom "addr" ++ ", " ++
         "pc: " ++ show pc ++ ", " ++
-        "loc: " ++ show_image_given_domain loc loc_dom ++ ", " ++
+        "loc: " ++ show_image_given_domain loc loc_dom "uid" ++ ", " ++
         "ppc: " ++ show ppc ++ ", " ++
-        "prev_loc: " ++ show_image_given_domain prev_loc prev_loc_dom)%string
+        "prev_loc: " ++
+        show_image_given_domain prev_loc prev_loc_dom "uid")%string
   |}.
 
 Definition state_of (stm: state_with_meta) :=
@@ -131,6 +135,26 @@ Definition state_of (stm: state_with_meta) :=
 (* Sample (@arbitrary state_with_meta _). *)
 
 
+
+Fixpoint generate_dummy_insns (n : nat) : list insn :=
+  let fixed_addr := Atom.fresh [] in
+  let fixed_uid := Atom.fresh [] in
+  match n with
+  | 0 => []
+  | S n' =>
+    (fixed_uid, cmd_load fixed_addr) :: generate_dummy_insns n'
+  end.
+
+(* TODO: proper generator *)
+Definition wrap_code_in_cfg (p: pc) (instrs instrs_after: list insn)
+  : cfg * pc :=
+  let empty_cfg := [] in
+  let '(lbl, offset) := p in
+  let blocks :=
+      ListCFG.update empty_cfg lbl
+                     ((generate_dummy_insns offset)
+                        ++ instrs ++ instrs_after) in
+  ((lbl, blocks), (lbl, offset + List.length instrs)).
 
 
 

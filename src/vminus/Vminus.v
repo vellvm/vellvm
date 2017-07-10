@@ -26,7 +26,16 @@
 
 Require Import Arith List.
 Import ListNotations.
+
+(*
+Require Import QuickChick.QuickChick.
+Import QcDefaultNotation.
+*)
+
 Require Import Vminus.Atom Vminus.Dom Vminus.Env Vminus.Imp Vminus.Util.
+(* Require Import Vminus.AtomQuickChick. *)
+
+
 
 (* ####################################################### *)
 (** ** Vminus Overview *)

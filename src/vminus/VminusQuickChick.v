@@ -79,19 +79,27 @@ Proof. unfold insn. auto with typeclass_instances. Defined.
 Instance shrink_insn : Shrink insn.
 Proof. unfold insn. auto with typeclass_instances. Defined.
 
-Instance show_insn : Show insn.
-Proof. unfold insn. auto with typeclass_instances. Defined.
+Instance show_insn : Show insn :=
+  {| show instr :=
+       let '(uid, cmd) := instr in
+       "(uid " ++ Atom.string_of uid ++ ", " ++ show cmd
+  |}.
 
 (** Program counters and CFG **)
 
 Instance gen_pc : Gen pc.
-Proof. unfold pc. auto with typeclass_instances. Defined.
+Proof.
+  unfold pc. auto with typeclass_instances. Defined.
 
 Instance shrink_pc : Shrink pc.
 Proof. unfold pc. auto with typeclass_instances. Defined.
 
-Instance show_pc : Show pc.
-Proof. unfold pc. auto with typeclass_instances. Defined.
+Instance show_pc : Show pc :=
+  {| show p :=
+       let '(lbl, offset) := p in
+       "(blk " ++ (Atom.string_of lbl) ++ ", ofs " 
+               ++ show_nat offset ++ ")"
+  |}.
 
 Instance gen_block : Gen ListCFG.block.
 Proof. unfold ListCFG.block. auto with typeclass_instances. Defined.
@@ -108,8 +116,17 @@ Proof. unfold ListCFG.t. auto with typeclass_instances. Defined.
 Instance shrink_cfg : Shrink ListCFG.t.
 Proof. unfold ListCFG.t. auto with typeclass_instances. Defined.
 
-Instance show_cfg : Show ListCFG.t.
-Proof. unfold ListCFG.t. auto with typeclass_instances. Defined.
+Instance show_cfg : Show ListCFG.t :=
+  {| show cfg :=
+       let '(entry_label, blks) := cfg in
+       "(entry " ++ Atom.string_of entry_label ++ ", blks: " ++
+                 (List.fold_left
+                    (fun accum blk =>
+                       let '(lbl, insns) := blk in
+                       "lbl " ++ Atom.string_of lbl ++ ": " ++
+                              (show insns))
+                    blks "")
+  |}.
 
 (* Sample (@arbitrary ListCFG.t _). *)
 

@@ -34,7 +34,8 @@ Require Import Vminus.CompilImpQuickChick.
     can be mapped to their corresponding entities in the LLVM "state" following
     the compiler, and that their values are equal. 
 
-    In this case, Imp variables are simplified to exactly the LLVM memory addr. 
+    In this case, Imp variables are simplified to exactly the LLVM memory addr,
+    so an Imp variable with identifier 42 is in LLVM memory at address 42. 
     Equivalence is thus checked by taking an ordering of the Imp variables and
     checking the value at each corresponding address. *)
 
@@ -187,25 +188,6 @@ Definition expression_step_checker
     ctx_incr cs cs'
  *)
 
-Fixpoint generate_dummy_insns (n : nat) : list insn :=
-  let fixed_addr := Atom.fresh [] in
-  let fixed_uid := Atom.fresh [] in
-  match n with
-  | 0 => []
-  | S n' =>
-    (fixed_uid, cmd_load fixed_addr) :: generate_dummy_insns n'
-  end.
-
-Definition wrap_code_in_cfg (p: pc) (instrs instrs_after: list insn)
-  : cfg * pc :=
-  let empty_cfg := [] in
-  let '(lbl, offset) := p in
-  let blocks :=
-      ListCFG.update empty_cfg lbl
-                     ((generate_dummy_insns offset)
-                        ++ instrs ++ instrs_after) in
-  ((lbl, blocks), (lbl, offset + List.length instrs)).
-
 Definition comp_correct_checker_inner
            (comp: ectmon (val * list insn)) (eval: V.Opsem.mem -> nat)
            (cs : list uid) (st: V.Opsem.state) (k: list insn)
@@ -239,7 +221,7 @@ Definition comp_aexp_correct_checker :=
   forAll arbitrary (fun a: aexp =>
     (* collect a ( *) comp_correct_checker (comp_aexp a) (aeval a)).
 
-(**! QuickChick comp_aexp_correct_checker. *)
+(* QuickChick comp_aexp_correct_checker. *)
 
 (*
 Lemma comp_bop_correct : forall b comp1 comp2 eval1 eval2
@@ -269,7 +251,7 @@ Definition comp_bop_correct_checker: Checker :=
       (comp_bop binop (comp_aexp a1) (comp_aexp a2))
       (fun m => V.Opsem.bop_denote binop (aeval a1 m) (aeval a2 m)))))).
 
-(*! QuickChick comp_bop_correct_checker. *)
+(* QuickChick comp_bop_correct_checker. *)
 
 (*
 Check comp_store_correct.
@@ -297,11 +279,14 @@ Definition comp_store_correct_checker_inner
   | inl err => whenFail "evaluator failed" false
   | inr st' =>
     if (eq_dec_pc (V.Opsem.st_pc st') (block_entry lr)) then
-      memory_on_domain_checker
-        (v :: stm_mem_dom stm) (V.Opsem.st_mem st')
-        (V.Opsem.Memory.update (V.Opsem.st_mem st)
-                               v
-                               (aeval a (V.Opsem.st_mem st)))
+      whenFail ("cfg is: " ++ show g ++
+               "::: store to " ++ show v ++
+               "::: terminate at " ++ show (block_entry lr))
+        (memory_on_domain_checker
+           (v :: stm_mem_dom stm) (V.Opsem.st_mem st')
+           (V.Opsem.Memory.update (V.Opsem.st_mem st)
+                                  v
+                                  (aeval a (V.Opsem.st_mem st))))
     else whenFail "comp_store_correct: pc not expected" false
   end.
   
