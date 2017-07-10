@@ -78,7 +78,7 @@ Fixpoint comp_aexp (a:aexp) : ectmon (val * list insn) :=
 (* /HIDE *)
 Fixpoint comp_bexp (b:bexp) : ectmon (val * list insn) :=
   match b with
-    | BTrue => (*! *)ret (val_nat 1, []) (*! ret (val_nat 0, []) *)
+    | BTrue => (*! *) ret (val_nat 1, []) (*! ret (val_nat 0, []) *)
     | BFalse => ret (val_nat 0, [])
     | BEq a1 a2 => comp_bop bop_eq (comp_aexp a1) (comp_aexp a2)
     | BLe a1 a2 => (**!*) comp_bop bop_le (comp_aexp a1) (comp_aexp a2)
