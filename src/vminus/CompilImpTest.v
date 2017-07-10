@@ -253,19 +253,6 @@ Definition comp_bop_correct_checker: Checker :=
 
 (* QuickChick comp_bop_correct_checker. *)
 
-(*
-Check comp_store_correct.
-Check comp_store.
-Print block_entry.
-Check wrap_code_in_cfg.
-Check V.Opsem.mkst.
-Print V.Opsem.state.
-Check eval_until_pc.
-Check V.Opsem.Memory.update.
-Check memory_on_domain_checker.
- *)
-
-(* generate cfg g such that its instruction *)
 Definition comp_store_correct_checker_inner
            (a : aexp) (v: addr) (lr le: lbl) (cs: list uid)
            (stm: state_with_meta)
@@ -314,6 +301,7 @@ Definition comp_store_correct_checker: Checker :=
   forAll arbitrary (fun (cs: list uid) =>
   forAll arbitrary (fun (stm: state_with_meta) =>
     comp_store_correct_checker_inner a v lr le cs stm)))))).
+
 
 (* QuickChick comp_store_correct_checker. *)
 
