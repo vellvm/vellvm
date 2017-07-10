@@ -15,7 +15,7 @@ Require Import Vminus.VminusQuickChick.
 Generalizable All Variables.
 
 Definition show_image_given_domain `{Show A}
-           (f: Atom.t -> A) (l: list Atom.t)
+           (f: Atom.t -> A) (l: list Atom.t) 
            (prefix: string) : string := 
   ((List.fold_left
       (fun accum atom =>
@@ -24,6 +24,15 @@ Definition show_image_given_domain `{Show A}
       l "[") ++ "]")%string.
                    
 (** Opsem **)
+
+Definition show_memory
+           (mem: V.Opsem.mem) (dom: list Atom.t) : string :=
+  "mem: " ++ (show_image_given_domain mem dom "addr").
+
+Definition show_locals
+           (loc: V.Opsem.loc) (dom: list Atom.t): string :=
+  "locals: " ++ (show_image_given_domain loc dom "uid").
+
 
 (*
 Instance gen_loc `{Gen nat} : GenSized (list Atom.t * V.Opsem.loc) :=
@@ -120,9 +129,9 @@ Instance show_state_with_meta `{Show pc} : Show state_with_meta :=
                             loc loc_dom
                             ppc
                             prev_loc prev_loc_dom := st in
-       ("mem: " ++ show_image_given_domain mem mem_dom "addr" ++ ", " ++
+       (show_memory mem mem_dom ++ ", " ++
         "pc: " ++ show pc ++ ", " ++
-        "loc: " ++ show_image_given_domain loc loc_dom "uid" ++ ", " ++
+        show_locals loc loc_dom ++ ", " ++
         "ppc: " ++ show ppc ++ ", " ++
         "prev_loc: " ++
         show_image_given_domain prev_loc prev_loc_dom "uid")%string
@@ -134,8 +143,7 @@ Definition state_of (stm: state_with_meta) :=
 
 (* Sample (@arbitrary state_with_meta _). *)
 
-
-
+(*
 Fixpoint generate_dummy_insns (n : nat) : list insn :=
   let fixed_addr := Atom.fresh [] in
   let fixed_uid := Atom.fresh [] in
@@ -144,6 +152,18 @@ Fixpoint generate_dummy_insns (n : nat) : list insn :=
   | S n' =>
     (fixed_uid, cmd_load fixed_addr) :: generate_dummy_insns n'
   end.
+ *)
+
+Definition generate_dummy_insns n: list insn :=
+  let atoms := (get_fresh_atoms n []) in
+  let nth_atom n := nth n atoms (Atom.fresh []) in
+  let fix helper k :=
+      match k with
+      | 0 => []
+      | S k' =>
+        (nth_atom k, cmd_load (nth_atom k)) :: (helper k')
+      end
+  in List.rev (helper n).
 
 (* TODO: proper generator *)
 Definition wrap_code_in_cfg (p: pc) (instrs instrs_after: list insn)
@@ -155,7 +175,6 @@ Definition wrap_code_in_cfg (p: pc) (instrs instrs_after: list insn)
                      ((generate_dummy_insns offset)
                         ++ instrs ++ instrs_after) in
   ((lbl, blocks), (lbl, offset + List.length instrs)).
-
 
 
 
