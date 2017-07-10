@@ -279,29 +279,26 @@ Definition comp_store_correct_checker_inner'
   let '(g, end_pc) :=
       wrap_code_in_cfg (block_entry le)
                        (Stmon.steval (comp_store a v lr) cs) [] in
-  match (eval_until_pc g st (block_entry lr) 1000) with
+  match (eval_once_and_until_pc g st (block_entry lr) 1000) with
   | inl err => whenFail "comp_store_correct: evaluator failed" false
   | inr st' =>
-    if (eq_dec_lbl le le) then
-      checker true (* need to execute at least one step *)
-    else 
-      if (eq_dec_pc (V.Opsem.st_pc st') (block_entry lr)) then
-        let new_dom := (v :: stm_mem_dom stm) in
-        whenFail ("::: cfg is: " ++ show g ++
-                 " ::: initial state pc: " ++ show (stm_pc stm) ++
-                 " ::: le: " ++ show le ++ 
-                 " ::: lr: " ++ show lr ++
-                 " ::: store to " ++ show v ++
-                 " ::: curr pc: " ++ show (block_entry lr) ++
-                 " ::: final memory: " ++
-                 show_memory (V.Opsem.st_mem st') new_dom ++
-                 " ::: initial memory: " ++
-                 show_memory (V.Opsem.st_mem st) new_dom)
-          (memory_on_domain_checker new_dom
-            (V.Opsem.st_mem st')
-            (V.Opsem.Memory.update (V.Opsem.st_mem st) v
-                                   (aeval a (V.Opsem.st_mem st))))
-      else whenFail "comp_store_correct: pc not expected" false
+    if (eq_dec_pc (V.Opsem.st_pc st') (block_entry lr)) then
+      let new_dom := (v :: stm_mem_dom stm) in
+      whenFail ("::: cfg is: " ++ show g ++
+                " ::: initial state pc: " ++ show (stm_pc stm) ++
+                " ::: le: " ++ show le ++ 
+                " ::: lr: " ++ show lr ++
+                " ::: store to " ++ show v ++
+                " ::: curr pc: " ++ show (block_entry lr) ++
+                " ::: final memory: " ++
+                show_memory (V.Opsem.st_mem st') new_dom ++
+                " ::: initial memory: " ++
+                show_memory (V.Opsem.st_mem st) new_dom)
+        (memory_on_domain_checker new_dom
+          (V.Opsem.st_mem st')
+          (V.Opsem.Memory.update (V.Opsem.st_mem st) v
+                                 (aeval a (V.Opsem.st_mem st))))
+    else whenFail "comp_store_correct: pc not expected" false
   end.
 
 Definition comp_store_correct_checker_inner
@@ -313,20 +310,17 @@ Definition comp_store_correct_checker_inner
   let '(g, end_pc) :=
       wrap_code_in_cfg (block_entry le)
                        (Stmon.steval (comp_store a v lr) cs) [] in
-  match (eval_until_pc g st (block_entry lr) 1000) with
+  match (eval_once_and_until_pc g st (block_entry lr) 1000) with
   | inl err => whenFail "comp_store_correct: evaluator failed" false
   | inr st' =>
-    if (eq_dec_lbl le le) then
-      checker true (* need to execute at least one step *)
-    else
-      if (eq_dec_pc (V.Opsem.st_pc st') (block_entry lr)) then
-        let new_dom := (v :: stm_mem_dom stm) in
-        whenFail "comp_store_correct: memories mismatch"
-          (memory_on_domain_checker new_dom
-            (V.Opsem.st_mem st')
-            (V.Opsem.Memory.update (V.Opsem.st_mem st) v
-                                   (aeval a (V.Opsem.st_mem st))))
-      else whenFail "comp_store_correct: pc not expected" false
+    if (eq_dec_pc (V.Opsem.st_pc st') (block_entry lr)) then
+      let new_dom := (v :: stm_mem_dom stm) in
+      whenFail "comp_store_correct: memories mismatch"
+               (memory_on_domain_checker new_dom
+                 (V.Opsem.st_mem st')
+                 (V.Opsem.Memory.update (V.Opsem.st_mem st) v
+                                        (aeval a (V.Opsem.st_mem st))))
+    else whenFail "comp_store_correct: pc not expected" false
   end.
 
 Definition comp_store_correct_checker: Checker :=
@@ -360,8 +354,12 @@ Definition comp_cond_correct_checker_inner
   let '(g, end_pc) :=
       wrap_code_in_cfg (block_entry le)
                        (Stmon.steval (comp_cond b l1 l2) cs) [] in
-  match (eval_until_pc g st end_pc 1000) with
-  | inl err => whenFail "comp_cond_correct: evaluator failed" false
+  match (eval_once_and_until_pc g st end_pc 1000) with
+  | inl err =>
+    whenFail 
+      ("::: cfg is: " ++ show g ++
+       "comp_cond_correct: evaluator failed")
+      false
   | inr st' =>
     if (eq_dec_lbl le le) then
       checker true (* need to execute at least one step *)
@@ -384,7 +382,9 @@ Definition comp_cond_correct_checker : Checker :=
   forAll arbitrary (fun (stm: state_with_meta) =>
     comp_cond_correct_checker_inner b cs le l1 l2 stm)))))).
 
-(* QuickChick comp_cond_correct_checker. *)
+QuickChick comp_cond_correct_checker.
+
+
 
 
 (*

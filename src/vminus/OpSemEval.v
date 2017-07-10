@@ -81,6 +81,14 @@ Definition eval_past_pc (g : cfg) (s : state)
   | inr s' => eval_step g s'
   end.
 
+Definition eval_once_and_until_pc (g : cfg) (s : state)
+           (target_pc: pc)
+           (fuel: nat) : err state :=
+  match eval_step g s with
+  | inl err => inl err
+  | inr s' => eval_until_pc g s' target_pc fuel
+  end.
+           
 Ltac eval_step_with_step next_state constructor_rule
      cfg_well_formed fetched :=
   match goal with
