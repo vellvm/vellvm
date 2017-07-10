@@ -9,7 +9,7 @@ Import ListCFG.
 Import V.Opsem.
 
 Require Import Vminus.Atom.
-Require Import Vminus.AtomQuickChick.
+Require Import Vminus.AtomGen.
 
 (* Some monadic set-up *)
 

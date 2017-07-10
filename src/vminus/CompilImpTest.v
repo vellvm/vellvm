@@ -12,9 +12,9 @@ Require Import Vminus.Vminus.
 Require Import Vminus.OpSemEval.
 
 Require Import Vminus.Imp.
-Require Import Vminus.ImpQuickChick.
-Require Import Vminus.VminusQuickChick.
-Require Import Vminus.CompilImpQuickChick.
+Require Import Vminus.ImpGen.
+Require Import Vminus.VminusGen.
+Require Import Vminus.CompilImpGen.
 
 (** ** QuickChick and Vellvm **************************************************)
 (** One may expect a compiler for a language as simple as IMP to be relatively 
@@ -394,7 +394,6 @@ Definition comp_cond_correct_checker : Checker :=
 
 (* QuickChick comp_cond_correct_checker. *)
 
-
 (*
 Inductive match_config : Imp.com -> (cfg * lbl * lbl) -> Prop :=
   | MC_Skip : forall bs l,
@@ -415,7 +414,19 @@ Inductive match_config : Imp.com -> (cfg * lbl * lbl) -> Prop :=
       match_config c (g, lb, le) ->
       insns_at_pc g (block_entry le) (steval (comp_cond b lb lr) cs) ->
       match_config (CWhile b c) (g, le, lr).
+*)
 
+(*
+Definition match_config_checker
+           (c: Imp.com) ((g, l1 l2): cfg * lbl * lbl)
+  : Checker :=
+  match c with
+  | SKIP => whenFail "match_config: labels not equal for skip"
+                    (eq_dec_lbl l1 l2)
+  | 
+*)                    
+
+(*
 Inductive match_states (g:cfg) (r:lbl)
   : (com * Imp.state) -> Opsem.state -> Prop :=
   match_states_intro : forall c mem st l,

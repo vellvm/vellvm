@@ -11,7 +11,7 @@ Import QcDefaultNotation. Open Scope qc_scope.
 Require Import Vminus.Atom.
 Require Import Vminus.Imp.
 
-Require Import Vminus.AtomQuickChick.
+Require Import Vminus.AtomGen.
 
 (** ** id **)
 Definition id_store := get_fresh_atoms 5 [].

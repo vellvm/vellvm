@@ -9,8 +9,8 @@ Require Import Vminus.Atom.
 Require Import Vminus.CompilImp.
 Require Import Vminus.Vminus.
 
-Require Import Vminus.AtomQuickChick.
-Require Import Vminus.VminusQuickChick.
+Require Import Vminus.AtomGen.
+Require Import Vminus.VminusGen.
 
 Generalizable All Variables.
 

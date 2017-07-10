@@ -11,7 +11,7 @@ Import QcDefaultNotation. Open Scope qc_scope.
 Require Import Vminus.Atom.
 Require Import Vminus.Vminus.
 
-Require Import Vminus.AtomQuickChick.
+Require Import Vminus.AtomGen.
 
 (** lbl, uid, addr **)
 
