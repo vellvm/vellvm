@@ -21,7 +21,7 @@ Definition show_image_given_domain `{Show A}
            (prefix: string) : string := 
   ((List.fold_left
       (fun accum atom =>
-         accum ++ "(" ++ prefix ++ " " ++ (Atom.string_of atom) ++ ", "
+         accum ++ "(" ++ prefix ++ " " ++ (show atom) ++ ", "
                ++ show (f atom) ++ ") ")
       l "[") ++ "]")%string.
                    

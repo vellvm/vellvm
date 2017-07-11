@@ -23,7 +23,7 @@ Instance shrink_lbl : Shrink lbl := {| shrink x := [] |}.
 
 Instance show_lbl : Show lbl :=
   {| show x :=
-       ("lbl "%string ++ Atom.string_of x ++ "")%string |}.
+       ("lbl "%string ++ show x ++ "")%string |}.
   
 Instance gen_uid : Gen uid :=
   {| arbitrary := gen_fresh fresh_store |}.
@@ -32,7 +32,7 @@ Instance shrink_uid : Shrink uid := {| shrink x := [] |}.
 
 Instance show_uid : Show uid :=
   {| show x :=
-       ("uid "%string ++ Atom.string_of x ++ "")%string |}.
+       ("uid "%string ++ show x ++ "")%string |}.
 
 Instance gen_addr : Gen addr :=
   {| arbitrary := gen_fresh fresh_store |}.
@@ -41,7 +41,7 @@ Instance shrink_addr : Shrink addr := {| shrink x := [] |}.
 
 Instance show_addr : Show addr :=
   {| show x :=
-       ("addr "%string ++ Atom.string_of x ++ "")%string |}.
+       ("addr "%string ++ show x ++ "")%string |}.
 
 (** Values and commands **)
 
@@ -83,7 +83,7 @@ Proof. unfold insn. auto with typeclass_instances. Defined.
 Instance show_insn : Show insn :=
   {| show instr :=
        let '(uid, cmd) := instr in
-       "(uid " ++ Atom.string_of uid ++ ", " ++ show cmd
+       "(uid " ++ show uid ++ ", " ++ show cmd
   |}.
 
 (** Program counters and CFG **)
@@ -98,7 +98,7 @@ Proof. unfold pc. auto with typeclass_instances. Defined.
 Instance show_pc : Show pc :=
   {| show p :=
        let '(lbl, offset) := p in
-       "(blk " ++ (Atom.string_of lbl) ++ ", ofs " 
+       "(blk " ++ (show lbl) ++ ", ofs " 
                ++ show_nat offset ++ ")"
   |}.
 
@@ -120,11 +120,11 @@ Proof. unfold ListCFG.t. auto with typeclass_instances. Defined.
 Instance show_cfg : Show ListCFG.t :=
   {| show cfg :=
        let '(entry_label, blks) := cfg in
-       "(entry " ++ Atom.string_of entry_label ++ ", blks: " ++
+       "(entry " ++ show entry_label ++ ", blks: " ++
                  (List.fold_left
                     (fun accum blk =>
                        let '(lbl, insns) := blk in
-                       "lbl " ++ Atom.string_of lbl ++ ": " ++
+                       "lbl " ++ show lbl ++ ": " ++
                               (show insns))
                     blks "")
   |}.
