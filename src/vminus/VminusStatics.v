@@ -584,3 +584,5 @@ Qed.
 (* /HIDE *)
 
 End OpsemCorrect.
+
+End MakeStatics.
