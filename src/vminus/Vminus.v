@@ -27,15 +27,7 @@
 Require Import Arith List.
 Import ListNotations.
 
-(*
-Require Import QuickChick.QuickChick.
-Import QcDefaultNotation.
-*)
-
 Require Import Vminus.Atom Vminus.Dom Vminus.Env Vminus.Imp Vminus.Util.
-(* Require Import Vminus.AtomQuickChick. *)
-
-
 
 (* ####################################################### *)
 (** ** Vminus Overview *)
@@ -361,6 +353,9 @@ Defined.
 Definition block_entry (l:lbl) : pc := (l, 0).
 Definition entry_of_pc (p:pc)  : pc := block_entry (fst p).
 
+
+(** * COMMENTED OUT *)
+(*
 (** ** Well-formed Control-flow Graphs *)
 
 (** FULL: Given the abstract characterization of program points, we need to
@@ -447,7 +442,9 @@ Module Type CFG.
     forall p', tmn_pc g p' -> forall p, le_pc p p' -> wf_pc g p.
 
 End CFG.
+*)
 
+(** * Commented out 
 (** ** Vminus Operational Semantics *)
 Module Make (Import Cfg:CFG).
 
@@ -1143,7 +1140,9 @@ End OpsemCorrect.
 Export Opsem Typing OpsemCorrect.
 
 End Make.
+*)
 
+(** * Commented out 
 (** *** List-based CFG Implementation *)
 
 (**  One possible implementation of cfgs *)
@@ -1402,4 +1401,4 @@ Module ListCFG <: CFG.
   Qed.      
     
 End ListCFG.
-
+*)

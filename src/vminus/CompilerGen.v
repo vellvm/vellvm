@@ -6,11 +6,13 @@ Require Import QuickChick.QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
 
 Require Import Vminus.Atom.
-Require Import Vminus.CompilImp.
 Require Import Vminus.Vminus.
+Require Import Vminus.ListCFG.
 
 Require Import Vminus.AtomGen.
 Require Import Vminus.VminusGen.
+
+Require Import Vminus.CompilerProp. (* More refactoring work to do *)
 
 Generalizable All Variables.
 
@@ -169,7 +171,7 @@ Definition generate_dummy_insns n: list insn :=
 (* Returns a CFG with a single block containing instrs ++ instrs_after, 
     and the pc in that block that begins at instrs_after *)
 Definition wrap_code_in_cfg (p: pc) (instrs instrs_after: list insn)
-  : cfg * pc :=
+  : ListCFG.t * pc :=
   let empty_cfg := [] in
   let '(lbl, offset) := p in
   let blocks :=

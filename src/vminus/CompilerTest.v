@@ -6,15 +6,16 @@ Require Import Arith.
 Require Import QuickChick.QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
 
-Require Import Vminus.Atom.
-Require Import Vminus.CompilImp.
 Require Import Vminus.Vminus.
-Require Import Vminus.OpSemEval.
-
+Require Import Vminus.Atom.
+Require Import Vminus.ListCFG.
 Require Import Vminus.Imp.
+Require Import Vminus.Compiler.
+Require Import Vminus.CompilerProp.
+
 Require Import Vminus.ImpGen.
 Require Import Vminus.VminusGen.
-Require Import Vminus.CompilImpGen.
+Require Import Vminus.CompilerGen.
 
 (** ** QuickChick and Vellvm **************************************************)
 (** One may expect a compiler for a language as simple as IMP to be relatively 
@@ -140,7 +141,7 @@ Fixpoint loc_on_domain_checker
   end.
 
 Fixpoint insns_at_pc_checker `{Show pc}
-         (g: cfg) (p: pc) (k : list insn) : Checker :=
+         (g: ListCFG.t) (p: pc) (k : list insn) : Checker :=
   match k with
   | [] => checker true
   | (uid, cmd) :: instrs =>
@@ -175,7 +176,7 @@ Definition ids_preserved_checker (cs : list uid) (st st': V.Opsem.state)
 
 Definition expression_step_checker
            (eval: V.Opsem.mem -> nat)
-           (g: cfg)
+           (g: ListCFG.t)
            (initial_state final_state: V.Opsem.state)
            (k: list insn) (end_of_expr: pc)
            (cs cs': list uid)
@@ -188,13 +189,14 @@ Definition expression_step_checker
     ctx_incr cs cs'
  *)
 
+
 Definition comp_correct_checker_inner
            (comp: ectmon (val * list insn)) (eval: V.Opsem.mem -> nat)
            (cs : list uid) (st: V.Opsem.state) (k: list insn)
   : Checker :=
   let '(cs', (v, instrs)) := comp cs in
   let '(g, cutpoint) := wrap_code_in_cfg (V.Opsem.st_pc st) instrs k in
-  match eval_until_pc g st cutpoint 1000 with
+  match V.Opsem.eval_until_pc g st cutpoint 1000 with
   | inl err => whenFail ("comp_correct_checker: " ++ err) false
   | inr st' => 
     expression_step_checker eval g st st' k cutpoint cs cs' v
@@ -290,7 +292,7 @@ Definition comp_store_correct_checker_inner'
   let '(g, end_pc) :=
       wrap_code_in_cfg (block_entry le)
                        (Stmon.steval (comp_store a v lr) cs) [] in
-  match (eval_once_and_until_pc g st (block_entry lr) 1000) with
+  match (V.Opsem.eval_once_and_until_pc g st (block_entry lr) 1000) with
   | inl err => whenFail ("comp_store_correct: " ++ err) false
   | inr st' =>
     if (eq_dec_pc (V.Opsem.st_pc st') (block_entry lr)) then
@@ -321,7 +323,7 @@ Definition comp_store_correct_checker_inner
   let '(g, end_pc) :=
       wrap_code_in_cfg (block_entry le)
                        (Stmon.steval (comp_store a v lr) cs) [] in
-  match (eval_once_and_until_pc g st (block_entry lr) 1000) with
+  match (V.Opsem.eval_once_and_until_pc g st (block_entry lr) 1000) with
   | inl err => whenFail ("comp_store_correct: " ++ err) false
   | inr st' =>
     if (eq_dec_pc (V.Opsem.st_pc st') (block_entry lr)) then
@@ -366,7 +368,7 @@ Definition comp_cond_correct_checker_inner
       wrap_code_in_cfg (block_entry le)
                        (Stmon.steval (comp_cond b l1 l2) cs) [] in
   let l := (if beval b (V.Opsem.st_mem st) then l1 else l2) in  
-  match (eval_until_pc g st (block_entry l) 1000) with
+  match (V.Opsem.eval_until_pc g st (block_entry l) 1000) with
   | inl err =>
     whenFail 
       ("::: cfg is: " ++ show g ++

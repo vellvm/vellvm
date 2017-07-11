@@ -9,6 +9,7 @@ Require Import QuickChick.QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
 
 Require Import Vminus.Atom.
+Require Import Vminus.ListCFG.
 Require Import Vminus.Vminus.
 
 Require Import Vminus.AtomGen.

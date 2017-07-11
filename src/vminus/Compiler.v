@@ -14,20 +14,10 @@
 (** Imports, instantiated with the list implementation of 
     control-flow graphs. *)
 
-
-Require Import Arith List RelationClasses.
+Require Import List.
 Import ListNotations.
 
-Require Import Vminus.Imp Vminus.Vminus Vminus.Sequences Vminus.Stmon Vminus.Util.
-Require Import FunctionalExtensionality. (* TODO: don't really need this *)
-
-Module Import V := Vminus.Make ListCFG.
-Import Opsem.
-Import ListCFG.
-
-Notation cfg := ListCFG.t.
-
-Unset Printing Records.
+Require Import Vminus.Imp Vminus.Vminus Vminus.Stmon.
 
 (** * Compiling Expressions *)
 
@@ -89,22 +79,24 @@ Fixpoint comp_bexp (b:bexp) : ectmon (val * list insn) :=
                 (**! comp_bop bop_eq (comp_bexp b1) (ret (val_nat 1, [])) *)
   end.
 
+
+(** * Commented out *
 (** ** Correspondence between concrete and abstract CFGs. *)
 
 (** Asserts that the instruction sequence found at program point p in 
     the control-flow graph g is exactly the list [is]. *)
 
-Fixpoint insns_at_pc (g:ListCFG.t) (p:pc) (is:list insn) : Prop := 
+Fixpoint insns_at_pc (g:CFG.t) (p:pc) (is:list insn) : Prop := 
   match is with
     | nil => True
-    | i :: is' => insn_at_pc g p i /\ insns_at_pc g (incr_pc p) is'
+    | i :: is' => Cfg.insn_at_pc g p i /\ insns_at_pc g (incr_pc p) is'
   end.
 
 (** Looking up the block labeled [l] in the concrete represenation
     agrees with the declarative specification. *)
 
 Lemma cfg_insns_at : forall g l is e,
-  lookup g l = Some is ->
+  Cfg.lookup g l = Some is ->
   insns_at_pc (e, g) (block_entry l) is.
 (* FOLD *)
 Proof.
@@ -114,7 +106,7 @@ Proof.
   clearbody k. generalize dependent k.
   induction is; intros. simpl; auto.
     simpl. split. eexists. split.
-    unfold lookup in H.
+    unfold CFG.lookup in H.
     apply assoc_in in H. simpl; eauto.
     clear H. induction k; simpl; auto.
     replace (S (length k)) with (length (k ++ [a])). apply IHis.
@@ -1114,3 +1106,4 @@ Proof.
   eapply simulation_infseq with (match_states := match_states g lr); eauto.
   eapply transl_sim_step_final. eapply match_config_initial; eauto.
 Qed.
+*)
