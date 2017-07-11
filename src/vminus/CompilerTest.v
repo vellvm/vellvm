@@ -13,10 +13,6 @@ Require Import Vminus.Imp.
 Require Import Vminus.Compiler.
 Require Import Vminus.CompilerProp.
 
-Require Import Vminus.ImpGen.
-Require Import Vminus.VminusGen.
-Require Import Vminus.CompilerGen.
-
 (** ** QuickChick and Vellvm **************************************************)
 (** One may expect a compiler for a language as simple as IMP to be relatively 
     straightforward, and a proof of its correctness to be correspondingly
@@ -29,84 +25,224 @@ Require Import Vminus.CompilerGen.
     compiler is a much simpler affair. Moreover, the simplicity of the source 
     language, i.e. Imp. means that it is really easy to test! *)
 
-(** Following the lecture on compiler correctness, the first step is to define
-    what it means for an Imp state and an LLVM "state" to be equivalent. 
-    For correct compilation, it should be that all variables in the Imp state
-    can be mapped to their corresponding entities in the LLVM "state" following
-    the compiler, and that their values are equal. 
+(** This lecture shows how QuickChick can be used to test the compiler. For
+    simplicity, the target language is the simplified SSA language Vminus, and
+    we use a variant of Imp whose names are just memory addresses which can be 
+    interpreted in the memory of Vminus states. Imp states and Vminus memory
+    are hence essentially the same, and this makes it easy to state correct 
+    compilation: after running the source program and its compilation, 
+    every Imp variable/address is mapped to the same nat by both the Imp state 
+    and Vminus memory. 
 
-    In this case, Imp variables are simplified to exactly the LLVM memory addr,
-    so an Imp variable with identifier 42 is in LLVM memory at address 42. 
-    Equivalence is thus checked by taking an ordering of the Imp variables and
-    checking the value at each corresponding address. *)
-
-(** Hence we have the following. *)
-
-
-(*
-(** Definition of a proper compiler, not correctness in the sense of 
-    semantics-preserving translation *)
-Definition comp_correct (comp : ectmon (val * list insn))
-                        (eval : mem -> nat) : Prop :=
-  forall cs cs' g st is k v,
-    
-  (* uid, val, instruction *) (cs', (v, is)) = comp cs ->
-  insns_at_pc g (st_pc st) (is ++ k) ->
-  exists st',
-    st_mem st' = st_mem st /\
-    insns_at_pc g (st_pc st') k /\
-    star (Opsem.step g) st st' /\
-    ids_preserved cs st st' /\
-    good_return cs' v /\
-    ctx_incr cs cs' /\
-    eval_val (st_loc st') v = Some (eval (st_mem st)).
-
-Lemma comp_aexp_correct : forall (a:aexp),
-  comp_correct (comp_aexp a) (aeval a).
-
-Lemma comp_bop_correct : forall b comp1 comp2 eval1 eval2
-    (IHa1: comp_correct comp1 eval1)
-    (IHa2: comp_correct comp2 eval2),
-    comp_correct (comp_bop b comp1 comp2)
-                 (fun m => bop_denote b (eval1 m) (eval2 m)).
-
-Lemma comp_store_correct : 
-  forall g a v le lr cs st,
-  insns_at_pc g (block_entry le) (steval (comp_store a v lr) cs) ->
-  st_pc st = (block_entry le) ->
-  exists st',
-    plus (step g) st st' /\
-    st_pc st' = (block_entry lr) /\
-    st_mem st' = (Memory.update (st_mem st) v (aeval a (st_mem st))).
-  
-Lemma comp_cond_correct :
-  forall g cs b le l1 l2 st,
-  insns_at_pc g (block_entry le) (steval (comp_cond b l1 l2) cs) ->
-  st_pc st = (block_entry le) ->
-  exists st',
-    plus (step g) st st' /\
-    st_pc st' = block_entry (if beval b (st_mem st) then l1 else l2) /\
-    st_mem st = st_mem st'.
+    A Vminus state consists of a memory (mapping addresses to nat), a program 
+    counter, an environment mapping locals to nat, a "previous" program 
+    counter, and a "previous" environment. The latter two are needed for
+    executing phi nodes. A configuration consists of a Vminus state and a CFG,
+    which "holds" Vminus instructions organized in basic blocks.
 *)
 
-(*
-  (* plug in any cfg and initial execution state such that instructions at the 
-     current pc has instructions is ++ k. Then there exists an intermediate
-     state whose memory is the same as the initial, the instructions at this
-     new pc is just k, we can step from st to st', ids are preserved, 
-     ... 
+(** Here's a look at what we mean. 
 
-     So we need generators for:
-     - instructions, for extraneous k
-     - states, in particular program counters to place the instructions at
-     - 
-     And we need to:
-     - construct a dummy CFG g where instructions are placed in a given 
-       block, and which tell us where the cut-point target pc is.
-     - execute instructions from an initial state until this intermediate 
-       state is reached. 
-     - have a Checker for the conjunction of properties.  
-   *)
+    Lemma comp_aexp_correct : forall (a:aexp),
+      comp_correct (comp_aexp a) (aeval a).
+    
+    Definition comp_correct (comp : ectmon (val * list insn))
+                            (eval : mem -> nat) : Prop :=
+      forall (cs cs': list uid) (g: ListCFG.t) (st: V.Opsem.state)
+        (is k: list insn) (v: val), 
+      (cs', (v, is)) = comp cs ->
+      insns_at_pc g (st_pc st) (is ++ k) ->
+      exists st',
+        st_mem st' = st_mem st /\
+        insns_at_pc g (st_pc st') k /\
+        star (Opsem.step g) st st' /\
+        ids_preserved cs st st' /\
+        good_return cs' v /\
+        ctx_incr cs cs' /\
+        eval_val (st_loc st') v = Some (eval (st_mem st)).
+*)
+
+(** That is, compiling Imp aexp is correct if:
+    - for any compilation run on an initial list of uids, 
+    - wherever we place the compilation result "is" in the CFG, as long
+      as the pc is pointed to it, (insns_at_pc g (st_pc) (is ++ k)),
+    - we can run to the end of compilation (insns_at_pc g (st_pc st') k),
+    - and in this state st', the memory is the same as above; but evaluating 
+      the result of the expression in this state (eval_val (st_loc st') v)
+      is exactly the same as evaluating it according to the Imp state
+      (eval (st_mem st)). 
+    - This last fact may not be obvious from the body of comp_correct. But note 
+      comp_aexp_correct; the evaluation function passed to it is Imp's aeval, 
+      and this is where the coincidence of Imp states and Vminus memory comes 
+      into play.
+    There is a bunch of other things that we need here, so as to prove correct
+    compilation for com. But the above description is the crux.
+*)
+
+(** We would like to write Checkers for propositions like the ones above.
+    To do so, we first need QuickChick infrastructure for Imp commands.
+
+    Exercise...
+ *)
+
+Require Import Vminus.ImpGen.
+
+(** Looking at comp_correct, it is clear that we need to generate more. 
+    In particular, it would seem that we need generators for the following:
+    - uid
+    - CFG
+    - Vminus states
+    - Vminus instructions
+    - values
+    However, note that the only value v (with cs', is) is computed by comp 
+    rather than generated, so we don't actually need a generator for value. 
+    Moreover, the CFG g should not be generated randomly the same way we do 
+    others, because it has to satisfy insns_at_pc; it is unlikely for just 
+    "any" CFG to satisfy this precondition of the lemma. *)
+
+(**
+    Exercise: Generators and Shows for uid and Vminus instructions, using 
+    automation as much as possible. (It is however useful to have custom Shows 
+    that are more descriptive.)
+
+    For states, we would like to know the domains of their memories and local
+    environment, so we have created an extended state that holds this 
+    information, called state_with_meta. The generator and show for this have
+    been done for you.
+ *)
+
+Require Import Vminus.VminusGen.
+Require Import Vminus.CompilerGen.
+
+(** With these out of the way, we can now address the remaining gaps. In its 
+    current form, comp_correct is inefficient and challenging for testing. 
+    Firstly, some of the quantities are computed by a function, so it is 
+    unnecessary to generate them in the first place, although seemingly 
+    suggested by "forall". Secondly, the CFG g is not just any CFG, but one 
+    that satisfies insns_at_pc for the compilation result - random generation 
+    in the usual way is very, very unlikely to meet this condition, so most
+    checks would end up being vacuously true. Thirdly, a Checker for the 
+    the existence of st' really needs to compute it, and this is not part of
+    the lemma itself. 
+
+    Hence the first order of affairs is to massage the lemma into a 
+    Checker-friendly version.
+ *)
+
+(** Firstly, let us drop the unnecessary variables, and use state_with_meta 
+    instead of just V.Opsem.state.
+
+    Definition comp_correct (comp : ectmon (val * list insn))
+                            (eval : mem -> nat) : Prop :=
+      forall (cs: list uid) (g: ListCFG.t) (st: state_with_meta)
+        (k: list insn),
+
+      let (cs', (v, is)) := comp cs in
+
+      insns_at_pc g (st_pc st) (is ++ k) ->
+      exists st',
+        st_mem st' = st_mem st /\
+        insns_at_pc g (st_pc st') k /\
+        star (Opsem.step g) st st' /\
+        ids_preserved cs st st' /\
+        good_return cs' v /\
+        ctx_incr cs cs' /\
+        eval_val (st_loc st') v = Some (eval (st_mem st)).
+
+    This is of course not accepted by Coq, but we will eventually get to a
+    Checker.
+ *)
+
+(** Secondly, we need to write a custom generator that generates CFGs 
+    satisfying insns_at_pc. An easier option is to just construct a CFG 
+    containing the required instructions deterministically. 
+
+    Let us call this function wrap_code_in_cfg pc is k (in correspondence with 
+    insns_at_pc g (st_pc st) (is ++ k)).
+
+    Exercise...
+*)
+
+Require Import Vminus.CompilerGen.
+
+(** The to-be-Checkable lemma is thus:
+
+    Definition comp_correct (comp : ectmon (val * list insn))
+                            (eval : mem -> nat) : Prop :=
+      forall (cs: list uid) (g: ListCFG.t) (st: state_with_meta)
+        (k: list insn),
+
+      let (cs', (v, is)) := comp cs in
+      let g := wrap_code_in_cfg (st_pc st) is k in
+
+      exists st',
+        st_mem st' = st_mem st /\
+        insns_at_pc g (st_pc st') k /\
+        star (Opsem.step g) st st' /\
+        ids_preserved cs st st' /\
+        good_return cs' v /\
+        ctx_incr cs cs' /\
+        eval_val (st_loc st') v = Some (eval (st_mem st)). 
+*)
+
+(** Thirdly, if we have grasped the meaning of the lemma, we know that st'
+    is given by executing the compilation result; this is the point of 
+    "loading" the compilation result at the current pc in g, and is of course 
+    also stated by "star (Opsem.step g) st st'". So we need an executable 
+    evaluator for Vminus. The state st' is obtained by running this evaluator 
+    until we reach (the start of) k. 
+    
+    The simplest way of doing so is to stop at the program counter that begins
+    k, and this is actually determined by the CFG that loaded (is ++ k). 
+
+    Exercise: Change wrap_code_in_cfg to return (g, pc), where the latter is 
+    the pc that begins k. *)
+
+Require Import Vminus.CompilerGen.
+
+(** Now we need the evaluator itself. This has been defined. *)
+
+Check V.Opsem.eval_until_pc.
+
+(** Now the lemma is:
+
+    Definition comp_correct (comp : ectmon (val * list insn))
+                            (eval : mem -> nat) : Prop :=
+      forall (cs: list uid) (g: ListCFG.t) (st: state_with_meta)
+        (k: list insn),
+
+      let (cs', (v, is)) := comp cs in
+      let (g, endpoint) := wrap_code_in_cfg (st_pc st) is k in
+
+      match V.Opsem.eval_until_pc g st cutpoint 1000 with
+      | inl err => false (* either out of fuel or no st' *)
+      | inr st' => 
+        st_mem st' = st_mem st /\
+        insns_at_pc g (st_pc st') k /\
+        star (Opsem.step g) st st' /\
+        ids_preserved cs st st' /\
+        good_return cs' v /\
+        ctx_incr cs cs' /\
+        eval_val (st_loc st') v = Some (eval (st_mem st))
+      end.
+ *)
+
+(** And with this, the major obstacles are out of the way, and we only have
+    to write a Checker for the big conjunction. Because the conjunction is 
+    huge, it is easier to write a Checker for each conjunct. That is, we would
+    like to have:
+    - A Checker that checks that two memories are the same. This is where 
+      knowing their domains is useful, and is where state_with_meta comes in.
+    - A Checker that checks for insns_at_pc g.
+    - A Checker for ids_preserved.
+    - A Checker for good_return.
+    - A Checker for ctxt_incr.
+    - A Checker that checks for equality between the two ways of evaluation.
+    Note that "star (Opsem.step g) st st'" doesn't need checking, because it is
+    implicit in eval_until_pc. With respect to correctness of aexp compilation 
+    itself, the last is most relevant. 
+
+    To give a headstart, most of these are defined below.
 *)
 
 Fixpoint memory_on_domain_checker
@@ -174,6 +310,8 @@ Definition ids_preserved_checker (cs : list uid) (st st': V.Opsem.state)
   : Checker :=
   loc_on_domain_checker cs (V.Opsem.st_loc st) (V.Opsem.st_loc st').
 
+
+(** We can now compose the checkers using QuickChick's conjoin combinator. *)
 Definition expression_step_checker
            (eval: V.Opsem.mem -> nat)
            (g: ListCFG.t)
@@ -189,6 +327,12 @@ Definition expression_step_checker
     ctx_incr cs cs'
  *)
 
+(** Finally, a Checker for comp_correct and comp_aexp could look like the 
+    following. It is convenient to split the Checker into a part that does 
+    only the generation, and a part that does the checking, because a type 
+    error can cause the typechecker to get stuck trying to resolve the issue
+    by looking for typeclass instances that don't exist.    
+*)
 
 Definition comp_correct_checker_inner
            (comp: ectmon (val * list insn)) (eval: V.Opsem.mem -> nat)
@@ -212,10 +356,6 @@ Definition comp_correct_checker
       comp eval
       cs (state_of start_evaluation_state) extra_insn))).
 
-(*
-Lemma comp_aexp_correct : forall (a:aexp),
-  comp_correct (comp_aexp a) (aeval a).
- *)
 
 (**! Section test_compile_aexp extends compiler *)
 
@@ -223,50 +363,28 @@ Definition comp_aexp_correct_checker :=
   forAll arbitrary (fun a: aexp =>
     (* collect a ( *) comp_correct_checker (comp_aexp a) (aeval a)).
 
-(* QuickChick comp_aexp_correct_checker. *)
+(*! QuickChick comp_aexp_correct_checker. *)
 
-(*
+
+(** Now you are on your own! **)
+
+(** Exercise: Write a Checker for the following lemma. 
+
 Lemma comp_bop_correct : forall b comp1 comp2 eval1 eval2
     (IHa1: comp_correct comp1 eval1)
     (IHa2: comp_correct comp2 eval2),
     comp_correct (comp_bop b comp1 comp2)
                  (fun m => bop_denote b (eval1 m) (eval2 m)).
- *)
+*)
 
-(**! Section test_compile_bexp extends compiler *)
+(** Exercise: Write a Checker for the following lemma. 
 
-(* Fatal error with stack overflow 
-Definition comp_bop_correct_checker: Checker :=
-  forAll arbitrary (fun (a1: aexp) =>
-  forAll arbitrary (fun (a2: aexp) =>
-  forAll arbitrary (fun (binop: bop) => 
-    collect (binop, a1, a2) (comp_correct_checker 
-      (comp_bop binop (comp_aexp a1) (comp_aexp a2))
-      (fun m => V.Opsem.bop_denote binop (aeval a1 m) (aeval a2 m)))))).
- *)
-
-Definition comp_bop_correct_checker: Checker :=
-  forAll arbitrary (fun (a1: aexp) =>
-  forAll arbitrary (fun (a2: aexp) =>
-  forAll arbitrary (fun (binop: bop) => 
-    collect binop (comp_correct_checker 
-      (comp_bop binop (comp_aexp a1) (comp_aexp a2))
-      (fun m => V.Opsem.bop_denote binop (aeval a1 m) (aeval a2 m)))))).
-
-(* QuickChick comp_bop_correct_checker. *)
-
-(*
 Lemma comp_bexp_correct : forall (b:bexp),
   comp_correct (comp_bexp b) (fun m => b2n (beval b m)).
- *)
+*)
 
-Definition comp_bexp_correct_checker : Checker :=
-  forAll arbitrary (fun b: bexp => 
-    comp_correct_checker (comp_bexp b) (fun m => if (beval b m) then 1 else 0)).
+(** Exercise: Write a Checker for the following lemma.
 
-(* QuickChick comp_bexp_correct_checker. *)
-
-(*
 Lemma comp_store_correct : 
   forall g a v le lr cs st,
   insns_at_pc g (block_entry le) (steval (comp_store a v lr) cs) ->
@@ -277,77 +395,8 @@ Lemma comp_store_correct :
     st_mem st' = (Memory.update (st_mem st) v (aeval a (st_mem st))).
 *)
 
-Definition comp_store_correct_checker_inner'
-           (a : aexp) (v: addr) (lr le: lbl) (cs: list uid)
-           (stm: state_with_meta)
-  : Checker :=
-  let st := V.Opsem.mkst (stm_mem stm) (block_entry le) (stm_loc stm)
-                         (stm_ppc stm) (stm_ploc stm) in
-  let stm := mk_st_with_meta
-               (stm_mem stm) (stm_mem_dom stm)
-               (block_entry le)
-               (stm_loc stm) (stm_loc_dom stm)
-               (stm_ppc stm)
-               (stm_ploc stm) (stm_ploc_dom stm) in
-  let '(g, end_pc) :=
-      wrap_code_in_cfg (block_entry le)
-                       (Stmon.steval (comp_store a v lr) cs) [] in
-  match (V.Opsem.eval_once_and_until_pc g st (block_entry lr) 1000) with
-  | inl err => whenFail ("comp_store_correct: " ++ err) false
-  | inr st' =>
-    if (eq_dec_pc (V.Opsem.st_pc st') (block_entry lr)) then
-      let new_dom := (v :: stm_mem_dom stm) in
-      whenFail ("::: cfg is: " ++ show g ++
-                " ::: initial state pc: " ++ show (stm_pc stm) ++
-                " ::: le: " ++ show le ++ 
-                " ::: lr: " ++ show lr ++
-                " ::: store to " ++ show v ++
-                " ::: curr pc: " ++ show (block_entry lr) ++
-                " ::: final memory: " ++
-                show_memory (V.Opsem.st_mem st') new_dom ++
-                " ::: initial memory: " ++
-                show_memory (V.Opsem.st_mem st) new_dom)
-        (memory_on_domain_checker new_dom
-          (V.Opsem.st_mem st')
-          (V.Opsem.Memory.update (V.Opsem.st_mem st) v
-                                 (aeval a (V.Opsem.st_mem st))))
-    else whenFail "comp_store_correct: pc not expected" false
-  end.
+(** Exercise: Write a Checker for the following lemma.
 
-Definition comp_store_correct_checker_inner
-           (a : aexp) (v: addr) (lr le: lbl) (cs: list uid)
-           (stm: state_with_meta)
-  : Checker :=
-  let st := V.Opsem.mkst (stm_mem stm) (block_entry le) (stm_loc stm)
-                         (stm_ppc stm) (stm_ploc stm) in
-  let '(g, end_pc) :=
-      wrap_code_in_cfg (block_entry le)
-                       (Stmon.steval (comp_store a v lr) cs) [] in
-  match (V.Opsem.eval_once_and_until_pc g st (block_entry lr) 1000) with
-  | inl err => whenFail ("comp_store_correct: " ++ err) false
-  | inr st' =>
-    if (eq_dec_pc (V.Opsem.st_pc st') (block_entry lr)) then
-      let new_dom := (v :: stm_mem_dom stm) in
-      whenFail "comp_store_correct: memories mismatch"
-               (memory_on_domain_checker new_dom
-                 (V.Opsem.st_mem st')
-                 (V.Opsem.Memory.update (V.Opsem.st_mem st) v
-                                        (aeval a (V.Opsem.st_mem st))))
-    else whenFail "comp_store_correct: pc not expected" false
-  end.
-
-Definition comp_store_correct_checker: Checker :=
-  forAll arbitrary (fun (a: aexp) =>
-  forAll arbitrary (fun (v: addr) =>
-  forAll arbitrary (fun (lr: lbl) =>
-  forAll arbitrary (fun (le: lbl) =>
-  forAll arbitrary (fun (cs: list uid) =>
-  forAll arbitrary (fun (stm: state_with_meta) =>
-    comp_store_correct_checker_inner a v lr le cs stm)))))).
-
-(* QuickChick comp_store_correct_checker. *)
-
-(*  
 Lemma comp_cond_correct :
   forall g cs b le l1 l2 st,
   insns_at_pc g (block_entry le) (steval (comp_cond b l1 l2) cs) ->
@@ -356,93 +405,4 @@ Lemma comp_cond_correct :
     plus (step g) st st' /\
     st_pc st' = block_entry (if beval b (st_mem st) then l1 else l2) /\
     st_mem st = st_mem st'.
-*)
-
-Definition comp_cond_correct_checker_inner
-           (b: bexp) (cs: list uid) (le l1 l2: lbl)
-           (stm: state_with_meta)
-  : Checker :=
-  let st := V.Opsem.mkst (stm_mem stm) (block_entry le) (stm_loc stm)
-                         (stm_ppc stm) (stm_ploc stm) in
-  let '(g, end_pc) :=
-      wrap_code_in_cfg (block_entry le)
-                       (Stmon.steval (comp_cond b l1 l2) cs) [] in
-  let l := (if beval b (V.Opsem.st_mem st) then l1 else l2) in  
-  match (V.Opsem.eval_until_pc g st (block_entry l) 1000) with
-  | inl err =>
-    whenFail 
-      ("::: cfg is: " ++ show g ++
-       "::: comp_cond_correct: " ++ err ++
-       "::: looking for pc: " ++ show end_pc
-      )
-      false
-  | inr st' =>
-    if (eq_dec_pc (V.Opsem.st_pc st') (block_entry l)) then 
-      whenFail "comp_store_correct: memories mismatch"
-               (memory_on_domain_checker (stm_mem_dom stm)
-                                         (V.Opsem.st_mem st)
-                                         (V.Opsem.st_mem st'))
-    else whenFail "comp_cond_correct: pc not expected" false
-  end.
-
-Definition comp_cond_correct_checker : Checker :=
-  forAll arbitrary (fun (b: bexp) =>
-  forAll arbitrary (fun (le: lbl) =>
-  forAll arbitrary (fun (l1: lbl) =>
-  forAll arbitrary (fun (l2: lbl) =>
-  forAll arbitrary (fun (cs: list uid) =>
-  forAll arbitrary (fun (stm: state_with_meta) =>
-    comp_cond_correct_checker_inner b cs le l1 l2 stm)))))).
-
-(* QuickChick comp_cond_correct_checker. *)
-
-(*
-Inductive match_config : Imp.com -> (cfg * lbl * lbl) -> Prop :=
-  | MC_Skip : forall bs l,
-      match_config SKIP (bs, l, l)
-  | MC_Ass : forall g l l' uid a cs,
-      insns_at_pc g (block_entry l) (steval (comp_store a uid l') cs) ->
-      match_config (CAss uid a) (g, l, l')
-  | MC_Seq : forall g l1 l2 l3 c1 c2,
-      match_config c1 (g, l1, l2) ->
-      match_config c2 (g, l2, l3) ->
-      match_config (CSeq c1 c2) (g, l1, l3)
-  | MC_If : forall g le lr l1 l2 b c1 c2 cs,
-      match_config c1 (g, l1, lr) ->
-      match_config c2 (g, l2, lr) ->
-      insns_at_pc g (block_entry le) (steval (comp_cond b l1 l2) cs) ->
-      match_config (CIf b c1 c2) (g, le, lr)
-  | MC_While : forall g le lb lr b c cs,
-      match_config c (g, lb, le) ->
-      insns_at_pc g (block_entry le) (steval (comp_cond b lb lr) cs) ->
-      match_config (CWhile b c) (g, le, lr).
-*)
-
-(*
-Definition match_config_checker
-           (c: Imp.com) ((g, l1 l2): cfg * lbl * lbl)
-  : Checker :=
-  match c with
-  | SKIP => whenFail "match_config: labels not equal for skip"
-                    (eq_dec_lbl l1 l2)
-  | 
-*)                    
-
-(*
-Inductive match_states (g:cfg) (r:lbl)
-  : (com * Imp.state) -> Opsem.state -> Prop :=
-  match_states_intro : forall c mem st l,
-    match_config c (g, l, r) ->
-    st_pc st = block_entry l ->
-    st_mem st = mem ->
-    match_states g r (c, mem) st.
-
-Lemma transl_sim_step_final :
-  forall g r imp_st imp_st' vmn_st,
-  Imp.step imp_st imp_st' ->
-  match_states g r imp_st vmn_st ->
-  exists vmn_st',
-    (plus (Opsem.step g) vmn_st vmn_st' \/
-     star (Opsem.step g) vmn_st vmn_st' /\ imp_size imp_st' < imp_size imp_st) /\
-    match_states g r imp_st' vmn_st'.
 *)
