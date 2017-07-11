@@ -797,8 +797,10 @@ Proof.
     assert ((uid, cmd_tmn tmn0) = (uid0, cmd_phi pas)).
     apply (insn_at_pc_func g Hwfcfg pc0); auto. inversion H1; subst.
 
-    rename tmn into tmn1.
-    assert ((uid, cmd_tmn tmn0) = (uid0, cmd_tmn tmn1)) as H1; auto. admit.
+    rename tmn0 into tmn1.
+    rename tmn into tmn0.
+    assert ((uid, cmd_tmn tmn0) = (uid0, cmd_tmn tmn1)).
+    apply (insn_at_pc_func g Hwfcfg pc0); auto.
     inversion H1; subst.
     rewrite <- H8 in H0. inversion H0; subst; auto.
 
@@ -849,7 +851,7 @@ Proof.
     assert ((uid, cmd_store addr v) = (uid0, cmd_store addr0 v0)).
     apply (insn_at_pc_func g Hwfcfg pc0); auto. inversion H1; subst.
     rewrite <- H8 in H0. inversion H0. subst; auto.
-Admitted.
+Qed.
 (* /FOLD *)
 (* /HIDE *)
 
