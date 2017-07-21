@@ -1311,8 +1311,9 @@ Lemma compiled_state_matches :
     exists P ,
     matching_state CFG fid P p cmd.
 Proof.
-  induction cmd; intros.
-
+  induction cmd; intros; admit.
+Admitted.
+(* Commented out for the sake of compiling.
   - exists (fun q => q = p).
     econstructor. eauto.
     
@@ -1402,7 +1403,7 @@ Proof.
     unfold cmd_ret in Hcomp. inversion Hcomp. subst.
     econstructor. eauto.
 
-End Correctness.      
+   
 
 
       
@@ -1440,4 +1441,6 @@ Proof.
   intros cmd res st st' Hceval.
   
   
-*)
+ *)*)
+
+End Correctness.   
