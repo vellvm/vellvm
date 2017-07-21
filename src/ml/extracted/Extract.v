@@ -1,8 +1,6 @@
 Require Vellvm.Ollvm_ast.
 Require Vellvm.Transform.
 Require Vellvm.Memory.
-Require Vellvm.Imp.
-Require Vellvm.Compiler.
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
@@ -46,6 +44,4 @@ Cd "ml/extracted".
 
 Extraction Library ExtrOcamlIntConv.
 Recursive Extraction Library Memory.
-Recursive Extraction Library Imp.
-Recursive Extraction Library Compiler.
 Extraction Library Transform.

@@ -13,15 +13,11 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-QUICKCHICKFILES := ImpQuickChick OllvmQuickChick MemoryQuickChick CompilerQuickChick ImpCorrectnessTest
-IMPCOQFILES := Maps Imp ImpCEvalFun Compiler ImpCorrectness ImpOptimizer CompilerProp 
-COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp $(IMPCOQFILES) $(QUICKCHICKFILES)
+COQFILES := Ollvm_ast Classes Util Misc AstLib Dom CFG CFGProp Effects StepSemantics Memory DeadInstr Transform
 OLLVMFILES := 
 
 VFILES := $(COQFILES:%=coq/%.v)
 VOFILES := $(COQFILES:%=coq/%.vo)
-
-EXPERIMENT_FILES := MiniLLVM Vellvm Extract_Haskell_Ollvm_ast Experiments
 
 all:
 	@test -f .depend || $(MAKE) depend
@@ -84,17 +80,5 @@ clean:
 	ocamlbuild -clean
 	rm -rf output
 	rm -f vellvm
-
-qc:
-	cp coq/Makefile_QuickChick coq/Makefile
-	cp coq/_CoqProject_QuickChick coq/_CoqProject
-	$(foreach f, $(EXPERIMENT_FILES), mv coq/$(f).v coq/$(f).bak;)
-	cd coq; echo "Entering coq/"; quickChick -top Vellvm -v
-	$(foreach f, $(EXPERIMENT_FILES), mv coq/$(f).bak coq/$(f).v;)
-
-restore:
-	rm coq/Makefile
-	rm coq/_CoqProject
-	$(foreach f, $(EXPERIMENT_FILES), mv coq/$(f).bak coq/$(f).v;)
 
 -include .depend

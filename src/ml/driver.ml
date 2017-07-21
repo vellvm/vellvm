@@ -44,10 +44,6 @@ let parse_file filename =
   |> Lexing.from_string
   |> Ollvm_lexer.parse
 
-let imp_parse_file filename =
-  read_file filename
-  |> Lexing.from_string
-  |> Imp_lexer.parse
 
 let output_file filename ast =
   let open Ollvm_printer in
@@ -81,27 +77,12 @@ let process_ll_file path file =
   let _ = output_file vll_file ll_ast' in
   ()
 
-let process_imp_file path file =
-  let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
-  let imp_ast = imp_parse_file path in
-  let ll_ast = match Compiler.compile imp_ast with
-    | Datatypes.Coq_inr d -> d
-    | Datatypes.Coq_inl m -> failwith ("Extracted compiler failed: " ^ (of_str m))
-  in
-  let _ = if !interpret then Interpreter.interpret ll_ast else () in
-  let ll_ast' = transform ll_ast in
-  let ll_file = Platform.gen_name !Platform.output_path file ".ll" in
-  let _ = output_file ll_file ll_ast' in
-  ()
-
-
 
 let process_file path =
   let _ = Printf.printf "Processing: %s\n" path in 
   let basename, ext = Platform.path_to_basename_ext path in
   begin match ext with
     | "ll" -> process_ll_file path basename
-    | "imp" -> process_imp_file path basename
     | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
   end
 

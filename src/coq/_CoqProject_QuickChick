@@ -1,4 +1,0 @@
--R ../../lib/paco/src Paco
--Q . Vellvm
--R . Vellvm
--R ../../lib/CompCert/ compcert
