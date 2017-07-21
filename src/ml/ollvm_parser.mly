@@ -333,11 +333,27 @@ definition:
 
         } }
 
+body_list:
+  | /* empty */  { ([], []) }  
+  | id=lident EQ p=phi EOL+ bl=body_list { let (ps,ins) = bl in ((Some id, p)::ps, ins) }
+
+  | p=phi EOL+ bl=body_list { let (ps, ins) = bl in ((None, p)::ps, ins) }
+
+  | id=lident EQ inst=instr EOL+ bl=body_list { let (ps, ins) = bl in (ps, (Some id, inst)::ins) }
+
+  | inst=instr EOL+ bl=body_list {let (ps, ins) = bl in (ps, (None, inst)::ins) }
+  
+block:
+  lbl=terminated(LABEL, EOL+)?
+  bl=body_list
+  term=terminated(terminator, EOL+)
+  { (lbl, fst bl, snd bl, term) }
+  
 df_blocks: 
-  | bs=pair(terminated(LABEL, EOL+)?, pair(terminated(id_phi, EOL+)*, pair(terminated(id_instr, EOL+)*, terminated(terminator, EOL+))))+
+  | bs=block+
     { let _ = anon_ctr.reset () in
       let _ = void_ctr.reset () in
-      List.map (fun (lbl, (phis, (instrs, term))) ->
+      List.map (fun (lbl, phis, body, term) ->
                 let l = raw_id_of lbl 
 		in let blk_phis = List.map (fun (id, phi) ->
 		                  (phi_id id, phi))
@@ -346,7 +362,7 @@ df_blocks:
                                     match id with 
                                     | None -> (id_of inst, inst)
                                     | Some s -> (IId s, inst))
-                       instrs
+                       body
                 in
                 {blk_id = l; blk_phis; blk_code; blk_term=(IVoid (void_ctr.get ()), term)})
 	bs
@@ -625,19 +641,14 @@ value:
   | eo=expr_op { eo }
   | ev=expr_val { ev }
 
-phi:
+%inline phi:
   | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry)
     { Phi (t, table) }
 
 phi_table_entry:
   | LSQUARE v=value COMMA l=lident RSQUARE { (l, v) }
-
-id_phi:
-  | id=lident EQ p=phi { (Some id, p) }
-  | p=phi              { (None, p) }
-
-
-instr:
+  
+%inline instr:
   | eo=instr_op { INSTR_Op eo }
 
   | KW_TAIL? KW_CALL cconv? list(param_attr) f=tident
@@ -698,9 +709,6 @@ terminator:
     list(fn_attr) KW_TO l1=branch_label KW_UNWIND l2=branch_label
     { TERM_Invoke (ret, a, l1, l2)  }
 
-id_instr:
-  | id=lident EQ inst=instr { (Some id, inst) }
-  | inst=instr              { (None, inst) }
 
 alloca_opt:
   | a=align                             { (None, Some a) }

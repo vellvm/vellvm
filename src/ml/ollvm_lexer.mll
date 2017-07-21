@@ -290,6 +290,7 @@ rule token = parse
                then METADATA_STRING id
                else METADATA_ID rid)
 	   | Ollvm_ast.Anon _ -> METADATA_ID rid
+    	   | Ollvm_ast.Raw _ -> METADATA_ID rid
 	   end
          }
 
