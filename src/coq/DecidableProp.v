@@ -6,8 +6,6 @@ Require Import compcert.lib.Integers.
 
 (* Vellvm dependencies *)
 Require Import Vellvm.Ollvm_ast Vellvm.CFG Vellvm.StepSemantics Vellvm.Memory.
-Require Import Vellvm.Compiler.
-Require Import Vellvm.ImpCorrectness.
 Require Import Vellvm.Classes.
 Require Import Vellvm.AstLib.
 Require Import Vellvm.DecidableEquality.
