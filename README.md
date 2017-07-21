@@ -5,9 +5,10 @@ LLVM compiler IR that is intended for _formal verification_ of
 LLVM-based software.  It is being developed at the
 University of Pennsylvania as part of the DeepSpec project.
 
-See:  [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/)
-      [DeepSpec](http://deepspec.org)
-      [LLVM](http://llvm.org)
+See:
+ - [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/)
+ - [DeepSpec](http://deepspec.org)
+ - [LLVM](http://llvm.org)
 
 # Participants
  - Steve Zdancewic
@@ -45,16 +46,13 @@ See:  [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/)
 Assumes:
  - coqc   : version 8.6   (and coqdep, etc.)
  - ocamlc : version 4.04  (probably works with 4.02 or later)
- - OPAM packages: ocamlbuild, menhir, llvm  (for llvm v. 3.8)
-BCP: llvm might not be needed?
+ - OPAM packages: ocamlbuild, menhir, [optional: llvm  (for llvm v. 3.8)]
  - paco  library  in /lib/paco   [available here](http://plv.mpi-sws.org/paco/)
-
-BCP 6/29/17: Also...
  - compcert 
      - download CompCert 3.0.1 from http://compcert.inria.fr/download.html
      - untar, rename to CompCert, and put in /vellvm/lib directory
-     ./configure x86_64-macosx    [or whatever]
-     make
+     - ./configure x86_64-macosx    [or whatever]
+     - make
 
 Compilation:
 
