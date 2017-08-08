@@ -48,16 +48,16 @@ Assumes:
  - ocamlc : version 4.04  (probably works with 4.02 or later)
  - OPAM packages: ocamlbuild, menhir, [optional: llvm  (for llvm v. 3.8)]
  - paco  library  in /lib/paco   [available here](http://plv.mpi-sws.org/paco/)
- - compcert 
-     - download CompCert 3.0.1 from http://compcert.inria.fr/download.html
-     - untar, rename to CompCert, and put in /vellvm/lib directory
-     - ./configure x86_64-macosx    [or whatever]
-     - make
 
 Compilation:
 
-1. clone the vellvm git repo
-2. install 3rd party libraries in /lib  (Paco and CompCert)
+1. clone the vellvm git repo with --recursuve option (git clone --recursive)
+2. install 3rd party libraries in /lib (Paco)
+3. compile CompCert:
+   - cd lib/Compcert
+   - ./configure x86_64-macosx    [or whatever]
+   - make
+   
 3. run `make` in the /src directory
 
 # Running
