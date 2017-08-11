@@ -27,4 +27,3 @@ src/ml/extracted/*.ml
 src/ml/extracted/STAMP
 src/.depend
 output
-/lib/paco
