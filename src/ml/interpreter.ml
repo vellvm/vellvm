@@ -12,7 +12,11 @@
  
 let print_int_dvalue dv : unit =
   match dv with
-  | SS.DV (Ollvm_ast.VALUE_Integer i) -> Printf.printf "Program terminated with: %d\n" (Camlcoq.Z.to_int i)
+  | SS.DV (Ollvm_ast.VALUE_Integer i) -> Printf.printf "Program terminated with: VALUE_Integer(%d)\n" (Camlcoq.Z.to_int i)
+  | SS.DVALUE_I1 (x) -> Printf.printf "Program terminated with: DVALUE_I1(%d)\n" (Camlcoq.Z.to_int (StepSemantics.Int1.unsigned x))
+  | SS.DVALUE_I32 (x) -> Printf.printf "Program terminated with: DVALUE_I32(%d)\n" (Camlcoq.Z.to_int (StepSemantics.Int32.unsigned x))
+  | SS.DVALUE_I64 (x) -> Printf.printf "Program terminated with: DVALUE_I64(%d) [possible precision loss: converted to OCaml int]\n"
+                       (Camlcoq.Z.to_int (StepSemantics.Int64.unsigned x))
   | _ -> Printf.printf "Program terminated with non-Integer value.\n"
 
 let rec step m =
