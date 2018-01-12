@@ -1,6 +1,6 @@
 [submodule "lib/CompCert"]
 	path = lib/CompCert
-	url = git@github.com:AbsInt/CompCert.git
+	url = https://github.com/AbsInt/CompCert.git
 [submodule "lib/paco"]
 	path = lib/paco
 	url = https://github.com/vzaliva/paco
