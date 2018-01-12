@@ -51,7 +51,7 @@ Compilation:
 1. clone the vellvm git repo with `--recursuve` option (`git clone --recursive`)
 2. compile 3rd party libraries:
    1. CompCert: `cd lib/Compcert && ./configure x86_64-macosx && make`
-   2. Compile Paco: `make -C lib/paco`
+   2. Compile Paco: `make -C lib/paco/src`
 3. run `make` in the /src directory
 
 # Running
