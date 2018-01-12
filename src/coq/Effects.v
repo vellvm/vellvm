@@ -37,6 +37,9 @@ Export ET.
      we would also have to expose the "Ret" instruction. 
 
    - What is the correct way to model global data? 
+
+   - Note: one might think that Store should take a continuation k of type
+     d, but that would imply an "asynchronous" interaction.
 *)
 Inductive effects (d:Type) : Type :=
 | Alloca (t:typ)  (k:value -> d)        (* Stack allocation *)
