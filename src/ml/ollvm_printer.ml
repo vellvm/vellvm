@@ -566,7 +566,7 @@ and id_instr : Format.formatter -> (Ollvm_ast.instr_id * Ollvm_ast.instr) -> uni
 and id_phi : Format.formatter -> (Ollvm_ast.local_id * Ollvm_ast.phi) -> unit =
   fun ppf ->
     function (id, p) ->
-      fprintf ppf "%a%a" lident id phi p
+      fprintf ppf "%a = %a" lident id phi p
 
 
 and instr_id : Format.formatter -> Ollvm_ast.instr_id -> unit =
