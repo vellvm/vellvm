@@ -42,17 +42,19 @@ University of Pennsylvania as part of the DeepSpec project.
 # Installing / Compiling Vellvm
 
 ### Assumes: 
-  - coqc   : version 8.6   (and coqdep, etc.)
+  - coqc   : version 8.7.1   (and coqdep, etc.)
   - ocamlc : version 4.04  (probably works with 4.02 or later)
   - OPAM packages: ocamlbuild, menhir, [optional: llvm  (for llvm v. 3.8)]
 
 Compilation:
 
 1. clone the vellvm git repo with `--recursive` option (`git clone --recursive`)
-2. compile 3rd party libraries:
+2. update CompCert submodule to coq 8.7.1 compatible version:
+   1. `cd lib/CompCert && git pull origin master`
+3. compile 3rd party libraries:
    1. CompCert: `cd lib/Compcert && ./configure x86_64-macosx && make`
    2. Compile Paco: `make -C lib/paco/src`
-3. run `make` in the /src directory
+4. run `make` in the /src directory
 
 # Running
 
