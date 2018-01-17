@@ -156,6 +156,7 @@ Fixpoint value_uses (v:value) : list ident :=
   | SV (VALUE_Ident id) => [id]
   | SV (VALUE_Integer _)
   | SV (VALUE_Float _ )
+  | SV (VALUE_Hex _ )       
   | SV (VALUE_Bool _)
   | SV (VALUE_Null)
   | SV (VALUE_Zero_initializer)

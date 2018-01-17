@@ -219,6 +219,7 @@ Inductive Expr (a:Set) : Set :=
 | VALUE_Ident   (id:ident)  
 | VALUE_Integer (x:int)
 | VALUE_Float   (f:float)
+| VALUE_Hex     (h:string)                
 | VALUE_Bool    (b:bool)
 | VALUE_Null
 | VALUE_Zero_initializer
@@ -246,6 +247,7 @@ Inductive Expr (a:Set) : Set :=
 Arguments VALUE_Ident {_} _.
 Arguments VALUE_Integer {_} _.
 Arguments VALUE_Float {_} _.
+Arguments VALUE_Hex {_} _.
 Arguments VALUE_Bool {_} _.
 Arguments VALUE_Null {_}.
 Arguments VALUE_Zero_initializer {_}.
