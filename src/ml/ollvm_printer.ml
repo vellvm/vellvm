@@ -261,11 +261,12 @@ and conversion_type : Format.formatter -> Ollvm_ast.conversion_type -> unit =
                | Bitcast  -> "bitcast")
 
 and value : Format.formatter -> Ollvm_ast.value -> unit =
-  fun (ppf:Format.formatter) (SV vv) ->
+  fun (ppf:Format.formatter) vv ->
     match vv with
   | VALUE_Ident i           -> ident ppf i
   | VALUE_Integer i         -> pp_print_int ppf (to_int i)
   | VALUE_Float f           -> pp_print_float ppf f
+  | VALUE_Hex h             -> fprintf ppf "0x%s" (of_str h)
   | VALUE_Bool b            -> pp_print_bool ppf b
   | VALUE_Null              -> pp_print_string ppf "null"
   | VALUE_Undef             -> pp_print_string ppf "undef"
@@ -281,8 +282,6 @@ and value : Format.formatter -> Ollvm_ast.value -> unit =
 
   | VALUE_Cstring s -> fprintf ppf "c\"%s\"" (of_str s)
 
-  | VALUE_None -> fprintf ppf "none"
-  
   | OP_IBinop (op, t, v1, v2) ->
      fprintf ppf "%a (%a %a, %a %a)"
              ibinop op
@@ -365,11 +364,12 @@ and value : Format.formatter -> Ollvm_ast.value -> unit =
              tvalue mask
 
 and inst_value : Format.formatter -> Ollvm_ast.value -> unit =
-  fun ppf (SV vv) ->
+  fun ppf vv ->
     match vv with
   | VALUE_Ident _ 
   | VALUE_Integer _ 
-  | VALUE_Float _   
+  | VALUE_Float _
+  | VALUE_Hex _         
   | VALUE_Bool _    
   | VALUE_Null      
   | VALUE_Undef     
@@ -378,8 +378,7 @@ and inst_value : Format.formatter -> Ollvm_ast.value -> unit =
   | VALUE_Struct _
   | VALUE_Packed_struct _
   | VALUE_Zero_initializer 
-  | VALUE_Cstring _ 
-  | VALUE_None -> assert false   (* there should be no "raw" values as instructions *)
+  | VALUE_Cstring _ -> assert false   (* there should be no "raw" values as instructions *)
   
   | OP_IBinop (op, t, v1, v2) ->
      fprintf ppf "%a %a %a, %a"

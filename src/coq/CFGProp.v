@@ -153,33 +153,32 @@ Definition pt_defines (p:pt) (lid:local_id) :=
 (* Which identifiers does an instruction use? *)
 Fixpoint value_uses (v:value) : list ident :=
   match v with
-  | SV (VALUE_Ident id) => [id]
-  | SV (VALUE_Integer _)
-  | SV (VALUE_Float _ )
-  | SV (VALUE_Hex _ )       
-  | SV (VALUE_Bool _)
-  | SV (VALUE_Null)
-  | SV (VALUE_Zero_initializer)
-  | SV (VALUE_Cstring _)
-  | SV (VALUE_None)
-  | SV (VALUE_Undef) => []
+  | VALUE_Ident id => [id]
+  | VALUE_Integer _
+  | VALUE_Float _ 
+  | VALUE_Hex _        
+  | VALUE_Bool _
+  | VALUE_Null
+  | VALUE_Zero_initializer
+  | VALUE_Cstring _
+  | VALUE_Undef => []
 
-  | SV (VALUE_Struct l)
-  | SV (VALUE_Packed_struct l)
-  | SV (VALUE_Array l)
-  | SV (VALUE_Vector l) => List.flat_map (fun x => value_uses (snd x)) l
-  | SV (OP_IBinop _ _ v1 v2) 
-  | SV (OP_ICmp _ _ v1 v2)
-  | SV (OP_FBinop _ _ _ v1 v2) 
-  | SV (OP_FCmp _ _ v1 v2) => (value_uses v1) ++ (value_uses v2)
-  | SV (OP_Conversion _ _ v _) => value_uses v
-  | SV (OP_GetElementPtr _ (_,ptr) idxs) => (value_uses ptr) ++ (List.flat_map (fun x => value_uses (snd x)) idxs)
-  | SV (OP_ExtractElement  (_,vec) (_,idx)) => (value_uses vec) ++ (value_uses idx)
-  | SV (OP_InsertElement (_,vec) (_,elt) (_,idx)) => (value_uses vec) ++ (value_uses elt) ++ (value_uses idx)
-  | SV (OP_ShuffleVector (_, vec1) (_,vec2) (_,idxmask)) => (value_uses vec1) ++ (value_uses vec2) ++ (value_uses idxmask)
-  | SV (OP_ExtractValue (_,vec) _) => value_uses vec
-  | SV (OP_InsertValue (_,vec) (_,elt) _) => (value_uses vec) ++ (value_uses elt)
-  | SV (OP_Select (_,cnd) (_,v1) (_,v2)) => (value_uses cnd) ++ (value_uses v1) ++ (value_uses v2)
+  | VALUE_Struct l
+  | VALUE_Packed_struct l
+  | VALUE_Array l
+  | VALUE_Vector l => List.flat_map (fun x => value_uses (snd x)) l
+  | OP_IBinop _ _ v1 v2
+  | OP_ICmp _ _ v1 v2
+  | OP_FBinop _ _ _ v1 v2
+  | OP_FCmp _ _ v1 v2 => (value_uses v1) ++ (value_uses v2)
+  | OP_Conversion _ _ v _ => value_uses v
+  | OP_GetElementPtr _ (_,ptr) idxs => (value_uses ptr) ++ (List.flat_map (fun x => value_uses (snd x)) idxs)
+  | OP_ExtractElement  (_,vec) (_,idx) => (value_uses vec) ++ (value_uses idx)
+  | OP_InsertElement (_,vec) (_,elt) (_,idx) => (value_uses vec) ++ (value_uses elt) ++ (value_uses idx)
+  | OP_ShuffleVector (_, vec1) (_,vec2) (_,idxmask) => (value_uses vec1) ++ (value_uses vec2) ++ (value_uses idxmask)
+  | OP_ExtractValue (_,vec) _ => value_uses vec
+  | OP_InsertValue (_,vec) (_,elt) _ => (value_uses vec) ++ (value_uses elt)
+  | OP_Select (_,cnd) (_,v1) (_,v2) => (value_uses cnd) ++ (value_uses v1) ++ (value_uses v2)
   end.
 
 Definition tvalue_uses (tv:tvalue) : list ident := value_uses (snd tv).
