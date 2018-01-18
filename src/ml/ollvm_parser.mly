@@ -141,6 +141,7 @@ let id_of = function
 %token<string> STRING
 %token<Camlcoq.Z.t> INTEGER
 %token<float> FLOAT
+%token<string> HEXCONSTANT
 %token KW_NULL KW_UNDEF KW_TRUE KW_FALSE KW_ZEROINITIALIZER KW_C
 
 %token<string> LABEL
@@ -625,6 +626,7 @@ expr_op:
 expr_val:
   | i=INTEGER                                         { SV (VALUE_Integer i)        }
   | f=FLOAT                                           { SV (VALUE_Float f)          }
+  | h=HEXCONSTANT                                     { SV (VALUE_Hex (str h))      }
   | KW_TRUE                                           { SV (VALUE_Bool true)        }
   | KW_FALSE                                          { SV (VALUE_Bool false)       }
   | KW_NULL                                           { SV (VALUE_Null)             }
@@ -635,7 +637,7 @@ expr_val:
   | LSQUARE l=separated_list(csep, tconst) RSQUARE    { SV (VALUE_Array l)          }
   | LT l=separated_list(csep, tconst) GT              { SV (VALUE_Vector l)         }
   | i=ident                                           { SV (VALUE_Ident i)          }
-  | KW_C cstr=STRING                                  { SV (VALUE_Cstring (str cstr))     }
+  | KW_C cstr=STRING                                  { SV (VALUE_Cstring (str cstr)) }
 
 value:
   | eo=expr_op { eo }

@@ -363,6 +363,7 @@ Definition expr_dvalue_ind: forall (P : dvalue -> Set),
     (forall id : ident, P (DV (VALUE_Ident id))) ->
     (forall x : int, P (DV (VALUE_Integer x))) ->
     (forall f : float, P (DV (VALUE_Float f))) ->
+    (forall h : String.string, P (DV (VALUE_Hex h))) ->    
     (forall b : bool, P (DV (VALUE_Bool b))) ->
     (P (DV VALUE_Null)) ->
     (P (DV (VALUE_Zero_initializer))) ->
@@ -436,7 +437,7 @@ Definition expr_dvalue_ind: forall (P : dvalue -> Set),
     (P DVALUE_Poison) ->
     (forall v : dvalue, P v).
 Proof.
-  intros P H_Ident H_Integer H_Float H_Bool H_Null
+  intros P H_Ident H_Integer H_Float H_Hex H_Bool H_Null
          H_Zero_initializer H_Cstring H_None H_Undef.
   intros IH_Struct_Base IH_Struct_Ind
          IH_Packed_struct_Base IH_Packed_struct_Ind
@@ -458,6 +459,7 @@ Proof.
          | VALUE_Ident id => _
          | VALUE_Integer n => _
          | VALUE_Float f => _
+         | VALUE_Hex h => _                             
          | VALUE_Bool b => _
          | VALUE_Null => _
          | VALUE_Zero_initializer => _
@@ -887,6 +889,7 @@ Definition expr_svalue_ind: forall P : Ollvm_ast.value -> Set,
         (forall id : ident, P (SV (VALUE_Ident id))) ->
     (forall x : int, P (SV (VALUE_Integer x))) ->
     (forall f : float, P (SV (VALUE_Float f))) ->
+    (forall h : String.string, P (SV (VALUE_Hex h))) ->
     (forall b : bool, P (SV (VALUE_Bool b))) ->
     (P (SV VALUE_Null)) ->
     (P (SV (VALUE_Zero_initializer))) ->
@@ -954,7 +957,7 @@ Definition expr_svalue_ind: forall P : Ollvm_ast.value -> Set,
     (forall v : Ollvm_ast.value, P v).
 Proof.
   (* Just copying from above! *)
-  intros P H_Ident H_Integer H_Float H_Bool H_Null
+  intros P H_Ident H_Integer H_Float H_Hex H_Bool H_Null
          H_Zero_initializer H_Cstring H_None H_Undef.
   intros IH_Struct_Base IH_Struct_Ind
          IH_Packed_struct_Base IH_Packed_struct_Ind
@@ -975,6 +978,7 @@ Proof.
          | VALUE_Ident id => _
          | VALUE_Integer n => _
          | VALUE_Float f => _
+         | VALUE_Hex h => _                             
          | VALUE_Bool b => _
          | VALUE_Null => _
          | VALUE_Zero_initializer => _

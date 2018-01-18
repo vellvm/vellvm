@@ -605,6 +605,10 @@ Module StepSemantics(A:ADDR).
     | _ => failwith "invalid aggregate data"
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
+
+  Definition dv_of_hex_string (h:string) (t:typ) : err value :=
+    failwith "dv_of_hex_string unimplemented"
+  .
   
 Definition eval_expr {A:Set} (f:env -> option typ -> A -> err value) (e:env) (top:option typ) (o:Expr A) : err value :=
   match o with
@@ -621,6 +625,11 @@ Definition eval_expr {A:Set} (f:env -> option typ -> A -> err value) (e:env) (to
     | _ => failwith "bad type for constant int"
     end
   | VALUE_Float x   => mret (DV (VALUE_Float x))
+  | VALUE_Hex h     =>
+    match top with
+    | None => failwith ("Hex value has no type!")
+    | Some t => dv_of_hex_string h t
+    end
   | VALUE_Bool b    => mret (DV (VALUE_Bool b)) 
   | VALUE_Null      => mret (DV (VALUE_Null))
   | VALUE_Zero_initializer => mret (DV (VALUE_Zero_initializer))

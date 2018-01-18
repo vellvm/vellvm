@@ -245,6 +245,8 @@
 let ws = [' ' '\t']
 let eol = ('\n' | '\r' | "\r\n" | "\n\r")
 let digit = ['0'-'9']
+let hexletter = ['A'-'F']|['a'-'f']
+let hexdigit = digit | hexletter
 let upletter = ['A'-'Z']
 let lowletter = ['a'-'z']
 let letter = upletter | lowletter
@@ -301,6 +303,7 @@ rule token = parse
   | '-'? digit* '.' digit+ as d { FLOAT (float_of_string d) }
   | '-'? digit ('.' digit+)? 'e' ('+'|'-') digit+ as d
                                 { FLOAT (float_of_string d) }
+  | '0''x' hexdigit+ as d       { HEXCONSTANT (d) }			
   | '"'                         { STRING (string (Buffer.create 10) lexbuf) }
 
   (* types *)
