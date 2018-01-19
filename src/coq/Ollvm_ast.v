@@ -157,6 +157,7 @@ Inductive typ : Set :=
 | TYPE_Fp128
 | TYPE_Ppc_fp128
 (* | TYPE_Label  label is not really a type *)
+(* | TYPE_Token -- used with exceptions *)    
 | TYPE_Metadata
 | TYPE_X86_mmx
 | TYPE_Array (sz:int) (t:typ)
@@ -164,7 +165,7 @@ Inductive typ : Set :=
 | TYPE_Struct (fields:list typ)
 | TYPE_Packed_struct (fields:list typ)
 | TYPE_Opaque
-| TYPE_Vector (sz:int) (t:typ)
+| TYPE_Vector (sz:int) (t:typ)     (* t must be integer, floating point, or pointer type *)
 | TYPE_Identified (id:ident)
 .
 

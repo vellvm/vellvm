@@ -303,7 +303,7 @@ rule token = parse
   | '-'? digit* '.' digit+ as d { FLOAT (float_of_string d) }
   | '-'? digit ('.' digit+)? 'e' ('+'|'-') digit+ as d
                                 { FLOAT (float_of_string d) }
-  | '0''x' hexdigit+ as d       { HEXCONSTANT (d) }			
+  | '0''x' (hexdigit+ as d)       { HEXCONSTANT (d) }			
   | '"'                         { STRING (string (Buffer.create 10) lexbuf) }
 
   (* types *)

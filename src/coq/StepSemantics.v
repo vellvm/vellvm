@@ -67,7 +67,6 @@ Module StepSemantics(A:ADDR).
   | DVALUE_Packed_struct (fields: list (typ * dvalue))
   | DVALUE_Array         (elts: list (typ * dvalue))
   | DVALUE_Vector        (elts: list (typ * dvalue))
-  | DVALUE_Symbolic (v:value)
   .
 
   Definition undef_i1  := (DVALUE_Undef (TYPE_I 1) None).
@@ -129,7 +128,6 @@ Module StepSemantics(A:ADDR).
   Definition add_env id dv (e:env) := (id,dv)::e.
   
   (* Arithmetic Operations ---------------------------------------------------- *)
-  (* TODO: implement LLVM semantics *)
 
   (* Since modules are not first class, this code duplication
      will probably have to do. *)
@@ -338,25 +336,6 @@ Module StepSemantics(A:ADDR).
     end.
   Arguments eval_iop_integer_h _ _ _ _ : simpl nomatch.
 
-(*
-  (* Handles the written constant cases for ops *)
-  Definition eval_bop_integer t op v1 v2 : err value :=
-    match t, v1, v2 with
-    | TYPE_I bits,  DV (VALUE_Integer i1), DV (VALUE_Integer i2) =>
-      'v1 <- coerce_integer_to_int bits i1;
-      'v2 <- coerce_integer_to_int bits i2;
-      op t v1 v2
-    | TYPE_I bits, DV (VALUE_Integer i1),v2 =>
-      'v1 <- coerce_integer_to_int bits i1;
-      op t v1 v2
-    | TYPE_I bits, v1, DV (VALUE_Integer i2) =>
-      'v2 <- coerce_integer_to_int bits i2;
-      op t v1 v2
-    | _,  v1, v2 => op t v1 v2
-    end.
-  Arguments eval_bop_integer _ _ _ _ : simpl nomatch.
- *)
-  
   (* I split the definition between the vector and other evaluations because
      otherwise eval_iop should be recursive to allow for vector calculations, 
      but coq can't find a fixpoint. *)
@@ -369,15 +348,6 @@ Module StepSemantics(A:ADDR).
     end.
   Arguments eval_iop _ _ _ _ : simpl nomatch.
 
-  (*
-  Definition cast_boolean_literal_if_needed (v : dvalue) : err value :=
-    match v with
-    | DV (VALUE_Bool true) => mret (DVALUE_I1 Int1.one)
-    | DV (VALUE_Bool false) => mret (DVALUE_I1 Int1.zero)
-    | DV _ => failwith "Not a castable boolean"
-    | _ => mret v
-    end.
-*)  
 
   Definition eval_i1_icmp icmp x y : value :=
     if match icmp with
@@ -445,10 +415,7 @@ Module StepSemantics(A:ADDR).
     end.
   Arguments eval_icmp _ _ _ _ : simpl nomatch.
 
-  (*
-  Definition eval_icmp t icmp v1 v2 : err dvalue :=
-    eval_bop_integer t (fun t => eval_icmp_h t icmp) v1 v2. *)
-  (*
+
   Definition double_op (fop:fbinop) (v1:ll_double) (v2:ll_double) : err value :=
     match fop with
     | FAdd => mret (DVALUE_Double (Float.add v1 v2))
@@ -465,20 +432,14 @@ Module StepSemantics(A:ADDR).
     | FMul => mret (DVALUE_Float (Float32.mul v1 v2))
     | FDiv => mret (DVALUE_Float (Float32.div v1 v2))
     | FRem => failwith "unimplemented"
-    end.*)
+    end.
   
   Definition eval_fop (t:typ) (fop:fbinop) (v1:value) (v2:value) : err dvalue :=
-    (* This can be revisited. Ollvm_ast.v needs to be updated. 
     match t, v1, v2 with
-    | TYPE_Float, DV (VALUE_Float f1), DV (VALUE_Float f2) =>
-      
     | TYPE_Float, DVALUE_Float f1, DVALUE_Float f2 => float_op fop f1 f2
-    | TYPE_Double, DV (VALUE_Float d1), DV (VALUE_Float d2) =>
-      
     | TYPE_Double, DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
     | _, _, _ => failwith "ill_typed-fop"
-    end. *)
-    failwith "unimplemented".
+    end. 
 
   Definition eval_fcmp (fcmp:fcmp) (v1:value) (v2:value) : err value := failwith "eval_fcmp not implemented".
 
@@ -578,7 +539,7 @@ Module StepSemantics(A:ADDR).
     end.
   Arguments eval_select _ _ _ _ _ : simpl nomatch.
   
-  (* Helper function for indexding into a structured datatype 
+  (* Helper function for indexing into a structured datatype 
      for extractvalue and insertvalue *)
   Definition index_into_str (v:value) (idx:Ollvm_ast.int) : err (typ * dvalue) :=
     let fix loop elts i :=
@@ -594,8 +555,7 @@ Module StepSemantics(A:ADDR).
     end.
   Arguments index_into_str _ _ : simpl nomatch.
   
-  (* Helper function for indexding into a structured datatype 
-     for insertvalue *)
+  (* Helper function for inserting into a structured datatype for insertvalue *)
   Definition insert_into_str (str:value) (v:value) (idx:Ollvm_ast.int) : err dvalue :=
     let fix loop (acc elts:list (typ * value)) (i:Ollvm_ast.int) :=
         match elts with
@@ -608,9 +568,11 @@ Module StepSemantics(A:ADDR).
     | DVALUE_Struct f =>
       'v <- (loop [] f idx);
       mret (DVALUE_Struct v)
+
     | DVALUE_Array e =>
       'v <- (loop [] e idx);
       mret (DVALUE_Array v)
+
     | _ => failwith "invalid aggregate data"
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
@@ -632,6 +594,15 @@ Module StepSemantics(A:ADDR).
 
   Definition dv_zero_initializer (t:typ) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".
+
+  Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
+    match l1, l2 with
+    | [], [] => mret []
+    | x::xs, y::ys =>
+      'l <- combine_lists_err xs ys;
+        mret ((x,y)::l)
+    | _, _ => failwith "combine_lists_err: different lenth lists"
+    end.
   
 (*
   [eval_expr] is the main entry point for evaluating LLVM expressions.
@@ -648,12 +619,14 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:Ollvm_ast.value) : err dvalue :=
       | None => failwith ("lookup_env: id = " ++ (string_of i) ++ " NOT IN env = " ++ (string_of e))
       | Some v => mret v
       end
+
   | Ollvm_ast.VALUE_Integer x =>
     match top with
     | None =>  failwith "eval_expr given untyped VALUE_Integer"
     | Some (TYPE_I bits) => coerce_integer_to_int bits x
     | _ => failwith "bad type for constant int"
     end
+
   | Ollvm_ast.VALUE_Float x   =>
     match top with
     | None => failwith "eval_expr given untyped VALUE_Float"
@@ -661,6 +634,7 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:Ollvm_ast.value) : err dvalue :=
     | Some TYPE_Double =>  dv_double_of_string x
     | _ => failwith "bad type for constant float"
     end
+
   | Ollvm_ast.VALUE_Hex h     =>
     match top with
     | None => failwith "eval_expr given untyped VALUE_Hex"
@@ -668,39 +642,52 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:Ollvm_ast.value) : err dvalue :=
     | Some TYPE_Double => dv_double_of_hex_string h
     | _ => failwith "bad type for constant hex float"
     end
+
   | Ollvm_ast.VALUE_Bool b    =>
     match b with
     | true => mret (DVALUE_I1 Int1.one)
     | false => mret (DVALUE_I1 Int1.zero)
     end
+
   | Ollvm_ast.VALUE_Null      => mret (DVALUE_Addr A.null)
+
   | Ollvm_ast.VALUE_Zero_initializer =>
     match top with
     | None => failwith "eval_expr given untyped VALUE_Zero_initializer"
     | Some t => dv_zero_initializer t
     end
+
   | Ollvm_ast.VALUE_Cstring s =>
     failwith "VALUE_Cstring not yet implemented"
+
   | Ollvm_ast.VALUE_Undef     =>
     match top with
     | None => failwith "eval_expr given untyped VALUE_Undef"
     | Some t => mret (DVALUE_Undef t None)
     end
 
+  (* Question: should we do any typechecking for aggregate types here? *)
+  (* Option 1: do no typechecking: *)
   | Ollvm_ast.VALUE_Struct es =>
-    'vs <- map_monad (monad_app_snd (eval_expr e top)) es;
-     mret (DVALUE_Struct vs)
+      'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) es;
+      mret (DVALUE_Struct vs)
 
+  (* Option 2: do a little bit of typechecking *)
   | Ollvm_ast.VALUE_Packed_struct es =>
-    'vs <- map_monad (monad_app_snd (eval_expr e top)) es;
-     mret (DVALUE_Packed_struct vs)
-    
+    match top with
+    | None => failwith "eval_expr given untyped VALUE_Struct"
+    | Some (TYPE_Packed_struct _) =>
+      'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) es;
+      mret (DVALUE_Packed_struct vs)
+    | _ => failwith "bad type for VALUE_Packed_struct"
+    end
+
   | Ollvm_ast.VALUE_Array es =>
-    'vs <- map_monad (monad_app_snd (eval_expr e top)) es;
+    'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) es;    
      mret (DVALUE_Array vs)
     
   | Ollvm_ast.VALUE_Vector es =>
-    'vs <- map_monad (monad_app_snd (eval_expr e top)) es;
+    'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) es;        
      mret (DVALUE_Vector vs)
 
   | Ollvm_ast.OP_IBinop iop t op1 op2 =>
@@ -727,13 +714,13 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:Ollvm_ast.value) : err dvalue :=
     'v <- eval_expr e (Some t1) op;
     (eval_conv conv) t1 v t2
                        
-  | Ollvm_ast.OP_GetElementPtr t ptrval idxs =>
-    'vptr <- monad_app_snd (eval_expr e (Some t) ) ptrval;
-    'vs <- map_monad (monad_app_snd (eval_expr e (Some (TYPE_I 32)))) idxs;
-    failwith "getelementptr not implemented"  (* TODO: Getelementptr *)  
+  | Ollvm_ast.OP_GetElementPtr t (ptrtyp, ptrval) idxs =>
+    'vptr <- eval_expr e (Some ptrtyp) ptrval;
+      'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) idxs;              
+      failwith "getelementptr not implemented"  (* TODO: Getelementptr *)  
     
   | Ollvm_ast.OP_ExtractElement vecop idx =>
-(*    'vec <- monad_app_snd (eval_expr e) vecop;
+    (*    'vec <- monad_app_snd (eval_expr e) vecop;
     'vidx <- monad_app_snd (eval_expr e) idx;  *)
     failwith "extractelement not implemented" (* TODO: Extract Element *) 
       
@@ -778,14 +765,11 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:Ollvm_ast.value) : err dvalue :=
     loop str idxs*)
     failwith "TODO"
     
-  | Ollvm_ast.OP_Select cndop op1 op2 => (* Do this *)
-    (*
-    '(t, cnd) <- monad_app_snd (eval_expr e) cndop;
-    '(t1, v1) <- monad_app_snd (eval_expr e) op1;
-    '(t2, v2) <- monad_app_snd (eval_expr e) op2;
-    eval_select t cnd t1 v1 v2
-     *)
-    failwith "TODO"
+  | Ollvm_ast.OP_Select (t, cnd) (t1, op1) (t2, op2) => 
+    'cndv <- eval_expr e (Some t) cnd;
+    'v1 <- eval_expr e (Some t1) op1;
+    'v2 <- eval_expr e (Some t2) op2;
+    eval_select t cndv t1 v1 v2
   end.
 Arguments eval_expr _ _ _ : simpl nomatch.
 
