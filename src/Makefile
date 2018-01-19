@@ -3,7 +3,7 @@ COQDIR = coq
 COQLIBDIR = ../lib
 
 # OCaml sources
-MLDIR = ml imp
+MLDIR = ml
 EXTRACTDIR = ml/extracted
 
 COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(COQLIBDIR)/paco/src Paco -R $(EXTRACTDIR) Extract -R ../lib/CompCert compcert
