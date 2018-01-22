@@ -547,97 +547,97 @@ fast_math:
 
 instr_op:
   | op=ibinop t=typ o1=value COMMA o2=value
-    { SV (OP_IBinop (op, t, o1, o2)) }
+    { OP_IBinop (op, t, o1, o2) }
 
   | KW_ICMP op=icmp t=typ o1=value COMMA o2=value
-    { SV (OP_ICmp (op, t, o1, o2)) }
+    { OP_ICmp (op, t, o1, o2) }
 
   | op=fbinop f=fast_math* t=typ o1=value COMMA o2=value
-    { SV (OP_FBinop (op, f, t, o1, o2)) }
+    { OP_FBinop (op, f, t, o1, o2) }
 
   | KW_FCMP op=fcmp t=typ o1=value COMMA o2=value
-    { SV (OP_FCmp (op, t, o1, o2)) }
+    { OP_FCmp (op, t, o1, o2) }
 
   | c=conversion t1=typ v=value KW_TO t2=typ
-    { SV (OP_Conversion (c, t1, v, t2)) }
+    { OP_Conversion (c, t1, v, t2) }
 
   | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=tvalue idx=preceded(COMMA, tvalue)*
-    { SV (OP_GetElementPtr (t, ptr, idx)) }
+    { OP_GetElementPtr (t, ptr, idx) }
 
   | KW_SELECT if_=tvalue COMMA then_=tvalue COMMA else_= tvalue
-    { SV (OP_Select (if_, then_, else_)) }
+    { OP_Select (if_, then_, else_) }
 
   | KW_EXTRACTELEMENT vec=tvalue COMMA idx=tvalue
-    { SV (OP_ExtractElement (vec, idx)) }
+    { OP_ExtractElement (vec, idx) }
 
   | KW_INSERTELEMENT vec=tvalue
     COMMA new_el=tvalue COMMA idx=tvalue
-    { SV (OP_InsertElement (vec, new_el, idx))  }
+    { OP_InsertElement (vec, new_el, idx)  }
 
   | KW_EXTRACTVALUE tv=tvalue COMMA
     idx=separated_nonempty_list (csep, INTEGER)
-    { SV (OP_ExtractValue (tv, idx)) }
+    { OP_ExtractValue (tv, idx) }
 
   | KW_INSERTVALUE agg=tvalue COMMA new_val=tvalue COMMA
     idx=separated_nonempty_list (csep, INTEGER)
-    { SV (OP_InsertValue (agg, new_val, idx)) }
+    { OP_InsertValue (agg, new_val, idx) }
 
   | KW_SHUFFLEVECTOR v1=tvalue COMMA v2=tvalue COMMA mask=tvalue
-    { SV (OP_ShuffleVector (v1, v2, mask))  }
+    { OP_ShuffleVector (v1, v2, mask)  }
 
 expr_op:
   | op=ibinop LPAREN t=typ o1=value COMMA typ o2=value RPAREN
-    { SV (OP_IBinop (op, t, o1, o2)) }
+    { OP_IBinop (op, t, o1, o2) }
 
   | KW_ICMP op=icmp LPAREN t=typ o1=value COMMA typ o2=value RPAREN
-    { SV (OP_ICmp (op, t, o1, o2)) }
+    { OP_ICmp (op, t, o1, o2) }
 
   | op=fbinop f=fast_math* LPAREN t=typ o1=value COMMA typ o2=value RPAREN
-    { SV (OP_FBinop (op, f, t, o1, o2)) }
+    { OP_FBinop (op, f, t, o1, o2) }
 
   | KW_FCMP op=fcmp LPAREN t=typ o1=value COMMA typ o2=value RPAREN
-    { SV (OP_FCmp (op, t, o1, o2)) }
+    { OP_FCmp (op, t, o1, o2) }
 
   | c=conversion LPAREN t1=typ v=value KW_TO t2=typ RPAREN
-    { SV (OP_Conversion (c, t1, v, t2)) }
+    { OP_Conversion (c, t1, v, t2) }
 
   | KW_GETELEMENTPTR KW_INBOUNDS? LPAREN t=typ COMMA ptr=tvalue idx=preceded(COMMA, tvalue)* RPAREN
-    { SV (OP_GetElementPtr (t, ptr, idx)) }
+    { OP_GetElementPtr (t, ptr, idx) }
 
   | KW_SELECT LPAREN if_=tvalue COMMA then_=tvalue COMMA else_= tvalue RPAREN
-    { SV (OP_Select (if_, then_, else_)) }
+    { OP_Select (if_, then_, else_) }
 
   | KW_EXTRACTELEMENT LPAREN vec=tvalue COMMA idx=tvalue RPAREN
-    { SV (OP_ExtractElement (vec, idx)) }
+    { OP_ExtractElement (vec, idx) }
 
   | KW_INSERTELEMENT LPAREN vec=tvalue COMMA new_el=tvalue COMMA idx=tvalue RPAREN
-    { SV (OP_InsertElement (vec, new_el, idx))  }
+    { OP_InsertElement (vec, new_el, idx)  }
 
   | KW_EXTRACTVALUE LPAREN tv=tvalue COMMA idx=separated_nonempty_list (csep, INTEGER) RPAREN
-    { SV (OP_ExtractValue (tv, idx)) }
+    { OP_ExtractValue (tv, idx) }
 
   | KW_INSERTVALUE LPAREN agg=tvalue COMMA new_val=tvalue COMMA idx=separated_nonempty_list (csep, INTEGER) RPAREN
-    { SV (OP_InsertValue (agg, new_val, idx)) }
+    { OP_InsertValue (agg, new_val, idx) }
 
   | KW_SHUFFLEVECTOR LPAREN v1=tvalue COMMA v2=tvalue COMMA mask=tvalue RPAREN
-    { SV (OP_ShuffleVector (v1, v2, mask))  }
+    { OP_ShuffleVector (v1, v2, mask)  }
 
 
 expr_val:
-  | i=INTEGER                                         { SV (VALUE_Integer i)        }
-  | f=FLOAT                                           { SV (VALUE_Float f)          }
-  | h=HEXCONSTANT                                     { SV (VALUE_Hex (str h))      }
-  | KW_TRUE                                           { SV (VALUE_Bool true)        }
-  | KW_FALSE                                          { SV (VALUE_Bool false)       }
-  | KW_NULL                                           { SV (VALUE_Null)             }
-  | KW_UNDEF                                          { SV (VALUE_Undef)            }
-  | KW_ZEROINITIALIZER                                { SV (VALUE_Zero_initializer) }
-  | LCURLY l=separated_list(csep, tconst) RCURLY      { SV (VALUE_Struct l)         }
-  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { SV (VALUE_Packed_struct l)  }
-  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { SV (VALUE_Array l)          }
-  | LT l=separated_list(csep, tconst) GT              { SV (VALUE_Vector l)         }
-  | i=ident                                           { SV (VALUE_Ident i)          }
-  | KW_C cstr=STRING                                  { SV (VALUE_Cstring (str cstr)) }
+  | i=INTEGER                                         { VALUE_Integer i        }
+  | f=FLOAT                                           { VALUE_Float f          }
+  | h=HEXCONSTANT                                     { VALUE_Hex (str h)      }
+  | KW_TRUE                                           { VALUE_Bool true        }
+  | KW_FALSE                                          { VALUE_Bool false       }
+  | KW_NULL                                           { VALUE_Null             }
+  | KW_UNDEF                                          { VALUE_Undef            }
+  | KW_ZEROINITIALIZER                                { VALUE_Zero_initializer }
+  | LCURLY l=separated_list(csep, tconst) RCURLY      { VALUE_Struct l         }
+  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { VALUE_Packed_struct l  }
+  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { VALUE_Array l          }
+  | LT l=separated_list(csep, tconst) GT              { VALUE_Vector l         }
+  | i=ident                                           { VALUE_Ident i          }
+  | KW_C cstr=STRING                                  { VALUE_Cstring (str cstr) }
 
 value:
   | eo=expr_op { eo }

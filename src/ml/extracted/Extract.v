@@ -32,11 +32,11 @@ Extract Inductive string => "string" [ "str_nil" "str_cons" ].
 Extract Inlined Constant Ollvm_ast.float => "float".
 
 (* Cutting the dependency to R. *)
-Extract Inlined Constant Fcore_defs.F2R => "fun _ -> assert false".
-Extract Inlined Constant Fappli_IEEE.FF2R => "fun _ -> assert false".
-Extract Inlined Constant Fappli_IEEE.B2R => "fun _ -> assert false".
-Extract Inlined Constant Fappli_IEEE.round_mode => "fun _ -> assert false".
-Extract Inlined Constant Fcalc_bracket.inbetween_loc => "fun _ -> assert false".
+Extract Inlined Constant Fcore_defs.F2R => "(fun _ -> assert false)".
+Extract Inlined Constant Fappli_IEEE.FF2R => "(fun _ -> assert false)".
+Extract Inlined Constant Fappli_IEEE.B2R => "(fun _ -> assert false)".
+Extract Inlined Constant Fappli_IEEE.round_mode => "(fun _ -> assert false)".
+Extract Inlined Constant Fcalc_bracket.inbetween_loc => "(fun _ -> assert false)".
 
 Set Extraction AccessOpaque.
 (* NOTE: assumes that this file is compiled from /src *)

@@ -8,28 +8,29 @@ Set Contextual Implicit.
 
 Module A : Vellvm.StepSemantics.ADDR with Definition addr := nat.
   Definition addr := nat.
+  Definition null := 1000%nat.   (* TODO this is unsound if the memory has > 1000 values *)
 End A.  
 
 Module SS := StepSemantics.StepSemantics(A).
 Export SS.
 
 Definition memory := list dvalue.
-Definition undef := DV VALUE_Undef.
+Definition undef t := DVALUE_Undef t None.
 
 Definition mem_step {X} (e:effects X) (m:memory) :=
   match e with
   | Alloca t k =>
-    inr  ((m ++ [undef])%list,
+    inr  ((m ++ [undef t])%list,
           DVALUE_Addr (List.length m),
           k)
-  | Load a k =>
+  | Load t a k =>
     inr (m,
-         nth_default undef m a,
+         nth_default (undef t) m a,
          k)
 
   | Store a v k =>
     inr (replace m a v,
-         DV VALUE_None,
+         DVALUE_None,
          k)
 
   | Call _ _ _ => inl e

@@ -43,7 +43,7 @@ Export ET.
 *)
 Inductive effects (d:Type) : Type :=
 | Alloca (t:typ)  (k:value -> d)        (* Stack allocation *)
-| Load   (a:addr) (k:value -> d)
+| Load   (t:typ) (a:addr) (k:value -> d)
 | Store  (a:addr) (v:value) (k:value -> d)
 | Call   (v:value) (args:list value) (k:value -> d)
 .    
@@ -51,7 +51,7 @@ Inductive effects (d:Type) : Type :=
 Definition effects_map {A B} (f:A -> B) (m:effects A) : effects B :=
   match m with
   | Alloca t g => Alloca t (fun a => f (g a))
-  | Load a g  => Load a (fun dv => f (g dv))
+  | Load t a g  => Load t a (fun dv => f (g dv))
   | Store a dv d => Store a dv (fun dv => f (d dv))
   | Call v args d => Call v args (fun dv => f (d dv))
   end.
@@ -178,10 +178,11 @@ Section RELATED_EFFECTS.
         related_effect_step (Alloca t k1) (Alloca t k2)
 
   | related_effect_Load :
-      forall a1 a2 k1 k2
+      forall a1 a2 t1 t2 k1 k2
         (HRa : a1 = a2)
+        (HRt : t1 = t2)
         (HRk : (forall (v1 v2:value), v1 = v2 -> R (k1 v1) (k2 v2))),
-        related_effect_step (Load a1 k1) (Load a2 k2)
+        related_effect_step (Load a1 t1 k1) (Load a2 t2 k2)
 
   | related_effect_Store  :
       forall a1 a2 v1 v2 k1 k2

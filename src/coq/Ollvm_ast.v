@@ -157,6 +157,7 @@ Inductive typ : Set :=
 | TYPE_Fp128
 | TYPE_Ppc_fp128
 (* | TYPE_Label  label is not really a type *)
+(* | TYPE_Token -- used with exceptions *)    
 | TYPE_Metadata
 | TYPE_X86_mmx
 | TYPE_Array (sz:int) (t:typ)
@@ -164,7 +165,7 @@ Inductive typ : Set :=
 | TYPE_Struct (fields:list typ)
 | TYPE_Packed_struct (fields:list typ)
 | TYPE_Opaque
-| TYPE_Vector (sz:int) (t:typ)
+| TYPE_Vector (sz:int) (t:typ)     (* t must be integer, floating point, or pointer type *)
 | TYPE_Identified (id:ident)
 .
 
@@ -199,13 +200,6 @@ Definition tident : Set := (typ * ident)%type.
 
 
 (* NOTES: 
-
-  This is the "functorial" presentation of the syntax.  Note that the 'value' type 
-  declared below actually creates the fixpoint.  Setting things up this way means 
-  that we can re-use this functor for defining the dynamic values (over in
-  StepSemantics.v) but we have to do some work to define appropriate induction
-  principles (see AstInd.v).
-
   This datatype is more permissive than legal in LLVM:
      - it allows identifiers to appear nested inside of "constant expressions"
 
@@ -215,7 +209,7 @@ Definition tident : Set := (typ * ident)%type.
    
    Why do we need Bool?  Why not i1 ?  Is that "real" llvm?
  *)
-Inductive Expr (a:Set) : Set :=
+Inductive value : Set :=
 | VALUE_Ident   (id:ident)  
 | VALUE_Integer (x:int)
 | VALUE_Float   (f:float)
@@ -224,58 +218,25 @@ Inductive Expr (a:Set) : Set :=
 | VALUE_Null
 | VALUE_Zero_initializer
 | VALUE_Cstring (s:string)
-| VALUE_None                                       (* "token" constant *)
 | VALUE_Undef
-| VALUE_Struct        (fields: list (typ * a))
-| VALUE_Packed_struct (fields: list (typ * a))
-| VALUE_Array         (elts: list (typ * a))
-| VALUE_Vector        (elts: list (typ * a))
-| OP_IBinop           (iop:ibinop) (t:typ) (v1:a) (v2:a)  
-| OP_ICmp             (cmp:icmp)   (t:typ) (v1:a) (v2:a)
-| OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:typ) (v1:a) (v2:a)
-| OP_FCmp             (cmp:fcmp)   (t:typ) (v1:a) (v2:a)
-| OP_Conversion       (conv:conversion_type) (t_from:typ) (v:a) (t_to:typ)
-| OP_GetElementPtr    (t:typ) (ptrval:(typ * a)) (idxs:list (typ * a))
-| OP_ExtractElement   (vec:(typ * a)) (idx:(typ * a))
-| OP_InsertElement    (vec:(typ * a)) (elt:(typ * a)) (idx:(typ * a))
-| OP_ShuffleVector    (vec1:(typ * a)) (vec2:(typ * a)) (idxmask:(typ * a))
-| OP_ExtractValue     (vec:(typ * a)) (idxs:list int)
-| OP_InsertValue      (vec:(typ * a)) (elt:(typ * a)) (idxs:list int)
-| OP_Select           (cnd:(typ * a)) (v1:(typ * a)) (v2:(typ * a)) (* if * then * else *)
+| VALUE_Struct        (fields: list (typ * value))
+| VALUE_Packed_struct (fields: list (typ * value))
+| VALUE_Array         (elts: list (typ * value))
+| VALUE_Vector        (elts: list (typ * value))
+| OP_IBinop           (iop:ibinop) (t:typ) (v1:value) (v2:value)  
+| OP_ICmp             (cmp:icmp)   (t:typ) (v1:value) (v2:value)
+| OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:typ) (v1:value) (v2:value)
+| OP_FCmp             (cmp:fcmp)   (t:typ) (v1:value) (v2:value)
+| OP_Conversion       (conv:conversion_type) (t_from:typ) (v:value) (t_to:typ)
+| OP_GetElementPtr    (t:typ) (ptrval:(typ * value)) (idxs:list (typ * value))
+| OP_ExtractElement   (vec:(typ * value)) (idx:(typ * value))
+| OP_InsertElement    (vec:(typ * value)) (elt:(typ * value)) (idx:(typ * value))
+| OP_ShuffleVector    (vec1:(typ * value)) (vec2:(typ * value)) (idxmask:(typ * value))
+| OP_ExtractValue     (vec:(typ * value)) (idxs:list int)
+| OP_InsertValue      (vec:(typ * value)) (elt:(typ * value)) (idxs:list int)
+| OP_Select           (cnd:(typ * value)) (v1:(typ * value)) (v2:(typ * value)) (* if * then * else *)
 .
 
-Arguments VALUE_Ident {_} _.
-Arguments VALUE_Integer {_} _.
-Arguments VALUE_Float {_} _.
-Arguments VALUE_Hex {_} _.
-Arguments VALUE_Bool {_} _.
-Arguments VALUE_Null {_}.
-Arguments VALUE_Zero_initializer {_}.
-Arguments VALUE_Cstring {_} _.
-Arguments VALUE_None {_}.
-Arguments VALUE_Undef {_}.
-Arguments VALUE_Struct {_} _.
-Arguments VALUE_Packed_struct {_} _.
-Arguments VALUE_Array {_} _.
-Arguments VALUE_Vector {_} _.
-Arguments OP_IBinop {_} _.
-Arguments OP_ICmp {_} _ _ _ _.
-Arguments OP_FBinop {_} _ _ _ _ _.
-Arguments OP_FCmp {_} _ _ _ _.
-Arguments OP_Conversion {_} _ _ _ _.
-Arguments OP_GetElementPtr {_} _ _ _.
-Arguments OP_ExtractElement {_} _ _.
-Arguments OP_InsertElement {_} _ _ _.
-Arguments OP_ShuffleVector {_} _ _ _.
-Arguments OP_ExtractValue {_} _ _.
-Arguments OP_InsertValue {_} _ _ _.
-Arguments OP_Select {_} _ _ _.
-
-
-(* static values *)
-Inductive value : Set :=
-| SV : Expr value -> value.
-            
 Definition tvalue : Set := typ * value.
 
 Inductive instr_id : Set :=
