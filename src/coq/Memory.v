@@ -33,8 +33,18 @@ Definition mem_step {X} (e:effects X) (m:memory) :=
          DVALUE_None,
          k)
 
-  | Call _ _ _ => inl e
+  | GEP t a vs k => inl e (* TODO: GEP semantics *)
+
+  | ItoP t i k => inl e (* TODO: ItoP semantics *)
+
+  | PtoI t a k => inl e (* TODO: ItoP semantics *)                     
+                       
+  | Call _ _ _ _ => inl e
   end.
+
+(*
+ memory -> Trace () -> Trace () -> Prop
+*)
 
 CoFixpoint memD (m:memory) (d:Trace ()) : Trace () :=
   match d with
