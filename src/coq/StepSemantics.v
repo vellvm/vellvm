@@ -938,7 +938,7 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
   | Term (TERM_Invoke _ _ _ _) => t_raise "Unsupport LLVM terminator" 
   
 
-  | CFG.Step insn =>  (* instruction *)
+  | CFG.Inst insn =>  (* instruction *)
     do pc_next <- trywith "no fallthrough intsruction" (incr_pc CFG pc);
       match (pt pc), insn  with
       | IId id, INSTR_Op op =>
@@ -1078,7 +1078,7 @@ Section Properties.
     end.
   
   Definition pc_non_call (CFG:mcfg) (p:pc) : Prop :=
-    pc_satisfies CFG p (fun c => exists i, not (is_Call i) /\ c = CFG.Step i).
+    pc_satisfies CFG p (fun c => exists i, not (is_Call i) /\ c = CFG.Inst i).
 
   Ltac stepD_destruct :=
     repeat (match goal with
