@@ -87,6 +87,7 @@ Inductive param_attr : Set :=
 | PARAMATTR_Align (a:int)
 | PARAMATTR_Noalias
 | PARAMATTR_Nocapture
+| PARAMATTR_Readonly
 | PARAMATTR_Nest
 | PARAMATTR_Returned
 | PARAMATTR_Nonnull
