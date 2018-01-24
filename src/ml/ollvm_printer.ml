@@ -82,6 +82,7 @@ and param_attr : Format.formatter -> Ollvm_ast.param_attr -> unit =
   | PARAMATTR_Align n           -> fprintf ppf "align %d" (to_int n)
   | PARAMATTR_Noalias           -> fprintf ppf "noalias"
   | PARAMATTR_Nocapture         -> fprintf ppf "nocapture"
+  | PARAMATTR_Readonly          -> fprintf ppf "readonly"
   | PARAMATTR_Nest              -> fprintf ppf "nest"
   | PARAMATTR_Returned          -> fprintf ppf "returned"
   | PARAMATTR_Nonnull           -> fprintf ppf "nonnull"

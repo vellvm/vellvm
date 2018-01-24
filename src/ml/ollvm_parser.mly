@@ -456,6 +456,7 @@ param_attr:
   | KW_ALIGN n=INTEGER           { PARAMATTR_Align n           }
   | KW_NOALIAS                   { PARAMATTR_Noalias           }
   | KW_NOCAPTURE                 { PARAMATTR_Nocapture         }
+  | KW_READONLY                  { PARAMATTR_Readonly          }
   | KW_NEST                      { PARAMATTR_Nest              }
   | KW_RETURNED                  { PARAMATTR_Returned          }
   | KW_NONNULL                   { PARAMATTR_Nonnull           }
