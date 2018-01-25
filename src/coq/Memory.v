@@ -28,7 +28,7 @@ Fixpoint init_block (n:nat) : block :=
   end.
 
 (* Makes a block appropriately sized for the given type. *)
-Definition make_empty_block (ty:typ) :=
+Definition make_empty_block (ty:typ) : block :=
   match ty with
   | TYPE_I sz =>
     let x := match sz with
@@ -39,19 +39,19 @@ Definition make_empty_block (ty:typ) :=
     init_block (if beq_nat (Nat.modulo x 8) 0
                 then (x / 8)
                 else ((x / 8) + 1))
-  | TYPE_Pointer t => []
-  | TYPE_Struct f => []
-  | TYPE_Array s t => []
-  | TYPE_Vector s t => []
-  | _ => []
+  | TYPE_Pointer t => init_block 64 (* TODO: assuming 64-bit pointer, do we need 32-bit? *)
+  | TYPE_Struct f => [] (* TODO: implement *)
+  | TYPE_Array s t => [] (* TODO: implement *)
+  | TYPE_Vector s t => [] (* TODO: implement *)
+  | _ => [] (* TODO: implement more types *)
   end.
 
 Definition mem_step {X} (e:effects X) (m:memory) :=
   match e with
   | Alloca t k =>
     let new_block := make_empty_block t in
-    inr  ((m ++ [new_block])%list,
-          DVALUE_Addr (List.length m, 0%nat),
+    inr  ((m ++ [new_block]) % list,
+          DVALUE_Addr (List.length m, 0 % nat),
           k)
   | Load t a k => inl e
     (*inr (m,
