@@ -1,20 +1,22 @@
 Require Import ZArith List String Omega.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.StepSemantics.
+Require Import Integers.
 Import ListNotations.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Module A : Vellvm.StepSemantics.ADDR with Definition addr := nat.
-  Definition addr := nat.
+Module A : Vellvm.StepSemantics.ADDR with Definition addr := nat * nat.
+  Definition addr := nat * nat.
   Definition null := 1000%nat.   (* TODO this is unsound if the memory has > 1000 values *)
 End A.  
 
 Module SS := StepSemantics.StepSemantics(A).
 Export SS.
 
-Definition memory := list dvalue.
+Definition block := list byte.
+Definition memory := list block.
 Definition undef t := DVALUE_Undef t None.
 
 Definition mem_step {X} (e:effects X) (m:memory) :=
