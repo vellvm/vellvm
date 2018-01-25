@@ -8,9 +8,9 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Module A : Vellvm.StepSemantics.ADDR with Definition addr := (nat * nat)%type.
-  Definition addr := (nat * nat)%type.
-  Definition null := (0%nat, 0%nat).   (* TODO this is unsound if the memory has > 1000 values *)
+Module A : Vellvm.StepSemantics.ADDR with Definition addr := (nat * nat) % type.
+  Definition addr := (nat * nat) % type.
+  Definition null := (0 % nat, 0 % nat).
 End A.
 
 Module SS := StepSemantics.StepSemantics(A).
@@ -18,23 +18,25 @@ Export SS.
 
 Definition block := list byte.
 Definition memory := list block.
-Definition undef t := DVALUE_Undef t None.
+Definition undef t := DVALUE_Undef t None. (* TODO: should this be an empty block? *)
 
-Fixpoint make_block (s: nat) : list byte :=
-  match s with
-  | 0%nat => []
-  | S n => Byte.zero::(make_block n)
+(* Initializes a block of n 0-bytes. *)
+Fixpoint init_block (n:nat) : block :=
+  match n with
+  | 0 % nat => []
+  | S n' => Byte.zero :: init_block n'
   end.
 
-Definition make_empty_block t :=
-  match t with
+(* Makes a block appropriately sized for the given type. *)
+Definition make_empty_block (ty:typ) :=
+  match ty with
   | TYPE_I sz =>
     let x := match sz with
-            | 0 => 0%nat
+            | 0 => 0 % nat
             | Z.pos n => BinPosDef.Pos.to_nat n
-            | Z.neg n => 0%nat (* this shouldn't happen *)
+            | Z.neg n => 0 % nat (* negative int size not allowed *)
             end in
-    make_block (if beq_nat (Nat.modulo x 8) 0%nat
+    init_block (if beq_nat (Nat.modulo x 8) 0
                 then (x / 8)
                 else ((x / 8) + 1))
   | TYPE_Pointer t => []
