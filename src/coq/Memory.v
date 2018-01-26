@@ -1,4 +1,4 @@
-Require Import ZArith List String Omega List.
+Require Import ZArith List String Omega.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.StepSemantics.
 Require Import Integers.
@@ -21,26 +21,21 @@ Definition memory := list block.
 Definition undef t := DVALUE_Undef t None. (* TODO: should this be an empty block? *)
 
 (* Computes the byte size of this type. *)
-Fixpoint sizeof_typ (ty:typ) : nat :=
+Fixpoint sizeof_typ (ty:typ) : Z :=
   match ty with
-  | TYPE_I sz =>
-    let x := match sz with
-            | 0 => 0 % nat
-            | Z.pos n => BinPosDef.Pos.to_nat n
-            | Z.neg n => 0 % nat (* negative int size not allowed *)
-             end in
-    (if beq_nat (Nat.modulo x 8) 0 then (x / 8) else ((x / 8) + 1))
+  | TYPE_I sz => (if Z.eqb (sz mod 8) 0 then (sz / 8) else ((sz / 8) + 1))
   | TYPE_Pointer t => 64
-  | TYPE_Struct f => List.fold_left (fun x acc => plus x (sizeof_typ acc)) f (0 % nat)
-  | TYPE_Array sz ty' => 
+  | TYPE_Struct l => fold_left (fun x acc => x + sizeof_typ acc) l 0
+  | TYPE_Array sz ty' => sz * sizeof_typ ty'
   | _ => 0 (* TODO: add support for more types as necessary *)
   end.
 
 (* Initializes a block of n 0-bytes. *)
-Fixpoint init_block (n:nat) : block :=
+Definition init_block (n:Z) : block :=
   match n with
-  | 0 % nat => []
-  | S n' => Byte.zero :: init_block n'
+  | 0 => []
+  | Z.pos n' => repeat Byte.zero (BinPosDef.Pos.to_nat n')
+  | Z.neg _ => [] (* invalid argument *)
   end.
 
 (* Makes a block appropriately sized for the given type. *)
