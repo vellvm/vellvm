@@ -12,15 +12,18 @@ University of Pennsylvania as part of the DeepSpec project.
 
 # Participants
  - Steve Zdancewic
- - Dmitri Garbuzov 
  - William Mansky
  - Christine Rizkallah
- - Richard Zhang
+ - Olek Gierczak
+ - Emmett Neyman
+ - Robert Zajac
 
 ## Past Contributors
  - Vivien Durey 
+ - Dmitri Garbuzov 
  - Milo Martin
  - Santosh Nagarakatte 
+ - Richard Zhang 
  - Jianzhou Zhao
 
 ---
