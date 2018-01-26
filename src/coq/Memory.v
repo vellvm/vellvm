@@ -1,4 +1,4 @@
-Require Import ZArith List String Omega.
+Require Import ZArith List String Omega List.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.StepSemantics.
 Require Import Integers.
@@ -20,6 +20,22 @@ Definition block := list byte.
 Definition memory := list block.
 Definition undef t := DVALUE_Undef t None. (* TODO: should this be an empty block? *)
 
+(* Computes the byte size of this type. *)
+Fixpoint sizeof_typ (ty:typ) : nat :=
+  match ty with
+  | TYPE_I sz =>
+    let x := match sz with
+            | 0 => 0 % nat
+            | Z.pos n => BinPosDef.Pos.to_nat n
+            | Z.neg n => 0 % nat (* negative int size not allowed *)
+             end in
+    (if beq_nat (Nat.modulo x 8) 0 then (x / 8) else ((x / 8) + 1))
+  | TYPE_Pointer t => 64
+  | TYPE_Struct f => List.fold_left (fun x acc => plus x (sizeof_typ acc)) f (0 % nat)
+  | TYPE_Array sz ty' => 
+  | _ => 0 (* TODO: add support for more types as necessary *)
+  end.
+
 (* Initializes a block of n 0-bytes. *)
 Fixpoint init_block (n:nat) : block :=
   match n with
@@ -29,22 +45,7 @@ Fixpoint init_block (n:nat) : block :=
 
 (* Makes a block appropriately sized for the given type. *)
 Definition make_empty_block (ty:typ) : block :=
-  match ty with
-  | TYPE_I sz =>
-    let x := match sz with
-            | 0 => 0 % nat
-            | Z.pos n => BinPosDef.Pos.to_nat n
-            | Z.neg n => 0 % nat (* negative int size not allowed *)
-            end in
-    init_block (if beq_nat (Nat.modulo x 8) 0
-                then (x / 8)
-                else ((x / 8) + 1))
-  | TYPE_Pointer t => init_block 64 (* TODO: assuming 64-bit pointer, do we need 32-bit? *)
-  | TYPE_Struct f => [] (* TODO: implement *)
-  | TYPE_Array s t => [] (* TODO: implement *)
-  | TYPE_Vector s t => [] (* TODO: implement *)
-  | _ => [] (* TODO: implement more types *)
-  end.
+  init_block (sizeof_typ ty).
 
 Definition mem_step {X} (e:effects X) (m:memory) :=
   match e with
