@@ -8,9 +8,9 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Module A : Vellvm.StepSemantics.ADDR with Definition addr := (nat * nat) % type.
-  Definition addr := (nat * nat) % type.
-  Definition null := (0 % nat, 0 % nat).
+Module A : Vellvm.StepSemantics.ADDR with Definition addr := (Z * Z) % type.
+  Definition addr := (Z * Z) % type.
+  Definition null := (0, 0).
 End A.
 
 Module SS := StepSemantics.StepSemantics(A).
@@ -47,7 +47,7 @@ Definition mem_step {X} (e:effects X) (m:memory) :=
   | Alloca t k =>
     let new_block := make_empty_block t in
     inr  ((m ++ [new_block]) % list,
-          DVALUE_Addr (List.length m, 0 % nat),
+          DVALUE_Addr (Z_of_nat (List.length m), 0),
           k)
   | Load t a k => inl e
     (*inr (m,
