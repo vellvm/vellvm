@@ -168,7 +168,7 @@ Inductive value : Set :=
   Hypothesis IH_Ident   : forall (id:ident), P ((VALUE_Ident id)).
   Hypothesis IH_Integer : forall (x:int), P ((VALUE_Integer x)).
   Hypothesis IH_Float   : forall (f:float), P ((VALUE_Float f)).
-  Hypothesis IH_Hex     : forall (h:string), P ((VALUE_Hex h)).  
+  Hypothesis IH_Hex     : forall (h:float), P ((VALUE_Hex h)).  
   Hypothesis IH_Bool    : forall (b:bool), P ((VALUE_Bool b)).
   Hypothesis IH_Null    : P ((VALUE_Null )).
   Hypothesis IH_Zero_initializer : P ((VALUE_Zero_initializer )).

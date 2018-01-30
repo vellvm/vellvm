@@ -140,8 +140,8 @@ let id_of = function
 
 %token<string> STRING
 %token<Camlcoq.Z.t> INTEGER
-%token<float> FLOAT
-%token<string> HEXCONSTANT
+%token<Floats.float> FLOAT
+%token<Floats.float> HEXCONSTANT
 %token KW_NULL KW_UNDEF KW_TRUE KW_FALSE KW_ZEROINITIALIZER KW_C
 
 %token<string> LABEL
@@ -627,7 +627,7 @@ expr_op:
 expr_val:
   | i=INTEGER                                         { VALUE_Integer i        }
   | f=FLOAT                                           { VALUE_Float f          }
-  | h=HEXCONSTANT                                     { VALUE_Hex (str h)      }
+  | f=HEXCONSTANT                                     { VALUE_Hex f            }
   | KW_TRUE                                           { VALUE_Bool true        }
   | KW_FALSE                                          { VALUE_Bool false       }
   | KW_NULL                                           { VALUE_Null             }

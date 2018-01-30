@@ -27,7 +27,9 @@
   let str = Camlcoq.coqstring_of_camlstring
   let of_str = Camlcoq.camlstring_of_coqstring
   let coq_of_int = Camlcoq.Z.of_sint
-
+  let coq_of_int64 = Camlcoq.Z.of_sint64  
+  let coqfloat_of_float f = Floats.Float.of_bits(Camlcoq.coqint_of_camlint64(Int64.bits_of_float f))
+  
   exception Lex_error_unterminated_string of Lexing.position
 
   let kw = function
@@ -299,11 +301,11 @@ rule token = parse
   | '#' (digit+ as i) { ATTR_GRP_ID (coq_of_int (int_of_string i)) }
 
   (* constants *)
-  | '-'? digit+ as d            { INTEGER (coq_of_int (int_of_string d)) }
-  | '-'? digit* '.' digit+ as d { FLOAT (float_of_string d) }
+  | '-'? digit+ as d            { INTEGER (coq_of_int64 (Int64.of_string d)) }
+  | '-'? digit* '.' digit+ as d { FLOAT (coqfloat_of_float (float_of_string d)) }
   | '-'? digit ('.' digit+)? 'e' ('+'|'-') digit+ as d
-                                { FLOAT (float_of_string d) }
-  | '0''x' (hexdigit+ as d)       { HEXCONSTANT (d) }			
+                                { FLOAT (coqfloat_of_float (float_of_string d)) }
+  | ('0''x' hexdigit+) as d     { HEXCONSTANT (coqfloat_of_float (Int64.float_of_bits (Int64.of_string d))) }			
   | '"'                         { STRING (string (Buffer.create 10) lexbuf) }
 
   (* types *)

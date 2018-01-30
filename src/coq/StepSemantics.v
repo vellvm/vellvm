@@ -444,7 +444,69 @@ Module StepSemantics(A:ADDR).
     | _, _, _ => failwith "ill_typed-fop"
     end. 
 
-  Definition eval_fcmp (fcmp:fcmp) (v1:value) (v2:value) : err value := failwith "eval_fcmp not implemented".
+  Definition not_nan32 (f:ll_float) : bool :=
+    negb (compcert.flocq.Appli.Fappli_IEEE.is_nan _ _ f). 
+
+  Definition ordered32 (f1 f2:ll_float) : bool :=
+    andb (not_nan32 f1) (not_nan32 f2).
+
+  Definition not_nan64 (f:ll_double) : bool :=
+    negb (compcert.flocq.Appli.Fappli_IEEE.is_nan _ _ f). 
+
+  Definition ordered64 (f1 f2:ll_double) : bool :=
+    andb (not_nan64 f1) (not_nan64 f2).
+  
+  Definition float_cmp (fcmp:fcmp) (x:ll_float) (y:ll_float) : dvalue :=
+    if match fcmp with
+       | FFalse => false
+       | FOeq => andb (ordered32 x y) (Float32.cmp Ceq x y)
+       | FOgt => andb (ordered32 x y) (Float32.cmp Cgt x y)
+       | FOge => andb (ordered32 x y) (Float32.cmp Cge x y)
+       | FOlt => andb (ordered32 x y) (Float32.cmp Clt x y)
+       | FOle => andb (ordered32 x y) (Float32.cmp Cle x y)
+       | FOne => andb (ordered32 x y) (Float32.cmp Cne x y)
+       | FOrd => ordered32 x y
+       | FUno => negb (ordered32 x y)
+       | FUeq => (Float32.cmp Ceq x y)
+       | FUgt => (Float32.cmp Cgt x y)
+       | FUge => (Float32.cmp Cge x y)
+       | FUlt => (Float32.cmp Clt x y)
+       | FUle => (Float32.cmp Cle x y)
+       | FUne => (Float32.cmp Cne x y)
+       | FTrue => true
+       end
+    then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
+  Arguments float_cmp _ _ _ : simpl nomatch.
+
+  Definition double_cmp (fcmp:fcmp) (x:ll_double) (y:ll_double) : dvalue :=
+    if match fcmp with
+       | FFalse => false
+       | FOeq => andb (ordered64 x y) (Float.cmp Ceq x y)
+       | FOgt => andb (ordered64 x y) (Float.cmp Cgt x y)
+       | FOge => andb (ordered64 x y) (Float.cmp Cge x y)
+       | FOlt => andb (ordered64 x y) (Float.cmp Clt x y)
+       | FOle => andb (ordered64 x y) (Float.cmp Cle x y)
+       | FOne => andb (ordered64 x y) (Float.cmp Cne x y)
+       | FOrd => ordered64 x y
+       | FUno => negb (ordered64 x y)
+       | FUeq => (Float.cmp Ceq x y)
+       | FUgt => (Float.cmp Cgt x y)
+       | FUge => (Float.cmp Cge x y)
+       | FUlt => (Float.cmp Clt x y)
+       | FUle => (Float.cmp Cle x y)
+       | FUne => (Float.cmp Cne x y)
+       | FTrue => true
+       end
+    then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
+    Arguments double_cmp _ _ _ : simpl nomatch.
+  
+  Definition eval_fcmp (fcmp:fcmp) (v1:value) (v2:value) : err value :=
+    match v1, v2 with
+    | DVALUE_Float f1, DVALUE_Float f2 => mret (float_cmp fcmp f1 f2)
+    | DVALUE_Double f1, DVALUE_Double f2 => mret (double_cmp fcmp f1 f2)
+    | _, _ => failwith "ill_typed-fcmp"
+    end.
+    
 
   Definition eval_conv_h conv t1 x t2 : err dvalue :=
     match conv with
@@ -581,20 +643,6 @@ Module StepSemantics(A:ADDR).
   Arguments insert_into_str _ _ _ : simpl nomatch.
 
 
-  (* NOTE: See compcert.lib.Floats.Float32.from_parsed *)
-  Definition dv_float_of_string (h:string) : err dvalue :=
-    failwith "dv_float_of_string unimplemented".
-
-  Definition dv_double_of_string (h:string) : err dvalue :=
-    failwith "dv_double_of_string unimplemented".
-
-    (* NOTE: See compcert.lib.Floats.Float32.of_bits *)
-  Definition dv_float_of_hex_string (h:string) : err dvalue :=
-    failwith "dv_float_of_hex_string unimplemented".
-
-  Definition dv_double_of_hex_string (h:string) : err dvalue :=
-    failwith "dv_double_of_hex_string unimplemented".
-
   Definition dv_zero_initializer (t:typ) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".
 
@@ -633,16 +681,16 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:Ollvm_ast.value) : err dvalue :=
   | Ollvm_ast.VALUE_Float x   =>
     match top with
     | None => failwith "eval_expr given untyped VALUE_Float"
-    | Some TYPE_Float  =>  dv_float_of_string x 
-    | Some TYPE_Double =>  dv_double_of_string x
+    | Some TYPE_Float  =>  mret (DVALUE_Float (Float32.of_double x))
+    | Some TYPE_Double =>  mret (DVALUE_Double x)
     | _ => failwith "bad type for constant float"
     end
 
-  | Ollvm_ast.VALUE_Hex h     =>
+  | Ollvm_ast.VALUE_Hex x     =>
     match top with
     | None => failwith "eval_expr given untyped VALUE_Hex"
-    | Some TYPE_Float => dv_float_of_hex_string h
-    | Some TYPE_Double => dv_double_of_hex_string h
+    | Some TYPE_Float  =>  mret (DVALUE_Float (Float32.of_double x))
+    | Some TYPE_Double =>  mret (DVALUE_Double x)
     | _ => failwith "bad type for constant hex float"
     end
 
