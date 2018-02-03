@@ -9,6 +9,9 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import ZArith List String Omega.
+Require Coq.FSets.FMapAVL.
+Require Coq.Structures.OrderedTypeEx.
+
 Require Import  Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.Ollvm_ast Vellvm.AstLib Vellvm.CFG.
 Import ListNotations.
@@ -92,6 +95,8 @@ Module StepSemantics(A:ADDR).
 
   (* TODO: add the global environment *)
   Definition genv := list (global_id * value).
+
+
   Definition env  := list (local_id * value).
 
   Inductive frame : Set :=
@@ -126,7 +131,7 @@ Module StepSemantics(A:ADDR).
   Instance string_of_env : StringOf env := string_of_env'.
   
   Definition lookup_env (e:env) (id:raw_id) : option dvalue :=
-    assoc RawID.eq_dec id e.
+    assoc RawIDOrd.eq_dec id e.
 
   Definition add_env id dv (e:env) := (id,dv)::e.
   
@@ -890,7 +895,7 @@ Fixpoint jump (CFG:cfg) (from:block_id) (e_init:env) (e:env) (to:block) (k:stack
   match ps with
   | [] => mret (q, e, k)
   | (id, (INSTR_Phi _ ls))::rest => 
-    match assoc RawID.eq_dec bn ls with
+    match assoc RawIDOrd.eq_dec bn ls with
     | Some op =>
       'dv <- eval_op e_init op;
       jump CFG bn e_init (add_env id dv e) rest q k
@@ -903,7 +908,7 @@ Fixpoint jump (CFG:cfg) (from:block_id) (e_init:env) (e:env) (to:block) (k:stack
 
 Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (e_init:env) (k:stack)  : err state :=
   let eval_phi (e:env) '(iid, Phi t ls) :=
-      match assoc RawID.eq_dec bid_src ls with
+      match assoc RawIDOrd.eq_dec bid_src ls with
       | Some op =>
         'dv <- eval_expr e_init (Some t) op;
           mret (add_env iid dv e)
@@ -1164,12 +1169,12 @@ Section Properties.
     intros id1 v e id2 u Hl.
     unfold add_env in Hl.
     unfold lookup_env in Hl.
-    remember (Util.assoc RawID.eq_dec id2 ((id1, v)::e)) as res.
+    remember (Util.assoc RawIDOrd.eq_dec id2 ((id1, v)::e)) as res.
     destruct res; simpl in Hl; try solve [inversion Hl].
     symmetry in Heqres.
     apply Util.assoc_cons_inv in Heqres.
     destruct Heqres as [[H1 H2]|[H1 H2]]. subst; auto.
-    (* destruct (@Util.assoc_cons_inv raw_id value id2 id1 v v0 e RawID.eq_dec)  *)
+    (* destruct (@Util.assoc_cons_inv raw_id value id2 id1 v v0 e RawIDOrd.eq_dec)  *)
     inversion Hl. tauto. 
     right. inversion Hl. subst. unfold lookup_env. exact H2.
   Qed.
