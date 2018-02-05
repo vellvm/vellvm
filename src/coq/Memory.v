@@ -1,7 +1,8 @@
 Require Import ZArith List String Omega.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.StepSemantics.
-Require Import Integers.
+Require Import FSets.FMapAVL.
+Require Coq.Structures.OrderedTypeEx.
 Require Import ZMicromega.
 Import ListNotations.
 
@@ -16,8 +17,35 @@ End A.
 Module SS := StepSemantics.StepSemantics(A).
 Export SS.
 
-Definition block := list byte.
-Definition memory := list block.
+Print FMapAVL.
+
+Module IM := FMapAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
+Definition IntMap := IM.t.
+
+Definition add {a} k (v:a) := IM.add k v.
+Definition delete {a} k (m:IntMap a) := IM.remove k m.
+Definition member {a} k (m:IntMap a) := IM.mem k m.
+Definition lookup {a} k (m:IntMap a) := IM.find k m.
+Definition empty {a} := @IM.empty a.
+Fixpoint add_all {a} ks (m:IntMap a) :=
+  match ks with
+  | [] => m
+  | (k,v) :: tl => add k v (add_all tl m)
+  end.
+Definition union {a} (m1 : IntMap a) (m2 : IntMap a)
+  := IM.map2 (fun mx my =>
+                match mx with | Some x => Some x | None => my end) m1 m2.
+Definition size {a} (m : IM.t a) : Z := Z.of_nat (IM.cardinal m).
+
+
+(* TODO: What should this type contain? *)
+Inductive SByte :=
+| DByte : dvalue -> SByte
+| FragByte : SByte
+| SUndef : SByte.
+
+Definition block := IntMap SByte.
+Definition memory := IntMap block.
 Definition undef t := DVALUE_Undef t None. (* TODO: should this be an empty block? *)
 
 (* Computes the byte size of this type. *)
@@ -30,24 +58,32 @@ Fixpoint sizeof_typ (ty:typ) : Z :=
   | _ => 0 (* TODO: add support for more types as necessary *)
   end.
 
+
+Fixpoint init_block_h (n:nat) (m:block) : block :=
+  match n with
+  | O => add 0 SUndef m
+  | S n' => add (Z.of_nat n) SUndef (init_block_h n' m)
+  end. 
+
 (* Initializes a block of n 0-bytes. *)
 Definition init_block (n:Z) : block :=
   match n with
-  | 0 => []
-  | Z.pos n' => repeat Byte.zero (BinPosDef.Pos.to_nat n')
-  | Z.neg _ => [] (* invalid argument *)
+  | 0 => empty
+  | Z.pos n' => init_block_h (BinPosDef.Pos.to_nat n') empty
+  | Z.neg _ => empty (* invalid argument *)
   end.
 
 (* Makes a block appropriately sized for the given type. *)
 Definition make_empty_block (ty:typ) : block :=
   init_block (sizeof_typ ty).
 
+(* TODO: implement each branch. Alloca is currently wrong. *)
 Definition mem_step {X} (e:effects X) (m:memory) :=
   match e with
   | Alloca t k =>
     let new_block := make_empty_block t in
-    inr  ((m ++ [new_block]) % list,
-          DVALUE_Addr (Z_of_nat (List.length m), 0),
+    inr  (m,
+          DVALUE_Addr (size m, 0),
           k)
   | Load t a k => inl e
     (*inr (m,
