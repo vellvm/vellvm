@@ -115,22 +115,7 @@ let phi_id s : raw_id =
    | None -> Anon (anon_ctr.get ())
    | Some s -> s
 
-let id_of = function
-  | INSTR_Store _
-  | INSTR_Unreachable
-  | INSTR_Fence
-  | INSTR_Call ((TYPE_Void, _), _)
-    -> IVoid (void_ctr.get ())
-
-  | INSTR_Op _
-  | INSTR_Call _
-  | INSTR_Alloca _
-  | INSTR_Load _
-  | INSTR_AtomicCmpXchg
-  | INSTR_AtomicRMW
-  | INSTR_VAArg
-  | INSTR_LandingPad
-    -> IId (Anon (anon_ctr.get ()))
+q    -> IId (Anon (anon_ctr.get ()))
 
 
 %}

@@ -268,7 +268,7 @@ and value : Format.formatter -> Ollvm_ast.value -> unit =
   | VALUE_Ident i           -> ident ppf i
   | VALUE_Integer i         -> pp_print_int ppf (to_int i)
   | VALUE_Float f           -> pp_print_float ppf (float_of_coqfloat f)
-  | VALUE_Hex h             -> fprintf ppf "%Lx" (Int64.bits_of_float (float_of_coqfloat h))
+  | VALUE_Hex h             -> fprintf ppf "0x%Lx" (Int64.bits_of_float (float_of_coqfloat h))
   | VALUE_Bool b            -> pp_print_bool ppf b
   | VALUE_Null              -> pp_print_string ppf "null"
   | VALUE_Undef             -> pp_print_string ppf "undef"
