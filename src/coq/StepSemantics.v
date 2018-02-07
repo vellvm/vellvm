@@ -10,6 +10,7 @@
 
 Require Import ZArith List String Omega.
 Require Coq.FSets.FMapAVL.
+Require Coq.FSets.FMapFacts.
 Require Coq.Structures.OrderedTypeEx.
 
 Require Import  Vellvm.Classes Vellvm.Util.
@@ -94,12 +95,16 @@ Module StepSemantics(A:ADDR).
   Export E.
 
   (* TODO: add the global environment *)
-  Definition genv := list (global_id * value).
+  Module ENV := FMapAVL.Make(AstLib.RawIDOrd).
+  Module ENVFacts := FMapFacts.WFacts_fun(AstLib.RawIDOrd)(ENV).
+  
+  Definition env_of_assoc {A} (l:list (raw_id * A)) : ENV.t A :=
+    List.fold_left (fun e '(k,v) => ENV.add k v e) l (@ENV.empty A).
+  
+  Definition genv := ENV.t value.
+  Definition env  := ENV.t value.
 
-
-  Definition env  := list (local_id * value).
-
-  Inductive frame : Set :=
+  Inductive frame : Type :=
   | KRet      (e:env) (id:local_id) (q:pc)
   | KRet_void (e:env) (p:pc)
   .       
@@ -122,18 +127,18 @@ Module StepSemantics(A:ADDR).
     | ID_Local i => mret i
     end.
 
-  Fixpoint string_of_env' (e:env) : string :=
+  Fixpoint string_of_env' (e:list (raw_id * value)) : string :=
     match e with
     | [] => ""
     | (lid, _)::rest => (string_of_raw_id lid) ++ " " ++ (string_of_env' rest)
     end.
 
-  Instance string_of_env : StringOf env := string_of_env'.
+  Instance string_of_env : StringOf env := fun env => string_of_env' (ENV.elements env).
   
   Definition lookup_env (e:env) (id:raw_id) : option dvalue :=
-    assoc RawIDOrd.eq_dec id e.
+    ENV.find id e.
 
-  Definition add_env id dv (e:env) := (id,dv)::e.
+  Definition add_env := ENV.add.
   
   (* Arithmetic Operations ---------------------------------------------------- *)
 
@@ -1061,7 +1066,9 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
           match (find_function_entry CFG fid) with
           | Some fnentry =>
             let 'FunctionEntry ids pc_f := fnentry in
-            Step (pc_f, combine ids dvs, (KRet_void e pc_next::k))
+            do bs <- combine_lists_err ids dvs;
+            let env := env_of_assoc bs in
+            Step (pc_f, env, (KRet_void e pc_next::k))
 
           | None =>
           (* TODO: look up fid in the global environment to see if it is a legitimate
@@ -1083,7 +1090,9 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
           match (find_function_entry CFG fid) with
           | Some fnentry =>
             let 'FunctionEntry ids pc_f := fnentry in
-            Step (pc_f, combine ids dvs, (KRet e id pc_next::k))
+            do bs <- combine_lists_err ids dvs;
+            let env := env_of_assoc bs in
+            Step (pc_f, env, (KRet e id pc_next::k))
 
           | None =>
             (* TODO: look up fid in the global environment to see if it is a legitimate
@@ -1127,7 +1136,7 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
 Definition init_state (CFG:mcfg) (fname:string) : err state :=
   'fentry <- trywith ("INIT: no function named " ++ fname) (find_function_entry CFG (Name fname));
   let 'FunctionEntry ids pc_f := fentry in
-    mret (pc_f, [], []).
+    mret (pc_f, (@ENV.empty value), []).
 
 (* Note: codomain is D'  *)
 CoFixpoint step_sem (CFG:mcfg) (s:state) : Trace state :=
@@ -1148,7 +1157,7 @@ Section Properties.
   Proof.
     intros id dv e.  unfold lookup_env. 
     unfold add_env.
-    rewrite Util.assoc_hd. reflexivity.
+    apply ENV.find_1. apply ENV.add_1. reflexivity.
   Qed.  
 
   Lemma lookup_env_tl : forall id1 v1 e id2,
@@ -1157,28 +1166,39 @@ Section Properties.
     unfold lookup_env.
     intros id1 v1 e id2 H.
     unfold add_env. 
-    rewrite Util.assoc_tl; auto.
+    remember (ENV.find (elt:=value) id2 (ENV.add id1 v1 e)) as x.
+    remember (ENV.find (elt:=value) id2 e) as y.
+    destruct x; destruct y; auto.
+    - symmetry in Heqx. rewrite <- ENVFacts.find_mapsto_iff in Heqx.
+      symmetry in Heqy. rewrite <- ENVFacts.find_mapsto_iff in Heqy.
+      rewrite ENVFacts.add_neq_mapsto_iff in Heqx; auto.
+      assert (v = v0). { eapply ENVFacts.MapsTo_fun; eauto. }
+                       subst; reflexivity.                 
+    - symmetry in Heqx. rewrite <- ENVFacts.find_mapsto_iff in Heqx.
+      symmetry in Heqy. rewrite <- ENVFacts.not_find_in_iff in Heqy.
+      rewrite ENVFacts.add_neq_mapsto_iff in Heqx; auto.
+      unfold ENV.In in Heqy. unfold ENV.Raw.In0 in Heqy. assert False. apply Heqy. exists v. apply Heqx. destruct H0.
+    - symmetry in Heqx. rewrite <- ENVFacts.not_find_in_iff in Heqx.
+      symmetry in Heqy. rewrite <- ENVFacts.find_mapsto_iff in Heqy.
+      assert False. apply Heqx. unfold ENV.In.  unfold ENV.Raw.In0. exists v. apply ENV.add_2; auto. destruct H0.
   Qed.  
 
 
   Lemma lookup_add_env_inv :
     forall id1 v e id2 u
       (Hl: lookup_env (add_env id1 v e) id2 = Some u),
-      (id1 = id2 /\ v = u) \/ (lookup_env e id2 = Some u).
+      (id1 = id2 /\ v = u) \/ (id1 <> id2 /\ lookup_env e id2 = Some u).
   Proof.
     intros id1 v e id2 u Hl.
     unfold add_env in Hl.
-    unfold lookup_env in Hl.
-    remember (Util.assoc RawIDOrd.eq_dec id2 ((id1, v)::e)) as res.
-    destruct res; simpl in Hl; try solve [inversion Hl].
-    symmetry in Heqres.
-    apply Util.assoc_cons_inv in Heqres.
-    destruct Heqres as [[H1 H2]|[H1 H2]]. subst; auto.
-    (* destruct (@Util.assoc_cons_inv raw_id value id2 id1 v v0 e RawIDOrd.eq_dec)  *)
-    inversion Hl. tauto. 
-    right. inversion Hl. subst. unfold lookup_env. exact H2.
-  Qed.
-
+    unfold lookup_env in *.
+    rewrite <- ENVFacts.find_mapsto_iff in Hl.
+    apply ENVFacts.add_mapsto_iff in Hl.
+    destruct Hl as [H | H].
+    - left. assumption.
+    - right. rewrite <- ENVFacts.find_mapsto_iff. assumption.
+  Qed.      
+    
   Definition pc_satisfies (CFG:mcfg) (p:pc) (P:cmd -> Prop) : Prop :=
     forall cmd, fetch CFG p = Some cmd -> P cmd.
 
