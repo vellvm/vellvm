@@ -23,7 +23,7 @@
 (*  ------------------------------------------------------------------------- *)
 
 Require Import compcert.lib.Integers.
-
+Require Import compcert.lib.Floats.
 Require Import List. 
 Require Import String Ascii.
 Require Import ZArith.
@@ -42,8 +42,7 @@ End Wordsize1.
 
 Module Int1 := Make(Wordsize1).
 
-(* Parameter float : Set. *)
-Definition float := string. (* CHKoh: Hack for now. UNSAFE! *)
+Definition float := Floats.float.
 
 Inductive linkage : Set :=
 | LINKAGE_Private
@@ -205,16 +204,23 @@ Definition tident : Set := (typ * ident)%type.
      - it allows identifiers to appear nested inside of "constant expressions"
 
   NOTES:
-   Integer values: llc parses large integer values and converts them to some 
-   internal form (based on integer size?)
+   - Integer values: llc parses large integer values and converts them to some 
+     internal form (based on integer size?) we use 
    
+   - Float constants: these are always parsed as 64-bit representable floats 
+     using ocamls float_of_string function.  If they are used in LLVM as 32-bit 
+     rather than 64-bit floats, they are converted when evaluated.
+
+   - Hex constants: these are always parsed as 0x<16-digit> 64-bit values and
+     bit-converted to ocaml's 64-bit float representation.
+
    Why do we need Bool?  Why not i1 ?  Is that "real" llvm?
  *)
 Inductive value : Set :=
 | VALUE_Ident   (id:ident)  
 | VALUE_Integer (x:int)
 | VALUE_Float   (f:float)
-| VALUE_Hex     (h:string)                
+| VALUE_Hex     (f:float)  (* See LLVM documentation about hex float constants. *)
 | VALUE_Bool    (b:bool)
 | VALUE_Null
 | VALUE_Zero_initializer

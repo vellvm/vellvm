@@ -9,6 +9,10 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import ZArith List String Omega.
+Require Coq.FSets.FMapAVL.
+Require Coq.FSets.FMapFacts.
+Require Coq.Structures.OrderedTypeEx.
+
 Require Import  Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.Ollvm_ast Vellvm.AstLib Vellvm.CFG.
 Import ListNotations.
@@ -91,10 +95,16 @@ Module StepSemantics(A:ADDR).
   Export E.
 
   (* TODO: add the global environment *)
-  Definition genv := list (global_id * value).
-  Definition env  := list (local_id * value).
+  Module ENV := FMapAVL.Make(AstLib.RawIDOrd).
+  Module ENVFacts := FMapFacts.WFacts_fun(AstLib.RawIDOrd)(ENV).
+  
+  Definition env_of_assoc {A} (l:list (raw_id * A)) : ENV.t A :=
+    List.fold_left (fun e '(k,v) => ENV.add k v e) l (@ENV.empty A).
+  
+  Definition genv := ENV.t value.
+  Definition env  := ENV.t value.
 
-  Inductive frame : Set :=
+  Inductive frame : Type :=
   | KRet      (e:env) (id:local_id) (q:pc)
   | KRet_void (e:env) (p:pc)
   .       
@@ -117,18 +127,18 @@ Module StepSemantics(A:ADDR).
     | ID_Local i => mret i
     end.
 
-  Fixpoint string_of_env' (e:env) : string :=
+  Fixpoint string_of_env' (e:list (raw_id * value)) : string :=
     match e with
     | [] => ""
     | (lid, _)::rest => (string_of_raw_id lid) ++ " " ++ (string_of_env' rest)
     end.
 
-  Instance string_of_env : StringOf env := string_of_env'.
+  Instance string_of_env : StringOf env := fun env => string_of_env' (ENV.elements env).
   
   Definition lookup_env (e:env) (id:raw_id) : option dvalue :=
-    assoc RawID.eq_dec id e.
+    ENV.find id e.
 
-  Definition add_env id dv (e:env) := (id,dv)::e.
+  Definition add_env := ENV.add.
   
   (* Arithmetic Operations ---------------------------------------------------- *)
 
@@ -444,7 +454,69 @@ Module StepSemantics(A:ADDR).
     | _, _, _ => failwith "ill_typed-fop"
     end. 
 
-  Definition eval_fcmp (fcmp:fcmp) (v1:value) (v2:value) : err value := failwith "eval_fcmp not implemented".
+  Definition not_nan32 (f:ll_float) : bool :=
+    negb (compcert.flocq.Appli.Fappli_IEEE.is_nan _ _ f). 
+
+  Definition ordered32 (f1 f2:ll_float) : bool :=
+    andb (not_nan32 f1) (not_nan32 f2).
+
+  Definition not_nan64 (f:ll_double) : bool :=
+    negb (compcert.flocq.Appli.Fappli_IEEE.is_nan _ _ f). 
+
+  Definition ordered64 (f1 f2:ll_double) : bool :=
+    andb (not_nan64 f1) (not_nan64 f2).
+  
+  Definition float_cmp (fcmp:fcmp) (x:ll_float) (y:ll_float) : dvalue :=
+    if match fcmp with
+       | FFalse => false
+       | FOeq => andb (ordered32 x y) (Float32.cmp Ceq x y)
+       | FOgt => andb (ordered32 x y) (Float32.cmp Cgt x y)
+       | FOge => andb (ordered32 x y) (Float32.cmp Cge x y)
+       | FOlt => andb (ordered32 x y) (Float32.cmp Clt x y)
+       | FOle => andb (ordered32 x y) (Float32.cmp Cle x y)
+       | FOne => andb (ordered32 x y) (Float32.cmp Cne x y)
+       | FOrd => ordered32 x y
+       | FUno => negb (ordered32 x y)
+       | FUeq => (Float32.cmp Ceq x y)
+       | FUgt => (Float32.cmp Cgt x y)
+       | FUge => (Float32.cmp Cge x y)
+       | FUlt => (Float32.cmp Clt x y)
+       | FUle => (Float32.cmp Cle x y)
+       | FUne => (Float32.cmp Cne x y)
+       | FTrue => true
+       end
+    then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
+  Arguments float_cmp _ _ _ : simpl nomatch.
+
+  Definition double_cmp (fcmp:fcmp) (x:ll_double) (y:ll_double) : dvalue :=
+    if match fcmp with
+       | FFalse => false
+       | FOeq => andb (ordered64 x y) (Float.cmp Ceq x y)
+       | FOgt => andb (ordered64 x y) (Float.cmp Cgt x y)
+       | FOge => andb (ordered64 x y) (Float.cmp Cge x y)
+       | FOlt => andb (ordered64 x y) (Float.cmp Clt x y)
+       | FOle => andb (ordered64 x y) (Float.cmp Cle x y)
+       | FOne => andb (ordered64 x y) (Float.cmp Cne x y)
+       | FOrd => ordered64 x y
+       | FUno => negb (ordered64 x y)
+       | FUeq => (Float.cmp Ceq x y)
+       | FUgt => (Float.cmp Cgt x y)
+       | FUge => (Float.cmp Cge x y)
+       | FUlt => (Float.cmp Clt x y)
+       | FUle => (Float.cmp Cle x y)
+       | FUne => (Float.cmp Cne x y)
+       | FTrue => true
+       end
+    then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
+    Arguments double_cmp _ _ _ : simpl nomatch.
+  
+  Definition eval_fcmp (fcmp:fcmp) (v1:value) (v2:value) : err value :=
+    match v1, v2 with
+    | DVALUE_Float f1, DVALUE_Float f2 => mret (float_cmp fcmp f1 f2)
+    | DVALUE_Double f1, DVALUE_Double f2 => mret (double_cmp fcmp f1 f2)
+    | _, _ => failwith "ill_typed-fcmp"
+    end.
+    
 
   Definition eval_conv_h conv t1 x t2 : err dvalue :=
     match conv with
@@ -581,20 +653,6 @@ Module StepSemantics(A:ADDR).
   Arguments insert_into_str _ _ _ : simpl nomatch.
 
 
-  (* NOTE: See compcert.lib.Floats.Float32.from_parsed *)
-  Definition dv_float_of_string (h:string) : err dvalue :=
-    failwith "dv_float_of_string unimplemented".
-
-  Definition dv_double_of_string (h:string) : err dvalue :=
-    failwith "dv_double_of_string unimplemented".
-
-    (* NOTE: See compcert.lib.Floats.Float32.of_bits *)
-  Definition dv_float_of_hex_string (h:string) : err dvalue :=
-    failwith "dv_float_of_hex_string unimplemented".
-
-  Definition dv_double_of_hex_string (h:string) : err dvalue :=
-    failwith "dv_double_of_hex_string unimplemented".
-
   Definition dv_zero_initializer (t:typ) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".
 
@@ -633,16 +691,16 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:Ollvm_ast.value) : err dvalue :=
   | Ollvm_ast.VALUE_Float x   =>
     match top with
     | None => failwith "eval_expr given untyped VALUE_Float"
-    | Some TYPE_Float  =>  dv_float_of_string x 
-    | Some TYPE_Double =>  dv_double_of_string x
+    | Some TYPE_Float  =>  mret (DVALUE_Float (Float32.of_double x))
+    | Some TYPE_Double =>  mret (DVALUE_Double x)
     | _ => failwith "bad type for constant float"
     end
 
-  | Ollvm_ast.VALUE_Hex h     =>
+  | Ollvm_ast.VALUE_Hex x     =>
     match top with
     | None => failwith "eval_expr given untyped VALUE_Hex"
-    | Some TYPE_Float => dv_float_of_hex_string h
-    | Some TYPE_Double => dv_double_of_hex_string h
+    | Some TYPE_Float  =>  mret (DVALUE_Float (Float32.of_double x))
+    | Some TYPE_Double =>  mret (DVALUE_Double x)
     | _ => failwith "bad type for constant hex float"
     end
 
@@ -842,7 +900,7 @@ Fixpoint jump (CFG:cfg) (from:block_id) (e_init:env) (e:env) (to:block) (k:stack
   match ps with
   | [] => mret (q, e, k)
   | (id, (INSTR_Phi _ ls))::rest => 
-    match assoc RawID.eq_dec bn ls with
+    match assoc RawIDOrd.eq_dec bn ls with
     | Some op =>
       'dv <- eval_op e_init op;
       jump CFG bn e_init (add_env id dv e) rest q k
@@ -855,7 +913,7 @@ Fixpoint jump (CFG:cfg) (from:block_id) (e_init:env) (e:env) (to:block) (k:stack
 
 Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (e_init:env) (k:stack)  : err state :=
   let eval_phi (e:env) '(iid, Phi t ls) :=
-      match assoc RawID.eq_dec bid_src ls with
+      match assoc RawIDOrd.eq_dec bid_src ls with
       | Some op =>
         'dv <- eval_expr e_init (Some t) op;
           mret (add_env iid dv e)
@@ -1008,7 +1066,9 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
           match (find_function_entry CFG fid) with
           | Some fnentry =>
             let 'FunctionEntry ids pc_f := fnentry in
-            Step (pc_f, combine ids dvs, (KRet_void e pc_next::k))
+            do bs <- combine_lists_err ids dvs;
+            let env := env_of_assoc bs in
+            Step (pc_f, env, (KRet_void e pc_next::k))
 
           | None =>
           (* TODO: look up fid in the global environment to see if it is a legitimate
@@ -1030,7 +1090,9 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
           match (find_function_entry CFG fid) with
           | Some fnentry =>
             let 'FunctionEntry ids pc_f := fnentry in
-            Step (pc_f, combine ids dvs, (KRet e id pc_next::k))
+            do bs <- combine_lists_err ids dvs;
+            let env := env_of_assoc bs in
+            Step (pc_f, env, (KRet e id pc_next::k))
 
           | None =>
             (* TODO: look up fid in the global environment to see if it is a legitimate
@@ -1074,7 +1136,7 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
 Definition init_state (CFG:mcfg) (fname:string) : err state :=
   'fentry <- trywith ("INIT: no function named " ++ fname) (find_function_entry CFG (Name fname));
   let 'FunctionEntry ids pc_f := fentry in
-    mret (pc_f, [], []).
+    mret (pc_f, (@ENV.empty value), []).
 
 (* Note: codomain is D'  *)
 CoFixpoint step_sem (CFG:mcfg) (s:state) : Trace state :=
@@ -1095,7 +1157,7 @@ Section Properties.
   Proof.
     intros id dv e.  unfold lookup_env. 
     unfold add_env.
-    rewrite Util.assoc_hd. reflexivity.
+    apply ENV.find_1. apply ENV.add_1. reflexivity.
   Qed.  
 
   Lemma lookup_env_tl : forall id1 v1 e id2,
@@ -1104,28 +1166,39 @@ Section Properties.
     unfold lookup_env.
     intros id1 v1 e id2 H.
     unfold add_env. 
-    rewrite Util.assoc_tl; auto.
+    remember (ENV.find (elt:=value) id2 (ENV.add id1 v1 e)) as x.
+    remember (ENV.find (elt:=value) id2 e) as y.
+    destruct x; destruct y; auto.
+    - symmetry in Heqx. rewrite <- ENVFacts.find_mapsto_iff in Heqx.
+      symmetry in Heqy. rewrite <- ENVFacts.find_mapsto_iff in Heqy.
+      rewrite ENVFacts.add_neq_mapsto_iff in Heqx; auto.
+      assert (v = v0). { eapply ENVFacts.MapsTo_fun; eauto. }
+                       subst; reflexivity.                 
+    - symmetry in Heqx. rewrite <- ENVFacts.find_mapsto_iff in Heqx.
+      symmetry in Heqy. rewrite <- ENVFacts.not_find_in_iff in Heqy.
+      rewrite ENVFacts.add_neq_mapsto_iff in Heqx; auto.
+      unfold ENV.In in Heqy. unfold ENV.Raw.In0 in Heqy. assert False. apply Heqy. exists v. apply Heqx. destruct H0.
+    - symmetry in Heqx. rewrite <- ENVFacts.not_find_in_iff in Heqx.
+      symmetry in Heqy. rewrite <- ENVFacts.find_mapsto_iff in Heqy.
+      assert False. apply Heqx. unfold ENV.In.  unfold ENV.Raw.In0. exists v. apply ENV.add_2; auto. destruct H0.
   Qed.  
 
 
   Lemma lookup_add_env_inv :
     forall id1 v e id2 u
       (Hl: lookup_env (add_env id1 v e) id2 = Some u),
-      (id1 = id2 /\ v = u) \/ (lookup_env e id2 = Some u).
+      (id1 = id2 /\ v = u) \/ (id1 <> id2 /\ lookup_env e id2 = Some u).
   Proof.
     intros id1 v e id2 u Hl.
     unfold add_env in Hl.
-    unfold lookup_env in Hl.
-    remember (Util.assoc RawID.eq_dec id2 ((id1, v)::e)) as res.
-    destruct res; simpl in Hl; try solve [inversion Hl].
-    symmetry in Heqres.
-    apply Util.assoc_cons_inv in Heqres.
-    destruct Heqres as [[H1 H2]|[H1 H2]]. subst; auto.
-    (* destruct (@Util.assoc_cons_inv raw_id value id2 id1 v v0 e RawID.eq_dec)  *)
-    inversion Hl. tauto. 
-    right. inversion Hl. subst. unfold lookup_env. exact H2.
-  Qed.
-
+    unfold lookup_env in *.
+    rewrite <- ENVFacts.find_mapsto_iff in Hl.
+    apply ENVFacts.add_mapsto_iff in Hl.
+    destruct Hl as [H | H].
+    - left. assumption.
+    - right. rewrite <- ENVFacts.find_mapsto_iff. assumption.
+  Qed.      
+    
   Definition pc_satisfies (CFG:mcfg) (p:pc) (P:cmd -> Prop) : Prop :=
     forall cmd, fetch CFG p = Some cmd -> P cmd.
 
