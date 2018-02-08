@@ -52,12 +52,33 @@ Definition undef t := DVALUE_Undef t None. (* TODO: should this be an empty bloc
 (* Computes the byte size of this type. *)
 Fixpoint sizeof_typ (ty:typ) : Z :=
   match ty with
-  | TYPE_I sz => (if Z.eqb (sz mod 8) 0 then (sz / 8) else ((sz / 8) + 1))
-  | TYPE_Pointer t => 64
+  | TYPE_I sz => 8 (* All integers are padded to 8 bytes. *)
+  | TYPE_Pointer t => 8
   | TYPE_Struct l => fold_left (fun x acc => x + sizeof_typ acc) l 0
   | TYPE_Array sz ty' => sz * sizeof_typ ty'
   | _ => 0 (* TODO: add support for more types as necessary *)
   end.
+
+
+Fixpoint Z_to_sbyte_list (count: nat) (z: Z) : list SByte :=
+  match count with
+  | O => []
+  | S n => (Z_to_sbyte_list n (z / 256)) ++ [Byte (Byte.repr (z mod 256))]
+  end.
+
+(* Serializes a dvalue into its SByte-sensitive form. *)
+Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
+  match dval with
+  | DVALUE_Addr addr => (Ptr addr) :: (repeat PtrFrag 7)
+  | DVALUE_I1 i => Z_to_sbyte_list 8 (Int1.unsigned i)
+  | DVALUE_I32 i => Z_to_sbyte_list 8 (Int32.unsigned i)
+  | DVALUE_I64 i => Z_to_sbyte_list 8 (Int64.unsigned i)
+  | DVALUE_Struct fields | DVALUE_Array fields =>
+      fold_left (fun acc '(typ, dv) => ((serialize_dvalue dv) ++ acc) % list) fields []
+  | _ => [] (* TODO add more dvalues as necessary *)
+  end.
+
+(* Compute serialize_dvalue (DVALUE_I64 (Int64.repr 4294967296)). *)
 
 (* Construct block indexed from 0 to n. *)
 Fixpoint init_block_h (n:nat) (m:block) : block :=
@@ -78,12 +99,11 @@ Definition init_block (n:Z) : block :=
 Definition make_empty_block (ty:typ) : block :=
   init_block (sizeof_typ ty).
 
-(* TODO: implement each branch. Alloca is currently wrong. *)
 Definition mem_step {X} (e:effects X) (m:memory) :=
   match e with
   | Alloca t k =>
     let new_block := make_empty_block t in
-    inr  (m,
+    inr  (add (size m) new_block m,
           DVALUE_Addr (size m, 0),
           k)
   | Load t a k => inl e
@@ -103,6 +123,7 @@ Definition mem_step {X} (e:effects X) (m:memory) :=
   | PtoI t a k => inl e (* TODO: ItoP semantics *)
   | Call _ _ _ _ => inl e
   end.
+Print dvalue.
 
 (*
  memory -> Trace () -> Trace () -> Prop
