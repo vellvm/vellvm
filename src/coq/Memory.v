@@ -2,6 +2,7 @@ Require Import ZArith List String Omega.
 Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.StepSemantics.
 Require Import FSets.FMapAVL.
+Require Import Integers.
 Require Coq.Structures.OrderedTypeEx.
 Require Import ZMicromega.
 Import ListNotations.
@@ -17,8 +18,6 @@ End A.
 Module SS := StepSemantics.StepSemantics(A).
 Export SS.
 
-Print FMapAVL.
-
 Module IM := FMapAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
 Definition IntMap := IM.t.
 
@@ -27,21 +26,24 @@ Definition delete {a} k (m:IntMap a) := IM.remove k m.
 Definition member {a} k (m:IntMap a) := IM.mem k m.
 Definition lookup {a} k (m:IntMap a) := IM.find k m.
 Definition empty {a} := @IM.empty a.
+
 Fixpoint add_all {a} ks (m:IntMap a) :=
   match ks with
   | [] => m
   | (k,v) :: tl => add k v (add_all tl m)
   end.
+
 Definition union {a} (m1 : IntMap a) (m2 : IntMap a)
   := IM.map2 (fun mx my =>
                 match mx with | Some x => Some x | None => my end) m1 m2.
-Definition size {a} (m : IM.t a) : Z := Z.of_nat (IM.cardinal m).
 
+Definition size {a} (m : IM.t a) : Z := Z.of_nat (IM.cardinal m).
 
 (* TODO: What should this type contain? *)
 Inductive SByte :=
-| DByte : dvalue -> SByte
-| FragByte : SByte
+| Byte : byte -> SByte
+| Ptr : addr -> SByte
+| PtrFrag : SByte
 | SUndef : SByte.
 
 Definition block := IntMap SByte.
@@ -58,18 +60,18 @@ Fixpoint sizeof_typ (ty:typ) : Z :=
   | _ => 0 (* TODO: add support for more types as necessary *)
   end.
 
-
+(* Construct block indexed from 0 to n. *)
 Fixpoint init_block_h (n:nat) (m:block) : block :=
   match n with
   | O => add 0 SUndef m
   | S n' => add (Z.of_nat n) SUndef (init_block_h n' m)
-  end. 
+  end.
 
 (* Initializes a block of n 0-bytes. *)
 Definition init_block (n:Z) : block :=
   match n with
   | 0 => empty
-  | Z.pos n' => init_block_h (BinPosDef.Pos.to_nat n') empty
+  | Z.pos n' => init_block_h (BinPosDef.Pos.to_nat (n' - 1)) empty
   | Z.neg _ => empty (* invalid argument *)
   end.
 
