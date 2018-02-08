@@ -39,7 +39,6 @@ Definition union {a} (m1 : IntMap a) (m2 : IntMap a)
 
 Definition size {a} (m : IM.t a) : Z := Z.of_nat (IM.cardinal m).
 
-(* TODO: What should this type contain? *)
 Inductive SByte :=
 | Byte : byte -> SByte
 | Ptr : addr -> SByte
