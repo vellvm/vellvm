@@ -2,7 +2,7 @@
 Require Import ZArith.
 
 (* CompCert dependencies *)
-Require Import compcert.lib.Integers.
+Require Import compcert.lib.Integers compcert.lib.Floats.
 
 (* Vellvm dependencies *)
 Require Import Vellvm.Ollvm_ast Vellvm.CFG Vellvm.StepSemantics Vellvm.Memory.
@@ -314,7 +314,7 @@ Definition value_ind': forall (P : Ollvm_ast.value  -> Set),
     (forall id : ident, P (VALUE_Ident id)) ->
     (forall x : int, P (VALUE_Integer x)) ->
     (forall f : float, P (VALUE_Float f)) ->
-    (forall h : String.string, P (VALUE_Hex h)) ->    
+    (forall h : float, P (VALUE_Hex h)) ->    
     (forall b : bool, P (VALUE_Bool b)) ->
     (P VALUE_Null) ->
     (P VALUE_Zero_initializer) ->
@@ -493,6 +493,13 @@ Proof.
     try (right; intro H; inversion H; tauto);
     try (left; reflexivity);
     try (lift_decide_eq).
+
+  - destruct (compcert.lib.Floats.Float.eq_dec f f0).
+    left; subst; reflexivity.
+    right. injection. tauto.
+  - destruct (compcert.lib.Floats.Float.eq_dec h f).
+    left; subst; reflexivity.
+    right. injection. tauto.
    
   (* Case Value_Struct *)
   - destruct fields; auto.
@@ -1021,11 +1028,13 @@ Proof. lift_decide_eq. Defined.
 Instance eq_dec_pc : eq_dec pc.
 Proof. lift_decide_eq. Defined.
 
+(*
 Instance eq_dec_frame : eq_dec frame.
 Proof. lift_decide_eq. Defined.
 
 Instance eq_dec_SS_state : eq_dec SS.state.
 Proof. lift_decide_eq. Defined.
+ *)
 
 (*
 The following are not true. 
