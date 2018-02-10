@@ -49,7 +49,7 @@ Inductive CFG_has_code_at (CFG:mcfg) (P:pc -> Prop) : pc -> code -> Prop :=
     forall p, P p -> CFG_has_code_at CFG P p []
 | has_code_cons :
     forall p iid instr pc_next cd
-      (HF: fetch CFG p = Some (Step instr))
+      (HF: fetch CFG p = Some (Inst instr))
       (Hiid: (pt p) = iid)
       (Hincr: incr_pc CFG p = Some pc_next)
       (Hcd: CFG_has_code_at CFG P pc_next cd),
