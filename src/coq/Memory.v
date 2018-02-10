@@ -33,6 +33,12 @@ Fixpoint add_all {a} ks (m:IntMap a) :=
   | (k,v) :: tl => add k v (add_all tl m)
   end.
 
+Fixpoint add_all_index {a} vs (i:Z) (m:IntMap a) :=
+  match vs with
+  | [] => m
+  | v :: tl => add i v (add_all_index tl (i+1) m)
+  end.
+
 Definition union {a} (m1 : IntMap a) (m2 : IntMap a)
   := IM.map2 (fun mx my =>
                 match mx with | Some x => Some x | None => my end) m1 m2.
@@ -99,6 +105,8 @@ Definition init_block (n:Z) : block :=
 Definition make_empty_block (ty:typ) : block :=
   init_block (sizeof_typ ty).
 
+Print List.fold_left.
+
 Definition mem_step {X} (e:effects X) (m:memory) :=
   match e with
   | Alloca t k =>
@@ -106,21 +114,29 @@ Definition mem_step {X} (e:effects X) (m:memory) :=
     inr  (add (size m) new_block m,
           DVALUE_Addr (size m, 0),
           k)
+         
   | Load t a k => inl e
     (*inr (m,
          nth_default (undef t) m a,
          k)*)
 
-  | Store a v k => inl e
-    (*inr (replace m a v,
-         DVALUE_None,
-         k)*)
-
+  | Store a v k =>
+    match a with
+    | (b, i) =>
+      match lookup b m with
+      | Some m' =>
+        inr (add b (add_all_index (serialize_dvalue v) i m') m,
+             DVALUE_None, k) 
+      | None => inl e
+      end
+    end
+      
   | GEP t a vs k => inl e (* TODO: GEP semantics *)
 
   | ItoP t i k => inl e (* TODO: ItoP semantics *)
 
   | PtoI t a k => inl e (* TODO: ItoP semantics *)
+                     
   | Call _ _ _ _ => inl e
   end.
 Print dvalue.
