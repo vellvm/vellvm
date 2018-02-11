@@ -39,7 +39,7 @@ let interpret (prog:(Ollvm_ast.block list) Ollvm_ast.toplevel_entity list) =
       | Datatypes.Coq_inl err -> failwith (Camlcoq.camlstring_of_coqstring err)
       | Datatypes.Coq_inr s ->
         let sem = SS.sem mcfg s in
-        let mem = memD [] sem in
+        let mem = memD empty sem in
         step mem
     end
   
