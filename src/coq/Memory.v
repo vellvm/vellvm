@@ -81,12 +81,18 @@ Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
   | DVALUE_I64 i => Z_to_sbyte_list 8 (Int64.unsigned i)
   | DVALUE_Struct fields | DVALUE_Array fields =>
       fold_left (fun acc '(typ, dv) => ((serialize_dvalue dv) ++ acc) % list) fields []
-      (* TODO: how to distinguish between structs and arrays when deserializing? *)
   | _ => [] (* TODO add more dvalues as necessary *)
   end.
 
 (* Deserialize a list of SBytes into a dvalue. *)
-Definition deserialize_sbytes (bytes:list SByte) : dvalue := DVALUE_None. (* TODO *)
+Definition deserialize_sbytes (bytes:list SByte) (t:typ) : dvalue :=
+  match t with
+  | TYPE_I sz => DVALUE_None (* todo *)
+  | TYPE_Pointer t' => DVALUE_None (* todo *)
+  | TYPE_Array sz t' => DVALUE_None (* todo *)
+  | TYPE_Struct fields => DVALUE_None (* todo *)
+  | _ => DVALUE_None (* TODO add more as serialization support increases *)
+  end.
 
 (* Construct block indexed from 0 to n. *)
 Fixpoint init_block_h (n:nat) (m:block) : block :=
@@ -139,7 +145,6 @@ Definition mem_step {X} (e:effects X) (m:memory) :=
                      
   | Call _ _ _ _ => inl e
   end.
-Print dvalue.
 
 (*
  memory -> Trace () -> Trace () -> Prop
