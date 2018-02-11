@@ -142,9 +142,6 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:typ) : dvalue :=
   | _ => DVALUE_None (* TODO add more as serialization support increases *)
   end.
 
-(*
-Compute deserialize_sbytes (serialize_dvalue (DVALUE_Struct [(TYPE_I 1, DVALUE_I1 (Int1.repr 1)); (TYPE_I 32, DVALUE_I32 (Int32.repr 2)); (TYPE_I 64, DVALUE_I64 (Int64.repr 3)); (TYPE_Struct [TYPE_I 32; TYPE_I 1], DVALUE_Struct [(TYPE_I 32, DVALUE_I32 (Int32.repr 4)); (TYPE_I 1, DVALUE_I1 (Int1.repr 1))]) ])) (TYPE_Struct [TYPE_I 1; TYPE_I 32; TYPE_I 64; TYPE_Struct [TYPE_I 32; TYPE_I 1]]). *)
-
 (* Construct block indexed from 0 to n. *)
 Fixpoint init_block_h (n:nat) (m:mem_block) : mem_block :=
   match n with
