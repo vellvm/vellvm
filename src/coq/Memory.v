@@ -65,7 +65,7 @@ Fixpoint sizeof_typ (ty:typ) : Z :=
   | _ => 0 (* TODO: add support for more types as necessary *)
   end.
 
-
+(* Convert integer to its SByte representation. *)
 Fixpoint Z_to_sbyte_list (count: nat) (z: Z) : list SByte :=
   match count with
   | O => []
@@ -81,10 +81,12 @@ Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
   | DVALUE_I64 i => Z_to_sbyte_list 8 (Int64.unsigned i)
   | DVALUE_Struct fields | DVALUE_Array fields =>
       fold_left (fun acc '(typ, dv) => ((serialize_dvalue dv) ++ acc) % list) fields []
+      (* TODO: how to distinguish between structs and arrays when deserializing? *)
   | _ => [] (* TODO add more dvalues as necessary *)
   end.
 
-(* Compute serialize_dvalue (DVALUE_I64 (Int64.repr 4294967296)). *)
+(* Deserialize a list of SBytes into a dvalue. *)
+Definition deserialize_sbytes (bytes:list SByte) : dvalue := DVALUE_None. (* TODO *)
 
 (* Construct block indexed from 0 to n. *)
 Fixpoint init_block_h (n:nat) (m:block) : block :=
@@ -104,8 +106,6 @@ Definition init_block (n:Z) : block :=
 (* Makes a block appropriately sized for the given type. *)
 Definition make_empty_block (ty:typ) : block :=
   init_block (sizeof_typ ty).
-
-Print List.fold_left.
 
 Definition mem_step {X} (e:effects X) (m:memory) :=
   match e with
