@@ -39,6 +39,16 @@ Fixpoint add_all_index {a} vs (i:Z) (m:IntMap a) :=
   | v :: tl => add i v (add_all_index tl (i+1) m)
   end.
 
+(* Give back a list of values from i to (i + sz) - 1 in m. *)
+(* Uses def as the default value if a lookup failed. *)
+Definition lookup_all_index {a} (i:Z) (sz:Z) (m:IntMap a) (def:a) : list a :=
+  map (fun x =>
+         let x' := lookup (Z.of_nat x) m in
+         match x' with
+         | None => def
+         | Some val => val
+         end) (seq (Z.to_nat i) (Z.to_nat sz)).
+
 Definition union {a} (m1 : IntMap a) (m2 : IntMap a)
   := IM.map2 (fun mx my =>
                 match mx with | Some x => Some x | None => my end) m1 m2.
@@ -162,10 +172,17 @@ Definition mem_step {X} (e:effects X) (m:memory) :=
           DVALUE_Addr (size m, 0),
           k)
          
-  | Load t a k => inl e
-    (*inr (m,
-         nth_default (undef t) m a,
-         k)*)
+  | Load t a k =>
+    match a with
+    | (b, i) =>
+      match lookup b m with
+      | Some block =>
+        inr (m,
+             deserialize_sbytes (lookup_all_index i (sizeof_typ t) block SUndef) t,
+             k)
+      | None => inl e
+      end
+    end
 
   | Store a v k =>
     match a with
