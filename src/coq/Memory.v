@@ -61,8 +61,8 @@ Inductive SByte :=
 | PtrFrag : SByte
 | SUndef : SByte.
 
-Definition block := IntMap SByte.
-Definition memory := IntMap block.
+Definition mem_block := IntMap SByte.
+Definition memory := IntMap mem_block.
 Definition undef t := DVALUE_Undef t None. (* TODO: should this be an empty block? *)
 
 (* Computes the byte size of this type. *)
@@ -146,14 +146,14 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:typ) : dvalue :=
 Compute deserialize_sbytes (serialize_dvalue (DVALUE_Struct [(TYPE_I 1, DVALUE_I1 (Int1.repr 1)); (TYPE_I 32, DVALUE_I32 (Int32.repr 2)); (TYPE_I 64, DVALUE_I64 (Int64.repr 3)); (TYPE_Struct [TYPE_I 32; TYPE_I 1], DVALUE_Struct [(TYPE_I 32, DVALUE_I32 (Int32.repr 4)); (TYPE_I 1, DVALUE_I1 (Int1.repr 1))]) ])) (TYPE_Struct [TYPE_I 1; TYPE_I 32; TYPE_I 64; TYPE_Struct [TYPE_I 32; TYPE_I 1]]). *)
 
 (* Construct block indexed from 0 to n. *)
-Fixpoint init_block_h (n:nat) (m:block) : block :=
+Fixpoint init_block_h (n:nat) (m:mem_block) : mem_block :=
   match n with
   | O => add 0 SUndef m
   | S n' => add (Z.of_nat n) SUndef (init_block_h n' m)
   end.
 
 (* Initializes a block of n 0-bytes. *)
-Definition init_block (n:Z) : block :=
+Definition init_block (n:Z) : mem_block :=
   match n with
   | 0 => empty
   | Z.pos n' => init_block_h (BinPosDef.Pos.to_nat (n' - 1)) empty
@@ -161,7 +161,7 @@ Definition init_block (n:Z) : block :=
   end.
 
 (* Makes a block appropriately sized for the given type. *)
-Definition make_empty_block (ty:typ) : block :=
+Definition make_empty_block (ty:typ) : mem_block :=
   init_block (sizeof_typ ty).
 
 Definition mem_step {X} (e:effects X) (m:memory) :=
