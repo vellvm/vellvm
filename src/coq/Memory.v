@@ -66,11 +66,21 @@ Fixpoint sizeof_typ (ty:typ) : Z :=
   end.
 
 (* Convert integer to its SByte representation. *)
-Fixpoint Z_to_sbyte_list (count: nat) (z: Z) : list SByte :=
+Fixpoint Z_to_sbyte_list (count:nat) (z:Z) : list SByte :=
   match count with
   | O => []
   | S n => (Z_to_sbyte_list n (z / 256)) ++ [Byte (Byte.repr (z mod 256))]
   end.
+
+(* Converts SBytes into their integer representation. *)
+Definition sbyte_list_to_Z (bytes:list SByte) : Z :=
+  fst (fold_right (fun x acc =>
+               match x with
+               | Byte b =>
+                 let shift := snd acc in
+                 ((fst acc) + ((Byte.intval b) * shift), shift * 256)
+               | _ => acc (* should not have other kinds bytes in an int *)
+               end) (0, 1) bytes).
 
 (* Serializes a dvalue into its SByte-sensitive form. *)
 Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
@@ -85,10 +95,21 @@ Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
   end.
 
 (* Deserialize a list of SBytes into a dvalue. *)
-Definition deserialize_sbytes (bytes:list SByte) (t:typ) : dvalue :=
+Fixpoint deserialize_sbytes (bytes:list SByte) (t:typ) : dvalue :=
   match t with
-  | TYPE_I sz => DVALUE_None (* todo *)
-  | TYPE_Pointer t' => DVALUE_None (* todo *)
+  | TYPE_I sz =>
+    let des_int := sbyte_list_to_Z bytes in
+    match sz with
+    | 1 => DVALUE_I1 (Int1.repr des_int)
+    | 32 => DVALUE_I32 (Int32.repr des_int)
+    | 64 => DVALUE_I64 (Int64.repr des_int)
+    | _ => DVALUE_None (* invalid size. *)
+    end
+  | TYPE_Pointer t' =>
+    match bytes with
+    | Ptr addr :: tl => DVALUE_Addr addr
+    | _ => DVALUE_None (* invalid pointer. *)
+    end
   | TYPE_Array sz t' => DVALUE_None (* todo *)
   | TYPE_Struct fields => DVALUE_None (* todo *)
   | _ => DVALUE_None (* TODO add more as serialization support increases *)
