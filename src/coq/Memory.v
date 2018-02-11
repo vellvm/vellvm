@@ -90,7 +90,8 @@ Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
   | DVALUE_I32 i => Z_to_sbyte_list 8 (Int32.unsigned i)
   | DVALUE_I64 i => Z_to_sbyte_list 8 (Int64.unsigned i)
   | DVALUE_Struct fields | DVALUE_Array fields =>
-      fold_left (fun acc '(typ, dv) => ((serialize_dvalue dv) ++ acc) % list) fields []
+      (* note the _right_ fold is necessary for byte ordering. *)
+      fold_right (fun '(typ, dv) acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
   | _ => [] (* TODO add more dvalues as necessary *)
   end.
 
@@ -110,7 +111,14 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:typ) : dvalue :=
     | Ptr addr :: tl => DVALUE_Addr addr
     | _ => DVALUE_None (* invalid pointer. *)
     end
-  | TYPE_Array sz t' => DVALUE_None (* todo *)
+  | TYPE_Array sz t' =>
+    let fix array_parse count byte_sz bytes :=
+        match count with
+        | O => []
+        | S n => (t', deserialize_sbytes (firstn byte_sz bytes) t')
+                   :: array_parse n byte_sz (skipn byte_sz bytes)
+        end in
+    DVALUE_Array (array_parse (Z.to_nat sz) (Z.to_nat (sizeof_typ t')) bytes)
   | TYPE_Struct fields => DVALUE_None (* todo *)
   | _ => DVALUE_None (* TODO add more as serialization support increases *)
   end.
