@@ -23,7 +23,7 @@
 (*  ------------------------------------------------------------------------- *)
 
 {
-  open Ollvm_parser
+  open Llvm_parser
   let str = Camlcoq.coqstring_of_camlstring
   let of_str = Camlcoq.camlstring_of_coqstring
   let coq_of_int = Camlcoq.Z.of_sint
@@ -288,13 +288,13 @@ rule token = parse
   | "!{" { BANGLCURLY }
   | '!'  { let rid = raw_id lexbuf in
            begin match rid with 
-           | Ollvm_ast.Name id ->
+           | LLVMAst.Name id ->
 	   let id = of_str id in
 	   (if id.[0] = '"' && id.[String.length id - 1] = '"'
                then METADATA_STRING id
                else METADATA_ID rid)
-	   | Ollvm_ast.Anon _ -> METADATA_ID rid
-    	   | Ollvm_ast.Raw _ -> METADATA_ID rid
+	   | LLVMAst.Anon _ -> METADATA_ID rid
+    	   | LLVMAst.Raw _ -> METADATA_ID rid
 	   end
          }
 
@@ -325,9 +325,9 @@ and string buf = parse
   | _ as c { Buffer.add_char buf c; string buf lexbuf }
 
 and raw_id = parse
-  | ident_fst ident_nxt* as i { Ollvm_ast.Name (str i) }
-  | digit+ as i               { Ollvm_ast.Anon (coq_of_int (int_of_string i)) }
-  | '"'                       { Ollvm_ast.Name (str ("\"" ^ string (Buffer.create 10) lexbuf ^ "\"")) }
+  | ident_fst ident_nxt* as i { LLVMAst.Name (str i) }
+  | digit+ as i               { LLVMAst.Anon (coq_of_int (int_of_string i)) }
+  | '"'                       { LLVMAst.Name (str ("\"" ^ string (Buffer.create 10) lexbuf ^ "\"")) }
 
 {
 
@@ -341,7 +341,7 @@ and raw_id = parse
                        (Lexing.lexeme lexbuf)
       in failwith msg
     in
-    try Ollvm_parser.toplevel_entities token lexbuf
-    with Ollvm_parser.Error -> parsing_err lexbuf
+    try Llvm_parser.toplevel_entities token lexbuf
+    with Llvm_parser.Error -> parsing_err lexbuf
 
 }

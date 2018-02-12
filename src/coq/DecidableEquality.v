@@ -5,7 +5,7 @@ Require Import ZArith.
 Require Import compcert.lib.Integers compcert.lib.Floats.
 
 (* Vellvm dependencies *)
-Require Import Vellvm.Ollvm_ast Vellvm.CFG Vellvm.StepSemantics Vellvm.Memory.
+Require Import Vellvm.LLVMAst Vellvm.CFG Vellvm.StepSemantics Vellvm.Memory.
 Require Import Vellvm.Classes.
 Require Import Vellvm.AstLib.
 Require Import Vellvm.Util.
@@ -122,9 +122,9 @@ Proof. lift_decide_eq. Defined.
 Instance eq_dec_instr_id : eq_dec instr_id.
 Proof. lift_decide_eq. Defined.
 
-Definition typ_strong_ind: forall P : Ollvm_ast.typ -> Set,
+Definition typ_strong_ind: forall P : LLVMAst.typ -> Set,
     (forall sz : int, P (TYPE_I sz)) ->
-    (forall t : Ollvm_ast.typ, P t -> P (TYPE_Pointer t)) ->
+    (forall t : LLVMAst.typ, P t -> P (TYPE_Pointer t)) ->
     P TYPE_Void ->
     P TYPE_Half ->
     P TYPE_Float ->
@@ -134,22 +134,22 @@ Definition typ_strong_ind: forall P : Ollvm_ast.typ -> Set,
     P TYPE_Ppc_fp128 ->
     P TYPE_Metadata ->
     P TYPE_X86_mmx ->
-    (forall (sz : int) (t : Ollvm_ast.typ), P t -> P (TYPE_Array sz t)) ->
-    (forall ret : Ollvm_ast.typ,
+    (forall (sz : int) (t : LLVMAst.typ), P t -> P (TYPE_Array sz t)) ->
+    (forall ret : LLVMAst.typ,
         P ret -> P (TYPE_Function ret [])) ->
-    (forall (ret: Ollvm_ast.typ) (arg : Ollvm_ast.typ) (args : list Ollvm_ast.typ),
+    (forall (ret: LLVMAst.typ) (arg : LLVMAst.typ) (args : list LLVMAst.typ),
         P ret -> P arg -> P (TYPE_Function ret args) -> P (TYPE_Function ret (arg :: args))) ->
     P (TYPE_Struct []) ->
-    (forall (new_field : Ollvm_ast.typ) (fields : list Ollvm_ast.typ),
+    (forall (new_field : LLVMAst.typ) (fields : list LLVMAst.typ),
         P new_field -> P (TYPE_Struct fields) -> P (TYPE_Struct (new_field :: fields))) ->
     P (TYPE_Packed_struct []) ->
-    (forall (new_field : Ollvm_ast.typ) (fields : list Ollvm_ast.typ),
+    (forall (new_field : LLVMAst.typ) (fields : list LLVMAst.typ),
         P new_field -> P (TYPE_Packed_struct fields) ->
         P (TYPE_Packed_struct (new_field :: fields))) ->
     P TYPE_Opaque ->
-    (forall (sz : int) (t : Ollvm_ast.typ), P t -> P (TYPE_Vector sz t)) ->
+    (forall (sz : int) (t : LLVMAst.typ), P t -> P (TYPE_Vector sz t)) ->
     (forall id : ident, P (TYPE_Identified id)) ->
-    forall t : Ollvm_ast.typ, P t.
+    forall t : LLVMAst.typ, P t.
 Proof.
   intros P HTYPE_I IHTYPE_Pointer HTYPE_Void HTYPE_Half HTYPE_Float
          HTYPE_Double HTYPE_X86_fp80 HTYPE_Fp128 HTYPE_Ppc_fp128
@@ -159,7 +159,7 @@ Proof.
          IHTYPE_PackedStructBase IHTYPE_PackedStructInd
          HTYPE_Opaque IHTYPE_Vector HTYPE_Ident.
   refine
-    (fix prove_t (t : Ollvm_ast.typ) : P t :=
+    (fix prove_t (t : LLVMAst.typ) : P t :=
        match t with
        | TYPE_I sz => _
        | TYPE_Pointer t' => IHTYPE_Pointer t' (prove_t t')
@@ -176,7 +176,7 @@ Proof.
        | TYPE_Identified id => _
        | TYPE_Array sz t' => IHTYPE_Array sz t' (prove_t t')
        | TYPE_Function ret args =>
-         let fix prove_l (l : list Ollvm_ast.typ) :=
+         let fix prove_l (l : list LLVMAst.typ) :=
              match l with
              | [] => IHTYPE_FunctionBase ret (prove_t ret)
              | (t' :: ts) =>
@@ -187,7 +187,7 @@ Proof.
              end
          in prove_l args
        | TYPE_Struct fields =>
-         let fix prove_l base ind (l : list Ollvm_ast.typ) :=
+         let fix prove_l base ind (l : list LLVMAst.typ) :=
              match l with
              | [] => base
              | (t' :: ts) =>
@@ -198,7 +198,7 @@ Proof.
          in
          prove_l IHTYPE_StructBase IHTYPE_StructInd fields
        | TYPE_Packed_struct fields => 
-         let fix prove_l base ind (l : list Ollvm_ast.typ) :=
+         let fix prove_l base ind (l : list LLVMAst.typ) :=
              match l with
              | [] => base
              | (t' :: ts) =>
@@ -213,7 +213,7 @@ Proof.
   auto.
 Defined.
 
-Instance eq_dec_ollvm_ast_typ : eq_dec Ollvm_ast.typ.
+Instance eq_dec_ollvm_ast_typ : eq_dec LLVMAst.typ.
 Proof.
   induction x using typ_strong_ind; destruct y;
     unfold Decidable;
@@ -310,7 +310,7 @@ Proof.
   lift_decide_eq; left; auto.
 Defined.
 
-Definition value_ind': forall (P : Ollvm_ast.value  -> Set),
+Definition value_ind': forall (P : LLVMAst.value  -> Set),
     (forall id : ident, P (VALUE_Ident id)) ->
     (forall x : int, P (VALUE_Integer x)) ->
     (forall f : float, P (VALUE_Float f)) ->
@@ -378,7 +378,7 @@ Definition value_ind': forall (P : Ollvm_ast.value  -> Set),
     (forall cnd_t cnd_v v1_t v1_v v2_t v2_v,
         P cnd_v -> P v1_v -> P v2_v ->
         P (OP_Select (cnd_t, cnd_v) (v1_t, v1_v) (v2_t, v2_v))) ->
-    (forall v : Ollvm_ast.value , P v).
+    (forall v : LLVMAst.value , P v).
 Proof.
   intros P H_Ident H_Integer H_Float H_Hex H_Bool H_Null
          H_Zero_initializer H_Cstring H_Undef.
@@ -394,7 +394,7 @@ Proof.
          IH_Select.
 
   refine
-    (fix prove_v (v : Ollvm_ast.value ) :=
+    (fix prove_v (v : LLVMAst.value ) :=
        match v with
          | VALUE_Ident id => _
          | VALUE_Integer n => _
@@ -407,7 +407,7 @@ Proof.
          | VALUE_Undef => _
          | VALUE_Struct l =>
            let
-             fix prove_l (l : list (Ollvm_ast.typ * Ollvm_ast.value)) :=
+             fix prove_l (l : list (LLVMAst.typ * LLVMAst.value)) :=
              match l with
              | [] => IH_Struct_Base
              | (t, v) :: rest =>
@@ -416,7 +416,7 @@ Proof.
            in prove_l l 
          | VALUE_Packed_struct l =>
            let
-             fix prove_l (l : list (Ollvm_ast.typ * Ollvm_ast.value)) :=
+             fix prove_l (l : list (LLVMAst.typ * LLVMAst.value)) :=
              match l with
              | [] => IH_Packed_struct_Base
              | (t, v) :: rest =>
@@ -425,7 +425,7 @@ Proof.
            in prove_l l 
          | VALUE_Array l =>
            let
-             fix prove_l (l : list (Ollvm_ast.typ * Ollvm_ast.value)) :=
+             fix prove_l (l : list (LLVMAst.typ * LLVMAst.value)) :=
              match l with
              | [] => IH_Array_Base
              | (t, v) :: rest =>
@@ -435,7 +435,7 @@ Proof.
 
          | VALUE_Vector l =>
            let
-             fix prove_l (l : list (Ollvm_ast.typ * Ollvm_ast.value)) :=
+             fix prove_l (l : list (LLVMAst.typ * LLVMAst.value)) :=
              match l with
              | [] => IH_Vector_Base
              | (t, v) :: rest =>
@@ -455,7 +455,7 @@ Proof.
            IH_Conversion conv t_from v t_to (prove_v v)
            
          | OP_GetElementPtr t (ptr_t, ptr_v) l =>
-           let fix prove_l (l : list (Ollvm_ast.typ * Ollvm_ast.value)) :=
+           let fix prove_l (l : list (LLVMAst.typ * LLVMAst.value)) :=
                match l with
                | [] =>
                  IH_GetElementPtr_Base t ptr_t ptr_v (prove_v ptr_v)
@@ -487,7 +487,7 @@ Proof.
     ); auto.
 Defined.
 
-Instance decide_value : eq_dec (Ollvm_ast.value).
+Instance decide_value : eq_dec (LLVMAst.value).
 Proof.
   induction x using value_ind'; destruct y; unfold Decidable;
     try (right; intro H; inversion H; tauto);
@@ -830,7 +830,7 @@ Definition dvalue_ind':=
     (f3 : forall x : int64, P (DVALUE_I64 x))
     (f4 : forall x : ll_double, P (DVALUE_Double x))
     (f5 : forall x : ll_float, P (DVALUE_Float x))
-    (f6 : forall (t : Ollvm_ast.typ) (v : option Ollvm_ast.value),
+    (f6 : forall (t : LLVMAst.typ) (v : option LLVMAst.value),
           P (DVALUE_Undef t v)) (f7 : P DVALUE_Poison) 
     (f8 : P DVALUE_None)
     (IH_Struct_Base: P(DVALUE_Struct []))
@@ -866,28 +866,28 @@ Definition dvalue_ind':=
       | DVALUE_Poison => f7
       | DVALUE_None => f8
       | DVALUE_Struct x =>
-        (fix prove_l (l : list (Ollvm_ast.typ * dvalue)) :=
+        (fix prove_l (l : list (LLVMAst.typ * dvalue)) :=
              match l with
              | [] => IH_Struct_Base
              | (t, v) :: rest =>
                IH_Struct_Ind t v rest (prove_dv v) (prove_l rest)
              end) x
       | DVALUE_Packed_struct x =>         
-        (fix prove_l (l : list (Ollvm_ast.typ * dvalue)) :=
+        (fix prove_l (l : list (LLVMAst.typ * dvalue)) :=
              match l with
              | [] => IH_Packed_Struct_Base
              | (t, v) :: rest =>
                IH_Packed_Struct_Ind t v rest (prove_dv v) (prove_l rest)
              end) x
       | DVALUE_Array x =>          
-        (fix prove_l (l : list (Ollvm_ast.typ * dvalue)) :=
+        (fix prove_l (l : list (LLVMAst.typ * dvalue)) :=
              match l with
              | [] => IH_Array_Base
              | (t, v) :: rest =>
                IH_Array_Ind t v rest (prove_dv v) (prove_l rest)
              end) x
       | DVALUE_Vector x =>          
-        (fix prove_l (l : list (Ollvm_ast.typ * dvalue)) :=
+        (fix prove_l (l : list (LLVMAst.typ * dvalue)) :=
              match l with
              | [] => IH_Vector_Base
              | (t, v) :: rest =>
@@ -1013,7 +1013,7 @@ Proof.
   lift_decide_eq; left; auto.
 Defined.
   
-Instance eq_dec_phi : eq_dec Ollvm_ast.phi.
+Instance eq_dec_phi : eq_dec LLVMAst.phi.
 Proof. lift_decide_eq. Defined.
 
 Instance eq_dec_code : eq_dec code.

@@ -9,7 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import ZArith List String Omega.
-Require Import Vellvm.Ollvm_ast Vellvm.CFG Vellvm.Dom.
+Require Import Vellvm.LLVMAst Vellvm.CFG Vellvm.Dom.
 Require Import Vellvm.Classes.
 Require Vellvm.AstLib.
 Import ListNotations.
@@ -192,7 +192,7 @@ Definition phi_uses (i:phi) : (list ident) :=
 Definition instr_uses (i:instr) : (list ident) :=
   match i with
   | INSTR_Op op => value_uses op                         
-  | INSTR_Call (_, fid) args => [fid] ++ (List.flat_map tvalue_uses args)
+  | INSTR_Call (_, op) args => (value_uses op) ++ (List.flat_map tvalue_uses args)
   | INSTR_Alloca t None align => []
   | INSTR_Alloca t (Some tv) align => tvalue_uses tv
   | INSTR_Load  volatile t ptr align => tvalue_uses ptr

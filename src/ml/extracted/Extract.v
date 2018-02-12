@@ -1,4 +1,4 @@
-Require Vellvm.Ollvm_ast.
+Require Vellvm.LLVMAst.
 Require Vellvm.Transform.
 Require Vellvm.Memory.
 
@@ -28,8 +28,8 @@ Extract Inductive string => "string" [ "str_nil" "str_cons" ].
 *)
 
 (* OCaml pervasive types ---------------------------------------------------- *)
-(* Extract Inlined Constant Ollvm_ast.int => "int". *)
-(* Extract Inlined Constant Ollvm_ast.float => "float". *)
+(* Extract Inlined Constant LLVMAst.int => "int". *)
+(* Extract Inlined Constant LLVMAst.float => "float". *)
 
 (* Cutting the dependency to R. *)
 Extract Inlined Constant Fcore_defs.F2R => "(fun _ -> assert false)".

@@ -12,7 +12,7 @@
 Require Import Ascii String.
 Extraction Language Haskell.
 
-Require Import Vellvm.Ollvm_ast.
+Require Import Vellvm.LLVMAst.
 
 Extract Inductive option => "Prelude.Maybe" [ "Nothing" "Just" ].
 Extract Inductive list => "[]" [ "[]" "(:)" ].
@@ -23,4 +23,4 @@ Extract Inlined Constant int => "Prelude.Int".
 Extract Inlined Constant float => "Prelude.Float".
 
 Extraction Library Datatypes.
-Extraction Library Ollvm_ast.
+Extraction Library LLVMAst.

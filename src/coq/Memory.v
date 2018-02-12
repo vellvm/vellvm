@@ -1,5 +1,5 @@
 Require Import ZArith List String Omega.
-Require Import  Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util.
+Require Import  Vellvm.LLVMAst Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.StepSemantics.
 Import ListNotations.
 

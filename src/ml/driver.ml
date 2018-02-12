@@ -10,14 +10,14 @@
 
 open Printf
 open Platform
-open Ollvm
+open Llvm
 open Ast    
 
 let of_str = Camlcoq.camlstring_of_coqstring
                
 let interpret = ref false
 
-let transform (prog : (Ollvm_ast.block list) Ollvm_ast.toplevel_entity list) : (Ollvm_ast.block list) Ollvm_ast.toplevel_entity list =
+let transform (prog : (LLVMAst.block list) LLVMAst.toplevel_entity list) : (LLVMAst.block list) LLVMAst.toplevel_entity list =
   Transform.transform prog
   
 let print_banner s =
@@ -42,11 +42,11 @@ let write_file (file:string) (out:string) =
 let parse_file filename =
   read_file filename
   |> Lexing.from_string
-  |> Ollvm_lexer.parse
+  |> Llvm_lexer.parse
 
 
 let output_file filename ast =
-  let open Ollvm_printer in
+  let open Llvm_printer in
   let channel = open_out filename in
   toplevel_entities (Format.formatter_of_out_channel channel) ast;
   close_out channel

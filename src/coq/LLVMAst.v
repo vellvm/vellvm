@@ -258,7 +258,7 @@ Inductive phi : Set :=
        
 Inductive instr : Set :=
 | INSTR_Op   (op:value)                          (* INVARIANT: op must be of the form SV (OP_ ...) *)
-| INSTR_Call (fn:tident) (args:list tvalue)      (* CORNER CASE: return type is void treated specially *)
+| INSTR_Call (fn:tvalue) (args:list tvalue)      (* CORNER CASE: return type is void treated specially *)
 | INSTR_Alloca (t:typ) (nb: option tvalue) (align:option int) 
 | INSTR_Load  (volatile:bool) (t:typ) (ptr:tvalue) (align:option int)       
 | INSTR_Store (volatile:bool) (val:tvalue) (ptr:tvalue) (align:option int)
