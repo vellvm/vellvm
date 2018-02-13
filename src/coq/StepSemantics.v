@@ -930,7 +930,6 @@ Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_i
 
 Inductive transition X :=
 | Step (s:X)
-| Jump (s:X)
 | Obs  (m:Event X)
 .
 
@@ -961,14 +960,14 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
     do dv <- eval_expr e (Some t) op;
       match k with
       | [] => Obs (Fin dv)
-      | (KRet e' id p') :: k' => Jump (p', add_env id dv e', k')
+      | (KRet e' id p') :: k' => Step (p', add_env id dv e', k')
       | _ => t_raise_p pc "IMPOSSIBLE: Ret op in non-return configuration" 
       end
 
   | Term TERM_Ret_void =>
     match k with
     | [] => Obs (Fin (DVALUE_None))
-    | (KRet_void e' p')::k' => Jump (p', e', k')
+    | (KRet_void e' p')::k' => Step (p', e', k')
     | _ => t_raise_p pc "IMPOSSIBLE: Ret void in non-return configuration"
     end
           
@@ -985,12 +984,12 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
               | _ => failwith "Br got non-bool value"
               end;
       do st <- jump CFG (fn pc) (bk pc) br e k;
-      Jump st
+      Step st
              
                  
   | Term (TERM_Br_1 br) =>
     do st <- jump CFG (fn pc) (bk pc) br e k;
-    Jump st
+    Step st
              
   (* Currently unhandled LLVM terminators *)                                  
   | Term (TERM_Switch _ _ _)
@@ -999,7 +998,7 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
   | Term (TERM_Invoke _ _ _ _) => t_raise "Unsupport LLVM terminator" 
   
 
-  | CFG.Step insn =>  (* instruction *)
+  | Inst insn =>  (* instruction *)
     do pc_next <- trywith "no fallthrough intsruction" (incr_pc CFG pc);
       match (pt pc), insn  with
 
@@ -1142,7 +1141,6 @@ Definition init_state (CFG:mcfg) (fname:string) : err state :=
 CoFixpoint step_sem (CFG:mcfg) (s:state) : Trace state :=
   match (stepD CFG s) with
   | Step s' => Tau s (step_sem CFG s')
-  | Jump s' => Tau s (step_sem CFG s')
   | Obs (Err s) => Vis (Err s)
   | Obs (Fin s) => Vis (Fin s)
   | Obs (Eff m) => Vis (Eff (effects_map (step_sem CFG) m))
@@ -1225,7 +1223,7 @@ Section Properties.
     end.
   
   Definition pc_non_call (CFG:mcfg) (p:pc) : Prop :=
-    pc_satisfies CFG p (fun c => exists i, not (is_Call i) /\ c = CFG.Step i).
+    pc_satisfies CFG p (fun c => exists i, not (is_Call i) /\ c = Inst i).
 
   Ltac stepD_destruct :=
     repeat (match goal with

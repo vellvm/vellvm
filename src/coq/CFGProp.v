@@ -49,7 +49,7 @@ Inductive CFG_has_code_at (CFG:mcfg) (P:pc -> Prop) : pc -> code -> Prop :=
     forall p, P p -> CFG_has_code_at CFG P p []
 | has_code_cons :
     forall p iid instr pc_next cd
-      (HF: fetch CFG p = Some (Step instr))
+      (HF: fetch CFG p = Some (Inst instr))
       (Hiid: (pt p) = iid)
       (Hincr: incr_pc CFG p = Some pc_next)
       (Hcd: CFG_has_code_at CFG P pc_next cd),
@@ -220,7 +220,7 @@ Definition terminator_uses (t:terminator) : list ident :=
 (*
 Definition cmd_uses_local (g:cfg) (p:pt) (id:local_id) : Prop :=
   match (code g) p with
-  | Some (Step ins _) => In (ID_Local id) (instr_uses ins)
+  | Some (Inst ins _) => In (ID_Local id) (instr_uses ins)
   | Some (Jump _ t) => In (ID_Local id) (terminator_uses t)
   | None => False
   end.
@@ -256,7 +256,7 @@ Definition pt_exists (CFG : cfg) (p:pt) : Prop :=
 (** Edge relation *)
 Inductive edge_pt (g:cfg) : pt -> pt -> Prop :=
 | edge_pt_S : forall p i q,
-    (code g) p = Some (Step i q) ->
+    (code g) p = Some (Inst i q) ->
     edge_pt g p q
 | edge_pt_J : forall p b t l q xs r,
     (code g) p = Some (Jump b t) ->
@@ -314,7 +314,7 @@ Inductive wf_phis (CFG : cfg) (entry:pt) (q : pt) : pt -> list (local_id * instr
 
 | wf_phis_cons :
     forall p p' x t args rest,
-    (code CFG p) = Some (Step (INSTR_Phi t args) p') ->
+    (code CFG p) = Some (Inst (INSTR_Phi t args) p') ->
     wf_phi_args CFG entry args ->
     wf_phis CFG entry q p' rest ->
     wf_phis CFG entry q p ((x, INSTR_Phi t args) :: rest) .
@@ -323,7 +323,7 @@ Inductive wf_cmd (g:cfg) (p:pt) : cmd -> Prop :=
 | wf_step : forall (i:instr) (q:pt)
               (Hq : pt_exists g q)
               (Huse: wf_use g (instr_uses i) p),
-    wf_cmd g p (Step i q)
+    wf_cmd g p (Inst i q)
 
 | wf_jump : forall (bn:block_id) (t:terminator)
               (Huse: wf_use g (terminator_uses t) p)
@@ -363,7 +363,7 @@ Proof.
     rewrite H3 in Ha. inversion Ha. subst.
     induction Hb.
     * exact H4.
-    * exists (Step (INSTR_Phi t0 args) p'0).
+    * exists (Inst (INSTR_Phi t0 args) p'0).
       exact H4.
 Unshelve. auto.
 Qed.      

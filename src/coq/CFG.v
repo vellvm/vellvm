@@ -54,7 +54,7 @@ Instance eq_dec_pc : eq_dec pc := PC.eq_dec.
 (* control flow graphs (CFGs) ----------------------------------------------- *)
 (* TODO: rename Step to Inst *)
 Inductive cmd : Set :=
-| Step (i:instr) 
+| Inst (i:instr) 
 | Term (t:terminator)
 .                    
 
@@ -106,7 +106,7 @@ Fixpoint find_instr (cd : code) (p:instr_id) (t:instr_id) : option (cmd * option
   | [] =>  None
   | (x,i)::cd =>
     if p == x then
-      Some (Step i, Some (fallthrough cd t))
+      Some (Inst i, Some (fallthrough cd t))
     else
       find_instr cd p t
   end.
