@@ -9,7 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import ZArith List String Omega.
-Require Import Vellvm.AstLib Vellvm.Ollvm_ast.
+Require Import Vellvm.AstLib Vellvm.LLVMAst.
 Require Import Vellvm.Classes.
 Require Import Vellvm.Util.
 Import ListNotations.

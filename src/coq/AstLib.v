@@ -11,7 +11,7 @@
 
 Require Import ZArith.ZArith List.
 Require Import String Omega.
-Require Import Vellvm.Ollvm_ast Vellvm.Classes Vellvm.Util.
+Require Import Vellvm.LLVMAst Vellvm.Classes Vellvm.Util.
 Require Import Equalities OrderedType OrderedTypeEx Compare_dec.
 Import ListNotations.
 

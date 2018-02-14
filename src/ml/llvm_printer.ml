@@ -22,7 +22,7 @@ let rec pp_print_list ?(pp_sep = Format.pp_print_cut) pp_v ppf = function
     pp_v ppf v; if vs <> [] then (pp_sep ppf ();
                                   pp_print_list ~pp_sep pp_v ppf vs)
 
-open Ollvm_ast
+open LLVMAst
 
 let get_function_type dc_type =
   match dc_type with
@@ -36,7 +36,7 @@ let pp_space ppf () = pp_print_char ppf ' '
 
 let pp_comma_space ppf () = pp_print_string ppf ", "
 
-let rec linkage : Format.formatter -> Ollvm_ast.linkage -> unit =
+let rec linkage : Format.formatter -> LLVMAst.linkage -> unit =
   fun ppf ->
   function
   | LINKAGE_Private              -> fprintf ppf "private"
@@ -51,27 +51,27 @@ let rec linkage : Format.formatter -> Ollvm_ast.linkage -> unit =
   | LINKAGE_Weak_odr             -> fprintf ppf "weak_odr"
   | LINKAGE_External             -> fprintf ppf "external"
 
- and dll_storage : Format.formatter -> Ollvm_ast.dll_storage -> unit =
+ and dll_storage : Format.formatter -> LLVMAst.dll_storage -> unit =
    fun ppf ->
    function
    | DLLSTORAGE_Dllimport -> fprintf ppf "dllimport"
    | DLLSTORAGE_Dllexport -> fprintf ppf "dllexport"
 
-and visibility : Format.formatter -> Ollvm_ast.visibility -> unit =
+and visibility : Format.formatter -> LLVMAst.visibility -> unit =
   fun ppf ->
   function
   | VISIBILITY_Default   -> fprintf ppf "default"
   | VISIBILITY_Hidden    -> fprintf ppf "hidden"
   | VISIBILITY_Protected -> fprintf ppf "protected"
 
-and cconv : Format.formatter -> Ollvm_ast.cconv -> unit =
+and cconv : Format.formatter -> LLVMAst.cconv -> unit =
   fun ppf -> function
           | CC_Ccc    -> fprintf ppf "ccc"
           | CC_Fastcc -> fprintf ppf "fastcc"
           | CC_Coldcc -> fprintf ppf "coldcc"
           | CC_Cc i   -> fprintf ppf "cc %d" (to_int i)
 
-and param_attr : Format.formatter -> Ollvm_ast.param_attr -> unit =
+and param_attr : Format.formatter -> LLVMAst.param_attr -> unit =
   fun ppf ->
   function
   | PARAMATTR_Zeroext           -> fprintf ppf "zeroext"
@@ -89,7 +89,7 @@ and param_attr : Format.formatter -> Ollvm_ast.param_attr -> unit =
   | PARAMATTR_Nonnull           -> fprintf ppf "nonnull"
   | PARAMATTR_Dereferenceable n -> fprintf ppf "dereferenceable(%d)" (to_int n)
 
-and fn_attr : Format.formatter -> Ollvm_ast.fn_attr -> unit =
+and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   fun ppf ->
   function
   | FNATTR_Alignstack i     -> fprintf ppf "alignstack(%d)" (to_int i)
@@ -124,20 +124,20 @@ and fn_attr : Format.formatter -> Ollvm_ast.fn_attr -> unit =
   | FNATTR_Key_value (k, v) -> fprintf ppf "\"%s\"=\"%s\"" (of_str k) (of_str v)
   | FNATTR_Attr_grp i       -> fprintf ppf "#%d" (to_int i)
 
-and str_of_raw_id : Ollvm_ast.raw_id -> string =
+and str_of_raw_id : LLVMAst.raw_id -> string =
     function
     | Anon i -> Printf.sprintf "%d" (to_int i)
     | Name s -> (of_str s)
     | Raw i -> Printf.sprintf "_RAW_%d" (to_int i)
 
-and lident : Format.formatter -> Ollvm_ast.local_id -> unit =
+and lident : Format.formatter -> LLVMAst.local_id -> unit =
   fun ppf i -> pp_print_char ppf '%' ; pp_print_string ppf (str_of_raw_id i)
 
-and gident : Format.formatter -> Ollvm_ast.global_id -> unit =
+and gident : Format.formatter -> LLVMAst.global_id -> unit =
   fun ppf i -> pp_print_char ppf '@' ; pp_print_string ppf (str_of_raw_id i)
 
 
-and ident : Format.formatter -> Ollvm_ast.ident -> unit =
+and ident : Format.formatter -> LLVMAst.ident -> unit =
 
   (* let ident_format : (string -> int) -> Format.formatter -> string -> unit = *)
   (* fun finder ppf i -> *)
@@ -149,7 +149,7 @@ and ident : Format.formatter -> Ollvm_ast.ident -> unit =
   | ID_Global i -> gident ppf i
   | ID_Local i  -> lident ppf i
 
-and typ : Format.formatter -> Ollvm_ast.typ -> unit =
+and typ : Format.formatter -> LLVMAst.typ -> unit =
   fun ppf ->
   function
   | TYPE_I i              -> fprintf ppf "i%d" (to_int i)
@@ -173,7 +173,7 @@ and typ : Format.formatter -> Ollvm_ast.typ -> unit =
   | TYPE_Vector (i, t)    -> fprintf ppf "<%d x %a>" (to_int i) typ t ;
   | TYPE_Identified i     -> ident ppf i
 
-and icmp : Format.formatter -> Ollvm_ast.icmp -> unit =
+and icmp : Format.formatter -> LLVMAst.icmp -> unit =
   fun ppf icmp ->
   fprintf ppf ( match icmp with
                 | Eq  -> "eq"
@@ -187,7 +187,7 @@ and icmp : Format.formatter -> Ollvm_ast.icmp -> unit =
                 | Slt -> "slt"
                 | Sle -> "sle")
 
-and fcmp : Format.formatter -> Ollvm_ast.fcmp -> unit =
+and fcmp : Format.formatter -> LLVMAst.fcmp -> unit =
   fun ppf fcmp ->
   fprintf ppf ( match fcmp with
                 | FFalse -> "false"
@@ -208,7 +208,7 @@ and fcmp : Format.formatter -> Ollvm_ast.fcmp -> unit =
                 | FTrue  -> "true")
 
 
-and ibinop : Format.formatter -> Ollvm_ast.ibinop -> unit =
+and ibinop : Format.formatter -> LLVMAst.ibinop -> unit =
   fun ppf ->
   let nuw ppf flag = if flag then fprintf ppf " nuw" in
   let nsw ppf flag = if flag then fprintf ppf " nsw" in
@@ -246,7 +246,7 @@ and fast_math =
                        | Arcp -> "arcp"
                        | Fast -> "fast")
 
-and conversion_type : Format.formatter -> Ollvm_ast.conversion_type -> unit =
+and conversion_type : Format.formatter -> LLVMAst.conversion_type -> unit =
   fun ppf conv ->
   fprintf ppf (match conv with
                | Trunc    -> "trunc"
@@ -262,7 +262,7 @@ and conversion_type : Format.formatter -> Ollvm_ast.conversion_type -> unit =
                | Ptrtoint -> "ptrtoint"
                | Bitcast  -> "bitcast")
 
-and value : Format.formatter -> Ollvm_ast.value -> unit =
+and value : Format.formatter -> LLVMAst.value -> unit =
   fun (ppf:Format.formatter) vv ->
     match vv with
   | VALUE_Ident i           -> ident ppf i
@@ -365,7 +365,7 @@ and value : Format.formatter -> Ollvm_ast.value -> unit =
              tvalue v2
              tvalue mask
 
-and inst_value : Format.formatter -> Ollvm_ast.value -> unit =
+and inst_value : Format.formatter -> LLVMAst.value -> unit =
   fun ppf vv ->
     match vv with
   | VALUE_Ident _ 
@@ -460,7 +460,7 @@ and inst_value : Format.formatter -> Ollvm_ast.value -> unit =
              tvalue mask
 
 
-and phi : Format.formatter -> Ollvm_ast.phi -> unit =
+and phi : Format.formatter -> LLVMAst.phi -> unit =
   fun ppf ->
   function
   | Phi (t, vil) ->
@@ -472,15 +472,15 @@ and phi : Format.formatter -> Ollvm_ast.phi -> unit =
                                                lident ppf i)) vil
 
 
-and instr : Format.formatter -> Ollvm_ast.instr -> unit =
+and instr : Format.formatter -> LLVMAst.instr -> unit =
   fun ppf ->
   function
 
   | INSTR_Op v -> inst_value ppf v
 
-  | INSTR_Call (ti, tvl) ->
+  | INSTR_Call (tv, tvl) ->
      fprintf ppf "call %a(%a)"
-             tident ti
+             tvalue tv
              (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
 
   | INSTR_Alloca (t, n, a) ->
@@ -518,12 +518,12 @@ and instr : Format.formatter -> Ollvm_ast.instr -> unit =
   | INSTR_Unreachable -> pp_print_string ppf "unreachable"
 
 
-and branch_label : Format.formatter -> Ollvm_ast.raw_id -> unit =
+and branch_label : Format.formatter -> LLVMAst.raw_id -> unit =
   fun ppf id ->
     pp_print_string ppf "label %"; pp_print_string ppf (str_of_raw_id id)
     
 
-and terminator : Format.formatter -> Ollvm_ast.terminator -> unit =
+and terminator : Format.formatter -> LLVMAst.terminator -> unit =
   fun ppf ->
   function
 
@@ -559,18 +559,18 @@ and terminator : Format.formatter -> Ollvm_ast.terminator -> unit =
              branch_label i2
              branch_label i3
 
-and id_instr : Format.formatter -> (Ollvm_ast.instr_id * Ollvm_ast.instr) -> unit =
+and id_instr : Format.formatter -> (LLVMAst.instr_id * LLVMAst.instr) -> unit =
   fun ppf ->
     function (id, inst) ->
       fprintf ppf "%a%a" instr_id id instr inst
 
-and id_phi : Format.formatter -> (Ollvm_ast.local_id * Ollvm_ast.phi) -> unit =
+and id_phi : Format.formatter -> (LLVMAst.local_id * LLVMAst.phi) -> unit =
   fun ppf ->
     function (id, p) ->
       fprintf ppf "%a = %a" lident id phi p
 
 
-and instr_id : Format.formatter -> Ollvm_ast.instr_id -> unit =
+and instr_id : Format.formatter -> LLVMAst.instr_id -> unit =
   fun ppf ->
     function
     | IId id  -> fprintf ppf "%%%s = " (str_of_raw_id id)
@@ -581,11 +581,11 @@ and tvalue ppf (t, v) = fprintf ppf "%a %a" typ t value v
 
 and tident ppf (t, v) = fprintf ppf "%a %a" typ t ident v
 
-and toplevel_entities : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.toplevel_entities -> unit =
+and toplevel_entities : Format.formatter -> (LLVMAst.block list) LLVMAst.toplevel_entities -> unit =
   fun ppf entries ->
   pp_print_list ~pp_sep:pp_force_newline toplevel_entity ppf entries
 
-and toplevel_entity : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.toplevel_entity -> unit =
+and toplevel_entity : Format.formatter -> (LLVMAst.block list) LLVMAst.toplevel_entity -> unit =
   fun ppf ->
   function
   | TLE_Target s               -> fprintf ppf "target triple = \"%s\"" (of_str s)
@@ -599,7 +599,7 @@ and toplevel_entity : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.tople
   | TLE_Attribute_group (i, a) -> fprintf ppf "attributes #%d = { %a }" (to_int i)
                                           (pp_print_list ~pp_sep:pp_space fn_attr) a
 
-and metadata : Format.formatter -> Ollvm_ast.metadata -> unit =
+and metadata : Format.formatter -> LLVMAst.metadata -> unit =
   fun ppf ->
   function
   | METADATA_Const v  -> tvalue ppf v
@@ -612,7 +612,7 @@ and metadata : Format.formatter -> Ollvm_ast.metadata -> unit =
                                  (pp_print_list ~pp_sep:pp_comma_space
                                                 (fun ppf i ->
                                                  fprintf ppf "!%s" i)) (List.map of_str m)
-and global : Format.formatter -> Ollvm_ast.global -> unit =
+and global : Format.formatter -> LLVMAst.global -> unit =
   fun ppf ->
   fun {
     g_ident;
@@ -637,7 +637,7 @@ and global : Format.formatter -> Ollvm_ast.global -> unit =
        (match a with None -> ()
                    | Some a -> fprintf ppf ", align %d" (to_int a))
 
-and declaration : Format.formatter -> Ollvm_ast.declaration -> unit =
+and declaration : Format.formatter -> LLVMAst.declaration -> unit =
   fun ppf ->
   fun { dc_name = i
       ; dc_type 
@@ -685,7 +685,7 @@ and declaration : Format.formatter -> Ollvm_ast.declaration -> unit =
     (match dc_gc with
        Some x -> fprintf ppf "gc \"%s\" " (of_str x) | _ -> ()) 
     
-and definition : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.definition -> unit =
+and definition : Format.formatter -> (LLVMAst.block list) LLVMAst.definition -> unit =
   fun ppf ->
   fun ({ df_prototype =
            { dc_name = i
@@ -747,7 +747,7 @@ and definition : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.definition
     pp_force_newline ppf () ;
     pp_print_char ppf '}' ;
 
-and block : Format.formatter -> Ollvm_ast.block -> unit =
+and block : Format.formatter -> LLVMAst.block -> unit =
   fun ppf {blk_id=lbl; blk_phis=phis; blk_code=b; blk_term=(_,t)} ->
     begin match lbl with
       | Anon i -> fprintf ppf "; <label> %d" (to_int i)
@@ -763,7 +763,7 @@ and block : Format.formatter -> Ollvm_ast.block -> unit =
     terminator ppf t;
     pp_close_box ppf ()
 
-and modul : Format.formatter -> (Ollvm_ast.block list) Ollvm_ast.modul -> unit =
+and modul : Format.formatter -> (LLVMAst.block list) LLVMAst.modul -> unit =
   fun ppf m ->
 
   pp_option ppf (fun ppf x -> fprintf ppf "; ModuleID = '%s'" (of_str x)) m.m_name ;

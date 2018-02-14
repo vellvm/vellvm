@@ -25,7 +25,7 @@
 
 
 
-open Ollvm_ast
+open LLVMAst
 
 let str = Camlcoq.coqstring_of_camlstring
 let coq_of_int = Camlcoq.Z.of_sint
@@ -134,7 +134,7 @@ let id_of = function
 
 %}
 
-%token<Ollvm_ast.raw_id> GLOBAL LOCAL
+%token<LLVMAst.raw_id> GLOBAL LOCAL
 %token LPAREN RPAREN LCURLY RCURLY LTLCURLY RCURLYGT LSQUARE RSQUARE LT GT EQ COMMA EOF EOL STAR
 
 %token<string> STRING
@@ -169,13 +169,13 @@ let id_of = function
 %token KW_TAIL
 %token KW_VOLATILE
 
-%token<Ollvm_ast.raw_id> METADATA_ID
+%token<LLVMAst.raw_id> METADATA_ID
 %token<string> METADATA_STRING
 %token BANGLCURLY
 %token KW_ATTRIBUTES
 %token<Camlcoq.Z.t> ATTR_GRP_ID
 
-%start<(Ollvm_ast.block list) Ollvm_ast.toplevel_entities> toplevel_entities
+%start<(LLVMAst.block list) LLVMAst.toplevel_entities> toplevel_entities
 
 %%
 
@@ -653,7 +653,7 @@ phi_table_entry:
 %inline instr:
   | eo=instr_op { INSTR_Op eo }
 
-  | KW_TAIL? KW_CALL cconv? list(param_attr) f=tident
+  | KW_TAIL? KW_CALL cconv? list(param_attr) f=tvalue
     a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
     list(fn_attr)
     { INSTR_Call (f, a) }

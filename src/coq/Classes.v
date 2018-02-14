@@ -11,7 +11,6 @@
 Set Implicit Arguments.
 Set Contextual Implicit.
 Global Generalizable All Variables.
-Global Set Automatic Coercions Import.
 From Coq Require Export Morphisms RelationClasses Setoid.
 Require Import List Bool String Utf8. 
 Export ListNotations.

@@ -11,7 +11,7 @@
 Require Import ZArith List String Omega.
 Require Import Program.
 Require Import  Vellvm.Classes Vellvm.Util.
-Require Import Vellvm.Ollvm_ast Vellvm.AstLib Vellvm.CFG Vellvm.CFGProp.
+Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG Vellvm.CFGProp.
 Import ListNotations.
 Open Scope Z_scope.
 Open Scope string_scope.

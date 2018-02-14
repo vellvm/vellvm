@@ -30,7 +30,7 @@ let rec step m =
   | SS.E.Vis (Eff _) -> failwith "should have been handled by the memory model"  
       
 
-let interpret (prog:(Ollvm_ast.block list) Ollvm_ast.toplevel_entity list) =
+let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) =
   let scfg = AstLib.modul_of_toplevel_entities prog in
   match CFG.mcfg_of_modul scfg with
   | None -> failwith "bad module"
