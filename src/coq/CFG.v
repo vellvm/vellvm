@@ -59,16 +59,16 @@ Inductive cmd : Set :=
 .                    
 
 
-(* each function definition corresponds to a control-flow graph *)
-(* NOTE: I'm not sure where to put the scoping information for globals 
-   They may belong elsewhere, in which case we can remove the glbl list.
+(* each function definition corresponds to a control-flow graph 
+   - init is the entry block
+   - blks is a list of labeled blocks
+   - args is the list of identifiers brought into scope by this function
 *)
 Record cfg := mkCFG
 {
   init : block_id;
   blks : list block;
-  glbl : list ident;   (* identifiers defined on entry to this CFG, 
-                          including globals and local function parameters *)
+  args : list ident;
 }.
 
 (* An mcfg is a module where each function body has been converted to a cfg *)
@@ -176,20 +176,19 @@ Definition init_of_definition d : option block_id :=
   end.
 
 
-Definition cfg_of_definition (g:list ident) (d:definition (list block)) : option cfg :=
+Definition cfg_of_definition (d:definition (list block)) : option cfg :=
   'init <- init_of_definition d;
     let args := List.map (fun x => ID_Local x) (df_args d) in
     Some {| init := init;
             blks := df_instrs d;
-            glbl := g++args;
+            args := args;
          |}.
 
 
 Definition mcfg_of_modul (m:modul (list block)) : option mcfg :=
-  let glbls := globals m in
   'defns <- map_option
                 (fun d =>
-                   'cfg <- cfg_of_definition glbls d;
+                   'cfg <- cfg_of_definition d;
                      Some {|
                        df_prototype := df_prototype d;
                        df_args := df_args d;
@@ -203,7 +202,6 @@ Definition mcfg_of_modul (m:modul (list block)) : option mcfg :=
     m_declarations := m_declarations m;
     m_definitions := defns
   |}.
-
 
 (*  ------------------------------------------------------------------------- *)
 

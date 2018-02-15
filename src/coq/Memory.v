@@ -8,7 +8,7 @@ Set Contextual Implicit.
 
 Module A : Vellvm.StepSemantics.ADDR with Definition addr := nat.
   Definition addr := nat.
-  Definition null := 1000%nat.   (* TODO this is unsound if the memory has > 1000 values *)
+  Definition null := 0%nat.   (* TODO this is unsound but convenient *)
 End A.  
 
 Module SS := StepSemantics.StepSemantics(A).
@@ -17,46 +17,46 @@ Export SS.
 Definition memory := list dvalue.
 Definition undef t := DVALUE_Undef t None.
 
-Definition mem_step {X} (e:effects X) (m:memory) :=
+Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (list dvalue * X) :=
   match e with
-  | Alloca t k =>
+  | Alloca t =>
     inr  ((m ++ [undef t])%list,
-          DVALUE_Addr (List.length m),
-          k)
-  | Load t a k =>
+          DVALUE_Addr (List.length m))
+
+  | Load t a =>
     inr (m,
-         nth_default (undef t) m a,
-         k)
+         nth_default (undef t) m a)
 
-  | Store a v k =>
+  | Store a v =>
     inr (replace m a v,
-         DVALUE_None,
-         k)
+         ())
 
-  | GEP t a vs k => inl e (* TODO: GEP semantics *)
+  | GEP t a vs => inl e (* TODO: GEP semantics *)
 
-  | ItoP t i k => inl e (* TODO: ItoP semantics *)
+  | ItoP t i => inl e (* TODO: ItoP semantics *)
 
-  | PtoI t a k => inl e (* TODO: ItoP semantics *)                     
+  | PtoI t a => inl e (* TODO: ItoP semantics *)                     
                        
-  | Call _ _ _ _ => inl e
+  | Call _ _ _  => inl e
   end.
 
 (*
  memory -> Trace () -> Trace () -> Prop
 *)
 
-CoFixpoint memD (m:memory) (d:Trace ()) : Trace () :=
+CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
   match d with
-  | Tau x d'            => Tau x (memD m d')
-  | Vis (Eff e) =>
-    match mem_step e m with
-    | inr (m', v, k) => Tau tt (memD m' (k v))
-    | inl e => Vis (Eff e)
+  | Trace.Tau d'            => Trace.Tau (memD m d')
+  | Trace.Vis _ io k =>
+    match mem_step io m with
+    | inr (m', v) => Trace.Tau (memD m' (k v))
+    | inl e => Trace.Vis io k
     end
-  | Vis x => Vis x
+  | Trace.Ret x => d
+  | Trace.Err x => d
   end.
-                            
+
+(*
 Fixpoint MemDFin (m:memory) (d:Trace ()) (steps:nat) : option memory :=
   match steps with
   | O => None
@@ -72,7 +72,7 @@ Fixpoint MemDFin (m:memory) (d:Trace ()) (steps:nat) : option memory :=
       end
     end
   end%N.
-
+*)
 
 (*
 Previous bug: 

@@ -20,14 +20,14 @@ let print_int_dvalue dv : unit =
 
 let rec step m =
   match Lazy.force m with
-  | SS.E.Tau (_, x) -> step x
-  | SS.E.Vis (Fin v) -> print_int_dvalue v
-  | SS.E.Vis (Err s) -> failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
-  | SS.E.Vis (Eff (SS.E.Call(t, f, args, k))) ->
+  | Trace.Tau x -> step x
+  | Trace.Ret v -> print_int_dvalue v
+  | Trace.Err s -> failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
+  | Trace.Vis ((SS.E.Call(t, f, args)), k) ->
     (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n" (Camlcoq.camlstring_of_coqstring f));
-    step (k (SS.DVALUE_I64 StepSemantics.Int64.zero))
+    step (k (Obj.magic (SS.DVALUE_I64 StepSemantics.Int64.zero)))
     
-  | SS.E.Vis (Eff _) -> failwith "should have been handled by the memory model"  
+  | Trace.Vis _ -> failwith "should have been handled by the memory model"  
       
 
 let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) =
@@ -38,7 +38,7 @@ let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) =
     begin match SS.init_state mcfg (Camlcoq.coqstring_of_camlstring "main") with
       | Datatypes.Coq_inl err -> failwith (Camlcoq.camlstring_of_coqstring err)
       | Datatypes.Coq_inr s ->
-        let sem = SS.sem mcfg s in
+        let sem = SS.step_sem mcfg (Memory.SS.Step s) in
         let mem = memD [] sem in
         step mem
     end

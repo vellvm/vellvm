@@ -163,7 +163,7 @@ Defined.
 Class Functor (F:Type -> Type) := fmap : forall {A B}, (A -> B) -> F A -> F B.
 Infix "<$>" := fmap (at level 60, right associativity).
 
-Class FunctorLaws (F:Type -> Type) `{Functor F} `{eqiv:forall A, Equiv A}    :=
+Class FunctorLaws (F:Type -> Type) `{Functor F} `{eqiv:forall A, Equiv (F A)}    :=
 {
   fmap_id : forall A (a : F A),
     (id <$> a) ≡ a;
@@ -174,22 +174,25 @@ Class FunctorLaws (F:Type -> Type) `{Functor F} `{eqiv:forall A, Equiv A}    :=
 
 
 Instance option_functor : @Functor option := option_map.
-Instance option_functor_eq_laws : (@FunctorLaws option) option_functor  (@eq).
+Instance option_equiv {A} : Equiv (option A) := (@eq (option A)).
+
+Instance option_functor_eq_laws : (@FunctorLaws option) option_functor (@option_equiv).
 Proof.
   intros. split.
   intros. unfold fmap. unfold option_functor. unfold option_map. destruct a.
   reflexivity. reflexivity.
   intros. unfold fmap. unfold option_functor. destruct a. simpl. reflexivity.
   simpl. reflexivity.
-Defined. (* CHKoh: Originally Qed. *)
+Defined. 
 
 Instance list_functor: @Functor list := List.map.
-Instance list_functor_eq_laws : (@FunctorLaws list) list_functor (@eq).
+Instance list_equiv {A} : Equiv (list A) := (@eq (list A)).
+Instance list_functor_eq_laws : (@FunctorLaws list) list_functor (@list_equiv).
 Proof.
   split.
   - apply List.map_id.
   - apply List.map_map.
-Defined. (* CHKoh: Originally Qed. *)    
+Defined. 
 
 (** ** Monads ------------------------------------------------------------------- *)
 Class Monad F `{Functor F} :=
@@ -307,14 +310,15 @@ Hint Unfold sum_map.
 Arguments sum_map _ _ : simpl nomatch.
 
 Instance sum_functor {X:Type} : @Functor (sum X) := (@sum_map X).
-Instance sum_functor_eq_laws {X:Type} : (@FunctorLaws(sum X)) sum_functor (@eq).
+Instance sum_equiv {X:Type} A : Equiv (sum X A) := (@eq (sum X A)).
+Instance sum_functor_eq_laws {X:Type} : (@FunctorLaws(sum X)) sum_functor (@sum_equiv X).
 Proof.
   intros. split.
   intros. unfold fmap. unfold sum_functor. unfold sum_map. destruct a.
   reflexivity. reflexivity.
   intros. unfold fmap. unfold sum_functor. destruct a. simpl. reflexivity.
   simpl. reflexivity.
-Defined. (* CHKoh: Originally Qed. *)
+Defined. 
 
 Program Instance sum_monad {X:Type} : (@Monad (sum X)) sum_functor := _.
 Next Obligation.
@@ -341,7 +345,9 @@ Next Obligation.
   apply H. intros. apply X in X0. apply H0. apply X0.
 Defined.
 
-Instance cont_functor_laws_eq : (@FunctorLaws cont) cont_functor (@eq).
+Instance cont_equiv A : Equiv (cont A) := (@eq (cont A)).
+
+Instance cont_functor_laws_eq : (@FunctorLaws cont) cont_functor (@cont_equiv).
 Proof.
   split.
   - reflexivity.
@@ -374,7 +380,8 @@ Definition st_bind {M A B} : (ST M A) -> (A -> ST M B) -> ST M B :=
 Hint Unfold st_bind.
 
 Instance st_functor {M} : (@Functor (ST M)) := (@st_map M).
-Instance st_functor_eq_laws {M} `{Equiv M} : (@FunctorLaws (ST M)) st_functor (@eq).
+Instance st_equiv {M} A : Equiv (ST M A) := (@eq (ST M A)).
+Instance st_functor_eq_laws {M} `{Equiv M} : (@FunctorLaws (ST M)) st_functor (@st_equiv M).
 Proof.
   split.
   - intros A a. unfold fmap. unfold st_functor. unfold st_map.
@@ -494,6 +501,6 @@ Fixpoint to_string_b10' fuel (x:Z) : string :=
   end.
 
 (* Definition to_string_b10 := to_string_b10' 10. *)
-Definition to_string_b10 := to_string_b10' 10000.
+Definition to_string_b10 := to_string_b10' 1000.
 
 Instance string_of_Z : StringOf Z := to_string_b10.

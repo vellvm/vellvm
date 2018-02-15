@@ -110,6 +110,7 @@ Module StepSemantics(A:ADDR).
   .       
   
   Definition stack := list frame.
+
   Definition state := (pc * env * stack)%type.
 
   Definition pc_of (s:state) :=
@@ -839,79 +840,8 @@ Fixpoint eval_op (e:env) (o:LLVMAst.value) : err dvalue :=
 
 Arguments eval_op _ _ : simpl nomatch.
 
-(*
-Definition eval_op_for_store (e:env) (t:typ) (o:LLVMAst.value)
-  : err value :=
-  match o with
-  | SV o' => 
-    match t, o' with 
-    | TYPE_I 1, VALUE_Integer i => mret (DVALUE_I1 (Int1.repr i))
-    | TYPE_I 32, VALUE_Integer i => mret (DVALUE_I32 (Int32.repr i))
-    | TYPE_I 64, VALUE_Integer i => mret (DVALUE_I64 (Int64.repr i))
 
-    | _, OP_IBinop _ _ _ _
-    | _, OP_ICmp _ _ _ _
-    | _, OP_FBinop _ _ _ _ _
-    | _, OP_FCmp _ _ _ _
-    | _, OP_Conversion _ _ _ _
-    | _, OP_GetElementPtr _ _ _
-    | _, OP_ExtractElement _ _
-    | _, OP_InsertElement _ _ _
-    | _, OP_ShuffleVector _ _ _
-    | _, OP_ExtractValue _ _
-    | _, OP_InsertValue _ _ _
-    | _, OP_Select _ _ _ => failwith "invalid operand for store"
-                                             
-    | _, _ => eval_op e (Some t) o
-    end
-  end.
-
-Definition eval_cond (e:env) (o:LLVMAst.value) : err value :=
-  match o with
-  | SV o' =>
-    match o' with
-    | VALUE_Bool true => mret (DVALUE_I1 (Int1.one))
-    | VALUE_Bool false => mret (DVALUE_I1 (Int1.zero))
-
-    | OP_IBinop _ _ _ _
-    | OP_ICmp _ _ _ _
-    | OP_FBinop _ _ _ _ _
-    | OP_FCmp _ _ _ _
-    | OP_Conversion _ _ _ _
-    | OP_GetElementPtr _ _ _
-    | OP_ExtractElement _ _
-    | OP_InsertElement _ _ _
-    | OP_ShuffleVector _ _ _
-    | OP_ExtractValue _ _
-    | OP_InsertValue _ _ _
-    | OP_Select _ _ _ => failwith "invalid conditional"
-
-    | _ => eval_op e None o
-    end
-  end.
-*)
-
-(*
-(* Semantically, a jump at the LLVM IR level might not be "atomic" in the sense that
-   Phi nodes may be lowered into a sequence of non-atomic operations on registers.  However,
-   Phi's should never touch memory [is that true? can there be spills?], so modeling them
-   as atomic should be OK. *)
-Fixpoint jump (CFG:cfg) (from:block_id) (e_init:env) (e:env) (to:block) (k:stack) : err state :=
-  match ps with
-  | [] => mret (q, e, k)
-  | (id, (INSTR_Phi _ ls))::rest => 
-    match assoc RawIDOrd.eq_dec bn ls with
-    | Some op =>
-      'dv <- eval_op e_init op;
-      jump CFG bn e_init (add_env id dv e) rest q k
-    | None => failwith ("jump: block name not found " ++ string_of_raw_id bn)
-    end
-  | _ => failwith "jump: got non-phi instruction"
-  end.
-*)
-
-
-Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (e_init:env) (k:stack)  : err state :=
+Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (e_init:env) (k:stack) : err state :=
   let eval_phi (e:env) '(iid, Phi t ls) :=
       match assoc RawIDOrd.eq_dec bid_src ls with
       | Some op =>
@@ -928,54 +858,52 @@ Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_i
   end.
 
 
-Inductive transition X :=
-| Step (s:X)
-| Obs  (m:Event X)
-.
 
-Definition lift_err_d {A} (m:err A) (f: A -> transition state) : transition state :=
+Definition lift_err_d {A X} (m:err A) (f: A -> Trace X) : Trace X :=
   match m with
-    | inl s => Obs (Err s)
+    | inl s => Trace.Err s
     | inr b => f b
   end.
 
 Notation "'do' x <- m ; f" := (lift_err_d m (fun x => f)) 
    (at level 200, x ident, m at level 100, f at level 200).
 
-Definition t_raise s : transition state :=
-  Obs (Err s). 
+
+Inductive result :=
+| Done (v:value)
+| Step (s:state)
+.       
+
+Definition t_raise s : Trace result :=
+  Trace.Err s. 
 
 Definition t_raise_p (p:pc) s := t_raise (s ++ ": " ++ (string_of p)).
 
-(* TODO:  clean up the pc abstraction: 
-   - replace blk_term (bk pc) with an accessor like 'fetch'
-*)
+Definition cont (s:state) : Trace result := mret (Step s).
+Definition halt (v:value) : Trace result := mret (Done v).
 
-
-Definition stepD (CFG:mcfg) (s:state) : transition state :=
+Definition step (CFG:mcfg) (s:state) : Trace result :=
   let '(pc, e, k) := s in
   do cmd <- trywith ("CFG has no instruction at " ++ string_of pc) (fetch CFG pc);
   match cmd with
   | Term (TERM_Ret (t, op)) =>
     do dv <- eval_expr e (Some t) op;
       match k with
-      | [] => Obs (Fin dv)
-      | (KRet e' id p') :: k' => Step (p', add_env id dv e', k')
+      | [] => halt dv        (* TODO: Add "final state?" Obs (Fin dv) *)
+      | (KRet e' id p') :: k' => cont (p', add_env id dv e', k')
       | _ => t_raise_p pc "IMPOSSIBLE: Ret op in non-return configuration" 
       end
-
+        
   | Term TERM_Ret_void =>
     match k with
-    | [] => Obs (Fin (DVALUE_None))
-    | (KRet_void e' p')::k' => Step (p', e', k')
+    | [] => halt DVALUE_None
+    | (KRet_void e' p')::k' => cont (p', e', k')
     | _ => t_raise_p pc "IMPOSSIBLE: Ret void in non-return configuration"
     end
-          
+      
   | Term (TERM_Br (t,op) br1 br2) =>
     do dv <- eval_expr e (Some t) op; (* TO SEE *)
       do br <- match dv with 
-              (* CHKoh: | DV (VALUE_Bool true) => mret br1
-                 | DV (VALUE_Bool false) => mret br2 *)
               | DVALUE_I1 comparison_bit =>
                 if Int1.eq comparison_bit Int1.one then
                   mret br1
@@ -984,12 +912,11 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
               | _ => failwith "Br got non-bool value"
               end;
       do st <- jump CFG (fn pc) (bk pc) br e k;
-      Step st
+      cont st
              
-                 
   | Term (TERM_Br_1 br) =>
     do st <- jump CFG (fn pc) (bk pc) br e k;
-    Step st
+    cont st
              
   (* Currently unhandled LLVM terminators *)                                  
   | Term (TERM_Switch _ _ _)
@@ -997,7 +924,6 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
   | Term (TERM_Resume _)
   | Term (TERM_Invoke _ _ _ _) => t_raise "Unsupport LLVM terminator" 
   
-
   | Inst insn =>  (* instruction *)
     do pc_next <- trywith "no fallthrough intsruction" (incr_pc CFG pc);
       match (pt pc), insn  with
@@ -1008,48 +934,42 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
         do vptr <- eval_expr e (Some ptrtyp) ptrval;
         do vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret v) idxs;
         match vptr with
-        | DVALUE_Addr a => Obs (Eff (GEP t a vs (fun (a:dvalue) => (pc_next, add_env id a e, k))))
+        | DVALUE_Addr a =>
+          Trace.Vis (GEP t a vs) (fun (a:dvalue) => cont (pc_next, add_env id a e, k))
+
         | _ => t_raise "ERROR: GEP got non-pointer value" 
         end
-
+          
       (* Note: Casts currently assume a 64-bit memory model *)
       | IId id, INSTR_Op (OP_Conversion Inttoptr (TYPE_I 64) op (TYPE_Pointer t)) =>
         do iv <- eval_expr e (Some (TYPE_I 64)) op;
         match iv with
-        | DVALUE_I64 i => Obs (Eff (ItoP t i (fun (a:dvalue) => (pc_next, add_env id a e, k))))
+        | DVALUE_I64 i => Trace.Vis (ItoP t i) (fun (a:dvalue) => cont (pc_next, add_env id a e, k))
         | _ => t_raise "ERROR: Inttoptr got non-integer value" 
         end
 
       | IId id, INSTR_Op (OP_Conversion Ptrtoint (TYPE_Pointer t) ptrval (TYPE_I 64)) =>
         do vptr <- eval_expr e (Some (TYPE_Pointer t)) ptrval;
         match vptr with
-        | DVALUE_Addr a => Obs (Eff (PtoI t a (fun (a:dvalue) => (pc_next, add_env id a e, k))))
+        | DVALUE_Addr a => Trace.Vis (PtoI t a) (fun (a:dvalue) => cont (pc_next, add_env id a e, k))
         | _ => t_raise "ERROR: Ptrtoint got non-pointer value" 
         end
-          
-
-                         
-      (* Handle the operations that _don't_ interact with the memory model *)
-      | IId id, INSTR_Op op =>
-        do dv <- eval_op e op;     
-          Step (pc_next, add_env id dv e, k)
 
       | IId id, INSTR_Alloca t _ _ =>
-        Obs (Eff (Alloca t (fun (a:value) =>  (pc_next, add_env id a e, k))))
+        Trace.Vis (Alloca t) (fun (a:value) =>  cont (pc_next, add_env id a e, k))
                 
       | IId id, INSTR_Load _ t (u,ptr) _ =>
         do dv <- eval_expr e (Some u) ptr;     
           match dv with
-          | DVALUE_Addr a => Obs (Eff (Load t a (fun dv => (pc_next, add_env id dv e, k))))
+          | DVALUE_Addr a => Trace.Vis (Load t a) (fun dv => cont (pc_next, add_env id dv e, k))
           | _ => t_raise "ERROR: Load got non-pointer value" 
           end
             
       | IVoid _, INSTR_Store _ (t, val) (u, ptr) _ => 
-        do dv <- eval_expr e (Some t) val; (* TO SEE: Added new function *)
-          (* CHKoh: do dv <- eval_op e val; *)
-          do v <- eval_expr e (Some u) ptr;
+        do dv <- eval_expr e (Some t) val; 
+        do v <- eval_expr e (Some u) ptr;
           match v with 
-          | DVALUE_Addr a => Obs (Eff (Store a dv (fun _ => (pc_next, e, k))))
+          | DVALUE_Addr a => Trace.Vis (Store a dv) (fun _ => cont (pc_next, e, k))
           |  _ => t_raise "ERROR: Store got non-pointer value" 
           end
 
@@ -1067,7 +987,7 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
             let 'FunctionEntry ids pc_f := fnentry in
             do bs <- combine_lists_err ids dvs;
             let env := env_of_assoc bs in
-            Step (pc_f, env, (KRet_void e pc_next::k))
+            cont (pc_f, env, (KRet_void e pc_next::k))
 
           | None =>
           (* TODO: look up fid in the global environment to see if it is a legitimate
@@ -1076,8 +996,8 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
             (* The continuation of a void call ignores the returned value -- 
                the handler for the call should pass DVALUE_None. *)
             match fid with
-            | LLVMAst.Name s => Obs (Eff (Call TYPE_Void s dvs (fun dv => (pc_next, e, k))))
-            | _ => t_raise ("stepD: no function " ++ (string_of fid))
+            | LLVMAst.Name s => Trace.Vis (Call TYPE_Void s dvs) (fun dv => cont (pc_next, e, k))
+            | _ => t_raise ("step: no function " ++ (string_of fid))
             end
 
           end
@@ -1091,7 +1011,7 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
             let 'FunctionEntry ids pc_f := fnentry in
             do bs <- combine_lists_err ids dvs;
             let env := env_of_assoc bs in
-            Step (pc_f, env, (KRet e id pc_next::k))
+            cont (pc_f, env, (KRet e id pc_next::k))
 
           | None =>
             (* TODO: look up fid in the global environment to see if it is a legitimate
@@ -1101,18 +1021,24 @@ Definition stepD (CFG:mcfg) (s:state) : transition state :=
                local environment
              *)
             match fid with
-            | LLVMAst.Name s => Obs (Eff (Call t s dvs (fun dv => (pc_next, add_env id dv e, k))))
-            | _ => t_raise ("stepD: no function " ++ (string_of fid))
+            | LLVMAst.Name s => Trace.Vis (Call t s dvs) (fun dv => cont (pc_next, add_env id dv e, k))
+            | _ => t_raise ("step: no function " ++ (string_of fid))
             end
 
           end
 
-        | _, _ => t_raise ("stepD: type mismatch: non-void function called as void")
+        | _, _ => t_raise ("step: type mismatch: non-void function called as void")
             
         end
-
+          
       (* NOTE : this is where we need to handle function pointers *)
       | _, INSTR_Call (_, VALUE_Ident (ID_Local _)) _ => t_raise "INSTR_Call to local"
+
+
+      (* Handle the operations that _don't_ interact with the memory model *)
+      | IId id, INSTR_Op op =>
+        do dv <- eval_op e op;     
+          cont (pc_next, add_env id dv e, k)
 
       | _, INSTR_Unreachable => t_raise "IMPOSSIBLE: unreachable" 
 
@@ -1138,16 +1064,23 @@ Definition init_state (CFG:mcfg) (fname:string) : err state :=
     mret (pc_f, (@ENV.empty value), []).
 
 (* Note: codomain is D'  *)
-CoFixpoint step_sem (CFG:mcfg) (s:state) : Trace state :=
-  match (stepD CFG s) with
-  | Step s' => Tau s (step_sem CFG s')
-  | Obs (Err s) => Vis (Err s)
+CoFixpoint step_sem (CFG:mcfg) (r:result) : Trace value :=
+  match r with
+  | Done v => mret v
+  | Step s => 'x <- step CFG s ; step_sem CFG x
+  end.
+
+(*
+  match (step CFG s) with
+  | Trace.Ret (Step s') => Tau (step_sem CFG s')
+  | Trace.Ret (Done v) => mret v
+  | Trace.Vis io k  => Vis (Err s)
   | Obs (Fin s) => Vis (Fin s)
   | Obs (Eff m) => Vis (Eff (effects_map (step_sem CFG) m))
   end.
 
 Definition sem (CFG:mcfg) (s:state) : Trace () := hide_taus (step_sem CFG s).
-
+*)
 
 Section Properties.
 (* environment facts -------------------------------------------------------- *)
@@ -1225,7 +1158,7 @@ Section Properties.
   Definition pc_non_call (CFG:mcfg) (p:pc) : Prop :=
     pc_satisfies CFG p (fun c => exists i, not (is_Call i) /\ c = Inst i).
 
-  Ltac stepD_destruct :=
+  Ltac step_destruct :=
     repeat (match goal with
             | [ H : context[do _ <- trywith _ ?E; _] |- _ ] => destruct E; [simpl in H | solve [inversion H]]
             | [ H : context[do _ <- ?E; _] |- _ ] => destruct E; [solve [inversion H] | simpl in H]
@@ -1235,10 +1168,11 @@ Section Properties.
             end).
 
   (* Not true for Call *)
-  Lemma stepD_pc_incr_inversion:
+  (*
+  Lemma step_pc_incr_inversion:
     forall CFG pc1 e1 k1 pc2 e2 k2
       (Hpc: pc_non_call CFG pc1)
-      (Hstep: stepD CFG (pc1, e1, k1) = Step (pc2, e2, k2)),
+      (Hstep: step CFG (pc1, e1, k1) = Step (pc2, e2, k2)),
       incr_pc CFG pc1 = Some pc2.
   Proof.
     (*
@@ -1249,10 +1183,10 @@ Section Properties.
     specialize Hpc with (cmd0 := c). destruct Hpc as [i [Hi Hc]]; auto.
     subst.
     destruct (incr_pc CFG pc1); [simpl in Hstep | solve [inversion Hstep]].
-    stepD_destruct.*)
+    step_destruct.*)
     admit. (* TODO: fix up once the effects interface is stabilized *)
   Admitted.
-
+*)
 End Properties.
 
 End StepSemantics.
