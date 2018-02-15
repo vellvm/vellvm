@@ -192,7 +192,60 @@ Definition mem_step {X} (e:effects X) (m:memory) :=
       end
     end
       
-  | GEP t a vs k => inl e (* TODO: GEP semantics *)
+  | GEP t a vs k =>
+    (* Index into a structured data type. *)
+    let index_into_type typ index :=
+        match typ with
+        | TYPE_Array sz ty =>
+          if sz <=? index then None else
+            Some (ty, index * (sizeof_typ ty))
+        | TYPE_Struct fields =>
+          let new_typ := List.nth_error fields (Z.to_nat index) in
+          match new_typ with
+          | Some new_typ' =>
+            let fix compute_offset typ_list i :=
+                match typ_list with
+                | [] => 0
+                | hd :: tl =>
+                  if i <? index
+                  then sizeof_typ hd + compute_offset tl (i + 1)
+                  else 0
+                end
+              in
+            Some (new_typ', compute_offset fields 0)
+          | None => None
+          end
+        | _ => None (* add type support as necessary *)
+        end
+    in
+    (* Give back the final offset into mem_bytes *)
+    let fix gep_helper mem_bytes cur_type offsets offset_acc :=
+        match offsets with
+        | [] => offset_acc
+        | dval :: tl =>
+          match dval with
+          | DVALUE_I32 x =>
+            let nat_index := Int32.unsigned x in
+            let new_typ_info := index_into_type cur_type nat_index in
+            match new_typ_info with
+              | Some (new_typ, offset) => 
+                gep_helper mem_bytes new_typ tl (offset_acc + offset)
+              | None => 0 (* fail *)
+            end
+          | _ => 0 (* fail, at least until supporting non-i32 indexes *)
+          end
+        end
+    in
+    match a with
+    | (b, i) =>
+      match lookup b m with
+      | Some block =>
+        let mem_val := lookup_all_index i (sizeof_typ t) block SUndef in
+        let answer := gep_helper mem_val t vs 0 in
+        inr (m, DVALUE_Addr (b, i + answer), k)
+      | None => inl e
+      end
+    end
 
   | ItoP t i k => inl e (* TODO: ItoP semantics *)
 
