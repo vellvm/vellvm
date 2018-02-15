@@ -203,6 +203,7 @@ Definition mem_step {X} (e:effects X) (m:memory) :=
           let new_typ := List.nth_error fields (Z.to_nat index) in
           match new_typ with
           | Some new_typ' =>
+            (* Compute the byte-offset induced by the first i elements of the struct. *)
             let fix compute_offset typ_list i :=
                 match typ_list with
                 | [] => 0
@@ -218,7 +219,7 @@ Definition mem_step {X} (e:effects X) (m:memory) :=
         | _ => None (* add type support as necessary *)
         end
     in
-    (* Give back the final offset into mem_bytes *)
+    (* Give back the final byte-offset into mem_bytes *)
     let fix gep_helper mem_bytes cur_type offsets offset_acc :=
         match offsets with
         | [] => offset_acc
