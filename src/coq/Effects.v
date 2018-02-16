@@ -113,6 +113,20 @@ Defined.
 Definition Trace X := M IO X.
 Instance functor_trace : Functor Trace := (@mapM IO).
 Instance monad_trace : (@Monad Trace) (@mapM IO) := { mret X x := Ret x; mbind := @bindM IO }.
+Instance exn_trace : (@ExceptionMonad string Trace _ _) := fun _ s => Err s.
+
+(* Utilities ---------------------------------------------------------------- *)
+
+(* Lift the error monad into the trace monad. *)
+Definition lift_err_d {A X} (m:err A) (f: A -> Trace X) : Trace X :=
+  match m with
+  | inl s => raise s
+  | inr b => f b
+  end.
+
+Notation "'do' x <- m ; f" := (lift_err_d m (fun x => f)) 
+                               (at level 200, x ident, m at level 100, f at level 200).
+
 
 (*
 Definition id_match_trace {X} (d:Trace X) : Trace X :=

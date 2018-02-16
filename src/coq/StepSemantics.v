@@ -519,7 +519,7 @@ Module StepSemantics(A:ADDR).
     end.
     
 
-  Definition eval_conv_h conv t1 x t2 : err dvalue :=
+  Definition eval_conv_h conv t1 x t2 : Trace dvalue :=
     match conv with
     | Trunc =>
       match t1, x, t2 with
@@ -565,12 +565,21 @@ Module StepSemantics(A:ADDR).
     | Sitofp
     | Fptoui
     | Fptosi => failwith "TODO: floating point conversion not yet implemented"
-    | Inttoptr
-    | Ptrtoint => failwith "nested Inttoptr or Ptrtoint unsupported"
+    | Inttoptr =>
+      match t1, x, t2 with
+      | TYPE_I 64, DVALUE_I64 i, TYPE_Pointer t => Trace.Vis (ItoP t i) mret
+      | _, _, _ => raise "ERROR: Inttoptr got illegal arguments"
+      end 
+    | Ptrtoint =>
+      match t1, x, t2 with
+      | TYPE_Pointer t, DVALUE_Addr a, TYPE_I 64 => Trace.Vis (PtoI t a) mret
+      | _, _, _ => raise "ERROR: Ptrtoint got illegal arguments"
+      end
     end.
   Arguments eval_conv_h _ _ _ _ : simpl nomatch.
+
   
-  Definition eval_conv conv t1 x t2 : err dvalue :=
+  Definition eval_conv conv t1 x t2 : Trace dvalue :=
     match t1, x with
     | TYPE_I bits, dv =>
         eval_conv_h conv t1 dv t2
@@ -665,6 +674,8 @@ Module StepSemantics(A:ADDR).
         mret ((x,y)::l)
     | _, _ => failwith "combine_lists_err: different lenth lists"
     end.
+
+  
   
 (*
   [eval_expr] is the main entry point for evaluating LLVM expressions.
@@ -673,10 +684,10 @@ Module StepSemantics(A:ADDR).
     - top my be None only for LLVMAst.OP_* cases
     - top must be Some t for LLVMAst.VALUE_* cases
 *)
-Fixpoint eval_expr (e:env) (top:option typ) (o:LLVMAst.value) : err dvalue :=
+Fixpoint eval_expr (e:env) (top:option typ) (o:LLVMAst.value) : Trace dvalue :=
   match o with
   | LLVMAst.VALUE_Ident id => 
-    'i <- local_id_of_ident id;
+    do i <- local_id_of_ident id;
       match lookup_env e i with
       | None => failwith ("lookup_env: id = " ++ (string_of i) ++ " NOT IN env = " ++ (string_of e))
       | Some v => mret v
@@ -685,7 +696,7 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:LLVMAst.value) : err dvalue :=
   | LLVMAst.VALUE_Integer x =>
     match top with
     | None =>  failwith "eval_expr given untyped VALUE_Integer"
-    | Some (TYPE_I bits) => coerce_integer_to_int bits x
+    | Some (TYPE_I bits) => do w <- coerce_integer_to_int bits x; mret w
     | _ => failwith "bad type for constant int"
     end
 
@@ -716,7 +727,7 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:LLVMAst.value) : err dvalue :=
   | LLVMAst.VALUE_Zero_initializer =>
     match top with
     | None => failwith "eval_expr given untyped VALUE_Zero_initializer"
-    | Some t => dv_zero_initializer t
+    | Some t => do w <- dv_zero_initializer t; mret w
     end
 
   | LLVMAst.VALUE_Cstring s =>
@@ -755,31 +766,39 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:LLVMAst.value) : err dvalue :=
   | LLVMAst.OP_IBinop iop t op1 op2 =>
     'v1 <- eval_expr e (Some t) op1;
     'v2 <- eval_expr e (Some t) op2;
-    (eval_iop t iop) v1 v2
+    do w <- (eval_iop t iop) v1 v2;
+    mret w
 
   | LLVMAst.OP_ICmp cmp t op1 op2 => 
     'v1 <- eval_expr e (Some t) op1;                   
     'v2 <- eval_expr e (Some t) op2;
-    (eval_icmp t cmp) v1 v2
+    do w <- (eval_icmp t cmp) v1 v2;
+    mret w
 
   | LLVMAst.OP_FBinop fop fm t op1 op2 =>
     'v1 <- eval_expr e (Some t) op1;
     'v2 <- eval_expr e (Some t) op2;
-    (eval_fop t fop) v1 v2
+    do w <- (eval_fop t fop) v1 v2;
+    mret w
 
   | LLVMAst.OP_FCmp fcmp t op1 op2 => 
     'v1 <- eval_expr e (Some t) op1;
     'v2 <- eval_expr e (Some t) op2;
-    (eval_fcmp fcmp) v1 v2
+    do w <- (eval_fcmp fcmp) v1 v2;
+    mret w
               
   | LLVMAst.OP_Conversion conv t1 op t2 =>
     'v <- eval_expr e (Some t1) op;
-    (eval_conv conv) t1 v t2
+    eval_conv conv t1 v t2
+
                        
   | LLVMAst.OP_GetElementPtr t (ptrtyp, ptrval) idxs =>
     'vptr <- eval_expr e (Some ptrtyp) ptrval;
-      'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) idxs;              
-      failwith "getelementptr not implemented"  (* TODO: Getelementptr *)  
+    'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret v) idxs;
+     match vptr with
+     | DVALUE_Addr a => Trace.Vis (GEP t a vs) mret 
+     | _ => raise "ERROR: GEP got non-pointer value" 
+     end
     
   | LLVMAst.OP_ExtractElement vecop idx =>
     (*    'vec <- monad_app_snd (eval_expr e) vecop;
@@ -808,7 +827,8 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:LLVMAst.value) : err dvalue :=
           '(_, v) <- index_into_str str i;
           loop v tl
         end in
-    loop str idxs
+    do w <- loop str idxs;
+      mret w
         
   | LLVMAst.OP_InsertValue strop eltop idxs =>
     (*
@@ -831,17 +851,27 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:LLVMAst.value) : err dvalue :=
     'cndv <- eval_expr e (Some t) cnd;
     'v1 <- eval_expr e (Some t1) op1;
     'v2 <- eval_expr e (Some t2) op2;
-    eval_select t cndv t1 v1 v2
+    do w <- eval_select t cndv t1 v1 v2;
+    mret w
   end.
 Arguments eval_expr _ _ _ : simpl nomatch.
 
-Fixpoint eval_op (e:env) (o:LLVMAst.value) : err dvalue :=
+Definition eval_op (e:env) (o:LLVMAst.value) : Trace dvalue :=
   eval_expr e None o.
 
 Arguments eval_op _ _ : simpl nomatch.
 
+Inductive result :=
+| Done (v:value)
+| Step (s:state)
+.       
 
-Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (e_init:env) (k:stack) : err state :=
+Definition raise_p {X} (p:pc) s : Trace X := raise (s ++ ": " ++ (string_of p)).
+Definition cont (s:state) : Trace result := mret (Step s).
+Definition halt (v:value) : Trace result := mret (Done v).
+
+
+Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (e_init:env) (k:stack) : Trace result :=
   let eval_phi (e:env) '(iid, Phi t ls) :=
       match assoc RawIDOrd.eq_dec bid_src ls with
       | Some op =>
@@ -851,133 +881,86 @@ Definition jump (CFG:mcfg) (fid:function_id) (bid_src:block_id) (bid_tgt:block_i
       end
   in
   match find_block_entry CFG fid bid_tgt with
-  | None => failwith ("jump: target block " ++ string_of bid_tgt ++ " not found")
+  | None => raise ("jump: target block " ++ string_of bid_tgt ++ " not found")
   | Some (BlockEntry phis pc_entry) =>
-    'e_out <- monad_fold_right eval_phi phis e_init;
-      mret (pc_entry, e_out, k)
+      'e_out <- monad_fold_right eval_phi phis e_init;
+      cont (pc_entry, e_out, k)
   end.
 
-
-
-Definition lift_err_d {A X} (m:err A) (f: A -> Trace X) : Trace X :=
-  match m with
-    | inl s => Trace.Err s
-    | inr b => f b
-  end.
-
-Notation "'do' x <- m ; f" := (lift_err_d m (fun x => f)) 
-   (at level 200, x ident, m at level 100, f at level 200).
-
-
-Inductive result :=
-| Done (v:value)
-| Step (s:state)
-.       
-
-Definition t_raise s : Trace result :=
-  Trace.Err s. 
-
-Definition t_raise_p (p:pc) s := t_raise (s ++ ": " ++ (string_of p)).
-
-Definition cont (s:state) : Trace result := mret (Step s).
-Definition halt (v:value) : Trace result := mret (Done v).
 
 Definition step (CFG:mcfg) (s:state) : Trace result :=
   let '(pc, e, k) := s in
   do cmd <- trywith ("CFG has no instruction at " ++ string_of pc) (fetch CFG pc);
   match cmd with
   | Term (TERM_Ret (t, op)) =>
-    do dv <- eval_expr e (Some t) op;
+    'dv <- eval_expr e (Some t) op;
       match k with
-      | [] => halt dv        (* TODO: Add "final state?" Obs (Fin dv) *)
+      | [] => halt dv       
       | (KRet e' id p') :: k' => cont (p', add_env id dv e', k')
-      | _ => t_raise_p pc "IMPOSSIBLE: Ret op in non-return configuration" 
+      | _ => raise_p pc "IMPOSSIBLE: Ret op in non-return configuration" 
       end
         
   | Term TERM_Ret_void =>
     match k with
     | [] => halt DVALUE_None
     | (KRet_void e' p')::k' => cont (p', e', k')
-    | _ => t_raise_p pc "IMPOSSIBLE: Ret void in non-return configuration"
+    | _ => raise_p pc "IMPOSSIBLE: Ret void in non-return configuration"
     end
       
   | Term (TERM_Br (t,op) br1 br2) =>
-    do dv <- eval_expr e (Some t) op; (* TO SEE *)
-      do br <- match dv with 
-              | DVALUE_I1 comparison_bit =>
-                if Int1.eq comparison_bit Int1.one then
-                  mret br1
-                else
-                  mret br2
-              | _ => failwith "Br got non-bool value"
-              end;
-      do st <- jump CFG (fn pc) (bk pc) br e k;
-      cont st
+    'dv <- eval_expr e (Some t) op; 
+    'br <- match dv with 
+            | DVALUE_I1 comparison_bit =>
+              if Int1.eq comparison_bit Int1.one then
+                mret br1
+              else
+                mret br2
+            | _ => failwith "Br got non-bool value"
+            end;
+    jump CFG (fn pc) (bk pc) br e k
              
   | Term (TERM_Br_1 br) =>
-    do st <- jump CFG (fn pc) (bk pc) br e k;
-    cont st
+    jump CFG (fn pc) (bk pc) br e k
+
              
   (* Currently unhandled LLVM terminators *)                                  
   | Term (TERM_Switch _ _ _)
   | Term (TERM_IndirectBr _ _)
   | Term (TERM_Resume _)
-  | Term (TERM_Invoke _ _ _ _) => t_raise "Unsupport LLVM terminator" 
+  | Term (TERM_Invoke _ _ _ _) => raise "Unsupport LLVM terminator" 
   
   | Inst insn =>  (* instruction *)
     do pc_next <- trywith "no fallthrough intsruction" (incr_pc CFG pc);
       match (pt pc), insn  with
 
-      (* operations that interact with the memory model - they generate effects *)
-        
-      | IId id, INSTR_Op (OP_GetElementPtr t (ptrtyp, ptrval) idxs) =>
-        do vptr <- eval_expr e (Some ptrtyp) ptrval;
-        do vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret v) idxs;
-        match vptr with
-        | DVALUE_Addr a =>
-          Trace.Vis (GEP t a vs) (fun (a:dvalue) => cont (pc_next, add_env id a e, k))
 
-        | _ => t_raise "ERROR: GEP got non-pointer value" 
-        end
+      | IId id, INSTR_Op op =>
+         'dv <- eval_op e op;     
+          cont (pc_next, add_env id dv e, k)
           
-      (* Note: Casts currently assume a 64-bit memory model *)
-      | IId id, INSTR_Op (OP_Conversion Inttoptr (TYPE_I 64) op (TYPE_Pointer t)) =>
-        do iv <- eval_expr e (Some (TYPE_I 64)) op;
-        match iv with
-        | DVALUE_I64 i => Trace.Vis (ItoP t i) (fun (a:dvalue) => cont (pc_next, add_env id a e, k))
-        | _ => t_raise "ERROR: Inttoptr got non-integer value" 
-        end
-
-      | IId id, INSTR_Op (OP_Conversion Ptrtoint (TYPE_Pointer t) ptrval (TYPE_I 64)) =>
-        do vptr <- eval_expr e (Some (TYPE_Pointer t)) ptrval;
-        match vptr with
-        | DVALUE_Addr a => Trace.Vis (PtoI t a) (fun (a:dvalue) => cont (pc_next, add_env id a e, k))
-        | _ => t_raise "ERROR: Ptrtoint got non-pointer value" 
-        end
-
       | IId id, INSTR_Alloca t _ _ =>
         Trace.Vis (Alloca t) (fun (a:value) =>  cont (pc_next, add_env id a e, k))
                 
       | IId id, INSTR_Load _ t (u,ptr) _ =>
-        do dv <- eval_expr e (Some u) ptr;     
+        'dv <- eval_expr e (Some u) ptr;     
           match dv with
           | DVALUE_Addr a => Trace.Vis (Load t a) (fun dv => cont (pc_next, add_env id dv e, k))
-          | _ => t_raise "ERROR: Load got non-pointer value" 
+          | _ => raise "ERROR: Load got non-pointer value" 
           end
             
       | IVoid _, INSTR_Store _ (t, val) (u, ptr) _ => 
-        do dv <- eval_expr e (Some t) val; 
-        do v <- eval_expr e (Some u) ptr;
+        'dv <- eval_expr e (Some t) val; 
+        'v <- eval_expr e (Some u) ptr;
           match v with 
           | DVALUE_Addr a => Trace.Vis (Store a dv) (fun _ => cont (pc_next, e, k))
-          |  _ => t_raise "ERROR: Store got non-pointer value" 
+          |  _ => raise "ERROR: Store got non-pointer value" 
           end
 
-      | _, INSTR_Store _ _ _ _ => t_raise "ERROR: Store to non-void ID" 
+      | _, INSTR_Store _ _ _ _ => raise "ERROR: Store to non-void ID" 
             
       | pt, INSTR_Call (ret_ty, VALUE_Ident (ID_Global fid)) args =>
         (* evaluate the function arguments *)
-        do dvs <-  map_monad (fun '(t, op) => (eval_expr e (Some t) op)) args;
+        'dvs <-  map_monad (fun '(t, op) => (eval_expr e (Some t) op)) args;
         match pt, ret_ty with
             
         | IVoid _, TYPE_Void =>
@@ -997,12 +980,12 @@ Definition step (CFG:mcfg) (s:state) : Trace result :=
                the handler for the call should pass DVALUE_None. *)
             match fid with
             | LLVMAst.Name s => Trace.Vis (Call TYPE_Void s dvs) (fun dv => cont (pc_next, e, k))
-            | _ => t_raise ("step: no function " ++ (string_of fid))
+            | _ => raise ("step: no function " ++ (string_of fid))
             end
 
           end
 
-        | _, TYPE_Void => t_raise "Call mismatch void function called with id"
+        | _, TYPE_Void => raise "Call mismatch void function called with id"
 
                                  
         | IId id, t =>
@@ -1022,35 +1005,29 @@ Definition step (CFG:mcfg) (s:state) : Trace result :=
              *)
             match fid with
             | LLVMAst.Name s => Trace.Vis (Call t s dvs) (fun dv => cont (pc_next, add_env id dv e, k))
-            | _ => t_raise ("step: no function " ++ (string_of fid))
+            | _ => raise ("step: no function " ++ (string_of fid))
             end
 
           end
 
-        | _, _ => t_raise ("step: type mismatch: non-void function called as void")
+        | _, _ => raise ("step: type mismatch: non-void function called as void")
             
         end
           
       (* NOTE : this is where we need to handle function pointers *)
-      | _, INSTR_Call (_, VALUE_Ident (ID_Local _)) _ => t_raise "INSTR_Call to local"
+      | _, INSTR_Call (_, VALUE_Ident (ID_Local _)) _ => raise "INSTR_Call to local"
 
-
-      (* Handle the operations that _don't_ interact with the memory model *)
-      | IId id, INSTR_Op op =>
-        do dv <- eval_op e op;     
-          cont (pc_next, add_env id dv e, k)
-
-      | _, INSTR_Unreachable => t_raise "IMPOSSIBLE: unreachable" 
+      | _, INSTR_Unreachable => raise "IMPOSSIBLE: unreachable" 
 
         (* Currently unhandled LLVM instructions *)
       | _, INSTR_Fence 
       | _, INSTR_AtomicCmpXchg 
       | _, INSTR_AtomicRMW
       | _, INSTR_VAArg 
-      | _, INSTR_LandingPad => t_raise "Unsupported LLVM intsruction" 
+      | _, INSTR_LandingPad => raise "Unsupported LLVM intsruction" 
 
       (* Error states *)                                     
-      | _, _ => t_raise "ID / Instr mismatch void/non-void"
+      | _, _ => raise "ID / Instr mismatch void/non-void"
       end
   end.
 
@@ -1063,24 +1040,12 @@ Definition init_state (CFG:mcfg) (fname:string) : err state :=
   let 'FunctionEntry ids pc_f := fentry in
     mret (pc_f, (@ENV.empty value), []).
 
-(* Note: codomain is D'  *)
+
 CoFixpoint step_sem (CFG:mcfg) (r:result) : Trace value :=
   match r with
   | Done v => mret v
   | Step s => 'x <- step CFG s ; step_sem CFG x
   end.
-
-(*
-  match (step CFG s) with
-  | Trace.Ret (Step s') => Tau (step_sem CFG s')
-  | Trace.Ret (Done v) => mret v
-  | Trace.Vis io k  => Vis (Err s)
-  | Obs (Fin s) => Vis (Fin s)
-  | Obs (Eff m) => Vis (Eff (effects_map (step_sem CFG) m))
-  end.
-
-Definition sem (CFG:mcfg) (s:state) : Trace () := hide_taus (step_sem CFG s).
-*)
 
 Section Properties.
 (* environment facts -------------------------------------------------------- *)

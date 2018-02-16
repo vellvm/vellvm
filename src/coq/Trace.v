@@ -93,9 +93,11 @@ Definition mapM {E X Y} (f:X -> Y) (s: M E X) : M E Y :=
 Instance functor_M {E} : Functor (M E) := (@mapM E).
 Instance monad_M {E} : (@Monad (M E)) (@mapM E) := { mret X x := Ret x; mbind := @bindM E }.
 
-Module MonadVerif.
 
-  
+
+(* Properties of Traces ----------------------------------------------------- *)
+
+Module MonadVerif.
 (* Monad laws:
    - return x >>= k   =   k x
    - s >>= return   =   w
