@@ -386,6 +386,7 @@ Record modul (FnBody:Set) : Set :=
     m_name: option string;
     m_target: option string;
     m_datalayout: option string;
+    m_type_defs: list (ident * typ);
     m_globals: list global;
     m_declarations: list declaration;
     m_definitions: list (definition FnBody);
@@ -394,6 +395,7 @@ Record modul (FnBody:Set) : Set :=
 Arguments m_name {_} _.
 Arguments m_target {_} _.
 Arguments m_datalayout {_} _.
+Arguments m_type_defs {_} _.
 Arguments m_globals {_} _.
 Arguments m_declarations {_} _.
 Arguments m_definitions {_} _.

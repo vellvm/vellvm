@@ -198,6 +198,7 @@ Definition mcfg_of_modul (m:modul (list block)) : option mcfg :=
     m_name := m_name m;
     m_target := m_target m;
     m_datalayout := m_datalayout m;
+    m_type_defs := m_type_defs m;
     m_globals := m_globals m;
     m_declarations := m_declarations m;
     m_definitions := defns

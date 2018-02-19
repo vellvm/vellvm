@@ -23,7 +23,7 @@ let rec step m =
   | Trace.Tau x -> step x
   | Trace.Ret v -> print_int_dvalue v
   | Trace.Err s -> failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
-  | Trace.Vis ((SS.E.Call(t, f, args)), k) ->
+  | Trace.Vis (SS.INTERACTION_INTERFACE.Call(t, f, args), k) ->
     (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n" (Camlcoq.camlstring_of_coqstring f));
     step (k (Obj.magic (SS.DVALUE_I64 StepSemantics.Int64.zero)))
     

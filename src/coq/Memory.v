@@ -6,9 +6,15 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Module A : Vellvm.StepSemantics.ADDR with Definition addr := nat.
-  Definition addr := nat.
-  Definition null := 0%nat.   (* TODO this is unsound but convenient *)
+Inductive Addr :=
+| Null
+| Ptr (n:nat)
+| Fun (s:string)
+.      
+
+Module A : Vellvm.StepSemantics.ADDR with Definition addr := Addr.
+  Definition addr := Addr.
+  Definition null := Null.   (* TODO this is unsound but convenient *)
 End A.  
 
 Module SS := StepSemantics.StepSemantics(A).
@@ -18,26 +24,39 @@ Definition memory := list dvalue.
 Definition undef t := DVALUE_Undef t None.
 
 Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (list dvalue * X) :=
-  match e with
+  match e in IO Y return (IO Y) + (list dvalue * Y) with 
   | Alloca t =>
     inr  ((m ++ [undef t])%list,
-          DVALUE_Addr (List.length m))
+          DVALUE_Addr (Ptr (List.length m)))
 
   | Load t a =>
     inr (m,
-         nth_default (undef t) m a)
-
+         match a with
+         | DVALUE_Addr (Ptr n) => nth_default (undef t) m n
+         | _ => undef t
+         end)
+        
   | Store a v =>
-    inr (replace m a v,
-         ())
+    inr (
+        match a with
+        | DVALUE_Addr (Ptr n) => replace m n v
+        | _ => m   (* TODO: should fail! *)
+        end,
+        ())
 
-  | GEP t a vs => inl e (* TODO: GEP semantics *)
+  | GEP t a vs => inl (GEP t a vs) (* TODO: GEP semantics *)
 
-  | ItoP t i => inl e (* TODO: ItoP semantics *)
+  | ItoP t i => inl (ItoP t i) (* TODO: ItoP semantics *)
 
-  | PtoI t a => inl e (* TODO: ItoP semantics *)                     
+  | PtoI t a => inl (PtoI t a) (* TODO: ItoP semantics *)                     
                        
-  | Call _ _ _  => inl e
+  | Call t f args  => inl (Call t f args)
+
+                         
+  | DeclareFun f =>
+    (* TODO: should check for re-declarations and maintain that state in the memory *)
+    inr (m,
+         DVALUE_Addr (Fun f))
   end.
 
 (*

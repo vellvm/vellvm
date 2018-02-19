@@ -908,6 +908,10 @@ Proof.
       try solve [left; auto];
       try solve [lift_decide_eq].
 
+  - destruct a; destruct a0; try (left; tauto); try (right; intro H; inversion H; tauto).
+    destruct (n == n0); subst; auto. right. intro H. inversion H. tauto.
+    destruct (s == s0). subst; auto. right. intro H. inversion H. tauto.
+
   (* DVALUE_Struct ... *)
   - destruct fields; auto.
   - refine

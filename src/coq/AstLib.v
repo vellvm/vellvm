@@ -641,11 +641,19 @@ Definition definitions_of {X} (tle : toplevel_entity X) : list (definition X) :=
   | _ => []
   end.
 
+Definition type_defs_of {X} (tle : toplevel_entity X) : list (ident * typ) :=
+  match tle with
+  | TLE_Type_decl id t => [(id,t)]
+  | _ => []
+  end.
+
+
 Definition modul_of_toplevel_entities {X} (tles : list (toplevel_entity X)) : modul X :=
   {|
     m_name := find_map filename_of tles;
     m_target := find_map target_of tles;
     m_datalayout := find_map datalayout_of tles;
+    m_type_defs := flat_map type_defs_of tles;
     m_globals := flat_map globals_of tles;
     m_declarations := flat_map declarations_of tles;
     m_definitions := flat_map definitions_of tles;
