@@ -823,7 +823,7 @@ Proof.
 Defined.
 
 Definition dvalue_ind':=
-  fun (P : dvalue -> Set) (f : forall p : instr_id, P (DVALUE_CodePointer p))
+  fun (P : dvalue -> Set) (f : forall p : function_id, P (DVALUE_FunPtr p))
     (f0 : forall a : A.addr, P (DVALUE_Addr a))
     (f1 : forall x : int1, P (DVALUE_I1 x))
     (f2 : forall x : int32, P (DVALUE_I32 x))
@@ -855,7 +855,7 @@ Definition dvalue_ind':=
           P (DVALUE_Vector ((t,v) :: elts)))
      =>
     fix prove_dv (d : dvalue) := match d as d0 return (P d0) with
-      | DVALUE_CodePointer x => f x
+      | DVALUE_FunPtr x => f x
       | DVALUE_Addr x => f0 x
       | DVALUE_I1 x => f1 x
       | DVALUE_I32 x => f2 x

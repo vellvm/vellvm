@@ -56,7 +56,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (list dvalue * X) :=
   | DeclareFun f =>
     (* TODO: should check for re-declarations and maintain that state in the memory *)
     inr (m,
-         DVALUE_Addr (Fun f))
+         DVALUE_FunPtr f)
   end.
 
 (*
