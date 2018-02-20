@@ -75,6 +75,20 @@ CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
   | Trace.Err x => d
   end.
 
+
+Definition run_with_memory prog : option (Trace dvalue) :=
+  let scfg := AstLib.modul_of_toplevel_entities prog in
+  match CFG.mcfg_of_modul scfg with
+  | None => None
+  | Some mcfg =>
+    mret
+      (memD [] 
+      ('s <- SS.init_state mcfg "main";
+         SS.step_sem mcfg (SS.Step s)))
+  end.
+
+
+
 (*
 Fixpoint MemDFin (m:memory) (d:Trace ()) (steps:nat) : option memory :=
   match steps with

@@ -31,15 +31,7 @@ let rec step m =
       
 
 let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) =
-  let scfg = AstLib.modul_of_toplevel_entities prog in
-  match CFG.mcfg_of_modul scfg with
+  match Memory.run_with_memory prog with
   | None -> failwith "bad module"
-  | Some mcfg ->
-    begin match SS.init_state mcfg (Camlcoq.coqstring_of_camlstring "main") with
-      | Datatypes.Coq_inl err -> failwith (Camlcoq.camlstring_of_coqstring err)
-      | Datatypes.Coq_inr s ->
-        let sem = SS.step_sem mcfg (Memory.SS.Step s) in
-        let mem = memD [] sem in
-        step mem
-    end
+  | Some t -> step t
   
