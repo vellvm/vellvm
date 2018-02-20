@@ -62,7 +62,7 @@ Module StepSemantics(A:ADDR).
   | DVALUE_I64 (x:int64)
   | DVALUE_Double (x:ll_double)
   | DVALUE_Float (x:ll_float)
-  | DVALUE_Undef (t:typ) (v:option value)
+  | DVALUE_Undef (t:typ) (v:option exp)
   | DVALUE_Poison
   | DVALUE_None
   | DVALUE_Struct        (fields: list (typ * dvalue))
@@ -702,79 +702,79 @@ Module StepSemantics(A:ADDR).
     - top my be None only for LLVMAst.OP_* cases
     - top must be Some t for LLVMAst.VALUE_* cases
 *)
-Fixpoint eval_expr (e:env) (top:option typ) (o:value) : Trace dvalue :=
+Fixpoint eval_expr (e:env) (top:option typ) (o:exp) : Trace dvalue :=
   match o with
-  | LLVMAst.VALUE_Ident id => 
+  | LLVMAst.EXP_Ident id => 
     do i <- local_id_of_ident id;
     lookup_env e i 
 
-  | LLVMAst.VALUE_Integer x =>
+  | LLVMAst.EXP_Integer x =>
     match top with
-    | None =>  failwith "eval_expr given untyped VALUE_Integer"
+    | None =>  failwith "eval_expr given untyped EXP_Integer"
     | Some (TYPE_I bits) => do w <- coerce_integer_to_int bits x; mret w
     | _ => failwith "bad type for constant int"
     end
 
-  | LLVMAst.VALUE_Float x   =>
+  | LLVMAst.EXP_Float x   =>
     match top with
-    | None => failwith "eval_expr given untyped VALUE_Float"
+    | None => failwith "eval_expr given untyped EXP_Float"
     | Some TYPE_Float  =>  mret (DVALUE_Float (Float32.of_double x))
     | Some TYPE_Double =>  mret (DVALUE_Double x)
     | _ => failwith "bad type for constant float"
     end
 
-  | LLVMAst.VALUE_Hex x     =>
+  | LLVMAst.EXP_Hex x     =>
     match top with
-    | None => failwith "eval_expr given untyped VALUE_Hex"
+    | None => failwith "eval_expr given untyped EXP_Hex"
     | Some TYPE_Float  =>  mret (DVALUE_Float (Float32.of_double x))
     | Some TYPE_Double =>  mret (DVALUE_Double x)
     | _ => failwith "bad type for constant hex float"
     end
 
-  | LLVMAst.VALUE_Bool b    =>
+  | LLVMAst.EXP_Bool b    =>
     match b with
     | true => mret (DVALUE_I1 Int1.one)
     | false => mret (DVALUE_I1 Int1.zero)
     end
 
-  | LLVMAst.VALUE_Null      => mret (DVALUE_Addr A.null)
+  | LLVMAst.EXP_Null      => mret (DVALUE_Addr A.null)
 
-  | LLVMAst.VALUE_Zero_initializer =>
+  | LLVMAst.EXP_Zero_initializer =>
     match top with
-    | None => failwith "eval_expr given untyped VALUE_Zero_initializer"
+    | None => failwith "eval_expr given untyped EXP_Zero_initializer"
     | Some t => do w <- dv_zero_initializer t; mret w
     end
 
-  | LLVMAst.VALUE_Cstring s =>
-    failwith "VALUE_Cstring not yet implemented"
+  | LLVMAst.EXP_Cstring s =>
+    failwith "EXP_Cstring not yet implemented"
 
-  | LLVMAst.VALUE_Undef     =>
+  | LLVMAst.EXP_Undef     =>
     match top with
-    | None => failwith "eval_expr given untyped VALUE_Undef"
+    | None => failwith "eval_expr given untyped EXP_Undef"
     | Some t => mret (DVALUE_Undef t None)
     end
 
   (* Question: should we do any typechecking for aggregate types here? *)
   (* Option 1: do no typechecking: *)
-  | LLVMAst.VALUE_Struct es =>
+  | LLVMAst.EXP_Struct es =>
       'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) es;
       mret (DVALUE_Struct vs)
 
   (* Option 2: do a little bit of typechecking *)
-  | LLVMAst.VALUE_Packed_struct es =>
+  | LLVMAst.EXP_Packed_struct es =>
     match top with
-    | None => failwith "eval_expr given untyped VALUE_Struct"
+    | None => failwith "eval_expr given untyped EXP_Struct"
     | Some (TYPE_Packed_struct _) =>
       'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) es;
       mret (DVALUE_Packed_struct vs)
     | _ => failwith "bad type for VALUE_Packed_struct"
     end
 
-  | LLVMAst.VALUE_Array es =>
+  | LLVMAst.EXP_Array es =>
     'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) es;    
      mret (DVALUE_Array vs)
     
-  | LLVMAst.VALUE_Vector es =>
+  | LLVMAst.EXP_Vector es =>
     'vs <- map_monad (fun '(t,ex) => 'v <- eval_expr e (Some t) ex; mret (t, v)) es;        
      mret (DVALUE_Vector vs)
 
@@ -868,7 +868,7 @@ Fixpoint eval_expr (e:env) (top:option typ) (o:value) : Trace dvalue :=
   end.
 Arguments eval_expr _ _ _ : simpl nomatch.
 
-Definition eval_op (e:env) (o:value) : Trace dvalue :=
+Definition eval_op (e:env) (o:exp) : Trace dvalue :=
   eval_expr e None o.
 
 Arguments eval_op _ _ : simpl nomatch.
@@ -964,7 +964,7 @@ Definition step (CFG:mcfg) (s:state) : Trace result :=
 
       | _, INSTR_Store _ _ _ _ => raise "ERROR: Store to non-void ID" 
 
-      | pt, INSTR_Call (ret_ty, VALUE_Ident (ID_Global fid)) args =>
+      | pt, INSTR_Call (ret_ty, EXP_Ident (ID_Global fid)) args =>
         (* evaluate the function arguments *)
         'dvs <-  map_monad (fun '(t, op) => (eval_expr e (Some t) op)) args;
         match pt, ret_ty with
@@ -1022,7 +1022,7 @@ Definition step (CFG:mcfg) (s:state) : Trace result :=
 
           
       (* NOTE : this is where we need to handle function pointers *)
-      | _, INSTR_Call (_, VALUE_Ident (ID_Local _)) _ => raise "INSTR_Call to local"
+      | _, INSTR_Call (_, EXP_Ident (ID_Local _)) _ => raise "INSTR_Call to local"
 
       | _, INSTR_Unreachable => raise "IMPOSSIBLE: unreachable" 
 
@@ -1063,7 +1063,7 @@ Definition initialize_globals (gs:list global) (g:genv) : Trace unit :=
        let t := (g_typ glb) in
        'a <- lookup_env g (g_ident glb);
        'dv <-
-           match (g_value glb) with
+           match (g_exp glb) with
            | None => mret (DVALUE_Undef t None)
            | Some e => eval_expr (@ENV.empty _) (Some t) e
            end;

@@ -262,43 +262,43 @@ and conversion_type : Format.formatter -> LLVMAst.conversion_type -> unit =
                | Ptrtoint -> "ptrtoint"
                | Bitcast  -> "bitcast")
 
-and value : Format.formatter -> LLVMAst.value -> unit =
+and exp : Format.formatter -> LLVMAst.exp -> unit =
   fun (ppf:Format.formatter) vv ->
     match vv with
-  | VALUE_Ident i           -> ident ppf i
-  | VALUE_Integer i         -> pp_print_int ppf (to_int i)
-  | VALUE_Float f           -> pp_print_float ppf (float_of_coqfloat f)
-  | VALUE_Hex h             -> fprintf ppf "0x%Lx" (Int64.bits_of_float (float_of_coqfloat h))
-  | VALUE_Bool b            -> pp_print_bool ppf b
-  | VALUE_Null              -> pp_print_string ppf "null"
-  | VALUE_Undef             -> pp_print_string ppf "undef"
-  | VALUE_Array tvl         -> fprintf ppf "[%a]"
-                                       (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
-  | VALUE_Vector tvl        -> fprintf ppf "<%a>"
-                                       (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
-  | VALUE_Struct tvl        -> fprintf ppf "{%a}"
-                                       (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
-  | VALUE_Packed_struct tvl -> fprintf ppf "<{%a}>"
-                                       (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
-  | VALUE_Zero_initializer  -> pp_print_string ppf "zeroinitializer"
+  | EXP_Ident i           -> ident ppf i
+  | EXP_Integer i         -> pp_print_int ppf (to_int i)
+  | EXP_Float f           -> pp_print_float ppf (float_of_coqfloat f)
+  | EXP_Hex h             -> fprintf ppf "0x%Lx" (Int64.bits_of_float (float_of_coqfloat h))
+  | EXP_Bool b            -> pp_print_bool ppf b
+  | EXP_Null              -> pp_print_string ppf "null"
+  | EXP_Undef             -> pp_print_string ppf "undef"
+  | EXP_Array tvl         -> fprintf ppf "[%a]"
+                                       (pp_print_list ~pp_sep:pp_comma_space texp) tvl
+  | EXP_Vector tvl        -> fprintf ppf "<%a>"
+                                       (pp_print_list ~pp_sep:pp_comma_space texp) tvl
+  | EXP_Struct tvl        -> fprintf ppf "{%a}"
+                                       (pp_print_list ~pp_sep:pp_comma_space texp) tvl
+  | EXP_Packed_struct tvl -> fprintf ppf "<{%a}>"
+                                       (pp_print_list ~pp_sep:pp_comma_space texp) tvl
+  | EXP_Zero_initializer  -> pp_print_string ppf "zeroinitializer"
 
-  | VALUE_Cstring s -> fprintf ppf "c\"%s\"" (of_str s)
+  | EXP_Cstring s -> fprintf ppf "c\"%s\"" (of_str s)
 
   | OP_IBinop (op, t, v1, v2) ->
      fprintf ppf "%a (%a %a, %a %a)"
              ibinop op
              typ t
-             value v1
+             exp v1
              typ t
-             value v2
+             exp v2
 
   | OP_ICmp (c, t, v1, v2) ->
      fprintf ppf "icmp %a (%a %a, %a %a)"
              icmp c
              typ t
-             value v1
+             exp v1
              typ t
-             value v2
+             exp v2
 
   | OP_FBinop (op, f, t, v1, v2) ->
      fbinop ppf op ;
@@ -306,95 +306,95 @@ and value : Format.formatter -> LLVMAst.value -> unit =
                       pp_print_list ~pp_sep:pp_space fast_math ppf f) ;
      fprintf ppf " (%a %a, %a %a)"
              typ t
-             value v1
+             exp v1
              typ t
-             value v2
+             exp v2
 
   | OP_FCmp (c, t, v1, v2) ->
      fprintf ppf "fcmp %a (%a %a, %a %a)"
              fcmp c
              typ t
-             value v1
+             exp v1
              typ t
-             value v2
+             exp v2
 
   | OP_Conversion (c, t1, v, t2) ->
      fprintf ppf "%a (%a %a to %a)"
              conversion_type c
              typ t1
-             value v
+             exp v
              typ t2
 
   | OP_GetElementPtr (t, tv, tvl) ->
     fprintf ppf "getelementptr (%a, %a, %a)"
              typ t
-             tvalue tv
-             (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
+             texp tv
+             (pp_print_list ~pp_sep:pp_comma_space texp) tvl
 
   | OP_Select (if_, then_, else_) ->
      fprintf ppf "select (%a, %a, %a)"
-             tvalue if_
-             tvalue then_
-             tvalue else_
+             texp if_
+             texp then_
+             texp else_
 
   | OP_ExtractElement (vec, idx) ->
      fprintf ppf "extractelement (%a, %a)"
-             tvalue vec
-             tvalue idx
+             texp vec
+             texp idx
 
   | OP_InsertElement (vec, new_val, idx) ->
      fprintf ppf "insertelement (%a, %a, %a)"
-             tvalue vec
-             tvalue new_val
-             tvalue idx
+             texp vec
+             texp new_val
+             texp idx
 
   | OP_ExtractValue (agg, idx) ->
      fprintf ppf "extractvalue (%a, %a)"
-             tvalue agg
+             texp agg
              (pp_print_list ~pp_sep:pp_comma_space pp_print_int) (List.map to_int idx)
 
   | OP_InsertValue (agg, new_val, idx) ->
      fprintf ppf "insertvalue (%a, %a, %a)"
-             tvalue agg
-             tvalue new_val
+             texp agg
+             texp new_val
              (pp_print_list ~pp_sep:pp_comma_space pp_print_int) (List.map to_int idx)
 
   | OP_ShuffleVector (v1, v2, mask) ->
      fprintf ppf "shufflevector (%a, %a, %a)"
-             tvalue v1
-             tvalue v2
-             tvalue mask
+             texp v1
+             texp v2
+             texp mask
 
-and inst_value : Format.formatter -> LLVMAst.value -> unit =
+and inst_exp : Format.formatter -> LLVMAst.exp -> unit =
   fun ppf vv ->
     match vv with
-  | VALUE_Ident _ 
-  | VALUE_Integer _ 
-  | VALUE_Float _
-  | VALUE_Hex _         
-  | VALUE_Bool _    
-  | VALUE_Null      
-  | VALUE_Undef     
-  | VALUE_Array _
-  | VALUE_Vector _  
-  | VALUE_Struct _
-  | VALUE_Packed_struct _
-  | VALUE_Zero_initializer 
-  | VALUE_Cstring _ -> assert false   (* there should be no "raw" values as instructions *)
+  | EXP_Ident _ 
+  | EXP_Integer _ 
+  | EXP_Float _
+  | EXP_Hex _         
+  | EXP_Bool _    
+  | EXP_Null      
+  | EXP_Undef     
+  | EXP_Array _
+  | EXP_Vector _  
+  | EXP_Struct _
+  | EXP_Packed_struct _
+  | EXP_Zero_initializer 
+  | EXP_Cstring _ -> assert false   (* there should be no "raw" exps as instructions *)
   
   | OP_IBinop (op, t, v1, v2) ->
      fprintf ppf "%a %a %a, %a"
              ibinop op
              typ t
-             value v1
-             value v2
+             exp v1
+             exp v2
 
   | OP_ICmp (c, t, v1, v2) ->
      fprintf ppf "icmp %a %a %a, %a"
              icmp c
              typ t
-             value v1
-             value v2
+             exp v1
+             exp v2
 
   | OP_FBinop (op, f, t, v1, v2) ->
      fbinop ppf op ;
@@ -402,62 +402,62 @@ and inst_value : Format.formatter -> LLVMAst.value -> unit =
                       pp_print_list ~pp_sep:pp_space fast_math ppf f) ;
      fprintf ppf " %a %a, %a"
              typ t
-             value v1
-             value v2
+             exp v1
+             exp v2
 
   | OP_FCmp (c, t, v1, v2) ->
      fprintf ppf "fcmp %a %a %a, %a"
              fcmp c
              typ t
-             value v1
-             value v2
+             exp v1
+             exp v2
 
   | OP_Conversion (c, t1, v, t2) ->
      fprintf ppf "%a %a %a to %a"
              conversion_type c
              typ t1
-             value v
+             exp v
              typ t2
 
   | OP_GetElementPtr (t, tv, tvl) ->
     fprintf ppf "getelementptr %a, %a, %a"
              typ t
-             tvalue tv
-             (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
+             texp tv
+             (pp_print_list ~pp_sep:pp_comma_space texp) tvl
 
   | OP_Select (if_, then_, else_) ->
      fprintf ppf "select %a, %a, %a"
-             tvalue if_
-             tvalue then_
-             tvalue else_
+             texp if_
+             texp then_
+             texp else_
 
   | OP_ExtractElement (vec, idx) ->
      fprintf ppf "extractelement %a, %a"
-             tvalue vec
-             tvalue idx
+             texp vec
+             texp idx
 
   | OP_InsertElement (vec, new_val, idx) ->
      fprintf ppf "insertelement %a, %a, %a"
-             tvalue vec
-             tvalue new_val
-             tvalue idx
+             texp vec
+             texp new_val
+             texp idx
 
   | OP_ExtractValue (agg, idx) ->
      fprintf ppf "extractvalue %a, %a"
-             tvalue agg
+             texp agg
              (pp_print_list ~pp_sep:pp_comma_space pp_print_int) (List.map to_int idx)
 
   | OP_InsertValue (agg, new_val, idx) ->
      fprintf ppf "insertvalue %a, %a, %a"
-             tvalue agg
-             tvalue new_val
+             texp agg
+             texp new_val
              (pp_print_list ~pp_sep:pp_comma_space pp_print_int) (List.map to_int idx)
 
   | OP_ShuffleVector (v1, v2, mask) ->
      fprintf ppf "shufflevector %a, %a, %a"
-             tvalue v1
-             tvalue v2
-             tvalue mask
+             texp v1
+             texp v2
+             texp mask
 
 
 and phi : Format.formatter -> LLVMAst.phi -> unit =
@@ -467,7 +467,7 @@ and phi : Format.formatter -> LLVMAst.phi -> unit =
      fprintf ppf "phi %a [%a]"
              typ t
              (pp_print_list ~pp_sep:(pp_sep "], [")
-                            (fun ppf (i, v) -> value ppf v ;
+                            (fun ppf (i, v) -> exp ppf v ;
                                                pp_print_string ppf ", " ;
                                                lident ppf i)) vil
 
@@ -476,17 +476,17 @@ and instr : Format.formatter -> LLVMAst.instr -> unit =
   fun ppf ->
   function
 
-  | INSTR_Op v -> inst_value ppf v
+  | INSTR_Op v -> inst_exp ppf v
 
   | INSTR_Call (tv, tvl) ->
      fprintf ppf "call %a(%a)"
-             tvalue tv
-             (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
+             texp tv
+             (pp_print_list ~pp_sep:pp_comma_space texp) tvl
 
   | INSTR_Alloca (t, n, a) ->
      fprintf ppf "alloca %a" typ t ;
      (match n with None -> ()
-                 | Some n -> fprintf ppf ", %a" tvalue n) ;
+                 | Some n -> fprintf ppf ", %a" texp n) ;
      (match a with None -> ()
                  | Some a -> fprintf ppf ", align %d" (to_int a))
 
@@ -495,7 +495,7 @@ and instr : Format.formatter -> LLVMAst.instr -> unit =
      if vol then pp_print_string ppf "volatile " ;
      (typ ppf t);
      pp_print_string ppf ", ";
-     tvalue ppf tv ;
+     texp ppf tv ;
      (match a with None -> ()
                  | Some a -> fprintf ppf ", align %d" (to_int a))
 
@@ -508,7 +508,7 @@ and instr : Format.formatter -> LLVMAst.instr -> unit =
   | INSTR_Store (vol, v, ptr, a) ->
      pp_print_string ppf "store " ;
      if vol then pp_print_string ppf "volatile " ;
-     fprintf ppf "%a, %a" tvalue v tvalue ptr ;
+     fprintf ppf "%a, %a" texp v texp ptr ;
      (match a with None -> ()
                  | Some a -> fprintf ppf ", align %d" (to_int a))
 
@@ -527,35 +527,35 @@ and terminator : Format.formatter -> LLVMAst.terminator -> unit =
   fun ppf ->
   function
 
-  | TERM_Ret (t, v)       -> fprintf ppf "ret %a" tvalue (t, v)
+  | TERM_Ret (t, v)       -> fprintf ppf "ret %a" texp (t, v)
 
   | TERM_Ret_void         -> pp_print_string ppf "ret void"
 
   | TERM_Br (c, i1, i2)   ->
-     fprintf ppf "br %a, %a, %a" tvalue c branch_label i1 branch_label i2
+     fprintf ppf "br %a, %a, %a" texp c branch_label i1 branch_label i2
 
   | TERM_Br_1 i          -> fprintf ppf "br %a" branch_label i
 
   | TERM_Switch (c, def, cases) ->
      fprintf ppf "switch %a, %a [%a]"
-             tvalue c
+             texp c
              branch_label def
              (pp_print_list ~pp_sep:pp_space
-                            (fun ppf (v, i) -> tvalue ppf v ;
+                            (fun ppf (v, i) -> texp ppf v ;
                                                pp_print_string ppf ", " ;
                                                branch_label ppf i)) cases
 
-  | TERM_Resume (t, v) -> fprintf ppf "resume %a" tvalue (t, v)
+  | TERM_Resume (t, v) -> fprintf ppf "resume %a" texp (t, v)
 
   | TERM_IndirectBr (tv, til) ->
     fprintf ppf "indirectbr %a, [%a]"
-      tvalue tv
+      texp tv
       (pp_print_list ~pp_sep:pp_comma_space branch_label) til
 
   | TERM_Invoke (ti, tvl, i2, i3) ->
      fprintf ppf "invoke %a(%a) to %a unwind %a"
              tident ti
-             (pp_print_list ~pp_sep:pp_comma_space tvalue) tvl
+             (pp_print_list ~pp_sep:pp_comma_space texp) tvl
              branch_label i2
              branch_label i3
 
@@ -577,7 +577,7 @@ and instr_id : Format.formatter -> LLVMAst.instr_id -> unit =
     | IVoid n -> fprintf ppf "; void instr %d" (to_int n); pp_force_newline ppf ()
   
 
-and tvalue ppf (t, v) = fprintf ppf "%a %a" typ t value v
+and texp ppf (t, v) = fprintf ppf "%a %a" typ t exp v
 
 and tident ppf (t, v) = fprintf ppf "%a %a" typ t ident v
 
@@ -602,7 +602,7 @@ and toplevel_entity : Format.formatter -> (LLVMAst.block list) LLVMAst.toplevel_
 and metadata : Format.formatter -> LLVMAst.metadata -> unit =
   fun ppf ->
   function
-  | METADATA_Const v  -> tvalue ppf v
+  | METADATA_Const v  -> texp ppf v
   | METADATA_Null     -> pp_print_string ppf "null"
   | METADATA_Id i     -> fprintf ppf "!%s" (str_of_raw_id i)
   | METADATA_String s -> fprintf ppf "!%s" (of_str s)
@@ -618,7 +618,7 @@ and global : Format.formatter -> LLVMAst.global -> unit =
     g_ident;
     g_typ;
     g_constant;
-    g_value;
+    g_exp;
 
     g_linkage;
     g_visibility = visibility;
@@ -631,7 +631,7 @@ and global : Format.formatter -> LLVMAst.global -> unit =
                            | Some l -> linkage ppf l; pp_print_string ppf " "
        );
        (fprintf ppf "%s %a" (if g_constant then "constant" else "global") typ g_typ) ;
-       (match g_value with None -> () | Some v -> (pp_print_string ppf " "; value ppf v)) ;
+       (match g_exp with None -> () | Some v -> (pp_print_string ppf " "; exp ppf v)) ;
        (match s with None -> ()
                    | Some s -> fprintf ppf ", section %s" (of_str s)) ;
        (match a with None -> ()

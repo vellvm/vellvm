@@ -354,20 +354,20 @@ Qed.
 
 End TypInd.
 
-Section ValueInd.
+Section ExpInd.
 (*  
-| VALUE_Ident   (id:ident)  
-| VALUE_Integer (x:int)
-| VALUE_Float   (f:float)
-| VALUE_Bool    (b:bool)
-| VALUE_Null
-| VALUE_Zero_initializer
-| VALUE_Cstring (s:string)
-| VALUE_Undef
-| VALUE_Struct        (fields: list (typ * a))
-| VALUE_Packed_struct (fields: list (typ * a))
-| VALUE_Array         (elts: list (typ * a))
-| VALUE_Vector        (elts: list (typ * a))
+| EXP_Ident   (id:ident)  
+| EXP_Integer (x:int)
+| EXP_Float   (f:float)
+| EXP_Bool    (b:bool)
+| EXP_Null
+| EXP_Zero_initializer
+| EXP_Cstring (s:string)
+| EXP_Undef
+| EXP_Struct        (fields: list (typ * a))
+| EXP_Packed_struct (fields: list (typ * a))
+| EXP_Array         (elts: list (typ * a))
+| EXP_Vector        (elts: list (typ * a))
 | OP_IBinop           (iop:ibinop) (t:typ) (v1:a) (v2:a)  
 | OP_ICmp             (cmp:icmp)   (t:typ) (v1:a) (v2:a)
 | OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:typ) (v1:a) (v2:a)
@@ -386,37 +386,37 @@ Section ValueInd.
 Inductive value : Set :=
 | SV : Expr value -> value.
 *)
-  Variable P : value -> Prop.
-  Hypothesis IH_Ident   : forall (id:ident), P ((VALUE_Ident id)).
-  Hypothesis IH_Integer : forall (x:int), P ((VALUE_Integer x)).
-  Hypothesis IH_Float   : forall (f:float), P ((VALUE_Float f)).
-  Hypothesis IH_Hex     : forall (h:float), P ((VALUE_Hex h)).  
-  Hypothesis IH_Bool    : forall (b:bool), P ((VALUE_Bool b)).
-  Hypothesis IH_Null    : P ((VALUE_Null )).
-  Hypothesis IH_Zero_initializer : P ((VALUE_Zero_initializer )).
-  Hypothesis IH_Cstring : forall (s:string), P ((VALUE_Cstring s)).
-  Hypothesis IH_Undef   : P ((VALUE_Undef )).
-  Hypothesis IH_Struct  : forall (fields: list (typ * value)), (forall p, In p fields -> P (snd p)) -> P ((VALUE_Struct fields)).
-  Hypothesis IH_Packed_struct : forall (fields: list (typ * value)), (forall p, In p fields -> P (snd p)) -> P ((VALUE_Packed_struct fields)).
-  Hypothesis IH_Array   : forall (elts: list (typ * value)), (forall p, In p elts -> P (snd p)) -> P ((VALUE_Array elts)).
-  Hypothesis IH_Vector  : forall (elts: list (typ * value)), (forall p, In p elts -> P (snd p)) -> P ((VALUE_Vector elts)).
-  Hypothesis IH_IBinop  : forall (iop:ibinop) (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P ((OP_IBinop iop t v1 v2)).
-  Hypothesis IH_ICmp    : forall (cmp:icmp)   (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P ((OP_ICmp cmp t v1 v2)).
-  Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P ((OP_FBinop fop fm t v1 v2)).
-  Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:typ) (v1:value) (v2:value), P v1 -> P v2 -> P ((OP_FCmp cmp t v1 v2)).
-  Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:typ) (v:value) (t_to:typ), P v -> P ((OP_Conversion conv t_from v t_to)).
-  Hypothesis IH_GetElementPtr : forall (t:typ) (ptrval:(typ * value)) (idxs:list (typ * value)),
+  Variable P : exp -> Prop.
+  Hypothesis IH_Ident   : forall (id:ident), P ((EXP_Ident id)).
+  Hypothesis IH_Integer : forall (x:int), P ((EXP_Integer x)).
+  Hypothesis IH_Float   : forall (f:float), P ((EXP_Float f)).
+  Hypothesis IH_Hex     : forall (h:float), P ((EXP_Hex h)).  
+  Hypothesis IH_Bool    : forall (b:bool), P ((EXP_Bool b)).
+  Hypothesis IH_Null    : P ((EXP_Null )).
+  Hypothesis IH_Zero_initializer : P ((EXP_Zero_initializer )).
+  Hypothesis IH_Cstring : forall (s:string), P ((EXP_Cstring s)).
+  Hypothesis IH_Undef   : P ((EXP_Undef )).
+  Hypothesis IH_Struct  : forall (fields: list (typ * exp)), (forall p, In p fields -> P (snd p)) -> P ((EXP_Struct fields)).
+  Hypothesis IH_Packed_struct : forall (fields: list (typ * exp)), (forall p, In p fields -> P (snd p)) -> P ((EXP_Packed_struct fields)).
+  Hypothesis IH_Array   : forall (elts: list (typ * exp)), (forall p, In p elts -> P (snd p)) -> P ((EXP_Array elts)).
+  Hypothesis IH_Vector  : forall (elts: list (typ * exp)), (forall p, In p elts -> P (snd p)) -> P ((EXP_Vector elts)).
+  Hypothesis IH_IBinop  : forall (iop:ibinop) (t:typ) (v1:exp) (v2:exp), P v1 -> P v2 -> P ((OP_IBinop iop t v1 v2)).
+  Hypothesis IH_ICmp    : forall (cmp:icmp)   (t:typ) (v1:exp) (v2:exp), P v1 -> P v2 -> P ((OP_ICmp cmp t v1 v2)).
+  Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:typ) (v1:exp) (v2:exp), P v1 -> P v2 -> P ((OP_FBinop fop fm t v1 v2)).
+  Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:typ) (v1:exp) (v2:exp), P v1 -> P v2 -> P ((OP_FCmp cmp t v1 v2)).
+  Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:typ) (v:exp) (t_to:typ), P v -> P ((OP_Conversion conv t_from v t_to)).
+  Hypothesis IH_GetElementPtr : forall (t:typ) (ptrval:(typ * exp)) (idxs:list (typ * exp)),
       P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P ((OP_GetElementPtr t ptrval idxs)).
-  Hypothesis IH_ExtractElement: forall (vec:(typ * value)) (idx:(typ * value)), P (snd vec) -> P (snd idx) -> P ((OP_ExtractElement vec idx)).
-  Hypothesis IH_InsertElement : forall (vec:(typ * value)) (elt:(typ * value)) (idx:(typ * value)),
+  Hypothesis IH_ExtractElement: forall (vec:(typ * exp)) (idx:(typ * exp)), P (snd vec) -> P (snd idx) -> P ((OP_ExtractElement vec idx)).
+  Hypothesis IH_InsertElement : forall (vec:(typ * exp)) (elt:(typ * exp)) (idx:(typ * exp)),
       P (snd vec) -> P (snd elt) -> P (snd idx) -> P ((OP_InsertElement vec elt idx)).
-  Hypothesis IH_ShuffleVector : forall (vec1:(typ * value)) (vec2:(typ * value)) (idxmask:(typ * value)),
+  Hypothesis IH_ShuffleVector : forall (vec1:(typ * exp)) (vec2:(typ * exp)) (idxmask:(typ * exp)),
       P (snd vec1) -> P (snd vec2 ) -> P (snd idxmask) -> P ((OP_ShuffleVector vec1 vec2 idxmask)).
-  Hypothesis IH_ExtractValue  : forall (vec:(typ * value)) (idxs:list int), P (snd vec) -> P ((OP_ExtractValue vec idxs)).
-  Hypothesis IH_InsertValue   : forall (vec:(typ * value)) (elt:(typ * value)) (idxs:list int), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue vec elt idxs)).
-  Hypothesis IH_Select        : forall (cnd:(typ * value)) (v1:(typ * value)) (v2:(typ * value)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select cnd v1 v2)).
+  Hypothesis IH_ExtractValue  : forall (vec:(typ * exp)) (idxs:list int), P (snd vec) -> P ((OP_ExtractValue vec idxs)).
+  Hypothesis IH_InsertValue   : forall (vec:(typ * exp)) (elt:(typ * exp)) (idxs:list int), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue vec elt idxs)).
+  Hypothesis IH_Select        : forall (cnd:(typ * exp)) (v1:(typ * exp)) (v2:(typ * exp)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select cnd v1 v2)).
 
-  Lemma value_ind' : forall (v:value), P v.
+  Lemma exp_ind' : forall (v:exp), P v.
     fix IH 1.
     destruct v. 
     - apply IH_Ident.
@@ -465,7 +465,7 @@ Inductive value : Set :=
     - apply IH_InsertValue. apply IH. apply IH.
     - apply IH_Select.  apply IH. apply IH. apply IH.
   Qed.
-End ValueInd.
+End ExpInd.
 
 
 (* Display *)
@@ -536,29 +536,29 @@ Fixpoint string_of_typ' typ :=
 
 Instance string_of_typ : StringOf typ := string_of_typ'.
 
-Fixpoint string_of_value' (v : value) :=
+Fixpoint string_of_exp (v : exp) :=
   match v with
-    | VALUE_Ident id => string_of id
-    | VALUE_Integer x => string_of x
-    | VALUE_Bool b => string_of b
-    | VALUE_Null => "null"
-    | VALUE_Zero_initializer => "zero initializer"
-    | VALUE_Cstring s => s
-    | VALUE_Undef => "undef"                                
+    | EXP_Ident id => string_of id
+    | EXP_Integer x => string_of x
+    | EXP_Bool b => string_of b
+    | EXP_Null => "null"
+    | EXP_Zero_initializer => "zero initializer"
+    | EXP_Cstring s => s
+    | EXP_Undef => "undef"                                
     | OP_IBinop iop t v1 v2 =>
       ((string_of iop) ++ " " ++ (string_of t)
-                       ++ " " ++ (string_of_value' v1)
-                       ++ " " ++ (string_of_value' v2))%string
+                       ++ " " ++ (string_of_exp v1)
+                       ++ " " ++ (string_of_exp v2))%string
     | OP_ICmp cmp t v1 v2 =>
       ((string_of cmp) ++ " " ++ (string_of t)
-                       ++ " " ++ (string_of_value' v1)
-                       ++ " " ++ (string_of_value' v2))%string
+                       ++ " " ++ (string_of_exp v1)
+                       ++ " " ++ (string_of_exp v2))%string
     | OP_GetElementPtr t ptrval idxs =>
       "getelementptr"                                                       
-    | _ => "string_of_value' todo"
+    | _ => "string_of_exp todo"
   end.
 
-Instance string_of_value : StringOf value := string_of_value'.
+Instance string_of_exp_instance : StringOf exp := string_of_exp.
 
 Instance string_of_instr : StringOf instr :=
   fun instr =>

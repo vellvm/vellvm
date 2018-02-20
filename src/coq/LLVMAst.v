@@ -204,47 +204,48 @@ Definition tident : Set := (typ * ident)%type.
      - it allows identifiers to appear nested inside of "constant expressions"
 
   NOTES:
-   - Integer values: llc parses large integer values and converts them to some 
-     internal form (based on integer size?) we use 
+   - Integer expressions: llc parses large integer exps and converts them to some 
+     internal form (based on integer size?)
    
    - Float constants: these are always parsed as 64-bit representable floats 
      using ocamls float_of_string function.  If they are used in LLVM as 32-bit 
      rather than 64-bit floats, they are converted when evaluated.
 
-   - Hex constants: these are always parsed as 0x<16-digit> 64-bit values and
+   - Hex constants: these are always parsed as 0x<16-digit> 64-bit exps and
      bit-converted to ocaml's 64-bit float representation.
 
-   Why do we need Bool?  Why not i1 ?  Is that "real" llvm?
+   - EXP_ prefix denotes syntax that LLVM calls a "value"
+   - OP_  prefix denotes syntax that requires further evaluation
  *)
-Inductive value : Set :=
-| VALUE_Ident   (id:ident)  
-| VALUE_Integer (x:int)
-| VALUE_Float   (f:float)
-| VALUE_Hex     (f:float)  (* See LLVM documentation about hex float constants. *)
-| VALUE_Bool    (b:bool)
-| VALUE_Null
-| VALUE_Zero_initializer
-| VALUE_Cstring (s:string)
-| VALUE_Undef
-| VALUE_Struct        (fields: list (typ * value))
-| VALUE_Packed_struct (fields: list (typ * value))
-| VALUE_Array         (elts: list (typ * value))
-| VALUE_Vector        (elts: list (typ * value))
-| OP_IBinop           (iop:ibinop) (t:typ) (v1:value) (v2:value)  
-| OP_ICmp             (cmp:icmp)   (t:typ) (v1:value) (v2:value)
-| OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:typ) (v1:value) (v2:value)
-| OP_FCmp             (cmp:fcmp)   (t:typ) (v1:value) (v2:value)
-| OP_Conversion       (conv:conversion_type) (t_from:typ) (v:value) (t_to:typ)
-| OP_GetElementPtr    (t:typ) (ptrval:(typ * value)) (idxs:list (typ * value))
-| OP_ExtractElement   (vec:(typ * value)) (idx:(typ * value))
-| OP_InsertElement    (vec:(typ * value)) (elt:(typ * value)) (idx:(typ * value))
-| OP_ShuffleVector    (vec1:(typ * value)) (vec2:(typ * value)) (idxmask:(typ * value))
-| OP_ExtractValue     (vec:(typ * value)) (idxs:list int)
-| OP_InsertValue      (vec:(typ * value)) (elt:(typ * value)) (idxs:list int)
-| OP_Select           (cnd:(typ * value)) (v1:(typ * value)) (v2:(typ * value)) (* if * then * else *)
+Inductive exp : Set :=
+| EXP_Ident   (id:ident)  
+| EXP_Integer (x:int)
+| EXP_Float   (f:float)
+| EXP_Hex     (f:float)  (* See LLVM documentation about hex float constants. *)
+| EXP_Bool    (b:bool)
+| EXP_Null
+| EXP_Zero_initializer
+| EXP_Cstring (s:string)
+| EXP_Undef
+| EXP_Struct        (fields: list (typ * exp))
+| EXP_Packed_struct (fields: list (typ * exp))
+| EXP_Array         (elts: list (typ * exp))
+| EXP_Vector        (elts: list (typ * exp))
+| OP_IBinop           (iop:ibinop) (t:typ) (v1:exp) (v2:exp)  
+| OP_ICmp             (cmp:icmp)   (t:typ) (v1:exp) (v2:exp)
+| OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:typ) (v1:exp) (v2:exp)
+| OP_FCmp             (cmp:fcmp)   (t:typ) (v1:exp) (v2:exp)
+| OP_Conversion       (conv:conversion_type) (t_from:typ) (v:exp) (t_to:typ)
+| OP_GetElementPtr    (t:typ) (ptrval:(typ * exp)) (idxs:list (typ * exp))
+| OP_ExtractElement   (vec:(typ * exp)) (idx:(typ * exp))
+| OP_InsertElement    (vec:(typ * exp)) (elt:(typ * exp)) (idx:(typ * exp))
+| OP_ShuffleVector    (vec1:(typ * exp)) (vec2:(typ * exp)) (idxmask:(typ * exp))
+| OP_ExtractValue     (vec:(typ * exp)) (idxs:list int)
+| OP_InsertValue      (vec:(typ * exp)) (elt:(typ * exp)) (idxs:list int)
+| OP_Select           (cnd:(typ * exp)) (v1:(typ * exp)) (v2:(typ * exp)) (* if * then * else *)
 .
 
-Definition tvalue : Set := typ * value.
+Definition texp : Set := typ * exp.
 
 Inductive instr_id : Set :=
 | IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)
@@ -253,15 +254,15 @@ Inductive instr_id : Set :=
 .
 
 Inductive phi : Set :=
-| Phi  (t:typ) (args:list (block_id * value))
+| Phi  (t:typ) (args:list (block_id * exp))
 .
        
 Inductive instr : Set :=
-| INSTR_Op   (op:value)                          (* INVARIANT: op must be of the form SV (OP_ ...) *)
-| INSTR_Call (fn:tvalue) (args:list tvalue)      (* CORNER CASE: return type is void treated specially *)
-| INSTR_Alloca (t:typ) (nb: option tvalue) (align:option int) 
-| INSTR_Load  (volatile:bool) (t:typ) (ptr:tvalue) (align:option int)       
-| INSTR_Store (volatile:bool) (val:tvalue) (ptr:tvalue) (align:option int)
+| INSTR_Op   (op:exp)                          (* INVARIANT: op must be of the form SV (OP_ ...) *)
+| INSTR_Call (fn:texp) (args:list texp)      (* CORNER CASE: return type is void treated specially *)
+| INSTR_Alloca (t:typ) (nb: option texp) (align:option int) 
+| INSTR_Load  (volatile:bool) (t:typ) (ptr:texp) (align:option int)       
+| INSTR_Store (volatile:bool) (val:texp) (ptr:texp) (align:option int)
 | INSTR_Fence
 | INSTR_AtomicCmpXchg
 | INSTR_AtomicRMW
@@ -274,14 +275,14 @@ Inductive instr : Set :=
 Inductive terminator : Set :=
 (* Terminators *)
 (* Types in branches are TYPE_Label constant *)
-| TERM_Ret        (v:tvalue)
+| TERM_Ret        (v:texp)
 | TERM_Ret_void
-| TERM_Br         (v:tvalue) (br1:block_id) (br2:block_id) 
+| TERM_Br         (v:texp) (br1:block_id) (br2:block_id) 
 | TERM_Br_1       (br:block_id)
-| TERM_Switch     (v:tvalue) (default_dest:block_id) (brs: list (tvalue * block_id))
-| TERM_IndirectBr (v:tvalue) (brs:list block_id) (* address * possible addresses (labels) *)
-| TERM_Resume     (v:tvalue)
-| TERM_Invoke     (fnptrval:tident) (args:list tvalue) (to_label:block_id) (unwind_label:block_id)
+| TERM_Switch     (v:texp) (default_dest:block_id) (brs: list (texp * block_id))
+| TERM_IndirectBr (v:texp) (brs:list block_id) (* address * possible addresses (labels) *)
+| TERM_Resume     (v:texp)
+| TERM_Invoke     (fnptrval:tident) (args:list texp) (to_label:block_id) (unwind_label:block_id)
 .
 
 Inductive thread_local_storage : Set :=
@@ -295,8 +296,7 @@ Record global : Set :=
       g_ident        : global_id;
       g_typ          : typ;
       g_constant     : bool;
-      g_value        : option value;
-
+      g_exp          : option exp;
       g_linkage      : option linkage;
       g_visibility   : option visibility;
       g_dll_storage  : option dll_storage;
@@ -349,7 +349,7 @@ Arguments df_args {_} _.
 Arguments df_instrs {_} _.
 
 Inductive metadata : Set :=
-  | METADATA_Const  (tv:tvalue)
+  | METADATA_Const  (tv:texp)
   | METADATA_Null
   | METADATA_Id     (id:raw_id)  (* local or global? *)
   | METADATA_String (str:string)

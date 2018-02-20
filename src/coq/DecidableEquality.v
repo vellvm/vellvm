@@ -310,36 +310,36 @@ Proof.
   lift_decide_eq; left; auto.
 Defined.
 
-Definition value_ind': forall (P : LLVMAst.value  -> Set),
-    (forall id : ident, P (VALUE_Ident id)) ->
-    (forall x : int, P (VALUE_Integer x)) ->
-    (forall f : float, P (VALUE_Float f)) ->
-    (forall h : float, P (VALUE_Hex h)) ->    
-    (forall b : bool, P (VALUE_Bool b)) ->
-    (P VALUE_Null) ->
-    (P VALUE_Zero_initializer) ->
-    (forall s : String.string, P (VALUE_Cstring s)) ->
-    (P VALUE_Undef) ->
-    (P (VALUE_Struct [])) ->
+Definition exp_ind': forall (P : LLVMAst.exp  -> Set),
+    (forall id : ident, P (EXP_Ident id)) ->
+    (forall x : int, P (EXP_Integer x)) ->
+    (forall f : float, P (EXP_Float f)) ->
+    (forall h : float, P (EXP_Hex h)) ->    
+    (forall b : bool, P (EXP_Bool b)) ->
+    (P EXP_Null) ->
+    (P EXP_Zero_initializer) ->
+    (forall s : String.string, P (EXP_Cstring s)) ->
+    (P EXP_Undef) ->
+    (P (EXP_Struct [])) ->
     (forall t v fields,
         P v ->
-        P (VALUE_Struct fields) ->
-        P (VALUE_Struct ((t, v) :: fields))) ->
-    (P (VALUE_Packed_struct [])) ->
+        P (EXP_Struct fields) ->
+        P (EXP_Struct ((t, v) :: fields))) ->
+    (P (EXP_Packed_struct [])) ->
     (forall t v fields,
         P v ->
-        P (VALUE_Packed_struct fields) ->
-        P (VALUE_Packed_struct ((t, v) :: fields))) ->
-    (P (VALUE_Array [])) ->
+        P (EXP_Packed_struct fields) ->
+        P (EXP_Packed_struct ((t, v) :: fields))) ->
+    (P (EXP_Array [])) ->
     (forall t v arr,
         P v ->
-        P (VALUE_Array arr) ->
-        P (VALUE_Array ((t, v) :: arr))) ->
-    (P (VALUE_Vector [])) ->
+        P (EXP_Array arr) ->
+        P (EXP_Array ((t, v) :: arr))) ->
+    (P (EXP_Vector [])) ->
     (forall t v vec,
         P v ->
-        P (VALUE_Vector vec) ->
-        P (VALUE_Vector ((t, v) :: vec))) ->
+        P (EXP_Vector vec) ->
+        P (EXP_Vector ((t, v) :: vec))) ->
     (forall iop t v1 v2,
         P v1 -> P v2 ->
         P (OP_IBinop iop t v1 v2)) ->
@@ -378,7 +378,7 @@ Definition value_ind': forall (P : LLVMAst.value  -> Set),
     (forall cnd_t cnd_v v1_t v1_v v2_t v2_v,
         P cnd_v -> P v1_v -> P v2_v ->
         P (OP_Select (cnd_t, cnd_v) (v1_t, v1_v) (v2_t, v2_v))) ->
-    (forall v : LLVMAst.value , P v).
+    (forall v : LLVMAst.exp , P v).
 Proof.
   intros P H_Ident H_Integer H_Float H_Hex H_Bool H_Null
          H_Zero_initializer H_Cstring H_Undef.
@@ -394,38 +394,38 @@ Proof.
          IH_Select.
 
   refine
-    (fix prove_v (v : LLVMAst.value ) :=
+    (fix prove_v (v : LLVMAst.exp ) :=
        match v with
-         | VALUE_Ident id => _
-         | VALUE_Integer n => _
-         | VALUE_Float f => _
-         | VALUE_Hex h => _                             
-         | VALUE_Bool b => _
-         | VALUE_Null => _
-         | VALUE_Zero_initializer => _
-         | VALUE_Cstring s => _
-         | VALUE_Undef => _
-         | VALUE_Struct l =>
+         | EXP_Ident id => _
+         | EXP_Integer n => _
+         | EXP_Float f => _
+         | EXP_Hex h => _                             
+         | EXP_Bool b => _
+         | EXP_Null => _
+         | EXP_Zero_initializer => _
+         | EXP_Cstring s => _
+         | EXP_Undef => _
+         | EXP_Struct l =>
            let
-             fix prove_l (l : list (LLVMAst.typ * LLVMAst.value)) :=
+             fix prove_l (l : list (LLVMAst.typ * LLVMAst.exp)) :=
              match l with
              | [] => IH_Struct_Base
              | (t, v) :: rest =>
                IH_Struct_Ind t v rest (prove_v v) (prove_l rest)
              end
            in prove_l l 
-         | VALUE_Packed_struct l =>
+         | EXP_Packed_struct l =>
            let
-             fix prove_l (l : list (LLVMAst.typ * LLVMAst.value)) :=
+             fix prove_l (l : list (LLVMAst.typ * LLVMAst.exp)) :=
              match l with
              | [] => IH_Packed_struct_Base
              | (t, v) :: rest =>
                IH_Packed_struct_Ind t v rest (prove_v v) (prove_l rest)
              end
            in prove_l l 
-         | VALUE_Array l =>
+         | EXP_Array l =>
            let
-             fix prove_l (l : list (LLVMAst.typ * LLVMAst.value)) :=
+             fix prove_l (l : list (LLVMAst.typ * LLVMAst.exp)) :=
              match l with
              | [] => IH_Array_Base
              | (t, v) :: rest =>
@@ -433,9 +433,9 @@ Proof.
              end
            in prove_l l 
 
-         | VALUE_Vector l =>
+         | EXP_Vector l =>
            let
-             fix prove_l (l : list (LLVMAst.typ * LLVMAst.value)) :=
+             fix prove_l (l : list (LLVMAst.typ * LLVMAst.exp)) :=
              match l with
              | [] => IH_Vector_Base
              | (t, v) :: rest =>
@@ -455,7 +455,7 @@ Proof.
            IH_Conversion conv t_from v t_to (prove_v v)
            
          | OP_GetElementPtr t (ptr_t, ptr_v) l =>
-           let fix prove_l (l : list (LLVMAst.typ * LLVMAst.value)) :=
+           let fix prove_l (l : list (LLVMAst.typ * LLVMAst.exp)) :=
                match l with
                | [] =>
                  IH_GetElementPtr_Base t ptr_t ptr_v (prove_v ptr_v)
@@ -487,9 +487,9 @@ Proof.
     ); auto.
 Defined.
 
-Instance decide_value : eq_dec (LLVMAst.value).
+Instance decide_exp : eq_dec (LLVMAst.exp).
 Proof.
-  induction x using value_ind'; destruct y; unfold Decidable;
+  induction x using exp_ind'; destruct y; unfold Decidable;
     try (right; intro H; inversion H; tauto);
     try (left; reflexivity);
     try (lift_decide_eq).
@@ -501,7 +501,7 @@ Proof.
     left; subst; reflexivity.
     right. injection. tauto.
    
-  (* Case Value_Struct *)
+  (* Case Exp_Struct *)
   - destruct fields; auto.
   - refine
       (match fields0 with
@@ -510,13 +510,13 @@ Proof.
          match (decide (t = t')) with
          | left t_eq =>
            match decide (x = v') with
-           | left value_eq =>
-             match decide ((VALUE_Struct fields) =
-                           (VALUE_Struct fields')) with
+           | left exp_eq =>
+             match decide ((EXP_Struct fields) =
+                           (EXP_Struct fields')) with
              | left fields_eq => left _
              | right fields_neq => right _
              end
-           | right value_neq => right _
+           | right exp_neq => right _
            end
          | right t_neq => right _
          end
@@ -525,10 +525,10 @@ Proof.
     { intros H; inversion H. }
     { inversion fields_eq. subst. reflexivity. }
     { intros H; inversion H; apply fields_neq; subst; auto. }
-    { intros H; inversion H; apply value_neq; subst; auto. }
+    { intros H; inversion H; apply exp_neq; subst; auto. }
     { intros H; inversion H; apply t_neq; subst; auto. }
 
-    (* (VALUE_Packed_struct ...) *)
+    (* (EXP_Packed_struct ...) *)
   - destruct fields; auto.
   - refine
       (match fields0 with
@@ -537,13 +537,13 @@ Proof.
          match (decide (t = t')) with
          | left t_eq =>
            match decide (x = v') with
-           | left value_eq =>
-             match decide ((VALUE_Packed_struct fields) =
-                           (VALUE_Packed_struct fields')) with
+           | left exp_eq =>
+             match decide ((EXP_Packed_struct fields) =
+                           (EXP_Packed_struct fields')) with
              | left fields_eq => left _
              | right fields_neq => right _
              end
-           | right value_neq => right _
+           | right exp_neq => right _
            end
          | right t_neq => right _
          end
@@ -551,49 +551,49 @@ Proof.
     { intros H; inversion H. }
     { inversion fields_eq. subst. reflexivity. }
     { intros H; inversion H; apply fields_neq; subst; auto. }
-    { intros H; inversion H; apply value_neq; subst; auto. }
+    { intros H; inversion H; apply exp_neq; subst; auto. }
     { intros H; inversion H; apply t_neq; subst; auto. }
 
-    (* (VALUE_Array ...) *)
+    (* (EXP_Array ...) *)
   - destruct elts; auto.
   - destruct elts as [| (t', x') arr']; auto.
     refine
       (match (decide (t = t')) with
        | left t_eq =>
          match (decide (x = x')) with
-         | left value_eq =>
-           match decide ((VALUE_Array arr) = (VALUE_Array arr')) with
+         | left exp_eq =>
+           match decide ((EXP_Array arr) = (EXP_Array arr')) with
            | left rest_eq => left _
            | right rest_neq => right _
            end
-         | right value_neq => right _
+         | right exp_neq => right _
          end
        | right t_neq => right _
        end).
     { inversion rest_eq; subst; auto. }
     { intros H; inversion H; apply rest_neq; subst; auto. }
-    { intros H; inversion H; apply value_neq; subst; auto. }
+    { intros H; inversion H; apply exp_neq; subst; auto. }
     { intros H; inversion H; apply t_neq; subst; auto. }
 
-    (* DV (VALUE_Vector *)
+    (* DV (EXP_Vector *)
   - destruct elts; auto.
   - destruct elts as [| (t', x') vec']; auto.
     refine
       (match (decide (t = t')) with
        | left t_eq =>
          match (decide (x = x')) with
-         | left value_eq =>
-           match decide ((VALUE_Vector vec) = (VALUE_Vector vec')) with
+         | left exp_eq =>
+           match decide ((EXP_Vector vec) = (EXP_Vector vec')) with
            | left rest_eq => left _
            | right rest_neq => right _
            end
-         | right value_neq => right _
+         | right exp_neq => right _
          end
        | right t_neq => right _
        end).
     { inversion rest_eq; subst; auto. }
     { intros H; inversion H; apply rest_neq; subst; auto. }
-    { intros H; inversion H; apply value_neq; subst; auto. }
+    { intros H; inversion H; apply exp_neq; subst; auto. }
     { intros H; inversion H; apply t_neq; subst; auto. }
 
 
@@ -604,13 +604,13 @@ Proof.
       (match decide (ptr_t = ptr_t') with
        | left t_eq =>
          match decide (x = ptr_v') with
-         | left ptr_value_eq => left _
-         | right ptr_value_neq => right _
+         | left ptr_exp_eq => left _
+         | right ptr_exp_neq => right _
          end
        | right t_neq => right _
        end).
     { subst; reflexivity. } 
-    { intros H; inversion H; apply ptr_value_neq; subst; auto. }
+    { intros H; inversion H; apply ptr_exp_neq; subst; auto. }
     { intros H; inversion H; apply t_neq; subst; auto. }
   - destruct ptrval as (ptr_t', ptr_v');
       destruct idxs as [| (idx_t', idx_v')];
@@ -619,16 +619,16 @@ Proof.
       (match decide (ptr_t = ptr_t') with
        | left ptr_t_eq =>
          match decide (x1 = ptr_v') with
-         | left ptr_value_eq =>
+         | left ptr_exp_eq =>
            match decide (idx_t = idx_t') with
            | left idx_t_eq =>
              match decide (x2 = idx_v') with
-             | left idx_value_eq => _
-             | right idx_value_neq => right _
+             | left idx_exp_eq => _
+             | right idx_exp_neq => right _
              end
            | right idx_t_neq => right _
            end
-         | right ptr_value_neq => right _
+         | right ptr_exp_neq => right _
          end
        | right t_neq => right _
        end).
@@ -642,9 +642,9 @@ Proof.
       { inversion rest_eq; subst; auto. }
       { intros H; inversion H; apply rest_neq; subst; auto. }
     }
-    { intros H; inversion H; apply idx_value_neq; subst; auto. }
+    { intros H; inversion H; apply idx_exp_neq; subst; auto. }
     { intros H; inversion H; apply idx_t_neq; subst; auto. }
-    { intros H; inversion H; apply ptr_value_neq; subst; auto. }
+    { intros H; inversion H; apply ptr_exp_neq; subst; auto. }
     { intros H; inversion H; apply t_neq; subst; auto. }
 
     (* (OP_ExtractElement ...), arity 2 *)
@@ -830,8 +830,8 @@ Definition dvalue_ind':=
     (f3 : forall x : int64, P (DVALUE_I64 x))
     (f4 : forall x : ll_double, P (DVALUE_Double x))
     (f5 : forall x : ll_float, P (DVALUE_Float x))
-    (f6 : forall (t : LLVMAst.typ) (v : option LLVMAst.value),
-          P (DVALUE_Undef t v)) (f7 : P DVALUE_Poison) 
+    (f6 : forall (t : LLVMAst.typ) (v : option exp), P (DVALUE_Undef t v))
+    (f7 : P DVALUE_Poison) 
     (f8 : P DVALUE_None)
     (IH_Struct_Base: P(DVALUE_Struct []))
     (IH_Struct_Ind : forall t v fields, 

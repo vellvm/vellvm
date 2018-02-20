@@ -225,7 +225,7 @@ global_decl:
           g_typ;
           g_constant;
 
-	  g_value = None;
+	  g_exp = None;
           g_linkage = Some el;
           g_visibility = get_visibility attrs;
           g_dll_storage = get_dll_storage attrs;
@@ -241,13 +241,13 @@ global_decl:
     attrs=global_attr*
     g_constant=global_is_constant
     g_typ=typ
-    gv=value
+    gv=exp
     opt=preceded(COMMA, separated_list(csep, global_attr))?
       { let opt = match opt with Some o -> o | None -> [] in
         { g_ident=ident;
           g_typ;
           g_constant;
-          g_value = Some gv;
+          g_exp = Some gv;
 
           g_linkage;
           g_visibility = get_visibility attrs;
@@ -464,7 +464,7 @@ param_attr:
 
 dc_arg: t=typ p=param_attr*         { (t, p)      }
 df_arg: t=typ p=param_attr* i=lident { ((t, p), i) }
-call_arg: t=typ i=value             { (t, i)      }
+call_arg: t=typ i=exp             { (t, i)      }
 
 fn_attr:
   | KW_ALIGNSTACK LPAREN p=INTEGER RPAREN { FNATTR_Alignstack p     }
@@ -546,100 +546,100 @@ fast_math:
   KW_NNAN{Nnan}|KW_NINF{Ninf}|KW_NSZ{Nsz}|KW_ARCP{Arcp}|KW_FAST{Fast}
 
 instr_op:
-  | op=ibinop t=typ o1=value COMMA o2=value
+  | op=ibinop t=typ o1=exp COMMA o2=exp
     { OP_IBinop (op, t, o1, o2) }
 
-  | KW_ICMP op=icmp t=typ o1=value COMMA o2=value
+  | KW_ICMP op=icmp t=typ o1=exp COMMA o2=exp
     { OP_ICmp (op, t, o1, o2) }
 
-  | op=fbinop f=fast_math* t=typ o1=value COMMA o2=value
+  | op=fbinop f=fast_math* t=typ o1=exp COMMA o2=exp
     { OP_FBinop (op, f, t, o1, o2) }
 
-  | KW_FCMP op=fcmp t=typ o1=value COMMA o2=value
+  | KW_FCMP op=fcmp t=typ o1=exp COMMA o2=exp
     { OP_FCmp (op, t, o1, o2) }
 
-  | c=conversion t1=typ v=value KW_TO t2=typ
+  | c=conversion t1=typ v=exp KW_TO t2=typ
     { OP_Conversion (c, t1, v, t2) }
 
-  | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=tvalue idx=preceded(COMMA, tvalue)*
+  | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=texp idx=preceded(COMMA, texp)*
     { OP_GetElementPtr (t, ptr, idx) }
 
-  | KW_SELECT if_=tvalue COMMA then_=tvalue COMMA else_= tvalue
+  | KW_SELECT if_=texp COMMA then_=texp COMMA else_= texp
     { OP_Select (if_, then_, else_) }
 
-  | KW_EXTRACTELEMENT vec=tvalue COMMA idx=tvalue
+  | KW_EXTRACTELEMENT vec=texp COMMA idx=texp
     { OP_ExtractElement (vec, idx) }
 
-  | KW_INSERTELEMENT vec=tvalue
-    COMMA new_el=tvalue COMMA idx=tvalue
+  | KW_INSERTELEMENT vec=texp
+    COMMA new_el=texp COMMA idx=texp
     { OP_InsertElement (vec, new_el, idx)  }
 
-  | KW_EXTRACTVALUE tv=tvalue COMMA
+  | KW_EXTRACTVALUE tv=texp COMMA
     idx=separated_nonempty_list (csep, INTEGER)
     { OP_ExtractValue (tv, idx) }
 
-  | KW_INSERTVALUE agg=tvalue COMMA new_val=tvalue COMMA
+  | KW_INSERTVALUE agg=texp COMMA new_val=texp COMMA
     idx=separated_nonempty_list (csep, INTEGER)
     { OP_InsertValue (agg, new_val, idx) }
 
-  | KW_SHUFFLEVECTOR v1=tvalue COMMA v2=tvalue COMMA mask=tvalue
+  | KW_SHUFFLEVECTOR v1=texp COMMA v2=texp COMMA mask=texp
     { OP_ShuffleVector (v1, v2, mask)  }
 
 expr_op:
-  | op=ibinop LPAREN t=typ o1=value COMMA typ o2=value RPAREN
+  | op=ibinop LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
     { OP_IBinop (op, t, o1, o2) }
 
-  | KW_ICMP op=icmp LPAREN t=typ o1=value COMMA typ o2=value RPAREN
+  | KW_ICMP op=icmp LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
     { OP_ICmp (op, t, o1, o2) }
 
-  | op=fbinop f=fast_math* LPAREN t=typ o1=value COMMA typ o2=value RPAREN
+  | op=fbinop f=fast_math* LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
     { OP_FBinop (op, f, t, o1, o2) }
 
-  | KW_FCMP op=fcmp LPAREN t=typ o1=value COMMA typ o2=value RPAREN
+  | KW_FCMP op=fcmp LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
     { OP_FCmp (op, t, o1, o2) }
 
-  | c=conversion LPAREN t1=typ v=value KW_TO t2=typ RPAREN
+  | c=conversion LPAREN t1=typ v=exp KW_TO t2=typ RPAREN
     { OP_Conversion (c, t1, v, t2) }
 
-  | KW_GETELEMENTPTR KW_INBOUNDS? LPAREN t=typ COMMA ptr=tvalue idx=preceded(COMMA, tvalue)* RPAREN
+  | KW_GETELEMENTPTR KW_INBOUNDS? LPAREN t=typ COMMA ptr=texp idx=preceded(COMMA, texp)* RPAREN
     { OP_GetElementPtr (t, ptr, idx) }
 
-  | KW_SELECT LPAREN if_=tvalue COMMA then_=tvalue COMMA else_= tvalue RPAREN
+  | KW_SELECT LPAREN if_=texp COMMA then_=texp COMMA else_= texp RPAREN
     { OP_Select (if_, then_, else_) }
 
-  | KW_EXTRACTELEMENT LPAREN vec=tvalue COMMA idx=tvalue RPAREN
+  | KW_EXTRACTELEMENT LPAREN vec=texp COMMA idx=texp RPAREN
     { OP_ExtractElement (vec, idx) }
 
-  | KW_INSERTELEMENT LPAREN vec=tvalue COMMA new_el=tvalue COMMA idx=tvalue RPAREN
+  | KW_INSERTELEMENT LPAREN vec=texp COMMA new_el=texp COMMA idx=texp RPAREN
     { OP_InsertElement (vec, new_el, idx)  }
 
-  | KW_EXTRACTVALUE LPAREN tv=tvalue COMMA idx=separated_nonempty_list (csep, INTEGER) RPAREN
+  | KW_EXTRACTVALUE LPAREN tv=texp COMMA idx=separated_nonempty_list (csep, INTEGER) RPAREN
     { OP_ExtractValue (tv, idx) }
 
-  | KW_INSERTVALUE LPAREN agg=tvalue COMMA new_val=tvalue COMMA idx=separated_nonempty_list (csep, INTEGER) RPAREN
+  | KW_INSERTVALUE LPAREN agg=texp COMMA new_val=texp COMMA idx=separated_nonempty_list (csep, INTEGER) RPAREN
     { OP_InsertValue (agg, new_val, idx) }
 
-  | KW_SHUFFLEVECTOR LPAREN v1=tvalue COMMA v2=tvalue COMMA mask=tvalue RPAREN
+  | KW_SHUFFLEVECTOR LPAREN v1=texp COMMA v2=texp COMMA mask=texp RPAREN
     { OP_ShuffleVector (v1, v2, mask)  }
 
 
 expr_val:
-  | i=INTEGER                                         { VALUE_Integer i        }
-  | f=FLOAT                                           { VALUE_Float f          }
-  | f=HEXCONSTANT                                     { VALUE_Hex f            }
-  | KW_TRUE                                           { VALUE_Bool true        }
-  | KW_FALSE                                          { VALUE_Bool false       }
-  | KW_NULL                                           { VALUE_Null             }
-  | KW_UNDEF                                          { VALUE_Undef            }
-  | KW_ZEROINITIALIZER                                { VALUE_Zero_initializer }
-  | LCURLY l=separated_list(csep, tconst) RCURLY      { VALUE_Struct l         }
-  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { VALUE_Packed_struct l  }
-  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { VALUE_Array l          }
-  | LT l=separated_list(csep, tconst) GT              { VALUE_Vector l         }
-  | i=ident                                           { VALUE_Ident i          }
-  | KW_C cstr=STRING                                  { VALUE_Cstring (str cstr) }
+  | i=INTEGER                                         { EXP_Integer i        }
+  | f=FLOAT                                           { EXP_Float f          }
+  | f=HEXCONSTANT                                     { EXP_Hex f            }
+  | KW_TRUE                                           { EXP_Bool true        }
+  | KW_FALSE                                          { EXP_Bool false       }
+  | KW_NULL                                           { EXP_Null             }
+  | KW_UNDEF                                          { EXP_Undef            }
+  | KW_ZEROINITIALIZER                                { EXP_Zero_initializer }
+  | LCURLY l=separated_list(csep, tconst) RCURLY      { EXP_Struct l         }
+  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { EXP_Packed_struct l  }
+  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { EXP_Array l          }
+  | LT l=separated_list(csep, tconst) GT              { EXP_Vector l         }
+  | i=ident                                           { EXP_Ident i          }
+  | KW_C cstr=STRING                                  { EXP_Cstring (str cstr) }
 
-value:
+exp:
   | eo=expr_op { eo }
   | ev=expr_val { ev }
 
@@ -648,12 +648,12 @@ value:
     { Phi (t, table) }
 
 phi_table_entry:
-  | LSQUARE v=value COMMA l=lident RSQUARE { (l, v) }
+  | LSQUARE v=exp COMMA l=lident RSQUARE { (l, v) }
   
 %inline instr:
   | eo=instr_op { INSTR_Op eo }
 
-  | KW_TAIL? KW_CALL cconv? list(param_attr) f=tvalue
+  | KW_TAIL? KW_CALL cconv? list(param_attr) f=texp
     a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
     list(fn_attr)
     { INSTR_Call (f, a) }
@@ -662,14 +662,14 @@ phi_table_entry:
     { let (n, a) = match opt with Some x -> x | None -> (None, None) in
       INSTR_Alloca (t, n, a) }
 
-  | KW_LOAD vol=KW_VOLATILE? t=typ COMMA tv=tvalue a=preceded(COMMA, align)?
+  | KW_LOAD vol=KW_VOLATILE? t=typ COMMA tv=texp a=preceded(COMMA, align)?
     { INSTR_Load (vol<>None, t, tv, a) }
 
 
   | KW_VAARG  { failwith"INSTR_VAArg"  }
   | KW_LANDINGPAD    { failwith"INSTR_LandingPad"    }
 
-  | KW_STORE vol=KW_VOLATILE? all=tvalue COMMA ptr=tvalue a=preceded(COMMA, align)?
+  | KW_STORE vol=KW_VOLATILE? all=texp COMMA ptr=texp a=preceded(COMMA, align)?
     { INSTR_Store (vol<>None, all, ptr, a) }
 
   | KW_ATOMICCMPXCHG { failwith"INSTR_AtomicCmpXchg" }
@@ -683,27 +683,27 @@ branch_label:
   KW_LABEL o=LOCAL  { o }
   
 terminator:  
-  | KW_RET t=typ o=value
+  | KW_RET t=typ o=exp
     { TERM_Ret (t, o) }
 
   | KW_RET KW_VOID
     { TERM_Ret_void }
 
-  | KW_BR c=tvalue COMMA o1=branch_label COMMA o2=branch_label
+  | KW_BR c=texp COMMA o1=branch_label COMMA o2=branch_label
     { TERM_Br (c, o1, o2) }
 
   | KW_BR b=branch_label
     { TERM_Br_1 b }
 
-  | KW_SWITCH c=tvalue COMMA
+  | KW_SWITCH c=texp COMMA
     def=branch_label LSQUARE EOL? table=list(switch_table_entry) RSQUARE
     { TERM_Switch (c, def, table) }
 
-  | KW_INDIRECTBR tv=tvalue
+  | KW_INDIRECTBR tv=texp
     COMMA LSQUARE til=separated_list(csep, branch_label)  RSQUARE
     { TERM_IndirectBr (tv, til) }
 
-  | KW_RESUME tv=tvalue
+  | KW_RESUME tv=texp
     { TERM_Resume tv }
 
   | KW_INVOKE cconv? ret=tident
@@ -714,11 +714,11 @@ terminator:
 
 alloca_opt:
   | a=align                             { (None, Some a) }
-  | nb=tvalue a=preceded(COMMA, align)? { (Some nb, a) }
+  | nb=texp a=preceded(COMMA, align)? { (Some nb, a) }
 
 
 switch_table_entry:
-  | v=tvalue COMMA i=branch_label EOL? { (v, i) }
+  | v=texp COMMA i=branch_label EOL? { (v, i) }
 
 csep:
   COMMA EOL* { () }
@@ -733,6 +733,6 @@ ident:
   | l=gident  { ID_Global l }
   | l=lident  { ID_Local l  }
 
-tvalue: t=typ v=value { (t, v) }
-tconst: t=typ c=value { (t, c) }
+texp: t=typ v=exp { (t, v) }
+tconst: t=typ c=exp { (t, c) }
 tident: t=typ i=ident { (t, i) }

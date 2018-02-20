@@ -151,52 +151,52 @@ Definition pt_defines (p:pt) (lid:local_id) :=
 *)
 
 (* Which identifiers does an instruction use? *)
-Fixpoint value_uses (v:value) : list ident :=
+Fixpoint exp_uses (v:exp) : list ident :=
   match v with
-  | VALUE_Ident id => [id]
-  | VALUE_Integer _
-  | VALUE_Float _ 
-  | VALUE_Hex _        
-  | VALUE_Bool _
-  | VALUE_Null
-  | VALUE_Zero_initializer
-  | VALUE_Cstring _
-  | VALUE_Undef => []
+  | EXP_Ident id => [id]
+  | EXP_Integer _
+  | EXP_Float _ 
+  | EXP_Hex _        
+  | EXP_Bool _
+  | EXP_Null
+  | EXP_Zero_initializer
+  | EXP_Cstring _
+  | EXP_Undef => []
 
-  | VALUE_Struct l
-  | VALUE_Packed_struct l
-  | VALUE_Array l
-  | VALUE_Vector l => List.flat_map (fun x => value_uses (snd x)) l
+  | EXP_Struct l
+  | EXP_Packed_struct l
+  | EXP_Array l
+  | EXP_Vector l => List.flat_map (fun x => exp_uses (snd x)) l
   | OP_IBinop _ _ v1 v2
   | OP_ICmp _ _ v1 v2
   | OP_FBinop _ _ _ v1 v2
-  | OP_FCmp _ _ v1 v2 => (value_uses v1) ++ (value_uses v2)
-  | OP_Conversion _ _ v _ => value_uses v
-  | OP_GetElementPtr _ (_,ptr) idxs => (value_uses ptr) ++ (List.flat_map (fun x => value_uses (snd x)) idxs)
-  | OP_ExtractElement  (_,vec) (_,idx) => (value_uses vec) ++ (value_uses idx)
-  | OP_InsertElement (_,vec) (_,elt) (_,idx) => (value_uses vec) ++ (value_uses elt) ++ (value_uses idx)
-  | OP_ShuffleVector (_, vec1) (_,vec2) (_,idxmask) => (value_uses vec1) ++ (value_uses vec2) ++ (value_uses idxmask)
-  | OP_ExtractValue (_,vec) _ => value_uses vec
-  | OP_InsertValue (_,vec) (_,elt) _ => (value_uses vec) ++ (value_uses elt)
-  | OP_Select (_,cnd) (_,v1) (_,v2) => (value_uses cnd) ++ (value_uses v1) ++ (value_uses v2)
+  | OP_FCmp _ _ v1 v2 => (exp_uses v1) ++ (exp_uses v2)
+  | OP_Conversion _ _ v _ => exp_uses v
+  | OP_GetElementPtr _ (_,ptr) idxs => (exp_uses ptr) ++ (List.flat_map (fun x => exp_uses (snd x)) idxs)
+  | OP_ExtractElement  (_,vec) (_,idx) => (exp_uses vec) ++ (exp_uses idx)
+  | OP_InsertElement (_,vec) (_,elt) (_,idx) => (exp_uses vec) ++ (exp_uses elt) ++ (exp_uses idx)
+  | OP_ShuffleVector (_, vec1) (_,vec2) (_,idxmask) => (exp_uses vec1) ++ (exp_uses vec2) ++ (exp_uses idxmask)
+  | OP_ExtractValue (_,vec) _ => exp_uses vec
+  | OP_InsertValue (_,vec) (_,elt) _ => (exp_uses vec) ++ (exp_uses elt)
+  | OP_Select (_,cnd) (_,v1) (_,v2) => (exp_uses cnd) ++ (exp_uses v1) ++ (exp_uses v2)
   end.
 
-Definition tvalue_uses (tv:tvalue) : list ident := value_uses (snd tv).
+Definition texp_uses (tv:texp) : list ident := exp_uses (snd tv).
 
 Definition phi_uses (i:phi) : (list ident) :=
   match i with
-  | Phi  t args => List.flat_map (fun x => value_uses (snd x)) args
+  | Phi  t args => List.flat_map (fun x => exp_uses (snd x)) args
   end.
 
 (* over-approximation: may include the same identifier more than once *)
 Definition instr_uses (i:instr) : (list ident) :=
   match i with
-  | INSTR_Op op => value_uses op                         
-  | INSTR_Call (_, op) args => (value_uses op) ++ (List.flat_map tvalue_uses args)
+  | INSTR_Op op => exp_uses op                         
+  | INSTR_Call (_, op) args => (exp_uses op) ++ (List.flat_map texp_uses args)
   | INSTR_Alloca t None align => []
-  | INSTR_Alloca t (Some tv) align => tvalue_uses tv
-  | INSTR_Load  volatile t ptr align => tvalue_uses ptr
-  | INSTR_Store volatile val ptr align => (tvalue_uses val) ++ (tvalue_uses ptr)
+  | INSTR_Alloca t (Some tv) align => texp_uses tv
+  | INSTR_Load  volatile t ptr align => texp_uses ptr
+  | INSTR_Store volatile val ptr align => (texp_uses val) ++ (texp_uses ptr)
   | INSTR_Fence 
   | INSTR_AtomicCmpXchg
   | INSTR_AtomicRMW
@@ -207,14 +207,14 @@ Definition instr_uses (i:instr) : (list ident) :=
 
 Definition terminator_uses (t:terminator) : list ident :=
   match t with
-  | TERM_Ret tv => tvalue_uses tv
+  | TERM_Ret tv => texp_uses tv
   | TERM_Ret_void => []
-  | TERM_Br tv _ _ => tvalue_uses tv
+  | TERM_Br tv _ _ => texp_uses tv
   | TERM_Br_1  _ => []
-  | TERM_Switch  tv _ brs => (tvalue_uses tv) ++ (List.flat_map (fun x => tvalue_uses (fst x)) brs)
-  | TERM_IndirectBr tv _ => tvalue_uses tv
-  | TERM_Resume tv => tvalue_uses tv
-  | TERM_Invoke (_,fid) args _ _ => [fid] ++ (List.flat_map tvalue_uses args)
+  | TERM_Switch  tv _ brs => (texp_uses tv) ++ (List.flat_map (fun x => texp_uses (fst x)) brs)
+  | TERM_IndirectBr tv _ => texp_uses tv
+  | TERM_Resume tv => texp_uses tv
+  | TERM_Invoke (_,fid) args _ _ => [fid] ++ (List.flat_map texp_uses args)
   end.
 
 (*
@@ -299,14 +299,14 @@ Definition wf_use (g:cfg) (ids:list ident) (p:pt) : Prop :=
 (** *** Well-formed phi nodes *)
 (**  Consider [ %x = phi [lbl1:v1, ...,lbln:vn] ].  This is well formed
      when every predecessor block with terminator program point p' 
-     has a label associated with value v.  Moreover, if v uses an id then
+     has a label associated with exp v.  Moreover, if v uses an id then
      the definition of the uid strictly dominates p'.
 *)
 
-Definition wf_phi_args (g:cfg) (entry:pt) (args:list (block_id * value)) :=
+Definition wf_phi_args (g:cfg) (entry:pt) (args:list (block_id * exp)) :=
   forall pred, edge_pt g pred entry ->
           exists b t, (code g) pred = Some (Jump b t) /\
-                 exists v, In (b,v) args /\ wf_use g (value_uses v) pred.
+                 exists v, In (b,v) args /\ wf_use g (exp_uses v) pred.
 
 Inductive wf_phis (CFG : cfg) (entry:pt) (q : pt) : pt -> list (local_id * instr) -> Prop :=
 | wf_phis_nil : pt_exists CFG q ->

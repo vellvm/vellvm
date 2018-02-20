@@ -16,8 +16,8 @@ val fbinop : Format.formatter -> LLVMAst.fbinop -> unit
 val fast_math : Format.formatter -> LLVMAst.fast_math -> unit
 val conversion_type : Format.formatter -> LLVMAst.conversion_type -> unit
 val instr : Format.formatter -> LLVMAst.instr -> unit
-val value : Format.formatter -> LLVMAst.value -> unit
-val tvalue : Format.formatter -> LLVMAst.tvalue -> unit
+val exp : Format.formatter -> LLVMAst.exp -> unit
+val texp : Format.formatter -> LLVMAst.texp -> unit
 val tident : Format.formatter -> LLVMAst.tident -> unit
 val toplevel_entities :
   Format.formatter -> (LLVMAst.block list) LLVMAst.toplevel_entities -> unit
