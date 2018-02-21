@@ -16,7 +16,7 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 
 (** An [M E X] is the denotation of a program as coinductive (possibly
-    infinte) tree where the leaves are labeled with [X] and every node
+    infinite) tree where the leaves are labeled with [X] and every node
     is either a [Tau] node with one child, or a branching node [Vis]
     with a visible event [E Y] that branches on the values of [Y]. *)
 CoInductive M (Event : Type -> Type) X := 

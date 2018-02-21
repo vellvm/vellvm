@@ -5,10 +5,9 @@ Require Import ZArith.
 Require Import compcert.lib.Integers compcert.lib.Floats.
 
 (* Vellvm dependencies *)
-Require Import Vellvm.LLVMAst Vellvm.CFG Vellvm.StepSemantics Vellvm.Memory.
-Require Import Vellvm.Classes.
-Require Import Vellvm.AstLib.
-Require Import Vellvm.Util.
+Require Import Vellvm.Classes Vellvm.Util.
+Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG.
+Require Import Vellvm.LLVMBaseTypes Vellvm.StepSemantics Vellvm.Memory.
 Require Import List.
 (** ** Decidable Equality *) 
 
@@ -910,7 +909,6 @@ Proof.
 
   - destruct a; destruct a0; try (left; tauto); try (right; intro H; inversion H; tauto).
     destruct (n == n0); subst; auto. right. intro H. inversion H. tauto.
-    destruct (s == s0). subst; auto. right. intro H. inversion H. tauto.
 
   (* DVALUE_Struct ... *)
   - destruct fields; auto.

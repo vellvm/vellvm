@@ -13,7 +13,7 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILES := LLVMAst Classes Util Misc AstLib Dom CFG CFGProp Trace Effects StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp
+COQFILES := LLVMAst Classes Util Misc AstLib Dom CFG CFGProp Trace LLVMBaseTypes LLVMIO StepSemantics Memory DeadInstr Transform DecidableEquality DecidableProp
 OLLVMFILES := 
 
 VFILES := $(COQFILES:%=coq/%.v)

@@ -22,27 +22,16 @@
 (* Adapted for use in Vellvm by Steve Zdancewic (c) 2017                      *)
 (*  ------------------------------------------------------------------------- *)
 
-Require Import compcert.lib.Integers.
 Require Import compcert.lib.Floats.
-Require Import List. 
-Require Import String Ascii.
-Require Import ZArith.
+Require Import List String Ascii ZArith.
 Require Import Vellvm.Util.
+
 Import ListNotations.
 Open Scope string_scope.
 Open Scope list_scope.
 
 Definition int := Z.
-
-Module Wordsize1.
-  Definition wordsize := 1%nat.
-  Remark wordsize_not_zero: wordsize <> 0%nat.
-  Proof. unfold wordsize; congruence. Qed.
-End Wordsize1.
-
-Module Int1 := Make(Wordsize1).
-
-Definition float := Floats.float.
+Definition float := Floats.float.  (* 64-bit floating point value *)
 
 Inductive linkage : Set :=
 | LINKAGE_Private
@@ -225,12 +214,12 @@ Inductive exp : Set :=
 | EXP_Bool    (b:bool)
 | EXP_Null
 | EXP_Zero_initializer
-| EXP_Cstring (s:string)
+| EXP_Cstring         (s:string)
 | EXP_Undef
-| EXP_Struct        (fields: list (typ * exp))
-| EXP_Packed_struct (fields: list (typ * exp))
-| EXP_Array         (elts: list (typ * exp))
-| EXP_Vector        (elts: list (typ * exp))
+| EXP_Struct          (fields: list (typ * exp))
+| EXP_Packed_struct   (fields: list (typ * exp))
+| EXP_Array           (elts: list (typ * exp))
+| EXP_Vector          (elts: list (typ * exp))
 | OP_IBinop           (iop:ibinop) (t:typ) (v1:exp) (v2:exp)  
 | OP_ICmp             (cmp:icmp)   (t:typ) (v1:exp) (v2:exp)
 | OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:typ) (v1:exp) (v2:exp)
@@ -258,7 +247,7 @@ Inductive phi : Set :=
 .
        
 Inductive instr : Set :=
-| INSTR_Op   (op:exp)                          (* INVARIANT: op must be of the form SV (OP_ ...) *)
+| INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form SV (OP_ ...) *)
 | INSTR_Call (fn:texp) (args:list texp)      (* CORNER CASE: return type is void treated specially *)
 | INSTR_Alloca (t:typ) (nb: option texp) (align:option int) 
 | INSTR_Load  (volatile:bool) (t:typ) (ptr:texp) (align:option int)       
@@ -267,7 +256,6 @@ Inductive instr : Set :=
 | INSTR_AtomicCmpXchg
 | INSTR_AtomicRMW
 | INSTR_Unreachable
-
 | INSTR_VAArg
 | INSTR_LandingPad
 .

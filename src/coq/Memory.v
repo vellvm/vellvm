@@ -9,19 +9,18 @@ Set Contextual Implicit.
 Inductive Addr :=
 | Null
 | Ptr (n:nat)
-| Fun (s:string)
 .      
 
-Module A : Vellvm.StepSemantics.ADDR with Definition addr := Addr.
+Module A : Vellvm.LLVMIO.ADDR with Definition addr := Addr.
   Definition addr := Addr.
-  Definition null := Null.   (* TODO this is unsound but convenient *)
+  Definition null := Null.   
 End A.  
 
 Module SS := StepSemantics.StepSemantics(A).
 Export SS.
+Export SS.DV.
 
 Definition memory := list dvalue.
-Definition undef t := DVALUE_Undef t None.
 
 Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (list dvalue * X) :=
   match e in IO Y return (IO Y) + (list dvalue * Y) with 

@@ -837,3 +837,13 @@ Fixpoint find_map {A B} (f : A -> option B) (l : list A) : option B :=
             end
   end.
 
+
+
+Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
+  match l1, l2 with
+  | [], [] => mret []
+  | x::xs, y::ys =>
+    'l <- combine_lists_err xs ys;
+      mret ((x,y)::l)
+  | _, _ => failwith "combine_lists_err: different lenth lists"
+  end.

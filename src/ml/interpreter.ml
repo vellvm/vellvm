@@ -12,20 +12,20 @@
  
 let print_int_dvalue dv : unit =
   match dv with
-  | SS.DVALUE_I1 (x) -> Printf.printf "Program terminated with: DVALUE_I1(%d)\n" (Camlcoq.Z.to_int (StepSemantics.Int1.unsigned x))
-  | SS.DVALUE_I32 (x) -> Printf.printf "Program terminated with: DVALUE_I32(%d)\n" (Camlcoq.Z.to_int (StepSemantics.Int32.unsigned x))
-  | SS.DVALUE_I64 (x) -> Printf.printf "Program terminated with: DVALUE_I64(%d) [possible precision loss: converted to OCaml int]\n"
-                       (Camlcoq.Z.to_int (StepSemantics.Int64.unsigned x))
+  | SS.DV.DVALUE_I1 (x) -> Printf.printf "Program terminated with: DVALUE_I1(%d)\n" (Camlcoq.Z.to_int (LLVMBaseTypes.Int1.unsigned x))
+  | SS.DV.DVALUE_I32 (x) -> Printf.printf "Program terminated with: DVALUE_I32(%d)\n" (Camlcoq.Z.to_int (LLVMBaseTypes.Int32.unsigned x))
+  | SS.DV.DVALUE_I64 (x) -> Printf.printf "Program terminated with: DVALUE_I64(%d) [possible precision loss: converted to OCaml int]\n"
+                       (Camlcoq.Z.to_int (LLVMBaseTypes.Int64.unsigned x))
   | _ -> Printf.printf "Program terminated with non-Integer value.\n"
 
 let rec step m =
   match Lazy.force m with
   | Trace.Tau x -> step x
-  | Trace.Ret v -> print_int_dvalue v
+  | Trace.Ret v -> v
   | Trace.Err s -> failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
-  | Trace.Vis (SS.INTERACTION_INTERFACE.Call(t, f, args), k) ->
+  | Trace.Vis (SS.DV.Call(t, f, args), k) ->
     (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n" (Camlcoq.camlstring_of_coqstring f));
-    step (k (Obj.magic (SS.DVALUE_I64 StepSemantics.Int64.zero)))
+    step (k (Obj.magic (SS.DV.DVALUE_I64 LLVMBaseTypes.Int64.zero)))
     
   | Trace.Vis _ -> failwith "should have been handled by the memory model"  
       
@@ -33,5 +33,5 @@ let rec step m =
 let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) =
   match Memory.run_with_memory prog with
   | None -> failwith "bad module"
-  | Some t -> step t
+  | Some t -> print_int_dvalue (step t)
   
