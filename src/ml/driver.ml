@@ -71,7 +71,7 @@ let add_link_file path =
 let process_ll_file path file =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let ll_ast = parse_file path in
-  let _ = if !interpret then Interpreter.interpret ll_ast else () in
+  let _ = if !interpret then Interpreter.print_int_dvalue (Interpreter.interpret ll_ast) else () in
   let ll_ast' = transform ll_ast in
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
   let _ = output_file vll_file ll_ast' in
@@ -88,3 +88,11 @@ let process_file path =
 
 let process_files files =
   List.iter process_file files
+
+(* file running ---------------------------------------------------------- *)
+(* Parses and runs the ll file at the given path, returning the dvalue produced. *)
+let run_ll_file path =
+  let _ = Platform.verb @@ Printf.sprintf "* running file: %s\n" path in
+  let ll_ast = parse_file path in
+  let res = Interpreter.interpret ll_ast in
+  res

@@ -33,5 +33,5 @@ let rec step m =
 let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) =
   match Memory.run_with_memory prog with
   | None -> failwith "bad module"
-  | Some t -> print_int_dvalue (step t)
+  | Some t -> step t
   
