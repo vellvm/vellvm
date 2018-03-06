@@ -47,7 +47,6 @@ Module StepSemantics(A:ADDR).
   | KRet      (e:env) (id:local_id) (q:pc)
   | KRet_void (e:env) (p:pc)
   .       
-  
   Definition stack := list frame.
 
   Definition state := (genv * pc * env * stack)%type.
@@ -536,7 +535,6 @@ Module StepSemantics(A:ADDR).
     end.
   Arguments eval_conv _ _ _ _ : simpl nomatch.
 
-
   End CONVERSIONS.
 
 
@@ -903,6 +901,7 @@ Definition step (CFG:mcfg) (s:state) : Trace result :=
               end
           | None => (* This must have been a registered external function *)
             match fid with
+              (* TODO: make sure the external call's type is correct *)
             | Name s => Trace.Vis (Call TYPE_Void s dvs) (fun dv => cont (g, pc_next, e, k))
             | _ => raise ("step: no function " ++ (string_of fid))
             end
@@ -977,112 +976,5 @@ CoFixpoint step_sem (CFG:mcfg) (r:result) : Trace dvalue :=
   | Step s => 'x <- step CFG s ; step_sem CFG x
   end.
 
-Section Properties.
-(* environment facts -------------------------------------------------------- 
-  Lemma lookup_env_hd : forall id dv e, lookup_env (add_env id dv e) id = Ret dv.
-  Proof.
-    intros id dv e.  unfold lookup_env. 
-    unfold add_env.
-    apply ENV.find_1. apply ENV.add_1. reflexivity.
-  Qed.  
-
-  Lemma lookup_env_tl : forall id1 v1 e id2,
-      id1 <> id2 -> lookup_env (add_env id1 v1 e) id2 = lookup_env e id2.
-  Proof.
-    unfold lookup_env.
-    intros id1 v1 e id2 H.
-    unfold add_env. 
-    remember (ENV.find (elt:=value) id2 (ENV.add id1 v1 e)) as x.
-    remember (ENV.find (elt:=value) id2 e) as y.
-    destruct x; destruct y; auto.
-    - symmetry in Heqx. rewrite <- ENVFacts.find_mapsto_iff in Heqx.
-      symmetry in Heqy. rewrite <- ENVFacts.find_mapsto_iff in Heqy.
-      rewrite ENVFacts.add_neq_mapsto_iff in Heqx; auto.
-      assert (v = v0). { eapply ENVFacts.MapsTo_fun; eauto. }
-                       subst; reflexivity.                 
-    - symmetry in Heqx. rewrite <- ENVFacts.find_mapsto_iff in Heqx.
-      symmetry in Heqy. rewrite <- ENVFacts.not_find_in_iff in Heqy.
-      rewrite ENVFacts.add_neq_mapsto_iff in Heqx; auto.
-      unfold ENV.In in Heqy. unfold ENV.Raw.In0 in Heqy. assert False. apply Heqy. exists v. apply Heqx. destruct H0.
-    - symmetry in Heqx. rewrite <- ENVFacts.not_find_in_iff in Heqx.
-      symmetry in Heqy. rewrite <- ENVFacts.find_mapsto_iff in Heqy.
-      assert False. apply Heqx. unfold ENV.In.  unfold ENV.Raw.In0. exists v. apply ENV.add_2; auto. destruct H0.
-  Qed.  
-
-
-  Lemma lookup_add_env_inv :
-    forall id1 v e id2 u
-      (Hl: lookup_env (add_env id1 v e) id2 = Some u),
-      (id1 = id2 /\ v = u) \/ (id1 <> id2 /\ lookup_env e id2 = Some u).
-  Proof.
-    intros id1 v e id2 u Hl.
-    unfold add_env in Hl.
-    unfold lookup_env in *.
-    rewrite <- ENVFacts.find_mapsto_iff in Hl.
-    apply ENVFacts.add_mapsto_iff in Hl.
-    destruct Hl as [H | H].
-    - left. assumption.
-    - right. rewrite <- ENVFacts.find_mapsto_iff. assumption.
-  Qed.      
- *)
-  
-  Definition pc_satisfies (CFG:mcfg) (p:pc) (P:cmd -> Prop) : Prop :=
-    forall cmd, fetch CFG p = Some cmd -> P cmd.
-
-
-  (* Move to AstLib.v ? *)
-  Definition is_Op (i:instr) : Prop :=
-    match i with
-    | INSTR_Op _ => True
-    | _ => False
-    end.
-
-  Definition is_Eff (i:instr) : Prop :=
-    match i with 
-    | INSTR_Alloca t nb a => True
-    | INSTR_Load v t p a => True
-    | INSTR_Store v val p a => True
-    | _ => False    (* TODO: Think about call *)
-    end.
-  
-  Definition is_Call (i:instr) : Prop :=
-    match i with
-    | INSTR_Call _ _ => True
-    | _ => False
-    end.
-  
-  Definition pc_non_call (CFG:mcfg) (p:pc) : Prop :=
-    pc_satisfies CFG p (fun c => exists i, not (is_Call i) /\ c = Inst i).
-
-  Ltac step_destruct :=
-    repeat (match goal with
-            | [ H : context[do _ <- trywith _ ?E; _] |- _ ] => destruct E; [simpl in H | solve [inversion H]]
-            | [ H : context[do _ <- ?E; _] |- _ ] => destruct E; [solve [inversion H] | simpl in H]
-            | [ H : context[match ?E with _ => _ end] |- _ ] => destruct E; try solve [inversion H]; simpl in H
-            | [ H : Step (?p, _ , _) = Step (?q, _, _) |- Some ?p = Some ?q ] => inversion H; auto
-            | [ H : ~ (is_Call (INSTR_Call _ _)) |- _ ] => simpl in H; contradiction
-            end).
-
-  (* Not true for Call *)
-  (*
-  Lemma step_pc_incr_inversion:
-    forall CFG pc1 e1 k1 pc2 e2 k2
-      (Hpc: pc_non_call CFG pc1)
-      (Hstep: step CFG (pc1, e1, k1) = Step (pc2, e2, k2)),
-      incr_pc CFG pc1 = Some pc2.
-  Proof.
-    (*
-    intros CFG pc1 e1 k1 pc2 e2 k2 Hpc Hstep.
-    simpl in Hstep.
-    unfold pc_non_call in Hpc. unfold pc_satisfies in Hpc.
-    destruct (fetch CFG pc1); try solve [inversion Hstep]; simpl in Hstep.
-    specialize Hpc with (cmd0 := c). destruct Hpc as [i [Hi Hc]]; auto.
-    subst.
-    destruct (incr_pc CFG pc1); [simpl in Hstep | solve [inversion Hstep]].
-    step_destruct.*)
-    admit. (* TODO: fix up once the effects interface is stabilized *)
-  Admitted.
-*)
-End Properties.
 
 End StepSemantics.

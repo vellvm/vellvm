@@ -273,7 +273,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
   end.
 
 (*
- memory -> Trace () -> Trace () -> Prop
+ memory -> TraceLLVMIO () -> TraceX86IO () -> Prop
 *)
 
 CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
