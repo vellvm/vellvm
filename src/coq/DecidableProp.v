@@ -32,10 +32,11 @@ Proof.
     try solve [left; rewrite iid_eq; rewrite instr_eq;
                constructor; auto].
 Defined.
-*)
+ *)
+(*
 Instance dec_is_Op : forall (i : instr), Decidable (is_Op i).
 Proof.
-  intros i; unfold Decidable; destruct i;
+  intros P i; unfold Decidable; destruct i;
     try solve [right; intros H; inversion H; auto];
     try solve [left; constructor].
 Defined.
@@ -46,3 +47,4 @@ Proof.
     try solve [right; intros H; inversion H; auto];
     try solve [left; constructor].
 Defined.
+*)
