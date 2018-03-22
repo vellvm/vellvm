@@ -2,7 +2,7 @@ Require Import ZArith List String Omega.
 Require Import  Vellvm.LLVMAst Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.StepSemantics Vellvm.LLVMIO Vellvm.LLVMBaseTypes.
 Require Import FSets.FMapAVL.
-Require Import Integers.
+Require Import compcert.lib.Integers.
 Require Coq.Structures.OrderedTypeEx.
 Require Import ZMicromega.
 Import ListNotations.
@@ -164,6 +164,50 @@ Definition init_block (n:Z) : mem_block :=
 Definition make_empty_block (ty:typ) : mem_block :=
   init_block (sizeof_typ ty).
 
+Check fold_left.
+Check nth_error.
+
+
+Fixpoint handle_gep_h {X} (e:IO X) (t:typ) (b:Z) (off:Z) (vs:list dvalue) (m:memory) :=
+  match vs with
+  | v :: vs' =>
+    match v with
+    | DVALUE_I32 i =>
+      let k := Int32.unsigned i in
+      let n := BinIntDef.Z.to_nat k in
+      match t with
+      | TYPE_Array _ ta => handle_gep_h e ta b (off + k * (sizeof_typ ta)) vs' m
+      | TYPE_Struct ts | TYPE_Packed_struct ts => (* Handle these differently in future *)
+        
+        let offset := fold_left (fun acc t => acc + sizeof_typ t)
+                                (firstn n ts) 0 in
+        match nth_error ts n with
+        | None => inl e (* What to do when overflow *)
+        | Some t' =>
+          handle_gep_h e t' b (off + offset) vs' m
+        end
+      | _ => inl e
+      end
+    | _ => inl e (* support other indexing options? *)
+    end
+  | [] => inr (m, DVALUE_Addr (b, off))
+  end.
+
+Definition handle_gep {X} (e:IO X) (t:typ) (dv:dvalue) (vs:list dvalue) (m:memory) :=
+  match vs with
+  | DVALUE_I32 i :: vs' =>
+    match t with
+    | TYPE_Pointer p =>
+      match dv with
+      | DVALUE_Addr (b, o) =>
+        handle_gep_h e p b (o + (sizeof_typ p) * (Int32.unsigned i)) vs' m
+      | _ => inl e
+      end
+    | _ => inl e
+    end
+  | _ => inl e
+  end.
+
 Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
   match e with
   | Alloca t =>
@@ -201,6 +245,10 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
     end
       
   | GEP t dv vs =>
+
+    
+
+    
     (* Index into a structured data type. *)
     let index_into_type typ index :=
         match typ with
