@@ -105,13 +105,24 @@ let i1_tests : (string * int) list =
    ("../tests/llvm-arith/i1/mul_safe.ll", 0);
    ("../tests/llvm-arith/i1/arith_combo.ll", 0);
    ("../tests/llvm-arith/i1/add_twice_named.ll", 1);
-   ("../tests/llvm-arith/i1/add_safe.ll", 1)]
+   ("../tests/llvm-arith/i1/add_safe.ll", 1)  
+  ]
 
 let i32_tests : (string * int) list =
   [  ]
 
 let i64_tests : (string * int) list =
-  [  ]
+  [
+    ("../tests/ll/gep1.ll", 6);
+    ("../tests/ll/gep2.ll", 4);
+    ("../tests/ll/gep3.ll", 1);
+    ("../tests/ll/gep4.ll", 2);
+    ("../tests/ll/gep5.ll", 4);
+    ("../tests/ll/gep6.ll", 7);
+    ("../tests/ll/gep7.ll", 7);
+    ("../tests/ll/gep8.ll", 2);
+    ("../tests/ll/gep9.ll", 5);
+  ]
     
 let parse_files =
   [  ]
