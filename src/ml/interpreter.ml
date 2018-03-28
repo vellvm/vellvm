@@ -27,6 +27,7 @@ let rec step m =
     (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n" (Camlcoq.camlstring_of_coqstring f));
     step (k (Obj.magic (SS.DV.DVALUE_I64 LLVMBaseTypes.Int64.zero)))
     
+  | Trace.Vis (SS.DV.GEP(_, _, _), _) -> failwith "GEP failed"
   | Trace.Vis _ -> failwith "should have been handled by the memory model"  
       
 
