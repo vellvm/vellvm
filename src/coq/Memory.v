@@ -165,7 +165,7 @@ Definition make_empty_block (ty:typ) : mem_block :=
   init_block (sizeof_typ ty).
 
 
-Fixpoint handle_gep_h (t:typ) (b:Z) (off:Z) (vs:list dvalue) (m:memory) :=
+Fixpoint handle_gep_h (t:typ) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
   match vs with
   | v :: vs' =>
     match v with
@@ -178,40 +178,45 @@ Fixpoint handle_gep_h (t:typ) (b:Z) (off:Z) (vs:list dvalue) (m:memory) :=
         let offset := fold_left (fun acc t => acc + sizeof_typ t)
                                 (firstn n ts) 0 in
         match nth_error ts n with
-        | None => None (* What to do when overflow *)
+        | None => raise "overflow"
         | Some t' =>
           handle_gep_h t' b (off + offset) vs' m
         end
-      | _ => None
+      | _ => raise ("non-indexable type: " ++ string_of t)
       end
-    | _ => None (* support other indexing options? *)
+    | _ => raise "non-I32 index"
     end
-  | [] => Some (m, DVALUE_Addr (b, off))
+  | [] => mret (m, DVALUE_Addr (b, off))
   end.
 
 Print typ.
 
-Definition handle_gep (t:typ) (dv:dvalue) (vs:list dvalue) (m:memory) :=
-  match vs with
-  | DVALUE_I32 i :: vs' => (* Why isn't t a pointer type? *)
-    match dv with
-    | DVALUE_Addr (b, o) =>
-      handle_gep_h t b (o + (sizeof_typ t) * (Int32.unsigned i)) vs' m
-    | _ => None
+Definition handle_gep (t:typ) (dv:dvalue) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
+  match t with
+  | TYPE_Pointer t =>
+    match vs with
+    | DVALUE_I32 i :: vs' => (* Why isn't t a pointer type? *)
+      match dv with
+      | DVALUE_Addr (b, o) =>
+        handle_gep_h t b (o + (sizeof_typ t) * (Int32.unsigned i)) vs' m
+      | _ => raise "non-address" 
+      end
+    | _ => raise "non-I32 index"
     end
-  | _ => None
+  | _ => raise "non-pointer type to GEP"
   end.
-
 Check handle_gep.
 
-Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
+Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
   match e with
   | Alloca t =>
     let new_block := make_empty_block t in
+    mret (
     inr  (add (size m) new_block m,
           DVALUE_Addr (size m, 0))
+    )
          
-  | Load t dv =>
+  | Load t dv => mret
     match dv with
     | DVALUE_Addr a =>
       match a with
@@ -226,7 +231,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
     | _ => inl (Load t dv)
     end 
 
-  | Store dv v =>
+  | Store dv v => mret
     match dv with
     | DVALUE_Addr a =>
       match a with
@@ -243,8 +248,8 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
   | GEP t dv vs =>
 
     match handle_gep t dv vs m with
-    | None => inl (GEP t dv vs)
-    | Some r => inr r
+    | inl s => raise s
+    | inr r => mret (inr r)
     end
 
     (*
@@ -306,17 +311,17 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
       end
     | _ => inl (GEP t dv vs)
     end*)
-  | ItoP t i => inl (ItoP t i) (* TODO: ItoP semantics *)
+  | ItoP t i => mret (inl (ItoP t i)) (* TODO: ItoP semantics *)
 
-  | PtoI t a => inl (PtoI t a) (* TODO: ItoP semantics *)                     
+  | PtoI t a => mret (inl (PtoI t a)) (* TODO: ItoP semantics *)                     
                        
-  | Call t f args  => inl (Call t f args)
+  | Call t f args  => mret (inl (Call t f args))
 
                          
   | DeclareFun f =>
     (* TODO: should check for re-declarations and maintain that state in the memory *)
-    inr (m,
-         DVALUE_FunPtr f)
+    mret (inr (m,
+          DVALUE_FunPtr f))
   end.
 
 (*
@@ -328,8 +333,9 @@ CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
   | Trace.Tau d'            => Trace.Tau (memD m d')
   | Trace.Vis _ io k =>
     match mem_step io m with
-    | inr (m', v) => Trace.Tau (memD m' (k v))
-    | inl e => Trace.Vis io k
+    | inr (inr (m', v)) => Trace.Tau (memD m' (k v))
+    | inr (inl e) => Trace.Vis io k
+    | inl s => Trace.Err s
     end
   | Trace.Ret x => d
   | Trace.Err x => d

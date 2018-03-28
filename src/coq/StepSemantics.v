@@ -731,8 +731,8 @@ Fixpoint eval_exp (g:genv) (e:env) (top:option typ) (o:exp) : Trace dvalue :=
                        
   | OP_GetElementPtr t (ptrtyp, ptrval) idxs =>
     'vptr <- eval_exp g e (Some ptrtyp) ptrval;
-    'vs <- map_monad (fun '(t,ex) => 'v <- eval_exp g e (Some t) ex; mret v) idxs;
-    Trace.Vis (GEP t vptr vs) mret
+    'vs <- map_monad (fun '(u,ex) => 'v <- eval_exp g e (Some u) ex; mret v) idxs;
+    Trace.Vis (GEP ptrtyp vptr vs) mret
     
   | OP_ExtractElement vecop idx =>
     (*    'vec <- monad_app_snd (eval_exp e) vecop;
