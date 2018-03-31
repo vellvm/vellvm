@@ -145,6 +145,52 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:typ) : dvalue :=
   | _ => DVALUE_None (* TODO add more as serialization support increases *)
   end.
 
+(* Todo - complete proofs, and think about moving to MemoryProp module. *)
+(* The relation defining serializable dvalues. *)
+Inductive serialize_defined : dvalue -> Prop :=
+  | d_addr: forall addr,
+      serialize_defined (DVALUE_Addr addr)
+  | d_i1: forall i1,
+      serialize_defined (DVALUE_I1 i1)
+  | d_i32: forall i32,
+      serialize_defined (DVALUE_I32 i32)
+  | d_i64: forall i64,
+      serialize_defined (DVALUE_I64 i64)
+  | d_struct_empty:
+      serialize_defined (DVALUE_Struct [])
+  | d_struct_nonempty: forall typ dval fields_list,
+      serialize_defined dval ->
+      serialize_defined (DVALUE_Struct fields_list) ->
+      serialize_defined (DVALUE_Struct ((typ, dval) :: fields_list))
+  | d_array_empty:
+      serialize_defined (DVALUE_Array [])
+  | d_array_nonempty: forall typ dval fields_list,
+      serialize_defined dval ->
+      serialize_defined (DVALUE_Array fields_list) ->
+      serialize_defined (DVALUE_Array ((typ, dval) :: fields_list)).
+      
+Lemma serialize_inverses : forall dval,
+      serialize_defined dval -> exists typ, deserialize_sbytes (serialize_dvalue dval) typ = dval.
+Proof.
+  intros. destruct H.
+  (* DVALUE_Addr. Type of pointer is not important. *)
+  - exists (TYPE_Pointer TYPE_Void). reflexivity.
+  (* DVALUE_I1. Todo: subversion lemma for integers. *)
+  - exists (TYPE_I 1). admit.
+  (* DVALUE_I32. Todo: subversion lemma for integers. *)
+  - exists (TYPE_I 32). admit.
+  (* DVALUE_I64. Todo: subversion lemma for integers. *)
+  - exists (TYPE_I 64). admit.
+  (* DVALUE_Struct [] *)
+  - exists (TYPE_Struct []). reflexivity.
+  (* DVALUE_Struct fields *)
+  - admit.
+  (* DVALUE_Array [] *)
+  - exists (TYPE_Array 0 TYPE_Void). reflexivity.
+  (* DVALUE_Array fields *)
+  - admit.
+Admitted.
+
 (* Construct block indexed from 0 to n. *)
 Fixpoint init_block_h (n:nat) (m:mem_block) : mem_block :=
   match n with
@@ -189,8 +235,6 @@ Fixpoint handle_gep_h (t:typ) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (m
   | [] => mret (m, DVALUE_Addr (b, off))
   end.
 
-Print typ.
-
 Definition handle_gep (t:typ) (dv:dvalue) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
   match t with
   | TYPE_Pointer t =>
@@ -205,7 +249,6 @@ Definition handle_gep (t:typ) (dv:dvalue) (vs:list dvalue) (m:memory) : err (mem
     end
   | _ => raise "non-pointer type to GEP"
   end.
-Check handle_gep.
 
 Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
   match e with
