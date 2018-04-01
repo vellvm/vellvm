@@ -91,7 +91,7 @@ Definition sbyte_list_to_Z (bytes:list SByte) : Z :=
                match x with
                | Byte b =>
                  let shift := snd acc in
-                 ((fst acc) + ((Byte.intval b) * shift), shift * 256)
+                 ((fst acc) + ((Byte.unsigned b) * shift), shift * 256)
                | _ => acc (* should not have other kinds bytes in an int *)
                end) (0, 1) bytes).
 
@@ -168,9 +168,20 @@ Inductive serialize_defined : dvalue -> Prop :=
       serialize_defined dval ->
       serialize_defined (DVALUE_Array fields_list) ->
       serialize_defined (DVALUE_Array ((typ, dval) :: fields_list)).
+
+(* Lemma assumes all integers encoded with 8 bytes. *)
+(* TODO: finish proof, perhaps writing serialize/deserialize with more compcert functions.
+Core part left is proving that adding together the different bytes of an int gives that int.
+Lemma integer_serialize_inverses: forall int,
+    sbyte_list_to_Z (Z_to_sbyte_list 8 int) = int.
+Proof.
+  intros int. simpl. unfold sbyte_list_to_Z.
+  simpl. repeat rewrite Byte.unsigned_repr_eq. simpl.
+  assert (H: Byte.modulus = 256). { auto. } rewrite H.
+*)
       
 Lemma serialize_inverses : forall dval,
-      serialize_defined dval -> exists typ, deserialize_sbytes (serialize_dvalue dval) typ = dval.
+    serialize_defined dval -> exists typ, deserialize_sbytes (serialize_dvalue dval) typ = dval.
 Proof.
   intros. destruct H.
   (* DVALUE_Addr. Type of pointer is not important. *)
