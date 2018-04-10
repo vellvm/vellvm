@@ -209,14 +209,16 @@ Proof.
   - unfold sbyte_list_to_Z. simpl. omega.
   - inversion HWF.   subst.
     rewrite IHl; auto.
-    
+Admitted.    
     
   
 
 Lemma sbyte_list_to_Z_app : forall l1 l2,
     sbyte_list_to_Z (l1 ++ l2) =
-    (sbyte_list_to_Z l1) * (pow 256 (List.length l2)) + sbyte_list_to_Z l2
-
+    (sbyte_list_to_Z l1) * (pow 256 (List.length l2)) + sbyte_list_to_Z l2.
+Proof.
+Admitted.
+  
 Lemma sbyte_list_to_Z_aux : forall l int,
   sbyte_list_to_Z (l ++ [Byte (Byte.repr (int mod 256))]) =
   (sbyte_list_to_Z l) * 256 + (int mod 256).
@@ -227,26 +229,35 @@ Proof.
   (* (x mod y) mod y = x mod y *)
   admit.
   simpl. 
-  
+Admitted.  
 
 Lemma F_pos : forall x, F x > 0 .
+Proof.
+Admitted.  
+  
 Lemma isi : forall (cnt:nat) (int:Z),
     0 <= int < (F cnt) ->
     sbyte_list_to_Z (Z_to_sbyte_list cnt int) = int.
 Proof.
   induction cnt; intros int H. simpl in H.
   simpl. unfold sbyte_list_to_Z. simpl. admit.
-  simpl. rewrite IHcnt.
+  simpl. 
+Admitted.
   
-
+(*
 Lemma integer_serialize_inverses: forall int,
     sbyte_list_to_Z (Z_to_sbyte_list 8 int) = int.
 Proof.
+Admitted.
+*)
+(*
   intros int. simpl. unfold sbyte_list_to_Z.
   simpl. repeat rewrite Byte.unsigned_repr_eq. simpl.
+  Admitted.
   assert (H: Byte.modulus = 256). { auto. } rewrite H.
-
-      
+Admitted.
+*)  
+    
 Lemma serialize_inverses : forall dval,
     serialize_defined dval -> exists typ, deserialize_sbytes (serialize_dvalue dval) typ = dval.
 Proof.

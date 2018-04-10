@@ -801,7 +801,7 @@ Inductive result :=
 .       
 
 Definition raise_p {X} (p:pc) s : Trace X := raise (s ++ ": " ++ (string_of p)).
-Definition cont (s:state) : Trace result := mret (Step s).
+Definition cont (s:state)  : Trace result := mret (Step s).
 Definition halt (v:dvalue) : Trace result := mret (Done v).
 
 

@@ -10,7 +10,8 @@
 
 Require Import ZArith List String Omega.
 Require Import Vellvm.Classes Vellvm.Util Vellvm.Trace.
-Require Import Vellvm.LLVMAst Vellvm.LLVMBaseTypes.
+Require Import Vellvm.LLVMAst.
+Require Export Vellvm.LLVMBaseTypes.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
