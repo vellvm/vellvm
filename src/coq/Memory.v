@@ -164,6 +164,7 @@ Definition init_block (n:Z) : mem_block :=
 Definition make_empty_block (ty:typ) : mem_block :=
   init_block (sizeof_typ ty).
 
+Print typ.
 
 Fixpoint handle_gep_h (t:typ) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
   match vs with
@@ -182,20 +183,26 @@ Fixpoint handle_gep_h (t:typ) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (m
         | Some t' =>
           handle_gep_h t' b (off + offset) vs' m
         end
-      | _ => raise ("non-indexable type: " ++ string_of t)
+      | _ => raise ("non-i32-indexable type: " ++ string_of t)
+      end
+    | DVALUE_I64 i =>
+      let k := Int64.unsigned i in
+      let n := BinIntDef.Z.to_nat k in
+      match t with
+      | TYPE_Array _ ta => handle_gep_h ta b (off + k * (sizeof_typ ta)) vs' m
+      | _ => raise ("non-i64-indexable type: " ++ string_of t)
       end
     | _ => raise "non-I32 index"
     end
   | [] => mret (m, DVALUE_Addr (b, off))
   end.
 
-Print typ.
 
 Definition handle_gep (t:typ) (dv:dvalue) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
   match t with
   | TYPE_Pointer t =>
     match vs with
-    | DVALUE_I32 i :: vs' => (* Why isn't t a pointer type? *)
+    | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 indices *)
       match dv with
       | DVALUE_Addr (b, o) =>
         handle_gep_h t b (o + (sizeof_typ t) * (Int32.unsigned i)) vs' m
@@ -205,7 +212,7 @@ Definition handle_gep (t:typ) (dv:dvalue) (vs:list dvalue) (m:memory) : err (mem
     end
   | _ => raise "non-pointer type to GEP"
   end.
-Check handle_gep.
+
 
 Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
   match e with
@@ -252,65 +259,6 @@ Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
     | inr r => mret (inr r)
     end
 
-    (*
-    (* Index into a structured data type. *)
-    let index_into_type typ index :=
-        match typ with
-        | TYPE_Array sz ty =>
-          if sz <=? index then None else
-            Some (ty, index * (sizeof_typ ty))
-        | TYPE_Struct fields =>
-          let new_typ := List.nth_error fields (Z.to_nat index) in
-          match new_typ with
-          | Some new_typ' =>
-            (* Compute the byte-offset induced by the first i elements of the struct. *)
-            let fix compute_offset typ_list i :=
-                match typ_list with
-                | [] => 0
-                | hd :: tl =>
-                  if i <? index
-                  then sizeof_typ hd + compute_offset tl (i + 1)
-                  else 0
-                end
-              in
-            Some (new_typ', compute_offset fields 0)
-          | None => None
-          end
-        | _ => None (* add type support as necessary *)
-        end
-    in
-    (* Give back the final byte-offset into mem_bytes *)
-    let fix gep_helper mem_bytes cur_type offsets offset_acc :=
-        match offsets with
-        | [] => offset_acc
-        | dval :: tl =>
-          match dval with
-          | DVALUE_I32 x =>
-            let nat_index := Int32.unsigned x in
-            let new_typ_info := index_into_type cur_type nat_index in
-            match new_typ_info with
-              | Some (new_typ, offset) => 
-                gep_helper mem_bytes new_typ tl (offset_acc + offset)
-              | None => 0 (* fail *)
-            end
-          | _ => 0 (* fail, at least until supporting non-i32 indexes *)
-          end
-        end
-    in
-    match dv with
-    | DVALUE_Addr a =>
-      match a with
-      | (b, i) =>
-        match lookup b m with
-        | Some block =>
-          let mem_val := lookup_all_index i (sizeof_typ t) block SUndef in
-          let answer := gep_helper mem_val t vs 0 in
-          inr (m, DVALUE_Addr (b, i + answer))
-        | None => inl (GEP t dv vs)
-        end
-      end
-    | _ => inl (GEP t dv vs)
-    end*)
   | ItoP t i => mret (inl (ItoP t i)) (* TODO: ItoP semantics *)
 
   | PtoI t a => mret (inl (PtoI t a)) (* TODO: ItoP semantics *)                     
