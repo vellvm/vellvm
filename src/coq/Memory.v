@@ -91,7 +91,7 @@ Definition sbyte_list_to_Z (bytes:list SByte) : Z :=
                match x with
                | Byte b =>
                  let shift := snd acc in
-                 ((fst acc) + ((Byte.intval b) * shift), shift * 256)
+                 ((fst acc) + ((Byte.unsigned b) * shift), shift * 256)
                | _ => acc (* should not have other kinds bytes in an int *)
                end) (0, 1) bytes).
 
@@ -145,6 +145,141 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:typ) : dvalue :=
   | _ => DVALUE_None (* TODO add more as serialization support increases *)
   end.
 
+(* Todo - complete proofs, and think about moving to MemoryProp module. *)
+(* The relation defining serializable dvalues. *)
+Inductive serialize_defined : dvalue -> Prop :=
+  | d_addr: forall addr,
+      serialize_defined (DVALUE_Addr addr)
+  | d_i1: forall i1,
+      serialize_defined (DVALUE_I1 i1)
+  | d_i32: forall i32,
+      serialize_defined (DVALUE_I32 i32)
+  | d_i64: forall i64,
+      serialize_defined (DVALUE_I64 i64)
+  | d_struct_empty:
+      serialize_defined (DVALUE_Struct [])
+  | d_struct_nonempty: forall typ dval fields_list,
+      serialize_defined dval ->
+      serialize_defined (DVALUE_Struct fields_list) ->
+      serialize_defined (DVALUE_Struct ((typ, dval) :: fields_list))
+  | d_array_empty:
+      serialize_defined (DVALUE_Array [])
+  | d_array_nonempty: forall typ dval fields_list,
+      serialize_defined dval ->
+      serialize_defined (DVALUE_Array fields_list) ->
+      serialize_defined (DVALUE_Array ((typ, dval) :: fields_list)).
+
+(* Lemma assumes all integers encoded with 8 bytes. *)
+(* TODO: finish proof, perhaps writing serialize/deserialize with more compcert functions.
+Core part left is proving that adding together the different bytes of an int gives that int.
+ *)
+(* F 0 = 1 *)
+Fixpoint F (n:nat) : Z :=
+  match n with
+  | O => 1
+  | S n => 256 * (F n)
+  end.
+
+(*
+Definition sbyte_list_wf (l:list SByte) : Prop := List.Forall (fun b => match b with
+                                                                  | Byte _ => True
+                                                                  | _ => False
+                                                                end) l.
+ *)
+
+Inductive sbyte_list_wf : list SByte -> Prop :=
+| wf_nil : sbyte_list_wf []
+| wf_cons : forall b l, sbyte_list_wf l -> sbyte_list_wf (Byte b :: l)
+.                                                   
+
+
+Fixpoint pow x n :=
+  match n with
+  | O => 1%Z
+  | S n => x * (pow x n)
+  end.
+          
+
+Lemma sbyte_list_to_Z_cons : forall l b
+    (HWF: sbyte_list_wf l),
+    sbyte_list_to_Z (Byte b::l) =
+    (Byte.unsigned b) * (pow 256 (List.length l)) + sbyte_list_to_Z l.
+Proof.
+  induction l; intros; simpl in *.
+  - unfold sbyte_list_to_Z. simpl. omega.
+  - inversion HWF.   subst.
+    rewrite IHl; auto.
+Admitted.    
+    
+  
+
+Lemma sbyte_list_to_Z_app : forall l1 l2,
+    sbyte_list_to_Z (l1 ++ l2) =
+    (sbyte_list_to_Z l1) * (pow 256 (List.length l2)) + sbyte_list_to_Z l2.
+Proof.
+Admitted.
+  
+Lemma sbyte_list_to_Z_aux : forall l int,
+  sbyte_list_to_Z (l ++ [Byte (Byte.repr (int mod 256))]) =
+  (sbyte_list_to_Z l) * 256 + (int mod 256).
+Proof.
+  induction l; intros; simpl in *.
+  unfold sbyte_list_to_Z. simpl. rewrite Byte.unsigned_repr_eq. simpl.
+  unfold Byte.modulus. unfold Byte.wordsize.
+  (* (x mod y) mod y = x mod y *)
+  admit.
+  simpl. 
+Admitted.  
+
+Lemma F_pos : forall x, F x > 0 .
+Proof.
+Admitted.  
+  
+Lemma isi : forall (cnt:nat) (int:Z),
+    0 <= int < (F cnt) ->
+    sbyte_list_to_Z (Z_to_sbyte_list cnt int) = int.
+Proof.
+  induction cnt; intros int H. simpl in H.
+  simpl. unfold sbyte_list_to_Z. simpl. admit.
+  simpl. 
+Admitted.
+  
+(*
+Lemma integer_serialize_inverses: forall int,
+    sbyte_list_to_Z (Z_to_sbyte_list 8 int) = int.
+Proof.
+Admitted.
+*)
+(*
+  intros int. simpl. unfold sbyte_list_to_Z.
+  simpl. repeat rewrite Byte.unsigned_repr_eq. simpl.
+  Admitted.
+  assert (H: Byte.modulus = 256). { auto. } rewrite H.
+Admitted.
+*)  
+    
+Lemma serialize_inverses : forall dval,
+    serialize_defined dval -> exists typ, deserialize_sbytes (serialize_dvalue dval) typ = dval.
+Proof.
+  intros. destruct H.
+  (* DVALUE_Addr. Type of pointer is not important. *)
+  - exists (TYPE_Pointer TYPE_Void). reflexivity.
+  (* DVALUE_I1. Todo: subversion lemma for integers. *)
+  - exists (TYPE_I 1). admit.
+  (* DVALUE_I32. Todo: subversion lemma for integers. *)
+  - exists (TYPE_I 32). admit.
+  (* DVALUE_I64. Todo: subversion lemma for integers. *)
+  - exists (TYPE_I 64). admit.
+  (* DVALUE_Struct [] *)
+  - exists (TYPE_Struct []). reflexivity.
+  (* DVALUE_Struct fields *)
+  - admit.
+  (* DVALUE_Array [] *)
+  - exists (TYPE_Array 0 TYPE_Void). reflexivity.
+  (* DVALUE_Array fields *)
+  - admit.
+Admitted.
+
 (* Construct block indexed from 0 to n. *)
 Fixpoint init_block_h (n:nat) (m:mem_block) : mem_block :=
   match n with
@@ -174,7 +309,8 @@ Fixpoint handle_gep_h (t:typ) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (m
       let k := Int32.unsigned i in
       let n := BinIntDef.Z.to_nat k in
       match t with
-      | TYPE_Array _ ta => handle_gep_h ta b (off + k * (sizeof_typ ta)) vs' m
+      | TYPE_Vector _ ta | TYPE_Array _ ta =>
+                           handle_gep_h ta b (off + k * (sizeof_typ ta)) vs' m
       | TYPE_Struct ts | TYPE_Packed_struct ts => (* Handle these differently in future *)
         let offset := fold_left (fun acc t => acc + sizeof_typ t)
                                 (firstn n ts) 0 in
@@ -189,14 +325,14 @@ Fixpoint handle_gep_h (t:typ) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (m
       let k := Int64.unsigned i in
       let n := BinIntDef.Z.to_nat k in
       match t with
-      | TYPE_Array _ ta => handle_gep_h ta b (off + k * (sizeof_typ ta)) vs' m
+      | TYPE_Vector _ ta | TYPE_Array _ ta =>
+                           handle_gep_h ta b (off + k * (sizeof_typ ta)) vs' m
       | _ => raise ("non-i64-indexable type: " ++ string_of t)
       end
     | _ => raise "non-I32 index"
     end
   | [] => mret (m, DVALUE_Addr (b, off))
   end.
-
 
 Definition handle_gep (t:typ) (dv:dvalue) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
   match t with
@@ -212,7 +348,6 @@ Definition handle_gep (t:typ) (dv:dvalue) (vs:list dvalue) (m:memory) : err (mem
     end
   | _ => raise "non-pointer type to GEP"
   end.
-
 
 Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
   match e with
