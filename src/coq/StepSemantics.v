@@ -36,6 +36,7 @@ Module StepSemantics(A:ADDR).
 (* Environments ------------------------------------------------------------- *)
   Module ENV := FMapAVL.Make(AstLib.RawIDOrd).
   Module ENVFacts := FMapFacts.WFacts_fun(AstLib.RawIDOrd)(ENV).
+  Module ENVProps := FMapFacts.WProperties_fun(AstLib.RawIDOrd)(ENV).
   
   Definition env_of_assoc {A} (l:list (raw_id * A)) : ENV.t A :=
     List.fold_left (fun e '(k,v) => ENV.add k v e) l (@ENV.empty A).
