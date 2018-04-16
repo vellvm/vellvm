@@ -10,9 +10,11 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
+Definition oracle (x:unit) : Z := 0.
+
 Module A : Vellvm.LLVMIO.ADDR with Definition addr := (Z * Z) % type.
   Definition addr := (Z * Z) % type.
-  Definition null := (0, 0).
+  Definition null := (-1, 0).
 End A.
 
 Definition addr := A.addr.
@@ -334,6 +336,22 @@ Fixpoint handle_gep_h (t:typ) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (m
   | [] => mret (m, DVALUE_Addr (b, off))
   end.
 
+Print IM.
+
+Definition concretize_block (b:Z) (m:memory) : Z * memory :=
+  match lookup b m with
+  | None =>(b, m)
+  | Some block =>
+    let i := oracle () in
+    let fix loop es k block : mem_block :=
+        match es with
+        | [] => block
+        | (i, e) :: tl => loop tl (k+1) (add (k + i) e block)
+        end in
+    (* TODO change source block SBYTES to associate abstract pointers with concrete memory. *)
+    (i, add b (loop (IM.elements block) i block) m)
+  end.
+
 Definition handle_gep (t:typ) (dv:dvalue) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
   match t with
   | TYPE_Pointer t =>
@@ -354,7 +372,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
   | Alloca t =>
     let new_block := make_empty_block t in
     mret (
-    inr  (add (size m) new_block m,
+    inr  (add (size m + 1) new_block m,
           DVALUE_Addr (size m, 0))
     )
          
@@ -394,9 +412,22 @@ Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
     | inr r => mret (inr r)
     end
 
-  | ItoP t i => mret (inl (ItoP t i)) (* TODO: ItoP semantics *)
-
-  | PtoI t a => mret (inl (PtoI t a)) (* TODO: ItoP semantics *)                     
+  | ItoP t i =>
+    match i with
+    | DVALUE_I64 i => mret (inr (m, DVALUE_Addr (0, Int64.unsigned i)))
+    | DVALUE_I32 i => mret (inr (m, DVALUE_Addr (0, Int32.unsigned i)))
+    | DVALUE_I1 i => mret (inr (m, DVALUE_Addr (0, Int1.unsigned i)))
+    | _ => raise "Non integer passed to ItoP"
+    end
+    
+  | PtoI t a =>
+    match a with
+    | DVALUE_Addr (b, i) =>
+      if Z.eqb b 0 then mret (inr (m, DVALUE_Addr(0, i)))
+      else let (k, m) := concretize_block b m in
+           mret (inr (m, DVALUE_Addr (0, (k + i))))
+    | _ => raise "Non pointer passed to PtoI"
+    end
                        
   | Call t f args  => mret (inl (Call t f args))
 
