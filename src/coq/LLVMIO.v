@@ -18,6 +18,7 @@ Set Contextual Implicit.
 Module Type ADDR.
   Parameter addr : Set.
   Parameter null : addr.
+(*  Parameter addr_dec : forall a1 a2:addr, {a1 = a2} + {a1 <> a2}. *)
 End ADDR.  
 
 Module DVALUE(A:ADDR).

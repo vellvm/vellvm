@@ -250,7 +250,7 @@ Module StepSemantics(A:ADDR).
   Arguments eval_i64_op _ _ _ : simpl nomatch.
   
   (* Evaluate the given iop on the given arguments according to the bitsize *)
-  Definition integer_op (bits:Z) (iop:ibinop) (x y:inttyp bits) : err dvalue:=
+  Definition integer_op (bits:Z) (iop:ibinop) (x y:inttyp bits) : err dvalue :=
     match bits, x, y with
     | 1, x, y => mret (eval_i1_op iop x y)
     | 32, x, y => mret (eval_i32_op iop x y)
