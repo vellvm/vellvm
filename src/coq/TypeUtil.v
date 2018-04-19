@@ -334,3 +334,72 @@ Inductive wf_typ : list (ident * typ) -> typ -> Prop :=
     forall (defs : list (ident * typ)),
       wf_typ defs TYPE_Opaque
 .
+
+
+Definition wf_env (env : list (ident * typ)) : Prop :=
+  NoDup (map fst env) -> Forall (wf_typ env) (map snd env).
+
+
+Inductive unrolled_typ : typ -> Prop :=
+| unrolled_typ_I :
+    forall (sz : int),
+      unrolled_typ (TYPE_I sz)
+
+| unrolled_typ_Pointer :
+    forall (t : typ),
+      unrolled_typ (TYPE_Pointer t)
+
+| unrolled_typ_Void :
+    unrolled_typ TYPE_Void
+
+| unrolled_typ_Half :
+    unrolled_typ TYPE_Half
+
+| unrolled_typ_Float :
+    unrolled_typ TYPE_Float
+
+| unrolled_typ_Double :
+    unrolled_typ TYPE_Double
+
+| unrolled_typ_X86_fp80 :
+    unrolled_typ TYPE_X86_fp80
+
+| unrolled_typ_Fp128 :
+    unrolled_typ TYPE_Fp128
+
+| unrolled_typ_Ppc_fp128 :
+    unrolled_typ TYPE_Ppc_fp128
+
+| unrolled_typ_Metadata :
+    unrolled_typ TYPE_Metadata
+
+| unrolled_typ_X86_mmx :
+    unrolled_typ TYPE_X86_mmx
+
+| unrolled_typ_Array :
+    forall (sz : int) (t : typ),
+      unrolled_typ t ->
+      unrolled_typ (TYPE_Array sz t)
+
+| unrolled_typ_Function :
+    forall (ret : typ) (args : list typ),
+      unrolled_typ ret ->
+      Forall unrolled_typ args ->
+      unrolled_typ (TYPE_Function ret args)
+
+| unrolled_typ_Struct :
+    forall (fields : list typ),
+      Forall (unrolled_typ) fields ->
+      unrolled_typ (TYPE_Struct fields)
+
+| unrolled_typ_Packed_struct :
+    forall (fields : list typ),
+      Forall (unrolled_typ) fields ->
+      unrolled_typ (TYPE_Packed_struct fields)
+
+| unrolled_typ_Opaque :
+    unrolled_typ TYPE_Opaque
+
+| unrolled_typ_Vector :
+    forall (sz : int) (t : typ), unrolled_typ (TYPE_Vector sz t)
+.
