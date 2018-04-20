@@ -409,17 +409,7 @@ Theorem wf_typ_order :
     well_founded typ_order.
 Proof.
   unfold well_founded.
-  induction a using typ_ind'; try (constructor; intros y H; inversion H; auto).
-  - constructor. intros y H0. inversion H0; subst.
-    + destruct args; try (solve [inversion H3]).
-      destruct H3; subst; intuition.
-    + assumption.
-  - constructor. intros y H0. inversion H0; subst.
-    + destruct fields; try (solve [inversion H3]).
-      destruct H3; subst; intuition.
-  - constructor. intros y H0. inversion H0; subst.
-    + destruct fields; try (solve [inversion H3]).
-      destruct H3; subst; intuition.
+  induction a using typ_ind'; constructor; intros y H'; inversion H'; subst; auto.
 Qed.
 
 
