@@ -66,15 +66,15 @@ Inductive SByte :=
 
 Definition mem_block := IntMap SByte.
 Definition memory := IntMap mem_block.
-Definition undef t := DVALUE_Undef t None. (* TODO: should this be an empty block? *)
+Definition undef t := DVALUE_Undef t. (* TODO: should this be an empty block? *)
 
 (* Computes the byte size of this type. *)
-Fixpoint sizeof_typ (ty:typ) : Z :=
+Fixpoint sizeof_dtyp (ty:dtyp) : Z :=
   match ty with
-  | TYPE_I sz => 8 (* All integers are padded to 8 bytes. *)
-  | TYPE_Pointer t => 8
-  | TYPE_Struct l => fold_left (fun x acc => x + sizeof_typ acc) l 0
-  | TYPE_Array sz ty' => sz * sizeof_typ ty'
+  | DTYPE_I sz => 8 (* All integers are padded to 8 bytes. *)
+  | DTYPE_Pointer => 8
+  | DTYPE_Struct l => fold_left (fun x acc => x + sizeof_dtyp acc) l 0
+  | DTYPE_Array sz ty' => sz * sizeof_dtyp ty'
   | _ => 0 (* TODO: add support for more types as necessary *)
   end.
 
@@ -109,9 +109,9 @@ Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
   end.
 
 (* Deserialize a list of SBytes into a dvalue. *)
-Fixpoint deserialize_sbytes (bytes:list SByte) (t:typ) : dvalue :=
+Fixpoint deserialize_sbytes (bytes:list SByte) (t:dtyp) : dvalue :=
   match t with
-  | TYPE_I sz =>
+  | DTYPE_I sz =>
     let des_int := sbyte_list_to_Z bytes in
     match sz with
     | 1 => DVALUE_I1 (Int1.repr des_int)
@@ -119,25 +119,25 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:typ) : dvalue :=
     | 64 => DVALUE_I64 (Int64.repr des_int)
     | _ => DVALUE_None (* invalid size. *)
     end
-  | TYPE_Pointer t' =>
+  | DTYPE_Pointer =>
     match bytes with
     | Ptr addr :: tl => DVALUE_Addr addr
     | _ => DVALUE_None (* invalid pointer. *)
     end
-  | TYPE_Array sz t' =>
+  | DTYPE_Array sz t' =>
     let fix array_parse count byte_sz bytes :=
         match count with
         | O => []
         | S n => (t', deserialize_sbytes (firstn byte_sz bytes) t')
                    :: array_parse n byte_sz (skipn byte_sz bytes)
         end in
-    DVALUE_Array (array_parse (Z.to_nat sz) (Z.to_nat (sizeof_typ t')) bytes)
-  | TYPE_Struct fields =>
+    DVALUE_Array (array_parse (Z.to_nat sz) (Z.to_nat (sizeof_dtyp t')) bytes)
+  | DTYPE_Struct fields =>
     let fix struct_parse typ_list bytes :=
         match typ_list with
         | [] => []
         | t :: tl =>
-          let size_ty := Z.to_nat (sizeof_typ t) in
+          let size_ty := Z.to_nat (sizeof_dtyp t) in
           (t, deserialize_sbytes (firstn size_ty bytes) t)
             :: struct_parse tl (skipn size_ty bytes)
         end in
@@ -161,8 +161,8 @@ Definition init_block (n:Z) : mem_block :=
   end.
 
 (* Makes a block appropriately sized for the given type. *)
-Definition make_empty_block (ty:typ) : mem_block :=
-  init_block (sizeof_typ ty).
+Definition make_empty_block (ty:dtyp) : mem_block :=
+  init_block (sizeof_dtyp ty).
 
 Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
   match e with
@@ -179,7 +179,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
         match lookup b m with
         | Some block =>
           inr (m,
-               deserialize_sbytes (lookup_all_index i (sizeof_typ t) block SUndef) t)
+               deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t)
         | None => inl (Load t dv)
         end
       end
@@ -204,10 +204,10 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
     (* Index into a structured data type. *)
     let index_into_type typ index :=
         match typ with
-        | TYPE_Array sz ty =>
+        | DTYPE_Array sz ty =>
           if sz <=? index then None else
-            Some (ty, index * (sizeof_typ ty))
-        | TYPE_Struct fields =>
+            Some (ty, index * (sizeof_dtyp ty))
+        | DTYPE_Struct fields =>
           let new_typ := List.nth_error fields (Z.to_nat index) in
           match new_typ with
           | Some new_typ' =>
@@ -217,7 +217,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
                 | [] => 0
                 | hd :: tl =>
                   if i <? index
-                  then sizeof_typ hd + compute_offset tl (i + 1)
+                  then sizeof_dtyp hd + compute_offset tl (i + 1)
                   else 0
                 end
               in
@@ -251,7 +251,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
       | (b, i) =>
         match lookup b m with
         | Some block =>
-          let mem_val := lookup_all_index i (sizeof_typ t) block SUndef in
+          let mem_val := lookup_all_index i (sizeof_dtyp t) block SUndef in
           let answer := gep_helper mem_val t vs 0 in
           inr (m, DVALUE_Addr (b, i + answer))
         | None => inl (GEP t dv vs)
@@ -259,17 +259,19 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
       end
     | _ => inl (GEP t dv vs)
     end
-  | ItoP t i => inl (ItoP t i) (* TODO: ItoP semantics *)
+  | ItoP i => inl (ItoP i) (* TODO: ItoP semantics *)
 
-  | PtoI t a => inl (PtoI t a) (* TODO: ItoP semantics *)                     
+  | PtoI a => inl (PtoI a) (* TODO: ItoP semantics *)                     
                        
   | Call t f args  => inl (Call t f args)
 
                          
   | DeclareFun f =>
     (* TODO: should check for re-declarations and maintain that state in the memory *)
-    inr (m,
-         DVALUE_FunPtr f)
+    (* TODO: what should be the "size" of the block associated with a function? *)
+    let new_block := make_empty_block DTYPE_Pointer in
+    inr  (add (size m) new_block m,
+          DVALUE_Addr (size m, 0))
   end.
 
 (*

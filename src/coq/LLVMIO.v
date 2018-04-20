@@ -21,39 +21,67 @@ Module Type ADDR.
 (*  Parameter addr_dec : forall a1 a2:addr, {a1 = a2} + {a1 <> a2}. *)
 End ADDR.  
 
+(* The set of dynamic types manipulated by an LLVM program.  Mostly
+   isomorphic to LLVMAst.typ but
+     - pointers have no further detail
+     - identified types are not allowed
+   Questions:
+     - What to do with Opaque?
+*)
+Inductive dtyp : Set :=
+| DTYPE_I (sz:int)
+| DTYPE_Pointer
+| DTYPE_Void
+| DTYPE_Half
+| DTYPE_Float
+| DTYPE_Double
+| DTYPE_X86_fp80
+| DTYPE_Fp128
+| DTYPE_Ppc_fp128
+| DTYPE_Metadata
+| DTYPE_X86_mmx
+| DTYPE_Array (sz:int) (t:dtyp)
+| DTYPE_Function (ret:typ) (args:list dtyp)
+| DTYPE_Struct (fields:list dtyp)
+| DTYPE_Packed_struct (fields:list dtyp)
+| DTYPE_Opaque
+| DTYPE_Vector (sz:int) (t:dtyp)     (* t must be integer, floating point, or pointer type *)
+.
+
+
 Module DVALUE(A:ADDR).
        
 (* The set of dynamic values manipulated by an LLVM program. *)
 Inductive dvalue : Set :=
-| DVALUE_FunPtr (fid : function_id)
+(* | DVALUE_FunPtr (fid : function_id) *)
 | DVALUE_Addr (a:A.addr)
 | DVALUE_I1 (x:int1)
 | DVALUE_I32 (x:int32)
 | DVALUE_I64 (x:int64)
 | DVALUE_Double (x:ll_double)
 | DVALUE_Float (x:ll_float)
-| DVALUE_Undef (t:typ) (v:option exp)
+| DVALUE_Undef (t:dtyp) (* (v:option exp) *)
 | DVALUE_Poison
 | DVALUE_None
-| DVALUE_Struct        (fields: list (typ * dvalue))
-| DVALUE_Packed_struct (fields: list (typ * dvalue))
-| DVALUE_Array         (elts: list (typ * dvalue))
-| DVALUE_Vector        (elts: list (typ * dvalue))
+| DVALUE_Struct        (fields: list (dtyp * dvalue))
+| DVALUE_Packed_struct (fields: list (dtyp * dvalue))
+| DVALUE_Array         (elts: list (dtyp * dvalue))
+| DVALUE_Vector        (elts: list (dtyp * dvalue))
 .
 
-Definition undef t := DVALUE_Undef t None.
-Definition undef_i1  := undef (TYPE_I 1).
-Definition undef_i32 := undef (TYPE_I 32).
-Definition undef_i64 := undef (TYPE_I 64).
+Definition undef t := DVALUE_Undef t.
+Definition undef_i1  := undef (DTYPE_I 1).
+Definition undef_i32 := undef (DTYPE_I 32).
+Definition undef_i64 := undef (DTYPE_I 64).
 
 Inductive IO : Type -> Type :=
-| Alloca : forall (t:typ), (IO dvalue)
-| Load   : forall (t:typ) (a:dvalue), (IO dvalue)
+| Alloca : forall (t:dtyp), (IO dvalue)
+| Load   : forall (t:dtyp) (a:dvalue), (IO dvalue)
 | Store  : forall (a:dvalue) (v:dvalue), (IO unit)
-| GEP    : forall (t:typ) (v:dvalue) (vs:list dvalue), (IO dvalue)
-| ItoP   : forall (t:typ) (i:dvalue), (IO dvalue)
-| PtoI   : forall (t:typ) (a:dvalue), (IO dvalue)
-| Call   : forall (t:typ) (f:string) (args:list dvalue), (IO dvalue)
+| GEP    : forall (t:dtyp) (v:dvalue) (vs:list dvalue), (IO dvalue)
+| ItoP   : forall (i:dvalue), (IO dvalue)
+| PtoI   : forall (a:dvalue), (IO dvalue)
+| Call   : forall (t:dtyp) (f:string) (args:list dvalue), (IO dvalue)
 | DeclareFun : forall (f:function_id), (IO dvalue)
 .    
 
