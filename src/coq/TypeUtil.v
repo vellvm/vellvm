@@ -1,6 +1,7 @@
 Require Import List String.
 Require Import Vellvm.Util.
 Require Import Vellvm.LLVMAst.
+Require Import Vellvm.AstLib.
 Require Import Vellvm.Classes.
 Require Import Coqlib.
 
@@ -35,44 +36,25 @@ Definition eqb_ident (a : ident) (b : ident) : bool :=
                     | ID_Local id_r => eqb_raw_id id_l id_r
                     | _ => false
                     end
-  end.
+  end.  
 
 
-Fixpoint normalize_type (fuel : nat) (typ_defs : list (ident * typ)) (t : typ) : option typ :=
-  match fuel, t with
-  | 0%nat, _ => None
-
-  | S fuel', TYPE_Pointer t =>
-      Some (TYPE_Pointer t)
-
-  | S fuel', TYPE_Array sz t =>
-      'nt <- normalize_type fuel' typ_defs t;
-      Some (TYPE_Array sz nt)
-
-  | S fuel', TYPE_Function ret args =>
-      'nret <- (normalize_type fuel' typ_defs ret);
-      'nargs <- (map_monad (normalize_type fuel' typ_defs) args);
-      Some (TYPE_Function nret nargs)
-
-  | S fuel', TYPE_Struct fields =>
-      'nfields <- (map_monad (normalize_type fuel' typ_defs) fields);
-      Some (TYPE_Struct nfields)
-
-  | S fuel', TYPE_Packed_struct fields =>
-      'nfields <- (map_monad (normalize_type fuel' typ_defs) fields);
-      Some (TYPE_Packed_struct nfields)
-
-  | S fuel', TYPE_Vector sz t =>
-      'nt <- normalize_type fuel' typ_defs t;
-      Some (TYPE_Vector sz nt)
-
-  | S fuel', TYPE_Identified id =>
-      '(_, t) <- find (fun a => eqb_ident id (fst a)) typ_defs;
-      'nt <- normalize_type fuel' typ_defs t;
-      Some nt
-
-  | S fuel', _ => Some t
-  end.
+Lemma eqb_ident_correct :
+  forall (a : ident) (b : ident),
+    eqb_ident a b = true ->
+    a = b.
+Proof.
+  intros a b H.
+  destruct a, b; intuition.
+  - destruct id, id0; try (inversion H).
+    destruct (string_dec s s0); subst; try reflexivity; try inversion H1.
+    apply Z.eqb_eq in H1. subst. reflexivity.
+    apply Z.eqb_eq in H1. subst. reflexivity.
+  - destruct id, id0; try (inversion H).
+    destruct (string_dec s s0); subst; try reflexivity; try inversion H1.
+    apply Z.eqb_eq in H1. subst. reflexivity.
+    apply Z.eqb_eq in H1. subst. reflexivity.
+Qed.
 
 
 (* Inductive predicate for types in LLVM with a size *)
@@ -403,3 +385,143 @@ Inductive unrolled_typ : typ -> Prop :=
 | unrolled_typ_Vector :
     forall (sz : int) (t : typ), unrolled_typ (TYPE_Vector sz t)
 .
+
+
+Inductive typ_order : typ -> typ -> Prop :=
+| typ_order_Pointer : forall (t : typ), typ_order t (TYPE_Pointer t)
+| typ_order_Array : forall (sz : int) (t : typ), typ_order t (TYPE_Array sz t)
+| typ_order_Vector : forall (sz : int) (t : typ), typ_order t (TYPE_Vector sz t)
+| typ_order_Struct : forall (fields : list typ),
+    forall f, In f fields -> typ_order f (TYPE_Struct fields)
+| typ_order_Packed_struct : forall (fields : list typ),
+    forall f, In f fields -> typ_order f (TYPE_Packed_struct fields)
+| typ_order_Function_args : forall (ret : typ) (args : list typ),
+    forall a, In a args -> typ_order a (TYPE_Function ret args)
+| typ_order_Function_ret : forall (ret : typ) (args : list typ),
+    typ_order ret (TYPE_Function ret args)
+.
+
+
+Hint Constructors typ_order.
+
+
+Theorem wf_typ_order :
+    well_founded typ_order.
+Proof.
+  unfold well_founded.
+  induction a using typ_ind'; try (constructor; intros y H; inversion H; auto).
+  - constructor. intros y H0. inversion H0; subst.
+    + destruct args; try (solve [inversion H3]).
+      destruct H3; subst; intuition.
+    + assumption.
+  - constructor. intros y H0. inversion H0; subst.
+    + destruct fields; try (solve [inversion H3]).
+      destruct H3; subst; intuition.
+  - constructor. intros y H0. inversion H0; subst.
+    + destruct fields; try (solve [inversion H3]).
+      destruct H3; subst; intuition.
+Qed.
+
+
+Definition sum (l : list nat) : nat := fold_left plus l 0%nat.
+
+
+Theorem wf_lt_typ_order :
+  well_founded (lex_ord lt typ_order).
+Proof.
+  apply wf_lex_ord.
+  apply lt_wf. apply wf_typ_order.
+Qed.
+
+Hint Resolve wf_lt_typ_order.
+Hint Constructors lex_ord.
+
+
+Lemma map_In {A B : Type} (l : list A) (f : forall (x : A), In x l -> B) : list B.
+Proof.
+  induction l.
+  - exact [].
+  - refine (f a _ :: IHl _).
+    + simpl. auto.
+    + intros x H. apply (f x). simpl. auto.
+Qed.
+
+
+Fixpoint remove_key {A B : Type} (eq_dec : (forall (x y : A), {x = y} + {x <> y})) (a : A) (l : list (A * B)) : list (A * B) :=
+  match l with
+  | nil => nil
+  | cons (h, b) t =>
+    match eq_dec a h with
+    | left _ => t
+    | right _ => (h, b) :: remove_key eq_dec a t
+    end
+  end.
+
+
+Lemma remove_key_in :
+  forall (A B : Type) (a : A)  (b : B) eq_dec l,
+    In (a, b) l ->
+    (List.length (remove_key eq_dec a l) < List.length l)%nat.
+Proof.
+  induction l.
+  - intros H. inversion H.
+  - intros H.
+    destruct a0.
+    simpl. destruct (eq_dec a a0).
+    + apply Nat.lt_succ_diag_r.
+    + simpl. apply lt_n_S. apply IHl.
+      destruct H.
+      * inversion H. subst. contradiction.
+      * assumption.
+Qed.
+
+
+Program Fixpoint normalize_type (env : list (ident * typ)) (t : typ) {measure (List.length env, t) (lex_ord lt typ_order)} : typ :=
+  match t with
+  | TYPE_Array sz t =>
+    let nt := normalize_type env t in
+    TYPE_Array sz nt
+
+  | TYPE_Function ret args =>
+    let nret := (normalize_type env ret) in
+    let nargs := map_In args (fun t _ => normalize_type env t) in
+    TYPE_Function nret nargs
+
+  | TYPE_Struct fields =>
+    let nfields := map_In fields (fun t _ => normalize_type env t) in
+    TYPE_Struct nfields
+
+  | TYPE_Packed_struct fields =>
+    let nfields := map_In fields (fun t _ => normalize_type env t) in
+    TYPE_Packed_struct nfields
+
+  | TYPE_Vector sz t =>
+    let nt := normalize_type env t in
+    TYPE_Vector sz nt
+
+  | TYPE_Identified id =>
+    match find (fun a => eqb_ident id (fst a)) env with
+    | None => TYPE_Identified id
+    | Some (_, t) => normalize_type (remove_key Ident.eq_dec id env) t
+    end
+
+  | TYPE_I sz => t
+  | TYPE_Pointer t' => t
+  | TYPE_Void => t
+  | TYPE_Half => t
+  | TYPE_Float => t
+  | TYPE_Double => t
+  | TYPE_X86_fp80 => t
+  | TYPE_Fp128 => t
+  | TYPE_Ppc_fp128 => t
+  | TYPE_Metadata => t
+  | TYPE_X86_mmx => t
+  | TYPE_Opaque => t
+  end.
+Next Obligation.
+  left.
+  symmetry in Heq_anonymous. apply find_some in Heq_anonymous. destruct Heq_anonymous as [Hin Heqb_ident].
+  simpl in Heqb_ident.
+  apply eqb_ident_correct in Heqb_ident. subst.
+  eapply remove_key_in. apply Hin.
+Defined.
