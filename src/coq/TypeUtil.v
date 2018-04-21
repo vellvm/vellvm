@@ -411,7 +411,7 @@ Theorem wf_typ_order :
 Proof.
   unfold well_founded.
   induction a using typ_ind'; constructor; intros y H'; inversion H'; subst; auto.
-Qed.
+Defined.
 
 
 Definition sum (l : list nat) : nat := fold_left plus l 0%nat.
@@ -422,7 +422,7 @@ Theorem wf_lt_typ_order :
 Proof.
   apply wf_lex_ord.
   apply lt_wf. apply wf_typ_order.
-Qed.
+Defined.
 
 Hint Resolve wf_lt_typ_order.
 Hint Constructors lex_ord.
@@ -435,7 +435,7 @@ Proof.
   - refine (f a _ :: IHl _).
     + simpl. auto.
     + intros x H. apply (f x). simpl. auto.
-Qed.
+Defined.
 
 
 Fixpoint remove_key {A B : Type} (eq_dec : (forall (x y : A), {x = y} + {x <> y})) (a : A) (l : list (A * B)) : list (A * B) :=
@@ -464,7 +464,7 @@ Proof.
       destruct H.
       * inversion H. subst. contradiction.
       * assumption.
-Qed.
+Defined.
 
 
 Program Fixpoint normalize_type (env : list (ident * typ)) (t : typ) {measure (List.length env, t) (lex_ord lt typ_order)} : dtyp :=
@@ -492,7 +492,8 @@ Program Fixpoint normalize_type (env : list (ident * typ)) (t : typ) {measure (L
     DTYPE_Vector sz nt
 
   | TYPE_Identified id =>
-    match find (fun a => eqb_ident id (fst a)) env with
+    let opt := find (fun a => eqb_ident id (fst a)) env in
+    match opt with
     | None => DTYPE_Void   (* TODO: should this be None? *)
     | Some (_, t) => normalize_type (remove_key Ident.eq_dec id env) t
     end
@@ -512,8 +513,79 @@ Program Fixpoint normalize_type (env : list (ident * typ)) (t : typ) {measure (L
   end.
 Next Obligation.
   left.
-  symmetry in Heq_anonymous. apply find_some in Heq_anonymous. destruct Heq_anonymous as [Hin Heqb_ident].
-  simpl in Heqb_ident.
-  apply eqb_ident_correct in Heqb_ident. subst.
-  eapply remove_key_in. apply Hin.
+  remember (find (fun a : ident * typ => eqb_ident id (fst a)) env) as o.
+  destruct o.
+  symmetry in Heqo.
+  apply find_some in Heqo.
+  destruct Heqo as [Hin Heqb_ident].
+  apply eqb_ident_correct in Heqb_ident.
+  inversion Heq_opt. destruct p. inversion H0. subst.
+  eapply remove_key_in. simpl. apply Hin.
+  inversion Heq_opt.
 Defined.
+
+
+Lemma normalize_type_equation : forall env t,
+    normalize_type env t =
+    match t with
+  | TYPE_Array sz t =>
+    let nt := normalize_type env t in
+    DTYPE_Array sz nt
+
+  | TYPE_Function ret args =>
+    (*
+    let nret := (normalize_type env ret) in
+    let nargs := map_In args (fun t _ => normalize_type env t) in *)
+    DTYPE_Pointer (* Function nret nargs *)
+
+  | TYPE_Struct fields =>
+    let nfields := map_In fields (fun t _ => normalize_type env t) in
+    DTYPE_Struct nfields
+
+  | TYPE_Packed_struct fields =>
+    let nfields := map_In fields (fun t _ => normalize_type env t) in
+    DTYPE_Packed_struct nfields
+
+  | TYPE_Vector sz t =>
+    let nt := normalize_type env t in
+    DTYPE_Vector sz nt
+
+  | TYPE_Identified id =>
+    let opt := find (fun a => eqb_ident id (fst a)) env in
+    match opt with
+    | None => DTYPE_Void   (* TODO: should this be None? *)
+    | Some (_, t) => normalize_type (remove_key Ident.eq_dec id env) t
+    end
+
+  | TYPE_I sz => DTYPE_I sz
+  | TYPE_Pointer t' => DTYPE_Pointer
+  | TYPE_Void => DTYPE_Void
+  | TYPE_Half => DTYPE_Half
+  | TYPE_Float => DTYPE_Float
+  | TYPE_Double => DTYPE_Double
+  | TYPE_X86_fp80 => DTYPE_X86_fp80
+  | TYPE_Fp128 => DTYPE_Fp128
+  | TYPE_Ppc_fp128 => DTYPE_Ppc_fp128
+  | TYPE_Metadata => DTYPE_Metadata
+  | TYPE_X86_mmx => DTYPE_X86_mmx
+  | TYPE_Opaque => DTYPE_Opaque
+  end.
+Proof.
+  intros env t.
+  unfold normalize_type. 
+  unfold normalize_type_func at 1.
+  rewrite Wf.WfExtensionality.fix_sub_eq_ext.
+  destruct t; try reflexivity. simpl.
+  destruct (find (fun a : ident * typ => eqb_ident id (fst a)) env).
+  destruct p; simpl; reflexivity.
+  reflexivity.
+Defined.    
+
+  
+
+Lemma example: normalize_type [] TYPE_Void = DTYPE_Void.
+Proof.
+  rewrite normalize_type_equation. reflexivity.
+Qed.  
+  
+  
