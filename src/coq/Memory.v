@@ -2,7 +2,7 @@ Require Import ZArith List String Omega.
 Require Import  Vellvm.LLVMAst Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.StepSemantics Vellvm.LLVMIO Vellvm.LLVMBaseTypes.
 Require Import FSets.FMapAVL.
-Require Import compcert.lib.Integers.
+Require Import compcert.lib.Integers compcert.lib.Coqlib.
 Require Coq.Structures.OrderedTypeEx.
 Require Import ZMicromega.
 Import ListNotations.
@@ -80,22 +80,59 @@ Fixpoint sizeof_typ (ty:typ) : Z :=
   | _ => 0 (* TODO: add support for more types as necessary *)
   end.
 
-(* Convert integer to its SByte representation. *)
-Fixpoint Z_to_sbyte_list (count:nat) (z:Z) : list SByte :=
-  match count with
-  | O => []
-  | S n => (Z_to_sbyte_list n (z / 256)) ++ [Byte (Byte.repr (z mod 256))]
+(* Convert integer to its byte representation. *)
+Fixpoint bytes_of_int (n: nat) (x: Z) {struct n}: list byte :=
+  match n with
+  | O => nil
+  | S m => Byte.repr x :: bytes_of_int m (x / 256)
   end.
 
-(* Converts SBytes into their integer representation. *)
+Fixpoint int_of_bytes (l: list byte): Z :=
+  match l with
+  | nil => 0
+  | b :: l' => Byte.unsigned b + int_of_bytes l' * 256
+  end.
+
+Definition Z_to_sbyte_list (count:nat) (z:Z) : list SByte :=
+  List.map Byte (bytes_of_int count z).
+
+Definition Sbyte_to_byte_list (sb:SByte) : list byte :=
+  match sb with
+  | Byte b => [b]
+  | Ptr _ | PtrFrag | SUndef => []
+  end.
+
+Definition sbyte_list_to_byte_list (bytes:list SByte) : list byte :=
+  List.flat_map Sbyte_to_byte_list bytes.
+
 Definition sbyte_list_to_Z (bytes:list SByte) : Z :=
-  fst (fold_right (fun x acc =>
-               match x with
-               | Byte b =>
-                 let shift := snd acc in
-                 ((fst acc) + ((Byte.unsigned b) * shift), shift * 256)
-               | _ => acc (* should not have other kinds bytes in an int *)
-               end) (0, 1) bytes).
+  int_of_bytes (sbyte_list_to_byte_list bytes).
+
+(** Length properties *)
+
+Lemma length_bytes_of_int:
+  forall n x, List.length (bytes_of_int n x) = n.
+Proof.
+  induction n; simpl; intros. auto. decEq. auto.
+Qed.
+
+Lemma int_of_bytes_of_int:
+  forall n x,
+  int_of_bytes (bytes_of_int n x) = x mod (two_p (Z.of_nat n * 8)).
+Proof.
+  induction n; intros.
+  simpl. rewrite Zmod_1_r. auto.
+Opaque Byte.wordsize.
+  rewrite Nat2Z.inj_succ. simpl.
+  replace (Z.succ (Z.of_nat n) * 8) with (Z.of_nat n * 8 + 8) by omega.
+  rewrite two_p_is_exp; try omega.
+  rewrite Zmod_recombine. rewrite IHn. rewrite Z.add_comm.
+  change (Byte.unsigned (Byte.repr x)) with (Byte.Z_mod_modulus x).
+  rewrite Byte.Z_mod_modulus_eq. reflexivity.
+  apply two_p_gt_ZERO. omega. apply two_p_gt_ZERO. omega.
+Qed.
+
+
 
 (* Serializes a dvalue into its SByte-sensitive form. *)
 Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
@@ -178,6 +215,15 @@ Inductive sbyte_list_wf : list SByte -> Prop :=
 | wf_cons : forall b l, sbyte_list_wf l -> sbyte_list_wf (Byte b :: l)
 .                                                   
 
+Lemma sbyte_list_to_Z_inverse:
+  forall i1 : int1, (sbyte_list_to_Z (Z_to_sbyte_list 8 (Int1.unsigned i1))) = 
+               (Int1.unsigned i1).
+Proof.
+  intros i1.
+  destruct i1. simpl.
+Admitted.
+
+
     
 Lemma serialize_inverses : forall dval,
     serialize_defined dval -> exists typ, deserialize_sbytes (serialize_dvalue dval) typ = dval.
@@ -186,7 +232,11 @@ Proof.
   (* DVALUE_Addr. Type of pointer is not important. *)
   - exists (TYPE_Pointer TYPE_Void). reflexivity.
   (* DVALUE_I1. Todo: subversion lemma for integers. *)
-  - exists (TYPE_I 1). admit.
+  - exists (TYPE_I 1).
+    simpl. 
+      
+
+    admit.
   (* DVALUE_I32. Todo: subversion lemma for integers. *)
   - exists (TYPE_I 32). admit.
   (* DVALUE_I64. Todo: subversion lemma for integers. *)
