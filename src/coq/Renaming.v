@@ -11,12 +11,23 @@
 Require Import ZArith Ascii Strings.String.
 Require Import Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG.
-Require Import Vellvm.LLVMBaseTypes Vellvm.Memory.
+Require Import Vellvm.DynamicValues.
+Require Import Vellvm.StepSemantics.
+Require Import Vellvm.Memory.
+Require Import Vellvm.LLVMIO.
 Require Import Setoid.
 
 Open Scope Z_scope.
 Open Scope string_scope.
 
+Module RENAMING
+       (A:MemoryAddress.ADDRESS)
+       (LLVMIO:LLVM_INTERACTIONS(A)).
+
+  Module SS := StepSemantics A LLVMIO.
+  Import SS.
+  Import LLVMIO.
+  
 Class Swap (A:Type) := swap : raw_id -> raw_id -> A -> A.
 Definition swap_raw_id (id1 id2:raw_id) (id:raw_id) : raw_id :=
   if id == id1 then id2 else
@@ -402,17 +413,18 @@ Hint Unfold swap_of_cfg.
 Instance swap_of_mcfg : Swap mcfg := swap.
 Hint Unfold swap_of_mcfg.
 
-Instance swap_of_addr : Swap addr := fun id1 id2 a => a.
+
 Instance swap_of_inttyp : forall {x:Z}, Swap (inttyp x) := fun _ id1 id2 a => a.
-Instance swap_of_int1 : Swap LLVMBaseTypes.int1 := fun id1 id2 a => a.
-Instance swap_of_int32 : Swap LLVMBaseTypes.int32 := fun id1 id2 a => a.
-Instance swap_of_int64 : Swap LLVMBaseTypes.int64 := fun id1 id2 a => a.
-Instance swap_of_ll_double : Swap LLVMBaseTypes.ll_double := fun id1 id2 a => a.
-Instance swap_of_ll_float : Swap LLVMBaseTypes.ll_float := fun id1 id2 a => a.
+Instance swap_of_int1 : Swap int1 := fun id1 id2 a => a.
+Instance swap_of_int32 : Swap int32 := fun id1 id2 a => a.
+Instance swap_of_int64 : Swap int64 := fun id1 id2 a => a.
+Instance swap_of_ll_double : Swap ll_double := fun id1 id2 a => a.
+Instance swap_of_ll_float : Swap ll_float := fun id1 id2 a => a.
 
 
-Hint Unfold swap_of_addr swap_of_inttyp swap_of_int1 swap_of_int32 swap_of_int64 swap_of_ll_double swap_of_ll_float.
+Hint Unfold swap_of_inttyp swap_of_int1 swap_of_int32 swap_of_int64 swap_of_ll_double swap_of_ll_float.
 
+(*
 Fixpoint swap_dvalue (id1 id2:raw_id) (dv:dvalue) : dvalue :=
   match dv with
   | DVALUE_FunPtr fid => DVALUE_FunPtr (swap id1 id2 fid)
@@ -430,23 +442,12 @@ Fixpoint swap_dvalue (id1 id2:raw_id) (dv:dvalue) : dvalue :=
   | DVALUE_Array elts => DVALUE_Array (List.map (fun '(t,e) => (swap id1 id2 t, swap_dvalue id1 id2 e)) elts)    
   | DVALUE_Vector elts => DVALUE_Vector (List.map (fun '(t,e) => (swap id1 id2 t, swap_dvalue id1 id2 e)) elts)    
   end.
-  
-Instance swap_of_dvalue : Swap dvalue := swap_dvalue.
+*)
+
+Instance swap_of_dvalue : Swap dvalue := fun (id1 id2 : raw_id) dv => dv.
 Hint Unfold swap_of_dvalue.
 
-Definition swap_IO {X} (id1 id2:raw_id) (x:IO X) : IO X:=
-  match x with
-  | Alloca t => Alloca (swap id1 id2 t)
-  | Load t a => Load (swap id1 id2 t) (swap id1 id2 a)
-  | Store a v => Store (swap id1 id2 a) (swap id1 id2 v)
-  | GEP  t v vs => GEP (swap id1 id2 t) (swap id1 id2 v) (swap id1 id2 vs)
-  | ItoP  t i => ItoP (swap id1 id2 t) (swap id1 id2 i)
-  | PtoI t a => PtoI (swap id1 id2 t) (swap id1 id2 a)
-  | Call t f args => Call (swap id1 id2 t) (swap id1 id2 f) (swap id1 id2 args)
-  | DeclareFun f => DeclareFun (swap id1 id2 f)
-  end.
-
-Instance swap_of_IO {X} : Swap (IO X) := swap_IO.
+Instance swap_of_IO {X} : Swap (IO X) := fun id1 id2 x => x.
 Hint Unfold swap_of_IO.
 
 CoFixpoint swap_Trace X `{Swap X} (id1 id2:raw_id) (t:Trace X) : Trace X :=
@@ -554,10 +555,7 @@ Section PROOFS.
     intros.
     unfold lookup_env.
     rewrite swap_ENV_find.
-    (destruct (ENV.find id e)).
-    simpl. rewrite (@Trace.matchM). simpl. constructor.
-    simpl. rewrite Trace.matchM. rewrite (@Trace.matchM). simpl.
-    econstructor.
+    destruct (ENV.find id e); unfold_swaps; simpl; reflexivity.
   Qed.
 
   Lemma swap_lookup_id : forall (g:genv) (e:env) (i:ident),
@@ -572,18 +570,16 @@ Section PROOFS.
       eval_i1_op (swap id1 id2 iop) (swap id1 id2 x) (swap id1 id2 y) = swap id1 id2 (eval_i1_op iop x y).
   Proof.
     unfold_swaps.
-    intros iop x y. 
-    destruct iop; simpl; simpl_ifs;
-    unfold swap_dvalue; try reflexivity.
+    intros iop x y.
+    reflexivity.
   Qed.
 
   Lemma swap_eval_i32_op : forall (iop:ibinop) (x y:inttyp 32),
       eval_i32_op (swap id1 id2 iop) (swap id1 id2 x) (swap id1 id2 y) = swap id1 id2 (eval_i32_op iop x y).
   Proof.
     unfold_swaps.
-    intros iop x y. 
-    destruct iop; simpl; simpl_ifs; 
-    unfold swap_dvalue; reflexivity.
+    intros iop x y.
+    reflexivity.
   Qed.
 
   Lemma swap_eval_i64_op : forall (iop:ibinop) (x y:inttyp 64),
@@ -591,32 +587,23 @@ Section PROOFS.
   Proof.
     unfold_swaps.
     intros iop x y. 
-    destruct iop; simpl; simpl_ifs; 
-    unfold swap_dvalue; reflexivity.
+    reflexivity.
   Qed.
 
   Lemma swap_integer_op : forall (bits:Z) (iop:ibinop) (x y:inttyp bits),
    integer_op bits (swap id1 id2 iop) (swap id1 id2 x) (swap id1 id2 y) = swap id1 id2 (integer_op bits iop x y).
   Proof.
     intros bits iop x y.
-    unfold integer_op.
-    destruct (bits == 1).
-    subst. simpl. rewrite swap_eval_i1_op. reflexivity.
-    destruct (bits == 32).
-    subst. simpl. rewrite swap_eval_i32_op. reflexivity.
-    destruct (bits == 64).
-    subst. simpl. rewrite swap_eval_i64_op. reflexivity.
-    (* what's the right way to do this case analysis? *)
-  Admitted.
-  
+    unfold_swaps.
+    destruct (integer_op bits iop x y); reflexivity.
+  Qed.
 
-  
   Lemma swap_step : forall (CFG:mcfg) (s:state),
       (step (swap id1 id2 CFG) (swap id1 id2 s)) ≡ (swap id1 id2 (step CFG s)).
   Proof.
     intros CFG.
     destruct s as [[[g pc] e] k].
-    simpl.
+    unfold_swaps. simpl.
   Admitted.
     
   
@@ -639,3 +626,4 @@ Section PROOFS.
   Admitted.    
     
 End PROOFS.  
+End RENAMING.

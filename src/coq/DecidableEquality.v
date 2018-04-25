@@ -7,7 +7,7 @@ Require Import compcert.lib.Integers compcert.lib.Floats.
 (* Vellvm dependencies *)
 Require Import Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG.
-Require Import Vellvm.LLVMBaseTypes Vellvm.StepSemantics Vellvm.Memory.
+Require Import Vellvm.DynamicValues Vellvm.StepSemantics Vellvm.Memory.
 Require Import List.
 (** ** Decidable Equality *) 
 

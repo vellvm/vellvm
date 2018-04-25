@@ -21,8 +21,9 @@ Require Import Vellvm.Trace.
 Require Import Vellvm.LLVMAst.
 Require Import Vellvm.AstLib.
 Require Import Vellvm.CFG.
-Require Import Vellvm.LLVMBaseTypes.
+Require Import Vellvm.MemoryAddress.
 Require Import Vellvm.LLVMIO.
+Require Import Vellvm.DynamicValues.
 Require Import Vellvm.TypeUtil.
 Import ListNotations.
 
@@ -33,12 +34,11 @@ Set Contextual Implicit.
 Open Scope Z_scope.
 Open Scope string_scope.
 
-Module StepSemantics(A:ADDR).
-  Module DV := DVALUE(A).
-  Import DV.
+Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   
+  Import LLVMIO.
 
-(* Environments ------------------------------------------------------------- *)
+  (* Environments ------------------------------------------------------------- *)
   Module ENV := FMapAVL.Make(AstLib.RawIDOrd).
   Module ENVFacts := FMapFacts.WFacts_fun(AstLib.RawIDOrd)(ENV).
   Module ENVProps := FMapFacts.WProperties_fun(AstLib.RawIDOrd)(ENV).
@@ -77,7 +77,7 @@ Module StepSemantics(A:ADDR).
   Definition lookup_env {X} (e:ENV.t X) (id:raw_id) : err X :=
     match ENV.find id e with
     | Some v => mret v
-    | None => failwith ("lookup_env: failed to find id = " ++ (string_of id))
+    | None => failwith "lookup_env: failed to find id" (* can't include ids in the error ++ (string_of id) *)
     end.
 
   Definition lookup_id (g:genv) (e:env) (i:ident) : err dvalue :=
@@ -93,6 +93,7 @@ Module StepSemantics(A:ADDR).
 
   (* Since modules are not first class, this code duplication
      will probably have to do. *)
+    
   Definition eval_i1_op (iop:ibinop) (x y:inttyp 1) : dvalue:=
     (* See eval_i64_op for a few comments *)
     match iop with
@@ -276,14 +277,12 @@ Module StepSemantics(A:ADDR).
   Arguments coerce_integer_to_int _ _ : simpl nomatch.
   
   (* Helper for looping 2 argument evaluation over vectors, producing a vector *)
-  Fixpoint vec_loop (f:dvalue -> dvalue -> err dvalue) (elts:list ((dtyp * dvalue) * (dtyp * dvalue)))
-    : err (list (dtyp * dvalue)) :=
-    monad_fold_right (fun acc e =>
-                       match e with
-                       | pair (pair t e1) (pair _ e2) =>
+  Fixpoint vec_loop (f:dvalue -> dvalue -> err dvalue) (elts:list (dvalue * dvalue))
+    : err (list dvalue) :=
+    monad_fold_right (fun acc '(e1, e2) =>
                          'val <- f e1 e2;
-                         mret (pair t val :: acc)
-                       end) elts [].
+                         mret (val :: acc)
+                       ) elts [].
     
   (* Integer iop evaluation, called from eval_iop. 
      Here the values must be integers. Helper defined
@@ -556,20 +555,16 @@ Module StepSemantics(A:ADDR).
   
   Definition eval_select t cnd t' v1 v2 : err dvalue :=
     match t, t', cnd, v1, v2 with
-    | TYPE_Vector _ t, TYPE_Vector _ t', (DVALUE_Vector es),
-      (DVALUE_Vector es1), (DVALUE_Vector es2) =>
+    | TYPE_Vector _ t, TYPE_Vector _ t', (DVALUE_Vector es), (DVALUE_Vector es1), (DVALUE_Vector es2) =>
       (* vec needs to loop over es, es1, and es2. Is there a way to
          generalize vec_loop to cover this? (make v1,v2 generic?) *)
       let fix loop elts := 
           match elts with
           | [] => mret []
-          | e :: tl =>
-            match e with
-            | pair (pair _ cnd) (pair (pair t v1) (pair _ v2)) =>
+          | (cnd,(v1,v2)) :: tl =>
               'val <- eval_select_h cnd v1 v2;
               'vec <- loop tl;
-              mret (pair t val :: vec)
-            end
+              mret (val :: vec)
           end in
       'val <- loop (List.combine es (List.combine es1 es2));
       mret (DVALUE_Vector val)
@@ -579,7 +574,7 @@ Module StepSemantics(A:ADDR).
   
   (* Helper function for indexing into a structured datatype 
      for extractvalue and insertvalue *)
-  Definition index_into_str (v:dvalue) (idx:LLVMAst.int) : err (dtyp * dvalue) :=
+  Definition index_into_str (v:dvalue) (idx:LLVMAst.int) : err dvalue :=
     let fix loop elts i :=
         match elts with
         | [] => failwith "index out of bounds"
@@ -595,13 +590,13 @@ Module StepSemantics(A:ADDR).
   
   (* Helper function for inserting into a structured datatype for insertvalue *)
   Definition insert_into_str (str:dvalue) (v:dvalue) (idx:LLVMAst.int) : err dvalue :=
-    let fix loop (acc elts:list (dtyp * dvalue)) (i:LLVMAst.int) :=
+    let fix loop (acc elts:list dvalue) (i:LLVMAst.int) :=
         match elts with
         | [] => failwith "index out of bounds"
-        | (t, h) :: tl =>
-          if idx =? 0 then mret (app (app acc [pair t v]) tl)
-          else loop (app acc [pair t h]) tl (i-1)
-        end in
+        | h :: tl =>
+          if idx =? 0 then mret (acc ++ (v :: tl))
+          else loop (acc ++ [h]) tl (i-1)
+        end%list in
     match str with
     | DVALUE_Struct f =>
       'v <- (loop [] f idx);
@@ -646,7 +641,7 @@ Variable e : env.
 Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
   let eval_texp '(t,ex) :=
              let dt := eval_typ t in
-             'v <- eval_exp (Some dt) ex; mret (dt, v)
+             'v <- eval_exp (Some dt) ex; mret v
   in
   match o with
   | EXP_Ident i => lift_err_d (lookup_id g e i) mret
@@ -676,11 +671,11 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
 
   | EXP_Bool b    =>
     match b with
-    | true => mret (DVALUE_I1 Int1.one)
+    | true  => mret (DVALUE_I1 Int1.one)
     | false => mret (DVALUE_I1 Int1.zero)
     end
 
-  | EXP_Null      => mret (DVALUE_Addr A.null)
+  | EXP_Null => mret (DVALUE_Addr A.null)
 
   | EXP_Zero_initializer =>
     match top with
@@ -691,10 +686,10 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
   | EXP_Cstring s =>
     failwith "EXP_Cstring not yet implemented"
 
-  | EXP_Undef     =>
+  | EXP_Undef =>
     match top with
     | None => failwith "eval_exp given untyped EXP_Undef"
-    | Some t => mret (DVALUE_Undef t)
+    | Some t => mret DVALUE_Undef  (* TODO: use t for size? *)
     end
 
   (* Question: should we do any typechecking for aggregate types here? *)
@@ -788,7 +783,7 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
         match idxs with
         | [] => mret str
         | i :: tl =>
-          '(_, v) <- index_into_str str i;
+          'v <- index_into_str str i;
           loop v tl
         end in
     do w <- loop str idxs;
@@ -971,7 +966,8 @@ Definition allocate_globals (gs:list global) : Trace genv :=
 
 
 Definition register_declaration (g:genv) (d:declaration) : Trace genv :=
-    Trace.Vis (DeclareFun (dc_name d)) (fun v => mret (ENV.add (dc_name d) v g)).
+  (* TODO: map dc_name d to the returned address *)
+    Trace.Vis (Alloca DTYPE_Pointer) (fun v => mret (ENV.add (dc_name d) v g)).
 
 Definition register_functions (g:genv) : Trace genv :=
   monad_fold_right register_declaration
@@ -985,7 +981,7 @@ Definition initialize_globals (gs:list global) (g:genv) : Trace unit :=
        do a <- lookup_env g (g_ident glb);
        'dv <-
            match (g_exp glb) with
-           | None => mret (DVALUE_Undef dt)
+           | None => mret DVALUE_Undef
            | Some e => eval_exp g (@ENV.empty _) (Some dt) e
            end;
        Trace.Vis (Store a dv) mret)

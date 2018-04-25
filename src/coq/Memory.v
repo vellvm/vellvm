@@ -1,6 +1,7 @@
 Require Import ZArith List String Omega.
 Require Import Vellvm.LLVMAst Vellvm.Classes Vellvm.Util.
-Require Import Vellvm.StepSemantics Vellvm.LLVMIO Vellvm.LLVMBaseTypes.
+Require Import Vellvm.MemoryAddress.
+Require Import Vellvm.LLVMIO.
 Require Import FSets.FMapAVL.
 Require Import Integers.
 Require Coq.Structures.OrderedTypeEx.
@@ -10,16 +11,18 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Module A : Vellvm.LLVMIO.ADDR with Definition addr := (Z * Z) % type.
+Module A : MemoryAddress.ADDRESS with Definition addr := (Z * Z) % type.
   Definition addr := (Z * Z) % type.
   Definition null := (0, 0).
+  Definition t := addr.
 End A.
 
-Definition addr := A.addr.
 
-Module SS := StepSemantics.StepSemantics(A).
-Export SS.
-Export SS.DV.
+Module Make(LLVMIO: LLVM_INTERACTIONS(A)).
+  Import LLVMIO.
+  Import DV.
+  
+Definition addr := A.addr.
 
 Module IM := FMapAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
 Definition IntMap := IM.t.
@@ -66,7 +69,7 @@ Inductive SByte :=
 
 Definition mem_block := IntMap SByte.
 Definition memory := IntMap mem_block.
-Definition undef t := DVALUE_Undef t. (* TODO: should this be an empty block? *)
+Definition undef := DVALUE_Undef. (* TODO: should this be an empty block? *)
 
 (* Computes the byte size of this type. *)
 Fixpoint sizeof_dtyp (ty:dtyp) : Z :=
@@ -99,12 +102,12 @@ Definition sbyte_list_to_Z (bytes:list SByte) : Z :=
 Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
   match dval with
   | DVALUE_Addr addr => (Ptr addr) :: (repeat PtrFrag 7)
-  | DVALUE_I1 i => Z_to_sbyte_list 8 (Int1.unsigned i)
-  | DVALUE_I32 i => Z_to_sbyte_list 8 (Int32.unsigned i)
+  | DVALUE_I1 i => Z_to_sbyte_list 8 (DynamicValues.Int1.unsigned i)
+  | DVALUE_I32 i => Z_to_sbyte_list 8 (DynamicValues.Int32.unsigned i)
   | DVALUE_I64 i => Z_to_sbyte_list 8 (Int64.unsigned i)
   | DVALUE_Struct fields | DVALUE_Array fields =>
       (* note the _right_ fold is necessary for byte ordering. *)
-      fold_right (fun '(typ, dv) acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
+      fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
   | _ => [] (* TODO add more dvalues as necessary *)
   end.
 
@@ -114,8 +117,8 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:dtyp) : dvalue :=
   | DTYPE_I sz =>
     let des_int := sbyte_list_to_Z bytes in
     match sz with
-    | 1 => DVALUE_I1 (Int1.repr des_int)
-    | 32 => DVALUE_I32 (Int32.repr des_int)
+    | 1 => DVALUE_I1 (DynamicValues.Int1.repr des_int)
+    | 32 => DVALUE_I32 (DynamicValues.Int32.repr des_int)
     | 64 => DVALUE_I64 (Int64.repr des_int)
     | _ => DVALUE_None (* invalid size. *)
     end
@@ -128,7 +131,7 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:dtyp) : dvalue :=
     let fix array_parse count byte_sz bytes :=
         match count with
         | O => []
-        | S n => (t', deserialize_sbytes (firstn byte_sz bytes) t')
+        | S n => (deserialize_sbytes (firstn byte_sz bytes) t')
                    :: array_parse n byte_sz (skipn byte_sz bytes)
         end in
     DVALUE_Array (array_parse (Z.to_nat sz) (Z.to_nat (sizeof_dtyp t')) bytes)
@@ -138,7 +141,7 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:dtyp) : dvalue :=
         | [] => []
         | t :: tl =>
           let size_ty := Z.to_nat (sizeof_dtyp t) in
-          (t, deserialize_sbytes (firstn size_ty bytes) t)
+          (deserialize_sbytes (firstn size_ty bytes) t)
             :: struct_parse tl (skipn size_ty bytes)
         end in
     DVALUE_Struct (struct_parse fields bytes)
@@ -234,7 +237,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
         | dval :: tl =>
           match dval with
           | DVALUE_I32 x =>
-            let nat_index := Int32.unsigned x in
+            let nat_index := DynamicValues.Int32.unsigned x in
             let new_typ_info := index_into_type cur_type nat_index in
             match new_typ_info with
               | Some (new_typ, offset) => 
@@ -266,12 +269,12 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
   | Call t f args  => inl (Call t f args)
 
                          
-  | DeclareFun f =>
-    (* TODO: should check for re-declarations and maintain that state in the memory *)
-    (* TODO: what should be the "size" of the block associated with a function? *)
-    let new_block := make_empty_block DTYPE_Pointer in
-    inr  (add (size m) new_block m,
-          DVALUE_Addr (size m, 0))
+  (* | DeclareFun f => *)
+  (*   (* TODO: should check for re-declarations and maintain that state in the memory *) *)
+  (*   (* TODO: what should be the "size" of the block associated with a function? *) *)
+  (*   let new_block := make_empty_block DTYPE_Pointer in *)
+  (*   inr  (add (size m) new_block m, *)
+  (*         DVALUE_Addr (size m, 0)) *)
   end.
 
 (*
@@ -289,10 +292,11 @@ CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
   | Trace.Ret x => d
   | Trace.Err x => d
   end.
+End Make.
 
-
+(*
 Definition run_with_memory prog : option (Trace dvalue) :=
-  let scfg := AstLib.modul_of_toplevel_entities prog in
+  let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
   match CFG.mcfg_of_modul scfg with
   | None => None
   | Some mcfg =>
@@ -301,6 +305,7 @@ Definition run_with_memory prog : option (Trace dvalue) :=
       ('s <- SS.init_state mcfg "main";
          SS.step_sem mcfg (SS.Step s)))
   end.
+*)
 
 (*
 Fixpoint MemDFin (m:memory) (d:Trace ()) (steps:nat) : option memory :=
