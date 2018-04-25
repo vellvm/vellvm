@@ -172,93 +172,12 @@ Inductive serialize_defined : dvalue -> Prop :=
       serialize_defined (DVALUE_Array ((typ, dval) :: fields_list)).
 
 (* Lemma assumes all integers encoded with 8 bytes. *)
-(* TODO: finish proof, perhaps writing serialize/deserialize with more compcert functions.
-Core part left is proving that adding together the different bytes of an int gives that int.
- *)
-(* F 0 = 1 *)
-Fixpoint F (n:nat) : Z :=
-  match n with
-  | O => 1
-  | S n => 256 * (F n)
-  end.
-
-(*
-Definition sbyte_list_wf (l:list SByte) : Prop := List.Forall (fun b => match b with
-                                                                  | Byte _ => True
-                                                                  | _ => False
-                                                                end) l.
- *)
 
 Inductive sbyte_list_wf : list SByte -> Prop :=
 | wf_nil : sbyte_list_wf []
 | wf_cons : forall b l, sbyte_list_wf l -> sbyte_list_wf (Byte b :: l)
 .                                                   
 
-
-Fixpoint pow x n :=
-  match n with
-  | O => 1%Z
-  | S n => x * (pow x n)
-  end.
-          
-
-Lemma sbyte_list_to_Z_cons : forall l b
-    (HWF: sbyte_list_wf l),
-    sbyte_list_to_Z (Byte b::l) =
-    (Byte.unsigned b) * (pow 256 (List.length l)) + sbyte_list_to_Z l.
-Proof.
-  induction l; intros; simpl in *.
-  - unfold sbyte_list_to_Z. simpl. omega.
-  - inversion HWF.   subst.
-    rewrite IHl; auto.
-Admitted.    
-    
-  
-
-Lemma sbyte_list_to_Z_app : forall l1 l2,
-    sbyte_list_to_Z (l1 ++ l2) =
-    (sbyte_list_to_Z l1) * (pow 256 (List.length l2)) + sbyte_list_to_Z l2.
-Proof.
-Admitted.
-  
-Lemma sbyte_list_to_Z_aux : forall l int,
-  sbyte_list_to_Z (l ++ [Byte (Byte.repr (int mod 256))]) =
-  (sbyte_list_to_Z l) * 256 + (int mod 256).
-Proof.
-  induction l; intros; simpl in *.
-  unfold sbyte_list_to_Z. simpl. rewrite Byte.unsigned_repr_eq. simpl.
-  unfold Byte.modulus. unfold Byte.wordsize.
-  (* (x mod y) mod y = x mod y *)
-  admit.
-  simpl. 
-Admitted.  
-
-Lemma F_pos : forall x, F x > 0 .
-Proof.
-Admitted.  
-  
-Lemma isi : forall (cnt:nat) (int:Z),
-    0 <= int < (F cnt) ->
-    sbyte_list_to_Z (Z_to_sbyte_list cnt int) = int.
-Proof.
-  induction cnt; intros int H. simpl in H.
-  simpl. unfold sbyte_list_to_Z. simpl. admit.
-  simpl. 
-Admitted.
-  
-(*
-Lemma integer_serialize_inverses: forall int,
-    sbyte_list_to_Z (Z_to_sbyte_list 8 int) = int.
-Proof.
-Admitted.
-*)
-(*
-  intros int. simpl. unfold sbyte_list_to_Z.
-  simpl. repeat rewrite Byte.unsigned_repr_eq. simpl.
-  Admitted.
-  assert (H: Byte.modulus = 256). { auto. } rewrite H.
-Admitted.
-*)  
     
 Lemma serialize_inverses : forall dval,
     serialize_defined dval -> exists typ, deserialize_sbytes (serialize_dvalue dval) typ = dval.
