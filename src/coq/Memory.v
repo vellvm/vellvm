@@ -15,6 +15,16 @@ Module A : MemoryAddress.ADDRESS with Definition addr := (Z * Z) % type.
   Definition addr := (Z * Z) % type.
   Definition null := (0, 0).
   Definition t := addr.
+  Lemma addr_dec : forall (a b : addr), {a = b} + {a <> b}.
+  Proof.
+    intros [a1 a2] [b1 b2].
+    destruct (a1 == b1); 
+      destruct (a2 == b2); subst.
+    - left; reflexivity.
+    - right. intros H. inversion H; subst. apply n. reflexivity.
+    - right. intros H. inversion H; subst. apply n. reflexivity.
+    - right. intros H. inversion H; subst. apply n. reflexivity.      
+  Qed.
 End A.
 
 

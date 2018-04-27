@@ -8,11 +8,12 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
+Require Import Vellvm.Classes.
 Require Import OrderedType OrderedTypeEx.
 
 Module Type ADDRESS.
   Parameter addr : Set.
   Parameter null : addr.
-  (* Include UsualOrderedType with Definition t:=addr. *)
+  Parameter addr_dec : forall (a b : addr), {a = b} + {a <> b}.
 End ADDRESS.
 

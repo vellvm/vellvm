@@ -37,7 +37,7 @@ Open Scope string_scope.
 Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   
   Import LLVMIO.
-
+  
   (* Environments ------------------------------------------------------------- *)
   Module ENV := FMapAVL.Make(AstLib.RawIDOrd).
   Module ENVFacts := FMapFacts.WFacts_fun(AstLib.RawIDOrd)(ENV).
@@ -84,6 +84,18 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     match i with
     | ID_Global x => lookup_env g x
     | ID_Local x => lookup_env e x
+    end.
+
+  Definition reverse_lookup_function_id (g:genv) (a:A.addr) : err raw_id :=
+    let f x :=
+        match x with
+        | (_, DVALUE_Addr b) => if a == b then true else false
+        | _ => false
+        end
+    in
+    match List.find f (ENV.elements g) with
+    | None => failwith "reverse_lookup_function_id failed"
+    | Some (fid, _) => mret fid
     end.
   
   Definition add_env := ENV.add.
@@ -923,7 +935,7 @@ Definition step (s:state) : Trace result :=
         match fv with
         | DVALUE_Addr addr =>
           (* TODO: lookup fid given addr from global environment *)
-          let fid := Name "" in
+          do fid <- reverse_lookup_function_id g addr;
           match (find_function_entry CFG fid) with
           | Some fnentry =>
             let 'FunctionEntry ids pc_f := fnentry in

@@ -37,6 +37,10 @@ Inductive dtyp : Set :=
 .
 
 Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
+
+Global Instance eq_dec_addr : eq_dec ADDR.addr := ADDR.addr_dec.
+  
+
 (* The set of dynamic types manipulated by an LLVM program.  Mostly
    isomorphic to LLVMAst.typ but
      - pointers have no further detail
