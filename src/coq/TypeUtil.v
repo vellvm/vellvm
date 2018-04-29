@@ -433,8 +433,7 @@ Inductive guarded_wf_typ : list (ident * typ) -> typ -> Prop :=
     forall (defs : list (ident * typ)) (sz : int) (t : typ),
       sz > 0 -> element_typ t -> guarded_wf_typ defs t -> guarded_wf_typ defs (TYPE_Vector sz t)
 
-(* This lax form doesn't care if the identifier is actually in the
-   typing environment.
+(* Identifier must be in the typing environment.
 
    Additionally the identifier must not occur anywhere in the type
    that it refers to *unless* it is guarded by a pointer. *)
@@ -1243,13 +1242,65 @@ Proof.
 Qed.
 
 
-(*
 Theorem normalize_type_unrolls:
-  forall et : list (ident * typ) * typ,
-    wf_env (fst et) ->
-    wf_typ (fst et) (snd et) ->
-    unrolled_typ (normalize_type (fst et) (snd et)).
+  forall env t,
+    NoDup (map fst env) ->
+    guarded_wf_typ env t ->
+    (forall ids,
+        (forall id, In id ids -> guarded_typ id env t) ->
+        unrolled_typ (normalize_type env t)).
 Proof.
-  TODO
+  intros env t Hdup Hwf ids Hguard_all.
+  induction Hwf; rewrite normalize_type_equation; simpl; auto.
+  - constructor.
+    + apply IHHwf; auto.
+      intros id H3.
+      pose proof Hguard_all _ H3 as Hguard'. inversion Hguard'; auto.
+    + rewrite Forall_forall. intros x H3.
+      apply in_map_in in H3 as [t [Hin Hnorm]].
+      rewrite <- Hnorm.
+      apply H2; auto.
+      intros id H3.
+      pose proof Hguard_all _ H3 as Hguard'. inversion Hguard'; auto.
+  - constructor. apply IHHwf; auto.
+    intros id H1.
+    pose proof Hguard_all _ H1 as Hguard'. inversion Hguard'; auto.
+  - destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) defs) as [[i t] |] eqn:Hfind.
+    + pose proof Hfind as Hfind'.
+      apply find_some in Hfind' as [Hin Heq].
+      simpl in *. destruct (Ident.eq_dec id i) as [He | He]; inversion Heq.
+
+      rewrite He.
+      replace (remove_key _ i defs) with (remove_keys Ident.eq_dec [i] defs) by auto.
+      rewrite guarded_id_normalize_same; auto.
+      * apply H2; auto. subst; auto.
+        intros id0 H3.
+        pose proof Hguard_all _ H3 as Hguard'; inversion Hguard'; auto.
+        -- rewrite Hfind in H6. inversion H6; subst; auto.
+        -- rewrite Hfind in H8. inversion H8.
+      * subst; try contradiction; auto.
+      * intros id0 H3.
+        inversion H3; subst.
+        -- apply H0; auto.
+        -- inversion H4.
+    + destruct H as [t Hin].
+      eapply find_none in Hfind; eauto.
+      simpl in Hfind. destruct (Ident.eq_dec id id).
+      inversion Hfind. contradiction.
+  - constructor.
+    rewrite Forall_forall.
+    intros x H2.
+    apply in_map_in in H2 as [t [Hin Hnorm]].
+    rewrite <- Hnorm.
+    apply H1; auto.
+    intros id H2.
+    pose proof Hguard_all _ H2 as Hguard'. inversion Hguard'; auto.
+  - constructor.
+    rewrite Forall_forall.
+    intros x H2.
+    apply in_map_in in H2 as [t [Hin Hnorm]].
+    rewrite <- Hnorm.
+    apply H1; auto.
+    intros id H2.
+    pose proof Hguard_all _ H2 as Hguard'. inversion Hguard'; auto.
 Qed.
-*)
