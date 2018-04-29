@@ -1242,7 +1242,7 @@ Proof.
 Qed.
 
 
-Theorem normalize_type_unrolls:
+Theorem guarded_normalize_type_unrolls:
   forall env t,
     NoDup (map fst env) ->
     guarded_wf_typ env t ->
@@ -1303,4 +1303,49 @@ Proof.
     apply H1; auto.
     intros id H2.
     pose proof Hguard_all _ H2 as Hguard'. inversion Hguard'; auto.
+Qed.
+
+
+
+Theorem normalize_type_unrolls:
+  forall env t,
+    wf_env env ->
+    wf_typ env t ->
+    unrolled_typ (normalize_type env t).
+Proof.
+  intros env t [Hdup Henv] Hwf.
+  induction Hwf; rewrite normalize_type_equation; simpl; auto.
+  - constructor.
+    + apply IHHwf; auto.
+    + rewrite Forall_forall. intros x H3.
+      apply in_map_in in H3 as [t [Hin Hnorm]].
+      rewrite <- Hnorm.
+      apply H2; auto.
+  - destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) defs) as [[i t] |] eqn:Hfind.
+    +
+      apply find_some in Hfind as [Hin Heq].
+      simpl in *. destruct (Ident.eq_dec id i); inversion Heq; subst.
+
+      replace (remove_key _ i defs) with (remove_keys Ident.eq_dec [i] defs) by auto.
+
+
+      rewrite guarded_id_normalize_same; auto using wf_typ_is_guarded_wf_typ.
+      intros id H3.
+      inversion H3; subst; try contradiction; auto.
+    + destruct H as [t Hin].
+      eapply find_none in Hfind; eauto.
+      simpl in Hfind. destruct (Ident.eq_dec id id).
+      inversion Hfind. contradiction.
+  - constructor.
+    rewrite Forall_forall.
+    intros x H2.
+    apply in_map_in in H2 as [t [Hin Hnorm]].
+    rewrite <- Hnorm.
+    apply H1; auto.
+  - constructor.
+    rewrite Forall_forall.
+    intros x H2.
+    apply in_map_in in H2 as [t [Hin Hnorm]].
+    rewrite <- Hnorm.
+    apply H1; auto.
 Qed.
