@@ -293,26 +293,26 @@ Definition undef_i64 := DVALUE_Undef.
   (* Integer iop evaluation, called from eval_iop. 
      Here the values must be integers. Helper defined
      in order to prevent eval_iop from being recursive. *)
-  Definition eval_iop_integer_h t iop v1 v2 : err dvalue :=
-    match t, v1, v2 with
-    | TYPE_I 1, DVALUE_I1 i1, DVALUE_I1 i2 => integer_op 1 iop i1 i2
-    | TYPE_I 32, DVALUE_I32 i1, DVALUE_I32 i2 => integer_op 32 iop i1 i2
-    | TYPE_I 64, DVALUE_I64 i1, DVALUE_I64 i2 => integer_op 64 iop i1 i2
-    | _, _, _ => failwith "ill_typed-iop"
+  Definition eval_iop_integer_h iop v1 v2 : err dvalue :=
+    match v1, v2 with
+    | DVALUE_I1 i1, DVALUE_I1 i2 => integer_op 1 iop i1 i2
+    | DVALUE_I32 i1, DVALUE_I32 i2 => integer_op 32 iop i1 i2
+    | DVALUE_I64 i1, DVALUE_I64 i2 => integer_op 64 iop i1 i2
+    | _, _ => failwith "ill_typed-iop"
     end.
-  Arguments eval_iop_integer_h _ _ _ _ : simpl nomatch.
+  Arguments eval_iop_integer_h _ _ _ : simpl nomatch.
 
   (* I split the definition between the vector and other evaluations because
      otherwise eval_iop should be recursive to allow for vector calculations, 
      but coq can't find a fixpoint. *)
-  Definition eval_iop t iop v1 v2 : err dvalue :=
-    match t, v1, v2 with
-    | TYPE_Vector s (TYPE_I i), (DVALUE_Vector elts1), (DVALUE_Vector elts2) =>
-      'val <- vec_loop (eval_iop_integer_h (TYPE_I i) iop) (List.combine elts1 elts2);
+  Definition eval_iop iop v1 v2 : err dvalue :=
+    match v1, v2 with
+    | (DVALUE_Vector elts1), (DVALUE_Vector elts2) =>
+      'val <- vec_loop (eval_iop_integer_h iop) (List.combine elts1 elts2);
       mret (DVALUE_Vector val)
-    | _, _, _ => eval_iop_integer_h t iop v1 v2
+    | _, _ => eval_iop_integer_h iop v1 v2
     end.
-  Arguments eval_iop _ _ _ _ : simpl nomatch.
+  Arguments eval_iop _ _ _ : simpl nomatch.
 
 
   Definition eval_i1_icmp icmp x y : dvalue :=
@@ -372,14 +372,14 @@ Definition undef_i64 := DVALUE_Undef.
     end.
   Arguments integer_cmp _ _ _ _ : simpl nomatch.
   
-  Definition eval_icmp t icmp v1 v2 : err dvalue :=
-    match t, v1, v2 with
-    | TYPE_I 1, DVALUE_I1 i1, DVALUE_I1 i2 => integer_cmp 1 icmp i1 i2
-    | TYPE_I 32, DVALUE_I32 i1, DVALUE_I32 i2 => integer_cmp 32 icmp i1 i2
-    | TYPE_I 64, DVALUE_I64 i1, DVALUE_I64 i2 => integer_cmp 64 icmp i1 i2
-    | _, _, _ => failwith "ill_typed-icmp"
+  Definition eval_icmp icmp v1 v2 : err dvalue :=
+    match v1, v2 with
+    | DVALUE_I1 i1, DVALUE_I1 i2 => integer_cmp 1 icmp i1 i2
+    | DVALUE_I32 i1, DVALUE_I32 i2 => integer_cmp 32 icmp i1 i2
+    | DVALUE_I64 i1, DVALUE_I64 i2 => integer_cmp 64 icmp i1 i2
+    | _, _ => failwith "ill_typed-icmp"
     end.
-  Arguments eval_icmp _ _ _ _ : simpl nomatch.
+  Arguments eval_icmp _ _ _ : simpl nomatch.
 
 
   Definition double_op (fop:fbinop) (v1:ll_double) (v2:ll_double) : err dvalue :=
@@ -400,11 +400,11 @@ Definition undef_i64 := DVALUE_Undef.
     | FRem => failwith "unimplemented"
     end.
   
-  Definition eval_fop (t:typ) (fop:fbinop) (v1:dvalue) (v2:dvalue) : err dvalue :=
-    match t, v1, v2 with
-    | TYPE_Float, DVALUE_Float f1, DVALUE_Float f2 => float_op fop f1 f2
-    | TYPE_Double, DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
-    | _, _, _ => failwith "ill_typed-fop"
+  Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : err dvalue :=
+    match v1, v2 with
+    | DVALUE_Float f1, DVALUE_Float f2 => float_op fop f1 f2
+    | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
+    | _, _ => failwith "ill_typed-fop"
     end. 
 
   Definition not_nan32 (f:ll_float) : bool :=
@@ -483,9 +483,9 @@ Definition undef_i64 := DVALUE_Undef.
   Arguments eval_select_h _ _ _ : simpl nomatch.
 
   
-  Definition eval_select t cnd t' v1 v2 : err dvalue :=
-    match t, t', cnd, v1, v2 with
-    | TYPE_Vector _ t, TYPE_Vector _ t', (DVALUE_Vector es), (DVALUE_Vector es1), (DVALUE_Vector es2) =>
+  Definition eval_select cnd v1 v2 : err dvalue :=
+    match cnd, v1, v2 with
+    | (DVALUE_Vector es), (DVALUE_Vector es1), (DVALUE_Vector es2) =>
       (* vec needs to loop over es, es1, and es2. Is there a way to
          generalize vec_loop to cover this? (make v1,v2 generic?) *)
       let fix loop elts := 
@@ -498,9 +498,9 @@ Definition undef_i64 := DVALUE_Undef.
           end in
       'val <- loop (List.combine es (List.combine es1 es2));
       mret (DVALUE_Vector val)
-    | _, _, _, _, _ => eval_select_h cnd v1 v2
+    | _, _, _ => eval_select_h cnd v1 v2
     end.
-  Arguments eval_select _ _ _ _ _ : simpl nomatch.
+  Arguments eval_select _ _ _ : simpl nomatch.
   
   (* Helper function for indexing into a structured datatype 
      for extractvalue and insertvalue *)

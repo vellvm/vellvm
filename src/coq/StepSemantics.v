@@ -286,28 +286,28 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
     let dt := eval_typ t in
     'v1 <- eval_exp (Some dt) op1;
     'v2 <- eval_exp (Some dt) op2;
-    do w <- (eval_iop t iop) v1 v2;
+    do w <- eval_iop iop v1 v2;
     mret w
 
   | OP_ICmp cmp t op1 op2 =>
     let dt := eval_typ t in
     'v1 <- eval_exp (Some dt) op1;                   
     'v2 <- eval_exp (Some dt) op2;
-    do w <- (eval_icmp t cmp) v1 v2;
+    do w <- (eval_icmp cmp) v1 v2;
     mret w
 
   | OP_FBinop fop fm t op1 op2 =>
     let dt := eval_typ t in    
     'v1 <- eval_exp (Some dt) op1;
     'v2 <- eval_exp (Some dt) op2;
-    do w <- (eval_fop t fop) v1 v2;
+    do w <- eval_fop fop v1 v2;
     mret w
 
   | OP_FCmp fcmp t op1 op2 =>
     let dt := eval_typ t in
     'v1 <- eval_exp (Some dt) op1;
     'v2 <- eval_exp (Some dt) op2;
-    do w <- (eval_fcmp fcmp) v1 v2;
+    do w <- eval_fcmp fcmp v1 v2;
     mret w
               
   | OP_Conversion conv t1 op t2 =>
@@ -379,7 +379,7 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
     'cndv <- eval_exp (Some dt) cnd;
     'v1 <- eval_exp (Some dt1) op1;
     'v2 <- eval_exp (Some dt2) op2;
-    do w <- eval_select t cndv t1 v1 v2;
+    do w <- eval_select cndv v1 v2;
     mret w
   end.
 Arguments eval_exp _ _ : simpl nomatch.

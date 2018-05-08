@@ -152,6 +152,9 @@ Fixpoint swap_typ (id1 id2:raw_id) (t:typ) : typ :=
 Instance swap_of_typ : Swap typ := swap_typ.
 Hint Unfold swap_of_typ.
 
+Instance swap_of_dtyp : Swap dtyp :=
+  fun id1 id2 d => d.
+
 Instance swap_of_tident : Swap tident := swap.
 Hint Unfold swap_of_tident.
 
@@ -513,16 +516,15 @@ Section PROOFS.
     rewrite H. assumption.
   Qed.
 
-
-  Lemma swap_raw_id_inj : forall (id1 id2 k j:raw_id), swap id1 id2 k = swap id1 id2 j -> k = j.
+  Variable id1 id2 : raw_id.
+  
+  Lemma swap_raw_id_inj : forall (k j:raw_id), swap id1 id2 k = swap id1 id2 j -> k = j.
   Proof.
     intros.
     unfold_swaps. unfold swap_raw_id in *.
     simpl_ifs; subst; try reflexivity; try contradiction.
   Qed.
   
-  Variable id1 id2 : raw_id.
-
   Lemma swap_ENV_find : forall {X} `{SX : Swap X} (e:ENV.t X) (id:raw_id),
       (ENV.find (swap id1 id2 id) (swap id1 id2 e)) = swap id1 id2 (ENV.find id e).
   Proof.
@@ -598,6 +600,35 @@ Section PROOFS.
     destruct (integer_op bits iop x y); reflexivity.
   Qed.
 
+
+  Lemma swap_eval_iop : forall iop v1 v2,
+      eval_iop (swap id1 id2 iop) (swap id1 id2 v1) (swap id1 id2 v2) =
+      swap id1 id2 (eval_iop iop v1 v2).
+  Proof.
+    intros iop v1 v2.
+    unfold_swaps.
+    destruct (eval_iop iop v1 v2); reflexivity.
+  Qed.
+
+  Lemma swap_eval_icmp : forall icmp v1 v2,
+      eval_icmp (swap id1 id2 icmp) (swap id1 id2 v1) (swap id1 id2 v2) =
+      swap id1 id2 (eval_icmp icmp v1 v2).
+  Proof.
+    intros icmp v1 v2.
+    unfold_swaps.
+    destruct (eval_icmp icmp v1 v2); reflexivity.
+  Qed.
+
+  Lemma swap_eval_exp : forall CFG g e top o,
+      eval_exp (swap id1 id2 CFG) (swap id1 id2 g) (swap id1 id2 e) (swap id1 id2 top) (swap id1 id2 o) =
+      swap id1 id2 (eval_exp CFG g e top o).
+  Proof.
+    intros CFG g e top.
+    induction o; simpl.
+  Admitted.
+
+  
+  
   Lemma swap_step : forall (CFG:mcfg) (s:state),
       (step (swap id1 id2 CFG) (swap id1 id2 s)) ≡ (swap id1 id2 (step CFG s)).
   Proof.
@@ -611,7 +642,7 @@ Section PROOFS.
       (step_sem (swap id1 id2 CFG) (swap id1 id2 r)) ≡ (swap id1 id2 (step_sem CFG r)).
   Proof.
     intros CFG.
-    cofix.
+    cofix swap_step_sem.
     destruct r.
     - rewrite Trace.matchM. simpl.
       assert (swap id1 id2 (step_sem CFG (Done v)) = Trace.idM (swap id1 id2 (step_sem CFG (Done v)))).

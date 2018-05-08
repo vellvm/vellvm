@@ -155,7 +155,7 @@ CoInductive EquivUpToTau E X :
 Lemma eutt_refl : forall E X (s : M E X),
     EquivUpToTau s s.
 Proof.
-  cofix.
+  cofix eutt_refl.
   intros.
   destruct s; constructor;
     intros;
@@ -165,7 +165,7 @@ Qed.
 Lemma eutt_sym : forall E X (s t : M E X),
     EquivUpToTau s t -> EquivUpToTau t s.
 Proof.
-  cofix.
+  cofix eutt_sym.
   intros.
   destruct H; try constructor.
   - intro y. apply eutt_sym. apply H.
@@ -240,7 +240,7 @@ Lemma eutt_tau_2 : forall E X (s s' t t' : M E X),
     UnTau s s' -> UnTau t t' -> EquivUpToTau s' t' ->
     EquivUpToTau s t.
 Proof.
-  cofix.
+  cofix eutt_tau_2.
   intros E X s s' t t' Hs Ht H.
   destruct Hs, Ht.
   - constructor.
@@ -280,7 +280,7 @@ Qed.
 Lemma eutt_untau_trans : forall E X (s s' t : M E X),
     UnTau s s' -> EquivUpToTau s' t -> EquivUpToTau s t.
 Proof.
-  cofix.
+  cofix eutt_untau_trans.
   intros E X s s' t H I.
   destruct H.
   { inversion I; subst.
@@ -324,7 +324,7 @@ Admitted.
 
 Lemma eutt_err_t : forall E X s1 s2 (t : M E X) , EquivUpToTau (Err s1) t -> EquivUpToTau (Err s2) t.
 Proof.  
-  cofix.
+  cofix eutt_err_t.
   intros E X s1 s2 t H.
   inversion H. subst.
   econstructor; auto. apply H1. eapply eutt_err_t. apply H2.
@@ -334,7 +334,7 @@ Qed.
 Lemma eutt_trans : forall E X (s t u : M E X),
     EquivUpToTau s t -> EquivUpToTau t u -> EquivUpToTau s u.
 Proof.
-  cofix.
+  cofix eutt_trans.
   intros E X s t u H1 H2.
 
   destruct H1 as [ | ? e1 ks kt | | | | ];
