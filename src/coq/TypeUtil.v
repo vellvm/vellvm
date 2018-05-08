@@ -11,52 +11,10 @@ Import ListNotations.
 Open Scope list_scope.
 
 
-Definition eqb_raw_id (a : raw_id) (b : raw_id) : bool :=
-  match a with
-  | Name s => match b with
-             | Name s2 => proj_sumbool (string_dec s s2)
-             | _ => false
-             end
-  | Anon n => match b with
-             | Anon n2 => Z.eqb n n2
-             | _ => false
-             end
-  | Raw n => match b with
-            | Raw n2 => Z.eqb n n2
-            | _ => false
-            end
-  end.
-
-
-Definition eqb_ident (a : ident) (b : ident) : bool :=
-  match a with
-  | ID_Global id_l => match b with
-                     | ID_Global id_r => eqb_raw_id id_l id_r
-                     | _ => false
-                     end
-  | ID_Local id_l => match b with
-                    | ID_Local id_r => eqb_raw_id id_l id_r
-                    | _ => false
-                    end
-  end.  
-
-
-Lemma eqb_ident_correct :
-  forall (a : ident) (b : ident),
-    eqb_ident a b = true ->
-    a = b.
-Proof.
-  intros a b H.
-  destruct a, b; intuition.
-  - destruct id, id0; try (inversion H).
-    destruct (string_dec s s0); subst; try reflexivity; try inversion H1.
-    apply Z.eqb_eq in H1. subst. reflexivity.
-    apply Z.eqb_eq in H1. subst. reflexivity.
-  - destruct id, id0; try (inversion H).
-    destruct (string_dec s s0); subst; try reflexivity; try inversion H1.
-    apply Z.eqb_eq in H1. subst. reflexivity.
-    apply Z.eqb_eq in H1. subst. reflexivity.
-Qed.
+Ltac contra :=
+  try match goal with
+  | [Heq : ?x = ?y, Hneq : ?y <> ?x |- _] => symmetry in Heq
+  end; contradiction.
 
 
 (* Inductive predicate for types in LLVM with a size *)
@@ -250,8 +208,10 @@ Inductive first_class_typ : typ -> Prop :=
 | first_class_Identified : forall id, first_class_typ (TYPE_Identified id)
 .
 
+
 Definition function_ret_typ (t : typ) : Prop :=
   first_class_typ t /\ t <> TYPE_Metadata.
+
 
 (* Inductive predicate for well-formed LLVM types.
 
@@ -268,7 +228,6 @@ Definition function_ret_typ (t : typ) : Prop :=
    - Vectors of size 0
    - Arrays with unsized elements
    - Recursive structures (must be guarded by a pointer) *)
-
 
 Inductive wf_typ : list (ident * typ) -> typ -> Prop :=
 | wf_typ_Pointer:
@@ -470,9 +429,14 @@ Theorem wf_typ_is_guarded_wf_typ :
     wf_typ env t ->
     guarded_wf_typ env t.
 Proof.
-  intros env t H.
-  induction H; auto.
+  induction 1; auto.
 Qed.
+
+
+(* An unrolled type is an LLVM type that contains no identifiers,
+   unless the identifier is behind a pointer.
+
+ *)
 
 
 Inductive unrolled_typ : typ -> Prop :=
@@ -566,9 +530,6 @@ Proof.
 Qed.
 
 
-Definition sum (l : list nat) : nat := fold_left plus l 0%nat.
-
-
 Theorem wf_lt_typ_order :
   well_founded (lex_ord lt typ_order).
 Proof.
@@ -579,18 +540,16 @@ Qed.
 Hint Resolve wf_lt_typ_order.
 Hint Constructors lex_ord.
 
+
 Definition length_order {A : Type} (l1 l2 : list A) :=
   (List.length l1 < List.length l2)%nat.
 
 
 Lemma lengthOrder_wf' : forall A len, forall ls, (List.length ls <= len)%nat -> Acc (@length_order A) ls.
-  unfold length_order; induction len.
-  - intros ls H. inversion H. rewrite length_zero_iff_nil in H1. subst.
-    constructor. intros y H0. inversion H0.
-  - intros ls H. inversion H.
-    + constructor. intros y H0. apply IHlen. omega.
-    + auto.
+  unfold length_order; induction len;
+    intros ls H; inversion H; subst; constructor; firstorder.
 Defined.
+
 
 Theorem lengthOrder_wf : forall A, well_founded (@length_order A).
   red; intros A a; eapply lengthOrder_wf'; eauto.
@@ -601,8 +560,8 @@ Theorem wf_length_typ_order :
   forall A,
     well_founded (lex_ord (@length_order A) typ_order).
 Proof.
-  intros A. apply wf_lex_ord.
-  apply lengthOrder_wf. apply wf_typ_order.
+  intros.
+  apply wf_lex_ord. apply lengthOrder_wf. apply wf_typ_order.
 Defined.
 
 
@@ -634,16 +593,30 @@ Fixpoint remove_keys {A B : Type} (eq_dec : (forall (x y : A), {x = y} + {x <> y
   end.
 
 
+Ltac destruct_prod :=
+  match goal with
+  | [ |- context[let (_, _) := ?p in _]] => destruct p
+  | [ p: ?A * ?B |- _ ] => destruct p
+  end.
+
+
+Ltac destruct_eq_dec :=
+  match goal with
+  | [ eq: forall x y : ?A , {x = y} + {x <> y} |- context[eq ?a ?b] ] => destruct (eq a b) eqn:?; simpl
+  | [ |- context[Ident.eq_dec ?a ?b] ] => destruct (Ident.eq_dec a b) eqn:?; simpl
+  end.
+
+
 Lemma remove_key_in :
   forall (A B : Type) (a : A)  (b : B) eq_dec l,
     In (a, b) l ->
     (List.length (remove_key eq_dec a l) < List.length l)%nat.
 Proof.
-  induction l.
+  induction 0.
   - intros H. inversion H.
   - intros H.
-    destruct a0.
-    simpl. destruct (eq_dec a a0).
+    destruct_prod.
+    simpl. destruct_eq_dec.
     + apply Nat.lt_succ_diag_r.
     + simpl. apply lt_n_S. apply IHl.
       destruct H.
@@ -659,29 +632,42 @@ Lemma remove_key_not_in :
 Proof.
   induction l; intros H.
   - reflexivity.
-  - simpl in *. destruct a0. destruct (eq_dec a a0).
+  - simpl in *. destruct_prod; destruct_eq_dec.
     + intuition.
     + rewrite IHl; intuition.
 Qed.
+
+
+Ltac solve_eq_dec_if :=
+  match goal with
+  | [ eq: forall x y : ?A , {x = y} + {x <> y},
+        Heq : ?eq ?a ?b = ?c |- context[if ?eq ?a ?b then _ else _] ] => rewrite Heq
+  | [ Heq : Ident.eq_dec ?a ?b = ?c |- context[if Ident.eq_dec ?a ?b then _ else _] ] => rewrite Heq
+  | [ eq: forall x y : ?A , {x = y} + {x <> y},
+        Heq : ?eq ?a ?b = ?c |- context[if proj_sumbool (?eq ?a ?b) then _ else _] ] => rewrite Heq
+  | [ Heq : Ident.eq_dec ?a ?b = ?c |- context[if proj_sumbool (Ident.eq_dec ?a ?b) then _ else _] ] => rewrite Heq
+
+  end.
+
+
+Ltac subst_eq :=
+  match goal with
+  | [ eq: forall x y : ?A , {x = y} + {x <> y}, Heq: eq ?a ?b = ?c |- _ ] => rewrite Heq
+  | [ Heq : Ident.eq_dec ?a ?b = ?c |- _ ] => rewrite Heq
+  end.
+
+
+Ltac solve_eq_dec :=
+  repeat destruct_prod; simpl in *;
+  repeat (destruct_eq_dec; simpl in *; subst; simpl; try contra; auto; repeat (solve_eq_dec_if; simpl); auto);
+  intuition; try congruence.
 
 
 Lemma remove_key_commutes :
   forall (A B : Type) (k1 k2 : A) eq_dec (l : list (A * B)),
     remove_key eq_dec k1 (remove_key eq_dec k2 l) = remove_key eq_dec k2 (remove_key eq_dec k1 l).
 Proof.
-  intros A B k1 k2 eq_dec l.
-  induction l; auto.
-  simpl. destruct a.
-  destruct (eq_dec k2 a) eqn:Hk2a.
-  - destruct (eq_dec k1 a).
-    + subst; auto.
-    + subst. simpl. destruct (eq_dec a a); try contradiction.
-      reflexivity.
-  - destruct (eq_dec k1 a) eqn:Hk1a.
-    + subst. simpl. destruct (eq_dec a a); try contradiction.
-      reflexivity.
-    + simpl. rewrite Hk2a. rewrite Hk1a. rewrite IHl.
-      reflexivity.
+  induction 0; solve_eq_dec.
 Qed.  
 
 
@@ -690,11 +676,10 @@ Lemma remove_key_keys :
     remove_key eq_dec key (remove_keys eq_dec keys l) = remove_keys eq_dec (key :: keys) l.
 Proof.
   intros A B keys.
-  induction keys; intros eq_dec key l; auto.
+  induction keys as [| k keys' IHkeys]; intros eq_dec key l; auto.
   simpl in *.
   rewrite IHkeys.
-  apply f_equal.
-  apply remove_key_commutes.
+  apply f_equal; apply remove_key_commutes.
 Qed.
 
 
@@ -756,7 +741,6 @@ Next Obligation.
   destruct (Ident.eq_dec id wildcard'). subst. eapply remove_key_in. apply Hin.
   inversion Heqb_ident.
 Defined.
-
 
 
 Lemma normalize_type_equation : forall env t,
@@ -825,15 +809,14 @@ Lemma find_in_wf_env :
     find (fun a : ident * typ => Ident.eq_dec id (fst a)) env = Some (id, t).
 Proof.
   intros env id t Hdup Hin.
-  induction env as [| [id' t'] env].
+  induction env as [| [id' t'] env IHenv].
   - contradiction.
   - destruct Hin as [Hin | Hin]; try inversion Hin; subst.
-    + simpl. destruct (Ident.eq_dec id id); intuition.
-    + simpl. destruct (Ident.eq_dec id id').
+    + simpl. destruct_eq_dec; intuition.
+    + simpl. destruct_eq_dec.
       * inversion Hdup. subst. apply in_map with (f:=fst) in Hin. simpl in *.
         contradiction.
-      * simpl. inversion Hdup.
-        apply IHenv; auto.
+      * simpl. inversion Hdup. auto.
 Qed.
 
 
@@ -846,23 +829,14 @@ Proof.
 Qed.
 
 
+
 Lemma find_different_key_from_removed :
   forall env id id',
     id <> id' ->
     find (fun a : ident * typ => Ident.eq_dec id' (fst a)) env = find (fun a : ident * typ => Ident.eq_dec id' (fst a)) (remove_key Ident.eq_dec id env).
 Proof.
   intros env id id' H.
-  induction env.
-  - reflexivity.
-  - destruct a as [i t]. simpl.
-    destruct (Ident.eq_dec id' i) eqn:Heq.
-    + simpl. destruct (Ident.eq_dec id i); subst.
-      * contradiction.
-      * simpl. destruct (Ident.eq_dec i i); try contradiction.
-        reflexivity.
-    + simpl. destruct (Ident.eq_dec id i); subst.
-      * intuition.
-      * simpl. rewrite Heq. simpl. auto.
+  induction env; solve_eq_dec.
 Qed.
 
 
@@ -878,15 +852,37 @@ Proof.
     rewrite <- find_different_key_from_removed with (id:=a); intuition; subst; intuition.
 Qed.
 
-Lemma trans :
-  forall {A} {a b c : A},
-    c = a ->
-    c = b ->
-    a = b.
-Proof.
-  intros A a b c Hca Hcb.
-  subst. reflexivity.
-Qed.
+
+Ltac solve_some :=
+  match goal with
+  | [ H: (?i1, ?t1) = (?i2, ?t2) |- ?F (?i1, ?t1) = ?F (?i2, ?t2) ] => inversion H; reflexivity
+  | [ Hdup : NoDup (?i :: map fst ?env),
+      Hin : In (?i, ?t) ?env |- ?F (?i, ?t1) = ?F (?i, ?t2) ] =>
+    let Hnin := fresh in
+    let Hdup' := fresh in
+    inversion Hdup as [| ? ? Hnin Hdup']; subst;
+    exfalso; apply Hnin;
+    replace i with (fst (i, t)) by reflexivity;
+    apply in_map; auto
+  | [ Hin : In (?i, ?t1) ((?i, ?t2) :: ?env) |- ?F (?i, ?t1) = ?F (?i, ?t2) ] => symmetry; solve_some
+  | [ Hin : In (?i, ?t2) ((?i, ?t1) :: ?env) |- ?F (?i, ?t1) = ?F (?i, ?t2) ] => inversion Hin; solve_some
+  end.
+
+
+Ltac solve_in :=
+  match goal with
+  | [ Hin: In (?id, ?t) ((?i, ?t0) :: ?env),
+      Hneq: ?id <> ?i |- In (?id, ?t) ?env ] =>
+    let Htup := fresh in
+    inversion Hin as [Htup | ?]; [> inversion Htup; contra | auto]
+
+  | [ H: find (fun a => (proj_sumbool (?eq ?id (fst a)))) ?env = Some (?i, ?t)
+      |- In (?id, ?t) ?env ] =>
+    let Hfind := fresh in
+    apply find_some in H as [? Hfind];
+    simpl in Hfind;
+    destruct (Ident.eq_dec id i) eqn:?; subst; intuition
+  end.
 
 
 Lemma find_some_id :
@@ -900,20 +896,12 @@ Proof.
   induction env.
   - inversion H.
   - destruct a. simpl.
-    destruct (Ident.eq_dec id i).
-    + simpl. subst. simpl in Hdup. inversion Hin.
-      * inversion H0. reflexivity.
-      * inversion Hdup. subst.
-        exfalso. apply H3.
-        assert (i = fst (i, t)) by reflexivity.
-        rewrite H1.
-        apply in_map. auto.
+    destruct_eq_dec.
+    + subst. simpl in Hdup. solve_some.
     + simpl. apply IHenv.
-      * simpl in Hdup. inversion Hdup. auto.
-      * simpl in Hin. inversion Hin.
-        -- inversion H0. symmetry in H2. contradiction.
-        -- assumption.
-      * simpl in H. destruct (Ident.eq_dec id i); try contradiction. simpl in H.
+      * inversion Hdup; auto.
+      * solve_in.
+      * simpl in *. rewrite Heqs in H. simpl in *.
         assumption.
 Qed.
 
@@ -1015,11 +1003,73 @@ Theorem map_rewrite :
     map_In l (fun t (_ : In t l) => f t) = map_In l (fun t (_ : In t l) => g t).
 Proof.
   intros A B x l f g H.
-  induction l as [| a l]; simpl; auto.
+  induction l as [| a l IHl]; simpl; auto.
   pose proof (H a) as Ha.
   rewrite Ha; intuition.
   rewrite IHl; intuition.
 Qed.
+
+
+Ltac simpl_remove_keys :=
+  match goal with
+  | [ |- context[remove_key ?eq ?id (remove_keys ?eq ?ids ?assoc_list)] ] =>
+    replace (remove_key eq id (remove_keys eq ids assoc_list)) with
+        (remove_keys eq (id :: ids) assoc_list) by auto using remove_key_keys
+
+  | [ |- context[remove_keys ?eq ?ids (remove_key ?eq ?id ?assoc_list)] ] =>
+    replace (remove_keys eq ids (remove_key eq id assoc_list)) with
+        (remove_keys eq (id :: ids) assoc_list) by auto using remove_keys_key
+
+  | [ |- context[remove_key ?eq ?id ?assoc_list] ] =>
+    replace (remove_key eq id assoc_list) with
+        (remove_keys eq [id] assoc_list) by auto
+  end.
+
+
+Ltac subst_find_some :=
+  match goal with
+  | [ H1: ?F ?filter ?defs = ?G (?i1, ?t1),
+      H2: ?X = ?F ?filter ?defs |- _ ] => rewrite H1 in H2; inversion H2
+  end.
+
+
+Ltac solve_guard :=
+  match goal with
+  | [ H: element_typ ?x |- guarded_typ ?id ?defs ?x ] =>
+        match goal with
+        | [H : element_typ _ |- _] => inversion H
+        end; auto
+
+  | [ Hguard: forall i, In i ?ids -> guarded_typ ?i ?env ?t |- ~(In ?id ?ids) ] =>
+    let Hguard' := fresh in
+    let Hin := fresh in
+    unfold not; intros Hin;
+    pose proof Hguard id Hin as Hguard';
+    inversion Hguard'; auto
+
+  | [ Hguard: forall t, In (?i, t) ?defs -> guarded_typ ?i ?defs t,
+        Hin: In ?id [?i] |- _ ] =>
+    intros; inversion Hin; subst; try contradiction; auto
+
+  | [ Hguard: forall i, In ?id [i] -> guarded_typ ?i ?env ?t |- ~(In ?id ?ids) ] =>
+    let Hguard' := fresh in
+    let Hin := fresh in
+    unfold not; intros Hin;
+    pose proof Hguard id Hin as Hguard';
+    inversion Hguard'; subst; try contra; auto
+
+  | [ Hguard: forall i, In i ?ids -> guarded_typ i ?env ?t,
+        Hin: In ?id [?one] |- guarded_typ ?id ?defs ?x ] =>
+    inversion Hin; subst; auto; contra
+
+  | [ Hguard: forall i, In i ?ids -> guarded_typ i ?env ?t,
+      Hin: In ?id ?ids |- guarded_typ ?id ?defs ?x ] =>
+    let Hguard' := fresh in
+    pose proof Hguard _ Hin as Hguard'; inversion Hguard'; auto; subst; subst_find_some; subst; auto
+
+  | [ |- forall id, In id ?ids -> guarded_typ id ?defs ?x ] =>
+    intros; solve_guard
+  end.
 
 
 Theorem guarded_id_normalize_same :
@@ -1032,73 +1082,46 @@ Theorem guarded_id_normalize_same :
 Proof.
   intros t env Hdup Hwf.
   induction Hwf; intros ids Hguard;
-    rewrite normalize_type_equation; symmetry; rewrite normalize_type_equation; simpl; auto.
-  4: { simpl. 
+    rewrite normalize_type_equation; symmetry; rewrite normalize_type_equation; simpl; auto;
+      try rewrite IHHwf; auto;
+        try match goal with
+            | [H : element_typ _ |- _] => inversion H
+            end;
+        try (rewrite map_rewrite with (f:=normalize_type (remove_keys _ _ _)) (g:=normalize_type defs);
+             try exact (TYPE_Void);
+             auto; intros;
+             match goal with
+             | [ H: _ |- _ ] => apply H
+             end;
+             auto);
+        try (intros id Hidin; solve_guard).
 
-       replace (remove_key Ident.eq_dec id (remove_keys Ident.eq_dec ids defs)) with
-           (remove_keys Ident.eq_dec (id :: ids) defs) by auto using remove_key_keys.
+  (* Identifiers *)
+  repeat simpl_remove_keys.
 
-       (* True because id not in ids.
+  (* If id is in ids, this means that guarded_typ id defs
+     (TYPE_Identified id), which is a contradiction. *)
+  assert (~ In id ids) as Hnotin by solve_guard.
 
-          because if id is in ids, this means that guarded_typ id defs
-          (TYPE_Identified id), which is a contradiction.
+  replace (find (fun a : ident * typ => Ident.eq_dec id (fst a)) (remove_keys Ident.eq_dec ids defs)) with
+      (find (fun a : ident * typ => Ident.eq_dec id (fst a)) defs) by (auto using remove_keys_find).
 
-        *)
-       assert ((find (fun a : ident * typ => Ident.eq_dec id (fst a)) (remove_keys Ident.eq_dec ids defs)) = (find (fun a : ident * typ => Ident.eq_dec id (fst a)) defs)) as Hfind_removekeys.
-       assert (~ In id ids). unfold not. intros Hinidids.
-       pose proof Hguard id Hinidids as Hguard'.
-       inversion Hguard'; contradiction.
-       symmetry; auto using remove_keys_find.
+  destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) defs) eqn:Hfind; auto.
+  destruct_prod. simpl.
 
-       rewrite Hfind_removekeys.
+  assert (In (id, t) defs).
+  apply find_some in Hfind as [Hin Hfind].
+  simpl in Hfind.
 
-       destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) defs) eqn:Hfind.
-       - destruct p. simpl.
+  destruct (Ident.eq_dec id i) eqn:Hidi; subst; intuition.
 
-         assert (In (id, t) defs).
-         apply find_some in Hfind as [Hin Hfind].
-         simpl in Hfind.
-         destruct (Ident.eq_dec id i) eqn:Hidi; subst; intuition.
-         
-         replace (remove_keys Ident.eq_dec ids (remove_key Ident.eq_dec id defs)) with
-             (remove_keys Ident.eq_dec (id :: ids) defs) by auto using remove_keys_key.
+  repeat (simpl_remove_keys;
+          repeat match goal with
+                 | [ H: _ |- _ ] => rewrite H
+                 end; auto); intros id0 [Hidid0 | Hin']; subst; auto.
 
-         rewrite H2; auto.
-
-         replace (remove_key Ident.eq_dec id defs) with
-             (remove_keys Ident.eq_dec [id] defs) by auto.
-
-         rewrite H2; auto.
-         + intros id0 H4. destruct H4.
-           * subst; auto.
-           * inversion H4.
-         + intros id0 H4. destruct H4.
-           * subst; auto.
-           * pose proof (Hguard id0 H4) as Hguard'. inversion Hguard'; subst.
-             -- rewrite Hfind in H7. inversion H7. subst. auto.
-             -- rewrite Hfind in H9. inversion H9.
-       - reflexivity.
-     }
-  - rewrite IHHwf; auto.
-    rewrite map_rewrite with (f:=normalize_type (remove_keys _ _ _)) (g:=normalize_type defs); auto.
-    intros x H3. apply H2; auto.
-    all: intros id Hidin; pose proof Hguard id Hidin as Hguard'; inversion Hguard'; auto.
-  - rewrite IHHwf; auto.
-    intros id Hidin.
-    pose proof Hguard id Hidin as Hguard'. inversion Hguard'; auto.
-  - rewrite IHHwf; auto;
-    intros id Hidin;
-    match goal with
-    | [H : element_typ _ |- _] => inversion H
-    end; auto.
-  - rewrite map_rewrite with (f:=normalize_type (remove_keys _ _ _)) (g:=normalize_type defs); auto.
-    exact (TYPE_Void).
-    intros x H2. apply H1; auto.
-    intros id Hidin; pose proof Hguard id Hidin as Hguard'; inversion Hguard'; auto.
-  - rewrite map_rewrite with (f:=normalize_type (remove_keys _ _ _)) (g:=normalize_type defs); auto.
-    exact (TYPE_Void).
-    intros x H2. apply H1; auto.
-    intros id Hidin; pose proof Hguard id Hidin as Hguard'; inversion Hguard'; auto.
+  - inversion Hin'.
+  - pose proof (Hguard id0 Hin') as Hguard'. inversion Hguard'; subst_find_some; subst; auto.
 Qed.
 
 
@@ -1107,10 +1130,44 @@ Theorem double_map_In :
     (map_In (map_In l (fun x (_ : In x l) => f x)) (fun x (_ : In x (map_In l (fun x (_ : In x l) => f x))) => g x)) = map_In l (fun x (_ : In x l) => g (f x)).
 Proof.
   intros A B C l f g.
-  induction l.
-  - reflexivity.
-  - simpl. auto using f_equal.
+  induction l; simpl; auto using f_equal.
 Qed.
+
+
+Ltac solve_map_in :=
+  repeat
+    match goal with
+    | [  |- context[map_In (map_In _ _)] ] => rewrite double_map_In
+    | [ defs : list (ident * typ) |- _ ] =>
+      try (rewrite map_rewrite with (f:=fun x => normalize_type defs (normalize_type defs x)) (g:=normalize_type defs); [> eauto | exact TYPE_Void | eauto]);
+      try solve [intros;
+                 match goal with
+                 | [ H: _ |- _ ] => apply H
+                 end; auto; solve_guard]
+
+  end.
+
+
+Ltac solve_match_find :=
+  match goal with
+  | [ |- context[match ?Find with _ => _ end = _] ] =>
+    let i := fresh in
+    let t := fresh in
+    let Hfind := fresh in
+    destruct Find as [[i t] |] eqn:Hfind;
+    match goal with
+    | [ Hf: context[find (fun a => proj_sumbool (?eq ?id (fst a))) ?defs],
+            defs : list (ident * typ) |- _ ] =>
+      try (assert (In (id, t) defs) by solve_in;
+           symmetry; simpl_remove_keys;
+           rewrite guarded_id_normalize_same; auto using wf_typ_is_guarded_wf_typ; try solve_guard;
+
+           try (match goal with
+                | [ H: _ |- _ ] => apply H
+                end; auto; solve_guard));
+      try (rewrite normalize_type_equation; simpl; rewrite Hfind; reflexivity)
+    end
+  end.
 
 
 Theorem guarded_normalize_same :
@@ -1122,59 +1179,13 @@ Theorem guarded_normalize_same :
         normalize_type env (normalize_type env t) = normalize_type env t).
 Proof.
   intros t env Hdup Hwf ids Hguard_all.
-  induction Hwf; try solve [rewrite normalize_type_equation; symmetry; rewrite normalize_type_equation; simpl; auto].
-  - rewrite normalize_type_equation; symmetry; rewrite normalize_type_equation; simpl; auto.
+  induction Hwf;
+    try solve [rewrite normalize_type_equation; symmetry; rewrite normalize_type_equation;
+               simpl; auto;
+               try rewrite IHHwf; auto; try solve_guard; solve_map_in].
 
-    rewrite IHHwf; auto.
-    rewrite double_map_In.
-    rewrite map_rewrite with (f:=fun x => normalize_type defs (normalize_type defs x)) (g:=normalize_type defs); auto.
-    intros x Hin. apply H2; auto.
-    all: intros id Hinids; pose proof Hguard_all _ Hinids as Hguard'; inversion Hguard'; auto.
-
-  - rewrite normalize_type_equation; symmetry; rewrite normalize_type_equation; simpl; auto.
-
-    rewrite IHHwf; auto.
-    intros id Hinids; pose proof Hguard_all _ Hinids as Hguard'; inversion Hguard'; auto.
-
-  - rewrite normalize_type_equation; symmetry; rewrite normalize_type_equation; simpl; auto.
-
-    rewrite IHHwf; auto.
-    intros id Hinids;
-      match goal with
-      | [H : element_typ _ |- _] => inversion H
-      end; auto.
-  - symmetry. rewrite normalize_type_equation. simpl.
-
-    destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) defs) eqn:Hfind.
-    + destruct p.
-
-      assert (In (id, t) defs).
-      apply find_some in Hfind as [Hin Hfind].
-      simpl in Hfind.
-      destruct (Ident.eq_dec id i) eqn:Hidi; subst; intuition.
-
-      symmetry.
-      replace (remove_key Ident.eq_dec id defs) with (remove_keys Ident.eq_dec [id] defs) by auto.
-      rewrite guarded_id_normalize_same; auto.
-      apply H2; auto.
-      * intros id0 Hinids; pose proof Hguard_all _ Hinids as Hguard'. inversion Hguard'; auto; subst.
-        -- rewrite Hfind in H6. inversion H6; subst; auto.
-        -- rewrite Hfind in H8. inversion H8.
-      * intros id0 H4. inversion H4. subst. auto.
-        inversion H5.
-    + rewrite normalize_type_equation. simpl. rewrite Hfind. reflexivity.
-  - rewrite normalize_type_equation; symmetry; rewrite normalize_type_equation; simpl; auto.
-    rewrite double_map_In.
-    rewrite map_rewrite with (f:=fun x => normalize_type defs (normalize_type defs x)) (g:=normalize_type defs); auto.
-    exact TYPE_Void.
-    intros x H2. rewrite H1; auto.
-    intros id0 Hinids; pose proof Hguard_all _ Hinids as Hguard'. inversion Hguard'; auto.
-  - rewrite normalize_type_equation; symmetry; rewrite normalize_type_equation; simpl; auto.
-    rewrite double_map_In.
-    rewrite map_rewrite with (f:=fun x => normalize_type defs (normalize_type defs x)) (g:=normalize_type defs); auto.
-    exact TYPE_Void.
-    intros x H2. rewrite H1; auto.
-    intros id0 Hinids; pose proof Hguard_all _ Hinids as Hguard'. inversion Hguard'; auto.
+  symmetry; rewrite normalize_type_equation; simpl.
+  solve_match_find.
 Qed.
 
 
@@ -1189,7 +1200,7 @@ Proof.
   eauto using wf_typ_is_guarded_wf_typ, guarded_normalize_same.
 Qed.
 
-
+  
 Theorem double_normalize_type :
   forall env t,
     wf_env env ->
@@ -1197,48 +1208,13 @@ Theorem double_normalize_type :
     normalize_type env (normalize_type env t) = normalize_type env t.
 Proof.
   intros env t [Hdup Henv] Hwf.
-  induction Hwf; try solve [rewrite normalize_type_equation; symmetry; rewrite normalize_type_equation; simpl; auto].
-  4 : {
-        simpl.
+  induction Hwf;
+    try solve [rewrite normalize_type_equation; symmetry; rewrite normalize_type_equation;
+               simpl; auto;
+               try rewrite IHHwf; auto; try solve_guard; solve_map_in].
 
-        symmetry.
-        rewrite normalize_type_equation. simpl.
-
-        destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) defs) as [[i t] |] eqn:Hfind.
-        - 
-          apply find_some in Hfind as [Hin Heq].
-          simpl in *. destruct (Ident.eq_dec id i); inversion Heq; subst.
-
-          replace (remove_key _ i defs) with (remove_keys Ident.eq_dec [i] defs) by auto.
-
-
-          rewrite guarded_id_normalize_same; auto using wf_typ_is_guarded_wf_typ.
-          + symmetry. apply H2; auto.
-          + intros id H3.
-            inversion H3; subst; try contradiction; auto.
-        - rewrite normalize_type_equation. simpl. rewrite Hfind.
-          reflexivity.
-        }
-
-        - rewrite normalize_type_equation. symmetry. rewrite normalize_type_equation.
-          simpl. rewrite double_map_In.
-          rewrite IHHwf; auto.
-          symmetry.
-          rewrite map_rewrite with (g:=normalize_type defs) at 1; auto.
-        - rewrite normalize_type_equation. symmetry. rewrite normalize_type_equation.
-          simpl. rewrite IHHwf; auto.
-        - rewrite normalize_type_equation. symmetry. rewrite normalize_type_equation.
-          simpl. rewrite IHHwf; auto.
-        - rewrite normalize_type_equation. symmetry. rewrite normalize_type_equation.
-          simpl. rewrite double_map_In.
-          symmetry.
-          rewrite map_rewrite with (g:=normalize_type defs) at 1; auto.
-          exact TYPE_Void.
-        - rewrite normalize_type_equation. symmetry. rewrite normalize_type_equation.
-          simpl. rewrite double_map_In.
-          symmetry.
-          rewrite map_rewrite with (g:=normalize_type defs) at 1; auto.
-          exact TYPE_Void.
+  symmetry; rewrite normalize_type_equation; simpl.
+  solve_match_find.
 Qed.
 
 
@@ -1251,60 +1227,36 @@ Theorem guarded_normalize_type_unrolls:
         unrolled_typ (normalize_type env t)).
 Proof.
   intros env t Hdup Hwf ids Hguard_all.
-  induction Hwf; rewrite normalize_type_equation; simpl; auto.
-  - constructor.
-    + apply IHHwf; auto.
-      intros id H3.
-      pose proof Hguard_all _ H3 as Hguard'. inversion Hguard'; auto.
-    + rewrite Forall_forall. intros x H3.
-      apply in_map_in in H3 as [t [Hin Hnorm]].
-      rewrite <- Hnorm.
-      apply H2; auto.
-      intros id H3.
-      pose proof Hguard_all _ H3 as Hguard'. inversion Hguard'; auto.
-  - constructor. apply IHHwf; auto.
-    intros id H1.
-    pose proof Hguard_all _ H1 as Hguard'. inversion Hguard'; auto.
+  induction Hwf; rewrite normalize_type_equation; simpl; auto;
+    try constructor;
+    try (apply IHHwf; auto; solve_guard);
+    try (rewrite Forall_forall; intros;
+         match goal with
+         | [ H: In ?x (map_In _ _) |- _ ] =>  apply in_map_in in H as [t [Hin Hnorm]]
+         end;
+
+         rewrite <- Hnorm;
+
+         match goal with
+         | [ H: _ |- _ ] => apply H
+         end; auto; solve_guard).
   - destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) defs) as [[i t] |] eqn:Hfind.
     + pose proof Hfind as Hfind'.
       apply find_some in Hfind' as [Hin Heq].
       simpl in *. destruct (Ident.eq_dec id i) as [He | He]; inversion Heq.
 
       rewrite He.
-      replace (remove_key _ i defs) with (remove_keys Ident.eq_dec [i] defs) by auto.
-      rewrite guarded_id_normalize_same; auto.
-      * apply H2; auto. subst; auto.
-        intros id0 H3.
-        pose proof Hguard_all _ H3 as Hguard'; inversion Hguard'; auto.
-        -- rewrite Hfind in H6. inversion H6; subst; auto.
-        -- rewrite Hfind in H8. inversion H8.
-      * subst; try contradiction; auto.
-      * intros id0 H3.
-        inversion H3; subst.
-        -- apply H0; auto.
-        -- inversion H4.
+      simpl_remove_keys.
+      rewrite guarded_id_normalize_same; auto;
+        try match goal with
+            | [ H: _ |- _ ] => apply H
+            end;
+        subst; auto; solve_guard.
     + destruct H as [t Hin].
       eapply find_none in Hfind; eauto.
       simpl in Hfind. destruct (Ident.eq_dec id id).
       inversion Hfind. contradiction.
-  - constructor.
-    rewrite Forall_forall.
-    intros x H2.
-    apply in_map_in in H2 as [t [Hin Hnorm]].
-    rewrite <- Hnorm.
-    apply H1; auto.
-    intros id H2.
-    pose proof Hguard_all _ H2 as Hguard'. inversion Hguard'; auto.
-  - constructor.
-    rewrite Forall_forall.
-    intros x H2.
-    apply in_map_in in H2 as [t [Hin Hnorm]].
-    rewrite <- Hnorm.
-    apply H1; auto.
-    intros id H2.
-    pose proof Hguard_all _ H2 as Hguard'. inversion Hguard'; auto.
 Qed.
-
 
 
 Theorem normalize_type_unrolls:
@@ -1314,38 +1266,29 @@ Theorem normalize_type_unrolls:
     unrolled_typ (normalize_type env t).
 Proof.
   intros env t [Hdup Henv] Hwf.
-  induction Hwf; rewrite normalize_type_equation; simpl; auto.
-  - constructor.
-    + apply IHHwf; auto.
-    + rewrite Forall_forall. intros x H3.
-      apply in_map_in in H3 as [t [Hin Hnorm]].
-      rewrite <- Hnorm.
-      apply H2; auto.
+  induction Hwf; rewrite normalize_type_equation; simpl; auto;
+    try constructor;
+    try (apply IHHwf; auto);
+    try (rewrite Forall_forall; intros;
+         match goal with
+         | [ H: In ?x (map_In _ _) |- _ ] =>  apply in_map_in in H as [t [Hin Hnorm]]
+         end;
+
+         rewrite <- Hnorm;
+
+         match goal with
+         | [ H: _ |- _ ] => apply H
+         end; auto; solve_guard).
   - destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) defs) as [[i t] |] eqn:Hfind.
     +
       apply find_some in Hfind as [Hin Heq].
       simpl in *. destruct (Ident.eq_dec id i); inversion Heq; subst.
 
-      replace (remove_key _ i defs) with (remove_keys Ident.eq_dec [i] defs) by auto.
+      simpl_remove_keys.
 
-
-      rewrite guarded_id_normalize_same; auto using wf_typ_is_guarded_wf_typ.
-      intros id H3.
-      inversion H3; subst; try contradiction; auto.
+      rewrite guarded_id_normalize_same; auto using wf_typ_is_guarded_wf_typ; solve_guard.
     + destruct H as [t Hin].
       eapply find_none in Hfind; eauto.
       simpl in Hfind. destruct (Ident.eq_dec id id).
       inversion Hfind. contradiction.
-  - constructor.
-    rewrite Forall_forall.
-    intros x H2.
-    apply in_map_in in H2 as [t [Hin Hnorm]].
-    rewrite <- Hnorm.
-    apply H1; auto.
-  - constructor.
-    rewrite Forall_forall.
-    intros x H2.
-    apply in_map_in in H2 as [t [Hin Hnorm]].
-    rewrite <- Hnorm.
-    apply H1; auto.
 Qed.
