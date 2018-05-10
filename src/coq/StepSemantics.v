@@ -462,7 +462,7 @@ Definition step (s:state) : Trace result :=
   | Term (TERM_Invoke _ _ _ _) => raise_p pc "Unsupport LLVM terminator" 
 
   | Inst insn =>  (* instruction *)
-    do pc_next <- trywith "no fallthrough intsruction" (incr_pc CFG pc);
+    do pc_next <- trywith "no fallthrough instruction" (incr_pc CFG pc);
     match (pt pc), insn  with
 
       | IId id, INSTR_Op op =>
@@ -516,7 +516,7 @@ Definition step (s:state) : Trace result :=
       | _, INSTR_AtomicCmpXchg 
       | _, INSTR_AtomicRMW
       | _, INSTR_VAArg 
-      | _, INSTR_LandingPad => raise_p pc "Unsupported LLVM intsruction" 
+      | _, INSTR_LandingPad => raise_p pc "Unsupported LLVM instruction"
 
       (* Error states *)                                     
       | _, _ => raise_p pc "ID / Instr mismatch void/non-void"
