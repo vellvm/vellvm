@@ -15,6 +15,7 @@ University of Pennsylvania as part of the DeepSpec project.
  - William Mansky
  - Christine Rizkallah
  - Yannick Zakowski
+ - Calvin Beck
  - Olek Gierczak
  - Emmett Neyman
  - Robert Zajac

@@ -277,14 +277,6 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
   | PtoI a => inl (PtoI a) (* TODO: ItoP semantics *)                     
                        
   | Call t f args  => inl (Call t f args)
-
-                         
-  (* | DeclareFun f => *)
-  (*   (* TODO: should check for re-declarations and maintain that state in the memory *) *)
-  (*   (* TODO: what should be the "size" of the block associated with a function? *) *)
-  (*   let new_block := make_empty_block DTYPE_Pointer in *)
-  (*   inr  (add (size m) new_block m, *)
-  (*         DVALUE_Addr (size m, 0)) *)
   end.
 
 (*
@@ -302,54 +294,6 @@ CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
   | Trace.Ret x => d
   | Trace.Err x => d
   end.
+
 End Make.
 
-(*
-Definition run_with_memory prog : option (Trace dvalue) :=
-  let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
-  match CFG.mcfg_of_modul scfg with
-  | None => None
-  | Some mcfg =>
-    mret
-      (memD empty
-      ('s <- SS.init_state mcfg "main";
-         SS.step_sem mcfg (SS.Step s)))
-  end.
-*)
-
-(*
-Fixpoint MemDFin (m:memory) (d:Trace ()) (steps:nat) : option memory :=
-  match steps with
-  | O => None
-  | S x =>
-    match d with
-    | Vis (Fin d) => Some m
-    | Vis (Err s) => None
-    | Tau _ d' => MemDFin m d' x
-    | Vis (Eff e)  =>
-      match mem_step e m with
-      | inr (m', v, k) => MemDFin m' (k v) x
-      | inl _ => None
-      end
-    end
-  end%N.
-*)
-
-(*
-Previous bug: 
-Fixpoint MemDFin {A} (memory:mtype) (d:Obs A) (steps:nat) : option mtype :=
-  match steps with
-  | O => None
-  | S x =>
-    match d with
-    | Ret a => None
-    | Fin d => Some memory
-    | Err s => None
-    | Tau d' => MemDFin memory d' x
-    | Eff (Alloca t k)  => MemDFin (memory ++ [undef])%list (k (DVALUE_Addr (pred (List.length memory)))) x
-    | Eff (Load a k)    => MemDFin memory (k (nth_default undef memory a)) x
-    | Eff (Store a v k) => MemDFin (replace memory a v) k x
-    | Eff (Call d ds k)    => None
-    end
-  end%N.
-*)

@@ -619,12 +619,41 @@ Section PROOFS.
     destruct (eval_icmp icmp v1 v2); reflexivity.
   Qed.
 
+  
+  Lemma swap_raise {X} `{SX: Swap X} : forall s : string, (raise s : Trace X) = swap id1 id2 (raise s).
+  Proof.
+    intros s.
+    unfold_swaps.
+    symmetry.
+    rewrite Trace.matchM. simpl. reflexivity.
+  Qed.    
+  Hint Resolve swap_raise.
+  
+  Lemma swap_ret {X} `{SX: Swap X} : forall x, Trace.Ret (swap id1 id2 x) = swap id1 id2 (Trace.Ret x).
+  Proof.
+    intro x.
+    symmetry.
+    rewrite Trace.matchM. simpl. reflexivity.
+  Qed.
+  Hint Resolve swap_ret.
+  
   Lemma swap_eval_exp : forall CFG g e top o,
       eval_exp (swap id1 id2 CFG) (swap id1 id2 g) (swap id1 id2 e) (swap id1 id2 top) (swap id1 id2 o) =
       swap id1 id2 (eval_exp CFG g e top o).
   Proof.
     intros CFG g e top.
     induction o; simpl.
+    - rewrite swap_lookup_id.
+      destruct (lookup_id g e id); simpl; auto.
+    - destruct top. destruct d; simpl; unfold failwith; auto.
+      symmetry. rewrite Trace.matchM. simpl.
+      destruct (coerce_integer_to_int sz x); reflexivity. 
+      simpl. unfold failwith. auto.
+    - destruct top. destruct d; simpl; unfold failwith; auto.
+      
+
+      
+    
   Admitted.
 
   
