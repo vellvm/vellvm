@@ -10,7 +10,6 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Definition oracle (x:unit) : Z := 0.
 
 Module A : Vellvm.LLVMIO.ADDR with Definition addr := (Z * Z) % type.
   Definition addr := (Z * Z) % type.
@@ -69,6 +68,20 @@ Inductive SByte :=
 Definition mem_block := IntMap SByte.
 Definition memory := IntMap mem_block.
 Definition undef t := DVALUE_Undef t None. (* TODO: should this be an empty block? *)
+
+Fixpoint max_default (l:list Z) (x:Z) :=
+  match l with
+  | [] => x
+  | h :: tl =>
+    max_default tl (if h >? x then h else x)
+  end.
+
+Definition oracle (m:memory) : Z :=
+  let keys := map fst (IM.elements m) in
+  let max := max_default keys 0 in
+  let offset := 1 in (* TODO: This should be "random" *)
+  max + offset.
+
 
 (* Computes the byte size of this type. *)
 Fixpoint sizeof_typ (ty:typ) : Z :=
@@ -270,7 +283,6 @@ Definition init_block (n:Z) : mem_block :=
 Definition make_empty_block (ty:typ) : mem_block :=
   init_block (sizeof_typ ty).
 
-Print typ.
 
 Fixpoint handle_gep_h (t:typ) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
   match vs with
@@ -305,13 +317,12 @@ Fixpoint handle_gep_h (t:typ) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (m
   | [] => mret (m, DVALUE_Addr (b, off))
   end.
 
-Print IM.
 
 Definition concretize_block (b:Z) (m:memory) : Z * memory :=
   match lookup b m with
   | None =>(b, m)
   | Some block =>
-    let i := oracle () in
+    let i := oracle m in
     let fix loop es k block : mem_block :=
         match es with
         | [] => block
@@ -340,10 +351,8 @@ Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
   match e with
   | Alloca t =>
     let new_block := make_empty_block t in
-    mret (
-    inr  (add (size m + 1) new_block m,
-          DVALUE_Addr (size m + 1, 0))
-    )
+    mret (inr (add (size m) new_block m,
+               DVALUE_Addr (size m, 0)))
          
   | Load t dv => mret
     match dv with
