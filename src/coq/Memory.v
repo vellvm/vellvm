@@ -342,7 +342,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
     let new_block := make_empty_block t in
     mret (
     inr  (add (size m + 1) new_block m,
-          DVALUE_Addr (size m, 0))
+          DVALUE_Addr (size m + 1, 0))
     )
          
   | Load t dv => mret
