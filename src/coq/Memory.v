@@ -334,7 +334,7 @@ Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (
 
 Definition concretize_block (b:Z) (m:memory) : Z * memory :=
   match lookup b m with
-  | None =>(b, m)
+  | None => (b, m)
   | Some block =>
     let i := oracle m in
     let fix loop es k block : mem_block :=
@@ -347,18 +347,14 @@ Definition concretize_block (b:Z) (m:memory) : Z * memory :=
   end.
 
 Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
-  match t with
-  | DTYPE_Pointer =>
-    match vs with
-    | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 indices *)
-      match dv with
-      | DVALUE_Addr (b, o) =>
-        handle_gep_h t b (o + (sizeof_dtyp t) * (Int32.unsigned i)) vs' m
-      | _ => raise "non-address" 
-      end
-    | _ => raise "non-I32 index"
+  match vs with
+  | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 indices *)
+    match dv with
+    | DVALUE_Addr (b, o) =>
+      handle_gep_h t b (o + (sizeof_dtyp t) * (Int32.unsigned i)) vs' m
+    | _ => raise "non-address" 
     end
-  | _ => raise "non-pointer type to GEP"
+  | _ => raise "non-I32 index"
   end.
 
 Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
