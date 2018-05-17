@@ -93,8 +93,15 @@ Definition mapM {E X Y} (f:X -> Y) (s: M E X) : M E Y :=
 Instance functor_M {E} : Functor (M E) := (@mapM E).
 Instance monad_M {E} : (@Monad (M E)) (@mapM E) := { mret X x := Ret x; mbind := @bindM E }.
 
+(* Properties of Traces ----------------------------------------------------- *)
 
-
+CoInductive equiv {E X} : M E X -> M E X -> Prop :=
+| equiv_Ret : forall x, equiv (Ret x) (Ret x)
+| equiv_Vis : forall {Y} e k1 k2, (forall (v:Y), equiv (k1 v) (k2 v)) -> equiv (Vis e k1) (Vis e k2)
+| equiv_Tau : forall k1 k2, equiv k1 k2 -> equiv (Tau k1) (Tau k2)
+| equiv_Err : forall s1 s2, equiv (Err s1) (Err s2)
+.
+                             
 (* Properties of Traces ----------------------------------------------------- *)
 
 Module MonadVerif.
@@ -142,13 +149,13 @@ CoInductive EquivUpToTau E X :
     UnTau t t' ->
     EquivUpToTau s t' ->
     EquivUpToTau s (Tau t)
-| EquivErr : forall s, EquivUpToTau (Err s) (Err s)
+| EquivErr : forall s1 s2, EquivUpToTau (Err s1) (Err s2)
 .
 
 Lemma eutt_refl : forall E X (s : M E X),
     EquivUpToTau s s.
 Proof.
-  cofix.
+  cofix eutt_refl.
   intros.
   destruct s; constructor;
     intros;
@@ -158,7 +165,7 @@ Qed.
 Lemma eutt_sym : forall E X (s t : M E X),
     EquivUpToTau s t -> EquivUpToTau t s.
 Proof.
-  cofix.
+  cofix eutt_sym.
   intros.
   destruct H; try constructor.
   - intro y. apply eutt_sym. apply H.
@@ -233,7 +240,7 @@ Lemma eutt_tau_2 : forall E X (s s' t t' : M E X),
     UnTau s s' -> UnTau t t' -> EquivUpToTau s' t' ->
     EquivUpToTau s t.
 Proof.
-  cofix.
+  cofix eutt_tau_2.
   intros E X s s' t t' Hs Ht H.
   destruct Hs, Ht.
   - constructor.
@@ -273,7 +280,7 @@ Qed.
 Lemma eutt_untau_trans : forall E X (s s' t : M E X),
     UnTau s s' -> EquivUpToTau s' t -> EquivUpToTau s t.
 Proof.
-  cofix.
+  cofix eutt_untau_trans.
   intros E X s s' t H I.
   destruct H.
   { inversion I; subst.
@@ -315,10 +322,19 @@ Lemma vis_inj :
 Proof.
 Admitted.
 
+Lemma eutt_err_t : forall E X s1 s2 (t : M E X) , EquivUpToTau (Err s1) t -> EquivUpToTau (Err s2) t.
+Proof.  
+  cofix eutt_err_t.
+  intros E X s1 s2 t H.
+  inversion H. subst.
+  econstructor; auto. apply H1. eapply eutt_err_t. apply H2.
+  econstructor.
+Qed.  
+
 Lemma eutt_trans : forall E X (s t u : M E X),
     EquivUpToTau s t -> EquivUpToTau t u -> EquivUpToTau s u.
 Proof.
-  cofix.
+  cofix eutt_trans.
   intros E X s t u H1 H2.
 
   destruct H1 as [ | ? e1 ks kt | | | | ];
@@ -394,7 +410,7 @@ Proof.
   - subst. eapply EquivTauLeft.
     + intros t' I; inversion I.
     + eassumption.
-    + assumption.
+    + eapply eutt_trans. apply H1. apply H2.
 
       
   - (* ~Tau, Tau, Tau *)
@@ -426,6 +442,7 @@ Proof.
       * apply inj_pair2 with (P := fun Y => Y -> M E X); auto.
       * apply inj_pair2 with (P := E); auto.
     + exfalso. eapply untau_notau. eassumption.
+    + constructor.
 
   - (* ~Tau, Tau & ~Tau, Tau *)
     dispatch_contra.
@@ -433,7 +450,7 @@ Proof.
   - subst. econstructor.
     + intros u I; inversion I.
     + eassumption.
-    + assumption.
+    + eapply eutt_err_t. apply H1.
 
   - econstructor.
 Qed.

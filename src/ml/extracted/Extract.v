@@ -1,6 +1,6 @@
-Require Vellvm.LLVMAst.
+Require Vellvm.TopLevel.
 Require Vellvm.Transform.
-Require Vellvm.Memory.
+
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
@@ -43,5 +43,5 @@ Set Extraction AccessOpaque.
 Cd "ml/extracted".
 
 Extraction Library ExtrOcamlIntConv.
-Recursive Extraction Library Memory.
+Recursive Extraction Library TopLevel.
 Extraction Library Transform.

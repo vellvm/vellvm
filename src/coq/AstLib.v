@@ -16,7 +16,7 @@ Require Import Equalities OrderedType OrderedTypeEx Compare_dec.
 Import ListNotations.
 
 (* Equalities --------------------------------------------------------------- *)
-Instance eq_dec_int : eq_dec int := Z_eq_dec.
+Instance eq_dec_int : eq_dec int := Z.eq_dec.
 
 Require Import Ascii.
 

@@ -11,8 +11,8 @@
 ;; open Platform
 ;; open Driver
 ;; open Assert
-;; open Memory
-;; open LLVMBaseTypes
+;; open TopLevel
+;; open DynamicValues
 
 (* Vellvm test cases -------------------------------------------------------- *)
 
@@ -58,7 +58,7 @@ let pp_test_of_dir dir =
   Test ("Parsing files in: " ^ dir,
         List.map (fun f -> (f, fun () -> parse_pp_test f)) (files_of_dir dir))
 
-let run_dvalue_test (test:SS.DV.dvalue -> bool) path =
+let run_dvalue_test (test:IO.DV.dvalue -> bool) path =
   if not (test (run_ll_file path)) then failwith (path ^ " test failed"); ()
 
 let poison_tests =
@@ -134,25 +134,25 @@ let test_dirs =
    "../tests/llvm-arith/i64/"]
 
 let poison_test = function
-  | SS.DV.DVALUE_Poison -> true
+  | IO.DV.DVALUE_Poison -> true
   | _ -> false
 
 let undef_test = function
-  | SS.DV.DVALUE_Undef (t, x) -> true
+  | IO.DV.DVALUE_Undef -> true
   | _ -> false
 
 let i1_test (i1:int1) = function
-  | SS.DV.DVALUE_I1 i2 ->
+  | IO.DV.DVALUE_I1 i2 ->
      Int1.eq i1 i2
   | _ -> false
 
 let i32_test (i1:int32) = function
-  | SS.DV.DVALUE_I32 i2 ->
+  | IO.DV.DVALUE_I32 i2 ->
      Int32.eq i1 i2
   | _ -> false
 
 let i64_test (i1:int64) = function
-  | SS.DV.DVALUE_I64 i2 ->
+  | IO.DV.DVALUE_I64 i2 ->
      Int64.eq i1 i2
   | _ -> false
 
