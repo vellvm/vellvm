@@ -25,6 +25,8 @@ CoInductive M (Event : Type -> Type) X :=
 | Tau (k: M Event X)
 | Err (s:String.string)
 .
+
+
 (** Note: One could imagine an alternative definition with an explicit
     Bind constructor (and a Prim constructor), but this might not be
     as nice / might not work at all -- this way makes productivity
@@ -95,13 +97,26 @@ Instance monad_M {E} : (@Monad (M E)) (@mapM E) := { mret X x := Ret x; mbind :=
 
 (* Properties of Traces ----------------------------------------------------- *)
 
-CoInductive equiv {E X} : M E X -> M E X -> Prop :=
-| equiv_Ret : forall x, equiv (Ret x) (Ret x)
-| equiv_Vis : forall {Y} e k1 k2, (forall (v:Y), equiv (k1 v) (k2 v)) -> equiv (Vis e k1) (Vis e k2)
-| equiv_Tau : forall k1 k2, equiv k1 k2 -> equiv (Tau k1) (Tau k2)
-| equiv_Err : forall s1 s2, equiv (Err s1) (Err s2)
+Inductive equiv_step {E X} (equiv: M E X -> M E X -> Prop) :  M E X -> M E X -> Prop :=
+| equiv_Ret : forall x, equiv_step equiv (Ret x) (Ret x)
+| equiv_Vis : forall {Y} e k1 k2, (forall (v:Y), equiv (k1 v) (k2 v))
+                             -> equiv_step equiv (Vis e k1) (Vis e k2)
+| equiv_Tau : forall k1 k2, equiv k1 k2 -> equiv_step equiv (Tau k1) (Tau k2)
+| equiv_Err : forall s1 s2, equiv_step equiv (Err s1) (Err s2)
 .
-                             
+Hint Constructors equiv_step.
+
+Lemma equiv_step_mono {E X} : monotone2 (@equiv_step E X).
+Proof.
+  unfold monotone2. intros x0 x1 r r' IN LE. 
+  induction IN; eauto.
+Qed.
+Hint Resolve equiv_step_mono : paco.
+
+Definition equiv {E X} (s t : M E X) := paco2 equiv_step bot2 s t .
+Hint Unfold equiv.
+
+
 (* Properties of Traces ----------------------------------------------------- *)
 
 Module MonadVerif.
@@ -129,49 +144,66 @@ Inductive UnTau E X : M E X -> M E X -> Prop :=
 | OneTau : forall s t, UnTau s t -> UnTau (Tau s) t
 | NoTau : forall s, (forall t, ~(Tau t = s)) -> UnTau s s.
 
-CoInductive EquivUpToTau E X :
-  M E X -> M E X -> Prop :=
-| EquivRet : forall x, EquivUpToTau (Ret x) (Ret x)
+
+Inductive eutt_step E X (eutt : M E X -> M E X -> Prop) : M E X -> M E X -> Prop :=
+| EquivRet : forall x, eutt_step eutt (Ret x) (Ret x)
 | EquivVis : forall Y (e : E Y) (k1 k2 : Y -> M E X),
-    (forall y, EquivUpToTau (k1 y) (k2 y)) ->
-    EquivUpToTau (Vis e k1) (Vis e k2)
+    (forall y, eutt (k1 y) (k2 y)) ->
+    eutt_step eutt (Vis e k1) (Vis e k2)
 (* Equality with spin is undecidable,
    but one can coinductively generate a proof with this. *)
 | EquivTau : forall s t,
-    EquivUpToTau s t -> EquivUpToTau (Tau s) (Tau t)
+    eutt s t -> eutt_step eutt (Tau s) (Tau t)
 | EquivTauLeft : forall s s' t,
     (forall t', ~(Tau t' = t)) ->
     UnTau s s' ->
-    EquivUpToTau s' t ->
-    EquivUpToTau (Tau s) t
+    eutt s' t ->
+    eutt_step eutt (Tau s) t
 | EquivTauRight : forall s t t',
     (forall s', ~(Tau s' = s)) ->
     UnTau t t' ->
-    EquivUpToTau s t' ->
-    EquivUpToTau s (Tau t)
-| EquivErr : forall s1 s2, EquivUpToTau (Err s1) (Err s2)
+    eutt s t' ->
+    eutt_step eutt s (Tau t)
+| EquivErr : forall s1 s2, eutt_step eutt (Err s1) (Err s2)
 .
+Hint Constructors eutt_step.
+
+Lemma eutt_step_mono {E X} : monotone2 (@eutt_step E X).
+Proof.
+  unfold monotone2. intros x0 x1 r r' IN LE. 
+  induction IN; eauto.
+Qed.
+Hint Resolve eutt_step_mono : paco.
+
+Definition EquivUpToTau {E X} (s t : M E X) := paco2 (@eutt_step E X) bot2 s t .
+Hint Unfold EquivUpToTau.
+
 
 Lemma eutt_refl : forall E X (s : M E X),
     EquivUpToTau s s.
 Proof.
-  cofix eutt_refl.
+  intros E X.
+  pcofix eutt_refl.
   intros.
-  destruct s; constructor;
-    intros;
-    apply eutt_refl.
+  pfold.
+  destruct s; auto.
 Qed.
 
 Lemma eutt_sym : forall E X (s t : M E X),
     EquivUpToTau s t -> EquivUpToTau t s.
 Proof.
-  cofix eutt_sym.
-  intros.
-  destruct H; try constructor.
-  - intro y. apply eutt_sym. apply H.
-  - apply eutt_sym. apply H.
-  - econstructor. assumption. eassumption. apply eutt_sym. assumption.
-  - econstructor. assumption. eassumption. apply eutt_sym. assumption.
+  intros E X.
+  pcofix eutt_sym.
+  intros s t H0. 
+  punfold H0. pfold.
+  dependent induction H0; auto.
+  - econstructor.
+    intros y.
+    assert (upaco2 (eutt_step (X:=X)) bot2 (k1 y) (k2 y)). apply H.
+    right. apply eutt_sym. pfold. destruct H0. punfold H0. inversion H0.
+  - econstructor. right. apply eutt_sym. pfold. destruct H. punfold H. inversion H.
+  - econstructor. assumption. eassumption. right. apply eutt_sym. destruct H1. punfold H1. inversion H1.
+  - econstructor. assumption. eassumption. right. apply eutt_sym. destruct H1. punfold H1. inversion H1.
 Qed.
 
 Lemma untau_notau : forall E X (s t : M E X), ~(UnTau s (Tau t)).
@@ -210,7 +242,7 @@ Proof.
   intros E X s s' t HUnTau.
   generalize dependent t.
   induction HUnTau as [ s s' HUnTau IH | s HNoTau ]; intros t H.
-  - inversion H as [ | | s1 t1 H1 | s1 s1' ? HtNoTau | | ].
+  - punfold H. inversion H as [ | | s1 t1 H1 | s1 s1' ? HtNoTau | | ]; pclearbot.
     + apply IH in H1; destruct H1 as [t' H1]; destruct H1.
       eexists; split.
       * constructor; eassumption.
@@ -221,11 +253,11 @@ Proof.
         -- assumption.
         -- eapply untau_inj; eassumption.
     + dispatch_contra.
-  - inversion H; subst.
-    + eexists; split; constructor; assumption.
-    + eexists; split; constructor.
+  - punfold H. inversion H; pclearbot; subst.
+    + eexists; split. constructor. assumption. pfold. constructor.
+    + eexists; split. constructor. 
       * intros t I. inversion I.
-      * assumption.
+      * pfold. assumption.
     + dispatch_contra.
     + dispatch_contra.
     + eexists; split.
@@ -233,24 +265,40 @@ Proof.
       * assumption.
     + eexists; split.
       * constructor. intros. unfold not. intros. inversion H0.
-      * assumption.
+      * pfold. assumption.
 Qed.
+
+Ltac eutt_mono :=
+  repeat
+    match goal with
+    | [ H : EquivUpToTau ?T1 ?T2, r : M ?E ?X -> M ?E ?X -> Prop |- upaco2 _ ?r ?T1 ?T2] =>
+      left
+    | [ H : EquivUpToTau ?T1 ?T2, r : M ?E ?X -> M ?E ?X -> Prop |- paco2 _ ?r ?T1 ?T2] =>
+      pfold
+    | [ H : EquivUpToTau ?T1 ?T2, r : M ?E ?X -> M ?E ?X -> Prop |- eutt_step _ ?T1 ?T2] =>
+      punfold H
+    | [ H : eutt_step (upaco2 _ bot2) ?T1 ?T2, r : M ?E ?X -> M ?E ?X -> Prop |- eutt_step _ ?T1 ?T2] =>
+      eapply eutt_step_mono; [eauto | intros]
+    | [ PR : upaco2 ?R bot2 ?X0 ?X1 |- _ ] => pclearbot
+    | [ PR : paco2 ?R bot2 ?X0 ?X1 |- upaco2 ?R ?r ?X0 ?X1 ] => left; eapply paco2_mon; eauto; intros; contradiction
+    | [ PR : paco2 ?R bot2 ?X0 ?X1 |- paco2 ?R ?r ?X0 ?X1 ] => eapply paco2_mon; eauto; intros; contradiction
+    | [ PR : paco2 ?R bot2 ?X0 ?X1 |- EquivUpToTau ?X0 ?X1 ] => eapply paco2_mon; eauto; intros; contradiction
+    end.
+
 
 Lemma eutt_tau_2 : forall E X (s s' t t' : M E X),
     UnTau s s' -> UnTau t t' -> EquivUpToTau s' t' ->
     EquivUpToTau s t.
 Proof.
-  cofix eutt_tau_2.
-  intros E X s s' t t' Hs Ht H.
-  destruct Hs, Ht.
-  - constructor.
-    eapply eutt_tau_2; eassumption.
-  - econstructor; eassumption.
-  - econstructor; eassumption.
-  - destruct H;
-      try (constructor; assumption);
-      dispatch_contra.
-Qed.
+  intros E X.
+  pcofix eutt_tau_2.
+  intros s s' t t' Hs Ht H.
+  destruct Hs, Ht; pfold.
+  - constructor. right. eauto.
+  - econstructor. eassumption. eassumption. eutt_mono.
+  - econstructor. eassumption. eassumption. eutt_mono.
+  - eutt_mono. 
+Qed.    
 
 Lemma eutt_untau_2 : forall E X (s s' t t' : M E X),
     UnTau s s' -> UnTau t t' -> EquivUpToTau s t ->
@@ -260,95 +308,82 @@ Proof.
   generalize dependent t'.
   generalize dependent t.
   induction Hs as [ s s' | s He ].
-  - intros t t' Ht H. inversion H; subst; inversion Ht; subst; try dispatch_contra.
-    + eapply IHHs. eassumption. assumption.
-    + replace s'0 with s' in *. assumption.
+  - intros t t' Ht H.
+    inversion Ht; subst; punfold H; inversion H; subst; try dispatch_contra.
+    + eapply IHHs. eassumption. eutt_mono.
+    + replace s'0 with s' in *. eutt_mono. 
       eapply untau_inj; eassumption.
   - intros t t' Ht H.
-    destruct H;
-      inversion Ht;
-      subst;
-      try dispatch_contra.
-    + constructor.
-    + constructor; assumption.
+    inversion Ht; subst; punfold H; inversion H; subst; try dispatch_contra.
     + replace t'0 with t' in *.
-      * assumption.
+      * eutt_mono.
       * eapply untau_inj; eassumption.
-    + constructor.
 Qed.
 
 Lemma eutt_untau_trans : forall E X (s s' t : M E X),
     UnTau s s' -> EquivUpToTau s' t -> EquivUpToTau s t.
 Proof.
-  cofix eutt_untau_trans.
-  intros E X s s' t H I.
+  intros E X.
+  pcofix eutt_untau_trans.
+  intros s s' t H I.
   destruct H.
-  { inversion I; subst.
-    - econstructor.
-      + intros t' J; inversion J.
-      + eassumption.
-      + assumption.
-    - econstructor.
-      + intros t' J; inversion J.
-      + eassumption.
-      + assumption.
-    - exfalso.
-      apply (untau_notau H).
-    - econstructor.
-      + assumption.
-      + eassumption.
-      + assumption.
-    - constructor.
-      eapply eutt_untau_trans.
-      + eassumption.
-      + eapply eutt_tau_2.
-        * eapply untau_untau. eassumption.
-        * eassumption.
-        * assumption.
-    - econstructor.
-      + intros t' J; inversion J.
-      + eassumption.
-      + assumption.
-  }
-  assumption.
-Qed.
-
-Import Logic.ProofIrrelevance.
+  * pfold. punfold I; inversion I; subst.
+  - econstructor; eauto. 
+  - econstructor; eauto. left. pfold.  eutt_mono.
+  - exfalso. apply (untau_notau H).
+  - econstructor; eauto. left. pfold. eutt_mono.
+  - constructor. right. eapply eutt_untau_trans.
+    + eassumption.
+    + eapply eutt_tau_2.
+      -- eapply untau_untau. eassumption.
+      -- eassumption.
+      -- eutt_mono.
+  - econstructor; eauto.
+  * eutt_mono.
+Qed.      
 
 Lemma vis_inj :
   forall E X Y (e e' : E Y)
          (k : Y -> M E X) (k' : Y -> M E X),
     Vis e k = Vis e' k' -> e = e'.
 Proof.
-Admitted.
+  intros E X Y e e' k k' H.
+  inversion H.
+  apply inj_pair2 with (P := (fun Y : Type => E Y)).
+  apply H1.
+Qed.
 
 Lemma eutt_err_t : forall E X s1 s2 (t : M E X) , EquivUpToTau (Err s1) t -> EquivUpToTau (Err s2) t.
-Proof.  
-  cofix eutt_err_t.
-  intros E X s1 s2 t H.
-  inversion H. subst.
-  econstructor; auto. apply H1. eapply eutt_err_t. apply H2.
-  econstructor.
+Proof.
+  intros E X.
+  pcofix eutt_err_t.
+  intros s1 s2 t H.
+  punfold H. inversion H; subst.
+  - pfold.  econstructor; eauto. right. apply eutt_err_t with (s1:=s1). eutt_mono.
+  - pfold.  econstructor; eauto. 
 Qed.  
 
 Lemma eutt_trans : forall E X (s t u : M E X),
     EquivUpToTau s t -> EquivUpToTau t u -> EquivUpToTau s u.
 Proof.
-  cofix eutt_trans.
-  intros E X s t u H1 H2.
+  intros E X.
+  pcofix eutt_trans.
+  intros s t u H1 H2.
 
+  punfold H1. punfold H2.
   destruct H1 as [ | ? e1 ks kt | | | | ];
-    inversion H2 as [ | ? e2 kt' ku | | t2 t2' u2 | | ].
+    inversion H2 as [ | ? e2 kt' ku | | t2 t2' u2 | | ]; pfold.
   - (* Ret, Ret, Ret *) constructor.
-  - (* Ret, Ret, Tau *) econstructor; try eassumption.
+  - (* Ret, Ret, Tau *) econstructor; try eauto. eutt_mono.
   - (* Vis, Vis, Vis *)
     (* induction Hk as [? Hk] using eq_sigT_rect. *) replace e2 with e1.
     + constructor.
       intro y.
-      eapply eutt_trans.
-      * auto.
+      right.
+      eapply eutt_trans. 
+      * specialize H with (y:=y). pclearbot. eauto.
       * replace kt with kt'.
-        -- auto.
+        -- specialize H0 with (y:=y). pclearbot. eauto.
         -- apply inj_pair2 with (P := fun Y => Y -> M E X).
            auto.
     + symmetry. apply inj_pair2 with (P := E). auto.
@@ -356,25 +391,25 @@ Proof.
   - (* Vis, Vis, Tau *) econstructor.
     + intros ? I. inversion I.
     + eassumption.
-    + eapply eutt_trans.
-      * constructor. eassumption.
-      * assumption.
+    + right. eapply eutt_trans.
+      * pclearbot. eauto. 
+      * pclearbot. assumption.
 
   - (* Tau, Tau, Tau *) econstructor.
-    eapply eutt_trans; try eassumption.
+    right. eapply eutt_trans; pclearbot; try eassumption.
 
   - (* Tau, Tau, ~Tau *)
     assert (I : exists s', UnTau s s' /\ EquivUpToTau t2' s').
     { apply eutt_untau with (s := t) (s' := t2').
       * assumption.
-      * apply eutt_sym. assumption. }
+      * apply eutt_sym. pclearbot. assumption. }
     destruct I as [s' [I1 I2]].
     econstructor.
     + assumption.
     + eassumption.
-    + eapply eutt_trans.
+    + right. eapply eutt_trans.
       * eapply eutt_sym; apply I2.
-      * assumption.
+      * pclearbot. assumption.
 
   - (* Tau, Tau & ~Tau, Tau *)
     dispatch_contra.
@@ -383,13 +418,13 @@ Proof.
     subst. eapply EquivTauLeft.
     * intros t' I; inversion I.
     * eassumption.
-    * assumption.
+    * left. eutt_mono.
 
   - (* Tau, Vis, Vis *)
     subst. eapply EquivTauLeft.
     * intros t' I; inversion I.
     * eassumption.
-    * eapply eutt_trans; eassumption.
+    * right. eapply eutt_trans. pclearbot. eauto. pfold. assumption.
 
   - (* Tau, ~Tau & Tau, Tau *)
     dispatch_contra.
@@ -398,47 +433,54 @@ Proof.
 
   - (* Tau, ~Tau, Tau *)
     constructor.
+    right.
     eapply eutt_trans.
     + eapply eutt_untau_trans.
       * eassumption.
-      * eassumption.
+      * pclearbot. eassumption.
     + eapply eutt_sym.
-      eapply eutt_untau_trans. eassumption.
-      eapply eutt_sym.
-      assumption.
+      eapply eutt_untau_trans.
+      * eassumption.
+      * eapply eutt_sym. pclearbot. assumption.
 
   - subst. eapply EquivTauLeft.
     + intros t' I; inversion I.
     + eassumption.
-    + eapply eutt_trans. apply H1. apply H2.
+    + right. eapply eutt_trans. pclearbot. apply H1. pfold. apply H2.
 
       
   - (* ~Tau, Tau, Tau *)
     assert (I : exists u', UnTau u u' /\ EquivUpToTau t' u').
-    { eapply eutt_untau. apply OneTau. eassumption. eassumption. }
+    { eapply eutt_untau. apply OneTau. eassumption.  pfold. assumption. }
     destruct I as [u' [I ?]].
     destruct I.
     + econstructor.
       * assumption.
       * inversion H5. eassumption.
-      * eapply eutt_trans; eassumption.
+      * right. eapply eutt_trans. pclearbot. eassumption. assumption.
     + dispatch_contra.
 
   - (* ~Tau, Tau, ~Tau *)
     assert (I : t' = t2').
     { eapply untau_inj; eassumption. }
     rewrite <- I in *.
+    pclearbot.
+    punfold H1.
+    punfold H5.
     inversion H1;
       inversion H5;
+      pclearbot;
       subst;
       try assumption;
       try dispatch_contra.
+    + eutt_mono.
     + inversion H12. subst.
       replace e0 with e.
       replace k0 with k2 in *.
       * constructor.
         intro y.
-        eapply eutt_trans; eauto.
+        right. specialize H8 with (y:=y). specialize H11 with (y:=y).
+        apply eutt_trans with (t:=(k2 y));  eutt_mono.
       * apply inj_pair2 with (P := fun Y => Y -> M E X); auto.
       * apply inj_pair2 with (P := E); auto.
     + exfalso. eapply untau_notau. eassumption.
@@ -450,7 +492,9 @@ Proof.
   - subst. econstructor.
     + intros u I; inversion I.
     + eassumption.
-    + eapply eutt_err_t. apply H1.
+    + assert (upaco2 (eutt_step (X:=X)) bot2 (Err s1) t') as H3.
+      left. eapply eutt_err_t. eutt_mono. apply H1.
+      left. pclearbot. eutt_mono.
 
   - econstructor.
 Qed.

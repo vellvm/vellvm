@@ -8,6 +8,7 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
+Require Import Program.
 Require Import ZArith Ascii Strings.String.
 Require Import Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG.
@@ -453,10 +454,17 @@ Hint Unfold swap_of_dvalue.
 Instance swap_of_IO {X} : Swap (IO X) := fun id1 id2 x => x.
 Hint Unfold swap_of_IO.
 
+(* HMMM::
+    - should the argument y to the continuation k itself somehow be swapped?
+      but then we don't know how to supply `{Swap Y}
+
+    - perhaps we are saved because (swap id1 id2 y) = y  for any y
+      that occurs in the LLVMIO interace 
+*)
 CoFixpoint swap_Trace X `{Swap X} (id1 id2:raw_id) (t:Trace X) : Trace X :=
   match t with
   | Trace.Ret x => Trace.Ret (swap id1 id2 x)
-  | Trace.Vis _ e k => Trace.Vis (swap id1 id2 e) (fun y => swap_Trace X id1 id2 (k y))
+  | Trace.Vis Y e k => Trace.Vis (swap id1 id2 e) (fun y => swap_Trace X id1 id2 (k y))
   | Trace.Tau k => Trace.Tau (swap_Trace X id1 id2 k)
   | Trace.Err s => Trace.Err s
   end.
@@ -636,22 +644,167 @@ Section PROOFS.
     rewrite Trace.matchM. simpl. reflexivity.
   Qed.
   Hint Resolve swap_ret.
+
+  Ltac eq_swaps :=
+    repeat match goal with
+           | [_ : _ |- Trace.Ret ?X = swap ?ID1 ?ID2 (Trace.Ret ?X) ] => rewrite <- swap_ret; unfold_swaps; auto
+           | [_ : _ |- failwith ?X = swap ?ID1 ?ID2 (failwith ?X) ] => unfold failwith; auto
+           | [_ : _ |- raise ?X = swap ?ID1 ?ID2 (raise ?X) ] => apply swap_raise
+           end.
+
+
+  Require Import paco.
+
+  Inductive TSS_step {X} `{Swap X} (tss : Trace X -> Trace X -> Prop) : Trace X  -> Trace X -> Prop :=
+  | TSSRet : forall x, TSS_step tss (Trace.Ret x) (Trace.Ret x)
+  | TSSVis : forall Y (e : IO Y) (k1 k2 : Y -> Trace X),
+      (forall y, tss (swap id1 id2 (k1 y)) (swap id1 id2 (k2 y)) /\ (k1 y ≡ k2 y)) ->
+      TSS_step tss (Trace.Vis e k1) (Trace.Vis e k2)
+  | TSSTau : forall s t,
+      tss s t -> TSS_step tss (Trace.Tau s) (Trace.Tau t)
+  | TSSErr : forall s1 s2, TSS_step tss (Trace.Err s1) (Trace.Err s2)
+  .
+                               
+  Hint Constructors TSS_step.
+
+  Lemma TSS_step_mono {X} `{Swap X}: monotone2 (@TSS_step X _).
+  Proof.
+    unfold monotone2. intros x0 x1 r r' IN LE. 
+    induction IN; eauto.
+    apply TSSVis. intros. split. apply LE. apply H0. apply H0.
+  Qed.
+  Hint Resolve TSS_step_mono : paco.
+
+  Definition TraceSwapStrong {X} `{Swap X} s t := paco2 TSS_step bot2 s t.
+  Hint Unfold TraceSwapStrong.
+
+  
+  
+  
+  (* CoInductive TraceSwapStrong {X} `{Swap X} : Trace X -> Trace X -> Prop := *)
+  (* | TSSRet : forall x, TraceSwapStrong (Trace.Ret x) (Trace.Ret x) *)
+  (* | TSSVis : forall Y (e : IO Y) (k1 k2 : Y -> Trace X), *)
+  (*     (forall y, TraceSwapStrong (swap id1 id2 (k1 y)) (swap id1 id2 (k2 y)) /\ (k1 y ≡ k2 y)) -> *)
+  (*     TraceSwapStrong (Trace.Vis e k1) (Trace.Vis e k2) *)
+  (* | TSSErr : forall s1 s2, TraceSwapStrong (Trace.Err s1) (Trace.Err s2) *)
+  (* . *)
+
+  Lemma TSS_swap_equiv X `{Swap X} : forall (x y: Trace X), TraceSwapStrong x y -> x ≡ y.
+  Proof.
+    cofix CH.
+    intros x y HT.
+    punfold HT.
+    inversion HT. 
+    - apply Trace.MonadVerif.EquivRet.
+    - apply Trace.MonadVerif.EquivVis.
+      intros y0.
+      apply H0.
+    - apply Trace.MonadVerif.EquivTau.
+      inversion H0. punfold H3.
+      
+    rewrite Trace.matchM.
+    apply Trace.MonadVerif.eutt_sym.
+    rewrite Trace.matchM.
+    apply Trace.MonadVerif.eutt_sym.
+    destruct x; inversion HT; subst.
+    - apply Trace.MonadVerif.EquivRet.
+    - assert (e1 = e).
+      apply inj_pair2 with (P := (fun (Y:Type) => IO Y)).
+      apply H2.
+      subst.
+      clear H2.
+      apply Trace.MonadVerif.EquivVis.
+      intros.
+      replace k with k0.
+      apply H4.
+      apply inj_pair2 with (P := (fun (Y:Type) => Y -> Trace.M IO X)).
+      apply H3.
+    - apply Trace.MonadVerif.EquivTau. apply CH. apply H1. 
+      
+    - inversion HT. subst. apply Trace.MonadVerif.EquivErr.
+  Qed.
+
+      
+
+  
+  Lemma swap_bindM {X} `{SX: Swap X} {Y} `{SY: Swap Y} :
+    forall (x:Trace X) (f: X -> Trace Y),
+      (forall z, f (swap id1 id2 z) = swap id1 id2 (f z)) ->
+      Trace.bindM (swap id1 id2 x) f ≡ swap id1 id2 (Trace.bindM x f).
+  Proof.
+    intros x f Hf.
+    rewrite Trace.matchM.
+    apply Trace.MonadVerif.eutt_sym.
+    rewrite Trace.matchM.
+    destruct x; simpl.
+    - simpl. apply Trace.MonadVerif.EquivTau. rewrite Hf. apply Trace.MonadVerif.eutt_refl.
+    - apply Trace.MonadVerif.EquivVis.
+      intros y.
+      destruct (k y).
+      + rewrite Trace.matchM. simpl. apply Trace.MonadVerif.eutt_sym. rewrite Trace.matchM.
+        simpl. rewrite Hf. apply Trace.MonadVerif.eutt_refl.
+      + 
+      
+      
+    symmetry.
+    rewrite Trace.matchM. simpl.
+    assert ((fun y : Y0 =>
+     swap_Trace Y id1 id2
+       ((cofix go (s : Trace.M IO X) : Trace.M IO Y :=
+           match s with
+           | Trace.Ret x => Trace.Tau (f x)
+           | @Trace.Vis _ _ Y1 e0 k0 => Trace.Vis e0 (fun y0 : Y1 => go (k0 y0))
+           | Trace.Tau k0 => Trace.Tau (go k0)
+           | Trace.Err s0 => Trace.Err (Event:=IO) (X:=Y) s0
+           end) (k y))) =
+            (fun y : Y0 =>
+     (cofix go (s : Trace.M IO X) : Trace.M IO Y :=
+        match s with
+        | Trace.Ret x => Trace.Tau (f x)
+        | @Trace.Vis _ _ Y1 e0 k0 => Trace.Vis e0 (fun y0 : Y1 => go (k0 y0))
+        | Trace.Tau k0 => Trace.Tau (go k0)
+        | Trace.Err s0 => Trace.Err (Event:=IO) (X:=Y) s0
+        end) (swap_Trace X id1 id2 (k y)))).
+    apply functional_extensionality.
+    intros x. symmetry.
+    rewrite Trace.matchM.
+    symmetry.
+    rewrite Trace.matchM.    simpl.
+    destruct (k x).
+    
+
   
   Lemma swap_eval_exp : forall CFG g e top o,
       eval_exp (swap id1 id2 CFG) (swap id1 id2 g) (swap id1 id2 e) (swap id1 id2 top) (swap id1 id2 o) =
       swap id1 id2 (eval_exp CFG g e top o).
   Proof.
     intros CFG g e top.
-    induction o; simpl.
+    induction o using exp_ind'; simpl.
     - rewrite swap_lookup_id.
       destruct (lookup_id g e id); simpl; auto.
-    - destruct top. destruct d; simpl; unfold failwith; auto.
-      symmetry. rewrite Trace.matchM. simpl.
-      destruct (coerce_integer_to_int sz x); reflexivity. 
-      simpl. unfold failwith. auto.
-    - destruct top. destruct d; simpl; unfold failwith; auto.
-      
+    - destruct top as [d |]; [destruct d; simpl; eq_swaps | simpl; eq_swaps].
+      destruct (coerce_integer_to_int sz x); simpl; eq_swaps.
+    - destruct top as [d |]; [destruct d; simpl; eq_swaps | simpl; eq_swaps].
+    - destruct top as [d |]; [destruct d; simpl; eq_swaps | simpl; eq_swaps].
+    - simpl_ifs; eq_swaps.
+    - eq_swaps.
+    - destruct top as [d |]; [destruct d; simpl; eq_swaps | simpl; eq_swaps].
+    - eq_swaps.
+    - destruct top as [d |]; [destruct d; simpl; eq_swaps | simpl; eq_swaps].
+    -
 
+      
+      
+      destruct top. destruct d; simpl; unfold failwith; auto.
+      rewrite <- swap_ret. unfold_swaps. reflexivity.
+      rewrite <- swap_ret. unfold_swaps. reflexivity.
+      unfold failwith. simpl. rewrite <- swap_raise. reflexivity.
+    - destruct top. destruct d; simpl; unfold failwith; auto.
+      rewrite <- swap_ret. unfold_swaps. reflexivity.
+      rewrite <- swap_ret. unfold_swaps. reflexivity.
+      unfold failwith. simpl. rewrite <- swap_raise. reflexivity.
+    - destruct b; simpl; auto.
+      rewrite <- swap_ret. unfold_swaps.
       
     
   Admitted.
