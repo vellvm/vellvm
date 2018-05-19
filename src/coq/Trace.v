@@ -490,6 +490,7 @@ Proof.
     dispatch_contra.
 
   - subst. econstructor.
+
     + intros u I; inversion I.
     + eassumption.
     + assert (upaco2 (eutt_step (X:=X)) bot2 (Err s1) t') as H3.
@@ -501,6 +502,51 @@ Qed.
 
 Instance equiv_eutt {E} X : Equiv (M E X) := (@EquivUpToTau E X).
 
+Check eutt_step.
+
+Definition eutt_step_strong 
+  : forall (E : Type -> Type) (X : Type), (M E X -> M E X -> Prop) -> M E X -> M E X -> Prop :=
+  fun E X R => @eutt_step E _ (fun x y => R x y /\ R (id <$> x) y).
+
+Lemma eutt_step_strong_mono {E X} : monotone2 (@eutt_step_strong E X).
+Proof.
+  unfold monotone2. unfold eutt_step_strong.  intros x0 x1 r r' IN LE.  
+  induction IN; eauto.
+  - econstructor. intros. split. destruct (H y) as [H1 H2]. eauto.
+    destruct (H y) as [H1 H2]. eauto.
+  - econstructor. split. destruct H as [H1 H2]. eauto.
+    destruct H as [H1 H2]. eauto.
+  - econstructor; eauto. split. destruct H1 as [H2 H3]. eauto.
+    destruct H1 as [H2 H3]. eauto.
+  - econstructor; eauto. split. destruct H1 as [H2 H3]. eauto.
+    destruct H1 as [H2 H3]. eauto.
+Qed.
+Hint Resolve eutt_step_strong_mono : paco.
+
+
+Definition EquivUpToTau_Strong {E X} (s t : M E X) := paco2 (@eutt_step_strong E X) bot2 s t .
+Hint Unfold EquivUpToTau_Strong.
+
+
+Lemma pad_tau_left : forall {E X} (t : M E X), Tau t ≡ t.
+Proof.
+  intros E X.
+  pcofix CH.
+  intros t.
+  pfold.
+  destruct t.
+  - econstructor. intros. dispatch_contra. eapply NoTau. dispatch_contra.
+    left. pfold. econstructor.
+  - econstructor. intros. dispatch_contra. eapply NoTau. dispatch_contra.
+    left. pfold. econstructor. intros y. left. eapply paco2_mon. eapply eutt_refl.
+    intros. inversion PR.
+  - econstructor. right. eapply CH.
+  - econstructor. intros. dispatch_contra. eapply NoTau. dispatch_contra.
+    left. pfold. econstructor.
+Qed.
+    
+
+
 (* SAZ: 
 Functoriality of (M E) probably holds only up to coinductively defined
 bisimulation of eq.  Or, we should assume as an Aximo that eq coincides
@@ -508,16 +554,75 @@ with that bisimulation.
 *)
 Instance M_functor_eutt_laws {E} : (@FunctorLaws (M E)) (@mapM E) (@equiv_eutt E).
 Proof.
-Admitted.  
+  split.
+  * intros A. pcofix H.
+    intros a.
+    rewrite matchM. simpl.
+    destruct a; pfold; econstructor.
+  - intros. right. eapply H.
+  - right. eapply H.
+
+  * intros A B C f g a.
+    generalize dependent a.
+    pcofix CH.
+    intros a.
+    rewrite matchM.
+    replace (g ∘ f <$> a) with (idM (g ∘ f <$> a)).
+    destruct a; simpl; pfold.
+    - econstructor.
+    - econstructor. intros y. right.
+      unfold fmap, functor_M, mapM in CH.
+      eapply CH.
+    - econstructor. right.
+      unfold fmap, functor_M, mapM in CH.
+      eapply CH.
+    - econstructor.
+    - rewrite <- matchM. reflexivity.
+Qed.
+
+Ltac monad_laws a :=
+    let CH := fresh in
+    let PR := fresh in 
+    generalize dependent a;
+    pcofix CH;
+    intros a;
+    rewrite matchM; destruct a; [
+      eapply paco2_mon; [ eapply pad_tau_left | intros ? ? PR; inversion PR ]
+    | pfold; econstructor; intros; right; eapply CH
+    | pfold; econstructor; right; eapply CH
+    | pfold; econstructor]
+.
 
 Program Instance M_monad_eutt_laws {E} : (@MonadLaws (M E)) (@functor_M E) (@monad_M E) _ _ _.
 Next Obligation.
-  Admitted.
+  monad_laws a.
+Defined.  
 Next Obligation.
-  Admitted.
+    generalize dependent a;
+    pcofix CH.
+    intros a.
+    rewrite matchM. simpl.
+    eapply paco2_mon. eapply pad_tau_left. intros ? ? PR; inversion PR.
+Defined.
 Next Obligation.
-  Admitted.
-
+  generalize dependent a.
+  generalize dependent f.
+  generalize dependent g.    
+  pcofix CH.
+  intros g f a.
+  rewrite matchM.
+  replace (bindM a (fun x : A => bindM (f x) g)) with (idM (bindM a (fun x : A => bindM (f x) g))).
+  destruct a; simpl.
+  - pfold. econstructor. left. eapply paco2_mon. eapply eutt_refl. intros ? ? PR; inversion PR.
+  - pfold. econstructor. intros y. right.
+    specialize CH with (g:=g)(f:=f)(a:=(k y)).
+    eapply CH.
+  - pfold. econstructor. right.
+    specialize CH with (g:=g)(f:=f)(a:=a).
+    eapply CH.
+  - pfold. econstructor.
+  - rewrite <- matchM. reflexivity.
+Defined.    
 
 End MonadVerif.
 
