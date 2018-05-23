@@ -1,9 +1,10 @@
 Require Import ZArith List String Omega.
 Require Import Vellvm.LLVMAst Vellvm.Classes Vellvm.Util.
+Require Import Vellvm.StepSemantics Vellvm.LLVMIO Vellvm.LLVMBaseTypes.
 Require Import Vellvm.MemoryAddress.
 Require Import Vellvm.LLVMIO.
 Require Import FSets.FMapAVL.
-Require Import Integers.
+Require Import compcert.lib.Integers compcert.lib.Coqlib.
 Require Coq.Structures.OrderedTypeEx.
 Require Import ZMicromega.
 Import ListNotations.
@@ -81,6 +82,20 @@ Definition mem_block := IntMap SByte.
 Definition memory := IntMap mem_block.
 Definition undef := DVALUE_Undef. (* TODO: should this be an empty block? *)
 
+Fixpoint max_default (l:list Z) (x:Z) :=
+  match l with
+  | [] => x
+  | h :: tl =>
+    max_default tl (if h >? x then h else x)
+  end.
+
+Definition oracle (m:memory) : Z :=
+  let keys := map fst (IM.elements m) in
+  let max := max_default keys 0 in
+  let offset := 1 in (* TODO: This should be "random" *)
+  max + offset.
+
+
 (* Computes the byte size of this type. *)
 Fixpoint sizeof_dtyp (ty:dtyp) : Z :=
   match ty with
@@ -91,22 +106,59 @@ Fixpoint sizeof_dtyp (ty:dtyp) : Z :=
   | _ => 0 (* TODO: add support for more types as necessary *)
   end.
 
-(* Convert integer to its SByte representation. *)
-Fixpoint Z_to_sbyte_list (count:nat) (z:Z) : list SByte :=
-  match count with
-  | O => []
-  | S n => (Z_to_sbyte_list n (z / 256)) ++ [Byte (Byte.repr (z mod 256))]
+(* Convert integer to its byte representation. *)
+Fixpoint bytes_of_int (n: nat) (x: Z) {struct n}: list byte :=
+  match n with
+  | O => nil
+  | S m => Byte.repr x :: bytes_of_int m (x / 256)
   end.
 
-(* Converts SBytes into their integer representation. *)
+Fixpoint int_of_bytes (l: list byte): Z :=
+  match l with
+  | nil => 0
+  | b :: l' => Byte.unsigned b + int_of_bytes l' * 256
+  end.
+
+Definition Z_to_sbyte_list (count:nat) (z:Z) : list SByte :=
+  List.map Byte (bytes_of_int count z).
+
+Definition Sbyte_to_byte_list (sb:SByte) : list byte :=
+  match sb with
+  | Byte b => [b]
+  | Ptr _ | PtrFrag | SUndef => []
+  end.
+
+Definition sbyte_list_to_byte_list (bytes:list SByte) : list byte :=
+  List.flat_map Sbyte_to_byte_list bytes.
+
 Definition sbyte_list_to_Z (bytes:list SByte) : Z :=
-  fst (fold_right (fun x acc =>
-               match x with
-               | Byte b =>
-                 let shift := snd acc in
-                 ((fst acc) + ((Byte.intval b) * shift), shift * 256)
-               | _ => acc (* should not have other kinds bytes in an int *)
-               end) (0, 1) bytes).
+  int_of_bytes (sbyte_list_to_byte_list bytes).
+
+(** Length properties *)
+
+Lemma length_bytes_of_int:
+  forall n x, List.length (bytes_of_int n x) = n.
+Proof.
+  induction n; simpl; intros. auto. decEq. auto.
+Qed.
+
+Lemma int_of_bytes_of_int:
+  forall n x,
+  int_of_bytes (bytes_of_int n x) = x mod (two_p (Z.of_nat n * 8)).
+Proof.
+  induction n; intros.
+  simpl. rewrite Zmod_1_r. auto.
+Opaque Byte.wordsize.
+  rewrite Nat2Z.inj_succ. simpl.
+  replace (Z.succ (Z.of_nat n) * 8) with (Z.of_nat n * 8 + 8) by omega.
+  rewrite two_p_is_exp; try omega.
+  rewrite Zmod_recombine. rewrite IHn. rewrite Z.add_comm.
+  change (Byte.unsigned (Byte.repr x)) with (Byte.Z_mod_modulus x).
+  rewrite Byte.Z_mod_modulus_eq. reflexivity.
+  apply two_p_gt_ZERO. omega. apply two_p_gt_ZERO. omega.
+Qed.
+
+
 
 (* Serializes a dvalue into its SByte-sensitive form. *)
 Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
@@ -158,6 +210,75 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:dtyp) : dvalue :=
   | _ => DVALUE_None (* TODO add more as serialization support increases *)
   end.
 
+(* Todo - complete proofs, and think about moving to MemoryProp module. *)
+(* The relation defining serializable dvalues. *)
+Inductive serialize_defined : dvalue -> Prop :=
+  | d_addr: forall addr,
+      serialize_defined (DVALUE_Addr addr)
+  | d_i1: forall i1,
+      serialize_defined (DVALUE_I1 i1)
+  | d_i32: forall i32,
+      serialize_defined (DVALUE_I32 i32)
+  | d_i64: forall i64,
+      serialize_defined (DVALUE_I64 i64)
+  | d_struct_empty:
+      serialize_defined (DVALUE_Struct [])
+  | d_struct_nonempty: forall dval fields_list,
+      serialize_defined dval ->
+      serialize_defined (DVALUE_Struct fields_list) ->
+      serialize_defined (DVALUE_Struct (dval :: fields_list))
+  | d_array_empty:
+      serialize_defined (DVALUE_Array [])
+  | d_array_nonempty: forall dval fields_list,
+      serialize_defined dval ->
+      serialize_defined (DVALUE_Array fields_list) ->
+      serialize_defined (DVALUE_Array (dval :: fields_list)).
+
+(* Lemma assumes all integers encoded with 8 bytes. *)
+
+Inductive sbyte_list_wf : list SByte -> Prop :=
+| wf_nil : sbyte_list_wf []
+| wf_cons : forall b l, sbyte_list_wf l -> sbyte_list_wf (Byte b :: l)
+.                                                   
+
+(*
+Lemma sbyte_list_to_Z_inverse:
+  forall i1 : int1, (sbyte_list_to_Z (Z_to_sbyte_list 8 (Int1.unsigned i1))) = 
+               (Int1.unsigned i1).
+Proof.
+  intros i1.
+  destruct i1. simpl.
+Admitted. *)
+
+
+(*
+Lemma serialize_inverses : forall dval,
+    serialize_defined dval -> exists typ, deserialize_sbytes (serialize_dvalue dval) typ = dval.
+Proof.
+  intros. destruct H.
+  (* DVALUE_Addr. Type of pointer is not important. *)
+  - exists (TYPE_Pointer TYPE_Void). reflexivity.
+  (* DVALUE_I1. Todo: subversion lemma for integers. *)
+  - exists (TYPE_I 1).
+    simpl. 
+      
+
+    admit.
+  (* DVALUE_I32. Todo: subversion lemma for integers. *)
+  - exists (TYPE_I 32). admit.
+  (* DVALUE_I64. Todo: subversion lemma for integers. *)
+  - exists (TYPE_I 64). admit.
+  (* DVALUE_Struct [] *)
+  - exists (TYPE_Struct []). reflexivity.
+  (* DVALUE_Struct fields *)
+  - admit.
+  (* DVALUE_Array [] *)
+  - exists (TYPE_Array 0 TYPE_Void). reflexivity.
+  (* DVALUE_Array fields *)
+  - admit.
+Admitted.
+*)
+
 (* Construct block indexed from 0 to n. *)
 Fixpoint init_block_h (n:nat) (m:mem_block) : mem_block :=
   match n with
@@ -177,14 +298,73 @@ Definition init_block (n:Z) : mem_block :=
 Definition make_empty_block (ty:dtyp) : mem_block :=
   init_block (sizeof_dtyp ty).
 
-Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
+Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
+  match vs with
+  | v :: vs' =>
+    match v with
+    | DVALUE_I32 i =>
+      let k := Int32.unsigned i in
+      let n := BinIntDef.Z.to_nat k in
+      match t with
+      | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
+                           handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+      | DTYPE_Struct ts | DTYPE_Packed_struct ts => (* Handle these differently in future *)
+        let offset := fold_left (fun acc t => acc + sizeof_dtyp t)
+                                (firstn n ts) 0 in
+        match nth_error ts n with
+        | None => raise "overflow"
+        | Some t' =>
+          handle_gep_h t' b (off + offset) vs' m
+        end
+      | _ => raise ("non-i32-indexable type")
+      end
+    | DVALUE_I64 i =>
+      let k := Int64.unsigned i in
+      let n := BinIntDef.Z.to_nat k in
+      match t with
+      | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
+                           handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+      | _ => raise ("non-i64-indexable type")
+      end
+    | _ => raise "non-I32 index"
+    end
+  | [] => mret (m, DVALUE_Addr (b, off))
+  end.
+
+
+Definition concretize_block (b:Z) (m:memory) : Z * memory :=
+  match lookup b m with
+  | None => (b, m)
+  | Some block =>
+    let i := oracle m in
+    let fix loop es k block : mem_block :=
+        match es with
+        | [] => block
+        | (i, e) :: tl => loop tl (k+1) (add (k + i) e block)
+        end in
+    (* TODO change source block SBYTES to associate abstract pointers with concrete memory. *)
+    (i, add b (loop (IM.elements block) i block) m)
+  end.
+
+Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
+  match vs with
+  | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 indices *)
+    match dv with
+    | DVALUE_Addr (b, o) =>
+      handle_gep_h t b (o + (sizeof_dtyp t) * (Int32.unsigned i)) vs' m
+    | _ => raise "non-address" 
+    end
+  | _ => raise "non-I32 index"
+  end.
+
+Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
   match e with
   | Alloca t =>
     let new_block := make_empty_block t in
-    inr  (add (size m) new_block m,
-          DVALUE_Addr (size m, 0))
+    mret (inr (add (size m) new_block m,
+               DVALUE_Addr (size m, 0)))
          
-  | Load t dv =>
+  | Load t dv => mret
     match dv with
     | DVALUE_Addr a =>
       match a with
@@ -199,7 +379,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
     | _ => inl (Load t dv)
     end 
 
-  | Store dv v =>
+  | Store dv v => mret
     match dv with
     | DVALUE_Addr a =>
       match a with
@@ -214,69 +394,29 @@ Definition mem_step {X} (e:IO X) (m:memory) : (IO X) + (memory * X) :=
     end
       
   | GEP t dv vs =>
-    (* Index into a structured data type. *)
-    let index_into_type typ index :=
-        match typ with
-        | DTYPE_Array sz ty =>
-          if sz <=? index then None else
-            Some (ty, index * (sizeof_dtyp ty))
-        | DTYPE_Struct fields =>
-          let new_typ := List.nth_error fields (Z.to_nat index) in
-          match new_typ with
-          | Some new_typ' =>
-            (* Compute the byte-offset induced by the first i elements of the struct. *)
-            let fix compute_offset typ_list i :=
-                match typ_list with
-                | [] => 0
-                | hd :: tl =>
-                  if i <? index
-                  then sizeof_dtyp hd + compute_offset tl (i + 1)
-                  else 0
-                end
-              in
-            Some (new_typ', compute_offset fields 0)
-          | None => None
-          end
-        | _ => None (* add type support as necessary *)
-        end
-    in
-    (* Give back the final byte-offset into mem_bytes *)
-    let fix gep_helper mem_bytes cur_type offsets offset_acc :=
-        match offsets with
-        | [] => offset_acc
-        | dval :: tl =>
-          match dval with
-          | DVALUE_I32 x =>
-            let nat_index := DynamicValues.Int32.unsigned x in
-            let new_typ_info := index_into_type cur_type nat_index in
-            match new_typ_info with
-              | Some (new_typ, offset) => 
-                gep_helper mem_bytes new_typ tl (offset_acc + offset)
-              | None => 0 (* fail *)
-            end
-          | _ => 0 (* fail, at least until supporting non-i32 indexes *)
-          end
-        end
-    in
-    match dv with
-    | DVALUE_Addr a =>
-      match a with
-      | (b, i) =>
-        match lookup b m with
-        | Some block =>
-          let mem_val := lookup_all_index i (sizeof_dtyp t) block SUndef in
-          let answer := gep_helper mem_val t vs 0 in
-          inr (m, DVALUE_Addr (b, i + answer))
-        | None => inl (GEP t dv vs)
-        end
-      end
-    | _ => inl (GEP t dv vs)
+    match handle_gep t dv vs m with
+    | inl s => raise s
+    | inr r => mret (inr r)
     end
-  | ItoP i => inl (ItoP i) (* TODO: ItoP semantics *)
 
-  | PtoI a => inl (PtoI a) (* TODO: ItoP semantics *)                     
+  | ItoP i =>
+    match i with
+    | DVALUE_I64 i => mret (inr (m, DVALUE_Addr (0, DynamicValues.Int64.unsigned i)))
+    | DVALUE_I32 i => mret (inr (m, DVALUE_Addr (0, DynamicValues.Int32.unsigned i)))
+    | DVALUE_I1 i => mret (inr (m, DVALUE_Addr (0, DynamicValues.Int1.unsigned i)))
+    | _ => raise "Non integer passed to ItoP"
+    end
+    
+  | PtoI a =>
+    match a with
+    | DVALUE_Addr (b, i) =>
+      if Z.eqb b 0 then mret (inr (m, DVALUE_Addr(0, i)))
+      else let (k, m) := concretize_block b m in
+           mret (inr (m, DVALUE_Addr (0, (k + i))))
+    | _ => raise "Non pointer passed to PtoI"
+    end
                        
-  | Call t f args  => inl (Call t f args)
+  | Call t f args  => mret (inl (Call t f args))
   end.
 
 (*
@@ -288,8 +428,9 @@ CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
   | Trace.Tau d'            => Trace.Tau (memD m d')
   | Trace.Vis _ io k =>
     match mem_step io m with
-    | inr (m', v) => Trace.Tau (memD m' (k v))
-    | inl e => Trace.Vis io k
+    | inr (inr (m', v)) => Trace.Tau (memD m' (k v))
+    | inr (inl e) => Trace.Vis io k
+    | inl s => Trace.Err s
     end
   | Trace.Ret x => d
   | Trace.Err x => d

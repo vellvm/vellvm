@@ -51,6 +51,7 @@ Global Instance eq_dec_addr : eq_dec ADDR.addr := ADDR.addr_dec.
 Module DV := DynamicValues.DVALUE(ADDR).
 Export DV.
 
+(* IO Interactions for the LLVM IR *)
 Inductive IO : Type -> Type :=
 | Alloca : forall (t:dtyp), (IO dvalue)
 | Load   : forall (t:dtyp) (a:dvalue), (IO dvalue)

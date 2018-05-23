@@ -314,7 +314,7 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
     let dt1 := eval_typ t1 in
     'v <- eval_exp (Some dt1) op;
     eval_conv conv t1 v t2
-
+                       
   | OP_GetElementPtr _ (TYPE_Pointer t, ptrval) idxs =>
     let dt := eval_typ t in
     'vptr <- eval_exp (Some DTYPE_Pointer) ptrval;
@@ -323,7 +323,7 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
 
   | OP_GetElementPtr _ (_, _) _ =>
     failwith "getelementptr has non-pointer type annotation"
-              
+    
   | OP_ExtractElement vecop idx =>
     (*    'vec <- monad_app_snd (eval_exp e) vecop;
     'vidx <- monad_app_snd (eval_exp e) idx;  *)
@@ -397,7 +397,7 @@ Inductive result :=
 .       
 
 Definition raise_p {X} (p:pc) s : Trace X := raise (s ++ ": " ++ (string_of p)).
-Definition cont (s:state) : Trace result := mret (Step s).
+Definition cont (s:state)  : Trace result := mret (Step s).
 Definition halt (v:dvalue) : Trace result := mret (Done v).
 
   
