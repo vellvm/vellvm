@@ -8,8 +8,9 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-Require Import  Vellvm.Classes Vellvm.Util.
-Require Import Program Classical.
+Require Import Coq.Init.Specif.
+Require Import ProofIrrelevance.
+Require Import Vellvm.Classes Vellvm.Util.
 Require Import paco.
 
 Set Implicit Arguments.
@@ -26,78 +27,53 @@ CoInductive M (Event : Type -> Type) X :=
 | Err (s:String.string)
 .
 
-
-(** Note: One could imagine an alternative definition with an explicit
-    Bind constructor (and a Prim constructor), but this might not be
-    as nice / might not work at all -- this way makes productivity
-    easier to deal with.  (Also, this one can be turned into a real
-    monad.)  We should compare at some point. *)
-
-(** N.b. This is related to the Free Monad construction, which is not
-    possible with Coq due to the positivity requirement. But when
-    the functor that we want to build the Free Monad from is
-    representable (or "Naperian", as it is called by Peter Hancock),
-    we can use this encoding to avoid the problem.
-    Update: that comment would apply only if we had
-    [Event : Type -> Type] and [Vis (Event -> M Event X)].
-    *)
-
-(** [M] is known as the "Freer monad".
-    "Freer Monads, More Extensible Effects",
-    Oleg Kiselyov, Hiromi Ishii.
-    The [Vis] constructor corresponds to a free functor construction
-    also called Co-Yoneda or left Kan extension.
-    Note that [Event] is meant to be an indexed type, and generally
-    not a functor, but we have a monad in any case. *)
-
-(** The existence of [spin] makes this not quite free:
-    amounts more or less to an additional [Event Void]
-    constructor.  *)
-
-(** In order to unfold a cofixpoint we have to rewrite it with
-    [matchM].  (Is this relevant only in proofs?  Maybe it should be
-    defined near the Ltac that uses it.) *)
-Definition idM E X (i: M E X) :=
+Definition idM {E X} (i: M E X) :=
   match i with 
   | Ret x => Ret x
   | Vis e k => Vis e k
   | Tau k => Tau k
   | Err s => Err s
   end.
-Lemma matchM : forall E X (i: M E X), i = idM i.
+Lemma matchM : forall {E X} (i: M E X), i = idM i.
 Proof. destruct i; auto. Qed.
 
+Module Core.
+
 (** [M E] forms a [Monad] *)
-(* N.b.: Possible variant: remove the Tau in the Ret case.  Not clear
-   whether this is a global win (we have to then put some extra Taus
-   in programs/specifications, which Joachim finds to be a breach of
-   abstraction), but it makes this a monad. *)
+Definition bind_body {E X Y}
+           (s : M E X)
+           (go : M E X -> M E Y)
+           (t : X -> M E Y) : M E Y :=
+  match s with
+  | Ret x => t x
+  | Vis e k => Vis e (fun y => go (k y))
+  | Tau k => Tau (go k)
+  | Err s => Err s
+  end.
+
 Definition bindM {E X Y} (s: M E X) (t: X -> M E Y) : M E Y :=
-  let cofix go (s : M E X) := 
-      match s with
-      | Ret x => Tau (t x)
-      | Vis e k => Vis e (fun y => go (k y))
-      | Tau k => Tau (go k)
-      | Err s => Err s
-      end
-  in go s.
+  (cofix go (s : M E X) :=
+      bind_body s go t) s.
 
-Definition mapM {E X Y} (f:X -> Y) (s: M E X) : M E Y :=
-  let cofix go (s : M E X) :=
-      match s with
-      | Ret x => Ret (f x)
-      | Vis e k => Vis e (fun y => go (k y))
-      | Tau k => Tau (go k)
-      | Err s => Err s
-      end
-  in go s.
+Lemma bind_def_core : forall {E X Y} s (k : X -> M E Y),
+    bindM s k = bind_body s (fun s => bindM s k) k.
+Proof.
+  intros.
+  rewrite matchM.
+  destruct s; auto.
+  simpl.
+  rewrite (@matchM _ _ (k x)) at 2.
+  auto.
+Qed.
 
-Instance functor_M {E} : Functor (M E) := (@mapM E).
-Instance monad_M {E} : (@Monad (M E)) (@mapM E) := { mret X x := Ret x; mbind := @bindM E }.
+End Core.
 
-(* Properties of Traces ----------------------------------------------------- *)
-
-Inductive equiv_step {E X} (equiv: M E X -> M E X -> Prop) :  M E X -> M E X -> Prop :=
+(* This is (almost) the strongest bisimulation between two traces. It requires
+   all of the Tau steps to line up, each of the visible events to match, and
+   that the returned values are [=].  For convenience, we _do_ allow any error
+   message to be considered equivalent to any other.  
+*)
+Inductive equiv_step {E X} (equiv: relation (M E X)) : relation (M E X) :=
 | equiv_Ret : forall x, equiv_step equiv (Ret x) (Ret x)
 | equiv_Vis : forall {Y} e k1 k2, (forall (v:Y), equiv (k1 v) (k2 v))
                              -> equiv_step equiv (Vis e k1) (Vis e k2)
@@ -117,15 +93,119 @@ Definition equiv {E X} (s t : M E X) := paco2 equiv_step bot2 s t .
 Hint Unfold equiv.
 
 
+Instance equiv_refl : Reflexive (@equiv E X).
+Proof.
+  intros E X.
+  pcofix CH.
+  intros x; destruct x; pfold; econstructor; eauto.
+Qed.
+
+Instance equiv_sym : Symmetric (@equiv E X).
+Proof.
+  intros E X.
+  pcofix CH.
+  intros x y H.
+  punfold H. inversion H; subst; pfold; econstructor.
+  - intros y. right. apply CH. specialize H0 with (v:=y). pclearbot. assumption.
+  - right. apply CH. pclearbot. assumption.
+Qed.
+
+Instance equiv_transitive : Transitive (@equiv E X).
+Proof.
+  intros E X.
+  pcofix CH.
+  intros x y z Hxy Hyz. pinversion Hyz; subst; pinversion Hxy; subst; pfold.
+  - constructor.
+  - apply inj_pair2 in H3.
+    apply inj_pair2 in H4.
+    subst.
+    constructor.
+    intro y'.
+    right.
+    eapply CH; auto. specialize H2 with (v:=y'). pclearbot. eassumption.
+    specialize H with (v:=y'). pclearbot. assumption.
+  - constructor. right. eauto.
+  - constructor.
+Qed.
+
+Global Instance equivEquivalence : Equivalence (@equiv E X).
+Proof.
+  constructor; typeclasses eauto.
+Qed.
+
+Lemma cong_bind {E X Y} :
+  forall s (k k' : X -> M E Y),
+    (forall x, equiv (k x) (k' x)) ->
+    equiv (Core.bindM s k) (Core.bindM s k').
+Proof.
+  pcofix CH.
+  intros s k k' H0. 
+  do 2 rewrite Core.bind_def_core.
+  destruct s; simpl.
+  - eapply paco2_mon. apply H0. intros ? ? PR; inversion PR.
+  - pfold. constructor. intros. right. eauto.
+  - pfold. constructor. intros. right. eauto.
+  - pfold. constructor.
+Qed.
+
+Definition bindM {E X Y} (s: M E X) (t: X -> M E Y) : M E Y :=
+  Core.bindM s (fun x => Tau (t x)).
+
+Definition mapM {E X Y} (f:X -> Y) (s: M E X) : M E Y :=
+  let cofix go (s : M E X) :=
+      match s with
+      | Ret x => Ret (f x)
+      | Vis e k => Vis e (fun y => go (k y))
+      | Tau k => Tau (go k)
+      | Err s => Err s
+      end
+  in go s.
+
+Instance functor_M {E} : Functor (M E) := (@mapM E).
+Instance monad_M {E} : (@Monad (M E)) (@mapM E) := { mret X x := Ret x; mbind := @bindM E }.
+
+Lemma bind_def_core : forall E X Y s (k : X -> M E Y),
+    Core.bindM s k = Core.bind_body s (fun s => Core.bindM s k) k.
+Proof.
+  intros.
+  rewrite matchM.
+  destruct s; auto.
+  simpl.
+  rewrite (@matchM _ _ (k x)) at 2.
+  auto.
+Qed.
+
+Lemma bind_def E X Y :
+  forall s (k : X -> M E Y),
+    bindM s k = Core.bind_body s (fun s' => bindM s' k) (fun x => Tau (k x)).
+Proof.
+  unfold bindM.
+  intros s k.
+  rewrite bind_def_core.
+  auto.
+Qed.
+
+(* Notes -------------------------------------------------------------------- *)
+
+(* TODO: Compare / reconcile with Liyao's version from DeepWeb.  
+
+   - Should we prove a more general library of "(bi)simulations up-to-R"?
+   - Can we then 
+
+   - Can we get some kind of monad library into the Coq Standard Library?
+
+   - use paco for that library?
+
+   - ask about the motivation for refactoring of the UnTau / eutt stuff
+*)
+
+
 (* Properties of Traces ----------------------------------------------------- *)
 
-Module MonadVerif.
-(* Monad laws:
-   - return x >>= k   =   k x
-   - s >>= return   =   w
-   - s >>= (\x -> k x >>= h)   =   (s >>= k) >>= h
- *)
+Section UpToTau.
 
+  Variable E : Type -> Type.
+  
 (** Get rid of absurd cases such as
     - forall t, Tau t <> Tau s
     - Tau t = Vis e k
@@ -140,101 +220,208 @@ Ltac dispatch_contra :=
     | discriminate
     ].
 
-Inductive UnTau E X : M E X -> M E X -> Prop :=
+Variable (X : Type) (R : relation X) (ER : Equivalence R).
+
+Inductive UnTau : relation (M E X) :=
 | OneTau : forall s t, UnTau s t -> UnTau (Tau s) t
-| NoTau : forall s, (forall t, ~(Tau t = s)) -> UnTau s s.
+| NoTau : forall s, UnTau s s.
+
+Lemma untau_tau : forall s s',
+    UnTau s (Tau s') -> UnTau s s'.
+Proof.
+  fix IH 3.
+  intros s s' H.
+  inversion_clear H as [ s0 s0' H0 | ].
+  - constructor. apply IH. assumption.
+  - repeat constructor.
+Qed.
+
+Lemma untau_trans : forall s t u,
+    UnTau s t -> UnTau t u -> UnTau s u.
+Proof.
+  fix IH 4.
+  intros s t u Hst Htu.
+  inversion_clear Hst as [ s0 s0' Hst0 | ].
+  - constructor. eapply IH; eauto.
+  - auto.
+Qed.
 
 
-Inductive eutt_step E X (eutt : M E X -> M E X -> Prop) : M E X -> M E X -> Prop :=
-| EquivRet : forall x, eutt_step eutt (Ret x) (Ret x)
-| EquivVis : forall Y (e : E Y) (k1 k2 : Y -> M E X),
-    (forall y, eutt (k1 y) (k2 y)) ->
-    eutt_step eutt (Vis e k1) (Vis e k2)
+Inductive eutt_step (eutt ent : relation (M E X)) : relation (M E X) :=
 (* Equality with spin is undecidable,
    but one can coinductively generate a proof with this. *)
 | EquivTau : forall s t,
-    eutt s t -> eutt_step eutt (Tau s) (Tau t)
-| EquivTauLeft : forall s s' t,
-    (forall t', ~(Tau t' = t)) ->
+    eutt s t ->
+    eutt_step eutt ent (Tau s) (Tau t)
+| EquivTauExhaust : forall s s' t t',
     UnTau s s' ->
-    eutt s' t ->
-    eutt_step eutt (Tau s) t
-| EquivTauRight : forall s t t',
-    (forall s', ~(Tau s' = s)) ->
     UnTau t t' ->
-    eutt s t' ->
-    eutt_step eutt s (Tau t)
-| EquivErr : forall s1 s2, eutt_step eutt (Err s1) (Err s2)
+    ent s' t' ->
+    eutt_step eutt ent s t
 .
 Hint Constructors eutt_step.
 
-Lemma eutt_step_mono {E X} : monotone2 (@eutt_step E X).
-Proof.
-  unfold monotone2. intros x0 x1 r r' IN LE. 
-  induction IN; eauto.
-Qed.
-Hint Resolve eutt_step_mono : paco.
+Inductive ent_step (eutt ent : relation (M E X))  : relation (M E X) :=
+| EquivRet : forall x x', R x x' -> ent_step eutt ent (Ret x) (Ret x')
+| EquivVis : forall Y (e : E Y) (k1 k2 : Y -> M E X),
+    (forall y, eutt (k1 y) (k2 y)) ->
+    ent_step eutt ent (Vis e k1) (Vis e k2)
+| EquivErr : forall s1 s2, ent_step eutt ent (Err s1) (Err s2)
+.                               
+Hint Constructors ent_step.
 
-Definition EquivUpToTau {E X} (s t : M E X) := paco2 (@eutt_step E X) bot2 s t .
+Lemma eutt_step_monotone : monotone2_2 eutt_step.
+Proof.
+  unfold monotone2_2. intros x0 x1 r_0 r_1 r'_0 r'_1 IN LE_0 LE_1.
+  inversion IN; subst.
+  - eapply EquivTau. eauto.
+  - eapply EquivTauExhaust. apply H. apply H0. apply LE_1. assumption.
+Qed.
+Hint Resolve eutt_step_monotone : paco.
+
+
+Lemma ent_step_monotone : monotone2_2 ent_step.
+Proof.
+  unfold monotone2_2. intros x0 x1 r_0 r_1 r'_0 r'_1 IN LE_0 LE_1.
+  induction IN.
+  - eapply EquivRet. assumption.
+  - eapply EquivVis. intros y. apply LE_0. apply H.
+  - eapply EquivErr.
+Qed.
+Hint Resolve ent_step_monotone : paco.
+
+
+Definition EquivUpToTau (s t : M E X) := paco2_2_0 (@eutt_step) (@ent_step) bot2 bot2 s t .
 Hint Unfold EquivUpToTau.
 
+Definition EquivNoTau (s t : M E X) := paco2_2_1 (@eutt_step) (@ent_step) bot2 bot2 s t .
+Hint Unfold EquivNoTau.
 
-Lemma eutt_refl : forall E X (s : M E X),
+
+Lemma eutt_refl : forall (s : M E X),
     EquivUpToTau s s.
 Proof.
-  intros E X.
   pcofix eutt_refl.
   intros.
   pfold.
   destruct s; auto.
+  - eapply EquivTauExhaust. eapply NoTau. eapply NoTau. left. pfold. eapply EquivRet. reflexivity.
+  - eapply EquivTauExhaust. eapply NoTau. eapply NoTau. left. pfold. eapply EquivVis. intros.
+    right. eapply eutt_refl.
+  - eapply EquivTauExhaust. eapply NoTau. eapply NoTau. left. pfold. eapply EquivErr. 
 Qed.
 
-Lemma eutt_sym : forall E X (s t : M E X),
+Lemma eutt_sym : forall (s t : M E X),
     EquivUpToTau s t -> EquivUpToTau t s.
 Proof.
-  intros E X.
   pcofix eutt_sym.
   intros s t H0. 
   punfold H0. pfold.
-  dependent induction H0; auto.
-  - econstructor.
-    intros y.
-    assert (upaco2 (eutt_step (X:=X)) bot2 (k1 y) (k2 y)). apply H.
-    right. apply eutt_sym. pfold. destruct H0. punfold H0. inversion H0.
-  - econstructor. right. apply eutt_sym. pfold. destruct H. punfold H. inversion H.
-  - econstructor. assumption. eassumption. right. apply eutt_sym. destruct H1. punfold H1. inversion H1.
-  - econstructor. assumption. eassumption. right. apply eutt_sym. destruct H1. punfold H1. inversion H1.
+  induction H0; eauto.
+  - econstructor. pclearbot. right. eauto.
+  - pclearbot. punfold H1.
+    inversion H1; subst; eauto.
+    + eapply EquivTauExhaust; eauto. left. pfold. eapply EquivRet. symmetry. assumption.
+    + eapply EquivTauExhaust; eauto. left. pfold. eapply EquivVis. intros y.
+      right. eapply eutt_sym. specialize H2 with (y:=y). pclearbot. eauto.
 Qed.
 
-Lemma untau_notau : forall E X (s t : M E X), ~(UnTau s (Tau t)).
+Lemma eunt_sym : forall (s t : M E X),
+    EquivNoTau s t -> EquivNoTau t s.
 Proof.
-  intros E X s t H.
-  remember (Tau t) as t'.
+  pcofix eunt_sym.
+  intros s t H. 
+  punfold H. pfold.
+  inversion H; subst; eauto.
+  - econstructor. symmetry. assumption.
+  - econstructor. intros y. left. eapply paco2_2_0_mon. eapply eutt_sym.
+    specialize H0 with (y:=y). pclearbot. eauto.
+    intros ? ? PR; inversion PR. intros ? ? PR; inversion PR.
+Qed.
+
+
+Lemma equiv_is_eutt : forall (s s' : M E X),
+    equiv s s' -> EquivUpToTau s s'.
+Proof.
+  pcofix CH.
+  intros s s' H. pinversion H; subst; pfold.
+  + econstructor. econstructor. econstructor. left. pfold. econstructor. reflexivity.
+  + econstructor. econstructor. econstructor. left. pfold. econstructor. intros y.
+    right. eapply CH.  specialize H0 with (v:=y). pclearbot. assumption.
+  + econstructor. right. eapply CH. assumption.
+  + econstructor. econstructor. econstructor. left. pfold. econstructor.
+Qed.
+
+Lemma pop_tau :
+  forall (s t : M E X),
+    EquivUpToTau s (Tau t) -> EquivUpToTau s t.
+Proof.
+  pcofix CH.
+  intros s t H.
+  pinversion H; subst. 
+  - pdestruct H2.  
+    + pfold. econstructor. right. apply CH. pfold. econstructor. left. assumption.
+    + pfold. econstructor. econstructor. eauto. eauto.
+      left. eapply paco2_2_1_mon. eapply H2. intros ? ? PR; inversion PR. intros ? ? PR; inversion PR.
+  - pfold. inversion H1. subst.
+    + econstructor; eauto. left. eapply paco2_2_1_mon. exact H2. intros ? ? PR; inversion PR.
+      intros ? ? PR; inversion PR.
+    + subst. pinversion H2.  
+Qed.
+
+Lemma push_tau :
+  forall (s t : M E X),
+    EquivUpToTau s t -> EquivUpToTau s (Tau t).
+Proof.
+  pcofix CH.
+  intros s t H.
+  pinversion H.
+  - pfold. constructor. right. apply CH. eauto.
+  - pfold. econstructor; eauto. apply OneTau. eassumption. left.
+    eapply paco2_2_1_mon. apply H2. intros ? ? PR; inversion PR. intros ? ? PR; inversion PR.
+Qed.
+
+Lemma tau_notau :
+  forall (s t t' u' : M E X),
+    EquivUpToTau s t ->
+    UnTau t t' ->
+    EquivNoTau t' u' ->
+    exists s', UnTau s s' /\ EquivNoTau s' t'.
+Proof.
+  intros s t t' u' Hst Htt' Ht'u'.
+  induction Htt'.
+  - apply IHHtt'; auto.
+    apply pop_tau; auto.
+  - pdestruct Hst; pinversion Ht'u'; subst;
+      exists s'; split; auto; inversion H0; subst; auto.
+Qed.
+
+Lemma eutt_untau : forall (s s' : M E X),
+    UnTau s s' -> EquivUpToTau s s'.
+Proof.
+  intros s s' H.
   induction H.
-  - auto.
-  - eapply H; eauto.
+  - apply eutt_sym.
+    apply push_tau.
+    apply eutt_sym.
+    auto.
+  - apply eutt_refl.
 Qed.
 
-Lemma untau_untau : forall E X (s t : M E X),
-    UnTau s t -> UnTau t t.
+Lemma untau_inj :
+  forall (s s' s'' t' t'' : M E X),
+    UnTau s s' ->
+    UnTau s s'' ->
+    EquivNoTau t' s' ->
+    EquivNoTau s'' t'' ->
+    s' = s''.
 Proof.
-  intros E X s t H.
-  induction H.
-  - auto.
-  - constructor; assumption.
+  intros s s' s'' t' t'' H.
+  induction H; intros H' Hts' Hst''; inversion H'; auto;
+    (pinversion Hst''; pinversion Hts'; subst; discriminate).
 Qed.
 
-Lemma untau_inj : forall E X (s s' s'' : M E X),
-    UnTau s s' -> UnTau s s'' -> s' = s''.
-Proof.
-  intros E X s s' s'' H.
-  induction H; intro H'; inversion H'.
-  - auto.
-  - dispatch_contra.
-  - dispatch_contra.
-  - reflexivity.
-Qed.
-
+(*
 Lemma eutt_untau : forall E X (s s' t : M E X),
     UnTau s s' -> EquivUpToTau s t ->
     exists t', UnTau t t' /\ EquivUpToTau s' t'.
@@ -267,6 +454,92 @@ Proof.
       * constructor. intros. unfold not. intros. inversion H0.
       * pfold. assumption.
 Qed.
+ *)
+
+Lemma eutt_trans :  forall (s t u : M E X),  EquivUpToTau s t -> EquivUpToTau t u -> EquivUpToTau s u
+with  ent_trans : forall (s t u : M E X), EquivNoTau s t -> EquivNoTau t u -> EquivNoTau s u.
+Proof.
+  {
+    clear eutt_trans.
+    pcofix CH.
+    intros s t u
+           H1
+           H2.
+    pdestruct H1.
+    pinversion H2; subst.
+    - pfold. econstructor. right. eapply CH.
+      apply H. apply H1.
+    - pfold. apply push_tau in H.
+      pose (Hs1t1 := tau_notau H H0 H3).
+      destruct Hs1t1 as [s0' [Hs1 Hs't2']].
+      econstructor.
+      + constructor; eassumption.
+      + eassumption.
+      + left. eapply paco2_2_1_mon. eapply ent_trans. eauto. eauto.
+        intros ? ? PR; inversion PR. intros ? ? PR; inversion PR.
+    - pfold.
+      (* _, _ & Tau, Tau *)
+      apply eutt_sym in H2.
+      apply eunt_sym in H1.
+      pose (Ht1u := tau_notau H2 H0 H1).
+      destruct Ht1u as [s0' [Hu Hs't1']].
+      econstructor.
+      + eassumption.
+      + eassumption.
+      + left.
+        eapply paco2_2_1_mon.
+        eapply ent_trans; apply eunt_sym; eassumption.
+        intros ? ? PR; inversion PR.
+        intros ? ? PR; inversion PR.
+  }
+  { clear ent_trans.
+    intros s t u Hst Htu.
+    pdestruct Hst; pinversion Htu; subst.
+    - pfold. econstructor. eapply transitivity. eapply H. eapply H1.
+    - pfold. 
+               
+               
+  }
+Qed.  
+    
+      subst.
+    - (* Tau, Tau, Tau *) constructor; eapply eutt_trans; eauto.
+    - (* Tau, Tau & _, _ *)
+      apply push_tau in H1.
+      pose (Hs1t1 := tau_notau H1 Ht2 H2').
+      destruct Hs1t1 as [s' [Hs1 Hs't2']].
+      econstructor.
+      + constructor; eassumption.
+      + eassumption.
+      + eapply eunt_trans; eassumption.
+    - (* _, _ & Tau, Tau *)
+      apply eutt_sym in H2.
+      apply eunt_sym in H1.
+      pose (Ht1u := tau_notau H2 H0 H1).
+      destruct Ht1u as [s' [Hu Hs't1']].
+      econstructor.
+      + eassumption.
+      + eassumption.
+      + eapply eunt_trans; apply eunt_sym; eassumption.
+    - (* _, _, _ *)
+      econstructor; try eassumption.
+      eapply eunt_trans. eassumption.
+      replace t2' with t1' in *.
+      + auto.
+      + eapply untau_inj; eauto.
+  }
+  { intros s t u Hst Htu.
+    destruct Hst; inversion Htu; subst.
+    - constructor; auto. eapply Equivalence.equiv_transitive; eauto.
+    - apply inj_pair2 in H2.
+      apply inj_pair2 in H3.
+      subst.
+      constructor.
+      intros.
+      eapply eutt_trans; eauto.
+  }
+Qed.
+
 
 Ltac eutt_mono :=
   repeat
@@ -502,8 +775,6 @@ Qed.
 
 Instance equiv_eutt {E} X : Equiv (M E X) := (@EquivUpToTau E X).
 
-Check eutt_step.
-
 Definition eutt_step_strong 
   : forall (E : Type -> Type) (X : Type), (M E X -> M E X -> Prop) -> M E X -> M E X -> Prop :=
   fun E X R => @eutt_step E _ (fun x y => R x y /\ R (id <$> x) y).
@@ -623,6 +894,31 @@ Next Obligation.
   - pfold. econstructor.
   - rewrite <- matchM. reflexivity.
 Defined.    
+
+Lemma bind_hom_1 {E X Y} : forall (x y : M E X) (f : X -> M E Y), x ≡ y -> (x ≫= f) ≡ (y ≫= f).
+Proof.
+  pcofix CH.
+  intros x y f He.
+  replace (x ≫= f) with (idM (x ≫= f)).
+  replace (y ≫= f) with (idM (y ≫= f)).
+  pdestruct He.
+  - eapply paco2_mon. apply eutt_refl. intros ? ? PR; inversion PR.
+  - pfold. econstructor. intros y. right.
+    unfold mbind in CH. unfold monad_M in CH. unfold bindM in CH.
+    eapply CH with (x := (k1 y))(y:=(k2 y))(f:=f).
+    specialize H with (y:=y). pclearbot. apply H.
+  - pfold. econstructor. right.
+    unfold mbind in CH. unfold monad_M in CH. unfold bindM in CH.
+    eapply CH with (x := s)(y:=t)(f:=f).
+    eauto.
+  - pfold. 
+    pinversion H1; subst; simpl.
+    * econstructor. left.
+      eapply paco2_mon. eapply mret_mbind.
+    
+    
+    
+  
 
 End MonadVerif.
 
