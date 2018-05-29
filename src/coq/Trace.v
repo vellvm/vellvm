@@ -456,6 +456,50 @@ Proof.
 Qed.
  *)
 
+Lemma eutt_trans : forall r1 r2, Transitive r1 -> Transitive r2 -> 
+    Transitive (paco2_2_0 (@eutt_step) (@ent_step) r1 r2).
+Proof.
+  intros r1 r2 HT1 HT2.
+  pcofix CH.
+  intros s t u H1 H2.
+  pdestruct H1.
+  pinversion H2; subst.
+  - pfold. econstructor.
+    destruct H as [H3 | H4]; destruct H1 as [H5 | H6].
+    + right. eapply CH. eapply H3. eapply H5.
+    + 
+    
+      
+
+
+      right. eapply CH. eapply H3. eapply H5.
+      right. eapply CH. eapply H3. pfold.
+      eapply H3.  pfold. left. apply H1.
+    - pfold. apply push_tau in H.
+      pose (Hs1t1 := tau_notau H H0 H3).
+      destruct Hs1t1 as [s0' [Hs1 Hs't2']].
+      econstructor.
+      + constructor; eassumption.
+      + eassumption.
+      + left. eapply paco2_2_1_mon. eapply ent_trans. eauto. eauto.
+        intros ? ? PR; inversion PR. intros ? ? PR; inversion PR.
+    - pfold.
+      (* _, _ & Tau, Tau *)
+      apply eutt_sym in H2.
+      apply eunt_sym in H1.
+      pose (Ht1u := tau_notau H2 H0 H1).
+      destruct Ht1u as [s0' [Hu Hs't1']].
+      econstructor.
+      + eassumption.
+      + eassumption.
+      + left.
+        eapply paco2_2_1_mon.
+        eapply ent_trans; apply eunt_sym; eassumption.
+        intros ? ? PR; inversion PR.
+        intros ? ? PR; inversion PR.
+  }
+  
+
 Lemma eutt_trans :  forall (s t u : M E X),  EquivUpToTau s t -> EquivUpToTau t u -> EquivUpToTau s u
 with  ent_trans : forall (s t u : M E X), EquivNoTau s t -> EquivNoTau t u -> EquivNoTau s u.
 Proof.
@@ -497,8 +541,12 @@ Proof.
     pdestruct Hst; pinversion Htu; subst.
     - pfold. econstructor. eapply transitivity. eapply H. eapply H1.
     - pfold. 
-               
-               
+      apply inj_pair2 in H2. subst.
+      apply inj_pair2 in H3. subst.
+      econstructor. intros y. left.
+      specialize H with (y:=y). specialize H4 with (y:=y).
+      pclearbot. eapply eutt_trans; eauto.
+    - pfold. econstructor.
   }
 Qed.  
     
