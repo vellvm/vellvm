@@ -185,7 +185,7 @@ Section IN_CFG_CONTEXT.
 Variable CFG:mcfg.
 
 Definition eval_typ (t:typ) : dtyp :=
-  TypeUtil.normalize_type (m_type_defs CFG) t.
+  TypeUtil.normalize_type_dtyp (m_type_defs CFG) t.
 
 
 Section IN_LOCAL_ENVIRONMENT.
