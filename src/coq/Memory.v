@@ -1,6 +1,6 @@
 Require Import ZArith List String Omega.
 Require Import Vellvm.LLVMAst Vellvm.Classes Vellvm.Util.
-Require Import Vellvm.StepSemantics Vellvm.LLVMIO Vellvm.LLVMBaseTypes.
+Require Import Vellvm.StepSemantics Vellvm.LLVMIO.
 Require Import Vellvm.MemoryAddress.
 Require Import Vellvm.LLVMIO.
 Require Import FSets.FMapAVL.
@@ -303,7 +303,7 @@ Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (
   | v :: vs' =>
     match v with
     | DVALUE_I32 i =>
-      let k := Int32.unsigned i in
+      let k := DynamicValues.Int32.unsigned i in
       let n := BinIntDef.Z.to_nat k in
       match t with
       | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
@@ -351,7 +351,7 @@ Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (me
   | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 indices *)
     match dv with
     | DVALUE_Addr (b, o) =>
-      handle_gep_h t b (o + (sizeof_dtyp t) * (Int32.unsigned i)) vs' m
+      handle_gep_h t b (o + (sizeof_dtyp t) * (DynamicValues.Int32.unsigned i)) vs' m
     | _ => raise "non-address" 
     end
   | _ => raise "non-I32 index"
