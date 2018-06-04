@@ -2,6 +2,7 @@ Require Import List String.
 Require Import Vellvm.Util.
 Require Import Vellvm.LLVMAst.
 Require Import Vellvm.AstLib.
+Require Import Vellvm.LLVMIO.
 Require Import Vellvm.Classes.
 Require Import Coqlib.
 Require Import Coq.Logic.FunctionalExtensionality.

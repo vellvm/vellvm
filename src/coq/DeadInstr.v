@@ -20,7 +20,6 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 
 Require Import Vellvm.Memory.
-Import SS.
 
 Definition optimization := definition (list block) -> definition (list block).
 

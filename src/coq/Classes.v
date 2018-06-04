@@ -141,7 +141,7 @@ Defined.
 Instance eq_dec_string : eq_dec string := string_dec.
 
 Require Import ZArith.ZArith.
-Instance eq_dec_z : eq_dec Z := Z_eq_dec.
+Instance eq_dec_z : eq_dec Z := Z.eq_dec.
 
 Instance eq_dec_pair {A B} `(EA:eq_dec A) `(EB:eq_dec B) : eq_dec (A * B)%type.
 Proof.
