@@ -355,29 +355,6 @@ Proof.
   + econstructor. econstructor. econstructor. left. pfold. econstructor.
 Qed.
 
-
-Lemma pop_tau_strong :
-  forall (r1 : M E X -> M E X -> Prop)
-    (Hr: (forall u v : M E X , r1 u (Tau v) -> r1 u v))
-    (s t : M E X),
-    upaco2_2_0 eutt_step ent_step r1 r2 s (Tau t) -> @eutt_strong r1 r2 s t.
-Proof.
-  intros r1 Hr.
-  pcofix CH.
-  intros s t H.
-  pinversion H; subst.
-  - inversion H2; clear H2; subst. 
-    + pinversion H0; subst.
-      * inversion H1.
-        -- pfold. eapply EquivTau. right. eapply CH. pfold. econstructor. left.  exact H2.
-        -- pfold. eapply EquivTau. right. eapply CH. pfold. econstructor. right. exact H2.
-      * pfold. econstructor. eapply OneTau. eapply H1. eapply H2. left.
-        eapply paco2_2_1_mon. eapply H3. exact CH0. intros ? ? HP; inversion HP.
-    + pfold. eapply EquivTauExhaust. eapply OneTau. eapply NoTau. eapply NoTau.
-      left. 
-  - 
-
-
 Lemma pop_tau :
   forall (s t : M E X),
     EquivUpToTau s (Tau t) -> EquivUpToTau s t.
@@ -398,37 +375,6 @@ Proof.
 Qed.
     
   
-(*
-Lemma pop_tau :
-  forall (r1 r2 : relation (M E X))
-    (Hr1: forall s t, r1 s (Tau t) -> r1 s t)
-    (s t : M E X),
-    (upaco2_2_0 eutt_step ent_step r1 r2 s (Tau t))-> (@eutt_strong r1 r2) s t.
-Proof.
-  intros r1 r2 Hr1.
-  pcofix CH.
-  intros s t [H1 | H2].
-  **  
-  pinversion H1; subst. 
-  - destruct H2.
-    + pfold. 
-      *  destruct H.
-         ++ pfold. econstructor. right. apply CH. left. pfold. econstructor. left. assumption.
-         ++ pfold. econstructor. right. apply CH. left. pfold. econstructor. right. assumption.
-      *  destruct H1. 
-         ++ pfold. econstructor. econstructor. eauto. eauto.
-            left. eapply paco2_2_1_mon; eauto.
-         ++ pfold. econstructor. econstructor. eauto. eauto. right. assumption.
-    + eapply paco2_2_0_mon. pfold. econstructor. econstructor. apply NoTau. apply NoTau. 
-      pfold. econstructor. econstructor. apply NoTau.  apply NoTau. right.
-      left. eapply paco2_2_1_mon. eapply H2. intros ? ? PR; inversion PR. intros ? ? PR; inversion PR.
-  - pfold. inversion H1. subst.
-    + econstructor; eauto. left. eapply paco2_2_1_mon. exact H2. intros ? ? PR; inversion PR.
-      intros ? ? PR; inversion PR.
-    + subst. pinversion H2.  
-Qed.
-*)
-
 Lemma push_tau :
   forall (s t : M E X),
     EquivUpToTau s t -> EquivUpToTau s (Tau t).
@@ -442,17 +388,16 @@ Proof.
 Qed.
 
 Lemma tau_notau :
-  forall r1 (s t t' u' : M E X),
-    paco2_2_0 (@eutt_step) (@ent_step) r1 bot2 s t ->
+  forall (s t t' u' : M E X),
+    EquivUpToTau s t ->
     UnTau t t' ->
-    paco2_2_1 (@eutt_step) (@ent_step) r1 bot2 t' u' ->
-    exists s', UnTau s s' /\ paco2_2_1 (@eutt_step) (@ent_step) r1 bot2 s' t'.
+    EquivNoTau t' u' ->
+    exists s', UnTau s s' /\ EquivNoTau s' t'.
 Proof.
-  intros r1 s t t' u' Hst Htt' Ht'u'.
+  intros s t t' u' Hst Htt' Ht'u'.
   induction Htt'.
   - apply IHHtt'; auto.
-    eapply paco2_2_0_mon. eapply pop_tau.
-    apply pop_tau; auto.
+    eapply pop_tau. eauto.
   - pdestruct Hst; pinversion Ht'u'; subst;
       exists s'; split; auto; inversion H0; subst; auto.
 Qed.
@@ -482,172 +427,140 @@ Proof.
     (pinversion Hst''; pinversion Hts'; subst; discriminate).
 Qed.
 
-(*
-Lemma eutt_untau : forall E X (s s' t : M E X),
-    UnTau s s' -> EquivUpToTau s t ->
-    exists t', UnTau t t' /\ EquivUpToTau s' t'.
-Proof.
-  intros E X s s' t HUnTau.
-  generalize dependent t.
-  induction HUnTau as [ s s' HUnTau IH | s HNoTau ]; intros t H.
-  - punfold H. inversion H as [ | | s1 t1 H1 | s1 s1' ? HtNoTau | | ]; pclearbot.
-    + apply IH in H1; destruct H1 as [t' H1]; destruct H1.
-      eexists; split.
-      * constructor; eassumption.
-      * assumption.
-    + eexists; split. constructor.
-      * assumption.
-      * replace s' with s1'.
-        -- assumption.
-        -- eapply untau_inj; eassumption.
-    + dispatch_contra.
-  - punfold H. inversion H; pclearbot; subst.
-    + eexists; split. constructor. assumption. pfold. constructor.
-    + eexists; split. constructor. 
-      * intros t I. inversion I.
-      * pfold. assumption.
-    + dispatch_contra.
-    + dispatch_contra.
-    + eexists; split.
-      * constructor. eassumption.
-      * assumption.
-    + eexists; split.
-      * constructor. intros. unfold not. intros. inversion H0.
-      * pfold. assumption.
-Qed.
- *)
 
-Lemma eutt_trans : forall r1 r2, Transitive r1 -> Transitive r2 ->
-                            forall s t u, ((paco2_2_0 (@eutt_step) (@ent_step) r1 r2 s t) \/ r1 s t) ->
-                                     ((paco2_2_0 (@eutt_step) (@ent_step) r1 r2 t u) \/ r1 t u) ->
-                                     paco2_2_0 (@eutt_step) (@ent_step) r1 r2 s u.
-Proof.
-  intros r1 r2.
-  pcofix CH1.
-  intros HT1 HT2 s t u [H1 | H1] [H2 | H2].
-  - pfold.
-    pdestruct H1.
-    pinversion H2; subst.
-    + econstructor. right. eapply CH1; eauto.
-    + destruct H.
-  - econstructor. right.
-    destruct H. destruct H1.
-    eapply CH1; eauto.
-  - econstructor. right. eapply CH1. eapply HT1. eapply HT2. eapply H.
-    pfold.
-    eapply paco2_2_0_mon.
-  - apply push_tau in H.
-      pose (Hs1t1 := tau_notau H H0 H3).
-      destruct Hs1t1 as [s0' [Hs1 Hs't2']].
-      econstructor.
-      + constructor; eassumption.
-      + eassumption.
-      + left. eapply paco2_2_1_mon. eapply ent_trans. eauto. eauto.
-        intros ? ? PR; inversion PR. intros ? ? PR; inversion PR.
-    - pfold.
-      (* _, _ & Tau, Tau *)
-      apply eutt_sym in H2.
-      apply eunt_sym in H1.
-      pose (Ht1u := tau_notau H2 H0 H1).
-      destruct Ht1u as [s0' [Hu Hs't1']].
-      econstructor.
-      + eassumption.
-      + eassumption.
-      + left.
-        eapply paco2_2_1_mon.
-        eapply ent_trans; apply eunt_sym; eassumption.
-        intros ? ? PR; inversion PR.
-        intros ? ? PR; inversion PR.
-  }
-  
+Lemma eutt_trans1:
+    forall r1 r2 : M E X -> M E X -> Prop,
+      (forall s t u : M E X, EquivNoTau s t -> EquivNoTau t u -> paco2_2_1 eutt_step ent_step r1 r2 s u) ->
+      forall s t u : M E X, EquivUpToTau s t -> EquivUpToTau t u -> paco2_2_0 eutt_step ent_step r1 r2 s u.
+  Proof.
+    intros r1 r2 HN.
+    pcofix CH2.
+    intros s t u Hst Htu.
+    pdestruct Hst.
+    pinversion Htu; subst.
+    - pfold. econstructor. right. eapply CH2. eapply H. eapply H1.
 
-Lemma eutt_trans :  forall (s t u : M E X),  EquivUpToTau s t -> EquivUpToTau t u -> EquivUpToTau s u
-with  ent_trans : forall (s t u : M E X), EquivNoTau s t -> EquivNoTau t u -> EquivNoTau s u.
-Proof.
-  {
-    clear eutt_trans.
-    pcofix CH.
-    intros s t u
-           H1
-           H2.
-    pdestruct H1.
-    pinversion H2; subst.
-    - pfold. econstructor. right. eapply CH.
-      apply H. apply H1.
     - pfold. apply push_tau in H.
-      pose (Hs1t1 := tau_notau H H0 H3).
+      pose (Hs1t1 := tau_notau H H0 H2).
       destruct Hs1t1 as [s0' [Hs1 Hs't2']].
       econstructor.
       + constructor; eassumption.
       + eassumption.
-      + left. eapply paco2_2_1_mon. eapply ent_trans. eauto. eauto.
-        intros ? ? PR; inversion PR. intros ? ? PR; inversion PR.
+      + left. eapply paco2_2_1_mon. eapply HN. eapply Hs't2'. eapply H2. apply CH0. intros; eauto.
     - pfold.
       (* _, _ & Tau, Tau *)
-      apply eutt_sym in H2.
+      apply eutt_sym in Htu.
       apply eunt_sym in H1.
-      pose (Ht1u := tau_notau H2 H0 H1).
+      pose (Ht1u := tau_notau Htu H0 H1).
       destruct Ht1u as [s0' [Hu Hs't1']].
       econstructor.
       + eassumption.
       + eassumption.
       + left.
         eapply paco2_2_1_mon.
-        eapply ent_trans; apply eunt_sym; eassumption.
-        intros ? ? PR; inversion PR.
-        intros ? ? PR; inversion PR.
-  }
-  { clear ent_trans.
+        eapply HN; apply eunt_sym; eassumption. apply CH0. intros; eauto.
+Qed.
+
+Lemma eutt_trans2:
+    forall r1 r2 : M E X -> M E X -> Prop,
+      (forall s t u : M E X, EquivNoTau s t -> EquivNoTau t u -> r2 s u) ->
+      forall s t u : M E X, EquivUpToTau s t -> EquivUpToTau t u -> paco2_2_0 eutt_step ent_step r1 r2 s u.
+  Proof.
+    intros r1 r2 HN.
+    pcofix CH2.
+    intros s t u Hst Htu.
+    pdestruct Hst.
+    pinversion Htu; subst.
+    - pfold. econstructor. right. eapply CH2. eapply H. eapply H1.
+
+    - pfold. apply push_tau in H.
+      pose (Hs1t1 := tau_notau H H0 H2).
+      destruct Hs1t1 as [s0' [Hs1 Hs't2']].
+      econstructor.
+      + constructor; eassumption.
+      + eassumption.
+      + right. eapply HN. eapply Hs't2'. eapply H2. 
+    - pfold.
+      (* _, _ & Tau, Tau *)
+      apply eutt_sym in Htu.
+      apply eunt_sym in H1.
+      pose (Ht1u := tau_notau Htu H0 H1).
+      destruct Ht1u as [s0' [Hu Hs't1']].
+      econstructor.
+      + eassumption.
+      + eassumption.
+      + right.
+        eapply HN; apply eunt_sym; eassumption. 
+Qed.
+
+  
+  Lemma ent_trans1:
+    forall r1 r2 : M E X -> M E X -> Prop,
+      (forall s t u : M E X, EquivUpToTau s t -> EquivUpToTau t u -> r1 s u) -> 
+      forall s t u : M E X, EquivNoTau s t -> EquivNoTau t u -> paco2_2_1 eutt_step ent_step r1 r2 s u.
+  Proof.
+    intros r1 r2 HE.
+    pcofix CH2.
     intros s t u Hst Htu.
     pdestruct Hst; pinversion Htu; subst.
     - pfold. econstructor. eapply transitivity. eapply H. eapply H1.
     - pfold. 
       apply inj_pair2 in H2. subst.
       apply inj_pair2 in H3. subst.
-      econstructor. intros y. left.
+      econstructor. intros y.
+      right. 
       specialize H with (y:=y). specialize H4 with (y:=y).
-      pclearbot. eapply eutt_trans; eauto.
+      pclearbot.
+      eapply HE. 
+      eauto. eauto.
     - pfold. econstructor.
-  }
-Qed.  
-    
-      subst.
-    - (* Tau, Tau, Tau *) constructor; eapply eutt_trans; eauto.
-    - (* Tau, Tau & _, _ *)
-      apply push_tau in H1.
-      pose (Hs1t1 := tau_notau H1 Ht2 H2').
-      destruct Hs1t1 as [s' [Hs1 Hs't2']].
-      econstructor.
-      + constructor; eassumption.
-      + eassumption.
-      + eapply eunt_trans; eassumption.
-    - (* _, _ & Tau, Tau *)
-      apply eutt_sym in H2.
-      apply eunt_sym in H1.
-      pose (Ht1u := tau_notau H2 H0 H1).
-      destruct Ht1u as [s' [Hu Hs't1']].
-      econstructor.
-      + eassumption.
-      + eassumption.
-      + eapply eunt_trans; apply eunt_sym; eassumption.
-    - (* _, _, _ *)
-      econstructor; try eassumption.
-      eapply eunt_trans. eassumption.
-      replace t2' with t1' in *.
-      + auto.
-      + eapply untau_inj; eauto.
-  }
-  { intros s t u Hst Htu.
-    destruct Hst; inversion Htu; subst.
-    - constructor; auto. eapply Equivalence.equiv_transitive; eauto.
-    - apply inj_pair2 in H2.
-      apply inj_pair2 in H3.
-      subst.
-      constructor.
-      intros.
-      eapply eutt_trans; eauto.
-  }
+  Qed.      
+
+  Lemma ent_trans2:
+    forall r1 r2 : M E X -> M E X -> Prop,
+      (forall s t u : M E X, EquivUpToTau s t -> EquivUpToTau t u -> paco2_2_0 eutt_step ent_step r1 r2 s u) -> 
+      forall s t u : M E X, EquivNoTau s t -> EquivNoTau t u -> paco2_2_1 eutt_step ent_step r1 r2 s u.
+  Proof.
+    intros r1 r2 HE.
+    pcofix CH2.
+    intros s t u Hst Htu.
+    pdestruct Hst; pinversion Htu; subst.
+    - pfold. econstructor. eapply transitivity. eapply H. eapply H1.
+    - pfold. 
+      apply inj_pair2 in H2. subst.
+      apply inj_pair2 in H3. subst.
+      econstructor. intros y.
+      left.
+      specialize H with (y:=y). specialize H4 with (y:=y).
+      pclearbot.
+      eapply paco2_2_0_mon.
+      eapply HE. 
+      eauto. eauto. intros; eauto. exact CH0.
+    - pfold. econstructor.
+  Qed.      
+
+  
+Lemma eutt_trans : Transitive (EquivUpToTau). 
+Proof.
+  pcofix CH.
+  intros s t u Hst Htu.
+  apply eutt_trans1 with (t:=t)(r1:=r)(r2:=bot2); eauto.
+  pcofix CH2.
+  intros.
+  eapply ent_trans1 with (t:=t0)(r1:=r)(r2:=r0); eauto.
 Qed.
+  
+Lemma ent_trans : Transitive (EquivNoTau).
+Proof.
+  pcofix CH.
+  intros x y z H0 H1.
+  apply ent_trans2 with (t:=y)(r1:=bot2)(r2:=r); eauto.
+  pcofix CH2.
+  intros; eapply eutt_trans2; eauto.
+Qed.  
+  
+
+
 
 
 Ltac eutt_mono :=
