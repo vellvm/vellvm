@@ -15,6 +15,7 @@ module DV = TopLevel.IO.DV
 let print_int_dvalue dv : unit =
   match dv with
   | DV.DVALUE_I1 (x) -> Printf.printf "Program terminated with: DVALUE_I1(%d)\n" (Camlcoq.Z.to_int (DynamicValues.Int1.unsigned x))
+  | DV.DVALUE_I8 (x) -> Printf.printf "Program terminated with: DVALUE_I8(%d)\n" (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
   | DV.DVALUE_I32 (x) -> Printf.printf "Program terminated with: DVALUE_I32(%d)\n" (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
   | DV.DVALUE_I64 (x) -> Printf.printf "Program terminated with: DVALUE_I64(%d) [possible precision loss: converted to OCaml int]\n"
                        (Camlcoq.Z.to_int (DynamicValues.Int64.unsigned x))
