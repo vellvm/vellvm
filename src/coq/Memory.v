@@ -165,6 +165,7 @@ Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
   match dval with
   | DVALUE_Addr addr => (Ptr addr) :: (repeat PtrFrag 7)
   | DVALUE_I1 i => Z_to_sbyte_list 8 (DynamicValues.Int1.unsigned i)
+  | DVALUE_I8 i => Z_to_sbyte_list 8 (DynamicValues.Int8.unsigned i)
   | DVALUE_I32 i => Z_to_sbyte_list 8 (DynamicValues.Int32.unsigned i)
   | DVALUE_I64 i => Z_to_sbyte_list 8 (Int64.unsigned i)
   | DVALUE_Struct fields | DVALUE_Array fields =>
@@ -180,6 +181,7 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:dtyp) : dvalue :=
     let des_int := sbyte_list_to_Z bytes in
     match sz with
     | 1 => DVALUE_I1 (DynamicValues.Int1.repr des_int)
+    | 8 => DVALUE_I8 (DynamicValues.Int8.repr des_int)
     | 32 => DVALUE_I32 (DynamicValues.Int32.repr des_int)
     | 64 => DVALUE_I64 (Int64.repr des_int)
     | _ => DVALUE_None (* invalid size. *)
@@ -217,6 +219,8 @@ Inductive serialize_defined : dvalue -> Prop :=
       serialize_defined (DVALUE_Addr addr)
   | d_i1: forall i1,
       serialize_defined (DVALUE_I1 i1)
+  | d_i8: forall i1,
+      serialize_defined (DVALUE_I8 i1)
   | d_i32: forall i32,
       serialize_defined (DVALUE_I32 i32)
   | d_i64: forall i64,
@@ -318,6 +322,14 @@ Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (
         end
       | _ => raise ("non-i32-indexable type")
       end
+    | DVALUE_I8 i =>
+      let k := DynamicValues.Int8.unsigned i in
+      let n := BinIntDef.Z.to_nat k in
+      match t with
+      | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
+                           handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+      | _ => raise ("non-i8-indexable type")
+      end
     | DVALUE_I64 i =>
       let k := Int64.unsigned i in
       let n := BinIntDef.Z.to_nat k in
@@ -403,6 +415,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
     match i with
     | DVALUE_I64 i => mret (inr (m, DVALUE_Addr (0, DynamicValues.Int64.unsigned i)))
     | DVALUE_I32 i => mret (inr (m, DVALUE_Addr (0, DynamicValues.Int32.unsigned i)))
+    | DVALUE_I8 i => mret (inr (m, DVALUE_Addr (0, DynamicValues.Int8.unsigned i)))
     | DVALUE_I1 i => mret (inr (m, DVALUE_Addr (0, DynamicValues.Int1.unsigned i)))
     | _ => raise "Non integer passed to ItoP"
     end

@@ -108,30 +108,48 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     match conv with
     | Trunc =>
       match t1, x, t2 with
+      | TYPE_I 8, DVALUE_I8 i1, TYPE_I 1 =>
+        mret (DVALUE_I1 (Int1.repr (Int8.unsigned i1)))
       | TYPE_I 32, DVALUE_I32 i1, TYPE_I 1 =>
         mret (DVALUE_I1 (Int1.repr (Int32.unsigned i1)))
+      | TYPE_I 32, DVALUE_I32 i1, TYPE_I 8 =>
+        mret (DVALUE_I8 (Int8.repr (Int32.unsigned i1)))
       | TYPE_I 64, DVALUE_I64 i1, TYPE_I 1 =>
         mret (DVALUE_I1 (Int1.repr (Int64.unsigned i1)))
+      | TYPE_I 64, DVALUE_I64 i1, TYPE_I 8 =>
+        mret (DVALUE_I8 (Int8.repr (Int64.unsigned i1)))
       | TYPE_I 64, DVALUE_I64 i1, TYPE_I 32 =>
         mret (DVALUE_I32 (Int32.repr (Int64.unsigned i1)))
       | _, _, _ => failwith "ill typed-conv"
       end
     | Zext =>
       match t1, x, t2 with
+      | TYPE_I 1, DVALUE_I1 i1, TYPE_I 8 =>
+        mret (DVALUE_I8 (Int8.repr (Int1.unsigned i1)))
       | TYPE_I 1, DVALUE_I1 i1, TYPE_I 32 =>
         mret (DVALUE_I32 (Int32.repr (Int1.unsigned i1)))
       | TYPE_I 1, DVALUE_I1 i1, TYPE_I 64 =>
         mret (DVALUE_I64 (Int64.repr (Int1.unsigned i1)))
+      | TYPE_I 8, DVALUE_I8 i1, TYPE_I 32 =>
+        mret (DVALUE_I32 (Int32.repr (Int8.unsigned i1)))
+      | TYPE_I 8, DVALUE_I8 i1, TYPE_I 64 =>
+        mret (DVALUE_I64 (Int64.repr (Int8.unsigned i1)))
       | TYPE_I 32, DVALUE_I32 i1, TYPE_I 64 =>
         mret (DVALUE_I64 (Int64.repr (Int32.unsigned i1)))
       | _, _, _ => failwith "ill typed-conv"
       end
     | Sext =>
       match t1, x, t2 with
+      | TYPE_I 1, DVALUE_I1 i1, TYPE_I 8 =>
+        mret (DVALUE_I8 (Int8.repr (Int1.signed i1)))
       | TYPE_I 1, DVALUE_I1 i1, TYPE_I 32 =>
         mret (DVALUE_I32 (Int32.repr (Int1.signed i1)))
       | TYPE_I 1, DVALUE_I1 i1, TYPE_I 64 =>
         mret (DVALUE_I64 (Int64.repr (Int1.signed i1)))
+      | TYPE_I 8, DVALUE_I8 i1, TYPE_I 32 =>
+        mret (DVALUE_I32 (Int32.repr (Int8.signed i1)))
+      | TYPE_I 8, DVALUE_I8 i1, TYPE_I 64 =>
+        mret (DVALUE_I64 (Int64.repr (Int8.signed i1)))
       | TYPE_I 32, DVALUE_I32 i1, TYPE_I 64 =>
         mret (DVALUE_I64 (Int64.repr (Int32.signed i1)))
       | _, _, _ => failwith "ill typed-conv"

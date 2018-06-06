@@ -19,24 +19,33 @@ Set Contextual Implicit.
 
 Open Scope Z_scope.
 
-(* Set up representations for for i1, i32, and i64 *) 
+(* Set up representations for for i1, i32, and i64 *)
 Module Wordsize1.
   Definition wordsize := 1%nat.
   Remark wordsize_not_zero: wordsize <> 0%nat.
   Proof. unfold wordsize; congruence. Qed.
 End Wordsize1.
 
+Module Wordsize8.
+  Definition wordsize := 8%nat.
+  Remark wordsize_not_zero: wordsize <> 0%nat.
+  Proof. unfold wordsize; congruence. Qed.
+End Wordsize8.
+
 Module Int1 := Make(Wordsize1).
+Module Int8 := Make(Wordsize8).
 Module Int32 := Integers.Int.
 Module Int64 := Integers.Int64.
 
 Definition int1 := Int1.int.
+Definition int8 := Int8.int.
 Definition int32 := Int32.int.
 Definition int64 := Int64.int.
 
 Definition inttyp (x:Z) : Type :=
   match x with
   | 1 => int1
+  | 8 => int8
   | 32 => int32
   | 64 => int64
   | _ => False
@@ -46,11 +55,12 @@ Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
 Module DVALUE(A:Vellvm.MemoryAddress.ADDRESS).
-       
+
 (* The set of dynamic values manipulated by an LLVM program. *)
 Inductive dvalue : Set :=
 | DVALUE_Addr (a:A.addr)
 | DVALUE_I1 (x:int1)
+| DVALUE_I8 (x:int8)
 | DVALUE_I32 (x:int32)
 | DVALUE_I64 (x:int64)
 | DVALUE_Double (x:ll_double)
@@ -64,7 +74,7 @@ Inductive dvalue : Set :=
 | DVALUE_Vector        (elts: list dvalue)
 .
 
-(* TODO: include Undefined values in this way? i.e. Undef is really a predicate on values 
+(* TODO: include Undefined values in this way? i.e. Undef is really a predicate on values
    Note: this isn't correct because it won't allow for undef fields of a struct or elts of an array
 Inductive dvalue' : Set :=
 | DVALUE_Undef (p:dvalue -> bool) (* TODO: used to include type information. is it necessary? (t:dtyp)  *)
@@ -74,6 +84,12 @@ Inductive dvalue' : Set :=
 Definition is_DVALUE_I1 (d:dvalue) : bool :=
   match d with
   | DVALUE_I1 _ => true
+  | _ => false
+  end.
+
+Definition is_DVALUE_I8 (d:dvalue) : bool :=
+  match d with
+  | DVALUE_I8 _ => true
   | _ => false
   end.
 
@@ -91,6 +107,7 @@ Definition is_DVALUE_I64 (d:dvalue) : bool :=
 
 
 Definition undef_i1  := DVALUE_Undef.
+Definition undef_i8  := DVALUE_Undef.
 Definition undef_i32 := DVALUE_Undef.
 Definition undef_i64 := DVALUE_Undef.
 
@@ -99,7 +116,7 @@ Definition undef_i64 := DVALUE_Undef.
 
   (* Since modules are not first class, this code duplication
      will probably have to do. *)
-    
+
   Definition eval_i1_op (iop:ibinop) (x y:inttyp 1) : dvalue:=
     (* See eval_i64_op for a few comments *)
     match iop with
@@ -140,7 +157,66 @@ Definition undef_i64 := DVALUE_Undef.
     end.
   Arguments eval_i1_op _ _ _ : simpl nomatch.
 
-  
+
+  Definition eval_i8_op (iop:ibinop) (x y:inttyp 8) : dvalue:=
+    match iop with
+    | Add nuw nsw =>
+      if orb (andb nuw (Int8.eq (Int8.add_carry x y Int8.zero) Int8.one))
+             (andb nsw (Int8.eq (Int8.add_overflow x y Int8.zero) Int8.one))
+      then DVALUE_Poison else DVALUE_I8 (Int8.add x y)
+    | Sub nuw nsw =>
+      if orb (andb nuw (Int8.eq (Int8.sub_borrow x y Int8.zero) Int8.one))
+             (andb nsw (Int8.eq (Int8.sub_overflow x y Int8.zero) Int8.one))
+      then DVALUE_Poison else DVALUE_I8 (Int8.sub x y)
+    | Mul nuw nsw =>
+      let res := Int8.mul x y in
+      let res_s' := (Int8.signed x) * (Int8.signed y) in
+      if orb (andb nuw ((Int8.unsigned x) * (Int8.unsigned y) >?
+                      Int8.unsigned res))
+             (andb nsw (orb (Int8.min_signed >? res_s')
+                            (res_s' >? Int8.max_signed)))
+      then DVALUE_Poison else DVALUE_I8 res
+    | Shl nuw nsw =>
+      let res := Int8.shl x y in
+      let res_u := Int8.unsigned res in
+      let res_u' := Z.shiftl (Int8.unsigned x) (Int8.unsigned y) in
+      if (Int8.unsigned y) >=? 8 then undef_i8
+      else if orb (andb nuw (res_u' >? res_u))
+                  (andb nsw (negb (Z.shiftr (Int8.unsigned x)
+                                            (8 - Int8.unsigned y)
+                                   =? (Int8.unsigned (Int8.negative res))
+                                      * (Z.pow 2 (Int8.unsigned y) - 1))))
+      then DVALUE_Poison else DVALUE_I8 res
+    | UDiv ex =>
+      if andb ex (negb ((Int8.unsigned x) mod (Int8.unsigned y) =? 0))
+      then DVALUE_Poison else DVALUE_I8 (Int8.divu x y)
+    | SDiv ex =>
+      if andb ex (negb (((Int8.signed x) mod (Int8.signed y)) =? 0))
+      then DVALUE_Poison else DVALUE_I8 (Int8.divs x y)
+    | LShr ex =>
+      if (Int8.unsigned y) >=? 8 then undef_i8
+      else if andb ex (negb ((Int8.unsigned x)
+                               mod (Z.pow 2 (Int8.unsigned y)) =? 0))
+      then DVALUE_Poison else DVALUE_I8 (Int8.shru x y)
+    | AShr ex =>
+      if (Int8.unsigned y) >=? 8 then undef_i8
+      else if andb ex (negb ((Int8.unsigned x)
+                               mod (Z.pow 2 (Int8.unsigned y)) =? 0))
+      then DVALUE_Poison else DVALUE_I8 (Int8.shr x y)
+    | URem =>
+      DVALUE_I8 (Int8.modu x y)
+    | SRem =>
+      DVALUE_I8 (Int8.mods x y)
+    | And =>
+      DVALUE_I8 (Int8.and x y)
+    | Or =>
+      DVALUE_I8 (Int8.or x y)
+    | Xor =>
+      DVALUE_I8 (Int8.xor x y)
+    end.
+  Arguments eval_i8_op _ _ _ : simpl nomatch.
+
+
   Definition eval_i32_op (iop:ibinop) (x y:inttyp 32) : dvalue:=
     match iop with
     | Add nuw nsw =>
@@ -198,7 +274,8 @@ Definition undef_i64 := DVALUE_Undef.
       DVALUE_I32 (Int32.xor x y)
     end.
   Arguments eval_i32_op _ _ _ : simpl nomatch.
-  
+
+
   Definition eval_i64_op (iop:ibinop) (x y:inttyp 64) : dvalue:=
     (* This needs to be tested *)
     match iop with
@@ -260,28 +337,30 @@ Definition undef_i64 := DVALUE_Undef.
       DVALUE_I64 (Int64.xor x y)
     end.
   Arguments eval_i64_op _ _ _ : simpl nomatch.
-  
+
   (* Evaluate the given iop on the given arguments according to the bitsize *)
   Definition integer_op (bits:Z) (iop:ibinop) (x y:inttyp bits) : err dvalue :=
     match bits, x, y with
     | 1, x, y => mret (eval_i1_op iop x y)
+    | 8, x, y => mret (eval_i8_op iop x y)
     | 32, x, y => mret (eval_i32_op iop x y)
     | 64, x, y => mret (eval_i64_op iop x y)
     | _, _, _ => failwith "unsupported bitsize"
     end.
   Arguments integer_op _ _ _ _ : simpl nomatch.
-  
+
   (* Convert written integer constant to corresponding integer with bitsize bits.
      Takes the integer modulo 2^bits. *)
   Definition coerce_integer_to_int (bits:Z) (i:Z) : err dvalue :=
     match bits with
-    | 1 => mret (DVALUE_I1 (Int1.repr i)) 
+    | 1 => mret (DVALUE_I1 (Int1.repr i))
+    | 8 => mret (DVALUE_I8 (Int8.repr i))
     | 32 => mret (DVALUE_I32 (Int32.repr i))
     | 64 => mret (DVALUE_I64 (Int64.repr i))
     | _ => failwith "unsupported integer size"
     end.
   Arguments coerce_integer_to_int _ _ : simpl nomatch.
-  
+
   (* Helper for looping 2 argument evaluation over vectors, producing a vector *)
   Fixpoint vec_loop (f:dvalue -> dvalue -> err dvalue) (elts:list (dvalue * dvalue))
     : err (list dvalue) :=
@@ -289,13 +368,14 @@ Definition undef_i64 := DVALUE_Undef.
                          'val <- f e1 e2;
                          mret (val :: acc)
                        ) elts [].
-    
-  (* Integer iop evaluation, called from eval_iop. 
+
+  (* Integer iop evaluation, called from eval_iop.
      Here the values must be integers. Helper defined
      in order to prevent eval_iop from being recursive. *)
   Definition eval_iop_integer_h iop v1 v2 : err dvalue :=
     match v1, v2 with
     | DVALUE_I1 i1, DVALUE_I1 i2 => integer_op 1 iop i1 i2
+    | DVALUE_I8 i1, DVALUE_I8 i2 => integer_op 8 iop i1 i2
     | DVALUE_I32 i1, DVALUE_I32 i2 => integer_op 32 iop i1 i2
     | DVALUE_I64 i1, DVALUE_I64 i2 => integer_op 64 iop i1 i2
     | _, _ => failwith "ill_typed-iop"
@@ -303,7 +383,7 @@ Definition undef_i64 := DVALUE_Undef.
   Arguments eval_iop_integer_h _ _ _ : simpl nomatch.
 
   (* I split the definition between the vector and other evaluations because
-     otherwise eval_iop should be recursive to allow for vector calculations, 
+     otherwise eval_iop should be recursive to allow for vector calculations,
      but coq can't find a fixpoint. *)
   Definition eval_iop iop v1 v2 : err dvalue :=
     match v1, v2 with
@@ -330,7 +410,23 @@ Definition undef_i64 := DVALUE_Undef.
        end
     then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
   Arguments eval_i1_icmp _ _ _ : simpl nomatch.
-  
+
+  Definition eval_i8_icmp icmp x y : dvalue :=
+    if match icmp with
+       | Eq => Int8.cmp Ceq x y
+       | Ne => Int8.cmp Cne x y
+       | Ugt => Int8.cmpu Cgt x y
+       | Uge => Int8.cmpu Cge x y
+       | Ult => Int8.cmpu Clt x y
+       | Ule => Int8.cmpu Cle x y
+       | Sgt => Int8.cmp Cgt x y
+       | Sge => Int8.cmp Cge x y
+       | Slt => Int8.cmp Clt x y
+       | Sle => Int8.cmp Cle x y
+       end
+    then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
+  Arguments eval_i8_icmp _ _ _ : simpl nomatch.
+
   Definition eval_i32_icmp icmp x y : dvalue :=
     if match icmp with
        | Eq => Int32.cmp Ceq x y
@@ -346,7 +442,7 @@ Definition undef_i64 := DVALUE_Undef.
        end
     then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
   Arguments eval_i32_icmp _ _ _ : simpl nomatch.
-  
+
   Definition eval_i64_icmp icmp x y : dvalue :=
     if match icmp with
        | Eq => Int64.cmp Ceq x y
@@ -362,19 +458,21 @@ Definition undef_i64 := DVALUE_Undef.
        end
     then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
   Arguments eval_i64_icmp _ _ _ : simpl nomatch.
-  
+
   Definition integer_cmp bits icmp (x y:inttyp bits) : err dvalue :=
     match bits, x, y with
     | 1, x, y => mret (eval_i1_icmp icmp x y)
+    | 8, x, y => mret (eval_i8_icmp icmp x y)
     | 32, x, y => mret (eval_i32_icmp icmp x y)
     | 64, x, y => mret (eval_i64_icmp icmp x y)
     | _, _, _ => failwith "unsupported bitsize"
     end.
   Arguments integer_cmp _ _ _ _ : simpl nomatch.
-  
+
   Definition eval_icmp icmp v1 v2 : err dvalue :=
     match v1, v2 with
     | DVALUE_I1 i1, DVALUE_I1 i2 => integer_cmp 1 icmp i1 i2
+    | DVALUE_I8 i1, DVALUE_I8 i2 => integer_cmp 8 icmp i1 i2
     | DVALUE_I32 i1, DVALUE_I32 i2 => integer_cmp 32 icmp i1 i2
     | DVALUE_I64 i1, DVALUE_I64 i2 => integer_cmp 64 icmp i1 i2
     | _, _ => failwith "ill_typed-icmp"
@@ -390,7 +488,7 @@ Definition undef_i64 := DVALUE_Undef.
     | FDiv => mret (DVALUE_Double (Float.div v1 v2))
     | FRem => failwith "unimplemented"
     end.
-  
+
   Definition float_op (fop:fbinop) (v1:ll_float) (v2:ll_float) : err dvalue :=
     match fop with
     | FAdd => mret (DVALUE_Float (Float32.add v1 v2))
@@ -399,26 +497,26 @@ Definition undef_i64 := DVALUE_Undef.
     | FDiv => mret (DVALUE_Float (Float32.div v1 v2))
     | FRem => failwith "unimplemented"
     end.
-  
+
   Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : err dvalue :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2 => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
     | _, _ => failwith "ill_typed-fop"
-    end. 
+    end.
 
   Definition not_nan32 (f:ll_float) : bool :=
-    negb (compcert.flocq.Appli.Fappli_IEEE.is_nan _ _ f). 
+    negb (compcert.flocq.Appli.Fappli_IEEE.is_nan _ _ f).
 
   Definition ordered32 (f1 f2:ll_float) : bool :=
     andb (not_nan32 f1) (not_nan32 f2).
 
   Definition not_nan64 (f:ll_double) : bool :=
-    negb (compcert.flocq.Appli.Fappli_IEEE.is_nan _ _ f). 
+    negb (compcert.flocq.Appli.Fappli_IEEE.is_nan _ _ f).
 
   Definition ordered64 (f1 f2:ll_double) : bool :=
     andb (not_nan64 f1) (not_nan64 f2).
-  
+
   Definition float_cmp (fcmp:fcmp) (x:ll_float) (y:ll_float) : dvalue :=
     if match fcmp with
        | FFalse => false
@@ -462,7 +560,7 @@ Definition undef_i64 := DVALUE_Undef.
        end
     then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
     Arguments double_cmp _ _ _ : simpl nomatch.
-  
+
   Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : err dvalue :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2 => mret (float_cmp fcmp f1 f2)
@@ -482,13 +580,13 @@ Definition undef_i64 := DVALUE_Undef.
     end.
   Arguments eval_select_h _ _ _ : simpl nomatch.
 
-  
+
   Definition eval_select cnd v1 v2 : err dvalue :=
     match cnd, v1, v2 with
     | (DVALUE_Vector es), (DVALUE_Vector es1), (DVALUE_Vector es2) =>
       (* vec needs to loop over es, es1, and es2. Is there a way to
          generalize vec_loop to cover this? (make v1,v2 generic?) *)
-      let fix loop elts := 
+      let fix loop elts :=
           match elts with
           | [] => mret []
           | (cnd,(v1,v2)) :: tl =>
@@ -501,8 +599,8 @@ Definition undef_i64 := DVALUE_Undef.
     | _, _, _ => eval_select_h cnd v1 v2
     end.
   Arguments eval_select _ _ _ : simpl nomatch.
-  
-  (* Helper function for indexing into a structured datatype 
+
+  (* Helper function for indexing into a structured datatype
      for extractvalue and insertvalue *)
   Definition index_into_str (v:dvalue) (idx:LLVMAst.int) : err dvalue :=
     let fix loop elts i :=
@@ -517,7 +615,7 @@ Definition undef_i64 := DVALUE_Undef.
     | _ => failwith "invalid aggregate data"
     end.
   Arguments index_into_str _ _ : simpl nomatch.
-  
+
   (* Helper function for inserting into a structured datatype for insertvalue *)
   Definition insert_into_str (str:dvalue) (v:dvalue) (idx:LLVMAst.int) : err dvalue :=
     let fix loop (acc elts:list dvalue) (i:LLVMAst.int) :=
@@ -540,5 +638,5 @@ Definition undef_i64 := DVALUE_Undef.
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
 
-  
+
 End DVALUE.

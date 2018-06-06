@@ -78,6 +78,18 @@ let poison_tests =
    "../tests/llvm-arith/i32/sub_nsw.ll";
    "../tests/llvm-arith/i32/sub_nuw.ll";
    "../tests/llvm-arith/i32/udiv_ex.ll";
+   "../tests/llvm-arith/i8/add_nsw.ll";
+   "../tests/llvm-arith/i8/add_nuw.ll";
+   "../tests/llvm-arith/i8/ashr_ex.ll";
+   "../tests/llvm-arith/i8/lshr_ex.ll";
+   "../tests/llvm-arith/i8/mul_nsw.ll";
+   "../tests/llvm-arith/i8/mul_nuw.ll";
+   "../tests/llvm-arith/i8/sdiv_ex.ll";
+   "../tests/llvm-arith/i8/shl_nsw.ll";
+   "../tests/llvm-arith/i8/shl_nuw.ll";
+   "../tests/llvm-arith/i8/sub_nsw.ll";
+   "../tests/llvm-arith/i8/sub_nuw.ll";
+   "../tests/llvm-arith/i8/udiv_ex.ll";
    "../tests/llvm-arith/i64/add_nsw.ll";
    "../tests/llvm-arith/i64/add_nuw.ll";
    "../tests/llvm-arith/i64/ashr_ex.ll";
@@ -130,6 +142,7 @@ let parse_files =
 let test_dirs =
   ["../tests/ll/";
    "../tests/llvm-arith/i1/";
+   "../tests/llvm-arith/i8/";
    "../tests/llvm-arith/i32/";
    "../tests/llvm-arith/i64/"]
 
@@ -146,6 +159,11 @@ let i1_test (i1:int1) = function
      Int1.eq i1 i2
   | _ -> false
 
+let i8_test (i1:int8) = function
+  | IO.DV.DVALUE_I1 i2 ->
+     Int8.eq i1 i2
+  | _ -> false
+
 let i32_test (i1:int32) = function
   | IO.DV.DVALUE_I32 i2 ->
      Int32.eq i1 i2
@@ -158,6 +176,8 @@ let i64_test (i1:int64) = function
 
 let i1_of_int i = Int1.repr (Camlcoq.Z.of_sint i)
 
+let i8_of_int i = Int8.repr (Camlcoq.Z.of_sint i)
+
 let i32_of_int i = Int32.repr (Camlcoq.Z.of_sint i)
 
 let i64_of_int i = Int64.repr (Camlcoq.Z.of_sint i)
@@ -167,6 +187,9 @@ let suite = [Test ("Parsing", List.map (fun f -> (f, fun () -> parse_pp_test f))
                                  (f, fun () -> run_dvalue_test poison_test f)) poison_tests);
              Test ("I1-arith", List.map (fun (f, i) ->
                                    (f, fun () -> run_dvalue_test (i1_test (i1_of_int i)) f))
+                                        i1_tests);
+             Test ("I8-arith", List.map (fun (f, i) ->
+                                   (f, fun () -> run_dvalue_test (i8_test (i8_of_int i)) f))
                                         i1_tests);
              Test ("I32-arith", List.map (fun (f, i) ->
                                     (f, fun () -> run_dvalue_test (i32_test (i32_of_int i)) f))
