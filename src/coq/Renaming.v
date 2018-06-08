@@ -645,11 +645,12 @@ Section PROOFS.
     induction o; simpl.
     - rewrite swap_lookup_id.
       destruct (lookup_id g e id); simpl; auto.
-    - destruct top. destruct d; simpl; unfold failwith; auto.
+      apply swap_raise. (** The extension of the Exception monad broke the automation, to fix **)
+    - destruct top. destruct d; simpl; unfold failwith; auto; try now apply swap_raise.
       symmetry. rewrite Trace.matchM. simpl.
       destruct (coerce_integer_to_int sz x); reflexivity. 
-      simpl. unfold failwith. auto.
-    - destruct top. destruct d; simpl; unfold failwith; auto.
+      simpl. unfold failwith. apply swap_raise.
+    - destruct top. destruct d; simpl; unfold failwith; auto; try now apply swap_raise.
       
 
       
