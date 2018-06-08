@@ -472,8 +472,75 @@ Next Obligation.
 Next Obligation.
   Admitted.
 Next Obligation.
-  Admitted.
+Admitted.
 
 
+(* (x >>= f) >> g ~= x >>= (fun x' => f x' >>= g ) *)
+Lemma bindM_assoc: forall {E: Type -> Type} {A B C: Type} (a: M E A) (f: A -> M E B)
+                     (g: B -> M E C),
+    (bindM (bindM a f) g) ≡ bindM  a (fun a' => bindM (f a') g).
+Admitted.
+
+Lemma eutt_Tau_annhilate: forall {E: Type -> Type} {A: Type} (a: M E A),
+    Tau a ≡ a.
+Proof.
+  intros until A.
+  cofix COIH.
+  intros.
+  destruct a; 
+  try (eapply EquivTauLeft; eauto;
+    econstructor; auto;
+    intros; apply eutt_refl; fail).
+  - constructor.
+    apply COIH.
+Qed.
+
+
+Lemma bindM_Ret: forall {E: Type -> Type} {A B C: Type} (a: A) (f: A -> M E B),
+    (bindM (Ret a) f) ≡ f a.
+Proof.
+  intros.
+  rewrite @matchM with (i := bindM _ _).
+  simpl.
+  apply eutt_Tau_annhilate.
+Qed.
+
+Lemma bindM_Err: forall {E: Type -> Type} {A B C: Type} (s: String.string) (f: A -> M E B),
+    (bindM (Err s) f) ≡ Err s.
+Proof.
+  intros.
+  rewrite @matchM with (i := bindM _ _).
+  simpl.
+  apply eutt_refl.
+Qed.
+
+
+Lemma bindM_Vis: forall {E: Type -> Type} {A B Y: Type}
+                   (e: E Y) (f: A -> M E B) (k: Y -> M E A),                     
+     bindM (Vis e k) f ≡ Vis e (fun y => bindM (k y) f).    
+Proof.
+  intros.
+  rewrite @matchM with (i := bindM _ _).
+  simpl.
+  apply eutt_refl.
+Qed.
+
+Create HintDb euttnormdb.
+Hint Rewrite (@bindM_assoc) : euttnormdb.
+Hint Rewrite (@bindM_Ret) : euttnormdb.
+Hint Rewrite (@eutt_Tau_annhilate) : euttnormdb.
+Hint Rewrite (@bindM_Vis) : euttnormdb.
+Hint Rewrite (@bindM_Err) : euttnormdb.
+
+Ltac euttnorm := autorewrite with euttnormdb; simpl.
+    
+
+(* x ≡ y -> can replace (Tau x) with (Tau y) *)
+Add Parametric Morphism (E: Type -> Type) (X : Type) : (@Tau E X) with
+      signature ((@EquivUpToTau E X) ==>(@EquivUpToTau E X)) as Tau.
+Proof.
+  intros.
+  constructor. auto.
+Qed.
 End MonadVerif.
 
