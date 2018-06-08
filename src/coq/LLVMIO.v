@@ -66,8 +66,13 @@ Inductive IO : Type -> Type :=
 Definition Trace X := M IO X.
 Global Instance functor_trace : Functor Trace := (@mapM IO).
 Global Instance monad_trace : (@Monad Trace) (@mapM IO) := { mret X x := Ret x; mbind := @bindM IO }.
-Global Instance exn_trace : (@ExceptionMonad string Trace _ _) := fun _ s => Err s.
-
+Global Instance exn_trace : (@ExceptionMonad string Trace _ _) :=
+  {| raise := fun _ s => Err s;
+     catch := fun _ e k => match e with
+                        | Err e => k e
+                        | _ => e
+                        end
+  |}.
 (* Trace Utilities ---------------------------------------------------------- *)
 
 (* Lift the error monad into the trace monad. *)

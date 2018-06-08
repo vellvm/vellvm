@@ -419,10 +419,33 @@ Defined.
 
 (* Monads with error -------------------------------------------------------- *)
 
-Class ExceptionMonad E F `{Monad F} := raise : forall {A}, E -> F A.
+Class ExceptionMonad E F `{Monad F} :=
+  { raise : forall {A}, E -> F A;
+    catch : forall {A}, F A -> (E -> F A) -> F A }
+.
+
+Class ExceptionMonadLaws `{ExceptionMonad M} :=
+  { raise_absorb :
+      forall {A B} e (k: A -> F B),
+        raise e ≫= k = raise e ;
+    catch_raise :
+      forall {A: Type} e k,
+        @catch _ _ _ _ _ A (raise e) k = k e;
+    catch_pure :
+      forall {A: Type} x k,
+        @catch _ _ _ _ _ A (mret x) k = mret x
+  }
+.
 
 Definition err := sum string.
-Instance err_error : (@ExceptionMonad string err _ _) := fun _ (s:string) => inl s.
+Instance err_error : (@ExceptionMonad string err _ _) :=
+  {| raise := fun _ (s:string) => inl s ;
+     catch := fun _ e k => match e with
+                        | inl e => k e
+                        | inr x => inr x
+                        end |}.
+
+Program Instance err_error_laws : (@ExceptionMonadLaws _ _ _ _ err_error).
 
 Definition trywith {A:Type} {F} `{ExceptionMonad string F} (s:string) (o:option A) : F A :=
     match o with
