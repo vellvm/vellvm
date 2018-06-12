@@ -847,3 +847,12 @@ Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B
       mret ((x,y)::l)
   | _, _ => failwith "combine_lists_err: different lenth lists"
   end.
+
+
+(** Predictes over Lists **)
+
+(** Analogue of Forall for a predicate into Type, rather than into Prop.
+   Used to generate induction principles in LLVMAst.v **)
+Inductive ForallListT A (T : A -> Type) : list A -> Type :=
+| ForallListT_nil : ForallListT T []
+| ForallListT_cons : forall x l, T x -> ForallListT T l -> ForallListT T (x :: l).

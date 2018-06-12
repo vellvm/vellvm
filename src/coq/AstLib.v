@@ -231,9 +231,6 @@ Module RawIDOrd <: UsualOrderedType.
 
   Definition eq_dec : forall (x y : t), {x = y} + {x <> y}.
     decide equality.
-    - apply string_dec.
-    - apply eq_dec_int.
-    - apply eq_dec_int.
   Defined.
 
 End RawIDOrd.  

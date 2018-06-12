@@ -123,10 +123,32 @@ Inductive raw_id : Set :=
 | Raw  (n:int)        (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
 .
 
+
+(** Use hints to resolve all decision procedures we require **)
+Hint Resolve string_dec.
+Hint Resolve Integers.Int.eq_dec.
+Hint Resolve Z.eq_dec.
+
+Lemma raw_id_eq_dec: forall (r1 r2: raw_id), {r1 = r2} + {r1 <> r2}.
+Proof.
+  decide equality; auto.
+Qed.
+
+Hint Resolve raw_id_eq_dec.
+
 Inductive ident : Set :=
 | ID_Global (id:raw_id)   (* @id *)
 | ID_Local  (id:raw_id)   (* %id *)
 .
+
+
+Theorem ident_eq_dec: forall (a b: ident), {a = b } + {a <> b}.
+Proof.
+  intros.
+  decide equality; auto.
+Qed.
+
+Hint Resolve ident_eq_dec.
 
 (* auxilliary definitions for when we know which case we're in already *)
 Definition local_id  := raw_id.
@@ -157,7 +179,166 @@ Inductive typ : Set :=
 | TYPE_Vector (sz:int) (t:typ)     (* t must be integer, floating point, or pointer type *)
 | TYPE_Identified (id:ident)
 .
+Section typ_nested_ind.
+  Variable P: typ -> Type.
+  Hypothesis I: forall sz: int, P (TYPE_I sz).
+  Hypothesis POINTER: forall (t: typ), P t ->
+                        P (TYPE_Pointer t).
+  Hypothesis VOID: P (TYPE_Void).
+  Hypothesis HALF: P (TYPE_Half).
+  Hypothesis FLOAT: P (TYPE_Float).
+  Hypothesis DOUBLE: P (TYPE_Double).
+  Hypothesis X86_fp80: P (TYPE_X86_fp80).
+  Hypothesis FP128: P TYPE_Fp128.
+  Hypothesis PPC_FP128: P TYPE_Ppc_fp128.
+  Hypothesis METADATA: P (TYPE_Metadata).
+  Hypothesis X86_mmx: P (TYPE_X86_mmx).
+  Hypothesis ARRAY: forall (sz: int) (t: typ),
+      P t -> P (TYPE_Array sz t).
+  Hypothesis  FUNCTION: forall (ret: typ) (ts: list typ),
+      P ret -> ForallListT P ts -> P (TYPE_Function ret ts).
+  Hypothesis STRUCT: forall (ts: list typ),
+      ForallListT P ts -> P (TYPE_Struct ts).
+  Hypothesis PACKED: forall (ts: list typ),
+      ForallListT P ts -> P (TYPE_Packed_struct ts).
+  Hypothesis OPAQUE: P (TYPE_Opaque).
+  Hypothesis VECTOR: forall (sz: int) (t: typ),
+      P t -> P (TYPE_Vector sz t).
+  Hypothesis IDENTIFIED: forall (id: ident), P (TYPE_Identified id).
 
+    Check (Forall_cons).
+    Check (Forall).
+    Fixpoint typ_nested_ind (t: typ) : P t :=
+      match t with
+      | TYPE_I sz => I sz
+      | TYPE_Pointer p => POINTER p (typ_nested_ind p)
+      | TYPE_Void => VOID
+      | TYPE_Half => HALF
+      | TYPE_Float => FLOAT
+      | TYPE_Double => DOUBLE
+      | TYPE_X86_fp80 => X86_fp80
+      | TYPE_Fp128 => FP128
+      | TYPE_Ppc_fp128 => PPC_FP128
+      | TYPE_Metadata => METADATA
+      | TYPE_X86_mmx => X86_mmx
+      | TYPE_Array sz t => ARRAY sz t (typ_nested_ind t)
+      | TYPE_Function ret args =>
+        let H := (fix fold (xs: list typ) : ForallListT P xs :=
+                    match xs with
+                    | nil => ForallListT_nil _
+                    | cons x xs' =>
+                      ForallListT_cons _ (typ_nested_ind x) (fold xs')
+                    end) args
+        in FUNCTION ret args (typ_nested_ind ret) H
+      | TYPE_Struct ts =>
+        let H := (fix fold (xs: list typ) : ForallListT P xs :=
+                    match xs with
+                    | nil => ForallListT_nil _
+                    | cons x xs' =>
+                      ForallListT_cons _ (typ_nested_ind x) (fold xs')
+                    end) ts
+        in STRUCT ts H
+        
+      | TYPE_Packed_struct ts =>
+        let H := (fix fold (xs: list typ) : ForallListT P xs :=
+                    match xs with
+                    | nil => ForallListT_nil _
+                    | cons x xs' =>
+                      ForallListT_cons _ (typ_nested_ind x) (fold xs')
+                    end) ts
+        in PACKED ts H
+        
+      | TYPE_Opaque => OPAQUE
+      | TYPE_Vector sz t =>  VECTOR sz t (typ_nested_ind t)
+      | TYPE_Identified id => IDENTIFIED id
+          
+      end.
+End typ_nested_ind.
+
+(* If we can decide equality "pointwise" for every list element, then
+we can decide list equality *)
+Lemma pointwise_decide_list_equality_to_list_equality:
+  forall {A: Type}
+    (l1 l2: list A)
+    (FORALL_DECEQ: ForallListT
+                     (fun t1 : A => forall t2 : A, {t1 = t2} + {t1 <> t2}) l1),
+    {l1 = l2} + {l1 <> l2}.
+Proof.
+  intros.
+  generalize dependent l2.
+  induction l1.
+  - destruct l2; auto.
+  - intros.
+    destruct l2; auto.
+
+    assert (ADEC: {a = a0} + {a <> a0}).
+    inversion FORALL_DECEQ; subst.
+    apply X.
+
+    assert (LDEC: {l1 = l2} + {l1 <> l2}).
+    inversion FORALL_DECEQ; subst.
+    apply IHl1.
+    auto.
+
+    destruct ADEC; destruct LDEC; subst; auto;
+      try (right; intros CONTRA; inversion CONTRA; auto; fail).
+Qed.
+
+    
+    
+
+Lemma type_eq_dec: forall (t1 t2: typ), {t1 = t2} + {t1 <> t2}.
+Proof.
+  induction t1 using typ_nested_ind;
+     auto; destruct t2; auto; try discriminate.
+  - assert (SZ_CASES: {sz = sz0} + {sz <> sz0}); auto.
+    destruct SZ_CASES; subst; auto;
+      try (right; intros CONTRA; inversion CONTRA; auto; fail).
+    
+  - destruct (IHt1 t2); subst; auto;
+      try (right; intros CONTRA; inversion CONTRA; auto; fail).
+
+  - assert (SZ_CASES: {sz = sz0} + {sz <> sz0}); auto.
+    destruct (IHt1 t2); destruct SZ_CASES; subst; auto;
+      try (right; intros CONTRA; inversion CONTRA; auto; fail).
+
+    
+  - assert (T1_CASES: {t1 = t2} + {t1 <> t2}).
+    apply IHt1; auto.
+    
+    assert (LIST_EQ_CASES: {ts = args} + {ts <> args}).
+    apply pointwise_decide_list_equality_to_list_equality; auto.
+
+    destruct T1_CASES; destruct LIST_EQ_CASES; subst; auto;
+      try (right; intros CONTRA; inversion CONTRA; auto; fail).
+
+  - assert (LIST_EQ_CASES: {ts = fields} + {ts <> fields}).
+    apply pointwise_decide_list_equality_to_list_equality; auto.
+    destruct LIST_EQ_CASES; subst; auto;
+      try (right; intros CONTRA; inversion CONTRA; auto; fail).
+     
+  - assert (LIST_EQ_CASES: {ts = fields} + {ts <> fields}).
+    apply pointwise_decide_list_equality_to_list_equality; auto.
+    destruct LIST_EQ_CASES; subst; auto;
+      try (right; intros CONTRA; inversion CONTRA; auto; fail).
+
+  - assert (SZ_CASES: {sz = sz0} + {sz <> sz0}); auto.
+    assert (T_CASES: {t1 = t2} + {t1 <> t2}).
+    auto.
+
+    
+    destruct SZ_CASES; destruct T_CASES; subst; auto;
+      try (right; intros CONTRA; inversion CONTRA; auto; fail).
+    
+  - assert (ID_EQ: {id = id0} + {id <> id0}); auto.
+
+    
+    destruct ID_EQ; subst; auto;
+      try (right; intros CONTRA; inversion CONTRA; auto; fail).
+Qed.
+
+Hint Resolve type_eq_dec.
+    
 
 Inductive icmp : Set := Eq|Ne|Ugt|Uge|Ult|Ule|Sgt|Sge|Slt|Sle.
 Inductive fcmp : Set := FFalse|FOeq|FOgt|FOge|FOlt|FOle|FOne|FOrd|FUno|FUeq|FUgt|FUge|FUlt|FUle|FUne|FTrue.
