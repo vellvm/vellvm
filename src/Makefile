@@ -81,4 +81,18 @@ clean:
 	rm -rf output
 	rm -f vellvm
 
+doc/coq2html: doc/coq2html.ml
+	ocamlopt -w +a-29 -o doc/coq2html str.cmxa doc/coq2html.ml
+
+doc/coq2html.ml: doc/coq2html.mll
+	ocamllex -q doc/coq2html.mll
+
+
+documentation: doc/coq2html $(VFILES)
+	mkdir -p doc/html
+	rm -f doc/html/*.html
+	doc/coq2html -o 'doc/html/%.html' doc/*.glob \
+          $(filter-out doc/coq2html cparser/Parser.v, $^)
+	cp doc/coq2html.css doc/coq2html.js doc/html/
+
 -include .depend
