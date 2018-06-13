@@ -75,11 +75,12 @@ print-includes:
 clean:
 	rm -f .depend
 	rm -f $(VOFILES)
-	rm -rf doc/*.glob
+	rm -rf doc/html doc/*.glob
 	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
 	ocamlbuild -clean
 	rm -rf output
 	rm -f vellvm
+	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
 
 doc/coq2html: doc/coq2html.ml
 	ocamlopt -w +a-29 -o doc/coq2html str.cmxa doc/coq2html.ml
@@ -88,6 +89,7 @@ doc/coq2html.ml: doc/coq2html.mll
 	ocamllex -q doc/coq2html.mll
 
 
+.PHONY: documentation
 documentation: doc/coq2html $(VFILES)
 	mkdir -p doc/html
 	rm -f doc/html/*.html
