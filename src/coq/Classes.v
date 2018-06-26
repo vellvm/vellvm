@@ -8,6 +8,12 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
+(* -------------------------------------------------------------------------- *
+ *  This file is adapted from the iris-coq/theories/prelude/base.v            *
+ *  development created by Robbert Krebbers and released un the BSD License.  * 
+ ---------------------------------------------------------------------------- *)
+
+
 Set Implicit Arguments.
 Set Contextual Implicit.
 Global Generalizable All Variables.
