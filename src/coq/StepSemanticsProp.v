@@ -12,67 +12,101 @@ Require Import ZArith List String Omega.
 Require Import  Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG Vellvm.CFGProp.
 Require Import Vellvm.LLVMIO Vellvm.StepSemantics.
+Require Import Vellvm.Classes.
+Require Import ZArith List String Omega.
+Require Import  Vellvm.Classes Vellvm.Util.
+Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG Vellvm.CFGProp.
+Require Import Vellvm.LLVMIO Vellvm.StepSemantics.
+
 
 Import ListNotations.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-
-
-Module StepSemanticsProp(A:ADDR).
-  Module SS := StepSemantics(A).
+Module StepSemanticsProp(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
+  Module SS := StepSemantics(A)(LLVMIO).
   Import SS.
-  Import SS.DV.
+  Import LLVMIO.DV.
 
-Section Properties.
-(* environment facts -------------------------------------------------------- 
-  Lemma lookup_env_hd : forall id dv e, lookup_env (add_env id dv e) id = Ret dv.
-  Proof.
-    intros id dv e.  unfold lookup_env. 
-    unfold add_env.
-    apply ENV.find_1. apply ENV.add_1. reflexivity.
-  Qed.  
-
-  Lemma lookup_env_tl : forall id1 v1 e id2,
-      id1 <> id2 -> lookup_env (add_env id1 v1 e) id2 = lookup_env e id2.
-  Proof.
-    unfold lookup_env.
-    intros id1 v1 e id2 H.
-    unfold add_env. 
-    remember (ENV.find (elt:=value) id2 (ENV.add id1 v1 e)) as x.
-    remember (ENV.find (elt:=value) id2 e) as y.
-    destruct x; destruct y; auto.
-    - symmetry in Heqx. rewrite <- ENVFacts.find_mapsto_iff in Heqx.
-      symmetry in Heqy. rewrite <- ENVFacts.find_mapsto_iff in Heqy.
-      rewrite ENVFacts.add_neq_mapsto_iff in Heqx; auto.
-      assert (v = v0). { eapply ENVFacts.MapsTo_fun; eauto. }
-                       subst; reflexivity.                 
-    - symmetry in Heqx. rewrite <- ENVFacts.find_mapsto_iff in Heqx.
-      symmetry in Heqy. rewrite <- ENVFacts.not_find_in_iff in Heqy.
-      rewrite ENVFacts.add_neq_mapsto_iff in Heqx; auto.
-      unfold ENV.In in Heqy. unfold ENV.Raw.In0 in Heqy. assert False. apply Heqy. exists v. apply Heqx. destruct H0.
-    - symmetry in Heqx. rewrite <- ENVFacts.not_find_in_iff in Heqx.
-      symmetry in Heqy. rewrite <- ENVFacts.find_mapsto_iff in Heqy.
-      assert False. apply Heqx. unfold ENV.In.  unfold ENV.Raw.In0. exists v. apply ENV.add_2; auto. destruct H0.
-  Qed.  
+  Section Properties.
 
 
-  Lemma lookup_add_env_inv :
-    forall id1 v e id2 u
-      (Hl: lookup_env (add_env id1 v e) id2 = Some u),
-      (id1 = id2 /\ v = u) \/ (id1 <> id2 /\ lookup_env e id2 = Some u).
-  Proof.
-    intros id1 v e id2 u Hl.
-    unfold add_env in Hl.
-    unfold lookup_env in *.
-    rewrite <- ENVFacts.find_mapsto_iff in Hl.
-    apply ENVFacts.add_mapsto_iff in Hl.
-    destruct Hl as [H | H].
-    - left. assumption.
-    - right. rewrite <- ENVFacts.find_mapsto_iff. assumption.
-  Qed.      
- *)
+  (** *Theorems about the environment *)
+  Section ENVFACTS.
+    
+    (** Lookup on an aliasing add, aka gss *)
+    Lemma lookup_env_hd : forall {X: Type} (id: ENV.key) (dv: X) (e: ENV.t X),
+      lookup_env (add_env id dv e) id = mret dv.
+    Proof.
+      intros.
+      unfold lookup_env. 
+      unfold add_env.
+      erewrite ENV.find_1; auto.
+      apply ENV.add_1; auto.
+    Qed.
+
+
+
+    (** Lookup on a non-aliasing add, aka gso *)
+    Lemma lookup_env_tl : forall {X: Type} (id1 id2: ENV.key) (v1: X) (e: ENV.t X),
+        id1 <> id2 -> lookup_env (add_env id1 v1 e) id2 = lookup_env e id2.
+    Proof.
+      intros.
+      unfold lookup_env.
+      unfold add_env.
+
+      destruct (ENV.find id2 e) eqn: FINDID2.
+      - (** Some x **)
+        assert (ID2_MAPSTO: ENV.MapsTo id2 x e).
+        apply ENV.find_2; auto.
+
+        assert (ID2_MAPSTO_ADDED_E': ENV.MapsTo id2 x (ENV.add id1 v1 e)).
+        apply ENV.add_2; auto.
+        erewrite ENV.find_1; eauto.
+
+        
+
+      - assert (ID2_NOT_IN: ~ ENV.In  id2 e).
+        rewrite ENVFacts.not_find_in_iff; auto.
+
+        assert (ID2_NOT_IN_E': ~ ENV.In id2 (ENV.add id1 v1 e)).
+        intros CONTRA.
+        rewrite ENVFacts.add_in_iff in CONTRA.
+        destruct CONTRA; try contradiction.
+
+        rewrite ENVFacts.not_find_in_iff in ID2_NOT_IN_E'.
+        rewrite ID2_NOT_IN_E'.
+        auto.
+    Qed.  
+
+
+    (** Extract information from a lookup-of-add *)
+    Lemma lookup_add_env_inv :
+      forall {X: Type} (id1 id2: ENV.key) (u v: X) (e: ENV.t X)
+             {ID_EQ_DEC: forall id1 id2: ENV.key, {id1 = id2} + {id1 <> id2}}
+             (Hl: lookup_env (add_env id1 v e) id2 = mret u),
+        (id1 = id2 /\ v = u) \/ (id1 <> id2 /\ lookup_env e id2 = mret u).
+    Proof.
+      intros.
+
+      assert (ID12_EQ_DEC: {id1 = id2}+ {id1 <> id2}).
+      auto.
+
+      destruct (ID12_EQ_DEC); subst.
+      - (* id1 = id2 *)
+        left.
+        split; auto.
+
+        rewrite lookup_env_hd in Hl.
+        inversion Hl; auto.
+        
+      - (* id1 <> id2 *)
+        right.
+        split; auto.
+        erewrite <- lookup_env_tl; eauto.
+    Qed.      
+  End ENVFACTS.
   
   Definition pc_satisfies (CFG:mcfg) (p:pc) (P:cmd -> Prop) : Prop :=
     forall cmd, fetch CFG p = Some cmd -> P cmd.
@@ -102,6 +136,7 @@ Section Properties.
   Definition pc_non_call (CFG:mcfg) (p:pc) : Prop :=
     pc_satisfies CFG p (fun c => exists i, not (is_Call i) /\ c = Inst i).
 
+  (* 
   Ltac step_destruct :=
     repeat (match goal with
             | [ H : context[do _ <- trywith _ ?E; _] |- _ ] => destruct E; [simpl in H | solve [inversion H]]
@@ -110,6 +145,7 @@ Section Properties.
             | [ H : Step (?p, _ , _) = Step (?q, _, _) |- Some ?p = Some ?q ] => inversion H; auto
             | [ H : ~ (is_Call (INSTR_Call _ _)) |- _ ] => simpl in H; contradiction
             end).
+    *)
 
   (* Not true for Call *)
   (*
