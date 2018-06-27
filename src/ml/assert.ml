@@ -61,6 +61,8 @@ let run_test (t:assertion test) : result test =
 let run_suite (s:suite):outcome =
   List.map run_test s
 
+let successful (o:outcome) : bool =
+  List.for_all (fun (Test (_,cases)) -> List.for_all (fun (_,r) -> r = Pass) cases) o
 
 (***********************)
 (* Reporting functions *)
