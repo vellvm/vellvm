@@ -4,3 +4,6 @@
 [submodule "lib/paco"]
 	path = lib/paco
 	url = https://github.com/vzaliva/paco
+[submodule "lib/coq2html"]
+	path = lib/coq2html
+	url = https://github.com/xavierleroy/coq2html.git
