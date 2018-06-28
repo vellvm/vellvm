@@ -82,19 +82,17 @@ clean:
 	rm -f vellvm
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
 
-doc/coq2html: doc/coq2html.ml
-	ocamlopt -w +a-29 -o doc/coq2html str.cmxa doc/coq2html.ml
-
-doc/coq2html.ml: doc/coq2html.mll
-	ocamllex -q doc/coq2html.mll
-
+doc/coq2html: 
+	make -C ../lib/coq2html
+	cp ../lib/coq2html doc/coq2html
+	chmod +x doc/coq2html
 
 .PHONY: documentation
 documentation: doc/coq2html $(VFILES)
 	mkdir -p doc/html
 	rm -f doc/html/*.html
-	doc/coq2html -o 'doc/html/%.html' doc/*.glob \
+	doc/coq2html -d doc/html doc/*.glob \
           $(filter-out doc/coq2html cparser/Parser.v, $^)
-	cp doc/coq2html.css doc/coq2html.js doc/html/
+	cp ../lib/coq2html/coq2html.css ../lib/coq2html/coq2html.js doc/html/
 
 -include .depend
