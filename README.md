@@ -1,4 +1,5 @@
 # Vellvm
+[![Build Status](https://travis-ci.com/vellvm/vellvm.svg?branch=master)](https://travis-ci.com/vellvm/vellvm)
 
 Vellvm is a Coq formalization of the semantics of (a subset of) the
 LLVM compiler IR that is intended for _formal verification_ of
