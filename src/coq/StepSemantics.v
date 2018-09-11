@@ -17,7 +17,7 @@ Require Import compcert.lib.Integers compcert.lib.Floats.
 
 Require Import Vellvm.Classes.
 Require Import Vellvm.Util.
-Require Import Vellvm.Trace.
+Require Import ITree.
 Require Import Vellvm.LLVMAst.
 Require Import Vellvm.AstLib.
 Require Import Vellvm.CFG.
@@ -170,12 +170,12 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     | Fptosi => failwith "TODO: floating point conversion not yet implemented"
     | Inttoptr =>
       match t1, t2 with
-      | TYPE_I 64, TYPE_Pointer t => Trace.Vis (ItoP x) mret
+      | TYPE_I 64, TYPE_Pointer t => Vis (ItoP x) mret
       | _, _ => raise "ERROR: Inttoptr got illegal arguments"
       end 
     | Ptrtoint =>
       match t1, t2 with
-      | TYPE_Pointer t, TYPE_I 64 => Trace.Vis (PtoI x) mret
+      | TYPE_Pointer t, TYPE_I 64 => Vis (PtoI x) mret
       | _, _ => raise "ERROR: Ptrtoint got illegal arguments"
       end
     end.
@@ -337,7 +337,7 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
     let dt := eval_typ t in
     'vptr <- eval_exp (Some DTYPE_Pointer) ptrval;
     'vs <- map_monad (fun '(_, index) => eval_exp (Some (DTYPE_I 32)) index) idxs;
-    Trace.Vis (GEP dt vptr vs) mret
+    Vis (GEP dt vptr vs) mret
 
   | OP_GetElementPtr _ (_, _) _ =>
     failwith "getelementptr has non-pointer type annotation"
@@ -488,16 +488,16 @@ Definition step (s:state) : Trace result :=
           cont (g, pc_next, add_env id dv e, k)
           
       | IId id, INSTR_Alloca t _ _ =>
-        Trace.Vis (Alloca (eval_typ t)) (fun (a:dvalue) =>  cont (g, pc_next, add_env id a e, k))
+        Vis (Alloca (eval_typ t)) (fun (a:dvalue) =>  cont (g, pc_next, add_env id a e, k))
                 
       | IId id, INSTR_Load _ t (u,ptr) _ =>
         'dv <- eval_exp (Some (eval_typ u)) ptr;
-          Trace.Vis (Load (eval_typ t) dv) (fun dv => cont (g, pc_next, add_env id dv e, k))
+          Vis (Load (eval_typ t) dv) (fun dv => cont (g, pc_next, add_env id dv e, k))
             
       | IVoid _, INSTR_Store _ (t, val) (u, ptr) _ => 
         'dv <- eval_exp (Some (eval_typ t)) val; 
         'v <- eval_exp (Some (eval_typ u)) ptr;
-          Trace.Vis (Store v dv) (fun _ => cont (g, pc_next, e, k))
+          Vis (Store v dv) (fun _ => cont (g, pc_next, e, k))
 
       | _, INSTR_Store _ _ _ _ => raise "ERROR: Store to non-void ID" 
 
@@ -520,7 +520,7 @@ Definition step (s:state) : Trace result :=
           | None => (* This must have been a registered external function *)
             match fid with
               (* TODO: make sure the external call's type is correct *)
-            | Name s => Trace.Vis (Call DTYPE_Void s dvs) (fun dv => cont (g, pc_next, e, k))
+            | Name s => Vis (Call DTYPE_Void s dvs) (fun dv => cont (g, pc_next, e, k))
             | _ => raise ("step: no function " ++ (string_of fid))
             end
           end
@@ -546,12 +546,12 @@ Definition step (s:state) : Trace result :=
 Definition allocate_globals (gs:list global) : Trace genv :=
   monad_fold_right
     (fun (m:genv) (g:global) =>
-       Trace.Vis (Alloca (eval_typ (g_typ g))) (fun v => mret (ENV.add (g_ident g) v m))) gs (@ENV.empty _).
+       Vis (Alloca (eval_typ (g_typ g))) (fun v => mret (ENV.add (g_ident g) v m))) gs (@ENV.empty _).
 
 
 Definition register_declaration (g:genv) (d:declaration) : Trace genv :=
   (* TODO: map dc_name d to the returned address *)
-    Trace.Vis (Alloca DTYPE_Pointer) (fun v => mret (ENV.add (dc_name d) v g)).
+    Vis (Alloca DTYPE_Pointer) (fun v => mret (ENV.add (dc_name d) v g)).
 
 Definition register_functions (g:genv) : Trace genv :=
   monad_fold_right register_declaration
@@ -568,7 +568,7 @@ Definition initialize_globals (gs:list global) (g:genv) : Trace unit :=
            | None => mret DVALUE_Undef
            | Some e => eval_exp g (@ENV.empty _) (Some dt) e
            end;
-       Trace.Vis (Store a dv) mret)
+       Vis (Store a dv) mret)
     gs tt.
   
 Definition build_global_environment : Trace genv :=
@@ -588,7 +588,7 @@ Definition init_state (fname:string) : Trace state :=
 CoFixpoint step_sem (r:result) : Trace dvalue :=
   match r with
   | Done v => mret v
-  | Step s => 'x <- step s ; step_sem x
+  | Step s => 'x <- step s ; Tau (step_sem x)
   end.
 
 End IN_CFG_CONTEXT.

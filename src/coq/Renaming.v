@@ -455,10 +455,9 @@ Hint Unfold swap_of_IO.
 
 CoFixpoint swap_Trace X `{Swap X} (id1 id2:raw_id) (t:Trace X) : Trace X :=
   match t with
-  | Trace.Ret x => Trace.Ret (swap id1 id2 x)
-  | Trace.Vis _ e k => Trace.Vis (swap id1 id2 e) (fun y => swap_Trace X id1 id2 (k y))
-  | Trace.Tau k => Trace.Tau (swap_Trace X id1 id2 k)
-  | Trace.Err s => Trace.Err s
+  | ITree.Ret x => ITree.Ret (swap id1 id2 x)
+  | ITree.Vis _ e k => ITree.Vis (swap id1 id2 e) (fun y => swap_Trace X id1 id2 (k y))
+  | ITree.Tau k => ITree.Tau (swap_Trace X id1 id2 k)
   end.
 
 Instance swap_of_Trace {X} `{SX : Swap X} : Swap (Trace X) := swap_Trace X.
@@ -624,19 +623,20 @@ Section PROOFS.
   Proof.
     intros s.
     unfold_swaps.
-    symmetry.
-    rewrite Trace.matchM. simpl. reflexivity.
+    rewrite ITree.match_itree.
+    simpl.
+    unfold_swaps.
+    reflexivity.
   Qed.    
-  Hint Resolve swap_raise.
-  
-  Lemma swap_ret {X} `{SX: Swap X} : forall x, Trace.Ret (swap id1 id2 x) = swap id1 id2 (Trace.Ret x).
+
+
+  Lemma swap_ret {X} `{SX: Swap X} : forall x, ITree.Ret (inr (swap id1 id2 x)) = swap id1 id2 (ITree.Ret (inr x)).
   Proof.
     intro x.
-    symmetry.
-    rewrite Trace.matchM. simpl. reflexivity.
+    rewrite ITree.match_itree. simpl. reflexivity.
   Qed.
   Hint Resolve swap_ret.
-  
+
   Lemma swap_eval_exp : forall CFG g e top o,
       eval_exp (swap id1 id2 CFG) (swap id1 id2 g) (swap id1 id2 e) (swap id1 id2 top) (swap id1 id2 o) =
       swap id1 id2 (eval_exp CFG g e top o).
@@ -646,14 +646,16 @@ Section PROOFS.
     - rewrite swap_lookup_id.
       destruct (lookup_id g e id); simpl; auto.
       apply swap_raise. (** The extension of the Exception monad broke the automation, to fix **)
+      apply swap_ret.
     - destruct top. destruct d; simpl; unfold failwith; auto; try now apply swap_raise.
-      symmetry. rewrite Trace.matchM. simpl.
-      destruct (coerce_integer_to_int sz x); reflexivity. 
+      symmetry. rewrite ITree.match_itree. simpl.
+(* 
+      destruct (coerce_integer_to_int sz x); try reflexivity. 
       simpl. unfold failwith. apply swap_raise.
     - destruct top. destruct d; simpl; unfold failwith; auto; try now apply swap_raise.
       
-
-      
+*)
+(* Change to the ITree affected the way that errors need to be handled here. *)      
     
   Admitted.
 
@@ -671,7 +673,8 @@ Section PROOFS.
   Lemma swap_step_sem : forall (CFG:mcfg) (r:result),
       (step_sem (swap id1 id2 CFG) (swap id1 id2 r)) ≡ (swap id1 id2 (step_sem CFG r)).
   Proof.
-    intros CFG.
+    intros CFG r.
+    (*
     cofix swap_step_sem.
     destruct r.
     - rewrite Trace.matchM. simpl.
@@ -682,7 +685,7 @@ Section PROOFS.
       
     - unfold swap at 2. simpl.
       rewrite Trace.matchM. simpl.
-    
+    *)
     
   Admitted.    
     

@@ -13,19 +13,19 @@ University of Pennsylvania as part of the DeepSpec project.
 
 # Participants
  - Steve Zdancewic
- - William Mansky
- - Christine Rizkallah
  - Yannick Zakowski
  - Calvin Beck
  - Olek Gierczak
- - Emmett Neyman
- - Robert Zajac
 
 ## Past Contributors
  - Vivien Durey 
  - Dmitri Garbuzov 
+ - William Mansky
  - Milo Martin
  - Santosh Nagarakatte 
+ - Emmett Neyman 
+ - Christine Rizkallah 
+ - Robert Zajac
  - Richard Zhang 
  - Jianzhou Zhao
 
@@ -51,6 +51,7 @@ University of Pennsylvania as part of the DeepSpec project.
 
 ### Assumes: 
   - coqc   : version 8.8.0   (and coqdep, etc.)
+  - Coq packages: ext-lib    (installed via, e.g. opam install coq-ext-lib)
   - ocamlc : version 4.04    (probably works with 4.02 or later)
   - OPAM packages: ocamlbuild, menhir, [optional: llvm  (for llvm v. 3.8)]
 
@@ -62,6 +63,11 @@ Compilation:
 3. compile 3rd party libraries:
    1. CompCert: `cd lib/Compcert && ./configure x86_64-macosx && make`
    2. Compile Paco: `make -C lib/paco/src`
+   3. Compile InteractionTrees
+      - create the file `lib/InteractionTrees/_CoqPath` and edit it to contain
+      `-Q ../paco/src Paco`
+	  - run `make` from the InteractionTrees directory  (do _not_ use `setup.sh`
+        since that will clone another copy of paco and we already assume ext-lib exists)
 4. run `make` in the /src directory
 
 # Running
