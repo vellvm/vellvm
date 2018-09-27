@@ -569,7 +569,7 @@ Section PROOFS.
   Qed.
   
   Lemma swap_eval_i1_op : forall (iop:ibinop) (x y:inttyp 1),
-      eval_i1_op (swap id1 id2 iop) (swap id1 id2 x) (swap id1 id2 y) = swap id1 id2 (eval_i1_op iop x y).
+      eval_int_op (swap id1 id2 iop) (swap id1 id2 x) (swap id1 id2 y) = swap id1 id2 (eval_int_op iop x y).
   Proof.
     unfold_swaps.
     intros iop x y.
@@ -577,7 +577,7 @@ Section PROOFS.
   Qed.
 
   Lemma swap_eval_i32_op : forall (iop:ibinop) (x y:inttyp 32),
-      eval_i32_op (swap id1 id2 iop) (swap id1 id2 x) (swap id1 id2 y) = swap id1 id2 (eval_i32_op iop x y).
+      eval_int_op (swap id1 id2 iop) (swap id1 id2 x) (swap id1 id2 y) = swap id1 id2 (eval_int_op iop x y).
   Proof.
     unfold_swaps.
     intros iop x y.
@@ -585,7 +585,7 @@ Section PROOFS.
   Qed.
 
   Lemma swap_eval_i64_op : forall (iop:ibinop) (x y:inttyp 64),
-      eval_i64_op (swap id1 id2 iop) (swap id1 id2 x) (swap id1 id2 y) = swap id1 id2 (eval_i64_op iop x y).
+      eval_int_op (swap id1 id2 iop) (swap id1 id2 x) (swap id1 id2 y) = swap id1 id2 (eval_int_op iop x y).
   Proof.
     unfold_swaps.
     intros iop x y. 
