@@ -164,10 +164,10 @@ Qed.
 Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
   match dval with
   | DVALUE_Addr addr => (Ptr addr) :: (repeat PtrFrag 7)
-  | DVALUE_I1 i => Z_to_sbyte_list 8 (DynamicValues.Int1.unsigned i)
-  | DVALUE_I8 i => Z_to_sbyte_list 8 (DynamicValues.Int8.unsigned i)
-  | DVALUE_I32 i => Z_to_sbyte_list 8 (DynamicValues.Int32.unsigned i)
-  | DVALUE_I64 i => Z_to_sbyte_list 8 (Int64.unsigned i)
+  | DVALUE_I1 i => Z_to_sbyte_list 8 (unsigned i)
+  | DVALUE_I8 i => Z_to_sbyte_list 8 (unsigned i)
+  | DVALUE_I32 i => Z_to_sbyte_list 8 (unsigned i)
+  | DVALUE_I64 i => Z_to_sbyte_list 8 (unsigned i)
   | DVALUE_Struct fields | DVALUE_Array fields =>
       (* note the _right_ fold is necessary for byte ordering. *)
       fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
@@ -180,10 +180,10 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:dtyp) : dvalue :=
   | DTYPE_I sz =>
     let des_int := sbyte_list_to_Z bytes in
     match sz with
-    | 1 => DVALUE_I1 (DynamicValues.Int1.repr des_int)
-    | 8 => DVALUE_I8 (DynamicValues.Int8.repr des_int)
-    | 32 => DVALUE_I32 (DynamicValues.Int32.repr des_int)
-    | 64 => DVALUE_I64 (Int64.repr des_int)
+    | 1 => DVALUE_I1 (repr des_int)
+    | 8 => DVALUE_I8 (repr des_int)
+    | 32 => DVALUE_I32 (repr des_int)
+    | 64 => DVALUE_I64 (repr des_int)
     | _ => DVALUE_None (* invalid size. *)
     end
   | DTYPE_Pointer =>
@@ -307,7 +307,7 @@ Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (
   | v :: vs' =>
     match v with
     | DVALUE_I32 i =>
-      let k := DynamicValues.Int32.unsigned i in
+      let k := unsigned i in
       let n := BinIntDef.Z.to_nat k in
       match t with
       | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
@@ -323,7 +323,7 @@ Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (
       | _ => raise ("non-i32-indexable type")
       end
     | DVALUE_I8 i =>
-      let k := DynamicValues.Int8.unsigned i in
+      let k := unsigned i in
       let n := BinIntDef.Z.to_nat k in
       match t with
       | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
@@ -331,7 +331,7 @@ Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (
       | _ => raise ("non-i8-indexable type")
       end
     | DVALUE_I64 i =>
-      let k := Int64.unsigned i in
+      let k := unsigned i in
       let n := BinIntDef.Z.to_nat k in
       match t with
       | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
@@ -363,7 +363,7 @@ Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (me
   | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 indices *)
     match dv with
     | DVALUE_Addr (b, o) =>
-      handle_gep_h t b (o + (sizeof_dtyp t) * (DynamicValues.Int32.unsigned i)) vs' m
+      handle_gep_h t b (o + (sizeof_dtyp t) * (unsigned i)) vs' m
     | _ => raise "non-address" 
     end
   | _ => raise "non-I32 index"
@@ -413,10 +413,10 @@ Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
 
   | ItoP i =>
     match i with
-    | DVALUE_I64 i => mret (inr (m, DVALUE_Addr (0, DynamicValues.Int64.unsigned i)))
-    | DVALUE_I32 i => mret (inr (m, DVALUE_Addr (0, DynamicValues.Int32.unsigned i)))
-    | DVALUE_I8 i => mret (inr (m, DVALUE_Addr (0, DynamicValues.Int8.unsigned i)))
-    | DVALUE_I1 i => mret (inr (m, DVALUE_Addr (0, DynamicValues.Int1.unsigned i)))
+    | DVALUE_I64 i => mret (inr (m, DVALUE_Addr (0, unsigned i)))
+    | DVALUE_I32 i => mret (inr (m, DVALUE_Addr (0, unsigned i)))
+    | DVALUE_I8 i => mret (inr (m, DVALUE_Addr (0, unsigned i)))
+    | DVALUE_I1 i => mret (inr (m, DVALUE_Addr (0, unsigned i)))
     | _ => raise "Non integer passed to ItoP"
     end
     

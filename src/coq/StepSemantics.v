@@ -109,49 +109,49 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     | Trunc =>
       match t1, x, t2 with
       | TYPE_I 8, DVALUE_I8 i1, TYPE_I 1 =>
-        mret (DVALUE_I1 (Int1.repr (Int8.unsigned i1)))
+        mret (DVALUE_I1 (repr (unsigned i1)))
       | TYPE_I 32, DVALUE_I32 i1, TYPE_I 1 =>
-        mret (DVALUE_I1 (Int1.repr (Int32.unsigned i1)))
+        mret (DVALUE_I1 (repr (unsigned i1)))
       | TYPE_I 32, DVALUE_I32 i1, TYPE_I 8 =>
-        mret (DVALUE_I8 (Int8.repr (Int32.unsigned i1)))
+        mret (DVALUE_I8 (repr (unsigned i1)))
       | TYPE_I 64, DVALUE_I64 i1, TYPE_I 1 =>
-        mret (DVALUE_I1 (Int1.repr (Int64.unsigned i1)))
+        mret (DVALUE_I1 (repr (unsigned i1)))
       | TYPE_I 64, DVALUE_I64 i1, TYPE_I 8 =>
-        mret (DVALUE_I8 (Int8.repr (Int64.unsigned i1)))
+        mret (DVALUE_I8 (repr (unsigned i1)))
       | TYPE_I 64, DVALUE_I64 i1, TYPE_I 32 =>
-        mret (DVALUE_I32 (Int32.repr (Int64.unsigned i1)))
+        mret (DVALUE_I32 (repr (unsigned i1)))
       | _, _, _ => failwith "ill typed-conv"
       end
     | Zext =>
       match t1, x, t2 with
       | TYPE_I 1, DVALUE_I1 i1, TYPE_I 8 =>
-        mret (DVALUE_I8 (Int8.repr (Int1.unsigned i1)))
+        mret (DVALUE_I8 (repr (unsigned i1)))
       | TYPE_I 1, DVALUE_I1 i1, TYPE_I 32 =>
-        mret (DVALUE_I32 (Int32.repr (Int1.unsigned i1)))
+        mret (DVALUE_I32 (repr (unsigned i1)))
       | TYPE_I 1, DVALUE_I1 i1, TYPE_I 64 =>
-        mret (DVALUE_I64 (Int64.repr (Int1.unsigned i1)))
+        mret (DVALUE_I64 (repr (unsigned i1)))
       | TYPE_I 8, DVALUE_I8 i1, TYPE_I 32 =>
-        mret (DVALUE_I32 (Int32.repr (Int8.unsigned i1)))
+        mret (DVALUE_I32 (repr (unsigned i1)))
       | TYPE_I 8, DVALUE_I8 i1, TYPE_I 64 =>
-        mret (DVALUE_I64 (Int64.repr (Int8.unsigned i1)))
+        mret (DVALUE_I64 (repr (unsigned i1)))
       | TYPE_I 32, DVALUE_I32 i1, TYPE_I 64 =>
-        mret (DVALUE_I64 (Int64.repr (Int32.unsigned i1)))
+        mret (DVALUE_I64 (repr (unsigned i1)))
       | _, _, _ => failwith "ill typed-conv"
       end
     | Sext =>
       match t1, x, t2 with
       | TYPE_I 1, DVALUE_I1 i1, TYPE_I 8 =>
-        mret (DVALUE_I8 (Int8.repr (Int1.signed i1)))
+        mret (DVALUE_I8 (repr (signed i1)))
       | TYPE_I 1, DVALUE_I1 i1, TYPE_I 32 =>
-        mret (DVALUE_I32 (Int32.repr (Int1.signed i1)))
+        mret (DVALUE_I32 (repr (signed i1)))
       | TYPE_I 1, DVALUE_I1 i1, TYPE_I 64 =>
-        mret (DVALUE_I64 (Int64.repr (Int1.signed i1)))
+        mret (DVALUE_I64 (repr (signed i1)))
       | TYPE_I 8, DVALUE_I8 i1, TYPE_I 32 =>
-        mret (DVALUE_I32 (Int32.repr (Int8.signed i1)))
+        mret (DVALUE_I32 (repr (signed i1)))
       | TYPE_I 8, DVALUE_I8 i1, TYPE_I 64 =>
-        mret (DVALUE_I64 (Int64.repr (Int8.signed i1)))
+        mret (DVALUE_I64 (repr (signed i1)))
       | TYPE_I 32, DVALUE_I32 i1, TYPE_I 64 =>
-        mret (DVALUE_I64 (Int64.repr (Int32.signed i1)))
+        mret (DVALUE_I64 (repr (signed i1)))
       | _, _, _ => failwith "ill typed-conv"
       end
     | Bitcast =>
@@ -255,8 +255,8 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
 
   | EXP_Bool b    =>
     match b with
-    | true  => mret (DVALUE_I1 Int1.one)
-    | false => mret (DVALUE_I1 Int1.zero)
+    | true  => mret (DVALUE_I1 one)
+    | false => mret (DVALUE_I1 zero)
     end
 
   | EXP_Null => mret (DVALUE_Addr A.null)
@@ -461,7 +461,7 @@ Definition step (s:state) : Trace result :=
     'dv <- eval_exp (Some (eval_typ t)) op; 
     'br <- match dv with 
             | DVALUE_I1 comparison_bit =>
-              if Int1.eq comparison_bit Int1.one then
+              if eq comparison_bit one then
                 mret br1
               else
                 mret br2
