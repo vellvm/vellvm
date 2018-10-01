@@ -379,11 +379,15 @@ Class VInt I : Type :=
   (* Arithmetic Operations ---------------------------------------------------- *)
   Section ARITHMETIC.
     
-  (* Since modules are not first class, this code duplication
-     will probably have to do. *)
+  (* Evaluate integer opererations to get a dvalue.
+
+     These operations are between VInts, which are "vellvm"
+     integers. This is a typeclass that wraps all of the integer
+     operations that we use for integer types with different bitwidths.
+   *)
   Definition eval_int_op `{VInt Int} (iop:ibinop) (x y: Int) : dvalue:=
-    (* See eval_i64_op for a few comments *)
     match iop with
+    (* Following to cases are probably right since they use CompCert *)
     | Add nuw nsw =>
       if orb (andb nuw (eq (add_carry x y zero) one))
              (andb nsw (eq (add_overflow x y zero) one))
@@ -412,6 +416,8 @@ Class VInt I : Type :=
         let res := shl x y in
         let res_u := unsigned res in
         let res_u' := Z.shiftl (unsigned x) (unsigned y) in
+        (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
+         then there is overflow. *)
         if (unsigned y) >=? bz then undef_int
         else if orb (andb nuw (res_u' >? res_u))
                     (andb nsw (negb (Z.shiftr (unsigned x)
