@@ -537,7 +537,7 @@ Class VInt I : Type :=
        | Slt => cmp Clt x y
        | Sle => cmp Cle x y
        end
-    then to_dvalue one else to_dvalue zero.
+    then DVALUE_I1 (Int1.one) else DVALUE_I1 (Int1.zero).
   Arguments eval_int_icmp _ _ _ : simpl nomatch.
 
   Definition eval_icmp icmp v1 v2 : err dvalue :=
