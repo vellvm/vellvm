@@ -3,6 +3,7 @@ Require Import Vellvm.LLVMAst Vellvm.Classes Vellvm.Util.
 Require Import Vellvm.StepSemantics Vellvm.LLVMIO.
 Require Import Vellvm.MemoryAddress.
 Require Import Vellvm.LLVMIO.
+Require Import ITree.
 Require Import FSets.FMapAVL.
 Require Import compcert.lib.Integers compcert.lib.Coqlib.
 Require Coq.Structures.OrderedTypeEx.
@@ -438,15 +439,14 @@ Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
 
 CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
   match d with
-  | Trace.Tau d'            => Trace.Tau (memD m d')
-  | Trace.Vis _ io k =>
+  | Tau d' => Tau (memD m d')
+  | Vis _ io k =>
     match mem_step io m with
-    | inr (inr (m', v)) => Trace.Tau (memD m' (k v))
-    | inr (inl e) => Trace.Vis io k
-    | inl s => Trace.Err s
+    | inr (inr (m', v)) => Tau (memD m' (k v))
+    | inr (inl e) => Vis io k
+    | inl s => raise s
     end
-  | Trace.Ret x => d
-  | Trace.Err x => d
+  | Ret x => d
   end.
 
 End Make.
