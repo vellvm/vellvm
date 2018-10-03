@@ -1,6 +1,9 @@
 dist: trusty
 sudo: required
-language: c
+language: generic
+
+before_cache:
+  - rm -rf $HOME/.opam/log
 cache:
   apt: true
   directories:
@@ -24,8 +27,6 @@ env:
   # get versions from: https://opam.ocaml.org/packages/coq/
   # Only use versions that CompCert can build with...
   matrix:
-  - TEST_TARGET="8.6.1"
-  - TEST_TARGET="8.7.2"
   - TEST_TARGET="8.8.0"
 
 before_script:
@@ -40,7 +41,7 @@ install:
   - opam install -y --verbose -j ${NJOBS} coq.${TEST_TARGET} && opam pin add coq ${TEST_TARGET} -y
   - opam install -y --verbose -j ${NJOBS} coq-mathcomp-ssreflect
   - opam install -y --verbose -j ${NJOBS} ocamlfind camlp5 ${EXTRA_OPAM} 
-
+  - opam install -y --verbose -j ${NJOBS} coq-ext-lib
 
 script:
   - eval $(opam config env)
@@ -48,6 +49,8 @@ script:
   # Look at how Coq builds compcert for their test suite
   # https://github.com/coq/coq/blob/b67b8ab65448a63cb53517ab9dfccb3b4d541d77/dev/ci/ci-compcert.sh
   - cd lib/CompCert &&  ./configure x86_64-linux -ignore-coq-version && make; cd ../../
-  - make -j ${NJOBS} -C lib/paco/src 
+  - make -j ${NJOBS} -C lib/paco/src
+  - echo "-Q ../paco/src Paco" > lib/InteractionTrees/_CoqPath
+  - make -j ${NJOBS} -C lib/InteractionTrees
   - make -j ${NJOBS} -C src/
   - cd src && ./vellvm --test
