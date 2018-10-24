@@ -6,7 +6,7 @@ COQLIBDIR = ../lib
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(COQLIBDIR)/CompCert compcert -R $(COQLIBDIR)/paco/src Paco -R $(COQLIBDIR)/InteractionTrees/theories ITree
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(COQLIBDIR)/CompCert compcert -R $(COQLIBDIR)/InteractionTrees/theories ITree
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source

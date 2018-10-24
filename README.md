@@ -64,8 +64,6 @@ Compilation:
    1. CompCert: `cd lib/Compcert && ./configure x86_64-macosx && make`
    2. Compile Paco: `make -C lib/paco/src`
    3. Compile InteractionTrees
-      - create the file `lib/InteractionTrees/_CoqPath` and edit it to contain
-      `-Q ../paco/src Paco`
 	  - run `make` from the InteractionTrees directory  (do _not_ use `setup.sh`
         since that will clone another copy of paco and we already assume ext-lib exists)
 4. run `make` in the /src directory

@@ -1,5 +1,4 @@
 -Q coq Vellvm
 -R coq Vellvm
 -R ../lib/CompCert/ compcert
--R ../lib/paco/src Paco
 -R ../lib/InteractionTrees/theories ITree
