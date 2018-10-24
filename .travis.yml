@@ -49,8 +49,6 @@ script:
   # Look at how Coq builds compcert for their test suite
   # https://github.com/coq/coq/blob/b67b8ab65448a63cb53517ab9dfccb3b4d541d77/dev/ci/ci-compcert.sh
   - cd lib/CompCert &&  ./configure x86_64-linux -ignore-coq-version && make; cd ../../
-  - make -j ${NJOBS} -C lib/paco/src
-  - echo "-Q ../paco/src Paco" > lib/InteractionTrees/_CoqPath
   - make -j ${NJOBS} -C lib/InteractionTrees
   - make -j ${NJOBS} -C src/
   - cd src && ./vellvm --test
