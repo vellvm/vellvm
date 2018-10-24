@@ -42,6 +42,7 @@ install:
   - opam install -y --verbose -j ${NJOBS} coq-mathcomp-ssreflect
   - opam install -y --verbose -j ${NJOBS} ocamlfind camlp5 ${EXTRA_OPAM} 
   - opam install -y --verbose -j ${NJOBS} coq-ext-lib
+  - opam install -y --verbose -j ${NJOBS} coq-paco
 
 script:
   - eval $(opam config env)
