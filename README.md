@@ -51,7 +51,9 @@ University of Pennsylvania as part of the DeepSpec project.
 
 ### Assumes: 
   - coqc   : version 8.8.0   (and coqdep, etc.)
-  - Coq packages: ext-lib    (installed via, e.g. opam install coq-ext-lib)
+  - Coq packages: 
+    - ext-lib    (installed via, e.g. opam install coq-ext-lib)
+    - paco       (installed via, e.g. opam install coq-paco)
   - ocamlc : version 4.04    (probably works with 4.02 or later)
   - OPAM packages: ocamlbuild, menhir, [optional: llvm  (for llvm v. 3.8)]
 
@@ -62,7 +64,6 @@ Compilation:
    1. `cd lib/CompCert && git pull origin master`
 3. compile 3rd party libraries:
    1. CompCert: `cd lib/Compcert && ./configure x86_64-macosx && make`
-   2. Compile Paco: `make -C lib/paco/src`
    3. Compile InteractionTrees
 	  - run `make` from the InteractionTrees directory  (do _not_ use `setup.sh`
         since that will clone another copy of paco and we already assume ext-lib exists)
