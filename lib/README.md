@@ -5,5 +5,4 @@ pulled in as git submodules when the project is cloned
 which can be installed independently of Vellvm:
 
 * lib/CompCert 
-* lib/paco
 * lib/InteractionTrees
