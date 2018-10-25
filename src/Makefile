@@ -27,6 +27,7 @@ all:
 
 coq: $(VOFILES)
 
+.PHONY: extracted
 extracted: $(EXTRACTDIR)/STAMP $(VOFILES)
 
 $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
@@ -49,11 +50,11 @@ depend: $(VFILES)
 
 .PHONY: clean test qc restore
 
-_build/default/main.exe: 
+EXE=_build/default/ml/main.exe
+
+$(EXE): extracted
 	@echo "Compiling Vellvm"
 	dune build ml/main.exe
-
-EXE=_build/default/ml/main.exe
 
 vellvm: $(EXE)
 	cp $(EXE) vellvm
