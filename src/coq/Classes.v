@@ -210,29 +210,33 @@ Class Monad F `{Functor F} :=
 Hint Unfold mret.
 Hint Unfold mbind.
 
-Notation "m ≫= f"  := (mbind m f) (at level 60, right associativity).
-Notation "( m ≫=)" := (mbind m) (only parsing).
-Notation "(≫= f )" := (fun m => mbind m f) (only parsing).
-Notation "(≫=)"    := (λ m f, mbind m f) (only parsing).
-Notation "'; y ; z" := (y ≫= (λ _ : (), z))
-  (at level 65, only parsing, right associativity).
-Notation "' x <- y ; z" := (y ≫= (λ x : _, z))
-  (at level 65, x ident, only parsing, right associativity).
+Delimit Scope classes_scope with class.
+
+Notation "m ≫= f"  := (mbind m f) (at level 60, right associativity) : classes_scope.
+Notation "( m ≫=)" := (mbind m) (only parsing) : classes_scope.
+Notation "(≫= f )" := (fun m => mbind m f) (only parsing) : classes_scope.
+Notation "(≫=)"    := (λ m f, mbind m f) (only parsing) : classes_scope.
+Notation "'; y ; z" := (y ≫= (λ _ : (), z))%class
+  (at level 110, only parsing, right associativity) : classes_scope.
+Notation "' x <- y ; z" := (y ≫= (λ x : _, z))%class
+  (at level 110, x ident, only parsing, right associativity) : classes_scope.
 Notation "' ( x1 , x2 ) <- y ; z" :=
-  (y ≫= (λ x : _, let ' (x1, x2) := x in z))
-  (at level 65, x1 ident, x2 ident, only parsing, right associativity).
+  (y ≫= (λ x : _, let ' (x1, x2) := x in z))%class
+  (at level 110, x1 ident, x2 ident, only parsing, right associativity) : classes_scope.
 Notation "' ( x1 , x2 , x3 ) <- y ; z" :=
-  (y ≫= (λ x : _, let ' (x1,x2,x3) := x in z))
-  (at level 65, x1 ident, x2 ident, x3 ident, only parsing, right associativity).
+  (y ≫= (λ x : _, let ' (x1,x2,x3) := x in z))%class
+  (at level 110, x1 ident, x2 ident, x3 ident, only parsing, right associativity) : classes_scope.
 Notation "' ( x1 , x2 , x3  , x4 ) <- y ; z" :=
-  (y ≫= (λ x : _, let ' (x1,x2,x3,x4) := x in z))
-  (at level 65, x1 ident, x2 ident, x3 ident, x4 ident, only parsing, right associativity).
+  (y ≫= (λ x : _, let ' (x1,x2,x3,x4) := x in z))%class
+  (at level 110, x1 ident, x2 ident, x3 ident, x4 ident, only parsing, right associativity) : classes_scope.
 Notation "' ( x1 , x2 , x3  , x4 , x5 ) <- y ; z" :=
-  (y ≫= (λ x : _, let ' (x1,x2,x3,x4,x5) := x in z))
-  (at level 65, x1 ident, x2 ident, x3 ident, x4 ident, x5 ident, only parsing, right associativity).
+  (y ≫= (λ x : _, let ' (x1,x2,x3,x4,x5) := x in z))%class
+  (at level 110, x1 ident, x2 ident, x3 ident, x4 ident, x5 ident, only parsing, right associativity) : classes_scope.
 Notation "' ( x1 , x2 , x3  , x4 , x5 , x6 ) <- y ; z" :=
-  (y ≫= (λ x : _, let ' (x1,x2,x3,x4,x5,x6) := x in z))
-  (at level 65, x1 ident, x2 ident, x3 ident, x4 ident, x5 ident, x6 ident, only parsing, right associativity).
+  (y ≫= (λ x : _, let ' (x1,x2,x3,x4,x5,x6) := x in z))%class
+  (at level 110, x1 ident, x2 ident, x3 ident, x4 ident, x5 ident, x6 ident, only parsing, right associativity) : classes_scope.
+
+Open Scope classes_scope.
 
 Class MonadLaws F `{Monad F} `{FunctorLaws F} :=
 {

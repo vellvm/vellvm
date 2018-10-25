@@ -450,13 +450,13 @@ Fixpoint swap_dvalue (id1 id2:raw_id) (dv:dvalue) : dvalue :=
 Instance swap_of_dvalue : Swap dvalue := fun (id1 id2 : raw_id) dv => dv.
 Hint Unfold swap_of_dvalue.
 
-Instance swap_of_IO {X} : Swap (IO X) := fun id1 id2 x => x.
+Instance swap_of_IO : Swap IO_action := fun id1 id2 x => x.
 Hint Unfold swap_of_IO.
 
 CoFixpoint swap_Trace X `{Swap X} (id1 id2:raw_id) (t:Trace X) : Trace X :=
   match t with
   | ITree.Ret x => ITree.Ret (swap id1 id2 x)
-  | ITree.Vis _ e k => ITree.Vis (swap id1 id2 e) (fun y => swap_Trace X id1 id2 (k y))
+  | ITree.Vis e k => ITree.Vis (swap id1 id2 e) (fun y => swap_Trace X id1 id2 (k y))
   | ITree.Tau k => ITree.Tau (swap_Trace X id1 id2 k)
   end.
 
@@ -691,3 +691,4 @@ Section PROOFS.
     
 End PROOFS.  
 End RENAMING.
+

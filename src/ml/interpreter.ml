@@ -27,12 +27,14 @@ let rec step m =
   | ITree.Tau x -> step x
   | ITree.Ret (Coq_inr v) -> v
   | ITree.Ret (Coq_inl s) -> failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
-  | ITree.Vis (IO.Call(t, f, args), k) ->
-    (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n" (Camlcoq.camlstring_of_coqstring f));
-    step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero)))
-    
-  | ITree.Vis (IO.GEP(_, _, _), _) -> failwith "GEP failed"
-  | ITree.Vis _ -> failwith "should have been handled by the memory model"  
+  | ITree.Vis (e, k) ->
+    begin match Obj.magic e with
+      | TopLevel.IO.Call(t, f, args) ->
+        (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n" (Camlcoq.camlstring_of_coqstring f));
+        step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero)))
+      | TopLevel.IO.GEP(_, _, _) -> failwith "GEP failed"
+      | _ -> failwith "should have been handled by the memory model"  
+    end
       
 
 let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) = 

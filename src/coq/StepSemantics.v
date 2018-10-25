@@ -27,7 +27,6 @@ Require Import Vellvm.DynamicValues.
 Require Import Vellvm.TypeUtil.
 Import ListNotations.
 
-
 Set Implicit Arguments.
 Set Contextual Implicit.
 
@@ -221,15 +220,16 @@ Variable e : env.
     - top must be Some t for the remaining EXP_* cases
       Note that when top is Some t, the resulting dvalue can never be
       a function pointer for a well-typed LLVM program.
-*)
+ *)
+
 Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
   let eval_texp '(t,ex) :=
              let dt := eval_typ t in
-             'v <- eval_exp (Some dt) ex; mret v
+             'v <- eval_exp (Some dt) ex ; mret v
   in
   match o with
   | EXP_Ident i => lift_err_d (lookup_id g e i) mret
-
+                             
   | EXP_Integer x =>
     match top with
     | None =>  failwith "eval_exp given untyped EXP_Integer"
@@ -279,7 +279,7 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
   (* Question: should we do any typechecking for aggregate types here? *)
   (* Option 1: do no typechecking: *)
   | EXP_Struct es =>
-    'vs <- map_monad eval_texp es;
+     'vs <- map_monad eval_texp es;
       mret (DVALUE_Struct vs)
 
   (* Option 2: do a little bit of typechecking *)
@@ -287,7 +287,7 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
     match top with
     | None => failwith "eval_exp given untyped EXP_Struct"
     | Some (DTYPE_Packed_struct _) =>
-      'vs <- map_monad eval_texp es;
+       'vs <- map_monad eval_texp es;
         mret (DVALUE_Packed_struct vs)
     | _ => failwith "bad type for VALUE_Packed_struct"
     end
@@ -309,7 +309,7 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
 
   | OP_ICmp cmp t op1 op2 =>
     let dt := eval_typ t in
-    'v1 <- eval_exp (Some dt) op1;                   
+    'v1 <- eval_exp (Some dt) op1;
     'v2 <- eval_exp (Some dt) op2;
     do w <- (eval_icmp cmp) v1 v2;
     mret w

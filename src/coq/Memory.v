@@ -60,7 +60,7 @@ Fixpoint add_all_index {a} vs (i:Z) (m:IntMap a) :=
 (* Give back a list of values from i to (i + sz) - 1 in m. *)
 (* Uses def as the default value if a lookup failed. *)
 Definition lookup_all_index {a} (i:Z) (sz:Z) (m:IntMap a) (def:a) : list a :=
-  map (fun x =>
+  List.map (fun x =>
          let x' := lookup (Z.of_nat x) m in
          match x' with
          | None => def
@@ -91,7 +91,7 @@ Fixpoint max_default (l:list Z) (x:Z) :=
   end.
 
 Definition oracle (m:memory) : Z :=
-  let keys := map fst (IM.elements m) in
+  let keys := List.map fst (IM.elements m) in
   let max := max_default keys 0 in
   let offset := 1 in (* TODO: This should be "random" *)
   max + offset.
@@ -370,7 +370,7 @@ Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (me
   | _ => raise "non-I32 index"
   end.
 
-Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
+Definition mem_step (e:IO) (m:memory) : err (IO + (memory * (reaction e))) :=
   match e with
   | Alloca t =>
     let new_block := make_empty_block t in
@@ -440,7 +440,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memory * X)) :=
 CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
   match d with
   | Tau d' => Tau (memD m d')
-  | Vis _ io k =>
+  | Vis io k =>
     match mem_step io m with
     | inr (inr (m', v)) => Tau (memD m' (k v))
     | inr (inl e) => Vis io k
