@@ -27,12 +27,13 @@ all:
 
 coq: $(VOFILES)
 
-extracted: $(EXTRACTDIR)/STAMP
+extracted: $(EXTRACTDIR)/STAMP $(VOFILES)
 
 $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "Extracting"
 	rm -f $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
 	$(COQEXEC) $(EXTRACTDIR)/Extract.v
+	patch -p0 < CRelationClasses.mli.patch
 	touch $(EXTRACTDIR)/STAMP
 
 
@@ -46,25 +47,16 @@ depend: $(VFILES)
 	@$(COQDEP) $^ > .depend
 
 
+.PHONY: clean test qc restore
 
-# Directories containing plain Caml code
-OCAMLDIRS= $(EXTRACTDIR) $(MLDIR) 
-
-COMMA=,
-OCAMLINCLUDES=$(patsubst %,-I %, $(OCAMLDIRS))
-print-ocaml-includes:
-	@echo $(OCAMLINCLUDES)
-
-OCAMLLIBS := unix,str
-
-.PHONY: clean main.native test qc restore
-
-main.native: 
+_build/default/main.exe: 
 	@echo "Compiling Vellvm"
-	ocamlbuild -r -use-menhir -yaccflag --explain $(OCAMLINCLUDES) -libs $(OCAMLLIBS) main.native
+	dune build ml/main.exe
 
-vellvm: main.native
-	cp main.native vellvm
+EXE=_build/default/ml/main.exe
+
+vellvm: $(EXE)
+	cp $(EXE) vellvm
 
 test: vellvm
 	./vellvm --test-pp-dir ../tests/ll
@@ -77,7 +69,7 @@ clean:
 	rm -f $(VOFILES)
 	rm -rf doc/html doc/*.glob
 	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
-	ocamlbuild -clean
+	dune clean
 	rm -rf output
 	rm -f vellvm
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o

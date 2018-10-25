@@ -43,6 +43,7 @@ install:
   - opam install -y --verbose -j ${NJOBS} ocamlfind camlp5 ${EXTRA_OPAM} 
   - opam install -y --verbose -j ${NJOBS} coq-ext-lib
   - opam install -y --verbose -j ${NJOBS} coq-paco
+  - opam install -y --verbose -j ${NJOBS} dune
 
 script:
   - eval $(opam config env)

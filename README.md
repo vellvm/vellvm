@@ -55,7 +55,7 @@ University of Pennsylvania as part of the DeepSpec project.
     - ext-lib    (installed via, e.g. opam install coq-ext-lib)
     - paco       (installed via, e.g. opam install coq-paco)
   - ocamlc : version 4.04    (probably works with 4.02 or later)
-  - OPAM packages: ocamlbuild, menhir, [optional: llvm  (for llvm v. 3.8)]
+  - OPAM packages: dune, menhir, [optional: llvm  (for llvm v. 3.8)]
 
 Compilation:
 
