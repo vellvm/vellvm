@@ -22,7 +22,7 @@ Module Make(LLVMIO: LLVMInters).
   Import LLVMIO.
   Import DV.
 
-  Module CerberusTypes : MemoryTypes.
+  Module CerberusTypes <: MemoryTypes.
 
     Definition name := "Cerberus".
 
@@ -51,7 +51,9 @@ Module Make(LLVMIO: LLVMInters).
     Definition fun_ptrval := fun (_ : symbol_sym) => A.null.
   End CerberusTypes.
 
-  Module MTC : MemoryTypeConversion LLVMIO CerberusTypes.
+  Module MTC <: MemoryTypeConversion LLVMIO CerberusTypes.
+    Import CerberusTypes.
+
     Definition pointer_value_to_dvalue := DVALUE_Addr.
     Definition dvalue_to_pointer_value (dv : dvalue) : pointer_value
       := match dv with
@@ -73,6 +75,12 @@ Module Make(LLVMIO: LLVMInters).
 
     Definition floating_value_to_dvalue (fv : floating_value) : dvalue := DVALUE_None.
     Definition dvalue_to_floating_value (dv : dvalue) : floating_value := tt.
+
+    Definition mem_value_to_dvalue (mv : mem_value) : dvalue := mv.
+    Definition dvalue_to_mem_value (dv : dvalue) : mem_value := dv.
+
+    Definition dtyp_to_ctype (dt : dtyp) : ctype0 := dt.
+    Definition ctype_to_dtyp (ct : ctype0) : dtyp := ct.
   End MTC.
 
 
@@ -86,14 +94,13 @@ Module Make(LLVMIO: LLVMInters).
 
   Module Type MemoryInst := Memory CerberusTypes CerberusMonad.
 
-  Import LLVMIO.
-  Import DV.
-  Module MTC := MTC LLVMIO.
-  Import MTC.
+Import MTC.
 
 (* Cerberus memory model *)
 
 Module MemoryLLVM (CMM : MemoryInst).
+Import CMM.
+
 
 Definition addr := A.addr.
 
@@ -302,7 +309,7 @@ Inductive sbyte_list_wf : list SByte -> Prop :=
 | wf_cons : forall b l, sbyte_list_wf l -> sbyte_list_wf (Byte b :: l)
 .                                                   
 
-Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
+Fixpoint handle_gep_h (t:dtyp) (pv:pointer_value) (vs:list dvalue) : err pointer_value :=
   match vs with
   | v :: vs' =>
     match v with
@@ -311,15 +318,17 @@ Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (
       let n := BinIntDef.Z.to_nat k in
       match t with
       | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
-                           handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+                           handle_gep_h ta (array_shift_ptrval pv (dtyp_to_ctype t) k) vs'
       | DTYPE_Struct ts | DTYPE_Packed_struct ts => (* Handle these differently in future *)
+                          raise "unimplemented structure indexing"
+                          (*
         let offset := fold_left (fun acc t => acc + sizeof_dtyp t)
                                 (firstn n ts) 0 in
         match nth_error ts n with
         | None => raise "overflow"
         | Some t' =>
           handle_gep_h t' b (off + offset) vs' m
-        end
+        end *)
       | _ => raise ("non-i32-indexable type")
       end
     | DVALUE_I8 i =>
@@ -327,7 +336,7 @@ Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (
       let n := BinIntDef.Z.to_nat k in
       match t with
       | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
-                           handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+                           handle_gep_h ta (array_shift_ptrval pv (dtyp_to_ctype t) k) vs'
       | _ => raise ("non-i8-indexable type")
       end
     | DVALUE_I64 i =>
@@ -335,21 +344,22 @@ Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (
       let n := BinIntDef.Z.to_nat k in
       match t with
       | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
-                           handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+                           handle_gep_h ta (array_shift_ptrval pv (dtyp_to_ctype t) k) vs'
       | _ => raise ("non-i64-indexable type")
       end
     | _ => raise "non-I32 index"
     end
-  | [] => mret (m, DVALUE_Addr (b, off))
+  | [] => mret pv
   end.
 
 
-Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
+Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue:=
   match vs with
   | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 indices *)
     match dv with
-    | DVALUE_Addr (b, o) =>
-      handle_gep_h t b (o + (sizeof_dtyp t) * (unsigned i)) vs' m
+    | DVALUE_Addr pv =>
+      let k := unsigned i in
+      fmap pointer_value_to_dvalue (handle_gep_h t (array_shift_ptrval pv (dtyp_to_ctype t) k) vs')
     | _ => raise "non-address" 
     end
   | _ => raise "non-I32 index"
@@ -357,46 +367,45 @@ Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (me
 
 
 (* TODO *)
-Definition dvalue_to_mem_value (dv : dvalue) : CMM.mem_value := tt.
-Definition dtyp_to_ail_integer_type (dt : dtyp) : CMM.AilIntegerType := tt.
+Definition dtyp_to_ail_integer_type (dt : dtyp) : AilIntegerType := tt.
 
-Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (CMM.memM X)) :=
+Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memM X)) :=
   match e with
   | Alloca t =>
-    let new_block := CMM.allocate_dynamic 0%nat "" 0 (sizeof_dtyp t) in
-    let new_block_dvalue := CMM.bind _ _ new_block (fun p => CMM.ret _ (MTC.pointer_value_to_dvalue p)) in
+    let new_block := allocate_dynamic 0%nat "" 0 (sizeof_dtyp t) in
+    let new_block_dvalue := bind _ _ new_block (fun p => ret _ (pointer_value_to_dvalue p)) in
     mret (inr (new_block_dvalue))
          
   | Load t dv => mret
     match dv with
-    | DVALUE_Addr a => CMM.load "" t a
-    | _ => mret (inl (Load t dv))
+    | DVALUE_Addr a => inr (bind _ _ (CMM.load "" t a) (fun fm => let (f, m) := fm in ret _ (mem_value_to_dvalue m)))
+    | _ => inl (Load t dv)
     end
 
   | Store t dv v => mret
     match dv with
-    | DVALUE_Addr a => inr (CMM.bind _ _ (CMM.store "" t a (dvalue_to_mem_value v)) (fun a => CMM.ret _ tt))
-    | _ => mret (inl (Store t dv v))
+    | DVALUE_Addr a => inr (bind _ _ (CMM.store "" t a (dvalue_to_mem_value v)) (fun a => CMM.ret _ tt))
+    | _ => inl (Store t dv v)
     end
       
   | GEP t dv vs =>
-    match handle_gep t dv vs m with
+    match handle_gep t dv vs with
     | inl s => raise s
-    | inr r => mret (inr r)
+    | inr r => mret (inr (ret _ r))
     end
 
   | ItoP s t i =>
     match i with
-    | DVALUE_I64 i => mret (inr (CMM.bind _ _ (CMM.ptrcast_ival s t (unsigned i)) (fun p => CMM.ret _ (MTC.pointer_value_to_dvalue p))))
-    | DVALUE_I32 i => mret (inr (CMM.bind _ _ (CMM.ptrcast_ival s t (unsigned i)) (fun p => CMM.ret _ (MTC.pointer_value_to_dvalue p))))
-    | DVALUE_I8 i => mret (inr (CMM.bind _ _ (CMM.ptrcast_ival s t (unsigned i)) (fun p => CMM.ret _ (MTC.pointer_value_to_dvalue p))))
-    | DVALUE_I1 i => mret (inr (CMM.bind _ _ (CMM.ptrcast_ival s t (unsigned i)) (fun p => CMM.ret _ (MTC.pointer_value_to_dvalue p))))
+    | DVALUE_I64 i => mret (inr (bind _ _ (ptrcast_ival s t (unsigned i)) (fun p => ret _ (MTC.pointer_value_to_dvalue p))))
+    | DVALUE_I32 i => mret (inr (bind _ _ (ptrcast_ival s t (unsigned i)) (fun p => ret _ (MTC.pointer_value_to_dvalue p))))
+    | DVALUE_I8 i => mret (inr (bind _ _ (ptrcast_ival s t (unsigned i)) (fun p => ret _ (MTC.pointer_value_to_dvalue p))))
+    | DVALUE_I1 i => mret (inr (bind _ _ (ptrcast_ival s t (unsigned i)) (fun p => ret _ (MTC.pointer_value_to_dvalue p))))
     | _ => raise "Non integer passed to ItoP"
     end
     
   | PtoI s t a =>
     match a with
-    | DVALUE_Addr p => raise "bleh" (* mret (inr (CMM.intcast_ptrval s (dtyp_to_ail_integer_type t) p)) *)
+    | DVALUE_Addr p => mret (inr (bind _ _ (intcast_ptrval s (dtyp_to_ail_integer_type t) p) (fun iv => ret _ (integer_value_to_dvalue iv))))
     | _ => raise "Non pointer passed to PtoI"
     end
                        

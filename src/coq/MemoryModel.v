@@ -66,6 +66,9 @@ Module Type MemoryTypeConversion (Import LLVMIO: LLVMInters) (Import MT: MemoryT
 
   Parameter mem_value_to_dvalue : mem_value -> dvalue.
   Parameter dvalue_to_mem_value : dvalue -> mem_value.
+
+  Parameter dtyp_to_ctype : dtyp -> ctype0.
+  Parameter ctype_to_dtyp : ctype0 -> dtyp.
 End MemoryTypeConversion.
 
 
@@ -271,4 +274,3 @@ Module Type Memory (Export MT:MemoryTypes) (Export MM:MemoryMonad).
 *)
 *)
 End Memory.
-
