@@ -100,6 +100,12 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   
   Definition add_env := ENV.add.
 
+Section IN_CFG_CONTEXT.
+Variable CFG:mcfg.
+
+Definition eval_typ (t:typ) : dtyp :=
+  TypeUtil.normalize_type_dtyp (m_type_defs CFG) t.
+
   
   Section CONVERSIONS.
   (* Conversions can't go into DynamicValues because Int2Ptr and Ptr2Int casts 
@@ -170,12 +176,12 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     | Fptosi => failwith "TODO: floating point conversion not yet implemented"
     | Inttoptr =>
       match t1, t2 with
-      | TYPE_I 64, TYPE_Pointer t => Vis (ItoP x) mret
+      | TYPE_I 64, TYPE_Pointer t => Vis (ItoP (DTYPE_I 64) (eval_typ t) x) mret
       | _, _ => raise "ERROR: Inttoptr got illegal arguments"
       end 
     | Ptrtoint =>
       match t1, t2 with
-      | TYPE_Pointer t, TYPE_I 64 => Vis (PtoI x) mret
+      | TYPE_Pointer t, TYPE_I 64 => Vis (PtoI (eval_typ t) (DTYPE_I 64) x) mret
       | _, _ => raise "ERROR: Ptrtoint got illegal arguments"
       end
     end.
@@ -197,14 +203,6 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
 
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".
-
-
-Section IN_CFG_CONTEXT.
-Variable CFG:mcfg.
-
-Definition eval_typ (t:typ) : dtyp :=
-  TypeUtil.normalize_type_dtyp (m_type_defs CFG) t.
-
 
 Section IN_LOCAL_ENVIRONMENT.
 Variable g : genv.
@@ -497,7 +495,7 @@ Definition step (s:state) : Trace result :=
       | IVoid _, INSTR_Store _ (t, val) (u, ptr) _ => 
         'dv <- eval_exp (Some (eval_typ t)) val; 
         'v <- eval_exp (Some (eval_typ u)) ptr;
-          Vis (Store v dv) (fun _ => cont (g, pc_next, e, k))
+          Vis (Store (eval_typ t) v dv) (fun _ => cont (g, pc_next, e, k))
 
       | _, INSTR_Store _ _ _ _ => raise "ERROR: Store to non-void ID" 
 
@@ -568,7 +566,7 @@ Definition initialize_globals (gs:list global) (g:genv) : Trace unit :=
            | None => mret DVALUE_Undef
            | Some e => eval_exp g (@ENV.empty _) (Some dt) e
            end;
-       Vis (Store a dv) mret)
+       Vis (Store dt a dv) mret)
     gs tt.
   
 Definition build_global_environment : Trace genv :=

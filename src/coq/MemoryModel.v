@@ -2,9 +2,25 @@
   Memory model that matches the ml interface...
  *)
 Require Import Coq.Strings.String.
+Require Import LLVMIO.
+Require Import ZArith List String Omega.
+Require Import Vellvm.LLVMAst Vellvm.Classes Vellvm.Util.
+Require Import Vellvm.StepSemantics Vellvm.LLVMIO.
+Require Import Vellvm.MemoryAddress.
+Require Import Vellvm.LLVMIO.
+Require Import ITree.
+Require Import FSets.FMapAVL.
+Require Import compcert.lib.Integers compcert.lib.Coqlib.
+Require Coq.Structures.OrderedTypeEx.
+Require Import ZMicromega.
+Import ListNotations.
+Require Import ExtLib.Data.Monads.IdentityMonad.
+Require Import ExtLib.Structures.Monad.
+Require Import DynamicValues.
+Require Import LLVMAddr.
 
 
-Module Type Memory.
+Module Type MemoryTypes.
   Parameter name : string.
 
   Parameter pointer_value : Type.
@@ -16,18 +32,9 @@ Module Type Memory.
   (* Definition mem_iv_constraint = Mem_Common.mem_constraint integer_value.*)
 
   Parameter footprint : Type.
-  Parameter do_overlap : footprint -> footprint -> bool.
 
   Parameter mem_state : Type.
   Parameter initial_mem_state : mem_state.
-
-  (* TODO Change memM to a proper monad.
-
-     Do we want bind and ret in here at all...?
-   *)
-  Parameter memM : Type -> Type.
-  Parameter ret : forall a, a -> memM a.
-  Parameter bind : forall a b, memM a -> (a -> memM b) -> memM b.
 
   (* TODO Original just uses Cthread.thread_id, not sure what we would use. *)
   Parameter thread_id : Type.
@@ -37,6 +44,48 @@ Module Type Memory.
 
   (* TODO Symbol.prefix *)
   Parameter symbol_prefix : Type.
+
+  (* TODO Symbol.sym? *)
+  Parameter symbol_sym : Type.
+  
+  (* Pointer value constructors *)
+  Parameter null_ptrval : ctype0 -> pointer_value.
+  Parameter fun_ptrval: symbol_sym -> pointer_value.
+End MemoryTypes.
+
+
+Module Type MemoryTypeConversion (Import LLVMIO: LLVMInters) (Import MT: MemoryTypes).
+  Parameter pointer_value_to_dvalue : pointer_value -> dvalue.
+  Parameter dvalue_to_pointer_value : dvalue -> pointer_value.  (* Type checking to catch incompatible dvalues? *)
+
+  Parameter integer_value_to_dvalue : integer_value -> dvalue.
+  Parameter dvalue_to_integer_value : dvalue -> integer_value.
+
+  Parameter floating_value_to_dvalue : floating_value -> dvalue.
+  Parameter dvalue_to_floating_value : dvalue -> floating_value.
+
+  Parameter mem_value_to_dvalue : mem_value -> dvalue.
+  Parameter dvalue_to_mem_value : dvalue -> mem_value.
+End MemoryTypeConversion.
+
+
+Module Type MemoryMonad.
+  (* TODO Change memM to a proper monad.
+
+     Do we want bind and ret in here at all...?
+   *)
+
+  Parameter memM : Type -> Type.
+  Parameter ret : forall a, a -> memM a.
+  Parameter bind : forall a b, memM a -> (a -> memM b) -> memM b.
+End MemoryMonad.
+
+
+Module Type Memory (Export MT:MemoryTypes) (Export MM:MemoryMonad).
+  Include MT.
+  Include MM.
+  
+  Parameter do_overlap : footprint -> footprint -> bool.
 
   (* Memory actions *)
   Parameter allocate_static :
@@ -57,17 +106,11 @@ Module Type Memory.
   Parameter kill : pointer_value -> memM unit.
 
   (* TODO Location_ocaml.t, not sure what this is... *)
-  Parameter loc_ocaml_t : Type.
+  (* Parameter loc_ocaml_t : Type. *)
+  Definition loc_ocaml_t := string.
   
   Parameter load : loc_ocaml_t -> ctype0 -> pointer_value -> memM (footprint * mem_value).
   Parameter store : loc_ocaml_t -> ctype0 -> pointer_value -> mem_value -> memM footprint.
-
-  (* TODO Symbol.sym? *)
-  Parameter symbol_sym : Type.
-  
-  (* Pointer value constructors *)
-  Parameter null_ptrval : ctype0 -> pointer_value.
-  Parameter fun_ptrval: symbol_sym -> pointer_value.
   
   (* Operations on pointer values *)
   Parameter eq_ptrval: pointer_value -> pointer_value -> memM bool.
@@ -82,7 +125,8 @@ Module Type Memory.
   Parameter isWellAligned_ptrval: ctype0 -> pointer_value -> memM bool.
 
   (* TODO AilTypes.integerType ? *)
-  Parameter AilIntegerType : Type.
+  (* Parameter AilIntegerType : Type. *)
+  Definition AilIntegerType := unit.
   
   (* Casting operations *)
   (* the first ctype is the original integer type, the second is the target referenced type *)
@@ -226,5 +270,5 @@ Module Type Memory.
     * Driver.driver_state ) list
 *)
 *)
-
 End Memory.
+

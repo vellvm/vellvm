@@ -57,10 +57,10 @@ Export DV.
 Inductive IO : Type -> Type :=
 | Alloca : forall (t:dtyp), (IO dvalue)
 | Load   : forall (t:dtyp) (a:dvalue), (IO dvalue)
-| Store  : forall (a:dvalue) (v:dvalue), (IO unit)
+| Store  : forall (t:dtyp) (a:dvalue) (v:dvalue), (IO unit)
 | GEP    : forall (t:dtyp) (v:dvalue) (vs:list dvalue), (IO dvalue)
-| ItoP   : forall (i:dvalue), (IO dvalue)
-| PtoI   : forall (a:dvalue), (IO dvalue)
+| ItoP   : forall (s:dtyp) (t:dtyp) (i:dvalue), (IO dvalue)
+| PtoI   : forall (s:dtyp) (t:dtyp) (a:dvalue), (IO dvalue)
 | Call   : forall (t:dtyp) (f:string) (args:list dvalue), (IO dvalue)
 .    
 

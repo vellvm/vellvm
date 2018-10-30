@@ -9,31 +9,92 @@ Require Import compcert.lib.Integers compcert.lib.Coqlib.
 Require Coq.Structures.OrderedTypeEx.
 Require Import ZMicromega.
 Import ListNotations.
+Require Import ExtLib.Data.Monads.IdentityMonad.
+Require Import ExtLib.Structures.Monad.
+Require Import LLVMAddr.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Module A : MemoryAddress.ADDRESS with Definition addr := (Z * Z) % type.
-  Definition addr := (Z * Z) % type.
-  Definition null := (0, 0).
-  Definition t := addr.
-  Lemma addr_dec : forall (a b : addr), {a = b} + {a <> b}.
-  Proof.
-    intros [a1 a2] [b1 b2].
-    destruct (a1 == b1); 
-      destruct (a2 == b2); subst.
-    - left; reflexivity.
-    - right. intros H. inversion H; subst. apply n. reflexivity.
-    - right. intros H. inversion H; subst. apply n. reflexivity.
-    - right. intros H. inversion H; subst. apply n. reflexivity.      
-  Qed.
-End A.
+Require Import MemoryModel.
 
-
-Module Make(LLVMIO: LLVM_INTERACTIONS(A)).
+Module Make(LLVMIO: LLVMInters).
   Import LLVMIO.
   Import DV.
-  
+
+  Module CerberusTypes : MemoryTypes.
+
+    Definition name := "Cerberus".
+
+    Definition pointer_value := A.addr.
+    Definition integer_value := Z.
+    Definition floating_value := unit.
+
+    Definition mem_value := dvalue.
+
+    Definition footprint := unit.
+
+    Definition mem_state := unit.
+    Definition initial_mem_state := tt.
+
+    (* TODO Original just uses Cthread.thread_id, not sure what we would use. *)
+    Definition thread_id := nat.
+
+    (* TODO Original used Core_ctype.ctype0... Not sure what this is, though. *)
+    Definition ctype0 := dtyp.
+
+    (* TODO Symbol.prefix *)
+    Definition symbol_prefix := string.
+
+    Definition symbol_sym := string.
+    Definition null_ptrval := fun (_ : ctype0) => A.null.
+    Definition fun_ptrval := fun (_ : symbol_sym) => A.null.
+  End CerberusTypes.
+
+  Module MTC : MemoryTypeConversion LLVMIO CerberusTypes.
+    Definition pointer_value_to_dvalue := DVALUE_Addr.
+    Definition dvalue_to_pointer_value (dv : dvalue) : pointer_value
+      := match dv with
+         | DVALUE_Addr a => a
+         | _ => A.null
+         end.
+
+    Definition integer_value_to_dvalue (iv : integer_value) : dvalue :=
+      DVALUE_I64 (repr iv).
+    
+    Definition dvalue_to_integer_value (dv : dvalue) : integer_value :=
+      match dv with
+      | DVALUE_I1 x => signed x
+      | DVALUE_I8 x => signed x
+      | DVALUE_I32 x => signed x
+      | DVALUE_I64 x => signed x
+      | _ => 0
+      end.
+
+    Definition floating_value_to_dvalue (fv : floating_value) : dvalue := DVALUE_None.
+    Definition dvalue_to_floating_value (dv : dvalue) : floating_value := tt.
+  End MTC.
+
+
+  Require Import ExtLib.Data.Monads.IdentityMonad.
+
+  Module CerberusMonad <: MemoryMonad.
+    Definition memM := ident.
+    Definition ret := @ret ident Monad_ident.
+    Definition bind := @bind ident Monad_ident.
+  End CerberusMonad.
+
+  Module Type MemoryInst := Memory CerberusTypes CerberusMonad.
+
+  Import LLVMIO.
+  Import DV.
+  Module MTC := MTC LLVMIO.
+  Import MTC.
+
+(* Cerberus memory model *)
+
+Module MemoryLLVM (CMM : MemoryInst).
+
 Definition addr := A.addr.
 
 Module IM := FMapAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
@@ -79,8 +140,9 @@ Inductive SByte :=
 | PtrFrag : SByte
 | SUndef : SByte.
 
-Definition mem_block := IntMap SByte.
-Definition memory := IntMap mem_block.
+(* Definition mem_block := unit. *)
+Print MemoryInst.
+Definition memory := CMM.mem_state.
 Definition undef := DVALUE_Undef. (* TODO: should this be an empty block? *)
 
 Fixpoint max_default (l:list Z) (x:Z) :=
@@ -89,12 +151,6 @@ Fixpoint max_default (l:list Z) (x:Z) :=
   | h :: tl =>
     max_default tl (if h >? x then h else x)
   end.
-
-Definition oracle (m:memory) : Z :=
-  let keys := map fst (IM.elements m) in
-  let max := max_default keys 0 in
-  let offset := 1 in (* TODO: This should be "random" *)
-  max + offset.
 
 
 (* Computes the byte size of this type. *)
@@ -246,63 +302,6 @@ Inductive sbyte_list_wf : list SByte -> Prop :=
 | wf_cons : forall b l, sbyte_list_wf l -> sbyte_list_wf (Byte b :: l)
 .                                                   
 
-(*
-Lemma sbyte_list_to_Z_inverse:
-  forall i1 : int1, (sbyte_list_to_Z (Z_to_sbyte_list 8 (Int1.unsigned i1))) = 
-               (Int1.unsigned i1).
-Proof.
-  intros i1.
-  destruct i1. simpl.
-Admitted. *)
-
-
-(*
-Lemma serialize_inverses : forall dval,
-    serialize_defined dval -> exists typ, deserialize_sbytes (serialize_dvalue dval) typ = dval.
-Proof.
-  intros. destruct H.
-  (* DVALUE_Addr. Type of pointer is not important. *)
-  - exists (TYPE_Pointer TYPE_Void). reflexivity.
-  (* DVALUE_I1. Todo: subversion lemma for integers. *)
-  - exists (TYPE_I 1).
-    simpl. 
-      
-
-    admit.
-  (* DVALUE_I32. Todo: subversion lemma for integers. *)
-  - exists (TYPE_I 32). admit.
-  (* DVALUE_I64. Todo: subversion lemma for integers. *)
-  - exists (TYPE_I 64). admit.
-  (* DVALUE_Struct [] *)
-  - exists (TYPE_Struct []). reflexivity.
-  (* DVALUE_Struct fields *)
-  - admit.
-  (* DVALUE_Array [] *)
-  - exists (TYPE_Array 0 TYPE_Void). reflexivity.
-  (* DVALUE_Array fields *)
-  - admit.
-Admitted.
-*)
-
-(* Construct block indexed from 0 to n. *)
-Fixpoint init_block_h (n:nat) (m:mem_block) : mem_block :=
-  match n with
-  | O => add 0 SUndef m
-  | S n' => add (Z.of_nat n) SUndef (init_block_h n' m)
-  end.
-
-(* Initializes a block of n 0-bytes. *)
-Definition init_block (n:Z) : mem_block :=
-  match n with
-  | 0 => empty
-  | Z.pos n' => init_block_h (BinPosDef.Pos.to_nat (n' - 1)) empty
-  | Z.neg _ => empty (* invalid argument *)
-  end.
-
-(* Makes a block appropriately sized for the given type. *)
-Definition make_empty_block (ty:dtyp) : mem_block :=
-  init_block (sizeof_dtyp ty).
-
 Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
   match vs with
   | v :: vs' =>
@@ -345,20 +344,6 @@ Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (
   end.
 
 
-Definition concretize_block (b:Z) (m:memory) : Z * memory :=
-  match lookup b m with
-  | None => (b, m)
-  | Some block =>
-    let i := oracle m in
-    let fix loop es k block : mem_block :=
-        match es with
-        | [] => block
-        | (i, e) :: tl => loop tl (k+1) (add (k + i) e block)
-        end in
-    (* TODO change source block SBYTES to associate abstract pointers with concrete memory. *)
-    (i, add b (loop (IM.elements block) i block) m)
-  end.
-
 Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
   match vs with
   | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 indices *)
@@ -370,40 +355,28 @@ Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (me
   | _ => raise "non-I32 index"
   end.
 
-Definition mem_step `{Monad M} {X} (e:IO X) (m:memory) : err ((IO X) + (prod memory X)) :=
+
+(* TODO *)
+Definition dvalue_to_mem_value (dv : dvalue) : CMM.mem_value := tt.
+Definition dtyp_to_ail_integer_type (dt : dtyp) : CMM.AilIntegerType := tt.
+
+Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (CMM.memM X)) :=
   match e with
   | Alloca t =>
-    let new_block := make_empty_block t in
-    mret (inr (add (size m) new_block m,
-               DVALUE_Addr (size m, 0)))
+    let new_block := CMM.allocate_dynamic 0%nat "" 0 (sizeof_dtyp t) in
+    let new_block_dvalue := CMM.bind _ _ new_block (fun p => CMM.ret _ (MTC.pointer_value_to_dvalue p)) in
+    mret (inr (new_block_dvalue))
          
   | Load t dv => mret
     match dv with
-    | DVALUE_Addr a =>
-      match a with
-      | (b, i) =>
-        match lookup b m with
-        | Some block =>
-          inr (m,
-               deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t)
-        | None => inl (Load t dv)
-        end
-      end
-    | _ => inl (Load t dv)
-    end 
+    | DVALUE_Addr a => CMM.load "" t a
+    | _ => mret (inl (Load t dv))
+    end
 
   | Store t dv v => mret
     match dv with
-    | DVALUE_Addr a =>
-      match a with
-      | (b, i) =>
-        match lookup b m with
-        | Some m' =>
-          inr (add b (add_all_index (serialize_dvalue v) i m') m, ()) 
-        | None => inl (Store t dv v)
-        end
-      end
-    | _ => inl (Store t dv v)
+    | DVALUE_Addr a => inr (CMM.bind _ _ (CMM.store "" t a (dvalue_to_mem_value v)) (fun a => CMM.ret _ tt))
+    | _ => mret (inl (Store t dv v))
     end
       
   | GEP t dv vs =>
@@ -414,19 +387,16 @@ Definition mem_step `{Monad M} {X} (e:IO X) (m:memory) : err ((IO X) + (prod mem
 
   | ItoP s t i =>
     match i with
-    | DVALUE_I64 i => mret (inr (m, DVALUE_Addr (0, unsigned i)))
-    | DVALUE_I32 i => mret (inr (m, DVALUE_Addr (0, unsigned i)))
-    | DVALUE_I8 i => mret (inr (m, DVALUE_Addr (0, unsigned i)))
-    | DVALUE_I1 i => mret (inr (m, DVALUE_Addr (0, unsigned i)))
+    | DVALUE_I64 i => mret (inr (CMM.bind _ _ (CMM.ptrcast_ival s t (unsigned i)) (fun p => CMM.ret _ (MTC.pointer_value_to_dvalue p))))
+    | DVALUE_I32 i => mret (inr (CMM.bind _ _ (CMM.ptrcast_ival s t (unsigned i)) (fun p => CMM.ret _ (MTC.pointer_value_to_dvalue p))))
+    | DVALUE_I8 i => mret (inr (CMM.bind _ _ (CMM.ptrcast_ival s t (unsigned i)) (fun p => CMM.ret _ (MTC.pointer_value_to_dvalue p))))
+    | DVALUE_I1 i => mret (inr (CMM.bind _ _ (CMM.ptrcast_ival s t (unsigned i)) (fun p => CMM.ret _ (MTC.pointer_value_to_dvalue p))))
     | _ => raise "Non integer passed to ItoP"
     end
     
   | PtoI s t a =>
     match a with
-    | DVALUE_Addr (b, i) =>
-      if Z.eqb b 0 then mret (inr (m, DVALUE_Addr(0, i)))
-      else let (k, m) := concretize_block b m in
-           mret (inr (m, DVALUE_Addr (0, (k + i))))
+    | DVALUE_Addr p => raise "bleh" (* mret (inr (CMM.intcast_ptrval s (dtyp_to_ail_integer_type t) p)) *)
     | _ => raise "Non pointer passed to PtoI"
     end
                        
@@ -448,6 +418,6 @@ CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
     end
   | Ret x => d
   end.
+End MemoryLLVM.
 
 End Make.
-
