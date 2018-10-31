@@ -2,7 +2,7 @@
 Require Import ZArith.
 
 (* CompCert dependencies *)
-Require Import compcert.lib.Integers.
+Require Import Integers.
 
 (* Vellvm dependencies *)
 Require Import Vellvm.LLVMAst Vellvm.CFG Vellvm.StepSemantics Vellvm.Memory.

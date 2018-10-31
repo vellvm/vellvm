@@ -9,7 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import ZArith List String Omega.
-Require Import compcert.lib.Integers compcert.lib.Floats.
+Require Import Integers Floats.
 Require Import Vellvm.Classes.
 Require Import Vellvm.LLVMAst.
 Require Import Vellvm.MemoryAddress.
@@ -577,13 +577,13 @@ Class VInt I : Type :=
     end.
 
   Definition not_nan32 (f:ll_float) : bool :=
-    negb (compcert.flocq.Appli.Fappli_IEEE.is_nan _ _ f).
+    negb (Flocq.IEEE754.Binary.is_nan _ _ f).
 
   Definition ordered32 (f1 f2:ll_float) : bool :=
     andb (not_nan32 f1) (not_nan32 f2).
 
   Definition not_nan64 (f:ll_double) : bool :=
-    negb (compcert.flocq.Appli.Fappli_IEEE.is_nan _ _ f).
+    negb (Flocq.IEEE754.Binary.is_nan _ _ f).
 
   Definition ordered64 (f1 f2:ll_double) : bool :=
     andb (not_nan64 f1) (not_nan64 f2).
