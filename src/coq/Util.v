@@ -12,12 +12,58 @@ b *   3 of the License, or (at your option) any later version.                 *
 
 Require Import List.
 Require Import Omega.
-Require Import Vellvm.Classes.
 Import ListNotations.
 
 Require Import RelationClasses.
 
 Set Implicit Arguments.
+
+
+(* Monads ------------------------------------------------------------------- *)
+(* TODO: Add to ExtLib *)
+
+Require Import ExtLib.Structures.Monads.
+Import MonadNotation.
+Open Scope monad_scope.
+
+Section monad.
+  Variable m : Type -> Type.
+  Variable M : Monad m.
+  
+  Fixpoint monad_fold_right {A B} (f : B -> A -> m B) (l:list A) (b : B) : m B :=
+    match l with
+    | [] => ret b
+    | x::xs => 
+      r <- monad_fold_right f xs b ;;
+      f r x
+    end.
+
+Definition monad_app_fst {A B C} (f : A -> m C) (p:A * B) : m (C * B)%type :=
+  let '(x,y) := p in
+  z <- f x ;;
+  ret (z,y).
+
+Definition monad_app_snd {A B C} (f : B -> m C) (p:A * B) : m (A * C)%type :=
+  let '(x,y) := p in
+  z <- f y ;;
+  ret (x,z).
+
+Definition map_monad {A B} (f:A -> m B) (l:list A) : m (list B) :=
+  let fix loop l :=
+      match l with
+      | [] => ret []
+      | a::l' =>
+        b <- f a ;;
+        bs <- loop l' ;;
+        ret (b::bs)  
+      end
+  in loop l.
+  
+End monad.
+Arguments monad_fold_right {_ _ _ _}.
+Arguments monad_app_fst {_ _ _ _ _}.
+Arguments monad_app_snd {_ _ _ _ _}.
+Arguments map_monad {_ _ _ _}.
 
 (* Arithmetic --------------------------------------------------------------- *)
 
@@ -711,6 +757,7 @@ Proof.
     contradiction n; auto.
 Qed.
 
+(*
 Theorem assoc_map :
   forall A B C eq_dec (x : A) (f : B -> C) l,
     assoc eq_dec x (map (fun p => (fst p, f (snd p))) l) =
@@ -720,7 +767,7 @@ Proof.
   simpl. destruct a; simpl. rewrite IHl.
   destruct (eq_dec x a); simpl; eauto.
 Qed.
-
+*)
 
 
 Lemma map_nth_error_none :
@@ -822,11 +869,14 @@ Proof.
     simpl; rewrite IHl; auto.
 Qed.
 
+(*
 Definition map_option_snd {A B C} (f : B -> option C) (p:A * B) : option (A * C) :=
   let '(x,y) := p in
   'z <- f y;
     Some (x,z).
 
+
+*)
 
 Fixpoint find_map {A B} (f : A -> option B) (l : list A) : option B :=
   match l with
@@ -839,11 +889,3 @@ Fixpoint find_map {A B} (f : A -> option B) (l : list A) : option B :=
 
 
 
-Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
-  match l1, l2 with
-  | [], [] => mret []
-  | x::xs, y::ys =>
-    'l <- combine_lists_err xs ys;
-      mret ((x,y)::l)
-  | _, _ => failwith "combine_lists_err: different lenth lists"
-  end.

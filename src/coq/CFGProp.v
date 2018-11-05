@@ -10,8 +10,8 @@
 
 Require Import ZArith List String Omega.
 Require Import Vellvm.LLVMAst Vellvm.CFG Vellvm.Dom.
-Require Import Vellvm.Classes.
 Require Vellvm.AstLib.
+
 Import ListNotations.
 Open Scope list_scope.
 
@@ -288,7 +288,7 @@ Definition def_at_pt (g:cfg) (p:pt) (lid:local_id) : Prop :=
 
 (** The definition of id dominates its use at point pt *)
 Inductive well_scoped_use_at_pt (g:cfg) (p:pt) : ident -> Prop :=
-| ws_global : forall id, In id (glbl g) -> pt_exists g p -> well_scoped_use_at_pt g p id
+| ws_global : forall id, In id (glbl g) -> pt_exists g p -> well_scoped_use_at_pt gy p id
 | ws_local : forall lid p', def_at_pt g p' lid -> SDom g p' p -> well_scoped_use_at_pt g p (ID_Local lid).
 
 (** All uses of a [uid] must be strictly dominated by their definitions. *)

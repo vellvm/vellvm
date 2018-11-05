@@ -8,10 +8,13 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-Require Import Vellvm.Classes.
+Require Import ExtLib.Structures.Monads.
+
 Require Import Vellvm.LLVMIO.
 Require Import Vellvm.StepSemantics.
 Require Import Vellvm.Memory.
+
+Import MonadNotation.
 
 Module IO := LLVMIO.Make(Memory.A).
 Module M := Memory.Make(IO).
@@ -25,9 +28,9 @@ Definition run_with_memory prog : option (Trace DV.dvalue) :=
   match CFG.mcfg_of_modul scfg with
   | None => None
   | Some mcfg =>
-    mret
+    ret
       (M.memD M.empty
-      ('s <- SS.init_state mcfg "main";
-         SS.step_sem mcfg (SS.Step s)))
+      (s <- SS.init_state mcfg "main" ;;
+       SS.step_sem mcfg (SS.Step s)))
   end.
 

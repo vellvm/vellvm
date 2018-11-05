@@ -8,11 +8,25 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
+Require Import Equalities.
 Require Import ZArith List String Omega.
 Require Import Vellvm.AstLib Vellvm.LLVMAst.
-Require Import Vellvm.Classes.
 Require Import Vellvm.Util.
+Require Import ExtLib.Core.RelDec.
+Require Import ExtLib.Programming.Show.
+Require Import ExtLib.Programming.Eqv.
+Require Import ExtLib.Structures.Monads.
+Require Import ExtLib.Data.Monads.OptionMonad.
 Import ListNotations.
+Import ShowNotation.
+Import EqvNotation.
+Import MonadNotation.
+Open Scope monad_scope.
+(* SAZ: This notation doesn't seem to be in the opam coq-ext-lib yet. *)
+Notation "' pat <- c1 ;; c2" :=
+    (@pbind _ _ _ _ _ c1 (fun x => match x with pat => c2 end))
+    (at level 100, pat pattern, c1 at next level, right associativity) : monad_scope.
+
 
 (* program counter denotes an instruction with a block of a function -------- *)
 Record pc :=
@@ -22,23 +36,30 @@ Record pc :=
       pt : instr_id;
     }.
 
-Instance string_of_pc : StringOf pc :=
-  fun p => "@" ++ (string_of (fn p)) ++ ":" ++ (string_of (bk p)) ++ ":" ++ (string_of (pt p)).
+Section hiding_notations.
+  Local Open Scope show_scope.
+  Global Instance show_pc : Show pc :=
+    { show p := "@" << show (fn p) << ":" << show (bk p) << ":" << show (pt p)}.
+End hiding_notations.
+  
 
-Require Import Equalities.
+Ltac unfold_eqv :=
+  repeat (unfold eqv in *; unfold eqv_raw_id in *; unfold eqv_instr_id in *).
+
 Module PC <: UsualDecidableTypeFull.
   Definition t := pc.
   Include HasUsualEq.
   Include UsualIsEq.
   Include UsualIsEqOrig.
-  
+
+
   Lemma eq_dec : forall (x y : pc), {x = y} + {x <> y}.
   Proof.
     intros x y.
     destruct x as [xf xi xp]; destruct y as [yf yi yp].
-    destruct (xf == yf).
-    - destruct (xi == yi).
-     + destruct (xp == yp).
+    destruct (xf ~=? yf); unfold_eqv.
+    - destruct (xi ~=? yi); unfold_eqv.
+     + destruct (xp ~=? yp); unfold_eqv.
         * subst. left. reflexivity.
         * right. unfold not. intros. apply n. inversion H. auto.
      + right. unfold not. intros. apply n. inversion H. auto.
@@ -48,7 +69,7 @@ Module PC <: UsualDecidableTypeFull.
   Include HasEqDec2Bool.
   
 End PC.
-Instance eq_dec_pc : eq_dec pc := PC.eq_dec.
+Instance eq_dec_pc : RelDec (@eq pc) := RelDec_from_dec (@eq pc) PC.eq_dec.
 
 
 (* control flow graphs (CFGs) ----------------------------------------------- *)
@@ -75,7 +96,7 @@ Record cfg := mkCFG
 Definition mcfg : Set := modul cfg.
 
 Definition find_defn {X:Set} (fid:function_id) (d:definition X) : option (definition X) :=
-  if (ident_of d) == (ID_Global fid) then Some d else None.
+  if (ident_of d) ~=? (ID_Global fid) then Some d else None.
 
 Definition find_function (CFG : mcfg) (fid:function_id) : option (definition cfg) :=
   find_map (find_defn fid) (m_definitions CFG).
@@ -99,13 +120,13 @@ Definition blk_term_pc (fid:function_id) (b:block) :=
   mk_pc fid (blk_id b) (blk_term_id b).
 
 Fixpoint find_block bs block_id : option block :=
-  find (fun b => if (blk_id b) == block_id then true else false) bs.
+  find (fun b => if (blk_id b) ~=? block_id then true else false) bs.
 
 Fixpoint find_instr (cd : code) (p:instr_id) (t:instr_id) : option (cmd * option instr_id) :=
   match cd with
   | [] =>  None
   | (x,i)::cd =>
-    if p == x then
+    if p ~=? x then
       Some (Inst i, Some (fallthrough cd t))
     else
       find_instr cd p t
@@ -113,26 +134,28 @@ Fixpoint find_instr (cd : code) (p:instr_id) (t:instr_id) : option (cmd * option
 
 Definition block_to_cmd (b:block) (iid:instr_id) : option (cmd * option instr_id) :=
   let term_id := blk_term_id b in 
-  if term_id == iid then
+  if term_id ~=? iid then
     Some (Term (snd (blk_term b)), None)
   else
     find_instr (blk_code b) iid term_id 
 .
-               
+
+
+
 Definition fetch (CFG : mcfg) (p:pc) : option cmd :=
   let 'mk_pc fid bid iid := p in 
-  'cfg <- find_function CFG fid;
-  'blk <- find_block (blks (df_instrs cfg)) bid;
-  '(c, _) <- block_to_cmd blk iid;
-  mret c.
+  cfg <- find_function CFG fid ;;
+  blk <- find_block (blks (df_instrs cfg)) bid ;;
+  '(c, _) <- block_to_cmd blk iid ;;
+  ret c.
    
 Definition incr_pc (CFG:mcfg) (p:pc) : option pc :=
   let 'mk_pc fid bid iid := p in 
-  'cfg <- find_function CFG fid;
-  'blk <- find_block (blks (df_instrs cfg)) bid;
-  '(c, n) <- block_to_cmd blk iid;
-  'iid_next <- n;
-  mret (mk_pc fid bid iid_next).
+  cfg <- find_function CFG fid ;;
+  blk <- find_block (blks (df_instrs cfg)) bid ;;
+  '(c, n) <- block_to_cmd blk iid ;;
+  iid_next <- n ;;
+  ret (mk_pc fid bid iid_next).
 
 Inductive block_entry : Set :=
 | BlockEntry (phis:list (local_id * phi)) (p:pc).
@@ -141,19 +164,19 @@ Definition block_to_entry (fid:function_id) (b:block) : block_entry :=
   BlockEntry (blk_phis b) (blk_entry_pc fid b).
 
 Definition find_block_entry (CFG:mcfg) (fid:function_id) (bid:block_id) : option block_entry :=
-  'cfg <- find_function CFG fid;
-  'blk <- find_block (blks (df_instrs cfg)) bid;
-  mret (block_to_entry fid blk).  
+  cfg <- find_function CFG fid ;;
+  blk <- find_block (blks (df_instrs cfg)) bid ;;
+  ret (block_to_entry fid blk).  
 
 Inductive function_entry : Set :=
 | FunctionEntry (args:list local_id) (p:pc).
 
 
 Definition find_function_entry (CFG:mcfg) (fid:function_id) : option function_entry :=
-  'dfn <- find_function CFG fid;
+  dfn <- find_function CFG fid ;;
   let cfg := df_instrs dfn in
-  'blk <- find_block (blks cfg) (init cfg);
-  mret (FunctionEntry (df_args dfn) (mk_pc fid (init cfg) (blk_entry_id blk))).  
+  blk <- find_block (blks cfg) (init cfg) ;;
+  ret (FunctionEntry (df_args dfn) (mk_pc fid (init cfg) (blk_entry_id blk))).  
 
 
 (*
@@ -177,8 +200,8 @@ Definition init_of_definition d : option block_id :=
 
 
 Definition cfg_of_definition (d:definition (list block)) : option cfg :=
-  'init <- init_of_definition d;
-    let args := List.map (fun x => ID_Local x) (df_args d) in
+  init <- init_of_definition d ;;
+  let args := List.map (fun x => ID_Local x) (df_args d) in
     Some {| init := init;
             blks := df_instrs d;
             args := args;
@@ -186,14 +209,14 @@ Definition cfg_of_definition (d:definition (list block)) : option cfg :=
 
 
 Definition mcfg_of_modul (m:modul (list block)) : option mcfg :=
-  'defns <- map_option
+  defns <- map_option
                 (fun d =>
-                   'cfg <- cfg_of_definition d;
+                   cfg <- cfg_of_definition d ;;
                      Some {|
                        df_prototype := df_prototype d;
                        df_args := df_args d;
                        df_instrs := cfg
-                       |}) (m_definitions m) ;
+                       |}) (m_definitions m) ;;
   Some {|
     m_name := m_name m;
     m_target := m_target m;

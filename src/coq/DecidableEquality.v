@@ -1,11 +1,16 @@
 
+(* TODO: This file needs to be ported for use with ExtLib.
+     - replace eq_dec with RelDec and Eqv instances 
+*)
+
+
 Require Import ZArith.
 
 (* CompCert dependencies *)
 Require Import compcert.lib.Integers compcert.lib.Floats.
 
 (* Vellvm dependencies *)
-Require Import Vellvm.Classes Vellvm.Util.
+Require Import Vellvm.Util.
 Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG.
 Require Import Vellvm.DynamicValues Vellvm.StepSemantics Vellvm.Memory.
 Require Import List.

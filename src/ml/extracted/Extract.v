@@ -7,7 +7,7 @@ Require ExtrOcamlString.
 Require ExtrOcamlIntConv.
 
 Extraction Language Ocaml.
-Extraction Blacklist String List.
+Extraction Blacklist String List Char Z.
 
 
 (* strings ------------------------------------------------------------------ *)

@@ -1,14 +1,32 @@
+(* -------------------------------------------------------------------------- *
+ *                     Vellvm - the Verified LLVM project                     *
+ *                                                                            *
+ *     Copyright (c) 2018 Steve Zdancewic <stevez@cis.upenn.edu>              *
+ *                                                                            *
+ *   This file is distributed under the terms of the GNU General Public       *
+ *   License as published by the Free Software Foundation, either version     *
+ *   3 of the License, or (at your option) any later version.                 *
+ ---------------------------------------------------------------------------- *)
+
+
 Require Import ZArith List String Omega.
-Require Import Vellvm.LLVMAst Vellvm.Classes Vellvm.Util.
+Require Import ExtLib.Structures.Monads.
+Require Import ExtLib.Programming.Eqv.
+Require Import Vellvm.LLVMAst Vellvm.Util.
 Require Import Vellvm.StepSemantics Vellvm.LLVMIO.
 Require Import Vellvm.MemoryAddress.
 Require Import Vellvm.LLVMIO.
+Require Import Vellvm.Error.
 Require Import ITree.
 Require Import FSets.FMapAVL.
 Require Import compcert.lib.Integers compcert.lib.Coqlib.
 Require Coq.Structures.OrderedTypeEx.
 Require Import ZMicromega.
+
+Import MonadNotation.
+Import EqvNotation.
 Import ListNotations.
+
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -20,8 +38,8 @@ Module A : MemoryAddress.ADDRESS with Definition addr := (Z * Z) % type.
   Lemma addr_dec : forall (a b : addr), {a = b} + {a <> b}.
   Proof.
     intros [a1 a2] [b1 b2].
-    destruct (a1 == b1); 
-      destruct (a2 == b2); subst.
+    destruct (a1 ~=? b1); 
+      destruct (a2 ~=? b2); unfold eqv in *; unfold AstLib.eqv_int in *; subst.
     - left; reflexivity.
     - right. intros H. inversion H; subst. apply n. reflexivity.
     - right. intros H. inversion H; subst. apply n. reflexivity.
@@ -341,7 +359,7 @@ Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (
       end
     | _ => raise "non-I32 index"
     end
-  | [] => mret (m, DVALUE_Addr (b, off))
+  | [] => ret (m, DVALUE_Addr (b, off))
   end.
 
 
@@ -374,10 +392,10 @@ Definition mem_step (e:IO) (m:memory) : err (IO + (memory * (reaction e))) :=
   match e with
   | Alloca t =>
     let new_block := make_empty_block t in
-    mret (inr (add (size m) new_block m,
+    ret (inr (add (size m) new_block m,
                DVALUE_Addr (size m, 0)))
          
-  | Load t dv => mret
+  | Load t dv => ret
     match dv with
     | DVALUE_Addr a =>
       match a with
@@ -392,14 +410,14 @@ Definition mem_step (e:IO) (m:memory) : err (IO + (memory * (reaction e))) :=
     | _ => inl (Load t dv)
     end 
 
-  | Store dv v => mret
+  | Store dv v => ret
     match dv with
     | DVALUE_Addr a =>
       match a with
       | (b, i) =>
         match lookup b m with
         | Some m' =>
-          inr (add b (add_all_index (serialize_dvalue v) i m') m, ()) 
+          inr (add b (add_all_index (serialize_dvalue v) i m') m, tt) 
         | None => inl (Store dv v)
         end
       end
@@ -409,28 +427,28 @@ Definition mem_step (e:IO) (m:memory) : err (IO + (memory * (reaction e))) :=
   | GEP t dv vs =>
     match handle_gep t dv vs m with
     | inl s => raise s
-    | inr r => mret (inr r)
+    | inr r => ret (inr r)
     end
 
   | ItoP i =>
     match i with
-    | DVALUE_I64 i => mret (inr (m, DVALUE_Addr (0, unsigned i)))
-    | DVALUE_I32 i => mret (inr (m, DVALUE_Addr (0, unsigned i)))
-    | DVALUE_I8 i => mret (inr (m, DVALUE_Addr (0, unsigned i)))
-    | DVALUE_I1 i => mret (inr (m, DVALUE_Addr (0, unsigned i)))
+    | DVALUE_I64 i => ret (inr (m, DVALUE_Addr (0, unsigned i)))
+    | DVALUE_I32 i => ret (inr (m, DVALUE_Addr (0, unsigned i)))
+    | DVALUE_I8 i => ret (inr (m, DVALUE_Addr (0, unsigned i)))
+    | DVALUE_I1 i => ret (inr (m, DVALUE_Addr (0, unsigned i)))
     | _ => raise "Non integer passed to ItoP"
     end
     
   | PtoI a =>
     match a with
     | DVALUE_Addr (b, i) =>
-      if Z.eqb b 0 then mret (inr (m, DVALUE_Addr(0, i)))
+      if Z.eqb b 0 then ret (inr (m, DVALUE_Addr(0, i)))
       else let (k, m) := concretize_block b m in
-           mret (inr (m, DVALUE_Addr (0, (k + i))))
+           ret (inr (m, DVALUE_Addr (0, (k + i))))
     | _ => raise "Non pointer passed to PtoI"
     end
                        
-  | Call t f args  => mret (inl (Call t f args))
+  | Call t f args  => ret (inl (Call t f args))
   end.
 
 (*

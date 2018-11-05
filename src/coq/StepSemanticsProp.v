@@ -9,16 +9,13 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import ZArith List String Omega.
-Require Import  Vellvm.Classes Vellvm.Util.
-Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG Vellvm.CFGProp.
-Require Import Vellvm.LLVMIO Vellvm.StepSemantics.
-Require Import Vellvm.Classes.
-Require Import ZArith List String Omega.
-Require Import  Vellvm.Classes Vellvm.Util.
+Require Import ExtLib.Structures.Monads.
+
+Require Import Vellvm.Util.
 Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG Vellvm.CFGProp.
 Require Import Vellvm.LLVMIO Vellvm.StepSemantics.
 
-
+Import MonadNotation.
 Import ListNotations.
 
 Set Implicit Arguments.
@@ -37,7 +34,7 @@ Module StepSemanticsProp(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     
     (** Lookup on an aliasing add, aka gss *)
     Lemma lookup_env_hd : forall {X: Type} (id: ENV.key) (dv: X) (e: ENV.t X),
-      lookup_env (add_env id dv e) id = mret dv.
+      lookup_env (add_env id dv e) id = ret dv.
     Proof.
       intros.
       unfold lookup_env. 
@@ -85,8 +82,8 @@ Module StepSemanticsProp(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     Lemma lookup_add_env_inv :
       forall {X: Type} (id1 id2: ENV.key) (u v: X) (e: ENV.t X)
              {ID_EQ_DEC: forall id1 id2: ENV.key, {id1 = id2} + {id1 <> id2}}
-             (Hl: lookup_env (add_env id1 v e) id2 = mret u),
-        (id1 = id2 /\ v = u) \/ (id1 <> id2 /\ lookup_env e id2 = mret u).
+             (Hl: lookup_env (add_env id1 v e) id2 = ret u),
+        (id1 = id2 /\ v = u) \/ (id1 <> id2 /\ lookup_env e id2 = ret u).
     Proof.
       intros.
 

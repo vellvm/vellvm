@@ -9,7 +9,12 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import ZArith Ascii Strings.String.
-Require Import Vellvm.Classes Vellvm.Util.
+Require Import ExtLib.Programming.Eqv.
+Require Import ExtLib.Structures.Monads.
+
+Require Import ITree.Equivalence.
+Require Import Vellvm.Error.
+Require Import Vellvm.Util.
 Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG.
 Require Import Vellvm.DynamicValues.
 Require Import Vellvm.StepSemantics.
@@ -17,8 +22,11 @@ Require Import Vellvm.Memory.
 Require Import Vellvm.LLVMIO.
 Require Import Setoid.
 
+Import EqvNotation.
+
 Open Scope Z_scope.
 Open Scope string_scope.
+
 
 Module RENAMING
        (A:MemoryAddress.ADDRESS)
@@ -30,8 +38,8 @@ Module RENAMING
   
 Class Swap (A:Type) := swap : raw_id -> raw_id -> A -> A.
 Definition swap_raw_id (id1 id2:raw_id) (id:raw_id) : raw_id :=
-  if id == id1 then id2 else
-    if id == id2 then id1 else
+  if id ~=? id1 then id2 else
+    if id ~=? id2 then id1 else
       id.
 Instance swap_of_raw_id : Swap raw_id := swap_raw_id.
 Hint Unfold swap_of_raw_id.
@@ -59,10 +67,11 @@ Ltac simpl_ifs :=
 Program Instance raw_id_swaplaws : SwapLaws raw_id.
 Next Obligation.
   unfold_swaps. unfold swap_raw_id.
-  destruct (x == id); auto.
+  destruct (x ~=? id); auto.
 Qed.
 Next Obligation.
   unfold_swaps. unfold swap_raw_id. simpl_ifs; subst; auto.
+  unfold eqv in *. unfold eqv_raw_id in *. subst. reflexivity.
 Qed.  
 
 Definition swap_ident (id1 id2:raw_id) (id:ident) : ident :=
@@ -521,7 +530,7 @@ Section PROOFS.
   Proof.
     intros.
     unfold_swaps. unfold swap_raw_id in *.
-    simpl_ifs; subst; try reflexivity; try contradiction.
+    simpl_ifs; unfold eqv, eqv_raw_id in *; subst; try reflexivity; try contradiction.
   Qed.
   
   Lemma swap_ENV_find : forall {X} `{SX : Swap X} (e:ENV.t X) (id:raw_id),
@@ -549,9 +558,11 @@ Section PROOFS.
       apply swap_raw_id_inj in e1. contradiction.
       apply H2.
   Qed.
+
+
   
   Lemma swap_lookup_env : forall {X} `{SX : Swap X} (e:ENV.t X) (id:raw_id),
-      lookup_env (swap id1 id2 e) (swap id1 id2 id) ≡ swap id1 id2 (lookup_env e id).
+      (lookup_env (swap id1 id2 e) (swap id1 id2 id) = swap id1 id2 (lookup_env e id)).
   Proof.
     intros.
     unfold lookup_env.
@@ -560,7 +571,7 @@ Section PROOFS.
   Qed.
 
   Lemma swap_lookup_id : forall (g:genv) (e:env) (i:ident),
-      lookup_id (swap id1 id2 g) (swap id1 id2 e) (swap id1 id2 i) ≡ swap id1 id2 (lookup_id g e i).
+      lookup_id (swap id1 id2 g) (swap id1 id2 e) (swap id1 id2 i) = swap id1 id2 (lookup_id g e i).
   Proof.
     intros g e i.
     unfold lookup_id.
@@ -662,7 +673,7 @@ Section PROOFS.
   
   
   Lemma swap_step : forall (CFG:mcfg) (s:state),
-      (step (swap id1 id2 CFG) (swap id1 id2 s)) ≡ (swap id1 id2 (step CFG s)).
+      eutt _ _ (step (swap id1 id2 CFG) (swap id1 id2 s)) (swap id1 id2 (step CFG s)).
   Proof.
     intros CFG.
     destruct s as [[[g pc] e] k].
@@ -671,7 +682,7 @@ Section PROOFS.
     
   
   Lemma swap_step_sem : forall (CFG:mcfg) (r:result),
-      (step_sem (swap id1 id2 CFG) (swap id1 id2 r)) ≡ (swap id1 id2 (step_sem CFG r)).
+      eutt _ _ (step_sem (swap id1 id2 CFG) (swap id1 id2 r)) (swap id1 id2 (step_sem CFG r)).
   Proof.
     intros CFG r.
     (*
