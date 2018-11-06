@@ -13,7 +13,7 @@ Require Coq.FSets.FMapAVL.
 Require Coq.FSets.FMapFacts.
 Require Coq.Structures.OrderedTypeEx.
 
-Require Import compcert.lib.Integers compcert.lib.Floats.
+Require Import Integers Floats.
 
 Require Import ExtLib.Programming.Show.
 Require Import ExtLib.Structures.Monads.

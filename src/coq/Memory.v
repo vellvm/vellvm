@@ -19,7 +19,7 @@ Require Import Vellvm.LLVMIO.
 Require Import Vellvm.Error.
 Require Import ITree.
 Require Import FSets.FMapAVL.
-Require Import compcert.lib.Integers compcert.lib.Coqlib.
+Require Import Integers Coqlib.
 Require Coq.Structures.OrderedTypeEx.
 Require Import ZMicromega.
 
