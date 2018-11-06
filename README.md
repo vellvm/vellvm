@@ -54,20 +54,18 @@ University of Pennsylvania as part of the DeepSpec project.
   - Coq packages: 
     - ext-lib    (installed via, e.g. opam install coq-ext-lib)
     - paco       (installed via, e.g. opam install coq-paco)
+    - flocq      (installed via, e.g. opam install coq-flocq)
   - ocamlc : version 4.04    (probably works with 4.02 or later)
   - OPAM packages: ocamlbuild, menhir, [optional: llvm  (for llvm v. 3.8)]
 
 Compilation:
 
 1. clone the vellvm git repo with `--recurse-submodule` option (`git clone --recurse-submodules`)
-2. update CompCert submodule to coq 8.7.1 compatible version:
-   1. `cd lib/CompCert && git pull origin master`
-3. compile 3rd party libraries:
-   1. CompCert: `cd lib/Compcert && ./configure x86_64-macosx && make`
-   3. Compile InteractionTrees
+2. compile 3rd party libraries:
+   1. Compile InteractionTrees
 	  - run `make` from the InteractionTrees directory  (do _not_ use `setup.sh`
         since that will clone another copy of paco and we already assume ext-lib exists)
-4. run `make` in the /src directory
+3. run `make` in the /src directory
 
 # Running
 

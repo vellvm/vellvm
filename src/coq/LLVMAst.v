@@ -22,7 +22,7 @@
 (* Adapted for use in Vellvm by Steve Zdancewic (c) 2017                      *)
 (*  ------------------------------------------------------------------------- *)
 
-Require Import compcert.lib.Floats.
+Require Import Floats.
 Require Import List String Ascii ZArith.
 Require Import Vellvm.Util.
 
