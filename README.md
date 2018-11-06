@@ -54,7 +54,7 @@ University of Pennsylvania as part of the DeepSpec project.
   - Coq packages: 
     - ext-lib    (installed via, e.g. opam install coq-ext-lib)
     - paco       (installed via, e.g. opam install coq-paco)
-    - flocq      (installed via, e.g. opam install coq-flocq)
+    - flocq      (installed via, e.g. opam install coq-flocq, see note below) 
   - ocamlc : version 4.04    (probably works with 4.02 or later)
   - OPAM packages: ocamlbuild, menhir, [optional: llvm  (for llvm v. 3.8)]
 
@@ -72,3 +72,15 @@ Compilation:
 Do `src/vellvm -help` from the command line.
 
 Try `src/vellvm -interpret tests/ll/factorial.ll`.
+
+
+# Notes
+
+### coq-flocq
+
+On some OSX configurations the opam installation for coq-flocq fails with a
+permissions error `# Failed to create server: Operation not permitted` caused by
+opam's sandboxing scripts.  The solution is to temporarily disable opam's
+sandboxing by editing ~/.opam/config to remove the lines having to do with
+`wrap-*-commands:`.
+
