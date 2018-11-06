@@ -1,8 +1,8 @@
 (env
  (dev
-  (flags (:standard -g -w -9-27-34-32-39-33-20-50)))
+  (flags (:standard -g -w -27-34-32-39-33-20-50)))
  (release
-  (flags (:standard -O3 -w -9-27-34-32-39-33-20-50))))
+  (flags (:standard -O3 -w -27-34-32-39-33-20-50))))
   
 (menhir
  (flags --explain)
