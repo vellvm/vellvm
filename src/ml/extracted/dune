@@ -1,0 +1,5 @@
+(library
+  (name extracted)
+  (wrapped false)
+  (synopsis "ML code extracted from Coq")
+  )

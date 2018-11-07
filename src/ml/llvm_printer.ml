@@ -624,6 +624,11 @@ and global : Format.formatter -> LLVMAst.global -> unit =
     g_visibility = visibility;
     g_dll_storage = gdll;
 
+    g_thread_local;
+    g_unnamed_addr;
+    g_addrspace;
+    g_externally_initialized;
+
     g_section = s;
     g_align = a;
   } -> fprintf ppf "@%s = "  (str_of_raw_id g_ident);
@@ -700,6 +705,8 @@ and definition : Format.formatter -> (LLVMAst.block list) LLVMAst.definition -> 
            ; dc_align
            ; dc_gc
            }
+       ; df_args
+       ; df_instrs
        } as df) ->
     let (ret_t, args_t) = get_function_type dc_type in
     let typ_attr_id =

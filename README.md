@@ -56,7 +56,7 @@ University of Pennsylvania as part of the DeepSpec project.
     - paco       (installed via, e.g. opam install coq-paco)
     - flocq      (installed via, e.g. opam install coq-flocq, see note below) 
   - ocamlc : version 4.04    (probably works with 4.02 or later)
-  - OPAM packages: ocamlbuild, menhir, [optional: llvm  (for llvm v. 3.8)]
+  - OPAM packages: dune, menhir, [optional: llvm  (for llvm v. 3.8)]
 
 Compilation:
 
