@@ -4,7 +4,6 @@
 
 open Format
 
-let str = Camlcoq.coqstring_of_camlstring
 let of_str = Camlcoq.camlstring_of_coqstring
 let to_int = Camlcoq.Z.to_int
 let float_of_coqfloat = Camlcoq.camlfloat_of_coqfloat               
@@ -621,16 +620,10 @@ and global : Format.formatter -> LLVMAst.global -> unit =
     g_exp;
 
     g_linkage;
-    g_visibility = visibility;
-    g_dll_storage = gdll;
-
-    g_thread_local;
-    g_unnamed_addr;
-    g_addrspace;
-    g_externally_initialized;
 
     g_section = s;
     g_align = a;
+    _;
   } -> fprintf ppf "@%s = "  (str_of_raw_id g_ident);
        (match g_linkage with None -> ()
                            | Some l -> linkage ppf l; pp_print_string ppf " "
@@ -651,10 +644,10 @@ and declaration : Format.formatter -> LLVMAst.declaration -> unit =
       ; dc_visibility
       ; dc_dll_storage
       ; dc_cconv
-      ; dc_attrs
       ; dc_section
       ; dc_align
       ; dc_gc
+      ; _
       } ->
     let (ret_t, args_t) = get_function_type dc_type in
     let typ_attr =
@@ -705,8 +698,7 @@ and definition : Format.formatter -> (LLVMAst.block list) LLVMAst.definition -> 
            ; dc_align
            ; dc_gc
            }
-       ; df_args
-       ; df_instrs
+       ; _
        } as df) ->
     let (ret_t, args_t) = get_function_type dc_type in
     let typ_attr_id =

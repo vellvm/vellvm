@@ -19,7 +19,7 @@
 
 let parse_pp_test path =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
-  let filename, ext = Platform.path_to_basename_ext path in
+  let filename, _ = Platform.path_to_basename_ext path in
   let vll_file = Platform.gen_name !Platform.output_path filename ".v.ll" in
   let dot_s = Platform.gen_name !Platform.output_path filename ".s" in
   let _ = Printf.fprintf stderr "Running llc on: %s\n%!" path in

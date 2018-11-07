@@ -9,9 +9,6 @@
  ---------------------------------------------------------------------------- *)
 
 open Printf
-open Platform
-open Llvm
-open Ast    
 
 let of_str = Camlcoq.camlstring_of_coqstring
                

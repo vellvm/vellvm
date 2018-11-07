@@ -8,7 +8,6 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-;; open TopLevel
 ;; open Datatypes
 
 module DV = TopLevel.IO.DV
@@ -29,7 +28,7 @@ let rec step m =
   | ITree.Ret (Coq_inl s) -> failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
   | ITree.Vis (e, k) ->
     begin match Obj.magic e with
-      | TopLevel.IO.Call(t, f, args) ->
+      | TopLevel.IO.Call(_, f, _) ->
         (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n" (Camlcoq.camlstring_of_coqstring f));
         step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero)))
       | TopLevel.IO.GEP(_, _, _) -> failwith "GEP failed"
