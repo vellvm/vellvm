@@ -53,7 +53,7 @@ depend: $(VFILES)
 
 EXE=_build/default/ml/main.exe
 
-$(EXE): extracted
+$(EXE): extracted ml/dune ml/extracted/dune
 	@echo "Compiling Vellvm"
 	dune build ml/main.exe
 
