@@ -27,3 +27,4 @@ src/ml/extracted/*.ml
 src/ml/extracted/STAMP
 src/.depend
 output
+/src/ml/extracted/.merlin

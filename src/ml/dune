@@ -1,0 +1,18 @@
+(env
+ (dev
+  (flags (:standard -g -w -27-34-32-39-33-20-50)))
+ (release
+  (flags (:standard -O3 -w -27-34-32-39-33-20-50))))
+  
+(menhir
+ (flags --explain)
+ (modules llvm_parser)
+)
+
+(ocamllex llvm_lexer)
+
+(executables
+ (names main)
+  (libraries extracted unix str)
+  )
+
