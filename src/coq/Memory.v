@@ -388,7 +388,7 @@ Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (me
   | _ => raise "non-I32 index"
   end.
 
-Definition mem_step (e:IO) (m:memory) : err (IO + (memory * (reaction e))) :=
+Definition mem_step {X} (e:IO X) (m:memory) : err (IO X + (memory * X)) :=
   match e with
   | Alloca t =>
     let new_block := make_empty_block t in
@@ -458,7 +458,7 @@ Definition mem_step (e:IO) (m:memory) : err (IO + (memory * (reaction e))) :=
 CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
   match d with
   | Tau d' => Tau (memD m d')
-  | Vis io k =>
+  | Vis _ io k =>
     match mem_step io m with
     | inr (inr (m', v)) => Tau (memD m' (k v))
     | inr (inl e) => Vis io k

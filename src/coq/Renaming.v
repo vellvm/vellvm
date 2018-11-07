@@ -459,13 +459,13 @@ Fixpoint swap_dvalue (id1 id2:raw_id) (dv:dvalue) : dvalue :=
 Instance swap_of_dvalue : Swap dvalue := fun (id1 id2 : raw_id) dv => dv.
 Hint Unfold swap_of_dvalue.
 
-Instance swap_of_IO : Swap IO_action := fun id1 id2 x => x.
+Instance swap_of_IO X : Swap (IO X) := fun id1 id2 x => x.
 Hint Unfold swap_of_IO.
 
 CoFixpoint swap_Trace X `{Swap X} (id1 id2:raw_id) (t:Trace X) : Trace X :=
   match t with
   | ITree.Ret x => ITree.Ret (swap id1 id2 x)
-  | ITree.Vis e k => ITree.Vis (swap id1 id2 e) (fun y => swap_Trace X id1 id2 (k y))
+  | ITree.Vis _ e k => ITree.Vis (swap id1 id2 e) (fun y => swap_Trace X id1 id2 (k y))
   | ITree.Tau k => ITree.Tau (swap_Trace X id1 id2 k)
   end.
 
@@ -673,7 +673,7 @@ Section PROOFS.
   
   
   Lemma swap_step : forall (CFG:mcfg) (s:state),
-      eutt _ _ (step (swap id1 id2 CFG) (swap id1 id2 s)) (swap id1 id2 (step CFG s)).
+      eutt (step (swap id1 id2 CFG) (swap id1 id2 s)) (swap id1 id2 (step CFG s)).
   Proof.
     intros CFG.
     destruct s as [[[g pc] e] k].
@@ -682,7 +682,7 @@ Section PROOFS.
     
   
   Lemma swap_step_sem : forall (CFG:mcfg) (r:result),
-      eutt _ _ (step_sem (swap id1 id2 CFG) (swap id1 id2 r)) (swap id1 id2 (step_sem CFG r)).
+      eutt (step_sem (swap id1 id2 CFG) (swap id1 id2 r)) (swap id1 id2 (step_sem CFG r)).
   Proof.
     intros CFG r.
     (*
