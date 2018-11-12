@@ -369,7 +369,7 @@ Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue:=
 (* TODO *)
 Definition dtyp_to_ail_integer_type (dt : dtyp) : AilIntegerType := tt.
 
-Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memM X)) :=
+Definition mem_step {X} (e:IO X) : err ((IO X) + (memM X)) :=
   match e with
   | Alloca t =>
     let new_block := allocate_dynamic 0%nat "" 0 (sizeof_dtyp t) in
@@ -415,18 +415,41 @@ Definition mem_step {X} (e:IO X) (m:memory) : err ((IO X) + (memM X)) :=
 (*
  memory -> TraceLLVMIO () -> TraceX86IO () -> Prop
 *)
+(* Definition mem_step {X} (e:IO X) : err ((IO X) + (memM X)) := *)
+Definition memM_map {A B : Type} (f : A -> B) (ma : memM A) : memM B
+  := bind _ _ ma (fun a => ret _ (f a)).
 
-CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
+Program CoFixpoint memD {X} (d:Trace (memM X)) : memM (Trace (memM X)) :=
   match d with
-  | Tau d' => Tau (memD m d')
+  | Tau d' => memM_map Tau (bind _ _ (ret _ d') memD) (* ret (Tau (memD d')) *)
   | Vis _ io k =>
-    match mem_step io m with
-    | inr (inr (m', v)) => Tau (memD m' (k v))
-    | inr (inl e) => Vis io k
-    | inl s => raise s
+    match mem_step io with
+    | inr (inr v) => _ (* memM_map Tau (bind _ _ v (fun v => ret _ (k v))) (* Tau (memD (k v))*) *)
+    | inr (inl e) => ret _ (Vis io k)
+    | inl s => ret _ (raise s)
     end
-  | Ret x => d
+  | Ret x => ret _ d
   end.
+Next Obligation of memD.
+  refine (memM_map Tau (bind _ _ v (fun v => ret _ (k v)))).
+  Guarded.
+Defined.
+Admitted.
+Next Obligation .
+  refine (ret _ (Vis io k)).
+
+  assert (Trace (memM X) -> memM (Trace (memM X))) as memD. admit.
+  refine (memM_map Tau (bind _ _ (ret _ d') memD)).
+
+Admitted.
+Next Obligation.
+  assert (Trace (memM X) -> memM (Trace (memM X))) as memD. admit.
+  refine (memM_map Tau (bind _ _ (ret _ d') memD)).
+  refine (ret _ (Vis io k)).
+
+  apply memD.
+  Check bind _ _ v k.
+Qed.
 End MemoryLLVM.
 
 End Make.
