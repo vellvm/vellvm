@@ -757,6 +757,7 @@ and block : Format.formatter -> LLVMAst.block -> unit =
     pp_print_string ppf "  ";
     pp_open_box ppf 0 ;
     pp_print_list ~pp_sep:pp_force_newline id_phi ppf phis ;
+    pp_force_newline ppf () ;
     pp_print_list ~pp_sep:pp_force_newline id_instr ppf b ;
     pp_force_newline ppf () ;
     terminator ppf t;
