@@ -6,6 +6,13 @@ COQLIBDIR = ../lib
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
+# Cerberus
+CERBERUS = cerberus-private/src
+CERBERUSGENERATED =cerberus-private/ocaml_generated
+LEMLIB = lem
+LEMOCAMLLIB = lem/num_impl_zarith
+
+
 COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(COQLIBDIR)/CompCert compcert -R $(COQLIBDIR)/paco/src Paco -R $(COQLIBDIR)/InteractionTrees/theories ITree
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
@@ -48,20 +55,29 @@ depend: $(VFILES)
 
 
 # Directories containing plain Caml code
-OCAMLDIRS= $(EXTRACTDIR) $(MLDIR) 
+OCAMLDIRS= $(EXTRACTDIR) $(MLDIR) $(CERBERUS) $(CERBERUSGENERATED) $(LEMLIB) $(LEMOCAMLLIB)
 
 COMMA=,
 OCAMLINCLUDES=$(patsubst %,-I %, $(OCAMLDIRS))
 print-ocaml-includes:
 	@echo $(OCAMLINCLUDES)
 
+# Deal with Z3 package installed by opam
+ifeq ($(shell ocamlfind query -qe -qo Z3; echo $$?), 0)
+Z3="Z3"
+else
+Z3="z3"
+endif
+
+
 OCAMLLIBS := unix,str
+OCAMLPKGS := zarith,pprint,${Z3}
 
 .PHONY: clean main.native test qc restore
 
 main.native: 
 	@echo "Compiling Vellvm"
-	ocamlbuild -r -use-menhir -yaccflag --explain $(OCAMLINCLUDES) -libs $(OCAMLLIBS) main.native
+	ocamlbuild -r -use-menhir -yaccflag --explain $(OCAMLINCLUDES) -use-ocamlfind -pkgs $(OCAMLPKGS) -libs $(OCAMLLIBS) main.native
 
 vellvm: main.native
 	cp main.native vellvm

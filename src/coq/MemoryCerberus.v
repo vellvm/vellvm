@@ -111,7 +111,7 @@ Definition add {a} k (v:a) := IM.add k v.
 Definition delete {a} k (m:IntMap a) := IM.remove k m.
 Definition member {a} k (m:IntMap a) := IM.mem k m.
 Definition lookup {a} k (m:IntMap a) := IM.find k m.
-Definition empty {a} := @IM.empty a.
+Definition empty := CMM.initial_mem_state.
 
 Fixpoint add_all {a} ks (m:IntMap a) :=
   match ks with
@@ -412,6 +412,12 @@ Definition mem_step {X} (e:IO X) : err ((IO X) + (memM X)) :=
   | Call t f args  => mret (inl (Call t f args))
   end.
 
+
+Require Coq.extraction.Extraction.
+Extraction Language OCaml.
+
+Recursive Extraction mem_step.
+
 (*
  memory -> TraceLLVMIO () -> TraceX86IO () -> Prop
 *)
@@ -419,6 +425,7 @@ Definition mem_step {X} (e:IO X) : err ((IO X) + (memM X)) :=
 Definition memM_map {A B : Type} (f : A -> B) (ma : memM A) : memM B
   := bind _ _ ma (fun a => ret _ (f a)).
 
+(*
 Program CoFixpoint memD {X} (d:Trace (memM X)) : memM (Trace (memM X)) :=
   match d with
   | Tau d' => memM_map Tau (bind _ _ (ret _ d') memD) (* ret (Tau (memD d')) *)
@@ -430,26 +437,8 @@ Program CoFixpoint memD {X} (d:Trace (memM X)) : memM (Trace (memM X)) :=
     end
   | Ret x => ret _ d
   end.
-Next Obligation of memD.
-  refine (memM_map Tau (bind _ _ v (fun v => ret _ (k v)))).
-  Guarded.
-Defined.
-Admitted.
-Next Obligation .
-  refine (ret _ (Vis io k)).
+*)
 
-  assert (Trace (memM X) -> memM (Trace (memM X))) as memD. admit.
-  refine (memM_map Tau (bind _ _ (ret _ d') memD)).
-
-Admitted.
-Next Obligation.
-  assert (Trace (memM X) -> memM (Trace (memM X))) as memD. admit.
-  refine (memM_map Tau (bind _ _ (ret _ d') memD)).
-  refine (ret _ (Vis io k)).
-
-  apply memD.
-  Check bind _ _ v k.
-Qed.
 End MemoryLLVM.
 
 End Make.

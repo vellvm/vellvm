@@ -12,6 +12,7 @@
 open Arg
 open Assert
 open Driver
+open AilTypes
 
 (* test harness ------------------------------------------------------------- *)
 exception Ran_tests of bool

@@ -10,3 +10,6 @@
 [submodule "lib/InteractionTrees"]
 	path = lib/InteractionTrees
 	url = https://github.com/DeepSpec/InteractionTrees.git
+[submodule "src/cerberus-private"]
+	path = src/cerberus-private
+	url = git@github.com:rems-project/cerberus-private.git
