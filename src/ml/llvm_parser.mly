@@ -116,6 +116,7 @@ let phi_id s : raw_id =
    | Some s -> s
 
 let id_of = function
+  | INSTR_Comment _
   | INSTR_Store _
   | INSTR_Unreachable
   | INSTR_Fence

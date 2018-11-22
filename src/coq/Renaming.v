@@ -255,6 +255,7 @@ Definition swap_instr (id1 id2:raw_id) (ins:instr) : instr :=
     INSTR_Load volatile (swap id1 id2 t) (swap id1 id2 ptr) align
   | INSTR_Store volatile val ptr align =>
     INSTR_Store volatile (swap id1 id2 val) (swap id1 id2 ptr) align
+  | INSTR_Comment _
   | INSTR_Fence
   | INSTR_AtomicCmpXchg
   | INSTR_AtomicRMW
@@ -370,6 +371,7 @@ Hint Unfold swap_of_metadata.
 
 Definition swap_toplevel_entity {FnBody:Set} `{SF:Swap FnBody} (id1 id2:raw_id) (tle:toplevel_entity FnBody) :=
   match tle with
+  | TLE_Comment msg => tle
   | TLE_Target tgt => TLE_Target (swap id1 id2 tgt)
   | TLE_Datalayout layout => TLE_Datalayout (swap id1 id2 layout)
   | TLE_Declaration decl => TLE_Declaration (swap id1 id2 decl)

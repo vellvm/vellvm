@@ -475,6 +475,8 @@ and instr : Format.formatter -> LLVMAst.instr -> unit =
   fun ppf ->
   function
 
+  | INSTR_Comment msg ->  fprintf ppf "; %s" (of_str msg)
+
   | INSTR_Op v -> inst_exp ppf v
 
   | INSTR_Call (tv, tvl) ->
@@ -587,6 +589,7 @@ and toplevel_entities : Format.formatter -> (LLVMAst.block list) LLVMAst.topleve
 and toplevel_entity : Format.formatter -> (LLVMAst.block list) LLVMAst.toplevel_entity -> unit =
   fun ppf ->
   function
+  | TLE_Comment msg            -> fprintf ppf "; %s" (of_str msg)
   | TLE_Target s               -> fprintf ppf "target triple = \"%s\"" (of_str s)
   | TLE_Datalayout s           -> fprintf ppf "target datalayout = \"%s\"" (of_str s)
   | TLE_Source_filename s      -> fprintf ppf "source_filename = \"%s\"" (of_str s)
