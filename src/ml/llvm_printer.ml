@@ -754,6 +754,7 @@ and block : Format.formatter -> LLVMAst.block -> unit =
     begin match c with
     | None -> ()
     | Some cs ->  pp_print_list ~pp_sep:pp_force_newline comment ppf cs ;
+                  pp_force_newline ppf ()
     end;
     begin match lbl with
       | Anon i -> fprintf ppf "; <label> %d" (to_int i)
