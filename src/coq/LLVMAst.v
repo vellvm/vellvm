@@ -323,6 +323,7 @@ Record block : Set :=
       blk_phis  : list (local_id * phi);
       blk_code  : code;
       blk_term  : instr_id * terminator;
+      blk_comments : option (list string)
     }.
 
 Record definition (FnBody:Set) :=

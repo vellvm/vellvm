@@ -365,7 +365,7 @@ df_blocks:
                                     | Some s -> (IId s, inst))
                        body
                 in
-                {blk_id = l; blk_phis; blk_code; blk_term=(IVoid (void_ctr.get ()), term)})
+                {blk_id = l; blk_phis; blk_code; blk_term=(IVoid (void_ctr.get ()), term); blk_comments=None})
 	bs
     }
 

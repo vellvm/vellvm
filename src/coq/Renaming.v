@@ -340,7 +340,8 @@ Definition swap_block (id1 id2:raw_id) (b:block) : block :=
   mk_block (swap id1 id2 (blk_id b))
            (swap id1 id2 (blk_phis b))
            (swap id1 id2 (blk_code b))
-           (swap id1 id2 (blk_term b)).
+           (swap id1 id2 (blk_term b))
+           (blk_comments b).
 Hint Unfold swap_block.  
 Instance swap_of_block : Swap block := swap_block.
 Hint Unfold swap_of_block.

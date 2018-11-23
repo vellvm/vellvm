@@ -750,7 +750,11 @@ and definition : Format.formatter -> (LLVMAst.block list) LLVMAst.definition -> 
     pp_print_char ppf '}' ;
 
 and block : Format.formatter -> LLVMAst.block -> unit =
-  fun ppf {blk_id=lbl; blk_phis=phis; blk_code=b; blk_term=(_,t)} ->
+  fun ppf {blk_id=lbl; blk_phis=phis; blk_code=b; blk_term=(_,t); blk_comments=c} ->
+    begin match c with
+    | None -> ()
+    | Some cs ->  pp_print_list ~pp_sep:pp_force_newline comment ppf cs ;
+    end;
     begin match lbl with
       | Anon i -> fprintf ppf "; <label> %d" (to_int i)
       | Name s -> (pp_print_string ppf (of_str s); pp_print_char ppf ':')
@@ -765,6 +769,8 @@ and block : Format.formatter -> LLVMAst.block -> unit =
     pp_force_newline ppf () ;
     terminator ppf t;
     pp_close_box ppf ()
+and comment : Format.formatter -> char list -> unit =
+  fun ppf s -> fprintf ppf "; %s" (of_str s)
 
 and modul : Format.formatter -> (LLVMAst.block list) LLVMAst.modul -> unit =
   fun ppf m ->
