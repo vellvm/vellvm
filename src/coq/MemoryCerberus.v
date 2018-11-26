@@ -18,6 +18,10 @@ Set Contextual Implicit.
 
 Require Import MemoryModel.
 
+Require Coq.extraction.Extraction.
+Extraction Language OCaml.
+
+
 Module Make(LLVMIO: LLVMInters).
   Import LLVMIO.
   Import DV.
@@ -93,13 +97,31 @@ Module Make(LLVMIO: LLVMInters).
   End CerberusMonad.
 
   Module Type MemoryInst := Memory CerberusTypes CerberusMonad.
-
 Import MTC.
 
 (* Cerberus memory model *)
 
 Module MemoryLLVM (CMM : MemoryInst).
 Import CMM.
+
+Definition retC := ret.
+Definition bindC := bind.
+
+Definition memM_map {A B : Type} (f : A -> B) (ma : memM A) : memM B
+  := bindC ma (fun a => retC (f a)).
+
+
+Program Instance FunctorMemM : Functor memM :=
+  {
+    fmap := @memM_map;
+  }.
+
+
+Program Instance MonadMemM : Monad memM :=
+  {
+    ret := @retC;
+    bind := @bindC;
+  }.
 
 
 Definition addr := A.addr.
@@ -422,23 +444,27 @@ Recursive Extraction mem_step.
  memory -> TraceLLVMIO () -> TraceX86IO () -> Prop
 *)
 (* Definition mem_step {X} (e:IO X) : err ((IO X) + (memM X)) := *)
-Definition memM_map {A B : Type} (f : A -> B) (ma : memM A) : memM B
-  := bind _ _ ma (fun a => ret _ (f a)).
 
-(*
-Program CoFixpoint memD {X} (d:Trace (memM X)) : memM (Trace (memM X)) :=
-  match d with
-  | Tau d' => memM_map Tau (bind _ _ (ret _ d') memD) (* ret (Tau (memD d')) *)
-  | Vis _ io k =>
-    match mem_step io with
-    | inr (inr v) => _ (* memM_map Tau (bind _ _ v (fun v => ret _ (k v))) (* Tau (memD (k v))*) *)
-    | inr (inl e) => ret _ (Vis io k)
-    | inl s => ret _ (raise s)
-    end
-  | Ret x => ret _ d
-  end.
-*)
+Axiom mfix_weak : forall `{Monad M} A B, ((A -> M B) -> (A -> M B)) -> A -> M B.
+
+Require Import ExtLib.Structures.Monad.
+
+Definition memD {X} (m:memory) (d:Trace X) : memM (Trace X) :=
+  mfix_weak _ (fun memD =>
+                 fun u =>
+                   match u with
+                   | Tau d' => bind (memD d') (fun t => ret (Tau t))
+                   | Vis _ io k =>
+                     match mem_step io with
+                     | inr (inr cont) => bind cont (fun v => bind (memD (k v))
+                                             (fun memkv => ret (Tau memkv))) (* (Tau (memD m' (k v)))) *)
+                     | inr (inl e) => ret (Vis io k)
+                     | inl s => ret (@raise string Trace _ _ _ X s)
+                     end
+                   | Ret x => ret u
+                   end) d.
 
 End MemoryLLVM.
+
 
 End Make.
