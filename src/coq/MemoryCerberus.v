@@ -53,6 +53,15 @@ Module Make(LLVMIO: LLVMInters).
     Definition symbol_sym := string.
     Definition null_ptrval := fun (_ : ctype0) => A.null.
     Definition fun_ptrval := fun (_ : symbol_sym) => A.null.
+
+    Definition loc_ocaml_t := string.
+    Definition AilIntegerType := unit.
+    Definition AilFloatingType := unit.
+    Definition big_num := unit.
+    Definition float := unit.
+    Definition cabs_identifier := unit.
+    Definition Mem_common_integer_operator := unit.
+    Definition Mem_common_floating_operator := unit.
   End CerberusTypes.
 
   Module MTC <: MemoryTypeConversion LLVMIO CerberusTypes.
@@ -85,6 +94,8 @@ Module Make(LLVMIO: LLVMInters).
 
     Definition dtyp_to_ctype (dt : dtyp) : ctype0 := dt.
     Definition ctype_to_dtyp (ct : ctype0) : dtyp := ct.
+
+    Definition str_to_loc (st : string) : loc_ocaml_t := st.
   End MTC.
 
 

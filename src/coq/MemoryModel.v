@@ -51,6 +51,30 @@ Module Type MemoryTypes.
   (* Pointer value constructors *)
   Parameter null_ptrval : ctype0 -> pointer_value.
   Parameter fun_ptrval: symbol_sym -> pointer_value.
+
+  (* TODO Location_ocaml.t, not sure what this is... *)
+  Parameter loc_ocaml_t : Type.
+
+  (* TODO AilTypes.integerType ? *)
+  Parameter AilIntegerType : Type.
+
+  (* TODO Nat_big_num.num ? *)
+  Parameter big_num : Type.
+
+  (* TODO AilTypes.floatingType *)
+  Parameter AilFloatingType : Type.
+
+  (* TODO float *)
+  Parameter float : Type.
+
+  (* TODO Cabs.cabs_identifier ? *)
+  Parameter cabs_identifier : Type.
+
+  (* TODO Mem_common.integer_operator *)
+  Parameter Mem_common_integer_operator : Type.
+
+  (* TODO Mem_common.floating_operator *)
+  Parameter Mem_common_floating_operator : Type.
 End MemoryTypes.
 
 
@@ -107,10 +131,6 @@ Module Type Memory (Export MT:MemoryTypes) (Export MM:MemoryMonad).
     -> memM pointer_value.
 
   Parameter kill : pointer_value -> memM unit.
-
-  (* TODO Location_ocaml.t, not sure what this is... *)
-  (* Parameter loc_ocaml_t : Type. *)
-  Definition loc_ocaml_t := string.
   
   Parameter load : loc_ocaml_t -> ctype0 -> pointer_value -> memM (footprint * mem_value).
   Parameter store : loc_ocaml_t -> ctype0 -> pointer_value -> mem_value -> memM footprint.
@@ -126,31 +146,18 @@ Module Type Memory (Export MT:MemoryTypes) (Export MM:MemoryMonad).
   
   Parameter validForDeref_ptrval: pointer_value -> bool.
   Parameter isWellAligned_ptrval: ctype0 -> pointer_value -> memM bool.
-
-  (* TODO AilTypes.integerType ? *)
-  (* Parameter AilIntegerType : Type. *)
-  Definition AilIntegerType := unit.
   
   (* Casting operations *)
   (* the first ctype is the original integer type, the second is the target referenced type *)
   Parameter ptrcast_ival: ctype0 -> ctype0 -> integer_value -> memM pointer_value.
   (* the first ctype is the original referenced type, the integerType is the target integer type *)
   Parameter intcast_ptrval: ctype0 -> AilIntegerType -> pointer_value -> memM integer_value.
-
-  (* TODO Cabs.cabs_identifier ? *)
-  Parameter cabs_identifier : Type.
   
   (* Pointer shifting constructors *)
   Parameter array_shift_ptrval:  pointer_value -> ctype0 -> integer_value -> pointer_value.
   Parameter member_shift_ptrval: pointer_value -> symbol_sym -> cabs_identifier -> pointer_value.
   
   Parameter memcmp: pointer_value -> pointer_value -> integer_value -> memM integer_value.
-
-  (* TODO Nat_big_num.num ? *)
-  Definition big_num := nat.
-
-  (* TODO Mem_common.integer_operator *)
-  Parameter Mem_common_integer_operator : Type.
   
   (* Integer value constructors *)
   Parameter concurRead_ival: AilIntegerType -> symbol_sym -> integer_value.
@@ -187,15 +194,9 @@ Module Type Memory (Export MT:MemoryTypes) (Export MM:MemoryMonad).
   (* Floating value constructors *)
   Parameter zero_fval: floating_value.
   Parameter str_fval: string -> floating_value.
-
-  (* TODO float *)
-  Parameter float : Type.
   
   (* Floating value destructors *)
   Parameter case_fval: forall a, floating_value -> (unit -> a) -> (float -> a) -> a.
-
-  (* TODO Mem_common.floating_operator *)
-  Parameter Mem_common_floating_operator : Type.
   
   (* Predicates on floating values *)
   Parameter op_fval: Mem_common_floating_operator -> floating_value -> floating_value -> floating_value.
@@ -206,10 +207,6 @@ Module Type Memory (Export MT:MemoryTypes) (Export MM:MemoryMonad).
   (* Integer <-> Floating casting constructors *)
   Parameter fvfromint: integer_value -> floating_value.
   Parameter ivfromfloat: AilIntegerType -> floating_value -> integer_value.
-  
-  
-  (* TODO AilTypes.floatingType *)
-  Parameter AilFloatingType : Type.
 
   (* Memory value constructors *)
   (*symbolic_mval: Symbolic.symbolic mem_value pointer_value -> mem_value *)
