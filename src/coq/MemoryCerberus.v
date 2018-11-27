@@ -21,6 +21,8 @@ Require Import MemoryModel.
 Require Coq.extraction.Extraction.
 Extraction Language OCaml.
 
+Axiom mfix_weak : forall `{Monad M} A B, ((A -> M B) -> (A -> M B)) -> A -> M B.
+Extract Constant mfix_weak => "fun m -> let rec mfixw f a = f (mfixw f) a in mfixw".
 
 Module Make(LLVMIO: LLVMInters).
   Import LLVMIO.
@@ -37,6 +39,7 @@ Module Make(LLVMIO: LLVMInters).
     Definition mem_value := dvalue.
 
     Definition footprint := unit.
+    Extract Constant footprint => "Concrete.footprint".
 
     Definition mem_state := unit.
     Definition initial_mem_state := tt.
@@ -181,7 +184,6 @@ Inductive SByte :=
 | SUndef : SByte.
 
 (* Definition mem_block := unit. *)
-Print MemoryInst.
 Definition memory := CMM.mem_state.
 Definition undef := DVALUE_Undef. (* TODO: should this be an empty block? *)
 
@@ -446,17 +448,10 @@ Definition mem_step {X} (e:IO X) : err ((IO X) + (memM X)) :=
   end.
 
 
-Require Coq.extraction.Extraction.
-Extraction Language OCaml.
-
-Recursive Extraction mem_step.
-
 (*
  memory -> TraceLLVMIO () -> TraceX86IO () -> Prop
 *)
 (* Definition mem_step {X} (e:IO X) : err ((IO X) + (memM X)) := *)
-
-Axiom mfix_weak : forall `{Monad M} A B, ((A -> M B) -> (A -> M B)) -> A -> M B.
 
 Require Import ExtLib.Structures.Monad.
 
