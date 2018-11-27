@@ -12,22 +12,98 @@ Require Import Vellvm.Classes.
 Require Import Vellvm.LLVMIO.
 Require Import Vellvm.StepSemantics.
 Require Import Vellvm.MemoryCerberus.
+Require Import Vellvm.MemoryModel.
 Require Import LLVMAddr.
 
 
 Module Memory := MemoryCerberus.
 Module IO := LLVMIO.Make(LLVMAddr.A).
-Module M := Memory.Make(IO).
 Module SS := StepSemantics(LLVMAddr.A)(IO).
 
 Import IO.
 Export IO.DV.
 
-Module CMM <: M.MemoryInst.
-   Include M.CerberusTypes.
-   Include M.CerberusMonad.
+Module CMM <: Memory.
+   Axiom memM : Type -> Type.
+   Axiom ret : forall a, a -> memM a.
+   Axiom bind : forall a b, memM a -> (a -> memM b) -> memM b.
 
+   Definition name := "Vellvm memory model...".
+
+   Axiom pointer_value : Type.
+   Extract Constant pointer_value => "Concrete.pointer_value".
+   Axiom integer_value : Type.
+   Extract Constant integer_value => "Concrete.integer_value".
+   Axiom floating_value : Type.
+   Extract Constant floating_value => "Concrete.floating_value".
+
+   Axiom mem_value : Type.
+   Extract Constant mem_value => "Concrete.mem_value".
+
+   (* Definition mem_iv_constraint = Mem_Common.mem_constraint integer_value.*)
+
+   Axiom footprint : Type.
    Extract Constant footprint => "Concrete.footprint".
+
+   Axiom mem_state : Type.
+   Extract Constant mem_state => "Concrete.mem_state".
+
+   Axiom initial_mem_state : mem_state.
+   Extract Constant initial_mem_state => "Concrete.initial_mem_state".
+
+   (* TODO Original just uses Cthread.thread_id, not sure what we would use. *)
+   Axiom thread_id : Type.
+   Extract Constant thread_id => "Cthread.thread_id".
+
+   (* TODO Original used Core_ctype.ctype0... Not sure what this is, though. *)
+   Axiom ctype0 : Type.
+   Extract Constant ctype0 => "Core_ctype.ctype0".
+
+   (* TODO Symbol.prefix *)
+   Axiom symbol_prefix : Type.
+   Extract Constant symbol_prefix => "Symbol.prefix".
+
+   (* TODO Symbol.sym? *)
+   Axiom symbol_sym : Type.
+   Extract Constant symbol_sym => "Symbol.sym".
+   
+   (* Pointer value constructors *)
+   Axiom null_ptrval : ctype0 -> pointer_value.
+   Extract Constant null_ptrval => "Concrete.null_ptrval".
+   Axiom fun_ptrval: symbol_sym -> pointer_value.
+   Extract Constant fun_ptrval => "Concrete.fun_ptrval".
+
+   (* TODO Location_ocaml.t, not sure what this is... *)
+   Axiom loc_ocaml_t : Type.
+   Extract Constant loc_ocaml_t => "Location_ocaml.t".
+
+   (* TODO AilTypes.integerType ? *)
+   Axiom AilIntegerType : Type.
+   Extract Constant AilIntegerType => "AilTypes.integerType".
+
+   (* TODO Nat_big_num.num ? *)
+   Axiom big_num : Type.
+   Extract Constant big_num => "Nat_big_num.num".
+
+   (* TODO AilTypes.floatingType *)
+   Axiom AilFloatingType : Type.
+   Extract Constant AilFloatingType => "AilTypes.floatingType".
+
+   (* TODO float *)
+   Axiom float : Type.
+   (* Extract Constant float => "float". *)
+
+   (* TODO Cabs.cabs_identifier ? *)
+   Axiom cabs_identifier : Type.
+   Extract Constant cabs_identifier => "Cabs.cabs_identifier".
+
+   (* TODO Mem_common.integer_operator *)
+   Axiom Mem_common_integer_operator : Type.
+   Extract Constant Mem_common_integer_operator => "Mem_common.integer_operator".
+
+   (* TODO Mem_common.floating_operator *)
+   Axiom Mem_common_floating_operator : Type.
+   Extract Constant Mem_common_floating_operator => "Mem_common.floating_operator".
 
    Axiom do_overlap : footprint -> footprint -> bool.
    Extract Constant do_overlap => "Concrete.do_overlap".
@@ -154,11 +230,13 @@ Module CMM <: M.MemoryInst.
    Extract Constant sequencePoint => "Concrete.sequencePoint".
 End CMM.
 
-Module MemLLVM := M.MemoryLLVM(CMM).
+Module M := Memory.Make IO CMM.
+(* Module MemLLVM := M.MemoryLLVM(CMM). *)
 
 (* TODO: Probably relies on runND in smt2.ml *)
 Axiom runMemM : forall a, CMM.memM a -> a.
 Extract Constant runMemM => "blah".
+
 
 Definition run_with_memory prog : option (Trace DV.dvalue) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
@@ -166,7 +244,7 @@ Definition run_with_memory prog : option (Trace DV.dvalue) :=
   | None => None
   | Some mcfg =>
     mret (runMemM _
-            (MemLLVM.memD MemLLVM.empty
+            (M.memD M.empty
                           ('s <- SS.init_state mcfg "main";
                            SS.step_sem mcfg (SS.Step s))))
   end.

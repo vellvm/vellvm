@@ -20,7 +20,11 @@ Require Import DynamicValues.
 Require Import LLVMAddr.
 
 
-Module Type MemoryTypes.
+Module Type Memory.
+  Parameter memM : Type -> Type.
+  Parameter ret : forall a, a -> memM a.
+  Parameter bind : forall a b, memM a -> (a -> memM b) -> memM b.
+
   Parameter name : string.
 
   Parameter pointer_value : Type.
@@ -75,43 +79,7 @@ Module Type MemoryTypes.
 
   (* TODO Mem_common.floating_operator *)
   Parameter Mem_common_floating_operator : Type.
-End MemoryTypes.
 
-
-Module Type MemoryTypeConversion (Import LLVMIO: LLVMInters) (Import MT: MemoryTypes).
-  Parameter pointer_value_to_dvalue : pointer_value -> dvalue.
-  Parameter dvalue_to_pointer_value : dvalue -> pointer_value.  (* Type checking to catch incompatible dvalues? *)
-
-  Parameter integer_value_to_dvalue : integer_value -> dvalue.
-  Parameter dvalue_to_integer_value : dvalue -> integer_value.
-
-  Parameter floating_value_to_dvalue : floating_value -> dvalue.
-  Parameter dvalue_to_floating_value : dvalue -> floating_value.
-
-  Parameter mem_value_to_dvalue : mem_value -> dvalue.
-  Parameter dvalue_to_mem_value : dvalue -> mem_value.
-
-  Parameter dtyp_to_ctype : dtyp -> ctype0.
-  Parameter ctype_to_dtyp : ctype0 -> dtyp.
-End MemoryTypeConversion.
-
-
-Module Type MemoryMonad.
-  (* TODO Change memM to a proper monad.
-
-     Do we want bind and ret in here at all...?
-   *)
-
-  Parameter memM : Type -> Type.
-  Parameter ret : forall a, a -> memM a.
-  Parameter bind : forall a b, memM a -> (a -> memM b) -> memM b.
-End MemoryMonad.
-
-
-Module Type Memory (Export MT:MemoryTypes) (Export MM:MemoryMonad).
-  Include MT.
-  Include MM.
-  
   Parameter do_overlap : footprint -> footprint -> bool.
 
   (* Memory actions *)
@@ -271,3 +239,22 @@ Module Type Memory (Export MT:MemoryTypes) (Export MM:MemoryMonad).
 *)
 *)
 End Memory.
+
+(*
+Module Type MemoryTypeConversion (Import LLVMIO: LLVMInters) (Import M: Memory).
+  Parameter pointer_value_to_dvalue : pointer_value -> dvalue.
+  Parameter dvalue_to_pointer_value : dvalue -> pointer_value.  (* Type checking to catch incompatible dvalues? *)
+
+  Parameter integer_value_to_dvalue : integer_value -> dvalue.
+  Parameter dvalue_to_integer_value : dvalue -> integer_value.
+
+  Parameter floating_value_to_dvalue : floating_value -> dvalue.
+  Parameter dvalue_to_floating_value : dvalue -> floating_value.
+
+  Parameter mem_value_to_dvalue : mem_value -> dvalue.
+  Parameter dvalue_to_mem_value : dvalue -> mem_value.
+
+  Parameter dtyp_to_ctype : dtyp -> ctype0.
+  Parameter ctype_to_dtyp : ctype0 -> dtyp.
+End MemoryTypeConversion.
+*)
