@@ -305,7 +305,7 @@ Module Make (LLVMIO: LLVMInters) (CMM: Memory).
         let n := BinIntDef.Z.to_nat k in
         match t with
         | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
-                              handle_gep_h ta (array_shift_ptrval pv (dtyp_to_ctype t) (Z_to_iv k)) vs'
+                              handle_gep_h ta (array_shift_ptrval pv t k) vs'
         | DTYPE_Struct ts | DTYPE_Packed_struct ts => (* Handle these differently in future *)
                             raise "unimplemented structure indexing"
         (*
@@ -323,7 +323,7 @@ Module Make (LLVMIO: LLVMInters) (CMM: Memory).
         let n := BinIntDef.Z.to_nat k in
         match t with
         | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
-                              handle_gep_h ta (array_shift_ptrval pv (dtyp_to_ctype t) k) vs'
+                              handle_gep_h ta (array_shift_ptrval pv t k) vs'
         | _ => raise ("non-i8-indexable type")
         end
       | DVALUE_I64 i =>
@@ -331,7 +331,7 @@ Module Make (LLVMIO: LLVMInters) (CMM: Memory).
         let n := BinIntDef.Z.to_nat k in
         match t with
         | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
-                              handle_gep_h ta (array_shift_ptrval pv (dtyp_to_ctype t) (Z_to_iv k)) vs'
+                              handle_gep_h ta (array_shift_ptrval pv t k) vs'
         | _ => raise ("non-i64-indexable type")
         end
       | _ => raise "non-I32 index"
@@ -346,7 +346,7 @@ Module Make (LLVMIO: LLVMInters) (CMM: Memory).
       match dv with
       | DVALUE_Addr pv =>
         let k := unsigned i in
-        fmap pointer_value_to_dvalue (handle_gep_h t (array_shift_ptrval (dvalue_to_pointer_value (DVALUE_Addr pv)) (dtyp_to_ctype t) (Z_to_iv k)) vs')
+        fmap pointer_value_to_dvalue (handle_gep_h t (array_shift_ptrval dv t k) vs')
       | _ => raise "non-address" 
       end
     | _ => raise "non-I32 index"
@@ -362,13 +362,13 @@ Module Make (LLVMIO: LLVMInters) (CMM: Memory).
            
     | Load t dv => mret
                     match dv with
-                    | DVALUE_Addr a => inr (bind _ _ (CMM.load empty_loc (dtyp_to_ctype t) (dvalue_to_pointer_value dv)) (fun fm => let (f, m) := fm in ret _ (mem_value_to_dvalue m)))
+                    | DVALUE_Addr a => inr (bind _ _ (CMM.load empty_loc t dv) (fun fm => let (f, m) := fm in ret _ (mem_value_to_dvalue m)))
                     | _ => inl (Load t dv)
                     end
 
     | Store t dv v => mret
                        match dv with
-                       | DVALUE_Addr a => inr (bind _ _ (CMM.store empty_loc (dtyp_to_ctype t) (dvalue_to_pointer_value dv) (dvalue_to_mem_value v)) (fun a => CMM.ret _ tt))
+                       | DVALUE_Addr a => inr (bind _ _ (CMM.store empty_loc t dv v) (fun a => CMM.ret _ tt))
                        | _ => inl (Store t dv v)
                        end
                        
@@ -389,7 +389,7 @@ Module Make (LLVMIO: LLVMInters) (CMM: Memory).
         
     | PtoI s t a =>
       match a with
-      | DVALUE_Addr p => mret (inr (bind _ _ (intcast_ptrval s (dtyp_to_ail_integer_type t) a) (fun iv => ret _ (integer_value_to_dvalue iv))))
+      | DVALUE_Addr p => mret (inr (bind _ _ (intcast_ptrval s t a) (fun iv => ret _ (integer_value_to_dvalue iv))))
       | _ => raise "Non pointer passed to PtoI"
       end
         
