@@ -197,6 +197,7 @@ Definition instr_uses (i:instr) : (list ident) :=
   | INSTR_Alloca t (Some tv) align => texp_uses tv
   | INSTR_Load  volatile t ptr align => texp_uses ptr
   | INSTR_Store volatile val ptr align => (texp_uses val) ++ (texp_uses ptr)
+  | INSTR_Comment _
   | INSTR_Fence 
   | INSTR_AtomicCmpXchg
   | INSTR_AtomicRMW

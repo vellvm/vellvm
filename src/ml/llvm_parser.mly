@@ -116,6 +116,7 @@ let phi_id s : raw_id =
    | Some s -> s
 
 let id_of = function
+  | INSTR_Comment _
   | INSTR_Store _
   | INSTR_Unreachable
   | INSTR_Fence
@@ -364,7 +365,7 @@ df_blocks:
                                     | Some s -> (IId s, inst))
                        body
                 in
-                {blk_id = l; blk_phis; blk_code; blk_term=(IVoid (void_ctr.get ()), term)})
+                {blk_id = l; blk_phis; blk_code; blk_term=(IVoid (void_ctr.get ()), term); blk_comments=None})
 	bs
     }
 
