@@ -72,7 +72,7 @@ Module Type Memory.
   Parameter AilFloatingType : Type.
 
   (* TODO float *)
-  Parameter float : Type.
+  (* Parameter float : Type. *)
 
   (* TODO Cabs.cabs_identifier ? *)
   Parameter cabs_identifier : Type.

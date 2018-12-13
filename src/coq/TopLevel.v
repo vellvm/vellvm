@@ -94,7 +94,7 @@ Module CMM <: Memory.
 
    (* TODO float *)
    Axiom float : Type.
-   (* Extract Constant float => "float". *)
+   Extract Inlined Constant float => "float".
 
    (* TODO Cabs.cabs_identifier ? *)
    Axiom cabs_identifier : Type.
