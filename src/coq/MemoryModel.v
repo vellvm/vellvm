@@ -20,6 +20,9 @@ Require Import DynamicValues.
 Require Import LLVMAddr.
 
 
+Definition ocaml_string : Type := unit.
+Extract Constant ocaml_string => "string".
+
 Module Type Memory.
   Parameter memM : Type -> Type.
   Parameter ret : forall a, a -> memM a.
@@ -98,10 +101,10 @@ Module Type Memory.
     -> integer_value     (* size *)
     -> memM pointer_value.
 
-  Parameter kill : pointer_value -> memM unit.
+  Parameter kill : loc_ocaml_t -> bool -> pointer_value -> memM unit.
   
   Parameter load : loc_ocaml_t -> ctype0 -> pointer_value -> memM (footprint * mem_value).
-  Parameter store : loc_ocaml_t -> ctype0 -> pointer_value -> mem_value -> memM footprint.
+  Parameter store : loc_ocaml_t -> ctype0 -> bool -> pointer_value -> mem_value -> memM footprint.
   
   (* Operations on pointer values *)
   Parameter eq_ptrval: pointer_value -> pointer_value -> memM bool.
@@ -112,7 +115,7 @@ Module Type Memory.
   Parameter ge_ptrval: pointer_value -> pointer_value -> memM bool.
   Parameter diff_ptrval: ctype0 -> pointer_value -> pointer_value -> memM integer_value.
   
-  Parameter validForDeref_ptrval: pointer_value -> bool.
+  Parameter validForDeref_ptrval : ctype0 -> pointer_value -> memM bool.
   Parameter isWellAligned_ptrval: ctype0 -> pointer_value -> memM bool.
   
   (* Casting operations *)
@@ -161,10 +164,10 @@ Module Type Memory.
   
   (* Floating value constructors *)
   Parameter zero_fval: floating_value.
-  Parameter str_fval: string -> floating_value.
+  Parameter str_fval: ocaml_string -> floating_value.
   
   (* Floating value destructors *)
-  Parameter case_fval: forall a, floating_value -> (unit -> a) -> (float -> a) -> a.
+  (* Parameter case_fval: forall a, floating_value -> (unit -> a) -> (float -> a) -> a. *)
   
   (* Predicates on floating values *)
   Parameter op_fval: Mem_common_floating_operator -> floating_value -> floating_value -> floating_value.
@@ -183,10 +186,11 @@ Module Type Memory.
   Parameter floating_value_mval: AilFloatingType -> floating_value -> mem_value.
   Parameter pointer_mval: ctype0 -> pointer_value -> mem_value.
   Parameter array_mval: list mem_value -> mem_value.
-  Parameter struct_mval: symbol_sym -> list (cabs_identifier * mem_value) -> mem_value.
+  (* Parameter struct_mval: symbol_sym -> list (cabs_identifier * ctype0 * mem_value) -> mem_value. *)
   Parameter union_mval: symbol_sym -> cabs_identifier -> mem_value -> mem_value.
   
   (* Memory value destructor *)
+  (*
   Parameter case_mem_value:
     forall a,
       mem_value ->
@@ -199,7 +203,7 @@ Module Type Memory.
       (symbol_sym -> list (cabs_identifier * mem_value) -> a) ->
       (symbol_sym -> cabs_identifier -> mem_value -> a) ->
       a.
-  
+  *)
   
   (* For race detection *)
   Parameter sequencePoint: memM unit.

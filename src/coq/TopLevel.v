@@ -7,14 +7,14 @@
  *   License as published by the Free Software Foundation, either version     *
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
-
+Require Import Coq.Strings.String String.
 Require Import Vellvm.Classes.
 Require Import Vellvm.LLVMIO.
 Require Import Vellvm.StepSemantics.
 Require Import Vellvm.MemoryCerberus.
 Require Import Vellvm.MemoryModel.
 Require Import LLVMAddr.
-
+Require Import ZArith.
 
 Module Memory := MemoryCerberus.
 Module IO := LLVMIO.Make(LLVMAddr.A).
@@ -25,8 +25,11 @@ Export IO.DV.
 
 Module CMM <: Memory.
    Axiom memM : Type -> Type.
+   Extract Constant memM "'a" => "'a Concrete.memM".
    Axiom ret : forall a, a -> memM a.
+   Extract Constant ret => "Concrete.return".
    Axiom bind : forall a b, memM a -> (a -> memM b) -> memM b.
+   Extract Constant bind => "Concrete.bind".
 
    Definition name := "Vellvm memory model...".
 
@@ -112,11 +115,11 @@ Module CMM <: Memory.
    Extract Constant allocate_static => "Concrete.allocate_static".
    Axiom allocate_dynamic : thread_id -> symbol_prefix -> integer_value -> integer_value -> memM pointer_value.
    Extract Constant allocate_dynamic => "Concrete.allocate_dynamic".
-   Axiom kill : pointer_value -> memM ().
+   Axiom kill : loc_ocaml_t -> bool -> pointer_value -> memM ().
    Extract Constant kill => "Concrete.kill".
    Axiom load : loc_ocaml_t -> ctype0 -> pointer_value -> memM (footprint * mem_value).
    Extract Constant load => "Concrete.load".
-   Axiom store : loc_ocaml_t -> ctype0 -> pointer_value -> mem_value -> memM footprint.
+   Axiom store : loc_ocaml_t -> ctype0 -> bool -> pointer_value -> mem_value -> memM footprint.
    Extract Constant store => "Concrete.store".
    Axiom eq_ptrval : pointer_value -> pointer_value -> memM bool.
    Extract Constant eq_ptrval => "Concrete.eq_ptrval".
@@ -132,7 +135,7 @@ Module CMM <: Memory.
    Extract Constant ge_ptrval => "Concrete.ge_ptrval".
    Axiom diff_ptrval : ctype0 -> pointer_value -> pointer_value -> memM integer_value.
    Extract Constant diff_ptrval => "Concrete.diff_ptrval".
-   Axiom validForDeref_ptrval : pointer_value -> bool.
+   Axiom validForDeref_ptrval : ctype0 -> pointer_value -> memM bool.
    Extract Constant validForDeref_ptrval => "Concrete.validForDeref_ptrval".
    Axiom isWellAligned_ptrval : ctype0 -> pointer_value -> memM bool.
    Extract Constant isWellAligned_ptrval => "Concrete.isWellAligned_ptrval".
@@ -184,10 +187,13 @@ Module CMM <: Memory.
    Extract Constant eval_integer_value => "Concrete.eval_integer_value".
    Axiom zero_fval : floating_value.
    Extract Constant zero_fval => "Concrete.zero_fval".
-   Axiom str_fval : String.string -> floating_value.
+   Axiom str_fval : ocaml_string -> floating_value.
    Extract Constant str_fval => "Concrete.str_fval".
+
+   (*
    Axiom case_fval : forall a : Type, floating_value -> (() -> a) -> (float -> a) -> a.
    Extract Constant case_fval => "Concrete.case_fval".
+   *)
    Axiom op_fval : Mem_common_floating_operator -> floating_value -> floating_value -> floating_value.
    Extract Constant op_fval => "Concrete.op_fval".
    Axiom eq_fval : floating_value -> floating_value -> bool.
@@ -210,10 +216,13 @@ Module CMM <: Memory.
    Extract Constant pointer_mval => "Concrete.pointer_mval".
    Axiom array_mval : list mem_value -> mem_value.
    Extract Constant array_mval => "Concrete.array_mval".
-   Axiom struct_mval : symbol_sym -> list (cabs_identifier * mem_value) -> mem_value.
+   (*
+   Axiom struct_mval : symbol_sym -> list (cabs_identifier * ctype0 * mem_value) -> mem_value.
    Extract Constant struct_mval => "Concrete.struct_mval".
+   *)
    Axiom union_mval : symbol_sym -> cabs_identifier -> mem_value -> mem_value.
    Extract Constant union_mval => "Concrete.union_mval".
+   (*
    Axiom case_mem_value :
      forall a : Type,
      mem_value ->
@@ -226,24 +235,81 @@ Module CMM <: Memory.
      (symbol_sym -> list (cabs_identifier * mem_value) -> a) ->
      (symbol_sym -> cabs_identifier -> mem_value -> a) -> a.
    Extract Constant case_mem_value => "Concrete.case_mem_value".
+   *)
    Axiom sequencePoint : memM ().
    Extract Constant sequencePoint => "Concrete.sequencePoint".
 End CMM.
 
-Module M := Memory.Make IO CMM.
+Module MC <: Memory.MemoryConversion IO CMM.
+  Import IO. Import DV.
+  Import CMM.
+
+    (* Conversion functions *)
+  Axiom pointer_value_to_dvalue : pointer_value -> dvalue.
+  Coercion pointer_value_to_dvalue : pointer_value >-> dvalue.
+  Extract Constant pointer_value_to_dvalue => "CoqCerberus.pointer_value_to_dvalue".
+
+  Axiom dvalue_to_pointer_value : dvalue -> pointer_value.
+  Coercion dvalue_to_pointer_value : dvalue >-> pointer_value.
+  Extract Constant dvalue_to_pointer_value => "CoqCerberus.dvalue_to_pointer_value".
+
+  Axiom integer_value_to_dvalue : integer_value -> dvalue.
+  Coercion integer_value_to_dvalue : integer_value >-> dvalue.
+  Extract Constant integer_value_to_dvalue => "CoqCerberus.integer_value_to_dvalue".
+
+  Axiom dvalue_to_integer_value : dvalue -> integer_value.
+  Coercion dvalue_to_integer_value : dvalue >-> integer_value.
+  Extract Constant dvalue_to_integer_value => "CoqCerberus.dvalue_to_integer_value".
+
+  Axiom floating_value_to_dvalue : floating_value -> dvalue.
+  Coercion floating_value_to_dvalue : floating_value >-> dvalue.
+  Extract Constant floating_value_to_dvalue => "CoqCerberus.floating_value_to_dvalue".
+
+  Axiom dvalue_to_floating_value : dvalue -> floating_value.
+  Coercion dvalue_to_floating_value : dvalue >-> floating_value.
+  Extract Constant dvalue_to_floating_value => "CoqCerberus.dvalue_to_floating_value".
+
+  Axiom mem_value_to_dvalue : mem_value -> dvalue.
+  Coercion mem_value_to_dvalue : mem_value >-> dvalue.
+  Extract Constant mem_value_to_dvalue => "CoqCerberus.mem_value_to_dvalue".
+
+  Axiom dvalue_to_mem_value : dvalue -> mem_value.
+  Coercion dvalue_to_mem_value : dvalue >-> mem_value.
+  Extract Constant dvalue_to_mem_value => "CoqCerberus.dvalue_to_mem_value".
+
+  Axiom dtyp_to_ctype : dtyp -> ctype0.
+  Coercion dtyp_to_ctype : dtyp >-> ctype0.
+  Extract Constant dtyp_to_ctype => "CoqCerberus.dtyp_to_ctype".
+
+  Axiom Z_to_iv : Z -> integer_value.
+  Coercion Z_to_iv : Z >-> integer_value.
+  Extract Constant Z_to_iv => "CoqCerberus.z_to_iv".
+
+  Axiom dtyp_to_ail_integer_type : dtyp -> AilIntegerType.
+  Coercion dtyp_to_ail_integer_type : dtyp >-> AilIntegerType.
+  Extract Constant dtyp_to_ail_integer_type => "CoqCerberus.dtyp_to_ail_integer_type".
+
+  Axiom thread_zero : thread_id.
+  Extract Constant thread_zero => "0".
+  Axiom empty_prefix : symbol_prefix.
+  Extract Constant empty_prefix => "Symbol.PrefOther """"".
+  Axiom empty_loc : loc_ocaml_t.
+  Extract Constant empty_loc => "Location_ocaml.unknown".
+End MC.
+  
+Module M := Memory.Make IO CMM MC.
 (* Module MemLLVM := M.MemoryLLVM(CMM). *)
 
 (* TODO: Probably relies on runND in smt2.ml *)
-Axiom runMemM : forall a, CMM.memM a -> a.
-Extract Constant runMemM => "blah".
-
+Axiom runMemM : forall a, a -> CMM.memM a -> a.
+Extract Constant runMemM => "fun def m -> match (List.hd Smt2.(runND Random Concrete.cs_module m Concrete.initial_mem_state)) with | (Active a, _, _) -> a | _ -> def".
 
 Definition run_with_memory prog : option (Trace DV.dvalue) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
   match CFG.mcfg_of_modul scfg with
   | None => None
   | Some mcfg =>
-    mret (runMemM _
+    mret (runMemM _ (mret (DVALUE_I64 zero))
             (M.memD M.empty
                           ('s <- SS.init_state mcfg "main";
                            SS.step_sem mcfg (SS.Step s))))

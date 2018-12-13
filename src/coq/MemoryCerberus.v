@@ -24,11 +24,10 @@ Extraction Language OCaml.
 Axiom mfix_weak : forall `{Monad M} A B, ((A -> M B) -> (A -> M B)) -> A -> M B.
 Extract Constant mfix_weak => "fun m -> let rec mfixw f a = f (mfixw f) a in mfixw".
 
-
-Module Make (LLVMIO: LLVMInters) (CMM: Memory).
+Module Type MemoryConversion (LLVMIO: LLVMInters) (CMM: Memory).
+  Import CMM.
   Import LLVMIO.
   Import DV.
-  Import CMM.
 
   (* Conversion functions *)
   Axiom pointer_value_to_dvalue : pointer_value -> dvalue.
@@ -69,6 +68,15 @@ Module Make (LLVMIO: LLVMInters) (CMM: Memory).
   Axiom thread_zero : thread_id.
   Axiom empty_prefix : symbol_prefix.
   Axiom empty_loc : loc_ocaml_t.
+End MemoryConversion.
+
+
+Module Make (LLVMIO: LLVMInters) (CMM: Memory) (MC : MemoryConversion LLVMIO CMM).
+  Import LLVMIO.
+  Import DV.
+  Import CMM.
+  Import MC.
+  (* Module SS := StepSemantics(LLVMAddr.A)(IO). *)
 
   Definition retC := ret.
   Definition bindC := bind.
@@ -368,7 +376,7 @@ Module Make (LLVMIO: LLVMInters) (CMM: Memory).
 
     | Store t dv v => mret
                        match dv with
-                       | DVALUE_Addr a => inr (bind _ _ (CMM.store empty_loc t dv v) (fun a => CMM.ret _ tt))
+                       | DVALUE_Addr a => inr (bind _ _ (CMM.store empty_loc t false dv v) (fun a => CMM.ret _ tt))
                        | _ => inl (Store t dv v)
                        end
                        

@@ -20,7 +20,7 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILES := LLVMAst Classes Util Misc AstLib Dom CFG CFGProp MemoryAddress DynamicValues LLVMIO TypeUtil StepSemantics StepSemanticsProp Memory Renaming DeadInstr Transform TopLevel
+COQFILES := LLVMAst Classes Util Misc AstLib Dom CFG CFGProp MemoryAddress DynamicValues LLVMIO TypeUtil StepSemantics StepSemanticsProp Memory Renaming DeadInstr Transform LLVMAddr MemoryModel MemoryCerberus TopLevel
 OLLVMFILES := 
 
 VFILES := $(COQFILES:%=coq/%.v)
@@ -70,14 +70,15 @@ Z3="z3"
 endif
 
 
-OCAMLLIBS := unix,str
-OCAMLPKGS := zarith,pprint,${Z3}
+OCAMLLIBS := str
+OCAMLPKGS := unix,lem,cmdliner,pprint,yojson,${Z3}
 
 .PHONY: clean main.native test qc restore
 
 main.native: 
 	@echo "Compiling Vellvm"
-	ocamlbuild -r -use-menhir -yaccflag --explain $(OCAMLINCLUDES) -use-ocamlfind -pkgs $(OCAMLPKGS) -libs $(OCAMLLIBS) main.native
+	ocamlbuild cerberus-private/src/cerberus_cstubs.o
+	ocamlbuild -tag link_cstubs -j 4 -r -use-menhir -yaccflag --explain $(OCAMLINCLUDES) -use-ocamlfind -pkgs $(OCAMLPKGS) -libs $(OCAMLLIBS) main.native
 
 vellvm: main.native
 	cp main.native vellvm
