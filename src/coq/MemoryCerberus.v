@@ -364,7 +364,7 @@ Module Make (LLVMIO: LLVMInters) (CMM: Memory) (MC : MemoryConversion LLVMIO CMM
   Definition mem_step {X} (e:IO X) : err ((IO X) + (memM X)) :=
     match e with
     | Alloca t =>
-      let new_block := allocate_dynamic thread_zero empty_prefix 0 (sizeof_dtyp t) in
+      let new_block := allocate_dynamic thread_zero empty_prefix 8 (sizeof_dtyp t) in
       let new_block_dvalue := bind _ _ new_block (fun p => ret _ (pointer_value_to_dvalue p)) in
       mret (inr (new_block_dvalue))
            
