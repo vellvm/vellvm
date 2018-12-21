@@ -375,6 +375,24 @@ Class VInt I : Type :=
     repr := Int64.repr;
   }.
 
+  Fixpoint dvalue_to_str (d : dvalue) : string :=
+    match d with
+    | DVALUE_Addr a => "Address..."
+    | DVALUE_I1 x => to_string_b10 (signed x)
+    | DVALUE_I8 x => to_string_b10 (signed x)
+    | DVALUE_I32 x => to_string_b10 (signed x)
+    | DVALUE_I64 x => to_string_b10 (signed x)
+    | DVALUE_Double x => "Double..."
+    | DVALUE_Float x => "Float..."
+    | DVALUE_Undef => "Undef"
+    | DVALUE_Poison => "Poison"
+    | DVALUE_None => "None"
+    | DVALUE_Struct fields => concat " " (app ("{" :: (map dvalue_to_str fields)) ["}"])
+    | DVALUE_Packed_struct fields => concat " " (app ("{" :: (map dvalue_to_str fields)) ["}"])
+    | DVALUE_Array elts => concat " " (app ("[" :: (map dvalue_to_str elts)) ["]"])
+    | DVALUE_Vector elts => concat " " (app ("<" :: (map dvalue_to_str elts)) [">"])
+    end.
+
 
   (* Arithmetic Operations ---------------------------------------------------- *)
   Section ARITHMETIC.

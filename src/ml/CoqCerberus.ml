@@ -102,3 +102,11 @@ let dtyp_to_ail_integer_type (dt : dtyp) : AilTypes.integerType =
   (match dt with
    | LLVMIO.DTYPE_I sz -> Signed (IntN_t (Camlcoq.Z.to_int sz))
    | _ -> failwith "Invalid conversion from dtyp to integer type.")
+
+let print_kill_reason (kr : Mem_common.mem_error Nondeterminism.kill_reason) =
+  match kr with
+  | Undef0 (t, ubs) -> print_string "Undefined behavior\n";
+                       print_string (String.concat "\n" (List.map Undefined.pretty_string_of_undefined_behaviour ubs));
+                       print_string "\n"
+  | Error0 (t, err) -> print_string err; print_string "\n"
+  | Other err -> print_string "Killed for other reason\n"

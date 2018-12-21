@@ -24,6 +24,15 @@ Extraction Language OCaml.
 Axiom mfix_weak : forall `{Monad M} A B, ((A -> M B) -> (A -> M B)) -> A -> M B.
 Extract Constant mfix_weak => "fun m -> let rec mfixw f a = f (mfixw f) a in mfixw".
 
+Definition trace {A : Type} (s : string) (a : A) : A := a.
+Extract Constant trace =>
+  "(fun l -> print_string (
+   let s = Bytes.create (List.length l) in
+   let rec copy i = function
+    | [] -> s
+    | c :: l -> s.[i] <- c; copy (i+1) l
+   in Bytes.to_string (copy 0 l)); flush stdout; fun y -> y)".
+
 Module Type MemoryConversion (LLVMIO: LLVMInters) (CMM: Memory).
   Import CMM.
   Import LLVMIO.
@@ -370,7 +379,7 @@ Module Make (LLVMIO: LLVMInters) (CMM: Memory) (MC : MemoryConversion LLVMIO CMM
            
     | Load t dv => mret
                     match dv with
-                    | DVALUE_Addr a => inr (bind _ _ (CMM.load empty_loc t dv) (fun fm => let (f, m) := fm in ret _ (mem_value_to_dvalue m)))
+                    | DVALUE_Addr a => inr (bind _ _ (CMM.load empty_loc t (trace ("Load: " ++ dvalue_to_str dv) dv)) (fun fm => let (f, m) := fm in ret _ (mem_value_to_dvalue m)))
                     | _ => inl (Load t dv)
                     end
 

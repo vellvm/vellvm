@@ -302,14 +302,14 @@ Module M := Memory.Make IO CMM MC.
 
 (* TODO: Probably relies on runND in smt2.ml *)
 Axiom runMemM : forall a, a -> CMM.memM a -> a.
-Extract Constant runMemM => "fun def m -> match (List.hd Smt2.(runND Random Concrete.cs_module m Concrete.initial_mem_state)) with | (Active a, _, _) -> a | _ -> def".
+Extract Constant runMemM => "fun def m -> match (List.hd Smt2.(runND Random Concrete.cs_module m Concrete.initial_mem_state)) with | (Active a, _, _) -> a | (Killed kr, _, _) -> CoqCerberus.print_kill_reason kr; def".
 
 Definition run_with_memory prog : option (Trace DV.dvalue) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
   match CFG.mcfg_of_modul scfg with
   | None => None
   | Some mcfg =>
-    mret (runMemM _ (mret (DVALUE_I64 zero))
+    mret (runMemM _ (mret (DVALUE_I64 (repr (-1))))
             (M.memD M.empty
                           ('s <- SS.init_state mcfg "main";
                            SS.step_sem mcfg (SS.Step s))))
