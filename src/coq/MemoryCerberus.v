@@ -379,7 +379,7 @@ Module Make (LLVMIO: LLVMInters) (CMM: Memory) (MC : MemoryConversion LLVMIO CMM
            
     | Load t dv => mret
                     match dv with
-                    | DVALUE_Addr a => inr (bind _ _ (CMM.load empty_loc t (trace ("Load: " ++ dvalue_to_str dv) dv)) (fun fm => let (f, m) := fm in ret _ (mem_value_to_dvalue m)))
+                    | DVALUE_Addr a => inr (bind _ _ (CMM.load empty_loc t dv) (fun fm => let (f, m) := fm in ret _ (mem_value_to_dvalue m)))
                     | _ => inl (Load t dv)
                     end
 

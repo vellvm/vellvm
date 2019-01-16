@@ -78,7 +78,7 @@ OCAMLPKGS := unix,lem,cmdliner,pprint,yojson,${Z3}
 main.native: 
 	@echo "Compiling Vellvm"
 	ocamlbuild cerberus-private/src/cerberus_cstubs.o
-	ocamlbuild -tag link_cstubs -j 4 -r -use-menhir -yaccflag --explain $(OCAMLINCLUDES) -use-ocamlfind -pkgs $(OCAMLPKGS) -libs $(OCAMLLIBS) main.native
+	ocamlbuild -tag debug -tag link_cstubs -j 4 -r -use-menhir -yaccflag --explain $(OCAMLINCLUDES) -use-ocamlfind -pkgs $(OCAMLPKGS) -libs $(OCAMLLIBS) main.native
 
 vellvm: main.native
 	cp main.native vellvm

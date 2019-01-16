@@ -29,20 +29,12 @@ let rec dtyp_to_ctype (dt : dtyp) : ctype0 =
    | LLVMIO.DTYPE_Vector (sz, t) -> Array0 (dtyp_to_ctype t, Some (Nat_big_num.of_int (Camlcoq.Z.to_int sz))))
 
 
-let rec pointer_value_to_dvalue (pv : pointer_value) : IO.DV.dvalue =
-  (match pv with
-   | PV (prov, PVnull t) -> IO.DV.DVALUE_Addr A.null
-   | PV (prov, PVconcrete n) -> IO.DV.DVALUE_Addr (Camlcoq.Z.of_sint 0, Camlcoq.Z.of_sint (Nat_big_num.to_int n))
-   | PV (prov, PVfunction s) -> failwith "Function pointers not implemented.")
-
+let rec pointer_value_to_dvalue (pv : pointer_value) : IO.DV.dvalue = IO.DV.DVALUE_Addr pv
 
 (* TODO, use block? *)
 let dvalue_to_pointer_value (dv : IO.DV.dvalue) : pointer_value =
   (match dv with
-   | IO.DV.DVALUE_Addr a ->
-      (match a with | (b, o) -> if Camlcoq.Z.to_int b == 0 && Camlcoq.Z.to_int o == 0
-                                then PV (Prov_none, PVnull Void0)
-                                else PV (Prov_none, PVconcrete (Nat_big_num.of_int (Camlcoq.Z.to_int o))))
+   | IO.DV.DVALUE_Addr a -> a
    | _ -> failwith "Undefined conversion from dvalue to pointer value.")
 
 let integer_value_to_dvalue (iv : integer_value) : IO.DV.dvalue =
@@ -51,10 +43,10 @@ let integer_value_to_dvalue (iv : integer_value) : IO.DV.dvalue =
 
 let dvalue_to_integer_value (dv : IO.DV.dvalue) : integer_value =
   (match dv with
-   | IO.DV.DVALUE_I1 i -> IV (Prov_none, Nat_big_num.of_int (Camlcoq.Z.to_int (DynamicValues.Int1.signed i)))
-   | IO.DV.DVALUE_I8 i -> IV (Prov_none, Nat_big_num.of_int (Camlcoq.Z.to_int (DynamicValues.Int8.signed i)))
-   | IO.DV.DVALUE_I32 i -> IV (Prov_none, Nat_big_num.of_int (Camlcoq.Z.to_int (DynamicValues.Int32.signed i)))
-   | IO.DV.DVALUE_I64 i -> IV (Prov_none, Nat_big_num.of_int (Camlcoq.Z.to_int (DynamicValues.Int64.signed i)))
+   | IO.DV.DVALUE_I1 i -> IV (Prov_wildcard, Nat_big_num.of_int (Camlcoq.Z.to_int (DynamicValues.Int1.signed i)))
+   | IO.DV.DVALUE_I8 i -> IV (Prov_wildcard, Nat_big_num.of_int (Camlcoq.Z.to_int (DynamicValues.Int8.signed i)))
+   | IO.DV.DVALUE_I32 i -> IV (Prov_wildcard, Nat_big_num.of_int (Camlcoq.Z.to_int (DynamicValues.Int32.signed i)))
+   | IO.DV.DVALUE_I64 i -> IV (Prov_wildcard, Nat_big_num.of_int (Camlcoq.Z.to_int (DynamicValues.Int64.signed i)))
    | _ -> failwith "Cannot convert non-integer dvalue to cerberus integer value.")
 
 let floating_value_to_dvalue (fv : floating_value) : IO.DV.dvalue =
@@ -96,7 +88,7 @@ let dvalue_to_mem_value (dv : IO.DV.dvalue) : mem_value =
    | IO.DV.DVALUE_I64 _ -> MVinteger (Signed (IntN_t 64), dvalue_to_integer_value dv)
    | _ -> failwith "dvalue_to_mem_value unimplemented")
 
-let z_to_iv z : integer_value = IV (Prov_none, Nat_big_num.of_int (Camlcoq.Z.to_int z))
+let z_to_iv z : integer_value = IV (Prov_wildcard, Nat_big_num.of_int (Camlcoq.Z.to_int z))
 
 let dtyp_to_ail_integer_type (dt : dtyp) : AilTypes.integerType =
   (match dt with
