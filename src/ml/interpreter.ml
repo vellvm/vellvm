@@ -22,11 +22,11 @@ let print_int_dvalue dv : unit =
   | _ -> Printf.printf "Program terminated with non-Integer value.\n"
 
 let rec step m =
-  match Lazy.force m with
-  | ITree.Tau x -> step x
-  | ITree.Ret (Coq_inr v) -> v
-  | ITree.Ret (Coq_inl s) -> failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
-  | ITree.Vis (e, k) ->
+  match Core.observe m with
+  | Core.TauF x -> step x
+  | Core.RetF (Coq_inr v) -> v
+  | Core.RetF (Coq_inl s) -> failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
+  | Core.VisF (e, k) ->
     begin match Obj.magic e with
       | TopLevel.IO.Call(_, f, _) ->
         (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n" (Camlcoq.camlstring_of_coqstring f));

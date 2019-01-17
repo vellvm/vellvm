@@ -238,7 +238,7 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
              ret v
   in
   match o with
-  | EXP_Ident i => lift_err_d (lookup_id g e i) ret
+  | EXP_Ident i => lift_err ret (lookup_id g e i) 
                              
   | EXP_Integer x =>
     match top with
@@ -609,7 +609,7 @@ CoFixpoint step_sem (r:result) : Trace dvalue :=
   match r with
   | Done v => ret v
   | Step s => x <- step s ;; Tau (step_sem x)
-  end.
+  end%itree.
 
 End IN_CFG_CONTEXT.
 
