@@ -107,6 +107,7 @@ Global Instance monad_trace : (Monad Trace) | 0 :=
     bind := fun A B => @bind_trace A B
   }.
 
+(*
 Lemma bind_of_ret : forall A B (a:A) (k : A -> Trace B),
     bind (ret a) k ≅ k a.
 Proof.
@@ -165,7 +166,7 @@ Proof.
   - econstructor. unfold bind_trace, ITree.bind in ch. apply ch. assumption.
   - econstructor. intros y. unfold bind_trace, ITree.bind in ch. apply ch. apply H1.
 Qed.    
-
+*)
 (* Trace Utilities ---------------------------------------------------------- *)
 Notation "'do' x <- m ;; f" := (lift_err (fun x => f) m)
                                 (at level 100, x ident, m at next level, right associativity).
