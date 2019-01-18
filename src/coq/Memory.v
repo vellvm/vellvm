@@ -456,16 +456,16 @@ Definition mem_step {X} (e:IO X) (m:memory) : err (IO X + (memory * X)) :=
 *)
 
 CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
-  match d with
-  | Tau d' => Tau (memD m d')
-  | Vis _ io k =>
+  match d.(observe) with
+  | TauF d' => Tau (memD m d')
+  | VisF _ io k =>
     match mem_step io m with
     | inr (inr (m', v)) => Tau (memD m' (k v))
     | inr (inl e) => Vis io k
     | inl s => raise s
     end
-  | Ret x => d
-  end.
+  | RetF x => d
+  end%itree.
 
 End Make.
 

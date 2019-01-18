@@ -31,7 +31,7 @@ Open Scope string_scope.
 Open Scope list_scope.
 
 Definition int := Z.
-Definition float := Floats.float.  (* 64-bit floating point value *)
+Definition float := Floats.float.  (* -bit floating point value *)
 
 Inductive linkage : Set :=
 | LINKAGE_Private
