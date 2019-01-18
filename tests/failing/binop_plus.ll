@@ -5,7 +5,6 @@ declare float @llvm.maxnum.f32(float, float)
 declare double @llvm.maxnum.f64(double, double)
 declare float @llvm.fabs.f32(float)
 declare double @llvm.fabs.f64(double)
-
 ;  Top-level operator definition
 define void @binop_plus([4 x double]* readonly align 16 nonnull %X, [2 x double]* align 16 nonnull %Y) {
 ; --- Operator: FSHBinOp ---
@@ -35,17 +34,18 @@ BinOp_lcont2:
   %l9 = icmp slt i64 %BinOp_next_i10, 2
   br i1 %l9, label %BinOp_loop5, label %b0
 b0:
+  
+  
   ret void
 }
-
-
-@X = global [4 x double] [double 8.66740830817e-309, double 8.66740830817e-309, double 8.66740830817e-309, double 8.66740830817e-309]
-
+;  X data
+@X = constant [4 x double] [double 6.73372083916e-309, double 6.73372083916e-309, double 6.73372083916e-309, double 6.73372083916e-309]
 ;  Main function
 define [2 x double] @main() {
 main_block:
   
   %Y = alloca [2 x double], align 16
+  ; void instr 0
   call void ([4 x double]*, [2 x double]*) @binop_plus([4 x double]* @X, [2 x double]* %Y)
   %z = load [2 x double], [2 x double]* %Y
   ret [2 x double] %z
