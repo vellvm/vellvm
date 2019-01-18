@@ -9,19 +9,27 @@
  ---------------------------------------------------------------------------- *)
 
 
-Require Import ZArith List String Omega.
-Require Import ExtLib.Structures.Monads.
-Require Import ExtLib.Programming.Eqv.
-Require Import Vellvm.LLVMAst Vellvm.Util.
-Require Import Vellvm.StepSemantics Vellvm.LLVMIO.
-Require Import Vellvm.MemoryAddress.
-Require Import Vellvm.LLVMIO.
-Require Import Vellvm.Error.
+From Coq Require Import
+     ZArith List String Omega
+     FSets.FMapAVL
+     Structures.OrderedTypeEx
+     ZMicromega.
+
+From ExtLib Require Import
+     Structures.Monads
+     Programming.Eqv.
+
+From Vellvm Require Import 
+     LLVMAst
+     Util
+     StepSemantics 
+     MemoryAddress
+     LLVMIO
+     Error
+     Coqlib
+     Numeric.Integers.
+
 Require Import ITree.
-Require Import FSets.FMapAVL.
-Require Import Integers Coqlib.
-Require Coq.Structures.OrderedTypeEx.
-Require Import ZMicromega.
 
 Import MonadNotation.
 Import EqvNotation.
@@ -458,10 +466,11 @@ Definition mem_step {X} (e:IO X) (m:memory) : err (IO X + (memory * X)) :=
 CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
   match d.(observe) with
   | TauF d' => Tau (memD m d')
-  | VisF _ io k =>
+  | VisF _ (inrE f) k => Vis (inrE f) k
+  | VisF _ (inlE io) k =>
     match mem_step io m with
     | inr (inr (m', v)) => Tau (memD m' (k v))
-    | inr (inl e) => Vis io k
+    | inr (inl e) => Vis (inlE io) k
     | inl s => raise s
     end
   | RetF x => d

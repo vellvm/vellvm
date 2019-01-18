@@ -641,7 +641,7 @@ Section PROOFS.
     destruct (eval_icmp icmp v1 v2); reflexivity.
   Qed.
 
-
+(*
   (* Before changing ITrees to records, we could prove _equality_ here.  Now we prove 
      only bisimulation?
    *)
@@ -775,7 +775,7 @@ Section PROOFS.
     *)
     
   Admitted.    
-    
+*)    
 End PROOFS.  
 End RENAMING.
 

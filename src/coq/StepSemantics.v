@@ -8,27 +8,31 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-Require Import ZArith List String Omega.
-Require Coq.FSets.FMapAVL.
-Require Coq.FSets.FMapFacts.
-Require Coq.Structures.OrderedTypeEx.
+From Coq Require Import
+     ZArith List String Omega
+     FSets.FMapAVL
+     FSets.FMapFacts
+     Structures.OrderedTypeEx.
 
 Require Import Integers Floats.
 
-Require Import ExtLib.Programming.Show.
-Require Import ExtLib.Structures.Monads.
-Require Import ExtLib.Programming.Eqv.
+From ExtLib Require Import
+     Programming.Show
+     Structures.Monads
+     Eqv.
 
 Require Import ITree.
-Require Import Vellvm.Util.
-Require Import Vellvm.Error.
-Require Import Vellvm.LLVMAst.
-Require Import Vellvm.AstLib.
-Require Import Vellvm.CFG.
-Require Import Vellvm.MemoryAddress.
-Require Import Vellvm.LLVMIO.
-Require Import Vellvm.DynamicValues.
-Require Import Vellvm.TypeUtil.
+
+From Vellvm Require Import 
+     Util
+     Error
+     LLVMAst
+     AstLib
+     CFG
+     MemoryAddress
+     LLVMIO
+     DynamicValues
+     TypeUtil.
 
 Import EqvNotation.
 Import ListNotations.
@@ -45,6 +49,8 @@ Open Scope string_scope.
 Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   
   Import LLVMIO.
+
+
   
   (* Environments ------------------------------------------------------------- *)
   Module ENV := FMapAVL.Make(AstLib.RawIDOrd).
@@ -178,12 +184,12 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     | Fptosi => raise "TODO: floating point conversion not yet implemented"
     | Inttoptr =>
       match t1, t2 with
-      | TYPE_I 64, TYPE_Pointer t => Vis (ItoP x) ret
+      | TYPE_I 64, TYPE_Pointer t => vis (ItoP x) ret
       | _, _ => raise "ERROR: Inttoptr got illegal arguments"
       end 
     | Ptrtoint =>
       match t1, t2 with
-      | TYPE_Pointer t, TYPE_I 64 => Vis (PtoI x) ret
+      | TYPE_Pointer t, TYPE_I 64 => vis (PtoI x) ret
       | _, _ => raise "ERROR: Ptrtoint got illegal arguments"
       end
     end.
@@ -231,6 +237,7 @@ Variable e : env.
       a function pointer for a well-typed LLVM program.
  *)
 
+
 Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
   let eval_texp '(t,ex) :=
              let dt := eval_typ t in
@@ -239,7 +246,7 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
   in
   match o with
   | EXP_Ident i => lift_err ret (lookup_id g e i) 
-                             
+
   | EXP_Integer x =>
     match top with
     | None =>  raise "eval_exp given untyped EXP_Integer"
@@ -347,7 +354,7 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
     let dt := eval_typ t in
     vptr <- eval_exp (Some DTYPE_Pointer) ptrval ;;
     vs <- map_monad (fun '(_, index) => eval_exp (Some (DTYPE_I 32)) index) idxs ;;
-    Vis (GEP dt vptr vs) ret
+    vis (GEP dt vptr vs) ret
 
   | OP_GetElementPtr _ (_, _) _ =>
     raise "getelementptr has non-pointer type annotation"
@@ -508,16 +515,16 @@ Definition step (s:state) : Trace result :=
          cont (g, pc_next, add_env id dv e, k)
           
       | IId id, INSTR_Alloca t _ _ =>
-        Vis (Alloca (eval_typ t)) (fun (a:dvalue) =>  cont (g, pc_next, add_env id a e, k))
+        vis (Alloca (eval_typ t)) (fun (a:dvalue) =>  cont (g, pc_next, add_env id a e, k))
                 
       | IId id, INSTR_Load _ t (u,ptr) _ =>
         dv <- eval_exp (Some (eval_typ u)) ptr ;;
-        Vis (Load (eval_typ t) dv) (fun dv => cont (g, pc_next, add_env id dv e, k))
+        vis (Load (eval_typ t) dv) (fun dv => cont (g, pc_next, add_env id dv e, k))
             
       | IVoid _, INSTR_Store _ (t, val) (u, ptr) _ => 
         dv <- eval_exp (Some (eval_typ t)) val ;; 
         v <- eval_exp (Some (eval_typ u)) ptr ;;
-        Vis (Store v dv) (fun _ => cont (g, pc_next, e, k))
+        vis (Store v dv) (fun _ => cont (g, pc_next, e, k))
 
       | _, INSTR_Store _ _ _ _ => raise "ERROR: Store to non-void ID" 
 
@@ -540,7 +547,7 @@ Definition step (s:state) : Trace result :=
           | None => (* This must have been a registered external function *)
             match fid with
               (* TODO: make sure the external call's type is correct *)
-            | Name s => Vis (Call DTYPE_Void s dvs) (fun dv => cont (g, pc_next, e, k))
+            | Name s => vis (Call DTYPE_Void s dvs) (fun dv => cont (g, pc_next, e, k))
             | _ => raise ("step: no function " (* ++ (string_of fid) *))
             end
           end
@@ -566,12 +573,12 @@ Definition step (s:state) : Trace result :=
 Definition allocate_globals (gs:list global) : Trace genv :=
   monad_fold_right
     (fun (m:genv) (g:global) =>
-       Vis (Alloca (eval_typ (g_typ g))) (fun v => ret (ENV.add (g_ident g) v m))) gs (@ENV.empty _).
+       vis (Alloca (eval_typ (g_typ g))) (fun v => ret (ENV.add (g_ident g) v m))) gs (@ENV.empty _).
 
 
 Definition register_declaration (g:genv) (d:declaration) : Trace genv :=
   (* TODO: map dc_name d to the returned address *)
-    Vis (Alloca DTYPE_Pointer) (fun v => ret (ENV.add (dc_name d) v g)).
+    vis (Alloca DTYPE_Pointer) (fun v => ret (ENV.add (dc_name d) v g)).
 
 Definition register_functions (g:genv) : Trace genv :=
   monad_fold_right register_declaration
@@ -588,7 +595,7 @@ Definition initialize_globals (gs:list global) (g:genv) : Trace unit :=
            | None => ret DVALUE_Undef
            | Some e => eval_exp g (@ENV.empty _) (Some dt) e
            end ;;
-       Vis (Store a dv) ret)
+       vis (Store a dv) ret)
     gs tt.
   
 Definition build_global_environment : Trace genv :=
@@ -601,9 +608,19 @@ Definition build_global_environment : Trace genv :=
    no parameters *)
 Definition init_state (fname:string) : Trace state :=
   g <- build_global_environment ;;
+  (* SAZ: Trace is no longer an instance of MonadExc -- FIX? *)
+  (*  
   fentry <- trywith ("INIT: no function named " ++ fname) (find_function_entry CFG (Name fname)) ;;
   let 'FunctionEntry ids pc_f := fentry in
     ret (g, pc_f, (@ENV.empty dvalue), []).
+   *)
+    match (find_function_entry CFG (Name fname)) with
+    | None => raise ("INIT: no function named " ++ fname)
+    | Some fentry =>
+      let 'FunctionEntry ids pc_f := fentry in
+      ret (g, pc_f, (@ENV.empty dvalue), [])
+    end.
+
 
 CoFixpoint step_sem (r:result) : Trace dvalue :=
   match r with

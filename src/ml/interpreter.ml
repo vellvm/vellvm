@@ -8,7 +8,6 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-;; open Datatypes
 
 module DV = TopLevel.IO.DV
 
@@ -24,9 +23,9 @@ let print_int_dvalue dv : unit =
 let rec step m =
   match Core.observe m with
   | Core.TauF x -> step x
-  | Core.RetF (Coq_inr v) -> v
-  | Core.RetF (Coq_inl s) -> failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
-  | Core.VisF (e, k) ->
+  | Core.RetF v -> v
+  | Core.VisF (OpenSum.Coq_inrE s, _) -> failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
+  | Core.VisF (OpenSum.Coq_inlE e, k) ->
     begin match Obj.magic e with
       | TopLevel.IO.Call(_, f, _) ->
         (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n" (Camlcoq.camlstring_of_coqstring f));
