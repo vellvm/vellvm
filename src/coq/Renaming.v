@@ -641,7 +641,7 @@ Section PROOFS.
     destruct (eval_icmp icmp v1 v2); reflexivity.
   Qed.
 
-(*
+  (*
   (* Before changing ITrees to records, we could prove _equality_ here.  Now we prove 
      only bisimulation?
    *)
@@ -651,6 +651,7 @@ Section PROOFS.
     econstructor.
     econstructor.
   Qed.    
+
 
   Lemma swap_ret {X E} `{SX: Swap X} : forall x, (Ret (swap id1 id2 x) : itree E (_+X)) ≅ swap id1 id2 (Ret x).
   Proof.
@@ -775,7 +776,8 @@ Section PROOFS.
     *)
     
   Admitted.    
-*)    
+
+    *)
 End PROOFS.  
 End RENAMING.
 
