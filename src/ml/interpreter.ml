@@ -24,6 +24,11 @@ let rec print_dvalue dv : string =
   | DV.DVALUE_Array elts -> Printf.sprintf "DVALUE_Array(%s)" (String.concat "," (List.map print_dvalue elts))
   | _ -> Printf.sprintf "print_dvalue TODO: add support for more dvalues"
 
+let debug_flag = ref false 
+let debug (msg:string) =
+  if !debug_flag then 
+    Printf.printf "DEBUG: %s\n%!" msg
+
 let rec step m : DV.dvalue =
   match Core.observe m with
   (* Internal steps compute as nothing *)
@@ -49,7 +54,7 @@ let rec step m : DV.dvalue =
         step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero)))
 
       | Debug(msg) ->
-        (Printf.printf "DEBUG: %s\n%!" (Camlcoq.camlstring_of_coqstring msg);
+        (debug (Camlcoq.camlstring_of_coqstring msg);
          step (k (Obj.magic DV.DVALUE_None)))
         
       | Alloca _   -> failwith "top-level Alloca"
