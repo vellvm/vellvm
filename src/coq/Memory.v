@@ -403,6 +403,7 @@ Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (me
   | _ => raise "non-I32 index"
   end.
 
+(* TODO: structure this more like an interpreter from the ITrees library *)
 Definition mem_step {X} (e:IO X) (m:memory) : err (IO X + (memory * X)) :=
   match e with
   | Alloca t =>
@@ -464,6 +465,8 @@ Definition mem_step {X} (e:IO X) (m:memory) : err (IO X + (memory * X)) :=
     end
                        
   | Call t f args  => ret (inl (Call t f args))
+
+  | Debug msg => ret (inl (Debug msg))
   end.
 
 (*
@@ -477,7 +480,7 @@ CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
   | VisF _ (inlE io) k =>
     match mem_step io m with
     | inr (inr (m', v)) => Tau (memD m' (k v))
-    | inr (inl e) => Vis (inlE io) k
+    | inr (inl e) => Vis (inlE io) (fun v => memD m (k v))
     | inl s => raise s
     end
   | RetF x => d

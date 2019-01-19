@@ -9,34 +9,60 @@
  ---------------------------------------------------------------------------- *)
 
 
-module DV = TopLevel.IO.DV
+;; open TopLevel.IO
 
-let print_int_dvalue dv : unit =
+(* TODO: Move this into Coq *)
+let rec print_dvalue dv : string =
   match dv with
-  | DV.DVALUE_I1 (x) -> Printf.printf "Program terminated with: DVALUE_I1(%d)\n" (Camlcoq.Z.to_int (DynamicValues.Int1.unsigned x))
-  | DV.DVALUE_I8 (x) -> Printf.printf "Program terminated with: DVALUE_I8(%d)\n" (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
-  | DV.DVALUE_I32 (x) -> Printf.printf "Program terminated with: DVALUE_I32(%d)\n" (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
-  | DV.DVALUE_I64 (x) -> Printf.printf "Program terminated with: DVALUE_I64(%d) [possible precision loss: converted to OCaml int]\n"
+  | DV.DVALUE_I1 x  -> Printf.sprintf "DVALUE_I1(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int1.unsigned x))
+  | DV.DVALUE_I8 x  -> Printf.sprintf "DVALUE_I8(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
+  | DV.DVALUE_I32 x -> Printf.sprintf "DVALUE_I32(%d)" (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
+  | DV.DVALUE_I64 x -> Printf.sprintf "DVALUE_I64(%d)[possible precision loss: converted to OCaml int]"
                        (Camlcoq.Z.to_int (DynamicValues.Int64.unsigned x))
-  | _ -> Printf.printf "Program terminated with non-Integer value.\n"
+  | DV.DVALUE_Float x  -> Printf.sprintf "DVALUE_Float(%f)" (Camlcoq.camlfloat_of_coqfloat x)
+  | DV.DVALUE_Double x -> Printf.sprintf "DVALUE_Double(%f)" (Camlcoq.camlfloat_of_coqfloat32 x)    
+  | DV.DVALUE_Array elts -> Printf.sprintf "DVALUE_Array(%s)" (String.concat "," (List.map print_dvalue elts))
+  | _ -> Printf.sprintf "print_dvalue TODO: add support for more dvalues"
 
-let rec step m =
+let rec step m : DV.dvalue =
   match Core.observe m with
+  (* Internal steps compute as nothing *)
   | Core.TauF x -> step x
+
+  (* We finished the computation *)
   | Core.RetF v -> v
-  | Core.VisF (OpenSum.Coq_inrE s, _) -> failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
+
+  (* The failE effect is a failure *)
+  | Core.VisF (OpenSum.Coq_inrE s, _) ->
+    failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
+
+  (* The only visible effects from LLVMIO that should propagate to the interpreter are:
+     - Call to external functions
+     - Debug  
+  *)
   | Core.VisF (OpenSum.Coq_inlE e, k) ->
     begin match Obj.magic e with
-      | TopLevel.IO.Call(_, f, _) ->
-        (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n" (Camlcoq.camlstring_of_coqstring f));
+
+      | Call(_, f, _) ->
+        (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n"
+           (Camlcoq.camlstring_of_coqstring f));
         step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero)))
-      | TopLevel.IO.GEP(_, _, _) -> failwith "GEP failed"
-      | _ -> failwith "should have been handled by the memory model"  
+
+      | Debug(msg) ->
+        (Printf.printf "DEBUG: %s\n%!" (Camlcoq.camlstring_of_coqstring msg);
+         step (k (Obj.magic DV.DVALUE_None)))
+        
+      | Alloca _   -> failwith "top-level Alloca"
+      | Load (_,_) -> failwith "top-level Load"
+      | Store (_,_) -> failwith "top-level Store"
+      | GEP (_,_,_) -> failwith "top-level GEP"
+      | ItoP _ -> failwith "top-level ItoP"
+      | PtoI _ -> failwith "top-level PtoI"
     end
       
 
-let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) = 
+let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) : DV.dvalue = 
   match TopLevel.run_with_memory prog with
-  | None -> failwith "bad module"
+  | None -> failwith "ERROR: bad module"
   | Some t -> step t
   

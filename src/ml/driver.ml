@@ -68,7 +68,11 @@ let add_link_file path =
 let process_ll_file path file =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let ll_ast = parse_file path in
-  let _ = if !interpret then Interpreter.print_int_dvalue (Interpreter.interpret ll_ast) else () in
+  let _ = if !interpret then begin
+      let dv = Interpreter.interpret ll_ast in
+      Printf.printf "Program terminated with: %s\n" (Interpreter.print_dvalue dv)
+    end
+  in
   let ll_ast' = transform ll_ast in
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
   let _ = output_file vll_file ll_ast' in

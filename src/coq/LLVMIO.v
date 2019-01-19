@@ -117,6 +117,8 @@ Inductive IO : Type -> Type :=
 | ItoP   : forall (i:dvalue), (IO dvalue)
 | PtoI   : forall (a:dvalue), (IO dvalue)
 | Call   : forall (t:dtyp) (f:string) (args:list dvalue), (IO dvalue)
+
+(* The Debug event causes the ocaml top-level to print a string during execution. *)                             | Debug  : forall (msg:string), IO dvalue
 .    
 
 
@@ -125,8 +127,10 @@ Definition Trace := itree (IO +' failureE).
 Hint Unfold Trace.
 
 
-
 (* Trace Utilities ---------------------------------------------------------- *)
+
+Definition debug msg : Trace unit :=
+  vis (Debug msg) (fun x => Ret tt).
 
 Definition lift_err {A B} (f : A -> Trace B) (m:err A) : Trace B :=
   match m with

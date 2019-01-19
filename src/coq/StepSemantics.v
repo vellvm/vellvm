@@ -529,6 +529,7 @@ Definition step (s:state) : Trace result :=
       | _, INSTR_Store _ _ _ _ => raise "ERROR: Store to non-void ID" 
 
       | pt, INSTR_Call (t, f) args =>
+        debug ("call") ;;
         fv <- eval_exp None f ;;
         dvs <-  map_monad (fun '(t, op) => (eval_exp (Some (eval_typ t)) op)) args ;;
         match fv with
