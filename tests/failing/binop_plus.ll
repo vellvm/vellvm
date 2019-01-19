@@ -46,7 +46,7 @@ main_block:
   
   %Y = alloca [2 x double], align 16
   ; void instr 0
-  call void ([4 x double]*, [2 x double]*) @binop_plus([4 x double]* @X, [2 x double]* %Y)
+  call void @binop_plus([4 x double]* @X, [2 x double]* %Y)
   %z = load [2 x double], [2 x double]* %Y
   ret [2 x double] %z
 }
