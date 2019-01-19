@@ -536,6 +536,7 @@ Definition step (s:state) : Trace result :=
         | DVALUE_Addr addr =>
           (* TODO: lookup fid given addr from global environment *)
           do fid <- reverse_lookup_function_id g addr ;;
+          debug ("  fid:" ++ to_string fid) ;;
           match (find_function_entry CFG fid) with
           | Some fnentry =>
             let 'FunctionEntry ids pc_f := fnentry in
@@ -609,19 +610,9 @@ Definition build_global_environment : Trace genv :=
    no parameters *)
 Definition init_state (fname:string) : Trace state :=
   g <- build_global_environment ;;
-  (* SAZ: Trace is no longer an instance of MonadExc -- FIX? *)
-  (*  
   fentry <- trywith ("INIT: no function named " ++ fname) (find_function_entry CFG (Name fname)) ;;
   let 'FunctionEntry ids pc_f := fentry in
     ret (g, pc_f, (@ENV.empty dvalue), []).
-   *)
-    match (find_function_entry CFG (Name fname)) with
-    | None => raise ("INIT: no function named " ++ fname)
-    | Some fentry =>
-      let 'FunctionEntry ids pc_f := fentry in
-      ret (g, pc_f, (@ENV.empty dvalue), [])
-    end.
-
 
 CoFixpoint step_sem (r:result) : Trace dvalue :=
   match r with
