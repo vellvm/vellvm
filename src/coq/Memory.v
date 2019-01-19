@@ -27,7 +27,9 @@ From Vellvm Require Import
      LLVMIO
      Error
      Coqlib
-     Numeric.Integers.
+     Numeric.Integers
+     Numeric.Floats.
+
 
 Require Import ITree.
 
@@ -195,6 +197,8 @@ Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
   | DVALUE_I8 i => Z_to_sbyte_list 8 (unsigned i)
   | DVALUE_I32 i => Z_to_sbyte_list 8 (unsigned i)
   | DVALUE_I64 i => Z_to_sbyte_list 8 (unsigned i)
+  | DVALUE_Double d => Z_to_sbyte_list 8 (unsigned (Float.to_bits d))
+  | DVALUE_Float f => Z_to_sbyte_list 8 (unsigned (Float32.to_bits f))
   | DVALUE_Struct fields | DVALUE_Array fields =>
       (* note the _right_ fold is necessary for byte ordering. *)
       fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
@@ -213,6 +217,9 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:dtyp) : dvalue :=
     | 64 => DVALUE_I64 (repr des_int)
     | _ => DVALUE_None (* invalid size. *)
     end
+  | DTYPE_Double => DVALUE_Double (Float.of_bits (repr (sbyte_list_to_Z bytes)))
+  | DTYPE_Float => DVALUE_Float (Float32.of_bits (repr (sbyte_list_to_Z bytes)))
+      
   | DTYPE_Pointer =>
     match bytes with
     | Ptr addr :: tl => DVALUE_Addr addr
