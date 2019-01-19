@@ -431,7 +431,7 @@ Inductive result :=
 | Step (s:state)
 .       
 
-Definition raise_p {X} (p:pc) s : Trace X := raise (s ++ ": " ++ (to_string p)).
+Definition raise_p {X} (p:pc) s : Trace X := raise (s ++ " in block: " ++ (to_string p)).
 Definition cont (s:state)  : Trace result := ret (Step s).
 Definition halt (v:dvalue) : Trace result := ret (Done v).
 
@@ -445,7 +445,6 @@ Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B
   | _, _ => failwith "combine_lists_err: different lenth lists"
   end.
 
-(* TODO: Add Show instances for block_id and (?) iid *)  
 Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv) (e_init:env) (k:stack) : Trace result :=
   let eval_phi (e:env) '(iid, Phi t ls) :=
       match assoc RawIDOrd.eq_dec bid_src ls with
@@ -453,11 +452,11 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
         let dt := eval_typ t in
         dv <- eval_exp g e_init (Some dt) op ;;
         ret (add_env iid dv e)
-      | None => raise ("jump: block ") (*  ++ to_string bid_src ++ " not found in " ++ to_string iid) *)
+      | None => raise ("jump: phi node doesn't include block " ++ to_string bid_src )
       end
   in
   match find_block_entry CFG fid bid_tgt with
-  | None => raise ("jump: target block " ) (* ++ to_string bid_tgt ++ " not found") *)
+  | None => raise ("jump: target block " ++ to_string bid_tgt ++ " not found")
   | Some (BlockEntry phis pc_entry) =>
       e_out <- monad_fold_right eval_phi phis e_init ;;
       cont (g, pc_entry, e_out, k)
@@ -543,8 +542,12 @@ Definition step (s:state) : Trace result :=
             do bs <- combine_lists_err ids dvs ;;
               let env := env_of_assoc bs in
               match pt with
-              | IVoid _ => cont (g, pc_f, env, (KRet_void e pc_next::k))
-              | IId id =>  cont (g, pc_f, env, (KRet e id pc_next::k))          
+              | IVoid _ =>
+                (debug "pushed void stack frame") ;;
+                cont (g, pc_f, env, (KRet_void e pc_next::k))
+              | IId id =>
+                (debug "pushed non-void stack frame") ;;
+                cont (g, pc_f, env, (KRet e id pc_next::k))          
               end
           | None => (* This must have been a registered external function *)
             match fid with
