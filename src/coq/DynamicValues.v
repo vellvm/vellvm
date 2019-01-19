@@ -8,16 +8,24 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-Require Import ZArith List String Omega.
-Require Import ExtLib.Core.RelDec.
-Require Import ExtLib.Programming.Eqv.
-Require Import ExtLib.Structures.Monads.
-Require Import ExtLib.Data.Nat.
+From Coq Require Import 
+     ZArith List String Omega.
+
+From ExtLib Require Import 
+     Core.RelDec
+     Programming.Eqv
+     Programming.Show
+     Structures.Monads
+     Data.Nat.
+
+From Vellvm Require Import
+     LLVMAst
+     AstLib
+     MemoryAddress
+     Error
+     Util.
+     
 Require Import Integers Floats.
-Require Import Vellvm.LLVMAst.
-Require Import Vellvm.MemoryAddress.
-Require Import Vellvm.Error.
-Require Import Vellvm.Util.
 
 Import EqvNotation.
 Import MonadNotation.
@@ -84,6 +92,37 @@ Inductive dvalue : Set :=
 | DVALUE_Array         (elts: list dvalue)
 | DVALUE_Vector        (elts: list dvalue)
 .
+
+Section hiding_notation.
+  Import ShowNotation.
+  Local Open Scope show_scope.
+
+  Fixpoint show_dvalue' (dv:dvalue) : showM :=
+    match dv with 
+    | DVALUE_Addr a => "address" (* TODO: insist that memory models can print addresses? *)
+    | DVALUE_I1 x => "dvalue(i1)"
+    | DVALUE_I8 x => "dvalue(i8)"
+    | DVALUE_I32 x => "dvalue(i32)"
+    | DVALUE_I64 x => "dvalue(i64)"
+    | DVALUE_Double x => "dvalue(double)"
+    | DVALUE_Float x => "dvalue(float)"
+    | DVALUE_Undef => "undef"   
+    | DVALUE_Poison => "poison"
+    | DVALUE_None => "none"
+    | DVALUE_Struct fields
+      => ("{" << iter_show (List.map (fun x => (show_dvalue' x) << ",") fields) << "}")
+    | DVALUE_Packed_struct fields
+      => ("packed{" << iter_show (List.map (fun x => (show_dvalue' x) << ",") fields) << "}")
+    | DVALUE_Array elts
+      => ("[" << iter_show (List.map (fun x => (show_dvalue' x) << ",") elts) << "]")
+    | DVALUE_Vector elts
+      => ("<" << iter_show (List.map (fun x => (show_dvalue' x) << ",") elts) << ">")                  
+    end%string.
+  
+  Global Instance show_dvalue : Show dvalue := show_dvalue'.
+
+End hiding_notation.
+
 
 (* TODO: include Undefined values in this way? i.e. Undef is really a predicate on values
    Note: this isn't correct because it won't allow for undef fields of a struct or elts of an array
@@ -589,7 +628,7 @@ Class VInt I : Type :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2 => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
-    | _, _ => failwith "ill_typed-fop"
+    | _, _ => failwith ("ill_typed-fop: " ++ (to_string fop) ++ " " ++ (to_string v1) ++ " " ++ (to_string v2))
     end.
 
   Definition not_nan32 (f:ll_float) : bool :=

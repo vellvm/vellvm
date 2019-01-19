@@ -528,6 +528,18 @@ Section hiding_notation.
         end
     }.
 
+  Global Instance show_fbinop : Show fbinop :=
+    { show fbinop :=
+        match fbinop with
+        | FAdd => "fadd"
+        | FSub => "fsub"
+        | FMul => "fmul"
+        | FDiv => "fdiv"
+        | FRem => "frem"
+        end
+    }.
+
+  
   Global Instance show_icmp : Show icmp :=
     { show cmp := 
         "icmp " <<
