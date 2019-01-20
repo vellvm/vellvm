@@ -66,7 +66,7 @@ main_block:
   
   %Y = alloca [4 x double], align 16
   ; void instr 0
-  call void ([4 x double]*, [4 x double]*) @sumunion([4 x double]* @X, [4 x double]* %Y)
+  call void @sumunion([4 x double]* @X, [4 x double]* %Y)
   %z = load [4 x double], [4 x double]* %Y
   ret [4 x double] %z
 }
