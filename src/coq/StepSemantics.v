@@ -455,6 +455,7 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
       | None => raise ("jump: phi node doesn't include block " ++ to_string bid_src )
       end
   in
+  debug ("jumping to: " ++ to_string bid_tgt) ;;
   match find_block_entry CFG fid bid_tgt with
   | None => raise ("jump: target block " ++ to_string bid_tgt ++ " not found")
   | Some (BlockEntry phis pc_entry) =>

@@ -19,8 +19,8 @@ let rec print_dvalue dv : string =
   | DV.DVALUE_I32 x -> Printf.sprintf "DVALUE_I32(%d)" (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
   | DV.DVALUE_I64 x -> Printf.sprintf "DVALUE_I64(%d)[possible precision loss: converted to OCaml int]"
                        (Camlcoq.Z.to_int (DynamicValues.Int64.unsigned x))
-  | DV.DVALUE_Float x  -> Printf.sprintf "DVALUE_Float(%f)" (Camlcoq.camlfloat_of_coqfloat x)
-  | DV.DVALUE_Double x -> Printf.sprintf "DVALUE_Double(%f)" (Camlcoq.camlfloat_of_coqfloat32 x)    
+  | DV.DVALUE_Float x  -> Printf.sprintf "DVALUE_Float(%F)" (Camlcoq.camlfloat_of_coqfloat32 x)
+  | DV.DVALUE_Double x -> Printf.sprintf "DVALUE_Double(%F)" (Camlcoq.camlfloat_of_coqfloat x)    
   | DV.DVALUE_Array elts -> Printf.sprintf "DVALUE_Array(%s)" (String.concat "," (List.map print_dvalue elts))
   | _ -> Printf.sprintf "print_dvalue TODO: add support for more dvalues"
 

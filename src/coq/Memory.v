@@ -132,6 +132,8 @@ Fixpoint sizeof_dtyp (ty:dtyp) : Z :=
   | DTYPE_Pointer => 8
   | DTYPE_Struct l => fold_left (fun x acc => x + sizeof_dtyp acc) l 0
   | DTYPE_Array sz ty' => sz * sizeof_dtyp ty'
+  | DTYPE_Float => 4
+  | DTYPE_Double => 8
   | _ => 0 (* TODO: add support for more types as necessary *)
   end.
 
@@ -197,8 +199,8 @@ Fixpoint serialize_dvalue (dval:dvalue) : list SByte :=
   | DVALUE_I8 i => Z_to_sbyte_list 8 (unsigned i)
   | DVALUE_I32 i => Z_to_sbyte_list 8 (unsigned i)
   | DVALUE_I64 i => Z_to_sbyte_list 8 (unsigned i)
+  | DVALUE_Float f => Z_to_sbyte_list 4 (unsigned (Float32.to_bits f))
   | DVALUE_Double d => Z_to_sbyte_list 8 (unsigned (Float.to_bits d))
-  | DVALUE_Float f => Z_to_sbyte_list 8 (unsigned (Float32.to_bits f))
   | DVALUE_Struct fields | DVALUE_Array fields =>
       (* note the _right_ fold is necessary for byte ordering. *)
       fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
@@ -217,8 +219,8 @@ Fixpoint deserialize_sbytes (bytes:list SByte) (t:dtyp) : dvalue :=
     | 64 => DVALUE_I64 (repr des_int)
     | _ => DVALUE_None (* invalid size. *)
     end
-  | DTYPE_Double => DVALUE_Double (Float.of_bits (repr (sbyte_list_to_Z bytes)))
   | DTYPE_Float => DVALUE_Float (Float32.of_bits (repr (sbyte_list_to_Z bytes)))
+  | DTYPE_Double => DVALUE_Double (Float.of_bits (repr (sbyte_list_to_Z bytes)))
       
   | DTYPE_Pointer =>
     match bytes with

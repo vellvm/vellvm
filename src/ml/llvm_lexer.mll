@@ -301,10 +301,11 @@ rule token = parse
   | '#' (digit+ as i) { ATTR_GRP_ID (coq_of_int (int_of_string i)) }
 
   (* constants *)
-  | '-'? digit+ as d            { INTEGER (coq_of_int64 (Int64.of_string d)) }
-  | '-'? digit* '.' digit+ as d { FLOAT (coqfloat_of_float (float_of_string d)) }
-  | '-'? digit ('.' digit+)? 'e' ('+'|'-') digit+ as d
-                                { FLOAT (coqfloat_of_float (float_of_string d)) }
+  | ('-'? digit+) as d            { INTEGER (coq_of_int64 (Int64.of_string d)) }
+  | ('-'? digit* '.' digit+) as d { FLOAT (coqfloat_of_float (float_of_string d)) }
+  | ('-'? digit ('.' digit+)? 'e' ('+'|'-') digit+) as d
+                                { let f = float_of_string d in
+                                  FLOAT (coqfloat_of_float f) }
   | ('0''x' hexdigit+) as d     { HEXCONSTANT (coqfloat_of_float (Int64.float_of_bits (Int64.of_string d))) }			
   | '"'                         { STRING (string (Buffer.create 10) lexbuf) }
 
