@@ -17,7 +17,9 @@ From Coq Require Import
 
 From ExtLib Require Import
      Structures.Monads
-     Programming.Eqv.
+     Programming.Eqv
+     Data.String.
+
 
 From Vellvm Require Import 
      LLVMAst
@@ -107,6 +109,10 @@ Inductive SByte :=
 | PtrFrag : SByte
 | SUndef : SByte.
 
+(* TODO SAZ: 
+    mem_block should keep track of its allocation size so that operations
+    can fail if they are out of range
+*)
 Definition mem_block := IntMap SByte.
 Definition memory := IntMap mem_block.
 Definition undef := DVALUE_Undef. (* TODO: should this be an empty block? *)
@@ -405,7 +411,34 @@ Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (me
   | _ => raise "non-I32 index"
   end.
 
+(* LLVM 5.0 memcpy 
+   According to the documentation: http://releases.llvm.org/5.0.0/docs/LangRef.html#llvm-memcpy-intrinsic
+   this operation can never fail?  It doesn't return any status code... 
+*)
+Definition handle_memcpy (args : List.list dvalue) (m:memory) : err memory :=
+  match args with
+  | DVALUE_Addr (dst_b, dst_o) ::
+                DVALUE_Addr (src_b, src_o) ::
+                DVALUE_I32 len ::
+                DVALUE_I32 align :: (* alignment ignored *)
+                DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+    src_block <- trywith "memcpy src block not found" (lookup src_b m) ;;
+    dst_block <- trywith "memcpy dst block not found" (lookup dst_b m) ;;
+    let sdata := lookup_all_index src_o (unsigned len) src_block SUndef in
+    let dst_block' := add_all_index sdata dst_o dst_block in
+    let m' := add dst_b dst_block' m in
+    ret m'
+              
+  | _ => raise "memcpy got incorrect arguments"
+  end.
+
+
 (* TODO: structure this more like an interpreter from the ITrees library *)
+(* TODO:
+     these operations are too defined: load and store should fail if the 
+     address isn't in range
+*)
+
 Definition mem_step {X} (e:IO X) (m:memory) : err (IO X + (memory * X)) :=
   match e with
   | Alloca t =>
@@ -443,10 +476,8 @@ Definition mem_step {X} (e:IO X) (m:memory) : err (IO X + (memory * X)) :=
     end
       
   | GEP t dv vs =>
-    match handle_gep t dv vs m with
-    | inl s => raise s
-    | inr r => ret (inr r)
-    end
+    r <- handle_gep t dv vs m ;;
+    ret (inr r)
 
   | ItoP i =>
     match i with
@@ -465,8 +496,13 @@ Definition mem_step {X} (e:IO X) (m:memory) : err (IO X + (memory * X)) :=
            ret (inr (m, DVALUE_Addr (0, (k + i))))
     | _ => raise "Non pointer passed to PtoI"
     end
-                       
-  | Call t f args  => ret (inl (Call t f args))
+      
+  | Call t f args =>
+    if string_dec f "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
+      m' <- handle_memcpy args m;;
+      ret (inr (m', DVALUE_None))
+    else
+      ret (inl (Call t f args))
 
   | Debug msg => ret (inl (Debug msg))
   end.
