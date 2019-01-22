@@ -39,7 +39,7 @@ b0:
   ret void
 }
 ;  X data
-@X = constant [4 x double] [double 6.73372083916e-309, double 6.73372083916e-309, double 6.73372083916e-309, double 6.73372083916e-309]
+@X = constant [4 x double] [double 1.1, double 2.2, double 3.3, double 4.4]
 ;  Main function
 define [2 x double] @main() {
 main_block:
