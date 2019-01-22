@@ -10,7 +10,7 @@
 
 From Coq Require Import
      ZArith List String Omega
-     FSets.FMapAVL
+     FSets.FMapWeakList
      FSets.FMapFacts
      Structures.OrderedTypeEx.
 
@@ -52,11 +52,12 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
 
 
   
-  (* Environments ------------------------------------------------------------- *)
-  Module ENV := FMapAVL.Make(AstLib.RawIDOrd).
+ (* Environments ------------------------------------------------------------- *)
+  Module ENV := FMapWeakList.Make(AstLib.RawIDOrd).
   Module ENVFacts := FMapFacts.WFacts_fun(AstLib.RawIDOrd)(ENV).
   Module ENVProps := FMapFacts.WProperties_fun(AstLib.RawIDOrd)(ENV).
-  
+
+
   Definition env_of_assoc {A} (l:list (raw_id * A)) : ENV.t A :=
     List.fold_left (fun e '(k,v) => ENV.add k v e) l (@ENV.empty A).
   
@@ -245,7 +246,8 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
              ret v
   in
   match o with
-  | EXP_Ident i => lift_err ret (lookup_id g e i) 
+  | EXP_Ident i =>
+    lift_err ret (lookup_id g e i) 
 
   | EXP_Integer x =>
     match top with
