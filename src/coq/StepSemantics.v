@@ -177,12 +177,66 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
         ret (DVALUE_Addr a) 
       | _, _, _ => raise "ill-typed_conv"
       end
-    | Fptrunc
-    | Fpext
-    | Uitofp
-    | Sitofp
+    | Uitofp =>
+      match t1, x, t2 with
+      | TYPE_I 1, DVALUE_I1 i1, TYPE_Float =>
+        ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+
+      | TYPE_I 8, DVALUE_I8 i1, TYPE_Float =>
+        ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+
+      | TYPE_I 32, DVALUE_I32 i1, TYPE_Float =>
+        ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+
+      | TYPE_I 64, DVALUE_I64 i1, TYPE_Float =>
+        ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+
+      | TYPE_I 1, DVALUE_I1 i1, TYPE_Double =>
+        ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+
+      | TYPE_I 8, DVALUE_I8 i1, TYPE_Double =>
+        ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+
+      | TYPE_I 32, DVALUE_I32 i1, TYPE_Double =>
+        ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+            
+      | TYPE_I 64, DVALUE_I64 i1, TYPE_Double =>
+        ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+
+      | _, _, _ => raise "ill typed Uitofp"
+      end
+    | Sitofp =>
+      match t1, x, t2 with
+      | TYPE_I 1, DVALUE_I1 i1, TYPE_Float =>
+        ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+
+      | TYPE_I 8, DVALUE_I8 i1, TYPE_Float =>
+        ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+
+      | TYPE_I 32, DVALUE_I32 i1, TYPE_Float =>
+        ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+
+      | TYPE_I 64, DVALUE_I64 i1, TYPE_Float =>
+        ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+
+      | TYPE_I 1, DVALUE_I1 i1, TYPE_Double =>
+        ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
+
+      | TYPE_I 8, DVALUE_I8 i1, TYPE_Double =>
+        ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
+
+      | TYPE_I 32, DVALUE_I32 i1, TYPE_Double =>
+        ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
+            
+      | TYPE_I 64, DVALUE_I64 i1, TYPE_Double =>
+        ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
+
+      | _, _, _ => raise "ill typed Sitofp"
+      end 
     | Fptoui
-    | Fptosi => raise "TODO: floating point conversion not yet implemented"
+    | Fptosi 
+    | Fptrunc
+    | Fpext => raise "TODO: unimplemented numeric conversion"
     | Inttoptr =>
       match t1, t2 with
       | TYPE_I 64, TYPE_Pointer t => vis (ItoP x) ret
