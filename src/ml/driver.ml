@@ -69,9 +69,14 @@ let process_ll_file path file =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let ll_ast = parse_file path in
   let _ = if !interpret then begin
-      let dv = Interpreter.interpret ll_ast in
-      Printf.printf "Program terminated with: %s\n" (Interpreter.print_dvalue dv)
-    end
+              let open Format in
+              let dv = Interpreter.interpret ll_ast in
+              Printf.printf "Program terminated with: " ;
+              let ppf = std_formatter in
+              Interpreter.pp_dvalue ppf dv ;
+              pp_force_newline ppf ();
+              pp_print_flush ppf ()
+            end
   in
   let ll_ast' = transform ll_ast in
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
