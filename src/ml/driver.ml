@@ -69,9 +69,10 @@ let process_ll_file path file =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let ll_ast = parse_file path in
   let _ = if !interpret then begin
-      let dv = Interpreter.interpret ll_ast in
-      Printf.printf "Program terminated with: %s\n" (Interpreter.print_dvalue dv)
-    end
+              match Interpreter.interpret ll_ast with
+              | Ok dv -> Printf.printf "Program terminated with: %s\n" (Interpreter.print_dvalue dv)
+              | Error msg -> failwith msg
+            end
   in
   let ll_ast' = transform ll_ast in
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
@@ -95,5 +96,4 @@ let process_files files =
 let run_ll_file path =
   let _ = Platform.verb @@ Printf.sprintf "* running file: %s\n" path in
   let ll_ast = parse_file path in
-  let res = Interpreter.interpret ll_ast in
-  res
+  Interpreter.interpret ll_ast

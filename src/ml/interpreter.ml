@@ -29,17 +29,17 @@ let debug (msg:string) =
   if !debug_flag then 
     Printf.printf "DEBUG: %s\n%!" msg
 
-let rec step m : DV.dvalue =
+let rec step m : (DV.dvalue, string) result =
   match Core.observe m with
   (* Internal steps compute as nothing *)
   | Core.TauF x -> step x
 
   (* We finished the computation *)
-  | Core.RetF v -> v
+  | Core.RetF v -> Ok v
 
   (* The failE effect is a failure *)
   | Core.VisF (OpenSum.Coq_inrE s, _) ->
-    failwith (Printf.sprintf "ERROR: %s" (Camlcoq.camlstring_of_coqstring s))
+    Error (Camlcoq.camlstring_of_coqstring s)
 
   (* The only visible effects from LLVMIO that should propagate to the interpreter are:
      - Call to external functions
@@ -57,17 +57,16 @@ let rec step m : DV.dvalue =
         (debug (Camlcoq.camlstring_of_coqstring msg);
          step (k (Obj.magic DV.DVALUE_None)))
         
-      | Alloca _   -> failwith "top-level Alloca"
-      | Load (_,_) -> failwith "top-level Load"
-      | Store (_,_) -> failwith "top-level Store"
-      | GEP (_,_,_) -> failwith "top-level GEP"
-      | ItoP _ -> failwith "top-level ItoP"
-      | PtoI _ -> failwith "top-level PtoI"
+      | Alloca _   -> Error "top-level Alloca"
+      | Load (_,_) -> Error "top-level Load"
+      | Store (_,_) -> Error "top-level Store"
+      | GEP (_,_,_) -> Error "top-level GEP"
+      | ItoP _ -> Error "top-level ItoP"
+      | PtoI _ -> Error "top-level PtoI"
     end
       
 
-let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) : DV.dvalue = 
+let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
   match TopLevel.run_with_memory prog with
   | None -> failwith "ERROR: bad module"
   | Some t -> step t
-  
