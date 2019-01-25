@@ -59,7 +59,12 @@ let pp_test_of_dir dir =
         List.map (fun f -> (f, fun () -> parse_pp_test f)) (files_of_dir dir))
 
 let run_dvalue_test (test:IO.DV.dvalue -> bool) path =
-  if not (test (run_ll_file path)) then failwith (path ^ " test failed"); ()
+  let res =
+    match run_ll_file path with
+    | Error _ -> false
+    | Ok dv -> test dv
+  in
+  if not res then failwith (path ^ " test failed"); ()
 
 let poison_tests =
   ["../tests/llvm-arith/i1/add_nsw.ll";
