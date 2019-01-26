@@ -616,6 +616,8 @@ Definition step (s:state) : Trace result :=
         | _ => raise_p pc "call got non-function pointer"
         end
 
+      | _, INSTR_Comment _ => cont (g, pc_next, e, k)
+
       | _, INSTR_Unreachable => raise_p pc "IMPOSSIBLE: unreachable in reachable position" 
 
         (* Currently unhandled LLVM instructions *)
