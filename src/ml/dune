@@ -7,6 +7,6 @@
 
 (executables
  (names main)
-  (libraries extracted unix str)
+  (libraries extracted libvellvm unix str)
   )
 
