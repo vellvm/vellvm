@@ -61,7 +61,7 @@ vellvm: $(EXE)
 	cp $(EXE) vellvm
 
 test: vellvm
-	./vellvm --test-pp-dir ../tests/ll
+	./vellvm --test
 
 print-includes:
 	@echo $(COQINCLUDES)
