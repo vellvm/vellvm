@@ -59,12 +59,12 @@ let pp_test_of_dir dir =
         List.map (fun f -> (f, fun () -> parse_pp_test f)) (files_of_dir dir))
 
 let run_dvalue_test (test:IO.DV.dvalue -> bool) path =
-  let res =
+  let (res, msg) =
     match run_ll_file path with
-    | Error _ -> false
-    | Ok dv -> test dv
+    | Error msg -> (false, msg)
+    | Ok dv -> (test dv, "")
   in
-  if not res then failwith (path ^ " test failed"); ()
+  if not res then failwith (path ^ " test failed: " ^ msg); ()
 
 let poison_tests =
   ["../tests/llvm-arith/i1/add_nsw.ll";
@@ -151,6 +151,10 @@ let double_tests : (string * float ) list =
     ("../tests/llvm-arith/double/i8_uitofp_double.ll", 255.0)
   ]
 
+let intrinsics_tests : (string * float) list =
+  [
+    ("../tests/intrinsics/llvm_fabs_f64.ll", 1.0)
+  ]
 
 let parse_files =
   [  ]
@@ -214,10 +218,7 @@ let i32_of_int i = Int32.repr (Camlcoq.Z.of_sint i)
 
 let i64_of_int i = Int64.repr (Camlcoq.Z.of_sint i)
                                             
-let suite = [Test ("Parsing",
-                   List.map (fun f -> (f, fun () -> parse_pp_test f)) parse_files);
-
-             Test ("Poison",
+let suite = [Test ("Poison",
                    List.map (fun f ->
                        (f, fun () -> run_dvalue_test poison_test f))
                      poison_tests);
@@ -251,6 +252,11 @@ let suite = [Test ("Parsing",
                    List.map (fun (f, i) ->
                        (f, (fun () -> run_dvalue_test (double_test i) f)))
                        double_tests);
+
+             Test ("Intrinsics",
+                   List.map (fun (f, i) ->
+                       (f, (fun () -> run_dvalue_test (double_test i) f)))
+                       intrinsics_tests);
             ]
 
 

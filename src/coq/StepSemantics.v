@@ -92,7 +92,7 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   Definition lookup_env {X} (e:ENV.t X) (id:raw_id) : err X :=
     match ENV.find id e with
     | Some v => ret v
-    | None => failwith "lookup_env: failed to find id" (* can't include ids in the error ++ (string_of id) *)
+    | None => failwith ("lookup_env: failed to find id " ++ (to_string id))
     end.
 
   Definition lookup_id (g:genv) (e:env) (i:ident) : err dvalue :=
@@ -606,10 +606,21 @@ Definition step (s:state) : Trace result :=
                 (debug "pushed non-void stack frame") ;;
                 cont (g, pc_f, env, (KRet e id pc_next::k))          
               end
-          | None => (* This must have been a registered external function *)
+          | None =>
+            (* This must have been a registered external function 
+               We _don't_ push a LLVM stack frame, since the external
+               call takes place in one "atomic" step.
+             *)
             match fid with
-              (* TODO: make sure the external call's type is correct *)
-            | Name s => vis (Call DTYPE_Void s dvs) (fun dv => cont (g, pc_next, e, k))
+            | Name s =>
+              match pt with
+              | IVoid _ =>  (* void externals don't return a value *)
+                vis (Call (eval_typ t) s dvs) (fun dv => cont (g, pc_next, e, k))
+
+              | IId id => (* non-void externals are assumed to be type correct and bind a value *)
+                vis (Call (eval_typ t) s dvs)
+                    (fun dv => cont (g, pc_next, add_env id dv e, k))
+              end
             | _ => raise ("step: no function " (* ++ (string_of fid) *))
             end
           end

@@ -18,15 +18,11 @@ From ExtLib Require Import
      Data.String.
 
 From Vellvm Require Import 
-     LLVMAst
      Util
-     StepSemantics 
+     LLVMAst
      LLVMIO
      Error
-     Coqlib
-     Numeric.Integers
-     Numeric.Floats.
-
+     IntrinsicsDefinitions.
 
 From ITree Require Import
      ITree
@@ -42,45 +38,23 @@ Set Contextual Implicit.
 
 (* (Pure) Intrinsics -------------------------------------------------------- *)
 
-(* This functor module provides a way to (extensibly) add the semantic behavior
-   for intrinsics defined outside of the core Vellvm operational semantics.  
-
-   Internally, invocation of an intrinsic looks no different than that of an 
-   external function call, so each LLVM intrinsic instruction should produce 
-   a Call effect.
-
-   Each intrinsic is identified by its name (a string) and its denotation is 
-   given by a function from a list of dynamic values to a dynamic value (or 
-   possibly an error).  
-
-   - each intrinsic should "morally" be a total function: assuming the LLVM program 
-     is well formed, the intrisnic should always produce an LLVM value (which itself 
-     might be poison or undef)
-
-   - error should be returned only in the case that the LLVM program is ill-formed 
-     (e.g. if the wrong number and/or type of arguments to the intrinsic is incorrect)
-
-   The interpreter looks for Calls to intrinsics defined by its argument and 
-   runs their semantic function, raising an error in case of exception.  Unknown
-   Calls (either to other intrinsics or external calls) are pass through unchanged.
-
-   NOTE: The intrinsics that can be defined at this layer of the semantics cannot 
-   affect the core interpreter state or the memory model.  This layer is useful
-   for implementing intrinsics like floating point operations, etc.
+(* The intrinsics interpreter looks for Calls to intrinsics defined by its
+   argument and runs their semantic function, raising an error in case of
+   exception.  Unknown Calls (either to other intrinsics or external calls) are
+   pass through unchanged.
 *)
-
-
 Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
+
+  Module IS := IntrinsicsDefinitions.Make(A)(LLVMIO).
+  Include IS.
   Import LLVMIO.
   Import DV.
 
-  (* Each (pure) intrinsic is defined by a function of the following type. *)
-  Definition semantic_function := (list dvalue) -> err dvalue.
 
-  (* An association list mapping intrinsic names to their semantic definitions *)
-  Definition intrinsic_definitions := list (string * semantic_function).
+  (* Interprets Call events found in the given association list by their
+     semantic functions.  
 
-  (* SAZ: This definition is trickier than one wants it to be because of the 
+     SAZ: This definition is trickier than one wants it to be because of the 
      dependent pattern matching.  The indices of the IO constructors need to 
      be used to coerce the result back to the general ITree type.
 
@@ -97,9 +71,9 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
           | Some f => fun pf => 
             match f args with
             | inl msg => fail msg
-            | inr result => fail "foo"
+            | inr result => Ret result
             end
-          | None => fun pf => (eq_rect X (fun a => itree (IO +' failureE) a) (Vis e (fun x => Ret x))) dvalue pf
+          | None => fun pf => (eq_rect X (fun a => itree (IO +' failureE) a) (ITree.liftE e)) dvalue pf
           end
         | Store _ _ => fun pf  => (eq_rect X (fun a => itree (IO +' failureE) a) (ITree.liftE e)) unit pf
         | _ => fun pf  => (eq_rect X (fun a => itree (IO +' failureE) a) (ITree.liftE e)) dvalue pf
@@ -111,5 +85,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
              : forall R, Trace R -> Trace R  :=
     interp (handle_intrinsics intrinsic_def).
 
+  Definition evaluate_with_defined_intrinsics := evaluate_intrinsics defined_intrinsics.
+  
 End Make.
-

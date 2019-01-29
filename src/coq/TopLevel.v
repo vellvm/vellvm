@@ -28,6 +28,7 @@ Module M := Memory.Make(IO).
 Module SS := StepSemantics(Memory.A)(IO).
 Module INT := Intrinsics.Make(Memory.A)(IO).
 
+
 Import IO.
 Export IO.DV.
 
@@ -38,5 +39,5 @@ Definition run_with_memory prog : option (Trace DV.dvalue) :=
       s <- SS.init_state mcfg "main" ;;
         SS.step_sem mcfg (SS.Step s)
   in
-  let after_intrinsics_trace := INT.evaluate_intrinsics [] core_trace in
+  let after_intrinsics_trace := INT.evaluate_with_defined_intrinsics core_trace in
   ret (M.memD M.empty after_intrinsics_trace).
