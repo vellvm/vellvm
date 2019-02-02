@@ -118,7 +118,8 @@ Inductive IO : Type -> Type :=
 | PtoI   : forall (a:dvalue), (IO dvalue)
 | Call   : forall (t:dtyp) (f:string) (args:list dvalue), (IO dvalue)
 
-(* The Debug event causes the ocaml top-level to print a string during execution. *)                             | Debug  : forall (msg:string), IO dvalue
+(* The Debug event causes the ocaml top-level to print a string during execution. *)
+| Debug  : forall (msg:string), IO dvalue
 .    
 
 
