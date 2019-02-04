@@ -83,7 +83,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         
   Definition evaluate_intrinsics (intrinsic_def : intrinsic_definitions)
              : forall R, Trace R -> Trace R  :=
-    interp (handle_intrinsics intrinsic_def).
+    fun R => interp (handle_intrinsics intrinsic_def).
 
   Definition evaluate_with_defined_intrinsics := evaluate_intrinsics defined_intrinsics.
   
