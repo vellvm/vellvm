@@ -62,12 +62,19 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
    *)
   Definition handle_intrinsics (intrinsic_defs : intrinsic_definitions)
     : eff_hom (IO +' failureE) (IO +' failureE) :=
+    (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
+    let defs_assoc := List.map (fun '(a,b) =>
+                                  match dc_name a with
+                                  | Name s => (s,b)
+                                  | _ => ("",b)
+                                  end
+                               ) intrinsic_defs in
     fun X (e : (IO +' failureE) X) =>
       match e return itree (IO +' failureE) X with
       | inlE e' =>
         match e' in IO Y return X = Y -> itree (IO +' failureE) Y with
         | Call _ fname args => 
-          match assoc Strings.String.string_dec fname intrinsic_defs with
+          match assoc Strings.String.string_dec fname defs_assoc with
           | Some f => fun pf => 
             match f args with
             | inl msg => fail msg

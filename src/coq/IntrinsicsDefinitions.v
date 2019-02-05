@@ -18,6 +18,7 @@ From ExtLib Require Import
 
 From Vellvm Require Import 
      LLVMIO
+     LLVMAst
      Error
      Coqlib
      Numeric.Integers
@@ -32,9 +33,65 @@ Import MonadNotation.
 Import EqvNotation.
 Import ListNotations.
 
-
 Set Implicit Arguments.
 Set Contextual Implicit.
+
+Definition fabs_32_decl: declaration :=
+  {|
+    dc_name        := Name "llvm.fabs.f32";
+    dc_type        := TYPE_Function TYPE_Float [TYPE_Float] ;
+    dc_param_attrs := ([], [[]]);
+    dc_linkage     := None ;
+    dc_visibility  := None ;
+    dc_dll_storage := None ;
+    dc_cconv       := None ;
+    dc_attrs       := [] ;
+    dc_section     := None ;
+    dc_align       := None ;
+    dc_gc          := None
+  |}.
+
+
+Definition fabs_64_decl: declaration :=
+  {|
+    dc_name        := Name "llvm.fabs.f64";
+    dc_type        := TYPE_Function TYPE_Double [TYPE_Double] ;
+    dc_param_attrs := ([], [[]]);
+    dc_linkage     := None ;
+    dc_visibility  := None ;
+    dc_dll_storage := None ;
+    dc_cconv       := None ;
+    dc_attrs       := [] ;
+    dc_section     := None ;
+    dc_align       := None ;
+    dc_gc          := None
+  |}.
+
+Definition memcpy_8_decl: declaration :=
+  let pt := TYPE_Pointer (TYPE_I 8%Z) in
+  let i32 := TYPE_I 32%Z in
+  let i1 := TYPE_I 1%Z in
+  {|
+    dc_name        := Name "llvm.memcpy.p0i8.p0i8.i32";
+    dc_type        := TYPE_Function TYPE_Void [pt; pt; i32; i32; i1] ;
+    dc_param_attrs := ([], [[];[];[];[];[]]);
+    dc_linkage     := None ;
+    dc_visibility  := None ;
+    dc_dll_storage := None ;
+    dc_cconv       := None ;
+    dc_attrs       := [] ;
+    dc_section     := None ;
+    dc_align       := None ;
+    dc_gc          := None
+  |}.
+
+
+(* This may seem to overlap with `defined_intrinsics`, but there are few differences:
+   1. This one is defined outside of the module and could be used at the LLVM AST generation stage without yet specifying memory model.
+   2. It includes declarations for built-in memory-dependent intrinisics such as `memcpy`.
+ *)
+Definition defined_intrinsics_decls :=
+  [ fabs_32_decl; fabs_64_decl; memcpy_8_decl ].
 
 (* This functor module provides a way to (extensibly) add the semantic behavior
    for intrinsics defined outside of the core Vellvm operational semantics.  
@@ -73,7 +130,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Definition semantic_function := (list dvalue) -> err dvalue.
 
   (* An association list mapping intrinsic names to their semantic definitions *)
-  Definition intrinsic_definitions := list (string * semantic_function).
+  Definition intrinsic_definitions := list (declaration * semantic_function).
 
 
   (* Intrinsics semantic functions -------------------------------------------- *)
@@ -86,7 +143,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | _ => raise "llvm_fabs_f64 got incorrect / ill-typed intputs"
       end.
 
-  
   (* Abosulute value for Doubles. *)
   Definition llvm_fabs_f64 : semantic_function :=
     fun args =>
@@ -95,12 +151,11 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | _ => raise "llvm_fabs_f64 got incorrect / ill-typed intputs"
       end.
 
-  
   (* Clients of Vellvm can register the names of their own intrinsics
      definitions here. *)
   Definition defined_intrinsics : intrinsic_definitions :=
-    [ ("llvm.fabs.f64", llvm_fabs_f64) ;
-      ("llvm.fabs.f32", llvm_fabs_f32) ].
+    [ (fabs_32_decl, llvm_fabs_f32) ;
+      (fabs_64_decl, llvm_fabs_f64) ].
 
   (* SAZ: TODO: it could be nice to provide a more general/modular way to "lift"
      primitive functions into intrinsics. *)
