@@ -38,7 +38,7 @@ install:
   - opam install -y --verbose -j ${NJOBS} coq-flocq
   - opam install -y --verbose -j ${NJOBS} coq-paco
   - opam install -y --verbose -j ${NJOBS} dune
-
+  - opam upgrade -y --verbose -j ${NJOBS}
 
 script:
   - eval $(opam config env)
