@@ -514,11 +514,11 @@ Definition mem_step {X} (e:IO X) (m:memory) : err (IO X + (memory * X)) :=
 CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
   match d.(observe) with
   | TauF d' => Tau (memD m d')
-  | VisF _ (inrE f) k => Vis (inrE f) k
-  | VisF _ (inlE io) k =>
+  | VisF _ (inr1 f) k => Vis (inr1 f) k
+  | VisF _ (inl1 io) k =>
     match mem_step io m with
     | inr (inr (m', v)) => Tau (memD m' (k v))
-    | inr (inl e) => Vis (inlE io) (fun v => memD m (k v))
+    | inr (inl e) => Vis (inl1 io) (fun v => memD m (k v))
     | inl s => raise s
     end
   | RetF x => d

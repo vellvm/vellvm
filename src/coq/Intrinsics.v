@@ -26,7 +26,7 @@ From Vellvm Require Import
 
 From ITree Require Import
      ITree
-     StdEffects.
+     Effect.Std.
 
 Import MonadNotation.
 Import EqvNotation.
@@ -61,10 +61,10 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
      We solve it by using the "Convoy Pattern" (see Chlipala's CPDT).  
    *)
   Definition handle_intrinsics (intrinsic_defs : intrinsic_definitions)
-    : eff_hom (IO +' failureE) (IO +' failureE) :=
+    : (IO +' failureE) ~> itree (IO +' failureE) :=
     fun X (e : (IO +' failureE) X) =>
       match e return itree (IO +' failureE) X with
-      | inlE e' =>
+      | inl1 e' =>
         match e' in IO Y return X = Y -> itree (IO +' failureE) Y with
         | Call _ fname args => 
           match assoc Strings.String.string_dec fname intrinsic_defs with
@@ -78,12 +78,12 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         | Store _ _ => fun pf  => (eq_rect X (fun a => itree (IO +' failureE) a) (ITree.liftE e)) unit pf
         | _ => fun pf  => (eq_rect X (fun a => itree (IO +' failureE) a) (ITree.liftE e)) dvalue pf
         end eq_refl
-      | inrE _ => ITree.liftE e
+      | inr1 _ => ITree.liftE e
       end.
         
   Definition evaluate_intrinsics (intrinsic_def : intrinsic_definitions)
              : forall R, Trace R -> Trace R  :=
-    fun R => interp (handle_intrinsics intrinsic_def).
+    interp (handle_intrinsics intrinsic_def).
 
   Definition evaluate_with_defined_intrinsics := evaluate_intrinsics defined_intrinsics.
   

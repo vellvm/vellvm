@@ -52,14 +52,14 @@ let rec step m : (DV.dvalue, string) result =
   | RetF v -> Ok v
 
   (* The failE effect is a failure *)
-  | VisF (OpenSum.Coq_inrE s, _) ->
+  | VisF (Sum.Coq_inr1 s, _) ->
     Error (Camlcoq.camlstring_of_coqstring s)
 
   (* The only visible effects from LLVMIO that should propagate to the interpreter are:
      - Call to external functions
      - Debug  
   *)
-  | VisF (OpenSum.Coq_inlE e, k) ->
+  | VisF (Sum.Coq_inl1 e, k) ->
     begin match Obj.magic e with
 
       | Call(_, f, _) ->

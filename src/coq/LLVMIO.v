@@ -25,7 +25,8 @@ From ExtLib Require Import
 
 From ITree Require Import 
      ITree
-     StdEffects.
+     Effect.Std
+     Effect.Sum.
 
 From Vellvm Require Import
      Util
@@ -149,8 +150,8 @@ CoFixpoint catch_Trace {X} (f:string -> Trace X) (t : Trace X) : Trace X :=
   match (observe t) with
   | RetF x => Ret x
   | TauF t => Tau (catch_Trace f t)
-  | VisF _ (inrE (Fail s)) k => f s
-  | VisF _ (inlE e) k => Vis (inlE e) (fun x => catch_Trace f (k x))
+  | VisF _ (inr1 (Fail s)) k => f s
+  | VisF _ (inl1 e) k => Vis (inl1 e) (fun x => catch_Trace f (k x))
   end.
 
 Global Instance monad_exc_Trace : (MonadExc string Trace) := {
