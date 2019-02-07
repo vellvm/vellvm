@@ -14,20 +14,20 @@ open Assert
 open Driver
 
 (* test harness ------------------------------------------------------------- *)
-exception Ran_tests
+exception Ran_tests of bool
 let suite = ref Test.suite
 let exec_tests () =
   Platform.configure();
   let outcome = run_suite !suite in
   Printf.printf "%s\n" (outcome_to_string outcome);
-  raise Ran_tests
+  raise (Ran_tests (successful outcome))
 
 let test_pp_dir dir =
   Platform.configure();
   let suite = [Test.pp_test_of_dir dir] in
   let outcome = run_suite suite in
   Printf.printf "%s\n" (outcome_to_string outcome);
-  raise Ran_tests
+  raise (Ran_tests (successful outcome))
 
 
 (* Use the --test option to run unit tests and the quit the program. *)
@@ -36,6 +36,7 @@ let args =
   ; ("--test-pp-dir", String test_pp_dir, "run the parsing/pretty-printing tests on all .ll files in the given directory")
   ; ("-op", Set_string Platform.output_path, "set the path to the output files directory  [default='output']")
   ; ("-interpret", Set Driver.interpret, "interpret ll program starting from 'main'")
+  ; ("-debug", Set Interpreter.debug_flag, "enable debugging trace output")
   ; ("-v", Set Platform.verbose, "enables more verbose compilation output")] 
 
 let files = ref []
@@ -47,7 +48,7 @@ let _ =
     Platform.configure ();
     process_files !files
 
-  with Ran_tests -> ()
-
+  with Ran_tests true -> exit 0
+     | Ran_tests false -> exit 1
 
 

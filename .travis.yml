@@ -1,0 +1,46 @@
+dist: trusty
+sudo: required
+language: generic
+
+before_cache:
+  - rm -rf $HOME/.opam/log
+cache:
+  apt: true
+  directories:
+  - $HOME/.opam
+addons:
+  apt:
+    sources:
+    - avsm
+    packages:
+    - opam
+    - aspcud
+env:
+  global:
+  - NJOBS=1
+  matrix:
+  - TEST_TARGET="8.8.2"
+
+before_script:
+  -  ./ci/keep_alive.sh &
+
+install:
+  - opam init -n -y
+  - eval $(opam config env)
+  - opam config var root
+  # this somehow fails the second time...
+  - opam repo add coq-released http://coq.inria.fr/opam/released || true
+  - opam install -y --verbose -j ${NJOBS} coq.${TEST_TARGET} && opam pin add coq ${TEST_TARGET} -y
+  - opam install -y --verbose -j ${NJOBS} ocamlfind camlp5 ${EXTRA_OPAM} 
+  - opam install -y --verbose -j ${NJOBS} coq-ext-lib
+  - opam install -y --verbose -j ${NJOBS} coq-flocq
+  - opam install -y --verbose -j ${NJOBS} coq-paco
+  - opam install -y --verbose -j ${NJOBS} dune
+  - opam upgrade -y --verbose -j ${NJOBS}
+
+script:
+  - eval $(opam config env)
+  - opam config var root
+  - make -C lib/InteractionTrees
+  - make -C src/
+  - cd src && ./vellvm --test

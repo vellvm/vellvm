@@ -1,0 +1,12 @@
+(menhir
+ (flags --explain)
+ (modules llvm_parser)
+)
+
+(ocamllex llvm_lexer)
+
+(executables
+ (names main)
+  (libraries extracted libvellvm unix str)
+  )
+

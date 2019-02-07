@@ -61,6 +61,8 @@ let run_test (t:assertion test) : result test =
 let run_suite (s:suite):outcome =
   List.map run_test s
 
+let successful (o:outcome) : bool =
+  List.for_all (fun (Test (_,cases)) -> List.for_all (fun (_,r) -> r = Pass) cases) o
 
 (***********************)
 (* Reporting functions *)
@@ -98,7 +100,7 @@ let get_results (t:result test) =
 let outcome_to_string (o:outcome):string =
   let sep = "\n(*-------------------------------------- *)\n" in
   let helper  (passed, failed, total, str) (t:result test) =
-    let (name_pts, p, f, tot, s, mg, mh) = get_results t in
+    let (name_pts, p, f, tot, _ , _, _) = get_results t in
     (passed + p, failed + f, total + tot, 
     str ^ "\n" ^ (
       if f > 0 then (result_test_to_string name_pts t) else 

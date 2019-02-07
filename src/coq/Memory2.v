@@ -1,10 +1,12 @@
 Require Import ZArith List String Omega.
-Require Import  Vellvm.LLVMAst Vellvm.Classes Vellvm.Util.
+Require Import  Vellvm.LLVMAst Vellvm.Util.
 Require Import Vellvm.StepSemantics.
 Import ListNotations.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
+
+(* SAZ: This file is deprecated. *)
 
 Inductive Addr :=
 | Null

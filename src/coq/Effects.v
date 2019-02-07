@@ -9,7 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import ZArith List String Omega.
-Require Import  Vellvm.Classes Vellvm.Util Vellvm.Trace.
+Require Import Vellvm.Util Vellvm.Trace.
 Require Import Program Classical.
 Require Import paco.
 Import ListNotations.

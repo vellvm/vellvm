@@ -21,9 +21,11 @@ src/ml/.merlin
 *.fls
 *.ml~
 examples.mli
-*.mli
 *.gz
 src/ml/extracted/*.ml
+src/ml/extracted/*.mli
 src/ml/extracted/STAMP
 src/.depend
 output
+/src/ml/extracted/.merlin
+/src/ml/libvellvm/.merlin

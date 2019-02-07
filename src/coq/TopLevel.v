@@ -8,26 +8,36 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-Require Import Vellvm.Classes.
-Require Import Vellvm.LLVMIO.
-Require Import Vellvm.StepSemantics.
-Require Import Vellvm.Memory.
+From Coq Require Import
+     List.
+
+From ExtLib Require Import 
+     Structures.Monads.
+
+From Vellvm Require Import 
+     LLVMIO
+     StepSemantics
+     Memory
+     Intrinsics.
+
+Import MonadNotation.
+Import ListNotations.
 
 Module IO := LLVMIO.Make(Memory.A).
 Module M := Memory.Make(IO).
 Module SS := StepSemantics(Memory.A)(IO).
+Module INT := Intrinsics.Make(Memory.A)(IO).
+
 
 Import IO.
 Export IO.DV.
 
 Definition run_with_memory prog : option (Trace DV.dvalue) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
-  match CFG.mcfg_of_modul scfg with
-  | None => None
-  | Some mcfg =>
-    mret
-      (M.memD M.empty
-      ('s <- SS.init_state mcfg "main";
-         SS.step_sem mcfg (SS.Step s)))
-  end.
-
+  mcfg <- CFG.mcfg_of_modul scfg ;;
+  let core_trace : Trace dvalue :=
+      s <- SS.init_state mcfg "main" ;;
+        SS.step_sem mcfg (SS.Step s)
+  in
+  let after_intrinsics_trace := INT.evaluate_with_defined_intrinsics core_trace in
+  ret (M.memD M.empty after_intrinsics_trace).

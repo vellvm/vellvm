@@ -11,15 +11,21 @@
 
 Require Import ZArith.ZArith List.
 Require Import String Omega.
-Require Import Vellvm.LLVMAst Vellvm.Classes Vellvm.Util.
+Require Import Vellvm.LLVMAst Vellvm.Util.
 Require Import Equalities OrderedType OrderedTypeEx Compare_dec.
+Require Import ExtLib.Core.RelDec ExtLib.Data.Z.
+Require Import ExtLib.Programming.Eqv.
+Require Import Ascii.
 Import ListNotations.
 
+Import EqvNotation.
+
 (* Equalities --------------------------------------------------------------- *)
-Instance eq_dec_int : eq_dec int := Z.eq_dec.
+Instance eq_dec_int : RelDec (@eq int) := Data.Z.RelDec_zeq.
+Instance eqv_int : Eqv int := (@eq int).
 
-Require Import Ascii.
-
+(* SAZ : These should be moved to part of the standard library, or at least to
+   ExtLib *)
 Module AsciiOrd <: UsualOrderedType.
   Definition t := ascii.
   Definition eq := @eq t.
@@ -232,8 +238,8 @@ Module RawIDOrd <: UsualOrderedType.
   Definition eq_dec : forall (x y : t), {x = y} + {x <> y}.
     decide equality.
     - apply string_dec.
-    - apply eq_dec_int.
-    - apply eq_dec_int.
+    - apply rel_dec_p.
+    - apply rel_dec_p.
   Defined.
 
 End RawIDOrd.  
@@ -250,9 +256,9 @@ End RawIDOrd.
 (* End RawIDDec. *)
   
 (* Module RawID := Make_UDT(RawIDDec).  *)
-Instance eq_dec_raw_id : eq_dec raw_id := RawIDOrd.eq_dec.
-
-
+Instance eq_dec_raw_id : RelDec (@eq raw_id) := RelDec_from_dec (@eq raw_id) RawIDOrd.eq_dec.
+Instance eqv_raw_id : Eqv raw_id := (@eq raw_id).
+Hint Unfold eqv_raw_id.
 
 Module InstrIDDec <: MiniDecidableType.
   Definition t := instr_id.
@@ -261,18 +267,19 @@ Module InstrIDDec <: MiniDecidableType.
   Proof.
     intros x y.
     destruct x as [xn | xn]; destruct y as [yn | yn].
-    - destruct (xn == yn). subst. left. reflexivity.
-      right. unfold not. intros. apply n. inversion H. auto.
+    - destruct (xn ~=? yn). unfold eqv in e. unfold eqv_raw_id in e. subst. left. reflexivity.
+      right. unfold not. intros. apply n. inversion H. unfold eqv. unfold eqv_raw_id. reflexivity.
     - right. unfold not. intros. inversion H.
     - right. unfold not. intros. inversion H.
-    - destruct (xn == yn).
-      left. subst. reflexivity.
-      right. unfold not. intros. apply n. inversion H. auto.
+    - destruct (xn ~=? yn).
+      left. unfold eqv in e. unfold eqv_int in e. subst. reflexivity.
+      right. unfold not. intros. apply n. inversion H. unfold eqv. unfold eqv_int. auto.
   Defined.
 End InstrIDDec.
 Module InstrID := Make_UDT(InstrIDDec).
 
-Instance eq_dec_instr_id : eq_dec instr_id := InstrID.eq_dec.
+Instance eq_dec_instr_id : RelDec (@eq instr_id) := RelDec_from_dec (@eq instr_id) InstrID.eq_dec.
+Instance eqv_instr_id : Eqv instr_id := (@eq instr_id).
 
 Module IdentDec <: MiniDecidableType.
   Definition t := ident.
@@ -281,17 +288,19 @@ Module IdentDec <: MiniDecidableType.
   Proof.
     intros x y.
     destruct x as [xn | xn]; destruct y as [yn | yn].
-    - destruct (xn == yn). subst. left. reflexivity.
-      right. unfold not. intros. apply n. inversion H. auto.
+    - destruct (xn ~=? yn). unfold eqv in e. unfold eqv_raw_id in e. subst. left. reflexivity.
+      right. unfold not. intros. apply n. inversion H. unfold eqv. unfold eqv_raw_id. reflexivity.
     - right. unfold not. intros. inversion H.
     - right. unfold not. intros. inversion H.
-    - destruct (xn == yn).
-      left. subst. reflexivity.
-      right. unfold not. intros. apply n. inversion H. auto.
+    - destruct (xn ~=? yn).
+      left. unfold eqv in e. unfold eqv_raw_id in e. subst.  reflexivity.
+      right. unfold not. intros. apply n. inversion H. unfold eqv. unfold eqv_raw_id. auto.
   Defined.
 End IdentDec.
 Module Ident := Make_UDT(IdentDec).
-Instance eq_dec_ident : eq_dec ident := Ident.eq_dec.  
+
+Instance eq_dec_ident : RelDec (@eq ident) := RelDec_from_dec (@eq ident) Ident.eq_dec.  
+Instance eqv_ident : Eqv ident := (@eq ident).
 
 (* Induction Principles ----------------------------------------------------- *)
 
@@ -469,141 +478,185 @@ End ExpInd.
 
 
 (* Display *)
+Require Import ExtLib.Programming.Show.
+
+Section hiding_notation.
+  Import ShowNotation.
+  Local Open Scope show_scope.
+
+  Global Instance show_raw_id : Show raw_id :=
+    { show r :=
+        match r with
+        | Name s => s
+        | Anon n => show n
+        | Raw  n => "_RAW_" << show n
+        end
+    }.
+
+  Global Instance show_ident : Show ident :=
+    { show id := 
+        match id with
+        | ID_Global r => "@" << show r
+        | ID_Local  r => "%" << show r
+        end
+    }.
+
+  Global Instance show_instr_id : Show instr_id :=
+    { show ins := 
+        match ins with
+        | IId id => show id
+        | IVoid n => "void<" << show n << ">"
+        end
+    }.
 
 
-Instance string_of_raw_id : StringOf raw_id := fun r =>
-  match r with
-  | Name s => s
-  | Anon n => to_string_b10 n
-  | Raw  n => "_RAW_" ++ (to_string_b10 n)                           
-  end.
+  Global Instance show_ibinop : Show ibinop := 
+    { show binop :=
+        match binop with
+        | Add nuw nsw => "add"
+        | Sub nuw nsw => "sub"
+        | Mul nuw nsw => "mul"
+        | Shl nuw nsw => "shl"
+        | UDiv flag => "udiv"
+        | SDiv flag => "sdiv"
+        | LShr flag => "lshr"
+        | AShr flag => "ashr"
+        | URem | SRem => "rem"
+        | And => "and"
+        | Or => "or"
+        | Xor => "xor"
+        end
+    }.
 
+  Global Instance show_fbinop : Show fbinop :=
+    { show fbinop :=
+        match fbinop with
+        | FAdd => "fadd"
+        | FSub => "fsub"
+        | FMul => "fmul"
+        | FDiv => "fdiv"
+        | FRem => "frem"
+        end
+    }.
 
-Instance string_of_ident : StringOf ident :=  fun id =>
-  match id with
-  | ID_Global r => "@" ++ (string_of_raw_id r)
-  | ID_Local  r => "%" ++ (string_of_raw_id r)
-  end.
-
-Instance string_of_instr_id : StringOf instr_id := fun ins =>
-  match ins with
-  | IId id => (string_of_raw_id id)
-  | IVoid n => "void<" ++ (to_string_b10 n) ++ ">"
-  end.
-
-
-(* String of *)
-
-Instance string_of_ibinop : StringOf ibinop :=
-  fun binop =>
-    match binop with
-    | Add nuw nsw => "add"
-    | Sub nuw nsw => "sub"
-    | Mul nuw nsw => "mul"
-    | Shl nuw nsw => "shl"
-    | UDiv flag => "udiv"
-    | SDiv flag => "sdiv"
-    | LShr flag => "lshr"
-    | AShr flag => "ashr"
-    | URem | SRem => "rem"
-    | And => "and"
-    | Or => "or"
-    | Xor => "xor"
+  
+  Global Instance show_icmp : Show icmp :=
+    { show cmp := 
+        "icmp " <<
+                match cmp with
+                | Eq => "eq"
+                | Ne => "ne" 
+                | Ugt => "ugt"
+                | Uge => "uge"
+                | Ult => "ult"
+                | Ule => "ule"
+                | Sgt => "sgt"
+                | Sge => "sge"
+                | Slt => "slt"
+                | Sle => "sle"
+                end
+    }.
+        
+  Fixpoint show_typ' typ := 
+    match typ with
+    | TYPE_I sz => ("i" << show sz)
+    | TYPE_Pointer t => ((show_typ' t) << "*")%string
+    | _ => "(show_typ todo)"
     end.
 
-Instance string_of_icmp : StringOf icmp :=
-  fun cmp =>
-    "icmp " ++ 
-            match cmp with
-            | Eq => "eq"
-            | Ne => "ne" 
-            | Ugt => "ugt"
-            | Uge => "uge"
-            | Ult => "ult"
-            | Ule => "ule"
-            | Sgt => "sgt"
-            | Sge => "sge"
-            | Slt => "slt"
-            | Sle => "sle"
-            end.
-        
-Fixpoint string_of_typ' typ := 
-  match typ with
-  | TYPE_I sz => ("i" ++ (string_of sz))%string
-  | TYPE_Pointer t => ((string_of_typ' t) ++ "*")%string
-  | _ => "(string_of_typ todo)"
-  end.
+  Global Instance show_typ : Show typ := show_typ'.
 
-Instance string_of_typ : StringOf typ := string_of_typ'.
-
-Fixpoint string_of_exp (v : exp) :=
-  match v with
-    | EXP_Ident id => string_of id
-    | EXP_Integer x => string_of x
-    | EXP_Bool b => string_of b
+  Fixpoint show_exp' (v : exp) :=
+    match v with
+    | EXP_Ident id => show id
+    | EXP_Integer x => show x
+    | EXP_Bool b => show b
     | EXP_Null => "null"
     | EXP_Zero_initializer => "zero initializer"
     | EXP_Cstring s => s
     | EXP_Undef => "undef"                                
     | OP_IBinop iop t v1 v2 =>
-      ((string_of iop) ++ " " ++ (string_of t)
-                       ++ " " ++ (string_of_exp v1)
-                       ++ " " ++ (string_of_exp v2))%string
+      ((show iop) << " " << (show t)
+                  << " " << (show_exp' v1)
+                  << " " << (show_exp' v2))%string
     | OP_ICmp cmp t v1 v2 =>
-      ((string_of cmp) ++ " " ++ (string_of t)
-                       ++ " " ++ (string_of_exp v1)
-                       ++ " " ++ (string_of_exp v2))%string
+      ((show cmp) << " " << (show t)
+                  << " " << (show_exp' v1)
+                  << " " << (show_exp' v2))%string
     | OP_GetElementPtr t ptrval idxs =>
       "getelementptr"                                                       
-    | _ => "string_of_exp todo"
-  end.
+    | _ => "show_exp todo"
+    end.
 
-Instance string_of_exp_instance : StringOf exp := string_of_exp.
+  Global Instance show_exp : Show exp := show_exp'.
 
-Instance string_of_instr : StringOf instr :=
-  fun instr =>
-    match instr with
-    | INSTR_Op op => string_of op
-    | INSTR_Load vol t ptr align =>
-      ("load " ++ (string_of t) ++ " " ++ (string_of ptr)
-               ++ ", align " ++ (string_of align))%string
-    | INSTR_Store vol tval ptr align =>
-      ("store " ++ (string_of tval) ++ " " ++ (string_of ptr)
-                ++ ", align " ++ (string_of align))%string
-    | INSTR_Alloca t nb align =>
-      ("alloca " ++ (string_of t) ++ ", align " ++ (string_of align))%string
+  Global Instance show_int : Show int := Show_Z.
+
+  Global Instance show_texp : Show texp :=
+    { show '(t, e) :=
+        show t << " " << show e }.
+  
+  Definition show_opt {A:Type} `{AS:Show A} (s:string) : Show (option A) :=
+    fun x =>
+        match x with
+        | None => empty
+        | Some a => s << show a
+        end.
+  
+  Global Instance show_instr : Show instr :=
+    { show instr :=
+        match instr with
+        | INSTR_Op op => show op
+                             
+        | INSTR_Load vol t ptr align =>
+          "load " << (show t) << " " << (show ptr)
+                   << (@show_opt _ show_int ", align " align)
+
+        | INSTR_Store vol tval ptr align =>
+          ("store " << (show tval) << " " << (show ptr)
+                    << (@show_opt _ show_int ", align " align))%string
+
+        | INSTR_Alloca t nb align =>
+          ("alloca " << (show t) << (@show_opt _ show_int ", align " align))%string
         (* 
-    | INSTR_Call
-    | INSTR_Phi
-    | INSTR_Alloca
+           | INSTR_Call
+           | INSTR_Phi 
+           | INSTR_Alloca
          *)
-    | _ => "string_of_instr todo"
-    end.
+        | _ => "string_of_instr todo"
+        end
+    }.
 
-Instance string_of_terminator : StringOf terminator :=
-  fun t =>
-    match t with
-    | TERM_Ret v => ("ret " ++ (string_of v))%string
-    | TERM_Ret_void => "ret"
-    | _ => "string_of_terminator todo"
-    end.
+  Global Instance show_terminator : Show terminator :=
+    { show t :=
+        match t with
+        | TERM_Ret v => "ret " << (show v)
+        | TERM_Ret_void => "ret"
+        | _ => "string_of_terminator todo"
+        end
+    }.
 
-Instance string_of_block : StringOf block :=
-  fun block =>
-    ("Block " ++ (string_of (blk_id block)) ++ ": "
-              ++ (string_of (blk_code block)))%string.
+  Global Instance show_instr_id_instr : Show (instr_id * instr) :=
+    { show '(iid, i) := show iid << " = " << show i }.
+  
+  Global Instance show_block : Show block :=
+    { show block :=
+        ("Block "
+           << show (blk_id block) << ": " )
+           << iter_show (List.map show (blk_code block))
+    }.
 
+  Global Instance show_definition_list_block : Show (definition (list block)) :=
+    { show defn := ("defn: " << iter_show (List.map show (df_instrs defn))) }.
 
-Instance string_of_definition_list_block : StringOf (definition (list block)) :=
-  fun defn => ("defn: " ++ string_of (df_instrs defn))%string.
-
-Instance string_of_tle_list_block : StringOf (toplevel_entity (list block)) :=
-  fun tle =>
-    match tle with
-    | TLE_Definition defn => string_of defn
-    | _ => "string_of_tle_list_block todo"
-    end.
-
+  Global Instance show_tle_list_block : Show (toplevel_entity (list block)) :=
+   { show tle :=
+       match tle with
+       | TLE_Definition defn => show defn
+       | _ => "string_of_tle_list_block todo"
+       end
+   }.
+End hiding_notation.
 
 Definition target_of {X} (tle : toplevel_entity X) : option string :=
   match tle with

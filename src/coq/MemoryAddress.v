@@ -8,7 +8,6 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-Require Import Vellvm.Classes.
 Require Import OrderedType OrderedTypeEx.
 
 Module Type ADDRESS.

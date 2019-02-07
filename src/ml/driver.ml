@@ -9,9 +9,6 @@
  ---------------------------------------------------------------------------- *)
 
 open Printf
-open Platform
-open Llvm
-open Ast    
 
 let of_str = Camlcoq.camlstring_of_coqstring
                
@@ -71,7 +68,19 @@ let add_link_file path =
 let process_ll_file path file =
   let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
   let ll_ast = parse_file path in
-  let _ = if !interpret then Interpreter.print_int_dvalue (Interpreter.interpret ll_ast) else () in
+  let _ = if !interpret then begin
+      let open Format in
+      match Interpreter.interpret ll_ast with
+      | Ok dv -> 
+        Printf.printf "Program terminated with: " ;
+        let ppf = std_formatter in
+        Interpreter.pp_dvalue ppf dv ;
+        pp_force_newline ppf ();
+        pp_print_flush ppf ()
+
+      | Error msg -> failwith msg
+    end
+  in
   let ll_ast' = transform ll_ast in
   let vll_file = Platform.gen_name !Platform.output_path file ".v.ll" in
   let _ = output_file vll_file ll_ast' in
@@ -94,5 +103,4 @@ let process_files files =
 let run_ll_file path =
   let _ = Platform.verb @@ Printf.sprintf "* running file: %s\n" path in
   let ll_ast = parse_file path in
-  let res = Interpreter.interpret ll_ast in
-  res
+  Interpreter.interpret ll_ast

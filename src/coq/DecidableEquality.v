@@ -1,11 +1,16 @@
 
+(* TODO: This file needs to be ported for use with ExtLib.
+     - replace eq_dec with RelDec and Eqv instances 
+*)
+
+
 Require Import ZArith.
 
 (* CompCert dependencies *)
-Require Import compcert.lib.Integers compcert.lib.Floats.
+Require Import Integers Floats.
 
 (* Vellvm dependencies *)
-Require Import Vellvm.Classes Vellvm.Util.
+Require Import Vellvm.Util.
 Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG.
 Require Import Vellvm.DynamicValues Vellvm.StepSemantics Vellvm.Memory.
 Require Import List.
@@ -493,10 +498,10 @@ Proof.
     try (left; reflexivity);
     try (lift_decide_eq).
 
-  - destruct (compcert.lib.Floats.Float.eq_dec f f0).
+  - destruct (Float.eq_dec f f0).
     left; subst; reflexivity.
     right. injection. tauto.
-  - destruct (compcert.lib.Floats.Float.eq_dec h f).
+  - destruct (Float.eq_dec h f).
     left; subst; reflexivity.
     right. injection. tauto.
    

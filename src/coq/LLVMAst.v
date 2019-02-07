@@ -22,7 +22,7 @@
 (* Adapted for use in Vellvm by Steve Zdancewic (c) 2017                      *)
 (*  ------------------------------------------------------------------------- *)
 
-Require Import compcert.lib.Floats.
+Require Import Floats.
 Require Import List String Ascii ZArith.
 Require Import Vellvm.Util.
 
@@ -31,7 +31,7 @@ Open Scope string_scope.
 Open Scope list_scope.
 
 Definition int := Z.
-Definition float := Floats.float.  (* 64-bit floating point value *)
+Definition float := Floats.float.  (* -bit floating point value *)
 
 Inductive linkage : Set :=
 | LINKAGE_Private
@@ -247,6 +247,7 @@ Inductive phi : Set :=
 .
        
 Inductive instr : Set :=
+| INSTR_Comment (msg:string)
 | INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form SV (OP_ ...) *)
 | INSTR_Call (fn:texp) (args:list texp)      (* CORNER CASE: return type is void treated specially *)
 | INSTR_Alloca (t:typ) (nb: option texp) (align:option int) 
@@ -322,6 +323,7 @@ Record block : Set :=
       blk_phis  : list (local_id * phi);
       blk_code  : code;
       blk_term  : instr_id * terminator;
+      blk_comments : option (list string)
     }.
 
 Record definition (FnBody:Set) :=
@@ -346,6 +348,7 @@ Inductive metadata : Set :=
 .
 
 Inductive toplevel_entity (FnBody:Set) : Set :=
+| TLE_Comment         (msg:string)
 | TLE_Target          (tgt:string)
 | TLE_Datalayout      (layout:string)
 | TLE_Declaration     (decl:declaration)
