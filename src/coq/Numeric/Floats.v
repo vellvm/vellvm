@@ -467,7 +467,6 @@ Proof.
   transitivity (split_bits 52 11 (join_bits 52 11 false (Int.unsigned x) 1075)).
   - f_equal. rewrite Int64.ofwords_add'. reflexivity.
   - apply split_join_bits.
-    compute; auto.
     generalize (Int.unsigned_range x).
     compute_this Int.modulus; compute_this (2^52); omega.
     compute_this (2^11); omega.
@@ -550,7 +549,6 @@ Proof.
   transitivity (split_bits 52 11 (join_bits 52 11 false (Int.unsigned x) 1107)).
   - f_equal. rewrite Int64.ofwords_add'. reflexivity.
   - apply split_join_bits.
-    compute; auto.
     generalize (Int.unsigned_range x).
     compute_this Int.modulus; compute_this (2^52); omega.
     compute_this (2^11); omega.
