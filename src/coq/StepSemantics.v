@@ -172,7 +172,7 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     | Bitcast =>
       match t1, x, t2 with
       | TYPE_I bits1, x, TYPE_I bits2 =>
-        if bits1 =? bits2 then ret x else raise "unequal bitsize in cast"
+        if (bits1 =? bits2)%Z then ret x else raise "unequal bitsize in cast"
       | TYPE_Pointer t1, DVALUE_Addr a, TYPE_Pointer t2 =>
         ret (DVALUE_Addr a) 
       | _, _, _ => raise "ill-typed_conv"

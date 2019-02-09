@@ -9,7 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 From Coq Require Import
-     List.
+     List Strings.String.
 
 From ExtLib Require Import 
      Structures.Monads.
