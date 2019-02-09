@@ -612,10 +612,10 @@ Lemma remove_key_in :
     In (a, b) l ->
     (List.length (remove_key eq_dec a l) < List.length l)%nat.
 Proof.
-  induction 0.
-  - intros H. inversion H.
-  - intros H.
-    destruct_prod.
+  intros A B a b eq_dec l. 
+  induction l; intros H.
+  - inversion H.
+  - destruct_prod.
     simpl. destruct_eq_dec.
     + apply Nat.lt_succ_diag_r.
     + simpl. apply lt_n_S. apply IHl.
@@ -630,6 +630,7 @@ Lemma remove_key_not_in :
     ~ In a (map fst l) ->
     remove_key eq_dec a l = l.
 Proof.
+  intros A B a eq_dec l. 
   induction l; intros H.
   - reflexivity.
   - simpl in *. destruct_prod; destruct_eq_dec.
@@ -667,7 +668,8 @@ Lemma remove_key_commutes :
   forall (A B : Type) (k1 k2 : A) eq_dec (l : list (A * B)),
     remove_key eq_dec k1 (remove_key eq_dec k2 l) = remove_key eq_dec k2 (remove_key eq_dec k1 l).
 Proof.
-  induction 0; solve_eq_dec.
+  intros A B k1 k2 eq_dec l. 
+  induction l; solve_eq_dec.
 Qed.  
 
 
