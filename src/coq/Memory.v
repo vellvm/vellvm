@@ -504,7 +504,6 @@ Definition mem_step {X} (e:IO X) (m:memory) : err (IO X + (memory * X)) :=
     else
       ret (inl (Call t f args))
 
-  | Debug msg => ret (inl (Debug msg))
   end.
 
 (*

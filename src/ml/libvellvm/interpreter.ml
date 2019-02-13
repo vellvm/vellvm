@@ -52,8 +52,13 @@ let rec step m : (DV.dvalue, string) result =
   | RetF v -> Ok v
 
   (* The failE effect is a failure *)
-  | VisF (Sum.Coq_inr1 s, _) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 s), _) ->
     Error (Camlcoq.camlstring_of_coqstring s)
+
+  (* The debugE effect *)
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 msg), k) ->
+        (debug (Camlcoq.camlstring_of_coqstring msg);
+         step (k (Obj.magic DV.DVALUE_None)))
 
   (* The only visible effects from LLVMIO that should propagate to the interpreter are:
      - Call to external functions
@@ -66,10 +71,6 @@ let rec step m : (DV.dvalue, string) result =
         (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n"
            (Camlcoq.camlstring_of_coqstring f));
         step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero)))
-
-      | Debug(msg) ->
-        (debug (Camlcoq.camlstring_of_coqstring msg);
-         step (k (Obj.magic DV.DVALUE_None)))
         
       | Alloca _   -> Error "top-level Alloca"
       | Load (_,_) -> Error "top-level Load"
@@ -78,7 +79,7 @@ let rec step m : (DV.dvalue, string) result =
       | ItoP _ -> Error "top-level ItoP"
       | PtoI _ -> Error "top-level PtoI"
     end
-      
+
 
 let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
   match TopLevel.run_with_memory prog with
