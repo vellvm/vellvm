@@ -17,7 +17,7 @@ Require Import Vellvm.StepSemantics.
 Require Import Vellvm.Memory.
 Require Import Vellvm.LLVMIO.
 Require Import Setoid.
-Require Import paco.
+Require Import Paco.paco.
 
 From ExtLib Require Import
      Programming.Eqv
@@ -93,18 +93,14 @@ Ltac simpl_ifs :=
 Program Instance raw_id_swaplaws : SwapLaws raw_id.
 Next Obligation.
   unfold_swaps. unfold swap_raw_id.
-  destruct (x ~=? id); auto.
+  simpl_ifs; auto.
 Qed.
 Next Obligation.
   unfold_swaps. unfold swap_raw_id. simpl_ifs; subst; auto.
   unfold eqv, eqv_raw_id in *. subst. reflexivity.
 Qed.
 Next Obligation.
-  unfold_swaps. unfold swap_raw_id. simpl_ifs; subst; unfold eqv, eqv_raw_id in *; subst; auto.
-  - contradiction.
-  - contradiction.
-  - contradiction.
-  - contradiction.
+  unfold_swaps. unfold swap_raw_id. simpl_ifs; subst; unfold eqv, eqv_raw_id in *; subst; auto; contradiction.
 Qed.    
   
 
@@ -587,6 +583,7 @@ Section PROOFS.
     intros.
     unfold lookup_env.
     rewrite swap_ENV_find.
+    
     (* FIXME: error message doesn't work *)
     (* destruct (ENV.find id e); unfold_swaps; simpl; reflexivity. *)
   Admitted.
@@ -861,16 +858,12 @@ Check map_monad.
 *)
 (* Change to the ITree affected the way that errors need to be handled here. *)      
     
-  Admitted.
-
-  
-
   Lemma swap_step : forall (CFG:mcfg) (s:state),
       eq_itree (step (swap id1 id2 CFG) (swap id1 id2 s)) (swap id1 id2 (step CFG s)).
   Proof.
     intros CFG.
     destruct s as [[[g pc] e] k].
-    unfold_swaps. simpl.
+    unfold_swaps.
   Admitted.
     
   
@@ -893,7 +886,6 @@ Check map_monad.
     
   Admitted.    
 
-    *)
 End PROOFS.  
 End RENAMING.
 
