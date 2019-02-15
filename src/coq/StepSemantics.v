@@ -43,8 +43,8 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 
 Open Scope monad_scope.
-Open Scope Z_scope.
 Open Scope string_scope.
+Open Scope Z_scope.
 
 Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   
@@ -118,7 +118,7 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   
   Section CONVERSIONS.
   (* Conversions can't go into DynamicValues because Int2Ptr and Ptr2Int casts 
-     generate memory effects. *) 
+     generate memory effects. *)
   Definition eval_conv_h conv t1 x t2 : Trace dvalue :=
     match conv with
     | Trunc =>

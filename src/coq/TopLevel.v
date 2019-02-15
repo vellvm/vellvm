@@ -9,7 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 From Coq Require Import
-     List.
+     List String.
 
 From ExtLib Require Import 
      Structures.Monads.
@@ -31,6 +31,8 @@ Module INT := Intrinsics.Make(Memory.A)(IO).
 
 Import IO.
 Export IO.DV.
+
+Open Scope string_scope.
 
 Definition run_with_memory prog : option (Trace DV.dvalue) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
