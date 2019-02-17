@@ -140,8 +140,16 @@ Definition debug_hom {E} (R : Type) (e : debugE R) : itree E R :=
   | Debug _ => Ret tt
   end.
 
-Definition ignore_debug {E} : itree (debugE +' E) ~> itree E :=
-  interp (into debug_hom).
+Definition into_debug {E F} (h : E ~> LLVM F) : IO +' (F +' E) ~> LLVM F :=
+  fun x e =>
+    match e with
+    | inr1 (inr1 e) => h _ e
+    | inr1 (inl1 e) => vis (inr1 (inl1 e)) (fun x => Ret x)
+    | inl1 e => vis e (fun x => Ret x)
+    end.
+
+Definition ignore_debug {E} : LLVM (E +' debugE) ~> LLVM E :=
+  interp (into_debug debug_hom).
 
 Definition lift_err {A B} (f : A -> LLVM (failureE +' debugE) B) (m:err A) : LLVM (failureE +' debugE) B :=
   match m with
