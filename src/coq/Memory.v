@@ -33,7 +33,7 @@ From Vellvm Require Import
      Numeric.Floats.
 
 
-Require Import ITree.
+Require Import ITree ITree.Effect.Std.
 
 Import MonadNotation.
 Import EqvNotation.
@@ -510,7 +510,7 @@ Definition mem_step {X} (e:IO X) (m:memory) : err (IO X + (memory * X)) :=
  memory -> TraceLLVMIO () -> TraceX86IO () -> Prop
 *)
 
-CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
+CoFixpoint memD {X} (m:memory) (d: LLVM (failureE +' debugE) X) : LLVM (failureE +' debugE) X :=
   match d.(observe) with
   | TauF d' => Tau (memD m d')
   | VisF _ (inr1 f) k => Vis (inr1 f) k

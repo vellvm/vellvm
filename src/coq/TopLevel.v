@@ -20,6 +20,10 @@ From Vellvm Require Import
      Memory
      Intrinsics.
 
+From ITree Require Import
+     ITree
+     Effect.Std.
+
 Import MonadNotation.
 Import ListNotations.
 
@@ -34,10 +38,10 @@ Export IO.DV.
 
 Open Scope string_scope.
 
-Definition run_with_memory prog : option (Trace DV.dvalue) :=
+Definition run_with_memory prog : option (LLVM (failureE +' debugE) DV.dvalue) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
   mcfg <- CFG.mcfg_of_modul scfg ;;
-  let core_trace : Trace dvalue :=
+  let core_trace : LLVM (failureE +' debugE) dvalue :=
       s <- SS.init_state mcfg "main" ;;
         SS.step_sem mcfg (SS.Step s)
   in
