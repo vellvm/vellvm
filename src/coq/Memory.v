@@ -15,6 +15,9 @@ From Coq Require Import
      Structures.OrderedTypeEx
      ZMicromega.
 
+Require Import ITree ITree.Effect.Std.
+
+
 From ExtLib Require Import
      Structures.Monads
      Programming.Eqv
@@ -32,13 +35,9 @@ From Vellvm Require Import
      Numeric.Integers
      Numeric.Floats.
 
-
-Require Import ITree.
-
 Import MonadNotation.
 Import EqvNotation.
 Import ListNotations.
-
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -414,7 +413,8 @@ Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (me
 (* LLVM 5.0 memcpy 
    According to the documentation: http://releases.llvm.org/5.0.0/docs/LangRef.html#llvm-memcpy-intrinsic
    this operation can never fail?  It doesn't return any status code... 
-*)
+ *)
+
 Definition handle_memcpy (args : List.list dvalue) (m:memory) : err memory :=
   match args with
   | DVALUE_Addr (dst_b, dst_o) ::
@@ -427,7 +427,7 @@ Definition handle_memcpy (args : List.list dvalue) (m:memory) : err memory :=
     let sdata := lookup_all_index src_o (unsigned len) src_block SUndef in
     let dst_block' := add_all_index sdata dst_o dst_block in
     let m' := add dst_b dst_block' m in
-    ret m'
+    (ret m' : err memory)
               
   | _ => raise "memcpy got incorrect arguments"
   end.
@@ -504,14 +504,13 @@ Definition mem_step {X} (e:IO X) (m:memory) : err (IO X + (memory * X)) :=
     else
       ret (inl (Call t f args))
 
-  | Debug msg => ret (inl (Debug msg))
   end.
 
 (*
  memory -> TraceLLVMIO () -> TraceX86IO () -> Prop
 *)
 
-CoFixpoint memD {X} (m:memory) (d:Trace X) : Trace X :=
+CoFixpoint memD {X} (m:memory) (d: LLVM (failureE +' debugE) X) : LLVM (failureE +' debugE) X :=
   match d.(observe) with
   | TauF d' => Tau (memD m d')
   | VisF _ (inr1 f) k => Vis (inr1 f) k

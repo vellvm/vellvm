@@ -21,7 +21,7 @@ From ExtLib Require Import
      Structures.Monads
      Eqv.
 
-Require Import ITree.
+Require Import ITree ITree.Effect.Std.
 
 From Vellvm Require Import 
      Util
@@ -43,8 +43,8 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 
 Open Scope monad_scope.
-Open Scope Z_scope.
 Open Scope string_scope.
+Open Scope Z_scope.
 
 Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   
@@ -118,8 +118,8 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   
   Section CONVERSIONS.
   (* Conversions can't go into DynamicValues because Int2Ptr and Ptr2Int casts 
-     generate memory effects. *) 
-  Definition eval_conv_h conv t1 x t2 : Trace dvalue :=
+     generate memory effects. *)
+  Definition eval_conv_h conv t1 x t2 : LLVM (failureE +' debugE) dvalue :=
     match conv with
     | Trunc =>
       match t1, x, t2 with
@@ -251,7 +251,7 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   Arguments eval_conv_h _ _ _ _ : simpl nomatch.
 
   
-  Definition eval_conv conv t1 x t2 : Trace dvalue :=
+  Definition eval_conv conv t1 x t2 : LLVM (failureE +' debugE) dvalue :=
     match t1, x with
     | TYPE_I bits, dv =>
         eval_conv_h conv t1 dv t2
@@ -293,7 +293,7 @@ Variable e : env.
  *)
 
 
-Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
+Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : LLVM (failureE +' debugE) dvalue :=
   let eval_texp '(t,ex) :=
              let dt := eval_typ t in
              v <- eval_exp (Some dt) ex ;;
@@ -475,7 +475,7 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : Trace dvalue :=
   end.
 Arguments eval_exp _ _ : simpl nomatch.
 
-Definition eval_op (o:exp) : Trace dvalue :=
+Definition eval_op (o:exp) : LLVM (failureE +' debugE) dvalue :=
   eval_exp None o.
 Arguments eval_op _ : simpl nomatch.
 
@@ -487,9 +487,9 @@ Inductive result :=
 | Step (s:state)
 .       
 
-Definition raise_p {X} (p:pc) s : Trace X := raise (s ++ " in block: " ++ (to_string p)).
-Definition cont (s:state)  : Trace result := ret (Step s).
-Definition halt (v:dvalue) : Trace result := ret (Done v).
+Definition raise_p {X} (p:pc) s : LLVM (failureE +' debugE) X := raise (s ++ " in block: " ++ (to_string p)).
+Definition cont (s:state)  : LLVM (failureE +' debugE) result := ret (Step s).
+Definition halt (v:dvalue) : LLVM (failureE +' debugE) result := ret (Done v).
 
 (* TODO: move elsewhere? *)
 Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
@@ -501,7 +501,7 @@ Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B
   | _, _ => failwith "combine_lists_err: different lenth lists"
   end.
 
-Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv) (e_init:env) (k:stack) : Trace result :=
+Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv) (e_init:env) (k:stack) : LLVM (failureE +' debugE) result :=
   let eval_phi (e:env) '(iid, Phi t ls) :=
       match assoc RawIDOrd.eq_dec bid_src ls with
       | Some op =>
@@ -519,7 +519,7 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
       cont (g, pc_entry, e_out, k)
   end.
 
-Definition step (s:state) : Trace result :=
+Definition step (s:state) : LLVM (failureE +' debugE) result :=
   let '(g, pc, e, k) := s in
   let eval_exp top exp := eval_exp g e top exp in
   
@@ -645,22 +645,22 @@ Definition step (s:state) : Trace result :=
 
 (* Defining the Global Environment ------------------------------------------------------- *)
 
-Definition allocate_globals (gs:list global) : Trace genv :=
+Definition allocate_globals (gs:list global) : LLVM (failureE +' debugE) genv :=
   monad_fold_right
     (fun (m:genv) (g:global) =>
        vis (Alloca (eval_typ (g_typ g))) (fun v => ret (ENV.add (g_ident g) v m))) gs (@ENV.empty _).
 
 
-Definition register_declaration (g:genv) (d:declaration) : Trace genv :=
+Definition register_declaration (g:genv) (d:declaration) : LLVM (failureE +' debugE) genv :=
   (* TODO: map dc_name d to the returned address *)
     vis (Alloca DTYPE_Pointer) (fun v => ret (ENV.add (dc_name d) v g)).
 
-Definition register_functions (g:genv) : Trace genv :=
+Definition register_functions (g:genv) : LLVM (failureE +' debugE) genv :=
   monad_fold_right register_declaration
                    ((m_declarations CFG) ++ (List.map df_prototype (m_definitions CFG)))
                    g.
   
-Definition initialize_globals (gs:list global) (g:genv) : Trace unit :=
+Definition initialize_globals (gs:list global) (g:genv) : LLVM (failureE +' debugE) unit :=
   monad_fold_right
     (fun (_:unit) (glb:global) =>
        let dt := eval_typ (g_typ glb) in
@@ -673,7 +673,7 @@ Definition initialize_globals (gs:list global) (g:genv) : Trace unit :=
        vis (Store a dv) ret)
     gs tt.
   
-Definition build_global_environment : Trace genv :=
+Definition build_global_environment : LLVM (failureE +' debugE) genv :=
   g <- allocate_globals (m_globals CFG) ;;
   g2 <- register_functions g ;;
   _ <- initialize_globals (m_globals CFG) g2 ;;
@@ -681,13 +681,13 @@ Definition build_global_environment : Trace genv :=
 
 (* Assumes that the entry-point function is named "fname" and that it takes
    no parameters *)
-Definition init_state (fname:string) : Trace state :=
+Definition init_state (fname:string) : LLVM (failureE +' debugE) state :=
   g <- build_global_environment ;;
   fentry <- trywith ("INIT: no function named " ++ fname) (find_function_entry CFG (Name fname)) ;;
   let 'FunctionEntry ids pc_f := fentry in
     ret (g, pc_f, (@ENV.empty dvalue), []).
 
-CoFixpoint step_sem (r:result) : Trace dvalue :=
+CoFixpoint step_sem (r:result) : LLVM (failureE +' debugE) dvalue :=
   match r with
   | Done v => ret v
   | Step s => x <- step s ;; Tau (step_sem x)

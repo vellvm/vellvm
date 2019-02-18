@@ -61,7 +61,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
      We solve it by using the "Convoy Pattern" (see Chlipala's CPDT).  
    *)
   Definition handle_intrinsics (intrinsic_defs : intrinsic_definitions)
-    : (IO +' failureE) ~> itree (IO +' failureE) :=
+    : (IO +' (failureE +' debugE)) ~> LLVM (failureE +' debugE) :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
     let defs_assoc := List.map (fun '(a,b) =>
                                   match dc_name a with
@@ -69,10 +69,10 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                                   | _ => ("",b)
                                   end
                                ) intrinsic_defs in
-    fun X (e : (IO +' failureE) X) =>
-      match e return itree (IO +' failureE) X with
+    fun X (e : (IO +' (failureE +' debugE)) X) =>
+      match e return LLVM (failureE +' debugE) X with
       | inl1 e' =>
-        match e' in IO Y return X = Y -> itree (IO +' failureE) Y with
+        match e' in IO Y return X = Y -> LLVM (failureE +' debugE) Y with
         | Call _ fname args => 
           match assoc Strings.String.string_dec fname defs_assoc with
           | Some f => fun pf => 
@@ -80,16 +80,16 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
             | inl msg => fail msg
             | inr result => Ret result
             end
-          | None => fun pf => (eq_rect X (fun a => itree (IO +' failureE) a) (ITree.liftE e)) dvalue pf
+          | None => fun pf => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.liftE e)) dvalue pf
           end
-        | Store _ _ => fun pf  => (eq_rect X (fun a => itree (IO +' failureE) a) (ITree.liftE e)) unit pf
-        | _ => fun pf  => (eq_rect X (fun a => itree (IO +' failureE) a) (ITree.liftE e)) dvalue pf
+        | Store _ _ => fun pf  => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.liftE e)) unit pf
+        | _ => fun pf  => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.liftE e)) dvalue pf
         end eq_refl
       | inr1 _ => ITree.liftE e
       end.
         
   Definition evaluate_intrinsics (intrinsic_def : intrinsic_definitions)
-             : forall R, Trace R -> Trace R  :=
+             : forall R, LLVM (failureE +' debugE) R -> LLVM (failureE +' debugE) R  :=
     interp (handle_intrinsics intrinsic_def).
 
   Definition evaluate_with_defined_intrinsics := evaluate_intrinsics defined_intrinsics.
