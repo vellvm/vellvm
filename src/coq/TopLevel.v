@@ -11,6 +11,10 @@
 From Coq Require Import
      List String.
 
+From ITree Require Import
+     ITree
+     Effect.Std.
+
 From ExtLib Require Import 
      Structures.Monads.
 
@@ -20,9 +24,6 @@ From Vellvm Require Import
      Memory
      Intrinsics.
 
-From ITree Require Import
-     ITree
-     Effect.Std.
 
 Import MonadNotation.
 Import ListNotations.
