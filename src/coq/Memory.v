@@ -15,8 +15,9 @@ From Coq Require Import
      Structures.OrderedTypeEx
      ZMicromega.
 
-Require Import ITree ITree.Effect.Std.
-
+From ITree Require Import
+     ITree
+     Effects.Std.
 
 From ExtLib Require Import
      Structures.Monads

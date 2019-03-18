@@ -25,8 +25,7 @@ From ExtLib Require Import
 
 From ITree Require Import 
      ITree
-     Effect.Std
-     Effect.Sum.
+     Effects.Std.
 
 From Vellvm Require Import
      Util

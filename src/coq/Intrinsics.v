@@ -26,7 +26,7 @@ From Vellvm Require Import
 
 From ITree Require Import
      ITree
-     Effect.Std.
+     Effects.Std.
 
 Import MonadNotation.
 Import EqvNotation.
@@ -80,12 +80,12 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
             | inl msg => fail msg
             | inr result => Ret result
             end
-          | None => fun pf => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.liftE e)) dvalue pf
+          | None => fun pf => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.lift e)) dvalue pf
           end
-        | Store _ _ => fun pf  => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.liftE e)) unit pf
-        | _ => fun pf  => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.liftE e)) dvalue pf
+        | Store _ _ => fun pf  => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.lift e)) unit pf
+        | _ => fun pf  => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.lift e)) dvalue pf
         end eq_refl
-      | inr1 _ => ITree.liftE e
+      | inr1 _ => ITree.lift e
       end.
         
   Definition evaluate_intrinsics (intrinsic_def : intrinsic_definitions)

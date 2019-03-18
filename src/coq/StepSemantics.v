@@ -21,7 +21,8 @@ From ExtLib Require Import
      Structures.Monads
      Eqv.
 
-Require Import ITree ITree.Effect.Std.
+From ITree Require Import
+     Effects.Std.
 
 From Vellvm Require Import 
      Util
@@ -34,6 +35,8 @@ From Vellvm Require Import
      DynamicValues
      TypeUtil.
 
+Import Sum.
+Import OpenSum.
 Import EqvNotation.
 Import ListNotations.
 Import MonadNotation.
@@ -690,8 +693,8 @@ Definition init_state (fname:string) : LLVM (failureE +' debugE) state :=
 CoFixpoint step_sem (r:result) : LLVM (failureE +' debugE) dvalue :=
   match r with
   | Done v => ret v
-  | Step s => x <- step s ;; Tau (step_sem x)
-  end%itree.
+  | Step s => x <- step s ;; ITree.Tau (step_sem x)
+  end.
 
 End IN_CFG_CONTEXT.
 

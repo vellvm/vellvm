@@ -13,7 +13,7 @@ From Coq Require Import
 
 From ITree Require Import
      ITree
-     Effect.Std.
+     Effects.Std.
 
 From ExtLib Require Import 
      Structures.Monads.
