@@ -663,12 +663,16 @@ Definition denote_terminator (t: terminator): LLVME block_id :=
        and of course we do not denote phi nodes first when denoting blocks.
        Issue (?) Doesn't it break modularity? Can we still loop to tie those things
        together?
-       OPTION 3 (?):
+       OPTION 3:
        Could the semantics of the phi node use a special event asking the environment
        where it comes from, and the semantics of the ret using a special event telling
        the world it's jumping?
        That kinda implies that now we have two level of handling the control flow of a
        single function, but avoids both ugly pairs and is completely modular.
+       OPTION 4:
+       Actually, it might be in the function provided to [loop] when denoting
+       a collection of blocks that this should take place so that there is no
+       need for a new effect, it's just that the jmp one does more work.
      *)
     ret br
 (*             
