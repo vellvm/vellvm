@@ -22,6 +22,7 @@ From ExtLib Require Import
      Eqv.
 
 From ITree Require Import
+     ITree
      Effects.Std.
 
 From Vellvm Require Import 
@@ -52,7 +53,8 @@ Open Scope Z_scope.
 Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   
   Import LLVMIO.
-
+  (* YZ TODO: remove this atrocity *)
+  Notation LLVME := (itree (Locals +' IO +' failureE +' debugE)).
 
   
  (* Environments ------------------------------------------------------------- *)
@@ -98,10 +100,10 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     | None => failwith ("lookup_env: failed to find id " ++ (to_string id))
     end.
 
-  Definition lookup_id (g:genv) (e:env) (i:ident) : err dvalue :=
+  Definition lookup_id (g:genv) (i:ident) : LLVME dvalue :=
     match i with
-    | ID_Global x => lookup_env g x
-    | ID_Local x => lookup_env e x
+    | ID_Global x => lift_err ret (lookup_env g x)
+    | ID_Local x =>  (lift (LocalRead x))
     end.
 
   Definition reverse_lookup_function_id (g:genv) (a:A.addr) : err raw_id :=
@@ -280,7 +282,6 @@ Definition eval_typ (t:typ) : dtyp :=
 
 Section IN_LOCAL_ENVIRONMENT.
 Variable g : genv.
-Variable e : env.
 
 (*
   [eval_exp] is the main entry point for evaluating LLVM expressions.
@@ -295,17 +296,20 @@ Variable e : env.
       a function pointer for a well-typed LLVM program.
  *)
 
-
-Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : LLVM (failureE +' debugE) dvalue :=
+Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : LLVME dvalue :=
   let eval_texp '(t,ex) :=
-             let dt := eval_typ t in
-             v <- eval_exp (Some dt) ex ;;
-             ret v
+      let dt := eval_typ t in
+      v <- eval_exp (Some dt) ex ;;
+      ret v
   in
   match o with
   | EXP_Ident i =>
-    lift_err ret (lookup_id g e i) 
+    lookup_id g i
 
+  | _ => ret DVALUE_Poison
+  end.
+
+(* 
   | EXP_Integer x =>
     match top with
     | None =>  raise "eval_exp given untyped EXP_Integer"
@@ -477,13 +481,13 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : LLVM (failureE +' debug
     ret w
   end.
 Arguments eval_exp _ _ : simpl nomatch.
+*)
 
 Definition eval_op (o:exp) : LLVM (failureE +' debugE) dvalue :=
   eval_exp None o.
 Arguments eval_op _ : simpl nomatch.
 
 End IN_LOCAL_ENVIRONMENT.
-
 
 Inductive result :=
 | Done (v:dvalue)
@@ -509,7 +513,7 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
       match assoc RawIDOrd.eq_dec bid_src ls with
       | Some op =>
         let dt := eval_typ t in
-        dv <- eval_exp g e_init (Some dt) op ;;
+        dv <- eval_exp g (Some dt) op ;;
         ret (add_env iid dv e)
       | None => raise ("jump: phi node doesn't include block " ++ to_string bid_src )
       end
@@ -521,6 +525,182 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
       e_out <- monad_fold_right eval_phi phis e_init ;;
       cont (g, pc_entry, e_out, k)
   end.
+
+
+(* YZ TODO: name the type "(instr_id * instr) ?? *)
+(* YZ TODO: redefine LLVM ? Remove explicit mentions of itrees ? *)
+Definition denote_instr (g: genv) (i: (instr_id * instr)): LLVME unit :=
+  match i with
+    (* YZ: where will this pc_next be relevant now? *)
+    (* do pc_next <- trywith "no fallthrough instruction" (incr_pc CFG pc) ;; *)
+    (* match (pt pc), insn  with *)
+
+  | (IId iid, INSTR_Op op) =>
+    dv <- eval_op g op ;;
+    lift (LocalWrite iid dv)
+
+  | _ => ret tt
+  end.
+
+(* 
+  | IId id, INSTR_Alloca t _ _ =>
+    vis (Alloca (eval_typ t)) (fun (a:dvalue) =>  cont (g, pc_next, add_env id a e, k))
+        
+  | IId id, INSTR_Load _ t (u,ptr) _ =>
+    dv <- eval_exp (Some (eval_typ u)) ptr ;;
+       vis (Load (eval_typ t) dv) (fun dv => cont (g, pc_next, add_env id dv e, k))
+       
+  | IVoid _, INSTR_Store _ (t, val) (u, ptr) _ => 
+    dv <- eval_exp (Some (eval_typ t)) val ;; 
+       v <- eval_exp (Some (eval_typ u)) ptr ;;
+       vis (Store v dv) (fun _ => cont (g, pc_next, e, k))
+
+  | _, INSTR_Store _ _ _ _ => raise "ERROR: Store to non-void ID" 
+
+  | pt, INSTR_Call (t, f) args =>
+    debug ("call") ;;
+          fv <- eval_exp None f ;;
+          dvs <-  map_monad (fun '(t, op) => (eval_exp (Some (eval_typ t)) op)) args ;;
+          match fv with
+          | DVALUE_Addr addr =>
+            (* TODO: lookup fid given addr from global environment *)
+            do fid <- reverse_lookup_function_id g addr ;;
+               debug ("  fid:" ++ to_string fid) ;;
+               match (find_function_entry CFG fid) with
+               | Some fnentry =>
+                 let 'FunctionEntry ids pc_f := fnentry in
+                 do bs <- combine_lists_err ids dvs ;;
+                    let env := env_of_assoc bs in
+                    match pt with
+                    | IVoid _ =>
+                      (debug "pushed void stack frame") ;;
+                                                        cont (g, pc_f, env, (KRet_void e pc_next::k))
+                    | IId id =>
+                      (debug "pushed non-void stack frame") ;;
+                                                            cont (g, pc_f, env, (KRet e id pc_next::k))          
+                    end
+               | None =>
+                 (* This must have been a registered external function 
+               We _don't_ push a LLVM stack frame, since the external
+               call takes place in one "atomic" step.
+                  *)
+                 match fid with
+                 | Name s =>
+                   match pt with
+                   | IVoid _ =>  (* void externals don't return a value *)
+                     vis (Call (eval_typ t) s dvs) (fun dv => cont (g, pc_next, e, k))
+
+                   | IId id => (* non-void externals are assumed to be type correct and bind a value *)
+                     vis (Call (eval_typ t) s dvs)
+                         (fun dv => cont (g, pc_next, add_env id dv e, k))
+                   end
+                 | _ => raise ("step: no function " (* ++ (string_of fid) *))
+                 end
+               end
+          | _ => raise_p pc "call got non-function pointer"
+          end
+
+  | _, INSTR_Comment _ => cont (g, pc_next, e, k)
+
+      | _, INSTR_Unreachable => raise_p pc "IMPOSSIBLE: unreachable in reachable position" 
+
+        (* Currently unhandled LLVM instructions *)
+      | _, INSTR_Fence 
+      | _, INSTR_AtomicCmpXchg 
+      | _, INSTR_AtomicRMW
+      | _, INSTR_VAArg 
+      | _, INSTR_LandingPad => raise_p pc "Unsupported LLVM instruction"
+
+      (* Error states *)                                     
+      | _, _ => raise_p pc "ID / Instr mismatch void/non-void"
+      end
+ *)
+
+Definition denote_terminator (t: terminator): LLVME block_id :=
+  match t with
+    (*
+  | TERM_Ret (t, op) =>
+    dv <- eval_exp (Some (eval_typ t)) op ;;
+       match k with
+       | [] => halt dv       
+       | (KRet e' id p') :: k' => cont (g, p', add_env id dv e', k')
+       | _ => raise_p pc "IMPOSSIBLE: Ret op in non-return configuration" 
+       end
+
+  | Term TERM_Ret_void =>
+    match k with
+    | [] => halt DVALUE_None
+    | (KRet_void e' p')::k' => cont (g, p', e', k')
+    | _ => raise_p pc "IMPOSSIBLE: Ret void in non-return configuration"
+    end
+      
+  | Term (TERM_Br (t,op) br1 br2) =>
+    dv <- eval_exp (Some (eval_typ t)) op ;; 
+    br <- match dv with 
+            | DVALUE_I1 comparison_bit =>
+              if eq comparison_bit one then
+                ret br1
+              else
+                ret br2
+            | _ => raise "Br got non-bool value"
+            end ;;
+    jump (fn pc) (bk pc) br g e k
+     *)
+
+  | TERM_Br_1 br =>
+    (* jump (fn pc) (bk pc) br g e k *)
+
+    (* YZ : How should we do handle phi nodes?
+       OPTION 1:
+       [| block|]: (block_id * block_id) -> LLVME (block_id * block_id)
+       i.e. We treat elementary blocks as having several entry point, one per
+       adress from which we jumped into it.
+       OPTION 2:
+       We actually perform the semantics of phi nodes at the end of the denotation
+       of the jumping block.
+       i.e. : if b1 := jmp b2 and b2 := x = phi (b1,1; b3,3)
+       then [b1] = lift (LocalWrite x 1);; ret b2
+       and of course we do not denote phi nodes first when denoting blocks.
+       Issue (?) Doesn't it break modularity? Can we still loop to tie those things
+       together?
+       OPTION 3 (?):
+       Could the semantics of the phi node use a special event asking the environment
+       where it comes from, and the semantics of the ret using a special event telling
+       the world it's jumping?
+       That kinda implies that now we have two level of handling the control flow of a
+       single function, but avoids both ugly pairs and is completely modular.
+     *)
+    ret br
+(*             
+  (* Currently unhandled LLVM terminators *)                                  
+  | Term (TERM_Switch _ _ _)
+  | Term (TERM_IndirectBr _ _)
+  | Term (TERM_Resume _)
+  | Term (TERM_Invoke _ _ _ _) => raise_p pc "Unsupport LLVM terminator" 
+ *)
+  | _ => ret (Name "bubu")
+  end.
+
+Fixpoint denote_code (g: env) (c: code): LLVME unit :=
+  match c with
+  | nil => ret tt
+  | i::c => denote_instr g i;; denote_code g c
+  end.
+
+Definition denote_block (bid: block_id) : LLVME block_id.
+Admitted.
+
+(* YZ : Here, we kinda come back to the question of representation of labels.
+   In particular, we can't really have a
+   blks: block_id -> block
+   since that would be partial (or wrap it in error monad? Can we still loop?)
+   So do we work with Fin? But then, back to issue #102 of the itree library.
+ *)
+Definition lift_blks (blks: list block) : Fin.t (List.length block_id) -> block :=
+  fun bid => if blks bid well defined = to b then b else ???
+
+Definition denote_cfg (cfg: ) : LLVME unit := 
+  loop ...
 
 Definition step (s:state) : LLVM (failureE +' debugE) result :=
   let '(g, pc, e, k) := s in
