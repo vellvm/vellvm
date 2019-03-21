@@ -53,7 +53,10 @@ Open Scope Z_scope.
 Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   
   Import LLVMIO.
-  (* YZ TODO: remove this atrocity *)
+  (* YZ TODO: Think about how we want to name our denotational domains.
+     Tied to whether we need a new way to combine effects than the straight
+     sum-based current one.
+   *)
   Notation LLVME := (itree (Locals +' IO +' failureE +' debugE)).
 
   
@@ -526,36 +529,43 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
       cont (g, pc_entry, e_out, k)
   end.
 
-
 (* YZ TODO: name the type "(instr_id * instr) ?? *)
-(* YZ TODO: redefine LLVM ? Remove explicit mentions of itrees ? *)
 Definition denote_instr (g: genv) (i: (instr_id * instr)): LLVME unit :=
   match i with
-    (* YZ: where will this pc_next be relevant now? *)
+    (* YZ: where will this pc_next be relevant now? Likely when looping I think. *)
     (* do pc_next <- trywith "no fallthrough instruction" (incr_pc CFG pc) ;; *)
     (* match (pt pc), insn  with *)
 
-  | (IId iid, INSTR_Op op) =>
+  (* Pure operations *)
+  | (IId id, INSTR_Op op) =>
     dv <- eval_op g op ;;
-    lift (LocalWrite iid dv)
+    lift (LocalWrite id dv)
+
+  (* Allocation *)
+  | (IId id, INSTR_Alloca t _ _) =>
+    dv <- lift (Alloca (eval_typ t));;
+    lift (LocalWrite id dv)
+
+  (* Load *)
+  | (IId id, INSTR_Load _ t (u,ptr) _) =>
+    da <- eval_exp g (Some (eval_typ u)) ptr ;;
+    dv <- lift (Load (eval_typ t) da);;
+    lift (LocalWrite id dv)
+
+  (* Store *)
+  | (IVoid _, INSTR_Store _ (t, val) (u, ptr) _) =>
+    da <- eval_exp g (Some (eval_typ t)) val ;;
+    dv <- eval_exp g (Some (eval_typ u)) ptr ;;
+    lift (Store da dv)
+
+  | (_, INSTR_Store _ _ _ _) => raise "ERROR: Store to non-void ID"
+
 
   | _ => ret tt
   end.
 
 (* 
-  | IId id, INSTR_Alloca t _ _ =>
-    vis (Alloca (eval_typ t)) (fun (a:dvalue) =>  cont (g, pc_next, add_env id a e, k))
-        
-  | IId id, INSTR_Load _ t (u,ptr) _ =>
-    dv <- eval_exp (Some (eval_typ u)) ptr ;;
-       vis (Load (eval_typ t) dv) (fun dv => cont (g, pc_next, add_env id dv e, k))
-       
-  | IVoid _, INSTR_Store _ (t, val) (u, ptr) _ => 
-    dv <- eval_exp (Some (eval_typ t)) val ;; 
-       v <- eval_exp (Some (eval_typ u)) ptr ;;
-       vis (Store v dv) (fun _ => cont (g, pc_next, e, k))
-
-  | _, INSTR_Store _ _ _ _ => raise "ERROR: Store to non-void ID" 
+ 
 
   | pt, INSTR_Call (t, f) args =>
     debug ("call") ;;
