@@ -485,6 +485,8 @@ Arguments eval_op _ : simpl nomatch.
 
 End IN_LOCAL_ENVIRONMENT.
 
+(*
+YZ : Should not be used anymore?
 Inductive result :=
 | Done (v:dvalue)
 | Step (s:state)
@@ -493,6 +495,9 @@ Inductive result :=
 Definition raise_p {X} (p:pc) s : LLVM (failureE +' debugE) X := raise (s ++ " in block: " ++ (to_string p)).
 Definition cont (s:state)  : LLVM (failureE +' debugE) result := ret (Step s).
 Definition halt (v:dvalue) : LLVM (failureE +' debugE) result := ret (Done v).
+
+ *)
+
 
 (* TODO: move elsewhere? *)
 Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
@@ -504,6 +509,7 @@ Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B
   | _, _ => failwith "combine_lists_err: different lenth lists"
   end.
 
+(*
 Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv) (e_init:env) (k:stack) : LLVM (failureE +' debugE) result :=
   let eval_phi (e:env) '(iid, Phi t ls) :=
       match assoc RawIDOrd.eq_dec bid_src ls with
@@ -521,8 +527,10 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
       e_out <- monad_fold_right eval_phi phis e_init ;;
       cont (g, pc_entry, e_out, k)
   end.
+ *)
 
 (* YZ TODO: name the type "(instr_id * instr) ?? *)
+(* YZ TODO: not enough information anymore for raise_p. Recover it? *)
 Definition denote_instr (g: genv) (i: (instr_id * instr)): LLVME unit :=
   match i with
     (* YZ: where will this pc_next be relevant now? Likely when looping I think. *)
@@ -556,7 +564,7 @@ Definition denote_instr (g: genv) (i: (instr_id * instr)): LLVME unit :=
   (* Call *)
   | (pt, INSTR_Call (t, f) args) =>
     debug ("call") ;;
-    fv <- eval_exp g None f ;;
+    fv  <- eval_exp g None f ;;
     dvs <-  map_monad (fun '(t, op) => (eval_exp g (Some (eval_typ t)) op)) args ;;
     (* Checks whether [fv] a function pointer *)
     match fv with
@@ -564,12 +572,11 @@ Definition denote_instr (g: genv) (i: (instr_id * instr)): LLVME unit :=
       (* TODO: lookup fid given addr from global environment *)
       fid <- lift_err ret (reverse_lookup_function_id g addr) ;;
       debug ("  fid:" ++ to_string fid) ;;
-      (* YZ: should all of this be part of the handling of the call? *)
-      (* YZ: should we have two different call events, one for internal and one for external? *)
-      (* YZ: should Call take a function_id and not a string? i.e.: *)
       dv <- lift (Call (eval_typ t) fid dvs);;
-      (* But we also need the id. Should Call return it? *)
-      lift (LocalWrite id dv)
+      match pt with
+      | IVoid _ => ret tt
+      | IId id  => lift (LocalWrite id dv)
+      end
       (*
       match (find_function_entry CFG fid) with
       | Some fnentry =>
@@ -606,13 +613,24 @@ Definition denote_instr (g: genv) (i: (instr_id * instr)): LLVME unit :=
     | _ => raise "call got non-function pointer"
     end
 
+  | (_, INSTR_Comment _) => ret tt
 
-  | _ => ret tt
+  | (_, INSTR_Unreachable) => raise "IMPOSSIBLE: unreachable in reachable position" 
+
+  (* Currently unhandled LLVM instructions *)
+  | (_, INSTR_Fence)
+  | (_, INSTR_AtomicCmpXchg) 
+  | (_, INSTR_AtomicRMW)
+  | (_, INSTR_VAArg)
+  | (_, INSTR_LandingPad) => raise "Unsupported LLVM instruction"
+
+  (* Error states *)                                     
+  | (_, _) => raise "ID / Instr mismatch void/non-void"
+                   
   end.
 
 (* 
  
-
   | pt, INSTR_Call (t, f) args =>
     debug ("call") ;;
           fv <- eval_exp None f ;;
