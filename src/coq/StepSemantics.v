@@ -57,7 +57,7 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
      Tied to whether we need a new way to combine effects than the straight
      sum-based current one.
    *)
-  Notation LLVME := (itree (Locals +' IO +' failureE +' debugE)).
+  Notation LLVME := (itree (CallE +' Locals +' IO +' failureE +' debugE)).
 
   
  (* Environments ------------------------------------------------------------- *)
@@ -103,6 +103,9 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     | None => failwith ("lookup_env: failed to find id " ++ (to_string id))
     end.
 
+  (* YZ : I lifted back the errors into the tree.
+     Not sure if that's right, always this debate about categorizing the different errors.
+   *)
   Definition lookup_id (g:genv) (i:ident) : LLVME dvalue :=
     match i with
     | ID_Global x => lift_err ret (lookup_env g x)
@@ -483,8 +486,8 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : LLVME dvalue :=
     do w <- eval_select cndv v1 v2 ;;
     ret w
   end.
-Arguments eval_exp _ _ : simpl nomatch.
 *)
+Arguments eval_exp _ : simpl nomatch.
 
 Definition eval_op (o:exp) : LLVM (failureE +' debugE) dvalue :=
   eval_exp None o.
@@ -559,6 +562,59 @@ Definition denote_instr (g: genv) (i: (instr_id * instr)): LLVME unit :=
     lift (Store da dv)
 
   | (_, INSTR_Store _ _ _ _) => raise "ERROR: Store to non-void ID"
+
+  (* Call *)
+  | (pt, INSTR_Call (t, f) args) =>
+    debug ("call") ;;
+    fv <- eval_exp g None f ;;
+    dvs <-  map_monad (fun '(t, op) => (eval_exp g (Some (eval_typ t)) op)) args ;;
+    (* Checks whether [fv] a function pointer *)
+    match fv with
+    | DVALUE_Addr addr =>
+      (* TODO: lookup fid given addr from global environment *)
+      fid <- lift_err ret (reverse_lookup_function_id g addr) ;;
+      debug ("  fid:" ++ to_string fid) ;;
+      (* YZ: should all of this be part of the handling of the call? *)
+      (* YZ: should we have two different call events, one for internal and one for external? *)
+      (* YZ: should Call take a function_id and not a string? i.e.: *)
+      dv <- lift (Call (eval_typ t) fid dvs);;
+      (* But we also need the id. Should Call return it? *)
+      lift (LocalWrite id dv)
+      (*
+      match (find_function_entry CFG fid) with
+      | Some fnentry =>
+        let 'FunctionEntry ids pc_f := fnentry in
+        bs <- combine_lists_err ids dvs ;;
+        let env := env_of_assoc bs in
+        match pt with
+        | IVoid _ =>
+          (debug "pushed void stack frame") ;;
+          cont (g, pc_f, env, (KRet_void e pc_next::k))
+        | IId id =>
+          (debug "pushed non-void stack frame") ;;
+          cont (g, pc_f, env, (KRet e id pc_next::k))
+        end
+      | None =>
+        (* This must have been a registered external function  *)
+        (* We _don't_ push a LLVM stack frame, since the external *)
+        (* call takes place in one "atomic" step. *)
+        
+        match fid with
+        | Name s =>
+          match pt with
+          | IVoid _ =>  (* void externals don't return a value *)
+            vis (Call (eval_typ t) s dvs) (fun dv => cont (g, pc_next, e, k))
+                
+                   | IId id => (* non-void externals are assumed to be type correct and bind a value *)
+                     vis (Call (eval_typ t) s dvs)
+                         (fun dv => cont (g, pc_next, add_env id dv e, k))
+                   end
+                 | _ => raise ("step: no function " (* ++ (string_of fid) *))
+                 end
+      end
+       *)
+    | _ => raise "call got non-function pointer"
+    end
 
 
   | _ => ret tt
