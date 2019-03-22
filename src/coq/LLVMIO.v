@@ -113,15 +113,16 @@ Inductive Void :=.
 (* YZ : Should f be a string or a function_id?
  *)
 Inductive CallE: Type -> Type :=
-| Call : forall (t:dtyp) (f:string) (args:list dvalue), CallE dvalue.
+| Call : forall (t:dtyp) (f:function_id) (args:list dvalue), CallE dvalue.
 
 (* Interactions with local variables for the LLVM IR *)
 (* YZ TODO: Change names to better ones ? *)
 (* YZ : Should the argument be a raw_id or a string? *)
 Inductive Locals : Type -> Type :=
+| LocalPush: Locals unit (* Push the local part of the stack frame during a call *)
+| LocalPop : Locals unit (* Pops it back during a ret *)
 | LocalWrite (id: raw_id) (dv: dvalue): Locals unit
 | LocalRead  (id: raw_id): Locals dvalue.
-
 
 (* IO Interactions for the LLVM IR *)
 Inductive IO : Type -> Type :=

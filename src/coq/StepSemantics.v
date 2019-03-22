@@ -312,34 +312,30 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : LLVME dvalue :=
   | EXP_Ident i =>
     lookup_id g i
 
-  | _ => ret DVALUE_Poison
-  end.
-
-(* 
   | EXP_Integer x =>
     match top with
-    | None =>  raise "eval_exp given untyped EXP_Integer"
-    | Some (DTYPE_I bits) => do w <- coerce_integer_to_int bits x ;; ret w
-    | _ => raise "bad type for constant int"
+    | None                => raise "eval_exp given untyped EXP_Integer"
+    | Some (DTYPE_I bits) => lift_err ret (coerce_integer_to_int bits x)
+    | _                   => raise "bad type for constant int"
     end
 
-  | EXP_Float x   =>
+  | EXP_Float x =>
     match top with
-    | None => raise "eval_exp given untyped EXP_Float"
-    | Some DTYPE_Float  =>  ret (DVALUE_Float (Float32.of_double x))
-    | Some DTYPE_Double =>  ret (DVALUE_Double x)
-    | _ => raise "bad type for constant float"
+    | None              => raise "eval_exp given untyped EXP_Float"
+    | Some DTYPE_Float  => ret (DVALUE_Float (Float32.of_double x))
+    | Some DTYPE_Double => ret (DVALUE_Double x)
+    | _                 => raise "bad type for constant float"
     end
 
-  | EXP_Hex x     =>
+  | EXP_Hex x =>
     match top with
-    | None => raise "eval_exp given untyped EXP_Hex"
-    | Some DTYPE_Float  =>  ret (DVALUE_Float (Float32.of_double x))
-    | Some DTYPE_Double =>  ret (DVALUE_Double x)
-    | _ => raise "bad type for constant hex float"
+    | None              => raise "eval_exp given untyped EXP_Hex"
+    | Some DTYPE_Float  => ret (DVALUE_Float (Float32.of_double x))
+    | Some DTYPE_Double => ret (DVALUE_Double x)
+    | _                 => raise "bad type for constant hex float"
     end
 
-  | EXP_Bool b    =>
+  | EXP_Bool b =>
     match b with
     | true  => ret (DVALUE_I1 one)
     | false => ret (DVALUE_I1 zero)
@@ -349,16 +345,15 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : LLVME dvalue :=
 
   | EXP_Zero_initializer =>
     match top with
-    | None => raise "eval_exp given untyped EXP_Zero_initializer"
-    | Some t => do w <- dv_zero_initializer t;; ret w
+    | None   => raise "eval_exp given untyped EXP_Zero_initializer"
+    | Some t => lift_err ret (dv_zero_initializer t)
     end
 
-  | EXP_Cstring s =>
-    raise "EXP_Cstring not yet implemented"
+  | EXP_Cstring s => raise "EXP_Cstring not yet implemented"
 
   | EXP_Undef =>
     match top with
-    | None => raise "eval_exp given untyped EXP_Undef"
+    | None   => raise "eval_exp given untyped EXP_Undef"
     | Some t => ret DVALUE_Undef  (* TODO: use t for size? *)
     end
 
@@ -390,29 +385,25 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : LLVME dvalue :=
     let dt := eval_typ t in
     v1 <- eval_exp (Some dt) op1 ;;
     v2 <- eval_exp (Some dt) op2 ;;
-    do w <- eval_iop iop v1 v2 ;;
-    ret w
+    lift_err ret (eval_iop iop v1 v2)
 
   | OP_ICmp cmp t op1 op2 =>
     let dt := eval_typ t in
     v1 <- eval_exp (Some dt) op1 ;;
     v2 <- eval_exp (Some dt) op2 ;;
-    do w <- (eval_icmp cmp) v1 v2 ;;
-    ret w
+    lift_err ret (eval_icmp cmp v1 v2)
 
   | OP_FBinop fop fm t op1 op2 =>
     let dt := eval_typ t in    
     v1 <- eval_exp (Some dt) op1 ;;
     v2 <- eval_exp (Some dt) op2 ;;
-    do w <- eval_fop fop v1 v2 ;;
-    ret w
+    lift_err ret (eval_fop fop v1 v2)
 
   | OP_FCmp fcmp t op1 op2 =>
     let dt := eval_typ t in
     v1 <- eval_exp (Some dt) op1 ;;
     v2 <- eval_exp (Some dt) op2 ;;
-    do w <- eval_fcmp fcmp v1 v2 ;;
-    ret w
+    lift_err ret (eval_fcmp fcmp v1 v2)
               
   | OP_Conversion conv t1 op t2 =>
     let dt1 := eval_typ t1 in
@@ -423,24 +414,24 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : LLVME dvalue :=
     let dt := eval_typ t in
     vptr <- eval_exp (Some DTYPE_Pointer) ptrval ;;
     vs <- map_monad (fun '(_, index) => eval_exp (Some (DTYPE_I 32)) index) idxs ;;
-    vis (GEP dt vptr vs) ret
+    lift (GEP dt vptr vs)
 
   | OP_GetElementPtr _ (_, _) _ =>
     raise "getelementptr has non-pointer type annotation"
-    
+ 
   | OP_ExtractElement vecop idx =>
-    (*    'vec <- monad_app_snd (eval_exp e) vecop;
+(*  'vec <- monad_app_snd (eval_exp e) vecop;
     'vidx <- monad_app_snd (eval_exp e) idx;  *)
     raise "extractelement not implemented" (* TODO: Extract Element *) 
       
   | OP_InsertElement vecop eltop idx =>
-(*    'vec <- monad_app_snd (eval_exp e) vecop;
+(*  'vec <- monad_app_snd (eval_exp e) vecop;
     'v <- monad_app_snd (eval_exp e) eltop;
     'vidx <- monad_app_snd (eval_exp e) idx; *)
     raise "insertelement not implemented" (* TODO *)
     
   | OP_ShuffleVector vecop1 vecop2 idxmask =>
-(*    'vec1 <- monad_app_snd (eval_exp e) vecop1;
+(*  'vec1 <- monad_app_snd (eval_exp e) vecop1;
     'vec2 <- monad_app_snd (eval_exp e) vecop2;      
     'vidx <- monad_app_snd (eval_exp e) idxmask; *)
     raise "shufflevector not implemented" (* TODO *)
@@ -448,17 +439,16 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : LLVME dvalue :=
   | OP_ExtractValue strop idxs =>
     let '(t, str) := strop in
     let dt := eval_typ t in
-    str <- eval_exp (Some dt) str ;;
+    str <- eval_exp (Some dt) str;;
     let fix loop str idxs : err dvalue :=
         match idxs with
         | [] => ret str
         | i :: tl =>
           v <- index_into_str str i ;;
-          loop v tl
+            loop v tl
         end in
-    do w <- loop str idxs ;;
-      ret w
-        
+    lift_err ret (loop str idxs)
+       
   | OP_InsertValue strop eltop idxs =>
     (*
     '(t1, str) <- monad_app_snd (eval_exp e) strop;
@@ -475,18 +465,18 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : LLVME dvalue :=
         end in
     loop str idxs*)
     raise "TODO"
-    
+          
   | OP_Select (t, cnd) (t1, op1) (t2, op2) =>
-    let dt := eval_typ t in
+    let dt  := eval_typ t in
     let dt1 := eval_typ t1 in
     let dt2 := eval_typ t2 in
     cndv <- eval_exp (Some dt) cnd ;;
-    v1 <- eval_exp (Some dt1) op1 ;;
-    v2 <- eval_exp (Some dt2) op2 ;;
-    do w <- eval_select cndv v1 v2 ;;
-    ret w
+    v1   <- eval_exp (Some dt1) op1 ;;
+    v2   <- eval_exp (Some dt2) op2 ;;
+    lift_err ret (eval_select cndv v1 v2)
+
   end.
-*)
+
 Arguments eval_exp _ : simpl nomatch.
 
 Definition eval_op (o:exp) : LLVM (failureE +' debugE) dvalue :=
