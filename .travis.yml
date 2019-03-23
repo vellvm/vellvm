@@ -36,6 +36,7 @@ install:
   - opam install -y --verbose -j ${NJOBS} coq-flocq
   - opam install -y --verbose -j ${NJOBS} coq-paco
   - opam install -y --verbose -j ${NJOBS} dune
+  - opam install -y --verbose -j ${NJOBS} menhir
   - opam upgrade -y --verbose -j ${NJOBS}
 
 script:
