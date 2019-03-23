@@ -49,7 +49,7 @@ let rec step m : (DV.dvalue, string) result =
   | TauF x -> step x
 
   (* We finished the computation *)
-  | RetF v -> Ok v
+  | RetF (_,v) -> Ok v
 
   (* The failE effect is a failure *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 s), _) ->
