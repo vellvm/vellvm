@@ -757,7 +757,7 @@ Fixpoint denote_code (g: env) (c: code): LLVME unit :=
   | i::c => denote_instr g i;; denote_code g c
   end.
 
-Definition denote_block (bid: block_id) : LLVME block_id.
+Definition denote_block (bid: block_id) : LLVME (block_id + dvalue).
 Admitted.
 
 (* YZ : Here, we kinda come back to the question of representation of labels.

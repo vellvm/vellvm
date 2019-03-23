@@ -111,6 +111,11 @@ Inductive Void :=.
 
 (* Call event for the LLVM IR *)
 (* YZ : Should f be a string or a function_id?
+ * SAZ: this should be function_id and just one Call event
+
+   %ans = call <t> @foo(args)  
+
+   call <void> @foo(args)
  *)
 Inductive CallE: Type -> Type :=
 | Call : forall (t:dtyp) (f:string) (args:list dvalue), CallE dvalue.

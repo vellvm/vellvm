@@ -59,6 +59,8 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
      be used to coerce the result back to the general ITree type.
 
      We solve it by using the "Convoy Pattern" (see Chlipala's CPDT).  
+
+     callE ~> LLVME 
    *)
   Definition handle_intrinsics (intrinsic_defs : intrinsic_definitions)
     : (IO +' (failureE +' debugE)) ~> LLVM (failureE +' debugE) :=
