@@ -25,7 +25,7 @@ From ExtLib Require Import
 
 From ITree Require Import 
      ITree
-     Effects.Std.
+     Effects.Exception.
 
 From Vellvm Require Import
      Util
@@ -131,7 +131,7 @@ Variant debugE : Type -> Type :=
 | Debug : string -> debugE unit.
 
 Definition debug {E} `{debugE -< E} (msg : string) : itree E unit :=
-  lift (Debug msg).
+  send (Debug msg).
 
 Definition debug_hom {E} (R : Type) (e : debugE R) : itree E R :=
   match e with
@@ -149,9 +149,12 @@ Definition into_debug {E F} (h : E ~> LLVM F) : IO +' (F +' E) ~> LLVM F :=
 Definition ignore_debug {E} : LLVM (E +' debugE) ~> LLVM E :=
   interp (into_debug debug_hom).
 
+(* Failures carry string *)
+Definition failureE := exceptE string.
+
 Definition lift_err {A B} (f : A -> LLVM (failureE +' debugE) B) (m:err A) : LLVM (failureE +' debugE) B :=
   match m with
-  | inl x => fail x
+  | inl x => throw x
   | inr x => f x
   end.
   
@@ -160,12 +163,12 @@ Notation "'do' x <- m ;; f" := (lift_err (fun x => f) m)
                                 (at level 100, x ident, m at next level, right associativity).
 
 
-Definition raise_LLVM {E} := @fail (IO +' (failureE +' E)) _.
+Definition raise_LLVM {E} := @throw _ (IO +' (failureE +' E)) _.
 CoFixpoint catch_LLVM {E} {X} (f:string -> LLVM (failureE +' E) X) (t : LLVM (failureE +' E) X) : LLVM (failureE +' E) X :=
   match (observe t) with
   | RetF x => Ret x
   | TauF t => Tau (catch_LLVM f t)
-  | VisF _ (inr1 (inl1 (Fail s))) k => f s
+  | VisF _ (inr1 (inl1 (Throw s))) k => f s
   | VisF _ (inr1 (inr1 e)) k => vis (inl1 (inr1 e)) (fun x => catch_LLVM f (k x))
   | VisF _ (inl1 e) k => Vis (inl1 e) (fun x => catch_LLVM f (k x))
   end.

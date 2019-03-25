@@ -12,8 +12,7 @@ From Coq Require Import
      List String.
 
 From ITree Require Import
-     ITree
-     Effects.Std.
+     ITree.
 
 From ExtLib Require Import 
      Structures.Monads.

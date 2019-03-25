@@ -18,7 +18,7 @@ From Coq Require Import
 From ITree Require Import
      ITree
      Basics.Basics
-     Effects.Std
+     Effects.Exception
      Effects.State.
 
 From ExtLib Require Import
@@ -514,7 +514,7 @@ Definition handleMem {X} : (IO +' (failureE +' debugE)) X -> memory -> (LLVM (fa
   fun e m => 
     match e with
     | inl1 io => handle_mem io m
-    | inr1 (inl1 (Fail s)) => raise s
+    | inr1 (inl1 (Throw s)) => raise s
     | inr1 (inr1 d) =>
       match d with
       | Debug s => vis (Debug s) (fun _ => ret (m, tt)) (* SAZ: should be able to use lift *)
@@ -522,7 +522,7 @@ Definition handleMem {X} : (IO +' (failureE +' debugE)) X -> memory -> (LLVM (fa
     end.
 
 Definition memD {X} (m:memory) (d: LLVM (failureE +' debugE) X) : LLVM (failureE +' debugE) (memory * X)%type :=
-  interp_state (fun T => @handleMem T) _ d m.
+  interp_state (fun T => @handleMem T) d m.
   
 End Make.
 
