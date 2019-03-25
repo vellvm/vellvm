@@ -113,7 +113,9 @@ Inductive Void :=.
 (* YZ : Should f be a string or a function_id?
  *)
 Inductive CallE: Type -> Type :=
-| Call : forall (t:dtyp) (f:function_id) (args:list dvalue), CallE dvalue.
+| Return      : forall (dv: dvalue), CallE block_id 
+| ReturnVoid  : CallE block_id
+| Call        : forall (t:dtyp) (f:function_id) (args:list dvalue), CallE dvalue.
 
 (* Interactions with local variables for the LLVM IR *)
 (* YZ TODO: Change names to better ones ? *)

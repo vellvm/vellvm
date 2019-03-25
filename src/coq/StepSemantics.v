@@ -629,102 +629,43 @@ Definition denote_instr (g: genv) (i: (instr_id * instr)): LLVME unit :=
                    
   end.
 
-(* 
- 
-  | pt, INSTR_Call (t, f) args =>
-    debug ("call") ;;
-          fv <- eval_exp None f ;;
-          dvs <-  map_monad (fun '(t, op) => (eval_exp (Some (eval_typ t)) op)) args ;;
-          match fv with
-          | DVALUE_Addr addr =>
-            (* TODO: lookup fid given addr from global environment *)
-            do fid <- reverse_lookup_function_id g addr ;;
-               debug ("  fid:" ++ to_string fid) ;;
-               match (find_function_entry CFG fid) with
-               | Some fnentry =>
-                 let 'FunctionEntry ids pc_f := fnentry in
-                 do bs <- combine_lists_err ids dvs ;;
-                    let env := env_of_assoc bs in
-                    match pt with
-                    | IVoid _ =>
-                      (debug "pushed void stack frame") ;;
-                                                        cont (g, pc_f, env, (KRet_void e pc_next::k))
-                    | IId id =>
-                      (debug "pushed non-void stack frame") ;;
-                                                            cont (g, pc_f, env, (KRet e id pc_next::k))          
-                    end
-               | None =>
-                 (* This must have been a registered external function 
-               We _don't_ push a LLVM stack frame, since the external
-               call takes place in one "atomic" step.
-                  *)
-                 match fid with
-                 | Name s =>
-                   match pt with
-                   | IVoid _ =>  (* void externals don't return a value *)
-                     vis (Call (eval_typ t) s dvs) (fun dv => cont (g, pc_next, e, k))
-
-                   | IId id => (* non-void externals are assumed to be type correct and bind a value *)
-                     vis (Call (eval_typ t) s dvs)
-                         (fun dv => cont (g, pc_next, add_env id dv e, k))
-                   end
-                 | _ => raise ("step: no function " (* ++ (string_of fid) *))
-                 end
-               end
-          | _ => raise_p pc "call got non-function pointer"
-          end
-
-  | _, INSTR_Comment _ => cont (g, pc_next, e, k)
-
-      | _, INSTR_Unreachable => raise_p pc "IMPOSSIBLE: unreachable in reachable position" 
-
-        (* Currently unhandled LLVM instructions *)
-      | _, INSTR_Fence 
-      | _, INSTR_AtomicCmpXchg 
-      | _, INSTR_AtomicRMW
-      | _, INSTR_VAArg 
-      | _, INSTR_LandingPad => raise_p pc "Unsupported LLVM instruction"
-
-      (* Error states *)                                     
-      | _, _ => raise_p pc "ID / Instr mismatch void/non-void"
-      end
- *)
-
-Definition denote_terminator (t: terminator): LLVME block_id :=
+Definition denote_terminator g (t: terminator): LLVME (block_id + dvalue) :=
   match t with
-    (*
+
   | TERM_Ret (t, op) =>
-    dv <- eval_exp (Some (eval_typ t)) op ;;
-       match k with
-       | [] => halt dv       
-       | (KRet e' id p') :: k' => cont (g, p', add_env id dv e', k')
-       | _ => raise_p pc "IMPOSSIBLE: Ret op in non-return configuration" 
-       end
+    dv <- eval_exp g (Some (eval_typ t)) op ;;
+    ret (inr dv)
+    (* lift (Return dv) *)
+    (* match k with *)
+    (* | [] => halt dv        *)
+    (* | (KRet e' id p') :: k' => cont (g, p', add_env id dv e', k') *)
+    (* | _ => raise_p pc "IMPOSSIBLE: Ret op in non-return configuration"  *)
+    (* end *)
 
-  | Term TERM_Ret_void =>
-    match k with
-    | [] => halt DVALUE_None
-    | (KRet_void e' p')::k' => cont (g, p', e', k')
-    | _ => raise_p pc "IMPOSSIBLE: Ret void in non-return configuration"
-    end
-      
-  | Term (TERM_Br (t,op) br1 br2) =>
-    dv <- eval_exp (Some (eval_typ t)) op ;; 
-    br <- match dv with 
-            | DVALUE_I1 comparison_bit =>
-              if eq comparison_bit one then
-                ret br1
-              else
-                ret br2
-            | _ => raise "Br got non-bool value"
-            end ;;
-    jump (fn pc) (bk pc) br g e k
-     *)
+  | TERM_Ret_void =>
+    ret (inr DVALUE_None)
+    (* lift ReturnVoid *)
+    (* match k with *)
+    (* | [] => halt DVALUE_None *)
+    (* | (KRet_void e' p')::k' => cont (g, p', e', k') *)
+    (* | _ => raise_p pc "IMPOSSIBLE: Ret void in non-return configuration" *)
+    (* end *)
 
-  | TERM_Br_1 br =>
-    (* jump (fn pc) (bk pc) br g e k *)
+  | TERM_Br (t,op) br1 br2 =>
+    dv <- eval_exp g (Some (eval_typ t)) op ;; 
+    match dv with 
+    | DVALUE_I1 comparison_bit =>
+      if eq comparison_bit one then
+        ret (inl br1)
+      else
+        ret (inl br2)
+    | _ => raise "Br got non-bool value"
+    end 
+
+  | TERM_Br_1 br => ret (inl br)
 
     (* YZ : How should we do handle phi nodes?
+       Seems like option 4 is the way to go
        OPTION 1:
        [| block|]: (block_id * block_id) -> LLVME (block_id * block_id)
        i.e. We treat elementary blocks as having several entry point, one per
@@ -748,15 +689,12 @@ Definition denote_terminator (t: terminator): LLVME block_id :=
        a collection of blocks that this should take place so that there is no
        need for a new effect, it's just that the jmp one does more work.
      *)
-    ret br
-(*             
+
   (* Currently unhandled LLVM terminators *)                                  
-  | Term (TERM_Switch _ _ _)
-  | Term (TERM_IndirectBr _ _)
-  | Term (TERM_Resume _)
-  | Term (TERM_Invoke _ _ _ _) => raise_p pc "Unsupport LLVM terminator" 
- *)
-  | _ => ret (Name "bubu")
+  | TERM_Switch _ _ _
+  | TERM_IndirectBr _ _
+  | TERM_Resume _
+  | TERM_Invoke _ _ _ _ => raise "Unsupport LLVM terminator" 
   end.
 
 Fixpoint denote_code (g: env) (c: code): LLVME unit :=
@@ -765,8 +703,10 @@ Fixpoint denote_code (g: env) (c: code): LLVME unit :=
   | i::c => denote_instr g i;; denote_code g c
   end.
 
-Definition denote_block (bid: block_id) : LLVME block_id.
-Admitted.
+(* Not sure what the instr_id of a terminator is used for? *)
+Definition denote_block g (b: block) : LLVME (block_id + dvalue) :=
+  denote_code g b.(blk_code);;
+  denote_terminator g (snd b.(blk_term)).
 
 (* YZ : Here, we kinda come back to the question of representation of labels.
    In particular, we can't really have a
@@ -777,132 +717,15 @@ Admitted.
 Definition lift_blks (blks: list block) : Fin.t (List.length block_id) -> block :=
   fun bid => if blks bid well defined = to b then b else ???
 
-Definition denote_cfg (cfg: ) : LLVME unit := 
-  loop ...
+Definition denote_cfg (cfg: ) : LLVME dvalue := 
+  loop (fun (l: 
 
-Definition step (s:state) : LLVM (failureE +' debugE) result :=
-  let '(g, pc, e, k) := s in
-  let eval_exp top exp := eval_exp g e top exp in
-  
-  do cmd <- trywith ("CFG has no instruction at " (* ++ string_of pc *)) (fetch CFG pc) ;;
-  match cmd with
-  | Term (TERM_Ret (t, op)) =>
-    dv <- eval_exp (Some (eval_typ t)) op ;;
-      match k with
-      | [] => halt dv       
-      | (KRet e' id p') :: k' => cont (g, p', add_env id dv e', k')
-      | _ => raise_p pc "IMPOSSIBLE: Ret op in non-return configuration" 
-      end
-        
-  | Term TERM_Ret_void =>
-    match k with
-    | [] => halt DVALUE_None
-    | (KRet_void e' p')::k' => cont (g, p', e', k')
-    | _ => raise_p pc "IMPOSSIBLE: Ret void in non-return configuration"
-    end
-      
-  | Term (TERM_Br (t,op) br1 br2) =>
-    dv <- eval_exp (Some (eval_typ t)) op ;; 
-    br <- match dv with 
-            | DVALUE_I1 comparison_bit =>
-              if eq comparison_bit one then
-                ret br1
-              else
-                ret br2
-            | _ => raise "Br got non-bool value"
-            end ;;
-    jump (fn pc) (bk pc) br g e k
-             
-  | Term (TERM_Br_1 br) =>
-    jump (fn pc) (bk pc) br g e k
 
-             
-  (* Currently unhandled LLVM terminators *)                                  
-  | Term (TERM_Switch _ _ _)
-  | Term (TERM_IndirectBr _ _)
-  | Term (TERM_Resume _)
-  | Term (TERM_Invoke _ _ _ _) => raise_p pc "Unsupport LLVM terminator" 
 
-  | Inst insn =>  (* instruction *)
-    do pc_next <- trywith "no fallthrough instruction" (incr_pc CFG pc) ;;
-    match (pt pc), insn  with
 
-      | IId id, INSTR_Op op =>
-         dv <- eval_op g e op ;;     
-         cont (g, pc_next, add_env id dv e, k)
-          
-      | IId id, INSTR_Alloca t _ _ =>
-        vis (Alloca (eval_typ t)) (fun (a:dvalue) =>  cont (g, pc_next, add_env id a e, k))
-                
-      | IId id, INSTR_Load _ t (u,ptr) _ =>
-        dv <- eval_exp (Some (eval_typ u)) ptr ;;
-        vis (Load (eval_typ t) dv) (fun dv => cont (g, pc_next, add_env id dv e, k))
-            
-      | IVoid _, INSTR_Store _ (t, val) (u, ptr) _ => 
-        dv <- eval_exp (Some (eval_typ t)) val ;; 
-        v <- eval_exp (Some (eval_typ u)) ptr ;;
-        vis (Store v dv) (fun _ => cont (g, pc_next, e, k))
 
-      | _, INSTR_Store _ _ _ _ => raise "ERROR: Store to non-void ID" 
 
-      | pt, INSTR_Call (t, f) args =>
-        debug ("call") ;;
-        fv <- eval_exp None f ;;
-        dvs <-  map_monad (fun '(t, op) => (eval_exp (Some (eval_typ t)) op)) args ;;
-        match fv with
-        | DVALUE_Addr addr =>
-          (* TODO: lookup fid given addr from global environment *)
-          do fid <- reverse_lookup_function_id g addr ;;
-          debug ("  fid:" ++ to_string fid) ;;
-          match (find_function_entry CFG fid) with
-          | Some fnentry =>
-            let 'FunctionEntry ids pc_f := fnentry in
-            do bs <- combine_lists_err ids dvs ;;
-              let env := env_of_assoc bs in
-              match pt with
-              | IVoid _ =>
-                (debug "pushed void stack frame") ;;
-                cont (g, pc_f, env, (KRet_void e pc_next::k))
-              | IId id =>
-                (debug "pushed non-void stack frame") ;;
-                cont (g, pc_f, env, (KRet e id pc_next::k))          
-              end
-          | None =>
-            (* This must have been a registered external function 
-               We _don't_ push a LLVM stack frame, since the external
-               call takes place in one "atomic" step.
-             *)
-            match fid with
-            | Name s =>
-              match pt with
-              | IVoid _ =>  (* void externals don't return a value *)
-                vis (Call (eval_typ t) s dvs) (fun dv => cont (g, pc_next, e, k))
 
-              | IId id => (* non-void externals are assumed to be type correct and bind a value *)
-                vis (Call (eval_typ t) s dvs)
-                    (fun dv => cont (g, pc_next, add_env id dv e, k))
-              end
-            | _ => raise ("step: no function " (* ++ (string_of fid) *))
-            end
-          end
-        | _ => raise_p pc "call got non-function pointer"
-        end
-
-      | _, INSTR_Comment _ => cont (g, pc_next, e, k)
-
-      | _, INSTR_Unreachable => raise_p pc "IMPOSSIBLE: unreachable in reachable position" 
-
-        (* Currently unhandled LLVM instructions *)
-      | _, INSTR_Fence 
-      | _, INSTR_AtomicCmpXchg 
-      | _, INSTR_AtomicRMW
-      | _, INSTR_VAArg 
-      | _, INSTR_LandingPad => raise_p pc "Unsupported LLVM instruction"
-
-      (* Error states *)                                     
-      | _, _ => raise_p pc "ID / Instr mismatch void/non-void"
-      end
-  end.
 
 (* Defining the Global Environment ------------------------------------------------------- *)
 
