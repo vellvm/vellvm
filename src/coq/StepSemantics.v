@@ -703,10 +703,10 @@ Fixpoint denote_code (g: env) (c: code): LLVME unit :=
   | i::c => denote_instr g i;; denote_code g c
   end.
 
-(* Not sure what the instr_id of a terminator is used for? *)
 Definition denote_block g (b: block) : LLVME (block_id + dvalue) :=
   denote_code g b.(blk_code);;
   denote_terminator g (snd b.(blk_term)).
+
 
 (* YZ : Here, we kinda come back to the question of representation of labels.
    In particular, we can't really have a
