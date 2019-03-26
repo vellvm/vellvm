@@ -23,6 +23,7 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
+     Interp.Recursion
      Effects.Std.
 
 From Vellvm Require Import 
@@ -57,7 +58,7 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
      Tied to whether we need a new way to combine effects than the straight
      sum-based current one.
    *)
-  Notation LLVME := (itree (CallE +' Locals +' IO +' failureE +' debugE)).
+  Notation LLVME := (itree (CallE +' ExternalCallE +' Locals +' IO +' failureE +' debugE)).
 
   
   (* Environments ------------------------------------------------------------- *)
@@ -586,10 +587,115 @@ Definition denote_block (b: block) : LLVME (block_id + dvalue) :=
   denote_code b.(blk_code);;
   denote_terminator (snd b.(blk_term)).
 
+(*
+Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv) (e_init:env) (k:stack) : LLVM (failureE +' debugE) result :=
+  let eval_phi (e:env) '(iid, Phi t ls) :=
+      match assoc RawIDOrd.eq_dec bid_src ls with
+      | Some op =>
+        let dt := eval_typ t in
+        dv <- denote_exp g (Some dt) op ;;
+        ret (add_env iid dv e)
+      | None => raise ("jump: phi node doesn't include block " ++ to_string bid_src )
+      end
+  in
+  debug ("jumping to: " ++ to_string bid_tgt) ;;
+  match find_block_entry CFG fid bid_tgt with
+  | None => raise ("jump: target block " ++ to_string bid_tgt ++ " not found")
+  | Some (BlockEntry phis pc_entry) =>
+      e_out <- monad_fold_right eval_phi phis e_init ;;
+      cont (g, pc_entry, e_out, k)
+  end.
+*)
+
+Definition denote_phi (bid : block_id) (id_p : local_id * phi) : LLVME unit :=
+  let '(id, Phi t args) := id_p in
+  match assoc RawIDOrd.eq_dec bid args with
+  | Some op =>
+    let dt := eval_typ t in
+    lift LocalPushCopy ;;
+    dv <- denote_exp (Some dt) op ;;
+    lift LocalPop ;;
+    lift (LocalWrite id dv)
+  | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
+  end.
+
 (* At this point, we want to tie a first loop to give denotation to a singlo function, that is a cfg *)
 (* That is, we want to define: *)
-Definition denote_cfg (f: cfg) : LLVME dvalue.
-Abort.
+Definition denote_cfg (f: cfg) : LLVME dvalue :=
+  loop (fun (bid : block_id + block_id) =>
+          match bid with
+          | inl bid
+          | inr bid =>
+            match find_block f.(blks) bid with
+            | None => raise ("Can't find block in denote_cfg " ++ to_string bid)
+            | Some block =>
+              bd <- denote_block block;;
+              match bd with
+              | inr dv => ret bd
+              | inl bid =>
+                let phi_nodes := block.(blk_phis) in
+                map_monad (denote_phi bid) phi_nodes ;; (* mapM_ :(? *)
+                ret bd
+              end
+            end
+          end
+       ) f.(init).
+
+Definition env_of_assoc {A} (l:list (raw_id * A)) : ENV.t A :=
+  List.fold_left (fun e '(k,v) => ENV.add k v e) l (@ENV.empty A).
+
+Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
+  match l1, l2 with
+  | [], [] => ret []
+  | x::xs, y::ys =>
+    l <- combine_lists_err xs ys ;;
+    ret ((x,y)::l)
+  | _, _ => failwith "combine_lists_err: different length lists"
+  end.
+
+
+Notation MCFGE := (itree (ExternalCallE +' Locals +' IO +' failureE +' debugE)).
+Definition denote_mcfg (m : mcfg) : dtyp -> function_id -> list dvalue ->  MCFGE dvalue :=
+  fun dt f_name args =>
+    mrec (fun T call =>
+            match call with
+            | Call dt f_name args =>
+              match (find_function m f_name) with
+              | Some fndef =>
+                let (_, ids, cfg) := fndef in
+                bs <- lift_err ret (combine_lists_err ids args) ;;
+                (* lift LocalPush ;; *) (* This is handled by denote_instr of Call *)
+                map_monad (fun '(id, dv) => lift (LocalWrite id dv)) bs ;;
+                denote_cfg cfg
+                (* lift LocalPop *) (* This is handled by denote_terminator of Ret *)
+              | None =>
+                (* This must have been a registered external function  *)
+                (* We _don't_ push a LLVM stack frame, since the external *)
+                (* call takes place in one "atomic" step. *)
+                ExternalCallE dt f_name args
+
+                      (* CB / YZ TODO: Worry about this? *)
+                      (*
+                      match fid with
+                      | Name s =>
+                        match pt with
+                        | IVoid _ =>  (* void externals don't return a value *)
+                          vis (Call (eval_typ t) s dvs) (fun dv => cont (g, pc_next, e, k))
+                              
+                        | IId id => (* non-void externals are assumed to be type correct and bind a value *)
+                          vis (Call (eval_typ t) s dvs)
+                              (fun dv => cont (g, pc_next, add_env id dv e, k))
+                        end
+                      | _ => raise ("step: no function " (* ++ (string_of fid) *))
+                      end *)
+                
+              end
+            end
+         ) _ (Call dt f_name args).
+
+(* Call : forall (t:dtyp) (f:function_id) (args:list dvalue), CallE dvalue. *)
+(* (ctx : D ~> itree (D +' E)) : D ~> itree E *)
+
 (* The way we want to do that is via the loop operator:
    loop : forall (E : Type -> Type) (A B C : Type), (C + A -> itree E (C + B)) -> A -> itree E B
    hence in our context:
@@ -626,34 +732,7 @@ Abort.
   Basically have a representation of "sub-CFG", that is open programs?
  *)
 
-Record Fin_Set_bid :=
-  {
-    t:= block_id;
-    elts: list block_id;
-  }.
-Definition get_exit_points (b: block): Fin.Set block_id. 
-
-Definition denote_block g (b: block) : LLVME (get_exit_points b).
-
-Definition blks (A B: Fin.Set block_id) := A -> block B. 
-
-Definition denote_blks g (A B: Fin.Set block_id) (bs: A -> block)
-           (H : B = ∪(a \in A) (get_exit_points (bs a)): A -> LLVME B :=
-  fun a => denote_block g (bs a).
-
-(* YZ : Here, we kinda come back to the question of representation of labels.
-   In particular, we can't really have a
-   blks: block_id -> block
-   since that would be partial (or wrap it in error monad? Can we still loop?)
-   So do we work with Fin? But then, back to issue #102 of the itree library.
- *)
-Definition lift_blks (blks: list block) : Fin.t (List.length block_id) -> block :=
-  fun bid => if blks bid well defined = to b then b else ???
-
-
-
-
-
+End IN_GLOBAL_ENVIRONMENT.
 (****************************** SCRAPYARD ******************************)
 
   (* Code related to environment unused for global env that are static.
@@ -665,14 +744,15 @@ Definition lift_blks (blks: list block) : Fin.t (List.length block_id) -> block 
 
   Definition env  := ENV.t dvalue.
 
-  Instance show_env : Show env := fun env => string_of_env' (ENV.elements env).
-  Definition add_env := ENV.add.
 
   Fixpoint string_of_env' (e:list (raw_id * dvalue)) :=
     match e with
     | [] => empty
     | (lid, _)::rest => ((to_string lid) << " " << (string_of_env' rest))%show
     end.
+
+  Instance show_env : Show env := fun env => string_of_env' (ENV.elements env).
+  Definition add_env := ENV.add.
 
   (* Code related to the previous structure of states.
      Will likely not be reused as is. The structure of states should now be
@@ -721,7 +801,6 @@ Definition lift_blks (blks: list block) : Fin.t (List.length block_id) -> block 
     (* end *)
 
 
-
 (* Defining the Global Environment ------------------------------------------------------- *)
 
 Definition allocate_globals (gs:list global) : LLVM (failureE +' debugE) genv :=
@@ -747,7 +826,7 @@ Definition initialize_globals (gs:list global) (g:genv) : LLVM (failureE +' debu
        dv <-
            match (g_exp glb) with
            | None => ret DVALUE_Undef
-           | Some e => denote_exp g (@ENV.empty _) (Some dt) e
+           | Some e => denote_exp g (Some dt) e
            end ;;
        vis (Store a dv) ret)
     gs tt.
@@ -760,6 +839,8 @@ Definition build_global_environment : LLVM (failureE +' debugE) genv :=
 
 (* Assumes that the entry-point function is named "fname" and that it takes
    no parameters *)
+
+(* COMMENTING OUT
 Definition init_state (fname:string) : LLVM (failureE +' debugE) state :=
   g <- build_global_environment ;;
   fentry <- trywith ("INIT: no function named " ++ fname) (find_function_entry CFG (Name fname)) ;;
@@ -782,6 +863,7 @@ Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B
   | _, _ => failwith "combine_lists_err: different lenth lists"
   end.
 
+END OF COMMENTING OUT *)
 (*
 YZ : Should not be used anymore?
 Inductive result :=
