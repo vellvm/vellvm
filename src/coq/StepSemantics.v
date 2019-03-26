@@ -21,9 +21,6 @@ From ExtLib Require Import
      Structures.Monads
      Eqv.
 
-From ITree Require Import
-     Effects.Std.
-
 From Vellvm Require Import 
      Util
      Error
