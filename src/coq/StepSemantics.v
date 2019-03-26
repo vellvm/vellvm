@@ -483,6 +483,7 @@ Definition denote_instr (i: (instr_id * instr)): LLVME unit :=
       (* TODO: lookup fid given addr from global environment *)
       fid <- lift_err ret (reverse_lookup_function_id g addr) ;;
       debug ("  fid:" ++ to_string fid) ;;
+      lift (LocalPush);;
       dv <- lift (Call (eval_typ t) fid dvs);;
       match pt with
       | IVoid _ => ret tt
@@ -579,7 +580,7 @@ Fixpoint denote_code (c: code): LLVME unit :=
 
 (* A block either jumps to another one, or return a dynamic value *)
 (* YZ : I got confused again. Why is the terminator in a block associated to a [instr_id]?
-   Is this simply redundant information with the instr_id in [%x = call args f]?
+   It seems to be bogus, might be removable. To be confirmed.
  *)
 Definition denote_block (b: block) : LLVME (block_id + dvalue) :=
   denote_code b.(blk_code);;
@@ -594,13 +595,23 @@ Abort.
    hence in our context:
    loop : forall (A B C: Type), (C + A -> LLVME (C + B)) -> A -> LLVME B
  *)
-(* But this raises a few issues.
+(*
+  open_CFG (A: finite_set block_id) (B: finite_set block_id) (I: finite_set block_id)
+  A -> LLVME (B + dvalue)
+
+  First try: C = A = block_id and B = dvalue
+  Start with this.
+
+   But this raises a few issues.
    First, the idea is to expose in the type of the constructs an overapproximation of the domain of labels it might jump to.
    At the moment, they can all jump to any block_id without restriction.
    Second, we are quite tied to the concrete representation of [block_id], we hence need to find a way to lift them at the type level.
  *)
 
-(* In Asm, labels as Type, we have:
+(* Defining open_cfg
+   Exposing types of labels everywhere.
+   And managing to 
+   In Asm, labels as Type, we have:
    (Type, A -> B) and (Type, A -> itree E B)
    With Fin types as labels, we have:
    (Nat, Fin A -> Fin B) and (Nat, Fin A -> itree E (Fin B))
