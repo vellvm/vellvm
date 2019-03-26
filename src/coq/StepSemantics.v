@@ -653,11 +653,12 @@ Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B
   | _, _ => failwith "combine_lists_err: different length lists"
   end.
 
-
 Notation MCFGE := (itree (ExternalCallE +' Locals +' IO +' failureE +' debugE)).
+
 Definition denote_mcfg (m : mcfg) : dtyp -> function_id -> list dvalue ->  MCFGE dvalue :=
   fun dt f_name args =>
-    mrec (fun T call =>
+    @mrec CallE (ExternalCallE +' Locals +' IO +' failureE +' debugE)
+          (fun T call =>
             match call with
             | Call dt f_name args =>
               match (find_function m f_name) with
@@ -672,7 +673,7 @@ Definition denote_mcfg (m : mcfg) : dtyp -> function_id -> list dvalue ->  MCFGE
                 (* This must have been a registered external function  *)
                 (* We _don't_ push a LLVM stack frame, since the external *)
                 (* call takes place in one "atomic" step. *)
-                ExternalCallE dt f_name args
+                lift (ExternalCall dt f_name args)
 
                       (* CB / YZ TODO: Worry about this? *)
                       (*
@@ -739,10 +740,7 @@ End IN_GLOBAL_ENVIRONMENT.
      Should be reused to handle locals.
    *)
 
-  Definition env_of_assoc {A} (l:list (raw_id * A)) : ENV.t A :=
-    List.fold_left (fun e '(k,v) => ENV.add k v e) l (@ENV.empty A).
-
-  Definition env  := ENV.t dvalue.
+    Definition env  := ENV.t dvalue.
 
 
   Fixpoint string_of_env' (e:list (raw_id * dvalue)) :=
