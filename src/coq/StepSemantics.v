@@ -9,10 +9,8 @@
  ---------------------------------------------------------------------------- *)
 
 From Coq Require Import
-     ZArith List String Omega
-     FSets.FMapWeakList
-     FSets.FMapFacts
-     Structures.OrderedTypeEx.
+     ZArith List String 
+     FSets.FMapWeakList.
 
 Require Import Integers Floats.
 
@@ -34,7 +32,6 @@ From Vellvm Require Import
      CFG
      MemoryAddress
      LLVMIO
-     DynamicValues
      TypeUtil.
 
 Import Sum.
@@ -51,35 +48,55 @@ Open Scope monad_scope.
 Open Scope string_scope.
 Open Scope Z_scope.
 
-Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
-  
+Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
+
   Import LLVMIO.
-  (* YZ TODO: Think about how we want to name our denotational domains.
-     Tied to whether we need a new way to combine effects than the straight
-     sum-based current one.
+  (* YZ note: take a more consistent scheme of names for events *)
+  (* Denotational semantics of LLVM programs.
+     Each sub-component is denoted as an itree that can emit any of the following effects:
+     - Internal Call (CallE)
+     - External Call (ExternalCallE)
+     - Manipulation of the local environment (Locals)
+     - Memory interactions (IO)
+     - Failure (failurE)
+     - Emit debugging information (debugE)
    *)
-  Notation LLVME := (itree (CallE +' ExternalCallE +' Locals +' IO +' failureE +' debugE)).
+  Notation LLVM1 := (itree (CallE +' ExternalCallE +' Locals +' IO +' failureE +' debugE)).
 
-  
+  (* The mutually recursive functions are tied together, interpreting away all internal calls*)
+  Notation LLVM := (itree (ExternalCallE +' Locals +' IO +' failureE +' debugE)).
+ 
   (* Environments ------------------------------------------------------------- *)
+  (* Used to implement (static) global environments.
+     The same data-structure will be reused for local (dynamic) environments.
+   *)
   Module ENV := FMapWeakList.Make(AstLib.RawIDOrd).
-  Module ENVFacts := FMapFacts.WFacts_fun(AstLib.RawIDOrd)(ENV).
-  Module ENVProps := FMapFacts.WProperties_fun(AstLib.RawIDOrd)(ENV).
 
+  (* YZ note : do we need those two over here? *)
+  (* Module ENVFacts := FMapFacts.WFacts_fun(AstLib.RawIDOrd)(ENV). *)
+  (* Module ENVProps := FMapFacts.WProperties_fun(AstLib.RawIDOrd)(ENV). *)
+
+  (* Global environments *)
   Definition genv := ENV.t dvalue.
-  
+
   Definition lookup_env {X} (e:ENV.t X) (id:raw_id) : err X :=
     match ENV.find id e with
     | Some v => ret v
     | None => failwith ("lookup_env: failed to find id " ++ (to_string id))
     end.
 
-  Definition lookup_id (g:genv) (i:ident) : LLVME dvalue :=
+  (* Lookup function for identifiers.
+     Returns directly the dynamic value if the identifier is global,
+     otherwise emits the corresponding read event.
+   *)
+  (* YZ note: read/writes for local and load/store for memory is fine? *)
+  Definition lookup_id (g:genv) (i:ident) : LLVM1 dvalue :=
     match i with
     | ID_Global x => lift_err ret (lookup_env g x)
     | ID_Local x =>  (lift (LocalRead x))
     end.
 
+  (* Lookup attempting to cast adresses into function identifiers *)
   Definition reverse_lookup_function_id (g:genv) (a:A.addr) : err raw_id :=
     let f x :=
         match x with
@@ -91,11 +108,12 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     | None => failwith "reverse_lookup_function_id failed"
     | Some (fid, _) => ret fid
     end.
-  
+
+
   Section CONVERSIONS.
     (* Conversions can't go into DynamicValues because Int2Ptr and Ptr2Int casts 
-     generate memory effects. *)
-    Definition eval_conv_h conv t1 x t2 : LLVM (failureE +' debugE) dvalue :=
+       generate memory effects. *)
+    Definition eval_conv_h conv t1 x t2 : LLVM1 dvalue :=
       match conv with
       | Trunc =>
         match t1, x, t2 with
@@ -226,7 +244,7 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
       end.
     Arguments eval_conv_h _ _ _ _ : simpl nomatch.
 
-    Definition eval_conv conv t1 x t2 : LLVM (failureE +' debugE) dvalue :=
+    Definition eval_conv conv t1 x t2 : LLVM1 dvalue :=
       match t1, x with
       | TYPE_I bits, dv =>
         eval_conv_h conv t1 dv t2
@@ -243,12 +261,18 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     failwith "dv_zero_initializer unimplemented".
 
   Section IN_CFG_CONTEXT.
+
+    (* YZ TODO : [eval_typ] is the only bit that still rely on the ambient mcfg.
+       That probably should not be the case.
+     *)
     Variable CFG:mcfg.
 
     Definition eval_typ (t:typ) : dtyp :=
       TypeUtil.normalize_type_dtyp (m_type_defs CFG) t.
 
     Section IN_GLOBAL_ENVIRONMENT.
+
+      (* Global environments are set at the top-level, and static *)
       Variable g : genv.
 
 (*
@@ -262,418 +286,417 @@ Module StepSemantics(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     - top must be Some t for the remaining EXP_* cases
       Note that when top is Some t, the resulting dvalue can never be
       a function pointer for a well-typed LLVM program.
+
+  Expressions are denoted as itrees that return a [dvalue].
  *)
 
-Fixpoint denote_exp (top:option dtyp) (o:exp) {struct o} : LLVME dvalue :=
-  let eval_texp '(t,ex) :=
-      let dt := eval_typ t in
-      v <- denote_exp (Some dt) ex ;;
-      ret v
-  in
-  match o with
-  | EXP_Ident i =>
-    lookup_id g i
+      Fixpoint denote_exp (top:option dtyp) (o:exp) {struct o} : LLVM1 dvalue :=
+        let eval_texp '(t,ex) :=
+            let dt := eval_typ t in
+            v <- denote_exp (Some dt) ex ;;
+            ret v
+        in
+        match o with
+        | EXP_Ident i =>
+          lookup_id g i
 
-  | EXP_Integer x =>
-    match top with
-    | None                => raise "denote_exp given untyped EXP_Integer"
-    | Some (DTYPE_I bits) => lift_err ret (coerce_integer_to_int bits x)
-    | _                   => raise "bad type for constant int"
-    end
-
-  | EXP_Float x =>
-    match top with
-    | None              => raise "denote_exp given untyped EXP_Float"
-    | Some DTYPE_Float  => ret (DVALUE_Float (Float32.of_double x))
-    | Some DTYPE_Double => ret (DVALUE_Double x)
-    | _                 => raise "bad type for constant float"
-    end
-
-  | EXP_Hex x =>
-    match top with
-    | None              => raise "denote_exp given untyped EXP_Hex"
-    | Some DTYPE_Float  => ret (DVALUE_Float (Float32.of_double x))
-    | Some DTYPE_Double => ret (DVALUE_Double x)
-    | _                 => raise "bad type for constant hex float"
-    end
-
-  | EXP_Bool b =>
-    match b with
-    | true  => ret (DVALUE_I1 one)
-    | false => ret (DVALUE_I1 zero)
-    end
-
-  | EXP_Null => ret (DVALUE_Addr A.null)
-
-  | EXP_Zero_initializer =>
-    match top with
-    | None   => raise "denote_exp given untyped EXP_Zero_initializer"
-    | Some t => lift_err ret (dv_zero_initializer t)
-    end
-
-  | EXP_Cstring s => raise "EXP_Cstring not yet implemented"
-
-  | EXP_Undef =>
-    match top with
-    | None   => raise "denote_exp given untyped EXP_Undef"
-    | Some t => ret DVALUE_Undef  (* TODO: use t for size? *)
-    end
-
-  (* Question: should we do any typechecking for aggregate types here? *)
-  (* Option 1: do no typechecking: *)
-  | EXP_Struct es =>
-     vs <- map_monad eval_texp es ;;
-     ret (DVALUE_Struct vs)
-
-  (* Option 2: do a little bit of typechecking *)
-  | EXP_Packed_struct es =>
-    match top with
-    | None => raise "denote_exp given untyped EXP_Struct"
-    | Some (DTYPE_Packed_struct _) =>
-       vs <- map_monad eval_texp es ;;
-       ret (DVALUE_Packed_struct vs)
-    | _ => raise "bad type for VALUE_Packed_struct"
-    end
-
-  | EXP_Array es =>
-     vs <- map_monad eval_texp es ;;
-     ret (DVALUE_Array vs)
-    
-  | EXP_Vector es =>
-     vs <- map_monad eval_texp es ;;
-     ret (DVALUE_Vector vs)
-
-  | OP_IBinop iop t op1 op2 =>
-    let dt := eval_typ t in
-    v1 <- denote_exp (Some dt) op1 ;;
-    v2 <- denote_exp (Some dt) op2 ;;
-    lift_err ret (eval_iop iop v1 v2)
-
-  | OP_ICmp cmp t op1 op2 =>
-    let dt := eval_typ t in
-    v1 <- denote_exp (Some dt) op1 ;;
-    v2 <- denote_exp (Some dt) op2 ;;
-    lift_err ret (eval_icmp cmp v1 v2)
-
-  | OP_FBinop fop fm t op1 op2 =>
-    let dt := eval_typ t in    
-    v1 <- denote_exp (Some dt) op1 ;;
-    v2 <- denote_exp (Some dt) op2 ;;
-    lift_err ret (eval_fop fop v1 v2)
-
-  | OP_FCmp fcmp t op1 op2 =>
-    let dt := eval_typ t in
-    v1 <- denote_exp (Some dt) op1 ;;
-    v2 <- denote_exp (Some dt) op2 ;;
-    lift_err ret (eval_fcmp fcmp v1 v2)
-              
-  | OP_Conversion conv t1 op t2 =>
-    let dt1 := eval_typ t1 in
-    v <- denote_exp (Some dt1) op ;;
-    eval_conv conv t1 v t2
-                       
-  | OP_GetElementPtr _ (TYPE_Pointer t, ptrval) idxs =>
-    let dt := eval_typ t in
-    vptr <- denote_exp (Some DTYPE_Pointer) ptrval ;;
-    vs <- map_monad (fun '(_, index) => denote_exp (Some (DTYPE_I 32)) index) idxs ;;
-    lift (GEP dt vptr vs)
-
-  | OP_GetElementPtr _ (_, _) _ =>
-    raise "getelementptr has non-pointer type annotation"
- 
-  | OP_ExtractElement vecop idx =>
-(*  'vec <- monad_app_snd (denote_exp e) vecop;
-    'vidx <- monad_app_snd (denote_exp e) idx;  *)
-    raise "extractelement not implemented" (* TODO: Extract Element *) 
-      
-  | OP_InsertElement vecop eltop idx =>
-(*  'vec <- monad_app_snd (denote_exp e) vecop;
-    'v <- monad_app_snd (denote_exp e) eltop;
-    'vidx <- monad_app_snd (denote_exp e) idx; *)
-    raise "insertelement not implemented" (* TODO *)
-    
-  | OP_ShuffleVector vecop1 vecop2 idxmask =>
-(*  'vec1 <- monad_app_snd (denote_exp e) vecop1;
-    'vec2 <- monad_app_snd (denote_exp e) vecop2;      
-    'vidx <- monad_app_snd (denote_exp e) idxmask; *)
-    raise "shufflevector not implemented" (* TODO *)
-
-  | OP_ExtractValue strop idxs =>
-    let '(t, str) := strop in
-    let dt := eval_typ t in
-    str <- denote_exp (Some dt) str;;
-    let fix loop str idxs : err dvalue :=
-        match idxs with
-        | [] => ret str
-        | i :: tl =>
-          v <- index_into_str str i ;;
-            loop v tl
-        end in
-    lift_err ret (loop str idxs)
-       
-  | OP_InsertValue strop eltop idxs =>
-    (*
-    '(t1, str) <- monad_app_snd (denote_exp e) strop;
-    '(t2, v) <- monad_app_snd (denote_exp e) eltop;
-    let fix loop str idxs : err dvalue :=
-        match idxs with
-        | [] => raise "invalid indices"
-        | [i] =>
-          insert_into_str str v i
-        | i :: tl =>
-          '(_, v) <- index_into_str str i;
-          'v <- loop v tl;
-          insert_into_str str v i
-        end in
-    loop str idxs*)
-    raise "TODO"
-          
-  | OP_Select (t, cnd) (t1, op1) (t2, op2) =>
-    let dt  := eval_typ t in
-    let dt1 := eval_typ t1 in
-    let dt2 := eval_typ t2 in
-    cndv <- denote_exp (Some dt) cnd ;;
-    v1   <- denote_exp (Some dt1) op1 ;;
-    v2   <- denote_exp (Some dt2) op2 ;;
-    lift_err ret (eval_select cndv v1 v2)
-
-  end.
-
-Arguments denote_exp _ : simpl nomatch.
-
-Definition eval_op (o:exp) : LLVME dvalue :=
-  denote_exp None o.
-Arguments eval_op _ : simpl nomatch.
-
-(* YZ TODO: not enough information anymore for raise_p. Recover it? *)
-
-(* An instruction has only side-effects, it returns [unit] *)
-Definition denote_instr (i: (instr_id * instr)): LLVME unit :=
-  match i with
-  (* Pure operations *)
-  | (IId id, INSTR_Op op) =>
-    dv <- eval_op op ;;
-    lift (LocalWrite id dv)
-
-  (* Allocation *)
-  | (IId id, INSTR_Alloca t _ _) =>
-    dv <- lift (Alloca (eval_typ t));;
-    lift (LocalWrite id dv)
-
-  (* Load *)
-  | (IId id, INSTR_Load _ t (u,ptr) _) =>
-    da <- denote_exp (Some (eval_typ u)) ptr ;;
-    dv <- lift (Load (eval_typ t) da);;
-    lift (LocalWrite id dv)
-
-  (* Store *)
-  | (IVoid _, INSTR_Store _ (t, val) (u, ptr) _) =>
-    da <- denote_exp (Some (eval_typ t)) val ;;
-    dv <- denote_exp (Some (eval_typ u)) ptr ;;
-    lift (Store da dv)
-  | (_, INSTR_Store _ _ _ _) => raise "ERROR: Store to non-void ID"
-
-  (* Call *)
-  | (pt, INSTR_Call (t, f) args) =>
-    debug ("call") ;;
-    fv  <- denote_exp None f ;;
-    dvs <-  map_monad (fun '(t, op) => (denote_exp (Some (eval_typ t)) op)) args ;;
-    (* Checks whether [fv] a function pointer *)
-    match fv with
-    | DVALUE_Addr addr =>
-      (* TODO: lookup fid given addr from global environment *)
-      fid <- lift_err ret (reverse_lookup_function_id g addr) ;;
-      debug ("  fid:" ++ to_string fid) ;;
-      lift (LocalPush);;
-      dv <- lift (Call (eval_typ t) fid dvs);;
-      match pt with
-      | IVoid _ => ret tt
-      | IId id  => lift (LocalWrite id dv)
-      end      
-    | _ => raise "call got non-function pointer"
-    end
-
-  | (_, INSTR_Comment _) => ret tt
-
-  | (_, INSTR_Unreachable) => raise "IMPOSSIBLE: unreachable in reachable position" 
-
-  (* Currently unhandled LLVM instructions *)
-  | (_, INSTR_Fence)
-  | (_, INSTR_AtomicCmpXchg) 
-  | (_, INSTR_AtomicRMW)
-  | (_, INSTR_VAArg)
-  | (_, INSTR_LandingPad) => raise "Unsupported LLVM instruction"
-
-  (* Error states *)                                     
-  | (_, _) => raise "ID / Instr mismatch void/non-void"
-                   
-  end.
-
-(* A terminator either returns from a function call, producing a [dvalue], or jumps to a new [block_id]. *)
-Definition denote_terminator (t: terminator): LLVME (block_id + dvalue) :=
-  match t with
-
-  | TERM_Ret (t, op) =>
-    dv <- denote_exp (Some (eval_typ t)) op ;;
-    (* YZ : Hesitant between two options. Either straight up emit the pop events to pop the stack frame, and return the dynamic value *)
-    lift LocalPop;; 
-    ret (inr dv)
-    (* YZ : Or could introduce a Return event that would be handled at the same time as Call and do it *)
-    (* lift (Return dv) *)
-
-  | TERM_Ret_void =>
-    lift LocalPop;; 
-    ret (inr DVALUE_None)
-    (* or  lift ReturnVoid? *)
-
-  | TERM_Br (t,op) br1 br2 =>
-    dv <- denote_exp (Some (eval_typ t)) op ;; 
-    match dv with 
-    | DVALUE_I1 comparison_bit =>
-      if eq comparison_bit one then
-        ret (inl br1)
-      else
-        ret (inl br2)
-    | _ => raise "Br got non-bool value"
-    end 
-
-  | TERM_Br_1 br => ret (inl br)
-
-    (* YZ : How should we do handle phi nodes?
-       Seems like option 4 is the way to go.
-       OPTION 1:
-       [| block|]: (block_id * block_id) -> LLVME (block_id * block_id)
-       i.e. We treat elementary blocks as having several entry point, one per
-       adress from which we jumped into it.
-       OPTION 2:
-       We actually perform the semantics of phi nodes at the end of the denotation
-       of the jumping block.
-       i.e. : if b1 := jmp b2 and b2 := x = phi (b1,1; b3,3)
-       then [b1] = lift (LocalWrite x 1);; ret b2
-       and of course we do not denote phi nodes first when denoting blocks.
-       Issue (?) Doesn't it break modularity? Can we still loop to tie those things
-       together?
-       OPTION 3:
-       Could the semantics of the phi node use a special event asking the environment
-       where it comes from, and the semantics of the ret using a special event telling
-       the world it's jumping?
-       That kinda implies that now we have two level of handling the control flow of a
-       single function, but avoids both ugly pairs and is completely modular.
-       OPTION 4:
-       Actually, it might be in the function provided to [loop] when denoting
-       a collection of blocks that this should take place so that there is no
-       need for a new effect, it's just that the jmp one does more work.
-     *)
-
-  (* Currently unhandled LLVM terminators *)                                  
-  | TERM_Switch _ _ _
-  | TERM_IndirectBr _ _
-  | TERM_Resume _
-  | TERM_Invoke _ _ _ _ => raise "Unsupport LLVM terminator" 
-  end.
-
-(* Denotation of a list of instructions *)
-Fixpoint denote_code (c: code): LLVME unit :=
-  match c with
-  | nil => ret tt
-  | i::c => denote_instr i;; denote_code c
-  end.
-
-(* A block either jumps to another one, or return a dynamic value *)
-(* YZ : I got confused again. Why is the terminator in a block associated to a [instr_id]?
-   It seems to be bogus, might be removable. To be confirmed.
- *)
-Definition denote_block (b: block) : LLVME (block_id + dvalue) :=
-  denote_code b.(blk_code);;
-  denote_terminator (snd b.(blk_term)).
-
-(*
-Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv) (e_init:env) (k:stack) : LLVM (failureE +' debugE) result :=
-  let eval_phi (e:env) '(iid, Phi t ls) :=
-      match assoc RawIDOrd.eq_dec bid_src ls with
-      | Some op =>
-        let dt := eval_typ t in
-        dv <- denote_exp g (Some dt) op ;;
-        ret (add_env iid dv e)
-      | None => raise ("jump: phi node doesn't include block " ++ to_string bid_src )
-      end
-  in
-  debug ("jumping to: " ++ to_string bid_tgt) ;;
-  match find_block_entry CFG fid bid_tgt with
-  | None => raise ("jump: target block " ++ to_string bid_tgt ++ " not found")
-  | Some (BlockEntry phis pc_entry) =>
-      e_out <- monad_fold_right eval_phi phis e_init ;;
-      cont (g, pc_entry, e_out, k)
-  end.
-*)
-
-Definition denote_phi (bid : block_id) (id_p : local_id * phi) : LLVME unit :=
-  let '(id, Phi t args) := id_p in
-  match assoc RawIDOrd.eq_dec bid args with
-  | Some op =>
-    let dt := eval_typ t in
-    lift LocalPushCopy ;;
-    dv <- denote_exp (Some dt) op ;;
-    lift LocalPop ;;
-    lift (LocalWrite id dv)
-  | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
-  end.
-
-(* At this point, we want to tie a first loop to give denotation to a singlo function, that is a cfg *)
-(* That is, we want to define: *)
-Definition denote_cfg (f: cfg) : LLVME dvalue :=
-  loop (fun (bid : block_id + block_id) =>
-          match bid with
-          | inl bid
-          | inr bid =>
-            match find_block f.(blks) bid with
-            | None => raise ("Can't find block in denote_cfg " ++ to_string bid)
-            | Some block =>
-              bd <- denote_block block;;
-              match bd with
-              | inr dv => ret bd
-              | inl bid =>
-                let phi_nodes := block.(blk_phis) in
-                map_monad (denote_phi bid) phi_nodes ;; (* mapM_ :(? *)
-                ret bd
-              end
-            end
+        | EXP_Integer x =>
+          match top with
+          | None                => raise "denote_exp given untyped EXP_Integer"
+          | Some (DTYPE_I bits) => lift_err ret (coerce_integer_to_int bits x)
+          | _                   => raise "bad type for constant int"
           end
-       ) f.(init).
 
-Definition env_of_assoc {A} (l:list (raw_id * A)) : ENV.t A :=
-  List.fold_left (fun e '(k,v) => ENV.add k v e) l (@ENV.empty A).
+        | EXP_Float x =>
+          match top with
+          | None              => raise "denote_exp given untyped EXP_Float"
+          | Some DTYPE_Float  => ret (DVALUE_Float (Float32.of_double x))
+          | Some DTYPE_Double => ret (DVALUE_Double x)
+          | _                 => raise "bad type for constant float"
+          end
 
-Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
-  match l1, l2 with
-  | [], [] => ret []
-  | x::xs, y::ys =>
-    l <- combine_lists_err xs ys ;;
-    ret ((x,y)::l)
-  | _, _ => failwith "combine_lists_err: different length lists"
-  end.
+        | EXP_Hex x =>
+          match top with
+          | None              => raise "denote_exp given untyped EXP_Hex"
+          | Some DTYPE_Float  => ret (DVALUE_Float (Float32.of_double x))
+          | Some DTYPE_Double => ret (DVALUE_Double x)
+          | _                 => raise "bad type for constant hex float"
+          end
 
-Notation MCFGE := (itree (ExternalCallE +' Locals +' IO +' failureE +' debugE)).
+        | EXP_Bool b =>
+          match b with
+          | true  => ret (DVALUE_I1 one)
+          | false => ret (DVALUE_I1 zero)
+          end
 
-Definition denote_mcfg (m : mcfg) : dtyp -> function_id -> list dvalue ->  MCFGE dvalue :=
-  fun dt f_name args =>
-    @mrec CallE (ExternalCallE +' Locals +' IO +' failureE +' debugE)
-          (fun T call =>
-            match call with
-            | Call dt f_name args =>
-              match (find_function m f_name) with
-              | Some fndef =>
-                let (_, ids, cfg) := fndef in
-                bs <- lift_err ret (combine_lists_err ids args) ;;
-                (* lift LocalPush ;; *) (* This is handled by denote_instr of Call *)
-                map_monad (fun '(id, dv) => lift (LocalWrite id dv)) bs ;;
-                denote_cfg cfg
-                (* lift LocalPop *) (* This is handled by denote_terminator of Ret *)
-              | None =>
-                (* This must have been a registered external function  *)
-                (* We _don't_ push a LLVM stack frame, since the external *)
-                (* call takes place in one "atomic" step. *)
-                lift (ExternalCall dt f_name args)
+        | EXP_Null => ret (DVALUE_Addr A.null)
+
+        | EXP_Zero_initializer =>
+          match top with
+          | None   => raise "denote_exp given untyped EXP_Zero_initializer"
+          | Some t => lift_err ret (dv_zero_initializer t)
+          end
+
+        | EXP_Cstring s => raise "EXP_Cstring not yet implemented"
+
+        | EXP_Undef =>
+          match top with
+          | None   => raise "denote_exp given untyped EXP_Undef"
+          | Some t => ret DVALUE_Undef  (* TODO: use t for size? *)
+          end
+
+        (* Question: should we do any typechecking for aggregate types here? *)
+        (* Option 1: do no typechecking: *)
+        | EXP_Struct es =>
+          vs <- map_monad eval_texp es ;;
+          ret (DVALUE_Struct vs)
+
+        (* Option 2: do a little bit of typechecking *)
+        | EXP_Packed_struct es =>
+          match top with
+          | None => raise "denote_exp given untyped EXP_Struct"
+          | Some (DTYPE_Packed_struct _) =>
+            vs <- map_monad eval_texp es ;;
+            ret (DVALUE_Packed_struct vs)
+          | _ => raise "bad type for VALUE_Packed_struct"
+          end
+
+        | EXP_Array es =>
+          vs <- map_monad eval_texp es ;;
+          ret (DVALUE_Array vs)
+             
+        | EXP_Vector es =>
+          vs <- map_monad eval_texp es ;;
+          ret (DVALUE_Vector vs)
+
+        | OP_IBinop iop t op1 op2 =>
+          let dt := eval_typ t in
+          v1 <- denote_exp (Some dt) op1 ;;
+          v2 <- denote_exp (Some dt) op2 ;;
+          lift_err ret (eval_iop iop v1 v2)
+
+        | OP_ICmp cmp t op1 op2 =>
+          let dt := eval_typ t in
+          v1 <- denote_exp (Some dt) op1 ;;
+          v2 <- denote_exp (Some dt) op2 ;;
+          lift_err ret (eval_icmp cmp v1 v2)
+
+        | OP_FBinop fop fm t op1 op2 =>
+          let dt := eval_typ t in    
+          v1 <- denote_exp (Some dt) op1 ;;
+          v2 <- denote_exp (Some dt) op2 ;;
+          lift_err ret (eval_fop fop v1 v2)
+
+        | OP_FCmp fcmp t op1 op2 =>
+          let dt := eval_typ t in
+          v1 <- denote_exp (Some dt) op1 ;;
+          v2 <- denote_exp (Some dt) op2 ;;
+          lift_err ret (eval_fcmp fcmp v1 v2)
+             
+        | OP_Conversion conv t1 op t2 =>
+          let dt1 := eval_typ t1 in
+          v <- denote_exp (Some dt1) op ;;
+          eval_conv conv t1 v t2
+            
+        | OP_GetElementPtr _ (TYPE_Pointer t, ptrval) idxs =>
+          let dt := eval_typ t in
+          vptr <- denote_exp (Some DTYPE_Pointer) ptrval ;;
+          vs <- map_monad (fun '(_, index) => denote_exp (Some (DTYPE_I 32)) index) idxs ;;
+          lift (GEP dt vptr vs)
+
+        | OP_GetElementPtr _ (_, _) _ =>
+          raise "getelementptr has non-pointer type annotation"
+                
+        | OP_ExtractElement vecop idx =>
+          (*  'vec <- monad_app_snd (denote_exp e) vecop;
+              'vidx <- monad_app_snd (denote_exp e) idx;  *)
+          raise "extractelement not implemented" (* TODO: Extract Element *) 
+                
+        | OP_InsertElement vecop eltop idx =>
+          (*  'vec <- monad_app_snd (denote_exp e) vecop;
+              'v <- monad_app_snd (denote_exp e) eltop;
+              'vidx <- monad_app_snd (denote_exp e) idx; *)
+          raise "insertelement not implemented" (* TODO *)
+                
+        | OP_ShuffleVector vecop1 vecop2 idxmask =>
+          (*  'vec1 <- monad_app_snd (denote_exp e) vecop1;
+              'vec2 <- monad_app_snd (denote_exp e) vecop2;      
+              'vidx <- monad_app_snd (denote_exp e) idxmask; *)
+          raise "shufflevector not implemented" (* TODO *)
+
+        | OP_ExtractValue strop idxs =>
+          let '(t, str) := strop in
+          let dt := eval_typ t in
+          str <- denote_exp (Some dt) str;;
+          let fix loop str idxs : err dvalue :=
+              match idxs with
+              | [] => ret str
+              | i :: tl =>
+                v <- index_into_str str i ;;
+               loop v tl
+              end in
+          lift_err ret (loop str idxs)
+                   
+        | OP_InsertValue strop eltop idxs =>
+          (*
+            '(t1, str) <- monad_app_snd (denote_exp e) strop;
+            '(t2, v) <- monad_app_snd (denote_exp e) eltop;
+            let fix loop str idxs : err dvalue :=
+            match idxs with
+            | [] => raise "invalid indices"
+            | [i] =>
+            insert_into_str str v i
+            | i :: tl =>
+            '(_, v) <- index_into_str str i;
+            'v <- loop v tl;
+            insert_into_str str v i
+            end in
+            loop str idxs*)
+          raise "TODO"
+                
+        | OP_Select (t, cnd) (t1, op1) (t2, op2) =>
+          let dt  := eval_typ t in
+          let dt1 := eval_typ t1 in
+          let dt2 := eval_typ t2 in
+          cndv <- denote_exp (Some dt) cnd ;;
+          v1   <- denote_exp (Some dt1) op1 ;;
+          v2   <- denote_exp (Some dt2) op2 ;;
+          lift_err ret (eval_select cndv v1 v2)
+
+        end.
+
+      Arguments denote_exp _ : simpl nomatch.
+
+      Definition eval_op (o:exp) : LLVM1 dvalue :=
+        denote_exp None o.
+      Arguments eval_op _ : simpl nomatch.
+
+      (* An instruction has only side-effects, it therefore returns [unit] *)
+      Definition denote_instr (i: (instr_id * instr)): LLVM1 unit :=
+        match i with
+        (* Pure operations *)
+        | (IId id, INSTR_Op op) =>
+          dv <- eval_op op ;;
+          lift (LocalWrite id dv)
+
+        (* Allocation *)
+        | (IId id, INSTR_Alloca t _ _) =>
+          dv <- lift (Alloca (eval_typ t));;
+          lift (LocalWrite id dv)
+
+        (* Load *)
+        | (IId id, INSTR_Load _ t (u,ptr) _) =>
+          da <- denote_exp (Some (eval_typ u)) ptr ;;
+          dv <- lift (Load (eval_typ t) da);;
+          lift (LocalWrite id dv)
+
+        (* Store *)
+        | (IVoid _, INSTR_Store _ (t, val) (u, ptr) _) =>
+          da <- denote_exp (Some (eval_typ t)) val ;;
+          dv <- denote_exp (Some (eval_typ u)) ptr ;;
+          lift (Store da dv)
+        | (_, INSTR_Store _ _ _ _) => raise "ERROR: Store to non-void ID"
+
+        (* Call *)
+        | (pt, INSTR_Call (t, f) args) =>
+          debug ("call") ;;
+          fv  <- denote_exp None f ;; 
+          dvs <-  map_monad (fun '(t, op) => (denote_exp (Some (eval_typ t)) op)) args ;; 
+          (* Checks whether [fv] a function pointer *)
+           match fv with
+           | DVALUE_Addr addr =>
+             (* TODO: lookup fid given addr from global environment *)
+             fid <- lift_err ret (reverse_lookup_function_id g addr) ;;
+             (* YZ TODO: Shouldn' we raise an error here if fid is not a Name? *)
+             debug ("  fid:" ++ to_string fid) ;;
+             lift (LocalPush);; (* We push a fresh environment on the stack. Could also be done in denote_mcfg *)
+             dv <- lift (Call (eval_typ t) fid dvs);;
+             match pt with
+             | IVoid _ => ret tt
+             | IId id  => lift (LocalWrite id dv)
+             end      
+           | _ => raise "call got non-function pointer"
+           end
+
+        | (_, INSTR_Comment _) => ret tt
+
+        | (_, INSTR_Unreachable) => raise "IMPOSSIBLE: unreachable in reachable position" 
+
+        (* Currently unhandled LLVM instructions *)
+        | (_, INSTR_Fence)
+        | (_, INSTR_AtomicCmpXchg) 
+        | (_, INSTR_AtomicRMW)
+        | (_, INSTR_VAArg)
+        | (_, INSTR_LandingPad) => raise "Unsupported LLVM instruction"
+
+        (* Error states *)                                     
+        | (_, _) => raise "ID / Instr mismatch void/non-void"
+                         
+        end.
+
+      (* A [terminator] either returns from a function call, producing a [dvalue],
+         or jumps to a new [block_id]. *)
+      Definition denote_terminator (t: terminator): LLVM1 (block_id + dvalue) :=
+        match t with
+
+        | TERM_Ret (t, op) =>
+          dv <- denote_exp (Some (eval_typ t)) op ;;
+             (* YZ : Hesitant between three options.
+                1. emit the pop events here and return the dvalue (current choice);
+                2. introduce a Return event that would be handled at the same time as Call and do it;
+                3. mix of both: can return the dynamic value and have no Ret event, but pop in denote_mcfg
+              *)
+          lift LocalPop;; 
+          ret (inr dv)
+
+        | TERM_Ret_void =>
+          lift LocalPop;; 
+          ret (inr DVALUE_None)
+
+        | TERM_Br (t,op) br1 br2 =>
+          dv <- denote_exp (Some (eval_typ t)) op ;; 
+          match dv with 
+          | DVALUE_I1 comparison_bit =>
+            if eq comparison_bit one then
+              ret (inl br1)
+            else
+              ret (inl br2)
+          | _ => raise "Br got non-bool value"
+          end 
+
+        | TERM_Br_1 br => ret (inl br) 
+
+        (* Currently unhandled LLVM terminators *)                                  
+        | TERM_Switch _ _ _
+        | TERM_IndirectBr _ _
+        | TERM_Resume _
+        | TERM_Invoke _ _ _ _ => raise "Unsupport LLVM terminator" 
+        end.
+
+      (* Denoting a list of instruction simply binds the trees together *)
+      Fixpoint denote_code (c: code): LLVM1 unit :=
+        match c with
+        | nil => ret tt
+        | i::c => denote_instr i;; denote_code c
+        end.
+
+      (* A block ends with a terminator, it either jumps to another block,
+         or returns a dynamic value *)
+      Definition denote_block (b: block) : LLVM1 (block_id + dvalue) :=
+        denote_code b.(blk_code);;
+        denote_terminator (snd b.(blk_term)).
+
+      (* One needs to be careful when denoting phi-nodes: they all must
+         be evaluated in the same environment.
+         We therefore starts the denotation of a phi-node by pushing a
+         local copy of the environment of the stack, that we pop back
+         once we are finished evaluating the expression.
+         We then bind the resulting value in the underlying environment.
+       *)
+      Definition denote_phi (bid : block_id) (id_p : local_id * phi) : LLVM1 unit :=
+        let '(id, Phi t args) := id_p in
+        match assoc RawIDOrd.eq_dec bid args with
+        | Some op =>
+          let dt := eval_typ t in
+          lift LocalPushCopy ;;
+          dv <- denote_exp (Some dt) op ;;
+          lift LocalPop ;;
+          lift (LocalWrite id dv)
+        | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
+        end.
+
+      (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
+         a cfg, and calls to functions, that jump from a cfg to another.
+         In order to denote a single [cfg], we tie the first knot by linking together all the blocks
+         contain in the [cfg].
+         Note that contrary to calls, no events have been explicitely introduced for internal jumps.
+         This is due to the _tail recursive_ nature of these jumps: they only occur as the last
+         instruction of blocks. We hence can use a [loop] operator to do the linking, as opposed
+         to the more general [mrec] operator that will be used to link internal calls.
+       *)
+      (* The idea here is simply to enter the body through the [init] [block_id] of the [cfg].
+         As long as the computation returns a new label to jump to, we feed it back to the loop.
+         If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
+       *)
+      (* Note that perhaps surprisingly, this is the place where phi-nodes get handled.
+         The intuition is that the semantics of phi-nodes depends on the identity of the block
+         jumping into the phi-nodes. It's hence actually at the time the jump is performed that
+         we have enough information to perform it.
+       *)
+      (* YZ Note: This should be sufficient to denote LLVM programs.
+         However, it does not give a denotation to open fragments of a [cfg], which might be
+         useful to facilitate some reasoning.
+         To do so, we would need to introduce sub-types of the universe of [block_id] and expose
+         in the type of the constructions the interface of the components, in a fashion similar
+         to the _Asm_ language introduced in the ICFP paper on itrees.
+       *)
+      Definition denote_cfg (f: cfg) : LLVM1 dvalue :=
+        loop (fun (bid : block_id + block_id) =>
+                match bid with
+                | inl bid
+                | inr bid =>
+                  match find_block f.(blks) bid with
+                  | None => raise ("Can't find block in denote_cfg " ++ to_string bid)
+                  | Some block =>
+                    (* We denote the block *)
+                    bd <- denote_block block;;
+                    (* And set the phi-nodes of the new destination, if any *)
+                    match bd with
+                    | inr dv => ret (inr dv)
+                    | inl bid =>
+                      map_monad (denote_phi bid) block.(blk_phis) ;; (* mapM_ :(? *)
+                      ret (inl bid)
+                    end
+                  end
+                end
+             ) f.(init).
+
+      (* TODO : Move this somewhere else *)
+      Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
+        match l1, l2 with
+        | [], [] => ret []
+        | x::xs, y::ys =>
+          l <- combine_lists_err xs ys ;;
+            ret ((x,y)::l)
+        | _, _ => failwith "combine_lists_err: different length lists"
+        end.
+
+      (* We now turn to the second knot to be tied: a top-level LLVM program is a set
+         of mutually recursively defined functions, i.e. [cfg]s. We hence need to
+         resolve this mutually recursive definition by interpreting away the call events.
+         As mentionned above, calls are not tail recursive: we need a more general fixpoint
+         operator than [loop], which [mrec] provides.
+       *)
+      (* A slight complication comes from the fact that not all call events will be interpreted
+         away as such. Some of them correspond to external calls -- to intrinsics -- that will
+         be kept uninterpreted for now.
+         Since the type of [mrec] forces us to get rid of the [CallE] family of events that we
+         interpret, we therefore cast external calls into an isomorphic family of events
+         [ExternalCallE].
+       *)
+      (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
+      Definition denote_mcfg (m : mcfg) : dtyp -> function_id -> list dvalue -> LLVM dvalue :=
+        fun dt f_name args =>
+          @mrec CallE (ExternalCallE +' Locals +' IO +' failureE +' debugE)
+                (fun T call =>
+                   match call with
+                   | Call dt f_name args =>
+                     match (find_function m f_name) with
+                     | Some fndef => (* If the call is internal *)
+                       let (_, ids, cfg) := fndef in
+                       (* We match the arguments variables to the inputs; *)
+                       bs <- lift_err ret (combine_lists_err ids args) ;;
+                       (* lift LocalPush ;; *) (* YZ Note: Handled by denote_instr of Call. Could be done here *)
+                       (* generate the corresponding writes; *)
+                       map_monad (fun '(id, dv) => lift (LocalWrite id dv)) bs ;;
+                       (* and denote the [cfg]. *)
+                       denote_cfg cfg
+                       (* lift LocalPop *)  (* YZ Note: Handled by denote_terminator of Ret. Could be done here *)
+                     | None =>
+                       (* This must have been a registered external function  *)
+                       (* We _don't_ push a LLVM stack frame, since the external *)
+                       (* call takes place in one "atomic" step. *)
+                       lift (ExternalCall dt f_name args)
 
                       (* CB / YZ TODO: Worry about this? *)
                       (*
@@ -694,15 +717,21 @@ Definition denote_mcfg (m : mcfg) : dtyp -> function_id -> list dvalue ->  MCFGE
             end
          ) _ (Call dt f_name args).
 
-(* Call : forall (t:dtyp) (f:function_id) (args:list dvalue), CallE dvalue. *)
-(* (ctx : D ~> itree (D +' E)) : D ~> itree E *)
+    End IN_GLOBAL_ENVIRONMENT.
 
-(* The way we want to do that is via the loop operator:
+  End IN_CFG_CONTEXT.
+
+End Denotation.
+
+      (* Call : forall (t:dtyp) (f:function_id) (args:list dvalue), CallE dvalue. *)
+      (* (ctx : D ~> itree (D +' E)) : D ~> itree E *)
+
+    (* The way we want to do that is via the loop operator:
    loop : forall (E : Type -> Type) (A B C : Type), (C + A -> itree E (C + B)) -> A -> itree E B
    hence in our context:
    loop : forall (A B C: Type), (C + A -> LLVME (C + B)) -> A -> LLVME B
- *)
-(*
+     *)
+    (*
   open_CFG (A: finite_set block_id) (B: finite_set block_id) (I: finite_set block_id)
   A -> LLVME (B + dvalue)
 
@@ -713,9 +742,9 @@ Definition denote_mcfg (m : mcfg) : dtyp -> function_id -> list dvalue ->  MCFGE
    First, the idea is to expose in the type of the constructs an overapproximation of the domain of labels it might jump to.
    At the moment, they can all jump to any block_id without restriction.
    Second, we are quite tied to the concrete representation of [block_id], we hence need to find a way to lift them at the type level.
- *)
+     *)
 
-(* Defining open_cfg
+    (* Defining open_cfg
    Exposing types of labels everywhere.
    And managing to 
    In Asm, labels as Type, we have:
@@ -726,21 +755,23 @@ Definition denote_mcfg (m : mcfg) : dtyp -> function_id -> list dvalue ->  MCFGE
    Definition FinSet (l: list block_id): Type := {bid: block_id | In bid l}.
    (list block_id, FinSet A -> FinSet B) (with tensor product on objects ++)
    (list block_id, FinSet A -> itree E (FinSet B))
- *)
+     *)
 
-(*
+    (*
   Do we need to change the type of cfg to expose more things?
   Basically have a representation of "sub-CFG", that is open programs?
- *)
+     *)
 
-End IN_GLOBAL_ENVIRONMENT.
 (****************************** SCRAPYARD ******************************)
 
   (* Code related to environment unused for global env that are static.
      Should be reused to handle locals.
    *)
+(*
+Definition env  := ENV.t dvalue.
 
-    Definition env  := ENV.t dvalue.
+Definition env_of_assoc {A} (l:list (raw_id * A)) : ENV.t A :=
+  List.fold_left (fun e '(k,v) => ENV.add k v e) l (@ENV.empty A).
 
 
   Fixpoint string_of_env' (e:list (raw_id * dvalue)) :=
@@ -751,7 +782,7 @@ End IN_GLOBAL_ENVIRONMENT.
 
   Instance show_env : Show env := fun env => string_of_env' (ENV.elements env).
   Definition add_env := ENV.add.
-
+*)
   (* Code related to the previous structure of states.
      Will likely not be reused as is. The structure of states should now be
      defined by successive states monads introduced by sucessive handlers.
@@ -800,7 +831,7 @@ End IN_GLOBAL_ENVIRONMENT.
 
 
 (* Defining the Global Environment ------------------------------------------------------- *)
-
+(*
 Definition allocate_globals (gs:list global) : LLVM (failureE +' debugE) genv :=
   monad_fold_right
     (fun (m:genv) (g:global) =>
@@ -834,7 +865,7 @@ Definition build_global_environment : LLVM (failureE +' debugE) genv :=
   g2 <- register_functions g ;;
   _ <- initialize_globals (m_globals CFG) g2 ;;
   ret g2.
-
+*)
 (* Assumes that the entry-point function is named "fname" and that it takes
    no parameters *)
 
@@ -898,7 +929,31 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
     (* do pc_next <- trywith "no fallthrough instruction" (incr_pc CFG pc) ;; *)
     (* match (pt pc), insn  with *)
 
-
+(* YZ : How should we do handle phi nodes?
+       Seems like option 4 is the way to go.
+       OPTION 1:
+       [| block|]: (block_id * block_id) -> LLVME (block_id * block_id)
+       i.e. We treat elementary blocks as having several entry point, one per
+       adress from which we jumped into it.
+       OPTION 2:
+       We actually perform the semantics of phi nodes at the end of the denotation
+       of the jumping block.
+       i.e. : if b1 := jmp b2 and b2 := x = phi (b1,1; b3,3)
+       then [b1] = lift (LocalWrite x 1);; ret b2
+       and of course we do not denote phi nodes first when denoting blocks.
+       Issue (?) Doesn't it break modularity? Can we still loop to tie those things
+       together?
+       OPTION 3:
+       Could the semantics of the phi node use a special event asking the environment
+       where it comes from, and the semantics of the ret using a special event telling
+       the world it's jumping?
+       That kinda implies that now we have two level of handling the control flow of a
+       single function, but avoids both ugly pairs and is completely modular.
+       OPTION 4:
+       Actually, it might be in the function provided to [loop] when denoting
+       a collection of blocks that this should take place so that there is no
+       need for a new effect, it's just that the jmp one does more work.
+     *)
 (*
       match (find_function_entry CFG fid) with
       | Some fnentry =>
@@ -932,6 +987,3 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
                  end
       end
        *)
-End IN_CFG_CONTEXT.
-
-End StepSemantics.
