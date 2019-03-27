@@ -507,9 +507,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
            | DVALUE_Addr addr =>
              (* TODO: lookup fid given addr from global environment *)
              fid <- lift_err ret (reverse_lookup_function_id g addr) ;;
-             (* YZ TODO: Shouldn' we raise an error here if fid is not a Name? *)
+             (* YZ TODO: MARKER1 Shouldn' we raise an error here if fid is not a Name? *)
              debug ("  fid:" ++ to_string fid) ;;
-             lift (LocalPush);; (* We push a fresh environment on the stack. Could also be done in denote_mcfg *)
+             (* lift (LocalPush);; *) (* We push a fresh environment on the stack. TODO: Actually done in denote_mcfg, to remove after confirmation *) 
              dv <- lift (Call (eval_typ t) fid dvs);;
              match pt with
              | IVoid _ => ret tt
@@ -546,11 +546,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
                 2. introduce a Return event that would be handled at the same time as Call and do it;
                 3. mix of both: can return the dynamic value and have no Ret event, but pop in denote_mcfg
               *)
-          lift LocalPop;; 
+          (* lift LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
           ret (inr dv)
 
         | TERM_Ret_void =>
-          lift LocalPop;; 
+          (* lift LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
           ret (inr DVALUE_None)
 
         | TERM_Br (t,op) br1 br2 =>
@@ -686,33 +686,29 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
                        let (_, ids, cfg) := fndef in
                        (* We match the arguments variables to the inputs; *)
                        bs <- lift_err ret (combine_lists_err ids args) ;;
-                       (* lift LocalPush ;; *) (* YZ Note: Handled by denote_instr of Call. Could be done here *)
+                       lift LocalPush ;;  (* YZ Note: Could be done by denote_instr of Call. But then need to be wary of external calls *)
                        (* generate the corresponding writes; *)
                        map_monad (fun '(id, dv) => lift (LocalWrite id dv)) bs ;;
                        (* and denote the [cfg]. *)
-                       denote_cfg cfg
-                       (* lift LocalPop *)  (* YZ Note: Handled by denote_terminator of Ret. Could be done here *)
+                       res <- denote_cfg cfg;;
+                       lift LocalPop;;  (* YZ Note: Could be done by denote_terminator of Ret. But then need to be wary of external calls *)
+                       ret res
                      | None =>
                        (* This must have been a registered external function  *)
                        (* We _don't_ push a LLVM stack frame, since the external *)
                        (* call takes place in one "atomic" step. *)
+
+                       (* We cast the call into ExternalCallE *)
                        lift (ExternalCall dt f_name args)
 
-                      (* CB / YZ TODO: Worry about this? *)
-                      (*
+                       (* CB / YZ TODO: Should we check weither f_name is a [Name] here?
+                          Note sure why we only worry about it in the external call case.
+                          See also remark MARKER1 *)
+                      (* In the old code, we hade:
                       match fid with
-                      | Name s =>
-                        match pt with
-                        | IVoid _ =>  (* void externals don't return a value *)
-                          vis (Call (eval_typ t) s dvs) (fun dv => cont (g, pc_next, e, k))
-                              
-                        | IId id => (* non-void externals are assumed to be type correct and bind a value *)
-                          vis (Call (eval_typ t) s dvs)
-                              (fun dv => cont (g, pc_next, add_env id dv e, k))
-                        end
+                      | Name s => (...)
                       | _ => raise ("step: no function " (* ++ (string_of fid) *))
                       end *)
-                
               end
             end
          ) _ (Call dt f_name args).
