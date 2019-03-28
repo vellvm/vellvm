@@ -25,7 +25,7 @@ From ExtLib Require Import
 
 From ITree Require Import 
      ITree
-     Effects.Std.
+     Effects.Exception.
 
 From Vellvm Require Import
      Util
@@ -118,27 +118,17 @@ Inductive Void :=.
    call <void> @foo(args)
  *)
 Inductive CallE: Type -> Type :=
-(*
-| Return      : forall (dv: dvalue), CallE block_id 
-| ReturnVoid  : CallE block_id
-*)
 | Call        : forall (t:dtyp) (f:function_id) (args:list dvalue), CallE dvalue.
 
 Inductive ExternalCallE: Type -> Type :=
-(*
-| Return      : forall (dv: dvalue), CallE block_id 
-| ReturnVoid  : CallE block_id
-*)
 | ExternalCall : forall (t:dtyp) (f:function_id) (args:list dvalue), ExternalCallE dvalue.
 
 
 (* Interactions with local variables for the LLVM IR *)
 (* YZ TODO: Change names to better ones ? *)
-(* YZ : Should the argument be a raw_id or a string? *)
 (* Note: maybe we can spare useless LocalPush for tailcalls *)
 Inductive Locals : Type -> Type :=
 | LocalPush: Locals unit (* Push a fresh environment. *)
-| LocalPushCopy: Locals unit (* Push a copy of the current environment. *)
 | LocalPop : Locals unit (* Pops it back during a ret *)
 | LocalWrite (id: raw_id) (dv: dvalue): Locals unit
 | LocalRead  (id: raw_id): Locals dvalue.
@@ -165,7 +155,7 @@ Variant debugE : Type -> Type :=
 | Debug : string -> debugE unit.
 
 Definition debug {E} `{debugE -< E} (msg : string) : itree E unit :=
-  lift (Debug msg).
+  send (Debug msg).
 
 Definition debug_hom {E} (R : Type) (e : debugE R) : itree E R :=
   match e with
@@ -186,23 +176,26 @@ Definition into_debug {E F} (h : E ~> LLVM F) : CallE +' ExternalCallE +' Locals
 Definition ignore_debug {E} : LLVM (E +' debugE) ~> LLVM E :=
   interp (into_debug debug_hom).
 
+(* Failures carry string *)
+Definition failureE := exceptE string.
+
 Definition lift_err {A B} (f : A -> LLVM (failureE +' debugE) B) (m:err A) : LLVM (failureE +' debugE) B :=
   match m with
-  | inl x => fail x
+  | inl x => throw x
   | inr x => f x
   end.
 
 Notation "'do' x <- m ;; f" := (lift_err (fun x => f) m)
                                 (at level 100, x ident, m at next level, right associativity).
 
-Definition raise_LLVM {E} := @fail (CallE +' ExternalCallE +' Locals +' IO +' (failureE +' E)) _.
+Definition raise_LLVM {E} := @throw _ (CallE +' ExternalCallE +' Locals +' IO +' (failureE +' E)) _.
 CoFixpoint catch_LLVM {E} {X}
            (f:string -> LLVM (failureE +' E) X)
            (t : LLVM (failureE +' E) X) : LLVM (failureE +' E) X :=
   match (observe t) with
   | RetF x => Ret x
   | TauF t => Tau (catch_LLVM f t)
-  | VisF _ (inr1 (inr1 (inr1 (inr1 (inl1 ( Fail s)))))) k => f s
+  | VisF _ (inr1 (inr1 (inr1 (inr1 (inl1 (Throw s)))))) k => f s
   | VisF _ (inr1 (inr1 (inr1 (inr1 e)))) k => vis e (fun x => catch_LLVM f (k x))
   | VisF _ e k => Vis e (fun x => catch_LLVM f (k x))
   end.

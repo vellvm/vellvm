@@ -22,7 +22,7 @@ From ExtLib Require Import
 From ITree Require Import
      ITree
      Interp.Recursion
-     Effects.Std.
+     Effects.Exception.
 
 From Vellvm Require Import 
      Util
@@ -93,7 +93,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   Definition lookup_id (g:genv) (i:ident) : LLVM1 dvalue :=
     match i with
     | ID_Global x => lift_err ret (lookup_env g x)
-    | ID_Local x =>  (lift (LocalRead x))
+    | ID_Local x =>  (send (LocalRead x))
     end.
 
   (* Lookup attempting to cast adresses into function identifiers *)
@@ -290,6 +290,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   Expressions are denoted as itrees that return a [dvalue].
  *)
 
+      Check 
+        x <- ret 0;;
+        ret 0.
+
       Fixpoint denote_exp (top:option dtyp) (o:exp) {struct o} : LLVM1 dvalue :=
         let eval_texp '(t,ex) :=
             let dt := eval_typ t in
@@ -402,7 +406,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
           let dt := eval_typ t in
           vptr <- denote_exp (Some DTYPE_Pointer) ptrval ;;
           vs <- map_monad (fun '(_, index) => denote_exp (Some (DTYPE_I 32)) index) idxs ;;
-          lift (GEP dt vptr vs)
+          send (GEP dt vptr vs)
 
         | OP_GetElementPtr _ (_, _) _ =>
           raise "getelementptr has non-pointer type annotation"
@@ -477,24 +481,24 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
         (* Pure operations *)
         | (IId id, INSTR_Op op) =>
           dv <- eval_op op ;;
-          lift (LocalWrite id dv)
+          send (LocalWrite id dv)
 
         (* Allocation *)
         | (IId id, INSTR_Alloca t _ _) =>
-          dv <- lift (Alloca (eval_typ t));;
-          lift (LocalWrite id dv)
+          dv <- send (Alloca (eval_typ t));;
+          send (LocalWrite id dv)
 
         (* Load *)
         | (IId id, INSTR_Load _ t (u,ptr) _) =>
           da <- denote_exp (Some (eval_typ u)) ptr ;;
-          dv <- lift (Load (eval_typ t) da);;
-          lift (LocalWrite id dv)
+          dv <- send (Load (eval_typ t) da);;
+          send (LocalWrite id dv)
 
         (* Store *)
         | (IVoid _, INSTR_Store _ (t, val) (u, ptr) _) =>
           da <- denote_exp (Some (eval_typ t)) val ;;
           dv <- denote_exp (Some (eval_typ u)) ptr ;;
-          lift (Store da dv)
+          send (Store da dv)
         | (_, INSTR_Store _ _ _ _) => raise "ERROR: Store to non-void ID"
 
         (* Call *)
@@ -509,11 +513,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
              fid <- lift_err ret (reverse_lookup_function_id g addr) ;;
              (* YZ TODO: MARKER1 Shouldn' we raise an error here if fid is not a Name? *)
              debug ("  fid:" ++ to_string fid) ;;
-             (* lift (LocalPush);; *) (* We push a fresh environment on the stack. TODO: Actually done in denote_mcfg, to remove after confirmation *) 
-             dv <- lift (Call (eval_typ t) fid dvs);;
+             (* send (LocalPush);; *) (* We push a fresh environment on the stack. TODO: Actually done in denote_mcfg, to remove after confirmation *) 
+             dv <- send (Call (eval_typ t) fid dvs);;
              match pt with
              | IVoid _ => ret tt
-             | IId id  => lift (LocalWrite id dv)
+             | IId id  => send (LocalWrite id dv)
              end      
            | _ => raise "call got non-function pointer"
            end
@@ -546,11 +550,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
                 2. introduce a Return event that would be handled at the same time as Call and do it;
                 3. mix of both: can return the dynamic value and have no Ret event, but pop in denote_mcfg
               *)
-          (* lift LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
+          (* send LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
           ret (inr dv)
 
         | TERM_Ret_void =>
-          (* lift LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
+          (* send LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
           ret (inr DVALUE_None)
 
         | TERM_Br (t,op) br1 br2 =>
@@ -586,6 +590,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
         denote_code b.(blk_code);;
         denote_terminator (snd b.(blk_term)).
 
+      (* YZ FIX: no need to push/pop, but do all the assignments afterward *)
       (* One needs to be careful when denoting phi-nodes: they all must
          be evaluated in the same environment.
          We therefore starts the denotation of a phi-node by pushing a
@@ -593,15 +598,13 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
          once we are finished evaluating the expression.
          We then bind the resulting value in the underlying environment.
        *)
-      Definition denote_phi (bid : block_id) (id_p : local_id * phi) : LLVM1 unit :=
+      Definition denote_phi (bid : block_id) (id_p : local_id * phi) : LLVM1 (local_id * dvalue) :=
         let '(id, Phi t args) := id_p in
         match assoc RawIDOrd.eq_dec bid args with
         | Some op =>
           let dt := eval_typ t in
-          lift LocalPushCopy ;;
           dv <- denote_exp (Some dt) op ;;
-          lift LocalPop ;;
-          lift (LocalWrite id dv)
+          ret (id,dv)
         | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
         end.
 
@@ -630,6 +633,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
          in the type of the constructions the interface of the components, in a fashion similar
          to the _Asm_ language introduced in the ICFP paper on itrees.
        *)
+      (*
+        We actually might be able to denote open programs without sending things at the level
+        of types, just by deciding internally to loop or not and not reflect the invariant
+        in the type.
+       *)
       Definition denote_cfg (f: cfg) : LLVM1 dvalue :=
         loop (fun (bid : block_id + block_id) =>
                 match bid with
@@ -644,7 +652,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
                     match bd with
                     | inr dv => ret (inr dv)
                     | inl bid =>
-                      map_monad (denote_phi bid) block.(blk_phis) ;; (* mapM_ :(? *)
+                      dvs <- map_monad (denote_phi bid) block.(blk_phis) ;; (* mapM_ :(? *)
+                      map_monad (fun '(id,dv) => send (LocalWrite id dv)) dvs;;
                       ret (inl bid)
                     end
                   end
@@ -686,12 +695,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
                        let (_, ids, cfg) := fndef in
                        (* We match the arguments variables to the inputs; *)
                        bs <- lift_err ret (combine_lists_err ids args) ;;
-                       lift LocalPush ;;  (* YZ Note: Could be done by denote_instr of Call. But then need to be wary of external calls *)
+                       send LocalPush ;;  (* YZ Note: Could be done by denote_instr of Call. But then need to be wary of external calls *)
                        (* generate the corresponding writes; *)
-                       map_monad (fun '(id, dv) => lift (LocalWrite id dv)) bs ;;
+                       map_monad (fun '(id, dv) => send (LocalWrite id dv)) bs ;;
                        (* and denote the [cfg]. *)
                        res <- denote_cfg cfg;;
-                       lift LocalPop;;  (* YZ Note: Could be done by denote_terminator of Ret. But then need to be wary of external calls *)
+                       send LocalPop;;  (* YZ Note: Could be done by denote_terminator of Ret. But then need to be wary of external calls *)
                        ret res
                      | None =>
                        (* This must have been a registered external function  *)
@@ -699,7 +708,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
                        (* call takes place in one "atomic" step. *)
 
                        (* We cast the call into ExternalCallE *)
-                       lift (ExternalCall dt f_name args)
+                       send (ExternalCall dt f_name args)
 
                        (* CB / YZ TODO: Should we check weither f_name is a [Name] here?
                           Note sure why we only worry about it in the external call case.
@@ -719,46 +728,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
 
 End Denotation.
 
-      (* Call : forall (t:dtyp) (f:function_id) (args:list dvalue), CallE dvalue. *)
-      (* (ctx : D ~> itree (D +' E)) : D ~> itree E *)
-
-    (* The way we want to do that is via the loop operator:
-   loop : forall (E : Type -> Type) (A B C : Type), (C + A -> itree E (C + B)) -> A -> itree E B
-   hence in our context:
-   loop : forall (A B C: Type), (C + A -> LLVME (C + B)) -> A -> LLVME B
-     *)
-    (*
-  open_CFG (A: finite_set block_id) (B: finite_set block_id) (I: finite_set block_id)
-  A -> LLVME (B + dvalue)
-
-  First try: C = A = block_id and B = dvalue
-  Start with this.
-
-   But this raises a few issues.
-   First, the idea is to expose in the type of the constructs an overapproximation of the domain of labels it might jump to.
-   At the moment, they can all jump to any block_id without restriction.
-   Second, we are quite tied to the concrete representation of [block_id], we hence need to find a way to lift them at the type level.
-     *)
-
-    (* Defining open_cfg
-   Exposing types of labels everywhere.
-   And managing to 
-   In Asm, labels as Type, we have:
-   (Type, A -> B) and (Type, A -> itree E B)
-   With Fin types as labels, we have:
-   (Nat, Fin A -> Fin B) and (Nat, Fin A -> itree E (Fin B))
-   Here, do we need:
-   Definition FinSet (l: list block_id): Type := {bid: block_id | In bid l}.
-   (list block_id, FinSet A -> FinSet B) (with tensor product on objects ++)
-   (list block_id, FinSet A -> itree E (FinSet B))
-     *)
-
-    (*
-  Do we need to change the type of cfg to expose more things?
-  Basically have a representation of "sub-CFG", that is open programs?
-     *)
-
-(****************************** SCRAPYARD ******************************)
+  (****************************** SCRAPYARD ******************************)
 
   (* Code related to environment unused for global env that are static.
      Should be reused to handle locals.
@@ -935,7 +905,7 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
        We actually perform the semantics of phi nodes at the end of the denotation
        of the jumping block.
        i.e. : if b1 := jmp b2 and b2 := x = phi (b1,1; b3,3)
-       then [b1] = lift (LocalWrite x 1);; ret b2
+       then [b1] = send (LocalWrite x 1);; ret b2
        and of course we do not denote phi nodes first when denoting blocks.
        Issue (?) Doesn't it break modularity? Can we still loop to tie those things
        together?
