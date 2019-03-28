@@ -690,7 +690,7 @@ Definition init_state (fname:string) : LLVM (failureE +' debugE) state :=
 CoFixpoint step_sem (r:result) : LLVM (failureE +' debugE) dvalue :=
   match r with
   | Done v => ret v
-  | Step s => x <- step s ;; ITree.Tau (step_sem x)
+  | Step s => x <- step s ;; ITreeDefinition.Tau (step_sem x)
   end.
 
 End IN_CFG_CONTEXT.

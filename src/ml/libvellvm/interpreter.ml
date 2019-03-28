@@ -43,7 +43,7 @@ let debug (msg:string) =
     Printf.printf "DEBUG: %s\n%!" msg
 
 let rec step m : (DV.dvalue, string) result =
-  let open ITree in
+  let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
   | TauF x -> step x
