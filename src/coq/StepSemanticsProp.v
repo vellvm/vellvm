@@ -22,13 +22,14 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 
 Module StepSemanticsProp(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
-  Module SS := StepSemantics(A)(LLVMIO).
+  Module SS := Denotation(A)(LLVMIO).
   Import SS.
   Import LLVMIO.DV.
 
   Section Properties.
 
-
+  (* CB: THESE GO AWAY *)
+  (*
   (** *Theorems about the environment *)
   Section ENVFACTS.
     
@@ -104,7 +105,7 @@ Module StepSemanticsProp(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
         erewrite <- lookup_env_tl; eauto.
     Qed.      
   End ENVFACTS.
-  
+  *)
   Definition pc_satisfies (CFG:mcfg) (p:pc) (P:cmd -> Prop) : Prop :=
     forall cmd, fetch CFG p = Some cmd -> P cmd.
 

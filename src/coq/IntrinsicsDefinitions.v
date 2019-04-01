@@ -26,8 +26,7 @@ From Vellvm Require Import
 
 
 From ITree Require Import
-     ITree
-     Effects.Std.
+     ITree.
 
 Import MonadNotation.
 Import EqvNotation.

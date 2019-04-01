@@ -32,6 +32,7 @@ From Vellvm Require Import
      LLVMAst
      MemoryAddress
      DynamicValues
+     LocalEnvironment
      Error.
 
 From Paco Require Import
@@ -107,6 +108,9 @@ Global Instance Eqv_addr : Eqv ADDR.addr := (@eq ADDR.addr).
 Module DV := DynamicValues.DVALUE(ADDR).
 Export DV.
 
+Module LCLS := LocalEnvironment.LLVM_LOCALS(ADDR).
+Export LCLS.
+
 Inductive Void :=.
 
 (* Call event for the LLVM IR *)
@@ -122,16 +126,6 @@ Inductive CallE: Type -> Type :=
 
 Inductive ExternalCallE: Type -> Type :=
 | ExternalCall : forall (t:dtyp) (f:function_id) (args:list dvalue), ExternalCallE dvalue.
-
-
-(* Interactions with local variables for the LLVM IR *)
-(* YZ TODO: Change names to better ones ? *)
-(* Note: maybe we can spare useless LocalPush for tailcalls *)
-Inductive Locals : Type -> Type :=
-| LocalPush: Locals unit (* Push a fresh environment. *)
-| LocalPop : Locals unit (* Pops it back during a ret *)
-| LocalWrite (id: raw_id) (dv: dvalue): Locals unit
-| LocalRead  (id: raw_id): Locals dvalue.
 
 (* IO Interactions for the LLVM IR *)
 Inductive IO : Type -> Type :=
