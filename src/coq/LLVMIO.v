@@ -185,7 +185,9 @@ Notation "'do' x <- m ;; f" := (lift_err (fun x => f) m)
                                 (at level 100, x ident, m at next level, right associativity).
 
 
+
 Definition raise_FailureE {E} `{failureE -< E} := @throw _ E _.
+(*
 CoFixpoint catch_FailureE {E F X} `{E -< F} `{failureE -< F}
            (f:string -> itree F X)
            (t : itree (failureE +' E) X) : itree F X :=
@@ -201,6 +203,7 @@ Global Instance monad_exc_FailureE {E} : (MonadExc string (itree (failureE +' E)
   raise := raise_FailureE ;
   catch := fun T m f => catch_FailureE f m ;
 }.
+ *)
 
 CoFixpoint catch_FailureE1E2 {E1 E2 F X} `{E1 -< F} `{E2 -< F} `{failureE -< F}
            (f:string -> itree F X)
@@ -218,7 +221,6 @@ Global Instance monad_exc_FailureE1E2 {E1 E2} : (MonadExc string (itree (E1 +' f
   raise := raise_FailureE ;
   catch := fun T m f => catch_FailureE1E2 f m ;
 }.
-
 
 End LLVM_INTERACTIONS.
 

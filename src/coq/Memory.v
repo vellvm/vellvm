@@ -501,13 +501,13 @@ Definition handle_mem {X} : (IO X) -> memory -> itree (IO +' failureE +' debugE)
     | MemoryIntrinsic t f args =>
       match f with
       | Name s =>
-        if true then  (* FIXME: use reldec typeclass? *)
+        if string_dec s "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
           match handle_memcpy args m with
           | inl err => raise err
           | inr m' => ret (m', DVALUE_None)
           end
         else            
-          raise "Unknown memory intrinsic: " ++ s
+          raise ("Unknown memory intrinsic: " ++ s)
       | _ => raise "Unnamed memory intrinsic."
       end
     end.
