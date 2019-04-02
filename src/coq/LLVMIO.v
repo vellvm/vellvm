@@ -23,7 +23,7 @@ From ExtLib Require Import
      Programming.Show
      Structures.Monads.
 
-From ITree Require Import 
+From ITree Require Import
      ITree
      Effects.Exception.
 
@@ -64,7 +64,7 @@ Section hiding_notation.
   Import ShowNotation.
   Local Open Scope show_scope.
 
-  Fixpoint show_dtyp' (dt:dtyp) := 
+  Fixpoint show_dtyp' (dt:dtyp) :=
     match dt with
     | DTYPE_I sz     => ("i" << show sz)
     | DTYPE_Pointer  => "ptr"
@@ -76,7 +76,7 @@ Section hiding_notation.
     | DTYPE_Fp128    => "fp128"
     | DTYPE_Ppc_fp128 => "ppc_fp128"
     | DTYPE_Metadata  => "metadata"
-    | DTYPE_X86_mmx   => "x86_mmx" 
+    | DTYPE_X86_mmx   => "x86_mmx"
     | DTYPE_Array sz t
           => ("[" << show sz << " x " << (show_dtyp' t) << "]")
     | DTYPE_Struct fields
@@ -95,7 +95,7 @@ End hiding_notation.
 Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
 Global Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.addr_dec.
-Global Instance Eqv_addr : Eqv ADDR.addr := (@eq ADDR.addr).  
+Global Instance Eqv_addr : Eqv ADDR.addr := (@eq ADDR.addr).
 
 (* The set of dynamic types manipulated by an LLVM program.  Mostly
    isomorphic to LLVMAst.typ but
@@ -182,27 +182,45 @@ Definition lift_err {A B} (f : A -> LLVM (failureE +' debugE) B) (m:err A) : LLV
 Notation "'do' x <- m ;; f" := (lift_err (fun x => f) m)
                                 (at level 100, x ident, m at next level, right associativity).
 
-Definition raise_LLVM {E} := @throw _ (CallE +' ExternalCallE +' Locals +' IO +' (failureE +' E)) _.
-CoFixpoint catch_LLVM {E} {X}
-           (f:string -> LLVM (failureE +' E) X)
-           (t : LLVM (failureE +' E) X) : LLVM (failureE +' E) X :=
+
+Definition raise_FailureE {E} `{failureE -< E} := @throw _ E _.
+CoFixpoint catch_FailureE {E F X} `{E -< F} `{failureE -< F}
+           (f:string -> itree F X)
+           (t : itree (failureE +' E) X) : itree F X :=
   match (observe t) with
   | RetF x => Ret x
-  | TauF t => Tau (catch_LLVM f t)
-  | VisF _ (inr1 (inr1 (inr1 (inr1 (inl1 (Throw s)))))) k => f s
-  | VisF _ (inr1 (inr1 (inr1 (inr1 e)))) k => vis e (fun x => catch_LLVM f (k x))
-  | VisF _ e k => Vis e (fun x => catch_LLVM f (k x))
+  | TauF t => Tau (catch_FailureE f t)
+  | VisF _ (inl1 (Throw s)) k => f s
+  | VisF _ (inr1 e) k => vis e (fun x => catch_FailureE f (k x))
   end.
 
-Global Instance monad_exc_LLVM : (MonadExc string (LLVM (failureE +' debugE))) := {
-  raise := raise_LLVM ;
-  catch := fun T m f => catch_LLVM f m ;
-}.                                                              
+(* CB TODO: Can we have 1 instance of MonadExc? *)
+Global Instance monad_exc_FailureE {E} : (MonadExc string (itree (failureE +' E))) := {
+  raise := raise_FailureE ;
+  catch := fun T m f => catch_FailureE f m ;
+}.
+
+CoFixpoint catch_FailureE1E2 {E1 E2 F X} `{E1 -< F} `{E2 -< F} `{failureE -< F}
+           (f:string -> itree F X)
+           (t : itree (E1 +' failureE +' E2) X) : itree F X :=
+  match (observe t) with
+  | RetF x => Ret x
+  | TauF t => Tau (catch_FailureE1E2 f t)
+  | VisF _ (inr1 (inl1 (Throw s))) k => f s
+  | VisF _ e k => vis e (fun x => catch_FailureE1E2 f (k x))
+  end.
+
+
+(* CB TODO: Can we have 1 instance of MonadExc? *)
+Global Instance monad_exc_FailureE1E2 {E1 E2} : (MonadExc string (itree (E1 +' failureE +' E2))) := {
+  raise := raise_FailureE ;
+  catch := fun T m f => catch_FailureE1E2 f m ;
+}.
 
 
 End LLVM_INTERACTIONS.
 
-  
+
 Module Make(ADDR : MemoryAddress.ADDRESS) <: LLVM_INTERACTIONS(ADDR).
 Include LLVM_INTERACTIONS(ADDR).
 End Make.

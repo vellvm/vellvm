@@ -12,8 +12,7 @@ From Coq Require Import
      List String.
 
 From ITree Require Import
-     ITree
-     Effects.Std.
+     ITree.
 
 From ExtLib Require Import 
      Structures.Monads.
@@ -39,7 +38,7 @@ Export IO.DV.
 
 Open Scope string_scope.
 
-Definition run_with_memory prog : option (LLVM (failureE +' debugE) DV.dvalue) :=
+Definition run_with_memory prog : option (LLVM (failureE +' debugE) (M.memory * DV.dvalue)) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
   mcfg <- CFG.mcfg_of_modul scfg ;;
   let core_trace : LLVM (failureE +' debugE) dvalue :=

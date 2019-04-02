@@ -43,13 +43,13 @@ let debug (msg:string) =
     Printf.printf "DEBUG: %s\n%!" msg
 
 let rec step m : (DV.dvalue, string) result =
-  let open ITree in
+  let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
   | TauF x -> step x
 
   (* We finished the computation *)
-  | RetF v -> Ok v
+  | RetF (_,v) -> Ok v
 
   (* The failE effect is a failure *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 s), _) ->

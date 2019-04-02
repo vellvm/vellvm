@@ -17,7 +17,9 @@ From Coq Require Import
 
 From ITree Require Import
      ITree
-     Effects.Std.
+     Basics.Basics
+     Effects.Exception
+     Effects.State.
 
 From ExtLib Require Import
      Structures.Monads
@@ -434,95 +436,95 @@ Definition handle_memcpy (args : List.list dvalue) (m:memory) : err memory :=
   end.
 
 
-(* TODO: structure this more like an interpreter from the ITrees library *)
 (* TODO:
-     these operations are too defined: load and store should fail if the 
+   - we can use the handler combinators to make these more modular
+
+   - these operations are too defined: load and store should fail if the 
      address isn't in range
 *)
 
-Definition mem_step {X} (e:IO X) (m:memory) : err (IO X + (memory * X)) :=
-  match e with
-  | Alloca t =>
-    let new_block := make_empty_block t in
-    ret (inr (add (size m) new_block m,
-               DVALUE_Addr (size m, 0)))
-         
-  | Load t dv => ret
-    match dv with
-    | DVALUE_Addr a =>
-      match a with
-      | (b, i) =>
-        match lookup b m with
-        | Some block =>
-          inr (m,
-               deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t)
-        | None => inl (Load t dv)
+Definition handle_mem {X} : (IO X) -> memory -> itree (IO +' failureE +' debugE) (memory * X)%type :=
+  fun e m =>
+    match e with
+    | Alloca t =>
+      let new_block := make_empty_block t in
+      ret (add (size m) new_block m,
+           DVALUE_Addr (size m, 0))
+          
+    | Load t dv =>
+        match dv with
+        | DVALUE_Addr (b, i) =>
+          ret match lookup b m with
+              | Some block =>
+                (m, deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t)
+              | None => (m, DVALUE_Undef)
+              end
+        | _ => raise "Load got non-address dvalue"
         end
-      end
-    | _ => inl (Load t dv)
-    end 
 
-  | Store dv v => ret
-    match dv with
-    | DVALUE_Addr a =>
-      match a with
-      | (b, i) =>
+    | Store dv v => 
+      match dv with
+      | DVALUE_Addr (b, i) =>
         match lookup b m with
         | Some m' =>
-          inr (add b (add_all_index (serialize_dvalue v) i m') m, tt) 
-        | None => inl (Store dv v)
+          ret (add b (add_all_index (serialize_dvalue v) i m') m, tt) 
+        | None => raise "stored to unallocated address"
         end
+      | _ => raise "Store got non-address dvalue"
       end
-    | _ => inl (Store dv v)
-    end
-      
-  | GEP t dv vs =>
-    r <- handle_gep t dv vs m ;;
-    ret (inr r)
 
-  | ItoP i =>
-    match i with
-    | DVALUE_I64 i => ret (inr (m, DVALUE_Addr (0, unsigned i)))
-    | DVALUE_I32 i => ret (inr (m, DVALUE_Addr (0, unsigned i)))
-    | DVALUE_I8 i => ret (inr (m, DVALUE_Addr (0, unsigned i)))
-    | DVALUE_I1 i => ret (inr (m, DVALUE_Addr (0, unsigned i)))
-    | _ => raise "Non integer passed to ItoP"
-    end
-    
-  | PtoI a =>
-    match a with
-    | DVALUE_Addr (b, i) =>
-      if Z.eqb b 0 then ret (inr (m, DVALUE_Addr(0, i)))
-      else let (k, m) := concretize_block b m in
-           ret (inr (m, DVALUE_Addr (0, (k + i))))
-    | _ => raise "Non pointer passed to PtoI"
-    end
-      
-  | Call t f args =>
-    if string_dec f "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
-      m' <- handle_memcpy args m;;
-      ret (inr (m', DVALUE_None))
-    else
-      ret (inl (Call t f args))
+    | GEP t dv vs =>
+      match handle_gep t dv vs m with
+      | inl err => raise err
+      | inr v => ret v
+      end
 
-  end.
+    | ItoP i =>
+      match i with
+      | DVALUE_I64 i => ret (m, DVALUE_Addr (0, unsigned i))
+      | DVALUE_I32 i => ret (m, DVALUE_Addr (0, unsigned i))
+      | DVALUE_I8 i => ret (m, DVALUE_Addr (0, unsigned i))
+      | DVALUE_I1 i => ret (m, DVALUE_Addr (0, unsigned i))
+      | _ => raise "Non integer passed to ItoP"
+      end
+  
+    | PtoI a =>
+      match a with
+      | DVALUE_Addr (b, i) =>
+        if Z.eqb b 0 then ret (m, DVALUE_Addr(0, i))
+        else let (k, m) := concretize_block b m in
+             ret (m, DVALUE_Addr (0, (k + i)))
+      | _ => raise "PtoI got non-address dvalue"
+      end
 
-(*
- memory -> TraceLLVMIO () -> TraceX86IO () -> Prop
-*)
+    (* CB TODO: Need to handle this *)
+    (*
+    | Call t f args =>
+      if string_dec f "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
+        match handle_memcpy args m with
+        | inl err => raise err
+        | inr m' => ret (m', DVALUE_None)
+        end
+      else            
+        vis (Call t f args) (fun x => ret (m, x))
+     *)
+    end.
+             
 
-CoFixpoint memD {X} (m:memory) (d: LLVM (failureE +' debugE) X) : LLVM (failureE +' debugE) X :=
-  match d.(observe) with
-  | TauF d' => Tau (memD m d')
-  | VisF _ (inr1 f) k => Vis (inr1 f) k
-  | VisF _ (inl1 io) k =>
-    match mem_step io m with
-    | inr (inr (m', v)) => Tau (memD m' (k v))
-    | inr (inl e) => Vis (inl1 io) (fun v => memD m (k v))
-    | inl s => raise s
-    end
-  | RetF x => d
-  end%itree.
 
+Definition handleMem {X} : (IO +' (failureE +' debugE)) X -> memory -> (itree (IO +' (failureE +' debugE))) (memory * X)%type :=
+  fun e m => 
+    match e with
+    | inl1 io => handle_mem io m
+    | inr1 (inl1 (Throw s)) => raise s
+    | inr1 (inr1 d) =>
+      match d with
+      | Debug s => vis (Debug s) (fun _ => ret (m, tt)) (* SAZ: should be able to use lift *)
+      end
+    end.
+
+Definition memD {X} (m:memory) (d: itree (IO +' (failureE +' debugE)) X) : itree (IO +' (failureE +' debugE)) (memory * X)%type :=
+  interp_state (fun T => @handleMem T) d m.
+  
 End Make.
 

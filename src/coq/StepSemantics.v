@@ -19,6 +19,7 @@ From ExtLib Require Import
      Structures.Monads
      Eqv.
 
+
 From ITree Require Import
      ITree
      Interp.Recursion
@@ -62,6 +63,23 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
      - Emit debugging information (debugE)
    *)
   Notation LLVM1 := (itree (CallE +' ExternalCallE +' Locals +' IO +' failureE +' debugE)).
+
+  (* CB TODO: Can we have 1 instance of MonadExc? *)
+  CoFixpoint catch_LLVM1 {E F X} `{E -< F} `{failureE -< F}
+             (f:string -> LLVM1 X)
+             (t : LLVM1 X) : LLVM1 X :=
+    match (observe t) with
+    | RetF x => Ret x
+    | TauF t => Tau (catch_LLVM1 f t)
+    | VisF _ (inr1 (inr1 (inr1 (inr1 (inl1 (Throw s)))))) k => f s
+    | VisF _ e k => vis e (fun x => catch_LLVM1 f (k x))
+    end.
+
+  Global Instance monad_exc_LLVM1 : (MonadExc string LLVM1) :=
+    {
+      raise := raise_FailureE ;
+      catch := fun T m f => catch_LLVM1 f m ;
+    }.
 
   (* The mutually recursive functions are tied together, interpreting away all internal calls*)
   Notation LLVM := (itree (ExternalCallE +' Locals +' IO +' failureE +' debugE)).
@@ -845,7 +863,7 @@ Definition init_state (fname:string) : LLVM (failureE +' debugE) state :=
 CoFixpoint step_sem (r:result) : LLVM (failureE +' debugE) dvalue :=
   match r with
   | Done v => ret v
-  | Step s => x <- step s ;; ITree.Tau (step_sem x)
+  | Step s => x <- step s ;; ITreeDefinition.Tau (step_sem x)
   end.
 
 (* TODO: move elsewhere? *)
