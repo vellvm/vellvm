@@ -79,12 +79,12 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
             | inl msg => raise msg
             | inr result => Ret result
             end
-          | None => fun pf => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.send e)) dvalue pf
+          | None => fun pf => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.trigger e)) dvalue pf
           end
-        | Store _ _ => fun pf  => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.send e)) unit pf
-        | _ => fun pf  => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.send e)) dvalue pf
+        | Store _ _ => fun pf  => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.trigger e)) unit pf
+        | _ => fun pf  => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.trigger e)) dvalue pf
         end eq_refl
-      | inr1 _ => ITree.send e
+      | inr1 _ => ITree.trigger e
       end.
         
   Definition evaluate_intrinsics (intrinsic_def : intrinsic_definitions)

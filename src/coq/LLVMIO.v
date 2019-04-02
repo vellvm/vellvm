@@ -25,7 +25,7 @@ From ExtLib Require Import
 
 From ITree Require Import 
      ITree
-     Effects.Exception.
+     Events.Exception.
 
 From Vellvm Require Import
      Util
@@ -131,7 +131,7 @@ Variant debugE : Type -> Type :=
 | Debug : string -> debugE unit.
 
 Definition debug {E} `{debugE -< E} (msg : string) : itree E unit :=
-  send (Debug msg).
+  trigger (Debug msg).
 
 Definition debug_hom {E} (R : Type) (e : debugE R) : itree E R :=
   match e with

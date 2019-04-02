@@ -33,7 +33,7 @@ From Vellvm Require Import
      TypeUtil.
 
 Import Sum.
-Import OpenSum.
+Import Subevent.
 Import EqvNotation.
 Import ListNotations.
 Import MonadNotation.

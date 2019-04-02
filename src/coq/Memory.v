@@ -18,8 +18,8 @@ From Coq Require Import
 From ITree Require Import
      ITree
      Basics.Basics
-     Effects.Exception
-     Effects.State.
+     Events.Exception
+     Events.State.
 
 From ExtLib Require Import
      Structures.Monads
