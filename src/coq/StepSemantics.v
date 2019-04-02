@@ -62,7 +62,41 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
      - Failure (failurE)
      - Emit debugging information (debugE)
    *)
-  Notation LLVM1 := (itree (CallE +' ExternalCallE +' Locals +' IO +' failureE +' debugE)).
+
+  (* Maybe should be "Locals +' CallE +' blah ...."
+
+     If you handle locals before you tie the knot, then you basically
+     have a single environment. Then calls need to handle stack.
+
+
+     (itree (CallE +' Locals +' ExternalCallE +' IO +' failureE +' debugE)).
+
+     Pure intrinsics, like math. Sin / cos and stuff. Some need to be
+     handled at the memory model level, like memcpy.
+
+     Do we need to separate ExternalCalls? Or Memory model
+     takes... ExternalCallE +' IO and produces ExternalCallE
+     itrees. Handles some ExternalCalls, but not necessarily all of
+     them.
+
+     Rename IO to MemE or something.
+
+     (itree (CallE +' Locals +' ExternalCallE +' IO +' failureE +' debugE)).
+
+     - StepSemantics: gets rid of CallE denote_mcfg (denote_cfg in practice never emits ExternalCalls)
+       + Linking, do we want to make this distinction?
+     - LocalEnvironment: gets rid of locals
+     - Intrinsics.v: should this be two?
+     - Memory.v: takes ExternalCallE and IO
+
+
+     - Add MemoryIntrinsic to IO, kind of like how Call used to be. Can now interpret away entirely inside memory model
+       + Call would have to figure out which ones are memory
+         intrinsics and which ones are not. Should have this information
+         while linking CFGs.
+       + General memory models need a way of registering which intrinsics they handle.
+  *)
+  Notation LLVM1 := (itree (CallE +' Locals +' ExternalCallE +'IO +' failureE +' debugE)).
 
   (* CB TODO: Can we have 1 instance of MonadExc? *)
   CoFixpoint catch_LLVM1 {E F X} `{E -< F} `{failureE -< F}
@@ -971,3 +1005,6 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
                  end
       end
        *)
+
+Check void1.
+Check send.

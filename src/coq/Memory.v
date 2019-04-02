@@ -509,9 +509,44 @@ Definition handle_mem {X} : (IO X) -> memory -> itree (IO +' failureE +' debugE)
         vis (Call t f args) (fun x => ret (m, x))
      *)
     end.
-             
 
 
+(* TODO: clean this up *)
+(* {E} `{failureE -< E} : IO ~> stateT memory (itree E)  *)
+(* Won't need to be case analysis, just passes through failure + debug *)
+(* Might get rid of this one *)
+(* This can't show that IO ∉ E :( *)
+(* Alternative 2: Fix order of effects
+
+   Layer interpretors so that they each chain into the next. Have to
+   do ugly matches everywhere :(.
+
+   Split the difference:
+
+   `{IO -< IO +' failureE +' debugE}
+
+   Alternative 3: follow 2, and then use notations to make things better.
+
+   Alternative 4: Extend itrees mechanisms with some kind of set operations.
+
+   If you want to allow sums on the left of your handlers, you want
+   this notion of an atomic handler / event, which is different from a
+   variable or a sum...
+
+   `{E +' F -< G}
+
+   This seems too experimental to try to work out now --- chat with Li Yao about it.
+
+   Alternative 2 might be the most straightforward way to get things working in the short term.
+
+   We just want to get everything hooked together to build and test
+   it. Then think about making the interfaces nicer. The steps to alt
+   2, start with LLVM1 ordering as the basic default. Then each stage
+   of interpretation peels off one, or reintroduces the same kind of
+   events / changes it.
+
+   
+*)
 Definition handleMem {X} : (IO +' (failureE +' debugE)) X -> memory -> (itree (IO +' (failureE +' debugE))) (memory * X)%type :=
   fun e m => 
     match e with
