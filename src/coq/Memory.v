@@ -441,7 +441,7 @@ Definition handle_memcpy (args : List.list dvalue) (m:memory) : err memory :=
 
    - these operations are too defined: load and store should fail if the 
      address isn't in range
-*)
+ *)
 
 Definition handle_mem {X} : (IO X) -> memory -> itree (IO +' failureE +' debugE) (memory * X)%type :=
   fun e m =>
@@ -498,16 +498,18 @@ Definition handle_mem {X} : (IO X) -> memory -> itree (IO +' failureE +' debugE)
       end
 
     (* CB TODO: Need to handle this *)
-    (*
-    | Call t f args =>
-      if string_dec f "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
-        match handle_memcpy args m with
-        | inl err => raise err
-        | inr m' => ret (m', DVALUE_None)
-        end
-      else            
-        vis (Call t f args) (fun x => ret (m, x))
-     *)
+    | MemoryIntrinsic t f args =>
+      match f with
+      | Name s =>
+        if true then  (* FIXME: use reldec typeclass? *)
+          match handle_memcpy args m with
+          | inl err => raise err
+          | inr m' => ret (m', DVALUE_None)
+          end
+        else            
+          raise "Unknown memory intrinsic: " ++ s
+      | _ => raise "Unnamed memory intrinsic."
+      end
     end.
 
 

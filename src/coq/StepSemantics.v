@@ -96,7 +96,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
          while linking CFGs.
        + General memory models need a way of registering which intrinsics they handle.
   *)
-  Notation LLVM1 := (itree (CallE +' Locals +' ExternalCallE +'IO +' failureE +' debugE)).
+  Notation LLVM1 := (itree (CallE +' Locals +' ExternalCallE +' IO +' failureE +' debugE)).
 
   (* CB TODO: Can we have 1 instance of MonadExc? *)
   CoFixpoint catch_LLVM1 {E F X} `{E -< F} `{failureE -< F}
@@ -116,7 +116,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     }.
 
   (* The mutually recursive functions are tied together, interpreting away all internal calls*)
-  Notation LLVM := (itree (ExternalCallE +' Locals +' IO +' failureE +' debugE)).
+  Notation LLVM := (itree (Locals +' ExternalCallE +' IO +' failureE +' debugE)).
  
   (* Environments ------------------------------------------------------------- *)
   (* Used to implement (static) global environments.
@@ -738,7 +738,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
       Definition denote_mcfg (m : mcfg) : dtyp -> function_id -> list dvalue -> LLVM dvalue :=
         fun dt f_name args =>
-          @mrec CallE (ExternalCallE +' Locals +' IO +' failureE +' debugE)
+          @mrec CallE (Locals +' ExternalCallE +' IO +' failureE +' debugE)
                 (fun T call =>
                    match call with
                    | Call dt f_name args =>

@@ -62,7 +62,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
      callE ~> LLVME 
    *)
   Definition handle_intrinsics (intrinsic_defs : intrinsic_definitions)
-    : (IO +' (failureE +' debugE)) ~> LLVM (failureE +' debugE) :=
+    : (ExternalCallE +' IO +' failureE +' debugE) ~> itree (ExternalCallE +' IO +' failureE +' debugE) :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
     let defs_assoc := List.map (fun '(a,b) =>
                                   match dc_name a with
@@ -70,27 +70,30 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                                   | _ => ("",b)
                                   end
                                ) intrinsic_defs in
-    fun X (e : (IO +' (failureE +' debugE)) X) =>
-      match e return LLVM (failureE +' debugE) X with
+    fun X (e : (ExternalCallE +' IO +' failureE +' debugE) X) =>
+      match e return itree (ExternalCallE +' IO +' failureE +' debugE) X with
       | inl1 e' =>
-        match e' in IO Y return X = Y -> LLVM (failureE +' debugE) Y with
-        | Call _ fname args => 
-          match assoc Strings.String.string_dec fname defs_assoc with
-          | Some f => fun pf => 
-            match f args with
-            | inl msg => raise msg
-            | inr result => Ret result
+        let '(ExternalCall _ fid args) := e' in
+        match e' in ExternalCallE Y return X = Y -> itree (ExternalCallE +' IO +' failureE +' debugE) Y with
+        | ExternalCall _ fid args =>
+          match fid with
+          | Name fname =>
+            match assoc Strings.String.string_dec fname defs_assoc with
+            | Some f => fun pf => 
+                         match f args with
+                         | inl msg => raise msg
+                         | inr result => Ret result
+                         end
+            | None => fun pf => (eq_rect X (fun a => itree (ExternalCallE +' IO +' failureE +' debugE) a) (ITree.send e)) dvalue pf
             end
-          | None => fun pf => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.send e)) dvalue pf
+          | _ => raise "Unnamed external call."
           end
-        | Store _ _ => fun pf  => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.send e)) unit pf
-        | _ => fun pf  => (eq_rect X (fun a => LLVM (failureE +' debugE) a) (ITree.send e)) dvalue pf
         end eq_refl
       | inr1 _ => ITree.send e
       end.
         
   Definition evaluate_intrinsics (intrinsic_def : intrinsic_definitions)
-             : forall R, LLVM (failureE +' debugE) R -> LLVM (failureE +' debugE) R  :=
+             : forall R, itree (ExternalCallE +' IO +' failureE +' debugE) R -> itree (ExternalCallE +' IO +' failureE +' debugE) R  :=
     interp (handle_intrinsics intrinsic_def).
 
   Definition evaluate_with_defined_intrinsics := evaluate_intrinsics defined_intrinsics.
