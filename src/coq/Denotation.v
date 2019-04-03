@@ -848,39 +848,7 @@ Definition env_of_assoc {A} (l:list (raw_id * A)) : ENV.t A :=
 
 (* Defining the Global Environment ------------------------------------------------------- *)
 (*
-Definition allocate_globals (gs:list global) : LLVM (failureE +' debugE) genv :=
-  monad_fold_right
-    (fun (m:genv) (g:global) =>
-       vis (Alloca (eval_typ (g_typ g))) (fun v => ret (ENV.add (g_ident g) v m))) gs (@ENV.empty _).
 
-
-Definition register_declaration (g:genv) (d:declaration) : LLVM (failureE +' debugE) genv :=
-  (* TODO: map dc_name d to the returned address *)
-    vis (Alloca DTYPE_Pointer) (fun v => ret (ENV.add (dc_name d) v g)).
-
-Definition register_functions (g:genv) : LLVM (failureE +' debugE) genv :=
-  monad_fold_right register_declaration
-                   ((m_declarations CFG) ++ (List.map df_prototype (m_definitions CFG)))
-                   g.
-  
-Definition initialize_globals (gs:list global) (g:genv) : LLVM (failureE +' debugE) unit :=
-  monad_fold_right
-    (fun (_:unit) (glb:global) =>
-       let dt := eval_typ (g_typ glb) in
-       do a <- lookup_env g (g_ident glb) ;;
-       dv <-
-           match (g_exp glb) with
-           | None => ret DVALUE_Undef
-           | Some e => denote_exp g (Some dt) e
-           end ;;
-       vis (Store a dv) ret)
-    gs tt.
-  
-Definition build_global_environment : LLVM (failureE +' debugE) genv :=
-  g <- allocate_globals (m_globals CFG) ;;
-  g2 <- register_functions g ;;
-  _ <- initialize_globals (m_globals CFG) g2 ;;
-  ret g2.
 *)
 (* Assumes that the entry-point function is named "fname" and that it takes
    no parameters *)

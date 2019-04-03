@@ -17,7 +17,7 @@ From ExtLib Require Import
      Data.String.
 
 From Vellvm Require Import 
-     LLVMIO
+     LLVMEvents
      LLVMAst
      Error
      Coqlib
@@ -139,7 +139,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     fun args =>
       match args with
       | [DVALUE_Float d] => ret (DVALUE_Float (Float32.abs d))
-      | _ => raise "llvm_fabs_f64 got incorrect / ill-typed intputs"
+      | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed intputs"
       end.
 
   (* Abosulute value for Doubles. *)
@@ -147,7 +147,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     fun args =>
       match args with
       | [DVALUE_Double d] => ret (DVALUE_Double (Float.abs d))
-      | _ => raise "llvm_fabs_f64 got incorrect / ill-typed intputs"
+      | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed intputs"
       end.
 
   (* Clients of Vellvm can register the names of their own intrinsics

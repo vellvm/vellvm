@@ -50,7 +50,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Import DV.
 
 
-Typeclasses eauto := 4.
   (* Interprets Call events found in the given association list by their
      semantic functions.  
 
@@ -62,9 +61,9 @@ Typeclasses eauto := 4.
 
      callE ~> LLVME 
    *)
-Print Instances MonadExc.
+
   Definition handle_intrinsics (intrinsic_defs : intrinsic_definitions)
-    : (ExternalCallE +' IO +' failureE +' debugE) ~> itree (ExternalCallE +' IO +' failureE +' debugE) :=
+    : IntrinsicE ~> LLVM_MCFG1 :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
     let defs_assoc := List.map (fun '(a,b) =>
                                   match dc_name a with
@@ -72,31 +71,34 @@ Print Instances MonadExc.
                                   | _ => ("",b)
                                   end
                                ) intrinsic_defs in
-    fun X (e : (ExternalCallE +' IO +' failureE +' debugE) X) =>
-      match e return itree (ExternalCallE +' IO +' failureE +' debugE) X with
-      | inl1 e' =>
-        let '(ExternalCall _ fid args) := e' in
-        match e' in ExternalCallE Y return X = Y -> itree (ExternalCallE +' IO +' failureE +' debugE) Y with
-        | ExternalCall _ fid args =>
-          match fid with
-          | Name fname =>
-            match assoc Strings.String.string_dec fname defs_assoc with
-            | Some f => fun pf => 
-                         match f args with
-                         | inl msg => @raise string _ (@monad_exc_FailureE1E2 (ExternalCallE +' IO) debugE) _ msg
-                         | inr result => Ret result
-                         end
-            | None => fun pf => (eq_rect X (fun a => itree (ExternalCallE +' IO +' failureE +' debugE) a) (ITree.send e)) dvalue pf
-            end
-          | _ => raise "Unnamed external call."
+    fun X (e : IntrinsicE X) =>
+      match e in IntrinsicE Y return X = Y -> LLVM_MCFG1 Y with
+      | (Intrinsic _ fid args) =>
+        match fid with
+        | Name fname =>
+          match assoc Strings.String.string_dec fname defs_assoc with
+          | Some f => fun pf => 
+                       match f args with
+                       | inl msg => raise msg
+                       | inr result => Ret result
+                       end
+          | None => fun pf => (eq_rect X (fun a => LLVM_MCFG1 a) (send e)) dvalue pf
           end
-        end eq_refl
-      | inr1 _ => ITree.send e
-      end.
-        
+        | _ => fun _ => raise "Unnamed external call."
+        end
+      end eq_refl.
+     
+
+  (* CB / YZ: TODO "principle this" *)
+  Definition mem_trigger : Handler MemoryE (MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE) :=
+  fun X e => send e.
+
+  Definition rest_trigger : Handler (MemoryIntrinsicE +' DebugE +' FailureE) (MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE) :=
+    fun X e => send e.
+
   Definition evaluate_intrinsics (intrinsic_def : intrinsic_definitions)
-             : forall R, itree (ExternalCallE +' IO +' failureE +' debugE) R -> itree (ExternalCallE +' IO +' failureE +' debugE) R  :=
-    interp (handle_intrinsics intrinsic_def).
+             : forall R, LLVM_MCFG1 R -> LLVM_MCFG1 R  :=
+    interp (case_ mem_trigger (case_ (handle_intrinsics intrinsic_def) rest_trigger)).
 
   Definition evaluate_with_defined_intrinsics := evaluate_intrinsics defined_intrinsics.
   
