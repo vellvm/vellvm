@@ -32,7 +32,7 @@ From Vellvm Require Import
      AstLib
      CFG
      MemoryAddress
-     LLVMIO
+     LLVMEvents
      TypeUtil.
 
 Import Sum.
@@ -49,18 +49,18 @@ Open Scope monad_scope.
 Open Scope string_scope.
 Open Scope Z_scope.
 
-Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
+(* YZ Ask Steve: why is LLVMEvents an argument to the functor rather than have Make(A) inside the module? *)
+Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
-  Import LLVMIO.
-  (* YZ note: take a more consistent scheme of names for events *)
+  Import LLVMEvents.
   (* Denotational semantics of LLVM programs.
      Each sub-component is denoted as an itree that can emit any of the following effects:
      - Internal Call (CallE)
-     - External Call (ExternalCallE)
-     - Manipulation of the local environment (Locals)
-     - Memory interactions (IO)
-     - Failure (failurE)
-     - Emit debugging information (debugE)
+     - External Call (IntrinsicE and MemoryIntrinsicE)
+     - Manipulation of the local environment (LocalE)
+     - Memory interactions (MemoryE)
+     - Failure (FailureE)
+     - Emit debugging information (DebugE)
    *)
 
   (* Maybe should be "Locals +' CallE +' blah ...."
@@ -83,7 +83,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
 
      (itree (CallE +' Locals +' ExternalCallE +' IO +' failureE +' debugE)).
 
-     - StepSemantics: gets rid of CallE denote_mcfg (denote_cfg in practice never emits ExternalCalls)
+     - Denotation: gets rid of CallE denote_mcfg (denote_cfg in practice never emits ExternalCalls)
        + Linking, do we want to make this distinction?
      - LocalEnvironment: gets rid of locals
      - Intrinsics.v: should this be two?
@@ -96,8 +96,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
          while linking CFGs.
        + General memory models need a way of registering which intrinsics they handle.
   *)
-  Notation LLVM1 := (itree (CallE +' Locals +' ExternalCallE +' IO +' failureE +' debugE)).
 
+  (*
   (* CB TODO: Can we have 1 instance of MonadExc? *)
   CoFixpoint catch_LLVM1 {E F X} `{E -< F} `{failureE -< F}
              (f:string -> LLVM1 X)
@@ -108,25 +108,23 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     | VisF _ (inr1 (inr1 (inr1 (inr1 (inl1 (Throw s)))))) k => f s
     | VisF _ e k => vis e (fun x => catch_LLVM1 f (k x))
     end.
-
+   *)
+(*
   Global Instance monad_exc_LLVM1 : (MonadExc string LLVM1) :=
     {
       raise := raise_FailureE ;
       catch := fun T m f => catch_LLVM1 f m ;
     }.
+ *)
+
 
   (* The mutually recursive functions are tied together, interpreting away all internal calls*)
-  Notation LLVM := (itree (Locals +' ExternalCallE +' IO +' failureE +' debugE)).
  
   (* Environments ------------------------------------------------------------- *)
   (* Used to implement (static) global environments.
      The same data-structure will be reused for local (dynamic) environments.
    *)
   Module ENV := FMapWeakList.Make(AstLib.RawIDOrd).
-
-  (* YZ note : do we need those two over here? *)
-  (* Module ENVFacts := FMapFacts.WFacts_fun(AstLib.RawIDOrd)(ENV). *)
-  (* Module ENVProps := FMapFacts.WProperties_fun(AstLib.RawIDOrd)(ENV). *)
 
   (* Global environments *)
   Definition genv := ENV.t dvalue.
@@ -142,10 +140,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
      otherwise emits the corresponding read event.
    *)
   (* YZ note: read/writes for local and load/store for memory is fine? *)
-  Definition lookup_id (g:genv) (i:ident) : LLVM1 dvalue :=
+  Definition lookup_id (g:genv) (i:ident) : LLVM_CFG dvalue :=
     match i with
     | ID_Global x => lift_err ret (lookup_env g x)
-    | ID_Local x =>  (send (LocalRead x))
+    | ID_Local x  =>  (send (LocalRead x))
     end.
 
   (* Lookup attempting to cast adresses into function identifiers *)
@@ -161,11 +159,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     | Some (fid, _) => ret fid
     end.
 
-
   Section CONVERSIONS.
     (* Conversions can't go into DynamicValues because Int2Ptr and Ptr2Int casts 
        generate memory effects. *)
-    Definition eval_conv_h conv t1 x t2 : LLVM1 dvalue :=
+    Definition eval_conv_h conv t1 x t2 : LLVM_CFG dvalue :=
       match conv with
       | Trunc =>
         match t1, x, t2 with
@@ -296,7 +293,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
       end.
     Arguments eval_conv_h _ _ _ _ : simpl nomatch.
 
-    Definition eval_conv conv t1 x t2 : LLVM1 dvalue :=
+    Definition eval_conv conv t1 x t2 : LLVM_CFG dvalue :=
       match t1, x with
       | TYPE_I bits, dv =>
         eval_conv_h conv t1 dv t2
@@ -346,7 +343,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
         x <- ret 0;;
         ret 0.
 
-      Fixpoint denote_exp (top:option dtyp) (o:exp) {struct o} : LLVM1 dvalue :=
+      Fixpoint denote_exp (top:option dtyp) (o:exp) {struct o} : LLVM_CFG dvalue :=
         let eval_texp '(t,ex) :=
             let dt := eval_typ t in
             v <- denote_exp (Some dt) ex ;;
@@ -523,12 +520,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
 
       Arguments denote_exp _ : simpl nomatch.
 
-      Definition eval_op (o:exp) : LLVM1 dvalue :=
+      Definition eval_op (o:exp) : LLVM_CFG dvalue :=
         denote_exp None o.
       Arguments eval_op _ : simpl nomatch.
 
       (* An instruction has only side-effects, it therefore returns [unit] *)
-      Definition denote_instr (i: (instr_id * instr)): LLVM1 unit :=
+      Definition denote_instr (i: (instr_id * instr)): LLVM_CFG unit :=
         match i with
         (* Pure operations *)
         | (IId id, INSTR_Op op) =>
@@ -592,7 +589,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
 
       (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
-      Definition denote_terminator (t: terminator): LLVM1 (block_id + dvalue) :=
+      Definition denote_terminator (t: terminator): LLVM_CFG (block_id + dvalue) :=
         match t with
 
         | TERM_Ret (t, op) =>
@@ -630,7 +627,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
         end.
 
       (* Denoting a list of instruction simply binds the trees together *)
-      Fixpoint denote_code (c: code): LLVM1 unit :=
+      Fixpoint denote_code (c: code): LLVM_CFG unit :=
         match c with
         | nil => ret tt
         | i::c => denote_instr i;; denote_code c
@@ -638,7 +635,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
 
       (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-      Definition denote_block (b: block) : LLVM1 (block_id + dvalue) :=
+      Definition denote_block (b: block) : LLVM_CFG (block_id + dvalue) :=
         denote_code b.(blk_code);;
         denote_terminator (snd b.(blk_term)).
 
@@ -650,7 +647,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
          once we are finished evaluating the expression.
          We then bind the resulting value in the underlying environment.
        *)
-      Definition denote_phi (bid : block_id) (id_p : local_id * phi) : LLVM1 (local_id * dvalue) :=
+      Definition denote_phi (bid : block_id) (id_p : local_id * phi) : LLVM_CFG (local_id * dvalue) :=
         let '(id, Phi t args) := id_p in
         match assoc RawIDOrd.eq_dec bid args with
         | Some op =>
@@ -690,7 +687,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
         of types, just by deciding internally to loop or not and not reflect the invariant
         in the type.
        *)
-      Definition denote_cfg (f: cfg) : LLVM1 dvalue :=
+      Definition denote_cfg (f: cfg) : LLVM_CFG dvalue :=
         loop (fun (bid : block_id + block_id) =>
                 match bid with
                 | inl bid
@@ -736,9 +733,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
          [ExternalCallE].
        *)
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
-      Definition denote_mcfg (m : mcfg) : dtyp -> function_id -> list dvalue -> LLVM dvalue :=
+      Definition denote_mcfg (m : mcfg) : dtyp -> function_id -> list dvalue -> LLVM_MCFG dvalue :=
         fun dt f_name args =>
-          @mrec CallE (Locals +' ExternalCallE +' IO +' failureE +' debugE)
+          @mrec CallE _
                 (fun T call =>
                    match call with
                    | Call dt f_name args =>
@@ -760,7 +757,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
                        (* call takes place in one "atomic" step. *)
 
                        (* We cast the call into ExternalCallE *)
-                       send (ExternalCall dt f_name args)
+                       (* YZ TODO: cast them into MemoryIntrinsic if applicable *)
+                       send (Intrinsic dt f_name args)
 
                        (* CB / YZ TODO: Should we check weither f_name is a [Name] here?
                           Note sure why we only worry about it in the external call case.
@@ -1005,6 +1003,3 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
                  end
       end
        *)
-
-Check void1.
-Check send.

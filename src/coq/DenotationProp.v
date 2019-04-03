@@ -13,7 +13,7 @@ Require Import ExtLib.Structures.Monads.
 
 Require Import Vellvm.Util.
 Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG Vellvm.CFGProp.
-Require Import Vellvm.LLVMIO Vellvm.StepSemantics.
+Require Import Vellvm.LLVMIO Vellvm.Denotation.
 
 Import MonadNotation.
 Import ListNotations.
@@ -21,7 +21,7 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Module StepSemanticsProp(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
+Module DenotationProp(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
   Module SS := Denotation(A)(LLVMIO).
   Import SS.
   Import LLVMIO.DV.
@@ -187,7 +187,7 @@ End Properties.
   Qed.
 
   
-(* StepSemanticsProp.v *)
+(* DenotationProp.v *)
 Lemma stepD_Eff_weakening :
   forall CFG fn bid phis term,
     let slc := slc_pc fn bid phis term in
@@ -213,7 +213,7 @@ Proof.
     reflexivity.
 Qed.    
 
-(* StepSemanticsProp.v *)
+(* DenotationProp.v *)
 Lemma stepD_Eff_Alloca_inversion :
   forall CFG fn bid phis term,
     let slc := slc_pc fn bid phis term in
@@ -232,7 +232,7 @@ Proof.
   inversion H0.
 Qed.
 
-(* StepSemanticsProp.v *)
+(* DenotationProp.v *)
 Lemma stepD_Eff_Load_inversion :
   forall CFG fn bid phis term,
     let slc := slc_pc fn bid phis term in
@@ -255,7 +255,7 @@ Proof.
   inversion HS1.
 Qed.
 
-(* StepSemanticsProp.v *)
+(* DenotationProp.v *)
 Lemma stepD_Eff_Store_inversion :
   forall CFG fn bid phis term,
     let slc := slc_pc fn bid phis term in
@@ -280,7 +280,7 @@ Proof.
      subst. split; auto.
 Qed.
 
-(* StepSemanticsProp.v *)
+(* DenotationProp.v *)
 Lemma stepD_Op_weakening :
   forall CFG fn bid phis term,
     let slc := slc_pc fn bid phis term in
@@ -300,5 +300,5 @@ Proof.
 Qed.
 *)
 
-End StepSemanticsProp.  
+End DenotationProp.  
 

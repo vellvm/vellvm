@@ -20,7 +20,7 @@ From ExtLib Require Import
 From Vellvm Require Import 
      Util
      LLVMAst
-     LLVMIO
+     LLVMEvents
      Error
      IntrinsicsDefinitions.
 
@@ -50,6 +50,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Import DV.
 
 
+Typeclasses eauto := 4.
   (* Interprets Call events found in the given association list by their
      semantic functions.  
 
@@ -61,6 +62,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
      callE ~> LLVME 
    *)
+Print Instances MonadExc.
   Definition handle_intrinsics (intrinsic_defs : intrinsic_definitions)
     : (ExternalCallE +' IO +' failureE +' debugE) ~> itree (ExternalCallE +' IO +' failureE +' debugE) :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
@@ -81,7 +83,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
             match assoc Strings.String.string_dec fname defs_assoc with
             | Some f => fun pf => 
                          match f args with
-                         | inl msg => raise msg
+                         | inl msg => @raise string _ (@monad_exc_FailureE1E2 (ExternalCallE +' IO) debugE) _ msg
                          | inr result => Ret result
                          end
             | None => fun pf => (eq_rect X (fun a => itree (ExternalCallE +' IO +' failureE +' debugE) a) (ITree.send e)) dvalue pf

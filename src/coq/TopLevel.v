@@ -18,8 +18,8 @@ From ExtLib Require Import
      Structures.Monads.
 
 From Vellvm Require Import 
-     LLVMIO
-     StepSemantics
+     LLVMEvents
+     Denotation
      Memory
      Intrinsics.
 
