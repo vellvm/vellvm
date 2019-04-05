@@ -62,11 +62,7 @@ University of Pennsylvania as part of the DeepSpec project.
 Compilation:
 
 1. clone the vellvm git repo with `--recurse-submodule` option (`git clone --recurse-submodules`)
-2. compile 3rd party libraries:
-   1. Compile InteractionTrees
-	  - run `make` from the InteractionTrees directory  (do _not_ use `setup.sh`
-        since that will clone another copy of paco and we already assume ext-lib exists)
-3. run `make` in the /src directory
+2. run `make` in the /src directory
 
 # Running
 
