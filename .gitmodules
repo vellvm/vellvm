@@ -1,6 +1,3 @@
 [submodule "lib/coq2html"]
 	path = lib/coq2html
 	url = https://github.com/xavierleroy/coq2html.git
-[submodule "lib/InteractionTrees"]
-	path = lib/InteractionTrees
-	url = https://github.com/DeepSpec/InteractionTrees.git
