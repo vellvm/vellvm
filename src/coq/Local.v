@@ -9,7 +9,7 @@ From ExtLib Require Import
 
 From ITree Require Import 
      ITree
-     Effects.State.
+     Events.State.
 
 From Vellvm Require Import
      LLVMAst
