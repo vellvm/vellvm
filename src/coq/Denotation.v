@@ -339,10 +339,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Expressions are denoted as itrees that return a [dvalue].
  *)
 
-      Check 
-        x <- ret 0;;
-        ret 0.
-
       Fixpoint denote_exp (top:option dtyp) (o:exp) {struct o} : LLVM_CFG dvalue :=
         let eval_texp '(t,ex) :=
             let dt := eval_typ t in

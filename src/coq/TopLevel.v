@@ -46,10 +46,15 @@ Definition allocate_globals (CFG: CFG.mcfg) (gs:list global) : LLVM_CFG D.genv :
        vis (Alloca (D.eval_typ CFG (g_typ g))) (fun v => ret (D.ENV.add (g_ident g) v m))) gs (@D.ENV.empty _).
 
 
+(* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
 Definition register_declaration (g:D.genv) (d:declaration) : LLVM_CFG D.genv :=
   (* TODO: map dc_name d to the returned address *)
     vis (Alloca DTYPE_Pointer) (fun v => ret (D.ENV.add (dc_name d) v g)).
 
+(* SAZ: for "open" MCFGs we have
+    - (m_declarations CFG) is the set of possible ExternalCalls 
+    - (List.map df_prototype (m_definitions CFG)) is the set of possilbe Entry Functions  (also internal calls)
+*)
 Definition register_functions (CFG: CFG.mcfg) (g:D.genv) : LLVM_CFG D.genv :=
   monad_fold_right register_declaration
                    ((m_declarations CFG) ++ (List.map df_prototype (m_definitions CFG)))
@@ -78,7 +83,7 @@ Definition run_with_memory prog : option (LLVM_MCFG2 (M.memory * DV.dvalue)) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
   mcfg <- CFG.mcfg_of_modul scfg ;;
   let core_trace :=
-      build_global_environment mcfg
+      build_global_environment mcfg ;;
       D.denote_mcfg mcfg
       s <- D.init_state mcfg "main" ;;
         D.step_sem mcfg (D.Step s)
