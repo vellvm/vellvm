@@ -548,9 +548,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         (* Store *)
         | (IVoid _, INSTR_Store _ (t, val) (u, ptr) _) =>
-          da <- denote_exp_cfg (Some (eval_typ t)) val ;;
-          dv <- denote_exp_cfg (Some (eval_typ u)) ptr ;;
+          dv <- denote_exp_cfg (Some (eval_typ t)) val ;;
+          da <- denote_exp_cfg (Some (eval_typ u)) ptr ;;
           trigger (Store da dv)
+          
         | (_, INSTR_Store _ _ _ _) => raise "ERROR: Store to non-void ID"
 
         (* Call *)

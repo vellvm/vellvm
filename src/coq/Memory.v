@@ -26,6 +26,7 @@ Import Basics.Basics.Monads.
 From ExtLib Require Import
      Structures.Monads
      Programming.Eqv
+     Programming.Show
      Data.String.
 
 From Vellvm Require Import 
@@ -439,7 +440,7 @@ Admitted.
    - we can use the handler combinators to make these more modular
 
    - these operations are too defined: load and store should fail if the 
-     address isn't in range
+n     address isn't in range
    *)
 
   Definition handle_memory {E} `{FailureE -< E}: MemoryE ~> stateT memory (itree E) :=
@@ -469,7 +470,7 @@ Admitted.
             ret (add b (add_all_index (serialize_dvalue v) i m') m, tt) 
           | None => raise "stored to unallocated address"
           end
-        | _ => raise "Store got non-address dvalue"
+        | _ => raise ("Store got non-address dvalue: " ++ (to_string dv))
         end
 
       | GEP t dv vs =>

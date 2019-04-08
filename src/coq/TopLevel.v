@@ -84,13 +84,21 @@ Definition build_global_environment (CFG : CFG.mcfg) : LLVM _MCFG D.genv :=
 (* Local environment implementation *)
 Definition local_env := FMapAList.alist raw_id dvalue.
 
+(* (for now) assume that [main (i64 argc, i8** argv)] 
+    pass in 0 and null as the arguments to main
+   Note: this isn't compliant with standard C semantics
+*)
+Definition main_args := [DV.DVALUE_I64 (DynamicValues.Int64.zero);
+                         DV.DVALUE_Addr (Memory.A.null)
+                        ].
+
 Definition run_with_memory (prog: list (toplevel_entity (list block))) :
   option (LLVM _MCFG2 (M.memory * (@L.stack local_env * DV.dvalue))) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
   mcfg <- CFG.mcfg_of_modul scfg ;;       
        let core_trace :=
            glbls <- build_global_environment mcfg ;;
-           D.denote_mcfg mcfg glbls DTYPE_Void (Name "main") [] in
+           D.denote_mcfg mcfg glbls DTYPE_Void (Name "main") main_args in
        let mem_trace := @L.run_local local_env _ _ _ _ core_trace L.start_stack in
        let interpreted_Trace := M.run_memory mem_trace M.empty in
        ret interpreted_Trace.
