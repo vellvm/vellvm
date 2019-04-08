@@ -55,17 +55,14 @@ University of Pennsylvania as part of the DeepSpec project.
     - ext-lib    (installed via, e.g. opam install coq-ext-lib)
     - paco       (installed via, e.g. opam install coq-paco)
     - flocq      (installed via, e.g. opam install coq-flocq, see note below) 
-  - ocamlc : version 4.04    (probably works with 4.03 or later)
+    - itree      (installed via, e.g. opam install coq-itree)
+- ocamlc : version 4.04    (probably works with 4.03 or later)
   - OPAM packages: dune, menhir, [optional: llvm  (for llvm v. 3.8)]
 
 Compilation:
 
 1. clone the vellvm git repo with `--recurse-submodule` option (`git clone --recurse-submodules`)
-2. compile 3rd party libraries:
-   1. Compile InteractionTrees
-	  - run `make` from the InteractionTrees directory  (do _not_ use `setup.sh`
-        since that will clone another copy of paco and we already assume ext-lib exists)
-3. run `make` in the /src directory
+2. run `make` in the /src directory
 
 # Running
 

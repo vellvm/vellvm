@@ -23,7 +23,7 @@ From ExtLib Require Import
 From ITree Require Import
      ITree
      Interp.Recursion
-     Effects.Exception.
+     Events.Exception.
 
 From Vellvm Require Import 
      Util
@@ -36,7 +36,7 @@ From Vellvm Require Import
      TypeUtil.
 
 Import Sum.
-Import OpenSum.
+Import Subevent.
 Import EqvNotation.
 Import ListNotations.
 Import MonadNotation.
@@ -143,7 +143,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Definition lookup_id (g:genv) (i:ident) : LLVM_CFG dvalue :=
     match i with
     | ID_Global x => lift_err ret (lookup_env g x)
-    | ID_Local x  =>  (send (LocalRead x))
+    | ID_Local x  =>  (trigger (LocalRead x))
     end.
 
   (* Lookup attempting to cast adresses into function identifiers *)
@@ -455,7 +455,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           let dt := eval_typ t in
           vptr <- denote_exp (Some DTYPE_Pointer) ptrval ;;
           vs <- map_monad (fun '(_, index) => denote_exp (Some (DTYPE_I 32)) index) idxs ;;
-          send (GEP dt vptr vs)
+          trigger (GEP dt vptr vs)
 
         | OP_GetElementPtr _ (_, _) _ =>
           raise "getelementptr has non-pointer type annotation"
@@ -530,24 +530,24 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Pure operations *)
         | (IId id, INSTR_Op op) =>
           dv <- eval_op op ;;
-          send (LocalWrite id dv)
+          trigger (LocalWrite id dv)
 
         (* Allocation *)
         | (IId id, INSTR_Alloca t _ _) =>
-          dv <- send (Alloca (eval_typ t));;
-          send (LocalWrite id dv)
+          dv <- trigger (Alloca (eval_typ t));;
+          trigger (LocalWrite id dv)
 
         (* Load *)
         | (IId id, INSTR_Load _ t (u,ptr) _) =>
           da <- denote_exp (Some (eval_typ u)) ptr ;;
-          dv <- send (Load (eval_typ t) da);;
-          send (LocalWrite id dv)
+          dv <- trigger (Load (eval_typ t) da);;
+          trigger (LocalWrite id dv)
 
         (* Store *)
         | (IVoid _, INSTR_Store _ (t, val) (u, ptr) _) =>
           da <- denote_exp (Some (eval_typ t)) val ;;
           dv <- denote_exp (Some (eval_typ u)) ptr ;;
-          send (Store da dv)
+          trigger (Store da dv)
         | (_, INSTR_Store _ _ _ _) => raise "ERROR: Store to non-void ID"
 
         (* Call *)
@@ -562,11 +562,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
              fid <- lift_err ret (reverse_lookup_function_id g addr) ;;
              (* YZ TODO: MARKER1 Shouldn' we raise an error here if fid is not a Name? *)
              debug ("  fid:" ++ to_string fid) ;;
-             (* send (LocalPush);; *) (* We push a fresh environment on the stack. TODO: Actually done in denote_mcfg, to remove after confirmation *) 
-             dv <- send (Call (eval_typ t) fid dvs);;
+             (* trigger (LocalPush);; *) (* We push a fresh environment on the stack. TODO: Actually done in denote_mcfg, to remove after confirmation *) 
+             dv <- trigger (Call (eval_typ t) fid dvs);;
              match pt with
              | IVoid _ => ret tt
-             | IId id  => send (LocalWrite id dv)
+             | IId id  => trigger (LocalWrite id dv)
              end      
            | _ => raise "call got non-function pointer"
            end
@@ -599,11 +599,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                 2. introduce a Return event that would be handled at the same time as Call and do it;
                 3. mix of both: can return the dynamic value and have no Ret event, but pop in denote_mcfg
               *)
-          (* send LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
+          (* trigger LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
           ret (inr dv)
 
         | TERM_Ret_void =>
-          (* send LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
+          (* trigger LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
           ret (inr DVALUE_None)
 
         | TERM_Br (t,op) br1 br2 =>
@@ -702,7 +702,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                     | inr dv => ret (inr dv)
                     | inl bid =>
                       dvs <- map_monad (denote_phi bid) block.(blk_phis) ;; (* mapM_ :(? *)
-                      map_monad (fun '(id,dv) => send (LocalWrite id dv)) dvs;;
+                      map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
                       ret (inl bid)
                     end
                   end
@@ -744,12 +744,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                        let (_, ids, cfg) := fndef in
                        (* We match the arguments variables to the inputs; *)
                        bs <- lift_err ret (combine_lists_err ids args) ;;
-                       send LocalPush ;;  (* YZ Note: Could be done by denote_instr of Call. But then need to be wary of external calls *)
+                       trigger LocalPush ;;  (* YZ Note: Could be done by denote_instr of Call. But then need to be wary of external calls *)
                        (* generate the corresponding writes; *)
-                       map_monad (fun '(id, dv) => send (LocalWrite id dv)) bs ;;
+                       map_monad (fun '(id, dv) => trigger (LocalWrite id dv)) bs ;;
                        (* and denote the [cfg]. *)
                        res <- denote_cfg cfg;;
-                       send LocalPop;;  (* YZ Note: Could be done by denote_terminator of Ret. But then need to be wary of external calls *)
+                       trigger LocalPop;;  (* YZ Note: Could be done by denote_terminator of Ret. But then need to be wary of external calls *)
                        ret res
                      | None =>
                        (* This must have been a registered external function  *)
@@ -758,7 +758,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
                        (* We cast the call into ExternalCallE *)
                        (* YZ TODO: cast them into MemoryIntrinsic if applicable *)
-                       send (Intrinsic dt f_name args)
+                       trigger (Intrinsic dt f_name args)
 
                        (* CB / YZ TODO: Should we check weither f_name is a [Name] here?
                           Note sure why we only worry about it in the external call case.

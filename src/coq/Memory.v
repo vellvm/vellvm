@@ -18,7 +18,8 @@ From Coq Require Import
 From ITree Require Import
      ITree
      Basics.Basics
-     Effects.State.
+     Events.Exception
+     Events.State.
 
 Import Basics.Basics.Monads.
 

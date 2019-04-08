@@ -25,7 +25,7 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
-     Effects.Exception.
+     Events.Exception.
 
 From Vellvm Require Import
      Util
@@ -195,7 +195,7 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
     end.
 
   Definition debug {E} `{DebugE -< E} (msg : string) : itree E unit :=
-    send (Debug msg).
+    trigger (Debug msg).
 
   Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
     throw msg.

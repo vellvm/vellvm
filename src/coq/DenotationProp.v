@@ -13,7 +13,7 @@ Require Import ExtLib.Structures.Monads.
 
 Require Import Vellvm.Util.
 Require Import Vellvm.LLVMAst Vellvm.AstLib Vellvm.CFG Vellvm.CFGProp.
-Require Import Vellvm.LLVMIO Vellvm.Denotation.
+Require Import Vellvm.LLVMEvents Vellvm.Denotation.
 
 Import MonadNotation.
 Import ListNotations.

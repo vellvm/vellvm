@@ -82,7 +82,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                        | inl msg => raise msg
                        | inr result => Ret result
                        end
-          | None => fun pf => (eq_rect X (fun a => LLVM_MCFG1 a) (send e)) dvalue pf
+          | None => fun pf => (eq_rect X (fun a => LLVM_MCFG1 a) (trigger e)) dvalue pf
           end
         | _ => fun _ => raise "Unnamed external call."
         end
@@ -91,10 +91,10 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
   (* CB / YZ: TODO "principle this" *)
   Definition mem_trigger : Handler MemoryE (MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE) :=
-  fun X e => send e.
+  fun X e => trigger e.
 
   Definition rest_trigger : Handler (MemoryIntrinsicE +' DebugE +' FailureE) (MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE) :=
-    fun X e => send e.
+    fun X e => trigger e.
 
   Definition evaluate_intrinsics (intrinsic_def : intrinsic_definitions)
              : forall R, LLVM_MCFG1 R -> LLVM_MCFG1 R  :=

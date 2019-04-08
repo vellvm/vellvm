@@ -24,9 +24,9 @@ From Vellvm Require Import
      AstLib
      CFG
      DynamicValues
-     StepSemantics
+     Denotation
      Memory
-     LLVMIO.
+     LLVMEvents.
 
 
 
@@ -41,7 +41,7 @@ Module RENAMING
        (A:MemoryAddress.ADDRESS)
        (LLVMIO:LLVM_INTERACTIONS(A)).
 
-  Module SS := StepSemantics A LLVMIO.
+  Module SS := Denotation A LLVMIO.
   Import SS.
   Import LLVMIO.
   
@@ -475,7 +475,7 @@ Next Obligation.
   constructor. intros. unfold swap. reflexivity.
 Defined.  
 
-Instance swap_of_IO X : Swap (IO X) := fun id1 id2 x => x.
+Instance swap_of_IO X : Swap (MemoryE X) := fun id1 id2 x => x.
 Hint Unfold swap_of_IO.
 
 Definition swap_itree {X E} `{Swap X} (id1 id2:raw_id) (t:itree E X) : itree E X :=
@@ -493,6 +493,7 @@ Hint Unfold swap_ENV.
 Instance swap_of_ENV {X} `{SX : Swap X} : Swap (ENV.t X) := swap_ENV.
 Hint Unfold swap_of_ENV.
 
+(*
 Definition swap_frame (id1 id2:raw_id) (f:frame) : frame :=
   match f with
   | KRet e id q => KRet (swap id1 id2 e) (swap id1 id2 id) (swap id1 id2 q)
@@ -510,9 +511,9 @@ Definition swap_result (id1 id2:raw_id) (r:result) : result :=
 
 Instance swap_of_result : Swap result := swap_result.
 Hint Unfold swap_of_result.
-
+*)
 Section PROOFS.
-
+(*
   (* TODO: Add to Coq Library *)
   Lemma Empty_Equals : forall {X} (e:ENV.t X), ENV.Empty e -> ENV.Equal (ENV.empty X) e.
   Proof.
@@ -536,7 +537,7 @@ Section PROOFS.
     apply Empty_Equals in H.
     rewrite H. assumption.
   Qed.
-
+*)
   Variable id1 id2 : raw_id.
   
   Lemma swap_raw_id_inj : forall (k j:raw_id), swap id1 id2 k = swap id1 id2 j -> k = j.
@@ -545,7 +546,8 @@ Section PROOFS.
     unfold_swaps. unfold swap_raw_id in *.
     simpl_ifs; unfold eqv, eqv_raw_id in *; subst; try reflexivity; try contradiction.
   Qed.
-  
+
+  (*
   Lemma swap_ENV_find : forall {X} `{SX : Swap X} (e:ENV.t X) (id:raw_id),
       (ENV.find (swap id1 id2 id) (swap id1 id2 e)) = swap id1 id2 (ENV.find id e).
   Proof.
@@ -571,8 +573,8 @@ Section PROOFS.
       apply swap_raw_id_inj in e1. contradiction.
       apply H2.
   Qed.
-
-  
+*)
+(*  
   Lemma swap_lookup_env : forall {X} `{SX : Swap X} (e:ENV.t X) (id:raw_id),
       (lookup_env (swap id1 id2 e) (swap id1 id2 id) = swap id1 id2 (lookup_env e id)).
   Proof.
@@ -641,7 +643,7 @@ Section PROOFS.
     unfold_swaps.
     destruct (eval_icmp icmp v1 v2); reflexivity.
   Qed.
-
+*)
   (*
   (* Before changing ITrees to records, we could prove _equality_ here.  Now we prove 
      only bisimulation?
