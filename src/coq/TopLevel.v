@@ -15,11 +15,13 @@ From ITree Require Import
      ITree.
 
 From ExtLib Require Import 
-     Structures.Monads.
+     Structures.Monads
+     Data.Map.FMapAList.
 
 From Vellvm Require Import 
      LLVMEvents
      Denotation
+     Local
      Memory
      Intrinsics
      LLVMAst
@@ -30,10 +32,10 @@ Import MonadNotation.
 Import ListNotations.
 
 Module IO := LLVMEvents.Make(Memory.A).
+Module L := LLVM_LOCAL(A)(IO).
 Module M := Memory.Make(IO).
 Module D := Denotation(Memory.A)(IO).
 Module INT := Intrinsics.Make(Memory.A)(IO).
-
 
 Import IO.
 Export IO.DV.
@@ -79,14 +81,20 @@ Definition build_global_environment (CFG : CFG.mcfg) : LLVM_CFG D.genv :=
   _ <- initialize_globals CFG (m_globals CFG) g2 ;;
   ret g2.
 
-Definition run_with_memory prog : option (LLVM_MCFG2 (M.memory * DV.dvalue)) :=
+(* Local environment implementation *)
+Definition local_env := FMapAList.alist raw_id dvalue.
+
+Definition run_with_memory (prog: list (toplevel_entity (list block))) :
+  option (LLVM_MCFG2 (M.memory * (@L.stack local_env * DV.dvalue))) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
   mcfg <- CFG.mcfg_of_modul scfg ;;
-  let core_trace :=
-      build_global_environment mcfg ;;
-      D.denote_mcfg mcfg
-      s <- D.init_state mcfg "main" ;;
-        D.step_sem mcfg (D.Step s)
-  in
-  let after_intrinsics_trace := INT.evaluate_with_defined_intrinsics core_trace in
-  ret (M.memD M.empty after_intrinsics_trace).
+       (* The global env needs to be built instead of starting from the empty one.
+             Slight issue: it builds a LLVM_CFG, due to [denote_expr], that we need to
+             bind with an LLVM_MCFG.
+        *)
+       let core_trace :=
+           D.denote_mcfg mcfg (@D.ENV.empty _) DTYPE_Void (Name "main") [] in
+       let mem_trace := @L.run_local local_env _ _ _ _ core_trace L.start_stack in
+       let interpreted_Trace := M.run_memory mem_trace M.empty in
+       ret interpreted_Trace.
+

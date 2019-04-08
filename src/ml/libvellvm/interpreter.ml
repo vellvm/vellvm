@@ -9,7 +9,8 @@
  ---------------------------------------------------------------------------- *)
 
 
-;; open TopLevel.IO
+;; open TopLevel
+;; open IO
 
 open Format
 
@@ -42,43 +43,54 @@ let debug (msg:string) =
   if !debug_flag then 
     Printf.printf "DEBUG: %s\n%!" msg
 
-let rec step m : (DV.dvalue, string) result =
+(* 
+   m is of type 
+ 
+  type 'r coq_LLVM_MCFG2 =
+    ((__ coq_IntrinsicE, (__ coq_MemoryIntrinsicE, (__ coq_DebugE, __ coq_FailureE, __) sum1, __) sum1, __) sum1, 'r) itree
+
+   inl1 _ = Intrinsic
+   inr1 (inl1 _) = MemoryIntrinsic
+
+
+*)
+
+let rec step (m : (M.memory * (local_env L.stack * DV.dvalue)) coq_LLVM_MCFG2) : (DV.dvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
   | TauF x -> step x
 
+  (* SAZ: Could inspect the memory or stack here too. *)
   (* We finished the computation *)
-  | RetF (_,v) -> Ok v
+  | RetF (_,(_,v)) -> Ok v
+
+
+  | VisF (Sum.Coq_inl1 (Intrinsic _), _) ->
+    Error "Uninterpreted Intrinsic"
 
   (* The failE effect is a failure *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 s), _) ->
-    Error (Camlcoq.camlstring_of_coqstring s)
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 (MemoryIntrinsic _)), _) ->
+    Error "Uninterpreted Memory Intrinsic"
 
   (* The debugE effect *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 msg), k) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg)), k) ->
         (debug (Camlcoq.camlstring_of_coqstring msg);
          step (k (Obj.magic DV.DVALUE_None)))
+
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 f)), _) ->
+    Error (Camlcoq.camlstring_of_coqstring f)
 
   (* The only visible effects from LLVMIO that should propagate to the interpreter are:
      - Call to external functions
      - Debug  
   *)
-  | VisF (Sum.Coq_inl1 e, k) ->
-    begin match Obj.magic e with
 
-      | Call(_, f, _) ->
-        (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n"
-           (Camlcoq.camlstring_of_coqstring f));
-        step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero)))
-        
-      | Alloca _   -> Error "top-level Alloca"
-      | Load (_,_) -> Error "top-level Load"
-      | Store (_,_) -> Error "top-level Store"
-      | GEP (_,_,_) -> Error "top-level GEP"
-      | ItoP _ -> Error "top-level ItoP"
-      | PtoI _ -> Error "top-level PtoI"
-    end
+      (* | Call(_, f, _) ->
+       *   (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n"
+       *      (Camlcoq.camlstring_of_coqstring f));
+       *   step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero))) *)
+    
 
 
 let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =

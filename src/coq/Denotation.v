@@ -729,13 +729,13 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          [ExternalCallE].
        *)
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
-      Definition denote_mcfg (m : mcfg) : dtyp -> function_id -> list dvalue -> LLVM_MCFG dvalue :=
+      Definition denote_mcfg : dtyp -> function_id -> list dvalue -> LLVM_MCFG dvalue :=
         fun dt f_name args =>
           @mrec CallE _
                 (fun T call =>
                    match call with
                    | Call dt f_name args =>
-                     match (find_function m f_name) with
+                     match (find_function CFG f_name) with
                      | Some fndef => (* If the call is internal *)
                        let (_, ids, cfg) := fndef in
                        (* We match the arguments variables to the inputs; *)
