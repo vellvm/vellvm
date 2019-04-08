@@ -55,7 +55,7 @@ let debug (msg:string) =
 
 *)
 
-let rec step (m : (M.memory * (local_env L.stack * DV.dvalue)) coq_LLVM_MCFG2) : (DV.dvalue, string) result =
+let rec step (m : ('a _MCFG2, M.memory * (local_env L.stack * DV.dvalue)) coq_LLVM) : (DV.dvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)

@@ -69,7 +69,7 @@ Module LLVM_LOCAL(ADDR:Vellvm.MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTION
 
     Definition start_stack : stack := [Maps.empty].
     
-    Definition run_local {E} `{FailureE -< E} : LLVM_MCFG ~> stateT stack LLVM_MCFG1 :=
+    Definition run_local {E} `{FailureE -< E} : LLVM _MCFG ~> stateT stack (LLVM _MCFG1) :=
       interp_state (case_ handle_local pure_state).
 
   End StackMap.

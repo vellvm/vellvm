@@ -551,7 +551,7 @@ Admitted.
    
    *)
 
-  Definition run_memory {E} `{FailureE -< E} : LLVM_MCFG1 ~> stateT memory LLVM_MCFG2 :=
+  Definition run_memory {E} `{FailureE -< E} : LLVM _MCFG1 ~> stateT memory (LLVM _MCFG2) :=
     interp_state (case_ handle_memory pure_state).
  
 End Make.

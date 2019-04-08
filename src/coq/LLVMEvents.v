@@ -176,16 +176,26 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
 
   (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
 
-  (* For single CFG *)
-  Definition LLVM_CFG := itree (CallE +' LocalE +' MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE).
-  (* For multiple CFG, that is after linking the mutually recursive local definitions *)
-  Definition LLVM_MCFG := itree (LocalE +' MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE).
-  (* For multiple CFG, after interpreting [LocalE] *)
-  Definition LLVM_MCFG1 := itree (MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE).
-  (* For multiple CFG, after interpreting [LocalE] and [MemoryE] *)
-  Definition LLVM_MCFG2 := itree (IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE).
-  Hint Unfold LLVM_CFG LLVM_MCFG LLVM_MCFG1 LLVM_MCFG2.
+  Definition LLVM X := itree X.
 
+  
+  (* For single CFG *)
+  Definition _CFG := CallE +' LocalE +' MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE.
+  
+  (* For multiple CFG, that is after linking the mutually recursive local definitions *)
+  Definition _MCFG := LocalE +' MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE.
+
+  (* For multiple CFG, after interpreting [LocalE] *)
+  Definition _MCFG1 := MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE.
+
+  (* For multiple CFG, after interpreting [LocalE] and [MemoryE] *)
+  Definition _MCFG2 := IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE.
+  Hint Unfold LLVM _CFG _MCFG _MCFG1 _MCFG2.
+
+  (* explicit coercions between the events signatures *)
+  Definition _MCFG_to_CFG : _MCFG ~> _CFG := inr1.
+  
+  
   (* Utilities to conveniently trigger debug and failure events *)
 
   Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m:err A) : itree E B :=

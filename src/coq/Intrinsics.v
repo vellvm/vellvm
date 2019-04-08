@@ -63,7 +63,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
    *)
 
   Definition handle_intrinsics (intrinsic_defs : intrinsic_definitions)
-    : IntrinsicE ~> LLVM_MCFG1 :=
+    : IntrinsicE ~> LLVM _MCFG1 :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
     let defs_assoc := List.map (fun '(a,b) =>
                                   match dc_name a with
@@ -72,7 +72,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                                   end
                                ) intrinsic_defs in
     fun X (e : IntrinsicE X) =>
-      match e in IntrinsicE Y return X = Y -> LLVM_MCFG1 Y with
+      match e in IntrinsicE Y return X = Y -> LLVM _MCFG1 Y with
       | (Intrinsic _ fid args) =>
         match fid with
         | Name fname =>
@@ -82,7 +82,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                        | inl msg => raise msg
                        | inr result => Ret result
                        end
-          | None => fun pf => (eq_rect X (fun a => LLVM_MCFG1 a) (trigger e)) dvalue pf
+          | None => fun pf => (eq_rect X (fun a => LLVM _MCFG1 a) (trigger e)) dvalue pf
           end
         | _ => fun _ => raise "Unnamed external call."
         end
@@ -97,7 +97,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     fun X e => trigger e.
 
   Definition evaluate_intrinsics (intrinsic_def : intrinsic_definitions)
-             : forall R, LLVM_MCFG1 R -> LLVM_MCFG1 R  :=
+             : forall R, LLVM _MCFG1 R -> LLVM _MCFG1 R  :=
     interp (case_ mem_trigger (case_ (handle_intrinsics intrinsic_def) rest_trigger)).
 
   Definition evaluate_with_defined_intrinsics := evaluate_intrinsics defined_intrinsics.
