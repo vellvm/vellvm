@@ -35,12 +35,49 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
+(*
+   LLVM _intrinsic_ functions are used like ordinary function calls, but
+   they have a special interpretation.
+
+     - any global identifier that starts with the prefix "llvm." is 
+       considered to be an intrinsic function 
+
+     - intrinsic functions must be delared in the global scope (to ascribe them types)
+
+     - it is _illegal_ to take the address of an intrinsic function (they do not 
+       always map directly to external functions, e.g. arithmetic intrinsics may 
+       be lowered directly to in-lined assembly on platforms that support the 
+       operations natively.
+
+   As a consequence of the above, it is possible to _statically_ determine 
+   that a call is an invocation of an intrinsic by looking for instructions
+   of the form:
+        call t @llvm._ (args...)
+*)
+
+(* This function extracts the string of the form [llvm._] from an LLVM expression.
+   It returns None if the expression is not an intrinsic definition.
+*) 
+Definition intrinsic_ident (id:ident) : option string :=
+  match id with
+  | ID_Global (Name s) =>
+    if String.prefix "llvm." s then Some s else None
+  | _ => None
+  end.
+
+Definition intrinsic_exp (e:exp) : option string :=
+  match e with
+  | EXP_Ident id => intrinsic_ident id
+  | _ => None
+  end.
+
+
 (* (Pure) Intrinsics -------------------------------------------------------- *)
 
 (* The intrinsics interpreter looks for Calls to intrinsics defined by its
    argument and runs their semantic function, raising an error in case of
    exception.  Unknown Calls (either to other intrinsics or external calls) are
-   pass through unchanged.
+   passed through unchanged.
 *)
 Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
@@ -54,52 +91,46 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
      semantic functions.  
 
      SAZ: This definition is trickier than one wants it to be because of the 
-     dependent pattern matching.  The indices of the IO constructors need to 
+     dependent pattern matching.  The index of the IntrinsicE constructor need to 
      be used to coerce the result back to the general ITree type.
 
      We solve it by using the "Convoy Pattern" (see Chlipala's CPDT).  
 
-     callE ~> LLVME 
+     IntrinsicE ~> LLVM _MCFG1
    *)
 
-  Definition handle_intrinsics (intrinsic_defs : intrinsic_definitions)
-    : IntrinsicE ~> LLVM _MCFG1 :=
-    (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
-    let defs_assoc := List.map (fun '(a,b) =>
+  Definition defs_assoc := List.map (fun '(a,b) =>
                                   match dc_name a with
                                   | Name s => (s,b)
                                   | _ => ("",b)
                                   end
-                               ) intrinsic_defs in
+                               ) defined_intrinsics.
+
+  
+  Definition handle_intrinsics : IntrinsicE ~> LLVM _MCFG :=
+    (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
     fun X (e : IntrinsicE X) =>
-      match e in IntrinsicE Y return X = Y -> LLVM _MCFG1 Y with
-      | (Intrinsic _ fid args) =>
-        match fid with
-        | Name fname =>
+      match e in IntrinsicE Y return X = Y -> LLVM _MCFG Y with
+      | (Intrinsic _ fname args) =>
           match assoc Strings.String.string_dec fname defs_assoc with
           | Some f => fun pf => 
                        match f args with
                        | inl msg => raise msg
                        | inr result => Ret result
                        end
-          | None => fun pf => (eq_rect X (fun a => LLVM _MCFG1 a) (trigger e)) dvalue pf
+          | None => fun pf => (eq_rect X (fun a => LLVM _MCFG a) (trigger e)) dvalue pf
           end
-        | _ => fun _ => raise "Unnamed external call."
-        end
       end eq_refl.
      
 
-  (* CB / YZ: TODO "principle this" *)
-  Definition mem_trigger : Handler MemoryE (MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE) :=
+  (* CB / YZ / SAZ: TODO "principle this" *)
+  Definition extcall_trigger : Handler ExternalCallE _MCFG :=
   fun X e => trigger e.
 
-  Definition rest_trigger : Handler (MemoryIntrinsicE +' DebugE +' FailureE) (MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE) :=
+  Definition rest_trigger : Handler (LocalE +' MemoryE +' DebugE +' FailureE) _MCFG :=
     fun X e => trigger e.
 
-  Definition evaluate_intrinsics (intrinsic_def : intrinsic_definitions)
-             : forall R, LLVM _MCFG1 R -> LLVM _MCFG1 R  :=
-    interp (case_ mem_trigger (case_ (handle_intrinsics intrinsic_def) rest_trigger)).
-
-  Definition evaluate_with_defined_intrinsics := evaluate_intrinsics defined_intrinsics.
+  Definition interpret_intrinsics: forall R, LLVM _MCFG R -> LLVM _MCFG R  :=
+    interp (case_ extcall_trigger (case_ handle_intrinsics rest_trigger)).
   
 End Make.

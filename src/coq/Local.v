@@ -67,10 +67,21 @@ Module LLVM_LOCAL(ADDR:Vellvm.MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTION
           end
         end.
 
+
     Definition start_stack : stack := [Maps.empty].
+
+    Open Scope monad_scope.
+    Definition extcall_trigger : forall R, ExternalCallE R -> (stateT stack (LLVM _MCFG1) R) :=
+      fun R e m => r <- trigger e ;; ret (m, r).
+
+    Definition intrinsic_trigger : forall R, IntrinsicE R -> (stateT stack (LLVM _MCFG1) R) :=
+      fun R e m => r <- trigger e ;; ret (m, r).
+
+    Definition rest_trigger : forall R , (MemoryE +' DebugE +' FailureE) R -> (stateT stack (LLVM _MCFG1) R) :=
+      fun R e m => r <- trigger e ;; ret (m, r).
     
-    Definition run_local {E} `{FailureE -< E} : LLVM _MCFG ~> stateT stack (LLVM _MCFG1) :=
-      interp_state (case_ handle_local pure_state).
+    Definition run_local : LLVM _MCFG ~> stateT stack (LLVM _MCFG1) :=
+      interp_state (case_ extcall_trigger (case_ intrinsic_trigger (case_ handle_local rest_trigger))).
 
   End StackMap.
 

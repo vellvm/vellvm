@@ -65,20 +65,16 @@ let rec step (m : ('a _MCFG2, M.memory * (local_env L.stack * DV.dvalue)) coq_LL
   (* We finished the computation *)
   | RetF (_,(_,v)) -> Ok v
 
-
-  | VisF (Sum.Coq_inl1 (Intrinsic _), _) ->
-    Error "Uninterpreted Intrinsic"
-
-  (* The failE effect is a failure *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 (MemoryIntrinsic _)), _) ->
-    Error "Uninterpreted Memory Intrinsic"
+  | VisF (Sum.Coq_inl1 (ExternalCall(_, _, _)), _) ->
+    Error "Uninterpreted External Call"
 
   (* The debugE effect *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg)), k) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 msg), k) ->
         (debug (Camlcoq.camlstring_of_coqstring msg);
          step (k (Obj.magic DV.DVALUE_None)))
 
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 f)), _) ->
+  (* The failE effect is a failure *)
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 f), _) ->
     Error (Camlcoq.camlstring_of_coqstring f)
 
   (* The only visible effects from LLVMIO that should propagate to the interpreter are:

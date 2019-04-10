@@ -50,17 +50,21 @@ Definition allocate_globals (CFG: CFG.mcfg) (gs:list global) : LLVM _MCFG D.genv
 
 (* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
 Definition register_declaration (g:D.genv) (d:declaration) : LLVM _MCFG D.genv :=
-  (* TODO: map dc_name d to the returned address *)
+  (* SAZ TODO:  Don't allocate pointers for LLVM intrinsics declarations *)
     vis (Alloca DTYPE_Pointer) (fun v => ret (D.ENV.add (dc_name d) v g)).
+
 
 (* SAZ: for "open" MCFGs we have
     - (m_declarations CFG) is the set of possible ExternalCalls 
     - (List.map df_prototype (m_definitions CFG)) is the set of possilbe Entry Functions  (also internal calls)
-*)
-Definition register_functions (CFG: CFG.mcfg) (g:D.genv) : LLVM _MCFG D.genv :=
-  monad_fold_right register_declaration
-                   ((m_declarations CFG) ++ (List.map df_prototype (m_definitions CFG)))
-                   g.
+ *)
+Definition denote_function CFG (g:D.genv) (df:definition _) : (A.addr * (list local_id * LLVM _CFG dvalue))  := 
+  let d := (df_prototype df) in
+  let fid := (dc_name d) in
+  match D.lookup_env g fid with
+  | inr (DVALUE_Addr a) => (a, (df_args df, D.denote_cfg CFG g (df_instrs df)))
+  | _ => (A.null, ([], raise "IMPOSSIBLE: register_function didn't find address"))
+  end.
   
 Definition initialize_globals (CFG: CFG.mcfg) (gs:list global) (g:D.genv) : LLVM _MCFG unit :=
   monad_fold_right
@@ -75,11 +79,12 @@ Definition initialize_globals (CFG: CFG.mcfg) (gs:list global) (g:D.genv) : LLVM
        vis (Store a dv) ret)
     gs tt.
   
-Definition build_global_environment (CFG : CFG.mcfg) : LLVM _MCFG D.genv :=
+Definition build_global_environment (CFG : CFG.mcfg) : LLVM _MCFG (D.genv * D.function_denotations) :=
   g <- allocate_globals CFG (m_globals CFG) ;;
-  g2 <- register_functions CFG g ;;
-  _ <- initialize_globals CFG (m_globals CFG) g2 ;;
-  ret g2.
+  g1 <- monad_fold_right register_declaration ((m_declarations CFG) ++ (List.map df_prototype (m_definitions CFG))) g;;
+  initialize_globals CFG (m_globals CFG) g1 ;;
+  let dl := List.map (denote_function CFG g1) (m_definitions CFG) in
+  ret (g1, dl).
 
 (* Local environment implementation *)
 Definition local_env := FMapAList.alist raw_id dvalue.
@@ -96,10 +101,12 @@ Definition run_with_memory (prog: list (toplevel_entity (list block))) :
   option (LLVM _MCFG2 (M.memory * (@L.stack local_env * DV.dvalue))) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
   mcfg <- CFG.mcfg_of_modul scfg ;;       
-       let core_trace :=
-           glbls <- build_global_environment mcfg ;;
-           D.denote_mcfg mcfg glbls DTYPE_Void (Name "main") main_args in
-       let mem_trace := @L.run_local local_env _ _ _ _ core_trace L.start_stack in
+       let core_trace : LLVM _MCFG dvalue :=
+           '(glbls, defns) <- build_global_environment mcfg ;;
+           'addr <- lift_err ret (D.lookup_env glbls (Name "main")) ;;
+           D.denote_mcfg defns DTYPE_Void addr main_args in
+       let after_intrinsics_trace : LLVM _MCFG dvalue := INT.interpret_intrinsics core_trace in
+       let mem_trace := L.run_local after_intrinsics_trace L.start_stack in
        let interpreted_Trace := M.run_memory mem_trace M.empty in
        ret interpreted_Trace.
 

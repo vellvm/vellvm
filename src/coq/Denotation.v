@@ -33,7 +33,8 @@ From Vellvm Require Import
      CFG
      MemoryAddress
      LLVMEvents
-     TypeUtil.
+     TypeUtil
+     Intrinsics.
 
 Import Sum.
 Import Subevent.
@@ -552,29 +553,24 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           da <- denote_exp_cfg (Some (eval_typ u)) ptr ;;
           trigger (Store da dv)
           
-        | (_, INSTR_Store _ _ _ _) => raise "ERROR: Store to non-void ID"
+        | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED LLVM ERROR: Store to non-void ID"
 
         (* Call *)
         | (pt, INSTR_Call (t, f) args) =>
           debug ("call") ;;
-          fv  <- denote_exp_cfg None f ;; 
-          dvs <-  map_monad (fun '(t, op) => (denote_exp_cfg (Some (eval_typ t)) op)) args ;; 
-          (* Checks whether [fv] a function pointer *)
-           match fv with
-           | DVALUE_Addr addr =>
-             (* TODO: lookup fid given addr from global environment *)
-             fid <- lift_err ret (reverse_lookup_function_id g addr) ;;
-             (* YZ TODO: MARKER1 Shouldn' we raise an error here if fid is not a Name? *)
-             debug ("  fid:" ++ to_string fid) ;;
-             (* trigger (LocalPush);; *) (* We push a fresh environment on the stack. TODO: Actually done in denote_mcfg, to remove after confirmation *) 
-             dv <- trigger (Call (eval_typ t) fid dvs);;
-             match pt with
-             | IVoid _ => ret tt
-             | IId id  => trigger (LocalWrite id dv)
-             end      
-           | _ => raise "call got non-function pointer"
-           end
-
+          dvs <-  map_monad (fun '(t, op) => (denote_exp_cfg (Some (eval_typ t)) op)) args ;;                 
+          returned_value <- 
+          match Intrinsics.intrinsic_exp f with
+          | Some s => trigger (Intrinsic (eval_typ t) s dvs)
+          | None => fv  <- denote_exp_cfg None f ;; 
+                         trigger (Call (eval_typ t) fv dvs)
+          end
+          ;;
+          match pt with
+          | IVoid _ => ret tt
+          | IId id  => trigger (LocalWrite id returned_value)
+          end      
+          
         | (_, INSTR_Comment _) => ret tt
 
         | (_, INSTR_Unreachable) => raise "IMPOSSIBLE: unreachable in reachable position" 
@@ -730,51 +726,57 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          operator than [loop], which [mrec] provides.
        *)
       (* A slight complication comes from the fact that not all call events will be interpreted
-         away as such. Some of them correspond to external calls -- to intrinsics -- that will
+         away as such. Some of them correspond to external calls -- or to intrinsics -- that will
          be kept uninterpreted for now.
          Since the type of [mrec] forces us to get rid of the [CallE] family of events that we
          interpret, we therefore cast external calls into an isomorphic family of events
          [ExternalCallE].
        *)
+
+(*
+          (* Checks whether [fv] a function pointer *)
+           end
+*)
+
+      Definition function_denotations := list (A.addr * (list raw_id * LLVM _CFG dvalue)).
+      Definition lookup_defn {B} := (@assoc _ B A.addr_dec).
+
+
+
+      
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
-      Definition denote_mcfg : dtyp -> function_id -> list dvalue -> LLVM _MCFG dvalue :=
-        fun dt f_name args =>
-          @mrec CallE _
+      Definition denote_mcfg (fundefs:function_denotations) :
+        dtyp -> dvalue -> (list dvalue) -> LLVM _MCFG dvalue :=
+        fun dt f_value args =>
+          @mrec CallE _MCFG
                 (fun T call =>
                    match call with
-                   | Call dt f_name args =>
-                     match (find_function CFG f_name) with
-                     | Some fndef => (* If the call is internal *)
-                       let (_, ids, cfg) := fndef in
-                       (* We match the arguments variables to the inputs; *)
-                       bs <- lift_err ret (combine_lists_err ids args) ;;
-                       trigger LocalPush ;;  (* YZ Note: Could be done by denote_instr of Call. But then need to be wary of external calls *)
-                       (* generate the corresponding writes; *)
-                       map_monad (fun '(id, dv) => trigger (LocalWrite id dv)) bs ;;
-                       (* and denote the [cfg]. *)
-                       res <- denote_cfg cfg;;
-                       trigger LocalPop;;  (* YZ Note: Could be done by denote_terminator of Ret. But then need to be wary of external calls *)
-                       ret res
-                     | None =>
-                       (* This must have been a registered external function  *)
-                       (* We _don't_ push a LLVM stack frame, since the external *)
-                       (* call takes place in one "atomic" step. *)
+                   | Call dt fv args =>
+                     match fv with
+                     | DVALUE_Addr addr =>
+                       match (lookup_defn addr fundefs) with
+                       | Some (ids, den) => (* If the call is internal *)
+                         (* We match the arguments variables to the inputs; *)
+                         bs <- lift_err ret (combine_lists_err ids args) ;;
+                         trigger LocalPush ;;  
+                         (* generate the corresponding writes; *)
+                         map_monad (fun '(id, dv) => trigger (LocalWrite id dv)) bs ;;
+                         (* and denote the [cfg]. *)
+                         res <- (translate _CFG_to_CFG_INTERNAL den);;  
+                         trigger LocalPop;;
+                         ret res
+                       | None => 
+                         (* This must have been a registered external function  *)
+                         (* We _don't_ push a LLVM stack frame, since the external *)
+                         (* call takes place in one "atomic" step. *)
 
-                       (* We cast the call into ExternalCallE *)
-                       (* YZ TODO: cast them into MemoryIntrinsic if applicable *)
-                       trigger (Intrinsic dt f_name args)
-
-                       (* CB / YZ TODO: Should we check weither f_name is a [Name] here?
-                          Note sure why we only worry about it in the external call case.
-                          See also remark MARKER1 *)
-                      (* In the old code, we hade:
-                      match fid with
-                      | Name s => (...)
-                      | _ => raise ("step: no function " (* ++ (string_of fid) *))
-                      end *)
-              end
-            end
-         ) _ (Call dt f_name args).
+                         (* We cast the call into ExternalCallE *)
+                         trigger (ExternalCall dt fv args)
+                       end
+                     | _ => raise "call got non-function pointer"                     
+                     end
+                   end
+                ) _ (Call dt f_value args).
 
     End IN_GLOBAL_ENVIRONMENT.
 

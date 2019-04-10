@@ -129,15 +129,20 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
 
   (* Generic calls, refined by [denote_mcfg] *)
   Variant CallE : Type -> Type :=
-  | Call        : forall (t:dtyp) (f:function_id) (args:list dvalue), CallE dvalue.
+  | Call        : forall (t:dtyp) (f:dvalue) (args:list dvalue), CallE dvalue.
 
+  (* External calls -- those not handled by mrec in denot_mcfg *)
+  Variant ExternalCallE : Type -> Type :=
+  | ExternalCall : forall (t:dtyp) (f:dvalue) (args:list dvalue), ExternalCallE dvalue.
+
+  
   (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
   Variant IntrinsicE : Type -> Type :=
-  | Intrinsic : forall (t:dtyp) (f:function_id) (args:list dvalue), IntrinsicE dvalue.
+  | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE dvalue.
 
   (* Call to an intrinsic whose implementation relies on the implementation of the memory model *)
-  Variant MemoryIntrinsicE : Type -> Type :=
-  | MemoryIntrinsic: forall (t:dtyp) (f:function_id) (args:list dvalue), MemoryIntrinsicE dvalue.
+  (* Variant MemoryIntrinsicE : Type -> Type := *)
+  (* | MemoryIntrinsic: forall (t:dtyp) (f:string) (args:list dvalue), MemoryIntrinsicE dvalue. *)
 
   (* YZ TODO: Try using a single domain of calls.
    This requires wiggling around the type of mrec.
@@ -155,6 +160,7 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   | LocalWrite (id: raw_id) (dv: dvalue): LocalE unit
   | LocalRead  (id: raw_id): LocalE dvalue.
 
+  (* SAZ: TODO: add Push / Pop to memory events to properly handle Alloca scoping *)
   (* Interactions with the memory for the LLVM IR *)
   Variant MemoryE : Type -> Type :=
   | Alloca : forall (t:dtyp),                             (MemoryE dvalue)
@@ -179,21 +185,48 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Definition LLVM X := itree X.
 
   
-  (* For single CFG *)
-  Definition _CFG := CallE +' LocalE +' MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE.
-  
+  (* Core effects - no distinction between "internal" and "external" calls. *)
+  Definition _CFG := CallE +' IntrinsicE +' LocalE +' MemoryE +' DebugE +' FailureE.
+
   (* For multiple CFG, that is after linking the mutually recursive local definitions *)
-  Definition _MCFG := LocalE +' MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE.
+  Definition _MCFG := ExternalCallE +' IntrinsicE +' LocalE +' MemoryE +' DebugE +' FailureE.
 
+  (* Distinction made between internal and external calls -- intermediate step in denote_mcfg *)
+  Definition _CFG_INTERNAL := CallE +' _MCFG.
+  
   (* For multiple CFG, after interpreting [LocalE] *)
-  Definition _MCFG1 := MemoryE +' IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE.
+  Definition _MCFG1 := ExternalCallE +' IntrinsicE +' MemoryE +' DebugE +' FailureE.
 
-  (* For multiple CFG, after interpreting [LocalE] and [MemoryE] *)
-  Definition _MCFG2 := IntrinsicE +' MemoryIntrinsicE +' DebugE +' FailureE.
+  (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
+  Definition _MCFG2 := ExternalCallE +' DebugE +' FailureE.
   Hint Unfold LLVM _CFG _MCFG _MCFG1 _MCFG2.
 
-  (* explicit coercions between the events signatures *)
-  Definition _MCFG_to_CFG : _MCFG ~> _CFG := inr1.
+  (* explicit coercions of external calls into internal calls *)
+  Definition _MCFG_to_CFG : _MCFG ~> _CFG :=
+    fun T e =>
+      match e with
+      | inl1 e' =>
+        match e' with
+        |  ExternalCall dt fv args => inl1 (Call dt fv args)
+        end
+      | inr1 e' => inr1 e'
+      end.
+
+  (* This inclusion "assumes" that all call events are internal.  The 
+     dispatch in denote_mcfg then interprets some of the calls directly,
+     if their definitions are known, or it "externalizes" the calls
+     whose definitions are not known.
+  *)
+  Definition _CFG_to_CFG_INTERNAL : _CFG ~> _CFG_INTERNAL :=
+    fun R e =>
+      match e with
+      | inl1 e' =>
+        match e' with
+        | Call dt fv args => inl1 (Call dt fv args)
+        end
+      | inr1 e' => inr1 (inr1 e')
+      end.
+
   
   
   (* Utilities to conveniently trigger debug and failure events *)

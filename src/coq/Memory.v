@@ -496,24 +496,21 @@ n     address isn't in range
                ret (m, DVALUE_Addr (0, (k + i)))
         | _ => raise "PtoI got non-address dvalue"
         end
-
-      (* CB TODO: Need to handle this *)
-          (*
-      | MemoryIntrinsic t f args =>
-        match f with
-        | Name s =>
-          if string_dec s "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
-            match handle_memcpy args m with
-            | inl err => raise err
-            | inr m' => ret (m', DVALUE_None)
-            end
-          else            
-            raise ("Unknown memory intrinsic: " ++ s)
-        | _ => raise "Unnamed memory intrinsic."
-        end
-           *)
       end.
 
+  Definition handle_intrinsic {E} `{FailureE -< E}: IntrinsicE ~> stateT memory (itree E) :=
+    fun _ e m =>
+      match e with 
+      | Intrinsic t name args =>
+        if string_dec name "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
+          match handle_memcpy args m with
+          | inl err => raise err
+          | inr m' => ret (m', DVALUE_None)
+          end
+        else            
+            raise ("Unknown intrinsic: " ++ name)
+      end.
+  
 
   (* TODO: clean this up *)
   (* {E} `{failureE -< E} : IO ~> stateT memory (itree E)  *)
@@ -552,8 +549,14 @@ n     address isn't in range
    
    *)
 
-  Definition run_memory {E} `{FailureE -< E} : LLVM _MCFG1 ~> stateT memory (LLVM _MCFG2) :=
-    interp_state (case_ handle_memory pure_state).
- 
+  Definition extcall_trigger : forall R, ExternalCallE R -> (stateT memory (LLVM _MCFG2) R) :=
+  fun R e m => r <- trigger e ;; ret (m, r).
+
+  Definition rest_trigger : forall R , (DebugE +' FailureE) R -> (stateT memory (LLVM _MCFG2) R) :=
+      fun R e m => r <- trigger e ;; ret (m, r).
+  
+  Definition run_memory : LLVM _MCFG1 ~> stateT memory (LLVM _MCFG2) :=
+    interp_state (case_ extcall_trigger (case_ handle_intrinsic (case_ handle_memory rest_trigger))).
+  
 End Make.
 
