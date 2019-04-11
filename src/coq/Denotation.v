@@ -727,16 +727,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          be kept uninterpreted for now.
          Since the type of [mrec] forces us to get rid of the [CallE] family of events that we
          interpret, we therefore cast external calls into an isomorphic family of events
-         [CallE].
+         that life in the "right" injection of the [_CFG_INTERNAL] effect
        *)
 
-(*
-          (* Checks whether [fv] a function pointer *)
-           end
-*)
-
       Definition function_denotations := list (A.addr * (list raw_id * LLVM _CFG dvalue)).
-      Definition lookup_defn {B} := (@assoc _ B A.addr_dec).
+      Definition lookup_defn {B} := (@assoc _ B A.eq_dec).
 
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
       Definition denote_mcfg (fundefs:function_denotations) :

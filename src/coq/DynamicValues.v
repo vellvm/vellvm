@@ -16,7 +16,8 @@ From ExtLib Require Import
      Programming.Eqv
      Programming.Show
      Structures.Monads
-     Data.Nat.
+     Data.Nat
+     Data.List.
 
 From Vellvm Require Import
      LLVMAst
@@ -24,7 +25,7 @@ From Vellvm Require Import
      MemoryAddress
      Error
      Util.
-     
+
 Require Import Integers Floats.
 
 Import EqvNotation.
@@ -123,6 +124,107 @@ Section hiding_notation.
 
 End hiding_notation.
 
+Ltac dec_dvalue :=
+  match goal with
+  | [ |- { ?X ?a = ?X ?b} + { ?X ?a <> ?X ?b} ] => idtac
+  | [ |- { ?X ?a = ?Y ?b} + { ?X ?a <> ?Y ?b} ] => right; intros H; inversion H
+  | [ |- { ?X = ?X } + { ?X <> ?X } ] => left; reflexivity
+  | [ |- { ?X = ?Y } + { ?X <> ?Y } ] => right; intros H; inversion H
+  end.
+                                                               
+Section DecidableEquality.
+
+  Fixpoint dvalue_eqb (d1 d2:dvalue) : bool :=
+    let lsteq := list_eqb (Build_RelDec eq dvalue_eqb) in
+    match d1, d2 with
+    | DVALUE_Addr a1, DVALUE_Addr a2 =>
+      if A.eq_dec a1 a2 then true else false
+    | DVALUE_I1 x1, DVALUE_I1 x2 =>
+      if Int1.eq_dec x1 x2 then true else false 
+    | DVALUE_I8 x1, DVALUE_I8 x2 =>
+      if Int8.eq_dec x1 x2 then true else false 
+    | DVALUE_I32 x1, DVALUE_I32 x2 =>
+      if Int32.eq_dec x1 x2 then true else false 
+    | DVALUE_I64 x1, DVALUE_I64 x2 =>
+      if Int64.eq_dec x1 x2 then true else false 
+    | DVALUE_Double x1, DVALUE_Double x2 =>
+      if Float.eq_dec x1 x2 then true else false
+    | DVALUE_Float x1, DVALUE_Float x2 =>
+      if Float32.eq_dec x1 x2 then true else false
+    | DVALUE_Undef, DVALUE_Undef => true
+    | DVALUE_Poison, DVALUE_Poision => true
+    | DVALUE_None, DVALUE_None => true
+    | DVALUE_Struct f1, DVALUE_Struct f2 =>
+      lsteq f1 f2
+    | DVALUE_Packed_struct f1, DVALUE_Packed_struct f2 =>
+      lsteq f1 f2
+    | DVALUE_Array f1, DVALUE_Array f2 =>
+      lsteq f1 f2
+    | DVALUE_Vector f1, DVALUE_Vector f2 =>
+      lsteq f1 f2
+    | _, _ => false
+    end.
+  
+
+  Lemma dvalue_eq_dec : forall (d1 d2:dvalue), {d1 = d2} + {d1 <> d2}.
+    refine (fix f d1 d2 :=
+    let lsteq_dec := list_eq_dec f in
+    match d1, d2 with
+    | DVALUE_Addr a1, DVALUE_Addr a2 => _
+    | DVALUE_I1 x1, DVALUE_I1 x2 => _
+    | DVALUE_I8 x1, DVALUE_I8 x2 => _
+    | DVALUE_I32 x1, DVALUE_I32 x2 => _
+    | DVALUE_I64 x1, DVALUE_I64 x2 => _
+    | DVALUE_Double x1, DVALUE_Double x2 => _
+    | DVALUE_Float x1, DVALUE_Float x2 => _
+    | DVALUE_Undef, DVALUE_Undef => _
+    | DVALUE_Poison, DVALUE_Poison => _
+    | DVALUE_None, DVALUE_None => _
+    | DVALUE_Struct f1, DVALUE_Struct f2 => _
+    | DVALUE_Packed_struct f1, DVALUE_Packed_struct f2 => _
+    | DVALUE_Array f1, DVALUE_Array f2 => _
+    | DVALUE_Vector f1, DVALUE_Vector f2 => _
+    | _, _ => _
+    end);  ltac:(dec_dvalue).
+    - destruct (A.eq_dec a1 a2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (Int1.eq_dec x1 x2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (Int8.eq_dec x1 x2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (Int32.eq_dec x1 x2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (Int64.eq_dec x1 x2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (Float.eq_dec x1 x2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (Float32.eq_dec x1 x2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (lsteq_dec f1 f2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (lsteq_dec f1 f2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (lsteq_dec f1 f2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (lsteq_dec f1 f2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+  Qed.
+  
+  Global Instance eq_dec_dvalue : RelDec (@eq dvalue) := RelDec_from_dec (@eq dvalue) (@dvalue_eq_dec).
+  Global Instance eqv_dvalue : Eqv dvalue := (@eq dvalue).
+  Hint Unfold eqv_dvalue.
+End DecidableEquality.
 
 (* TODO: include Undefined values in this way? i.e. Undef is really a predicate on values
    Note: this isn't correct because it won't allow for undef fields of a struct or elts of an array
