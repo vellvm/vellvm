@@ -549,14 +549,14 @@ n     address isn't in range
    
    *)
 
-  Definition extcall_trigger : forall R, ExternalCallE R -> (stateT memory (LLVM _MCFG2) R) :=
+  Definition call_trigger : forall R, CallE R -> (stateT memory (LLVM _MCFG2) R) :=
   fun R e m => r <- trigger e ;; ret (m, r).
 
   Definition rest_trigger : forall R , (DebugE +' FailureE) R -> (stateT memory (LLVM _MCFG2) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
   
   Definition run_memory : LLVM _MCFG1 ~> stateT memory (LLVM _MCFG2) :=
-    interp_state (case_ extcall_trigger (case_ handle_intrinsic (case_ handle_memory rest_trigger))).
+    interp_state (case_ call_trigger (case_ handle_intrinsic (case_ handle_memory rest_trigger))).
   
 End Make.
 

@@ -42,14 +42,14 @@ Export IO.DV.
 
 Open Scope string_scope.
 
-Definition allocate_globals (CFG: CFG.mcfg) (gs:list global) : LLVM _MCFG D.genv :=
+Definition allocate_globals (CFG: CFG.mcfg) (gs:list global) : LLVM _CFG D.genv :=
   monad_fold_right
     (fun (m:D.genv) (g:global) =>
        vis (Alloca (D.eval_typ CFG (g_typ g))) (fun v => ret (D.ENV.add (g_ident g) v m))) gs (@D.ENV.empty _).
 
 
 (* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
-Definition register_declaration (g:D.genv) (d:declaration) : LLVM _MCFG D.genv :=
+Definition register_declaration (g:D.genv) (d:declaration) : LLVM _CFG D.genv :=
   (* SAZ TODO:  Don't allocate pointers for LLVM intrinsics declarations *)
     vis (Alloca DTYPE_Pointer) (fun v => ret (D.ENV.add (dc_name d) v g)).
 
@@ -66,7 +66,7 @@ Definition denote_function CFG (g:D.genv) (df:definition _) : (A.addr * (list lo
   | _ => (A.null, ([], raise "IMPOSSIBLE: register_function didn't find address"))
   end.
   
-Definition initialize_globals (CFG: CFG.mcfg) (gs:list global) (g:D.genv) : LLVM _MCFG unit :=
+Definition initialize_globals (CFG: CFG.mcfg) (gs:list global) (g:D.genv) : LLVM _CFG unit :=
   monad_fold_right
     (fun (_:unit) (glb:global) =>
        let dt := D.eval_typ CFG (g_typ glb) in
@@ -79,7 +79,7 @@ Definition initialize_globals (CFG: CFG.mcfg) (gs:list global) (g:D.genv) : LLVM
        vis (Store a dv) ret)
     gs tt.
   
-Definition build_global_environment (CFG : CFG.mcfg) : LLVM _MCFG (D.genv * D.function_denotations) :=
+Definition build_global_environment (CFG : CFG.mcfg) : LLVM _CFG (D.genv * D.function_denotations) :=
   g <- allocate_globals CFG (m_globals CFG) ;;
   g1 <- monad_fold_right register_declaration ((m_declarations CFG) ++ (List.map df_prototype (m_definitions CFG))) g;;
   initialize_globals CFG (m_globals CFG) g1 ;;
@@ -101,11 +101,11 @@ Definition run_with_memory (prog: list (toplevel_entity (list block))) :
   option (LLVM _MCFG2 (M.memory * (@L.stack local_env * DV.dvalue))) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
   mcfg <- CFG.mcfg_of_modul scfg ;;       
-       let core_trace : LLVM _MCFG dvalue :=
+       let core_trace : LLVM _CFG dvalue :=
            '(glbls, defns) <- build_global_environment mcfg ;;
            'addr <- lift_err ret (D.lookup_env glbls (Name "main")) ;;
            D.denote_mcfg defns DTYPE_Void addr main_args in
-       let after_intrinsics_trace : LLVM _MCFG dvalue := INT.interpret_intrinsics core_trace in
+       let after_intrinsics_trace : LLVM _CFG dvalue := INT.interpret_intrinsics core_trace in
        let mem_trace := L.run_local after_intrinsics_trace L.start_stack in
        let interpreted_Trace := M.run_memory mem_trace M.empty in
        ret interpreted_Trace.

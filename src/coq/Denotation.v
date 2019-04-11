@@ -70,25 +70,25 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
      have a single environment. Then calls need to handle stack.
 
 
-     (itree (CallE +' Locals +' ExternalCallE +' IO +' failureE +' debugE)).
+     (itree (CallE +' Locals +' CallE +' IO +' failureE +' debugE)).
 
      Pure intrinsics, like math. Sin / cos and stuff. Some need to be
      handled at the memory model level, like memcpy.
 
      Do we need to separate ExternalCalls? Or Memory model
-     takes... ExternalCallE +' IO and produces ExternalCallE
+     takes... CallE +' IO and produces CallE
      itrees. Handles some ExternalCalls, but not necessarily all of
      them.
 
      Rename IO to MemE or something.
 
-     (itree (CallE +' Locals +' ExternalCallE +' IO +' failureE +' debugE)).
+     (itree (CallE +' Locals +' CallE +' IO +' failureE +' debugE)).
 
      - Denotation: gets rid of CallE denote_mcfg (denote_cfg in practice never emits ExternalCalls)
        + Linking, do we want to make this distinction?
      - LocalEnvironment: gets rid of locals
      - Intrinsics.v: should this be two?
-     - Memory.v: takes ExternalCallE and IO
+     - Memory.v: takes CallE and IO
 
 
      - Add MemoryIntrinsic to IO, kind of like how Call used to be. Can now interpret away entirely inside memory model
@@ -141,7 +141,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
      otherwise emits the corresponding read event.
    *)
   (* YZ note: read/writes for local and load/store for memory is fine? *)
-  Definition lookup_id (g:genv) (i:ident) : LLVM _MCFG dvalue :=
+  Definition lookup_id (g:genv) (i:ident) : LLVM _CFG dvalue :=
     match i with
     | ID_Global x => lift_err ret (lookup_env g x)
     | ID_Local x  =>  (trigger (LocalRead x))
@@ -165,9 +165,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
        generate memory effects. *)
     (* SAZ: for some reason, typeclass resolution was taking forever in eval_conv_h,
         so I respecialized it... *)
-    Definition spec_raise {X} (s:string) : LLVM _MCFG X := raise s.
+    Definition spec_raise {X} (s:string) : LLVM _CFG X := raise s.
     
-    Definition eval_conv_h conv t1 x t2 : LLVM _MCFG dvalue :=
+    Definition eval_conv_h conv t1 x t2 : LLVM _CFG dvalue :=
       match conv with
       | Trunc =>
         match t1, x, t2 with
@@ -298,7 +298,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       end.
     Arguments eval_conv_h _ _ _ _ : simpl nomatch.
 
-    Definition eval_conv conv t1 x t2 : LLVM _MCFG dvalue :=
+    Definition eval_conv conv t1 x t2 : LLVM _CFG dvalue :=
       match t1, x with
       | TYPE_I bits, dv =>
         eval_conv_h conv t1 dv t2
@@ -344,7 +344,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Expressions are denoted as itrees that return a [dvalue].
  *)
 
-      Fixpoint denote_exp (top:option dtyp) (o:exp) {struct o} : LLVM _MCFG dvalue :=
+      Fixpoint denote_exp (top:option dtyp) (o:exp) {struct o} : LLVM _CFG dvalue :=
         let eval_texp '(t,ex) :=
             let dt := eval_typ t in
             v <- denote_exp (Some dt) ex ;;
@@ -518,14 +518,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           lift_err ret (eval_select cndv v1 v2)
 
         end.
-
       Arguments denote_exp _ : simpl nomatch.
-
-      Definition denote_exp_cfg top e := translate _MCFG_to_CFG (denote_exp top e).
-
       
       Definition eval_op (o:exp) : LLVM _CFG dvalue :=
-        denote_exp_cfg None o.
+        denote_exp None o.
       Arguments eval_op _ : simpl nomatch.
 
       (* An instruction has only side-effects, it therefore returns [unit] *)
@@ -543,14 +539,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         (* Load *)
         | (IId id, INSTR_Load _ t (u,ptr) _) =>
-          da <- denote_exp_cfg (Some (eval_typ u)) ptr ;;
+          da <- denote_exp (Some (eval_typ u)) ptr ;;
           dv <- trigger (Load (eval_typ t) da);;
           trigger (LocalWrite id dv)
 
         (* Store *)
         | (IVoid _, INSTR_Store _ (t, val) (u, ptr) _) =>
-          dv <- denote_exp_cfg (Some (eval_typ t)) val ;;
-          da <- denote_exp_cfg (Some (eval_typ u)) ptr ;;
+          dv <- denote_exp (Some (eval_typ t)) val ;;
+          da <- denote_exp (Some (eval_typ u)) ptr ;;
           trigger (Store da dv)
           
         | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED LLVM ERROR: Store to non-void ID"
@@ -558,11 +554,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Call *)
         | (pt, INSTR_Call (t, f) args) =>
           debug ("call") ;;
-          dvs <-  map_monad (fun '(t, op) => (denote_exp_cfg (Some (eval_typ t)) op)) args ;;                 
+          dvs <-  map_monad (fun '(t, op) => (denote_exp (Some (eval_typ t)) op)) args ;;                 
           returned_value <- 
           match Intrinsics.intrinsic_exp f with
           | Some s => trigger (Intrinsic (eval_typ t) s dvs)
-          | None => fv  <- denote_exp_cfg None f ;; 
+          | None => fv  <- denote_exp None f ;; 
                          trigger (Call (eval_typ t) fv dvs)
           end
           ;;
@@ -593,7 +589,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         match t with
 
         | TERM_Ret (t, op) =>
-          dv <- denote_exp_cfg (Some (eval_typ t)) op ;;
+          dv <- denote_exp (Some (eval_typ t)) op ;;
              (* YZ : Hesitant between three options.
                 1. emit the pop events here and return the dvalue (current choice);
                 2. introduce a Return event that would be handled at the same time as Call and do it;
@@ -607,7 +603,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           ret (inr DVALUE_None)
 
         | TERM_Br (t,op) br1 br2 =>
-          dv <- denote_exp_cfg (Some (eval_typ t)) op ;; 
+          dv <- denote_exp (Some (eval_typ t)) op ;; 
           match dv with 
           | DVALUE_I1 comparison_bit =>
             if eq comparison_bit one then
@@ -652,7 +648,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         match assoc RawIDOrd.eq_dec bid args with
         | Some op =>
           let dt := eval_typ t in
-          dv <- denote_exp_cfg (Some dt) op ;;
+          dv <- denote_exp (Some dt) op ;;
           ret (id,dv)
         | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
         end.
@@ -730,7 +726,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          be kept uninterpreted for now.
          Since the type of [mrec] forces us to get rid of the [CallE] family of events that we
          interpret, we therefore cast external calls into an isomorphic family of events
-         [ExternalCallE].
+         [CallE].
        *)
 
 (*
@@ -741,14 +737,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition function_denotations := list (A.addr * (list raw_id * LLVM _CFG dvalue)).
       Definition lookup_defn {B} := (@assoc _ B A.addr_dec).
 
-
-
-      
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
       Definition denote_mcfg (fundefs:function_denotations) :
-        dtyp -> dvalue -> (list dvalue) -> LLVM _MCFG dvalue :=
+        dtyp -> dvalue -> (list dvalue) -> LLVM _CFG dvalue :=
         fun dt f_value args =>
-          @mrec CallE _MCFG
+          @mrec CallE _CFG
                 (fun T call =>
                    match call with
                    | Call dt fv args =>
@@ -770,7 +763,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                          (* We _don't_ push a LLVM stack frame, since the external *)
                          (* call takes place in one "atomic" step. *)
 
-                         (* We cast the call into ExternalCallE *)
+                         (* We cast the call into an external CallE *)
                          trigger (ExternalCall dt fv args)
                        end
                      | _ => raise "call got non-function pointer"                     
@@ -901,7 +894,7 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
       match assoc RawIDOrd.eq_dec bid_src ls with
       | Some op =>
         let dt := eval_typ t in
-        dv <- denote_exp_cfg g (Some dt) op ;;
+        dv <- denote_exp g (Some dt) op ;;
         ret (add_env iid dv e)
       | None => raise ("jump: phi node doesn't include block " ++ to_string bid_src )
       end

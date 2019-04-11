@@ -5,7 +5,7 @@ Definition debug_hom {E} (R : Type) (e : DebugE R) : itree E R :=
   | Debug _ => Ret tt
   end.
 
-Definition into_debug {E F} (h : E ~> LLVM F) : CallE +' Locals +' ExternalCallE +' IO +' (F +' E) ~> LLVM F :=
+Definition into_debug {E F} (h : E ~> LLVM F) : CallE +' Locals +' CallE +' IO +' (F +' E) ~> LLVM F :=
   fun x e =>
     match e with
     | inr1 (inr1 (inr1 (inr1 (inr1 e)))) => h _ e

@@ -65,7 +65,7 @@ let rec step (m : ('a _MCFG2, M.memory * (local_env L.stack * DV.dvalue)) coq_LL
   (* We finished the computation *)
   | RetF (_,(_,v)) -> Ok v
 
-  | VisF (Sum.Coq_inl1 (ExternalCall(_, _, _)), _) ->
+  | VisF (Sum.Coq_inl1 (Call(_, _, _)), _) ->
     Error "Uninterpreted External Call"
 
   (* The debugE effect *)
