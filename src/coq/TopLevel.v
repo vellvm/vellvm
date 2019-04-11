@@ -18,7 +18,8 @@ From ExtLib Require Import
      Structures.Monads
      Data.Map.FMapAList.
 
-From Vellvm Require Import 
+From Vellvm Require Import
+     DynamicTypes
      LLVMEvents
      Denotation
      Local
@@ -79,12 +80,12 @@ Definition initialize_globals (CFG: CFG.mcfg) (gs:list global) (g:D.genv) : LLVM
        vis (Store a dv) ret)
     gs tt.
   
-Definition build_global_environment (CFG : CFG.mcfg) : LLVM _CFG (D.genv * D.function_denotations) :=
+Definition build_global_environment (CFG : CFG.mcfg) : LLVM _CFG D.genv :=
   g <- allocate_globals CFG (m_globals CFG) ;;
-  g1 <- monad_fold_right register_declaration ((m_declarations CFG) ++ (List.map df_prototype (m_definitions CFG))) g;;
+  g1 <- monad_fold_right register_declaration
+       ((m_declarations CFG) ++ (List.map df_prototype (m_definitions CFG))) g;;
   initialize_globals CFG (m_globals CFG) g1 ;;
-  let dl := List.map (denote_function CFG g1) (m_definitions CFG) in
-  ret (g1, dl).
+  ret g1.
 
 (* Local environment implementation *)
 Definition local_env := FMapAList.alist raw_id dvalue.
@@ -102,7 +103,8 @@ Definition run_with_memory (prog: list (toplevel_entity (list block))) :
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities prog in
   mcfg <- CFG.mcfg_of_modul scfg ;;       
        let core_trace : LLVM _CFG dvalue :=
-           '(glbls, defns) <- build_global_environment mcfg ;;
+           'glbls <- build_global_environment mcfg ;;
+            let defns := List.map (denote_function mcfg glbls) (m_definitions mcfg) in
            'addr <- lift_err ret (D.lookup_env glbls (Name "main")) ;;
            D.denote_mcfg defns DTYPE_Void addr main_args in
        let after_intrinsics_trace : LLVM _CFG dvalue := INT.interpret_intrinsics core_trace in

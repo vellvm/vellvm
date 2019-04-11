@@ -31,6 +31,7 @@ From Vellvm Require Import
      LLVMAst
      AstLib
      CFG
+     DynamicTypes
      MemoryAddress
      LLVMEvents
      TypeUtil

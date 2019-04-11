@@ -1,11 +1,15 @@
-Require Import List String.
-Require Import Vellvm.Util.
-Require Import Vellvm.LLVMAst.
-Require Import Vellvm.AstLib.
-Require Import Vellvm.LLVMEvents.
-Require Import Coqlib.
-Require Import Coq.Logic.FunctionalExtensionality.
+From Coq Require Import
+     List
+     String
+     Logic.FunctionalExtensionality.
 
+From Vellvm Require Import 
+     Util
+     LLVMAst
+     AstLib
+     DynamicTypes.
+
+Require Import Coqlib.
 
 Import ListNotations.
 Open Scope list_scope.

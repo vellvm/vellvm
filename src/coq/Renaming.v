@@ -23,6 +23,7 @@ From Vellvm Require Import
      LLVMAst
      AstLib
      CFG
+     DynamicTypes
      DynamicValues
      Denotation
      Memory

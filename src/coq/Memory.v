@@ -32,6 +32,7 @@ From ExtLib Require Import
 From Vellvm Require Import 
      LLVMAst
      Util
+     DynamicTypes
      Denotation
      MemoryAddress
      LLVMEvents
