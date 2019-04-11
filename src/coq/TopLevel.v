@@ -26,7 +26,8 @@ From Vellvm Require Import
      Memory
      Intrinsics
      LLVMAst
-     Util.
+     Util
+     Error.
 
 
 Import MonadNotation.
@@ -59,14 +60,14 @@ Definition register_declaration (g:D.genv) (d:declaration) : LLVM _CFG D.genv :=
     - (m_declarations CFG) is the set of possible ExternalCalls 
     - (List.map df_prototype (m_definitions CFG)) is the set of possilbe Entry Functions  (also internal calls)
  *)
-Definition denote_function CFG (g:D.genv) (df:definition _) : (A.addr * (list local_id * LLVM _CFG dvalue))  := 
+
+
+Definition denote_function CFG (g:D.genv) (df:definition _) :
+  err (dvalue * (list local_id * LLVM _CFG dvalue))  := 
   let d := (df_prototype df) in
   let fid := (dc_name d) in
-  match D.lookup_env g fid with
-  | inr (DVALUE_Addr a) => (a, (df_args df, D.denote_cfg CFG g (df_instrs df)))
-  | _ => (A.null, ([], raise "IMPOSSIBLE: register_function didn't find address"))
-  end.
-  
+  liftM (fun fv => (fv, (df_args df, D.denote_cfg CFG g (df_instrs df)))) (D.lookup_env g fid).
+
 Definition initialize_globals (CFG: CFG.mcfg) (gs:list global) (g:D.genv) : LLVM _CFG unit :=
   monad_fold_right
     (fun (_:unit) (glb:global) =>
@@ -104,7 +105,7 @@ Definition run_with_memory (prog: list (toplevel_entity (list block))) :
   mcfg <- CFG.mcfg_of_modul scfg ;;       
        let core_trace : LLVM _CFG dvalue :=
            'glbls <- build_global_environment mcfg ;;
-            let defns := List.map (denote_function mcfg glbls) (m_definitions mcfg) in
+           'defns <- lift_err ret (map_monad (denote_function mcfg glbls) (m_definitions mcfg)) ;;
            'addr <- lift_err ret (D.lookup_env glbls (Name "main")) ;;
            D.denote_mcfg defns DTYPE_Void addr main_args in
        let after_intrinsics_trace : LLVM _CFG dvalue := INT.interpret_intrinsics core_trace in

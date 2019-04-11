@@ -41,7 +41,7 @@ Set Contextual Implicit.
 
 Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
-  Global Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.addr_dec.
+  Global Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.eq_dec.
   Global Instance Eqv_addr : Eqv ADDR.addr := (@eq ADDR.addr).
 
   (* The set of dynamic types manipulated by an LLVM program.  Mostly

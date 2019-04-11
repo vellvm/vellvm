@@ -730,8 +730,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          that life in the "right" injection of the [_CFG_INTERNAL] effect
        *)
 
-      Definition function_denotations := list (A.addr * (list raw_id * LLVM _CFG dvalue)).
-      Definition lookup_defn {B} := (@assoc _ B A.eq_dec).
+      Definition function_denotations := list (dvalue * (list raw_id * LLVM _CFG dvalue)).
+      Definition lookup_defn {B} := (@assoc _ B (@dvalue_eq_dec)).
 
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
       Definition denote_mcfg (fundefs:function_denotations) :
@@ -741,28 +741,24 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                 (fun T call =>
                    match call with
                    | Call dt fv args =>
-                     match fv with
-                     | DVALUE_Addr addr =>
-                       match (lookup_defn addr fundefs) with
-                       | Some (ids, den) => (* If the call is internal *)
-                         (* We match the arguments variables to the inputs; *)
-                         bs <- lift_err ret (combine_lists_err ids args) ;;
-                         trigger LocalPush ;;  
-                         (* generate the corresponding writes; *)
-                         map_monad (fun '(id, dv) => trigger (LocalWrite id dv)) bs ;;
-                         (* and denote the [cfg]. *)
-                         res <- (translate _CFG_to_CFG_INTERNAL den);;  
-                         trigger LocalPop;;
-                         ret res
-                       | None => 
-                         (* This must have been a registered external function  *)
-                         (* We _don't_ push a LLVM stack frame, since the external *)
-                         (* call takes place in one "atomic" step. *)
-
-                         (* We cast the call into an external CallE *)
-                         trigger (ExternalCall dt fv args)
-                       end
-                     | _ => raise "call got non-function pointer"                     
+                     match (lookup_defn fv fundefs) with
+                     | Some (ids, den) => (* If the call is internal *)
+                       (* We match the arguments variables to the inputs; *)
+                       bs <- lift_err ret (combine_lists_err ids args) ;;
+                          trigger LocalPush ;;  
+                          (* generate the corresponding writes; *)
+                          map_monad (fun '(id, dv) => trigger (LocalWrite id dv)) bs ;;
+                          (* and denote the [cfg]. *)
+                          res <- (translate _CFG_to_CFG_INTERNAL den);;  
+                          trigger LocalPop;;
+                          ret res
+                     | None => 
+                       (* This must have been a registered external function  *)
+                       (* We _don't_ push a LLVM stack frame, since the external *)
+                       (* call takes place in one "atomic" step. *)
+                       
+                       (* We cast the call into an external CallE *)
+                       trigger (ExternalCall dt fv args)
                      end
                    end
                 ) _ (Call dt f_value args).
