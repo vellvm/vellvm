@@ -56,18 +56,6 @@ Definition register_declaration (g:D.genv) (d:declaration) : LLVM _CFG D.genv :=
     vis (Alloca DTYPE_Pointer) (fun v => ret (D.ENV.add (dc_name d) v g)).
 
 
-(* SAZ: for "open" MCFGs we have
-    - (m_declarations CFG) is the set of possible ExternalCalls 
-    - (List.map df_prototype (m_definitions CFG)) is the set of possilbe Entry Functions  (also internal calls)
- *)
-
-
-Definition denote_function CFG (g:D.genv) (df:definition _) :
-  err (dvalue * (list local_id * LLVM _CFG dvalue))  := 
-  let d := (df_prototype df) in
-  let fid := (dc_name d) in
-  liftM (fun fv => (fv, (df_args df, D.denote_cfg CFG g (df_instrs df)))) (D.lookup_env g fid).
-
 Definition initialize_globals (CFG: CFG.mcfg) (gs:list global) (g:D.genv) : LLVM _CFG unit :=
   monad_fold_right
     (fun (_:unit) (glb:global) =>
@@ -91,6 +79,17 @@ Definition build_global_environment (CFG : CFG.mcfg) : LLVM _CFG D.genv :=
 (* Local environment implementation *)
 Definition local_env := FMapAList.alist raw_id dvalue.
 
+Definition function_env := FMapAList.alist dvalue D.function_denotation.
+
+(* let d := (df_prototype df) in *)
+(* -  let fid := (dc_name d) in *)
+(* -  liftM (fun fv => (fv, (df_args df, D.denote_cfg CFG g (df_instrs df)))) (D.lookup_env g fid). *)
+
+Definition address_one_function CFG (g:D.genv) (df : definition CFG.cfg) : err (dvalue * D.function_denotation) :=
+  let fid := (dc_name (df_prototype df)) in
+   liftM (fun fv => (fv, D.denote_function CFG g df)) (D.lookup_env g fid).
+   
+
 (* (for now) assume that [main (i64 argc, i8** argv)] 
     pass in 0 and null as the arguments to main
    Note: this isn't compliant with standard C semantics
@@ -105,7 +104,7 @@ Definition run_with_memory (prog: list (toplevel_entity (list block))) :
   mcfg <- CFG.mcfg_of_modul scfg ;;       
        let core_trace : LLVM _CFG dvalue :=
            'glbls <- build_global_environment mcfg ;;
-           'defns <- lift_err ret (map_monad (denote_function mcfg glbls) (m_definitions mcfg)) ;;
+           'defns <- lift_err ret (map_monad (address_one_function mcfg glbls) (m_definitions mcfg)) ;;
            'addr <- lift_err ret (D.lookup_env glbls (Name "main")) ;;
            D.denote_mcfg defns DTYPE_Void addr main_args in
        let after_intrinsics_trace : LLVM _CFG dvalue := INT.interpret_intrinsics core_trace in

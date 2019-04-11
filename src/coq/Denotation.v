@@ -716,6 +716,20 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | _, _ => failwith "combine_lists_err: different length lists"
         end.
 
+
+      (* The denotation of an LLVM function is a coq function that takes
+         a list of dvalues and returns the appropriate semantics.
+      *)
+      Definition function_denotation : Type := list dvalue -> LLVM _CFG dvalue.
+
+      Definition denote_function (df:definition cfg) : function_denotation  := 
+        fun (args : list dvalue) =>
+          (* We match the arguments variables to the inputs *)
+          bs <- lift_err ret (combine_lists_err (df_args df) args) ;;
+          (* generate the corresponding writes to the local stack frame *)
+          map_monad (fun '(id, dv) => trigger (LocalWrite id dv)) bs ;;
+          denote_cfg (df_instrs df).
+
       (* We now turn to the second knot to be tied: a top-level LLVM program is a set
          of mutually recursively defined functions, i.e. [cfg]s. We hence need to
          resolve this mutually recursive definition by interpreting away the call events.
@@ -730,11 +744,17 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          that life in the "right" injection of the [_CFG_INTERNAL] effect
        *)
 
-      Definition function_denotations := list (dvalue * (list raw_id * LLVM _CFG dvalue)).
-      Definition lookup_defn {B} := (@assoc _ B (@dvalue_eq_dec)).
 
+(* SAZ: for "open" MCFGs we have
+    - (m_declarations CFG) is the set of possible ExternalCalls 
+    - (List.map df_prototype (m_definitions CFG)) is the set of possilbe Entry Functions  (also internal calls)
+ *)
+
+      
+      Definition lookup_defn {B} := (@assoc _ B (@dvalue_eq_dec)).
+      
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
-      Definition denote_mcfg (fundefs:function_denotations) :
+      Definition denote_mcfg (fundefs:list (dvalue * function_denotation)) :
         dtyp -> dvalue -> (list dvalue) -> LLVM _CFG dvalue :=
         fun dt f_value args =>
           @mrec CallE _CFG
@@ -742,20 +762,18 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                    match call with
                    | Call dt fv args =>
                      match (lookup_defn fv fundefs) with
-                     | Some (ids, den) => (* If the call is internal *)
-                       (* We match the arguments variables to the inputs; *)
-                       bs <- lift_err ret (combine_lists_err ids args) ;;
-                          trigger LocalPush ;;  
-                          (* generate the corresponding writes; *)
-                          map_monad (fun '(id, dv) => trigger (LocalWrite id dv)) bs ;;
-                          (* and denote the [cfg]. *)
-                          res <- (translate _CFG_to_CFG_INTERNAL den);;  
-                          trigger LocalPop;;
-                          ret res
+                     | Some f_den => (* If the call is internal *)                       
+                       trigger LocalPush ;;  
+                       (* and denote the [cfg]. *)
+                       res <- (translate _CFG_to_CFG_INTERNAL (f_den args));;  
+                       trigger LocalPop;;
+                       ret res
                      | None => 
                        (* This must have been a registered external function  *)
                        (* We _don't_ push a LLVM stack frame, since the external *)
-                       (* call takes place in one "atomic" step. *)
+                       (* call takes place in one "atomic" step. 
+                          SAZ: Not sure that we shouldn't at least push the memory frame
+                        *)
                        
                        (* We cast the call into an external CallE *)
                        trigger (ExternalCall dt fv args)
