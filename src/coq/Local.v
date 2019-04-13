@@ -30,8 +30,7 @@ Module LLVM_LOCAL(ADDR:Vellvm.MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTION
 
   Module DV := DynamicValues.DVALUE(ADDR).
   Export DV.
-  Import LLVMEvents.
-
+  Import LLVMEvents. 
   Section StackMap.
     Context {map : Type}.
     Context {M: Map raw_id dvalue map}.
@@ -40,7 +39,9 @@ Module LLVM_LOCAL(ADDR:Vellvm.MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTION
     Definition handle_local {E} `{FailureE -< E} : LocalE ~> stateT stack (itree E) :=
       fun _ e env =>
         match e with
-        | LocalPush => Ret (Maps.empty :: env, tt)
+        | LocalPush bs =>
+          let init := List.fold_right (fun '(x,dv) => Maps.add x dv) Maps.empty bs in
+          Ret (init :: env, tt)
         | LocalPop =>
           match env with
           (* CB TODO: should this raise an error? *)

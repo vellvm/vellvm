@@ -91,7 +91,7 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
    Shall we split them?
    *)
   Variant LocalE : Type -> Type :=
-  | LocalPush: LocalE unit (* Pushes a fresh environment during a call *)
+  | LocalPush (args: list (raw_id * dvalue)) : LocalE unit (* Pushes a fresh environment during a call *)
   | LocalPop : LocalE unit (* Pops it back during a ret *)
   | LocalWrite (id: raw_id) (dv: dvalue): LocalE unit
   | LocalRead  (id: raw_id): LocalE dvalue.

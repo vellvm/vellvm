@@ -315,17 +315,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".
 
-  Section IN_CFG_CONTEXT.
-
-    (* YZ TODO : [eval_typ] is the only bit that still rely on the ambient mcfg.
-       That probably should not be the case.
-     *)
-    Variable CFG:mcfg typ.
-
-    (*
-    Definition eval_typ (t:typ) : dtyp :=
-      TypeUtil.normalize_type_dtyp (m_type_defs CFG typ) t.
-    *)
 
     Section IN_GLOBAL_ENVIRONMENT.
 
@@ -710,9 +699,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         fun (args : list dvalue) =>
           (* We match the arguments variables to the inputs *)
           bs <- lift_err ret (combine_lists_err (df_args dtyp _ df) args) ;;
-          (* generate the corresponding writes to the local stack frame *)
-          map_monad (fun '(id, dv) => trigger (LocalWrite id dv)) bs ;;
-          denote_cfg (df_instrs dtyp _ df).
+             (* generate the corresponding writes to the local stack frame *)
+          trigger (LocalPush bs) ;;  
+          rv <- denote_cfg (df_instrs dtyp _ df);;
+          trigger LocalPop;;
+          ret rv.
 
       (* We now turn to the second knot to be tied: a top-level LLVM program is a set
          of mutually recursively defined functions, i.e. [cfg]s. We hence need to
@@ -728,13 +719,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          that life in the "right" injection of the [_CFG_INTERNAL] effect
        *)
 
-
 (* SAZ: for "open" MCFGs we have
     - (m_declarations CFG) is the set of possible ExternalCalls 
     - (List.map df_prototype (m_definitions CFG)) is the set of possilbe Entry Functions  (also internal calls)
  *)
-
-      
       Definition lookup_defn {B} := (@assoc _ B (@dvalue_eq_dec)).
       
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
@@ -747,11 +735,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                    | Call dt fv args =>
                      match (lookup_defn fv fundefs) with
                      | Some f_den => (* If the call is internal *)                       
-                       trigger LocalPush ;;  
                        (* and denote the [cfg]. *)
-                       res <- (translate _CFG_to_CFG_INTERNAL (f_den args));;  
-                       trigger LocalPop;;
-                       ret res
+                       translate _CFG_to_CFG_INTERNAL (f_den args)
                      | None => 
                        (* This must have been a registered external function  *)
                        (* We _don't_ push a LLVM stack frame, since the external *)
@@ -766,8 +751,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                 ) _ (Call dt f_value args).
 
     End IN_GLOBAL_ENVIRONMENT.
-
-  End IN_CFG_CONTEXT.
 
 End Denotation.
 
