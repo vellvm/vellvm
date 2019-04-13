@@ -35,7 +35,7 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Definition fabs_32_decl: declaration :=
+Definition fabs_32_decl: declaration typ :=
   {|
     dc_name        := Name "llvm.fabs.f32";
     dc_type        := TYPE_Function TYPE_Float [TYPE_Float] ;
@@ -51,7 +51,7 @@ Definition fabs_32_decl: declaration :=
   |}.
 
 
-Definition fabs_64_decl: declaration :=
+Definition fabs_64_decl: declaration typ :=
   {|
     dc_name        := Name "llvm.fabs.f64";
     dc_type        := TYPE_Function TYPE_Double [TYPE_Double] ;
@@ -66,7 +66,7 @@ Definition fabs_64_decl: declaration :=
     dc_gc          := None
   |}.
 
-Definition memcpy_8_decl: declaration :=
+Definition memcpy_8_decl: declaration typ :=
   let pt := TYPE_Pointer (TYPE_I 8%Z) in
   let i32 := TYPE_I 32%Z in
   let i1 := TYPE_I 1%Z in
@@ -125,11 +125,13 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
    - error should be returned only in the case that the LLVM program is ill-formed 
      (e.g. if the wrong number and/or type of arguments is given to the intrinsic)
 
+   *)
+  (* SAZ: TODO - unify this with the Denotational notion of semantic function?
   *)
   Definition semantic_function := (list dvalue) -> err dvalue.
 
   (* An association list mapping intrinsic names to their semantic definitions *)
-  Definition intrinsic_definitions := list (declaration * semantic_function).
+  Definition intrinsic_definitions := list (declaration typ * semantic_function).
 
 
   (* Intrinsics semantic functions -------------------------------------------- *)

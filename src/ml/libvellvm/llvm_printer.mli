@@ -15,16 +15,16 @@ val ibinop : Format.formatter -> LLVMAst.ibinop -> unit
 val fbinop : Format.formatter -> LLVMAst.fbinop -> unit
 val fast_math : Format.formatter -> LLVMAst.fast_math -> unit
 val conversion_type : Format.formatter -> LLVMAst.conversion_type -> unit
-val instr : Format.formatter -> LLVMAst.instr -> unit
-val exp : Format.formatter -> LLVMAst.exp -> unit
-val texp : Format.formatter -> LLVMAst.texp -> unit
-val tident : Format.formatter -> LLVMAst.tident -> unit
+val instr : Format.formatter -> LLVMAst.typ LLVMAst.instr -> unit
+val exp : Format.formatter -> LLVMAst.typ LLVMAst.exp -> unit
+val texp : Format.formatter -> LLVMAst.typ LLVMAst.texp -> unit
+val tident : Format.formatter -> LLVMAst.typ LLVMAst.tident -> unit
 val toplevel_entities :
-  Format.formatter -> (LLVMAst.block list) LLVMAst.toplevel_entities -> unit
-val toplevel_entity : Format.formatter -> (LLVMAst.block list) LLVMAst.toplevel_entity -> unit
-val metadata : Format.formatter -> LLVMAst.metadata -> unit
-val global : Format.formatter -> LLVMAst.global -> unit
-val declaration : Format.formatter -> LLVMAst.declaration -> unit
-val definition : Format.formatter -> (LLVMAst.block list) LLVMAst.definition -> unit
-val block : Format.formatter -> LLVMAst.block -> unit
-val modul : Format.formatter -> (LLVMAst.block list) LLVMAst.modul -> unit
+  Format.formatter -> (LLVMAst.typ , ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities -> unit
+val toplevel_entity : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity -> unit
+val metadata : Format.formatter -> LLVMAst.typ LLVMAst.metadata -> unit
+val global : Format.formatter -> LLVMAst.typ LLVMAst.global -> unit
+val declaration : Format.formatter -> LLVMAst.typ LLVMAst.declaration -> unit
+val definition : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.definition -> unit
+val block : Format.formatter -> (LLVMAst.typ LLVMAst.block) -> unit
+val modul : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.modul -> unit

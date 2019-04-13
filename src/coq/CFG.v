@@ -28,6 +28,7 @@ Notation "' pat <- c1 ;; c2" :=
     (at level 100, pat pattern, c1 at next level, right associativity) : monad_scope.
 
 
+(* SAZ: The notion of pc, and many other things in this file is now obsolete *)
 (* program counter denotes an instruction with a block of a function -------- *)
 Record pc :=
   mk_pc {
@@ -73,10 +74,13 @@ Instance eq_dec_pc : RelDec (@eq pc) := RelDec_from_dec (@eq pc) PC.eq_dec.
 
 
 (* control flow graphs (CFGs) ----------------------------------------------- *)
+Section CFG.
+  Variable (T:Set).
+
 (* TODO: rename Step to Inst *)
 Inductive cmd : Set :=
-| Inst (i:instr) 
-| Term (t:terminator)
+| Inst (i:instr T) 
+| Term (t:terminator T)
 .                    
 
 
@@ -88,41 +92,41 @@ Inductive cmd : Set :=
 Record cfg := mkCFG
 {
   init : block_id;
-  blks : list block;
+  blks : list (block T);
   args : list ident;
 }.
 
 (* An mcfg is a module where each function body has been converted to a cfg *)
-Definition mcfg : Set := modul cfg.
+Definition mcfg : Set := modul T cfg.
 
-Definition find_defn {X:Set} (fid:function_id) (d:definition X) : option (definition X) :=
+Definition find_defn {X:Set} (fid:function_id) (d:definition T X) : option (definition T X) :=
   if (ident_of d) ~=? (ID_Global fid) then Some d else None.
 
-Definition find_function (CFG : mcfg) (fid:function_id) : option (definition cfg) :=
-  find_map (find_defn fid) (m_definitions CFG).
+Definition find_function (CFG : mcfg) (fid:function_id) : option (definition T cfg) :=
+  find_map (find_defn fid) (m_definitions T _ CFG).
 
 
-Definition fallthrough (cd: code) term_id : instr_id :=
+Definition fallthrough (cd: (code T)) term_id : instr_id :=
   match cd with
   | [] => term_id
   | (next, _)::_ => next
   end.
 
-Definition blk_term_id b := fst (blk_term b).
-Definition blk_terminator b := snd (blk_term b).
+Definition blk_term_id b := fst (blk_term T b).
+Definition blk_terminator b := snd (blk_term T b).
 
-Definition blk_entry_id (b:block) : instr_id := fallthrough (blk_code b) (blk_term_id b). 
+Definition blk_entry_id (b:block T) : instr_id := fallthrough (blk_code T b) (blk_term_id b). 
 
-Definition blk_entry_pc (fid:function_id) (b:block) :=
-  mk_pc fid (blk_id b) (blk_entry_id b).
+Definition blk_entry_pc (fid:function_id) (b:block T) :=
+  mk_pc fid (blk_id T b) (blk_entry_id b).
 
-Definition blk_term_pc (fid:function_id) (b:block) :=
-  mk_pc fid (blk_id b) (blk_term_id b).
+Definition blk_term_pc (fid:function_id) (b:block T) :=
+  mk_pc fid (blk_id T b) (blk_term_id b).
 
-Fixpoint find_block bs block_id : option block :=
-  find (fun b => if (blk_id b) ~=? block_id then true else false) bs.
+Fixpoint find_block bs block_id : option (block T) :=
+  find (fun b => if (blk_id T b) ~=? block_id then true else false) bs.
 
-Fixpoint find_instr (cd : code) (p:instr_id) (t:instr_id) : option (cmd * option instr_id) :=
+Fixpoint find_instr (cd : (code T)) (p:instr_id) (t:instr_id) : option (cmd * option instr_id) :=
   match cd with
   | [] =>  None
   | (x,i)::cd =>
@@ -132,40 +136,40 @@ Fixpoint find_instr (cd : code) (p:instr_id) (t:instr_id) : option (cmd * option
       find_instr cd p t
   end.
 
-Definition block_to_cmd (b:block) (iid:instr_id) : option (cmd * option instr_id) :=
+Definition block_to_cmd (b:block T) (iid:instr_id) : option (cmd * option instr_id) :=
   let term_id := blk_term_id b in 
   if term_id ~=? iid then
-    Some (Term (snd (blk_term b)), None)
+    Some (Term (snd (blk_term T b)), None)
   else
-    find_instr (blk_code b) iid term_id 
+    find_instr (blk_code T b) iid term_id 
 .
 
-
-
-Definition fetch (CFG : mcfg) (p:pc) : option cmd :=
+(*
+Definition fetch (CFG : mcfg) (p:pc) : option cmd:=
   let 'mk_pc fid bid iid := p in 
   cfg <- find_function CFG fid ;;
-  blk <- find_block (blks (df_instrs cfg)) bid ;;
+  blk <- find_block (blks (df_instrs T cfg)) bid ;;
   '(c, _) <- block_to_cmd blk iid ;;
   ret c.
    
 Definition incr_pc (CFG:mcfg) (p:pc) : option pc :=
   let 'mk_pc fid bid iid := p in 
   cfg <- find_function CFG fid ;;
-  blk <- find_block (blks (df_instrs cfg)) bid ;;
+  blk <- find_block (blks (df_instrs T cfg)) bid ;;
   '(c, n) <- block_to_cmd blk iid ;;
   iid_next <- n ;;
   ret (mk_pc fid bid iid_next).
+*)
 
 Inductive block_entry : Set :=
-| BlockEntry (phis:list (local_id * phi)) (p:pc).
+| BlockEntry (phis:list (local_id * (phi T))) (p:pc).
 
-Definition block_to_entry (fid:function_id) (b:block) : block_entry :=
-  BlockEntry (blk_phis b) (blk_entry_pc fid b).
+Definition block_to_entry (fid:function_id) (b:block T) : block_entry :=
+  BlockEntry (blk_phis T b) (blk_entry_pc fid b).
 
 Definition find_block_entry (CFG:mcfg) (fid:function_id) (bid:block_id) : option block_entry :=
   cfg <- find_function CFG fid ;;
-  blk <- find_block (blks (df_instrs cfg)) bid ;;
+  blk <- find_block (blks (df_instrs T _ cfg)) bid ;;
   ret (block_to_entry fid blk).  
 
 Inductive function_entry : Set :=
@@ -174,9 +178,9 @@ Inductive function_entry : Set :=
 
 Definition find_function_entry (CFG:mcfg) (fid:function_id) : option function_entry :=
   dfn <- find_function CFG fid ;;
-  let cfg := df_instrs dfn in
+  let cfg := df_instrs T _ dfn in
   blk <- find_block (blks cfg) (init cfg) ;;
-  ret (FunctionEntry (df_args dfn) (mk_pc fid (init cfg) (blk_entry_id blk))).  
+  ret (FunctionEntry (df_args T _ dfn) (mk_pc fid (init cfg) (blk_entry_id blk))).  
 
 
 (*
@@ -193,40 +197,40 @@ Definition phis_of_definition (d:definition (list block)) block_id : option bloc
 *)
 
 Definition init_of_definition d : option block_id :=
-  match (df_instrs d) with
+  match (df_instrs T _ d) with
   | [] => None
-  | b :: _ => Some (blk_id b)
+  | b :: _ => Some (blk_id T b)
   end.
 
 
-Definition cfg_of_definition (d:definition (list block)) : option cfg :=
+Definition cfg_of_definition (d:definition T (list (block T))) : option cfg :=
   init <- init_of_definition d ;;
-  let args := List.map (fun x => ID_Local x) (df_args d) in
+  let args := List.map (fun x => ID_Local x) (df_args T _ d) in
     Some {| init := init;
-            blks := df_instrs d;
+            blks := df_instrs T _ d;
             args := args;
          |}.
 
 
-Definition mcfg_of_modul (m:modul (list block)) : option mcfg :=
+Definition mcfg_of_modul (m:modul T (list (block T))) : option mcfg :=
   defns <- map_option
                 (fun d =>
                    cfg <- cfg_of_definition d ;;
                      Some {|
-                       df_prototype := df_prototype d;
-                       df_args := df_args d;
+                       df_prototype := df_prototype T _ d;
+                       df_args := df_args T _ d;
                        df_instrs := cfg
-                       |}) (m_definitions m) ;;
+                       |}) (m_definitions T _ m) ;;
   Some {|
-    m_name := m_name m;
-    m_target := m_target m;
-    m_datalayout := m_datalayout m;
-    m_type_defs := m_type_defs m;
-    m_globals := m_globals m;
-    m_declarations := m_declarations m;
+    m_name := m_name T _ m;
+    m_target := m_target T _ m;
+    m_datalayout := m_datalayout _ _ m;
+    m_type_defs := m_type_defs _ _ m;
+    m_globals := m_globals _ _ m;
+    m_declarations := m_declarations _ _ m;
     m_definitions := defns
   |}.
 
 (*  ------------------------------------------------------------------------- *)
-
+End CFG.
 

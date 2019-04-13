@@ -65,7 +65,7 @@ Definition intrinsic_ident (id:ident) : option string :=
   | _ => None
   end.
 
-Definition intrinsic_exp (e:exp) : option string :=
+Definition intrinsic_exp {T} (e:exp T) : option string :=
   match e with
   | EXP_Ident id => intrinsic_ident id
   | _ => None
@@ -100,7 +100,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
    *)
 
   Definition defs_assoc := List.map (fun '(a,b) =>
-                                  match dc_name a with
+                                  match dc_name typ a with
                                   | Name s => (s,b)
                                   | _ => ("",b)
                                   end

@@ -168,116 +168,116 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         so I respecialized it... *)
     Definition spec_raise {X} (s:string) : LLVM _CFG X := raise s.
     
-    Definition eval_conv_h conv t1 x t2 : LLVM _CFG dvalue :=
+    Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : LLVM _CFG dvalue :=
       match conv with
       | Trunc =>
         match t1, x, t2 with
-        | TYPE_I 8, DVALUE_I8 i1, TYPE_I 1 =>
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1 =>
           ret (DVALUE_I1 (repr (unsigned i1)))
-        | TYPE_I 32, DVALUE_I32 i1, TYPE_I 1 =>
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1 =>
           ret (DVALUE_I1 (repr (unsigned i1)))
-        | TYPE_I 32, DVALUE_I32 i1, TYPE_I 8 =>
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8 =>
           ret (DVALUE_I8 (repr (unsigned i1)))
-        | TYPE_I 64, DVALUE_I64 i1, TYPE_I 1 =>
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 1 =>
           ret (DVALUE_I1 (repr (unsigned i1)))
-        | TYPE_I 64, DVALUE_I64 i1, TYPE_I 8 =>
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 8 =>
           ret (DVALUE_I8 (repr (unsigned i1)))
-        | TYPE_I 64, DVALUE_I64 i1, TYPE_I 32 =>
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
           ret (DVALUE_I32 (repr (unsigned i1)))
         | _, _, _ => spec_raise "ill typed-conv"
         end
       | Zext =>
         match t1, x, t2 with
-        | TYPE_I 1, DVALUE_I1 i1, TYPE_I 8 =>
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
           ret (DVALUE_I8 (repr (unsigned i1)))
-        | TYPE_I 1, DVALUE_I1 i1, TYPE_I 32 =>
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32 =>
           ret (DVALUE_I32 (repr (unsigned i1)))
-        | TYPE_I 1, DVALUE_I1 i1, TYPE_I 64 =>
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64 =>
           ret (DVALUE_I64 (repr (unsigned i1)))
-        | TYPE_I 8, DVALUE_I8 i1, TYPE_I 32 =>
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
           ret (DVALUE_I32 (repr (unsigned i1)))
-        | TYPE_I 8, DVALUE_I8 i1, TYPE_I 64 =>
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64 =>
           ret (DVALUE_I64 (repr (unsigned i1)))
-        | TYPE_I 32, DVALUE_I32 i1, TYPE_I 64 =>
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
           ret (DVALUE_I64 (repr (unsigned i1)))
         | _, _, _ => spec_raise "ill typed-conv"
         end
       | Sext =>
         match t1, x, t2 with
-        | TYPE_I 1, DVALUE_I1 i1, TYPE_I 8 =>
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
           ret (DVALUE_I8 (repr (signed i1)))
-        | TYPE_I 1, DVALUE_I1 i1, TYPE_I 32 =>
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32 =>
           ret (DVALUE_I32 (repr (signed i1)))
-        | TYPE_I 1, DVALUE_I1 i1, TYPE_I 64 =>
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64 =>
           ret (DVALUE_I64 (repr (signed i1)))
-        | TYPE_I 8, DVALUE_I8 i1, TYPE_I 32 =>
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
           ret (DVALUE_I32 (repr (signed i1)))
-        | TYPE_I 8, DVALUE_I8 i1, TYPE_I 64 =>
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64 =>
           ret (DVALUE_I64 (repr (signed i1)))
-        | TYPE_I 32, DVALUE_I32 i1, TYPE_I 64 =>
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
           ret (DVALUE_I64 (repr (signed i1)))
         | _, _, _ => spec_raise "ill typed-conv"
         end
       | Bitcast =>
         match t1, x, t2 with
-        | TYPE_I bits1, x, TYPE_I bits2 =>
+        | DTYPE_I bits1, x, DTYPE_I bits2 =>
           if bits1 =? bits2 then ret x else spec_raise "unequal bitsize in cast"
-        | TYPE_Pointer t1, DVALUE_Addr a, TYPE_Pointer t2 =>
+        | DTYPE_Pointer, DVALUE_Addr a, DTYPE_Pointer =>
           ret (DVALUE_Addr a) 
         | _, _, _ => spec_raise "ill-typed_conv"
         end
       | Uitofp =>
         match t1, x, t2 with
-        | TYPE_I 1, DVALUE_I1 i1, TYPE_Float =>
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
 
-        | TYPE_I 8, DVALUE_I8 i1, TYPE_Float =>
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
 
-        | TYPE_I 32, DVALUE_I32 i1, TYPE_Float =>
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
 
-        | TYPE_I 64, DVALUE_I64 i1, TYPE_Float =>
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
 
-        | TYPE_I 1, DVALUE_I1 i1, TYPE_Double =>
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
 
-        | TYPE_I 8, DVALUE_I8 i1, TYPE_Double =>
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
 
-        | TYPE_I 32, DVALUE_I32 i1, TYPE_Double =>
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
               
-        | TYPE_I 64, DVALUE_I64 i1, TYPE_Double =>
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
 
         | _, _, _ => spec_raise "ill typed Uitofp"
         end
       | Sitofp =>
         match t1, x, t2 with
-        | TYPE_I 1, DVALUE_I1 i1, TYPE_Float =>
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
 
-        | TYPE_I 8, DVALUE_I8 i1, TYPE_Float =>
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
 
-        | TYPE_I 32, DVALUE_I32 i1, TYPE_Float =>
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
 
-        | TYPE_I 64, DVALUE_I64 i1, TYPE_Float =>
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
 
-        | TYPE_I 1, DVALUE_I1 i1, TYPE_Double =>
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
 
-        | TYPE_I 8, DVALUE_I8 i1, TYPE_Double =>
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
 
-        | TYPE_I 32, DVALUE_I32 i1, TYPE_Double =>
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
               
-        | TYPE_I 64, DVALUE_I64 i1, TYPE_Double =>
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
 
         | _, _, _ => spec_raise "ill typed Sitofp"
@@ -288,22 +288,22 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       | Fpext => spec_raise "TODO: unimplemented numeric conversion"
       | Inttoptr =>
         match t1, t2 with
-        | TYPE_I 64, TYPE_Pointer t => vis (ItoP x) ret
+        | DTYPE_I 64, DTYPE_Pointer => vis (ItoP x) ret
         | _, _ => spec_raise "ERROR: Inttoptr got illegal arguments"
         end 
       | Ptrtoint =>
         match t1, t2 with
-        | TYPE_Pointer t, TYPE_I 64 => vis (PtoI x) ret
+        | DTYPE_Pointer, DTYPE_I 64 => vis (PtoI x) ret
         | _, _ => spec_raise "ERROR: Ptrtoint got illegal arguments"
         end
       end.
     Arguments eval_conv_h _ _ _ _ : simpl nomatch.
 
-    Definition eval_conv conv t1 x t2 : LLVM _CFG dvalue :=
+    Definition eval_conv conv (t1:dtyp) x (t2:dtyp) : LLVM _CFG dvalue :=
       match t1, x with
-      | TYPE_I bits, dv =>
+      | DTYPE_I bits, dv =>
         eval_conv_h conv t1 dv t2
-      | TYPE_Vector s t, (DVALUE_Vector elts) =>
+      | DTYPE_Vector s t, (DVALUE_Vector elts) =>
         (* In the future, implement bitcast and etc with vectors *)
         raise "vectors unimplemented"
       | _, _ => eval_conv_h conv t1 x t2
@@ -320,10 +320,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     (* YZ TODO : [eval_typ] is the only bit that still rely on the ambient mcfg.
        That probably should not be the case.
      *)
-    Variable CFG:mcfg.
+    Variable CFG:mcfg typ.
 
+    (*
     Definition eval_typ (t:typ) : dtyp :=
-      TypeUtil.normalize_type_dtyp (m_type_defs CFG) t.
+      TypeUtil.normalize_type_dtyp (m_type_defs CFG typ) t.
+    *)
 
     Section IN_GLOBAL_ENVIRONMENT.
 
@@ -345,11 +347,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Expressions are denoted as itrees that return a [dvalue].
  *)
 
-      Fixpoint denote_exp (top:option dtyp) (o:exp) {struct o} : LLVM _CFG dvalue :=
-        let eval_texp '(t,ex) :=
-            let dt := eval_typ t in
-            v <- denote_exp (Some dt) ex ;;
-            ret v
+      Fixpoint denote_exp (top:option dtyp) (o:exp dtyp) {struct o} : LLVM _CFG dvalue :=
+        let eval_texp '(dt,ex) := denote_exp (Some dt) ex
         in
         match o with
         | EXP_Ident i =>
@@ -424,44 +423,35 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           vs <- map_monad eval_texp es ;;
           ret (DVALUE_Vector vs)
 
-        | OP_IBinop iop t op1 op2 =>
-          let dt := eval_typ t in
+        | OP_IBinop iop dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
           lift_err ret (eval_iop iop v1 v2)
 
-        | OP_ICmp cmp t op1 op2 =>
-          let dt := eval_typ t in
+        | OP_ICmp cmp dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
           lift_err ret (eval_icmp cmp v1 v2)
 
-        | OP_FBinop fop fm t op1 op2 =>
-          let dt := eval_typ t in    
+        | OP_FBinop fop fm dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
           lift_err ret (eval_fop fop v1 v2)
 
-        | OP_FCmp fcmp t op1 op2 =>
-          let dt := eval_typ t in
+        | OP_FCmp fcmp dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
           lift_err ret (eval_fcmp fcmp v1 v2)
              
-        | OP_Conversion conv t1 op t2 =>
-          let dt1 := eval_typ t1 in
+        | OP_Conversion conv dt1 op t2 =>
           v <- denote_exp (Some dt1) op ;;
-          eval_conv conv t1 v t2
-            
-        | OP_GetElementPtr _ (TYPE_Pointer t, ptrval) idxs =>
-          let dt := eval_typ t in
-          vptr <- denote_exp (Some DTYPE_Pointer) ptrval ;;
-          vs <- map_monad (fun '(_, index) => denote_exp (Some (DTYPE_I 32)) index) idxs ;;
-          trigger (GEP dt vptr vs)
+          eval_conv conv dt1 v t2
 
-        | OP_GetElementPtr _ (_, _) _ =>
-          raise "getelementptr has non-pointer type annotation"
-                
+        | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
+          vptr <- denote_exp (Some dt2) ptrval ;;
+          vs <- map_monad (fun '(_, index) => denote_exp (Some (DTYPE_I 32)) index) idxs ;;
+          trigger (GEP dt1 vptr vs)
+
         | OP_ExtractElement vecop idx =>
           (*  'vec <- monad_app_snd (denote_exp e) vecop;
               'vidx <- monad_app_snd (denote_exp e) idx;  *)
@@ -479,9 +469,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
               'vidx <- monad_app_snd (denote_exp e) idxmask; *)
           raise "shufflevector not implemented" (* TODO *)
 
-        | OP_ExtractValue strop idxs =>
-          let '(t, str) := strop in
-          let dt := eval_typ t in
+        | OP_ExtractValue (dt, str) idxs =>
           str <- denote_exp (Some dt) str;;
           let fix loop str idxs : err dvalue :=
               match idxs with
@@ -509,10 +497,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             loop str idxs*)
           raise "TODO"
                 
-        | OP_Select (t, cnd) (t1, op1) (t2, op2) =>
-          let dt  := eval_typ t in
-          let dt1 := eval_typ t1 in
-          let dt2 := eval_typ t2 in
+        | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
           cndv <- denote_exp (Some dt) cnd ;;
           v1   <- denote_exp (Some dt1) op1 ;;
           v2   <- denote_exp (Some dt2) op2 ;;
@@ -521,12 +506,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         end.
       Arguments denote_exp _ : simpl nomatch.
       
-      Definition eval_op (o:exp) : LLVM _CFG dvalue :=
+      Definition eval_op (o:exp dtyp) : LLVM _CFG dvalue :=
         denote_exp None o.
       Arguments eval_op _ : simpl nomatch.
 
       (* An instruction has only side-effects, it therefore returns [unit] *)
-      Definition denote_instr (i: (instr_id * instr)): LLVM _CFG unit :=
+      Definition denote_instr (i: (instr_id * instr dtyp)): LLVM _CFG unit :=
         match i with
         (* Pure operations *)
         | (IId id, INSTR_Op op) =>
@@ -534,33 +519,33 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           trigger (LocalWrite id dv)
 
         (* Allocation *)
-        | (IId id, INSTR_Alloca t _ _) =>
-          dv <- trigger (Alloca (eval_typ t));;
+        | (IId id, INSTR_Alloca dt _ _) =>
+          dv <- trigger (Alloca dt);;
           trigger (LocalWrite id dv)
 
         (* Load *)
-        | (IId id, INSTR_Load _ t (u,ptr) _) =>
-          da <- denote_exp (Some (eval_typ u)) ptr ;;
-          dv <- trigger (Load (eval_typ t) da);;
+        | (IId id, INSTR_Load _ dt (du,ptr) _) =>
+          da <- denote_exp (Some du) ptr ;;
+          dv <- trigger (Load dt da);;
           trigger (LocalWrite id dv)
 
         (* Store *)
-        | (IVoid _, INSTR_Store _ (t, val) (u, ptr) _) =>
-          dv <- denote_exp (Some (eval_typ t)) val ;;
-          da <- denote_exp (Some (eval_typ u)) ptr ;;
+        | (IVoid _, INSTR_Store _ (dt, val) (du, ptr) _) =>
+          dv <- denote_exp (Some dt) val ;;
+          da <- denote_exp (Some du) ptr ;;
           trigger (Store da dv)
           
         | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED LLVM ERROR: Store to non-void ID"
 
         (* Call *)
-        | (pt, INSTR_Call (t, f) args) =>
+        | (pt, INSTR_Call (dt, f) args) =>
           debug ("call") ;;
-          dvs <-  map_monad (fun '(t, op) => (denote_exp (Some (eval_typ t)) op)) args ;;                 
+          dvs <-  map_monad (fun '(t, op) => (denote_exp (Some dt) op)) args ;;                 
           returned_value <- 
           match Intrinsics.intrinsic_exp f with
-          | Some s => trigger (Intrinsic (eval_typ t) s dvs)
+          | Some s => trigger (Intrinsic dt s dvs)
           | None => fv  <- denote_exp None f ;; 
-                         trigger (Call (eval_typ t) fv dvs)
+                         trigger (Call dt fv dvs)
           end
           ;;
           match pt with
@@ -586,11 +571,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
       (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
-      Definition denote_terminator (t: terminator): LLVM _CFG (block_id + dvalue) :=
+      Definition denote_terminator (t: terminator dtyp): LLVM _CFG (block_id + dvalue) :=
         match t with
 
-        | TERM_Ret (t, op) =>
-          dv <- denote_exp (Some (eval_typ t)) op ;;
+        | TERM_Ret (dt, op) =>
+          dv <- denote_exp (Some dt) op ;;
              (* YZ : Hesitant between three options.
                 1. emit the pop events here and return the dvalue (current choice);
                 2. introduce a Return event that would be handled at the same time as Call and do it;
@@ -603,8 +588,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           (* trigger LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
           ret (inr DVALUE_None)
 
-        | TERM_Br (t,op) br1 br2 =>
-          dv <- denote_exp (Some (eval_typ t)) op ;; 
+        | TERM_Br (dt,op) br1 br2 =>
+          dv <- denote_exp (Some dt) op ;; 
           match dv with 
           | DVALUE_I1 comparison_bit =>
             if eq comparison_bit one then
@@ -624,7 +609,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         end.
 
       (* Denoting a list of instruction simply binds the trees together *)
-      Fixpoint denote_code (c: code): LLVM _CFG unit :=
+      Fixpoint denote_code (c: code dtyp): LLVM _CFG unit :=
         match c with
         | nil => ret tt
         | i::c => denote_instr i;; denote_code c
@@ -632,9 +617,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
       (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-      Definition denote_block (b: block) : LLVM _CFG (block_id + dvalue) :=
-        denote_code b.(blk_code);;
-        denote_terminator (snd b.(blk_term)).
+      Definition denote_block (b: block dtyp) : LLVM _CFG (block_id + dvalue) :=
+        denote_code (blk_code dtyp b);;
+        denote_terminator (snd (blk_term dtyp b)).
 
       (* YZ FIX: no need to push/pop, but do all the assignments afterward *)
       (* One needs to be careful when denoting phi-nodes: they all must
@@ -644,11 +629,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          once we are finished evaluating the expression.
          We then bind the resulting value in the underlying environment.
        *)
-      Definition denote_phi (bid : block_id) (id_p : local_id * phi) : LLVM _CFG (local_id * dvalue) :=
-        let '(id, Phi t args) := id_p in
+      Definition denote_phi (bid : block_id) (id_p : local_id * phi dtyp) : LLVM _CFG (local_id * dvalue) :=
+        let '(id, Phi dt args) := id_p in
         match assoc RawIDOrd.eq_dec bid args with
         | Some op =>
-          let dt := eval_typ t in
           dv <- denote_exp (Some dt) op ;;
           ret (id,dv)
         | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
@@ -684,12 +668,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         of types, just by deciding internally to loop or not and not reflect the invariant
         in the type.
        *)
-      Definition denote_cfg (f: cfg) : LLVM _CFG dvalue :=
+      Definition denote_cfg (f: cfg dtyp) : LLVM _CFG dvalue :=
         loop (fun (bid : block_id + block_id) =>
                 match bid with
                 | inl bid
                 | inr bid =>
-                  match find_block f.(blks) bid with
+                  match find_block dtyp (blks _ f) bid with
                   | None => raise ("Can't find block in denote_cfg " ++ to_string bid)
                   | Some block =>
                     (* We denote the block *)
@@ -698,13 +682,13 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                     match bd with
                     | inr dv => ret (inr dv)
                     | inl bid =>
-                      dvs <- map_monad (denote_phi bid) block.(blk_phis) ;; (* mapM_ :(? *)
+                      dvs <- map_monad (denote_phi bid) (blk_phis _ block) ;; (* mapM_ :(? *)
                       map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
                       ret (inl bid)
                     end
                   end
                 end
-             ) f.(init).
+             ) (init _ f).
 
       (* TODO : Move this somewhere else *)
       Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
@@ -722,13 +706,13 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       *)
       Definition function_denotation : Type := list dvalue -> LLVM _CFG dvalue.
 
-      Definition denote_function (df:definition cfg) : function_denotation  := 
+      Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation  := 
         fun (args : list dvalue) =>
           (* We match the arguments variables to the inputs *)
-          bs <- lift_err ret (combine_lists_err (df_args df) args) ;;
+          bs <- lift_err ret (combine_lists_err (df_args dtyp _ df) args) ;;
           (* generate the corresponding writes to the local stack frame *)
           map_monad (fun '(id, dv) => trigger (LocalWrite id dv)) bs ;;
-          denote_cfg (df_instrs df).
+          denote_cfg (df_instrs dtyp _ df).
 
       (* We now turn to the second knot to be tied: a top-level LLVM program is a set
          of mutually recursively defined functions, i.e. [cfg]s. We hence need to

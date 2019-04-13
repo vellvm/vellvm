@@ -116,6 +116,13 @@ Inductive fn_attr : Set :=
 | FNATTR_Attr_grp (g:int)
 .
 
+Inductive thread_local_storage : Set :=
+| TLS_Localdynamic
+| TLS_Initialexec
+| TLS_Localexec
+.
+
+
 
 Inductive raw_id : Set :=
 | Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)  
@@ -162,7 +169,6 @@ Inductive typ : Set :=
 Inductive icmp : Set := Eq|Ne|Ugt|Uge|Ult|Ule|Sgt|Sge|Slt|Sle.
 Inductive fcmp : Set := FFalse|FOeq|FOgt|FOge|FOlt|FOle|FOne|FOrd|FUno|FUeq|FUgt|FUge|FUlt|FUle|FUne|FTrue.
 
-
 Inductive ibinop : Set :=
 | Add (nuw:bool) (nsw:bool)
 | Sub (nuw:bool) (nsw:bool)
@@ -185,7 +191,11 @@ Inductive conversion_type : Set :=
   Trunc | Zext | Sext | Fptrunc | Fpext | Uitofp | Sitofp | Fptoui |
   Fptosi | Inttoptr | Ptrtoint | Bitcast.
 
-Definition tident : Set := (typ * ident)%type.
+Section TypedSyntax.
+
+  Variable (T:Set).
+
+Definition tident : Set := (T * ident)%type.
 
 
 (* NOTES: 
@@ -216,25 +226,25 @@ Inductive exp : Set :=
 | EXP_Zero_initializer
 | EXP_Cstring         (s:string)
 | EXP_Undef
-| EXP_Struct          (fields: list (typ * exp))
-| EXP_Packed_struct   (fields: list (typ * exp))
-| EXP_Array           (elts: list (typ * exp))
-| EXP_Vector          (elts: list (typ * exp))
-| OP_IBinop           (iop:ibinop) (t:typ) (v1:exp) (v2:exp)  
-| OP_ICmp             (cmp:icmp)   (t:typ) (v1:exp) (v2:exp)
-| OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:typ) (v1:exp) (v2:exp)
-| OP_FCmp             (cmp:fcmp)   (t:typ) (v1:exp) (v2:exp)
-| OP_Conversion       (conv:conversion_type) (t_from:typ) (v:exp) (t_to:typ)
-| OP_GetElementPtr    (t:typ) (ptrval:(typ * exp)) (idxs:list (typ * exp))
-| OP_ExtractElement   (vec:(typ * exp)) (idx:(typ * exp))
-| OP_InsertElement    (vec:(typ * exp)) (elt:(typ * exp)) (idx:(typ * exp))
-| OP_ShuffleVector    (vec1:(typ * exp)) (vec2:(typ * exp)) (idxmask:(typ * exp))
-| OP_ExtractValue     (vec:(typ * exp)) (idxs:list int)
-| OP_InsertValue      (vec:(typ * exp)) (elt:(typ * exp)) (idxs:list int)
-| OP_Select           (cnd:(typ * exp)) (v1:(typ * exp)) (v2:(typ * exp)) (* if * then * else *)
+| EXP_Struct          (fields: list (T * exp))
+| EXP_Packed_struct   (fields: list (T * exp))
+| EXP_Array           (elts: list (T * exp))
+| EXP_Vector          (elts: list (T * exp))
+| OP_IBinop           (iop:ibinop) (t:T) (v1:exp) (v2:exp)  
+| OP_ICmp             (cmp:icmp)   (t:T) (v1:exp) (v2:exp)
+| OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp) (v2:exp)
+| OP_FCmp             (cmp:fcmp)   (t:T) (v1:exp) (v2:exp)
+| OP_Conversion       (conv:conversion_type) (t_from:T) (v:exp) (t_to:T)
+| OP_GetElementPtr    (t:T) (ptrval:(T * exp)) (idxs:list (T * exp))
+| OP_ExtractElement   (vec:(T * exp)) (idx:(T * exp))
+| OP_InsertElement    (vec:(T * exp)) (elt:(T * exp)) (idx:(T * exp))
+| OP_ShuffleVector    (vec1:(T * exp)) (vec2:(T * exp)) (idxmask:(T * exp))
+| OP_ExtractValue     (vec:(T * exp)) (idxs:list int)
+| OP_InsertValue      (vec:(T * exp)) (elt:(T * exp)) (idxs:list int)
+| OP_Select           (cnd:(T * exp)) (v1:(T * exp)) (v2:(T * exp)) (* if * then * else *)
 .
 
-Definition texp : Set := typ * exp.
+Definition texp : Set := T * exp.
 
 Inductive instr_id : Set :=
 | IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)
@@ -243,15 +253,15 @@ Inductive instr_id : Set :=
 .
 
 Inductive phi : Set :=
-| Phi  (t:typ) (args:list (block_id * exp))
+| Phi  (t:T) (args:list (block_id * exp))
 .
        
 Inductive instr : Set :=
 | INSTR_Comment (msg:string)
 | INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form SV (OP_ ...) *)
 | INSTR_Call (fn:texp) (args:list texp)      (* CORNER CASE: return type is void treated specially *)
-| INSTR_Alloca (t:typ) (nb: option texp) (align:option int) 
-| INSTR_Load  (volatile:bool) (t:typ) (ptr:texp) (align:option int)       
+| INSTR_Alloca (t:T) (nb: option texp) (align:option int) 
+| INSTR_Load  (volatile:bool) (t:T) (ptr:texp) (align:option int)       
 | INSTR_Store (volatile:bool) (val:texp) (ptr:texp) (align:option int)
 | INSTR_Fence
 | INSTR_AtomicCmpXchg
@@ -274,16 +284,11 @@ Inductive terminator : Set :=
 | TERM_Invoke     (fnptrval:tident) (args:list texp) (to_label:block_id) (unwind_label:block_id)
 .
 
-Inductive thread_local_storage : Set :=
-| TLS_Localdynamic
-| TLS_Initialexec
-| TLS_Localexec
-.
 
 Record global : Set :=
   mk_global {
       g_ident        : global_id;
-      g_typ          : typ;
+      g_typ          : T;
       g_constant     : bool;
       g_exp          : option exp;
       g_linkage      : option linkage;
@@ -301,7 +306,7 @@ Record declaration : Set :=
   mk_declaration
   {
     dc_name        : function_id;  
-    dc_type        : typ;    (* INVARIANT: should be TYPE_Function (ret_t * args_t) *)
+    dc_type        : T;    (* INVARIANT: should be TYPE_Function (ret_t * args_t) *)
     dc_param_attrs : list param_attr * list (list param_attr); (* ret_attrs * args_attrs *)
     dc_linkage     : option linkage;
     dc_visibility  : option visibility;
@@ -322,6 +327,7 @@ Record block : Set :=
       blk_id    : block_id;
       blk_phis  : list (local_id * phi);
       blk_code  : code;
+      (* SAZ: TODO: remove the instr_id from this syntax -- it's not needed anymore *)
       blk_term  : instr_id * terminator;
       blk_comments : option (list string)
     }.
@@ -353,7 +359,7 @@ Inductive toplevel_entity (FnBody:Set) : Set :=
 | TLE_Datalayout      (layout:string)
 | TLE_Declaration     (decl:declaration)
 | TLE_Definition      (defn:definition FnBody)
-| TLE_Type_decl       (id:ident) (t:typ)
+| TLE_Type_decl       (id:ident) (t:T)
 | TLE_Source_filename (s:string)
 | TLE_Global          (g:global)
 | TLE_Metadata        (id:raw_id) (md:metadata)
@@ -377,7 +383,7 @@ Record modul (FnBody:Set) : Set :=
     m_name: option string;
     m_target: option string;
     m_datalayout: option string;
-    m_type_defs: list (ident * typ);
+    m_type_defs: list (ident * T);
     m_globals: list global;
     m_declarations: list declaration;
     m_definitions: list (definition FnBody);
@@ -390,5 +396,5 @@ Arguments m_type_defs {_} _.
 Arguments m_globals {_} _.
 Arguments m_declarations {_} _.
 Arguments m_definitions {_} _.
-
+End TypedSyntax.
 

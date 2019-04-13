@@ -17,6 +17,7 @@ Open Scope list_scope.
 
 (* invariants of the CFG machine -------------------------------------------- *)
 
+(*
 Lemma incr_pc_in_block: forall CFG p1 p2, incr_pc CFG p1 = Some p2 -> (fn p1 = fn p2) /\ (bk p1 = bk p2).
 Proof.
   intros CFG p1 p2 H.
@@ -28,14 +29,17 @@ Proof.
   destruct p. destruct o; try inversion H.
   simpl. split; reflexivity.
 Qed.  
+ *)
+Section WithType.
+  Variable (T:Set).
 
 Lemma find_block_same_fid : forall CFG fid br phis p,
-    find_block_entry CFG fid br = Some (BlockEntry phis p) -> (fn p) = fid.
+    find_block_entry T CFG fid br = Some (BlockEntry _ phis p) -> (fn p) = fid.
 Proof.
   intros CFG fid br phis p H.
   unfold find_block_entry in H.
-  destruct (find_function CFG fid); simpl in H; try solve [inversion H].
-  destruct (find_block (blks (df_instrs d)) br); simpl in H; try solve [inversion H].
+  destruct (find_function T CFG fid); simpl in H; try solve [inversion H].
+  destruct (find_block T (blks T (df_instrs T (cfg T) d)) br); simpl in H; try solve [inversion H].
   destruct b. unfold block_to_entry in H. simpl in H. inversion H.
   simpl. reflexivity.
 Qed.  
@@ -43,7 +47,7 @@ Qed.
     
 
 (* syntactic structure ------------------------------------------------------ *)
-
+(*
 Inductive CFG_has_code_at (CFG:mcfg) (P:pc -> Prop) : pc -> code -> Prop :=
 | has_code_nil :
     forall p, P p -> CFG_has_code_at CFG P p []
@@ -138,7 +142,7 @@ Inductive CFG_fun_has_block (CFG:mcfg) (fid:function_id) (b:block) phis : Prop :
 
 Definition CFG_fun_has_blocks (CFG:mcfg) (fid:function_id) (bs:list block) : Prop :=
   Forall (fun b => exists phis, CFG_fun_has_block CFG fid b phis /\ CFG_fun_has_terminator_lbls CFG fid (snd (blk_term b))) bs.
-
+*)
 
 (* well formedness ---------------------------------------------------------- *)
 (*
@@ -151,7 +155,7 @@ Definition pt_defines (p:pt) (lid:local_id) :=
 *)
 
 (* Which identifiers does an instruction use? *)
-Fixpoint exp_uses (v:exp) : list ident :=
+Fixpoint exp_uses (v:exp T) : list ident :=
   match v with
   | EXP_Ident id => [id]
   | EXP_Integer _
@@ -181,15 +185,15 @@ Fixpoint exp_uses (v:exp) : list ident :=
   | OP_Select (_,cnd) (_,v1) (_,v2) => (exp_uses cnd) ++ (exp_uses v1) ++ (exp_uses v2)
   end.
 
-Definition texp_uses (tv:texp) : list ident := exp_uses (snd tv).
+Definition texp_uses (tv:texp T) : list ident := exp_uses (snd tv).
 
-Definition phi_uses (i:phi) : (list ident) :=
+Definition phi_uses (i:phi T) : (list ident) :=
   match i with
   | Phi  t args => List.flat_map (fun x => exp_uses (snd x)) args
   end.
 
 (* over-approximation: may include the same identifier more than once *)
-Definition instr_uses (i:instr) : (list ident) :=
+Definition instr_uses (i:instr T) : (list ident) :=
   match i with
   | INSTR_Op op => exp_uses op                         
   | INSTR_Call (_, op) args => (exp_uses op) ++ (List.flat_map texp_uses args)
@@ -206,7 +210,7 @@ Definition instr_uses (i:instr) : (list ident) :=
   | INSTR_LandingPad => []
   end.
 
-Definition terminator_uses (t:terminator) : list ident :=
+Definition terminator_uses (t:terminator T) : list ident :=
   match t with
   | TERM_Ret tv => texp_uses tv
   | TERM_Ret_void => []
@@ -228,7 +232,7 @@ Definition cmd_uses_local (g:cfg) (p:pt) (id:local_id) : Prop :=
 *)             
 
 (* Which labels does a terminator mention *)
-Definition lbls (t:terminator) : list block_id :=
+Definition lbls (t:terminator T) : list block_id :=
   match t with
   | TERM_Ret _        
   | TERM_Ret_void   => []
@@ -403,4 +407,5 @@ Qed.
 
 
 
-*)
+ *)
+End WithType.

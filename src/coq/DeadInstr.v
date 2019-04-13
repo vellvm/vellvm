@@ -21,17 +21,17 @@ Set Contextual Implicit.
 
 Require Import Vellvm.Memory.
 
-Definition optimization := definition (list block) -> definition (list block).
+Definition optimization {T} := definition T (list (block T)) -> definition T (list (block T)).
 
-Definition optimize (m:modul (list block)) (o:optimization) : modul (list block) :=
+Definition optimize {T} (m:modul T (list (block T))) (o:optimization) : modul T (list (block T)) :=
  {|
-  m_name := (m_name m);
-  m_target := (m_target m);
-  m_datalayout := (m_datalayout m);
-  m_type_defs := (m_type_defs m);
-  m_globals := (m_globals m);
-  m_declarations := (m_declarations m);
-  m_definitions := map o (m_definitions m);
+  m_name := (m_name _ _ m);
+  m_target := (m_target _ _ m);
+  m_datalayout := (m_datalayout _ _ m);
+  m_type_defs := (m_type_defs _ _ m);
+  m_globals := (m_globals _ _ m);
+  m_declarations := (m_declarations _ _ m);
+  m_definitions := map o (m_definitions _ _ m);
   |}.
 
 

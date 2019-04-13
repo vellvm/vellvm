@@ -89,7 +89,7 @@ let rec step (m : ('a _MCFG2, M.memory * (local_env L.stack * DV.dvalue)) coq_LL
     
 
 
-let interpret (prog:(LLVMAst.block list) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
+let interpret (prog:(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
   match TopLevel.run_with_memory prog with
   | None -> failwith "ERROR: bad module"
   | Some t -> step t

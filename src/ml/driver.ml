@@ -14,7 +14,8 @@ let of_str = Camlcoq.camlstring_of_coqstring
                
 let interpret = ref false
 
-let transform (prog : (LLVMAst.block list) LLVMAst.toplevel_entity list) : (LLVMAst.block list) LLVMAst.toplevel_entity list =
+let transform (prog : (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list)
+  : (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block list))) LLVMAst.toplevel_entity list =
   Transform.transform prog
   
 let print_banner s =

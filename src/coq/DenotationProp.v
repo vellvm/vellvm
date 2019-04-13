@@ -105,19 +105,20 @@ Module DenotationProp(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
         erewrite <- lookup_env_tl; eauto.
     Qed.      
   End ENVFACTS.
-  *)
-  Definition pc_satisfies (CFG:mcfg) (p:pc) (P:cmd -> Prop) : Prop :=
-    forall cmd, fetch CFG p = Some cmd -> P cmd.
-
+   *)
+  (*
+  Definition pc_satisfies {T} (CFG:mcfg T) (p:pc) (P:cmd T -> Prop) : Prop :=
+    forall cmd, fetch T CFG p = Some cmd -> P cmd.
+*)
 
   (* Move to AstLib.v ? *)
-  Definition is_Op (i:instr) : Prop :=
+  Definition is_Op {T} (i:instr T) : Prop :=
     match i with
     | INSTR_Op _ => True
     | _ => False
     end.
 
-  Definition is_Eff (i:instr) : Prop :=
+  Definition is_Eff {T} (i:instr T) : Prop :=
     match i with 
     | INSTR_Alloca t nb a => True
     | INSTR_Load v t p a => True
@@ -125,15 +126,16 @@ Module DenotationProp(A:MemoryAddress.ADDRESS)(LLVMIO:LLVM_INTERACTIONS(A)).
     | _ => False    (* TODO: Think about call *)
     end.
   
-  Definition is_Call (i:instr) : Prop :=
+  Definition is_Call {T} (i:instr T) : Prop :=
     match i with
     | INSTR_Call _ _ => True
     | _ => False
     end.
-  
-  Definition pc_non_call (CFG:mcfg) (p:pc) : Prop :=
-    pc_satisfies CFG p (fun c => exists i, not (is_Call i) /\ c = Inst i).
 
+  (*
+  Definition pc_non_call {T} (CFG:mcfg T) (p:pc) : Prop :=
+    pc_satisfies CFG p (fun c => exists i, not (is_Call i) /\ c = Inst i).
+   *)
   (* 
   Ltac step_destruct :=
     repeat (match goal with

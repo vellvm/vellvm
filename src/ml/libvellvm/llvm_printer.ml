@@ -261,7 +261,7 @@ and conversion_type : Format.formatter -> LLVMAst.conversion_type -> unit =
                | Ptrtoint -> "ptrtoint"
                | Bitcast  -> "bitcast")
 
-and exp : Format.formatter -> LLVMAst.exp -> unit =
+and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
   fun (ppf:Format.formatter) vv ->
     match vv with
   | EXP_Ident i           -> ident ppf i
@@ -364,7 +364,7 @@ and exp : Format.formatter -> LLVMAst.exp -> unit =
              texp v2
              texp mask
 
-and inst_exp : Format.formatter -> LLVMAst.exp -> unit =
+and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
   fun ppf vv ->
     match vv with
   | EXP_Ident _ 
@@ -459,7 +459,7 @@ and inst_exp : Format.formatter -> LLVMAst.exp -> unit =
              texp mask
 
 
-and phi : Format.formatter -> LLVMAst.phi -> unit =
+and phi : Format.formatter -> (LLVMAst.typ LLVMAst.phi) -> unit =
   fun ppf ->
   function
   | Phi (t, vil) ->
@@ -471,7 +471,7 @@ and phi : Format.formatter -> LLVMAst.phi -> unit =
                                                lident ppf i)) vil
 
 
-and instr : Format.formatter -> LLVMAst.instr -> unit =
+and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
   fun ppf ->
   function
 
@@ -524,7 +524,7 @@ and branch_label : Format.formatter -> LLVMAst.raw_id -> unit =
     pp_print_string ppf "label %"; pp_print_string ppf (str_of_raw_id id)
     
 
-and terminator : Format.formatter -> LLVMAst.terminator -> unit =
+and terminator : Format.formatter -> (LLVMAst.typ LLVMAst.terminator) -> unit =
   fun ppf ->
   function
 
@@ -560,12 +560,12 @@ and terminator : Format.formatter -> LLVMAst.terminator -> unit =
              branch_label i2
              branch_label i3
 
-and id_instr : Format.formatter -> (LLVMAst.instr_id * LLVMAst.instr) -> unit =
+and id_instr : Format.formatter -> (LLVMAst.instr_id * LLVMAst.typ LLVMAst.instr) -> unit =
   fun ppf ->
     function (id, inst) ->
       fprintf ppf "%a%a" instr_id id instr inst
 
-and id_phi : Format.formatter -> (LLVMAst.local_id * LLVMAst.phi) -> unit =
+and id_phi : Format.formatter -> (LLVMAst.local_id * LLVMAst.typ LLVMAst.phi) -> unit =
   fun ppf ->
     function (id, p) ->
       fprintf ppf "%a = %a" lident id phi p
@@ -582,11 +582,11 @@ and texp ppf (t, v) = fprintf ppf "%a %a" typ t exp v
 
 and tident ppf (t, v) = fprintf ppf "%a %a" typ t ident v
 
-and toplevel_entities : Format.formatter -> (LLVMAst.block list) LLVMAst.toplevel_entities -> unit =
+and toplevel_entities : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities -> unit =
   fun ppf entries ->
   pp_print_list ~pp_sep:pp_force_newline toplevel_entity ppf entries
 
-and toplevel_entity : Format.formatter -> (LLVMAst.block list) LLVMAst.toplevel_entity -> unit =
+and toplevel_entity : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity -> unit =
   fun ppf ->
   function
   | TLE_Comment msg            -> fprintf ppf "; %s" (of_str msg)
@@ -601,7 +601,7 @@ and toplevel_entity : Format.formatter -> (LLVMAst.block list) LLVMAst.toplevel_
   | TLE_Attribute_group (i, a) -> fprintf ppf "attributes #%d = { %a }" (to_int i)
                                           (pp_print_list ~pp_sep:pp_space fn_attr) a
 
-and metadata : Format.formatter -> LLVMAst.metadata -> unit =
+and metadata : Format.formatter -> (LLVMAst.typ LLVMAst.metadata) -> unit =
   fun ppf ->
   function
   | METADATA_Const v  -> texp ppf v
@@ -614,7 +614,7 @@ and metadata : Format.formatter -> LLVMAst.metadata -> unit =
                                  (pp_print_list ~pp_sep:pp_comma_space
                                                 (fun ppf i ->
                                                  fprintf ppf "!%s" i)) (List.map of_str m)
-and global : Format.formatter -> LLVMAst.global -> unit =
+and global : Format.formatter -> (LLVMAst.typ LLVMAst.global) -> unit =
   fun ppf ->
   fun {
     g_ident;
@@ -638,7 +638,7 @@ and global : Format.formatter -> LLVMAst.global -> unit =
        (match a with None -> ()
                    | Some a -> fprintf ppf ", align %d" (to_int a))
 
-and declaration : Format.formatter -> LLVMAst.declaration -> unit =
+and declaration : Format.formatter -> (LLVMAst.typ LLVMAst.declaration) -> unit =
   fun ppf ->
   fun { dc_name = i
       ; dc_type 
@@ -686,7 +686,7 @@ and declaration : Format.formatter -> LLVMAst.declaration -> unit =
     (match dc_gc with
        Some x -> fprintf ppf "gc \"%s\" " (of_str x) | _ -> ()) 
     
-and definition : Format.formatter -> (LLVMAst.block list) LLVMAst.definition -> unit =
+and definition : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block list))) LLVMAst.definition -> unit =
   fun ppf ->
   fun ({ df_prototype =
            { dc_name = i
@@ -749,7 +749,7 @@ and definition : Format.formatter -> (LLVMAst.block list) LLVMAst.definition -> 
     pp_force_newline ppf () ;
     pp_print_char ppf '}' ;
 
-and block : Format.formatter -> LLVMAst.block -> unit =
+and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
   fun ppf {blk_id=lbl; blk_phis=phis; blk_code=b; blk_term=(_,t); blk_comments=c} ->
     begin match c with
     | None -> ()
@@ -773,7 +773,7 @@ and block : Format.formatter -> LLVMAst.block -> unit =
 and comment : Format.formatter -> char list -> unit =
   fun ppf s -> fprintf ppf "; %s" (of_str s)
 
-and modul : Format.formatter -> (LLVMAst.block list) LLVMAst.modul -> unit =
+and modul : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block list))) LLVMAst.modul -> unit =
   fun ppf m ->
 
   pp_option ppf (fun ppf x -> fprintf ppf "; ModuleID = '%s'" (of_str x)) m.m_name ;

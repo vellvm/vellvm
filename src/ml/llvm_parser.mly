@@ -176,7 +176,7 @@ let id_of = function
 %token KW_ATTRIBUTES
 %token<Camlcoq.Z.t> ATTR_GRP_ID
 
-%start<(LLVMAst.block list) LLVMAst.toplevel_entities> toplevel_entities
+%start<(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities> toplevel_entities
 
 %%
 
