@@ -12,18 +12,21 @@ From Coq Require Import
      List String.
 
 From ITree Require Import
-     ITree.
+     ITree
+     Events.State.
 
 From ExtLib Require Import 
      Structures.Monads
      Data.Map.FMapAList.
 
 From Vellvm Require Import
+     AstLib
      TransformTypes
      DynamicTypes
      LLVMEvents
      Denotation
      Local
+     Stack
      Memory
      Intrinsics
      LLVMAst
@@ -33,9 +36,9 @@ From Vellvm Require Import
 
 Import MonadNotation.
 Import ListNotations.
+Import Monads.
 
 Module IO := LLVMEvents.Make(Memory.A).
-Module L := LLVM_LOCAL(A)(IO).
 Module M := Memory.Make(IO).
 Module D := Denotation(Memory.A)(IO).
 Module INT := Intrinsics.Make(Memory.A)(IO).
@@ -80,6 +83,7 @@ Definition build_global_environment (CFG : CFG.mcfg dtyp) : LLVM _CFG D.genv :=
 (* Local environment implementation *)
 Definition local_env := FMapAList.alist raw_id dvalue.
 
+
 Definition function_env := FMapAList.alist dvalue D.function_denotation.
 
 (* let d := (df_prototype df) in *)
@@ -102,11 +106,13 @@ Definition main_args := [DV.DVALUE_I64 (DynamicValues.Int64.zero);
 Definition eval_typ (CFG:CFG.mcfg typ) (t:typ) : dtyp :=
       TypeUtil.normalize_type_dtyp (m_type_defs _ _ CFG) t.
 
+
 Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
   TransformTypes.fmap_mcfg _ _ (eval_typ CFG) CFG.
 
+
 Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (LLVM _MCFG2 (M.memory * (@L.stack local_env * DV.dvalue))) :=
+  option (LLVM _MCFG2 (M.memory * ((local_env * stack) * dvalue))) :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
     ucfg <- CFG.mcfg_of_modul _ scfg ;;
     let mcfg := normalize_types ucfg in 
@@ -114,9 +120,17 @@ Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ))))
            'glbls <- build_global_environment mcfg ;;
            'defns <- lift_err ret (map_monad (address_one_function glbls) (m_definitions _ _ mcfg)) ;;
            'addr <- lift_err ret (D.lookup_env glbls (Name "main")) ;;
-           D.denote_mcfg defns DTYPE_Void addr main_args in
-       let after_intrinsics_trace : LLVM _CFG dvalue := INT.interpret_intrinsics core_trace in
-       let mem_trace := L.run_local after_intrinsics_trace L.start_stack in
-       let interpreted_Trace := M.run_memory mem_trace M.empty in
-       ret interpreted_Trace.
+           D.denote_mcfg defns DTYPE_Void addr main_args
+       in
 
+       let after_intrinsics_trace : LLVM _CFG dvalue := INT.interpret_intrinsics core_trace in
+       
+       let mem_trace : LLVM _ ((local_env * stack) * dvalue) :=
+           run_local_stack
+             (@handle_local raw_id dvalue _ _ show_raw_id _ _)
+             after_intrinsics_trace ([], [])
+       in
+
+       let interpreted_Trace := M.run_memory mem_trace M.empty in
+
+       ret interpreted_Trace.

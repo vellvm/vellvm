@@ -39,6 +39,28 @@ From Vellvm Require Import
 Set Implicit Arguments.
 Set Contextual Implicit.
 
+  (* Interactions with local variables for the LLVM IR *)
+  (* YZ NOTE: We here conflate two concepts: [LocalWrite] and [LocalRead] are events about a single local
+   environment, while [LocalPush] and [LocalPop] are events about the stack dynamic required to handle
+   call frames.
+   Shall we split them?
+   *)
+  Variant LocalE (k v:Type) : Type -> Type :=
+  | LocalWrite (id: k) (dv: v): LocalE k v unit
+  | LocalRead  (id: k): LocalE k v v.
+
+  Variant StackE (k v:Type) : Type -> Type :=
+    | StackPush (args: list (k * v)) : StackE k v unit (* Pushes a fresh environment during a call *)
+    | StackPop : StackE k v unit. (* Pops it back during a ret *)
+
+  (* Failures carry string *)
+  Definition FailureE := exceptE string.
+
+  Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
+    throw msg.
+
+(* SAZ: TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism
+   not functors. *)
 Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Global Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.eq_dec.
@@ -54,11 +76,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Module DV := DynamicValues.DVALUE(ADDR).
   Export DV.
-
-  (*
-Module LCLS := LocalEnvironment.LLVM_LOCALS(ADDR).
-Export LCLS.
-   *)
 
   (****************************** LLVM Events *******************************)
   (**
@@ -83,19 +100,7 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Variant IntrinsicE : Type -> Type :=
   | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE dvalue.
 
-
-  (* Interactions with local variables for the LLVM IR *)
-  (* YZ NOTE: We here conflate two concepts: [LocalWrite] and [LocalRead] are events about a single local
-   environment, while [LocalPush] and [LocalPop] are events about the stack dynamic required to handle
-   call frames.
-   Shall we split them?
-   *)
-  Variant LocalE : Type -> Type :=
-  | LocalPush (args: list (raw_id * dvalue)) : LocalE unit (* Pushes a fresh environment during a call *)
-  | LocalPop : LocalE unit (* Pops it back during a ret *)
-  | LocalWrite (id: raw_id) (dv: dvalue): LocalE unit
-  | LocalRead  (id: raw_id): LocalE dvalue.
-
+  
   (* SAZ: TODO: add Push / Pop to memory events to properly handle Alloca scoping *)
   (* Interactions with the memory for the LLVM IR *)
   Variant MemoryE : Type -> Type :=
@@ -113,16 +118,16 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Variant DebugE : Type -> Type :=
   | Debug : string -> DebugE unit.
 
-  (* Failures carry string *)
-  Definition FailureE := exceptE string.
 
   (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
 
   Definition LLVM X := itree X.
 
+  Definition LLVMEnvE := (LocalE raw_id dvalue).
+  Definition LLVMStackE := (StackE raw_id dvalue).
   
   (* Core effects - no distinction between "internal" and "external" calls. *)
-  Definition _CFG := CallE +' IntrinsicE +' LocalE +' MemoryE +' DebugE +' FailureE.
+  Definition _CFG := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE.
 
   (* Distinction made between internal and external calls -- intermediate step in denote_mcfg.
      Note that [CallE] appears _twice_ in the [_CFG_INTERNAL] type.  The left one is 
@@ -169,8 +174,6 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Definition debug {E} `{DebugE -< E} (msg : string) : itree E unit :=
     trigger (Debug msg).
 
-  Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
-    throw msg.
 
 End LLVM_INTERACTIONS.
 

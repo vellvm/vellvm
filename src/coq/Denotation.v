@@ -700,9 +700,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           (* We match the arguments variables to the inputs *)
           bs <- lift_err ret (combine_lists_err (df_args dtyp _ df) args) ;;
              (* generate the corresponding writes to the local stack frame *)
-          trigger (LocalPush bs) ;;  
+          trigger (StackPush bs) ;;  
           rv <- denote_cfg (df_instrs dtyp _ df);;
-          trigger LocalPop;;
+          trigger StackPop;;
           ret rv.
 
       (* We now turn to the second knot to be tied: a top-level LLVM program is a set
