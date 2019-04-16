@@ -58,12 +58,17 @@ Definition map_monad {A B} (f:A -> m B) (l:list A) : m (list B) :=
         ret (b::bs)  
       end
   in loop l.
-  
+
+Definition map_monad_ {A}
+  (f: A -> m unit) (l: list A): m unit :=
+  map_monad f l;; ret tt.
+
 End monad.
 Arguments monad_fold_right {_ _ _ _}.
 Arguments monad_app_fst {_ _ _ _ _}.
 Arguments monad_app_snd {_ _ _ _ _}.
 Arguments map_monad {_ _ _ _}.
+Arguments map_monad_ {_ _ _}.
 
 (* Arithmetic --------------------------------------------------------------- *)
 
