@@ -55,7 +55,7 @@ let debug (msg:string) =
 
 *)
 
-let rec step (m : ('a TopLevel.IO._MCFG2, TopLevel.M.memory * ((TopLevel.local_env * (LLVMAst.raw_id * TopLevel.IO.DV.dvalue) list Stack.stack) * TopLevel.IO.DV.dvalue)) TopLevel.IO.coq_LLVM) : (DV.dvalue, string) result =
+let rec step (m : ('a TopLevel.IO._MCFG3, TopLevel.M.memory * ((TopLevel.local_env * (LLVMAst.raw_id * TopLevel.IO.DV.dvalue) list Stack.stack) * (TopLevel.global_env * TopLevel.IO.DV.dvalue))) TopLevel.IO.coq_LLVM) : (DV.dvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -63,7 +63,7 @@ let rec step (m : ('a TopLevel.IO._MCFG2, TopLevel.M.memory * ((TopLevel.local_e
 
   (* SAZ: Could inspect the memory or stack here too. *)
   (* We finished the computation *)
-  | RetF (_,(_,v)) -> Ok v
+  | RetF (_,(_,(_,v))) -> Ok v
 
   | VisF (Sum.Coq_inl1 (Call(_, _, _)), _) ->
     Error "Uninterpreted External Call"
