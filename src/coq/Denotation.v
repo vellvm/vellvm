@@ -122,43 +122,30 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
   (* The mutually recursive functions are tied together, interpreting away all internal calls*)
  
-  (* Environments ------------------------------------------------------------- *)
-  (* Used to implement (static) global environments.
-     The same data-structure will be reused for local (dynamic) environments.
-   *)
-  Module ENV := FMapWeakList.Make(AstLib.RawIDOrd).
+  (* (* Environments ------------------------------------------------------------- *) *)
+  (* (* Used to implement (static) global environments. *)
+  (*    The same data-structure will be reused for local (dynamic) environments. *)
+  (*  *) *)
+  (* Module ENV := FMapWeakList.Make(AstLib.RawIDOrd). *)
 
-  (* Global environments *)
-  Definition genv := ENV.t dvalue.
+  (* (* Global environments *) *)
+  (* Definition genv := ENV.t dvalue. *)
 
-  Definition lookup_env {X} (e:ENV.t X) (id:raw_id) : err X :=
-    match ENV.find id e with
-    | Some v => ret v
-    | None => failwith ("lookup_env: failed to find id " ++ (to_string id))
-    end.
+  (* Definition lookup_env {X} (e:ENV.t X) (id:raw_id) : err X := *)
+  (*   match ENV.find id e with *)
+  (*   | Some v => ret v *)
+  (*   | None => failwith ("lookup_env: failed to find id " ++ (to_string id)) *)
+  (*   end. *)
 
   (* Lookup function for identifiers.
      Returns directly the dynamic value if the identifier is global,
      otherwise emits the corresponding read event.
    *)
   (* YZ note: read/writes for local and load/store for memory is fine? *)
-  Definition lookup_id (g:genv) (i:ident) : LLVM _CFG dvalue :=
+  Definition lookup_id (i:ident) : LLVM _CFG dvalue :=
     match i with
-    | ID_Global x => lift_err ret (lookup_env g x)
+    | ID_Global x => (trigger (GlobalRead x))
     | ID_Local x  =>  (trigger (LocalRead x))
-    end.
-
-  (* Lookup attempting to cast adresses into function identifiers *)
-  Definition reverse_lookup_function_id (g:genv) (a:A.addr) : err raw_id :=
-    let f x :=
-        match x with
-        | (_, DVALUE_Addr b) => if a ~=? b then true else false
-        | _ => false
-        end
-    in
-    match List.find f (ENV.elements g) with
-    | None => failwith "reverse_lookup_function_id failed"
-    | Some (fid, _) => ret fid
     end.
 
   Section CONVERSIONS.
@@ -316,11 +303,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     failwith "dv_zero_initializer unimplemented".
 
 
-    Section IN_GLOBAL_ENVIRONMENT.
-
-      (* Global environments are set at the top-level, and static *)
-      Variable g : genv.
-
 (*
   [denote_exp] is the main entry point for evaluating LLVM expressions.
   top : is the type at which the expression should be evaluated (if any)
@@ -340,8 +322,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
         in
         match o with
-        | EXP_Ident i =>
-          lookup_id g i
+        | EXP_Ident i => lookup_id i
 
         | EXP_Integer x =>
           match top with
@@ -749,8 +730,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                      end
                    end
                 ) _ (Call dt f_value args).
-
-    End IN_GLOBAL_ENVIRONMENT.
 
 End Denotation.
 

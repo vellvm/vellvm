@@ -1,9 +1,7 @@
 * Tasks
 
  Remove ExternalCall events in favor of a copy of Call
- * Remove the dependency of denote_exp on the mcfg by pulling out the normalization of types
  * Treat globals via effects
- * Split Locals between the actual local environment and the stack policy
  * Uniformize via the handlers provided by the ITree library the way we handle Globals, Locals and Memory events
  * Prove the renaming optimization
  * Start pondering the question of Call inlining 

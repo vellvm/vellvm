@@ -49,6 +49,10 @@ Set Contextual Implicit.
   | LocalWrite (id: k) (dv: v): LocalE k v unit
   | LocalRead  (id: k): LocalE k v v.
 
+  Variant GlobalE (k v:Type) : Type -> Type :=
+  | GlobalWrite (id: k) (dv: v): GlobalE k v unit
+  | GlobalRead  (id: k): GlobalE k v v.
+  
   Variant StackE (k v:Type) : Type -> Type :=
     | StackPush (args: list (k * v)) : StackE k v unit (* Pushes a fresh environment during a call *)
     | StackPop : StackE k v unit. (* Pops it back during a ret *)
@@ -100,7 +104,6 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Variant IntrinsicE : Type -> Type :=
   | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE dvalue.
 
-  
   (* SAZ: TODO: add Push / Pop to memory events to properly handle Alloca scoping *)
   (* Interactions with the memory for the LLVM IR *)
   Variant MemoryE : Type -> Type :=
@@ -124,10 +127,12 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Definition LLVM X := itree X.
 
   Definition LLVMEnvE := (LocalE raw_id dvalue).
+  Definition LLVMGlobalE := (GlobalE raw_id dvalue).
   Definition LLVMStackE := (StackE raw_id dvalue).
+
   
   (* Core effects - no distinction between "internal" and "external" calls. *)
-  Definition _CFG := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE.
+  Definition _CFG := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' LLVMGlobalE +' MemoryE +' DebugE +' FailureE.
 
   (* Distinction made between internal and external calls -- intermediate step in denote_mcfg.
      Note that [CallE] appears _twice_ in the [_CFG_INTERNAL] type.  The left one is 
