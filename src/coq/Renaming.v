@@ -492,14 +492,16 @@ Definition swap_itree {X E} `{Swap X} (id1 id2:raw_id) (t:itree E X) : itree E X
 Instance swap_of_itree {X E} `{SX : Swap X} : Swap (itree E X) := swap_itree.
 Hint Unfold swap_of_itree.
 
-
+(*
 (* Parameter fold : forall A: Type, (key -> elt -> A -> A) -> t elt -> A -> A. *)
 (* Definition swap_ENV {X} `{SX : Swap X} (id1 id2:raw_id) (m:ENV.t X) : ENV.t X := *)
 (*   ENV.fold (fun k v n => ENV.add (swap id1 id2 k) (swap id1 id2 v) n) m (ENV.empty X). *)
 (* Hint Unfold swap_ENV. *)
 
-(* Instance swap_of_ENV {X} `{SX : Swap X} : Swap (ENV.t X) := swap_ENV. *)
-(* Hint Unfold swap_of_ENV. *)
+Instance swap_of_ENV {X} `{SX : Swap X} : Swap (ENV.t X) := swap_ENV.
+Hint Unfold swap_of_ENV.
+ *)
+
 
 (*
 Definition swap_frame (id1 id2:raw_id) (f:frame) : frame :=

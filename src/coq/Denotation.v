@@ -99,55 +99,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
        + General memory models need a way of registering which intrinsics they handle.
   *)
 
-  (*
-  (* CB TODO: Can we have 1 instance of MonadExc? *)
-  CoFixpoint catch_LLVM1 {E F X} `{E -< F} `{failureE -< F}
-             (f:string -> LLVM1 X)
-             (t : LLVM1 X) : LLVM1 X :=
-    match (observe t) with
-    | RetF x => Ret x
-    | TauF t => Tau (catch_LLVM1 f t)
-    | VisF _ (inr1 (inr1 (inr1 (inr1 (inl1 (Throw s)))))) k => f s
-    | VisF _ e k => vis e (fun x => catch_LLVM1 f (k x))
-    end.
-   *)
-(*
-  Global Instance monad_exc_LLVM1 : (MonadExc string LLVM1) :=
-    {
-      raise := raise_FailureE ;
-      catch := fun T m f => catch_LLVM1 f m ;
-    }.
- *)
-
-
   (* The mutually recursive functions are tied together, interpreting away all internal calls*)
  
-  (* (* Environments ------------------------------------------------------------- *) *)
-  (* (* Used to implement (static) global environments. *)
-  (*    The same data-structure will be reused for local (dynamic) environments. *)
-  (*  *) *)
-  (* Module ENV := FMapWeakList.Make(AstLib.RawIDOrd). *)
-
-  (* (* Global environments *) *)
-  (* Definition genv := ENV.t dvalue. *)
-
-  (* Definition lookup_env {X} (e:ENV.t X) (id:raw_id) : err X := *)
-  (*   match ENV.find id e with *)
-  (*   | Some v => ret v *)
-  (*   | None => failwith ("lookup_env: failed to find id " ++ (to_string id)) *)
-  (*   end. *)
-
-  (* Lookup function for identifiers.
-     Returns directly the dynamic value if the identifier is global,
-     otherwise emits the corresponding read event.
-   *)
-  (* YZ note: read/writes for local and load/store for memory is fine? *)
-  Definition lookup_id (i:ident) : LLVM _CFG dvalue :=
-    match i with
-    | ID_Global x => (trigger (GlobalRead x))
-    | ID_Local x  =>  (trigger (LocalRead x))
-    end.
-
   Section CONVERSIONS.
     (* Conversions can't go into DynamicValues because Int2Ptr and Ptr2Int casts 
        generate memory effects. *)
@@ -302,6 +255,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".
 
+  Definition lookup_id (i:ident) : LLVM _CFG dvalue :=
+    match i with
+    | ID_Global x => trigger (GlobalRead x)
+    | ID_Local x  => trigger (LocalRead x)
+    end.
 
 (*
   [denote_exp] is the main entry point for evaluating LLVM expressions.
@@ -322,7 +280,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
         in
         match o with
-        | EXP_Ident i => lookup_id i
+        | EXP_Ident i =>
+          lookup_id i
 
         | EXP_Integer x =>
           match top with
@@ -652,7 +611,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                     match bd with
                     | inr dv => ret (inr dv)
                     | inl bid =>
-                      dvs <- map_monad (denote_phi bid) (blk_phis _ block) ;; (* mapM_ :(? *)
+                      dvs <- map_monad (denote_phi bid) (blk_phis _ block) ;; 
                       map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
                       ret (inl bid)
                     end

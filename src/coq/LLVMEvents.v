@@ -39,19 +39,16 @@ From Vellvm Require Import
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-  (* Interactions with local variables for the LLVM IR *)
-  (* YZ NOTE: We here conflate two concepts: [LocalWrite] and [LocalRead] are events about a single local
-   environment, while [LocalPush] and [LocalPop] are events about the stack dynamic required to handle
-   call frames.
-   Shall we split them?
-   *)
-  Variant LocalE (k v:Type) : Type -> Type :=
-  | LocalWrite (id: k) (dv: v): LocalE k v unit
-  | LocalRead  (id: k): LocalE k v v.
-
+ (* Interactions with global variables for the LLVM IR *)
+ (* YZ: Globals are read-only, except for the initialization. We may want to reflect this in the events. *)
   Variant GlobalE (k v:Type) : Type -> Type :=
   | GlobalWrite (id: k) (dv: v): GlobalE k v unit
   | GlobalRead  (id: k): GlobalE k v v.
+
+  (* Interactions with local variables for the LLVM IR *)
+  Variant LocalE (k v:Type) : Type -> Type :=
+  | LocalWrite (id: k) (dv: v): LocalE k v unit
+  | LocalRead  (id: k): LocalE k v v.
   
   Variant StackE (k v:Type) : Type -> Type :=
     | StackPush (args: list (k * v)) : StackE k v unit (* Pushes a fresh environment during a call *)
@@ -126,13 +123,13 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
 
   Definition LLVM X := itree X.
 
+  Definition LLVMGEnvE := (GlobalE raw_id dvalue).
   Definition LLVMEnvE := (LocalE raw_id dvalue).
-  Definition LLVMGlobalE := (GlobalE raw_id dvalue).
   Definition LLVMStackE := (StackE raw_id dvalue).
 
   
   (* Core effects - no distinction between "internal" and "external" calls. *)
-  Definition _CFG := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' LLVMGlobalE +' MemoryE +' DebugE +' FailureE.
+  Definition _CFG := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE.
 
   (* Distinction made between internal and external calls -- intermediate step in denote_mcfg.
      Note that [CallE] appears _twice_ in the [_CFG_INTERNAL] type.  The left one is 
@@ -144,12 +141,15 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Definition _CFG_INTERNAL := CallE +' _CFG.
   Definition ExternalCall t f args : _CFG_INTERNAL dvalue := (inr1 (inl1 (Call t f args))).
   
+  (* For multiple CFG, after interpreting [GlobalE] *)
+  Definition _MCFG1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE.
+
   (* For multiple CFG, after interpreting [LocalE] *)
-  Definition _MCFG1 := CallE +' IntrinsicE +' MemoryE +' DebugE +' FailureE.
+  Definition _MCFG2 := CallE +' IntrinsicE +' MemoryE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
-  Definition _MCFG2 := CallE +' DebugE +' FailureE.
-  Hint Unfold LLVM _CFG _MCFG1 _MCFG2.
+  Definition _MCFG3 := CallE +' DebugE +' FailureE.
+  Hint Unfold LLVM _CFG _MCFG1 _MCFG2 _MCFG3.
 
   (* This inclusion "assumes" that all call events are internal.  The 
      dispatch in denote_mcfg then interprets some of the calls directly,
@@ -165,7 +165,6 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
         end
       | inr1 e' => inr1 (inr1 e')
       end.
-
   
   
   (* Utilities to conveniently trigger debug and failure events *)

@@ -25,6 +25,7 @@ From Vellvm Require Import
      DynamicTypes
      LLVMEvents
      Denotation
+     Global
      Local
      Stack
      Memory
@@ -48,15 +49,11 @@ Export IO.DV.
 
 Open Scope string_scope.
 
-(* SAZ: Add this to the itrees library? *)
-Definition map_bind {E} {A} (f : A -> itree E unit) (l:list A) : itree E unit :=
-  List.fold_right (fun (x:A) t => (f x) ;; t) (ret tt) l.
-
 Definition allocate_global (g:global dtyp) : LLVM _CFG unit :=
   (vis (Alloca (g_typ _ g)) (fun v => trigger (GlobalWrite (g_ident _ g) v))).
 
 Definition allocate_globals (gs:list (global dtyp)) : LLVM _CFG unit :=
-  map_bind allocate_global gs.
+  map_monad_ allocate_global gs.
 
 (* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
 Definition allocate_declaration (d:declaration dtyp) : LLVM _CFG unit :=
@@ -64,7 +61,7 @@ Definition allocate_declaration (d:declaration dtyp) : LLVM _CFG unit :=
     vis (Alloca DTYPE_Pointer) (fun v => trigger (GlobalWrite (dc_name _ d) v)).
 
 Definition allocate_declarations (ds:list (declaration dtyp)) : LLVM _CFG unit :=
-  map_bind allocate_declaration ds.
+  map_monad_ allocate_declaration ds.
 
 Definition initialize_global (g:global dtyp) : LLVM _CFG unit :=
   let dt := (g_typ _ g) in
@@ -76,7 +73,7 @@ Definition initialize_global (g:global dtyp) : LLVM _CFG unit :=
   trigger (Store a dv).
 
 Definition initialize_globals (gs:list (global dtyp)): LLVM _CFG unit :=
-  map_bind initialize_global gs.
+  map_monad_ initialize_global gs.
   
 Definition build_global_environment (CFG : CFG.mcfg dtyp) : LLVM _CFG unit :=
   allocate_globals (m_globals _ _ CFG) ;;
@@ -93,7 +90,6 @@ Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : LLVM _CF
   let fid := (dc_name _ (df_prototype _ _ df)) in
   fv <- trigger (GlobalRead fid) ;;
   ret (fv, D.denote_function df).
-   
 
 (* (for now) assume that [main (i64 argc, i8** argv)] 
     pass in 0 and null as the arguments to main
@@ -110,30 +106,31 @@ Definition eval_typ (CFG:CFG.mcfg typ) (t:typ) : dtyp :=
 Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
   TransformTypes.fmap_mcfg _ _ (eval_typ CFG) CFG.
 
+  Existing Instance show_raw_id.
 
 Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (LLVM _MCFG2 (M.memory * ((local_env * stack) * dvalue))) :=
+  option (LLVM _MCFG3 (M.memory * ((local_env * stack) * (global_env * dvalue)))) :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
     ucfg <- CFG.mcfg_of_modul _ scfg ;;
-    let mcfg := normalize_types ucfg in 
-       let core_trace : LLVM _CFG dvalue :=
-           'glbls <- build_global_environment mcfg ;;
-           'defns <- map_monad address_one_function (m_definitions _ _ mcfg) ;;
-           'addr <- trigger (GlobalRead (Name "main")) ;;
-           D.denote_mcfg defns DTYPE_Void addr main_args
-       in
+    let mcfg := normalize_types ucfg in
 
-       let after_intrinsics_trace : LLVM _CFG dvalue := INT.interpret_intrinsics core_trace in
-       
-       let glbl_trace : LLVM _ ((local_env * stack) * dvalue) :=
-           run_local_stack
-             (@handle_local raw_id dvalue _ _ show_raw_id _ _)
-             after_intrinsics_trace ([], [])
-       in
+    let core_trace : LLVM _CFG dvalue :=
+        build_global_environment mcfg ;;
+        'defns <- map_monad address_one_function (m_definitions _ _ mcfg) ;;
+        'addr <- trigger (GlobalRead (Name "main")) ;;
+        D.denote_mcfg defns DTYPE_Void addr main_args
+    in
+    let after_intrinsics_trace : LLVM _CFG dvalue := INT.interpret_intrinsics core_trace in
 
-       let mem_trace : LLVM _ ((local_env * stack) * dvalue) :=
-           
-       
-       let interpreted_Trace := M.run_memory mem_trace M.empty in
+    let local_trace: LLVM _ (global_env * dvalue) :=
+        @run_global _ _ _ _ show_raw_id _ _ _ _ _ after_intrinsics_trace []
+    in
 
-       ret interpreted_Trace.
+    let mem_trace: LLVM _ ((local_env * stack) * (global_env * dvalue)) :=
+        run_local_stack
+          (@handle_local raw_id dvalue _ _ show_raw_id _ _)
+          local_trace ([], [])
+    in
+    
+    let interpreted_Trace := M.run_memory mem_trace M.empty in
+    ret interpreted_Trace.

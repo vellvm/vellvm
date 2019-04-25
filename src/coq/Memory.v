@@ -537,7 +537,7 @@ n     address isn't in range
 
    `{E +' F -< G}
 
-   This seems too experimental to try to work out now --- chat with Li Yao about it.
+   This seems too experimental to try to work out now --- chat with Li-yao about it.
 
    Alternative 2 might be the most straightforward way to get things working in the short term.
 
@@ -550,13 +550,13 @@ n     address isn't in range
    
    *)
 
-  Definition call_trigger : forall R, CallE R -> (stateT memory (LLVM _MCFG2) R) :=
+  Definition call_trigger : forall R, CallE R -> (stateT memory (LLVM _MCFG3) R) :=
   fun R e m => r <- trigger e ;; ret (m, r).
 
-  Definition rest_trigger : forall R , (DebugE +' FailureE) R -> (stateT memory (LLVM _MCFG2) R) :=
+  Definition rest_trigger : forall R , (DebugE +' FailureE) R -> (stateT memory (LLVM _MCFG3) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
   
-  Definition run_memory : LLVM _MCFG1 ~> stateT memory (LLVM _MCFG2) :=
+  Definition run_memory : LLVM _MCFG2 ~> stateT memory (LLVM _MCFG3) :=
     interp_state (case_ call_trigger (case_ handle_intrinsic (case_ handle_memory rest_trigger))).
   
 End Make.
