@@ -266,8 +266,8 @@ and exp : Format.formatter -> LLVMAst.exp -> unit =
     match vv with
   | EXP_Ident i           -> ident ppf i
   | EXP_Integer i         -> pp_print_int ppf (to_int i)
-  | EXP_Float f           -> pp_print_float ppf (float_of_coqfloat f)
-  | EXP_Hex h             -> fprintf ppf "0x%Lx" (Int64.bits_of_float (float_of_coqfloat h))
+  | EXP_Float f           -> fprintf ppf "0x%LX" (Int64.bits_of_float (float_of_coqfloat f))
+  | EXP_Hex h             -> fprintf ppf "0x%LX" (Int64.bits_of_float (float_of_coqfloat h))
   | EXP_Bool b            -> pp_print_bool ppf b
   | EXP_Null              -> pp_print_string ppf "null"
   | EXP_Undef             -> pp_print_string ppf "undef"
@@ -577,16 +577,7 @@ and instr_id : Format.formatter -> LLVMAst.instr_id -> unit =
     | IId id  -> fprintf ppf "%%%s = " (str_of_raw_id id)
     | IVoid n -> fprintf ppf "; void instr %d" (to_int n); pp_force_newline ppf ()
   
-and float_fmt : Format.formatter -> LLVMAst.exp -> unit =
-  fun ppf v ->
-  match v with
-  | EXP_Float f -> fprintf ppf "0x%lx" (Int32.bits_of_float (float_of_coqfloat f))
-  | _ -> fprintf ppf "%a" exp v (* Default to printing whatever, e.g., identifiers like %1 *)
-
-and texp ppf (t, v) =
-  match t with
-  | TYPE_Float -> fprintf ppf "%a %a" typ t float_fmt v
-  | _ ->  fprintf ppf "%a %a" typ t exp v
+and texp ppf (t, v) = fprintf ppf "%a %a" typ t exp v
 
 and tident ppf (t, v) = fprintf ppf "%a %a" typ t ident v
 
