@@ -228,12 +228,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       | Fpext => spec_raise "TODO: unimplemented numeric conversion"
       | Inttoptr =>
         match t1, t2 with
-        | DTYPE_I 64, DTYPE_Pointer => vis (ItoP x) ret
+        | DTYPE_I 64, DTYPE_Pointer => trigger (ItoP x)
         | _, _ => spec_raise "ERROR: Inttoptr got illegal arguments"
         end 
       | Ptrtoint =>
         match t1, t2 with
-        | DTYPE_Pointer, DTYPE_I 64 => vis (PtoI x) ret
+        | DTYPE_Pointer, DTYPE_I 64 => trigger (PtoI x) 
         | _, _ => spec_raise "ERROR: Ptrtoint got illegal arguments"
         end
       end.
