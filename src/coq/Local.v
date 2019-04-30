@@ -57,5 +57,5 @@ Section Locals.
       interp_state (case_ E_trigger (case_ F_trigger (case_ handle_local G_trigger))).
     End PARAMS.
     
-  End Locals.
+End Locals.
 
