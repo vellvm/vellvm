@@ -155,7 +155,8 @@ Fixpoint exp_uses (v:exp) : list ident :=
   match v with
   | EXP_Ident id => [id]
   | EXP_Integer _
-  | EXP_Float _ 
+  | EXP_Float _
+  | EXP_Double _               
   | EXP_Hex _        
   | EXP_Bool _
   | EXP_Null

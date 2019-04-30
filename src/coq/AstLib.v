@@ -398,7 +398,8 @@ Inductive value : Set :=
   Variable P : exp -> Prop.
   Hypothesis IH_Ident   : forall (id:ident), P ((EXP_Ident id)).
   Hypothesis IH_Integer : forall (x:int), P ((EXP_Integer x)).
-  Hypothesis IH_Float   : forall (f:float), P ((EXP_Float f)).
+  Hypothesis IH_Float   : forall (f:float32), P ((EXP_Float f)).
+  Hypothesis IH_Double  : forall (f:float), P ((EXP_Double f)).  
   Hypothesis IH_Hex     : forall (h:float), P ((EXP_Hex h)).  
   Hypothesis IH_Bool    : forall (b:bool), P ((EXP_Bool b)).
   Hypothesis IH_Null    : P ((EXP_Null )).
@@ -431,6 +432,7 @@ Inductive value : Set :=
     - apply IH_Ident.
     - apply IH_Integer.
     - apply IH_Float.
+    - apply IH_Double.      
     - apply IH_Hex.      
     - apply IH_Bool.
     - apply IH_Null.

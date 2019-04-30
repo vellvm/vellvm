@@ -266,8 +266,9 @@ and exp : Format.formatter -> LLVMAst.exp -> unit =
     match vv with
   | EXP_Ident i           -> ident ppf i
   | EXP_Integer i         -> pp_print_int ppf (to_int i)
-  | EXP_Float f           -> fprintf ppf "0x%LX" (Int64.bits_of_float (float_of_coqfloat f))
-  | EXP_Hex h             -> fprintf ppf "0x%LX" (Int64.bits_of_float (float_of_coqfloat h))
+  | EXP_Float f           -> fprintf ppf "0x%lX" (Camlcoq.camlint_of_coqint(Floats.Float32.to_bits f))
+  | EXP_Double f          -> fprintf ppf "0x%LX" (Camlcoq.camlint64_of_coqint(Floats.Float.to_bits f))
+  | EXP_Hex h             -> fprintf ppf "0x%LX" (Camlcoq.camlint64_of_coqint(Floats.Float.to_bits h))
   | EXP_Bool b            -> pp_print_bool ppf b
   | EXP_Null              -> pp_print_string ppf "null"
   | EXP_Undef             -> pp_print_string ppf "undef"
@@ -370,6 +371,7 @@ and inst_exp : Format.formatter -> LLVMAst.exp -> unit =
   | EXP_Ident _ 
   | EXP_Integer _ 
   | EXP_Float _
+  | EXP_Double _      
   | EXP_Hex _         
   | EXP_Bool _    
   | EXP_Null      
