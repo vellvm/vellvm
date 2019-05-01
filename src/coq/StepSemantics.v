@@ -313,11 +313,18 @@ Fixpoint eval_exp (top:option dtyp) (o:exp) {struct o} : LLVM (failureE +' debug
   | EXP_Float x   =>
     match top with
     | None => raise "eval_exp given untyped EXP_Float"
-    | Some DTYPE_Float  =>  ret (DVALUE_Float (Float32.of_double x))
+    | Some DTYPE_Float  =>  ret (DVALUE_Float x)
+    | _ => raise "bad type for constant float"
+    end
+
+  | EXP_Double x   =>
+    match top with
+    | None => raise "eval_exp given untyped EXP_Float"
     | Some DTYPE_Double =>  ret (DVALUE_Double x)
     | _ => raise "bad type for constant float"
     end
 
+      
   | EXP_Hex x     =>
     match top with
     | None => raise "eval_exp given untyped EXP_Hex"

@@ -205,6 +205,7 @@ Fixpoint swap_exp (id1 id2:raw_id) (e:exp) : exp :=
   | EXP_Ident id => EXP_Ident (swap id1 id2 id)
   | EXP_Integer _
   | EXP_Float   _
+  | EXP_Double  _                
   | EXP_Hex     _
   | EXP_Bool    _
   | EXP_Null

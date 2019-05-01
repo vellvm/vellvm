@@ -30,6 +30,23 @@ open LLVMAst
 let str = Camlcoq.coqstring_of_camlstring
 let coq_of_int = Camlcoq.Z.of_sint
 
+let coqfloat_of_string d = Floats.Float.of_bits(Camlcoq.coqint_of_camlint64(Int64.bits_of_float (float_of_string d)))
+let coqfloat32_of_string d = Floats.Float32.of_bits(Camlcoq.coqint_of_camlint(Int32.bits_of_float (float_of_string d)))
+
+(* normalize_float_size : 
+   - LLVM floating point literals need different interpretations depending
+     on their types.
+
+   - This function converts a string into either a 
+     EXP_Double 64-bit literal, or
+     EXP_Float 32-bit literal depending on the type annotation t
+ *)
+let normalize_float_literal (t:typ) (d:string) : exp =
+  match t with
+  | TYPE_Double -> EXP_Double (coqfloat_of_string d)
+  | TYPE_Float  -> EXP_Float (coqfloat32_of_string d)
+  | _ -> failwith "normalize_float_literal called with non-float type"
+	       
 (* att type is a workaround to simplify parsing of optionnal keywords in
  * global / function declaration / definition.
  * It is far from what would be ideal since it will allow to parse silly
@@ -140,7 +157,7 @@ let id_of = function
 
 %token<string> STRING
 %token<Camlcoq.Z.t> INTEGER
-%token<Floats.float> FLOAT
+%token<string> FLOAT
 %token<Floats.float> HEXCONSTANT
 %token KW_NULL KW_UNDEF KW_TRUE KW_FALSE KW_ZEROINITIALIZER KW_C
 
@@ -248,7 +265,7 @@ global_decl:
         { g_ident=ident;
           g_typ;
           g_constant;
-          g_exp = Some gv;
+          g_exp = Some (gv g_typ);
 
           g_linkage;
           g_visibility = get_visibility attrs;
@@ -465,7 +482,7 @@ param_attr:
 
 dc_arg: t=typ p=param_attr*         { (t, p)      }
 df_arg: t=typ p=param_attr* i=lident { ((t, p), i) }
-call_arg: t=typ i=exp             { (t, i)      }
+call_arg: t=typ i=exp             { (t, i t)      }
 
 fn_attr:
   | KW_ALIGNSTACK LPAREN p=INTEGER RPAREN { FNATTR_Alignstack p     }
@@ -548,19 +565,19 @@ fast_math:
 
 instr_op:
   | op=ibinop t=typ o1=exp COMMA o2=exp
-    { OP_IBinop (op, t, o1, o2) }
+    { OP_IBinop (op, t, o1 t, o2 t) }
 
   | KW_ICMP op=icmp t=typ o1=exp COMMA o2=exp
-    { OP_ICmp (op, t, o1, o2) }
+    { OP_ICmp (op, t, o1 t, o2 t) }
 
   | op=fbinop f=fast_math* t=typ o1=exp COMMA o2=exp
-    { OP_FBinop (op, f, t, o1, o2) }
+    { OP_FBinop (op, f, t, o1 t, o2 t) }
 
   | KW_FCMP op=fcmp t=typ o1=exp COMMA o2=exp
-    { OP_FCmp (op, t, o1, o2) }
+    { OP_FCmp (op, t, o1 t, o2 t) }
 
   | c=conversion t1=typ v=exp KW_TO t2=typ
-    { OP_Conversion (c, t1, v, t2) }
+    { OP_Conversion (c, t1, v t1, t2) }
 
   | KW_GETELEMENTPTR KW_INBOUNDS? t=typ COMMA ptr=texp idx=preceded(COMMA, texp)*
     { OP_GetElementPtr (t, ptr, idx) }
@@ -588,19 +605,19 @@ instr_op:
 
 expr_op:
   | op=ibinop LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
-    { OP_IBinop (op, t, o1, o2) }
+    { OP_IBinop (op, t, o1 t, o2 t) }
 
   | KW_ICMP op=icmp LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
-    { OP_ICmp (op, t, o1, o2) }
+    { OP_ICmp (op, t, o1 t, o2 t) }
 
   | op=fbinop f=fast_math* LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
-    { OP_FBinop (op, f, t, o1, o2) }
+    { OP_FBinop (op, f, t, o1 t, o2 t) }
 
   | KW_FCMP op=fcmp LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
-    { OP_FCmp (op, t, o1, o2) }
+    { OP_FCmp (op, t, o1 t, o2 t) }
 
   | c=conversion LPAREN t1=typ v=exp KW_TO t2=typ RPAREN
-    { OP_Conversion (c, t1, v, t2) }
+    { OP_Conversion (c, t1, v t1, t2) }
 
   | KW_GETELEMENTPTR KW_INBOUNDS? LPAREN t=typ COMMA ptr=texp idx=preceded(COMMA, texp)* RPAREN
     { OP_GetElementPtr (t, ptr, idx) }
@@ -625,28 +642,28 @@ expr_op:
 
 
 expr_val:
-  | i=INTEGER                                         { EXP_Integer i        }
-  | f=FLOAT                                           { EXP_Float f          }
-  | f=HEXCONSTANT                                     { EXP_Hex f            }
-  | KW_TRUE                                           { EXP_Bool true        }
-  | KW_FALSE                                          { EXP_Bool false       }
-  | KW_NULL                                           { EXP_Null             }
-  | KW_UNDEF                                          { EXP_Undef            }
-  | KW_ZEROINITIALIZER                                { EXP_Zero_initializer }
-  | LCURLY l=separated_list(csep, tconst) RCURLY      { EXP_Struct l         }
-  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { EXP_Packed_struct l  }
-  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { EXP_Array l          }
-  | LT l=separated_list(csep, tconst) GT              { EXP_Vector l         }
-  | i=ident                                           { EXP_Ident i          }
-  | KW_C cstr=STRING                                  { EXP_Cstring (str cstr) }
+  | i=INTEGER                                         { fun _ -> EXP_Integer i        }
+  | f=FLOAT                                           { fun t -> normalize_float_literal t f }
+  | f=HEXCONSTANT                                     { fun _ -> EXP_Hex f            }
+  | KW_TRUE                                           { fun _ -> EXP_Bool true        }
+  | KW_FALSE                                          { fun _ -> EXP_Bool false       }
+  | KW_NULL                                           { fun _ -> EXP_Null             }
+  | KW_UNDEF                                          { fun _ -> EXP_Undef            }
+  | KW_ZEROINITIALIZER                                { fun _ -> EXP_Zero_initializer }
+  | LCURLY l=separated_list(csep, tconst) RCURLY      { fun _ -> EXP_Struct l         }
+  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { fun _ -> EXP_Packed_struct l  }
+  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { fun _ -> EXP_Array l          }
+  | LT l=separated_list(csep, tconst) GT              { fun _ -> EXP_Vector l         }
+  | i=ident                                           { fun _ -> EXP_Ident i          }
+  | KW_C cstr=STRING                                  { fun _ -> EXP_Cstring (str cstr) }
 
 exp:
-  | eo=expr_op { eo }
+  | eo=expr_op { fun _ -> eo }
   | ev=expr_val { ev }
 
 %inline phi:
   | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry)
-    { Phi (t, table) }
+    { Phi (t, List.map (fun (l,v) -> (l, v t)) table)}
 
 phi_table_entry:
   | LSQUARE v=exp COMMA l=lident RSQUARE { (l, v) }
@@ -684,8 +701,8 @@ branch_label:
   KW_LABEL o=LOCAL  { o }
   
 terminator:  
-  | KW_RET t=typ o=exp
-    { TERM_Ret (t, o) }
+  | KW_RET tv=texp
+    { TERM_Ret tv }
 
   | KW_RET KW_VOID
     { TERM_Ret_void }
@@ -714,7 +731,7 @@ terminator:
 
 
 alloca_opt:
-  | a=align                             { (None, Some a) }
+  | a=align                           { (None, Some a) }
   | nb=texp a=preceded(COMMA, align)? { (Some nb, a) }
 
 
@@ -734,6 +751,6 @@ ident:
   | l=gident  { ID_Global l }
   | l=lident  { ID_Local l  }
 
-texp: t=typ v=exp { (t, v) }
-tconst: t=typ c=exp { (t, c) }
+texp: t=typ v=exp { (t, v t) }
+tconst: t=typ c=exp { (t, c t) }
 tident: t=typ i=ident { (t, i) }
