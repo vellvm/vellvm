@@ -64,11 +64,11 @@ let normalize_float_literal (t:typ) (d:string) : exp =
          if can_convert_float_to_float32 v 
            then EXP_Float (coqfloat32_of_string d)
          else
-           let d = (match v with
-                   | B754_finite (_, m, e) -> (Printf.sprintf ": [m=%s e=%s]" (string_of_positive m) (string_of_Z e))
-                   | _ -> "")
+           let dbg = (match v with
+                   | B754_finite (_, m, e) -> Printf.sprintf "\"%s\" [m=%s, e=%s]" d (string_of_positive m) (string_of_Z e)
+                   | _ -> Printf.sprintf "\"%s\"" d)
            in
-           failwith ("Illegal 32-bit floating point literal" ^ d)
+           failwith ("Illegal 32-bit floating point literal: " ^ dbg)
   | _ -> failwith "normalize_float_literal called with non-float type"
 	       
 (* att type is a workaround to simplify parsing of optionnal keywords in
