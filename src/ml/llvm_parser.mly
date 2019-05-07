@@ -26,6 +26,7 @@
 
 
 open LLVMAst
+open ParserHelper
 
 let str = Camlcoq.coqstring_of_camlstring
 let coq_of_int = Camlcoq.Z.of_sint
@@ -44,7 +45,10 @@ let coqfloat32_of_string d = Floats.Float32.of_bits(Camlcoq.coqint_of_camlint(In
 let normalize_float_literal (t:typ) (d:string) : exp =
   match t with
   | TYPE_Double -> EXP_Double (coqfloat_of_string d)
-  | TYPE_Float  -> EXP_Float (coqfloat32_of_string d)
+  | TYPE_Float  ->
+       if can_convert_float_to_float32 (coqfloat_of_string d)
+       then EXP_Float (coqfloat32_of_string d)
+       else failwith "Illegal 32-bit floating point literal"
   | _ -> failwith "normalize_float_literal called with non-float type"
 	       
 (* att type is a workaround to simplify parsing of optionnal keywords in
