@@ -5,32 +5,111 @@ Require Import Floats.
 
 Open Scope Z.
 
-(*
- * Inspired by StructTact
- * Source: github.com/uwplse/StructTact
- *
- * [break_match] looks for a [match] construct in the goal or some hypothesis,
- * and destructs the discriminee, while retaining the information about
- * the discriminee's value leading to the branch being taken. 
- *)
-Ltac break_match :=
-  match goal with
-    | [ |- context [ match ?X with _ => _ end ] ] =>
-      match type of X with
-        | sumbool _ _ => destruct X
-        | _ => destruct X eqn:?
-      end
-    | [ H : context [ match ?X with _ => _ end ] |- _] =>
-      match type of X with
-        | sumbool _ _ => destruct X
-        | _ => destruct X eqn:?
-      end
+(* a basic float - a pair of two integers - mantissa and exponent *)
+Definition bfloat := Flocq.Core.Defs.float radix2.
+Definition BFloat := Flocq.Core.Defs.Float radix2.
+
+(** * converting between floats in the same cohort *)
+
+(* increase a given float's exponent by [de] *)
+Definition inc_e (f : bfloat) (de : positive) : option bfloat :=
+  let '(m, e) := (Fnum f, Fexp f) in
+  let rm := two_power_pos de in
+  if (Zmod m rm =? 0)
+  then Some (BFloat (m / two_power_pos de) (e + Z.pos de))
+  else None.
+
+(* decrese a given float's exponent by [de] *)
+Definition dec_e (f : bfloat) (de : positive) : bfloat :=
+  let '(m, e) := (Fnum f, Fexp f) in
+  let rm := two_power_pos de in
+  BFloat (m * two_power_pos de) (e - Z.pos de).
+
+(* shift (up or down) the exponent by [de] *)
+Definition shift_e (f : bfloat) (de : Z) : option bfloat :=
+  match de with
+  | Z0 => Some f
+  | Z.pos pde => inc_e f pde
+  | Z.neg nde => Some (dec_e f nde)
   end.
 
-Section General_normalization.
+(* set exponent to a given one *)
+Definition set_e (f : bfloat) (e : Z) : option bfloat :=
+  shift_e f (e - Fexp f).
+
+(* binary length of a number *)
+Definition Zdigits (m : Z) := Z.log2 (Z.abs m) + 1.
+
+(* shifting the binary length of the mantissa - *)
+Definition inc_digits_m := dec_e.
+Definition dec_digits_m := inc_e.
+Definition shift_digits_m (f : bfloat) (ddm : Z) := shift_e f (- ddm).
+Definition set_digits_m (f : bfloat) (dm : Z) := shift_digits_m f (dm - Zdigits (Fnum f)).
+
+(** * normalization *)
+Definition normalize_float (prec emax : Z) (f : bfloat)
+  : option bfloat :=
+  let emin := 3 - emax - prec in
+  match set_e f emin with
+    | None => None
+    | Some f1 => if Zdigits (Fnum f1) <=? prec
+                 then Some f1
+                 else match set_digits_m f prec with
+                     | None => None
+                     | Some f2 => if andb
+                                       (emin <=? Fexp f2)
+                                       (Fexp f2 <=? emax - prec)
+                                  then Some f2
+                                  else None
+                     end
+  end.
+
+(* check if a mantissa-exponent pair is represntable in a format given by prec, emax *)
+Definition can_convert_exactly (prec__target emax__target : Z) (m : positive) (e : Z) : bool :=
+  let f := BFloat (Z.pos m) e in
+  match normalize_float prec__target emax__target f with
+  | Some _ => true
+  | None => false
+  end.
+
+Definition can_convert_float_to_float32 (v : float) : bool :=
+  match v with
+  | B754_finite _ m e _ => can_convert_exactly 24 128 m e
+  | _ => true
+  end.
+
+Definition can_convert_float_to_float64 (v : float) : bool :=
+  match v with
+  | B754_finite _ m e _ => can_convert_exactly 53 1024 m e
+  | _ => true
+  end.
+
+Section Correctness.
+
+  (*
+   * Inspired by StructTact
+   * Source: github.com/uwplse/StructTact
+   *
+   * [break_match] looks for a [match] construct in the goal or some hypothesis,
+   * and destructs the discriminee, while retaining the information about
+   * the discriminee's value leading to the branch being taken. 
+   *)
+  Ltac break_match :=
+    match goal with
+      | [ |- context [ match ?X with _ => _ end ] ] =>
+        match type of X with
+          | sumbool _ _ => destruct X
+          | _ => destruct X eqn:?
+        end
+      | [ H : context [ match ?X with _ => _ end ] |- _] =>
+        match type of X with
+          | sumbool _ _ => destruct X
+          | _ => destruct X eqn:?
+        end
+    end.
 
   (* binary length of a positive number *)
-  Let digits := compose Z.succ log_inf.
+  Definition digits := compose Z.succ log_inf.
   
   (* closed form for Flocq's [digits2_pos] *)
   Lemma digits2_pos_digits (m : positive) :
@@ -60,19 +139,15 @@ Section General_normalization.
     all: lia.
   Qed.
 
-  (* a basic float - a pair of two integers - mantissa and exponent *)
-  Let float := Flocq.Core.Defs.float radix2.
-  Let Float := Flocq.Core.Defs.Float radix2.
-
-  Definition valid_float (prec emax : Z) (f : float) :=
+  Definition valid_float (prec emax : Z) (f : bfloat) :=
     match (Fnum f) with
     | Z0 => true
     | Z.pos m => bounded prec emax m (Fexp f)
     | Z.neg m => bounded prec emax m (Fexp f)
     end.
   
-  (** * equality on floats with no jumps to Real *)
-  Definition float_eq (f1 : float) (f2 : float) : Prop :=
+  (** ** equality on floats with no jumps to Real *)
+  Definition float_eq (f1 : bfloat) (f2 : bfloat) : Prop :=
     let '(m1, e1) := (Fnum f1, Fexp f1) in
     let '(m2, e2) := (Fnum f2, Fexp f2) in
     or
@@ -110,7 +185,6 @@ Section General_normalization.
     unfold Transitive.
     destruct x as [mx ex], y as [my ey], z as [mz ez].
     unfold float_eq.
-    clear float Float.
     simpl.
     intros XY YZ.
     destruct XY as [XY | XY]; destruct YZ as [YZ | YZ].
@@ -184,13 +258,13 @@ Section General_normalization.
   Definition float_eq_equivalence :=
     Build_Equivalence float_eq float_eq_refl float_eq_sym float_eq_trans.
 
-  Definition not_zero (f : float) := (Fnum f) <> 0.
+  Definition not_zero (f : bfloat) := (Fnum f) <> 0.
 
   Lemma not_zero_Zpos (m : positive) (e : Z) :
-    not_zero (Float (Z.pos m) e).
+    not_zero (BFloat (Z.pos m) e).
   Proof. unfold not_zero. simpl. discriminate. Qed.
 
-  Lemma not_zero_eq (f1 f2 : float) :
+  Lemma not_zero_eq (f1 f2 : bfloat) :
     not_zero f1 ->
     float_eq f1 f2 ->
     not_zero f2.
@@ -206,38 +280,8 @@ Section General_normalization.
       subst; reflexivity.
   Qed.
 
-
-  (** * converting between floats in the same cohort *)
-  
-  (** ** shifting the exponent *)
-  (* increase a given float's exponent by `de` *)
-  Definition inc_e (f : float) (de : positive) : option float :=
-    let '(m, e) := (Fnum f, Fexp f) in
-    let rm := two_power_pos de in
-    if (Zmod m rm =? 0)
-    then Some (Float (m / two_power_pos de) (e + Z.pos de))
-    else None.
-
-  (* decrese a given float's exponent by `de` *)
-  Definition dec_e (f : float) (de : positive) : float :=
-    let '(m, e) := (Fnum f, Fexp f) in
-    let rm := two_power_pos de in
-    Float (m * two_power_pos de) (e - Z.pos de).
-
-  (* shift (up or down) the exponent by de *)
-  Definition shift_e (f : float) (de : Z) : option float :=
-    match de with
-    | Z0 => Some f
-    | Z.pos pde => inc_e f pde
-    | Z.neg nde => Some (dec_e f nde)
-    end.
-
-  (* set exponent to a given one *)
-  Definition set_e (f : float) (e : Z) : option float :=
-    shift_e f (e - Fexp f).
-
   (** shifting the exponent results in a shifted exponent as expected *)
-  Lemma inc_e_correct (f1 : float) (de : positive) {f2 : float} :
+  Lemma inc_e_correct (f1 : bfloat) (de : positive) {f2 : bfloat} :
     inc_e f1 de = Some f2 ->
     Fexp f2 = Fexp f1 + Z.pos de.
   Proof.
@@ -246,11 +290,11 @@ Section General_normalization.
     reflexivity.
   Qed.
 
-  Lemma dec_e_correct (f : float) (de : positive) :
+  Lemma dec_e_correct (f : bfloat) (de : positive) :
     Fexp (dec_e f de) = Fexp f - Z.pos de.
   Proof. reflexivity. Qed.
 
-  Lemma shift_e_correct (f1 : float) (de : Z) {f2 : float} :
+  Lemma shift_e_correct (f1 : bfloat) (de : Z) {f2 : bfloat} :
     shift_e f1 de = Some f2 ->
     Fexp f2 = Fexp f1 + de.
   Proof.
@@ -260,7 +304,7 @@ Section General_normalization.
     apply dec_e_correct.
   Qed.
 
-  Lemma set_e_correct (f1 : float) (e : Z) {f2 : float} :
+  Lemma set_e_correct (f1 : bfloat) (e : Z) {f2 : bfloat} :
     set_e f1 e = Some f2 ->
     Fexp f2 = e.
   Proof.
@@ -271,7 +315,7 @@ Section General_normalization.
   Qed.
 
   (** shifting the exponent preserves the float's value *)
-  Lemma inc_e_eq (f1 : float) (de : positive) {f2 : float} :
+  Lemma inc_e_eq (f1 : bfloat) (de : positive) {f2 : bfloat} :
     inc_e f1 de = Some f2 ->
     float_eq f1 f2.
   Proof.
@@ -297,7 +341,7 @@ Section General_normalization.
     lia.
   Qed.
 
-  Lemma dec_e_eq (f : float) (de : positive) :
+  Lemma dec_e_eq (f : bfloat) (de : positive) :
     float_eq f (dec_e f de).
   Proof.
     destruct f as [m e].
@@ -311,7 +355,7 @@ Section General_normalization.
     reflexivity.
   Qed.
 
-  Lemma shift_e_eq (f1 : float) (de : Z) {f2 : float} :
+  Lemma shift_e_eq (f1 : bfloat) (de : Z) {f2 : bfloat} :
     shift_e f1 de = Some f2 ->
     float_eq f1 f2.
   Proof.
@@ -321,19 +365,13 @@ Section General_normalization.
     - intro H; inversion H; apply dec_e_eq.
   Qed.
 
-  Lemma set_e_eq (f1 : float) (e : Z) {f2 : float} :
+  Lemma set_e_eq (f1 : bfloat) (e : Z) {f2 : bfloat} :
     set_e f1 e = Some f2 ->
     float_eq f1 f2.
   Proof.
     unfold set_e.
     apply shift_e_eq.
   Qed.
-
-
-  (** ** changing binary length of the m, disregarding the sign *)
-
-  (* binary length of a number *)
-  Definition Zdigits (m : Z) := Z.log2 (Z.abs m) + 1.
 
   Lemma Zdigits_mul_pow2 (m : Z) (d : positive) :
     m <> 0 -> Zdigits (m * two_power_pos d) = Zdigits m + Z.pos d.
@@ -395,116 +433,91 @@ Section General_normalization.
     rewrite two_power_pos_equiv; generalize (Z.pow_pos_nonneg 2 (Z.pos d)); lia.
   Qed.
 
-  (** ** correspondence between shifting the exponent and the binary length of the mantissa *)
-  Definition inc_Zdigits_m := dec_e.
-  Definition dec_Zdigits_m := inc_e.
-  Definition shift_Zdigits_m (f : float) (ddm : Z) := shift_e f (- ddm).
-  Definition set_Zdigits_m (f : float) (dm : Z) := shift_Zdigits_m f (dm - Zdigits (Fnum f)).
-
   (** changing the mantissa's binary length results in an expected number of digits *)
-  Lemma inc_Zdigits_m_correct (f : float) (ddm : positive) :
+  Lemma inc_digits_m_correct (f : bfloat) (ddm : positive) :
     not_zero f ->
-    Zdigits (Fnum (inc_Zdigits_m f ddm)) = Zdigits (Fnum f) + Z.pos ddm.
+    Zdigits (Fnum (inc_digits_m f ddm)) = Zdigits (Fnum f) + Z.pos ddm.
   Proof.
-    unfold inc_Zdigits_m, dec_e; simpl.
+    unfold inc_digits_m, dec_e; simpl.
     apply Zdigits_mul_pow2.
   Qed.
 
-  Lemma dec_Zdigits_m_correct (f1 : float) (ddm : positive) {f2 : float} :
+  Lemma dec_digits_m_correct (f1 : bfloat) (ddm : positive) {f2 : bfloat} :
     not_zero f1 ->
-    dec_Zdigits_m f1 ddm = Some f2 ->
+    dec_digits_m f1 ddm = Some f2 ->
     Zdigits (Fnum f2) = Zdigits (Fnum f1) - Z.pos ddm.
   Proof.
     destruct f1 as [m1 e1], f2 as [m2 e2].
-    unfold dec_Zdigits_m, inc_e.
+    unfold dec_digits_m, inc_e.
     simpl; intros M H.
     break_match; inversion H; clear H.
     rewrite Z.eqb_eq in Heqb.
     apply Zdigits_div_pow2; assumption.
   Qed.
 
-  Lemma shift_Zdigits_m_correct (f1 : float) (ddm : Z) {f2 : float} :
+  Lemma shift_digits_m_correct (f1 : bfloat) (ddm : Z) {f2 : bfloat} :
     Fnum f1 <> 0 ->
-    shift_Zdigits_m f1 ddm = Some f2 ->
+    shift_digits_m f1 ddm = Some f2 ->
     Zdigits (Fnum f2) = Zdigits (Fnum f1) + ddm.
   Proof.
-    unfold shift_Zdigits_m, shift_e.
+    unfold shift_digits_m, shift_e.
     simpl; intros M H.
     break_match; inversion H; clear H; subst.
     - lia.
-    - replace inc_e with dec_Zdigits_m in H1 by reflexivity.
+    - replace inc_e with dec_digits_m in H1 by reflexivity.
       replace ddm with (Z.neg p) by lia.
-      apply dec_Zdigits_m_correct; assumption.
-    - replace dec_e with inc_Zdigits_m in Heqz by reflexivity.
+      apply dec_digits_m_correct; assumption.
+    - replace dec_e with inc_digits_m in Heqz by reflexivity.
       replace ddm with (Z.pos p) by lia.
-      apply inc_Zdigits_m_correct; assumption.
+      apply inc_digits_m_correct; assumption.
   Qed.
 
-  Lemma set_Zdigits_m_correct (f1 : float) (dm : Z) {f2 : float} :
+  Lemma set_digits_m_correct (f1 : bfloat) (dm : Z) {f2 : bfloat} :
     not_zero f1 ->
-    set_Zdigits_m f1 dm = Some f2 ->
+    set_digits_m f1 dm = Some f2 ->
     Zdigits (Fnum f2) = dm.
   Proof.
     intros M H.
-    unfold set_Zdigits_m in H.
-    apply shift_Zdigits_m_correct in H; [| assumption].
+    unfold set_digits_m in H.
+    apply shift_digits_m_correct in H; [| assumption].
     rewrite H.
     lia.
   Qed.
 
   (** changing the binary length of the mantissa preserves the float's value *)
-  Lemma inc_Zdigits_m_eq (f : float) (ddm : positive) :
-    float_eq f (inc_Zdigits_m f ddm).
+  Lemma inc_digits_m_eq (f : bfloat) (ddm : positive) :
+    float_eq f (inc_digits_m f ddm).
   Proof.
-    unfold inc_Zdigits_m.
+    unfold inc_digits_m.
     apply dec_e_eq.
   Qed.
 
-  Lemma dec_Zdigits_m_eq (f1 : float) (ddm : positive) {f2 : float} :
-    dec_Zdigits_m f1 ddm = Some f2 ->
+  Lemma dec_digits_m_eq (f1 : bfloat) (ddm : positive) {f2 : bfloat} :
+    dec_digits_m f1 ddm = Some f2 ->
     float_eq f1 f2.
   Proof.
-    unfold dec_Zdigits_m.
+    unfold dec_digits_m.
     apply inc_e_eq.
   Qed.
 
-  Lemma shift_Zdigits_m_eq (f1 : float) (ddm : Z) {f2 : float} :
-    shift_Zdigits_m f1 ddm = Some f2 ->
+  Lemma shift_digits_m_eq (f1 : bfloat) (ddm : Z) {f2 : bfloat} :
+    shift_digits_m f1 ddm = Some f2 ->
     float_eq f1 f2.
   Proof.
-    unfold shift_Zdigits_m.
+    unfold shift_digits_m.
     apply shift_e_eq.
   Qed.
 
-  Lemma set_Zdigits_m_eq (f1 : float) (dm : Z) {f2 : float} :
-    set_Zdigits_m f1 dm = Some f2 ->
+  Lemma set_digits_m_eq (f1 : bfloat) (dm : Z) {f2 : bfloat} :
+    set_digits_m f1 dm = Some f2 ->
     float_eq f1 f2.
   Proof.
-    unfold set_Zdigits_m.
-    apply shift_Zdigits_m_eq.
+    unfold set_digits_m.
+    apply shift_digits_m_eq.
   Qed.
 
-
-  (** * normalization *)
-  Definition normalize_float (prec emax : Z) (f : float) (NZ : not_zero f)
-    : option float :=
-    let emin := 3 - emax - prec in
-    match set_e f emin with
-      | None => None
-      | Some f1 => if Zdigits (Fnum f1) <=? prec
-                   then Some f1
-                   else match set_Zdigits_m f prec with
-                       | None => None
-                       | Some f2 => if andb
-                                         (emin <=? Fexp f2)
-                                         (Fexp f2 <=? emax - prec)
-                                    then Some f2
-                                    else None
-                       end
-    end.
-
   (** two equal floats with the same exponent are exactly the same *)
-  Lemma exponent_unique_fnum (f1 f2 : float) :
+  Lemma exponent_unique_fnum (f1 f2 : bfloat) :
     float_eq f1 f2 ->
     Fexp f1 = Fexp f2 ->
     Fnum f1 = Fnum f2.
@@ -515,7 +528,7 @@ Section General_normalization.
     all: rewrite Z.sub_diag; simpl; lia.
   Qed.
 
-  Lemma exponent_unique (f1 f2 : float) :
+  Lemma exponent_unique (f1 f2 : bfloat) :
     float_eq f1 f2 ->
     Fexp f1 = Fexp f2 ->
     f1 = f2.
@@ -527,7 +540,7 @@ Section General_normalization.
   Qed.
 
   (** two equal floats with the same mantissa length are exactly the same *)
-  Lemma Zdigits_m_unique_fexp (f1 f2 : float) :
+  Lemma Zdigits_m_unique_fexp (f1 f2 : bfloat) :
     not_zero f1 ->
     float_eq f1 f2 ->
     Zdigits (Fnum f1) = Zdigits (Fnum f2) ->
@@ -555,7 +568,7 @@ Section General_normalization.
       contradict DM; lia.
   Qed.
 
-  Lemma Zdigits_m_unique (f1 f2 : float) :
+  Lemma Zdigits_m_unique (f1 f2 : bfloat) :
     not_zero f1 ->
     float_eq f1 f2 ->
     Zdigits (Fnum f1) = Zdigits (Fnum f2) ->
@@ -583,7 +596,7 @@ Section General_normalization.
   Qed.
     
   (* similar to [bounded_closed_form] *)
-  Lemma valid_float_closed_form (prec emax : Z) (f : float) (NZ : not_zero f)
+  Lemma valid_float_closed_form (prec emax : Z) (f : bfloat) (NZ : not_zero f)
         (prec_gt_0 : FLX.Prec_gt_0 prec) (Hmax : prec < emax) :
     let emin := 3 - emax - prec in
     let '(m, e) := (Fnum f, Fexp f) in
@@ -625,7 +638,7 @@ Section General_normalization.
     - destruct H; subst; discriminate.
   Qed.
 
-  Lemma float_eq_trans_l (f1 f2 f3 : float) :
+  Lemma float_eq_trans_l (f1 f2 f3 : bfloat) :
     float_eq f1 f2 ->
     float_eq f1 f3 ->
     float_eq f2 f3.
@@ -636,12 +649,12 @@ Section General_normalization.
       assumption.
   Qed.
 
-  Lemma float_eq_set_e (f1 f2 : float) :
+  Lemma float_eq_set_e (f1 f2 : bfloat) :
     float_eq f1 f2 ->
     set_e f1 (Fexp f2) = Some f2.
   Proof.
     intro.
-    destruct set_e eqn:SE.
+    destruct set_e as [f |] eqn:SE.
     - (* if successful, then equal *)
       pose proof set_e_eq f1 (Fexp f2) SE; rename H0 into H1.
       apply set_e_correct in SE.
@@ -661,24 +674,24 @@ Section General_normalization.
       generalize (Z.pow_pos_nonneg 2 (Z.pos p)); lia.
   Qed.
 
-  Lemma float_eq_set_Zdigits_m (f1 f2 : float) :
+  Lemma float_eq_set_digits_m (f1 f2 : bfloat) :
     not_zero f1 ->
     float_eq f1 f2 ->
-    set_Zdigits_m f1 (Zdigits (Fnum f2)) = Some f2.
+    set_digits_m f1 (Zdigits (Fnum f2)) = Some f2.
   Proof.
     intros NZ1 H.
     assert (NZ2 : not_zero f2) by apply (not_zero_eq f1 f2 NZ1 H).
-    destruct set_Zdigits_m eqn:SDM.
+    destruct set_digits_m as [f |] eqn:SDM.
     - (* if successful, then equal *)
-      pose proof set_Zdigits_m_eq f1 (Zdigits (Fnum f2)) SDM; rename H0 into H1.
-      apply set_Zdigits_m_correct in SDM; auto.
+      pose proof set_digits_m_eq f1 (Zdigits (Fnum f2)) SDM; rename H0 into H1.
+      apply set_digits_m_correct in SDM; auto.
       apply (float_eq_trans_l f1 f f2 H1) in H.
       assert (NZ: not_zero f) by (apply not_zero_eq with (f1 := f1); assumption).
       apply (Zdigits_m_unique f f2 NZ H) in SDM.
       subst; reflexivity.
     - (* always successful *)
       exfalso.
-      unfold float_eq, set_Zdigits_m, shift_Zdigits_m, shift_e, inc_e, dec_e in *.
+      unfold float_eq, set_digits_m, shift_digits_m, shift_e, inc_e, dec_e in *.
       destruct f1 as [m1 e1], f2 as [m2 e2]; simpl in *.
       repeat break_match; try discriminate.
       clear SDM; rename Heqb into H1.
@@ -712,7 +725,7 @@ Section General_normalization.
   Qed.
 
   (** ** declarative definition of `set_e` *)
-  Lemma set_e_definition (f1 : float) (e : Z) {f2 : float} :
+  Lemma set_e_definition (f1 : bfloat) (e : Z) {f2 : bfloat} :
     set_e f1 e = Some f2 <->
     float_eq f1 f2 /\ Fexp f2 = e.
   Proof.
@@ -724,32 +737,32 @@ Section General_normalization.
       apply (float_eq_set_e f1 f2 EQ).
   Qed.
 
-  (** ** declarative definition of `set_Zdigits_m` *)
-  Lemma set_Zdigits_m_definition (f1 : float) (dm : Z) {f2 : float} :
+  (** ** declarative definition of `set_digits_m` *)
+  Lemma set_digits_m_definition (f1 : bfloat) (dm : Z) {f2 : bfloat} :
     not_zero f1 ->
-    set_Zdigits_m f1 dm = Some f2 <->
+    set_digits_m f1 dm = Some f2 <->
     float_eq f1 f2 /\ Zdigits (Fnum f2) = dm.
   Proof.
     intros NZ1.
     split; intro.
     - split.
-      apply (set_Zdigits_m_eq f1 dm H).
-      apply (set_Zdigits_m_correct f1 dm NZ1 H).
+      apply (set_digits_m_eq f1 dm H).
+      apply (set_digits_m_correct f1 dm NZ1 H).
     - destruct H as [EQ FEXP].
       subst.
-      apply (float_eq_set_Zdigits_m f1 f2 NZ1 EQ).
+      apply (float_eq_set_digits_m f1 f2 NZ1 EQ).
   Qed.
 
-  Lemma normalize_correct' (prec emax : Z) (f : float) (NZ : not_zero f)
+  Lemma normalize_correct' (prec emax : Z) (f : bfloat) (NZ : not_zero f)
         (prec_gt_0 : FLX.Prec_gt_0 prec) (Hmax : prec < emax) :
-    match (normalize_float prec emax f NZ) with
+    match (normalize_float prec emax f) with
     | Some nf => (float_eq f nf) /\ (valid_float prec emax nf = true)
-    | None => forall (xf : float),
+    | None => forall (xf : bfloat),
         float_eq f xf -> valid_float prec emax xf = false
     end.
   Proof.
     unfold FLX.Prec_gt_0 in prec_gt_0.
-    break_match. rename f0 into nf.
+    break_match. rename b into nf.
     - (* successful normalization - equal and valid? *)
       unfold normalize_float in Heqo.
       repeat break_match; inversion Heqo; subst.
@@ -759,7 +772,7 @@ Section General_normalization.
           apply set_e_eq with (e := 3 - emax - prec).
           assumption.
         * (* valid float? *)
-          apply Z.leb_le in Heqb.
+          apply Z.leb_le in Heqb0.
           rewrite valid_float_closed_form.
           apply set_e_correct in Heqo0.
           lia.
@@ -770,19 +783,19 @@ Section General_normalization.
       + (* normal *)
         split.
         * (* same float? *)
-          apply set_Zdigits_m_eq with (dm := prec).
+          apply set_digits_m_eq with (dm := prec).
           assumption.
         * (* valid float? *)
-          apply andb_prop in Heqb0; destruct Heqb0 as [H1 H2].
+          apply andb_prop in Heqb1; destruct Heqb1 as [H1 H2].
           apply Z.leb_le in H1; apply Z.leb_le in H2.
           rewrite valid_float_closed_form.
           right.
           apply set_e_correct in Heqo0.
-          apply set_Zdigits_m_correct in Heqo1.
+          apply set_digits_m_correct in Heqo1.
           lia.
           assumption.
           apply not_zero_eq with (f1 := f). assumption.
-          apply set_Zdigits_m_eq in Heqo1. assumption.
+          apply set_digits_m_eq in Heqo1. assumption.
           unfold FLX.Prec_gt_0; lia.
           assumption.
     - (* unsuccesful normalization - impossible to normalize? *)
@@ -798,17 +811,17 @@ Section General_normalization.
         all: rewrite <-E in Heqo0.
         all: rewrite float_eq_set_e in Heqo0 by assumption.
         all: inversion Heqo0; subst.
-        all: rewrite Z.leb_gt in Heqb; lia.
+        all: rewrite Z.leb_gt in Heqb0; lia.
       + (* xf is normal *)
         unfold normalize_float in Heqo.
         repeat break_match; try discriminate; clear Heqo.
         * rewrite <-D in Heqo1.
-          rewrite float_eq_set_Zdigits_m in Heqo1 by assumption.
+          rewrite float_eq_set_digits_m in Heqo1 by assumption.
           inversion Heqo1; subst; clear Heqo1.
-          apply Bool.andb_false_elim in Heqb0; destruct Heqb0.
+          apply Bool.andb_false_elim in Heqb1; destruct Heqb1.
           all: rewrite Z.leb_gt in e; lia.
         * rewrite <-D in Heqo1.
-          rewrite float_eq_set_Zdigits_m in Heqo1 by assumption.
+          rewrite float_eq_set_digits_m in Heqo1 by assumption.
           inversion Heqo1.
         * unfold set_e, shift_e, inc_e, dec_e in Heqo0.
           repeat break_match; try discriminate; clear Heqo0.
@@ -830,9 +843,9 @@ Section General_normalization.
              generalize (Z.pow_pos_nonneg 2 (Z.pos p)); lia.
   Qed.
 
-  Theorem normalize_correct (prec emax : Z) (f : float) (NZ : not_zero f)
-        (prec_gt_0 : FLX.Prec_gt_0 prec) (Hmax : prec < emax) {nf : float} :
-    normalize_float prec emax f NZ = Some nf
+  Theorem normalize_correct (prec emax : Z) (f : bfloat) (NZ : not_zero f)
+        (prec_gt_0 : FLX.Prec_gt_0 prec) (Hmax : prec < emax) {nf : bfloat} :
+    normalize_float prec emax f = Some nf
     <->
     (float_eq f nf) /\ (valid_float prec emax nf = true).
   Proof.
@@ -841,7 +854,7 @@ Section General_normalization.
     - rewrite H0 in H; clear H0; assumption.
     - break_match; try discriminate.
       + destruct H, H0.
-        rename f0 into f1, nf into f2.
+        rename b into f1, nf into f2.
         pose proof float_eq_trans_l f f1 f2 H H0 as EQ.
         pose proof not_zero_eq f f1 NZ H as NZ1.
         pose proof not_zero_eq f f2 NZ H0 as NZ2.
@@ -893,23 +906,4 @@ Section General_normalization.
         inversion H1.
   Qed.
 
-End General_normalization.
-
-Definition can_convert_exactly (prec__target emax__target : Z) (m : positive) (e : Z) : bool :=
-  let f := Float radix2 (Z.pos m) e in
-  match normalize_float prec__target emax__target f (not_zero_Zpos m e) with
-  | Some _ => true
-  | None => false
-  end.
-
-Definition can_convert_float_to_float32 (v: float) : bool :=
-  match v with
-  | B754_finite _ m e _ => can_convert_exactly 24 128 m e
-  | _ => true
-  end.
-
-Definition can_convert_float_to_float64 (v: float) : bool :=
-  match v with
-  | B754_finite _ m e _ => can_convert_exactly 53 1024 m e
-  | _ => true
-  end.
+End Correctness.
