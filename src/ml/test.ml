@@ -66,6 +66,28 @@ let run_dvalue_test (test:IO.DV.dvalue -> bool) path =
   in
   if not res then failwith (path ^ " test failed: " ^ msg); ()
 
+(* https://www.rosettacode.org/wiki/String_matching#OCaml *)
+let sting_begins_with s1 s2 =
+  let len1 = String.length s1
+  and len2 = String.length s2 in
+  if len1 < len2 then false else
+    let sub = String.sub s1 0 len2 in
+    (sub = s2)
+
+let run_parsefail_test path prefix =
+  let (failed,msg) =
+    try
+      ignore (run_ll_file path);
+      (false,"")
+    with
+      Failure msg -> (sting_begins_with msg prefix, msg)
+  in
+  if not failed then failwith (path ^ " test failed to produce expected parsing error. Got ubstead: " ^ msg); ()
+
+let must_fail_tests =
+  [("../tests/must-fail/float-literal-size.ll", "Illegal 32-bit floating point literal");
+  ]
+
 let poison_tests =
   ["../tests/llvm-arith/i1/add_nsw.ll";
    "../tests/llvm-arith/i1/add_nuw.ll";
@@ -256,10 +278,17 @@ let suite = [Test ("Poison",
                        (f, (fun () -> run_dvalue_test (double_test i) f)))
                        double_tests);
 
+             Test ("Parsing-Must-fail",
+                   List.map (fun (f, p) ->
+                       (f, (fun () -> run_parsefail_test f p)))
+                     must_fail_tests);
+
              Test ("Intrinsics",
                    List.map (fun (f, i) ->
                        (f, (fun () -> run_dvalue_test (double_test i) f)))
-                       intrinsics_tests);
+                     intrinsics_tests);
+
+
             ]
 
 
