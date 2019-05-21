@@ -3,6 +3,7 @@ Require Import Flocq.IEEE754.Binary Flocq.Core.Defs Flocq.Core.Zaux.
 Require Import ExtLib.Structures.Monads ExtLib.Data.Monads.OptionMonad.
 Require Import Floats.
 
+
 Open Scope Z.
 
 (* a basic float - a pair of two integers - mantissa and exponent *)
@@ -109,7 +110,7 @@ Section Correctness.
     end.
 
   (* binary length of a positive number *)
-  Definition digits := compose Z.succ log_inf.
+  Let digits := compose Z.succ log_inf.
   
   (* closed form for Flocq's [digits2_pos] *)
   Lemma digits2_pos_digits (m : positive) :
