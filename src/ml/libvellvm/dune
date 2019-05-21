@@ -7,6 +7,6 @@
 (library
   (name libvellvm)
   (wrapped false)
-  (libraries extracted)  
+  (libraries extracted str)
   (synopsis "Vellvm library")
   )
