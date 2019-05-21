@@ -143,11 +143,14 @@ let i64_tests : (string * int) list =
 
 let float_tests : (string * float ) list =
   [
-    ("../tests/llvm-arith/float/i8_uitofp_float.ll", 10.0)
+    ("../tests/llvm-arith/float/float_literal.ll", 125.31999969482421875);
+    ("../tests/llvm-arith/float/hex_float_literal.ll", 468655825485824.);
+    ("../tests/llvm-arith/float/i8_uitofp_float.ll", 10.0);
   ]
 
 let double_tests : (string * float ) list =
   [
+    ("../tests/llvm-arith/float/double_literal.ll", 125.31999999999999317878973670303821563720703125);
     ("../tests/llvm-arith/double/i8_uitofp_double.ll", 255.0)
   ]
 
