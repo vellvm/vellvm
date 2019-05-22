@@ -581,14 +581,20 @@ Module RENAMING
 
     (******************** Proofs ********************)
 
-    Lemma swap_trigger_Global (* {E F: Type -> Type} `{E -< F} `{forall T, Swap (F T)}  `{Swap (E X)} *)
-          {X} `{Swap X} {INV: SwapInvariant X}:
-      forall (e: LLVMGEnvE X), @ITree.trigger _CFG X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
+    Lemma swap_subevent {E F} {X} `{Swap X} `{Swap (E X)} `{E -< F} : forall (e:E X),
+        (swap id1 id2 (subevent X e)) = subevent X (swap id1 id2 e).
+    Proof.
+    Abort.
+
+    
+    Lemma swap_trigger_Global 
+          {X} {E} `{Swap X} `{LLVMGEnvE -< E} `{forall T, Swap (E T)}  {INV: SwapInvariant X}:
+      forall (e: LLVMGEnvE X), @ITree.trigger E X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
     Proof.
       intros e.
       unfold trigger.
       unfold swap at 2, swap_of_LLVM, swap_LLVM, ITree.map.
-      rewrite translate_vis, bind_vis.
+      rewrite translate_vis, bind_vis. 
       match goal with
       | |- context[subevent ?T ?x] => destruct (subevent T x) eqn:?EQ
       end; [inversion EQ |]. 

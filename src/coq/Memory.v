@@ -549,15 +549,17 @@ n     address isn't in range
 
    
    *)
+  Section PARAMS.
+  Variable (E F : Type -> Type).
+    Definition E_trigger {M} : forall R, E R -> (stateT M (itree (E +' F)) R) :=
+      fun R e m => r <- trigger e ;; ret (m, r).
 
-  Definition call_trigger : forall R, CallE R -> (stateT memory (LLVM _MCFG3) R) :=
-  fun R e m => r <- trigger e ;; ret (m, r).
-
-  Definition rest_trigger : forall R , (DebugE +' FailureE) R -> (stateT memory (LLVM _MCFG3) R) :=
+  Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
   
-  Definition run_memory : LLVM _MCFG2 ~> stateT memory (LLVM _MCFG3) :=
-    interp_state (case_ call_trigger (case_ handle_intrinsic (case_ handle_memory rest_trigger))).
-  
+  Definition run_memory `{FailureE -< E +' F} :
+    LLVM (E +'  IntrinsicE +' MemoryE +' F) ~> stateT memory (LLVM (E +' F)) :=
+    interp_state (case_ E_trigger (case_ handle_intrinsic (case_ handle_memory F_trigger))).
+  End PARAMS.
 End Make.
 
