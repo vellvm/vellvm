@@ -1,6 +1,6 @@
 Require Vellvm.TopLevel.
 Require Vellvm.Transform.
-
+Require Vellvm.ParserHelper.
 
 Require ExtrOcamlBasic.
 Require ExtrOcamlString.
@@ -45,3 +45,4 @@ Cd "ml/extracted".
 Extraction Library ExtrOcamlIntConv.
 Recursive Extraction Library TopLevel.
 Extraction Library Transform.
+Extraction Library ParserHelper.

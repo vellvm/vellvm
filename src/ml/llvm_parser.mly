@@ -26,12 +26,27 @@
 
 
 open LLVMAst
+open ParserHelper
 
 let str = Camlcoq.coqstring_of_camlstring
 let coq_of_int = Camlcoq.Z.of_sint
 
 let coqfloat_of_string d = Floats.Float.of_bits(Camlcoq.coqint_of_camlint64(Int64.bits_of_float (float_of_string d)))
 let coqfloat32_of_string d = Floats.Float32.of_bits(Camlcoq.coqint_of_camlint(Int32.bits_of_float (float_of_string d)))
+
+let rec string_of_positive =
+  let open BinNums in
+  function 
+    | Coq_xI p -> string_of_positive p ^ "1"
+    | Coq_xO p -> string_of_positive p ^ "0"
+    | Coq_xH -> "1"
+
+let string_of_Z =
+  let open BinNums in
+  function
+    | Z0 -> "0"
+    | Zpos v -> string_of_positive v
+    | Zneg v -> "-" ^ (string_of_positive v)
 
 (* normalize_float_size : 
    - LLVM floating point literals need different interpretations depending
@@ -44,7 +59,16 @@ let coqfloat32_of_string d = Floats.Float32.of_bits(Camlcoq.coqint_of_camlint(In
 let normalize_float_literal (t:typ) (d:string) : exp =
   match t with
   | TYPE_Double -> EXP_Double (coqfloat_of_string d)
-  | TYPE_Float  -> EXP_Float (coqfloat32_of_string d)
+  | TYPE_Float  ->
+       let v = coqfloat_of_string d in
+         if can_convert_float_to_float32 v 
+           then EXP_Float (coqfloat32_of_string d)
+         else
+           let dbg = (match v with
+                   | B754_finite (_, m, e) -> Printf.sprintf "\"%s\" [m=%s, e=%s]" d (string_of_positive m) (string_of_Z e)
+                   | _ -> Printf.sprintf "\"%s\"" d)
+           in
+           failwith ("Illegal 32-bit floating point literal: " ^ dbg)
   | _ -> failwith "normalize_float_literal called with non-float type"
 	       
 (* att type is a workaround to simplify parsing of optionnal keywords in

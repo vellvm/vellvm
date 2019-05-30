@@ -27,5 +27,8 @@ src/ml/extracted/*.mli
 src/ml/extracted/STAMP
 src/.depend
 output
-/src/ml/extracted/.merlin
-/src/ml/libvellvm/.merlin
+src/ml/extracted/.merlin
+src/ml/libvellvm/.merlin
+src/.lia.cache
+src/.ll_files.tmp
+src/coq/.lia.cache
