@@ -588,13 +588,14 @@ Module RENAMING
 
     
     Lemma swap_trigger_Global 
-          {X} {E} `{Swap X} `{LLVMGEnvE -< E} `{forall T, Swap (E T)}  {INV: SwapInvariant X}:
-      forall (e: LLVMGEnvE X), @ITree.trigger E X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
+          {X} `{Swap X} {INV: SwapInvariant X}:
+      forall (e: LLVMGEnvE X), @ITree.trigger _CFG X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
     Proof.
       intros e.
       unfold trigger.
       unfold swap at 2, swap_of_LLVM, swap_LLVM, ITree.map.
-      rewrite translate_vis, bind_vis. 
+      rewrite translate_vis, bind_vis.
+
       match goal with
       | |- context[subevent ?T ?x] => destruct (subevent T x) eqn:?EQ
       end; [inversion EQ |]. 
@@ -605,7 +606,7 @@ Module RENAMING
       subst.
       rewrite <- EQ.
       cbn.
-      apply eq_itree_Vis; auto.
+      apply eqit_Vis; auto.
       intros ?.
       rewrite translate_ret, bind_ret.
       rewrite swap_invariant; reflexivity.
@@ -629,7 +630,7 @@ Module RENAMING
       subst.
       rewrite <- EQ.
       cbn.
-      apply eq_itree_Vis; auto.
+      apply eqit_Vis; auto.
       intros ?.
       rewrite translate_ret, bind_ret.
       rewrite swap_invariant; reflexivity.
@@ -653,12 +654,12 @@ Module RENAMING
       subst.
       rewrite <- EQ.
       cbn.
-      apply eq_itree_Vis; auto.
+      apply eqit_Vis; auto.
       intros ?.
       rewrite translate_ret, bind_ret.
       rewrite swap_invariant; reflexivity.
     Qed.
-
+(*
     Instance Commute_lookup_id: Commute_eq_LLVM1 lookup_id.
     Proof.
       intros i.
@@ -1010,7 +1011,7 @@ Module RENAMING
      intros ? ? ? ?.
      unfold denote_mcfg.
    Admitted.
-
+*)
   
   End PROOFS.  
 End RENAMING.

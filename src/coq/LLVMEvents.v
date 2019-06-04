@@ -127,19 +127,69 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Definition LLVMEnvE := (LocalE raw_id dvalue).
   Definition LLVMStackE := (StackE raw_id dvalue).
 
-  
+  Definition conv_E := MemoryE +' DebugE +' FailureE.
+  Definition lookup_E := LLVMGEnvE +' LLVMEnvE.
+  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' DebugE +' FailureE.
+
+  Definition lookup_E_to_exp_E : lookup_E ~> exp_E :=
+    fun T e =>
+      match e with
+      | inl1 e => inl1 e
+      | inr1 e => inr1 (inl1 e)
+      end.
+
+  Definition conv_E_to_exp_E : conv_E ~> exp_E :=
+    fun T e => inr1 (inr1 e).
+      
+  Definition instr_E := CallE +' IntrinsicE +' exp_E.
+  Definition exp_E_to_instr_E : exp_E ~> instr_E:=
+    fun T e => inr1 (inr1 e).
+      
+  Definition fun_E := LLVMStackE +' CallE +' IntrinsicE +' exp_E.
+  Definition instr_E_to_fun_E : instr_E ~> fun_E :=
+    fun T e => inr1 e.
+
   (* Core effects - no distinction between "internal" and "external" calls. *)
   Definition _CFG := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE.
-
+      
+  Definition _funE_to_CFG : fun_E ~> _CFG :=
+    fun R e =>
+      match e with
+      | inl1 e' => (inr1 (inr1 (inr1 (inl1 (inr1 e')))))
+      | inr1 (inl1 e') => inl1 e'
+      | inr1 (inr1 (inl1 e')) => (inr1 (inl1 e'))
+      | inr1 (inr1 (inr1 (inl1 e'))) => (inr1 (inr1 (inl1 e')))
+      | inr1 (inr1 (inr1 (inr1 (inl1 e')))) => (inr1 (inr1 (inr1 (inl1 (inl1 e')))))
+      | inr1 (inr1 (inr1 (inr1 (inr1 e)))) => (inr1 (inr1 (inr1 (inr1 e))))
+      end.
+  
   (* Distinction made between internal and external calls -- intermediate step in denote_mcfg.
      Note that [CallE] appears _twice_ in the [_CFG_INTERNAL] type.  The left one is 
      meant to be the "internal" call event and the right one is the "external" call event.
      The [denote_mcfg] function, which uses [mrec] to tie the recursive knot distinguishes
      the two.  It re-triggers an unknown [Call] event as an [ExternalCall] (which is just
      an injection into the right-hand side.
-  *)
+   *)
   Definition _CFG_INTERNAL := CallE +' _CFG.
+
   Definition ExternalCall t f args : _CFG_INTERNAL dvalue := (inr1 (inl1 (Call t f args))).
+  
+  (* This inclusion "assumes" that all call events are internal.  The 
+     dispatch in denote_mcfg then interprets some of the calls directly,
+     if their definitions are known, or it "externalizes" the calls
+     whose definitions are not known.
+   *)
+  Definition _CFG_to_CFG_INTERNAL : _CFG ~> _CFG_INTERNAL :=
+    fun R e =>
+      match e with
+      | inl1 e' => inl1 e'
+      | inr1 e' => inr1 (inr1 e')
+      end.
+
+  Definition _funE_to_CFG_Internal (T:Type) e := @_CFG_to_CFG_INTERNAL T (_funE_to_CFG e).
+
+  Definition _exp_E_to_CFG : exp_E ~> _CFG :=
+    fun T e => @_funE_to_CFG T (instr_E_to_fun_E (exp_E_to_instr_E e)).
   
   (* For multiple CFG, after interpreting [GlobalE] *)
   Definition _MCFG1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE.
@@ -151,20 +201,6 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Definition _MCFG3 := CallE +' DebugE +' FailureE.
   Hint Unfold LLVM _CFG _MCFG1 _MCFG2 _MCFG3.
 
-  (* This inclusion "assumes" that all call events are internal.  The 
-     dispatch in denote_mcfg then interprets some of the calls directly,
-     if their definitions are known, or it "externalizes" the calls
-     whose definitions are not known.
-  *)
-  Definition _CFG_to_CFG_INTERNAL : _CFG ~> _CFG_INTERNAL :=
-    fun R e =>
-      match e with
-      | inl1 e' =>
-        match e' with
-        | Call dt fv args => inl1 (Call dt fv args)
-        end
-      | inr1 e' => inr1 (inr1 e')
-      end.
   
   
   (* Utilities to conveniently trigger debug and failure events *)

@@ -107,8 +107,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     (* SAZ: for some reason, typeclass resolution was taking forever in eval_conv_h,
         so I respecialized it... *)
     Definition spec_raise {X} (s:string) : LLVM _CFG X := raise s.
-    
-    Definition eval_conv_h {E} `{FailureE -< E} `{MemoryE -< E} conv (t1:dtyp) (x:dvalue) (t2:dtyp) : LLVM E dvalue :=
+
+    Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : LLVM conv_E dvalue :=
       match conv with
       | Trunc =>
         match t1, x, t2 with
@@ -239,7 +239,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       end.
     Arguments eval_conv_h _ _ _ _ : simpl nomatch.
 
-    Definition eval_conv {E} `{FailureE -< E} `{MemoryE -< E} conv (t1:dtyp) x (t2:dtyp) : LLVM E dvalue :=
+    Definition eval_conv conv (t1:dtyp) x (t2:dtyp) : LLVM conv_E dvalue :=
       match t1, x with
       | DTYPE_I bits, dv =>
         eval_conv_h conv t1 dv t2
@@ -255,7 +255,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".
 
-  Definition lookup_id {E} `{LLVMGEnvE -< E} `{LLVMEnvE -< E} (i:ident) : LLVM E dvalue :=
+  Definition lookup_id (i:ident) : LLVM lookup_E dvalue :=
     match i with
     | ID_Global x => trigger (GlobalRead x)
     | ID_Local x  => trigger (LocalRead x)
@@ -275,15 +275,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
   Expressions are denoted as itrees that return a [dvalue].
  *)
-
+  
   Fixpoint denote_exp
-           {E} `{LLVMGEnvE -< E} `{LLVMEnvE -< E} `{MemoryE -< E} `{FailureE -< E}
-           (top:option dtyp) (o:exp dtyp) {struct o} : LLVM E dvalue :=
+           (top:option dtyp) (o:exp dtyp) {struct o} : LLVM exp_E dvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
         in
         match o with
         | EXP_Ident i =>
-          lookup_id i
+          translate lookup_E_to_exp_E (lookup_id i)
 
         | EXP_Integer x =>
           match top with
@@ -376,7 +375,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
              
         | OP_Conversion conv dt1 op t2 =>
           v <- denote_exp (Some dt1) op ;;
-          eval_conv conv dt1 v t2
+          translate conv_E_to_exp_E (eval_conv conv dt1 v t2)
 
         | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
           vptr <- denote_exp (Some dt2) ptrval ;;
@@ -437,20 +436,17 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         end.
       Arguments denote_exp _ : simpl nomatch.
       
-      Definition eval_op
-                 {E} `{LLVMGEnvE -< E} `{LLVMEnvE -< E} `{MemoryE -< E} `{FailureE -< E}
-                 (o:exp dtyp) : LLVM E dvalue :=
+      Definition eval_op (o:exp dtyp) : LLVM exp_E dvalue :=
         denote_exp None o.
       Arguments eval_op _ : simpl nomatch.
 
       (* An instruction has only side-effects, it therefore returns [unit] *)
       Definition denote_instr
-                 {E} `{LLVMGEnvE -< E} `{LLVMEnvE -< E} `{MemoryE -< E} `{FailureE -< E} `{DebugE -< E} `{IntrinsicE -< E} `{CallE -< E}
-                 (i: (instr_id * instr dtyp)): LLVM E unit :=
+                 (i: (instr_id * instr dtyp)): LLVM instr_E unit :=
         match i with
         (* Pure operations *)
         | (IId id, INSTR_Op op) =>
-          dv <- eval_op op ;;
+          dv <- translate exp_E_to_instr_E (eval_op op) ;;
           trigger (LocalWrite id dv)
 
         (* Allocation *)
@@ -460,14 +456,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         (* Load *)
         | (IId id, INSTR_Load _ dt (du,ptr) _) =>
-          da <- denote_exp (Some du) ptr ;;
+          da <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
           dv <- trigger (Load dt da);;
           trigger (LocalWrite id dv)
 
         (* Store *)
         | (IVoid _, INSTR_Store _ (dt, val) (du, ptr) _) =>
-          dv <- denote_exp (Some dt) val ;;
-          da <- denote_exp (Some du) ptr ;;
+          dv <- translate exp_E_to_instr_E (denote_exp (Some dt) val) ;;
+          da <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
           trigger (Store da dv)
           
         | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED LLVM ERROR: Store to non-void ID"
@@ -475,11 +471,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Call *)
         | (pt, INSTR_Call (dt, f) args) =>
           debug ("call") ;;
-          dvs <-  map_monad (fun '(t, op) => (denote_exp (Some dt) op)) args ;;                 
+          dvs <-  map_monad (fun '(t, op) => (translate exp_E_to_instr_E (denote_exp (Some dt) op))) args ;; 
           returned_value <- 
           match Intrinsics.intrinsic_exp f with
           | Some s => trigger (Intrinsic dt s dvs)
-          | None => fv  <- denote_exp None f ;; 
+          | None => fv  <- translate exp_E_to_instr_E (denote_exp None f) ;; 
                          trigger (Call dt fv dvs)
           end
           ;;
@@ -506,9 +502,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
       (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
-      Definition denote_terminator
-           {E} `{LLVMGEnvE -< E} `{LLVMEnvE -< E} `{MemoryE -< E} `{FailureE -< E}
-                 (t: terminator dtyp): LLVM E (block_id + dvalue) :=
+      Definition denote_terminator (t: terminator dtyp): LLVM exp_E (block_id + dvalue) :=
         match t with
 
         | TERM_Ret (dt, op) =>
@@ -546,9 +540,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         end.
 
       (* Denoting a list of instruction simply binds the trees together *)
-      Fixpoint denote_code
-                 {E} `{LLVMGEnvE -< E} `{LLVMEnvE -< E} `{MemoryE -< E} `{FailureE -< E} `{DebugE -< E} `{IntrinsicE -< E} `{CallE -< E}
-           (c: code dtyp): LLVM E unit :=
+      Fixpoint denote_code (c: code dtyp): LLVM instr_E unit :=
         match c with
         | nil => ret tt
         | i::c => denote_instr i;; denote_code c
@@ -556,11 +548,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
       (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-      Definition denote_block
-                 {E} `{LLVMGEnvE -< E} `{LLVMEnvE -< E} `{MemoryE -< E} `{FailureE -< E} `{DebugE -< E} `{IntrinsicE -< E} `{CallE -< E}
-                 (b: block dtyp) : LLVM E (block_id + dvalue) :=
+      Definition denote_block (b: block dtyp) : LLVM instr_E (block_id + dvalue) :=
         denote_code (blk_code dtyp b);;
-        denote_terminator (snd (blk_term dtyp b)).
+        translate exp_E_to_instr_E (denote_terminator (snd (blk_term dtyp b))).
 
       (* YZ FIX: no need to push/pop, but do all the assignments afterward *)
       (* One needs to be careful when denoting phi-nodes: they all must
@@ -570,9 +560,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          once we are finished evaluating the expression.
          We then bind the resulting value in the underlying environment.
        *)
-      Definition denote_phi
-           {E} `{LLVMGEnvE -< E} `{LLVMEnvE -< E} `{MemoryE -< E} `{FailureE -< E}
-                 (bid : block_id) (id_p : local_id * phi dtyp) : LLVM E (local_id * dvalue) :=
+      Definition denote_phi (bid : block_id) (id_p : local_id * phi dtyp) : LLVM exp_E (local_id * dvalue) :=
         let '(id, Phi dt args) := id_p in
         match assoc RawIDOrd.eq_dec bid args with
         | Some op =>
@@ -611,9 +599,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         of types, just by deciding internally to loop or not and not reflect the invariant
         in the type.
        *)
-      Definition denote_cfg
-                 {E} `{LLVMGEnvE -< E} `{LLVMEnvE -< E} `{MemoryE -< E} `{FailureE -< E} `{DebugE -< E} `{IntrinsicE -< E} `{CallE -< E}
-                 (f: cfg dtyp) : LLVM E dvalue :=
+      Definition denote_cfg (f: cfg dtyp) : LLVM instr_E dvalue :=
         loop (fun (bid : block_id + block_id) =>
                 match bid with
                 | inl bid
@@ -627,7 +613,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                     match bd with
                     | inr dv => ret (inr dv)
                     | inl bid =>
-                      dvs <- map_monad (denote_phi bid) (blk_phis _ block) ;; 
+                      dvs <- map_monad
+                          (fun x => translate exp_E_to_instr_E (denote_phi bid x))
+                          (blk_phis _ block) ;; 
                       map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
                       ret (inl bid)
                     end
@@ -645,22 +633,19 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | _, _ => failwith "combine_lists_err: different length lists"
         end.
 
-
+      
       (* The denotation of an LLVM function is a coq function that takes
-         a list of dvalues and returns the appropriate semantics.
-      *)
+         a list of dvalues and returns the appropriate semantics. *)
       Definition function_denotation : Type :=
-        forall E `{LLVMGEnvE -< E} `{LLVMEnvE -< E} `{LLVMStackE -< E} `{MemoryE -< E} `{FailureE -< E} `{DebugE -< E} `{IntrinsicE -< E} `{CallE -< E},
-          list dvalue -> LLVM E dvalue.
+          list dvalue -> LLVM fun_E dvalue.
 
       Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation  :=
-        fun E `{LLVMGEnvE -< E} `{LLVMEnvE -< E} `{LLVMStackE -< E} `{MemoryE -< E} `{FailureE -< E} `{DebugE -< E} `{IntrinsicE -< E} `{CallE -< E} =>
         fun (args : list dvalue) =>
           (* We match the arguments variables to the inputs *)
           bs <- lift_err ret (combine_lists_err (df_args dtyp _ df) args) ;;
              (* generate the corresponding writes to the local stack frame *)
           trigger (StackPush bs) ;;  
-          rv <- denote_cfg (df_instrs dtyp _ df);;
+          rv <- translate instr_E_to_fun_E (denote_cfg (df_instrs dtyp _ df));;
           trigger StackPop;;
           ret rv.
 
@@ -685,31 +670,20 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition lookup_defn {B} := (@assoc _ B (@dvalue_eq_dec)).
 
 
-      Definition _CallE_to_CallE_INTERNAL {E} : (CallE +' E) ~> (CallE +' CallE +' E) :=
-        fun R e =>
-          match e with
-          | inl1 e' =>
-            match e' with
-            | Call dt fv args => inl1 (Call dt fv args)
-        end
-          | inr1 e' => inr1 (inr1 e')
-          end.
-
-      
+  
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
       Definition denote_mcfg
-                 {E} `{LLVMGEnvE -< E} `{LLVMEnvE -< E} `{LLVMStackE -< E} `{MemoryE -< E} `{FailureE -< E} `{DebugE -< E} `{IntrinsicE -< E}
                  (fundefs:list (dvalue * function_denotation)) :
-        dtyp -> dvalue -> (list dvalue) -> LLVM (CallE +' E) dvalue :=
+        dtyp -> dvalue -> (list dvalue) -> LLVM _ dvalue :=
         fun dt f_value args =>
-          @mrec CallE (CallE +' E)
+          @mrec CallE (CallE +' _)
                 (fun T call =>
                    match call with
                    | Call dt fv args =>
                      match (lookup_defn fv fundefs) with
                      | Some f_den => (* If the call is internal *)                       
                        (* and denote the [cfg]. *)
-                       translate _CallE_to_CallE_INTERNAL (f_den (CallE +' E) _ _ _ _ _ _ _ _ args)
+                       translate _funE_to_CFG_Internal (f_den args)
                      | None => 
                        (* This must have been a registered external function  *)
                        (* We _don't_ push a LLVM stack frame, since the external *)
@@ -722,7 +696,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                      end
                    end
                 ) _ (Call dt f_value args).
-
 End Denotation.
 
   (****************************** SCRAPYARD ******************************)

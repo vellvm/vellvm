@@ -63,7 +63,7 @@ Definition allocate_declaration (d:declaration dtyp) : LLVM _CFG unit :=
 Definition allocate_declarations (ds:list (declaration dtyp)) : LLVM _CFG unit :=
   map_monad_ allocate_declaration ds.
 
-Definition initialize_global (g:global dtyp) : LLVM _CFG unit :=
+Definition initialize_global (g:global dtyp) : LLVM exp_E unit :=
   let dt := (g_typ _ g) in
   a <- trigger (GlobalRead (g_ident _ g));;
   dv <- match (g_exp _ g) with
@@ -72,14 +72,14 @@ Definition initialize_global (g:global dtyp) : LLVM _CFG unit :=
        end ;;
   trigger (Store a dv).
 
-Definition initialize_globals (gs:list (global dtyp)): LLVM _CFG unit :=
+Definition initialize_globals (gs:list (global dtyp)): LLVM exp_E unit :=
   map_monad_ initialize_global gs.
-  
+
+
 Definition build_global_environment (CFG : CFG.mcfg dtyp) : LLVM _CFG unit :=
   allocate_globals (m_globals _ _ CFG) ;;
   allocate_declarations ((m_declarations _ _ CFG) ++ (List.map (df_prototype _ _) (m_definitions _ _ CFG)));;
-  initialize_globals (m_globals _ _ CFG).
-
+  translate _exp_E_to_CFG (initialize_globals (m_globals _ _ CFG)).
 
 (* Local environment implementation *)
 Definition local_env := FMapAList.alist raw_id dvalue.
