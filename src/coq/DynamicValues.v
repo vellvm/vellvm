@@ -152,7 +152,7 @@ Section DecidableEquality.
     | DVALUE_Float x1, DVALUE_Float x2 =>
       if Float32.eq_dec x1 x2 then true else false
     | DVALUE_Undef, DVALUE_Undef => true
-    | DVALUE_Poison, DVALUE_Poision => true
+    | DVALUE_Poison, DVALUE_Poison => true
     | DVALUE_None, DVALUE_None => true
     | DVALUE_Struct f1, DVALUE_Struct f2 =>
       lsteq f1 f2
