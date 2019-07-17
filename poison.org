@@ -1,0 +1,5 @@
+* When does poison cause undefined behaviour?
+
+  - Branching on poison is undefined behaviour.
+  - Store to poison address is UB
+  - Load from poison address is UB

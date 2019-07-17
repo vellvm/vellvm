@@ -28,6 +28,7 @@ From ITree Require Import
 From Vellvm Require Import 
      Util
      Error
+     UndefinedBehaviour
      LLVMAst
      AstLib
      CFG
@@ -457,14 +458,20 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Load *)
         | (IId id, INSTR_Load _ dt (du,ptr) _) =>
           da <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
-          dv <- trigger (Load dt da);;
-          trigger (LocalWrite id dv)
+          match da with
+          | DVALUE_Poison => raiseUB "Load from poisoned address."
+          | _ => dv <- trigger (Load dt da);;
+                 trigger (LocalWrite id dv)
+          end
 
         (* Store *)
         | (IVoid _, INSTR_Store _ (dt, val) (du, ptr) _) =>
           dv <- translate exp_E_to_instr_E (denote_exp (Some dt) val) ;;
           da <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
-          trigger (Store da dv)
+          match da with
+          | DVALUE_Poison => raiseUB "Store to poisoned address."
+          | _ => trigger (Store da dv)
+          end
           
         | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED LLVM ERROR: Store to non-void ID"
 
@@ -527,6 +534,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
               ret (inl br1)
             else
               ret (inl br2)
+          | DVALUE_Poison => raiseUB "Branching on poison."
           | _ => raise "Br got non-bool value"
           end 
 
@@ -560,6 +568,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          once we are finished evaluating the expression.
          We then bind the resulting value in the underlying environment.
        *)
+
       Definition denote_phi (bid : block_id) (id_p : local_id * phi dtyp) : LLVM exp_E (local_id * dvalue) :=
         let '(id, Phi dt args) := id_p in
         match assoc RawIDOrd.eq_dec bid args with

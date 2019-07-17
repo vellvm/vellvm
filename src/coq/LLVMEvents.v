@@ -33,7 +33,8 @@ From Vellvm Require Import
      MemoryAddress
      DynamicTypes
      DynamicValues
-     Error.
+     Error
+     UndefinedBehaviour.
 
 
 Set Implicit Arguments.
@@ -127,9 +128,9 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Definition LLVMEnvE := (LocalE raw_id dvalue).
   Definition LLVMStackE := (StackE raw_id dvalue).
 
-  Definition conv_E := MemoryE +' DebugE +' FailureE.
+  Definition conv_E := MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE.
   Definition lookup_E := LLVMGEnvE +' LLVMEnvE.
-  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' DebugE +' FailureE.
+  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE.
 
   Definition lookup_E_to_exp_E : lookup_E ~> exp_E :=
     fun T e =>
@@ -150,7 +151,7 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
     fun T e => inr1 e.
 
   (* Core effects - no distinction between "internal" and "external" calls. *)
-  Definition _CFG := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE.
+  Definition _CFG := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE.
       
   Definition _funE_to_CFG : fun_E ~> _CFG :=
     fun R e =>
@@ -192,13 +193,13 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
     fun T e => @_funE_to_CFG T (instr_E_to_fun_E (exp_E_to_instr_E e)).
   
   (* For multiple CFG, after interpreting [GlobalE] *)
-  Definition _MCFG1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE.
+  Definition _MCFG1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE.
 
   (* For multiple CFG, after interpreting [LocalE] *)
-  Definition _MCFG2 := CallE +' IntrinsicE +' MemoryE +' DebugE +' FailureE.
+  Definition _MCFG2 := CallE +' IntrinsicE +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
-  Definition _MCFG3 := CallE +' DebugE +' FailureE.
+  Definition _MCFG3 := CallE +' DebugE +' FailureE +' UndefinedBehaviourE.
   Hint Unfold LLVM _CFG _MCFG1 _MCFG2 _MCFG3.
 
   
@@ -213,7 +214,6 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
 
   Definition debug {E} `{DebugE -< E} (msg : string) : itree E unit :=
     trigger (Debug msg).
-
 
 End LLVM_INTERACTIONS.
 

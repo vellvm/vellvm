@@ -13,7 +13,7 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILES := Error LLVMAst Util Misc AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues LLVMEvents TypeUtil Denotation DenotationProp Memory IntrinsicsDefinitions Intrinsics Renaming DeadInstr Transform Local Global Stack TransformTypes TopLevel Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric/Floats Numeric/Integers
+COQFILES := Error UndefinedBehaviour Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric/Integers Numeric/Floats Util LLVMAst Misc AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues LLVMEvents TypeUtil IntrinsicsDefinitions Intrinsics Denotation DenotationProp Memory Renaming DeadInstr Transform Local Global Stack TransformTypes TopLevel
 
 OLLVMFILES := 
 

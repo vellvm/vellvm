@@ -24,6 +24,7 @@ From Vellvm Require Import
      AstLib
      MemoryAddress
      Error
+     UndefinedBehaviour
      Util.
 
 Require Import Integers Floats.

@@ -74,7 +74,11 @@ let rec step (m : ('a TopLevel.IO._MCFG3, TopLevel.M.memory * ((TopLevel.local_e
          step (k (Obj.magic DV.DVALUE_None)))
 
   (* The failE effect is a failure *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 f), _) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 f)), _) ->
+    Error (Camlcoq.camlstring_of_coqstring f)
+
+  (* The UndefinedBehaviourE effect is a failure *)
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 f)), _) ->
     Error (Camlcoq.camlstring_of_coqstring f)
 
   (* The only visible effects from LLVMIO that should propagate to the interpreter are:
