@@ -258,6 +258,9 @@ Definition is_DVALUE_I64 (d:dvalue) : bool :=
   | _ => false
   end.
 
+Definition is_DVALUE_IX (d:dvalue) : bool :=
+  is_DVALUE_I1 d || is_DVALUE_I8 d || is_DVALUE_I32 d || is_DVALUE_I64 d.
+
 
 Definition undef_i1  := DVALUE_Undef.
 Definition undef_i8  := DVALUE_Undef.
@@ -659,12 +662,16 @@ Class VInt I : Type :=
   (* Integer iop evaluation, called from eval_iop.
      Here the values must be integers. Helper defined
      in order to prevent eval_iop from being recursive. *)
+  (* CB TODO: Should this do anything for undef? *)
   Definition eval_iop_integer_h iop v1 v2 : err dvalue :=
     match v1, v2 with
     | DVALUE_I1 i1, DVALUE_I1 i2 => ret (eval_int_op iop i1 i2)
     | DVALUE_I8 i1, DVALUE_I8 i2 => ret (eval_int_op iop i1 i2)
     | DVALUE_I32 i1, DVALUE_I32 i2 => ret (eval_int_op iop i1 i2)
     | DVALUE_I64 i1, DVALUE_I64 i2 => ret (eval_int_op iop i1 i2)
+    | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
+    | DVALUE_Poison, _ => if is_DVALUE_IX v2 then ret DVALUE_Poison else failwith "ill_typed-iop"
+    | _, DVALUE_Poison => if is_DVALUE_IX v1 then ret DVALUE_Poison else failwith "ill_typed-iop"
     | _, _ => failwith "ill_typed-iop"
     end.
   Arguments eval_iop_integer_h _ _ _ : simpl nomatch.
@@ -704,6 +711,9 @@ Class VInt I : Type :=
     | DVALUE_I8 i1, DVALUE_I8 i2 => ret (eval_int_icmp icmp i1 i2)
     | DVALUE_I32 i1, DVALUE_I32 i2 => ret (eval_int_icmp icmp i1 i2)
     | DVALUE_I64 i1, DVALUE_I64 i2 => ret (eval_int_icmp icmp i1 i2)
+    | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
+    | DVALUE_Poison, _ => if is_DVALUE_IX v2 then ret DVALUE_Poison else failwith "ill_typed-iop"
+    | _, DVALUE_Poison => if is_DVALUE_IX v1 then ret DVALUE_Poison else failwith "ill_typed-iop"
     | _, _ => failwith "ill_typed-icmp"
     end.
   Arguments eval_icmp _ _ _ : simpl nomatch.
@@ -731,6 +741,11 @@ Class VInt I : Type :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2 => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
+    | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
+    | DVALUE_Poison, DVALUE_Double _ => ret DVALUE_Poison
+    | DVALUE_Poison, DVALUE_Float _ => ret DVALUE_Poison
+    | DVALUE_Double _, DVALUE_Poison => ret DVALUE_Poison
+    | DVALUE_Float _, DVALUE_Poison => ret DVALUE_Poison
     | _, _ => failwith ("ill_typed-fop: " ++ (to_string fop) ++ " " ++ (to_string v1) ++ " " ++ (to_string v2))
     end.
 
@@ -794,6 +809,11 @@ Class VInt I : Type :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2 => ret (float_cmp fcmp f1 f2)
     | DVALUE_Double f1, DVALUE_Double f2 => ret (double_cmp fcmp f1 f2)
+    | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
+    | DVALUE_Poison, DVALUE_Double _ => ret DVALUE_Poison
+    | DVALUE_Poison, DVALUE_Float _ => ret DVALUE_Poison
+    | DVALUE_Double _, DVALUE_Poison => ret DVALUE_Poison
+    | DVALUE_Float _, DVALUE_Poison => ret DVALUE_Poison
     | _, _ => failwith "ill_typed-fcmp"
     end.
 
@@ -802,10 +822,13 @@ Class VInt I : Type :=
 
   (* Same deal as above with the helper *)
   Definition eval_select_h cnd v1 v2 : err dvalue :=
-    match cnd with
-    | DVALUE_I1 i =>
+    match cnd, v1, v2 with
+    | _, DVALUE_Poison, _ => ret DVALUE_Poison
+    | _, _, DVALUE_Poison => ret DVALUE_Poison
+    | DVALUE_I1 i, _, _ =>
       ret (if Int1.unsigned i =? 1 then v1 else v2)
-    | _ => failwith "ill_typed-select"
+    | DVALUE_Poison, _, _ => ret DVALUE_Poison
+    | _, _, _ => failwith "ill_typed-select"
     end.
   Arguments eval_select_h _ _ _ : simpl nomatch.
 

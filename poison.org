@@ -1,5 +1,25 @@
 * When does poison cause undefined behaviour?
 
   - Branching on poison is undefined behaviour.
+    + select does NOT raise UB.
   - Store to poison address is UB
   - Load from poison address is UB
+
+* Evaluation and poison
+
+  Evaluation of expressions depending on poison should yield poison as
+  well... This mostly appears in DynamicValues.v, like for instance in
+  eval_icmp... Normally this would result in a type error being raised
+  if the types don't match up, but poison erases type information...
+
+* Select and poison
+
+  If any operand of select is poison the result is poison.
+
+  "An instruction that depends on a poison value, produces a poison value itself."
+
+  Even if the select chooses the non-poison value.
+
+* Vectors and poison
+
+  Considered pointwise, I think.

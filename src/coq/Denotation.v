@@ -115,48 +115,84 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         match t1, x, t2 with
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1 =>
           ret (DVALUE_I1 (repr (unsigned i1)))
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 1 =>
+          ret DVALUE_Poison
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1 =>
           ret (DVALUE_I1 (repr (unsigned i1)))
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 1 =>
+          ret DVALUE_Poison
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8 =>
           ret (DVALUE_I8 (repr (unsigned i1)))
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 8 =>
+          ret DVALUE_Poison
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 1 =>
           ret (DVALUE_I1 (repr (unsigned i1)))
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 1 =>
+          ret DVALUE_Poison
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 8 =>
           ret (DVALUE_I8 (repr (unsigned i1)))
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 8 =>
+          ret DVALUE_Poison
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
           ret (DVALUE_I32 (repr (unsigned i1)))
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 32 =>
+          ret DVALUE_Poison
         | _, _, _ => raise "ill typed-conv"
         end
       | Zext =>
         match t1, x, t2 with
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
           ret (DVALUE_I8 (repr (unsigned i1)))
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8 =>
+          ret DVALUE_Poison
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32 =>
           ret (DVALUE_I32 (repr (unsigned i1)))
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32 =>
+          ret DVALUE_Poison
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64 =>
           ret (DVALUE_I64 (repr (unsigned i1)))
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64 =>
+          ret DVALUE_Poison
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
           ret (DVALUE_I32 (repr (unsigned i1)))
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32 =>
+          ret DVALUE_Poison
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64 =>
           ret (DVALUE_I64 (repr (unsigned i1)))
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64 =>
+          ret DVALUE_Poison
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
           ret (DVALUE_I64 (repr (unsigned i1)))
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 64 =>
+          ret DVALUE_Poison
         | _, _, _ => raise "ill typed-conv"
         end
       | Sext =>
         match t1, x, t2 with
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
           ret (DVALUE_I8 (repr (signed i1)))
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8 =>
+          ret DVALUE_Poison
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32 =>
           ret (DVALUE_I32 (repr (signed i1)))
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32 =>
+          ret DVALUE_Poison
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64 =>
           ret (DVALUE_I64 (repr (signed i1)))
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64 =>
+          ret DVALUE_Poison
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
           ret (DVALUE_I32 (repr (signed i1)))
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32 =>
+          ret DVALUE_Poison
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64 =>
           ret (DVALUE_I64 (repr (signed i1)))
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64 =>
+          ret DVALUE_Poison
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
           ret (DVALUE_I64 (repr (signed i1)))
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 64 =>
+          ret DVALUE_Poison
         | _, _, _ => raise "ill typed-conv"
         end
       | Bitcast =>
@@ -165,33 +201,51 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           if bits1 =? bits2 then ret x else raise "unequal bitsize in cast"
         | DTYPE_Pointer, DVALUE_Addr a, DTYPE_Pointer =>
           ret (DVALUE_Addr a) 
+        | DTYPE_Pointer, DVALUE_Poison, DTYPE_Pointer =>
+          ret DVALUE_Poison
         | _, _, _ => raise "ill-typed_conv"
         end
       | Uitofp =>
         match t1, x, t2 with
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float =>
+          ret DVALUE_Poison
 
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float =>
+          ret DVALUE_Poison
 
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float =>
+          ret DVALUE_Poison
 
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float =>
+          ret DVALUE_Poison
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double =>
+          ret DVALUE_Poison
 
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double =>
+          ret DVALUE_Poison
 
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double =>
+          ret DVALUE_Poison
               
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
+          ret DVALUE_Poison
 
         | _, _, _ => raise "ill typed Uitofp"
         end
@@ -199,27 +253,43 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         match t1, x, t2 with
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float =>
+          ret DVALUE_Poison
 
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float =>
+          ret DVALUE_Poison
 
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float =>
+          ret DVALUE_Poison
 
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
           ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float =>
+          ret DVALUE_Poison
 
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double =>
+          ret DVALUE_Poison
 
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double =>
+          ret DVALUE_Poison
 
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double =>
+          ret DVALUE_Poison
               
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
+          ret DVALUE_Poison
 
         | _, _, _ => raise "ill typed Sitofp"
         end 
