@@ -692,6 +692,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                     match bd with
                     | inr dv => ret (inr dv)
                     | inl bid =>
+                      debug ("phi") ;;
                       dvs <- map_monad
                           (fun x => translate exp_E_to_instr_E (denote_phi bid x))
                           (blk_phis _ block) ;; 
