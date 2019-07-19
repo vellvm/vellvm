@@ -106,6 +106,7 @@ Definition eval_typ (CFG:CFG.mcfg typ) (t:typ) : dtyp :=
 Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
   TransformTypes.fmap_mcfg _ _ (eval_typ CFG) CFG.
 
+
 Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ)))) :
   option (LLVM _MCFG3 (M.memory * ((local_env * stack) * (global_env * dvalue)))) :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in

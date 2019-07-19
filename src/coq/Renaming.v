@@ -22,6 +22,7 @@ From ITree Require Import
 
 From Vellvm Require Import 
      Error
+     UndefinedBehaviour
      Util
      LLVMAst
      AstLib
@@ -522,6 +523,7 @@ Module RENAMING
   Instance swap_of_IntrinsicE {X} : Swap (IntrinsicE X) := fun id1 id2 x => x.
   Instance swap_of_DebugE {X} : Swap (DebugE X) := fun id1 id2 x => x.
   Instance swap_of_FailureE {X} : Swap (FailureE X) := fun id1 id2 x => x.
+  Instance swap_of_UndefinedBehaviourE {X} : Swap (UndefinedBehaviourE X) := fun id1 id2 x => x.
   Hint Unfold swap_of_MemoryE swap_of_StackE swap_of_LocalE swap_of_GlobalE swap_of_CallE swap_of_IntrinsicE swap_of_DebugE FailureE.
 
   Instance swap_of_sum {A B} `{Swap A} `{Swap B}: Swap (A + B) :=

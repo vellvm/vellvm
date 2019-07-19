@@ -29,5 +29,3 @@ Arguments trywith _ _ _ _ _: simpl nomatch.
 Definition failwith {A:Type} {F} `{Monad F} `{MonadExc string F} (s:string) : F A := raise s.
 Hint Unfold failwith.
 Arguments failwith _ _ _ _: simpl nomatch.
-
-

@@ -23,7 +23,6 @@ Import EqvNotation.
 Import MonadNotation.
 Open Scope monad_scope.
 
-
 (* SAZ: The notion of pc, and many other things in this file is now obsolete *)
 (* program counter denotes an instruction with a block of a function -------- *)
 Record pc :=

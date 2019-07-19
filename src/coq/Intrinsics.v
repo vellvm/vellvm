@@ -22,6 +22,7 @@ From Vellvm Require Import
      LLVMAst
      LLVMEvents
      Error
+     UndefinedBehaviour
      IntrinsicsDefinitions.
 
 From ITree Require Import
@@ -127,7 +128,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Definition extcall_trigger : Handler CallE _CFG :=
   fun X e => trigger e.
 
-  Definition rest_trigger : Handler (LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE) _CFG :=
+  Definition rest_trigger : Handler (LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE) _CFG :=
     fun X e => trigger e.
 
   Definition interpret_intrinsics: forall R, LLVM _CFG R -> LLVM _CFG R  :=
