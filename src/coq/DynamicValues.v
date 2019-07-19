@@ -538,6 +538,7 @@ Class VInt I : Type :=
      integers. This is a typeclass that wraps all of the integer
      operations that we use for integer types with different bitwidths.
    *)
+  (* SAZ: This needs to move into: [itree (UndefinedBehaviorE +' UndefE) dvalue]  *)
   Definition eval_int_op {Int} `{VInt Int} (iop:ibinop) (x y: Int) : dvalue:=
     match iop with
     (* Following to cases are probably right since they use CompCert *)
@@ -655,6 +656,7 @@ Class VInt I : Type :=
                          ret (val :: acc)
                        ) elts [].
 
+
   (* Integer iop evaluation, called from eval_iop.
      Here the values must be integers. Helper defined
      in order to prevent eval_iop from being recursive. *)
@@ -671,6 +673,15 @@ Class VInt I : Type :=
   (* I split the definition between the vector and other evaluations because
      otherwise eval_iop should be recursive to allow for vector calculations,
      but coq can't find a fixpoint. *)
+  (* SAZ: Here is where we want to add the case distinction  for uvalues
+
+       - this should check for "determined" uvalues and then use eval_iop_integer_h
+         otherwise leave the op symbolic
+
+       - this should use the inclusion of dvalue into uvalue in the case that
+         eval_iop_integer_h is calle
+ 
+   *)
   Definition eval_iop iop v1 v2 : err dvalue :=
     match v1, v2 with
     | (DVALUE_Vector elts1), (DVALUE_Vector elts2) =>
