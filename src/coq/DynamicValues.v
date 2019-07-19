@@ -24,7 +24,8 @@ From Vellvm Require Import
      AstLib
      MemoryAddress
      Error
-     Util.
+     Util
+     DynamicTypes.
 
 Require Import Integers Floats.
 
@@ -877,5 +878,54 @@ Class VInt I : Type :=
     end.
   Arguments insert_into_str _ _ _ : simpl nomatch.
 
+(*  ------------------------------------------------------------------------- *)
+  (** TODO: Add [uvalue] *)
 
+
+(* The set of dynamic values manipulated by an LLVM program. *)
+Inductive uvalue : Set :=
+| UVALUE_Addr (a:A.addr)
+| UVALUE_I1 (x:int1)
+| UVALUE_I8 (x:int8)
+| UVALUE_I32 (x:int32)
+| UVALUE_I64 (x:int64)
+| UVALUE_Double (x:ll_double)
+| UVALUE_Float (x:ll_float)
+| UVALUE_Undef (t:dtyp)
+| UVALUE_Poison
+| UVALUE_None
+| UVALUE_Struct        (fields: list uvalue)
+| UVALUE_Packed_struct (fields: list uvalue)
+| UVALUE_Array         (elts: list uvalue)
+| UVALUE_Vector        (elts: list uvalue)
+| UVALUE_IBinop           (iop:ibinop) (v1:uvalue) (v2:uvalue)  
+| UVALUE_ICmp             (cmp:icmp)   (v1:uvalue) (v2:uvalue)
+| UVALUE_FBinop           (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
+| UVALUE_FCmp             (cmp:fcmp)   (v1:uvalue) (v2:uvalue)
+| UVALUE_Conversion       (conv:conversion_type) (v:uvalue) (t_to:dtyp)
+| UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue))
+| UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue)
+| UVALUE_InsertElement    (vec: uvalue) (elt:uvalue) (idx:uvalue)
+| UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
+| UVALUE_ExtractValue     (vec:uvalue) (idxs:list int)
+| UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list int)
+| UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue) 
+.
+
+
+Variant UndefE : Type -> Type :=
+| pick (u:uvalue) : UndefE dvalue.
+
+(* TODO: define the inclusion dvalue -> uvalue 
+     trivial inclusion
+*)
+
+(* TODO: define [is_defined : uvalue -> bool] 
+
+    returns true iff the uvalue contains no occurrence of UVALUE_Undef.
+*)
+
+(* TODO: define [refines : uvalue -> dvalue -> Prop] which characterizes the nondeterminism of undef values *)
+
+  
 End DVALUE.

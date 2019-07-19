@@ -22,10 +22,6 @@ Import ShowNotation.
 Import EqvNotation.
 Import MonadNotation.
 Open Scope monad_scope.
-(* SAZ: This notation doesn't seem to be in the opam coq-ext-lib yet. *)
-Notation "' pat <- c1 ;; c2" :=
-    (@pbind _ _ _ _ _ c1 (fun x => match x with pat => c2 end))
-    (at level 100, pat pattern, c1 at next level, right associativity) : monad_scope.
 
 
 (* SAZ: The notion of pc, and many other things in this file is now obsolete *)
