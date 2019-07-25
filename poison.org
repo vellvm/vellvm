@@ -1,31 +1,153 @@
-* When does poison cause undefined behaviour?
+This file describe the design choices we are following in the way of handling
+the notions of undefined behavior and undefined values (i.e. poison and undef)
+that llvm supports.
 
-  - Branching on poison is undefined behaviour.
-    + select does NOT raise UB.
-  - Store to poison address is UB
-  - Load from poison address is UB
+* Poison
 
-* Evaluation and poison
+  The first notion of undefined value, _poison_, is treated as a (symbolic) specific dynamic value,
+  named _DVALUE_Poison_.
+  The central property motivating this choice is that all operations remain _deterministic_ when the
+  domain of dynamic values is extended to include poison.
 
-  Evaluation of expressions depending on poison should yield poison as
-  well... This mostly appears in DynamicValues.v, like for instance in
-  eval_icmp... Normally this would result in a type error being raised
-  if the types don't match up, but poison erases type information...
+** Semantics and poisoned values
+  
+   Depending on the operation performed over a poisoned value, two behaviors can be exhibited:
+   - either the operation is deemed to be unsafe to execute over certain dvalues, in which case 
+   it raises _Undefined Behavior_;
+   - or it acts as a taint: the operation is performed, but results in a poisoned value.
+   An example of the former is division by a poisoned value.
+   An example of the former is addition of a poisoned value to another.
 
-* Select and poison
+   Operands can be classified into two categories: _safe_ operands are such that
+   any dynamic value of the appropriate type in place of this operand leads to a
+   safe execution; _unsafe_ operands in contrast are such that there exists a 
+   dynamic value of the appropriate type such that evaluation would raise UB.
+   The general rule is that poisoned values in place of safe operands are tainting,
+   while poisoned value in place of unsafe operands raise UB.
 
-  If any operand of select is poison the result is poison.
+   Note that [DVALUE_Poison] is not typed, such as:
+   %x = add f32 poison 0
+   %y = add i32 %x 0
+   will not trigger a dynamic error. It should however be statically ruled out by a type checker.
+ 
+** What is the list of cases where poison triggers an undefined behaviour?
 
-  "An instruction that depends on a poison value, produces a poison value itself."
+ 
+*** Branching on poison is UB
+    See [denote_terminator]
+    Note: _select_ does NOT raise UB however, see [eval_select_h].
 
-  Even if the select chooses the non-poison value.
+*** Store to a poisoned address is UB
+    See [denote_instr]
+*** Load from a poisoned address is UB
+    See [denote_instr]
 
-* Vectors and poison
+** Select and poison
 
-  Considered pointwise, I think.
+   If _any_ operand of [select] is poison, the result is poison.
 
-* When to Pick?
+   LangRef: "An instruction that depends on a poison value, produces a poison value itself."
 
-  Attempt to pick a value when undef is in a crucial place. Such places are:
+   For an expression such as a select, this dependency is on the set of operands. 
+   This means in particular that [select true 0 poison] still evaluates to poison.
 
-  - divisor
+** Vectors and poison
+
+   Considered pointwise, I think.
+
+* Undef
+
+  Contrary to _poison_, _undef_ is _not_ a dynamic value. 
+  Its intuitive semantics is to represent the set of dynamic values of the corresponding type.
+  
+** Incorrect model 1: immediate non-deterministic branching
+   As such, we could simply pick in a non-deterministic fashion a [dvalue] when encountering an
+   undef value.
+   However, an important property is that several reads to a same _undef_ can lead to different results.
+   We hence cannot collapse the non-determinism as soon as it happens.
+
+   LangRef: "This example points out that two ‘undef’ operands are not
+   necessarily the same. This can be surprising to people (and also matches C
+   semantics) where they assume that “X^X” is always zero, even if X is
+   undefined."
+
+** Incorrect model 2: a simple symbolic value for _undef_
+   By extending _dvalue_ with an additional symbolic value _undef_, we could delay the non-deterministic 
+   choice such that a different choice is taken every time.
+   However, if it is wrong that:
+   %x = undef
+   %y = %x + %x
+   always leads to an even value in y, it is true with the following example:
+   %x = undef
+   %y = 2 * %x 
+   
+** Chosen model: symbolic expressions as values
+   We hence want to both delay the non-deterministic choice while having other abstract values than the
+   simple "any dvalue of a given type" embodied by _undef_ itself.
+   We hence introduce _uvalue_, potentially undefined symbolic values, as a subset of _dvalue_.
+   They additionally contain a new _undef_ symbolic value, as well as all arithmetic and comparison operators.
+   This way, we can build compound expressions representing arbitrary set of [dvalues] of a given type.
+
+   Note that [dvalue] maintain their property that evaluation over them is deterministic.
+   There is a trivial injection from [dvalue] into [uvalue] (see [dvalue_to_uvalue]).
+   There is a decidable judgment over [uvalue] to test whether they are images of the previous injection, dubbed "defined".
+   There is hence an induced decidable partial injection from [uvalue] into [dvalue] (see [uvalue_to_dvalue]).
+
+** Semantics and [uvalue]
+
+   Recall the distinction between safe and unsafe operands. 
+
+*** Over safe operands: 
+
+    * If both operands are defined, we perform the computation immediately over the corresponding dvalue and reinject the result.
+    * If at least one operand is not defined, we construct the new symbolic [uvalue] as an AST of the expression.
+
+*** Over unsafe operands:
+
+    * If the operand is defined, we perform the computation immediately over the
+      corresponding dvalue, operation that may raise UB, the same as it used to.
+    * If the unsafe operand is not defined, and contrary to the [poison] case, we
+    do not always raise UB: the concretization of the [uvalue] may not contain any
+    incriminating [dvalue].
+
+    To decide¹ what to do, we hence collapse there the non-determinism via a new event:
+    pick (uv: uvalue) (P: Prop): Pick dvalue.
+    Ignoring the proposition for now, it provides the [uvalue] at hand to the environment
+    and ask it to return a [dvalue], allowing us to continue the execution.
+    However, note that we do not wish to fail dynamically in some execution paths if a UB
+    may be raised: we want to abort all executions if one of the paths would raise UB.
+    We hence pass to the event a predicate _P_ describing a property to be satisfied for
+    the execution to proceed in a non-deterministic, and raise UB otherwise.
+
+    For instance, in the case of the second operand of a division hosting a non concrete
+    [uvalue] _uv_, we would raise:
+    pick uv (forall dv, concretize uv dv -> dv <> 0)
+    Where concretize² is a predicate relating a uvalue to the set of dynamic values it
+    represents.
+
+    ¹: Note that in the technical sense of the term, we are performing arithmetic
+    over a finite set of values, things are always decidable. 
+    ²: TODO: reuse as much as possible of the dvalue evaluator.
+
+*** Handling pick
+
+**** The main intended handler goes into the Prop monad and contains two rules:
+     * If P is not satisfied, trigger UB
+     * If P is satisfied, evaluate to any dvalue related by concretize in a non-deterministic way.
+
+**** For the evaluator, an handler can systematically pick 0
+     Remark: this raises a concern. 
+    
+     In this case, the predicate is ignored. This does not mean that we will
+     perform an unsafe operation, since the dynamic evaluation will raise UB if
+     0 is a problematic value, but it does mean that we may actually reduce where
+     the Prop evaluator would have raised UB. For instance in the following case:
+     %x = undef - 1
+     %y = 1 / %x
+     Is this a sound refinement?
+
+** What is the list of cases where we trigger pick?
+
+   Attempt to pick a value when undef is in a crucial place. Such places are:
+
+   - divisor
