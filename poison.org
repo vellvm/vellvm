@@ -23,3 +23,9 @@
 * Vectors and poison
 
   Considered pointwise, I think.
+
+* When to Pick?
+
+  Attempt to pick a value when undef is in a crucial place. Such places are:
+
+  - divisor

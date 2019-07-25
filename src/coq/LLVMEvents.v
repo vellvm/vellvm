@@ -34,7 +34,8 @@ From Vellvm Require Import
      DynamicTypes
      DynamicValues
      Error
-     UndefinedBehaviour.
+     UndefinedBehaviour
+     Failure.
 
 
 Set Implicit Arguments.
@@ -54,12 +55,6 @@ Set Contextual Implicit.
   Variant StackE (k v:Type) : Type -> Type :=
     | StackPush (args: list (k * v)) : StackE k v unit (* Pushes a fresh environment during a call *)
     | StackPop : StackE k v unit. (* Pops it back during a ret *)
-
-  (* Failures carry string *)
-  Definition FailureE := exceptE string.
-
-  Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
-    throw msg.
 
 (* SAZ: TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism
    not functors. *)
@@ -119,18 +114,17 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Variant DebugE : Type -> Type :=
   | Debug : string -> DebugE unit.
 
-
   (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
 
   Definition LLVM X := itree X.
 
-  Definition LLVMGEnvE := (GlobalE raw_id dvalue).
-  Definition LLVMEnvE := (LocalE raw_id dvalue).
-  Definition LLVMStackE := (StackE raw_id dvalue).
+  Definition LLVMGEnvE := (GlobalE raw_id uvalue).
+  Definition LLVMEnvE := (LocalE raw_id uvalue).
+  Definition LLVMStackE := (StackE raw_id uvalue).
 
-  Definition conv_E := MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE.
+  Definition conv_E := MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' UndefE.
   Definition lookup_E := LLVMGEnvE +' LLVMEnvE.
-  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE.
+  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' UndefE.
 
   Definition lookup_E_to_exp_E : lookup_E ~> exp_E :=
     fun T e =>
@@ -151,7 +145,7 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
     fun T e => inr1 e.
 
   (* Core effects - no distinction between "internal" and "external" calls. *)
-  Definition _CFG := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE.
+  Definition _CFG := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' UndefE.
       
   Definition _funE_to_CFG : fun_E ~> _CFG :=
     fun R e =>
@@ -192,6 +186,13 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Definition _exp_E_to_CFG : exp_E ~> _CFG :=
     fun T e => @_funE_to_CFG T (instr_E_to_fun_E (exp_E_to_instr_E e)).
   
+  Definition _failure_UB_to_ExpE : (FailureE +' UndefinedBehaviourE) ~> exp_E :=
+    fun T e =>
+      match e with
+      | inl1 x => inr1 (inr1 (inr1 (inr1 (inl1 x))))
+      | inr1 x => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 x)))))
+      end.
+
   (* For multiple CFG, after interpreting [GlobalE] *)
   Definition _MCFG1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE.
 
@@ -205,12 +206,6 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   
   
   (* Utilities to conveniently trigger debug and failure events *)
-
-  Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m:err A) : itree E B :=
-    match m with
-    | inl x => throw x
-    | inr x => f x
-    end.
 
   Definition debug {E} `{DebugE -< E} (msg : string) : itree E unit :=
     trigger (Debug msg).

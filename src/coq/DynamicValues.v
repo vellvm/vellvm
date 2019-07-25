@@ -8,14 +8,15 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-From Coq Require Import 
-     ZArith List String Omega.
+From Coq Require Import
+     ZArith List String Omega Bool.Bool.
 
-From ExtLib Require Import 
+From ExtLib Require Import
      Core.RelDec
      Programming.Eqv
      Programming.Show
      Structures.Monads
+     Structures.Functor
      Data.Nat
      Data.List.
 
@@ -25,8 +26,12 @@ From Vellvm Require Import
      MemoryAddress
      Error
      UndefinedBehaviour
+     Failure
      DynamicTypes
      Util.
+
+From ITree Require Import
+     ITree.
 
 Require Import Integers Floats.
 
@@ -87,7 +92,6 @@ Inductive dvalue : Set :=
 | DVALUE_I64 (x:int64)
 | DVALUE_Double (x:ll_double)
 | DVALUE_Float (x:ll_float)
-| DVALUE_Undef     (* TODO: include type information? Ideally, also include some kind of constraint: (p:dvalue -> bool) *)
 | DVALUE_Poison
 | DVALUE_None
 | DVALUE_Struct        (fields: list dvalue)
@@ -96,12 +100,175 @@ Inductive dvalue : Set :=
 | DVALUE_Vector        (elts: list dvalue)
 .
 
+(* The set of dynamic values manipulated by an LLVM program. *)
+Inductive uvalue : Set :=
+| UVALUE_Addr (a:A.addr)
+| UVALUE_I1 (x:int1)
+| UVALUE_I8 (x:int8)
+| UVALUE_I32 (x:int32)
+| UVALUE_I64 (x:int64)
+| UVALUE_Double (x:ll_double)
+| UVALUE_Float (x:ll_float)
+| UVALUE_Undef (t:dtyp)
+| UVALUE_Poison
+| UVALUE_None
+| UVALUE_Struct        (fields: list uvalue)
+| UVALUE_Packed_struct (fields: list uvalue)
+| UVALUE_Array         (elts: list uvalue)
+| UVALUE_Vector        (elts: list uvalue)
+| UVALUE_IBinop           (iop:ibinop) (v1:uvalue) (v2:uvalue)
+| UVALUE_ICmp             (cmp:icmp)   (v1:uvalue) (v2:uvalue)
+| UVALUE_FBinop           (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
+| UVALUE_FCmp             (cmp:fcmp)   (v1:uvalue) (v2:uvalue)
+| UVALUE_Conversion       (conv:conversion_type) (v:uvalue) (t_to:dtyp)
+| UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue))
+| UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue)
+| UVALUE_InsertElement    (vec: uvalue) (elt:uvalue) (idx:uvalue)
+| UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
+| UVALUE_ExtractValue     (vec:uvalue) (idxs:list int)
+| UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list int)
+| UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
+.
+
+
+Variant UndefE : Type -> Type :=
+  | pick (u:uvalue) (p : dvalue -> Prop) : UndefE dvalue.
+
+
+
+Fixpoint dvalue_to_uvalue (dv : dvalue) : uvalue :=
+  match dv with
+  | DVALUE_Addr a => UVALUE_Addr a
+  | DVALUE_I1 x => UVALUE_I1 x
+  | DVALUE_I8 x => UVALUE_I8 x
+  | DVALUE_I32 x => UVALUE_I32 x
+  | DVALUE_I64 x => UVALUE_I64 x
+  | DVALUE_Double x => UVALUE_Double x
+  | DVALUE_Float x => UVALUE_Float x
+  | DVALUE_Poison => UVALUE_Poison
+  | DVALUE_None => UVALUE_None
+  | DVALUE_Struct fields => UVALUE_Struct (map dvalue_to_uvalue fields)
+  | DVALUE_Packed_struct fields => UVALUE_Packed_struct (map dvalue_to_uvalue fields)
+  | DVALUE_Array elts => UVALUE_Array (map dvalue_to_uvalue elts)
+  | DVALUE_Vector elts => UVALUE_Vector (map dvalue_to_uvalue elts)
+  end.
+
+Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
+  match uv with
+  | UVALUE_Addr a                          => ret (DVALUE_Addr a)
+  | UVALUE_I1 x                            => ret (DVALUE_I1 x)
+  | UVALUE_I8 x                            => ret (DVALUE_I8 x)
+  | UVALUE_I32 x                           => ret (DVALUE_I32 x)
+  | UVALUE_I64 x                           => ret (DVALUE_I64 x)
+  | UVALUE_Double x                        => ret (DVALUE_Double x)
+  | UVALUE_Float x                         => ret (DVALUE_Float x)
+  | UVALUE_Undef t                         => failwith "Converting undef to dvalue :("
+  | UVALUE_Poison                          => ret (DVALUE_Poison)
+  | UVALUE_None                            => ret (DVALUE_None)
+
+  | UVALUE_Struct fields                   =>
+    fields' <- map_monad uvalue_to_dvalue fields ;;
+    ret (DVALUE_Struct fields')
+
+  | UVALUE_Packed_struct fields            =>
+    fields' <- map_monad uvalue_to_dvalue fields ;;
+    ret (DVALUE_Packed_struct fields')
+
+  | UVALUE_Array elts                      =>
+    elts' <- map_monad uvalue_to_dvalue elts ;;
+    ret (DVALUE_Array elts')
+
+  | UVALUE_Vector elts                     =>
+    elts' <- map_monad uvalue_to_dvalue elts ;;
+    ret (DVALUE_Vector elts')
+
+  | _ => failwith "unimplemented uvalue to dvalue conversion"
+                 (* TODO: recursively convert dvalue to uvalue with evaluation*)
+  (*
+  | UVALUE_IBinop iop v1 v2                => ret (DVALUE_IBinop iop v1 v2)
+  | UVALUE_ICmp cmp v1 v2                  => ret (DVALUE_ICmp cmp v1 v2)
+  | UVALUE_FBinop fop fm v1 v2             => ret (DVALUE_FBinop fop fm v1 v2)
+  | UVALUE_FCmp cmp v1 v2                  => ret (DVALUE_FCmp cmp v1 v2)
+  | UVALUE_Conversion conv v t_to          => ret (DVALUE_Conversion conv v t_to)
+  | UVALUE_GetElementPtr t ptrval idxs     => ret (DVALUE_GetElementPtr t ptrval idxs)
+  | UVALUE_ExtractElement vec idx          => ret (DVALUE_ExtractElement vec idx)
+  | UVALUE_InsertElement vec elt idx       => ret (DVALUE_InsertElement vec elt idx)
+  | UVALUE_ShuffleVector vec1 vec2 idxmask => ret (DVALUE_ShuffleVector vec1 vec2 idxmask)
+  | UVALUE_ExtractValue vec idxs           => ret (DVALUE_ExtractValue vec idxs)
+  | UVALUE_InsertValue vec elt idxs        => ret (DVALUE_InsertValue vec elt idxs)
+  | UVALUE_Select cnd v1 v2                => ret (DVALUE_Select cnd v1 v2)
+   *)
+  end.
+
+Definition concretize := uvalue_to_dvalue.
+
+(* returns true iff the uvalue contains no occurrence of UVALUE_Undef. *)
+Fixpoint is_concrete (uv : uvalue) : bool :=
+  match uv with
+  | UVALUE_Addr a => true
+  | UVALUE_I1 x => true
+  | UVALUE_I8 x => true
+  | UVALUE_I32 x => true
+  | UVALUE_I64 x => true
+  | UVALUE_Double x => true
+  | UVALUE_Float x => true
+  | UVALUE_Undef t => false
+  | UVALUE_Poison => true
+  | UVALUE_None => true
+  | UVALUE_Struct fields => allb is_concrete fields
+  | UVALUE_Packed_struct fields => allb is_concrete fields
+  | UVALUE_Array elts => allb is_concrete elts
+  | UVALUE_Vector elts => allb is_concrete elts
+  | UVALUE_IBinop iop v1 v2 => allb is_concrete [v1 ; v2]
+  | UVALUE_ICmp cmp v1 v2 => allb is_concrete [v1 ; v2]
+  | UVALUE_FBinop fop fm v1 v2 => allb is_concrete [v1 ; v2]
+  | UVALUE_FCmp cmp v1 v2 => allb is_concrete [v1 ; v2]
+  | UVALUE_Conversion conv v t_to => is_concrete v
+  | UVALUE_GetElementPtr t ptrval idxs => allb is_concrete (ptrval :: idxs)
+  | UVALUE_ExtractElement vec idx => allb is_concrete [vec ; idx]
+  | UVALUE_InsertElement vec elt idx => allb is_concrete [vec ; elt ; idx]
+  | UVALUE_ShuffleVector vec1 vec2 idxmask => allb is_concrete [vec1 ; vec2 ; idxmask]
+  | UVALUE_ExtractValue vec idxs => is_concrete vec
+  | UVALUE_InsertValue vec elt idxs => allb is_concrete [vec ; elt]
+  | UVALUE_Select cnd v1 v2 => allb is_concrete [cnd ; v1 ; v2]
+  end.
+
+
+(* If both operands are concrete, concretize them and run them through
+   opd, else run the abstract ones through opu *)
+Definition concretize_binop {A : Type}
+           (opu : uvalue -> uvalue -> A) (opd : dvalue -> dvalue -> A) (uv1 uv2 : uvalue) : A :=
+  let ma := dv1 <- concretize uv1 ;; dv2 <- concretize uv2 ;; ret (opd dv1 dv2)
+  in match ma with
+     | inl e => opu uv1 uv2
+     | inr a => a
+     end.
+
+(* Like concretize_binop, but the second operand is already concrete *)
+Definition concretize_binop2 {A : Type}
+           (opu : uvalue -> uvalue -> A) (opd : dvalue -> dvalue -> A) (uv1 : uvalue) (dv2 : dvalue) : A :=
+  let ma := dv1 <- concretize uv1 ;; ret (opd dv1 dv2)
+  in match ma with
+     | inl e => opu uv1 (dvalue_to_uvalue dv2)
+     | inr a => a
+     end.
+
+Definition concretize_uop {A : Type}
+           (opu : uvalue -> A) (opd : dvalue -> A) (uv : uvalue) : A :=
+  let ma := dv <- concretize uv ;; ret (opd dv)
+  in match ma with
+     | inl e => opu uv
+     | inr a => a
+     end.
+
+(* TODO: define [refines : uvalue -> dvalue -> Prop] which characterizes the nondeterminism of undef values *)
+
 Section hiding_notation.
   Import ShowNotation.
   Local Open Scope show_scope.
 
   Fixpoint show_dvalue' (dv:dvalue) : showM :=
-    match dv with 
+    match dv with
     | DVALUE_Addr a => "address" (* TODO: insist that memory models can print addresses? *)
     | DVALUE_I1 x => "dvalue(i1)"
     | DVALUE_I8 x => "dvalue(i8)"
@@ -109,7 +276,6 @@ Section hiding_notation.
     | DVALUE_I64 x => "dvalue(i64)"
     | DVALUE_Double x => "dvalue(double)"
     | DVALUE_Float x => "dvalue(float)"
-    | DVALUE_Undef => "undef"   
     | DVALUE_Poison => "poison"
     | DVALUE_None => "none"
     | DVALUE_Struct fields
@@ -119,9 +285,9 @@ Section hiding_notation.
     | DVALUE_Array elts
       => ("[" << iter_show (List.map (fun x => (show_dvalue' x) << ",") elts) << "]")
     | DVALUE_Vector elts
-      => ("<" << iter_show (List.map (fun x => (show_dvalue' x) << ",") elts) << ">")                  
+      => ("<" << iter_show (List.map (fun x => (show_dvalue' x) << ",") elts) << ">")
     end%string.
-  
+
   Global Instance show_dvalue : Show dvalue := show_dvalue'.
 
 End hiding_notation.
@@ -133,7 +299,8 @@ Ltac dec_dvalue :=
   | [ |- { ?X = ?X } + { ?X <> ?X } ] => left; reflexivity
   | [ |- { ?X = ?Y } + { ?X <> ?Y } ] => right; intros H; inversion H
   end.
-                                                               
+
+
 Section DecidableEquality.
 
   Fixpoint dvalue_eqb (d1 d2:dvalue) : bool :=
@@ -142,18 +309,17 @@ Section DecidableEquality.
     | DVALUE_Addr a1, DVALUE_Addr a2 =>
       if A.eq_dec a1 a2 then true else false
     | DVALUE_I1 x1, DVALUE_I1 x2 =>
-      if Int1.eq_dec x1 x2 then true else false 
+      if Int1.eq_dec x1 x2 then true else false
     | DVALUE_I8 x1, DVALUE_I8 x2 =>
-      if Int8.eq_dec x1 x2 then true else false 
+      if Int8.eq_dec x1 x2 then true else false
     | DVALUE_I32 x1, DVALUE_I32 x2 =>
-      if Int32.eq_dec x1 x2 then true else false 
+      if Int32.eq_dec x1 x2 then true else false
     | DVALUE_I64 x1, DVALUE_I64 x2 =>
-      if Int64.eq_dec x1 x2 then true else false 
+      if Int64.eq_dec x1 x2 then true else false
     | DVALUE_Double x1, DVALUE_Double x2 =>
       if Float.eq_dec x1 x2 then true else false
     | DVALUE_Float x1, DVALUE_Float x2 =>
       if Float32.eq_dec x1 x2 then true else false
-    | DVALUE_Undef, DVALUE_Undef => true
     | DVALUE_Poison, DVALUE_Poison => true
     | DVALUE_None, DVALUE_None => true
     | DVALUE_Struct f1, DVALUE_Struct f2 =>
@@ -166,7 +332,7 @@ Section DecidableEquality.
       lsteq f1 f2
     | _, _ => false
     end.
-  
+
 
   Lemma dvalue_eq_dec : forall (d1 d2:dvalue), {d1 = d2} + {d1 <> d2}.
     refine (fix f d1 d2 :=
@@ -179,7 +345,6 @@ Section DecidableEquality.
     | DVALUE_I64 x1, DVALUE_I64 x2 => _
     | DVALUE_Double x1, DVALUE_Double x2 => _
     | DVALUE_Float x1, DVALUE_Float x2 => _
-    | DVALUE_Undef, DVALUE_Undef => _
     | DVALUE_Poison, DVALUE_Poison => _
     | DVALUE_None, DVALUE_None => _
     | DVALUE_Struct f1, DVALUE_Struct f2 => _
@@ -222,7 +387,7 @@ Section DecidableEquality.
       * left; subst; reflexivity.
       * right; intros H; inversion H. contradiction.
   Qed.
-  
+
   Global Instance eq_dec_dvalue : RelDec (@eq dvalue) := RelDec_from_dec (@eq dvalue) (@dvalue_eq_dec).
   Global Instance eqv_dvalue : Eqv dvalue := (@eq dvalue).
   Hint Unfold eqv_dvalue.
@@ -261,13 +426,6 @@ Definition is_DVALUE_I64 (d:dvalue) : bool :=
 
 Definition is_DVALUE_IX (d:dvalue) : bool :=
   is_DVALUE_I1 d || is_DVALUE_I8 d || is_DVALUE_I32 d || is_DVALUE_I64 d.
-
-
-Definition undef_i1  := DVALUE_Undef.
-Definition undef_i8  := DVALUE_Undef.
-Definition undef_i32 := DVALUE_Undef.
-Definition undef_i64 := DVALUE_Undef.
-Definition undef_int := DVALUE_Undef.
 
 
 Class VInt I : Type :=
@@ -333,7 +491,7 @@ Class VInt I : Type :=
 
     (* Constants *)
     zero := Int1.zero;
-    one := Int1.one;    
+    one := Int1.one;
 
     (* Arithmetic *)
     add := Int1.add;
@@ -365,7 +523,7 @@ Class VInt I : Type :=
     (* Bounds *)
     min_signed := Int1.min_signed;
     max_signed := Int1.max_signed;
-    
+
     (* Conversion *)
     to_dvalue := DVALUE_I1;
     unsigned := Int1.unsigned;
@@ -386,7 +544,7 @@ Class VInt I : Type :=
 
     (* Constants *)
     zero := Int8.zero;
-    one := Int8.one;    
+    one := Int8.one;
 
     (* Arithmetic *)
     add := Int8.add;
@@ -418,7 +576,7 @@ Class VInt I : Type :=
     (* Bounds *)
     min_signed := Int8.min_signed;
     max_signed := Int8.max_signed;
-    
+
     (* Conversion *)
     to_dvalue := DVALUE_I8;
     unsigned := Int8.unsigned;
@@ -439,7 +597,7 @@ Class VInt I : Type :=
 
     (* Constants *)
     zero := Int32.zero;
-    one := Int32.one;    
+    one := Int32.one;
 
     (* Arithmetic *)
     add := Int32.add;
@@ -471,7 +629,7 @@ Class VInt I : Type :=
     (* Bounds *)
     min_signed := Int32.min_signed;
     max_signed := Int32.max_signed;
-    
+
     (* Conversion *)
     to_dvalue := DVALUE_I32;
     unsigned := Int32.unsigned;
@@ -523,7 +681,7 @@ Class VInt I : Type :=
     (* Bounds *)
     min_signed := Int64.min_signed;
     max_signed := Int64.max_signed;
-    
+
     (* Conversion *)
     to_dvalue := DVALUE_I64;
     unsigned := Int64.unsigned;
@@ -532,10 +690,16 @@ Class VInt I : Type :=
     repr := Int64.repr;
   }.
 
+  Definition undef_i1  := UVALUE_Undef (DTYPE_I 1).
+  Definition undef_i8  := UVALUE_Undef (DTYPE_I 8).
+  Definition undef_i32 := UVALUE_Undef (DTYPE_I 32).
+  Definition undef_i64 := UVALUE_Undef (DTYPE_I 64).
+  Definition undef_int {Int} `{VInt Int}  := UVALUE_Undef (DTYPE_I (Z.of_nat bitwidth)).
+
+  Definition to_uvalue {Int} `{VInt Int} (i : Int) : uvalue := dvalue_to_uvalue (to_dvalue i).
 
   (* Arithmetic Operations ---------------------------------------------------- *)
   Section ARITHMETIC.
-
 
   (* Evaluate integer opererations to get a dvalue.
 
@@ -543,101 +707,105 @@ Class VInt I : Type :=
      integers. This is a typeclass that wraps all of the integer
      operations that we use for integer types with different bitwidths.
    *)
-  (* SAZ: This needs to move into: [itree (UndefinedBehaviorE +' UndefE) dvalue]  *)
-  Definition eval_int_op {Int} `{VInt Int} (iop:ibinop) (x y: Int) : dvalue:=
+  Definition eval_int_op {Int} `{VInt Int} (iop:ibinop) (x y: Int) : itree UndefinedBehaviourE dvalue :=
     match iop with
     (* Following to cases are probably right since they use CompCert *)
     | Add nuw nsw =>
-      if orb (andb nuw (eq (add_carry x y zero) one))
-             (andb nsw (eq (add_overflow x y zero) one))
-      then DVALUE_Poison else to_dvalue (add x y)
+      ret (if orb (andb nuw (eq (add_carry x y zero) one))
+                  (andb nsw (eq (add_overflow x y zero) one))
+           then DVALUE_Poison else to_dvalue (add x y))
+
     | Sub nuw nsw =>
-      if orb (andb nuw (eq (sub_borrow x y zero) one))
-             (andb nsw (eq (sub_overflow x y zero) one))
-      then DVALUE_Poison else to_dvalue (sub x y)
+      ret (if orb (andb nuw (eq (sub_borrow x y zero) one))
+                  (andb nsw (eq (sub_overflow x y zero) one))
+           then DVALUE_Poison else to_dvalue (sub x y))
 
     | Mul nuw nsw =>
       (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
-      if (bitwidth ~=? 1)%nat then to_dvalue (mul x y)
-      else 
+      if (bitwidth ~=? 1)%nat then ret (to_dvalue (mul x y))
+      else
         let res := mul x y in
         let res_s' := (signed x) * (signed y) in
         if orb (andb nuw ((unsigned x) * (unsigned y) >?
                       unsigned res))
              (andb nsw (orb (min_signed >? res_s')
                             (res_s' >? max_signed)))
-      then DVALUE_Poison else to_dvalue res
+      then ret DVALUE_Poison else ret (to_dvalue res)
   
     | Shl nuw nsw =>
-      if (bitwidth ~=? 1)%nat
-      then
-        if (unsigned y) >=? 1 then undef_int else to_dvalue x
-      else
-        let bz := Z.of_nat bitwidth in
-        let res := shl x y in
-        let res_u := unsigned res in
-        let res_u' := Z.shiftl (unsigned x) (unsigned y) in
-        (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
+      let bz := Z.of_nat bitwidth in
+      let res := shl x y in
+      let res_u := unsigned res in
+      let res_u' := Z.shiftl (unsigned x) (unsigned y) in
+      (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
          then there is overflow. *)
-        if (unsigned y) >=? bz then undef_int
-        else if orb (andb nuw (res_u' >? res_u))
-                    (andb nsw (negb (Z.shiftr (unsigned x)
-                                              (bz - unsigned y)
-                                     =? (unsigned (negative res))
-                                        * (Z.pow 2 (unsigned y) - 1))))
-             then DVALUE_Poison else to_dvalue res
+      if (unsigned y) >=? bz then ret DVALUE_Poison
+      else if orb (andb nuw (res_u' >? res_u))
+                  (andb nsw (negb (Z.shiftr (unsigned x)
+                                            (bz - unsigned y)
+                                   =? (unsigned (negative res))
+                                      * (Z.pow 2 (unsigned y) - 1))))
+           then ret DVALUE_Poison else ret (to_dvalue res)
+
     | UDiv ex =>
-      if andb ex (negb ((unsigned x) mod (unsigned y) =? 0))
-      then DVALUE_Poison else to_dvalue (divu x y)
+      if (unsigned y =? 0)
+      then raiseUB "Unsigned division by 0."
+      else if andb ex (negb ((unsigned x) mod (unsigned y) =? 0))
+           then ret DVALUE_Poison
+           else ret (to_dvalue (divu x y))
+
     | SDiv ex =>
       (* What does signed i1 mean? *)
-      if andb ex (negb (((signed x) mod (signed y)) =? 0))
-      then DVALUE_Poison else to_dvalue (divs x y)
+      if (signed y =? 0)
+      then raiseUB "Signed division by 0."
+      else if andb ex (negb ((signed x) mod (signed y) =? 0))
+           then ret DVALUE_Poison
+           else ret (to_dvalue (divs x y))
+
     | LShr ex =>
-      if (bitwidth ~=? 1)%nat
-      then
-        if (unsigned y) >=? 1 then undef_int else to_dvalue x
-      else
-        let bz := Z.of_nat bitwidth in
-        if (unsigned y) >=? bz then undef_int
-        else if andb ex (negb ((unsigned x)
-                                 mod (Z.pow 2 (unsigned y)) =? 0))
-             then DVALUE_Poison else to_dvalue (shru x y)
+      let bz := Z.of_nat bitwidth in
+      if (unsigned y) >=? bz then ret DVALUE_Poison
+      else if andb ex (negb ((unsigned x)
+                               mod (Z.pow 2 (unsigned y)) =? 0))
+           then ret DVALUE_Poison else ret (to_dvalue (shru x y))
+
     | AShr ex =>
-      if (bitwidth ~=? 1)%nat
-      then
-        if (unsigned y) >=? 1 then undef_int else to_dvalue x
-      else
-        let bz := Z.of_nat bitwidth in
-        if (unsigned y) >=? bz then undef_int
-        else if andb ex (negb ((unsigned x)
-                                 mod (Z.pow 2 (unsigned y)) =? 0))
-             then DVALUE_Poison else to_dvalue (shr x y)
+      let bz := Z.of_nat bitwidth in
+      if (unsigned y) >=? bz then ret DVALUE_Poison
+      else if andb ex (negb ((unsigned x)
+                               mod (Z.pow 2 (unsigned y)) =? 0))
+           then ret DVALUE_Poison else ret (to_dvalue (shr x y))
 
     | URem =>
-      to_dvalue (modu x y)
+      if unsigned y =? 0
+      then raiseUB "Unsigned mod 0."
+      else ret (to_dvalue (modu x y))
+
     | SRem =>
-      to_dvalue (mods x y)
+      if signed y =? 0
+      then raiseUB "Signed mod 0."
+      else ret (to_dvalue (mods x y))
+
     | And =>
-      to_dvalue (and x y)
+      ret (to_dvalue (and x y))
+
     | Or =>
-      to_dvalue (or x y)
+      ret (to_dvalue (or x y))
+
     | Xor =>
-      to_dvalue (xor x y)
+      ret (to_dvalue (xor x y))
     end.
   Arguments eval_int_op _ _ _ : simpl nomatch.
 
 
-  
-
   (* Evaluate the given iop on the given arguments according to the bitsize *)
-  Definition integer_op (bits:Z) (iop:ibinop) (x y:inttyp bits) : err dvalue :=
+  Definition integer_op (bits:Z) (iop:ibinop) (x y:inttyp bits) : itree (FailureE +' UndefinedBehaviourE) dvalue :=
     match bits, x, y with
-    | 1, x, y => ret (eval_int_op iop x y)
-    | 8, x, y => ret (eval_int_op iop x y)
-    | 32, x, y => ret (eval_int_op iop x y)
-    | 64, x, y => ret (eval_int_op iop x y)
-    | _, _, _ => failwith "unsupported bitsize"
+    | 1, x, y  => translate inr1 (eval_int_op iop x y)
+    | 8, x, y  => translate inr1 (eval_int_op iop x y)
+    | 32, x, y => translate inr1 (eval_int_op iop x y)
+    | 64, x, y => translate inr1 (eval_int_op iop x y)
+    | _, _, _  => raise "unsupported bitsize"
     end.
   Arguments integer_op _ _ _ _ : simpl nomatch.
 
@@ -645,37 +813,70 @@ Class VInt I : Type :=
      Takes the integer modulo 2^bits. *)
   Definition coerce_integer_to_int (bits:Z) (i:Z) : err dvalue :=
     match bits with
-    | 1 => ret (DVALUE_I1 (repr i))
-    | 8 => ret (DVALUE_I8 (repr i))
+    | 1  => ret (DVALUE_I1 (repr i))
+    | 8  => ret (DVALUE_I8 (repr i))
     | 32 => ret (DVALUE_I32 (repr i))
     | 64 => ret (DVALUE_I64 (repr i))
-    | _ => failwith "unsupported integer size"
+    | _  => failwith "unsupported integer size"
     end.
   Arguments coerce_integer_to_int _ _ : simpl nomatch.
 
   (* Helper for looping 2 argument evaluation over vectors, producing a vector *)
 
-  Fixpoint vec_loop (f:dvalue -> dvalue -> err dvalue) (elts:list (dvalue * dvalue)) : err (list dvalue) :=
+  Definition vec_loop {A : Type} {M : Type -> Type} `{Monad M}
+             (f : A -> A -> M A)
+             (elts : list (A * A)) : M (list A) :=
     monad_fold_right (fun acc '(e1, e2) =>
-                         val <- f e1 e2 ;;
-                         ret (val :: acc)
-                       ) elts [].
+                        val <- f e1 e2 ;;
+                        ret (val :: acc)
+                     ) elts [].
 
 
   (* Integer iop evaluation, called from eval_iop.
      Here the values must be integers. Helper defined
      in order to prevent eval_iop from being recursive. *)
   (* CB TODO: Should this do anything for undef? *)
-  Definition eval_iop_integer_h iop v1 v2 : err dvalue :=
+
+  (*
+    match iop with
+    | UDiv ex =>
+      if (unsigned y =? 0)
+      then raiseUB "Unsigned division by 0."
+      else if andb ex (negb ((unsigned x) mod (unsigned y) =? 0))
+           then ret DVALUE_Poison
+           else ret (to_dvalue (divu x y))
+
+    | SDiv ex =>
+      (* What does signed i1 mean? *)
+      if (signed y =? 0)
+      then raiseUB "Signed division by 0."
+      else if andb ex (negb ((signed x) mod (signed y) =? 0))
+           then ret DVALUE_Poison
+           else ret (to_dvalue (divs x y))
+
+    | URem =>
+      if unsigned y =? 0
+      then raiseUB "Unsigned mod 0."
+      else ret (to_dvalue (modu x y))
+
+    | SRem =>
+      if signed y =? 0
+      then raiseUB "Signed mod 0."
+      else ret (to_dvalue (mods x y))
+    | _ =>
+ *)
+
+
+  (* TODO: make work with undef ??? Maybe this is all dvalues? *)
+  Definition eval_iop_integer_h iop v1 v2 : itree (FailureE +' UndefinedBehaviourE) dvalue :=
     match v1, v2 with
-    | DVALUE_I1 i1, DVALUE_I1 i2 => ret (eval_int_op iop i1 i2)
-    | DVALUE_I8 i1, DVALUE_I8 i2 => ret (eval_int_op iop i1 i2)
-    | DVALUE_I32 i1, DVALUE_I32 i2 => ret (eval_int_op iop i1 i2)
-    | DVALUE_I64 i1, DVALUE_I64 i2 => ret (eval_int_op iop i1 i2)
-    | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
-    | DVALUE_Poison, _ => if is_DVALUE_IX v2 then ret DVALUE_Poison else failwith "ill_typed-iop"
-    | _, DVALUE_Poison => if is_DVALUE_IX v1 then ret DVALUE_Poison else failwith "ill_typed-iop"
-    | _, _ => failwith "ill_typed-iop"
+    | DVALUE_I1 i1, DVALUE_I1 i2    => translate inr1 (eval_int_op iop i1 i2)
+    | DVALUE_I8 i1, DVALUE_I8 i2    => translate inr1 (eval_int_op iop i1 i2)
+    | DVALUE_I32 i1, DVALUE_I32 i2  => translate inr1 (eval_int_op iop i1 i2)
+    | DVALUE_I64 i1, DVALUE_I64 i2  => translate inr1 (eval_int_op iop i1 i2)
+    | DVALUE_Poison, _              => ret DVALUE_Poison
+    | _, DVALUE_Poison              => ret DVALUE_Poison
+    | _, _                          => raise "ill_typed-iop"
     end.
   Arguments eval_iop_integer_h _ _ _ : simpl nomatch.
 
@@ -689,9 +890,10 @@ Class VInt I : Type :=
 
        - this should use the inclusion of dvalue into uvalue in the case that
          eval_iop_integer_h is calle
- 
+
    *)
-  Definition eval_iop iop v1 v2 : err dvalue :=
+
+  Definition eval_iop iop v1 v2 : itree (FailureE +' UndefinedBehaviourE) dvalue :=
     match v1, v2 with
     | (DVALUE_Vector elts1), (DVALUE_Vector elts2) =>
       val <- vec_loop (eval_iop_integer_h iop) (List.combine elts1 elts2) ;;
@@ -731,34 +933,35 @@ Class VInt I : Type :=
   Arguments eval_icmp _ _ _ : simpl nomatch.
 
 
-  Definition double_op (fop:fbinop) (v1:ll_double) (v2:ll_double) : err dvalue :=
+  Definition double_op (fop:fbinop) (v1:ll_double) (v2:ll_double) : itree (FailureE +' UndefinedBehaviourE) dvalue :=
     match fop with
     | FAdd => ret (DVALUE_Double (Float.add v1 v2))
     | FSub => ret (DVALUE_Double (Float.sub v1 v2))
     | FMul => ret (DVALUE_Double (Float.mul v1 v2))
-    | FDiv => ret (DVALUE_Double (Float.div v1 v2))
-    | FRem => failwith "unimplemented"
+    | FDiv => if (Float.eq_dec v2 Float.zero)
+              then raiseUB "Signed division by 0."
+              else ret (DVALUE_Double (Float.div v1 v2))
+    | FRem => raise "unimplemented double operation"
     end.
 
-  Definition float_op (fop:fbinop) (v1:ll_float) (v2:ll_float) : err dvalue :=
+  Definition float_op (fop:fbinop) (v1:ll_float) (v2:ll_float) : itree (FailureE +' UndefinedBehaviourE) dvalue :=
     match fop with
     | FAdd => ret (DVALUE_Float (Float32.add v1 v2))
     | FSub => ret (DVALUE_Float (Float32.sub v1 v2))
     | FMul => ret (DVALUE_Float (Float32.mul v1 v2))
-    | FDiv => ret (DVALUE_Float (Float32.div v1 v2))
-    | FRem => failwith "unimplemented"
+    | FDiv => if (Float32.eq_dec v2 Float32.zero)
+              then raiseUB "Signed division by 0."
+              else ret (DVALUE_Float (Float32.div v1 v2))
+    | FRem => raise "unimplemented float operation"
     end.
 
-  Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : err dvalue :=
+  Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : itree (FailureE +' UndefinedBehaviourE) dvalue :=
     match v1, v2 with
-    | DVALUE_Float f1, DVALUE_Float f2 => float_op fop f1 f2
+    | DVALUE_Float f1, DVALUE_Float f2   => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
-    | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
-    | DVALUE_Poison, DVALUE_Double _ => ret DVALUE_Poison
-    | DVALUE_Poison, DVALUE_Float _ => ret DVALUE_Poison
-    | DVALUE_Double _, DVALUE_Poison => ret DVALUE_Poison
-    | DVALUE_Float _, DVALUE_Poison => ret DVALUE_Poison
-    | _, _ => failwith ("ill_typed-fop: " ++ (to_string fop) ++ " " ++ (to_string v1) ++ " " ++ (to_string v2))
+    | DVALUE_Poison, _                   => ret DVALUE_Poison
+    | _, DVALUE_Poison                   => ret DVALUE_Poison
+    | _, _                               => raise ("ill_typed-fop: " ++ (to_string fop) ++ " " ++ (to_string v1) ++ " " ++ (to_string v2))
     end.
 
   Definition not_nan32 (f:ll_float) : bool :=
@@ -905,51 +1108,4 @@ Class VInt I : Type :=
 (*  ------------------------------------------------------------------------- *)
   (** TODO: Add [uvalue] *)
 
-
-(* The set of dynamic values manipulated by an LLVM program. *)
-Inductive uvalue : Set :=
-| UVALUE_Addr (a:A.addr)
-| UVALUE_I1 (x:int1)
-| UVALUE_I8 (x:int8)
-| UVALUE_I32 (x:int32)
-| UVALUE_I64 (x:int64)
-| UVALUE_Double (x:ll_double)
-| UVALUE_Float (x:ll_float)
-| UVALUE_Undef (t:dtyp)
-| UVALUE_Poison
-| UVALUE_None
-| UVALUE_Struct        (fields: list uvalue)
-| UVALUE_Packed_struct (fields: list uvalue)
-| UVALUE_Array         (elts: list uvalue)
-| UVALUE_Vector        (elts: list uvalue)
-| UVALUE_IBinop           (iop:ibinop) (v1:uvalue) (v2:uvalue)  
-| UVALUE_ICmp             (cmp:icmp)   (v1:uvalue) (v2:uvalue)
-| UVALUE_FBinop           (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
-| UVALUE_FCmp             (cmp:fcmp)   (v1:uvalue) (v2:uvalue)
-| UVALUE_Conversion       (conv:conversion_type) (v:uvalue) (t_to:dtyp)
-| UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue))
-| UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue)
-| UVALUE_InsertElement    (vec: uvalue) (elt:uvalue) (idx:uvalue)
-| UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
-| UVALUE_ExtractValue     (vec:uvalue) (idxs:list int)
-| UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list int)
-| UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue) 
-.
-
-
-Variant UndefE : Type -> Type :=
-| pick (u:uvalue) : UndefE dvalue.
-
-(* TODO: define the inclusion dvalue -> uvalue 
-     trivial inclusion
-*)
-
-(* TODO: define [is_defined : uvalue -> bool] 
-
-    returns true iff the uvalue contains no occurrence of UVALUE_Undef.
-*)
-
-(* TODO: define [refines : uvalue -> dvalue -> Prop] which characterizes the nondeterminism of undef values *)
-
-  
 End DVALUE.

@@ -291,7 +291,7 @@ Inductive wf_typ : list (ident * typ) -> typ -> Prop :=
     forall (defs : list (ident * typ)) (sz : int) (t : typ),
       sz >= 0 -> sized_typ defs t -> wf_typ defs t -> wf_typ defs (TYPE_Array sz t)
 
-(* Vectors of size 0 are not allowed, and elemnts must be of element_typ. *)
+(* Vectors of size 0 are not allowed, and elements must be of element_typ. *)
 | wf_typ_Vector :
     forall (defs : list (ident * typ)) (sz : int) (t : typ),
       sz > 0 -> element_typ t -> wf_typ defs t -> wf_typ defs (TYPE_Vector sz t)

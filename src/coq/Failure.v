@@ -1,3 +1,27 @@
+From Coq Require Import
+     String.
+
+From Vellvm Require Import
+     Error.
+
+From ITree Require Import
+     ITree
+     Events.Exception.
+
+(* Failures carry string *)
+Definition FailureE := exceptE string.
+
+Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
+  throw msg.
+
+Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m:err A) : itree E B :=
+  match m with
+  | inl x => throw x
+  | inr x => f x
+  end.
+
+
+(*
 Notation "'do' x <- m ;; f" := (lift_err (fun x => f) m)
                                 (at level 100, x ident, m at next level, right associativity).
 
@@ -38,3 +62,4 @@ Global Instance monad_exc_FailureE1E2 {E1 E2} : (MonadExc string (itree (E1 +' f
   catch := fun T m f => catch_FailureE1E2 f m ;
 }.
 
+*)

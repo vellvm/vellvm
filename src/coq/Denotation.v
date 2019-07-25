@@ -10,13 +10,15 @@
 
 From Coq Require Import
      ZArith List String 
-     FSets.FMapWeakList.
+     FSets.FMapWeakList
+     Bool.Bool.
 
 Require Import Integers Floats.
 
 From ExtLib Require Import
      Programming.Show
      Structures.Monads
+     Structures.Functor
      Eqv.
 
 
@@ -29,6 +31,7 @@ From Vellvm Require Import
      Util
      Error
      UndefinedBehaviour
+     Failure
      LLVMAst
      AstLib
      CFG
@@ -51,6 +54,7 @@ Set Contextual Implicit.
 Open Scope monad_scope.
 Open Scope string_scope.
 Open Scope Z_scope.
+
 
 (* YZ Ask Steve: why is LLVMEvents an argument to the functor rather than have Make(A) inside the module? *)
 Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
@@ -101,7 +105,82 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   *)
 
   (* The mutually recursive functions are tied together, interpreting away all internal calls*)
- 
+
+  (*
+  Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
+  | DVALUE_Addr_typ   : forall a, dvalue_has_dtyp (DVALUE_Addr a) DTYPE_Pointer
+  | DVALUE_I1_typ     : forall x, dvalue_has_dtyp (DVALUE_I1 x) (DTYPE_I 1)
+  | DVALUE_I8_typ     : forall x, dvalue_has_dtyp (DVALUE_I8 x) (DTYPE_I 8)
+  | DVALUE_I32_typ    : forall x, dvalue_has_dtyp (DVALUE_I32 x) (DTYPE_I 32)
+  | DVALUE_I64_typ    : forall x, dvalue_has_dtyp (DVALUE_I64 x) (DTYPE_I 64)
+  | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
+  | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
+  | DVALUE_Poison_typ : forall dt, dvalue_has_dtyp DVALUE_Poison dt
+  | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
+
+  | DVALUE_Struct_Nil : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
+  | DVALUE_Struct_Cons :
+      forall f dt fields dts,
+      dvalue_has_dtyp f dt ->
+      dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
+      dvalue_has_dtyp (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts))
+
+  | DVALUE_Packed_struct_Nil : dvalue_has_dtyp (DVALUE_Packed_struct []) (DTYPE_Packed_struct [])
+  | DVALUE_Packed_struct_Cons :
+      forall f dt fields dts,
+      dvalue_has_dtyp f dt ->
+      dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
+      dvalue_has_dtyp (DVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts))
+
+  | DVALUE_Array_typ : dvalue_has_dtyp (DVALUE_Array []) (DTYPE_
+
+| DTYPE_Array (sz:Z) (t:dtyp)
+
+          (elts: list dvalue)
+  | DVALUE_Vector        (elts: list dvalue)
+  .
+
+*)
+
+
+(*
+
+(* Arrays are only well formed if the size is >= 0, and the element type is sized. *)
+| wf_typ_Array :
+    forall (defs : list (ident * typ)) (sz : int) (t : typ),
+      sz >= 0 -> sized_typ defs t -> wf_typ defs t -> wf_typ defs (TYPE_Array sz t)
+
+(* Vectors of size 0 are not allowed, and elements must be of element_typ. *)
+| wf_typ_Vector :
+    forall (defs : list (ident * typ)) (sz : int) (t : typ),
+      sz > 0 -> element_typ t -> wf_typ defs t -> wf_typ defs (TYPE_Vector sz t)
+
+(* Any type identifier must exist in the environment.
+
+   Additionally the identifier must not occur anywhere in the type
+   that it refers to *unless* it is guarded by a pointer. *)
+| wf_typ_Identified :
+    forall (defs : list (ident * typ)) (id : ident),
+      (exists t, In (id, t) defs) ->
+      (forall (t : typ), In (id, t) defs -> guarded_typ id defs t) ->
+      (forall (t : typ), In (id, t) defs -> wf_typ defs t) ->
+      wf_typ defs (TYPE_Identified id)
+
+(* Fields of structure must be sized types *)
+| wf_typ_Struct :
+    forall (defs : list (ident * typ)) (fields : list typ),
+      (forall (f : typ), In f fields -> sized_typ defs f) ->
+      (forall (f : typ), In f fields -> wf_typ defs f) ->
+      wf_typ defs (TYPE_Struct fields)
+
+| wf_typ_Packed_struct :
+    forall (defs : list (ident * typ)) (fields : list typ),
+      (forall (f : typ), In f fields -> sized_typ defs f) ->
+      (forall (f : typ), In f fields -> wf_typ defs f) ->
+      wf_typ defs (TYPE_Packed_struct fields)
+
+*)
+
   Section CONVERSIONS.
     (* Conversions can't go into DynamicValues because Int2Ptr and Ptr2Int casts 
        generate memory effects. *)
@@ -323,10 +402,109 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
   End CONVERSIONS.
 
+
+  Inductive pickU : uvalue -> dvalue -> Prop :=
+  | Pick_UVALUE_Addr           : forall a, pickU (UVALUE_Addr a) (DVALUE_Addr a)
+  | Pick_UVALUE_I1             : forall x, pickU (UVALUE_I1 x) (DVALUE_I1 x)
+  | Pick_UVALUE_I8             : forall x, pickU (UVALUE_I8 x) (DVALUE_I8 x)
+  | Pick_UVALUE_I32            : forall x, pickU (UVALUE_I32 x) (DVALUE_I32 x)
+  | Pick_UVALUE_I64            : forall x, pickU (UVALUE_I64 x) (DVALUE_I64 x)
+  | Pick_UVALUE_Double         : forall x, pickU (UVALUE_Double x) (DVALUE_Double x)
+  | Pick_UVALUE_Float          : forall x, pickU (UVALUE_Float x) (DVALUE_Float x)
+  (* TODO: Do we want some kind of `has_type dv dt`? When working with well typed programs, should be able to recover, no? *)
+  | Pick_UVALUE_Undef          : forall dt dv, pickU (UVALUE_Undef dt) dv
+  | Pick_UVALUE_Poison         : pickU UVALUE_Poison DVALUE_Poison
+  | Pick_UVALUE_None           : pickU UVALUE_None DVALUE_None
+
+  | Pick_UVALUE_Struct_Nil     : pickU (UVALUE_Struct []) (DVALUE_Struct [])
+  | Pick_UVALUE_Struct_Cons    : forall u d us ds,
+      pickU u d ->
+      pickU (UVALUE_Struct us) (DVALUE_Struct ds) ->
+      pickU (UVALUE_Struct (u :: us)) (DVALUE_Struct (d :: ds))
+
+
+  | Pick_UVALUE_Packed_struct_Nil     : pickU (UVALUE_Packed_struct []) (DVALUE_Packed_struct [])
+  | Pick_UVALUE_Packed_struct_Cons    : forall u d us ds,
+      pickU u d ->
+      pickU (UVALUE_Packed_struct us) (DVALUE_Packed_struct ds) ->
+      pickU (UVALUE_Packed_struct (u :: us)) (DVALUE_Packed_struct (d :: ds))
+
+  | Pick_UVALUE_Array_Nil :
+      pickU (UVALUE_Array []) (DVALUE_Array [])
+
+  | Pick_UVALUE_Array_Cons : forall u d us ds,
+      pickU u d ->
+      pickU (UVALUE_Array us) (DVALUE_Array ds) ->
+      pickU (UVALUE_Array (u :: us)) (DVALUE_Array (d :: ds))
+
+  | Pick_UVALUE_Vector_Nil :
+      pickU (UVALUE_Vector []) (DVALUE_Vector [])
+
+  | Pick_UVALUE_Vector_Cons : forall u d us ds,
+      pickU u d ->
+      pickU (UVALUE_Vector us) (DVALUE_Vector ds) ->
+      pickU (UVALUE_Vector (u :: us)) (DVALUE_Vector (d :: ds))
+
+  | Pick_UVALUE_IBinop : forall iop uv1 dv1 uv2 dv2 res,
+      pickU uv1 dv1 ->
+      pickU uv2 dv2 ->
+      Val res = eval_iop iop dv1 dv2 ->
+      pickU (UVALUE_IBinop iop uv1 uv2) res
+
+  | Pick_UVALUE_ICmp : forall cmp uv1 dv1 uv2 dv2 res,
+      pickU uv1 dv1 ->
+      pickU uv2 dv2 ->
+      inr res = eval_icmp cmp dv1 dv2 ->
+      pickU (UVALUE_ICmp cmp uv1 uv2) res
+
+  | Pick_UVALUE_FBinop : forall fop fm uv1 dv1 uv2 dv2 res,
+      pickU uv1 dv1 ->
+      pickU uv2 dv2 ->
+      Val res = eval_fop fop dv1 dv2 ->
+      pickU (UVALUE_FBinop fop fm uv1 uv2) res
+
+  | Pick_UVALUE_FCmp : forall cmp uv1 dv1 uv2 dv2 res,
+      pickU uv1 dv1 ->
+      pickU uv2 dv2 ->
+      inr res = eval_fcmp cmp dv1 dv2 ->
+      pickU (UVALUE_FCmp cmp uv1 uv2) res.
+
+  | Pick_UVALUE_Conversion     : pickU (UVALUE_Conversion       _) (DVALUE_Conversion       _)
+  | Pick_UVALUE_GetElementPtr  : pickU (UVALUE_GetElementPtr    _) (DVALUE_GetElementPtr    _)
+  | Pick_UVALUE_ExtractElement : pickU (UVALUE_ExtractElement   _) (DVALUE_ExtractElement   _)
+  | Pick_UVALUE_InsertElement  : pickU (UVALUE_InsertElement    _) (DVALUE_InsertElement    _)
+  | Pick_UVALUE_ShuffleVector  : pickU (UVALUE_ShuffleVector    _) (DVALUE_ShuffleVector    _)
+  | Pick_UVALUE_ExtractValue   : pickU (UVALUE_ExtractValue     _) (DVALUE_ExtractValue     _)
+  | Pick_UVALUE_InsertValue    : pickU (UVALUE_InsertValue      _) (DVALUE_InsertValue      _)
+  | Pick_UVALUE_Select         : pickU (UVALUE_Select           _) (DVALUE_Select           _)
+  .
+
+  Definition eval_iop iop v1 v2 : itree (FailureE +' UndefinedBehaviourE) dvalue :=
+
+Inductive dtyp : Set :=
+| DTYPE_I (sz:Z)
+| DTYPE_Pointer
+| DTYPE_Void
+| DTYPE_Half
+| DTYPE_Float
+| DTYPE_Double
+| DTYPE_X86_fp80
+| DTYPE_Fp128
+| DTYPE_Ppc_fp128
+| DTYPE_Metadata
+| DTYPE_X86_mmx
+| DTYPE_Array (sz:Z) (t:dtyp)
+| DTYPE_Struct (fields:list dtyp)
+| DTYPE_Packed_struct (fields:list dtyp)
+| DTYPE_Opaque
+| DTYPE_Vector (sz:Z) (t:dtyp)     (* t must be integer, floating point, or pointer type *)
+.
+
+
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".
 
-  Definition lookup_id (i:ident) : LLVM lookup_E dvalue :=
+  Definition lookup_id (i:ident) : LLVM lookup_E uvalue :=
     match i with
     | ID_Global x => trigger (GlobalRead x)
     | ID_Local x  => trigger (LocalRead x)
@@ -346,9 +524,37 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
   Expressions are denoted as itrees that return a [dvalue].
  *)
-  
+
+  (* Instructions where division by 0 is UB *)
+  Definition iop_is_div (iop : ibinop) : bool :=
+    match iop with
+    | UDiv _ => true
+    | SDiv _ => true
+    | URem   => true
+    | SRem   => true
+    | _      => false
+    end.
+
+  Definition fop_is_div (fop : fbinop) : bool :=
+    match fop with
+    | FDiv => true
+    | FRem => true
+    | _    => false
+    end.
+
+  Definition dvalue_not_zero (dv : dvalue) : Prop :=
+    match dv with
+    | DVALUE_I1 x     => x = zero
+    | DVALUE_I8 x     => x = zero
+    | DVALUE_I32 x    => x = zero
+    | DVALUE_I64 x    => x = zero
+    | DVALUE_Double x => x = Float.zero
+    | DVALUE_Float x  => x = Float32.zero
+    | _               => False
+    end.
+
   Fixpoint denote_exp
-           (top:option dtyp) (o:exp dtyp) {struct o} : LLVM exp_E dvalue :=
+           (top:option dtyp) (o:exp dtyp) {struct o} : LLVM exp_E uvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
         in
         match o with
@@ -358,38 +564,38 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | EXP_Integer x =>
           match top with
           | None                => raise "denote_exp given untyped EXP_Integer"
-          | Some (DTYPE_I bits) => lift_err ret (coerce_integer_to_int bits x)
+          | Some (DTYPE_I bits) => lift_err ret (fmap dvalue_to_uvalue (coerce_integer_to_int bits x))
           | _                   => raise "bad type for constant int"
           end
 
         | EXP_Float x =>
           match top with
           | None              => raise "denote_exp given untyped EXP_Float"
-          | Some DTYPE_Float  => ret (DVALUE_Float (Float32.of_double x))
-          | Some DTYPE_Double => ret (DVALUE_Double x)
+          | Some DTYPE_Float  => ret (UVALUE_Float (Float32.of_double x))
+          | Some DTYPE_Double => ret (UVALUE_Double x)
           | _                 => raise "bad type for constant float"
           end
 
         | EXP_Hex x =>
           match top with
           | None              => raise "denote_exp given untyped EXP_Hex"
-          | Some DTYPE_Float  => ret (DVALUE_Float (Float32.of_double x))
-          | Some DTYPE_Double => ret (DVALUE_Double x)
+          | Some DTYPE_Float  => ret (UVALUE_Float (Float32.of_double x))
+          | Some DTYPE_Double => ret (UVALUE_Double x)
           | _                 => raise "bad type for constant hex float"
           end
 
         | EXP_Bool b =>
           match b with
-          | true  => ret (DVALUE_I1 one)
-          | false => ret (DVALUE_I1 zero)
+          | true  => ret (UVALUE_I1 one)
+          | false => ret (UVALUE_I1 zero)
           end
 
-        | EXP_Null => ret (DVALUE_Addr A.null)
+        | EXP_Null => ret (UVALUE_Addr A.null)
 
         | EXP_Zero_initializer =>
           match top with
           | None   => raise "denote_exp given untyped EXP_Zero_initializer"
-          | Some t => lift_err ret (dv_zero_initializer t)
+          | Some t => lift_err ret (fmap dvalue_to_uvalue (dv_zero_initializer t))
           end
 
         | EXP_Cstring s => raise "EXP_Cstring not yet implemented"
@@ -397,14 +603,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | EXP_Undef =>
           match top with
           | None   => raise "denote_exp given untyped EXP_Undef"
-          | Some t => ret DVALUE_Undef  (* TODO: use t for size? *)
+          | Some t => ret (UVALUE_Undef t)
           end
 
         (* Question: should we do any typechecking for aggregate types here? *)
         (* Option 1: do no typechecking: *)
         | EXP_Struct es =>
           vs <- map_monad eval_texp es ;;
-          ret (DVALUE_Struct vs)
+          ret (UVALUE_Struct vs)
 
         (* Option 2: do a little bit of typechecking *)
         | EXP_Packed_struct es =>
@@ -412,41 +618,66 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | None => raise "denote_exp given untyped EXP_Struct"
           | Some (DTYPE_Packed_struct _) =>
             vs <- map_monad eval_texp es ;;
-            ret (DVALUE_Packed_struct vs)
+            ret (UVALUE_Packed_struct vs)
           | _ => raise "bad type for VALUE_Packed_struct"
           end
 
         | EXP_Array es =>
           vs <- map_monad eval_texp es ;;
-          ret (DVALUE_Array vs)
+          ret (UVALUE_Array vs)
              
         | EXP_Vector es =>
           vs <- map_monad eval_texp es ;;
-          ret (DVALUE_Vector vs)
+          ret (UVALUE_Vector vs)
 
         | OP_IBinop iop dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          lift_err ret (eval_iop iop v1 v2)
+          if iop_is_div iop && negb (is_concrete v2)
+          then dv2 <- trigger (pick v2 dvalue_not_zero) ;;
+               concretize_binop2 (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
+                                 (fun v1 v2 => translate _failure_UB_to_ExpE 
+                                                      (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
+                                 v1 dv2
+          else concretize_binop (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
+                                (fun v1 v2 => translate _failure_UB_to_ExpE
+                                                     (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
+                                v1 v2
 
         | OP_ICmp cmp dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          lift_err ret (eval_icmp cmp v1 v2)
+          lift_err ret (concretize_binop (fun v1 v2 => ret (UVALUE_ICmp cmp v1 v2))
+                                         (fun v1 v2 => fmap dvalue_to_uvalue (eval_icmp cmp v1 v2))
+                                         v1 v2)
 
         | OP_FBinop fop fm dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          lift_err ret (eval_fop fop v1 v2)
+          if fop_is_div fop && negb (is_concrete v2)
+          then dv2 <- trigger (pick v2 dvalue_not_zero) ;;
+               concretize_binop2 (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
+                                 (fun v1 v2 => translate _failure_UB_to_ExpE 
+                                                      (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
+                                 v1 dv2
+          else concretize_binop (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
+                                (fun v1 v2 => translate _failure_UB_to_ExpE
+                                                     (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
+                                v1 v2
 
         | OP_FCmp fcmp dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          lift_err ret (eval_fcmp fcmp v1 v2)
+          lift_err ret (concretize_binop (fun v1 v2 => ret (UVALUE_FCmp fcmp v1 v2))
+                                         (fun v1 v2 => fmap dvalue_to_uvalue (eval_fcmp fcmp v1 v2))
+                                         v1 v2)
              
         | OP_Conversion conv dt1 op t2 =>
           v <- denote_exp (Some dt1) op ;;
-          translate conv_E_to_exp_E (eval_conv conv dt1 v t2)
+          concretize_uop (fun v => ret (UVALUE_Conversion conv v t2))
+                         (fun v => translate conv_E_to_exp_E
+                              (fmap dvalue_to_uvalue (eval_conv conv dt1 v t2)))
+                         v
 
         | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
           vptr <- denote_exp (Some dt2) ptrval ;;
