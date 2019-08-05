@@ -2,6 +2,18 @@ This file describe the design choices we are following in the way of handling
 the notions of undefined behavior and undefined values (i.e. poison and undef)
 that llvm supports.
 
+* Undefined behaviors
+  
+** List of cases triggering undefined behavior
+   
+*** Division (udiv/sdiv/urem/srem) by zero
+    In case of division by vector, raises UB if any element of the vector is zero (TODO)
+
+*** Division overflow (TODO)
+    Some corner case can cause (signed) division to overflow. For instance:
+    sdiv -2147483648 -1
+    Such cases are UB.
+
 * Poison
 
   The first notion of undefined value, _poison_, is treated as a (symbolic) specific dynamic value,
@@ -30,17 +42,28 @@ that llvm supports.
    %y = add i32 %x 0
    will not trigger a dynamic error. It should however be statically ruled out by a type checker.
  
-** What is the list of cases where poison triggers an undefined behaviour?
+** List of cases generating poison
 
- 
-*** Branching on poison is UB
-    See [denote_terminator]
-    Note: _select_ does NOT raise UB however, see [eval_select_h].
+*** Prohibited overflow marked by nuw/nsw flags (“No Unsigned Wrap” and “No Signed Wrap”)
+    Arithmetic operations (add/sub/mul) can be tagged to forbid wrapping on overflow, resulting in poison instead.
+    Bitwise operations (shl) use the same flags such that:
+    * nuw prohibits shifting non-zero bits
+    * nsw prohibits shifting bits disagreeing with the resultant's sign
 
-*** Store to a poisoned address is UB
-    See [denote_instr]
-*** Load from a poisoned address is UB
-    See [denote_instr]
+*** Prohibited rounding marked by the exact flag
+    Divisions over integers (udiv/sdiv) can be tagged to be enforced to have a null remainder
+    Bitwise operations (lshr,ashr) use the same flags leading to poison if any shifted out bit is
+    non-zero.
+
+*** Shifting by more bits than available   
+    When shifting (ashr/lshr/shl) op1 by op2, if op2 is equal to or larger than the number of bits of op1,
+    the operation results in poison.
+
+*** Wrongly indexed 'extractelement'
+
+*** Wrongly indexed 'insertelement'
+
+*** Prohibited out of bound getelementptr by the inbouds flag
 
 ** Select and poison
 
@@ -54,6 +77,19 @@ that llvm supports.
 ** Vectors and poison
 
    Considered pointwise, I think.
+
+** List of cases where poison triggers an undefined behavior
+
+*** Branching on poison is UB
+    See [denote_terminator]
+    Note: _select_ does NOT raise UB however, see [eval_select_h].
+
+*** Store to a poisoned address is UB
+    See [denote_instr]
+*** Load from a poisoned address is UB
+    See [denote_instr]
+
+
 
 * Undef
 

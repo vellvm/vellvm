@@ -402,104 +402,88 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
   End CONVERSIONS.
 
+  (* YZ: This need to be moved somewhere else *)
+  Inductive concretize : uvalue -> dvalue -> Prop :=
+  (* Concrete uvalue are contretized into their singleton *)
+  | Pick_concrete             : forall uv dv, uvalue_to_dvalue uv = inr dv -> concretize uv dv
 
-  Inductive pickU : uvalue -> dvalue -> Prop :=
-  | Pick_UVALUE_Addr           : forall a, pickU (UVALUE_Addr a) (DVALUE_Addr a)
-  | Pick_UVALUE_I1             : forall x, pickU (UVALUE_I1 x) (DVALUE_I1 x)
-  | Pick_UVALUE_I8             : forall x, pickU (UVALUE_I8 x) (DVALUE_I8 x)
-  | Pick_UVALUE_I32            : forall x, pickU (UVALUE_I32 x) (DVALUE_I32 x)
-  | Pick_UVALUE_I64            : forall x, pickU (UVALUE_I64 x) (DVALUE_I64 x)
-  | Pick_UVALUE_Double         : forall x, pickU (UVALUE_Double x) (DVALUE_Double x)
-  | Pick_UVALUE_Float          : forall x, pickU (UVALUE_Float x) (DVALUE_Float x)
-  (* TODO: Do we want some kind of `has_type dv dt`? When working with well typed programs, should be able to recover, no? *)
-  | Pick_UVALUE_Undef          : forall dt dv, pickU (UVALUE_Undef dt) dv
-  | Pick_UVALUE_Poison         : pickU UVALUE_Poison DVALUE_Poison
-  | Pick_UVALUE_None           : pickU UVALUE_None DVALUE_None
+  (* Undef relates to all dvalue of the type *)
+  | Concretize_Undef          : forall dt dv, concretize (UVALUE_Undef dt) dv (* YZ: check that dv has type dt *)
 
-  | Pick_UVALUE_Struct_Nil     : pickU (UVALUE_Struct []) (DVALUE_Struct [])
-  | Pick_UVALUE_Struct_Cons    : forall u d us ds,
-      pickU u d ->
-      pickU (UVALUE_Struct us) (DVALUE_Struct ds) ->
-      pickU (UVALUE_Struct (u :: us)) (DVALUE_Struct (d :: ds))
+  (* The other operations proceed non-deterministically *)
+  | Concretize_IBinop : forall iop uv1 dv1 uv2 dv2 res,
+      concretize uv1 dv1 ->
+      concretize uv2 dv2 ->
+      eval_iop iop dv1 dv2 = ret res ->
+      concretize (UVALUE_IBinop iop uv1 uv2) res
+
+  | Concretize_ICmp : forall cmp uv1 dv1 uv2 dv2 res,
+      concretize uv1 dv1 ->
+      concretize uv2 dv2 ->
+      eval_icmp cmp dv1 dv2 = inr res  ->
+      concretize (UVALUE_ICmp cmp uv1 uv2) res
+
+  | Concretize_FBinop : forall fop fm uv1 dv1 uv2 dv2 res,
+      concretize uv1 dv1 ->
+      concretize uv2 dv2 ->
+      eval_fop fop dv1 dv2 = ret res ->
+      concretize (UVALUE_FBinop fop fm uv1 uv2) res
+
+  | Concretize_FCmp : forall cmp uv1 dv1 uv2 dv2 res,
+      concretize uv1 dv1 ->
+      concretize uv2 dv2 ->
+      eval_fcmp cmp dv1 dv2 = inr res ->
+      concretize (UVALUE_FCmp cmp uv1 uv2) res
+
+  | Concretize_Struct_Nil     : concretize (UVALUE_Struct []) (DVALUE_Struct [])
+  | Concretize_Struct_Cons    : forall u d us ds,
+      concretize u d ->
+      concretize (UVALUE_Struct us) (DVALUE_Struct ds) ->
+      concretize (UVALUE_Struct (u :: us)) (DVALUE_Struct (d :: ds))
 
 
-  | Pick_UVALUE_Packed_struct_Nil     : pickU (UVALUE_Packed_struct []) (DVALUE_Packed_struct [])
-  | Pick_UVALUE_Packed_struct_Cons    : forall u d us ds,
-      pickU u d ->
-      pickU (UVALUE_Packed_struct us) (DVALUE_Packed_struct ds) ->
-      pickU (UVALUE_Packed_struct (u :: us)) (DVALUE_Packed_struct (d :: ds))
+  | Concretize_Packed_struct_Nil     : concretize (UVALUE_Packed_struct []) (DVALUE_Packed_struct [])
+  | Concretize_Packed_struct_Cons    : forall u d us ds,
+      concretize u d ->
+      concretize (UVALUE_Packed_struct us) (DVALUE_Packed_struct ds) ->
+      concretize (UVALUE_Packed_struct (u :: us)) (DVALUE_Packed_struct (d :: ds))
 
-  | Pick_UVALUE_Array_Nil :
-      pickU (UVALUE_Array []) (DVALUE_Array [])
+  | Concretize_Array_Nil :
+      concretize (UVALUE_Array []) (DVALUE_Array [])
 
-  | Pick_UVALUE_Array_Cons : forall u d us ds,
-      pickU u d ->
-      pickU (UVALUE_Array us) (DVALUE_Array ds) ->
-      pickU (UVALUE_Array (u :: us)) (DVALUE_Array (d :: ds))
+  | Concretize_Array_Cons : forall u d us ds,
+      concretize u d ->
+      concretize (UVALUE_Array us) (DVALUE_Array ds) ->
+      concretize (UVALUE_Array (u :: us)) (DVALUE_Array (d :: ds))
 
-  | Pick_UVALUE_Vector_Nil :
-      pickU (UVALUE_Vector []) (DVALUE_Vector [])
+  | Concretize_Vector_Nil :
+      concretize (UVALUE_Vector []) (DVALUE_Vector [])
 
-  | Pick_UVALUE_Vector_Cons : forall u d us ds,
-      pickU u d ->
-      pickU (UVALUE_Vector us) (DVALUE_Vector ds) ->
-      pickU (UVALUE_Vector (u :: us)) (DVALUE_Vector (d :: ds))
-
-  | Pick_UVALUE_IBinop : forall iop uv1 dv1 uv2 dv2 res,
-      pickU uv1 dv1 ->
-      pickU uv2 dv2 ->
-      Val res = eval_iop iop dv1 dv2 ->
-      pickU (UVALUE_IBinop iop uv1 uv2) res
-
-  | Pick_UVALUE_ICmp : forall cmp uv1 dv1 uv2 dv2 res,
-      pickU uv1 dv1 ->
-      pickU uv2 dv2 ->
-      inr res = eval_icmp cmp dv1 dv2 ->
-      pickU (UVALUE_ICmp cmp uv1 uv2) res
-
-  | Pick_UVALUE_FBinop : forall fop fm uv1 dv1 uv2 dv2 res,
-      pickU uv1 dv1 ->
-      pickU uv2 dv2 ->
-      Val res = eval_fop fop dv1 dv2 ->
-      pickU (UVALUE_FBinop fop fm uv1 uv2) res
-
-  | Pick_UVALUE_FCmp : forall cmp uv1 dv1 uv2 dv2 res,
-      pickU uv1 dv1 ->
-      pickU uv2 dv2 ->
-      inr res = eval_fcmp cmp dv1 dv2 ->
-      pickU (UVALUE_FCmp cmp uv1 uv2) res.
-
-  | Pick_UVALUE_Conversion     : pickU (UVALUE_Conversion       _) (DVALUE_Conversion       _)
-  | Pick_UVALUE_GetElementPtr  : pickU (UVALUE_GetElementPtr    _) (DVALUE_GetElementPtr    _)
-  | Pick_UVALUE_ExtractElement : pickU (UVALUE_ExtractElement   _) (DVALUE_ExtractElement   _)
-  | Pick_UVALUE_InsertElement  : pickU (UVALUE_InsertElement    _) (DVALUE_InsertElement    _)
-  | Pick_UVALUE_ShuffleVector  : pickU (UVALUE_ShuffleVector    _) (DVALUE_ShuffleVector    _)
-  | Pick_UVALUE_ExtractValue   : pickU (UVALUE_ExtractValue     _) (DVALUE_ExtractValue     _)
-  | Pick_UVALUE_InsertValue    : pickU (UVALUE_InsertValue      _) (DVALUE_InsertValue      _)
-  | Pick_UVALUE_Select         : pickU (UVALUE_Select           _) (DVALUE_Select           _)
+  | Concretize_Vector_Cons : forall u d us ds,
+      concretize u d ->
+      concretize (UVALUE_Vector us) (DVALUE_Vector ds) ->
+      concretize (UVALUE_Vector (u :: us)) (DVALUE_Vector (d :: ds))
   .
 
-  Definition eval_iop iop v1 v2 : itree (FailureE +' UndefinedBehaviourE) dvalue :=
+  (*
+    YZ TODO: Note sure whether those can be uvalues, to figure out
+  | Concretize_Conversion     : pickU (UVALUE_Conversion       _) (DVALUE_Conversion       _)
+  | Concretize_GetElementPtr  : pickU (UVALUE_GetElementPtr    _) (DVALUE_GetElementPtr    _)
+  | Concretize_ExtractElement : pickU (UVALUE_ExtractElement   _) (DVALUE_ExtractElement   _)
+  | Concretize_InsertElement  : pickU (UVALUE_InsertElement    _) (DVALUE_InsertElement    _)
+  | Concretize_ShuffleVector  : pickU (UVALUE_ShuffleVector    _) (DVALUE_ShuffleVector    _)
+  | Concretize_ExtractValue   : pickU (UVALUE_ExtractValue     _) (DVALUE_ExtractValue     _)
+  | Concretize_InsertValue    : pickU (UVALUE_InsertValue      _) (DVALUE_InsertValue      _)
+  | Concretize_Select         : pickU (UVALUE_Select           _) (DVALUE_Select           _)
+  .
+   *)
 
-Inductive dtyp : Set :=
-| DTYPE_I (sz:Z)
-| DTYPE_Pointer
-| DTYPE_Void
-| DTYPE_Half
-| DTYPE_Float
-| DTYPE_Double
-| DTYPE_X86_fp80
-| DTYPE_Fp128
-| DTYPE_Ppc_fp128
-| DTYPE_Metadata
-| DTYPE_X86_mmx
-| DTYPE_Array (sz:Z) (t:dtyp)
-| DTYPE_Struct (fields:list dtyp)
-| DTYPE_Packed_struct (fields:list dtyp)
-| DTYPE_Opaque
-| DTYPE_Vector (sz:Z) (t:dtyp)     (* t must be integer, floating point, or pointer type *)
-.
-
+  (* YZ: This need to be moved somewhere else *)
+  (* YZ: TODO: better UB error message *)
+  (* YZ: TODO: rename UndefinedBehaviourE *)
+  Inductive Pick_handler: forall X, UndefE X -> (itree UndefinedBehaviourE X -> Prop) :=
+  | PickUB: forall uv C, ~ C -> Pick_handler (pick uv C) (raiseUB "Picking unsafe uvalue")
+  | PickD: forall uv (C: Prop) dv, C -> concretize uv dv -> Pick_handler (pick uv C) (ret dv).
 
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".

@@ -892,5 +892,3 @@ Fixpoint find_map {A B} (f : A -> option B) (l : list A) : option B :=
             end
   end.
 
-
-

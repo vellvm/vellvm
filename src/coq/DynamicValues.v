@@ -130,12 +130,15 @@ Inductive uvalue : Set :=
 | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
 .
 
-
+(* An event resolving the non-determinism induced by undef.
+   The argument _P_ is intended to be a predicate over the set
+   of dvalues _u_ can take such that if it is not satisfied, the
+   only possible execution is to raise _UB_.
+ *)
 Variant UndefE : Type -> Type :=
-  | pick (u:uvalue) (p : dvalue -> Prop) : UndefE dvalue.
+  | pick (u:uvalue) (P : Prop) : UndefE dvalue.
 
-
-
+(* Injection of [dvalue] into [uvalue] *)
 Fixpoint dvalue_to_uvalue (dv : dvalue) : uvalue :=
   match dv with
   | DVALUE_Addr a => UVALUE_Addr a
@@ -153,6 +156,7 @@ Fixpoint dvalue_to_uvalue (dv : dvalue) : uvalue :=
   | DVALUE_Vector elts => UVALUE_Vector (map dvalue_to_uvalue elts)
   end.
 
+(* Partial injection of [uvalue] into [dvalue] *)
 Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
   match uv with
   | UVALUE_Addr a                          => ret (DVALUE_Addr a)
@@ -162,7 +166,7 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
   | UVALUE_I64 x                           => ret (DVALUE_I64 x)
   | UVALUE_Double x                        => ret (DVALUE_Double x)
   | UVALUE_Float x                         => ret (DVALUE_Float x)
-  | UVALUE_Undef t                         => failwith "Converting undef to dvalue :("
+  | UVALUE_Undef t                         => failwith "Attempting to convert a non-defined uvalue to dvalue. The conversion should be guarded by is_concrete"
   | UVALUE_Poison                          => ret (DVALUE_Poison)
   | UVALUE_None                            => ret (DVALUE_None)
 
@@ -182,7 +186,11 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
     elts' <- map_monad uvalue_to_dvalue elts ;;
     ret (DVALUE_Vector elts')
 
-  | _ => failwith "unimplemented uvalue to dvalue conversion"
+  | _ => failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"
+                 (* YZ: likely useless to recurse: I think it should be an invariant that:
+                    1: We only call [uvalue_to_dvalue] on concrete [uvalue]s
+                    2: That concrete [uvalue] do not contain any operators, i.e. are already fully reduced
+                  *)
                  (* TODO: recursively convert dvalue to uvalue with evaluation*)
   (*
   | UVALUE_IBinop iop v1 v2                => ret (DVALUE_IBinop iop v1 v2)
@@ -200,9 +208,10 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
    *)
   end.
 
-Definition concretize := uvalue_to_dvalue.
-
 (* returns true iff the uvalue contains no occurrence of UVALUE_Undef. *)
+(* YZ: See my comment above. If I'm correct, then we should also fail on operators and hence have:
+   is_concrete uv = true <-> uvalue_to_dvalue uv = Some v
+ *)
 Fixpoint is_concrete (uv : uvalue) : bool :=
   match uv with
   | UVALUE_Addr a => true
@@ -219,43 +228,52 @@ Fixpoint is_concrete (uv : uvalue) : bool :=
   | UVALUE_Packed_struct fields => allb is_concrete fields
   | UVALUE_Array elts => allb is_concrete elts
   | UVALUE_Vector elts => allb is_concrete elts
-  | UVALUE_IBinop iop v1 v2 => allb is_concrete [v1 ; v2]
-  | UVALUE_ICmp cmp v1 v2 => allb is_concrete [v1 ; v2]
-  | UVALUE_FBinop fop fm v1 v2 => allb is_concrete [v1 ; v2]
-  | UVALUE_FCmp cmp v1 v2 => allb is_concrete [v1 ; v2]
-  | UVALUE_Conversion conv v t_to => is_concrete v
-  | UVALUE_GetElementPtr t ptrval idxs => allb is_concrete (ptrval :: idxs)
-  | UVALUE_ExtractElement vec idx => allb is_concrete [vec ; idx]
-  | UVALUE_InsertElement vec elt idx => allb is_concrete [vec ; elt ; idx]
-  | UVALUE_ShuffleVector vec1 vec2 idxmask => allb is_concrete [vec1 ; vec2 ; idxmask]
-  | UVALUE_ExtractValue vec idxs => is_concrete vec
-  | UVALUE_InsertValue vec elt idxs => allb is_concrete [vec ; elt]
-  | UVALUE_Select cnd v1 v2 => allb is_concrete [cnd ; v1 ; v2]
+  | _ => false
+  (* | UVALUE_IBinop iop v1 v2 => allb is_concrete [v1 ; v2] *)
+  (* | UVALUE_ICmp cmp v1 v2 => allb is_concrete [v1 ; v2] *)
+  (* | UVALUE_FBinop fop fm v1 v2 => allb is_concrete [v1 ; v2] *)
+  (* | UVALUE_FCmp cmp v1 v2 => allb is_concrete [v1 ; v2] *)
+  (* | UVALUE_Conversion conv v t_to => is_concrete v *)
+  (* | UVALUE_GetElementPtr t ptrval idxs => allb is_concrete (ptrval :: idxs) *)
+  (* | UVALUE_ExtractElement vec idx => allb is_concrete [vec ; idx] *)
+  (* | UVALUE_InsertElement vec elt idx => allb is_concrete [vec ; elt ; idx] *)
+  (* | UVALUE_ShuffleVector vec1 vec2 idxmask => allb is_concrete [vec1 ; vec2 ; idxmask] *)
+  (* | UVALUE_ExtractValue vec idxs => is_concrete vec *)
+  (* | UVALUE_InsertValue vec elt idxs => allb is_concrete [vec ; elt] *)
+  (* | UVALUE_Select cnd v1 v2 => allb is_concrete [cnd ; v1 ; v2] *)
   end.
 
+(* YZ: TODO: need a more general induction principle over uvalue to prove this due to Structs/Arrays/Vectors *)
+(*
+Lemma uvalue_to_dvalue_is_concrete: forall uv,
+    is_concrete uv = true <-> exists v, uvalue_to_dvalue uv = inr v.
+Proof.
+  induction uv; simpl; split; intros H;
+    first [easy | eexists; reflexivity  | destruct H; easy | idtac].
+*) 
 
-(* If both operands are concrete, concretize them and run them through
+(* If both operands are concrete, uvalue_to_dvalue them and run them through
    opd, else run the abstract ones through opu *)
-Definition concretize_binop {A : Type}
+Definition uvalue_to_dvalue_binop {A : Type}
            (opu : uvalue -> uvalue -> A) (opd : dvalue -> dvalue -> A) (uv1 uv2 : uvalue) : A :=
-  let ma := dv1 <- concretize uv1 ;; dv2 <- concretize uv2 ;; ret (opd dv1 dv2)
+  let ma := dv1 <- uvalue_to_dvalue uv1 ;; dv2 <- uvalue_to_dvalue uv2 ;; ret (opd dv1 dv2)
   in match ma with
      | inl e => opu uv1 uv2
      | inr a => a
      end.
 
-(* Like concretize_binop, but the second operand is already concrete *)
-Definition concretize_binop2 {A : Type}
+(* Like uvalue_to_dvalue_binop, but the second operand is already concrete *)
+Definition uvalue_to_dvalue_binop2 {A : Type}
            (opu : uvalue -> uvalue -> A) (opd : dvalue -> dvalue -> A) (uv1 : uvalue) (dv2 : dvalue) : A :=
-  let ma := dv1 <- concretize uv1 ;; ret (opd dv1 dv2)
+  let ma := dv1 <- uvalue_to_dvalue uv1 ;; ret (opd dv1 dv2)
   in match ma with
      | inl e => opu uv1 (dvalue_to_uvalue dv2)
      | inr a => a
      end.
 
-Definition concretize_uop {A : Type}
+Definition uvalue_to_dvalue_uop {A : Type}
            (opu : uvalue -> A) (opd : dvalue -> A) (uv : uvalue) : A :=
-  let ma := dv <- concretize uv ;; ret (opd dv)
+  let ma := dv <- uvalue_to_dvalue uv ;; ret (opd dv)
   in match ma with
      | inl e => opu uv
      | inr a => a
