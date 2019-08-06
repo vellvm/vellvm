@@ -6,10 +6,10 @@ that llvm supports.
   
 ** List of cases triggering undefined behavior
    
-*** Division (udiv/sdiv/urem/srem) by zero
-    In case of division by vector, raises UB if any element of the vector is zero (TODO)
+*** TODO Division (udiv/sdiv/urem/srem) by zero
+    In case of division by vector, raises UB if any element of the vector is zero
 
-*** Division overflow (TODO)
+*** TODO Division overflow
     Some corner case can cause (signed) division to overflow. For instance:
     sdiv -2147483648 -1
     Such cases are UB.
