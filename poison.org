@@ -196,7 +196,7 @@ that llvm supports.
   (WEIRDISH) indicates that it's not completely clear to me yet how to justify properly the transformation.
   (TODO) indicates that it quite clearly makes sense, but does not match our current development.
 
-** test0: mul (EQ)
+** test0: mul                                                            :EQ:
    ret i64 undef
    ⊑ 
    %r = mul i64 undef, undef
@@ -204,7 +204,7 @@ that llvm supports.
    
    This clearly makes sense, the set of traces are the same
 
-** test1: mul (EQ)
+** test1: mul                                                            :EQ:
    ret i64 undef
    ⊑
    %r = mul i64 3, undef
@@ -217,7 +217,7 @@ that llvm supports.
    and since no flag is provided to mul, then the only way for this to make sense is if 3*Z_64 ~~ Z_64.
    That would be true if 2^64 and 3 are relatively prime, which is true. So it still makes sense.
 
-** test2: mul (EQ) 
+** test2: mul                                                            :EQ:
    ret i64 undef 
    ⊑
    %r = mul i64 undef, 3
@@ -225,7 +225,7 @@ that llvm supports.
 
    No surprise here, rather reassuring that mul seems to commute.
 
-** test3: mul (INEQ)
+** test3: mul                                                          :INEQ:
    ret i64 0
    ⊑
    %r = mul i64 undef, 6
@@ -243,7 +243,7 @@ that llvm supports.
    the llvm compiler does, but if any logic still applies, refining the previous 
    examples by returning 0 would also have been _safe_.
 
-** test4: mul (INEQ)
+** test4: mul                                                          :INEQ:
    ret i64 0 
    ⊑
    %r = mul i64 6, undef
@@ -251,7 +251,7 @@ that llvm supports.
 
    The symmetric case, no surprise
 
-** test5: and (EQ)
+** test5: and                                                            :EQ:
    ret i64 undef
    ⊑ 
    and i64 undef, undef
@@ -259,7 +259,7 @@ that llvm supports.
 
    _and_ is a surjection from i64*i64 into i64, so it makes sense.
 
-** test6: or (EQ)
+** test6: or                                                             :EQ:
    ret i64 undef
    ⊑
    or i64 undef, undef
@@ -267,7 +267,7 @@ that llvm supports.
    
    Idem for _or_
 
-** test7: udiv (EQ)
+** test7: udiv                                                           :EQ:
    ret i64 undef
    ⊑
    udiv i64 undef, 1
@@ -275,7 +275,7 @@ that llvm supports.
 
    Seems about right.
 
-** test8: sdiv (EQ)
+** test8: sdiv                                                           :EQ:
    ret i64 undef
    ⊑
    sdiv i64 undef, 1
@@ -283,7 +283,7 @@ that llvm supports.
 
    Seems about right.
 
-** test9: urem (EQ)
+** test9: urem                                                           :EQ:
    ret i64 0
    ⊑
    urem i64 undef, 1
@@ -291,7 +291,7 @@ that llvm supports.
 
    Same, remainder by 1 is always 0.
 
-** test10: srem (EQ)
+** test10: srem                                                          :EQ:
    ret i64 0
    ⊑
    srem i64 undef, 1
@@ -299,7 +299,7 @@ that llvm supports.
 
    Same, remainder by 1 is always 0.
 
-** test11: shl (EQ?) (WEIRDISH)
+** test11: shl                                            :MAYBE_EQ:WEIRDISH:
    ret i64 undef
    ⊑
    shl i64 undef, undef
@@ -319,7 +319,7 @@ that llvm supports.
 
    TODO: more investigation
 
-** test11b: shl (EQ?) (WEIRDISH)
+** test11b: shl                                           :MAYBE_EQ:WEIRDISH:
    ret i64 undef
    ⊑
    shl i64 %a, undef
@@ -328,7 +328,7 @@ that llvm supports.
    %a is an argument to the function 
    See test11
 
-** test12: ashr (EQ?) (WEIRDISH)
+** test12: ashr                                           :MAYBE_EQ:WEIRDISH:
    ret i64 undef
    ⊑
    ashr i64 undef, undef
@@ -336,7 +336,7 @@ that llvm supports.
 
    See test11
 
-** test12b: ashr (EQ?) (WEIRDISH)
+** test12b: ashr                                          :MAYBE_EQ:WEIRDISH:
    ret i64 undef
    ⊑
    ashr i64 %a, undef
@@ -345,7 +345,7 @@ that llvm supports.
    %a is an argument to the function
    See test11
 
-** test13: lshr (EQ?) (WEIRDISH)
+** test13: lshr                                           :MAYBE_EQ:WEIRDISH:
    ret i64 undef
    ⊑
    lshr i64 undef, undef
@@ -353,13 +353,13 @@ that llvm supports.
 
    See test11
 
-** test13b: lshr (EQ?) (WEIRDISH)
+** test13b: lshr                                          :MAYBE_EQ:WEIRDISH:
    ret i64 undef ⊑ lshr i64 %a, undef; ret i64 %r
 
    %a is an argument to the function 
    See test11
 
-** test14: slt (EQ) 
+** test14: slt                                                           :EQ:
    ret i1 undef
    ⊑
    %r = icmp slt i64 undef, undef
@@ -367,7 +367,7 @@ that llvm supports.
    
    As usual, makes sense quite trivially with respect to the set inclusion, no information is lost. 
 
-** test15: ult (EQ)
+** test15: ult                                                           :EQ:
    ret i1 undef
    ⊑  
    %r = icmp ult i64 undef, undef
@@ -375,7 +375,7 @@ that llvm supports.
 
    As usual, makes sense quite trivially with respect to the set inclusion, no information is lost. 
 
-** test16: select (EQ)
+** test16: select                                                        :EQ:
    ret i64 undef
    ⊑
    %r = select i1 undef, i64 undef, i64 %a
@@ -386,7 +386,7 @@ that llvm supports.
    particular have the selector being true and hence any value in the left
    branch. Since evaluating %a is pure, we cannot have more.
 
-** test17: select (EQ)
+** test17: select                                                        :EQ:
    ret i64 undef 
    ⊑ 
    %r = select i1 undef, i64 %a, i64 undef
@@ -394,7 +394,7 @@ that llvm supports.
 
    Idem
 
-** test18: call (INEQ?) (UB?) (WEIRDISH)
+** test18: call                                :MAYBE_UB:MAYBE_INEQ:WEIRDISH:
    [[R:%.*]] = call i64 undef(i64 %a); ret i64 undef
    ⊑
    %r = call i64 (i64) undef(i64 %a)
@@ -411,7 +411,7 @@ that llvm supports.
 
    TODO: investigate further
 
-** test19: shl over vectors (EQ) (TODO)
+** TODO test19: shl over vectors                                  :EQ:
    ret <4 x i8> undef
    ⊑
    %b = shl <4 x i8> %a, <i8 8, i8 9, i8 undef, i8 -1>
@@ -420,7 +420,8 @@ that llvm supports.
    This emphasize that operations over vectors do not behave as maps of the semantics over the vector.
    Here a single undef legitimates the whole vector to be refined as undef.
 
-** test20: udiv (UB) (INEQ)
+** test20: udiv                                                     :UB:INEQ:
+
    ret i32 undef
    ⊑
    %b = udiv i32 %a, 0
@@ -428,7 +429,7 @@ that llvm supports.
 
    Division by 0 raises UB, hence everything goes.
 
-** test20vec: udiv over vectors (UB) (INEQ)
+** test20vec: udiv over vectors                                     :UB:INEQ:
    ret <2 x i32> undef
    ⊑
    %b = udiv <2 x i32> %a, zeroinitializer
@@ -436,7 +437,7 @@ that llvm supports.
 
    The situation is the same when it happens as part of a vector.
 
-** test21: sdiv (UB) (INEQ)
+** test21: sdiv                                                     :UB:INEQ:
    ret i32 undef
    ⊑
    %b = sdiv i32 %a, 0
@@ -444,7 +445,7 @@ that llvm supports.
 
    See test20
 
-** test21vec: sdiv over vectors (UB) (INEQ)
+** test21vec: sdiv over vectors                                     :UB:INEQ:
    ret <2 x i32> undef
    ⊑
    %b = sdiv <2 x i32> %a, zeroinitializer
@@ -452,7 +453,7 @@ that llvm supports.
 
    See test20vec
 
-** test22: ashr exact (INEQ?) (WEIRDISH)
+** test22: ashr exact                                   :MAYBE_INEQ:WEIRDISH:
    ret i32 undef
    ⊑
    %b = ashr exact i32 undef, %a
@@ -462,7 +463,7 @@ that llvm supports.
    I believe however that the 'exact' key word here is irrelevant since poison is already 
    raised when undef gets concretized into a value having less bits that %a.
 
-** test23: lshr exact (INEQ?) (WEIRDISH)
+** test23: lshr exact                                   :MAYBE_INEQ:WEIRDISH:
    ret i32 undef
    ⊑
    %b = lshr exact i32 undef, %a
@@ -470,7 +471,7 @@ that llvm supports.
 
    See test22
 
-** test24: udiv by 0 (UB)
+** test24: udiv by 0                                                     :UB:
    ret i32 undef
    ⊑
    %b = udiv i32 undef, 0
@@ -478,7 +479,7 @@ that llvm supports.
 
    Division by zero raises UB, anything goes, in particular they chose to return undef.
 
-** test25: lshr (INEQ?) (WEIRDISH)
+** test25: lshr                                         :MAYBE_INEQ:WEIRDISH:
    ret i32 undef
    ⊑
    %b = lshr i32 0, undef
@@ -487,7 +488,7 @@ that llvm supports.
    Similar to test11 and all the other shifts.
    All concretizations of undef lead to the shift returning poison. It gets refined into undef.
 
-** test26: ashr (INEQ?) (WEIRDISH)
+** test26: ashr                                         :MAYBE_INEQ:WEIRDISH:
    ret i32 undef
    ⊑
    %b = ashr i32 0, undef
@@ -495,7 +496,7 @@ that llvm supports.
 
    See test25
 
-** test28: shl (INEQ?) (WEIRDISH)
+** test28: shl                                          :MAYBE_INEQ:WEIRDISH:
    ret i32 undef
    ⊑
    %b = shl i32 0, undef
@@ -503,7 +504,7 @@ that llvm supports.
 
    See test25
 
-** test28: shl nsw (INEQ?) (WEIRDISH)
+** test28: shl nsw                                      :MAYBE_INEQ:WEIRDISH:
    ret i32 undef
    ⊑
    %b = shl nsw i32 undef, %a
@@ -511,7 +512,7 @@ that llvm supports.
 
    Similar to test25, the nsw flag leading to poison being emitted for some concretizations.
 
-** test29: shl nuw (INEQ?) (WEIRDISH)
+** test29: shl nuw                                      :MAYBE_INEQ:WEIRDISH:
    ret i32 undef
    ⊑
    %b = shl nuw i32 undef, %a
@@ -519,7 +520,7 @@ that llvm supports.
 
    Similar to test28.
 
-** test30: shl nsw nuw (INEQ?) (WEIRDISH)
+** test30: shl nsw nuw                                  :MAYBE_INEQ:WEIRDISH:
    ret i32 undef
    ⊑
    %b = shl nsw nuw i32 undef, %a
@@ -527,7 +528,7 @@ that llvm supports.
 
    Similar to test28.
 
-** test31: shl (INEQ) (SLIGHTLY WEIRDISH)
+** test31: shl                                       :INEQ:SLIGHTLY_WEIRDISH:
    ret i32 0
    ⊑
    %b = shl i32 undef, %a
@@ -541,7 +542,7 @@ that llvm supports.
    always concretizations leading to poison, then we would refine by undef, but since it depends
    on the argument, we cannot and give up?
 
-** test32: shl (EQ)
+** test32: shl                                                           :EQ:
    ret i32 undef
    ⊑
    %b = shl i32 undef, 0
@@ -549,7 +550,7 @@ that llvm supports.
 
    This one shl seems fairly innocent.
 
-** test33: ashr (EQ)
+** test33: ashr                                                          :EQ:
    ret i32 undef
    ⊑
    %b = ashr i32 undef, 0
@@ -557,7 +558,7 @@ that llvm supports.
 
    See test32
 
-** test34: lshr (EQ)
+** test34: lshr                                                          :EQ:
    ret i32 undef
    ⊑
    %b = lshr i32 undef, 0
@@ -565,7 +566,7 @@ that llvm supports.
 
    See test32
 
-** test35: extractelement (EQ?) (SLIGHTLY WEIRDISH)
+** test35: extractelement                        :MAYBE_EQ:SLIGHTLY_WEIRDISH:
    ret i32 undef
    ⊑
    %b = extractelement <4 x i32> %V, i32 4
@@ -573,7 +574,7 @@ that llvm supports.
 
    By extracting out of bound, we get poison, that we are now used to see refined into undef.
 
-** test36: extractelement (EQ?) (SLIGHTLY WEIRDISH)
+** test36: extractelement                        :MAYBE_EQ:SLIGHTLY_WEIRDISH:
    ret i32 undef
    ⊑
    %b = extractelement <4 x i32> undef, i32 %V
@@ -581,7 +582,7 @@ that llvm supports.
 
    Undef as the vector argument does not change anything.
 
-** test37: udiv (EQ?) (UB)
+** test37: udiv                                                 :MAYBE_EQ:UB:
    ret i32 undef
    ⊑
    %b = udiv i32 undef, undef
@@ -591,7 +592,7 @@ that llvm supports.
    Most likely: among all pairs of concretizations, some raise UB, hence the whole operation is UB,
    hence everything goes.
 
-** test38: udiv (EQ?) (UB)
+** test38: udiv                                                 :MAYBE_EQ:UB:
    ret i32 undef
    ⊑
    %b = udiv i32 %a, undef
@@ -599,7 +600,7 @@ that llvm supports.
 
    Idem, there's a UB concretization for any input.
 
-** test39: udiv (EQ?) (UB)
+** test39: udiv                                                 :MAYBE_EQ:UB:
    ret i32 undef
    ⊑
    %b = udiv i32 0, undef
