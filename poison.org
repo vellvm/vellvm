@@ -187,3 +187,422 @@ that llvm supports.
    Attempt to pick a value when undef is in a crucial place. Such places are:
 
    - divisor
+
+
+* The mysterious /InstSimplify/undef.ll test suite
+
+  (EQ) indicates when the inclusion is actually believed (by YZ at least) to be an equality, (INEQ) otherwise.
+  (UB) indicates that the justification for the optimization relies on undefined behaviors being raised in the source.
+  (WEIRDISH) indicates that it's not completely clear to me yet how to justify properly the transformation.
+  (TODO) indicates that it quite clearly makes sense, but does not match our current development.
+
+** test0: mul (EQ)
+   ret i64 undef
+   ⊑ 
+   %r = mul i64 undef, undef
+   ret i64 %r
+   
+   This clearly makes sense, the set of traces are the same
+
+** test1: mul (EQ)
+   ret i64 undef
+   ⊑
+   %r = mul i64 3, undef
+   ret i64 %r
+
+   Assuming that the returned value is observed (which seems fair), this suggests that 
+   returning _any_ i64 is a sound refinement to returning three times any i64.
+
+   If refinement is indeed defined as a trace inclusion even when it comes to undef,
+   and since no flag is provided to mul, then the only way for this to make sense is if 3*Z_64 ~~ Z_64.
+   That would be true if 2^64 and 3 are relatively prime, which is true. So it still makes sense.
+
+** test2: mul (EQ) 
+   ret i64 undef 
+   ⊑
+   %r = mul i64 undef, 3
+   ret i64 %r
+
+   No surprise here, rather reassuring that mul seems to commute.
+
+** test3: mul (INEQ)
+   ret i64 0
+   ⊑
+   %r = mul i64 undef, 6
+   ret i64 %r
+   
+   Things get slightly stranger here.
+   Returning six times any i64 can be refined into returning always 0.
+   This actually makes sense: for one, that's obviously sound with respect 
+   to the set inclusion interpretation, but also as opposed to 3, 6 is not 
+   relatively prime to 2^64.
+   So if in the previous case the general invariant %r contains undef could be
+   easily remembered, here it would require more work. LLVM seems to not want
+   to bother, and hence collapse the non-determinism.
+   However note that these tests illustrate what the specific implementation of 
+   the llvm compiler does, but if any logic still applies, refining the previous 
+   examples by returning 0 would also have been _safe_.
+
+** test4: mul (INEQ)
+   ret i64 0 
+   ⊑
+   %r = mul i64 6, undef
+   ret i64 %r
+
+   The symmetric case, no surprise
+
+** test5: and (EQ)
+   ret i64 undef
+   ⊑ 
+   and i64 undef, undef
+   ret i64 %r
+
+   _and_ is a surjection from i64*i64 into i64, so it makes sense.
+
+** test6: or (EQ)
+   ret i64 undef
+   ⊑
+   or i64 undef, undef
+   ret i64 %r
+   
+   Idem for _or_
+
+** test7: udiv (EQ)
+   ret i64 undef
+   ⊑
+   udiv i64 undef, 1
+   ret i64 %r
+
+   Seems about right.
+
+** test8: sdiv (EQ)
+   ret i64 undef
+   ⊑
+   sdiv i64 undef, 1
+   ret i64 %r
+
+   Seems about right.
+
+** test9: urem (EQ)
+   ret i64 0
+   ⊑
+   urem i64 undef, 1
+   ret i64 %r
+
+   Same, remainder by 1 is always 0.
+
+** test10: srem (EQ)
+   ret i64 0
+   ⊑
+   srem i64 undef, 1
+   ret i64 %r
+
+   Same, remainder by 1 is always 0.
+
+** test11: shl (EQ?) (WEIRDISH)
+   ret i64 undef
+   ⊑
+   shl i64 undef, undef
+   ret i64 %r
+   
+   This one is slightly puzzling.
+   It does seem to make sense to say that shifting any value by any width should be able to
+   lead to any value, and hence be refined into undef.
+   However, the former can also result in poison, that is not "contained" into undef.
+   The set inclusion interpretation hence seems broken here.
+   In particular, since LangRef clearly states:
+   "Call instructions depend on the ret instructions that dynamically transfer control back to them."
+   it should actually matter.
+
+   It might make sense as an overapproximation if we consider that a uvalue that is always defined 
+   but include poison concretizes into poison, that can be itself refined into undef.
+
+   TODO: more investigation
+
+** test11b: shl (EQ?) (WEIRDISH)
+   ret i64 undef
+   ⊑
+   shl i64 %a, undef
+   ret i64 %r
+
+   %a is an argument to the function 
+   See test11
+
+** test12: ashr (EQ?) (WEIRDISH)
+   ret i64 undef
+   ⊑
+   ashr i64 undef, undef
+   ret i64 %r
+
+   See test11
+
+** test12b: ashr (EQ?) (WEIRDISH)
+   ret i64 undef
+   ⊑
+   ashr i64 %a, undef
+   ret i64 %r
+
+   %a is an argument to the function
+   See test11
+
+** test13: lshr (EQ?) (WEIRDISH)
+   ret i64 undef
+   ⊑
+   lshr i64 undef, undef
+   ret i64 %r
+
+   See test11
+
+** test13b: lshr (EQ?) (WEIRDISH)
+   ret i64 undef ⊑ lshr i64 %a, undef; ret i64 %r
+
+   %a is an argument to the function 
+   See test11
+
+** test14: slt (EQ) 
+   ret i1 undef
+   ⊑
+   %r = icmp slt i64 undef, undef
+   ret i1 %r
+   
+   As usual, makes sense quite trivially with respect to the set inclusion, no information is lost. 
+
+** test15: ult (EQ)
+   ret i1 undef
+   ⊑  
+   %r = icmp ult i64 undef, undef
+   ret i1 %r
+
+   As usual, makes sense quite trivially with respect to the set inclusion, no information is lost. 
+
+** test16: select (EQ)
+   ret i64 undef
+   ⊑
+   %r = select i1 undef, i64 undef, i64 %a
+   ret i64 %r
+  
+   %a is an argument to the function 
+   Makes sense: among all inclusions we in
+   particular have the selector being true and hence any value in the left
+   branch. Since evaluating %a is pure, we cannot have more.
+
+** test17: select (EQ)
+   ret i64 undef 
+   ⊑ 
+   %r = select i1 undef, i64 %a, i64 undef
+   ret i64 %r
+
+   Idem
+
+** test18: call (INEQ?) (UB?) (WEIRDISH)
+   [[R:%.*]] = call i64 undef(i64 %a); ret i64 undef
+   ⊑
+   %r = call i64 (i64) undef(i64 %a)
+   ret i64 %r
+
+   If we call a function at the undef address, and return what it gives us back, we retain the call, but can
+   return undef instead.
+   This one is a bit more puzzling to justify:
+   - either it assumes something along the fact that there is somewhere 
+     a function returning any value over any argument, hence by set inclusion we are correct;
+   - or calling a function at an undef address is Undefined Behavior, hence anything goes from there 
+   (after the call), and for whatever reason they judged this transformation interesting to perform.
+   LangRef has literally nothing to say about this...
+
+   TODO: investigate further
+
+** test19: shl over vectors (EQ) (TODO)
+   ret <4 x i8> undef
+   ⊑
+   %b = shl <4 x i8> %a, <i8 8, i8 9, i8 undef, i8 -1>
+   ret <4 x i8> %b
+   
+   This emphasize that operations over vectors do not behave as maps of the semantics over the vector.
+   Here a single undef legitimates the whole vector to be refined as undef.
+
+** test20: udiv (UB) (INEQ)
+   ret i32 undef
+   ⊑
+   %b = udiv i32 %a, 0
+   ret i32 %b
+
+   Division by 0 raises UB, hence everything goes.
+
+** test20vec: udiv over vectors (UB) (INEQ)
+   ret <2 x i32> undef
+   ⊑
+   %b = udiv <2 x i32> %a, zeroinitializer
+   ret <2 x i32> %b
+
+   The situation is the same when it happens as part of a vector.
+
+** test21: sdiv (UB) (INEQ)
+   ret i32 undef
+   ⊑
+   %b = sdiv i32 %a, 0
+   ret i32 %b
+
+   See test20
+
+** test21vec: sdiv over vectors (UB) (INEQ)
+   ret <2 x i32> undef
+   ⊑
+   %b = sdiv <2 x i32> %a, zeroinitializer
+   ret <2 x i32> %b
+
+   See test20vec
+
+** test22: ashr exact (INEQ?) (WEIRDISH)
+   ret i32 undef
+   ⊑
+   %b = ashr exact i32 undef, %a
+   ret i32 %b 
+
+   Similar to test11 and all the other shifts, weird interaction between poison and undef. 
+   I believe however that the 'exact' key word here is irrelevant since poison is already 
+   raised when undef gets concretized into a value having less bits that %a.
+
+** test23: lshr exact (INEQ?) (WEIRDISH)
+   ret i32 undef
+   ⊑
+   %b = lshr exact i32 undef, %a
+   ret i32 %b 
+
+   See test22
+
+** test24: udiv by 0 (UB)
+   ret i32 undef
+   ⊑
+   %b = udiv i32 undef, 0
+   ret i32 %b
+
+   Division by zero raises UB, anything goes, in particular they chose to return undef.
+
+** test25: lshr (INEQ?) (WEIRDISH)
+   ret i32 undef
+   ⊑
+   %b = lshr i32 0, undef
+   ret i32 %b
+
+   Similar to test11 and all the other shifts.
+   All concretizations of undef lead to the shift returning poison. It gets refined into undef.
+
+** test26: ashr (INEQ?) (WEIRDISH)
+   ret i32 undef
+   ⊑
+   %b = ashr i32 0, undef
+   ret i32 %b
+
+   See test25
+
+** test28: shl (INEQ?) (WEIRDISH)
+   ret i32 undef
+   ⊑
+   %b = shl i32 0, undef
+   ret i32 %b
+
+   See test25
+
+** test28: shl nsw (INEQ?) (WEIRDISH)
+   ret i32 undef
+   ⊑
+   %b = shl nsw i32 undef, %a
+   ret i32 %b
+
+   Similar to test25, the nsw flag leading to poison being emitted for some concretizations.
+
+** test29: shl nuw (INEQ?) (WEIRDISH)
+   ret i32 undef
+   ⊑
+   %b = shl nuw i32 undef, %a
+   ret i32 %b
+
+   Similar to test28.
+
+** test30: shl nsw nuw (INEQ?) (WEIRDISH)
+   ret i32 undef
+   ⊑
+   %b = shl nsw nuw i32 undef, %a
+   ret i32 %b
+
+   Similar to test28.
+
+** test31: shl (INEQ) (SLIGHTLY WEIRDISH)
+   ret i32 0
+   ⊑
+   %b = shl i32 undef, %a
+   ret i32 %b
+
+   This one seems to echo the "if the invariant is any subtler than just undef, drop it" approach: 
+   after shifting, not all patterns can be stored in b, so we chose to lose information by picking 
+   the value 0.
+   However, there a slight concern: depending %a, there's also values concretizing undef that
+   result in poison: is it completely orthogonal? I would guess the reasoning is: if there were
+   always concretizations leading to poison, then we would refine by undef, but since it depends
+   on the argument, we cannot and give up?
+
+** test32: shl (EQ)
+   ret i32 undef
+   ⊑
+   %b = shl i32 undef, 0
+   ret i32 %b 
+
+   This one shl seems fairly innocent.
+
+** test33: ashr (EQ)
+   ret i32 undef
+   ⊑
+   %b = ashr i32 undef, 0
+   ret i32 %b
+
+   See test32
+
+** test34: lshr (EQ)
+   ret i32 undef
+   ⊑
+   %b = lshr i32 undef, 0
+   ret i32 %b
+
+   See test32
+
+** test35: extractelement (EQ?) (SLIGHTLY WEIRDISH)
+   ret i32 undef
+   ⊑
+   %b = extractelement <4 x i32> %V, i32 4
+   ret i32 %b
+
+   By extracting out of bound, we get poison, that we are now used to see refined into undef.
+
+** test36: extractelement (EQ?) (SLIGHTLY WEIRDISH)
+   ret i32 undef
+   ⊑
+   %b = extractelement <4 x i32> undef, i32 %V
+   ret i32 %b 
+
+   Undef as the vector argument does not change anything.
+
+** test37: udiv (EQ?) (UB)
+   ret i32 undef
+   ⊑
+   %b = udiv i32 undef, undef
+   ret i32 %b 
+
+   Here the refinement seems fair with little doubt, but it's unclear which justification is paramount.
+   Most likely: among all pairs of concretizations, some raise UB, hence the whole operation is UB,
+   hence everything goes.
+
+** test38: udiv (EQ?) (UB)
+   ret i32 undef
+   ⊑
+   %b = udiv i32 %a, undef
+   ret i32 %b
+
+   Idem, there's a UB concretization for any input.
+
+** test39: udiv (EQ?) (UB)
+   ret i32 undef
+   ⊑
+   %b = udiv i32 0, undef
+   ret i32 %b
+
+   Particular case of test38.
