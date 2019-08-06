@@ -9,7 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 From Coq Require Import
-     ZArith List String 
+     ZArith String List
      FSets.FMapWeakList
      Bool.Bool.
 
@@ -106,80 +106,50 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
   (* The mutually recursive functions are tied together, interpreting away all internal calls*)
 
-  (*
-  Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
-  | DVALUE_Addr_typ   : forall a, dvalue_has_dtyp (DVALUE_Addr a) DTYPE_Pointer
-  | DVALUE_I1_typ     : forall x, dvalue_has_dtyp (DVALUE_I1 x) (DTYPE_I 1)
-  | DVALUE_I8_typ     : forall x, dvalue_has_dtyp (DVALUE_I8 x) (DTYPE_I 8)
-  | DVALUE_I32_typ    : forall x, dvalue_has_dtyp (DVALUE_I32 x) (DTYPE_I 32)
-  | DVALUE_I64_typ    : forall x, dvalue_has_dtyp (DVALUE_I64 x) (DTYPE_I 64)
-  | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
-  | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
-  | DVALUE_Poison_typ : forall dt, dvalue_has_dtyp DVALUE_Poison dt
-  | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
+Definition vector_dtyp dt :=
+  forall n, dt = DTYPE_I n \/ dt = DTYPE_Pointer \/ dt = DTYPE_Half \/ dt = DTYPE_Float \/
+       dt = DTYPE_Double \/ dt = DTYPE_X86_fp80 \/ dt = DTYPE_Fp128 \/ dt = DTYPE_Ppc_fp128.
 
-  | DVALUE_Struct_Nil : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
-  | DVALUE_Struct_Cons :
-      forall f dt fields dts,
+Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
+| DVALUE_Addr_typ   : forall a, dvalue_has_dtyp (DVALUE_Addr a) DTYPE_Pointer
+| DVALUE_I1_typ     : forall x, dvalue_has_dtyp (DVALUE_I1 x) (DTYPE_I 1)
+| DVALUE_I8_typ     : forall x, dvalue_has_dtyp (DVALUE_I8 x) (DTYPE_I 8)
+| DVALUE_I32_typ    : forall x, dvalue_has_dtyp (DVALUE_I32 x) (DTYPE_I 32)
+| DVALUE_I64_typ    : forall x, dvalue_has_dtyp (DVALUE_I64 x) (DTYPE_I 64)
+| DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
+| DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
+| DVALUE_Poison_typ : forall dt, dvalue_has_dtyp DVALUE_Poison dt
+| DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
+
+| DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
+| DVALUE_Struct_Cons_typ :
+    forall f dt fields dts,
       dvalue_has_dtyp f dt ->
       dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
       dvalue_has_dtyp (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts))
 
-  | DVALUE_Packed_struct_Nil : dvalue_has_dtyp (DVALUE_Packed_struct []) (DTYPE_Packed_struct [])
-  | DVALUE_Packed_struct_Cons :
-      forall f dt fields dts,
+| DVALUE_Packed_struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Packed_struct []) (DTYPE_Packed_struct [])
+| DVALUE_Packed_struct_Cons_typ :
+    forall f dt fields dts,
       dvalue_has_dtyp f dt ->
       dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
       dvalue_has_dtyp (DVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts))
 
-  | DVALUE_Array_typ : dvalue_has_dtyp (DVALUE_Array []) (DTYPE_
+(* CB TODO: Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
+| DVALUE_Array_typ :
+    forall xs sz dt,
+      Forall (fun x => dvalue_has_dtyp x dt) xs ->
+      length xs = sz ->
+      dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt)
 
-| DTYPE_Array (sz:Z) (t:dtyp)
+| DVALUE_Vector_typ :
+    forall xs sz dt,
+      Forall (fun x => dvalue_has_dtyp x dt) xs ->
+      length xs = sz ->
+      vector_dtyp dt ->
+      dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt)
+.
 
-          (elts: list dvalue)
-  | DVALUE_Vector        (elts: list dvalue)
-  .
-
-*)
-
-
-(*
-
-(* Arrays are only well formed if the size is >= 0, and the element type is sized. *)
-| wf_typ_Array :
-    forall (defs : list (ident * typ)) (sz : int) (t : typ),
-      sz >= 0 -> sized_typ defs t -> wf_typ defs t -> wf_typ defs (TYPE_Array sz t)
-
-(* Vectors of size 0 are not allowed, and elements must be of element_typ. *)
-| wf_typ_Vector :
-    forall (defs : list (ident * typ)) (sz : int) (t : typ),
-      sz > 0 -> element_typ t -> wf_typ defs t -> wf_typ defs (TYPE_Vector sz t)
-
-(* Any type identifier must exist in the environment.
-
-   Additionally the identifier must not occur anywhere in the type
-   that it refers to *unless* it is guarded by a pointer. *)
-| wf_typ_Identified :
-    forall (defs : list (ident * typ)) (id : ident),
-      (exists t, In (id, t) defs) ->
-      (forall (t : typ), In (id, t) defs -> guarded_typ id defs t) ->
-      (forall (t : typ), In (id, t) defs -> wf_typ defs t) ->
-      wf_typ defs (TYPE_Identified id)
-
-(* Fields of structure must be sized types *)
-| wf_typ_Struct :
-    forall (defs : list (ident * typ)) (fields : list typ),
-      (forall (f : typ), In f fields -> sized_typ defs f) ->
-      (forall (f : typ), In f fields -> wf_typ defs f) ->
-      wf_typ defs (TYPE_Struct fields)
-
-| wf_typ_Packed_struct :
-    forall (defs : list (ident * typ)) (fields : list typ),
-      (forall (f : typ), In f fields -> sized_typ defs f) ->
-      (forall (f : typ), In f fields -> wf_typ defs f) ->
-      wf_typ defs (TYPE_Packed_struct fields)
-
-*)
 
   Section CONVERSIONS.
     (* Conversions can't go into DynamicValues because Int2Ptr and Ptr2Int casts 
