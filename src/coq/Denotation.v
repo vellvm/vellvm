@@ -106,6 +106,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
   (* The mutually recursive functions are tied together, interpreting away all internal calls*)
 
+  (* CB TODO: These should be moved somewhere else. *)
 Definition vector_dtyp dt :=
   forall n, dt = DTYPE_I n \/ dt = DTYPE_Pointer \/ dt = DTYPE_Half \/ dt = DTYPE_Float \/
        dt = DTYPE_Double \/ dt = DTYPE_X86_fp80 \/ dt = DTYPE_Fp128 \/ dt = DTYPE_Ppc_fp128.
@@ -378,7 +379,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
   | Pick_concrete             : forall uv dv, uvalue_to_dvalue uv = inr dv -> concretize uv dv
 
   (* Undef relates to all dvalue of the type *)
-  | Concretize_Undef          : forall dt dv, concretize (UVALUE_Undef dt) dv (* YZ: check that dv has type dt *)
+  | Concretize_Undef          : forall dt dv, dvalue_has_dtyp dv dt ->  concretize (UVALUE_Undef dt) dv
 
   (* The other operations proceed non-deterministically *)
   | Concretize_IBinop : forall iop uv1 dv1 uv2 dv2 res,
@@ -588,12 +589,12 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
           if iop_is_div iop && negb (is_concrete v2)
-          then dv2 <- trigger (pick v2 dvalue_not_zero) ;;
-               concretize_binop2 (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
+          then dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2)) ;;
+               uvalue_to_dvalue_binop2 (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
                                  (fun v1 v2 => translate _failure_UB_to_ExpE 
                                                       (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
                                  v1 dv2
-          else concretize_binop (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
+          else uvalue_to_dvalue_binop (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
                                 (fun v1 v2 => translate _failure_UB_to_ExpE
                                                      (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
                                 v1 v2
@@ -601,7 +602,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
         | OP_ICmp cmp dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          lift_err ret (concretize_binop (fun v1 v2 => ret (UVALUE_ICmp cmp v1 v2))
+          lift_err ret (uvalue_to_dvalue_binop (fun v1 v2 => ret (UVALUE_ICmp cmp v1 v2))
                                          (fun v1 v2 => fmap dvalue_to_uvalue (eval_icmp cmp v1 v2))
                                          v1 v2)
 
@@ -609,12 +610,12 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
           if fop_is_div fop && negb (is_concrete v2)
-          then dv2 <- trigger (pick v2 dvalue_not_zero) ;;
-               concretize_binop2 (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
+          then dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2)) ;;
+               uvalue_to_dvalue_binop2 (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
                                  (fun v1 v2 => translate _failure_UB_to_ExpE 
                                                       (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
                                  v1 dv2
-          else concretize_binop (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
+          else uvalue_to_dvalue_binop (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
                                 (fun v1 v2 => translate _failure_UB_to_ExpE
                                                      (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
                                 v1 v2
@@ -622,21 +623,24 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
         | OP_FCmp fcmp dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          lift_err ret (concretize_binop (fun v1 v2 => ret (UVALUE_FCmp fcmp v1 v2))
+          lift_err ret (uvalue_to_dvalue_binop (fun v1 v2 => ret (UVALUE_FCmp fcmp v1 v2))
                                          (fun v1 v2 => fmap dvalue_to_uvalue (eval_fcmp fcmp v1 v2))
                                          v1 v2)
              
         | OP_Conversion conv dt1 op t2 =>
           v <- denote_exp (Some dt1) op ;;
-          concretize_uop (fun v => ret (UVALUE_Conversion conv v t2))
+          uvalue_to_dvalue_uop (fun v => ret (UVALUE_Conversion conv v t2))
                          (fun v => translate conv_E_to_exp_E
                               (fmap dvalue_to_uvalue (eval_conv conv dt1 v t2)))
                          v
 
+        (* CB TODO: Do we actually need to pick here? GEP doesn't do any derefs. *)
         | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
           vptr <- denote_exp (Some dt2) ptrval ;;
+          dvptr <- trigger (pick vptr True) ;;
           vs <- map_monad (fun '(_, index) => denote_exp (Some (DTYPE_I 32)) index) idxs ;;
-          trigger (GEP dt1 vptr vs)
+          dvs <- map_monad (fun v => trigger (pick v True)) vs ;;
+          trigger (GEP dt1 dvptr dvs)
 
         | OP_ExtractElement vecop idx =>
           (*  'vec <- monad_app_snd (denote_exp e) vecop;
@@ -655,8 +659,10 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
               'vidx <- monad_app_snd (denote_exp e) idxmask; *)
           raise "shufflevector not implemented" (* TODO *)
 
+        (* CB TODO: Do we need to pick here? *)
         | OP_ExtractValue (dt, str) idxs =>
           str <- denote_exp (Some dt) str;;
+          dstr <- trigger (pick str True) ;;
           let fix loop str idxs : err dvalue :=
               match idxs with
               | [] => ret str
@@ -664,7 +670,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
                 v <- index_into_str str i ;;
                loop v tl
               end in
-          lift_err ret (loop str idxs)
+          lift_err ret (loop dstr idxs)
                    
         | OP_InsertValue strop eltop idxs =>
           (*
