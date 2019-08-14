@@ -8,7 +8,7 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-From Coq Require Import 
+From Coq Require Import
      ZArith Ascii Strings.String Setoid.
 
 From ExtLib Require Import
@@ -20,7 +20,8 @@ From ITree Require Import
      Eq.Eq
      Interp.TranslateFacts.
 
-From Vellvm Require Import 
+From Vellvm Require Import
+     Failure
      Error
      UndefinedBehaviour
      Util
@@ -118,7 +119,7 @@ Module RENAMING
     - contradiction.
     - contradiction.
     - contradiction.
-  Qed.    
+  Qed.
 
   Definition swap_ident (id1 id2:raw_id) (id:ident) : ident :=
     match id with
@@ -135,7 +136,7 @@ Module RENAMING
   Qed.
   Next Obligation.
     unfold_swaps; unfold swap_of_ident; destruct x; simpl; rewrite swap_swap_id; reflexivity.
-  Qed.  
+  Qed.
 
   Instance swap_of_pair {A B} `(SA:Swap A) `(SB:Swap B) : Swap (A * B)%type :=
     fun id1 id2 '(a,b) => (swap id1 id2 a, swap id1 id2 b).
@@ -145,7 +146,7 @@ Module RENAMING
   Next Obligation.
     unfold swap. unfold swap_of_pair.
     rewrite swap_same_id. rewrite swap_same_id. reflexivity.
-  Qed.  
+  Qed.
   Next Obligation.
     unfold swap. unfold swap_of_pair. simpl.
     rewrite swap_comm. rewrite (@swap_comm B) at 1. reflexivity. assumption.
@@ -165,7 +166,7 @@ Module RENAMING
 
   Instance swap_of_err {A} `(SA:Swap A) : Swap (err A) :=
     fun id1 id2 e =>
-      match e with 
+      match e with
       | inl s => inl s
       | inr a => inr (swap id1 id2 a)
       end.
@@ -237,7 +238,7 @@ Module RENAMING
       | EXP_Struct fields =>
         EXP_Struct _ (List.map (fun '(t,e) => (swap id1 id2 t, swap_exp id1 id2 e)) fields)
       | EXP_Packed_struct fields =>
-        EXP_Packed_struct _ (List.map (fun '(t,e) => (swap id1 id2 t, swap_exp id1 id2 e)) fields)    
+        EXP_Packed_struct _ (List.map (fun '(t,e) => (swap id1 id2 t, swap_exp id1 id2 e)) fields)
       | EXP_Array elts =>
         EXP_Array _ (List.map (fun '(t,e) => (swap id1 id2 t, swap_exp id1 id2 e)) elts)
       | EXP_Vector elts =>
@@ -247,9 +248,9 @@ Module RENAMING
       | OP_ICmp cmp t v1 v2 =>
         OP_ICmp _ (swap id1 id2 cmp) (swap id1 id2 t) (swap_exp id1 id2 v1) (swap_exp id1 id2 v2)
       | OP_FBinop fop fm t v1 v2 =>
-        OP_FBinop _ (swap id1 id2 fop) fm (swap id1 id2 t) (swap_exp id1 id2 v1) (swap_exp id1 id2 v2)    
+        OP_FBinop _ (swap id1 id2 fop) fm (swap id1 id2 t) (swap_exp id1 id2 v1) (swap_exp id1 id2 v2)
       | OP_FCmp cmp t v1 v2 =>
-        OP_FCmp _ (swap id1 id2 cmp) (swap id1 id2 t) (swap_exp id1 id2 v1) (swap_exp id1 id2 v2)    
+        OP_FCmp _ (swap id1 id2 cmp) (swap id1 id2 t) (swap_exp id1 id2 v1) (swap_exp id1 id2 v2)
       | OP_Conversion conv t_from v t_to =>
         OP_Conversion _ conv (swap id1 id2 t_from) (swap_exp id1 id2 v) (swap id1 id2 t_to)
       | OP_GetElementPtr t ptrval idxs =>
@@ -260,11 +261,11 @@ Module RENAMING
                           (swap id1 id2 (fst idx), swap_exp id1 id2 (snd idx))
       | OP_InsertElement  vec elt idx =>
         OP_InsertElement _ (swap id1 id2 (fst vec), swap_exp id1 id2 (snd vec))
-                         (swap id1 id2 (fst elt), swap_exp id1 id2 (snd elt))                     
+                         (swap id1 id2 (fst elt), swap_exp id1 id2 (snd elt))
                          (swap id1 id2 (fst idx), swap_exp id1 id2 (snd idx))
       | OP_ShuffleVector vec1 vec2 idxmask =>
         OP_ShuffleVector _ (swap id1 id2 (fst vec1), swap_exp id1 id2 (snd vec1))
-                         (swap id1 id2 (fst vec2), swap_exp id1 id2 (snd vec2))                     
+                         (swap id1 id2 (fst vec2), swap_exp id1 id2 (snd vec2))
                          (swap id1 id2 (fst idxmask), swap_exp id1 id2 (snd idxmask))
       | OP_ExtractValue  vec idxs =>
         OP_ExtractValue  _ (swap id1 id2 (fst vec), swap_exp id1 id2 (snd vec))
@@ -356,7 +357,7 @@ Module RENAMING
     Definition swap_global (id1 id2:raw_id) (g:global T) : (global T) :=
       mk_global _
                 (swap id1 id2 (g_ident _ g))
-                (swap id1 id2 (g_typ _ g))     
+                (swap id1 id2 (g_typ _ g))
                 (swap id1 id2 (g_constant _ g))
                 (swap id1 id2 (g_exp _ g))
                 (swap id1 id2 (g_linkage _ g))
@@ -386,7 +387,7 @@ Module RENAMING
                      (swap id1 id2 (dc_align _ d))
                      (swap id1 id2 (dc_gc _ d)).
     Hint Unfold swap_declaration.
-    Global Instance swap_of_declaration : Swap (declaration T) := swap_declaration.    
+    Global Instance swap_of_declaration : Swap (declaration T) := swap_declaration.
     Hint Unfold swap_of_declaration.
 
     Definition swap_block (id1 id2:raw_id) (b:block T) : block T :=
@@ -395,7 +396,7 @@ Module RENAMING
                (swap id1 id2 (blk_code _ b))
                (swap id1 id2 (blk_term _ b))
                (blk_comments _ b).
-    Hint Unfold swap_block.  
+    Hint Unfold swap_block.
     Global Instance swap_of_block : Swap (block T) := swap_block.
     Hint Unfold swap_of_block.
 
@@ -487,10 +488,18 @@ Module RENAMING
   Instance swap_of_dvalue : Swap dvalue := fun (id1 id2 : raw_id) dv => dv.
   Hint Unfold swap_of_dvalue.
 
+  Instance swap_of_uvalue : Swap uvalue := fun (id1 id2 : raw_id) uv => uv.
+  Hint Unfold swap_of_uvalue.
+
   Program Instance swap_invariant_dvalue_inst : SwapInvariant dvalue := _.
   Next Obligation.
     constructor. intros. unfold swap. reflexivity.
-  Defined.  
+  Defined.
+
+  Program Instance swap_invariant_uvalue_inst : SwapInvariant uvalue := _.
+  Next Obligation.
+    constructor. intros. unfold swap. reflexivity.
+  Defined.
 
   Instance swap_invariant_of_list {X} `{SwapInvariant X}: SwapInvariant (list X).
   Proof.
@@ -500,16 +509,17 @@ Module RENAMING
     f_equal; auto.
   Qed.
 
+
   Instance swap_of_GlobalE {X} : Swap (LLVMGEnvE X) :=
     fun id1 id2 e =>
       match e with
-      | GlobalWrite id v => GlobalWrite (swap id1 id2 id) v 
+      | GlobalWrite id v => GlobalWrite (swap id1 id2 id) v
       | GlobalRead id => GlobalRead (swap id1 id2 id)
       end.
   Instance swap_of_LocalE {X} : Swap (LLVMEnvE X) :=
     fun id1 id2 e =>
       match e with
-      | LocalWrite id v => LocalWrite (swap id1 id2 id) v 
+      | LocalWrite id v => LocalWrite (swap id1 id2 id) v
       | LocalRead id => LocalRead (swap id1 id2 id)
       end.
   Instance swap_of_StackE v {X} : Swap (StackE raw_id v X) :=
@@ -524,7 +534,8 @@ Module RENAMING
   Instance swap_of_DebugE {X} : Swap (DebugE X) := fun id1 id2 x => x.
   Instance swap_of_FailureE {X} : Swap (FailureE X) := fun id1 id2 x => x.
   Instance swap_of_UndefinedBehaviourE {X} : Swap (UndefinedBehaviourE X) := fun id1 id2 x => x.
-  Hint Unfold swap_of_MemoryE swap_of_StackE swap_of_LocalE swap_of_GlobalE swap_of_CallE swap_of_IntrinsicE swap_of_DebugE FailureE.
+  Instance swap_of_UndefE {X} : Swap (UndefE X) := fun id1 id2 x => x.
+  Hint Unfold swap_of_MemoryE swap_of_StackE swap_of_LocalE swap_of_GlobalE swap_of_CallE swap_of_IntrinsicE swap_of_DebugE FailureE swap_of_FailureE swap_of_UndefinedBehaviourE swap_of_UndefE.
 
   Instance swap_of_sum {A B} `{Swap A} `{Swap B}: Swap (A + B) :=
     fun id1 id2 ab =>
@@ -544,6 +555,7 @@ Module RENAMING
     ITree.map (swap id1 id2) (@translate E E (fun T => swap id1 id2) _ t).
   Instance swap_of_LLVM {X E} `{SX : Swap X} `{forall T, Swap (E T)}: Swap (LLVM E X) := swap_LLVM.
   Hint Unfold swap_of_LLVM.
+
 
   (* Should we swap the arguments? Not when used to create an itree *)
   Instance swap_of_fun {A B} (* `{Swap A} *) `{Swap B}: Swap (A -> B) :=
@@ -588,8 +600,8 @@ Module RENAMING
     Proof.
     Abort.
 
-    
-    Lemma swap_trigger_Global 
+
+    Lemma swap_trigger_Global
           {X} `{Swap X} {INV: SwapInvariant X}:
       forall (e: LLVMGEnvE X), @ITree.trigger _CFG X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
     Proof.
@@ -600,10 +612,10 @@ Module RENAMING
 
       match goal with
       | |- context[subevent ?T ?x] => destruct (subevent T x) eqn:?EQ
-      end; [inversion EQ |]. 
+      end; [inversion EQ |].
       repeat (
           match goal with
-          | s: (?E +' ?F) ?X |- _ => destruct s eqn:?H; [try (inversion EQ; fail) | try (inversion EQ; fail)]; [] 
+          | s: (?E +' ?F) ?X |- _ => destruct s eqn:?H; [try (inversion EQ; fail) | try (inversion EQ; fail)]; []
           end).
       subst.
       rewrite <- EQ.
@@ -624,10 +636,10 @@ Module RENAMING
       rewrite translate_vis, bind_vis.
       match goal with
       | |- context[subevent ?T ?x] => destruct (subevent T x) eqn:?EQ
-      end; [inversion EQ |]. 
+      end; [inversion EQ |].
       repeat (
           match goal with
-          | s: (?E +' ?F) ?X |- _ => destruct s eqn:?H; [try (inversion EQ; fail) | try (inversion EQ; fail)]; [] 
+          | s: (?E +' ?F) ?X |- _ => destruct s eqn:?H; [try (inversion EQ; fail) | try (inversion EQ; fail)]; []
           end).
       subst.
       rewrite <- EQ.
@@ -648,10 +660,10 @@ Module RENAMING
       rewrite translate_vis, bind_vis.
       match goal with
       | |- context[subevent ?T ?x] => destruct (subevent T x) eqn:?EQ
-      end; [inversion EQ |]. 
+      end; [inversion EQ |].
       repeat (
           match goal with
-          | s: (?E +' ?F) ?X |- _ => destruct s eqn:?H; [try (inversion EQ; fail) | try (inversion EQ; fail)]; [] 
+          | s: (?E +' ?F) ?X |- _ => destruct s eqn:?H; [try (inversion EQ; fail) | try (inversion EQ; fail)]; []
           end).
       subst.
       rewrite <- EQ.
@@ -667,8 +679,8 @@ Module RENAMING
       intros i.
       unfold lookup_id.
       destruct i; cbn.
-      rewrite <- swap_trigger_Global; reflexivity. 
-      rewrite <- swap_trigger_Local; reflexivity. 
+      rewrite <- swap_trigger_Global; reflexivity.
+      rewrite <- swap_trigger_Local; reflexivity.
     Qed.
 
     (* Lemma bind_vis'_ {E F} `{E -< F} {X Y Z} (e: E X) (ek: X -> itree F Y) (k: Y -> itree F Z) : *)
@@ -702,7 +714,7 @@ Module RENAMING
     Qed.
 
     Instance swap_unit: Swap unit := fun _ _ x => x.
-    Instance swap_invariant_unit: SwapInvariant unit := {swap_invariant := fun _ _ _ => eq_refl }. 
+    Instance swap_invariant_unit: SwapInvariant unit := {swap_invariant := fun _ _ _ => eq_refl }.
 
     Instance Commute_debug :
       Commute_eq_LLVM1 (@debug _CFG _).
@@ -716,7 +728,7 @@ Module RENAMING
       end; [inversion EQ |].
       repeat (
           match goal with
-          | s: (?E +' ?F) ?X |- _ => destruct s eqn:?H; [try (inversion EQ; fail) | try (inversion EQ; fail)]; [] 
+          | s: (?E +' ?F) ?X |- _ => destruct s eqn:?H; [try (inversion EQ; fail) | try (inversion EQ; fail)]; []
           end).
       subst.
       cbn.
@@ -736,7 +748,7 @@ Module RENAMING
     (* Weird to have to assume [SwapInvariant Y]. In particular, is there any case where
        we don't bind with X = Y?
      *)
-    Lemma swap_bind {X Y E} `{SX : Swap X} `{SY : Swap Y} `{forall T, Swap (E T)} `{SIY : SwapInvariant Y} : 
+    Lemma swap_bind {X Y E} `{SX : Swap X} `{SY : Swap Y} `{forall T, Swap (E T)} `{SIY : SwapInvariant Y} :
       forall (e : LLVM E Y) (k : Y -> LLVM E X),
         swap id1 id2 (ITree.bind e k) ≅ ITree.bind (swap id1 id2 e) (fun y => swap id1 id2 (k y)).
     Proof.
@@ -767,10 +779,10 @@ Module RENAMING
       forall c, swap id1 id2 (lift_err f c) ≅ @lift_err A B _CFG _ f c.
     Proof.
       intros ?; rewrite Commute_lift_err, swap_invariant; [reflexivity | typeclasses eauto].
-    Qed.      
+    Qed.
 
     Lemma Commute_map_monad {E} {X Y} `{Swap X} `{Swap Y} `{forall T, Swap (E T)} {I:SwapInvariant Y}
-          (f: X -> LLVM E Y) (l: list X) (IH: forall x, In x l -> swap id1 id2 (f x) ≅ f (swap id1 id2 x)): 
+          (f: X -> LLVM E Y) (l: list X) (IH: forall x, In x l -> swap id1 id2 (f x) ≅ f (swap id1 id2 x)):
       swap id1 id2 (@map_monad (LLVM E) _ X Y f l) ≅ map_monad f (swap id1 id2 l).
     Proof.
       induction l as [| b l IH'].
@@ -786,7 +798,7 @@ Module RENAMING
     Qed.
 
     Ltac commute_swap :=
-      rewrite commute_eq1 
+      rewrite commute_eq1
       || rewrite Commute_Ret
       || (rewrite Commute_map_monad; try typeclasses eauto)
       || (rewrite Commute_lift_err'; try typeclasses eauto)
@@ -799,7 +811,7 @@ Module RENAMING
     (* This proof script takes a whole minute to compile *)
     Ltac local_tac := (simpl; try match goal with |- _ ≅ spec_raise _ => solver end).
     Instance Commute_eval_conv_h conv: Commute_eq_LLVM3 (eval_conv_h conv).
-    Proof with local_tac. 
+    Proof with local_tac.
       intros ? ? ?.
       unfold eval_conv_h.
       Time repeat match goal with
@@ -819,17 +831,17 @@ Module RENAMING
       induction e using exp_ind'; intros top.
       - solver.
       - destruct top as [[]|]; solver.
-      - destruct top as [[]|]; solver. 
-      - destruct top as [[]|]; solver. 
+      - destruct top as [[]|]; solver.
+      - destruct top as [[]|]; solver.
       - destruct b; solver.
       - solver.
-      - destruct top; solver. 
-      - solver. 
+      - destruct top; solver.
+      - solver.
       - destruct top; solver.
       - simpl; step_bind.
         solver.
         rewrite Commute_map_monad; [reflexivity | intros [x t] ?; apply (H (x,t)); auto].
-      - destruct top as [[]|]; try solver. 
+      - destruct top as [[]|]; try solver.
         simpl; step_bind.
         solver.
         rewrite Commute_map_monad; [reflexivity | intros [x t] ?; apply (H (x,t)); auto].
@@ -867,7 +879,7 @@ Module RENAMING
       - solver.
       - destruct vec; simpl; repeat step_bind.
         solver.
-        rewrite IHe; solver. 
+        rewrite IHe; solver.
       - solver.
       - destruct cnd,v1,v2; simpl; repeat step_bind.
         solver.
@@ -890,12 +902,12 @@ Module RENAMING
         + rewrite Commute_map_monad.
           solver.
           intros [] ?; solver.
-      - simpl; step_bind; solver. 
+      - simpl; step_bind; solver.
       - destruct ptr; simpl; repeat step_bind; try solver.
       - destruct fn; simpl; repeat step_bind; try solver.
         + admit. (* Intrinsics *)
         + rewrite Commute_map_monad.
-          solver. 
+          solver.
           intros [] ?; solver.
       - destruct val, ptr; simpl; repeat step_bind; try solver.
     Admitted.
@@ -913,7 +925,7 @@ Module RENAMING
         match goal with | |- context[if ?e then _ else _] => destruct e; solver end.
         cbn; rewrite Commute_denote_exp; reflexivity.
     Qed.
-    
+
     Instance Commute_denote_code: Commute_eq_LLVM1 denote_code.
     intros c; induction c as [| i c IH]; [solver |].
     simpl; rewrite swap_bind; apply eq_itree_bind; [intros ?; apply IH | solver].
@@ -1014,8 +1026,8 @@ Module RENAMING
      unfold denote_mcfg.
    Admitted.
 *)
-  
-  End PROOFS.  
+
+  End PROOFS.
 End RENAMING.
 
 (* Scrap *)
@@ -1057,15 +1069,15 @@ Hint Unfold swap_ENV.
   Lemma swap_ENV_find : forall {X} `{SX : Swap X} (e:ENV.t X) (id:raw_id),
       (ENV.find (swap id1 id2 id) (swap id1 id2 e)) = swap id1 id2 (ENV.find id e).
   Proof.
-    intros X SX. 
+    intros X SX.
     unfold_swaps.
     intros e id.
     apply ENVProps.fold_rec.
     - intros m H.
-      rewrite find_Empty_none. rewrite find_Empty_none. reflexivity. assumption. 
+      rewrite find_Empty_none. rewrite find_Empty_none. reflexivity. assumption.
       apply ENV.empty_1.
 
-    - intros k e0 a m' m'' H H0 H1 H2. 
+    - intros k e0 a m' m'' H H0 H1 H2.
       rewrite H1.
       repeat rewrite ENVFacts.add_o.
       destruct (ENVProps.F.eq_dec k id).
@@ -1080,7 +1092,7 @@ Hint Unfold swap_ENV.
       apply H2.
   Qed.
    *)
-  (*  
+  (*
   Lemma swap_lookup_env : forall {X} `{SX : Swap X} (e:ENV.t X) (id:raw_id),
       (lookup_env (swap id1 id2 e) (swap id1 id2 id) = swap id1 id2 (lookup_env e id)).
   Proof.
@@ -1091,7 +1103,7 @@ Hint Unfold swap_ENV.
     (* destruct (ENV.find id e); unfold_swaps; simpl; reflexivity. *)
   Admitted.
 
- 
+
   Lemma swap_eval_i1_op : forall (iop:ibinop) (x y:inttyp 1),
       eval_int_op (swap id1 id2 iop) (swap id1 id2 x) (swap id1 id2 y) = swap id1 id2 (eval_int_op iop x y).
   Proof.
@@ -1112,7 +1124,7 @@ Hint Unfold swap_ENV.
       eval_int_op (swap id1 id2 iop) (swap id1 id2 x) (swap id1 id2 y) = swap id1 id2 (eval_int_op iop x y).
   Proof.
     unfold_swaps.
-    intros iop x y. 
+    intros iop x y.
     reflexivity.
   Qed.
 
@@ -1144,7 +1156,7 @@ Hint Unfold swap_ENV.
   Qed.
    *)
   (*
-  (* Before changing ITrees to records, we could prove _equality_ here.  Now we prove 
+  (* Before changing ITrees to records, we could prove _equality_ here.  Now we prove
      only bisimulation?
    *)
   Lemma swap_raise {X} `{SX: Swap X} : forall s : string, (@raise string Trace _ _ s) ≅ (swap id1 id2 (@raise string Trace _ _ s)).
@@ -1152,7 +1164,7 @@ Hint Unfold swap_ENV.
     intros s.
     econstructor.
     econstructor.
-  Qed.    
+  Qed.
 
 
   Lemma swap_ret {X E} `{SX: Swap X} : forall x, (Ret (swap id1 id2 x) : itree E (_+X)) ≅ swap id1 id2 (Ret x).
@@ -1166,7 +1178,7 @@ Hint Unfold swap_ENV.
     Ltac bisim :=
     repeat (cbn; match goal with
                  | [H : _ |- go ?X ≅ swap ?ID1 ?ID2 (go ?Y) ] => econstructor
-                 | [H : _ |- ?X ≅ swap ?ID1 ?ID2 ?X ] => econstructor; cbn                                  
+                 | [H : _ |- ?X ≅ swap ?ID1 ?ID2 ?X ] => econstructor; cbn
                  | [ _ : _ |- match swap ?ID1 ?ID2 ?X with _ => _ end ≅ swap ?ID1 ?ID2 (match ?X with _ => _  end) ] => destruct X; cbn
                  | [ _ : _ |- eq_itreeF eq_itree ?X ?X ] => econstructor; cbn
                  | [ _ : _ |- eq_itreeF eq_itree (RetF ?X) (RetF ?Y) ] => econstructor; cbn
@@ -1184,40 +1196,40 @@ Hint Unfold swap_ENV.
     - reflexivity.
     - constructor. econstructor.
   Qed.
-    
-    
-  Lemma swap_bind {X Y} `{SX : Swap X} `{SY : Swap Y} `{SIY : SwapInvariant Y} : 
+
+
+  Lemma swap_bind {X Y} `{SX : Swap X} `{SY : Swap Y} `{SIY : SwapInvariant Y} :
     forall (e : Trace Y) (k : Y -> Trace X),
       swap id1 id2 (bind e k) ≅ bind (swap id1 id2 e) (fun y => swap id1 id2 (k y)).
   Proof.
     cofix ch.
     intros e k.
-    econstructor. 
+    econstructor.
     cbn.
     destruct (observe e).
     - cbn. destruct r; cbn.
       + econstructor.
-      + rewrite swap_invariant. 
+      + rewrite swap_invariant.
         destruct (observe (k y)) eqn:Heq; cbn; econstructor.
         * reflexivity.
         * intros. reflexivity.
-    - econstructor. 
+    - econstructor.
       pose bind_associativity as HA.
       unfold bind, monad_trace, bind_trace, ITree.bind in HA.
-      
-      
-      
-      
-      
-      
-      
-        
-  Admitted.   
 
 
 
 
-  
+
+
+
+
+  Admitted.
+
+
+
+
+
   Lemma swap_eval_exp : forall CFG g e top o,
       eval_exp (swap id1 id2 CFG) (swap id1 id2 g) (swap id1 id2 e) (swap id1 id2 top) (swap id1 id2 o) ≅
       swap id1 id2 (eval_exp CFG g e top o).
@@ -1225,9 +1237,9 @@ Hint Unfold swap_ENV.
     intros CFG g e top.
     unfold err in *.
     induction o using exp_ind'; bisim.
-    - cbn. rewrite swap_lookup_id. 
+    - cbn. rewrite swap_lookup_id.
       bisim.
-(*      
+(*
     - destruct (coerce_integer_to_int sz x); bisim.
 
     - destruct b; bisim.
@@ -1237,19 +1249,19 @@ Hint Unfold swap_ENV.
       + bisim.
       + destruct a. cbn. bisim.
 
-      
+
     - cbn. econstructor. econstructor.
 
     - cbn. destruct top; try destruct d; simpl; try (econstructor; econstructor).
 
-    - cbn. econstructor. 
-      
+    - cbn. econstructor.
+
    *)
-(* Change to the ITree affected the way that errors need to be handled here. *)      
-    
+(* Change to the ITree affected the way that errors need to be handled here. *)
+
   Admitted.
 
-  
+
 
   Lemma swap_step : forall (CFG:mcfg) (s:state),
       eq_itree (step (swap id1 id2 CFG) (swap id1 id2 s)) (swap id1 id2 (step CFG s)).
@@ -1258,8 +1270,8 @@ Hint Unfold swap_ENV.
     destruct s as [[[g pc] e] k].
     unfold_swaps. simpl.
   Admitted.
-    
-  
+
+
   Lemma swap_step_sem : forall (CFG:mcfg) (r:result),
       eq_itree (step_sem (swap id1 id2 CFG) (swap id1 id2 r)) (swap id1 id2 (step_sem CFG r)).
   Proof.
@@ -1272,12 +1284,12 @@ Hint Unfold swap_ENV.
       rewrite Trace.matchM at 1. reflexivity.
       rewrite H. simpl. constructor.
 
-      
+
     - unfold swap at 2. simpl.
       rewrite Trace.matchM. simpl.
    *)
-    
-  Admitted.    
+
+  Admitted.
 
    *)
 *)

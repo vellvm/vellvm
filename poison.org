@@ -3,9 +3,9 @@ the notions of undefined behavior and undefined values (i.e. poison and undef)
 that llvm supports.
 
 * Undefined behaviors
-  
+
 ** List of cases triggering undefined behavior
-   
+
 *** TODO Division (udiv/sdiv/urem/srem) by zero
     In case of division by vector, raises UB if any element of the vector is zero
 
@@ -22,9 +22,9 @@ that llvm supports.
   domain of dynamic values is extended to include poison.
 
 ** Semantics and poisoned values
-  
+
    Depending on the operation performed over a poisoned value, two behaviors can be exhibited:
-   - either the operation is deemed to be unsafe to execute over certain dvalues, in which case 
+   - either the operation is deemed to be unsafe to execute over certain dvalues, in which case
    it raises _Undefined Behavior_;
    - or it acts as a taint: the operation is performed, but results in a poisoned value.
    An example of the former is division by a poisoned value.
@@ -32,7 +32,7 @@ that llvm supports.
 
    Operands can be classified into two categories: _safe_ operands are such that
    any dynamic value of the appropriate type in place of this operand leads to a
-   safe execution; _unsafe_ operands in contrast are such that there exists a 
+   safe execution; _unsafe_ operands in contrast are such that there exists a
    dynamic value of the appropriate type such that evaluation would raise UB.
    The general rule is that poisoned values in place of safe operands are tainting,
    while poisoned value in place of unsafe operands raise UB.
@@ -41,7 +41,7 @@ that llvm supports.
    %x = add f32 poison 0
    %y = add i32 %x 0
    will not trigger a dynamic error. It should however be statically ruled out by a type checker.
- 
+
 ** List of cases generating poison
 
 *** Prohibited overflow marked by nuw/nsw flags (“No Unsigned Wrap” and “No Signed Wrap”)
@@ -55,7 +55,7 @@ that llvm supports.
     Bitwise operations (lshr,ashr) use the same flags leading to poison if any shifted out bit is
     non-zero.
 
-*** Shifting by more bits than available   
+*** Shifting by more bits than available
     When shifting (ashr/lshr/shl) op1 by op2, if op2 is equal to or larger than the number of bits of op1,
     the operation results in poison.
 
@@ -71,7 +71,7 @@ that llvm supports.
 
    LangRef: "An instruction that depends on a poison value, produces a poison value itself."
 
-   For an expression such as a select, this dependency is on the set of operands. 
+   For an expression such as a select, this dependency is on the set of operands.
    This means in particular that [select true 0 poison] still evaluates to poison.
 
 ** Vectors and poison
@@ -93,9 +93,9 @@ that llvm supports.
 
 * Undef
 
-  Contrary to _poison_, _undef_ is _not_ a dynamic value. 
+  Contrary to _poison_, _undef_ is _not_ a dynamic value.
   Its intuitive semantics is to represent the set of dynamic values of the corresponding type.
-  
+
 ** Incorrect model 1: immediate non-deterministic branching
    As such, we could simply pick in a non-deterministic fashion a [dvalue] when encountering an
    undef value.
@@ -108,15 +108,15 @@ that llvm supports.
    undefined."
 
 ** Incorrect model 2: a simple symbolic value for _undef_
-   By extending _dvalue_ with an additional symbolic value _undef_, we could delay the non-deterministic 
+   By extending _dvalue_ with an additional symbolic value _undef_, we could delay the non-deterministic
    choice such that a different choice is taken every time.
    However, if it is wrong that:
    %x = undef
    %y = %x + %x
    always leads to an even value in y, it is true with the following example:
    %x = undef
-   %y = 2 * %x 
-   
+   %y = 2 * %x
+
 ** Chosen model: symbolic expressions as values
    We hence want to both delay the non-deterministic choice while having other abstract values than the
    simple "any dvalue of a given type" embodied by _undef_ itself.
@@ -131,9 +131,9 @@ that llvm supports.
 
 ** Semantics and [uvalue]
 
-   Recall the distinction between safe and unsafe operands. 
+   Recall the distinction between safe and unsafe operands.
 
-*** Over safe operands: 
+*** Over safe operands:
 
     * If both operands are defined, we perform the computation immediately over the corresponding dvalue and reinject the result.
     * If at least one operand is not defined, we construct the new symbolic [uvalue] as an AST of the expression.
@@ -162,7 +162,7 @@ that llvm supports.
     represents.
 
     ¹: Note that in the technical sense of the term, we are performing arithmetic
-    over a finite set of values, things are always decidable. 
+    over a finite set of values, things are always decidable.
     ²: TODO: reuse as much as possible of the dvalue evaluator.
 
 *** Handling pick
@@ -172,8 +172,8 @@ that llvm supports.
      * If P is satisfied, evaluate to any dvalue related by concretize in a non-deterministic way.
 
 **** For the evaluator, an handler can systematically pick 0
-     Remark: this raises a concern. 
-    
+     Remark: this raises a concern.
+
      In this case, the predicate is ignored. This does not mean that we will
      perform an unsafe operation, since the dynamic evaluation will raise UB if
      0 is a problematic value, but it does mean that we may actually reduce where
@@ -198,10 +198,10 @@ that llvm supports.
 
 ** test0: mul                                                            :EQ:
    ret i64 undef
-   ⊑ 
+   ⊑
    %r = mul i64 undef, undef
    ret i64 %r
-   
+
    This clearly makes sense, the set of traces are the same
 
 ** test1: mul                                                            :EQ:
@@ -210,15 +210,18 @@ that llvm supports.
    %r = mul i64 3, undef
    ret i64 %r
 
-   Assuming that the returned value is observed (which seems fair), this suggests that 
+   Assuming that the returned value is observed (which seems fair), this suggests that
    returning _any_ i64 is a sound refinement to returning three times any i64.
 
    If refinement is indeed defined as a trace inclusion even when it comes to undef,
    and since no flag is provided to mul, then the only way for this to make sense is if 3*Z_64 ~~ Z_64.
    That would be true if 2^64 and 3 are relatively prime, which is true. So it still makes sense.
 
+   Additionally, this makes sense even with the ~nuw~ and ~nsw~,
+   because we can relax ~poison~ to ~undef~.
+
 ** test2: mul                                                            :EQ:
-   ret i64 undef 
+   ret i64 undef
    ⊑
    %r = mul i64 undef, 3
    ret i64 %r
@@ -230,21 +233,21 @@ that llvm supports.
    ⊑
    %r = mul i64 undef, 6
    ret i64 %r
-   
+
    Things get slightly stranger here.
    Returning six times any i64 can be refined into returning always 0.
-   This actually makes sense: for one, that's obviously sound with respect 
-   to the set inclusion interpretation, but also as opposed to 3, 6 is not 
+   This actually makes sense: for one, that's obviously sound with respect
+   to the set inclusion interpretation, but also as opposed to 3, 6 is not
    relatively prime to 2^64.
    So if in the previous case the general invariant %r contains undef could be
    easily remembered, here it would require more work. LLVM seems to not want
    to bother, and hence collapse the non-determinism.
-   However note that these tests illustrate what the specific implementation of 
-   the llvm compiler does, but if any logic still applies, refining the previous 
+   However note that these tests illustrate what the specific implementation of
+   the llvm compiler does, but if any logic still applies, refining the previous
    examples by returning 0 would also have been _safe_.
 
 ** test4: mul                                                          :INEQ:
-   ret i64 0 
+   ret i64 0
    ⊑
    %r = mul i64 6, undef
    ret i64 %r
@@ -253,7 +256,7 @@ that llvm supports.
 
 ** test5: and                                                            :EQ:
    ret i64 undef
-   ⊑ 
+   ⊑
    and i64 undef, undef
    ret i64 %r
 
@@ -264,7 +267,7 @@ that llvm supports.
    ⊑
    or i64 undef, undef
    ret i64 %r
-   
+
    Idem for _or_
 
 ** test7: udiv                                                           :EQ:
@@ -299,12 +302,12 @@ that llvm supports.
 
    Same, remainder by 1 is always 0.
 
-** test11: shl                                            :MAYBE_EQ:WEIRDISH:
+** TODO test11: shl                                       :MAYBE_EQ:WEIRDISH:
    ret i64 undef
    ⊑
    shl i64 undef, undef
    ret i64 %r
-   
+
    This one is slightly puzzling.
    It does seem to make sense to say that shifting any value by any width should be able to
    lead to any value, and hence be refined into undef.
@@ -314,7 +317,7 @@ that llvm supports.
    "Call instructions depend on the ret instructions that dynamically transfer control back to them."
    it should actually matter.
 
-   It might make sense as an overapproximation if we consider that a uvalue that is always defined 
+   It might make sense as an overapproximation if we consider that a uvalue that is always defined
    but include poison concretizes into poison, that can be itself refined into undef.
 
    TODO: more investigation
@@ -325,7 +328,7 @@ that llvm supports.
    shl i64 %a, undef
    ret i64 %r
 
-   %a is an argument to the function 
+   %a is an argument to the function
    See test11
 
 ** test12: ashr                                           :MAYBE_EQ:WEIRDISH:
@@ -356,7 +359,7 @@ that llvm supports.
 ** test13b: lshr                                          :MAYBE_EQ:WEIRDISH:
    ret i64 undef ⊑ lshr i64 %a, undef; ret i64 %r
 
-   %a is an argument to the function 
+   %a is an argument to the function
    See test11
 
 ** test14: slt                                                           :EQ:
@@ -364,37 +367,37 @@ that llvm supports.
    ⊑
    %r = icmp slt i64 undef, undef
    ret i1 %r
-   
-   As usual, makes sense quite trivially with respect to the set inclusion, no information is lost. 
+
+   As usual, makes sense quite trivially with respect to the set inclusion, no information is lost.
 
 ** test15: ult                                                           :EQ:
    ret i1 undef
-   ⊑  
+   ⊑
    %r = icmp ult i64 undef, undef
    ret i1 %r
 
-   As usual, makes sense quite trivially with respect to the set inclusion, no information is lost. 
+   As usual, makes sense quite trivially with respect to the set inclusion, no information is lost.
 
 ** test16: select                                                        :EQ:
    ret i64 undef
    ⊑
    %r = select i1 undef, i64 undef, i64 %a
    ret i64 %r
-  
-   %a is an argument to the function 
+
+   %a is an argument to the function
    Makes sense: among all inclusions we in
    particular have the selector being true and hence any value in the left
    branch. Since evaluating %a is pure, we cannot have more.
 
 ** test17: select                                                        :EQ:
-   ret i64 undef 
-   ⊑ 
+   ret i64 undef
+   ⊑
    %r = select i1 undef, i64 %a, i64 undef
    ret i64 %r
 
    Idem
 
-** test18: call                                :MAYBE_UB:MAYBE_INEQ:WEIRDISH:
+** TODO test18: call                           :MAYBE_UB:MAYBE_INEQ:WEIRDISH:
    [[R:%.*]] = call i64 undef(i64 %a); ret i64 undef
    ⊑
    %r = call i64 (i64) undef(i64 %a)
@@ -403,9 +406,9 @@ that llvm supports.
    If we call a function at the undef address, and return what it gives us back, we retain the call, but can
    return undef instead.
    This one is a bit more puzzling to justify:
-   - either it assumes something along the fact that there is somewhere 
+   - either it assumes something along the fact that there is somewhere
      a function returning any value over any argument, hence by set inclusion we are correct;
-   - or calling a function at an undef address is Undefined Behavior, hence anything goes from there 
+   - or calling a function at an undef address is Undefined Behavior, hence anything goes from there
    (after the call), and for whatever reason they judged this transformation interesting to perform.
    LangRef has literally nothing to say about this...
 
@@ -416,9 +419,14 @@ that llvm supports.
    ⊑
    %b = shl <4 x i8> %a, <i8 8, i8 9, i8 undef, i8 -1>
    ret <4 x i8> %b
-   
+
    This emphasize that operations over vectors do not behave as maps of the semantics over the vector.
    Here a single undef legitimates the whole vector to be refined as undef.
+
+   Wasn't there something with poison bits and vectors with respect to
+   the "taming undefined behaviour semantics?" Weird.
+
+   https://lists.llvm.org/pipermail/llvm-dev/2018-March/121940.html
 
 ** test20: udiv                                                     :UB:INEQ:
 
@@ -457,17 +465,17 @@ that llvm supports.
    ret i32 undef
    ⊑
    %b = ashr exact i32 undef, %a
-   ret i32 %b 
+   ret i32 %b
 
-   Similar to test11 and all the other shifts, weird interaction between poison and undef. 
-   I believe however that the 'exact' key word here is irrelevant since poison is already 
+   Similar to test11 and all the other shifts, weird interaction between poison and undef.
+   I believe however that the 'exact' key word here is irrelevant since poison is already
    raised when undef gets concretized into a value having less bits that %a.
 
 ** test23: lshr exact                                   :MAYBE_INEQ:WEIRDISH:
    ret i32 undef
    ⊑
    %b = lshr exact i32 undef, %a
-   ret i32 %b 
+   ret i32 %b
 
    See test22
 
@@ -534,8 +542,8 @@ that llvm supports.
    %b = shl i32 undef, %a
    ret i32 %b
 
-   This one seems to echo the "if the invariant is any subtler than just undef, drop it" approach: 
-   after shifting, not all patterns can be stored in b, so we chose to lose information by picking 
+   This one seems to echo the "if the invariant is any subtler than just undef, drop it" approach:
+   after shifting, not all patterns can be stored in b, so we chose to lose information by picking
    the value 0.
    However, there a slight concern: depending %a, there's also values concretizing undef that
    result in poison: is it completely orthogonal? I would guess the reasoning is: if there were
@@ -546,7 +554,7 @@ that llvm supports.
    ret i32 undef
    ⊑
    %b = shl i32 undef, 0
-   ret i32 %b 
+   ret i32 %b
 
    This one shl seems fairly innocent.
 
@@ -578,7 +586,7 @@ that llvm supports.
    ret i32 undef
    ⊑
    %b = extractelement <4 x i32> undef, i32 %V
-   ret i32 %b 
+   ret i32 %b
 
    Undef as the vector argument does not change anything.
 
@@ -586,7 +594,7 @@ that llvm supports.
    ret i32 undef
    ⊑
    %b = udiv i32 undef, undef
-   ret i32 %b 
+   ret i32 %b
 
    Here the refinement seems fair with little doubt, but it's unclear which justification is paramount.
    Most likely: among all pairs of concretizations, some raise UB, hence the whole operation is UB,

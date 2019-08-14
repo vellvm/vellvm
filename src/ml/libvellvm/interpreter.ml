@@ -30,7 +30,6 @@ let rec pp_dvalue : Format.formatter -> DV.dvalue -> unit =
   | DVALUE_I64    x -> fprintf ppf "DVALUE_I64(%s)" (Int64.to_string (Z.to_int64 (DynamicValues.Int64.unsigned x)))
   | DVALUE_Double x -> fprintf ppf "DVALUE_Double(%F)" (camlfloat_of_coqfloat x)
   | DVALUE_Float  x -> fprintf ppf "DVALUE_Float(%F)"  (camlfloat_of_coqfloat32 x)
-  | DVALUE_Undef    -> fprintf ppf "DVALUE_Undef"
   | DVALUE_Poison   -> fprintf ppf "DVALUE_Poison"
   | DVALUE_None     -> fprintf ppf "DVALUE_None"
   | DVALUE_Struct        l -> fprintf ppf "DVALUE_Struct(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l
@@ -55,7 +54,7 @@ let debug (msg:string) =
 
 *)
 
-let rec step (m : ('a TopLevel.IO._MCFG3, TopLevel.M.memory * ((TopLevel.local_env * (LLVMAst.raw_id * TopLevel.IO.DV.dvalue) list Stack.stack) * (TopLevel.global_env * TopLevel.IO.DV.dvalue))) TopLevel.IO.coq_LLVM) : (DV.dvalue, string) result =
+let rec step (m : ('a TopLevel.IO._MCFG3, TopLevel.M.memory * ((TopLevel.local_env * (LLVMAst.raw_id * TopLevel.IO.DV.uvalue) list Stack.stack) * (TopLevel.global_env * TopLevel.IO.DV.dvalue))) TopLevel.IO.coq_LLVM) : (DV.dvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -93,7 +92,7 @@ let rec step (m : ('a TopLevel.IO._MCFG3, TopLevel.M.memory * ((TopLevel.local_e
     
 
 
-let interpret (prog:(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
+let interpret (prog:(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.uvalue, string) result =
   match TopLevel.run_with_memory prog with
   | None -> failwith "ERROR: bad module"
   | Some t -> step t

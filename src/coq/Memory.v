@@ -37,6 +37,7 @@ From Vellvm Require Import
      MemoryAddress
      LLVMEvents
      Error
+     Failure
      Coqlib
      Numeric.Integers
      Numeric.Floats.
@@ -120,7 +121,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
    *)
   Definition mem_block := IntMap SByte.
   Definition memory := IntMap mem_block.
-  Definition undef := DVALUE_Undef. (* TODO: should this be an empty block? *)
+  (* Definition undef := DVALUE_Undef. (* TODO: should this be an empty block? *) *)
 
   Fixpoint max_default (l:list Z) (x:Z) :=
     match l with
@@ -441,7 +442,7 @@ Admitted.
    - we can use the handler combinators to make these more modular
 
    - these operations are too defined: load and store should fail if the 
-n     address isn't in range
+     address isn't in range
    *)
 
   Definition handle_memory {E} `{FailureE -< E}: MemoryE ~> stateT memory (itree E) :=
@@ -458,7 +459,7 @@ n     address isn't in range
           ret match lookup b m with
               | Some block =>
                 (m, deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t)
-              | None => (m, DVALUE_Undef)
+              | None => (m, DVALUE_Poison) (* CB TODO: This is probably *NOT* poison *)
               end
         | _ => raise "Load got non-address dvalue"
         end

@@ -16,6 +16,7 @@ From Vellvm Require Import
      MemoryAddress
      DynamicValues
      LLVMEvents
+     Failure
      Error.
 
 Set Implicit Arguments.

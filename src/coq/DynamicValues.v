@@ -1054,21 +1054,24 @@ Class VInt I : Type :=
 
 
   (* Same deal as above with the helper *)
-  Definition eval_select_h cnd v1 v2 : err dvalue :=
-    match cnd, v1, v2 with
-    | _, DVALUE_Poison, _ => ret DVALUE_Poison
-    | _, _, DVALUE_Poison => ret DVALUE_Poison
-    | DVALUE_I1 i, _, _ =>
-      ret (if Int1.unsigned i =? 1 then v1 else v2)
-    | DVALUE_Poison, _, _ => ret DVALUE_Poison
-    | _, _, _ => failwith "ill_typed-select"
+  Definition eval_select_h (cnd : dvalue) (v1 v2 : uvalue) : err uvalue :=
+    match v1, v2 with
+    | UVALUE_Poison, _ => ret UVALUE_Poison
+    | _, UVALUE_Poison => ret UVALUE_Poison
+    | _, _ =>
+      match cnd with
+      | DVALUE_I1 i =>
+        ret (if Int1.unsigned i =? 1 then v1 else v2)
+      | DVALUE_Poison => ret UVALUE_Poison
+      | _ => failwith "ill_typed-select"
+      end
     end.
   Arguments eval_select_h _ _ _ : simpl nomatch.
 
 
-  Definition eval_select cnd v1 v2 : err dvalue :=
+  Definition eval_select cnd v1 v2 : err uvalue :=
     match cnd, v1, v2 with
-    | (DVALUE_Vector es), (DVALUE_Vector es1), (DVALUE_Vector es2) =>
+    | (DVALUE_Vector es), (UVALUE_Vector es1), (UVALUE_Vector es2) =>
       (* vec needs to loop over es, es1, and es2. Is there a way to
          generalize vec_loop to cover this? (make v1,v2 generic?) *)
       let fix loop elts :=
@@ -1080,14 +1083,14 @@ Class VInt I : Type :=
               ret (val :: vec)
           end in
       val <- loop (List.combine es (List.combine es1 es2)) ;;
-      ret (DVALUE_Vector val)
+      ret (UVALUE_Vector val)
     | _, _, _ => eval_select_h cnd v1 v2
     end.
   Arguments eval_select _ _ _ : simpl nomatch.
 
   (* Helper function for indexing into a structured datatype
      for extractvalue and insertvalue *)
-  Definition index_into_str (v:dvalue) (idx:LLVMAst.int) : err dvalue :=
+  Definition index_into_str (v:uvalue) (idx:LLVMAst.int) : err uvalue :=
     let fix loop elts i :=
         match elts with
         | [] => failwith "index out of bounds"
@@ -1095,8 +1098,8 @@ Class VInt I : Type :=
           if idx =? 0 then ret h else loop tl (i-1)
         end in
     match v with
-    | DVALUE_Struct f => loop f idx
-    | DVALUE_Array e => loop e idx
+    | UVALUE_Struct f => loop f idx
+    | UVALUE_Array e => loop e idx
     | _ => failwith "invalid aggregate data"
     end.
   Arguments index_into_str _ _ : simpl nomatch.

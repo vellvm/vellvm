@@ -27,7 +27,7 @@ From ITree Require Import
      Interp.Recursion
      Events.Exception.
 
-From Vellvm Require Import 
+From Vellvm Require Import
      Util
      Error
      UndefinedBehaviour
@@ -153,7 +153,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
 
 
   Section CONVERSIONS.
-    (* Conversions can't go into DynamicValues because Int2Ptr and Ptr2Int casts 
+    (* Conversions can't go into DynamicValues because Int2Ptr and Ptr2Int casts
        generate memory effects. *)
     (* SAZ: for some reason, typeclass resolution was taking forever in eval_conv_h,
         so I respecialized it... *)
@@ -250,7 +250,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
         | DTYPE_I bits1, x, DTYPE_I bits2 =>
           if bits1 =? bits2 then ret x else raise "unequal bitsize in cast"
         | DTYPE_Pointer, DVALUE_Addr a, DTYPE_Pointer =>
-          ret (DVALUE_Addr a) 
+          ret (DVALUE_Addr a)
         | DTYPE_Pointer, DVALUE_Poison, DTYPE_Pointer =>
           ret DVALUE_Poison
         | _, _, _ => raise "ill-typed_conv"
@@ -291,7 +291,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
           ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
         | DTYPE_I 32, DVALUE_Poison, DTYPE_Double =>
           ret DVALUE_Poison
-              
+
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
         | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
@@ -335,26 +335,26 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
           ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
         | DTYPE_I 32, DVALUE_Poison, DTYPE_Double =>
           ret DVALUE_Poison
-              
+
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
           ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
         | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
           ret DVALUE_Poison
 
         | _, _, _ => raise "ill typed Sitofp"
-        end 
+        end
       | Fptoui
-      | Fptosi 
+      | Fptosi
       | Fptrunc
       | Fpext => raise "TODO: unimplemented numeric conversion"
       | Inttoptr =>
         match t1, t2 with
         | DTYPE_I 64, DTYPE_Pointer => trigger (ItoP x)
         | _, _ => raise "ERROR: Inttoptr got illegal arguments"
-        end 
+        end
       | Ptrtoint =>
         match t1, t2 with
-        | DTYPE_Pointer, DTYPE_I 64 => trigger (PtoI x) 
+        | DTYPE_Pointer, DTYPE_I 64 => trigger (PtoI x)
         | _, _ => raise "ERROR: Ptrtoint got illegal arguments"
         end
       end.
@@ -468,9 +468,9 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
 (*
   [denote_exp] is the main entry point for evaluating LLVM expressions.
   top : is the type at which the expression should be evaluated (if any)
-  INVARIANT: 
-    - top may be None only for 
-        - EXP_Ident 
+  INVARIANT:
+    - top may be None only for
+        - EXP_Ident
         - OP_* cases
 
     - top must be Some t for the remaining EXP_* cases
@@ -580,7 +580,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
         | EXP_Array es =>
           vs <- map_monad eval_texp es ;;
           ret (UVALUE_Array vs)
-             
+
         | EXP_Vector es =>
           vs <- map_monad eval_texp es ;;
           ret (UVALUE_Vector vs)
@@ -591,7 +591,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
           if iop_is_div iop && negb (is_concrete v2)
           then dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2)) ;;
                uvalue_to_dvalue_binop2 (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-                                 (fun v1 v2 => translate _failure_UB_to_ExpE 
+                                 (fun v1 v2 => translate _failure_UB_to_ExpE
                                                       (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
                                  v1 dv2
           else uvalue_to_dvalue_binop (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
@@ -612,7 +612,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
           if fop_is_div fop && negb (is_concrete v2)
           then dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2)) ;;
                uvalue_to_dvalue_binop2 (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
-                                 (fun v1 v2 => translate _failure_UB_to_ExpE 
+                                 (fun v1 v2 => translate _failure_UB_to_ExpE
                                                       (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
                                  v1 dv2
           else uvalue_to_dvalue_binop (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
@@ -626,7 +626,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
           lift_err ret (uvalue_to_dvalue_binop (fun v1 v2 => ret (UVALUE_FCmp fcmp v1 v2))
                                          (fun v1 v2 => fmap dvalue_to_uvalue (eval_fcmp fcmp v1 v2))
                                          v1 v2)
-             
+
         | OP_Conversion conv dt1 op t2 =>
           v <- denote_exp (Some dt1) op ;;
           uvalue_to_dvalue_uop (fun v => ret (UVALUE_Conversion conv v t2))
@@ -637,41 +637,43 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
         (* CB TODO: Do we actually need to pick here? GEP doesn't do any derefs. *)
         | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
           vptr <- denote_exp (Some dt2) ptrval ;;
-          dvptr <- trigger (pick vptr True) ;;
           vs <- map_monad (fun '(_, index) => denote_exp (Some (DTYPE_I 32)) index) idxs ;;
+
+          (* Pick to get dvalues *)
+          dvptr <- trigger (pick vptr True) ;;
           dvs <- map_monad (fun v => trigger (pick v True)) vs ;;
-          trigger (GEP dt1 dvptr dvs)
+
+          res <- trigger (GEP dt1 dvptr dvs) ;;
+          ret (dvalue_to_uvalue res)
 
         | OP_ExtractElement vecop idx =>
           (*  'vec <- monad_app_snd (denote_exp e) vecop;
               'vidx <- monad_app_snd (denote_exp e) idx;  *)
-          raise "extractelement not implemented" (* TODO: Extract Element *) 
-                
+          raise "extractelement not implemented" (* TODO: Extract Element *)
+
         | OP_InsertElement vecop eltop idx =>
           (*  'vec <- monad_app_snd (denote_exp e) vecop;
               'v <- monad_app_snd (denote_exp e) eltop;
               'vidx <- monad_app_snd (denote_exp e) idx; *)
           raise "insertelement not implemented" (* TODO *)
-                
+
         | OP_ShuffleVector vecop1 vecop2 idxmask =>
           (*  'vec1 <- monad_app_snd (denote_exp e) vecop1;
-              'vec2 <- monad_app_snd (denote_exp e) vecop2;      
+              'vec2 <- monad_app_snd (denote_exp e) vecop2;
               'vidx <- monad_app_snd (denote_exp e) idxmask; *)
           raise "shufflevector not implemented" (* TODO *)
 
-        (* CB TODO: Do we need to pick here? *)
         | OP_ExtractValue (dt, str) idxs =>
           str <- denote_exp (Some dt) str;;
-          dstr <- trigger (pick str True) ;;
-          let fix loop str idxs : err dvalue :=
+          let fix loop str idxs : err uvalue :=
               match idxs with
               | [] => ret str
               | i :: tl =>
                 v <- index_into_str str i ;;
                loop v tl
               end in
-          lift_err ret (loop dstr idxs)
-                   
+          lift_err ret (loop str idxs)
+
         | OP_InsertValue strop eltop idxs =>
           (*
             '(t1, str) <- monad_app_snd (denote_exp e) strop;
@@ -688,25 +690,29 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
             end in
             loop str idxs*)
           raise "TODO"
-                
+
         | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
           cndv <- denote_exp (Some dt) cnd ;;
           v1   <- denote_exp (Some dt1) op1 ;;
           v2   <- denote_exp (Some dt2) op2 ;;
-          lift_err ret (eval_select cndv v1 v2)
-
+          match uvalue_to_dvalue cndv with
+          | inl e => ret (UVALUE_Select cndv v1 v2)
+          | inr dcndv => lift_err ret (eval_select dcndv v1 v2)
+          end
         end.
       Arguments denote_exp _ : simpl nomatch.
-      
-      Definition eval_op (o:exp dtyp) : LLVM exp_E dvalue :=
+
+      Definition eval_op (o:exp dtyp) : LLVM exp_E uvalue :=
         denote_exp None o.
       Arguments eval_op _ : simpl nomatch.
 
       (* An instruction has only side-effects, it therefore returns [unit] *)
+
       Definition denote_instr
                  (i: (instr_id * instr dtyp)): LLVM instr_E unit :=
         match i with
         (* Pure operations *)
+
         | (IId id, INSTR_Op op) =>
           dv <- translate exp_E_to_instr_E (eval_op op) ;;
           trigger (LocalWrite id dv)
@@ -714,63 +720,72 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
         (* Allocation *)
         | (IId id, INSTR_Alloca dt _ _) =>
           dv <- trigger (Alloca dt);;
-          trigger (LocalWrite id dv)
+          trigger (LocalWrite id (dvalue_to_uvalue dv))
 
         (* Load *)
         | (IId id, INSTR_Load _ dt (du,ptr) _) =>
-          da <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
+          ua <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
+          da <- trigger (pick ua True) ;;
           match da with
           | DVALUE_Poison => raiseUB "Load from poisoned address."
           | _ => dv <- trigger (Load dt da);;
-                 trigger (LocalWrite id dv)
+                 trigger (LocalWrite id (dvalue_to_uvalue dv))
           end
 
         (* Store *)
         | (IVoid _, INSTR_Store _ (dt, val) (du, ptr) _) =>
-          dv <- translate exp_E_to_instr_E (denote_exp (Some dt) val) ;;
-          da <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
+          uv <- translate exp_E_to_instr_E (denote_exp (Some dt) val) ;;
+          dv <- trigger (pick uv True) ;;
+          ua <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
+          da <- trigger (pick ua True) ;;
           match da with
           | DVALUE_Poison => raiseUB "Store to poisoned address."
           | _ => trigger (Store da dv)
           end
-          
+
         | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED LLVM ERROR: Store to non-void ID"
 
         (* Call *)
+        (* CB TODO: Do we need to pick here? *)
         | (pt, INSTR_Call (dt, f) args) =>
           debug ("call") ;;
-          dvs <-  map_monad (fun '(t, op) => (translate exp_E_to_instr_E (denote_exp (Some dt) op))) args ;; 
+          uvs <- map_monad (fun '(t, op) => (translate exp_E_to_instr_E (denote_exp (Some dt) op))) args ;;
+          dvs <- map_monad (fun x => trigger (pick x True)) uvs ;;
           returned_value <- 
           match Intrinsics.intrinsic_exp f with
-          | Some s => trigger (Intrinsic dt s dvs)
-          | None => fv  <- translate exp_E_to_instr_E (denote_exp None f) ;; 
-                         trigger (Call dt fv dvs)
+          | Some s =>
+            dv <- trigger (Intrinsic dt s dvs) ;;
+            ret (dvalue_to_uvalue dv)
+          | None =>
+            fv <- translate exp_E_to_instr_E (denote_exp None f) ;;
+            dfv <- trigger (pick fv True) ;;
+            trigger (Call dt dfv dvs)
           end
           ;;
           match pt with
           | IVoid _ => ret tt
           | IId id  => trigger (LocalWrite id returned_value)
-          end      
-          
+          end
+
         | (_, INSTR_Comment _) => ret tt
 
-        | (_, INSTR_Unreachable) => raise "IMPOSSIBLE: unreachable in reachable position" 
+        | (_, INSTR_Unreachable) => raise "IMPOSSIBLE: unreachable in reachable position"
 
         (* Currently unhandled LLVM instructions *)
         | (_, INSTR_Fence)
-        | (_, INSTR_AtomicCmpXchg) 
+        | (_, INSTR_AtomicCmpXchg)
         | (_, INSTR_AtomicRMW)
         | (_, INSTR_VAArg)
         | (_, INSTR_LandingPad) => raise "Unsupported LLVM instruction"
 
-        (* Error states *)                                     
+        (* Error states *)
         | (_, _) => raise "ID / Instr mismatch void/non-void"
-                         
+
         end.
 
       (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
-      Definition denote_terminator (t: terminator dtyp): LLVM exp_E (block_id + dvalue) :=
+      Definition denote_terminator (t: terminator dtyp): LLVM exp_E (block_id + uvalue) :=
         match t with
 
         | TERM_Ret (dt, op) =>
@@ -785,27 +800,27 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
 
         | TERM_Ret_void =>
           (* trigger LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
-          ret (inr DVALUE_None)
+          ret (inr UVALUE_None)
 
         | TERM_Br (dt,op) br1 br2 =>
-          dv <- denote_exp (Some dt) op ;; 
-          match dv with 
-          | DVALUE_I1 comparison_bit =>
+          uv <- denote_exp (Some dt) op ;;
+          match uv with
+          | UVALUE_I1 comparison_bit =>
             if eq comparison_bit one then
               ret (inl br1)
             else
               ret (inl br2)
-          | DVALUE_Poison => raiseUB "Branching on poison."
+          | UVALUE_Poison => raiseUB "Branching on poison."
           | _ => raise "Br got non-bool value"
-          end 
+          end
 
-        | TERM_Br_1 br => ret (inl br) 
+        | TERM_Br_1 br => ret (inl br)
 
-        (* Currently unhandled LLVM terminators *)                                  
+        (* Currently unhandled LLVM terminators *)
         | TERM_Switch _ _ _
         | TERM_IndirectBr _ _
         | TERM_Resume _
-        | TERM_Invoke _ _ _ _ => raise "Unsupport LLVM terminator" 
+        | TERM_Invoke _ _ _ _ => raise "Unsupport LLVM terminator"
         end.
 
       (* Denoting a list of instruction simply binds the trees together *)
@@ -817,7 +832,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
 
       (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-      Definition denote_block (b: block dtyp) : LLVM instr_E (block_id + dvalue) :=
+      Definition denote_block (b: block dtyp) : LLVM instr_E (block_id + uvalue) :=
         denote_code (blk_code dtyp b);;
         translate exp_E_to_instr_E (denote_terminator (snd (blk_term dtyp b))).
 
@@ -830,12 +845,12 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
          We then bind the resulting value in the underlying environment.
        *)
 
-      Definition denote_phi (bid : block_id) (id_p : local_id * phi dtyp) : LLVM exp_E (local_id * dvalue) :=
+      Definition denote_phi (bid : block_id) (id_p : local_id * phi dtyp) : LLVM exp_E (local_id * uvalue) :=
         let '(id, Phi dt args) := id_p in
         match assoc RawIDOrd.eq_dec bid args with
         | Some op =>
-          dv <- denote_exp (Some dt) op ;;
-          ret (id,dv)
+          uv <- denote_exp (Some dt) op ;;
+          ret (id,uv)
         | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
         end.
 
@@ -869,7 +884,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
         of types, just by deciding internally to loop or not and not reflect the invariant
         in the type.
        *)
-      Definition denote_cfg (f: cfg dtyp) : LLVM instr_E dvalue :=
+      Definition denote_cfg (f: cfg dtyp) : LLVM instr_E uvalue :=
         loop (fun (bid : block_id + block_id) =>
                 match bid with
                 | inl bid
@@ -886,7 +901,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
                       debug ("phi") ;;
                       dvs <- map_monad
                           (fun x => translate exp_E_to_instr_E (denote_phi bid x))
-                          (blk_phis _ block) ;; 
+                          (blk_phis _ block) ;;
                       map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
                       ret (inl bid)
                     end
@@ -904,18 +919,18 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
         | _, _ => failwith "combine_lists_err: different length lists"
         end.
 
-      
+
       (* The denotation of an LLVM function is a coq function that takes
          a list of dvalues and returns the appropriate semantics. *)
       Definition function_denotation : Type :=
-          list dvalue -> LLVM fun_E dvalue.
+          list dvalue -> LLVM fun_E uvalue.
 
       Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation  :=
         fun (args : list dvalue) =>
           (* We match the arguments variables to the inputs *)
           bs <- lift_err ret (combine_lists_err (df_args dtyp _ df) args) ;;
              (* generate the corresponding writes to the local stack frame *)
-          trigger (StackPush bs) ;;  
+          trigger (StackPush (map (fun '(k,v) => (k, dvalue_to_uvalue v)) bs)) ;;
           rv <- translate instr_E_to_fun_E (denote_cfg (df_instrs dtyp _ df));;
           trigger StackPop;;
           ret rv.
@@ -935,33 +950,55 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
        *)
 
 (* SAZ: for "open" MCFGs we have
-    - (m_declarations CFG) is the set of possible ExternalCalls 
+    - (m_declarations CFG) is the set of possible ExternalCalls
     - (List.map df_prototype (m_definitions CFG)) is the set of possilbe Entry Functions  (also internal calls)
  *)
       Definition lookup_defn {B} := (@assoc _ B (@dvalue_eq_dec)).
 
 
-  
+
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
+
+      Check @mrec.
+      Check @mrec CallE (CallE +' _)
+            (fun T call =>
+                   match call with
+                   | Call dt fv args =>
+                     match (lookup_defn fv _) with
+                     | Some f_den => (* If the call is internal *)
+                       (* and denote the [cfg]. *)
+                       translate _funE_to_CFG_Internal (f_den args)
+                     | None =>
+                       (* This must have been a registered external function  *)
+                       (* We _don't_ push a LLVM stack frame, since the external *)
+                       (* call takes place in one "atomic" step.
+                          SAZ: Not sure that we shouldn't at least push the memory frame
+                        *)
+
+                       (* We cast the call into an external CallE *)
+                       trigger (ExternalCall dt fv args)
+                     end
+                   end
+                ) _ .
+
       Definition denote_mcfg
-                 (fundefs:list (dvalue * function_denotation)) :
-        dtyp -> dvalue -> (list dvalue) -> LLVM _ dvalue :=
-        fun dt f_value args =>
+                 (fundefs:list (dvalue * function_denotation)) (dt : dtyp)
+                 (f_value : dvalue) (args : list dvalue) : LLVM _ uvalue :=
           @mrec CallE (CallE +' _)
                 (fun T call =>
                    match call with
                    | Call dt fv args =>
                      match (lookup_defn fv fundefs) with
-                     | Some f_den => (* If the call is internal *)                       
+                     | Some f_den => (* If the call is internal *)
                        (* and denote the [cfg]. *)
                        translate _funE_to_CFG_Internal (f_den args)
-                     | None => 
+                     | None =>
                        (* This must have been a registered external function  *)
                        (* We _don't_ push a LLVM stack frame, since the external *)
-                       (* call takes place in one "atomic" step. 
+                       (* call takes place in one "atomic" step.
                           SAZ: Not sure that we shouldn't at least push the memory frame
                         *)
-                       
+
                        (* We cast the call into an external CallE *)
                        trigger (ExternalCall dt fv args)
                      end
@@ -998,7 +1035,7 @@ Definition env_of_assoc {A} (l:list (raw_id * A)) : ENV.t A :=
   Inductive frame : Type :=
   | KRet      (e:env) (id:local_id) (q:pc)
   | KRet_void (e:env) (p:pc)
-  .       
+  .
   Definition stack := list frame.
 
   Definition state := (genv * pc * env * stack)%type.
@@ -1011,7 +1048,7 @@ Definition env_of_assoc {A} (l:list (raw_id * A)) : ENV.t A :=
 
   Definition stack_of (s:state) :=
     let '(g, p, e, k) := s in k.
-*)  
+*)
 
   (* Code related to manipulating the stack frame during a return *)
   (* Should be mostly irrelevant, but needs to be pondered. *)
@@ -1073,7 +1110,7 @@ YZ : Should not be used anymore?
 Inductive result :=
 | Done (v:dvalue)
 | Step (s:state)
-.       
+.
 
 Definition raise_p {X} (p:pc) s : LLVM (failureE +' debugE) X := raise (s ++ " in block: " ++ (to_string p)).
 Definition cont (s:state)  : LLVM (failureE +' debugE) result := ret (Step s).
@@ -1147,13 +1184,13 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
         (* This must have been a registered external function  *)
         (* We _don't_ push a LLVM stack frame, since the external *)
         (* call takes place in one "atomic" step. *)
-        
+
         match fid with
         | Name s =>
           match pt with
           | IVoid _ =>  (* void externals don't return a value *)
             vis (Call (eval_typ t) s dvs) (fun dv => cont (g, pc_next, e, k))
-                
+
                    | IId id => (* non-void externals are assumed to be type correct and bind a value *)
                      vis (Call (eval_typ t) s dvs)
                          (fun dv => cont (g, pc_next, add_env id dv e, k))

@@ -91,7 +91,7 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
 
   (* Generic calls, refined by [denote_mcfg] *)
   Variant CallE : Type -> Type :=
-  | Call        : forall (t:dtyp) (f:dvalue) (args:list dvalue), CallE dvalue.
+  | Call        : forall (t:dtyp) (f:dvalue) (args:list dvalue), CallE uvalue.
 
   (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
   Variant IntrinsicE : Type -> Type :=
@@ -167,7 +167,7 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
    *)
   Definition _CFG_INTERNAL := CallE +' _CFG.
 
-  Definition ExternalCall t f args : _CFG_INTERNAL dvalue := (inr1 (inl1 (Call t f args))).
+  Definition ExternalCall t f args : _CFG_INTERNAL uvalue := (inr1 (inl1 (Call t f args))).
   
   (* This inclusion "assumes" that all call events are internal.  The 
      dispatch in denote_mcfg then interprets some of the calls directly,
@@ -194,14 +194,18 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
       end.
 
   (* For multiple CFG, after interpreting [GlobalE] *)
-  Definition _MCFG1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE.
+  Definition _MCFG1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' UndefE.
 
   (* For multiple CFG, after interpreting [LocalE] *)
-  Definition _MCFG2 := CallE +' IntrinsicE +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE.
+  Definition _MCFG2 := CallE +' IntrinsicE +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' UndefE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
-  Definition _MCFG3 := CallE +' DebugE +' FailureE +' UndefinedBehaviourE.
-  Hint Unfold LLVM _CFG _MCFG1 _MCFG2 _MCFG3.
+  Definition _MCFG3 := CallE +' DebugE +' FailureE +' UndefinedBehaviourE +' UndefE.
+
+  (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [UndefE]*)
+  Definition _MCFG4 := CallE +' DebugE +' FailureE +' UndefinedBehaviourE.
+
+  Hint Unfold LLVM _CFG _MCFG1 _MCFG2 _MCFG3 _MCFG4.
 
   
   
