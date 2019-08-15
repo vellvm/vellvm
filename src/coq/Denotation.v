@@ -634,18 +634,26 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
                               (fmap dvalue_to_uvalue (eval_conv conv dt1 v t2)))
                          v
 
-        (* CB TODO: Do we actually need to pick here? GEP doesn't do any derefs. *)
+        (* CB TODO: Do we actually need to pick here? GEP doesn't do any derefs. Does it make sense to leave it as a UVALUE? *)
         | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
           vptr <- denote_exp (Some dt2) ptrval ;;
           vs <- map_monad (fun '(_, index) => denote_exp (Some (DTYPE_I 32)) index) idxs ;;
 
-          (* Pick to get dvalues *)
-          dvptr <- trigger (pick vptr True) ;;
-          dvs <- map_monad (fun v => trigger (pick v True)) vs ;;
+          let maybe_dvs := dvptr <- uvalue_to_dvalue vptr ;;
+                           dvs <- map_monad uvalue_to_dvalue vs ;;
+                           ret (dvptr, dvs)
+          in
 
-          res <- trigger (GEP dt1 dvptr dvs) ;;
-          ret (dvalue_to_uvalue res)
+          match maybe_dvs with
+          | inr (dvptr, dvs) => fmap dvalue_to_uvalue (trigger (GEP dt1 dvptr dvs))
+          | inl _ =>
+            (* Pick to get dvalues *)
+            dvptr <- trigger (pick vptr True) ;;
+            dvs <- map_monad (fun v => trigger (pick v True)) vs ;;
 
+            fmap dvalue_to_uvalue (trigger (GEP dt1 dvptr dvs))
+          end         
+          
         | OP_ExtractElement vecop idx =>
           (*  'vec <- monad_app_snd (denote_exp e) vecop;
               'vidx <- monad_app_snd (denote_exp e) idx;  *)
