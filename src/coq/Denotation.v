@@ -745,7 +745,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
           uv <- translate exp_E_to_instr_E (denote_exp (Some dt) val) ;;
           dv <- trigger (pick uv True) ;;
           ua <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
-          da <- trigger (pick ua True) ;;
+          da <- trigger (pick ua (exists x, forall da, concretize ua da -> da = x)) ;;
           match da with
           | DVALUE_Poison => raiseUB "Store to poisoned address."
           | _ => trigger (Store da dv)
@@ -766,7 +766,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
             ret (dvalue_to_uvalue dv)
           | None =>
             fv <- translate exp_E_to_instr_E (denote_exp None f) ;;
-            dfv <- trigger (pick fv True) ;;
+            dfv <- trigger (pick fv True) ;; (* TODO, should this be unique? *)
             trigger (Call dt dfv dvs)
           end
           ;;
