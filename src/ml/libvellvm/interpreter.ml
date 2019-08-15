@@ -54,7 +54,7 @@ let debug (msg:string) =
 
 *)
 
-let rec step (m : ('a TopLevel.IO._MCFG3, TopLevel.M.memory * ((TopLevel.local_env * (LLVMAst.raw_id * TopLevel.IO.DV.uvalue) list Stack.stack) * (TopLevel.global_env * TopLevel.IO.DV.dvalue))) TopLevel.IO.coq_LLVM) : (DV.dvalue, string) result =
+let rec step (m : ('a TopLevel.IO._MCFG4, TopLevel.M.memory * ((TopLevel.local_env * (LLVMAst.raw_id * TopLevel.IO.DV.uvalue) list Stack.stack) * (TopLevel.global_env * TopLevel.IO.DV.dvalue))) TopLevel.IO.coq_LLVM) : (DV.dvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -82,17 +82,16 @@ let rec step (m : ('a TopLevel.IO._MCFG3, TopLevel.M.memory * ((TopLevel.local_e
 
   (* The only visible effects from LLVMIO that should propagate to the interpreter are:
      - Call to external functions
-     - Debug  
+     - Debug
   *)
 
       (* | Call(_, f, _) ->
        *   (Printf.printf "UNINTERPRETED EXTERNAL CALL: %s - returning 0l to the caller\n"
        *      (Camlcoq.camlstring_of_coqstring f));
        *   step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero))) *)
-    
 
 
-let interpret (prog:(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.uvalue, string) result =
+let interpret (prog:(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
   match TopLevel.run_with_memory prog with
   | None -> failwith "ERROR: bad module"
   | Some t -> step t

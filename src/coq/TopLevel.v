@@ -112,7 +112,7 @@ Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
   TransformTypes.fmap_mcfg _ _ (eval_typ CFG) CFG.
 
 
-Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ)))) :
+Definition run_with_memory' (prog: list (toplevel_entity typ (list (block typ)))) :
   option (LLVM _MCFG3 (M.memory * ((local_env * stack) * (global_env * uvalue)))) :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
     ucfg <- CFG.mcfg_of_modul _ scfg ;;
@@ -141,3 +141,26 @@ Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ))))
     
     let interpreted_Trace := M.run_memory mem_trace M.empty in
     ret interpreted_Trace.
+
+Program Definition interp_undef {X} (trace : LLVM _MCFG3 X) : LLVM _MCFG4 X.
+unfold _MCFG3 in *. unfold _MCFG4.
+eapply interp. 2: exact trace.
+intros T E.
+
+repeat match goal with
+| [ H : (?e +' ?E) ?T |- _ ] => destruct H as [event | undef]; try apply (trigger event)
+end.
+
+apply concretize_picks; auto.
+Defined.
+
+Program Definition embed_in_mcfg4 (T : Type) (E: (Failure.FailureE +' UndefinedBehaviour.UndefinedBehaviourE) T) : _MCFG4 T.
+firstorder.
+Defined.
+
+Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ)))) :
+  option (LLVM _MCFG4 (M.memory * ((local_env * stack) * (global_env * dvalue)))) :=
+  match run_with_memory' prog with
+  | Some trace => ret ('(m, (env, (genv, uv))) <- (interp_undef trace);; dv <- translate embed_in_mcfg4 (concretize_uvalue uv);; ret (m, (env, (genv, dv))))
+  | None => None
+  end.

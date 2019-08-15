@@ -173,10 +173,6 @@ let poison_test = function
   | IO.DV.DVALUE_Poison -> true
   | _ -> false
 
-let undef_test = function
-  | IO.DV.DVALUE_Undef -> true
-  | _ -> false
-
 let i1_test (i1:int1) = function
   | IO.DV.DVALUE_I1 i2 ->
      Int1.eq i1 i2
