@@ -966,29 +966,6 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
 
 
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
-
-      Check @mrec.
-      Check @mrec CallE (CallE +' _)
-            (fun T call =>
-                   match call with
-                   | Call dt fv args =>
-                     match (lookup_defn fv _) with
-                     | Some f_den => (* If the call is internal *)
-                       (* and denote the [cfg]. *)
-                       translate _funE_to_CFG_Internal (f_den args)
-                     | None =>
-                       (* This must have been a registered external function  *)
-                       (* We _don't_ push a LLVM stack frame, since the external *)
-                       (* call takes place in one "atomic" step.
-                          SAZ: Not sure that we shouldn't at least push the memory frame
-                        *)
-
-                       (* We cast the call into an external CallE *)
-                       trigger (ExternalCall dt fv args)
-                     end
-                   end
-                ) _ .
-
       Definition denote_mcfg
                  (fundefs:list (dvalue * function_denotation)) (dt : dtyp)
                  (f_value : dvalue) (args : list dvalue) : LLVM _ uvalue :=
