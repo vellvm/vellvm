@@ -32,7 +32,8 @@ From Vellvm Require Import
      Intrinsics
      LLVMAst
      Util
-     Error.
+     Error
+     Pick.
 
 
 Import MonadNotation.
@@ -43,7 +44,7 @@ Module IO := LLVMEvents.Make(Memory.A).
 Module M := Memory.Make(IO).
 Module D := Denotation(Memory.A)(IO).
 Module INT := Intrinsics.Make(Memory.A)(IO).
-
+Module P := Pick.Make(Memory.A)(IO).
 Import IO.
 Export IO.DV.
 
@@ -148,7 +149,7 @@ repeat match goal with
 | [ H : (?e +' ?E) ?T |- _ ] => destruct H as [event | undef]; try apply (trigger event)
 end.
 
-apply concretize_picks; auto.
+apply P.concretize_picks; auto.
 Defined.
 
 Program Definition embed_in_mcfg4 (T : Type) (E: (Failure.FailureE +' UndefinedBehaviour.UndefinedBehaviourE) T) : _MCFG4 T.
@@ -158,6 +159,6 @@ Defined.
 Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ)))) :
   option (LLVM _MCFG4 (M.memory * ((local_env * stack) * (global_env * dvalue)))) :=
   match run_with_memory' prog with
-  | Some trace => ret ('(m, (env, (genv, uv))) <- (interp_undef trace);; dv <- translate embed_in_mcfg4 (concretize_uvalue uv);; ret (m, (env, (genv, dv))))
+  | Some trace => ret ('(m, (env, (genv, uv))) <- (interp_undef trace);; dv <- translate embed_in_mcfg4 (P.concretize_uvalue uv);; ret (m, (env, (genv, dv))))
   | None => None
   end.

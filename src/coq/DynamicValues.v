@@ -130,14 +130,6 @@ Inductive uvalue : Set :=
 | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
 .
 
-(* An event resolving the non-determinism induced by undef.
-   The argument _P_ is intended to be a predicate over the set
-   of dvalues _u_ can take such that if it is not satisfied, the
-   only possible execution is to raise _UB_.
- *)
-Variant UndefE : Type -> Type :=
-  | pick (u:uvalue) (P : Prop) : UndefE dvalue.
-
 (* Injection of [dvalue] into [uvalue] *)
 Fixpoint dvalue_to_uvalue (dv : dvalue) : uvalue :=
   match dv with
@@ -1126,90 +1118,131 @@ Class VInt I : Type :=
   Arguments insert_into_str _ _ _ : simpl nomatch.
 
 (*  ------------------------------------------------------------------------- *)
-  (** TODO: Add [uvalue] *)
 
-(* Handler for UndefE which concretizes everything to 0 *)
-Fixpoint default_dvalue_of_dtyp (dt : dtyp) : dvalue :=
-  match dt with
-  | DTYPE_I sz =>
-      (* CB TODO: better way? *)
-      match sz with
-      | 1  => DVALUE_I1 (repr 0)
-      | 8  => DVALUE_I8 (repr 0)
-      | 32 => DVALUE_I32 (repr 0)
-      | 64 => DVALUE_I64 (repr 0)
-      | _  => DVALUE_None
-      end
-  | DTYPE_Pointer => DVALUE_Addr A.null
-  | DTYPE_Void => DVALUE_None
-  | DTYPE_Half => DVALUE_Float Float32.zero (* ??? *)
-  | DTYPE_Float => DVALUE_Float Float32.zero
-  | DTYPE_Double => DVALUE_Float Float32.zero (* ??? *)
-  | DTYPE_X86_fp80 => DVALUE_Float Float32.zero (* ??? *)
-  | DTYPE_Fp128 => DVALUE_Float Float32.zero (* ??? *)
-  | DTYPE_Ppc_fp128 => DVALUE_Float Float32.zero (* ??? *)
-  | DTYPE_Metadata => DVALUE_None (* ??? *)
-  | DTYPE_X86_mmx => DVALUE_None (* ??? *)
-  | DTYPE_Array sz t => DVALUE_Array (repeat (default_dvalue_of_dtyp t) (Z.to_nat sz))
-  | DTYPE_Struct fields => DVALUE_Struct (map default_dvalue_of_dtyp fields)
-  | DTYPE_Packed_struct fields => DVALUE_Packed_struct (map default_dvalue_of_dtyp fields)
-  | DTYPE_Opaque => DVALUE_None (* ??? *)
-  | DTYPE_Vector sz t => DVALUE_Vector (repeat (default_dvalue_of_dtyp t) (Z.to_nat sz))
-  end.
+  (* Interpretation of [uvalue] in terms of sets of [dvalue].
+     Essentially used to implemenmt the handler for [pick], but also required to
+     define some predicates passed as arguments to the [pick] events, hence why
+     it's defined here.
+   *)
+
+  Definition vector_dtyp dt :=
+    forall n, dt = DTYPE_I n \/ dt = DTYPE_Pointer \/ dt = DTYPE_Half \/ dt = DTYPE_Float \/
+         dt = DTYPE_Double \/ dt = DTYPE_X86_fp80 \/ dt = DTYPE_Fp128 \/ dt = DTYPE_Ppc_fp128.
+
+  Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
+  | DVALUE_Addr_typ   : forall a, dvalue_has_dtyp (DVALUE_Addr a) DTYPE_Pointer
+  | DVALUE_I1_typ     : forall x, dvalue_has_dtyp (DVALUE_I1 x) (DTYPE_I 1)
+  | DVALUE_I8_typ     : forall x, dvalue_has_dtyp (DVALUE_I8 x) (DTYPE_I 8)
+  | DVALUE_I32_typ    : forall x, dvalue_has_dtyp (DVALUE_I32 x) (DTYPE_I 32)
+  | DVALUE_I64_typ    : forall x, dvalue_has_dtyp (DVALUE_I64 x) (DTYPE_I 64)
+  | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
+  | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
+  | DVALUE_Poison_typ : forall dt, dvalue_has_dtyp DVALUE_Poison dt
+  | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
+
+  | DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
+  | DVALUE_Struct_Cons_typ :
+      forall f dt fields dts,
+        dvalue_has_dtyp f dt ->
+        dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
+        dvalue_has_dtyp (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts))
+
+  | DVALUE_Packed_struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Packed_struct []) (DTYPE_Packed_struct [])
+  | DVALUE_Packed_struct_Cons_typ :
+      forall f dt fields dts,
+        dvalue_has_dtyp f dt ->
+        dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
+        dvalue_has_dtyp (DVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts))
+
+  (* CB TODO: Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
+  | DVALUE_Array_typ :
+      forall xs sz dt,
+        Forall (fun x => dvalue_has_dtyp x dt) xs ->
+        length xs = sz ->
+        dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt)
+
+  | DVALUE_Vector_typ :
+      forall xs sz dt,
+        Forall (fun x => dvalue_has_dtyp x dt) xs ->
+        length xs = sz ->
+        vector_dtyp dt ->
+        dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt)
+  .
+
+  Inductive concretize : uvalue -> dvalue -> Prop :=
+  (* Concrete uvalue are contretized into their singleton *)
+  | Pick_concrete             : forall uv dv, uvalue_to_dvalue uv = inr dv -> concretize uv dv
+
+  (* Undef relates to all dvalue of the type *)
+  | Concretize_Undef          : forall dt dv, dvalue_has_dtyp dv dt ->  concretize (UVALUE_Undef dt) dv
+
+  (* The other operations proceed non-deterministically *)
+  | Concretize_IBinop : forall iop uv1 dv1 uv2 dv2 res,
+      concretize uv1 dv1 ->
+      concretize uv2 dv2 ->
+      eval_iop iop dv1 dv2 = ret res ->
+      concretize (UVALUE_IBinop iop uv1 uv2) res
+
+  | Concretize_ICmp : forall cmp uv1 dv1 uv2 dv2 res,
+      concretize uv1 dv1 ->
+      concretize uv2 dv2 ->
+      eval_icmp cmp dv1 dv2 = inr res  ->
+      concretize (UVALUE_ICmp cmp uv1 uv2) res
+
+  | Concretize_FBinop : forall fop fm uv1 dv1 uv2 dv2 res,
+      concretize uv1 dv1 ->
+      concretize uv2 dv2 ->
+      eval_fop fop dv1 dv2 = ret res ->
+      concretize (UVALUE_FBinop fop fm uv1 uv2) res
+
+  | Concretize_FCmp : forall cmp uv1 dv1 uv2 dv2 res,
+      concretize uv1 dv1 ->
+      concretize uv2 dv2 ->
+      eval_fcmp cmp dv1 dv2 = inr res ->
+      concretize (UVALUE_FCmp cmp uv1 uv2) res
+
+  | Concretize_Struct_Nil     : concretize (UVALUE_Struct []) (DVALUE_Struct [])
+  | Concretize_Struct_Cons    : forall u d us ds,
+      concretize u d ->
+      concretize (UVALUE_Struct us) (DVALUE_Struct ds) ->
+      concretize (UVALUE_Struct (u :: us)) (DVALUE_Struct (d :: ds))
 
 
-Fixpoint concretize_uvalue (u : uvalue) : itree (FailureE +' UndefinedBehaviourE) dvalue :=
-  match u with
-  | UVALUE_Addr a                          => ret (DVALUE_Addr a)
-  | UVALUE_I1 x                            => ret (DVALUE_I1 x)
-  | UVALUE_I8 x                            => ret (DVALUE_I8 x)
-  | UVALUE_I32 x                           => ret (DVALUE_I32 x)
-  | UVALUE_I64 x                           => ret (DVALUE_I64 x)
-  | UVALUE_Double x                        => ret (DVALUE_Double x)
-  | UVALUE_Float x                         => ret (DVALUE_Float x)
-  | UVALUE_Undef t                         => ret (default_dvalue_of_dtyp t)
-  | UVALUE_Poison                          => ret (DVALUE_Poison)
-  | UVALUE_None                            => ret DVALUE_None
-  | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalue fields ;;
-                                              ret (DVALUE_Struct dfields)
-  | UVALUE_Packed_struct fields            => 'dfields <- map_monad concretize_uvalue fields ;;
-                                              ret (DVALUE_Packed_struct dfields)
-  | UVALUE_Array elts                      => 'delts <- map_monad concretize_uvalue elts ;;
-                                              ret (DVALUE_Array delts)
-  | UVALUE_Vector elts                     => 'delts <- map_monad concretize_uvalue elts ;;
-                                              ret (DVALUE_Vector delts)
-  | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalue v1 ;;
-                                              dv2 <- concretize_uvalue v2 ;;
-                                              eval_iop iop dv1 dv2
-  | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
-                                              dv2 <- concretize_uvalue v2 ;;
-                                              lift_err ret (eval_icmp cmp dv1 dv2)
-  | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalue v1 ;;
-                                              dv2 <- concretize_uvalue v2 ;;
-                                              eval_fop fop dv1 dv2
-  | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
-                                              dv2 <- concretize_uvalue v2 ;;
-                                              lift_err ret (eval_fcmp cmp dv1 dv2)
-  | _ => raise "unimplemented concretization of uvalue"
-(*
-  | UVALUE_Conversion conv v t_to          => 
-  | UVALUE_GetElementPtr t ptrval idxs     => _
-  | UVALUE_ExtractElement vec idx          => _
-  | UVALUE_InsertElement vec elt idx       => _
-  | UVALUE_ShuffleVector vec1 vec2 idxmask => _
-  | UVALUE_ExtractValue vec idxs           => _
-  | UVALUE_InsertValue vec elt idxs        => _
-  | UVALUE_Select cnd v1 v2                => _
-*)
-  end.
+  | Concretize_Packed_struct_Nil     : concretize (UVALUE_Packed_struct []) (DVALUE_Packed_struct [])
+  | Concretize_Packed_struct_Cons    : forall u d us ds,
+      concretize u d ->
+      concretize (UVALUE_Packed_struct us) (DVALUE_Packed_struct ds) ->
+      concretize (UVALUE_Packed_struct (u :: us)) (DVALUE_Packed_struct (d :: ds))
 
-Program Definition concretize_picks {E} `{FailureE -< E} `{UndefinedBehaviourE -< E} : UndefE ~> itree E.
-refine (fun T p => match p with
-             | pick u P => translate _ (concretize_uvalue u)
-             end).
-refine (fun T fu => _).
-destruct fu; auto.
-Defined.
+  | Concretize_Array_Nil :
+      concretize (UVALUE_Array []) (DVALUE_Array [])
+
+  | Concretize_Array_Cons : forall u d us ds,
+      concretize u d ->
+      concretize (UVALUE_Array us) (DVALUE_Array ds) ->
+      concretize (UVALUE_Array (u :: us)) (DVALUE_Array (d :: ds))
+
+  | Concretize_Vector_Nil :
+      concretize (UVALUE_Vector []) (DVALUE_Vector [])
+
+  | Concretize_Vector_Cons : forall u d us ds,
+      concretize u d ->
+      concretize (UVALUE_Vector us) (DVALUE_Vector ds) ->
+      concretize (UVALUE_Vector (u :: us)) (DVALUE_Vector (d :: ds))
+  .
+
+  (*
+    YZ TODO: Not sure whether those can be uvalues, to figure out
+  | Concretize_Conversion     : pickU (UVALUE_Conversion       _) (DVALUE_Conversion       _)
+  | Concretize_GetElementPtr  : pickU (UVALUE_GetElementPtr    _) (DVALUE_GetElementPtr    _)
+  | Concretize_ExtractElement : pickU (UVALUE_ExtractElement   _) (DVALUE_ExtractElement   _)
+  | Concretize_InsertElement  : pickU (UVALUE_InsertElement    _) (DVALUE_InsertElement    _)
+  | Concretize_ShuffleVector  : pickU (UVALUE_ShuffleVector    _) (DVALUE_ShuffleVector    _)
+  | Concretize_ExtractValue   : pickU (UVALUE_ExtractValue     _) (DVALUE_ExtractValue     _)
+  | Concretize_InsertValue    : pickU (UVALUE_InsertValue      _) (DVALUE_InsertValue      _)
+  | Concretize_Select         : pickU (UVALUE_Select           _) (DVALUE_Select           _)
+  .
+   *)
 
 
 End DVALUE.

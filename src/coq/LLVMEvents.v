@@ -114,6 +114,14 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Variant DebugE : Type -> Type :=
   | Debug : string -> DebugE unit.
 
+  (* An event resolving the non-determinism induced by undef.
+   The argument _P_ is intended to be a predicate over the set
+   of dvalues _u_ can take such that if it is not satisfied, the
+   only possible execution is to raise _UB_.
+   *)
+  Variant UndefE : Type -> Type :=
+  | pick (u:uvalue) (P : Prop) : UndefE dvalue.
+
   (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
 
   Definition LLVM X := itree X.
