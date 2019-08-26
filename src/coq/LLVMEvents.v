@@ -101,7 +101,7 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   (* Interactions with the memory for the LLVM IR *)
   Variant MemoryE : Type -> Type :=
   | Alloca : forall (t:dtyp),                             (MemoryE dvalue)
-  | Load   : forall (t:dtyp) (a:dvalue),                  (MemoryE dvalue)
+  | Load   : forall (t:dtyp) (a:dvalue),                  (MemoryE uvalue)
   | Store  : forall (a:dvalue) (v:dvalue),                (MemoryE unit)
   | GEP    : forall (t:dtyp) (v:dvalue) (vs:list dvalue), (MemoryE dvalue)
   | ItoP   : forall (i:dvalue),                           (MemoryE dvalue)
@@ -118,7 +118,7 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
 
   Definition LLVM X := itree X.
 
-  Definition LLVMGEnvE := (GlobalE raw_id uvalue).
+  Definition LLVMGEnvE := (GlobalE raw_id dvalue).
   Definition LLVMEnvE := (LocalE raw_id uvalue).
   Definition LLVMStackE := (StackE raw_id uvalue).
 

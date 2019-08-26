@@ -1052,7 +1052,6 @@ Class VInt I : Type :=
 
   End ARITHMETIC.
 
-
   (* Same deal as above with the helper *)
   Definition eval_select_h (cnd : dvalue) (v1 v2 : uvalue) : err uvalue :=
     match v1, v2 with
@@ -1066,8 +1065,8 @@ Class VInt I : Type :=
       | _ => failwith "ill_typed-select"
       end
     end.
-  Arguments eval_select_h _ _ _ : simpl nomatch.
 
+  Arguments eval_select_h _ _ _ : simpl nomatch.
 
   Definition eval_select cnd v1 v2 : err uvalue :=
     match cnd, v1, v2 with

@@ -458,8 +458,8 @@ Admitted.
         | DVALUE_Addr (b, i) =>
           ret match lookup b m with
               | Some block =>
-                (m, deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t)
-              | None => (m, DVALUE_Poison) (* CB TODO: This is probably *NOT* poison *)
+                (m, dvalue_to_uvalue (deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t))
+              | None => (m, UVALUE_Undef t) (* CB TODO: This is probably *NOT* poison *)
               end
         | _ => raise "Load got non-address dvalue"
         end

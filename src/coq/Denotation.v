@@ -437,7 +437,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
   .
 
   (*
-    YZ TODO: Note sure whether those can be uvalues, to figure out
+    YZ TODO: Not sure whether those can be uvalues, to figure out
   | Concretize_Conversion     : pickU (UVALUE_Conversion       _) (DVALUE_Conversion       _)
   | Concretize_GetElementPtr  : pickU (UVALUE_GetElementPtr    _) (DVALUE_GetElementPtr    _)
   | Concretize_ExtractElement : pickU (UVALUE_ExtractElement   _) (DVALUE_ExtractElement   _)
@@ -459,9 +459,10 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".
 
+  (* YZ: GlobalRead should always returns a dvalue. We can either carry the invariant, or cast [dvalue_to_uvalue] here *)
   Definition lookup_id (i:ident) : LLVM lookup_E uvalue :=
     match i with
-    | ID_Global x => trigger (GlobalRead x)
+    | ID_Global x => dv <- trigger (GlobalRead x);; ret (dvalue_to_uvalue dv)
     | ID_Local x  => trigger (LocalRead x)
     end.
 
@@ -508,6 +509,11 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
     | _               => False
     end.
 
+(*
+  local: uvalue (fully blown)
+  global: dvalue
+  mem: dvalue + undef?
+ *) 
   Fixpoint denote_exp
            (top:option dtyp) (o:exp dtyp) {struct o} : LLVM exp_E uvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
@@ -737,7 +743,7 @@ Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
           match da with
           | DVALUE_Poison => raiseUB "Load from poisoned address."
           | _ => dv <- trigger (Load dt da);;
-                 trigger (LocalWrite id (dvalue_to_uvalue dv))
+                trigger (LocalWrite id dv)
           end
 
         (* Store *)
