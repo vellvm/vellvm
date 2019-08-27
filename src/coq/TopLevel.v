@@ -25,15 +25,15 @@ From Vellvm Require Import
      DynamicTypes
      LLVMEvents
      Denotation
-     Global
-     Local
-     Stack
-     Memory
-     Intrinsics
+     Handlers.Global
+     Handlers.Local
+     Handlers.Stack
+     Handlers.Memory
+     Handlers.Intrinsics
      LLVMAst
      Util
      Error
-     Pick.
+     Handlers.Pick.
 
 
 Import MonadNotation.
@@ -162,3 +162,4 @@ Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ))))
   | Some trace => ret ('(m, (env, (genv, uv))) <- (interp_undef trace);; dv <- translate embed_in_mcfg4 (P.concretize_uvalue uv);; ret (m, (env, (genv, dv))))
   | None => None
   end.
+

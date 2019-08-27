@@ -19,7 +19,7 @@ Open Scope string_scope.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Require Import Vellvm.Memory.
+Require Import Vellvm.Handlers.Memory.
 
 Definition optimization {T} := definition T (list (block T)) -> definition T (list (block T)).
 

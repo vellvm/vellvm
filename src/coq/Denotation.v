@@ -39,7 +39,9 @@ From Vellvm Require Import
      MemoryAddress
      LLVMEvents
      TypeUtil
-     Intrinsics.
+     Handlers.Intrinsics.
+
+(* YZ: Undesirable dependency on Handlers/Intrinsics: move [intrinsic_exp] somewhere else? *)
 
 Import Sum.
 Import Subevent.

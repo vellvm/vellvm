@@ -34,9 +34,31 @@ From Vellvm Require Import
      DynamicTypes
      DynamicValues
      Error
-     UndefinedBehaviour
-     Failure.
+     Failure
+     UndefinedBehaviour.
 
+(****************************** LLVM Events *******************************)
+(**
+   Vellvm's semantics relies on _Interaction Trees_, a generic data-structure allowing to model
+   effectful computations.
+   This file defined the interface provided to the interaction trees, that is the set of
+   events that a LLVM program can trigger.
+   These events are then concretely interpreted as a succesion of handler, as defined in the
+   _Handlers_ folder.
+   The possible events are:
+   * Function calls [CallE]
+   * Calls to intrinsics whose implementation _do not_ depends on the memory [IntrinsicE]
+   * Interactions with the global environment [GlobalE]
+   * Interactions with the local environment [LocalE]
+   * Manipulation of the frame stack [StackE]
+   * Interactions with the memory [MemoryE]
+   * Concretization of a subdefined value [PickE]
+   * Undefined behaviour [UndefinedBehaviourE]
+   * Failure [FailureE]
+   * Debugging messages [DebugE]
+   The [FailureE] and [DebugE] events are defined in their own files for dependency reasons
+   since they can show up in the evaluation of pure expressions as performed in _DynamicValues_.
+*)
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -53,8 +75,8 @@ Set Contextual Implicit.
   | LocalRead  (id: k): LocalE k v v.
   
   Variant StackE (k v:Type) : Type -> Type :=
-    | StackPush (args: list (k * v)) : StackE k v unit (* Pushes a fresh environment during a call *)
-    | StackPop : StackE k v unit. (* Pops it back during a ret *)
+  | StackPush (args: list (k * v)) : StackE k v unit (* Pushes a fresh environment during a call *)
+  | StackPop : StackE k v unit. (* Pops it back during a ret *)
 
 (* SAZ: TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism
    not functors. *)
@@ -73,21 +95,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Module DV := DynamicValues.DVALUE(ADDR).
   Export DV.
-
-  (****************************** LLVM Events *******************************)
-  (**
-   We define the denotation of an LLVM program as computation emitting several families of events.
-   These events are then concretely interpreted as a succesion of handler.
-   In the current approach, we fix at the top level both the universe of events, and the order in which
-   they get handled. More specifically:
-   * a single CFG is an [itree (CallE +' LocalE +' MemoryE +' +' IntrinsicE +' MemoryIntrinsicE +' FailureE +' DebugE)]
-   * [denote_mcfg] ties the functional knot, interpreting away [CallE]
-   * [Local] interprets away [LocalE]
-   * [Memory] interprets away [MemoryE]
-   * Both kind of intrinsics admit handlers that do not interpret away their respective universe of events, since there might remain some of them
-
-YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. However, that means that [Memory] cannot interpret away [MemoryE] anymore.
-   *)
 
   (* Generic calls, refined by [denote_mcfg] *)
   Variant CallE : Type -> Type :=
@@ -119,8 +126,8 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
    of dvalues _u_ can take such that if it is not satisfied, the
    only possible execution is to raise _UB_.
    *)
-  Variant UndefE : Type -> Type :=
-  | pick (u:uvalue) (P : Prop) : UndefE dvalue.
+  Variant PickE : Type -> Type :=
+  | pick (u:uvalue) (P : Prop) : PickE dvalue.
 
   (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
 
@@ -130,9 +137,9 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
   Definition LLVMEnvE := (LocalE raw_id uvalue).
   Definition LLVMStackE := (StackE raw_id uvalue).
 
-  Definition conv_E := MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' UndefE.
+  Definition conv_E := MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE.
   Definition lookup_E := LLVMGEnvE +' LLVMEnvE.
-  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' UndefE.
+  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE.
 
   Definition lookup_E_to_exp_E : lookup_E ~> exp_E :=
     fun T e =>
@@ -153,7 +160,7 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
     fun T e => inr1 e.
 
   (* Core effects - no distinction between "internal" and "external" calls. *)
-  Definition _CFG := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' UndefE.
+  Definition _CFG := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE.
       
   Definition _funE_to_CFG : fun_E ~> _CFG :=
     fun R e =>
@@ -202,15 +209,15 @@ YZ NOTE: It makes sense for [MemoryIntrinsicE] to actually live in [MemoryE]. Ho
       end.
 
   (* For multiple CFG, after interpreting [GlobalE] *)
-  Definition _MCFG1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' UndefE.
+  Definition _MCFG1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE.
 
   (* For multiple CFG, after interpreting [LocalE] *)
-  Definition _MCFG2 := CallE +' IntrinsicE +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' UndefE.
+  Definition _MCFG2 := CallE +' IntrinsicE +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
-  Definition _MCFG3 := CallE +' DebugE +' FailureE +' UndefinedBehaviourE +' UndefE.
+  Definition _MCFG3 := CallE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE.
 
-  (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [UndefE]*)
+  (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickE]*)
   Definition _MCFG4 := CallE +' DebugE +' FailureE +' UndefinedBehaviourE.
 
   Hint Unfold LLVM _CFG _MCFG1 _MCFG2 _MCFG3 _MCFG4.

@@ -25,8 +25,8 @@ From Vellvm Require Import
      AstLib
      MemoryAddress
      Error
-     UndefinedBehaviour
      Failure
+     UndefinedBehaviour
      DynamicTypes
      Util.
 
@@ -806,7 +806,6 @@ Class VInt I : Type :=
       ret (to_dvalue (xor x y))
     end.
   Arguments eval_int_op _ _ _ : simpl nomatch.
-
 
   (* Evaluate the given iop on the given arguments according to the bitsize *)
   Definition integer_op (bits:Z) (iop:ibinop) (x y:inttyp bits) : itree (FailureE +' UndefinedBehaviourE) dvalue :=

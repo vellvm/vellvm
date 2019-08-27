@@ -31,7 +31,7 @@ From Vellvm Require Import
      DynamicTypes
      DynamicValues
      Denotation
-     Memory
+     Handlers.Memory
      LLVMEvents.
 
 Import EqvNotation.
@@ -534,8 +534,8 @@ Module RENAMING
   Instance swap_of_DebugE {X} : Swap (DebugE X) := fun id1 id2 x => x.
   Instance swap_of_FailureE {X} : Swap (FailureE X) := fun id1 id2 x => x.
   Instance swap_of_UndefinedBehaviourE {X} : Swap (UndefinedBehaviourE X) := fun id1 id2 x => x.
-  Instance swap_of_UndefE {X} : Swap (UndefE X) := fun id1 id2 x => x.
-  Hint Unfold swap_of_MemoryE swap_of_StackE swap_of_LocalE swap_of_GlobalE swap_of_CallE swap_of_IntrinsicE swap_of_DebugE FailureE swap_of_FailureE swap_of_UndefinedBehaviourE swap_of_UndefE.
+  Instance swap_of_PickE {X} : Swap (PickE X) := fun id1 id2 x => x.
+  Hint Unfold swap_of_MemoryE swap_of_StackE swap_of_LocalE swap_of_GlobalE swap_of_CallE swap_of_IntrinsicE swap_of_DebugE FailureE swap_of_FailureE swap_of_UndefinedBehaviourE swap_of_PickE.
 
   Instance swap_of_sum {A B} `{Swap A} `{Swap B}: Swap (A + B) :=
     fun id1 id2 ab =>

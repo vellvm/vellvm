@@ -1,5 +1,5 @@
 Require Vellvm.TopLevel.
-Require Vellvm.Transform.
+Require Vellvm.Transformations.Transform.
 
 
 Require ExtrOcamlBasic.
