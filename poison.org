@@ -615,3 +615,59 @@ that llvm supports.
    ret i32 %b
 
    Particular case of test38.
+
+
+* Refinement relation
+  
+  These relations should be justified by a refinement on programs, defined in terms of some flavor 
+  of an observational refinement on the denotations of these programs.
+  We however have a significant margin in design space to do so.
+
+** Refinement of uvalues
+
+   We first want to define the refinement [R: uvalue -> uvalue -> Prop] as:
+   - undef R poison
+   - uv1 R uv2 if concretization(uv1) is included in concretization(uv2)
+
+** A hierarchy of refinements?
+
+   Refinements are mainly relations over itrees. We can however define one such for each interface.
+
+*** The _true_ refinement?
+    At its core, the one of interest should be defined over the signature containing only UB, i.e. 
+    after running all handlers.
+    At this level, the denotation returns a [uvalue] wrapped in a state monad of
+    a memory, genv, and stack of local env, as well as the Prop monad.
+    We essentially want eutt of the trees, except that UB can be refined by any tree:
+    The returned [uvalue] should be related by [R], which we can feed to [eutt].
+    We hence would have over trees something like:
+    - eutt t1 t2 -> t1 ⊑ t2
+    - forall t, t ⊑ raiseUB
+    It is however unclear how this bisimulation could work: by defining brutally one such inductive,
+    we cannot establish that Vis e (fun dv -> k dv) ⊑ Vis e (fun dv -> raiseUB).
+    Do we need to redefine the bisimulation from scratch or can we get away with an extension of eutt?
+    
+    We do not care about the global and local env.
+    However we do care about the memory, we need some kind of bijection.
+    Finally, we want implication in the Prop monad.
+
+*** Other refinements?
+
+    This being said, the benefit of the approach is to be able to reason at
+    various level of abstraction. In particular, before interpretation of
+    [MemoryE], we can enforce that the same memory events are emitted. This
+    allows to relate only programs that generate exactly the same memory rather
+    than up to bijection, but does not require to reason about the memory.
+
+    The governing soundness guarantee should be that if two programs are
+    related before interpretation, then their interpretations are related.
+
+    The case of [pick] is interesting. We may want some or all of the following
+    rules before its interpretation:
+    - PickRefineU: forall P uv1 uv2, uv1 R uv2 -> trigger (pick P uv1) ⊑ trigger (pick P uv2)
+    - PickRefineD: forall P dv uv, dv ∈ concretization(uv) -> k dv ⊑ Vis (pick P uv) k
+    - PickFails : forall P uv t, (exists dv, dv ∈ concretization uv /\~ P dv) -> t ⊑ trigger (pick P uv)
+   
+    However arguably maybe those are semantics reasoning and hence should be
+    lemma after interpretation rather than rules before?
+    
