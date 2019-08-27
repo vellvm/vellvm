@@ -459,7 +459,7 @@ Admitted.
           ret match lookup b m with
               | Some block =>
                 (m, dvalue_to_uvalue (deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t))
-              | None => (m, UVALUE_Undef t) (* CB TODO: This is probably *NOT* poison *)
+              | None => (m, UVALUE_Undef t) (* CB TODO: This is probably *NOT* poison *) (* YZ: This should actually probably be UB as it looks up a non-allocated block. But we also need to tag a block as non-initialized which would return undef *)
               end
         | _ => raise "Load got non-address dvalue"
         end
