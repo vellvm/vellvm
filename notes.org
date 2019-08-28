@@ -620,9 +620,10 @@ that llvm supports.
 
 * Refinement relation
   
-  These relations should be justified by a refinement on programs, defined in terms of some flavor 
-  of an observational refinement on the denotations of these programs.
-  We however have a significant margin in design space to do so.
+  These relations should be justified by a refinement on programs,
+  defined in terms of some flavor of an observational refinement on
+  the denotations of these programs.  We however have a significant
+  margin in design space to do so.
 
 ** Refinement of uvalues
 
@@ -668,6 +669,7 @@ that llvm supports.
     - PickRefineU: forall P uv1 uv2, uv1 R uv2 -> trigger (pick P uv1) ⊑ trigger (pick P uv2)
     - PickRefineD: forall P dv uv, dv ∈ concretization(uv) -> k dv ⊑ Vis (pick P uv) k
     - PickFails : forall P uv t, (exists dv, dv ∈ concretization uv /\~ P dv) -> t ⊑ trigger (pick P uv)
+      + Should we call this PickUB or something instead? Although, we may not need these. -- CB
    
     However arguably maybe those are semantics reasoning and hence should be
     lemma after interpretation rather than rules before?
