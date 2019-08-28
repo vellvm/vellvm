@@ -187,7 +187,8 @@ that llvm supports.
    Attempt to pick a value when undef is in a crucial place. Such places are:
 
    - divisor
-
+   - interaction with memory model
+   - calls
 
 * The mysterious /InstSimplify/undef.ll test suite
 
