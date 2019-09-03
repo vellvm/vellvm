@@ -35,6 +35,7 @@ install:
   - opam install -y --verbose -j ${NJOBS} coq-ext-lib
   - opam install -y --verbose -j ${NJOBS} coq-flocq
   - opam install -y --verbose -j ${NJOBS} coq-paco
+  - opam pin add coq-itree --dev-repo
   - opam install -y --verbose -j ${NJOBS} coq-itree
   - opam install -y --verbose -j ${NJOBS} dune
   - opam install -y --verbose -j ${NJOBS} menhir

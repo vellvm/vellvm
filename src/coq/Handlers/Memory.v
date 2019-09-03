@@ -29,7 +29,7 @@ From ExtLib Require Import
      Programming.Show
      Data.String.
 
-From Vellvm Require Import 
+From Vellvm Require Import
      LLVMAst
      Util
      DynamicTypes
@@ -38,6 +38,7 @@ From Vellvm Require Import
      LLVMEvents
      Error
      Failure
+     UndefinedBehaviour
      Coqlib
      Numeric.Integers
      Numeric.Floats.
@@ -56,12 +57,12 @@ Module A : MemoryAddress.ADDRESS with Definition addr := (Z * Z) % type.
   Lemma eq_dec : forall (a b : addr), {a = b} + {a <> b}.
   Proof.
     intros [a1 a2] [b1 b2].
-    destruct (a1 ~=? b1); 
+    destruct (a1 ~=? b1);
       destruct (a2 ~=? b2); unfold eqv in *; unfold AstLib.eqv_int in *; subst.
     - left; reflexivity.
     - right. intros H. inversion H; subst. apply n. reflexivity.
     - right. intros H. inversion H; subst. apply n. reflexivity.
-    - right. intros H. inversion H; subst. apply n. reflexivity.      
+    - right. intros H. inversion H; subst. apply n. reflexivity.
   Qed.
 End A.
 
@@ -69,7 +70,7 @@ End A.
 Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
   Import LLVMEvents.
   Import DV.
-  
+
   Definition addr := A.addr.
 
   Module IM := FMapAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
@@ -115,7 +116,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
   | PtrFrag : SByte
   | SUndef : SByte.
 
-  (* TODO SAZ: 
+  (* TODO SAZ:
     mem_block should keep track of its allocation size so that operations
     can fail if they are out of range
    *)
@@ -233,7 +234,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
       end
     | DTYPE_Float => DVALUE_Float (Float32.of_bits (repr (sbyte_list_to_Z bytes)))
     | DTYPE_Double => DVALUE_Double (Float.of_bits (repr (sbyte_list_to_Z bytes)))
-                                    
+
     | DTYPE_Pointer =>
       match bytes with
       | Ptr addr :: tl => DVALUE_Addr addr
@@ -291,11 +292,11 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
   Inductive sbyte_list_wf : list SByte -> Prop :=
   | wf_nil : sbyte_list_wf []
   | wf_cons : forall b l, sbyte_list_wf l -> sbyte_list_wf (Byte b :: l)
-  .                                                   
+  .
 
   (*
 Lemma sbyte_list_to_Z_inverse:
-  forall i1 : int1, (sbyte_list_to_Z (Z_to_sbyte_list 8 (Int1.unsigned i1))) = 
+  forall i1 : int1, (sbyte_list_to_Z (Z_to_sbyte_list 8 (Int1.unsigned i1))) =
                (Int1.unsigned i1).
 Proof.
   intros i1.
@@ -312,8 +313,8 @@ Proof.
   - exists (TYPE_Pointer TYPE_Void). reflexivity.
   (* DVALUE_I1. Todo: subversion lemma for integers. *)
   - exists (TYPE_I 1).
-    simpl. 
-      
+    simpl.
+
 
     admit.
   (* DVALUE_I32. Todo: subversion lemma for integers. *)
@@ -411,14 +412,14 @@ Admitted.
       match dv with
       | DVALUE_Addr (b, o) =>
         handle_gep_h t b (o + (sizeof_dtyp t) * (unsigned i)) vs' m
-      | _ => failwith "non-address" 
+      | _ => failwith "non-address"
       end
     | _ => failwith "non-I32 index"
     end.
 
-  (* LLVM 5.0 memcpy 
+  (* LLVM 5.0 memcpy
    According to the documentation: http://releases.llvm.org/5.0.0/docs/LangRef.html#llvm-memcpy-intrinsic
-   this operation can never fail?  It doesn't return any status code... 
+   this operation can never fail?  It doesn't return any status code...
    *)
 
   Definition handle_memcpy (args : List.list dvalue) (m:memory) : err memory :=
@@ -434,42 +435,43 @@ Admitted.
                 let dst_block' := add_all_index sdata dst_o dst_block in
                 let m' := add dst_b dst_block' m in
                 (ret m' : err memory)
-                  
+
     | _ => failwith "memcpy got incorrect arguments"
     end.
 
   (* TODO:
    - we can use the handler combinators to make these more modular
 
-   - these operations are too defined: load and store should fail if the 
+   - these operations are too defined: load and store should fail if the
      address isn't in range
    *)
 
-  Definition handle_memory {E} `{FailureE -< E}: MemoryE ~> stateT memory (itree E) :=
+  Definition handle_memory {E} `{FailureE -< E} `{UndefinedBehaviourE -< E}: MemoryE ~> stateT memory (itree E) :=
     fun _ e m =>
       match e with
       | Alloca t =>
         let new_block := make_empty_block t in
         ret (add (size m) new_block m,
              DVALUE_Addr (size m, 0))
-            
+
       | Load t dv =>
         match dv with
         | DVALUE_Addr (b, i) =>
-          ret match lookup b m with
-              | Some block =>
-                (m, dvalue_to_uvalue (deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t))
-              | None => (m, UVALUE_Undef t) (* CB TODO: This is probably *NOT* poison *) (* YZ: This should actually probably be UB as it looks up a non-allocated block. But we also need to tag a block as non-initialized which would return undef *)
-              end
+          match lookup b m with
+          | Some block =>
+            ret (m, dvalue_to_uvalue (deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t))
+          (* Asking for a non-allocated block is undefined behaviour. *)
+          | None => raiseUB "Loading from block that has never been allocated."
+          end
         | _ => raise "Load got non-address dvalue"
         end
 
-      | Store dv v => 
+      | Store dv v =>
         match dv with
         | DVALUE_Addr (b, i) =>
           match lookup b m with
           | Some m' =>
-            ret (add b (add_all_index (serialize_dvalue v) i m') m, tt) 
+            ret (add b (add_all_index (serialize_dvalue v) i m') m, tt)
           | None => raise "stored to unallocated address"
           end
         | _ => raise ("Store got non-address dvalue: " ++ (to_string dv))
@@ -489,7 +491,7 @@ Admitted.
         | DVALUE_I1 i => ret (m, DVALUE_Addr (0, unsigned i))
         | _ => raise "Non integer passed to ItoP"
         end
-          
+
       | PtoI a =>
         match a with
         | DVALUE_Addr (b, i) =>
@@ -502,17 +504,17 @@ Admitted.
 
   Definition handle_intrinsic {E} `{FailureE -< E}: IntrinsicE ~> stateT memory (itree E) :=
     fun _ e m =>
-      match e with 
+      match e with
       | Intrinsic t name args =>
         if string_dec name "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
           match handle_memcpy args m with
           | inl err => raise err
           | inr m' => ret (m', DVALUE_None)
           end
-        else            
+        else
             raise ("Unknown intrinsic: " ++ name)
       end.
-  
+
 
   (* TODO: clean this up *)
   (* {E} `{failureE -< E} : IO ~> stateT memory (itree E)  *)
@@ -548,7 +550,7 @@ Admitted.
    of interpretation peels off one, or reintroduces the same kind of
    events / changes it.
 
-   
+
    *)
   Section PARAMS.
   Variable (E F : Type -> Type).
@@ -557,10 +559,9 @@ Admitted.
 
   Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
-  
-  Definition run_memory `{FailureE -< E +' F} :
+
+  Definition run_memory `{FailureE -< E +' F} `{UndefinedBehaviourE -< E +' F}:
     LLVM (E +'  IntrinsicE +' MemoryE +' F) ~> stateT memory (LLVM (E +' F)) :=
     interp_state (case_ E_trigger (case_ handle_intrinsic (case_ handle_memory F_trigger))).
   End PARAMS.
 End Make.
-
