@@ -15,7 +15,7 @@ From ITree Require Import
      ITree
      Events.State.
 
-From ExtLib Require Import 
+From ExtLib Require Import
      Structures.Monads
      Data.Map.FMapAList.
 
@@ -96,7 +96,7 @@ Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : LLVM _CF
   (* dfv <- trigger (pick fv True) ;; *)
   ret (fv, D.denote_function df).
 
-(* (for now) assume that [main (i64 argc, i8** argv)] 
+(* (for now) assume that [main (i64 argc, i8** argv)]
     pass in 0 and null as the arguments to main
    Note: this isn't compliant with standard C semantics
 *)
@@ -112,33 +112,20 @@ Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
   TransformTypes.fmap_mcfg _ _ (eval_typ CFG) CFG.
 
 
-Definition run_with_memory' (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (LLVM _MCFG3 (M.memory * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) :=
+Definition build_MCFG (mcfg : CFG.mcfg dtyp) : LLVM _CFG uvalue
+  := build_global_environment mcfg ;;
+     'defns <- map_monad address_one_function (m_definitions _ _ mcfg) ;;
+     'addr <- trigger (GlobalRead (Name "main")) ;;
+     D.denote_mcfg defns DTYPE_Void addr main_args.
 
-    let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in 
-    ucfg <- CFG.mcfg_of_modul _ scfg ;;
-    let mcfg := normalize_types ucfg in  
+Definition build_MCFG1 (trace : LLVM _CFG uvalue) : LLVM _MCFG1 (global_env * uvalue)
+  := @run_global _ _ _ _ show_raw_id _ _ _ _ _ trace [].
 
-    let core_trace : LLVM _CFG uvalue :=
-        build_global_environment mcfg ;;
-        'defns <- map_monad address_one_function (m_definitions _ _ mcfg) ;;
-        'addr <- trigger (GlobalRead (Name "main")) ;;
-        D.denote_mcfg defns DTYPE_Void addr main_args
-    in
-   let after_intrinsics_trace : LLVM _CFG uvalue := INT.interpret_intrinsics core_trace in
+Definition build_MCFG2 (trace : LLVM _MCFG1 (global_env * uvalue)) : LLVM _MCFG2 (local_env * stack * (global_env * uvalue))
+  := run_local_stack (@handle_local raw_id uvalue _ _ show_raw_id _ _) trace ([], []).
 
-    let local_trace : LLVM _ (global_env * uvalue) :=
-        @run_global _ _ _ _ show_raw_id _ _ _ _ _ after_intrinsics_trace []
-    in
-
-    let mem_trace: LLVM _ ((local_env * stack) * (global_env * uvalue)) :=
-        run_local_stack
-          (@handle_local raw_id uvalue _ _ show_raw_id _ _)
-          local_trace ([], [])
-    in
-
-    let interpreted_Trace := M.run_memory mem_trace M.empty in 
-    ret interpreted_Trace.
+Definition build_MCFG3 (trace : LLVM _MCFG2 (local_env * stack * (global_env * uvalue))) : LLVM _MCFG3 (M.memory * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))
+  := M.run_memory trace M.empty.
 
 Program Definition interp_undef {X} (trace : LLVM _MCFG3 X) : LLVM _MCFG4 X.
 unfold _MCFG3 in *. unfold _MCFG4.
@@ -156,10 +143,24 @@ Program Definition embed_in_mcfg4 (T : Type) (E: (Failure.FailureE +' UndefinedB
 firstorder.
 Defined.
 
-Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (LLVM _MCFG4 (M.memory * ((local_env * stack) * (global_env * dvalue)))) :=
-  match run_with_memory' prog with
-  | Some trace => ret ('(m, (env, (genv, uv))) <- (interp_undef trace);; dv <- translate embed_in_mcfg4 (P.concretize_uvalue uv);; ret (m, (env, (genv, dv))))
-  | None => None
-  end.
 
+Definition build_MCFG4 (trace : LLVM _MCFG3 (M.memory * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) : LLVM _MCFG4 (M.memory * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))
+  := '(m, (env, (genv, uv))) <- (interp_undef trace);;
+     dv <- translate embed_in_mcfg4 (P.concretize_uvalue uv);;
+     ret (m, (env, (genv, dv))).
+
+Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ)))) :
+  option (LLVM _MCFG4 (M.memory * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))) :=
+    let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
+
+    ucfg <- CFG.mcfg_of_modul _ scfg ;;
+    let mcfg := normalize_types ucfg in
+
+    let core_trace        := build_MCFG mcfg in
+    let global_trace      := INT.interpret_intrinsics core_trace in
+    let local_trace       := build_MCFG1 global_trace in
+    let mem_trace         := build_MCFG2 local_trace in
+    let undef_Trace       := build_MCFG3 mem_trace in
+    let interpreted_trace := build_MCFG4 undef_Trace in
+
+    Some interpreted_trace.
