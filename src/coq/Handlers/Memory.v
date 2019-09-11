@@ -116,12 +116,16 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
   | PtrFrag : SByte
   | SUndef : SByte.
 
-  (* TODO SAZ:
-    mem_block should keep track of its allocation size so that operations
-    can fail if they are out of range
+  (* TODO SAZ: mem_block should keep track of its allocation size so
+    that operations can fail if they are out of range
+
+    CB: I think this might happen implicitly with make_empty_block --
+    it initializes the IntMap with only the valid indices. As long as the
+    lookup functions handle this properly, anyway.
    *)
   Definition mem_block := IntMap SByte.
   Definition memory := IntMap mem_block.
+
   (* Definition undef := DVALUE_Undef. (* TODO: should this be an empty block? *) *)
 
   Fixpoint max_default (l:list Z) (x:Z) :=
@@ -163,6 +167,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
     | b :: l' => Byte.unsigned b + int_of_bytes l' * 256
     end.
 
+  (* CB TODO: Is interpreting everything except for bytes as undef reasonable? *)
+  Definition Sbyte_to_byte (sb:SByte) : option byte :=
+    match sb with
+    | Byte b => ret b
+    | Ptr _ | PtrFrag | SUndef => None
+    end.
+
   Definition Z_to_sbyte_list (count:nat) (z:Z) : list SByte :=
     List.map Byte (bytes_of_int count z).
 
@@ -177,6 +188,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
 
   Definition sbyte_list_to_Z (bytes:list SByte) : Z :=
     int_of_bytes (sbyte_list_to_byte_list bytes).
+
 
   (** Length properties *)
 
@@ -220,46 +232,61 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
     | _ => [] (* TODO add more dvalues as necessary *)
     end.
 
-  (* Deserialize a list of SBytes into a dvalue. *)
-  Fixpoint deserialize_sbytes (bytes:list SByte) (t:dtyp) : dvalue :=
+  (* CB TODO: does this really not exist somewhere? *)
+  Definition is_some {A} (o : option A) :=
+    match o with
+    | Some x => true
+    | None => false
+    end.
+
+  Definition all_not_sundef (bytes : list SByte) : bool :=
+    forallb is_some (map Sbyte_to_byte bytes).
+
+  (* Deserialize a list of SBytes into a uvalue, assuming that none of the bytes are undef *)
+  Fixpoint deserialize_sbytes_defined (bytes:list SByte) (t:dtyp) : uvalue :=
     match t with
     | DTYPE_I sz =>
       let des_int := sbyte_list_to_Z bytes in
       match sz with
-      | 1 => DVALUE_I1 (repr des_int)
-      | 8 => DVALUE_I8 (repr des_int)
-      | 32 => DVALUE_I32 (repr des_int)
-      | 64 => DVALUE_I64 (repr des_int)
-      | _ => DVALUE_None (* invalid size. *)
+      | 1  => UVALUE_I1 (repr des_int)
+      | 8  => UVALUE_I8 (repr des_int)
+      | 32 => UVALUE_I32 (repr des_int)
+      | 64 => UVALUE_I64 (repr des_int)
+      | _  => UVALUE_None (* invalid size. *)
       end
-    | DTYPE_Float => DVALUE_Float (Float32.of_bits (repr (sbyte_list_to_Z bytes)))
-    | DTYPE_Double => DVALUE_Double (Float.of_bits (repr (sbyte_list_to_Z bytes)))
+    | DTYPE_Float => UVALUE_Float (Float32.of_bits (repr (sbyte_list_to_Z bytes)))
+    | DTYPE_Double => UVALUE_Double (Float.of_bits (repr (sbyte_list_to_Z bytes)))
 
     | DTYPE_Pointer =>
       match bytes with
-      | Ptr addr :: tl => DVALUE_Addr addr
-      | _ => DVALUE_None (* invalid pointer. *)
+      | Ptr addr :: tl => UVALUE_Addr addr
+      | _ => UVALUE_None (* invalid pointer. *)
       end
     | DTYPE_Array sz t' =>
       let fix array_parse count byte_sz bytes :=
           match count with
           | O => []
-          | S n => (deserialize_sbytes (firstn byte_sz bytes) t')
+          | S n => (deserialize_sbytes_defined (firstn byte_sz bytes) t')
                      :: array_parse n byte_sz (skipn byte_sz bytes)
           end in
-      DVALUE_Array (array_parse (Z.to_nat sz) (Z.to_nat (sizeof_dtyp t')) bytes)
+      UVALUE_Array (array_parse (Z.to_nat sz) (Z.to_nat (sizeof_dtyp t')) bytes)
     | DTYPE_Struct fields =>
       let fix struct_parse typ_list bytes :=
           match typ_list with
           | [] => []
           | t :: tl =>
             let size_ty := Z.to_nat (sizeof_dtyp t) in
-            (deserialize_sbytes (firstn size_ty bytes) t)
+            (deserialize_sbytes_defined (firstn size_ty bytes) t)
               :: struct_parse tl (skipn size_ty bytes)
           end in
-      DVALUE_Struct (struct_parse fields bytes)
-    | _ => DVALUE_None (* TODO add more as serialization support increases *)
+      UVALUE_Struct (struct_parse fields bytes)
+    | _ => UVALUE_None (* TODO add more as serialization support increases *)
     end.
+
+  Definition deserialize_sbytes (bytes : list SByte) (t : dtyp) : uvalue :=
+    if all_not_sundef bytes
+    then deserialize_sbytes_defined bytes t
+    else UVALUE_Undef t.
 
   (* Todo - complete proofs, and think about moving to MemoryProp module. *)
   (* The relation defining serializable dvalues. *)
@@ -459,7 +486,7 @@ Admitted.
         | DVALUE_Addr (b, i) =>
           match lookup b m with
           | Some block =>
-            ret (m, dvalue_to_uvalue (deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t))
+            ret (m, deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t)
           (* Asking for a non-allocated block is undefined behaviour. *)
           | None => raiseUB "Loading from block that has never been allocated."
           end

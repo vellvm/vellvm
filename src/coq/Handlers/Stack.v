@@ -45,7 +45,7 @@ Section StackMap.
           Ret ((init, env::stk), tt)
         | StackPop =>
           match stk with
-          (* CB TODO: should this raise an error? *)
+          (* CB TODO: should this raise an error? Is this UB? *)
           | [] => raise "Tried to pop too many stack frames."
           | (env'::stk') => Ret ((env',stk'), tt)
           end
