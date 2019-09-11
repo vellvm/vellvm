@@ -564,14 +564,14 @@ Admitted.
         end
       end.
 
-  Definition handle_intrinsic {E} `{FailureE -< E}: IntrinsicE ~> stateT memory (itree E) :=
-    fun _ e m =>
+  Definition handle_intrinsic {E} `{FailureE -< E}: IntrinsicE ~> stateT memory_stack (itree E) :=
+    fun _ e '(m, s) =>
       match e with
       | Intrinsic t name args =>
         if string_dec name "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
           match handle_memcpy args m with
           | inl err => raise err
-          | inr m' => ret (m', DVALUE_None)
+          | inr m' => ret ((m', s), DVALUE_None)
           end
         else
             raise ("Unknown intrinsic: " ++ name)
