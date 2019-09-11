@@ -107,12 +107,14 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   (* SAZ: TODO: add Push / Pop to memory events to properly handle Alloca scoping *)
   (* Interactions with the memory for the LLVM IR *)
   Variant MemoryE : Type -> Type :=
-  | Alloca : forall (t:dtyp),                             (MemoryE dvalue)
-  | Load   : forall (t:dtyp) (a:dvalue),                  (MemoryE uvalue)
-  | Store  : forall (a:dvalue) (v:dvalue),                (MemoryE unit)
-  | GEP    : forall (t:dtyp) (v:dvalue) (vs:list dvalue), (MemoryE dvalue)
-  | ItoP   : forall (i:dvalue),                           (MemoryE dvalue)
-  | PtoI   : forall (a:dvalue),                           (MemoryE dvalue)
+  | MemPush : MemoryE unit
+  | MemPop  : MemoryE unit
+  | Alloca  : forall (t:dtyp),                             (MemoryE dvalue)
+  | Load    : forall (t:dtyp) (a:dvalue),                  (MemoryE uvalue)
+  | Store   : forall (a:dvalue) (v:dvalue),                (MemoryE unit)
+  | GEP     : forall (t:dtyp) (v:dvalue) (vs:list dvalue), (MemoryE dvalue)
+  | ItoP    : forall (i:dvalue),                           (MemoryE dvalue)
+  | PtoI    : forall (a:dvalue),                           (MemoryE dvalue)
   (* | MemoryIntrinsic : forall (t:dtyp) (f:function_id) (args:list dvalue), MemoryE dvalue *)
   .
 

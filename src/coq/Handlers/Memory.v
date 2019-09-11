@@ -108,7 +108,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
     := IM.map2 (fun mx my =>
                   match mx with | Some x => Some x | None => my end) m1 m2.
 
-  Definition size {a} (m : IM.t a) : Z := Z.of_nat (IM.cardinal m).
+  Definition maximumBy {A} (leq : A -> A -> bool) (def : A) (l : list A) : A :=
+    fold_left (fun a b => if leq a b then b else a) l def.
+
+  (* Get a fresh key for use in memory map *)
+  Definition next_key {a} (m : IM.t a) : Z
+    := let keys := map fst (IM.elements m) in
+       1 + maximumBy Z.leb (-1) keys.
 
   Inductive SByte :=
   | Byte : byte -> SByte
@@ -123,8 +129,17 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
     it initializes the IntMap with only the valid indices. As long as the
     lookup functions handle this properly, anyway.
    *)
+
+  (* Simple view of memory *)
   Definition mem_block := IntMap SByte.
-  Definition memory := IntMap mem_block.
+  Definition memory    := IntMap mem_block.
+
+  (* Allocation stacks *)
+  Definition mem_frame := list Z.  (* A list of block ids that need to be freed when popped *)
+  Definition mem_stack := list mem_frame.
+
+  (* Memory + stack for freeing *)
+  Definition memory_stack : Type := memory * mem_stack.
 
   (* Definition undef := DVALUE_Undef. (* TODO: should this be an empty block? *) *)
 
@@ -473,20 +488,40 @@ Admitted.
      address isn't in range
    *)
 
-  Definition handle_memory {E} `{FailureE -< E} `{UndefinedBehaviourE -< E}: MemoryE ~> stateT memory (itree E) :=
-    fun _ e m =>
+  Definition free_frame (f : mem_frame) (m : memory) : memory
+    := fold_left (fun m key => delete key m) f m.
+
+  Definition handle_memory {E} `{FailureE -< E} `{UndefinedBehaviourE -< E}: MemoryE ~> stateT memory_stack (itree E) :=
+    fun _ e '(m, s) =>
       match e with
+      | MemPush => ret ((m, [] :: s), tt)
+
+      | MemPop =>
+        match s with
+        | [] => raise "Tried to pop memory stack, but there's nothing to pop."
+        | frame :: stack_rest =>
+          let m' := free_frame frame m in
+          ret ((m', stack_rest), tt)
+        end
+
       | Alloca t =>
         let new_block := make_empty_block t in
-        ret (add (size m) new_block m,
-             DVALUE_Addr (size m, 0))
+        let key := next_key m in
+        let new_mem := add key new_block m in
+
+        match s with
+        | [] => raise "No stack frame for alloca."
+        | frame :: stack_rest =>
+          let new_stack := (key :: frame) :: stack_rest in
+          ret ((new_mem, new_stack), DVALUE_Addr (key, 0))
+        end
 
       | Load t dv =>
         match dv with
         | DVALUE_Addr (b, i) =>
           match lookup b m with
           | Some block =>
-            ret (m, deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t)
+            ret ((m, s), deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t)
           (* Asking for a non-allocated block is undefined behaviour. *)
           | None => raiseUB "Loading from block that has never been allocated."
           end
@@ -498,7 +533,7 @@ Admitted.
         | DVALUE_Addr (b, i) =>
           match lookup b m with
           | Some m' =>
-            ret (add b (add_all_index (serialize_dvalue v) i m') m, tt)
+            ret ((add b (add_all_index (serialize_dvalue v) i m') m, s), tt)
           | None => raise "stored to unallocated address"
           end
         | _ => raise ("Store got non-address dvalue: " ++ (to_string dv))
@@ -507,24 +542,24 @@ Admitted.
       | GEP t dv vs =>
         match handle_gep t dv vs m with
         | inl err => raise err
-        | inr v => ret v
+        | inr (m, dv) => ret ((m, s), dv)
         end
 
       | ItoP i =>
         match i with
-        | DVALUE_I64 i => ret (m, DVALUE_Addr (0, unsigned i))
-        | DVALUE_I32 i => ret (m, DVALUE_Addr (0, unsigned i))
-        | DVALUE_I8 i => ret (m, DVALUE_Addr (0, unsigned i))
-        | DVALUE_I1 i => ret (m, DVALUE_Addr (0, unsigned i))
-        | _ => raise "Non integer passed to ItoP"
+        | DVALUE_I64 i => ret ((m, s), DVALUE_Addr (0, unsigned i))
+        | DVALUE_I32 i => ret ((m, s), DVALUE_Addr (0, unsigned i))
+        | DVALUE_I8 i  => ret ((m, s), DVALUE_Addr (0, unsigned i))
+        | DVALUE_I1 i  => ret ((m, s), DVALUE_Addr (0, unsigned i))
+        | _            => raise "Non integer passed to ItoP"
         end
 
       | PtoI a =>
         match a with
         | DVALUE_Addr (b, i) =>
-          if Z.eqb b 0 then ret (m, DVALUE_Addr(0, i))
+          if Z.eqb b 0 then ret ((m, s), DVALUE_Addr(0, i))
           else let (k, m) := concretize_block b m in
-               ret (m, DVALUE_Addr (0, (k + i)))
+               ret ((m, s), DVALUE_Addr (0, (k + i)))
         | _ => raise "PtoI got non-address dvalue"
         end
       end.
@@ -588,7 +623,7 @@ Admitted.
       fun R e m => r <- trigger e ;; ret (m, r).
 
   Definition run_memory `{FailureE -< E +' F} `{UndefinedBehaviourE -< E +' F}:
-    LLVM (E +'  IntrinsicE +' MemoryE +' F) ~> stateT memory (LLVM (E +' F)) :=
+    LLVM (E +'  IntrinsicE +' MemoryE +' F) ~> stateT memory_stack (LLVM (E +' F)) :=
     interp_state (case_ E_trigger (case_ handle_intrinsic (case_ handle_memory F_trigger))).
   End PARAMS.
 End Make.
