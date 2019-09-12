@@ -124,8 +124,8 @@ Definition build_MCFG1 (trace : LLVM _CFG uvalue) : LLVM _MCFG1 (global_env * uv
 Definition build_MCFG2 (trace : LLVM _MCFG1 (global_env * uvalue)) : LLVM _MCFG2 (local_env * stack * (global_env * uvalue))
   := run_local_stack (@handle_local raw_id uvalue _ _ show_raw_id _ _) trace ([], []).
 
-Definition build_MCFG3 (trace : LLVM _MCFG2 (local_env * stack * (global_env * uvalue))) : LLVM _MCFG3 (M.memory * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))
-  := M.run_memory trace M.empty.
+Definition build_MCFG3 (trace : LLVM _MCFG2 (local_env * stack * (global_env * uvalue))) : LLVM _MCFG3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))
+  := M.run_memory trace (M.empty, [[]]).
 
 Program Definition interp_undef {X} (trace : LLVM _MCFG3 X) : LLVM _MCFG4 X.
 unfold _MCFG3 in *. unfold _MCFG4.
@@ -144,13 +144,13 @@ firstorder.
 Defined.
 
 
-Definition build_MCFG4 (trace : LLVM _MCFG3 (M.memory * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) : LLVM _MCFG4 (M.memory * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))
+Definition build_MCFG4 (trace : LLVM _MCFG3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) : LLVM _MCFG4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))
   := '(m, (env, (genv, uv))) <- (interp_undef trace);;
      dv <- translate embed_in_mcfg4 (P.concretize_uvalue uv);;
      ret (m, (env, (genv, dv))).
 
 Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (LLVM _MCFG4 (M.memory * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))) :=
+  option (LLVM _MCFG4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))) :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
     ucfg <- CFG.mcfg_of_modul _ scfg ;;
