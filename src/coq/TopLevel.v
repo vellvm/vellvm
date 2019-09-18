@@ -9,7 +9,7 @@
  ---------------------------------------------------------------------------- *)
 
 From Coq Require Import
-     List String.
+     Ensembles List String.
 
 From ITree Require Import
      ITree
@@ -33,7 +33,8 @@ From Vellvm Require Import
      LLVMAst
      Util
      Error
-     Handlers.Pick.
+     Handlers.Pick
+     PropT.
 
 
 Import MonadNotation.
@@ -127,29 +128,40 @@ Definition build_MCFG2 (trace : LLVM _MCFG1 (global_env * uvalue)) : LLVM _MCFG2
 Definition build_MCFG3 (trace : LLVM _MCFG2 (local_env * stack * (global_env * uvalue))) : LLVM _MCFG3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))
   := M.run_memory trace (M.empty, [[]]).
 
+(* YZ TODO: Principle this definition and move it into Handlers/Pick  *)
 Program Definition interp_undef {X} (trace : LLVM _MCFG3 X) : LLVM _MCFG4 X.
 unfold _MCFG3 in *. unfold _MCFG4.
 eapply interp. 2: exact trace.
 intros T E.
-
 repeat match goal with
 | [ H : (?e +' ?E) ?T |- _ ] => destruct H as [event | undef]; try apply (trigger event)
 end.
-
 apply P.concretize_picks; auto.
 Defined.
 
+(* YZ TODO: Principle this *)
 Program Definition embed_in_mcfg4 (T : Type) (E: (Failure.FailureE +' UndefinedBehaviour.UndefinedBehaviourE) T) : _MCFG4 T.
 firstorder.
 Defined.
 
+Program Definition interp_model {X} (trace : LLVM _MCFG3 X) : PropT (LLVM _MCFG4) X.
+unfold _MCFG3 in *. unfold _MCFG4.
+eapply interp. 2: exact trace.
+intros T E.
+repeat match goal with
+| [ H : (?e +' ?E) ?T |- _ ] => destruct H as [event | undef]; try exact (fun l => l = trigger event) (* YZ: this is the trigger instance of PropT *)
+       end.
+intros t.
+refine (P.Pick_handler undef _).
+(* Mmmh how can we conclude here? Some kind of subevent under the prop monad *)
+Abort.
 
 Definition build_MCFG4 (trace : LLVM _MCFG3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) : LLVM _MCFG4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))
   := '(m, (env, (genv, uv))) <- (interp_undef trace);;
      dv <- translate embed_in_mcfg4 (P.concretize_uvalue uv);;
      ret (m, (env, (genv, dv))).
 
-Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ)))) :
+Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) :
   option (LLVM _MCFG4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))) :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
@@ -164,3 +176,21 @@ Definition run_with_memory (prog: list (toplevel_entity typ (list (block typ))))
     let interpreted_trace := build_MCFG4 undef_Trace in
 
     Some interpreted_trace.
+
+(*
+Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
+  option (LLVM _MCFG4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))) :=
+    let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
+
+    ucfg <- CFG.mcfg_of_modul _ scfg ;;
+    let mcfg := normalize_types ucfg in
+
+    let core_trace        := build_MCFG mcfg in
+    let global_trace      := INT.interpret_intrinsics core_trace in
+    let local_trace       := build_MCFG1 global_trace in
+    let mem_trace         := build_MCFG2 local_trace in
+    let undef_Trace       := build_MCFG3 mem_trace in
+    let interpreted_trace := build_MCFG4 undef_Trace in
+
+    Some interpreted_trace.
+*)

@@ -73,7 +73,7 @@ Set Contextual Implicit.
   Variant LocalE (k v:Type) : Type -> Type :=
   | LocalWrite (id: k) (dv: v): LocalE k v unit
   | LocalRead  (id: k): LocalE k v v.
-  
+
   Variant StackE (k v:Type) : Type -> Type :=
   | StackPush (args: list (k * v)) : StackE k v unit (* Pushes a fresh environment during a call *)
   | StackPop : StackE k v unit. (* Pops it back during a ret *)
@@ -152,18 +152,18 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Definition conv_E_to_exp_E : conv_E ~> exp_E :=
     fun T e => inr1 (inr1 e).
-      
+
   Definition instr_E := CallE +' IntrinsicE +' exp_E.
   Definition exp_E_to_instr_E : exp_E ~> instr_E:=
     fun T e => inr1 (inr1 e).
-      
+
   Definition fun_E := LLVMStackE +' CallE +' IntrinsicE +' exp_E.
   Definition instr_E_to_fun_E : instr_E ~> fun_E :=
     fun T e => inr1 e.
 
   (* Core effects - no distinction between "internal" and "external" calls. *)
   Definition _CFG := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE.
-      
+
   Definition _funE_to_CFG : fun_E ~> _CFG :=
     fun R e =>
       match e with
@@ -174,7 +174,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
       | inr1 (inr1 (inr1 (inr1 (inl1 e')))) => (inr1 (inr1 (inr1 (inl1 (inl1 e')))))
       | inr1 (inr1 (inr1 (inr1 (inr1 e)))) => (inr1 (inr1 (inr1 (inr1 e))))
       end.
-  
+
   (* Distinction made between internal and external calls -- intermediate step in denote_mcfg.
      Note that [CallE] appears _twice_ in the [_CFG_INTERNAL] type.  The left one is 
      meant to be the "internal" call event and the right one is the "external" call event.
@@ -185,7 +185,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Definition _CFG_INTERNAL := CallE +' _CFG.
 
   Definition ExternalCall t f args : _CFG_INTERNAL uvalue := (inr1 (inl1 (Call t f args))).
-  
+
   (* This inclusion "assumes" that all call events are internal.  The 
      dispatch in denote_mcfg then interprets some of the calls directly,
      if their definitions are known, or it "externalizes" the calls
@@ -202,7 +202,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Definition _exp_E_to_CFG : exp_E ~> _CFG :=
     fun T e => @_funE_to_CFG T (instr_E_to_fun_E (exp_E_to_instr_E e)).
-  
+
   Definition _failure_UB_to_ExpE : (FailureE +' UndefinedBehaviourE) ~> exp_E :=
     fun T e =>
       match e with
@@ -224,8 +224,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Hint Unfold LLVM _CFG _MCFG1 _MCFG2 _MCFG3 _MCFG4.
 
-  
-  
   (* Utilities to conveniently trigger debug and failure events *)
 
   Definition debug {E} `{DebugE -< E} (msg : string) : itree E unit :=

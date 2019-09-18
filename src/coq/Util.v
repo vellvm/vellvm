@@ -9,12 +9,11 @@
 b *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-
-Require Import List.
-Require Import Omega.
+From Coq Require Import
+     List
+     Omega
+     RelationClasses.
 Import ListNotations.
-
-Require Import RelationClasses.
 
 Set Implicit Arguments.
 
@@ -1015,3 +1014,4 @@ Tactic Notation "inv_bind" hyp(H) :=
       let hy := fresh H in
       destruct o eqn:hy; [|discriminate]; simpl in H
     end.
+
