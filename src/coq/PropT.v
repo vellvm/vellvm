@@ -1,7 +1,10 @@
 From Coq Require Import Ensembles.
+
 From ExtLib Require Import
      Structures.Functor
      Structures.Monad.
+
+From ITree Require Import Basics.Basics.
 
 Section PropMonad.
 
@@ -19,6 +22,10 @@ Section PropMonad.
       ; bind := fun A B PA K b => exists (a: A), PA (ret a) /\ K a b
     |}.
 
+  Global Polymorphic Instance MonadIter_Prop {M} {MM: MonadIter M} : MonadIter (PropT M) :=
+    fun R I step i r =>
+      exists (step': I -> M (I + R)%type),
+        (forall j, step j (step' j)) /\ iter step' i = r.
 
-
+  (* Look on Steve's github what he did last summer *)
 End PropMonad.

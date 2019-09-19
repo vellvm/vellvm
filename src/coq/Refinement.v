@@ -21,7 +21,6 @@ Variable global_env : Type.
 Variable local_env : Type.
 Variable stack : Type.
 Variable memory : Type.
-Variable refine_mem : relation memory.
 
 (* Refinement relation for uvalues *)
 Inductive refine_uvalue: uvalue -> uvalue -> Prop :=
@@ -55,7 +54,7 @@ Definition refine_MCFG2 : relation (LLVM _MCFG2 (local_env * stack * (global_env
 
 (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
 Definition refine_res3 : relation (memory * (local_env * stack * (global_env * uvalue)))
-  := refine_mem × refine_res2.
+  := TT × refine_res2.
 
 Definition refine_MCFG3 : relation (LLVM _MCFG3 (memory * (local_env * stack * (global_env * uvalue))))
   := eutt refine_res3.
@@ -63,5 +62,8 @@ Definition refine_MCFG3 : relation (LLVM _MCFG3 (memory * (local_env * stack * (
 (* Refinement for after interpreting pick. *)
 Definition refine_MCFG4 : relation ((LLVM _MCFG4 (memory * (local_env * stack * (global_env * uvalue)))) -> Prop)
   := fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt refine_res3 t t'.
+
+Lemma refine_12: forall t1 t2,
+    refine_MCFG t1 t2 -> refine_MCFG1 (build_MCFG1 t1) (build_MCFG1 t2).
 
 End Make.
