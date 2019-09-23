@@ -251,3 +251,4 @@ Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
     let interpreted_trace := build_MCFG4 undef_Trace in
 
     Some interpreted_trace.
+*)
