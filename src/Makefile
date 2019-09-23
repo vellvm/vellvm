@@ -28,7 +28,7 @@ all:
 	$(MAKE) extracted
 	$(MAKE) vellvm
 
-coq: itrees $(VOFILES)
+coq: $(VOFILES)
 
 itrees:
 	git submodule update --init
@@ -50,7 +50,7 @@ $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "COQC $*.v"
 	@$(COQC) -dump-glob doc/$(*F).glob $*.v
 
-depend: $(VFILES) 
+depend: itrees $(VFILES) 
 	@echo "Analyzing Coq dependencies"
 	@$(COQDEP) $^ > .depend
 
