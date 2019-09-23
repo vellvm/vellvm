@@ -168,15 +168,15 @@ Definition build_L0 (mcfg : CFG.mcfg dtyp) : itree L0 res_L0
 (* Interpretation of the global environment *)
 (* TODO YZ: Why do we need to provide this instance explicitly? *)
 Definition build_L1 (trace : itree L0 uvalue) : itree L1 res_L1
-  := @run_global _ _ _ _ show_raw_id _ _ _ _ _ trace [].
+  := @interp_global _ _ _ _ show_raw_id _ _ _ _ _ trace [].
 
 (* Interpretation of the local environment: map and stack *)
 Definition build_L2 (trace : itree L1 (global_env * uvalue)) : itree L2 res_L2
-  := run_local_stack (@handle_local raw_id uvalue _ _ show_raw_id _ _) trace ([], []).
+  := interp_local_stack (@handle_local raw_id uvalue _ _ show_raw_id _ _) trace ([], []).
 
 (* Interpretation of the memory *)
 Definition build_L3 (trace : itree L2 (local_env * stack * (global_env * uvalue))) : itree L3 res_L3
-  := M.run_memory trace (M.empty, [[]]).
+  := M.interp_memory trace (M.empty, [[]]).
 
 (* YZ TODO: Principle this definition and move it into Handlers/Pick  *)
 Program Definition interp_undef {X} (trace : itree L3 X) : itree L4 X.

@@ -53,7 +53,7 @@ Section Globals.
     Definition G_trigger {M} : forall R , G R -> (stateT M (itree (E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition run_global `{FailureE -< E +' F +' G} : itree (E +' F +' (GlobalE k v) +' G) ~> stateT map (itree (E +' F +' G)) :=
+    Definition interp_global `{FailureE -< E +' F +' G} : itree (E +' F +' (GlobalE k v) +' G) ~> stateT map (itree (E +' F +' G)) :=
       interp_state (case_ E_trigger (case_ F_trigger (case_ handle_global G_trigger))).
   End PARAMS.
 

@@ -130,5 +130,5 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
   Definition interpret_intrinsics: forall R, itree L0 R -> itree L0 R  :=
     interp (case_ extcall_trigger (case_ handle_intrinsics rest_trigger)).
-  
+
 End Make.

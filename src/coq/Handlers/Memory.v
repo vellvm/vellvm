@@ -620,8 +620,10 @@ Admitted.
   Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-  Definition run_memory `{FailureE -< E +' F} `{UBE -< E +' F}:
+  Definition interp_memory `{FailureE -< E +' F} `{UBE -< E +' F}:
     itree (E +'  IntrinsicE +' MemoryE +' F) ~> stateT memory_stack (itree (E +' F)) :=
     interp_state (case_ E_trigger (case_ handle_intrinsic (case_ handle_memory F_trigger))).
+
   End PARAMS.
+
 End Make.

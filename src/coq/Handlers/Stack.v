@@ -56,20 +56,19 @@ Section StackMap.
       :=
       fun _ e '(env, stk) => ITree.map (fun '(env',r) => ((env',stk), r)) (h _ e env).
 
-  
   Open Scope monad_scope.
   Section PARAMS.
     Variable (E F G : Type -> Type).
     Definition E_trigger {S} : forall R, E R -> (stateT S (itree (E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
-    
+
     Definition F_trigger {S} : forall R, F R -> (stateT S (itree (E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
-    
+
     Definition G_trigger {S} : forall R , G R -> (stateT S (itree (E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition run_local_stack `{FailureE -< E +' F +' G}
+    Definition interp_local_stack `{FailureE -< E +' F +' G}
                (h:(LocalE k v) ~> stateT map (itree _)) :
       (itree (E +' F +' ((LocalE k v) +' (StackE k v)) +' G)) ~>  stateT (map * stack) (itree (E +' F +' G)) :=
       interp_state (case_ E_trigger
