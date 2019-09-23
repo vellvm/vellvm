@@ -1,3 +1,3 @@
 -Q coq Vellvm
 -R coq Vellvm
--R ../lib/InteractionTrees/theories ITree	
+-R ../lib/InteractionTrees/theories ITree

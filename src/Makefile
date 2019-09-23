@@ -6,7 +6,9 @@ COQLIBDIR = ../lib
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract
+ITREEDIR=../lib/InteractionTrees
+
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(ITREEDIR)/theories/ ITree
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
@@ -26,9 +28,13 @@ all:
 	$(MAKE) extracted
 	$(MAKE) vellvm
 
-coq: $(VOFILES)
+coq: itrees $(VOFILES)
 
-.PHONY: extracted
+itrees:
+	git submodule update --init
+	make -C $(ITREEDIR)
+
+.PHONY: extracted itrees
 extracted: $(EXTRACTDIR)/STAMP $(VOFILES)
 
 $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
@@ -75,6 +81,7 @@ clean:
 	rm -rf output
 	rm -f vellvm
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
+	make -C $(ITREEDIR) clean
 
 doc/coq2html: 
 	make -C ../lib/coq2html
