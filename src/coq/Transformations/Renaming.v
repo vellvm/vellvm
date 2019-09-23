@@ -21,9 +21,7 @@ From ITree Require Import
      Interp.TranslateFacts.
 
 From Vellvm Require Import
-     Failure
      Error
-     UndefinedBehaviour
      Util
      LLVMAst
      AstLib
@@ -533,7 +531,7 @@ Module RENAMING
   Instance swap_of_IntrinsicE {X} : Swap (IntrinsicE X) := fun id1 id2 x => x.
   Instance swap_of_DebugE {X} : Swap (DebugE X) := fun id1 id2 x => x.
   Instance swap_of_FailureE {X} : Swap (FailureE X) := fun id1 id2 x => x.
-  Instance swap_of_UndefinedBehaviourE {X} : Swap (UndefinedBehaviourE X) := fun id1 id2 x => x.
+  Instance swap_of_UndefinedBehaviourE {X} : Swap (UBE X) := fun id1 id2 x => x.
   Instance swap_of_PickE {X} : Swap (PickE X) := fun id1 id2 x => x.
   Hint Unfold swap_of_MemoryE swap_of_StackE swap_of_LocalE swap_of_GlobalE swap_of_CallE swap_of_IntrinsicE swap_of_DebugE FailureE swap_of_FailureE swap_of_UndefinedBehaviourE swap_of_PickE.
 
@@ -551,10 +549,10 @@ Module RENAMING
       | inr1 f => inr1 (swap id1 id2 f)
       end.
 
-  Definition swap_LLVM {X E} `{Swap X} `{forall T, Swap (E T)} (id1 id2:raw_id) (t:LLVM E X) : LLVM E X :=
+  Definition swap_itree {X E} `{Swap X} `{forall T, Swap (E T)} (id1 id2:raw_id) (t:itree E X) : itree E X :=
     ITree.map (swap id1 id2) (@translate E E (fun T => swap id1 id2) _ t).
-  Instance swap_of_LLVM {X E} `{SX : Swap X} `{forall T, Swap (E T)}: Swap (LLVM E X) := swap_LLVM.
-  Hint Unfold swap_of_LLVM.
+  Instance swap_of_itree {X E} `{SX : Swap X} `{forall T, Swap (E T)}: Swap (itree E X) := swap_itree.
+  Hint Unfold swap_of_itree.
 
 
   (* Should we swap the arguments? Not when used to create an itree *)
@@ -573,23 +571,23 @@ Module RENAMING
     Class Commute_eq1 {A B: Type} `{Swap A} `{Swap B} (f: A -> B) :=
       commute_eq1: forall a, swap id1 id2 (f a) = f (swap id1 id2 a).
 
-    Class Commute_eq_LLVM1 {E} {A B: Type} `{forall T, Swap (E T)} `{Swap A} `{Swap B} (f: A -> LLVM E B) :=
-      commute_eq_LLVM1: forall a, swap id1 id2 (f a) ≅ f (swap id1 id2 a).
+    Class Commute_eq_itree1 {E} {A B: Type} `{forall T, Swap (E T)} `{Swap A} `{Swap B} (f: A -> itree E B) :=
+      commute_eq_itree1: forall a, swap id1 id2 (f a) ≅ f (swap id1 id2 a).
 
     Class Commute_eq2 {A B C: Type} `{Swap A} `{Swap B} `{Swap C} (f: A -> B -> C) :=
       commute_eq2: forall a b, swap id1 id2 (f a b) = f (swap id1 id2 a) (swap id1 id2 b).
 
-    Class Commute_eq_LLVM2 {E} {A B C: Type} `{forall T, Swap (E T)} `{Swap A} `{Swap B} `{Swap C}
-          (f: A -> B -> LLVM E C) :=
-      commute_eq_LLVM2: forall a b, swap id1 id2 (f a b) ≅ f (swap id1 id2 a) (swap id1 id2 b).
+    Class Commute_eq_itree2 {E} {A B C: Type} `{forall T, Swap (E T)} `{Swap A} `{Swap B} `{Swap C}
+          (f: A -> B -> itree E C) :=
+      commute_eq_itree2: forall a b, swap id1 id2 (f a b) ≅ f (swap id1 id2 a) (swap id1 id2 b).
 
-    Class Commute_eq_LLVM3 {E} {A B C D: Type} `{forall T, Swap (E T)} `{Swap A} `{Swap B} `{Swap C} `{Swap D}
-          (f: A -> B -> C -> LLVM E D) :=
-      commute_eq_LLVM3: forall a b c, swap id1 id2 (f a b c) ≅ f (swap id1 id2 a) (swap id1 id2 b) (swap id1 id2 c).
+    Class Commute_eq_itree3 {E} {A B C D: Type} `{forall T, Swap (E T)} `{Swap A} `{Swap B} `{Swap C} `{Swap D}
+          (f: A -> B -> C -> itree E D) :=
+      commute_eq_itree3: forall a b c, swap id1 id2 (f a b c) ≅ f (swap id1 id2 a) (swap id1 id2 b) (swap id1 id2 c).
 
-    Class Commute_eq_LLVM4 {E} {A B C D F: Type} `{forall T, Swap (E T)} `{Swap A} `{Swap B} `{Swap C} `{Swap D} `{Swap F}
-          (f: A -> B -> C -> D -> LLVM E F) :=
-      commute_eq_LLVM4: forall a b c d, swap id1 id2 (f a b c d) ≅ f (swap id1 id2 a) (swap id1 id2 b) (swap id1 id2 c) (swap id1 id2 d).
+    Class Commute_eq_itree4 {E} {A B C D F: Type} `{forall T, Swap (E T)} `{Swap A} `{Swap B} `{Swap C} `{Swap D} `{Swap F}
+          (f: A -> B -> C -> D -> itree E F) :=
+      commute_eq_itree4: forall a b c d, swap id1 id2 (f a b c d) ≅ f (swap id1 id2 a) (swap id1 id2 b) (swap id1 id2 c) (swap id1 id2 d).
 
 
 
@@ -600,14 +598,13 @@ Module RENAMING
     Proof.
     Abort.
 
-
     Lemma swap_trigger_Global
           {X} `{Swap X} {INV: SwapInvariant X}:
-      forall (e: LLVMGEnvE X), @ITree.trigger _CFG X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
+      forall (e: LLVMGEnvE X), @ITree.trigger L0 X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
     Proof.
       intros e.
       unfold trigger.
-      unfold swap at 2, swap_of_LLVM, swap_LLVM, ITree.map.
+      unfold swap at 2, swap_of_itree, swap_itree, ITree.map.
       rewrite translate_vis, bind_vis.
 
       match goal with
@@ -628,11 +625,11 @@ Module RENAMING
 
     Lemma swap_trigger_Local (* {E F: Type -> Type} `{E -< F} `{forall T, Swap (F T)}  `{Swap (E X)} *)
           {X} `{Swap X} {INV: SwapInvariant X}:
-      forall (e: LLVMEnvE X), @ITree.trigger _CFG X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
+      forall (e: LLVMEnvE X), @ITree.trigger L0 X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
     Proof.
       intros e.
       unfold trigger.
-      unfold swap at 2, swap_of_LLVM, swap_LLVM, ITree.map.
+      unfold swap at 2, swap_of_itree, swap_itree, ITree.map.
       rewrite translate_vis, bind_vis.
       match goal with
       | |- context[subevent ?T ?x] => destruct (subevent T x) eqn:?EQ
@@ -652,11 +649,11 @@ Module RENAMING
 
     Lemma swap_trigger_Memory (* {E F: Type -> Type} `{E -< F} `{forall T, Swap (F T)}  `{Swap (E X)} *)
           {X} `{Swap X} {INV: SwapInvariant X}:
-      forall (e: MemoryE X), @ITree.trigger _CFG X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
+      forall (e: MemoryE X), @ITree.trigger L0 X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
     Proof.
       intros e.
       unfold trigger.
-      unfold swap at 2, swap_of_LLVM, swap_LLVM, ITree.map.
+      unfold swap at 2, swap_of_itree, swap_itree, ITree.map.
       rewrite translate_vis, bind_vis.
       match goal with
       | |- context[subevent ?T ?x] => destruct (subevent T x) eqn:?EQ
@@ -674,7 +671,7 @@ Module RENAMING
       rewrite swap_invariant; reflexivity.
     Qed.
 (*
-    Instance Commute_lookup_id: Commute_eq_LLVM1 lookup_id.
+    Instance Commute_lookup_id: Commute_eq_itree1 lookup_id.
     Proof.
       intros i.
       unfold lookup_id.

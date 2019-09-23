@@ -16,10 +16,8 @@ From Vellvm Require Import
      AstLib
      MemoryAddress
      DynamicValues
-     UndefinedBehaviour
      DynamicTypes
      LLVMEvents
-     Failure
      Error
      Util.
 
@@ -32,8 +30,8 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Section PickPropositional.
 
     (* YZ: TODO: better UB error message *)
-    (* YZ: TODO: rename UndefinedBehaviourE *)
-    Inductive Pick_handler: forall {X}, PickE X -> (itree UndefinedBehaviourE X -> Prop) :=
+    (* YZ: TODO: rename UBE *)
+    Inductive Pick_handler: forall {X}, PickE X -> (itree UBE X -> Prop) :=
     | PickUB: forall uv C, ~ C -> Pick_handler (pick uv C) (raiseUB "Picking unsafe uvalue")
     | PickD: forall uv (C: Prop) dv, C -> concretize uv dv -> Pick_handler (pick uv C) (ret dv).
 
@@ -73,7 +71,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       end.
 
     Import MonadNotation.
-    Fixpoint concretize_uvalue (u : uvalue) : itree (FailureE +' UndefinedBehaviourE) dvalue :=
+    Fixpoint concretize_uvalue (u : uvalue) : itree (FailureE +' UBE) dvalue :=
       match u with
       | UVALUE_Addr a                          => ret (DVALUE_Addr a)
       | UVALUE_I1 x                            => ret (DVALUE_I1 x)
@@ -95,16 +93,16 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                                                         ret (DVALUE_Vector delts)
       | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalue v1 ;;
                                                      dv2 <- concretize_uvalue v2 ;;
-                                                     eval_iop iop dv1 dv2
+                                                     lift_undef_or_err ret (eval_iop iop dv1 dv2) 
       | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
                                                      dv2 <- concretize_uvalue v2 ;;
-                                                     lift_err ret (eval_icmp cmp dv1 dv2)
+                                                     lift_undef_or_err ret (eval_icmp cmp dv1 dv2) 
       | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalue v1 ;;
                                                      dv2 <- concretize_uvalue v2 ;;
-                                                     eval_fop fop dv1 dv2
+                                                     lift_undef_or_err ret (eval_fop fop dv1 dv2)
       | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
                                                      dv2 <- concretize_uvalue v2 ;;
-                                                     lift_err ret (eval_fcmp cmp dv1 dv2)
+                                                     lift_undef_or_err ret (eval_fcmp cmp dv1 dv2)
       | _ => raise "unimplemented concretization of uvalue"
       (*
   | UVALUE_Conversion conv v t_to          => 
@@ -118,7 +116,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
        *)
       end.
 
-    Program Definition concretize_picks {E} `{FailureE -< E} `{UndefinedBehaviourE -< E} : PickE ~> itree E.
+    Program Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} : PickE ~> itree E.
     refine (fun T p => match p with
                     | pick u P => translate _ (concretize_uvalue u)
                     end).

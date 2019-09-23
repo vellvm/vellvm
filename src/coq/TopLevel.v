@@ -74,21 +74,21 @@ Open Scope string_scope.
     an [itree] as any other.
  *)
 
-Definition allocate_global (g:global dtyp) : LLVM _CFG unit :=
+Definition allocate_global (g:global dtyp) : itree L0 unit :=
   (vis (Alloca (g_typ _ g)) (fun v => trigger (GlobalWrite (g_ident _ g) v))).
 
-Definition allocate_globals (gs:list (global dtyp)) : LLVM _CFG unit :=
+Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
   map_monad_ allocate_global gs.
 
 (* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
-Definition allocate_declaration (d:declaration dtyp) : LLVM _CFG unit :=
+Definition allocate_declaration (d:declaration dtyp) : itree L0 unit :=
   (* SAZ TODO:  Don't allocate pointers for LLVM intrinsics declarations *)
     vis (Alloca DTYPE_Pointer) (fun v => trigger (GlobalWrite (dc_name _ d) v)).
 
-Definition allocate_declarations (ds:list (declaration dtyp)) : LLVM _CFG unit :=
+Definition allocate_declarations (ds:list (declaration dtyp)) : itree L0 unit :=
   map_monad_ allocate_declaration ds.
 
-Definition initialize_global (g:global dtyp) : LLVM exp_E unit :=
+Definition initialize_global (g:global dtyp) : itree exp_E unit :=
   let dt := (g_typ _ g) in
   a <- trigger (GlobalRead (g_ident _ g));;
   uv <- match (g_exp _ g) with
@@ -99,13 +99,13 @@ Definition initialize_global (g:global dtyp) : LLVM exp_E unit :=
   dv <- trigger (pick uv True) ;;
   trigger (Store a dv).
 
-Definition initialize_globals (gs:list (global dtyp)): LLVM exp_E unit :=
+Definition initialize_globals (gs:list (global dtyp)): itree exp_E unit :=
   map_monad_ initialize_global gs.
 
-Definition build_global_environment (CFG : CFG.mcfg dtyp) : LLVM _CFG unit :=
+Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree L0 unit :=
   allocate_globals (m_globals _ _ CFG) ;;
   allocate_declarations ((m_declarations _ _ CFG) ++ (List.map (df_prototype _ _) (m_definitions _ _ CFG)));;
-  translate _exp_E_to_CFG (initialize_globals (m_globals _ _ CFG)).
+  translate _exp_E_to_L0 (initialize_globals (m_globals _ _ CFG)).
 
 (** Local environment implementation
     The map-based handlers are defined parameterized over a domain of key and value.
@@ -121,7 +121,7 @@ Definition function_env := FMapAList.alist dvalue D.function_denotation.
    Denotes a function and returns its pointer.
  *)
 
-Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : LLVM _CFG (dvalue * D.function_denotation) :=
+Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree L0 (dvalue * D.function_denotation) :=
   let fid := (dc_name _ (df_prototype _ _ df)) in
   fv <- trigger (GlobalRead fid) ;;
   ret (fv, D.denote_function df).
@@ -151,7 +151,7 @@ Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
  *)
 
 (* Initialization and denotation of a Vellvm program *)
-Definition build_MCFG (mcfg : CFG.mcfg dtyp) : LLVM _CFG uvalue
+Definition build_MCFG (mcfg : CFG.mcfg dtyp) : itree L0 uvalue
   := build_global_environment mcfg ;;
      'defns <- map_monad address_one_function (m_definitions _ _ mcfg) ;;
      'addr <- trigger (GlobalRead (Name "main")) ;;
@@ -159,20 +159,20 @@ Definition build_MCFG (mcfg : CFG.mcfg dtyp) : LLVM _CFG uvalue
 
 (* Interpretation of the global environment *)
 (* TODO YZ: Why do we need to provide this instance explicitly? *)
-Definition build_MCFG1 (trace : LLVM _CFG uvalue) : LLVM _MCFG1 (global_env * uvalue)
+Definition build_MCFG1 (trace : itree L0 uvalue) : itree L1 (global_env * uvalue)
   := @run_global _ _ _ _ show_raw_id _ _ _ _ _ trace [].
 
 (* Interpretation of the local environment: map and stack *)
-Definition build_MCFG2 (trace : LLVM _MCFG1 (global_env * uvalue)) : LLVM _MCFG2 (local_env * stack * (global_env * uvalue))
+Definition build_MCFG2 (trace : itree L1 (global_env * uvalue)) : itree L2 (local_env * stack * (global_env * uvalue))
   := run_local_stack (@handle_local raw_id uvalue _ _ show_raw_id _ _) trace ([], []).
 
 (* Interpretation of the memory *)
-Definition build_MCFG3 (trace : LLVM _MCFG2 (local_env * stack * (global_env * uvalue))) : LLVM _MCFG3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))
+Definition build_MCFG3 (trace : itree L2 (local_env * stack * (global_env * uvalue))) : itree L3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))
   := M.run_memory trace (M.empty, [[]]).
 
 (* YZ TODO: Principle this definition and move it into Handlers/Pick  *)
-Program Definition interp_undef {X} (trace : LLVM _MCFG3 X) : LLVM _MCFG4 X.
-unfold _MCFG3 in *. unfold _MCFG4.
+Program Definition interp_undef {X} (trace : itree L3 X) : itree L4 X.
+unfold L3 in *. unfold L4.
 eapply interp. 2: exact trace.
 intros T E.
 repeat match goal with
@@ -182,12 +182,12 @@ apply P.concretize_picks; auto.
 Defined.
 
 (* YZ TODO: Principle this *)
-Program Definition embed_in_mcfg4 (T : Type) (E: (Failure.FailureE +' UndefinedBehaviour.UndefinedBehaviourE) T) : _MCFG4 T.
+Program Definition embed_in_mcfg4 (T : Type) (E: (FailureE +' UBE) T) : L4 T.
 firstorder.
 Defined.
 
-Program Definition model_undef {X} (trace : LLVM _MCFG3 X) : PropT (LLVM _MCFG4) X.
-unfold _MCFG3 in *. unfold _MCFG4.
+Program Definition model_undef {X} (trace : itree L3 X) : PropT (itree L4) X.
+unfold L3 in *. unfold L4.
 eapply interp. 2: exact trace.
 intros T E.
 repeat match goal with
@@ -198,19 +198,19 @@ generalize (P.Pick_handler undef); intros P.
 refine (exists t', P t' /\ t = translate subevent t').
 Defined.
 
-Definition build_MCFG4 (trace : LLVM _MCFG3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) : LLVM _MCFG4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))
+Definition build_MCFG4 (trace : itree L3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) : itree L4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))
   := '(m, (env, (genv, uv))) <- (interp_undef trace);;
      dv <- translate embed_in_mcfg4 (P.concretize_uvalue uv);;
      ret (m, (env, (genv, dv))).
 
-Definition model_MCFG4 (trace : LLVM _MCFG3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) : PropT (LLVM _MCFG4) (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue))).
+Definition model_MCFG4 (trace : itree L3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) : PropT (itree L4) (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue))).
   refine ( '(m, (env, (genv, uv))) <- (model_undef trace);; _).
-  dv <- translate embed_in_mcfg4 (P.concretize_uvalue uv);;
-     ret (m, (env, (genv, dv))).
-
+  (* dv <- translate embed_in_mcfg4 (P.concretize_uvalue uv);; *)
+  (*    ret (m, (env, (genv, dv))). *)
+Admitted.
 
 Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (LLVM _MCFG4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))) :=
+  option (itree L4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))) :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
     ucfg <- CFG.mcfg_of_modul _ scfg ;;
@@ -225,8 +225,9 @@ Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) :
 
     Some interpreted_trace.
 
+(*
 Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (LLVM _MCFG4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))) :=
+  option (itree _MCFG4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))) :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
     ucfg <- CFG.mcfg_of_modul _ scfg ;;

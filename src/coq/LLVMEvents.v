@@ -33,9 +33,7 @@ From Vellvm Require Import
      MemoryAddress
      DynamicTypes
      DynamicValues
-     Error
-     Failure
-     UndefinedBehaviour.
+     Error.
 
 (****************************** LLVM Events *******************************)
 (**
@@ -50,14 +48,12 @@ From Vellvm Require Import
    * Calls to intrinsics whose implementation _do not_ depends on the memory [IntrinsicE]
    * Interactions with the global environment [GlobalE]
    * Interactions with the local environment [LocalE]
-   * Manipulation of the frame stack [StackE]
+   * Manipulation of the frame stack for local environments [StackE]
    * Interactions with the memory [MemoryE]
-   * Concretization of a subdefined value [PickE]
-   * Undefined behaviour [UndefinedBehaviourE]
+   * Concretization of a under-defined value [PickE]
+   * Undefined behaviour [UBE]
    * Failure [FailureE]
    * Debugging messages [DebugE]
-   The [FailureE] and [DebugE] events are defined in their own files for dependency reasons
-   since they can show up in the evaluation of pure expressions as performed in _DynamicValues_.
 *)
 
 Set Implicit Arguments.
@@ -77,6 +73,47 @@ Set Contextual Implicit.
   Variant StackE (k v:Type) : Type -> Type :=
   | StackPush (args: list (k * v)) : StackE k v unit (* Pushes a fresh environment during a call *)
   | StackPop : StackE k v unit. (* Pops it back during a ret *)
+
+  (* Undefined behaviour carries a string. *)
+  Variant UBE : Type -> Type :=
+  | ThrowUB : string -> UBE void.
+
+  (** Since the output type of [ThrowUB] is [void], we can make it an action
+    with any return type. *)
+  Definition raiseUB {E : Type -> Type} `{UBE -< E} {X}
+             (e : string)
+    : itree E X
+    := vis (ThrowUB e) (fun v : void => match v with end).
+
+  (* Debug is identical to the "Trace" effect from the itrees library,
+   but debug is probably a less confusing name for us. *)
+  Variant DebugE : Type -> Type :=
+  | Debug : string -> DebugE unit.
+  (* Utilities to conveniently trigger debug events *)
+  Definition debug {E} `{DebugE -< E} (msg : string) : itree E unit :=
+    trigger (Debug msg).
+
+  Definition FailureE := exceptE string.
+
+  Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
+    throw msg.
+
+  Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m:err A) : itree E B :=
+    match m with
+    | inl x => throw x
+    | inr x => f x
+    end.
+
+  (* YZ : to double check that I did not mixed up the error and the ub positions *)
+  Definition lift_undef_or_err {A B} {E} `{FailureE -< E} `{UBE -< E} (f : A -> itree E B) (m:undef_or_err A) : itree E B :=
+    match m with
+    | mkEitherT m =>
+      match m with
+      | inl x => throw x
+      | inr (inl x) => raiseUB x
+      | inr (inr x) => f x
+      end
+    end.
 
 (* SAZ: TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism
    not functors. *)
@@ -104,7 +141,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Variant IntrinsicE : Type -> Type :=
   | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE dvalue.
 
-  (* SAZ: TODO: add Push / Pop to memory events to properly handle Alloca scoping *)
   (* Interactions with the memory for the LLVM IR *)
   Variant MemoryE : Type -> Type :=
   | MemPush : MemoryE unit
@@ -118,11 +154,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   (* | MemoryIntrinsic : forall (t:dtyp) (f:function_id) (args:list dvalue), MemoryE dvalue *)
   .
 
-  (* Debug is identical to the "Trace" effect from the itrees library,
-   but debug is probably a less confusing name for us. *)
-  Variant DebugE : Type -> Type :=
-  | Debug : string -> DebugE unit.
-
   (* An event resolving the non-determinism induced by undef.
    The argument _P_ is intended to be a predicate over the set
    of dvalues _u_ can take such that if it is not satisfied, the
@@ -132,16 +163,15 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   | pick (u:uvalue) (P : Prop) : PickE dvalue.
 
   (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
-
-  Definition LLVM X := itree X.
-
+  (* YZ TODO: The events and handlers are parameterized by the types of key and value.
+     It's weird for it to be the case if the events are concretely instantiated right here *)
   Definition LLVMGEnvE := (GlobalE raw_id dvalue).
   Definition LLVMEnvE := (LocalE raw_id uvalue).
   Definition LLVMStackE := (StackE raw_id uvalue).
 
-  Definition conv_E := MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE.
+  Definition conv_E := MemoryE +' DebugE +' FailureE +' UBE +' PickE.
   Definition lookup_E := LLVMGEnvE +' LLVMEnvE.
-  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE.
+  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' DebugE +' FailureE +' UBE +' PickE.
 
   Definition lookup_E_to_exp_E : lookup_E ~> exp_E :=
     fun T e =>
@@ -162,9 +192,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
     fun T e => inr1 e.
 
   (* Core effects - no distinction between "internal" and "external" calls. *)
-  Definition _CFG := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE.
+  Definition L0 := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UBE +' PickE.
 
-  Definition _funE_to_CFG : fun_E ~> _CFG :=
+  Definition _funE_to_L0 : fun_E ~> L0 :=
     fun R e =>
       match e with
       | inl1 e' => (inr1 (inr1 (inr1 (inl1 (inr1 e')))))
@@ -176,34 +206,34 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
       end.
 
   (* Distinction made between internal and external calls -- intermediate step in denote_mcfg.
-     Note that [CallE] appears _twice_ in the [_CFG_INTERNAL] type.  The left one is 
+     Note that [CallE] appears _twice_ in the [INTERNAL] type.  The left one is 
      meant to be the "internal" call event and the right one is the "external" call event.
      The [denote_mcfg] function, which uses [mrec] to tie the recursive knot distinguishes
      the two.  It re-triggers an unknown [Call] event as an [ExternalCall] (which is just
      an injection into the right-hand side.
    *)
-  Definition _CFG_INTERNAL := CallE +' _CFG.
+  Definition INTERNAL := CallE +' L0.
 
-  Definition ExternalCall t f args : _CFG_INTERNAL uvalue := (inr1 (inl1 (Call t f args))).
+  Definition ExternalCall t f args : INTERNAL uvalue := (inr1 (inl1 (Call t f args))).
 
   (* This inclusion "assumes" that all call events are internal.  The 
      dispatch in denote_mcfg then interprets some of the calls directly,
      if their definitions are known, or it "externalizes" the calls
      whose definitions are not known.
    *)
-  Definition _CFG_to_CFG_INTERNAL : _CFG ~> _CFG_INTERNAL :=
+  Definition L0_to_INTERNAL : L0 ~> INTERNAL :=
     fun R e =>
       match e with
       | inl1 e' => inl1 e'
       | inr1 e' => inr1 (inr1 e')
       end.
 
-  Definition _funE_to_CFG_Internal (T:Type) e := @_CFG_to_CFG_INTERNAL T (_funE_to_CFG e).
+  Definition _funE_to_INTERNAL (T:Type) e := @L0_to_INTERNAL T (_funE_to_L0 e).
 
-  Definition _exp_E_to_CFG : exp_E ~> _CFG :=
-    fun T e => @_funE_to_CFG T (instr_E_to_fun_E (exp_E_to_instr_E e)).
+  Definition _exp_E_to_L0 : exp_E ~> L0 :=
+    fun T e => @_funE_to_L0 T (instr_E_to_fun_E (exp_E_to_instr_E e)).
 
-  Definition _failure_UB_to_ExpE : (FailureE +' UndefinedBehaviourE) ~> exp_E :=
+  Definition _failure_UB_to_ExpE : (FailureE +' UBE) ~> exp_E :=
     fun T e =>
       match e with
       | inl1 x => inr1 (inr1 (inr1 (inr1 (inl1 x))))
@@ -211,26 +241,20 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
       end.
 
   (* For multiple CFG, after interpreting [GlobalE] *)
-  Definition _MCFG1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE.
+  Definition L1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UBE +' PickE.
 
   (* For multiple CFG, after interpreting [LocalE] *)
-  Definition _MCFG2 := CallE +' IntrinsicE +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE.
+  Definition L2 := CallE +' IntrinsicE +' MemoryE +' DebugE +' FailureE +' UBE +' PickE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
-  Definition _MCFG3 := CallE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE.
+  Definition L3 := CallE +' DebugE +' FailureE +' UBE +' PickE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickE]*)
-  Definition _MCFG4 := CallE +' DebugE +' FailureE +' UndefinedBehaviourE.
+  Definition L4 := CallE +' DebugE +' FailureE +' UBE.
 
-  Hint Unfold LLVM _CFG _MCFG1 _MCFG2 _MCFG3 _MCFG4.
-
-  (* Utilities to conveniently trigger debug and failure events *)
-
-  Definition debug {E} `{DebugE -< E} (msg : string) : itree E unit :=
-    trigger (Debug msg).
+  Hint Unfold  L0 L1 L2 L3 L4.
 
 End LLVM_INTERACTIONS.
-
 
 Module Make(ADDR : MemoryAddress.ADDRESS) <: LLVM_INTERACTIONS(ADDR).
 Include LLVM_INTERACTIONS(ADDR).

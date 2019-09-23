@@ -37,8 +37,6 @@ From Vellvm Require Import
      MemoryAddress
      LLVMEvents
      Error
-     Failure
-     UndefinedBehaviour
      Coqlib
      Numeric.Integers
      Numeric.Floats.
@@ -491,7 +489,7 @@ Admitted.
   Definition free_frame (f : mem_frame) (m : memory) : memory
     := fold_left (fun m key => delete key m) f m.
 
-  Definition handle_memory {E} `{FailureE -< E} `{UndefinedBehaviourE -< E}: MemoryE ~> stateT memory_stack (itree E) :=
+  Definition handle_memory {E} `{FailureE -< E} `{UBE -< E}: MemoryE ~> stateT memory_stack (itree E) :=
     fun _ e '(m, s) =>
       match e with
       | MemPush => ret ((m, [] :: s), tt)
@@ -622,8 +620,8 @@ Admitted.
   Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-  Definition run_memory `{FailureE -< E +' F} `{UndefinedBehaviourE -< E +' F}:
-    LLVM (E +'  IntrinsicE +' MemoryE +' F) ~> stateT memory_stack (LLVM (E +' F)) :=
+  Definition run_memory `{FailureE -< E +' F} `{UBE -< E +' F}:
+    itree (E +'  IntrinsicE +' MemoryE +' F) ~> stateT memory_stack (itree (E +' F)) :=
     interp_state (case_ E_trigger (case_ handle_intrinsic (case_ handle_memory F_trigger))).
   End PARAMS.
 End Make.

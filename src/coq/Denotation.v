@@ -21,7 +21,6 @@ From ExtLib Require Import
      Structures.Functor
      Eqv.
 
-
 From ITree Require Import
      ITree
      Interp.Recursion
@@ -30,8 +29,6 @@ From ITree Require Import
 From Vellvm Require Import
      Util
      Error
-     UndefinedBehaviour
-     Failure
      LLVMAst
      AstLib
      CFG
@@ -113,9 +110,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
        generate memory effects. *)
     (* SAZ: for some reason, typeclass resolution was taking forever in eval_conv_h,
         so I respecialized it... *)
-    Definition spec_raise {X} (s:string) : LLVM _CFG X := raise s.
+    Definition spec_raise {X} (s:string) : itree L0 X := raise s.
 
-    Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : LLVM conv_E dvalue :=
+    (* YZ: Inferring the subevent instance takes a small but non-trivial amount of time,
+       and has to be done here hundreds and hundreds of times. Factoring the inferrence is crucial.
+     *)
+    Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
+      let raise := @raise conv_E dvalue _
+      in
       match conv with
       | Trunc =>
         match t1, x, t2 with
@@ -316,7 +318,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       end.
     Arguments eval_conv_h _ _ _ _ : simpl nomatch.
 
-    Definition eval_conv conv (t1:dtyp) x (t2:dtyp) : LLVM conv_E dvalue :=
+    Definition eval_conv conv (t1:dtyp) x (t2:dtyp) : itree conv_E dvalue :=
       match t1, x with
       | DTYPE_I bits, dv =>
         eval_conv_h conv t1 dv t2
@@ -333,14 +335,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     failwith "dv_zero_initializer unimplemented".
 
   (* YZ: GlobalRead should always returns a dvalue. We can either carry the invariant, or cast [dvalue_to_uvalue] here *)
-  Definition lookup_id (i:ident) : LLVM lookup_E uvalue :=
+  Definition lookup_id (i:ident) : itree lookup_E uvalue :=
     match i with
     | ID_Global x => dv <- trigger (GlobalRead x);; ret (dvalue_to_uvalue dv)
     | ID_Local x  => trigger (LocalRead x)
     end.
 
 (*
-  [denote_exp] is the main entry point for evaluating LLVM expressions.
+  [denote_exp] is the main entry point for evaluating itree expressions.
   top : is the type at which the expression should be evaluated (if any)
   INVARIANT:
     - top may be None only for
@@ -349,7 +351,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
     - top must be Some t for the remaining EXP_* cases
       Note that when top is Some t, the resulting dvalue can never be
-      a function pointer for a well-typed LLVM program.
+      a function pointer for a well-typed itree program.
 
   Expressions are denoted as itrees that return a [dvalue].
  *)
@@ -386,9 +388,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   local: uvalue (fully blown)
   global: dvalue
   mem: dvalue + undef?
- *) 
+ *)
+
+  (* YZ TODO: Need functor instance for undef_or_err *)
+
   Fixpoint denote_exp
-           (top:option dtyp) (o:exp dtyp) {struct o} : LLVM exp_E uvalue :=
+           (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
         in
         match o with
@@ -398,7 +403,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | EXP_Integer x =>
           match top with
           | None                => raise "denote_exp given untyped EXP_Integer"
-          | Some (DTYPE_I bits) => lift_err ret (fmap dvalue_to_uvalue (coerce_integer_to_int bits x))
+          | Some (DTYPE_I bits) => lift_undef_or_err ret (fmap dvalue_to_uvalue (coerce_integer_to_int bits x))
           | _                   => raise "bad type for constant int"
           end
 
@@ -468,50 +473,61 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
           if iop_is_div iop && negb (is_concrete v2)
-          then dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2)) ;;
-               uvalue_to_dvalue_binop2 (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-                                 (fun v1 v2 => translate _failure_UB_to_ExpE
-                                                      (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
-                                 v1 dv2
-          else uvalue_to_dvalue_binop (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-                                (fun v1 v2 => translate _failure_UB_to_ExpE
-                                                     (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
-                                v1 v2
+          then
+            dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2)) ;;
+            uvalue_to_dvalue_binop2
+              (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
+              (fun v1 v2 => translate _failure_UB_to_ExpE
+                                   (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
+              v1 dv2
+          else
+            uvalue_to_dvalue_binop
+              (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
+              (fun v1 v2 => translate _failure_UB_to_ExpE
+                                   (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
+              v1 v2
 
         | OP_ICmp cmp dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          lift_err ret (uvalue_to_dvalue_binop (fun v1 v2 => ret (UVALUE_ICmp cmp v1 v2))
-                                         (fun v1 v2 => fmap dvalue_to_uvalue (eval_icmp cmp v1 v2))
-                                         v1 v2)
+          uvalue_to_dvalue_binop
+            (fun v1 v2 => ret (UVALUE_ICmp cmp v1 v2))
+            (fun v1 v2 => lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_icmp cmp v1 v2)))
+            v1 v2
 
         | OP_FBinop fop fm dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
           if fop_is_div fop && negb (is_concrete v2)
-          then dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2)) ;;
-               uvalue_to_dvalue_binop2 (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
-                                 (fun v1 v2 => translate _failure_UB_to_ExpE
-                                                      (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
-                                 v1 dv2
-          else uvalue_to_dvalue_binop (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
-                                (fun v1 v2 => translate _failure_UB_to_ExpE
-                                                     (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
-                                v1 v2
+          then
+            dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2)) ;;
+            uvalue_to_dvalue_binop2
+              (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
+              (fun v1 v2 => translate _failure_UB_to_ExpE
+                                   (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
+              v1 dv2
+          else
+            uvalue_to_dvalue_binop
+              (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
+              (fun v1 v2 => translate _failure_UB_to_ExpE
+                                   (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
+              v1 v2
 
         | OP_FCmp fcmp dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          lift_err ret (uvalue_to_dvalue_binop (fun v1 v2 => ret (UVALUE_FCmp fcmp v1 v2))
-                                         (fun v1 v2 => fmap dvalue_to_uvalue (eval_fcmp fcmp v1 v2))
-                                         v1 v2)
+          uvalue_to_dvalue_binop
+            (fun v1 v2 => ret (UVALUE_FCmp fcmp v1 v2))
+            (fun v1 v2 => lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fcmp fcmp v1 v2)))
+            v1 v2
 
         | OP_Conversion conv dt1 op t2 =>
           v <- denote_exp (Some dt1) op ;;
-          uvalue_to_dvalue_uop (fun v => ret (UVALUE_Conversion conv v t2))
-                         (fun v => translate conv_E_to_exp_E
-                              (fmap dvalue_to_uvalue (eval_conv conv dt1 v t2)))
-                         v
+          uvalue_to_dvalue_uop
+            (fun v => ret (UVALUE_Conversion conv v t2))
+            (fun v => translate conv_E_to_exp_E
+                             (fmap dvalue_to_uvalue (eval_conv conv dt1 v t2)))
+            v
 
         (* CB TODO: Do we actually need to pick here? GEP doesn't do any derefs. Does it make sense to leave it as a UVALUE? *)
         | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
@@ -531,8 +547,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             dvs <- map_monad (fun v => trigger (pick v True)) vs ;;
 
             fmap dvalue_to_uvalue (trigger (GEP dt1 dvptr dvs))
-          end         
-          
+          end
+
         | OP_ExtractElement vecop idx =>
           (*  'vec <- monad_app_snd (denote_exp e) vecop;
               'vidx <- monad_app_snd (denote_exp e) idx;  *)
@@ -552,14 +568,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         | OP_ExtractValue (dt, str) idxs =>
           str <- denote_exp (Some dt) str;;
-          let fix loop str idxs : err uvalue :=
+          let fix loop str idxs : undef_or_err uvalue :=
               match idxs with
               | [] => ret str
               | i :: tl =>
                 v <- index_into_str str i ;;
                loop v tl
               end in
-          lift_err ret (loop str idxs)
+          lift_undef_or_err ret (loop str idxs)
 
         | OP_InsertValue strop eltop idxs =>
           (*
@@ -584,19 +600,19 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           v2   <- denote_exp (Some dt2) op2 ;;
           match uvalue_to_dvalue cndv with
           | inl e => ret (UVALUE_Select cndv v1 v2)
-          | inr dcndv => lift_err ret (eval_select dcndv v1 v2)
+          | inr dcndv => lift_undef_or_err ret (eval_select dcndv v1 v2)
           end
         end.
       Arguments denote_exp _ : simpl nomatch.
 
-      Definition eval_op (o:exp dtyp) : LLVM exp_E uvalue :=
+      Definition eval_op (o:exp dtyp) : itree exp_E uvalue :=
         denote_exp None o.
       Arguments eval_op _ : simpl nomatch.
 
       (* An instruction has only side-effects, it therefore returns [unit] *)
 
       Definition denote_instr
-                 (i: (instr_id * instr dtyp)): LLVM instr_E unit :=
+                 (i: (instr_id * instr dtyp)): itree instr_E unit :=
         match i with
         (* Pure operations *)
 
@@ -630,7 +646,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | _ => trigger (Store da dv)
           end
 
-        | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED LLVM ERROR: Store to non-void ID"
+        | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED itree ERROR: Store to non-void ID"
 
         (* Call *)
         (* CB TODO: Do we need to pick here? *)
@@ -658,12 +674,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         | (_, INSTR_Unreachable) => raise "IMPOSSIBLE: unreachable in reachable position"
 
-        (* Currently unhandled LLVM instructions *)
+        (* Currently unhandled itree instructions *)
         | (_, INSTR_Fence)
         | (_, INSTR_AtomicCmpXchg)
         | (_, INSTR_AtomicRMW)
         | (_, INSTR_VAArg)
-        | (_, INSTR_LandingPad) => raise "Unsupported LLVM instruction"
+        | (_, INSTR_LandingPad) => raise "Unsupported itree instruction"
 
         (* Error states *)
         | (_, _) => raise "ID / Instr mismatch void/non-void"
@@ -672,7 +688,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
       (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
-      Definition denote_terminator (t: terminator dtyp): LLVM exp_E (block_id + uvalue) :=
+      Definition denote_terminator (t: terminator dtyp): itree exp_E (block_id + uvalue) :=
         match t with
 
         | TERM_Ret (dt, op) =>
@@ -703,15 +719,15 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         | TERM_Br_1 br => ret (inl br)
 
-        (* Currently unhandled LLVM terminators *)
+        (* Currently unhandled itree terminators *)
         | TERM_Switch _ _ _
         | TERM_IndirectBr _ _
         | TERM_Resume _
-        | TERM_Invoke _ _ _ _ => raise "Unsupport LLVM terminator"
+        | TERM_Invoke _ _ _ _ => raise "Unsupport itree terminator"
         end.
 
       (* Denoting a list of instruction simply binds the trees together *)
-      Fixpoint denote_code (c: code dtyp): LLVM instr_E unit :=
+      Fixpoint denote_code (c: code dtyp): itree instr_E unit :=
         match c with
         | nil => ret tt
         | i::c => denote_instr i;; denote_code c
@@ -719,7 +735,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
       (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-      Definition denote_block (b: block dtyp) : LLVM instr_E (block_id + uvalue) :=
+      Definition denote_block (b: block dtyp) : itree instr_E (block_id + uvalue) :=
         denote_code (blk_code dtyp b);;
         translate exp_E_to_instr_E (denote_terminator (snd (blk_term dtyp b))).
 
@@ -732,7 +748,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          We then bind the resulting value in the underlying environment.
        *)
 
-      Definition denote_phi (bid : block_id) (id_p : local_id * phi dtyp) : LLVM exp_E (local_id * uvalue) :=
+      Definition denote_phi (bid : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) :=
         let '(id, Phi dt args) := id_p in
         match assoc RawIDOrd.eq_dec bid args with
         | Some op =>
@@ -759,7 +775,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          jumping into the phi-nodes. It's hence actually at the time the jump is performed that
          we have enough information to perform it.
        *)
-      (* YZ Note: This should be sufficient to denote LLVM programs.
+      (* YZ Note: This should be sufficient to denote itree programs.
          However, it does not give a denotation to open fragments of a [cfg], which might be
          useful to facilitate some reasoning.
          To do so, we would need to introduce sub-types of the universe of [block_id] and expose
@@ -771,7 +787,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         of types, just by deciding internally to loop or not and not reflect the invariant
         in the type.
        *)
-      Definition denote_cfg (f: cfg dtyp) : LLVM instr_E uvalue :=
+      Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
         loop (fun (bid : block_id + block_id) =>
                 match bid with
                 | inl bid
@@ -807,10 +823,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         end.
 
 
-      (* The denotation of an LLVM function is a coq function that takes
+      (* The denotation of an itree function is a coq function that takes
          a list of dvalues and returns the appropriate semantics. *)
       Definition function_denotation : Type :=
-          list dvalue -> LLVM fun_E uvalue.
+          list dvalue -> itree fun_E uvalue.
 
       Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation  :=
         fun (args : list dvalue) =>
@@ -824,7 +840,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           trigger MemPop ;;
           ret rv.
 
-      (* We now turn to the second knot to be tied: a top-level LLVM program is a set
+      (* We now turn to the second knot to be tied: a top-level itree program is a set
          of mutually recursively defined functions, i.e. [cfg]s. We hence need to
          resolve this mutually recursive definition by interpreting away the call events.
          As mentionned above, calls are not tail recursive: we need a more general fixpoint
@@ -849,7 +865,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
       Definition denote_mcfg
                  (fundefs:list (dvalue * function_denotation)) (dt : dtyp)
-                 (f_value : dvalue) (args : list dvalue) : LLVM _ uvalue :=
+                 (f_value : dvalue) (args : list dvalue) : itree _ uvalue :=
           @mrec CallE (CallE +' _)
                 (fun T call =>
                    match call with
@@ -857,10 +873,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                      match (lookup_defn fv fundefs) with
                      | Some f_den => (* If the call is internal *)
                        (* and denote the [cfg]. *)
-                       translate _funE_to_CFG_Internal (f_den args)
+                       translate _funE_to_INTERNAL (f_den args)
                      | None =>
                        (* This must have been a registered external function  *)
-                       (* We _don't_ push a LLVM stack frame, since the external *)
+                       (* We _don't_ push a itree stack frame, since the external *)
                        (* call takes place in one "atomic" step.
                           SAZ: Not sure that we shouldn't at least push the memory frame
                         *)
@@ -948,13 +964,13 @@ Definition env_of_assoc {A} (l:list (raw_id * A)) : ENV.t A :=
    no parameters *)
 
 (* COMMENTING OUT
-Definition init_state (fname:string) : LLVM (failureE +' debugE) state :=
+Definition init_state (fname:string) : itree (failureE +' debugE) state :=
   g <- build_global_environment ;;
   fentry <- trywith ("INIT: no function named " ++ fname) (find_function_entry CFG (Name fname)) ;;
   let 'FunctionEntry ids pc_f := fentry in
     ret (g, pc_f, (@ENV.empty dvalue), []).
 
-CoFixpoint step_sem (r:result) : LLVM (failureE +' debugE) dvalue :=
+CoFixpoint step_sem (r:result) : itree (failureE +' debugE) dvalue :=
   match r with
   | Done v => ret v
   | Step s => x <- step s ;; ITreeDefinition.Tau (step_sem x)
@@ -978,13 +994,13 @@ Inductive result :=
 | Step (s:state)
 .
 
-Definition raise_p {X} (p:pc) s : LLVM (failureE +' debugE) X := raise (s ++ " in block: " ++ (to_string p)).
-Definition cont (s:state)  : LLVM (failureE +' debugE) result := ret (Step s).
-Definition halt (v:dvalue) : LLVM (failureE +' debugE) result := ret (Done v).
+Definition raise_p {X} (p:pc) s : itree (failureE +' debugE) X := raise (s ++ " in block: " ++ (to_string p)).
+Definition cont (s:state)  : itree (failureE +' debugE) result := ret (Step s).
+Definition halt (v:dvalue) : itree (failureE +' debugE) result := ret (Done v).
 
  *)
 (*
-Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv) (e_init:env) (k:stack) : LLVM (failureE +' debugE) result :=
+Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv) (e_init:env) (k:stack) : itree (failureE +' debugE) result :=
   let eval_phi (e:env) '(iid, Phi t ls) :=
       match assoc RawIDOrd.eq_dec bid_src ls with
       | Some op =>
@@ -1010,7 +1026,7 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
 (* YZ : How should we do handle phi nodes?
        Seems like option 4 is the way to go.
        OPTION 1:
-       [| block|]: (block_id * block_id) -> LLVME (block_id * block_id)
+       [| block|]: (block_id * block_id) -> itreeE (block_id * block_id)
        i.e. We treat elementary blocks as having several entry point, one per
        adress from which we jumped into it.
        OPTION 2:
@@ -1048,7 +1064,7 @@ Definition jump (fid:function_id) (bid_src:block_id) (bid_tgt:block_id) (g:genv)
         end
       | None =>
         (* This must have been a registered external function  *)
-        (* We _don't_ push a LLVM stack frame, since the external *)
+        (* We _don't_ push a itree stack frame, since the external *)
         (* call takes place in one "atomic" step. *)
 
         match fid with

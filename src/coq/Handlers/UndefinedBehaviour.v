@@ -1,8 +1,8 @@
 From Vellvm Require Import
-     UndefinedBehaviour.
+     LLVMEvents.
 
 From ITree Require Import
      ITree.
 
-Definition UB_handler: forall {X}, UndefinedBehaviourE X -> (itree void1 X -> Prop) := fun _ _ _ => True.
+Definition UB_handler: forall {X}, UBE X -> (itree void1 X -> Prop) := fun _ _ _ => True.
 

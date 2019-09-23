@@ -18,7 +18,6 @@ From Vellvm Require Import
      DynamicValues
      LLVMEvents
      Local
-     Failure
      Error.
 
 Set Implicit Arguments.

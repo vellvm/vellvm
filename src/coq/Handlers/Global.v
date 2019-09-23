@@ -16,7 +16,6 @@ From Vellvm Require Import
      MemoryAddress
      DynamicValues
      LLVMEvents
-     Failure
      Error.
 
 Set Implicit Arguments.
@@ -57,6 +56,6 @@ Section Globals.
     Definition run_global `{FailureE -< E +' F +' G} : itree (E +' F +' (GlobalE k v) +' G) ~> stateT map (itree (E +' F +' G)) :=
       interp_state (case_ E_trigger (case_ F_trigger (case_ handle_global G_trigger))).
   End PARAMS.
-  
+
 End Globals.
 

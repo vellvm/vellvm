@@ -25,13 +25,8 @@ From Vellvm Require Import
      AstLib
      MemoryAddress
      Error
-     Failure
-     UndefinedBehaviour
      DynamicTypes
      Util.
-
-From ITree Require Import
-     ITree.
 
 Require Import Integers Floats.
 
@@ -711,19 +706,19 @@ Class VInt I : Type :=
   (* Arithmetic Operations ---------------------------------------------------- *)
   Section ARITHMETIC.
 
-  (* Evaluate integer opererations to get a dvalue.
+    (* Evaluate integer opererations to get a dvalue.
 
      These operations are between VInts, which are "vellvm"
      integers. This is a typeclass that wraps all of the integer
      operations that we use for integer types with different bitwidths.
-   *)
-  Definition eval_int_op {Int} `{VInt Int} (iop:ibinop) (x y: Int) : itree UndefinedBehaviourE dvalue :=
-    match iop with
-    (* Following to cases are probably right since they use CompCert *)
-    | Add nuw nsw =>
-      ret (if orb (andb nuw (eq (add_carry x y zero) one))
-                  (andb nsw (eq (add_overflow x y zero) one))
-           then DVALUE_Poison else to_dvalue (add x y))
+     *)
+    Definition eval_int_op {Int} `{VInt Int} (iop:ibinop) (x y: Int) : undef dvalue :=
+      match iop with
+      (* Following to cases are probably right since they use CompCert *)
+      | Add nuw nsw =>
+        ret (if orb (andb nuw (eq (add_carry x y zero) one))
+                    (andb nsw (eq (add_overflow x y zero) one))
+             then DVALUE_Poison else to_dvalue (add x y))
 
     | Sub nuw nsw =>
       ret (if orb (andb nuw (eq (sub_borrow x y zero) one))
@@ -741,7 +736,7 @@ Class VInt I : Type :=
              (andb nsw (orb (min_signed >? res_s')
                             (res_s' >? max_signed)))
       then ret DVALUE_Poison else ret (to_dvalue res)
-  
+
     | Shl nuw nsw =>
       let bz := Z.of_nat bitwidth in
       let res := shl x y in
@@ -759,7 +754,7 @@ Class VInt I : Type :=
 
     | UDiv ex =>
       if (unsigned y =? 0)
-      then raiseUB "Unsigned division by 0."
+      then failwith "Unsigned division by 0."
       else if andb ex (negb ((unsigned x) mod (unsigned y) =? 0))
            then ret DVALUE_Poison
            else ret (to_dvalue (divu x y))
@@ -767,7 +762,7 @@ Class VInt I : Type :=
     | SDiv ex =>
       (* What does signed i1 mean? *)
       if (signed y =? 0)
-      then raiseUB "Signed division by 0."
+      then failwith "Signed division by 0."
       else if andb ex (negb ((signed x) mod (signed y) =? 0))
            then ret DVALUE_Poison
            else ret (to_dvalue (divs x y))
@@ -788,12 +783,12 @@ Class VInt I : Type :=
 
     | URem =>
       if unsigned y =? 0
-      then raiseUB "Unsigned mod 0."
+      then failwith "Unsigned mod 0."
       else ret (to_dvalue (modu x y))
 
     | SRem =>
       if signed y =? 0
-      then raiseUB "Signed mod 0."
+      then failwith "Signed mod 0."
       else ret (to_dvalue (mods x y))
 
     | And =>
@@ -808,19 +803,19 @@ Class VInt I : Type :=
   Arguments eval_int_op _ _ _ : simpl nomatch.
 
   (* Evaluate the given iop on the given arguments according to the bitsize *)
-  Definition integer_op (bits:Z) (iop:ibinop) (x y:inttyp bits) : itree (FailureE +' UndefinedBehaviourE) dvalue :=
+  Definition integer_op (bits:Z) (iop:ibinop) (x y:inttyp bits) : undef_or_err dvalue :=
     match bits, x, y with
-    | 1, x, y  => translate inr1 (eval_int_op iop x y)
-    | 8, x, y  => translate inr1 (eval_int_op iop x y)
-    | 32, x, y => translate inr1 (eval_int_op iop x y)
-    | 64, x, y => translate inr1 (eval_int_op iop x y)
-    | _, _, _  => raise "unsupported bitsize"
+    | 1, x, y  => lift (eval_int_op iop x y)
+    | 8, x, y  => lift (eval_int_op iop x y)
+    | 32, x, y => lift (eval_int_op iop x y)
+    | 64, x, y => lift (eval_int_op iop x y)
+    | _, _, _  => failwith "unsupported bitsize"
     end.
   Arguments integer_op _ _ _ _ : simpl nomatch.
 
   (* Convert written integer constant to corresponding integer with bitsize bits.
      Takes the integer modulo 2^bits. *)
-  Definition coerce_integer_to_int (bits:Z) (i:Z) : err dvalue :=
+  Definition coerce_integer_to_int (bits:Z) (i:Z) : undef_or_err dvalue :=
     match bits with
     | 1  => ret (DVALUE_I1 (repr i))
     | 8  => ret (DVALUE_I8 (repr i))
@@ -877,15 +872,15 @@ Class VInt I : Type :=
 
 
   (* TODO: make work with undef ??? Maybe this is all dvalues? *)
-  Definition eval_iop_integer_h iop v1 v2 : itree (FailureE +' UndefinedBehaviourE) dvalue :=
+  Definition eval_iop_integer_h iop v1 v2 : undef_or_err dvalue :=
     match v1, v2 with
-    | DVALUE_I1 i1, DVALUE_I1 i2    => translate inr1 (eval_int_op iop i1 i2)
-    | DVALUE_I8 i1, DVALUE_I8 i2    => translate inr1 (eval_int_op iop i1 i2)
-    | DVALUE_I32 i1, DVALUE_I32 i2  => translate inr1 (eval_int_op iop i1 i2)
-    | DVALUE_I64 i1, DVALUE_I64 i2  => translate inr1 (eval_int_op iop i1 i2)
-    | DVALUE_Poison, _              => ret DVALUE_Poison
-    | _, DVALUE_Poison              => ret DVALUE_Poison
-    | _, _                          => raise "ill_typed-iop"
+    | DVALUE_I1 i1, DVALUE_I1 i2    => lift (eval_int_op iop i1 i2)
+    | DVALUE_I8 i1, DVALUE_I8 i2    => lift (eval_int_op iop i1 i2)
+    | DVALUE_I32 i1, DVALUE_I32 i2  => lift (eval_int_op iop i1 i2)
+    | DVALUE_I64 i1, DVALUE_I64 i2  => lift (eval_int_op iop i1 i2)
+    | DVALUE_Poison, _              => lift (ret DVALUE_Poison)
+    | _, DVALUE_Poison              => lift (ret DVALUE_Poison)
+    | _, _                          => failwith "ill_typed-iop"
     end.
   Arguments eval_iop_integer_h _ _ _ : simpl nomatch.
 
@@ -902,7 +897,7 @@ Class VInt I : Type :=
 
    *)
 
-  Definition eval_iop iop v1 v2 : itree (FailureE +' UndefinedBehaviourE) dvalue :=
+  Definition eval_iop iop v1 v2 : undef_or_err dvalue :=
     match v1, v2 with
     | (DVALUE_Vector elts1), (DVALUE_Vector elts2) =>
       val <- vec_loop (eval_iop_integer_h iop) (List.combine elts1 elts2) ;;
@@ -910,7 +905,6 @@ Class VInt I : Type :=
     | _, _ => eval_iop_integer_h iop v1 v2
     end.
   Arguments eval_iop _ _ _ : simpl nomatch.
-
 
   Definition eval_int_icmp {Int} `{VInt Int} icmp (x y : Int) : dvalue :=
     if match icmp with
@@ -928,7 +922,7 @@ Class VInt I : Type :=
     then DVALUE_I1 (Int1.one) else DVALUE_I1 (Int1.zero).
   Arguments eval_int_icmp _ _ _ : simpl nomatch.
 
-  Definition eval_icmp icmp v1 v2 : err dvalue :=
+  Definition eval_icmp icmp v1 v2 : undef_or_err dvalue :=
     match v1, v2 with
     | DVALUE_I1 i1, DVALUE_I1 i2 => ret (eval_int_icmp icmp i1 i2)
     | DVALUE_I8 i1, DVALUE_I8 i2 => ret (eval_int_icmp icmp i1 i2)
@@ -941,36 +935,35 @@ Class VInt I : Type :=
     end.
   Arguments eval_icmp _ _ _ : simpl nomatch.
 
-
-  Definition double_op (fop:fbinop) (v1:ll_double) (v2:ll_double) : itree (FailureE +' UndefinedBehaviourE) dvalue :=
+  Definition double_op (fop:fbinop) (v1:ll_double) (v2:ll_double) : undef_or_err dvalue :=
     match fop with
     | FAdd => ret (DVALUE_Double (Float.add v1 v2))
     | FSub => ret (DVALUE_Double (Float.sub v1 v2))
     | FMul => ret (DVALUE_Double (Float.mul v1 v2))
     | FDiv => if (Float.eq_dec v2 Float.zero)
-              then raiseUB "Signed division by 0."
+              then lift (raise "Signed division by 0.")
               else ret (DVALUE_Double (Float.div v1 v2))
-    | FRem => raise "unimplemented double operation"
+    | FRem => failwith "unimplemented double operation"
     end.
 
-  Definition float_op (fop:fbinop) (v1:ll_float) (v2:ll_float) : itree (FailureE +' UndefinedBehaviourE) dvalue :=
+  Definition float_op (fop:fbinop) (v1:ll_float) (v2:ll_float) : undef_or_err dvalue :=
     match fop with
     | FAdd => ret (DVALUE_Float (Float32.add v1 v2))
     | FSub => ret (DVALUE_Float (Float32.sub v1 v2))
     | FMul => ret (DVALUE_Float (Float32.mul v1 v2))
     | FDiv => if (Float32.eq_dec v2 Float32.zero)
-              then raiseUB "Signed division by 0."
+              then lift (raise "Signed division by 0.")
               else ret (DVALUE_Float (Float32.div v1 v2))
-    | FRem => raise "unimplemented float operation"
+    | FRem => failwith "unimplemented float operation"
     end.
 
-  Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : itree (FailureE +' UndefinedBehaviourE) dvalue :=
+  Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : undef_or_err dvalue :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2   => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
     | DVALUE_Poison, _                   => ret DVALUE_Poison
     | _, DVALUE_Poison                   => ret DVALUE_Poison
-    | _, _                               => raise ("ill_typed-fop: " ++ (to_string fop) ++ " " ++ (to_string v1) ++ " " ++ (to_string v2))
+    | _, _                               => failwith ("ill_typed-fop: " ++ (to_string fop) ++ " " ++ (to_string v1) ++ " " ++ (to_string v2))
     end.
 
   Definition not_nan32 (f:ll_float) : bool :=
@@ -1029,7 +1022,7 @@ Class VInt I : Type :=
     then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
     Arguments double_cmp _ _ _ : simpl nomatch.
 
-  Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : err dvalue :=
+  Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : undef_or_err dvalue :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2 => ret (float_cmp fcmp f1 f2)
     | DVALUE_Double f1, DVALUE_Double f2 => ret (double_cmp fcmp f1 f2)
@@ -1044,22 +1037,25 @@ Class VInt I : Type :=
   End ARITHMETIC.
 
   (* Same deal as above with the helper *)
-  Definition eval_select_h (cnd : dvalue) (v1 v2 : uvalue) : err uvalue :=
+  (* The pattern matching generates hundreds of subgoals, hence the factorization of the typeclass inference *)
+  Definition eval_select_h (cnd : dvalue) (v1 v2 : uvalue) : undef_or_err uvalue :=
+    let failwith_local := (@failwith _ undef_or_err (Monad_eitherT string Monad_err) (Exception_eitherT string Monad_err))
+    in
+    let ret_local := (@ret undef_or_err (Monad_eitherT string Monad_err) uvalue)
+    in
     match v1, v2 with
-    | UVALUE_Poison, _ => ret UVALUE_Poison
-    | _, UVALUE_Poison => ret UVALUE_Poison
+    | UVALUE_Poison, _ => ret_local UVALUE_Poison
+    | _, UVALUE_Poison => ret_local UVALUE_Poison
     | _, _ =>
       match cnd with
       | DVALUE_I1 i =>
-        ret (if Int1.unsigned i =? 1 then v1 else v2)
-      | DVALUE_Poison => ret UVALUE_Poison
-      | _ => failwith "ill_typed-select"
+        ret_local (if Int1.unsigned i =? 1 then v1 else v2)
+      | DVALUE_Poison => ret_local UVALUE_Poison
+      | _ => failwith_local "ill_typed select"
       end
     end.
 
-  Arguments eval_select_h _ _ _ : simpl nomatch.
-
-  Definition eval_select cnd v1 v2 : err uvalue :=
+  Definition eval_select cnd v1 v2 : undef_or_err uvalue :=
     match cnd, v1, v2 with
     | (DVALUE_Vector es), (UVALUE_Vector es1), (UVALUE_Vector es2) =>
       (* vec needs to loop over es, es1, and es2. Is there a way to
@@ -1080,7 +1076,7 @@ Class VInt I : Type :=
 
   (* Helper function for indexing into a structured datatype
      for extractvalue and insertvalue *)
-  Definition index_into_str (v:uvalue) (idx:LLVMAst.int) : err uvalue :=
+  Definition index_into_str (v:uvalue) (idx:LLVMAst.int) : undef_or_err uvalue :=
     let fix loop elts i :=
         match elts with
         | [] => failwith "index out of bounds"
@@ -1095,7 +1091,7 @@ Class VInt I : Type :=
   Arguments index_into_str _ _ : simpl nomatch.
 
   (* Helper function for inserting into a structured datatype for insertvalue *)
-  Definition insert_into_str (str:dvalue) (v:dvalue) (idx:LLVMAst.int) : err dvalue :=
+  Definition insert_into_str (str:dvalue) (v:dvalue) (idx:LLVMAst.int) : undef_or_err dvalue :=
     let fix loop (acc elts:list dvalue) (i:LLVMAst.int) :=
         match elts with
         | [] => failwith "index out of bounds"
@@ -1185,7 +1181,7 @@ Class VInt I : Type :=
   | Concretize_ICmp : forall cmp uv1 dv1 uv2 dv2 res,
       concretize uv1 dv1 ->
       concretize uv2 dv2 ->
-      eval_icmp cmp dv1 dv2 = inr res  ->
+      eval_icmp cmp dv1 dv2 = ret res  ->
       concretize (UVALUE_ICmp cmp uv1 uv2) res
 
   | Concretize_FBinop : forall fop fm uv1 dv1 uv2 dv2 res,
@@ -1197,7 +1193,7 @@ Class VInt I : Type :=
   | Concretize_FCmp : forall cmp uv1 dv1 uv2 dv2 res,
       concretize uv1 dv1 ->
       concretize uv2 dv2 ->
-      eval_fcmp cmp dv1 dv2 = inr res ->
+      eval_fcmp cmp dv1 dv2 = ret res ->
       concretize (UVALUE_FCmp cmp uv1 uv2) res
 
   | Concretize_Struct_Nil     : concretize (UVALUE_Struct []) (DVALUE_Struct [])

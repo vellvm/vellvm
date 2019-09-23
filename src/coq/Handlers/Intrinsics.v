@@ -17,13 +17,11 @@ From ExtLib Require Import
      Programming.Eqv
      Data.String.
 
-From Vellvm Require Import 
+From Vellvm Require Import
      Util
      LLVMAst
      LLVMEvents
      Error
-     UndefinedBehaviour
-     Failure
      IntrinsicsDefinitions.
 
 From ITree Require Import
@@ -108,11 +106,10 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                                   end
                                ) defined_intrinsics.
 
-  
-  Definition handle_intrinsics : IntrinsicE ~> LLVM _CFG :=
+  Definition handle_intrinsics : IntrinsicE ~> itree L0 :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
     fun X (e : IntrinsicE X) =>
-      match e in IntrinsicE Y return X = Y -> LLVM _CFG Y with
+      match e in IntrinsicE Y return X = Y -> itree L0 Y with
       | (Intrinsic _ fname args) =>
           match assoc Strings.String.string_dec fname defs_assoc with
           | Some f => fun pf => 
@@ -120,19 +117,18 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                        | inl msg => raise msg
                        | inr result => Ret result
                        end
-          | None => fun pf => (eq_rect X (fun a => LLVM _CFG a) (trigger e)) dvalue pf
+          | None => fun pf => (eq_rect X (fun a => itree L0 a) (trigger e)) dvalue pf
           end
       end eq_refl.
-     
 
   (* CB / YZ / SAZ: TODO "principle this" *)
-  Definition extcall_trigger : Handler CallE _CFG :=
+  Definition extcall_trigger : Handler CallE L0 :=
   fun X e => trigger e.
 
-  Definition rest_trigger : Handler (LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UndefinedBehaviourE +' PickE) _CFG :=
+  Definition rest_trigger : Handler (LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UBE +' PickE) L0 :=
     fun X e => trigger e.
 
-  Definition interpret_intrinsics: forall R, LLVM _CFG R -> LLVM _CFG R  :=
+  Definition interpret_intrinsics: forall R, itree L0 R -> itree L0 R  :=
     interp (case_ extcall_trigger (case_ handle_intrinsics rest_trigger)).
   
 End Make.
