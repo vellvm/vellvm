@@ -6,14 +6,14 @@ COQLIBDIR = ../lib
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R ../lib/InteractionTrees/theories/ ITree
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILES := PropT Error Failure UndefinedBehaviour Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric/Integers Numeric/Floats Util LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues LLVMEvents TypeUtil IntrinsicsDefinitions Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Denotation Handlers/Memory DenotationProp Transformations/Renaming Transformations/DeadInstr Transformations/Transform TransformTypes TopLevel
+COQFILES := Error Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric/Integers Numeric/Floats Util LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues LLVMEvents TypeUtil IntrinsicsDefinitions Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Denotation Handlers/Memory DenotationProp Transformations/Renaming Transformations/DeadInstr Transformations/Transform TransformTypes TopLevel
 
 OLLVMFILES := 
 

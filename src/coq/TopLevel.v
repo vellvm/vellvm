@@ -149,9 +149,17 @@ Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
    resulting from the denotation of the LLVM program. Each successive handler
    then transform a tree at layer n to a tree at layer (n+1).
  *)
+(**
+   In order to limit bloated type signature, we name the successive return types.
+*)
+
+Notation res_L0 := uvalue.
+Notation res_L1 := (global_env * res_L0)%type.
+Notation res_L2 := (local_env * (@stack (list (raw_id * uvalue))) * res_L1)%type.
+Notation res_L3 := (M.memory_stack * res_L2)%type.
 
 (* Initialization and denotation of a Vellvm program *)
-Definition build_MCFG (mcfg : CFG.mcfg dtyp) : itree L0 uvalue
+Definition build_L0 (mcfg : CFG.mcfg dtyp) : itree L0 res_L0
   := build_global_environment mcfg ;;
      'defns <- map_monad address_one_function (m_definitions _ _ mcfg) ;;
      'addr <- trigger (GlobalRead (Name "main")) ;;
@@ -159,15 +167,15 @@ Definition build_MCFG (mcfg : CFG.mcfg dtyp) : itree L0 uvalue
 
 (* Interpretation of the global environment *)
 (* TODO YZ: Why do we need to provide this instance explicitly? *)
-Definition build_MCFG1 (trace : itree L0 uvalue) : itree L1 (global_env * uvalue)
+Definition build_L1 (trace : itree L0 uvalue) : itree L1 res_L1
   := @run_global _ _ _ _ show_raw_id _ _ _ _ _ trace [].
 
 (* Interpretation of the local environment: map and stack *)
-Definition build_MCFG2 (trace : itree L1 (global_env * uvalue)) : itree L2 (local_env * stack * (global_env * uvalue))
+Definition build_L2 (trace : itree L1 (global_env * uvalue)) : itree L2 res_L2
   := run_local_stack (@handle_local raw_id uvalue _ _ show_raw_id _ _) trace ([], []).
 
 (* Interpretation of the memory *)
-Definition build_MCFG3 (trace : itree L2 (local_env * stack * (global_env * uvalue))) : itree L3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))
+Definition build_L3 (trace : itree L2 (local_env * stack * (global_env * uvalue))) : itree L3 res_L3
   := M.run_memory trace (M.empty, [[]]).
 
 (* YZ TODO: Principle this definition and move it into Handlers/Pick  *)
@@ -182,7 +190,7 @@ apply P.concretize_picks; auto.
 Defined.
 
 (* YZ TODO: Principle this *)
-Program Definition embed_in_mcfg4 (T : Type) (E: (FailureE +' UBE) T) : L4 T.
+Program Definition embed_in_L4 (T : Type) (E: (FailureE +' UBE) T) : L4 T.
 firstorder.
 Defined.
 
@@ -198,12 +206,14 @@ generalize (P.Pick_handler undef); intros P.
 refine (exists t', P t' /\ t = translate subevent t').
 Defined.
 
-Definition build_MCFG4 (trace : itree L3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) : itree L4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))
+Definition build_L4 (trace : itree L3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) : itree L4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))
   := '(m, (env, (genv, uv))) <- (interp_undef trace);;
-     dv <- translate embed_in_mcfg4 (P.concretize_uvalue uv);;
+     dv <- translate embed_in_L4 (P.concretize_uvalue uv);;
      ret (m, (env, (genv, dv))).
 
-Definition model_MCFG4 (trace : itree L3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) : PropT (itree L4) (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue))).
+Definition model_L4
+           (trace : itree L3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) :
+  PropT (itree L4) (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue))).
   refine ( '(m, (env, (genv, uv))) <- (model_undef trace);; _).
   (* dv <- translate embed_in_mcfg4 (P.concretize_uvalue uv);; *)
   (*    ret (m, (env, (genv, dv))). *)
@@ -216,12 +226,12 @@ Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) :
     ucfg <- CFG.mcfg_of_modul _ scfg ;;
     let mcfg := normalize_types ucfg in
 
-    let core_trace        := build_MCFG mcfg in
+    let core_trace        := build_L0 mcfg in
     let global_trace      := INT.interpret_intrinsics core_trace in
-    let local_trace       := build_MCFG1 global_trace in
-    let mem_trace         := build_MCFG2 local_trace in
-    let undef_Trace       := build_MCFG3 mem_trace in
-    let interpreted_trace := build_MCFG4 undef_Trace in
+    let local_trace       := build_L1 global_trace in
+    let mem_trace         := build_L2 local_trace in
+    let undef_Trace       := build_L3 mem_trace in
+    let interpreted_trace := build_L4 undef_Trace in
 
     Some interpreted_trace.
 
