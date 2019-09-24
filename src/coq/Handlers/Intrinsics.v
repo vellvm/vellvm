@@ -125,7 +125,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Definition extcall_trigger : Handler CallE L0 :=
   fun X e => trigger e.
 
-  Definition rest_trigger : Handler (LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UBE +' PickE) L0 :=
+  Definition rest_trigger : Handler (LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE) L0 :=
     fun X e => trigger e.
 
   Definition interpret_intrinsics: forall R, itree L0 R -> itree L0 R  :=

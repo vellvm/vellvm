@@ -177,10 +177,38 @@ Definition build_L2 (trace : itree L1 (global_env * uvalue)) : itree L2 res_L2
 (* Interpretation of the memory *)
 Definition build_L3 (trace : itree L2 (local_env * stack * (global_env * uvalue))) : itree L3 res_L3
   := M.interp_memory trace (M.empty, [[]]).
+From ExtLib Require Import
+     Structures.Functor.
 
+(* Here we want something of this kind (similar to Handlers/Locals) to define [inter_undef] and [model_undef] a bit
+ more generically in Handlers/Pick *)
+(*
+Section PARAMS.
+  Variable (E F G: Type -> Type).
+  Definition E_trigger : forall R, E R -> itree (E +' F +' G) R :=
+    fun R e => r <- trigger e ;; ret r.
+
+  Definition F_trigger : forall R, F R -> itree (E +' F +' G) R :=
+    fun R e => r <- trigger e ;; ret r.
+
+  Definition G_trigger : forall R , G R -> itree (E +' F +' G) R :=
+    fun R e => r <- trigger e ;; ret r.
+
+  Definition interp_undef `{FailureE -< E +' F +' G} :
+    itree (E +' F +' (LocalE k v) +' G) ~> stateT map (itree (E +' F +' G)) :=
+    interp_state (case_ E_trigger (case_ F_trigger (case_ handle_local G_trigger))).
+
+End PARAMS.
+*)
+(*
 (* YZ TODO: Principle this definition and move it into Handlers/Pick  *)
-Program Definition interp_undef {X} (trace : itree L3 X) : itree L4 X.
-unfold L3 in *. unfold L4.
+Definition interp_undef {X} (trace : itree L3 X) : itree L4 X.
+  refine (interp _ trace).
+  unfold L3 in *. unfold L4.
+  refine (case_ _ (case_ P.concretize_picks _)).
+  refine (fun _ e => trigger e).
+  refine (P.concretize_picks).
+  refine (interp_prop _). 
 eapply interp. 2: exact trace.
 intros T E.
 repeat match goal with
@@ -188,12 +216,17 @@ repeat match goal with
 end.
 apply P.concretize_picks; auto.
 Defined.
-
+*)
 (* YZ TODO: Principle this *)
 Program Definition embed_in_L4 (T : Type) (E: (FailureE +' UBE) T) : L4 T.
 firstorder.
 Defined.
 
+Definition model_undef {E M}
+           {FM : Functor M} {MM : Monad M}
+           {IM : MonadIter M} (h : E ~> PropT M) :
+  itree E ~> PropT M := interp h.
+(*
 Program Definition model_undef {X} (trace : itree L3 X) : PropT (itree L4) X.
 unfold L3 in *. unfold L4.
 eapply interp. 2: exact trace.
@@ -205,7 +238,8 @@ intros t.
 generalize (P.Pick_handler undef); intros P.
 refine (exists t', P t' /\ t = translate subevent t').
 Defined.
-
+ *)
+(*
 Definition build_L4 (trace : itree L3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) : itree L4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))
   := '(m, (env, (genv, uv))) <- (interp_undef trace);;
      dv <- translate embed_in_L4 (P.concretize_uvalue uv);;
@@ -251,3 +285,4 @@ Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
     let interpreted_trace := build_MCFG4 undef_Trace in
 
     Some interpreted_trace.
+*)

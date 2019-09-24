@@ -169,9 +169,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Definition LLVMEnvE := (LocalE raw_id uvalue).
   Definition LLVMStackE := (StackE raw_id uvalue).
 
-  Definition conv_E := MemoryE +' DebugE +' FailureE +' UBE +' PickE.
+  Definition conv_E := MemoryE +' PickE +' UBE +' DebugE +' FailureE.
   Definition lookup_E := LLVMGEnvE +' LLVMEnvE.
-  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' DebugE +' FailureE +' UBE +' PickE.
+  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
   Definition lookup_E_to_exp_E : lookup_E ~> exp_E :=
     fun T e =>
@@ -192,7 +192,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
     fun T e => inr1 e.
 
   (* Core effects - no distinction between "internal" and "external" calls. *)
-  Definition L0 := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UBE +' PickE.
+  Definition L0 := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
   Definition _funE_to_L0 : fun_E ~> L0 :=
     fun R e =>
@@ -236,23 +236,23 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Definition _failure_UB_to_ExpE : (FailureE +' UBE) ~> exp_E :=
     fun T e =>
       match e with
-      | inl1 x => inr1 (inr1 (inr1 (inr1 (inl1 x))))
-      | inr1 x => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 x)))))
+      | inl1 x => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 x)))))
+      | inr1 x => inr1 (inr1 (inr1 (inr1 (inl1 x))))
       end.
 
   (* For multiple CFG, after interpreting [GlobalE] *)
-  Definition L1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' DebugE +' FailureE +' UBE +' PickE.
+  Definition L1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] *)
-  Definition L2 := CallE +' IntrinsicE +' MemoryE +' DebugE +' FailureE +' UBE +' PickE.
+  Definition L2 := CallE +' IntrinsicE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
-  Definition L3 := CallE +' DebugE +' FailureE +' UBE +' PickE.
+  Definition L3 := CallE +' PickE +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickE]*)
-  Definition L4 := CallE +' DebugE +' FailureE +' UBE.
+  Definition L4 := CallE +' UBE +' DebugE +' FailureE.
 
-  Hint Unfold  L0 L1 L2 L3 L4.
+  Hint Unfold L0 L1 L2 L3 L4.
 
 End LLVM_INTERACTIONS.
 
