@@ -33,6 +33,7 @@ From Vellvm Require Import
      Handlers.Stack
      Handlers.Memory
      Handlers.Intrinsics
+     Handlers.UndefinedBehaviour
      LLVMAst
      Util
      Error
@@ -157,7 +158,7 @@ Notation res_L0 := uvalue (* (only parsing) *).
 Notation res_L1 := (global_env * res_L0)%type (* (only parsing) *).
 Notation res_L2 := (local_env * (@stack (list (raw_id * uvalue))) * res_L1)%type (* (only parsing) *).
 Notation res_L3 := (M.memory_stack * res_L2)%type (* (only parsing) *).
-Notation res_L4 := (res_L3)%type (* (only parsing) *).
+(* Notation res_L4 := (res_L3)%type (* (only parsing) *). *)
 
 (* Initialization and denotation of a Vellvm program *)
 Definition build_L0 (mcfg : CFG.mcfg dtyp) : itree L0 res_L0
@@ -180,48 +181,52 @@ Definition build_L3 (trace : itree L2 res_L2) : itree L3 res_L3
   := M.interp_memory trace (M.empty, [[]]).
 
 (* Interpretation of under-defined values as 0 *)
-Definition build_L4 (trace : itree L3 res_L3) : itree L4 res_L4 :=
+Definition build_L4 (trace : itree L3 res_L3) : itree L4 res_L3 :=
   P.interp_undef trace.
 
 (* Interpretation of under-defined values as 0 *)
-Definition model_L4 (trace : itree L3 res_L3) : PropT (itree L4) res_L4 :=
+Definition model_L4 (trace : itree L3 res_L3) : PropT (itree L4) res_L3 :=
   P.model_undef trace.
 
-(* YZ TODO: interpret away UBE into failure *)
-(* YZ : should we cast [mcfg_of_modul] None answer into triggering a failure to get rid of the option monad? *)
+(* YZ TODO: translate away UBE into failure *)
+(* YZ TODO: Rename traces better *)
+(* YZ TODO: should we cast [mcfg_of_modul] None answer into triggering a failure to get rid of the option monad? *)
 Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (itree L4 res_L4) :=
+  option (itree L4 res_L3) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
   ucfg <- CFG.mcfg_of_modul _ scfg ;;
   let mcfg := normalize_types ucfg in
 
-  let core_trace        := build_L0 mcfg in
-  let global_trace      := INT.interpret_intrinsics core_trace in
-  let local_trace       := build_L1 global_trace in
-  let mem_trace         := build_L2 local_trace in
-  let undef_Trace       := build_L3 mem_trace in
-  let interpreted_trace := build_L4 undef_Trace in
+  let L0_trace          := build_L0 mcfg in
+  let L1_trace          := INT.interpret_intrinsics L0_trace in
+  let L2_trace          := build_L1 L1_trace in
+  let L3_trace          := build_L2 L2_trace in
+  let L4_Trace          := build_L3 L3_trace in
+  let interpreted_trace := build_L4 L4_Trace in
 
   Some interpreted_trace.
 
-(*
+(* YZ TODO: interpret UBE *)
+(* YZ TODO: Rename traces better *)
 Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (PropT (itree L4) res_L4).
-  refine (
-    let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
+  option (PropT (itree (CallE +' DebugE +' FailureE)) res_L3) :=
+  let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
     ucfg <- CFG.mcfg_of_modul _ scfg ;;
     let mcfg := normalize_types ucfg in
 
     let L0_trace        := build_L0 mcfg in
-    let L1_trace      := INT.interpret_intrinsics core_trace in
-    let L2_trace       := build_MCFG1 global_trace in
-    let L3_trace         := build_MCFG2 local_trace in _).
+    let L1_trace        := INT.interpret_intrinsics L0_trace in
+    let L2_trace        := build_L1 L1_trace in
+    let L3_trace        := build_L2 L2_trace in
+    let L4_trace        := build_L3 L3_trace in
+    let  interpreted_trace := model_L4 L4_trace in
+    let foo_trace := model_UB interpreted_trace in
+    Some foo_trace.
 
-    let undef_Trace       := build_MCFG3 mem_trace in
-    let interpreted_trace := build_MCFG4 undef_Trace in
-
-    Some interpreted_trace.
-
+(*
+Lemma interpreter_satisfies_model: forall prog t,
+    interpreter prog = Some t ->
+    exists P, model prog = Some P /\ P t.
 *)
