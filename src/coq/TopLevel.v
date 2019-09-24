@@ -153,10 +153,11 @@ Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
    In order to limit bloated type signature, we name the successive return types.
 *)
 
-Notation res_L0 := uvalue.
-Notation res_L1 := (global_env * res_L0)%type.
-Notation res_L2 := (local_env * (@stack (list (raw_id * uvalue))) * res_L1)%type.
-Notation res_L3 := (M.memory_stack * res_L2)%type.
+Notation res_L0 := uvalue (* (only parsing) *).
+Notation res_L1 := (global_env * res_L0)%type (* (only parsing) *).
+Notation res_L2 := (local_env * (@stack (list (raw_id * uvalue))) * res_L1)%type (* (only parsing) *).
+Notation res_L3 := (M.memory_stack * res_L2)%type (* (only parsing) *).
+Notation res_L4 := (res_L3)%type (* (only parsing) *).
 
 (* Initialization and denotation of a Vellvm program *)
 Definition build_L0 (mcfg : CFG.mcfg dtyp) : itree L0 res_L0
@@ -167,79 +168,60 @@ Definition build_L0 (mcfg : CFG.mcfg dtyp) : itree L0 res_L0
 
 (* Interpretation of the global environment *)
 (* TODO YZ: Why do we need to provide this instance explicitly? *)
-Definition build_L1 (trace : itree L0 uvalue) : itree L1 res_L1
-  := @interp_global _ _ _ _ show_raw_id _ _ _ _ _ trace [].
+Definition build_L1 (trace : itree L0 res_L0) : itree L1 res_L1 :=
+  @interp_global _ _ _ _ show_raw_id _ _ _ _ _ trace [].
 
 (* Interpretation of the local environment: map and stack *)
-Definition build_L2 (trace : itree L1 (global_env * uvalue)) : itree L2 res_L2
+Definition build_L2 (trace : itree L1 res_L1) : itree L2 res_L2
   := interp_local_stack (@handle_local raw_id uvalue _ _ show_raw_id _ _) trace ([], []).
 
 (* Interpretation of the memory *)
-Definition build_L3 (trace : itree L2 (local_env * stack * (global_env * uvalue))) : itree L3 res_L3
+Definition build_L3 (trace : itree L2 res_L2) : itree L3 res_L3
   := M.interp_memory trace (M.empty, [[]]).
 
-(* YZ TODO: Principle this *)
-Program Definition embed_in_L4 (T : Type) (E: (FailureE +' UBE) T) : L4 T.
-firstorder.
-Defined.
+(* Interpretation of under-defined values as 0 *)
+Definition build_L4 (trace : itree L3 res_L3) : itree L4 res_L4 :=
+  P.interp_undef trace.
 
-(*
-Program Definition model_undef {X} (trace : itree L3 X) : PropT (itree L4) X.
-unfold L3 in *. unfold L4.
-eapply interp. 2: exact trace.
-intros T E.
-repeat match goal with
-| [ H : (?e +' ?E) ?T |- _ ] => destruct H as [event | undef]; try exact (fun l => l = trigger event) (* YZ: this is the trigger instance of PropT *)
-       end.
-intros t.
-generalize (P.Pick_handler undef); intros P.
-refine (exists t', P t' /\ t = translate subevent t').
-Defined.
- *)
-(*
-Definition build_L4 (trace : itree L3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) : itree L4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))
-  := '(m, (env, (genv, uv))) <- (interp_undef trace);;
-     dv <- translate embed_in_L4 (P.concretize_uvalue uv);;
-     ret (m, (env, (genv, dv))).
+(* Interpretation of under-defined values as 0 *)
+Definition model_L4 (trace : itree L3 res_L3) : PropT (itree L4) res_L4 :=
+  P.model_undef trace.
 
-Definition model_L4
-           (trace : itree L3 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * uvalue)))) :
-  PropT (itree L4) (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue))).
-  refine ( '(m, (env, (genv, uv))) <- (model_undef trace);; _).
-  (* dv <- translate embed_in_mcfg4 (P.concretize_uvalue uv);; *)
-  (*    ret (m, (env, (genv, dv))). *)
-Admitted.
-
+(* YZ TODO: interpret away UBE into failure *)
+(* YZ : should we cast [mcfg_of_modul] None answer into triggering a failure to get rid of the option monad? *)
 Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (itree L4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))) :=
-    let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
+  option (itree L4 res_L4) :=
+  let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
-    ucfg <- CFG.mcfg_of_modul _ scfg ;;
-    let mcfg := normalize_types ucfg in
+  ucfg <- CFG.mcfg_of_modul _ scfg ;;
+  let mcfg := normalize_types ucfg in
 
-    let core_trace        := build_L0 mcfg in
-    let global_trace      := INT.interpret_intrinsics core_trace in
-    let local_trace       := build_L1 global_trace in
-    let mem_trace         := build_L2 local_trace in
-    let undef_Trace       := build_L3 mem_trace in
-    let interpreted_trace := build_L4 undef_Trace in
+  let core_trace        := build_L0 mcfg in
+  let global_trace      := INT.interpret_intrinsics core_trace in
+  let local_trace       := build_L1 global_trace in
+  let mem_trace         := build_L2 local_trace in
+  let undef_Trace       := build_L3 mem_trace in
+  let interpreted_trace := build_L4 undef_Trace in
 
-    Some interpreted_trace.
+  Some interpreted_trace.
 
 (*
 Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (itree _MCFG4 (M.memory_stack * ((local_env * (@stack (list (raw_id * uvalue)))) * (global_env * dvalue)))) :=
+  option (PropT (itree L4) res_L4).
+  refine (
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
     ucfg <- CFG.mcfg_of_modul _ scfg ;;
     let mcfg := normalize_types ucfg in
 
-    let core_trace        := build_MCFG mcfg in
-    let global_trace      := INT.interpret_intrinsics core_trace in
-    let local_trace       := build_MCFG1 global_trace in
-    let mem_trace         := build_MCFG2 local_trace in
+    let L0_trace        := build_L0 mcfg in
+    let L1_trace      := INT.interpret_intrinsics core_trace in
+    let L2_trace       := build_MCFG1 global_trace in
+    let L3_trace         := build_MCFG2 local_trace in _).
+
     let undef_Trace       := build_MCFG3 mem_trace in
     let interpreted_trace := build_MCFG4 undef_Trace in
 
     Some interpreted_trace.
+
 *)
