@@ -19,9 +19,12 @@ From Vellvm Require Import
      DynamicTypes
      LLVMEvents
      Error
-     Util.
+     Util
+     PropT.
 
-Require Import  Floats.
+Require Import Floats.
+
+Import MonadNotation.
 
 Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
@@ -30,10 +33,24 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Section PickPropositional.
 
     (* YZ: TODO: better UB error message *)
-    (* YZ: TODO: rename UBE *)
-    Inductive Pick_handler: forall {X}, PickE X -> (itree UBE X -> Prop) :=
-    | PickUB: forall uv C, ~ C -> Pick_handler (pick uv C) (raiseUB "Picking unsafe uvalue")
-    | PickD: forall uv (C: Prop) dv, C -> concretize uv dv -> Pick_handler (pick uv C) (ret dv).
+    Inductive Pick_handler {E} `{UBE -< E}: PickE ~> PropT (itree E) :=
+    | PickUB: forall uv C, ~ C -> Pick_handler _ (pick uv C) (raiseUB "Picking unsafe uvalue")
+    | PickD: forall uv (C: Prop) dv, C -> concretize uv dv -> Pick_handler _ (pick uv C) (ret dv).
+
+    Section PARAMS.
+      Variable (E F: Type -> Type).
+
+      Definition E_trigger_prop : E ~> PropT (itree (E +' F)) :=
+        fun R e => fun t => t = r <- trigger e ;; ret r.
+
+      Definition F_trigger_prop : F ~> PropT (itree (E +' F)) :=
+        fun R e => fun t => t = r <- trigger e ;; ret r.
+
+      Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
+        itree (E +' PickE +' F) ~> PropT (itree (E +' F)) :=
+        interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)).
+
+    End PARAMS.
 
   End PickPropositional.
 
@@ -123,6 +140,20 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     refine (fun T fu => _).
     destruct fu; auto.
     Defined.
+
+    Section PARAMS.
+      Variable (E F: Type -> Type).
+      Definition E_trigger :  E ~> itree (E +' F) :=
+        fun R e => r <- trigger e ;; ret r.
+
+      Definition F_trigger : F ~> itree (E +' F) :=
+        fun R e => r <- trigger e ;; ret r.
+
+      Definition interp_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
+        itree (E +' PickE +' F) ~> itree (E +' F) :=
+        interp (case_ E_trigger (case_ concretize_picks F_trigger)).
+
+    End PARAMS.
 
   End PickImplementation.
 

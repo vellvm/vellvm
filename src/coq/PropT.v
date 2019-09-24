@@ -4,7 +4,9 @@ From ExtLib Require Import
      Structures.Functor
      Structures.Monad.
 
-From ITree Require Import Basics.Basics.
+From ITree Require Import
+     Basics.Basics
+     ITree.
 
 Section PropMonad.
 
@@ -25,7 +27,14 @@ Section PropMonad.
   Global Polymorphic Instance MonadIter_Prop {M} {MM: MonadIter M} : MonadIter (PropT M) :=
     fun R I step i r =>
       exists (step': I -> M (I + R)%type),
-        (forall j, step j (step' j)) /\ iter step' i = r.
+        (forall j, step j (step' j)) /\ CategoryOps.iter step' i = r.
 
-  (* Look on Steve's github what he did last summer *)
+  Definition interp_prop {E M}
+             {FM : Functor M} {MM : Monad M}
+             {IM : MonadIter M} (h : E ~> PropT M) :
+    itree E ~> PropT M := interp h.
+
+  (* YZ TODO: Look on Steve's github what he did last summer in relation
+     to working up to an equivalence relation *)
+
 End PropMonad.
