@@ -40,22 +40,10 @@ let rec pp_dvalue : Format.formatter -> DV.dvalue -> unit =
 
 let debug_flag = ref false 
 let debug (msg:string) =
-  if !debug_flag then 
+  if !debug_flag then
     Printf.printf "DEBUG: %s\n%!" msg
 
-(* 
-   m is of type 
- 
-  type 'r coq_LLVM_MCFG2 =
-    ((__ coq_IntrinsicE, (__ coq_MemoryIntrinsicE, (__ coq_DebugE, __ coq_FailureE, __) sum1, __) sum1, __) sum1, 'r) itree
-
-   inl1 _ = Intrinsic
-   inr1 (inl1 _) = MemoryIntrinsic
-
-
-*)
-
-let rec step (m : ('a TopLevel.IO.coq_L4, TopLevel.M.memory_stack * ((TopLevel.local_env * (LLVMAst.raw_id * TopLevel.IO.DV.uvalue) list Stack.stack) * (TopLevel.global_env * TopLevel.IO.DV.dvalue))) itree) : (DV.dvalue, string) result =
+let rec step (m : ('a TopLevel.IO.coq_L5, TopLevel.M.memory_stack * ((TopLevel.local_env * (LLVMAst.raw_id * TopLevel.IO.DV.uvalue) list Stack.stack) * (TopLevel.global_env * TopLevel.IO.DV.dvalue))) itree) : (DV.dvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -74,12 +62,12 @@ let rec step (m : ('a TopLevel.IO.coq_L4, TopLevel.M.memory_stack * ((TopLevel.l
          step (k (Obj.magic DV.DVALUE_None)))
 
   (* The failE effect is a failure *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 f)), _) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 f), _) ->
     Error (Camlcoq.camlstring_of_coqstring f)
 
   (* The UndefinedBehaviourE effect is a failure *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 f)), _) ->
-    Error (Camlcoq.camlstring_of_coqstring f)
+  (* | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 f)), _) -> *)
+    (* Error (Camlcoq.camlstring_of_coqstring f) *)
 
   (* The only visible effects from LLVMIO that should propagate to the interpreter are:
      - Call to external functions

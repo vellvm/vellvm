@@ -159,7 +159,6 @@ Notation res_L1 := (global_env * res_L0)%type (* (only parsing) *).
 Notation res_L2 := (local_env * (@stack (list (raw_id * uvalue))) * res_L1)%type (* (only parsing) *).
 Notation res_L3 := (M.memory_stack * res_L2)%type (* (only parsing) *).
 Notation res_L4 := (M.memory_stack * (local_env * (@stack (list (raw_id * uvalue))) * (global_env * dvalue)))%type (* (only parsing) *).
-(* Notation res_L4 := (res_L3)%type (* (only parsing) *). *)
 
 (* Initialization and denotation of a Vellvm program *)
 Definition build_L0 (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
@@ -182,7 +181,7 @@ Definition build_L3 (trace : itree L2 res_L2) : itree L3 res_L3 :=
   M.interp_memory trace (M.empty, [[]]).
 
 (* Interpretation of under-defined values as 0 *)
-(* YZ: I'm not fully convinced by this. *)
+(* YZ: I'm not fully convinced by this, this translate for the return value is awkward. *)
 Definition build_L4 (trace : itree L3 res_L3) : itree L4 res_L4 :=
   '(m, (env, (genv, uv))) <- (P.interp_undef trace);;
    dv <- translate _failure_UB_to_L4 (P.concretize_uvalue uv);;
@@ -192,11 +191,14 @@ Definition build_L4 (trace : itree L3 res_L3) : itree L4 res_L4 :=
 Definition model_L4 (trace : itree L3 res_L3) : PropT (itree L4) res_L3 :=
   P.model_undef trace.
 
-(* YZ TODO: translate away UBE into failure *)
+Definition build_L5 (trace : itree L4 res_L4) : itree L5 res_L4 :=
+  interp_UB trace.
+
+Definition model_L5 (trace : PropT (itree L4) res_L3) : PropT (itree L5) res_L3 :=
+  model_UB trace.
+
 (* YZ TODO: Rename traces better *)
-(* Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) : *)
-  (* option (itree L4 res_L4) := *)
-Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) : itree L4 res_L4 :=
+Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) : itree L5 res_L4 :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
   match CFG.mcfg_of_modul _ scfg with
@@ -205,20 +207,20 @@ Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) : i
     let mcfg := normalize_types ucfg in
 
     let L0_trace          := build_L0 mcfg in
-    let L1_trace          := INT.interpret_intrinsics L0_trace in
-    let L2_trace          := build_L1 L1_trace in
-    let L3_trace          := build_L2 L2_trace in
-    let L4_Trace          := build_L3 L3_trace in
-    let interpreted_trace := build_L4 L4_Trace in
-    interpreted_trace
+    let L0_trace'         := INT.interpret_intrinsics L0_trace in
+    let L1_trace          := build_L1 L0_trace' in
+    let L2_trace          := build_L2 L1_trace in
+    let L3_Trace          := build_L3 L2_trace in
+    let L4_Trace          := build_L4 L3_Trace in
+    let L5_Trace          := build_L5 L4_Trace in
+    L5_Trace
 
   | None => raise "Ill-formed program: mcfg_of_modul failed."
   end.
 
-(* YZ TODO: interpret UBE *)
 (* YZ TODO: Rename traces better *)
 Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
-  PropT (itree (CallE +' DebugE +' FailureE)) res_L3 :=
+  PropT (itree L5) res_L3 :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
   match  CFG.mcfg_of_modul _ scfg with
@@ -226,13 +228,13 @@ Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
     let mcfg := normalize_types ucfg in
 
     let L0_trace        := build_L0 mcfg in
-    let L1_trace        := INT.interpret_intrinsics L0_trace in
-    let L2_trace        := build_L1 L1_trace in
-    let L3_trace        := build_L2 L2_trace in
-    let L4_trace        := build_L3 L3_trace in
-    let  interpreted_trace := model_L4 L4_trace in
-    let foo_trace := model_UB interpreted_trace in
-    foo_trace
+    let L0_trace'       := INT.interpret_intrinsics L0_trace in
+    let L1_trace        := build_L1 L0_trace' in
+    let L2_trace        := build_L2 L1_trace in
+    let L3_trace        := build_L3 L2_trace in
+    let L4_trace        := model_L4 L3_trace in
+    let L5_trace        := model_L5 L4_trace in
+    L5_trace
 
   | None => lift (raise "Ill-formed program: mcfg_of_modul failed.")
   end.

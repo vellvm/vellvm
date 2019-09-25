@@ -1,12 +1,14 @@
+From Coq Require Import String.
+
+From ExtLib Require Import
+     Structures.Monads.
+
 From Vellvm Require Import
      PropT
      LLVMEvents.
 
 From ITree Require Import
      ITree.
-
-From ExtLib Require Import
-     Structures.Monads.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -29,6 +31,23 @@ Section PARAMS.
     PropT (itree (E +' UBE +' F)) ~> PropT (itree (E +' F)) :=
     fun T Pt t =>
       exists t', Pt t' /\ interp_prop (case_ E_trigger_prop (case_ UB_handler F_trigger_prop)) _ t' t.
+
+End PARAMS.
+
+Definition UB_exec {E} `{FailureE -< E}: UBE ~> itree E := fun _ _ => raise "Undefined Behaviour".
+
+Section PARAMS.
+  Variable (E F: Type -> Type).
+
+  Definition E_trigger : E ~> itree (E +' F) :=
+    fun R e => r <- trigger e ;; ret r.
+
+  Definition F_trigger : F ~> itree (E +' F) :=
+    fun R e =>  r <- trigger e ;; ret r.
+
+  Definition interp_UB `{FailureE -< E +' F}:
+    itree (E +' UBE +' F) ~> itree (E +' F) :=
+    interp (case_ E_trigger (case_ UB_exec F_trigger)).
 
 End PARAMS.
 

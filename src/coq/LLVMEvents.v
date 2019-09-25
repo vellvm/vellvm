@@ -252,7 +252,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickE]*)
   Definition L4 := CallE +' UBE +' DebugE +' FailureE.
 
-  Hint Unfold L0 L1 L2 L3 L4.
+  Definition L5 := CallE +' DebugE +' FailureE.
+
+  Hint Unfold L0 L1 L2 L3 L4 L5.
 
   Definition _failure_UB_to_L4 : (FailureE +' UBE) ~> L4:=
     fun T e =>

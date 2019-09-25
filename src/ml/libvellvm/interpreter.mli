@@ -9,6 +9,6 @@ val interpret: ((LLVMAst.typ, (LLVMAst.typ LLVMAst.block) list) LLVMAst.toplevel
 
 (* SAZ: do we need to expose the step function in this way?  Its type is very complicated *)
 (* val step : ((Obj.t Std.failureE, Obj.t debugE, 'b) Sum.sum1, DV.dvalue) coq_LLVM -> (TopLevel.IO.DV.dvalue, string) result *)
-val step : ('a TopLevel.IO.coq_L4, TopLevel.M.memory_stack* ((TopLevel.local_env * (LLVMAst.raw_id * TopLevel.IO.DV.uvalue) list Stack.stack) * (TopLevel.global_env * TopLevel.IO.DV.dvalue))) itree -> (TopLevel.IO.DV.dvalue, string) result
+val step : ('a TopLevel.IO.coq_L5, TopLevel.M.memory_stack* ((TopLevel.local_env * (LLVMAst.raw_id * TopLevel.IO.DV.uvalue) list Stack.stack) * (TopLevel.global_env * TopLevel.IO.DV.dvalue))) itree -> (TopLevel.IO.DV.dvalue, string) result
 
 val debug_flag: bool ref
