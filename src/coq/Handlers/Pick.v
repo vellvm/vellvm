@@ -104,25 +104,25 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | UVALUE_Poison                          => ret (DVALUE_Poison)
       | UVALUE_None                            => ret DVALUE_None
       | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalue fields ;;
-                                                          ret (DVALUE_Struct dfields)
+                                                   ret (DVALUE_Struct dfields)
       | UVALUE_Packed_struct fields            => 'dfields <- map_monad concretize_uvalue fields ;;
-                                                          ret (DVALUE_Packed_struct dfields)
+                                                   ret (DVALUE_Packed_struct dfields)
       | UVALUE_Array elts                      => 'delts <- map_monad concretize_uvalue elts ;;
-                                                        ret (DVALUE_Array delts)
+                                                   ret (DVALUE_Array delts)
       | UVALUE_Vector elts                     => 'delts <- map_monad concretize_uvalue elts ;;
-                                                        ret (DVALUE_Vector delts)
+                                                   ret (DVALUE_Vector delts)
       | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalue v1 ;;
-                                                     dv2 <- concretize_uvalue v2 ;;
-                                                     lift_undef_or_err ret (eval_iop iop dv1 dv2) 
+                                                  dv2 <- concretize_uvalue v2 ;;
+                                                  lift_undef_or_err ret (eval_iop iop dv1 dv2) 
       | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
-                                                     dv2 <- concretize_uvalue v2 ;;
-                                                     lift_undef_or_err ret (eval_icmp cmp dv1 dv2) 
+                                                  dv2 <- concretize_uvalue v2 ;;
+                                                  lift_undef_or_err ret (eval_icmp cmp dv1 dv2) 
       | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalue v1 ;;
-                                                     dv2 <- concretize_uvalue v2 ;;
-                                                     lift_undef_or_err ret (eval_fop fop dv1 dv2)
+                                                  dv2 <- concretize_uvalue v2 ;;
+                                                  lift_undef_or_err ret (eval_fop fop dv1 dv2)
       | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
-                                                     dv2 <- concretize_uvalue v2 ;;
-                                                     lift_undef_or_err ret (eval_fcmp cmp dv1 dv2)
+                                                  dv2 <- concretize_uvalue v2 ;;
+                                                  lift_undef_or_err ret (eval_fcmp cmp dv1 dv2)
       | _ => raise "unimplemented concretization of uvalue"
       (*
   | UVALUE_Conversion conv v t_to          => 
