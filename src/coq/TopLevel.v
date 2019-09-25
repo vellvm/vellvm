@@ -162,11 +162,11 @@ Notation res_L4 := (M.memory_stack * (local_env * (@stack (list (raw_id * uvalue
 (* Notation res_L4 := (res_L3)%type (* (only parsing) *). *)
 
 (* Initialization and denotation of a Vellvm program *)
-Definition build_L0 (mcfg : CFG.mcfg dtyp) : itree L0 res_L0
-  := build_global_environment mcfg ;;
-     'defns <- map_monad address_one_function (m_definitions _ _ mcfg) ;;
-     'addr <- trigger (GlobalRead (Name "main")) ;;
-     D.denote_mcfg defns DTYPE_Void addr main_args.
+Definition build_L0 (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
+  build_global_environment mcfg ;;
+  'defns <- map_monad address_one_function (m_definitions _ _ mcfg) ;;
+  'addr <- trigger (GlobalRead (Name "main")) ;;
+  D.denote_mcfg defns DTYPE_Void addr main_args.
 
 (* Interpretation of the global environment *)
 (* TODO YZ: Why do we need to provide this instance explicitly? *)
@@ -174,18 +174,19 @@ Definition build_L1 (trace : itree L0 res_L0) : itree L1 res_L1 :=
   @interp_global _ _ _ _ show_raw_id _ _ _ _ _ trace [].
 
 (* Interpretation of the local environment: map and stack *)
-Definition build_L2 (trace : itree L1 res_L1) : itree L2 res_L2
-  := interp_local_stack (@handle_local raw_id uvalue _ _ show_raw_id _ _) trace ([], []).
+Definition build_L2 (trace : itree L1 res_L1) : itree L2 res_L2 :=
+  interp_local_stack (@handle_local raw_id uvalue _ _ show_raw_id _ _) trace ([], []).
 
 (* Interpretation of the memory *)
-Definition build_L3 (trace : itree L2 res_L2) : itree L3 res_L3
-  := M.interp_memory trace (M.empty, [[]]).
+Definition build_L3 (trace : itree L2 res_L2) : itree L3 res_L3 :=
+  M.interp_memory trace (M.empty, [[]]).
 
 (* Interpretation of under-defined values as 0 *)
-Definition build_L4 (trace : itree L3 res_L3) : itree L4 res_L4
-  := '(m, (env, (genv, uv))) <- (P.interp_undef trace);;
-      dv <- translate _failure_UB_to_L4 (P.concretize_uvalue uv);;
-      ret (m, (env, (genv, dv))).
+(* YZ: I'm not fully convinced by this. *)
+Definition build_L4 (trace : itree L3 res_L3) : itree L4 res_L4 :=
+  '(m, (env, (genv, uv))) <- (P.interp_undef trace);;
+   dv <- translate _failure_UB_to_L4 (P.concretize_uvalue uv);;
+   ret (m, (env, (genv, dv))).
 
 (* Interpretation of under-defined values as 0 *)
 Definition model_L4 (trace : itree L3 res_L3) : PropT (itree L4) res_L3 :=
@@ -193,30 +194,35 @@ Definition model_L4 (trace : itree L3 res_L3) : PropT (itree L4) res_L3 :=
 
 (* YZ TODO: translate away UBE into failure *)
 (* YZ TODO: Rename traces better *)
-(* YZ TODO: should we cast [mcfg_of_modul] None answer into triggering a failure to get rid of the option monad? *)
-Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (itree L4 res_L4) :=
+(* Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) : *)
+  (* option (itree L4 res_L4) := *)
+Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) : itree L4 res_L4 :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
-  ucfg <- CFG.mcfg_of_modul _ scfg ;;
-  let mcfg := normalize_types ucfg in
+  match CFG.mcfg_of_modul _ scfg with
+  | Some ucfg =>
 
-  let L0_trace          := build_L0 mcfg in
-  let L1_trace          := INT.interpret_intrinsics L0_trace in
-  let L2_trace          := build_L1 L1_trace in
-  let L3_trace          := build_L2 L2_trace in
-  let L4_Trace          := build_L3 L3_trace in
-  let interpreted_trace := build_L4 L4_Trace in
+    let mcfg := normalize_types ucfg in
 
-  Some interpreted_trace.
+    let L0_trace          := build_L0 mcfg in
+    let L1_trace          := INT.interpret_intrinsics L0_trace in
+    let L2_trace          := build_L1 L1_trace in
+    let L3_trace          := build_L2 L2_trace in
+    let L4_Trace          := build_L3 L3_trace in
+    let interpreted_trace := build_L4 L4_Trace in
+    interpreted_trace
+
+  | None => raise "Ill-formed program: mcfg_of_modul failed."
+  end.
 
 (* YZ TODO: interpret UBE *)
 (* YZ TODO: Rename traces better *)
 Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (PropT (itree (CallE +' DebugE +' FailureE)) res_L3) :=
+  PropT (itree (CallE +' DebugE +' FailureE)) res_L3 :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
-    ucfg <- CFG.mcfg_of_modul _ scfg ;;
+  match  CFG.mcfg_of_modul _ scfg with
+  | Some ucfg =>
     let mcfg := normalize_types ucfg in
 
     let L0_trace        := build_L0 mcfg in
@@ -226,7 +232,10 @@ Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
     let L4_trace        := build_L3 L3_trace in
     let  interpreted_trace := model_L4 L4_trace in
     let foo_trace := model_UB interpreted_trace in
-    Some foo_trace.
+    foo_trace
+
+  | None => lift (raise "Ill-formed program: mcfg_of_modul failed.")
+  end.
 
 (*
 Lemma interpreter_satisfies_model: forall prog t,

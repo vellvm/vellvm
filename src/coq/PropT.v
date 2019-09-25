@@ -2,7 +2,9 @@ From Coq Require Import Ensembles.
 
 From ExtLib Require Import
      Structures.Functor
-     Structures.Monad.
+     Structures.Monad
+     Structures.MonadTrans
+Data.Monads.EitherMonad.
 
 From ITree Require Import
      Basics.Basics
@@ -23,6 +25,9 @@ Section PropMonad.
       ret := fun _ x y =>  y = ret x
       ; bind := fun A B PA K b => exists (a: A), PA (ret a) /\ K a b
     |}.
+
+  Global Instance MonadT_PropT {M}: MonadT (PropT M) M :=
+    {| lift := fun _ m m' => m = m' |}.
 
   Global Polymorphic Instance MonadIter_Prop {M} {MM: MonadIter M} : MonadIter (PropT M) :=
     fun R I step i r =>

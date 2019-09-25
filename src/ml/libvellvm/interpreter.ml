@@ -93,6 +93,4 @@ let rec step (m : ('a TopLevel.IO.coq_L4, TopLevel.M.memory_stack * ((TopLevel.l
 
 
 let interpret (prog:(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
-  match TopLevel.interpreter prog with
-  | None -> failwith "ERROR: bad module"
-  | Some t -> step t
+  step (TopLevel.interpreter prog)
