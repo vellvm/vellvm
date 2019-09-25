@@ -13,6 +13,7 @@
 ;; open IO
 
 open Format
+open ITreeDefinition
 
 (* TODO: probaly should be part of ADDRESS module interface*)
 let pp_addr : Format.formatter -> Memory.A.addr -> unit
@@ -54,7 +55,7 @@ let debug (msg:string) =
 
 *)
 
-let rec step (m : ('a TopLevel.IO._MCFG4, TopLevel.M.memory_stack * ((TopLevel.local_env * (LLVMAst.raw_id * TopLevel.IO.DV.uvalue) list Stack.stack) * (TopLevel.global_env * TopLevel.IO.DV.dvalue))) TopLevel.IO.coq_LLVM) : (DV.dvalue, string) result =
+let rec step (m : ('a TopLevel.IO.coq_L4, TopLevel.M.memory_stack * ((TopLevel.local_env * (LLVMAst.raw_id * TopLevel.IO.DV.uvalue) list Stack.stack) * (TopLevel.global_env * TopLevel.IO.DV.dvalue))) itree) : (DV.dvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -92,6 +93,6 @@ let rec step (m : ('a TopLevel.IO._MCFG4, TopLevel.M.memory_stack * ((TopLevel.l
 
 
 let interpret (prog:(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
-  match TopLevel.run_with_memory prog with
+  match TopLevel.interpreter prog with
   | None -> failwith "ERROR: bad module"
   | Some t -> step t

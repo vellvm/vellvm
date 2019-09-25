@@ -15,7 +15,7 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILES := Error Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric/Integers Numeric/Floats Util LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues LLVMEvents TypeUtil IntrinsicsDefinitions Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Denotation Handlers/Memory DenotationProp Transformations/Renaming Transformations/DeadInstr Transformations/Transform TransformTypes TopLevel
+COQFILES := PropT Error Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric/Integers Numeric/Floats Util LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues LLVMEvents TypeUtil IntrinsicsDefinitions Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/UndefinedBehaviour Denotation DenotationProp Transformations/Renaming Transformations/DeadInstr Transformations/Transform TransformTypes TopLevel
 
 OLLVMFILES := 
 

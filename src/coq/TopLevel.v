@@ -158,6 +158,7 @@ Notation res_L0 := uvalue (* (only parsing) *).
 Notation res_L1 := (global_env * res_L0)%type (* (only parsing) *).
 Notation res_L2 := (local_env * (@stack (list (raw_id * uvalue))) * res_L1)%type (* (only parsing) *).
 Notation res_L3 := (M.memory_stack * res_L2)%type (* (only parsing) *).
+Notation res_L4 := (M.memory_stack * (local_env * (@stack (list (raw_id * uvalue))) * (global_env * dvalue)))%type (* (only parsing) *).
 (* Notation res_L4 := (res_L3)%type (* (only parsing) *). *)
 
 (* Initialization and denotation of a Vellvm program *)
@@ -181,8 +182,10 @@ Definition build_L3 (trace : itree L2 res_L2) : itree L3 res_L3
   := M.interp_memory trace (M.empty, [[]]).
 
 (* Interpretation of under-defined values as 0 *)
-Definition build_L4 (trace : itree L3 res_L3) : itree L4 res_L3 :=
-  P.interp_undef trace.
+Definition build_L4 (trace : itree L3 res_L3) : itree L4 res_L4
+  := '(m, (env, (genv, uv))) <- (P.interp_undef trace);;
+      dv <- translate _failure_UB_to_L4 (P.concretize_uvalue uv);;
+      ret (m, (env, (genv, dv))).
 
 (* Interpretation of under-defined values as 0 *)
 Definition model_L4 (trace : itree L3 res_L3) : PropT (itree L4) res_L3 :=
@@ -192,7 +195,7 @@ Definition model_L4 (trace : itree L3 res_L3) : PropT (itree L4) res_L3 :=
 (* YZ TODO: Rename traces better *)
 (* YZ TODO: should we cast [mcfg_of_modul] None answer into triggering a failure to get rid of the option monad? *)
 Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) :
-  option (itree L4 res_L3) :=
+  option (itree L4 res_L4) :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
   ucfg <- CFG.mcfg_of_modul _ scfg ;;

@@ -254,6 +254,13 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Hint Unfold L0 L1 L2 L3 L4.
 
+  Definition _failure_UB_to_L4 : (FailureE +' UBE) ~> L4:=
+    fun T e =>
+      match e with
+      | inl1 x => inr1 (inr1 (inr1 x))
+      | inr1 x => inr1 (inl1 x)
+      end.
+
 End LLVM_INTERACTIONS.
 
 Module Make(ADDR : MemoryAddress.ADDRESS) <: LLVM_INTERACTIONS(ADDR).
