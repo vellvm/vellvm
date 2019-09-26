@@ -227,6 +227,7 @@ Module RENAMING
       | EXP_Ident id => EXP_Ident _ (swap id1 id2 id)
       | EXP_Integer _
       | EXP_Float   _
+      | EXP_Double  _
       | EXP_Hex     _
       | EXP_Bool    _
       | EXP_Null

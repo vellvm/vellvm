@@ -19,6 +19,16 @@ open ITreeDefinition
 let pp_addr : Format.formatter -> Memory.A.addr -> unit
   = fun ppf _ -> fprintf ppf "DVALUE_Addr(?)"
 
+(* Converts `float` to a `string` at max precision.
+   Both OCaml `printf` and `string_of_float` truncate
+   and do not print all significat digits.
+*)
+let string_of_float_full f =
+  (* Due to the limited number of bits in the representation of doubles, the maximal precision is 324. See Wikipedia. *)
+  let s = sprintf "%.350f" f in
+  let open Str in
+  Str.global_replace (Str.regexp "0+$") "" s
+
 let rec pp_dvalue : Format.formatter -> DV.dvalue -> unit =
   let open Camlcoq in
   let pp_comma_space ppf () = pp_print_string ppf ", " in
@@ -29,8 +39,8 @@ let rec pp_dvalue : Format.formatter -> DV.dvalue -> unit =
   | DVALUE_I8     x -> fprintf ppf "DVALUE_I8(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
   | DVALUE_I32    x -> fprintf ppf "DVALUE_I32(%d)" (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
   | DVALUE_I64    x -> fprintf ppf "DVALUE_I64(%s)" (Int64.to_string (Z.to_int64 (DynamicValues.Int64.unsigned x)))
-  | DVALUE_Double x -> fprintf ppf "DVALUE_Double(%F)" (camlfloat_of_coqfloat x)
-  | DVALUE_Float  x -> fprintf ppf "DVALUE_Float(%F)"  (camlfloat_of_coqfloat32 x)
+  | DVALUE_Double x -> fprintf ppf "DVALUE_Double(%s)" (string_of_float_full (camlfloat_of_coqfloat x))
+  | DVALUE_Float  x -> fprintf ppf "DVALUE_Float(%s)"  (string_of_float_full (camlfloat_of_coqfloat32 x))
   | DVALUE_Poison   -> fprintf ppf "DVALUE_Poison"
   | DVALUE_None     -> fprintf ppf "DVALUE_None"
   | DVALUE_Struct        l -> fprintf ppf "DVALUE_Struct(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l

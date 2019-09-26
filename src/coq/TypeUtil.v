@@ -616,7 +616,7 @@ Lemma remove_key_in :
     In (a, b) l ->
     (List.length (remove_key eq_dec a l) < List.length l)%nat.
 Proof.
-  induction 0.
+  induction l.
   - intros H. inversion H.
   - intros H.
     destruct_prod.
@@ -671,7 +671,7 @@ Lemma remove_key_commutes :
   forall (A B : Type) (k1 k2 : A) eq_dec (l : list (A * B)),
     remove_key eq_dec k1 (remove_key eq_dec k2 l) = remove_key eq_dec k2 (remove_key eq_dec k1 l).
 Proof.
-  induction 0; solve_eq_dec.
+  induction l; solve_eq_dec.
 Qed.  
 
 
@@ -1044,7 +1044,7 @@ Ltac solve_guard :=
         | [H : element_typ _ |- _] => inversion H
         end; auto
 
-  | [ Hguard: forall i, In i ?ids -> guarded_typ ?i ?env ?t |- ~(In ?id ?ids) ] =>
+  | [ Hguard: forall i, In i ?ids -> guarded_typ i ?env ?t |- ~(In ?id ?ids) ] =>
     let Hguard' := fresh in
     let Hin := fresh in
     unfold not; intros Hin;
@@ -1074,7 +1074,6 @@ Ltac solve_guard :=
   | [ |- forall id, In id ?ids -> guarded_typ id ?defs ?x ] =>
     intros; solve_guard
   end.
-
 
 Theorem guarded_id_normalize_same :
   forall t env,

@@ -407,10 +407,17 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | _                   => raise "bad type for constant int"
           end
 
+        (* YZ TODO: Double check that I handled correctly the following two cases when merging master *)
         | EXP_Float x =>
           match top with
           | None              => raise "denote_exp given untyped EXP_Float"
-          | Some DTYPE_Float  => ret (UVALUE_Float (Float32.of_double x))
+          | Some DTYPE_Float  => ret (UVALUE_Float x)
+          | _                 => raise "bad type for constant float"
+          end
+
+        | EXP_Double x =>
+          match top with
+          | None              => raise "denote_exp given untyped EXP_Double"
           | Some DTYPE_Double => ret (UVALUE_Double x)
           | _                 => raise "bad type for constant float"
           end

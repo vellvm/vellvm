@@ -31,7 +31,8 @@ Open Scope string_scope.
 Open Scope list_scope.
 
 Definition int := Z.
-Definition float := Floats.float.  (* -bit floating point value *)
+Definition float := Floats.float.  (* 64-bit floating point value *)
+Definition float32 := Floats.float32.
 
 Inductive linkage : Set :=
 | LINKAGE_Private
@@ -201,17 +202,22 @@ Definition tident : Set := (T * ident)%type.
 (* NOTES: 
   This datatype is more permissive than legal in LLVM:
      - it allows identifiers to appear nested inside of "constant expressions"
+       that is OK as long as we validate the syntax as "well-formed" before 
+       trying to give it semantics
 
   NOTES:
    - Integer expressions: llc parses large integer exps and converts them to some 
      internal form (based on integer size?)
    
    - Float constants: these are always parsed as 64-bit representable floats 
-     using ocamls float_of_string function.  If they are used in LLVM as 32-bit 
-     rather than 64-bit floats, they are converted when evaluated.
+     using ocamls float_of_string function. The parser converts float literals 
+     to 32-bit values using the type information available in the syntax.
+
+     -- TODO: 128-bit, 16-bit, other float formats?
 
    - Hex constants: these are always parsed as 0x<16-digit> 64-bit exps and
-     bit-converted to ocaml's 64-bit float representation.
+     bit-converted to ocaml's 64-bit float representation.  If they are
+     evaluated at 32-bit float types, they are converted during evaluation.
 
    - EXP_ prefix denotes syntax that LLVM calls a "value"
    - OP_  prefix denotes syntax that requires further evaluation
@@ -219,8 +225,9 @@ Definition tident : Set := (T * ident)%type.
 Inductive exp : Set :=
 | EXP_Ident   (id:ident)  
 | EXP_Integer (x:int)
-| EXP_Float   (f:float)
-| EXP_Hex     (f:float)  (* See LLVM documentation about hex float constants. *)
+| EXP_Float   (f:float32)  (* 32-bit floating point values *)
+| EXP_Double  (f:float)    (* 64-bit floating point values *)
+| EXP_Hex     (f:float)    (* See LLVM documentation about hex float constants. *)
 | EXP_Bool    (b:bool)
 | EXP_Null
 | EXP_Zero_initializer

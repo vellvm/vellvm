@@ -41,6 +41,7 @@ Fixpoint fmap_exp (e:exp T) : exp U :=
   | EXP_Ident id => EXP_Ident _ id
   | EXP_Integer x => EXP_Integer _ x
   | EXP_Float x => EXP_Float _ x
+  | EXP_Double x => EXP_Double _ x
   | EXP_Hex x => EXP_Hex _ x
   | EXP_Bool x => EXP_Bool _ x
   | EXP_Null => EXP_Null _
