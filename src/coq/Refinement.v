@@ -5,22 +5,21 @@ From ITree Require Import
 From Vellvm Require Import
      Util
      UndefinedBehaviour
-     Failure
      DynamicValues
      MemoryAddress
-     LLVMEvents.
+     LLVMEvents
+     LLVMAst
+     Environment
+     Handlers.Stack.
 
 From Coq Require Import Relations.
 
 
-Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
+Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A))(ENV: Environment).
 
 Import LLVMIO.
-
-Variable global_env : Type.
-Variable local_env : Type.
-Variable stack : Type.
-Variable memory : Type.
+Import LLVMIO.DV.
+Import ENV.
 
 (* Refinement relation for uvalues *)
 Inductive refine_uvalue: uvalue -> uvalue -> Prop :=
@@ -36,34 +35,31 @@ Infix "×" := prod_rel (at level 90, left associativity).
 Definition TT {A} : relation A := fun _ _ => True.
 
 (* Refinement of uninterpreted mcfg *)
-Definition refine_MCFG: relation (LLVM _CFG uvalue) := eutt refine_uvalue.
+Definition refine_L0: relation (itree L0 uvalue) := eutt refine_uvalue.
 
 (* Refinement of mcfg after globals *)
 Definition refine_res1 : relation (global_env * uvalue)
   := TT × refine_uvalue.
 
-Definition refine_MCFG1 : relation (LLVM _MCFG1 (global_env * uvalue))
+Definition refine_L1 : relation (itree L1 (global_env * uvalue))
   := eutt refine_res1.
 
 (* Refinement of mcfg after locals *)
 Definition refine_res2 : relation (local_env * stack * (global_env * uvalue))
   := TT × refine_res1.
 
-Definition refine_MCFG2 : relation (LLVM _MCFG2 (local_env * stack * (global_env * uvalue)))
+Definition refine_L2 : relation (itree L2 (local_env * stack * (global_env * uvalue)))
   := eutt refine_res2.
 
 (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
 Definition refine_res3 : relation (memory * (local_env * stack * (global_env * uvalue)))
   := TT × refine_res2.
 
-Definition refine_MCFG3 : relation (LLVM _MCFG3 (memory * (local_env * stack * (global_env * uvalue))))
+Definition refine_L3 : relation (itree L3 (memory * (local_env * stack * (global_env * uvalue))))
   := eutt refine_res3.
 
 (* Refinement for after interpreting pick. *)
-Definition refine_MCFG4 : relation ((LLVM _MCFG4 (memory * (local_env * stack * (global_env * uvalue)))) -> Prop)
+Definition refine_L4 : relation ((itree L4 (memory * (local_env * stack * (global_env * uvalue)))) -> Prop)
   := fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt refine_res3 t t'.
-
-Lemma refine_12: forall t1 t2,
-    refine_MCFG t1 t2 -> refine_MCFG1 (build_MCFG1 t1) (build_MCFG1 t2).
 
 End Make.

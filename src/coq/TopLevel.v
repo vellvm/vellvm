@@ -28,6 +28,7 @@ From Vellvm Require Import
      DynamicTypes
      LLVMEvents
      Denotation
+     Environment
      Handlers.Global
      Handlers.Local
      Handlers.Stack
@@ -51,6 +52,16 @@ Module INT := Intrinsics.Make(Memory.A)(IO).
 Module P := Pick.Make(Memory.A)(IO).
 Import IO.
 Export IO.DV.
+
+Module TopLevelEnv <: Environment.
+  Definition local_env  := FMapAList.alist raw_id uvalue.
+  Definition global_env := FMapAList.alist raw_id dvalue.
+  Definition memory     := M.memory_stack.
+  Definition stack      := @stack (list (raw_id * uvalue)).
+
+(* Definition local_env  := FMapAList.alist raw_id uvalue. *)
+(* Definition global_env := FMapAList.alist raw_id dvalue. *)
+
 
 Open Scope string_scope.
 
@@ -114,8 +125,6 @@ Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree L0 unit :=
     Note that while local environments may store under-defined values,
     global environments are statically guaranteed to store [dvalue]s.
  *)
-Definition local_env := FMapAList.alist raw_id uvalue.
-Definition global_env := FMapAList.alist raw_id dvalue.
 Definition function_env := FMapAList.alist dvalue D.function_denotation.
 
 (**
@@ -156,9 +165,9 @@ Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
 
 Notation res_L0 := uvalue (* (only parsing) *).
 Notation res_L1 := (global_env * res_L0)%type (* (only parsing) *).
-Notation res_L2 := (local_env * (@stack (list (raw_id * uvalue))) * res_L1)%type (* (only parsing) *).
-Notation res_L3 := (M.memory_stack * res_L2)%type (* (only parsing) *).
-Notation res_L4 := (M.memory_stack * (local_env * (@stack (list (raw_id * uvalue))) * (global_env * dvalue)))%type (* (only parsing) *).
+Notation res_L2 := (local_env * stack * res_L1)%type (* (only parsing) *).
+Notation res_L3 := (memory * res_L2)%type (* (only parsing) *).
+Notation res_L4 := (memory * (local_env * stack * (global_env * dvalue)))%type (* (only parsing) *).
 
 (* Initialization and denotation of a Vellvm program *)
 Definition build_L0 (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
@@ -170,7 +179,7 @@ Definition build_L0 (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
 (* Interpretation of the global environment *)
 (* TODO YZ: Why do we need to provide this instance explicitly? *)
 Definition build_L1 (trace : itree L0 res_L0) : itree L1 res_L1 :=
-  @interp_global _ _ _ _ show_raw_id _ _ _ _ _ trace [].
+             @interp_global _ _ _ _ show_raw_id _ _ _ _ _ trace [].
 
 (* Interpretation of the local environment: map and stack *)
 Definition build_L2 (trace : itree L1 res_L1) : itree L2 res_L2 :=
@@ -196,6 +205,10 @@ Definition build_L5 (trace : itree L4 res_L4) : itree L5 res_L4 :=
 
 Definition model_L5 (trace : PropT (itree L4) res_L3) : PropT (itree L5) res_L3 :=
   model_UB trace.
+
+End TopLevelEnv.
+
+Import TopLevelEnv.
 
 (* YZ TODO: Rename traces better *)
 Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) : itree L5 res_L4 :=
@@ -240,7 +253,17 @@ Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
   end.
 
 (*
-Lemma interpreter_satisfies_model: forall prog t,
-    interpreter prog = Some t ->
-    exists P, model prog = Some P /\ P t.
+Lemma interpreter_satisfies_model: forall prog,
+    model prog (ITree.map (fun '(m, (env, (genv, uv))) => (m,(env,(genv, dvalue_to_uvalue uv)))) (interpreter prog)).
+Proof.
+  intros prog.
+  unfold model. unfold interpreter.
+  destruct (CFG.mcfg_of_modul typ (modul_of_toplevel_entities typ prog)) eqn:Hmodul.
+  - admit.
+  - simpl. unfold I
+
+    Print raise.
+    Print ITree.map.
+Qed.
 *)
+
