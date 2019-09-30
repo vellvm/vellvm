@@ -53,7 +53,7 @@ let debug (msg:string) =
   if !debug_flag then
     Printf.printf "DEBUG: %s\n%!" msg
 
-let rec step (m : ('a TopLevel.IO.coq_L5, TopLevel.M.memory_stack * ((TopLevel.local_env * (LLVMAst.raw_id * TopLevel.IO.DV.uvalue) list Stack.stack) * (TopLevel.global_env * TopLevel.IO.DV.dvalue))) itree) : (DV.dvalue, string) result =
+let rec step (m : ('a TopLevel.IO.coq_L5, TopLevel.TopLevelEnv.memory * ((TopLevel.TopLevelEnv.local_env * TopLevel.TopLevelEnv.stack) * (TopLevel.TopLevelEnv.global_env * TopLevel.IO.DV.dvalue))) itree) : (TopLevel.IO.DV.dvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
