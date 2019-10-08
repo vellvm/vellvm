@@ -1,5 +1,6 @@
 From ITree Require Import
      ITree
+     Basics
      Eq.Eq.
 
 From Vellvm Require Import
@@ -27,8 +28,10 @@ Inductive refine_uvalue: uvalue -> uvalue -> Prop :=
 | RefineConcrete: forall uv1 uv2, (forall dv, concretize uv1 dv -> concretize uv2 dv) -> refine_uvalue uv1 uv2
 .
 
-Definition prod_rel {A B} (RA : relation A) (RB : relation B) : relation (A * B)
-  := fun '(a,b) '(a', b') => RA a a' /\ RB b b'.
+Inductive refine_dvalue: dvalue -> dvalue -> Prop :=
+| DvalueRefl : forall v, refine_dvalue v v
+| Poison : forall v, refine_dvalue v DVALUE_Poison
+.
 
 Infix "×" := prod_rel (at level 90, left associativity).
 
