@@ -487,6 +487,12 @@ Section hiding_notation.
   Import ShowNotation.
   Local Open Scope show_scope.
 
+  Global Instance show_option {T} `{Show T}: Show (option T) :=
+    { show mt := match mt with
+                 | None => show "None"
+                 | Some t => show "Some " << show t
+                 end }.
+
   Global Instance show_raw_id : Show raw_id :=
     { show r :=
         match r with

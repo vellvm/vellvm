@@ -384,18 +384,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     | _               => False
     end.
 
-(*
-  local: uvalue (fully blown)
-  global: dvalue
-  mem: dvalue + undef?
- *)
-
-  (* YZ TODO: Need functor instance for undef_or_err *)
-
   Fixpoint denote_exp
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
         in
+        debug ("Evaluating expression " ++ to_string o);;
         match o with
         | EXP_Ident i =>
           translate lookup_E_to_exp_E (lookup_id i)
@@ -404,7 +397,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           match top with
           | None                => raise "denote_exp given untyped EXP_Integer"
           | Some (DTYPE_I bits) => lift_undef_or_err ret (fmap dvalue_to_uvalue (coerce_integer_to_int bits x))
-          | _                   => raise "bad type for constant int"
+          | Some typ              => raise ("bad type for constant int: " ++ to_string typ)
           end
 
         (* YZ TODO: Double check that I handled correctly the following two cases when merging master *)
@@ -529,6 +522,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             v1 v2
 
         | OP_Conversion conv dt1 op t2 =>
+          debug ("conversion, evaluating " ++ to_string op ++ " at type " ++ to_string dt1);;
           v <- denote_exp (Some dt1) op ;;
           uvalue_to_dvalue_uop
             (fun v => ret (UVALUE_Conversion conv v t2))
@@ -658,7 +652,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Call *)
         (* CB TODO: Do we need to pick here? *)
         | (pt, INSTR_Call (dt, f) args) =>
-          uvs <- map_monad (fun '(t, op) => (translate exp_E_to_instr_E (denote_exp (Some dt) op))) args ;;
+          uvs <- map_monad (fun '(t, op) => (translate exp_E_to_instr_E (denote_exp (Some t) op))) args ;;
           dvs <- map_monad (fun x => trigger (pick x True)) uvs ;;
           returned_value <-
           match Intrinsics.intrinsic_exp f with
