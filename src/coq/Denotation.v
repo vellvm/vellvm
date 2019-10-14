@@ -388,7 +388,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
         in
-        debug ("Evaluating expression " ++ to_string o);;
+        (* debug ("Evaluating expression " ++ to_string o);; *)
         match o with
         | EXP_Ident i =>
           translate lookup_E_to_exp_E (lookup_id i)
@@ -397,7 +397,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           match top with
           | None                => raise "denote_exp given untyped EXP_Integer"
           | Some (DTYPE_I bits) => lift_undef_or_err ret (fmap dvalue_to_uvalue (coerce_integer_to_int bits x))
-          | Some typ              => raise ("bad type for constant int: " ++ to_string typ)
+          | Some typ            => raise ("bad type for constant int: " ++ to_string typ)
           end
 
         (* YZ TODO: Double check that I handled correctly the following two cases when merging master *)
@@ -604,11 +604,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | inr dcndv => lift_undef_or_err ret (eval_select dcndv v1 v2)
           end
         end.
-      Arguments denote_exp _ : simpl nomatch.
+  Arguments denote_exp _ : simpl nomatch.
 
-      Definition eval_op (o:exp dtyp) : itree exp_E uvalue :=
-        denote_exp None o.
-      Arguments eval_op _ : simpl nomatch.
+  Definition eval_op (o:exp dtyp) : itree exp_E uvalue :=
+    denote_exp None o.
+  Arguments eval_op _ : simpl nomatch.
 
       (* An instruction has only side-effects, it therefore returns [unit] *)
 
