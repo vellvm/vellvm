@@ -138,7 +138,7 @@ Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree L0
 
 (* (for now) assume that [main (i64 argc, i8** argv)]
     pass in 0 and null as the arguments to main
-   Note: this isn't compliant with standard C semantics
+    Note: this isn't compliant with standard C semantics
 *)
 Definition main_args := [DV.DVALUE_I64 (DynamicValues.Int64.zero);
                          DV.DVALUE_Addr (Memory.A.null)
@@ -210,7 +210,6 @@ End TopLevelEnv.
 
 Import TopLevelEnv.
 
-(* YZ TODO: Rename traces better *)
 Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) : itree L5 res_L4 :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
@@ -226,6 +225,7 @@ Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) : i
     let L3_Trace          := build_L3 L2_trace in
     let L4_Trace          := build_L4 L3_Trace in
     let L5_Trace          := build_L5 L4_Trace in
+    debug "Starting to interpret the program.";;
     L5_Trace
 
   | None => raise "Ill-formed program: mcfg_of_modul failed."

@@ -829,15 +829,15 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | _, _ => failwith "combine_lists_err: different length lists"
         end.
 
-
       (* The denotation of an itree function is a coq function that takes
          a list of dvalues and returns the appropriate semantics. *)
       Definition function_denotation : Type :=
-          list dvalue -> itree fun_E uvalue.
+        list dvalue -> itree fun_E uvalue.
 
       Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation  :=
         fun (args : list dvalue) =>
           (* We match the arguments variables to the inputs *)
+          debug ("denoting function with args: " ++ to_string args ++ "and prototype: " ++ to_string (df_args dtyp _ df));;
           bs <- lift_err ret (combine_lists_err (df_args dtyp _ df) args) ;;
              (* generate the corresponding writes to the local stack frame *)
           trigger MemPush ;;

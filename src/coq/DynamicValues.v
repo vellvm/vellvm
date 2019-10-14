@@ -295,6 +295,43 @@ Section hiding_notation.
 
   Global Instance show_dvalue : Show dvalue := show_dvalue'.
 
+  Fixpoint show_uvalue' (uv:uvalue) : showM :=
+    match uv with
+    | UVALUE_Addr a => "address" (* TODO: insist that memory models can print addresses? *)
+    | UVALUE_I1 x => "uvalue(i1)"
+    | UVALUE_I8 x => "uvalue(i8)"
+    | UVALUE_I32 x => "uvalue(i32)"
+    | UVALUE_I64 x => "uvalue(i64)"
+    | UVALUE_Double x => "uvalue(double)"
+    | UVALUE_Float x => "uvalue(float)"
+    | UVALUE_Poison => "poison"
+    | UVALUE_None => "none"
+    | UVALUE_Struct fields
+      => ("{" << iter_show (List.map (fun x => (show_uvalue' x) << ",") fields) << "}")
+    | UVALUE_Packed_struct fields
+      => ("packed{" << iter_show (List.map (fun x => (show_uvalue' x) << ",") fields) << "}")
+    | UVALUE_Array elts
+      => ("[" << iter_show (List.map (fun x => (show_uvalue' x) << ",") elts) << "]")
+    | UVALUE_Vector elts
+      => ("<" << iter_show (List.map (fun x => (show_uvalue' x) << ",") elts) << ">")
+    | UVALUE_Undef t => "undef(" << show t << ")"
+    | UVALUE_IBinop iop v1 v2 => "(" << show_uvalue' v1 << " " << show iop << " " << show_uvalue' v2 << ")"
+    | UVALUE_ICmp cmp v1 v2 => "(" << show_uvalue' v1 << " " << show cmp << " " << show_uvalue' v2 << ")"
+    | UVALUE_FBinop fop _ v1 v2 => "(" << show_uvalue' v1 << " " << show fop << " " << show_uvalue' v2 << ")"
+    | UVALUE_FCmp cmp v1 v2 => "(" << show_uvalue' v1 << " " << show cmp << " " << show_uvalue' v2 << ")"
+    (* | UVALUE_Conversion       (conv:conversion_type) (v:uvalue) (t_to:dtyp) *)
+    (* | UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)) (* TODO: do we ever need this? GEP raises an event? *) *)
+    (* | UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue) *)
+    (* | UVALUE_InsertElement    (vec: uvalue) (elt:uvalue) (idx:uvalue) *)
+    (* | UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue) *)
+    (* | UVALUE_ExtractValue     (vec:uvalue) (idxs:list int) *)
+    (* | UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list int) *)
+    (* | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue) *)
+    | _ => "TODO: show_uvalue"
+    end%string.
+
+  Global Instance show_uvalue : Show uvalue := show_uvalue'.
+
 End hiding_notation.
 
 Ltac dec_dvalue :=

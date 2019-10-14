@@ -53,7 +53,7 @@ Module AsciiOrd <: UsualOrderedType.
     rewrite <- (@ascii_N_embedding x).
     rewrite H. reflexivity.
   Defined.
-  
+
   Program Definition compare (x y: t) : Compare lt eq x y :=
     match N_as_OT.compare (N_of_ascii x) (N_of_ascii y) with
     | LT p => _
@@ -107,8 +107,8 @@ Module StringOrd <: UsualOrderedType.
         * AsciiOrdFacts.elim_comp; auto.
         * AsciiOrdFacts.elim_comp; auto.
           eapply IHa; eauto.
-  Qed.          
-      
+  Qed.
+
   Lemma lt_not_eq : forall a b:t, lt a b -> ~eq a b.
   Proof.
     induction a; intros b H He; unfold eq in He; subst.
@@ -131,7 +131,7 @@ Module StringOrd <: UsualOrderedType.
                | EQ _ => _
                | GT _ => _
                end
-      | GT _ => _ 
+      | GT _ => _
       end
     | String a s1', EmptyString => _
     end.
@@ -160,7 +160,7 @@ Module StringOrd <: UsualOrderedType.
   Next Obligation.
     apply GT. simpl. auto.
   Defined.
-    
+
   Definition eq_dec := string_dec.
 End StringOrd.
 Module StringOrdFacts := OrderedTypeFacts(StringOrd).
@@ -181,7 +181,7 @@ Module RawIDOrd <: UsualOrderedType.
     | Raw n1, Raw n2 => (n1 < n2)%Z
     | Anon _, _ => True
     | Name _, Raw _ => True
-    | _, _ => False 
+    | _, _ => False
     end.
 
   Lemma lt_trans : forall a b c : t, lt a b -> lt b c -> lt a c.
@@ -242,7 +242,7 @@ Module RawIDOrd <: UsualOrderedType.
     - apply rel_dec_p.
   Defined.
 
-End RawIDOrd.  
+End RawIDOrd.
 
 (* Module RawIDDec <: MiniDecidableType. *)
 (*   Definition t := raw_id. *)
@@ -254,7 +254,7 @@ End RawIDOrd.
 (*     - destruct (n == n0); tauto. *)
 (*   Defined. *)
 (* End RawIDDec. *)
-  
+
 (* Module RawID := Make_UDT(RawIDDec).  *)
 Instance eq_dec_raw_id : RelDec (@eq raw_id) := RelDec_from_dec (@eq raw_id) RawIDOrd.eq_dec.
 Instance eqv_raw_id : Eqv raw_id := (@eq raw_id).
@@ -262,7 +262,7 @@ Hint Unfold eqv_raw_id.
 
 Module InstrIDDec <: MiniDecidableType.
   Definition t := instr_id.
-  
+
   Lemma eq_dec : forall (x y : instr_id), {x = y} + {x <> y}.
   Proof.
     intros x y.
@@ -299,7 +299,7 @@ Module IdentDec <: MiniDecidableType.
 End IdentDec.
 Module Ident := Make_UDT(IdentDec).
 
-Instance eq_dec_ident : RelDec (@eq ident) := RelDec_from_dec (@eq ident) Ident.eq_dec.  
+Instance eq_dec_ident : RelDec (@eq ident) := RelDec_from_dec (@eq ident) Ident.eq_dec.
 Instance eqv_ident : Eqv ident := (@eq ident).
 
 (* Induction Principles ----------------------------------------------------- *)
@@ -346,12 +346,12 @@ Lemma typ_ind' : forall (t:typ), P t.
       fix IHargs 1. intros [|u args']. intros. inversion H.
       intros u' [<-|Hin]. apply IH. eapply IHargs. apply Hin.
     }
-  - apply IH_Struct. 
+  - apply IH_Struct.
     { revert fields.
       fix IHfields 1. intros [|u fields']. intros. inversion H.
       intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
     }
-  - apply IH_Packed_struct. 
+  - apply IH_Packed_struct.
     { revert fields.
       fix IHfields 1. intros [|u fields']. intros. inversion H.
       intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
@@ -364,8 +364,8 @@ Qed.
 End TypInd.
 
 Section ExpInd.
-(*  
-| EXP_Ident   (id:ident)  
+(*
+| EXP_Ident   (id:ident)
 | EXP_Integer (x:int)
 | EXP_Float   (f:float)
 | EXP_Bool    (b:bool)
@@ -377,7 +377,7 @@ Section ExpInd.
 | EXP_Packed_struct (fields: list (typ * a))
 | EXP_Array         (elts: list (typ * a))
 | EXP_Vector        (elts: list (typ * a))
-| OP_IBinop           (iop:ibinop) (t:typ) (v1:a) (v2:a)  
+| OP_IBinop           (iop:ibinop) (t:typ) (v1:a) (v2:a)
 | OP_ICmp             (cmp:icmp)   (t:typ) (v1:a) (v2:a)
 | OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:typ) (v1:a) (v2:a)
 | OP_FCmp             (cmp:fcmp)   (t:typ) (v1:a) (v2:a)
@@ -400,8 +400,8 @@ Inductive value : Set :=
   Hypothesis IH_Ident   : forall (id:ident), P ((EXP_Ident T id)).
   Hypothesis IH_Integer : forall (x:int), P ((EXP_Integer T x)).
   Hypothesis IH_Float   : forall (f:float32), P ((EXP_Float T f)).
-  Hypothesis IH_Double  : forall (f:float), P ((EXP_Double T f)).  
-  Hypothesis IH_Hex     : forall (h:float), P ((EXP_Hex T h)).  
+  Hypothesis IH_Double  : forall (f:float), P ((EXP_Double T f)).
+  Hypothesis IH_Hex     : forall (h:float), P ((EXP_Hex T h)).
   Hypothesis IH_Bool    : forall (b:bool), P ((EXP_Bool T b)).
   Hypothesis IH_Null    : P ((EXP_Null T)).
   Hypothesis IH_Zero_initializer : P ((EXP_Zero_initializer T)).
@@ -497,7 +497,7 @@ Section hiding_notation.
     }.
 
   Global Instance show_ident : Show ident :=
-    { show id := 
+    { show id :=
         match id with
         | ID_Global r => "@" << show r
         | ID_Local  r => "%" << show r
@@ -505,7 +505,7 @@ Section hiding_notation.
     }.
 
   Global Instance show_instr_id : Show instr_id :=
-    { show ins := 
+    { show ins :=
         match ins with
         | IId id => show id
         | IVoid n => "void<" << show n << ">"
@@ -513,7 +513,7 @@ Section hiding_notation.
     }.
 
 
-  Global Instance show_ibinop : Show ibinop := 
+  Global Instance show_ibinop : Show ibinop :=
     { show binop :=
         match binop with
         | Add nuw nsw => "add"
@@ -542,13 +542,12 @@ Section hiding_notation.
         end
     }.
 
-  
   Global Instance show_icmp : Show icmp :=
-    { show cmp := 
+    { show cmp :=
         "icmp " <<
                 match cmp with
                 | Eq => "eq"
-                | Ne => "ne" 
+                | Ne => "ne"
                 | Ugt => "ugt"
                 | Uge => "uge"
                 | Ult => "ult"
@@ -559,8 +558,31 @@ Section hiding_notation.
                 | Sle => "sle"
                 end
     }.
-        
-  Fixpoint show_typ' typ := 
+
+  Global Instance show_fcmp : Show fcmp :=
+    { show cmp :=
+        "fcmp " <<
+                match cmp with
+                  FFalse => "ffalse"
+                | FOeq => "foeq"
+                | FOgt => "fogt"
+                | FOge => "foge"
+                | FOlt => "folt"
+                | FOle => "fole"
+                | FOne => "fone"
+                | FOrd => "ford"
+                | FUno => "funo"
+                | FUeq => "fueq"
+                | FUgt => "fugt"
+                | FUge => "fuge"
+                | FUlt => "fult"
+                | FUle => "fule"
+                | FUne => "fune"
+                | FTrue => "ftrue"
+               end
+    }.
+
+  Fixpoint show_typ' typ :=
     match typ with
     | TYPE_I sz => ("i" << show sz)
     | TYPE_Pointer t => ((show_typ' t) << "*")%string
@@ -572,7 +594,7 @@ Section hiding_notation.
   Section WithShowT.
     Variable (T:Set).
     Context `{showT : Show T}.
-  
+
   Fixpoint show_exp' (v : exp T) :=
     match v with
     | EXP_Ident id => show id
@@ -581,7 +603,7 @@ Section hiding_notation.
     | EXP_Null => "null"
     | EXP_Zero_initializer => "zero initializer"
     | EXP_Cstring s => s
-    | EXP_Undef => "undef"                                
+    | EXP_Undef => "undef"
     | OP_IBinop iop t v1 v2 =>
       ((show iop) << " " << (show t)
                   << " " << (show_exp' v1)
@@ -591,7 +613,7 @@ Section hiding_notation.
                   << " " << (show_exp' v1)
                   << " " << (show_exp' v2))%string
     | OP_GetElementPtr t ptrval idxs =>
-      "getelementptr"                                                       
+      "getelementptr"
     | _ => "show_exp todo"
     end.
 
@@ -602,19 +624,19 @@ Section hiding_notation.
   Global Instance show_texp : Show (texp T) :=
     { show '(t, e) :=
         show t << " " << show e }.
-  
+
   Definition show_opt {A:Type} `{AS:Show A} (s:string) : Show (option A) :=
     fun x =>
         match x with
         | None => empty
         | Some a => s << show a
         end.
-  
+
   Global Instance show_instr : Show (instr T) :=
     { show instr :=
         match instr with
         | INSTR_Op op => show op
-                             
+
         | INSTR_Load vol t ptr align =>
           "load " << (show t) << " " << (show ptr)
                    << (@show_opt _ show_int ", align " align)
@@ -625,9 +647,9 @@ Section hiding_notation.
 
         | INSTR_Alloca t nb align =>
           ("alloca " << (show t) << (@show_opt _ show_int ", align " align))%string
-        (* 
+        (*
            | INSTR_Call
-           | INSTR_Phi 
+           | INSTR_Phi
            | INSTR_Alloca
          *)
         | _ => "string_of_instr todo"
@@ -645,7 +667,7 @@ Section hiding_notation.
 
   Global Instance show_instr_id_instr : Show (instr_id * (instr T)) :=
     { show '(iid, i) := show iid << " = " << show i }.
-  
+
   Global Instance show_block : Show (block T) :=
     { show block :=
         ("Block "
@@ -736,9 +758,8 @@ Global Instance ident_of_declaration : Ident (declaration T) := fun (d:declarati
 Global Instance ident_of_definition : forall X, Ident (definition T X) := fun X => fun (d:definition T X) => ident_of (df_prototype T _ d).
 
 
-Definition globals {X} (m:modul T X) : list ident := 
+Definition globals {X} (m:modul T X) : list ident :=
            map ident_of (m_globals T _ m)
         ++ map ident_of (m_declarations T _ m)
         ++ map ident_of (m_definitions T _ m).
 End WithType.
-
