@@ -104,13 +104,12 @@ Set Contextual Implicit.
     | inr x => f x
     end.
 
-  (* YZ : to double check that I did not mixed up the error and the ub positions *)
   Definition lift_undef_or_err {A B} {E} `{FailureE -< E} `{UBE -< E} (f : A -> itree E B) (m:undef_or_err A) : itree E B :=
     match m with
     | mkEitherT m =>
       match m with
-      | inl x => throw x
-      | inr (inl x) => raiseUB x
+      | inl x => raiseUB x
+      | inr (inl x) => throw x
       | inr (inr x) => f x
       end
     end.
