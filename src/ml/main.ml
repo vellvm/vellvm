@@ -29,11 +29,50 @@ let test_pp_dir dir =
   Printf.printf "%s\n" (outcome_to_string outcome);
   raise (Ran_tests (successful outcome))
 
+(* Ugly duplication. TODO: reuse more existing facility *)
+let ast_pp_file_inner path =
+  let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
+  let file, ext = Platform.path_to_basename_ext path in
+  begin match ext with
+    | "ll" ->
+      let ll_ast = parse_file path in
+      let ll_ast' = transform ll_ast in
+      let vast_file = Platform.gen_name !Platform.output_path file ".v.ast" in
+
+      (* Prints the original llvm program *)
+      let _ = output_file vast_file ll_ast' in
+
+      let perm = [Open_append; Open_creat] in
+      let channel = open_out_gen perm 0o640 vast_file in
+      let oc = (Format.formatter_of_out_channel channel) in
+
+      (* Prints the internal representation of the llvm program *)
+      Format.pp_force_newline oc ();
+      Format.pp_force_newline oc ();
+      Format.pp_print_string oc "Internal Coq representation of the ast:";
+      Format.pp_force_newline oc ();
+      Format.pp_force_newline oc ();
+      let _ = output_ast vast_file ll_ast' oc in
+
+      close_out channel
+    | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
+  end
+
+let ast_pp_file path =
+  Platform.configure();
+  ast_pp_file_inner path
+
+let ast_pp_dir dir =
+  Platform.configure();
+  let files = Test.files_of_dir dir in
+  List.iter ast_pp_file_inner files
 
 (* Use the --test option to run unit tests and the quit the program. *)
 let args =
   [ ("--test", Unit exec_tests, "run the test suite, ignoring later inputs")
   ; ("--test-pp-dir", String test_pp_dir, "run the parsing/pretty-printing tests on all .ll files in the given directory")
+  ; ("--print-ast", String ast_pp_file, "run the parsing on the given .ll file and print its internal ast and domination tree")
+  ; ("--print-ast-dir", String ast_pp_dir, "run the parsing on the given directory and print its internal ast and domination tree")
   ; ("-op", Set_string Platform.output_path, "set the path to the output files directory  [default='output']")
   ; ("-interpret", Set Driver.interpret, "interpret ll program starting from 'main'")
   ; ("-debug", Set Interpreter.debug_flag, "enable debugging trace output")
