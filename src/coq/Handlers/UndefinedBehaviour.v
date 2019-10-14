@@ -34,7 +34,7 @@ Section PARAMS.
 
 End PARAMS.
 
-Definition UB_exec {E} `{FailureE -< E}: UBE ~> itree E := fun _ _ => raise "Undefined Behaviour".
+Definition UB_exec {E} `{FailureE -< E}: UBE ~> itree E := fun _ e => match e with | ThrowUB s => raise ("Undefined Behaviour: " ++ s) end.
 
 Section PARAMS.
   Variable (E F: Type -> Type).
