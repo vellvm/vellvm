@@ -787,7 +787,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          useful to facilitate some reasoning.
          To do so, we would need to introduce sub-types of the universe of [block_id] and expose
          in the type of the constructions the interface of the components, in a fashion similar
-         to the _Asm_ language introduced in the ICFP paper on itrees.
+         to the _Asm_ language introduced in the POPL paper on itrees.
        *)
       (*
         We actually might be able to denote open programs without sending things at the level
@@ -826,7 +826,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | x::xs, y::ys =>
           l <- combine_lists_err xs ys ;;
             ret ((x,y)::l)
-        | _, _ => failwith "combine_lists_err: different length lists"
+        | _, _ =>
+          (* YZ: This should be a failure, but we first need to have a proper
+          story to handle main arguments since at the moment we expect exactly
+          argc and argv, and feed default values to them *)
+          (* failwith "combine_lists_err: different length lists" *)
+          ret []
         end.
 
       (* The denotation of an itree function is a coq function that takes
