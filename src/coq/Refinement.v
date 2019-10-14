@@ -65,4 +65,11 @@ Definition refine_L3 : relation (itree L3 (memory * (local_env * stack * (global
 Definition refine_L4 : relation ((itree L4 (memory * (local_env * stack * (global_env * uvalue)))) -> Prop)
   := fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt refine_res3 t t'.
 
+Definition refine_res4 : relation (memory * (local_env * stack * (global_env * dvalue)))
+  := TT × (TT × (TT × refine_dvalue)).
+
+(* Refinement for after interpreting pick, specializing to 0. *)
+Definition refine_L4_concrete : relation (itree L4 (memory * (local_env * stack * (global_env * dvalue))))
+  := eutt refine_res4.
+
 End Make.

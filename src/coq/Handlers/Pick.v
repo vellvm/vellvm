@@ -38,7 +38,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     (* YZ: TODO: better UB error message *)
     Inductive Pick_handler {E} `{UBE -< E}: PickE ~> PropT (itree E) :=
     | PickUB: forall uv C, ~ C -> Pick_handler (pick uv C) (raiseUB "Picking unsafe uvalue")
-    | PickD: forall uv (C: Prop) dv, C -> concretize uv dv -> Pick_handler (pick uv C) (ret dv).
+    | PickD: forall uv (C: Prop) dv, C -> concretize uv dv -> Pick_handler (pick uv C) (Ret dv).
 
     Section PARAMS.
       Variable (E F: Type -> Type).
