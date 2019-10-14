@@ -658,10 +658,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Call *)
         (* CB TODO: Do we need to pick here? *)
         | (pt, INSTR_Call (dt, f) args) =>
-          debug ("call") ;;
           uvs <- map_monad (fun '(t, op) => (translate exp_E_to_instr_E (denote_exp (Some dt) op))) args ;;
           dvs <- map_monad (fun x => trigger (pick x True)) uvs ;;
-          returned_value <- 
+          returned_value <-
           match Intrinsics.intrinsic_exp f with
           | Some s =>
             dv <- trigger (Intrinsic dt s dvs) ;;
@@ -669,6 +668,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | None =>
             fv <- translate exp_E_to_instr_E (denote_exp None f) ;;
             dfv <- trigger (pick fv True) ;; (* TODO, should this be unique? *)
+            debug ("Call to function: " ++ to_string f) ;;
             trigger (Call dt dfv dvs)
           end
           ;;
@@ -754,7 +754,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          once we are finished evaluating the expression.
          We then bind the resulting value in the underlying environment.
        *)
-
+      (* The argument [bid] is the identity of the block from which we are jumping.
+         The argument [id_p] are the phi nodes of the block toward which we are jumping. *)
       Definition denote_phi (bid : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) :=
         let '(id, Phi dt args) := id_p in
         match assoc RawIDOrd.eq_dec bid args with
@@ -799,6 +800,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                 match bid with
                 | inl bid
                 | inr bid =>
+                  (* We lookup the block [bid] to be denoted *)
                   match find_block dtyp (blks _ f) bid with
                   | None => raise ("Can't find block in denote_cfg " ++ to_string bid)
                   | Some block =>
@@ -807,13 +809,17 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                     (* And set the phi-nodes of the new destination, if any *)
                     match bd with
                     | inr dv => ret (inr dv)
-                    | inl bid =>
-                      debug ("phi") ;;
-                      dvs <- map_monad
-                          (fun x => translate exp_E_to_instr_E (denote_phi bid x))
-                          (blk_phis _ block) ;;
-                      map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
-                      ret (inl bid)
+                    | inl bid_target =>
+                      debug ("Jumping to " ++ to_string bid_target ++ ", evaluating phi nodes") ;;
+                      match find_block dtyp (blks _ f) bid_target with
+                        | None => raise ("Can't find block we are about to jump to " ++ to_string bid)
+                        | Some block_target =>
+                          dvs <- map_monad
+                              (fun x => translate exp_E_to_instr_E (denote_phi bid x))
+                              (blk_phis _ block_target) ;;
+                              map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
+                              ret (inl bid_target)
+                      end
                     end
                   end
                 end
@@ -842,7 +848,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation  :=
         fun (args : list dvalue) =>
           (* We match the arguments variables to the inputs *)
-          debug ("denoting function with args: " ++ to_string args ++ "and prototype: " ++ to_string (df_args dtyp _ df));;
+          debug ("Denoting function " ++ to_string (dc_name _ (df_prototype _ _ df)) ++ " with args: " ++ to_string args ++ " against prototype: " ++ to_string (df_args dtyp _ df));;
           bs <- lift_err ret (combine_lists_err (df_args dtyp _ df) args) ;;
              (* generate the corresponding writes to the local stack frame *)
           trigger MemPush ;;
