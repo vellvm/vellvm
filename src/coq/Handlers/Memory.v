@@ -399,16 +399,18 @@ Admitted.
         let k := unsigned i in
         let n := BinIntDef.Z.to_nat k in
         match t with
-        | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
-                              handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
-        | DTYPE_Struct ts | DTYPE_Packed_struct ts => (* Handle these differently in future *)
-                            let offset := fold_left (fun acc t => acc + sizeof_dtyp t)
-                                                    (firstn n ts) 0 in
-                            match nth_error ts n with
-                            | None => failwith "overflow"
-                            | Some t' =>
-                              handle_gep_h t' b (off + offset) vs' m
-                            end
+        | DTYPE_Vector _ ta
+        | DTYPE_Array _ ta =>
+          handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+        | DTYPE_Struct ts
+        | DTYPE_Packed_struct ts => (* Handle these differently in future *)
+          let offset := fold_left (fun acc t => acc + sizeof_dtyp t)
+                                  (firstn n ts) 0 in
+          match nth_error ts n with
+          | None => failwith "overflow"
+          | Some t' =>
+            handle_gep_h t' b (off + offset) vs' m
+          end
         | _ => failwith ("non-i32-indexable type")
         end
       | DVALUE_I8 i =>
@@ -423,8 +425,9 @@ Admitted.
         let k := unsigned i in
         let n := BinIntDef.Z.to_nat k in
         match t with
-        | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
-                              handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+        | DTYPE_Vector _ ta
+        | DTYPE_Array _ ta =>
+          handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
         | _ => failwith ("non-i64-indexable type")
         end
       | _ => failwith "non-I32 index"
