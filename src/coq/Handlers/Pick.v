@@ -7,7 +7,7 @@ From ExtLib Require Import
      Structures.Monads
      Structures.Maps.
 
-From ITree Require Import 
+From ITree Require Import
      ITree
      Events.State.
 
@@ -77,7 +77,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | DTYPE_Void => DVALUE_None
       | DTYPE_Half => DVALUE_Float Float32.zero (* ??? *)
       | DTYPE_Float => DVALUE_Float Float32.zero
-      | DTYPE_Double => DVALUE_Float Float32.zero (* ??? *)
+      | DTYPE_Double => DVALUE_Double (Float32.to_double Float32.zero)
       | DTYPE_X86_fp80 => DVALUE_Float Float32.zero (* ??? *)
       | DTYPE_Fp128 => DVALUE_Float Float32.zero (* ??? *)
       | DTYPE_Ppc_fp128 => DVALUE_Float Float32.zero (* ??? *)
@@ -113,10 +113,10 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                                                    ret (DVALUE_Vector delts)
       | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalue v1 ;;
                                                   dv2 <- concretize_uvalue v2 ;;
-                                                  lift_undef_or_err ret (eval_iop iop dv1 dv2) 
+                                                  lift_undef_or_err ret (eval_iop iop dv1 dv2)
       | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
                                                   dv2 <- concretize_uvalue v2 ;;
-                                                  lift_undef_or_err ret (eval_icmp cmp dv1 dv2) 
+                                                  lift_undef_or_err ret (eval_icmp cmp dv1 dv2)
       | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalue v1 ;;
                                                   dv2 <- concretize_uvalue v2 ;;
                                                   lift_undef_or_err ret (eval_fop fop dv1 dv2)
@@ -125,7 +125,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                                                   lift_undef_or_err ret (eval_fcmp cmp dv1 dv2)
       | _ => raise "unimplemented concretization of uvalue"
       (*
-  | UVALUE_Conversion conv v t_to          => 
+  | UVALUE_Conversion conv v t_to          =>
   | UVALUE_GetElementPtr t ptrval idxs     => _
   | UVALUE_ExtractElement vec idx          => _
   | UVALUE_InsertElement vec elt idx       => _
