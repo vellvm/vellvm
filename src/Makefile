@@ -15,12 +15,23 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILES := PropT Error Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric/Integers Numeric/Floats Util LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues LLVMEvents TypeUtil IntrinsicsDefinitions Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/UndefinedBehaviour Denotation DenotationProp Transformations/Renaming Transformations/DeadInstr Transformations/Transform TransformTypes TopLevel ParserHelper Refinement Environment TopLevelRefinements
+COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric/Integers Numeric/Floats\
+									Util PropT Error LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues\
+									LLVMEvents TypeUtil IntrinsicsDefinitions\
+									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/UndefinedBehaviour\
+									Denotation TransformTypes TopLevel
 
-OLLVMFILES := 
+COQFILESOPT    := Transformations/Renaming Transformations/DeadInstr Transformations/Transform\
+									ParserHelper Refinement Environment TopLevelRefinements
 
-VFILES := $(COQFILES:%=coq/%.v)
-VOFILES := $(COQFILES:%=coq/%.vo)
+OLLVMFILES :=
+
+VFILES  := $(COQFILESINTERP:%=coq/%.v) $(COQFILESOPT:%=coq/%.v)
+VOFILES := $(COQFILESINTERP:%=coq/%.vo) $(COQFILESOPT:%=coq/%.vo)
+
+
+VFILES  := $(COQFILESINTERP:%=coq/%.v) $(COQFILESOPT:%=coq/%.v)
+VOFILES := $(COQFILESINTERP:%=coq/%.vo) $(COQFILESOPT:%=coq/%.vo)
 
 all:
 	@test -f .depend || $(MAKE) depend
@@ -28,7 +39,15 @@ all:
 	$(MAKE) extracted
 	$(MAKE) vellvm
 
+interp:
+	@test -f .depend || $(MAKE) depend
+	$(MAKE) coqinterp
+	$(MAKE) extracted
+	$(MAKE) vellvm
+
 coq: $(VOFILES)
+
+coqinterp: $(COQFILESINTERP:%=coq/%.vo)
 
 itrees:
 	git submodule update --init
