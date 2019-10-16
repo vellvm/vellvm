@@ -16,14 +16,13 @@ From ExtLib Require Import
      Programming.Eqv
      Data.String.
 
-From Vellvm Require Import 
+From Vellvm Require Import
      LLVMEvents
      LLVMAst
      Error
      Coqlib
      Numeric.Integers
      Numeric.Floats.
-
 
 From ITree Require Import
      ITree.
@@ -93,21 +92,21 @@ Definition defined_intrinsics_decls :=
   [ fabs_32_decl; fabs_64_decl; memcpy_8_decl ].
 
 (* This functor module provides a way to (extensibly) add the semantic behavior
-   for intrinsics defined outside of the core Vellvm operational semantics.  
+   for intrinsics defined outside of the core Vellvm operational semantics.
 
-   Internally, invocation of an intrinsic looks no different than that of an 
-   external function call, so each LLVM intrinsic instruction should produce 
+   Internally, invocation of an intrinsic looks no different than that of an
+   external function call, so each LLVM intrinsic instruction should produce
    a Call effect.
 
-   Each intrinsic is identified by its name (a string) and its denotation is 
-   given by a function from a list of dynamic values to a dynamic value (or 
-   possibly an error).  
+   Each intrinsic is identified by its name (a string) and its denotation is
+   given by a function from a list of dynamic values to a dynamic value (or
+   possibly an error).
 
    NOTE: The intrinsics that can be defined at this layer of the semantics
    cannot affect the core interpreter state or the memory model.  This layer is
    useful for implementing "pure value" intrinsics like floating point
    operations, etc.  Also note that such intrinsics cannot themselves generate
-   any other effects.  
+   any other effects.
 
 *)
 Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
@@ -116,13 +115,13 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Import LLVMIO.
   Import DV.
 
-  (* Each (pure) intrinsic is defined by a function of the following type. 
+  (* Each (pure) intrinsic is defined by a function of the following type.
 
-   - each intrinsic should "morally" be a total function: assuming the LLVM program 
-     is well formed, the intrisnic should always produce an LLVM value (which itself 
+   - each intrinsic should "morally" be a total function: assuming the LLVM program
+     is well formed, the intrisnic should always produce an LLVM value (which itself
      might be poison or undef)
 
-   - error should be returned only in the case that the LLVM program is ill-formed 
+   - error should be returned only in the case that the LLVM program is ill-formed
      (e.g. if the wrong number and/or type of arguments is given to the intrinsic)
 
    *)

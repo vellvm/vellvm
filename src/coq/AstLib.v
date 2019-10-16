@@ -493,26 +493,28 @@ Section hiding_notation.
            | Some t => [Raw "Some " ; to_sexp t]
            end.
 
-  Global Instance serialize_raw_id : Serialize raw_id :=
+  Definition serialize_raw_id (prefix: string): Serialize raw_id :=
     fun r =>
       match r with
-      | Name s => Raw s
+      | Name s => Raw (prefix ++ s)
       | Anon n => to_sexp n
-      | LLVMAst.Raw  n => [Raw "_RAW_" ; to_sexp n]
+      | LLVMAst.Raw n => Raw ("_RAW_" ++ to_string n)
       end.
+
+  Global Instance serialize_raw_id': Serialize raw_id := serialize_raw_id "".
 
   Global Instance serialize_ident : Serialize ident :=
     fun id =>
       match id with
-      | ID_Global r => [Raw "@" ; to_sexp r]
-      | ID_Local  r => [Raw "%" ; to_sexp r]
+      | ID_Global r => serialize_raw_id "@" r
+      | ID_Local  r => serialize_raw_id "%" r
       end.
 
   Global Instance serialize_instr_id : Serialize instr_id :=
     fun ins =>
       match ins with
       | IId id => to_sexp id
-      | IVoid n => [Raw "void<" ; to_sexp n ; Raw ">"]
+      | IVoid n => Raw ("void<" ++ to_string n ++ ">")
       end.
 
   Global Instance serialize_ibinop : Serialize ibinop :=
@@ -544,45 +546,47 @@ Section hiding_notation.
 
   Global Instance serialize_icmp : Serialize icmp :=
     fun cmp =>
-      [Raw "icmp " ;
-         match cmp with
-         | Eq => Raw "eq"
-         | Ne => Raw "ne"
-         | Ugt => Raw "ugt"
-         | Uge => Raw "uge"
-         | Ult => Raw "ult"
-         | Ule => Raw "ule"
-         | Sgt => Raw "sgt"
-         | Sge => Raw "sge"
-         | Slt => Raw "slt"
-         | Sle => Raw "sle"
-         end].
+      Raw ("icmp "
+             ++
+             match cmp with
+             | Eq => "eq"
+             | Ne => "ne"
+             | Ugt => "ugt"
+             | Uge => "uge"
+             | Ult => "ult"
+             | Ule => "ule"
+             | Sgt => "sgt"
+             | Sge => "sge"
+             | Slt => "slt"
+             | Sle => "sle"
+             end).
 
   Global Instance serialize_fcmp : Serialize fcmp :=
     fun cmp =>
-      [Raw "fcmp " ;
-         match cmp with
-           FFalse => Raw "ffalse"
-         | FOeq => Raw "foeq"
-         | FOgt => Raw "fogt"
-         | FOge => Raw "foge"
-         | FOlt => Raw "folt"
-         | FOle => Raw "fole"
-         | FOne => Raw "fone"
-         | FOrd => Raw "ford"
-         | FUno => Raw "funo"
-         | FUeq => Raw "fueq"
-         | FUgt => Raw "fugt"
-         | FUge => Raw "fuge"
-         | FUlt => Raw "fult"
-         | FUle => Raw "fule"
-         | FUne => Raw "fune"
-         | FTrue => Raw "ftrue"
-         end].
+      Raw ("fcmp "
+             ++
+             match cmp with
+               FFalse => "ffalse"
+             | FOeq => "foeq"
+             | FOgt => "fogt"
+             | FOge => "foge"
+             | FOlt => "folt"
+             | FOle => "fole"
+             | FOne => "fone"
+             | FOrd => "ford"
+             | FUno => "funo"
+             | FUeq => "fueq"
+             | FUgt => "fugt"
+             | FUge => "fuge"
+             | FUlt => "fult"
+             | FUle => "fule"
+             | FUne => "fune"
+             | FTrue => "ftrue"
+             end).
 
-  Fixpoint serialize_typ' typ :=
+  Fixpoint serialize_typ' typ: sexp atom :=
     match typ with
-    | TYPE_I sz => [Raw "i" ; to_sexp sz]
+    | TYPE_I sz => Raw ("i" ++ to_string sz)
     | TYPE_Pointer t => [serialize_typ' t ; Raw "*"]
     | _ => Raw "(show_typ todo)"
     end.
@@ -603,13 +607,13 @@ Section hiding_notation.
       | EXP_Cstring s => Raw s
       | EXP_Undef => Raw "undef"
       | OP_IBinop iop t v1 v2 =>
-        [to_sexp iop ; Raw " " ; to_sexp t
-                    ; Raw " " ; serialize_exp' v1
-                    ; Raw " " ; serialize_exp' v2]
+        [to_sexp iop ; to_sexp t
+                    ; serialize_exp' v1
+                    ; serialize_exp' v2]
       | OP_ICmp cmp t v1 v2 =>
-        [to_sexp cmp ; Raw " " ; to_sexp t
-                    ; Raw " " ; serialize_exp' v1
-                    ; Raw " " ; serialize_exp' v2]
+        [to_sexp cmp ; to_sexp t
+                    ; serialize_exp' v1
+                    ; serialize_exp' v2]
       | OP_GetElementPtr t ptrval idxs =>
         Raw "getelementptr"
       | _ => Raw "to_sexp_exp todo"
@@ -635,15 +639,15 @@ Section hiding_notation.
         | INSTR_Op op => to_sexp op
 
         | INSTR_Load vol t ptr align =>
-          [Raw "load " ; to_sexp t ; Raw " " ; to_sexp ptr
-           ; @serialize_opt _ serialize_int ", align " align]
+          [Raw "load" ; to_sexp t ; to_sexp ptr
+           ; @serialize_opt _ serialize_int ", align" align]
 
         | INSTR_Store vol tval ptr align =>
-          [Raw "store " ; to_sexp tval ; Raw " " ; to_sexp ptr
-           ; @serialize_opt _ serialize_int ", align " align]
+          [Raw "store" ; to_sexp tval; to_sexp ptr
+           ; @serialize_opt _ serialize_int ", align" align]
 
         | INSTR_Alloca t nb align =>
-          [Raw "alloca " ; to_sexp t ; @serialize_opt _ serialize_int ", align " align]
+          [Raw "alloca" ; to_sexp t ; @serialize_opt _ serialize_int ", align" align]
         (*
            | INSTR_Call
            | INSTR_Phi
@@ -661,7 +665,7 @@ Section hiding_notation.
         end.
 
     Global Instance serialize_instr_id_instr : Serialize (instr_id * (instr T)) :=
-      fun '(iid, i) => [to_sexp iid ; Raw " = " ; to_sexp i].
+      fun '(iid, i) => [to_sexp iid ; Raw "=" ; to_sexp i].
 
     Global Instance serialize_block : Serialize (block T) :=
       fun block =>
@@ -670,7 +674,7 @@ Section hiding_notation.
            to_sexp (blk_code T block)].
 
     Global Instance serialize_definition_list_block : Serialize (definition T (list (block T))) :=
-      fun defn => [Raw "defn: " ; to_sexp (df_instrs T _ defn)].
+      fun defn => [Raw "defn:" ; to_sexp (df_instrs T _ defn)].
 
     Global Instance serialize_tle_list_block : Serialize (toplevel_entity T (list (block T))) :=
       fun tle =>

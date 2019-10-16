@@ -39,17 +39,17 @@ Set Contextual Implicit.
    LLVM _intrinsic_ functions are used like ordinary function calls, but
    they have a special interpretation.
 
-     - any global identifier that starts with the prefix "llvm." is 
-       considered to be an intrinsic function 
+     - any global identifier that starts with the prefix "llvm." is
+       considered to be an intrinsic function
 
      - intrinsic functions must be delared in the global scope (to ascribe them types)
 
-     - it is _illegal_ to take the address of an intrinsic function (they do not 
-       always map directly to external functions, e.g. arithmetic intrinsics may 
-       be lowered directly to in-lined assembly on platforms that support the 
+     - it is _illegal_ to take the address of an intrinsic function (they do not
+       always map directly to external functions, e.g. arithmetic intrinsics may
+       be lowered directly to in-lined assembly on platforms that support the
        operations natively.
 
-   As a consequence of the above, it is possible to _statically_ determine 
+   As a consequence of the above, it is possible to _statically_ determine
    that a call is an invocation of an intrinsic by looking for instructions
    of the form:
         call t @llvm._ (args...)
@@ -57,7 +57,7 @@ Set Contextual Implicit.
 
 (* This function extracts the string of the form [llvm._] from an LLVM expression.
    It returns None if the expression is not an intrinsic definition.
-*) 
+*)
 Definition intrinsic_ident (id:ident) : option string :=
   match id with
   | ID_Global (Name s) =>
@@ -88,13 +88,13 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
 
   (* Interprets Call events found in the given association list by their
-     semantic functions.  
+     semantic functions.
 
-     SAZ: This definition is trickier than one wants it to be because of the 
-     dependent pattern matching.  The index of the IntrinsicE constructor need to 
+     SAZ: This definition is trickier than one wants it to be because of the
+     dependent pattern matching.  The index of the IntrinsicE constructor need to
      be used to coerce the result back to the general ITree type.
 
-     We solve it by using the "Convoy Pattern" (see Chlipala's CPDT).  
+     We solve it by using the "Convoy Pattern" (see Chlipala's CPDT).
 
      IntrinsicE ~> LLVM _MCFG1
    *)
@@ -112,7 +112,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       match e in IntrinsicE Y return X = Y -> itree L0 Y with
       | (Intrinsic _ fname args) =>
           match assoc Strings.String.string_dec fname defs_assoc with
-          | Some f => fun pf => 
+          | Some f => fun pf =>
                        match f args with
                        | inl msg => raise msg
                        | inr result => Ret result

@@ -53,9 +53,9 @@ Inductive dtyp : Set :=
 Section hiding_notation.
   Local Open Scope sexp_scope.
 
-  Fixpoint serialize_dtyp' (dt:dtyp) :=
+  Fixpoint serialize_dtyp' (dt:dtyp): sexp atom :=
     match dt with
-    | DTYPE_I sz     => [Raw "i" ; to_sexp sz]
+    | DTYPE_I sz     => Raw ("i" ++ to_string sz)
     | DTYPE_Pointer  => Raw "ptr"
     | DTYPE_Void     => Raw "dvoid"
     | DTYPE_Half     => Raw "half"
@@ -67,14 +67,14 @@ Section hiding_notation.
     | DTYPE_Metadata  => Raw "metadata"
     | DTYPE_X86_mmx   => Raw "x86_mmx"
     | DTYPE_Array sz t
-      => [Raw "[" ; to_sexp sz ; Raw " x " ; serialize_dtyp' t ; Raw "]"]
+      => [Raw "[" ; to_sexp sz ; Raw "x" ; serialize_dtyp' t ; Raw "]"]
     | DTYPE_Struct fields
       => [Raw "{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Raw ","]) fields) ; Raw "}"]
     | DTYPE_Packed_struct fields
       => [Raw "packed{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Raw ","]) fields) ; Raw "}"]
     | DTYPE_Opaque => Raw "opaque"
     | DTYPE_Vector sz t
-      => [Raw "<" ; to_sexp sz ; Raw " x " ; serialize_dtyp' t ; Raw ">"]  (* TODO: right notation? *)
+      => [Raw "<" ; to_sexp sz ; Raw "x" ; serialize_dtyp' t ; Raw ">"]  (* TODO: right notation? *)
     end.
 
   Global Instance serialize_dtyp : Serialize dtyp := serialize_dtyp'.
