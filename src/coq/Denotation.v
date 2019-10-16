@@ -388,7 +388,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
         in
-        debug ("Evaluating expression " ++ to_string o);;
+        debug ("Evaluating expression: " ++ to_string o);;
         match o with
         | EXP_Ident i =>
           translate lookup_E_to_exp_E (lookup_id i)

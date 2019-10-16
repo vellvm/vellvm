@@ -295,30 +295,30 @@ Section hiding_notation.
 
   Global Instance serialize_dvalue : Serialize dvalue := serialize_dvalue'.
 
-  Fixpoint serialize_uvalue' (uv:uvalue) : sexp atom :=
+  Fixpoint serialize_uvalue' (pre post: string) (uv:uvalue): sexp atom :=
     match uv with
-    | UVALUE_Addr a => S.Raw "address" (* TODO: insist that memory models can print addresses? *)
-    | UVALUE_I1 x => S.Raw "uvalue(i1)"
-    | UVALUE_I8 x => S.Raw "uvalue(i8)"
-    | UVALUE_I32 x => S.Raw "uvalue(i32)"
-    | UVALUE_I64 x => S.Raw "uvalue(i64)"
-    | UVALUE_Double x => S.Raw "uvalue(double)"
-    | UVALUE_Float x => S.Raw "uvalue(float)"
-    | UVALUE_Poison => S.Raw "poison"
-    | UVALUE_None => S.Raw "none"
+    | UVALUE_Addr a => S.Raw (pre ++ "address" ++ post) (* TODO: insist that memory models can print addresses? *)
+    | UVALUE_I1 x => S.Raw (pre ++ "uvalue(i1)" ++ post)
+    | UVALUE_I8 x => S.Raw (pre ++ "uvalue(i8)" ++ post)
+    | UVALUE_I32 x => S.Raw (pre ++ "uvalue(i32)" ++ post)
+    | UVALUE_I64 x => S.Raw (pre ++ "uvalue(i64)" ++ post)
+    | UVALUE_Double x => S.Raw (pre ++ "uvalue(double)" ++ post)
+    | UVALUE_Float x => S.Raw (pre ++ "uvalue(float)" ++ post)
+    | UVALUE_Poison => S.Raw (pre ++ "poison" ++ post)
+    | UVALUE_None => S.Raw (pre ++ "none" ++ post)
     | UVALUE_Struct fields
-      => [S.Raw "{" ; to_sexp (List.map (fun x => [serialize_uvalue' x ; S.Raw ","]) fields) ; S.Raw "}"]
+      => [S.Raw "{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; S.Raw "}"]
     | UVALUE_Packed_struct fields
-      => [S.Raw "packed{" ; to_sexp (List.map (fun x => [serialize_uvalue' x ; S.Raw ","]) fields) ; S.Raw "}"]
+      => [S.Raw "packed{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; S.Raw "}"]
     | UVALUE_Array elts
-      => [S.Raw "[" ; to_sexp (List.map (fun x => [serialize_uvalue' x ; S.Raw ","]) elts) ; S.Raw "]"]
+      => [S.Raw "[" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; S.Raw "]"]
     | UVALUE_Vector elts
-      => [S.Raw "<" ; to_sexp (List.map (fun x => [serialize_uvalue' x ; S.Raw  ","]) elts) ; S.Raw ">"]
+      => [S.Raw "<" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; S.Raw ">"]
     | UVALUE_Undef t => [S.Raw "undef(" ; to_sexp t ; S.Raw ")"]
-    | UVALUE_IBinop iop v1 v2 => [S.Raw "(" ; serialize_uvalue' v1 ; S.Raw " " ; to_sexp iop ; S.Raw " " ; serialize_uvalue' v2 ; S.Raw ")"]
-    | UVALUE_ICmp cmp v1 v2 => [S.Raw "(" ; serialize_uvalue' v1 ; S.Raw " " ; to_sexp cmp ; S.Raw " " ; serialize_uvalue' v2 ; S.Raw ")"]
-    | UVALUE_FBinop fop _ v1 v2 => [S.Raw "(" ; serialize_uvalue' v1 ; S.Raw " " ; to_sexp fop ; S.Raw " " ; serialize_uvalue' v2 ; S.Raw ")"]
-    | UVALUE_FCmp cmp v1 v2 => [S.Raw "(" ; serialize_uvalue' v1 ; S.Raw " " ; to_sexp cmp ; S.Raw " " ; serialize_uvalue' v2 ; S.Raw ")"]
+    | UVALUE_IBinop iop v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp iop ; serialize_uvalue' "" ")" v2]
+    | UVALUE_ICmp cmp v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp cmp; serialize_uvalue' "" ")" v2]
+    | UVALUE_FBinop fop _ v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp fop; serialize_uvalue' "" ")" v2]
+    | UVALUE_FCmp cmp v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp cmp; serialize_uvalue' "" ")" v2]
     (* | UVALUE_Conversion       (conv:conversion_type) (v:uvalue) (t_to:dtyp) *)
     (* | UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)) (* TODO: do we ever need this? GEP raises an event? *) *)
     (* | UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue) *)
@@ -330,7 +330,7 @@ Section hiding_notation.
     | _ => S.Raw "TODO: show_uvalue"
     end.
 
-  Global Instance serialize_uvalue : Serialize uvalue := serialize_uvalue'.
+  Global Instance serialize_uvalue : Serialize uvalue := serialize_uvalue' "" "".
 
 End hiding_notation.
 
