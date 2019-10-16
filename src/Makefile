@@ -35,7 +35,11 @@ itrees:
 	git submodule update --init
 	make -C $(ITREEDIR)
 
-.PHONY: extracted itrees
+ceres:
+	git submodule update --init
+	make -C $(CERESDIR)
+
+.PHONY: extracted itrees ceres
 extracted: $(EXTRACTDIR)/STAMP $(VOFILES)
 
 $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
@@ -51,7 +55,7 @@ $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "COQC $*.v"
 	@$(COQC) -dump-glob doc/$(*F).glob $*.v
 
-depend: itrees $(VFILES) 
+depend: itrees ceres $(VFILES) 
 	@echo "Analyzing Coq dependencies"
 	@$(COQDEP) $^ > .depend
 
@@ -83,6 +87,7 @@ clean:
 	rm -f vellvm
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
 	make -C $(ITREEDIR) clean
+	make -C $(CERESDIR) clean
 
 doc/coq2html: 
 	make -C ../lib/coq2html
