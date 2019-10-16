@@ -23,7 +23,7 @@
 (*  ------------------------------------------------------------------------- *)
 
 Require Import Floats.
-Require Import List String Ascii ZArith.
+From Coq Require Import List String Ascii ZArith.
 Require Import Vellvm.Util.
 
 Import ListNotations.
@@ -47,25 +47,25 @@ Inductive linkage : Set :=
 | LINKAGE_Weak_odr
 | LINKAGE_External
 .
-      
+
 Inductive dll_storage : Set :=
 | DLLSTORAGE_Dllimport
 | DLLSTORAGE_Dllexport
-.      
+.
 
 Inductive visibility : Set :=
 | VISIBILITY_Default
 | VISIBILITY_Hidden
 | VISIBILITY_Protected
 .
-    
+
 Inductive cconv : Set :=
 | CC_Ccc
 | CC_Fastcc
 | CC_Coldcc
 | CC_Cc (cc:int)
 .
-        
+
 Inductive param_attr : Set :=
 | PARAMATTR_Zeroext
 | PARAMATTR_Signext
@@ -82,7 +82,7 @@ Inductive param_attr : Set :=
 | PARAMATTR_Nonnull
 | PARAMATTR_Dereferenceable (a:int)
 .
-                            
+
 Inductive fn_attr : Set :=
 | FNATTR_Alignstack (a:int)
 | FNATTR_Alwaysinline
@@ -126,7 +126,7 @@ Inductive thread_local_storage : Set :=
 
 
 Inductive raw_id : Set :=
-| Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)  
+| Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)
 | Anon (n:int)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
 | Raw  (n:int)        (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
 .
@@ -154,7 +154,7 @@ Inductive typ : Set :=
 | TYPE_Fp128
 | TYPE_Ppc_fp128
 (* | TYPE_Label  label is not really a type *)
-(* | TYPE_Token -- used with exceptions *)    
+(* | TYPE_Token -- used with exceptions *)
 | TYPE_Metadata
 | TYPE_X86_mmx
 | TYPE_Array (sz:int) (t:typ)
@@ -199,18 +199,18 @@ Section TypedSyntax.
 Definition tident : Set := (T * ident)%type.
 
 
-(* NOTES: 
+(* NOTES:
   This datatype is more permissive than legal in LLVM:
      - it allows identifiers to appear nested inside of "constant expressions"
-       that is OK as long as we validate the syntax as "well-formed" before 
+       that is OK as long as we validate the syntax as "well-formed" before
        trying to give it semantics
 
   NOTES:
-   - Integer expressions: llc parses large integer exps and converts them to some 
+   - Integer expressions: llc parses large integer exps and converts them to some
      internal form (based on integer size?)
-   
-   - Float constants: these are always parsed as 64-bit representable floats 
-     using ocamls float_of_string function. The parser converts float literals 
+
+   - Float constants: these are always parsed as 64-bit representable floats
+     using ocamls float_of_string function. The parser converts float literals
      to 32-bit values using the type information available in the syntax.
 
      -- TODO: 128-bit, 16-bit, other float formats?
@@ -223,7 +223,7 @@ Definition tident : Set := (T * ident)%type.
    - OP_  prefix denotes syntax that requires further evaluation
  *)
 Inductive exp : Set :=
-| EXP_Ident   (id:ident)  
+| EXP_Ident   (id:ident)
 | EXP_Integer (x:int)
 | EXP_Float   (f:float32)  (* 32-bit floating point values *)
 | EXP_Double  (f:float)    (* 64-bit floating point values *)
@@ -237,7 +237,7 @@ Inductive exp : Set :=
 | EXP_Packed_struct   (fields: list (T * exp))
 | EXP_Array           (elts: list (T * exp))
 | EXP_Vector          (elts: list (T * exp))
-| OP_IBinop           (iop:ibinop) (t:T) (v1:exp) (v2:exp)  
+| OP_IBinop           (iop:ibinop) (t:T) (v1:exp) (v2:exp)
 | OP_ICmp             (cmp:icmp)   (t:T) (v1:exp) (v2:exp)
 | OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp) (v2:exp)
 | OP_FCmp             (cmp:fcmp)   (t:T) (v1:exp) (v2:exp)
@@ -262,13 +262,13 @@ Inductive instr_id : Set :=
 Inductive phi : Set :=
 | Phi  (t:T) (args:list (block_id * exp))
 .
-       
+
 Inductive instr : Set :=
 | INSTR_Comment (msg:string)
 | INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form SV (OP_ ...) *)
 | INSTR_Call (fn:texp) (args:list texp)      (* CORNER CASE: return type is void treated specially *)
-| INSTR_Alloca (t:T) (nb: option texp) (align:option int) 
-| INSTR_Load  (volatile:bool) (t:T) (ptr:texp) (align:option int)       
+| INSTR_Alloca (t:T) (nb: option texp) (align:option int)
+| INSTR_Load  (volatile:bool) (t:T) (ptr:texp) (align:option int)
 | INSTR_Store (volatile:bool) (val:texp) (ptr:texp) (align:option int)
 | INSTR_Fence
 | INSTR_AtomicCmpXchg
@@ -283,7 +283,7 @@ Inductive terminator : Set :=
 (* Types in branches are TYPE_Label constant *)
 | TERM_Ret        (v:texp)
 | TERM_Ret_void
-| TERM_Br         (v:texp) (br1:block_id) (br2:block_id) 
+| TERM_Br         (v:texp) (br1:block_id) (br2:block_id)
 | TERM_Br_1       (br:block_id)
 | TERM_Switch     (v:texp) (default_dest:block_id) (brs: list (texp * block_id))
 | TERM_IndirectBr (v:texp) (brs:list block_id) (* address * possible addresses (labels) *)
@@ -312,7 +312,7 @@ Record global : Set :=
 Record declaration : Set :=
   mk_declaration
   {
-    dc_name        : function_id;  
+    dc_name        : function_id;
     dc_type        : T;    (* INVARIANT: should be TYPE_Function (ret_t * args_t) *)
     dc_param_attrs : list param_attr * list (list param_attr); (* ret_attrs * args_attrs *)
     dc_linkage     : option linkage;
@@ -404,4 +404,3 @@ Arguments m_globals {_} _.
 Arguments m_declarations {_} _.
 Arguments m_definitions {_} _.
 End TypedSyntax.
-

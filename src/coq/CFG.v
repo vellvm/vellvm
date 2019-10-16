@@ -9,16 +9,16 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import Equalities.
-Require Import ZArith List String Omega.
+From Coq Require Import ZArith List String Omega.
 Require Import Vellvm.AstLib Vellvm.LLVMAst.
 Require Import Vellvm.Util.
-Require Import ExtLib.Core.RelDec.
-Require Import ExtLib.Programming.Show.
-Require Import ExtLib.Programming.Eqv.
-Require Import ExtLib.Structures.Monads.
-Require Import ExtLib.Data.Monads.OptionMonad.
+From ExtLib Require Import
+     Core.RelDec
+     Programming.Eqv
+     Structures.Monads
+     Data.Monads.OptionMonad.
+Require Import Ceres.Ceres.
 Import ListNotations.
-Import ShowNotation.
 Import EqvNotation.
 Import MonadNotation.
 Open Scope monad_scope.
@@ -33,11 +33,11 @@ Record pc :=
     }.
 
 Section hiding_notations.
-  Local Open Scope show_scope.
-  Global Instance show_pc : Show pc :=
-    { show p := "@" << show (fn p) << ":" << show (bk p) << ":" << show (pt p)}.
+  Local Open Scope sexp_scope.
+  Global Instance serialize_pc : Serialize pc :=
+    fun p => [Raw "@" ; to_sexp (fn p) ; Raw ":" ; to_sexp (bk p) ; Raw ":" ; to_sexp (pt p)].
 End hiding_notations.
-  
+
 
 Ltac unfold_eqv :=
   repeat (unfold eqv in *; unfold eqv_raw_id in *; unfold eqv_instr_id in *).
@@ -63,7 +63,7 @@ Module PC <: UsualDecidableTypeFull.
   Defined.
 
   Include HasEqDec2Bool.
-  
+
 End PC.
 Instance eq_dec_pc : RelDec (@eq pc) := RelDec_from_dec (@eq pc) PC.eq_dec.
 
@@ -74,12 +74,12 @@ Section CFG.
 
 (* TODO: rename Step to Inst *)
 Inductive cmd : Set :=
-| Inst (i:instr T) 
+| Inst (i:instr T)
 | Term (t:terminator T)
-.                    
+.
 
 
-(* each function definition corresponds to a control-flow graph 
+(* each function definition corresponds to a control-flow graph
    - init is the entry block
    - blks is a list of labeled blocks
    - args is the list of identifiers brought into scope by this function
@@ -110,7 +110,7 @@ Definition fallthrough (cd: (code T)) term_id : instr_id :=
 Definition blk_term_id b := fst (blk_term T b).
 Definition blk_terminator b := snd (blk_term T b).
 
-Definition blk_entry_id (b:block T) : instr_id := fallthrough (blk_code T b) (blk_term_id b). 
+Definition blk_entry_id (b:block T) : instr_id := fallthrough (blk_code T b) (blk_term_id b).
 
 Definition blk_entry_pc (fid:function_id) (b:block T) :=
   mk_pc fid (blk_id T b) (blk_entry_id b).
@@ -132,23 +132,23 @@ Fixpoint find_instr (cd : (code T)) (p:instr_id) (t:instr_id) : option (cmd * op
   end.
 
 Definition block_to_cmd (b:block T) (iid:instr_id) : option (cmd * option instr_id) :=
-  let term_id := blk_term_id b in 
+  let term_id := blk_term_id b in
   if term_id ~=? iid then
     Some (Term (snd (blk_term T b)), None)
   else
-    find_instr (blk_code T b) iid term_id 
+    find_instr (blk_code T b) iid term_id
 .
 
 (*
 Definition fetch (CFG : mcfg) (p:pc) : option cmd:=
-  let 'mk_pc fid bid iid := p in 
+  let 'mk_pc fid bid iid := p in
   cfg <- find_function CFG fid ;;
   blk <- find_block (blks (df_instrs T cfg)) bid ;;
   '(c, _) <- block_to_cmd blk iid ;;
   ret c.
-   
+
 Definition incr_pc (CFG:mcfg) (p:pc) : option pc :=
-  let 'mk_pc fid bid iid := p in 
+  let 'mk_pc fid bid iid := p in
   cfg <- find_function CFG fid ;;
   blk <- find_block (blks (df_instrs T cfg)) bid ;;
   '(c, n) <- block_to_cmd blk iid ;;
@@ -165,7 +165,7 @@ Definition block_to_entry (fid:function_id) (b:block T) : block_entry :=
 Definition find_block_entry (CFG:mcfg) (fid:function_id) (bid:block_id) : option block_entry :=
   cfg <- find_function CFG fid ;;
   blk <- find_block (blks (df_instrs T _ cfg)) bid ;;
-  ret (block_to_entry fid blk).  
+  ret (block_to_entry fid blk).
 
 Inductive function_entry : Set :=
 | FunctionEntry (args:list local_id) (p:pc).
@@ -175,13 +175,13 @@ Definition find_function_entry (CFG:mcfg) (fid:function_id) : option function_en
   dfn <- find_function CFG fid ;;
   let cfg := df_instrs T _ dfn in
   blk <- find_block (blks cfg) (init cfg) ;;
-  ret (FunctionEntry (df_args T _ dfn) (mk_pc fid (init cfg) (blk_entry_id blk))).  
+  ret (FunctionEntry (df_args T _ dfn) (mk_pc fid (init cfg) (blk_entry_id blk))).
 
 
 (*
 Definition code_of_definition (d:definition (list block)) (p:pt) : option cmd :=
   cmd_from_blocks p (df_instrs d).
-  
+
 Definition blks_of_definition (d:definition (list block)) block_id : option pt :=
   'b <- lookup_block (df_instrs d) block_id;
   Some (fallthrough (blk_term_id b) (blk_instrs b)).
@@ -228,4 +228,3 @@ Definition mcfg_of_modul (m:modul T (list (block T))) : option mcfg :=
 
 (*  ------------------------------------------------------------------------- *)
 End CFG.
-

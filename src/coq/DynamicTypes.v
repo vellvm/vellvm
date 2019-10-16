@@ -19,13 +19,14 @@ From Coq Require Import
 
 From ExtLib Require Import
      Core.RelDec
-     Programming.Eqv
-     Programming.Show.
+     Programming.Eqv.
 
 From Vellvm Require Import
      Util
      LLVMAst
      Error.
+
+Require Import Ceres.Ceres.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -50,33 +51,32 @@ Inductive dtyp : Set :=
 .
 
 Section hiding_notation.
-  Import ShowNotation.
-  Local Open Scope show_scope.
+  Local Open Scope sexp_scope.
 
-  Fixpoint show_dtyp' (dt:dtyp) :=
+  Fixpoint serialize_dtyp' (dt:dtyp) :=
     match dt with
-    | DTYPE_I sz     => ("i" << show sz)
-    | DTYPE_Pointer  => "ptr"
-    | DTYPE_Void     => "dvoid"
-    | DTYPE_Half     => "half"
-    | DTYPE_Float    => "float"
-    | DTYPE_Double   => "double"
-    | DTYPE_X86_fp80 => "x86_fp80"
-    | DTYPE_Fp128    => "fp128"
-    | DTYPE_Ppc_fp128 => "ppc_fp128"
-    | DTYPE_Metadata  => "metadata"
-    | DTYPE_X86_mmx   => "x86_mmx"
+    | DTYPE_I sz     => [Raw "i" ; to_sexp sz]
+    | DTYPE_Pointer  => Raw "ptr"
+    | DTYPE_Void     => Raw "dvoid"
+    | DTYPE_Half     => Raw "half"
+    | DTYPE_Float    => Raw "float"
+    | DTYPE_Double   => Raw "double"
+    | DTYPE_X86_fp80 => Raw "x86_fp80"
+    | DTYPE_Fp128    => Raw "fp128"
+    | DTYPE_Ppc_fp128 => Raw "ppc_fp128"
+    | DTYPE_Metadata  => Raw "metadata"
+    | DTYPE_X86_mmx   => Raw "x86_mmx"
     | DTYPE_Array sz t
-      => ("[" << show sz << " x " << (show_dtyp' t) << "]")
+      => [Raw "[" ; to_sexp sz ; Raw " x " ; serialize_dtyp' t ; Raw "]"]
     | DTYPE_Struct fields
-      => ("{" << iter_show (List.map (fun x => (show_dtyp' x) << ",") fields) << "}")
+      => [Raw "{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Raw ","]) fields) ; Raw "}"]
     | DTYPE_Packed_struct fields
-      => ("packed{" << iter_show (List.map (fun x => (show_dtyp' x) << ",") fields) << "}")
-    | DTYPE_Opaque => "opaque"
+      => [Raw "packed{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Raw ","]) fields) ; Raw "}"]
+    | DTYPE_Opaque => Raw "opaque"
     | DTYPE_Vector sz t
-      => ("<" << show sz << " x " << (show_dtyp' t) << ">")  (* TODO: right notation? *)
-    end%string.
+      => [Raw "<" ; to_sexp sz ; Raw " x " ; serialize_dtyp' t ; Raw ">"]  (* TODO: right notation? *)
+    end.
 
-  Global Instance show_dtyp : Show dtyp := show_dtyp'.
+  Global Instance serialize_dtyp : Serialize dtyp := serialize_dtyp'.
 End hiding_notation.
 

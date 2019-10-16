@@ -20,7 +20,6 @@ From Coq Require Import
 From ExtLib Require Import
      Core.RelDec
      Programming.Eqv
-     Programming.Show
      Structures.Monads.
 
 From ITree Require Import

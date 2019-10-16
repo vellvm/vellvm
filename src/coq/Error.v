@@ -8,14 +8,13 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-Require Import String.
+From Coq Require Import String.
 Require Import ExtLib.Structures.Monads.
 Require Export ExtLib.Data.Monads.EitherMonad.
 
 From ITree Require Import
      ITree
      Events.Exception.
-
 
 Definition err T := sum string T.
 

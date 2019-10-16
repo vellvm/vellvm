@@ -11,10 +11,11 @@
 From Coq Require Import
      ZArith List String Omega Bool.Bool.
 
+Require Import Ceres.Ceres.
+
 From ExtLib Require Import
      Core.RelDec
      Programming.Eqv
-     Programming.Show
      Structures.Monads
      Structures.Functor
      Data.Nat
@@ -237,7 +238,7 @@ Lemma uvalue_to_dvalue_is_concrete: forall uv,
 Proof.
   induction uv; simpl; split; intros H;
     first [easy | eexists; reflexivity  | destruct H; easy | idtac].
-*) 
+*)
 
 (* If both operands are concrete, uvalue_to_dvalue them and run them through
    opd, else run the abstract ones through opu *)
@@ -269,56 +270,55 @@ Definition uvalue_to_dvalue_uop {A : Type}
 (* TODO: define [refines : uvalue -> dvalue -> Prop] which characterizes the nondeterminism of undef values *)
 
 Section hiding_notation.
-  Import ShowNotation.
-  Local Open Scope show_scope.
+  Local Open Scope sexp_scope.
 
-  Fixpoint show_dvalue' (dv:dvalue) : showM :=
+  Fixpoint serialize_dvalue' (dv:dvalue): sexp atom :=
     match dv with
-    | DVALUE_Addr a => "address" (* TODO: insist that memory models can print addresses? *)
-    | DVALUE_I1 x => "dvalue(i1)"
-    | DVALUE_I8 x => "dvalue(i8)"
-    | DVALUE_I32 x => "dvalue(i32)"
-    | DVALUE_I64 x => "dvalue(i64)"
-    | DVALUE_Double x => "dvalue(double)"
-    | DVALUE_Float x => "dvalue(float)"
-    | DVALUE_Poison => "poison"
-    | DVALUE_None => "none"
+    | DVALUE_Addr a => S.Raw "address" (* TODO: insist that memory models can print addresses? *)
+    | DVALUE_I1 x => S.Raw "dvalue(i1)"
+    | DVALUE_I8 x => S.Raw "dvalue(i8)"
+    | DVALUE_I32 x => S.Raw "dvalue(i32)"
+    | DVALUE_I64 x => S.Raw "dvalue(i64)"
+    | DVALUE_Double x => S.Raw "dvalue(double)"
+    | DVALUE_Float x => S.Raw "dvalue(float)"
+    | DVALUE_Poison => S.Raw "poison"
+    | DVALUE_None => S.Raw "none"
     | DVALUE_Struct fields
-      => ("{" << iter_show (List.map (fun x => (show_dvalue' x) << ",") fields) << "}")
+      => [S.Raw "{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; S.Raw ","]) fields) ; S.Raw "}"]
     | DVALUE_Packed_struct fields
-      => ("packed{" << iter_show (List.map (fun x => (show_dvalue' x) << ",") fields) << "}")
+      => [S.Raw "packed{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; S.Raw ","]) fields) ; S.Raw "}"]
     | DVALUE_Array elts
-      => ("[" << iter_show (List.map (fun x => (show_dvalue' x) << ",") elts) << "]")
+      => [S.Raw "[" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; S.Raw ","]) elts) ; S.Raw "]"]
     | DVALUE_Vector elts
-      => ("<" << iter_show (List.map (fun x => (show_dvalue' x) << ",") elts) << ">")
-    end%string.
+      => [S.Raw "<" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; S.Raw  ","]) elts) ; S.Raw ">"]
+    end.
 
-  Global Instance show_dvalue : Show dvalue := show_dvalue'.
+  Global Instance serialize_dvalue : Serialize dvalue := serialize_dvalue'.
 
-  Fixpoint show_uvalue' (uv:uvalue) : showM :=
+  Fixpoint serialize_uvalue' (uv:uvalue) : sexp atom :=
     match uv with
-    | UVALUE_Addr a => "address" (* TODO: insist that memory models can print addresses? *)
-    | UVALUE_I1 x => "uvalue(i1)"
-    | UVALUE_I8 x => "uvalue(i8)"
-    | UVALUE_I32 x => "uvalue(i32)"
-    | UVALUE_I64 x => "uvalue(i64)"
-    | UVALUE_Double x => "uvalue(double)"
-    | UVALUE_Float x => "uvalue(float)"
-    | UVALUE_Poison => "poison"
-    | UVALUE_None => "none"
+    | UVALUE_Addr a => S.Raw "address" (* TODO: insist that memory models can print addresses? *)
+    | UVALUE_I1 x => S.Raw "uvalue(i1)"
+    | UVALUE_I8 x => S.Raw "uvalue(i8)"
+    | UVALUE_I32 x => S.Raw "uvalue(i32)"
+    | UVALUE_I64 x => S.Raw "uvalue(i64)"
+    | UVALUE_Double x => S.Raw "uvalue(double)"
+    | UVALUE_Float x => S.Raw "uvalue(float)"
+    | UVALUE_Poison => S.Raw "poison"
+    | UVALUE_None => S.Raw "none"
     | UVALUE_Struct fields
-      => ("{" << iter_show (List.map (fun x => (show_uvalue' x) << ",") fields) << "}")
+      => [S.Raw "{" ; to_sexp (List.map (fun x => [serialize_uvalue' x ; S.Raw ","]) fields) ; S.Raw "}"]
     | UVALUE_Packed_struct fields
-      => ("packed{" << iter_show (List.map (fun x => (show_uvalue' x) << ",") fields) << "}")
+      => [S.Raw "packed{" ; to_sexp (List.map (fun x => [serialize_uvalue' x ; S.Raw ","]) fields) ; S.Raw "}"]
     | UVALUE_Array elts
-      => ("[" << iter_show (List.map (fun x => (show_uvalue' x) << ",") elts) << "]")
+      => [S.Raw "[" ; to_sexp (List.map (fun x => [serialize_uvalue' x ; S.Raw ","]) elts) ; S.Raw "]"]
     | UVALUE_Vector elts
-      => ("<" << iter_show (List.map (fun x => (show_uvalue' x) << ",") elts) << ">")
-    | UVALUE_Undef t => "undef(" << show t << ")"
-    | UVALUE_IBinop iop v1 v2 => "(" << show_uvalue' v1 << " " << show iop << " " << show_uvalue' v2 << ")"
-    | UVALUE_ICmp cmp v1 v2 => "(" << show_uvalue' v1 << " " << show cmp << " " << show_uvalue' v2 << ")"
-    | UVALUE_FBinop fop _ v1 v2 => "(" << show_uvalue' v1 << " " << show fop << " " << show_uvalue' v2 << ")"
-    | UVALUE_FCmp cmp v1 v2 => "(" << show_uvalue' v1 << " " << show cmp << " " << show_uvalue' v2 << ")"
+      => [S.Raw "<" ; to_sexp (List.map (fun x => [serialize_uvalue' x ; S.Raw  ","]) elts) ; S.Raw ">"]
+    | UVALUE_Undef t => [S.Raw "undef(" ; to_sexp t ; S.Raw ")"]
+    | UVALUE_IBinop iop v1 v2 => [S.Raw "(" ; serialize_uvalue' v1 ; S.Raw " " ; to_sexp iop ; S.Raw " " ; serialize_uvalue' v2 ; S.Raw ")"]
+    | UVALUE_ICmp cmp v1 v2 => [S.Raw "(" ; serialize_uvalue' v1 ; S.Raw " " ; to_sexp cmp ; S.Raw " " ; serialize_uvalue' v2 ; S.Raw ")"]
+    | UVALUE_FBinop fop _ v1 v2 => [S.Raw "(" ; serialize_uvalue' v1 ; S.Raw " " ; to_sexp fop ; S.Raw " " ; serialize_uvalue' v2 ; S.Raw ")"]
+    | UVALUE_FCmp cmp v1 v2 => [S.Raw "(" ; serialize_uvalue' v1 ; S.Raw " " ; to_sexp cmp ; S.Raw " " ; serialize_uvalue' v2 ; S.Raw ")"]
     (* | UVALUE_Conversion       (conv:conversion_type) (v:uvalue) (t_to:dtyp) *)
     (* | UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)) (* TODO: do we ever need this? GEP raises an event? *) *)
     (* | UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue) *)
@@ -327,10 +327,10 @@ Section hiding_notation.
     (* | UVALUE_ExtractValue     (vec:uvalue) (idxs:list int) *)
     (* | UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list int) *)
     (* | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue) *)
-    | _ => "TODO: show_uvalue"
-    end%string.
+    | _ => S.Raw "TODO: show_uvalue"
+    end.
 
-  Global Instance show_uvalue : Show uvalue := show_uvalue'.
+  Global Instance serialize_uvalue : Serialize uvalue := serialize_uvalue'.
 
 End hiding_notation.
 

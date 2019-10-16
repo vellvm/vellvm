@@ -26,7 +26,6 @@ Import Basics.Basics.Monads.
 From ExtLib Require Import
      Structures.Monads
      Programming.Eqv
-     Programming.Show
      Data.String.
 
 From Vellvm Require Import
@@ -40,6 +39,8 @@ From Vellvm Require Import
      Coqlib
      Numeric.Integers
      Numeric.Floats.
+
+Require Import Ceres.Ceres.
 
 Import MonadNotation.
 Import EqvNotation.
@@ -68,6 +69,7 @@ End A.
 Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
   Import LLVMEvents.
   Import DV.
+  Open Scope list.
 
   Definition addr := A.addr.
 

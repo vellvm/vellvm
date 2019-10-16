@@ -3,11 +3,10 @@ From Coq Require Import
      String.
 
 From ExtLib Require Import
-     Programming.Show
      Structures.Monads
      Structures.Maps.
 
-From ITree Require Import 
+From ITree Require Import
      ITree
      Events.State.
 
@@ -19,6 +18,8 @@ From Vellvm Require Import
      LLVMEvents
      Local
      Error.
+
+Require Import Ceres.Ceres.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
@@ -32,7 +33,7 @@ Section StackMap.
   Variable (k v:Type).
   Context {map : Type}.
   Context {M: Map k v map}.
-  Context {SK : Show k}.
+  Context {SK : Serialize k}.
 
   Definition stack := list map.
 

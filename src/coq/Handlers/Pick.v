@@ -3,7 +3,6 @@ From Coq Require Import
      String.
 
 From ExtLib Require Import
-     Programming.Show
      Structures.Monads
      Structures.Maps.
 

@@ -177,13 +177,12 @@ Definition build_L0 (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
   D.denote_mcfg defns DTYPE_Void addr main_args.
 
 (* Interpretation of the global environment *)
-(* TODO YZ: Why do we need to provide this instance explicitly? *)
 Definition build_L1 (trace : itree L0 res_L0) : itree L1 res_L1 :=
-             @interp_global _ _ _ _ show_raw_id _ _ _ _ _ trace [].
+             interp_global trace [].
 
 (* Interpretation of the local environment: map and stack *)
 Definition build_L2 (trace : itree L1 res_L1) : itree L2 res_L2 :=
-  interp_local_stack (@handle_local raw_id uvalue _ _ show_raw_id _ _) trace ([], []).
+  interp_local_stack (@handle_local _ _ _ _ _ _ _) trace ([], []).
 
 (* Interpretation of the memory *)
 Definition build_L3 (trace : itree L2 res_L2) : itree L3 res_L3 :=
