@@ -6,7 +6,7 @@ open Format
 
 let of_str = Camlcoq.camlstring_of_coqstring
 let to_int = Camlcoq.Z.to_int
-let float_of_coqfloat = Camlcoq.camlfloat_of_coqfloat               
+let float_of_coqfloat = Camlcoq.camlfloat_of_coqfloat
 
 (* TODO: Use pp_option everywhere instead of inlined matching *)
 let pp_option ppf f o =
@@ -368,21 +368,21 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
 and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
   fun ppf vv ->
     match vv with
-  | EXP_Ident _ 
-  | EXP_Integer _ 
+  | EXP_Ident _
+  | EXP_Integer _
   | EXP_Float _
-  | EXP_Double _      
-  | EXP_Hex _         
-  | EXP_Bool _    
-  | EXP_Null      
-  | EXP_Undef     
+  | EXP_Double _
+  | EXP_Hex _
+  | EXP_Bool _
+  | EXP_Null
+  | EXP_Undef
   | EXP_Array _
-  | EXP_Vector _  
+  | EXP_Vector _
   | EXP_Struct _
   | EXP_Packed_struct _
-  | EXP_Zero_initializer 
+  | EXP_Zero_initializer
   | EXP_Cstring _ -> assert false   (* there should be no "raw" exps as instructions *)
-  
+
   | OP_IBinop (op, t, v1, v2) ->
      fprintf ppf "%a %a %a, %a"
              ibinop op
@@ -524,7 +524,7 @@ and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
 and branch_label : Format.formatter -> LLVMAst.raw_id -> unit =
   fun ppf id ->
     pp_print_string ppf "label %"; pp_print_string ppf (str_of_raw_id id)
-    
+
 
 and terminator : Format.formatter -> (LLVMAst.typ LLVMAst.terminator) -> unit =
   fun ppf ->
@@ -578,7 +578,7 @@ and instr_id : Format.formatter -> LLVMAst.instr_id -> unit =
     function
     | IId id  -> fprintf ppf "%%%s = " (str_of_raw_id id)
     | IVoid n -> fprintf ppf "; void instr %d" (to_int n); pp_force_newline ppf ()
-  
+
 and texp ppf (t, v) = fprintf ppf "%a %a" typ t exp v
 
 and tident ppf (t, v) = fprintf ppf "%a %a" typ t ident v
@@ -642,7 +642,7 @@ and global : Format.formatter -> (LLVMAst.typ LLVMAst.global) -> unit =
 and declaration : Format.formatter -> (LLVMAst.typ LLVMAst.declaration) -> unit =
   fun ppf ->
   fun { dc_name = i
-      ; dc_type 
+      ; dc_type
       ; dc_param_attrs = (ret_attrs, args_attrs)
       ; dc_linkage
       ; dc_visibility
@@ -685,8 +685,8 @@ and declaration : Format.formatter -> (LLVMAst.typ LLVMAst.declaration) -> unit 
     (match dc_align with
        Some x -> fprintf ppf "align %d " (to_int x) | _ -> ()) ;
     (match dc_gc with
-       Some x -> fprintf ppf "gc \"%s\" " (of_str x) | _ -> ()) 
-    
+       Some x -> fprintf ppf "gc \"%s\" " (of_str x) | _ -> ())
+
 and definition : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block list))) LLVMAst.definition -> unit =
   fun ppf ->
   fun ({ df_prototype =
