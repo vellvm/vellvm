@@ -87,7 +87,7 @@ Open Scope string_scope.
  *)
 
 Definition allocate_global (g:global dtyp) : itree L0 unit :=
-  (vis (Alloca (g_typ _ g)) (fun v => trigger (GlobalWrite (g_ident _ g) v))).
+  (vis (Alloca (g_typ g)) (fun v => trigger (GlobalWrite (g_ident g) v))).
 
 Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
   map_monad_ allocate_global gs.
@@ -95,15 +95,15 @@ Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
 (* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
 Definition allocate_declaration (d:declaration dtyp) : itree L0 unit :=
   (* SAZ TODO:  Don't allocate pointers for LLVM intrinsics declarations *)
-    vis (Alloca DTYPE_Pointer) (fun v => trigger (GlobalWrite (dc_name _ d) v)).
+    vis (Alloca DTYPE_Pointer) (fun v => trigger (GlobalWrite (dc_name d) v)).
 
 Definition allocate_declarations (ds:list (declaration dtyp)) : itree L0 unit :=
   map_monad_ allocate_declaration ds.
 
 Definition initialize_global (g:global dtyp) : itree exp_E unit :=
-  let dt := (g_typ _ g) in
-  a <- trigger (GlobalRead (g_ident _ g));;
-  uv <- match (g_exp _ g) with
+  let dt := (g_typ g) in
+  a <- trigger (GlobalRead (g_ident g));;
+  uv <- match (g_exp g) with
        | None => ret (UVALUE_Undef dt)
        | Some e => D.denote_exp (Some dt) e
        end ;;
@@ -115,9 +115,9 @@ Definition initialize_globals (gs:list (global dtyp)): itree exp_E unit :=
   map_monad_ initialize_global gs.
 
 Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree L0 unit :=
-  allocate_globals (m_globals _ _ CFG) ;;
-  allocate_declarations ((m_declarations _ _ CFG) ++ (List.map (df_prototype _ _) (m_definitions _ _ CFG)));;
-  translate _exp_E_to_L0 (initialize_globals (m_globals _ _ CFG)).
+  allocate_globals (m_globals CFG) ;;
+  allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
+  translate _exp_E_to_L0 (initialize_globals (m_globals CFG)).
 
 (** Local environment implementation
     The map-based handlers are defined parameterized over a domain of key and value.
@@ -132,7 +132,7 @@ Definition function_env := FMapAList.alist dvalue D.function_denotation.
  *)
 
 Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree L0 (dvalue * D.function_denotation) :=
-  let fid := (dc_name _ (df_prototype _ _ df)) in
+  let fid := (dc_name (df_prototype df)) in
   fv <- trigger (GlobalRead fid) ;;
   ret (fv, D.denote_function df).
 
@@ -148,7 +148,7 @@ Definition main_args := [DV.DVALUE_I64 (DynamicValues.Int64.zero);
    Transformation and normalization of types.
 *)
 Definition eval_typ (CFG:CFG.mcfg typ) (t:typ) : dtyp :=
-      TypeUtil.normalize_type_dtyp (m_type_defs _ _ CFG) t.
+      TypeUtil.normalize_type_dtyp (m_type_defs CFG) t.
 
 Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
   TransformTypes.fmap_mcfg _ _ (eval_typ CFG) CFG.
@@ -172,7 +172,7 @@ Notation res_L4 := (memory * (local_env * stack * (global_env * dvalue)))%type (
 (* Initialization and denotation of a Vellvm program *)
 Definition build_L0 (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
   build_global_environment mcfg ;;
-  'defns <- map_monad address_one_function (m_definitions _ _ mcfg) ;;
+  'defns <- map_monad address_one_function (m_definitions mcfg) ;;
   'addr <- trigger (GlobalRead (Name "main")) ;;
   D.denote_mcfg defns DTYPE_Void addr main_args.
 

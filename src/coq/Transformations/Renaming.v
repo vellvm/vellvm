@@ -219,12 +219,12 @@ Module RENAMING
     Variable T:Set.
     Context `{ST: Swap T}.
 
-    Global Instance swap_of_tident : Swap (tident T) := swap.
+    Global Instance swap_of_tident : Swap tident := swap.
     Hint Unfold swap_of_tident.
 
     Fixpoint swap_exp (id1 id2:raw_id) (e:exp T) : exp T :=
       match e with
-      | EXP_Ident id => EXP_Ident _ (swap id1 id2 id)
+      | EXP_Ident id => EXP_Ident (swap id1 id2 id)
       | EXP_Integer _
       | EXP_Float   _
       | EXP_Double  _
@@ -235,46 +235,46 @@ Module RENAMING
       | EXP_Cstring _
       | EXP_Undef => e
       | EXP_Struct fields =>
-        EXP_Struct _ (List.map (fun '(t,e) => (swap id1 id2 t, swap_exp id1 id2 e)) fields)
+        EXP_Struct (List.map (fun '(t,e) => (swap id1 id2 t, swap_exp id1 id2 e)) fields)
       | EXP_Packed_struct fields =>
-        EXP_Packed_struct _ (List.map (fun '(t,e) => (swap id1 id2 t, swap_exp id1 id2 e)) fields)
+        EXP_Packed_struct (List.map (fun '(t,e) => (swap id1 id2 t, swap_exp id1 id2 e)) fields)
       | EXP_Array elts =>
-        EXP_Array _ (List.map (fun '(t,e) => (swap id1 id2 t, swap_exp id1 id2 e)) elts)
+        EXP_Array (List.map (fun '(t,e) => (swap id1 id2 t, swap_exp id1 id2 e)) elts)
       | EXP_Vector elts =>
-        EXP_Vector _ (List.map (fun '(t,e) => (swap id1 id2 t, swap_exp id1 id2 e)) elts)
+        EXP_Vector (List.map (fun '(t,e) => (swap id1 id2 t, swap_exp id1 id2 e)) elts)
       | OP_IBinop iop t v1 v2 =>
-        OP_IBinop _ (swap id1 id2 iop) (swap id1 id2 t) (swap_exp id1 id2 v1) (swap_exp id1 id2 v2)
+        OP_IBinop (swap id1 id2 iop) (swap id1 id2 t) (swap_exp id1 id2 v1) (swap_exp id1 id2 v2)
       | OP_ICmp cmp t v1 v2 =>
-        OP_ICmp _ (swap id1 id2 cmp) (swap id1 id2 t) (swap_exp id1 id2 v1) (swap_exp id1 id2 v2)
+        OP_ICmp (swap id1 id2 cmp) (swap id1 id2 t) (swap_exp id1 id2 v1) (swap_exp id1 id2 v2)
       | OP_FBinop fop fm t v1 v2 =>
-        OP_FBinop _ (swap id1 id2 fop) fm (swap id1 id2 t) (swap_exp id1 id2 v1) (swap_exp id1 id2 v2)
+        OP_FBinop (swap id1 id2 fop) fm (swap id1 id2 t) (swap_exp id1 id2 v1) (swap_exp id1 id2 v2)
       | OP_FCmp cmp t v1 v2 =>
-        OP_FCmp _ (swap id1 id2 cmp) (swap id1 id2 t) (swap_exp id1 id2 v1) (swap_exp id1 id2 v2)
+        OP_FCmp (swap id1 id2 cmp) (swap id1 id2 t) (swap_exp id1 id2 v1) (swap_exp id1 id2 v2)
       | OP_Conversion conv t_from v t_to =>
-        OP_Conversion _ conv (swap id1 id2 t_from) (swap_exp id1 id2 v) (swap id1 id2 t_to)
+        OP_Conversion conv (swap id1 id2 t_from) (swap_exp id1 id2 v) (swap id1 id2 t_to)
       | OP_GetElementPtr t ptrval idxs =>
-        OP_GetElementPtr _ (swap id1 id2 t) (swap id1 id2 (fst ptrval), swap_exp id1 id2 (snd ptrval))
+        OP_GetElementPtr (swap id1 id2 t) (swap id1 id2 (fst ptrval), swap_exp id1 id2 (snd ptrval))
                          (List.map (fun '(a,b) => (swap id1 id2 a, swap_exp id1 id2 b)) idxs)
       | OP_ExtractElement vec idx =>
-        OP_ExtractElement _ (swap id1 id2 (fst vec), swap_exp id1 id2 (snd vec))
+        OP_ExtractElement (swap id1 id2 (fst vec), swap_exp id1 id2 (snd vec))
                           (swap id1 id2 (fst idx), swap_exp id1 id2 (snd idx))
       | OP_InsertElement  vec elt idx =>
-        OP_InsertElement _ (swap id1 id2 (fst vec), swap_exp id1 id2 (snd vec))
+        OP_InsertElement (swap id1 id2 (fst vec), swap_exp id1 id2 (snd vec))
                          (swap id1 id2 (fst elt), swap_exp id1 id2 (snd elt))
                          (swap id1 id2 (fst idx), swap_exp id1 id2 (snd idx))
       | OP_ShuffleVector vec1 vec2 idxmask =>
-        OP_ShuffleVector _ (swap id1 id2 (fst vec1), swap_exp id1 id2 (snd vec1))
+        OP_ShuffleVector (swap id1 id2 (fst vec1), swap_exp id1 id2 (snd vec1))
                          (swap id1 id2 (fst vec2), swap_exp id1 id2 (snd vec2))
                          (swap id1 id2 (fst idxmask), swap_exp id1 id2 (snd idxmask))
       | OP_ExtractValue  vec idxs =>
-        OP_ExtractValue  _ (swap id1 id2 (fst vec), swap_exp id1 id2 (snd vec))
+        OP_ExtractValue  (swap id1 id2 (fst vec), swap_exp id1 id2 (snd vec))
                          idxs
       | OP_InsertValue vec elt idxs =>
-        OP_InsertValue _ (swap id1 id2 (fst vec), swap_exp id1 id2 (snd vec))
+        OP_InsertValue (swap id1 id2 (fst vec), swap_exp id1 id2 (snd vec))
                        (swap id1 id2 (fst elt), swap_exp id1 id2 (snd elt))
                        idxs
       | OP_Select cnd v1 v2 =>
-        OP_Select _ (swap id1 id2 (fst cnd), swap_exp id1 id2 (snd cnd))
+        OP_Select (swap id1 id2 (fst cnd), swap_exp id1 id2 (snd cnd))
                   (swap id1 id2 (fst v1), swap_exp id1 id2 (snd v1))
                   (swap id1 id2 (fst v2), swap_exp id1 id2 (snd v2))
       end.
@@ -293,21 +293,21 @@ Module RENAMING
 
     Definition swap_phi (id1 id2:raw_id) (p:phi T) : phi T :=
       match p with
-      | Phi t args => Phi _ (swap id1 id2 t) (swap id1 id2 args)
+      | Phi t args => Phi (swap id1 id2 t) (swap id1 id2 args)
       end.
     Global Instance swap_of_phi : Swap (phi T) := swap_phi.
     Hint Unfold swap_of_phi.
 
     Definition swap_instr (id1 id2:raw_id) (ins:instr T) : instr T :=
       match ins with
-      | INSTR_Op op => INSTR_Op _ (swap id1 id2 op)
-      | INSTR_Call fn args => INSTR_Call _ (swap id1 id2 fn) (swap id1 id2 args)
+      | INSTR_Op op => INSTR_Op (swap id1 id2 op)
+      | INSTR_Call fn args => INSTR_Call (swap id1 id2 fn) (swap id1 id2 args)
       | INSTR_Alloca t nb align =>
-        INSTR_Alloca _ (swap id1 id2 t) (swap id1 id2 nb) align
+        INSTR_Alloca (swap id1 id2 t) (swap id1 id2 nb) align
       | INSTR_Load volatile t ptr align =>
-        INSTR_Load _ volatile (swap id1 id2 t) (swap id1 id2 ptr) align
+        INSTR_Load volatile (swap id1 id2 t) (swap id1 id2 ptr) align
       | INSTR_Store volatile val ptr align =>
-        INSTR_Store _ volatile (swap id1 id2 val) (swap id1 id2 ptr) align
+        INSTR_Store volatile (swap id1 id2 val) (swap id1 id2 ptr) align
       | INSTR_Comment _
       | INSTR_Fence
       | INSTR_AtomicCmpXchg
@@ -321,17 +321,17 @@ Module RENAMING
 
     Definition swap_terminator (id1 id2:raw_id) (trm:terminator T) : terminator T :=
       match trm with
-      | TERM_Ret  v => TERM_Ret _ (swap id1 id2 v)
-      | TERM_Ret_void => TERM_Ret_void _
-      | TERM_Br v br1 br2 => TERM_Br _ (swap id1 id2 v) (swap id1 id2 br1) (swap id1 id2 br2)
-      | TERM_Br_1 br => TERM_Br_1 _ (swap id1 id2 br)
+      | TERM_Ret  v => TERM_Ret (swap id1 id2 v)
+      | TERM_Ret_void => TERM_Ret_void
+      | TERM_Br v br1 br2 => TERM_Br (swap id1 id2 v) (swap id1 id2 br1) (swap id1 id2 br2)
+      | TERM_Br_1 br => TERM_Br_1 (swap id1 id2 br)
       | TERM_Switch  v default_dest brs =>
-        TERM_Switch _ (swap id1 id2 v) (swap id1 id2 default_dest) (swap id1 id2 brs)
+        TERM_Switch (swap id1 id2 v) (swap id1 id2 default_dest) (swap id1 id2 brs)
       | TERM_IndirectBr v brs =>
-        TERM_IndirectBr _ (swap id1 id2 v) (swap id1 id2 brs)
-      | TERM_Resume v => TERM_Resume _ (swap id1 id2 v)
+        TERM_IndirectBr (swap id1 id2 v) (swap id1 id2 brs)
+      | TERM_Resume v => TERM_Resume (swap id1 id2 v)
       | TERM_Invoke fnptrval args to_label unwind_label =>
-        TERM_Invoke _ (swap id1 id2 fnptrval) (swap id1 id2 args) (swap id1 id2 to_label) (swap id1 id2 unwind_label)
+        TERM_Invoke (swap id1 id2 fnptrval) (swap id1 id2 args) (swap id1 id2 to_label) (swap id1 id2 unwind_label)
       end.
     Global Instance swap_of_terminator : Swap (terminator T) := swap_terminator.
     Hint Unfold swap_of_terminator.
@@ -354,71 +354,70 @@ Module RENAMING
     Hint Unfold swap_of_param_attr swap_of_fn_attr swap_of_cconv swap_of_linkage swap_of_visibility swap_of_dll_storage swap_of_thread_local_storage.
 
     Definition swap_global (id1 id2:raw_id) (g:global T) : (global T) :=
-      mk_global _
-                (swap id1 id2 (g_ident _ g))
-                (swap id1 id2 (g_typ _ g))
-                (swap id1 id2 (g_constant _ g))
-                (swap id1 id2 (g_exp _ g))
-                (swap id1 id2 (g_linkage _ g))
-                (swap id1 id2 (g_visibility _ g))
-                (swap id1 id2 (g_dll_storage _ g))
-                (swap id1 id2 (g_thread_local _ g))
-                (swap id1 id2 (g_unnamed_addr _ g))
-                (swap id1 id2 (g_addrspace _ g))
-                (swap id1 id2 (g_externally_initialized _ g))
-                (swap id1 id2 (g_section _ g))
-                (swap id1 id2 (g_align _ g)).
+      mk_global
+                (swap id1 id2 (g_ident g))
+                (swap id1 id2 (g_typ g))
+                (swap id1 id2 (g_constant g))
+                (swap id1 id2 (g_exp g))
+                (swap id1 id2 (g_linkage g))
+                (swap id1 id2 (g_visibility g))
+                (swap id1 id2 (g_dll_storage g))
+                (swap id1 id2 (g_thread_local g))
+                (swap id1 id2 (g_unnamed_addr g))
+                (swap id1 id2 (g_addrspace g))
+                (swap id1 id2 (g_externally_initialized g))
+                (swap id1 id2 (g_section g))
+                (swap id1 id2 (g_align g)).
     Hint Unfold swap_global.
     Global Instance swap_of_global : Swap (global T) := swap_global.
     Hint Unfold swap_of_global.
 
     Definition swap_declaration (id1 id2:raw_id) (d:declaration T) : declaration T :=
-      mk_declaration _
-                     (swap id1 id2 (dc_name _ d))
-                     (swap id1 id2 (dc_type _ d))
-                     (swap id1 id2 (dc_param_attrs _ d))
-                     (swap id1 id2 (dc_linkage _ d))
-                     (swap id1 id2 (dc_visibility _ d))
-                     (swap id1 id2 (dc_dll_storage _ d))
-                     (swap id1 id2 (dc_cconv _ d))
-                     (swap id1 id2 (dc_attrs _ d))
-                     (swap id1 id2 (dc_section _ d))
-                     (swap id1 id2 (dc_align _ d))
-                     (swap id1 id2 (dc_gc _ d)).
+      mk_declaration
+                     (swap id1 id2 (dc_name d))
+                     (swap id1 id2 (dc_type d))
+                     (swap id1 id2 (dc_param_attrs d))
+                     (swap id1 id2 (dc_linkage d))
+                     (swap id1 id2 (dc_visibility d))
+                     (swap id1 id2 (dc_dll_storage d))
+                     (swap id1 id2 (dc_cconv d))
+                     (swap id1 id2 (dc_attrs d))
+                     (swap id1 id2 (dc_section d))
+                     (swap id1 id2 (dc_align d))
+                     (swap id1 id2 (dc_gc d)).
     Hint Unfold swap_declaration.
     Global Instance swap_of_declaration : Swap (declaration T) := swap_declaration.
     Hint Unfold swap_of_declaration.
 
     Definition swap_block (id1 id2:raw_id) (b:block T) : block T :=
-      mk_block _ (swap id1 id2 (blk_id _ b))
-               (swap id1 id2 (blk_phis _ b))
-               (swap id1 id2 (blk_code _ b))
-               (swap id1 id2 (blk_term _ b))
-               (blk_comments _ b).
+      mk_block (swap id1 id2 (blk_id b))
+               (swap id1 id2 (blk_phis b))
+               (swap id1 id2 (blk_code b))
+               (swap id1 id2 (blk_term b))
+               (blk_comments b).
     Hint Unfold swap_block.
     Global Instance swap_of_block : Swap (block T) := swap_block.
     Hint Unfold swap_of_block.
 
     Definition swap_definition {FnBody:Set} `{SF: Swap FnBody} (id1 id2:raw_id) (d:definition T FnBody) : definition T FnBody :=
-      mk_definition _ _
-                    (swap id1 id2 (df_prototype _ _ d))
-                    (swap id1 id2 (df_args _ _ d))
-                    (swap id1 id2 (df_instrs _ _ d)).
+      mk_definition _
+                    (swap id1 id2 (df_prototype d))
+                    (swap id1 id2 (df_args d))
+                    (swap id1 id2 (df_instrs d)).
     Hint Unfold swap_definition.
 
     Global Instance swap_of_definition {FnBody:Set} `{SF:Swap FnBody} : Swap (definition T FnBody) :=
       swap_definition.
     Hint Unfold swap_of_definition.
 
-
     Fixpoint swap_metadata (id1 id2:raw_id) (m:metadata T) : metadata T :=
       match m with
-      | METADATA_Const  tv => METADATA_Const _ (swap id1 id2 tv)
-      | METADATA_Null => METADATA_Null _
-      | METADATA_Id id => METADATA_Id _ (swap id1 id2 id)
-      | METADATA_String str => METADATA_String _ (swap id1 id2 str)
-      | METADATA_Named strs => METADATA_Named _ (swap id1 id2 strs)
-      | METADATA_Node mds => METADATA_Node _ (List.map (swap_metadata id1 id2) mds)
+      | METADATA_Const  tv => METADATA_Const (swap id1 id2 tv)
+      | METADATA_Null => METADATA_Null
+      | METADATA_Id id => METADATA_Id (swap id1 id2 id)
+      | METADATA_String str => METADATA_String (swap id1 id2 str)
+      | METADATA_Named strs => METADATA_Named (swap id1 id2 strs)
+      | METADATA_Node mds => METADATA_Node (List.map (swap_metadata id1 id2) mds)
       end.
     Global Instance swap_of_metadata : Swap (metadata T) := swap_metadata.
     Hint Unfold swap_of_metadata.
@@ -426,15 +425,15 @@ Module RENAMING
     Definition swap_toplevel_entity {FnBody:Set} `{SF:Swap FnBody} (id1 id2:raw_id) (tle:toplevel_entity T FnBody) :=
       match tle with
       | TLE_Comment msg => tle
-      | TLE_Target tgt => TLE_Target _ _ (swap id1 id2 tgt)
-      | TLE_Datalayout layout => TLE_Datalayout _ _ (swap id1 id2 layout)
-      | TLE_Declaration decl => TLE_Declaration _ _ (swap id1 id2 decl)
-      | TLE_Definition defn => TLE_Definition _ _ (swap id1 id2 defn)
-      | TLE_Type_decl id t => TLE_Type_decl _ _ (swap id1 id2 id) (swap id1 id2 t)
-      | TLE_Source_filename s => TLE_Source_filename _ _ (swap id1 id2 s)
-      | TLE_Global g => TLE_Global _ _ (swap id1 id2 g)
-      | TLE_Metadata id md => TLE_Metadata _ _ (swap id1 id2 id) (swap id1 id2 md)
-      | TLE_Attribute_group i attrs => TLE_Attribute_group _ _ (swap id1 id2 i) (swap id1 id2 attrs)
+      | TLE_Target tgt => TLE_Target (swap id1 id2 tgt)
+      | TLE_Datalayout layout => TLE_Datalayout (swap id1 id2 layout)
+      | TLE_Declaration decl => TLE_Declaration (swap id1 id2 decl)
+      | TLE_Definition defn => TLE_Definition (swap id1 id2 defn)
+      | TLE_Type_decl id t => TLE_Type_decl (swap id1 id2 id) (swap id1 id2 t)
+      | TLE_Source_filename s => TLE_Source_filename (swap id1 id2 s)
+      | TLE_Global g => TLE_Global (swap id1 id2 g)
+      | TLE_Metadata id md => TLE_Metadata (swap id1 id2 id) (swap id1 id2 md)
+      | TLE_Attribute_group i attrs => TLE_Attribute_group (swap id1 id2 i) (swap id1 id2 attrs)
       end.
 
     Global Instance swap_of_toplevel_entity {FnBody:Set} `{SF:Swap FnBody} : Swap (toplevel_entity T FnBody) :=
@@ -442,14 +441,14 @@ Module RENAMING
     Hint Unfold swap_of_toplevel_entity.
 
     Definition swap_modul {FnBody:Set} `{SF:Swap FnBody} (id1 id2:raw_id) (m:modul T FnBody) : modul T FnBody :=
-      mk_modul _ _
-               (swap id1 id2 (m_name _ _ m))
-               (swap id1 id2 (m_target _ _ m))
-               (swap id1 id2 (m_datalayout _ _ m))
-               (swap id1 id2 (m_type_defs _ _ m))
-               (swap id1 id2 (m_globals _ _ m))
-               (swap id1 id2 (m_declarations _ _ m))
-               (swap id1 id2 (m_definitions _ _ m)).
+      mk_modul _
+               (swap id1 id2 (m_name m))
+               (swap id1 id2 (m_target m))
+               (swap id1 id2 (m_datalayout m))
+               (swap id1 id2 (m_type_defs m))
+               (swap id1 id2 (m_globals m))
+               (swap id1 id2 (m_declarations m))
+               (swap id1 id2 (m_definitions m)).
     Hint Unfold swap_modul.
 
     Global Instance swap_of_modul {FnBody:Set} `{SF:Swap FnBody} : Swap (modul T FnBody) :=

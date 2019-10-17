@@ -748,8 +748,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
       Definition denote_block (b: block dtyp) : itree instr_E (block_id + uvalue) :=
-        denote_code (blk_code dtyp b);;
-        translate exp_E_to_instr_E (denote_terminator (snd (blk_term dtyp b))).
+        denote_code (blk_code b);;
+        translate exp_E_to_instr_E (denote_terminator (snd (blk_term b))).
 
       (* YZ FIX: no need to push/pop, but do all the assignments afterward *)
       (* One needs to be careful when denoting phi-nodes: they all must
@@ -821,7 +821,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                         | Some block_target =>
                           dvs <- map_monad
                               (fun x => translate exp_E_to_instr_E (denote_phi bid x))
-                              (blk_phis _ block_target) ;;
+                              (blk_phis block_target) ;;
                               map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
                               ret (inl bid_target)
                       end
@@ -853,12 +853,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation  :=
         fun (args : list dvalue) =>
           (* We match the arguments variables to the inputs *)
-          debug ("Denoting function " ++ to_string (dc_name _ (df_prototype _ _ df)) ++ " with args: " ++ to_string args ++ " against prototype: " ++ to_string (df_args dtyp _ df));;
-          bs <- lift_err ret (combine_lists_err (df_args dtyp _ df) args) ;;
+          debug ("Denoting function " ++ to_string (dc_name (df_prototype df)) ++ " with args: " ++ to_string args ++ " against prototype: " ++ to_string (df_args df));;
+          bs <- lift_err ret (combine_lists_err (df_args df) args) ;;
              (* generate the corresponding writes to the local stack frame *)
           trigger MemPush ;;
           trigger (StackPush (map (fun '(k,v) => (k, dvalue_to_uvalue v)) bs)) ;;
-          rv <- translate instr_E_to_fun_E (denote_cfg (df_instrs dtyp _ df)) ;;
+          rv <- translate instr_E_to_fun_E (denote_cfg (df_instrs df)) ;;
           trigger StackPop ;;
           trigger MemPop ;;
           ret rv.
