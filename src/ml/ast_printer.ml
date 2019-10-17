@@ -242,7 +242,7 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
 
     | EXP_Zero_initializer  -> pp_print_string ppf "EXP_Zero_initializer"
 
-    | EXP_Cstring s -> fprintf ppf "(EXP_Cstring %s)" (of_str s)
+    | EXP_Cstring s -> fprintf ppf "(EXP_Cstring \"%s\")" (of_str s)
 
     | OP_IBinop (op, t, v1, v2) ->
       fprintf ppf "(OP_IBinop %a %a %a %a)"
@@ -859,8 +859,6 @@ and modul : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block list))
   pp_print_list ~pp_sep:pp_force_newline global ppf m.m_globals;
   pp_force_newline ppf () ;
 
-  (* Print function declaration only if there is no corresponding
-     function definition *)
   pp_print_list ~pp_sep:pp_force_newline declaration ppf m.m_declarations;
   pp_force_newline ppf () ;
 
