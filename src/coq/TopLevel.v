@@ -233,6 +233,7 @@ Definition interpreter_user (user_intrinsics: IS.intrinsic_definitions) (prog: l
   | None => raise "Ill-formed program: mcfg_of_modul failed."
   end.
 
+(* Users may define their own interpreter by providing additional intrinsics *)
 Definition interpreter := interpreter_user [].
 
 Definition model_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))) :
@@ -255,5 +256,6 @@ Definition model_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (t
   | None => lift (raise "Ill-formed program: mcfg_of_modul failed.")
   end.
 
+(* Users may define their own model by providing additional intrinsics *)
 Definition model := model_user [].
 
