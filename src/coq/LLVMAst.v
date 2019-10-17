@@ -194,9 +194,9 @@ Inductive conversion_type : Set :=
 
 Section TypedSyntax.
 
-  Variable (T:Set).
+  Context {T:Set}.
 
-Definition tident : Set := (T * ident)%type.
+  Definition tident : Set := (T * ident)%type.
 
 
 (* NOTES:
@@ -339,17 +339,13 @@ Record block : Set :=
       blk_comments : option (list string)
     }.
 
-Record definition (FnBody:Set) :=
+Record definition {FnBody:Set} :=
   mk_definition
   {
     df_prototype   : declaration;
     df_args        : list local_id;
     df_instrs      : FnBody;
   }.
-
-Arguments df_prototype {_} _.
-Arguments df_args {_} _.
-Arguments df_instrs {_} _.
 
 Inductive metadata : Set :=
   | METADATA_Const  (tv:texp)
@@ -360,31 +356,22 @@ Inductive metadata : Set :=
   | METADATA_Node   (mds:list metadata)
 .
 
-Inductive toplevel_entity (FnBody:Set) : Set :=
+Inductive toplevel_entity {FnBody:Set} : Set :=
 | TLE_Comment         (msg:string)
 | TLE_Target          (tgt:string)
 | TLE_Datalayout      (layout:string)
 | TLE_Declaration     (decl:declaration)
-| TLE_Definition      (defn:definition FnBody)
+| TLE_Definition      (defn:@definition FnBody)
 | TLE_Type_decl       (id:ident) (t:T)
 | TLE_Source_filename (s:string)
 | TLE_Global          (g:global)
 | TLE_Metadata        (id:raw_id) (md:metadata)
 | TLE_Attribute_group (i:int) (attrs:list fn_attr)
 .
-Arguments TLE_Target {_} _.
-Arguments TLE_Datalayout {_} _.
-Arguments TLE_Declaration {_} _.
-Arguments TLE_Definition {_} _.
-Arguments TLE_Type_decl {_} _.
-Arguments TLE_Source_filename {_} _.
-Arguments TLE_Global {_} _.
-Arguments TLE_Metadata {_} _.
-Arguments TLE_Attribute_group {_} _ _.
 
-Definition toplevel_entities (FnBody:Set) : Set := list (toplevel_entity FnBody).
+Definition toplevel_entities (FnBody:Set) : Set := list (@toplevel_entity FnBody).
 
-Record modul (FnBody:Set) : Set :=
+Record modul {FnBody:Set} : Set :=
   mk_modul
   {
     m_name: option string;
@@ -393,14 +380,23 @@ Record modul (FnBody:Set) : Set :=
     m_type_defs: list (ident * T);
     m_globals: list global;
     m_declarations: list declaration;
-    m_definitions: list (definition FnBody);
+    m_definitions: list (@definition FnBody);
   }.
 
-Arguments m_name {_} _.
-Arguments m_target {_} _.
-Arguments m_datalayout {_} _.
-Arguments m_type_defs {_} _.
-Arguments m_globals {_} _.
-Arguments m_declarations {_} _.
-Arguments m_definitions {_} _.
 End TypedSyntax.
+
+Arguments exp: clear implicits.
+Arguments block: clear implicits.
+Arguments texp: clear implicits.
+Arguments phi: clear implicits.
+Arguments instr: clear implicits.
+Arguments terminator: clear implicits.
+Arguments code: clear implicits.
+Arguments global: clear implicits.
+Arguments declaration: clear implicits.
+Arguments definition: clear implicits.
+Arguments metadata: clear implicits.
+Arguments toplevel_entity: clear implicits.
+Arguments toplevel_entities: clear implicits.
+Arguments modul: clear implicits.
+

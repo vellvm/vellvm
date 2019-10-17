@@ -28,7 +28,7 @@ Proof.
   destruct (block_to_cmd b pt); simpl in H; try solve [inversion H].
   destruct p. destruct o; try inversion H.
   simpl. split; reflexivity.
-Qed.  
+Qed.
  *)
 Section WithType.
   Variable (T:Set).
@@ -39,12 +39,12 @@ Proof.
   intros CFG fid br phis p H.
   unfold find_block_entry in H.
   destruct (find_function T CFG fid); simpl in H; try solve [inversion H].
-  destruct (find_block T (blks T (df_instrs T (cfg T) d)) br); simpl in H; try solve [inversion H].
+  destruct (find_block T (blks T (df_instrs d)) br); simpl in H; try solve [inversion H].
   destruct b. unfold block_to_entry in H. simpl in H. inversion H.
   simpl. reflexivity.
-Qed.  
-  
-    
+Qed.
+
+
 
 (* syntactic structure ------------------------------------------------------ *)
 (*
@@ -72,7 +72,7 @@ Proof.
   induction H1; intros cd2 H2; simpl in *; auto.
   - subst. subst. auto.
   - eapply has_code_cons; eauto.
-Qed.    
+Qed.
 
 Lemma CFG_has_code_app_inv :
   forall CFG P pc1 (cd1 cd2:code)
@@ -96,7 +96,7 @@ Definition CFG_has_pc (CFG:mcfg) (p:pc) : Prop :=
   exists cmd, fetch CFG p = Some cmd.
 
 Definition CFG_fun_has_block_id (CFG:mcfg) (fid:function_id) (bid:block_id) phis (p:pc) : Prop :=
-  find_block_entry CFG fid bid = Some (BlockEntry phis p) /\ CFG_has_pc CFG p. 
+  find_block_entry CFG fid bid = Some (BlockEntry phis p) /\ CFG_has_pc CFG p.
 
 
 Inductive CFG_fun_has_terminator_lbls (CFG:mcfg) (fid:function_id) : terminator -> Prop :=
@@ -115,7 +115,7 @@ Inductive CFG_fun_has_terminator_lbls (CFG:mcfg) (fid:function_id) : terminator 
 .
 (* TODO:  Add these cases:
   | TERM_Switch     (v:tvalue) (default_dest:block_id) (brs: list (tvalue * block_id))
-  | TERM_IndirectBr 
+  | TERM_IndirectBr
   | TERM_Invoke     (fnptrval:tident) (args:list tvalue) (to_label:block_id) (unwind_label:block_id)
   .
 *)
@@ -133,7 +133,7 @@ Inductive CFG_has_terminator_at (CFG:mcfg) : pc -> instr_id -> terminator -> Pro
 Inductive CFG_fun_has_block (CFG:mcfg) (fid:function_id) (b:block) phis : Prop :=
 | CFG_fun_has_block_intro:
     forall
-      (HFind: find_block_entry CFG fid (blk_id b) = Some (BlockEntry phis (blk_entry_pc fid b)))      
+      (HFind: find_block_entry CFG fid (blk_id b) = Some (BlockEntry phis (blk_entry_pc fid b)))
       (Hcode: CFG_has_code_at CFG (fun q => q = blk_term_pc fid b) (blk_entry_pc fid b) (blk_code b))
       (Hterm: CFG_has_terminator_at CFG (blk_term_pc fid b) (blk_term_id b) (blk_terminator b))
     ,
@@ -160,8 +160,8 @@ Fixpoint exp_uses (v:exp T) : list ident :=
   | EXP_Ident id => [id]
   | EXP_Integer _
   | EXP_Float _
-  | EXP_Double _               
-  | EXP_Hex _        
+  | EXP_Double _
+  | EXP_Hex _
   | EXP_Bool _
   | EXP_Null
   | EXP_Zero_initializer
@@ -196,14 +196,14 @@ Definition phi_uses (i:phi T) : (list ident) :=
 (* over-approximation: may include the same identifier more than once *)
 Definition instr_uses (i:instr T) : (list ident) :=
   match i with
-  | INSTR_Op op => exp_uses op                         
+  | INSTR_Op op => exp_uses op
   | INSTR_Call (_, op) args => (exp_uses op) ++ (List.flat_map texp_uses args)
   | INSTR_Alloca t None align => []
   | INSTR_Alloca t (Some tv) align => texp_uses tv
   | INSTR_Load  volatile t ptr align => texp_uses ptr
   | INSTR_Store volatile val ptr align => (texp_uses val) ++ (texp_uses ptr)
   | INSTR_Comment _
-  | INSTR_Fence 
+  | INSTR_Fence
   | INSTR_AtomicCmpXchg
   | INSTR_AtomicRMW
   | INSTR_Unreachable
@@ -230,26 +230,26 @@ Definition cmd_uses_local (g:cfg) (p:pt) (id:local_id) : Prop :=
   | Some (Jump _ t) => In (ID_Local id) (terminator_uses t)
   | None => False
   end.
-*)             
+*)
 
 (* Which labels does a terminator mention *)
 Definition lbls (t:terminator T) : list block_id :=
   match t with
-  | TERM_Ret _        
+  | TERM_Ret _
   | TERM_Ret_void   => []
-  | TERM_Br _ l1 l2 => [l1; l2] 
-  | TERM_Br_1 l => [l] 
+  | TERM_Br _ l1 l2 => [l1; l2]
+  | TERM_Br_1 l => [l]
   | TERM_Switch _ l brs => l::(List.map (fun x => snd x) brs)
   | TERM_IndirectBr _ brs => brs
   | TERM_Resume _    => []
-  | TERM_Invoke  _ _ l1 l2 => [l1; l2] 
+  | TERM_Invoke  _ _ l1 l2 => [l1; l2]
   end.
 
 (*
 
-(* Well-formed SSA-form CFGs 
-   - the initial pt denotes a command  
-   - fallthrough closure: each fallthrough pt maps to a command 
+(* Well-formed SSA-form CFGs
+   - the initial pt denotes a command
+   - fallthrough closure: each fallthrough pt maps to a command
    - jump closure: each label used in a terminator leads to a
      block within the same function body.
    - every use of an identifier is dominated by the id's definition
@@ -304,7 +304,7 @@ Definition wf_use (g:cfg) (ids:list ident) (p:pt) : Prop :=
 
 (** *** Well-formed phi nodes *)
 (**  Consider [ %x = phi [lbl1:v1, ...,lbln:vn] ].  This is well formed
-     when every predecessor block with terminator program point p' 
+     when every predecessor block with terminator program point p'
      has a label associated with exp v.  Moreover, if v uses an id then
      the definition of the uid strictly dominates p'.
 *)
@@ -334,14 +334,14 @@ Inductive wf_cmd (g:cfg) (p:pt) : cmd -> Prop :=
 | wf_jump : forall (bn:block_id) (t:terminator)
               (Huse: wf_use g (terminator_uses t) p)
               (Hlbls: Forall (fun tgt => exists p', exists xs, exists q,
-                             (phis g tgt) = Some (Phis p' xs q) 
+                             (phis g tgt) = Some (Phis p' xs q)
                              /\ wf_phis g p' q p' xs
                       )
                       (lbls t)),
     wf_cmd g p (Jump bn t).
 
 
-(* TODO: do we have to worry about locals shadowing function parameters? 
+(* TODO: do we have to worry about locals shadowing function parameters?
    Could add: forall lid, In (ID_Local lid) (glbl CFG) -> (code CFG) (IId lid) = None
 
    - also, somewhere probably need that globals and function parameters are distinct
@@ -349,11 +349,11 @@ Inductive wf_cmd (g:cfg) (p:pt) : cmd -> Prop :=
 
 Definition wf_cfg (CFG : cfg) : Prop :=
   pt_exists CFG (init CFG)
-  /\ forall p, ~ edge_pt CFG p (init CFG)            
+  /\ forall p, ~ edge_pt CFG p (init CFG)
   /\ (forall p cmd, (code CFG p) = Some cmd -> wf_cmd CFG p cmd)
 .
 
-            
+
 Lemma wf_cfg_edge_pt : forall g p1 p2,
     wf_cfg g -> pt_exists g p1 -> edge_pt g p1 p2 -> pt_exists g p2.
 Proof.
@@ -362,7 +362,7 @@ Proof.
   inversion H1; subst.
   - apply Hcmd in H. inversion H. exact Hq.
   - apply Hcmd in H.
-    inversion H. subst. 
+    inversion H. subst.
     eapply Forall_forall in Hlbls.
     Focus 2. apply H2.
     destruct Hlbls as [p' [xs' [q [Ha Hb]]]].
@@ -372,13 +372,13 @@ Proof.
     * exists (Inst (INSTR_Phi t0 args) p'0).
       exact H4.
 Unshelve. auto.
-Qed.      
+Qed.
 
 
 (* domination trees --------------------------------------------------------- *)
 
   (* Quite hard to prove this:
-      - need to know that Dom can be definied equivalently by quantifying over 
+      - need to know that Dom can be definied equivalently by quantifying over
         all acyclic paths from entry
       - need to know that there are a finite number of acyclic paths (and hence can
         be enumerated)  DFS
@@ -389,19 +389,19 @@ Qed.
   Proof.
     intros g v1 v2.
   Admitted.
-  
+
 
   Inductive vtree (A:Type) : Type :=
   | vnode (v:A) (cs:list (vtree A)).
 
   Arguments vnode {A} _ _.
-  
+
   Inductive dom_tree (g:cfg) : instr_id -> (vtree instr_id) -> Prop :=
   | dom_tree_intro:
-      forall (v:instr_id) (cs:list (vtree instr_id)), 
+      forall (v:instr_id) (cs:list (vtree instr_id)),
         (forall u, IDom g v u -> exists (t:vtree instr_id), In t cs /\ dom_tree g u t) ->
         (forall t, In t cs -> exists u, IDom g v u /\ dom_tree g u t) ->
-        dom_tree g v (vnode v cs). 
+        dom_tree g v (vnode v cs).
 
   Lemma dom_tree_exists : forall (g:cfg), exists (t:vtree instr_id), dom_tree g (init g) t.
   Admitted.

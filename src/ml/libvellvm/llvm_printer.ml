@@ -504,8 +504,6 @@ and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
 
   | INSTR_VAArg -> pp_print_string ppf "vaarg"
 
-
-
   | INSTR_LandingPad -> assert false
 
   | INSTR_Store (vol, v, ptr, a) ->
@@ -519,7 +517,6 @@ and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
   | INSTR_AtomicRMW
   | INSTR_Fence -> assert false
   | INSTR_Unreachable -> pp_print_string ppf "unreachable"
-
 
 and branch_label : Format.formatter -> LLVMAst.raw_id -> unit =
   fun ppf id ->
@@ -615,6 +612,7 @@ and metadata : Format.formatter -> (LLVMAst.typ LLVMAst.metadata) -> unit =
                                  (pp_print_list ~pp_sep:pp_comma_space
                                                 (fun ppf i ->
                                                  fprintf ppf "!%s" i)) (List.map of_str m)
+
 and global : Format.formatter -> (LLVMAst.typ LLVMAst.global) -> unit =
   fun ppf ->
   fun {
@@ -771,6 +769,7 @@ and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
     pp_force_newline ppf () ;
     terminator ppf t;
     pp_close_box ppf ()
+
 and comment : Format.formatter -> char list -> unit =
   fun ppf s -> fprintf ppf "; %s" (of_str s)
 

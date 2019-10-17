@@ -89,29 +89,21 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
   (* Interprets Call events found in the given association list by their
      semantic functions.
-
-     SAZ: This definition is trickier than one wants it to be because of the
-     dependent pattern matching.  The index of the IntrinsicE constructor need to
-     be used to coerce the result back to the general ITree type.
-
-     We solve it by using the "Convoy Pattern" (see Chlipala's CPDT).
-
-     IntrinsicE ~> LLVM _MCFG1
    *)
 
-  Definition defs_assoc := List.map (fun '(a,b) =>
-                                  match dc_name typ a with
+  Definition defs_assoc (user_intrinsics: intrinsic_definitions) := List.map (fun '(a,b) =>
+                                  match dc_name a with
                                   | Name s => (s,b)
                                   | _ => ("",b)
                                   end
-                               ) defined_intrinsics.
+                               ) (user_intrinsics ++ defined_intrinsics).
 
-  Definition handle_intrinsics : IntrinsicE ~> itree L0 :=
+  Definition handle_intrinsics (user_intrinsics: intrinsic_definitions): IntrinsicE ~> itree L0 :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
     fun X (e : IntrinsicE X) =>
       match e in IntrinsicE Y return X = Y -> itree L0 Y with
       | (Intrinsic _ fname args) =>
-          match assoc Strings.String.string_dec fname defs_assoc with
+          match assoc Strings.String.string_dec fname (defs_assoc user_intrinsics) with
           | Some f => fun pf =>
                        match f args with
                        | inl msg => raise msg
@@ -128,7 +120,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Definition rest_trigger : Handler (LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE) L0 :=
     fun X e => trigger e.
 
-  Definition interpret_intrinsics: forall R, itree L0 R -> itree L0 R  :=
-    interp (case_ extcall_trigger (case_ handle_intrinsics rest_trigger)).
+  Definition interpret_intrinsics (user_intrinsics: intrinsic_definitions): forall R, itree L0 R -> itree L0 R  :=
+    interp (case_ extcall_trigger (case_ (handle_intrinsics user_intrinsics) rest_trigger)).
 
 End Make.

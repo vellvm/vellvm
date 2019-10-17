@@ -11,13 +11,13 @@
 open Printf
 
 let of_str = Camlcoq.camlstring_of_coqstring
-               
+
 let interpret = ref false
 
 let transform (prog : (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list)
   : (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block list))) LLVMAst.toplevel_entity list =
   Transform.transform prog
-  
+
 let print_banner s =
   let rec dashes n = if n = 0 then "" else "-"^(dashes (n-1)) in
   printf "%s %s\n%!" (dashes (79 - (String.length s))) s
@@ -49,15 +49,18 @@ let output_file filename ast =
   toplevel_entities (Format.formatter_of_out_channel channel) ast;
   close_out channel
 
+let output_ast filename ast channel =
+  let open Ast_printer in
+  toplevel_entities channel ast
 
 let string_of_file (f:in_channel) : string =
   let rec _string_of_file (stream:string list) (f:in_channel) : string list=
-    try 
+    try
       let s = input_line f in
       _string_of_file (s::stream) f
     with
       | End_of_file -> stream
-  in 
+  in
     String.concat "\n" (List.rev (_string_of_file [] f))
 
 
@@ -72,7 +75,7 @@ let process_ll_file path file =
   let _ = if !interpret then begin
       let open Format in
       match Interpreter.interpret ll_ast with
-      | Ok dv -> 
+      | Ok dv ->
         Printf.printf "Program terminated with: " ;
         let ppf = std_formatter in
         Interpreter.pp_dvalue ppf dv ;
@@ -89,7 +92,7 @@ let process_ll_file path file =
 
 
 let process_file path =
-  let _ = Printf.printf "Processing: %s\n" path in 
+  let _ = Printf.printf "Processing: %s\n" path in
   let basename, ext = Platform.path_to_basename_ext path in
   begin match ext with
     | "ll" -> process_ll_file path basename
