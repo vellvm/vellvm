@@ -7,6 +7,8 @@ open Format
 let str = Camlcoq.coqstring_of_camlstring
 let of_str = Camlcoq.camlstring_of_coqstring
 let to_int = Camlcoq.Z.to_int
+let to_float = Camlcoq.camlfloat_of_coqfloat
+let to_float32 = Camlcoq.camlfloat_of_coqfloat32
 
 (* TODO: Use pp_option everywhere instead of inlined matching *)
 let pp_option ppf f o =
@@ -14,12 +16,28 @@ let pp_option ppf f o =
   | None -> ()
   | Some x -> f ppf x
 
+let pp_print_option f ppf o =
+  match o with
+  | None -> pp_print_string ppf "None"
+  | Some x -> pp_print_string ppf "(Some "; f ppf x; pp_print_string ppf ")"
+
+let pp_print_int ppf n =
+  fprintf ppf "%d" (to_int n)
+
 (* Backward compatibility with 4.01.0 *)
 let rec pp_print_list ?(pp_sep = Format.pp_print_cut) pp_v ppf = function
 | [] -> ()
 | v :: vs ->
     pp_v ppf v; if vs <> [] then (pp_sep ppf ();
                                   pp_print_list ~pp_sep pp_v ppf vs)
+
+let pp_print_prod pp_v1 pp_v2 ppf =
+  fun te ->
+    pp_print_string ppf "(";
+    pp_v1 ppf (fst te);
+    pp_print_string ppf ",";
+    pp_v2 ppf (snd te);
+    pp_print_string ppf ")"
 
 open LLVMAst
 
@@ -41,6 +59,10 @@ let rec str_of_raw_id : LLVMAst.raw_id -> string =
     | Anon i -> Printf.sprintf "Anon %d%%Z" (to_int i)
     | Name s -> Printf.sprintf "Name \"%s\"" (of_str s)
     | Raw i -> Printf.sprintf "Raw %d%%Z" (to_int i)
+
+and raw_id : Format.formatter -> LLVMAst.raw_id -> unit =
+  fun ppf i ->
+    fprintf ppf "%s" (str_of_raw_id i);
 
 and lident : Format.formatter -> LLVMAst.local_id -> unit =
   fun ppf i ->
@@ -70,20 +92,20 @@ and typ : Format.formatter -> LLVMAst.typ -> unit =
   | TYPE_Void             -> fprintf ppf "TYPE_Void"
   | TYPE_Function (t, tl) -> fprintf ppf "(TYPE_Function (%a) [%a])" typ t (pp_print_list ~pp_sep:pp_sc_space typ) tl
 
-  | TYPE_Half             -> fprintf ppf "todo"
-  | TYPE_Float            -> fprintf ppf "todo"
-  | TYPE_Double           -> fprintf ppf "todo"
-  | TYPE_X86_fp80         -> fprintf ppf "todo"
-  | TYPE_Fp128            -> fprintf ppf "todo"
-  | TYPE_Ppc_fp128        -> fprintf ppf "todo"
-  | TYPE_Metadata         -> fprintf ppf "todo"
-  | TYPE_X86_mmx          -> fprintf ppf "todo"
-  | TYPE_Array (i, t)     -> fprintf ppf "todo"
-  | TYPE_Struct tl        -> fprintf ppf "todo"
-  | TYPE_Packed_struct tl -> fprintf ppf "todo"
-  | TYPE_Opaque           -> fprintf ppf "todo"
-  | TYPE_Vector (i, t)    -> fprintf ppf "todo"
-  | TYPE_Identified i     -> fprintf ppf "todo"
+  | TYPE_Half             -> fprintf ppf "TYPE_Half"
+  | TYPE_Float            -> fprintf ppf "TYPE_Float"
+  | TYPE_Double           -> fprintf ppf "TYPE_Double"
+  | TYPE_X86_fp80         -> fprintf ppf "TYPE_X86_fp80"
+  | TYPE_Fp128            -> fprintf ppf "TYPE_Fp128"
+  | TYPE_Ppc_fp128        -> fprintf ppf "TYPE_Ppc_fp128"
+  | TYPE_Metadata         -> fprintf ppf "TYPE_Metadata"
+  | TYPE_X86_mmx          -> fprintf ppf "TYPE_X86_mmx"
+  | TYPE_Array (i, t)     -> fprintf ppf "(TYPE_Array %d %a)" (to_int i) typ t
+  | TYPE_Struct tl        -> fprintf ppf "(TYPE_Struct [%a])" (pp_print_list ~pp_sep:pp_sc_space typ) tl
+  | TYPE_Packed_struct tl -> fprintf ppf "(TYPE_Packed_struct [%a])" (pp_print_list ~pp_sep:pp_sc_space typ) tl
+  | TYPE_Opaque           -> fprintf ppf "TYPE_Opaque"
+  | TYPE_Vector (i, t)    -> fprintf ppf "(TYPE_Vector %d %a)" (to_int i) typ t
+  | TYPE_Identified i     -> fprintf ppf "(TYPE_Identified %a)" ident i
 
 and icmp : Format.formatter -> LLVMAst.icmp -> unit =
   fun ppf icmp ->
@@ -185,16 +207,16 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
       fprintf ppf "(EXP_Integer %d%%Z)" (to_int i);
 
     | EXP_Float f           ->
-      fprintf ppf "todo"
+      fprintf ppf "(EXP_Float %f)" (to_float32 f)
 
-    | EXP_Bool b            -> 
-      fprintf ppf "todo"
+    | EXP_Bool b            ->
+      fprintf ppf "(EXP_Bool %B)" b
 
     | EXP_Double f          ->
-      fprintf ppf "todo"
+      fprintf ppf "(EXP_Double %f)" (to_float f)
 
     | EXP_Hex h             ->
-      fprintf ppf "todo"
+      fprintf ppf "(EXP_Hex %f)" (to_float h)
 
     | EXP_Null              ->
       pp_print_string ppf "EXP_Null"
@@ -202,11 +224,21 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
     | EXP_Undef             ->
       pp_print_string ppf "EXP_Undef"
 
-    | EXP_Array tvl         -> fprintf ppf "todo"
+    | EXP_Array tvl         ->
+      fprintf ppf "(EXP_Array [%a])"
+        (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
 
-    | EXP_Vector tvl        -> fprintf ppf "todo"
-    | EXP_Struct tvl        -> fprintf ppf "todo"
-    | EXP_Packed_struct tvl -> fprintf ppf "todo"
+    | EXP_Vector tvl        ->
+      fprintf ppf "(EXP_Vector [%a])"
+        (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
+
+    | EXP_Struct tvl        ->
+      fprintf ppf "(EXP_Struct [%a])"
+        (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
+
+    | EXP_Packed_struct tvl ->
+      fprintf ppf "(EXP_Packed_struct [%a])"
+        (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
 
     | EXP_Zero_initializer  -> pp_print_string ppf "EXP_Zero_initializer"
 
@@ -227,8 +259,9 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
         exp v2
 
   | OP_FBinop (op, f, t, v1, v2) ->
-     fprintf ppf "(OP_FBinop %a todo %a %a %a)"
+     fprintf ppf "(OP_FBinop %a %a %a %a %a)"
         fbinop op
+        (pp_print_list ~pp_sep:pp_sc_space fast_math) f
         typ t
         exp v1
         exp v2
@@ -241,28 +274,51 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
         exp v2
 
   | OP_Conversion (c, t1, v, t2) ->
-     fprintf ppf "todo"
+     fprintf ppf "(OP_Conversion %a %a %a %a)"
+        conversion_type c
+        typ t1
+        exp v
+        typ t2
 
   | OP_GetElementPtr (t, tv, tvl) ->
-     fprintf ppf "todo"
+     fprintf ppf "(OP_GetElementPtr %a %a [%a])"
+       typ t
+       (pp_print_prod typ exp) tv
+       (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
 
   | OP_Select (if_, then_, else_) ->
-     fprintf ppf "todo"
+     fprintf ppf "(OP_Select %a %a %a)"
+       (pp_print_prod typ exp) if_
+       (pp_print_prod typ exp) then_
+       (pp_print_prod typ exp) else_
 
   | OP_ExtractElement (vec, idx) ->
-     fprintf ppf "todo"
+     fprintf ppf "(OP_ExtractElement %a %a)"
+       (pp_print_prod typ exp) vec
+       (pp_print_prod typ exp) idx
 
   | OP_InsertElement (vec, new_val, idx) ->
-     fprintf ppf "todo"
+     fprintf ppf "(OP_InsertElement %a %a %a)"
+       (pp_print_prod typ exp) vec
+       (pp_print_prod typ exp) new_val
+       (pp_print_prod typ exp) idx
 
   | OP_ExtractValue (agg, idx) ->
-     fprintf ppf "todo"
+      fprintf ppf "(OP_ExtractValue %a %a)"
+       (pp_print_prod typ exp) agg
+       (pp_print_list ~pp_sep:pp_sc_space (fun ppf i -> fprintf ppf "%d" (to_int i))) idx
 
   | OP_InsertValue (agg, new_val, idx) ->
-     fprintf ppf "todo"
+     fprintf ppf "(OP_InsertValue %a %a %a)"
+       (pp_print_prod typ exp) agg
+       (pp_print_prod typ exp) new_val
+       (pp_print_list ~pp_sep:pp_sc_space (fun ppf i -> fprintf ppf "%d" (to_int i))) idx
 
   | OP_ShuffleVector (v1, v2, mask) ->
-     fprintf ppf "todo"
+     fprintf ppf "(OP_ShuffleVector %a %a %a)"
+       (pp_print_prod typ exp) v1
+       (pp_print_prod typ exp) v2
+       (pp_print_prod typ exp) mask
 
 and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
   fun ppf vv ->
@@ -283,52 +339,80 @@ and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
   | EXP_Cstring _ -> assert false (* there should be no "raw" exps as instructions *)
 
   | OP_IBinop (op, t, v1, v2) ->
-      fprintf ppf "(OP_IBinop %a %a %a %a)"
-        ibinop op
-        typ t
-        exp v1
-        exp v2
+    fprintf ppf "(OP_IBinop %a %a %a %a)"
+      ibinop op
+      typ t
+      exp v1
+      exp v2
 
   | OP_ICmp (c, t, v1, v2) ->
-     fprintf ppf "(OP_ICmp %a %a %a %a)"
-        icmp c
-        typ t
-        exp v1
-        exp v2
+    fprintf ppf "(OP_ICmp %a %a %a %a)"
+      icmp c
+      typ t
+      exp v1
+      exp v2
 
   | OP_FBinop (op, f, t, v1, v2) ->
-     fprintf ppf "(OP_FBinop %a todo %a %a %a)"
-        fbinop op
-        typ t
-        exp v1
-        exp v2
+    fprintf ppf "(OP_FBinop %a %a %a %a %a)"
+      fbinop op
+      (pp_print_list ~pp_sep:pp_sc_space fast_math) f
+      typ t
+      exp v1
+      exp v2
 
   | OP_FCmp (c, t, v1, v2) ->
-     fprintf ppf "(OP_FCmp %a %a %a %a)"
-        fcmp c
-        typ t
-        exp v1
-        exp v2
+    fprintf ppf "(OP_FCmp %a %a %a %a)"
+      fcmp c
+      typ t
+      exp v1
+      exp v2
 
   | OP_Conversion (c, t1, v, t2) ->
-     fprintf ppf "todo"
+    fprintf ppf "(OP_Conversion %a %a %a %a)"
+      conversion_type c
+      typ t1
+      exp v
+      typ t2
+
   | OP_GetElementPtr (t, tv, tvl) ->
-     fprintf ppf "todo"
+    fprintf ppf "(OP_GetElementPtr %a %a [%a])"
+      typ t
+      (pp_print_prod typ exp) tv
+      (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
+
   | OP_Select (if_, then_, else_) ->
-     fprintf ppf "todo"
+    fprintf ppf "(OP_Select %a %a %a)"
+      (pp_print_prod typ exp) if_
+      (pp_print_prod typ exp) then_
+      (pp_print_prod typ exp) else_
+
   | OP_ExtractElement (vec, idx) ->
-     fprintf ppf "todo"
+    fprintf ppf "(OP_ExtractElement %a %a)"
+      (pp_print_prod typ exp) vec
+      (pp_print_prod typ exp) idx
+
   | OP_InsertElement (vec, new_val, idx) ->
-     fprintf ppf "todo"
+    fprintf ppf "(OP_InsertElement %a %a %a)"
+      (pp_print_prod typ exp) vec
+      (pp_print_prod typ exp) new_val
+      (pp_print_prod typ exp) idx
+
   | OP_ExtractValue (agg, idx) ->
-     fprintf ppf "todo"
+    fprintf ppf "(OP_ExtractValue %a %a)"
+      (pp_print_prod typ exp) agg
+      (pp_print_list ~pp_sep:pp_sc_space (fun ppf i -> fprintf ppf "%d" (to_int i))) idx
 
   | OP_InsertValue (agg, new_val, idx) ->
-     fprintf ppf "todo"
+    fprintf ppf "(OP_InsertValue %a %a %a)"
+      (pp_print_prod typ exp) agg
+      (pp_print_prod typ exp) new_val
+      (pp_print_list ~pp_sep:pp_sc_space (fun ppf i -> fprintf ppf "%d" (to_int i))) idx
 
   | OP_ShuffleVector (v1, v2, mask) ->
-     fprintf ppf "todo"
-
+    fprintf ppf "(OP_ShuffleVector %a %a %a)"
+      (pp_print_prod typ exp) v1
+      (pp_print_prod typ exp) v2
+      (pp_print_prod typ exp) mask
 
 and phi : Format.formatter -> (LLVMAst.typ LLVMAst.phi) -> unit =
   fun ppf ->
@@ -344,7 +428,7 @@ and phi : Format.formatter -> (LLVMAst.typ LLVMAst.phi) -> unit =
            )) vil
 
 
-and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
+and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit = 
   fun ppf ->
   function
 
@@ -356,24 +440,27 @@ and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
     pp_print_string ppf ")";
 
   | INSTR_Call (tv, tvl) ->
-     fprintf ppf "(INSTR_Call %a [%a])"
+    fprintf ppf "(INSTR_Call %a [%a])"
              texp tv
              (pp_print_list ~pp_sep:pp_sc_space texp) tvl
 
   | INSTR_Alloca (t, n, a) ->
-    (match n with
-       None   -> fprintf ppf "(INSTR_Alloca %a None todo)" typ t ;
-     | Some n -> fprintf ppf "(INSTR_Alloca %a (Some %a) todo)" typ t texp n)
+    fprintf ppf "(INSTR_Alloca %a %a %a)"
+    typ t
+    (pp_print_option texp) n
+    (pp_print_option pp_print_int) a
 
   | INSTR_Load (vol, t, tv, a) ->
-    fprintf ppf "(INSTR_Load todo %a %a todo)"
+    fprintf ppf "(INSTR_Load %B %a %a %a)" vol
       typ t
       texp tv
+      (pp_print_option pp_print_int) a
 
   | INSTR_Store (vol, v, ptr, a) ->
-    fprintf ppf "(INSTR_Store todo %a %a todo)"
+    fprintf ppf "(INSTR_Store %B %a %a %a)" vol
       texp v
       texp ptr
+      (pp_print_option pp_print_int) a
 
   | INSTR_VAArg -> pp_print_string ppf "INSTR_VAarg"
   | INSTR_LandingPad
@@ -395,21 +482,31 @@ and terminator : Format.formatter -> (LLVMAst.typ LLVMAst.terminator) -> unit =
   | TERM_Ret_void         -> pp_print_string ppf "TERM_Ret_void"
 
   | TERM_Br (c, i1, i2)   ->
-     fprintf ppf "TERM_Br %a (%a) (%a)" texp c branch_label i1 branch_label i2
+    fprintf ppf "TERM_Br %a (%a) (%a)" texp c branch_label i1 branch_label i2
 
   | TERM_Br_1 i          -> fprintf ppf "TERM_Br_1 (%a)" branch_label i
 
   | TERM_Switch (c, def, cases) ->
-     fprintf ppf "todo"
+    fprintf ppf "TERM_Switch %a %a %a"
+      texp c
+      raw_id def
+      (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod texp raw_id)) cases
 
-  | TERM_Resume (t, v) ->
-     fprintf ppf "todo"
+  | TERM_Resume tv ->
+    fprintf ppf "TERM_Resume %a"
+     texp tv
 
   | TERM_IndirectBr (tv, til) ->
-     fprintf ppf "todo"
+    fprintf ppf "TERM_IndirectBr %a %a"
+      texp tv
+      (pp_print_list ~pp_sep:pp_sc_space raw_id) til
 
   | TERM_Invoke (ti, tvl, i2, i3) ->
-     fprintf ppf "todo"
+    fprintf ppf "TERM_Invoke %a %a %a %a"
+      tident ti
+      (pp_print_list ~pp_sep:pp_sc_space texp) tvl
+      raw_id i2
+      raw_id i3
 
 and id_instr : Format.formatter -> (LLVMAst.instr_id * (LLVMAst.typ LLVMAst.instr)) -> unit =
   fun ppf ->
@@ -443,26 +540,27 @@ and toplevel_entities : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.
 and toplevel_entity : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity -> unit =
   fun ppf ->
   function
-  | TLE_Comment msg            -> fprintf ppf "todo"
-  | TLE_Target s               -> fprintf ppf "todo"
-  | TLE_Datalayout s           -> fprintf ppf "todo"
-  | TLE_Source_filename s      -> fprintf ppf "todo"
+  | TLE_Comment msg            -> fprintf ppf "TLE_Comment %s" (of_str msg)
+  | TLE_Target s               -> fprintf ppf "TLE_Target %s" (of_str s)
+  | TLE_Datalayout s           -> fprintf ppf "TLE_Datalayout %s" (of_str s)
+  | TLE_Source_filename s      -> fprintf ppf "TLE_Source_filename %s" (of_str s)
   | TLE_Declaration d          -> declaration ppf d
   | TLE_Definition d           -> definition ppf d
-  | TLE_Type_decl (i, t)       -> fprintf ppf "todo"
+  | TLE_Type_decl (i, t)       -> fprintf ppf "TLE_Type_decl %a %a" ident i typ t
   | TLE_Global g               -> global ppf g
-  | TLE_Metadata (i, m)        -> fprintf ppf "todo"
-  | TLE_Attribute_group (i, a) -> fprintf ppf "todo"
+  | TLE_Metadata (i, m)        -> fprintf ppf "TLE_Metadata %a %a" raw_id i metadata m
+  | TLE_Attribute_group (i, a) -> fprintf ppf "TLE_Attribute_group %d todo" (to_int i)
 
 and metadata : Format.formatter -> (LLVMAst.typ LLVMAst.metadata) -> unit =
   fun ppf ->
   function
-  | METADATA_Const v  -> fprintf ppf "todo"
-  | METADATA_Null     -> fprintf ppf "todo"
-  | METADATA_Id i     -> fprintf ppf "todo"
-  | METADATA_String s -> fprintf ppf "todo"
-  | METADATA_Node m   -> fprintf ppf "todo"
-  | METADATA_Named m  -> fprintf ppf "todo"
+  | METADATA_Const v  -> fprintf ppf "METADATA_Const %a" texp v
+  | METADATA_Null     -> fprintf ppf "METADA_Null"
+  | METADATA_Id i     -> fprintf ppf "METADATA_Id %a" raw_id i
+  | METADATA_String s -> fprintf ppf "METADATA_String %s" (of_str s)
+  | METADATA_Node m   -> fprintf ppf "METADATA_Node [%a]" (pp_print_list ~pp_sep:pp_sc_space metadata) m
+  | METADATA_Named m  -> fprintf ppf "METADAT_Named [%a]"
+                           (pp_print_list ~pp_sep:pp_sc_space (fun ppf s -> fprintf ppf "%s" (of_str s))) m
 
 and global : Format.formatter -> (LLVMAst.typ LLVMAst.global) -> unit =
   fun ppf ->
