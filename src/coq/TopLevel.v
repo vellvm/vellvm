@@ -29,6 +29,7 @@ From Vellvm Require Import
      LLVMEvents
      Denotation
      Environment
+     IntrinsicsDefinitions
      Handlers.Global
      Handlers.Local
      Handlers.Stack
@@ -48,6 +49,7 @@ Import Monads.
 Module IO := LLVMEvents.Make(Memory.A).
 Module M := Memory.Make(IO).
 Module D := Denotation(Memory.A)(IO).
+Module IS := IntrinsicsDefinitions.Make(A)(IO).
 Module INT := Intrinsics.Make(Memory.A)(IO).
 Module P := Pick.Make(Memory.A)(IO).
 Import IO.
@@ -210,7 +212,7 @@ End TopLevelEnv.
 
 Import TopLevelEnv.
 
-Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) : itree L5 res_L4 :=
+Definition interpreter_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))) : itree L5 res_L4 :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
   match CFG.mcfg_of_modul _ scfg with
@@ -219,7 +221,7 @@ Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) : i
     let mcfg := normalize_types ucfg in
 
     let L0_trace          := build_L0 mcfg in
-    let L0_trace'         := INT.interpret_intrinsics L0_trace in
+    let L0_trace'         := INT.interpret_intrinsics user_intrinsics L0_trace in
     let L1_trace          := build_L1 L0_trace' in
     let L2_trace          := build_L2 L1_trace in
     let L3_Trace          := build_L3 L2_trace in
@@ -231,8 +233,10 @@ Definition interpreter (prog: list (toplevel_entity typ (list (block typ)))) : i
   | None => raise "Ill-formed program: mcfg_of_modul failed."
   end.
 
-(* YZ TODO: Rename traces better *)
-Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
+(* Users may define their own interpreter by providing additional intrinsics *)
+Definition interpreter := interpreter_user [].
+
+Definition model_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))) :
   PropT (itree L5) res_L3 :=
   let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
@@ -241,7 +245,7 @@ Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
     let mcfg := normalize_types ucfg in
 
     let L0_trace        := build_L0 mcfg in
-    let L0_trace'       := INT.interpret_intrinsics L0_trace in
+    let L0_trace'       := INT.interpret_intrinsics user_intrinsics L0_trace in
     let L1_trace        := build_L1 L0_trace' in
     let L2_trace        := build_L2 L1_trace in
     let L3_trace        := build_L3 L2_trace in
@@ -252,18 +256,6 @@ Definition model (prog: list (toplevel_entity typ (list (block typ)))) :
   | None => lift (raise "Ill-formed program: mcfg_of_modul failed.")
   end.
 
-(*
-Lemma interpreter_satisfies_model: forall prog,
-    model prog (ITree.map (fun '(m, (env, (genv, uv))) => (m,(env,(genv, dvalue_to_uvalue uv)))) (interpreter prog)).
-Proof.
-  intros prog.
-  unfold model. unfold interpreter.
-  destruct (CFG.mcfg_of_modul typ (modul_of_toplevel_entities typ prog)) eqn:Hmodul.
-  - admit.
-  - simpl. unfold I
-
-    Print raise.
-    Print ITree.map.
-Qed.
-*)
+(* Users may define their own model by providing additional intrinsics *)
+Definition model := model_user [].
 
