@@ -397,35 +397,35 @@ Inductive value : Set :=
  *)
   Variable T : Set.
   Variable P : (exp T) -> Prop.
-  Hypothesis IH_Ident   : forall (id:ident), P ((EXP_Ident T id)).
-  Hypothesis IH_Integer : forall (x:int), P ((EXP_Integer T x)).
-  Hypothesis IH_Float   : forall (f:float32), P ((EXP_Float T f)).
-  Hypothesis IH_Double  : forall (f:float), P ((EXP_Double T f)).
-  Hypothesis IH_Hex     : forall (h:float), P ((EXP_Hex T h)).
-  Hypothesis IH_Bool    : forall (b:bool), P ((EXP_Bool T b)).
-  Hypothesis IH_Null    : P ((EXP_Null T)).
-  Hypothesis IH_Zero_initializer : P ((EXP_Zero_initializer T)).
-  Hypothesis IH_Cstring : forall (s:string), P ((EXP_Cstring T s)).
-  Hypothesis IH_Undef   : P ((EXP_Undef T)).
-  Hypothesis IH_Struct  : forall (fields: list (T * exp T)), (forall p, In p fields -> P (snd p)) -> P ((EXP_Struct T fields)).
-  Hypothesis IH_Packed_struct : forall (fields: list (T * exp T)), (forall p, In p fields -> P (snd p)) -> P ((EXP_Packed_struct T fields)).
-  Hypothesis IH_Array   : forall (elts: list (T * exp T)), (forall p, In p elts -> P (snd p)) -> P ((EXP_Array T elts)).
-  Hypothesis IH_Vector  : forall (elts: list (T * exp T)), (forall p, In p elts -> P (snd p)) -> P ((EXP_Vector T elts)).
-  Hypothesis IH_IBinop  : forall (iop:ibinop) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_IBinop T iop t v1 v2)).
-  Hypothesis IH_ICmp    : forall (cmp:icmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_ICmp T cmp t v1 v2)).
-  Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FBinop T fop fm t v1 v2)).
-  Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FCmp T cmp t v1 v2)).
-  Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:T) (v:exp T) (t_to:T), P v -> P ((OP_Conversion T conv t_from v t_to)).
+  Hypothesis IH_Ident   : forall (id:ident), P ((EXP_Ident id)).
+  Hypothesis IH_Integer : forall (x:int), P ((EXP_Integer x)).
+  Hypothesis IH_Float   : forall (f:float32), P ((EXP_Float f)).
+  Hypothesis IH_Double  : forall (f:float), P ((EXP_Double f)).
+  Hypothesis IH_Hex     : forall (h:float), P ((EXP_Hex h)).
+  Hypothesis IH_Bool    : forall (b:bool), P ((EXP_Bool b)).
+  Hypothesis IH_Null    : P ((EXP_Null)).
+  Hypothesis IH_Zero_initializer : P ((EXP_Zero_initializer)).
+  Hypothesis IH_Cstring : forall (s:string), P ((EXP_Cstring s)).
+  Hypothesis IH_Undef   : P ((EXP_Undef)).
+  Hypothesis IH_Struct  : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Struct fields)).
+  Hypothesis IH_Packed_struct : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Packed_struct fields)).
+  Hypothesis IH_Array   : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Array elts)).
+  Hypothesis IH_Vector  : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Vector elts)).
+  Hypothesis IH_IBinop  : forall (iop:ibinop) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_IBinop iop t v1 v2)).
+  Hypothesis IH_ICmp    : forall (cmp:icmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_ICmp cmp t v1 v2)).
+  Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FBinop fop fm t v1 v2)).
+  Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FCmp cmp t v1 v2)).
+  Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:T) (v:exp T) (t_to:T), P v -> P ((OP_Conversion conv t_from v t_to)).
   Hypothesis IH_GetElementPtr : forall (t:T) (ptrval:(T * exp T)) (idxs:list (T * exp T)),
-      P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P ((OP_GetElementPtr T t ptrval idxs)).
-  Hypothesis IH_ExtractElement: forall (vec:(T * exp T)) (idx:(T * exp T)), P (snd vec) -> P (snd idx) -> P ((OP_ExtractElement T vec idx)).
+      P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P ((OP_GetElementPtr t ptrval idxs)).
+  Hypothesis IH_ExtractElement: forall (vec:(T * exp T)) (idx:(T * exp T)), P (snd vec) -> P (snd idx) -> P ((OP_ExtractElement vec idx)).
   Hypothesis IH_InsertElement : forall (vec:(T * exp T)) (elt:(T * exp T)) (idx:(T * exp T)),
-      P (snd vec) -> P (snd elt) -> P (snd idx) -> P ((OP_InsertElement T vec elt idx)).
+      P (snd vec) -> P (snd elt) -> P (snd idx) -> P ((OP_InsertElement vec elt idx)).
   Hypothesis IH_ShuffleVector : forall (vec1:(T * exp T)) (vec2:(T * exp T)) (idxmask:(T * exp T)),
-      P (snd vec1) -> P (snd vec2 ) -> P (snd idxmask) -> P ((OP_ShuffleVector T vec1 vec2 idxmask)).
-  Hypothesis IH_ExtractValue  : forall (vec:(T * exp T)) (idxs:list int), P (snd vec) -> P ((OP_ExtractValue T vec idxs)).
-  Hypothesis IH_InsertValue   : forall (vec:(T * exp T)) (elt:(T * exp T)) (idxs:list int), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue T vec elt idxs)).
-  Hypothesis IH_Select        : forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select T cnd v1 v2)).
+      P (snd vec1) -> P (snd vec2 ) -> P (snd idxmask) -> P ((OP_ShuffleVector vec1 vec2 idxmask)).
+  Hypothesis IH_ExtractValue  : forall (vec:(T * exp T)) (idxs:list int), P (snd vec) -> P ((OP_ExtractValue vec idxs)).
+  Hypothesis IH_InsertValue   : forall (vec:(T * exp T)) (elt:(T * exp T)) (idxs:list int), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue vec elt idxs)).
+  Hypothesis IH_Select        : forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select cnd v1 v2)).
 
   Lemma exp_ind' : forall (v:exp T), P v.
     fix IH 1.
@@ -671,20 +671,19 @@ Section hiding_notation.
   Global Instance show_block : Show (block T) :=
     { show block :=
         ("Block "
-           << show (blk_id T block) << ": " )
-           << iter_show (List.map show (blk_code T block))
+           << show (blk_id block) << ": " )
+           << iter_show (List.map show (blk_code block))
     }.
 
   Global Instance show_definition_list_block : Show (definition T (list (block T))) :=
-    { show defn := ("defn: " << iter_show (List.map show (df_instrs T _ defn))) }.
+    { show defn := ("defn: " << iter_show (List.map show (df_instrs defn))) }.
 
   Global Instance show_tle_list_block : Show (toplevel_entity T (list (block T))) :=
-   { show tle :=
-       match tle with
-       | TLE_Definition defn => show defn
-       | _ => "string_of_tle_list_block todo"
-       end
-   }.
+    { show tle := match tle with
+                  | TLE_Definition defn => @show _ show_definition_list_block defn
+                  | _ => "string_of_tle_list_block todo"
+                  end
+    }.
 
   End WithShowT.
 End hiding_notation.
@@ -692,74 +691,70 @@ End hiding_notation.
 Section WithType.
   Variable (T:Set).
 
-Definition target_of {X} (tle : toplevel_entity T X) : option string :=
-  match tle with
-  | TLE_Target tgt => Some tgt
-  | _ => None
-  end.
+  Definition target_of {X} (tle : toplevel_entity T X) : option string :=
+    match tle with
+    | TLE_Target tgt => Some tgt
+    | _ => None
+    end.
 
-Definition datalayout_of {X} (tle : toplevel_entity T X) : option string :=
-  match tle with
-  | TLE_Datalayout l => Some l
-  | _ => None
-  end.
+  Definition datalayout_of {X} (tle : toplevel_entity T X) : option string :=
+    match tle with
+    | TLE_Datalayout l => Some l
+    | _ => None
+    end.
 
-Definition filename_of {X} (tle : toplevel_entity T X) : option string :=
-  match tle with
-  | TLE_Source_filename l => Some l
-  | _ => None
-  end.
+  Definition filename_of {X} (tle : toplevel_entity T X) : option string :=
+    match tle with
+    | TLE_Source_filename l => Some l
+    | _ => None
+    end.
 
-Definition globals_of {X} (tle : toplevel_entity T X) : list (global T) :=
-  match tle with
-  | TLE_Global g => [g]
-  | _ => []
-  end.
+  Definition globals_of {X} (tle : toplevel_entity T X) : list (global T) :=
+    match tle with
+    | TLE_Global g => [g]
+    | _ => []
+    end.
 
-Definition declarations_of {X} (tle : toplevel_entity T X) : list (declaration T) :=
-  match tle with
-  | TLE_Declaration d => [d]
-  | _ => []
-  end.
+  Definition declarations_of {X} (tle : toplevel_entity T X) : list (declaration T) :=
+    match tle with
+    | TLE_Declaration d => [d]
+    | _ => []
+    end.
 
-Definition definitions_of {X} (tle : toplevel_entity T X) : list (definition T X) :=
-  match tle with
-  | TLE_Definition d => [d]
-  | _ => []
-  end.
+  Definition definitions_of {X} (tle : toplevel_entity T X) : list (definition T X) :=
+    match tle with
+    | TLE_Definition d => [d]
+    | _ => []
+    end.
 
-Definition type_defs_of {X} (tle : toplevel_entity T X) : list (ident * T) :=
-  match tle with
-  | TLE_Type_decl id t => [(id,t)]
-  | _ => []
-  end.
+  Definition type_defs_of {X} (tle : toplevel_entity T X) : list (ident * T) :=
+    match tle with
+    | TLE_Type_decl id t => [(id,t)]
+    | _ => []
+    end.
 
+  Definition modul_of_toplevel_entities {X} (tles : list (toplevel_entity T X)) : modul T X :=
+    {|
+      m_name := find_map filename_of tles;
+      m_target := find_map target_of tles;
+      m_datalayout := find_map datalayout_of tles;
+      m_type_defs := flat_map type_defs_of tles;
+      m_globals := flat_map globals_of tles;
+      m_declarations := flat_map declarations_of tles;
+      m_definitions := flat_map definitions_of tles;
+    |}.
 
-Definition modul_of_toplevel_entities {X} (tles : list (toplevel_entity T X)) : modul T X :=
-  {|
-    m_name := find_map filename_of tles;
-    m_target := find_map target_of tles;
-    m_datalayout := find_map datalayout_of tles;
-    m_type_defs := flat_map type_defs_of tles;
-    m_globals := flat_map globals_of tles;
-    m_declarations := flat_map declarations_of tles;
-    m_definitions := flat_map definitions_of tles;
-  |}.
+  (* Identifiers ----------------------------------------------------------- *)
+  Class Ident (X:Set) := ident_of : X -> ident.
 
+  Global Instance ident_of_block : Ident (block T) := fun (b:block T) => ID_Local (@blk_id T b).
+  Global Instance ident_of_global : Ident (global T) := fun (g:global T) => ID_Global (@g_ident T g).
+  Global Instance ident_of_declaration : Ident (declaration T) := fun (d:declaration T) => ID_Global (@dc_name T d).
+  Global Instance ident_of_definition : forall X, Ident (definition T X) := fun X => fun (d:definition T X) => ident_of (@df_prototype T _ d).
 
+  Definition globals {X} (m:modul T X) : list ident :=
+    map ident_of (m_globals m)
+        ++ map ident_of (m_declarations m)
+        ++ map ident_of (m_definitions m).
 
-
-(* Identifiers ----------------------------------------------------------- *)
-Class Ident (X:Set) := ident_of : X -> ident.
-
-Global Instance ident_of_block : Ident (block T) := fun (b:block _) => ID_Local (blk_id T b).
-Global Instance ident_of_global : Ident (global T) := fun (g:global _) => ID_Global (g_ident T g).
-Global Instance ident_of_declaration : Ident (declaration T) := fun (d:declaration _) => ID_Global (dc_name T d).
-Global Instance ident_of_definition : forall X, Ident (definition T X) := fun X => fun (d:definition T X) => ident_of (df_prototype T _ d).
-
-
-Definition globals {X} (m:modul T X) : list ident :=
-           map ident_of (m_globals T _ m)
-        ++ map ident_of (m_declarations T _ m)
-        ++ map ident_of (m_definitions T _ m).
 End WithType.
