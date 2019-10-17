@@ -87,7 +87,7 @@ and ident : Format.formatter -> LLVMAst.ident -> unit =
 and typ : Format.formatter -> LLVMAst.typ -> unit =
   fun ppf ->
   function
-  | TYPE_I i              -> fprintf ppf "TYPE_Int (%d)" (to_int i)
+  | TYPE_I i              -> fprintf ppf "(TYPE_I %d%%Z)" (to_int i)
   | TYPE_Pointer t        -> fprintf ppf "(TYPE_Pointer (%a))" typ t ;
   | TYPE_Void             -> fprintf ppf "TYPE_Void"
   | TYPE_Function (t, tl) -> fprintf ppf "(TYPE_Function (%a) [%a])" typ t (pp_print_list ~pp_sep:pp_sc_space typ) tl
@@ -428,7 +428,7 @@ and phi : Format.formatter -> (LLVMAst.typ LLVMAst.phi) -> unit =
            )) vil
 
 
-and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit = 
+and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
   fun ppf ->
   function
 
@@ -562,6 +562,24 @@ and metadata : Format.formatter -> (LLVMAst.typ LLVMAst.metadata) -> unit =
   | METADATA_Named m  -> fprintf ppf "METADAT_Named [%a]"
                            (pp_print_list ~pp_sep:pp_sc_space (fun ppf s -> fprintf ppf "%s" (of_str s))) m
 
+and param_attr : Format.formatter -> LLVMAst.param_attr -> unit =
+  fun ppf ->
+  function
+  | PARAMATTR_Zeroext -> pp_print_string ppf "PARAMATTR_Zeroext"
+  | PARAMATTR_Signext  -> pp_print_string ppf "PARAMATTR_Signext"
+  | PARAMATTR_Inreg -> pp_print_string ppf "PARAMATTR_Inreg"
+  | PARAMATTR_Byval -> pp_print_string ppf "PARAMATTR_Byval"
+  | PARAMATTR_Inalloca -> pp_print_string ppf "PARAMATTR_Inalloca"
+  | PARAMATTR_Sret -> pp_print_string ppf "PARAMATTR_Sret"
+  | PARAMATTR_Align n -> fprintf ppf "PARAMATTR_Align %d" (to_int n)
+  | PARAMATTR_Noalias -> pp_print_string ppf "PARAMATTR_Noalias"
+  | PARAMATTR_Nocapture -> pp_print_string ppf "PARAMATTR_Nocapture"
+  | PARAMATTR_Readonly -> pp_print_string ppf "PARAMATTR_Readonly"
+  | PARAMATTR_Nest -> pp_print_string ppf "PARAMATTR_Nest"
+  | PARAMATTR_Returned  -> pp_print_string ppf "PARAMATTR_Returned"
+  | PARAMATTR_Nonnull -> pp_print_string ppf "PARAMATTR_Nonnull"
+  | PARAMATTR_Dereferenceable n -> fprintf ppf "PARAMATTR_Dereferenceable %d" (to_int n)
+
 and global : Format.formatter -> (LLVMAst.typ LLVMAst.global) -> unit =
   fun ppf ->
   fun {
@@ -571,25 +589,125 @@ and global : Format.formatter -> (LLVMAst.typ LLVMAst.global) -> unit =
     g_exp;
   } -> fprintf ppf "todo"
 
+and linkage : Format.formatter -> LLVMAst.linkage -> unit =
+  fun ppf ->
+  function
+  | LINKAGE_Private -> pp_print_string ppf "LINKAGE_Private"
+  | LINKAGE_Internal -> pp_print_string ppf "LINKAGE_Internal"
+  | LINKAGE_Available_externally -> pp_print_string ppf "LINKAGE_Available_externally"
+  | LINKAGE_Linkonce -> pp_print_string ppf "LINKAGE_Linkonce"
+  | LINKAGE_Weak -> pp_print_string ppf "LINKAGE_Weak"
+  | LINKAGE_Common -> pp_print_string ppf "LINKAGE_Common"
+  | LINKAGE_Appending -> pp_print_string ppf "LINKAGE_Appending"
+  | LINKAGE_Extern_weak -> pp_print_string ppf "LINKAGE_Extern_weak"
+  | LINKAGE_Linkonce_odr -> pp_print_string ppf "LINKAGE_Linkonce_odr"
+  | LINKAGE_Weak_odr -> pp_print_string ppf "LINKAGE_Weak_odr"
+  | LINKAGE_External -> pp_print_string ppf "LINKAGE_External"
+
+and visibility : Format.formatter -> LLVMAst.visibility -> unit =
+  fun ppf ->
+  function
+  | VISIBILITY_Default -> pp_print_string ppf "VISIBILITY_Default"
+  | VISIBILITY_Hidden  -> pp_print_string ppf "VISIBILITY_Hidden"
+  | VISIBILITY_Protected -> pp_print_string ppf "VISIBILITY_Protected"
+
+and dll_storage : Format.formatter -> LLVMAst.dll_storage -> unit =
+  fun ppf ->
+  function
+  | DLLSTORAGE_Dllimport -> pp_print_string ppf "DLLSTORAGE_Dllimport"
+  | DLLSTORAGE_Dllexport -> pp_print_string ppf "DLLSTORAGE_Dllexport"
+
+and cconv : Format.formatter -> LLVMAst.cconv -> unit =
+  fun ppf ->
+  function
+  | CC_Ccc -> pp_print_string ppf "CC_Ccc"
+  | CC_Fastcc -> pp_print_string ppf "CC_Fastcc"
+  | CC_Coldcc -> pp_print_string ppf "CC_Coldcc"
+  | CC_Cc n -> fprintf ppf "CC_Cc %d" (to_int n)
+
+and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
+  fun ppf ->
+  function
+  | FNATTR_Alignstack n -> fprintf ppf "FNATTR_Alignstack %d" (to_int n)
+  | FNATTR_Alwaysinline -> pp_print_string ppf "FNATTR_Alwaysinline"
+  | FNATTR_Builtin -> pp_print_string ppf "FNATTR_Builtin"
+  | FNATTR_Cold -> pp_print_string ppf "FNATTR_Cold"
+  | FNATTR_Inlinehint -> pp_print_string ppf "FNATTR_Inlinehint"
+  | FNATTR_Jumptable -> pp_print_string ppf "FNATTR_Jumptable"
+  | FNATTR_Minsize -> pp_print_string ppf "FNATTR_Minsize"
+  | FNATTR_Naked -> pp_print_string ppf "FNATTR_Naked"
+  | FNATTR_Nobuiltin -> pp_print_string ppf "FNATTR_Nobuiltin"
+  | FNATTR_Noduplicate -> pp_print_string ppf "FNATTR_Noduplicate"
+  | FNATTR_Noimplicitfloat -> pp_print_string ppf "FNATTR_Noimplicitfloat"
+  | FNATTR_Noinline -> pp_print_string ppf "FNATTR_Noinline"
+  | FNATTR_Nonlazybind -> pp_print_string ppf "FNATTR_Nonlazybind"
+  | FNATTR_Noredzone -> pp_print_string ppf "FNATTR_Noredzone"
+  | FNATTR_Noreturn -> pp_print_string ppf "FNATTR_Noreturn"
+  | FNATTR_Nounwind -> pp_print_string ppf "FNATTR_Nounwind"
+  | FNATTR_Optnone -> pp_print_string ppf "FNATTR_Optnone"
+  | FNATTR_Optsize -> pp_print_string ppf "FNATTR_Optsize"
+  | FNATTR_Readnone -> pp_print_string ppf "FNATTR_Readnone"
+  | FNATTR_Readonly -> pp_print_string ppf "FNATTR_Readonly"
+  | FNATTR_Returns_twice -> pp_print_string ppf "FNATTR_Returns_twice"
+  | FNATTR_Sanitize_address -> pp_print_string ppf "FNATTR_Sanitize_address"
+  | FNATTR_Sanitize_memory -> pp_print_string ppf "FNATTR_Sanitize_memory"
+  | FNATTR_Sanitize_thread -> pp_print_string ppf "FNATTR_Sanitize_thread"
+  | FNATTR_Ssp -> pp_print_string ppf "FNATTR_Ssp"
+  | FNATTR_Sspreq -> pp_print_string ppf "FNATTR_Sspreq"
+  | FNATTR_Sspstrong -> pp_print_string ppf "FNATTR_Sspstrong"
+  | FNATTR_Uwtable -> pp_print_string ppf "FNATTR_Uwtable"
+  | FNATTR_String s -> fprintf ppf "FNATTR_String %s" (of_str s)
+  | FNATTR_Key_value (s,s') -> fprintf ppf "FNATTR_Key_value (%s,%s)" (of_str s) (of_str s')
+  | FNATTR_Attr_grp n  -> fprintf ppf "FNATTR_Attr_grp %d" (to_int n)
+
 and declaration : Format.formatter -> (LLVMAst.typ LLVMAst.declaration) -> unit =
   fun ppf ->
   fun { dc_name = i
-      ; dc_type
+      ; dc_type = t
+      ; dc_param_attrs = patt
+      ; dc_linkage = link
+      ; dc_visibility = vis
+      ; dc_dll_storage = ost
+      ; dc_cconv = occ
+      ; dc_attrs = att
+      ; dc_section = osec
+      ; dc_align = oali
+      ; dc_gc = ogc
       } ->
-    let (ret_t, args_t) = get_function_type dc_type in
-    pp_print_string ppf "declare " ;
-    fprintf ppf "%a @%s(%t)"
-      typ ret_t
-      (str_of_raw_id i)
-      (fun ppf -> pp_print_list ~pp_sep:pp_comma_space typ ppf args_t)
+    pp_print_string ppf "{|";
+    pp_open_box ppf 0;
+    fprintf ppf "dc_name := %s;" (str_of_raw_id i);
+    pp_force_newline ppf ();
+    fprintf ppf "dc_type := %a;" typ t;
+    pp_force_newline ppf ();
+    fprintf ppf "dc_param_attrs := ([%a], [%a]);"
+      (pp_print_list ~pp_sep:pp_sc_space param_attr) (fst patt)
+      (pp_print_list (fun ppf l -> fprintf ppf "%a" (pp_print_list ~pp_sep:pp_sc_space param_attr) l)) (snd patt);
+    pp_force_newline ppf ();
+    fprintf ppf "dc_linkage := %a;" (pp_print_option linkage) link;
+    pp_force_newline ppf ();
+    fprintf ppf "dc_visibility := %a;" (pp_print_option visibility) vis;
+    pp_force_newline ppf ();
+    fprintf ppf "dc_dll_storage := %a;" (pp_print_option dll_storage) ost;
+    pp_force_newline ppf ();
+    fprintf ppf "dc_cconv := %a;" (pp_print_option cconv) occ;
+    pp_force_newline ppf ();
+    fprintf ppf "dc_attrs := [%a];" (pp_print_list ~pp_sep:pp_sc_space fn_attr) att;
+    pp_force_newline ppf ();
+    fprintf ppf "dc_section := %a;" (pp_print_option (fun ppf s -> fprintf ppf "%s" (of_str s))) osec;
+    pp_force_newline ppf ();
+    fprintf ppf "dc_align := %a;" (pp_print_option (fun ppf s -> fprintf ppf "%d" (to_int s))) oali;
+    pp_force_newline ppf ();
+    fprintf ppf "dc_gc := %a" (pp_print_option (fun ppf s -> fprintf ppf "%s" (of_str s))) ogc;
+    pp_print_string ppf "|}";
+    pp_close_box ppf ();
 
 and definition : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block list))) LLVMAst.definition -> unit =
   fun ppf ->
-  fun ({ df_prototype =
-           { dc_name = i
-           ; dc_type
-           }
-       } as df) ->
+  fun { df_prototype = df
+      ; df_args = args
+      ; df_instrs = ins
+      } ->
     (* let (ret_t, args_t) = get_function_type dc_type in *)
     (* let typ_arg =
      *   fun ppf (t,id) ->
@@ -597,21 +715,16 @@ and definition : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block l
      *     pp_space ppf ();
      *     lident ppf id
      * in *)
-    pp_print_string ppf "TLE_Definition {|";
+    pp_print_string ppf "{|";
     pp_force_newline ppf ();
 
-    pp_print_string ppf "  df_prototype := {| ";
-    pp_open_box ppf 0;
-    fprintf ppf "dc_name := %s;" (str_of_raw_id i);
-    pp_force_newline ppf ();
-    fprintf ppf "dc_type := %a |}" typ dc_type;
-    pp_close_box ppf ();
-    pp_print_string ppf ";";
+    pp_print_string ppf "  df_prototype := ";
+    fprintf ppf "%a;" declaration df;
     pp_force_newline ppf ();
 
     pp_print_string ppf "  df_args := [";
     pp_print_list ~pp_sep:pp_sc_space (fun ppf id -> pp_print_string ppf (str_of_raw_id id))
-      ppf df.df_args;
+      ppf args;
     pp_print_string ppf "];";
 
     pp_force_newline ppf ();
@@ -621,7 +734,7 @@ and definition : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block l
     pp_print_string ppf "[";
     pp_open_box ppf 0;
     pp_print_list ~pp_sep:(fun ppf () -> pp_print_string ppf ";"; pp_force_newline ppf ())
-      block ppf df.df_instrs ;
+      block ppf ins ;
     pp_print_string ppf "]";
     pp_close_box ppf ();
     pp_force_newline ppf ();
