@@ -25,13 +25,13 @@ Definition optimization {T} := definition T (list (block T)) -> definition T (li
 
 Definition optimize {T} (m:modul T (list (block T))) (o:optimization) : modul T (list (block T)) :=
  {|
-  m_name := (m_name _ _ m);
-  m_target := (m_target _ _ m);
-  m_datalayout := (m_datalayout _ _ m);
-  m_type_defs := (m_type_defs _ _ m);
-  m_globals := (m_globals _ _ m);
-  m_declarations := (m_declarations _ _ m);
-  m_definitions := map o (m_definitions _ _ m);
+  m_name := (m_name m);
+  m_target := (m_target m);
+  m_datalayout := (m_datalayout m);
+  m_type_defs := (m_type_defs m);
+  m_globals := (m_globals m);
+  m_declarations := (m_declarations m);
+  m_definitions := map o (m_definitions m);
   |}.
 
 
@@ -45,7 +45,7 @@ Definition correct (P : modul (list block) -> Prop) (o:optimization) :=
     forall (s:state),
       E.obs_error_free (sem m_semantic s) ->
       E.obs_equiv (sem m_semantic s) (sem m_opt_semantic s).
-      
+
 Class RemoveInstr X := remove_instr : instr_id -> X -> X.
 
 Definition remove_instr_block (id:instr_id) (b:block) : block :=
@@ -84,24 +84,24 @@ Require Import paco.
 
 (*
 Lemma obs_error_free_inv :
-  forall (m:mcfg) (s:state), 
+  forall (m:mcfg) (s:state),
     E.obs_error_free (sem m s) ->
     (exists dv, sem m s = E.Fin dv) \/
     (exists s', stepD m s = E.Ret s' /\ E.obs_error_free (sem m s')).
 Proof.
   intros m s H.
-  punfold H. remember (upaco1 obs_error_free_step bot1). remember (sem m s) as d. induction H. 
+  punfold H. remember (upaco1 obs_error_free_step bot1). remember (sem m s) as d. induction H.
   - left. exists v. reflexivity.
   - rewrite sem_match_id in Heqd. unfold sem in Heqd.
-    unfold bind in Heqd. 
+    unfold bind in Heqd.
     destruct (stepD m s).
     + right. exists s0. split; eauto. subst. inversion Heqd. pclearbot. punfold H. subst. pfold. apply H.
     + inversion Heqd.
     + inversion Heqd.
-    + 
-Abort.    
-*)  
-    
+    +
+Abort.
+*)
+
 
 Lemma remove_instr_correct:
   forall (instr:instr_id), correct (remove_instr_applies_module instr) (remove_instr_defn instr).
@@ -111,8 +111,8 @@ Proof.
   intros m m_semantic m_opt_semantic Happlies H0 H1 s Herr. revert s Herr.
   pcofix CIH.
   intros s Herr.
-  
+
 Abort.
-  
-  
+
+
 *)

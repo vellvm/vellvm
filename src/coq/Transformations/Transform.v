@@ -28,7 +28,7 @@ Definition mangle_ident (id:ident) : ident :=
 
 Section WithT.
   Variable (T : Set).
-  
+
 
 Definition mangle_instr (i:instr_id * instr T) : (instr_id * instr T) :=
   match i with
@@ -42,16 +42,16 @@ Definition mangle_blocks (blks:list (block T)) : list (block T) :=
   List.map mangle_block blks.
 
 Definition mangle_definition (d:definition T (list (block T))) : definition T (list (block T)) :=
-  mk_definition _ _
-  (df_prototype _ _ d)
-  (df_args _ _ d)
-  (mangle_blocks (df_instrs _ _ d))
+  mk_definition _
+  (df_prototype d)
+  (df_args d)
+  (mangle_blocks (df_instrs d))
 .
 
 
 Definition mangle_toplevel_entity (tle : toplevel_entity T (list (block T))) : toplevel_entity T (list (block T)) :=
   match tle with
-  | TLE_Definition d => TLE_Definition _ _ (mangle_definition d)
+  | TLE_Definition d => TLE_Definition (mangle_definition d)
   | _ => tle
   end.
 

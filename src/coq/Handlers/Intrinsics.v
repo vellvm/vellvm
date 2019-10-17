@@ -100,7 +100,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
    *)
 
   Definition defs_assoc (user_intrinsics: intrinsic_definitions) := List.map (fun '(a,b) =>
-                                  match dc_name typ a with
+                                  match dc_name a with
                                   | Name s => (s,b)
                                   | _ => ("",b)
                                   end
