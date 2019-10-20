@@ -72,4 +72,7 @@ Definition refine_res4 : relation (memory * (local_env * stack * (global_env * d
 Definition refine_L4_concrete : relation (itree L4 (memory * (local_env * stack * (global_env * dvalue))))
   := eutt refine_res4.
 
+Definition refine_L5 : relation ((itree L5 (memory * (local_env * stack * (global_env * uvalue)))) -> Prop)
+  := fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt refine_res3 t t'.
+
 End Make.
