@@ -204,7 +204,7 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
       pp_print_string ppf ")";
 
     | EXP_Integer i         ->
-      fprintf ppf "(EXP_Integer %d%%Z)" (to_int i);
+      fprintf ppf "(EXP_Integer (%d)%%Z)" (to_int i);
 
     | EXP_Float f           ->
       fprintf ppf "(EXP_Float %f)" (to_float32 f)
