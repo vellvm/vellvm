@@ -152,8 +152,8 @@ and ibinop : Format.formatter -> LLVMAst.ibinop -> unit =
   | Mul (nu, ns) -> fprintf ppf "(Mul" ; nuw ppf nu ; nsw ppf ns
   | UDiv e       -> fprintf ppf "(UDiv" ; exact ppf e
   | SDiv e       -> fprintf ppf "(SDiv" ; exact ppf e
-  | URem         -> fprintf ppf "(URem"
-  | SRem         -> fprintf ppf "(SRem"
+  | URem         -> fprintf ppf "URem"
+  | SRem         -> fprintf ppf "SRem"
   | Shl (nu, ns) -> fprintf ppf "(Shl" ; nuw ppf nu ; nsw ppf ns
   | LShr e       -> fprintf ppf "(LShr" ; exact ppf e
   | AShr e       -> fprintf ppf "(AShr" ; exact ppf e
