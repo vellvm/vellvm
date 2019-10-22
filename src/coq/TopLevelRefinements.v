@@ -47,34 +47,45 @@ Proof.
   inversion HRR2; firstorder.
 Qed.
 
+Lemma eutt_tt_to_eq_prod :
+  forall X R (RR : relation R) E (t1 t2 : itree E (X * R)),
+    eutt (eq × RR) t1 t2 -> eutt (TT × RR) t1 t2.
+Proof.
+  intros X R RR E t1 t2 Heutt.
+
+  unfold eutt.
+  About eqit_mon.
+  apply (eqit_mon (eq × RR) (TT × RR) true true true true); trivial.
+  intros x0 x1 PR.
+  eapply subrelation_prod_left. apply subrelation_R_TT. all: apply PR.
+Qed.
+
 Lemma refine_01: forall t1 t2,
     refine_L0 t1 t2 -> refine_L1 (build_L1 t1) (build_L1 t2).
 Proof.
   intros t1 t2 H.
-  apply eqit_mon with (RR:=(eq × refine_uvalue)) (b1:=true) (b2:=true); trivial.
-  - intros x0 x1 PR.
-    eapply subrelation_prod_left. apply subrelation_R_TT. apply PR.
-  - apply eutt_interp_state_gen; auto.
- Qed.
+
+  unfold refine_L1. unfold eutt.
+  unfold refine_res1.
+
+  apply eutt_tt_to_eq_prod.
+  apply eutt_interp_state_gen; auto.
+Qed.
 
 Lemma refine_12 : forall t1 t2,
     refine_L1 t1 t2 -> refine_L2 (build_L2 t1) (build_L2 t2).
 Proof.
   intros t1 t2 H.
-  apply eqit_mon with (RR:=(eq × refine_res1)) (b1:=true) (b2:=true); trivial.
-  - intros x0 x1 PR.
-    eapply subrelation_prod_left. apply subrelation_R_TT. apply PR.
-  - apply eutt_interp_state_gen; auto.
+  apply eutt_tt_to_eq_prod.
+  apply eutt_interp_state_gen; auto.
 Qed.
 
 Lemma refine_23 : forall t1 t2,
     refine_L2 t1 t2 -> refine_L3 (build_L3 t1) (build_L3 t2).
 Proof.
   intros t1 t2 H.
-  apply eqit_mon with (RR:=(eq × refine_res2)) (b1:=true) (b2:=true); trivial.
-  - intros x0 x1 PR.
-    eapply subrelation_prod_left. apply subrelation_R_TT. apply PR.
-  - apply eutt_interp_state_gen; auto.
+  apply eutt_tt_to_eq_prod.
+  apply eutt_interp_state_gen; auto.
 Qed.
 
 Instance refine_uvalue_refl :
@@ -152,4 +163,31 @@ Proof.
   eapply subrelation_prod_left. apply subrelation_R_TT with (R:=eq). apply PR.
   
 Qed.
-*)
+ *)
+
+(*
+Lemma refine_45 : forall t1 t2,
+    refine_L4 t1 t2 -> refine_L5 (model_L5 t1) (model_L5 t2).
+Proof.
+  intros t1 t2 H.
+  unfold refine_L5.
+  intros t Hip.
+
+  exists t. split.
+  - unfold model_L5 in *.
+    unfold UndefinedBehaviour.model_UB in *.
+    destruct Hip as [t' [t1p Hip]].
+
+    exists t'. split.
+    + unfold refine_L4 in H.
+      pose proof (H t' t1p) as H1.
+      destruct H1 as [t'' [Ht2t'' Ht't'']].
+
+      Print Basics.impl.
+      rewrite Ht't''.
+    + apply Hip.
+  - reflexivity.
+
+  repeat apply prod_rel_refl; auto using TT_refl, refine_uvalue_refl.
+Qed.
+ *)

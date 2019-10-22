@@ -13,7 +13,7 @@ From Vellvm Require Import
      Environment
      Handlers.Stack.
 
-From Coq Require Import Relations.
+From Coq Require Import Relations RelationClasses.
 
 
 Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A))(ENV: Environment).
@@ -28,10 +28,22 @@ Inductive refine_uvalue: uvalue -> uvalue -> Prop :=
 | RefineConcrete: forall uv1 uv2, (forall dv, concretize uv1 dv -> concretize uv2 dv) -> refine_uvalue uv1 uv2
 .
 
+Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
+Proof.
+  unfold Reflexive. intros x.
+  induction x; constructor; auto.
+Qed.
+
 Inductive refine_dvalue: dvalue -> dvalue -> Prop :=
 | DvalueRefl : forall v, refine_dvalue v v
 | Poison : forall v, refine_dvalue v DVALUE_Poison
 .
+
+Instance refine_dvalue_Reflexive : Reflexive refine_dvalue.
+Proof.
+  unfold Reflexive. intros x.
+  induction x; constructor; auto.
+Qed.
 
 Infix "×" := prod_rel (at level 90, left associativity).
 
