@@ -121,16 +121,56 @@ Definition refine_cfg_L2 c1 c2 := eutt (TT × (TT × refine_uvalue)) (cfg_interp
 (* -------------------------------------------------- *)
 (* Block substitution into CFG.                       *)
 (* -------------------------------------------------- *)
-Theorem bl2_subst_cfgl2 :
-  forall (b1 b2 : block dtyp) (bls brs : list (block dtyp)) (bid : block_id) args,
-    refine_block_L2 b1 b2 ->
-    refine_cfg_L2 (mkCFG dtyp bid (bls ++ [b1] ++ brs) args)
-                  (mkCFG dtyp bid (bls ++ [b2] ++ brs) args).
+Fixpoint replace_pred {A} (p : A -> bool) (a : A) (xs : list A) : list A :=
+  match xs with
+  | nil => nil
+  | (x::xs') =>
+    if p x
+    then a :: xs'
+    else x :: replace_pred p a xs'
+  end.
+
+From ExtLib Require Import
+     Core.RelDec
+     Programming.Eqv.
+
+Import EqvNotation.
+
+Definition block_subst (c : cfg dtyp) (b : block dtyp) : cfg dtyp :=
+  let bid := blk_id b in
+  let blk_id_eq (b : block dtyp) := if blk_id b ~=? bid then true else false
+  in match c with
+     | mkCFG init blks args => mkCFG dtyp init (replace_pred blk_id_eq b blks) args
+     end.
+
+Lemma block_subst_find :
+  forall c b bid b',
+    bid = blk_id b ->
+    find_block dtyp (CFG.blks dtyp c) bid = Some b' ->
+    find_block dtyp (CFG.blks dtyp (block_subst c b)) bid = Some b.
 Proof.
-  intros b1 b2 bls brs bid args H.
+  intros c b bid b' Hid Hfind.
+  apply find_some in Hfind.
+  destruct Hfind as [Hin Hideq].
+
+  unfold find_block. unfold block_subst.
+  destruct c. induction blks.
+  
+Qed.
+
+Theorem bl2_subst_cfgl2 :
+  forall (b1 b2 : block dtyp) (blks : list (block dtyp)) (c : cfg dtyp),
+    refine_block_L2 b1 b2 ->
+    blk_id b1 = blk_id b2 ->
+    refine_cfg_L2 (block_subst c b1)
+                  (block_subst c b2).
+Proof.
+  intros b1 b2 blks c Hrefb Hids.
   unfold refine_cfg_L2, refine_block_L2 in *.
   unfold cfg_interp_L2, cfg_interp_L1, block_interp_L2, block_interp_L1 in *.
   tau_steps.
+
+  unfold cat.
 Qed.
 
 
