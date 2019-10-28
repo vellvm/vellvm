@@ -64,10 +64,6 @@ Lemma refine_01: forall t1 t2,
     refine_L0 t1 t2 -> refine_L1 (build_L1 t1) (build_L1 t2).
 Proof.
   intros t1 t2 H.
-
-  unfold refine_L1. unfold eutt.
-  unfold refine_res1.
-
   apply eutt_tt_to_eq_prod.
   apply eutt_interp_state_gen; auto.
 Qed.
