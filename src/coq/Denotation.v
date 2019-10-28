@@ -388,7 +388,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
         in
-        debug ("Evaluating expression: " ++ to_string o);;
+        (* debug ("Evaluating expression: " ++ to_string o);; *)
         match o with
         | EXP_Ident i =>
           translate lookup_E_to_exp_E (lookup_id i)
@@ -498,27 +498,27 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | OP_FBinop fop fm dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          debug ("fop " ++ to_string op1 ++ " " ++ to_string op2);;
+          (* debug ("fop " ++ to_string op1 ++ " " ++ to_string op2);; *)
           if fop_is_div fop && negb (is_concrete v2)
           then
-            debug ("fop: branch1 ");;
+            (* debug ("fop: branch1 ");; *)
             dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2)) ;;
-            debug ("fop, branch1, dv2: " ++ to_string dv2);;
+            (* debug ("fop, branch1, dv2: " ++ to_string dv2);; *)
             uvalue_to_dvalue_binop2
               (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
               (fun v1 v2 =>
-                 debug ("eval_fop branch 1: " ++ to_string v1 ++ " " ++ to_string v2);;
+                 (* debug ("eval_fop branch 1: " ++ to_string v1 ++ " " ++ to_string v2);; *)
                  translate _failure_UB_to_ExpE
                                    (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
               v1 dv2
           else
-            debug ("fop: branch2 ");;
+            (* debug ("fop: branch2 ");; *)
             uvalue_to_dvalue_binop
             (fun v1 v2 =>
-               debug ("fop: ret ");;
+               (* debug ("fop: ret ");; *)
                ret (UVALUE_FBinop fop fm v1 v2))
               (fun v1 v2 =>
-                 debug ("eval_fop branch 2: " ++ to_string v1 ++ " " ++ to_string v2);;
+                 (* debug ("eval_fop branch 2: " ++ to_string v1 ++ " " ++ to_string v2);; *)
                  translate _failure_UB_to_ExpE
                                    (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
               v1 v2
@@ -532,7 +532,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             v1 v2
 
         | OP_Conversion conv dt1 op t2 =>
-          debug ("conversion, evaluating " ++ to_string op ++ " at type " ++ to_string dt1);;
+          (* debug ("conversion, evaluating " ++ to_string op ++ " at type " ++ to_string dt1);; *)
           v <- denote_exp (Some dt1) op ;;
           uvalue_to_dvalue_uop
             (fun v => ret (UVALUE_Conversion conv v t2))
@@ -637,13 +637,13 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         (* Load *)
         | (IId id, INSTR_Load _ dt (du,ptr) _) =>
-          debug ("Load: " ++ to_string dt);;
+          (* debug ("Load: " ++ to_string dt);; *)
           ua <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
           da <- trigger (pick ua True) ;;
           match da with
           | DVALUE_Poison => raiseUB "Load from poisoned address."
           | _ => dv <- trigger (Load dt da);;
-                debug ("Loading: " ++ to_string dv);;
+                (* debug ("Loading: " ++ to_string dv);; *)
                 trigger (LocalWrite id dv)
           end
 
@@ -673,7 +673,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | None =>
             fv <- translate exp_E_to_instr_E (denote_exp None f) ;;
             dfv <- trigger (pick fv True) ;; (* TODO, should this be unique? *)
-            debug ("Call to function: " ++ to_string f) ;;
+            (* debug ("Call to function: " ++ to_string f) ;; *)
             trigger (Call dt dfv dvs)
           end
           ;;
@@ -815,7 +815,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                     match bd with
                     | inr dv => ret (inr dv)
                     | inl bid_target =>
-                      debug ("Jumping to " ++ to_string bid_target ++ ", evaluating phi nodes") ;;
+                      (* debug ("Jumping to " ++ to_string bid_target ++ ", evaluating phi nodes") ;; *)
                       match find_block dtyp (blks _ f) bid_target with
                         | None => raise ("Can't find block we are about to jump to " ++ to_string bid)
                         | Some block_target =>
@@ -853,7 +853,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation  :=
         fun (args : list dvalue) =>
           (* We match the arguments variables to the inputs *)
-          debug ("Denoting function " ++ to_string (dc_name (df_prototype df)) ++ " with args: " ++ to_string args ++ " against prototype: " ++ to_string (df_args df));;
+          (* debug ("Denoting function " ++ to_string (dc_name (df_prototype df)) ++ " with args: " ++ to_string args ++ " against prototype: " ++ to_string (df_args df));; *)
           bs <- lift_err ret (combine_lists_err (df_args df) args) ;;
              (* generate the corresponding writes to the local stack frame *)
           trigger MemPush ;;
@@ -886,7 +886,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
       Definition denote_mcfg
                  (fundefs:list (dvalue * function_denotation)) (dt : dtyp)
-                 (f_value : dvalue) (args : list dvalue) : itree _ uvalue :=
+                 (f_value : dvalue) (args : list dvalue) : itree L0 uvalue :=
           @mrec CallE (CallE +' _)
                 (fun T call =>
                    match call with
@@ -908,4 +908,3 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                    end
                 ) _ (Call dt f_value args).
 End Denotation.
-
