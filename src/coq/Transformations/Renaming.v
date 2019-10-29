@@ -18,6 +18,8 @@ From ExtLib Require Import
 From ITree Require Import
      ITree
      Eq.Eq
+     Interp.Interp
+     Interp.InterpFacts
      Interp.TranslateFacts.
 
 From Vellvm Require Import
@@ -118,7 +120,7 @@ Module RENAMING
     - contradiction.
     - contradiction.
   Qed.
-
+  
   Definition swap_ident (id1 id2:raw_id) (id:ident) : ident :=
     match id with
     | ID_Global i => ID_Global (swap id1 id2 i)
