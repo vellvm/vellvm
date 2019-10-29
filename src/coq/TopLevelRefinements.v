@@ -15,9 +15,7 @@ From Vellvm Require Import
      Handlers.Stack.
 
 From ExtLib Require Import
-     Structures.Functor
-     
-.
+     Structures.Functor.
 
 From Coq Require Import
      Logic

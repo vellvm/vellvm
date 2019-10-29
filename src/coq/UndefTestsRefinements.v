@@ -12,7 +12,8 @@ From Vellvm Require Import
      TopLevelRefinements
      CFG
      DynamicTypes
-     PropT.
+     PropT
+     Transformations.Traversal.
 
 From Vellvm.Handlers Require Import
      Stack
@@ -143,6 +144,49 @@ Definition block_subst (c : cfg dtyp) (b : block dtyp) : cfg dtyp :=
      | mkCFG init blks args => mkCFG dtyp init (replace_pred blk_id_eq b blks) args
      end.
 
+(* CB TODO: bad name *)
+Lemma blk_id_eq :
+  forall T b bid,
+    (if @blk_id T b ~=? bid then true else false) = true ->
+    bid = @blk_id T b.
+Proof.
+  intros T b bid H.
+  destruct (blk_id b ~=? bid) eqn:Hbid; firstorder.
+Qed.
+
+Lemma find_replace_pred :
+  forall T p l x y,
+    find p l = Some x ->
+    (p x = true -> p y = true) ->
+    find p (@replace_pred T p y l) = Some y.
+Proof.
+  intros T p l; induction l; intros x y Hf Hp.
+  - inversion Hf.
+  - pose proof (find_some _ _ Hf) as [Hin Hpx].
+    destruct Hin as [Hxa | Hinl].
+    + simpl; subst. rewrite Hpx.
+      simpl. rewrite (Hp Hpx).
+      reflexivity.
+    + simpl. simpl in Hf.
+      destruct (p a) eqn:Hpa.
+      * simpl. rewrite (Hp Hpx). reflexivity.
+      * simpl. rewrite Hpa.
+        eapply IHl; eauto.
+Qed.
+
+(* CB: TODO bad name *)
+Lemma blk_id_eq_if :
+  forall T x y bid,
+    blk_id x = blk_id y ->
+    (if @blk_id T x ~=? bid then true else false) = true ->
+    (if @blk_id T y ~=? bid then true else false) = true.
+Proof.
+  intros T x y bid H H0.
+  apply blk_id_eq in H0. rewrite H0.
+  subst. rewrite H.
+  destruct (blk_id y ~=? blk_id y); firstorder.
+Qed.
+
 Lemma block_subst_find :
   forall c b bid b',
     bid = blk_id b ->
@@ -150,12 +194,15 @@ Lemma block_subst_find :
     find_block dtyp (CFG.blks dtyp (block_subst c b)) bid = Some b.
 Proof.
   intros c b bid b' Hid Hfind.
+  unfold find_block in *;
+    destruct c; simpl in *; subst.
+
+  eapply find_replace_pred; eauto.
+  apply blk_id_eq_if.
+  
   apply find_some in Hfind.
   destruct Hfind as [Hin Hideq].
-
-  unfold find_block. unfold block_subst.
-  destruct c. induction blks.
-  
+  apply blk_id_eq in Hideq. symmetry. auto.
 Qed.
 
 Theorem bl2_subst_cfgl2 :
