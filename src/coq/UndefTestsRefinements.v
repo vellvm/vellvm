@@ -137,12 +137,32 @@ From ExtLib Require Import
 
 Import EqvNotation.
 
-Definition block_subst (c : cfg dtyp) (b : block dtyp) : cfg dtyp :=
+(* Replace a block with a given block r if the ids match *)
+Definition replace_block {T} (r : block T) (b : block T) : block T :=
+  if blk_id b ~=? blk_id r then r else b.
+
+Section block_replace.
+  Variable T : Set.
+  Variable b : block T.
+
+  Definition blah := b.
+
+  Instance block_replace_endo : endo (block T)
+    := replace_block b.
+
+  Definition cfg_replace_block : endo (cfg T)
+    := f_endo.
+End block_replace.
+
+
+(*
+Definition block_subst {T} (c : cfg T) (b : block T) : cfg T :=
   let bid := blk_id b in
-  let blk_id_eq (b : block dtyp) := if blk_id b ~=? bid then true else false
+  let blk_id_eq (b : block T) := if blk_id b ~=? bid then true else false
   in match c with
-     | mkCFG init blks args => mkCFG dtyp init (replace_pred blk_id_eq b blks) args
+     | mkCFG init blks args => mkCFG T init (replace_pred blk_id_eq b blks) args
      end.
+*)
 
 (* CB TODO: bad name *)
 Lemma blk_id_eq :
@@ -174,6 +194,28 @@ Proof.
         eapply IHl; eauto.
 Qed.
 
+
+Lemma find_map :
+  forall T p (l : list T) x y,
+    find p l = Some x ->
+    (p x = true -> p y = true) ->
+    find p (map (fun x => if p x then y else x) l) = Some y.
+Proof.
+  intros T p l; induction l; intros x y Hf Hp.
+  - inversion Hf.
+  - pose proof (find_some _ _ Hf) as [Hin Hpx].
+    destruct Hin as [Hxa | Hinl].
+    + simpl; subst. rewrite Hpx.
+      simpl. rewrite (Hp Hpx).
+      reflexivity.
+    + simpl. simpl in Hf.
+      destruct (p a) eqn:Hpa.
+      * simpl. rewrite (Hp Hpx). reflexivity.
+      * simpl. rewrite Hpa.
+        eapply IHl; eauto.
+Qed.
+
+
 (* CB: TODO bad name *)
 Lemma blk_id_eq_if :
   forall T x y bid,
@@ -187,22 +229,46 @@ Proof.
   destruct (blk_id y ~=? blk_id y); firstorder.
 Qed.
 
-Lemma block_subst_find :
+(* CB: TODO bad name *)
+Lemma if_lift :
+  forall A T (b0 b : block T) (x y : A),
+    (if blk_id b0 ~=? blk_id b then x else y) = (if (if blk_id b0 ~=? blk_id b then true else false) then x else y).
+Proof.
+  intros A T b0 b x y.
+  destruct (blk_id b0 ~=? blk_id b); reflexivity.
+Qed.
+
+Lemma map_if_lift :
+  forall b blks,
+    map (fun b0 : block dtyp => if if blk_id b0 ~=? blk_id b then true else false then b else b0) blks =
+    map (fun b0 : block dtyp => if blk_id b0 ~=? blk_id b then b else b0) blks.
+Proof.
+  intros b blks. revert b.
+  induction blks; intros b.
+  - reflexivity.
+  - simpl. rewrite <- if_lift.
+    rewrite IHblks.
+    reflexivity.
+ Qed.
+
+Lemma cfg_replace_block_find :
   forall c b bid b',
     bid = blk_id b ->
     find_block dtyp (CFG.blks dtyp c) bid = Some b' ->
-    find_block dtyp (CFG.blks dtyp (block_subst c b)) bid = Some b.
+    find_block dtyp (CFG.blks dtyp (cfg_replace_block dtyp b c)) bid = Some b.
 Proof.
   intros c b bid b' Hid Hfind.
   unfold find_block in *;
     destruct c; simpl in *; subst.
 
-  eapply find_replace_pred; eauto.
+  unfold f_endo, endo_list, f_endo, block_replace_endo, replace_block.
+  rewrite <- map_if_lift.
+  eapply find_map; eauto.
   apply blk_id_eq_if.
   
   apply find_some in Hfind.
   destruct Hfind as [Hin Hideq].
-  apply blk_id_eq in Hideq. symmetry. auto.
+  apply blk_id_eq in Hideq; firstorder.
 Qed.
 
 Theorem bl2_subst_cfgl2 :
