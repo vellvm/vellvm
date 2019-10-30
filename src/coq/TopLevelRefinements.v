@@ -135,10 +135,17 @@ Proof.
   - reflexivity.
 Qed.
 
-Lemma refine_45 : forall t1 t2,
-    refine_L4 t1 t2 -> refine_L5 (model_L5 t1) (model_L5 t2).
+Lemma refine_45 : forall Pt1 Pt2,
+    refine_L4 Pt1 Pt2 -> refine_L5 (model_L5 Pt1) (model_L5 Pt2).
 Proof.
-Admitted.
+  intros Pt1 Pt2 HR t2 HM.
+  exists t2; split; [| reflexivity].
+  destruct HM as (t2' & HPt2 & HPT2).
+  apply HR in HPt2; destruct HPt2 as (t1' & HPt1 & HPT1).
+  exists t1'; split; auto.
+  match type of HPT2 with | PropT.interp_prop ?h' ?t _ _ => remember h' as h end.
+  eapply interp_prop_Proper; eauto.
+Qed.
 
 (**
    We now define partial interpretations in order to define refinements of [mcfg]s
@@ -197,23 +204,31 @@ Definition refine_mcfg (p1 p2: mcfg typ): Prop :=
 
 Lemma refine_mcfg_L1_correct: forall p1 p2,
     refine_mcfg_L1 p1 p2 -> refine_mcfg p1 p2.
-Admitted.
+Proof.
+  intros p1 p2 HR.
+  apply refine_45, refine_34, refine_23, refine_12, HR.
+Qed.
 
 Lemma refine_mcfg_L2_correct: forall p1 p2,
     refine_mcfg_L2 p1 p2 -> refine_mcfg p1 p2.
 Proof.
-Admitted.
+  intros p1 p2 HR.
+  apply refine_45, refine_34, refine_23, HR.
+Qed.
 
 Lemma refine_mcfg_L3_correct: forall p1 p2,
     refine_mcfg_L3 p1 p2 -> refine_mcfg p1 p2.
 Proof.
-Admitted.
+  intros p1 p2 HR.
+  apply refine_45, refine_34, HR.
+Qed.
 
 Lemma refine_mcfg_L4_correct: forall p1 p2,
     refine_mcfg_L4 p1 p2 -> refine_mcfg p1 p2.
 Proof.
-Admitted.
-
+  intros p1 p2 HR.
+  apply refine_45, HR.
+Qed.
 
 (* TODO SCRAPYARD, TO RECYCLE OR BURN
 Instance refine_uvalue_refl :
