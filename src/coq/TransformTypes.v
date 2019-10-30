@@ -198,7 +198,6 @@ Definition fmap_toplevel_entity {X Y:Set} (g : X -> Y) (tle:toplevel_entity T X)
   | TLE_Attribute_group id attrs => TLE_Attribute_group id attrs
   end.
 
-
 Definition fmap_modul {X Y:Set} (g : X -> Y) (m:modul T X) : modul U Y :=
   mk_modul _
     (m_name m)

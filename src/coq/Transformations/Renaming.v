@@ -32,16 +32,101 @@ From Vellvm Require Import
      DynamicValues
      Denotation
      Handlers.Memory
-     LLVMEvents.
+     LLVMEvents
+     Transformation
+     Traversal
+     TopLevelRefinements.
 
 Import EqvNotation.
 
 Open Scope Z_scope.
 Open Scope string_scope.
-Open Scope eq_itree_scope.
 
-Set Nested Proofs Allowed.
+From ExtLib Require Import
+     Programming.Eqv
+     Structures.Monads.
 
+From Vellvm Require Import
+     AstLib.
+
+Import EqvNotation.
+Import TopLevel.
+Import TopLevelEnv.
+Import R.
+
+Section Swap.
+
+  (* Class Swap (A:Type) := swap : raw_id -> raw_id -> A -> A. *)
+
+  Variable id1 id2: raw_id.
+
+  Definition swap_raw_id (id:raw_id) : raw_id :=
+    if id ~=? id1 then id2 else
+      if id ~=? id2 then id1 else
+        id.
+
+  Instance swap_endo_raw_id : endo raw_id := swap_raw_id.
+
+  Definition swap_mcfg: transformation := f_endo.
+
+  Lemma swap_correct_L2:
+    forall p, refine_mcfg_L2 p (swap_mcfg p).
+  Admitted.
+
+  Theorem swap_cfg_correct: transformation_correct swap_mcfg.
+  Proof.
+    intros p.
+    apply refine_mcfg_L2_correct, swap_correct_L2.
+  Qed.
+
+  (* YZ: TEMPORARY TESTING, TO REMOVE AFTERWARDS *)
+  (*
+  (* Here's some random cfg *)
+  Definition foo :=
+    {|
+      init := Anon 0%Z;
+      blks := [{|
+                  blk_id := Anon 0%Z;
+                  blk_phis := [];
+                  blk_code := [(IId (Anon 1%Z),
+                                INSTR_Op
+                                  (OP_IBinop (Add false false) (TYPE_I 32%Z) (EXP_Integer 5%Z) (EXP_Integer 9%Z)));
+                                 (IId (Anon 2%Z),
+                                  INSTR_Op
+                                    (OP_IBinop (Add false false) (TYPE_I 32%Z) (EXP_Ident (ID_Local (Anon 1%Z)))
+                                               (EXP_Integer 15%Z)))];
+                  blk_term := (IVoid 0%Z, TERM_Ret (TYPE_I 32%Z, EXP_Ident (ID_Local (Anon 2%Z))));
+                  blk_comments := None |}];
+      args := [ID_Local (Name "argc"); ID_Local (Name "arcv")] |}.
+
+    (* We can define a generic endomorphism that will do the traversal without altering anything *)
+    Definition dummy_swap_cfg: endo (cfg typ) := f_endo.
+    (* And it does indeed do nothing *)
+    Eval compute in dummy_swap_cfg foo.
+
+    (* But now let's simply hijack the endomorphism for [raw_id] by declaring a local instance of [endo] *)
+    Variable id1 id2: raw_id.
+    Instance swap_endo_raw_id : endo raw_id := swap_raw_id id1 id2.
+    (* And still rely on type classes to define the swap at the level of cfgs *)
+    Definition swap_cfg: endo (cfg typ) := f_endo.
+
+    (* We now get an [endo] that does the substitution in the leaves (albeit not concretely here since of course since [id1] and [id2] are not instantiated *)
+    Eval compute in swap_cfg foo.
+
+  (* Note however that we _need_ to fix [id1] and [id2] as variables, the following does not work:
+
+     Instance swap_endo_raw_id (id1 id2: raw_id): endo raw_id := swap_raw_id id1 id2.
+     Definition swap_cfg (id1 id2: raw_id): endo (cfg typ) := f_endo.
+
+   *)
+   *)
+
+End Swap.
+
+
+(** WIP: ELEMENTS OF PROOF TO PLUG BACK UP THERE.
+ *)
+(*
 (** We define a renaming pass and prove it correct.
     The basic operation consider is a _swap_ between two [raw_id].
  *)
@@ -592,7 +677,7 @@ Module RENAMING
       commute_eq_itree4: forall a b c d, swap id1 id2 (f a b c d) ≅ f (swap id1 id2 a) (swap id1 id2 b) (swap id1 id2 c) (swap id1 id2 d).
 
 
-
+    
     (******************** Proofs ********************)
 
     Lemma swap_subevent {E F} {X} `{Swap X} `{Swap (E X)} `{E -< F} : forall (e:E X),
@@ -1291,4 +1376,5 @@ Hint Unfold swap_ENV.
   Admitted.
 
    *)
+*)
 *)
