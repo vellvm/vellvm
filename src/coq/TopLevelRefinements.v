@@ -13,6 +13,8 @@ From Vellvm Require Import
      Environment
      TopLevel
      LLVMAst
+     Handlers.Global
+     Handlers.Local
      Handlers.Stack.
 
 From ExtLib Require Import
@@ -21,8 +23,10 @@ From ExtLib Require Import
 From Coq Require Import
      Logic
      Morphisms
-     Relations.
+     Relations
+     List.
 
+Import ListNotations.
 Import ITree.Basics.Basics.Monads.
 
 Module R := Refinement.Make(Memory.A)(IO)(TopLevelEnv).
@@ -151,35 +155,43 @@ Qed.
    We now define partial interpretations in order to define refinements of [mcfg]s
  *)
 
-Definition build_to_L1 user_intrinsics (prog: mcfg typ) :=
-  let mcfg := normalize_types prog in
-  let L0_trace        := build_L0 mcfg in
-  let L0_trace'       := INT.interpret_intrinsics user_intrinsics L0_trace in
-  let L1_trace        := build_L1 L0_trace' in
+Definition interp_to_L1 {R} (t: itree IO.L0 R) g :=
+  let L0_trace       := INT.interpret_intrinsics nil t in
+  let L1_trace       := run_state (interp_global L0_trace) g in
   L1_trace.
 
-Definition build_to_L2 user_intrinsics (prog: mcfg typ) :=
+Definition build_to_L1 (prog: mcfg typ) :=
   let mcfg := normalize_types prog in
-  let L0_trace        := build_L0 mcfg in
-  let L0_trace'       := INT.interpret_intrinsics user_intrinsics L0_trace in
-  let L1_trace        := build_L1 L0_trace' in
-  let L2_trace        := build_L2 L1_trace in
+  let L0_trace        := denote_vellvm mcfg in
+  interp_to_L1 L0_trace [].
+
+Definition interp_to_L2 {R} (t: itree IO.L0 R) g l :=
+  let L0_trace       := INT.interpret_intrinsics [] t in
+  let L1_trace       := run_state (interp_global L0_trace) g in
+  let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
   L2_trace.
 
-Definition build_to_L3 (user_intrinsics: IS.intrinsic_definitions) (prog: mcfg typ) :=
+Definition build_to_L2 (prog: mcfg typ) :=
   let mcfg := normalize_types prog in
+  let L0_trace        := denote_vellvm mcfg in
+  interp_to_L2 L0_trace [] ([],[]).
 
-  let L0_trace        := build_L0 mcfg in
-  let L0_trace'       := INT.interpret_intrinsics user_intrinsics L0_trace in
-  let L1_trace        := build_L1 L0_trace' in
-  let L2_trace        := build_L2 L1_trace in
-  let L3_trace        := build_L3 L2_trace in
+Definition interp_to_L3 {R} (t: itree IO.L0 R) g l m :=
+  let L0_trace       := INT.interpret_intrinsics [] t in
+  let L1_trace       := run_state (interp_global L0_trace) g in
+  let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+  let L3_trace       := run_state (M.interp_memory L2_trace) m in
   L3_trace.
+
+Definition build_to_L3 (prog: mcfg typ) :=
+  let mcfg := normalize_types prog in
+  let L0_trace        := denote_vellvm mcfg in
+  interp_to_L3 L0_trace [] ([],[]) (M.empty, [[]]).
 
 Definition build_to_L4 (user_intrinsics: IS.intrinsic_definitions) (prog: mcfg typ) :=
   let mcfg := normalize_types prog in
 
-  let L0_trace        := build_L0 mcfg in
+  let L0_trace        := denote_vellvm mcfg in
   let L0_trace'       := INT.interpret_intrinsics user_intrinsics L0_trace in
   let L1_trace        := build_L1 L0_trace' in
   let L2_trace        := build_L2 L1_trace in
@@ -188,13 +200,13 @@ Definition build_to_L4 (user_intrinsics: IS.intrinsic_definitions) (prog: mcfg t
   L4_trace.
 
 Definition refine_mcfg_L1 (p1 p2: mcfg typ): Prop :=
-  R.refine_L1 (build_to_L1 nil p1) (build_to_L1 nil p2).
+  R.refine_L1 (build_to_L1 p1) (build_to_L1 p2).
 
 Definition refine_mcfg_L2 (p1 p2: mcfg typ): Prop :=
-  R.refine_L2 (build_to_L2 nil p1) (build_to_L2 nil p2).
+  R.refine_L2 (build_to_L2 p1) (build_to_L2 p2).
 
 Definition refine_mcfg_L3 (p1 p2: mcfg typ): Prop :=
-  R.refine_L3 (build_to_L3 nil p1) (build_to_L3 nil p2).
+  R.refine_L3 (build_to_L3 p1) (build_to_L3 p2).
 
 Definition refine_mcfg_L4 (p1 p2: mcfg typ): Prop :=
   R.refine_L4 (build_to_L4 nil p1) (build_to_L4 nil p2).

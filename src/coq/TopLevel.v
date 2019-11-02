@@ -168,22 +168,22 @@ Module TopLevelEnv <: Environment.
   Notation res_L4 := (memory * (local_env * stack * (global_env * dvalue)))%type (* (only parsing) *).
 
   (* Initialization and denotation of a Vellvm program *)
-  Definition build_L0 (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
+  Definition denote_vellvm (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
     build_global_environment mcfg ;;
-                             'defns <- map_monad address_one_function (m_definitions mcfg) ;;
-                             'addr <- trigger (GlobalRead (Name "main")) ;;
-                             D.denote_mcfg defns DTYPE_Void addr main_args.
+    'defns <- map_monad address_one_function (m_definitions mcfg) ;;
+    'addr <- trigger (GlobalRead (Name "main")) ;;
+    D.denote_mcfg defns DTYPE_Void addr main_args.
 
   (* Interpretation of the global environment *)
-  Definition build_L1 (trace : itree L0 res_L0) : itree L1 res_L1 :=
+  Definition build_L1 {R} (trace : itree L0 R) : itree L1 (global_env * R) :=
     interp_global trace [].
 
   (* Interpretation of the local environment: map and stack *)
-  Definition build_L2 (trace : itree L1 res_L1) : itree L2 res_L2 :=
+  Definition build_L2 {R} (trace : itree L1 R) : itree L2 (local_env * stack * R) :=
     interp_local_stack (@handle_local _ _ _ _ _ _ _) trace ([], []).
 
   (* Interpretation of the memory *)
-  Definition build_L3 (trace : itree L2 res_L2) : itree L3 res_L3 :=
+  Definition build_L3 {R} (trace : itree L2 R) : itree L3 (memory * R) :=
     M.interp_memory trace (M.empty, [[]]).
 
   (* Interpretation of under-defined values as 0 *)
@@ -208,7 +208,7 @@ Module TopLevelEnv <: Environment.
   Definition interpret_mcfg_user (user_intrinsics: IS.intrinsic_definitions) (prog: CFG.mcfg typ) : itree L5 res_L4 :=
     let mcfg := normalize_types prog in
 
-    let L0_trace          := build_L0 mcfg in
+    let L0_trace          := denote_vellvm mcfg in
     let L0_trace'         := INT.interpret_intrinsics user_intrinsics L0_trace in
     let L1_trace          := build_L1 L0_trace' in
     let L2_trace          := build_L2 L1_trace in
@@ -232,14 +232,16 @@ Module TopLevelEnv <: Environment.
 
   (** Definition of the semantics -- a propositional model that serves as official specification of the language *)
 
+  Definition run_state {E A env} (R : Monads.stateT env (itree E) A) (st: env) : itree E (env * A) := R st.
+
   Definition model_mcfg_user (user_intrinsics: IS.intrinsic_definitions) (prog: CFG.mcfg typ) : PropT (itree L5) res_L3 :=
     let mcfg := normalize_types prog in
 
-    let L0_trace        := build_L0 mcfg in
+    let L0_trace        := denote_vellvm mcfg in
     let L0_trace'       := INT.interpret_intrinsics user_intrinsics L0_trace in
-    let L1_trace        := build_L1 L0_trace' in
-    let L2_trace        := build_L2 L1_trace in
-    let L3_trace        := build_L3 L2_trace in
+    let L1_trace        := run_state (interp_global L0_trace') [] in
+    let L2_trace        := run_state (interp_local_stack (@handle_local _ _ _ _ _ _ _) L1_trace) ([],[]) in
+    let L3_trace        := run_state (M.interp_memory L2_trace) (M.empty, [[]]) in
     let L4_trace        := model_L4 L3_trace in
     let L5_trace        := model_L5 L4_trace in
     L5_trace.
