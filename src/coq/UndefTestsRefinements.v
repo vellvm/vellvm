@@ -28,7 +28,12 @@ From ITree Require Import
 
 From ExtLib Require Import
      Structures.Monads
-     Structures.Maps.
+     Structures.Maps
+     Core.RelDec
+     Programming.Eqv.
+
+Import EqvNotation.
+
 
 Import ITree.Basics.Basics.Monads.
 
@@ -81,7 +86,6 @@ Theorem undef_refines_mul_undef_undef:
 Proof.
   constructor.
   intros dv H.
-  Print dvalue.
   apply Concretize_IBinop with (dv1:=DVALUE_I64 one) (dv2:=dv).
   - apply Concretize_Undef. constructor.
   - auto.
@@ -122,25 +126,12 @@ Definition refine_cfg_L2 c1 c2 := eutt (TT × (TT × refine_uvalue)) (cfg_interp
 (* -------------------------------------------------- *)
 (* Block substitution into CFG.                       *)
 (* -------------------------------------------------- *)
-Fixpoint replace_pred {A} (p : A -> bool) (a : A) (xs : list A) : list A :=
-  match xs with
-  | nil => nil
-  | (x::xs') =>
-    if p x
-    then a :: xs'
-    else x :: replace_pred p a xs'
-  end.
-
-From ExtLib Require Import
-     Core.RelDec
-     Programming.Eqv.
-
-Import EqvNotation.
 
 (* Replace a block with a given block r if the ids match *)
 Definition replace_block {T} (r : block T) (b : block T) : block T :=
   if blk_id b ~=? blk_id r then r else b.
 
+(* Endomorphism for replacing blocks that have the same id as a given block *)
 Section block_replace.
   Variable T : Set.
   Variable b : block T.
@@ -155,15 +146,6 @@ Section block_replace.
 End block_replace.
 
 
-(*
-Definition block_subst {T} (c : cfg T) (b : block T) : cfg T :=
-  let bid := blk_id b in
-  let blk_id_eq (b : block T) := if blk_id b ~=? bid then true else false
-  in match c with
-     | mkCFG init blks args => mkCFG T init (replace_pred blk_id_eq b blks) args
-     end.
-*)
-
 (* CB TODO: bad name *)
 Lemma blk_id_eq :
   forall T b bid,
@@ -173,27 +155,6 @@ Proof.
   intros T b bid H.
   destruct (blk_id b ~=? bid) eqn:Hbid; firstorder.
 Qed.
-
-Lemma find_replace_pred :
-  forall T p l x y,
-    find p l = Some x ->
-    (p x = true -> p y = true) ->
-    find p (@replace_pred T p y l) = Some y.
-Proof.
-  intros T p l; induction l; intros x y Hf Hp.
-  - inversion Hf.
-  - pose proof (find_some _ _ Hf) as [Hin Hpx].
-    destruct Hin as [Hxa | Hinl].
-    + simpl; subst. rewrite Hpx.
-      simpl. rewrite (Hp Hpx).
-      reflexivity.
-    + simpl. simpl in Hf.
-      destruct (p a) eqn:Hpa.
-      * simpl. rewrite (Hp Hpx). reflexivity.
-      * simpl. rewrite Hpa.
-        eapply IHl; eauto.
-Qed.
-
 
 Lemma find_map :
   forall T p (l : list T) x y,
@@ -214,7 +175,6 @@ Proof.
       * simpl. rewrite Hpa.
         eapply IHl; eauto.
 Qed.
-
 
 (* CB: TODO bad name *)
 Lemma blk_id_eq_if :
@@ -271,18 +231,124 @@ Proof.
   apply blk_id_eq in Hideq; firstorder.
 Qed.
 
+
+Inductive is_read_exp {T} : exp T -> ident -> Prop :=
+| is_read_Ident  : forall id, is_read_exp (EXP_Ident id) id
+| is_read_Struct : forall id t fields e, In (t, e) fields -> is_read_exp e id -> is_read_exp (EXP_Struct fields) id
+| is_read_Packed : forall id t fields e, In (t, e) fields -> is_read_exp e id -> is_read_exp (EXP_Packed_struct fields) id
+| is_read_Array  : forall id t elts e, In (t, e) elts -> is_read_exp e id -> is_read_exp (EXP_Array elts) id
+| is_read_Vector  : forall id t elts e, In (t, e) elts -> is_read_exp e id -> is_read_exp (EXP_Vector elts) id
+| is_read_IBinop_left : forall id op t l r, is_read_exp l id -> is_read_exp (OP_IBinop op t l r) id
+| is_read_IBinop_right : forall id op t l r, is_read_exp r id -> is_read_exp (OP_IBinop op t l r) id
+| is_read_FBinop_left : forall id op fm t l r, is_read_exp l id -> is_read_exp (OP_FBinop op fm t l r) id
+| is_read_FBinop_right : forall id op fm t l r, is_read_exp r id -> is_read_exp (OP_FBinop op fm t l r) id
+| is_read_FCMP_left : forall cmp t l r id, is_read_exp l id -> is_read_exp (OP_FCmp cmp t l r) id
+| is_read_FCMP_right : forall cmp t l r id, is_read_exp r id -> is_read_exp (OP_FCmp cmp t l r) id
+| is_read_Conversion : forall conv t_f v t_t id, is_read_exp v id -> is_read_exp (OP_Conversion conv t_f v t_t) id
+| is_read_GetElementPtr_ptr: forall (t:T) (ptrval:(T * exp T)) (idxs:list (T * exp T)) id,
+    is_read_exp (snd ptrval) id ->
+    is_read_exp (OP_GetElementPtr t ptrval idxs) id
+| is_read_GetElementPtr_idx: forall (t:T) t' e (ptrval:(T * exp T)) (idxs:list (T * exp T)) id,
+    In (t', e) idxs -> is_read_exp e id ->
+    is_read_exp (OP_GetElementPtr t ptrval idxs) id
+
+| is_read_ExtractElement_vec: forall (vec:(T * exp T)) (idx:(T * exp T)) id,
+    is_read_exp (snd vec) id ->
+    is_read_exp (OP_ExtractElement vec idx) id
+| is_read_ExtractElement_idx: forall (vec:(T * exp T)) (idx:(T * exp T)) id,
+    is_read_exp (snd idx) id ->
+    is_read_exp (OP_ExtractElement vec idx) id
+
+| is_read_InsertElement_vec: forall (vec:(T * exp T)) (elt:(T * exp T)) (idx:(T * exp T)) id,
+    is_read_exp (snd vec) id ->
+    is_read_exp (OP_InsertElement vec elt idx) id
+| is_read_InsertElement_idx: forall (vec:(T * exp T)) (elt:(T * exp T)) (idx:(T * exp T)) id,
+    is_read_exp (snd idx) id ->
+    is_read_exp (OP_InsertElement vec elt idx) id
+
+| is_read_ShuffleVector_left: forall (vec1:(T * exp T)) (vec2:(T * exp T)) (idxmask:(T * exp T)) id,
+    is_read_exp (snd vec1) id ->
+    is_read_exp (OP_ShuffleVector vec1 vec2 idxmask) id
+| is_read_ShuffleVector_right: forall (vec1:(T * exp T)) (vec2:(T * exp T)) (idxmask:(T * exp T)) id,
+    is_read_exp (snd vec2) id ->
+    is_read_exp (OP_ShuffleVector vec1 vec2 idxmask) id
+| is_read_ShuffleVector_idx: forall (vec1:(T * exp T)) (vec2:(T * exp T)) (idxmask:(T * exp T)) id,
+    is_read_exp (snd idxmask) id ->
+    is_read_exp (OP_ShuffleVector vec1 vec2 idxmask) id
+
+| is_read_ExtractValue: forall (vec:(T * exp T)) (idxs:list int) id,
+    is_read_exp (snd vec) id ->
+    is_read_exp (OP_ExtractValue vec idxs) id
+
+| is_read_InsertValue_vec: forall (vec:(T * exp T)) (elt:(T * exp T)) (idxs:list int) id,
+    is_read_exp (snd vec) id ->
+    is_read_exp (OP_InsertValue vec elt idxs) id
+| is_read_InsertValue_elt: forall (vec:(T * exp T)) (elt:(T * exp T)) (idxs:list int) id,
+    is_read_exp (snd elt) id ->
+    is_read_exp (OP_InsertValue vec elt idxs) id
+
+| is_read_Select_cnd: forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)) id,
+    is_read_exp (snd cnd) id ->
+    is_read_exp (OP_Select cnd v1 v2) id
+| is_read_Select_v1: forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)) id,
+    is_read_exp (snd v1) id ->
+    is_read_exp (OP_Select cnd v1 v2) id
+| is_read_Select_v2: forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)) id,
+    is_read_exp (snd v2) id ->
+    is_read_exp (OP_Select cnd v1 v2) id.
+
+Fixpoint is_read_instr {T} (id : ident) (i : instr T) : Prop :=
+  match i with
+  | INSTR_Comment msg       => False
+  | INSTR_Op op             => is_read_exp op id
+  | INSTR_Call fn args      => is_read_exp (snd fn) id \/ Exists (fun '(_,e) => is_read_exp e id) args
+  | INSTR_Alloca t nb align => match nb with
+                              | None => False
+                              | Some (_, e) => is_read_exp e id
+                              end
+
+  | INSTR_Load volatile t ptr align    => is_read_exp (snd ptr) id
+  | INSTR_Store volatile val ptr align => is_read_exp (snd ptr) id \/ is_read_exp (snd val) id
+  | INSTR_Fence                        => False
+  | INSTR_AtomicCmpXchg                => False
+  | INSTR_AtomicRMW                    => False
+  | INSTR_Unreachable                  => False
+  | INSTR_VAArg                        => False
+  | INSTR_LandingPad                   => False
+  end.
+
+Definition is_read_phi {T} (id : ident) (p : phi T) : Prop :=
+  match p with
+  | Phi _ args => Exists (fun '(_, e) => is_read_exp e id) args
+  end.
+
+Fixpoint is_read_block {T} (id : ident) (b : block T) : Prop :=
+  let phis   := map snd (blk_phis b) in
+  let instrs := map snd (blk_code b) in
+  Exists (is_read_phi id) phis \/ Exists (is_read_instr id) instrs
+.
+
+Fixpoint is_read {T} (c : cfg T) (id : ident) (b : block T) : Prop :=
+  match c with
+  | mkCFG init blks args =>
+    let bid := blk_id b in
+    Exists (fun b' => if blk_id b' ~=? bid
+                   then False
+                   else is_read_block id b') blks
+  end.
+
 Theorem bl2_subst_cfgl2 :
   forall (b1 b2 : block dtyp) (blks : list (block dtyp)) (c : cfg dtyp),
     refine_block_L2 b1 b2 ->
     blk_id b1 = blk_id b2 ->
-    refine_cfg_L2 (block_subst c b1)
-                  (block_subst c b2).
+    refine_cfg_L2 (cfg_replace_block _ b1 c)
+                  (cfg_replace_block _ b2 c).
 Proof.
   intros b1 b2 blks c Hrefb Hids.
   unfold refine_cfg_L2, refine_block_L2 in *.
   unfold cfg_interp_L2, cfg_interp_L1, block_interp_L2, block_interp_L1 in *.
   tau_steps.
-
+  cbn. unfold f_endo. unfold endo_list. rewrite cfg_replace_block_find.
   unfold cat.
 Qed.
 
