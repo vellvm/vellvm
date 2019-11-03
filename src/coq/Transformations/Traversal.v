@@ -257,6 +257,22 @@ Section Traverse.
               (f_endo (dc_align d))
               (f_endo (dc_gc d)).
 
+    Global Instance endo_metadata
+           `{endo T}
+           `{endo (exp T)}
+           `{endo raw_id}
+           `{endo string}
+      : endo (metadata T) | 50 :=
+      fix endo_metadata m :=
+        match m with
+        | METADATA_Const  tv => METADATA_Const (f_endo tv)
+        | METADATA_Null => METADATA_Null
+        | METADATA_Id id => METADATA_Id (f_endo id)
+        | METADATA_String str => METADATA_String (f_endo str)
+        | METADATA_Named strs => METADATA_Named (f_endo strs)
+        | METADATA_Node mds => METADATA_Node (List.map endo_metadata mds)
+        end.
+
     Global Instance endo_definition
            {FnBody:Set}
            `{endo (declaration T)}
@@ -324,6 +340,25 @@ Section Traverse.
                   (f_endo (blks _ p))
                   (f_endo (args _ p)).
 
+    Global Instance endo_mcfg
+           {FnBody:Set}
+           `{endo T}
+           `{endo FnBody}
+           `{endo string}
+           `{endo raw_id}
+           `{endo (global T)}
+           `{endo (declaration T)}
+           `{endo (definition T FnBody)}
+      : endo (modul T FnBody) | 50 :=
+      fun p => mk_modul _
+                  (f_endo (m_name p))
+                  (f_endo (m_target p))
+                  (f_endo (m_datalayout p))
+                  (f_endo (m_type_defs p))
+                  (f_endo (m_globals p))
+                  (f_endo (m_declarations p))
+                  (f_endo (m_definitions p)).
+
   End Syntax.
 
   Section Semantics.
@@ -349,69 +384,11 @@ Section Traverse.
 
   End Semantics.
 
-    (* By default, the solver can always pick the identity as an instance.
+  (* By default, the solver can always pick the identity as an instance.
      However both structural traversal from this section and local
      instances should always have priority over this, hence the 100.
-     *)
-    Global Instance endo_id (T: Set): endo T | 100 := fun x: T => x.
-
-  End Traverse.
-
-  Section Swap.
-
-    Class Swap (A:Type) := swap : raw_id -> raw_id -> A -> A.
-
-    From ExtLib Require Import
-         Programming.Eqv
-         Structures.Monads.
-
-    From Vellvm Require Import
-         AstLib.
-
-    Import EqvNotation.
-
-    Definition swap_raw_id (id1 id2:raw_id) (id:raw_id) : raw_id :=
-      if id ~=? id1 then id2 else
-        if id ~=? id2 then id1 else
-          id.
-
-    (* Here's some random cfg *)
-    Definition foo :=
-      {|
-        init := Anon 0%Z;
-        blks := [{|
-                    blk_id := Anon 0%Z;
-                    blk_phis := [];
-                    blk_code := [(IId (Anon 1%Z),
-                                  INSTR_Op
-                                    (OP_IBinop (Add false false) (TYPE_I 32%Z) (EXP_Integer 5%Z) (EXP_Integer 9%Z)));
-                                   (IId (Anon 2%Z),
-                                    INSTR_Op
-                                      (OP_IBinop (Add false false) (TYPE_I 32%Z) (EXP_Ident (ID_Local (Anon 1%Z)))
-                                                 (EXP_Integer 15%Z)))];
-                    blk_term := (IVoid 0%Z, TERM_Ret (TYPE_I 32%Z, EXP_Ident (ID_Local (Anon 2%Z))));
-                    blk_comments := None |}];
-        args := [ID_Local (Name "argc"); ID_Local (Name "arcv")] |}.
-
-    (* We can define a generic endomorphism that will do the traversal without altering anything *)
-    Definition dummy_swap_cfg: endo (cfg typ) := f_endo.
-    (* And it does indeed do nothing *)
-    Eval compute in dummy_swap_cfg foo.
-
-    (* But now let's simply hijack the endomorphism for [raw_id] by declaring a local instance of [endo] *)
-    Variable id1 id2: raw_id.
-    Instance swap_endo_raw_id : endo raw_id := swap_raw_id id1 id2.
-    (* And still rely on type classes to define the swap at the level of cfgs *)
-    Definition swap_cfg: endo (cfg typ) := f_endo.
-
-    (* We now get an [endo] that does the substitution in the leaves (albeit not concretely here since of course since [id1] and [id2] are not instantiated *)
-    Eval compute in swap_cfg foo.
-
-  (* Note however that we _need_ to fix [id1] and [id2] as variables, the following does not work:
-
-     Instance swap_endo_raw_id (id1 id2: raw_id): endo raw_id := swap_raw_id id1 id2.
-     Definition swap_cfg (id1 id2: raw_id): endo (cfg typ) := f_endo.
-
    *)
+  Global Instance endo_id (T: Set): endo T | 100 := fun x: T => x.
 
-  End Swap.
+End Traverse.
+

@@ -27,13 +27,15 @@ Inductive refine_uvalue: uvalue -> uvalue -> Prop :=
 | UndefPoison: forall t, refine_uvalue (UVALUE_Undef t) UVALUE_Poison (* CB / YZ: TODO, type for poison? *)
 | RefineConcrete: forall uv1 uv2, (forall dv, concretize uv1 dv -> concretize uv2 dv) -> refine_uvalue uv1 uv2
 .
+Hint Constructors refine_uvalue.
 
 Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
 Proof.
-  unfold Reflexive. intros x.
-  induction x; constructor; auto.
+  repeat intro; auto.
 Qed.
 
+(* YZ: The following is unlikely to be useful I believe. *)
+(*
 Inductive refine_dvalue: dvalue -> dvalue -> Prop :=
 | DvalueRefl : forall v, refine_dvalue v v
 | Poison : forall v, refine_dvalue v DVALUE_Poison
@@ -44,6 +46,7 @@ Proof.
   unfold Reflexive. intros x.
   induction x; constructor; auto.
 Qed.
+ *)
 
 Infix "×" := prod_rel (at level 90, left associativity).
 
@@ -77,12 +80,10 @@ Definition refine_L3 : relation (itree L3 (memory * (local_env * stack * (global
 Definition refine_L4 : relation ((itree L4 (memory * (local_env * stack * (global_env * uvalue)))) -> Prop)
   := fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt refine_res3 t t'.
 
+(*
 Definition refine_res4 : relation (memory * (local_env * stack * (global_env * dvalue)))
   := TT × (TT × (TT × refine_dvalue)).
-
-(* Refinement for after interpreting pick, specializing to 0. *)
-Definition refine_L4_concrete : relation (itree L4 (memory * (local_env * stack * (global_env * dvalue))))
-  := eutt refine_res4.
+ *)
 
 Definition refine_L5 : relation ((itree L5 (memory * (local_env * stack * (global_env * uvalue)))) -> Prop)
   := fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt refine_res3 t t'.

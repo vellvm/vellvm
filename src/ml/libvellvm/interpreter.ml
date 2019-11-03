@@ -91,4 +91,4 @@ let rec step (m : ('a TopLevel.IO.coq_L5, TopLevel.TopLevelEnv.memory * ((TopLev
 
 
 let interpret (prog:(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
-  step (TopLevel.interpreter prog)
+  step (TopLevel.TopLevelEnv.interpreter prog)
