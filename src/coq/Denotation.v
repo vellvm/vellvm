@@ -848,7 +848,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       (* The denotation of an itree function is a coq function that takes
          a list of dvalues and returns the appropriate semantics. *)
       Definition function_denotation : Type :=
-        list dvalue -> itree fun_E uvalue.
+        list dvalue -> itree L0 uvalue.
 
       Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation  :=
         fun (args : list dvalue) =>
@@ -858,7 +858,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
              (* generate the corresponding writes to the local stack frame *)
           trigger MemPush ;;
           trigger (StackPush (map (fun '(k,v) => (k, dvalue_to_uvalue v)) bs)) ;;
-          rv <- translate instr_E_to_fun_E (denote_cfg (df_instrs df)) ;;
+          rv <- translate instr_E_to_L0 (denote_cfg (df_instrs df)) ;;
           trigger StackPop ;;
           trigger MemPop ;;
           ret rv.
@@ -879,7 +879,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
 (* SAZ: for "open" MCFGs we have
     - (m_declarations CFG) is the set of possible ExternalCalls
-    - (List.map df_prototype (m_definitions CFG)) is the set of possilbe Entry Functions  (also internal calls)
+    - (List.map df_prototype (m_definitions CFG)) is the set of possible Entry Functions  (also internal calls)
  *)
       Definition lookup_defn {B} := (@assoc _ B (@dvalue_eq_dec)).
 
@@ -894,7 +894,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                      match (lookup_defn fv fundefs) with
                      | Some f_den => (* If the call is internal *)
                        (* and denote the [cfg]. *)
-                       translate _funE_to_INTERNAL (f_den args)
+                       translate L0_to_INTERNAL (f_den args)
                      | None =>
                        (* This must have been a registered external function  *)
                        (* We _don't_ push a itree stack frame, since the external *)
@@ -907,4 +907,5 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                      end
                    end
                 ) _ (Call dt f_value args).
+
 End Denotation.

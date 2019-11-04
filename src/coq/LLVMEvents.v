@@ -185,22 +185,21 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Definition exp_E_to_instr_E : exp_E ~> instr_E:=
     fun T e => inr1 (inr1 e).
 
-  Definition fun_E := LLVMStackE +' CallE +' IntrinsicE +' exp_E.
-  Definition instr_E_to_fun_E : instr_E ~> fun_E :=
-    fun T e => inr1 e.
-
   (* Core effects - no distinction between "internal" and "external" calls. *)
   Definition L0 := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
-  Definition _funE_to_L0 : fun_E ~> L0 :=
-    fun R e =>
+  Definition instr_E_to_L0 : instr_E ~> L0 :=
+    fun T e =>
       match e with
-      | inl1 e' => (inr1 (inr1 (inr1 (inl1 (inr1 e')))))
-      | inr1 (inl1 e') => inl1 e'
-      | inr1 (inr1 (inl1 e')) => (inr1 (inl1 e'))
-      | inr1 (inr1 (inr1 (inl1 e'))) => (inr1 (inr1 (inl1 e')))
-      | inr1 (inr1 (inr1 (inr1 (inl1 e')))) => (inr1 (inr1 (inr1 (inl1 (inl1 e')))))
-      | inr1 (inr1 (inr1 (inr1 (inr1 e)))) => (inr1 (inr1 (inr1 (inr1 e))))
+      | inl1 e => inl1 e
+      | inr1 (inl1 e) => inr1 (inl1 e)
+      | inr1 (inr1 (inl1 e)) => (inr1 (inr1 (inl1 e)))
+      | inr1 (inr1 (inr1 (inl1 e))) => inr1 (inr1 (inr1 ((inl1 (inl1 e)))))
+      | inr1 (inr1 (inr1 (inr1 (inl1 e)))) => inr1 (inr1 (inr1 (inr1 (inl1 e))))
+      | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))
+      | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))
+      | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))
+      | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e))))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))))
       end.
 
   (* Distinction made between internal and external calls -- intermediate step in denote_mcfg.
@@ -226,10 +225,8 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
       | inr1 e' => inr1 (inr1 e')
       end.
 
-  Definition _funE_to_INTERNAL (T:Type) e := @L0_to_INTERNAL T (_funE_to_L0 e).
-
   Definition _exp_E_to_L0 : exp_E ~> L0 :=
-    fun T e => @_funE_to_L0 T (instr_E_to_fun_E (exp_E_to_instr_E e)).
+    fun T e => instr_E_to_L0 (exp_E_to_instr_E e).
 
   Definition _failure_UB_to_ExpE : (FailureE +' UBE) ~> exp_E :=
     fun T e =>

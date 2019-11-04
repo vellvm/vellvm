@@ -39,7 +39,7 @@ From Vellvm Require Import
      Handlers.Stack
      Handlers.Memory
      LLVMEvents
-     Transformation
+     Transformations.Transformation
      Traversal
      TopLevelRefinements.
 
@@ -218,7 +218,7 @@ Section Swap.
   Hint Constructors list_rel.
 
   Definition foo_rel {X}:
-    relation (FMapAList.alist raw_id res_L0 * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (dvalue * (list dvalue -> itree IO.fun_E res_L0)))) := (Logic.eq × (Logic.eq × list_rel (Logic.eq × (fun d1 d2 => forall x, d1 x ≈ d2 x)))).
+    relation (FMapAList.alist raw_id res_L0 * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (dvalue * (list dvalue -> itree IO.L0 res_L0)))) := (Logic.eq × (Logic.eq × list_rel (Logic.eq × (fun d1 d2 => forall x, d1 x ≈ d2 x)))).
   Hint Unfold foo_rel.
 
   Global Instance list_rel_refl {R: Type} {RR: relation R} `{Reflexive _ RR} : Reflexive (list_rel RR).

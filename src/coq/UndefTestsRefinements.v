@@ -122,7 +122,6 @@ Definition cfg_interp_L3 (c : cfg dtyp) := M.interp_memory (cfg_interp_L2 c) (M.
 
 Definition refine_cfg_L2 c1 c2 := eutt (TT × (TT × refine_uvalue)) (cfg_interp_L2 c1) (cfg_interp_L2 c2).
 
-
 (* -------------------------------------------------- *)
 (* Block substitution into CFG.                       *)
 (* -------------------------------------------------- *)
@@ -144,7 +143,6 @@ Section block_replace.
   Definition cfg_replace_block : endo (cfg T)
     := f_endo.
 End block_replace.
-
 
 (* CB TODO: bad name *)
 Lemma blk_id_eq :
