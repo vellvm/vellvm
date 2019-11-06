@@ -97,16 +97,19 @@ Section Swap.
   .
   Hint Constructors list_rel.
 
-  Definition foo_rel {X}:
+  (* In top-level, [address_one_function] is mapped to return notably a mapping from function addresses to itrees.
+     We hence want to get extensional eutt over the returned type.
+   *)
+  Definition function_rel {X}:
     relation (FMapAList.alist raw_id res_L0 * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (dvalue * (list dvalue -> itree IO.L0 res_L0)))) := (Logic.eq × (Logic.eq × list_rel (Logic.eq × (fun d1 d2 => forall x, d1 x ≈ d2 x)))).
-  Hint Unfold foo_rel.
+  Hint Unfold function_rel.
 
   Global Instance list_rel_refl {R: Type} {RR: relation R} `{Reflexive _ RR} : Reflexive (list_rel RR).
   Proof.
     intros l; induction l as [| hd tl IH]; auto.
   Qed.
 
-  Global Instance foo_rel_refl {X}: Reflexive (@foo_rel X).
+  Global Instance function_rel_refl {X}: Reflexive (@function_rel X).
   Proof.
     repeat apply prod_rel_refl; auto.
     eapply list_rel_refl.
@@ -116,9 +119,9 @@ Section Swap.
     reflexivity.
   Qed.
 
-  Lemma interp_to_L2_map_monad: forall ui {X} (f: X -> itree _ (dvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
-      (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (Logic.eq × (fun d1 d2 => forall x, d1 x ≈ d2 x)))) (interp_to_L2 ui (f x) s1 s2) (interp_to_L2 ui (f (g x)) s1 s2)) ->
-      eutt foo_rel (interp_to_L2 ui (map_monad f l) s1 s2) (interp_to_L2 ui (map_monad f (map g l)) s1 s2).
+  Lemma interp_to_L2_map_monad: forall {X} (f: X -> itree _ (dvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
+      (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (Logic.eq × (fun d1 d2 => forall x, d1 x ≈ d2 x)))) (interp_to_L2 nil (f x) s1 s2) (interp_to_L2 nil (f (g x)) s1 s2)) ->
+      eutt function_rel (interp_to_L2 nil (map_monad f l) s1 s2) (interp_to_L2 nil (map_monad f (map g l)) s1 s2).
   Proof.
     induction l as [| x l IH]; simpl; intros; [reflexivity |].
     rewrite 2 interp_to_L2_bind.
@@ -152,12 +155,57 @@ Section Swap.
     }
 
     rewrite 2 interp_to_L2_bind.
-    apply eutt_clo_bind with foo_rel.
+    (* We use [function_rel] here to establish that we get piece-wise eutt when denoting each function *)
+    apply eutt_clo_bind with function_rel.
 
     {
       (* Denotation of each cfg *)
+      (* Here we need to actually establish something different than equality of states, but rather extensional agreement after renaming *)
       apply interp_to_L2_map_monad.
+      intros cfg g l HIN.
+      unfold address_one_function.
+      simpl.
+      rewrite 2 interp_to_L2_bind.
+      split_bind.
+      { (* Getting the address of the function *)
+        admit.
+      }
+      rewrite 2 interp_to_L2_ret.
+      apply eqit_Ret.
+      do 3 constructor; auto.
+      intros args.
+      destruct cfg.
+      unfold f_endo, endo_definition; simpl.
+      unfold D.denote_function.
+      simpl.
+      apply eutt_clo_bind with (UU := Logic.eq).
+      (* Debug message, to remove / deal with *)
       admit.
+      intros ? ? ->.
+      apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros [] [] _].
+      apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros [] [] _].
+      apply eutt_clo_bind with (UU := Logic.eq); [| intros ? ? ->; reflexivity].
+      apply eutt_translate'.
+
+      unfold D.denote_cfg.
+(*
+      Set Nested Proofs Allowed.
+      Lemma denote_cfg_comp:
+        forall  {E} (body body': (block_id + block_id) -> itree E (block_id + block_id)) (x: block_id) (f: endo block_id),
+          (forall l, body l ≈ body' (f l)) ->
+          loop body x ≈ loop body' (f x).
+
+      unfold D.denote_cfg.
+      unfold f_endo. endo_cfg. simpl.
+      unfold eqm.
+      Instance loop_Proper:
+        Proper () loop
+      (* Set Printing Implicit. *)
+      apply (@Proper_loop.
+*)
+
+      admit.
+
     }
 
     intros (? & ? & ?) (? & ? & ?) EQ.
