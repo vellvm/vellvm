@@ -2,7 +2,8 @@ From Vellvm Require Import
      CFG
      LLVMAst
      TopLevel
-     TopLevelRefinements.
+     TopLevelRefinements
+     DynamicTypes.
 
 From ITree Require Import
      ITree.
@@ -13,8 +14,9 @@ From Coq Require Export
 Import R.
 Import TopLevelEnv.
 
-Definition transformation := mcfg typ -> mcfg typ.
+Definition transformation := mcfg dtyp -> mcfg dtyp.
 
 Definition transformation_correct (T: transformation): Prop :=
-  forall p, refine_L5 (model_mcfg p) (model_mcfg (T p)).
+  forall p, refine_mcfg nil p (T p).
+
 

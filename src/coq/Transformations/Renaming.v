@@ -54,8 +54,7 @@ From ExtLib Require Import
 
 From Vellvm Require Import
      AstLib.
-  Import ListNotations.
-
+Import ListNotations.
 
 Import EqvNotation.
 Import TopLevel.
@@ -63,14 +62,6 @@ Import TopLevelEnv.
 Import R.
 
 Import MonadNotation.
-(* This should move to the library *)
-Lemma eq_itree_clo_bind {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop) {U1 U2 UU} t1 t2 k1 k2
-      (EQT: @eq_itree E U1 U2 UU t1 t2)
-      (EQK: forall u1 u2, UU u1 u2 -> eq_itree RR (k1 u1) (k2 u2)):
-  eq_itree RR (x <- t1;; k1 x) (x <- t2;; k2 x).
-Proof.
-  eapply eqit_bind'; eauto.
-Qed.
 
 Section Swap.
 
@@ -88,126 +79,15 @@ Section Swap.
   Definition swap_mcfg: transformation := f_endo.
   Definition swap_dmcfg: endo (mcfg dtyp) := f_endo.
 
+  (*
+    For now we forget about normalization of types, we reason after it happened.
+    I'll see how to plug it back in the story later.
   Lemma normalize_types_swap: forall p,
       normalize_types (swap_mcfg p) = swap_dmcfg (normalize_types p).
   Proof.
   Admitted.
-
-  (* Definition build_to_L2_dmcfg (prog: mcfg dtyp) := *)
-  (*   let trace        := build_L0 prog in *)
-  (*   interp_to_L2 trace [] ([],[]). *)
-
-  (* Definition refine_mcfg_L2_dmcfg (p1 p2: mcfg dtyp): Prop := *)
-  (*   R.refine_L2 (build_to_L2_dmcfg p1) (build_to_L2_dmcfg p2). *)
-
-  (* Instance eutt_build_L1_proper {R}: *)
-  (*   Proper (eutt (@Logic.eq R) ==> eutt Logic.eq) build_L1. *)
-  (* Admitted. *)
-
-  (* Instance eutt_build_L2_proper {R}: *)
-  (*   Proper (eutt (@Logic.eq R) ==> eutt Logic.eq) build_L2. *)
-  (* Admitted. *)
-
-  (* Instance eutt_refine_L2_proper: *)
-  (*   Proper (eutt Logic.eq ==> eutt Logic.eq ==> iff) refine_L2. *)
-  (* Admitted. *)
-
-
-  Lemma interp_intrinsics_bind :
-    forall (R S : Type) l (t : itree _ R) (k : R -> itree _ S),
-      INT.interpret_intrinsics l (ITree.bind t k) ≅ ITree.bind (INT.interpret_intrinsics l t) (fun r : R => INT.interpret_intrinsics l (k r)).
-  Proof.
-    intros; apply interp_bind.
-  Qed.
-
-  Lemma interp_intrinsics_ret :
-    forall (R : Type) l (x: R),
-      INT.interpret_intrinsics l (Ret x) ≅ Ret x.
-  Proof.
-    intros; apply interp_ret.
-  Qed.
-
-  Lemma interp_global_bind :
-    forall {E F G} `{FailureE -< E +' F +' G}
-      (R S : Type) (t : itree _ R) (k : R -> itree _ S) s,
-      run_state (@interp_global raw_id dvalue (list (raw_id * dvalue)) _ _ E F G _ _ (ITree.bind t k)) s ≅
-      ITree.bind (run_state (interp_global t) s) (fun '(s',r) => run_state (interp_global (k r)) s').
-  Proof.
-    intros.
-    unfold interp_global.
-    setoid_rewrite interp_state_bind.
-    apply eq_itree_clo_bind with (UU := Logic.eq).
-    reflexivity.
-    intros [] [] EQ; inv EQ; reflexivity.
-  Qed.
-
- Lemma interp_global_ret :
-    forall {E F G} `{FailureE -< E +' F +' G} (R : Type) g (x: R),
-      run_state (@interp_global raw_id dvalue (list (raw_id * dvalue)) _ _ E F G _ _ (Ret x)) g ≅ Ret (g,x).
-  Proof.
-    intros; apply interp_state_ret.
-  Qed.
-
-  Lemma interp_local_stack_bind :
-    forall (R S: Type) (t : itree IO.L1 _) (k : R -> itree IO.L1 S) s,
-      run_state (interp_local_stack (handle_local (v:=res_L0)) (ITree.bind t k)) s ≅
-                ITree.bind (run_state (interp_local_stack (handle_local (v:=res_L0)) t) s)
-                (fun '(s',r) => run_state (interp_local_stack (handle_local (v:=res_L0)) (k r)) s').
-  Proof.
-    intros.
-    unfold interp_local_stack.
-    setoid_rewrite interp_state_bind.
-    apply eq_itree_clo_bind with (UU := Logic.eq).
-    reflexivity.
-    intros [] [] EQ; inv EQ; reflexivity.
-  Qed.
-
- Lemma interp_local_stack_ret :
-    forall {E F G} `{FailureE -< E +' F +' G} (R : Type) l (x: R),
-      run_state (@interp_local_stack raw_id uvalue (list (raw_id * uvalue)) _ E F G _ (handle_local (v:=uvalue)) _ (Ret x)) l ≅ Ret (l,x).
-  Proof.
-    intros; apply interp_state_ret.
-  Qed.
-
-  Instance run_state_proper_eqit {E A env} : Proper (MonadTheory.eqm ==> Logic.eq ==> eutt Logic.eq) (@run_state E A env).
-  Proof.
-    repeat intro; subst; apply H.
-  Qed.
-
-  Require Import Paco.paco.
-  Instance interp_state_proper {T E F S} (h: forall T : Type, E T -> Monads.stateT S (itree F) T) : Proper (eutt Logic.eq ==> MonadTheory.eqm) (State.interp_state h (T := T)).
-  Proof.
-    einit. ecofix CIH. intros.
-
-    rewrite !unfold_interp_state. punfold H0. red in H0.
-    induction H0; intros; subst; simpl; pclearbot.
-    - eret.
-    - etau.
-    - ebind. econstructor; [reflexivity|].
-      intros; subst.
-      etau. ebase.
-    - rewrite tau_eutt, unfold_interp_state; eauto.
-    - rewrite tau_eutt, unfold_interp_state; eauto.
-  Qed.
-
+   *)
   Ltac split_bind := apply eutt_clo_bind with (UU := Logic.eq); [| intros ? (? & ? & ?) ->].
-
-  Lemma interp_to_L2_bind:
-    forall  {R S} (t: itree IO.L0 R) (k: R -> itree IO.L0 S) s1 s2,
-      interp_to_L2 (ITree.bind t k) s1 s2 ≈
-                   (ITree.bind (interp_to_L2 t s1 s2) (fun '(s1',(s2',x)) => interp_to_L2 (k x) s2' s1')).
-  Proof.
-    intros.
-    unfold interp_to_L2.
-    rewrite interp_intrinsics_bind, interp_global_bind, interp_local_stack_bind.
-    split_bind; reflexivity.
-  Qed.
-
-  Lemma interp_to_L2_ret:  forall (R : Type) s1 s2 (x : R), interp_to_L2 (Ret x) s1 s2 ≈ Ret (s2, (s1, x)).
-  Proof.
-    intros; unfold interp_to_L2.
-    rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret; reflexivity.
-  Qed.
 
   (** Logical relation for the [list] type. *)
   Inductive list_rel {A1 A2 : Type}
@@ -236,9 +116,9 @@ Section Swap.
     reflexivity.
   Qed.
 
-  Lemma interp_to_L2_map_monad: forall {X} (f: X -> itree _ (dvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
-      (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (Logic.eq × (fun d1 d2 => forall x, d1 x ≈ d2 x)))) (interp_to_L2 (f x) s1 s2) (interp_to_L2 (f (g x)) s1 s2)) ->
-      eutt foo_rel (interp_to_L2 (map_monad f l) s1 s2) (interp_to_L2 (map_monad f (map g l)) s1 s2).
+  Lemma interp_to_L2_map_monad: forall ui {X} (f: X -> itree _ (dvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
+      (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (Logic.eq × (fun d1 d2 => forall x, d1 x ≈ d2 x)))) (interp_to_L2 ui (f x) s1 s2) (interp_to_L2 ui (f (g x)) s1 s2)) ->
+      eutt foo_rel (interp_to_L2 ui (map_monad f l) s1 s2) (interp_to_L2 ui (map_monad f (map g l)) s1 s2).
   Proof.
     induction l as [| x l IH]; simpl; intros; [reflexivity |].
     rewrite 2 interp_to_L2_bind.
@@ -256,15 +136,11 @@ Section Swap.
   Qed.
 
   Lemma swap_correct_L2:
-    forall p, refine_mcfg_L2 p (swap_mcfg p).
+    forall p, refine_mcfg_L2 nil p (swap_mcfg p).
   Proof.
     intros p.
     unfold refine_mcfg_L2.
-    unfold build_to_L2.
-
-    (* Proof obligation number 1: commutation with normalize_types. *)
-    rewrite normalize_types_swap.
-    pattern (normalize_types p); generalize (normalize_types p); clear p; intros p.
+    unfold model_to_L2.
 
     unfold denote_vellvm.
     simpl; rewrite 2 interp_to_L2_bind.

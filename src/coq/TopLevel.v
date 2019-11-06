@@ -165,99 +165,109 @@ Module TopLevelEnv <: Environment.
   Notation res_L1 := (global_env * res_L0)%type (* (only parsing) *).
   Notation res_L2 := (local_env * stack * res_L1)%type (* (only parsing) *).
   Notation res_L3 := (memory * res_L2)%type (* (only parsing) *).
-  Notation res_L4 := (memory * (local_env * stack * (global_env * dvalue)))%type (* (only parsing) *).
+  Notation res_L4 := (memory * (local_env * stack * (global_env * uvalue)))%type (* (only parsing) *).
 
-  (* Initialization and denotation of a Vellvm program *)
+  (**
+     Full denotation of a Vellvm program as an interaction tree:
+     * initialize the global environment;
+     * point wise denote each function;
+     * retrieve the address of the main function;
+     * tie the mutually recursive know and run it starting from the main.
+   *)
   Definition denote_vellvm (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'addr <- trigger (GlobalRead (Name "main")) ;;
     D.denote_mcfg defns DTYPE_Void addr main_args.
 
-  (* Interpretation of the global environment *)
-  Definition build_L1 {R} (trace : itree L0 R) : itree L1 (global_env * R) :=
-    interp_global trace [].
+  (**
+     Now that we know how to denote a whole llvm program, we can _interpret_
+     the resulting [itree].
+   *)
 
-  (* Interpretation of the local environment: map and stack *)
-  Definition build_L2 {R} (trace : itree L1 R) : itree L2 (local_env * stack * R) :=
-    interp_local_stack (@handle_local _ _ _ _ _ _ _) trace ([], []).
+  (* Explicit application of a state to a [stateT] computation: convenient to ease some rewriting,
+     but semantically equivalent to simply applying the state. *)
+  Definition run_state {E A env} (R : Monads.stateT env (itree E) A) (st: env) : itree E (env * A) := R st.
 
-  (* Interpretation of the memory *)
-  Definition build_L3 {R} (trace : itree L2 R) : itree L3 (memory * R) :=
-    M.interp_memory trace (M.empty, [[]]).
+  (**
+     First, we build the interpreter that will get extracted to OCaml and allow for the interpretation
+     of compliant llvm programs.
+   *)
+  (**
+     Executable interpretation: we run the successive interpreters, and use in particular
+     the executable ones for [pick] and [UB], i.e. the ones returning back
+     into the [itree] monad.
+   *)
+  Definition interp_vellvm_exec_user {R: Type} user_intrinsics (trace: itree IO.L0 R) g l m :=
+    let L0_trace       := INT.interpret_intrinsics user_intrinsics trace in
+    let L1_trace       := run_state (interp_global L0_trace) g in
+    let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+    let L3_trace       := run_state (M.interp_memory L2_trace) m in
+    let L4_trace       := P.interp_undef L3_trace in
+    let L5_trace       := interp_UB L4_trace in
+    L5_trace.
 
-  (* Interpretation of under-defined values as 0 *)
-  (* YZ: I'm not fully convinced by this, this translate for the return value is awkward. *)
-  Definition build_L4 (trace : itree L3 res_L3) : itree L4 res_L4 :=
-    '(m, (env, (genv, uv))) <- (P.interp_undef trace);;
-     dv <- translate _failure_UB_to_L4 (P.concretize_uvalue uv);;
-     ret (m, (env, (genv, dv))).
-
-  (* Interpretation of under-defined values as 0 *)
-  Definition model_L4 (trace : itree L3 res_L3) : PropT (itree L4) res_L3 :=
-    P.model_undef trace.
-
-  Definition build_L5 (trace : itree L4 res_L4) : itree L5 res_L4 :=
-    interp_UB trace.
-
-  Definition model_L5 (trace : PropT (itree L4) res_L3) : PropT (itree L5) res_L3 :=
-    model_UB trace.
-
-  (** Definition of the executable interpreter *)
-
-  Definition interpret_mcfg_user (user_intrinsics: IS.intrinsic_definitions) (prog: CFG.mcfg typ) : itree L5 res_L4 :=
-    let mcfg := normalize_types prog in
-
-    let L0_trace          := denote_vellvm mcfg in
-    let L0_trace'         := INT.interpret_intrinsics user_intrinsics L0_trace in
-    let L1_trace          := build_L1 L0_trace' in
-    let L2_trace          := build_L2 L1_trace in
-    let L3_Trace          := build_L3 L2_trace in
-    let L4_Trace          := build_L4 L3_Trace in
-    let L5_Trace          := build_L5 L4_Trace in
-    debug "Starting to interpret the program.";;
-          L5_Trace.
-
+  (**
+     The interpreter now simply performs the syntactic conversion from [toplevel_entity]
+     to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
+     starting from empty environments.
+   *)
   Definition interpreter_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))) : itree L5 res_L4 :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
     match CFG.mcfg_of_modul _ scfg with
-    | Some ucfg => interpret_mcfg_user user_intrinsics ucfg
+    | Some ucfg =>
+      let mcfg := normalize_types ucfg in
+
+      let t := denote_vellvm mcfg in
+
+      interp_vellvm_exec_user user_intrinsics t [] ([],[]) (M.empty, [[]])
 
     | None => raise "Ill-formed program: mcfg_of_modul failed."
     end.
 
-  (* Users may define their own interpreter by providing additional intrinsics *)
+  (**
+     Finally, the reference interpreter assumes no user-defined intrinsics.
+   *)
   Definition interpreter := interpreter_user [].
 
-  (** Definition of the semantics -- a propositional model that serves as official specification of the language *)
-
-  Definition run_state {E A env} (R : Monads.stateT env (itree E) A) (st: env) : itree E (env * A) := R st.
-
-  Definition model_mcfg_user (user_intrinsics: IS.intrinsic_definitions) (prog: CFG.mcfg typ) : PropT (itree L5) res_L3 :=
-    let mcfg := normalize_types prog in
-
-    let L0_trace        := denote_vellvm mcfg in
-    let L0_trace'       := INT.interpret_intrinsics user_intrinsics L0_trace in
-    let L1_trace        := run_state (interp_global L0_trace') [] in
-    let L2_trace        := run_state (interp_local_stack (@handle_local _ _ _ _ _ _ _) L1_trace) ([],[]) in
-    let L3_trace        := run_state (M.interp_memory L2_trace) (M.empty, [[]]) in
-    let L4_trace        := model_L4 L3_trace in
-    let L5_trace        := model_L5 L4_trace in
+  (**
+     We now turn to the definition of our _model_ of vellvm's semantics. The
+     process is extremely similar to the one for defining the executable
+     semantics, except that we use, where relevant, the handlers capturing
+     all allowed behaviors into the [Prop] monad.
+   *)
+  Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree IO.L0 R) g l m :=
+    let L0_trace       := INT.interpret_intrinsics user_intrinsics trace in
+    let L1_trace       := run_state (interp_global L0_trace) g in
+    let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+    let L3_trace       := run_state (M.interp_memory L2_trace) m in
+    let L4_trace       := P.model_undef L3_trace in
+    let L5_trace       := model_UB L4_trace in
     L5_trace.
 
-  Definition model_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))) :
-    PropT (itree L5) res_L3 :=
+  (**
+     The model now simply performs the syntactic conversion from [toplevel_entity]
+     to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
+     starting from empty environments.
+   *)
+  Definition model_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))): PropT (itree L5) res_L4 :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
-    match  CFG.mcfg_of_modul _ scfg with
-    | Some ucfg => model_mcfg_user user_intrinsics ucfg
+    match CFG.mcfg_of_modul _ scfg with
+    | Some ucfg =>
+      let mcfg := normalize_types ucfg in
+
+      let t := denote_vellvm mcfg in
+
+      interp_vellvm_model_user user_intrinsics t [] ([],[]) (M.empty, [[]])
 
     | None => lift (raise "Ill-formed program: mcfg_of_modul failed.")
     end.
 
-  (* Users may define their own model by providing additional intrinsics *)
-  Definition model_mcfg := model_mcfg_user [].
+  (**
+     Finally, the reference interpreter assumes no user-defined intrinsics.
+   *)
   Definition model := model_user [].
 
 End TopLevelEnv.

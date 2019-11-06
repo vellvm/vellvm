@@ -17,7 +17,7 @@ open ITreeDefinition
 
 (* TODO: probaly should be part of ADDRESS module interface*)
 let pp_addr : Format.formatter -> Memory.A.addr -> unit
-  = fun ppf _ -> fprintf ppf "DVALUE_Addr(?)"
+  = fun ppf _ -> fprintf ppf "UVALUE_Addr(?)"
 
 (* Converts `float` to a `string` at max precision.
    Both OCaml `printf` and `string_of_float` truncate
@@ -29,31 +29,33 @@ let string_of_float_full f =
   let open Str in
   Str.global_replace (Str.regexp "0+$") "" s
 
-let rec pp_dvalue : Format.formatter -> DV.dvalue -> unit =
+let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
   let open Camlcoq in
   let pp_comma_space ppf () = pp_print_string ppf ", " in
   fun ppf ->
   function
-  | DVALUE_Addr   x -> pp_addr ppf x
-  | DVALUE_I1     x -> fprintf ppf "DVALUE_I1(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int1.unsigned x))
-  | DVALUE_I8     x -> fprintf ppf "DVALUE_I8(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
-  | DVALUE_I32    x -> fprintf ppf "DVALUE_I32(%d)" (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
-  | DVALUE_I64    x -> fprintf ppf "DVALUE_I64(%s)" (Int64.to_string (Z.to_int64 (DynamicValues.Int64.unsigned x)))
-  | DVALUE_Double x -> fprintf ppf "DVALUE_Double(%s)" (string_of_float_full (camlfloat_of_coqfloat x))
-  | DVALUE_Float  x -> fprintf ppf "DVALUE_Float(%s)"  (string_of_float_full (camlfloat_of_coqfloat32 x))
-  | DVALUE_Poison   -> fprintf ppf "DVALUE_Poison"
-  | DVALUE_None     -> fprintf ppf "DVALUE_None"
-  | DVALUE_Struct        l -> fprintf ppf "DVALUE_Struct(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l
-  | DVALUE_Packed_struct l -> fprintf ppf "DVALUE_Packet_struct(%a)" (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l
-  | DVALUE_Array         l -> fprintf ppf "DVALUE_Array(%a)"         (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l
-  | DVALUE_Vector        l -> fprintf ppf "DVALUE_Vector(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l
+  | UVALUE_Addr   x -> pp_addr ppf x
+  | UVALUE_I1     x -> fprintf ppf "UVALUE_I1(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int1.unsigned x))
+  | UVALUE_I8     x -> fprintf ppf "UVALUE_I8(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
+  | UVALUE_I32    x -> fprintf ppf "UVALUE_I32(%d)" (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
+  | UVALUE_I64    x -> fprintf ppf "UVALUE_I64(%s)" (Int64.to_string (Z.to_int64 (DynamicValues.Int64.unsigned x)))
+  | UVALUE_Double x -> fprintf ppf "UVALUE_Double(%s)" (string_of_float_full (camlfloat_of_coqfloat x))
+  | UVALUE_Float  x -> fprintf ppf "UVALUE_Float(%s)"  (string_of_float_full (camlfloat_of_coqfloat32 x))
+  | UVALUE_Poison   -> fprintf ppf "UVALUE_Poison"
+  | UVALUE_None     -> fprintf ppf "UVALUE_None"
+  | UVALUE_Undef _  -> fprintf ppf "UVALUE_Undef"
+  | UVALUE_Struct        l -> fprintf ppf "UVALUE_Struct(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
+  | UVALUE_Packed_struct l -> fprintf ppf "UVALUE_Packet_struct(%a)" (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
+  | UVALUE_Array         l -> fprintf ppf "UVALUE_Array(%a)"         (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
+  | UVALUE_Vector        l -> fprintf ppf "UVALUE_Vector(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
+  | _ -> fprintf ppf "todo"
 
 let debug_flag = ref false 
 let debug (msg:string) =
   if !debug_flag then
     Printf.printf "DEBUG: %s\n%!" msg
 
-let rec step (m : ('a TopLevel.IO.coq_L5, TopLevel.TopLevelEnv.memory * ((TopLevel.TopLevelEnv.local_env * TopLevel.TopLevelEnv.stack) * (TopLevel.TopLevelEnv.global_env * TopLevel.IO.DV.dvalue))) itree) : (TopLevel.IO.DV.dvalue, string) result =
+let rec step (m : ('a TopLevel.IO.coq_L5, TopLevel.TopLevelEnv.memory * ((TopLevel.TopLevelEnv.local_env * TopLevel.TopLevelEnv.stack) * (TopLevel.TopLevelEnv.global_env * TopLevel.IO.DV.uvalue))) itree) : (TopLevel.IO.DV.uvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -69,7 +71,7 @@ let rec step (m : ('a TopLevel.IO.coq_L5, TopLevel.TopLevelEnv.memory * ((TopLev
   (* The debugE effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 msg), k) ->
         (debug (Camlcoq.camlstring_of_coqstring msg);
-         step (k (Obj.magic DV.DVALUE_None)))
+         step (k (Obj.magic DV.UVALUE_None)))
 
   (* The failE effect is a failure *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 f), _) ->
@@ -90,5 +92,5 @@ let rec step (m : ('a TopLevel.IO.coq_L5, TopLevel.TopLevelEnv.memory * ((TopLev
        *   step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero))) *)
 
 
-let interpret (prog:(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
+let interpret (prog:(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.uvalue, string) result =
   step (TopLevel.TopLevelEnv.interpreter prog)
