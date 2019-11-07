@@ -35,7 +35,7 @@ University of Pennsylvania as part of the DeepSpec project.
 
 /src/ci   - travis configuration
 
-/src/coq  - Coq formalization (see StepSemantics.v)
+/src/coq  - Coq formalization (see Denotation.v)
 
 /src/ml   - OCaml glue code for working with ollvm
 
