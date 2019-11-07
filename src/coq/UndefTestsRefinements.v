@@ -81,6 +81,7 @@ Definition refine_block_L2 b1 b2 := eutt (TT × (TT × (sum_rel Logic.eq refine_
 (* -------------------------------------------------------- *)
 (* Refinement of undef * undef to undef in uvalues / blocks *)
 (* -------------------------------------------------------- *)
+
 Theorem undef_refines_mul_undef_undef:
   refine_uvalue (UVALUE_Undef (DTYPE_I 64)) (UVALUE_IBinop (Mul false false) (UVALUE_Undef (DTYPE_I 64)) (UVALUE_Undef (DTYPE_I 64))).
 Proof.
@@ -99,18 +100,206 @@ Proof.
       * rewrite Integers.Int64.unsigned_repr; try omega; cbn; try omega.
 Qed.
 
+Lemma rel_prime_mod_mul :
+  forall a b x,
+    Znumtheory.rel_prime a b ->
+  exists k, (a * k) mod b = x.
+Proof.
+Admitted.
+
+Lemma mod_range :
+  forall x m, -1 < x mod m < m.
+Proof.
+Admitted.
+
+Lemma Int64_mul_mod :
+  forall a b intrange,
+    (DynamicValues.Int64.mul (DynamicValues.Int64.repr a)
+                             (DynamicValues.Int64.repr b)) = 
+    {| DynamicValues.Int64.intval := ((a * b) mod DynamicValues.Int64.modulus);
+       DynamicValues.Int64.intrange := intrange
+    |}.
+Proof.
+Admitted.
+
+Theorem undef_refines_mul_undef_relprime :
+  forall a,
+    Znumtheory.rel_prime a DynamicValues.Int64.modulus -> 
+    refine_uvalue (UVALUE_Undef (DTYPE_I 64))
+                  (UVALUE_IBinop (Mul false false)
+                                 (UVALUE_Undef (DTYPE_I 64)) (UVALUE_I64 (DynamicValues.Int64.repr a))).
+Proof.
+  intros a Hrp.
+  constructor.
+  intros dv H.
+  inversion H; subst.
+  - inversion H0. 
+  - inversion H1; subst; inversion H; subst.
+    + inversion H0.
+    + destruct x eqn:Hx.
+      pose proof rel_prime_mod_mul a DynamicValues.Int64.modulus intval Hrp as Hmod.
+
+      destruct Hmod as [k Hmod].
+      rewrite Z.mul_comm in Hmod.
+
+      match goal with
+      | [ H : concretize (UVALUE_Undef ?t) ?dv |- concretize (UVALUE_IBinop _ (UVALUE_Undef ?t) (UVALUE_I64 ?v1)) ?dv ]
+        => apply Concretize_IBinop with (dv2:=(DVALUE_I64 v1)) (dv1:=DVALUE_I64 (repr k))
+      end.
+   -- apply Concretize_Undef; constructor.
+   -- constructor; reflexivity.
+   -- subst; simpl.
+      destruct (Eqv.eqv_dec_p 64%nat 1%nat);
+        (rewrite (Int64_mul_mod k a intrange); reflexivity).
+Qed.
+
+Theorem undef_refines_mul_relprime_undef :
+  forall a,
+    Znumtheory.rel_prime a DynamicValues.Int64.modulus -> 
+    refine_uvalue (UVALUE_Undef (DTYPE_I 64))
+                  (UVALUE_IBinop (Mul false false)
+                                 (UVALUE_I64 (DynamicValues.Int64.repr a)) (UVALUE_Undef (DTYPE_I 64))).
+Proof.
+  intros a Hrp.
+  constructor.
+  intros dv H.
+  inversion H; subst.
+  - inversion H0. 
+  - inversion H1; subst; inversion H; subst.
+    + inversion H0.
+    + destruct x eqn:Hx.
+      pose proof rel_prime_mod_mul a DynamicValues.Int64.modulus intval Hrp as Hmod.
+
+      destruct Hmod as [k Hmod].
+
+    match goal with
+    | [ H : concretize (UVALUE_Undef ?t) ?dv |- concretize (UVALUE_IBinop _ (UVALUE_I64 ?v1) (UVALUE_Undef ?t)) ?dv ]
+      => apply Concretize_IBinop with (dv1:=(DVALUE_I64 v1)) (dv2:=DVALUE_I64 (repr k))
+    end.
+   -- constructor; reflexivity.
+   -- apply Concretize_Undef; constructor.
+   -- subst; simpl.
+      destruct (Eqv.eqv_dec_p 64%nat 1%nat);
+        (rewrite (Int64_mul_mod a k intrange); reflexivity).
+Qed.
+
+Lemma zero_refines_undef :
+  refine_uvalue (UVALUE_I64 (DynamicValues.Int64.repr 0)) (UVALUE_Undef (DTYPE_I 64)).
+Proof.
+  constructor. intros dv H.
+  inversion H; subst.
+  inversion H0; subst.
+  apply Concretize_Undef.
+  constructor.
+Qed.
+
+Lemma zero_refines_undef_mul_a :
+  forall a,
+    refine_uvalue (UVALUE_I64 (DynamicValues.Int64.repr 0))
+                  (UVALUE_IBinop (Mul false false)
+                                 (UVALUE_Undef (DTYPE_I 64)) (UVALUE_I64 a)).
+Proof.
+  constructor. intros dv H.
+  inversion H; subst.
+  inversion H0; subst.
+  simpl in *.
+  clear H0.
+
+  eapply Concretize_IBinop with
+      (dv1:=DVALUE_I64 (DynamicValues.Int64.repr 0)).
+
+  apply Concretize_Undef.
+  constructor.
+  constructor. reflexivity.
+Admitted.
+
+
+Lemma zero_refines_a_mul_undef :
+  forall a,
+    refine_uvalue (UVALUE_I64 (DynamicValues.Int64.repr 0))
+                  (UVALUE_IBinop (Mul false false)
+                                 (UVALUE_I64 a) (UVALUE_Undef (DTYPE_I 64))).
+Proof.
+Admitted.
+
+Hint Unfold refine_block_L2.
+Hint Unfold block_interp_L1.
+Hint Unfold block_interp_L2.
+
+Ltac step_refine := autounfold;
+                    tau_steps.
+
+Ltac simple_refine := step_refine;
+                      apply eqit_Ret; repeat (apply prod_morphism; firstorder);
+                      apply inr_morphism.
+
+
+Ltac refine_a_times_undef :=
+  match goal with
+  | [ |-
+      refine_uvalue (UVALUE_Undef (DTYPE_I 64))
+                    (UVALUE_IBinop (Mul false false)
+                                   (UVALUE_I64 ?a)
+                                   (UVALUE_Undef (DTYPE_I 64)))
+    ] => apply undef_refines_mul_relprime_undef
+  | [ |-
+      refine_uvalue (UVALUE_Undef (DTYPE_I 64))
+                    (UVALUE_IBinop (Mul false false)
+                                   (UVALUE_Undef (DTYPE_I 64))
+                                   (UVALUE_I64 ?a))
+    ] => apply undef_refines_mul_undef_relprime
+  end;
+  unfold Znumtheory.rel_prime;
+  match goal with
+  | [ |- Znumtheory.Zis_gcd ?a ?m ?x ] =>  replace x with (Z.gcd a m) by (cbv; auto)
+  end; apply Znumtheory.Zgcd_is_gcd.
+
+Ltac refine_mul_uvalue :=
+  solve [ refine_a_times_undef
+        | apply zero_refines_undef_mul_a
+        | apply zero_refines_a_mul_undef
+        | apply undef_refines_mul_undef_undef
+        ].
+
+Ltac refine_uvalue :=
+  solve [ refine_mul_uvalue
+        ].
+
 Theorem undef_test0 :
  refine_block_L2 undef_test0_block_refine undef_test0_block.
 Proof.
-  unfold refine_block_L2.
-  unfold block_interp_L2. unfold block_interp_L1.
-  tau_steps.
-
-  apply eqit_Ret.
-
-  repeat (apply prod_morphism; firstorder).
-  apply inr_morphism; apply undef_refines_mul_undef_undef.
+  simple_refine.
+  refine_uvalue.
 Qed.
+
+Theorem undef_test1 :
+  refine_block_L2 undef_test1_block_refine undef_test1_block.
+Proof.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test2 :
+  refine_block_L2 undef_test2_block_refine undef_test2_block.
+Proof.
+  simple_refine.
+  refine_uvalue.  
+Qed.
+
+Theorem undef_test3 :
+  refine_block_L2 undef_test3_block_refine undef_test3_block.
+Proof.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test4 :
+  refine_block_L2 undef_test4_block_refine undef_test4_block.
+Proof.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
 
 (* -------------------------------------------------- *)
 (* CFG interpretation / refinement                    *)

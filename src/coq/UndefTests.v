@@ -26,6 +26,69 @@ Definition undef_test0_block_refine : block dtyp :=
     blk_comments := None
   |}.
 
+Definition undef_test1_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (Mul false false) (DTYPE_I 64%Z) (EXP_Integer 3%Z) EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test1_block_refine := undef_test0_block_refine.
+
+Definition undef_test2_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (Mul false false) (DTYPE_I 64%Z) EXP_Undef (EXP_Integer 3%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test2_block_refine := undef_test0_block_refine.
+
+Definition undef_test3_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (Mul false false) (DTYPE_I 64%Z) EXP_Undef (EXP_Integer 6%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test3_block_refine : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Integer 0%Z)));
+      blk_comments := None
+    |}.
+
+
+Definition undef_test4_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (Mul false false) (DTYPE_I 64%Z) (EXP_Integer 6%Z) EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test4_block_refine := undef_test3_block_refine.
+
+Definition undef_test5_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop And (DTYPE_I 64%Z) EXP_Undef EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test5_block_refine := undef_test0_block_refine.
+
 (* InstSimplify's undef.ll tests *)
 Definition undef_test0_cfg : cfg dtyp :=
   {| init := (Anon 0%Z);
