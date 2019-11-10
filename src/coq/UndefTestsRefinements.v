@@ -119,8 +119,13 @@ Ltac refine_mul_uvalue :=
         | apply undef_refines_mul_undef_undef
         ].
 
+Ltac refine_and_uvalue :=
+  solve [ apply undef_refines_and_undef_undef
+        ].
+
 Ltac refine_uvalue :=
   solve [ refine_mul_uvalue
+        | refine_and_uvalue
         ].
 
 Theorem undef_test0 :
@@ -162,6 +167,15 @@ Qed.
 Theorem undef_test4 :
   forall g l
     refine_block_L2 undef_test4_block_refine undef_test4_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test5 :
+  forall g l,
+    refine_block_L2 undef_test5_block_refine undef_test5_block g l.
 Proof.
   intros g l.
   simple_refine.
