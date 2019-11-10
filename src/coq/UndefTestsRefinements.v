@@ -112,6 +112,7 @@ Ltac refine_a_times_undef :=
   | [ |- Znumtheory.Zis_gcd ?a ?m ?x ] =>  replace x with (Z.gcd a m) by (cbv; auto)
   end; apply Znumtheory.Zgcd_is_gcd.
 
+(* These should probably be hint databases? *)
 Ltac refine_mul_uvalue :=
   solve [ refine_a_times_undef
         | apply zero_refines_undef_mul_a
@@ -119,14 +120,36 @@ Ltac refine_mul_uvalue :=
         | apply undef_refines_mul_undef_undef
         ].
 
+Ltac refine_div_uvalue :=
+  solve [ apply undef_refines_undef_udiv_1
+        | apply undef_refines_undef_sdiv_1
+        | apply zero_refines_undef_urem_1
+        | apply zero_refines_undef_srem_1
+        ].
+
 Ltac refine_and_uvalue :=
   solve [ apply undef_refines_and_undef_undef
         ].
 
+Ltac refine_or_uvalue :=
+  solve [ apply undef_refines_or_undef_undef
+        ].
+
 Ltac refine_uvalue :=
   solve [ refine_mul_uvalue
+        | refine_div_uvalue
         | refine_and_uvalue
+        | refine_or_uvalue
         ].
+
+Theorem undef_test6 :
+  forall g l,
+    refine_block_L2 undef_test6_block_refine undef_test6_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
 
 Theorem undef_test0 :
   forall g l,
@@ -179,6 +202,53 @@ Theorem undef_test5 :
 Proof.
   intros g l.
   simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test6 :
+  forall g l,
+    refine_block_L2 undef_test6_block_refine undef_test6_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test7 :
+  forall g l,
+    refine_block_L2 undef_test7_block_refine undef_test7_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test8 :
+  forall g l,
+    refine_block_L2 undef_test8_block_refine undef_test8_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test9 :
+  forall g l,
+    refine_block_L2 undef_test9_block_refine undef_test9_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test10 :
+  forall g l,
+    refine_block_L2 undef_test10_block_refine undef_test10_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+
+  simpl.
   refine_uvalue.
 Qed.
 

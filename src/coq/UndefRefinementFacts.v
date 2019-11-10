@@ -232,3 +232,100 @@ Qed.
 (* -------------------------------------------------------- *)
 (* Facts about undef and bitwise or                         *)
 (* -------------------------------------------------------- *)
+
+Theorem undef_refines_or_undef_undef:
+  refine_uvalue (UVALUE_Undef (DTYPE_I 64)) (UVALUE_IBinop Or (UVALUE_Undef (DTYPE_I 64)) (UVALUE_Undef (DTYPE_I 64))).
+Proof.
+  constructor.
+  intros dv H.
+  apply Concretize_IBinop with (dv1:=DVALUE_I64 (DynamicValues.Int64.repr 0)) (dv2:=dv).
+  - apply Concretize_Undef. constructor.
+  - auto.
+  - simpl. inversion H; subst.
+    + inversion H0.
+    + inversion H1; subst; auto.
+      unfold DynamicValues.Int64.or.
+      replace (Z.lor
+                 (DynamicValues.Int64.unsigned
+                    (DynamicValues.Int64.repr 0))
+                 (DynamicValues.Int64.unsigned x))
+        with (DynamicValues.Int64.unsigned x).
+      * destruct (Eqv.eqv_dec_p 64%nat 1%nat); rewrite DynamicValues.Int64.repr_unsigned; reflexivity.
+      * rewrite Integers.Int64.unsigned_repr by (cbn; omega).
+        reflexivity.
+Qed.
+
+
+(* -------------------------------------------------- *)
+(* Division and undef facts                           *)
+(* -------------------------------------------------- *)
+
+Theorem undef_refines_undef_udiv_1:
+    refine_uvalue (UVALUE_Undef (DTYPE_I 64)) (UVALUE_IBinop (UDiv false) (UVALUE_Undef (DTYPE_I 64)) (UVALUE_I64 (DynamicValues.Int64.repr 1))).
+Proof.
+  constructor.
+  intros dv H.
+  apply Concretize_IBinop with (dv1:=dv) (dv2:=DVALUE_I64 (DynamicValues.Int64.repr 1)).
+  - auto.
+  - constructor; reflexivity.
+  - inversion H; subst; simpl in *.
+    + inversion H0.
+    + inversion H1. simpl.
+      destruct (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr 1) =?
+                0)%Z eqn:Heq.
+      inversion Heq.
+      simpl.
+      rewrite DynamicValues.Int64.divu_one.
+      reflexivity.
+Qed.
+
+Theorem undef_refines_undef_sdiv_1:
+    refine_uvalue (UVALUE_Undef (DTYPE_I 64)) (UVALUE_IBinop (SDiv false) (UVALUE_Undef (DTYPE_I 64)) (UVALUE_I64 (DynamicValues.Int64.repr 1))).
+Proof.
+  constructor.
+  intros dv H.
+  apply Concretize_IBinop with (dv1:=dv) (dv2:=DVALUE_I64 (DynamicValues.Int64.repr 1)).
+  - auto.
+  - constructor; reflexivity.
+  - inversion H; subst; simpl in *.
+    + inversion H0.
+    + inversion H1. simpl.
+      destruct (DynamicValues.Int64.signed (DynamicValues.Int64.repr 1) =?
+                0)%Z eqn:Heq.
+      inversion Heq.
+      simpl.
+      rewrite DynamicValues.Int64.divs_one.
+      reflexivity.
+      cbn.
+      omega.
+Qed.
+
+Theorem zero_refines_undef_urem_1:
+    refine_uvalue (UVALUE_I64 (DynamicValues.Int64.repr 0)) (UVALUE_IBinop URem (UVALUE_Undef (DTYPE_I 64)) (UVALUE_I64 (DynamicValues.Int64.repr 1))).
+Proof.
+  constructor.
+  intros dv H. inversion H; subst; inversion H0; subst.
+  apply Concretize_IBinop with (dv1:=DVALUE_I64 (DynamicValues.Int64.repr 0)) (dv2:=DVALUE_I64 (DynamicValues.Int64.repr 1)).
+  - apply Concretize_Undef. constructor.
+  - constructor. reflexivity.
+  - simpl.
+    destruct (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr 1) =?
+              0)%Z eqn:Heq; simpl.
+    inversion Heq.
+
+    rewrite Integers.Int64.modu_one. reflexivity.
+Qed.
+
+Theorem zero_refines_undef_srem_1:
+    refine_uvalue (UVALUE_I64 (DynamicValues.Int64.repr 0)) (UVALUE_IBinop SRem (UVALUE_Undef (DTYPE_I 64)) (UVALUE_I64 (DynamicValues.Int64.repr 1))).
+Proof.
+  constructor.
+  intros dv H. inversion H; subst; inversion H0; subst.
+  apply Concretize_IBinop with (dv1:=DVALUE_I64 (DynamicValues.Int64.repr 0)) (dv2:=DVALUE_I64 (DynamicValues.Int64.repr 1)).
+  - apply Concretize_Undef. constructor.
+  - constructor. reflexivity.
+  - simpl.
+    destruct (DynamicValues.Int64.signed (DynamicValues.Int64.repr 1) =?
+              0)%Z eqn:Heq; simpl.
+    inversion Heq.
+Admitted.

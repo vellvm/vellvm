@@ -89,7 +89,6 @@ Definition undef_test5_block : block dtyp
 
 Definition undef_test5_block_refine := undef_test0_block_refine.
 
-
 Definition undef_test6_block : block dtyp
   := {|
       blk_id := (Anon 0%Z);
@@ -98,6 +97,8 @@ Definition undef_test6_block : block dtyp
       blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
       blk_comments := None
     |}.
+
+Definition undef_test6_block_refine := undef_test0_block_refine.
 
 Definition undef_test7_block : block dtyp
   := {|
@@ -108,6 +109,8 @@ Definition undef_test7_block : block dtyp
       blk_comments := None
     |}.
 
+Definition undef_test7_block_refine := undef_test0_block_refine.
+
 Definition undef_test8_block : block dtyp
   := {|
       blk_id := (Anon 0%Z);
@@ -116,6 +119,8 @@ Definition undef_test8_block : block dtyp
       blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
       blk_comments := None
     |}.
+
+Definition undef_test8_block_refine := undef_test0_block_refine.
 
 Definition undef_test9_block : block dtyp
   := {|
@@ -126,6 +131,8 @@ Definition undef_test9_block : block dtyp
       blk_comments := None
     |}.
 
+Definition undef_test9_block_refine := undef_test3_block_refine.
+
 Definition undef_test10_block : block dtyp
   := {|
       blk_id := (Anon 0%Z);
@@ -134,6 +141,8 @@ Definition undef_test10_block : block dtyp
       blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
       blk_comments := None
     |}.
+
+Definition undef_test10_block_refine := undef_test3_block_refine.
 
 Definition undef_test11_block : block dtyp
   := {|
