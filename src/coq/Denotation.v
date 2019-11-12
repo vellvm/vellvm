@@ -719,13 +719,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         | TERM_Br (dt,op) br1 br2 =>
           uv <- denote_exp (Some dt) op ;;
-          match uv with
-          | UVALUE_I1 comparison_bit =>
+          dv <- trigger (pick uv True) ;; (* TODO, should this be unique? *)
+          match dv with
+          | DVALUE_I1 comparison_bit =>
             if eq comparison_bit one then
               ret (inl br1)
             else
               ret (inl br2)
-          | UVALUE_Poison => raiseUB "Branching on poison."
+          | DVALUE_Poison => raiseUB "Branching on poison."
           | _ => raise "Br got non-bool value"
           end
 
