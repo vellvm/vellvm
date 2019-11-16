@@ -221,7 +221,7 @@ Module TopLevelEnv <: Environment.
 
       let t := denote_vellvm mcfg in
 
-      interp_vellvm_exec_user user_intrinsics t [] ([],[]) (M.empty, [[]])
+      interp_vellvm_exec_user user_intrinsics t [] ([],[]) ((M.empty, M.empty), [[]])
 
     | None => raise "Ill-formed program: mcfg_of_modul failed."
     end.
@@ -260,7 +260,7 @@ Module TopLevelEnv <: Environment.
 
       let t := denote_vellvm mcfg in
 
-      interp_vellvm_model_user user_intrinsics t [] ([],[]) (M.empty, [[]])
+      interp_vellvm_model_user user_intrinsics t [] ([],[]) ((M.empty, M.empty), [[]])
 
     | None => lift (raise "Ill-formed program: mcfg_of_modul failed.")
     end.

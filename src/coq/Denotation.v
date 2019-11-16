@@ -312,7 +312,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         end
       | Ptrtoint =>
         match t1, t2 with
-        | DTYPE_Pointer, DTYPE_I 64 => trigger (PtoI x)
+        | DTYPE_Pointer, DTYPE_I _ => trigger (PtoI t2 x)
         | _, _ => raise "ERROR: Ptrtoint got illegal arguments"
         end
       end.
@@ -320,8 +320,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
     Definition eval_conv conv (t1:dtyp) x (t2:dtyp) : itree conv_E dvalue :=
       match t1, x with
-      | DTYPE_I bits, dv =>
-        eval_conv_h conv t1 dv t2
       | DTYPE_Vector s t, (DVALUE_Vector elts) =>
         (* In the future, implement bitcast and etc with vectors *)
         raise "vectors unimplemented"
