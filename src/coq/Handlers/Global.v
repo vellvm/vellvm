@@ -32,7 +32,7 @@ Section Globals.
   Context {M: Map k v map}.
   Context {SK : Serialize k}.
 
-  Definition handle_global {E} `{FailureE -< E} : (GlobalE k v) ~> stateT map (itree E) :=
+  Definition handle_global {E F} `{FailureE +? E -< F} : (GlobalE k v) ~> stateT map (itree F) :=
     fun _ e env =>
       match e with
       | GlobalWrite k v => ret (Maps.add k v env, tt)
@@ -43,20 +43,8 @@ Section Globals.
         end
       end.
 
-  Open Scope monad_scope.
-  Section PARAMS.
-    Variable (E F G : Type -> Type).
-    Definition E_trigger {M} : forall R, E R -> (stateT M (itree (E +' F +' G)) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
-
-    Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F +' G)) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
-
-    Definition G_trigger {M} : forall R , G R -> (stateT M (itree (E +' F +' G)) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
-
-    Definition interp_global `{FailureE -< E +' F +' G} : itree (E +' F +' (GlobalE k v) +' G) ~> stateT map (itree (E +' F +' G)) :=
-      interp_state (case_ E_trigger (case_ F_trigger (case_ handle_global G_trigger))).
-  End PARAMS.
+  Definition interp_global {E1 E2 F} `{GlobalE k v +? E1 -< F} `{FailureE +? E2 -< E1}
+    : itree F ~> stateT map (itree E1) :=
+      interp_state (over handle_global).
 
 End Globals.

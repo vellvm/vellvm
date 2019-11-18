@@ -35,24 +35,16 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Section PickPropositional.
 
     (* YZ: TODO: better UB error message *)
-    Inductive Pick_handler {E} `{UBE -< E}: PickE ~> PropT (itree E) :=
+    Inductive Pick_handler {E F} `{UBE +? E -< F}: PickE ~> PropT (itree F) :=
     | PickUB: forall uv C, ~ C -> Pick_handler (pick uv C) (raiseUB "Picking unsafe uvalue")
     | PickD: forall uv (C: Prop) dv, C -> concretize uv dv -> Pick_handler (pick uv C) (Ret dv).
 
-    Section PARAMS.
-      Variable (E F: Type -> Type).
 
-      Definition E_trigger_prop : E ~> PropT (itree (E +' F)) :=
-        fun R e => fun t => t = r <- trigger e ;; ret r.
-
-      Definition F_trigger_prop : F ~> PropT (itree (E +' F)) :=
-        fun R e => fun t => t = r <- trigger e ;; ret r.
-
-      Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
-        itree (E +' PickE +' F) ~> PropT (itree (E +' F)) :=
-        interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)).
-
-    End PARAMS.
+    Definition model_undef {E1 E2 F}
+               `{UBE +? E1 -< F} 
+               `{FailureE +? E1 -< E2} :
+        itree PickE ~> PropT (itree F) :=
+        interp_prop (over Pick_handler).
 
   End PickPropositional.
 
@@ -90,7 +82,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       end.
 
     Import MonadNotation.
-    Fixpoint concretize_uvalue (u : uvalue) : itree (FailureE +' UBE) dvalue :=
+    Fixpoint concretize_uvalue {E1 E2 F} `{FailureE +? E1 -< F} `{UBE +? E2 -< F} (u : uvalue) : itree F dvalue :=
       match u with
       | UVALUE_Addr a                          => ret (DVALUE_Addr a)
       | UVALUE_I1 x                            => ret (DVALUE_I1 x)
@@ -135,7 +127,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
        *)
       end.
 
-    Program Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} : PickE ~> itree E.
+    Program Definition concretize_picks {E F} `{UBE +? E -< F}: PickE ~> PropT (itree F).
     refine (fun T p => match p with
                     | pick u P => translate _ (concretize_uvalue u)
                     end).

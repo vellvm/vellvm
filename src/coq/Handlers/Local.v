@@ -31,7 +31,8 @@ Section Locals.
   Context {map : Type}.
   Context {M: Map k v map}.
   Context {SK : Serialize k}.
-  Definition handle_local {E} `{FailureE -< E} : (LocalE k v) ~> stateT map (itree E) :=
+
+  Definition handle_local {E F} `{FailureE +? E -< F} : (LocalE k v) ~> stateT map (itree F) :=
       fun _ e env =>
         match e with
         | LocalWrite k v => ret (Maps.add k v env, tt)
@@ -42,20 +43,9 @@ Section Locals.
             end
         end.
 
-    Open Scope monad_scope.
-    Section PARAMS.
-      Variable (E F G : Type -> Type).
-    Definition E_trigger {M} : forall R, E R -> (stateT M (itree (E +' F +' G)) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
+  Definition interp_local {E1 E2 F} `{LocalE k v +? E1 -< F} `{FailureE +? E2 -< E1}
+    : itree F ~> stateT map (itree E1) :=
+      interp_state (over handle_local).
 
-    Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F +' G)) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
-
-    Definition G_trigger {M} : forall R , G R -> (stateT M (itree (E +' F +' G)) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
-
-    Definition interp_local `{FailureE -< E +' F +' G} : itree (E +' F +' (LocalE k v) +' G) ~> stateT map (itree (E +' F +' G)) :=
-      interp_state (case_ E_trigger (case_ F_trigger (case_ handle_local G_trigger))).
-    End PARAMS.
 
 End Locals.

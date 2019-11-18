@@ -79,9 +79,9 @@ Set Contextual Implicit.
 
   (** Since the output type of [ThrowUB] is [void], we can make it an action
     with any return type. *)
-  Definition raiseUB {E : Type -> Type} `{UBE -< E} {X}
+  Definition raiseUB {E F : Type -> Type} `{UBE +? E -< F} {X}
              (e : string)
-    : itree E X
+    : itree F X
     := vis (ThrowUB e) (fun v : void => match v with end).
 
   (* Debug is identical to the "Trace" effect from the itrees library,
@@ -89,21 +89,22 @@ Set Contextual Implicit.
   Variant DebugE : Type -> Type :=
   | Debug : string -> DebugE unit.
   (* Utilities to conveniently trigger debug events *)
-  Definition debug {E} `{DebugE -< E} (msg : string) : itree E unit :=
+  Definition debug {E F} `{DebugE +? E -< F} (msg : string) : itree F unit :=
     trigger (Debug msg).
 
   Definition FailureE := exceptE string.
 
-  Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
+  Definition raise {E F} {A} `{FailureE +? E -< F} (msg : string) : itree F A :=
     throw msg.
 
-  Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m:err A) : itree E B :=
+  Definition lift_err {E F} {A B} `{FailureE +? E -< F} (f : A -> itree F B) (m:err A) : itree F B :=
     match m with
     | inl x => throw x
     | inr x => f x
     end.
 
-  Definition lift_undef_or_err {A B} {E} `{FailureE -< E} `{UBE -< E} (f : A -> itree E B) (m:undef_or_err A) : itree E B :=
+  Definition lift_undef_or_err {E1 E2 F} {A B} `{FailureE +? E1 -< F} `{UBE +? E2 -< F}
+             (f : A -> itree F B) (m:undef_or_err A) : itree F B :=
     match m with
     | mkEitherT m =>
       match m with
