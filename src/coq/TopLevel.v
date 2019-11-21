@@ -185,10 +185,6 @@ Module TopLevelEnv <: Environment.
      the resulting [itree].
    *)
 
-  (* Explicit application of a state to a [stateT] computation: convenient to ease some rewriting,
-     but semantically equivalent to simply applying the state. *)
-  Definition run_state {E A env} (R : Monads.stateT env (itree E) A) (st: env) : itree E (env * A) := R st.
-
   (**
      First, we build the interpreter that will get extracted to OCaml and allow for the interpretation
      of compliant llvm programs.
@@ -200,9 +196,9 @@ Module TopLevelEnv <: Environment.
    *)
   Definition interp_vellvm_exec_user {R: Type} user_intrinsics (trace: itree IO.L0 R) g l m :=
     let L0_trace       := INT.interpret_intrinsics user_intrinsics trace in
-    let L1_trace       := run_state (interp_global L0_trace) g in
-    let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
-    let L3_trace       := run_state (M.interp_memory L2_trace) m in
+    let L1_trace       := runState (interp_global L0_trace) g in
+    let L2_trace       := runState (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+    let L3_trace       := runState (M.interp_memory L2_trace) m in
     let L4_trace       := P.interp_undef L3_trace in
     let L5_trace       := interp_UB L4_trace in
     L5_trace.
@@ -239,9 +235,9 @@ Module TopLevelEnv <: Environment.
    *)
   Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree IO.L0 R) g l m :=
     let L0_trace       := INT.interpret_intrinsics user_intrinsics trace in
-    let L1_trace       := run_state (interp_global L0_trace) g in
-    let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
-    let L3_trace       := run_state (M.interp_memory L2_trace) m in
+    let L1_trace       := runState (interp_global L0_trace) g in
+    let L2_trace       := runState (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+    let L3_trace       := runState (M.interp_memory L2_trace) m in
     let L4_trace       := P.model_undef L3_trace in
     let L5_trace       := model_UB L4_trace in
     L5_trace.
@@ -251,7 +247,8 @@ Module TopLevelEnv <: Environment.
      to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
      starting from empty environments.
    *)
-  Definition model_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))): PropT (itree L5) res_L4 :=
+  Definition model_user (user_intrinsics: IS.intrinsic_definitions)
+             (prog: list (toplevel_entity typ (list (block typ)))): PropT L5 res_L4 :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
     match CFG.mcfg_of_modul _ scfg with
@@ -262,7 +259,7 @@ Module TopLevelEnv <: Environment.
 
       interp_vellvm_model_user user_intrinsics t [] ([],[]) (M.empty, [[]])
 
-    | None => lift (raise "Ill-formed program: mcfg_of_modul failed.")
+    | None => singletonT _ (raise "Ill-formed program: mcfg_of_modul failed.")
     end.
 
   (**

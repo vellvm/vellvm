@@ -19,6 +19,8 @@ From ITree Require Import
      ITree
      Basics.Basics
      Events.Exception
+     Eq.Eq
+     Events.StateFacts
      Events.State.
 
 Import Basics.Basics.Monads.
@@ -618,16 +620,40 @@ Admitted.
 
    *)
   Section PARAMS.
-  Variable (E F : Type -> Type).
-    Definition E_trigger {M} : forall R, E R -> (stateT M (itree (E +' F)) R) :=
+    Variable (E F : Type -> Type).
+    Context `{FailureE -< F} `{UBE -< F}.
+    Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
+    Notation Effout := (E +' F).
+
+    Definition E_trigger {M} : forall R, E R -> (stateT M (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-  Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F)) R) :=
+    Definition F_trigger {M} : forall R, F R -> (stateT M (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-  Definition interp_memory `{FailureE -< E +' F} `{UBE -< E +' F}:
-    itree (E +'  IntrinsicE +' MemoryE +' F) ~> stateT memory_stack (itree (E +' F)) :=
-    interp_state (case_ E_trigger (case_ handle_intrinsic (case_ handle_memory F_trigger))).
+    Definition interp_memory :
+      itree Effin ~> stateT memory_stack (itree Effout) :=
+      interp_state (case_ E_trigger (case_ handle_intrinsic (case_ handle_memory F_trigger))).
+
+    Lemma interp_memory_bind :
+      forall (R S : Type) (t : itree Effin R) (k : R -> itree Effin S) m,
+        runState (interp_memory (ITree.bind t k)) m ≅
+         ITree.bind (runState (interp_memory t) m) (fun '(m',r) => runState (interp_memory (k r)) m').
+    Proof.
+      intros.
+      unfold interp_memory.
+      setoid_rewrite interp_state_bind.
+      apply eq_itree_clo_bind with (UU := Logic.eq).
+      reflexivity.
+      intros [] [] EQ; inv EQ; reflexivity.
+    Qed.
+
+    Lemma interp_memory_ret :
+      forall (R : Type) g (x: R),
+        runState (interp_memory (Ret x: itree Effin R)) g ≅ Ret (g,x).
+    Proof.
+      intros; apply interp_state_ret.
+    Qed.
 
   End PARAMS.
 

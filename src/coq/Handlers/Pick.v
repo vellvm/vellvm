@@ -35,21 +35,21 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Section PickPropositional.
 
     (* YZ: TODO: better UB error message *)
-    Inductive Pick_handler {E} `{UBE -< E}: PickE ~> PropT (itree E) :=
+    Inductive Pick_handler {E} `{FO:UBE -< E}: PickE ~> PropT E :=
     | PickUB: forall uv C, ~ C -> Pick_handler (pick uv C) (raiseUB "Picking unsafe uvalue")
     | PickD: forall uv (C: Prop) dv, C -> concretize uv dv -> Pick_handler (pick uv C) (Ret dv).
 
     Section PARAMS.
       Variable (E F: Type -> Type).
 
-      Definition E_trigger_prop : E ~> PropT (itree (E +' F)) :=
+      Definition E_trigger_prop : E ~> PropT (E +' F) :=
         fun R e => fun t => t = r <- trigger e ;; ret r.
 
-      Definition F_trigger_prop : F ~> PropT (itree (E +' F)) :=
+      Definition F_trigger_prop : F ~> PropT (E +' F) :=
         fun R e => fun t => t = r <- trigger e ;; ret r.
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
-        itree (E +' PickE +' F) ~> PropT (itree (E +' F)) :=
+        itree (E +' PickE +' F) ~> PropT (E +' F) :=
         interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)).
 
     End PARAMS.

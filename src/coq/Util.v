@@ -1015,3 +1015,25 @@ Tactic Notation "inv_bind" hyp(H) :=
       destruct o eqn:hy; [|discriminate]; simpl in H
     end.
 
+(* This should find another place, ideally should be part of itree library. *)
+(* Explicit application of a state to a [stateT] computation: convenient to ease some rewriting,
+     but semantically equivalent to simply applying the state. *)
+
+From ITree Require Import
+     ITree
+     Eq.
+Definition runState {E A env} (R : Monads.stateT env (itree E) A) (st: env) : itree E (env * A) := R st.
+
+(* This should move to the library. It's just a specialization of [eqit_bind'], but I like the much more
+ informative name. *)
+From ExtLib Require Import
+     Structures.Monads.
+Import MonadNotation.
+Lemma eq_itree_clo_bind {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop) {U1 U2 UU} t1 t2 k1 k2
+      (EQT: @eq_itree E U1 U2 UU t1 t2)
+      (EQK: forall u1 u2, UU u1 u2 -> eq_itree RR (k1 u1) (k2 u2)):
+  eq_itree RR (x <- t1;; k1 x) (x <- t2;; k2 x).
+Proof.
+  eapply eqit_bind'; eauto.
+Qed.
+

@@ -7,9 +7,11 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
+     Eq
      Events.State.
 
 From Vellvm Require Import
+     Util
      LLVMAst
      AstLib
      MemoryAddress
@@ -42,20 +44,25 @@ Section Locals.
             end
         end.
 
-    Open Scope monad_scope.
-    Section PARAMS.
-      Variable (E F G : Type -> Type).
-    Definition E_trigger {M} : forall R, E R -> (stateT M (itree (E +' F +' G)) R) :=
+  Open Scope monad_scope.
+  Section PARAMS.
+    Variable (E F G : Type -> Type).
+    Context `{FailureE -< E +' F +' G}.
+    Notation Effin := (E +' F +' (LocalE k v) +' G).
+    Notation Effout := (E +' F +' G).
+
+    Definition E_trigger {M} : forall R, E R -> (stateT M (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F +' G)) R) :=
+    Definition F_trigger {M} : forall R, F R -> (stateT M (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition G_trigger {M} : forall R , G R -> (stateT M (itree (E +' F +' G)) R) :=
+    Definition G_trigger {M} : forall R , G R -> (stateT M (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition interp_local `{FailureE -< E +' F +' G} : itree (E +' F +' (LocalE k v) +' G) ~> stateT map (itree (E +' F +' G)) :=
+    Definition interp_local : itree Effin ~> stateT map (itree Effout) :=
       interp_state (case_ E_trigger (case_ F_trigger (case_ handle_local G_trigger))).
-    End PARAMS.
+
+  End PARAMS.
 
 End Locals.

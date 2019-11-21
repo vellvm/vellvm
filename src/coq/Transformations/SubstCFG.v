@@ -63,37 +63,87 @@ Section Substitute_cfg.
 
 End Substitute_cfg.
 
-Definition interpret_model (t: itree IO.L0 res_L0): PropT (itree IO.L5) res_L3 :=
-  let L0_trace        := INT.interpret_intrinsics [] t in
-  let L1_trace        := run_state (interp_global L0_trace) [] in
-  let L2_trace        := run_state (interp_local_stack (@handle_local _ _ _ _ _ _ _) L1_trace) ([],[]) in
-  let L3_trace        := run_state (M.interp_memory L2_trace) (M.empty, [[]]) in
-  let L4_trace        := model_L4 L3_trace in
-  let L5_trace        := model_L5 L4_trace in
-  L5_trace.
-
-
-Definition model_mcfg_user' (user_intrinsics: IS.intrinsic_definitions) (prog: CFG.mcfg dtyp) : PropT (itree IO.L5) res_L3 :=
-  let L0_trace        := denote_vellvm prog in
-  let L0_trace'       := INT.interpret_intrinsics user_intrinsics L0_trace in
-  let L1_trace        := run_state (interp_global L0_trace') [] in
-  let L2_trace        := run_state (interp_local_stack (@handle_local _ _ _ _ _ _ _) L1_trace) ([],[]) in
-  let L3_trace        := run_state (M.interp_memory L2_trace) (M.empty, [[]]) in
-  let L4_trace        := model_L4 L3_trace in
-  let L5_trace        := model_L5 L4_trace in
-  L5_trace.
-
 Definition transformation_correct (T: endo (mcfg dtyp)) p: Prop :=
-  refine_L5 (model_mcfg_user' [] p) (model_mcfg_user' [] (T p)).
+  refine_mcfg [] p (T p).
 
-(* Definition model_to_L5 {R E} (t: itree IO.L0 R) g l m := *)
-(*   let L0_trace       := INT.interpret_intrinsics [] t in *)
-(*   let L1_trace       := run_state (interp_global L0_trace) g in *)
-(*   let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in *)
-(*   let L3_trace       := run_state (M.interp_memory L2_trace) m in *)
-(*   let L4_trace       := P.model_undef L3_trace in *)
-(*   let L5_trace       := model_UB L4_trace *)
-(*   in L5_trace. *)
+Lemma interp_to_L3_bind:
+  forall ui {R S} (t: itree IO.L0 R) (k: R -> itree IO.L0 S) s1 s2 m,
+    interp_to_L3 ui (ITree.bind t k) s1 s2 m ≈
+                 (ITree.bind (interp_to_L3 ui t s1 s2 m) (fun '(m',(s2',(s1',x))) => interp_to_L3 ui (k x) s1' s2' m')).
+Proof.
+  intros.
+  unfold interp_to_L3.
+  fold_L2; rewrite interp_to_L2_bind, M.interp_memory_bind.
+  apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros ? (? & ? & ? & ?) ->; reflexivity].
+Qed.
+
+Lemma interp_to_L3_ret: forall ui (R : Type) s1 s2 m (x : R), interp_to_L3 ui (Ret x) s1 s2 m ≈ Ret (m, (s2, (s1, x))).
+Proof.
+  intros; unfold interp_to_L3; fold_L2.
+  rewrite interp_to_L2_ret, M.interp_memory_ret; reflexivity.
+Qed.
+
+Lemma interp_to_L4_bind: forall {R S} g l m (t: itree _ R) (k: R -> itree _ S) t',
+    interp_to_L4 [] (bind t k) g l m t' ->
+    bind (interp_to_L4 [] t g l m) (fun '(m,(l,(g,x))) => interp_to_L4 [] (k x) g l m) t'.
+Proof.
+  intros.
+  cbn in *.
+  unfold interp_to_L4 in H.
+    match type of H with
+       context[
+            runState (M.interp_memory
+            (runState
+              (interp_local_stack ?h
+                (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m] =>
+      replace (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m) with
+        (interp_to_L3 ui p g l m) in H by reflexivity
+    end.
+    destruct H as [t1 [H1 H2]].
+    rewrite interp_to_L3_bind in H2.
+
+Lemma interp_vellvm_model_user_bind: forall {R S} g l m (t: itree _ R) (k: R -> itree _ S) t',
+    interp_vellvm_model_user [] (bind t k) g l m t' ->
+    bind (interp_vellvm_model_user [] t g l m) (fun '(m,(l,(g,x))) => interp_vellvm_model_user [] (k x) g l m) t'.
+Proof.
+  intros.
+  cbn in *.
+  destruct H as [t1 [MODEL1 H]].
+
+    match type of MODEL1 with
+      context[
+            P.model_undef (runState (M.interp_memory
+            (runState
+              (interp_local_stack ?h
+                (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m)] =>
+      replace (P.model_undef (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m)) with
+        (interp_to_L4 ui p g l m) in MODEL1 by reflexivity
+    end.
+
+
+    match type of MODEL1 with
+      context[
+            P.model_undef (runState (M.interp_memory
+            (runState
+              (interp_local_stack ?h
+                (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m)] =>
+      replace (P.model_undef (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m)) with
+        (interp_to_L4 ui p g l m) in MODEL1 by reflexivity
+    end.
+
+
+  fold_L4.
+  Global Instance Monad_Prop {M} {MM : Monad M}
+    : Monad (PropT M).
+  split.
+  2:{
+    intros A B PA KAB b.
+    refine (exists (a: M A), PA a /\ KAB _ b).
+    {|
+      ret := fun _ x y =>  y = ret x
+      ; bind := fun A B PA K b => exists (a: A), PA (ret a) /\ K a b
+    |}.
+
 
 
 Section Substitute_cfg_correct.
@@ -102,11 +152,20 @@ Section Substitute_cfg_correct.
     forall (p: mcfg dtyp) id f d,
       In d (m_definitions p) ->
       dc_name (df_prototype d) = id ->
-      model_cfg (D.denote_cfg (df_instrs d)) (D.denote_cfg f) ->
+      refine_cfg (df_instrs d) f ->
       transformation_correct (subst_cfg id f) p.
   Proof.
-    intros.
-    remember (D.denote_cfg f).
+    intros p id f d IN LU REFINE t tIN.
+    unfold model_to_L5 in tIN.
+    unfold denote_vellvm in tIN.
+    simpl in tIN.
+
+    destruct tIN as (t' & (t'' & t''IN & HUndef) & HUB).
+    simpl in *.
+
+    repeat red in REFINE.
+
+    repeat red in INMODEL.
 
     intros p.
     unfold refine_mcfg_L2.
@@ -192,5 +251,3 @@ Section block_replace.
   Definition cfg_replace_block : endo (cfg T)
     := f_endo.
 End block_replace.
-
-

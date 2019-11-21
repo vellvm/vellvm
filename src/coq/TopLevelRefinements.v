@@ -7,6 +7,8 @@ From ITree Require Import
      Eq.Eq.
 
 From Vellvm Require Import
+     Util
+     PropT
      DynamicTypes
      CFG
      Memory
@@ -14,6 +16,7 @@ From Vellvm Require Import
      Environment
      TopLevel
      LLVMAst
+     Handlers.Intrinsics
      Handlers.Global
      Handlers.Local
      Handlers.Stack
@@ -97,12 +100,12 @@ Qed.
 
 (* This formulation should be easier to use *)
 Instance interp_prop_Proper :
-  forall R E F G (RR : relation R) (h : (E +' F +' G) ~> PropT.PropT (itree (E +' G))),
-    Proper (@eutt (E +' F +' G) _ _ RR ==> eq ==> Basics.impl) (@PropT.interp_prop (E +' F +' G) _ _ _ _ h R).
+  forall R E F G (RR : relation R) (h : (E +' F +' G) ~> PropT (E +' G)),
+    Proper (@eutt (E +' F +' G) _ _ RR ==> eq ==> Basics.impl) (@interp_prop (E +' F +' G) _ h R).
 Proof.
-  intros R E F G t RR h.
+  intros R E F G RR h.
   intros t1 t2 Heutt.
-  unfold PropT.PropT in h. unfold Ensembles.Ensemble in h.
+  unfold PropT in h. 
 Admitted.
 
 Hint Unfold TT.
@@ -120,21 +123,21 @@ Qed.
  *)
 
 Lemma refine_01: forall t1 t2 g,
-    refine_L0 t1 t2 -> refine_L1 (run_state (interp_global t1) g) (run_state (interp_global t2) g).
+    refine_L0 t1 t2 -> refine_L1 (runState (interp_global t1) g) (runState (interp_global t2) g).
 Proof.
   intros t1 t2 g H.
   apply eutt_tt_to_eq_prod, eutt_interp_state_gen; auto.
 Qed.
 
 Lemma refine_12 : forall t1 t2 l,
-    refine_L1 t1 t2 -> refine_L2 (run_state (interp_local_stack (handle_local (v:=res_L0)) t1) l) (run_state (interp_local_stack (handle_local (v:=res_L0)) t2) l).
+    refine_L1 t1 t2 -> refine_L2 (runState (interp_local_stack (handle_local (v:=res_L0)) t1) l) (runState (interp_local_stack (handle_local (v:=res_L0)) t2) l).
 Proof.
   intros t1 t2 l H.
   apply eutt_tt_to_eq_prod, eutt_interp_state_gen; auto.
 Qed.
 
 Lemma refine_23 : forall t1 t2 m,
-    refine_L2 t1 t2 -> refine_L3 (run_state (M.interp_memory t1) m) (run_state (M.interp_memory t2) m).
+    refine_L2 t1 t2 -> refine_L3 (runState (M.interp_memory t1) m) (runState (M.interp_memory t2) m).
 Proof.
   intros t1 t2 m H.
   apply eutt_tt_to_eq_prod, eutt_interp_state_gen; auto.
@@ -176,77 +179,77 @@ Qed.
 
 Definition interp_to_L1 {R} user_intrinsics (t: itree IO.L0 R) g :=
   let L0_trace       := INT.interpret_intrinsics user_intrinsics t in
-  let L1_trace       := run_state (interp_global L0_trace) g in
+  let L1_trace       := runState (interp_global L0_trace) g in
   L1_trace.
 
 Definition interp_to_L2 {R} user_intrinsics (t: itree IO.L0 R) g l :=
   let L0_trace       := INT.interpret_intrinsics user_intrinsics t in
-  let L1_trace       := run_state (interp_global L0_trace) g in
-  let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+  let L1_trace       := runState (interp_global L0_trace) g in
+  let L2_trace       := runState (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
   L2_trace.
 
 Definition interp_to_L3 {R} user_intrinsics (t: itree IO.L0 R) g l m :=
   let L0_trace       := INT.interpret_intrinsics user_intrinsics t in
-  let L1_trace       := run_state (interp_global L0_trace) g in
-  let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
-  let L3_trace       := run_state (M.interp_memory L2_trace) m in
+  let L1_trace       := runState (interp_global L0_trace) g in
+  let L2_trace       := runState (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+  let L3_trace       := runState (M.interp_memory L2_trace) m in
   L3_trace.
 
 Definition interp_to_L4 {R} user_intrinsics (t: itree IO.L0 R) g l m :=
   let L0_trace       := INT.interpret_intrinsics user_intrinsics t in
-  let L1_trace       := run_state (interp_global L0_trace) g in
-  let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
-  let L3_trace       := run_state (M.interp_memory L2_trace) m in
+  let L1_trace       := runState (interp_global L0_trace) g in
+  let L2_trace       := runState (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+  let L3_trace       := runState (M.interp_memory L2_trace) m in
   let L4_trace       := P.model_undef L3_trace in
   L4_trace.
 
 Ltac fold_L1 :=
     match goal with
-      |- context[run_state (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g] =>
-      replace (run_state (interp_global (INT.interpret_intrinsics ui p)) g) with
+      |- context[runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g] =>
+      replace (runState (interp_global (INT.interpret_intrinsics ui p)) g) with
         (interp_to_L1 ui p g) by reflexivity
     end.
 
 Ltac fold_L2 :=
     match goal with
       |- context[
-            run_state
+            runState
               (interp_local_stack ?h
-                (run_state (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l] =>
-      replace (run_state (interp_local_stack h (run_state (interp_global (INT.interpret_intrinsics ui p)) g)) l) with
+                (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l] =>
+      replace (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l) with
         (interp_to_L2 ui p g l) by reflexivity
     end.
 
 Ltac fold_L3 :=
     match goal with
       |- context[
-            run_state (M.interp_memory
-            (run_state
+            runState (M.interp_memory
+            (runState
               (interp_local_stack ?h
-                (run_state (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m] =>
-      replace (run_state (M.interp_memory (run_state (interp_local_stack h (run_state (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m) with
+                (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m] =>
+      replace (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m) with
         (interp_to_L3 ui p g l m) by reflexivity
     end.
 
 Ltac fold_L4 :=
     match goal with
       |- context[
-            P.model_undef (run_state (M.interp_memory
-            (run_state
+            P.model_undef (runState (M.interp_memory
+            (runState
               (interp_local_stack ?h
-                (run_state (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m)] =>
-      replace (P.model_undef (run_state (M.interp_memory (run_state (interp_local_stack h (run_state (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m)) with
+                (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m)] =>
+      replace (P.model_undef (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m)) with
         (interp_to_L4 ui p g l m) by reflexivity
     end.
 
 Ltac fold_L5 :=
     match goal with
       |- context[
-            model_UB (P.model_undef (run_state (M.interp_memory
-            (run_state
+            model_UB (P.model_undef (runState (M.interp_memory
+            (runState
               (interp_local_stack ?h
-                (run_state (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m))] =>
-      replace (model_UB (P.model_undef (run_state (M.interp_memory (run_state (interp_local_stack h (run_state (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m))) with
+                (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m))] =>
+      replace (model_UB (P.model_undef (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m))) with
         (interp_vellvm_model_user ui p g l m) by reflexivity
     end.
 
@@ -343,6 +346,32 @@ Ltac flatten_all :=
   | |- context[match ?x with | _ => _ end] => let Heq := fresh "Heq" in destruct x eqn:Heq
   end.
 
+(* Lemma interp_prop_mon: *)
+(*   forall {E F} (h h': E ~> (PropT (itree F))), *)
+(*     (forall e t, h _ e t -> h' _ e t) -> *)
+(*     forall t, interp_prop h _ t -> interp_prop h' _ t. *)
+
+(* Lemma interp_prop_correct_exec: *)
+(*   forall {E F} (h: E ~> (PropT (itree F))) (h': E ~> itree F), *)
+(*     (forall e t, h _ e (h' _ t)) -> *)
+(*     forall t, interp_prop h _ (interp h' t). *)
+
+Lemma interp_prop_correct_exec:
+  forall {E F} (h: E ~> PropT F) (h': E ~> itree F),
+    (forall T e, h T e (h' T e)) ->
+    forall R t, interp_prop h R t (interp h' t).
+Proof.
+  intros.
+  eexists; split; [| reflexivity].
+  intros t'.
+  destruct (observe t') eqn:EQ; cbn; rewrite EQ; try reflexivity.
+  exists (h' _ e); auto.
+Qed.
+
+Instance pick_handler_proper {E R} `{LLVMEvents.UBE -< E}:
+  Proper (eq ==> eq_itree eq ==> iff) (@P.Pick_handler E _ R).
+Admitted.
+
 (**
    We should be able to prove that the interpreter belongs to the model.
  *)
@@ -353,90 +382,47 @@ Proof.
   flatten_goal.
   2:{
     unfold interpreter, interpreter_user.
-    rewrite Heq; reflexivity.
+    rewrite Heq.
+    unfold singletonT; reflexivity.
   }
   unfold interpreter, interpreter_user; rewrite Heq.
   unfold interp_vellvm_model_user, interp_vellvm_exec_user.
   match goal with |- model_UB _ (interp_UB ?t) => exists t end.
   split.
-  {
-    fold_L4.
-    admit.
+  2:{
+
+    fold_L3.
+    apply interp_prop_correct_exec.
+    intros.
+    subst.
+    destruct e as [|e]; cbn; [reflexivity|].
+    destruct e; cbn; [constructor | reflexivity].
   }
-  admit.
+  fold_L3.
+  apply interp_prop_correct_exec.
+  intros.
+  destruct e as [|e]; cbn; [reflexivity|].
+  destruct e; cbn; [|reflexivity].
+
+  (* Remains to prove refinement of pick handlers.
+     Currently ~untrue due to the predicate
+   *)
+  (*
+  destruct p0 as [uv P].
+  destruct uv.
+  all: try (simpl; setoid_rewrite translate_ret).
+  { constructor; [| constructor; reflexivity].
+    setoid_rewrite (translate_ret _ (DVALUE_Addr a)).
+    eapply pick_handler_proper; [reflexivity | |].
+    apply translate_ret.
+
+    destruct uv; cbn; try rewrite translate_ret.
+    *)
 Admitted.
 
 (**
    Each interpreter commutes with [bind] and [ret].
  **)
-
-(* This should move to the library. It's just a specialization of [eqit_bind'], but I like the much more
- informative name. *)
-From ExtLib Require Import
-     Structures.Monads.
-Import MonadNotation.
-Lemma eq_itree_clo_bind {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop) {U1 U2 UU} t1 t2 k1 k2
-      (EQT: @eq_itree E U1 U2 UU t1 t2)
-      (EQK: forall u1 u2, UU u1 u2 -> eq_itree RR (k1 u1) (k2 u2)):
-  eq_itree RR (x <- t1;; k1 x) (x <- t2;; k2 x).
-Proof.
-  eapply eqit_bind'; eauto.
-Qed.
-
-Lemma interp_intrinsics_bind :
-  forall (R S : Type) l (t : itree _ R) (k : R -> itree _ S),
-    INT.interpret_intrinsics l (ITree.bind t k) ≅ ITree.bind (INT.interpret_intrinsics l t) (fun r : R => INT.interpret_intrinsics l (k r)).
-Proof.
-  intros; apply interp_bind.
-Qed.
-
-Lemma interp_intrinsics_ret :
-  forall (R : Type) l (x: R),
-    INT.interpret_intrinsics l (Ret x) ≅ Ret x.
-Proof.
-  intros; apply interp_ret.
-Qed.
-
-Lemma interp_global_bind :
-  forall (R S : Type) (t : itree IO.L0 R) (k : R -> itree IO.L0 S) s,
-    run_state (interp_global (ITree.bind t k)) s ≅
-              ITree.bind (run_state (interp_global t) s) (fun '(s',r) => run_state (interp_global (k r)) s').
-Proof.
-  intros.
-  unfold interp_global.
-  setoid_rewrite interp_state_bind.
-  apply eq_itree_clo_bind with (UU := Logic.eq).
-  reflexivity.
-  intros [] [] EQ; inv EQ; reflexivity.
-Qed.
-
-Lemma interp_global_ret :
-  forall (R : Type) g (x: R),
-    run_state (interp_global (Ret x: itree IO.L0 R)) g ≅ Ret (g,x).
-Proof.
-  intros; apply interp_state_ret.
-Qed.
-
-Lemma interp_local_stack_bind :
-  forall (R S: Type) (t : itree IO.L1 _) (k : R -> itree IO.L1 S) s,
-    run_state (interp_local_stack (handle_local (v:=res_L0)) (ITree.bind t k)) s ≅
-              ITree.bind (run_state (interp_local_stack (handle_local (v:=res_L0)) t) s)
-              (fun '(s',r) => run_state (interp_local_stack (handle_local (v:=res_L0)) (k r)) s').
-Proof.
-  intros.
-  unfold interp_local_stack.
-  setoid_rewrite interp_state_bind.
-  apply eq_itree_clo_bind with (UU := Logic.eq).
-  reflexivity.
-  intros [] [] EQ; inv EQ; reflexivity.
-Qed.
-
-Lemma interp_local_stack_ret :
-  forall (R : Type) l (x: R),
-    run_state (interp_local_stack (handle_local (v:=uvalue)) (Ret x: itree IO.L1 R)) l ≅ Ret (l,x).
-Proof.
-  intros; apply interp_state_ret.
-Qed.
 
 (** We hence can also commute them at the various levels of interpretation *)
 
@@ -445,7 +431,7 @@ From ITree Require Import
      Events.StateKleisli
      Events.StateFacts.
 
-Instance run_state_proper_eqit {E A env} : Proper (MonadTheory.eqm ==> Logic.eq ==> eutt Logic.eq) (@run_state E A env).
+Instance runState_proper_eqit {E A env} : Proper (MonadTheory.eqm ==> Logic.eq ==> eutt Logic.eq) (@runState E A env).
 Proof.
   repeat intro; subst; apply H.
 Qed.
@@ -475,13 +461,32 @@ Lemma interp_to_L2_bind:
 Proof.
   intros.
   unfold interp_to_L2.
-  rewrite interp_intrinsics_bind, interp_global_bind, interp_local_stack_bind.
+  rewrite INT.interp_intrinsics_bind, interp_global_bind, interp_local_stack_bind.
   apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros ? (? & ? & ?) ->; reflexivity].
 Qed.
 
 Lemma interp_to_L2_ret: forall ui (R : Type) s1 s2 (x : R), interp_to_L2 ui (Ret x) s1 s2 ≈ Ret (s2, (s1, x)).
 Proof.
   intros; unfold interp_to_L2.
-  rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret; reflexivity.
+  rewrite INT.interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret; reflexivity.
 Qed.
+
+Definition interp_cfg {R: Type} (trace: itree IO.instr_E R) g l m :=
+  let L0_trace       := INT.interpret_intrinsics [] trace in
+  let L1_trace       := runState (interp_global L0_trace) g in
+  let L2_trace       := runState (interp_local L1_trace) l in
+  let L3_trace       := runState (M.interp_memory L2_trace) m in
+  let L4_trace       := P.model_undef L3_trace in
+  let L5_trace       := model_UB L4_trace in
+  L5_trace.
+
+Definition model_to_L5_cfg (prog: cfg dtyp) :=
+  let trace := D.denote_cfg prog in
+  interp_cfg trace [] [] (M.empty, [[]]).
+
+Definition refine_cfg_ret: relation (PropT IO.L5 (memory * (local_env * (global_env * uvalue)))) :=
+  fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt  (TT × (TT × (TT × refine_uvalue))) t t'.
+
+Definition refine_cfg  (p1 p2: cfg dtyp): Prop :=
+  refine_cfg_ret (model_to_L5_cfg p1) (model_to_L5_cfg p2).
 

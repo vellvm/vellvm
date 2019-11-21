@@ -25,7 +25,9 @@ From Vellvm Require Import
      IntrinsicsDefinitions.
 
 From ITree Require Import
-     ITree.
+     ITree
+     InterpFacts
+     Eq.Eq.
 
 Import MonadNotation.
 Import EqvNotation.
@@ -98,10 +100,11 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                                   end
                                ) (user_intrinsics ++ defined_intrinsics).
 
-  Definition handle_intrinsics (user_intrinsics: intrinsic_definitions): IntrinsicE ~> itree L0 :=
+  Definition handle_intrinsics {E} `{FailureE -< E} `{IntrinsicE -< E}
+             (user_intrinsics: intrinsic_definitions) : IntrinsicE ~> itree E :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
     fun X (e : IntrinsicE X) =>
-      match e in IntrinsicE Y return X = Y -> itree L0 Y with
+      match e in IntrinsicE Y return X = Y -> itree E Y with
       | (Intrinsic _ fname args) =>
           match assoc Strings.String.string_dec fname (defs_assoc user_intrinsics) with
           | Some f => fun pf =>
@@ -109,18 +112,36 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                        | inl msg => raise msg
                        | inr result => Ret result
                        end
-          | None => fun pf => (eq_rect X (fun a => itree L0 a) (trigger e)) dvalue pf
+          | None => fun pf => (eq_rect X (fun a => itree E a) (trigger e)) dvalue pf
           end
       end eq_refl.
 
-  (* CB / YZ / SAZ: TODO "principle this" *)
-  Definition extcall_trigger : Handler CallE L0 :=
-  fun X e => trigger e.
+  Section PARAMS.
+    Variable (E F : Type -> Type).
+    Context `{FailureE -< F}.
+    Notation Eff := (E +' IntrinsicE +' F).
 
-  Definition rest_trigger : Handler (LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE) L0 :=
-    fun X e => trigger e.
+    Definition E_trigger : Handler E Eff := fun _ e => trigger e.
+    Definition F_trigger : Handler F Eff := fun _ e => trigger e.
 
-  Definition interpret_intrinsics (user_intrinsics: intrinsic_definitions): forall R, itree L0 R -> itree L0 R  :=
-    interp (case_ extcall_trigger (case_ (handle_intrinsics user_intrinsics) rest_trigger)).
+    Definition interpret_intrinsics (user_intrinsics: intrinsic_definitions):
+      forall R, itree Eff R -> itree Eff R :=
+      interp (case_ E_trigger (case_ (handle_intrinsics user_intrinsics) F_trigger)).
+
+    Lemma interp_intrinsics_bind :
+      forall (R S : Type) l (t : itree Eff R) (k : R -> itree _ S),
+        interpret_intrinsics l (ITree.bind t k) ≅ ITree.bind (interpret_intrinsics l t) (fun r : R => interpret_intrinsics l (k r)).
+    Proof.
+      intros; apply interp_bind.
+    Qed.
+
+    Lemma interp_intrinsics_ret :
+      forall (R : Type) l (x: R),
+        interpret_intrinsics l (Ret x: itree Eff _) ≅ Ret x.
+    Proof.
+      intros; apply interp_ret.
+    Qed.
+
+  End PARAMS.
 
 End Make.

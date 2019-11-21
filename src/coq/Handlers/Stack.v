@@ -8,9 +8,12 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
+     Events.StateFacts
+     Eq
      Events.State.
 
 From Vellvm Require Import
+     Util
      LLVMAst
      AstLib
      MemoryAddress
@@ -60,24 +63,50 @@ Section StackMap.
   Open Scope monad_scope.
   Section PARAMS.
     Variable (E F G : Type -> Type).
-    Definition E_trigger {S} : forall R, E R -> (stateT S (itree (E +' F +' G)) R) :=
+    Context `{FailureE -< E +' F +' G}.
+    Notation Effin := (E +' F +' (LocalE k v +' StackE k v) +' G).
+    Notation Effout := (E +' F +' G).
+
+    Definition E_trigger {S} : forall R, E R -> (stateT S (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition F_trigger {S} : forall R, F R -> (stateT S (itree (E +' F +' G)) R) :=
+    Definition F_trigger {S} : forall R, F R -> (stateT S (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition G_trigger {S} : forall R , G R -> (stateT S (itree (E +' F +' G)) R) :=
+    Definition G_trigger {S} : forall R , G R -> (stateT S (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
     Definition interp_local_stack `{FailureE -< E +' F +' G}
-               (h:(LocalE k v) ~> stateT map (itree _)) :
-      (itree (E +' F +' ((LocalE k v) +' (StackE k v)) +' G)) ~>  stateT (map * stack) (itree (E +' F +' G)) :=
+               (h:(LocalE k v) ~> stateT map (itree Effout)) :
+      (itree Effin) ~>  stateT (map * stack) (itree Effout) :=
       interp_state (case_ E_trigger
                    (case_ F_trigger
                    (case_ (case_ (handle_local_stack h)
                                  handle_stack)
                           G_trigger))).
-    End PARAMS.
+
+    Lemma interp_local_stack_bind :
+      forall (R S: Type) (t : itree Effin _) (k : R -> itree Effin S) s,
+        runState (interp_local_stack (handle_local (v:=v)) (ITree.bind t k)) s ≅
+                 ITree.bind (runState (interp_local_stack (handle_local (v:=v)) t) s)
+                 (fun '(s',r) => runState (interp_local_stack (handle_local (v:=v)) (k r)) s').
+    Proof.
+      intros.
+      unfold interp_local_stack.
+      setoid_rewrite interp_state_bind.
+      apply eq_itree_clo_bind with (UU := Logic.eq).
+      reflexivity.
+      intros [] [] EQ; inv EQ; reflexivity.
+    Qed.
+
+    Lemma interp_local_stack_ret :
+      forall (R : Type) l (x: R),
+        runState (interp_local_stack (handle_local (v:=v)) (Ret x: itree Effin R)) l ≅ Ret (l,x).
+    Proof.
+      intros; apply interp_state_ret.
+    Qed.
+
+  End PARAMS.
 
 
     (* SAZ: I wasn't (yet) able to completey disentangle the ocal events from the stack events.
