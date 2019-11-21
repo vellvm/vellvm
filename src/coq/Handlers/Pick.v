@@ -127,27 +127,16 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
        *)
       end.
 
-    Program Definition concretize_picks {E F} `{UBE +? E -< F}: PickE ~> PropT (itree F).
-    refine (fun T p => match p with
-                    | pick u P => translate _ (concretize_uvalue u)
-                    end).
-    refine (fun T fu => _).
-    destruct fu; auto.
-    Defined.
+    Definition concretize_picks {E E' F} `{UBE +? E -< F} `{FailureE +? E' -< F} : PickE ~> (itree F) := 
+      fun T p => match p with
+              | pick u P => concretize_uvalue u
+              end.
 
-    Section PARAMS.
-      Variable (E F: Type -> Type).
-      Definition E_trigger :  E ~> itree (E +' F) :=
-        fun R e => r <- trigger e ;; ret r.
 
-      Definition F_trigger : F ~> itree (E +' F) :=
-        fun R e => r <- trigger e ;; ret r.
+    Definition interp_undef {E E' C F} `{PickE +? C -< F} `{UBE +? E -< C} `{FailureE +? E' -< C} :
+      itree F ~> itree C :=
+      interp (over concretize_picks).
 
-      Definition interp_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
-        itree (E +' PickE +' F) ~> itree (E +' F) :=
-        interp (case_ E_trigger (case_ concretize_picks F_trigger)).
-
-    End PARAMS.
 
   End PickImplementation.
 

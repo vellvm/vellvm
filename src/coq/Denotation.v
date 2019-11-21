@@ -59,6 +59,8 @@ Open Scope Z_scope.
 Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
   Import LLVMEvents.
+
+  
   (* Denotational semantics of LLVM programs.
      Each sub-component is denoted as an itree that can emit any of the following effects:
      - Internal Call (CallE)
@@ -114,10 +116,21 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
     (* YZ: Inferring the subevent instance takes a small but non-trivial amount of time,
        and has to be done here hundreds and hundreds of times. Factoring the inferrence is crucial.
+
+
+  Definition conv_E := MemoryE +' PickE +' UBE +' DebugE +' FailureE.
      *)
-    Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
-      let raise := @raise conv_E dvalue _
-      in
+
+    
+    Context {E X1 X2 X3 X4 X5 : Type -> Type}
+            {HasMem : MemoryE +? X1 -< E}
+            {HasPick : PickE +? X2 -< E}
+            {HasUBE : UBE +? X3 -< E}
+            {HasDebugE :DebugE +? X4 -< E}
+            {HasFailureE : FailureE +? X5 -< E}.
+    
+    Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree E dvalue :=
+      let raise := @raise _ _ dvalue _ in
       match conv with
       | Trunc =>
         match t1, x, t2 with
@@ -318,7 +331,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       end.
     Arguments eval_conv_h _ _ _ _ : simpl nomatch.
 
-    Definition eval_conv conv (t1:dtyp) x (t2:dtyp) : itree conv_E dvalue :=
+    Definition eval_conv conv (t1:dtyp) x (t2:dtyp) : itree E dvalue :=
       match t1, x with
       | DTYPE_I bits, dv =>
         eval_conv_h conv t1 dv t2
@@ -334,8 +347,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".
 
+
+  
   (* YZ: GlobalRead should always returns a dvalue. We can either carry the invariant, or cast [dvalue_to_uvalue] here *)
-  Definition lookup_id (i:ident) : itree lookup_E uvalue :=
+  Definition lookup_id {E X1 X2} `{LLVMGEnvE +? X1 -< E} `{LLVMEnvE +? X2 -< E} (i:ident) : itree E uvalue :=
     match i with
     | ID_Global x => dv <- trigger (GlobalRead x);; ret (dvalue_to_uvalue dv)
     | ID_Local x  => trigger (LocalRead x)
