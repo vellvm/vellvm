@@ -41,7 +41,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
 
     Definition model_undef {E1 E2 F}
-               `{UBE +? E1 -< F} 
+               `{UBE +? E1 -< F}
                `{FailureE +? E1 -< E2} :
         itree PickE ~> PropT (itree F) :=
         interp_prop (over Pick_handler).

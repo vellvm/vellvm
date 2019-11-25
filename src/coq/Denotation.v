@@ -121,14 +121,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Definition conv_E := MemoryE +' PickE +' UBE +' DebugE +' FailureE.
      *)
 
-    
     Context {E X1 X2 X3 X4 X5 : Type -> Type}
             {HasMem : MemoryE +? X1 -< E}
-            {HasPick : PickE +? X2 -< E}
-            {HasUBE : UBE +? X3 -< E}
             {HasDebugE :DebugE +? X4 -< E}
             {HasFailureE : FailureE +? X5 -< E}.
-    
+
     Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree E dvalue :=
       let raise := @raise _ _ dvalue _ in
       match conv with
@@ -347,8 +344,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".
 
-
-  
   (* YZ: GlobalRead should always returns a dvalue. We can either carry the invariant, or cast [dvalue_to_uvalue] here *)
   Definition lookup_id {E X1 X2} `{LLVMGEnvE +? X1 -< E} `{LLVMEnvE +? X2 -< E} (i:ident) : itree E uvalue :=
     match i with
@@ -399,16 +394,26 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     | _               => False
     end.
 
+  Section Denote_Exp.
+
+    Context {E X1 X2 X3 X4 X5 X6}
+            `{LLVMGEnvE +? X1 -< E}
+            `{LLVMEnvE +? X2 -< E}
+            `{FailureE +? X3 -< E}
+            `{UBE +? X4 -< E}
+            `{PickE +? X5 -< E}
+            `{MemoryE +? X6 -< E}.
+
   Fixpoint denote_exp
-           (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
+           (top:option dtyp) (o:exp dtyp) {struct o} : itree E uvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
         in
         (* debug ("Evaluating expression: " ++ to_string o);; *)
         match o with
         | EXP_Ident i =>
-          translate lookup_E_to_exp_E (lookup_id i)
+          lookup_id i
 
-        | EXP_Integer x =>
+       | EXP_Integer x =>
           match top with
           | None                => raise "denote_exp given untyped EXP_Integer"
           | Some (DTYPE_I bits) => lift_undef_or_err ret (fmap dvalue_to_uvalue (coerce_integer_to_int bits x))
@@ -492,17 +497,15 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2)) ;;
             uvalue_to_dvalue_binop2
               (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-              (fun v1 v2 => translate _failure_UB_to_ExpE
-                                   (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
+              (fun v1 v2 => lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
               v1 dv2
           else
             uvalue_to_dvalue_binop
               (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-              (fun v1 v2 => translate _failure_UB_to_ExpE
-                                   (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
+              (fun v1 v2 => lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
               v1 v2
 
-        | OP_ICmp cmp dt op1 op2 =>
+       | OP_ICmp cmp dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
           uvalue_to_dvalue_binop
@@ -521,10 +524,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             (* debug ("fop, branch1, dv2: " ++ to_string dv2);; *)
             uvalue_to_dvalue_binop2
               (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
-              (fun v1 v2 =>
-                 (* debug ("eval_fop branch 1: " ++ to_string v1 ++ " " ++ to_string v2);; *)
-                 translate _failure_UB_to_ExpE
-                                   (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
+              (fun v1 v2 => lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
               v1 dv2
           else
             (* debug ("fop: branch2 ");; *)
@@ -532,11 +532,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             (fun v1 v2 =>
                (* debug ("fop: ret ");; *)
                ret (UVALUE_FBinop fop fm v1 v2))
-              (fun v1 v2 =>
-                 (* debug ("eval_fop branch 2: " ++ to_string v1 ++ " " ++ to_string v2);; *)
-                 translate _failure_UB_to_ExpE
-                                   (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
-              v1 v2
+              (fun v1 v2 => lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))) v1 v2
 
         | OP_FCmp fcmp dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
@@ -551,8 +547,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           v <- denote_exp (Some dt1) op ;;
           uvalue_to_dvalue_uop
             (fun v => ret (UVALUE_Conversion conv v t2))
-            (fun v => translate conv_E_to_exp_E
-                             (fmap dvalue_to_uvalue (eval_conv conv dt1 v t2)))
+            (fun v => fmap dvalue_to_uvalue (eval_conv conv dt1 v t2))
             v
 
         (* CB TODO: Do we actually need to pick here? GEP doesn't do any derefs. Does it make sense to leave it as a UVALUE? *)
@@ -630,19 +625,33 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         end.
   Arguments denote_exp _ : simpl nomatch.
 
-  Definition eval_op (o:exp dtyp) : itree exp_E uvalue :=
+  Definition eval_op (o:exp dtyp) : itree E uvalue :=
     denote_exp None o.
   Arguments eval_op _ : simpl nomatch.
+
+  End Denote_Exp.
+
+  Section Denote_Instr.
+
+    Context {E X1 X2 X3 X4 X5 X6 X7 X8}
+            `{LLVMGEnvE +? X1 -< E}
+            `{LLVMEnvE +? X2 -< E}
+            `{FailureE +? X3 -< E}
+            `{UBE +? X4 -< E}
+            `{PickE +? X5 -< E}
+            `{MemoryE +? X6 -< E}
+            `{IntrinsicE +? X7 -< E}
+            `{CallE +? X8 -< E}.
 
       (* An instruction has only side-effects, it therefore returns [unit] *)
 
       Definition denote_instr
-                 (i: (instr_id * instr dtyp)): itree instr_E unit :=
+                 (i: (instr_id * instr dtyp)): itree E unit :=
         match i with
         (* Pure operations *)
 
         | (IId id, INSTR_Op op) =>
-          dv <- translate exp_E_to_instr_E (eval_op op) ;;
+          dv <- eval_op op ;;
           trigger (LocalWrite id dv)
 
         (* Allocation *)
@@ -653,7 +662,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Load *)
         | (IId id, INSTR_Load _ dt (du,ptr) _) =>
           (* debug ("Load: " ++ to_string dt);; *)
-          ua <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
+          ua <- denote_exp (Some du) ptr ;;
           da <- trigger (pick ua True) ;;
           match da with
           | DVALUE_Poison => raiseUB "Load from poisoned address."
@@ -664,9 +673,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         (* Store *)
         | (IVoid _, INSTR_Store _ (dt, val) (du, ptr) _) =>
-          uv <- translate exp_E_to_instr_E (denote_exp (Some dt) val) ;;
+          uv <- denote_exp (Some dt) val ;;
           dv <- trigger (pick uv True) ;;
-          ua <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
+          ua <- denote_exp (Some du) ptr ;;
           da <- trigger (pick ua (exists x, forall da, concretize ua da -> da = x)) ;;
           match da with
           | DVALUE_Poison => raiseUB "Store to poisoned address."
@@ -678,7 +687,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Call *)
         (* CB TODO: Do we need to pick here? *)
         | (pt, INSTR_Call (dt, f) args) =>
-          uvs <- map_monad (fun '(t, op) => (translate exp_E_to_instr_E (denote_exp (Some t) op))) args ;;
+          uvs <- map_monad (fun '(t, op) => denote_exp (Some t) op) args ;;
           dvs <- map_monad (fun x => trigger (pick x True)) uvs ;;
           returned_value <-
           match Intrinsics.intrinsic_exp f with
@@ -686,7 +695,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             dv <- trigger (Intrinsic dt s dvs) ;;
             ret (dvalue_to_uvalue dv)
           | None =>
-            fv <- translate exp_E_to_instr_E (denote_exp None f) ;;
+            fv <- denote_exp None f ;;
             dfv <- trigger (pick fv True) ;; (* TODO, should this be unique? *)
             (* debug ("Call to function: " ++ to_string f) ;; *)
             trigger (Call dt dfv dvs)
@@ -713,9 +722,28 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         end.
 
+      (* Denoting a list of instruction simply binds the trees together *)
+      Fixpoint denote_code (c: code dtyp): itree E unit :=
+        match c with
+        | nil => ret tt
+        | i::c => denote_instr i;; denote_code c
+        end.
+
+  End Denote_Instr.
+
+  Section Denote_Term.
+
+    Context {E X1 X2 X3 X4 X5 X6}
+            `{LLVMGEnvE +? X1 -< E}
+            `{LLVMEnvE +? X2 -< E}
+            `{FailureE +? X3 -< E}
+            `{UBE +? X4 -< E}
+            `{PickE +? X5 -< E}
+            `{MemoryE +? X6 -< E}.
+
       (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
-      Definition denote_terminator (t: terminator dtyp): itree exp_E (block_id + uvalue) :=
+      Definition denote_terminator (t: terminator dtyp): itree E (block_id + uvalue) :=
         match t with
 
         | TERM_Ret (dt, op) =>
@@ -753,19 +781,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | TERM_Invoke _ _ _ _ => raise "Unsupport itree terminator"
         end.
 
-      (* Denoting a list of instruction simply binds the trees together *)
-      Fixpoint denote_code (c: code dtyp): itree instr_E unit :=
-        match c with
-        | nil => ret tt
-        | i::c => denote_instr i;; denote_code c
-        end.
-
-      (* A block ends with a terminator, it either jumps to another block,
-         or returns a dynamic value *)
-      Definition denote_block (b: block dtyp) : itree instr_E (block_id + uvalue) :=
-        denote_code (blk_code b);;
-        translate exp_E_to_instr_E (denote_terminator (snd (blk_term b))).
-
       (* YZ FIX: no need to push/pop, but do all the assignments afterward *)
       (* One needs to be careful when denoting phi-nodes: they all must
          be evaluated in the same environment.
@@ -776,7 +791,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
        *)
       (* The argument [bid] is the identity of the block from which we are jumping.
          The argument [id_p] are the phi nodes of the block toward which we are jumping. *)
-      Definition denote_phi (bid : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) :=
+      Definition denote_phi (bid : block_id) (id_p : local_id * phi dtyp) : itree E (local_id * uvalue) :=
         let '(id, Phi dt args) := id_p in
         match assoc RawIDOrd.eq_dec bid args with
         | Some op =>
@@ -784,6 +799,26 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           ret (id,uv)
         | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
         end.
+
+  End Denote_Term.
+
+  Section Denote_Block_and_CFG.
+
+    Context {E X1 X2 X3 X4 X5 X6 X7 X8}
+            `{LLVMGEnvE +? X1 -< E}
+            `{LLVMEnvE +? X2 -< E}
+            `{FailureE +? X3 -< E}
+            `{UBE +? X4 -< E}
+            `{PickE +? X5 -< E}
+            `{MemoryE +? X6 -< E}
+            `{IntrinsicE +? X7 -< E}
+            `{CallE +? X8 -< E}.
+
+      (* A block ends with a terminator, it either jumps to another block,
+         or returns a dynamic value *)
+      Definition denote_block (b: block dtyp) : itree E (block_id + uvalue) :=
+        denote_code (blk_code b);;
+        denote_terminator (snd (blk_term b)).
 
       (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
          a cfg, and calls to functions, that jump from a cfg to another.
@@ -815,7 +850,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         of types, just by deciding internally to loop or not and not reflect the invariant
         in the type.
        *)
-      Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
+      Definition denote_cfg (f: cfg dtyp) : itree E uvalue :=
         loop (fun (bid : block_id + block_id) =>
                 match bid with
                 | inl bid
@@ -835,7 +870,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                         | None => raise ("Can't find block we are about to jump to " ++ to_string bid)
                         | Some block_target =>
                           dvs <- map_monad
-                              (fun x => translate exp_E_to_instr_E (denote_phi bid x))
+                              (fun x => denote_phi bid x)
                               (blk_phis block_target) ;;
                               map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
                               ret (inl bid_target)
@@ -844,6 +879,21 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                   end
                 end
              ) (init _ f).
+
+  End Denote_Block_and_CFG.
+
+  Section Denote_function.
+
+    Context {E X1 X2 X3 X4 X5 X6 X7 X8 X9}
+            `{LLVMGEnvE +? X1 -< E}
+            `{LLVMEnvE +? X2 -< E}
+            `{FailureE +? X3 -< E}
+            `{UBE +? X4 -< E}
+            `{PickE +? X5 -< E}
+            `{MemoryE +? X6 -< E}
+            `{IntrinsicE +? X7 -< E}
+            `{CallE +? X8 -< E}
+            `{LLVMStackE +? X9 -< E}.
 
       (* TODO : Move this somewhere else *)
       Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
@@ -863,7 +913,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       (* The denotation of an itree function is a coq function that takes
          a list of dvalues and returns the appropriate semantics. *)
       Definition function_denotation : Type :=
-        list dvalue -> itree L0 uvalue.
+        list dvalue -> itree E uvalue.
 
       Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation  :=
         fun (args : list dvalue) =>
@@ -873,7 +923,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
              (* generate the corresponding writes to the local stack frame *)
           trigger MemPush ;;
           trigger (StackPush (map (fun '(k,v) => (k, dvalue_to_uvalue v)) bs)) ;;
-          rv <- translate instr_E_to_L0 (denote_cfg (df_instrs df)) ;;
+          rv <- denote_cfg (df_instrs df);;
           trigger StackPop ;;
           trigger MemPop ;;
           ret rv.
@@ -892,24 +942,54 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          that life in the "right" injection of the [_CFG_INTERNAL] effect
        *)
 
-(* SAZ: for "open" MCFGs we have
+  End Denote_function.
+
+  Section Denote_MCFG.
+
+    Definition interp_mrec' {D E F : Type -> Type}
+               `{D +? E -< F}
+               (ctx : D ~> itree F) : itree F ~> itree E :=
+      fun R =>
+        ITree.iter (fun t : itree F R =>
+                      match observe t with
+                      | RetF r => Ret (inr r)
+                      | TauF t => Ret (inl t)
+                      | VisF _ e k =>
+                        match case e with
+                        | inl1 d => Ret (inl (ctx _ d >>= k))
+                        | inr1 e => Vis e (fun x => Ret (inl (k x)))
+                        end
+                      end).
+
+    Arguments interp_mrec' {D E F _} ctx [T].
+
+    (** Unfold a mutually recursive definition into separate trees,
+    resolving the mutual references. *)
+    Definition mrec' {D E F : Type -> Type}
+               `{D +? E -< F}
+               (ctx : D ~> itree F) : D ~> itree E :=
+      fun R d => interp_mrec' ctx (ctx _ d).
+
+    Arguments mrec' {D E F _} ctx [T].
+
+
+    (* SAZ: for "open" MCFGs we have
     - (m_declarations CFG) is the set of possible ExternalCalls
     - (List.map df_prototype (m_definitions CFG)) is the set of possible Entry Functions  (also internal calls)
- *)
-      Definition lookup_defn {B} := (@assoc _ B (@dvalue_eq_dec)).
+     *)
+    Definition lookup_defn {B} := (@assoc _ B (@dvalue_eq_dec)).
 
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
       Definition denote_mcfg
                  (fundefs:list (dvalue * function_denotation)) (dt : dtyp)
-                 (f_value : dvalue) (args : list dvalue) : itree L0 uvalue :=
-          @mrec CallE (CallE +' _)
-                (fun T call =>
+                 (f_value : dvalue) (args : list dvalue) : itree E uvalue :=
+          @mrec' CallE _ _ _ (fun T call =>
                    match call with
                    | Call dt fv args =>
                      match (lookup_defn fv fundefs) with
                      | Some f_den => (* If the call is internal *)
                        (* and denote the [cfg]. *)
-                       translate L0_to_INTERNAL (f_den args)
+                       f_den args
                      | None =>
                        (* This must have been a registered external function  *)
                        (* We _don't_ push a itree stack frame, since the external *)

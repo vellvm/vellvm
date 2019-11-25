@@ -494,7 +494,8 @@ Admitted.
   Definition free_frame (f : mem_frame) (m : memory) : memory
     := fold_left (fun m key => delete key m) f m.
 
-  Definition handle_memory {E} `{FailureE -< E} `{UBE -< E}: MemoryE ~> stateT memory_stack (itree E) :=
+  Definition handle_memory {C1 C2 F} `{FailureE +? C1 -< F} `{UBE +? C2 -< F}:
+    MemoryE ~> stateT memory_stack (itree F) :=
     fun _ e '(m, s) =>
       match e with
       | MemPush => ret ((m, [] :: s), tt)
@@ -567,7 +568,7 @@ Admitted.
         end
       end.
 
-  Definition handle_intrinsic {E} `{FailureE -< E}: IntrinsicE ~> stateT memory_stack (itree E) :=
+  Definition handle_intrinsic {E C} `{FailureE +? C -< E}: IntrinsicE ~> stateT memory_stack (itree E) :=
     fun _ e '(m, s) =>
       match e with
       | Intrinsic t name args =>
@@ -579,56 +580,54 @@ Admitted.
         else
             raise ("Unknown intrinsic: " ++ name)
       end.
+Import CatNotations.
+Open Scope cat_scope.
 
 
-  (* TODO: clean this up *)
-  (* {E} `{failureE -< E} : IO ~> stateT memory (itree E)  *)
-  (* Won't need to be case analysis, just passes through failure + debug *)
-  (* Might get rid of this one *)
-  (* This can't show that IO ∉ E :( *)
-  (* Alternative 2: Fix order of effects
+  Instance Subevent_lift_chain {A B C E F}
+           `{A +? E -< F}
+           `{B +? C -< E}:
+    B +? A +' C -< F :=
+    {|
+      split_E := split_E >>> case_
+                         (inl_ >>> inr_)
+                         (split_E >>> case_ inl_ (inr_ >>> inr_));
+      merge_E := case_
+                   (inl_ >>> merge_E >>> inr_ >>> merge_E)
+                   (case_
+                      (inl_ >>> merge_E)
+                      (inr_ >>> merge_E >>> inr_ >>> merge_E))
+    |}.
 
-   Layer interpretors so that they each chain into the next. Have to
-   do ugly matches everywhere :(.
+  Instance Subevent_need_a_better_name {A B C E F}
+           `{A +? E -< F}
+           `{B +? C -< E}:
+    A +' B +? C -< F :=
+    {|
+      split_E := split_E >>> case_
+                         (inl_ >>> inl_)
+                         (split_E >>> case_
+                                  (inr_ >>> inl_)
+                                  inr_);
+      merge_E := assoc_r >>> case_
+                         (inl_ >>> merge_E)
+                         (merge_E >>> inr_ >>> merge_E)
+    |}.
 
-   Split the difference:
-
-   `{IO -< IO +' failureE +' debugE}
-
-   Alternative 3: follow 2, and then use notations to make things better.
-
-   Alternative 4: Extend itrees mechanisms with some kind of set operations.
-
-   If you want to allow sums on the left of your handlers, you want
-   this notion of an atomic handler / event, which is different from a
-   variable or a sum...
-
-   `{E +' F -< G}
-
-   This seems too experimental to try to work out now --- chat with Li-yao about it.
-
-   Alternative 2 might be the most straightforward way to get things working in the short term.
-
-   We just want to get everything hooked together to build and test
-   it. Then think about making the interfaces nicer. The steps to alt
-   2, start with LLVM1 ordering as the basic default. Then each stage
-   of interpretation peels off one, or reintroduces the same kind of
-   events / changes it.
-
-
+  (* This one is tricky: we want to interpret simultaneously, since they go into the same monad,
+     two categories of events, IntrinsicE and MemoryE.
+     This seems fine: we just take the coproduct of the handlers, and assume that the coproduct of
+     the events are in the context.
+     However, we also want indeed to interpret MemoryE, but want to retain IntrinsicE!
+     So that we need a constraint of the form `{MemoryE +? E -< F} to get this return signature E
+     But running `over` on the coproduct of handlers requires a `{IntrinsicE +' MemoryE +? ?C -< F}`.
+     One solution is to use the instance above, but it's hard to infer, we need a type annotation to
+     avoid a loop, and need to be careful to give the handlers in the right order.
    *)
-  Section PARAMS.
-  Variable (E F : Type -> Type).
-    Definition E_trigger {M} : forall R, E R -> (stateT M (itree (E +' F)) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
-
-  Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F)) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
-
-  Definition interp_memory `{FailureE -< E +' F} `{UBE -< E +' F}:
-    itree (E +'  IntrinsicE +' MemoryE +' F) ~> stateT memory_stack (itree (E +' F)) :=
-    interp_state (case_ E_trigger (case_ handle_intrinsic (case_ handle_memory F_trigger))).
-
-  End PARAMS.
+  Definition interp_memory {C1 C2 C3 E F}
+             `{FailureE +? C1 -< E} `{UBE +? C2 -< E}
+             `{IntrinsicE +? C3 -< E} `{MemoryE +? E -< F}:
+    itree F ~> stateT memory_stack (itree E) :=
+    interp_state (over (C := C3) (case_ handle_memory handle_intrinsic)).
 
 End Make.
