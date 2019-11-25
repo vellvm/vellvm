@@ -60,7 +60,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
   Import LLVMEvents.
 
-  
+
   (* Denotational semantics of LLVM programs.
      Each sub-component is denoted as an itree that can emit any of the following effects:
      - Internal Call (CallE)
@@ -979,28 +979,47 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
      *)
     Definition lookup_defn {B} := (@assoc _ B (@dvalue_eq_dec)).
 
-      (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
-      Definition denote_mcfg
-                 (fundefs:list (dvalue * function_denotation)) (dt : dtyp)
-                 (f_value : dvalue) (args : list dvalue) : itree E uvalue :=
-          @mrec' CallE _ _ _ (fun T call =>
-                   match call with
-                   | Call dt fv args =>
-                     match (lookup_defn fv fundefs) with
-                     | Some f_den => (* If the call is internal *)
-                       (* and denote the [cfg]. *)
-                       f_den args
-                     | None =>
-                       (* This must have been a registered external function  *)
-                       (* We _don't_ push a itree stack frame, since the external *)
-                       (* call takes place in one "atomic" step.
-                          SAZ: Not sure that we shouldn't at least push the memory frame
-                        *)
+    Context {E F X: Type -> Type}
+            {INL:CallE +? E -< F}
+            {INR:CallE +? X -< E}.
 
-                       (* We cast the call into an external CallE *)
-                       trigger (ExternalCall dt fv args)
-                     end
-                   end
-                ) _ (Call dt f_value args).
+    Import CatNotations.
+    Open Scope cat_scope.
+
+    Instance Subevent_Commute {E F G} `{E +? F -< G}: F +? E -< G.
+    split.
+    refine (split_E >>> swap).
+    refine (swap >>> merge_E).
+    Defined.
+
+    Instance Trigger_ITree' {E F G} `{E +? F -< G}: Trigger F (itree G) :=
+      fun _ e => ITree.trigger (inj1 e).
+
+    (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
+    Definition denote_mcfg
+               (fundefs:list (dvalue * @function_denotation F)) (dt : dtyp)
+               (f_value : dvalue) (args : list dvalue) : itree E uvalue :=
+      @mrec' CallE E F _ (fun T call =>
+                            match call with
+                            | Call dt fv args =>
+                              match (lookup_defn fv fundefs) with
+                              | Some f_den => (* If the call is internal *)
+                                (* and denote the [cfg]. *)
+                                f_den args
+                              | None =>
+                                (* This must have been a registered external function  *)
+                                (* We _don't_ push a itree stack frame, since the external *)
+                                (* call takes place in one "atomic" step.
+                                   SAZ: Not sure that we shouldn't at least push the memory frame
+                                 *)
+
+                                (* We cast the call into an external CallE *)
+                                @trigger' _ (itree F) _ _ (@inj1 _ _ _ INR _ (Call dt fv args))
+                                (* trigger (@inj1 _ _ _ INR _ (Call dt fv args)) *)
+                              end
+                            end
+                         ) _ (Call dt f_value args).
+
+  End Denote_MCFG.
 
 End Denotation.
