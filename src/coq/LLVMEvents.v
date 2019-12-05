@@ -133,11 +133,11 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   (* Generic calls, refined by [denote_mcfg] *)
   Variant CallE : Type -> Type :=
-  | Call        : forall (t:dtyp) (f:dvalue) (args:list dvalue), CallE uvalue.
+  | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue), CallE uvalue.
 
   (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
   Variant IntrinsicE : Type -> Type :=
-  | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE dvalue.
+  | Intrinsic : forall (t:dtyp) (f:string) (args:list uvalue), IntrinsicE uvalue.
 
   (* Interactions with the memory for the LLVM IR *)
   Variant MemoryE : Type -> Type :=

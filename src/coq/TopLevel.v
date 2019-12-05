@@ -138,8 +138,8 @@ Module TopLevelEnv <: Environment.
     pass in 0 and null as the arguments to main
     Note: this isn't compliant with standard C semantics
    *)
-  Definition main_args := [DV.DVALUE_I64 (DynamicValues.Int64.zero);
-                             DV.DVALUE_Addr (Memory.A.null)
+  Definition main_args := [DV.UVALUE_I64 (DynamicValues.Int64.zero);
+                             DV.UVALUE_Addr (Memory.A.null)
                           ].
 
   (**
@@ -178,7 +178,7 @@ Module TopLevelEnv <: Environment.
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'addr <- trigger (GlobalRead (Name "main")) ;;
-    D.denote_mcfg defns DTYPE_Void addr main_args.
+    D.denote_mcfg defns DTYPE_Void (dvalue_to_uvalue addr) main_args.
 
   (**
      Now that we know how to denote a whole llvm program, we can _interpret_

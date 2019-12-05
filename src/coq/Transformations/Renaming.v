@@ -101,7 +101,7 @@ Section Swap.
      We hence want to get extensional eutt over the returned type.
    *)
   Definition function_rel {X}:
-    relation (FMapAList.alist raw_id res_L0 * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (dvalue * (list dvalue -> itree IO.L0 res_L0)))) := (Logic.eq × (Logic.eq × list_rel (Logic.eq × (fun d1 d2 => forall x, d1 x ≈ d2 x)))).
+    relation (FMapAList.alist raw_id res_L0 * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (uvalue * (list uvalue -> itree IO.L0 res_L0)))) := (Logic.eq × (Logic.eq × list_rel (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))).
   Hint Unfold function_rel.
 
   Global Instance list_rel_refl {R: Type} {RR: relation R} `{Reflexive _ RR} : Reflexive (list_rel RR).
@@ -119,8 +119,8 @@ Section Swap.
     reflexivity.
   Qed.
 
-  Lemma interp_to_L2_map_monad: forall {X} (f: X -> itree _ (dvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
-      (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (Logic.eq × (fun d1 d2 => forall x, d1 x ≈ d2 x)))) (interp_to_L2 nil (f x) s1 s2) (interp_to_L2 nil (f (g x)) s1 s2)) ->
+  Lemma interp_to_L2_map_monad: forall {X} (f: X -> itree _ (uvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
+      (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))) (interp_to_L2 nil (f x) s1 s2) (interp_to_L2 nil (f (g x)) s1 s2)) ->
       eutt function_rel (interp_to_L2 nil (map_monad f l) s1 s2) (interp_to_L2 nil (map_monad f (map g l)) s1 s2).
   Proof.
     induction l as [| x l IH]; simpl; intros; [reflexivity |].
@@ -153,160 +153,163 @@ Section Swap.
       (* Reasoning about initialization *)
       admit.
     }
+Admitted.
+(*     rewrite 2 interp_to_L2_bind. *)
+(*     (* We use [function_rel] here to establish that we get piece-wise eutt when denoting each function *) *)
+(*     eapply eutt_clo_bind with function_rel. *)
+(*     Focus 2. *)
+(*     intros u1 u2 H. *)
+(*     epose proof function_rel. *)
+(*     unfold D.function_denotation in *. *)
+(*     { *)
+(*       (* Denotation of each cfg *) *)
+(*       (* Here we need to actually establish something different than equality of states, but rather extensional agreement after renaming *) *)
+(*       apply interp_to_L2_map_monad. *)
+(*       intros cfg g l HIN. *)
+(*       unfold address_one_function. *)
+(*       simpl. *)
+(*       rewrite 2 interp_to_L2_bind. *)
+(*       split_bind. *)
+(*       { (* Getting the address of the function *) *)
+(*         admit. *)
+(*       } *)
+(*       rewrite 2 interp_to_L2_ret. *)
+(*       apply eqit_Ret. *)
+(*       do 3 constructor; auto. *)
+(*       intros args. *)
+(*       destruct cfg. *)
+(*       unfold f_endo, endo_definition; simpl. *)
+(*       unfold D.denote_function. *)
+(*       simpl. *)
+(*       apply eutt_clo_bind with (UU := Logic.eq). *)
+(*       (* Debug message, to remove / deal with *) *)
+(*       admit. *)
+(*       intros ? ? ->. *)
+(*       apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros [] [] _]. *)
+(*       apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros [] [] _]. *)
+(*       apply eutt_clo_bind with (UU := Logic.eq); [| intros ? ? ->; reflexivity]. *)
+(*       apply eutt_translate'. *)
 
-    rewrite 2 interp_to_L2_bind.
-    (* We use [function_rel] here to establish that we get piece-wise eutt when denoting each function *)
-    apply eutt_clo_bind with function_rel.
+(*       unfold D.denote_cfg. *)
+(* (* *)
+(*       Set Nested Proofs Allowed. *)
+(*       Lemma denote_cfg_comp: *)
+(*         forall  {E} (body body': (block_id + block_id) -> itree E (block_id + block_id)) (x: block_id) (f: endo block_id), *)
+(*           (forall l, body l ≈ body' (f l)) -> *)
+(*           loop body x ≈ loop body' (f x). *)
 
-    {
-      (* Denotation of each cfg *)
-      (* Here we need to actually establish something different than equality of states, but rather extensional agreement after renaming *)
-      apply interp_to_L2_map_monad.
-      intros cfg g l HIN.
-      unfold address_one_function.
-      simpl.
-      rewrite 2 interp_to_L2_bind.
-      split_bind.
-      { (* Getting the address of the function *)
-        admit.
-      }
-      rewrite 2 interp_to_L2_ret.
-      apply eqit_Ret.
-      do 3 constructor; auto.
-      intros args.
-      destruct cfg.
-      unfold f_endo, endo_definition; simpl.
-      unfold D.denote_function.
-      simpl.
-      apply eutt_clo_bind with (UU := Logic.eq).
-      (* Debug message, to remove / deal with *)
-      admit.
-      intros ? ? ->.
-      apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros [] [] _].
-      apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros [] [] _].
-      apply eutt_clo_bind with (UU := Logic.eq); [| intros ? ? ->; reflexivity].
-      apply eutt_translate'.
+(*       unfold D.denote_cfg. *)
+(*       unfold f_endo. endo_cfg. simpl. *)
+(*       unfold eqm. *)
+(*       Instance loop_Proper: *)
+(*         Proper () loop *)
+(*       (* Set Printing Implicit. *) *)
+(*       apply (@Proper_loop. *)
+(* *) *)
 
-      unfold D.denote_cfg.
-(*
-      Set Nested Proofs Allowed.
-      Lemma denote_cfg_comp:
-        forall  {E} (body body': (block_id + block_id) -> itree E (block_id + block_id)) (x: block_id) (f: endo block_id),
-          (forall l, body l ≈ body' (f l)) ->
-          loop body x ≈ loop body' (f x).
+(*       admit. *)
 
-      unfold D.denote_cfg.
-      unfold f_endo. endo_cfg. simpl.
-      unfold eqm.
-      Instance loop_Proper:
-        Proper () loop
-      (* Set Printing Implicit. *)
-      apply (@Proper_loop.
-*)
+(*     } *)
 
-      admit.
+(*     intros (? & ? & ?) (? & ? & ?) EQ. *)
+(*     inv EQ; repeat match goal with | h: prod_rel _ _ _ _ |- _ => inv h end. *)
+(*     rewrite 2 interp_to_L2_bind. *)
+(*     split_bind. *)
 
-    }
+(*     { (* Getting the address of "main" *) *)
+(*       admit. *)
+(*     } *)
 
-    intros (? & ? & ?) (? & ? & ?) EQ.
-    inv EQ; repeat match goal with | h: prod_rel _ _ _ _ |- _ => inv h end.
-    rewrite 2 interp_to_L2_bind.
-    split_bind.
+(*     (* Tying the recursive knot *) *)
 
-    { (* Getting the address of "main" *)
-      admit.
-    }
-
-    (* Tying the recursive knot *)
-
-    admit.
-  (*   rewrite 2 interp_to_L2_bind. *)
-
-
-  (*   2:rewrite interp_to_L2_bind; reflexivity. *)
-  (*   unfold f_endo, endo_list. *)
-  (*   apply interp_to_L2_map_monad. *)
-  (*   intros. *)
-  (*   remember (interp_to_L2 (address_one_function x) s1 s2). *)
-  (*   cbn. *)
-  (*   rewrite 2 interp_to_L2_bind. *)
-  (*   split_bind. *)
-  (*   { (* Reading the name of the function *) *)
-  (*     admit. *)
-  (*   } *)
-
-  (*     unfold f_endo. *)
-  (*     Set Printing All. *)
-  (*     unfold interp_to_L2, INT.interpret_intrinsics, interp_global, interp_local_stack. *)
-  (*     rewrite interp_trigger; cbn. *)
-  (*     Lemma refine_cfg_to_mcfg: forall {B} f (l:list (definition dtyp (cfg dtyp))) s1 s2, *)
-  (*       interp_to_L2 (map_monad (B := B) f l) s1 s2 = *)
-  (*       interp_to_L2 (map_monad f l) s1 s2. *)
-
-  (*     (* Denotation of each cfg, need a modularity lemma *) *)
+(*     admit. *)
+(*   (*   rewrite 2 interp_to_L2_bind. *) *)
 
 
+(*   (*   2:rewrite interp_to_L2_bind; reflexivity. *) *)
+(*   (*   unfold f_endo, endo_list. *) *)
+(*   (*   apply interp_to_L2_map_monad. *) *)
+(*   (*   intros. *) *)
+(*   (*   remember (interp_to_L2 (address_one_function x) s1 s2). *) *)
+(*   (*   cbn. *) *)
+(*   (*   rewrite 2 interp_to_L2_bind. *) *)
+(*   (*   split_bind. *) *)
+(*   (*   { (* Reading the name of the function *) *) *)
+(*   (*     admit. *) *)
+(*   (*   } *) *)
 
-  (*   { *)
-  (*     Transparent build_global_environment. *)
-  (*     unfold build_global_environment. *)
-  (*     simpl. *)
-  (*     rewrite interp_intrinsics_bind, interp_global_bind, build_L2_bind. *)
-  (*     setoid_rewrite interp_intrinsics_bind. *)
-  (*     setoid_rewrite interp_global_bind. *)
-  (*     setoid_rewrite build_L2_bind. *)
-  (*     eapply eutt_clo_bind with (UU := Logic.eq). *)
-  (*     { *)
-  (*       match goal with |- _ ≈ run_state ?m ?s => rewrite <- (bind_ret2 (run_state m s)) end. *)
-  (*       eapply eutt_clo_bind. *)
-  (*       2: intros [] [] *)
-  (*     } *)
-  (*     intros ? (? & ? & ?) ?; subst. *)
-  (*     eapply eutt_refine_L2_proper. *)
-  (*     eapply eqitgen_cong_eqit_eq; [| reflexivity |]. *)
-  (*     setoid_rewrite interp_global_bind. *)
-  (*     do 2 setoid_rewrite build_L2_bind. *)
+(*   (*     unfold f_endo. *) *)
+(*   (*     Set Printing All. *) *)
+(*   (*     unfold interp_to_L2, INT.interpret_intrinsics, interp_global, interp_local_stack. *) *)
+(*   (*     rewrite interp_trigger; cbn. *) *)
+(*   (*     Lemma refine_cfg_to_mcfg: forall {B} f (l:list (definition dtyp (cfg dtyp))) s1 s2, *) *)
+(*   (*       interp_to_L2 (map_monad (B := B) f l) s1 s2 = *) *)
+(*   (*       interp_to_L2 (map_monad f l) s1 s2. *) *)
+
+(*   (*     (* Denotation of each cfg, need a modularity lemma *) *) *)
 
 
-  (*   unfold normalize_types, eval_typ; cbn. *)
-  (*   unfold swap_mcfg, f_endo, endo_mcfg; cbn. *)
-  (*   unfold fmap_mcfg, fmap_modul; cbn. *)
-  (*   unfold swap_dmcfg, f_endo, endo_mcfg; cbn. *)
-  (*   f_equal. *)
-  (*   - unfold f_endo, endo_list. *)
-  (*     induction m_type_defs as [| [] tl IH]; [reflexivity | cbn]. *)
-  (*     f_equal. *)
-  (*     unfold f_endo, endo_id. *)
 
-  (*     P: mcfg typ -> Prop := fun p => refine_mcfg_L2 p (endo_mcfg p). *)
-  (*     goal: forall p, P p. *)
+(*   (*   { *) *)
+(*   (*     Transparent build_global_environment. *) *)
+(*   (*     unfold build_global_environment. *) *)
+(*   (*     simpl. *) *)
+(*   (*     rewrite interp_intrinsics_bind, interp_global_bind, build_L2_bind. *) *)
+(*   (*     setoid_rewrite interp_intrinsics_bind. *) *)
+(*   (*     setoid_rewrite interp_global_bind. *) *)
+(*   (*     setoid_rewrite build_L2_bind. *) *)
+(*   (*     eapply eutt_clo_bind with (UU := Logic.eq). *) *)
+(*   (*     { *) *)
+(*   (*       match goal with |- _ ≈ run_state ?m ?s => rewrite <- (bind_ret2 (run_state m s)) end. *) *)
+(*   (*       eapply eutt_clo_bind. *) *)
+(*   (*       2: intros [] [] *) *)
+(*   (*     } *) *)
+(*   (*     intros ? (? & ? & ?) ?; subst. *) *)
+(*   (*     eapply eutt_refine_L2_proper. *) *)
+(*   (*     eapply eqitgen_cong_eqit_eq; [| reflexivity |]. *) *)
+(*   (*     setoid_rewrite interp_global_bind. *) *)
+(*   (*     do 2 setoid_rewrite build_L2_bind. *) *)
 
-  (*     rewrite map_map. *)
-  (*     f_equal. *)
-  (*     2: rewrite <- IH. *)
-  (*   - *)
-  (*   unfold normalize_types, eval_typ. *)
-  (*   cbn. *)
-  (*   (* unfold swap_mcfg, f_endo, endo_mcfg. *) *)
-  (*   f_endo, endo_option. *)
 
-  (*   destruct p as [a b c d e f g]. *)
+(*   (*   unfold normalize_types, eval_typ; cbn. *) *)
+(*   (*   unfold swap_mcfg, f_endo, endo_mcfg; cbn. *) *)
+(*   (*   unfold fmap_mcfg, fmap_modul; cbn. *) *)
+(*   (*   unfold swap_dmcfg, f_endo, endo_mcfg; cbn. *) *)
+(*   (*   f_equal. *) *)
+(*   (*   - unfold f_endo, endo_list. *) *)
+(*   (*     induction m_type_defs as [| [] tl IH]; [reflexivity | cbn]. *) *)
+(*   (*     f_equal. *) *)
+(*   (*     unfold f_endo, endo_id. *) *)
 
-  (*   destruct m_globals, m_definitions, m_declarations. *)
+(*   (*     P: mcfg typ -> Prop := fun p => refine_mcfg_L2 p (endo_mcfg p). *) *)
+(*   (*     goal: forall p, P p. *) *)
 
-  (* Lemma swap_correct_L2: *)
-  (*   forall p, refine_mcfg_L2 p (swap_mcfg p). *)
-  (* Proof. *)
-  (*   intros p. *)
-  (*   unfold refine_mcfg_L2. *)
-  (*   unfold build_to_L2. *)
+(*   (*     rewrite map_map. *) *)
+(*   (*     f_equal. *) *)
+(*   (*     2: rewrite <- IH. *) *)
+(*   (*   - *) *)
+(*   (*   unfold normalize_types, eval_typ. *) *)
+(*   (*   cbn. *) *)
+(*   (*   (* unfold swap_mcfg, f_endo, endo_mcfg. *) *) *)
+(*   (*   f_endo, endo_option. *) *)
 
-  (*   Opaque build_L0. *)
-  (*   cbn. *)
+(*   (*   destruct p as [a b c d e f g]. *) *)
 
-  (*   cbn. *)
+(*   (*   destruct m_globals, m_definitions, m_declarations. *) *)
 
-  Admitted.
+(*   (* Lemma swap_correct_L2: *) *)
+(*   (*   forall p, refine_mcfg_L2 p (swap_mcfg p). *) *)
+(*   (* Proof. *) *)
+(*   (*   intros p. *) *)
+(*   (*   unfold refine_mcfg_L2. *) *)
+(*   (*   unfold build_to_L2. *) *)
+
+(*   (*   Opaque build_L0. *) *)
+(*   (*   cbn. *) *)
+
+(*   (*   cbn. *) *)
+
+(*   Admitted. *)
 
   Theorem swap_cfg_correct: transformation_correct swap_mcfg.
   Proof.

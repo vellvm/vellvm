@@ -109,7 +109,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                        | inl msg => raise msg
                        | inr result => Ret result
                        end
-          | None => fun pf => (eq_rect X (fun a => itree L0 a) (trigger e)) dvalue pf
+          | None => fun pf => (eq_rect X (fun a => itree L0 a) (trigger e)) uvalue pf
           end
       end eq_refl.
 
