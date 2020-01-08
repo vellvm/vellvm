@@ -35,7 +35,7 @@ Record pc :=
 Section hiding_notations.
   Local Open Scope sexp_scope.
   Global Instance serialize_pc : Serialize pc :=
-    fun p => [Raw "@" ; to_sexp (fn p) ; Raw ":" ; to_sexp (bk p) ; Raw ":" ; to_sexp (pt p)].
+    fun p => [Atom "@" ; to_sexp (fn p) ; Atom ":" ; to_sexp (bk p) ; Atom ":" ; to_sexp (pt p)].
 End hiding_notations.
 
 
