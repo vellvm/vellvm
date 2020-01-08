@@ -21,7 +21,7 @@ COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric
 									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/UndefinedBehaviour\
 									Denotation TransformTypes TopLevel
 
-COQFILESOPT    := Transformations/Renaming Transformations/DeadInstr Transformations/Transform Transformations/Transformation\
+COQFILESOPT    := Transformations/Renaming Transformations/DeadInstr Transformations/Transform Transformations/Traversal Transformations/Transformation\
 									ParserHelper Refinement Environment TopLevelRefinements
 
 OLLVMFILES :=

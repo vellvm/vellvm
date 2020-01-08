@@ -427,7 +427,7 @@ Section Correctness.
     all: subst.
     all: try lia.
     destruct (Z.eq_dec x 0); subst; lia.
-    (* destruct (Z.eq_dec (2 ^ Z.pos d) 0); [ rewrite e in M; lia | assumption ]. *)
+    destruct (Z.eq_dec (2 ^ Z.pos d) 0); [ rewrite e in M; lia | assumption ].
     assert (m mod 2 ^ Z.pos d < 2 ^ Z.pos d); try lia.
     apply Zmod_pos_bound.
     apply Z.pow_pos_nonneg; lia.
