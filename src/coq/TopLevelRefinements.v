@@ -349,11 +349,12 @@ Ltac flatten_all :=
 Theorem interpreter_sound: forall p, model p (interpreter p).
 Proof.
   intros p.
-  unfold model, model_user.
+  unfold model, model_user, lift_sem_to_mcfg.
   flatten_goal.
   2:{
     unfold interpreter, interpreter_user.
-    rewrite Heq; reflexivity.
+    rewrite Heq.
+    admit.
   }
   unfold interpreter, interpreter_user; rewrite Heq.
   unfold interp_vellvm_model_user, interp_vellvm_exec_user.
