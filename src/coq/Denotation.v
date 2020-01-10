@@ -694,7 +694,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           uv <- translate exp_E_to_instr_E (denote_exp (Some dt) val) ;;
           dv <- trigger (pick uv True) ;;
           ua <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
-          da <- trigger (pick ua (exists x, forall da, concretize ua da -> da = x)) ;;
+          da <- trigger (pickUnique ua) ;;
           match da with
           | DVALUE_Poison => raiseUB "Store to poisoned address."
           | _ => trigger (Store da dv)
@@ -707,7 +707,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           uvs <- map_monad (fun '(t, op) => (translate exp_E_to_instr_E (denote_exp (Some t) op))) args ;;
           returned_value <-
           match Intrinsics.intrinsic_exp f with
-          | Some s => trigger (Intrinsic dt s uvs)
+          | Some s =>
+            dvs <- map_monad (fun uv => trigger (pickUnique uv)) uvs ;;
+            fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
           | None =>
             fv <- translate exp_E_to_instr_E (denote_exp None f) ;;
             (* debug ("Call to function: " ++ to_string f) ;; *)
@@ -732,7 +734,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         (* Error states *)
         | (_, _) => raise "ID / Instr mismatch void/non-void"
-
         end.
 
       (* A [terminator] either returns from a function call, producing a [dvalue],
@@ -924,8 +925,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
       Definition denote_mcfg
                  (fundefs:list (dvalue * function_denotation)) (dt : dtyp)
-                 (f_value : uvalue) (args : list uvalue) : itree L0 uvalue :=
-          @mrec CallE (CallE +' _)
+                 (f_value : uvalue) (args : list uvalue) : itree (CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE) uvalue :=
+          @mrec CallE (CallE +' ExternalCallE +' _)
                 (fun T call =>
                    match call with
                    | Call dt fv args =>
@@ -941,8 +942,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                           SAZ: Not sure that we shouldn't at least push the memory frame
                         *)
 
-                       (* We cast the call into an external CallE *)
-                       trigger (ExternalCall dt fv args)
+                       (* We cast the call into an ExternalCallE *)
+                       dargs <- map_monad (fun uv => trigger (pickUnique uv)) args ;;
+                       fmap dvalue_to_uvalue (trigger (ExternalCall dt fv dargs))
                      end
                    end
                 ) _ (Call dt f_value args).

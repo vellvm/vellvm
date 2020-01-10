@@ -127,7 +127,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
    *)
   (* SAZ: TODO - unify this with the Denotational notion of semantic function?
   *)
-  Definition semantic_function := (list uvalue) -> err uvalue.
+  Definition semantic_function := (list dvalue) -> err dvalue.
 
   (* An association list mapping intrinsic names to their semantic definitions *)
   Definition intrinsic_definitions := list (declaration typ * semantic_function).
@@ -139,7 +139,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Definition llvm_fabs_f32 : semantic_function :=
     fun args =>
       match args with
-      | [UVALUE_Float d] => ret (UVALUE_Float (Float32.abs d))
+      | [DVALUE_Float d] => ret (DVALUE_Float (Float32.abs d))
       | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed intputs"
       end.
 
@@ -147,7 +147,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Definition llvm_fabs_f64 : semantic_function :=
     fun args =>
       match args with
-      | [UVALUE_Double d] => ret (UVALUE_Double (Float.abs d))
+      | [DVALUE_Double d] => ret (DVALUE_Double (Float.abs d))
       | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed intputs"
       end.
 

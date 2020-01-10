@@ -45,18 +45,22 @@ Section Globals.
 
   Open Scope monad_scope.
   Section PARAMS.
-    Variable (E F G : Type -> Type).
-    Definition E_trigger {M} : forall R, E R -> (stateT M (itree (E +' F +' G)) R) :=
+    Variable (D E F G : Type -> Type).
+
+    Definition D_trigger {M} : forall R, D R -> (stateT M (itree (D +' E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F +' G)) R) :=
+    Definition E_trigger {M} : forall R, E R -> (stateT M (itree (D +' E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition G_trigger {M} : forall R , G R -> (stateT M (itree (E +' F +' G)) R) :=
+    Definition F_trigger {M} : forall R, F R -> (stateT M (itree (D +' E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition interp_global `{FailureE -< E +' F +' G} : itree (E +' F +' (GlobalE k v) +' G) ~> stateT map (itree (E +' F +' G)) :=
-      interp_state (case_ E_trigger (case_ F_trigger (case_ handle_global G_trigger))).
+    Definition G_trigger {M} : forall R , G R -> (stateT M (itree (D +' E +' F +' G)) R) :=
+      fun R e m => r <- trigger e ;; ret (m, r).
+
+    Definition interp_global `{FailureE -< D +' E +' F +' G} : itree (D +' E +' F +' (GlobalE k v) +' G) ~> stateT map (itree (D+' E +' F +' G)) :=
+      interp_state (case_ D_trigger (case_ E_trigger (case_ F_trigger (case_ handle_global G_trigger)))).
   End PARAMS.
 
 End Globals.
