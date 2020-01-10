@@ -114,9 +114,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       end eq_refl.
 
   (* CB / YZ / SAZ: TODO "principle this" *)
-  Definition call_trigger : Handler CallE L0 :=
-  fun X e => trigger e.
-
   Definition extcall_trigger : Handler ExternalCallE L0 :=
   fun X e => trigger e.
 
@@ -124,6 +121,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     fun X e => trigger e.
 
   Definition interpret_intrinsics (user_intrinsics: intrinsic_definitions): forall R, itree L0 R -> itree L0 R  :=
-    interp (case_ call_trigger (case_ extcall_trigger (case_ (handle_intrinsics user_intrinsics) rest_trigger))).
+    interp (case_ extcall_trigger (case_ (handle_intrinsics user_intrinsics) rest_trigger)).
 
 End Make.

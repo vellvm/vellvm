@@ -715,22 +715,18 @@ Admitted.
 
    *)
   Section PARAMS.
-  Variable (D E F : Type -> Type).
+  Variable (E F : Type -> Type).
 
-  Definition D_trigger {M} : forall R, D R -> (stateT M (itree (D +' E +' F)) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
-  
-  Definition E_trigger {M} : forall R, E R -> (stateT M (itree (D +' E +' F)) R) :=
+  Definition E_trigger {M} : forall R, E R -> (stateT M (itree (E +' F)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-  Definition F_trigger {M} : forall R, F R -> (stateT M (itree (D +' E +' F)) R) :=
+  Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-  Definition interp_memory `{PickE -< D +' E +' F} `{FailureE -< D +' E +' F} `{UBE -< D +' E +' F}:
-    itree (D +' E +'  IntrinsicE +' MemoryE +' F) ~> stateT memory_stack (itree (D +' E +' F)) :=
-    interp_state (case_ D_trigger
-                 (case_ E_trigger
-                 (case_ handle_intrinsic (case_ handle_memory F_trigger)))).
+  Definition interp_memory `{PickE -< E +' F} `{FailureE -< E +' F} `{UBE -< E +' F}:
+    itree (E +'  IntrinsicE +' MemoryE +' F) ~> stateT memory_stack (itree (E +' F)) :=
+    interp_state (case_ E_trigger
+                 (case_ handle_intrinsic (case_ handle_memory F_trigger))).
 
   End PARAMS.
 

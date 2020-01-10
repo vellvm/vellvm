@@ -65,21 +65,17 @@ let rec step (m : ('a TopLevel.IO.coq_L5, TopLevel.TopLevelEnv.memory * ((TopLev
   (* We finished the computation *)
   | RetF (_,(_,(_,v))) -> Ok v
 
-  | VisF (Sum.Coq_inl1 (Call(_, _, _)), _) ->
+  (* The ExternalCallE effect *)
+  | VisF (Sum.Coq_inl1 (ExternalCall(_, _, _)), _) ->
     Error "Uninterpreted Call"
 
-  (* The ExternalCallE effect *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 (ExternalCall(_, _, _))), _) ->
-     Error "Uninterpreted External Call"
-
   (* The debugE effect *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg)), k) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 msg), k) ->
         (debug (Camlcoq.camlstring_of_coqstring msg);
          step (k (Obj.magic DV.UVALUE_None)))
 
-
   (* The failE effect is a failure *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 f)), _) ->
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 f), _) ->
     Error (Camlcoq.camlstring_of_coqstring f)
 
   (* The UndefinedBehaviourE effect is a failure *)

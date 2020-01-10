@@ -97,8 +97,8 @@ Qed.
 
 (* This formulation should be easier to use *)
 Instance interp_prop_Proper :
-  forall R D E F G (RR : relation R) (h : (D +' E +' F +' G) ~> PropT.PropT (itree (D +' E +' G))),
-    Proper (@eutt (D +' E +' F +' G) _ _ RR ==> eq ==> Basics.impl) (@PropT.interp_prop (D +' E +' F +' G) _ _ _ _ h R).
+  forall R E F G (RR : relation R) (h : (E +' F +' G) ~> PropT.PropT (itree (E +' G))),
+    Proper (@eutt (E +' F +' G) _ _ RR ==> eq ==> Basics.impl) (@PropT.interp_prop (E +' F +' G) _ _ _ _ h R).
 Proof.
   intros R E F G t RR h.
   intros t1 t2 Heutt.

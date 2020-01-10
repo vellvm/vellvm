@@ -196,9 +196,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
     fun T e => inr1 (inr1 (inr1 e)).
 
   (* Core effects. *)
-  Definition L0 := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
+  Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
-  Definition instr_E_to_L0 : instr_E ~> L0 :=
+  Definition instr_E_to_L0' : instr_E ~> L0' :=
     fun T e =>
       match e with
       | inl1 e => inl1 e
@@ -212,29 +212,8 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
       | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e))))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))))
       end.
 
-  (* Distinction made between internal and external calls -- intermediate step in denote_mcfg.
-     Note that [CallE] appears _twice_ in the [INTERNAL] type.  The left one is 
-     meant to be the "internal" call event and the right one is the "external" call event.
-     The [denote_mcfg] function, which uses [mrec] to tie the recursive knot distinguishes
-     the two.  It re-triggers an unknown [Call] event as an [ExternalCall] (which is just
-     an injection into the right-hand side.
-   *)
-  Definition INTERNAL := CallE +' L0.
-
-  (* This inclusion "assumes" that all call events are internal.  The 
-     dispatch in denote_mcfg then interprets some of the calls directly,
-     if their definitions are known, or it "externalizes" the calls
-     whose definitions are not known.
-   *)
-  Definition L0_to_INTERNAL : L0 ~> INTERNAL :=
-    fun R e =>
-      match e with
-      | inl1 e' => inl1 e'
-      | inr1 e' => inr1 (inr1 e')
-      end.
-
-  Definition _exp_E_to_L0 : exp_E ~> L0 :=
-    fun T e => instr_E_to_L0 (exp_E_to_instr_E e).
+  Definition _exp_E_to_L0' : exp_E ~> L0' :=
+    fun T e => instr_E_to_L0' (exp_E_to_instr_E e).
 
   Definition _failure_UB_to_ExpE : (FailureE +' UBE) ~> exp_E :=
     fun T e =>
@@ -243,27 +222,42 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
       | inr1 x => inr1 (inr1 (inr1 (inr1 (inl1 x))))
       end.
 
+  Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
+
+  (* exp_E = LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE *)
+  (* L0 = ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE *)
+
+  Definition _exp_E_to_L0 : exp_E ~> L0 :=
+    fun T e =>
+      match e with
+      | inl1 e => inr1 (inr1 (inl1 e))
+      | inr1 (inl1 e) => inr1 (inr1 (inr1 (inl1 (inl1 e))))
+      | inr1 (inr1 e) => inr1 (inr1 (inr1 (inr1 e)))
+      end.
+
+  Definition _L0_to_L0' : L0 ~> L0' := inr1.
+
   (* For multiple CFG, after interpreting [GlobalE] *)
-  Definition L1 := CallE +' ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
+  Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] *)
-  Definition L2 := CallE +' ExternalCallE +' IntrinsicE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
+  Definition L2 := ExternalCallE +' IntrinsicE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
-  Definition L3 := CallE +' ExternalCallE +' PickE +' UBE +' DebugE +' FailureE.
+  Definition L3 := ExternalCallE +' PickE +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickE]*)
-  Definition L4 := CallE +' ExternalCallE +' UBE +' DebugE +' FailureE.
+  Definition L4 := ExternalCallE +' UBE +' DebugE +' FailureE.
 
-  Definition L5 := CallE +' ExternalCallE +' DebugE +' FailureE.
+  Definition L5 := ExternalCallE +' DebugE +' FailureE.
 
-  Hint Unfold L0 L1 L2 L3 L4 L5.
+  Hint Unfold L0 L0' L1 L2 L3 L4 L5.
 
   Definition _failure_UB_to_L4 : (FailureE +' UBE) ~> L4:=
     fun T e =>
       match e with
-      | inl1 x =>  inr1 (inr1 (inr1 (inr1 x)))
-      | inr1 x => inr1 (inr1 (inl1 x))
+      | inl1 x => inr1 (inr1 (inr1 x))
+      | inr1 x => inr1 (inl1 x)
       end.
 
 End LLVM_INTERACTIONS.

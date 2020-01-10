@@ -59,29 +59,25 @@ Section StackMap.
 
   Open Scope monad_scope.
   Section PARAMS.
-    Variable (D E F G : Type -> Type).
+    Variable (E F G : Type -> Type).
 
-    Definition D_trigger {M} : forall R, D R -> (stateT M (itree (D +' E +' F +' G)) R) :=
+    Definition E_trigger {M} : forall R, E R -> (stateT M (itree (E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition E_trigger {M} : forall R, E R -> (stateT M (itree (D +' E +' F +' G)) R) :=
+    Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition F_trigger {M} : forall R, F R -> (stateT M (itree (D +' E +' F +' G)) R) :=
+    Definition G_trigger {M} : forall R , G R -> (stateT M (itree (E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition G_trigger {M} : forall R , G R -> (stateT M (itree (D +' E +' F +' G)) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
-
-    Definition interp_local_stack `{FailureE -< D +' E +' F +' G}
+    Definition interp_local_stack `{FailureE -< E +' F +' G}
                (h:(LocalE k v) ~> stateT map (itree _)) :
-      (itree (D +' E +' F +' ((LocalE k v) +' (StackE k v)) +' G)) ~>  stateT (map * stack) (itree (D +' E +' F +' G)) :=
-      interp_state (case_ D_trigger
-                   (case_ E_trigger
+      (itree (E +' F +' ((LocalE k v) +' (StackE k v)) +' G)) ~>  stateT (map * stack) (itree (E +' F +' G)) :=
+      interp_state (case_ E_trigger
                    (case_ F_trigger
                    (case_ (case_ (handle_local_stack h)
                                  handle_stack)
-                          G_trigger)))).
+                          G_trigger))).
     End PARAMS.
 
 

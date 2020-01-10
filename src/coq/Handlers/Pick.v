@@ -41,20 +41,17 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     | PickD: forall uv (C: Prop) dv, C -> concretize uv dv -> Pick_handler (pick uv C) (Ret dv).
 
     Section PARAMS.
-      Variable (D E F: Type -> Type).
+      Variable (E F: Type -> Type).
 
-      Definition D_trigger_prop :  D ~> PropT (itree (D +' E +' F)) :=
+      Definition E_trigger_prop :  E ~> PropT (itree (E +' F)) :=
         fun R e t => t = r <- trigger e ;; ret r.
 
-      Definition E_trigger_prop :  E ~> PropT (itree (D +' E +' F)) :=
+      Definition F_trigger_prop : F ~> PropT (itree (E +' F)) :=
         fun R e t => t = r <- trigger e ;; ret r.
 
-      Definition F_trigger_prop : F ~> PropT (itree (D +' E +' F)) :=
-        fun R e t => t = r <- trigger e ;; ret r.
-
-      Definition model_undef `{FailureE -< D +' E +' F} `{UBE -< D +' E +' F} :
-        itree (D +' E +' PickE +' F) ~> PropT (itree (D +' E +' F)) :=
-        interp_prop (case_ D_trigger_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop))).
+      Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
+        itree (E +' PickE +' F) ~> PropT (itree (E +' F)) :=
+        interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)).
 
     End PARAMS.
 
@@ -148,22 +145,18 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     Defined.
 
     Section PARAMS.
-      Variable (D E F: Type -> Type).
+      Variable (E F: Type -> Type).
 
-      Definition D_trigger :  D ~> itree (D +' E +' F) :=
+      Definition E_trigger :  E ~> itree (E +' F) :=
         fun R e => r <- trigger e ;; ret r.
 
-      Definition E_trigger :  E ~> itree (D +' E +' F) :=
+      Definition F_trigger : F ~> itree (E +' F) :=
         fun R e => r <- trigger e ;; ret r.
 
-      Definition F_trigger : F ~> itree (D +' E +' F) :=
-        fun R e => r <- trigger e ;; ret r.
-
-      Definition interp_undef `{FailureE -< D +' E +' F} `{UBE -< D +' E +' F} :
-        itree (D +' E +' PickE +' F) ~> itree (D +' E +' F) :=
-        interp (case_ D_trigger
-               (case_ E_trigger
-               (case_ concretize_picks F_trigger))).
+      Definition interp_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
+        itree (E +' PickE +' F) ~> itree (E +' F) :=
+        interp (case_ E_trigger
+               (case_ concretize_picks F_trigger)).
 
     End PARAMS.
 

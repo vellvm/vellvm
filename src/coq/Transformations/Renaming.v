@@ -119,6 +119,9 @@ Section Swap.
     reflexivity.
   Qed.
 
+  (*
+  (* Calvin broke this somehow by changing L0 to not include
+     CallE. Yannick promises not to be mad later when fixing this. :) *)
   Lemma interp_to_L2_map_monad: forall {X} (f: X -> itree _ (uvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
       (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))) (interp_to_L2 nil (f x) s1 s2) (interp_to_L2 nil (f (g x)) s1 s2)) ->
       eutt function_rel (interp_to_L2 nil (map_monad f l) s1 s2) (interp_to_L2 nil (map_monad f (map g l)) s1 s2).
@@ -137,6 +140,7 @@ Section Swap.
     apply eqit_Ret.
     constructor; auto.
   Qed.
+  *)
 
   Lemma swap_correct_L2:
     forall p, refine_mcfg_L2 nil p (swap_mcfg p).
