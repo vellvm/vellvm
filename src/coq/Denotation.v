@@ -694,7 +694,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           uv <- translate exp_E_to_instr_E (denote_exp (Some dt) val) ;;
           dv <- trigger (pick uv True) ;;
           ua <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
-          da <- trigger (pick ua (exists x, forall da, concretize ua da -> da = x)) ;;
+          da <- trigger (pickUnique ua) ;;
           match da with
           | DVALUE_Poison => raiseUB "Store to poisoned address."
           | _ => trigger (Store da dv)
@@ -703,20 +703,17 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED itree ERROR: Store to non-void ID"
 
         (* Call *)
-        (* CB TODO: Do we need to pick here? *)
         | (pt, INSTR_Call (dt, f) args) =>
           uvs <- map_monad (fun '(t, op) => (translate exp_E_to_instr_E (denote_exp (Some t) op))) args ;;
-          dvs <- map_monad (fun x => trigger (pick x True)) uvs ;;
           returned_value <-
           match Intrinsics.intrinsic_exp f with
           | Some s =>
-            dv <- trigger (Intrinsic dt s dvs) ;;
-            ret (dvalue_to_uvalue dv)
+            dvs <- map_monad (fun uv => trigger (pickUnique uv)) uvs ;;
+            fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
           | None =>
             fv <- translate exp_E_to_instr_E (denote_exp None f) ;;
-            dfv <- trigger (pick fv True) ;; (* TODO, should this be unique? *)
             (* debug ("Call to function: " ++ to_string f) ;; *)
-            trigger (Call dt dfv dvs)
+            trigger (Call dt fv uvs)
           end
           ;;
           match pt with
@@ -737,7 +734,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         (* Error states *)
         | (_, _) => raise "ID / Instr mismatch void/non-void"
-
         end.
 
       (* A [terminator] either returns from a function call, producing a [dvalue],
@@ -894,19 +890,19 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         end.
 
       (* The denotation of an itree function is a coq function that takes
-         a list of dvalues and returns the appropriate semantics. *)
+         a list of uvalues and returns the appropriate semantics. *)
       Definition function_denotation : Type :=
-        list dvalue -> itree L0 uvalue.
+        list uvalue -> itree L0' uvalue.
 
       Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation  :=
-        fun (args : list dvalue) =>
+        fun (args : list uvalue) =>
           (* We match the arguments variables to the inputs *)
           (* debug ("Denoting function " ++ to_string (dc_name (df_prototype df)) ++ " with args: " ++ to_string args ++ " against prototype: " ++ to_string (df_args df));; *)
           bs <- lift_err ret (combine_lists_err (df_args df) args) ;;
              (* generate the corresponding writes to the local stack frame *)
           trigger MemPush ;;
-          trigger (StackPush (map (fun '(k,v) => (k, dvalue_to_uvalue v)) bs)) ;;
-          rv <- translate instr_E_to_L0 (denote_cfg (df_instrs df)) ;;
+          trigger (StackPush (map (fun '(k,v) => (k, v)) bs)) ;;
+          rv <- translate instr_E_to_L0' (denote_cfg (df_instrs df)) ;;
           trigger StackPop ;;
           trigger MemPop ;;
           ret rv.
@@ -934,15 +930,16 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
       Definition denote_mcfg
                  (fundefs:list (dvalue * function_denotation)) (dt : dtyp)
-                 (f_value : dvalue) (args : list dvalue) : itree L0 uvalue :=
-          @mrec CallE (CallE +' _)
+                 (f_value : uvalue) (args : list uvalue) : itree L0 uvalue :=
+          @mrec CallE (ExternalCallE +' _)
                 (fun T call =>
                    match call with
                    | Call dt fv args =>
-                     match (lookup_defn fv fundefs) with
+                     dfv <- trigger (pick fv True) ;; (* TODO, should this be unique? *)
+                     match (lookup_defn dfv fundefs) with
                      | Some f_den => (* If the call is internal *)
                        (* and denote the [cfg]. *)
-                       translate L0_to_INTERNAL (f_den args)
+                       f_den args
                      | None =>
                        (* This must have been a registered external function  *)
                        (* We _don't_ push a itree stack frame, since the external *)
@@ -950,10 +947,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                           SAZ: Not sure that we shouldn't at least push the memory frame
                         *)
 
-                       (* We cast the call into an external CallE *)
-                       trigger (ExternalCall dt fv args)
+                       (* We cast the call into an ExternalCallE *)
+                       dargs <- map_monad (fun uv => trigger (pickUnique uv)) args ;;
+                       fmap dvalue_to_uvalue (trigger (ExternalCall dt fv dargs))
                      end
                    end
                 ) _ (Call dt f_value args).
-
 End Denotation.

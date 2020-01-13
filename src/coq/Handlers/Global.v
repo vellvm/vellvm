@@ -46,6 +46,7 @@ Section Globals.
   Open Scope monad_scope.
   Section PARAMS.
     Variable (E F G : Type -> Type).
+
     Definition E_trigger {M} : forall R, E R -> (stateT M (itree (E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 

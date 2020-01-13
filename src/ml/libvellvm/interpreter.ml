@@ -65,8 +65,9 @@ let rec step (m : ('a TopLevel.IO.coq_L5, TopLevel.TopLevelEnv.memory * ((TopLev
   (* We finished the computation *)
   | RetF (_,(_,(_,v))) -> Ok v
 
-  | VisF (Sum.Coq_inl1 (Call(_, _, _)), _) ->
-    Error "Uninterpreted External Call"
+  (* The ExternalCallE effect *)
+  | VisF (Sum.Coq_inl1 (ExternalCall(_, _, _)), _) ->
+    Error "Uninterpreted Call"
 
   (* The debugE effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 msg), k) ->

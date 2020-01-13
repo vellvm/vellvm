@@ -21,11 +21,11 @@ Definition UB_handler {E}: UBE ~> PropT (itree E) := fun _ _ _ => True.
 Section PARAMS.
   Variable (E F: Type -> Type).
 
-  Definition E_trigger_prop : E ~> PropT (itree (E +' F)) :=
-    fun R e => fun t => t = r <- trigger e ;; ret r.
+  Definition E_trigger_prop :  E ~> PropT (itree (E +' F)) :=
+    fun R e t => t = r <- trigger e ;; ret r.
 
   Definition F_trigger_prop : F ~> PropT (itree (E +' F)) :=
-    fun R e => fun t => t = r <- trigger e ;; ret r.
+    fun R e t => t = r <- trigger e ;; ret r.
 
   Definition model_UB :
     PropT (itree (E +' UBE +' F)) ~> PropT (itree (E +' F)) :=
@@ -39,11 +39,11 @@ Definition UB_exec {E} `{FailureE -< E}: UBE ~> itree E := fun _ e => match e wi
 Section PARAMS.
   Variable (E F: Type -> Type).
 
-  Definition E_trigger : E ~> itree (E +' F) :=
+  Definition E_trigger :  E ~> itree (E +' F) :=
     fun R e => r <- trigger e ;; ret r.
 
   Definition F_trigger : F ~> itree (E +' F) :=
-    fun R e =>  r <- trigger e ;; ret r.
+    fun R e => r <- trigger e ;; ret r.
 
   Definition interp_UB `{FailureE -< E +' F}:
     itree (E +' UBE +' F) ~> itree (E +' F) :=

@@ -60,13 +60,14 @@ Section StackMap.
   Open Scope monad_scope.
   Section PARAMS.
     Variable (E F G : Type -> Type).
-    Definition E_trigger {S} : forall R, E R -> (stateT S (itree (E +' F +' G)) R) :=
+
+    Definition E_trigger {M} : forall R, E R -> (stateT M (itree (E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition F_trigger {S} : forall R, F R -> (stateT S (itree (E +' F +' G)) R) :=
+    Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition G_trigger {S} : forall R , G R -> (stateT S (itree (E +' F +' G)) R) :=
+    Definition G_trigger {M} : forall R , G R -> (stateT M (itree (E +' F +' G)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
     Definition interp_local_stack `{FailureE -< E +' F +' G}

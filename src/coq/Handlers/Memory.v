@@ -510,10 +510,11 @@ Admitted.
   Definition handle_memcpy (args : List.list dvalue) (m:memory) : err memory :=
     match args with
     | DVALUE_Addr (dst_b, dst_o) ::
-                  DVALUE_Addr (src_b, src_o) ::
-                  DVALUE_I32 len ::
-                  DVALUE_I32 align :: (* alignment ignored *)
-                  DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+      DVALUE_Addr (src_b, src_o) ::
+      DVALUE_I32 len ::
+      DVALUE_I32 align :: (* alignment ignored *)
+      DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+
       src_block <- trywith "memcpy src block not found" (lookup_logical src_b m) ;;
       dst_block <- trywith "memcpy dst block not found" (lookup_logical dst_b m) ;;
 
@@ -663,17 +664,18 @@ Admitted.
         end
       end.
 
-  Definition handle_intrinsic {E} `{FailureE -< E}: IntrinsicE ~> stateT memory_stack (itree E) :=
+  Definition handle_intrinsic {E} `{FailureE -< E} `{PickE -< E}: IntrinsicE ~> stateT memory_stack (itree E) :=
     fun _ e '(m, s) =>
       match e with
       | Intrinsic t name args =>
+        (* Pick all arguments, they should all be unique. *)
         if string_dec name "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
           match handle_memcpy args m with
           | inl err => raise err
           | inr m' => ret ((m', s), DVALUE_None)
           end
         else
-            raise ("Unknown intrinsic: " ++ name)
+          raise ("Unknown intrinsic: " ++ name)
       end.
 
 
@@ -715,15 +717,17 @@ Admitted.
    *)
   Section PARAMS.
   Variable (E F : Type -> Type).
-    Definition E_trigger {M} : forall R, E R -> (stateT M (itree (E +' F)) R) :=
+
+  Definition E_trigger {M} : forall R, E R -> (stateT M (itree (E +' F)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
   Definition F_trigger {M} : forall R, F R -> (stateT M (itree (E +' F)) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-  Definition interp_memory `{FailureE -< E +' F} `{UBE -< E +' F}:
+  Definition interp_memory `{PickE -< E +' F} `{FailureE -< E +' F} `{UBE -< E +' F}:
     itree (E +'  IntrinsicE +' MemoryE +' F) ~> stateT memory_stack (itree (E +' F)) :=
-    interp_state (case_ E_trigger (case_ handle_intrinsic (case_ handle_memory F_trigger))).
+    interp_state (case_ E_trigger
+                 (case_ handle_intrinsic (case_ handle_memory F_trigger))).
 
   End PARAMS.
 
