@@ -15,7 +15,7 @@
 open Format
 open ITreeDefinition
 
-(* TODO: probaly should be part of ADDRESS module interface*)
+(* TODO: probably should be part of ADDRESS module interface*)
 let pp_addr : Format.formatter -> Memory.A.addr -> unit
   = fun ppf _ -> fprintf ppf "UVALUE_Addr(?)"
 

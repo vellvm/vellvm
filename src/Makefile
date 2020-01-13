@@ -7,9 +7,8 @@ MLDIR = ml
 EXTRACTDIR = ml/extracted
 
 ITREEDIR=../lib/InteractionTrees
-CERESDIR=../lib/coq-ceres
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(ITREEDIR)/theories/ ITree -R $(CERESDIR)/theories/ Ceres
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(ITREEDIR)/theories/ ITree 
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
@@ -22,7 +21,7 @@ COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric
 									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/UndefinedBehaviour\
 									Denotation TransformTypes TopLevel
 
-COQFILESOPT    := Transformations/Renaming Transformations/DeadInstr Transformations/Transform Transformations/Transformation\
+COQFILESOPT    := Transformations/Renaming Transformations/DeadInstr Transformations/Transform Transformations/Traversal Transformations/Transformation\
 									ParserHelper Refinement Environment TopLevelRefinements
 
 OLLVMFILES :=
@@ -51,14 +50,10 @@ coq: $(VOFILES)
 coqinterp: $(COQFILESINTERP:%=coq/%.vo)
 
 itrees:
-	git submodule update --init
+	git submodule update --remote -- $(ITREEDIR)
 	make -C $(ITREEDIR)
 
-ceres:
-	git submodule update --init
-	make -C $(CERESDIR)
-
-.PHONY: extracted itrees ceres
+.PHONY: extracted itrees 
 extracted: $(EXTRACTDIR)/STAMP $(VOFILES)
 
 $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
@@ -74,7 +69,7 @@ $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "COQC $*.v"
 	@$(COQC) -dump-glob doc/$(*F).glob $*.v
 
-depend: itrees ceres $(VFILES) 
+depend: itrees $(VFILES) 
 	@echo "Analyzing Coq dependencies"
 	@$(COQDEP) $^ > .depend
 
@@ -106,7 +101,6 @@ clean:
 	rm -f vellvm
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
 	make -C $(ITREEDIR) clean
-	make -C $(CERESDIR) clean
 
 doc/coq2html: 
 	make -C ../lib/coq2html

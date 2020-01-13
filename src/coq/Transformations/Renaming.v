@@ -21,7 +21,7 @@ From ITree Require Import
      Interp.Interp
      Interp.InterpFacts
      Interp.TranslateFacts
-     Events.StateKleisli
+     Basics.MonadState
      Events.StateFacts.
 
 From Vellvm Require Import

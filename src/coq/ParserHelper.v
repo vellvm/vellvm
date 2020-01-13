@@ -799,7 +799,7 @@ Section Correctness.
           apply set_digits_m_eq in Heqo1. assumption.
           unfold FLX.Prec_gt_0; lia.
           assumption.
-    - (* unsuccesful normalization - impossible to normalize? *)
+    - (* unsuccessful normalization - impossible to normalize? *)
       intros xf H.
       apply Bool.not_true_is_false.
       intros V.

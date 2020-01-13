@@ -123,21 +123,21 @@ Lemma refine_01: forall t1 t2 g,
     refine_L0 t1 t2 -> refine_L1 (run_state (interp_global t1) g) (run_state (interp_global t2) g).
 Proof.
   intros t1 t2 g H.
-  apply eutt_tt_to_eq_prod, eutt_interp_state_gen; auto.
+  apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
 Qed.
 
 Lemma refine_12 : forall t1 t2 l,
     refine_L1 t1 t2 -> refine_L2 (run_state (interp_local_stack (handle_local (v:=res_L0)) t1) l) (run_state (interp_local_stack (handle_local (v:=res_L0)) t2) l).
 Proof.
   intros t1 t2 l H.
-  apply eutt_tt_to_eq_prod, eutt_interp_state_gen; auto.
+  apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
 Qed.
 
 Lemma refine_23 : forall t1 t2 m,
     refine_L2 t1 t2 -> refine_L3 (run_state (M.interp_memory t1) m) (run_state (M.interp_memory t2) m).
 Proof.
   intros t1 t2 m H.
-  apply eutt_tt_to_eq_prod, eutt_interp_state_gen; auto.
+  apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
 Qed.
 
 (* Things are different for L4 and L5: we get into the [Prop] monad. *)
@@ -349,11 +349,12 @@ Ltac flatten_all :=
 Theorem interpreter_sound: forall p, model p (interpreter p).
 Proof.
   intros p.
-  unfold model, model_user.
+  unfold model, model_user, lift_sem_to_mcfg.
   flatten_goal.
   2:{
     unfold interpreter, interpreter_user.
-    rewrite Heq; reflexivity.
+    rewrite Heq.
+    admit.
   }
   unfold interpreter, interpreter_user; rewrite Heq.
   unfold interp_vellvm_model_user, interp_vellvm_exec_user.
@@ -442,16 +443,16 @@ Qed.
 
 (** BEGIN MOVE *)
 From ITree Require Import
-     Events.StateKleisli
+     Basics.MonadState
      Events.StateFacts.
 
-Instance run_state_proper_eqit {E A env} : Proper (MonadTheory.eqm ==> Logic.eq ==> eutt Logic.eq) (@run_state E A env).
+Instance run_state_proper_eqit {E A env} : Proper (Monad.eqm ==> Logic.eq ==> eutt Logic.eq) (@run_state E A env).
 Proof.
   repeat intro; subst; apply H.
 Qed.
 
 Require Import Paco.paco.
-Instance interp_state_proper {T E F S} (h: forall T : Type, E T -> Monads.stateT S (itree F) T) : Proper (eutt Logic.eq ==> MonadTheory.eqm) (State.interp_state h (T := T)).
+Instance interp_state_proper {T E F S} (h: forall T : Type, E T -> Monads.stateT S (itree F) T) : Proper (eutt Logic.eq ==> Monad.eqm) (State.interp_state h (T := T)).
 Proof.
   einit. ecofix CIH. intros.
 

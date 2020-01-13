@@ -57,7 +57,7 @@ University of Pennsylvania as part of the DeepSpec project.
     - flocq      (installed via, e.g. opam install coq-flocq, see note below) 
     - itree      ~~(installed via, e.g. opam install coq-itree)~~
       - Currently you should actually just use the submodule (lib/InteractionTrees)
-    - ceres      (installed via the submodule (lib/coq-ceres))
+    - ceres      (installed via, e.g. opam install coq-ceres)
 - ocamlc : version 4.04    (probably works with 4.03 or later)
   - OPAM packages: dune, menhir, [optional: llvm  (for llvm v. 3.8)]
 

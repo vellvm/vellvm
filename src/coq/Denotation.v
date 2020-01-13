@@ -809,6 +809,34 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
         end.
 
+      Definition denote_bks (bks: list _): block_id -> itree instr_E (block_id + uvalue) :=
+        loop (fun (bid : block_id + block_id) =>
+                match bid with
+                | inl bid
+                | inr bid =>
+                  (* We lookup the block [bid] to be denoted *)
+                  match find_block DynamicTypes.dtyp bks bid with
+                  | None => ret (inr (inl bid))
+                  | Some block =>
+                    (* We denote the block *)
+                    bd <- denote_block block;;
+                    (* And set the phi-nodes of the new destination, if any *)
+                    match bd with
+                    | inr dv => ret (inr (inr dv))
+                    | inl bid_target =>
+                      match find_block DynamicTypes.dtyp bks bid_target with
+                      | None => ret (inr (inl bid_target))
+                      | Some block_target =>
+                        dvs <- Util.map_monad
+                                (fun x => translate exp_E_to_instr_E (denote_phi bid x))
+                                (blk_phis block_target) ;;
+                        Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
+                        ret (inl bid_target)
+                      end
+                    end
+                  end
+                end).
+
       (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
          a cfg, and calls to functions, that jump from a cfg to another.
          In order to denote a single [cfg], we tie the first knot by linking together all the blocks
@@ -840,34 +868,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         in the type.
        *)
       Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
-        loop (fun (bid : block_id + block_id) =>
-                match bid with
-                | inl bid
-                | inr bid =>
-                  (* We lookup the block [bid] to be denoted *)
-                  match find_block dtyp (blks _ f) bid with
-                  | None => raise ("Can't find block in denote_cfg " ++ to_string bid)
-                  | Some block =>
-                    (* We denote the block *)
-                    bd <- denote_block block;;
-                    (* And set the phi-nodes of the new destination, if any *)
-                    match bd with
-                    | inr dv => ret (inr dv)
-                    | inl bid_target =>
-                      (* debug ("Jumping to " ++ to_string bid_target ++ ", evaluating phi nodes") ;; *)
-                      match find_block dtyp (blks _ f) bid_target with
-                        | None => raise ("Can't find block we are about to jump to " ++ to_string bid)
-                        | Some block_target =>
-                          dvs <- map_monad
-                              (fun x => translate exp_E_to_instr_E (denote_phi bid x))
-                              (blk_phis block_target) ;;
-                              map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
-                              ret (inl bid_target)
-                      end
-                    end
-                  end
-                end
-             ) (init _ f).
+        r <- denote_bks (blks _ f) (init _ f) ;;
+        match r with
+        | inl bid => raise ("Can't find block in denote_cfg " ++ to_string bid)
+        | inr uv  => ret uv
+        end.
 
       (* TODO : Move this somewhere else *)
       Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=

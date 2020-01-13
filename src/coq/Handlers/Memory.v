@@ -395,7 +395,7 @@ Admitted.
     let block := make_empty_mem_block ty in
     LBlock (sizeof_dtyp ty) block None.
 
-  Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
+  Fixpoint handle_gep_h (t:dtyp) (off:Z) (vs:list dvalue): err Z :=
     match vs with
     | v :: vs' =>
       match v with
@@ -405,7 +405,7 @@ Admitted.
         match t with
         | DTYPE_Vector _ ta
         | DTYPE_Array _ ta =>
-          handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+          handle_gep_h ta (off + k * (sizeof_dtyp ta)) vs'
         | DTYPE_Struct ts
         | DTYPE_Packed_struct ts => (* Handle these differently in future *)
           let offset := fold_left (fun acc t => acc + sizeof_dtyp t)
@@ -413,7 +413,7 @@ Admitted.
           match nth_error ts n with
           | None => failwith "overflow"
           | Some t' =>
-            handle_gep_h t' b (off + offset) vs' m
+            handle_gep_h t' (off + offset) vs'
           end
         | _ => failwith ("non-i32-indexable type")
         end
@@ -422,7 +422,7 @@ Admitted.
         let n := BinIntDef.Z.to_nat k in
         match t with
         | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
-                              handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+                              handle_gep_h ta (off + k * (sizeof_dtyp ta)) vs'
         | _ => failwith ("non-i8-indexable type")
         end
       | DVALUE_I64 i =>
@@ -431,12 +431,24 @@ Admitted.
         match t with
         | DTYPE_Vector _ ta
         | DTYPE_Array _ ta =>
-          handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+          handle_gep_h ta (off + k * (sizeof_dtyp ta)) vs'
         | _ => failwith ("non-i64-indexable type")
         end
       | _ => failwith "non-I32 index"
       end
-    | [] => ret (m, DVALUE_Addr (b, off))
+    | [] => ret off
+    end.
+
+  Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
+    match vs with
+    | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 indices *)
+      match dv with
+      | DVALUE_Addr (b, o) =>
+        off <- handle_gep_h t (o + (sizeof_dtyp t) * (unsigned i)) vs' ;;
+        ret (DVALUE_Addr (b, off))
+      | _ => failwith "non-address"
+      end
+    | _ => failwith "non-I32 index"
     end.
 
 
@@ -487,17 +499,6 @@ Admitted.
       let m'        := add_concrete id new_block m in
       let m''       := add_logical  b (LBlock sz bytes (Some id)) m' in
       (id, m'')
-    end.
-
-  Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
-    match vs with
-    | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 indices *)
-      match dv with
-      | DVALUE_Addr (b, o) =>
-        handle_gep_h t b (o + (sizeof_dtyp t) * (unsigned i)) vs' m
-      | _ => failwith "non-address"
-      end
-    | _ => failwith "non-I32 index"
     end.
 
   (* LLVM 5.0 memcpy
@@ -622,9 +623,9 @@ Admitted.
         end
 
       | GEP t dv vs =>
-        match handle_gep t dv vs m with
+        match handle_gep t dv vs with
         | inl err => raise err
-        | inr (m, dv) => ret ((m, s), dv)
+        | inr dv => ret ((m, s), dv)
         end
 
       | ItoP x =>

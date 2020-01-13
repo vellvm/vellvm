@@ -272,49 +272,49 @@ Definition uvalue_to_dvalue_uop {A : Type}
 Section hiding_notation.
   Local Open Scope sexp_scope.
 
-  Fixpoint serialize_dvalue' (dv:dvalue): sexp atom :=
+  Fixpoint serialize_dvalue' (dv:dvalue): sexp :=
     match dv with
-    | DVALUE_Addr a => S.Raw "address" (* TODO: insist that memory models can print addresses? *)
-    | DVALUE_I1 x => S.Raw "dvalue(i1)"
-    | DVALUE_I8 x => S.Raw "dvalue(i8)"
-    | DVALUE_I32 x => S.Raw "dvalue(i32)"
-    | DVALUE_I64 x => S.Raw "dvalue(i64)"
-    | DVALUE_Double x => S.Raw "dvalue(double)"
-    | DVALUE_Float x => S.Raw "dvalue(float)"
-    | DVALUE_Poison => S.Raw "poison"
-    | DVALUE_None => S.Raw "none"
+    | DVALUE_Addr a => Atom "address" (* TODO: insist that memory models can print addresses? *)
+    | DVALUE_I1 x => Atom "dvalue(i1)"
+    | DVALUE_I8 x => Atom "dvalue(i8)"
+    | DVALUE_I32 x => Atom "dvalue(i32)"
+    | DVALUE_I64 x => Atom "dvalue(i64)"
+    | DVALUE_Double x => Atom "dvalue(double)"
+    | DVALUE_Float x => Atom "dvalue(float)"
+    | DVALUE_Poison => Atom "poison"
+    | DVALUE_None => Atom "none"
     | DVALUE_Struct fields
-      => [S.Raw "{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; S.Raw ","]) fields) ; S.Raw "}"]
+      => [Atom "{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) fields) ; Atom "}"]
     | DVALUE_Packed_struct fields
-      => [S.Raw "packed{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; S.Raw ","]) fields) ; S.Raw "}"]
+      => [Atom "packed{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) fields) ; Atom "}"]
     | DVALUE_Array elts
-      => [S.Raw "[" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; S.Raw ","]) elts) ; S.Raw "]"]
+      => [Atom "[" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) elts) ; Atom "]"]
     | DVALUE_Vector elts
-      => [S.Raw "<" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; S.Raw  ","]) elts) ; S.Raw ">"]
+      => [Atom "<" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom  ","]) elts) ; Atom ">"]
     end.
 
   Global Instance serialize_dvalue : Serialize dvalue := serialize_dvalue'.
 
-  Fixpoint serialize_uvalue' (pre post: string) (uv:uvalue): sexp atom :=
+  Fixpoint serialize_uvalue' (pre post: string) (uv:uvalue): sexp :=
     match uv with
-    | UVALUE_Addr a => S.Raw (pre ++ "address" ++ post) (* TODO: insist that memory models can print addresses? *)
-    | UVALUE_I1 x => S.Raw (pre ++ "uvalue(i1)" ++ post)
-    | UVALUE_I8 x => S.Raw (pre ++ "uvalue(i8)" ++ post)
-    | UVALUE_I32 x => S.Raw (pre ++ "uvalue(i32)" ++ post)
-    | UVALUE_I64 x => S.Raw (pre ++ "uvalue(i64)" ++ post)
-    | UVALUE_Double x => S.Raw (pre ++ "uvalue(double)" ++ post)
-    | UVALUE_Float x => S.Raw (pre ++ "uvalue(float)" ++ post)
-    | UVALUE_Poison => S.Raw (pre ++ "poison" ++ post)
-    | UVALUE_None => S.Raw (pre ++ "none" ++ post)
+    | UVALUE_Addr a => Atom (pre ++ "address" ++ post)%string (* TODO: insist that memory models can print addresses? *)
+    | UVALUE_I1 x => Atom (pre ++ "uvalue(i1)" ++ post)%string
+    | UVALUE_I8 x => Atom (pre ++ "uvalue(i8)" ++ post)%string
+    | UVALUE_I32 x => Atom (pre ++ "uvalue(i32)" ++ post)%string
+    | UVALUE_I64 x => Atom (pre ++ "uvalue(i64)" ++ post)%string
+    | UVALUE_Double x => Atom (pre ++ "uvalue(double)" ++ post)%string
+    | UVALUE_Float x => Atom (pre ++ "uvalue(float)" ++ post)%string
+    | UVALUE_Poison => Atom (pre ++ "poison" ++ post)%string
+    | UVALUE_None => Atom (pre ++ "none" ++ post)%string
     | UVALUE_Struct fields
-      => [S.Raw "{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; S.Raw "}"]
+      => [Atom "{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; Atom "}"]
     | UVALUE_Packed_struct fields
-      => [S.Raw "packed{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; S.Raw "}"]
+      => [Atom "packed{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; Atom "}"]
     | UVALUE_Array elts
-      => [S.Raw "[" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; S.Raw "]"]
+      => [Atom "[" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; Atom "]"]
     | UVALUE_Vector elts
-      => [S.Raw "<" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; S.Raw ">"]
-    | UVALUE_Undef t => [S.Raw "undef(" ; to_sexp t ; S.Raw ")"]
+      => [Atom "<" ; to_sexp (List.map (serialize_uvalue' "" ",") elts) ; Atom ">"]
+    | UVALUE_Undef t => [Atom "undef(" ; to_sexp t ; Atom ")"]
     | UVALUE_IBinop iop v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp iop ; serialize_uvalue' "" ")" v2]
     | UVALUE_ICmp cmp v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp cmp; serialize_uvalue' "" ")" v2]
     | UVALUE_FBinop fop _ v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp fop; serialize_uvalue' "" ")" v2]
@@ -327,7 +327,7 @@ Section hiding_notation.
     (* | UVALUE_ExtractValue     (vec:uvalue) (idxs:list int) *)
     (* | UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list int) *)
     (* | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue) *)
-    | _ => S.Raw "TODO: show_uvalue"
+    | _ => Atom "TODO: show_uvalue"
     end.
 
   Global Instance serialize_uvalue : Serialize uvalue := serialize_uvalue' "" "".

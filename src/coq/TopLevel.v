@@ -254,19 +254,24 @@ Module TopLevelEnv <: Environment.
      to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
      starting from empty environments.
    *)
+  Definition lift_sem_to_mcfg {E X} `{FailureE -< E}
+             (sem: (CFG.mcfg DynamicTypes.dtyp) -> itree E X):
+    list (toplevel_entity typ (list (LLVMAst.block typ))) -> itree E X :=
+    fun prog =>
+      let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
+
+      match CFG.mcfg_of_modul _ scfg with
+      | Some ucfg =>
+        let mcfg := TopLevelEnv.normalize_types ucfg in
+
+        sem mcfg
+
+      | None => raise "Ill-formed program: mcfg_of_modul failed."
+      end.
+
   Definition model_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))): PropT (itree L5) res_L4 :=
-    let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
-
-    match CFG.mcfg_of_modul _ scfg with
-    | Some ucfg =>
-      let mcfg := normalize_types ucfg in
-
-      let t := denote_vellvm mcfg in
-
-      interp_vellvm_model_user user_intrinsics t [] ([],[]) ((M.empty, M.empty), [[]])
-
-    | None => lift (raise "Ill-formed program: mcfg_of_modul failed.")
-    end.
+    let t := lift_sem_to_mcfg denote_vellvm prog in
+    interp_vellvm_model_user user_intrinsics t [] ([],[]) ((M.empty, M.empty), [[]]).
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics.
