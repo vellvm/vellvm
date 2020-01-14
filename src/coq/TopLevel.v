@@ -180,9 +180,6 @@ Module TopLevelEnv <: Environment.
     'addr <- trigger (GlobalRead (Name "main")) ;;
     D.denote_mcfg defns DTYPE_Void (dvalue_to_uvalue addr) main_args.
 
-  Definition denote_vellvm' (mcfg : CFG.mcfg dtyp) : itree L0' res_L0 :=
-    translate _L0_to_L0' (denote_vellvm mcfg).
-
   (**
      Now that we know how to denote a whole llvm program, we can _interpret_
      the resulting [itree].

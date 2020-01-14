@@ -212,9 +212,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
       | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e))))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))))
       end.
 
-  Definition _exp_E_to_L0' : exp_E ~> L0' :=
-    fun T e => instr_E_to_L0' (exp_E_to_instr_E e).
-
   Definition _failure_UB_to_ExpE : (FailureE +' UBE) ~> exp_E :=
     fun T e =>
       match e with
@@ -224,9 +221,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
-  (* exp_E = LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE *)
-  (* L0 = ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE *)
-
   Definition _exp_E_to_L0 : exp_E ~> L0 :=
     fun T e =>
       match e with
@@ -234,8 +228,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
       | inr1 (inl1 e) => inr1 (inr1 (inr1 (inl1 (inl1 e))))
       | inr1 (inr1 e) => inr1 (inr1 (inr1 (inr1 e)))
       end.
-
-  Definition _L0_to_L0' : L0 ~> L0' := inr1.
 
   (* For multiple CFG, after interpreting [GlobalE] *)
   Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
