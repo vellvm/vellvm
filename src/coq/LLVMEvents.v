@@ -136,6 +136,10 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Variant CallE : Type -> Type :=
   | Call        : forall (t:dtyp) (f:dvalue) (args:list dvalue), CallE uvalue.
 
+  Variant ExternalCallE : Type -> Type :=
+    (* TODO: is f a dvalue or a uvalue? *)
+  | ExternalCall        : forall (t:dtyp) (f:dvalue) (args:list dvalue), ExternalCallE uvalue.
+
   (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
   Variant IntrinsicE : Type -> Type :=
   | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE dvalue.
@@ -187,21 +191,21 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
     fun T e => inr1 (inr1 e).
 
   (* Core effects - no distinction between "internal" and "external" calls. *)
-  Definition L0 := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
+  Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
-  Definition instr_E_to_L0 : instr_E ~> L0 :=
-    fun T e =>
-      match e with
-      | inl1 e => inl1 e
-      | inr1 (inl1 e) => inr1 (inl1 e)
-      | inr1 (inr1 (inl1 e)) => (inr1 (inr1 (inl1 e)))
-      | inr1 (inr1 (inr1 (inl1 e))) => inr1 (inr1 (inr1 ((inl1 (inl1 e)))))
-      | inr1 (inr1 (inr1 (inr1 (inl1 e)))) => inr1 (inr1 (inr1 (inr1 (inl1 e))))
-      | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))
-      | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))
-      | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))
-      | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e))))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))))
-      end.
+  (* Definition instr_E_to_L0 : instr_E ~> L0 := *)
+  (*   fun T e => *)
+  (*     match e with *)
+  (*     | inl1 e => inl1 e *)
+  (*     | inr1 (inl1 e) => inr1 (inl1 e) *)
+  (*     | inr1 (inr1 (inl1 e)) => (inr1 (inr1 (inl1 e))) *)
+  (*     | inr1 (inr1 (inr1 (inl1 e))) => inr1 (inr1 (inr1 ((inl1 (inl1 e))))) *)
+  (*     | inr1 (inr1 (inr1 (inr1 (inl1 e)))) => inr1 (inr1 (inr1 (inr1 (inl1 e)))) *)
+  (*     | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))) *)
+  (*     | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))) *)
+  (*     | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))) *)
+  (*     | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e))))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e))))))) *)
+  (*     end. *)
 
   (* Distinction made between internal and external calls -- intermediate step in denote_mcfg.
      Note that [CallE] appears _twice_ in the [INTERNAL] type.  The left one is 
@@ -210,24 +214,24 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
      the two.  It re-triggers an unknown [Call] event as an [ExternalCall] (which is just
      an injection into the right-hand side.
    *)
-  Definition INTERNAL := CallE +' L0.
+  (* Definition INTERNAL := CallE +' L0. *)
 
-  Definition ExternalCall t f args : INTERNAL uvalue := (inr1 (inl1 (Call t f args))).
+  (* Definition ExternalCall t f args : INTERNAL uvalue := (inr1 (inl1 (Call t f args))). *)
 
   (* This inclusion "assumes" that all call events are internal.  The 
      dispatch in denote_mcfg then interprets some of the calls directly,
      if their definitions are known, or it "externalizes" the calls
      whose definitions are not known.
    *)
-  Definition L0_to_INTERNAL : L0 ~> INTERNAL :=
-    fun R e =>
-      match e with
-      | inl1 e' => inl1 e'
-      | inr1 e' => inr1 (inr1 e')
-      end.
+  (* Definition L0_to_INTERNAL : L0 ~> INTERNAL := *)
+  (*   fun R e => *)
+  (*     match e with *)
+  (*     | inl1 e' => inl1 e' *)
+  (*     | inr1 e' => inr1 (inr1 e') *)
+  (*     end. *)
 
-  Definition _exp_E_to_L0 : exp_E ~> L0 :=
-    fun T e => instr_E_to_L0 (exp_E_to_instr_E e).
+  (* Definition _exp_E_to_L0 : exp_E ~> L0 := *)
+  (*   fun T e => instr_E_to_L0 (exp_E_to_instr_E e). *)
 
   Definition _failure_UB_to_ExpE : (FailureE +' UBE) ~> exp_E :=
     fun T e =>

@@ -98,29 +98,49 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                                   end
                                ) (user_intrinsics ++ defined_intrinsics).
 
-  Definition handle_intrinsics (user_intrinsics: intrinsic_definitions): IntrinsicE ~> itree L0 :=
-    (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
+  (* Definition handle_intrinsics *)
+  (*            (user_intrinsics: intrinsic_definitions) *)
+  (*            {E F} `{FailureE +? E -< F} *)
+  (*   : IntrinsicE ~> itree F. *)
+  (*   refine (fun X (e : IntrinsicE X) => *)
+  (*             match e with *)
+  (*             | Intrinsic _ fname args =>  *)
+  (*               match assoc Strings.String.string_dec fname (defs_assoc user_intrinsics) with *)
+  (*               | Some f =>  match f args with *)
+  (*                                 | inl msg => raise msg *)
+  (*                                 | inr result => Ret result *)
+  (*                                 end *)
+  (*               | None => _ *)
+  (*               end *)
+  (*             end). *)
+
+  (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
+  Definition handle_intrinsics
+             (user_intrinsics: intrinsic_definitions)
+             {E1 E2 F} `{FailureE +? E1 -< F} `{IntrinsicE +? E2 -< F}
+    : IntrinsicE ~> itree F :=
     fun X (e : IntrinsicE X) =>
-      match e in IntrinsicE Y return X = Y -> itree L0 Y with
+      match e in IntrinsicE Y return X = Y -> itree F Y with
       | (Intrinsic _ fname args) =>
-          match assoc Strings.String.string_dec fname (defs_assoc user_intrinsics) with
-          | Some f => fun pf =>
-                       match f args with
-                       | inl msg => raise msg
-                       | inr result => Ret result
-                       end
-          | None => fun pf => (eq_rect X (fun a => itree L0 a) (trigger e)) dvalue pf
-          end
-      end eq_refl.
+        match assoc Strings.String.string_dec fname (defs_assoc user_intrinsics) with
+        | Some f => fun pf => match f args with
+                          | inl msg => raise msg
+                          | inr result => Ret result
+                          end
+        | None => fun pf => (eq_rect X (fun a => itree F a) (trigger e)) dvalue pf
+        end
+      end eq_refl
+  .
 
-  (* CB / YZ / SAZ: TODO "principle this" *)
-  Definition extcall_trigger : Handler CallE L0 :=
-  fun X e => trigger e.
-
-  Definition rest_trigger : Handler (LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE) L0 :=
-    fun X e => trigger e.
-
-  Definition interpret_intrinsics (user_intrinsics: intrinsic_definitions): forall R, itree L0 R -> itree L0 R  :=
-    interp (case_ extcall_trigger (case_ (handle_intrinsics user_intrinsics) rest_trigger)).
+  (* YZ: TODO support automatically Subevent_forget_order *)
+  Definition interpret_intrinsics (user_intrinsics: intrinsic_definitions)
+             {E1 E2 F} `{IntrinsicE +? E1 -< F} `{FailureE +? E2 -< F}
+    : itree F ~> itree F.
+    refine (interp (over (handle_intrinsics user_intrinsics))).
+    eauto.
+    eapply Trigger_ITree.
+    Unshelve.
+    2: eapply Subevent_forget_order.
+  Defined.
 
 End Make.

@@ -584,20 +584,20 @@ Import CatNotations.
 Open Scope cat_scope.
 
 
-  Instance Subevent_lift_chain {A B C E F}
-           `{A +? E -< F}
-           `{B +? C -< E}:
-    B +? A +' C -< F :=
-    {|
-      split_E := split_E >>> case_
-                         (inl_ >>> inr_)
-                         (split_E >>> case_ inl_ (inr_ >>> inr_));
-      merge_E := case_
-                   (inl_ >>> merge_E >>> inr_ >>> merge_E)
-                   (case_
-                      (inl_ >>> merge_E)
-                      (inr_ >>> merge_E >>> inr_ >>> merge_E))
-    |}.
+  (* Instance Subevent_lift_chain {A B C E F} *)
+  (*          `{A +? E -< F} *)
+  (*          `{B +? C -< E}: *)
+  (*   B +? A +' C -< F := *)
+  (*   {| *)
+  (*     split_E := split_E >>> case_ *)
+  (*                        (inl_ >>> inr_) *)
+  (*                        (split_E >>> case_ inl_ (inr_ >>> inr_)); *)
+  (*     merge_E := case_ *)
+  (*                  (inl_ >>> merge_E >>> inr_ >>> merge_E) *)
+  (*                  (case_ *)
+  (*                     (inl_ >>> merge_E) *)
+  (*                     (inr_ >>> merge_E >>> inr_ >>> merge_E)) *)
+  (*   |}. *)
 
   Instance Subevent_need_a_better_name {A B C E F}
            `{A +? E -< F}
@@ -613,6 +613,17 @@ Open Scope cat_scope.
                          (inl_ >>> merge_E)
                          (merge_E >>> inr_ >>> merge_E)
     |}.
+
+  Section foo.
+    Instance Subevent_Commute {E F G} `{E +? F -< G}: F +? E -< G.
+    split.
+    refine (split_E >>> swap).
+    refine (swap >>> merge_E).
+    Defined.
+
+    Global Instance Trigger_ITree' {E F G} `{E +? F -< G}: Trigger F (itree G) :=
+      fun _ e => ITree.trigger (inj1 e).
+  End foo.
 
   (* This one is tricky: we want to interpret simultaneously, since they go into the same monad,
      two categories of events, IntrinsicE and MemoryE.

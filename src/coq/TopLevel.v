@@ -63,6 +63,19 @@ Module TopLevelEnv <: Environment.
 
   Open Scope string_scope.
 
+  Section WithContext.
+
+    Context {E X1 X2 X3 X4 X5 X6 X7 X8 X9}
+            `{LLVMGEnvE +? X1 -< E}
+            `{LLVMEnvE +? X2 -< E}
+            `{FailureE +? X3 -< E}
+            `{UBE +? X4 -< E}
+            `{PickE +? X5 -< E}
+            `{MemoryE +? X6 -< E}
+            `{IntrinsicE +? X7 -< E}
+            `{CallE +? X8 -< E}
+            `{LLVMStackE +? X9 -< E}.
+
   (* end hide *)
 
   (**
@@ -84,21 +97,23 @@ Module TopLevelEnv <: Environment.
     an [itree] as any other.
    *)
 
-  Definition allocate_global (g:global dtyp) : itree L0 unit :=
-    (vis (Alloca (g_typ g)) (fun v => trigger (GlobalWrite (g_ident g) v))).
+    Typeclasses eauto := 3.
+    Definition allocate_global (g:global dtyp) : itree E unit :=
+      'v <- trigger (Alloca (g_typ g));;
+       trigger (GlobalWrite (g_ident g) v).
 
-  Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
+  Definition allocate_globals (gs:list (global dtyp)) : itree E unit :=
     map_monad_ allocate_global gs.
 
   (* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
-  Definition allocate_declaration (d:declaration dtyp) : itree L0 unit :=
+  Definition allocate_declaration (d:declaration dtyp) : itree E unit :=
     (* SAZ TODO:  Don't allocate pointers for LLVM intrinsics declarations *)
     vis (Alloca DTYPE_Pointer) (fun v => trigger (GlobalWrite (dc_name d) v)).
 
-  Definition allocate_declarations (ds:list (declaration dtyp)) : itree L0 unit :=
+  Definition allocate_declarations (ds:list (declaration dtyp)) : itree E unit :=
     map_monad_ allocate_declaration ds.
 
-  Definition initialize_global (g:global dtyp) : itree exp_E unit :=
+  Definition initialize_global (g:global dtyp) : itree E unit :=
     let dt := (g_typ g) in
     a <- trigger (GlobalRead (g_ident g));;
       uv <- match (g_exp g) with
@@ -109,13 +124,13 @@ Module TopLevelEnv <: Environment.
       dv <- trigger (pick uv True) ;;
       trigger (Store a dv).
 
-  Definition initialize_globals (gs:list (global dtyp)): itree exp_E unit :=
+  Definition initialize_globals (gs:list (global dtyp)): itree E unit :=
     map_monad_ initialize_global gs.
 
-  Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree L0 unit :=
+  Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree E unit :=
     allocate_globals (m_globals CFG) ;;
-                     allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
-                     translate _exp_E_to_L0 (initialize_globals (m_globals CFG)).
+    allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
+    initialize_globals (m_globals CFG).
 
   (** Local environment implementation
     The map-based handlers are defined parameterized over a domain of key and value.
@@ -123,16 +138,16 @@ Module TopLevelEnv <: Environment.
     Note that while local environments may store under-defined values,
     global environments are statically guaranteed to store [dvalue]s.
    *)
-  Definition function_env := FMapAList.alist dvalue D.function_denotation.
+  Definition function_env := FMapAList.alist dvalue (@D.function_denotation E).
 
   (**
    Denotes a function and returns its pointer.
    *)
 
-  Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree L0 (dvalue * D.function_denotation) :=
+  Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree E (dvalue * @D.function_denotation E) :=
     let fid := (dc_name (df_prototype df)) in
     fv <- trigger (GlobalRead fid) ;;
-       ret (fv, D.denote_function df).
+    ret (fv, D.denote_function df).
 
   (* (for now) assume that [main (i64 argc, i8** argv)]
     pass in 0 and null as the arguments to main
@@ -161,6 +176,22 @@ Module TopLevelEnv <: Environment.
    In order to limit bloated type signature, we name the successive return types.
    *)
 
+  End WithContext.
+
+  Section WithContext.
+
+    Context {F E X1 X2 X3 X4 X5 X6 X7 X8 X9}
+            `{CallE +? E -< F}
+            `{LLVMGEnvE +? X1 -< E}
+            `{LLVMEnvE +? X2 -< E}
+            `{FailureE +? X3 -< E}
+            `{UBE +? X4 -< E}
+            `{PickE +? X5 -< E}
+            `{MemoryE +? X6 -< E}
+            `{IntrinsicE +? X7 -< E}
+            `{CallE +? X8 -< E}
+            `{LLVMStackE +? X9 -< E}.
+
   Notation res_L0 := uvalue (* (only parsing) *).
   Notation res_L1 := (global_env * res_L0)%type (* (only parsing) *).
   Notation res_L2 := (local_env * stack * res_L1)%type (* (only parsing) *).
@@ -174,7 +205,14 @@ Module TopLevelEnv <: Environment.
      * retrieve the address of the main function;
      * tie the mutually recursive know and run it starting from the main.
    *)
-  Definition denote_vellvm (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
+  Definition denote_vellvm (mcfg : CFG.mcfg dtyp) : itree E res_L0.
+    refine (build_global_environment mcfg ;;
+                                     'defns <- map_monad address_one_function (m_definitions mcfg) ;; _).
+    Set Typeclasses Debug.
+    refine ('addr <- trigger' _ (@inj1 _ _ _ _ _ (@GlobalRead raw_id dvalue (Name "main"))) ;; _).
+    D.denote_mcfg defns DTYPE_Void addr main_args).
+                                                  _).
+    :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'addr <- trigger (GlobalRead (Name "main")) ;;
