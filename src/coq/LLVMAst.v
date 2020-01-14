@@ -136,7 +136,7 @@ Inductive ident : Set :=
 | ID_Local  (id:raw_id)   (* %id *)
 .
 
-(* auxilliary definitions for when we know which case we're in already *)
+(* auxiliary definitions for when we know which case we're in already *)
 Definition local_id  := raw_id.
 Definition global_id := raw_id.
 Definition block_id := raw_id.

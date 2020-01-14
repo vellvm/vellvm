@@ -126,21 +126,21 @@ Lemma refine_01: forall t1 t2 g,
     refine_L0 t1 t2 -> refine_L1 (runState (interp_global t1) g) (runState (interp_global t2) g).
 Proof.
   intros t1 t2 g H.
-  apply eutt_tt_to_eq_prod, eutt_interp_state_gen; auto.
+  apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
 Qed.
 
 Lemma refine_12 : forall t1 t2 l,
     refine_L1 t1 t2 -> refine_L2 (runState (interp_local_stack (handle_local (v:=res_L0)) t1) l) (runState (interp_local_stack (handle_local (v:=res_L0)) t2) l).
 Proof.
   intros t1 t2 l H.
-  apply eutt_tt_to_eq_prod, eutt_interp_state_gen; auto.
+  apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
 Qed.
 
 Lemma refine_23 : forall t1 t2 m,
     refine_L2 t1 t2 -> refine_L3 (runState (M.interp_memory t1) m) (runState (M.interp_memory t2) m).
 Proof.
   intros t1 t2 m H.
-  apply eutt_tt_to_eq_prod, eutt_interp_state_gen; auto.
+  apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
 Qed.
 
 (* Things are different for L4 and L5: we get into the [Prop] monad. *)
@@ -267,15 +267,15 @@ Definition model_to_L2 user_intrinsics (prog: mcfg dtyp) :=
 
 Definition model_to_L3 user_intrinsics (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm prog in
-  interp_to_L3 user_intrinsics L0_trace [] ([],[]) (M.empty, [[]]).
+  interp_to_L3 user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
 
 Definition model_to_L4 user_intrinsics (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm prog in
-  interp_to_L4 user_intrinsics L0_trace [] ([],[]) (M.empty, [[]]).
+  interp_to_L4 user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
 
 Definition model_to_L5 user_intrinsics (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm prog in
-  interp_vellvm_model_user user_intrinsics L0_trace [] ([],[]) (M.empty, [[]]).
+  interp_vellvm_model_user user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
 
 (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -378,12 +378,12 @@ Admitted.
 Theorem interpreter_sound: forall p, model p (interpreter p).
 Proof.
   intros p.
-  unfold model, model_user.
+  unfold model, model_user, lift_sem_to_mcfg.
   flatten_goal.
   2:{
     unfold interpreter, interpreter_user.
     rewrite Heq.
-    unfold singletonT; reflexivity.
+    admit.
   }
   unfold interpreter, interpreter_user; rewrite Heq.
   unfold interp_vellvm_model_user, interp_vellvm_exec_user.
@@ -428,16 +428,20 @@ Admitted.
 
 (** BEGIN MOVE *)
 From ITree Require Import
-     Events.StateKleisli
-     Events.StateFacts.
+     Basics.Monad
+     Basics.MonadState.
 
-Instance runState_proper_eqit {E A env} : Proper (MonadTheory.eqm ==> Logic.eq ==> eutt Logic.eq) (@runState E A env).
+Instance runState_proper_eqit {E A env} : Proper (Monad.eqm ==> Logic.eq ==> eutt Logic.eq) (@runState E A env).
 Proof.
-  repeat intro; subst; apply H.
+  repeat intro; subst. unfold runState.
+  unfold eqm, ITreeMonad.EqM_ITree in H.
+  rewrite H; reflexivity.
 Qed.
 
 Require Import Paco.paco.
-Instance interp_state_proper {T E F S} (h: forall T : Type, E T -> Monads.stateT S (itree F) T) : Proper (eutt Logic.eq ==> MonadTheory.eqm) (State.interp_state h (T := T)).
+Instance interp_state_proper {T E F S}
+         (h: forall T : Type, E T -> Monads.stateT S (itree F) T)
+  : Proper (eutt Logic.eq ==> Monad.eqm) (State.interp_state h (T := T)).
 Proof.
   einit. ecofix CIH. intros.
 
@@ -482,7 +486,7 @@ Definition interp_cfg {R: Type} (trace: itree IO.instr_E R) g l m :=
 
 Definition model_to_L5_cfg (prog: cfg dtyp) :=
   let trace := D.denote_cfg prog in
-  interp_cfg trace [] [] (M.empty, [[]]).
+  interp_cfg trace [] [] ((M.empty, M.empty), [[]]).
 
 Definition refine_cfg_ret: relation (PropT IO.L5 (memory * (local_env * (global_env * uvalue)))) :=
   fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt  (TT × (TT × (TT × refine_uvalue))) t t'.

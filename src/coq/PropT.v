@@ -11,7 +11,7 @@ From ITree Require Import
      Eq.Eq
      Eq.UpToTaus
      ITree
-     Basics.MonadTheory
+     Basics.Monad
      Core.ITreeMonad.
 
 Section PropMonad.
@@ -76,6 +76,13 @@ Section MonadLaws.
       (forall x y, x ≈ y -> (PA x <-> PA' y)) /\
       eutt_closed PA /\ eutt_closed PA'.
 
+  Require Import Paco.paco.
+  Lemma eutt_ret_vis_abs: forall {X Y E} (x: X) (e: E Y) k, Ret x ≈ Vis e k -> False.
+  Proof.
+    intros.
+    punfold H; inv H.
+  Qed.
+
   Lemma ret_bind: forall {E} (a b : Type) (f : a -> PropT E b) (x : a),
       eutt_closed (f x) ->
       eqm (bind (ret x) f) (f x).
@@ -85,33 +92,34 @@ Section MonadLaws.
     + intros t t' eq; split; intros eqtt'.
       * cbn in *.
         destruct eqtt' as (ta & k &  EQ1 & EQ2 & KA).
-        rewrite EQ1, Eq.bind_ret, eq in EQ2.
+        rewrite EQ1, Eq.bind_ret_l, eq in EQ2.
         eapply H; [apply EQ2 | apply KA].
         constructor 1; eauto.
       * cbn.
         exists (Ret x), (fun _ => t); split; [reflexivity | split].
-        rewrite Eq.bind_ret; reflexivity.
+        rewrite Eq.bind_ret_l; reflexivity.
         intros.
         inv H0.
         { apply eqit_inv_ret in H1; subst.
           eapply H; eauto.
         }
-        { exfalso; eapply eutt_inv_ret; symmetry; eauto. }
+        {
+          exfalso; eapply eutt_ret_vis_abs; eauto. }
     + intros t t' EQ; cbn; split; intros (? & ? & ? & ? & ?).
-      * exists (Ret x), (fun _ => t'); split; [reflexivity | split; [rewrite Eq.bind_ret; reflexivity |]].
+      * exists (Ret x), (fun _ => t'); split; [reflexivity | split; [rewrite Eq.bind_ret_l; reflexivity |]].
         intros ? RET; inv RET.
-        2: exfalso; eapply eutt_inv_ret; symmetry; eauto.
+        2: exfalso; eapply eutt_ret_vis_abs; eauto.
         apply eqit_inv_ret in H3; subst.
         eapply H, H2.
         2:rewrite H0; constructor; reflexivity.
-        rewrite H0, Eq.bind_ret in H1; rewrite <- EQ, H1; reflexivity.
-      * exists (Ret x), (fun _ => t); split; [reflexivity | split; [rewrite Eq.bind_ret; reflexivity |]].
+        rewrite H0, Eq.bind_ret_l in H1; rewrite <- EQ, H1; reflexivity.
+      * exists (Ret x), (fun _ => t); split; [reflexivity | split; [rewrite Eq.bind_ret_l; reflexivity |]].
         intros ? RET; inv RET.
-        2: exfalso; eapply eutt_inv_ret; symmetry; eauto.
+        2: exfalso; eapply eutt_ret_vis_abs; eauto.
         apply eqit_inv_ret in H3; subst.
         eapply H, H2.
         2:rewrite H0; constructor; reflexivity.
-        rewrite H0, Eq.bind_ret in H1; rewrite EQ, H1; reflexivity.
+        rewrite H0, Eq.bind_ret_l in H1; rewrite EQ, H1; reflexivity.
     + assumption.
   Qed.
 
@@ -206,13 +214,13 @@ Section MonadLaws.
         eapply H; [symmetry; eauto | clear eq t'].
         eapply H; [eauto | clear EQ t].
         eapply H; eauto.
-        rewrite <- (bind_ret2 ta) at 2.
+        rewrite <- (bind_ret_r _ ta) at 2.
         apply eqit_Returns_bind'; [reflexivity |].
         intros.
         rewrite (HRET r); auto.
         reflexivity.
       * cbn.
-        exists t', (fun x => Ret x); split; [auto | split; [rewrite bind_ret2; auto |]].
+        exists t', (fun x => Ret x); split; [auto | split; [rewrite Eq.bind_ret_r; auto |]].
         intros ? ?; reflexivity.
     + intros x y EQ; split; intros (ta & k & HPA & EQ' & HRET).
       * cbn in *.
@@ -230,7 +238,7 @@ Section MonadLaws.
       Returns b (bind t k).
   Proof.
     intros E A B t k a b HRA HRB; induction HRA.
-    - cbn; rewrite H, Eq.bind_ret; auto.
+    - cbn; rewrite H, Eq.bind_ret_l; auto.
     - cbn in *. rewrite (eqit_tauL true t t); [| reflexivity]; auto. 
     - cbn in *; rewrite H, bind_vis.
       eapply (ReturnsVis b e); [reflexivity | cbn; eauto].
@@ -309,5 +317,4 @@ Section MonadLaws.
   Qed.
 
 End MonadLaws.
-
 

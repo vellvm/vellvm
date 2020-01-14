@@ -26,6 +26,431 @@ Definition undef_test0_block_refine : block dtyp :=
     blk_comments := None
   |}.
 
+Definition undef_test1_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (Mul false false) (DTYPE_I 64%Z) (EXP_Integer 3%Z) EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test1_block_refine := undef_test0_block_refine.
+
+Definition undef_test2_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (Mul false false) (DTYPE_I 64%Z) EXP_Undef (EXP_Integer 3%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test2_block_refine := undef_test0_block_refine.
+
+Definition undef_test3_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (Mul false false) (DTYPE_I 64%Z) EXP_Undef (EXP_Integer 6%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test3_block_refine : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Integer 0%Z)));
+      blk_comments := None
+    |}.
+
+
+Definition undef_test4_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (Mul false false) (DTYPE_I 64%Z) (EXP_Integer 6%Z) EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test4_block_refine := undef_test3_block_refine.
+
+Definition undef_test5_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop And (DTYPE_I 64%Z) EXP_Undef EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test5_block_refine := undef_test0_block_refine.
+
+Definition undef_test6_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop Or (DTYPE_I 64%Z) EXP_Undef EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test6_block_refine := undef_test0_block_refine.
+
+Definition undef_test7_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (UDiv false) (DTYPE_I 64%Z) EXP_Undef (EXP_Integer 1%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test7_block_refine := undef_test0_block_refine.
+
+Definition undef_test8_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (SDiv false) (DTYPE_I 64%Z) EXP_Undef (EXP_Integer 1%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test8_block_refine := undef_test0_block_refine.
+
+Definition undef_test9_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop URem (DTYPE_I 64%Z) EXP_Undef (EXP_Integer 1%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test9_block_refine := undef_test3_block_refine.
+
+Definition undef_test10_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop SRem (DTYPE_I 64%Z) EXP_Undef (EXP_Integer 1%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test10_block_refine := undef_test3_block_refine.
+
+Definition undef_test11_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (Shl false false) (DTYPE_I 64%Z) EXP_Undef EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test11b_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (Shl false false) (DTYPE_I 64%Z) (EXP_Ident (ID_Local (Name "a"))) EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test12_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (AShr false) (DTYPE_I 64%Z) EXP_Undef EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test12b_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (AShr false) (DTYPE_I 64%Z) (EXP_Ident (ID_Local (Name "a"))) EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test13_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (LShr false) (DTYPE_I 64%Z) EXP_Undef EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test13b_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_IBinop (LShr false) (DTYPE_I 64%Z) (EXP_Ident (ID_Local (Name "a"))) EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test14_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_ICmp Slt (DTYPE_I 64%Z) EXP_Undef EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 1%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test15_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_ICmp Ult (DTYPE_I 64%Z) EXP_Undef EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 1%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test16_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_Select ((DTYPE_I 1%Z),EXP_Undef) ((DTYPE_I 64%Z),(EXP_Ident (ID_Local (Name "a")))) ((DTYPE_I 64%Z),EXP_Undef))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test17_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Op (OP_Select ((DTYPE_I 1%Z),EXP_Undef) ((DTYPE_I 64%Z),EXP_Undef) ((DTYPE_I 64%Z),(EXP_Ident (ID_Local (Name "a")))))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test18_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "r"), (INSTR_Call ((DTYPE_Pointer), @EXP_Undef dtyp) [((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "a"))))]))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Ident (ID_Local (Name "r")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test19_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (Shl false false) (DTYPE_Vector 4%Z (DTYPE_I 8%Z)) (EXP_Ident (ID_Local (Name "a"))) (EXP_Vector [((DTYPE_I 8%Z),(EXP_Integer 8%Z)); ((DTYPE_I 8%Z),(EXP_Integer 9%Z)); ((DTYPE_I 8%Z),EXP_Undef); ((DTYPE_I 8%Z), (EXP_Integer (-1)%Z))]))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_Vector 4%Z (DTYPE_I 8%Z)), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test20_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (UDiv false) (DTYPE_I 32%Z) (EXP_Ident (ID_Local (Name "a"))) (EXP_Integer 0%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test20vec_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (UDiv false) (DTYPE_Vector 2%Z (DTYPE_I 32%Z)) (EXP_Ident (ID_Local (Name "a"))) EXP_Zero_initializer)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_Vector 2%Z (DTYPE_I 32%Z)), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test21_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (SDiv false) (DTYPE_I 32%Z) (EXP_Ident (ID_Local (Name "a"))) (EXP_Integer 0%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test21vec_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (SDiv false) (DTYPE_Vector 2%Z (DTYPE_I 32%Z)) (EXP_Ident (ID_Local (Name "a"))) EXP_Zero_initializer)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_Vector 2%Z (DTYPE_I 32%Z)), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test22_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (AShr true) (DTYPE_I 32%Z) EXP_Undef (EXP_Ident (ID_Local (Name "a"))))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test23_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (LShr true) (DTYPE_I 32%Z) EXP_Undef (EXP_Ident (ID_Local (Name "a"))))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test24_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (UDiv false) (DTYPE_I 32%Z) EXP_Undef (EXP_Integer 0%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test25_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (LShr false) (DTYPE_I 32%Z) (EXP_Integer 0%Z) EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test26_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (AShr false) (DTYPE_I 32%Z) (EXP_Integer 0%Z) EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test27_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (Shl false false) (DTYPE_I 32%Z) (EXP_Integer 0%Z) EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test28_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (Shl false true) (DTYPE_I 32%Z) EXP_Undef (EXP_Ident (ID_Local (Name "a"))))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test29_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (Shl true false) (DTYPE_I 32%Z) EXP_Undef (EXP_Ident (ID_Local (Name "a"))))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test30_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (Shl true true) (DTYPE_I 32%Z) EXP_Undef (EXP_Ident (ID_Local (Name "a"))))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test31_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (Shl false false) (DTYPE_I 32%Z) EXP_Undef (EXP_Ident (ID_Local (Name "a"))))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test32_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (Shl false false) (DTYPE_I 32%Z) EXP_Undef (EXP_Integer 0%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test33_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (AShr false) (DTYPE_I 32%Z) EXP_Undef (EXP_Integer 0%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test34_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (LShr false) (DTYPE_I 32%Z) EXP_Undef (EXP_Integer 0%Z))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test35_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_ExtractElement ((DTYPE_Vector 4%Z (DTYPE_I 32%Z)),(EXP_Ident (ID_Local (Name "V")))) ((DTYPE_I 32%Z),(EXP_Integer 4%Z)))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test36_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_ExtractElement ((DTYPE_Vector 4%Z (DTYPE_I 32%Z)),EXP_Undef) ((DTYPE_I 32%Z),(EXP_Ident (ID_Local (Name "V")))))))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test37_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (UDiv false) (DTYPE_I 32%Z) EXP_Undef EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test38_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (UDiv false) (DTYPE_I 32%Z) (EXP_Ident (ID_Local (Name "a"))) EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+Definition undef_test39_block : block dtyp
+  := {|
+      blk_id := (Anon 0%Z);
+      blk_phis := [];
+      blk_code := [(IId (Name "b"), (INSTR_Op (OP_IBinop (UDiv false) (DTYPE_I 32%Z) (EXP_Integer 0%Z) EXP_Undef)))];
+      blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 32%Z), (EXP_Ident (ID_Local (Name "b")))));
+      blk_comments := None
+    |}.
+
+
 (* InstSimplify's undef.ll tests *)
 Definition undef_test0_cfg : cfg dtyp :=
   {| init := (Anon 0%Z);
@@ -38,20 +463,6 @@ Definition undef_test0_cfg : cfg dtyp :=
                |}];
      args := [];
   |}.
-
-
-Definition undef_test0_cfg_refine : cfg dtyp :=
-  {| init := (Anon 0%Z);
-     blks := [{|
-                 blk_id := (Anon 0%Z);
-                 blk_phis := [];
-                 blk_code := [];
-                 blk_term := (IVoid 0%Z, TERM_Ret ((DTYPE_I 64%Z), (EXP_Undef)));
-                 blk_comments := None
-               |}];
-     args := [];
-  |}.
-
 
 Definition undef_test0 : list (toplevel_entity typ (list (block typ)))
   := [TLE_Definition {|

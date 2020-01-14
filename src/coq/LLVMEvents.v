@@ -40,7 +40,7 @@ From Vellvm Require Import
    effectful computations.
    This file defined the interface provided to the interaction trees, that is the set of
    events that a LLVM program can trigger.
-   These events are then concretely interpreted as a succesion of handler, as defined in the
+   These events are then concretely interpreted as a succession of handler, as defined in the
    _Handlers_ folder.
    The possible events are:
    * Function calls [CallE]
@@ -148,7 +148,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   | Store   : forall (a:dvalue) (v:dvalue),                (MemoryE unit)
   | GEP     : forall (t:dtyp) (v:dvalue) (vs:list dvalue), (MemoryE dvalue)
   | ItoP    : forall (i:dvalue),                           (MemoryE dvalue)
-  | PtoI    : forall (a:dvalue),                           (MemoryE dvalue)
+  | PtoI    : forall (t:dtyp) (a:dvalue),                  (MemoryE dvalue)
   (* | MemoryIntrinsic : forall (t:dtyp) (f:function_id) (args:list dvalue), MemoryE dvalue *)
   .
 

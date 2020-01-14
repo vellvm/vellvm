@@ -312,7 +312,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         end
       | Ptrtoint =>
         match t1, t2 with
-        | DTYPE_Pointer, DTYPE_I 64 => trigger (PtoI x)
+        | DTYPE_Pointer, DTYPE_I _ => trigger (PtoI t2 x)
         | _, _ => raise "ERROR: Ptrtoint got illegal arguments"
         end
       end.
@@ -320,8 +320,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
     Definition eval_conv conv (t1:dtyp) x (t2:dtyp) : itree conv_E dvalue :=
       match t1, x with
-      | DTYPE_I bits, dv =>
-        eval_conv_h conv t1 dv t2
       | DTYPE_Vector s t, (DVALUE_Vector elts) =>
         (* In the future, implement bitcast and etc with vectors *)
         raise "vectors unimplemented"
@@ -541,6 +539,50 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             v
 
         (* CB TODO: Do we actually need to pick here? GEP doesn't do any derefs. Does it make sense to leave it as a UVALUE? *)
+        (* CB TODO: This is probably not what we want in the long term!
+
+           There are a couple of points here:
+
+           1. We do not want to use uvalue_to_dvalue
+           2. We do not want to do picks instead of uvalue_to_dvalue (current situation)
+           3. We do not want to use UVALUE_GetElementPtr
+
+           For each of these points:
+
+           1. This is bad because uvalue_to_dvalue is "partial". It
+              raises an error when the uvalue given to it is not fully
+              concrete already. Arguably most of the time we would
+              want the arguments to GetElementPtr to be concrete,
+              because nondeterministic addresses likely causes
+              UB... But it might not, and for instance an index could
+              reasonably be `0 * undef`
+           2. We could concretize everything using `pick` events,
+              which initially might seem like a good option. Things
+              like `0 * undef` will go through without a hitch. BUT
+              suppose r = GetElementPtr a i such that r ≈ {v1, v2},
+              i.e., the result is nondeterministically one of v1 or
+              v2. Then a store to r should raise UB, which is
+              currently handled using the predicate for pick events:
+
+              da <- trigger (pick ua (exists x, forall da, concretize ua da -> da = x)) ;;
+
+              However, if we pick before calling store the address
+              will be concrete at this point, and so UB will not be
+              raised, the nondeterminism is collapsed too early :(.
+           3. Using UVALUE_GetElementPtr to delay the evaluation of
+              GetElementPtr until it's used. This would be ideal
+              because it would keep the address nondeterministic and
+              allow us to raise UB if the address to a store
+              concretizes to two different addresses... But this is
+              problematic because GEP is handled by memory events,
+              which should be interpreted before pick events, so
+              raising more when handling pick is :(.
+
+           This may be something worth readdressing when we modify the
+           memory model interface to take uvalues. The problem should,
+           essentially, go away?
+
+         *)
         | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
           vptr <- denote_exp (Some dt2) ptrval ;;
           vs <- map_monad (fun '(_, index) => denote_exp (Some (DTYPE_I 32)) index) idxs ;;
@@ -719,13 +761,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         | TERM_Br (dt,op) br1 br2 =>
           uv <- denote_exp (Some dt) op ;;
-          match uv with
-          | UVALUE_I1 comparison_bit =>
+          dv <- trigger (pick uv True) ;; (* TODO, should this be unique? *)
+          match dv with
+          | DVALUE_I1 comparison_bit =>
             if eq comparison_bit one then
               ret (inl br1)
             else
               ret (inl br2)
-          | UVALUE_Poison => raiseUB "Branching on poison."
+          | DVALUE_Poison => raiseUB "Branching on poison."
           | _ => raise "Br got non-bool value"
           end
 
@@ -770,6 +813,34 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
         end.
 
+      Definition denote_bks (bks: list _): block_id -> itree instr_E (block_id + uvalue) :=
+        loop (fun (bid : block_id + block_id) =>
+                match bid with
+                | inl bid
+                | inr bid =>
+                  (* We lookup the block [bid] to be denoted *)
+                  match find_block DynamicTypes.dtyp bks bid with
+                  | None => ret (inr (inl bid))
+                  | Some block =>
+                    (* We denote the block *)
+                    bd <- denote_block block;;
+                    (* And set the phi-nodes of the new destination, if any *)
+                    match bd with
+                    | inr dv => ret (inr (inr dv))
+                    | inl bid_target =>
+                      match find_block DynamicTypes.dtyp bks bid_target with
+                      | None => ret (inr (inl bid_target))
+                      | Some block_target =>
+                        dvs <- Util.map_monad
+                                (fun x => translate exp_E_to_instr_E (denote_phi bid x))
+                                (blk_phis block_target) ;;
+                        Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
+                        ret (inl bid_target)
+                      end
+                    end
+                  end
+                end).
+
       (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
          a cfg, and calls to functions, that jump from a cfg to another.
          In order to denote a single [cfg], we tie the first knot by linking together all the blocks
@@ -801,34 +872,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         in the type.
        *)
       Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
-        loop (fun (bid : block_id + block_id) =>
-                match bid with
-                | inl bid
-                | inr bid =>
-                  (* We lookup the block [bid] to be denoted *)
-                  match find_block dtyp (blks _ f) bid with
-                  | None => raise ("Can't find block in denote_cfg " ++ to_string bid)
-                  | Some block =>
-                    (* We denote the block *)
-                    bd <- denote_block block;;
-                    (* And set the phi-nodes of the new destination, if any *)
-                    match bd with
-                    | inr dv => ret (inr dv)
-                    | inl bid_target =>
-                      (* debug ("Jumping to " ++ to_string bid_target ++ ", evaluating phi nodes") ;; *)
-                      match find_block dtyp (blks _ f) bid_target with
-                        | None => raise ("Can't find block we are about to jump to " ++ to_string bid)
-                        | Some block_target =>
-                          dvs <- map_monad
-                              (fun x => translate exp_E_to_instr_E (denote_phi bid x))
-                              (blk_phis block_target) ;;
-                              map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
-                              ret (inl bid_target)
-                      end
-                    end
-                  end
-                end
-             ) (init _ f).
+        r <- denote_bks (blks _ f) (init _ f) ;;
+        match r with
+        | inl bid => raise ("Can't find block in denote_cfg " ++ to_string bid)
+        | inr uv  => ret uv
+        end.
 
       (* TODO : Move this somewhere else *)
       Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
