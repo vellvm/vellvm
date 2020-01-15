@@ -54,7 +54,6 @@ Open Scope monad_scope.
 Open Scope string_scope.
 Open Scope Z_scope.
 
-
 (* YZ Ask Steve: why is LLVMEvents an argument to the functor rather than have Make(A) inside the module? *)
 Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
@@ -126,7 +125,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             {HasDebugE :DebugE +? X4 -< E}
             {HasFailureE : FailureE +? X5 -< E}.
 
-    Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree E dvalue :=
+    Definition eval_conv_h (conv: conversion_type) (t1:dtyp) (x:dvalue) (t2:dtyp) : itree E dvalue :=
       let raise := @raise _ _ dvalue _ in
       match conv with
       | Trunc =>
@@ -983,40 +982,20 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             {INL:CallE +? E -< F}
             {INR:ExternalCallE +? X -< E}.
 
-    (* Import CatNotations. *)
-    (* Open Scope cat_scope. *)
-
-    (* Instance Subevent_Commute {E F G} `{E +? F -< G}: F +? E -< G. *)
-    (* split. *)
-    (* refine (split_E >>> swap). *)
-    (* refine (swap >>> merge_E). *)
-    (* Defined. *)
-
-    (* Instance Trigger_ITree' {E F G} `{E +? F -< G}: Trigger F (itree G) := *)
-    (*   fun _ e => ITree.trigger (inj1 e). *)
-
     (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
-    (* YZ: Here too the inferrence needs something like for instance Subevent_forget_order.
-       The commutation one above could work too.
-     *)
     Definition denote_mcfg
                (fundefs:list (dvalue * @function_denotation F)) (dt : dtyp)
-               (f_value : dvalue) (args : list dvalue) : itree E uvalue.
-      refine (@mrec' CallE E F _ _ _ (Call dt f_value args)).
-      refine (fun T call =>
-                match call with
-                | Call dt fv args => _
-                end).
-      refine (
-          match (lookup_defn fv fundefs) with
-          | Some f_den => _
-          | None => _
-          end).
-      refine (f_den args).
-      refine (trigger (ExternalCall dt fv args)).
-      2: eapply Subevent_forget_order.
-      typeclasses eauto.
-    Defined.
+               (f_value : dvalue) (args : list dvalue) : itree E uvalue :=
+      mrec' (D := CallE)
+            (fun T call =>
+               match call with
+               | Call dt fv args =>
+                 match (lookup_defn fv fundefs) with
+                 | Some f_den => f_den args
+                 | None => trigger (ExternalCall dt fv args)
+                 end
+               end)
+            (Call dt f_value args).
 
   End Denote_MCFG.
 

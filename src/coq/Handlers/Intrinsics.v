@@ -32,6 +32,8 @@ Import EqvNotation.
 Import ListNotations.
 
 
+(* Existing Instance Subevent_forget_order  | 10. *)
+
 Set Implicit Arguments.
 Set Contextual Implicit.
 
@@ -132,15 +134,9 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       end eq_refl
   .
 
-  (* YZ: TODO support automatically Subevent_forget_order *)
   Definition interpret_intrinsics (user_intrinsics: intrinsic_definitions)
              {E1 E2 F} `{IntrinsicE +? E1 -< F} `{FailureE +? E2 -< F}
-    : itree F ~> itree F.
-    refine (interp (over (handle_intrinsics user_intrinsics))).
-    eauto.
-    eapply Trigger_ITree.
-    Unshelve.
-    2: eapply Subevent_forget_order.
-  Defined.
+    : itree F ~> itree F :=
+    interp (over (handle_intrinsics user_intrinsics)).
 
 End Make.
