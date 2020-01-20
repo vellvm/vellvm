@@ -191,7 +191,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
     fun T e => inr1 (inr1 e).
 
   (* Core effects - no distinction between "internal" and "external" calls. *)
-  Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
+  Definition L0 := FailureE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE.
 
   (* Definition instr_E_to_L0 : instr_E ~> L0 := *)
   (*   fun T e => *)

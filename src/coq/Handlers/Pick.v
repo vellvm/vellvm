@@ -40,10 +40,8 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     | PickD: forall uv (C: Prop) dv, C -> concretize uv dv -> Pick_handler (pick uv C) (Ret dv).
 
 
-    Definition model_undef {E1 E2 F}
-               `{UBE +? E1 -< F}
-               `{FailureE +? E1 -< E2} :
-        itree PickE ~> PropT (itree F) :=
+    Definition model_undef {E E' C F} `{PickE +? C -< F} `{UBE +? E -< C} `{FailureE +? E' -< C} :
+        itree F ~> PropT (itree C) :=
         interp_prop (over Pick_handler).
 
   End PickPropositional.

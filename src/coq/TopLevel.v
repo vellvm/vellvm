@@ -63,17 +63,32 @@ Module TopLevelEnv <: Environment.
 
   Open Scope string_scope.
 
+  Notation res_L0 := uvalue (* (only parsing) *).
+  Notation res_L1 := (global_env * res_L0)%type (* (only parsing) *).
+  Notation res_L2 := (local_env * stack * res_L1)%type (* (only parsing) *).
+  Notation res_L3 := (memory * res_L2)%type (* (only parsing) *).
+  Notation res_L4 := (memory * (local_env * stack * (global_env * uvalue)))%type (* (only parsing) *).
+
+  
   Section WithContext.
 
-    Context {E X1 X2 X3 X4 X5 X6 X7 (* X8 *)}
+
+    (* Context E is the "general ambient context of non-call related events." *)
+    Context {E X1 X2 X3 X4 X5 X6 X7 X8}
             `{LLVMGEnvE +? X1 -< E}
             `{LLVMEnvE +? X2 -< E}
             `{FailureE +? X3 -< E}
             `{UBE +? X4 -< E}
             `{PickE +? X5 -< E}
             `{MemoryE +? X6 -< E}
-            `{IntrinsicE +? X7 -< E}.
-            (* `{LLVMStackE +? X8 -< E}. *)
+            `{IntrinsicE +? X7 -< E}
+            `{ExternalCallE +? X8 -< E}.
+
+    Context {E2 X9}
+            `{CallE +? E -< E2}
+            `{LLVMStackE +? X9 -< E2}.
+
+(*
     Context {E1 E2 E3 C3}
             `{CallE +? E -< E3}
             `{ExternalCallE +? E -< E1}
@@ -82,7 +97,7 @@ Module TopLevelEnv <: Environment.
             `{C3 +? E -< E2}.
     Context {Y2} `{LLVMStackE +? Y2 -< E2}.
     Context {Y1} `{LLVMStackE +? Y1 -< E1}.
-
+*)
     (* Three contexts:
 
 COMMON_E    +? C11 -< E1
@@ -108,41 +123,37 @@ ExternCallE: In E1 and E3
 
   (* end hide *)
 
-  (**
-   This file ties things together to concretely defines the semantics of a [Vellvm]
-   program. It covers two main tasks to do so: to initialize the memory, and to
-   chain together the successive interpreters.
-   As such, the raw denotation of a [Vellvm] program in terms of an [itree] is
-   progressively stripped out of its events.
-   We provide two such chains of interpretations: a model, that handles the
-   internal non-determinism due to under-defined values into the non-determinism
-   monad; and an executable one, that arbitrarily interpret under-defined values
-   by setting its bits to 0.
-   *)
+  (** This file ties things together to concretely defines the semantics of a
+   [Vellvm] program. It covers two main tasks to do so: to initialize the
+   memory, and to chain together the successive interpreters.  As such, the raw
+   denotation of a [Vellvm] program in terms of an [itree] is progressively
+   stripped out of its events.  We provide two such chains of interpretations: a
+   model, that handles the internal non-determinism due to under-defined values
+   into the non-determinism monad; and an executable one, that arbitrarily
+   interpret under-defined values by setting its bits to 0.  *)
 
   (** Initialization
-    The initialization phase allocates and initializes globals,
-    and allocates function pointers.
-    This initialization phase is internalized in [Vellvm], it is
-    an [itree] as any other.
-   *)
 
-    Definition allocate_global (g:global dtyp) : itree E1 unit :=
+    The initialization phase allocates and initializes globals, and allocates
+    function pointers.  This initialization phase is internalized in [Vellvm],
+    it is an [itree] as any other.  *)
+
+    Definition allocate_global (g:global dtyp) : itree E unit :=
       'v <- trigger (Alloca (g_typ g));;
        trigger (GlobalWrite (g_ident g) v).
 
-    Definition allocate_globals (gs:list (global dtyp)) : itree E1 unit :=
+    Definition allocate_globals (gs:list (global dtyp)) : itree E unit :=
       map_monad_ allocate_global gs.
 
     (* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
-    Definition allocate_declaration (d:declaration dtyp) : itree E1 unit :=
+    Definition allocate_declaration (d:declaration dtyp) : itree E unit :=
       (* SAZ TODO:  Don't allocate pointers for LLVM intrinsics declarations *)
       vis (Alloca DTYPE_Pointer) (fun v => trigger (GlobalWrite (dc_name d) v)).
 
-    Definition allocate_declarations (ds:list (declaration dtyp)) : itree E1 unit :=
+    Definition allocate_declarations (ds:list (declaration dtyp)) : itree E unit :=
       map_monad_ allocate_declaration ds.
 
-    Definition initialize_global (g:global dtyp) : itree E1 unit :=
+    Definition initialize_global (g:global dtyp) : itree E unit :=
       let dt := (g_typ g) in
       a <- trigger (GlobalRead (g_ident g));;
         uv <- match (g_exp g) with
@@ -153,43 +164,42 @@ ExternCallE: In E1 and E3
         dv <- trigger (pick uv True) ;;
         trigger (Store a dv).
 
-    Definition initialize_globals (gs:list (global dtyp)): itree E1 unit :=
+    Definition initialize_globals (gs:list (global dtyp)): itree E unit :=
       map_monad_ initialize_global gs.
 
-    Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree E1 unit :=
+    Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree E unit :=
       allocate_globals (m_globals CFG) ;;
       allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
       initialize_globals (m_globals CFG).
 
     (** Local environment implementation
-    The map-based handlers are defined parameterized over a domain of key and value.
-    We now pick concrete such domain.
-    Note that while local environments may store under-defined values,
-    global environments are statically guaranteed to store [dvalue]s.
-     *)
+
+    The map-based handlers are defined parameterized over a domain of key and
+    value.  We now pick concrete such domain.  Note that while local
+    environments may store under-defined values, global environments are
+    statically guaranteed to store [dvalue]s.  *)
     Definition function_env := FMapAList.alist dvalue (@D.function_denotation E2).
 
-    (**
-   Denotes a function and returns its pointer.
-     *)
+    (** Denotes a function and returns its pointer.  *)
 
     Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)):
-      itree E1 (dvalue * @D.function_denotation E2) :=
+      itree E (dvalue * @D.function_denotation E2) :=
       let fid := (dc_name (df_prototype df)) in
       fv <- trigger (GlobalRead fid) ;;
       ret (fv, D.denote_function df).
 
     (* (for now) assume that [main (i64 argc, i8** argv)]
-    pass in 0 and null as the arguments to main
-    Note: this isn't compliant with standard C semantics
+
+       - pass in 0 and null as the arguments to main 
+       - Note: this isn't compliant with standard C semantics 
+
+      TODO: implement command-line arguments
      *)
     Definition main_args := [DV.DVALUE_I64 (DynamicValues.Int64.zero);
                                DV.DVALUE_Addr (Memory.A.null)
                             ].
 
-    (**
-   Transformation and normalization of types.
-     *)
+    (** Transformation and normalization of types. *)
     Definition eval_typ (CFG:CFG.mcfg typ) (t:typ) : dtyp :=
       TypeUtil.normalize_type_dtyp (m_type_defs CFG) t.
 
@@ -222,14 +232,12 @@ ExternCallE: In E1 and E3
   (*           `{ExternalCallE +? X8 -< E} *)
   (*           `{LLVMStackE +? X9 -< E}. *)
 (* Set Printing Implicit. *)
-  Notation res_L0 := uvalue (* (only parsing) *).
-  Notation res_L1 := (global_env * res_L0)%type (* (only parsing) *).
-  Notation res_L2 := (local_env * stack * res_L1)%type (* (only parsing) *).
-  Notation res_L3 := (memory * res_L2)%type (* (only parsing) *).
-  Notation res_L4 := (memory * (local_env * stack * (global_env * uvalue)))%type (* (only parsing) *).
 
+
+
+    
   (**
-     Full denotation of a Vellvm program as an interaction tree:
+l     Full denotation of a Vellvm program as an interaction tree:
      * initialize the global environment;
      * point wise denote each function;
      * retrieve the address of the main function;
@@ -242,7 +250,7 @@ ExternCallE: In E1 and E3
     It should be a function from (list dvalue) to  t d
 
    *)
-  Definition denote_vellvm (mcfg : CFG.mcfg dtyp) : itree E1 res_L0 :=
+  Definition denote_vellvm (mcfg : CFG.mcfg dtyp) : itree _ res_L0 :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg);;
     'addr <- trigger (GlobalRead (Name "main")) ;;
@@ -257,63 +265,18 @@ ExternCallE: In E1 and E3
      but semantically equivalent to simply applying the state. *)
   Definition run_state {E A env} (R : Monads.stateT env (itree E) A) (st: env) : itree E (env * A) := R st.
 
+
   End WithContext.
 
-  Section WithContext.
-    Context {E X1 X2 X3 X4 X5 X6 X7 X8}
-            `{LLVMGEnvE +? X1 -< E}
-            `{LLVMEnvE +? X2 -< E}
-            `{FailureE +? X3 -< E}
-            `{UBE +? X4 -< E}
-            `{PickE +? X5 -< E}
-            `{MemoryE +? X6 -< E}
-            `{IntrinsicE +? X7 -< E}
-            `{LLVMStackE +? X8 -< E}.
+  Definition IOE := FailureE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' LLVMEnvE +' LLVMStackE +' MemoryE +' PickE +' UBE +' DebugE.
 
-  Definition interp_vellvm_exec_user {F} {R: Type} (user_intrinsics: INT.intrinsic_definitions)
-             (trace: itree E1 R)
-             (g: global_env)
-             (l: local_env * @Stack.stack local_env)
-             (m: M.memory_stack): itree F (M.memory_stack * (local_env * @Stack.stack local_env * (global_env * R))). 
-    refine (let L0_trace       := INT.interpret_intrinsics user_intrinsics trace in 
-            let L1_trace       := run_state (interp_global L0_trace) g in _).
-    Unshelve.
-
-    let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
-    let L3_trace       := run_state (M.interp_memory L2_trace) m in
-    let L4_trace       := P.interp_undef L3_trace in
-    let L5_trace       := interp_UB L4_trace in
-    L5_trace.
-
-
-
+  Typeclasses eauto := 5.
   Definition interp_vellvm_exec_user {R: Type} (user_intrinsics: INT.intrinsic_definitions)
-             (trace: itree IO.L0 R)
+             (trace: itree IOE R)
              (g: global_env)
              (l: local_env * @Stack.stack local_env)
-             (m: M.memory_stack): itree (CallE +' DebugE +' FailureE) (M.memory_stack * (local_env * @Stack.stack local_env * (global_env * R))).
-    Typeclasses eauto :=5.
-    refine (let L0_trace       := INT.interpret_intrinsics (F:= L0) user_intrinsics trace in
-    let L1_trace       := run_state (interp_global (E1 := IO.L1) L0_trace) g in _).
-    refine (let L2_trace       := run_state (interp_local_stack (E1 := IO.L2) (handle_local (v:=res_L0)) L1_trace) l in 
-    _).
-
-    refine (let L3_trace       := run_state (M.interp_memory (E := IO.L3) L2_trace) m in _).
-    refine (let L4_trace       := P.interp_undef L3_trace in
-    let L5_trace       := interp_UB L4_trace in _).
-    refine (L5_trace).
-    all: try typeclasses eauto.
-
-  (**
-     First, we build the interpreter that will get extracted to OCaml and allow for the interpretation
-     of compliant llvm programs.
-   *)
-  (**
-     Executable interpretation: we run the successive interpreters, and use in particular
-     the executable ones for [pick] and [UB], i.e. the ones returning back
-     into the [itree] monad.
-   *)
-  Definition interp_vellvm_exec_user {R: Type} user_intrinsics (trace: itree IO.L0 R) g l m :=
+             (m: M.memory_stack)
+ :=
     let L0_trace       := INT.interpret_intrinsics user_intrinsics trace in
     let L1_trace       := run_state (interp_global L0_trace) g in
     let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
@@ -321,13 +284,21 @@ ExternCallE: In E1 and E3
     let L4_trace       := P.interp_undef L3_trace in
     let L5_trace       := interp_UB L4_trace in
     L5_trace.
+  Typeclasses eauto := .
 
   (**
      The interpreter now simply performs the syntactic conversion from [toplevel_entity]
      to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
      starting from empty environments.
    *)
-  Definition interpreter_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))) : itree L5 res_L4 :=
+
+  
+  Definition interpreter_user
+             (user_intrinsics: IS.intrinsic_definitions)
+             (prog: list (toplevel_entity typ (list (block typ))))
+    : itree (FailureE +' ExternalCallE +' IntrinsicE +' DebugE)
+            (M.memory_stack * (local_env * Stack.stack * (global_env * _)))             
+    :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
     match CFG.mcfg_of_modul _ scfg with
@@ -352,21 +323,24 @@ ExternCallE: In E1 and E3
      semantics, except that we use, where relevant, the handlers capturing
      all allowed behaviors into the [Prop] monad.
    *)
-  Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree IO.L0 R) g l m :=
+  
+  Typeclasses eauto := 5.
+  Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree IOE R) g l m :=
     let L0_trace       := INT.interpret_intrinsics user_intrinsics trace in
     let L1_trace       := run_state (interp_global L0_trace) g in
     let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
     let L3_trace       := run_state (M.interp_memory L2_trace) m in
-    let L4_trace       := P.model_undef L3_trace in
+    let L4_trace       := P.model_undef L3_trace in 
     let L5_trace       := model_UB L4_trace in
     L5_trace.
-
+  Typeclasses eauto := .
+  
   (**
      The model now simply performs the syntactic conversion from [toplevel_entity]
      to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
      starting from empty environments.
    *)
-  Definition model_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))): PropT (itree L5) res_L4 :=
+  Definition model_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))) :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
     match CFG.mcfg_of_modul _ scfg with
