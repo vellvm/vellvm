@@ -65,16 +65,46 @@ Module TopLevelEnv <: Environment.
 
   Section WithContext.
 
-    Context {E X1 X2 X3 X4 X5 X6 X7 X8 X9}
+    Context {E X1 X2 X3 X4 X5 X6 X7 (* X8 *)}
             `{LLVMGEnvE +? X1 -< E}
             `{LLVMEnvE +? X2 -< E}
             `{FailureE +? X3 -< E}
             `{UBE +? X4 -< E}
             `{PickE +? X5 -< E}
             `{MemoryE +? X6 -< E}
-            `{IntrinsicE +? X7 -< E}
-            `{CallE +? X8 -< E}
-            `{LLVMStackE +? X9 -< E}.
+            `{IntrinsicE +? X7 -< E}.
+            (* `{LLVMStackE +? X8 -< E}. *)
+    Context {E1 E2 E3 C3}
+            `{CallE +? E -< E3}
+            `{ExternalCallE +? E -< E1}
+            `{CallE +? E1 -< E2}
+            `{ExternalCallE +? E3 -< E2}
+            `{C3 +? E -< E2}.
+    Context {Y2} `{LLVMStackE +? Y2 -< E2}.
+    Context {Y1} `{LLVMStackE +? Y1 -< E1}.
+
+    (* Three contexts:
+
+COMMON_E    +? C11 -< E1
+ExternCallE +? C12 -< E1
+
+COMMON_E +? C31 -< E3
+CallE    +? C32 -< E3
+
+COMMON_E +? C21 -< E2
+CallE    +? C22 -< E2
+ExternalCallE    +? C23 -< E2
+
+COMMON_E CALLE EXTERNCALLE
+E1 E2 E3
+We have some COMMON_E that are shared everywhere: COMMON_E +? Ci -< Ei
+
+StackE has a peculiar status: stackE +? X -< E1/E2
+
+CallE: In E2 and E3
+ExternCallE: In E1 and E3
+
+     *)
 
   (* end hide *)
 
@@ -97,74 +127,74 @@ Module TopLevelEnv <: Environment.
     an [itree] as any other.
    *)
 
-    Typeclasses eauto := 3.
-    Definition allocate_global (g:global dtyp) : itree E unit :=
+    Definition allocate_global (g:global dtyp) : itree E1 unit :=
       'v <- trigger (Alloca (g_typ g));;
        trigger (GlobalWrite (g_ident g) v).
 
-  Definition allocate_globals (gs:list (global dtyp)) : itree E unit :=
-    map_monad_ allocate_global gs.
+    Definition allocate_globals (gs:list (global dtyp)) : itree E1 unit :=
+      map_monad_ allocate_global gs.
 
-  (* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
-  Definition allocate_declaration (d:declaration dtyp) : itree E unit :=
-    (* SAZ TODO:  Don't allocate pointers for LLVM intrinsics declarations *)
-    vis (Alloca DTYPE_Pointer) (fun v => trigger (GlobalWrite (dc_name d) v)).
+    (* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
+    Definition allocate_declaration (d:declaration dtyp) : itree E1 unit :=
+      (* SAZ TODO:  Don't allocate pointers for LLVM intrinsics declarations *)
+      vis (Alloca DTYPE_Pointer) (fun v => trigger (GlobalWrite (dc_name d) v)).
 
-  Definition allocate_declarations (ds:list (declaration dtyp)) : itree E unit :=
-    map_monad_ allocate_declaration ds.
+    Definition allocate_declarations (ds:list (declaration dtyp)) : itree E1 unit :=
+      map_monad_ allocate_declaration ds.
 
-  Definition initialize_global (g:global dtyp) : itree E unit :=
-    let dt := (g_typ g) in
-    a <- trigger (GlobalRead (g_ident g));;
-      uv <- match (g_exp g) with
-            | None => ret (UVALUE_Undef dt)
-            | Some e => D.denote_exp (Some dt) e
-            end ;;
-      (* CB TODO: Do we need pick here? *)
-      dv <- trigger (pick uv True) ;;
-      trigger (Store a dv).
+    Definition initialize_global (g:global dtyp) : itree E1 unit :=
+      let dt := (g_typ g) in
+      a <- trigger (GlobalRead (g_ident g));;
+        uv <- match (g_exp g) with
+             | None => ret (UVALUE_Undef dt)
+             | Some e => D.denote_exp (Some dt) e
+             end ;;
+        (* CB TODO: Do we need pick here? *)
+        dv <- trigger (pick uv True) ;;
+        trigger (Store a dv).
 
-  Definition initialize_globals (gs:list (global dtyp)): itree E unit :=
-    map_monad_ initialize_global gs.
+    Definition initialize_globals (gs:list (global dtyp)): itree E1 unit :=
+      map_monad_ initialize_global gs.
 
-  Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree E unit :=
-    allocate_globals (m_globals CFG) ;;
-    allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
-    initialize_globals (m_globals CFG).
+    Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree E1 unit :=
+      allocate_globals (m_globals CFG) ;;
+      allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
+      initialize_globals (m_globals CFG).
 
-  (** Local environment implementation
+    (** Local environment implementation
     The map-based handlers are defined parameterized over a domain of key and value.
     We now pick concrete such domain.
     Note that while local environments may store under-defined values,
     global environments are statically guaranteed to store [dvalue]s.
-   *)
-  Definition function_env := FMapAList.alist dvalue (@D.function_denotation E).
+     *)
+    Definition function_env := FMapAList.alist dvalue (@D.function_denotation E2).
 
-  (**
+    (**
    Denotes a function and returns its pointer.
-   *)
+     *)
 
-  Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree E (dvalue * @D.function_denotation E) :=
-    let fid := (dc_name (df_prototype df)) in
-    fv <- trigger (GlobalRead fid) ;;
-    ret (fv, D.denote_function df).
+    Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)):
+      itree E1 (dvalue * @D.function_denotation E2) :=
+      let fid := (dc_name (df_prototype df)) in
+      fv <- trigger (GlobalRead fid) ;;
+      ret (fv, D.denote_function df).
 
-  (* (for now) assume that [main (i64 argc, i8** argv)]
+    (* (for now) assume that [main (i64 argc, i8** argv)]
     pass in 0 and null as the arguments to main
     Note: this isn't compliant with standard C semantics
-   *)
-  Definition main_args := [DV.DVALUE_I64 (DynamicValues.Int64.zero);
-                             DV.DVALUE_Addr (Memory.A.null)
-                          ].
+     *)
+    Definition main_args := [DV.DVALUE_I64 (DynamicValues.Int64.zero);
+                               DV.DVALUE_Addr (Memory.A.null)
+                            ].
 
-  (**
+    (**
    Transformation and normalization of types.
-   *)
-  Definition eval_typ (CFG:CFG.mcfg typ) (t:typ) : dtyp :=
-    TypeUtil.normalize_type_dtyp (m_type_defs CFG) t.
+     *)
+    Definition eval_typ (CFG:CFG.mcfg typ) (t:typ) : dtyp :=
+      TypeUtil.normalize_type_dtyp (m_type_defs CFG) t.
 
-  Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
-    TransformTypes.fmap_mcfg _ _ (eval_typ CFG) CFG.
+    Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
+      TransformTypes.fmap_mcfg _ _ (eval_typ CFG) CFG.
 
   (**
    We are now ready to define our semantics. Guided by the events and handlers,
@@ -176,22 +206,22 @@ Module TopLevelEnv <: Environment.
    In order to limit bloated type signature, we name the successive return types.
    *)
 
-  End WithContext.
+  (* End WithContext. *)
 
-  Section WithContext.
+  (* Section WithContext. *)
 
-    Context {F E X1 X2 X3 X4 X5 X6 X7 X8 X9}
-            `{CallE +? E -< F}
-            `{LLVMGEnvE +? X1 -< E}
-            `{LLVMEnvE +? X2 -< E}
-            `{FailureE +? X3 -< E}
-            `{UBE +? X4 -< E}
-            `{PickE +? X5 -< E}
-            `{MemoryE +? X6 -< E}
-            `{IntrinsicE +? X7 -< E}
-            `{CallE +? X8 -< E}
-            `{LLVMStackE +? X9 -< E}.
-
+  (*   Context {F E X1 X2 X3 X4 X5 X6 X7 X8 X9} *)
+  (*           `{CallE +? E -< F} *)
+  (*           `{LLVMGEnvE +? X1 -< E} *)
+  (*           `{LLVMEnvE +? X2 -< E} *)
+  (*           `{FailureE +? X3 -< E} *)
+  (*           `{UBE +? X4 -< E} *)
+  (*           `{PickE +? X5 -< E} *)
+  (*           `{MemoryE +? X6 -< E} *)
+  (*           `{IntrinsicE +? X7 -< E} *)
+  (*           `{ExternalCallE +? X8 -< E} *)
+  (*           `{LLVMStackE +? X9 -< E}. *)
+(* Set Printing Implicit. *)
   Notation res_L0 := uvalue (* (only parsing) *).
   Notation res_L1 := (global_env * res_L0)%type (* (only parsing) *).
   Notation res_L2 := (local_env * stack * res_L1)%type (* (only parsing) *).
@@ -204,17 +234,17 @@ Module TopLevelEnv <: Environment.
      * point wise denote each function;
      * retrieve the address of the main function;
      * tie the mutually recursive know and run it starting from the main.
+     *)
+
+  (*
+    denoting a CFG: no ExtCall.
+    The function_denotation should not expose Calls.
+    It should be a function from (list dvalue) to  t d
+
    *)
-  Definition denote_vellvm (mcfg : CFG.mcfg dtyp) : itree E res_L0.
-    refine (build_global_environment mcfg ;;
-                                     'defns <- map_monad address_one_function (m_definitions mcfg) ;; _).
-    Set Typeclasses Debug.
-    refine ('addr <- trigger' _ (@inj1 _ _ _ _ _ (@GlobalRead raw_id dvalue (Name "main"))) ;; _).
-    D.denote_mcfg defns DTYPE_Void addr main_args).
-                                                  _).
-    :=
+  Definition denote_vellvm (mcfg : CFG.mcfg dtyp) : itree E1 res_L0 :=
     build_global_environment mcfg ;;
-    'defns <- map_monad address_one_function (m_definitions mcfg) ;;
+    'defns <- map_monad address_one_function (m_definitions mcfg);;
     'addr <- trigger (GlobalRead (Name "main")) ;;
     D.denote_mcfg defns DTYPE_Void addr main_args.
 
@@ -226,6 +256,53 @@ Module TopLevelEnv <: Environment.
   (* Explicit application of a state to a [stateT] computation: convenient to ease some rewriting,
      but semantically equivalent to simply applying the state. *)
   Definition run_state {E A env} (R : Monads.stateT env (itree E) A) (st: env) : itree E (env * A) := R st.
+
+  End WithContext.
+
+  Section WithContext.
+    Context {E X1 X2 X3 X4 X5 X6 X7 X8}
+            `{LLVMGEnvE +? X1 -< E}
+            `{LLVMEnvE +? X2 -< E}
+            `{FailureE +? X3 -< E}
+            `{UBE +? X4 -< E}
+            `{PickE +? X5 -< E}
+            `{MemoryE +? X6 -< E}
+            `{IntrinsicE +? X7 -< E}
+            `{LLVMStackE +? X8 -< E}.
+
+  Definition interp_vellvm_exec_user {F} {R: Type} (user_intrinsics: INT.intrinsic_definitions)
+             (trace: itree E1 R)
+             (g: global_env)
+             (l: local_env * @Stack.stack local_env)
+             (m: M.memory_stack): itree F (M.memory_stack * (local_env * @Stack.stack local_env * (global_env * R))). 
+    refine (let L0_trace       := INT.interpret_intrinsics user_intrinsics trace in 
+            let L1_trace       := run_state (interp_global L0_trace) g in _).
+    Unshelve.
+
+    let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+    let L3_trace       := run_state (M.interp_memory L2_trace) m in
+    let L4_trace       := P.interp_undef L3_trace in
+    let L5_trace       := interp_UB L4_trace in
+    L5_trace.
+
+
+
+  Definition interp_vellvm_exec_user {R: Type} (user_intrinsics: INT.intrinsic_definitions)
+             (trace: itree IO.L0 R)
+             (g: global_env)
+             (l: local_env * @Stack.stack local_env)
+             (m: M.memory_stack): itree (CallE +' DebugE +' FailureE) (M.memory_stack * (local_env * @Stack.stack local_env * (global_env * R))).
+    Typeclasses eauto :=5.
+    refine (let L0_trace       := INT.interpret_intrinsics (F:= L0) user_intrinsics trace in
+    let L1_trace       := run_state (interp_global (E1 := IO.L1) L0_trace) g in _).
+    refine (let L2_trace       := run_state (interp_local_stack (E1 := IO.L2) (handle_local (v:=res_L0)) L1_trace) l in 
+    _).
+
+    refine (let L3_trace       := run_state (M.interp_memory (E := IO.L3) L2_trace) m in _).
+    refine (let L4_trace       := P.interp_undef L3_trace in
+    let L5_trace       := interp_UB L4_trace in _).
+    refine (L5_trace).
+    all: try typeclasses eauto.
 
   (**
      First, we build the interpreter that will get extracted to OCaml and allow for the interpretation
