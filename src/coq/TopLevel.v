@@ -88,40 +88,7 @@ Module TopLevelEnv <: Environment.
             `{CallE +? E -< E2}
             `{LLVMStackE +? X9 -< E2}.
 
-(*
-    Context {E1 E2 E3 C3}
-            `{CallE +? E -< E3}
-            `{ExternalCallE +? E -< E1}
-            `{CallE +? E1 -< E2}
-            `{ExternalCallE +? E3 -< E2}
-            `{C3 +? E -< E2}.
-    Context {Y2} `{LLVMStackE +? Y2 -< E2}.
-    Context {Y1} `{LLVMStackE +? Y1 -< E1}.
-*)
-    (* Three contexts:
-
-COMMON_E    +? C11 -< E1
-ExternCallE +? C12 -< E1
-
-COMMON_E +? C31 -< E3
-CallE    +? C32 -< E3
-
-COMMON_E +? C21 -< E2
-CallE    +? C22 -< E2
-ExternalCallE    +? C23 -< E2
-
-COMMON_E CALLE EXTERNCALLE
-E1 E2 E3
-We have some COMMON_E that are shared everywhere: COMMON_E +? Ci -< Ei
-
-StackE has a peculiar status: stackE +? X -< E1/E2
-
-CallE: In E2 and E3
-ExternCallE: In E1 and E3
-
-     *)
-
-  (* end hide *)
+(* end hide *)
 
   (** This file ties things together to concretely defines the semantics of a
    [Vellvm] program. It covers two main tasks to do so: to initialize the
@@ -216,25 +183,6 @@ ExternCallE: In E1 and E3
    In order to limit bloated type signature, we name the successive return types.
    *)
 
-  (* End WithContext. *)
-
-  (* Section WithContext. *)
-
-  (*   Context {F E X1 X2 X3 X4 X5 X6 X7 X8 X9} *)
-  (*           `{CallE +? E -< F} *)
-  (*           `{LLVMGEnvE +? X1 -< E} *)
-  (*           `{LLVMEnvE +? X2 -< E} *)
-  (*           `{FailureE +? X3 -< E} *)
-  (*           `{UBE +? X4 -< E} *)
-  (*           `{PickE +? X5 -< E} *)
-  (*           `{MemoryE +? X6 -< E} *)
-  (*           `{IntrinsicE +? X7 -< E} *)
-  (*           `{ExternalCallE +? X8 -< E} *)
-  (*           `{LLVMStackE +? X9 -< E}. *)
-(* Set Printing Implicit. *)
-
-
-
     
   (**
 l     Full denotation of a Vellvm program as an interaction tree:
@@ -268,6 +216,7 @@ l     Full denotation of a Vellvm program as an interaction tree:
 
   End WithContext.
 
+  (* This is basically the same definition as IO.L0 *)
   Definition IOE := FailureE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' LLVMEnvE +' LLVMStackE +' MemoryE +' PickE +' UBE +' DebugE.
 
   Typeclasses eauto := 5.
@@ -291,8 +240,6 @@ l     Full denotation of a Vellvm program as an interaction tree:
      to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
      starting from empty environments.
    *)
-
-  
   Definition interpreter_user
              (user_intrinsics: IS.intrinsic_definitions)
              (prog: list (toplevel_entity typ (list (block typ))))
