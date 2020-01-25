@@ -216,12 +216,10 @@ l     Full denotation of a Vellvm program as an interaction tree:
 
   End WithContext.
 
-  (* This is basically the same definition as IO.L0 *)
-  Definition IOE := FailureE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' LLVMEnvE +' LLVMStackE +' MemoryE +' PickE +' UBE +' DebugE.
 
   Typeclasses eauto := 5.
   Definition interp_vellvm_exec_user {R: Type} (user_intrinsics: INT.intrinsic_definitions)
-             (trace: itree IOE R)
+             (trace: itree IO.L0 R)
              (g: global_env)
              (l: local_env * @Stack.stack local_env)
              (m: M.memory_stack)
@@ -272,7 +270,7 @@ l     Full denotation of a Vellvm program as an interaction tree:
    *)
   
   Typeclasses eauto := 5.
-  Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree IOE R) g l m :=
+  Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree L0 R) g l m :=
     let L0_trace       := INT.interpret_intrinsics user_intrinsics trace in
     let L1_trace       := run_state (interp_global L0_trace) g in
     let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
@@ -281,7 +279,7 @@ l     Full denotation of a Vellvm program as an interaction tree:
     let L5_trace       := model_UB L4_trace in
     L5_trace.
   Typeclasses eauto := .
-  
+
   (**
      The model now simply performs the syntactic conversion from [toplevel_entity]
      to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree

@@ -97,10 +97,10 @@ Qed.
 
 (* This formulation should be easier to use *)
 Instance interp_prop_Proper :
-  forall R E F G (RR : relation R) (h : (E +' F +' G) ~> PropT.PropT (itree (E +' G))),
-    Proper (@eutt (E +' F +' G) _ _ RR ==> eq ==> Basics.impl) (@PropT.interp_prop (E +' F +' G) _ _ _ _ h R).
+  forall R E F G H I (RR : relation R) (h : (E +' F +' G +' H +' I) ~> PropT.PropT (itree (E +' F +' G +' I))),
+    Proper (@eutt (E +' F +' G +' H +' I) _ _ RR ==> eq ==> Basics.impl) (@PropT.interp_prop (E +' F +' G +' H +' I) _ _ _ _ h R).
 Proof.
-  intros R E F G t RR h.
+  intros R E F G H I RR h.
   intros t1 t2 Heutt.
   unfold PropT.PropT in h. unfold Ensembles.Ensemble in h.
 Admitted.
@@ -119,25 +119,26 @@ Qed.
     refinement at level [i+1] after running the [i+1] level of interpretation
  *)
 
+
 Lemma refine_01: forall t1 t2 g,
     refine_L0 t1 t2 -> refine_L1 (run_state (interp_global t1) g) (run_state (interp_global t2) g).
 Proof.
   intros t1 t2 g H.
-  apply eutt_tt_to_eq_prod, eutt_interp_state_gen; auto.
+  apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
 Qed.
 
 Lemma refine_12 : forall t1 t2 l,
     refine_L1 t1 t2 -> refine_L2 (run_state (interp_local_stack (handle_local (v:=res_L0)) t1) l) (run_state (interp_local_stack (handle_local (v:=res_L0)) t2) l).
 Proof.
   intros t1 t2 l H.
-  apply eutt_tt_to_eq_prod, eutt_interp_state_gen; auto.
+  apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
 Qed.
 
 Lemma refine_23 : forall t1 t2 m,
     refine_L2 t1 t2 -> refine_L3 (run_state (M.interp_memory t1) m) (run_state (M.interp_memory t2) m).
 Proof.
   intros t1 t2 m H.
-  apply eutt_tt_to_eq_prod, eutt_interp_state_gen; auto.
+  apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
 Qed.
 
 (* Things are different for L4 and L5: we get into the [Prop] monad. *)
@@ -185,12 +186,15 @@ Definition interp_to_L2 {R} user_intrinsics (t: itree IO.L0 R) g l :=
   let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
   L2_trace.
 
+
+Typeclasses eauto := 5.
 Definition interp_to_L3 {R} user_intrinsics (t: itree IO.L0 R) g l m :=
-  let L0_trace       := INT.interpret_intrinsics user_intrinsics t in
-  let L1_trace       := run_state (interp_global L0_trace) g in
-  let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
-  let L3_trace       := run_state (M.interp_memory L2_trace) m in
-  L3_trace.
+    let L0_trace       := INT.interpret_intrinsics user_intrinsics t in
+    let L1_trace       := run_state (interp_global L0_trace) g in
+    let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+    let L3_trace       := run_state (M.interp_memory L2_trace) m in
+    L3_trace.
+
 
 Definition interp_to_L4 {R} user_intrinsics (t: itree IO.L0 R) g l m :=
   let L0_trace       := INT.interpret_intrinsics user_intrinsics t in
@@ -199,6 +203,7 @@ Definition interp_to_L4 {R} user_intrinsics (t: itree IO.L0 R) g l m :=
   let L3_trace       := run_state (M.interp_memory L2_trace) m in
   let L4_trace       := P.model_undef L3_trace in
   L4_trace.
+Typeclasses eauto :=.
 
 Ltac fold_L1 :=
     match goal with
@@ -383,14 +388,14 @@ Proof.
   eapply eqit_bind'; eauto.
 Qed.
 
-Lemma interp_intrinsics_bind :
+Lemma interp_intrinsics_bind {E1 E2 F} `{IO.IntrinsicE +? E1 -< F} `{LLVMEvents.FailureE +? E2 -< F} :
   forall (R S : Type) l (t : itree _ R) (k : R -> itree _ S),
     INT.interpret_intrinsics l (ITree.bind t k) ≅ ITree.bind (INT.interpret_intrinsics l t) (fun r : R => INT.interpret_intrinsics l (k r)).
 Proof.
   intros; apply interp_bind.
 Qed.
 
-Lemma interp_intrinsics_ret :
+Lemma interp_intrinsics_ret {E1 E2 F} `{IO.IntrinsicE +? E1 -< F} `{LLVMEvents.FailureE +? E2 -< F} :
   forall (R : Type) l (x: R),
     INT.interpret_intrinsics l (Ret x) ≅ Ret x.
 Proof.

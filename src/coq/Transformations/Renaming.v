@@ -156,62 +156,63 @@ Section Swap.
 
     rewrite 2 interp_to_L2_bind.
     (* We use [function_rel] here to establish that we get piece-wise eutt when denoting each function *)
-    apply eutt_clo_bind with function_rel.
+    
+(*     apply eutt_clo_bind with function_rel. *)
 
-    {
-      (* Denotation of each cfg *)
-      (* Here we need to actually establish something different than equality of states, but rather extensional agreement after renaming *)
-      apply interp_to_L2_map_monad.
-      intros cfg g l HIN.
-      unfold address_one_function.
-      simpl.
-      rewrite 2 interp_to_L2_bind.
-      split_bind.
-      { (* Getting the address of the function *)
-        admit.
-      }
-      rewrite 2 interp_to_L2_ret.
-      apply eqit_Ret.
-      do 3 constructor; auto.
-      intros args.
-      destruct cfg.
-      unfold f_endo, endo_definition; simpl.
-      unfold D.denote_function.
-      simpl.
-      apply eutt_clo_bind with (UU := Logic.eq).
-      (* Debug message, to remove / deal with *)
-      admit.
-      intros ? ? ->.
-      apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros [] [] _].
-      apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros [] [] _].
-      apply eutt_clo_bind with (UU := Logic.eq); [| intros ? ? ->; reflexivity].
-      apply eutt_translate'.
+(*     { *)
+(*       (* Denotation of each cfg *) *)
+(*       (* Here we need to actually establish something different than equality of states, but rather extensional agreement after renaming *) *)
+(*       apply interp_to_L2_map_monad. *)
+(*       intros cfg g l HIN. *)
+(*       unfold address_one_function. *)
+(*       simpl. *)
+(*       rewrite 2 interp_to_L2_bind. *)
+(*       split_bind. *)
+(*       { (* Getting the address of the function *) *)
+(*         admit. *)
+(*       } *)
+(*       rewrite 2 interp_to_L2_ret. *)
+(*       apply eqit_Ret. *)
+(*       do 3 constructor; auto. *)
+(*       intros args. *)
+(*       destruct cfg. *)
+(*       unfold f_endo, endo_definition; simpl. *)
+(*       unfold D.denote_function. *)
+(*       simpl. *)
+(*       apply eutt_clo_bind with (UU := Logic.eq). *)
+(*       (* Debug message, to remove / deal with *) *)
+(*       admit. *)
+(*       intros ? ? ->. *)
+(*       apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros [] [] _]. *)
+(*       apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros [] [] _]. *)
+(*       apply eutt_clo_bind with (UU := Logic.eq); [| intros ? ? ->; reflexivity]. *)
+(*       apply eutt_translate'. *)
 
-      unfold D.denote_cfg.
-(*
-      Set Nested Proofs Allowed.
-      Lemma denote_cfg_comp:
-        forall  {E} (body body': (block_id + block_id) -> itree E (block_id + block_id)) (x: block_id) (f: endo block_id),
-          (forall l, body l ≈ body' (f l)) ->
-          loop body x ≈ loop body' (f x).
+(*       unfold D.denote_cfg. *)
+(* (* *)
+(*       Set Nested Proofs Allowed. *)
+(*       Lemma denote_cfg_comp: *)
+(*         forall  {E} (body body': (block_id + block_id) -> itree E (block_id + block_id)) (x: block_id) (f: endo block_id), *)
+(*           (forall l, body l ≈ body' (f l)) -> *)
+(*           loop body x ≈ loop body' (f x). *)
 
-      unfold D.denote_cfg.
-      unfold f_endo. endo_cfg. simpl.
-      unfold eqm.
-      Instance loop_Proper:
-        Proper () loop
-      (* Set Printing Implicit. *)
-      apply (@Proper_loop.
-*)
+(*       unfold D.denote_cfg. *)
+(*       unfold f_endo. endo_cfg. simpl. *)
+(*       unfold eqm. *)
+(*       Instance loop_Proper: *)
+(*         Proper () loop *)
+(*       (* Set Printing Implicit. *) *)
+(*       apply (@Proper_loop. *)
+(* *) *)
 
-      admit.
+(*       admit. *)
 
-    }
+(*     } *)
 
-    intros (? & ? & ?) (? & ? & ?) EQ.
-    inv EQ; repeat match goal with | h: prod_rel _ _ _ _ |- _ => inv h end.
-    rewrite 2 interp_to_L2_bind.
-    split_bind.
+    (* intros (? & ? & ?) (? & ? & ?) EQ. *)
+    (* inv EQ; repeat match goal with | h: prod_rel _ _ _ _ |- _ => inv h end. *)
+    (* rewrite 2 interp_to_L2_bind. *)
+    (* split_bind. *)
 
     { (* Getting the address of "main" *)
       admit.
@@ -219,7 +220,6 @@ Section Swap.
 
     (* Tying the recursive knot *)
 
-    admit.
   (*   rewrite 2 interp_to_L2_bind. *)
 
 

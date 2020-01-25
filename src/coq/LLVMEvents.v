@@ -191,8 +191,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
     fun T e => inr1 (inr1 e).
 
   (* Core effects - no distinction between "internal" and "external" calls. *)
-  Definition L0 := FailureE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE.
+  Definition L0 := FailureE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' LLVMEnvE +' LLVMStackE +' MemoryE +' PickE +' UBE +' DebugE.
 
+  
   (* Definition instr_E_to_L0 : instr_E ~> L0 := *)
   (*   fun T e => *)
   (*     match e with *)
@@ -240,27 +241,28 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
       | inr1 x => inr1 (inr1 (inr1 (inr1 (inl1 x))))
       end.
 
+
+  
   (* For multiple CFG, after interpreting [GlobalE] *)
-  Definition L1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
+  Definition L1 := FailureE +' ExternalCallE +' IntrinsicE +' LLVMEnvE +' LLVMStackE +' MemoryE +' PickE +' UBE +' DebugE.
 
   (* For multiple CFG, after interpreting [LocalE] *)
-  Definition L2 := CallE +' IntrinsicE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
+  Definition L2 := FailureE +' ExternalCallE +' IntrinsicE +' MemoryE +' PickE +' UBE +' DebugE.
 
-  (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
-  Definition L3 := CallE +' PickE +' UBE +' DebugE +' FailureE.
 
-  (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickE]*)
-  Definition L4 := CallE +' UBE +' DebugE +' FailureE.
+  Definition L3 :=  FailureE +' ExternalCallE +' IntrinsicE +' PickE +' UBE +' DebugE.
 
-  Definition L5 := CallE +' DebugE +' FailureE.
+  Definition L4 :=  FailureE +' ExternalCallE +' IntrinsicE +' UBE +' DebugE.
+
+  Definition L5 :=  FailureE +' ExternalCallE +' IntrinsicE +' DebugE.
 
   Hint Unfold L0 L1 L2 L3 L4 L5.
 
   Definition _failure_UB_to_L4 : (FailureE +' UBE) ~> L4:=
     fun T e =>
       match e with
-      | inl1 x => inr1 (inr1 (inr1 x))
-      | inr1 x => inr1 (inl1 x)
+      | inl1 x => inl1 x 
+      | inr1 x => inr1 (inr1 (inr1 (inl1 x)))
       end.
 
 End LLVM_INTERACTIONS.
