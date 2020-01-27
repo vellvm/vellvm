@@ -809,8 +809,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
         end.
 
-      Definition denote_bks (bks: list _): block_id -> itree instr_E (block_id + uvalue) :=
-        loop (fun (bid : block_id + block_id) =>
+      Definition denote_bks (bks: list (block dtyp)): block_id -> itree instr_E (block_id + uvalue) :=
+        loop (C := ktree _)
+             (fun (bid : block_id + block_id) =>
                 match bid with
                 | inl bid
                 | inr bid =>
