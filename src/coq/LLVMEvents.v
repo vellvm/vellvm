@@ -153,7 +153,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   | Store   : forall (a:dvalue) (v:dvalue),                (MemoryE unit)
   | GEP     : forall (t:dtyp) (v:dvalue) (vs:list dvalue), (MemoryE dvalue)
   | ItoP    : forall (i:dvalue),                           (MemoryE dvalue)
-  | PtoI    : forall (a:dvalue),                           (MemoryE dvalue)
+  | PtoI    : forall (t:dtyp) (a:dvalue),                  (MemoryE dvalue)
   (* | MemoryIntrinsic : forall (t:dtyp) (f:function_id) (args:list dvalue), MemoryE dvalue *)
   .
 

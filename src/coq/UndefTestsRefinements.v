@@ -7,6 +7,7 @@ From Vellvm Require Import
      LLVMAst
      LLVMEvents
      UndefTests
+     UndefRefinementFacts
      TopLevel
      Refinement
      TopLevelRefinements
@@ -49,13 +50,14 @@ Import TopLevelEnv.
 Import IO.
 Import D.
 
+
 (* -------------------------------------------------- *)
 (* Interpretation / refinement of blocks.             *)
 (* -------------------------------------------------- *)
 Definition block_interp_L0 (b: block dtyp) := denote_block b.
-Definition block_interp_L1 (b : block dtyp) := interp_global (block_interp_L0 b) [].
-Definition block_interp_L2 (b : block dtyp) := interp_local (block_interp_L1 b) [].
-Definition block_interp_L3 (b : block dtyp) := M.interp_memory (block_interp_L2 b) (M.empty, [[]]).
+Definition block_interp_L1 (b : block dtyp) g := run_state (interp_global (block_interp_L0 b)) g.
+Definition block_interp_L2 (b : block dtyp) g l := run_state (interp_local (block_interp_L1 b g)) l.
+Definition block_interp_L3 (b : block dtyp) g l m := run_state (M.interp_memory (block_interp_L2 b g l)) m.
 
 Definition _failure_UB_to_block_L4 : (FailureE +' UBE) ~> (CallE +' UBE +' FailureE) :=
   fun T e =>
@@ -70,47 +72,186 @@ Definition concretize_block_uv (res : (block_id + res_L0)) : itree (FailureE +' 
      | inr uv => ITree.map inr (P.concretize_uvalue uv)
      end.
 
-Definition block_interp_L4 (b : block dtyp) : itree (CallE +' UBE +' DebugE +' FailureE) (M.memory_stack * (list (raw_id * res_L0) * (list (raw_id * dvalue) * (block_id + dvalue)))) :=
-  '(m, (env, (genv, buv))) <- P.interp_undef (block_interp_L3 b);;
+Definition block_interp_L4 (b : block dtyp) g l m : itree (CallE +' UBE +' DebugE +' FailureE) (M.memory_stack * (list (raw_id * res_L0) * (list (raw_id * dvalue) * (block_id + dvalue)))) :=
+  '(m, (env, (genv, buv))) <- P.interp_undef (block_interp_L3 b g l m);;
    bdv <- translate _failure_UB_to_L4 (concretize_block_uv buv);;
    ret (m, (env, (genv, bdv))).
 
 
-Definition refine_block_L2 b1 b2 := eutt (TT × (TT × (sum_rel Logic.eq refine_uvalue))) (block_interp_L2 b1) (block_interp_L2 b2).
+Definition refine_block_L2 b1 b2 g l := eutt (TT × (TT × (sum_rel Logic.eq refine_uvalue))) (block_interp_L2 b1 g l) (block_interp_L2 b2 g l).
 
-(* -------------------------------------------------------- *)
-(* Refinement of undef * undef to undef in uvalues / blocks *)
-(* -------------------------------------------------------- *)
-Theorem undef_refines_mul_undef_undef:
-  refine_uvalue (UVALUE_Undef (DTYPE_I 64)) (UVALUE_IBinop (Mul false false) (UVALUE_Undef (DTYPE_I 64)) (UVALUE_Undef (DTYPE_I 64))).
+Hint Unfold refine_block_L2.
+Hint Unfold block_interp_L1.
+Hint Unfold block_interp_L2.
+
+Ltac step_refine := autounfold;
+                    tau_steps.
+
+Ltac simple_refine := step_refine;
+                      apply eqit_Ret; repeat (apply prod_morphism; firstorder);
+                      apply inr_morphism.
+
+
+Ltac refine_a_times_undef :=
+  match goal with
+  | [ |-
+      refine_uvalue (UVALUE_Undef (DTYPE_I 64))
+                    (UVALUE_IBinop (Mul false false)
+                                   (UVALUE_I64 ?a)
+                                   (UVALUE_Undef (DTYPE_I 64)))
+    ] => apply undef_refines_mul_relprime_undef
+  | [ |-
+      refine_uvalue (UVALUE_Undef (DTYPE_I 64))
+                    (UVALUE_IBinop (Mul false false)
+                                   (UVALUE_Undef (DTYPE_I 64))
+                                   (UVALUE_I64 ?a))
+    ] => apply undef_refines_mul_undef_relprime
+  end;
+  unfold Znumtheory.rel_prime;
+  match goal with
+  | [ |- Znumtheory.Zis_gcd ?a ?m ?x ] =>  replace x with (Z.gcd a m) by (cbv; auto)
+  end; apply Znumtheory.Zgcd_is_gcd.
+
+(* These should probably be hint databases? *)
+Ltac refine_mul_uvalue :=
+  solve [ refine_a_times_undef
+        | apply zero_refines_undef_mul_a
+        | apply zero_refines_a_mul_undef
+        | apply undef_refines_mul_undef_undef
+        ].
+
+Ltac refine_div_uvalue :=
+  solve [ apply undef_refines_undef_udiv_1
+        | apply undef_refines_undef_sdiv_1
+        | apply zero_refines_undef_urem_1
+        | apply zero_refines_undef_srem_1
+        ].
+
+Ltac refine_and_uvalue :=
+  solve [ apply undef_refines_and_undef_undef
+        ].
+
+Ltac refine_or_uvalue :=
+  solve [ apply undef_refines_or_undef_undef
+        ].
+
+Ltac refine_uvalue :=
+  solve [ refine_mul_uvalue
+        | refine_div_uvalue
+        | refine_and_uvalue
+        | refine_or_uvalue
+        ].
+
+Theorem undef_test6 :
+  forall g l,
+    refine_block_L2 undef_test6_block_refine undef_test6_block g l.
 Proof.
-  constructor.
-  intros dv H.
-  apply Concretize_IBinop with (dv1:=DVALUE_I64 one) (dv2:=dv).
-  - apply Concretize_Undef. constructor.
-  - auto.
-  - simpl. inversion H; subst.
-    + inversion H0.
-    + inversion H1; subst; auto.
-      unfold DynamicValues.Int64.mul. unfold DynamicValues.Int64.one.
-      replace (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr 1) *
-               DynamicValues.Int64.unsigned x) with (DynamicValues.Int64.unsigned x).
-      * destruct (Eqv.eqv_dec_p 64%nat 1%nat); rewrite DynamicValues.Int64.repr_unsigned; reflexivity.
-      * rewrite Integers.Int64.unsigned_repr; try omega; cbn; try omega.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
 Qed.
 
 Theorem undef_test0 :
- refine_block_L2 undef_test0_block_refine undef_test0_block.
+  forall g l,
+    refine_block_L2 undef_test0_block_refine undef_test0_block g l.
 Proof.
-  unfold refine_block_L2.
-  unfold block_interp_L2. unfold block_interp_L1.
-  tau_steps.
-
-  apply eqit_Ret.
-
-  repeat (apply prod_morphism; firstorder).
-  apply inr_morphism; apply undef_refines_mul_undef_undef.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
 Qed.
+
+Theorem undef_test1 :
+  forall g l,
+    refine_block_L2 undef_test1_block_refine undef_test1_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test2 :
+  forall g l,
+    refine_block_L2 undef_test2_block_refine undef_test2_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.  
+Qed.
+
+Theorem undef_test3 :
+  forall g l
+    refine_block_L2 undef_test3_block_refine undef_test3_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test4 :
+  forall g l
+    refine_block_L2 undef_test4_block_refine undef_test4_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test5 :
+  forall g l,
+    refine_block_L2 undef_test5_block_refine undef_test5_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test6 :
+  forall g l,
+    refine_block_L2 undef_test6_block_refine undef_test6_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test7 :
+  forall g l,
+    refine_block_L2 undef_test7_block_refine undef_test7_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test8 :
+  forall g l,
+    refine_block_L2 undef_test8_block_refine undef_test8_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test9 :
+  forall g l,
+    refine_block_L2 undef_test9_block_refine undef_test9_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+  refine_uvalue.
+Qed.
+
+Theorem undef_test10 :
+  forall g l,
+    refine_block_L2 undef_test10_block_refine undef_test10_block g l.
+Proof.
+  intros g l.
+  simple_refine.
+
+  simpl.
+  refine_uvalue.
+Qed.
+
 
 (* -------------------------------------------------- *)
 (* CFG interpretation / refinement                    *)

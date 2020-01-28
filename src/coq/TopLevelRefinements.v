@@ -269,15 +269,15 @@ Definition model_to_L2 user_intrinsics (prog: mcfg dtyp) :=
 
 Definition model_to_L3 user_intrinsics (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm prog in
-  interp_to_L3 user_intrinsics L0_trace [] ([],[]) (M.empty, [[]]).
+  interp_to_L3 user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
 
 Definition model_to_L4 user_intrinsics (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm prog in
-  interp_to_L4 user_intrinsics L0_trace [] ([],[]) (M.empty, [[]]).
+  interp_to_L4 user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
 
 Definition model_to_L5 user_intrinsics (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm prog in
-  interp_vellvm_model_user user_intrinsics L0_trace [] ([],[]) (M.empty, [[]]).
+  interp_vellvm_model_user user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
 
 (**
    Which leads to five notion of equivalence of [mcfg]s.
