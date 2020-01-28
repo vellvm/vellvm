@@ -150,6 +150,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
   (* Memory + stack for freeing *)
   Definition memory_stack : Type := memory * mem_stack.
 
+  Definition empty_memory_stack : memory_stack := ((empty, empty), [[]]).
+
   Fixpoint max_default (l:list Z) (x:Z) :=
     match l with
     | [] => x
