@@ -40,7 +40,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     | PickUB: forall uv C, ~ C -> Pick_handler (pick uv C) (raiseUB "Picking unsafe uvalue")
     | PickD: forall uv (C: Prop) dv, C -> concretize uv dv -> Pick_handler (pick uv C) (Ret dv).
 
-    Section PARAMS.
+    Section PARAMS_MODEL.
       Variable (E F: Type -> Type).
 
       Definition E_trigger_prop :  E ~> PropT (itree (E +' F)) :=
@@ -53,7 +53,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         itree (E +' PickE +' F) ~> PropT (itree (E +' F)) :=
         interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)).
 
-    End PARAMS.
+    End PARAMS_MODEL.
 
   End PickPropositional.
 
@@ -144,7 +144,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     destruct fu; auto.
     Defined.
 
-    Section PARAMS.
+    Section PARAMS_INTERP.
       Variable (E F: Type -> Type).
 
       Definition E_trigger :  E ~> itree (E +' F) :=
@@ -158,7 +158,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         interp (case_ E_trigger
                (case_ concretize_picks F_trigger)).
 
-    End PARAMS.
+    End PARAMS_INTERP.
 
   End PickImplementation.
 
