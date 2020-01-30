@@ -4,6 +4,3 @@
 [submodule "lib/InteractionTrees"]
 	path = lib/InteractionTrees
 	url = https://github.com/DeepSpec/InteractionTrees.git
-[submodule "lib/coq-ceres"]
-	path = lib/coq-ceres
-	url = https://github.com/Lysxia/coq-ceres.git
