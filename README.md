@@ -35,7 +35,7 @@ University of Pennsylvania as part of the DeepSpec project.
 
 /src/ci   - travis configuration
 
-/src/coq  - Coq formalization (see Denotation.v)
+/src/coq  - Coq formalization (see Denotation.v and TopLevel.v most notably)
 
 /src/ml   - OCaml glue code for working with ollvm
 
@@ -50,13 +50,13 @@ University of Pennsylvania as part of the DeepSpec project.
 # Installing / Compiling Vellvm
 
 ### Assumes: 
-  - coqc   : version 8.8.0   (and coqdep, etc.)
+  - coqc   : version 8.9.1 or 8.10.0 (and coqdep, etc.) 
   - Coq packages: 
     - ext-lib    (installed via, e.g. opam install coq-ext-lib)
     - paco       (installed via, e.g. opam install coq-paco)
     - flocq      (installed via, e.g. opam install coq-flocq, see note below) 
     - itree      ~~(installed via, e.g. opam install coq-itree)~~
-      - Currently you should actually just use the submodule (lib/InteractionTrees)
+      - Currently you should actually just use the submodule (lib/InteractionTrees): see the instructions for compilation below.
     - ceres      (installed via, e.g. opam install coq-ceres)
 - ocamlc : version 4.04    (probably works with 4.03 or later)
   - OPAM packages: dune, menhir, [optional: llvm  (for llvm v. 3.8)]
