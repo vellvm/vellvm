@@ -20,7 +20,7 @@ COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric
 									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/UndefinedBehaviour\
 									Denotation TransformTypes TopLevel
 
-COQFILESOPT    := Transformations/Renaming Transformations/DeadInstr Transformations/Transform Transformations/Transformation\
+COQFILESOPT    := Transformations/Renaming Transformations/DeadInstr Transformations/Transform Transformations/Traversal Transformations/Transformation\
 									ParserHelper Refinement Environment TopLevelRefinements
 
 OLLVMFILES :=
@@ -49,7 +49,7 @@ coq: $(VOFILES)
 coqinterp: $(COQFILESINTERP:%=coq/%.vo)
 
 itrees:
-	git submodule update --init
+	git submodule update -- $(ITREEDIR)
 	make -C $(ITREEDIR)
 
 .PHONY: extracted itrees
@@ -68,7 +68,7 @@ $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "COQC $*.v"
 	@$(COQC) -dump-glob doc/$(*F).glob $*.v
 
-depend: itrees $(VFILES) 
+depend: itrees $(VFILES)
 	@echo "Analyzing Coq dependencies"
 	@$(COQDEP) $^ > .depend
 
@@ -79,7 +79,7 @@ EXE=_build/default/ml/main.exe
 
 $(EXE): extracted ml/dune ml/extracted/dune
 	@echo "Compiling Vellvm"
-	dune build ml/main.exe 
+	dune build ml/main.exe
 
 vellvm: $(EXE)
 	cp $(EXE) vellvm
@@ -101,7 +101,7 @@ clean:
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
 	make -C $(ITREEDIR) clean
 
-doc/coq2html: 
+doc/coq2html:
 	make -C ../lib/coq2html
 	cp ../lib/coq2html doc/coq2html
 	chmod +x doc/coq2html

@@ -49,7 +49,7 @@ let output_file filename ast =
   toplevel_entities (Format.formatter_of_out_channel channel) ast;
   close_out channel
 
-let output_ast filename ast channel =
+let output_ast ast channel =
   let open Ast_printer in
   toplevel_entities channel ast
 

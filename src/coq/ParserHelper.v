@@ -426,8 +426,8 @@ Section Correctness.
     rewrite Z.log2_mul_pow2.
     all: subst.
     all: try lia.
+    all: try (destruct (Z.eq_dec (2 ^ Z.pos d) 0); [ rewrite e in M; lia | assumption ]). (* For backward compatibility *)
     destruct (Z.eq_dec x 0); subst; lia.
-    destruct (Z.eq_dec (2 ^ Z.pos d) 0); [ rewrite e in M; lia | assumption ].
     assert (m mod 2 ^ Z.pos d < 2 ^ Z.pos d); try lia.
     apply Zmod_pos_bound.
     apply Z.pow_pos_nonneg; lia.
@@ -799,7 +799,7 @@ Section Correctness.
           apply set_digits_m_eq in Heqo1. assumption.
           unfold FLX.Prec_gt_0; lia.
           assumption.
-    - (* unsuccesful normalization - impossible to normalize? *)
+    - (* unsuccessful normalization - impossible to normalize? *)
       intros xf H.
       apply Bool.not_true_is_false.
       intros V.

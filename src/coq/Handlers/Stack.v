@@ -57,7 +57,6 @@ Section StackMap.
       :=
       fun _ e '(env, stk) => ITree.map (fun '(env',r) => ((env',stk), r)) (h _ e env).
 
-
     Definition interp_local_stack {E1 E2 F}
                `{(LocalE k v) +' (StackE k v) +? E1 -< F}
                `{FailureE +? E2 -< E1}

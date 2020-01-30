@@ -52,7 +52,7 @@ let ast_pp_file_inner path =
       Format.pp_print_string oc "Internal Coq representation of the ast:";
       Format.pp_force_newline oc ();
       Format.pp_force_newline oc ();
-      let _ = output_ast vast_file ll_ast' oc in
+      let _ = output_ast ll_ast' oc in
 
       close_out channel
     | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path

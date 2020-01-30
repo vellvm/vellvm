@@ -53,28 +53,28 @@ Inductive dtyp : Set :=
 Section hiding_notation.
   Local Open Scope sexp_scope.
 
-  Fixpoint serialize_dtyp' (dt:dtyp): sexp atom :=
+  Fixpoint serialize_dtyp' (dt:dtyp): sexp :=
     match dt with
-    | DTYPE_I sz     => Raw ("i" ++ to_string sz)
-    | DTYPE_Pointer  => Raw "ptr"
-    | DTYPE_Void     => Raw "dvoid"
-    | DTYPE_Half     => Raw "half"
-    | DTYPE_Float    => Raw "float"
-    | DTYPE_Double   => Raw "double"
-    | DTYPE_X86_fp80 => Raw "x86_fp80"
-    | DTYPE_Fp128    => Raw "fp128"
-    | DTYPE_Ppc_fp128 => Raw "ppc_fp128"
-    | DTYPE_Metadata  => Raw "metadata"
-    | DTYPE_X86_mmx   => Raw "x86_mmx"
+    | DTYPE_I sz     => Atom ("i" ++ to_string sz)%string
+    | DTYPE_Pointer  => Atom "ptr"
+    | DTYPE_Void     => Atom "dvoid"
+    | DTYPE_Half     => Atom "half"
+    | DTYPE_Float    => Atom "float"
+    | DTYPE_Double   => Atom "double"
+    | DTYPE_X86_fp80 => Atom "x86_fp80"
+    | DTYPE_Fp128    => Atom "fp128"
+    | DTYPE_Ppc_fp128 => Atom "ppc_fp128"
+    | DTYPE_Metadata  => Atom "metadata"
+    | DTYPE_X86_mmx   => Atom "x86_mmx"
     | DTYPE_Array sz t
-      => [Raw ("[" ++ to_string sz) ; Raw "x" ; serialize_dtyp' t ; Raw "]"]
+      => [Atom ("[" ++ to_string sz) ; Atom "x" ; serialize_dtyp' t ; Atom "]"]%string
     | DTYPE_Struct fields
-      => [Raw "{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Raw ","]) fields) ; Raw "}"]
+      => [Atom "{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Atom ","]) fields) ; Atom "}"]
     | DTYPE_Packed_struct fields
-      => [Raw "packed{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Raw ","]) fields) ; Raw "}"]
-    | DTYPE_Opaque => Raw "opaque"
+      => [Atom "packed{" ; to_sexp (List.map (fun x => [serialize_dtyp' x ; Atom ","]) fields) ; Atom "}"]
+    | DTYPE_Opaque => Atom "opaque"
     | DTYPE_Vector sz t
-      => [Raw ("<" ++ to_string sz) ; Raw "x" ; serialize_dtyp' t ; Raw ">"]  (* TODO: right notation? *)
+      => [Atom ("<" ++ to_string sz) ; Atom "x" ; serialize_dtyp' t ; Atom ">"]%string  (* TODO: right notation? *)
     end.
 
   Global Instance serialize_dtyp : Serialize dtyp := serialize_dtyp'.

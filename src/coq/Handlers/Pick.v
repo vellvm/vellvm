@@ -28,6 +28,7 @@ Set Contextual Implicit.
 
 Import MonadNotation.
 
+
 Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
   Import LLVMIO.
@@ -129,12 +130,9 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       fun T p => match p with
               | pick u P => concretize_uvalue u
               end.
-
-
     Definition interp_undef {E E' C F} `{PickE +? C -< F} `{UBE +? E -< C} `{FailureE +? E' -< C} :
       itree F ~> itree C :=
       interp (over concretize_picks).
-
 
   End PickImplementation.
 

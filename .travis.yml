@@ -35,6 +35,7 @@ install:
   - opam install -y --verbose -j ${NJOBS} coq-ext-lib
   - opam install -y --verbose -j ${NJOBS} coq-flocq
   - opam install -y --verbose -j ${NJOBS} coq-paco
+  - opam install -y --verbose -j ${NJOBS} coq-ceres
   # This branch uses the lib/InteractionTree submodule.
   # - opam pin -y add coq-itree --dev-repo
   # - opam install -y --verbose -j ${NJOBS} coq-itree

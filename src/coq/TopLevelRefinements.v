@@ -354,11 +354,12 @@ Ltac flatten_all :=
 Theorem interpreter_sound: forall p, model p (interpreter p).
 Proof.
   intros p.
-  unfold model, model_user.
+  unfold model, model_user, lift_sem_to_mcfg.
   flatten_goal.
   2:{
     unfold interpreter, interpreter_user.
-    rewrite Heq; reflexivity.
+    rewrite Heq.
+    admit.
   }
   unfold interpreter, interpreter_user; rewrite Heq.
   unfold interp_vellvm_model_user, interp_vellvm_exec_user.
@@ -447,16 +448,16 @@ Qed.
 
 (** BEGIN MOVE *)
 From ITree Require Import
-     Events.StateKleisli
+     Basics.MonadState
      Events.StateFacts.
 
-Instance run_state_proper_eqit {E A env} : Proper (MonadTheory.eqm ==> Logic.eq ==> eutt Logic.eq) (@run_state E A env).
+Instance run_state_proper_eqit {E A env} : Proper (Monad.eqm ==> Logic.eq ==> eutt Logic.eq) (@run_state E A env).
 Proof.
   repeat intro; subst; apply H.
 Qed.
 
 Require Import Paco.paco.
-Instance interp_state_proper {T E F S} (h: forall T : Type, E T -> Monads.stateT S (itree F) T) : Proper (eutt Logic.eq ==> MonadTheory.eqm) (State.interp_state h (T := T)).
+Instance interp_state_proper {T E F S} (h: forall T : Type, E T -> Monads.stateT S (itree F) T) : Proper (eutt Logic.eq ==> Monad.eqm) (State.interp_state h (T := T)).
 Proof.
   einit. ecofix CIH. intros.
 

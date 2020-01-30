@@ -69,7 +69,7 @@ Module TopLevelEnv <: Environment.
   Notation res_L3 := (memory * res_L2)%type (* (only parsing) *).
   Notation res_L4 := (memory * (local_env * stack * (global_env * uvalue)))%type (* (only parsing) *).
 
-  
+
   Section WithContext.
 
 
@@ -157,13 +157,13 @@ Module TopLevelEnv <: Environment.
 
     (* (for now) assume that [main (i64 argc, i8** argv)]
 
-       - pass in 0 and null as the arguments to main 
-       - Note: this isn't compliant with standard C semantics 
+       - pass in 0 and null as the arguments to main
+       - Note: this isn't compliant with standard C semantics
 
       TODO: implement command-line arguments
      *)
-    Definition main_args := [DV.DVALUE_I64 (DynamicValues.Int64.zero);
-                               DV.DVALUE_Addr (Memory.A.null)
+    Definition main_args := [DV.UVALUE_I64 (DynamicValues.Int64.zero);
+                               DV.UVALUE_Addr (Memory.A.null)
                             ].
 
     (** Transformation and normalization of types. *)
@@ -183,7 +183,7 @@ Module TopLevelEnv <: Environment.
    In order to limit bloated type signature, we name the successive return types.
    *)
 
-    
+
   (**
 l     Full denotation of a Vellvm program as an interaction tree:
      * initialize the global environment;
@@ -202,7 +202,7 @@ l     Full denotation of a Vellvm program as an interaction tree:
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg);;
     'addr <- trigger (GlobalRead (Name "main")) ;;
-    D.denote_mcfg defns DTYPE_Void addr main_args.
+    D.denote_mcfg defns DTYPE_Void (dvalue_to_uvalue addr) main_args.
 
   (**
      Now that we know how to denote a whole llvm program, we can _interpret_
@@ -242,7 +242,7 @@ l     Full denotation of a Vellvm program as an interaction tree:
              (user_intrinsics: IS.intrinsic_definitions)
              (prog: list (toplevel_entity typ (list (block typ))))
     : itree (FailureE +' ExternalCallE +' IntrinsicE +' DebugE)
-            (M.memory_stack * (local_env * Stack.stack * (global_env * _)))             
+            (M.memory_stack * (local_env * Stack.stack * (global_env * _)))
     :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
@@ -268,14 +268,14 @@ l     Full denotation of a Vellvm program as an interaction tree:
      semantics, except that we use, where relevant, the handlers capturing
      all allowed behaviors into the [Prop] monad.
    *)
-  
+
   Typeclasses eauto := 5.
   Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree L0 R) g l m :=
     let L0_trace       := INT.interpret_intrinsics user_intrinsics trace in
     let L1_trace       := run_state (interp_global L0_trace) g in
     let L2_trace       := run_state (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
     let L3_trace       := run_state (M.interp_memory L2_trace) m in
-    let L4_trace       := P.model_undef L3_trace in 
+    let L4_trace       := P.model_undef L3_trace in
     let L5_trace       := model_UB L4_trace in
     L5_trace.
   Typeclasses eauto := .
@@ -285,19 +285,25 @@ l     Full denotation of a Vellvm program as an interaction tree:
      to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
      starting from empty environments.
    *)
-  Definition model_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))) :=
-    let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
-    match CFG.mcfg_of_modul _ scfg with
-    | Some ucfg =>
-      let mcfg := normalize_types ucfg in
+  Definition lift_sem_to_mcfg {E C X} `{FailureE +? C -< E}
+             (sem: (CFG.mcfg DynamicTypes.dtyp) -> itree E X):
+    list (toplevel_entity typ (list (LLVMAst.block typ))) -> itree E X :=
+    fun prog =>
+      let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
+      match CFG.mcfg_of_modul _ scfg with
+      | Some ucfg =>
+        let mcfg := TopLevelEnv.normalize_types ucfg in
 
-      let t := denote_vellvm mcfg in
+        sem mcfg
 
-      interp_vellvm_model_user user_intrinsics t [] ([],[]) ((M.empty, M.empty), [[]])
+      | None => raise "Ill-formed program: mcfg_of_modul failed."
+      end.
 
-    | None => lift (raise "Ill-formed program: mcfg_of_modul failed.")
-    end.
+
+  Definition model_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))): PropT (itree L5) res_L4 :=
+    let t := lift_sem_to_mcfg denote_vellvm prog in
+    interp_vellvm_model_user user_intrinsics t [] ([],[]) ((M.empty, M.empty), [[]]).
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics.

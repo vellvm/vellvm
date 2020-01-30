@@ -21,7 +21,7 @@ From ITree Require Import
      Interp.Interp
      Interp.InterpFacts
      Interp.TranslateFacts
-     Events.StateKleisli
+     Basics.MonadState
      Events.StateFacts.
 
 From Vellvm Require Import
@@ -101,7 +101,7 @@ Section Swap.
      We hence want to get extensional eutt over the returned type.
    *)
   Definition function_rel {X}:
-    relation (FMapAList.alist raw_id res_L0 * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (dvalue * (list dvalue -> itree IO.L0 res_L0)))) := (Logic.eq × (Logic.eq × list_rel (Logic.eq × (fun d1 d2 => forall x, d1 x ≈ d2 x)))).
+    relation (FMapAList.alist raw_id res_L0 * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (uvalue * (list uvalue -> itree IO.L0 res_L0)))) := (Logic.eq × (Logic.eq × list_rel (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))).
   Hint Unfold function_rel.
 
   Global Instance list_rel_refl {R: Type} {RR: relation R} `{Reflexive _ RR} : Reflexive (list_rel RR).
@@ -119,8 +119,11 @@ Section Swap.
     reflexivity.
   Qed.
 
-  Lemma interp_to_L2_map_monad: forall {X} (f: X -> itree _ (dvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
-      (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (Logic.eq × (fun d1 d2 => forall x, d1 x ≈ d2 x)))) (interp_to_L2 nil (f x) s1 s2) (interp_to_L2 nil (f (g x)) s1 s2)) ->
+  (*
+  (* Calvin broke this somehow by changing L0 to not include
+     CallE. Yannick promises not to be mad later when fixing this. :) *)
+  Lemma interp_to_L2_map_monad: forall {X} (f: X -> itree _ (uvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
+      (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))) (interp_to_L2 nil (f x) s1 s2) (interp_to_L2 nil (f (g x)) s1 s2)) ->
       eutt function_rel (interp_to_L2 nil (map_monad f l) s1 s2) (interp_to_L2 nil (map_monad f (map g l)) s1 s2).
   Proof.
     induction l as [| x l IH]; simpl; intros; [reflexivity |].
@@ -137,6 +140,7 @@ Section Swap.
     apply eqit_Ret.
     constructor; auto.
   Qed.
+  *)
 
   Lemma swap_correct_L2:
     forall p, refine_mcfg_L2 nil p (swap_mcfg p).

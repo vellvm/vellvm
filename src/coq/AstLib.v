@@ -487,18 +487,12 @@ Require Import Ceres.Ceres.
 Section hiding_notation.
   Local Open Scope sexp_scope.
 
-  Global Instance serialize_option {T} `{Serialize T}: Serialize (option T) :=
-    fun mt => match mt with
-           | None => Raw "None"
-           | Some t => [Raw "Some " ; to_sexp t]
-           end.
-
   Definition serialize_raw_id (prefix: string): Serialize raw_id :=
     fun r =>
       match r with
-      | Name s => Raw (prefix ++ s)
+      | Name s => Atom (prefix ++ s)%string
       | Anon n => to_sexp n
-      | LLVMAst.Raw n => Raw ("_RAW_" ++ to_string n)
+      | LLVMAst.Raw n => Atom ("_RAW_" ++ to_string n)%string
       end.
 
   Global Instance serialize_raw_id': Serialize raw_id := serialize_raw_id "".
@@ -514,39 +508,39 @@ Section hiding_notation.
     fun ins =>
       match ins with
       | IId id => to_sexp id
-      | IVoid n => Raw ("void<" ++ to_string n ++ ">")
+      | IVoid n => Atom ("void<" ++ to_string n ++ ">")%string
       end.
 
   Global Instance serialize_ibinop : Serialize ibinop :=
     fun binop =>
       match binop with
-      | Add nuw nsw => Raw "add"
-      | Sub nuw nsw => Raw "sub"
-      | Mul nuw nsw => Raw "mul"
-      | Shl nuw nsw => Raw "shl"
-      | UDiv flag => Raw "udiv"
-      | SDiv flag => Raw "sdiv"
-      | LShr flag => Raw "lshr"
-      | AShr flag => Raw "ashr"
-      | URem | SRem => Raw "rem"
-      | And => Raw "and"
-      | Or => Raw "or"
-      | Xor => Raw "xor"
+      | Add nuw nsw => Atom "add"
+      | Sub nuw nsw => Atom "sub"
+      | Mul nuw nsw => Atom "mul"
+      | Shl nuw nsw => Atom "shl"
+      | UDiv flag => Atom "udiv"
+      | SDiv flag => Atom "sdiv"
+      | LShr flag => Atom "lshr"
+      | AShr flag => Atom "ashr"
+      | URem | SRem => Atom "rem"
+      | And => Atom "and"
+      | Or => Atom "or"
+      | Xor => Atom "xor"
       end.
 
   Global Instance serialize_fbinop : Serialize fbinop :=
     fun fbinop =>
       match fbinop with
-      | FAdd => Raw "fadd"
-      | FSub => Raw "fsub"
-      | FMul => Raw "fmul"
-      | FDiv => Raw "fdiv"
-      | FRem => Raw "frem"
+      | FAdd => Atom "fadd"
+      | FSub => Atom "fsub"
+      | FMul => Atom "fmul"
+      | FDiv => Atom "fdiv"
+      | FRem => Atom "frem"
       end.
 
   Global Instance serialize_icmp : Serialize icmp :=
     fun cmp =>
-      Raw ("icmp "
+      Atom ("icmp "
              ++
              match cmp with
              | Eq => "eq"
@@ -559,11 +553,11 @@ Section hiding_notation.
              | Sge => "sge"
              | Slt => "slt"
              | Sle => "sle"
-             end).
+             end)%string.
 
   Global Instance serialize_fcmp : Serialize fcmp :=
     fun cmp =>
-      Raw ("fcmp "
+      Atom ("fcmp "
              ++
              match cmp with
                FFalse => "ffalse"
@@ -582,13 +576,13 @@ Section hiding_notation.
              | FUle => "fule"
              | FUne => "fune"
              | FTrue => "ftrue"
-             end).
+             end)%string.
 
-  Fixpoint serialize_typ' typ: sexp atom :=
+  Fixpoint serialize_typ' typ: sexp :=
     match typ with
-    | TYPE_I sz => Raw ("i" ++ to_string sz)
-    | TYPE_Pointer t => [serialize_typ' t ; Raw "*"]
-    | _ => Raw "(show_typ todo)"
+    | TYPE_I sz => Atom ("i" ++ to_string sz)%string
+    | TYPE_Pointer t => [serialize_typ' t ; Atom "*"]
+    | _ => Atom "(show_typ todo)"
     end.
 
   Global Instance serialize_typ : Serialize typ := serialize_typ'.
@@ -602,10 +596,10 @@ Section hiding_notation.
       | EXP_Ident id => to_sexp id
       | EXP_Integer x => to_sexp x
       | EXP_Bool b => to_sexp b
-      | EXP_Null => Raw "null"
-      | EXP_Zero_initializer => Raw "zero initializer"
-      | EXP_Cstring s => Raw s
-      | EXP_Undef => Raw "undef"
+      | EXP_Null => Atom "null"
+      | EXP_Zero_initializer => Atom "zero initializer"
+      | EXP_Cstring s => Atom s
+      | EXP_Undef => Atom "undef"
       | OP_IBinop iop t v1 v2 =>
         [to_sexp iop ; to_sexp t
                     ; serialize_exp' v1
@@ -615,8 +609,8 @@ Section hiding_notation.
                     ; serialize_exp' v1
                     ; serialize_exp' v2]
       | OP_GetElementPtr t ptrval idxs =>
-        Raw "getelementptr"
-      | _ => Raw "to_sexp_exp todo"
+        Atom "getelementptr"
+      | _ => Atom "to_sexp_exp todo"
       end.
 
     Global Instance serialize_exp : Serialize (exp T) := serialize_exp'.
@@ -624,13 +618,13 @@ Section hiding_notation.
 
     Global Instance serialize_texp : Serialize (texp T) :=
       fun '(t, e) =>
-          [to_sexp t ; Raw " " ; to_sexp e ].
+          [to_sexp t ; Atom " " ; to_sexp e ].
 
     Definition serialize_opt {A:Type} `{AS:Serialize A} (s:string) : Serialize (option A) :=
       fun x =>
         match x with
-        | None => Raw ""
-        | Some a => [Raw s ; to_sexp a]
+        | None => Atom ""
+        | Some a => [Atom s ; to_sexp a]
         end.
 
     Global Instance serialize_instr : Serialize (instr T) :=
@@ -639,48 +633,48 @@ Section hiding_notation.
         | INSTR_Op op => to_sexp op
 
         | INSTR_Load vol t ptr align =>
-          [Raw "load" ; to_sexp t ; to_sexp ptr
+          [Atom "load" ; to_sexp t ; to_sexp ptr
            ; @serialize_opt _ serialize_int ", align" align]
 
         | INSTR_Store vol tval ptr align =>
-          [Raw "store" ; to_sexp tval; to_sexp ptr
+          [Atom "store" ; to_sexp tval; to_sexp ptr
            ; @serialize_opt _ serialize_int ", align" align]
 
         | INSTR_Alloca t nb align =>
-          [Raw "alloca" ; to_sexp t ; @serialize_opt _ serialize_int ", align" align]
+          [Atom "alloca" ; to_sexp t ; @serialize_opt _ serialize_int ", align" align]
         (*
            | INSTR_Call
            | INSTR_Phi
            | INSTR_Alloca
          *)
-        | _ => Raw "string_of_instr todo"
+        | _ => Atom "string_of_instr todo"
         end.
 
     Global Instance serialize_terminator : Serialize (terminator T) :=
       fun t =>
         match t with
-        | TERM_Ret v => [Raw "ret " ; to_sexp v]
-        | TERM_Ret_void => Raw "ret"
-        | _ => Raw "string_of_terminator todo"
+        | TERM_Ret v => [Atom "ret " ; to_sexp v]
+        | TERM_Ret_void => Atom "ret"
+        | _ => Atom "string_of_terminator todo"
         end.
 
     Global Instance serialize_instr_id_instr : Serialize (instr_id * (instr T)) :=
-      fun '(iid, i) => [to_sexp iid ; Raw "=" ; to_sexp i].
+      fun '(iid, i) => [to_sexp iid ; Atom "=" ; to_sexp i].
 
     Global Instance serialize_block : Serialize (block T) :=
       fun block =>
-        [Raw "Block "
-         ; to_sexp (blk_id block) ; Raw ": " ;
+        [Atom "Block "
+         ; to_sexp (blk_id block) ; Atom ": " ;
            to_sexp (blk_code block)].
 
     Global Instance serialize_definition_list_block : Serialize (definition T (list (block T))) :=
-      fun defn => [Raw "defn:" ; to_sexp (df_instrs defn)].
+      fun defn => [Atom "defn:" ; to_sexp (df_instrs defn)].
 
     Global Instance serialize_tle_list_block : Serialize (toplevel_entity T (list (block T))) :=
       fun tle =>
         match tle with
         | TLE_Definition defn => to_sexp defn
-        | _ => Raw "string_of_tle_list_block todo"
+        | _ => Atom "string_of_tle_list_block todo"
         end.
 
   End WithSerializeT.
