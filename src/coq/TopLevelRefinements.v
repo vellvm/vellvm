@@ -187,7 +187,7 @@ Definition interp_to_L2 {R} user_intrinsics (t: itree IO.L0 R) g l :=
   L2_trace.
 
 
-Typeclasses eauto := 5.
+Typeclasses eauto := 6.
 Definition interp_to_L3 {R} user_intrinsics (t: itree IO.L0 R) g l m :=
     let L0_trace       := INT.interpret_intrinsics user_intrinsics t in
     let L1_trace       := run_state (interp_global L0_trace) g in

@@ -217,7 +217,7 @@ l     Full denotation of a Vellvm program as an interaction tree:
   End WithContext.
 
 
-  Typeclasses eauto := 5.
+  Typeclasses eauto := 6.
   Definition interp_vellvm_exec_user {R: Type} (user_intrinsics: INT.intrinsic_definitions)
              (trace: itree IO.L0 R)
              (g: global_env)
@@ -269,7 +269,7 @@ l     Full denotation of a Vellvm program as an interaction tree:
      all allowed behaviors into the [Prop] monad.
    *)
 
-  Typeclasses eauto := 5.
+  Typeclasses eauto := 6.
   Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree L0 R) g l m :=
     let L0_trace       := INT.interpret_intrinsics user_intrinsics trace in
     let L1_trace       := run_state (interp_global L0_trace) g in
