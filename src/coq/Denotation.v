@@ -382,6 +382,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     | _               => False
     end.
 
+  (* Pick a possibly poison value, treating poison as
+     nondeterminism. This is used for freeze. *)
+  Definition pick_your_poison {E : Type -> Type} `{PickE -< E} (dt : dtyp) (uv : uvalue) : itree E dvalue :=
+    match uv with
+    | UVALUE_Poison => trigger (pick (UVALUE_Undef dt) True)
+    | _             => trigger (pick uv True)
+    end.
+
   Fixpoint denote_exp
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
@@ -657,7 +665,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         | OP_Freeze (dt, e) =>
           uv <- denote_exp (Some dt) e ;;
-          dv <- trigger (pick uv True);;
+          dv <- pick_your_poison dt uv;;
           ret (dvalue_to_uvalue dv)
         end.
   Arguments denote_exp _ : simpl nomatch.
