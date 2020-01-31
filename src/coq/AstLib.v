@@ -427,6 +427,7 @@ Inductive value : Set :=
   Hypothesis IH_ExtractValue  : forall (vec:(T * exp T)) (idxs:list int), P (snd vec) -> P ((OP_ExtractValue vec idxs)).
   Hypothesis IH_InsertValue   : forall (vec:(T * exp T)) (elt:(T * exp T)) (idxs:list int), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue vec elt idxs)).
   Hypothesis IH_Select        : forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select cnd v1 v2)).
+  Hypothesis IH_Freeze        : forall (v:(T * exp T)), P (snd v) -> P ((OP_Freeze v)).
 
   Lemma exp_ind' : forall (v:exp T), P v.
     fix IH 1.
@@ -477,6 +478,7 @@ Inductive value : Set :=
     - apply IH_ExtractValue. apply IH.
     - apply IH_InsertValue. apply IH. apply IH.
     - apply IH_Select.  apply IH. apply IH. apply IH.
+    - apply IH_Freeze. apply IH.
   Qed.
 End ExpInd.
 

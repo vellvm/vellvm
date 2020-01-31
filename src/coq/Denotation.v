@@ -654,6 +654,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | inl e => ret (UVALUE_Select cndv v1 v2)
           | inr dcndv => lift_undef_or_err ret (eval_select dcndv v1 v2)
           end
+
+        | OP_Freeze (dt, e) =>
+          uv <- denote_exp (Some dt) e ;;
+          dv <- trigger (pick uv True);;
+          ret (dvalue_to_uvalue dv)
         end.
   Arguments denote_exp _ : simpl nomatch.
 
