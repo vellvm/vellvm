@@ -337,6 +337,10 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
              texp then_
              texp else_
 
+  | OP_Freeze (tv) ->
+    fprintf ppf "freeze %a"
+      texp tv
+
   | OP_ExtractElement (vec, idx) ->
      fprintf ppf "extractelement (%a, %a)"
              texp vec
@@ -431,6 +435,10 @@ and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
              texp if_
              texp then_
              texp else_
+
+  | OP_Freeze (tv) ->
+    fprintf ppf "freeze %a"
+      texp tv
 
   | OP_ExtractElement (vec, idx) ->
      fprintf ppf "extractelement %a, %a"
