@@ -250,28 +250,36 @@ Ltac fold_L5 :=
         (interp_vellvm_model_user ui p g l m) by reflexivity
     end.
 
+Section TopLevelInputs.
+  Variable ret_typ : dtyp.
+  Variable entry : string.
+  Variable args : list uvalue.
+  Variable user_intrinsics: IS.intrinsic_definitions.
+
+  Definition denote_vellvm_init := denote_vellvm ret_typ entry args.
+  
 (**
    In particular, we can therefore define top-level models
    short-circuiting the interpretation early.
  *)
-Definition model_to_L1 user_intrinsics (prog: mcfg dtyp) :=
-  let L0_trace := denote_vellvm prog in
+Definition model_to_L1  (prog: mcfg dtyp) :=
+  let L0_trace := denote_vellvm_init prog in
   interp_to_L1 user_intrinsics L0_trace [].
 
-Definition model_to_L2 user_intrinsics (prog: mcfg dtyp) :=
-  let L0_trace := denote_vellvm prog in
+Definition model_to_L2 (prog: mcfg dtyp) :=
+  let L0_trace := denote_vellvm_init prog in
   interp_to_L2 user_intrinsics L0_trace [] ([],[]).
 
-Definition model_to_L3 user_intrinsics (prog: mcfg dtyp) :=
-  let L0_trace := denote_vellvm prog in
+Definition model_to_L3 (prog: mcfg dtyp) :=
+  let L0_trace := denote_vellvm_init prog in
   interp_to_L3 user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
 
-Definition model_to_L4 user_intrinsics (prog: mcfg dtyp) :=
-  let L0_trace := denote_vellvm prog in
+Definition model_to_L4 (prog: mcfg dtyp) :=
+  let L0_trace := denote_vellvm_init prog in
   interp_to_L4 user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
 
-Definition model_to_L5 user_intrinsics (prog: mcfg dtyp) :=
-  let L0_trace := denote_vellvm prog in
+Definition model_to_L5 (prog: mcfg dtyp) :=
+  let L0_trace := denote_vellvm_init prog in
   interp_vellvm_model_user user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
 
 (**
@@ -279,50 +287,50 @@ Definition model_to_L5 user_intrinsics (prog: mcfg dtyp) :=
    Note that all reasoning is conducted after conversion to [mcfg] and
    normalization of types.
  *)
-Definition refine_mcfg_L1 user_intrinsics (p1 p2: mcfg dtyp): Prop :=
-  R.refine_L1 (model_to_L1 user_intrinsics p1) (model_to_L1 user_intrinsics p2).
+Definition refine_mcfg_L1 (p1 p2: mcfg dtyp): Prop :=
+  R.refine_L1 (model_to_L1 p1) (model_to_L1 p2).
 
-Definition refine_mcfg_L2 user_intrinsics (p1 p2: mcfg dtyp): Prop :=
-  R.refine_L2 (model_to_L2 user_intrinsics p1) (model_to_L2 user_intrinsics p2).
+Definition refine_mcfg_L2 (p1 p2: mcfg dtyp): Prop :=
+  R.refine_L2 (model_to_L2 p1) (model_to_L2 p2).
 
-Definition refine_mcfg_L3 user_intrinsics (p1 p2: mcfg dtyp): Prop :=
-  R.refine_L3 (model_to_L3 user_intrinsics p1) (model_to_L3 user_intrinsics p2).
+Definition refine_mcfg_L3 (p1 p2: mcfg dtyp): Prop :=
+  R.refine_L3 (model_to_L3 p1) (model_to_L3 p2).
 
-Definition refine_mcfg_L4 user_intrinsics (p1 p2: mcfg dtyp): Prop :=
-  R.refine_L4 (model_to_L4 user_intrinsics p1) (model_to_L4 user_intrinsics p2).
+Definition refine_mcfg_L4 (p1 p2: mcfg dtyp): Prop :=
+  R.refine_L4 (model_to_L4 p1) (model_to_L4 p2).
 
-Definition refine_mcfg user_intrinsics  (p1 p2: mcfg dtyp): Prop :=
-  R.refine_L5 (model_to_L5 user_intrinsics p1) (model_to_L5 user_intrinsics p2).
+Definition refine_mcfg  (p1 p2: mcfg dtyp): Prop :=
+  R.refine_L5 (model_to_L5 p1) (model_to_L5 p2).
 
 (**
    The chain of refinements is monotone, legitimating the ability to
    conduct reasoning before interpretation when suitable.
  *)
-Lemma refine_mcfg_L1_correct: forall user_intrinsics p1 p2,
-    refine_mcfg_L1 user_intrinsics p1 p2 -> refine_mcfg user_intrinsics p1 p2.
+Lemma refine_mcfg_L1_correct: forall p1 p2,
+    refine_mcfg_L1 p1 p2 -> refine_mcfg p1 p2.
 Proof.
-  intros ? p1 p2 HR.
+  intros p1 p2 HR.
   apply refine_45, refine_34, refine_23, refine_12, HR.
 Qed.
 
-Lemma refine_mcfg_L2_correct: forall user_intrinsics p1 p2,
-    refine_mcfg_L2 user_intrinsics p1 p2 -> refine_mcfg user_intrinsics p1 p2.
+Lemma refine_mcfg_L2_correct: forall p1 p2,
+    refine_mcfg_L2 p1 p2 -> refine_mcfg p1 p2.
 Proof.
-  intros ? p1 p2 HR.
+  intros p1 p2 HR.
   apply refine_45, refine_34, refine_23, HR.
 Qed.
 
-Lemma refine_mcfg_L3_correct: forall user_intrinsics p1 p2,
-    refine_mcfg_L3 user_intrinsics p1 p2 -> refine_mcfg user_intrinsics p1 p2.
+Lemma refine_mcfg_L3_correct: forall p1 p2,
+    refine_mcfg_L3 p1 p2 -> refine_mcfg p1 p2.
 Proof.
-  intros ? p1 p2 HR.
+  intros p1 p2 HR.
   apply refine_45, refine_34, HR.
 Qed.
 
-Lemma refine_mcfg_L4_correct: forall user_intrinsics p1 p2,
-    refine_mcfg_L4 user_intrinsics p1 p2 -> refine_mcfg user_intrinsics p1 p2.
+Lemma refine_mcfg_L4_correct: forall p1 p2,
+    refine_mcfg_L4 p1 p2 -> refine_mcfg p1 p2.
 Proof.
-  intros ? p1 p2 HR.
+  intros p1 p2 HR.
   apply refine_45, HR.
 Qed.
 
@@ -486,3 +494,4 @@ Proof.
   rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret; reflexivity.
 Qed.
 
+End TopLevelInputs.

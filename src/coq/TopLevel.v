@@ -12,7 +12,7 @@
 
 (* begin hide *)
 From Coq Require Import
-     Ensembles List String.
+     Ensembles List String ZArith.
 
 From ITree Require Import
      ITree
@@ -134,13 +134,6 @@ Module TopLevelEnv <: Environment.
     fv <- trigger (GlobalRead fid) ;;
     ret (fv, D.denote_function df).
 
-  (* (for now) assume that [main (i64 argc, i8** argv)]
-    pass in 0 and null as the arguments to main
-    Note: this isn't compliant with standard C semantics
-   *)
-  Definition main_args := [DV.UVALUE_I64 (DynamicValues.Int64.zero);
-                           DV.UVALUE_Addr (Memory.A.null)
-                          ].
 
   (**
    Transformation and normalization of types.
@@ -171,15 +164,42 @@ Module TopLevelEnv <: Environment.
      Full denotation of a Vellvm program as an interaction tree:
      * initialize the global environment;
      * point wise denote each function;
-     * retrieve the address of the main function;
-     * tie the mutually recursive know and run it starting from the main.
+     * retrieve the address of the entry point function;
+     * tie the mutually recursive know and run it starting from the 
+     * entry point
+     *
+     * This code should be semantically equivalent to running the following
+     * LLVM snippet after initializing the global configuration:
+     *
+     *  %ans = call ret_typ entry (args)
+     *  ret ret_typ %ans
    *)
-  Definition denote_vellvm (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
+  Definition denote_vellvm
+             (ret_typ : dtyp)
+             (entry : string)
+             (args : list uvalue)
+             (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
-    'addr <- trigger (GlobalRead (Name "main")) ;;
-    D.denote_mcfg defns DTYPE_Void (dvalue_to_uvalue addr) main_args.
+    'addr <- trigger (GlobalRead (Name entry)) ;;
+    D.denote_mcfg defns ret_typ (dvalue_to_uvalue addr) args.
 
+
+  (* SAZ: main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them 
+     For backwards compatibility.
+  *)
+  (* (for now) assume that [main (i64 argc, i8** argv)]
+    pass in 0 and null as the arguments to main
+    Note: this isn't compliant with standard C semantics
+   *)
+  Definition main_args := [DV.UVALUE_I64 (DynamicValues.Int64.zero);
+                           DV.UVALUE_Addr (Memory.A.null)
+                          ].
+
+
+  Definition denote_vellvm_main (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
+    denote_vellvm (DTYPE_I (32)%Z) "main" main_args mcfg.
+    
   (**
      Now that we know how to denote a whole llvm program, we can _interpret_
      the resulting [itree].
@@ -187,7 +207,11 @@ Module TopLevelEnv <: Environment.
 
   (* Explicit application of a state to a [stateT] computation: convenient to ease some rewriting,
      but semantically equivalent to simply applying the state. *)
-  Definition run_state {E A env} (R : Monads.stateT env (itree E) A) (st: env) : itree E (env * A) := R st.
+  Definition run_state {E A env}
+             (R : Monads.stateT env (itree E) A)
+             (st: env)
+    : itree E (env * A) :=
+    R st.
 
   (**
      First, we build the interpreter that will get extracted to OCaml and allow for the interpretation
@@ -212,14 +236,20 @@ Module TopLevelEnv <: Environment.
      to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
      starting from empty environments.
    *)
-  Definition interpreter_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))) : itree L5 res_L4 :=
+  Definition interpreter_user
+             (ret_typ : dtyp)
+             (entry : string)
+             (args : list uvalue)
+             (user_intrinsics: IS.intrinsic_definitions)
+             (prog: list (toplevel_entity typ (list (block typ))))
+    : itree L5 res_L4 :=
     let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
 
     match CFG.mcfg_of_modul _ scfg with
     | Some ucfg =>
       let mcfg := normalize_types ucfg in
 
-      let t := denote_vellvm mcfg in
+      let t := denote_vellvm ret_typ entry args mcfg in
 
       interp_vellvm_exec_user user_intrinsics t [] ([],[]) ((M.empty, M.empty), [[]])
 
@@ -227,9 +257,10 @@ Module TopLevelEnv <: Environment.
     end.
 
   (**
-     Finally, the reference interpreter assumes no user-defined intrinsics.
+     Finally, the reference interpreter assumes no user-defined intrinsics and starts 
+     from "main" using bogus initial inputs.
    *)
-  Definition interpreter := interpreter_user [].
+  Definition interpreter := interpreter_user (DTYPE_I 32%Z) "main" main_args [].
 
   (**
      We now turn to the definition of our _model_ of vellvm's semantics. The
@@ -256,23 +287,28 @@ Module TopLevelEnv <: Environment.
     list (toplevel_entity typ (list (LLVMAst.block typ))) -> itree E X :=
     fun prog =>
       let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
-
+      
       match CFG.mcfg_of_modul _ scfg with
       | Some ucfg =>
         let mcfg := TopLevelEnv.normalize_types ucfg in
-
         sem mcfg
 
       | None => raise "Ill-formed program: mcfg_of_modul failed."
       end.
 
-  Definition model_user (user_intrinsics: IS.intrinsic_definitions) (prog: list (toplevel_entity typ (list (block typ)))): PropT (itree L5) res_L4 :=
-    let t := lift_sem_to_mcfg denote_vellvm prog in
+  Definition model_user
+             (ret_typ : dtyp)
+             (entry : string)
+             (args : list uvalue)
+             (user_intrinsics: IS.intrinsic_definitions)
+             (prog: list (toplevel_entity typ (list (block typ))))
+    : PropT (itree L5) res_L4 :=
+    let t := lift_sem_to_mcfg (denote_vellvm ret_typ entry args) prog in
     interp_vellvm_model_user user_intrinsics t [] ([],[]) ((M.empty, M.empty), [[]]).
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics.
    *)
-  Definition model := model_user [].
+  Definition model := model_user (DTYPE_I 32%Z) "main" main_args [].
 
 End TopLevelEnv.

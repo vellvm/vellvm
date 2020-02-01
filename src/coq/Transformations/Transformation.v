@@ -17,6 +17,6 @@ Import TopLevelEnv.
 Definition transformation := mcfg dtyp -> mcfg dtyp.
 
 Definition transformation_correct (T: transformation): Prop :=
-  forall p, refine_mcfg nil p (T p).
+  forall ret_typ entry args p, refine_mcfg ret_typ entry args nil p (T p).
 
 
