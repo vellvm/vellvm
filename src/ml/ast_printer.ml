@@ -292,6 +292,10 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
        (pp_print_prod typ exp) then_
        (pp_print_prod typ exp) else_
 
+  | OP_Freeze (v) ->
+    fprintf ppf "(OP_Freeze %a)"
+      (pp_print_prod typ exp) v
+
   | OP_ExtractElement (vec, idx) ->
      fprintf ppf "(OP_ExtractElement %a %a)"
        (pp_print_prod typ exp) vec
@@ -385,6 +389,11 @@ and inst_exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
       (pp_print_prod typ exp) if_
       (pp_print_prod typ exp) then_
       (pp_print_prod typ exp) else_
+
+  | OP_Freeze (v) ->
+    fprintf ppf "(OP_Freeze %a)"
+      (pp_print_prod typ exp) v
+
 
   | OP_ExtractElement (vec, idx) ->
     fprintf ppf "(OP_ExtractElement %a %a)"
