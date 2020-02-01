@@ -154,6 +154,7 @@
   | "ptrtoint"       -> KW_PTRTOINT
   | "bitcast"        -> KW_BITCAST
   | "select"         -> KW_SELECT
+  | "freeze"         -> KW_FREEZE
   | "va_arg"         -> KW_VAARG
   | "ret"            -> KW_RET
   | "br"             -> KW_BR

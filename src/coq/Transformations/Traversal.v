@@ -131,6 +131,8 @@ Section Traverse.
           OP_Select (f_endo (fst cnd), f_exp (snd cnd))
                     (f_endo (fst v1), f_exp (snd v1))
                     (f_endo (fst v2), f_exp (snd v2))
+        | OP_Freeze v =>
+          OP_Freeze (f_endo (fst v), f_exp (snd v))
         end.
 
     Global Instance endo_texp
