@@ -452,8 +452,8 @@ Proof.
   - ebind. econstructor; [reflexivity|].
     intros; subst.
     etau. ebase.
-  - rewrite tau_eutt, unfold_interp_state; eauto.
-  - rewrite tau_eutt, unfold_interp_state; eauto.
+  - rewrite tau_euttge, unfold_interp_state; eauto.
+  - rewrite tau_euttge, unfold_interp_state; eauto.
 Qed.
 
 (** END MOVE *)
@@ -491,6 +491,6 @@ Definition model_to_L5_cfg (prog: cfg dtyp) :=
 Definition refine_cfg_ret: relation (PropT IO.L5 (memory * (local_env * (global_env * uvalue)))) :=
   fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt  (TT × (TT × (TT × refine_uvalue))) t t'.
 
-Definition refine_cfg  (p1 p2: cfg dtyp): Prop :=
-  refine_cfg_ret (model_to_L5_cfg p1) (model_to_L5_cfg p2).
+(* Definition refine_cfg  (p1 p2: cfg dtyp): Prop := *)
+(*   refine_cfg_ret (model_to_L5_cfg p1) (model_to_L5_cfg p2). *)
 

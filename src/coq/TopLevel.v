@@ -101,21 +101,21 @@ Module TopLevelEnv <: Environment.
   Definition initialize_global (g:global dtyp) : itree exp_E unit :=
     let dt := (g_typ g) in
     a <- trigger (GlobalRead (g_ident g));;
-      uv <- match (g_exp g) with
-            | None => ret (UVALUE_Undef dt)
-            | Some e => D.denote_exp (Some dt) e
-            end ;;
-      (* CB TODO: Do we need pick here? *)
-      dv <- trigger (pick uv True) ;;
-      trigger (Store a dv).
+    uv <- match (g_exp g) with
+         | None => ret (UVALUE_Undef dt)
+         | Some e => D.denote_exp (Some dt) e
+         end ;;
+    (* CB TODO: Do we need pick here? *)
+    dv <- trigger (pick uv True) ;;
+    trigger (Store a dv).
 
   Definition initialize_globals (gs:list (global dtyp)): itree exp_E unit :=
     map_monad_ initialize_global gs.
 
   Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree L0 unit :=
     allocate_globals (m_globals CFG) ;;
-                     allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
-                     translate _exp_E_to_L0 (initialize_globals (m_globals CFG)).
+    allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
+    translate _exp_E_to_L0 (initialize_globals (m_globals CFG)).
 
   (** Local environment implementation
     The map-based handlers are defined parameterized over a domain of key and value.
@@ -132,14 +132,14 @@ Module TopLevelEnv <: Environment.
   Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree L0 (dvalue * D.function_denotation) :=
     let fid := (dc_name (df_prototype df)) in
     fv <- trigger (GlobalRead fid) ;;
-       ret (fv, D.denote_function df).
+    ret (fv, D.denote_function df).
 
   (* (for now) assume that [main (i64 argc, i8** argv)]
     pass in 0 and null as the arguments to main
     Note: this isn't compliant with standard C semantics
    *)
-  Definition main_args := [DV.DVALUE_I64 (DynamicValues.Int64.zero);
-                             DV.DVALUE_Addr (Memory.A.null)
+  Definition main_args := [DV.UVALUE_I64 (DynamicValues.Int64.zero);
+                           DV.UVALUE_Addr (Memory.A.null)
                           ].
 
   (**
@@ -178,7 +178,12 @@ Module TopLevelEnv <: Environment.
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'addr <- trigger (GlobalRead (Name "main")) ;;
-    D.denote_mcfg defns DTYPE_Void addr main_args.
+    D.denote_mcfg defns DTYPE_Void (dvalue_to_uvalue addr) main_args.
+
+  Definition _L0_to_L0' : L0 ~> L0' := inr1.
+
+  Definition denote_vellvm' (mcfg : CFG.mcfg dtyp) : itree L0' res_L0 :=
+    translate _L0_to_L0' (denote_vellvm mcfg).
 
   (**
      Now that we know how to denote a whole llvm program, we can _interpret_

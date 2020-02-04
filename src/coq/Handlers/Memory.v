@@ -397,7 +397,7 @@ Admitted.
     let block := make_empty_mem_block ty in
     LBlock (sizeof_dtyp ty) block None.
 
-  Fixpoint handle_gep_h (t:dtyp) (b:Z) (off:Z) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
+  Fixpoint handle_gep_h (t:dtyp) (off:Z) (vs:list dvalue): err Z :=
     match vs with
     | v :: vs' =>
       match v with
@@ -407,7 +407,7 @@ Admitted.
         match t with
         | DTYPE_Vector _ ta
         | DTYPE_Array _ ta =>
-          handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+          handle_gep_h ta (off + k * (sizeof_dtyp ta)) vs'
         | DTYPE_Struct ts
         | DTYPE_Packed_struct ts => (* Handle these differently in future *)
           let offset := fold_left (fun acc t => acc + sizeof_dtyp t)
@@ -415,7 +415,7 @@ Admitted.
           match nth_error ts n with
           | None => failwith "overflow"
           | Some t' =>
-            handle_gep_h t' b (off + offset) vs' m
+            handle_gep_h t' (off + offset) vs'
           end
         | _ => failwith ("non-i32-indexable type")
         end
@@ -424,7 +424,7 @@ Admitted.
         let n := BinIntDef.Z.to_nat k in
         match t with
         | DTYPE_Vector _ ta | DTYPE_Array _ ta =>
-                              handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+                              handle_gep_h ta (off + k * (sizeof_dtyp ta)) vs'
         | _ => failwith ("non-i8-indexable type")
         end
       | DVALUE_I64 i =>
@@ -433,12 +433,24 @@ Admitted.
         match t with
         | DTYPE_Vector _ ta
         | DTYPE_Array _ ta =>
-          handle_gep_h ta b (off + k * (sizeof_dtyp ta)) vs' m
+          handle_gep_h ta (off + k * (sizeof_dtyp ta)) vs'
         | _ => failwith ("non-i64-indexable type")
         end
       | _ => failwith "non-I32 index"
       end
-    | [] => ret (m, DVALUE_Addr (b, off))
+    | [] => ret off
+    end.
+
+  Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
+    match vs with
+    | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 indices *)
+      match dv with
+      | DVALUE_Addr (b, o) =>
+        off <- handle_gep_h t (o + (sizeof_dtyp t) * (unsigned i)) vs' ;;
+        ret (DVALUE_Addr (b, off))
+      | _ => failwith "non-address"
+      end
+    | _ => failwith "non-I32 index"
     end.
 
 
@@ -491,17 +503,6 @@ Admitted.
       (id, m'')
     end.
 
-  Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) (m:memory) : err (memory * dvalue):=
-    match vs with
-    | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 indices *)
-      match dv with
-      | DVALUE_Addr (b, o) =>
-        handle_gep_h t b (o + (sizeof_dtyp t) * (unsigned i)) vs' m
-      | _ => failwith "non-address"
-      end
-    | _ => failwith "non-I32 index"
-    end.
-
   (* LLVM 5.0 memcpy
    According to the documentation: http://releases.llvm.org/5.0.0/docs/LangRef.html#llvm-memcpy-intrinsic
    this operation can never fail?  It doesn't return any status code...
@@ -511,10 +512,11 @@ Admitted.
   Definition handle_memcpy (args : List.list dvalue) (m:memory) : err memory :=
     match args with
     | DVALUE_Addr (dst_b, dst_o) ::
-                  DVALUE_Addr (src_b, src_o) ::
-                  DVALUE_I32 len ::
-                  DVALUE_I32 align :: (* alignment ignored *)
-                  DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+      DVALUE_Addr (src_b, src_o) ::
+      DVALUE_I32 len ::
+      DVALUE_I32 align :: (* alignment ignored *)
+      DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+
       src_block <- trywith "memcpy src block not found" (lookup_logical src_b m) ;;
       dst_block <- trywith "memcpy dst block not found" (lookup_logical dst_b m) ;;
 
@@ -623,9 +625,9 @@ Admitted.
         end
 
       | GEP t dv vs =>
-        match handle_gep t dv vs m with
+        match handle_gep t dv vs with
         | inl err => raise err
-        | inr (m, dv) => ret ((m, s), dv)
+        | inr dv => ret ((m, s), dv)
         end
 
       | ItoP x =>
@@ -668,13 +670,14 @@ Admitted.
     fun _ e '(m, s) =>
       match e with
       | Intrinsic t name args =>
+        (* Pick all arguments, they should all be unique. *)
         if string_dec name "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
           match handle_memcpy args m with
           | inl err => raise err
           | inr m' => ret ((m', s), DVALUE_None)
           end
         else
-            raise ("Unknown intrinsic: " ++ name)
+          raise ("Unknown intrinsic: " ++ name)
       end.
 
 

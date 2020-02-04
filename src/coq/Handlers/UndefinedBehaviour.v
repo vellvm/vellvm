@@ -39,11 +39,11 @@ Definition UB_exec {E} `{FailureE -< E}: UBE ~> itree E := fun _ e => match e wi
 Section PARAMS.
   Variable (E F: Type -> Type).
 
-  Definition E_trigger : E ~> itree (E +' F) :=
+  Definition E_trigger :  E ~> itree (E +' F) :=
     fun R e => r <- trigger e ;; ret r.
 
   Definition F_trigger : F ~> itree (E +' F) :=
-    fun R e =>  r <- trigger e ;; ret r.
+    fun R e => r <- trigger e ;; ret r.
 
   Definition interp_UB `{FailureE -< E +' F}:
     itree (E +' UBE +' F) ~> itree (E +' F) :=

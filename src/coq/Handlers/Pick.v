@@ -28,6 +28,7 @@ Set Contextual Implicit.
 
 Import MonadNotation.
 
+
 Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
   Import LLVMIO.
@@ -145,6 +146,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
     Section PARAMS.
       Variable (E F: Type -> Type).
+
       Definition E_trigger :  E ~> itree (E +' F) :=
         fun R e => r <- trigger e ;; ret r.
 
@@ -153,7 +155,8 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
       Definition interp_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
         itree (E +' PickE +' F) ~> itree (E +' F) :=
-        interp (case_ E_trigger (case_ concretize_picks F_trigger)).
+        interp (case_ E_trigger
+               (case_ concretize_picks F_trigger)).
 
     End PARAMS.
 

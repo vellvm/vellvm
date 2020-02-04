@@ -133,7 +133,12 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   (* Generic calls, refined by [denote_mcfg] *)
   Variant CallE : Type -> Type :=
-  | Call        : forall (t:dtyp) (f:dvalue) (args:list dvalue), CallE uvalue.
+    (* TODO: not sure about uvalue for f here *)
+  | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue), CallE uvalue.
+
+  Variant ExternalCallE : Type -> Type :=
+    (* TODO: is f a dvalue or a uvalue? *)
+  | ExternalCall        : forall (t:dtyp) (f:uvalue) (args:list dvalue), ExternalCallE dvalue.
 
   (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
   Variant IntrinsicE : Type -> Type :=
@@ -143,12 +148,12 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Variant MemoryE : Type -> Type :=
   | MemPush : MemoryE unit
   | MemPop  : MemoryE unit
-  | Alloca  : forall (t:dtyp),                             (MemoryE dvalue)
-  | Load    : forall (t:dtyp) (a:dvalue),                  (MemoryE uvalue)
-  | Store   : forall (a:dvalue) (v:dvalue),                (MemoryE unit)
-  | GEP     : forall (t:dtyp) (v:dvalue) (vs:list dvalue), (MemoryE dvalue)
-  | ItoP    : forall (i:dvalue),                           (MemoryE dvalue)
-  | PtoI    : forall (t:dtyp) (a:dvalue),                  (MemoryE dvalue)
+  | Alloca  : forall (t:dtyp),                               (MemoryE dvalue)
+  | Load    : forall (t:dtyp)   (a:dvalue),                  (MemoryE uvalue)
+  | Store   : forall (a:dvalue) (v:dvalue),                  (MemoryE unit)
+  | GEP     : forall (t:dtyp)   (v:dvalue) (vs:list dvalue), (MemoryE dvalue)
+  | ItoP    : forall (i:dvalue),                             (MemoryE dvalue)
+  | PtoI    : forall (t:dtyp) (a:dvalue),                    (MemoryE dvalue)
   (* | MemoryIntrinsic : forall (t:dtyp) (f:function_id) (args:list dvalue), MemoryE dvalue *)
   .
 
@@ -159,6 +164,11 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
    *)
   Variant PickE : Type -> Type :=
   | pick (u:uvalue) (P : Prop) : PickE dvalue.
+
+  Definition pickUnique (uv : uvalue) : PickE dvalue
+    := pick uv (exists x, forall dv, concretize uv dv -> dv = x).
+
+  Definition pickAll (p : uvalue -> PickE dvalue) := map_monad (fun uv => trigger (p uv)).
 
   (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
   (* YZ TODO: The events and handlers are parameterized by the types of key and value.
@@ -185,48 +195,21 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Definition exp_E_to_instr_E : exp_E ~> instr_E:=
     fun T e => inr1 (inr1 e).
 
-  (* Core effects - no distinction between "internal" and "external" calls. *)
-  Definition L0 := CallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
+  (* Core effects. *)
+  Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
-  Definition instr_E_to_L0 : instr_E ~> L0 :=
+  Definition instr_E_to_L0' : instr_E ~> L0' :=
     fun T e =>
       match e with
       | inl1 e => inl1 e
-      | inr1 (inl1 e) => inr1 (inl1 e)
-      | inr1 (inr1 (inl1 e)) => (inr1 (inr1 (inl1 e)))
-      | inr1 (inr1 (inr1 (inl1 e))) => inr1 (inr1 (inr1 ((inl1 (inl1 e)))))
-      | inr1 (inr1 (inr1 (inr1 (inl1 e)))) => inr1 (inr1 (inr1 (inr1 (inl1 e))))
-      | inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))
-      | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))
-      | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e))))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inl1 e)))))))
-      | inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e))))))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))))
+      | inr1 (inl1 e) => inr1 (inr1 (inl1 e))
+      | inr1 (inr1 (inl1 e)) => inr1 (inr1 (inr1 (inl1 e)))
+      | inr1 (inr1 (inr1 (inl1 e))) => inr1 (inr1 (inr1 (inr1 (inl1 (inl1 e)))))
+      | inr1 (inr1 (inr1 (inr1 e))) => inr1 (inr1 (inr1 (inr1 (inr1 e))))
       end.
 
-  (* Distinction made between internal and external calls -- intermediate step in denote_mcfg.
-     Note that [CallE] appears _twice_ in the [INTERNAL] type.  The left one is 
-     meant to be the "internal" call event and the right one is the "external" call event.
-     The [denote_mcfg] function, which uses [mrec] to tie the recursive knot distinguishes
-     the two.  It re-triggers an unknown [Call] event as an [ExternalCall] (which is just
-     an injection into the right-hand side.
-   *)
-  Definition INTERNAL := CallE +' L0.
-
-  Definition ExternalCall t f args : INTERNAL uvalue := (inr1 (inl1 (Call t f args))).
-
-  (* This inclusion "assumes" that all call events are internal.  The 
-     dispatch in denote_mcfg then interprets some of the calls directly,
-     if their definitions are known, or it "externalizes" the calls
-     whose definitions are not known.
-   *)
-  Definition L0_to_INTERNAL : L0 ~> INTERNAL :=
-    fun R e =>
-      match e with
-      | inl1 e' => inl1 e'
-      | inr1 e' => inr1 (inr1 e')
-      end.
-
-  Definition _exp_E_to_L0 : exp_E ~> L0 :=
-    fun T e => instr_E_to_L0 (exp_E_to_instr_E e).
+  Definition _exp_E_to_L0' : exp_E ~> L0' :=
+    fun T e => instr_E_to_L0' (exp_E_to_instr_E e).
 
   Definition _failure_UB_to_ExpE : (FailureE +' UBE) ~> exp_E :=
     fun T e =>
@@ -235,21 +218,41 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
       | inr1 x => inr1 (inr1 (inr1 (inr1 (inl1 x))))
       end.
 
+  Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
+
+  (* exp_E = LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE *)
+  (* L0 = ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE *)
+
+  Definition _exp_E_to_L0 : exp_E ~> L0 :=
+    fun T e =>
+      match e with
+      | inl1 e => inr1 (inr1 (inl1 e))
+      | inr1 (inl1 e) => inr1 (inr1 (inr1 (inl1 (inl1 e))))
+      | inr1 (inr1 e) => inr1 (inr1 (inr1 (inr1 e)))
+      end.
+
+  (* Definition _L0_to_L0' : L0 ~> L0' := *)
+  (*   fun _ e => *)
+  (*     match e with *)
+  (*     | inl1 e => inl1 (inr1 e) *)
+  (*     | inr1 e => (inr1 e) *)
+  (*     end. *)
+
   (* For multiple CFG, after interpreting [GlobalE] *)
-  Definition L1 := CallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
+  Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] *)
-  Definition L2 := CallE +' IntrinsicE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
+  Definition L2 := ExternalCallE +' IntrinsicE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
-  Definition L3 := CallE +' PickE +' UBE +' DebugE +' FailureE.
+  Definition L3 := ExternalCallE +' PickE +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickE]*)
-  Definition L4 := CallE +' UBE +' DebugE +' FailureE.
+  Definition L4 := ExternalCallE +' UBE +' DebugE +' FailureE.
 
-  Definition L5 := CallE +' DebugE +' FailureE.
+  Definition L5 := ExternalCallE +' DebugE +' FailureE.
 
-  Hint Unfold L0 L1 L2 L3 L4 L5.
+  Hint Unfold L0 L0' L1 L2 L3 L4 L5.
 
   Definition _failure_UB_to_L4 : (FailureE +' UBE) ~> L4:=
     fun T e =>
