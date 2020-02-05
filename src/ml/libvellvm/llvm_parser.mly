@@ -218,6 +218,8 @@ let id_of = function
 %token<Camlcoq.Z.t> ATTR_GRP_ID
 
 %start<(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities> toplevel_entities
+%start<LLVMAst.typ LLVMAst.instr> test_call
+%start<(LLVMAst.typ * LLVMAst.typ LLVMAst.exp)> texp
 
 %%
 
@@ -784,3 +786,15 @@ ident:
 texp: t=typ v=exp { (t, v t) }
 tconst: t=typ c=exp { (t, c t) }
 tident: t=typ i=ident { (t, i) }
+
+(* SAZ: Copying this here is a bit unfortunate but works for now.
+   It might be better to experiment with eliminating the "inline" keyword
+   for the instr nonterminal and then add a new nonterminal like this:
+test_instr:
+   instr EOF { ... }
+*)
+test_call:
+  | KW_TAIL? KW_CALL cconv? list(param_attr) f=texp
+    a=delimited(LPAREN, separated_list(csep, call_arg), RPAREN)
+    list(fn_attr) EOF
+    { INSTR_Call (f, a) }

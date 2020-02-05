@@ -67,9 +67,47 @@ let ast_pp_dir dir =
   let files = Test.files_of_dir dir in
   List.iter ast_pp_file_inner files
 
+let make_test ll_ast t : string * assertion  =
+  match t with
+  | Assertion.EQTest (expected, dtyp, entry, args) ->
+    let str =
+      let expected_str =
+        Interpreter.pp_uvalue Format.str_formatter expected;
+        Format.flush_str_formatter ()
+      in
+      let args_str =
+        Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter  args;
+        Format.flush_str_formatter()
+      in
+      Printf.sprintf "%s = %s(%s)" expected_str entry args_str
+    in
+    let result () = Interpreter.step (TopLevel.TopLevelEnv.interpreter_user dtyp (Camlcoq.coqstring_of_camlstring entry) args [] ll_ast) 
+    in
+    str, (Assert.assert_eqf result (Ok expected))
+
+
+let test_file path =
+  Platform.configure ();
+  let _ = Platform.verb @@ Printf.sprintf "* processing file: %s\n" path in
+  let file, ext = Platform.path_to_basename_ext path in
+  begin match ext with
+    | "ll" -> 
+      let tests = parse_tests path in
+      let ll_ast = parse_file path in
+      let suite = Test (file, List.map (make_test ll_ast) tests) in
+      let outcome = run_suite [suite] in
+      Printf.printf "%s\n" (outcome_to_string outcome);
+      raise (Ran_tests (successful outcome))
+    | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
+  end
+
+    
+  
+
 (* Use the --test option to run unit tests and the quit the program. *)
 let args =
   [ ("--test", Unit exec_tests, "run the test suite, ignoring later inputs")
+  ; ("--test-file", String test_file, "run the assertions in a given file")
   ; ("--test-pp-dir", String test_pp_dir, "run the parsing/pretty-printing tests on all .ll files in the given directory")
   ; ("--print-ast", String ast_pp_file, "run the parsing on the given .ll file and print its internal ast and domination tree")
   ; ("--print-ast-dir", String ast_pp_dir, "run the parsing on the given directory and print its internal ast and domination tree")

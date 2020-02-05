@@ -78,7 +78,7 @@ depend: itrees $(VFILES)
 
 EXE=_build/default/ml/main.exe
 
-$(EXE): extracted ml/dune ml/extracted/dune
+$(EXE): extracted ml/dune ml/extracted/dune ml/testing/dune
 	@echo "Compiling Vellvm"
 	dune build ml/main.exe 
 
