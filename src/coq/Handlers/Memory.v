@@ -152,6 +152,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
   (* Memory + stack for freeing *)
   Definition memory_stack : Type := memory * mem_stack.
 
+  Definition empty_memory_stack : memory_stack := ((empty, empty), [[]]).
+
   Fixpoint max_default (l:list Z) (x:Z) :=
     match l with
     | [] => x
@@ -666,7 +668,7 @@ Admitted.
         end
       end.
 
-  Definition handle_intrinsic {E} `{FailureE -< E}: IntrinsicE ~> stateT memory_stack (itree E) :=
+  Definition handle_intrinsic {E} `{FailureE -< E} `{PickE -< E}: IntrinsicE ~> stateT memory_stack (itree E) :=
     fun _ e '(m, s) =>
       match e with
       | Intrinsic t name args =>
@@ -719,7 +721,7 @@ Admitted.
    *)
   Section PARAMS.
     Variable (E F G : Type -> Type).
-    Context `{FailureE -< F} `{UBE -< F}.
+    Context `{FailureE -< F} `{UBE -< F} `{PickE -< F}.
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
     Notation Effin' := (E +' G +' IntrinsicE +' MemoryE +' F).
@@ -742,7 +744,7 @@ Admitted.
 
     Definition interp_memory :
       itree Effin ~> stateT memory_stack (itree Effout) :=
-      interp_state (case_ E_trigger (case_ handle_intrinsic (case_ handle_memory F_trigger))).
+      interp_state (case_ E_trigger  (case_ handle_intrinsic  (case_ handle_memory  F_trigger))).
 
     Definition interp_memory' :
       itree Effin' ~> stateT memory_stack (itree Effout') :=

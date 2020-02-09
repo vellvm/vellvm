@@ -80,6 +80,7 @@ Fixpoint fmap_exp (e:exp T) : exp U :=
     OP_InsertValue (fmap_texp vec) (fmap_texp elt) idxs
   | OP_Select cnd v1 v2 =>
     OP_Select (fmap_texp cnd) (fmap_texp v1) (fmap_texp v2)
+  | OP_Freeze v => OP_Freeze (fmap_texp v)
   end.
 
 Definition fmap_texp '(t, e) := (f t, fmap_exp e).

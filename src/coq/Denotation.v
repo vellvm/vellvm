@@ -382,6 +382,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     | _               => False
     end.
 
+  (* Pick a possibly poison value, treating poison as
+     nondeterminism. This is used for freeze. *)
+  Definition pick_your_poison {E : Type -> Type} `{PickE -< E} (dt : dtyp) (uv : uvalue) : itree E dvalue :=
+    match uv with
+    | UVALUE_Poison => trigger (pick (UVALUE_Undef dt) True)
+    | _             => trigger (pick uv True)
+    end.
+
   Fixpoint denote_exp
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
@@ -654,6 +662,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | inl e => ret (UVALUE_Select cndv v1 v2)
           | inr dcndv => lift_undef_or_err ret (eval_select dcndv v1 v2)
           end
+
+        | OP_Freeze (dt, e) =>
+          uv <- denote_exp (Some dt) e ;;
+          dv <- pick_your_poison dt uv;;
+          ret (dvalue_to_uvalue dv)
         end.
   Arguments denote_exp _ : simpl nomatch.
 
@@ -810,7 +823,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         end.
 
       Definition denote_bks (bks: list _): block_id -> itree instr_E (block_id + uvalue) :=
-        loop (C := ktree _) (fun (bid : block_id + block_id) =>
+        loop (C := ktree _)
+             (fun (bid : block_id + block_id) =>
                 match bid with
                 | inl bid
                 | inr bid =>

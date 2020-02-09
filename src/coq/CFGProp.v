@@ -184,6 +184,7 @@ Fixpoint exp_uses (v:exp T) : list ident :=
   | OP_ExtractValue (_,vec) _ => exp_uses vec
   | OP_InsertValue (_,vec) (_,elt) _ => (exp_uses vec) ++ (exp_uses elt)
   | OP_Select (_,cnd) (_,v1) (_,v2) => (exp_uses cnd) ++ (exp_uses v1) ++ (exp_uses v2)
+  | OP_Freeze (_,v) => exp_uses v
   end.
 
 Definition texp_uses (tv:texp T) : list ident := exp_uses (snd tv).

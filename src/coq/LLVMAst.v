@@ -249,6 +249,7 @@ Inductive exp : Set :=
 | OP_ExtractValue     (vec:(T * exp)) (idxs:list int)
 | OP_InsertValue      (vec:(T * exp)) (elt:(T * exp)) (idxs:list int)
 | OP_Select           (cnd:(T * exp)) (v1:(T * exp)) (v2:(T * exp)) (* if * then * else *)
+| OP_Freeze           (v:(T * exp))
 .
 
 Definition texp : Set := T * exp.
