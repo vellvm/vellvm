@@ -117,16 +117,25 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       end eq_refl.
 
   Section PARAMS.
-    Variable (E F : Type -> Type).
+    Variable (E E' F : Type -> Type).
     Context `{FailureE -< F}.
     Notation Eff := (E +' IntrinsicE +' F).
+    Notation Eff' := (E +' E' +' IntrinsicE +' F).
 
     Definition E_trigger : Handler E Eff := fun _ e => trigger e.
     Definition F_trigger : Handler F Eff := fun _ e => trigger e.
 
+    Definition E_trigger' : Handler E Eff' := fun _ e => trigger e.
+    Definition E'_trigger' : Handler E' Eff' := fun _ e => trigger e.
+    Definition F_trigger' : Handler F Eff' := fun _ e => trigger e.
+
     Definition interpret_intrinsics (user_intrinsics: intrinsic_definitions):
       forall R, itree Eff R -> itree Eff R :=
       interp (case_ E_trigger (case_ (handle_intrinsics user_intrinsics) F_trigger)).
+
+    Definition interpret_intrinsics' (user_intrinsics: intrinsic_definitions):
+      forall R, itree Eff' R -> itree Eff' R :=
+      interp (case_ E_trigger' (case_ E'_trigger' (case_ (handle_intrinsics user_intrinsics) F_trigger'))).
 
     Lemma interp_intrinsics_bind :
       forall (R S : Type) l (t : itree Eff R) (k : R -> itree _ S),
@@ -138,6 +147,20 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     Lemma interp_intrinsics_ret :
       forall (R : Type) l (x: R),
         interpret_intrinsics l (Ret x: itree Eff _) ≅ Ret x.
+    Proof.
+      intros; apply interp_ret.
+    Qed.
+
+    Lemma interp_intrinsics'_bind :
+      forall (R S : Type) l (t : itree Eff' R) (k : R -> itree _ S),
+        interpret_intrinsics' l (ITree.bind t k) ≅ ITree.bind (interpret_intrinsics' l t) (fun r : R => interpret_intrinsics' l (k r)).
+    Proof.
+      intros; apply interp_bind.
+    Qed.
+
+    Lemma interp_intrinsics'_ret :
+      forall (R : Type) l (x: R),
+        interpret_intrinsics' l (Ret x: itree Eff' _) ≅ Ret x.
     Proof.
       intros; apply interp_ret.
     Qed.

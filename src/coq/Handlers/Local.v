@@ -46,10 +46,12 @@ Section Locals.
 
   Open Scope monad_scope.
   Section PARAMS.
-    Variable (E F G : Type -> Type).
-    Context `{FailureE -< E +' F +' G}.
+    Variable (E F G H: Type -> Type).
+    Context `{FailureE -< G}.
     Notation Effin := (E +' F +' (LocalE k v) +' G).
     Notation Effout := (E +' F +' G).
+    Notation Effin' := (E +' F +' H +' (LocalE k v) +' G).
+    Notation Effout' := (E +' F +' H +' G).
 
     Definition E_trigger {M} : forall R, E R -> (stateT M (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
@@ -60,8 +62,23 @@ Section Locals.
     Definition G_trigger {M} : forall R , G R -> (stateT M (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
+    Definition E_trigger' {M} : forall R, E R -> (stateT M (itree Effout') R) :=
+      fun R e m => r <- trigger e ;; ret (m, r).
+
+    Definition F_trigger' {M} : forall R, F R -> (stateT M (itree Effout') R) :=
+      fun R e m => r <- trigger e ;; ret (m, r).
+
+    Definition H_trigger' {M} : forall R, H R -> (stateT M (itree Effout') R) :=
+      fun R e m => r <- trigger e ;; ret (m, r).
+
+    Definition G_trigger' {M} : forall R , G R -> (stateT M (itree Effout') R) :=
+      fun R e m => r <- trigger e ;; ret (m, r).
+
     Definition interp_local : itree Effin ~> stateT map (itree Effout) :=
       interp_state (case_ E_trigger (case_ F_trigger (case_ handle_local G_trigger))).
+
+    Definition interp_local' : itree Effin' ~> stateT map (itree Effout') :=
+      interp_state (case_ E_trigger' (case_ F_trigger' (case_ H_trigger' (case_ handle_local G_trigger')))).
 
   End PARAMS.
 
