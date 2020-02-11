@@ -49,8 +49,10 @@ coq: $(VOFILES)
 
 coqinterp: $(COQFILESINTERP:%=coq/%.vo)
 
-itrees:
+update-trees:
 	git submodule update -- $(ITREEDIR)
+
+itrees:
 	make -C $(ITREEDIR)
 
 .PHONY: extracted itrees 
