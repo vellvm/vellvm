@@ -822,6 +822,57 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
         end.
 
+      (* This function denotes _some_ notion of open cfg: it takes a list of blocks and denote them
+         in such a way that the denotation of a full cfg can be defined by instantiating it over the
+         list of all blocks in the cfg, and its entry point as argument.
+         It is however not a properly compositional way to do so. Abstracting away a little bit,
+         the function is the following:
+
+         [|bks|] = loop (fun bid =>
+                     if bid ∈ (ids bks)                       (* over ids of blocks considered, we evaluate the block *)
+                     then bov <- [|bks[bid]|]
+                          match bov with
+                          | inr v    => ret (inr (inr v))     (* if it returns, we terminate *)
+                          | inl bid' => ret (inl bid')        (* otherwise we _always_ feed it back to the loop *)
+                     else               ret (inr (inl bid))   (* over ids of blocks not considered, it's the id, we return it immediately *)
+                     )
+
+         Intuitively, this means that we tie the recursive knot over all available blocks greedily. In order to be able to define combinators,
+         we need to be a bit more subtle, in the style of [Asm].
+         This branch plans to do such an extension. The current plan is the following:
+
+         Let (Domain := list block_id) and bks be a list of blocks,
+         We want the denotation to take two domain parameters as arguments: ([|bks|] A B) corresponds
+         to the denotation of bks where one can only enter the subcfg through one of the labels provided
+         in A, and do not loop back from a label described in B (or from the opposite perspective,
+         B are the possibly returned labels).
+         Define dom(bks) := {l | l ∈ map blk_id bks}
+         Define codom(bks) := {l | l ∈ map blk_term bks}
+         Compared to Asm, we try a slightly less typed approach: instead of defining the
+         domain of the denotation function itself as A, we have it as a total function over
+         label ids, and maintain invariants instead.
+         Assume the following invariants:
+         A ⊆ dom(bks)
+         B ⊆ codom(bks)
+         dom(bks) \ A ~~ codom(bks) \ B
+         Define I := cod(bks) \ B
+         Then it should be correct to redefine [|bks|] as follows:
+
+         [|bks|] A B = loop (fun bid =>
+                       if bid ∈ A                                 (* over ids in A, we evaluate the block *)
+                       then bov <- [|bks[bid]|]
+                          match bov with
+                          | inr v    => ret (inr (inr v))         (* if it returns, we terminate *)
+                          | inl bid' => if bid' ∈ B
+                                        then ret (inr (inr bid')) (* if we get something in B, we return *)
+                                        else ret (inl bid')       (* otherwise it's in I, hence we loop *)
+                       else             ret (inr (inl bid))       (* over ids of non-entry blocks, it's the id, we return it immediately (should we fail so that we only returns labels in B?) *)
+                     )
+
+        We should then be able to define and prove correct combinators of such open cfgs.
+
+       *)
+
       Definition denote_bks (bks: list _): block_id -> itree instr_E (block_id + uvalue) :=
         loop (C := ktree _)
              (fun (bid : block_id + block_id) =>
