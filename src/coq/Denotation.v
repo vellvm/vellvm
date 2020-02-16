@@ -797,12 +797,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | i::c => denote_instr i;; denote_code c
         end.
 
-      (* A block ends with a terminator, it either jumps to another block,
-         or returns a dynamic value *)
-      Definition denote_block (b: block dtyp) : itree instr_E (block_id + uvalue) :=
-        denote_code (blk_code b);;
-        translate exp_E_to_instr_E (denote_terminator (snd (blk_term b))).
-
       (* YZ FIX: no need to push/pop, but do all the assignments afterward *)
       (* One needs to be careful when denoting phi-nodes: they all must
          be evaluated in the same environment.
@@ -821,6 +815,21 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           ret (id,uv)
         | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
         end.
+
+      Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp)): itree instr_E unit :=
+        dvs <- Util.map_monad
+                (fun x => translate exp_E_to_instr_E (denote_phi bid_from x))
+                phis;;
+        Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
+        ret tt.
+
+      (* A block ends with a terminator, it either jumps to another block,
+         or returns a dynamic value *)
+      Definition denote_block (b: block dtyp) : itree instr_E (block_id + uvalue) :=
+        'bid_from <- trigger ComeFrom;;
+        denote_phis bid_from (blk_phis b);;
+        denote_code (blk_code b);;
+        translate exp_E_to_instr_E (denote_terminator (snd (blk_term b))).
 
       (* This function denotes _some_ notion of open cfg: it takes a list of blocks and denote them
          in such a way that the denotation of a full cfg can be defined by instantiating it over the
@@ -899,8 +908,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition collect_blocks (ocfg: open_cfg) (i: interface): list (block dtyp) :=
         List.filter (fun block => inb i (blk_id block)) (bks ocfg).
 
-      (* Question: we denote phi-nodes of blocks we are about to jump to after the denotation of a given block.
-         If I jump to a block in B, and hence do not re-entry, should I denote the phis?
+      (* I moved back to denoting the phi-nodes on entry to the block.
+         To do so I use an extra event acting as an oracle feeding me where the control flow comes from.
        *)
       Definition denote_open_cfg (ocfg: open_cfg): block_id -> itree instr_E (block_id + uvalue) :=
         loop (C := ktree _)
@@ -911,7 +920,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                   (* We only consider the inputs as valid entry point *)
                   if inb (inputs ocfg) bid
                   then
-                    (* [bid] is an input. We should have invariants ensuring the lookup succeeds *)
                     match find_block DynamicTypes.dtyp (bks ocfg) bid with
                     | None => ret (inr (inl bid)) (* This case should never happen for a well-formed open_cfg *)
                     | Some block =>
@@ -920,21 +928,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                       match bd with
                       | inr dv => ret (inr (inr dv)) (* On value we return *)
                       | inl bid_target =>
-                        (* On jumps, we return if we find an exit point, otherwise we try to loop *)
+                        (* On jumps, we recall where we come from via the [GoTo] event,
+                           and then return if we have found an exit point, otherwise we loop *)
+                        trigger (GoTo bid);;
                         if inb (outputs ocfg) bid_target
-                        then ret (inr (inl bid))
-                        else
-                          (* Otherwise, we find the block, evaluate its phi and loop back *)
-                          match find_block DynamicTypes.dtyp (bks ocfg) bid_target with
-                          | None => ret (inr (inl bid_target))
-                          | Some block_target =>
-                            (* And set the phi-nodes of the new destination, if any *)
-                            dvs <- Util.map_monad
-                                    (fun x => translate exp_E_to_instr_E (denote_phi bid x))
-                                    (blk_phis block_target) ;;
-                            Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
-                            ret (inl bid_target)
-                          end
+                        then ret (inr (inl bid_target))
+                        else ret (inl bid_target)
                       end
                     end
                   else

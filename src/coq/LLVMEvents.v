@@ -58,6 +58,10 @@ From Vellvm Require Import
 Set Implicit Arguments.
 Set Contextual Implicit.
 
+Variant JmpE: Type -> Type :=
+| GoTo (l: block_id): JmpE unit
+| ComeFrom: JmpE block_id.
+
  (* Interactions with global variables for the LLVM IR *)
  (* YZ: Globals are read-only, except for the initialization. We may want to reflect this in the events. *)
   Variant GlobalE (k v:Type) : Type -> Type :=
@@ -191,12 +195,12 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Definition conv_E_to_exp_E : conv_E ~> exp_E :=
     fun T e => inr1 (inr1 e).
 
-  Definition instr_E := CallE +' IntrinsicE +' exp_E.
+  Definition instr_E := CallE +' IntrinsicE +' JmpE +' exp_E.
   Definition exp_E_to_instr_E : exp_E ~> instr_E:=
-    fun T e => inr1 (inr1 e).
+    fun T e => inr1 (inr1 (inr1 e)).
 
   (* Core effects. *)
-  Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
+  Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' JmpE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
   Definition instr_E_to_L0' : instr_E ~> L0' :=
     fun T e =>
@@ -204,8 +208,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
       | inl1 e => inl1 e
       | inr1 (inl1 e) => inr1 (inr1 (inl1 e))
       | inr1 (inr1 (inl1 e)) => inr1 (inr1 (inr1 (inl1 e)))
-      | inr1 (inr1 (inr1 (inl1 e))) => inr1 (inr1 (inr1 (inr1 (inl1 (inl1 e)))))
-      | inr1 (inr1 (inr1 (inr1 e))) => inr1 (inr1 (inr1 (inr1 (inr1 e))))
+      | inr1 (inr1 (inr1 (inl1 e))) => inr1 (inr1 (inr1 (inr1 (inl1 e))))
+      | inr1 (inr1 (inr1 (inr1 (inl1 e)))) => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 (inl1 e))))))
+      | inr1 (inr1 (inr1 (inr1 (inr1 e)))) => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 e)))))
       end.
 
   Definition _exp_E_to_L0' : exp_E ~> L0' :=
