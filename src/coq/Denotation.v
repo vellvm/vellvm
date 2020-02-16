@@ -874,8 +874,18 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
        *)
 
       Definition interface: Type := list block_id.
-      Definition open_cfg: Type  := list (block dtyp).
-      Definition dom: open_cfg -> interface := List.map blk_id.
+      (* An open cfg is made of a list of blocks and two interface:
+         the set of blocks from which the open cfg can be entered,
+         and the set toward which it can exit.
+       *)
+      Record open_cfg: Type :=
+        {
+          bks: list (block dtyp);
+          inputs : interface;
+          outputs: interface
+        }.
+
+      Definition dom (ocfg: open_cfg): interface := List.map blk_id (bks ocfg).
       Definition lbl_from_terminator {T} (t: terminator T): interface :=
         match t with
         | TERM_Br _ id1 id2 => [id1;id2]
@@ -883,57 +893,71 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | _ => []
         end.
       Definition codom (ocfg: open_cfg): interface :=
-        List.fold_left (fun acc block => app (lbl_from_terminator (snd (blk_term block))) acc) ocfg [].
+        List.fold_left (fun acc block => app (lbl_from_terminator (snd (blk_term block))) acc) (bks ocfg) [].
       Definition inb {A: Type} {eqa} {H: RelDec.RelDec eqa} (xs: list A) (x: A): bool :=
         existsb (fun y => RelDec.rel_dec x y) xs.
-      Definition collect_blocks (ocfg: open_cfg) (i: interface): open_cfg :=
-        List.filter (fun block => inb i (blk_id block)) ocfg.
+      Definition collect_blocks (ocfg: open_cfg) (i: interface): list (block dtyp) :=
+        List.filter (fun block => inb i (blk_id block)) (bks ocfg).
 
       (* Question: we denote phi-nodes of blocks we are about to jump to after the denotation of a given block.
          If I jump to a block in B, and hence do not re-entry, should I denote the phis?
        *)
-      Definition denote_open_bks (bks: open_cfg) (A B: list block_id): block_id -> itree instr_E (block_id + uvalue) :=
+      Definition denote_open_cfg (ocfg: open_cfg): block_id -> itree instr_E (block_id + uvalue) :=
         loop (C := ktree _)
              (fun (bid: block_id + block_id) =>
                 match bid with
                 | inl bid
                 | inr bid =>
-                  (* We only consider bks described in A as valid entry point *)
-                  match find_block DynamicTypes.dtyp (collect_blocks bks A) bid with
-                  | None => ret (inr (inl bid)) (* Should this be a failure instead? *)
-                  | Some block =>
-                    (* We denote the block considered *)
-                    bd <- denote_block block;;
-                    match bd with
-                    | inr dv => ret (inr (inr dv)) (* On value we return *)
-                    | inl bid_target =>
-                      (* On jumps, we return if in B, try to loop otherwise *)
-                      if inb B bid_target
-                      then ret (inr (inl bid))
-                      else
-                        (* Otherwise, we find the block, evaluate its phi and loop back *)
-                        match find_block DynamicTypes.dtyp bks bid_target with
-                        | None => ret (inr (inl bid_target))
-                        | Some block_target =>
-                          (* And set the phi-nodes of the new destination, if any *)
-                          dvs <- Util.map_monad
-                                  (fun x => translate exp_E_to_instr_E (denote_phi bid x))
-                                  (blk_phis block_target) ;;
-                          Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
-                          ret (inl bid_target)
-                        end
+                  (* We only consider the inputs as valid entry point *)
+                  if inb (inputs ocfg) bid
+                  then
+                    (* [bid] is an input. We should have invariants ensuring the lookup succeeds *)
+                    match find_block DynamicTypes.dtyp (bks ocfg) bid with
+                    | None => ret (inr (inl bid)) (* This case should never happen for a well-formed open_cfg *)
+                    | Some block =>
+                      (* We denote the block considered *)
+                      bd <- denote_block block;;
+                      match bd with
+                      | inr dv => ret (inr (inr dv)) (* On value we return *)
+                      | inl bid_target =>
+                        (* On jumps, we return if we find an exit point, otherwise we try to loop *)
+                        if inb (outputs ocfg) bid_target
+                        then ret (inr (inl bid))
+                        else
+                          (* Otherwise, we find the block, evaluate its phi and loop back *)
+                          match find_block DynamicTypes.dtyp (bks ocfg) bid_target with
+                          | None => ret (inr (inl bid_target))
+                          | Some block_target =>
+                            (* And set the phi-nodes of the new destination, if any *)
+                            dvs <- Util.map_monad
+                                    (fun x => translate exp_E_to_instr_E (denote_phi bid x))
+                                    (blk_phis block_target) ;;
+                            Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
+                            ret (inl bid_target)
+                          end
+                      end
                     end
-                  end
+                  else
+                    ret (inr (inl bid)) (* Trying to enter the open_cfg from a non-input label.
+                                           Should it be returned, or should it be failure?
+                                           i.e. is the denotation the identity over other labels,
+                                           or is it a partial function?
+                                         *)
                 end).
 
       Definition denote_cfg' (f: cfg dtyp): itree instr_E uvalue :=
-        r <- denote_open_bks (blks _ f) [init _ f] [] (init _ f) ;;
+        let ocfg :=
+            {| bks := (blks _ f);
+               inputs := [init _ f];
+               outputs := []
+            |} in
+        r <- denote_open_cfg ocfg (init _ f) ;;
         match r with
         | inl bid => raise ("Can't find block in denote_cfg " ++ to_string bid)
         | inr uv  => ret uv
         end.
 
-      Definition denote_bks (bks: open_cfg) (A B: list block_id): block_id -> itree instr_E (block_id + uvalue) :=
+      Definition denote_bks (bks: list _): block_id -> itree instr_E (block_id + uvalue) :=
         loop (C := ktree _)
              (fun (bid : block_id + block_id) =>
                 match bid with
