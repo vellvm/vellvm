@@ -22,6 +22,35 @@ let exec_tests () =
   Printf.printf "%s\n" (outcome_to_string outcome);
   raise (Ran_tests (successful outcome))
 
+let make_test ll_ast t : string * assertion  =
+  match t with
+  | Assertion.EQTest (expected, dtyp, entry, args) ->
+    let str =
+      let expected_str =
+        Interpreter.pp_uvalue Format.str_formatter expected;
+        Format.flush_str_formatter ()
+      in
+      let args_str =
+        Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter  args;
+        Format.flush_str_formatter()
+      in
+      Printf.sprintf "%s = %s(%s)" expected_str entry args_str
+    in
+    let result () = Interpreter.step (TopLevel.TopLevelEnv.interpreter_user dtyp (Camlcoq.coqstring_of_camlstring entry) args [] ll_ast) 
+    in
+    str, (Assert.assert_eqf result (Ok expected))
+
+
+
+let test_dir dir =
+Platform.configure();
+let pathlist = Test.files_of_dir dir in
+let parsedtests = List.map (fun f -> (f, fun() -> parse_tests f)) (pathlist) in
+let madetests = List.map (fun f -> (f, fun() -> make_test f))( [parsedtests]) in
+let suite = Test (madetests) in
+let outcome = run_suite suite in
+raise (Ran_tests (successful outcome))
+
 let test_pp_dir dir =
   Platform.configure();
   let suite = [Test.pp_test_of_dir dir] in
@@ -67,24 +96,6 @@ let ast_pp_dir dir =
   let files = Test.files_of_dir dir in
   List.iter ast_pp_file_inner files
 
-let make_test ll_ast t : string * assertion  =
-  match t with
-  | Assertion.EQTest (expected, dtyp, entry, args) ->
-    let str =
-      let expected_str =
-        Interpreter.pp_uvalue Format.str_formatter expected;
-        Format.flush_str_formatter ()
-      in
-      let args_str =
-        Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter  args;
-        Format.flush_str_formatter()
-      in
-      Printf.sprintf "%s = %s(%s)" expected_str entry args_str
-    in
-    let result () = Interpreter.step (TopLevel.TopLevelEnv.interpreter_user dtyp (Camlcoq.coqstring_of_camlstring entry) args [] ll_ast) 
-    in
-    str, (Assert.assert_eqf result (Ok expected))
-
 
 let test_file path =
   Platform.configure ();
@@ -108,6 +119,7 @@ let test_file path =
 let args =
   [ ("--test", Unit exec_tests, "run the test suite, ignoring later inputs")
   ; ("--test-file", String test_file, "run the assertions in a given file")
+  ; ("--test-dir", Unit test_dir, "run all .ll files in the given directory")
   ; ("--test-pp-dir", String test_pp_dir, "run the parsing/pretty-printing tests on all .ll files in the given directory")
   ; ("--print-ast", String ast_pp_file, "run the parsing on the given .ll file and print its internal ast and domination tree")
   ; ("--print-ast-dir", String ast_pp_dir, "run the parsing on the given directory and print its internal ast and domination tree")

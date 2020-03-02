@@ -1,9 +1,9 @@
 EXCLUDE_QUERY_DIR
-B /Users/stevez/.opam/default/lib/ocaml
+B /home/albert/.opam/default/lib/ocaml
 B ../../_build/default/ml/extracted/.extracted.objs/byte
 B ../../_build/default/ml/libvellvm/.libvellvm.objs/byte
 B ../../_build/default/ml/testing/.testing.objs/byte
-S /Users/stevez/.opam/default/lib/ocaml
+S /home/albert/.opam/default/lib/ocaml
 S ../extracted
 S ../libvellvm
 S .
