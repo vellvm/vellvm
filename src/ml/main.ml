@@ -42,14 +42,6 @@ let make_test ll_ast t : string * assertion  =
 
 
 
-let test_dir dir =
-Platform.configure();
-let pathlist = Test.files_of_dir dir in
-let parsedtests = List.map (fun f -> (f, fun() -> parse_tests f)) (pathlist) in
-let madetests = List.map (fun f -> (f, fun() -> make_test f))( [parsedtests]) in
-let suite = Test (madetests) in
-let outcome = run_suite suite in
-raise (Ran_tests (successful outcome))
 
 let test_pp_dir dir =
   Platform.configure();
@@ -112,14 +104,27 @@ let test_file path =
     | _ -> failwith @@ Printf.sprintf "found unsupported file type: %s" path
   end
 
-    
+let test_dir dir =
+  Platform.configure();
+  let pathlist = Test.files_of_dir dir in
+  let files = List.filter_map (fun path ->
+      let file, ext = Platform.path_to_basename_ext path in
+      begin match ext with
+        | "ll" -> Some (file, parse_file path, parse_tests path)
+        | _ -> None
+      end) pathlist
+  in
+  let suite = List.map (fun (file, ast, tests) -> Test (file, List.map (make_test ast) tests)) files in
+  let outcome = run_suite suite in
+  Printf.printf "%s\n" (outcome_to_string outcome);
+  raise (Ran_tests (successful outcome))
   
 
 (* Use the --test option to run unit tests and the quit the program. *)
 let args =
   [ ("--test", Unit exec_tests, "run the test suite, ignoring later inputs")
   ; ("--test-file", String test_file, "run the assertions in a given file")
-  ; ("--test-dir", Unit test_dir, "run all .ll files in the given directory")
+  ; ("--test-dir", String test_dir, "run all .ll files in the given directory")
   ; ("--test-pp-dir", String test_pp_dir, "run the parsing/pretty-printing tests on all .ll files in the given directory")
   ; ("--print-ast", String ast_pp_file, "run the parsing on the given .ll file and print its internal ast and domination tree")
   ; ("--print-ast-dir", String ast_pp_dir, "run the parsing on the given directory and print its internal ast and domination tree")
