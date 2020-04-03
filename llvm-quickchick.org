@@ -1,0 +1,55 @@
+* Stuff to look into
+
+  - CSmith paper
+    + similar kind of generator
+  - [[https://dl.acm.org/doi/10.1145/3110259][Effect-driven QuickChecking of Compilers]]
+  - QuickChick interaction trees stuff with deepweb
+
+* Some Questions
+
+  - Does it make sense to do differential testing?
+    + llc vs vellvm?
+    + what would you compare? Just return values?
+  - What do we check for equivalence?
+    + final memory states
+    + event stream?
+      * Need an idea of what events can be reordered, combined, etc.
+  - What properties do we want to test
+
+* Notes on how CSmith generates
+
+  1. First step
+     - Might not need filter step, QuickChick is flexible enough to
+       avoid generating something that doesn't make sense in current
+       context (see SystemF example in backtracking paper)
+  2. Targets (variables / functions / labels)
+     - CSmith seems to generate new targets / variables on the fly as
+       well as selecting from previously defined ones.
+
+** Safety Mechanisms
+
+   Summarized nicely in Table 1. We don't need to worry about every
+   aspect of this (I think we might not have to worry about
+   unspecified order of evaluation of function arguments for instance
+   -- there's "only one LLVM"). Some good tricks:
+
+   - Not allowing recursion
+   - wrapper functions for safe arithmetic
+     + should we just inline these?
+   - pointer analysis
+     + CSmith uses this for detecting things like local function variables escaping...
+       * We can maybe get by without complicated pointer analysis by just running the programs and seeing if they raise an error for now?
+         - Will not catch bugs related to popping function stacks.
+   - Doesn't allow recursion
+
+* Steps
+
+  - Just get QuickChick included in Vellvm
+    + Probably as a submodule for now, as we'll want to use backtracking
+  - Build a basic generator
+  - Test some 
+  - Experiment with performance of generator
+    + build up a set of mutants
+      * Look into broken semi-concrete memory model for inspiration
+      * break GEP somehow
+    + use mutants to measure MTTF
