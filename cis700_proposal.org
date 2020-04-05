@@ -1,0 +1,78 @@
+#+TITLE: Quichicking Vellvm
+
+* Vellvm, a formal semantics for LLVM's IR
+
+  Vellvm is a project aiming at providing LLVM's IR with a formal semantics written in Coq.
+  It aims to come with a propositional model, capturing all legal executions, but also 
+  an interpreter sound with respect to this model.
+  
+  IR's semantics is described by an informal document, written in plain English, the [[https://llvm.org/docs/LangRef.html][LangRef]].
+  While Vellvm semantics means to reflect this document, the task is not quite straightforward.
+  For one the cheer size of the task is error prone. But more importantly, the semantics is often
+  imprecise, sometimes ambiguous. Finally, some corner of the semantics are known to lack sanity,
+  and require some redesign.
+
+  On the other hand, the LLVM's project includes an interpreter for IR that also intends to reflect
+  LangRef. Ideally, both interpreters should therefore be in agreement.
+
+  That being said, empirical evidence suggests that both IR's semantics and IR's implementations are
+  buggy. Discovering these bugs would be of crucial interest.
+
+  Finally, while it is in part a matter of blame attribution, some program transformations performed
+  on IR may incorrectly change the semantics of the program.
+
+  Wrapping up this chain of thoughts, we make the following observations. 
+  1. We are developing a complex software entity meant to essentially agree with
+     another one: testing for this agreement may help
+     our development process.
+  2. There are strong suspicions that some aspects of these semantics are problematic. Could we find
+     properties expressing sanity that could be tested?
+  3. It is known that some (combinations of) transformations are unsound with respect to the current
+     official semantics, a pitfall that our semantics intends to fix (either by fixing the semantics,
+     or prohibiting such unsound combinations of optimizations). Is there any hope to perform some
+     testing at this level?
+  
+  We propose to start through this project this line of research, by first and foremost focusing
+  on the design and implementation of an efficient random generator of Vellvm programs using the
+  [[https://github.com/QuickChick/QuickChick][QuickChick]] Coq library.
+
+* In the footsteps of CSmith
+
+  [[https://embed.cs.utah.edu/csmith/][CSmith]] is a tool performing random testing of C compilers. It uncovered an unprecedented amount of
+  critical bugs in all the compilers it challenged, with the exception of the verified-at-the-time
+  subset of CompCert. One of the key ingredient to their success is the combination of random generation
+  with static analyses meant to ensure that all program generated admit no undefined behaviors, and do
+  not rely on unspecified behaviors.
+ 
+  While C and IR are not identical, they are similar enough that we believe this work to be the right
+  starting point for the design of our random generator.
+
+* Difficulties, open questions and remarks
+
+  - The approach to testing that CSmith takes is differential testing,
+    simultaneously testing a suite of compiler and letting the majority decide
+    what is the right answer. This approach does not apply to our case, although
+    we will probably be satisfied with simply testing agreement with the reference
+    interpreter (llc).
+  - Since llc is obviously not implemented in Coq, this approach does not fit the
+    property-based framework. 
+  - IR's semantics is non deterministic for some features. Non-agreement on these
+    features is therefore not necessarily sign of a bug. Should and can we restrict 
+    ourselves to the deterministic fragment? Can we find a way to meaningfully test
+    the non-deterministic one?
+  - What does it mean to compare the implementations? Is testing the return values 
+    sufficient?
+  - What are interesting properties of our compiler that we could test, independently
+    from llc? It feels like when it comes to a compiler, we are mostly interested in
+    clearly non-computable semantic properties of program, and program equivalence in
+    particular.
+
+* Bibliography
+
+  - Finding and understanding bugs in C Compilers (Yang et al., PLDI 2011)
+    This paper introduces the [[https://embed.cs.utah.edu/csmith/][CSmith]] tool.
+
+  - A survey of compiler testing (Chen et al., ACM Computing Survey 2020)
+
+  - Effect-driven QuickChecking of compilers (Midtgaardjan et al., ICFP 2017) 
+
