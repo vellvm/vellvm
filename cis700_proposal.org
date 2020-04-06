@@ -2,35 +2,57 @@
 
 * Vellvm, a formal semantics for LLVM's IR
 
-  Vellvm is a project aiming at providing LLVM's IR with a formal semantics written in Coq.
-  It aims to come with a propositional model, capturing all legal executions, but also 
-  an interpreter sound with respect to this model.
-  
-  IR's semantics is described by an informal document, written in plain English, the [[https://llvm.org/docs/LangRef.html][LangRef]].
-  While Vellvm semantics means to reflect this document, the task is not quite straightforward.
-  For one the cheer size of the task is error prone. But more importantly, the semantics is often
-  imprecise, sometimes ambiguous. Finally, some corner of the semantics are known to lack sanity,
-  and require some redesign.
+  Vellvm is a project that aims to provide LLVM's IR with a formal
+  semantics in Coq.  It comes with a propositional model capturing all
+  legal executions, but also an interpreter that is sound with respect
+  to this model.
 
-  On the other hand, the LLVM's project includes an interpreter for IR that also intends to reflect
-  LangRef. Ideally, both interpreters should therefore be in agreement.
+  The IR's semantics is described by an informal document, written in
+  plain English, the [[https://llvm.org/docs/LangRef.html][LangRef]].  While Vellvm's semantics are intended
+  to reflect this document, the task is not straightforward. For
+  starters, the sheer size of the language makes developing semantics
+  error prone. A more crucial difficulty is that the semantics
+  provided in LangRef are often imprecise, and sometimes
+  ambiguous. Furthermore, some features of the language are known to
+  be inconsistent, requiring careful tip-toeing and an eye towards
+  significant future redesigns.
 
-  That being said, empirical evidence suggests that both IR's semantics and IR's implementations are
-  buggy. Discovering these bugs would be of crucial interest.
+  While LangRef may leave out important details, the LLVM project also
+  includes an interpreter for the IR. This interpreter can serve as a
+  reference implementation for the language, and so it should be
+  possible to compare Vellvm's interpreter with LLVM's interpreter and
+  check if they are in agreement. An excellent way to do this would be
+  to use QuickChick to randomly generate LLVM IR programs to run on
+  each interpreter --- comparing the results of each program should
+  allow us to find differences and bugs in each implementation.
 
-  Finally, while it is in part a matter of blame attribution, some program transformations performed
-  on IR may incorrectly change the semantics of the program.
+  Furthermore, Vellvm is also meant to be a tool for reasoning about
+  LLVM IR programs. As Vellvm is still under development there are
+  still many theorems for reasoning about the equivalence of LLVM
+  programs that need to be proven. Furthermore, Vellvm hopes to
+  develop several verified program transformations on LLVM IR in the
+  near future. Proving these lemmas and correctness theorems is
+  expensive, and so it would be prudent to test these theorems early
+  on to ensure that the theorems are stated correctly and that the
+  program transformations are not obviously wrong. The first step to
+  testing these properties is a good generator like the one we might
+  use to perform differential testing between Vellvm and the LLVM
+  interpreter.
 
-  Wrapping up this chain of thoughts, we make the following observations. 
-  1. We are developing a complex software entity meant to essentially agree with
-     another one: testing for this agreement may help
-     our development process.
-  2. There are strong suspicions that some aspects of these semantics are problematic. Could we find
-     properties expressing sanity that could be tested?
-  3. It is known that some (combinations of) transformations are unsound with respect to the current
-     official semantics, a pitfall that our semantics intends to fix (either by fixing the semantics,
-     or prohibiting such unsound combinations of optimizations). Is there any hope to perform some
-     testing at this level?
+  In summary, we make the following observations:
+
+  1. We are developing complex software which is meant to agree with
+     another one: testing for this agreement may help our development
+     process.
+  2. There are strong suspicions that some aspects of these semantics
+     are problematic. Could we find properties expressing sanity that
+     could be tested?
+  3. It is known that some (combinations of) transformations are
+     unsound with respect to the current official semantics, a pitfall
+     that our semantics intends to fix (either by fixing the
+     semantics, or prohibiting such unsound combinations of
+     optimizations). Is there any hope to perform some testing at this
+     level?
   
   We propose to start through this project this line of research, by first and foremost focusing
   on the design and implementation of an efficient random generator of Vellvm programs using the
@@ -54,18 +76,25 @@
     what is the right answer. This approach does not apply to our case, although
     we will probably be satisfied with simply testing agreement with the reference
     interpreter (llc).
-  - Since llc is obviously not implemented in Coq, this approach does not fit the
-    property-based framework. 
-  - IR's semantics is non deterministic for some features. Non-agreement on these
-    features is therefore not necessarily sign of a bug. Should and can we restrict 
-    ourselves to the deterministic fragment? Can we find a way to meaningfully test
+  - Since llc is obviously not implemented in Coq, we will need to
+    look into calling llc from ocaml and fiddling with Coq's
+    extraction mechanism to make our properties work.
+  - IR's semantics is non deterministic for some
+    features. Non-agreement on these features is therefore not
+    necessarily sign of a bug. Should and can we restrict ourselves to
+    the deterministic fragment? Can we find a way to meaningfully test
     the non-deterministic one?
+    + It does make sense to start with the deterministic fragment of
+      the language, but some of the most interesting and difficult
+      behaviour of IR is in the behaviour of nondeterministic things like undef.
   - What does it mean to compare the implementations? Is testing the return values 
     sufficient?
   - What are interesting properties of our compiler that we could test, independently
     from llc? It feels like when it comes to a compiler, we are mostly interested in
     clearly non-computable semantic properties of program, and program equivalence in
     particular.
+    + We'll have to look into how to test things like eutt if we want
+      to check most of our properties.
 
 * Bibliography
 
