@@ -2,8 +2,8 @@
 (*                                                                     *)
 (*              The Compcert verified compiler                         *)
 (*                                                                     *)
-(*                Xavier Leroy, INRIA Paris                            *)
-(*                Jacques-Henri Jourdan, INRIA Paris                   *)
+(*          Xavier Leroy, INRIA Paris-Rocquencourt                     *)
+(*          Jacques-Henri Jourdan, INRIA Paris-Rocquencourt            *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique.  All rights reserved.  This file is distributed       *)
@@ -14,45 +14,55 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(** Architecture-dependent parameters for x86 in 64-bit mode *)
+(** Architecture-dependent parameters for PowerPC *)
 
-Require Import ZArith.
-Require Import Flocq.IEEE754.Binary.
-Require Import Flocq.IEEE754.Bits.
+Require Import ZArith List.
+From Flocq Require Import Binary Bits.
 
-Definition ptr64 := true.
+Definition ptr64 := false.
 
-Definition big_endian := false.
+Definition big_endian := true.
 
 Definition align_int64 := 8%Z.
 Definition align_float64 := 8%Z.
 
-Definition splitlong := negb ptr64.
+(** Can we use the 64-bit extensions to the PowerPC architecture? *)
+Parameter ppc64 : bool.
+
+Definition splitlong := negb ppc64.
 
 Lemma splitlong_ptr32: splitlong = true -> ptr64 = false.
 Proof.
-  unfold splitlong. destruct ptr64; simpl; congruence.
+  reflexivity.
 Qed.
 
-Definition x_nan_pl (z:Z) := {p | nan_pl z p = true}.
-Definition mk_x_nan_pl {z:Z} {p:positive} (P: nan_pl z p = true) : x_nan_pl z
-  := exist _ _ P.
+Definition default_nan_64 := (false, iter_nat 51 _ xO xH).
+Definition default_nan_32 := (false, iter_nat 22 _ xO xH).
 
-Program Definition default_pl_64 : bool * x_nan_pl 53 :=
-  (true, iter_nat 51 _ xO xH).
+(* Always choose the first NaN argument, if any *)
 
-Definition choose_binop_pl_64 (s1: bool) (pl1: x_nan_pl 53) (s2: bool) (pl2: x_nan_pl 53) :=
-  false.                        (**r always choose first NaN *)
+Definition choose_nan_64 (l: list (bool * positive)) : bool * positive :=
+  match l with nil => default_nan_64 | n :: _ => n end.
 
-Program Definition default_pl_32 : bool * x_nan_pl 24 :=
-  (true, iter_nat 22 _ xO xH).
+Definition choose_nan_32 (l: list (bool * positive)) : bool * positive :=
+  match l with nil => default_nan_32 | n :: _ => n end.
 
-Definition choose_binop_pl_32 (s1: bool) (pl1: x_nan_pl 24) (s2: bool) (pl2: x_nan_pl 24) :=
-  false.                        (**r always choose first NaN *)
+Lemma choose_nan_64_idem: forall n,
+  choose_nan_64 (n :: n :: nil) = choose_nan_64 (n :: nil).
+Proof. auto. Qed.
 
-Definition float_of_single_preserves_sNaN := false.
+Lemma choose_nan_32_idem: forall n,
+  choose_nan_32 (n :: n :: nil) = choose_nan_32 (n :: nil).
+Proof. auto. Qed.
+
+Definition fma_order {A: Type} (x y z: A) := (x, z, y).
+
+Definition fma_invalid_mul_is_nan := false.
+
+Definition float_of_single_preserves_sNaN := true.
 
 Global Opaque ptr64 big_endian splitlong
-              default_pl_64 choose_binop_pl_64
-              default_pl_32 choose_binop_pl_32
+              default_nan_64 choose_nan_64
+              default_nan_32 choose_nan_32
+              fma_order fma_invalid_mul_is_nan
               float_of_single_preserves_sNaN.

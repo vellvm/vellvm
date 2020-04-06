@@ -15,7 +15,7 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric/Integers Numeric/Floats\
+COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats\
 									Util PropT Error LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues\
 									LLVMEvents TypeUtil IntrinsicsDefinitions\
 									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/UndefinedBehaviour\
