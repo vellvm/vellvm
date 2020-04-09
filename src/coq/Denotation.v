@@ -382,6 +382,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     | _               => False
     end.
 
+  (* trigger pick, but only if the value isn't concrete *)
+  Definition concretize_or_pick {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) (P : Prop) : itree E dvalue :=
+    if is_concrete uv
+    then lift_err ret (uvalue_to_dvalue uv)
+    else trigger (pick uv P).
+  
   (* Pick a possibly poison value, treating poison as
      nondeterminism. This is used for freeze. *)
   Definition pick_your_poison {E : Type -> Type} `{PickE -< E} (dt : dtyp) (uv : uvalue) : itree E dvalue :=
@@ -694,7 +700,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | (IId id, INSTR_Load _ dt (du,ptr) _) =>
           (* debug ("Load: " ++ to_string dt);; *)
           ua <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
-          da <- trigger (pick ua True) ;;
+          da <- concretize_or_pick ua True ;;
           match da with
           | DVALUE_Poison => raiseUB "Load from poisoned address."
           | _ => dv <- trigger (Load dt da);;
@@ -705,9 +711,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Store *)
         | (IVoid _, INSTR_Store _ (dt, val) (du, ptr) _) =>
           uv <- translate exp_E_to_instr_E (denote_exp (Some dt) val) ;;
-          dv <- trigger (pick uv True) ;;
+          dv <- concretize_or_pick uv True ;;
           ua <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
-          da <- trigger (pickUnique ua) ;;
+          da <- concretize_or_pick ua (unique_prop ua) ;;
           match da with
           | DVALUE_Poison => raiseUB "Store to poisoned address."
           | _ => trigger (Store da dv)

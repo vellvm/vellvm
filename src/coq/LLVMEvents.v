@@ -165,8 +165,11 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Variant PickE : Type -> Type :=
   | pick (u:uvalue) (P : Prop) : PickE dvalue.
 
+  Definition unique_prop (uv : uvalue) : Prop
+    := exists x, forall dv, concretize uv dv -> dv = x.
+  
   Definition pickUnique (uv : uvalue) : PickE dvalue
-    := pick uv (exists x, forall dv, concretize uv dv -> dv = x).
+    := pick uv (unique_prop uv).
 
   Definition pickAll (p : uvalue -> PickE dvalue) := map_monad (fun uv => trigger (p uv)).
 

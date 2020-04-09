@@ -77,8 +77,9 @@ Section Globals.
     Definition G_trigger' {M} : forall R , G R -> (stateT M (itree Effout') R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
+    Definition interp_global_h := (case_ E_trigger (case_ F_trigger (case_ handle_global G_trigger))).
     Definition interp_global  : itree Effin ~> stateT map (itree Effout) :=
-      interp_state (case_ E_trigger (case_ F_trigger (case_ handle_global G_trigger))).
+      interp_state interp_global_h.
 
     Definition interp_global'  : itree Effin' ~> stateT map (itree Effout') :=
       interp_state (case_ E_trigger' (case_ F_trigger' (case_ H_trigger' (case_ handle_global G_trigger')))).

@@ -74,8 +74,9 @@ Section Locals.
     Definition G_trigger' {M} : forall R , G R -> (stateT M (itree Effout') R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
+    Definition interp_local_h := (case_ E_trigger (case_ F_trigger (case_ handle_local G_trigger))).
     Definition interp_local : itree Effin ~> stateT map (itree Effout) :=
-      interp_state (case_ E_trigger (case_ F_trigger (case_ handle_local G_trigger))).
+      interp_state interp_local_h.
 
     Definition interp_local' : itree Effin' ~> stateT map (itree Effout') :=
       interp_state (case_ E_trigger' (case_ F_trigger' (case_ H_trigger' (case_ handle_local G_trigger')))).

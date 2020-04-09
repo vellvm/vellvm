@@ -129,9 +129,12 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     Definition E'_trigger' : Handler E' Eff' := fun _ e => trigger e.
     Definition F_trigger' : Handler F Eff' := fun _ e => trigger e.
 
+    Definition interpret_intrinsics_h (user_intrinsics: intrinsic_definitions) :=
+      (case_ E_trigger (case_ (handle_intrinsics user_intrinsics) F_trigger)).
+
     Definition interpret_intrinsics (user_intrinsics: intrinsic_definitions):
       forall R, itree Eff R -> itree Eff R :=
-      interp (case_ E_trigger (case_ (handle_intrinsics user_intrinsics) F_trigger)).
+      interp (interpret_intrinsics_h user_intrinsics).
 
     Definition interpret_intrinsics' (user_intrinsics: intrinsic_definitions):
       forall R, itree Eff' R -> itree Eff' R :=
