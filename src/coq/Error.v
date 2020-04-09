@@ -16,7 +16,7 @@ From ITree Require Import
      ITree
      Events.Exception.
 
-Definition err T := sum string T.
+Notation err := (sum string).
 
 Instance Monad_err : Monad err := Monad_either string.
 Instance Exception_err : MonadExc string err := Exception_either string.
