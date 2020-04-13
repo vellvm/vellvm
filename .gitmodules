@@ -4,3 +4,6 @@
 [submodule "lib/InteractionTrees"]
 	path = lib/InteractionTrees
 	url = https://github.com/DeepSpec/InteractionTrees.git
+[submodule "lib/QuickChick"]
+	path = lib/QuickChick
+	url = git@github.com:QuickChick/QuickChick.git

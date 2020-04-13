@@ -7,8 +7,9 @@ MLDIR = ml
 EXTRACTDIR = ml/extracted
 
 ITREEDIR=../lib/InteractionTrees
+QUICKCHICKDIR=../lib/QuickChick
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(ITREEDIR)/theories/ ITree 
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(ITREEDIR)/theories/ ITree -R $(QUICKCHICKDIR)/src/ QuickChick
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
@@ -55,7 +56,15 @@ update-trees:
 itrees:
 	make -C $(ITREEDIR)
 
-.PHONY: extracted itrees 
+quickchick:
+	make -C $(QUICKCHICKDIR)
+
+update-quickchick:
+	git submodule update -- $(QUICKCHICKDIR)
+
+update-submodules: update-trees update-quickchick
+
+.PHONY: extracted update-trees update-quickchick update-submodules itrees quickchick
 extracted: $(EXTRACTDIR)/STAMP $(VOFILES)
 
 $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
@@ -71,7 +80,7 @@ $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "COQC $*.v"
 	@$(COQC) -dump-glob doc/$(*F).glob $*.v
 
-depend: itrees $(VFILES) 
+depend: itrees quickchick $(VFILES) 
 	@echo "Analyzing Coq dependencies"
 	@$(COQDEP) $^ > .depend
 
@@ -103,6 +112,7 @@ clean:
 	rm -f vellvm
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
 	make -C $(ITREEDIR) clean
+	make -C $(QUICKCHICKDIR) clean
 
 doc/coq2html: 
 	make -C ../lib/coq2html
