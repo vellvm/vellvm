@@ -8,7 +8,8 @@ From ExtLib Require Import
 From ITree Require Import
      ITree
      Eq
-     Events.State.
+     Events.State
+     Events.StateFacts.
 
 From Vellvm Require Import
      Util
@@ -80,6 +81,14 @@ Section Locals.
 
     Definition interp_local' : itree Effin' ~> stateT map (itree Effout') :=
       interp_state (case_ E_trigger' (case_ F_trigger' (case_ H_trigger' (case_ handle_local G_trigger')))).
+
+    Lemma interp_local_ret :
+      forall (R : Type) g (x: R),
+        runState (interp_local (Ret x: itree Effin R)) g ≅ Ret (g,x).
+    Proof.
+      intros; apply interp_state_ret.
+    Qed.
+
 
   End PARAMS.
 

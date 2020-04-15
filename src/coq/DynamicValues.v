@@ -96,6 +96,50 @@ Inductive dvalue : Set :=
 | DVALUE_Vector        (elts: list dvalue)
 .
 
+Section DvalueInd.
+  Variable P : dvalue -> Prop.
+  Hypothesis IH_Addr          : forall a, P (DVALUE_Addr a).
+  Hypothesis IH_I1            : forall x, P (DVALUE_I1 x).
+  Hypothesis IH_I8            : forall x, P (DVALUE_I8 x).
+  Hypothesis IH_I32           : forall x, P (DVALUE_I32 x).
+  Hypothesis IH_I64           : forall x, P (DVALUE_I64 x).
+  Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
+  Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
+  Hypothesis IH_Poison        : P DVALUE_Poison.
+  Hypothesis IH_None          : P DVALUE_None.
+  Hypothesis IH_Struct        : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Struct fields).
+  Hypothesis IH_Packed_Struct : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Packed_struct fields).
+  Hypothesis IH_Array         : forall (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Array elts).
+  Hypothesis IH_Vector        : forall (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Vector elts).
+
+  Lemma dvalue_ind' : forall (dv:dvalue), P dv.
+    fix IH 1.
+    remember P as P0 in IH.
+    destruct dv; auto; subst.
+    - apply IH_Struct.
+      { revert fields.
+        fix IHfields 1. intros [|u fields']. intros. inversion H.
+        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
+      }
+    - apply IH_Packed_Struct.
+      { revert fields.
+        fix IHfields 1. intros [|u fields']. intros. inversion H.
+        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
+      }
+    - apply IH_Array.
+      { revert elts.
+        fix IHelts 1. intros [|u elts']. intros. inversion H.
+        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
+      }
+    - apply IH_Vector.
+      { revert elts.
+        fix IHelts 1. intros [|u elts']. intros. inversion H.
+        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
+      }
+  Qed.
+End DvalueInd.
+
+
 (* The set of dynamic values manipulated by an LLVM program. *)
 Inductive uvalue : Set :=
 | UVALUE_Addr (a:A.addr)
@@ -125,6 +169,78 @@ Inductive uvalue : Set :=
 | UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list int)
 | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
 .
+
+Section UvalueInd.
+  Variable P : uvalue -> Prop.
+  Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
+  Hypothesis IH_I1             : forall x, P (UVALUE_I1 x).
+  Hypothesis IH_I8             : forall x, P (UVALUE_I8 x).
+  Hypothesis IH_I32            : forall x, P (UVALUE_I32 x).
+  Hypothesis IH_I64            : forall x, P (UVALUE_I64 x).
+  Hypothesis IH_Double         : forall x, P (UVALUE_Double x).
+  Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
+  Hypothesis IH_Undef          : forall t, P (UVALUE_Undef t).
+  Hypothesis IH_Poison         : P UVALUE_Poison.
+  Hypothesis IH_None           : P UVALUE_None.
+  Hypothesis IH_Struct         : forall (fields: list uvalue), (forall u, In u fields -> P u) -> P (UVALUE_Struct fields).
+  Hypothesis IH_Packed_Struct  : forall (fields: list uvalue), (forall u, In u fields -> P u) -> P (UVALUE_Packed_struct fields).
+  Hypothesis IH_Array          : forall (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Array elts).
+  Hypothesis IH_Vector         : forall (elts: list uvalue), (forall e, In e elts -> P e) -> P (UVALUE_Vector elts).
+  Hypothesis IH_IBinop         : forall (iop:ibinop) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_IBinop iop v1 v2).
+  Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
+  Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
+  Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
+  Hypothesis IH_Conversion     : forall (conv:conversion_type) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv v t_to).
+  Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
+  Hypothesis IH_ExtractElement : forall (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement vec idx).
+  Hypothesis IH_InsertElement  : forall (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement vec elt idx).
+  Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
+  Hypothesis IH_ExtractValue   : forall (vec:uvalue) (idxs:list int), P vec -> P (UVALUE_ExtractValue vec idxs).
+  Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
+  Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
+
+  Lemma uvalue_ind' : forall (uv:uvalue), P uv.
+    fix IH 1.
+    remember P as P0 in IH.
+    destruct uv; auto; subst.
+    - apply IH_Struct.
+      { revert fields.
+        fix IHfields 1. intros [|u fields']. intros. inversion H.
+        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
+      }
+    - apply IH_Packed_Struct.
+      { revert fields.
+        fix IHfields 1. intros [|u fields']. intros. inversion H.
+        intros u' [<-|Hin]. apply IH. eapply IHfields. apply Hin.
+      }
+    - apply IH_Array.
+      { revert elts.
+        fix IHelts 1. intros [|u elts']. intros. inversion H.
+        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
+      }
+    - apply IH_Vector.
+      { revert elts.
+        fix IHelts 1. intros [|u elts']. intros. inversion H.
+        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
+      }
+    - apply IH_IBinop; auto.
+    - apply IH_ICmp; auto.
+    - apply IH_FBinop; auto.
+    - apply IH_FCmp; auto.
+    - apply IH_Conversion; auto.
+    - apply IH_GetElementPtr. apply IH.
+      { revert idxs.
+        fix IHidxs 1. intros [|u idxs']. intros. inversion H.
+        intros u' [<-|Hin]. apply IH. eapply IHidxs. apply Hin.
+      }
+    - apply IH_ExtractElement; auto.
+    - apply IH_InsertElement; auto.
+    - apply IH_ShuffleVector; auto.
+    - apply IH_ExtractValue; auto.
+    - apply IH_InsertValue; auto.
+    - apply IH_Select; auto.
+  Qed.
+End UvalueInd.
 
 (* Injection of [dvalue] into [uvalue] *)
 Fixpoint dvalue_to_uvalue (dv : dvalue) : uvalue :=
@@ -195,6 +311,13 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
   | UVALUE_Select cnd v1 v2                => ret (DVALUE_Select cnd v1 v2)
    *)
   end.
+
+
+Lemma uvalue_to_dvalue_of_dvalue_to_uvalue :
+  forall (d : dvalue),
+    uvalue_to_dvalue (dvalue_to_uvalue d) = inr d.
+Proof.
+Admitted.
 
 (* returns true iff the uvalue contains no occurrence of UVALUE_Undef. *)
 (* YZ: See my comment above. If I'm correct, then we should also fail on operators and hence have:
