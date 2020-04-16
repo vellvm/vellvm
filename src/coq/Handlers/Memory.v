@@ -445,7 +445,14 @@ Admitted.
 
   Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
     match vs with
-    | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 indices *)
+    | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 / i64 indices *)
+      match dv with
+      | DVALUE_Addr (b, o) =>
+        off <- handle_gep_h t (o + (sizeof_dtyp t) * (unsigned i)) vs' ;;
+        ret (DVALUE_Addr (b, off))
+      | _ => failwith "non-address"
+      end
+    | DVALUE_I64 i :: vs' =>
       match dv with
       | DVALUE_Addr (b, o) =>
         off <- handle_gep_h t (o + (sizeof_dtyp t) * (unsigned i)) vs' ;;
