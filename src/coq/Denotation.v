@@ -599,7 +599,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          *)
         | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
           vptr <- denote_exp (Some dt2) ptrval ;;
-          vs <- map_monad (fun '(_, index) => denote_exp (Some (DTYPE_I 32)) index) idxs ;;
+          vs <- map_monad (fun '(dt, index) => denote_exp (Some dt) index) idxs ;;
 
           let maybe_dvs := dvptr <- uvalue_to_dvalue vptr ;;
                            dvs <- map_monad uvalue_to_dvalue vs ;;
