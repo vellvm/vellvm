@@ -3,3 +3,4 @@
 -R ../lib/InteractionTrees/theories ITree
 -R ../lib/QuickChick/src QuickChick
 -I ../lib/QuickChick/src
+-R ../lib/flocq-quickchick FlocqQuickChick

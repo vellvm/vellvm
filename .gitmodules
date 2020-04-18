@@ -7,3 +7,6 @@
 [submodule "lib/QuickChick"]
 	path = lib/QuickChick
 	url = git@github.com:QuickChick/QuickChick.git
+[submodule "lib/flocq-quickchick"]
+	path = lib/flocq-quickchick
+	url = git@github.com:Chobbes/flocq-quickchick.git
