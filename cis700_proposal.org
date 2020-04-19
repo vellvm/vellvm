@@ -105,3 +105,15 @@
 
   - Effect-driven QuickChecking of compilers (Midtgaardjan et al., ICFP 2017) 
 
+
+
+* Notes
+
+- One of the problems is just that LLVM is a large language, making it
+  a fair amount of work to go through and write a generator.
+  + Had to pick a subset for now. Focusing on simple integer expressions?
+- Derive for Arbitrary might be broken in this version of QuickChick,
+  which makes it a bit more work...
+- There are certain constraints that you might not know about.
+  + Well formed types?
+  + Can I test for these?
