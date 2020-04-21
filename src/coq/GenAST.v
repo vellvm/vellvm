@@ -195,7 +195,7 @@ Section Generators.
       match t with
       | TYPE_I n                  => ret EXP_Integer <*> arbitrary
       | TYPE_Pointer t            => failGen (* Only pointer type expressions might be conversions? Maybe GEP? *)
-      | TYPE_Void                 => failGen  (* There should be no expressions of type void *)
+      | TYPE_Void                 => failGen (* There should be no expressions of type void *)
       | TYPE_Function ret args    => failGen (* No expressions of function type *)
       | TYPE_Opaque               => failGen (* TODO: not sure what these should be... *)
       | TYPE_Half                 => failGen
@@ -213,40 +213,43 @@ Section Generators.
       | TYPE_Identified id        => failGen
       end
     | (S sz') =>
-      (* TODO: short-circuit to size 0 *)
-      match t with
-      | TYPE_I isz =>
-        (* If I1 also allow ICmp and FCmp *)
-        let n := Nat.div sz 2 in
-        ret OP_IBinop <*> gen_ibinop <*> ret t <*> gen_exp_size n ctx t <*> gen_exp_size n ctx t
-      | TYPE_Pointer t => failGen (* GEP? *)
-      | TYPE_Void => failGen (* No void type expressions *)
-      | TYPE_Array n t =>
-        es <- vectorOf (Z.to_nat n) (gen_exp_size sz' ctx t);;
-        ret (EXP_Array (map (fun e => (t, e)) es))
-      | TYPE_Vector n t =>
-        es <- vectorOf (Z.to_nat n) (gen_exp_size sz' ctx t);;
-        ret (EXP_Array (map (fun e => (t, e)) es))
-      | TYPE_Function ret args => failGen (* These shouldn't exist, I think *)
-      | TYPE_Struct fields =>
-        (* Should we divide size evenly amongst components of struct? *)
-        tes <- map_monad (fun t => e <- gen_exp_size sz' ctx t;; ret (t, e)) fields;;
-        ret (EXP_Struct tes)
-      | TYPE_Packed_struct fields =>
-        (* Should we divide size evenly amongst components of struct? *)
-        tes <- map_monad (fun t => e <- gen_exp_size sz' ctx t;; ret (t, e)) fields;;
-        ret (EXP_Packed_struct tes)
-      | TYPE_Opaque               => failGen (* TODO: not sure what these should be... *)
-      | TYPE_Half                 => failGen
-      | TYPE_Float                => failGen
-      | TYPE_Double               => failGen
-      | TYPE_X86_fp80             => failGen
-      | TYPE_Fp128                => failGen
-      | TYPE_Ppc_fp128            => failGen
-      | TYPE_Metadata             => failGen
-      | TYPE_X86_mmx              => failGen
-      | TYPE_Identified id        => failGen (* TODO: Involves lookup *)
-      end
+      let gens :=
+          match t with
+          | TYPE_I isz =>
+            (* TODO: If I1 also allow ICmp and FCmp *)
+            [let n := Nat.div sz 2 in
+             ret OP_IBinop <*> gen_ibinop <*> ret t <*> gen_exp_size n ctx t <*> gen_exp_size n ctx t]
+          | TYPE_Array n t =>
+            [es <- vectorOf (Z.to_nat n) (gen_exp_size sz' ctx t);;
+             ret (EXP_Array (map (fun e => (t, e)) es))]
+          | TYPE_Vector n t =>
+            [es <- vectorOf (Z.to_nat n) (gen_exp_size sz' ctx t);;
+             ret (EXP_Array (map (fun e => (t, e)) es))]
+          | TYPE_Struct fields =>
+            (* Should we divide size evenly amongst components of struct? *)
+            [tes <- map_monad (fun t => e <- gen_exp_size sz' ctx t;; ret (t, e)) fields;;
+             ret (EXP_Struct tes)]
+          | TYPE_Packed_struct fields =>
+            (* Should we divide size evenly amongst components of struct? *)
+            [tes <- map_monad (fun t => e <- gen_exp_size sz' ctx t;; ret (t, e)) fields;;
+             ret (EXP_Packed_struct tes)]
+          | TYPE_Pointer t         => [failGen] (* GEP? *)
+          | TYPE_Void              => [failGen] (* No void type expressions *)
+          | TYPE_Function ret args => [failGen] (* These shouldn't exist, I think *)
+          | TYPE_Opaque            => [failGen] (* TODO: not sure what these should be... *)
+          | TYPE_Half              => [failGen]
+          | TYPE_Float             => [failGen]
+          | TYPE_Double            => [failGen]
+          | TYPE_X86_fp80          => [failGen]
+          | TYPE_Fp128             => [failGen]
+          | TYPE_Ppc_fp128         => [failGen]
+          | TYPE_Metadata          => [failGen]
+          | TYPE_X86_mmx           => [failGen]
+          | TYPE_Identified id     => [failGen] (* TODO: Involves lookup *)
+          end
+      in
+      (* short-circuit to size 0 *)
+      oneOf_ failGen (gen_exp_size 0 ctx t :: gens)
     end.
   Next Obligation.
     cbn.
@@ -262,7 +265,13 @@ Section Generators.
     cbn; destruct (Nat.divmod sz' 1 0 0).
     cbn; omega.
   Qed.
-
+  Next Obligation.
+    cbn.
+    assert (0 <= 1)%nat by omega.
+    pose proof Nat.divmod_spec sz' 1 0 0 H.
+    cbn; destruct (Nat.divmod sz' 1 0 0).
+    cbn; omega.
+  Qed.
 End Generators.
 
 Section Helpers.
