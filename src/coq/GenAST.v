@@ -54,9 +54,11 @@ Section ShowInstances.
 
 End ShowInstances.
 
-Section Generators.
-  (* Generate a type of size 0 *)
-  Definition gen_typ_0 (ctx : list (ident * typ)) : G typ :=
+Section TypGenerators.
+  (* TODO: These currently don't generate pointer types either. *)
+
+  (* Not sized in the QuickChick sense, sized in the LLVM sense. *)
+  Definition gen_sized_typ_0 (ctx : list (ident * typ)) : G typ :=
     oneOf_ failGen
           ((ret TYPE_Identified <*> oneOf_ failGen (map (fun '(i,_) => ret i) ctx)) ::
            (map ret
@@ -64,28 +66,29 @@ Section Generators.
                 ; TYPE_I 8
                 ; TYPE_I 32
                 ; TYPE_I 64
-                ; TYPE_Void
-                ; TYPE_Half
-                ; TYPE_Double
-                ; TYPE_X86_fp80
-                ; TYPE_Fp128
-                ; TYPE_Ppc_fp128
-                ; TYPE_Metadata
-                ; TYPE_X86_mmx
-                ; TYPE_Opaque
+                (* TODO: Generate floats and stuff *)
+                (* TODO: Could generate TYPE_Identified if we filter for sized types *)
+                (* ; TYPE_Half *)
+                (* ; TYPE_Double *)
+                (* ; TYPE_X86_fp80 *)
+                (* ; TYPE_Fp128 *)
+                (* ; TYPE_Ppc_fp128 *)
+                (* ; TYPE_Metadata *)
+                (* ; TYPE_X86_mmx *)
+                (* ; TYPE_Opaque *)
                 ])).
 
-  Program Fixpoint gen_typ_size (sz : nat) (ctx : list (ident * typ)) {measure sz} : G typ :=
+  Program Fixpoint gen_sized_typ_size (sz : nat) (ctx : list (ident * typ)) {measure sz} : G typ :=
     match sz with
-    | 0%nat => gen_typ_0 ctx
+    | O => gen_sized_typ_0 ctx
     | (S sz') => oneOf_ failGen
-                      [ gen_typ_0 ctx
+                      [ gen_sized_typ_0 ctx
                       (* Might want to restrict the size to something reasonable *)
-                      ; ret TYPE_Array <*> arbitrary <*> gen_typ_size sz' ctx
-                      ; ret TYPE_Vector <*> arbitrary <*> gen_typ_size sz' ctx
-                      ; let n := Nat.div sz 2 in ret TYPE_Function <*> gen_typ_size n ctx <*> listOf (gen_typ_size n ctx)
-                      ; ret TYPE_Struct <*> listOf (gen_typ_size sz' ctx)
-                      ; ret TYPE_Packed_struct <*> listOf (gen_typ_size sz' ctx)
+                      ; ret TYPE_Array <*> arbitrary <*> gen_sized_typ_size sz' ctx
+                      ; ret TYPE_Vector <*> arbitrary <*> gen_sized_typ_size sz' ctx
+                      ; let n := Nat.div sz 2 in ret TYPE_Function <*> gen_sized_typ_size n ctx <*> listOf (gen_sized_typ_size n ctx)
+                      ; ret TYPE_Struct <*> listOf (gen_sized_typ_size sz' ctx)
+                      ; ret TYPE_Packed_struct <*> listOf (gen_sized_typ_size sz' ctx)
                       ]
     end.
   Next Obligation.
@@ -103,9 +106,61 @@ Section Generators.
     cbn; omega.
   Qed.
 
+  Definition gen_sized_typ (ctx : list (ident * typ)) : G typ
+    := sized (fun sz => gen_sized_typ_size sz ctx).
+
+  (* Generate a type of size 0 *)
+  Definition gen_typ_0 (ctx : list (ident * typ)) : G typ :=
+    oneOf_ failGen
+          ((ret TYPE_Identified <*> oneOf_ failGen (map (fun '(i,_) => ret i) ctx)) ::
+           (map ret
+                [ TYPE_I 1
+                ; TYPE_I 8
+                ; TYPE_I 32
+                ; TYPE_I 64
+                ; TYPE_Void
+                (* TODO: Generate floats and stuff *)
+                (* ; TYPE_Half *)
+                (* ; TYPE_Double *)
+                (* ; TYPE_X86_fp80 *)
+                (* ; TYPE_Fp128 *)
+                (* ; TYPE_Ppc_fp128 *)
+                (* ; TYPE_Metadata *)
+                (* ; TYPE_X86_mmx *)
+                (* ; TYPE_Opaque *)
+                ])).
+
+  (* TODO: This should probably be mutually recursive with
+     gen_sized_typ since pointers of any type are considered sized *)
+  Program Fixpoint gen_typ_size (sz : nat) (ctx : list (ident * typ)) {measure sz} : G typ :=
+    match sz with
+    | 0%nat => gen_typ_0 ctx
+    | (S sz') => oneOf_ failGen
+                      [ gen_typ_0 ctx
+                      (* Might want to restrict the size to something reasonable *)
+                      (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
+                      ; ret TYPE_Array <*> arbitrary <*> gen_sized_typ_size sz' ctx
+                      ; ret TYPE_Vector <*> arbitrary <*> gen_sized_typ_size sz' ctx
+                      ; let n := Nat.div sz 2 in
+                        ret TYPE_Function <*> gen_typ_size n ctx <*> listOf (gen_sized_typ_size n ctx)
+                      ; ret TYPE_Struct <*> listOf (gen_sized_typ_size sz' ctx)
+                      ; ret TYPE_Packed_struct <*> listOf (gen_sized_typ_size sz' ctx)
+                      ]
+    end.
+  Next Obligation.
+    cbn.
+    assert (0 <= 1)%nat by omega.
+    pose proof Nat.divmod_spec sz' 1 0 0 H.
+    cbn; destruct (Nat.divmod sz' 1 0 0).
+    cbn; omega.
+  Qed.
+
   Definition gen_typ (ctx : list (ident * typ)) : G typ
     := sized (fun sz => gen_typ_size sz ctx).
 
+End TypGenerators.
+
+Section Generators.
   Definition gen_ibinop : G ibinop :=
     oneOf_ failGen
            [ ret LLVMAst.Add <*> arbitrary <*> arbitrary
