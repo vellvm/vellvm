@@ -312,6 +312,11 @@ Section ExpGenerators.
        e <- gen_exp ctx t;;
        ret (t, e).
 
+  Definition gen_sized_texp (ctx : list (ident * typ)) : G (texp typ)
+    := t <- gen_sized_typ ctx;;
+       e <- gen_exp ctx t;;
+       ret (t, e).
+
   Definition gen_op (ctx : list (ident * typ)) (t : typ) : G (exp typ)
     := sized (fun sz =>
                 match t with
@@ -342,17 +347,42 @@ Section InstrGenerators.
   Definition gen_option {A} (g : G A) : G (option A)
     := freq_ failGen [(1%nat, ret None); (7%nat, liftM Some g)].
 
-  Definition gen_instr_size (ctx : list (ident * typ)) : G (instr typ) :=
+  Definition gen_load (ctx : list (ident * typ)) : G (instr typ)
+    := t   <- gen_sized_typ ctx;;
+       let pt := TYPE_Pointer t in
+       vol <- (arbitrary : G bool);;
+       ptr <- gen_exp ctx pt;;
+       align <- arbitrary;;
+       ret (INSTR_Load vol t (pt, ptr) align).
+
+  Definition gen_store (ctx : list (ident * typ)) : G (instr typ)
+    := vol <- arbitrary;;
+       align <- arbitrary;;
+
+       val <- gen_sized_texp ctx;;
+       let '(t, e) := val in
+
+       let pt := TYPE_Pointer t in
+       pexp <- gen_exp ctx pt;;
+       let ptr := (pt, pexp) in
+
+       ret (INSTR_Store vol val ptr align).
+
+
+  Definition gen_instr (ctx : list (ident * typ)) : G (instr typ) :=
     oneOf_ failGen
            [ ret (INSTR_Comment "test")
            ; t <- gen_op_typ;; ret INSTR_Op <*> gen_op ctx t
            ; ret INSTR_Alloca <*> gen_sized_typ ctx <*> gen_option (gen_int_texp ctx) <*> arbitrary
            (* TODO: Generate calls *)
-           ; ret INSTR_Load <*> arbitrary <*> gen_
+           ; gen_load ctx
+           ; gen_store ctx
+           (* TODO: Generate atomic operations and other instructions *)
            ].
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
+  Definition gen_id_instr_pair (ctx : list (ident * typ)) : G (instr typ)
 
   Inductive instr : Set :=
 | INSTR_Comment (msg:string)
