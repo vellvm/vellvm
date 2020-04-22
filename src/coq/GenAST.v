@@ -60,7 +60,8 @@ Section TypGenerators.
   (* Not sized in the QuickChick sense, sized in the LLVM sense. *)
   Definition gen_sized_typ_0 (ctx : list (ident * typ)) : G typ :=
     oneOf_ failGen
-          ((ret TYPE_Identified <*> oneOf_ failGen (map (fun '(i,_) => ret i) ctx)) ::
+          (* TODO: add identified here *)
+          ( (* (ret TYPE_Identified <*> oneOf_ failGen (map (fun '(i,_) => ret i) ctx)) :: *)
            (map ret
                 [ TYPE_I 1
                 ; TYPE_I 8
@@ -158,9 +159,39 @@ Section TypGenerators.
   Definition gen_typ (ctx : list (ident * typ)) : G typ
     := sized (fun sz => gen_typ_size sz ctx).
 
+  (* TODO: look up identifiers *)
+  (* Types for operation expressions *)
+  Definition gen_op_typ : G typ :=
+    oneOf_ failGen
+           (map ret
+                [ TYPE_I 1
+                ; TYPE_I 8
+                ; TYPE_I 32
+                ; TYPE_I 64
+                (* TODO: Generate floats and stuff *)
+                (* ; TYPE_Half *)
+                (* ; TYPE_Double *)
+                (* ; TYPE_X86_fp80 *)
+                (* ; TYPE_Fp128 *)
+                (* ; TYPE_Ppc_fp128 *)
+                (* ; TYPE_Metadata *)
+                (* ; TYPE_X86_mmx *)
+                (* ; TYPE_Opaque *)
+                ]).
+
+  (* TODO: look up identifiers *)
+  Definition gen_int_typ : G typ :=
+    oneOf_ failGen
+           (map ret
+                [ TYPE_I 1
+                ; TYPE_I 8
+                ; TYPE_I 32
+                ; TYPE_I 64
+                ]).
+
 End TypGenerators.
 
-Section Generators.
+Section ExpGenerators.
   Definition gen_ibinop : G ibinop :=
     oneOf_ failGen
            [ ret LLVMAst.Add <*> arbitrary <*> arbitrary
@@ -272,7 +303,71 @@ Section Generators.
     cbn; destruct (Nat.divmod sz' 1 0 0).
     cbn; omega.
   Qed.
-End Generators.
+
+  Definition gen_exp (ctx : list (ident * typ)) (t : typ) : G (exp typ)
+    := sized (fun sz => gen_exp_size sz ctx t).
+
+  Definition gen_texp (ctx : list (ident * typ)) : G (texp typ)
+    := t <- gen_typ ctx;;
+       e <- gen_exp ctx t;;
+       ret (t, e).
+
+  Definition gen_op (ctx : list (ident * typ)) (t : typ) : G (exp typ)
+    := sized (fun sz =>
+                match t with
+                | TYPE_I isz =>
+                  (* TODO: If I1 also allow ICmp and FCmp *)
+                  let n := Nat.div sz 2 in
+                  ret OP_IBinop <*> gen_ibinop <*> ret t <*> gen_exp_size n ctx t <*> gen_exp_size n ctx t
+                | _ => failGen
+                end).
+
+  Definition gen_int_texp (ctx : list (ident * typ)) : G (texp typ)
+    := t <- gen_int_typ;;
+       e <- gen_exp ctx t;;
+       ret (t, e).
+
+End ExpGenerators.
+
+Section InstrGenerators.
+
+  (* TODO: move this *)
+  Definition genInt : G int
+    := fmap Int.repr (arbitrary : G Z).
+
+  Instance GenInt : Gen int
+    := Build_Gen int genInt.
+
+  (* TODO: move this. Also give a less confusing name because genOption is a thing? *)
+  Definition gen_option {A} (g : G A) : G (option A)
+    := freq_ failGen [(1%nat, ret None); (7%nat, liftM Some g)].
+
+  Definition gen_instr_size (ctx : list (ident * typ)) : G (instr typ) :=
+    oneOf_ failGen
+           [ ret (INSTR_Comment "test")
+           ; t <- gen_op_typ;; ret INSTR_Op <*> gen_op ctx t
+           ; ret INSTR_Alloca <*> gen_sized_typ ctx <*> gen_option (gen_int_texp ctx) <*> arbitrary
+           (* TODO: Generate calls *)
+           ; ret INSTR_Load <*> arbitrary <*> gen_
+           ].
+
+  (* TODO: Generate instructions with ids *)
+  (* Make sure we can add these new ids to the context! *)
+
+  Inductive instr : Set :=
+| INSTR_Comment (msg:string)
+| INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form SV (OP_ ...) *)
+| INSTR_Call (fn:texp) (args:list texp)      (* CORNER CASE: return type is void treated specially *)
+| INSTR_Alloca (t:T) (nb: option texp) (align:option int)
+| INSTR_Load  (volatile:bool) (t:T) (ptr:texp) (align:option int)
+| INSTR_Store (volatile:bool) (val:texp) (ptr:texp) (align:option int)
+| INSTR_Fence
+| INSTR_AtomicCmpXchg
+| INSTR_AtomicRMW
+| INSTR_Unreachable
+| INSTR_VAArg
+| INSTR_LandingPad
+End InstrGenerators.
 
 Section Helpers.
   Fixpoint max_nat_list (l : list nat) : nat :=
@@ -291,6 +386,41 @@ Section Helpers.
     | TYPE_Packed_struct fields => max_nat_list (map sizeof_typ fields)
     | TYPE_Vector sz t          => S (sizeof_typ t)
     | _                         => 0
+    end.
+
+  (* TODO: incomplete. Should typecheck *)
+  Fixpoint well_formed_op (ctx : list (ident * typ)) (op : exp typ) : bool :=
+    match op with
+    | OP_IBinop iop t v1 v2              => true 
+    | OP_ICmp cmp t v1 v2                => true
+    | OP_FBinop fop fm t v1 v2           => true
+    | OP_FCmp cmp t v1 v2                => true
+    | OP_Conversion conv t_from v t_to   => true
+    | OP_GetElementPtr t ptrval idxs     => true
+    | OP_ExtractElement vec idx          => true
+    | OP_InsertElement vec elt idx       => true
+    | OP_ShuffleVector vec1 vec2 idxmask => true
+    | OP_ExtractValue vec idxs           => true
+    | OP_InsertValue vec elt idxs        => true
+    | OP_Select cnd v1 v2                => true
+    | OP_Freeze v                        => true
+    | _                                  => false
+    end.
+  
+  Fixpoint well_formed_instr (ctx : list (ident * typ)) (i : instr typ) : bool :=
+    match i with
+    | INSTR_Comment msg => true
+    | INSTR_Op op => well_formed_op ctx op
+    | INSTR_Call fn args => _
+    | INSTR_Alloca t nb align => is_sized_typ ctx t (* The alignment may not be greater than 1 << 29. *)
+    | INSTR_Load volatile t ptr align => _
+    | INSTR_Store volatile val ptr align => _
+    | INSTR_Fence => _
+    | INSTR_AtomicCmpXchg => _
+    | INSTR_AtomicRMW => _
+    | INSTR_Unreachable => _
+    | INSTR_VAArg => _
+    | INSTR_LandingPad => _
     end.
 End Helpers.
 
