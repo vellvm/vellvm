@@ -161,8 +161,7 @@ Module TopLevelEnv <: Environment.
    In order to limit bloated type signature, we name the successive return types.
    *)
 
-  Notation res_L0 := uvalue (* (only parsing) *).
-  Notation res_L1 := (global_env * res_L0)%type (* (only parsing) *).
+  Notation res_L1 := (global_env * uvalue)%type (* (only parsing) *).
   Notation res_L2 := (local_env * stack * res_L1)%type (* (only parsing) *).
   Notation res_L3 := (memory * res_L2)%type (* (only parsing) *).
   Notation res_L4 := (memory * (local_env * stack * (global_env * uvalue)))%type (* (only parsing) *).
@@ -174,16 +173,16 @@ Module TopLevelEnv <: Environment.
      * retrieve the address of the main function;
      * tie the mutually recursive know and run it starting from the main.
    *)
-  Definition denote_vellvm (mcfg : CFG.mcfg dtyp) : itree L0 res_L0 :=
+  Definition denote_vellvm (mcfg : CFG.mcfg dtyp) : itree L0 uvalue :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'addr <- trigger (GlobalRead (Name "main")) ;;
     D.denote_mcfg defns DTYPE_Void (dvalue_to_uvalue addr) main_args.
 
-  Definition _L0_to_L0' : L0 ~> L0' := inr1.
+  Definition _uvalue_to_uvalue' : L0 ~> L0' := inr1.
 
-  Definition denote_vellvm' (mcfg : CFG.mcfg dtyp) : itree L0' res_L0 :=
-    translate _L0_to_L0' (denote_vellvm mcfg).
+  Definition denote_vellvm' (mcfg : CFG.mcfg dtyp) : itree L0' uvalue :=
+    translate _uvalue_to_uvalue' (denote_vellvm mcfg).
 
   (**
      Now that we know how to denote a whole llvm program, we can _interpret_
@@ -199,10 +198,10 @@ Module TopLevelEnv <: Environment.
      the executable ones for [pick] and [UB], i.e. the ones returning back
      into the [itree] monad.
    *)
-  Definition interp_vellvm_exec_user {R: Type} user_intrinsics (trace: itree IO.L0 R) g l m :=
-    let L0_trace       := INT.interpret_intrinsics user_intrinsics trace in
-    let L1_trace       := runState (interp_global L0_trace) g in
-    let L2_trace       := runState (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+  Definition interp_vellvm_exec_user {R: Type} user_intrinsics (trace: itree L0 R) g l m :=
+    let uvalue_trace       := INT.interpret_intrinsics user_intrinsics trace in
+    let L1_trace       := runState (interp_global uvalue_trace) g in
+    let L2_trace       := runState (interp_local_stack (handle_local (v:=uvalue)) L1_trace) l in
     let L3_trace       := runState (M.interp_memory L2_trace) m in
     let L4_trace       := P.interp_undef L3_trace in
     let L5_trace       := interp_UB L4_trace in
@@ -238,10 +237,10 @@ Module TopLevelEnv <: Environment.
      semantics, except that we use, where relevant, the handlers capturing
      all allowed behaviors into the [Prop] monad.
    *)
-  Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree IO.L0 R) g l m :=
-    let L0_trace       := INT.interpret_intrinsics user_intrinsics trace in
-    let L1_trace       := runState (interp_global L0_trace) g in
-    let L2_trace       := runState (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+  Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree L0 R) g l m :=
+    let uvalue_trace       := INT.interpret_intrinsics user_intrinsics trace in
+    let L1_trace       := runState (interp_global uvalue_trace) g in
+    let L2_trace       := runState (interp_local_stack (handle_local (v:=uvalue)) L1_trace) l in
     let L3_trace       := runState (M.interp_memory L2_trace) m in
     let L4_trace       := P.model_undef L3_trace in
     let L5_trace       := model_UB L4_trace in

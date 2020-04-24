@@ -101,7 +101,7 @@ Section Swap.
      We hence want to get extensional eutt over the returned type.
    *)
   Definition function_rel {X}:
-    relation (FMapAList.alist raw_id res_L0 * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (uvalue * (list uvalue -> itree IO.L0 res_L0)))) := (Logic.eq × (Logic.eq × list_rel (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))).
+    relation (FMapAList.alist raw_id res_uvalue * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (uvalue * (list uvalue -> itree IO.uvalue res_uvalue)))) := (Logic.eq × (Logic.eq × list_rel (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))).
   Hint Unfold function_rel.
 
   Global Instance list_rel_refl {R: Type} {RR: relation R} `{Reflexive _ RR} : Reflexive (list_rel RR).
@@ -120,7 +120,7 @@ Section Swap.
   Qed.
 
   (*
-  (* Calvin broke this somehow by changing L0 to not include
+  (* Calvin broke this somehow by changing uvalue to not include
      CallE. Yannick promises not to be mad later when fixing this. :) *)
   Lemma interp_to_L2_map_monad: forall {X} (f: X -> itree _ (uvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
       (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))) (interp_to_L2 nil (f x) s1 s2) (interp_to_L2 nil (f (g x)) s1 s2)) ->
@@ -308,7 +308,7 @@ Admitted.
 (*   (*   unfold refine_mcfg_L2. *) *)
 (*   (*   unfold build_to_L2. *) *)
 
-(*   (*   Opaque build_L0. *) *)
+(*   (*   Opaque build_uvalue. *) *)
 (*   (*   cbn. *) *)
 
 (*   (*   cbn. *) *)
@@ -929,7 +929,7 @@ Module RENAMING
 
     Lemma swap_trigger_Global
           {X} `{Swap X} {INV: SwapInvariant X}:
-      forall (e: LLVMGEnvE X), @ITree.trigger L0 X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
+      forall (e: LLVMGEnvE X), @ITree.trigger uvalue X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
     Proof.
       intros e.
       unfold trigger.
@@ -954,7 +954,7 @@ Module RENAMING
 
     Lemma swap_trigger_Local (* {E F: Type -> Type} `{E -< F} `{forall T, Swap (F T)}  `{Swap (E X)} *)
           {X} `{Swap X} {INV: SwapInvariant X}:
-      forall (e: LLVMEnvE X), @ITree.trigger L0 X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
+      forall (e: LLVMEnvE X), @ITree.trigger uvalue X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
     Proof.
       intros e.
       unfold trigger.
@@ -978,7 +978,7 @@ Module RENAMING
 
     Lemma swap_trigger_Memory (* {E F: Type -> Type} `{E -< F} `{forall T, Swap (F T)}  `{Swap (E X)} *)
           {X} `{Swap X} {INV: SwapInvariant X}:
-      forall (e: MemoryE X), @ITree.trigger L0 X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
+      forall (e: MemoryE X), @ITree.trigger uvalue X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
     Proof.
       intros e.
       unfold trigger.

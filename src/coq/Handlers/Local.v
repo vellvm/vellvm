@@ -82,13 +82,25 @@ Section Locals.
     Definition interp_local' : itree Effin' ~> stateT map (itree Effout') :=
       interp_state (case_ E_trigger' (case_ F_trigger' (case_ H_trigger' (case_ handle_local G_trigger')))).
 
+    Lemma interp_local_bind :
+      forall (R S : Type) (t : itree Effin R) (k : R -> itree Effin S) s,
+        runState (interp_local (ITree.bind t k)) s ≅
+         ITree.bind (runState (interp_local t) s) (fun '(s',r) => runState (interp_local (k r)) s').
+    Proof.
+      intros.
+      unfold interp_local.
+      setoid_rewrite interp_state_bind.
+      apply eq_itree_clo_bind with (UU := Logic.eq).
+      reflexivity.
+      intros [] [] EQ; inv EQ; reflexivity.
+    Qed.
+
     Lemma interp_local_ret :
       forall (R : Type) g (x: R),
         runState (interp_local (Ret x: itree Effin R)) g ≅ Ret (g,x).
     Proof.
       intros; apply interp_state_ret.
     Qed.
-
 
   End PARAMS.
 

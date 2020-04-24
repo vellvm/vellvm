@@ -54,8 +54,8 @@ Import D.
 (* -------------------------------------------------- *)
 (* Interpretation / refinement of blocks.             *)
 (* -------------------------------------------------- *)
-Definition block_interp_L0 (b: block dtyp) := denote_block b.
-Definition block_interp_L1 (b : block dtyp) g := run_state (interp_global (block_interp_L0 b)) g.
+Definition block_interp_uvalue (b: block dtyp) := denote_block b.
+Definition block_interp_L1 (b : block dtyp) g := run_state (interp_global (block_interp_uvalue b)) g.
 Definition block_interp_L2 (b : block dtyp) g l := run_state (interp_local (block_interp_L1 b g)) l.
 Definition block_interp_L3 (b : block dtyp) g l m := run_state (M.interp_memory (block_interp_L2 b g l)) m.
 
@@ -66,13 +66,13 @@ Definition _failure_UB_to_block_L4 : (FailureE +' UBE) ~> (CallE +' UBE +' Failu
     | inr1 x => inr1 (inl1 x)
     end.
 
-Definition concretize_block_uv (res : (block_id + res_L0)) : itree (FailureE +' UBE) (block_id + dvalue)
+Definition concretize_block_uv (res : (block_id + res_uvalue)) : itree (FailureE +' UBE) (block_id + dvalue)
   := match res with
      | inl bid => ret (inl bid)
      | inr uv => ITree.map inr (P.concretize_uvalue uv)
      end.
 
-Definition block_interp_L4 (b : block dtyp) g l m : itree (CallE +' UBE +' DebugE +' FailureE) (M.memory_stack * (list (raw_id * res_L0) * (list (raw_id * dvalue) * (block_id + dvalue)))) :=
+Definition block_interp_L4 (b : block dtyp) g l m : itree (CallE +' UBE +' DebugE +' FailureE) (M.memory_stack * (list (raw_id * res_uvalue) * (list (raw_id * dvalue) * (block_id + dvalue)))) :=
   '(m, (env, (genv, buv))) <- P.interp_undef (block_interp_L3 b g l m);;
    bdv <- translate _failure_UB_to_L4 (concretize_block_uv buv);;
    ret (m, (env, (genv, bdv))).
@@ -256,8 +256,8 @@ Qed.
 (* -------------------------------------------------- *)
 (* CFG interpretation / refinement                    *)
 (* -------------------------------------------------- *)
-Definition cfg_interp_L0 (c : cfg dtyp) := denote_cfg c.
-Definition cfg_interp_L1 (c : cfg dtyp) := interp_global (cfg_interp_L0 c) [].
+Definition cfg_interp_uvalue (c : cfg dtyp) := denote_cfg c.
+Definition cfg_interp_L1 (c : cfg dtyp) := interp_global (cfg_interp_uvalue c) [].
 Definition cfg_interp_L2 (c : cfg dtyp) := interp_local (cfg_interp_L1 c) [].
 Definition cfg_interp_L3 (c : cfg dtyp) := M.interp_memory (cfg_interp_L2 c) (M.empty, [[]]).
 

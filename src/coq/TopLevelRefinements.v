@@ -130,7 +130,7 @@ Proof.
 Qed.
 
 Lemma refine_12 : forall t1 t2 l,
-    refine_L1 t1 t2 -> refine_L2 (runState (interp_local_stack (handle_local (v:=res_L0)) t1) l) (runState (interp_local_stack (handle_local (v:=res_L0)) t2) l).
+    refine_L1 t1 t2 -> refine_L2 (runState (interp_local_stack (handle_local (v:=uvalue)) t1) l) (runState (interp_local_stack (handle_local (v:=uvalue)) t2) l).
 Proof.
   intros t1 t2 l H.
   apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
@@ -178,27 +178,27 @@ Qed.
  *)
 
 Definition interp_to_L1 {R} user_intrinsics (t: itree IO.L0 R) g :=
-  let L0_trace       := INT.interpret_intrinsics user_intrinsics t in
-  let L1_trace       := runState (interp_global L0_trace) g in
+  let uvalue_trace       := INT.interpret_intrinsics user_intrinsics t in
+  let L1_trace       := runState (interp_global uvalue_trace) g in
   L1_trace.
 
 Definition interp_to_L2 {R} user_intrinsics (t: itree IO.L0 R) g l :=
-  let L0_trace       := INT.interpret_intrinsics user_intrinsics t in
-  let L1_trace       := runState (interp_global L0_trace) g in
-  let L2_trace       := runState (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+  let uvalue_trace       := INT.interpret_intrinsics user_intrinsics t in
+  let L1_trace       := runState (interp_global uvalue_trace) g in
+  let L2_trace       := runState (interp_local_stack (handle_local (v:=uvalue)) L1_trace) l in
   L2_trace.
 
 Definition interp_to_L3 {R} user_intrinsics (t: itree IO.L0 R) g l m :=
-  let L0_trace       := INT.interpret_intrinsics user_intrinsics t in
-  let L1_trace       := runState (interp_global L0_trace) g in
-  let L2_trace       := runState (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+  let uvalue_trace       := INT.interpret_intrinsics user_intrinsics t in
+  let L1_trace       := runState (interp_global uvalue_trace) g in
+  let L2_trace       := runState (interp_local_stack (handle_local (v:=uvalue)) L1_trace) l in
   let L3_trace       := runState (M.interp_memory L2_trace) m in
   L3_trace.
 
 Definition interp_to_L4 {R} user_intrinsics (t: itree IO.L0 R) g l m :=
-  let L0_trace       := INT.interpret_intrinsics user_intrinsics t in
-  let L1_trace       := runState (interp_global L0_trace) g in
-  let L2_trace       := runState (interp_local_stack (handle_local (v:=res_L0)) L1_trace) l in
+  let uvalue_trace       := INT.interpret_intrinsics user_intrinsics t in
+  let L1_trace       := runState (interp_global uvalue_trace) g in
+  let L2_trace       := runState (interp_local_stack (handle_local (v:=uvalue)) L1_trace) l in
   let L3_trace       := runState (M.interp_memory L2_trace) m in
   let L4_trace       := P.model_undef L3_trace in
   L4_trace.
@@ -258,24 +258,24 @@ Ltac fold_L5 :=
    short-circuiting the interpretation early.
  *)
 Definition model_to_L1 user_intrinsics (prog: mcfg dtyp) :=
-  let L0_trace := denote_vellvm prog in
-  interp_to_L1 user_intrinsics L0_trace [].
+  let uvalue_trace := denote_vellvm prog in
+  interp_to_L1 user_intrinsics uvalue_trace [].
 
 Definition model_to_L2 user_intrinsics (prog: mcfg dtyp) :=
-  let L0_trace := denote_vellvm prog in
-  interp_to_L2 user_intrinsics L0_trace [] ([],[]).
+  let uvalue_trace := denote_vellvm prog in
+  interp_to_L2 user_intrinsics uvalue_trace [] ([],[]).
 
 Definition model_to_L3 user_intrinsics (prog: mcfg dtyp) :=
-  let L0_trace := denote_vellvm prog in
-  interp_to_L3 user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
+  let uvalue_trace := denote_vellvm prog in
+  interp_to_L3 user_intrinsics uvalue_trace [] ([],[]) ((M.empty, M.empty), [[]]).
 
 Definition model_to_L4 user_intrinsics (prog: mcfg dtyp) :=
-  let L0_trace := denote_vellvm prog in
-  interp_to_L4 user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
+  let uvalue_trace := denote_vellvm prog in
+  interp_to_L4 user_intrinsics uvalue_trace [] ([],[]) ((M.empty, M.empty), [[]]).
 
 Definition model_to_L5 user_intrinsics (prog: mcfg dtyp) :=
-  let L0_trace := denote_vellvm prog in
-  interp_vellvm_model_user user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
+  let uvalue_trace := denote_vellvm prog in
+  interp_vellvm_model_user user_intrinsics uvalue_trace [] ([],[]) ((M.empty, M.empty), [[]]).
 
 (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -476,8 +476,8 @@ Proof.
 Qed.
 
 Definition interp_cfg {R: Type} (trace: itree IO.instr_E R) g l m :=
-  let L0_trace       := INT.interpret_intrinsics [] trace in
-  let L1_trace       := runState (interp_global L0_trace) g in
+  let uvalue_trace       := INT.interpret_intrinsics [] trace in
+  let L1_trace       := runState (interp_global uvalue_trace) g in
   let L2_trace       := runState (interp_local L1_trace) l in
   let L3_trace       := runState (M.interp_memory L2_trace) m in
   let L4_trace       := P.model_undef L3_trace in
