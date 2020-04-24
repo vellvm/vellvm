@@ -21,6 +21,7 @@ From Vellvm Require Import
      Util
      PropT.
 
+Require Import List.
 Require Import Floats.
 
 Set Implicit Arguments.

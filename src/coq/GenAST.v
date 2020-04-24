@@ -7,7 +7,7 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 From ExtLib.Structures Require Export
      Functor Applicative Monads.
 
-From Vellvm Require Import LLVMAst Util.
+From Vellvm Require Import LLVMAst Util AstLib TypeUtil.
 Require Import Integers Floats.
 
 Require Import List.
@@ -54,14 +54,123 @@ Section ShowInstances.
 
 End ShowInstances.
 
+Section Helpers.
+  Fixpoint max_nat_list (l : list nat) : nat :=
+    match l with
+    | [] => 0
+    | x::rest => max x (max_nat_list rest)
+    end.
+
+  (* TODO: how big should lists be? *)
+  Fixpoint sizeof_typ (t : typ) : nat :=
+    match t with
+    | TYPE_Pointer t            => S (sizeof_typ t)
+    | TYPE_Array sz t           => S (sizeof_typ t)
+    | TYPE_Function ret args    => max (sizeof_typ ret) (max_nat_list (map sizeof_typ args))
+    | TYPE_Struct fields        => max_nat_list (map sizeof_typ fields)
+    | TYPE_Packed_struct fields => max_nat_list (map sizeof_typ fields)
+    | TYPE_Vector sz t          => S (sizeof_typ t)
+    | _                         => 0
+    end.
+
+  (* TODO: Move these *)
+  Fixpoint find_pred {A} (p : A -> bool) (l : list A) : option A
+    := match l with
+       | []   => None
+       | x::xs =>
+         if p x
+         then Some x
+         else find_pred p xs
+       end.
+
+  Fixpoint is_sized_type_h (t : typ) : bool
+    := match t with
+       | TYPE_I sz                 => true
+       | TYPE_Pointer t            => true
+       | TYPE_Void                 => false
+       | TYPE_Half                 => true
+       | TYPE_Float                => true
+       | TYPE_Double               => true
+       | TYPE_X86_fp80             => true
+       | TYPE_Fp128                => true
+       | TYPE_Ppc_fp128            => true
+       | TYPE_Metadata             => true (* Is this right? *)
+       | TYPE_X86_mmx              => true
+       | TYPE_Array sz t           => is_sized_type_h t
+       | TYPE_Function ret args    => false
+       | TYPE_Struct fields        => true
+       | TYPE_Packed_struct fields => true
+       | TYPE_Opaque               => false
+       | TYPE_Vector sz t          => is_sized_type_h t
+       | TYPE_Identified id        => false (* Shouldn't happen *)
+       end.
+
+  (* Only works correctly if the type is well formed *)
+  Definition is_sized_type (ctx : list (ident * typ)) (t : typ) : bool
+    := is_sized_type_h (normalize_type ctx t).
+
+  Definition is_int_type_h (t : typ) : bool
+    := match t with
+       | TYPE_I sz => true
+       | _ => false
+       end.
+
+  (* Only works correctly if the type is well formed *)
+  Definition is_int_type (ctx : list (ident * typ)) (t : typ) : bool
+    := is_int_type_h (normalize_type ctx t).
+
+  (* TODO: incomplete. Should typecheck *)
+  Fixpoint well_formed_op (ctx : list (ident * typ)) (op : exp typ) : bool :=
+    match op with
+    | OP_IBinop iop t v1 v2              => true 
+    | OP_ICmp cmp t v1 v2                => true
+    | OP_FBinop fop fm t v1 v2           => true
+    | OP_FCmp cmp t v1 v2                => true
+    | OP_Conversion conv t_from v t_to   => true
+    | OP_GetElementPtr t ptrval idxs     => true
+    | OP_ExtractElement vec idx          => true
+    | OP_InsertElement vec elt idx       => true
+    | OP_ShuffleVector vec1 vec2 idxmask => true
+    | OP_ExtractValue vec idxs           => true
+    | OP_InsertValue vec elt idxs        => true
+    | OP_Select cnd v1 v2                => true
+    | OP_Freeze v                        => true
+    | _                                  => false
+    end.
+
+  (*
+  Fixpoint well_formed_instr (ctx : list (ident * typ)) (i : instr typ) : bool :=
+    match i with
+    | INSTR_Comment msg => true
+    | INSTR_Op op => well_formed_op ctx op
+    | INSTR_Call fn args => _
+    | INSTR_Alloca t nb align => is_sized_typ ctx t (* The alignment may not be greater than 1 << 29. *)
+    | INSTR_Load volatile t ptr align => _
+    | INSTR_Store volatile val ptr align => _
+    | INSTR_Fence => _
+    | INSTR_AtomicCmpXchg => _
+    | INSTR_AtomicRMW => _
+    | INSTR_Unreachable => _
+    | INSTR_VAArg => _
+    | INSTR_LandingPad => _
+    end.
+   *)
+End Helpers.
+
+
 Section TypGenerators.
   (* TODO: These currently don't generate pointer types either. *)
 
   (* Not sized in the QuickChick sense, sized in the LLVM sense. *)
   Definition gen_sized_typ_0 (ctx : list (ident * typ)) : G typ :=
+    let sized_ctx := filter (fun '(i,t) => is_sized_type ctx t) ctx in
+    let ident_gen :=
+        (* Don't want to fail if there are no identifiers *)
+        if (List.length sized_ctx =? 0)%nat
+        then []
+        else [ret TYPE_Identified <*> oneOf_ failGen (map (fun '(i,_) => ret i) sized_ctx)] in
     oneOf_ failGen
-          (* TODO: add identified here *)
-          ( (* (ret TYPE_Identified <*> oneOf_ failGen (map (fun '(i,_) => ret i) ctx)) :: *)
+           (ident_gen ++
            (map ret
                 [ TYPE_I 1
                 ; TYPE_I 8
@@ -84,6 +193,7 @@ Section TypGenerators.
     | O => gen_sized_typ_0 ctx
     | (S sz') => oneOf_ failGen
                       [ gen_sized_typ_0 ctx
+                      ; ret TYPE_Pointer <*> gen_sized_typ_size sz' ctx
                       (* Might want to restrict the size to something reasonable *)
                       ; ret TYPE_Array <*> arbitrary <*> gen_sized_typ_size sz' ctx
                       ; ret TYPE_Vector <*> arbitrary <*> gen_sized_typ_size sz' ctx
@@ -159,6 +269,41 @@ Section TypGenerators.
   Definition gen_typ (ctx : list (ident * typ)) : G typ
     := sized (fun sz => gen_typ_size sz ctx).
 
+  Definition gen_typ_non_void_0 (ctx : list (ident * typ)) : G typ :=
+    oneOf_ failGen
+          ((ret TYPE_Identified <*> oneOf_ failGen (map (fun '(i,_) => ret i) ctx)) ::
+           (map ret
+                [ TYPE_I 1
+                ; TYPE_I 8
+                ; TYPE_I 32
+                ; TYPE_I 64
+                (* TODO: Generate floats and stuff *)
+                (* ; TYPE_Half *)
+                (* ; TYPE_Double *)
+                (* ; TYPE_X86_fp80 *)
+                (* ; TYPE_Fp128 *)
+                (* ; TYPE_Ppc_fp128 *)
+                (* ; TYPE_Metadata *)
+                (* ; TYPE_X86_mmx *)
+                (* ; TYPE_Opaque *)
+                ])).
+
+  Program Fixpoint gen_typ_non_void_size (sz : nat) (ctx : list (ident * typ)) {measure sz} : G typ :=
+    match sz with
+    | 0%nat => gen_typ_non_void_0 ctx
+    | (S sz') => oneOf_ failGen
+                      [ gen_typ_non_void_0 ctx
+                      (* Might want to restrict the size to something reasonable *)
+                      (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
+                      ; ret TYPE_Array <*> arbitrary <*> gen_sized_typ_size sz' ctx
+                      ; ret TYPE_Vector <*> arbitrary <*> gen_sized_typ_size sz' ctx
+                      ; let n := Nat.div sz 2 in
+                        ret TYPE_Function <*> gen_typ_size n ctx <*> listOf (gen_sized_typ_size n ctx)
+                      ; ret TYPE_Struct <*> listOf (gen_sized_typ_size sz' ctx)
+                      ; ret TYPE_Packed_struct <*> listOf (gen_sized_typ_size sz' ctx)
+                      ]
+    end.
+
   (* TODO: look up identifiers *)
   (* Types for operation expressions *)
   Definition gen_op_typ : G typ :=
@@ -214,13 +359,135 @@ Section ExpGenerators.
            (map ret
                 [ Eq; Ne; Ugt; Uge; Ult; Ule; Sgt; Sge; Slt; Sle]).
 
+
+  (* TODO: Move. Also, do I really have to define this? *)
+  Fixpoint zipWith {A B C} (f : A -> B -> C) (xs : list A) (ys : list B) : list C
+    := match xs, ys with
+       | [], _        => []
+       | _, []        => []
+       | a::xs', b::ys' => f a b :: zipWith f xs' ys'
+       end.
+
+  (* TODO: Move this*)
+  (* This only returns what you expect on normalized typs *)
+  (* TODO: I don't think this does the right thing for pointers to
+           identified types... It should be conservative and say that
+           the types are *not* equal always, though.
+   *)
+  Program Fixpoint normalized_typ_eq (a : typ) (b : typ) {measure (sizeof_typ a)} : bool
+    := match a with
+       | TYPE_I sz =>
+         match b with
+         | TYPE_I sz' => if Z.eq_dec sz sz' then true else false
+         | _ => false
+         end
+       | TYPE_Pointer t =>
+         match b with
+         | TYPE_Pointer t' => normalized_typ_eq t t'
+         | _ => false
+         end
+       | TYPE_Void =>
+         match b with
+         | TYPE_Void => true
+         | _ => false
+         end
+       | TYPE_Half =>
+         match b with
+         | TYPE_Half => true
+         | _ => false
+         end
+       | TYPE_Float =>
+         match b with
+         | TYPE_Float => true
+         | _ => false
+         end
+       | TYPE_Double =>
+         match b with
+         | TYPE_Double => true
+         | _ => false
+         end
+       | TYPE_X86_fp80 =>
+         match b with
+         | TYPE_X86_fp80 => true
+         | _ => false
+         end
+       | TYPE_Fp128 =>
+         match b with
+         | TYPE_Fp128 => true
+         | _ => false
+         end
+       | TYPE_Ppc_fp128 =>
+         match b with
+         | TYPE_Ppc_fp128 => true
+         | _ => false
+         end
+       | TYPE_Metadata =>
+         match b with
+         | TYPE_Metadata => true
+         | _ => false
+         end
+       | TYPE_X86_mmx =>
+         match b with
+         | TYPE_X86_mmx => true
+         | _ => false
+         end
+       | TYPE_Array sz t =>
+         match b with
+         | TYPE_Array sz' t' =>
+           if Z.eq_dec sz sz'
+           then normalized_typ_eq t t'
+           else false
+         | _ => false
+         end
+       | TYPE_Function ret args =>
+         match b with
+         | TYPE_Function ret' args' =>
+           normalized_typ_eq ret ret' && forallb id (zipWith (fun a b => @normalized_typ_eq a b _) args args')
+         | _ => false
+         end
+       | TYPE_Struct fields =>
+         match b with
+         | TYPE_Struct fields' => forallb id (zipWith (fun a b => @normalized_typ_eq a b _) fields fields')
+         | _ => false
+         end
+       | TYPE_Packed_struct fields =>
+         match b with
+         | TYPE_Packed_struct fields' => forallb id (zipWith (fun a b => @normalized_typ_eq a b _) fields fields')
+         | _ => false
+         end
+       | TYPE_Opaque =>
+         match b with
+         | TYPE_Opaque => false (* TODO: Unsure if this should compare equal *)
+         | _ => false
+         end
+       | TYPE_Vector sz t =>
+         match b with
+         | TYPE_Vector sz' t' =>
+           if Z.eq_dec sz sz'
+           then normalized_typ_eq t t'
+           else false
+         | _ => false
+         end
+       | TYPE_Identified id => false
+       end.
+  Admit Obligations.
+  
   (* Generate an expression of a given type *)
   (* Context should probably not have duplicate ids *)
   (* May want to decrease size more for arrays and vectors *)
   (* TODO: Need a restricted version of the type generator for this? *)
   (* TODO: look up named types from the context *)
   (* TODO: generate conversions? *)
-  Program Fixpoint gen_exp_size (sz : nat) (ctx : list (ident * typ)) (t : typ) {measure sz} : G (exp typ) :=
+  Unset Guard Checking.
+
+  (* TODO: Move this *)
+  Fixpoint replicateM {M : Type -> Type} {A} `{Monad M} (n : nat) (ma : M A) : M (list A)
+    := match n with
+       | O    => a <- ma;; ret [a]
+       | S n' => a <- ma;; rest <- replicateM n' ma;; ret (a :: rest)
+       end.
+
+  Fixpoint gen_exp_size (sz : nat) (ctx : list (ident * typ)) (t : typ) {struct t} : G (exp typ) :=
     match sz with
     | 0%nat =>
       match t with
@@ -229,6 +496,16 @@ Section ExpGenerators.
       | TYPE_Void                 => failGen (* There should be no expressions of type void *)
       | TYPE_Function ret args    => failGen (* No expressions of function type *)
       | TYPE_Opaque               => failGen (* TODO: not sure what these should be... *)
+      | TYPE_Array n t            => failGen
+      | TYPE_Vector sz t          => failGen
+      | TYPE_Struct fields        => failGen
+      | TYPE_Packed_struct fields => failGen
+      | TYPE_Identified id        =>
+        match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
+        | None => failGen
+        | Some (i,t) => gen_exp_size sz ctx t
+        end
+      (* Not generating these types for now *)
       | TYPE_Half                 => failGen
       | TYPE_Float                => failGen
       | TYPE_Double               => failGen
@@ -237,11 +514,6 @@ Section ExpGenerators.
       | TYPE_Ppc_fp128            => failGen
       | TYPE_Metadata             => failGen
       | TYPE_X86_mmx              => failGen
-      | TYPE_Array sz t           => failGen
-      | TYPE_Struct fields        => failGen
-      | TYPE_Packed_struct fields => failGen
-      | TYPE_Vector sz t          => failGen
-      | TYPE_Identified id        => failGen
       end
     | (S sz') =>
       let gens :=
@@ -276,33 +548,16 @@ Section ExpGenerators.
           | TYPE_Ppc_fp128         => [failGen]
           | TYPE_Metadata          => [failGen]
           | TYPE_X86_mmx           => [failGen]
-          | TYPE_Identified id     => [failGen] (* TODO: Involves lookup *)
+          | TYPE_Identified id     =>
+            [match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
+             | None => failGen
+             | Some (i,t) => gen_exp_size sz ctx t
+             end]
           end
       in
       (* short-circuit to size 0 *)
       oneOf_ failGen (gen_exp_size 0 ctx t :: gens)
     end.
-  Next Obligation.
-    cbn.
-    assert (0 <= 1)%nat by omega.
-    pose proof Nat.divmod_spec sz' 1 0 0 H.
-    cbn; destruct (Nat.divmod sz' 1 0 0).
-    cbn; omega.
-  Qed.
-  Next Obligation.
-    cbn.
-    assert (0 <= 1)%nat by omega.
-    pose proof Nat.divmod_spec sz' 1 0 0 H.
-    cbn; destruct (Nat.divmod sz' 1 0 0).
-    cbn; omega.
-  Qed.
-  Next Obligation.
-    cbn.
-    assert (0 <= 1)%nat by omega.
-    pose proof Nat.divmod_spec sz' 1 0 0 H.
-    cbn; destruct (Nat.divmod sz' 1 0 0).
-    cbn; omega.
-  Qed.
 
   Definition gen_exp (ctx : list (ident * typ)) (t : typ) : G (exp typ)
     := sized (fun sz => gen_exp_size sz ctx t).
@@ -347,15 +602,15 @@ Section InstrGenerators.
   Definition gen_option {A} (g : G A) : G (option A)
     := freq_ failGen [(1%nat, ret None); (7%nat, liftM Some g)].
 
-  Definition gen_load (ctx : list (ident * typ)) : G (instr typ)
+  Definition gen_load (ctx : list (ident * typ)) : G (typ * instr typ)
     := t   <- gen_sized_typ ctx;;
        let pt := TYPE_Pointer t in
        vol <- (arbitrary : G bool);;
        ptr <- gen_exp ctx pt;;
        align <- arbitrary;;
-       ret (INSTR_Load vol t (pt, ptr) align).
+       ret (t, INSTR_Load vol t (pt, ptr) align).
 
-  Definition gen_store (ctx : list (ident * typ)) : G (instr typ)
+  Definition gen_store (ctx : list (ident * typ)) : G (typ * instr typ)
     := vol <- arbitrary;;
        align <- arbitrary;;
 
@@ -366,14 +621,22 @@ Section InstrGenerators.
        pexp <- gen_exp ctx pt;;
        let ptr := (pt, pexp) in
 
-       ret (INSTR_Store vol val ptr align).
+       ret (TYPE_Void, INSTR_Store vol val ptr align).
 
 
-  Definition gen_instr (ctx : list (ident * typ)) : G (instr typ) :=
+  (* Generate an instruction, as well as its type...
+
+     The type is sometimes void for instructions that don't really
+     compute a value, like void function calls, stores, etc.
+   *)
+  Definition gen_instr (ctx : list (ident * typ)) : G (typ * instr typ) :=
     oneOf_ failGen
-           [ ret (INSTR_Comment "test")
-           ; t <- gen_op_typ;; ret INSTR_Op <*> gen_op ctx t
-           ; ret INSTR_Alloca <*> gen_sized_typ ctx <*> gen_option (gen_int_texp ctx) <*> arbitrary
+           [ ret (TYPE_Void, INSTR_Comment "test")
+           ; t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op ctx t;; ret (t, i)
+           ; t <- gen_sized_typ ctx;;
+             num_elems <- gen_option (gen_int_texp ctx);;
+             align <- arbitrary;;
+             ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
            (* TODO: Generate calls *)
            ; gen_load ctx
            ; gen_store ctx
@@ -382,77 +645,43 @@ Section InstrGenerators.
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
-  Definition gen_id_instr_pair (ctx : list (ident * typ)) : G (instr typ)
 
-  Inductive instr : Set :=
-| INSTR_Comment (msg:string)
-| INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form SV (OP_ ...) *)
-| INSTR_Call (fn:texp) (args:list texp)      (* CORNER CASE: return type is void treated specially *)
-| INSTR_Alloca (t:T) (nb: option texp) (align:option int)
-| INSTR_Load  (volatile:bool) (t:T) (ptr:texp) (align:option int)
-| INSTR_Store (volatile:bool) (val:texp) (ptr:texp) (align:option int)
-| INSTR_Fence
-| INSTR_AtomicCmpXchg
-| INSTR_AtomicRMW
-| INSTR_Unreachable
-| INSTR_VAArg
-| INSTR_LandingPad
-End InstrGenerators.
-
-Section Helpers.
-  Fixpoint max_nat_list (l : list nat) : nat :=
-    match l with
-    | [] => 0
-    | x::rest => max x (max_nat_list rest)
-    end.
-
-  (* TODO: how big should lists be? *)
-  Fixpoint sizeof_typ (t : typ) : nat :=
-    match t with
-    | TYPE_Pointer t            => S (sizeof_typ t)
-    | TYPE_Array sz t           => S (sizeof_typ t)
-    | TYPE_Function ret args    => max (sizeof_typ ret) (max_nat_list (map sizeof_typ args))
-    | TYPE_Struct fields        => max_nat_list (map sizeof_typ fields)
-    | TYPE_Packed_struct fields => max_nat_list (map sizeof_typ fields)
-    | TYPE_Vector sz t          => S (sizeof_typ t)
-    | _                         => 0
-    end.
-
-  (* TODO: incomplete. Should typecheck *)
-  Fixpoint well_formed_op (ctx : list (ident * typ)) (op : exp typ) : bool :=
-    match op with
-    | OP_IBinop iop t v1 v2              => true 
-    | OP_ICmp cmp t v1 v2                => true
-    | OP_FBinop fop fm t v1 v2           => true
-    | OP_FCmp cmp t v1 v2                => true
-    | OP_Conversion conv t_from v t_to   => true
-    | OP_GetElementPtr t ptrval idxs     => true
-    | OP_ExtractElement vec idx          => true
-    | OP_InsertElement vec elt idx       => true
-    | OP_ShuffleVector vec1 vec2 idxmask => true
-    | OP_ExtractValue vec idxs           => true
-    | OP_InsertValue vec elt idxs        => true
-    | OP_Select cnd v1 v2                => true
-    | OP_Freeze v                        => true
-    | _                                  => false
-    end.
+  (* TODO: want to generate phi nodes, which might be a bit
+  complicated because we need to know that an id that occurs in a
+  later block is in context *)
   
-  Fixpoint well_formed_instr (ctx : list (ident * typ)) (i : instr typ) : bool :=
-    match i with
-    | INSTR_Comment msg => true
-    | INSTR_Op op => well_formed_op ctx op
-    | INSTR_Call fn args => _
-    | INSTR_Alloca t nb align => is_sized_typ ctx t (* The alignment may not be greater than 1 << 29. *)
-    | INSTR_Load volatile t ptr align => _
-    | INSTR_Store volatile val ptr align => _
-    | INSTR_Fence => _
-    | INSTR_AtomicCmpXchg => _
-    | INSTR_AtomicRMW => _
-    | INSTR_Unreachable => _
-    | INSTR_VAArg => _
-    | INSTR_LandingPad => _
-    end.
-End Helpers.
+  (* Generate a block of code, spitting out a new context. *)
+  Record GenVars :=
+    { num_void : nat
+    ; num_raw  : nat
+    }.
+
+  Definition gen_instr_id (vs : GenVars) (ctx : list (ident * typ)) : G (GenVars * list (ident * typ) * (instr_id * instr typ))
+    := '(t, instr) <- gen_instr ctx;;
+       match t with
+       | TYPE_Void =>
+         let vs' := {| num_void := S vs.(num_void); num_raw := vs.(num_raw) |} in
+         ret (vs', ctx, (IVoid (Z.of_nat vs.(num_void)), instr))
+       | _ =>
+         let vs' := {| num_void := vs.(num_void); num_raw := S vs.(num_raw) |} in
+         let i := Name ("v" ++ show vs.(num_raw)) in
+         ret (vs', (ID_Local i, t)::ctx, (IId i, instr))
+       end.
+
+  Fixpoint gen_code_length (n : nat) (vs : GenVars) (ctx : list (ident * typ)) : G (code typ)
+    := match n with
+       | O => ret []
+       | S n' =>
+         '(vs', ctx', instr) <- gen_instr_id vs ctx;;
+         rest <- gen_code_length n' vs' ctx';;
+         ret (instr :: rest)
+       end.
+
+  Definition gen_code (vs : GenVars) (ctx : list (ident * typ)) : G (code typ)
+    := n <- arbitrary;;
+       gen_code_length n vs ctx.
+
+End InstrGenerators.
 
 (* Graveyard *)
 
