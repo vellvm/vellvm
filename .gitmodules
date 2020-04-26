@@ -6,7 +6,7 @@
 	url = https://github.com/DeepSpec/InteractionTrees.git
 [submodule "lib/QuickChick"]
 	path = lib/QuickChick
-	url = git@github.com:QuickChick/QuickChick.git
+	url = https://github.com/QuickChick/QuickChick.git
 [submodule "lib/flocq-quickchick"]
 	path = lib/flocq-quickchick
 	url = git@github.com:Chobbes/flocq-quickchick.git
