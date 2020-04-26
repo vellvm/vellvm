@@ -20,7 +20,7 @@ env:
   - NJOBS=1
   - OCAML_VERSION="4.07.0"
   matrix:
-  - TEST_TARGET="8.9.1"
+  - TEST_TARGET="8.10.2"
 
 before_script:
   -  ./ci/keep_alive.sh &
