@@ -7,6 +7,8 @@ Set Warnings "-extraction-opaque-accessed,-extraction".
 From ExtLib.Structures Require Export
      Functor Applicative Monads.
 
+Require Import ExtLib.Data.Monads.StateMonad.
+
 From Vellvm Require Import LLVMAst Util AstLib TypeUtil.
 Require Import Integers Floats.
 
@@ -122,7 +124,7 @@ Section Helpers.
   (* TODO: incomplete. Should typecheck *)
   Fixpoint well_formed_op (ctx : list (ident * typ)) (op : exp typ) : bool :=
     match op with
-    | OP_IBinop iop t v1 v2              => true 
+    | OP_IBinop iop t v1 v2              => true
     | OP_ICmp cmp t v1 v2                => true
     | OP_FBinop fop fm t v1 v2           => true
     | OP_FCmp cmp t v1 v2                => true
@@ -157,6 +159,82 @@ Section Helpers.
    *)
 End Helpers.
 
+Section GenerationState.
+  Record GenState :=
+    mkGenState
+    { num_void : nat
+    ; num_raw  : nat
+    ; num_blocks : nat
+    ; gen_ctx : list (ident * typ)
+    }.
+
+  Definition increment_raw (gs : GenState) : GenState
+    := {| num_void   := gs.(num_void)
+        ; num_raw    := S gs.(num_raw)
+        ; num_blocks := gs.(num_blocks)
+        ; gen_ctx    := gs.(gen_ctx)
+       |}.
+
+  Definition increment_void (gs : GenState) : GenState
+    := {| num_void   := S gs.(num_void)
+        ; num_raw    := gs.(num_raw)
+        ; num_blocks := gs.(num_blocks)
+        ; gen_ctx    := gs.(gen_ctx)
+       |}.
+
+  Definition increment_blocks (gs : GenState) : GenState
+    := {| num_void   := gs.(num_void)
+        ; num_raw    := gs.(num_raw)
+        ; num_blocks := S gs.(num_blocks)
+        ; gen_ctx    := gs.(gen_ctx)
+       |}.
+
+  Definition replace_ctx (ctx : list (ident * typ)) (gs : GenState) : GenState
+    := {| num_void   := gs.(num_void)
+        ; num_raw    := gs.(num_raw)
+        ; num_blocks := gs.(num_blocks)
+        ; gen_ctx    := ctx
+       |}.
+
+  Definition GenLLVM := stateT GenState G.
+
+  Definition get_raw (gs : GenState) : nat
+    := gs.(num_raw).
+
+  Definition get_void (gs : GenState) : nat
+    := gs.(num_void).
+
+  Definition get_blocks (gs : GenState) : nat
+    := gs.(num_blocks).
+
+  Definition new_raw_id : GenLLVM raw_id
+    := n <- gets get_raw;;
+       modify increment_raw;;
+       ret (Name ("v" ++ show n)).
+
+  Definition new_void_id : GenLLVM instr_id
+    := n <- gets get_void;;
+       modify increment_void;;
+       ret (IVoid (Z.of_nat n)).
+
+  Definition new_block_id : GenLLVM block_id
+    := n <- gets get_blocks;;
+       modify increment_blocks;;
+       ret (Name ("b" ++ show n)).
+
+  Definition get_ctx : GenLLVM (list (ident * typ))
+    := gets (fun gs => gs.(gen_ctx)).
+
+  Definition add_to_ctx (x : (ident * typ)) : GenLLVM  unit
+    := ctx <- get_ctx;;
+       let new_ctx := x :: ctx in
+       modify (replace_ctx new_ctx);;
+       ret tt.
+
+  Definition oneOf_LLVM {A} (gs : list (GenLLVM A)) : GenLLVM A
+    := n <- lift (choose (0, List.length gs - 1)%nat);;
+       nth n gs (lift failGen).
+End GenerationState.
 
 Section TypGenerators.
   (* TODO: These currently don't generate pointer types either. *)
@@ -471,7 +549,7 @@ Section ExpGenerators.
        | TYPE_Identified id => false
        end.
   Admit Obligations.
-  
+
   (* Generate an expression of a given type *)
   (* Context should probably not have duplicate ids *)
   (* May want to decrease size more for arrays and vectors *)
@@ -629,8 +707,9 @@ Section InstrGenerators.
      The type is sometimes void for instructions that don't really
      compute a value, like void function calls, stores, etc.
    *)
-  Definition gen_instr (ctx : list (ident * typ)) : G (typ * instr typ) :=
-    oneOf_ failGen
+  Definition gen_instr : GenLLVM (typ * instr typ) :=
+    ctx <- get_ctx;;
+    lift (oneOf_ failGen
            [ ret (TYPE_Void, INSTR_Comment "test")
            ; t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op ctx t;; ret (t, i)
            ; t <- gen_sized_typ ctx;;
@@ -641,7 +720,7 @@ Section InstrGenerators.
            ; gen_load ctx
            ; gen_store ctx
            (* TODO: Generate atomic operations and other instructions *)
-           ].
+           ]).
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
@@ -649,37 +728,70 @@ Section InstrGenerators.
   (* TODO: want to generate phi nodes, which might be a bit
   complicated because we need to know that an id that occurs in a
   later block is in context *)
-  
-  (* Generate a block of code, spitting out a new context. *)
-  Record GenVars :=
-    { num_void : nat
-    ; num_raw  : nat
-    }.
 
-  Definition gen_instr_id (vs : GenVars) (ctx : list (ident * typ)) : G (GenVars * list (ident * typ) * (instr_id * instr typ))
-    := '(t, instr) <- gen_instr ctx;;
+  (* Generate a block of code, spitting out a new context. *)
+  Definition gen_instr_id : GenLLVM (instr_id * instr typ)
+    := '(t, instr) <- gen_instr;;
        match t with
        | TYPE_Void =>
-         let vs' := {| num_void := S vs.(num_void); num_raw := vs.(num_raw) |} in
-         ret (vs', ctx, (IVoid (Z.of_nat vs.(num_void)), instr))
+         vid <- new_void_id;;
+         ret (vid, instr)
        | _ =>
-         let vs' := {| num_void := vs.(num_void); num_raw := S vs.(num_raw) |} in
-         let i := Name ("v" ++ show vs.(num_raw)) in
-         ret (vs', (ID_Local i, t)::ctx, (IId i, instr))
+         i <- new_raw_id;;
+         add_to_ctx (ID_Local i, t);;
+         ret (IId i, instr)
        end.
 
-  Fixpoint gen_code_length (n : nat) (vs : GenVars) (ctx : list (ident * typ)) : G (code typ)
+  Fixpoint gen_code_length (n : nat) : GenLLVM (code typ)
     := match n with
        | O => ret []
        | S n' =>
-         '(vs', ctx', instr) <- gen_instr_id vs ctx;;
-         rest <- gen_code_length n' vs' ctx';;
+         instr <- gen_instr_id;;
+         rest  <- gen_code_length n';;
          ret (instr :: rest)
        end.
 
-  Definition gen_code (vs : GenVars) (ctx : list (ident * typ)) : G (code typ)
-    := n <- arbitrary;;
-       gen_code_length n vs ctx.
+  Definition gen_code : GenLLVM (code typ)
+    := n <- lift arbitrary;;
+       gen_code_length n.
+
+  (* Returns a terminator and a list of new blocks that it reaches *)
+  (* Need to make returns more likely than branches so we don't get an
+     endless tree of blocks *)
+
+  Fixpoint gen_terminator
+             (sz : nat) (t : typ) {struct t} : GenLLVM (terminator typ * list (block typ))
+    :=
+      ctx <- get_ctx;;
+      match sz with
+       | 0%nat =>
+         (* Only returns allowed *)
+         match (normalize_type ctx t) with
+         | TYPE_Void => ret (TERM_Ret_void, [])
+         | _ =>
+           e <- lift (gen_exp ctx t);;
+           ret (TERM_Ret (t, e), [])
+         end
+       | S sz' =>
+         (* Need to lift oneOf to GenLLVM ...*)
+         oneOf_LLVM
+           [ gen_terminator 0 t
+           ; '(b, bs) <- gen_blocks sz' ctx t;; ret (TERM_Br_1 (blk_id b), bs)
+           ]
+       end
+  with gen_blocks (sz : nat) (ctx : list (ident * typ)) (t : typ) {struct t} : GenLLVM (block typ * list (block typ))
+         :=
+           bid <- new_block_id;;
+           code <- gen_code;;
+           '(term, bs) <- gen_terminator (sz - 1) t;;
+           i <- new_raw_id;;
+           let b := {| blk_id   := bid
+                     ; blk_phis := []
+                     ; blk_code := code
+                     ; blk_term := (IId i, term)
+                     ; blk_comments := None
+                    |} in
+           ret (b, b :: bs).
 
 End InstrGenerators.
 
