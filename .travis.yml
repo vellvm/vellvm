@@ -19,7 +19,7 @@ env:
   global:
   - NJOBS=1
   matrix:
-  - TEST_TARGET="8.9.1"
+  - TEST_TARGET="8.11.0"
 
 before_script:
   -  ./ci/keep_alive.sh &
