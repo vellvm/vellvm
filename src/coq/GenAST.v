@@ -1,7 +1,5 @@
-From QuickChick Require Import QuickChick GenLow.
 From QuickChick Require Import QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
-Import GenLow GenHigh.
 Set Warnings "-extraction-opaque-accessed,-extraction".
 
 From ExtLib.Structures Require Export
@@ -9,7 +7,7 @@ From ExtLib.Structures Require Export
 
 Require Import ExtLib.Data.Monads.StateMonad.
 
-From Vellvm Require Import LLVMAst Util AstLib TypeUtil.
+From Vellvm Require Import LLVMAst Util AstLib TypeUtil CFG.
 Require Import Integers Floats.
 
 Require Import List.
@@ -57,6 +55,16 @@ Section ShowInstances.
   Global Instance showBlock: Show (block typ) :=
     {|
     show := CeresSerialize.to_string 
+    |}.
+
+  Global Instance showCode: Show (code typ) :=
+    {|
+    show := CeresSerialize.to_string 
+    |}.
+
+  Global Instance showInstr: Show (instr typ) :=
+    {|
+    show := CeresSerialize.to_string
     |}.
 
 End ShowInstances.
@@ -243,6 +251,15 @@ Section GenerationState.
        modify (replace_ctx new_ctx);;
        ret tt.
 
+  Definition append_to_ctx (vars : list (ident * typ)) : GenLLVM unit
+    := ctx <- get_ctx;;
+       let new_ctx := vars ++ ctx in
+       modify (replace_ctx new_ctx);;
+       ret tt.
+
+  Definition reset_ctx : GenLLVM unit
+    := modify (replace_ctx []);; ret tt.
+
   Definition oneOf_LLVM {A} (gs : list (GenLLVM A)) : GenLLVM A
     := n <- lift (choose (0, List.length gs - 1)%nat);;
        nth n gs (lift failGen).
@@ -423,7 +440,6 @@ Section TypGenerators.
                 ; TYPE_I 32
                 ; TYPE_I 64
                 ]).
-
 End TypGenerators.
 
 Section ExpGenerators.
@@ -770,7 +786,6 @@ Section InstrGenerators.
   (* Returns a terminator and a list of new blocks that it reaches *)
   (* Need to make returns more likely than branches so we don't get an
      endless tree of blocks *)
-
   Fixpoint gen_terminator
              (sz : nat) (t : typ) {struct t} : GenLLVM (terminator typ * list (block typ))
     :=
@@ -788,10 +803,10 @@ Section InstrGenerators.
          (* Need to lift oneOf to GenLLVM ...*)
          oneOf_LLVM
            [ gen_terminator 0 t
-           ; '(b, bs) <- gen_blocks sz' ctx t;; ret (TERM_Br_1 (blk_id b), bs)
+           ; '(b, bs) <- gen_blocks sz' t;; ret (TERM_Br_1 (blk_id b), bs)
            ]
        end
-  with gen_blocks (sz : nat) (ctx : list (ident * typ)) (t : typ) {struct t} : GenLLVM (block typ * list (block typ))
+  with gen_blocks (sz : nat) (t : typ) {struct t} : GenLLVM (block typ * list (block typ))
          :=
            bid <- new_block_id;;
            code <- gen_code;;
@@ -804,6 +819,18 @@ Section InstrGenerators.
                      ; blk_comments := None
                     |} in
            ret (b, b :: bs).
+
+  Definition gen_cfg_with_typ (sz : nat) (ret_t : typ) (args : list (ident * typ)) : GenLLVM (cfg typ)
+    :=
+      reset_ctx;;
+      append_to_ctx args;;
+      '(b, blocks) <- gen_blocks sz ret_t;;
+      let cfg :=
+          {| init := b.(blk_id);
+             blks := blocks;
+             args := map fst args;
+          |} in
+      ret cfg.
 
 End InstrGenerators.
 
