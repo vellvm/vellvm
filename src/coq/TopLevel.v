@@ -199,7 +199,7 @@ Module TopLevelEnv <: Environment.
      into the [itree] monad.
    *)
   Definition interp_vellvm_exec_user {R: Type} user_intrinsics (trace: itree L0 R) g l m :=
-    let uvalue_trace       := INT.interpret_intrinsics user_intrinsics trace in
+    let uvalue_trace       := INT.interp_intrinsics user_intrinsics trace in
     let L1_trace       := runState (interp_global uvalue_trace) g in
     let L2_trace       := runState (interp_local_stack (handle_local (v:=uvalue)) L1_trace) l in
     let L3_trace       := runState (M.interp_memory L2_trace) m in
@@ -238,7 +238,7 @@ Module TopLevelEnv <: Environment.
      all allowed behaviors into the [Prop] monad.
    *)
   Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree L0 R) g l m :=
-    let uvalue_trace       := INT.interpret_intrinsics user_intrinsics trace in
+    let uvalue_trace       := INT.interp_intrinsics user_intrinsics trace in
     let L1_trace       := runState (interp_global uvalue_trace) g in
     let L2_trace       := runState (interp_local_stack (handle_local (v:=uvalue)) L1_trace) l in
     let L3_trace       := runState (M.interp_memory L2_trace) m in

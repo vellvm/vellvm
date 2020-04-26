@@ -10,7 +10,7 @@
 
 
 From Coq Require Import
-     ZArith List String.
+     ZArith List String Morphisms.
 
 From ExtLib Require Import
      Structures.Monads
@@ -129,41 +129,49 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     Definition E'_trigger' : Handler E' Eff' := fun _ e => trigger e.
     Definition F_trigger' : Handler F Eff' := fun _ e => trigger e.
 
-    Definition interpret_intrinsics_h (user_intrinsics: intrinsic_definitions) :=
+    Definition interp_intrinsics_h (user_intrinsics: intrinsic_definitions) :=
       (case_ E_trigger (case_ (handle_intrinsics user_intrinsics) F_trigger)).
 
-    Definition interpret_intrinsics (user_intrinsics: intrinsic_definitions):
+    Definition interp_intrinsics (user_intrinsics: intrinsic_definitions):
       forall R, itree Eff R -> itree Eff R :=
-      interp (interpret_intrinsics_h user_intrinsics).
+      interp (interp_intrinsics_h user_intrinsics).
 
-    Definition interpret_intrinsics' (user_intrinsics: intrinsic_definitions):
+    Definition interp_intrinsics' (user_intrinsics: intrinsic_definitions):
       forall R, itree Eff' R -> itree Eff' R :=
       interp (case_ E_trigger' (case_ E'_trigger' (case_ (handle_intrinsics user_intrinsics) F_trigger'))).
 
     Lemma interp_intrinsics_bind :
       forall (R S : Type) l (t : itree Eff R) (k : R -> itree _ S),
-        interpret_intrinsics l (ITree.bind t k) ≅ ITree.bind (interpret_intrinsics l t) (fun r : R => interpret_intrinsics l (k r)).
+        interp_intrinsics l (ITree.bind t k) ≅ ITree.bind (interp_intrinsics l t) (fun r : R => interp_intrinsics l (k r)).
     Proof.
       intros; apply interp_bind.
     Qed.
 
     Lemma interp_intrinsics_ret :
       forall (R : Type) l (x: R),
-        interpret_intrinsics l (Ret x: itree Eff _) ≅ Ret x.
+        interp_intrinsics l (Ret x: itree Eff _) ≅ Ret x.
     Proof.
       intros; apply interp_ret.
     Qed.
 
+    Global Instance eutt_interp_intrinsics (user_intrinsics: intrinsic_definitions) {R} :
+        Proper (eutt Logic.eq ==> eutt Logic.eq) (@interp_intrinsics user_intrinsics R).
+    Proof.
+      do 2 red; intros * EQ.
+      unfold interp_intrinsics.
+      rewrite EQ; reflexivity.
+    Qed.
+
     Lemma interp_intrinsics'_bind :
       forall (R S : Type) l (t : itree Eff' R) (k : R -> itree _ S),
-        interpret_intrinsics' l (ITree.bind t k) ≅ ITree.bind (interpret_intrinsics' l t) (fun r : R => interpret_intrinsics' l (k r)).
+        interp_intrinsics' l (ITree.bind t k) ≅ ITree.bind (interp_intrinsics' l t) (fun r : R => interp_intrinsics' l (k r)).
     Proof.
       intros; apply interp_bind.
     Qed.
 
     Lemma interp_intrinsics'_ret :
       forall (R : Type) l (x: R),
-        interpret_intrinsics' l (Ret x: itree Eff' _) ≅ Ret x.
+        interp_intrinsics' l (Ret x: itree Eff' _) ≅ Ret x.
     Proof.
       intros; apply interp_ret.
     Qed.

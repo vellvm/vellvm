@@ -1,4 +1,5 @@
 From Coq Require Import
+     Morphisms
      String.
 
 From ExtLib Require Import
@@ -104,6 +105,16 @@ Section Globals.
       intros; apply interp_state_ret.
     Qed.
 
+    Global Instance eutt_interp_global {R} :
+      Proper (eutt eq ==> eq ==> eutt eq) (@interp_global R). 
+    Proof.
+      repeat intro.
+      unfold interp_global. 
+      subst; rewrite H1.
+      reflexivity.
+    Qed.
+
+    (* YZ: THe following isn't used anymore I believe *)
     Lemma interp_global'_bind :
       forall (R S : Type) (t : itree Effin' R) (k : R -> itree Effin' S) s,
         runState (interp_global' (ITree.bind t k)) s ≅

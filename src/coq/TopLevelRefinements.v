@@ -178,25 +178,25 @@ Qed.
  *)
 
 Definition interp_to_L1 {R} user_intrinsics (t: itree IO.L0 R) g :=
-  let uvalue_trace       := INT.interpret_intrinsics user_intrinsics t in
+  let uvalue_trace       := INT.interp_intrinsics user_intrinsics t in
   let L1_trace       := runState (interp_global uvalue_trace) g in
   L1_trace.
 
 Definition interp_to_L2 {R} user_intrinsics (t: itree IO.L0 R) g l :=
-  let uvalue_trace       := INT.interpret_intrinsics user_intrinsics t in
+  let uvalue_trace       := INT.interp_intrinsics user_intrinsics t in
   let L1_trace       := runState (interp_global uvalue_trace) g in
   let L2_trace       := runState (interp_local_stack (handle_local (v:=uvalue)) L1_trace) l in
   L2_trace.
 
 Definition interp_to_L3 {R} user_intrinsics (t: itree IO.L0 R) g l m :=
-  let uvalue_trace       := INT.interpret_intrinsics user_intrinsics t in
+  let uvalue_trace       := INT.interp_intrinsics user_intrinsics t in
   let L1_trace       := runState (interp_global uvalue_trace) g in
   let L2_trace       := runState (interp_local_stack (handle_local (v:=uvalue)) L1_trace) l in
   let L3_trace       := runState (M.interp_memory L2_trace) m in
   L3_trace.
 
 Definition interp_to_L4 {R} user_intrinsics (t: itree IO.L0 R) g l m :=
-  let uvalue_trace       := INT.interpret_intrinsics user_intrinsics t in
+  let uvalue_trace       := INT.interp_intrinsics user_intrinsics t in
   let L1_trace       := runState (interp_global uvalue_trace) g in
   let L2_trace       := runState (interp_local_stack (handle_local (v:=uvalue)) L1_trace) l in
   let L3_trace       := runState (M.interp_memory L2_trace) m in
@@ -205,8 +205,8 @@ Definition interp_to_L4 {R} user_intrinsics (t: itree IO.L0 R) g l m :=
 
 Ltac fold_L1 :=
     match goal with
-      |- context[runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g] =>
-      replace (runState (interp_global (INT.interpret_intrinsics ui p)) g) with
+      |- context[runState (interp_global (INT.interp_intrinsics ?ui ?p)) ?g] =>
+      replace (runState (interp_global (INT.interp_intrinsics ui p)) g) with
         (interp_to_L1 ui p g) by reflexivity
     end.
 
@@ -215,8 +215,8 @@ Ltac fold_L2 :=
       |- context[
             runState
               (interp_local_stack ?h
-                (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l] =>
-      replace (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l) with
+                (runState (interp_global (INT.interp_intrinsics ?ui ?p)) ?g)) ?l] =>
+      replace (runState (interp_local_stack h (runState (interp_global (INT.interp_intrinsics ui p)) g)) l) with
         (interp_to_L2 ui p g l) by reflexivity
     end.
 
@@ -226,8 +226,8 @@ Ltac fold_L3 :=
             runState (M.interp_memory
             (runState
               (interp_local_stack ?h
-                (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m] =>
-      replace (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m) with
+                (runState (interp_global (INT.interp_intrinsics ?ui ?p)) ?g)) ?l)) ?m] =>
+      replace (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interp_intrinsics ui p)) g)) l)) m) with
         (interp_to_L3 ui p g l m) by reflexivity
     end.
 
@@ -237,8 +237,8 @@ Ltac fold_L4 :=
             P.model_undef (runState (M.interp_memory
             (runState
               (interp_local_stack ?h
-                (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m)] =>
-      replace (P.model_undef (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m)) with
+                (runState (interp_global (INT.interp_intrinsics ?ui ?p)) ?g)) ?l)) ?m)] =>
+      replace (P.model_undef (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interp_intrinsics ui p)) g)) l)) m)) with
         (interp_to_L4 ui p g l m) by reflexivity
     end.
 
@@ -248,8 +248,8 @@ Ltac fold_L5 :=
             model_UB (P.model_undef (runState (M.interp_memory
             (runState
               (interp_local_stack ?h
-                (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m))] =>
-      replace (model_UB (P.model_undef (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m))) with
+                (runState (interp_global (INT.interp_intrinsics ?ui ?p)) ?g)) ?l)) ?m))] =>
+      replace (model_UB (P.model_undef (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interp_intrinsics ui p)) g)) l)) m))) with
         (interp_vellvm_model_user ui p g l m) by reflexivity
     end.
 
@@ -476,7 +476,7 @@ Proof.
 Qed.
 
 Definition interp_cfg {R: Type} (trace: itree IO.instr_E R) g l m :=
-  let uvalue_trace       := INT.interpret_intrinsics [] trace in
+  let uvalue_trace       := INT.interp_intrinsics [] trace in
   let L1_trace       := runState (interp_global uvalue_trace) g in
   let L2_trace       := runState (interp_local L1_trace) l in
   let L3_trace       := runState (M.interp_memory L2_trace) m in
