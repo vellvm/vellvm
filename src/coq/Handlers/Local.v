@@ -84,8 +84,8 @@ Section Locals.
 
     Lemma interp_local_bind :
       forall (R S : Type) (t : itree Effin R) (k : R -> itree Effin S) s,
-        runState (interp_local (ITree.bind t k)) s ≅
-         ITree.bind (runState (interp_local t) s) (fun '(s',r) => runState (interp_local (k r)) s').
+        interp_local (ITree.bind t k) s ≅
+         ITree.bind (interp_local t s) (fun '(s',r) => interp_local (k r) s').
     Proof.
       intros.
       unfold interp_local.
@@ -97,7 +97,7 @@ Section Locals.
 
     Lemma interp_local_ret :
       forall (R : Type) g (x: R),
-        runState (interp_local (Ret x: itree Effin R)) g ≅ Ret (g,x).
+        interp_local (Ret x: itree Effin R) g ≅ Ret (g,x).
     Proof.
       intros; apply interp_state_ret.
     Qed.

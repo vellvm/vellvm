@@ -200,9 +200,9 @@ Module TopLevelEnv <: Environment.
    *)
   Definition interp_vellvm_exec_user {R: Type} user_intrinsics (trace: itree L0 R) g l m :=
     let uvalue_trace       := INT.interp_intrinsics user_intrinsics trace in
-    let L1_trace       := runState (interp_global uvalue_trace) g in
-    let L2_trace       := runState (interp_local_stack (handle_local (v:=uvalue)) L1_trace) l in
-    let L3_trace       := runState (M.interp_memory L2_trace) m in
+    let L1_trace       := interp_global uvalue_trace g in
+    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
+    let L3_trace       := M.interp_memory L2_trace m in
     let L4_trace       := P.interp_undef L3_trace in
     let L5_trace       := interp_UB L4_trace in
     L5_trace.
@@ -239,9 +239,9 @@ Module TopLevelEnv <: Environment.
    *)
   Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree L0 R) g l m :=
     let uvalue_trace       := INT.interp_intrinsics user_intrinsics trace in
-    let L1_trace       := runState (interp_global uvalue_trace) g in
-    let L2_trace       := runState (interp_local_stack (handle_local (v:=uvalue)) L1_trace) l in
-    let L3_trace       := runState (M.interp_memory L2_trace) m in
+    let L1_trace       := interp_global uvalue_trace g in
+    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
+    let L3_trace       := M.interp_memory L2_trace m in
     let L4_trace       := P.model_undef L3_trace in
     let L5_trace       := model_UB L4_trace in
     L5_trace.

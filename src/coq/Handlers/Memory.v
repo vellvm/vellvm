@@ -759,8 +759,8 @@ Admitted.
 
     Lemma interp_memory_bind :
       forall (R S : Type) (t : itree Effin R) (k : R -> itree Effin S) m,
-        runState (interp_memory (ITree.bind t k)) m ≅
-         ITree.bind (runState (interp_memory t) m) (fun '(m',r) => runState (interp_memory (k r)) m').
+        interp_memory (ITree.bind t k) m ≅
+         ITree.bind (interp_memory t m) (fun '(m',r) => interp_memory (k r) m').
     Proof.
       intros.
       unfold interp_memory.
@@ -772,15 +772,15 @@ Admitted.
 
     Lemma interp_memory_ret :
       forall (R : Type) g (x: R),
-        runState (interp_memory (Ret x: itree Effin R)) g ≅ Ret (g,x).
+        interp_memory (Ret x: itree Effin R) g ≅ Ret (g,x).
     Proof.
       intros; apply interp_state_ret.
     Qed.
 
     Lemma interp_memory'_bind :
       forall (R S : Type) (t : itree Effin' R) (k : R -> itree Effin' S) m,
-        runState (interp_memory' (ITree.bind t k)) m ≅
-                 ITree.bind (runState (interp_memory' t) m) (fun '(m',r) => runState (interp_memory' (k r)) m').
+        interp_memory' (ITree.bind t k) m ≅
+                 ITree.bind (interp_memory' t m) (fun '(m',r) => interp_memory' (k r) m').
     Proof.
       intros.
       unfold interp_memory.
@@ -792,7 +792,7 @@ Admitted.
 
     Lemma interp_memory'_ret :
       forall (R : Type) g (x: R),
-        runState (interp_memory' (Ret x: itree Effin' R)) g ≅ Ret (g,x).
+        interp_memory' (Ret x: itree Effin' R) g ≅ Ret (g,x).
     Proof.
       intros; apply interp_state_ret.
     Qed.

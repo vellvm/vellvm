@@ -87,8 +87,8 @@ Section Globals.
 
     Lemma interp_global_bind :
       forall (R S : Type) (t : itree Effin R) (k : R -> itree Effin S) s,
-        runState (interp_global (ITree.bind t k)) s ≅
-         ITree.bind (runState (interp_global t) s) (fun '(s',r) => runState (interp_global (k r)) s').
+        interp_global (ITree.bind t k) s ≅
+        ITree.bind (interp_global t s) (fun '(s',r) => interp_global (k r) s').
     Proof.
       intros.
       unfold interp_global.
@@ -100,7 +100,7 @@ Section Globals.
 
     Lemma interp_global_ret :
       forall (R : Type) g (x: R),
-        runState (interp_global (Ret x: itree Effin R)) g ≅ Ret (g,x).
+        interp_global (Ret x: itree Effin R) g ≅ Ret (g,x).
     Proof.
       intros; apply interp_state_ret.
     Qed.
@@ -117,8 +117,8 @@ Section Globals.
     (* YZ: THe following isn't used anymore I believe *)
     Lemma interp_global'_bind :
       forall (R S : Type) (t : itree Effin' R) (k : R -> itree Effin' S) s,
-        runState (interp_global' (ITree.bind t k)) s ≅
-         ITree.bind (runState (interp_global' t) s) (fun '(s',r) => runState (interp_global' (k r)) s').
+        interp_global' (ITree.bind t k) s ≅
+         ITree.bind (interp_global' t s) (fun '(s',r) => interp_global' (k r) s').
     Proof.
       intros.
       unfold interp_global.
@@ -130,7 +130,7 @@ Section Globals.
 
     Lemma interp_global'_ret :
       forall (R : Type) g (x: R),
-        runState (interp_global' (Ret x: itree Effin' R)) g ≅ Ret (g,x).
+        interp_global' (Ret x: itree Effin' R) g ≅ Ret (g,x).
     Proof.
       intros; apply interp_state_ret.
     Qed.

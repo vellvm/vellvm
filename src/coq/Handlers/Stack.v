@@ -87,9 +87,9 @@ Section StackMap.
 
     Lemma interp_local_stack_bind :
       forall (R S: Type) (t : itree Effin _) (k : R -> itree Effin S) s,
-        runState (interp_local_stack (handle_local (v:=v)) (ITree.bind t k)) s ≅
-                 ITree.bind (runState (interp_local_stack (handle_local (v:=v)) t) s)
-                 (fun '(s',r) => runState (interp_local_stack (handle_local (v:=v)) (k r)) s').
+        interp_local_stack (handle_local (v:=v)) (ITree.bind t k) s ≅
+        ITree.bind (interp_local_stack (handle_local (v:=v)) t s)
+        (fun '(s',r) => interp_local_stack (handle_local (v:=v)) (k r) s').
     Proof.
       intros.
       unfold interp_local_stack.
@@ -101,7 +101,7 @@ Section StackMap.
 
     Lemma interp_local_stack_ret :
       forall (R : Type) l (x: R),
-        runState (interp_local_stack (handle_local (v:=v)) (Ret x: itree Effin R)) l ≅ Ret (l,x).
+        interp_local_stack (handle_local (v:=v)) (Ret x: itree Effin R) l ≅ Ret (l,x).
     Proof.
       intros; apply interp_state_ret.
     Qed.
