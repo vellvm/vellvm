@@ -49,9 +49,14 @@ Section ShowInstances.
     | TYPE_Identified id        => "TYPE_Identified " ++ show id
     end.
 
-  Instance showTyp:  Show typ :=
+  Global Instance showTyp:  Show typ :=
     {|
     show := show_typ
+    |}.
+
+  Global Instance showBlock: Show (block typ) :=
+    {|
+    show := CeresSerialize.to_string 
     |}.
 
 End ShowInstances.
@@ -167,6 +172,13 @@ Section GenerationState.
     ; num_blocks : nat
     ; gen_ctx : list (ident * typ)
     }.
+
+  Definition init_GenState : GenState
+    := {| num_void   := 0
+        ; num_raw    := 0
+        ; num_blocks := 0
+        ; gen_ctx    := []
+       |}.
 
   Definition increment_raw (gs : GenState) : GenState
     := {| num_void   := gs.(num_void)
@@ -794,6 +806,7 @@ Section InstrGenerators.
            ret (b, b :: bs).
 
 End InstrGenerators.
+
 
 (* Graveyard *)
 
