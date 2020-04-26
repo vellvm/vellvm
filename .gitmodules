@@ -9,4 +9,4 @@
 	url = https://github.com/QuickChick/QuickChick.git
 [submodule "lib/flocq-quickchick"]
 	path = lib/flocq-quickchick
-	url = git@github.com:Chobbes/flocq-quickchick.git
+	url = https://github.com/Chobbes/flocq-quickchick.git
