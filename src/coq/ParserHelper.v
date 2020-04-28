@@ -596,10 +596,8 @@ Section Correctness.
   Zdigits (Z.neg p) = Z.succ (Z.log2 (Zpos p)).
   Proof.
     unfold Zdigits, Z.abs.
-    (* rewrite <-Zlog2_log_inf. *)
-    (* reflexivity. *)
-    (* Qed. *)
-  Admitted.
+    reflexivity.
+  Qed.
 
   (* similar to [bounded_closed_form] *)
   Lemma valid_float_closed_form (prec emax : Z) (f : bfloat) (NZ : not_zero f)
