@@ -589,10 +589,8 @@ Section Correctness.
   Zdigits (Z.pos p) = Z.succ (Z.log2 (Zpos p)).
   Proof.
     unfold Zdigits, Z.abs.
-    (* rewrite <-Zlog2_log_inf. *)
-    (* reflexivity. *)
-    (* Qed. *)
-  Admitted.
+    reflexivity.
+  Qed.
 
   Fact Zdigits_Zneg_log_inf (p : positive) :
   Zdigits (Z.neg p) = Z.succ (Z.log2 (Zpos p)).
