@@ -117,13 +117,13 @@ Section Correctness.
     Z.pos (Digits.digits2_pos m) = digits m.
   Proof.
     induction m; simpl.
-    {rewrite Pos2Z.inj_succ, IHm.
-     unfold digits.
-
-
-  (*     try rewrite Pos2Z.inj_succ, IHm; reflexivity. *)
-  (* Qed. *)
-  Admitted.
+    1,2:
+      rewrite Pos2Z.inj_succ, IHm;
+      unfold digits;
+      rewrite <- Z.log2_double by lia;
+      reflexivity.
+    auto.
+  Qed.
 
   (** ** Flocq's Binary.bounded rewritten in a form close to IEEE-754 *)
   Lemma bounded_closed_form (prec emax : Z)
