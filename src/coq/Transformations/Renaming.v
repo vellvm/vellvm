@@ -69,10 +69,10 @@ Section Swap.
       if id ~=? id2 then id1 else
         id.
 
-  Instance swap_endo_raw_id : endo raw_id := swap_raw_id.
+  Instance swap_endo_raw_id : Endo raw_id := swap_raw_id.
 
-  Definition swap_mcfg: transformation := f_endo.
-  Definition swap_dmcfg: endo (mcfg dtyp) := f_endo.
+  Definition swap_mcfg: transformation := endo.
+  Definition swap_dmcfg: Endo (mcfg dtyp) := endo.
 
   (*
     For now we forget about normalization of types, we reason after it happened.
