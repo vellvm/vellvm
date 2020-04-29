@@ -156,7 +156,7 @@ Proof.
   destruct n; discriminate. 
 Qed.
 
-Hint Resolve not_Nth_nil.
+Hint Resolve not_Nth_nil : core.
 
 Lemma Nth_nth_default : forall X l n (a:X) d,
   Nth l n a ->

@@ -89,14 +89,14 @@ Section Swap.
   | list_rel_nil: list_rel RA [] []
   | list_rel_cons: forall a1 a2 tl1 tl2, RA a1 a2 -> list_rel RA tl1 tl2 -> list_rel RA (a1 :: tl1) (a2 :: tl2)
   .
-  Hint Constructors list_rel.
+  Hint Constructors list_rel : core.
 
   (* In top-level, [address_one_function] is mapped to return notably a mapping from function addresses to itrees.
      We hence want to get extensional eutt over the returned type.
    *)
   Definition function_rel {X}:
     relation (FMapAList.alist raw_id uvalue * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (uvalue * (list uvalue -> itree IO.L0 uvalue)))) := (Logic.eq × (Logic.eq × list_rel (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))).
-  Hint Unfold function_rel.
+  Hint Unfold function_rel : core.
 
   Global Instance list_rel_refl {R: Type} {RR: relation R} `{Reflexive _ RR} : Reflexive (list_rel RR).
   Proof.

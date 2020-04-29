@@ -27,7 +27,7 @@ Inductive refine_uvalue: uvalue -> uvalue -> Prop :=
 | UndefPoison: forall t, refine_uvalue (UVALUE_Undef t) UVALUE_Poison (* CB / YZ: TODO, type for poison? *)
 | RefineConcrete: forall uv1 uv2, (forall dv, concretize uv1 dv -> concretize uv2 dv) -> refine_uvalue uv1 uv2
 .
-Hint Constructors refine_uvalue.
+Hint Constructors refine_uvalue : core.
 
 Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
 Proof.

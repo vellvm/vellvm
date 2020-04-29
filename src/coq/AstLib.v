@@ -259,7 +259,7 @@ End RawIDOrd.
 (* Module RawID := Make_UDT(RawIDDec).  *)
 Instance eq_dec_raw_id : RelDec (@eq raw_id) := RelDec_from_dec (@eq raw_id) RawIDOrd.eq_dec.
 Instance eqv_raw_id : Eqv raw_id := (@eq raw_id).
-Hint Unfold eqv_raw_id.
+Hint Unfold eqv_raw_id: core.
 
 Module InstrIDDec <: MiniDecidableType.
   Definition t := instr_id.

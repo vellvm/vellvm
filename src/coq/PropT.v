@@ -14,6 +14,8 @@ From ITree Require Import
      Basics.Monad
      Core.ITreeMonad.
 
+From Paco Require Import paco.
+
 Section PropMonad.
 
   Definition PropT (E: Type -> Type) (X: Type): Type :=
@@ -28,7 +30,7 @@ Section PropMonad.
   | ReturnsTau: forall t, Returns a t -> Returns a (Tau t)
   | ReturnsVis: forall {X} (e: E X) (x: X) t k, t ≈ Vis e k -> Returns a (k x) -> Returns a t
   .
-  Hint Constructors Returns.
+  Hint Constructors Returns: core.
 
   Global Instance Monad_Prop {E} : Monad (PropT E) :=
     {|
@@ -76,7 +78,6 @@ Section MonadLaws.
       (forall x y, x ≈ y -> (PA x <-> PA' y)) /\
       eutt_closed PA /\ eutt_closed PA'.
 
-  Require Import Paco.paco.
   Lemma eutt_ret_vis_abs: forall {X Y E} (x: X) (e: E Y) k, Ret x ≈ Vis e k -> False.
   Proof.
     intros.
@@ -123,8 +124,6 @@ Section MonadLaws.
     + assumption.
   Qed.
 
-
-  From Paco Require Import paco.
   Section ReturnsBind.
 
     Context {E : Type -> Type} {R : Type}. 
@@ -139,7 +138,7 @@ Section MonadLaws.
                   (REL: forall u, Returns u t1 -> r (k1 u) (k2 u))
       : eqit_Returns_bind_clo b1 b2 r (ITree.bind t1 k1) (ITree.bind t2 k2)
     .
-    Hint Constructors eqit_Returns_bind_clo.
+    Hint Constructors eqit_Returns_bind_clo: core.
 
     Lemma eqit_Returns_clo_bind b1 b2 vclo
           (MON: monotone2 vclo)

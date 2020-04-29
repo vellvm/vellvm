@@ -555,7 +555,7 @@ Section DecidableEquality.
 
   Global Instance eq_dec_dvalue : RelDec (@eq dvalue) := RelDec_from_dec (@eq dvalue) (@dvalue_eq_dec).
   Global Instance eqv_dvalue : Eqv dvalue := (@eq dvalue).
-  Hint Unfold eqv_dvalue.
+  Hint Unfold eqv_dvalue : core.
 End DecidableEquality.
 
 (* TODO: include Undefined values in this way? i.e. Undef is really a predicate on values

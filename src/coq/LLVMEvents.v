@@ -255,7 +255,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Definition L5 := ExternalCallE +' DebugE +' FailureE.
 
-  Hint Unfold L0 L0' L1 L2 L3 L4 L5.
+  Hint Unfold L0 L0' L1 L2 L3 L4 L5 : core.
 
   Definition _failure_UB_to_L4 : (FailureE +' UBE) ~> L4:=
     fun T e =>

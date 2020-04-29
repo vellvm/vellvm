@@ -180,7 +180,7 @@ Module Spec (Import G:GRAPH).
       Path g v1 v2 vs -> mem g v3 -> edge g v2 v3 
       -> Path g v1 v3 (v3::vs).
 
-Hint Constructors Path.
+Hint Constructors Path: core.
   
 (** *** Definition of domination *)
 

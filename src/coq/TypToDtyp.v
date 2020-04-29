@@ -36,7 +36,7 @@ Inductive typ_order : typ -> typ -> Prop :=
 | typ_order_Function_ret : forall (ret : typ) (args : list typ),
     typ_order ret (TYPE_Function ret args)
 .
-Hint Constructors typ_order.
+Hint Constructors typ_order : core.
 
 Lemma map_In {A B : Type} (l : list A) (f : forall (x : A), In x l -> B) : list B.
 Proof.
@@ -100,8 +100,8 @@ Proof.
       * assumption.
 Qed.
 
-Hint Resolve wf_lt_typ_order.
-Hint Constructors lex_ord.
+Hint Resolve wf_lt_typ_order : core.
+Hint Constructors lex_ord : core.
 
 Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List.length env, t) (lex_ord lt typ_order)} : dtyp :=
   match t with

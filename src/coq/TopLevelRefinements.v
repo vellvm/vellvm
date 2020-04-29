@@ -108,7 +108,7 @@ Proof.
   unfold PropT in h. 
 Admitted.
 
-Hint Unfold TT.
+Hint Unfold TT : core.
 Instance TT_equiv :
   forall A, Equivalence (@TT A).
 Proof.
