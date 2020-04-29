@@ -67,6 +67,16 @@ Section ShowInstances.
     show := CeresSerialize.to_string
     |}.
 
+  Global Instance showDefinition: Show (definition typ (list (block typ))) :=
+    {|
+    show := CeresSerialize.to_string
+    |}.
+
+  Global Instance showExp : Show (exp typ) :=
+    {|
+    show := CeresSerialize.to_string
+    |}.
+
 End ShowInstances.
 
 Section Helpers.
@@ -170,6 +180,12 @@ Section Helpers.
     | INSTR_LandingPad => _
     end.
    *)
+
+  Definition genNatInt : G int
+    := fmap (fun n => Int.repr (Z.of_nat n)) (arbitrary : G nat).
+
+  Definition genPosInt : G int
+    := fmap (fun n => Int.repr (Z.of_nat (S n))) (arbitrary : G nat).
 End Helpers.
 
 Section GenerationState.
@@ -177,6 +193,7 @@ Section GenerationState.
     mkGenState
     { num_void : nat
     ; num_raw  : nat
+    ; num_global : nat
     ; num_blocks : nat
     (* Types of values *)
     ; gen_ctx : list (ident * typ)
@@ -187,6 +204,7 @@ Section GenerationState.
   Definition init_GenState : GenState
     := {| num_void   := 0
         ; num_raw    := 0
+        ; num_global := 0
         ; num_blocks := 0
         ; gen_ctx    := []
         ; gen_typ_ctx    := []
@@ -195,6 +213,16 @@ Section GenerationState.
   Definition increment_raw (gs : GenState) : GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := S gs.(num_raw)
+        ; num_global  := gs.(num_global)
+        ; num_blocks  := gs.(num_blocks)
+        ; gen_ctx     := gs.(gen_ctx)
+        ; gen_typ_ctx := gs.(gen_typ_ctx)
+       |}.
+
+  Definition increment_global (gs : GenState) : GenState
+    := {| num_void    := gs.(num_void)
+        ; num_raw     := gs.(num_raw)
+        ; num_global  := S gs.(num_global)
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
@@ -203,6 +231,7 @@ Section GenerationState.
   Definition increment_void (gs : GenState) : GenState
     := {| num_void    := S gs.(num_void)
         ; num_raw     := gs.(num_raw)
+        ; num_global  := gs.(num_global)
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
@@ -211,6 +240,7 @@ Section GenerationState.
   Definition increment_blocks (gs : GenState) : GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
+        ; num_global  := gs.(num_global)
         ; num_blocks  := S gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := gs.(gen_typ_ctx)
@@ -219,6 +249,7 @@ Section GenerationState.
   Definition replace_ctx (ctx : list (ident * typ)) (gs : GenState) : GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
+        ; num_global  := gs.(num_global)
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := ctx
         ; gen_typ_ctx := gs.(gen_typ_ctx)
@@ -227,6 +258,7 @@ Section GenerationState.
   Definition replace_typ_ctx (typ_ctx : list (ident * typ)) (gs : GenState) : GenState
     := {| num_void    := gs.(num_void)
         ; num_raw     := gs.(num_raw)
+        ; num_global  := gs.(num_global)
         ; num_blocks  := gs.(num_blocks)
         ; gen_ctx     := gs.(gen_ctx)
         ; gen_typ_ctx := typ_ctx
@@ -236,6 +268,9 @@ Section GenerationState.
 
   Definition get_raw (gs : GenState) : nat
     := gs.(num_raw).
+
+  Definition get_global (gs : GenState) : nat
+    := gs.(num_global).
 
   Definition get_void (gs : GenState) : nat
     := gs.(num_void).
@@ -247,6 +282,11 @@ Section GenerationState.
     := n <- gets get_raw;;
        modify increment_raw;;
        ret (Name ("v" ++ show n)).
+
+  Definition new_global_id : GenLLVM raw_id
+    := n <- gets get_global;;
+       modify increment_global;;
+       ret (Name ("g" ++ show n)).
 
   Definition new_void_id : GenLLVM instr_id
     := n <- gets get_void;;
@@ -298,6 +338,10 @@ Section GenerationState.
     := n <- lift (choose (0, List.length gs - 1)%nat);;
        nth n gs (lift failGen).
 
+  Definition freq_LLVM {A} (gs : list (nat * GenLLVM A)) : GenLLVM A
+    := mkStateT
+         (fun st => freq_ failGen (fmap (fun '(n, g) => (n, runStateT g st)) gs)).
+
   Definition vectorOf_LLVM {A : Type} (k : nat) (g : GenLLVM A)
     : GenLLVM (list A) :=
     fold_right (fun m m' =>
@@ -346,6 +390,11 @@ Section TypGenerators.
                 (* ; TYPE_Opaque *)
                 ])).
 
+  Definition genPosZ : G Z
+    :=
+      n <- (arbitrary : G nat);;
+      ret (Z.of_nat n). 
+
   Program Fixpoint gen_sized_typ_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
     | O => gen_sized_typ_0
@@ -354,8 +403,8 @@ Section TypGenerators.
         [ gen_sized_typ_0
         ; ret TYPE_Pointer <*> gen_sized_typ_size sz'
         (* Might want to restrict the size to something reasonable *)
-        ; ret TYPE_Array <*> lift arbitrary <*> gen_sized_typ_size sz'
-        ; ret TYPE_Vector <*> lift arbitrary <*> gen_sized_typ_size sz'
+        ; ret TYPE_Array <*> lift genPosZ <*> gen_sized_typ_size sz'
+        ; ret TYPE_Vector <*> lift genPosZ <*> gen_sized_typ_size sz'
         ; let n := Nat.div sz 2 in
           ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
         ; ret TYPE_Struct <*> listOf_LLVM (gen_sized_typ_size sz')
@@ -411,8 +460,8 @@ Section TypGenerators.
                       [ gen_typ_0
                       (* Might want to restrict the size to something reasonable *)
                       (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
-                      ; ret TYPE_Array <*> lift arbitrary <*> gen_sized_typ_size sz'
-                      ; ret TYPE_Vector <*> lift arbitrary <*> gen_sized_typ_size sz'
+                      ; ret TYPE_Array <*> lift genPosZ <*> gen_sized_typ_size sz'
+                      ; ret TYPE_Vector <*> lift genPosZ <*> gen_sized_typ_size sz'
                       ; let n := Nat.div sz 2 in
                         ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
                       ; ret TYPE_Struct <*> listOf_LLVM (gen_sized_typ_size sz')
@@ -457,8 +506,8 @@ Section TypGenerators.
                       [ gen_typ_non_void_0
                       (* Might want to restrict the size to something reasonable *)
                       (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
-                      ; ret TYPE_Array <*> lift arbitrary <*> gen_sized_typ_size sz'
-                      ; ret TYPE_Vector <*> lift arbitrary <*> gen_sized_typ_size sz'
+                      ; ret TYPE_Array <*> lift genPosZ <*> gen_sized_typ_size sz'
+                      ; ret TYPE_Vector <*> lift genPosZ <*> gen_sized_typ_size sz'
                       ; let n := Nat.div sz 2 in
                         ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
                       ; ret TYPE_Struct <*> listOf_LLVM (gen_sized_typ_size sz')
@@ -856,7 +905,7 @@ Section InstrGenerators.
   (* Returns a terminator and a list of new blocks that it reaches *)
   (* Need to make returns more likely than branches so we don't get an
      endless tree of blocks *)
-  Fixpoint gen_terminator
+  Fixpoint gen_terminator_sz
              (sz : nat) (t : typ) {struct t} : GenLLVM (terminator typ * list (block typ))
     :=
       ctx <- get_ctx;;
@@ -871,26 +920,26 @@ Section InstrGenerators.
          end
        | S sz' =>
          (* Need to lift oneOf to GenLLVM ...*)
-         oneOf_LLVM
-           [ gen_terminator 0 t
-           ; '(b, bs) <- gen_blocks sz' t;; ret (TERM_Br_1 (blk_id b), bs)
-           ; ctx <- get_ctx;;
-             c <- gen_exp (TYPE_I 1);;
-             '(b1, bs1) <- gen_blocks sz' t;;
+         freq_LLVM
+           [ (8%nat, gen_terminator_sz 0 t)
+           ; (0%nat, '(b, bs) <- gen_blocks_sz sz' t;; ret (TERM_Br_1 (blk_id b), bs))
+           ; (0%nat, ctx <- get_ctx;;
+                   c <- gen_exp (TYPE_I 1);;
+                   '(b1, bs1) <- gen_blocks_sz sz' t;;
 
-             (* Restore context so blocks in second branch don't refer
-                to variables from the first branch. *)
-             modify (replace_ctx ctx);;
-             '(b2, bs2) <- gen_blocks sz' t;;
+                   (* Restore context so blocks in second branch don't refer
+                      to variables from the first branch. *)
+                   modify (replace_ctx ctx);;
+                   '(b2, bs2) <- gen_blocks_sz sz' t;;
 
-             ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), bs1 ++ bs2)
+                   ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), bs1 ++ bs2))
            ]
        end
-  with gen_blocks (sz : nat) (t : typ) {struct t} : GenLLVM (block typ * list (block typ))
+  with gen_blocks_sz (sz : nat) (t : typ) {struct t} : GenLLVM (block typ * list (block typ))
          :=
            bid <- new_block_id;;
            code <- gen_code;;
-           '(term, bs) <- gen_terminator (sz - 1) t;;
+           '(term, bs) <- gen_terminator_sz (sz - 1) t;;
            i <- new_raw_id;;
            let b := {| blk_id   := bid
                      ; blk_phis := []
@@ -900,31 +949,44 @@ Section InstrGenerators.
                     |} in
            ret (b, b :: bs).
 
-  Definition gen_cfg_with_typ (sz : nat) (ret_t : typ) (args : list (ident * typ)) : GenLLVM (cfg typ)
+  Definition gen_blocks (t : typ) : GenLLVM (list (block typ))
+    := sized_LLVM (fun n => fmap snd (gen_blocks_sz n t)).
+
+  (* Don't want to generate CFGs, actually. Want to generated TLEs *)
+  Definition gen_definition (name : global_id) (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (list (block typ)))
     :=
-      reset_ctx;;
-      append_to_ctx args;;
-      '(b, blocks) <- gen_blocks sz ret_t;;
-      let cfg :=
-          {| init := b.(blk_id);
-             blks := blocks;
-             args := map fst args;
-          |} in
-      ret cfg.
+      ctx <- get_ctx;;
+      (* Add arguments to context *)
+      let args_ctx := map (fun '(i, t) => (ID_Local i, t)) args in
+      append_to_ctx args_ctx;;
+
+      bs <- gen_blocks ret_t;;
+
+      let args_t := map snd args in
+      let f_type := TYPE_Function ret_t args_t in
+      let prototype :=
+          mk_declaration name f_type
+                         ([], [])
+                         None None None None
+                         []
+                         None None None
+      in
+      (* Reset context *)
+      modify (replace_ctx ((ID_Global name, f_type) :: ctx));;
+      ret (mk_definition (list (block typ)) prototype (map fst args) bs).
+
+  Definition gen_new_definition (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (list (block typ)))
+    :=
+      name <- new_global_id;;
+      gen_definition name ret_t args.
+
+  Definition gen_main : GenLLVM (definition typ (list (block typ)))
+    := gen_definition (Name "main") (TYPE_I 8) [].
 
 End InstrGenerators.
 
+Definition run_GenLLVM {A} (g : GenLLVM A) : G A
+  := fmap fst (runStateT g init_GenState).
 
-(* Graveyard *)
-
-(* Definition gen_global_name : G ident := *)
-(*   n <- choose (0, 10000);; *)
-(*   ret (ID_Global (Name ("v" ++ show n))). *)
-
-(* Definition gen_typ_ctx_size (sz : nat) (names : nat) : G (list (ident * typ)) *)
-(*   := match sz with *)
-(*      | O => ret [] *)
-(*      | S x => *)
-(*        n <- gen_global_name;; *)
-(*        ret (n, t) *)
-(*      end. *)
+Sample (arbitrary : G nat).
+Sample (resize 1 (run_GenLLVM (gen_texp))).
