@@ -1,3 +1,9 @@
+(** ** Normalization of types
+    This file contains a lot of stuff related to the historical normalization of types performed as a pre-processing phase.
+    The current version uses a notion of dynamic types instead and a conversion function [TypToDtyp.typ_to_dtyp].
+    The content of this file is however likely to be useful for static analyses in the future.
+*)
+
 From Coq Require Import
      List
      String
@@ -1296,55 +1302,3 @@ Proof.
       inversion Hfind. contradiction.
 Qed.
 
-
-Program Fixpoint normalize_type_dtyp (env : list (ident * typ)) (t : typ) {measure (List.length env, t) (lex_ord lt typ_order)} : dtyp :=
-  match t with
-  | TYPE_Array sz t =>
-    let nt := normalize_type_dtyp env t in
-    DTYPE_Array sz nt
-
-  | TYPE_Function ret args =>
-    (*
-    let nret := (normalize_type env ret) in
-    let nargs := map_In args (fun t _ => normalize_type env t) in *)
-    DTYPE_Pointer (* Function nret nargs *)
-
-  | TYPE_Struct fields =>
-    let nfields := map_In fields (fun t _ => normalize_type_dtyp env t) in
-    DTYPE_Struct nfields
-
-  | TYPE_Packed_struct fields =>
-    let nfields := map_In fields (fun t _ => normalize_type_dtyp env t) in
-    DTYPE_Packed_struct nfields
-
-  | TYPE_Vector sz t =>
-    let nt := normalize_type_dtyp env t in
-    DTYPE_Vector sz nt
-
-  | TYPE_Identified id =>
-    let opt := find (fun a => Ident.eq_dec id (fst a)) env in
-    match opt with
-    | None => DTYPE_Void   (* TODO: should this be None? *)
-    | Some (_, t) => normalize_type_dtyp (remove_key Ident.eq_dec id env) t
-    end
-
-  | TYPE_I sz => DTYPE_I sz
-  | TYPE_Pointer t' => DTYPE_Pointer
-  | TYPE_Void => DTYPE_Void
-  | TYPE_Half => DTYPE_Half
-  | TYPE_Float => DTYPE_Float
-  | TYPE_Double => DTYPE_Double
-  | TYPE_X86_fp80 => DTYPE_X86_fp80
-  | TYPE_Fp128 => DTYPE_Fp128
-  | TYPE_Ppc_fp128 => DTYPE_Ppc_fp128
-  | TYPE_Metadata => DTYPE_Metadata
-  | TYPE_X86_mmx => DTYPE_X86_mmx
-  | TYPE_Opaque => DTYPE_Opaque
-  end.
-Next Obligation.
-  left.
-  symmetry in Heq_opt. apply find_some in Heq_opt. destruct Heq_opt as [Hin Heqb_ident].
-  simpl in Heqb_ident.
-  destruct (Ident.eq_dec id wildcard'). subst. eapply remove_key_in. apply Hin.
-  inversion Heqb_ident.
-Defined.

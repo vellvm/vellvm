@@ -17,7 +17,7 @@ CP=cp
 
 COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric/Integers Numeric/Floats\
 									Util PropT Error LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues\
-									LLVMEvents TypeUtil IntrinsicsDefinitions\
+									LLVMEvents TypToDtyp IntrinsicsDefinitions\
 									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/UndefinedBehaviour\
 									Denotation TransformTypes TopLevel
 

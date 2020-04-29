@@ -37,6 +37,7 @@ From Vellvm Require Import
      Handlers.Intrinsics
      Handlers.UndefinedBehaviour
      LLVMAst
+     TypToDtyp
      Util
      Error
      Handlers.Pick
@@ -145,8 +146,9 @@ Module TopLevelEnv <: Environment.
   (**
    Transformation and normalization of types.
    *)
+
   Definition eval_typ (CFG:CFG.mcfg typ) (t:typ) : dtyp :=
-    TypeUtil.normalize_type_dtyp (m_type_defs CFG) t.
+    typ_to_dtyp (m_type_defs CFG) t.
 
   Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
     TransformTypes.fmap_mcfg _ _ (eval_typ CFG) CFG.
@@ -238,7 +240,7 @@ Module TopLevelEnv <: Environment.
      all allowed behaviors into the [Prop] monad.
    *)
   Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree L0 R) g l m :=
-    let uvalue_trace       := INT.interp_intrinsics user_intrinsics trace in
+    let uvalue_trace   := INT.interp_intrinsics user_intrinsics trace in
     let L1_trace       := interp_global uvalue_trace g in
     let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
     let L3_trace       := M.interp_memory L2_trace m in
