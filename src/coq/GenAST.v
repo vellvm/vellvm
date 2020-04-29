@@ -874,6 +874,16 @@ Section InstrGenerators.
          oneOf_LLVM
            [ gen_terminator 0 t
            ; '(b, bs) <- gen_blocks sz' t;; ret (TERM_Br_1 (blk_id b), bs)
+           ; ctx <- get_ctx;;
+             c <- gen_exp (TYPE_I 1);;
+             '(b1, bs1) <- gen_blocks sz' t;;
+
+             (* Restore context so blocks in second branch don't refer
+                to variables from the first branch. *)
+             modify (replace_ctx ctx);;
+             '(b2, bs2) <- gen_blocks sz' t;;
+
+             ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), bs1 ++ bs2)
            ]
        end
   with gen_blocks (sz : nat) (t : typ) {struct t} : GenLLVM (block typ * list (block typ))
