@@ -1,3 +1,13 @@
+(** **
+    This file defines an [fmap] over the AST of VIR in order to lift the
+    conversion of types to dynamic types.
+    It is rendered obsolete by the use of the more general traversal from [Transformations/Traversal.v],
+    and its use for the case of the conversion of types instantiated at the bottom of the [TypToDtyp] module.
+
+    It is cut from the compilation chain, but kept around for now until we're confident the change is correct.
+*)
+
+
 (* -------------------------------------------------------------------------- *
  *                     Vellvm - the Verified LLVM project                     *
  *                                                                            *

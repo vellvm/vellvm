@@ -24,7 +24,6 @@ From ExtLib Require Import
 
 From Vellvm Require Import
      AstLib
-     TransformTypes
      DynamicTypes
      LLVMEvents
      Denotation

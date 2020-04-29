@@ -21,7 +21,6 @@ From Vellvm Require Import
      LLVMAst
      AstLib
      CFG
-     TransformTypes
      DynamicTypes
      DynamicValues
      Denotation
