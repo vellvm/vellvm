@@ -121,8 +121,8 @@ Section Helpers.
        end.
 
   (* Only works correctly if the type is well formed *)
-  Definition is_sized_type (ctx : list (ident * typ)) (t : typ) : bool
-    := is_sized_type_h (normalize_type ctx t).
+  Definition is_sized_type (typ_ctx : list (ident * typ)) (t : typ) : bool
+    := is_sized_type_h (normalize_type typ_ctx t).
 
   Definition is_int_type_h (t : typ) : bool
     := match t with
@@ -131,11 +131,11 @@ Section Helpers.
        end.
 
   (* Only works correctly if the type is well formed *)
-  Definition is_int_type (ctx : list (ident * typ)) (t : typ) : bool
-    := is_int_type_h (normalize_type ctx t).
+  Definition is_int_type (typ_ctx : list (ident * typ)) (t : typ) : bool
+    := is_int_type_h (normalize_type typ_ctx t).
 
   (* TODO: incomplete. Should typecheck *)
-  Fixpoint well_formed_op (ctx : list (ident * typ)) (op : exp typ) : bool :=
+  Fixpoint well_formed_op (typ_ctx : list (ident * typ)) (op : exp typ) : bool :=
     match op with
     | OP_IBinop iop t v1 v2              => true
     | OP_ICmp cmp t v1 v2                => true
@@ -178,7 +178,10 @@ Section GenerationState.
     { num_void : nat
     ; num_raw  : nat
     ; num_blocks : nat
+    (* Types of values *)
     ; gen_ctx : list (ident * typ)
+    (* Type aliases *)
+    ; gen_typ_ctx : list (ident * typ)
     }.
 
   Definition init_GenState : GenState
@@ -186,34 +189,47 @@ Section GenerationState.
         ; num_raw    := 0
         ; num_blocks := 0
         ; gen_ctx    := []
+        ; gen_typ_ctx    := []
        |}.
 
   Definition increment_raw (gs : GenState) : GenState
-    := {| num_void   := gs.(num_void)
-        ; num_raw    := S gs.(num_raw)
-        ; num_blocks := gs.(num_blocks)
-        ; gen_ctx    := gs.(gen_ctx)
+    := {| num_void    := gs.(num_void)
+        ; num_raw     := S gs.(num_raw)
+        ; num_blocks  := gs.(num_blocks)
+        ; gen_ctx     := gs.(gen_ctx)
+        ; gen_typ_ctx := gs.(gen_typ_ctx)
        |}.
 
   Definition increment_void (gs : GenState) : GenState
-    := {| num_void   := S gs.(num_void)
-        ; num_raw    := gs.(num_raw)
-        ; num_blocks := gs.(num_blocks)
-        ; gen_ctx    := gs.(gen_ctx)
+    := {| num_void    := S gs.(num_void)
+        ; num_raw     := gs.(num_raw)
+        ; num_blocks  := gs.(num_blocks)
+        ; gen_ctx     := gs.(gen_ctx)
+        ; gen_typ_ctx := gs.(gen_typ_ctx)
        |}.
 
   Definition increment_blocks (gs : GenState) : GenState
-    := {| num_void   := gs.(num_void)
-        ; num_raw    := gs.(num_raw)
-        ; num_blocks := S gs.(num_blocks)
-        ; gen_ctx    := gs.(gen_ctx)
+    := {| num_void    := gs.(num_void)
+        ; num_raw     := gs.(num_raw)
+        ; num_blocks  := S gs.(num_blocks)
+        ; gen_ctx     := gs.(gen_ctx)
+        ; gen_typ_ctx := gs.(gen_typ_ctx)
        |}.
 
   Definition replace_ctx (ctx : list (ident * typ)) (gs : GenState) : GenState
-    := {| num_void   := gs.(num_void)
-        ; num_raw    := gs.(num_raw)
-        ; num_blocks := gs.(num_blocks)
-        ; gen_ctx    := ctx
+    := {| num_void    := gs.(num_void)
+        ; num_raw     := gs.(num_raw)
+        ; num_blocks  := gs.(num_blocks)
+        ; gen_ctx     := ctx
+        ; gen_typ_ctx := gs.(gen_typ_ctx)
+       |}.
+
+  Definition replace_typ_ctx (typ_ctx : list (ident * typ)) (gs : GenState) : GenState
+    := {| num_void    := gs.(num_void)
+        ; num_raw     := gs.(num_raw)
+        ; num_blocks  := gs.(num_blocks)
+        ; gen_ctx     := gs.(gen_ctx)
+        ; gen_typ_ctx := typ_ctx
        |}.
 
   Definition GenLLVM := stateT GenState G.
@@ -245,10 +261,19 @@ Section GenerationState.
   Definition get_ctx : GenLLVM (list (ident * typ))
     := gets (fun gs => gs.(gen_ctx)).
 
+  Definition get_typ_ctx : GenLLVM (list (ident * typ))
+    := gets (fun gs => gs.(gen_typ_ctx)).
+
   Definition add_to_ctx (x : (ident * typ)) : GenLLVM  unit
     := ctx <- get_ctx;;
        let new_ctx := x :: ctx in
        modify (replace_ctx new_ctx);;
+       ret tt.
+
+  Definition add_to_typ_ctx (x : (ident * typ)) : GenLLVM  unit
+    := ctx <- get_typ_ctx;;
+       let new_ctx := x :: ctx in
+       modify (replace_typ_ctx new_ctx);;
        ret tt.
 
   Definition append_to_ctx (vars : list (ident * typ)) : GenLLVM unit
@@ -257,26 +282,52 @@ Section GenerationState.
        modify (replace_ctx new_ctx);;
        ret tt.
 
+  Definition append_to_typ_ctx (aliases : list (ident * typ)) : GenLLVM unit
+    := ctx <- get_typ_ctx;;
+       let new_ctx := aliases ++ ctx in
+       modify (replace_typ_ctx new_ctx);;
+       ret tt.
+
   Definition reset_ctx : GenLLVM unit
     := modify (replace_ctx []);; ret tt.
+
+  Definition reset_typ_ctx : GenLLVM unit
+    := modify (replace_typ_ctx []);; ret tt.
 
   Definition oneOf_LLVM {A} (gs : list (GenLLVM A)) : GenLLVM A
     := n <- lift (choose (0, List.length gs - 1)%nat);;
        nth n gs (lift failGen).
+
+  Definition vectorOf_LLVM {A : Type} (k : nat) (g : GenLLVM A)
+    : GenLLVM (list A) :=
+    fold_right (fun m m' =>
+                  x <- m;;
+                  xs <- m';;
+                  ret (x :: xs)) (ret []) (repeat g k).
+
+  Definition sized_LLVM {A : Type} (gn : nat -> GenLLVM A) : GenLLVM A
+    := mkStateT
+         (fun st => sized (fun n => runStateT (gn n) st)).
+
+  Definition listOf_LLVM {A : Type} (g : GenLLVM A) : GenLLVM (list A) :=
+    sized_LLVM (fun n =>
+                  k <- lift (choose (0, n)%nat);;
+                  vectorOf_LLVM k g).
 End GenerationState.
 
 Section TypGenerators.
   (* TODO: These currently don't generate pointer types either. *)
 
   (* Not sized in the QuickChick sense, sized in the LLVM sense. *)
-  Definition gen_sized_typ_0 (ctx : list (ident * typ)) : G typ :=
-    let sized_ctx := filter (fun '(i,t) => is_sized_type ctx t) ctx in
+  Definition gen_sized_typ_0 : GenLLVM typ :=
+    aliases <- get_typ_ctx;;
+    let sized_aliases := filter (fun '(i,t) => is_sized_type aliases t) aliases in
     let ident_gen :=
         (* Don't want to fail if there are no identifiers *)
-        if (List.length sized_ctx =? 0)%nat
+        if (List.length sized_aliases =? 0)%nat
         then []
-        else [ret TYPE_Identified <*> oneOf_ failGen (map (fun '(i,_) => ret i) sized_ctx)] in
-    oneOf_ failGen
+        else [ret TYPE_Identified <*> oneOf_LLVM (map (fun '(i,_) => ret i) sized_aliases)] in
+    oneOf_LLVM
            (ident_gen ++
            (map ret
                 [ TYPE_I 1
@@ -295,19 +346,21 @@ Section TypGenerators.
                 (* ; TYPE_Opaque *)
                 ])).
 
-  Program Fixpoint gen_sized_typ_size (sz : nat) (ctx : list (ident * typ)) {measure sz} : G typ :=
+  Program Fixpoint gen_sized_typ_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
-    | O => gen_sized_typ_0 ctx
-    | (S sz') => oneOf_ failGen
-                      [ gen_sized_typ_0 ctx
-                      ; ret TYPE_Pointer <*> gen_sized_typ_size sz' ctx
-                      (* Might want to restrict the size to something reasonable *)
-                      ; ret TYPE_Array <*> arbitrary <*> gen_sized_typ_size sz' ctx
-                      ; ret TYPE_Vector <*> arbitrary <*> gen_sized_typ_size sz' ctx
-                      ; let n := Nat.div sz 2 in ret TYPE_Function <*> gen_sized_typ_size n ctx <*> listOf (gen_sized_typ_size n ctx)
-                      ; ret TYPE_Struct <*> listOf (gen_sized_typ_size sz' ctx)
-                      ; ret TYPE_Packed_struct <*> listOf (gen_sized_typ_size sz' ctx)
-                      ]
+    | O => gen_sized_typ_0
+    | (S sz') =>
+      oneOf_LLVM
+        [ gen_sized_typ_0
+        ; ret TYPE_Pointer <*> gen_sized_typ_size sz'
+        (* Might want to restrict the size to something reasonable *)
+        ; ret TYPE_Array <*> lift arbitrary <*> gen_sized_typ_size sz'
+        ; ret TYPE_Vector <*> lift arbitrary <*> gen_sized_typ_size sz'
+        ; let n := Nat.div sz 2 in
+          ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
+        ; ret TYPE_Struct <*> listOf_LLVM (gen_sized_typ_size sz')
+        ; ret TYPE_Packed_struct <*> listOf_LLVM (gen_sized_typ_size sz')
+        ]
     end.
   Next Obligation.
     cbn.
@@ -324,13 +377,14 @@ Section TypGenerators.
     cbn; omega.
   Qed.
 
-  Definition gen_sized_typ (ctx : list (ident * typ)) : G typ
-    := sized (fun sz => gen_sized_typ_size sz ctx).
+  Definition gen_sized_typ : GenLLVM typ
+    := sized_LLVM (fun sz => gen_sized_typ_size sz).
 
   (* Generate a type of size 0 *)
-  Definition gen_typ_0 (ctx : list (ident * typ)) : G typ :=
-    oneOf_ failGen
-          ((ret TYPE_Identified <*> oneOf_ failGen (map (fun '(i,_) => ret i) ctx)) ::
+  Definition gen_typ_0 : GenLLVM typ :=
+    aliases <- get_typ_ctx;;
+    oneOf_LLVM
+          ((ret TYPE_Identified <*> oneOf_LLVM (map (fun '(i,_) => ret i) aliases)) ::
            (map ret
                 [ TYPE_I 1
                 ; TYPE_I 8
@@ -350,19 +404,19 @@ Section TypGenerators.
 
   (* TODO: This should probably be mutually recursive with
      gen_sized_typ since pointers of any type are considered sized *)
-  Program Fixpoint gen_typ_size (sz : nat) (ctx : list (ident * typ)) {measure sz} : G typ :=
+  Program Fixpoint gen_typ_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
-    | 0%nat => gen_typ_0 ctx
-    | (S sz') => oneOf_ failGen
-                      [ gen_typ_0 ctx
+    | 0%nat => gen_typ_0
+    | (S sz') => oneOf_LLVM
+                      [ gen_typ_0
                       (* Might want to restrict the size to something reasonable *)
                       (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
-                      ; ret TYPE_Array <*> arbitrary <*> gen_sized_typ_size sz' ctx
-                      ; ret TYPE_Vector <*> arbitrary <*> gen_sized_typ_size sz' ctx
+                      ; ret TYPE_Array <*> lift arbitrary <*> gen_sized_typ_size sz'
+                      ; ret TYPE_Vector <*> lift arbitrary <*> gen_sized_typ_size sz'
                       ; let n := Nat.div sz 2 in
-                        ret TYPE_Function <*> gen_typ_size n ctx <*> listOf (gen_sized_typ_size n ctx)
-                      ; ret TYPE_Struct <*> listOf (gen_sized_typ_size sz' ctx)
-                      ; ret TYPE_Packed_struct <*> listOf (gen_sized_typ_size sz' ctx)
+                        ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
+                      ; ret TYPE_Struct <*> listOf_LLVM (gen_sized_typ_size sz')
+                      ; ret TYPE_Packed_struct <*> listOf_LLVM (gen_sized_typ_size sz')
                       ]
     end.
   Next Obligation.
@@ -373,12 +427,13 @@ Section TypGenerators.
     cbn; omega.
   Qed.
 
-  Definition gen_typ (ctx : list (ident * typ)) : G typ
-    := sized (fun sz => gen_typ_size sz ctx).
+  Definition gen_typ : GenLLVM typ
+    := sized_LLVM (fun sz => gen_typ_size sz).
 
-  Definition gen_typ_non_void_0 (ctx : list (ident * typ)) : G typ :=
-    oneOf_ failGen
-          ((ret TYPE_Identified <*> oneOf_ failGen (map (fun '(i,_) => ret i) ctx)) ::
+  Definition gen_typ_non_void_0 : GenLLVM typ :=
+    aliases <- get_typ_ctx;;
+    oneOf_LLVM
+          ((ret TYPE_Identified <*> oneOf_LLVM (map (fun '(i,_) => ret i) aliases)) ::
            (map ret
                 [ TYPE_I 1
                 ; TYPE_I 8
@@ -395,26 +450,26 @@ Section TypGenerators.
                 (* ; TYPE_Opaque *)
                 ])).
 
-  Program Fixpoint gen_typ_non_void_size (sz : nat) (ctx : list (ident * typ)) {measure sz} : G typ :=
+  Program Fixpoint gen_typ_non_void_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
-    | 0%nat => gen_typ_non_void_0 ctx
-    | (S sz') => oneOf_ failGen
-                      [ gen_typ_non_void_0 ctx
+    | 0%nat => gen_typ_non_void_0
+    | (S sz') => oneOf_LLVM
+                      [ gen_typ_non_void_0
                       (* Might want to restrict the size to something reasonable *)
                       (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
-                      ; ret TYPE_Array <*> arbitrary <*> gen_sized_typ_size sz' ctx
-                      ; ret TYPE_Vector <*> arbitrary <*> gen_sized_typ_size sz' ctx
+                      ; ret TYPE_Array <*> lift arbitrary <*> gen_sized_typ_size sz'
+                      ; ret TYPE_Vector <*> lift arbitrary <*> gen_sized_typ_size sz'
                       ; let n := Nat.div sz 2 in
-                        ret TYPE_Function <*> gen_typ_size n ctx <*> listOf (gen_sized_typ_size n ctx)
-                      ; ret TYPE_Struct <*> listOf (gen_sized_typ_size sz' ctx)
-                      ; ret TYPE_Packed_struct <*> listOf (gen_sized_typ_size sz' ctx)
+                        ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
+                      ; ret TYPE_Struct <*> listOf_LLVM (gen_sized_typ_size sz')
+                      ; ret TYPE_Packed_struct <*> listOf_LLVM (gen_sized_typ_size sz')
                       ]
     end.
 
   (* TODO: look up identifiers *)
   (* Types for operation expressions *)
-  Definition gen_op_typ : G typ :=
-    oneOf_ failGen
+  Definition gen_op_typ : GenLLVM typ :=
+    oneOf_LLVM
            (map ret
                 [ TYPE_I 1
                 ; TYPE_I 8
@@ -432,8 +487,8 @@ Section TypGenerators.
                 ]).
 
   (* TODO: look up identifiers *)
-  Definition gen_int_typ : G typ :=
-    oneOf_ failGen
+  Definition gen_int_typ : GenLLVM typ :=
+    oneOf_LLVM
            (map ret
                 [ TYPE_I 1
                 ; TYPE_I 8
@@ -593,33 +648,34 @@ Section ExpGenerators.
        | S n' => a <- ma;; rest <- replicateM n' ma;; ret (a :: rest)
        end.
 
-  Fixpoint gen_exp_size (sz : nat) (ctx : list (ident * typ)) (t : typ) {struct t} : G (exp typ) :=
+  Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
     match sz with
     | 0%nat =>
       match t with
-      | TYPE_I n                  => ret EXP_Integer <*> arbitrary
-      | TYPE_Pointer t            => failGen (* Only pointer type expressions might be conversions? Maybe GEP? *)
-      | TYPE_Void                 => failGen (* There should be no expressions of type void *)
-      | TYPE_Function ret args    => failGen (* No expressions of function type *)
-      | TYPE_Opaque               => failGen (* TODO: not sure what these should be... *)
-      | TYPE_Array n t            => failGen
-      | TYPE_Vector sz t          => failGen
-      | TYPE_Struct fields        => failGen
-      | TYPE_Packed_struct fields => failGen
+      | TYPE_I n                  => ret EXP_Integer <*> lift arbitrary
+      | TYPE_Pointer t            => lift failGen (* Only pointer type expressions might be conversions? Maybe GEP? *)
+      | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
+      | TYPE_Function ret args    => lift failGen (* No expressions of function type *)
+      | TYPE_Opaque               => lift failGen (* TODO: not sure what these should be... *)
+      | TYPE_Array n t            => lift failGen
+      | TYPE_Vector sz t          => lift failGen
+      | TYPE_Struct fields        => lift failGen
+      | TYPE_Packed_struct fields => lift failGen
       | TYPE_Identified id        =>
+        ctx <- get_ctx;;
         match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
-        | None => failGen
-        | Some (i,t) => gen_exp_size sz ctx t
+        | None => lift failGen
+        | Some (i,t) => gen_exp_size sz t
         end
       (* Not generating these types for now *)
-      | TYPE_Half                 => failGen
-      | TYPE_Float                => failGen
-      | TYPE_Double               => failGen
-      | TYPE_X86_fp80             => failGen
-      | TYPE_Fp128                => failGen
-      | TYPE_Ppc_fp128            => failGen
-      | TYPE_Metadata             => failGen
-      | TYPE_X86_mmx              => failGen
+      | TYPE_Half                 => lift failGen
+      | TYPE_Float                => lift failGen
+      | TYPE_Double               => lift failGen
+      | TYPE_X86_fp80             => lift failGen
+      | TYPE_Fp128                => lift failGen
+      | TYPE_Ppc_fp128            => lift failGen
+      | TYPE_Metadata             => lift failGen
+      | TYPE_X86_mmx              => lift failGen
       end
     | (S sz') =>
       let gens :=
@@ -627,70 +683,72 @@ Section ExpGenerators.
           | TYPE_I isz =>
             (* TODO: If I1 also allow ICmp and FCmp *)
             [let n := Nat.div sz 2 in
-             ret OP_IBinop <*> gen_ibinop <*> ret t <*> gen_exp_size n ctx t <*> gen_exp_size n ctx t]
+             ret OP_IBinop <*> lift gen_ibinop <*> ret t <*> gen_exp_size n t <*> gen_exp_size n t]
           | TYPE_Array n t =>
-            [es <- vectorOf (Z.to_nat n) (gen_exp_size sz' ctx t);;
+            [es <- vectorOf_LLVM (Z.to_nat n) (gen_exp_size sz' t);;
              ret (EXP_Array (map (fun e => (t, e)) es))]
           | TYPE_Vector n t =>
-            [es <- vectorOf (Z.to_nat n) (gen_exp_size sz' ctx t);;
+            [es <- vectorOf_LLVM (Z.to_nat n) (gen_exp_size sz' t);;
              ret (EXP_Array (map (fun e => (t, e)) es))]
           | TYPE_Struct fields =>
             (* Should we divide size evenly amongst components of struct? *)
-            [tes <- map_monad (fun t => e <- gen_exp_size sz' ctx t;; ret (t, e)) fields;;
+            [tes <- map_monad (fun t => e <- gen_exp_size sz' t;; ret (t, e)) fields;;
              ret (EXP_Struct tes)]
           | TYPE_Packed_struct fields =>
             (* Should we divide size evenly amongst components of struct? *)
-            [tes <- map_monad (fun t => e <- gen_exp_size sz' ctx t;; ret (t, e)) fields;;
+            [tes <- map_monad (fun t => e <- gen_exp_size sz' t;; ret (t, e)) fields;;
              ret (EXP_Packed_struct tes)]
-          | TYPE_Pointer t         => [failGen] (* GEP? *)
-          | TYPE_Void              => [failGen] (* No void type expressions *)
-          | TYPE_Function ret args => [failGen] (* These shouldn't exist, I think *)
-          | TYPE_Opaque            => [failGen] (* TODO: not sure what these should be... *)
-          | TYPE_Half              => [failGen]
-          | TYPE_Float             => [failGen]
-          | TYPE_Double            => [failGen]
-          | TYPE_X86_fp80          => [failGen]
-          | TYPE_Fp128             => [failGen]
-          | TYPE_Ppc_fp128         => [failGen]
-          | TYPE_Metadata          => [failGen]
-          | TYPE_X86_mmx           => [failGen]
+          | TYPE_Pointer t         => [lift failGen] (* GEP? *)
+          | TYPE_Void              => [lift failGen] (* No void type expressions *)
+          | TYPE_Function ret args => [lift failGen] (* These shouldn't exist, I think *)
+          | TYPE_Opaque            => [lift failGen] (* TODO: not sure what these should be... *)
+          | TYPE_Half              => [lift failGen]
+          | TYPE_Float             => [lift failGen]
+          | TYPE_Double            => [lift failGen]
+          | TYPE_X86_fp80          => [lift failGen]
+          | TYPE_Fp128             => [lift failGen]
+          | TYPE_Ppc_fp128         => [lift failGen]
+          | TYPE_Metadata          => [lift failGen]
+          | TYPE_X86_mmx           => [lift failGen]
           | TYPE_Identified id     =>
-            [match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
-             | None => failGen
-             | Some (i,t) => gen_exp_size sz ctx t
+            [ctx <- get_ctx;;
+             match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
+             | None => lift failGen
+             | Some (i,t) => gen_exp_size sz t
              end]
           end
       in
       (* short-circuit to size 0 *)
-      oneOf_ failGen (gen_exp_size 0 ctx t :: gens)
+      oneOf_LLVM (gen_exp_size 0 t :: gens)
     end.
 
-  Definition gen_exp (ctx : list (ident * typ)) (t : typ) : G (exp typ)
-    := sized (fun sz => gen_exp_size sz ctx t).
+  Definition gen_exp (t : typ) : GenLLVM (exp typ)
+    := sized_LLVM (fun sz => gen_exp_size sz t).
 
-  Definition gen_texp (ctx : list (ident * typ)) : G (texp typ)
-    := t <- gen_typ ctx;;
-       e <- gen_exp ctx t;;
+  Definition gen_texp : GenLLVM (texp typ)
+    := t <- gen_typ;;
+       e <- gen_exp t;;
        ret (t, e).
 
-  Definition gen_sized_texp (ctx : list (ident * typ)) : G (texp typ)
-    := t <- gen_sized_typ ctx;;
-       e <- gen_exp ctx t;;
+  Definition gen_sized_texp : GenLLVM (texp typ)
+    := t <- gen_sized_typ;;
+       e <- gen_exp t;;
        ret (t, e).
 
-  Definition gen_op (ctx : list (ident * typ)) (t : typ) : G (exp typ)
-    := sized (fun sz =>
-                match t with
-                | TYPE_I isz =>
-                  (* TODO: If I1 also allow ICmp and FCmp *)
-                  let n := Nat.div sz 2 in
-                  ret OP_IBinop <*> gen_ibinop <*> ret t <*> gen_exp_size n ctx t <*> gen_exp_size n ctx t
-                | _ => failGen
-                end).
+  Definition gen_op (t : typ) : GenLLVM (exp typ)
+    := sized_LLVM
+         (fun sz =>
+            match t with
+            | TYPE_I isz =>
+              (* TODO: If I1 also allow ICmp and FCmp *)
+              let n := Nat.div sz 2 in
+              ret OP_IBinop <*> lift gen_ibinop <*> ret t <*> gen_exp_size n t <*> gen_exp_size n t
+            | _ => lift failGen
+            end).
 
-  Definition gen_int_texp (ctx : list (ident * typ)) : G (texp typ)
+  Definition gen_int_texp : GenLLVM (texp typ)
     := t <- gen_int_typ;;
-       e <- gen_exp ctx t;;
+       e <- gen_exp t;;
        ret (t, e).
 
 End ExpGenerators.
@@ -708,23 +766,36 @@ Section InstrGenerators.
   Definition gen_option {A} (g : G A) : G (option A)
     := freq_ failGen [(1%nat, ret None); (7%nat, liftM Some g)].
 
-  Definition gen_load (ctx : list (ident * typ)) : G (typ * instr typ)
-    := t   <- gen_sized_typ ctx;;
+  (* TODO: move these *)
+  Definition opt_add_state {A} {ST} (st : ST) (o : option (A * ST)) : (option A * ST)
+    := match o with
+       | None => (None, st)
+       | (Some (a, st')) => (Some a, st')
+       end.
+
+  Definition gen_opt_LLVM {A} (g : GenLLVM A) : GenLLVM (option A)
+    := mkStateT
+         (fun st =>
+            opt <- gen_option (runStateT g st);;
+            ret (opt_add_state st opt)).
+
+  Definition gen_load : GenLLVM (typ * instr typ)
+    := t   <- gen_sized_typ;;
        let pt := TYPE_Pointer t in
-       vol <- (arbitrary : G bool);;
-       ptr <- gen_exp ctx pt;;
-       align <- arbitrary;;
+       vol <- lift (arbitrary : G bool);;
+       ptr <- gen_exp pt;;
+       align <- lift arbitrary;;
        ret (t, INSTR_Load vol t (pt, ptr) align).
 
-  Definition gen_store (ctx : list (ident * typ)) : G (typ * instr typ)
-    := vol <- arbitrary;;
-       align <- arbitrary;;
+  Definition gen_store : GenLLVM (typ * instr typ)
+    := vol   <- lift arbitrary;;
+       align <- lift arbitrary;;
 
-       val <- gen_sized_texp ctx;;
+       val <- gen_sized_texp;;
        let '(t, e) := val in
 
        let pt := TYPE_Pointer t in
-       pexp <- gen_exp ctx pt;;
+       pexp <- gen_exp pt;;
        let ptr := (pt, pexp) in
 
        ret (TYPE_Void, INSTR_Store vol val ptr align).
@@ -736,19 +807,18 @@ Section InstrGenerators.
      compute a value, like void function calls, stores, etc.
    *)
   Definition gen_instr : GenLLVM (typ * instr typ) :=
-    ctx <- get_ctx;;
-    lift (oneOf_ failGen
-           [ ret (TYPE_Void, INSTR_Comment "test")
-           ; t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op ctx t;; ret (t, i)
-           ; t <- gen_sized_typ ctx;;
-             num_elems <- gen_option (gen_int_texp ctx);;
-             align <- arbitrary;;
-             ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
-           (* TODO: Generate calls *)
-           ; gen_load ctx
-           ; gen_store ctx
-           (* TODO: Generate atomic operations and other instructions *)
-           ]).
+    oneOf_LLVM
+      [ ret (TYPE_Void, INSTR_Comment "test")
+      ; t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
+      ; t <- gen_sized_typ;;
+        num_elems <- gen_opt_LLVM gen_int_texp;;
+        align <- lift arbitrary;;
+        ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
+      (* TODO: Generate calls *)
+      ; gen_load
+      ; gen_store
+      (* TODO: Generate atomic operations and other instructions *)
+      ].
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
@@ -796,7 +866,7 @@ Section InstrGenerators.
          match (normalize_type ctx t) with
          | TYPE_Void => ret (TERM_Ret_void, [])
          | _ =>
-           e <- lift (gen_exp ctx t);;
+           e <- gen_exp t;;
            ret (TERM_Ret (t, e), [])
          end
        | S sz' =>
