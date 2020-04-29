@@ -1,3 +1,10 @@
+(** * Conversion from static to dynamic types
+    LLVM admits static types than can be recursive in the case of function types.
+    At run-time, this information is unnecessary, we therefore pre-process them by
+    converting them into a notion of dynamic types whose pointer type contains no
+    further information.
+    The conversion also inlines globally declared types (field [m_type_defs] of a [modul] (i.e. a [mcfg]).
+*)
 From Coq Require Import
      List
      String
@@ -7,7 +14,9 @@ From Vellvm Require Import
      Util
      LLVMAst
      AstLib
-     DynamicTypes.
+     DynamicTypes
+     CFG
+     Transformations.Traversal.
 
 Require Import Coqlib.
 
@@ -146,4 +155,30 @@ Next Obligation.
   inversion Heqb_ident.
 Defined.
 
+(** ** Conversion of syntactic components
 
+    Front-ends and optimizations generate code containing static types.
+    Since the semantics always acts upon dynamic types, in order to reason
+    about the sub-components of code produce, we need to be able to convert
+    types of any syntactic substructure of Vellvm.
+
+    We leverage the parameterized [Fmap] typeclass to do this in a fairly lightway.
+ *)
+Section ConvertTyp.
+
+  Class ConvertTyp (F: Set -> Set) : Type :=
+    convert_typ : list (ident * typ) -> F typ -> F dtyp.
+
+  Global Instance ConvertTyp_instr : ConvertTyp instr :=
+    fun env => fmap (typ_to_dtyp env).
+
+  Global Instance ConvertTyp_code : ConvertTyp code :=
+    fun env => fmap (typ_to_dtyp env).
+
+  Global Instance ConvertTyp_cfg : ConvertTyp cfg :=
+    fun env => fmap (typ_to_dtyp env).
+
+  Global Instance ConvertTyp_mcfg : ConvertTyp mcfg :=
+    fun env => fmap (typ_to_dtyp env).
+
+End ConvertTyp.  

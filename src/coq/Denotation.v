@@ -34,7 +34,6 @@ From Vellvm Require Import
      DynamicTypes
      MemoryAddress
      LLVMEvents
-     TypeUtil
      Handlers.Intrinsics.
 
 Require Import Ceres.Ceres.

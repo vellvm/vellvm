@@ -55,6 +55,7 @@ Module INT := Intrinsics.Make(Memory.A)(IO).
 Module P := Pick.Make(Memory.A)(IO).
 Import IO.
 Export IO.DV.
+Import M D IS INT P.
 
 Module TopLevelEnv <: Environment.
   Definition local_env  := FMapAList.alist raw_id uvalue.
@@ -144,14 +145,11 @@ Module TopLevelEnv <: Environment.
                           ].
 
   (**
-   Transformation and normalization of types.
+     Conversion to dynamic types
    *)
 
-  Definition eval_typ (CFG:CFG.mcfg typ) (t:typ) : dtyp :=
-    typ_to_dtyp (m_type_defs CFG) t.
-
-  Definition normalize_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
-    TransformTypes.fmap_mcfg _ _ (eval_typ CFG) CFG.
+  Definition convert_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
+    convert_typ (m_type_defs CFG) CFG.
 
   (**
    We are now ready to define our semantics. Guided by the events and handlers,
@@ -201,7 +199,7 @@ Module TopLevelEnv <: Environment.
      into the [itree] monad.
    *)
   Definition interp_vellvm_exec_user {R: Type} user_intrinsics (trace: itree L0 R) g l m :=
-    let uvalue_trace       := INT.interp_intrinsics user_intrinsics trace in
+    let uvalue_trace   := INT.interp_intrinsics user_intrinsics trace in
     let L1_trace       := interp_global uvalue_trace g in
     let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
     let L3_trace       := M.interp_memory L2_trace m in
@@ -219,7 +217,7 @@ Module TopLevelEnv <: Environment.
 
     match CFG.mcfg_of_modul _ scfg with
     | Some ucfg =>
-      let mcfg := normalize_types ucfg in
+      let mcfg := convert_types ucfg in
 
       let t := denote_vellvm mcfg in
 
@@ -261,7 +259,7 @@ Module TopLevelEnv <: Environment.
 
       match CFG.mcfg_of_modul _ scfg with
       | Some ucfg =>
-        let mcfg := TopLevelEnv.normalize_types ucfg in
+        let mcfg := convert_types ucfg in
 
         sem mcfg
 
