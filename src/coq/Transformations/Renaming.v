@@ -11,10 +11,6 @@
 From Coq Require Import
      ZArith Ascii Strings.String Setoid Morphisms List.
 
-From ExtLib Require Import
-     Programming.Eqv
-     Structures.Monads.
-
 From ITree Require Import
      ITree
      Eq.Eq
@@ -43,20 +39,19 @@ From Vellvm Require Import
      Traversal
      TopLevelRefinements.
 
+From ExtLib Require Import
+     Programming.Eqv
+     Structures.Monads.
+
 Import EqvNotation.
 
 Open Scope Z_scope.
 Open Scope string_scope.
 
-From ExtLib Require Import
-     Programming.Eqv
-     Structures.Monads.
-
 From Vellvm Require Import
      AstLib.
 Import ListNotations.
 
-Import EqvNotation.
 Import TopLevel.
 Import TopLevelEnv.
 Import R.
