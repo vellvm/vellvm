@@ -19,7 +19,7 @@ COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Fappli_IEEE_extra Numeric
 									Util PropT Error LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues\
 									LLVMEvents TypToDtyp IntrinsicsDefinitions\
 									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/UndefinedBehaviour\
-									Denotation TransformTypes TopLevel
+									Denotation TopLevel
 
 COQFILESOPT    := Transformations/Renaming Transformations/DeadInstr Transformations/Transform Transformations/Traversal Transformations/Transformation\
 									ParserHelper Refinement Environment TopLevelRefinements
@@ -93,7 +93,8 @@ test: vellvm
 print-includes:
 	@echo $(COQINCLUDES)
 
-clean:
+clean: clean-vellvm clean-itrees
+clean-vellvm:
 	rm -f .depend
 	rm -f $(VOFILES)
 	rm -rf doc/html doc/*.glob
@@ -102,7 +103,9 @@ clean:
 	rm -rf output
 	rm -f vellvm
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
+clean-itrees:
 	make -C $(ITREEDIR) clean
+.PHONY: clean-vellvm clean-itrees
 
 doc/coq2html: 
 	make -C ../lib/coq2html
