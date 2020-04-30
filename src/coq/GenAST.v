@@ -54,12 +54,12 @@ Section ShowInstances.
 
   Global Instance showBlock: Show (block typ) :=
     {|
-    show := CeresSerialize.to_string 
+    show := CeresSerialize.to_string
     |}.
 
   Global Instance showCode: Show (code typ) :=
     {|
-    show := CeresSerialize.to_string 
+    show := CeresSerialize.to_string
     |}.
 
   Global Instance showInstr: Show (instr typ) :=
@@ -72,9 +72,30 @@ Section ShowInstances.
     show := CeresSerialize.to_string
     |}.
 
-  Global Instance showExp : Show (exp typ) :=
+  Global Instance showIbinop: Show ibinop :=
     {|
     show := CeresSerialize.to_string
+    |}.
+
+  Fixpoint show_exp (e : exp typ) : string
+    :=
+      match e with
+      | EXP_Ident id => show id
+      | EXP_Integer x => show x
+      | EXP_Bool b => show b
+      | EXP_Null => "null"
+      | EXP_Zero_initializer => "zero initializer"
+      | EXP_Cstring s => """ ++ s ++ """
+      | EXP_Undef => "undef"
+      | OP_IBinop iop t e1 e2 =>
+        "(" ++ show iop ++ " " ++ show t ++ " " ++ show_exp e1 ++ " " ++ show_exp e2 ++ ")"
+      | _ => "todo"
+      end.
+
+
+  Global Instance showExp : Show (exp typ) :=
+    {|
+    show := show_exp
     |}.
 
 End ShowInstances.
@@ -186,6 +207,11 @@ Section Helpers.
 
   Definition genPosInt : G int
     := fmap (fun n => Int.repr (Z.of_nat (S n))) (arbitrary : G nat).
+
+  Definition genPosZ : G Z
+    :=
+      n <- (arbitrary : G nat);;
+      ret (Z.of_nat n).
 End Helpers.
 
 Section GenerationState.
@@ -353,6 +379,10 @@ Section GenerationState.
     := mkStateT
          (fun st => sized (fun n => runStateT (gn n) st)).
 
+  Definition resize_LLVM {A : Type} (sz : nat) (g : GenLLVM A) : GenLLVM A
+    := mkStateT
+         (fun st => resize sz (runStateT g st)).
+
   Definition listOf_LLVM {A : Type} (g : GenLLVM A) : GenLLVM (list A) :=
     sized_LLVM (fun n =>
                   k <- lift (choose (0, n)%nat);;
@@ -389,11 +419,6 @@ Section TypGenerators.
                 (* ; TYPE_X86_mmx *)
                 (* ; TYPE_Opaque *)
                 ])).
-
-  Definition genPosZ : G Z
-    :=
-      n <- (arbitrary : G nat);;
-      ret (Z.of_nat n). 
 
   Program Fixpoint gen_sized_typ_size (sz : nat) {measure sz} : GenLLVM typ :=
     match sz with
@@ -701,7 +726,7 @@ Section ExpGenerators.
     match sz with
     | 0%nat =>
       match t with
-      | TYPE_I n                  => ret EXP_Integer <*> lift arbitrary
+      | TYPE_I n                  => ret EXP_Integer <*> lift (arbitrary : G Z)
       | TYPE_Pointer t            => lift failGen (* Only pointer type expressions might be conversions? Maybe GEP? *)
       | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
       | TYPE_Function ret args    => lift failGen (* No expressions of function type *)
@@ -989,4 +1014,11 @@ Definition run_GenLLVM {A} (g : GenLLVM A) : G A
   := fmap fst (runStateT g init_GenState).
 
 Sample (arbitrary : G nat).
-Sample (resize 1 (run_GenLLVM (gen_texp))).
+
+Definition gen_texp' (szt sze : nat) : GenLLVM (texp typ)
+    := t <- resize_LLVM szt gen_int_typ;;
+       e <- resize_LLVM sze (gen_exp t);;
+       ret (t, e).
+
+Sample (run_GenLLVM (gen_texp' 10 5)).
+Sample (run_GenLLVM (resize_LLVM 0 (ret EXP_Integer <*> ret 0))).

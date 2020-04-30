@@ -12,7 +12,6 @@
 From Coq Require Import
      ZArith.ZArith List
      String Omega.
-Require Import Vellvm.LLVMAst Vellvm.Util.
 Require Import Equalities OrderedType OrderedTypeEx Compare_dec.
 Require Import ExtLib.Core.RelDec ExtLib.Data.Z.
 Require Import ExtLib.Programming.Eqv.
@@ -20,6 +19,7 @@ Require Import Ascii.
 Import ListNotations.
 
 Import EqvNotation.
+Require Import Vellvm.LLVMAst Vellvm.Util.
 
 (* Equalities --------------------------------------------------------------- *)
 Instance eq_dec_int : RelDec (@eq int) := Data.Z.RelDec_zeq.
@@ -364,6 +364,59 @@ Qed.
 
 End TypInd.
 
+Section TypRect.
+
+Variable P : typ -> Type.
+Hypothesis IH_I          : forall sz, P (TYPE_I sz).
+Hypothesis IH_Pointer    : forall t, P t -> P(TYPE_Pointer t).
+Hypothesis IH_Void       : P(TYPE_Void).
+Hypothesis IH_Half       : P(TYPE_Half).
+Hypothesis IH_Float      : P(TYPE_Float).
+Hypothesis IH_Double     : P(TYPE_Double).
+Hypothesis IH_X86_fp80   : P(TYPE_X86_fp80).
+Hypothesis IH_Fp128      : P(TYPE_Fp128).
+Hypothesis IH_Ppc_fp128  : P(TYPE_Ppc_fp128).
+Hypothesis IH_Metadata   : P(TYPE_Metadata).
+Hypothesis IH_X86_mmx    : P(TYPE_X86_mmx).
+Hypothesis IH_Array      : forall sz t, P t -> P(TYPE_Array sz t).
+Hypothesis IH_Function   : forall ret args, P ret -> (forall u : typ, (P u -> typ -> P u) -> list typ -> P u -> P u) -> P(TYPE_Function ret args).
+Hypothesis IH_Struct     : forall fields, (forall u : typ, (P u -> typ -> P u) -> list typ -> P u -> P u) -> P(TYPE_Struct fields).
+Hypothesis IH_Packed_struct : forall fields, (forall u : typ, (P u -> typ -> P u) -> list typ -> P u -> P u) -> P(TYPE_Packed_struct fields).
+Hypothesis IH_Opaque     : P(TYPE_Opaque).
+Hypothesis IH_Vector     : forall sz t, P t -> P(TYPE_Vector sz t).
+Hypothesis IH_Identified : forall id, P(TYPE_Identified id).
+
+Lemma typ_rect' : forall (t:typ), P t.
+  fix IH 1.
+  destruct t.
+  - apply IH_I.
+  - apply IH_Pointer. apply IH.
+  - apply IH_Void.
+  - apply IH_Half.
+  - apply IH_Float.
+  - apply IH_Double.
+  - apply IH_X86_fp80.
+  - apply IH_Fp128.
+  - apply IH_Ppc_fp128.
+  - apply IH_Metadata.
+  - apply IH_X86_mmx.
+  - apply IH_Array. apply IH.
+  - apply IH_Function. apply IH.
+    intros u f l def.
+    refine (match args with [] => def | (x::rest) => f def x end).
+  - apply IH_Struct.
+    intros u f l def.
+    refine (match fields with [] => def | (x::rest) => f def x end).
+  - apply IH_Packed_struct.
+    intros u f l def.
+    refine (match fields with [] => def | (x::rest) => f def x end).
+  - apply IH_Opaque.
+  - apply IH_Vector. apply IH.
+  - apply IH_Identified.
+Qed.
+
+End TypRect.
+
 Section ExpInd.
 (*
 | EXP_Ident   (id:ident)
@@ -513,6 +566,7 @@ Section hiding_notation.
       | IVoid n => Atom ("void<" ++ to_string n ++ ">")%string
       end.
 
+  Locate Add.
   Global Instance serialize_ibinop : Serialize ibinop :=
     fun binop =>
       match binop with
@@ -584,7 +638,22 @@ Section hiding_notation.
     match typ with
     | TYPE_I sz => Atom ("i" ++ to_string sz)%string
     | TYPE_Pointer t => [serialize_typ' t ; Atom "*"]
-    | _ => Atom "(show_typ todo)"
+    | TYPE_Void => Atom "void"
+    | TYPE_Half => Atom "half"
+    | TYPE_Float => Atom "float"
+    | TYPE_Double => Atom "double"
+    | TYPE_X86_fp80 => Atom "x86_fp80"
+    | TYPE_Fp128 => Atom "fp128"
+    | TYPE_Ppc_fp128 => Atom "ppc_fp128"
+    | TYPE_Metadata => Atom "metadata"
+    | TYPE_X86_mmx => Atom "x86_mmx"
+    | TYPE_Array sz t => [Atom "["; Atom (to_string sz); Atom "x"; serialize_typ' t; Atom "]"]
+    | TYPE_Function ret args => [serialize_typ' ret; Atom "("; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexpa (serialize_typ' x)) args)); Atom ")"]
+    | TYPE_Struct fields => [Atom "{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexpa (serialize_typ' x)) fields)); Atom "}"]
+    | TYPE_Packed_struct fields => [Atom "<{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexpa (serialize_typ' x)) fields)); Atom "}>"]
+    | TYPE_Opaque => Atom "opaque"
+    | TYPE_Vector sz t => [Atom "<"; Atom (to_string sz); Atom "x"; serialize_typ' t; Atom ">"]
+    | TYPE_Identified id => Atom (to_string id)
     end.
 
   Global Instance serialize_typ : Serialize typ := serialize_typ'.
