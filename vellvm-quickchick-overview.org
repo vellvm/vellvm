@@ -1,0 +1,99 @@
+* Introduction
+
+The goal of this project is to start a suite of QuickChick generators
+that produce LLVM code in order to test the Vellvm project. In the
+near term we simply want to compare Vellvm's interpreter to ~llc~ in
+order to find disagreements with Vellvm's semantics, but we are hoping
+that this will lay the ground work for automatically testing if an
+optimization of LLVM code preserves the semantics of programs.
+
+* Updating Backtracking QuickChick
+
+The first step of this project was to get the backtracking version of
+QuickChick up to speed. We wanted to use Coq 8.11 to stay up to date,
+but also in order to take advantage of the easy way to turn off the
+termination checker in Coq 8.11 (some of the generators use complex
+non-structural recursion, and since these generators will not be used
+in proofs it's better not to waste time on guaranteeing their
+termination). This took a little bit of effort at first, as quite a
+lot has changed in QuickChick since the backtracking branch was last
+updated --- all of the combinators have new names, and a lot of the ml
+code has changed as well!
+
+Vellvm also required some hacking and admitted lemmas to work on 8.11,
+but this should be fixed soon in a new release of Vellvm.
+
+* Overview of Generators
+
+The generators live here:
+
+https://github.com/vellvm/vellvm/blob/quickchick/src/coq/GenAST.v
+
+We wanted to start with a simple subset of LLVM -- LLVM is quite a
+large language to begin with, and there are many different constraints
+that the generator might need to take into account depending on the
+context.
+
+For instance the types in LLVM programs have different
+constraints at many different points. In some places only non-void
+types are valid, some places need types to have sizes, and other
+places can only have integer types. This is not a huge problem, but it
+does result in us building many different type generators.
+
+The generators themselves are relatively straightforward, save for
+some tuning to make sure we generate programs of a reasonable
+size. For the most part these generators just reflect the structure of
+the LLVM AST, making sure to call the right generators (the ones that
+generate, say, types with the right constraints) for different
+sub-components.
+
+The most complicated generator is the one for terminators and
+blocks. These generators are mutually recursive, as when we generate a
+branching terminator we need to generate blocks to branch to, and
+similarly when we generate a block we need to be able to generate
+terminators. Currently we do not create branches into already existing
+blocks in order to make sure all of our programs terminate to ease
+testing, though this is something that we hope to improve on in the
+future---for instance it might be nice to automatically generate loops
+over arrays like Csmith does, and it might be nice to relax this
+restriction and rely upon timeouts.
+
+* Show instances
+
+Testing generators with ~Sample~ has proven to be somewhat
+painful. Vellvm lacks ~Show~ instances for almost all of the AST, and
+what is there uses the ~Ceres~ library in Coq, which (unfortunately)
+sometimes causes segmentation faults in QuickChick when using
+~Sample~. We're not sure why this is yet, but until then we have to
+tediously build up some of the ~Show~ instances manually.
+
+* Properties under test
+
+  Properties will live here:
+
+  https://github.com/vellvm/vellvm/blob/quickchick/src/coq/QCVellvm.v  
+
+  Currently there are no properties under test, as we are still
+  building up that infrastructure. However, as a first step, we
+  believe that we should be able to differentially test the Vellvm
+  interpreter against the ~llc~ compiler from the Vellvm project. The
+  idea is to take advantage of Coq's ~Extract Constant~ method to
+  build an ml function that pretty prints the LLVM AST into LLVM IR,
+  passes this IR to ~llc~, and then runs the existing executable. The
+  return code from the executed program can then be compared against
+  the result we get from interpreting the function using Vellvm's
+  interpreter.
+
+  We believe that we should be able to test certain ~eutt~ relations
+  automatically using QuickChick as well, which we hope will help with
+  testing program transformations within Vellvm. The idea is to
+  compare the trees up to a finite depth, like testing if prefixes of
+  streams are equal. The ~Tau t~ and ~Ret x~ constructors in
+  interaction trees are simple to handle --- ~Tau~ nodes can be
+  automatically stripped, and ~Ret~ nodes can be compared
+  directly. The difficulty in testing ~eutt~ is with ~Vis e k~
+  nodes. If we have ~eutt (Vis e1 k1) (Vis e2 k2)~, then we just need
+  to make sure that ~e1 = e2~, and then in principle it should just be
+  a matter of providing the same (possibly randomly generated) value
+  to each of the continuations. More work needs to be done on this,
+  but in principle it should be possible to do something here.
