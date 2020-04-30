@@ -387,6 +387,9 @@ Section GenerationState.
     sized_LLVM (fun n =>
                   k <- lift (choose (0, n)%nat);;
                   vectorOf_LLVM k g).
+
+  Definition run_GenLLVM {A} (g : GenLLVM A) : G A
+    := fmap fst (runStateT g init_GenState).
 End GenerationState.
 
 Section TypGenerators.
@@ -1008,10 +1011,10 @@ Section InstrGenerators.
   Definition gen_main : GenLLVM (definition typ (list (block typ)))
     := gen_definition (Name "main") (TYPE_I 8) [].
 
-End InstrGenerators.
+Definition gen_main_tle : GenLLVM (toplevel_entity typ (list (block typ)))
+  := ret TLE_Definition <*> gen_main.
 
-Definition run_GenLLVM {A} (g : GenLLVM A) : G A
-  := fmap fst (runStateT g init_GenState).
+End InstrGenerators.
 
 Sample (arbitrary : G nat).
 
