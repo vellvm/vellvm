@@ -169,10 +169,22 @@ Section ConvertTyp.
   Class ConvertTyp (F: Set -> Set) : Type :=
     convert_typ : list (ident * typ) -> F typ -> F dtyp.
 
+  Global Instance ConvertTyp_exp : ConvertTyp exp :=
+    fun env => fmap (typ_to_dtyp env).
+
   Global Instance ConvertTyp_instr : ConvertTyp instr :=
     fun env => fmap (typ_to_dtyp env).
 
+  Global Instance ConvertTyp_term : ConvertTyp terminator :=
+    fun env => fmap (typ_to_dtyp env).
+
   Global Instance ConvertTyp_code : ConvertTyp code :=
+    fun env => fmap (typ_to_dtyp env).
+
+  Global Instance ConvertTyp_phi : ConvertTyp phi :=
+    fun env => fmap (typ_to_dtyp env).
+
+  Global Instance ConvertTyp_block : ConvertTyp block :=
     fun env => fmap (typ_to_dtyp env).
 
   Global Instance ConvertTyp_cfg : ConvertTyp cfg :=
