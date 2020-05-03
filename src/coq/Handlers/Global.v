@@ -54,8 +54,6 @@ Section Globals.
     Context `{FailureE -< G}.
     Notation Effin := (E +' F +' (GlobalE k v) +' G).
     Notation Effout := (E +' F +' G).
-    Notation Effin' := (E +' F +' H +' (GlobalE k v) +' G).
-    Notation Effout' := (E +' F +' H +' G).
 
     Definition E_trigger {M} : forall R, E R -> (stateT M (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
@@ -65,6 +63,108 @@ Section Globals.
 
     Definition G_trigger {M} : forall R , G R -> (stateT M (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
+
+    Definition interp_global_h := (case_ E_trigger (case_ F_trigger (case_ handle_global G_trigger))).
+    Definition interp_global  : itree Effin ~> stateT map (itree Effout) :=
+      interp_state interp_global_h.
+
+
+    Section Structural_Lemmas.
+
+      Lemma interp_global_bind :
+        forall (R S : Type) (t : itree Effin R) (k : R -> itree Effin S) s,
+          interp_global (ITree.bind t k) s ≅
+                        ITree.bind (interp_global t s) (fun '(s',r) => interp_global (k r) s').
+      Proof.
+        intros.
+        unfold interp_global.
+        setoid_rewrite interp_state_bind.
+        apply eq_itree_clo_bind with (UU := Logic.eq).
+        reflexivity.
+        intros [] [] EQ; inv EQ; reflexivity.
+      Qed.
+
+      Lemma interp_global_ret :
+        forall (R : Type) g (x: R),
+          interp_global (Ret x: itree Effin R) g ≅ Ret (g,x).
+      Proof.
+        intros; apply interp_state_ret.
+      Qed.
+
+      Lemma interp_global_vis_eqit:
+        forall (g : map) S X (kk : X -> itree Effin S) (e : Effin X),
+          interp_global (Vis e kk) g ≅ ITree.bind (interp_global_h e g) (fun (sx : map * X) => Tau (interp_global (kk (snd sx)) (fst sx))).
+      Proof.
+        intros.
+        unfold interp_global.
+        setoid_rewrite interp_state_vis.
+        reflexivity.
+      Qed.
+
+      Lemma interp_global_vis:
+        forall (g : map) S X (kk : X -> itree Effin S) (e : Effin X),
+          interp_global (Vis e kk) g ≈ ITree.bind (interp_global_h e g) (fun (sx : map * X) => interp_global (kk (snd sx)) (fst sx)).
+      Proof.
+        intros.
+        rewrite interp_global_vis_eqit.
+        apply eutt_eq_bind.
+        intros ?; tau_steps; reflexivity.
+      Qed.
+
+      Lemma interp_global_trigger:
+        forall (g : map) X (e : Effin X),
+          interp_global (ITree.trigger e) g ≈ interp_global_h e g.
+      Proof.
+        intros.
+        unfold interp_global.
+        rewrite interp_state_trigger.
+        reflexivity.
+      Qed.
+
+      Lemma interp_global_bind_trigger_eqit:
+        forall (g : map) S X
+          (kk : X -> itree Effin S)
+          (e : Effin X),
+          interp_global (ITree.bind (trigger e) kk) g ≅ ITree.bind (interp_global_h e g) (fun (sx : map * X) => Tau (interp_global (kk (snd sx)) (fst sx))).
+      Proof.
+        intros.
+        unfold interp_global.
+        rewrite bind_trigger.
+        setoid_rewrite interp_state_vis.
+        reflexivity.
+      Qed.
+
+      Lemma interp_global_bind_trigger:
+        forall (g : map) S X
+          (kk : X -> itree Effin S)
+          (e : Effin X),
+          interp_global (ITree.bind (trigger e) kk) g ≈ ITree.bind (interp_global_h e g) (fun (sx : map * X) => interp_global (kk (snd sx)) (fst sx)).
+      Proof.
+        intros.
+        rewrite interp_global_bind_trigger_eqit.
+        apply eutt_eq_bind.
+        intros ?; tau_steps; reflexivity.
+      Qed.
+
+      Global Instance eutt_interp_global {R} :
+        Proper (eutt eq ==> eq ==> eutt eq) (@interp_global R). 
+      Proof.
+        repeat intro.
+        unfold interp_global. 
+        subst; rewrite H1.
+        reflexivity.
+      Qed.
+
+    End Structural_Lemmas.
+
+    (** ** DEPRECATED
+        TODO : Double check, garbage collect
+     *)
+    (*
+    (* YZ: THe following isn't used anymore I believe *)
+
+    Notation Effin' := (E +' F +' H +' (GlobalE k v) +' G).
+    Notation Effout' := (E +' F +' H +' G).
 
     Definition E_trigger' {M} : forall R, E R -> (stateT M (itree Effout') R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
@@ -78,43 +178,9 @@ Section Globals.
     Definition G_trigger' {M} : forall R , G R -> (stateT M (itree Effout') R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition interp_global_h := (case_ E_trigger (case_ F_trigger (case_ handle_global G_trigger))).
-    Definition interp_global  : itree Effin ~> stateT map (itree Effout) :=
-      interp_state interp_global_h.
-
     Definition interp_global'  : itree Effin' ~> stateT map (itree Effout') :=
       interp_state (case_ E_trigger' (case_ F_trigger' (case_ H_trigger' (case_ handle_global G_trigger')))).
 
-    Lemma interp_global_bind :
-      forall (R S : Type) (t : itree Effin R) (k : R -> itree Effin S) s,
-        interp_global (ITree.bind t k) s ≅
-        ITree.bind (interp_global t s) (fun '(s',r) => interp_global (k r) s').
-    Proof.
-      intros.
-      unfold interp_global.
-      setoid_rewrite interp_state_bind.
-      apply eq_itree_clo_bind with (UU := Logic.eq).
-      reflexivity.
-      intros [] [] EQ; inv EQ; reflexivity.
-    Qed.
-
-    Lemma interp_global_ret :
-      forall (R : Type) g (x: R),
-        interp_global (Ret x: itree Effin R) g ≅ Ret (g,x).
-    Proof.
-      intros; apply interp_state_ret.
-    Qed.
-
-    Global Instance eutt_interp_global {R} :
-      Proper (eutt eq ==> eq ==> eutt eq) (@interp_global R). 
-    Proof.
-      repeat intro.
-      unfold interp_global. 
-      subst; rewrite H1.
-      reflexivity.
-    Qed.
-
-    (* YZ: THe following isn't used anymore I believe *)
     Lemma interp_global'_bind :
       forall (R S : Type) (t : itree Effin' R) (k : R -> itree Effin' S) s,
         interp_global' (ITree.bind t k) s ≅
@@ -134,6 +200,7 @@ Section Globals.
     Proof.
       intros; apply interp_state_ret.
     Qed.
+     *)
 
   End PARAMS.
 
