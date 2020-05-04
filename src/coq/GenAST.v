@@ -1,3 +1,5 @@
+Require Import Ceres.Ceres.
+
 From QuickChick Require Import QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
 Set Warnings "-extraction-opaque-accessed,-extraction".
@@ -7,7 +9,7 @@ From ExtLib.Structures Require Export
 
 Require Import ExtLib.Data.Monads.StateMonad.
 
-From Vellvm Require Import LLVMAst Util AstLib TypeUtil CFG.
+From Vellvm Require Import LLVMAst Util AstLib TypeUtil CFG Show.
 Require Import Integers Floats.
 
 Require Import List.
@@ -49,7 +51,7 @@ Section ShowInstances.
 
   Global Instance showTyp:  Show typ :=
     {|
-    show := show_typ
+    show := CeresSerialize.to_string
     |}.
 
   Global Instance showBlock: Show (block typ) :=
@@ -72,32 +74,20 @@ Section ShowInstances.
     show := CeresSerialize.to_string
     |}.
 
-  Global Instance showIbinop: Show ibinop :=
+  Global Instance showExp : Show (exp typ) :=
     {|
     show := CeresSerialize.to_string
     |}.
 
-  Fixpoint show_exp (e : exp typ) : string
-    :=
-      match e with
-      | EXP_Ident id => show id
-      | EXP_Integer x => show x
-      | EXP_Bool b => show b
-      | EXP_Null => "null"
-      | EXP_Zero_initializer => "zero initializer"
-      | EXP_Cstring s => """ ++ s ++ """
-      | EXP_Undef => "undef"
-      | OP_IBinop iop t e1 e2 =>
-        "(" ++ show iop ++ " " ++ show t ++ " " ++ show_exp e1 ++ " " ++ show_exp e2 ++ ")"
-      | _ => "todo"
-      end.
-
-
-  Global Instance showExp : Show (exp typ) :=
+  Global Instance showTexp : Show (texp typ) :=
     {|
-    show := show_exp
+    show := CeresSerialize.to_string
     |}.
 
+  Global Instance showTLE: Show (toplevel_entity typ (list (block typ))) :=
+    {|
+    show := CeresSerialize.to_string
+    |}.
 End ShowInstances.
 
 Section Helpers.
@@ -460,8 +450,14 @@ Section TypGenerators.
   (* Generate a type of size 0 *)
   Definition gen_typ_0 : GenLLVM typ :=
     aliases <- get_typ_ctx;;
+    let identified :=
+        match aliases with
+        | [] => []
+        | _  => [(ret TYPE_Identified <*> oneOf_LLVM (map (fun '(i,_) => ret i) aliases))]
+        end
+    in
     oneOf_LLVM
-          ((ret TYPE_Identified <*> oneOf_LLVM (map (fun '(i,_) => ret i) aliases)) ::
+          ((* identified ++ *)
            (map ret
                 [ TYPE_I 1
                 ; TYPE_I 8
@@ -509,8 +505,14 @@ Section TypGenerators.
 
   Definition gen_typ_non_void_0 : GenLLVM typ :=
     aliases <- get_typ_ctx;;
+    let identified :=
+        match aliases with
+        | [] => []
+        | _  => [(ret TYPE_Identified <*> oneOf_LLVM (map (fun '(i,_) => ret i) aliases))]
+        end
+    in
     oneOf_LLVM
-          ((ret TYPE_Identified <*> oneOf_LLVM (map (fun '(i,_) => ret i) aliases)) ::
+          (identified ++
            (map ret
                 [ TYPE_I 1
                 ; TYPE_I 8
@@ -575,16 +577,17 @@ Section TypGenerators.
 End TypGenerators.
 
 Section ExpGenerators.
+  (* nuw / nsw make poison values likely *)
   Definition gen_ibinop : G ibinop :=
     oneOf_ failGen
-           [ ret LLVMAst.Add <*> arbitrary <*> arbitrary
-           ; ret Sub <*> arbitrary <*> arbitrary
-           ; ret Mul <*> arbitrary <*> arbitrary
-           ; ret Shl <*> arbitrary <*> arbitrary
-           ; ret UDiv <*> arbitrary
-           ; ret SDiv <*> arbitrary
-           ; ret LShr <*> arbitrary
-           ; ret AShr <*> arbitrary
+           [ ret LLVMAst.Add <*> ret false <*> ret false
+           ; ret Sub <*> ret false <*> ret false
+           ; ret Mul <*> ret false <*> ret false
+           ; ret Shl <*> ret false <*> ret false
+           ; ret UDiv <*> ret false
+           ; ret SDiv <*> ret false
+           ; ret LShr <*> ret false
+           ; ret AShr <*> ret false
            ; ret URem
            ; ret SRem
            ; ret And
@@ -725,35 +728,50 @@ Section ExpGenerators.
        | S n' => a <- ma;; rest <- replicateM n' ma;; ret (a :: rest)
        end.
 
+  Definition filter_type (ty : typ) (ctx : list (ident * typ)) : list (ident * typ)
+    := filter (fun '(i, t) => normalized_typ_eq (normalize_type ctx ty) (normalize_type ctx t)) ctx.
+  
+  (* TODO: should make it much more likely to pick an identifier for
+           better test cases *)
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
     match sz with
     | 0%nat =>
-      match t with
-      | TYPE_I n                  => ret EXP_Integer <*> lift (arbitrary : G Z)
-      | TYPE_Pointer t            => lift failGen (* Only pointer type expressions might be conversions? Maybe GEP? *)
-      | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
-      | TYPE_Function ret args    => lift failGen (* No expressions of function type *)
-      | TYPE_Opaque               => lift failGen (* TODO: not sure what these should be... *)
-      | TYPE_Array n t            => lift failGen
-      | TYPE_Vector sz t          => lift failGen
-      | TYPE_Struct fields        => lift failGen
-      | TYPE_Packed_struct fields => lift failGen
-      | TYPE_Identified id        =>
-        ctx <- get_ctx;;
-        match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
-        | None => lift failGen
-        | Some (i,t) => gen_exp_size sz t
-        end
-      (* Not generating these types for now *)
-      | TYPE_Half                 => lift failGen
-      | TYPE_Float                => lift failGen
-      | TYPE_Double               => lift failGen
-      | TYPE_X86_fp80             => lift failGen
-      | TYPE_Fp128                => lift failGen
-      | TYPE_Ppc_fp128            => lift failGen
-      | TYPE_Metadata             => lift failGen
-      | TYPE_X86_mmx              => lift failGen
-      end
+      ctx <- get_ctx;;
+      let ts := filter_type t ctx in
+      let gen_idents :=
+          match ts with
+          | [] => []
+          | _ => [(4%nat, fmap (fun '(i,_) => EXP_Ident i) (oneOf_LLVM (fmap ret ts)))]
+          end in
+      let gen_size_0 :=
+          match t with
+          | TYPE_I n                  => ret EXP_Integer <*> lift (arbitrary : G Z) (* TODO: should the integer be forced to be in bounds? *)
+          | TYPE_Pointer t            => lift failGen (* Only pointer type expressions might be conversions? Maybe GEP? *)
+          | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
+          | TYPE_Function ret args    => lift failGen (* No expressions of function type *)
+          | TYPE_Opaque               => lift failGen (* TODO: not sure what these should be... *)
+          | TYPE_Array n t            => lift failGen
+          | TYPE_Vector sz t          => lift failGen
+          | TYPE_Struct fields        => lift failGen
+          | TYPE_Packed_struct fields => lift failGen
+          | TYPE_Identified id        =>
+            ctx <- get_ctx;;
+            match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
+            | None => lift failGen
+            | Some (i,t) => gen_exp_size sz t
+            end
+          (* Not generating these types for now *)
+          | TYPE_Half                 => lift failGen
+          | TYPE_Float                => lift failGen
+          | TYPE_Double               => lift failGen
+          | TYPE_X86_fp80             => lift failGen
+          | TYPE_Fp128                => lift failGen
+          | TYPE_Ppc_fp128            => lift failGen
+          | TYPE_Metadata             => lift failGen
+          | TYPE_X86_mmx              => lift failGen
+          end in
+      freq_LLVM
+        (gen_idents ++ [(1%nat, gen_size_0)])
     | (S sz') =>
       let gens :=
           match t with
@@ -1015,13 +1033,3 @@ Definition gen_main_tle : GenLLVM (toplevel_entity typ (list (block typ)))
   := ret TLE_Definition <*> gen_main.
 
 End InstrGenerators.
-
-Sample (arbitrary : G nat).
-
-Definition gen_texp' (szt sze : nat) : GenLLVM (texp typ)
-    := t <- resize_LLVM szt gen_int_typ;;
-       e <- resize_LLVM sze (gen_exp t);;
-       ret (t, e).
-
-Sample (run_GenLLVM (gen_texp' 10 5)).
-Sample (run_GenLLVM (resize_LLVM 0 (ret EXP_Integer <*> ret 0))).

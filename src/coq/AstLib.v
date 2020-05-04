@@ -19,7 +19,12 @@ Require Import Ascii.
 Import ListNotations.
 
 Import EqvNotation.
-Require Import Vellvm.LLVMAst Vellvm.Util.
+Require Import Vellvm.LLVMAst Vellvm.Util Vellvm.
+
+(* TODO: The show instances I added in Vellvm.Show, which are copied
+   from here, segfault for some reason when extracted. Seems wrong to
+   import QuickChick here, but it will work for now. *)
+Require Import QuickChick.Show.
 
 (* Equalities --------------------------------------------------------------- *)
 Instance eq_dec_int : RelDec (@eq int) := Data.Z.RelDec_zeq.
@@ -546,8 +551,8 @@ Section hiding_notation.
     fun r =>
       match r with
       | Name s => Atom (prefix ++ s)%string
-      | Anon n => to_sexp n
-      | LLVMAst.Raw n => Atom ("_RAW_" ++ to_string n)%string
+      | Anon n => Atom (show_Z n)
+      | LLVMAst.Raw n => Atom ("_RAW_" ++ show_Z n)%string
       end.
 
   Global Instance serialize_raw_id': Serialize raw_id := serialize_raw_id "".
@@ -563,7 +568,7 @@ Section hiding_notation.
     fun ins =>
       match ins with
       | IId id => to_sexp id
-      | IVoid n => Atom ("void<" ++ to_string n ++ ">")%string
+      | IVoid n => Atom ("void<" ++ show_Z n ++ ">")%string
       end.
 
   Locate Add.
@@ -634,9 +639,11 @@ Section hiding_notation.
              | FTrue => "ftrue"
              end)%string.
 
+  (* I need show_ZVellvm here because Ceres segfaults on extraction for
+  showing integers for some reason *)
   Fixpoint serialize_typ' typ: sexp :=
     match typ with
-    | TYPE_I sz => Atom ("i" ++ to_string sz)%string
+    | TYPE_I sz => Atom ("i" ++ show_Z sz)%string
     | TYPE_Pointer t => [serialize_typ' t ; Atom "*"]
     | TYPE_Void => Atom "void"
     | TYPE_Half => Atom "half"
@@ -647,12 +654,12 @@ Section hiding_notation.
     | TYPE_Ppc_fp128 => Atom "ppc_fp128"
     | TYPE_Metadata => Atom "metadata"
     | TYPE_X86_mmx => Atom "x86_mmx"
-    | TYPE_Array sz t => [Atom "["; Atom (to_string sz); Atom "x"; serialize_typ' t; Atom "]"]
+    | TYPE_Array sz t => [Atom "["; Atom (show_Z sz); Atom "x"; serialize_typ' t; Atom "]"]
     | TYPE_Function ret args => [serialize_typ' ret; Atom "("; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexpa (serialize_typ' x)) args)); Atom ")"]
     | TYPE_Struct fields => [Atom "{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexpa (serialize_typ' x)) fields)); Atom "}"]
     | TYPE_Packed_struct fields => [Atom "<{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexpa (serialize_typ' x)) fields)); Atom "}>"]
     | TYPE_Opaque => Atom "opaque"
-    | TYPE_Vector sz t => [Atom "<"; Atom (to_string sz); Atom "x"; serialize_typ' t; Atom ">"]
+    | TYPE_Vector sz t => [Atom "<"; Atom (show_Z sz); Atom "x"; serialize_typ' t; Atom ">"]
     | TYPE_Identified id => Atom (to_string id)
     end.
 
@@ -665,7 +672,7 @@ Section hiding_notation.
     Fixpoint serialize_exp' (v : exp T) :=
       match v with
       | EXP_Ident id => to_sexp id
-      | EXP_Integer x => to_sexp x
+      | EXP_Integer x => Atom (show x)
       | EXP_Bool b => to_sexp b
       | EXP_Null => Atom "null"
       | EXP_Zero_initializer => Atom "zero initializer"
@@ -685,7 +692,7 @@ Section hiding_notation.
       end.
 
     Global Instance serialize_exp : Serialize (exp T) := serialize_exp'.
-    Global Instance serialize_int : Serialize int := Serialize_Integral Integral_Z.
+    Global Instance serialize_int : Serialize int := fun i => Atom (show_Z i).
 
     Global Instance serialize_texp : Serialize (texp T) :=
       fun '(t, e) =>
@@ -726,6 +733,9 @@ Section hiding_notation.
         match t with
         | TERM_Ret v => [Atom "ret " ; to_sexp v]
         | TERM_Ret_void => Atom "ret"
+        | TERM_Br te b1 b2 =>
+          [Atom "br"; to_sexp te; Atom ", label "; to_sexp b1; Atom ", label "; to_sexp b2]
+        | TERM_Br_1 b => [Atom "br label"; to_sexp b]
         | _ => Atom "string_of_terminator todo"
         end.
 
@@ -736,7 +746,7 @@ Section hiding_notation.
       fun block =>
         [Atom "Block "
          ; to_sexp (blk_id block) ; Atom ": " ;
-           to_sexp (blk_code block)].
+           to_sexp (blk_code block); to_sexp (blk_term block)].
 
     Global Instance serialize_definition_list_block : Serialize (definition T (list (block T))) :=
       fun defn => [Atom "defn:" ; to_sexp (df_instrs defn)].
