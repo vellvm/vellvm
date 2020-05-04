@@ -1021,7 +1021,7 @@ Tactic Notation "inv_bind" hyp(H) :=
 
 From ITree Require Import
      ITree
-     Eq.
+     Eq.Eq.
 (* Definition runState {E A env} (R : Monads.stateT env (itree E) A) (st: env) : itree E (env * A) := R st. *)
 
 (* This should move to the library. It's just a specialization of [eqit_bind'], but I like the much more
