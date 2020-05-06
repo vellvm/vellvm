@@ -149,9 +149,9 @@ Section ShowInstances.
        | INSTR_Comment s => "; " ++ s
        | INSTR_Op e => show e
        | INSTR_Load vol t ptr align =>
-         "load " ++ show t ++ " " ++ show ptr ++ show_opt_prefix ", align " align
+         "load " ++ show t ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
        | INSTR_Store vol tval ptr align =>
-         "store " ++ show tval ++ " " ++ show ptr ++ show_opt_prefix ", align " align
+         "store " ++ show tval ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
        | INSTR_Alloca t nb align =>
          "alloca " ++ show t ++ show_opt_prefix ", " nb ++ show_opt_prefix ", align " align
        | _ => "show_instr todo"
@@ -1043,7 +1043,7 @@ Section InstrGenerators.
     := t   <- gen_sized_typ;;
        let pt := TYPE_Pointer t in
        vol <- lift (arbitrary : G bool);;
-       ptr <- gen_exp pt;;
+       ptr <- resize_LLVM 0 (gen_exp pt);;
        align <- ret None;;
        ret (t, INSTR_Load vol t (pt, ptr) align).
 
@@ -1051,7 +1051,7 @@ Section InstrGenerators.
     := vol   <- lift arbitrary;;
        align <- ret None;;
 
-       val <- gen_sized_texp;;
+       val <- resize_LLVM 0 gen_sized_texp;;
        let '(t, e) := val in
 
        let pt := TYPE_Pointer t in
@@ -1134,7 +1134,7 @@ Section InstrGenerators.
            [ (6%nat, gen_terminator_sz 0 t)
            ; (min sz' 6%nat, '(b, bs) <- gen_blocks_sz sz' t;; ret (TERM_Br_1 (blk_id b), bs))
            ; (min sz' 6%nat, ctx <- get_ctx;;
-                   c <- gen_exp (TYPE_I 1);;
+                   c <- gen_exp_size 0 (TYPE_I 1);;
                    '(b1, bs1) <- gen_blocks_sz sz' t;;
 
                    (* Restore context so blocks in second branch don't refer
