@@ -1,0 +1,10 @@
+EXCLUDE_QUERY_DIR
+B /home/albert/.opam/default/lib/ocaml
+B ../../_build/default/ml/extracted/.extracted.objs/byte
+B ../../_build/default/ml/libvellvm/.libvellvm.objs/byte
+B ../../_build/default/ml/testing/.testing.objs/byte
+S /home/albert/.opam/default/lib/ocaml
+S ../extracted
+S ../libvellvm
+S .
+FLG -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -warn-error -A -g -w -20-32-33-39

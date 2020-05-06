@@ -137,12 +137,14 @@ Section Swap.
   *)
 
   Lemma swap_correct_L2:
-    forall p, refine_mcfg_L2 nil p (swap_mcfg p).
+    forall p ret_typ entry args, refine_mcfg_L2 ret_typ entry args nil p (swap_mcfg p).
   Proof.
-    intros p.
+    intros p ret_typ entry args. 
     unfold refine_mcfg_L2.
     unfold model_to_L2.
 
+    unfold denote_vellvm.
+    unfold denote_vellvm_init.
     unfold denote_vellvm.
     simpl; rewrite 2 interp_to_L2_bind.
     split_bind.
@@ -311,7 +313,8 @@ Admitted.
 
   Theorem swap_cfg_correct: transformation_correct swap_mcfg.
   Proof.
-    intros p.
+    unfold transformation_correct.
+    intros ret_typ entry args p. 
     apply refine_mcfg_L2_correct, swap_correct_L2.
   Qed.
 

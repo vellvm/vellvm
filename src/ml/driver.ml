@@ -43,6 +43,20 @@ let parse_file filename =
   |> Llvm_lexer.parse
 
 
+(* Todo add line count information *)
+let parse_tests filename =
+  let assertions = ref [] in
+  let channel = open_in filename in
+  try while true; do
+      let line = input_line channel in
+      match Assertion.parse_assertion line with
+      | None -> ()
+      | Some x -> assertions := x::!assertions
+    done; []
+  with End_of_file ->
+    close_in channel;
+    List.rev !assertions
+
 let output_file filename ast =
   let open Llvm_printer in
   let channel = open_out filename in

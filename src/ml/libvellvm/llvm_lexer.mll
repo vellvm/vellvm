@@ -331,17 +331,25 @@ and raw_id = parse
 
 {
 
-  let parse lexbuf =
-    let parsing_err lexbuf =
-      let pos = Lexing.lexeme_start_p lexbuf in
-      let msg =
+  let parsing_err lexbuf =
+    let pos = Lexing.lexeme_start_p lexbuf in
+    let msg =
         Printf.sprintf "Parsing error: line %d, column %d, token '%s'"
                        pos.Lexing.pos_lnum
                        (pos.Lexing.pos_cnum - pos.Lexing.pos_bol)
                        (Lexing.lexeme lexbuf)
       in failwith msg
-    in
+
+  let parse lexbuf =
     try Llvm_parser.toplevel_entities token lexbuf
     with Llvm_parser.Error -> parsing_err lexbuf
 
+  let parse_test_call lexbuf = 
+    try Llvm_parser.test_call token lexbuf
+    with Llvm_parser.Error -> parsing_err lexbuf
+
+  let parse_texp lexbuf =
+    try Llvm_parser.texp token lexbuf
+    with Llvm_parser.Error -> parsing_err lexbuf
+    
 }
