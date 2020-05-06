@@ -7,5 +7,5 @@ define i64 @main(i32 %i) {
   ret i64 %3
 }
 
-; ASSERT EQ: i64 4 = call i64 @test(i32 3)
-; ASSERT EQ: i64 5 = call i64 @test(i32 4)
+; ASSERT EQ: i64 4 = call i64 @main(i32 3)
+; ASSERT EQ: i64 5 = call i64 @main(i32 4)
