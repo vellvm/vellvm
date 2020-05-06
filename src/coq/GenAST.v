@@ -24,8 +24,24 @@ From Coq Require Import
 Open Scope Z_scope.
 
 Section ShowInstances.
-  Derive Show for raw_id.
-  Derive Show for ident.
+  Definition show_raw_id (rid : raw_id) : string
+    := match rid with
+       | Name s => s
+       | Anon i => show i
+       | Raw i  => show i
+       end.
+
+  Global Instance showRawId : Show raw_id
+    := {| show := show_raw_id |}.
+
+  Definition show_ident (i : ident) : string
+    := match i with
+       | ID_Global r => "@" ++ show_raw_id r
+       | ID_Local r  => "%" ++ show_raw_id r
+       end.
+
+  Global Instance showIdent : Show ident
+    := {| show := show_ident |}.
 
   Local Open Scope string.
 
@@ -188,7 +204,7 @@ Section ShowInstances.
   Definition show_block (indent : string) (b : block typ) : string
     :=
       let code   := show_code indent (blk_code b) in
-      let term   := indent ++ show (blk_term b) ++ newline in
+      let term   := indent ++ show (snd (blk_term b)) ++ newline in
       show (blk_id b) ++ ":" ++ newline
            ++ code
            ++ term.
@@ -225,7 +241,7 @@ Section ShowInstances.
         let args := zip defn.(df_args) args_t in
         let blocks := concat newline (map (show_block "    ") (df_instrs defn)) in
         concatStr
-          [ "define "; show ret_t; " "; show name; show_arg_list args; " {"; newline
+          [ "define "; show ret_t; " @"; show name; show_arg_list args; " {"; newline
           ; blocks
           ; "}"; newline
           ]
