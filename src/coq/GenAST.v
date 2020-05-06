@@ -120,9 +120,9 @@ Section ShowInstances.
       | EXP_Cstring s => s (* TODO, this is probably wrong *)
       | EXP_Undef => "undef"
       | OP_IBinop iop t v1 v2 =>
-        show iop ++ " " ++ show t ++ " " ++ show_exp v1 ++ " " ++ show_exp v2
+        show iop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
       | OP_ICmp cmp t v1 v2 =>
-        show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ " " ++ show_exp v2
+        show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
       | OP_GetElementPtr t ptrval idxs =>
         "getelementptr"
       | _ => "show_exp todo"
@@ -186,9 +186,9 @@ Section ShowInstances.
        | TERM_Ret v => "ret " ++ show v
        | TERM_Ret_void => "ret"
        | TERM_Br te b1 b2 =>
-         "br " ++ show te ++ ", label " ++ show b1 ++ ", label " ++ show b2
+         "br " ++ show te ++ ", label %" ++ show b1 ++ ", label %" ++ show b2
        | TERM_Br_1 b =>
-         "br label " ++ show b
+         "br label %" ++ show b
        | _ => "show_terminator todo"
        end.
 
@@ -602,28 +602,14 @@ Section TypGenerators.
         [ gen_sized_typ_0
         ; ret TYPE_Pointer <*> gen_sized_typ_size sz'
         (* Might want to restrict the size to something reasonable *)
-        ; ret TYPE_Array <*> lift genPosZ <*> gen_sized_typ_size sz'
+        (* ; ret TYPE_Array <*> lift genPosZ <*> gen_sized_typ_size sz'
         ; ret TYPE_Vector <*> lift genPosZ <*> gen_sized_typ_size sz'
         ; let n := Nat.div sz 2 in
           ret TYPE_Function <*> gen_sized_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
         ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
-        ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
+        ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz') *)
         ]
     end.
-  Next Obligation.
-    cbn.
-    assert (0 <= 1)%nat by omega.
-    pose proof Nat.divmod_spec sz' 1 0 0 H.
-    cbn; destruct (Nat.divmod sz' 1 0 0).
-    cbn; omega.
-  Qed.
-  Next Obligation.
-    cbn.
-    assert (0 <= 1)%nat by omega.
-    pose proof Nat.divmod_spec sz' 1 0 0 H.
-    cbn; destruct (Nat.divmod sz' 1 0 0).
-    cbn; omega.
-  Qed.
 
   Definition gen_sized_typ : GenLLVM typ
     := sized_LLVM (fun sz => gen_sized_typ_size sz).
@@ -939,7 +925,7 @@ Section ExpGenerators.
             ctx <- get_ctx;;
             match find_pred (fun '(i,t) => if Ident.eq_dec id i then true else false) ctx with
             | None => lift failGen
-            | Some (i,t) => gen_exp_size sz t
+            | Some (i,t) => gen_exp_size 0 t
             end
           (* Not generating these types for now *)
           | TYPE_Half                 => lift failGen
@@ -958,21 +944,20 @@ Section ExpGenerators.
           match t with
           | TYPE_I isz =>
             (* TODO: If I1 also allow ICmp and FCmp *)
-            [let n := Nat.div sz 2 in
-             ret OP_IBinop <*> lift gen_ibinop <*> ret t <*> gen_exp_size n t <*> gen_exp_size n t]
+            [ret OP_IBinop <*> lift gen_ibinop <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t]
           | TYPE_Array n t =>
-            [es <- vectorOf_LLVM (Z.to_nat n) (gen_exp_size sz' t);;
+            [es <- vectorOf_LLVM (Z.to_nat n) (gen_exp_size 0 t);;
              ret (EXP_Array (map (fun e => (t, e)) es))]
           | TYPE_Vector n t =>
-            [es <- vectorOf_LLVM (Z.to_nat n) (gen_exp_size sz' t);;
+            [es <- vectorOf_LLVM (Z.to_nat n) (gen_exp_size 0 t);;
              ret (EXP_Array (map (fun e => (t, e)) es))]
           | TYPE_Struct fields =>
             (* Should we divide size evenly amongst components of struct? *)
-            [tes <- map_monad (fun t => e <- gen_exp_size sz' t;; ret (t, e)) fields;;
+            [tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
              ret (EXP_Struct tes)]
           | TYPE_Packed_struct fields =>
             (* Should we divide size evenly amongst components of struct? *)
-            [tes <- map_monad (fun t => e <- gen_exp_size sz' t;; ret (t, e)) fields;;
+            [tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
              ret (EXP_Packed_struct tes)]
           | TYPE_Pointer t         => [lift failGen] (* GEP? *)
           | TYPE_Void              => [lift failGen] (* No void type expressions *)
@@ -1017,8 +1002,7 @@ Section ExpGenerators.
             match t with
             | TYPE_I isz =>
               (* TODO: If I1 also allow ICmp and FCmp *)
-              let n := Nat.div sz 2 in
-              ret OP_IBinop <*> lift gen_ibinop <*> ret t <*> gen_exp_size n t <*> gen_exp_size n t
+              ret OP_IBinop <*> lift gen_ibinop <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t
             | _ => lift failGen
             end).
 
@@ -1060,12 +1044,12 @@ Section InstrGenerators.
        let pt := TYPE_Pointer t in
        vol <- lift (arbitrary : G bool);;
        ptr <- gen_exp pt;;
-       align <- lift arbitrary;;
+       align <- ret None;;
        ret (t, INSTR_Load vol t (pt, ptr) align).
 
   Definition gen_store : GenLLVM (typ * instr typ)
     := vol   <- lift arbitrary;;
-       align <- lift arbitrary;;
+       align <- ret None;;
 
        val <- gen_sized_texp;;
        let '(t, e) := val in
@@ -1086,8 +1070,8 @@ Section InstrGenerators.
     oneOf_LLVM
       [ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
       ; t <- gen_sized_typ;;
-        num_elems <- gen_opt_LLVM gen_int_texp;;
-        align <- lift arbitrary;;
+        num_elems <- gen_opt_LLVM (resize_LLVM 0 gen_int_texp);;
+        align <- ret None;;
         ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
       (* TODO: Generate calls *)
       ; gen_load
@@ -1141,7 +1125,7 @@ Section InstrGenerators.
          match (normalize_type ctx t) with
          | TYPE_Void => ret (TERM_Ret_void, [])
          | _ =>
-           e <- gen_exp t;;
+           e <- gen_exp_size 0 t;;
            ret (TERM_Ret (t, e), [])
          end
        | S sz' =>

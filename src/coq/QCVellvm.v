@@ -54,5 +54,5 @@ Definition always_zeroP (prog : list (toplevel_entity typ (list (block typ)))) :
             | _, _ => checker true
             end.
 
-Extract Constant defNumTests    => "1".
+Extract Constant defNumTests    => "10".
 QuickChick (forAll (run_GenLLVM gen_llvm) always_zeroP).
