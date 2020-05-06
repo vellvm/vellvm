@@ -58,6 +58,12 @@ future---for instance it might be nice to automatically generate loops
 over arrays like Csmith does, and it might be nice to relax this
 restriction and rely upon timeouts.
 
+Currently we do not do much static analysis to avoid generating terms
+which trigger undefined behaviour. We were able to test, however, that
+only 10% of the programs generated yield a ~poison~ result (which
+indicates undefined behaviour in LLVM), so filtering these out should
+be reasonable for now.
+
 * Show instances
 
 Testing generators with ~Sample~ has proven to be somewhat

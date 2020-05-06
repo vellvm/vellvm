@@ -567,7 +567,7 @@ Section hiding_notation.
   Global Instance serialize_instr_id : Serialize instr_id :=
     fun ins =>
       match ins with
-      | IId id => to_sexp id
+      | IId id => serialize_raw_id "%" id
       | IVoid n => Atom ("void<" ++ show_Z n ++ ">")%string
       end.
 
@@ -740,26 +740,42 @@ Section hiding_notation.
         end.
 
     Global Instance serialize_instr_id_instr : Serialize (instr_id * (instr T)) :=
-      fun '(iid, i) => [to_sexp iid ; Atom "=" ; to_sexp i].
+      fun '(iid, i) =>
+        match iid with
+        | IId _ =>
+          [to_sexp iid ; Atom "=" ; to_sexp i]
+        | IVoid n =>
+          [to_sexp i]
+        end.
 
     Global Instance serialize_block : Serialize (block T) :=
       fun block =>
-        [Atom "Block "
-         ; to_sexp (blk_id block) ; Atom ": " ;
-           to_sexp (blk_code block); to_sexp (blk_term block)].
+        [to_sexp (blk_id block) ; Atom ":\n" ;
+        (* TODO: add indentation *)
+        to_sexp (blk_code block); to_sexp (blk_term block)].
+  End WithSerializeT.
 
-    Global Instance serialize_definition_list_block : Serialize (definition T (list (block T))) :=
-      fun defn => [Atom "defn:" ; to_sexp (df_instrs defn)].
+  Section SerializeTyp.
+    Global Instance serialize_definition_list_block : Serialize (definition typ (list (block typ))) :=
+      fun defn =>
+        match defn.(df_prototype).(dc_type) with
+        | TYPE_Function ret_t args_t
+          => let name  := defn.(df_prototype).(dc_name) in
+             [Atom "define"; to_sexp ret_t; to_sexp name;
+             Atom " {\n";
+             (* TODO: Add prefix for indentation? *)
+             to_sexp (df_instrs defn);
+             Atom "}\n"]
+        | _ => Atom "Invalid type on function"
+        end.
 
-    Global Instance serialize_tle_list_block : Serialize (toplevel_entity T (list (block T))) :=
+    Global Instance serialize_tle_list_block : Serialize (toplevel_entity typ (list (block typ))) :=
       fun tle =>
         match tle with
         | TLE_Definition defn => to_sexp defn
         | _ => Atom "string_of_tle_list_block todo"
         end.
-
-  End WithSerializeT.
-
+  End SerializeTyp.
 End hiding_notation.
 
 Section WithType.
