@@ -46,7 +46,7 @@ Extract Constant llc_command => "fun prog -> let f = open_out ""temporary_vellvm
 Definition run_llc (prog : list (toplevel_entity typ (list (block typ)))) : uvalue
   := UVALUE_I8 (repr (llc_command (to_caml_str (show prog)))).
 
-Definition always_zeroP (prog : list (toplevel_entity typ (list (block typ)))) : Checker
+Definition vellvm_agrees_with_clang (prog : list (toplevel_entity typ (list (block typ)))) : Checker
   := 
     collect (show prog)
             match interpret prog, run_llc prog with
@@ -54,5 +54,5 @@ Definition always_zeroP (prog : list (toplevel_entity typ (list (block typ)))) :
             | _, _ => checker true
             end.
 
-Extract Constant defNumTests    => "10".
-QuickChick (forAll (run_GenLLVM gen_llvm) always_zeroP).
+Extract Constant defNumTests    => "1000".
+QuickChick (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).

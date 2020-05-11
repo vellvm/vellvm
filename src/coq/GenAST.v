@@ -9,7 +9,7 @@ From ExtLib.Structures Require Export
 
 Require Import ExtLib.Data.Monads.StateMonad.
 
-From Vellvm Require Import LLVMAst Util AstLib TypeUtil CFG Show.
+From Vellvm Require Import LLVMAst Util AstLib TypeUtil CFG Show TopLevel.
 Require Import Integers Floats.
 
 Require Import List.
@@ -143,7 +143,7 @@ Section ShowInstances.
        | None   => ""
        | Some a => prefix ++ show a
        end.
-  
+
   Fixpoint show_instr (i : instr typ) : string
     := match i with
        | INSTR_Comment s => "; " ++ s
@@ -897,7 +897,18 @@ Section ExpGenerators.
 
   Definition filter_type (ty : typ) (ctx : list (ident * typ)) : list (ident * typ)
     := filter (fun '(i, t) => normalized_typ_eq (normalize_type ctx ty) (normalize_type ctx t)) ctx.
-  
+
+  (* TODO: Also generate negative numbers *)
+  Definition gen_non_zero : G Z
+    := n <- (arbitrary : G nat);;
+       ret (Z.of_nat (S n)).
+
+  Definition gen_non_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
+    := match t with
+       | TYPE_I n => ret EXP_Integer <*> lift gen_non_zero (* TODO: should integer be forced to be in bounds? *)
+       | _ => lift failGen
+       end.
+
   (* TODO: should make it much more likely to pick an identifier for
            better test cases *)
   Fixpoint gen_exp_size (sz : nat) (t : typ) {struct t} : GenLLVM (exp typ) :=
@@ -937,14 +948,18 @@ Section ExpGenerators.
           | TYPE_Metadata             => lift failGen
           | TYPE_X86_mmx              => lift failGen
           end in
-      freq_LLVM
-        (gen_idents ++ [(1%nat, gen_size_0)])
+      (* Hack to avoid failing way too much *)
+      match t with
+      | TYPE_Pointer t => freq_LLVM gen_idents
+      | _ => freq_LLVM
+               (gen_idents ++ [(1%nat, gen_size_0)])
+      end
     | (S sz') =>
       let gens :=
           match t with
           | TYPE_I isz =>
             (* TODO: If I1 also allow ICmp and FCmp *)
-            [ret OP_IBinop <*> lift gen_ibinop <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t]
+            [gen_ibinop_exp isz]
           | TYPE_Array n t =>
             [es <- vectorOf_LLVM (Z.to_nat n) (gen_exp_size 0 t);;
              ret (EXP_Array (map (fun e => (t, e)) es))]
@@ -959,7 +974,7 @@ Section ExpGenerators.
             (* Should we divide size evenly amongst components of struct? *)
             [tes <- map_monad (fun t => e <- gen_exp_size 0 t;; ret (t, e)) fields;;
              ret (EXP_Packed_struct tes)]
-          | TYPE_Pointer t         => [lift failGen] (* GEP? *)
+          | TYPE_Pointer t         => [] (* GEP? *)
           | TYPE_Void              => [lift failGen] (* No void type expressions *)
           | TYPE_Function ret args => [lift failGen] (* These shouldn't exist, I think *)
           | TYPE_Opaque            => [lift failGen] (* TODO: not sure what these should be... *)
@@ -981,7 +996,16 @@ Section ExpGenerators.
       in
       (* short-circuit to size 0 *)
       oneOf_LLVM (gen_exp_size 0 t :: gens)
-    end.
+    end
+  with
+  (* TODO: Make sure we don't divide by 0 *)
+  gen_ibinop_exp (isz : Z) : GenLLVM (exp typ)
+    :=
+      let t := TYPE_I isz in
+      ibinop <- lift gen_ibinop;;
+      if D.iop_is_div ibinop
+      then ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
+      else ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t.
 
   Definition gen_exp (t : typ) : GenLLVM (exp typ)
     := sized_LLVM (fun sz => gen_exp_size sz t).
@@ -1002,7 +1026,7 @@ Section ExpGenerators.
             match t with
             | TYPE_I isz =>
               (* TODO: If I1 also allow ICmp and FCmp *)
-              ret OP_IBinop <*> lift gen_ibinop <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t
+              gen_ibinop_exp isz
             | _ => lift failGen
             end).
 
@@ -1047,19 +1071,25 @@ Section InstrGenerators.
        align <- ret None;;
        ret (t, INSTR_Load vol t (pt, ptr) align).
 
+  Definition gen_store_to (ptr : texp typ) : GenLLVM (typ * instr typ)
+    :=
+      match ptr with
+      | (TYPE_Pointer t, pexp) =>
+        vol   <- lift arbitrary;;
+        align <- ret None;;
+
+        e <- resize_LLVM 0 (gen_exp t);;
+        let val := (t, e) in
+
+        ret (TYPE_Void, INSTR_Store vol val ptr align)
+      | _ => lift failGen
+      end.
+
   Definition gen_store : GenLLVM (typ * instr typ)
-    := vol   <- lift arbitrary;;
-       align <- ret None;;
-
-       val <- resize_LLVM 0 gen_sized_texp;;
-       let '(t, e) := val in
-
+    := t <- gen_sized_typ;;
        let pt := TYPE_Pointer t in
        pexp <- gen_exp pt;;
-       let ptr := (pt, pexp) in
-
-       ret (TYPE_Void, INSTR_Store vol val ptr align).
-
+       gen_store_to (pt, pexp).
 
   (* Generate an instruction, as well as its type...
 
@@ -1069,8 +1099,9 @@ Section InstrGenerators.
   Definition gen_instr : GenLLVM (typ * instr typ) :=
     oneOf_LLVM
       [ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
-      ; t <- gen_sized_typ;;
-        num_elems <- gen_opt_LLVM (resize_LLVM 0 gen_int_texp);;
+      ; t <- gen_op_typ;; (* gen_sized_typ;; *)
+        (* TODO: generate multiple element allocas. Will involve changing initialization *)
+        num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *)
         align <- ret None;;
         ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
       (* TODO: Generate calls *)
@@ -1086,17 +1117,29 @@ Section InstrGenerators.
   complicated because we need to know that an id that occurs in a
   later block is in context *)
 
+  Definition add_id_to_instr (t_instr : typ * instr typ) : GenLLVM (instr_id * instr typ)
+    :=
+      match t_instr with
+      | (TYPE_Void, instr) =>
+        vid <- new_void_id;;
+        ret (vid, instr)
+      | (t, instr) =>
+        i <- new_raw_id;;
+        add_to_ctx (ID_Local i, t);;
+        ret (IId i, instr)
+      end.
+
   (* Generate a block of code, spitting out a new context. *)
   Definition gen_instr_id : GenLLVM (instr_id * instr typ)
-    := '(t, instr) <- gen_instr;;
-       match t with
-       | TYPE_Void =>
-         vid <- new_void_id;;
-         ret (vid, instr)
-       | _ =>
-         i <- new_raw_id;;
-         add_to_ctx (ID_Local i, t);;
-         ret (IId i, instr)
+    := t_instr <- gen_instr;; add_id_to_instr t_instr.
+
+  Definition fix_alloca (iid : instr_id * instr typ) : GenLLVM (list (instr_id * instr typ))
+    := match iid with
+       | (IId i, INSTR_Alloca t num_elems align) =>
+         t_instr <- gen_store_to (TYPE_Pointer t, EXP_Ident (ID_Local i));;
+         instr <- add_id_to_instr t_instr;;
+         ret [instr]
+       | _ => ret []
        end.
 
   Fixpoint gen_code_length (n : nat) : GenLLVM (code typ)
@@ -1104,8 +1147,10 @@ Section InstrGenerators.
        | O => ret []
        | S n' =>
          instr <- gen_instr_id;;
+         (* Add an initial store if instr is alloca *)
+         alloca_store <- fix_alloca instr;;
          rest  <- gen_code_length n';;
-         ret (instr :: rest)
+         ret (instr :: alloca_store ++ rest)
        end.
 
   Definition gen_code : GenLLVM (code typ)
