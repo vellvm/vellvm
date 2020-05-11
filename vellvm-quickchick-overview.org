@@ -1,24 +1,23 @@
 * Introduction
 
-The goal of this project is to start a suite of QuickChick generators
-that produce LLVM code in order to test the Vellvm project. In the
-near term we simply want to compare Vellvm's interpreter to ~llc~ in
-order to find disagreements with Vellvm's semantics, but we are hoping
-that this will lay the ground work for automatically testing if an
+This project is the start of a suite of QuickChick generators for LLVM
+code, with the purpose of testing the Vellvm project. In the near term
+we simply want to compare Vellvm's interpreter to ~clang~ in order to
+find disagreements with Vellvm's semantics, but we are hoping that
+this will lay the ground work for automatically testing if an
 optimization of LLVM code preserves the semantics of programs.
 
 * Updating Backtracking QuickChick
 
 The first step of this project was to get the backtracking version of
-QuickChick up to speed. We wanted to use Coq 8.11 to stay up to date,
-but also in order to take advantage of the easy way to turn off the
-termination checker in Coq 8.11 (some of the generators use complex
-non-structural recursion, and since these generators will not be used
-in proofs it's better not to waste time on guaranteeing their
-termination). This took a little bit of effort at first, as quite a
-lot has changed in QuickChick since the backtracking branch was last
-updated --- all of the combinators have new names, and a lot of the ml
-code has changed as well!
+QuickChick up to speed. We wanted to use Coq 8.11 in order to take
+advantage of the easy way to turn off the termination checker in Coq
+8.11 (some of the generators use complex non-structural recursion, and
+since these generators will not be used in proofs it's better not to
+waste time and effort guaranteeing their termination). This took a little bit
+of effort at first, as quite a lot has changed in QuickChick since the
+backtracking branch was last updated --- all of the combinators have
+new names, and a lot of the ml code has changed as well!
 
 Vellvm also required some hacking and admitted lemmas to work on 8.11,
 but this should be fixed soon in a new release of Vellvm.
@@ -41,11 +40,11 @@ places can only have integer types. This is not a huge problem, but it
 does result in us building many different type generators.
 
 The generators themselves are relatively straightforward, save for
-some tuning to make sure we generate programs of a reasonable
-size. For the most part these generators just reflect the structure of
-the LLVM AST, making sure to call the right generators (the ones that
-generate, say, types with the right constraints) for different
-sub-components.
+some tuning to ensure that we use previously generated variables and
+to ensure we generate programs with reasonable sizes. For the most
+part these generators just reflect the structure of the LLVM AST,
+making sure to call generators that satisfy the right constraints for
+different components.
 
 The most complicated generator is the one for terminators and
 blocks. These generators are mutually recursive, as when we generate a
@@ -58,37 +57,58 @@ future---for instance it might be nice to automatically generate loops
 over arrays like Csmith does, and it might be nice to relax this
 restriction and rely upon timeouts.
 
-Currently we do not do much static analysis to avoid generating terms
-which trigger undefined behaviour. We were able to test, however, that
-only 10% of the programs generated yield a ~poison~ result (which
-indicates undefined behaviour in LLVM), so filtering these out should
-be reasonable for now.
+** Avoiding Errors
+
+Currently we do not perform much static analysis like Csmith in order
+to avoid generating terms which trigger undefined behaviour. We use a
+number of simple techniques to avoid some common cases of undefined
+behaviour and errors in programs.
+
+For instance, to avoid division by 0 we currently only generate
+division (and mod) instructions with constant, non-zero valued
+denominators. In principle it should be possible to use variables in
+the denominator, but we would have to perform some analysis in order
+to make sure that the identifiers chosen are non-zero. This analysis
+should be fairly easy under the current restrictions for the CFGs that
+we are generating, however we believe that we will get more
+interesting programs in the future by generating more complicated CFGs
+(with back edges and phi nodes) that would would make this analysis
+obsolete anyway.
+
+We also make some efforts to not generate garbage pointers. Currently
+all pointers must come from the ~alloca~ instruction, which allocates
+space on the stack for a value. To ensure that we do not load from
+uninitialized memory, every ~alloca~ is paired with a ~store~ that
+initializes the allocated memory.
 
 * Show instances
 
-Testing generators with ~Sample~ has proven to be somewhat
-painful. Vellvm lacks ~Show~ instances for almost all of the AST, and
-what is there uses the ~Ceres~ library in Coq, which (unfortunately)
-sometimes causes segmentation faults in QuickChick when using
-~Sample~. We're not sure why this is yet, but until then we have to
-tediously build up some of the ~Show~ instances manually.
+It's useful to test generators with ~Sample~ while building them. This
+has proven to be a little painful because Vellvm lacked ~Show~
+instances for almost all of the AST, and what is there used the
+~Ceres~ library in Coq, which (unfortunately) sometimes causes
+segmentation faults in QuickChick due to how ~nat~ was getting
+serialized. Eventually we gave up on extending the ~Ceres~
+serialization of the AST, and instead manually wrote ~Show~ instances
+for the parts of the AST that we actually generate.
+
+These ~Show~ instances are not only useful for testing the generators,
+but they're also useful for the properties we want to test, as we want
+to serialize the ASTs into LLVM programs that ~clang~ can parse.
 
 * Properties under test
 
-  Properties will live here:
+  The properties that we are testing live here:
 
   https://github.com/vellvm/vellvm/blob/quickchick/src/coq/QCVellvm.v  
 
-  Currently there are no properties under test, as we are still
-  building up that infrastructure. However, as a first step, we
-  believe that we should be able to differentially test the Vellvm
-  interpreter against the ~llc~ compiler from the Vellvm project. The
-  idea is to take advantage of Coq's ~Extract Constant~ method to
-  build an ml function that pretty prints the LLVM AST into LLVM IR,
-  passes this IR to ~llc~, and then runs the existing executable. The
-  return code from the executed program can then be compared against
-  the result we get from interpreting the function using Vellvm's
-  interpreter.
+  As a first step, we are using QuickChick to differentially test the
+  Vellvm interpreter against the ~clang~ compiler. We take advantage
+  of Coq's ~Extract Constant~ mechanism to build an ml function that
+  pretty prints the AST into LLVM IR, passes this IR to ~clang~, and
+  then runs the resulting executable. The return code from the
+  executed program can then be compared against the result we get from
+  interpreting the function using Vellvm's interpreter.
 
   We believe that we should be able to test certain ~eutt~ relations
   automatically using QuickChick as well, which we hope will help with
@@ -103,3 +123,69 @@ tediously build up some of the ~Show~ instances manually.
   a matter of providing the same (possibly randomly generated) value
   to each of the continuations. More work needs to be done on this,
   but in principle it should be possible to do something here.
+
+* Future Work
+
+** Testing of undef
+
+LLVM has a notion of nondeterminism called ~undef~ which is used for
+performing optimizations. A value of ~undef~ essentially means "I
+don't care what this value is" and is used to represent things like
+uninitialized variables. The compiler is allowed to concretize ~undef~
+values into any value it finds convenient. It can replace ~undef~ with
+whatever is left in a machine register, or it can always replace it
+with 0. The semantics of an LLVM program is actually a set of traces,
+where each trace makes different choices for what the ~undef~ values
+are in the program. Having multiple allowable behaviours grants the
+compiler more flexibility, which can lead to more efficient programs,
+but multiple behaviours also means that we can't simply compare the
+output of ~clang~ and ~vellvm~ for instance. The ~clang~ compiler
+might make different choices than ~vellvm~, but they might both be
+valid. This makes simple differential testing no longer an
+option. Vellvm does have a propositional semantics which collects all
+of the possible traces, and in theory some kind of automated theorem
+proving might be able to prove that a particular trace, such as one
+generated by a ~clang~ executable, is part of this set.
+
+** TODO More complex programs
+
+A goal for the near future of this project is to generate more complex
+programs with fewer constraints. The programs that we currently
+generate are *heavily* constrained in order to be deterministic,
+terminating, and safe.
+
+Our CFGs currently have no back-edges, making it easy to think about
+whether a program terminates (it does). Unfortunately, this means that
+the generated programs are very boring.
+
+It may be interesting to explore timeout mechanisms, instead of
+ensuring that programs terminate, as this is something that Csmith
+seems to do as well.
+
+** More complex testing
+
+*** I/O and traces
+
+The current testing framework relies exclusively upon the return value
+of programs. Testing that programs perform the same (or equivalent)
+I/O operations would also be interesting. Capturing and comparing
+~stdout~ should not be too difficult as a first approximation, but
+generating programs that read structured data from ~stdin~, and then
+automatically generating this data while testing could be interesting
+future work.
+
+*** TODO Other properties (eutt)
+
+In theory we would also like to be able to test other properties
+(aside from just testing Vellvm against clang). One important property
+that we would like to test is eutt, or "equivalence up to tau", 
+
+** Speed
+
+Generating and running the tests is currently quite slow. Benchmarking
+the time spent generating test cases and the time spent running tests
+could help us improve this. For instance, we might find that much of
+our time is spent running tests because we have to write our program
+out to a file and then call ~clang~ on it. Working on making larger
+test cases could ensure that each call to ~clang~ makes us as likely
+as possible to generate
