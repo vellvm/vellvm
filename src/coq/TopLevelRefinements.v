@@ -32,6 +32,11 @@ From Coq Require Import
      Relations
      List.
 
+From ITree Require Import
+     Basics.Monad
+     Basics.MonadState.
+Require Import Paco.paco.
+
 Import ListNotations.
 Import ITree.Basics.Basics.Monads.
 
@@ -429,9 +434,7 @@ Admitted.
 (** We hence can also commute them at the various levels of interpretation *)
 
 (** BEGIN MOVE *)
-From ITree Require Import
-     Basics.Monad
-     Basics.MonadState.
+
 
 (* Instance runState_proper_eqit {E A env} : Proper (Monad.eqm ==> Logic.eq ==> eutt Logic.eq) (@runState E A env). *)
 (* Proof. *)
@@ -440,7 +443,6 @@ From ITree Require Import
 (*   rewrite H; reflexivity. *)
 (* Qed. *)
 
-Require Import Paco.paco.
 Instance interp_state_proper {T E F S}
          (h: forall T : Type, E T -> Monads.stateT S (itree F) T)
   : Proper (eutt Logic.eq ==> Monad.eqm) (State.interp_state h (T := T)).
