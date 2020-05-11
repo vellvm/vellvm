@@ -516,7 +516,7 @@ Section hiding_notation.
   Global Instance serialize_ibinop : Serialize ibinop :=
     fun binop =>
       match binop with
-      | Add nuw nsw => Atom "add"
+      | LLVMAst.Add nuw nsw => Atom "add"
       | Sub nuw nsw => Atom "sub"
       | Mul nuw nsw => Atom "mul"
       | Shl nuw nsw => Atom "shl"

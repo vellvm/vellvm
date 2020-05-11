@@ -110,16 +110,21 @@ Section Correctness.
     end.
 
   (* binary length of a positive number *)
-  Let digits := compose Z.succ log_inf.
+  Let digits (p: positive) := Z.succ (Z.log2 (Zpos p)).
 
   (* closed form for Flocq's [digits2_pos] *)
   Lemma digits2_pos_digits (m : positive) :
     Z.pos (Digits.digits2_pos m) = digits m.
   Proof.
-    induction m; simpl;
-      try rewrite Pos2Z.inj_succ, IHm; reflexivity.
+    induction m; simpl.
+    1,2:
+      rewrite Pos2Z.inj_succ, IHm;
+      unfold digits;
+      rewrite <- Z.log2_double by lia;
+      reflexivity.
+    auto.
   Qed.
-  
+
   (** ** Flocq's Binary.bounded rewritten in a form close to IEEE-754 *)
   Lemma bounded_closed_form (prec emax : Z)
         (prec_gt_0 : Flocq.Core.FLX.Prec_gt_0 prec) (Hmax : (prec < emax)%Z)
@@ -581,21 +586,19 @@ Section Correctness.
   Qed.
 
   Fact Zdigits_Zpos_log_inf (p : positive) :
-  Zdigits (Z.pos p) = Z.succ (log_inf p).
+  Zdigits (Z.pos p) = Z.succ (Z.log2 (Zpos p)).
   Proof.
     unfold Zdigits, Z.abs.
-    rewrite <-Zlog2_log_inf.
     reflexivity.
   Qed.
 
   Fact Zdigits_Zneg_log_inf (p : positive) :
-  Zdigits (Z.neg p) = Z.succ (log_inf p).
+  Zdigits (Z.neg p) = Z.succ (Z.log2 (Zpos p)).
   Proof.
     unfold Zdigits, Z.abs.
-    rewrite <-Zlog2_log_inf.
     reflexivity.
   Qed.
-    
+
   (* similar to [bounded_closed_form] *)
   Lemma valid_float_closed_form (prec emax : Z) (f : bfloat) (NZ : not_zero f)
         (prec_gt_0 : FLX.Prec_gt_0 prec) (Hmax : prec < emax) :
