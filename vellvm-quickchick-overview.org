@@ -1,23 +1,25 @@
 * Introduction
 
 This project is the start of a suite of QuickChick generators for LLVM
-code, with the purpose of testing the Vellvm project. In the near term
-we simply want to compare Vellvm's interpreter to ~clang~ in order to
-find disagreements with Vellvm's semantics, but we are hoping that
-this will lay the ground work for automatically testing if an
-optimization of LLVM code preserves the semantics of programs.
+code, with the purpose of testing the Vellvm project. The short term
+goal is to compare Vellvm's interpreter to the ~clang~ compiler in
+order to find disagreements about the LLVM semantics, however we hope
+that this project will lay the gorund work for automatically testing
+that code transformations (like optimizations) preserve the semantics
+of a program in Vellvm.
 
 * Updating Backtracking QuickChick
 
 The first step of this project was to get the backtracking version of
 QuickChick up to speed. We wanted to use Coq 8.11 in order to take
 advantage of the easy way to turn off the termination checker in Coq
-8.11 (some of the generators use complex non-structural recursion, and
-since these generators will not be used in proofs it's better not to
-waste time and effort guaranteeing their termination). This took a little bit
-of effort at first, as quite a lot has changed in QuickChick since the
-backtracking branch was last updated --- all of the combinators have
-new names, and a lot of the ml code has changed as well!
+8.11. Some of the generators use complex non-structural recursion, and
+since these generators will not be used in proofs, guaranteeing their
+termination is largely wasted time and effort.  Updating the
+backtracking QuickChick took a little bit of effort at first, as quite
+a lot has changed since the backtracking branch was last updated---all
+of the combinators have new names, and a lot of the ml code has
+changed as well!
 
 Vellvm also required some hacking and admitted lemmas to work on 8.11,
 but this should be fixed soon in a new release of Vellvm.
@@ -31,74 +33,83 @@ https://github.com/vellvm/vellvm/blob/quickchick/src/coq/GenAST.v
 We wanted to start with a simple subset of LLVM -- LLVM is quite a
 large language to begin with, and there are many different constraints
 that the generator might need to take into account depending on the
-context.
+context. For instance the types in LLVM programs have different
+constraints in different contexts; sometimes only non-void types are
+valid, sometimes types must have fixed sizes, and sometimes only an
+integer type will do. QuickChick can fairly easily construct
+generators for each of these constraints, but it does result in us
+having to build many different type generators.
 
-For instance the types in LLVM programs have different
-constraints at many different points. In some places only non-void
-types are valid, some places need types to have sizes, and other
-places can only have integer types. This is not a huge problem, but it
-does result in us building many different type generators.
+The LLVM generators are relatively straightforward, save for some
+tuning of frequencies to ensure that we use previously generated
+variables and to ensure we generate programs with reasonable
+sizes. Largely these generators reflect the structure of the LLVM AST,
+with some care being taken to generate the different sub-components of
+each structure with the right set of constraints.
 
-The generators themselves are relatively straightforward, save for
-some tuning to ensure that we use previously generated variables and
-to ensure we generate programs with reasonable sizes. For the most
-part these generators just reflect the structure of the LLVM AST,
-making sure to call generators that satisfy the right constraints for
-different components.
-
-The most complicated generator is the one for terminators and
+The most complex generators are those for terminators and
 blocks. These generators are mutually recursive, as when we generate a
 branching terminator we need to generate blocks to branch to, and
-similarly when we generate a block we need to be able to generate
-terminators. Currently we do not create branches into already existing
-blocks in order to make sure all of our programs terminate to ease
-testing, though this is something that we hope to improve on in the
+similarly when generating a block we need to be able to generate
+terminators. When generating branches we have chosen to always create
+new blocks, and thus we never produce back-edges in the CFG. This
+ensures that all generated programs terminate in order to ease
+testing, though this is something we hope to improve upon in the
 future---for instance it might be nice to automatically generate loops
-over arrays like Csmith does, and it might be nice to relax this
-restriction and rely upon timeouts.
+over arrays like Csmith does, and it may be nice to relax this
+restriction and rely upon timeouts instead. Further experimentation is
+necessary to determine the most effective approach.
 
 ** Avoiding Errors
 
-Currently we do not perform much static analysis like Csmith in order
-to avoid generating terms which trigger undefined behaviour. We use a
-number of simple techniques to avoid some common cases of undefined
-behaviour and errors in programs.
+Our current assortment of generators relies on simple techniques in
+order to avoid some common cases of undefined behaviour and errors in
+programs.
 
 For instance, to avoid division by 0 we currently only generate
 division (and mod) instructions with constant, non-zero valued
-denominators. In principle it should be possible to use variables in
-the denominator, but we would have to perform some analysis in order
-to make sure that the identifiers chosen are non-zero. This analysis
-should be fairly easy under the current restrictions for the CFGs that
-we are generating, however we believe that we will get more
-interesting programs in the future by generating more complicated CFGs
-(with back edges and phi nodes) that would would make this analysis
-obsolete anyway.
+denominators. In theory it should be possible to use variables in the
+denominator, but some analysis is necessary in order to ensure that
+the variable at that stage in the program is necessarily
+non-zero. This analysis should be fairly easy, especially under the
+current restrictions for CFGs that we are generating, however we
+believe that it will be more fruitful to generate more complicated
+CFGs (with back-edges and phi nodes) that might break the analysis
+that we would have done here anyway.
 
-We also make some efforts to not generate garbage pointers. Currently
-all pointers must come from the ~alloca~ instruction, which allocates
-space on the stack for a value. To ensure that we do not load from
-uninitialized memory, every ~alloca~ is paired with a ~store~ that
-initializes the allocated memory.
+Furthermore we make efforts to use pointers safely. Pointer values in
+our generated programs can only arise from the ~alloca~ instruction,
+which allocates space on the stack. We guarantee that we do not load
+from uninitialized memory by pairing every ~alloca~ with a ~store~
+instruction that initializes the freshly allocated memory.
+
+In the future we hope to perform more static analysis like Csmith in
+order to generate larger and more interesting programs, all while
+guaranteeing that the programs only execute safe instructions that do
+not trigger undefined behaviour.
 
 * Show instances
 
-It's useful to test generators with ~Sample~ while building them. This
-has proven to be a little painful because Vellvm lacked ~Show~
-instances for almost all of the AST, and what is there used the
-~Ceres~ library in Coq, which (unfortunately) sometimes causes
-segmentation faults in QuickChick due to how ~nat~ was getting
-serialized. Eventually we gave up on extending the ~Ceres~
-serialization of the AST, and instead manually wrote ~Show~ instances
-for the parts of the AST that we actually generate.
+Custom generators are difficult to write, which means testing them
+during development is important. One method of testing a generator is
+to just use ~Sample~ to generate and print some values, however this
+has proven to be a little painful as Vellvm lacks ~Show~ instances for
+almost all of the ~AST~. Furthermore what ~Vellvm~ does have to print
+the AST relies on the ~Ceres~ library in Coq, which we found
+(unfortunately) causes a segmentation fault in QuickChick due to how
+~nat~ was serialized. Eventually we gave up on extending the ~Ceres~
+serialization, and instead manually wrote ~Show~ instances for the
+AST.
 
-These ~Show~ instances are not only useful for testing the generators,
-but they're also useful for the properties we want to test, as we want
-to serialize the ASTs into LLVM programs that ~clang~ can parse.
+An important benefit of this is that we were able to make our ~Show~
+instances produce valid LLVM programs, so we could ~show~ our
+generated programs, write the string to a file, and then run this file
+through ~clang~ in order to produce a native executable for our
+generated program.
 
 * Properties under test
 
-  The properties that we are testing live here:
+The property we are testing lives here:
 
   https://github.com/vellvm/vellvm/blob/quickchick/src/coq/QCVellvm.v  
 
@@ -110,21 +121,7 @@ to serialize the ASTs into LLVM programs that ~clang~ can parse.
   executed program can then be compared against the result we get from
   interpreting the function using Vellvm's interpreter.
 
-  We believe that we should be able to test certain ~eutt~ relations
-  automatically using QuickChick as well, which we hope will help with
-  testing program transformations within Vellvm. The idea is to
-  compare the trees up to a finite depth, like testing if prefixes of
-  streams are equal. The ~Tau t~ and ~Ret x~ constructors in
-  interaction trees are simple to handle --- ~Tau~ nodes can be
-  automatically stripped, and ~Ret~ nodes can be compared
-  directly. The difficulty in testing ~eutt~ is with ~Vis e k~
-  nodes. If we have ~eutt (Vis e1 k1) (Vis e2 k2)~, then we just need
-  to make sure that ~e1 = e2~, and then in principle it should just be
-  a matter of providing the same (possibly randomly generated) value
-  to each of the continuations. More work needs to be done on this,
-  but in principle it should be possible to do something here.
-
-* Future Work
+* Other Future Work
 
 ** Testing of undef
 
@@ -147,20 +144,25 @@ of the possible traces, and in theory some kind of automated theorem
 proving might be able to prove that a particular trace, such as one
 generated by a ~clang~ executable, is part of this set.
 
-** TODO More complex programs
+** More complex programs
 
-A goal for the near future of this project is to generate more complex
-programs with fewer constraints. The programs that we currently
-generate are *heavily* constrained in order to be deterministic,
-terminating, and safe.
+Currently we generate programs subject to very heavy constraints in
+order to be deterministic, terminating, and safe. Our CFGs have no
+back-edges, making termination trivial, but this does make our
+generated programs somewhat boring. It may be interesting to explore
+timeout mechanisms instead of ensuring that the programs terminate,
+much like Csmith does. Furthermore, Csmith sees great results by
+generating common programming idioms, like generating loops which walk
+over an arrays elements. There's no reason we can not apply the same
+techniques in the future.
 
-Our CFGs currently have no back-edges, making it easy to think about
-whether a program terminates (it does). Unfortunately, this means that
-the generated programs are very boring.
-
-It may be interesting to explore timeout mechanisms, instead of
-ensuring that programs terminate, as this is something that Csmith
-seems to do as well.
+Additionally, we may build up better tools for static analysis along
+the way (there are some ideas about treating Vellvm's instructions as
+events to enable abstract interpretation, for instance). Better static
+analysis will allow us to guarantee that a larger set of programs is
+devoid of undefined behaviour, and so we should be able to relax some
+constraints when generating, check if the resulting program is safe
+and, if not, backtrack.
 
 ** More complex testing
 
@@ -174,11 +176,20 @@ generating programs that read structured data from ~stdin~, and then
 automatically generating this data while testing could be interesting
 future work.
 
-*** TODO Other properties (eutt)
+*** Other properties (eutt)
 
-In theory we would also like to be able to test other properties
-(aside from just testing Vellvm against clang). One important property
-that we would like to test is eutt, or "equivalence up to tau", 
+  In the future we believe that we should be able to test certain
+  ~eutt~ relations automatically using QuickChick as well, which
+  should allow us to test program transformations within Vellvm. The
+  idea is to compare the trees up to a finite depth, like testing if
+  prefixes of streams are equal. The ~Tau t~ and ~Ret x~ constructors
+  in interaction trees are simple to handle --- ~Tau~ nodes can be
+  automatically stripped, and ~Ret~ nodes can be compared
+  directly. The primary difficulty is handling ~Vis e k~ nodes. If we
+  have ~eutt (Vis e1 k1) (Vis e2 k2)~, then we just need to make sure
+  that ~e1 = e2~, and then in principle it should just be a matter of
+  providing the same (possibly randomly generated) value to each of
+  the continuations.
 
 ** Speed
 
