@@ -386,30 +386,30 @@ Theorem interpreter_sound: forall p, model p (interpreter p).
 Proof.
   intros p.
   unfold model, model_user, lift_sem_to_mcfg.
-  flatten_goal.
-  2:{
-    unfold interpreter, interpreter_user.
-    rewrite Heq.
-    admit.
-  }
-  unfold interpreter, interpreter_user; rewrite Heq.
-  unfold interp_vellvm_model_user, interp_vellvm_exec_user.
-  match goal with |- model_UB _ (interp_UB ?t) => exists t end.
-  split.
-  2:{
+  (* flatten_goal. *)
+  (* 2:{ *)
+  (*   unfold interpreter, interpreter_user. *)
+  (*   rewrite Heq. *)
+  (*   admit. *)
+  (* } *)
+  (* unfold interpreter, interpreter_user; rewrite Heq. *)
+  (* unfold interp_vellvm_model_user, interp_vellvm_exec_user. *)
+  (* match goal with |- model_UB _ (interp_UB ?t) => exists t end. *)
+  (* split. *)
+  (* 2:{ *)
 
-    fold_L3.
-    apply interp_prop_correct_exec.
-    intros.
-    subst.
-    destruct e as [|e]; cbn; [reflexivity|].
-    destruct e; cbn; [constructor | reflexivity].
-  }
-  fold_L3.
-  apply interp_prop_correct_exec.
-  intros.
-  destruct e as [|e]; cbn; [reflexivity|].
-  destruct e; cbn; [|reflexivity].
+  (*   fold_L3. *)
+  (*   apply interp_prop_correct_exec. *)
+  (*   intros. *)
+  (*   subst. *)
+  (*   destruct e as [|e]; cbn; [reflexivity|]. *)
+  (*   destruct e; cbn; [constructor | reflexivity]. *)
+  (* } *)
+  (* fold_L3. *)
+  (* apply interp_prop_correct_exec. *)
+  (* intros. *)
+  (* destruct e as [|e]; cbn; [reflexivity|]. *)
+  (* destruct e; cbn; [|reflexivity]. *)
 
   (* Remains to prove refinement of pick handlers.
      Currently ~untrue due to the predicate

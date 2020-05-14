@@ -93,5 +93,5 @@ let rec step (m : ('a TopLevel.IO.coq_L5, TopLevel.TopLevelEnv.memory * ((TopLev
        *   step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero))) *)
 
 
-let interpret (prog:(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.uvalue, string) result =
+let interpret (prog:(LLVMAst.typ, (LLVMAst.typ LLVMAst.block * (LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.uvalue, string) result =
   step (TopLevel.TopLevelEnv.interpreter prog)

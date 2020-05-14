@@ -189,30 +189,25 @@ Definition phis_of_definition (d:definition (list block)) block_id : option bloc
   block_to_phis b.
 *)
 
-Definition init_of_definition (d: definition T (list (block T))) : option block_id :=
-  match (df_instrs d) with
-  | [] => None
-  | b :: _ => Some (blk_id b)
-  end.
+(* YZ experiment: guaranteeing success of the conversion by only generating definitions with at least one (entry) block *)
+Definition init_of_definition (d: definition T (block T * list (block T))) : block_id :=
+  blk_id (fst (df_instrs d)).
 
-Definition cfg_of_definition (d:definition T (list (block T))) : option cfg :=
-  init <- init_of_definition d ;;
+Definition cfg_of_definition (d:definition T (block T * list (block T))) : cfg :=
   let args := List.map (fun x => ID_Local x) (df_args d) in
-    Some {| init := init;
-            blks := df_instrs d;
-            args := args;
-         |}.
+  {| init := init_of_definition d;
+     blks := fst (df_instrs d) :: snd (df_instrs d);
+     args := args;
+  |}.
 
-Definition mcfg_of_modul (m:modul T (list (block T))) : option mcfg :=
-  defns <- map_option
-                (fun d =>
-                   cfg <- cfg_of_definition d ;;
-                     Some {|
-                       df_prototype := df_prototype d;
-                       df_args := df_args d;
-                       df_instrs := cfg
-                       |}) (m_definitions m) ;;
-  Some {|
+Definition mcfg_of_modul (m:modul T (block T * list (block T))) : mcfg :=
+  let defns := map (fun d => {|
+                     df_prototype := df_prototype d;
+                     df_args := df_args d;
+                     df_instrs := cfg_of_definition d
+                      |}) (m_definitions m)
+  in
+  {|
     m_name := m_name m;
     m_target := m_target m;
     m_datalayout := m_datalayout m;

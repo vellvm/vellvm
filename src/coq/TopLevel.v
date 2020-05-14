@@ -225,25 +225,19 @@ Module TopLevelEnv <: Environment.
      to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
      starting from empty environments.
    *)
+  Definition mcfg_of_tle (p: list (toplevel_entity typ (block typ * list (block typ)))) :=
+    convert_types (CFG.mcfg_of_modul _ (modul_of_toplevel_entities _ p)).
+
   Definition interpreter_user
              (ret_typ : dtyp)
              (entry : string)
              (args : list uvalue)
              (user_intrinsics: IS.intrinsic_definitions)
-             (prog: list (toplevel_entity typ (list (block typ))))
+             (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : itree L5 res_L4 :=
-    let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
+    let t := denote_vellvm ret_typ entry args (mcfg_of_tle prog) in
 
-    match CFG.mcfg_of_modul _ scfg with
-    | Some ucfg =>
-      let mcfg := convert_types ucfg in
-
-      let t := denote_vellvm ret_typ entry args mcfg in
-
-      interp_vellvm_exec_user user_intrinsics t [] ([],[]) ((M.empty, M.empty), [[]])
-
-    | None => raise "Ill-formed program: mcfg_of_modul failed."
-    end.
+    interp_vellvm_exec_user user_intrinsics t [] ([],[]) ((M.empty, M.empty), [[]]).
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts 
@@ -273,24 +267,15 @@ Module TopLevelEnv <: Environment.
    *)
   Definition lift_sem_to_mcfg {E X} `{FailureE -< E}
              (sem: (CFG.mcfg DynamicTypes.dtyp) -> itree E X):
-    list (toplevel_entity typ (list (LLVMAst.block typ))) -> itree E X :=
-    fun prog =>
-      let scfg := Vellvm.AstLib.modul_of_toplevel_entities _ prog in
-      
-      match CFG.mcfg_of_modul _ scfg with
-      | Some ucfg =>
-        let mcfg := convert_types ucfg in
-        sem mcfg
-
-      | None => raise "Ill-formed program: mcfg_of_modul failed."
-      end.
+    list (toplevel_entity typ (block typ * list (block typ))) -> itree E X :=
+    fun prog => sem (mcfg_of_tle prog).
 
   Definition model_user
              (ret_typ : dtyp)
              (entry : string)
              (args : list uvalue)
              (user_intrinsics: IS.intrinsic_definitions)
-             (prog: list (toplevel_entity typ (list (block typ))))
+             (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L5 (memory * (local_env * stack * (global_env * uvalue))) :=
     let t := lift_sem_to_mcfg (denote_vellvm ret_typ entry args) prog in 
     interp_vellvm_model_user user_intrinsics t [] ([],[]) ((M.empty, M.empty), [[]]).
