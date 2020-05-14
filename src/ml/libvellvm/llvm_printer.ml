@@ -588,11 +588,11 @@ and texp ppf (t, v) = fprintf ppf "%a %a" typ t exp v
 
 and tident ppf (t, v) = fprintf ppf "%a %a" typ t ident v
 
-and toplevel_entities : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities -> unit =
+and toplevel_entities : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities -> unit =
   fun ppf entries ->
   pp_print_list ~pp_sep:pp_force_newline toplevel_entity ppf entries
 
-and toplevel_entity : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity -> unit =
+and toplevel_entity : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity -> unit =
   fun ppf ->
   function
   | TLE_Comment msg            -> fprintf ppf "; %s" (of_str msg)
@@ -693,7 +693,7 @@ and declaration : Format.formatter -> (LLVMAst.typ LLVMAst.declaration) -> unit 
     (match dc_gc with
        Some x -> fprintf ppf "gc \"%s\" " (of_str x) | _ -> ())
 
-and definition : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block list))) LLVMAst.definition -> unit =
+and definition : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block list))) LLVMAst.definition -> unit =
   fun ppf ->
   fun ({ df_prototype =
            { dc_name = i
@@ -752,7 +752,9 @@ and definition : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block l
        Some x -> fprintf ppf "gc \"%s\" " (of_str x) | _ -> ()) ;
     pp_print_char ppf '{' ;
     pp_force_newline ppf () ;
-    pp_print_list ~pp_sep:pp_force_newline block ppf df.df_instrs ;
+    block ppf (fst df.df_instrs);
+    pp_force_newline ppf () ;
+    pp_print_list ~pp_sep:pp_force_newline block ppf (snd df.df_instrs) ;
     pp_force_newline ppf () ;
     pp_print_char ppf '}' ;
 
@@ -781,7 +783,7 @@ and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
 and comment : Format.formatter -> char list -> unit =
   fun ppf s -> fprintf ppf "; %s" (of_str s)
 
-and modul : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block list))) LLVMAst.modul -> unit =
+and modul : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block list))) LLVMAst.modul -> unit =
   fun ppf m ->
 
   pp_option ppf (fun ppf x -> fprintf ppf "; ModuleID = '%s'" (of_str x)) m.m_name ;

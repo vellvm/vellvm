@@ -217,7 +217,7 @@ let id_of = function
 %token KW_ATTRIBUTES
 %token<Camlcoq.Z.t> ATTR_GRP_ID
 
-%start<(LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities> toplevel_entities
+%start<(LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities> toplevel_entities
 %start<LLVMAst.typ LLVMAst.instr> test_call
 %start<(LLVMAst.typ * LLVMAst.typ LLVMAst.exp)> texp
 
@@ -397,7 +397,7 @@ df_blocks:
   | bs=block+
     { let _ = anon_ctr.reset () in
       let _ = void_ctr.reset () in
-      List.map (fun (lbl, phis, body, term) ->
+      let blks = List.map (fun (lbl, phis, body, term) ->
                 let l = raw_id_of lbl 
 		in let blk_phis = List.map (fun (id, phi) ->
 		                  (phi_id id, phi))
@@ -409,7 +409,11 @@ df_blocks:
                        body
                 in
                 {blk_id = l; blk_phis; blk_code; blk_term=(IVoid (void_ctr.get ()), term); blk_comments=None})
-	bs
+       bs
+      in begin match blks with
+	 | [] -> failwith "illegal LLVM function definition: must have non-empty entry block"
+	 | entry::rest -> (entry, rest)
+	 end
     }
 
 df_pre_attr:
