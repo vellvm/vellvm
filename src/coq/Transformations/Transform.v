@@ -38,10 +38,11 @@ Definition mangle_instr (i:instr_id * instr T) : (instr_id * instr T) :=
 Definition mangle_block (blk:block T) : block T :=
   blk.
 
-Definition mangle_blocks (blks:list (block T)) : list (block T) :=
-  List.map mangle_block blks.
+Definition mangle_blocks (blks: block T * list (block T)) : block T * list (block T) :=
+  let '(entry, body) := blks in 
+  (mangle_block entry, List.map mangle_block body).
 
-Definition mangle_definition (d:definition T (list (block T))) : definition T (list (block T)) :=
+Definition mangle_definition (d:definition T (block T * list (block T))) : definition T (block T * list (block T)) :=
   mk_definition _
   (df_prototype d)
   (df_args d)
@@ -49,13 +50,13 @@ Definition mangle_definition (d:definition T (list (block T))) : definition T (l
 .
 
 
-Definition mangle_toplevel_entity (tle : toplevel_entity T (list (block T))) : toplevel_entity T (list (block T)) :=
+Definition mangle_toplevel_entity (tle : toplevel_entity T (block T * list (block T))) : toplevel_entity T (block T * list (block T)) :=
   match tle with
   | TLE_Definition d => TLE_Definition (mangle_definition d)
   | _ => tle
   end.
 
-Definition transform (prog: list (toplevel_entity T (list (block T)))) : list (toplevel_entity T (list (block T))) :=
+Definition transform (prog: list (toplevel_entity T (block T * list (block T)))) : list (toplevel_entity T (block T * list (block T))) :=
   List.map mangle_toplevel_entity prog.
 
 End WithT.

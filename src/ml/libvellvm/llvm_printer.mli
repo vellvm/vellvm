@@ -20,11 +20,11 @@ val exp : Format.formatter -> LLVMAst.typ LLVMAst.exp -> unit
 val texp : Format.formatter -> LLVMAst.typ LLVMAst.texp -> unit
 val tident : Format.formatter -> LLVMAst.typ LLVMAst.tident -> unit
 val toplevel_entities :
-  Format.formatter -> (LLVMAst.typ , ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities -> unit
-val toplevel_entity : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity -> unit
+  Format.formatter -> (LLVMAst.typ , (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities -> unit
+val toplevel_entity : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity -> unit
 val metadata : Format.formatter -> LLVMAst.typ LLVMAst.metadata -> unit
 val global : Format.formatter -> LLVMAst.typ LLVMAst.global -> unit
 val declaration : Format.formatter -> LLVMAst.typ LLVMAst.declaration -> unit
-val definition : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.definition -> unit
+val definition : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.definition -> unit
 val block : Format.formatter -> (LLVMAst.typ LLVMAst.block) -> unit
-val modul : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.modul -> unit
+val modul : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.modul -> unit
