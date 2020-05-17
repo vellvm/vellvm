@@ -8,15 +8,17 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-
-;; open TopLevel
-;; open IO
+open Handlers.Mem
+open Handlers.Local
+open Handlers.Stack
+open Handlers.Global
+open Handlers.LLVMEvents
 
 open Format
 open ITreeDefinition
 
 (* TODO: probably should be part of ADDRESS module interface*)
-let pp_addr : Format.formatter -> Memory.A.addr -> unit
+let pp_addr : Format.formatter -> Memory.Addr.addr -> unit
   = fun ppf _ -> fprintf ppf "UVALUE_Addr(?)"
 
 (* Converts `float` to a `string` at max precision.
@@ -55,7 +57,7 @@ let debug (msg:string) =
   if !debug_flag then
     Printf.printf "DEBUG: %s\n%!" msg
 
-let rec step (m : ('a TopLevel.IO.coq_L5, TopLevel.TopLevelEnv.memory * ((TopLevel.TopLevelEnv.local_env * TopLevel.TopLevelEnv.stack) * (TopLevel.TopLevelEnv.global_env * TopLevel.IO.DV.uvalue))) itree) : (TopLevel.IO.DV.uvalue, string) result =
+let rec step (m : ('a coq_L5, memory_stack * ((local_env * lstack) * (global_env * DV.uvalue))) itree) : (DV.uvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -94,4 +96,4 @@ let rec step (m : ('a TopLevel.IO.coq_L5, TopLevel.TopLevelEnv.memory * ((TopLev
 
 
 let interpret (prog:(LLVMAst.typ, (LLVMAst.typ LLVMAst.block * (LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.uvalue, string) result =
-  step (TopLevel.TopLevelEnv.interpreter prog)
+  step (TopLevel.interpreter prog)

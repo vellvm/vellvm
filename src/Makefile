@@ -15,14 +15,14 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats\
+COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats ParserHelper\
 									Util PropT Error LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues\
 									LLVMEvents TypToDtyp IntrinsicsDefinitions\
 									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/UndefinedBehaviour Handlers/Handlers\
 									Denotation TopLevel
 
-COQFILESOPT    := Transformations/Renaming Transformations/DeadInstr Transformations/Transform Transformations/Traversal Transformations/Transformation\
-									ParserHelper Refinement Environment TopLevelRefinements
+COQFILESOPT    := Transformations/Transform Transformations/Renaming Transformations/DeadInstr Transformations/Traversal\
+									Transformations/Transformation Refinement TopLevelRefinements
 
 OLLVMFILES :=
 

@@ -6,6 +6,7 @@ From ITree Require Import
      InterpFacts
      Eq.Eq.
 
+(* YZ TODO : Revisit the dependency w.r.t. Refinement *)
 From Vellvm Require Import
      Util
      PropT
@@ -13,14 +14,11 @@ From Vellvm Require Import
      CFG
      Memory
      Refinement
-     Environment
      TopLevel
      LLVMAst
-     Handlers.Intrinsics
-     Handlers.Global
-     Handlers.Local
-     Handlers.Stack
-     Handlers.UndefinedBehaviour.
+     InterpreterMCFG
+     InterpreterCFG
+     Handlers.Handlers.
 
 From ExtLib Require Import
      Structures.Functor.
@@ -40,9 +38,8 @@ Require Import Paco.paco.
 Import ListNotations.
 Import ITree.Basics.Basics.Monads.
 
-Module R := Refinement.Make(Memory.A)(IO)(TopLevelEnv).
-Import R.
-Import TopLevelEnv.
+Module R := Refinement.Make Memory.Addr LLVMEvents.
+Import R. 
 
 (**
    YZ: Trying to figure how to tidy up everything. This file is currently a holdall.
@@ -142,7 +139,7 @@ Proof.
 Qed.
 
 Lemma refine_23 : forall t1 t2 m,
-    refine_L2 t1 t2 -> refine_L3 (M.interp_memory t1 m) (M.interp_memory t2 m).
+    refine_L2 t1 t2 -> refine_L3 (interp_memory t1 m) (interp_memory t2 m).
 Proof.
   intros t1 t2 m H.
   apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
@@ -150,12 +147,12 @@ Qed.
 
 (* Things are different for L4 and L5: we get into the [Prop] monad. *)
 Lemma refine_34 : forall t1 t2,
-    refine_L3 t1 t2 -> refine_L4 (P.model_undef t1) (P.model_undef t2).
+    refine_L3 t1 t2 -> refine_L4 (model_undef t1) (model_undef t2).
 Proof.
   intros t1 t2 H t Ht.
   exists t; split.
-  - unfold P.model_undef in *.
-    unfold IO.L3 in *.
+  - unfold model_undef in *.
+    unfold L3 in *.
     match goal with |- PropT.interp_prop ?x _ _ _ => remember x as h end.
     eapply interp_prop_Proper; eauto.
   - reflexivity.
@@ -172,84 +169,6 @@ Proof.
   match type of HPT2 with | PropT.interp_prop ?h' ?t _ _ => remember h' as h end.
   eapply interp_prop_Proper; eauto.
 Qed.
-
-(**
-   We now define partial interpretations of the trees produced by the
-   denotation of vellvm programs.
-   The intent is to allow us to only interpret as many layers as needed
-   to perform the required semantic reasoning, and lift for free the
-   equivalence down the pipe.
-   This gives us a _vertical_ notion of compositionality.
- *)
-
-Definition interp_to_L1 {R} user_intrinsics (t: itree IO.L0 R) g :=
-  let uvalue_trace       := INT.interp_intrinsics user_intrinsics t in
-  let L1_trace           := interp_global uvalue_trace g in
-  L1_trace.
-
-Definition interp_to_L2 {R} user_intrinsics (t: itree IO.L0 R) g l :=
-  let uvalue_trace   := INT.interp_intrinsics user_intrinsics t in
-  let L1_trace       := interp_global uvalue_trace g in
-  let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
-  L2_trace.
-
-Definition interp_to_L3 {R} user_intrinsics (t: itree IO.L0 R) g l m :=
-  let uvalue_trace   := INT.interp_intrinsics user_intrinsics t in
-  let L1_trace       := interp_global uvalue_trace g in
-  let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
-  let L3_trace       := M.interp_memory L2_trace m in
-  L3_trace.
-
-Definition interp_to_L4 {R} user_intrinsics (t: itree IO.L0 R) g l m :=
-  let uvalue_trace   := INT.interp_intrinsics user_intrinsics t in
-  let L1_trace       := interp_global uvalue_trace g in
-  let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
-  let L3_trace       := M.interp_memory L2_trace m in
-  let L4_trace       := P.model_undef L3_trace in
-  L4_trace.
-
-Ltac fold_L1 :=
-    match goal with
-      |- context[interp_global (INT.interp_intrinsics ?ui ?p) ?g] =>
-      replace (interp_global (INT.interp_intrinsics ui p) g) with
-        (interp_to_L1 ui p g) by reflexivity
-    end.
-
-Ltac fold_L2 :=
-    match goal with
-      |- context[interp_local_stack ?h
-                (interp_global (INT.interp_intrinsics ?ui ?p) ?g) ?l] =>
-      replace (interp_local_stack h (interp_global (INT.interp_intrinsics ui p) g) l) with
-        (interp_to_L2 ui p g l) by reflexivity
-    end.
-
-Ltac fold_L3 :=
-    match goal with
-      |- context[
-            M.interp_memory
-              (interp_local_stack ?h
-                (interp_global (INT.interp_intrinsics ?ui ?p) ?g) ?l) ?m] =>
-      replace (M.interp_memory (interp_local_stack h (interp_global (INT.interp_intrinsics ui p) g) l) m) with
-        (interp_to_L3 ui p g l m) by reflexivity
-    end.
-
-Ltac fold_L4 :=
-    match goal with
-      |- context[
-            P.model_undef
-              (M.interp_memory
-                 (interp_local_stack ?h
-                                     (interp_global (INT.interp_intrinsics ?ui ?p) ?g) ?l) ?m)] =>
-      replace (P.model_undef (M.interp_memory (interp_local_stack h (interp_global (INT.interp_intrinsics ui p) g) l) m)) with
-    (interp_to_L4 ui p g l m) by reflexivity
-    end.
-
-Ltac fold_L5 :=
-    match goal with
-      |- context[model_UB (P.model_undef (M.interp_memory (interp_local_stack ?h (interp_global (INT.interp_intrinsics ?ui ?p) ?g) ?l) ?m))] =>
-      replace (model_UB (P.model_undef (M.interp_memory (interp_local_stack h (interp_global (INT.interp_intrinsics ui p) g) l) m))) with
-    (interp_vellvm_model_user ui p g l m) by reflexivity
-    end.
 
 Section TopLevelInputs.
   Variable ret_typ : dtyp.
@@ -274,15 +193,15 @@ Definition model_to_L2 (prog: mcfg dtyp) :=
 
 Definition model_to_L3 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L3 user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
+  interp_to_L3 user_intrinsics L0_trace [] ([],[]) ((empty, empty), [[]]).
 
 Definition model_to_L4 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L4 user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
+  interp_to_L4 user_intrinsics L0_trace [] ([],[]) ((empty, empty), [[]]).
 
 Definition model_to_L5 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_vellvm_model_user user_intrinsics L0_trace [] ([],[]) ((M.empty, M.empty), [[]]).
+  interp_to_L5 user_intrinsics L0_trace [] ([],[]) ((empty, empty), [[]]).
 
 (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -376,7 +295,7 @@ Proof.
 Qed.
 
 Instance pick_handler_proper {E R} `{LLVMEvents.UBE -< E}:
-  Proper (eq ==> eq_itree eq ==> iff) (@P.Pick_handler E _ R).
+  Proper (eq ==> eq_itree eq ==> iff) (@Pick_handler E _ R).
 Admitted.
 
 (**
@@ -385,7 +304,7 @@ Admitted.
 Theorem interpreter_sound: forall p, model p (interpreter p).
 Proof.
   intros p.
-  unfold model, model_user, lift_sem_to_mcfg.
+  unfold model, model_user.
   (* flatten_goal. *)
   (* 2:{ *)
   (*   unfold interpreter, interpreter_user. *)
@@ -463,36 +382,36 @@ Qed.
 (** END MOVE *)
 
 Lemma interp_to_L2_bind:
-  forall ui {R S} (t: itree IO.L0 R) (k: R -> itree IO.L0 S) s1 s2,
+  forall ui {R S} (t: itree L0 R) (k: R -> itree L0 S) s1 s2,
     interp_to_L2 ui (ITree.bind t k) s1 s2 ≈
                  (ITree.bind (interp_to_L2 ui t s1 s2) (fun '(s1',(s2',x)) => interp_to_L2 ui (k x) s2' s1')).
 Proof.
   intros.
   unfold interp_to_L2.
-  rewrite INT.interp_intrinsics_bind, interp_global_bind, interp_local_stack_bind.
+  rewrite interp_intrinsics_bind, interp_global_bind, interp_local_stack_bind.
   apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros ? (? & ? & ?) ->; reflexivity].
 Qed.
 
 Lemma interp_to_L2_ret: forall ui (R : Type) s1 s2 (x : R), interp_to_L2 ui (Ret x) s1 s2 ≈ Ret (s2, (s1, x)).
 Proof.
   intros; unfold interp_to_L2.
-  rewrite INT.interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret; reflexivity.
+  rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret; reflexivity.
 Qed.
 
-Definition interp_cfg {R: Type} (trace: itree IO.instr_E R) g l m :=
-  let uvalue_trace       := INT.interp_intrinsics [] trace in
+Definition interp_cfg {R: Type} (trace: itree instr_E R) g l m :=
+  let uvalue_trace   := interp_intrinsics [] trace in
   let L1_trace       := interp_global uvalue_trace g in
   let L2_trace       := interp_local L1_trace l in
-  let L3_trace       := M.interp_memory L2_trace m in
-  let L4_trace       := P.model_undef L3_trace in
+  let L3_trace       := interp_memory L2_trace m in
+  let L4_trace       := model_undef L3_trace in
   let L5_trace       := model_UB L4_trace in
   L5_trace.
 
 Definition model_to_L5_cfg (prog: cfg dtyp) :=
   let trace := D.denote_cfg prog in
-  interp_cfg trace [] [] ((M.empty, M.empty), [[]]).
+  interp_cfg trace [] [] ((empty, empty), [[]]).
 
-Definition refine_cfg_ret: relation (PropT IO.L5 (memory * (local_env * (global_env * uvalue)))) :=
+Definition refine_cfg_ret: relation (PropT L5 (memory_stack * (local_env * (global_env * uvalue)))) :=
   fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt  (TT × (TT × (TT × refine_uvalue))) t t'.
 
 (* Definition refine_cfg  (p1 p2: cfg dtyp): Prop := *)

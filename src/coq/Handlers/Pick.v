@@ -154,7 +154,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       Definition F_trigger : F ~> itree (E +' F) :=
         fun R e => r <- trigger e ;; ret r.
 
-      Definition interp_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
+      Definition exec_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
         itree (E +' PickE +' F) ~> itree (E +' F) :=
         interp (case_ E_trigger
                (case_ concretize_picks F_trigger)).

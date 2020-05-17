@@ -51,7 +51,7 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Module A : MemoryAddress.ADDRESS with Definition addr := (Z * Z) % type.
+Module Addr : MemoryAddress.ADDRESS with Definition addr := (Z * Z) % type.
   Definition addr := (Z * Z) % type.
   Definition null := (0, 0).
   Definition t := addr.
@@ -65,15 +65,14 @@ Module A : MemoryAddress.ADDRESS with Definition addr := (Z * Z) % type.
     - right. intros H. inversion H; subst. apply n. reflexivity.
     - right. intros H. inversion H; subst. apply n. reflexivity.
   Qed.
-End A.
+End Addr.
 
-
-Module Make(LLVMEvents: LLVM_INTERACTIONS(A)).
+Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Import LLVMEvents.
   Import DV.
   Open Scope list.
 
-  Definition addr := A.addr.
+  Definition addr := Addr.addr.
 
   Module IM := FMapAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
   Definition IntMap := IM.t.

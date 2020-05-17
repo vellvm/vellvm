@@ -12,7 +12,6 @@ From Coq Require Export
      Relations.
 
 Import R.
-Import TopLevelEnv.
 
 Definition transformation := mcfg dtyp -> mcfg dtyp.
 

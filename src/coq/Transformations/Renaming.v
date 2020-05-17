@@ -29,10 +29,7 @@ From Vellvm Require Import
      DynamicTypes
      DynamicValues
      Denotation
-     Handlers.Global
-     Handlers.Local
-     Handlers.Stack
-     Handlers.Memory
+     Handlers.Handlers
      LLVMEvents
      Transformations.Transformation
      Traversal
@@ -51,8 +48,7 @@ From Vellvm Require Import
      AstLib.
 Import ListNotations.
 
-Import TopLevel.
-Import TopLevelEnv.
+Import DV.
 Import R.
 
 Import MonadNotation.
@@ -95,7 +91,7 @@ Section Swap.
      We hence want to get extensional eutt over the returned type.
    *)
   Definition function_rel {X}:
-    relation (FMapAList.alist raw_id uvalue * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (uvalue * (list uvalue -> itree IO.L0 uvalue)))) := (Logic.eq × (Logic.eq × list_rel (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))).
+    relation (FMapAList.alist raw_id uvalue * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (uvalue * (list uvalue -> itree L0 uvalue)))) := (Logic.eq × (Logic.eq × list_rel (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))).
   Hint Unfold function_rel : core.
 
   Global Instance list_rel_refl {R: Type} {RR: relation R} `{Reflexive _ RR} : Reflexive (list_rel RR).
@@ -143,11 +139,11 @@ Section Swap.
     unfold refine_mcfg_L2.
     unfold model_to_L2.
 
-    unfold denote_vellvm.
-    unfold denote_vellvm_init.
-    unfold denote_vellvm.
-    simpl; rewrite 2 interp_to_L2_bind.
-    split_bind.
+    (* unfold denote_vellvm. *)
+    (* unfold denote_vellvm_init. *)
+    (* unfold denote_vellvm. *)
+    (* simpl; rewrite 2 interp_to_L2_bind. *)
+    (* split_bind. *)
 
     {
       (* Reasoning about initialization *)

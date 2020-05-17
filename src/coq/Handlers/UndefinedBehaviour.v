@@ -45,7 +45,7 @@ Section PARAMS_INTERP.
   Definition F_trigger : F ~> itree (E +' F) :=
     fun R e => r <- trigger e ;; ret r.
 
-  Definition interp_UB `{FailureE -< E +' F}:
+  Definition exec_UB `{FailureE -< E +' F}:
     itree (E +' UBE +' F) ~> itree (E +' F) :=
     interp (case_ E_trigger (case_ UB_exec F_trigger)).
 

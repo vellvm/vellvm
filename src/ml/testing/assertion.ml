@@ -1,6 +1,6 @@
-;; open LLVMAst
-;; open TopLevel
-;; open IO
+open LLVMAst
+open TopLevel
+open Handlers.LLVMEvents
 
 
 type raw_assertion_string =

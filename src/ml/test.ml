@@ -13,6 +13,7 @@
 ;; open Assert
 ;; open TopLevel
 ;; open DynamicValues
+;; open Handlers.LLVMEvents
 
 (* Vellvm test cases -------------------------------------------------------- *)
 
@@ -58,7 +59,7 @@ let pp_test_of_dir dir =
   Test ("Parsing files in: " ^ dir,
         List.map (fun f -> (f, fun () -> parse_pp_test f)) (files_of_dir dir))
 
-let run_uvalue_test (test:IO.DV.uvalue -> bool) path =
+let run_uvalue_test (test:DV.uvalue -> bool) path =
   let (res, msg) =
     match run_ll_file path with
     | Error msg -> (false, msg)
@@ -195,37 +196,37 @@ let test_dirs =
   ]
 
 let poison_test = function
-  | IO.DV.UVALUE_Poison -> true
+  | DV.UVALUE_Poison -> true
   | _ -> false
 
 let i1_test (i1:int1) = function
-  | IO.DV.UVALUE_I1 i2 ->
+  | DV.UVALUE_I1 i2 ->
      Int1.eq i1 i2
   | _ -> false
 
 let i8_test (i1:int8) = function
-  | IO.DV.UVALUE_I1 i2 ->
+  | DV.UVALUE_I1 i2 ->
      Int8.eq i1 i2
   | _ -> false
 
 let i32_test (i1:int32) = function
-  | IO.DV.UVALUE_I32 i2 ->
+  | DV.UVALUE_I32 i2 ->
      Int32.eq i1 i2
   | _ -> false
 
 let i64_test (i1:int64) = function
-  | IO.DV.UVALUE_I64 i2 ->
+  | DV.UVALUE_I64 i2 ->
      Int64.eq i1 i2
   | _ -> false
 
 (* NOTE: OCaml's floats are actually 64-bit doubles, but contain 32-bit floats as a subset *)
 let float_test (i1:float) = function
-  | IO.DV.UVALUE_Float i2 ->
+  | DV.UVALUE_Float i2 ->
     compare i1 (Camlcoq.camlfloat_of_coqfloat32 i2) = 0
   | _ -> false
 
 let double_test (i1:float) = function
-  | IO.DV.UVALUE_Double i2 ->
+  | DV.UVALUE_Double i2 ->
     compare i1 (Camlcoq.camlfloat_of_coqfloat i2) = 0
   | _ -> false
 

@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------------- *
-
  *                     Vellvm - the Verified LLVM project                     *
  *                                                                            *
  *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
@@ -24,39 +23,29 @@ From ExtLib Require Import
      Data.Map.FMapAList.
 
 From Vellvm Require Import
+     LLVMAst
      AstLib
      DynamicTypes
      LLVMEvents
      Denotation
-     Environment
      IntrinsicsDefinitions
      Handlers.Handlers
-     LLVMAst
      TypToDtyp
      Util
      Error
-     Handlers.Pick
-     PropT.
+     PropT
+     InterpreterMCFG.
 
 Import MonadNotation.
 Import ListNotations.
 Import Monads.
 
-Module IO := LLVMEvents.Make(Memory.A).
-Module M := Memory.Make(IO).
-Module D := Denotation(Memory.A)(IO).
-Module IS := IntrinsicsDefinitions.Make(A)(IO).
-Module INT := Intrinsics.Make(Memory.A)(IO).
-Module P := Pick.Make(Memory.A)(IO).
-Import IO.
-Export IO.DV.
-Import M D IS INT P.
+Module D   := Denotation Addr LLVMEvents.
+Module IS  := IntrinsicsDefinitions.Make Addr LLVMEvents.
+Export DV.
+Import D IS.
 
-Module TopLevelEnv <: Environment.
-  Definition local_env  := FMapAList.alist raw_id uvalue.
-  Definition global_env := FMapAList.alist raw_id dvalue.
-  Definition memory     := M.memory_stack.
-  Definition stack      := @stack (list (raw_id * uvalue)).
+(* Module TopLevelEnv. *)
 
   Open Scope string_scope.
 
@@ -102,7 +91,6 @@ Module TopLevelEnv <: Environment.
          | None => ret (UVALUE_Undef dt)
          | Some e => D.denote_exp (Some dt) e
          end ;;
-    (* CB TODO: Do we need pick here? *)
     dv <- trigger (pick uv True) ;;
     trigger (Store a dv).
 
@@ -131,7 +119,6 @@ Module TopLevelEnv <: Environment.
     fv <- trigger (GlobalRead fid) ;;
     ret (fv, D.denote_function df).
 
-
   (**
      Conversion to dynamic types
    *)
@@ -150,9 +137,9 @@ Module TopLevelEnv <: Environment.
    *)
 
   Notation res_L1 := (global_env * uvalue)%type (* (only parsing) *).
-  Notation res_L2 := (local_env * stack * res_L1)%type (* (only parsing) *).
-  Notation res_L3 := (memory * res_L2)%type (* (only parsing) *).
-  Notation res_L4 := (memory * (local_env * stack * (global_env * uvalue)))%type (* (only parsing) *).
+  Notation res_L2 := (local_env * lstack * res_L1)%type (* (only parsing) *).
+  Notation res_L3 := (memory_stack * res_L2)%type (* (only parsing) *).
+  Notation res_L4 := (memory_stack * (local_env * lstack * (global_env * uvalue)))%type (* (only parsing) *).
 
   (**
      Full denotation of a Vellvm program as an interaction tree:
@@ -187,7 +174,7 @@ Module TopLevelEnv <: Environment.
     Note: this isn't compliant with standard C semantics
    *)
   Definition main_args := [DV.UVALUE_I64 (DynamicValues.Int64.zero);
-                           DV.UVALUE_Addr (Memory.A.null)
+                           DV.UVALUE_Addr (Addr.null)
                           ].
 
   Definition denote_vellvm_main (mcfg : CFG.mcfg dtyp) : itree L0 uvalue :=
@@ -199,24 +186,6 @@ Module TopLevelEnv <: Environment.
    *)
 
   (**
-     First, we build the interpreter that will get extracted to OCaml and allow for the interpretation
-     of compliant llvm programs.
-   *)
-  (**
-     Executable interpretation: we run the successive interpreters, and use in particular
-     the executable ones for [pick] and [UB], i.e. the ones returning back
-     into the [itree] monad.
-   *)
-  Definition interp_vellvm_exec_user {R: Type} user_intrinsics (trace: itree L0 R) g l m :=
-    let uvalue_trace   := INT.interp_intrinsics user_intrinsics trace in
-    let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
-    let L3_trace       := M.interp_memory L2_trace m in
-    let L4_trace       := P.interp_undef L3_trace in
-    let L5_trace       := interp_UB L4_trace in
-    L5_trace.
-
-  (**
      The interpreter now simply performs the syntactic conversion from [toplevel_entity]
      to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
      starting from empty environments.
@@ -224,16 +193,17 @@ Module TopLevelEnv <: Environment.
   Definition mcfg_of_tle (p: list (toplevel_entity typ (block typ * list (block typ)))) :=
     convert_types (CFG.mcfg_of_modul _ (modul_of_toplevel_entities _ p)).
 
+  (* YZ TODO : We overload the term interpreter for the general notion of lifting handlers and
+     for the executable version of the semantics *)
   Definition interpreter_user
              (ret_typ : dtyp)
              (entry : string)
              (args : list uvalue)
-             (user_intrinsics: IS.intrinsic_definitions)
+             (user_intrinsics: intrinsic_definitions)
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : itree L5 res_L4 :=
     let t := denote_vellvm ret_typ entry args (mcfg_of_tle prog) in
-
-    interp_vellvm_exec_user user_intrinsics t [] ([],[]) ((M.empty, M.empty), [[]]).
+    interp_to_L5_exec user_intrinsics t [] ([],[]) ((empty, empty), [[]]).
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts 
@@ -247,38 +217,24 @@ Module TopLevelEnv <: Environment.
      semantics, except that we use, where relevant, the handlers capturing
      all allowed behaviors into the [Prop] monad.
    *)
-  Definition interp_vellvm_model_user {R: Type} user_intrinsics (trace: itree L0 R) g l m :=
-    let uvalue_trace   := INT.interp_intrinsics user_intrinsics trace in
-    let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
-    let L3_trace       := M.interp_memory L2_trace m in
-    let L4_trace       := P.model_undef L3_trace in
-    let L5_trace       := model_UB L4_trace in
-    L5_trace.
-
   (**
-     The model now simply performs the syntactic conversion from [toplevel_entity]
+     The model simply performs the syntactic conversion from [toplevel_entity]
      to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
      starting from empty environments.
    *)
-  Definition lift_sem_to_mcfg {E X} `{FailureE -< E}
-             (sem: (CFG.mcfg DynamicTypes.dtyp) -> itree E X):
-    list (toplevel_entity typ (block typ * list (block typ))) -> itree E X :=
-    fun prog => sem (mcfg_of_tle prog).
-
   Definition model_user
              (ret_typ : dtyp)
              (entry : string)
              (args : list uvalue)
              (user_intrinsics: IS.intrinsic_definitions)
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
-    : PropT L5 (memory * (local_env * stack * (global_env * uvalue))) :=
-    let t := lift_sem_to_mcfg (denote_vellvm ret_typ entry args) prog in 
-    interp_vellvm_model_user user_intrinsics t [] ([],[]) ((M.empty, M.empty), [[]]).
+    : PropT L5 (memory_stack * (local_env * lstack * (global_env * uvalue))) :=
+    let t := denote_vellvm ret_typ entry args (mcfg_of_tle prog) in
+    interp_to_L5 user_intrinsics t [] ([],[]) ((empty, empty), [[]]).
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics.
    *)
   Definition model := model_user (DTYPE_I 32%Z) "main" main_args [].
 
-End TopLevelEnv.
+(* End TopLevelEnv. *)

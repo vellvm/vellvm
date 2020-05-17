@@ -36,7 +36,7 @@ let make_test ll_ast t : string * assertion  =
       in
       Printf.sprintf "%s = %s(%s)" expected_str entry args_str
     in
-    let result () = Interpreter.step (TopLevel.TopLevelEnv.interpreter_user dtyp (Camlcoq.coqstring_of_camlstring entry) args [] ll_ast) 
+    let result () = Interpreter.step (TopLevel.interpreter_user dtyp (Camlcoq.coqstring_of_camlstring entry) args [] ll_ast) 
     in
     str, (Assert.assert_eqf result (Ok expected))
 

@@ -108,7 +108,6 @@ Section StackMap.
 
   End PARAMS.
 
-
     (* SAZ: I wasn't (yet) able to completey disentangle the ocal events from the stack events.
        This version makes the stack a kind of "wrapper" around the locals and provides a way
        of lifting locals into this new state.
@@ -124,3 +123,20 @@ Section StackMap.
     *)
 
 End StackMap.
+
+From ExtLib Require Import
+     Data.Map.FMapAList.
+From Vellvm Require Import
+     LLVMAst
+     MemoryAddress.
+
+(* YZ TODO : Undecided about the status of this over-generalization of these events over domains of keys and values.
+   The interface needs to be specialized anyway in [LLVMEvents].
+   We want to have access to the specialized type both in [InterpreterMCFG] and [InterpreterCFG] so we cannot delay
+   it until [TopLevel] either.
+   So exposing the specialization here, but it is awkward.
+ *)
+Module Make (A : ADDRESS) (LLVMEvents : LLVM_INTERACTIONS(A)).
+  Definition lstack := @stack (list (raw_id * LLVMEvents.DV.uvalue)).
+End Make.
+
