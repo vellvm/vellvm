@@ -11,7 +11,7 @@
 **/_build
 src/main.native
 src/vellvm
-src/ml/.merlin
+**/.merlin
 *~
 *.v~
 *.log
