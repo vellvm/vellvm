@@ -830,50 +830,6 @@ Admitted.
 
     End Structural_Lemmas.
 
-
-  (** ** DEPRECATED
-        TODO : Double check, garbage collect
-   *)
-  (*
-    Notation Effin' := (E +' G +' IntrinsicE +' MemoryE +' F).
-    Notation Effout' := (E +' G +' F).
-
-    Definition E_trigger' {M} : forall R, E R -> (stateT M (itree Effout') R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
-
-    Definition F_trigger' {M} : forall R, F R -> (stateT M (itree Effout') R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
-
-    Definition G_trigger' {M} : forall R, G R -> (stateT M (itree Effout') R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
-
-    Definition interp_memory' :
-      itree Effin' ~> stateT memory_stack (itree Effout') :=
-      interp_state (case_ E_trigger' (case_ G_trigger' (case_ handle_intrinsic (case_ handle_memory F_trigger')))).
-
-    Lemma interp_memory'_bind :
-      forall (R S : Type) (t : itree Effin' R) (k : R -> itree Effin' S) m,
-        interp_memory' (ITree.bind t k) m ≅
-                 ITree.bind (interp_memory' t m) (fun '(m',r) => interp_memory' (k r) m').
-    Proof.
-      intros.
-      unfold interp_memory.
-      setoid_rewrite interp_state_bind.
-      apply eq_itree_clo_bind with (UU := Logic.eq).
-      reflexivity.
-      intros [] [] EQ; inv EQ; reflexivity.
-    Qed.
-
-    Lemma interp_memory'_ret :
-      forall (R : Type) g (x: R),
-        interp_memory' (Ret x: itree Effin' R) g ≅ Ret (g,x).
-    Proof.
-      intros; apply interp_state_ret.
-    Qed.
-
-
-   *)
-
   End PARAMS.
 
 End Make.

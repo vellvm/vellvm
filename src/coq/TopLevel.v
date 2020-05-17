@@ -29,12 +29,7 @@ From Vellvm Require Import
      Denotation
      Environment
      IntrinsicsDefinitions
-     Handlers.Global
-     Handlers.Local
-     Handlers.Stack
-     Handlers.Memory
-     Handlers.Intrinsics
-     Handlers.UndefinedBehaviour
+     Handlers.Handlers
      LLVMAst
      TypToDtyp
      Util
