@@ -7,6 +7,7 @@
  *   License as published by the Free Software Foundation, either version     *
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
+(* begin hide *)
 
 From Coq Require Import
      ZArith String List
@@ -53,66 +54,65 @@ Open Scope monad_scope.
 Open Scope string_scope.
 Open Scope Z_scope.
 
+(* end hide *)
+
+(** ** Uninterpreted denotation
+    In this file, we define the first layer of denotation of _VIR_.
+
+    More specifically, we follow the overall structure of itree-based denotations which consist
+    in splitting the process in two main phases:
+    1. Denote syntactic entities in terms of uninterpreted itrees, where syntactic events are carried in the tree.
+    2. Interpret these itrees into the appropriate monad to implement the effect of these events.
+
+    This file implements step 1: to a [mcfg], and to every internal syntactic constructs of _VIR_, we associate
+    an uninterpreted interaction tree.
+
+    The interface of events used for this denotation is defined in LLVMEvents.v. Roughly speaking, they include:
+     - Internal Calls                                 (CallE)
+     - External Calls                                 (ExtrernalCallE)
+     - Calls to Intrinsics                            (IntrinsicE and MemoryIntrinsicE)
+     - Manipulation of the global environment         (LLVMGEnvE)
+     - Manipulation of the local environment          (LLVMEnvE)
+     - Manipulation of the stack of local environment (LLVMStackE)
+     - Manipulation of the memory                     (MemoryE)
+     - Determination of undef                         (PickE)
+     - Undefined behavior                             (UBE)
+     - Failure                                        (FailureE)
+     - Debugging                                      (DebugE)
+
+    The exact interface used by each denotation function depends slightly on the object of consideration.
+    Most specifically, three interfaces are used.
+    - At the top level, in order to denote whole _VIR_ programs, we use the interface:
+      L0 ::=  ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE. 
+      Noticeable:
+      * there are no more internal calls, they are resolved through the itree combinator
+        for mutual recursiion [mrec].
+    - For individual [cfg] (i.e. VIR functions) and most of their internal components:
+      [instr_E ::= CallE +' IntrinsicE +' LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE].
+      Noticeable:
+      * there are no external calls: the distinction between internal and external is only made once we
+        tie the mutually recursive knot.
+      * there are no manipulation of the stack: internally to a function, the denotation only sees the
+        current local stack. The stack discipline is handled when tying the knot.
+    - For expressions [exp], we specialize further the interface:
+      [exp_E ::= LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE].
+      The rationale for this restriction is that we need to denote expressions both internally to cfgs
+      of course, but also at the [mcfg] level to perform the initialization of the memory.
+      We therefore need to be able to inject their signature into both [L0] and [instr_E].
+ *)
 
 (* YZ Ask Steve: why is LLVMEvents an argument to the functor rather than have Make(A) inside the module? *)
 Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
-
   Import LLVMEvents.
-  (* Denotational semantics of LLVM programs.
-     Each sub-component is denoted as an itree that can emit any of the following effects:
-     - Internal Call (CallE)
-     - External Call (IntrinsicE and MemoryIntrinsicE)
-     - Manipulation of the local environment (LocalE)
-     - Memory interactions (MemoryE)
-     - Failure (FailureE)
-     - Emit debugging information (DebugE)
-   *)
-
-  (* Maybe should be "Locals +' CallE +' blah ...."
-
-     If you handle locals before you tie the knot, then you basically
-     have a single environment. Then calls need to handle stack.
-
-
-     (itree (CallE +' Locals +' CallE +' IO +' failureE +' debugE)).
-
-     Pure intrinsics, like math. Sin / cos and stuff. Some need to be
-     handled at the memory model level, like memcpy.
-
-     Do we need to separate ExternalCalls? Or Memory model
-     takes... CallE +' IO and produces CallE
-     itrees. Handles some ExternalCalls, but not necessarily all of
-     them.
-
-     Rename IO to MemE or something.
-
-     (itree (CallE +' Locals +' CallE +' IO +' failureE +' debugE)).
-
-     - Denotation: gets rid of CallE denote_mcfg (denote_cfg in practice never emits ExternalCalls)
-       + Linking, do we want to make this distinction?
-     - LocalEnvironment: gets rid of locals
-     - Intrinsics.v: should this be two?
-     - Memory.v: takes CallE and IO
-
-
-     - Add MemoryIntrinsic to IO, kind of like how Call used to be. Can now interpret away entirely inside memory model
-       + Call would have to figure out which ones are memory
-         intrinsics and which ones are not. Should have this information
-         while linking CFGs.
-       + General memory models need a way of registering which intrinsics they handle.
-  *)
-
-  (* The mutually recursive functions are tied together, interpreting away all internal calls*)
 
   Section CONVERSIONS.
     (* Conversions can't go into DynamicValues because Int2Ptr and Ptr2Int casts
        generate memory effects. *)
-    (* SAZ: for some reason, typeclass resolution was taking forever in eval_conv_h,
-        so I respecialized it... *)
-    Definition spec_raise {X} (s:string) : itree L0 X := raise s.
 
     (* YZ: Inferring the subevent instance takes a small but non-trivial amount of time,
-       and has to be done here hundreds and hundreds of times. Factoring the inferrence is crucial.
+       and has to be done here hundreds and hundreds of times due to the brutal pattern matching on
+       several values.
+       Factoring the inferrence is necessary.
      *)
     Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
       let raise := @raise conv_E dvalue _
