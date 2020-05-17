@@ -99,6 +99,10 @@ Open Scope Z_scope.
       The rationale for this restriction is that we need to denote expressions both internally to cfgs
       of course, but also at the [mcfg] level to perform the initialization of the memory.
       We therefore need to be able to inject their signature into both [L0] and [instr_E].
+
+    The effect of each event used through this first phase is defined by the corresponding [handler] in
+    the Handlers repository. These handlers are chained together to form the interpretation of the
+    itrees in the second phase.
  *)
 
 (* YZ Ask Steve: why is LLVMEvents an argument to the functor rather than have Make(A) inside the module? *)
@@ -344,10 +348,60 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Note: global maps contain [dvalue]s, while local maps contain [uvalue]s.
       We perform the conversion here.
    *)
+  (* YZ: Loosen [lookup_E] into [exp_E] to reduce the number of interfaces at play? *)
   Definition lookup_id (i:ident) : itree lookup_E uvalue :=
     match i with
     | ID_Global x => dv <- trigger (GlobalRead x);; ret (dvalue_to_uvalue dv)
     | ID_Local x  => trigger (LocalRead x)
+    end.
+
+  (* YZ TODO: move these somewhere else (DynamicValues most likely) *)
+
+  (* Instructions for which division by 0 is an undefined behavior *)
+  Definition iop_is_div (iop : ibinop) : bool :=
+    match iop with
+    | UDiv _ => true
+    | SDiv _ => true
+    | URem   => true
+    | SRem   => true
+    | _      => false
+    end.
+
+  Definition fop_is_div (fop : fbinop) : bool :=
+    match fop with
+    | FDiv => true
+    | FRem => true
+    | _    => false
+    end.
+
+  (* Predicate testing whether a [dvalue] is equal to zero at its type *)
+  Definition dvalue_is_zero (dv : dvalue) : Prop :=
+    match dv with
+    | DVALUE_I1 x     => x = zero
+    | DVALUE_I8 x     => x = zero
+    | DVALUE_I32 x    => x = zero
+    | DVALUE_I64 x    => x = zero
+    | DVALUE_Double x => x = Float.zero
+    | DVALUE_Float x  => x = Float32.zero
+    | _               => False
+    end.
+
+  Definition dvalue_not_zero dv := ~ (dvalue_is_zero dv).
+
+  (* A trivially concrete [uvalue] does not need to go through a pick event to get concretize.
+     This function therefore either trigger [pick], or perform a direct cast.
+     The value of this "optimization" is debatable. *)
+  Definition concretize_or_pick {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) (P : Prop) : itree E dvalue :=
+    if is_concrete uv
+    then lift_err ret (uvalue_to_dvalue uv)
+    else trigger (pick uv P).
+  
+  (* Pick a possibly poison value, treating poison as nondeterminism.
+     This is used for freeze. *)
+  Definition pick_your_poison {E : Type -> Type} `{PickE -< E} (dt : dtyp) (uv : uvalue) : itree E dvalue :=
+    match uv with
+    | UVALUE_Poison => trigger (pick (UVALUE_Undef dt) True)
+    | _             => trigger (pick uv True)
     end.
 
   (** ** Denotation of expressions
@@ -365,54 +419,13 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
      Expressions are denoted as itrees that return a [uvalue].
  *)
 
-  (* Instructions where division by 0 is UB *)
-  Definition iop_is_div (iop : ibinop) : bool :=
-    match iop with
-    | UDiv _ => true
-    | SDiv _ => true
-    | URem   => true
-    | SRem   => true
-    | _      => false
-    end.
-
-  Definition fop_is_div (fop : fbinop) : bool :=
-    match fop with
-    | FDiv => true
-    | FRem => true
-    | _    => false
-    end.
-
-  Definition dvalue_not_zero (dv : dvalue) : Prop :=
-    match dv with
-    | DVALUE_I1 x     => x = zero
-    | DVALUE_I8 x     => x = zero
-    | DVALUE_I32 x    => x = zero
-    | DVALUE_I64 x    => x = zero
-    | DVALUE_Double x => x = Float.zero
-    | DVALUE_Float x  => x = Float32.zero
-    | _               => False
-    end.
-
-  (* trigger pick, but only if the value isn't concrete *)
-  Definition concretize_or_pick {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) (P : Prop) : itree E dvalue :=
-    if is_concrete uv
-    then lift_err ret (uvalue_to_dvalue uv)
-    else trigger (pick uv P).
-  
-  (* Pick a possibly poison value, treating poison as
-     nondeterminism. This is used for freeze. *)
-  Definition pick_your_poison {E : Type -> Type} `{PickE -< E} (dt : dtyp) (uv : uvalue) : itree E dvalue :=
-    match uv with
-    | UVALUE_Poison => trigger (pick (UVALUE_Undef dt) True)
-    | _             => trigger (pick uv True)
-    end.
-
   Fixpoint denote_exp
            (top:option dtyp) (o:exp dtyp) {struct o} : itree exp_E uvalue :=
         let eval_texp '(dt,ex) := denote_exp (Some dt) ex
         in
-        (* debug ("Evaluating expression: " ++ to_string o);; *)
         match o with
+
+        (* The translation injects the [lookup_E] interface used by [lookup_id] to the ambient one *)
         | EXP_Ident i =>
           translate lookup_E_to_exp_E (lookup_id i)
 
@@ -423,7 +436,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | Some typ            => raise ("bad type for constant int: " ++ to_string typ)
           end
 
-        (* YZ TODO: Double check that I handled correctly the following two cases when merging master *)
         | EXP_Float x =>
           match top with
           | None              => raise "denote_exp given untyped EXP_Float"
@@ -468,6 +480,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | Some t => ret (UVALUE_Undef t)
           end
 
+        (* YZ TODO : Unsure what this means. Expand on it *)
         (* Question: should we do any typechecking for aggregate types here? *)
         (* Option 1: do no typechecking: *)
         | EXP_Struct es =>
@@ -492,6 +505,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           vs <- map_monad eval_texp es ;;
           ret (UVALUE_Vector vs)
 
+        (* The semantics of operators is complicated by both uvalues and
+           undefined behaviors.
+           We denote each operands first, but the denotation of the operator itself
+           depends on whether it may raise UB, and how.
+         *)
         | OP_IBinop iop dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
@@ -521,27 +539,20 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | OP_FBinop fop fm dt op1 op2 =>
           v1 <- denote_exp (Some dt) op1 ;;
           v2 <- denote_exp (Some dt) op2 ;;
-          (* debug ("fop " ++ to_string op1 ++ " " ++ to_string op2);; *)
           if fop_is_div fop && negb (is_concrete v2)
           then
-            (* debug ("fop: branch1 ");; *)
-            dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2)) ;;
-            (* debug ("fop, branch1, dv2: " ++ to_string dv2);; *)
+            dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_is_zero dv2)) ;;
             uvalue_to_dvalue_binop2
               (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
               (fun v1 v2 =>
-                 (* debug ("eval_fop branch 1: " ++ to_string v1 ++ " " ++ to_string v2);; *)
                  translate _failure_UB_to_ExpE
                                    (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
               v1 dv2
           else
-            (* debug ("fop: branch2 ");; *)
             uvalue_to_dvalue_binop
             (fun v1 v2 =>
-               (* debug ("fop: ret ");; *)
                ret (UVALUE_FBinop fop fm v1 v2))
               (fun v1 v2 =>
-                 (* debug ("eval_fop branch 2: " ++ to_string v1 ++ " " ++ to_string v2);; *)
                  translate _failure_UB_to_ExpE
                                    (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
               v1 v2
@@ -555,7 +566,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             v1 v2
 
         | OP_Conversion conv dt1 op t2 =>
-          (* debug ("conversion, evaluating " ++ to_string op ++ " at type " ++ to_string dt1);; *)
           v <- denote_exp (Some dt1) op ;;
           uvalue_to_dvalue_uop
             (fun v => ret (UVALUE_Conversion conv v t2))
