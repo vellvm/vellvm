@@ -106,14 +106,21 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Import LLVMEvents.
 
   Section CONVERSIONS.
-    (* Conversions can't go into DynamicValues because Int2Ptr and Ptr2Int casts
-       generate memory effects. *)
 
-    (* YZ: Inferring the subevent instance takes a small but non-trivial amount of time,
-       and has to be done here hundreds and hundreds of times due to the brutal pattern matching on
-       several values.
-       Factoring the inferrence is necessary.
+    (** ** Typed conversion
+        Performs a dynamic conversion of a [dvalue] of type [t1] to one of type [t2].
+        For instance, convert an integer over 8 bits to one over 1 bit by truncation.
+
+        The conversion function is not pure, i.e. in particular cannot live in [DynamicValues.v]
+        as would be natural, due to the [Int2Ptr] and [Ptr2Int] cases. At those types, the conversion
+        needs to cast between integers and pointers, which depends on the memory model.
      *)
+
+    (* Note: Inferring the subevent instance takes a small but non-trivial amount of time,
+       and has to be done here hundreds and hundreds of times due to the brutal pattern matching on
+       several values. Factoring the inference upfront is therefore necessary.
+     *)
+    (* YZ: Loosen [conv_E] into [exp_E] to reduce the number of interfaces at play? *)
     Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
       let raise := @raise conv_E dvalue _
       in
@@ -317,7 +324,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       end.
     Arguments eval_conv_h _ _ _ _ : simpl nomatch.
 
-    Definition eval_conv conv (t1:dtyp) x (t2:dtyp) : itree conv_E dvalue :=
+    Definition eval_conv (conv : conversion_type) (t1 : dtyp) (x : dvalue) (t2:dtyp) : itree conv_E dvalue :=
       match t1, x with
       | DTYPE_Vector s t, (DVALUE_Vector elts) =>
         (* In the future, implement bitcast and etc with vectors *)
@@ -331,26 +338,31 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".
 
-  (* YZ: GlobalRead should always returns a dvalue. We can either carry the invariant, or cast [dvalue_to_uvalue] here *)
+  (** ** Ident lookups
+      Look-ups depend on the nature of the [ident], that may be local or global.
+      In each case, we simply trigger the corresponding read event.
+      Note: global maps contain [dvalue]s, while local maps contain [uvalue]s.
+      We perform the conversion here.
+   *)
   Definition lookup_id (i:ident) : itree lookup_E uvalue :=
     match i with
     | ID_Global x => dv <- trigger (GlobalRead x);; ret (dvalue_to_uvalue dv)
     | ID_Local x  => trigger (LocalRead x)
     end.
 
-(*
-  [denote_exp] is the main entry point for evaluating itree expressions.
-  top : is the type at which the expression should be evaluated (if any)
-  INVARIANT:
-    - top may be None only for
-        - EXP_Ident
-        - OP_* cases
+  (** ** Denotation of expressions
+      [denote_exp top o] is the main entry point for evaluating itree expressions.
+      top : the type at which the expression should be evaluated (if any)
+      o   : the expression to be evaluated
+      INVARIANT:
+       - top may be None only for
+        + EXP_Ident
+        + OP_* cases
 
-    - top must be Some t for the remaining EXP_* cases
-      Note that when top is Some t, the resulting dvalue can never be
-      a function pointer for a well-typed itree program.
+     Note that when top is Some t, the resulting dvalue can never be a function pointer
+     for a well-typed itree program.
 
-  Expressions are denoted as itrees that return a [dvalue].
+     Expressions are denoted as itrees that return a [uvalue].
  *)
 
   (* Instructions where division by 0 is UB *)
