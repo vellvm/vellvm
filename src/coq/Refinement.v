@@ -10,7 +10,6 @@ From Vellvm Require Import
      MemoryAddress
      LLVMEvents
      LLVMAst
-     Environment
      Handlers.Handlers.
 
 From Coq Require Import Relations RelationClasses.
