@@ -19,10 +19,10 @@ COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Nu
 									Util PropT Error LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues\
 									LLVMEvents TypToDtyp IntrinsicsDefinitions\
 									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/UndefinedBehaviour Handlers/Handlers\
-									Denotation TopLevel
+									Denotation InterpreterMCFG InterpreterCFG TopLevel Refinement TopLevelRefinements
 
 COQFILESOPT    := Transformations/Transform Transformations/Renaming Transformations/DeadInstr Transformations/Traversal\
-									Transformations/Transformation Refinement TopLevelRefinements
+									Transformations/Transformation 
 
 OLLVMFILES :=
 
