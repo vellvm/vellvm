@@ -447,7 +447,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           match top with
           | None              => raise "denote_exp given untyped EXP_Double"
           | Some DTYPE_Double => ret (UVALUE_Double x)
-          | _                 => raise "bad type for constant float"
+          | _                 => raise "bad type for constant double"
           end
 
         | EXP_Hex x =>
