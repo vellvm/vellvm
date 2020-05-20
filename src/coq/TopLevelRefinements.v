@@ -299,6 +299,7 @@ Instance pick_handler_proper {E R} `{LLVMEvents.UBE -< E}:
 Admitted.
 
 (**
+   SAZ : Possible entry point here
    We should be able to prove that the interpreter belongs to the model.
  *)
 Theorem interpreter_sound: forall p, model p (interpreter p).

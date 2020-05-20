@@ -24,11 +24,7 @@ From Vellvm Require Import
      DynamicTypes
      DynamicValues
      Denotation
-     Handlers.Global
-     Handlers.Local
-     Handlers.Stack
-     Handlers.Memory
-     Handlers.UndefinedBehaviour
+     Handlers.Handlers
      LLVMEvents
      Transformations.Transformation
      Traversal
