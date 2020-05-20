@@ -205,6 +205,31 @@ Section InterpreterCFG.
     reflexivity.
   Qed.
 
+  Lemma interp_cfg_to_L3_LW : forall defs id g l m v,
+      interp_cfg_to_L3 defs (trigger (LocalWrite id v)) g l m ≈ ret (m,(Maps.add id v l, (g,tt))).
+  Proof.
+    intros.
+    unfold interp_cfg_to_L3.
+    rewrite interp_intrinsics_trigger; cbn. 
+    unfold Intrinsics.F_trigger.
+    rewrite interp_global_trigger; cbn.
+    rewrite interp_local_bind, interp_local_trigger; cbn.
+    rewrite bind_ret_l, interp_local_ret, interp_memory_ret.
+    reflexivity.
+  Qed.
+
+  Lemma interp_cfg_to_L3_GW : forall defs id g l m v,
+      interp_cfg_to_L3 defs (trigger (GlobalWrite id v)) g l m ≈ ret (m,(l,(Maps.add id v g,tt))).
+  Proof.
+    intros.
+    unfold interp_cfg_to_L3.
+    rewrite interp_intrinsics_trigger; cbn. 
+    unfold Intrinsics.F_trigger.
+    rewrite interp_global_trigger; cbn.
+    rewrite interp_local_ret, interp_memory_ret.
+    reflexivity.
+  Qed.
+
   (**
      TODO YZ: Can we expose better than this? It's super low level
    *)
