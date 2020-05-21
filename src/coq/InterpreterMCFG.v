@@ -1,5 +1,5 @@
 From Coq Require Import
-     Morphisms.
+     Morphisms ZArith.
 
 From ITree Require Import
      ITree
@@ -225,6 +225,34 @@ Section InterpreterMCFG.
       rewrite interp_state_ret.
       rewrite interp_memory_ret.
       rewrite EQ.
+      reflexivity.
+    Qed.
+
+    Lemma interp_to_L3_Alloca : forall defs t key g l m m' s frame stack_rest,
+        next_logical_key m = key ->
+        s = frame :: stack_rest ->
+        add_logical key (make_empty_block t) m = m' ->
+        interp_to_L3 defs (trigger (Alloca t)) g l (m,s) ≈ Ret ((m',(key::frame)::stack_rest),(l,(g, DVALUE_Addr (key, 0%Z)))).
+    Proof.
+      intros defs t key g l m m' s frame stack_rest Hkey Hs Hm'.
+      unfold interp_to_L3.
+
+      rewrite interp_intrinsics_trigger; cbn.
+      unfold Intrinsics.F_trigger.
+      rewrite interp_global_trigger; cbn.
+      rewrite bind_trigger.
+      unfold interp_local_stack.
+      rewrite interp_state_vis. cbn.
+      rewrite bind_bind.
+      rewrite bind_trigger.
+      rewrite interp_memory_vis. cbn.
+      rewrite Hs.
+      repeat rewrite bind_ret_l.
+      cbn.
+      rewrite interp_state_ret.
+      rewrite tau_eutt.
+      rewrite interp_memory_ret.
+      subst.
       reflexivity.
     Qed.
 
