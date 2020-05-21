@@ -10,7 +10,7 @@ From Coq Require Import
      String
      Logic.FunctionalExtensionality.
 
-From Vellvm Require Import 
+From Vellvm Require Import
      Util
      LLVMAst
      AstLib
@@ -155,6 +155,62 @@ Next Obligation.
   inversion Heqb_ident.
 Defined.
 
+Lemma typ_to_dtyp_equation  : forall env t,
+    typ_to_dtyp env t =
+    match t with
+    | TYPE_Array sz t =>
+      let nt := typ_to_dtyp env t in
+      DTYPE_Array sz nt
+
+    | TYPE_Function ret args =>
+      (*
+    let nret := (normalize_type env ret) in
+    let nargs := map_In args (fun t _ => normalize_type env t) in *)
+      DTYPE_Pointer (* Function nret nargs *)
+
+    | TYPE_Struct fields =>
+      let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
+      DTYPE_Struct nfields
+
+    | TYPE_Packed_struct fields =>
+      let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
+      DTYPE_Packed_struct nfields
+
+    | TYPE_Vector sz t =>
+      let nt := typ_to_dtyp env t in
+      DTYPE_Vector sz nt
+
+    | TYPE_Identified id =>
+      let opt := find (fun a => Ident.eq_dec id (fst a)) env in
+      match opt with
+      | None => DTYPE_Void   (* TODO: should this be None? *)
+      | Some (_, t) => typ_to_dtyp (remove_key Ident.eq_dec id env) t
+      end
+
+    | TYPE_I sz => DTYPE_I sz
+    | TYPE_Pointer t' => DTYPE_Pointer
+    | TYPE_Void => DTYPE_Void
+    | TYPE_Half => DTYPE_Half
+    | TYPE_Float => DTYPE_Float
+    | TYPE_Double => DTYPE_Double
+    | TYPE_X86_fp80 => DTYPE_X86_fp80
+    | TYPE_Fp128 => DTYPE_Fp128
+    | TYPE_Ppc_fp128 => DTYPE_Ppc_fp128
+    | TYPE_Metadata => DTYPE_Metadata
+    | TYPE_X86_mmx => DTYPE_X86_mmx
+    | TYPE_Opaque => DTYPE_Opaque
+    end.
+Proof.
+  intros env t.
+  unfold typ_to_dtyp.
+  unfold typ_to_dtyp_func at 1.
+  rewrite Wf.WfExtensionality.fix_sub_eq_ext.
+  destruct t; try reflexivity. simpl.
+  destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) env).
+  destruct p; simpl; eauto.
+  reflexivity.
+Defined.
+
 (** ** Conversion of syntactic components
 
     Front-ends and optimizations generate code containing static types.
@@ -193,4 +249,4 @@ Section ConvertTyp.
   Global Instance ConvertTyp_mcfg : ConvertTyp mcfg :=
     fun env => fmap (typ_to_dtyp env).
 
-End ConvertTyp.  
+End ConvertTyp.
