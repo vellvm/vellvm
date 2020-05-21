@@ -4,6 +4,7 @@ From Coq Require Import
 From ITree Require Import
      ITree
      Basics.Monad
+     Events.StateFacts
      Eq.Eq.
 
 From Vellvm Require Import
@@ -183,6 +184,47 @@ Section InterpreterMCFG.
       intros.
       rewrite bind_trigger.
       rewrite interp_to_L3_vis at 1.
+      reflexivity.
+    Qed.
+
+    Lemma interp_to_L3_GW : forall defs id g l m v,
+        interp_to_L3 defs (trigger (GlobalWrite id v)) g l m ≈ ret (m,(l,(Maps.add id v g,tt))).
+    Proof.
+      intros.
+      unfold interp_to_L3.
+      rewrite interp_intrinsics_trigger; cbn. 
+      unfold Intrinsics.F_trigger.
+      rewrite interp_global_trigger; cbn.
+      unfold interp_local_stack.
+      rewrite interp_state_ret, interp_memory_ret.
+      reflexivity.
+    Qed.
+
+    Lemma interp_to_L3_LM : forall defs t a size offset g l m v bytes concrete_id,
+        lookup_logical a (fst m) = Some (LBlock size bytes concrete_id) ->
+        deserialize_sbytes (lookup_all_index offset (sizeof_dtyp t) bytes SUndef) t = v ->
+        interp_to_L3 defs (trigger (Load t (DVALUE_Addr (a, offset)))) g l m ≈ Ret (m,(l,(g,v))).
+    Proof.
+      intros * LUL EQ.
+      unfold interp_to_L3.
+      rewrite interp_intrinsics_trigger.
+      cbn.
+      unfold Intrinsics.F_trigger.
+      rewrite interp_global_trigger.
+      cbn.
+      unfold interp_local_stack.
+      rewrite interp_state_bind.
+      rewrite interp_state_trigger.
+      cbn. rewrite bind_bind.
+      rewrite bind_trigger.
+      rewrite interp_memory_vis.
+      destruct m as [mem memstack].
+      cbn.
+      cbn in LUL; rewrite LUL.
+      rewrite 2 bind_ret_l.
+      rewrite interp_state_ret.
+      rewrite interp_memory_ret.
+      rewrite EQ.
       reflexivity.
     Qed.
 
