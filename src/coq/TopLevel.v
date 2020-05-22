@@ -71,7 +71,8 @@ Import D IS.
    *)
 
   Definition allocate_global (g:global dtyp) : itree L0 unit :=
-    (vis (Alloca (g_typ g)) (fun v => trigger (GlobalWrite (g_ident g) v))).
+    'v <- trigger (Alloca (g_typ g));;
+    trigger (GlobalWrite (g_ident g) v).
 
   Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
     map_monad_ allocate_global gs.
@@ -79,7 +80,8 @@ Import D IS.
   (* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
   Definition allocate_declaration (d:declaration dtyp) : itree L0 unit :=
     (* SAZ TODO:  Don't allocate pointers for LLVM intrinsics declarations *)
-    vis (Alloca DTYPE_Pointer) (fun v => trigger (GlobalWrite (dc_name d) v)).
+    'v <- trigger (Alloca DTYPE_Pointer);;
+    trigger (GlobalWrite (dc_name d) v).
 
   Definition allocate_declarations (ds:list (declaration dtyp)) : itree L0 unit :=
     map_monad_ allocate_declaration ds.
