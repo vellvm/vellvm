@@ -16,7 +16,7 @@ MENHIR=menhir
 CP=cp
 
 COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats ParserHelper\
-									Util PropT Error LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues\
+									Tactics Util PropT Error LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues\
 									LLVMEvents TypToDtyp IntrinsicsDefinitions\
 									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/UndefinedBehaviour Handlers/Handlers\
 									Denotation InterpreterMCFG InterpreterCFG TopLevel Refinement TopLevelRefinements
