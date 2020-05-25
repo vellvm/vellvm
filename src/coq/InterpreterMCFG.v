@@ -229,7 +229,7 @@ Section InterpreterMCFG.
     Qed.
 
     Lemma interp_to_L3_Alloca : forall defs t key g l m m' s frame stack_rest,
-        next_logical_key m = key ->
+        next_key_logical m = key ->
         s = frame :: stack_rest ->
         add_logical key (make_empty_block t) m = m' ->
         interp_to_L3 defs (trigger (Alloca t)) g l (m,s) ≈ Ret ((m',(key::frame)::stack_rest),(l,(g, DVALUE_Addr (key, 0%Z)))).
