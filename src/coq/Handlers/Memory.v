@@ -882,7 +882,7 @@ Admitted.
 
       | GEP t dv vs =>
         'dv' <- lift_pure_err (handle_gep t dv vs);;
-        ret (m, dv)
+        ret (m, dv')
 
       | ItoP x =>
         match x with
