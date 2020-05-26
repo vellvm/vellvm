@@ -746,11 +746,7 @@ Admitted.
       let '(cm, lm) := m in
       let cm' := fold_left (fun m key => free_concrete_of_logical key lm m) f cm in
       (cm', fold_left (fun m key => delete key m) f lm).
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> master
   End Frame_Stack_Operations.
 
   Section Memory_Stack_Operations.
