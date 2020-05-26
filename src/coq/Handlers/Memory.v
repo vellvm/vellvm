@@ -793,13 +793,12 @@ Admitted.
     (** ** Single element lookup -- memory_stack
         Retreive the value stored at address [a] in memory [m].
      *)
-    Definition read_from_address (m : memory_stack) (a : addr) (t : dtyp) : err uvalue :=
+    Definition get_value (m : memory_stack) (a : addr) (t : dtyp) : err uvalue :=
       let '(b, o) := a in
       match get_logical_block m a with
       | Some (LBlock _ bk _) => ret (get_value_mem_block bk o t)
-      | None => failwith "Memory function [read_from_address] called at a non-allocated address"
+      | None => failwith "Memory function [get_value] called at a non-allocated address"
       end.
-
 
     (** ** Array lookups -- memory_stack
       Retrieve the values stored at position [from] to position [to - 1] in an array stored at address [a] in memory.
