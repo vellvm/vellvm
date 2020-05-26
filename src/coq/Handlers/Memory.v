@@ -58,7 +58,7 @@ Set Contextual Implicit.
     The model is inspired by CompCert's memory model, but differs in that it maintains two
     representation of the memory, a logical one and a low-level one.
     Pointers (type signature [MemoryAddress.ADDRESS]) are implemented as a pair containing
-    an address and an offset. 
+    an address and an offset.
 *)
 
 (** ** Type of pointers
@@ -198,7 +198,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       i.e. when the function returns.
       A [frame_stack] is a list of such frames.
      *)
-    Definition mem_frame := list Z.  
+    Definition mem_frame := list Z.
     Definition frame_stack := list mem_frame.
 
     (** ** Memory stack
@@ -212,7 +212,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
    (** ** Serialization
        Conversion back and forth between values and their byte representation
-   *) 
+   *)
 
     (* Converts an integer [x] to its byte representation over [n] bytes.
      The representation is little endian. In particular, if [n] is too small,
@@ -532,7 +532,7 @@ Admitted.
         end
       | _ => failwith "non-I32 index"
       end.
-   
+
   End GEP.
 
   Section Logical_Operations.
@@ -572,25 +572,30 @@ Admitted.
       let block := make_empty_mem_block ty in
       LBlock (sizeof_dtyp ty) block None.
 
+    (** ** Single element lookup
+     *)
+    Definition get_value_mem_block (bk : mem_block) (bk_offset : Z) (t : dtyp) : uvalue :=
+      read_in_mem_block bk bk_offset t.
+
     (** ** Array element lookup
       A [mem_block] can be seen as storing an array of elements of [dtyp] [t], from which we retrieve
       the [i]th [uvalue].
-      The [size] argument has no effect, but we need to provide one to the array type. 
+      The [size] argument has no effect, but we need to provide one to the array type.
      *)
-    Definition get_array_mem_block_at_i (bk : mem_block) (i : nat) (size : Z) (t : dtyp) : err uvalue :=
+    Definition get_array_mem_block_at_i (bk : mem_block) (bk_offset : Z) (i : nat) (size : Z) (t : dtyp) : err uvalue :=
       'offset <- handle_gep_h (DTYPE_Array size t)
-                             0
+                             bk_offset
                              [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))];;
       inr (read_in_mem_block bk offset t).
 
     (** ** Array lookups -- mem_block
       Retrieve the values stored at position [from] to position [to - 1] in an array stored in a [mem_block].
      *)
-    Definition get_array_mem_block (bk : mem_block) (from to : nat) (size : Z) (t : dtyp) : err (list uvalue) :=
-      map_monad (fun i => get_array_mem_block_at_i bk i size t) (seq from (to - 1)). 
+    Definition get_array_mem_block (bk : mem_block) (bk_offset : Z) (from to : nat) (size : Z) (t : dtyp) : err (list uvalue) :=
+      map_monad (fun i => get_array_mem_block_at_i bk bk_offset i size t) (seq from (to - 1)).
 
   End Logical_Operations.
-  
+
   Section Concrete_Operations.
 
     Definition concrete_empty : concrete_memory := empty.
@@ -620,7 +625,7 @@ Admitted.
       (* Get the next key in the logical map *)
       Definition next_key_logical (m : memory) : Z :=
         logical_next_key (snd m).
-      
+
       (* Get the next key in the concrete map *)
       Definition next_key_concrete (m : memory) : Z :=
         concrete_next_key (fst m).
@@ -680,7 +685,7 @@ Admitted.
          According to the documentation: http://releases.llvm.org/5.0.0/docs/LangRef.html#llvm-memcpy-intrinsic
          this operation can never fail?  It doesn't return any status code...
        *)
-      
+
       (* TODO probably doesn't handle sizes correctly... *)
       (** ** MemCopy
           Implementation of the [memcpy] intrinsics.
@@ -737,11 +742,11 @@ Admitted.
          | Some (LBlock _ _ (Some cid)) => delete cid cm
          end.
 
-    Definition free_frame_memory (f : mem_frame) (m : memory) : memory := 
+    Definition free_frame_memory (f : mem_frame) (m : memory) : memory :=
       let '(cm, lm) := m in
       let cm' := fold_left (fun m key => free_concrete_of_logical key lm m) f cm in
       (cm', fold_left (fun m key => delete key m) f lm).
-   
+
   End Frame_Stack_Operations.
 
   Section Memory_Stack_Operations.
@@ -761,13 +766,25 @@ Admitted.
       let '(b,a) := ptr in
       lookup_logical b (fst m).
 
+    (** ** Single element lookup -- memory_stack
+        Retreive the value stored at address [a] in memory [m].
+     *)
+    Definition read_from_address (m : memory_stack) (a : addr) (t : dtyp) : err uvalue :=
+      let '(b, o) := a in
+      match get_logical_block m a with
+      | Some (LBlock _ bk _) => ret (get_value_mem_block bk o t)
+      | None => failwith "Memory function [read_from_address] called at a non-allocated address"
+      end.
+
+
     (** ** Array lookups -- memory_stack
       Retrieve the values stored at position [from] to position [to - 1] in an array stored at address [a] in memory.
      *)
     Definition get_array (m: memory_stack) (a : addr) (from to: nat) (size : Z) (t : dtyp) : err (list uvalue) :=
+      let '(b, o) := a in
       match get_logical_block m a with
       | Some (LBlock _ bk _) =>
-        get_array_mem_block bk from to size t
+        get_array_mem_block bk o from to size t
       | None => failwith "Memory function [get_array] called at a non-allocated address"
       end.
 
@@ -944,7 +961,7 @@ Admitted.
       interp_state interp_memory_h.
 
     Section Structural_Lemmas.
-      
+
       Lemma interp_memory_bind :
         forall (R S : Type) (t : itree Effin R) (k : R -> itree Effin S) m,
           interp_memory (ITree.bind t k) m ≅
@@ -988,7 +1005,7 @@ Admitted.
 
       Lemma interp_memory_trigger:
         forall (m : memory_stack) X (e : Effin X),
-          interp_memory (ITree.trigger e) m ≈ interp_memory_h e m. 
+          interp_memory (ITree.trigger e) m ≈ interp_memory_h e m.
       Proof.
         intros.
         unfold interp_memory.
@@ -1020,10 +1037,10 @@ Admitted.
       Qed.
 
       Global Instance eutt_interp_memory {R} :
-        Proper (eutt Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@interp_memory R). 
+        Proper (eutt Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@interp_memory R).
       Proof.
         repeat intro.
-        unfold interp_memory. 
+        unfold interp_memory.
         subst; rewrite H2.
         reflexivity.
       Qed.
