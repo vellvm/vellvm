@@ -375,6 +375,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       then deserialize_sbytes_defined bytes t
       else UVALUE_Undef t.
 
+    (** ** Reading values in memory
+      Given an offset in [mem_block], we decode a [uvalue] at [dtyp] [t] by looking up the
+      appropriate number of [SByte] and deserializing them.
+     *)
+    Definition read_in_mem_block (bk : mem_block) (offset : Z) (t : dtyp) : uvalue :=
+      deserialize_sbytes (lookup_all_index offset (sizeof_dtyp t) bk SUndef) t.
+
     (* Todo - complete proofs, and think about moving to MemoryProp module. *)
     (* The relation defining serializable dvalues. *)
     Inductive serialize_defined : dvalue -> Prop :=
@@ -525,7 +532,7 @@ Admitted.
         end
       | _ => failwith "non-I32 index"
       end.
-
+   
   End GEP.
 
   Section Logical_Operations.
@@ -564,6 +571,23 @@ Admitted.
     Definition make_empty_block (ty:dtyp) : logical_block :=
       let block := make_empty_mem_block ty in
       LBlock (sizeof_dtyp ty) block None.
+
+    (** ** Array element lookup
+      A [mem_block] can be seen as storing an array of elements of [dtyp] [t], from which we retrieve
+      the [i]th [uvalue].
+      The [size] argument has no effect, but we need to provide one to the array type. 
+     *)
+    Definition get_array_mem_block_at_i (bk : mem_block) (i : nat) (size : Z) (t : dtyp) : err uvalue :=
+      'offset <- handle_gep_h (DTYPE_Array size t)
+                             0
+                             [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))];;
+      inr (read_in_mem_block bk offset t).
+
+    (** ** Array lookups -- mem_block
+      Retrieve the values stored at position [from] to position [to - 1] in an array stored in a [mem_block].
+     *)
+    Definition get_array_mem_block (bk : mem_block) (from to : nat) (size : Z) (t : dtyp) : err (list uvalue) :=
+      map_monad (fun i => get_array_mem_block_at_i bk i size t) (seq from (to - 1)). 
 
   End Logical_Operations.
   
@@ -613,7 +637,7 @@ Admitted.
         | (cm, lm) =>
           (cm, add id b lm)
         end.
-      
+
       (** ** Concretization of blocks
           Look-ups a concrete block in memory. The logical memory acts first as a potential layer of indirection:
           - if no logical block is found, the input is directly returned.
@@ -713,11 +737,11 @@ Admitted.
          | Some (LBlock _ _ (Some cid)) => delete cid cm
          end.
 
-    Definition free_frame (f : mem_frame) (m : memory) : memory := 
+    Definition free_frame_memory (f : mem_frame) (m : memory) : memory := 
       let '(cm, lm) := m in
       let cm' := fold_left (fun m key => free_concrete_of_logical key lm m) f cm in
       (cm', fold_left (fun m key => delete key m) f lm).
-    
+   
   End Frame_Stack_Operations.
 
   Section Memory_Stack_Operations.
@@ -729,8 +753,32 @@ Admitted.
      *)
     Definition empty_memory_stack : memory_stack := ((concrete_empty, logical_empty), frame_empty).
 
-  End Memory_Stack_Operations.
+    Definition get_concrete_block (m : memory_stack) (ptr : addr) : option concrete_block :=
+      let '(b,a) := ptr in
+      lookup_concrete b (fst m).
 
+    Definition get_logical_block (m : memory_stack) (ptr : addr) : option logical_block :=
+      let '(b,a) := ptr in
+      lookup_logical b (fst m).
+
+    (** ** Array lookups -- memory_stack
+      Retrieve the values stored at position [from] to position [to - 1] in an array stored at address [a] in memory.
+     *)
+    Definition get_array (m: memory_stack) (a : addr) (from to: nat) (size : Z) (t : dtyp) : err (list uvalue) :=
+      match get_logical_block m a with
+      | Some (LBlock _ bk _) =>
+        get_array_mem_block bk from to size t
+      | None => failwith "Memory function [get_array] called at a non-allocated address"
+      end.
+
+    Definition free_frame (m : memory_stack) : err memory_stack :=
+      let '(m,sf) := m in
+      match sf with
+      | [] => failwith "Attempting to free a frame with a currently empty stack of frame"
+      | f :: sf => inr (free_frame_memory f m,sf)
+      end.
+
+  End Memory_Stack_Operations.
 
   (** ** Memory Handler
       Implementation of the memory model per se as a memory handler to the [MemoryE] interface.
@@ -744,7 +792,7 @@ Admitted.
         match s with
         | [] => raise "Tried to pop memory stack, but there's nothing to pop."
         | frame :: stack_rest =>
-          let m' := free_frame frame m in
+          let m' := free_frame_memory frame m in
           ret ((m', stack_rest), tt)
         end
 
