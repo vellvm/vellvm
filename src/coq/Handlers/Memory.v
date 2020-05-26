@@ -237,7 +237,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       end.
 
     (* Partial function casting a [Sbyte] into a simple [byte] *)
-    (* CB TODO: Is interpreting everything except for bytes as undef reasonable? *)
     Definition Sbyte_to_byte (sb:SByte) : option byte :=
       match sb with
       | Byte b => ret b
@@ -248,6 +247,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       match sb with
       | Byte b => [b]
       | Ptr _ | PtrFrag | SUndef => []
+      end.
+
+    Definition Sbyte_defined (sb:SByte) : bool :=
+      match sb with
+      | SUndef => false
+      | _ => true
       end.
 
     Definition sbyte_list_to_byte_list (bytes:list SByte) : list byte :=
@@ -306,7 +311,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       This predicate checks that they are all well-defined.
      *)
     Definition all_not_sundef (bytes : list SByte) : bool :=
-      forallb is_some (map Sbyte_to_byte bytes).
+      forallb id (map Sbyte_defined bytes).
 
     (** ** Size of a dynamic type
       Computes the byte size of a [dtyp]. *)
@@ -424,33 +429,31 @@ Proof.
   destruct i1. simpl.
 Admitted. *)
 
-  (*
-Lemma serialize_inverses : forall dval,
-    serialize_defined dval -> exists typ, deserialize_sbytes (serialize_dvalue dval) typ = dval.
-Proof.
-  intros. destruct H.
-  (* DVALUE_Addr. Type of pointer is not important. *)
-  - exists (TYPE_Pointer TYPE_Void). reflexivity.
-  (* DVALUE_I1. Todo: subversion lemma for integers. *)
-  - exists (TYPE_I 1).
-    simpl.
+(* Lemma serialize_inverses : forall dval, *)
+(*     serialize_defined dval -> exists typ, deserialize_sbytes (serialize_dvalue dval) typ = dvalue_to_uvalue dval. *)
+(* Proof. *)
+(*   intros. destruct H. *)
+(*   (* DVALUE_Addr. Type of pointer is not important. *) *)
+(*   - exists DTYPE_Pointer. reflexivity. *)
+(*   (* DVALUE_I1. Todo: subversion lemma for integers. *) *)
+(*   - exists (DTYPE_I 1). *)
+(*     simpl. *)
 
 
-    admit.
-  (* DVALUE_I32. Todo: subversion lemma for integers. *)
-  - exists (TYPE_I 32). admit.
-  (* DVALUE_I64. Todo: subversion lemma for integers. *)
-  - exists (TYPE_I 64). admit.
-  (* DVALUE_Struct [] *)
-  - exists (TYPE_Struct []). reflexivity.
-  (* DVALUE_Struct fields *)
-  - admit.
-  (* DVALUE_Array [] *)
-  - exists (TYPE_Array 0 TYPE_Void). reflexivity.
-  (* DVALUE_Array fields *)
-  - admit.
-Admitted.
-   *)
+(*     admit. *)
+(*   (* DVALUE_I32. Todo: subversion lemma for integers. *) *)
+(*   - exists (TYPE_I 32). admit. *)
+(*   (* DVALUE_I64. Todo: subversion lemma for integers. *) *)
+(*   - exists (TYPE_I 64). admit. *)
+(*   (* DVALUE_Struct [] *) *)
+(*   - exists (TYPE_Struct []). reflexivity. *)
+(*   (* DVALUE_Struct fields *) *)
+(*   - admit. *)
+(*   (* DVALUE_Array [] *) *)
+(*   - exists (TYPE_Array 0 TYPE_Void). reflexivity. *)
+(*   (* DVALUE_Array fields *) *)
+(*   - admit. *)
+(* Admitted. *)
 
   End Serialization.
 
@@ -844,6 +847,21 @@ Admitted.
       let '(b', m') := concretize_block_mem (fst ptr) (fst m) in
       (b', (m', snd m)).
 
+    (** ** Block level lemmas *)
+
+    Lemma get_logical_block_of_add_logical_block :
+      forall (m : memory_stack) (a : addr) (lb : logical_block),
+        get_logical_block (add_logical_block (fst a) lb m) a = Some lb.
+    Proof.
+      intros [[cm lm] s] [b o] lb.
+      cbn.
+      rewrite IM.Raw.Proofs.add_find.
+      pose proof @IM.Raw.Proofs.MX.elim_compare_eq b b eq_refl as [blah Heq].
+      rewrite Heq.
+      reflexivity.
+      apply IM.is_bst.
+    Qed.
+
   End Memory_Stack_Operations.
 
   (** ** Memory Handler
@@ -1084,6 +1102,51 @@ Admitted.
         rewrite interp_memory_trigger.
         cbn. rewrite Hval.
         reflexivity.
+      Qed.
+
+      Lemma interp_memory_trigger_store :
+        forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr),
+          write m a val = inr m' ->
+          interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ ret (m', tt).
+      Proof.
+        intros m m' t val a Hwrite.
+        rewrite interp_memory_trigger.
+        cbn. rewrite Hwrite.
+        cbn. rewrite bind_ret_l.
+        reflexivity.
+      Qed.
+
+      Lemma blah :
+        forall val o bytes t,
+          read_in_mem_block (add_all_index (serialize_dvalue val) o bytes) o t = dvalue_to_uvalue val.
+      Proof.
+        induction val; intros o bytes t.
+        - cbn.
+      Admitted.
+
+      Lemma write_read :
+        forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr),
+          write m a val = inr m' ->
+          read m' a t = inr (dvalue_to_uvalue val).
+      Proof.
+        intros m m' t val a Hwrite.
+        unfold write in Hwrite.
+        unfold read.
+        destruct (get_logical_block m a) eqn:Hbk.
+        - destruct l eqn:Hl. destruct a as [b o].
+          cbn in Hbk.
+          cbn in Hwrite.
+          inversion Hwrite.
+          cbn.
+
+          (* TODO: clean this up *)
+          epose proof get_logical_block_of_add_logical_block m (b, o).
+          unfold get_logical_block in H2.
+          rewrite H2. clear H2.
+
+          rewrite blah.
+          reflexivity.
+        - inversion Hwrite.
       Qed.
 
     End Structural_Lemmas.
