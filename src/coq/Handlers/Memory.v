@@ -1075,6 +1075,17 @@ Admitted.
         reflexivity.
       Qed.
 
+      Lemma interp_memory_load :
+        forall (m : memory_stack) (t : dtyp) (val : uvalue) (a : addr),
+          read m a t = inr val ->
+          interp_memory (trigger (Load t (DVALUE_Addr a))) m ≈ ret (m, val).
+      Proof.
+        intros m t val a Hval.
+        rewrite interp_memory_trigger.
+        cbn. rewrite Hval.
+        reflexivity.
+      Qed.
+
     End Structural_Lemmas.
 
   End PARAMS.
