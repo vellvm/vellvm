@@ -572,11 +572,6 @@ Admitted.
       let block := make_empty_mem_block ty in
       LBlock (sizeof_dtyp ty) block None.
 
-    (** ** Single element lookup
-     *)
-    Definition get_value_mem_block (bk : mem_block) (bk_offset : Z) (t : dtyp) : uvalue :=
-      read_in_mem_block bk bk_offset t.
-
     (** ** Array element lookup
       A [mem_block] can be seen as storing an array of elements of [dtyp] [t], from which we retrieve
       the [i]th [uvalue].
@@ -789,16 +784,6 @@ Admitted.
 
     Definition add_logical_block (id : Z) (b : logical_block) (m : memory_stack) : memory_stack :=
       let '(m,s) := m in (add_logical_block_mem id b m,s).
-
-    (** ** Single element lookup -- memory_stack
-        Retreive the value stored at address [a] in memory [m].
-     *)
-    Definition get_value (m : memory_stack) (a : addr) (t : dtyp) : err uvalue :=
-      let '(b, o) := a in
-      match get_logical_block m a with
-      | Some (LBlock _ bk _) => ret (get_value_mem_block bk o t)
-      | None => failwith "Memory function [get_value] called at a non-allocated address"
-      end.
 
     (** ** Array lookups -- memory_stack
       Retrieve the values stored at position [from] to position [to - 1] in an array stored at address [a] in memory.
