@@ -234,7 +234,7 @@ Section InterpreterCFG.
      TODO YZ: Can we expose better than this? It's super low level
    *)
   Lemma interp_cfg_to_L3_LM : forall defs t a size offset g l m v bytes concrete_id,
-      lookup_logical a (fst m) = Some (LBlock size bytes concrete_id) ->
+      get_logical_block m (a,offset) = Some (LBlock size bytes concrete_id) ->
       deserialize_sbytes (lookup_all_index offset (sizeof_dtyp t) bytes SUndef) t = v ->
       interp_cfg_to_L3 defs (trigger (Load t (DVALUE_Addr (a, offset)))) g l m ≈ Ret (m,(l,(g,v))).
   Proof.
@@ -250,8 +250,10 @@ Section InterpreterCFG.
     rewrite interp_memory_bind, interp_memory_trigger.
     cbn.
     destruct m as [mem memstack]. cbn.
-    cbn in LUL; rewrite LUL.
+    cbn in LUL. unfold read.
+    cbn; rewrite LUL.
     rewrite 2 bind_ret_l, interp_local_ret, interp_memory_ret.
+    unfold read_in_mem_block.
     rewrite EQ.
     reflexivity.
   Qed.

@@ -568,7 +568,7 @@ Admitted.
       init_block (sizeof_dtyp ty).
 
     (* Constructs an initial [logical_block] appropriately sized for a given type [ty]. *)
-    Definition make_empty_block (ty:dtyp) : logical_block :=
+    Definition make_empty_logical_block (ty:dtyp) : logical_block :=
       let block := make_empty_mem_block ty in
       LBlock (sizeof_dtyp ty) block None.
 
@@ -609,30 +609,30 @@ Admitted.
   Section Memory_Operations.
 
       (** ** Smart lookups *)
-      Definition lookup_concrete (b : Z) (m : memory) : option concrete_block :=
+      Definition get_concrete_block_mem (b : Z) (m : memory) : option concrete_block :=
         let concrete_map := fst m in
         lookup b concrete_map.
 
-      Definition lookup_logical (b : Z) (m : memory) : option logical_block :=
+      Definition get_logical_block_mem (b : Z) (m : memory) : option logical_block :=
         let logical_map := snd m in
         lookup b logical_map.
 
       (* Get the next key in the logical map *)
-      Definition next_key_logical (m : memory) : Z :=
+      Definition next_logical_key_mem (m : memory) : Z :=
         logical_next_key (snd m).
       
       (* Get the next key in the concrete map *)
-      Definition next_key_concrete (m : memory) : Z :=
+      Definition next_concrete_key_mem (m : memory) : Z :=
         concrete_next_key (fst m).
 
       (** ** Extending the memory  *)
-      Definition add_concrete (id : Z) (b : concrete_block) (m : memory) : memory :=
+      Definition add_concrete_block_mem (id : Z) (b : concrete_block) (m : memory) : memory :=
         match m with
         | (cm, lm) =>
           (add id b cm, lm)
         end.
 
-      Definition add_logical (id : Z) (b : logical_block) (m : memory) : memory :=
+      Definition add_logical_block_mem (id : Z) (b : logical_block) (m : memory) : memory :=
         match m with
         | (cm, lm) =>
           (cm, add id b lm)
@@ -646,16 +646,16 @@ Admitted.
           - if a logical block is found, but that no concrete block is (yet) associated to it, then the associated
           concrete block is allocated, and the association is added to the logical block.
        *)
-      Definition concretize_block (b:Z) (m:memory) : Z * memory :=
-        match lookup_logical b m with
+      Definition concretize_block_mem (b:Z) (m:memory) : Z * memory :=
+        match get_logical_block_mem b m with
         | None => (b, m) (* TODO: Not sure this makes sense??? *)
         | Some (LBlock sz bytes (Some cid)) => (cid, m)
         | Some (LBlock sz bytes None) =>
           (* Allocates a concrete block for this one *)
-          let id        := next_key_concrete m in
+          let id        := next_concrete_key_mem m in
           let new_block := CBlock sz b in
-          let m'        := add_concrete id new_block m in
-          let m''       := add_logical  b (LBlock sz bytes (Some id)) m' in
+          let m'        := add_concrete_block_mem id new_block m in
+          let m''       := add_logical_block_mem  b (LBlock sz bytes (Some id)) m' in
           (id, m'')
         end.
 
@@ -669,7 +669,7 @@ Admitted.
                                              then Some (k, CBlock sz bid)
                                              else a) (fst m) None.
 
-      Definition concrete_address_to_logical (cid : Z) (m : memory) : option (Z * Z)
+      Definition concrete_address_to_logical_mem (cid : Z) (m : memory) : option (Z * Z)
         := match m with
            | (cm, lm) =>
              '(rid, CBlock sz bid) <- get_real_cid cid m ;;
@@ -693,8 +693,8 @@ Admitted.
                       DVALUE_I32 align :: (* alignment ignored *)
                       DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
 
-          src_block <- trywith "memcpy src block not found" (lookup_logical src_b m) ;;
-          dst_block <- trywith "memcpy dst block not found" (lookup_logical dst_b m) ;;
+          src_block <- trywith "memcpy src block not found" (get_logical_block_mem src_b m) ;;
+          dst_block <- trywith "memcpy dst block not found" (get_logical_block_mem dst_b m) ;;
 
           let src_bytes
               := match src_block with
@@ -707,7 +707,7 @@ Admitted.
           let sdata := lookup_all_index src_o (unsigned len) src_bytes SUndef in
           let dst_bytes' := add_all_index sdata dst_o dst_bytes in
           let dst_block' := LBlock dst_sz dst_bytes' dst_cid in
-          let m' := add_logical dst_b dst_block' m in
+          let m' := add_logical_block_mem dst_b dst_block' m in
           (ret m' : err memory)
         | _ => failwith "memcpy got incorrect arguments"
         end.
@@ -741,10 +741,15 @@ Admitted.
       let '(cm, lm) := m in
       let cm' := fold_left (fun m key => free_concrete_of_logical key lm m) f cm in
       (cm', fold_left (fun m key => delete key m) f lm).
-   
+    
   End Frame_Stack_Operations.
 
   Section Memory_Stack_Operations.
+
+   (** ** Top-level interface
+       Ideally, outside of this module, the [memory_stack] datatype should be abstract and all interactions should go
+       through this interface.
+    *)
 
     (** ** The empty memory
         Both the concrete and logical views of the memory are empty maps, i.e. nothing is allocated.
@@ -753,13 +758,32 @@ Admitted.
      *)
     Definition empty_memory_stack : memory_stack := ((concrete_empty, logical_empty), frame_empty).
 
+    (** ** Smart lookups *)
+
     Definition get_concrete_block (m : memory_stack) (ptr : addr) : option concrete_block :=
       let '(b,a) := ptr in
-      lookup_concrete b (fst m).
+      get_concrete_block_mem b (fst m).
 
     Definition get_logical_block (m : memory_stack) (ptr : addr) : option logical_block :=
       let '(b,a) := ptr in
-      lookup_logical b (fst m).
+      get_logical_block_mem b (fst m).
+
+    (** ** Fresh key getters *)
+
+    (* Get the next key in the logical map *)
+    Definition next_logical_key (m : memory_stack) : Z :=
+      next_logical_key_mem (fst m).
+    
+    (* Get the next key in the concrete map *)
+    Definition next_concrete_key (m : memory_stack) : Z :=
+      next_concrete_key_mem (fst m).
+
+    (** ** Extending the memory  *)
+    Definition add_concrete_block (id : Z) (b : concrete_block) (m : memory_stack) : memory_stack :=
+      let '(m,s) := m in (add_concrete_block_mem id b m,s).
+
+    Definition add_logical_block (id : Z) (b : logical_block) (m : memory_stack) : memory_stack :=
+      let '(m,s) := m in (add_logical_block_mem id b m,s).
 
     (** ** Array lookups -- memory_stack
       Retrieve the values stored at position [from] to position [to - 1] in an array stored at address [a] in memory.
@@ -774,9 +798,50 @@ Admitted.
     Definition free_frame (m : memory_stack) : err memory_stack :=
       let '(m,sf) := m in
       match sf with
-      | [] => failwith "Attempting to free a frame with a currently empty stack of frame"
+      | [] => failwith "Attempting to free a frame from a currently empty stack of frame"
       | f :: sf => inr (free_frame_memory f m,sf)
       end.
+
+    Definition push_fresh_frame (m : memory_stack) : memory_stack :=
+      let '(m,s) := m in (m, [] :: s).
+
+    Definition add_to_frame (m : memory_stack) (k : Z) : err memory_stack :=
+      let '(m,s) := m in
+      match s with
+      | [] => failwith "Attempting to allocate in a currently empty stack of frame"
+      | f :: s => ret (m, (k :: f) :: s)
+      end.
+      
+    Definition allocate (m : memory_stack) (t : dtyp) : err (memory_stack * Z) :=
+      let new_block := make_empty_logical_block t in
+      let key       := next_logical_key m in
+      let m         := add_logical_block key new_block m in
+      'm <- add_to_frame m key;;
+      ret (m,key).
+
+    Definition read (m : memory_stack) (ptr : addr) (t : dtyp) : err uvalue :=
+      match get_logical_block m ptr with
+      | Some (LBlock _ block _) =>
+        ret (read_in_mem_block block (snd ptr) t)
+      | None => failwith "Attempting to read a non-allocated address"
+      end.
+
+    Definition write (m : memory_stack) (ptr : addr) (v : dvalue) : err memory_stack :=
+      match get_logical_block m ptr with
+      | Some (LBlock sz bytes cid) =>
+        let '(b,off) := ptr in
+        let bytes' := add_all_index (serialize_dvalue v) off bytes in
+        let block' := LBlock sz bytes' cid in
+        ret (add_logical_block b block' m) 
+      | None => failwith "Attempting to write to a non-allocated address"
+      end.
+
+    Definition concrete_address_to_logical (cid : Z) (m : memory_stack) : option (Z * Z) :=
+      concrete_address_to_logical_mem cid (fst m).
+
+    Definition concretize_block (ptr : addr) (m : memory_stack) : Z * memory_stack :=
+      let '(b', m') := concretize_block_mem (fst ptr) (fst m) in
+      (b', (m', snd m)).
 
   End Memory_Stack_Operations.
 
@@ -784,95 +849,76 @@ Admitted.
       Implementation of the memory model per se as a memory handler to the [MemoryE] interface.
    *)
   Definition handle_memory {E} `{FailureE -< E} `{UBE -< E}: MemoryE ~> stateT memory_stack (itree E) :=
-    fun _ e '(m, s) =>
+    fun _ e m =>
       match e with
-      | MemPush => ret ((m, [] :: s), tt)
+      | MemPush =>
+        ret (push_fresh_frame m, tt)
 
       | MemPop =>
-        match s with
-        | [] => raise "Tried to pop memory stack, but there's nothing to pop."
-        | frame :: stack_rest =>
-          let m' := free_frame_memory frame m in
-          ret ((m', stack_rest), tt)
-        end
+        'm' <- lift_pure_err (free_frame m);;
+        ret (m',tt)
 
       | Alloca t =>
-        let new_block := make_empty_block t in
-        let key := next_key_logical m in
-        let new_mem := add_logical key new_block m in
-
-        match s with
-        | [] => raise "No stack frame for alloca."
-        | frame :: stack_rest =>
-          let new_stack := (key :: frame) :: stack_rest in
-          ret ((new_mem, new_stack), DVALUE_Addr (key, 0))
-        end
+        '(m',key) <- lift_pure_err (allocate m t);;
+        ret (m', DVALUE_Addr (key,0))
 
       | Load t dv =>
         match dv with
-        | DVALUE_Addr (b, i) =>
-          match lookup_logical b m with
-          | Some (LBlock _ block _) =>
-            ret ((m, s), deserialize_sbytes (lookup_all_index i (sizeof_dtyp t) block SUndef) t)
-          (* Asking for a non-allocated block is undefined behaviour. *)
-          | None => raiseUB "Loading from block that has never been allocated."
+        | DVALUE_Addr ptr =>
+          match read m ptr t with
+          | inr v => ret (m, v)
+          | inl s => raiseUB s
           end
-        | _ => raise "Load got non-address dvalue"
+        | _ => raise "Attempting to load from a non-address dvalue"
         end
 
       | Store dv v =>
         match dv with
-        | DVALUE_Addr (b, i) =>
-          match lookup_logical b m with
-          | Some (LBlock sz bytes cid) =>
-            let bytes' := add_all_index (serialize_dvalue v) i bytes in
-            let block' := LBlock sz bytes' cid in
-            ret ((add_logical b block' m, s), tt)
-          | None => raise "stored to unallocated address"
-          end
-        | _ => raise ("Store got non-address dvalue: " ++ (to_string dv))
+        | DVALUE_Addr ptr =>
+          'm' <- lift_pure_err (write m ptr v);;
+          ret (m', tt)
+        | _ => raise ("Attemptingeto store to a non-address dvalue: " ++ (to_string dv))
         end
 
       | GEP t dv vs =>
-        match handle_gep t dv vs with
-        | inl err => raise err
-        | inr dv => ret ((m, s), dv)
-        end
+        'dv' <- lift_pure_err (handle_gep t dv vs);;
+        ret (m, dv)
 
       | ItoP x =>
         match x with
         | DVALUE_I64 i =>
           match concrete_address_to_logical (unsigned i) m with
           | None => raise ("Invalid concrete address " ++ (to_string x))
-          | Some (b, o) => ret ((m, s), DVALUE_Addr (b, o))
+          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
           end
         | DVALUE_I32 i =>
           match concrete_address_to_logical (unsigned i) m with
           | None => raise "Invalid concrete address "
-          | Some (b, o) => ret ((m, s), DVALUE_Addr (b, o))
+          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
           end
         | DVALUE_I8 i  =>
           match concrete_address_to_logical (unsigned i) m with
           | None => raise "Invalid concrete address"
-          | Some (b, o) => ret ((m, s), DVALUE_Addr (b, o))
+          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
           end
         | DVALUE_I1 i  =>
           match concrete_address_to_logical (unsigned i) m with
           | None => raise "Invalid concrete address"
-          | Some (b, o) => ret ((m, s), DVALUE_Addr (b, o))
+          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
           end
         | _            => raise "Non integer passed to ItoP"
         end
-
+          
       (* TODO take integer size into account *)
       | PtoI t a =>
         match a, t with
-        | DVALUE_Addr (b, i), DTYPE_I sz =>
-          let (cid, m') := concretize_block b m in
-          'addr <- lift_undef_or_err ret (coerce_integer_to_int sz (cid+i)) ;;
-           ret ((m', s), addr)
+        | DVALUE_Addr ptr, DTYPE_I sz =>
+          let (cid, m') := concretize_block ptr m in
+          'addr <- lift_undef_or_err ret (coerce_integer_to_int sz (cid + (snd ptr))) ;;
+          ret (m', addr)
         | _, _ => raise "PtoI type error."
         end
+
       end.
 
   Definition handle_intrinsic {E} `{FailureE -< E} `{PickE -< E}: IntrinsicE ~> stateT memory_stack (itree E) :=

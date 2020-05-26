@@ -103,6 +103,9 @@ Set Contextual Implicit.
     | inr x => f x
     end.
 
+  Definition lift_pure_err {A} {E} `{FailureE -< E} (m:err A) : itree E A :=
+    lift_err ret m.
+
   Definition lift_undef_or_err {A B} {E} `{FailureE -< E} `{UBE -< E} (f : A -> itree E B) (m:undef_or_err A) : itree E B :=
     match m with
     | mkEitherT m =>
