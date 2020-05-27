@@ -31,6 +31,7 @@ From ExtLib Require Import
      Data.String.
 
 From Vellvm Require Import
+     Tactics
      LLVMAst
      Util
      DynamicTypes
@@ -124,8 +125,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
    *)
   Definition lookup_all_index {a} (i:Z) (sz:Z) (m:IntMap a) (def:a) : list a :=
     List.map (fun x =>
-                let x' := lookup (Z.of_nat x) m in
-                match x' with
+                match lookup (Z.of_nat x) m with
                 | None => def
                 | Some val => val
                 end) (seq (Z.to_nat i) (Z.to_nat sz)).
@@ -587,10 +587,10 @@ Admitted. *)
       inr (read_in_mem_block bk offset t).
 
     (** ** Array lookups -- mem_block
-      Retrieve the values stored at position [from] to position [to - 1] in an array stored in a [mem_block].
+      Retrieve the values stored at position [from] to position [from + len - 1] in an array stored in a [mem_block].
      *)
-    Definition get_array_mem_block (bk : mem_block) (bk_offset : Z) (from to : nat) (size : Z) (t : dtyp) : err (list uvalue) :=
-      map_monad (fun i => get_array_mem_block_at_i bk bk_offset i size t) (seq from (to - 1)).
+    Definition get_array_mem_block (bk : mem_block) (bk_offset : Z) (from len : nat) (size : Z) (t : dtyp) : err (list uvalue) :=
+      map_monad (fun i => get_array_mem_block_at_i bk bk_offset i size t) (seq from len).
 
   End Logical_Operations.
 
@@ -763,13 +763,11 @@ Admitted. *)
 
     (** ** Smart lookups *)
 
-    Definition get_concrete_block (m : memory_stack) (ptr : addr) : option concrete_block :=
-      let '(b,a) := ptr in
-      get_concrete_block_mem b (fst m).
+    Definition get_concrete_block (m : memory_stack) (key : Z) : option concrete_block :=
+      get_concrete_block_mem key (fst m).
 
-    Definition get_logical_block (m : memory_stack) (ptr : addr) : option logical_block :=
-      let '(b,a) := ptr in
-      get_logical_block_mem b (fst m).
+    Definition get_logical_block (m : memory_stack) (key : Z) : option logical_block :=
+      get_logical_block_mem key (fst m).
 
     (** ** Fresh key getters *)
 
@@ -789,13 +787,13 @@ Admitted. *)
       let '(m,s) := m in (add_logical_block_mem id b m,s).
 
     (** ** Array lookups -- memory_stack
-      Retrieve the values stored at position [from] to position [to - 1] in an array stored at address [a] in memory.
+      Retrieve the values stored at position [from] to position [from + len - 1] in an array stored at address [a] in memory.
      *)
-    Definition get_array (m: memory_stack) (a : addr) (from to: nat) (size : Z) (t : dtyp) : err (list uvalue) :=
+    Definition get_array (m: memory_stack) (a : addr) (from len: nat) (size : Z) (t : dtyp) : err (list uvalue) :=
       let '(b, o) := a in
-      match get_logical_block m a with
+      match get_logical_block m b with
       | Some (LBlock _ bk _) =>
-        get_array_mem_block bk o from to size t
+        get_array_mem_block bk o from len size t
       | None => failwith "Memory function [get_array] called at a non-allocated address"
       end.
 
@@ -824,14 +822,14 @@ Admitted. *)
       ret (m,key).
 
     Definition read (m : memory_stack) (ptr : addr) (t : dtyp) : err uvalue :=
-      match get_logical_block m ptr with
+      match get_logical_block m (fst ptr) with
       | Some (LBlock _ block _) =>
         ret (read_in_mem_block block (snd ptr) t)
       | None => failwith "Attempting to read a non-allocated address"
       end.
 
     Definition write (m : memory_stack) (ptr : addr) (v : dvalue) : err memory_stack :=
-      match get_logical_block m ptr with
+      match get_logical_block m (fst ptr) with
       | Some (LBlock sz bytes cid) =>
         let '(b,off) := ptr in
         let bytes' := add_all_index (serialize_dvalue v) off bytes in
@@ -847,13 +845,17 @@ Admitted. *)
       let '(b', m') := concretize_block_mem (fst ptr) (fst m) in
       (b', (m', snd m)).
 
+  End Memory_Stack_Operations.
+
+  Section Memory_Stack_Theory.
+
     (** ** Block level lemmas *)
 
     Lemma get_logical_block_of_add_logical_block :
-      forall (m : memory_stack) (a : addr) (lb : logical_block),
-        get_logical_block (add_logical_block (fst a) lb m) a = Some lb.
+      forall (m : memory_stack) (key : Z) (lb : logical_block),
+        get_logical_block (add_logical_block key lb m) key = Some lb.
     Proof.
-      intros [[cm lm] s] [b o] lb.
+      intros [[cm lm] s] b lb.
       cbn.
       rewrite IM.Raw.Proofs.add_find.
       pose proof @IM.Raw.Proofs.MX.elim_compare_eq b b eq_refl as [blah Heq].
@@ -862,7 +864,106 @@ Admitted. *)
       apply IM.is_bst.
     Qed.
 
-  End Memory_Stack_Operations.
+    Require Import Psatz.
+
+    Lemma seq_succ : forall off n,
+        n >= 0 ->
+        off >= 0 ->
+        seq (Z.to_nat off) (Z.to_nat (Z.succ n)) = Z.to_nat off :: seq (Z.to_nat (Z.succ off)) (Z.to_nat n).
+    Proof.
+      intros; cbn.
+      rewrite Z2Nat.inj_succ; [| lia].
+      cbn; f_equal.
+      rewrite (Z2Nat.inj_succ off); [| lia].
+      auto.
+      Qed.
+
+    Lemma lookup_all_index_cons : forall off (n : Z) (bk : mem_block) def,
+        off >= 0 ->
+        n >= 0 ->
+        lookup_all_index off (Z.succ n) bk def =
+        match lookup off bk with
+        | Some val => val
+        | None => def
+        end :: lookup_all_index (Z.succ off) n bk def 
+    .
+    Proof.
+      intros.
+      unfold lookup_all_index.
+      rewrite seq_succ; try lia.
+      cbn.
+      rewrite Z2Nat.id; auto.
+      lia.
+    Qed.
+
+    Lemma lookup_all_index_add_out_of_range : forall off n (bk : mem_block) key x def,
+        key < off ->
+        lookup_all_index off n (add key x bk) def =
+        lookup_all_index off n bk def.
+    Proof.
+    Admitted.
+
+    Lemma lookup_add : forall k x (bk : mem_block),
+        lookup k (add k x bk) = Some x.
+    Proof.
+      intros.
+      unfold lookup, add.
+      apply IM.find_1, IM.add_1; auto.
+    Qed.
+
+    Lemma lookup_all_index_add : forall off size x (bk : mem_block) def,
+        off >= 0 ->
+        0 < size ->
+        lookup_all_index off (Z.succ size) (add off x bk) def =
+        x :: lookup_all_index (Z.succ off) size bk def.
+    Proof.
+      intros * POS LT.
+      apply Z.lt_exists_pred in LT; destruct LT as (size' & -> & INEQ); try lia.
+      rewrite lookup_all_index_cons; auto; try lia.
+      rewrite lookup_add.
+      f_equal.
+      rewrite lookup_all_index_add_out_of_range; auto.
+      lia.
+    Qed.
+
+    (** ** Deserialize - Serialize
+        Starting from a dvalue [val] whose [dtyp] is [t], if:
+        1. we serialize [val], getting a [list SByte]
+        2. we add all these bytes to the memory block, starting from the position [off], getting back a new [mem_block] m'
+        3. we lookup in this new memory [m'] the indices starting from [off] for the size of [t], getting back a [list SByte]
+        4. we deserialize this final list of bytes
+        then we should get back the initial value [val], albeit injected into [uvalue].
+
+        The proof should go by induction over [TYP] I think, and rely on [lookup_all_index_add] notably.
+     *)
+    Lemma deserialize_serialize : forall val t (TYP : dvalue_has_dtyp val t), 
+        forall off (bytes : mem_block),
+          deserialize_sbytes (lookup_all_index off (sizeof_dtyp t) (add_all_index (serialize_dvalue val) off bytes) SUndef) t = dvalue_to_uvalue val.
+    Proof.
+    Admitted.             
+
+    (** ** Write - Read
+        The expected law: reading the key that has just been written to returns the written value.
+        The only subtlety comes from the fact that it holds _if_ the read is performed at the type of
+        the written value.
+     *)
+    Lemma write_read :
+      forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr),
+        write m a val = inr m' ->
+        dvalue_has_dtyp val t ->
+        read m' a t = inr (dvalue_to_uvalue val).
+    Proof.
+      unfold write, read; cbn.
+      intros * WR TYP.
+      flatten_hyp WR; try inv_sum.
+      destruct l,a as [id off]; inv_sum.
+      rewrite get_logical_block_of_add_logical_block.
+      cbn.
+      unfold read_in_mem_block.
+      rewrite deserialize_serialize; auto.
+    Qed.
+
+  End Memory_Stack_Theory.
 
   (** ** Memory Handler
       Implementation of the memory model per se as a memory handler to the [MemoryE] interface.
@@ -1124,30 +1225,30 @@ Admitted. *)
         - cbn.
       Admitted.
 
-      Lemma write_read :
-        forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr),
-          write m a val = inr m' ->
-          read m' a t = inr (dvalue_to_uvalue val).
-      Proof.
-        intros m m' t val a Hwrite.
-        unfold write in Hwrite.
-        unfold read.
-        destruct (get_logical_block m a) eqn:Hbk.
-        - destruct l eqn:Hl. destruct a as [b o].
-          cbn in Hbk.
-          cbn in Hwrite.
-          inversion Hwrite.
-          cbn.
+      (* Lemma write_read : *)
+      (*   forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr), *)
+      (*     write m a val = inr m' -> *)
+      (*     read m' a t = inr (dvalue_to_uvalue val). *)
+      (* Proof. *)
+      (*   intros m m' t val a Hwrite. *)
+      (*   unfold write in Hwrite. *)
+      (*   unfold read. *)
+      (*   destruct (get_logical_block m a) eqn:Hbk. *)
+      (*   - destruct l eqn:Hl. destruct a as [b o]. *)
+      (*     cbn in Hbk. *)
+      (*     cbn in Hwrite. *)
+      (*     inversion Hwrite. *)
+      (*     cbn. *)
 
-          (* TODO: clean this up *)
-          epose proof get_logical_block_of_add_logical_block m (b, o).
-          unfold get_logical_block in H2.
-          rewrite H2. clear H2.
+      (*     (* TODO: clean this up *) *)
+      (*     epose proof get_logical_block_of_add_logical_block m (b, o). *)
+      (*     unfold get_logical_block in H2. *)
+      (*     rewrite H2. clear H2. *)
 
-          rewrite blah.
-          reflexivity.
-        - inversion Hwrite.
-      Qed.
+      (*     rewrite blah. *)
+      (*     reflexivity. *)
+      (*   - inversion Hwrite. *)
+      (* Qed. *)
 
     End Structural_Lemmas.
 
