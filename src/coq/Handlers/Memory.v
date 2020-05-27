@@ -913,17 +913,33 @@ Admitted. *)
 
     Lemma lookup_all_index_add : forall off size x (bk : mem_block) def,
         off >= 0 ->
-        0 < size ->
+        size >= 0 ->
         lookup_all_index off (Z.succ size) (add off x bk) def =
         x :: lookup_all_index (Z.succ off) size bk def.
     Proof.
-      intros * POS LT.
-      apply Z.lt_exists_pred in LT; destruct LT as (size' & -> & INEQ); try lia.
+      intros * POS1 POS2.
       rewrite lookup_all_index_cons; auto; try lia.
       rewrite lookup_add.
       f_equal.
-      rewrite lookup_all_index_add_out_of_range; auto.
-      lia.
+      rewrite lookup_all_index_add_out_of_range; auto; try lia.
+    Qed.
+
+    Lemma unsigned_I1_in_range : forall (x : DynamicValues.int1),
+        0 <= DynamicValues.Int1.unsigned x <= 1.
+    Proof.
+      destruct x as [x [? ?]].
+      cbn in *.
+      unfold DynamicValues.Int1.modulus,DynamicValues.Int1.wordsize, DynamicValues.Wordsize1.wordsize, two_power_nat in *.
+      cbn in *; lia.
+    Qed.
+
+    Lemma unsigned_I8_in_range : forall (x : DynamicValues.int8),
+        0 <= DynamicValues.Int8.unsigned x <= 255.
+    Proof.
+      destruct x as [x [? ?]].
+      cbn in *.
+      unfold DynamicValues.Int8.modulus,DynamicValues.Int8.wordsize, DynamicValues.Wordsize8.wordsize, two_power_nat in *.
+      cbn in *; lia.
     Qed.
 
     (** ** Deserialize - Serialize
@@ -938,9 +954,41 @@ Admitted. *)
      *)
     Lemma deserialize_serialize : forall val t (TYP : dvalue_has_dtyp val t), 
         forall off (bytes : mem_block),
+          off >= 0 ->
           deserialize_sbytes (lookup_all_index off (sizeof_dtyp t) (add_all_index (serialize_dvalue val) off bytes) SUndef) t = dvalue_to_uvalue val.
     Proof.
-    Admitted.             
+      induction 1; try auto.
+      - admit.
+      - intros.
+        simpl add_all_index; simpl sizeof_dtyp.
+        replace 8 with (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ 0)))))))) by reflexivity.
+        do 8 (rewrite lookup_all_index_add; try lia).
+        cbn; f_equal.
+        pose proof (unsigned_I1_in_range x).
+        assert (EQ :DynamicValues.Int1.unsigned x / 256 = 0).
+        apply Z.div_small; lia.
+        rewrite EQ.
+        repeat rewrite Zdiv_0_l.
+        repeat rewrite Byte.unsigned_repr.
+        all: unfold Byte.max_unsigned, Byte.modulus; cbn; try lia.
+        rewrite Z.add_0_r.
+        apply DynamicValues.Int1.repr_unsigned.
+      - intros.
+        simpl add_all_index; simpl sizeof_dtyp.
+        replace 8 with (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ 0)))))))) by reflexivity.
+        do 8 (rewrite lookup_all_index_add; try lia).
+        cbn; f_equal.
+        pose proof (unsigned_I8_in_range x).
+        revert H0; generalize (DynamicValues.Int8.unsigned x) as y; intros y ?.
+        repeat rewrite Byte.unsigned_repr.
+        all: unfold Byte.max_unsigned, Byte.modulus; cbn.
+        all: try lia.
+        all: admit.
+      - admit.
+      - admit.
+      - admit.
+      - admit.
+     Admitted.
 
     (** ** Write - Read
         The expected law: reading the key that has just been written to returns the written value.
@@ -961,8 +1009,50 @@ Admitted. *)
       cbn.
       unfold read_in_mem_block.
       rewrite deserialize_serialize; auto.
-    Qed.
+      (* The address needs to be well-formed in that the offset is positive *)
+      admit.
+    Admitted. 
 
+
+    (* This does not hold for Leibniz.
+    Lemma add_add : forall {a} off b1 b2 (m : IM.t a),
+        add off b2 (add off b1 m) = add off b2 m.
+    Proof.
+      intros; unfold add, IM.add.
+      cbn.
+
+    Lemma add_add_logical_block_mem :
+      forall off b1 b2 m,
+        add_logical_block_mem off b2 (add_logical_block_mem off b1 m) = add_logical_block_mem off b2 m.
+    Proof.
+      intros ? ? ? [].
+      cbn.
+
+    Lemma add_logical_block_add_logical_block :
+      forall off b1 b2 m,
+        add_logical_block off b2 (add_logical_block off b1 m) = add_logical_block off b2 m.
+    Proof.
+      intros ? ? ? [].
+      cbn.
+
+
+    Lemma write_write :
+      forall (m : memory_stack) (v1 v2 : dvalue) (a : addr),
+        'm1 <- write m a v1;;
+        write m1 a v2 =
+        write m a v2.
+    Proof.
+      intros.
+      unfold write; cbn.
+      flatten_goal; repeat flatten_hyp Heq; try inv_sum.
+      reflexivity.
+      cbn.
+      rewrite get_logical_block_of_add_logical_block.
+      f_equal.
+      cbn.
+     *)
+   
+      
   End Memory_Stack_Theory.
 
   (** ** Memory Handler
