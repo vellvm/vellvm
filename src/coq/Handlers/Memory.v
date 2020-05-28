@@ -368,6 +368,16 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                 :: struct_parse tl (skipn size_ty bytes)
             end in
         UVALUE_Struct (struct_parse fields bytes)
+      | DTYPE_Packed_struct fields =>
+        let fix struct_parse typ_list bytes :=
+            match typ_list with
+            | [] => []
+            | t :: tl =>
+              let size_ty := Z.to_nat (sizeof_dtyp t) in
+              (deserialize_sbytes_defined (firstn size_ty bytes) t)
+                :: struct_parse tl (skipn size_ty bytes)
+            end in
+        UVALUE_Packed_struct (struct_parse fields bytes)
       | _ => UVALUE_None (* TODO add more as serialization support increases *)
       end.
 
@@ -591,41 +601,104 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     (* Qed. *)
 
-(* Lemma serialize_inverses : forall dval t (TYP : dvalue_has_dtyp dval t), *)
-(*         deserialize_sbytes (serialize_dvalue dval) t = dvalue_to_uvalue dval. *)
-(* Proof. *)
-(*   intros dval t TYP. *)
-(*   induction TYP using dvalue_has_dtyp_ind'; auto. *)
-(*   - (* I1 *) admit. *)
-(*   - (* I8 *) admit. *)
-(*   - (* I32 *) admit. *)
-(*   - (* I64 *) admit. *)
-(*   - (* Double *) admit. *)
-(*   - (* Float *) admit. *)
-(*   - (* Structs *) *)
-(*     cbn in *. *)
-(*     unfold deserialize_sbytes. *)
-    
+    Lemma skipn_length_app :
+      forall {A} (xs ys : list A),
+        skipn (Datatypes.length xs) (xs ++ ys) = ys.
+    Proof.
+      intros A xs ys.
+      induction xs; cbn; auto.
+    Qed.
 
-(*   (* DVALUE_Addr. Type of pointer is not important. *) *)
-(*   - exists DTYPE_Pointer. reflexivity. *)
-(*   (* DVALUE_I1. Todo: subversion lemma for integers. *) *)
-(*   - exists (DTYPE_I 1). admit. *)
-(*   (* DVALUE_I8. Todo: subversion lemma for integers. *) *)
-(*   - exists (DTYPE_I 8). admit. *)
-(*   (* DVALUE_I32. Todo: subversion lemma for integers. *) *)
-(*   - exists (DTYPE_I 32). admit. *)
-(*   (* DVALUE_I64. Todo: subversion lemma for integers. *) *)
-(*   - exists (DTYPE_I 64). admit. *)
-(*   (* DVALUE_Struct [] *) *)
-(*   - exists (DTYPE_Struct []). reflexivity. *)
-(*   (* DVALUE_Struct fields *) *)
-(*   - admit. *)
-(*   (* DVALUE_Array [] *) *)
-(*   - exists (DTYPE_Array 0 DTYPE_Void). reflexivity. *)
-(*   (* DVALUE_Array fields *) *)
-(*   - admit. *)
-(* Admitted. *)
+    Lemma all_not_sundef_cons :
+      forall b bs,
+        all_not_sundef (b :: bs) = true ->
+        all_not_sundef bs = true.
+    Proof.
+      intros b bs H.
+      cbn in H.
+      unfold all_not_sundef.
+      apply andb_prop in H as [Hid Hall].
+      auto.
+    Qed.
+    
+    Lemma byte_defined :
+      forall b bs,
+        all_not_sundef bs ->
+        In b bs ->
+        Sbyte_defined b.
+    Proof.
+      intros b bs Hundef Hin.
+      induction bs.
+      - inversion Hin.
+      - apply andb_prop in Hundef as [Hid Hall].
+        inversion Hin; subst.
+        + apply Hid.
+        + apply IHbs; auto.
+    Qed.
+
+    Lemma dvalue_serialized_not_sundef :
+      forall dv,
+        all_not_sundef (serialize_dvalue dv) = true.
+    Proof.
+      intros dv.
+      induction dv using dvalue_ind'; auto.
+      - induction fields.
+        + reflexivity.
+        + cbn. apply forallb_forall.
+          intros x Hin.
+          apply list_in_map_inv in Hin as [b [Hxb Hin]]; subst.
+          apply in_app_or in Hin as [Hin | Hin].
+          * assert (In a (a :: fields)) as Hina by intuition.
+            specialize (H a Hina).
+            eapply byte_defined; eauto.
+          * assert (forall u : dvalue, In u fields -> all_not_sundef (serialize_dvalue u) = true) as Hu.
+            intros u Hinu.
+            apply H. cbn. auto.
+
+            specialize (IHfields Hu).
+            eapply byte_defined. apply IHfields.
+            apply Hin.
+      - induction elts.
+        + reflexivity.
+        + cbn in *.
+          rewrite map_app.
+          rewrite forallb_app.
+          apply andb_true_iff.
+          split.
+          * apply H; auto.
+          * apply IHelts. intros e H0.
+            apply H; auto.
+    Qed.
+
+    Lemma serialize_inverses : forall dval t (TYP : dvalue_has_dtyp dval t),
+        deserialize_sbytes (serialize_dvalue dval) t = dvalue_to_uvalue dval.
+    Proof.
+      intros dval t TYP.
+      induction TYP using dvalue_has_dtyp_ind'; auto.
+      - (* I1 *) admit.
+      - (* I8 *) admit.
+      - (* I32 *) admit.
+      - (* I64 *) admit.
+      - (* Double *) admit.
+      - (* Float *) admit.
+      - (* Structs *)
+        cbn in *.
+        unfold deserialize_sbytes.
+        destruct (all_not_sundef
+                    (serialize_dvalue f ++
+                                      fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) [ ] fields)).
+        Focus 2. admit.
+
+        cbn.
+        erewrite <- sizeof_serialized; eauto.
+        rewrite Nat2Z.id.
+        rewrite skipn_length_app.
+
+        admit.
+      (* DVALUE_Addr. Type of pointer is not important. *)
+      - (* Packed Structs *) admit.
+      - (* Arrays *) admit.
+    Admitted.
 
   End Serialization.
 
