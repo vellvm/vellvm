@@ -478,20 +478,16 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         cbn in IHTYP2. rewrite IHTYP2.
         symmetry.
         apply fold_sizeof.
-      - admit.
-    Admitted.
-
-    (* Lemma blah : *)
-    (*   forall dts fields, *)
-    (*     dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) -> *)
-    (*     Forall (fun ft => 0 <= sizeof_dtyp ft) dts. *)
-    (* Proof. *)
-    (*   induction dts; intros fields TYP. *)
-    (*   - auto. *)
-    (*   - apply Forall_cons. *)
-    (*     + inversion TYP; subst. *)
-    (*     +  *)
-    (* Qed. *)
+      - generalize dependent sz.
+        induction xs; intros sz H; cbn.
+        + subst; auto.
+        + cbn in *. rewrite <- H. rewrite app_length.
+          replace (Z.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt)
+            with (sizeof_dtyp dt + Z.of_nat (Datatypes.length xs) * sizeof_dtyp dt).
+          * rewrite Nat2Z.inj_add. rewrite IHxs with (sz:=Datatypes.length xs); auto.
+            apply Z.add_cancel_r; auto.
+          * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. omega.
+    Qed.
 
     (* TODO: does this exist somewhere else? *)
     Lemma app_prefix :
