@@ -1348,12 +1348,14 @@ Class VInt I : Type :=
         dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
         P (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
         P (DVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts)).
-    Hypothesis IH_Array : forall (xs : list dvalue) (sz : nat) (dt : dtyp),
-        (forall x, In x xs -> P x dt /\ dvalue_has_dtyp x dt) ->
+    Hypothesis IH_Array : forall (xs : list dvalue) (sz : nat) (dt : dtyp)
+                            (IH : forall x, In x xs -> P x dt)
+                            (IHdtyp : forall x, In x xs -> dvalue_has_dtyp x dt),
         Datatypes.length xs = sz -> P (DVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt).
 
-    Hypothesis IH_Vector : forall (xs : list dvalue) (sz : nat) (dt : dtyp),
-        (forall x, In x xs -> P x dt /\ dvalue_has_dtyp x dt) ->
+    Hypothesis IH_Vector : forall (xs : list dvalue) (sz : nat) (dt : dtyp)
+                             (IH : forall x, In x xs -> P x dt)
+                             (IHdtyp : forall x, In x xs -> dvalue_has_dtyp x dt),
         Datatypes.length xs = sz ->
         vector_dtyp dt -> P (DVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt).
 
@@ -1375,32 +1377,40 @@ Class VInt I : Type :=
       - apply (IH_Packed_Struct_cons TYP1 (IH f dt TYP1) TYP2 (IH (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) TYP2)).
       - rename H into Hforall.
         rename H0 into Hlen.
-        refine (IH_Array _ Hlen).
-        generalize dependent sz.
-        generalize dependent xs.
-        fix IHxs 2.
-        intros xs Hforall sz Hlen x H.
-        destruct xs.
-        + inversion H.
-        + inversion H; subst.
-          * inversion Hforall; subst.
-            split; auto.
-          * eapply IHxs. inversion Hforall; subst.
-            apply H4. reflexivity. apply H0.
+        refine (IH_Array _ _ Hlen).
+
+        { generalize dependent sz.
+          generalize dependent xs.
+          fix IHxs 2.
+          intros xs Hforall sz Hlen x H.
+          destruct xs.
+          + inversion H.
+          + inversion H; subst.
+            * inversion Hforall; subst.
+              apply IH. apply H2.
+            * eapply IHxs. inversion Hforall; subst.
+              apply H4. reflexivity. apply H0.
+        }
+
+        apply Forall_forall; auto.
       - rename H into Hforall.
         rename H0 into Hlen.
-        refine (IH_Array _ Hlen).
-        generalize dependent sz.
-        generalize dependent xs.
-        fix IHxs 2.
-        intros xs Hforall sz Hlen x H.
-        destruct xs.
-        + inversion H.
-        + inversion H; subst.
-          * inversion Hforall; subst.
-            split; auto.
-          * eapply IHxs. inversion Hforall; subst.
-            apply H5. reflexivity. apply H0.
+        refine (IH_Array _ _ Hlen).
+
+        { generalize dependent sz.
+          generalize dependent xs.
+          fix IHxs 2.
+          intros xs Hforall sz Hlen x H.
+          destruct xs.
+          + inversion H.
+          + inversion H; subst.
+            * inversion Hforall; subst.
+              apply IH. apply H3.
+            * eapply IHxs. inversion Hforall; subst.
+              apply H5. reflexivity. apply H0.
+        }
+
+        apply Forall_forall; auto.
     Qed.
   End dvalue_has_dtyp_ind.
 

@@ -319,7 +319,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       match ty with
       | DTYPE_I sz         => 8 (* All integers are padded to 8 bytes. *)
       | DTYPE_Pointer      => 8
-      | DTYPE_Struct l     => fold_left (fun x acc => x + sizeof_dtyp acc) l 0
+      | DTYPE_Struct l     => fold_left (fun acc x => acc + sizeof_dtyp x) l 0
       | DTYPE_Array sz ty' => sz * sizeof_dtyp ty'
       | DTYPE_Float        => 4
       | DTYPE_Double       => 8
@@ -420,37 +420,210 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     | wf_cons : forall b l, sbyte_list_wf l -> sbyte_list_wf (Byte b :: l)
     .
 
-  (*
-Lemma sbyte_list_to_Z_inverse:
-  forall i1 : int1, (sbyte_list_to_Z (Z_to_sbyte_list 8 (Int1.unsigned i1))) =
-               (Int1.unsigned i1).
-Proof.
-  intros i1.
-  destruct i1. simpl.
-Admitted. *)
+    Lemma fold_sizeof :
+        forall (dts : list dtyp) n,
+          fold_left (fun (acc : Z) (x : dtyp) => acc + sizeof_dtyp x) dts n =
+          n + fold_left (fun (acc : Z) (x : dtyp) => acc + sizeof_dtyp x) dts 0.
+    Proof.
+      induction dts; intros n.
+      - cbn. rewrite Z.add_0_r. reflexivity.
+      - cbn. rewrite IHdts at 1. rewrite (IHdts (sizeof_dtyp a)).
+        rewrite Z.add_assoc.
+        reflexivity.
+    Qed.
 
-(* Lemma serialize_inverses : forall dval, *)
-(*     serialize_defined dval -> exists typ, deserialize_sbytes (serialize_dvalue dval) typ = dvalue_to_uvalue dval. *)
+    Lemma sizeof_struct_cons :
+      forall dt dts,
+        sizeof_dtyp (DTYPE_Struct (dt :: dts)) = sizeof_dtyp dt + sizeof_dtyp (DTYPE_Struct dts).
+    Proof.
+      cbn.
+      intros dt dts.
+      rewrite fold_sizeof. reflexivity.
+    Qed.
+
+    Lemma zero_le_sizeof_dvalue :
+      forall dv dt,
+        dvalue_has_dtyp dv dt ->
+        0 <= sizeof_dtyp dt.
+    Proof.
+      intros dv dt TYP.
+      induction TYP using dvalue_has_dtyp_ind';
+        try solve [cbn; omega].
+      - rewrite sizeof_struct_cons.
+        omega.
+      - cbn. destruct xs.
+        + cbn in *; subst.
+          reflexivity.
+        + assert (In d (d :: xs)); intuition.
+          pose proof (IH d H0) as Hsz.
+          inversion H. cbn.
+          destruct (sizeof_dtyp dt).
+          reflexivity.
+          apply Zle_0_pos.
+          pose proof Pos2Z.neg_is_neg p.
+          contradiction.
+    Qed.
+
+    Lemma sizeof_serialized :
+      forall dv dt,
+        dvalue_has_dtyp dv dt ->
+        Z.of_nat (List.length (serialize_dvalue dv)) = sizeof_dtyp dt.
+    Proof.
+      intros dv dt TYP.
+      induction TYP using dvalue_has_dtyp_ind'; try solve [cbn; auto].
+      - cbn.
+        rewrite app_length.
+        rewrite Nat2Z.inj_add.
+        rewrite IHTYP1.
+        cbn in IHTYP2. rewrite IHTYP2.
+        symmetry.
+        apply fold_sizeof.
+      - admit.
+    Admitted.
+
+    (* Lemma blah : *)
+    (*   forall dts fields, *)
+    (*     dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) -> *)
+    (*     Forall (fun ft => 0 <= sizeof_dtyp ft) dts. *)
+    (* Proof. *)
+    (*   induction dts; intros fields TYP. *)
+    (*   - auto. *)
+    (*   - apply Forall_cons. *)
+    (*     + inversion TYP; subst. *)
+    (*     +  *)
+    (* Qed. *)
+
+    (* TODO: does this exist somewhere else? *)
+    Lemma app_prefix :
+      forall {A} (a b c : list A),
+        b = c -> a ++ b = a ++ c.
+    Proof.
+      intros A a b c H.
+      induction a.
+      - cbn; auto.
+      - cbn. rewrite IHa.
+        reflexivity.
+    Qed.
+
+    Lemma firstn_sizeof_dtyp :
+      forall dv dt,
+        dvalue_has_dtyp dv dt ->
+        (firstn (Z.to_nat (sizeof_dtyp dt)) (serialize_dvalue dv)) = serialize_dvalue dv.
+    Proof.
+      intros dv dt TYP.
+      induction TYP using dvalue_has_dtyp_ind'; auto.
+      - (* Structs *)
+        rewrite sizeof_struct_cons.
+        cbn.
+        rewrite <- sizeof_serialized with (dv:=f); auto.
+        Require Import Omega.
+
+        replace (Z.to_nat
+                   (Z.of_nat (Datatypes.length (serialize_dvalue f)) +
+                    fold_left (fun (x : Z) (acc : dtyp) => x + sizeof_dtyp acc) dts 0)) with
+            (Datatypes.length (serialize_dvalue f) +
+             Z.to_nat (fold_left (fun (x : Z) (acc : dtyp) => (x + sizeof_dtyp acc)%Z) dts 0%Z))%nat.
+        + rewrite firstn_app_2.
+          cbn in *.
+          rewrite IHTYP2.
+          reflexivity.
+        + rewrite Z2Nat.inj_add; try omega.
+          rewrite Nat2Z.id. reflexivity.
+          inversion TYP2; cbn.
+          omega.
+
+          pose proof (zero_le_sizeof_dvalue H2) as Hsz_fields.
+          pose proof (zero_le_sizeof_dvalue H1) as Hsz_f.
+          cbn in Hsz_fields.
+          cbn in Hsz_f.
+
+          rewrite fold_sizeof.
+          omega.
+      - (* Arrays *)
+        generalize dependent sz.
+        induction xs; intros sz H.
+        + cbn. apply firstn_nil.
+        + cbn in *. inversion H.
+          replace (Z.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt) with
+              (sizeof_dtyp dt + Z.of_nat (Datatypes.length xs) * sizeof_dtyp dt).
+          * rewrite Z2Nat.inj_add.
+            -- cbn. rewrite <- sizeof_serialized with (dv:=a).
+               rewrite Nat2Z.id.
+               rewrite firstn_app_2.
+               rewrite sizeof_serialized with (dt:=dt).
+               apply app_prefix.
+               apply IHxs.
+               intros x Hin.
+               apply IH; intuition.
+               intros x Hin; auto.
+               auto.
+               auto.
+               auto.
+            -- eapply zero_le_sizeof_dvalue; eauto.
+            -- assert (dvalue_has_dtyp a dt) as TYP by auto.
+               pose proof zero_le_sizeof_dvalue TYP.
+               pose proof Zle_0_nat (Datatypes.length xs).
+               apply Z.mul_nonneg_nonneg; auto.
+          * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. omega.
+    Qed.
+
+    (* Lemma serialize_inverse_struct_singleton : *)
+    (*   forall f dt, *)
+    (*     dvalue_has_dtyp f dt -> *)
+    (*     deserialize_sbytes (serialize_dvalue f) dt = dvalue_to_uvalue f -> *)
+    (*     deserialize_sbytes (serialize_dvalue f) (DTYPE_Struct [dt]) = UVALUE_Struct [dvalue_to_uvalue f]. *)
+    (* Proof. *)
+    (*   intros f dt Hf. *)
+    (*   unfold deserialize_sbytes in *. *)
+    (*   destruct (all_not_sundef (serialize_dvalue f)) eqn:Hundef. *)
+    (*   - cbn. rewrite firstn_sizeof_dtyp; auto. *)
+    (*   -  *)
+    (* Qed. *)
+
+    (* Lemma serialize_inverse_struct_cons : *)
+    (*   forall f fields dt dts, *)
+    (*     deserialize_sbytes (serialize_dvalue (DVALUE_Struct fields)) (DTYPE_Struct dts) = dvalue_to_uvalue (DVALUE_Struct fields) -> *)
+    (*     deserialize_sbytes (serialize_dvalue f) dt = dvalue_to_uvalue f -> *)
+    (*     List.length dts = List.length fields -> *)
+    (*     deserialize_sbytes (serialize_dvalue (DVALUE_Struct (f :: fields))) (DTYPE_Struct (dt :: dts)) *)
+    (*     = dvalue_to_uvalue (DVALUE_Struct (f :: fields)). *)
+    (* Proof. *)
+    (*   intros f fields dt dts Hfields Hf Hlen. *)
+    (*   induction fields. *)
+    (*   - cbn. rewrite app_nil_r. *)
+    (*     cbn in Hlen. apply length_zero_iff_nil in Hlen. subst. *)
+
+    (* Qed. *)
+
+(* Lemma serialize_inverses : forall dval t (TYP : dvalue_has_dtyp dval t), *)
+(*         deserialize_sbytes (serialize_dvalue dval) t = dvalue_to_uvalue dval. *)
 (* Proof. *)
-(*   intros. destruct H. *)
+(*   intros dval t TYP. *)
+(*   induction TYP; auto. *)
+(*   - (* I1 *) admit. *)
+(*   - (* I8 *) admit. *)
+(*   - (* I32 *) admit. *)
+(*   - (* I64 *) admit. *)
+(*   - (* Double *) admit. *)
+(*   - (* Float *) admit. *)
+(*   - cbn in *. admit. *)
+
 (*   (* DVALUE_Addr. Type of pointer is not important. *) *)
 (*   - exists DTYPE_Pointer. reflexivity. *)
 (*   (* DVALUE_I1. Todo: subversion lemma for integers. *) *)
-(*   - exists (DTYPE_I 1). *)
-(*     simpl. *)
-
-
-(*     admit. *)
+(*   - exists (DTYPE_I 1). admit. *)
+(*   (* DVALUE_I8. Todo: subversion lemma for integers. *) *)
+(*   - exists (DTYPE_I 8). admit. *)
 (*   (* DVALUE_I32. Todo: subversion lemma for integers. *) *)
-(*   - exists (TYPE_I 32). admit. *)
+(*   - exists (DTYPE_I 32). admit. *)
 (*   (* DVALUE_I64. Todo: subversion lemma for integers. *) *)
-(*   - exists (TYPE_I 64). admit. *)
+(*   - exists (DTYPE_I 64). admit. *)
 (*   (* DVALUE_Struct [] *) *)
-(*   - exists (TYPE_Struct []). reflexivity. *)
+(*   - exists (DTYPE_Struct []). reflexivity. *)
 (*   (* DVALUE_Struct fields *) *)
 (*   - admit. *)
 (*   (* DVALUE_Array [] *) *)
-(*   - exists (TYPE_Array 0 TYPE_Void). reflexivity. *)
+(*   - exists (DTYPE_Array 0 DTYPE_Void). reflexivity. *)
 (*   (* DVALUE_Array fields *) *)
 (*   - admit. *)
 (* Admitted. *)
@@ -774,7 +947,7 @@ Admitted. *)
     (* Get the next key in the logical map *)
     Definition next_logical_key (m : memory_stack) : Z :=
       next_logical_key_mem (fst m).
-    
+
     (* Get the next key in the concrete map *)
     Definition next_concrete_key (m : memory_stack) : Z :=
       next_concrete_key_mem (fst m).
@@ -813,7 +986,7 @@ Admitted. *)
       | [] => failwith "Attempting to allocate in a currently empty stack of frame"
       | f :: s => ret (m, (k :: f) :: s)
       end.
-      
+
     Definition allocate (m : memory_stack) (t : dtyp) : err (memory_stack * Z) :=
       let new_block := make_empty_logical_block t in
       let key       := next_logical_key m in
@@ -834,7 +1007,7 @@ Admitted. *)
         let '(b,off) := ptr in
         let bytes' := add_all_index (serialize_dvalue v) off bytes in
         let block' := LBlock sz bytes' cid in
-        ret (add_logical_block b block' m) 
+        ret (add_logical_block b block' m)
       | None => failwith "Attempting to write to a non-allocated address"
       end.
 
@@ -885,7 +1058,7 @@ Admitted. *)
         match lookup off bk with
         | Some val => val
         | None => def
-        end :: lookup_all_index (Z.succ off) n bk def 
+        end :: lookup_all_index (Z.succ off) n bk def
     .
     Proof.
       intros.
@@ -952,7 +1125,7 @@ Admitted. *)
 
         The proof should go by induction over [TYP] I think, and rely on [lookup_all_index_add] notably.
      *)
-    Lemma deserialize_serialize : forall val t (TYP : dvalue_has_dtyp val t), 
+    Lemma deserialize_serialize : forall val t (TYP : dvalue_has_dtyp val t),
         forall off (bytes : mem_block),
           off >= 0 ->
           deserialize_sbytes (lookup_all_index off (sizeof_dtyp t) (add_all_index (serialize_dvalue val) off bytes) SUndef) t = dvalue_to_uvalue val.
@@ -1011,7 +1184,7 @@ Admitted. *)
       rewrite deserialize_serialize; auto.
       (* The address needs to be well-formed in that the offset is positive *)
       admit.
-    Admitted. 
+    Admitted.
 
 
     (* This does not hold for Leibniz.
@@ -1051,8 +1224,8 @@ Admitted. *)
       f_equal.
       cbn.
      *)
-   
-      
+
+
   End Memory_Stack_Theory.
 
   (** ** Memory Handler
@@ -1118,7 +1291,7 @@ Admitted. *)
           end
         | _            => raise "Non integer passed to ItoP"
         end
-          
+
       (* TODO take integer size into account *)
       | PtoI t a =>
         match a, t with
@@ -1307,12 +1480,41 @@ Admitted. *)
         reflexivity.
       Qed.
 
+      Lemma lookup_all_add_all_app :
+        forall (xs ys : list SByte) o bytes def,
+          lookup_all_index o (Z.of_nat (List.length xs + List.length ys)) (add_all_index (xs ++ ys) o bytes) def = xs ++ lookup_all_index (o + Z.of_nat (List.length xs)) (Z.of_nat (List.length ys)) (add_all_index (xs ++ ys) o bytes) def.
+      Proof.
+        induction xs; intros ys def.
+        - cbn. rewrite Z.add_0_r. reflexivity.
+        - cbn.
+        intros o bytes xs ys def.
+        induction b
+
+      Qed.
+
+
+  lookup_all_index o (Z.of_nat (Datatypes.length (a :: sbytes))) (add_all_index (a :: sbytes) o bytes)
+    def = a :: sbytes
+
+
+      Lemma lookup_all_add_all :
+        forall o bytes (sbytes : list SByte) def,
+          lookup_all_index o (Z.of_nat (List.length sbytes)) (add_all_index sbytes o bytes) def = sbytes.
+      Proof.
+        intros o bytes sbytes def.
+        induction sbytes.
+        - reflexivity.
+        - cbn in *.
+      Qed.
+
       Lemma blah :
         forall val o bytes t,
           read_in_mem_block (add_all_index (serialize_dvalue val) o bytes) o t = dvalue_to_uvalue val.
       Proof.
         induction val; intros o bytes t.
-        - cbn.
+        pose proof serialize_inverses.
+        unfold read_in_mem_block.
+
       Admitted.
 
       (* Lemma write_read : *)
