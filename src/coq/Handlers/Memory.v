@@ -512,7 +512,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         rewrite sizeof_struct_cons.
         cbn.
         rewrite <- sizeof_serialized with (dv:=f); auto.
-        Require Import Omega.
 
         replace (Z.to_nat
                    (Z.of_nat (Datatypes.length (serialize_dvalue f)) +
@@ -578,13 +577,14 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     (* Lemma serialize_inverse_struct_cons : *)
     (*   forall f fields dt dts, *)
+    (*     dvalue_has_dtyp (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts)) -> *)
     (*     deserialize_sbytes (serialize_dvalue (DVALUE_Struct fields)) (DTYPE_Struct dts) = dvalue_to_uvalue (DVALUE_Struct fields) -> *)
     (*     deserialize_sbytes (serialize_dvalue f) dt = dvalue_to_uvalue f -> *)
-    (*     List.length dts = List.length fields -> *)
     (*     deserialize_sbytes (serialize_dvalue (DVALUE_Struct (f :: fields))) (DTYPE_Struct (dt :: dts)) *)
     (*     = dvalue_to_uvalue (DVALUE_Struct (f :: fields)). *)
     (* Proof. *)
-    (*   intros f fields dt dts Hfields Hf Hlen. *)
+    (*   intros f fields dt dts TYP Hfields Hf. *)
+    (*   induction TYP using dvalue_has_dtyp_ind'; auto. *)
     (*   induction fields. *)
     (*   - cbn. rewrite app_nil_r. *)
     (*     cbn in Hlen. apply length_zero_iff_nil in Hlen. subst. *)
@@ -595,14 +595,17 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 (*         deserialize_sbytes (serialize_dvalue dval) t = dvalue_to_uvalue dval. *)
 (* Proof. *)
 (*   intros dval t TYP. *)
-(*   induction TYP; auto. *)
+(*   induction TYP using dvalue_has_dtyp_ind'; auto. *)
 (*   - (* I1 *) admit. *)
 (*   - (* I8 *) admit. *)
 (*   - (* I32 *) admit. *)
 (*   - (* I64 *) admit. *)
 (*   - (* Double *) admit. *)
 (*   - (* Float *) admit. *)
-(*   - cbn in *. admit. *)
+(*   - (* Structs *) *)
+(*     cbn in *. *)
+(*     unfold deserialize_sbytes. *)
+    
 
 (*   (* DVALUE_Addr. Type of pointer is not important. *) *)
 (*   - exists DTYPE_Pointer. reflexivity. *)
@@ -1480,18 +1483,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         forall (xs ys : list SByte) o bytes def,
           lookup_all_index o (Z.of_nat (List.length xs + List.length ys)) (add_all_index (xs ++ ys) o bytes) def = xs ++ lookup_all_index (o + Z.of_nat (List.length xs)) (Z.of_nat (List.length ys)) (add_all_index (xs ++ ys) o bytes) def.
       Proof.
-        induction xs; intros ys def.
-        - cbn. rewrite Z.add_0_r. reflexivity.
-        - cbn.
-        intros o bytes xs ys def.
-        induction b
-
-      Qed.
-
-
-  lookup_all_index o (Z.of_nat (Datatypes.length (a :: sbytes))) (add_all_index (a :: sbytes) o bytes)
-    def = a :: sbytes
-
+      Abort.
 
       Lemma lookup_all_add_all :
         forall o bytes (sbytes : list SByte) def,
@@ -1501,17 +1493,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         induction sbytes.
         - reflexivity.
         - cbn in *.
-      Qed.
-
-      Lemma blah :
-        forall val o bytes t,
-          read_in_mem_block (add_all_index (serialize_dvalue val) o bytes) o t = dvalue_to_uvalue val.
-      Proof.
-        induction val; intros o bytes t.
-        pose proof serialize_inverses.
-        unfold read_in_mem_block.
-
-      Admitted.
+      Abort.
 
       (* Lemma write_read : *)
       (*   forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr), *)
