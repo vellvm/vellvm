@@ -670,6 +670,56 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
             apply H; auto.
     Qed.
 
+    Lemma all_not_sundef_deserialized :
+      forall bs t,
+        all_not_sundef bs ->
+        deserialize_sbytes_defined bs t = deserialize_sbytes bs t.
+    Proof.
+      intros bs t H.
+      unfold deserialize_sbytes.
+      rewrite H.
+      auto.
+    Qed.
+
+    Lemma deserialize_sbytes_defined_dvalue :
+      forall dv t,
+        deserialize_sbytes_defined (serialize_dvalue dv) t = deserialize_sbytes (serialize_dvalue dv) t.
+    Proof.
+      intros dv t.
+      apply all_not_sundef_deserialized.
+      apply dvalue_serialized_not_sundef.
+    Qed.
+
+    Lemma serialize_firstn_app :
+      forall dv dt rest,
+        dvalue_has_dtyp dv dt ->
+        firstn (Z.to_nat (sizeof_dtyp dt))
+               (serialize_dvalue dv ++ rest) = serialize_dvalue dv.
+    Proof.
+      intros dv dt rest H.
+      erewrite <- sizeof_serialized; eauto.
+      rewrite Nat2Z.id.
+      rewrite firstn_app.
+      rewrite Nat.sub_diag.
+      cbn.
+      rewrite app_nil_r.
+      rewrite <- (Nat2Z.id (Datatypes.length (serialize_dvalue dv))).
+      erewrite sizeof_serialized; eauto.
+      rewrite firstn_sizeof_dtyp; eauto.
+    Qed.
+
+    Lemma serialize_skipn_app :
+      forall dv dt rest,
+        dvalue_has_dtyp dv dt ->
+        skipn (Z.to_nat (sizeof_dtyp dt))
+               (serialize_dvalue dv ++ rest) = rest.
+    Proof.
+      intros dv dt rest H.
+      erewrite <- sizeof_serialized; eauto.
+      rewrite Nat2Z.id.
+      apply skipn_length_app.
+    Qed.
+
     Lemma serialize_inverses : forall dval t (TYP : dvalue_has_dtyp dval t),
         deserialize_sbytes (serialize_dvalue dval) t = dvalue_to_uvalue dval.
     Proof.
@@ -682,20 +732,54 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       - (* Double *) admit.
       - (* Float *) admit.
       - (* Structs *)
-        cbn in *.
-        unfold deserialize_sbytes.
-        destruct (all_not_sundef
-                    (serialize_dvalue f ++
-                                      fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) [ ] fields)).
-        Focus 2. admit.
+        generalize dependent f.
+        generalize dependent dt.
+        generalize dependent dts.
+        induction fields; intros dts TYP2 IHTYP2 dt f TYP1 IHTYP1; inversion TYP2.
+        + cbn. rewrite app_nil_r.
+          unfold deserialize_sbytes.
+          rewrite dvalue_serialized_not_sundef.
+          cbn.
+          rewrite firstn_sizeof_dtyp; auto.
+          rewrite deserialize_sbytes_defined_dvalue.
+          rewrite IHTYP1.
+          auto.
+        + subst; cbn.
+          unfold deserialize_sbytes.
 
-        cbn.
-        erewrite <- sizeof_serialized; eauto.
-        rewrite Nat2Z.id.
-        rewrite skipn_length_app.
+          destruct (all_not_sundef (serialize_dvalue f ++
+       serialize_dvalue a ++
+       fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) [ ] fields)).
+          Focus 2. admit.
 
-        admit.
-      (* DVALUE_Addr. Type of pointer is not important. *)
+          cbn.
+          rewrite serialize_firstn_app; eauto.
+          rewrite deserialize_sbytes_defined_dvalue.
+          rewrite IHTYP1.
+
+          cbn in *.
+          rewrite serialize_skipn_app; eauto.
+          rewrite serialize_firstn_app; eauto.
+          rewrite deserialize_sbytes_defined_dvalue.
+
+          unfold deserialize_sbytes in IHTYP2.
+          destruct (all_not_sundef
+               (serialize_dvalue a ++
+                fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) [ ]
+                fields)).
+          Focus 2. admit.
+
+          cbn in IHTYP2.
+          inversion IHTYP2.
+          rewrite serialize_firstn_app in H0; eauto.
+          rewrite deserialize_sbytes_defined_dvalue in H0.
+          rewrite H0.
+
+          rewrite serialize_firstn_app; eauto.
+          rewrite deserialize_sbytes_defined_dvalue.
+          rewrite H0.
+
+          reflexivity.
       - (* Packed Structs *) admit.
       - (* Arrays *) admit.
     Admitted.
