@@ -131,12 +131,30 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
   Lemma member_add_eq {a}: forall k v (m: IM.t a),
       member k (add k v m).
-  Admitted.
+  Proof.
+    intros.
+    cbn.
+    apply IM.Raw.Proofs.mem_1.
+    apply IM.Raw.Proofs.add_bst, IM.is_bst.
+    rewrite IM.Raw.Proofs.add_in; auto.
+  Qed.
 
   Lemma member_add_ineq {a}: forall k k' v (m: IM.t a),
       k <> k' ->
       member k (add k' v m) <-> member k m.
-  Admitted.
+  Proof.
+    intros.
+    cbn. split.
+    - intros IN; apply IM.Raw.Proofs.mem_2 in IN.
+      rewrite IM.Raw.Proofs.add_in in IN.
+      destruct IN as [-> | IN]; [contradiction H; auto | ].
+      apply IM.Raw.Proofs.mem_1; [apply IM.is_bst | auto]. 
+    - intros IN.
+      apply IM.Raw.Proofs.mem_1.
+      apply IM.Raw.Proofs.add_bst, IM.is_bst.
+      rewrite IM.Raw.Proofs.add_in; right; auto.
+      apply IM.Raw.Proofs.mem_2 in IN; auto. 
+  Qed.
 
   Lemma lookup_add_eq : forall {a} k x (m : IM.t a),
       lookup k (add k x m) = Some x.
@@ -1195,14 +1213,62 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     | Equivlb : forall z m m' cid, Equal m m' -> equivlb (LBlock z m cid) (LBlock z m' cid).
 
     Global Instance equivlb_Equiv : Equivalence equivlb.
-    Admitted.
+    Proof.
+      split.
+      - intros []; constructor; reflexivity.
+      - intros [] [] EQ; inv EQ; constructor; symmetry; auto. 
+      - intros [] [] [] EQ1 EQ2; inv EQ1; inv EQ2; constructor; etransitivity; eauto. 
+    Qed.
 
     Definition equivl : logical_memory -> logical_memory -> Prop :=
       @Equiv _ equivlb.
 
+    Lemma member_lookup {a} : forall k (m : IM.t a),
+        member k m -> exists v, lookup k m = Some v.
+    Proof.
+      unfold member,lookup in *.
+      intros * IN.
+      apply IM.Raw.Proofs.mem_2, IM.Raw.Proofs.In_MapsTo in IN.
+      destruct IN as [v IN].
+      exists v. 
+      apply IM.Raw.Proofs.find_1; eauto.
+      apply IM.is_bst.
+    Qed.
+
+    Lemma lookup_member {a} : forall k v(m : IM.t a),
+        lookup k m = Some v -> member k m .
+    Proof.
+      unfold member,lookup in *.
+      intros * IN.
+      apply IM.Raw.Proofs.mem_1; [apply IM.is_bst |].
+      apply IM.Raw.Proofs.find_2 in IN; eauto.
+      eapply IM.Raw.Proofs.MapsTo_In; eauto. 
+    Qed.
+    
+    Global Instance Equiv_Equiv {a} {r: a -> a -> Prop} {rE : Equivalence r} : Equivalence (Equiv r).
+    Proof.
+      split.
+      - intros ?; split.
+        intros k; reflexivity.
+        intros * LU1 LU2; rewrite LU1 in LU2; inv LU2; reflexivity.
+      - intros ? ? [DOM EQ]; split.
+        intros ?; split; intros ?; apply DOM; auto. 
+        intros; symmetry; eapply EQ; eauto.
+      - intros ? ? ? [DOM1 EQ1] [DOM2 EQ2]; split.
+        intros ?; split; intros ?.
+        apply DOM2,DOM1; auto.
+        apply DOM1,DOM2; auto.
+        (* intros. *)
+        (* apply lookup_member in H. H0. *)
+        (* destruct (member_lookup ) *)
+        (* intros; etransitivity; [eapply EQ1; eauto | eapply EQ2; eauto]. *)
+    Admitted.
+
     Global Instance equivl_Equiv : Equivalence equivl.
     Proof.
-    Admitted.
+      unfold equivl.
+      apply Equiv_Equiv.
+    Qed.
 
     Definition logical_empty : logical_memory := empty.
 
