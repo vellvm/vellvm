@@ -620,7 +620,23 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       apply andb_prop in H as [Hid Hall].
       auto.
     Qed.
-    
+
+    Lemma all_not_sundef_app :
+      forall xs ys,
+        all_not_sundef xs ->
+        all_not_sundef ys ->
+        all_not_sundef (xs ++ ys).
+    Proof.
+      induction xs; intros ys Hxs Hys; auto.
+      cbn in *.
+      apply andb_prop in Hxs.
+      apply andb_true_iff.
+      intuition.
+      apply IHxs; auto.
+    Qed.
+
+    Hint Resolve all_not_sundef_app.
+
     Lemma byte_defined :
       forall b bs,
         all_not_sundef bs ->
@@ -670,6 +686,18 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
             apply H; auto.
     Qed.
 
+    Hint Resolve dvalue_serialized_not_sundef.
+
+    Lemma all_not_sundef_fold_right_serialize :
+      forall xs,
+        all_not_sundef (fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) [ ] xs).
+    Proof.
+      induction xs; auto.
+      - cbn. apply all_not_sundef_app; auto.
+    Qed.
+
+    Hint Resolve all_not_sundef_fold_right_serialize.
+
     Lemma all_not_sundef_deserialized :
       forall bs t,
         all_not_sundef bs ->
@@ -689,6 +717,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       apply all_not_sundef_deserialized.
       apply dvalue_serialized_not_sundef.
     Qed.
+
+    Hint Resolve deserialize_sbytes_defined.
 
     Lemma serialize_firstn_app :
       forall dv dt rest,
@@ -720,6 +750,25 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       apply skipn_length_app.
     Qed.
 
+    Lemma array_deserialize :
+      forall xs dt,
+        dvalue_has_dtyp (DVALUE_Array xs) dt ->
+        deserialize_sbytes (serialize_dvalue (DVALUE_Array xs)) dt =
+        UVALUE_Array (map dvalue_to_uvalue xs).
+    Proof.
+      induction xs; intros dt H; inversion H; subst; auto.
+      - cbn. unfold deserialize_sbytes.
+
+        destruct (all_not_sundef
+                    (serialize_dvalue a ++
+                                      fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) [ ] xs)).
+        Focus 2. admit.
+
+        cbn in *.
+        unfold deserialize_sbytes in IHxs.
+    Admitted.
+
+
     Lemma serialize_inverses : forall dval t (TYP : dvalue_has_dtyp dval t),
         deserialize_sbytes (serialize_dvalue dval) t = dvalue_to_uvalue dval.
     Proof.
@@ -747,10 +796,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         + subst; cbn.
           unfold deserialize_sbytes.
 
-          destruct (all_not_sundef (serialize_dvalue f ++
-       serialize_dvalue a ++
-       fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) [ ] fields)).
-          Focus 2. admit.
+          rewrite all_not_sundef_app; auto.
 
           cbn.
           rewrite serialize_firstn_app; eauto.
@@ -763,11 +809,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           rewrite deserialize_sbytes_defined_dvalue.
 
           unfold deserialize_sbytes in IHTYP2.
-          destruct (all_not_sundef
-               (serialize_dvalue a ++
-                fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) [ ]
-                fields)).
-          Focus 2. admit.
+          rewrite all_not_sundef_app in IHTYP2; auto.
 
           cbn in IHTYP2.
           inversion IHTYP2.
@@ -781,8 +823,18 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
           reflexivity.
       - (* Packed Structs *) admit.
-      - (* Arrays *) admit.
-    Admitted.
+      - (* Arrays *)
+        induction xs.
+        + subst. cbn. reflexivity.
+        + cbn.
+          unfold deserialize_sbytes.
+
+          destruct (all_not_sundef (serialize_dvalue a ++ fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) [ ] xs)).
+          Focus 2. admit.
+
+          cbn. destruct sz; inversion H.
+          cbn. destruct xs; subst.
+    Admitted. 
 
   End Serialization.
 
