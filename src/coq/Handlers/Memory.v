@@ -1919,10 +1919,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Qed.
 
     Lemma write_write :
-      forall (m : memory_stack) (v1 v2 : dvalue) (a : addr),
+      forall (m : memory_stack) (v1 v2 : dvalue) (a : addr) τ,
+        dvalue_has_dtyp v1 τ ->
+        dvalue_has_dtyp v2 τ ->
         equiv_sum equiv ('m1 <- write m a v1;; write m1 a v2) (write m a v2).
     Proof.
-      intros.
+      intros * T1 T2.
       unfold write; cbn.
       flatten_goal; repeat flatten_hyp Heq; try inv_sum.
       reflexivity.
@@ -1931,10 +1933,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       cbn.
       rewrite add_all_index_twice.
       apply add_logical_block_add_logical_block.
-      (* YZ : Oh this does not hold right, we need to assume that both values are of the same type *)
-      admit.
-
-      Admitted.
+      erewrite 2 Zlength_correct, 2 sizeof_serialized; eauto.
+    Qed.
 
   End Memory_Stack_Theory.
 
