@@ -304,6 +304,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DVALUE_Array fields =>
         (* note the _right_ fold is necessary for byte ordering. *)
         fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
+      | DVALUE_Vector fields =>
+        (* note the _right_ fold is necessary for byte ordering. *)
+        fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
       | _ => [] (* TODO add more dvalues as necessary *)
       end.
 
@@ -333,7 +336,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       assuming that none of the bytes are undef.
       Truncate integer as dictated by [t].
      *)
-    Fixpoint deserialize_sbytes_defined (bytes:list SByte) (t:dtyp) : uvalue :=
+    Fixpoint deserialize_sbytes_defined (bytes:list SByte) (t:dtyp) {struct t} : uvalue :=
       match t with
       | DTYPE_I sz =>
         let des_int := sbyte_list_to_Z bytes in
@@ -360,6 +363,14 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                       :: array_parse n byte_sz (skipn byte_sz bytes)
             end in
         UVALUE_Array (array_parse (Z.to_nat sz) (Z.to_nat (sizeof_dtyp t')) bytes)
+      | DTYPE_Vector sz t' =>
+        let fix array_parse count byte_sz bytes :=
+            match count with
+            | O => []
+            | S n => (deserialize_sbytes_defined (firstn byte_sz bytes) t')
+                      :: array_parse n byte_sz (skipn byte_sz bytes)
+            end in
+        UVALUE_Vector (array_parse (Z.to_nat sz) (Z.to_nat (sizeof_dtyp t')) bytes)
       | DTYPE_Struct fields =>
         let fix struct_parse typ_list bytes :=
             match typ_list with
@@ -618,35 +629,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. omega.
     Qed.
 
-    (* Lemma serialize_inverse_struct_singleton : *)
-    (*   forall f dt, *)
-    (*     dvalue_has_dtyp f dt -> *)
-    (*     deserialize_sbytes (serialize_dvalue f) dt = dvalue_to_uvalue f -> *)
-    (*     deserialize_sbytes (serialize_dvalue f) (DTYPE_Struct [dt]) = UVALUE_Struct [dvalue_to_uvalue f]. *)
-    (* Proof. *)
-    (*   intros f dt Hf. *)
-    (*   unfold deserialize_sbytes in *. *)
-    (*   destruct (all_not_sundef (serialize_dvalue f)) eqn:Hundef. *)
-    (*   - cbn. rewrite firstn_sizeof_dtyp; auto. *)
-    (*   -  *)
-    (* Qed. *)
-
-    (* Lemma serialize_inverse_struct_cons : *)
-    (*   forall f fields dt dts, *)
-    (*     dvalue_has_dtyp (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts)) -> *)
-    (*     deserialize_sbytes (serialize_dvalue (DVALUE_Struct fields)) (DTYPE_Struct dts) = dvalue_to_uvalue (DVALUE_Struct fields) -> *)
-    (*     deserialize_sbytes (serialize_dvalue f) dt = dvalue_to_uvalue f -> *)
-    (*     deserialize_sbytes (serialize_dvalue (DVALUE_Struct (f :: fields))) (DTYPE_Struct (dt :: dts)) *)
-    (*     = dvalue_to_uvalue (DVALUE_Struct (f :: fields)). *)
-    (* Proof. *)
-    (*   intros f fields dt dts TYP Hfields Hf. *)
-    (*   induction TYP using dvalue_has_dtyp_ind'; auto. *)
-    (*   induction fields. *)
-    (*   - cbn. rewrite app_nil_r. *)
-    (*     cbn in Hlen. apply length_zero_iff_nil in Hlen. subst. *)
-
-    (* Qed. *)
-
     Lemma skipn_length_app :
       forall {A} (xs ys : list A),
         skipn (Datatypes.length xs) (xs ++ ys) = ys.
@@ -736,6 +718,16 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
             specialize (IHfields Hu).
             eapply byte_defined. apply IHfields.
             apply Hin.
+      - induction elts.
+        + reflexivity.
+        + cbn in *.
+          rewrite map_app.
+          rewrite forallb_app.
+          apply andb_true_iff.
+          split.
+          * apply H; auto.
+          * apply IHelts. intros e H0.
+            apply H; auto.
       - induction elts.
         + reflexivity.
         + cbn in *.
@@ -937,7 +929,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
           cbn. destruct sz; inversion H.
           cbn. destruct xs; subst.
-    Admitted. 
+    Admitted.
 
   End Serialization.
 
