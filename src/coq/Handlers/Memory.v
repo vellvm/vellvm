@@ -1258,11 +1258,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         intros ?; split; intros ?.
         apply DOM2,DOM1; auto.
         apply DOM1,DOM2; auto.
-        (* intros. *)
-        (* apply lookup_member in H. H0. *)
-        (* destruct (member_lookup ) *)
-        (* intros; etransitivity; [eapply EQ1; eauto | eapply EQ2; eauto]. *)
-    Admitted.
+       intros ? ? ? LU1 LU2.
+       generalize LU1; intros LU3; apply lookup_member,DOM1,member_lookup in LU3. 
+       destruct LU3 as [e'' LU3].
+       transitivity e''.
+       eapply EQ1; eauto.
+       eapply EQ2; eauto.
+    Qed. 
 
     Global Instance equivl_Equiv : Equivalence equivl.
     Proof.
@@ -1911,7 +1913,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Qed.
 
     Global Instance Proper_LBlock : Proper (Logic.eq ==> Equal ==> Logic.eq ==> equivlb) LBlock.
-    Admitted.
+    Proof.
+      repeat intro; subst.
+      constructor; auto.
+    Qed.
 
     Lemma write_write :
       forall (m : memory_stack) (v1 v2 : dvalue) (a : addr),
