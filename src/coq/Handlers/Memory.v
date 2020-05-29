@@ -301,9 +301,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DVALUE_Double d => sbytes_of_int 8 (unsigned (Float.to_bits d))
       | DVALUE_Struct fields
       | DVALUE_Packed_struct fields
-      | DVALUE_Array fields =>
-        (* note the _right_ fold is necessary for byte ordering. *)
-        fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
+      | DVALUE_Array fields
       | DVALUE_Vector fields =>
         (* note the _right_ fold is necessary for byte ordering. *)
         fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
@@ -325,6 +323,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DTYPE_Pointer      => 8
       | DTYPE_Packed_struct l
       | DTYPE_Struct l     => fold_left (fun acc x => acc + sizeof_dtyp x) l 0
+      | DTYPE_Vector sz ty'
       | DTYPE_Array sz ty' => sz * sizeof_dtyp ty'
       | DTYPE_Float        => 4
       | DTYPE_Double       => 8
@@ -496,6 +495,17 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           apply Zle_0_pos.
           pose proof Pos2Z.neg_is_neg p.
           contradiction.
+      - cbn. destruct xs.
+        + cbn in *; subst.
+          reflexivity.
+        + assert (In d (d :: xs)); intuition.
+          pose proof (IH d H1) as Hsz.
+          inversion H. cbn.
+          destruct (sizeof_dtyp dt).
+          reflexivity.
+          apply Zle_0_pos.
+          pose proof Pos2Z.neg_is_neg p.
+          contradiction.
     Qed.
 
     Lemma sizeof_serialized :
@@ -519,6 +529,15 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         cbn in IHTYP2. rewrite IHTYP2.
         symmetry.
         apply fold_sizeof.
+      - generalize dependent sz.
+        induction xs; intros sz H; cbn.
+        + subst; auto.
+        + cbn in *. rewrite <- H. rewrite app_length.
+          replace (Z.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt)
+            with (sizeof_dtyp dt + Z.of_nat (Datatypes.length xs) * sizeof_dtyp dt).
+          * rewrite Nat2Z.inj_add. rewrite IHxs with (sz:=Datatypes.length xs); auto.
+            apply Z.add_cancel_r; auto.
+          * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. omega.
       - generalize dependent sz.
         induction xs; intros sz H; cbn.
         + subst; auto.
@@ -602,6 +621,32 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           rewrite fold_sizeof.
           omega.
       - (* Arrays *)
+        generalize dependent sz.
+        induction xs; intros sz H.
+        + cbn. apply firstn_nil.
+        + cbn in *. inversion H.
+          replace (Z.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt) with
+              (sizeof_dtyp dt + Z.of_nat (Datatypes.length xs) * sizeof_dtyp dt).
+          * rewrite Z2Nat.inj_add.
+            -- cbn. rewrite <- sizeof_serialized with (dv:=a).
+               rewrite Nat2Z.id.
+               rewrite firstn_app_2.
+               rewrite sizeof_serialized with (dt:=dt).
+               apply app_prefix.
+               apply IHxs.
+               intros x Hin.
+               apply IH; intuition.
+               intros x Hin; auto.
+               auto.
+               auto.
+               auto.
+            -- eapply zero_le_sizeof_dvalue; eauto.
+            -- assert (dvalue_has_dtyp a dt) as TYP by auto.
+               pose proof zero_le_sizeof_dvalue TYP.
+               pose proof Zle_0_nat (Datatypes.length xs).
+               apply Z.mul_nonneg_nonneg; auto.
+          * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. omega.
+      - (* Vectors *)
         generalize dependent sz.
         induction xs; intros sz H.
         + cbn. apply firstn_nil.

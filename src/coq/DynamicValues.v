@@ -1321,7 +1321,7 @@ Class VInt I : Type :=
         Forall (fun x => dvalue_has_dtyp x dt) xs ->
         length xs = sz ->
         vector_dtyp dt ->
-        dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt)
+        dvalue_has_dtyp (DVALUE_Vector xs) (DTYPE_Vector (Z.of_nat sz) dt)
   .
 
   Section dvalue_has_dtyp_ind.
@@ -1357,7 +1357,7 @@ Class VInt I : Type :=
                              (IH : forall x, In x xs -> P x dt)
                              (IHdtyp : forall x, In x xs -> dvalue_has_dtyp x dt),
         Datatypes.length xs = sz ->
-        vector_dtyp dt -> P (DVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt).
+        vector_dtyp dt -> P (DVALUE_Vector xs) (DTYPE_Vector (Z.of_nat sz) dt).
 
     Lemma dvalue_has_dtyp_ind' : forall (dv:dvalue) (dt:dtyp) (TYP: dvalue_has_dtyp dv dt), P dv dt.
       fix IH 3.
@@ -1386,16 +1386,16 @@ Class VInt I : Type :=
           destruct xs.
           + inversion H.
           + inversion H; subst.
-            * inversion Hforall; subst.
-              apply IH. apply H2.
+            * inversion Hforall; subst; auto.
             * eapply IHxs. inversion Hforall; subst.
-              apply H4. reflexivity. apply H0.
+              all: try eassumption. reflexivity.
         }
 
         apply Forall_forall; auto.
       - rename H into Hforall.
         rename H0 into Hlen.
-        refine (IH_Array _ _ Hlen).
+        rename H1 into Hvect.
+        refine (IH_Vector _ _ Hlen Hvect).
 
         { generalize dependent sz.
           generalize dependent xs.
@@ -1404,10 +1404,9 @@ Class VInt I : Type :=
           destruct xs.
           + inversion H.
           + inversion H; subst.
-            * inversion Hforall; subst.
-              apply IH. apply H3.
+            * inversion Hforall; subst; auto.
             * eapply IHxs. inversion Hforall; subst.
-              apply H5. reflexivity. apply H0.
+              all: try eassumption. reflexivity.
         }
 
         apply Forall_forall; auto.
