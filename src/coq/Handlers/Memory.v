@@ -849,25 +849,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       apply skipn_length_app.
     Qed.
 
-    Lemma array_deserialize :
-      forall xs dt,
-        dvalue_has_dtyp (DVALUE_Array xs) dt ->
-        deserialize_sbytes (serialize_dvalue (DVALUE_Array xs)) dt =
-        UVALUE_Array (map dvalue_to_uvalue xs).
-    Proof.
-      induction xs; intros dt H; inversion H; subst; auto.
-      - cbn. unfold deserialize_sbytes.
-
-        destruct (all_not_sundef
-                    (serialize_dvalue a ++
-                                      fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) [ ] xs)).
-        Focus 2. admit.
-
-        cbn in *.
-        unfold deserialize_sbytes in IHxs.
-    Admitted.
-
-
     Lemma serialize_inverses : forall dval t (TYP : dvalue_has_dtyp dval t),
         deserialize_sbytes (serialize_dvalue dval) t = dvalue_to_uvalue dval.
     Proof.
@@ -964,16 +945,71 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
           reflexivity.
       - (* Arrays *)
-        induction xs.
-        + subst. cbn. reflexivity.
-        + cbn.
-          unfold deserialize_sbytes.
+        generalize dependent sz.
+        generalize dependent dt.
+        induction xs; intros dt IH IHdtyp sz H; inversion H.
+        + subst. auto.
+        + cbn. unfold deserialize_sbytes.
+          rewrite all_not_sundef_app; auto.
+          cbn in *.
+          rewrite SuccNat2Pos.id_succ.
+          subst.
 
-          destruct (all_not_sundef (serialize_dvalue a ++ fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) [ ] xs)).
-          Focus 2. admit.
+          rewrite serialize_firstn_app; auto.
+          rewrite deserialize_sbytes_defined_dvalue.
+          rewrite IH; auto.
 
-          cbn. destruct sz; inversion H.
-          cbn. destruct xs; subst.
+          unfold deserialize_sbytes in IHxs.
+          setoid_rewrite dvalue_serialized_not_sundef in IHxs.
+          setoid_rewrite all_not_sundef_fold_right_serialize in IHxs.
+
+          assert (forall x : dvalue, In x xs -> deserialize_sbytes_defined (serialize_dvalue x) dt = dvalue_to_uvalue x) as H1.
+          intros x H.
+          rewrite deserialize_sbytes_defined_dvalue. auto.
+
+          assert (forall x : dvalue, In x xs -> dvalue_has_dtyp x dt) as H2 by auto.
+
+          pose proof (IHxs dt H1 H2 (Datatypes.length xs) eq_refl).
+          cbn in H.
+          inversion H.
+
+          rewrite serialize_skipn_app.
+          rewrite Nat2Z.id.
+          reflexivity.
+          auto.
+      - (* Vectors *)
+        generalize dependent sz.
+        generalize dependent dt.
+        induction xs; intros dt IH IHdtyp Hvect sz H; inversion H.
+        + subst. auto.
+        + cbn. unfold deserialize_sbytes.
+          rewrite all_not_sundef_app; auto.
+          cbn in *.
+          rewrite SuccNat2Pos.id_succ.
+          subst.
+
+          rewrite serialize_firstn_app; auto.
+          rewrite deserialize_sbytes_defined_dvalue.
+          rewrite IH; auto.
+
+          unfold deserialize_sbytes in IHxs.
+          setoid_rewrite dvalue_serialized_not_sundef in IHxs.
+          setoid_rewrite all_not_sundef_fold_right_serialize in IHxs.
+
+          assert (forall x : dvalue, In x xs -> deserialize_sbytes_defined (serialize_dvalue x) dt = dvalue_to_uvalue x) as H1.
+          intros x H.
+          rewrite deserialize_sbytes_defined_dvalue. auto.
+
+          assert (forall x : dvalue, In x xs -> dvalue_has_dtyp x dt) as H2 by auto.
+
+          pose proof (IHxs dt H1 H2 Hvect (Datatypes.length xs) eq_refl).
+          cbn in H.
+          inversion H.
+
+          rewrite serialize_skipn_app.
+          rewrite Nat2Z.id.
+          reflexivity.
+          auto.
     Admitted.
 
   End Serialization.
