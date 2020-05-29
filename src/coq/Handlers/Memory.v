@@ -102,6 +102,100 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Definition member {a} k (m:IntMap a) := IM.mem k m.
   Definition lookup {a} k (m:IntMap a) := IM.find k m.
   Definition empty {a} := @IM.empty a.
+  Definition Equal {a} : IntMap a -> IntMap a -> Prop :=
+    fun m m' => forall k, lookup k m = lookup k m'.
+  Definition Equiv {a} (R : a -> a -> Prop) : IntMap a -> IntMap a -> Prop :=
+    fun m m' =>
+      (forall k, member k m <-> member k m') /\
+      (forall k e e', lookup k m = Some e -> lookup k m' = Some e' -> R e e').
+  
+  Global Instance Equal_Equiv {a}: Equivalence (@Equal a).
+  Proof.
+    split.
+    - repeat intro; reflexivity.
+    - repeat intro.
+      symmetry; apply H.
+    - intros ? ? ? EQ1 EQ2 ?.
+      etransitivity; eauto.
+  Qed.
+
+  Lemma add_add : forall {a} off b1 b2 (m : IM.t a),
+      Equal (add off b2 (add off b1 m)) (add off b2 m).
+  Proof.
+    intros; intro key; cbn.
+    rewrite IM.Raw.Proofs.add_find; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
+    rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
+    rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
+    flatten_goal; auto.
+  Qed.
+
+  Lemma member_add_eq {a}: forall k v (m: IM.t a),
+      member k (add k v m).
+  Admitted.
+
+  Lemma member_add_ineq {a}: forall k k' v (m: IM.t a),
+      k <> k' ->
+      member k (add k' v m) <-> member k m.
+  Admitted.
+
+  Lemma lookup_add_eq : forall {a} k x (m : IM.t a),
+      lookup k (add k x m) = Some x.
+  Proof.
+    intros.
+    unfold lookup, add.
+    apply IM.find_1, IM.add_1; auto.
+  Qed.
+
+  Lemma MapsTo_inj : forall {a} k v v' (m : IM.t a),
+      IM.MapsTo k v m ->
+      IM.MapsTo k v' m ->
+      v = v'.
+  Proof.
+    intros.
+    apply IM.find_1 in H; apply IM.find_1 in H0.
+    rewrite H0 in H; inv H. 
+    reflexivity.
+  Qed.
+
+  Lemma lookup_add_ineq : forall {a} k k' x (m : IM.t a),
+      k <> k' ->
+      lookup k (add k' x m) = lookup k m.
+  Proof.
+    intros.
+    unfold lookup, add.
+    match goal with
+      |- ?x = ?y => destruct x eqn:EQx,y eqn:EQy;
+                    try apply IM.find_2,IM.add_3 in EQx;
+                    try apply IM.find_2 in EQy
+    end; auto.
+    eapply MapsTo_inj in EQx; eauto; subst; eauto.
+    apply IM.find_1 in EQx; rewrite EQx in EQy; inv EQy. 
+    cbn in *.
+    apply IM.Raw.Proofs.not_find_iff in EQx; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
+    exfalso; apply EQx, IM.Raw.Proofs.add_in.
+    destruct (RelDec.rel_dec_p k k'); auto.
+    right.
+    unfold IM.MapsTo in *.
+    eapply IM.Raw.Proofs.MapsTo_In,EQy.
+  Qed.
+
+  Lemma Equiv_add_add : forall {a} {r: a -> a -> Prop} {rR: Reflexive r},
+      forall k v1 v2 (m: IM.t a),
+        Equiv r (add k v2 (add k v1 m)) (add k v2 m).
+  Proof.
+    intros; split.
+    - intros key.
+      destruct (RelDec.rel_dec_p key k).
+      + subst; rewrite 2 member_add_eq; reflexivity.
+      + subst; rewrite 3 member_add_ineq; auto; reflexivity.
+    - intros key v v' LU1 LU2; cbn.
+      destruct (RelDec.rel_dec_p key k).
+      + subst; rewrite lookup_add_eq in LU1, LU2; inv LU1; inv LU2.
+        reflexivity.
+      + subst; rewrite lookup_add_ineq in LU1, LU2; auto; rewrite lookup_add_ineq in LU1; auto.
+        rewrite LU1 in LU2; inv LU2.
+        reflexivity.
+  Qed.
 
   (* Extends the map with a list of pairs key/value.
      Note: additions start from the end of the list, so in case of duplicate
@@ -181,7 +275,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     | Ptr : addr -> SByte
     | PtrFrag : SByte
     | SUndef : SByte.
-    Definition mem_block       := IntMap SByte.
+    Definition mem_block    := IntMap SByte.
     Inductive logical_block :=
     | LBlock (size : Z) (bytes : mem_block) (concrete_id : option Z) : logical_block.
 
@@ -1097,6 +1191,19 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
   Section Logical_Operations.
 
+    Inductive equivlb : logical_block -> logical_block -> Prop :=
+    | Equivlb : forall z m m' cid, Equal m m' -> equivlb (LBlock z m cid) (LBlock z m' cid).
+
+    Global Instance equivlb_Equiv : Equivalence equivlb.
+    Admitted.
+
+    Definition equivl : logical_memory -> logical_memory -> Prop :=
+      @Equiv _ equivlb.
+
+    Global Instance equivl_Equiv : Equivalence equivl.
+    Proof.
+    Admitted.
+
     Definition logical_empty : logical_memory := empty.
 
     (* Returns a fresh key for use in memory map *)
@@ -1154,6 +1261,15 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Section Concrete_Operations.
 
     Definition concrete_empty : concrete_memory := empty.
+
+    Definition equivc : concrete_memory -> concrete_memory -> Prop := Equal.
+
+    Global Instance equivc_Equiv : Equivalence equivc.
+    Proof.
+      unfold equivc; typeclasses eauto.
+    Qed.
+
+    Infix "≡" := equivc (at level 39).
 
     Definition concrete_next_key (m : concrete_memory) : Z :=
       let keys         := List.map fst (IM.elements m) in
@@ -1301,6 +1417,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       let '(cm, lm) := m in
       let cm' := fold_left (fun m key => free_concrete_of_logical key lm m) f cm in
       (cm', fold_left (fun m key => delete key m) f lm).
+
+    Definition equivs : frame_stack -> frame_stack -> Prop := Logic.eq.
+
+    Global Instance equivs_Equiv : Equivalence equivs. 
+    split; unfold equivs; typeclasses eauto.
+    Qed.
 
   End Frame_Stack_Operations.
 
@@ -1460,14 +1582,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
     Admitted.
 
-    Lemma lookup_add : forall k x (bk : mem_block),
-        lookup k (add k x bk) = Some x.
-    Proof.
-      intros.
-      unfold lookup, add.
-      apply IM.find_1, IM.add_1; auto.
-    Qed.
-
     Lemma lookup_all_index_add : forall off size x (bk : mem_block) def,
         off >= 0 ->
         size >= 0 ->
@@ -1476,7 +1590,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
       intros * POS1 POS2.
       rewrite lookup_all_index_cons; auto; try lia.
-      rewrite lookup_add.
+      rewrite lookup_add_eq.
       f_equal.
       rewrite lookup_all_index_add_out_of_range; auto; try lia.
     Qed.
@@ -1570,45 +1684,180 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       admit.
     Admitted.
 
+    Definition equiv : memory_stack -> memory_stack -> Prop := 
+      fun '((cm,lm), s) '((cm',lm'),s') =>
+        equivs s s' /\
+        equivc cm cm' /\
+        equivl lm lm'.
 
-    (* This does not hold for Leibniz.
-    Lemma add_add : forall {a} off b1 b2 (m : IM.t a),
-        add off b2 (add off b1 m) = add off b2 m.
+    Global Instance equiv_Equiv : Equivalence equiv.
     Proof.
-      intros; unfold add, IM.add.
-      cbn.
+      split.
+      - intros ((cm,lm),s); cbn; split; [| split]; reflexivity. 
+      - intros ((cm,lm),s) ((cm',lm'),s') EQ; cbn; split; [| split]; symmetry; apply EQ.
+      - intros ((cm,lm),s) ((cm',lm'),s') ((cm'',lm''),s'') EQ1 EQ2; cbn; split; [| split]; (etransitivity; [apply EQ1 | apply EQ2]).
+    Qed.      
 
-    Lemma add_add_logical_block_mem :
-      forall off b1 b2 m,
-        add_logical_block_mem off b2 (add_logical_block_mem off b1 m) = add_logical_block_mem off b2 m.
+    Infix "≡" := equiv (at level 25).
+
+    Lemma add_add_logical : forall off b1 b2 m,
+        equivl (add off b2 (add off b1 m)) (add off b2 m).
     Proof.
-      intros ? ? ? [].
-      cbn.
+      intros; apply Equiv_add_add. 
+   Qed.
 
     Lemma add_logical_block_add_logical_block :
       forall off b1 b2 m,
-        add_logical_block off b2 (add_logical_block off b1 m) = add_logical_block off b2 m.
+        add_logical_block off b2 (add_logical_block off b1 m) ≡ add_logical_block off b2 m.
     Proof.
-      intros ? ? ? [].
-      cbn.
+      intros ? ? ? ((cm,lm),s).
+      cbn; split; [reflexivity | split; [reflexivity |]]. 
+      apply add_add_logical. 
+    Qed.
 
+    (* YZ : Either exists, or define more properly *)
+    Definition equiv_sum {A : Type} (R : A -> A -> Prop) : err A -> err A -> Prop :=
+      fun ma ma' => match ma,ma' with
+                 | inr a, inr a' => R a a'
+                 | inl _, inl _ => True
+                 | _, _ => False
+                 end.
+
+    Global Instance Proper_lookup {a} k: Proper (@Equal a ==> Logic.eq) (lookup k).
+    Proof.
+      repeat intro.
+      apply H.
+    Qed.
+
+    Lemma lookup_add_all_index_in : forall l k z (m : mem_block) v,
+        z <= k <= z + Zlength l - 1 ->
+        list_nth_z l (k - z) = Some v ->
+        lookup k (add_all_index l z m) = Some v.
+    Proof.
+      induction l as [| x l IH]; simpl; intros * INEQ LU.
+      inv LU.
+      destruct (RelDec.rel_dec_p k z).
+      - subst.
+        rewrite Z.sub_diag in LU; cbn in LU; inv LU.
+        rewrite lookup_add_eq;  reflexivity.
+      - rewrite lookup_add_ineq; auto.
+        apply IH.
+        rewrite Zlength_cons in INEQ; lia.
+        destruct (zeq (k - z)) eqn:INEQ'; [lia |].
+        replace (k - (z + 1)) with (Z.pred (k-z)) by lia; auto.
+    Qed.
+
+    Lemma lookup_add_all_index_out : forall l k z (m : mem_block),
+        (k < z \/ k >= z + Zlength l) ->
+        lookup k (add_all_index l z m) = lookup k m.
+    Proof.
+      induction l as [| x l IH]; simpl; intros * INEQ; auto.
+      destruct (RelDec.rel_dec_p k z).
+      - subst. exfalso; destruct INEQ as [INEQ | INEQ]; try lia.
+        rewrite Zlength_cons, Zlength_correct in INEQ; lia.
+      - rewrite lookup_add_ineq; auto.
+        apply IH.
+        destruct INEQ as [INEQ | INEQ]; [left; lia | ].
+        right.
+        rewrite Zlength_cons, Zlength_correct in INEQ. 
+        rewrite Zlength_correct.
+        lia.
+    Qed.
+
+    Lemma key_in_range_or_not_aux : forall (k z : Z) (l : list SByte),
+        {z <= k <= z + Zlength l - 1} + {k < z} + {k >= z + Zlength l}.
+    Proof.
+      induction l as [| x l IH]; intros.
+      - cbn; rewrite Z.add_0_r.
+        destruct (@RelDec.rel_dec_p _ Z.lt _ _ k z); [left; right; auto | right; lia].
+      - rewrite Zlength_cons, <- Z.add_1_r.
+        destruct IH as [[IH | IH] | IH].
+        + left; left; lia.
+        + left; right; lia.
+        + destruct (RelDec.rel_dec_p k (z + Zlength l)).
+          * subst; left; left; rewrite Zlength_correct; lia.
+          * right; lia.
+    Qed.
+
+    Lemma key_in_range_or_not : forall (k z : Z) (l : list SByte),
+        {z <= k <= z + Zlength l - 1} + {k < z \/ k >= z + Zlength l}.
+    Proof.
+      intros; destruct (@key_in_range_or_not_aux k z l) as [[? | ?] | ?]; [left; auto | right; auto | right; auto].
+    Qed.
+
+    Lemma range_list_nth_z : forall {a} (l : list a) k,
+        0 <= k < Zlength l ->
+        exists v, list_nth_z l k = Some v.
+    Proof.
+      induction l as [| x l IH]; intros k INEQ; [cbn in *; lia |].
+      cbn; flatten_goal; [eexists; reflexivity |].
+      destruct (IH (Z.pred k)) as [v LU]; eauto.
+      rewrite Zlength_cons in INEQ; lia.
+    Qed.
+
+    Lemma in_range_is_in :  forall (k z : Z) (l : list SByte),
+        z <= k <= z + Zlength l - 1 ->
+        exists v, list_nth_z l (k - z) = Some v.
+    Proof.
+      intros.
+      apply range_list_nth_z; lia.
+    Qed.
+
+    Lemma add_all_index_twice : forall (l1 l2 : list SByte) z bytes, 
+        Zlength l1 = Zlength l2 ->
+        Equal (add_all_index l2 z (add_all_index l1 z bytes))
+              (add_all_index l2 z bytes).
+    Proof.
+      intros * EQ k.
+      destruct (@key_in_range_or_not k z l2) as [IN | OUT].
+      - destruct (in_range_is_in _ IN) as [? LU].
+        erewrite 2 lookup_add_all_index_in; eauto.
+      - rewrite 3 lookup_add_all_index_out; eauto.
+        rewrite EQ; auto.
+    Qed.
+
+    Global Instance Proper_add {a} : Proper (Logic.eq ==> Logic.eq ==> Equal ==> Equal) (@add a).
+    Proof.
+      repeat intro; subst.
+      destruct (RelDec.rel_dec_p k y); [subst; rewrite 2 lookup_add_eq; auto | rewrite 2 lookup_add_ineq; auto].
+    Qed.
+
+    Global Instance Proper_add_logical : Proper (Logic.eq ==> equivlb ==> equivl ==> equivl) add.
+    Proof.
+      repeat intro; subst.
+      destruct H1 as [DOM EQUIV].
+      split.
+      - intros k; destruct (RelDec.rel_dec_p k y); [subst; rewrite 2 member_add_eq; auto | rewrite 2 member_add_ineq; auto]; reflexivity.
+      - intros k; destruct (RelDec.rel_dec_p k y); [subst; rewrite 2 lookup_add_eq; auto | rewrite 2 lookup_add_ineq; auto].
+        intros v v' EQ1 EQ2; inv EQ1; inv EQ2; auto. 
+        intros v v' EQ1 EQ2.
+        eapply EQUIV; eauto.
+    Qed.
+
+    Global Instance Proper_add_logical_block :
+      Proper (Logic.eq ==> equivlb ==> equiv ==> equiv) add_logical_block.
+    Proof.
+      repeat intro; subst.
+      destruct x1 as ((mc,ml),s), y1 as ((mc',ml'),s'), H1 as (? & ? & EQ); cbn in *.
+      split; [| split]; auto.
+      rewrite EQ, H0.
+      reflexivity.
+    Qed.
 
     Lemma write_write :
       forall (m : memory_stack) (v1 v2 : dvalue) (a : addr),
-        'm1 <- write m a v1;;
-        write m1 a v2 =
-        write m a v2.
+        equiv_sum equiv ('m1 <- write m a v1;; write m1 a v2) (write m a v2).
     Proof.
       intros.
       unfold write; cbn.
       flatten_goal; repeat flatten_hyp Heq; try inv_sum.
       reflexivity.
-      cbn.
+      cbn in *.
       rewrite get_logical_block_of_add_logical_block.
-      f_equal.
       cbn.
-     *)
-
+      pose proof (add_all_index_twice (serialize_dvalue v1) (serialize_dvalue v2) z0 bytes).
+      (* YZ IN PROGRESS *)
+      Admitted.
 
   End Memory_Stack_Theory.
 
