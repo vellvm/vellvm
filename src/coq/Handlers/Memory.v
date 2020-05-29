@@ -1844,6 +1844,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       reflexivity.
     Qed.
 
+    Global Instance Proper_LBlock : Proper (Logic.eq ==> Equal ==> Logic.eq ==> equivlb) LBlock.
+    Admitted.
+
     Lemma write_write :
       forall (m : memory_stack) (v1 v2 : dvalue) (a : addr),
         equiv_sum equiv ('m1 <- write m a v1;; write m1 a v2) (write m a v2).
@@ -1855,8 +1858,11 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       cbn in *.
       rewrite get_logical_block_of_add_logical_block.
       cbn.
-      pose proof (add_all_index_twice (serialize_dvalue v1) (serialize_dvalue v2) z0 bytes).
-      (* YZ IN PROGRESS *)
+      rewrite add_all_index_twice.
+      apply add_logical_block_add_logical_block.
+      (* YZ : Oh this does not hold right, we need to assume that both values are of the same type *)
+      admit.
+
       Admitted.
 
   End Memory_Stack_Theory.
