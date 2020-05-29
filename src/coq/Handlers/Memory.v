@@ -300,6 +300,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DVALUE_Float f => sbytes_of_int 4 (unsigned (Float32.to_bits f))
       | DVALUE_Double d => sbytes_of_int 8 (unsigned (Float.to_bits d))
       | DVALUE_Struct fields
+      | DVALUE_Packed_struct fields
       | DVALUE_Array fields =>
         (* note the _right_ fold is necessary for byte ordering. *)
         fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
@@ -319,6 +320,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       match ty with
       | DTYPE_I sz         => 8 (* All integers are padded to 8 bytes. *)
       | DTYPE_Pointer      => 8
+      | DTYPE_Packed_struct l
       | DTYPE_Struct l     => fold_left (fun acc x => acc + sizeof_dtyp x) l 0
       | DTYPE_Array sz ty' => sz * sizeof_dtyp ty'
       | DTYPE_Float        => 4
@@ -451,6 +453,15 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       rewrite fold_sizeof. reflexivity.
     Qed.
 
+    Lemma sizeof_packed_struct_cons :
+      forall dt dts,
+        sizeof_dtyp (DTYPE_Packed_struct (dt :: dts)) = sizeof_dtyp dt + sizeof_dtyp (DTYPE_Packed_struct dts).
+    Proof.
+      cbn.
+      intros dt dts.
+      rewrite fold_sizeof. reflexivity.
+    Qed.
+
     Lemma zero_le_sizeof_dvalue :
       forall dv dt,
         dvalue_has_dtyp dv dt ->
@@ -460,6 +471,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       induction TYP using dvalue_has_dtyp_ind';
         try solve [cbn; omega].
       - rewrite sizeof_struct_cons.
+        omega.
+      - rewrite sizeof_packed_struct_cons.
         omega.
       - cbn. destruct xs.
         + cbn in *; subst.
@@ -481,6 +494,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
       intros dv dt TYP.
       induction TYP using dvalue_has_dtyp_ind'; try solve [cbn; auto].
+      - cbn.
+        rewrite app_length.
+        rewrite Nat2Z.inj_add.
+        rewrite IHTYP1.
+        cbn in IHTYP2. rewrite IHTYP2.
+        symmetry.
+        apply fold_sizeof.
       - cbn.
         rewrite app_length.
         rewrite Nat2Z.inj_add.
@@ -520,6 +540,32 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       induction TYP using dvalue_has_dtyp_ind'; auto.
       - (* Structs *)
         rewrite sizeof_struct_cons.
+        cbn.
+        rewrite <- sizeof_serialized with (dv:=f); auto.
+
+        replace (Z.to_nat
+                   (Z.of_nat (Datatypes.length (serialize_dvalue f)) +
+                    fold_left (fun (x : Z) (acc : dtyp) => x + sizeof_dtyp acc) dts 0)) with
+            (Datatypes.length (serialize_dvalue f) +
+             Z.to_nat (fold_left (fun (x : Z) (acc : dtyp) => (x + sizeof_dtyp acc)%Z) dts 0%Z))%nat.
+        + rewrite firstn_app_2.
+          cbn in *.
+          rewrite IHTYP2.
+          reflexivity.
+        + rewrite Z2Nat.inj_add; try omega.
+          rewrite Nat2Z.id. reflexivity.
+          inversion TYP2; cbn.
+          omega.
+
+          pose proof (zero_le_sizeof_dvalue H2) as Hsz_fields.
+          pose proof (zero_le_sizeof_dvalue H1) as Hsz_f.
+          cbn in Hsz_fields.
+          cbn in Hsz_f.
+
+          rewrite fold_sizeof.
+          omega.
+      - (* Packed Structs *)
+        rewrite sizeof_packed_struct_cons.
         cbn.
         rewrite <- sizeof_serialized with (dv:=f); auto.
 
@@ -658,6 +704,22 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
       intros dv.
       induction dv using dvalue_ind'; auto.
+      - induction fields.
+        + reflexivity.
+        + cbn. apply forallb_forall.
+          intros x Hin.
+          apply list_in_map_inv in Hin as [b [Hxb Hin]]; subst.
+          apply in_app_or in Hin as [Hin | Hin].
+          * assert (In a (a :: fields)) as Hina by intuition.
+            specialize (H a Hina).
+            eapply byte_defined; eauto.
+          * assert (forall u : dvalue, In u fields -> all_not_sundef (serialize_dvalue u) = true) as Hu.
+            intros u Hinu.
+            apply H. cbn. auto.
+
+            specialize (IHfields Hu).
+            eapply byte_defined. apply IHfields.
+            apply Hin.
       - induction fields.
         + reflexivity.
         + cbn. apply forallb_forall.
@@ -822,7 +884,48 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           rewrite H0.
 
           reflexivity.
-      - (* Packed Structs *) admit.
+      - (* Packed Structs *)
+        generalize dependent f.
+        generalize dependent dt.
+        generalize dependent dts.
+        induction fields; intros dts TYP2 IHTYP2 dt f TYP1 IHTYP1; inversion TYP2.
+        + cbn. rewrite app_nil_r.
+          unfold deserialize_sbytes.
+          rewrite dvalue_serialized_not_sundef.
+          cbn.
+          rewrite firstn_sizeof_dtyp; auto.
+          rewrite deserialize_sbytes_defined_dvalue.
+          rewrite IHTYP1.
+          auto.
+        + subst; cbn.
+          unfold deserialize_sbytes.
+
+          rewrite all_not_sundef_app; auto.
+
+          cbn.
+          rewrite serialize_firstn_app; eauto.
+          rewrite deserialize_sbytes_defined_dvalue.
+          rewrite IHTYP1.
+
+          cbn in *.
+          rewrite serialize_skipn_app; eauto.
+          rewrite serialize_firstn_app; eauto.
+          rewrite deserialize_sbytes_defined_dvalue.
+
+          unfold deserialize_sbytes in IHTYP2.
+          rewrite all_not_sundef_app in IHTYP2; auto.
+
+          cbn in IHTYP2.
+          inversion IHTYP2.
+          rewrite serialize_firstn_app in H0; eauto.
+          rewrite deserialize_sbytes_defined_dvalue in H0.
+          rewrite H0.
+
+          rewrite serialize_firstn_app; eauto.
+          rewrite deserialize_sbytes_defined_dvalue.
+          rewrite H0.
+
+          reflexivity.
       - (* Arrays *)
         induction xs.
         + subst. cbn. reflexivity.
