@@ -1811,12 +1811,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | f :: s => ret (m, (k :: f) :: s)
       end.
 
-    Definition allocate (m : memory_stack) (t : dtyp) : err (memory_stack * Z) :=
+    Definition allocate (m : memory_stack) (t : dtyp) : err (memory_stack * addr) :=
       let new_block := make_empty_logical_block t in
       let key       := next_logical_key m in
       let m         := add_logical_block key new_block m in
       'm <- add_to_frame m key;;
-      ret (m,key).
+      ret (m,(key,0)).
 
     Definition read (m : memory_stack) (ptr : addr) (t : dtyp) : err uvalue :=
       match get_logical_block m (fst ptr) with
@@ -1834,6 +1834,94 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         ret (add_logical_block b block' m)
       | None => failwith "Attempting to write to a non-allocated address"
       end.
+
+    (* Test whether a given address belong to the current main frame,
+       and hence if it will be collected when the current function returns
+     *)
+    Definition in_frame (a : addr) (m : memory_stack) : Prop :=
+      let '(_,s) := m in
+      match s with
+      | [] => False (* This case should never happen *)
+      | f::_ => In (fst a) f
+      end.
+    
+    Definition allocated (a : addr) (m : memory_stack) : Prop :=
+      let '((_,lm),_) := m in member (fst a) lm.
+
+    Record ext_memory (m1 : memory_stack) (a : addr) (τ : dtyp) (v : uvalue) (m2 : memory_stack) : Prop :=
+      {
+      new_lu  : read m2 a τ = inr v;
+      old_lu  : forall a' τ', a <> a' -> read m2 a' τ' = read m1 a' τ'
+      }.
+
+    Definition same_reads (m1 m2 : memory_stack) : Prop := forall a τ, read m1 a τ = read m2 a τ.
+
+    Record allocate_spec (m1 : memory_stack) (τ : dtyp) (m2 : memory_stack) (a : addr) : Prop :=
+      {
+      was_fresh : ~ allocated a m1;
+      is_allocated : ext_memory m1 a τ (UVALUE_Undef τ) m2
+      }.
+
+    Record write_spec (m1 : memory_stack) (a : addr) (v : dvalue) (m2 : memory_stack) : Prop :=
+      {
+      was_allocated : allocated a m1;
+      is_written    : forall τ, dvalue_has_dtyp v τ -> ext_memory m1 a τ (dvalue_to_uvalue v) m2
+      }.
+    
+    Record read_spec (m : memory_stack) (a : addr) (τ : dtyp) (v : uvalue) : Prop :=
+      {
+      is_read : read m a τ = inr v
+      }.
+
+    Lemma next_logical_key_fresh : forall lm,
+        ~ member (logical_next_key lm) lm.
+    Proof.
+    Admitted.
+
+    Arguments add : simpl never.
+    Arguments lookup : simpl never.
+    Arguments logical_next_key : simpl never.
+    Arguments get_logical_block /.
+    Arguments get_logical_block_mem /.
+
+    Lemma allocate_correct : forall m1 τ m2 a,
+        allocate m1 τ = inr (m2,a) ->
+        allocate_spec m1 τ m2 a.
+    Proof.
+      intros ((cm,lm),s) * EQ.
+      destruct s as [|f s]; inv EQ.
+      split.
+      - apply next_logical_key_fresh.
+      - split.
+        + unfold read; cbn.
+          rewrite lookup_add_eq.
+          cbn.
+          admit.
+        + intros * NEQ.
+          unfold read; cbn.
+          rewrite lookup_add_ineq.
+          reflexivity.
+          destruct a'; intros abs; apply NEQ; cbn in *; subst; auto.
+          f_equal.
+          (* Annoying: need to introduce an equivalence over addresses that share the same pointer but not offset? *)
+          admit.
+    Admitted.
+
+    Lemma write_correct : forall m1 a v m2,
+        write m1 a v = inr m2 ->
+        write_spec m1 a v m2.
+    Proof.
+      unfold write; intros ((cm,lm),s) * WR.
+      cbn in *.
+      flatten_hyp WR; [| inv_sum].
+      destruct l,a; inv WR.
+      cbn in *.
+      split.
+      - cbn. eapply lookup_member; eauto.
+      - intros * TYP.
+        (* Need read_add lemmas *)
+        admit.
+    Admitted.
 
     Definition concrete_address_to_logical (cid : Z) (m : memory_stack) : option (Z * Z) :=
       concrete_address_to_logical_mem cid (fst m).
@@ -1869,7 +1957,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       unfold DynamicValues.Int1.modulus,DynamicValues.Int1.wordsize, DynamicValues.Wordsize1.wordsize, two_power_nat in *.
       cbn in *; lia.
     Qed.
-
+{
     Lemma unsigned_I8_in_range : forall (x : DynamicValues.int8),
         0 <= DynamicValues.Int8.unsigned x <= 255.
     Proof.
@@ -1981,14 +2069,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       apply add_add_logical. 
     Qed.
 
-    (* YZ : Either exists, or define more properly *)
-    Definition equiv_sum {A : Type} (R : A -> A -> Prop) : err A -> err A -> Prop :=
-      fun ma ma' => match ma,ma' with
-                 | inr a, inr a' => R a a'
-                 | inl _, inl _ => True
-                 | _, _ => False
-                 end.
-
     Global Instance Proper_add_logical : Proper (Logic.eq ==> equivlb ==> equivl ==> equivl) add.
     Proof.
       repeat intro; subst.
@@ -2016,6 +2096,14 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       repeat intro; subst.
       constructor; auto.
     Qed.
+
+    (* YZ : Either exists, or define more properly *)
+    Definition equiv_sum {A : Type} (R : A -> A -> Prop) : err A -> err A -> Prop :=
+      fun ma ma' => match ma,ma' with
+                 | inr a, inr a' => R a a'
+                 | inl _, inl _ => True
+                 | _, _ => False
+                 end.
 
     Lemma write_write :
       forall (m : memory_stack) (v1 v2 : dvalue) (a : addr) τ,
