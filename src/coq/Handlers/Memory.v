@@ -2139,8 +2139,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         ret (m',tt)
 
       | Alloca t =>
-        '(m',key) <- lift_pure_err (allocate m t);;
-        ret (m', DVALUE_Addr (key,0))
+        '(m',a) <- lift_pure_err (allocate m t);;
+        ret (m', DVALUE_Addr a)
 
       | Load t dv =>
         match dv with
