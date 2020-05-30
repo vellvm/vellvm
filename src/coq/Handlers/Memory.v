@@ -13,7 +13,8 @@ From Coq Require Import
      Morphisms ZArith List String Omega
      FSets.FMapAVL
      Structures.OrderedTypeEx
-     ZMicromega.
+     ZMicromega
+     Psatz.
 
 From ITree Require Import
      ITree
@@ -94,183 +95,456 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Definition addr := Addr.addr.
 
   Module IM := FMapAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
-  (* Polymorphic type of maps indexed by [Z] *)
-  Definition IntMap := IM.t.
 
-  Definition add {a} k (v:a) := IM.add k v.
-  Definition delete {a} k (m:IntMap a) := IM.remove k m.
-  Definition member {a} k (m:IntMap a) := IM.mem k m.
-  Definition lookup {a} k (m:IntMap a) := IM.find k m.
-  Definition empty {a} := @IM.empty a.
-  Definition Equal {a} : IntMap a -> IntMap a -> Prop :=
-    fun m m' => forall k, lookup k m = lookup k m'.
-  Definition Equiv {a} (R : a -> a -> Prop) : IntMap a -> IntMap a -> Prop :=
-    fun m m' =>
-      (forall k, member k m <-> member k m') /\
-      (forall k e e', lookup k m = Some e -> lookup k m' = Some e' -> R e e').
-  
-  Global Instance Equal_Equiv {a}: Equivalence (@Equal a).
-  Proof.
-    split.
-    - repeat intro; reflexivity.
-    - repeat intro.
-      symmetry; apply H.
-    - intros ? ? ? EQ1 EQ2 ?.
-      etransitivity; eauto.
-  Qed.
+  (** ** Finite maps
+      We use finite maps in several place of the memory model. We rely on the AVL implementation from the standard library.
+      We redefine locally the operations we use and their axiomatisation as the interface exposed by the standard library
+      tends to leak out the [Raw] underlying implementation, and feels overall tedious to use.
+   *)
+  Section Map_Operations.
 
-  Lemma add_add : forall {a} off b1 b2 (m : IM.t a),
-      Equal (add off b2 (add off b1 m)) (add off b2 m).
-  Proof.
-    intros; intro key; cbn.
-    rewrite IM.Raw.Proofs.add_find; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
-    rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
-    rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
-    flatten_goal; auto.
-  Qed.
+    (* Polymorphic type of maps indexed by [Z] *)
+    Definition IntMap := IM.t.
 
-  Lemma member_add_eq {a}: forall k v (m: IM.t a),
-      member k (add k v m).
-  Proof.
-    intros.
-    cbn.
-    apply IM.Raw.Proofs.mem_1.
-    apply IM.Raw.Proofs.add_bst, IM.is_bst.
-    rewrite IM.Raw.Proofs.add_in; auto.
-  Qed.
+    Definition add {a} k (v:a) := IM.add k v.
+    Definition delete {a} k (m:IntMap a) := IM.remove k m.
+    Definition member {a} k (m:IntMap a) := IM.mem k m.
+    Definition lookup {a} k (m:IntMap a) := IM.find k m.
+    Definition empty {a} := @IM.empty a.
 
-  Lemma member_add_ineq {a}: forall k k' v (m: IM.t a),
-      k <> k' ->
-      member k (add k' v m) <-> member k m.
-  Proof.
-    intros.
-    cbn. split.
-    - intros IN; apply IM.Raw.Proofs.mem_2 in IN.
-      rewrite IM.Raw.Proofs.add_in in IN.
-      destruct IN as [-> | IN]; [contradiction H; auto | ].
-      apply IM.Raw.Proofs.mem_1; [apply IM.is_bst | auto]. 
-    - intros IN.
-      apply IM.Raw.Proofs.mem_1.
-      apply IM.Raw.Proofs.add_bst, IM.is_bst.
-      rewrite IM.Raw.Proofs.add_in; right; auto.
-      apply IM.Raw.Proofs.mem_2 in IN; auto. 
-  Qed.
-
-  Lemma lookup_add_eq : forall {a} k x (m : IM.t a),
-      lookup k (add k x m) = Some x.
-  Proof.
-    intros.
-    unfold lookup, add.
-    apply IM.find_1, IM.add_1; auto.
-  Qed.
-
-  Lemma MapsTo_inj : forall {a} k v v' (m : IM.t a),
-      IM.MapsTo k v m ->
-      IM.MapsTo k v' m ->
-      v = v'.
-  Proof.
-    intros.
-    apply IM.find_1 in H; apply IM.find_1 in H0.
-    rewrite H0 in H; inv H. 
-    reflexivity.
-  Qed.
-
-  Lemma lookup_add_ineq : forall {a} k k' x (m : IM.t a),
-      k <> k' ->
-      lookup k (add k' x m) = lookup k m.
-  Proof.
-    intros.
-    unfold lookup, add.
-    match goal with
-      |- ?x = ?y => destruct x eqn:EQx,y eqn:EQy;
-                    try apply IM.find_2,IM.add_3 in EQx;
-                    try apply IM.find_2 in EQy
-    end; auto.
-    eapply MapsTo_inj in EQx; eauto; subst; eauto.
-    apply IM.find_1 in EQx; rewrite EQx in EQy; inv EQy. 
-    cbn in *.
-    apply IM.Raw.Proofs.not_find_iff in EQx; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
-    exfalso; apply EQx, IM.Raw.Proofs.add_in.
-    destruct (RelDec.rel_dec_p k k'); auto.
-    right.
-    unfold IM.MapsTo in *.
-    eapply IM.Raw.Proofs.MapsTo_In,EQy.
-  Qed.
-
-  Lemma Equiv_add_add : forall {a} {r: a -> a -> Prop} {rR: Reflexive r},
-      forall k v1 v2 (m: IM.t a),
-        Equiv r (add k v2 (add k v1 m)) (add k v2 m).
-  Proof.
-    intros; split.
-    - intros key.
-      destruct (RelDec.rel_dec_p key k).
-      + subst; rewrite 2 member_add_eq; reflexivity.
-      + subst; rewrite 3 member_add_ineq; auto; reflexivity.
-    - intros key v v' LU1 LU2; cbn.
-      destruct (RelDec.rel_dec_p key k).
-      + subst; rewrite lookup_add_eq in LU1, LU2; inv LU1; inv LU2.
-        reflexivity.
-      + subst; rewrite lookup_add_ineq in LU1, LU2; auto; rewrite lookup_add_ineq in LU1; auto.
-        rewrite LU1 in LU2; inv LU2.
-        reflexivity.
-  Qed.
-
-  (* Extends the map with a list of pairs key/value.
+    (* We use two notions of equivalence of maps depending on the type of objects stored.
+       When we can get away with Leibniz's equality over the return type, we simply use
+       [Equal] that implements extensional equality (and equality of domains).
+       When the domain of value itself has a non-trivial notion of equivalence, we use [Equiv]
+       which relax functional equivalence up-to this relation.
+     *)
+    Definition Equal {a} : IntMap a -> IntMap a -> Prop :=
+      fun m m' => forall k, lookup k m = lookup k m'.
+    Definition Equiv {a} (R : a -> a -> Prop) : IntMap a -> IntMap a -> Prop :=
+      fun m m' =>
+        (forall k, member k m <-> member k m') /\
+        (forall k e e', lookup k m = Some e -> lookup k m' = Some e' -> R e e').
+    
+    (* Extends the map with a list of pairs key/value.
      Note: additions start from the end of the list, so in case of duplicate
      keys, the binding in the front will shadow though in the back.
-   *)
-  Fixpoint add_all {a} ks (m:IntMap a) :=
-    match ks with
-    | [] => m
-    | (k,v) :: tl => add k v (add_all tl m)
-    end.
+     *)
+    Fixpoint add_all {a} ks (m:IntMap a) :=
+      match ks with
+      | [] => m
+      | (k,v) :: tl => add k v (add_all tl m)
+      end.
 
-  (* Extends the map with the bindings {(i,v_1) .. (i+n-1, v_n)} for [vs ::= v_1..v_n] *)
-  Fixpoint add_all_index {a} vs (i:Z) (m:IntMap a) :=
-    match vs with
-    | [] => m
-    | v :: tl => add i v (add_all_index tl (i+1) m)
-    end.
+    (* Extends the map with the bindings {(i,v_1) .. (i+n-1, v_n)} for [vs ::= v_1..v_n] *)
+    Fixpoint add_all_index {a} vs (i:Z) (m:IntMap a) :=
+      match vs with
+      | [] => m
+      | v :: tl => add i v (add_all_index tl (i+1) m)
+      end.
 
-  (* Give back a list of values from [|i|] to [|i| + |sz| - 1] in [m].
+    (* Give back a list of values from [|i|] to [|i| + |sz| - 1] in [m].
      Uses [def] as the default value if a lookup failed.
-   *)
-  Definition lookup_all_index {a} (i:Z) (sz:Z) (m:IntMap a) (def:a) : list a :=
-    List.map (fun x =>
-                match lookup (Z.of_nat x) m with
-                | None => def
-                | Some val => val
-                end) (seq (Z.to_nat i) (Z.to_nat sz)).
+     *)
+    Definition lookup_all_index {a} (i:Z) (sz:Z) (m:IntMap a) (def:a) : list a :=
+      List.map (fun x =>
+                  match lookup (Z.of_nat x) m with
+                  | None => def
+                  | Some val => val
+                  end) (seq (Z.to_nat i) (Z.to_nat sz)).
 
-  (* Takes the join of two maps, favoring the first one over the intersection of their domains *)
-  Definition union {a} (m1 : IntMap a) (m2 : IntMap a)
-    := IM.map2 (fun mx my =>
-                  match mx with | Some x => Some x | None => my end) m1 m2.
+    (* Takes the join of two maps, favoring the first one over the intersection of their domains *)
+    Definition union {a} (m1 : IntMap a) (m2 : IntMap a)
+      := IM.map2 (fun mx my =>
+                    match mx with | Some x => Some x | None => my end) m1 m2.
 
-  (* TODO : Move the three following functions *)
+    (* TODO : Move the three following functions *)
     Fixpoint max_default (l:list Z) (x:Z) :=
-    match l with
-    | [] => x
-    | h :: tl =>
-      max_default tl (if h >? x then h else x)
-    end.
+      match l with
+      | [] => x
+      | h :: tl =>
+        max_default tl (if h >? x then h else x)
+      end.
 
-  Definition maximumBy {A} (leq : A -> A -> bool) (def : A) (l : list A) : A :=
-    fold_left (fun a b => if leq a b then b else a) l def.
+    Definition maximumBy {A} (leq : A -> A -> bool) (def : A) (l : list A) : A :=
+      fold_left (fun a b => if leq a b then b else a) l def.
 
-  Definition is_some {A} (o : option A) :=
-    match o with
-    | Some x => true
-    | None => false
-    end.
+    Definition is_some {A} (o : option A) :=
+      match o with
+      | Some x => true
+      | None => false
+      end.
 
-  (* TODO SAZ: mem_block should keep track of its allocation size so
+  End Map_Operations.
+
+  (** ** Theory of the general operations over the finite maps we manipulate
+   *)
+  Section Map_Theory.
+
+    (* Keys are in the domain if and only if they lead to values when looked-up  *)
+    Lemma member_lookup {a} : forall k (m : IM.t a),
+      member k m -> exists v, lookup k m = Some v.
+    Proof.
+      unfold member,lookup in *.
+      intros * IN.
+      apply IM.Raw.Proofs.mem_2, IM.Raw.Proofs.In_MapsTo in IN.
+      destruct IN as [v IN].
+      exists v. 
+      apply IM.Raw.Proofs.find_1; eauto.
+      apply IM.is_bst.
+    Qed.
+
+    Lemma lookup_member {a} : forall k v(m : IM.t a),
+        lookup k m = Some v -> member k m .
+    Proof.
+      unfold member,lookup in *.
+      intros * IN.
+      apply IM.Raw.Proofs.mem_1; [apply IM.is_bst |].
+      apply IM.Raw.Proofs.find_2 in IN; eauto.
+      eapply IM.Raw.Proofs.MapsTo_In; eauto. 
+    Qed.
+
+    (* Relationship between [lookup] and [add] *)
+    Lemma MapsTo_inj : forall {a} k v v' (m : IM.t a),
+        IM.MapsTo k v m ->
+        IM.MapsTo k v' m ->
+        v = v'.
+    Proof.
+      intros.
+      apply IM.find_1 in H; apply IM.find_1 in H0.
+      rewrite H0 in H; inv H. 
+      reflexivity.
+    Qed.
+
+    Lemma lookup_add_eq : forall {a} k x (m : IM.t a),
+        lookup k (add k x m) = Some x.
+    Proof.
+      intros.
+      unfold lookup, add.
+      apply IM.find_1, IM.add_1; auto.
+    Qed.
+
+    Lemma lookup_add_ineq : forall {a} k k' x (m : IM.t a),
+        k <> k' ->
+        lookup k (add k' x m) = lookup k m.
+    Proof.
+      intros.
+      unfold lookup, add.
+      match goal with
+        |- ?x = ?y => destruct x eqn:EQx,y eqn:EQy;
+                      try apply IM.find_2,IM.add_3 in EQx;
+                      try apply IM.find_2 in EQy
+      end; auto.
+      eapply MapsTo_inj in EQx; eauto; subst; eauto.
+      apply IM.find_1 in EQx; rewrite EQx in EQy; inv EQy. 
+      cbn in *.
+      apply IM.Raw.Proofs.not_find_iff in EQx; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
+      exfalso; apply EQx, IM.Raw.Proofs.add_in.
+      destruct (RelDec.rel_dec_p k k'); auto.
+      right.
+      unfold IM.MapsTo in *.
+      eapply IM.Raw.Proofs.MapsTo_In,EQy.
+    Qed.
+
+    (* Relationship between [add] and [member] *)
+    Lemma member_add_eq {a}: forall k v (m: IM.t a),
+        member k (add k v m).
+    Proof.
+      intros.
+      cbn.
+      apply IM.Raw.Proofs.mem_1.
+      apply IM.Raw.Proofs.add_bst, IM.is_bst.
+      rewrite IM.Raw.Proofs.add_in; auto.
+    Qed.
+
+    Lemma member_add_ineq {a}: forall k k' v (m: IM.t a),
+        k <> k' ->
+        member k (add k' v m) <-> member k m.
+    Proof.
+      intros.
+      cbn. split.
+      - intros IN; apply IM.Raw.Proofs.mem_2 in IN.
+        rewrite IM.Raw.Proofs.add_in in IN.
+        destruct IN as [-> | IN]; [contradiction H; auto | ].
+        apply IM.Raw.Proofs.mem_1; [apply IM.is_bst | auto]. 
+      - intros IN.
+        apply IM.Raw.Proofs.mem_1.
+        apply IM.Raw.Proofs.add_bst, IM.is_bst.
+        rewrite IM.Raw.Proofs.add_in; right; auto.
+        apply IM.Raw.Proofs.mem_2 in IN; auto. 
+    Qed.
+
+    (** ** Equivalences
+        Both notions of equivalence of maps that we manipulate are indeed equivalences
+        (assuming the relation on values is itself an equivalence for [Equiv]).
+     *)
+    Global Instance Equal_Equiv {a}: Equivalence (@Equal a).
+    Proof.
+      split.
+      - repeat intro; reflexivity.
+      - repeat intro.
+        symmetry; apply H.
+      - intros ? ? ? EQ1 EQ2 ?.
+        etransitivity; eauto.
+    Qed.
+
+    Global Instance Equiv_Equiv {a} {r: a -> a -> Prop} {rE : Equivalence r} : Equivalence (Equiv r).
+    Proof.
+      split.
+      - intros ?; split.
+        intros k; reflexivity.
+        intros * LU1 LU2; rewrite LU1 in LU2; inv LU2; reflexivity.
+      - intros ? ? [DOM EQ]; split.
+        intros ?; split; intros ?; apply DOM; auto. 
+        intros; symmetry; eapply EQ; eauto.
+      - intros ? ? ? [DOM1 EQ1] [DOM2 EQ2]; split.
+        intros ?; split; intros ?.
+        apply DOM2,DOM1; auto.
+        apply DOM1,DOM2; auto.
+       intros ? ? ? LU1 LU2.
+       generalize LU1; intros LU3; apply lookup_member,DOM1,member_lookup in LU3. 
+       destruct LU3 as [e'' LU3].
+       transitivity e''.
+       eapply EQ1; eauto.
+       eapply EQ2; eauto.
+    Qed. 
+
+    (* Consecutive extensions of the map *)
+    Lemma add_add : forall {a} off b1 b2 (m : IM.t a),
+        Equal (add off b2 (add off b1 m)) (add off b2 m).
+    Proof.
+      intros; intro key; cbn.
+      rewrite IM.Raw.Proofs.add_find; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
+      rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
+      rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
+      flatten_goal; auto.
+    Qed.
+
+    Lemma Equiv_add_add : forall {a} {r: a -> a -> Prop} {rR: Reflexive r},
+        forall k v1 v2 (m: IM.t a),
+          Equiv r (add k v2 (add k v1 m)) (add k v2 m).
+    Proof.
+      intros; split.
+      - intros key.
+        destruct (RelDec.rel_dec_p key k).
+        + subst; rewrite 2 member_add_eq; reflexivity.
+        + subst; rewrite 3 member_add_ineq; auto; reflexivity.
+      - intros key v v' LU1 LU2; cbn.
+        destruct (RelDec.rel_dec_p key k).
+        + subst; rewrite lookup_add_eq in LU1, LU2; inv LU1; inv LU2.
+          reflexivity.
+        + subst; rewrite lookup_add_ineq in LU1, LU2; auto; rewrite lookup_add_ineq in LU1; auto.
+          rewrite LU1 in LU2; inv LU2.
+          reflexivity.
+    Qed.
+
+    Lemma add_add_ineq : forall {a} k1 k2 v1 v2 (m : IM.t a),
+        k1 <> k2 ->
+        Equal (add k2 v2 (add k1 v1 m)) (add k1 v1 (add k2 v2 m)).
+    Proof.
+      intros; intro key; cbn.
+      rewrite IM.Raw.Proofs.add_find; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
+      rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
+      rewrite IM.Raw.Proofs.add_find; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
+      rewrite IM.Raw.Proofs.add_find; [| apply  IM.is_bst].
+      pose proof (IM.Raw.Proofs.MX.eqb_alt key k2).
+      flatten_goal; auto.
+      pose proof (IM.Raw.Proofs.MX.eqb_alt key k1).
+      flatten_goal; auto.
+      unfold IM.Raw.Proofs.MX.eqb in *.
+      flatten_hyp H0.
+      flatten_hyp H1.
+      subst; contradiction H; auto.
+      inv H1.
+      inv H0.
+    Qed.
+
+    (** ** [lookup_all_index]
+     *)
+    Lemma seq_succ : forall off n,
+        n >= 0 ->
+        off >= 0 ->
+        seq (Z.to_nat off) (Z.to_nat (Z.succ n)) = Z.to_nat off :: seq (Z.to_nat (Z.succ off)) (Z.to_nat n).
+    Proof.
+      intros; cbn.
+      rewrite Z2Nat.inj_succ; [| lia].
+      cbn; f_equal.
+      rewrite (Z2Nat.inj_succ off); [| lia].
+      auto.
+      Qed.
+
+    Lemma lookup_all_index_cons {a} : forall k (n : Z) (m : IntMap a) def,
+        k >= 0 ->
+        n >= 0 ->
+        lookup_all_index k (Z.succ n) m def =
+        match lookup k m with
+        | Some val => val
+        | None => def
+        end :: lookup_all_index (Z.succ k) n m def
+    .
+    Proof.
+      intros.
+      unfold lookup_all_index.
+      rewrite seq_succ; try lia.
+      cbn.
+      rewrite Z2Nat.id; auto.
+      lia.
+    Qed.
+
+    Global Instance Proper_lookup {a} k: Proper (@Equal a ==> Logic.eq) (lookup k).
+    Proof.
+      repeat intro.
+      apply H.
+    Qed.
+
+    Lemma lookup_all_index_add_out_of_range_aux {a} : forall l k n (m : IntMap a) key x def,
+        l = seq (Z.to_nat k) (Z.to_nat n) ->
+        key >= 0 ->
+        k >= 0 ->
+        (key < k \/ key >= k + n) ->
+        lookup_all_index k n (add key x m) def =
+        lookup_all_index k n m def.
+    Proof.
+      induction l as [| x l IH]; simpl.
+      - intros * EQ LT.
+        unfold lookup_all_index; rewrite <- EQ; reflexivity.
+      - intros * EQ POS1 POS2 RANGE.
+        destruct (Z.to_nat n) eqn:EQn; [inv EQ |].
+        cbn in EQ; inv EQ.
+        assert (n = Z.succ (Z.of_nat n0)) by lia.
+        subst; rewrite lookup_all_index_cons; auto; try lia.
+        subst; rewrite lookup_all_index_cons; auto; try lia.
+        rewrite lookup_add_ineq; [| lia].
+        f_equal.
+        apply IH; try lia.
+        rewrite Nat2Z.id, Z2Nat.inj_succ; try lia.
+        reflexivity.
+    Qed.
+
+    Lemma lookup_all_index_add_out_of_range {a} : forall k n (m : IntMap a) key x def,
+        key >= 0 ->
+        k >= 0 ->
+        (key < k \/ key >= k + n) ->
+        lookup_all_index k n (add key x m) def =
+        lookup_all_index k n m def.
+    Proof.
+      intros; eapply lookup_all_index_add_out_of_range_aux; eauto.
+    Qed.
+
+    Lemma lookup_add_all_index_in {a} : forall l k z (m : IntMap a) v,
+        z <= k <= z + Zlength l - 1 ->
+        list_nth_z l (k - z) = Some v ->
+        lookup k (add_all_index l z m) = Some v.
+    Proof.
+      induction l as [| x l IH]; simpl; intros * INEQ LU.
+      inv LU.
+      destruct (RelDec.rel_dec_p k z).
+      - subst.
+        rewrite Z.sub_diag in LU; cbn in LU; inv LU.
+        rewrite lookup_add_eq;  reflexivity.
+      - rewrite lookup_add_ineq; auto.
+        apply IH.
+        rewrite Zlength_cons in INEQ; lia.
+        destruct (zeq (k - z)) eqn:INEQ'; [lia |].
+        replace (k - (z + 1)) with (Z.pred (k-z)) by lia; auto.
+    Qed.
+
+    Lemma lookup_add_all_index_out {a} : forall l k z (m : IntMap a),
+        (k < z \/ k >= z + Zlength l) ->
+        lookup k (add_all_index l z m) = lookup k m.
+    Proof.
+      induction l as [| x l IH]; simpl; intros * INEQ; auto.
+      destruct (RelDec.rel_dec_p k z).
+      - subst. exfalso; destruct INEQ as [INEQ | INEQ]; try lia.
+        rewrite Zlength_cons, Zlength_correct in INEQ; lia.
+      - rewrite lookup_add_ineq; auto.
+        apply IH.
+        destruct INEQ as [INEQ | INEQ]; [left; lia | ].
+        right.
+        rewrite Zlength_cons, Zlength_correct in INEQ. 
+        rewrite Zlength_correct.
+        lia.
+    Qed.
+
+    Lemma key_in_range_or_not_aux {a} : forall (k z : Z) (l : list a),
+        {z <= k <= z + Zlength l - 1} + {k < z} + {k >= z + Zlength l}.
+    Proof.
+      induction l as [| x l IH]; intros.
+      - cbn; rewrite Z.add_0_r.
+        destruct (@RelDec.rel_dec_p _ Z.lt _ _ k z); [left; right; auto | right; lia].
+      - rewrite Zlength_cons, <- Z.add_1_r.
+        destruct IH as [[IH | IH] | IH].
+        + left; left; lia.
+        + left; right; lia.
+        + destruct (RelDec.rel_dec_p k (z + Zlength l)).
+          * subst; left; left; rewrite Zlength_correct; lia.
+          * right; lia.
+    Qed.
+
+    Lemma key_in_range_or_not {a} : forall (k z : Z) (l : list a),
+        {z <= k <= z + Zlength l - 1} + {k < z \/ k >= z + Zlength l}.
+    Proof.
+      intros; destruct (@key_in_range_or_not_aux _ k z l) as [[? | ?] | ?]; [left; auto | right; auto | right; auto].
+    Qed.
+
+    Lemma range_list_nth_z : forall {a} (l : list a) k,
+        0 <= k < Zlength l ->
+        exists v, list_nth_z l k = Some v.
+    Proof.
+      induction l as [| x l IH]; intros k INEQ; [cbn in *; lia |].
+      cbn; flatten_goal; [eexists; reflexivity |].
+      destruct (IH (Z.pred k)) as [v LU]; eauto.
+      rewrite Zlength_cons in INEQ; lia.
+    Qed.
+
+    Lemma in_range_is_in {a} :  forall (k z : Z) (l : list a),
+        z <= k <= z + Zlength l - 1 ->
+        exists v, list_nth_z l (k - z) = Some v.
+    Proof.
+      intros.
+      apply range_list_nth_z; lia.
+    Qed.
+
+    Lemma add_all_index_twice {a} : forall (l1 l2 : list a) z m, 
+        Zlength l1 = Zlength l2 ->
+        Equal (add_all_index l2 z (add_all_index l1 z m))
+              (add_all_index l2 z m).
+    Proof.
+      intros * EQ k.
+      destruct (@key_in_range_or_not _ k z l2) as [IN | OUT].
+      - destruct (in_range_is_in _ IN) as [? LU].
+        erewrite 2 lookup_add_all_index_in; eauto.
+      - rewrite 3 lookup_add_all_index_out; eauto.
+        rewrite EQ; auto.
+    Qed.
+
+    Global Instance Proper_add {a} : Proper (Logic.eq ==> Logic.eq ==> Equal ==> Equal) (@add a).
+    Proof.
+      repeat intro; subst.
+      destruct (RelDec.rel_dec_p k y); [subst; rewrite 2 lookup_add_eq; auto | rewrite 2 lookup_add_ineq; auto].
+    Qed.
+
+    Lemma lookup_all_index_add {a} : forall k size x (m : IntMap a) def,
+        k >= 0 ->
+        size >= 0 ->
+        lookup_all_index k (Z.succ size) (add k x m) def =
+        x :: lookup_all_index (Z.succ k) size m def.
+    Proof.
+      intros * POS1 POS2.
+      rewrite lookup_all_index_cons; auto; try lia.
+      rewrite lookup_add_eq.
+      f_equal.
+      rewrite lookup_all_index_add_out_of_range; auto; try lia.
+    Qed.
+
+  End Map_Theory.
+
+    (* TODO SAZ: mem_block should keep track of its allocation size so
     that operations can fail if they are out of range
 
     CB: I think this might happen implicitly with make_empty_block --
     it initializes the IntMap with only the valid indices. As long as the
     lookup functions handle this properly, anyway.
-   *)
+     *)
 
   Section Datatype_Definition.
 
@@ -584,7 +858,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       rewrite fold_sizeof. reflexivity.
     Qed.
 
-    Lemma zero_le_sizeof_dvalue :
+    Lemma sizeof_dvalue_pos :
       forall dv dt,
         dvalue_has_dtyp dv dt ->
         0 <= sizeof_dtyp dt.
@@ -699,8 +973,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           inversion TYP2; cbn.
           omega.
 
-          pose proof (zero_le_sizeof_dvalue H2) as Hsz_fields.
-          pose proof (zero_le_sizeof_dvalue H1) as Hsz_f.
+          pose proof (sizeof_dvalue_pos H2) as Hsz_fields.
+          pose proof (sizeof_dvalue_pos H1) as Hsz_f.
           cbn in Hsz_fields.
           cbn in Hsz_f.
 
@@ -725,8 +999,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           inversion TYP2; cbn.
           omega.
 
-          pose proof (zero_le_sizeof_dvalue H2) as Hsz_fields.
-          pose proof (zero_le_sizeof_dvalue H1) as Hsz_f.
+          pose proof (sizeof_dvalue_pos H2) as Hsz_fields.
+          pose proof (sizeof_dvalue_pos H1) as Hsz_f.
           cbn in Hsz_fields.
           cbn in Hsz_f.
 
@@ -752,9 +1026,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                auto.
                auto.
                auto.
-            -- eapply zero_le_sizeof_dvalue; eauto.
+            -- eapply sizeof_dvalue_pos; eauto.
             -- assert (dvalue_has_dtyp a dt) as TYP by auto.
-               pose proof zero_le_sizeof_dvalue TYP.
+               pose proof sizeof_dvalue_pos TYP.
                pose proof Zle_0_nat (Datatypes.length xs).
                apply Z.mul_nonneg_nonneg; auto.
           * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. omega.
@@ -778,9 +1052,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                auto.
                auto.
                auto.
-            -- eapply zero_le_sizeof_dvalue; eauto.
+            -- eapply sizeof_dvalue_pos; eauto.
             -- assert (dvalue_has_dtyp a dt) as TYP by auto.
-               pose proof zero_le_sizeof_dvalue TYP.
+               pose proof sizeof_dvalue_pos TYP.
                pose proof Zle_0_nat (Datatypes.length xs).
                apply Z.mul_nonneg_nonneg; auto.
           * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. omega.
@@ -820,7 +1094,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       apply IHxs; auto.
     Qed.
 
-    Hint Resolve all_not_sundef_app.
+    Hint Resolve all_not_sundef_app: core.
 
     Lemma byte_defined :
       forall b bs,
@@ -897,7 +1171,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
             apply H; auto.
     Qed.
 
-    Hint Resolve dvalue_serialized_not_sundef.
+    Hint Resolve dvalue_serialized_not_sundef: core.
 
     Lemma all_not_sundef_fold_right_serialize :
       forall xs,
@@ -907,7 +1181,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       - cbn. apply all_not_sundef_app; auto.
     Qed.
 
-    Hint Resolve all_not_sundef_fold_right_serialize.
+    Hint Resolve all_not_sundef_fold_right_serialize: core.
 
     Lemma all_not_sundef_deserialized :
       forall bs t,
@@ -929,7 +1203,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       apply dvalue_serialized_not_sundef.
     Qed.
 
-    Hint Resolve deserialize_sbytes_defined.
+    Hint Resolve deserialize_sbytes_defined: core.
 
     Lemma serialize_firstn_app :
       forall dv dt rest,
@@ -1223,49 +1497,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition equivl : logical_memory -> logical_memory -> Prop :=
       @Equiv _ equivlb.
 
-    Lemma member_lookup {a} : forall k (m : IM.t a),
-        member k m -> exists v, lookup k m = Some v.
-    Proof.
-      unfold member,lookup in *.
-      intros * IN.
-      apply IM.Raw.Proofs.mem_2, IM.Raw.Proofs.In_MapsTo in IN.
-      destruct IN as [v IN].
-      exists v. 
-      apply IM.Raw.Proofs.find_1; eauto.
-      apply IM.is_bst.
-    Qed.
-
-    Lemma lookup_member {a} : forall k v(m : IM.t a),
-        lookup k m = Some v -> member k m .
-    Proof.
-      unfold member,lookup in *.
-      intros * IN.
-      apply IM.Raw.Proofs.mem_1; [apply IM.is_bst |].
-      apply IM.Raw.Proofs.find_2 in IN; eauto.
-      eapply IM.Raw.Proofs.MapsTo_In; eauto. 
-    Qed.
-    
-    Global Instance Equiv_Equiv {a} {r: a -> a -> Prop} {rE : Equivalence r} : Equivalence (Equiv r).
-    Proof.
-      split.
-      - intros ?; split.
-        intros k; reflexivity.
-        intros * LU1 LU2; rewrite LU1 in LU2; inv LU2; reflexivity.
-      - intros ? ? [DOM EQ]; split.
-        intros ?; split; intros ?; apply DOM; auto. 
-        intros; symmetry; eapply EQ; eauto.
-      - intros ? ? ? [DOM1 EQ1] [DOM2 EQ2]; split.
-        intros ?; split; intros ?.
-        apply DOM2,DOM1; auto.
-        apply DOM1,DOM2; auto.
-       intros ? ? ? LU1 LU2.
-       generalize LU1; intros LU3; apply lookup_member,DOM1,member_lookup in LU3. 
-       destruct LU3 as [e'' LU3].
-       transitivity e''.
-       eapply EQ1; eauto.
-       eapply EQ2; eauto.
-    Qed. 
-
+   
     Global Instance equivl_Equiv : Equivalence equivl.
     Proof.
       unfold equivl.
@@ -1611,58 +1843,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       apply IM.is_bst.
     Qed.
 
-    Require Import Psatz.
-
-    Lemma seq_succ : forall off n,
-        n >= 0 ->
-        off >= 0 ->
-        seq (Z.to_nat off) (Z.to_nat (Z.succ n)) = Z.to_nat off :: seq (Z.to_nat (Z.succ off)) (Z.to_nat n).
-    Proof.
-      intros; cbn.
-      rewrite Z2Nat.inj_succ; [| lia].
-      cbn; f_equal.
-      rewrite (Z2Nat.inj_succ off); [| lia].
-      auto.
-      Qed.
-
-    Lemma lookup_all_index_cons : forall off (n : Z) (bk : mem_block) def,
-        off >= 0 ->
-        n >= 0 ->
-        lookup_all_index off (Z.succ n) bk def =
-        match lookup off bk with
-        | Some val => val
-        | None => def
-        end :: lookup_all_index (Z.succ off) n bk def
-    .
-    Proof.
-      intros.
-      unfold lookup_all_index.
-      rewrite seq_succ; try lia.
-      cbn.
-      rewrite Z2Nat.id; auto.
-      lia.
-    Qed.
-
-    Lemma lookup_all_index_add_out_of_range : forall off n (bk : mem_block) key x def,
-        key < off ->
-        lookup_all_index off n (add key x bk) def =
-        lookup_all_index off n bk def.
-    Proof.
-    Admitted.
-
-    Lemma lookup_all_index_add : forall off size x (bk : mem_block) def,
-        off >= 0 ->
-        size >= 0 ->
-        lookup_all_index off (Z.succ size) (add off x bk) def =
-        x :: lookup_all_index (Z.succ off) size bk def.
-    Proof.
-      intros * POS1 POS2.
-      rewrite lookup_all_index_cons; auto; try lia.
-      rewrite lookup_add_eq.
-      f_equal.
-      rewrite lookup_all_index_add_out_of_range; auto; try lia.
-    Qed.
-
     Lemma unsigned_I1_in_range : forall (x : DynamicValues.int1),
         0 <= DynamicValues.Int1.unsigned x <= 1.
     Proof.
@@ -1790,105 +1970,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                  | inl _, inl _ => True
                  | _, _ => False
                  end.
-
-    Global Instance Proper_lookup {a} k: Proper (@Equal a ==> Logic.eq) (lookup k).
-    Proof.
-      repeat intro.
-      apply H.
-    Qed.
-
-    Lemma lookup_add_all_index_in : forall l k z (m : mem_block) v,
-        z <= k <= z + Zlength l - 1 ->
-        list_nth_z l (k - z) = Some v ->
-        lookup k (add_all_index l z m) = Some v.
-    Proof.
-      induction l as [| x l IH]; simpl; intros * INEQ LU.
-      inv LU.
-      destruct (RelDec.rel_dec_p k z).
-      - subst.
-        rewrite Z.sub_diag in LU; cbn in LU; inv LU.
-        rewrite lookup_add_eq;  reflexivity.
-      - rewrite lookup_add_ineq; auto.
-        apply IH.
-        rewrite Zlength_cons in INEQ; lia.
-        destruct (zeq (k - z)) eqn:INEQ'; [lia |].
-        replace (k - (z + 1)) with (Z.pred (k-z)) by lia; auto.
-    Qed.
-
-    Lemma lookup_add_all_index_out : forall l k z (m : mem_block),
-        (k < z \/ k >= z + Zlength l) ->
-        lookup k (add_all_index l z m) = lookup k m.
-    Proof.
-      induction l as [| x l IH]; simpl; intros * INEQ; auto.
-      destruct (RelDec.rel_dec_p k z).
-      - subst. exfalso; destruct INEQ as [INEQ | INEQ]; try lia.
-        rewrite Zlength_cons, Zlength_correct in INEQ; lia.
-      - rewrite lookup_add_ineq; auto.
-        apply IH.
-        destruct INEQ as [INEQ | INEQ]; [left; lia | ].
-        right.
-        rewrite Zlength_cons, Zlength_correct in INEQ. 
-        rewrite Zlength_correct.
-        lia.
-    Qed.
-
-    Lemma key_in_range_or_not_aux : forall (k z : Z) (l : list SByte),
-        {z <= k <= z + Zlength l - 1} + {k < z} + {k >= z + Zlength l}.
-    Proof.
-      induction l as [| x l IH]; intros.
-      - cbn; rewrite Z.add_0_r.
-        destruct (@RelDec.rel_dec_p _ Z.lt _ _ k z); [left; right; auto | right; lia].
-      - rewrite Zlength_cons, <- Z.add_1_r.
-        destruct IH as [[IH | IH] | IH].
-        + left; left; lia.
-        + left; right; lia.
-        + destruct (RelDec.rel_dec_p k (z + Zlength l)).
-          * subst; left; left; rewrite Zlength_correct; lia.
-          * right; lia.
-    Qed.
-
-    Lemma key_in_range_or_not : forall (k z : Z) (l : list SByte),
-        {z <= k <= z + Zlength l - 1} + {k < z \/ k >= z + Zlength l}.
-    Proof.
-      intros; destruct (@key_in_range_or_not_aux k z l) as [[? | ?] | ?]; [left; auto | right; auto | right; auto].
-    Qed.
-
-    Lemma range_list_nth_z : forall {a} (l : list a) k,
-        0 <= k < Zlength l ->
-        exists v, list_nth_z l k = Some v.
-    Proof.
-      induction l as [| x l IH]; intros k INEQ; [cbn in *; lia |].
-      cbn; flatten_goal; [eexists; reflexivity |].
-      destruct (IH (Z.pred k)) as [v LU]; eauto.
-      rewrite Zlength_cons in INEQ; lia.
-    Qed.
-
-    Lemma in_range_is_in :  forall (k z : Z) (l : list SByte),
-        z <= k <= z + Zlength l - 1 ->
-        exists v, list_nth_z l (k - z) = Some v.
-    Proof.
-      intros.
-      apply range_list_nth_z; lia.
-    Qed.
-
-    Lemma add_all_index_twice : forall (l1 l2 : list SByte) z bytes, 
-        Zlength l1 = Zlength l2 ->
-        Equal (add_all_index l2 z (add_all_index l1 z bytes))
-              (add_all_index l2 z bytes).
-    Proof.
-      intros * EQ k.
-      destruct (@key_in_range_or_not k z l2) as [IN | OUT].
-      - destruct (in_range_is_in _ IN) as [? LU].
-        erewrite 2 lookup_add_all_index_in; eauto.
-      - rewrite 3 lookup_add_all_index_out; eauto.
-        rewrite EQ; auto.
-    Qed.
-
-    Global Instance Proper_add {a} : Proper (Logic.eq ==> Logic.eq ==> Equal ==> Equal) (@add a).
-    Proof.
-      repeat intro; subst.
-      destruct (RelDec.rel_dec_p k y); [subst; rewrite 2 lookup_add_eq; auto | rewrite 2 lookup_add_ineq; auto].
-    Qed.
 
     Global Instance Proper_add_logical : Proper (Logic.eq ==> equivlb ==> equivl ==> equivl) add.
     Proof.
