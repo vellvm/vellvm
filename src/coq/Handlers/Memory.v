@@ -180,7 +180,75 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
    *)
   Section Map_Theory.
 
-    (* Keys are in the domain if and only if they lead to values when looked-up  *)
+    (* begin hide *)
+    (** ** Utilitary lemmas  *)
+    Lemma MapsTo_inj : forall {a} k v v' (m : IM.t a),
+      IM.MapsTo k v m ->
+      IM.MapsTo k v' m ->
+      v = v'.
+    Proof.
+      intros.
+      apply IM.find_1 in H; apply IM.find_1 in H0.
+      rewrite H0 in H; inv H. 
+      reflexivity.
+    Qed.
+
+    Lemma seq_succ : forall off n,
+        n >= 0 ->
+        off >= 0 ->
+        seq (Z.to_nat off) (Z.to_nat (Z.succ n)) = Z.to_nat off :: seq (Z.to_nat (Z.succ off)) (Z.to_nat n).
+    Proof.
+      intros; cbn.
+      rewrite Z2Nat.inj_succ; [| lia].
+      cbn; f_equal.
+      rewrite (Z2Nat.inj_succ off); [| lia].
+      auto.
+    Qed.
+
+    Lemma key_in_range_or_not_aux {a} : forall (k z : Z) (l : list a),
+        {z <= k <= z + Zlength l - 1} + {k < z} + {k >= z + Zlength l}.
+    Proof.
+      induction l as [| x l IH]; intros.
+      - cbn; rewrite Z.add_0_r.
+        destruct (@RelDec.rel_dec_p _ Z.lt _ _ k z); [left; right; auto | right; lia].
+      - rewrite Zlength_cons, <- Z.add_1_r.
+        destruct IH as [[IH | IH] | IH].
+        + left; left; lia.
+        + left; right; lia.
+        + destruct (RelDec.rel_dec_p k (z + Zlength l)).
+          * subst; left; left; rewrite Zlength_correct; lia.
+          * right; lia.
+    Qed.
+
+    Lemma key_in_range_or_not {a} : forall (k z : Z) (l : list a),
+        {z <= k <= z + Zlength l - 1} + {k < z \/ k >= z + Zlength l}.
+    Proof.
+      intros; destruct (@key_in_range_or_not_aux _ k z l) as [[? | ?] | ?]; [left; auto | right; auto | right; auto].
+    Qed.
+
+    Lemma range_list_nth_z : forall {a} (l : list a) k,
+        0 <= k < Zlength l ->
+        exists v, list_nth_z l k = Some v.
+    Proof.
+      induction l as [| x l IH]; intros k INEQ; [cbn in *; lia |].
+      cbn; flatten_goal; [eexists; reflexivity |].
+      destruct (IH (Z.pred k)) as [v LU]; eauto.
+      rewrite Zlength_cons in INEQ; lia.
+    Qed.
+
+    Lemma in_range_is_in {a} :  forall (k z : Z) (l : list a),
+        z <= k <= z + Zlength l - 1 ->
+        exists v, list_nth_z l (k - z) = Some v.
+    Proof.
+      intros.
+      apply range_list_nth_z; lia.
+    Qed.
+
+    (* end hide *)
+
+    (** ** [member]/[lookup] interaction
+        Keys are in the domain if and only if they lead to values when looked-up
+     *)
     Lemma member_lookup {a} : forall k (m : IM.t a),
       member k m -> exists v, lookup k m = Some v.
     Proof.
@@ -203,18 +271,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       eapply IM.Raw.Proofs.MapsTo_In; eauto. 
     Qed.
 
-    (* Relationship between [lookup] and [add] *)
-    Lemma MapsTo_inj : forall {a} k v v' (m : IM.t a),
-        IM.MapsTo k v m ->
-        IM.MapsTo k v' m ->
-        v = v'.
-    Proof.
-      intros.
-      apply IM.find_1 in H; apply IM.find_1 in H0.
-      rewrite H0 in H; inv H. 
-      reflexivity.
-    Qed.
-
+    (** ** [add]/[lookup] interaction
+        Lookups look up the lastly added value
+     *)
     Lemma lookup_add_eq : forall {a} k x (m : IM.t a),
         lookup k (add k x m) = Some x.
     Proof.
@@ -245,7 +304,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       eapply IM.Raw.Proofs.MapsTo_In,EQy.
     Qed.
 
-    (* Relationship between [add] and [member] *)
+    (** ** [add]/[member] interaction
+        Added keys are a member of the map
+     *)
     Lemma member_add_eq {a}: forall k v (m: IM.t a),
         member k (add k v m).
     Proof.
@@ -308,7 +369,21 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        eapply EQ2; eauto.
     Qed. 
 
-    (* Consecutive extensions of the map *)
+    Global Instance Proper_lookup {a} k: Proper (@Equal a ==> Logic.eq) (lookup k).
+    Proof.
+      repeat intro.
+      apply H.
+    Qed.
+
+    Global Instance Proper_add {a} : Proper (Logic.eq ==> Logic.eq ==> Equal ==> Equal) (@add a).
+    Proof.
+      repeat intro; subst.
+      destruct (RelDec.rel_dec_p k y); [subst; rewrite 2 lookup_add_eq; auto | rewrite 2 lookup_add_ineq; auto].
+    Qed.
+
+    (** ** [add]/[add]
+        Consecutive extensions of the map either commute or erase the oldest one.
+     *)
     Lemma add_add : forall {a} off b1 b2 (m : IM.t a),
         Equal (add off b2 (add off b1 m)) (add off b2 m).
     Proof.
@@ -358,19 +433,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       inv H0.
     Qed.
 
-    (** ** [lookup_all_index]
+    (** ** Behavior of [lookup_all_index]
      *)
-    Lemma seq_succ : forall off n,
-        n >= 0 ->
-        off >= 0 ->
-        seq (Z.to_nat off) (Z.to_nat (Z.succ n)) = Z.to_nat off :: seq (Z.to_nat (Z.succ off)) (Z.to_nat n).
-    Proof.
-      intros; cbn.
-      rewrite Z2Nat.inj_succ; [| lia].
-      cbn; f_equal.
-      rewrite (Z2Nat.inj_succ off); [| lia].
-      auto.
-      Qed.
 
     Lemma lookup_all_index_cons {a} : forall k (n : Z) (m : IntMap a) def,
         k >= 0 ->
@@ -379,8 +443,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         match lookup k m with
         | Some val => val
         | None => def
-        end :: lookup_all_index (Z.succ k) n m def
-    .
+        end :: lookup_all_index (Z.succ k) n m def.
     Proof.
       intros.
       unfold lookup_all_index.
@@ -390,13 +453,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       lia.
     Qed.
 
-    Global Instance Proper_lookup {a} k: Proper (@Equal a ==> Logic.eq) (lookup k).
-    Proof.
-      repeat intro.
-      apply H.
-    Qed.
-
-    Lemma lookup_all_index_add_out_of_range_aux {a} : forall l k n (m : IntMap a) key x def,
+    Lemma lookup_all_index_add_out_aux {a} : forall l k n (m : IntMap a) key x def,
         l = seq (Z.to_nat k) (Z.to_nat n) ->
         key >= 0 ->
         k >= 0 ->
@@ -420,16 +477,33 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         reflexivity.
     Qed.
 
-    Lemma lookup_all_index_add_out_of_range {a} : forall k n (m : IntMap a) key x def,
+    (* Generalization of [lookup_add_ineq]: adding outside of the range of the lookup is inconsequential *)
+    Lemma lookup_all_index_add_out {a} : forall k n (m : IntMap a) key x def,
         key >= 0 ->
         k >= 0 ->
         (key < k \/ key >= k + n) ->
         lookup_all_index k n (add key x m) def =
         lookup_all_index k n m def.
     Proof.
-      intros; eapply lookup_all_index_add_out_of_range_aux; eauto.
+      intros; eapply lookup_all_index_add_out_aux; eauto.
     Qed.
 
+    Lemma lookup_all_index_add {a} : forall k size x (m : IntMap a) def,
+        k >= 0 ->
+        size >= 0 ->
+        lookup_all_index k (Z.succ size) (add k x m) def =
+        x :: lookup_all_index (Z.succ k) size m def.
+    Proof.
+      intros * POS1 POS2.
+      rewrite lookup_all_index_cons; auto; try lia.
+      rewrite lookup_add_eq.
+      f_equal.
+      rewrite lookup_all_index_add_out; auto; try lia.
+    Qed.
+
+    (** ** Behavior of [add_all_index]
+     *)
+    (* Generalization of [lookup_add_eq]: looking in range of the additions is fully defined *)
     Lemma lookup_add_all_index_in {a} : forall l k z (m : IntMap a) v,
         z <= k <= z + Zlength l - 1 ->
         list_nth_z l (k - z) = Some v ->
@@ -448,6 +522,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         replace (k - (z + 1)) with (Z.pred (k-z)) by lia; auto.
     Qed.
 
+     (* (Different from [lookup_all_index_add_out]) Generalization of [lookup_add_eq]: looking out of range of the additions can ignore the additions *)
     Lemma lookup_add_all_index_out {a} : forall l k z (m : IntMap a),
         (k < z \/ k >= z + Zlength l) ->
         lookup k (add_all_index l z m) = lookup k m.
@@ -465,45 +540,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         lia.
     Qed.
 
-    Lemma key_in_range_or_not_aux {a} : forall (k z : Z) (l : list a),
-        {z <= k <= z + Zlength l - 1} + {k < z} + {k >= z + Zlength l}.
-    Proof.
-      induction l as [| x l IH]; intros.
-      - cbn; rewrite Z.add_0_r.
-        destruct (@RelDec.rel_dec_p _ Z.lt _ _ k z); [left; right; auto | right; lia].
-      - rewrite Zlength_cons, <- Z.add_1_r.
-        destruct IH as [[IH | IH] | IH].
-        + left; left; lia.
-        + left; right; lia.
-        + destruct (RelDec.rel_dec_p k (z + Zlength l)).
-          * subst; left; left; rewrite Zlength_correct; lia.
-          * right; lia.
-    Qed.
-
-    Lemma key_in_range_or_not {a} : forall (k z : Z) (l : list a),
-        {z <= k <= z + Zlength l - 1} + {k < z \/ k >= z + Zlength l}.
-    Proof.
-      intros; destruct (@key_in_range_or_not_aux _ k z l) as [[? | ?] | ?]; [left; auto | right; auto | right; auto].
-    Qed.
-
-    Lemma range_list_nth_z : forall {a} (l : list a) k,
-        0 <= k < Zlength l ->
-        exists v, list_nth_z l k = Some v.
-    Proof.
-      induction l as [| x l IH]; intros k INEQ; [cbn in *; lia |].
-      cbn; flatten_goal; [eexists; reflexivity |].
-      destruct (IH (Z.pred k)) as [v LU]; eauto.
-      rewrite Zlength_cons in INEQ; lia.
-    Qed.
-
-    Lemma in_range_is_in {a} :  forall (k z : Z) (l : list a),
-        z <= k <= z + Zlength l - 1 ->
-        exists v, list_nth_z l (k - z) = Some v.
-    Proof.
-      intros.
-      apply range_list_nth_z; lia.
-    Qed.
-
+    (* Generalization of [add_ad], with the added constraint on the size of the lists *)
     Lemma add_all_index_twice {a} : forall (l1 l2 : list a) z m, 
         Zlength l1 = Zlength l2 ->
         Equal (add_all_index l2 z (add_all_index l1 z m))
@@ -515,25 +552,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         erewrite 2 lookup_add_all_index_in; eauto.
       - rewrite 3 lookup_add_all_index_out; eauto.
         rewrite EQ; auto.
-    Qed.
-
-    Global Instance Proper_add {a} : Proper (Logic.eq ==> Logic.eq ==> Equal ==> Equal) (@add a).
-    Proof.
-      repeat intro; subst.
-      destruct (RelDec.rel_dec_p k y); [subst; rewrite 2 lookup_add_eq; auto | rewrite 2 lookup_add_ineq; auto].
-    Qed.
-
-    Lemma lookup_all_index_add {a} : forall k size x (m : IntMap a) def,
-        k >= 0 ->
-        size >= 0 ->
-        lookup_all_index k (Z.succ size) (add k x m) def =
-        x :: lookup_all_index (Z.succ k) size m def.
-    Proof.
-      intros * POS1 POS2.
-      rewrite lookup_all_index_cons; auto; try lia.
-      rewrite lookup_add_eq.
-      f_equal.
-      rewrite lookup_all_index_add_out_of_range; auto; try lia.
     Qed.
 
   End Map_Theory.
