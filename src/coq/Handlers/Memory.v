@@ -1475,8 +1475,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       end.
 
     (* At the toplevel, GEP takes a [dvalue] as an argument that must contain a pointer, but no other pointer can be recursively followed.
-     The pointer set the block into which we look, and the initial offset. The first index value add to the initial offset passed to
-     [handle_gep_h] for the actual access to structured data.
+     The pointer set the block into which we look, and the initial offset. The first index value add to the initial offset passed to [handle_gep_h] for the actual access to structured data.
      *)
     Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
       match vs with
@@ -1562,7 +1561,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       the [i]th [uvalue].
       The [size] argument has no effect, but we need to provide one to the array type.
      *)
-    Definition get_array_mem_block_at_i (bk : mem_block) (bk_offset : Z) (i : nat) (size : Z) (t : dtyp) : err uvalue :=
+    Definition get_array_cell_mem_block (bk : mem_block) (bk_offset : Z) (i : nat) (size : Z) (t : dtyp) : err uvalue :=
       'offset <- handle_gep_h (DTYPE_Array size t)
                              bk_offset
                              [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))];;
@@ -1572,7 +1571,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       Retrieve the values stored at position [from] to position [from + len - 1] in an array stored in a [mem_block].
      *)
     Definition get_array_mem_block (bk : mem_block) (bk_offset : Z) (from len : nat) (size : Z) (t : dtyp) : err (list uvalue) :=
-      map_monad (fun i => get_array_mem_block_at_i bk bk_offset i size t) (seq from len).
+      map_monad (fun i => get_array_cell_mem_block bk bk_offset i size t) (seq from len).
 
   End Logical_Operations.
 
@@ -1794,6 +1793,14 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | None => failwith "Memory function [get_array] called at a non-allocated address"
       end.
 
+    Definition get_array_cell (m : memory_stack) (a : addr) (i : nat) (τ : dtyp) : err uvalue :=
+        let '(b, o) := a in
+        match get_logical_block m b with
+        | Some (LBlock _ bk _) =>
+          get_array_cell_mem_block bk o i 0 τ
+        | None => failwith "Memory function [get_array] called at a non-allocated address"
+        end.
+
     Definition free_frame (m : memory_stack) : err memory_stack :=
       let '(m,sf) := m in
       match sf with
@@ -1848,10 +1855,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition allocated (a : addr) (m : memory_stack) : Prop :=
       let '((_,lm),_) := m in member (fst a) lm.
 
+    Definition equiv_ptr : addr -> addr -> Prop :=
+      fun a a' => fst a = fst a'.
+
     Record ext_memory (m1 : memory_stack) (a : addr) (τ : dtyp) (v : uvalue) (m2 : memory_stack) : Prop :=
       {
       new_lu  : read m2 a τ = inr v;
-      old_lu  : forall a' τ', a <> a' -> read m2 a' τ' = read m1 a' τ'
+      old_lu  : forall a' τ', ~ equiv_ptr a a' -> read m2 a' τ' = read m1 a' τ'
       }.
 
     Definition same_reads (m1 m2 : memory_stack) : Prop := forall a τ, read m1 a τ = read m2 a τ.
@@ -1872,56 +1882,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       {
       is_read : read m a τ = inr v
       }.
-
-    Lemma next_logical_key_fresh : forall lm,
-        ~ member (logical_next_key lm) lm.
-    Proof.
-    Admitted.
-
-    Arguments add : simpl never.
-    Arguments lookup : simpl never.
-    Arguments logical_next_key : simpl never.
-    Arguments get_logical_block /.
-    Arguments get_logical_block_mem /.
-
-    Lemma allocate_correct : forall m1 τ m2 a,
-        allocate m1 τ = inr (m2,a) ->
-        allocate_spec m1 τ m2 a.
-    Proof.
-      intros ((cm,lm),s) * EQ.
-      destruct s as [|f s]; inv EQ.
-      split.
-      - apply next_logical_key_fresh.
-      - split.
-        + unfold read; cbn.
-          rewrite lookup_add_eq.
-          cbn.
-          admit.
-        + intros * NEQ.
-          unfold read; cbn.
-          rewrite lookup_add_ineq.
-          reflexivity.
-          destruct a'; intros abs; apply NEQ; cbn in *; subst; auto.
-          f_equal.
-          (* Annoying: need to introduce an equivalence over addresses that share the same pointer but not offset? *)
-          admit.
-    Admitted.
-
-    Lemma write_correct : forall m1 a v m2,
-        write m1 a v = inr m2 ->
-        write_spec m1 a v m2.
-    Proof.
-      unfold write; intros ((cm,lm),s) * WR.
-      cbn in *.
-      flatten_hyp WR; [| inv_sum].
-      destruct l,a; inv WR.
-      cbn in *.
-      split.
-      - cbn. eapply lookup_member; eauto.
-      - intros * TYP.
-        (* Need read_add lemmas *)
-        admit.
-    Admitted.
 
     Definition concrete_address_to_logical (cid : Z) (m : memory_stack) : option (Z * Z) :=
       concrete_address_to_logical_mem cid (fst m).
@@ -2037,6 +1997,79 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       (* The address needs to be well-formed in that the offset is positive *)
       admit.
     Admitted.
+
+    Arguments add : simpl never.
+    Arguments lookup : simpl never.
+    Arguments logical_next_key : simpl never.
+
+    Lemma write_allocated : forall m a val m',
+        write m a val = inr m' ->
+        allocated a m.
+    Proof.
+      unfold write; intros ((cm,lm),s) * WR; cbn in *.
+      flatten_hyp WR; [| inv_sum].
+      destruct l,a; inv WR.
+      cbn in *; eapply lookup_member; eauto.
+    Qed.
+
+    Lemma write_untouched:
+      forall (m1 : memory_stack) (a : addr) (v : dvalue) (m2 : memory_stack),
+        write m1 a v = inr m2 -> forall (a' : addr) (τ' : dtyp), ~ equiv_ptr a a' -> read m2 a' τ' = read m1 a' τ'.
+    Proof.
+      intros ((cm,lm),s) [a off] v ((cm',lm'),s') WR [a' off'] τ' INEQ.
+      unfold read,write in *.
+      cbn in *.
+      flatten_hyp WR; try inv_sum.
+      destruct l; inv_sum.
+      unfold equiv_ptr in INEQ; cbn in INEQ.
+      unfold get_logical_block, get_logical_block_mem; cbn.
+      rewrite lookup_add_ineq; auto.
+    Qed.
+
+    Lemma write_correct : forall m1 a v m2,
+        write m1 a v = inr m2 ->
+        write_spec m1 a v m2.
+    Proof.
+      intros; split; [| split]; eauto using write_allocated, write_read, write_untouched.
+    Qed.
+
+    Lemma next_logical_key_fresh : forall lm,
+        ~ member (logical_next_key lm) lm.
+    Proof.
+    Admitted.
+      
+    Lemma read_empty_block : forall τ,
+        read_in_mem_block (make_empty_mem_block τ) 0 τ = UVALUE_Undef τ.
+    Proof.
+    Admitted.
+    
+    Lemma allocate_correct : forall m1 τ m2 a,
+        allocate m1 τ = inr (m2,a) ->
+        allocate_spec m1 τ m2 a.
+    Proof.
+      intros ((cm,lm),s) * EQ.
+      destruct s as [|f s]; inv EQ.
+      split.
+      - apply next_logical_key_fresh.
+      - split.
+        + unfold read; cbn.
+          unfold get_logical_block, get_logical_block_mem; cbn.
+          rewrite lookup_add_eq.
+          cbn.
+          f_equal.
+          apply read_empty_block.
+        + intros * NEQ.
+          unfold read; cbn.
+          unfold get_logical_block, get_logical_block_mem; cbn.
+          rewrite lookup_add_ineq.
+          reflexivity.
+          destruct a'; intros abs; apply NEQ; cbn in *; subst; auto.
+          reflexivity.
+    Qed.
+
+    (* TODO *)
+    (* Lemma read_array: forall m size τ off bk i, *)
+    (*     read m (handle_gep_h (DTYPE_Array size τ) off [DVALUE_I64 i]) = get_array_cell m a i τ. *)
 
     Definition equiv : memory_stack -> memory_stack -> Prop := 
       fun '((cm,lm), s) '((cm',lm'),s') =>
