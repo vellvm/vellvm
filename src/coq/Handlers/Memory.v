@@ -1822,6 +1822,11 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition can_allocate (m : memory_stack) : Prop :=
       let '(_,s) := m in s <> [].
 
+    Definition can_write (m : memory_stack) (a : addr) (τ : dtyp) :=
+      exists sz bytes cid,
+        get_logical_block m (fst a) = Some (LBlock sz bytes cid) /\
+        snd a + sizeof_dtyp τ <= sz.
+
     Definition read (m : memory_stack) (ptr : addr) (t : dtyp) : err uvalue :=
       match get_logical_block m (fst ptr) with
       | Some (LBlock _ block _) =>
@@ -2082,6 +2087,19 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           unfold read_in_mem_block.
           rewrite lookup_all_index_add_all_index_no_overlap; auto.
       - rewrite lookup_add_ineq; auto.
+    Qed.
+
+    Lemma can_write_succeeds : forall m1 v τ a,
+        dvalue_has_dtyp v τ ->
+        can_write m1 a τ ->
+        exists m2, write m1 a v = inr m2.
+    Proof.
+      intros m1 v τ a TYP CAN.
+      destruct CAN as (sz & bytes & cid & BLOCK & SIZE).
+      exists (add_logical_block (fst a) (LBlock sz (add_all_index (serialize_dvalue v) (snd a) bytes) cid) m1).
+      unfold write.
+      rewrite BLOCK.
+      cbn. destruct a. reflexivity.
     Qed.
 
     Lemma write_correct : forall m1 a v m2,
@@ -2486,6 +2504,21 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         rewrite interp_memory_trigger.
         cbn. rewrite Hwrite.
         cbn. rewrite bind_ret_l.
+        reflexivity.
+      Qed.
+
+      Lemma interp_memory_store_exists :
+        forall (m : memory_stack) (t : dtyp) (val : dvalue) (a : addr),
+          dvalue_has_dtyp val t ->
+          can_write m a t ->
+          exists m', write m a val = inr m' ->
+          interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ ret (m', tt).
+      Proof.
+        intros m t val a TYP CAN.
+        apply can_write_succeeds with (v:=val) in CAN as [m2 WRITE]; auto.
+        exists m2. intros _.
+
+        rewrite interp_memory_store; eauto.
         reflexivity.
       Qed.
 
