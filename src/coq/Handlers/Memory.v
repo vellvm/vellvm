@@ -1887,7 +1887,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Record ext_memory (m1 : memory_stack) (a : addr) (τ : dtyp) (v : uvalue) (m2 : memory_stack) : Prop :=
       {
       new_lu  : read m2 a τ = inr v;
-      old_lu  : forall a' τ', 0 <= sizeof_dtyp τ' -> no_overlap a τ a' τ' -> read m2 a' τ' = read m1 a' τ'
+      old_lu  : forall a' τ', 0 <= sizeof_dtyp τ' -> allocated a' m1 -> no_overlap a τ a' τ' -> read m2 a' τ' = read m1 a' τ'
       }.
 
     Definition same_reads (m1 m2 : memory_stack) : Prop := forall a τ, read m1 a τ = read m2 a τ.
@@ -2113,64 +2113,21 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           cbn.
           f_equal.
           apply read_empty_block.
-        + intros * SIZE NOVER.
+        + intros * SIZE ALLOC NOVER.
           unfold read; cbn.
           unfold get_logical_block, get_logical_block_mem; cbn.
 
-          cbn in NOVER. unfold next_logical_key, next_logical_key_mem.
-          destruct NOVER as [Haa | [Hrange | Hrange]].
-          -- cbn in *. unfold next_logical_key, next_logical_key_mem in Haa.
-             cbn in Haa.
-             rewrite lookup_add_ineq; auto.
-          -- cbn in *. admit.
-          -- cbn in *.
-
+          cbn in ALLOC.
 
           apply no_overlap__not_overlaps in NOVER.
-          unfold overlaps in NOVER.
-          cbn in NOVER.
+          unfold next_logical_key, next_logical_key_mem, overlaps in *.
+          cbn in *.
 
-          destruct (Z.eq_dec (next_logical_key (cm, lm, f :: s)) (fst a')) as [Haa | Haa].
-          * setoid_rewrite Haa.
-            rewrite lookup_add_eq.
-            unfold make_empty_logical_block.
-            setoid_rewrite read_empty_block.
-
-
-          cbn in NOVER. unfold next_logical_key, next_logical_key_mem.
-          destruct NOVER as [Haa | [Hrange | Hrange]].
-          -- cbn in *. unfold next_logical_key, next_logical_key_mem in Haa.
-             cbn in Haa.
-             rewrite lookup_add_ineq; auto.
-          -- cbn in *. omega.
-          -- cbn in *. cbn.
-
-          destruct (Z.eq_dec (next_logical_key (cm, lm, f :: s)) (fst a')) eqn:Ha.
-          * setoid_rewrite e. rewrite lookup_add_eq.
-            --
-
-          * destruct (lookup (fst a') lm) eqn:LUP.
-            -- pose proof (lookup_member _ _ LUP).
-               exfalso. eapply next_logical_key_fresh.
-               unfold next_logical_key, next_logical_key_mem in e.
-               cbn in e. rewrite <- e in H.
-               apply H.
-            -- setoid_rewrite e. rewrite lookup_add_eq.
-            destruct (Z.le_gt_cases 0 (snd a' + sizeof_dtyp τ')) as [Hle | Hnle].
-            -- destruct (Z.le_gt_cases (snd a') (sizeof_dtyp τ)) as [Hle' | Hnle'].
-               ++ exfalso. apply NOVER. auto.
-               ++ setoid_rewrite e. cbn.
-                  destruct (lookup (fst a') lm) eqn:LUP.
-                  ** pose proof (lookup_member _ _ LUP).
-                     exfalso.
-
-            -- admit.
-          * rewrite lookup_add_ineq; auto.
-
-          reflexivity.
-          destruct a'; intros abs; apply NEQ; cbn in *; subst; auto.
-          unfold overlaps. cbn.
-          reflexivity.
+          destruct (Z.eq_dec (logical_next_key lm) (fst a')) as [Ha' | Ha'].
+          -- (* Bogus branch where a' is the freshly allocated block *)
+            exfalso. eapply next_logical_key_fresh; erewrite Ha'; eauto.
+          -- (* Good branch *)
+            rewrite lookup_add_ineq; auto.
     Qed.
 
     (* TODO *)
