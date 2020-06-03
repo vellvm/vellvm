@@ -1819,6 +1819,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       'm <- add_to_frame m key;;
       ret (m,(key,0)).
 
+    Definition can_allocate (m : memory_stack) : Prop :=
+      let '(_,s) := m in s <> [].
+
     Definition read (m : memory_stack) (ptr : addr) (t : dtyp) : err uvalue :=
       match get_logical_block m (fst ptr) with
       | Some (LBlock _ block _) =>
@@ -2097,6 +2100,19 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         read_in_mem_block (make_empty_mem_block τ) 0 τ = UVALUE_Undef τ.
     Proof.
     Admitted.
+
+    Lemma can_allocate_succeeds : forall m1 τ,
+        can_allocate m1 -> exists m2 a, allocate m1 τ = inr (m2, a).
+    Proof.
+      intros m1 τ H.
+      destruct m1 as [m fs]. cbn in H.
+      cbn.
+      destruct fs as [|f fs].
+      contradiction.
+      exists (add_logical_block_mem (next_logical_key (m, f :: fs)) (make_empty_logical_block τ) m, (next_logical_key (m, f :: fs) :: f) :: fs).
+      exists (next_logical_key (m, f :: fs), 0).
+      reflexivity.
+    Qed.
 
     Lemma allocate_correct : forall m1 τ m2 a,
         allocate m1 τ = inr (m2,a) ->
@@ -2483,6 +2499,18 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         cbn in *. rewrite Halloc. clear Halloc.
         cbn. rewrite bind_ret_l.
         reflexivity.
+      Qed.
+
+      Lemma interp_memory_alloca_exists :
+        forall (m : memory_stack) (t : dtyp),
+          can_allocate m ->
+          exists m' a', allocate m t = inr (m', a') /\
+                   interp_memory (trigger (Alloca t)) m ≈ ret (m', DVALUE_Addr a').
+      Proof.
+        intros m t CAN.
+        apply can_allocate_succeeds with (τ:=t) in CAN as [m' [a' ALLOC]].
+        exists m'. exists a'.
+        auto using interp_memory_alloca.
       Qed.
 
       Lemma lookup_all_add_all_app :
