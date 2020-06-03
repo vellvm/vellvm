@@ -9,6 +9,7 @@ From ITree Require Import
 
 From Vellvm Require Import
      LLVMEvents
+     DynamicTypes
      Handlers.Handlers.
 
 Section InterpreterMCFG.
@@ -230,33 +231,39 @@ Section InterpreterMCFG.
       reflexivity.
     Qed.
 
-    Lemma interp_to_L3_Alloca : forall defs t key g l m m' frame stack_rest,
-        next_logical_key m = key ->
-        snd m = frame :: stack_rest ->
-        add_logical_block key (make_empty_logical_block t) m = m' ->
-        interp_to_L3 defs (trigger (Alloca t)) g l m ≈ Ret (m',(l,(g, DVALUE_Addr (key, 0%Z)))).
+    Lemma interp_to_L3_alloca :
+      forall (defs : intrinsic_definitions) (m : memory_stack) (t : dtyp) (g : global_env) l,
+        can_allocate m ->
+        exists m' a', allocate m t = inr (m', a') /\
+                 interp_to_L3 defs (trigger (Alloca t)) g l m ≈ ret (m', (l, (g, DVALUE_Addr a'))).
     Proof.
-      (* intros defs t key g l m m' s frame stack_rest Hkey Hs Hm'. *)
-      (* unfold interp_to_L3. *)
+      intros defs m t g l CAN.
+      unfold interp_to_L3.
+      eapply interp_memory_alloca_exists with (t:=t) in CAN.
+      destruct CAN as (m' & a' & allocate & INTERP).
 
-      (* rewrite interp_intrinsics_trigger; cbn. *)
-      (* unfold Intrinsics.F_trigger. *)
-      (* rewrite interp_global_trigger; cbn. *)
-      (* rewrite bind_trigger. *)
-      (* unfold interp_local_stack. *)
-      (* rewrite interp_state_vis. cbn. *)
-      (* rewrite bind_bind. *)
-      (* rewrite bind_trigger. *)
-      (* rewrite interp_memory_vis. cbn. *)
-      (* rewrite Hs. *)
-      (* repeat rewrite bind_ret_l. *)
-      (* cbn. *)
-      (* rewrite interp_state_ret. *)
-      (* rewrite tau_eutt. *)
-      (* rewrite interp_memory_ret. *)
-      (* subst. *)
-      (* reflexivity. *)
-      Admitted.
+      exists m'. exists a'.
+      split; auto.
+
+      cbn.
+      rewrite interp_intrinsics_trigger.
+      cbn.
+      unfold Intrinsics.F_trigger.
+      rewrite interp_global_trigger.
+      cbn.
+      unfold interp_local_stack.
+      rewrite interp_state_bind.
+      rewrite interp_state_trigger.
+      cbn.
+      rewrite bind_bind.
+      rewrite interp_memory_bind.
+      rewrite INTERP. cbn.
+      repeat rewrite bind_ret_l.
+      cbn.
+      rewrite interp_state_ret.
+      rewrite interp_memory_ret.
+      reflexivity.
+    Qed.
 
   End Structural_Lemmas.
 
