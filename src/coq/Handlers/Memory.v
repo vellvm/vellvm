@@ -2461,7 +2461,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         reflexivity.
       Qed.
 
-      Lemma interp_memory_trigger_store :
+      Lemma interp_memory_store :
         forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr),
           write m a val = inr m' ->
           interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ ret (m', tt).
@@ -2469,6 +2469,18 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         intros m m' t val a Hwrite.
         rewrite interp_memory_trigger.
         cbn. rewrite Hwrite.
+        cbn. rewrite bind_ret_l.
+        reflexivity.
+      Qed.
+
+      Lemma interp_memory_alloca :
+        forall (m m' : memory_stack) (t : dtyp) (a : addr),
+          allocate m t = inr (m', a) ->
+          interp_memory (trigger (Alloca t)) m ≈ ret (m', DVALUE_Addr a).
+      Proof.
+        intros m m' t a Halloc.
+        rewrite interp_memory_trigger.
+        cbn in *. rewrite Halloc. clear Halloc.
         cbn. rewrite bind_ret_l.
         reflexivity.
       Qed.
