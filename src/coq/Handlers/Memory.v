@@ -124,7 +124,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       fun m m' =>
         (forall k, member k m <-> member k m') /\
         (forall k e e', lookup k m = Some e -> lookup k m' = Some e' -> R e e').
-    
+
     (* Extends the map with a list of pairs key/value.
      Note: additions start from the end of the list, so in case of duplicate
      keys, the binding in the front will shadow though in the back.
@@ -142,15 +142,21 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | v :: tl => add i v (add_all_index tl (i+1) m)
       end.
 
+    Fixpoint Zseq (start : Z) (len : nat) : list Z :=
+      match len with
+      | O => []
+      | S x => start :: Zseq (Z.succ start) x
+      end.
+
     (* Give back a list of values from [|i|] to [|i| + |sz| - 1] in [m].
      Uses [def] as the default value if a lookup failed.
      *)
     Definition lookup_all_index {a} (i:Z) (sz:Z) (m:IntMap a) (def:a) : list a :=
       List.map (fun x =>
-                  match lookup (Z.of_nat x) m with
+                  match lookup x m with
                   | None => def
                   | Some val => val
-                  end) (seq (Z.to_nat i) (Z.to_nat sz)).
+                  end) (Zseq i (Z.to_nat sz)).
 
     (* Takes the join of two maps, favoring the first one over the intersection of their domains *)
     Definition union {a} (m1 : IntMap a) (m2 : IntMap a)
@@ -189,20 +195,16 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
       intros.
       apply IM.find_1 in H; apply IM.find_1 in H0.
-      rewrite H0 in H; inv H. 
+      rewrite H0 in H; inv H.
       reflexivity.
     Qed.
 
-    Lemma seq_succ : forall off n,
-        n >= 0 ->
-        off >= 0 ->
-        seq (Z.to_nat off) (Z.to_nat (Z.succ n)) = Z.to_nat off :: seq (Z.to_nat (Z.succ off)) (Z.to_nat n).
+    Lemma Zseq_succ : forall off n,
+        0 <= n ->
+        Zseq off (Z.to_nat (Z.succ n)) = off :: Zseq (Z.succ off) (Z.to_nat n).
     Proof.
-      intros; cbn.
-      rewrite Z2Nat.inj_succ; [| lia].
-      cbn; f_equal.
-      rewrite (Z2Nat.inj_succ off); [| lia].
-      auto.
+      intros off n Hsz.
+      rewrite Z2Nat.inj_succ; auto.
     Qed.
 
     Lemma key_in_range_or_not_aux {a} : forall (k z : Z) (l : list a),
@@ -256,7 +258,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       intros * IN.
       apply IM.Raw.Proofs.mem_2, IM.Raw.Proofs.In_MapsTo in IN.
       destruct IN as [v IN].
-      exists v. 
+      exists v.
       apply IM.Raw.Proofs.find_1; eauto.
       apply IM.is_bst.
     Qed.
@@ -268,7 +270,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       intros * IN.
       apply IM.Raw.Proofs.mem_1; [apply IM.is_bst |].
       apply IM.Raw.Proofs.find_2 in IN; eauto.
-      eapply IM.Raw.Proofs.MapsTo_In; eauto. 
+      eapply IM.Raw.Proofs.MapsTo_In; eauto.
     Qed.
 
     (** ** [add]/[lookup] interaction
@@ -294,7 +296,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                       try apply IM.find_2 in EQy
       end; auto.
       eapply MapsTo_inj in EQx; eauto; subst; eauto.
-      apply IM.find_1 in EQx; rewrite EQx in EQy; inv EQy. 
+      apply IM.find_1 in EQx; rewrite EQx in EQy; inv EQy.
       cbn in *.
       apply IM.Raw.Proofs.not_find_iff in EQx; [| apply IM.Raw.Proofs.add_bst, IM.is_bst].
       exfalso; apply EQx, IM.Raw.Proofs.add_in.
@@ -326,12 +328,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       - intros IN; apply IM.Raw.Proofs.mem_2 in IN.
         rewrite IM.Raw.Proofs.add_in in IN.
         destruct IN as [-> | IN]; [contradiction H; auto | ].
-        apply IM.Raw.Proofs.mem_1; [apply IM.is_bst | auto]. 
+        apply IM.Raw.Proofs.mem_1; [apply IM.is_bst | auto].
       - intros IN.
         apply IM.Raw.Proofs.mem_1.
         apply IM.Raw.Proofs.add_bst, IM.is_bst.
         rewrite IM.Raw.Proofs.add_in; right; auto.
-        apply IM.Raw.Proofs.mem_2 in IN; auto. 
+        apply IM.Raw.Proofs.mem_2 in IN; auto.
     Qed.
 
     (** ** Equivalences
@@ -355,19 +357,19 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         intros k; reflexivity.
         intros * LU1 LU2; rewrite LU1 in LU2; inv LU2; reflexivity.
       - intros ? ? [DOM EQ]; split.
-        intros ?; split; intros ?; apply DOM; auto. 
+        intros ?; split; intros ?; apply DOM; auto.
         intros; symmetry; eapply EQ; eauto.
       - intros ? ? ? [DOM1 EQ1] [DOM2 EQ2]; split.
         intros ?; split; intros ?.
         apply DOM2,DOM1; auto.
         apply DOM1,DOM2; auto.
        intros ? ? ? LU1 LU2.
-       generalize LU1; intros LU3; apply lookup_member,DOM1,member_lookup in LU3. 
+       generalize LU1; intros LU3; apply lookup_member,DOM1,member_lookup in LU3.
        destruct LU3 as [e'' LU3].
        transitivity e''.
        eapply EQ1; eauto.
        eapply EQ2; eauto.
-    Qed. 
+    Qed.
 
     Global Instance Proper_lookup {a} k: Proper (@Equal a ==> Logic.eq) (lookup k).
     Proof.
@@ -437,7 +439,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
      *)
 
     Lemma lookup_all_index_cons {a} : forall k (n : Z) (m : IntMap a) def,
-        k >= 0 ->
         n >= 0 ->
         lookup_all_index k (Z.succ n) m def =
         match lookup k m with
@@ -447,16 +448,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
       intros.
       unfold lookup_all_index.
-      rewrite seq_succ; try lia.
-      cbn.
-      rewrite Z2Nat.id; auto.
-      lia.
+      rewrite Zseq_succ; try lia.
+      auto.
     Qed.
 
     Lemma lookup_all_index_add_out_aux {a} : forall l k n (m : IntMap a) key x def,
-        l = seq (Z.to_nat k) (Z.to_nat n) ->
-        key >= 0 ->
-        k >= 0 ->
+        l = Zseq k (Z.to_nat n) ->
         (key < k \/ key >= k + n) ->
         lookup_all_index k n (add key x m) def =
         lookup_all_index k n m def.
@@ -464,7 +461,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       induction l as [| x l IH]; simpl.
       - intros * EQ LT.
         unfold lookup_all_index; rewrite <- EQ; reflexivity.
-      - intros * EQ POS1 POS2 RANGE.
+      - intros * EQ RANGE.
         destruct (Z.to_nat n) eqn:EQn; [inv EQ |].
         cbn in EQ; inv EQ.
         assert (n = Z.succ (Z.of_nat n0)) by lia.
@@ -473,14 +470,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         rewrite lookup_add_ineq; [| lia].
         f_equal.
         apply IH; try lia.
-        rewrite Nat2Z.id, Z2Nat.inj_succ; try lia.
+        rewrite Nat2Z.id.
         reflexivity.
     Qed.
 
     (* Generalization of [lookup_add_ineq]: adding outside of the range of the lookup is inconsequential *)
     Lemma lookup_all_index_add_out {a} : forall k n (m : IntMap a) key x def,
-        key >= 0 ->
-        k >= 0 ->
         (key < k \/ key >= k + n) ->
         lookup_all_index k n (add key x m) def =
         lookup_all_index k n m def.
@@ -489,12 +484,11 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Qed.
 
     Lemma lookup_all_index_add {a} : forall k size x (m : IntMap a) def,
-        k >= 0 ->
         size >= 0 ->
         lookup_all_index k (Z.succ size) (add k x m) def =
         x :: lookup_all_index (Z.succ k) size m def.
     Proof.
-      intros * POS1 POS2.
+      intros * SIZE.
       rewrite lookup_all_index_cons; auto; try lia.
       rewrite lookup_add_eq.
       f_equal.
@@ -535,13 +529,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         apply IH.
         destruct INEQ as [INEQ | INEQ]; [left; lia | ].
         right.
-        rewrite Zlength_cons, Zlength_correct in INEQ. 
+        rewrite Zlength_cons, Zlength_correct in INEQ.
         rewrite Zlength_correct.
         lia.
     Qed.
 
     (* Generalization of [add_ad], with the added constraint on the size of the lists *)
-    Lemma add_all_index_twice {a} : forall (l1 l2 : list a) z m, 
+    Lemma add_all_index_twice {a} : forall (l1 l2 : list a) z m,
         Zlength l1 = Zlength l2 ->
         Equal (add_all_index l2 z (add_all_index l1 z m))
               (add_all_index l2 z m).
@@ -1507,14 +1501,14 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
       split.
       - intros []; constructor; reflexivity.
-      - intros [] [] EQ; inv EQ; constructor; symmetry; auto. 
-      - intros [] [] [] EQ1 EQ2; inv EQ1; inv EQ2; constructor; etransitivity; eauto. 
+      - intros [] [] EQ; inv EQ; constructor; symmetry; auto.
+      - intros [] [] [] EQ1 EQ2; inv EQ1; inv EQ2; constructor; etransitivity; eauto.
     Qed.
 
     Definition equivl : logical_memory -> logical_memory -> Prop :=
       @Equiv _ equivlb.
 
-   
+
     Global Instance equivl_Equiv : Equivalence equivl.
     Proof.
       unfold equivl.
@@ -1737,7 +1731,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     Definition equivs : frame_stack -> frame_stack -> Prop := Logic.eq.
 
-    Global Instance equivs_Equiv : Equivalence equivs. 
+    Global Instance equivs_Equiv : Equivalence equivs.
     split; unfold equivs; typeclasses eauto.
     Qed.
 
@@ -1851,17 +1845,49 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | [] => False (* This case should never happen *)
       | f::_ => In (fst a) f
       end.
-    
+
     Definition allocated (a : addr) (m : memory_stack) : Prop :=
       let '((_,lm),_) := m in member (fst a) lm.
 
-    Definition equiv_ptr : addr -> addr -> Prop :=
-      fun a a' => fst a = fst a'.
+    (* Do two memory regions overlap each other? *)
+    Definition overlaps (a1 : addr) (τ1 : dtyp) (a2 : addr) (τ2 : dtyp) : Prop :=
+      let a1_start := snd a1 in
+      let a1_end   := snd a1 + sizeof_dtyp τ1 in
+      let a2_start := snd a2 in
+      let a2_end   := snd a2 + sizeof_dtyp τ2 in
+      fst a1 = fst a2 /\ a1_start <= a2_end /\ a2_start <= a1_end.
+
+    Definition no_overlap (a1 : addr) (τ1 : dtyp) (a2 : addr) (τ2 : dtyp) : Prop :=
+      let a1_start := snd a1 in
+      let a1_end   := snd a1 + sizeof_dtyp τ1 in
+      let a2_start := snd a2 in
+      let a2_end   := snd a2 + sizeof_dtyp τ2 in
+      fst a1 <> fst a2 \/ a1_start > a2_end \/ a2_start > a1_end.
+
+    Lemma not_overlaps__no_overlap :
+      forall a1 τ1 a2 τ2,
+        ~ overlaps a1 τ1 a2 τ2 -> no_overlap a1 τ1 a2 τ2.
+    Proof.
+      intros [a1_r a1_o] τ1 [a2_r a2_o] τ2 H.
+      unfold overlaps in H.
+      unfold no_overlap.
+      omega.
+    Qed.
+
+    Lemma no_overlap__not_overlaps :
+      forall a1 τ1 a2 τ2,
+        no_overlap a1 τ1 a2 τ2 -> ~ overlaps a1 τ1 a2 τ2.
+    Proof.
+      intros [a1_r a1_o] τ1 [a2_r a2_o] τ2 H.
+      unfold no_overlap in H.
+      unfold overlaps.
+      omega.
+    Qed.
 
     Record ext_memory (m1 : memory_stack) (a : addr) (τ : dtyp) (v : uvalue) (m2 : memory_stack) : Prop :=
       {
       new_lu  : read m2 a τ = inr v;
-      old_lu  : forall a' τ', ~ equiv_ptr a a' -> read m2 a' τ' = read m1 a' τ'
+      old_lu  : forall a' τ', 0 <= sizeof_dtyp τ' -> no_overlap a τ a' τ' -> read m2 a' τ' = read m1 a' τ'
       }.
 
     Definition same_reads (m1 m2 : memory_stack) : Prop := forall a τ, read m1 a τ = read m2 a τ.
@@ -1877,7 +1903,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       was_allocated : allocated a m1;
       is_written    : forall τ, dvalue_has_dtyp v τ -> ext_memory m1 a τ (dvalue_to_uvalue v) m2
       }.
-    
+
     Record read_spec (m : memory_stack) (a : addr) (τ : dtyp) (v : uvalue) : Prop :=
       {
       is_read : read m a τ = inr v
@@ -2012,18 +2038,47 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       cbn in *; eapply lookup_member; eauto.
     Qed.
 
-    Lemma write_untouched:
-      forall (m1 : memory_stack) (a : addr) (v : dvalue) (m2 : memory_stack),
-        write m1 a v = inr m2 -> forall (a' : addr) (τ' : dtyp), ~ equiv_ptr a a' -> read m2 a' τ' = read m1 a' τ'.
+    Lemma lookup_all_index_add_all_index_no_overlap :
+      forall {A} bs off off' m (def : A) sz,
+        0 <= sz ->
+        off' + sz < off \/ off + (Z.of_nat (length bs)) < off' ->
+        lookup_all_index off' sz (add_all_index bs off m) def =
+        lookup_all_index off' sz m def.
     Proof.
-      intros ((cm,lm),s) [a off] v ((cm',lm'),s') WR [a' off'] τ' INEQ.
+      intros A; induction bs; intros off off' m def sz Hsz Hrange; auto.
+      cbn.
+      rewrite lookup_all_index_add_out; auto; try omega.
+      apply IHbs; auto.
+      destruct Hrange as [Hleft | Hright]; cbn in *; lia.
+    Qed.
+
+    Lemma write_untouched:
+      forall (m1 : memory_stack) (a : addr) (v : dvalue) (τ : dtyp) (m2 : memory_stack),
+        dvalue_has_dtyp v τ ->
+        write m1 a v = inr m2 -> forall (a' : addr) (τ' : dtyp), 0 <= sizeof_dtyp τ' -> no_overlap a τ a' τ' -> read m2 a' τ' = read m1 a' τ'.
+    Proof.
+      intros ((cm,lm),s) [a off] v τ ((cm',lm'),s') TYP WR [a' off'] τ' SIZE INEQ.
       unfold read,write in *.
       cbn in *.
       flatten_hyp WR; try inv_sum.
       destruct l; inv_sum.
-      unfold equiv_ptr in INEQ; cbn in INEQ.
+      apply no_overlap__not_overlaps in INEQ; unfold overlaps in INEQ; cbn in INEQ.
       unfold get_logical_block, get_logical_block_mem; cbn.
-      rewrite lookup_add_ineq; auto.
+      destruct (Z.eq_dec a a') eqn:Haa'.
+      - subst. rewrite lookup_add_eq.
+        unfold get_logical_block,get_logical_block_mem in Heq. cbn in Heq.
+        rewrite Heq.
+        destruct (Z.le_gt_cases off (off' + sizeof_dtyp τ')) as [Hle | Hnle].
+        + destruct (Z.le_gt_cases off' (off + sizeof_dtyp τ)) as [Hle' | Hnle'].
+          * exfalso. auto.
+          * (* Overlap because off + sizeof_dtyp τ < off', so second memory region is "to the right" *)
+            unfold read_in_mem_block.
+            rewrite lookup_all_index_add_all_index_no_overlap; auto.
+            rewrite sizeof_serialized with (dt:=τ); auto; lia.
+        + (* off' + sizeof_dtyp τ' < off, so second memory region is "to the left" *)
+          unfold read_in_mem_block.
+          rewrite lookup_all_index_add_all_index_no_overlap; auto.
+      - rewrite lookup_add_ineq; auto.
     Qed.
 
     Lemma write_correct : forall m1 a v m2,
@@ -2037,12 +2092,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         ~ member (logical_next_key lm) lm.
     Proof.
     Admitted.
-      
+
     Lemma read_empty_block : forall τ,
         read_in_mem_block (make_empty_mem_block τ) 0 τ = UVALUE_Undef τ.
     Proof.
     Admitted.
-    
+
     Lemma allocate_correct : forall m1 τ m2 a,
         allocate m1 τ = inr (m2,a) ->
         allocate_spec m1 τ m2 a.
@@ -2058,12 +2113,63 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           cbn.
           f_equal.
           apply read_empty_block.
-        + intros * NEQ.
+        + intros * SIZE NOVER.
           unfold read; cbn.
           unfold get_logical_block, get_logical_block_mem; cbn.
-          rewrite lookup_add_ineq.
+
+          cbn in NOVER. unfold next_logical_key, next_logical_key_mem.
+          destruct NOVER as [Haa | [Hrange | Hrange]].
+          -- cbn in *. unfold next_logical_key, next_logical_key_mem in Haa.
+             cbn in Haa.
+             rewrite lookup_add_ineq; auto.
+          -- cbn in *. admit.
+          -- cbn in *.
+
+
+          apply no_overlap__not_overlaps in NOVER.
+          unfold overlaps in NOVER.
+          cbn in NOVER.
+
+          destruct (Z.eq_dec (next_logical_key (cm, lm, f :: s)) (fst a')) as [Haa | Haa].
+          * setoid_rewrite Haa.
+            rewrite lookup_add_eq.
+            unfold make_empty_logical_block.
+            setoid_rewrite read_empty_block.
+
+
+          cbn in NOVER. unfold next_logical_key, next_logical_key_mem.
+          destruct NOVER as [Haa | [Hrange | Hrange]].
+          -- cbn in *. unfold next_logical_key, next_logical_key_mem in Haa.
+             cbn in Haa.
+             rewrite lookup_add_ineq; auto.
+          -- cbn in *. omega.
+          -- cbn in *. cbn.
+
+          destruct (Z.eq_dec (next_logical_key (cm, lm, f :: s)) (fst a')) eqn:Ha.
+          * setoid_rewrite e. rewrite lookup_add_eq.
+            --
+
+          * destruct (lookup (fst a') lm) eqn:LUP.
+            -- pose proof (lookup_member _ _ LUP).
+               exfalso. eapply next_logical_key_fresh.
+               unfold next_logical_key, next_logical_key_mem in e.
+               cbn in e. rewrite <- e in H.
+               apply H.
+            -- setoid_rewrite e. rewrite lookup_add_eq.
+            destruct (Z.le_gt_cases 0 (snd a' + sizeof_dtyp τ')) as [Hle | Hnle].
+            -- destruct (Z.le_gt_cases (snd a') (sizeof_dtyp τ)) as [Hle' | Hnle'].
+               ++ exfalso. apply NOVER. auto.
+               ++ setoid_rewrite e. cbn.
+                  destruct (lookup (fst a') lm) eqn:LUP.
+                  ** pose proof (lookup_member _ _ LUP).
+                     exfalso.
+
+            -- admit.
+          * rewrite lookup_add_ineq; auto.
+
           reflexivity.
           destruct a'; intros abs; apply NEQ; cbn in *; subst; auto.
+          unfold overlaps. cbn.
           reflexivity.
     Qed.
 
@@ -2071,7 +2177,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     (* Lemma read_array: forall m size τ off bk i, *)
     (*     read m (handle_gep_h (DTYPE_Array size τ) off [DVALUE_I64 i]) = get_array_cell m a i τ. *)
 
-    Definition equiv : memory_stack -> memory_stack -> Prop := 
+    Definition equiv : memory_stack -> memory_stack -> Prop :=
       fun '((cm,lm), s) '((cm',lm'),s') =>
         equivs s s' /\
         equivc cm cm' /\
@@ -2080,17 +2186,17 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Global Instance equiv_Equiv : Equivalence equiv.
     Proof.
       split.
-      - intros ((cm,lm),s); cbn; split; [| split]; reflexivity. 
+      - intros ((cm,lm),s); cbn; split; [| split]; reflexivity.
       - intros ((cm,lm),s) ((cm',lm'),s') EQ; cbn; split; [| split]; symmetry; apply EQ.
       - intros ((cm,lm),s) ((cm',lm'),s') ((cm'',lm''),s'') EQ1 EQ2; cbn; split; [| split]; (etransitivity; [apply EQ1 | apply EQ2]).
-    Qed.      
+    Qed.
 
     Infix "≡" := equiv (at level 25).
 
     Lemma add_add_logical : forall off b1 b2 m,
         equivl (add off b2 (add off b1 m)) (add off b2 m).
     Proof.
-      intros; apply Equiv_add_add. 
+      intros; apply Equiv_add_add.
    Qed.
 
     Lemma add_logical_block_add_logical_block :
@@ -2098,8 +2204,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         add_logical_block off b2 (add_logical_block off b1 m) ≡ add_logical_block off b2 m.
     Proof.
       intros ? ? ? ((cm,lm),s).
-      cbn; split; [reflexivity | split; [reflexivity |]]. 
-      apply add_add_logical. 
+      cbn; split; [reflexivity | split; [reflexivity |]].
+      apply add_add_logical.
     Qed.
 
     Global Instance Proper_add_logical : Proper (Logic.eq ==> equivlb ==> equivl ==> equivl) add.
@@ -2109,7 +2215,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       split.
       - intros k; destruct (RelDec.rel_dec_p k y); [subst; rewrite 2 member_add_eq; auto | rewrite 2 member_add_ineq; auto]; reflexivity.
       - intros k; destruct (RelDec.rel_dec_p k y); [subst; rewrite 2 lookup_add_eq; auto | rewrite 2 lookup_add_ineq; auto].
-        intros v v' EQ1 EQ2; inv EQ1; inv EQ2; auto. 
+        intros v v' EQ1 EQ2; inv EQ1; inv EQ2; auto.
         intros v v' EQ1 EQ2.
         eapply EQUIV; eauto.
     Qed.
