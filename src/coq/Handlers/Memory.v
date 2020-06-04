@@ -1856,16 +1856,23 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       end.
 
     Definition allocate (m : memory_stack) (t : dtyp) : err (memory_stack * addr) :=
-      let new_block := make_empty_logical_block t in
-      let key       := next_logical_key m in
-      let m         := add_logical_block key new_block m in
-      'm <- add_to_frame m key;;
-      ret (m,(key,0)).
+      match t with
+      | DTYPE_Void => failwith "Allocation of type void"
+      | _ =>
+        let new_block := make_empty_logical_block t in
+        let key       := next_logical_key m in
+        let m         := add_logical_block key new_block m in
+        'm <- add_to_frame m key;;
+        ret (m,(key,0))
+      end.
 
     Definition can_allocate (m : memory_stack) : Prop :=
       let '(_,s) := m in s <> [].
 
-    Definition can_write (m : memory_stack) (a : addr) (τ : dtyp) :=
+    Definition non_void (τ : dtyp) : Prop :=
+      τ <> DTYPE_Void.
+
+    Definition dtyp_fits (m : memory_stack) (a : addr) (τ : dtyp) :=
       exists sz bytes cid,
         get_logical_block m (fst a) = Some (LBlock sz bytes cid) /\
         snd a + sizeof_dtyp τ <= sz.
@@ -2134,9 +2141,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       - rewrite lookup_add_ineq; auto.
     Qed.
 
-    Lemma can_write_succeeds : forall m1 v τ a,
+    Lemma write_succeeds : forall m1 v τ a,
         dvalue_has_dtyp v τ ->
-        can_write m1 a τ ->
+        dtyp_fits m1 a τ ->
         exists m2, write m1 a v = inr m2.
     Proof.
       intros m1 v τ a TYP CAN.
@@ -2157,24 +2164,57 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Lemma next_logical_key_fresh : forall lm,
         ~ member (logical_next_key lm) lm.
     Proof.
+      intros lm MEM.
+      unfold logical_next_key in MEM.
+      apply member_lookup in MEM as [lb LUP].
+      (* Need something about IM.elements and the keys in the assoc list *)
+      (* Might be able to use one of these:
+IM.elements_1:
+  forall (elt : Type) (m : IM.t elt) (x : IM.key) (e : elt),
+  IM.MapsTo x e m -> SetoidList.InA (IM.eq_key_elt (elt:=elt)) (x, e) (IM.elements (elt:=elt) m)
+IM.elements_2:
+  forall (elt : Type) (m : IM.t elt) (x : IM.key) (e : elt),
+  SetoidList.InA (IM.eq_key_elt (elt:=elt)) (x, e) (IM.elements (elt:=elt) m) -> IM.MapsTo x e m
+       *)
     Admitted.
 
+    (* This is false for VOID, and 0 length arrays *)
     Lemma read_empty_block : forall τ,
         read_in_mem_block (make_empty_mem_block τ) 0 τ = UVALUE_Undef τ.
     Proof.
+      unfold read_in_mem_block.
+      unfold make_empty_mem_block.
+      unfold deserialize_sbytes.
+      intros τ. induction τ.
+      Focus 12.
+      destruct sz eqn:Hsz.
+      cbn.
+      Focus 2.
+      cbn.
     Admitted.
 
     Lemma can_allocate_succeeds : forall m1 τ,
-        can_allocate m1 -> exists m2 a, allocate m1 τ = inr (m2, a).
+        can_allocate m1 ->
+        non_void τ ->
+        exists m2 a, allocate m1 τ = inr (m2, a).
     Proof.
-      intros m1 τ H.
+      intros m1 τ H NV.
       destruct m1 as [m fs]. cbn in H.
       cbn.
       destruct fs as [|f fs].
       contradiction.
       exists (add_logical_block_mem (next_logical_key (m, f :: fs)) (make_empty_logical_block τ) m, (next_logical_key (m, f :: fs) :: f) :: fs).
       exists (next_logical_key (m, f :: fs), 0).
-      reflexivity.
+      destruct τ; try reflexivity.
+      exfalso. apply NV. reflexivity.
+    Qed.
+
+    Lemma allocate_non_void : forall m τ x,
+        allocate m τ = inr x ->
+        non_void τ.
+    Proof.
+      intros m τ x H.
+      destruct τ; inversion H; intros NV; inversion NV.
     Qed.
 
     Lemma allocate_correct : forall m1 τ m2 a,
@@ -2616,12 +2656,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       Lemma interp_memory_store_exists :
         forall (m : memory_stack) (t : dtyp) (val : dvalue) (a : addr),
           dvalue_has_dtyp val t ->
-          can_write m a t ->
+          dtyp_fits m a t ->
           exists m', write m a val = inr m' ->
           interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ ret (m', tt).
       Proof.
         intros m t val a TYP CAN.
-        apply can_write_succeeds with (v:=val) in CAN as [m2 WRITE]; auto.
+        apply write_succeeds with (v:=val) in CAN as [m2 WRITE]; auto.
         exists m2. intros _.
 
         rewrite interp_memory_store; eauto.
