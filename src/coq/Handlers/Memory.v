@@ -28,6 +28,7 @@ Import Basics.Basics.Monads.
 
 From ExtLib Require Import
      Structures.Monads
+     Structures.Functor
      Programming.Eqv
      Data.String.
 
@@ -1471,23 +1472,22 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     (* At the toplevel, GEP takes a [dvalue] as an argument that must contain a pointer, but no other pointer can be recursively followed.
      The pointer set the block into which we look, and the initial offset. The first index value add to the initial offset passed to [handle_gep_h] for the actual access to structured data.
      *)
-    Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
+    Definition handle_gep_addr (t:dtyp) (a:addr) (vs:list dvalue) : err addr :=
+      let '(b, o) := a in
       match vs with
       | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 / i64 indices *)
-        match dv with
-        | DVALUE_Addr (b, o) =>
-          off <- handle_gep_h t (o + (sizeof_dtyp t) * (unsigned i)) vs' ;;
-          ret (DVALUE_Addr (b, off))
-        | _ => failwith "non-address"
-        end
+        off <- handle_gep_h t (o + (sizeof_dtyp t) * (unsigned i)) vs' ;;
+        ret (b, off)
       | DVALUE_I64 i :: vs' =>
-        match dv with
-        | DVALUE_Addr (b, o) =>
-          off <- handle_gep_h t (o + (sizeof_dtyp t) * (unsigned i)) vs' ;;
-          ret (DVALUE_Addr (b, off))
-        | _ => failwith "non-address"
-        end
+        off <- handle_gep_h t (o + (sizeof_dtyp t) * (unsigned i)) vs' ;;
+        ret (b, off)
       | _ => failwith "non-I32 index"
+      end.
+
+    Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
+      match dv with
+      | DVALUE_Addr a => fmap DVALUE_Addr (handle_gep_addr t a vs)
+      | _ => failwith "non-address"
       end.
 
   End GEP.
@@ -1854,6 +1854,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | f::_ => In (fst a) f
       end.
 
+    (* Check if the block for an address is allocated *)
+    (* TODO: should this check if everything is in range...? *)
     Definition allocated (a : addr) (m : memory_stack) : Prop :=
       let '((_,lm),_) := m in member (fst a) lm.
 
@@ -2164,9 +2166,50 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
             rewrite lookup_add_ineq; auto.
     Qed.
 
+    Lemma allocated_get_logical_block :
+      forall a m,
+        allocated a m ->
+        exists b, get_logical_block m (fst a) = Some b.
+    Proof.
+      intros a m H.
+      unfold allocated in H.
+      destruct m as [[cm lm] fs].
+      apply member_lookup in H as [b LUP].
+      exists b. unfold get_logical_block. cbn.
+      unfold get_logical_block_mem. cbn.
+      auto.
+    Qed.
+
     (* TODO *)
-    (* Lemma read_array: forall m size τ off bk i, *)
-    (*     read m (handle_gep_h (DTYPE_Array size τ) off [DVALUE_I64 i]) = get_array_cell m a i τ. *)
+    (* Does this need to be existential? *)
+    Lemma read_array: forall m size τ i a elem_addr,
+        allocated a m ->
+        handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr elem_addr ->
+        read m elem_addr τ = get_array_cell m a i τ.
+    Proof.
+      intros m size τ i a elem_addr ALLOC GEP.
+      unfold get_array_cell.
+      destruct a.
+      unfold read.
+      cbn in GEP.
+      inversion GEP. subst.
+      cbn.
+      destruct (get_logical_block m z) eqn:GET.
+      - destruct l.
+        cbn.
+        rewrite Int64.unsigned_repr.
+        + replace (z0 + size * sizeof_dtyp τ * 0 +
+                   DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
+            with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
+            by omega.
+
+          reflexivity.
+        + unfold Int64.max_unsigned. cbn. lia.
+      - pose proof allocated_get_logical_block (z, z0) m ALLOC as [b GETSOME].
+        cbn in GETSOME.
+        rewrite GET in GETSOME.
+        inversion GETSOME.
+    Qed.
 
     Definition equiv : memory_stack -> memory_stack -> Prop :=
       fun '((cm,lm), s) '((cm',lm'),s') =>
