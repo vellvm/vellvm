@@ -175,6 +175,49 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition maximumBy {A} (leq : A -> A -> bool) (def : A) (l : list A) : A :=
       fold_left (fun a b => if leq a b then b else a) l def.
 
+    Definition maximumBy_Z_le_def :
+      forall def l e,
+        e <=? def ->
+        e <=? maximumBy Z.leb def l.
+    Proof.
+      intros def l.
+      revert def.
+      induction l; intros def e LE.
+      - cbn; auto.
+      - cbn. destruct (def <=? a) eqn:Hdef.
+        + apply IHl.
+          eapply Zle_bool_trans; eauto.
+        + apply IHl; auto.
+    Qed.
+
+    Definition maximumBy_Z_def :
+      forall def l,
+        def <=? maximumBy Z.leb def l.
+    Proof.
+      intros def l.
+      apply maximumBy_Z_le_def; eauto.
+      apply Z.leb_refl.
+    Qed.
+
+    Definition maximumBy_Z_correct :
+      forall def (l : list Z),
+        forall a, In a l -> Z.leb a (maximumBy Z.leb def l).
+    Proof.
+      intros def l.
+      revert def.
+      induction l as [|x xs];
+        intros def a IN;
+        inversion IN.
+      - subst; cbn.
+        apply maximumBy_Z_le_def.
+        destruct (def <=? a) eqn:LE.
+        + apply Z.leb_refl.
+        + rewrite Z.leb_gt in LE.
+          apply Z.leb_le.
+          lia.
+      - subst; cbn; apply IHxs; auto.
+    Qed.
+
     Definition is_some {A} (o : option A) :=
       match o with
       | Some x => true
