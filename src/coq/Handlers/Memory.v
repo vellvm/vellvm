@@ -2180,8 +2180,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       auto.
     Qed.
 
-    (* TODO *)
-    (* Does this need to be existential? *)
     Lemma read_array: forall m size τ i a elem_addr,
         allocated a m ->
         handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr elem_addr ->
