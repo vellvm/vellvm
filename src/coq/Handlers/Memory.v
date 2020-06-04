@@ -598,7 +598,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       A [frame_stack] is a list of such frames.
      *)
     Definition mem_frame := list Z.
-    Definition frame_stack := list mem_frame.
+    Inductive frame_stack : Type := | Singleton (f : mem_frame) | Snoc (s : frame_stack) (f : mem_frame).
+    (* Definition frame_stack := list mem_frame. *)
 
     (** ** Memory stack
       The full notion of state manipulated by the monad is a pair of a [memory] and a [mem_stack].
@@ -1704,7 +1705,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Section Frame_Stack_Operations.
 
     (* The initial frame stack is not an empty stack, but a singleton stack containing an empty frame *)
-    Definition frame_empty : frame_stack := [[]].
+    Definition frame_empty : frame_stack := Singleton [].
 
     (** ** Free
         [free_frame f m] deallocates the frame [f] from the memory [m].
@@ -1798,29 +1799,25 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition free_frame (m : memory_stack) : err memory_stack :=
       let '(m,sf) := m in
       match sf with
-      | [] => failwith "Attempting to free a frame from a currently empty stack of frame"
-      | f :: sf => inr (free_frame_memory f m,sf)
+      | Snoc sf f => inr (free_frame_memory f m,sf)
+      | _ => failwith "Ill-form frame-stack: attempting to free when only one frame is in scope"
       end.
 
     Definition push_fresh_frame (m : memory_stack) : memory_stack :=
-      let '(m,s) := m in (m, [] :: s).
+      let '(m,s) := m in (m, Snoc s []).
 
-    Definition add_to_frame (m : memory_stack) (k : Z) : err memory_stack :=
+    Definition add_to_frame (m : memory_stack) (k : Z) : memory_stack :=
       let '(m,s) := m in
       match s with
-      | [] => failwith "Attempting to allocate in a currently empty stack of frame"
-      | f :: s => ret (m, (k :: f) :: s)
+      | Singleton f => (m, Singleton (k :: f))
+      | Snoc s f => (m, Snoc s (k :: f))
       end.
 
-    Definition allocate (m : memory_stack) (t : dtyp) : err (memory_stack * addr) :=
+    Definition allocate (m : memory_stack) (t : dtyp) : memory_stack * addr :=
       let new_block := make_empty_logical_block t in
       let key       := next_logical_key m in
       let m         := add_logical_block key new_block m in
-      'm <- add_to_frame m key;;
-      ret (m,(key,0)).
-
-    Definition can_allocate (m : memory_stack) : Prop :=
-      let '(_,s) := m in s <> [].
+      (add_to_frame m key, (key,0)).
 
     Definition can_write (m : memory_stack) (a : addr) (τ : dtyp) :=
       exists sz bytes cid,
@@ -1850,8 +1847,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition in_frame (a : addr) (m : memory_stack) : Prop :=
       let '(_,s) := m in
       match s with
-      | [] => False (* This case should never happen *)
-      | f::_ => In (fst a) f
+      | Singleton f | Snoc _ f => In (fst a) f
       end.
 
     (* Check if the block for an address is allocated *)
@@ -2121,34 +2117,16 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
     Admitted.
 
-    Lemma can_allocate_succeeds : forall m1 τ,
-        can_allocate m1 -> exists m2 a, allocate m1 τ = inr (m2, a).
-    Proof.
-      intros m1 τ H.
-      destruct m1 as [m fs]. cbn in H.
-      cbn.
-      destruct fs as [|f fs].
-      contradiction.
-      exists (add_logical_block_mem (next_logical_key (m, f :: fs)) (make_empty_logical_block τ) m, (next_logical_key (m, f :: fs) :: f) :: fs).
-      exists (next_logical_key (m, f :: fs), 0).
-      reflexivity.
-    Qed.
-
     Lemma allocate_correct : forall m1 τ m2 a,
-        allocate m1 τ = inr (m2,a) ->
+        allocate m1 τ = (m2,a) ->
         allocate_spec m1 τ m2 a.
     Proof.
       intros ((cm,lm),s) * EQ.
-      destruct s as [|f s]; inv EQ.
       split.
-      - apply next_logical_key_fresh.
+      - destruct s; inv EQ; apply next_logical_key_fresh.
       - split.
         + unfold read; cbn.
-          unfold get_logical_block, get_logical_block_mem; cbn.
-          rewrite lookup_add_eq.
-          cbn.
-          f_equal.
-          apply read_empty_block.
+          destruct s; inv EQ; unfold get_logical_block, get_logical_block_mem; cbn; rewrite lookup_add_eq; cbn; f_equal; apply read_empty_block.
         + intros * SIZE ALLOC NOVER.
           unfold read; cbn.
           unfold get_logical_block, get_logical_block_mem; cbn.
@@ -2158,12 +2136,14 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           apply no_overlap__not_overlaps in NOVER.
           unfold next_logical_key, next_logical_key_mem, overlaps in *.
           cbn in *.
-
-          destruct (Z.eq_dec (logical_next_key lm) (fst a')) as [Ha' | Ha'].
+          destruct s; inv EQ; cbn in *;
+            destruct (Z.eq_dec (logical_next_key lm) (fst a')) as [Ha' | Ha'].
           -- (* Bogus branch where a' is the freshly allocated block *)
             exfalso. eapply next_logical_key_fresh; erewrite Ha'; eauto.
           -- (* Good branch *)
             rewrite lookup_add_ineq; auto.
+          -- exfalso. eapply next_logical_key_fresh; erewrite Ha'; eauto.
+          -- rewrite lookup_add_ineq; auto.
     Qed.
 
     Lemma allocated_get_logical_block :
@@ -2332,7 +2312,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         ret (m',tt)
 
       | Alloca t =>
-        '(m',a) <- lift_pure_err (allocate m t);;
+        let (m',a) := allocate m t in
         ret (m', DVALUE_Addr a)
 
       | Load t dv =>
@@ -2586,27 +2566,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       Qed.
 
       Lemma interp_memory_alloca :
-        forall (m m' : memory_stack) (t : dtyp) (a : addr),
-          allocate m t = inr (m', a) ->
-          interp_memory (trigger (Alloca t)) m ≈ ret (m', DVALUE_Addr a).
-      Proof.
-        intros m m' t a Halloc.
-        rewrite interp_memory_trigger.
-        cbn in *. rewrite Halloc. clear Halloc.
-        cbn. rewrite bind_ret_l.
-        reflexivity.
-      Qed.
-
-      Lemma interp_memory_alloca_exists :
         forall (m : memory_stack) (t : dtyp),
-          can_allocate m ->
-          exists m' a', allocate m t = inr (m', a') /\
-                   interp_memory (trigger (Alloca t)) m ≈ ret (m', DVALUE_Addr a').
+          interp_memory (trigger (Alloca t)) m ≈ ret (fst (allocate m t), DVALUE_Addr (snd (allocate m t))).
       Proof.
-        intros m t CAN.
-        apply can_allocate_succeeds with (τ:=t) in CAN as [m' [a' ALLOC]].
-        exists m'. exists a'.
-        auto using interp_memory_alloca.
+        intros *.
+        rewrite interp_memory_trigger.
+        reflexivity.
       Qed.
 
       Lemma lookup_all_add_all_app :

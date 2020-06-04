@@ -8,6 +8,7 @@ From ITree Require Import
      Eq.Eq.
 
 From Vellvm Require Import
+     Tactics
      LLVMEvents
      DynamicTypes
      Handlers.Handlers.
@@ -231,21 +232,31 @@ Section InterpreterMCFG.
       reflexivity.
     Qed.
 
+    Lemma resum_to_subevent : forall (E F : Type -> Type) H T e,
+        @resum _ IFun E F H T e = subevent _ e.
+    Proof.
+      intros; reflexivity.
+    Qed.
+
+    Lemma subevent_subevent' : forall {E F} `{E -< F} {X} (e : E X),
+        @subevent F F _ X (@subevent E F _ X e) = subevent X e.
+    Proof.
+      reflexivity.
+    Qed.
+
+    Lemma subevent_subevent : forall {E F G :Type -> Type} (SEF: E -< F) (SFG: F -< G) T (e : E T),
+        @subevent F G SFG T (@subevent E F SEF T e) =
+        @subevent E G (fun x f => SFG _ (SEF _ f)) T e.
+    Proof.
+      reflexivity.
+    Qed.
+
     Lemma interp_to_L3_alloca :
       forall (defs : intrinsic_definitions) (m : memory_stack) (t : dtyp) (g : global_env) l,
-        can_allocate m ->
-        exists m' a', allocate m t = inr (m', a') /\
-                 interp_to_L3 defs (trigger (Alloca t)) g l m ≈ ret (m', (l, (g, DVALUE_Addr a'))).
+        interp_to_L3 defs (trigger (Alloca t)) g l m ≈ ret (fst (allocate m t), (l, (g, DVALUE_Addr (snd (allocate m t))))).
     Proof.
-      intros defs m t g l CAN.
+      intros *.
       unfold interp_to_L3.
-      eapply interp_memory_alloca_exists with (t:=t) in CAN.
-      destruct CAN as (m' & a' & allocate & INTERP).
-
-      exists m'. exists a'.
-      split; auto.
-
-      cbn.
       rewrite interp_intrinsics_trigger.
       cbn.
       unfold Intrinsics.F_trigger.
@@ -257,7 +268,8 @@ Section InterpreterMCFG.
       cbn.
       rewrite bind_bind.
       rewrite interp_memory_bind.
-      rewrite INTERP. cbn.
+      rewrite subevent_subevent, interp_memory_alloca.
+      cbn.
       repeat rewrite bind_ret_l.
       cbn.
       rewrite interp_state_ret.
