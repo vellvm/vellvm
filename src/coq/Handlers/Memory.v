@@ -2211,6 +2211,28 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         inversion GETSOME.
     Qed.
 
+    Lemma read_array_exists : forall m size τ i a,
+        allocated a m ->
+        exists elem_addr,
+          handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr elem_addr /\ read m elem_addr τ = get_array_cell m a i τ.
+    Proof.
+      intros m size τ i a ALLOC.
+      destruct a.
+      exists (z,
+         z0 + size * sizeof_dtyp τ * DynamicValues.Int64.unsigned (DynamicValues.Int64.repr 0) +
+         DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ).
+      split.
+      - cbn.
+        rewrite Int64.unsigned_repr.
+        replace (z0 + size * sizeof_dtyp τ * 0 +
+                   DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
+            with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
+          by omega.
+        reflexivity.
+        unfold Int64.max_unsigned. cbn. lia.
+      - eapply read_array; cbn; eauto.
+    Qed.
+
     Definition equiv : memory_stack -> memory_stack -> Prop :=
       fun '((cm,lm), s) '((cm',lm'),s') =>
         equivs s s' /\
