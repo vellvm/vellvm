@@ -1872,6 +1872,23 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition non_void (τ : dtyp) : Prop :=
       τ <> DTYPE_Void.
 
+    Lemma allocate_inv : forall m τ m' a,
+        allocate m τ = inr (m', a) ->
+        non_void τ /\
+        let new_block := make_empty_logical_block τ in
+        let key       := next_logical_key m in
+        let m         := add_logical_block key new_block m in
+        add_to_frame m key = inr m' /\ a = (key,0).
+    Proof.
+      intros m τ m' a ALLOC.
+      split.
+      - intros NV. destruct τ; inversion NV; inversion ALLOC.
+      - split.
+        + destruct τ; cbn in ALLOC; try flatten_hyp ALLOC; inversion ALLOC; subst; cbn; auto.
+        + destruct τ; cbn in ALLOC; try flatten_hyp ALLOC; inversion ALLOC; auto.
+    Qed.
+
+    (* TODO: very similar to overlaps *)
     Definition dtyp_fits (m : memory_stack) (a : addr) (τ : dtyp) :=
       exists sz bytes cid,
         get_logical_block m (fst a) = Some (LBlock sz bytes cid) /\
@@ -2222,7 +2239,7 @@ IM.elements_2:
         allocate_spec m1 τ m2 a.
     Proof.
       intros ((cm,lm),s) * EQ.
-      destruct s as [|f s]; inv EQ.
+      destruct s as [|f s]; apply allocate_inv in EQ as [NV EQ]; cbn in EQ; inv EQ; inv H.
       split.
       - apply next_logical_key_fresh.
       - split.
@@ -2682,12 +2699,13 @@ IM.elements_2:
 
       Lemma interp_memory_alloca_exists :
         forall (m : memory_stack) (t : dtyp),
+          non_void t ->
           can_allocate m ->
           exists m' a', allocate m t = inr (m', a') /\
                    interp_memory (trigger (Alloca t)) m ≈ ret (m', DVALUE_Addr a').
       Proof.
-        intros m t CAN.
-        apply can_allocate_succeeds with (τ:=t) in CAN as [m' [a' ALLOC]].
+        intros m t NV CAN.
+        apply can_allocate_succeeds with (τ:=t) in CAN as [m' [a' ALLOC]]; auto.
         exists m'. exists a'.
         auto using interp_memory_alloca.
       Qed.
