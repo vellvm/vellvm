@@ -255,10 +255,16 @@ Section InterpreterCFG.
   Arguments allocate : simpl never.
   Lemma interp_cfg_to_L3_alloca :
     forall (defs : intrinsic_definitions) (m : memory_stack) (t : dtyp) (g : global_env) l,
-      interp_cfg_to_L3 defs (trigger (Alloca t)) g l m ≈ ret (fst (allocate m t), (l, (g, DVALUE_Addr (snd (allocate m t))))).
+      non_void t ->
+      exists m' a',
+        allocate m t = inr (m', a') /\
+        interp_cfg_to_L3 defs (trigger (Alloca t)) g l m ≈ ret (m', (l, (g, DVALUE_Addr a'))).
   Proof.
-    intros *.
+    intros * NV.
     unfold interp_cfg_to_L3.
+    eapply interp_memory_alloca_exists in NV as [m' [a' [ALLOC INTERP]]].
+    exists m'. exists a'.
+
     rewrite interp_intrinsics_trigger.
     cbn.
     unfold Intrinsics.F_trigger.
@@ -268,13 +274,16 @@ Section InterpreterCFG.
     cbn.
     rewrite bind_bind.
     rewrite interp_memory_bind.
-    rewrite subevent_subevent, interp_memory_alloca.
+    rewrite subevent_subevent, interp_memory_alloca; eauto.
     cbn.
     repeat rewrite bind_ret_l.
     cbn.
     rewrite interp_local_ret.
     rewrite interp_memory_ret.
+    split; eauto.
     reflexivity.
+    Unshelve.
+    auto.
   Qed.
 
   (**

@@ -235,10 +235,16 @@ Section InterpreterMCFG.
 
     Lemma interp_to_L3_alloca :
       forall (defs : intrinsic_definitions) (m : memory_stack) (t : dtyp) (g : global_env) l,
-        interp_to_L3 defs (trigger (Alloca t)) g l m ≈ ret (fst (allocate m t), (l, (g, DVALUE_Addr (snd (allocate m t))))).
+        non_void t ->
+        exists m' a',
+          allocate m t = inr (m', a') /\
+          interp_to_L3 defs (trigger (Alloca t)) g l m ≈ ret (m', (l, (g, DVALUE_Addr a'))).
     Proof.
-      intros *.
+      intros * NV.
       unfold interp_to_L3.
+      eapply interp_memory_alloca_exists in NV as [m' [a' [ALLOC INTERP]]].
+      exists m'. exists a'.
+
       rewrite interp_intrinsics_trigger.
       cbn.
       unfold Intrinsics.F_trigger.
@@ -250,13 +256,16 @@ Section InterpreterMCFG.
       cbn.
       rewrite bind_bind.
       rewrite interp_memory_bind.
-      rewrite subevent_subevent, interp_memory_alloca.
+      rewrite subevent_subevent, interp_memory_alloca; eauto.
       cbn.
       repeat rewrite bind_ret_l.
       cbn.
       rewrite interp_state_ret.
       rewrite interp_memory_ret.
+      split; eauto.
       reflexivity.
+      Unshelve.
+      auto.
     Qed.
 
   End Structural_Lemmas.
@@ -305,4 +314,3 @@ Ltac fold_L5 :=
     replace (model_UB (model_undef (interp_memory (interp_local_stack h (interp_global (interp_intrinsics ui p) g) l) m))) with
     (interp_to_L5 ui p g l m) by reflexivity
   end.
-
