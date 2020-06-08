@@ -2174,22 +2174,64 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       intros; split; [| split]; eauto using write_allocated, write_read, write_untouched.
     Qed.
 
+    Lemma lookup_mapsto :
+      forall {A} k m (v : A),
+        lookup k m = Some v <-> IM.MapsTo k v m.
+    Proof.
+      intros A k m v.
+      split.
+      - apply IM.find_2.
+      - apply IM.find_1.
+    Qed.
+
+    Lemma all_neq_not_in:
+      forall {A} (m : A) l,
+      Forall (fun a => a <> m) l -> ~ In m l.
+    Proof.
+      intros A m l ALL.
+      induction ALL; intros IN; inversion IN.
+      - subst; contradiction.
+      - contradiction.
+    Qed.
+
+    Lemma assoc_list_in_key_in :
+      forall A k v l,
+      SetoidList.InA (IM.eq_key_elt (elt:=A)) (k, v) l ->
+      In k (map fst l).
+    Proof.
+      intros A k v l IN.
+      induction IN as [[k' v'] l EQ | [k' v'] l INA IH].
+      - cbn. cbv in EQ. intuition.
+      - cbn. auto.
+    Qed.
+
+    Lemma no_key_not_in :
+      forall A l k v,
+      (forall a : Z, In a (map fst l) -> a <> k) ->
+      ~ SetoidList.InA (IM.eq_key_elt (elt:=A)) (k, v) l.
+    Proof.
+      intros A l k v NOKEY.
+      intros IN. apply assoc_list_in_key_in in IN.
+      specialize (NOKEY k IN).
+      contradiction.
+    Qed.
+
     Lemma next_logical_key_fresh : forall lm,
         ~ member (logical_next_key lm) lm.
     Proof.
       intros lm MEM.
       unfold logical_next_key in MEM.
       apply member_lookup in MEM as [lb LUP].
-      (* Need something about IM.elements and the keys in the assoc list *)
-      (* Might be able to use one of these:
-IM.elements_1:
-  forall (elt : Type) (m : IM.t elt) (x : IM.key) (e : elt),
-  IM.MapsTo x e m -> SetoidList.InA (IM.eq_key_elt (elt:=elt)) (x, e) (IM.elements (elt:=elt) m)
-IM.elements_2:
-  forall (elt : Type) (m : IM.t elt) (x : IM.key) (e : elt),
-  SetoidList.InA (IM.eq_key_elt (elt:=elt)) (x, e) (IM.elements (elt:=elt) m) -> IM.MapsTo x e m
-       *)
-    Admitted.
+      apply lookup_mapsto in LUP.
+      apply IM.elements_1 in LUP.
+      assert (forall a : Z, In a (map fst (IM.elements (elt:=logical_block) lm)) -> a <> 1 + maximumBy Z.leb (-1) (map fst (IM.elements (elt:=logical_block) lm))) as NOKEY.
+      - intros a IN.
+        apply (maximumBy_Z_correct (-1)) in IN.
+        apply Zle_bool_imp_le in IN.
+        lia.
+      - apply no_key_not_in with (v:=lb) in NOKEY.
+        contradiction.
+    Qed.
 
     (* This is false for VOID, and 0 length arrays *)
     Lemma read_empty_block : forall τ,
