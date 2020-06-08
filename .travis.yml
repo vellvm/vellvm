@@ -34,7 +34,7 @@ install:
   - opam install -y --verbose -j ${NJOBS} coq.${TEST_TARGET} && opam pin add coq ${TEST_TARGET} -y
   - opam install -y --verbose -j ${NJOBS} ocamlfind camlp5 ${EXTRA_OPAM} 
   - opam install -y --verbose -j ${NJOBS} coq-ext-lib
-  - opam install -y --verbose -j ${NJOBS} coq-flocq
+  - opam pin -y --verbose -j ${NJOBS} add coq-flocq 3.2.1
   - opam install -y --verbose -j ${NJOBS} coq-paco
   - opam install -y --verbose -j ${NJOBS} coq-ceres
   # This branch uses the lib/InteractionTree submodule.
