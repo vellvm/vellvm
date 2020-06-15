@@ -2248,6 +2248,104 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       cbn.
     Admitted.
 
+    (* CB TODO: Figure out where these predicates should live, or figure
+       out how to get rid of them. Currently not using some of these... *)
+
+    (* Is a dtyp supported in the memory model?
+
+       This is mostly to rule out:
+
+       - arbitrary bitwidth integers
+       - half
+       - x86_fp80
+       - fp128
+       - ppc_fp128
+       - metadata
+       - x86_mmx
+       - opaque
+     *)
+    Inductive is_supported : dtyp -> Prop :=
+    | is_supported_DTYPE_I1 : is_supported (DTYPE_I 1)
+    | is_supported_DTYPE_I8 : is_supported (DTYPE_I 8)
+    | is_supported_DTYPE_I32 : is_supported (DTYPE_I 32)
+    | is_supported_DTYPE_I64 : is_supported (DTYPE_I 64)
+    | is_supported_DTYPE_Pointer : is_supported (DTYPE_Pointer)
+    | is_supported_DTYPE_Void : is_supported (DTYPE_Void)
+    | is_supported_DTYPE_Float : is_supported (DTYPE_Float)
+    | is_supported_DTYPE_Double : is_supported (DTYPE_Double)
+    | is_supported_DTYPE_Array : forall sz τ, is_supported τ -> is_supported (DTYPE_Array sz τ)
+    | is_supported_DTYPE_Struct : forall fields, Forall is_supported fields -> is_supported (DTYPE_Struct fields)
+    | is_supported_DTYPE_Packed_struct : forall fields, Forall is_supported fields -> is_supported (DTYPE_Packed_struct fields)
+    | is_supported_DTYPE_Vector : forall sz τ, is_supported (DTYPE_Vector sz τ)
+    .
+
+    Definition not_pointer (τ : dtyp) : Prop
+      := τ <> DTYPE_Pointer.
+
+    Definition not_undef (v : uvalue) : Prop
+      := forall τ, v <> UVALUE_Undef τ.
+
+    (* TODO: finish a less specialized version of this *)
+    Lemma read_array_not_pointer : forall mem a τ sz v dv,
+        not_undef v ->
+        read mem a (DTYPE_Array sz τ) = inr v ->
+        uvalue_to_dvalue v = inr dv ->
+        ~ dvalue_has_dtyp dv DTYPE_Pointer.
+    Proof.
+      intros mem a τ sz v dv NU READ CONVERT.
+      intros TYP.
+      inversion TYP.
+      subst.
+      unfold read in READ.
+      break_match; try discriminate READ.
+      break_match; subst.
+      unfold read_in_mem_block in READ.
+      unfold deserialize_sbytes in READ.
+      break_match.
+      - (* Fully defined *)
+        inversion READ; subst.
+        cbn in CONVERT.
+        break_match; inversion CONVERT.
+      - (* Undefined *)
+        inversion READ; subst;
+        eapply NU; eauto.
+    Qed.
+
+    (* Lemma read_value_has_dtyp : forall mem a τ v dv, *)
+    (*     is_supported τ -> *)
+    (*     not_pointer τ -> *)
+    (*     non_void τ -> *)
+    (*     read mem a τ = inr v -> *)
+    (*     uvalue_to_dvalue v = inr dv -> *)
+    (*     dvalue_has_dtyp dv τ. *)
+    (* Proof. *)
+    (*   intros mem a τ v dv SUP NP NV READ CONVERT. *)
+    (*   unfold read in READ. *)
+    (*   break_match; try solve [inversion READ]. *)
+    (*   break_match; subst. *)
+    (*   unfold read_in_mem_block in READ. *)
+    (*   unfold deserialize_sbytes in READ. *)
+    (*   break_match. *)
+    (*   - (* Fully defined *) *)
+    (*     inversion SUP; *)
+    (*       try solve [exfalso; auto]; *)
+    (*       try solve [inversion READ; subst; inversion CONVERT; subst; constructor]. *)
+
+    (*     +  *)
+    (*     unfold deserialize_sbytes_defined in READ. *)
+    (*     cbn in *. *)
+    (*     + inversion READ; subst; inversion CONVERT; subst. *)
+    (*       constructor. *)
+    (*     + unfold deserialize_sbytes_defined in READ *)
+    (*       break_match; inversion SUP; subst. *)
+    (*       inversion READ; subst; inversion CONVERT; subst; *)
+    (*       constructor. *)
+
+    (*   - (* UNDEF, actually a contradiction *) *)
+    (*     inversion READ; subst. *)
+    (*     cbn in CONVERT. inversion CONVERT. *)
+    (* Qed. *)
+
     Lemma allocate_succeeds : forall m1 τ,
         non_void τ ->
         exists m2 a, allocate m1 τ = inr (m2, a).
@@ -2511,7 +2609,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         | DVALUE_Addr ptr =>
           'm' <- lift_pure_err (write m ptr v);;
           ret (m', tt)
-        | _ => raise ("Attemptingeto store to a non-address dvalue: " ++ (to_string dv))
+        | _ => raise ("Attempting to store to a non-address dvalue: " ++ (to_string dv))
         end
 
       | GEP t dv vs =>
