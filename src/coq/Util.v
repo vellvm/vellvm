@@ -471,6 +471,31 @@ Arguments monad_app_snd {_ _ _ _ _}.
 Arguments map_monad {_ _ _ _}.
 Arguments map_monad_ {_ _ _}.
 
+From ITree Require Import
+     Basics.Monad. 
+
+Lemma map_monad_app
+      {m : Type -> Type}
+      {Mm : Monad m}
+      {EqMm : EqM m}
+      {HEQP: EqMProps m}
+      {ML: MonadLaws m}
+      {A B} (f:A -> m B) (l0 l1:list A):
+  map_monad f (l0++l1) ≈
+  bs1 <- map_monad f l0;;
+  bs2 <- map_monad f l1;;
+  ret (bs1 ++ bs2).
+Proof.
+  induction l0 as [| a l0 IH]; simpl; intros.
+  - cbn; rewrite bind_ret_l, bind_ret_r.
+    reflexivity.
+  - cbn.
+    setoid_rewrite IH.
+    repeat setoid_rewrite bind_bind.
+    setoid_rewrite bind_ret_l.
+    reflexivity.
+Qed.
+
 (* Arithmetic --------------------------------------------------------------- *)
 
 
@@ -1455,4 +1480,3 @@ Lemma subevent_subevent : forall {E F G :Type -> Type} (SEF: E -< F) (SFG: F -< 
 Proof.
   reflexivity.
 Qed.
-
