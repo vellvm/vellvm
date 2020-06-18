@@ -471,6 +471,31 @@ Arguments monad_app_snd {_ _ _ _ _}.
 Arguments map_monad {_ _ _ _}.
 Arguments map_monad_ {_ _ _}.
 
+From ITree Require Import
+     Basics.Monad. 
+
+Lemma map_monad_app
+      {m : Type -> Type}
+      {Mm : Monad m}
+      {EqMm : EqM m}
+      {HEQP: EqMProps m}
+      {ML: MonadLaws m}
+      {A B} (f:A -> m B) (l0 l1:list A):
+  map_monad f (l0++l1) ≈
+  bs1 <- map_monad f l0;;
+  bs2 <- map_monad f l1;;
+  ret (bs1 ++ bs2).
+Proof.
+  induction l0 as [| a l0 IH]; simpl; intros.
+  - cbn; rewrite bind_ret_l, bind_ret_r.
+    reflexivity.
+  - cbn.
+    setoid_rewrite IH.
+    repeat setoid_rewrite bind_bind.
+    setoid_rewrite bind_ret_l.
+    reflexivity.
+Qed.
+
 (* Arithmetic --------------------------------------------------------------- *)
 
 
@@ -1437,3 +1462,21 @@ Proof.
   eapply eqit_bind'; eauto.
 Qed.
 
+Lemma resum_to_subevent : forall (E F : Type -> Type) H T e,
+    @resum _ IFun E F H T e = subevent _ e.
+Proof.
+  intros; reflexivity.
+Qed.
+
+Lemma subevent_subevent' : forall {E F} `{E -< F} {X} (e : E X),
+    @subevent F F _ X (@subevent E F _ X e) = subevent X e.
+Proof.
+  reflexivity.
+Qed.
+
+Lemma subevent_subevent : forall {E F G :Type -> Type} (SEF: E -< F) (SFG: F -< G) T (e : E T),
+    @subevent F G SFG T (@subevent E F SEF T e) =
+    @subevent E G (fun x f => SFG _ (SEF _ f)) T e.
+Proof.
+  reflexivity.
+Qed.

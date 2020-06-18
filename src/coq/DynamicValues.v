@@ -1321,8 +1321,98 @@ Class VInt I : Type :=
         Forall (fun x => dvalue_has_dtyp x dt) xs ->
         length xs = sz ->
         vector_dtyp dt ->
-        dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt)
+        dvalue_has_dtyp (DVALUE_Vector xs) (DTYPE_Vector (Z.of_nat sz) dt)
   .
+
+  Section dvalue_has_dtyp_ind.
+    Variable P : dvalue -> dtyp -> Prop.
+    Hypothesis IH_Addr           : forall a, P (DVALUE_Addr a) DTYPE_Pointer.
+    Hypothesis IH_I1             : forall x, P (DVALUE_I1 x) (DTYPE_I 1).
+    Hypothesis IH_I8             : forall x, P (DVALUE_I8 x) (DTYPE_I 8).
+    Hypothesis IH_I32            : forall x, P (DVALUE_I32 x) (DTYPE_I 32).
+    Hypothesis IH_I64            : forall x, P (DVALUE_I64 x) (DTYPE_I 64).
+    Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
+    Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
+    Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
+    Hypothesis IH_Struct_nil     : P (DVALUE_Struct []) (DTYPE_Struct []).
+    Hypothesis IH_Struct_cons    : forall (f : dvalue) (dt : dtyp) (fields : list dvalue) (dts : list dtyp),
+        dvalue_has_dtyp f dt ->
+        P f dt ->
+        dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
+        P (DVALUE_Struct fields) (DTYPE_Struct dts) ->
+        P (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts)).
+    Hypothesis IH_Packed_Struct_nil     : P (DVALUE_Packed_struct []) (DTYPE_Packed_struct []).
+    Hypothesis IH_Packed_Struct_cons    : forall (f : dvalue) (dt : dtyp) (fields : list dvalue) (dts : list dtyp),
+        dvalue_has_dtyp f dt ->
+        P f dt ->
+        dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
+        P (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
+        P (DVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts)).
+    Hypothesis IH_Array : forall (xs : list dvalue) (sz : nat) (dt : dtyp)
+                            (IH : forall x, In x xs -> P x dt)
+                            (IHdtyp : forall x, In x xs -> dvalue_has_dtyp x dt),
+        Datatypes.length xs = sz -> P (DVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt).
+
+    Hypothesis IH_Vector : forall (xs : list dvalue) (sz : nat) (dt : dtyp)
+                             (IH : forall x, In x xs -> P x dt)
+                             (IHdtyp : forall x, In x xs -> dvalue_has_dtyp x dt),
+        Datatypes.length xs = sz ->
+        vector_dtyp dt -> P (DVALUE_Vector xs) (DTYPE_Vector (Z.of_nat sz) dt).
+
+    Lemma dvalue_has_dtyp_ind' : forall (dv:dvalue) (dt:dtyp) (TYP: dvalue_has_dtyp dv dt), P dv dt.
+      fix IH 3.
+      intros dv dt TYP.
+      destruct TYP.
+      - apply IH_Addr.
+      - apply IH_I1.
+      - apply IH_I8.
+      - apply IH_I32.
+      - apply IH_I64.
+      - apply IH_Double.
+      - apply IH_Float.
+      - apply IH_None.
+      - apply IH_Struct_nil.
+      - apply (IH_Struct_cons TYP1 (IH f dt TYP1) TYP2 (IH (DVALUE_Struct fields) (DTYPE_Struct dts) TYP2)).
+      - apply IH_Packed_Struct_nil.
+      - apply (IH_Packed_Struct_cons TYP1 (IH f dt TYP1) TYP2 (IH (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) TYP2)).
+      - rename H into Hforall.
+        rename H0 into Hlen.
+        refine (IH_Array _ _ Hlen).
+
+        { generalize dependent sz.
+          generalize dependent xs.
+          fix IHxs 2.
+          intros xs Hforall sz Hlen x H.
+          destruct xs.
+          + inversion H.
+          + inversion H; subst.
+            * inversion Hforall; subst; auto.
+            * eapply IHxs. inversion Hforall; subst.
+              all: try eassumption. reflexivity.
+        }
+
+        apply Forall_forall; auto.
+      - rename H into Hforall.
+        rename H0 into Hlen.
+        rename H1 into Hvect.
+        refine (IH_Vector _ _ Hlen Hvect).
+
+        { generalize dependent sz.
+          generalize dependent xs.
+          fix IHxs 2.
+          intros xs Hforall sz Hlen x H.
+          destruct xs.
+          + inversion H.
+          + inversion H; subst.
+            * inversion Hforall; subst; auto.
+            * eapply IHxs. inversion Hforall; subst.
+              all: try eassumption. reflexivity.
+        }
+
+        apply Forall_forall; auto.
+    Qed.
+  End dvalue_has_dtyp_ind.
+
 
   Inductive concretize : uvalue -> dvalue -> Prop :=
   (* Concrete uvalue are contretized into their singleton *)

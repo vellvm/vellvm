@@ -8,6 +8,8 @@ From ITree Require Import
 
 From Vellvm Require Import
      LLVMEvents
+     Util
+     DynamicTypes
      Handlers.Handlers.
 
 Section InterpreterCFG.
@@ -230,9 +232,64 @@ Section InterpreterCFG.
     reflexivity.
   Qed.
 
+  Lemma interp_cfg_to_L3_Load : forall defs t a g l m val,
+      read m a t = inr val ->
+      interp_cfg_to_L3 defs (trigger (Load t (DVALUE_Addr a))) g l m ≈ Ret (m,(l,(g,val))).
+  Proof.
+    intros * READ.
+    unfold interp_cfg_to_L3.
+    rewrite interp_intrinsics_trigger.
+    cbn.
+    unfold Intrinsics.F_trigger.
+    rewrite interp_global_trigger.
+    cbn.
+    rewrite interp_local_bind, interp_local_trigger.
+    cbn; rewrite bind_bind.
+    rewrite interp_memory_bind, subevent_subevent.
+    rewrite interp_memory_load; eauto.
+    cbn.
+    rewrite 2 bind_ret_l, interp_local_ret, interp_memory_ret.
+    reflexivity.
+  Qed.
+
+  Arguments allocate : simpl never.
+  Lemma interp_cfg_to_L3_alloca :
+    forall (defs : intrinsic_definitions) (m : memory_stack) (t : dtyp) (g : global_env) l,
+      non_void t ->
+      exists m' a',
+        allocate m t = inr (m', a') /\
+        interp_cfg_to_L3 defs (trigger (Alloca t)) g l m ≈ ret (m', (l, (g, DVALUE_Addr a'))).
+  Proof.
+    intros * NV.
+    unfold interp_cfg_to_L3.
+    eapply interp_memory_alloca_exists in NV as [m' [a' [ALLOC INTERP]]].
+    exists m'. exists a'.
+
+    rewrite interp_intrinsics_trigger.
+    cbn.
+    unfold Intrinsics.F_trigger.
+    rewrite interp_global_trigger.
+    cbn.
+    rewrite interp_local_bind, interp_local_trigger.
+    cbn.
+    rewrite bind_bind.
+    rewrite interp_memory_bind.
+    rewrite subevent_subevent, interp_memory_alloca; eauto.
+    cbn.
+    repeat rewrite bind_ret_l.
+    cbn.
+    rewrite interp_local_ret.
+    rewrite interp_memory_ret.
+    split; eauto.
+    reflexivity.
+    Unshelve.
+    auto.
+  Qed.
+
   (**
-     TODO YZ: Can we expose better than this? It's super low level
+     YZ : Should be obsolete. Keeping it around for a bit
    *)
+  (*
   Lemma interp_cfg_to_L3_LM : forall defs t a size offset g l m v bytes concrete_id,
       get_logical_block m a = Some (LBlock size bytes concrete_id) ->
       deserialize_sbytes (lookup_all_index offset (sizeof_dtyp t) bytes SUndef) t = v ->
@@ -257,5 +314,6 @@ Section InterpreterCFG.
     rewrite EQ.
     reflexivity.
   Qed.
+   *)
 
 End InterpreterCFG.
