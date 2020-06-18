@@ -37,3 +37,6 @@ Arguments failwith _ _ _ _: simpl nomatch.
 Definition undef := err.
 Definition undef_or_err := eitherT string err.
 
+Instance Monad_undef_or_err : Monad undef_or_err.
+unfold undef_or_err. typeclasses eauto.
+Defined.

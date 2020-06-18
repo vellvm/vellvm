@@ -762,7 +762,11 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       Computes the byte size of a [dtyp]. *)
     Fixpoint sizeof_dtyp (ty:dtyp) : Z :=
       match ty with
-      | DTYPE_I sz         => 8 (* All integers are padded to 8 bytes. *)
+      | DTYPE_I 1          => 8 (* All integers are padded to 8 bytes. *)
+      | DTYPE_I 8          => 8 (* All integers are padded to 8 bytes. *)
+      | DTYPE_I 32         => 8 (* All integers are padded to 8 bytes. *)
+      | DTYPE_I 64         => 8 (* All integers are padded to 8 bytes. *)
+      | DTYPE_I x          => 0 (* Unsupported integers *)
       | DTYPE_Pointer      => 8
       | DTYPE_Packed_struct l
       | DTYPE_Struct l     => fold_left (fun acc x => acc + sizeof_dtyp x) l 0
@@ -770,6 +774,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DTYPE_Array sz ty' => sz * sizeof_dtyp ty'
       | DTYPE_Float        => 4
       | DTYPE_Double       => 8
+      | DTYPE_Half         => 4
+      | DTYPE_X86_fp80     => 4 (* TODO: Unsupported, currently modeled by Float32 *) 
+      | DTYPE_Fp128        => 4 (* TODO: Unsupported, currently modeled by Float32 *) 
+      | DTYPE_Ppc_fp128    => 4 (* TODO: Unsupported, currently modeled by Float32 *) 
+      | DTYPE_Metadata     => 0 
+      | DTYPE_X86_mmx      => 0 (* TODO: Unsupported *)
+      | DTYPE_Opaque       => 0 (* TODO: Unsupported *)
       | _                  => 0 (* TODO: add support for more types as necessary *)
       end.
 
@@ -923,6 +934,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       intros dv dt TYP.
       induction TYP using dvalue_has_dtyp_ind';
         try solve [cbn; omega].
+      - cbn.  rewrite DynamicValues.unsupported_cases. omega. assumption.
       - rewrite sizeof_struct_cons.
         omega.
       - rewrite sizeof_packed_struct_cons.
@@ -958,6 +970,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
       intros dv dt TYP.
       induction TYP using dvalue_has_dtyp_ind'; try solve [cbn; auto].
+      - cbn. rewrite DynamicValues.unsupported_cases; auto.
       - cbn.
         rewrite app_length.
         rewrite Nat2Z.inj_add.
@@ -1011,6 +1024,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
       intros dv dt TYP.
       induction TYP using dvalue_has_dtyp_ind'; auto.
+      - cbn. rewrite DynamicValues.unsupported_cases. reflexivity. auto.
       - (* Structs *)
         rewrite sizeof_struct_cons.
         cbn.
@@ -1301,8 +1315,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       - (* I8 *) admit.
       - (* I32 *) admit.
       - (* I64 *) admit.
+      - cbn. rewrite DynamicValues.unsupported_cases; auto.
       - (* Double *) admit.
       - (* Float *) admit.
+      - (* Half *) admit.
+      - (* X86_fp80 *) admit.
+      - (* FP128 *) admit.
+      - (* Ppc_fp128 *) admit.
       - (* Structs *)
         generalize dependent f.
         generalize dependent dt.

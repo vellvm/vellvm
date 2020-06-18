@@ -280,9 +280,9 @@ Ltac flatten_all :=
   | |- context[match ?x with | _ => _ end] => let Heq := fresh "Heq" in destruct x eqn:Heq
   end.
 
-Instance pick_handler_proper {E R} `{LLVMEvents.UBE -< E}:
-  Proper (eq ==> eq_itree eq ==> iff) (@Pick_handler E _ R).
-Admitted.
+(* Instance pick_handler_proper {E R} `{LLVMEvents.UBE -< E}: *)
+(*   Proper (eq ==> eq_itree eq ==> iff) (@Pick_handler E _ R). *)
+(* Admitted. *)
 
 
 (* Lemma interp_prop_mon: *)
@@ -361,7 +361,7 @@ Check (case_ (@E_trigger_prop LLVMEvents.ExternalCallE)
 Check  ((case_ E_trigger_prop (case_ UB_handler F_trigger_prop)) : L4 ~> PropT L5).
 *)
 
-
+(*
 Lemma pickE_UB_correct `{LLVMEvents.UBE -< L4} `{LLVMEvents.FailureE -< L4} :
   handler_correct_prop
     (Pick_handler : PickE ~> PropT L4)
@@ -376,8 +376,17 @@ Proof.
   destruct e.
   cbn.
   assert (P \/ ~P).
-Abort.    
+  { admit. (* TODO: Classical logic *) }
+  destruct H1.
+  - eexists (translate _ (concretize_uvalue u)).
+    Unshelve. 2 :
+    {  refine (fun T fu => _).
+       destruct fu; auto. }
+    cbn. split. 
   
+Abort.    
+*)  
+
 Lemma refine_UB
   : forall E F `{LLVMEvents.FailureE -< E +' F} T
                       (x : _ -> Prop)
@@ -398,8 +407,13 @@ Qed.
 
 Lemma Pick_handler_correct :
   forall E `{LLVMEvents.FailureE -< E} `{LLVMEvents.UBE -< E},
-    handler_correct (@Pick_handler E _) concretize_picks.
+    handler_correct (@Pick_handler E _ _) concretize_picks.
+Proof.  
   unfold handler_correct.
+  intros.
+  destruct e.
+  cbn. apply PickD with (res := concretize_uvalue u).
+  
 Admitted.
   
 Lemma refine_undef

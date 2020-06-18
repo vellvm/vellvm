@@ -9,7 +9,9 @@
  ---------------------------------------------------------------------------- *)
 
 From Coq Require Import
-     ZArith List String Omega Bool.Bool.
+     ZArith DecidableClass List String Omega Bool.Bool.
+
+Import BinInt.
 
 Require Import Ceres.Ceres.
 
@@ -17,6 +19,7 @@ From ExtLib Require Import
      Core.RelDec
      Programming.Eqv
      Structures.Monads
+     Data.Monads.EitherMonad
      Structures.Functor
      Data.Nat
      Data.List.
@@ -73,6 +76,42 @@ Definition inttyp (x:Z) : Type :=
   | 64 => int64
   | _ => False
   end.
+
+Inductive IX_supported : Z -> Prop :=
+| I1_Supported : IX_supported 1
+| I8_Supported : IX_supported 8
+| I32_Supported : IX_supported 32
+| I64_Supported : IX_supported 64
+.
+
+Lemma IX_supported_dec : forall (sz:Z), {IX_supported sz} + {~IX_supported sz}.
+Proof.
+  intros sz.
+  - decide (sz = 1).
+    + left. subst. constructor.
+    + decide (sz = 8). 
+      * left. subst. constructor.
+      * decide (sz = 32).
+        -- left. subst. constructor.
+        -- decide (sz = 64).
+           ++ left. subst. constructor.
+           ++ right. intro X.
+              inversion X; subst; contradiction.
+Qed.
+
+(* What's a good way to prove this ? *) 
+Lemma unsupported_cases : forall {X} (sz : Z) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X), 
+    match sz with
+    | 64 => x64
+    | 32 => x32
+    | 8 => x8
+    | 1 => x1
+    | _ => x
+    end = x.
+Proof.
+  intros.
+Admitted.
+
 
 Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
@@ -1291,8 +1330,16 @@ Class VInt I : Type :=
   | DVALUE_I8_typ     : forall x, dvalue_has_dtyp (DVALUE_I8 x) (DTYPE_I 8)
   | DVALUE_I32_typ    : forall x, dvalue_has_dtyp (DVALUE_I32 x) (DTYPE_I 32)
   | DVALUE_I64_typ    : forall x, dvalue_has_dtyp (DVALUE_I64 x) (DTYPE_I 64)
+  | DVALUE_IX_typ     : forall x, ~IX_supported x -> dvalue_has_dtyp DVALUE_None (DTYPE_I x)
   | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
+  | DVALUE_Half_typ   : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Half (* ??? *)
+  | DVALUE_X86_fp80   : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_X86_fp80 (* ??? *)
+  | DVALUE_Fp128      : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Fp128 (* ??? *)
+  | DVALUE_Ppc_fp128  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Ppc_fp128 (* ??? *)
+  | DVALUE_Metadata   : dvalue_has_dtyp DVALUE_None DTYPE_Metadata (* ??? *)
+  | DVALUE_X86_mmx    : dvalue_has_dtyp DVALUE_None DTYPE_X86_mmx (* ??? *)
+  | DVALUE_Opaque     : dvalue_has_dtyp DVALUE_None DTYPE_Opaque (* ??? *)
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
 
   | DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
@@ -1331,8 +1378,16 @@ Class VInt I : Type :=
     Hypothesis IH_I8             : forall x, P (DVALUE_I8 x) (DTYPE_I 8).
     Hypothesis IH_I32            : forall x, P (DVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (DVALUE_I64 x) (DTYPE_I 64).
+    Hypothesis IH_IX             : forall x, ~IX_supported x -> P DVALUE_None (DTYPE_I x).
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
+    Hypothesis IH_Half           : forall x, P (DVALUE_Float x) DTYPE_Half. (* ??? *)
+    Hypothesis IH_X86_fp80       : forall x, P (DVALUE_Float x) DTYPE_X86_fp80. (* ??? *)
+    Hypothesis IH_Fp128          : forall x, P (DVALUE_Float x) DTYPE_Fp128. (* ??? *)
+    Hypothesis IH_Ppc_fp128      : forall x, P (DVALUE_Float x) DTYPE_Ppc_fp128. (* ??? *)
+    Hypothesis IH_Metadata       : P DVALUE_None DTYPE_Metadata. (* ??? *)
+    Hypothesis IH_X86_mmx        : P DVALUE_None DTYPE_X86_mmx. (* ??? *)
+    Hypothesis IH_Opaque         : P DVALUE_None DTYPE_Opaque. (* ??? *)
     Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
     Hypothesis IH_Struct_nil     : P (DVALUE_Struct []) (DTYPE_Struct []).
     Hypothesis IH_Struct_cons    : forall (f : dvalue) (dt : dtyp) (fields : list dvalue) (dts : list dtyp),
@@ -1368,8 +1423,16 @@ Class VInt I : Type :=
       - apply IH_I8.
       - apply IH_I32.
       - apply IH_I64.
+      - apply IH_IX. assumption.
       - apply IH_Double.
       - apply IH_Float.
+      - apply IH_Half.
+      - apply IH_X86_fp80.
+      - apply IH_Fp128.
+      - apply IH_Ppc_fp128.
+      - apply IH_Metadata.
+      - apply IH_X86_mmx.
+      - apply IH_Opaque.
       - apply IH_None.
       - apply IH_Struct_nil.
       - apply (IH_Struct_cons TYP1 (IH f dt TYP1) TYP2 (IH (DVALUE_Struct fields) (DTYPE_Struct dts) TYP2)).
@@ -1413,69 +1476,104 @@ Class VInt I : Type :=
     Qed.
   End dvalue_has_dtyp_ind.
 
-
-  Inductive concretize : uvalue -> dvalue -> Prop :=
+  
+  Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop := 
   (* Concrete uvalue are contretized into their singleton *)
-  | Pick_concrete             : forall uv dv, uvalue_to_dvalue uv = inr dv -> concretize uv dv
+  | Pick_concrete             : forall uv dv, uvalue_to_dvalue uv = inr dv -> concretize_u uv (ret dv)
+  | Pick_fail                 : forall uv s, uvalue_to_dvalue uv = inl s  -> concretize_u uv (failwith s)
 
   (* Undef relates to all dvalue of the type *)
-  | Concretize_Undef          : forall dt dv, dvalue_has_dtyp dv dt ->  concretize (UVALUE_Undef dt) dv
+  | Concretize_Undef          : forall dt dv, dvalue_has_dtyp dv dt ->  concretize_u (UVALUE_Undef dt) (ret dv)
 
   (* The other operations proceed non-deterministically *)
-  | Concretize_IBinop : forall iop uv1 dv1 uv2 dv2 res,
-      concretize uv1 dv1 ->
-      concretize uv2 dv2 ->
-      eval_iop iop dv1 dv2 = ret res ->
-      concretize (UVALUE_IBinop iop uv1 uv2) res
+  | Concretize_IBinop : forall iop uv1 e1 uv2 e2,
+      concretize_u uv1 e1 ->
+      concretize_u uv2 e2 ->
+      concretize_u (UVALUE_IBinop iop uv1 uv2)
+                   (dv1 <- e1 ;;
+                    dv2 <- e2 ;;
+                    (eval_iop iop dv1 dv2))
+  
+  | Concretize_ICmp : forall cmp uv1 e1 uv2 e2 ,
+      concretize_u uv1 e1 ->
+      concretize_u uv2 e2 ->
+      concretize_u (UVALUE_ICmp cmp uv1 uv2)
+                   (dv1 <- e1 ;;
+                    dv2 <- e2 ;;
+                    eval_icmp cmp dv1 dv2)
 
-  | Concretize_ICmp : forall cmp uv1 dv1 uv2 dv2 res,
-      concretize uv1 dv1 ->
-      concretize uv2 dv2 ->
-      eval_icmp cmp dv1 dv2 = ret res  ->
-      concretize (UVALUE_ICmp cmp uv1 uv2) res
+  | Concretize_FBinop : forall fop fm uv1 e1 uv2 e2,
+      concretize_u uv1 e1 ->
+      concretize_u uv2 e2 ->
+      concretize_u (UVALUE_FBinop fop fm uv1 uv2)
+                   (dv1 <- e1 ;;
+                    dv2 <- e2 ;;
+                    eval_fop fop dv1 dv2)
 
-  | Concretize_FBinop : forall fop fm uv1 dv1 uv2 dv2 res,
-      concretize uv1 dv1 ->
-      concretize uv2 dv2 ->
-      eval_fop fop dv1 dv2 = ret res ->
-      concretize (UVALUE_FBinop fop fm uv1 uv2) res
+  | Concretize_FCmp : forall cmp uv1 e1 uv2 e2,
+      concretize_u uv1 e1 ->
+      concretize_u uv2 e2 ->
+      concretize_u (UVALUE_FCmp cmp uv1 uv2)
+                   (dv1 <- e1 ;;
+                    dv2 <- e2 ;;
+                    eval_fcmp cmp dv1 dv2)
 
-  | Concretize_FCmp : forall cmp uv1 dv1 uv2 dv2 res,
-      concretize uv1 dv1 ->
-      concretize uv2 dv2 ->
-      eval_fcmp cmp dv1 dv2 = ret res ->
-      concretize (UVALUE_FCmp cmp uv1 uv2) res
+  | Concretize_Struct_Nil     : concretize_u (UVALUE_Struct []) (ret (DVALUE_Struct []))
+  | Concretize_Struct_Cons    : forall u e us es,
+      concretize_u u e ->
+      concretize_u (UVALUE_Struct us) es ->
+      concretize_u (UVALUE_Struct (u :: us))
+                   (d <- e ;;
+                    vs <- es ;;
+                    match vs with
+                    | (DVALUE_Struct ds) => ret (DVALUE_Struct (d :: ds))
+                    | _ => failwith "illegal Struct Cons"
+                    end)
 
-  | Concretize_Struct_Nil     : concretize (UVALUE_Struct []) (DVALUE_Struct [])
-  | Concretize_Struct_Cons    : forall u d us ds,
-      concretize u d ->
-      concretize (UVALUE_Struct us) (DVALUE_Struct ds) ->
-      concretize (UVALUE_Struct (u :: us)) (DVALUE_Struct (d :: ds))
 
-
-  | Concretize_Packed_struct_Nil     : concretize (UVALUE_Packed_struct []) (DVALUE_Packed_struct [])
-  | Concretize_Packed_struct_Cons    : forall u d us ds,
-      concretize u d ->
-      concretize (UVALUE_Packed_struct us) (DVALUE_Packed_struct ds) ->
-      concretize (UVALUE_Packed_struct (u :: us)) (DVALUE_Packed_struct (d :: ds))
+  | Concretize_Packed_struct_Nil     : concretize_u (UVALUE_Packed_struct []) (ret (DVALUE_Packed_struct []))
+  | Concretize_Packed_struct_Cons    : forall u e us es,
+      concretize_u u e ->
+      concretize_u (UVALUE_Packed_struct us) es ->
+      concretize_u (UVALUE_Packed_struct (u :: us))
+                   (d <- e ;;
+                    vs <- es ;;
+                    match vs with
+                    | (DVALUE_Packed_struct ds) => ret (DVALUE_Packed_struct (d :: ds))
+                    | _ => failwith "illegal Packed_struct cons"
+                    end)
 
   | Concretize_Array_Nil :
-      concretize (UVALUE_Array []) (DVALUE_Array [])
+      concretize_u (UVALUE_Array []) (ret (DVALUE_Array []))
 
-  | Concretize_Array_Cons : forall u d us ds,
-      concretize u d ->
-      concretize (UVALUE_Array us) (DVALUE_Array ds) ->
-      concretize (UVALUE_Array (u :: us)) (DVALUE_Array (d :: ds))
+  | Concretize_Array_Cons : forall u e us es,
+      concretize_u u e ->
+      concretize_u (UVALUE_Array us) es ->      
+      concretize_u (UVALUE_Array (u :: us))
+                   (d <- e ;;
+                    vs <- es ;;
+                    match vs with
+                    | (DVALUE_Array ds) => ret (DVALUE_Array (d :: ds))
+                    | _ => failwith "illegal Array cons"
+                    end)
 
   | Concretize_Vector_Nil :
-      concretize (UVALUE_Vector []) (DVALUE_Vector [])
+      concretize_u (UVALUE_Vector []) (ret (DVALUE_Vector []))
 
-  | Concretize_Vector_Cons : forall u d us ds,
-      concretize u d ->
-      concretize (UVALUE_Vector us) (DVALUE_Vector ds) ->
-      concretize (UVALUE_Vector (u :: us)) (DVALUE_Vector (d :: ds))
+  | Concretize_Vector_Cons : forall u e us es,
+      concretize_u u e ->
+      concretize_u (UVALUE_Vector us) es ->      
+      concretize_u (UVALUE_Vector (u :: us))
+                   (d <- e ;;
+                    vs <- es ;;
+                    match vs with
+                    | (DVALUE_Vector ds) => ret (DVALUE_Vector (d :: ds))
+                    | _ => failwith "illegal Vector cons"
+                    end)
   .
 
+  Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
+  
   (*
     YZ TODO: Not sure whether those can be uvalues, to figure out
   | Concretize_Conversion     : pickU (UVALUE_Conversion       _) (DVALUE_Conversion       _)

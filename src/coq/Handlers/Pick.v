@@ -9,6 +9,7 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
+     Eq
      Events.State.
 
 From Vellvm Require Import
@@ -36,11 +37,44 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
   Section PickPropositional.
 
-    (* YZ: TODO: better UB error message *)
-    Inductive Pick_handler {E} `{FO:UBE -< E}: PickE ~> PropT E :=
-    | PickUB: forall uv C, ~ C -> Pick_handler (pick uv C) (raiseUB "Picking unsafe uvalue")
-    | PickD: forall uv (C: Prop) dv, C -> concretize uv dv -> Pick_handler (pick uv C) (Ret dv).
+    (*  Semantics with the Pick + Predicates:
+        expr = div 1 undef 
+           intepreter: "evaluate"   div 1 0   ==> trigger UBE   ==> interpret UBE as trigger Fail
+           model:  trigger UBE ==> all Trees  (including trigger Fail)
 
+       expr = div 1 (1 - undef)
+           interpreter:  div 1 1 ==> ret 1
+           model:  trigger UBE ==> all Trees  (including ret 1)
+
+
+       Four cases:
+       C   exists dv, concretize_uvalue uv = ret dv  => easy by relation between concretize and 
+       C   concretize_uvalue uv = trigger UBE        => in this case, later interpretation of UBE
+       C   concretize_uvalue uv = trigger fail 
+      ~C   --> pick UBE
+    
+       Lemma: concretize_uvalue uv = Ret dv  ->  concretize uv dv
+
+
+
+       Semantics without the predicates in Pick:
+        expr = div 1 undef 
+           intepreter: "evaluate"   div 1 0      ==> trigger UB   ==> interpret UBE as trigger Fail
+           model: after Pick_handler:  {trigger UBE, ret (1/n) | n }  ==> 
+                  after UBE_handler :  { all trees }    (including trigger Fail)
+
+       expr = div 1 (1 - undef)
+           interpreter:  div 1 1 ==> ret 1
+           model: after Pick_handler:  {trigger UBE, ret (1/n) | n }  ==> 
+                  after UBE_handler :  { all trees }    (including ret 1)
+    *)
+    (* YZ: TODO: better UB error message *)
+    (* SAZ: For now, leaving the "C" parameter, but just ignoring it here *)
+    
+    
+    Inductive Pick_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E}: PickE ~> PropT E :=
+    | PickD: forall uv C res t,  concretize_u uv res -> t ≈ (lift_undef_or_err ret res) -> Pick_handler (pick uv C) t.
+                                                                      
     Section PARAMS_MODEL.
       Variable (E F: Type -> Type).
 
@@ -92,7 +126,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       end.
 
     Import MonadNotation.
-    Fixpoint concretize_uvalue (u : uvalue) : itree (FailureE +' UBE) dvalue :=
+    Fixpoint concretize_uvalue (u : uvalue) : undef_or_err dvalue :=
       match u with
       | UVALUE_Addr a                          => ret (DVALUE_Addr a)
       | UVALUE_I1 x                            => ret (DVALUE_I1 x)
@@ -105,7 +139,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | UVALUE_Poison                          => ret (DVALUE_Poison)
       | UVALUE_None                            => ret DVALUE_None
       | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalue fields ;;
-                                                   ret (DVALUE_Struct dfields)
+                                                  ret (DVALUE_Struct dfields)
       | UVALUE_Packed_struct fields            => 'dfields <- map_monad concretize_uvalue fields ;;
                                                    ret (DVALUE_Packed_struct dfields)
       | UVALUE_Array elts                      => 'delts <- map_monad concretize_uvalue elts ;;
@@ -113,18 +147,18 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | UVALUE_Vector elts                     => 'delts <- map_monad concretize_uvalue elts ;;
                                                    ret (DVALUE_Vector delts)
       | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalue v1 ;;
-                                                  dv2 <- concretize_uvalue v2 ;;
-                                                  lift_undef_or_err ret (eval_iop iop dv1 dv2)
+                                                 dv2 <- concretize_uvalue v2 ;;
+                                                 eval_iop iop dv1 dv2
       | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
                                                   dv2 <- concretize_uvalue v2 ;;
-                                                  lift_undef_or_err ret (eval_icmp cmp dv1 dv2)
+                                                  eval_icmp cmp dv1 dv2
       | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalue v1 ;;
                                                   dv2 <- concretize_uvalue v2 ;;
-                                                  lift_undef_or_err ret (eval_fop fop dv1 dv2)
+                                                  eval_fop fop dv1 dv2
       | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
                                                   dv2 <- concretize_uvalue v2 ;;
-                                                  lift_undef_or_err ret (eval_fcmp cmp dv1 dv2)
-      | _ => raise "unimplemented concretization of uvalue"
+                                                  eval_fcmp cmp dv1 dv2
+      | _ => failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"
       (*
   | UVALUE_Conversion conv v t_to          =>
   | UVALUE_GetElementPtr t ptrval idxs     => _
@@ -137,13 +171,29 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
        *)
       end.
 
-    Program Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} : PickE ~> itree E.
-    refine (fun T p => match p with
-                    | pick u P => translate _ (concretize_uvalue u)
-                    end).
-    refine (fun T fu => _).
-    destruct fu; auto.
-    Defined.
+    Ltac do_it := constructor; cbn; auto; fail.
+
+    Lemma dvalue_default : forall t,  dvalue_has_dtyp (default_dvalue_of_dtyp t) t.
+    Proof.
+      intros t.
+      induction t using dtyp_ind; try do_it.
+      - cbn. destruct (@IX_supported_dec sz).
+        * inversion i; constructor; auto.
+        * rewrite unsupported_cases; auto. constructor. auto.
+    Admitted.          
+      
+    Lemma concretize_u_concretize_uvalue : forall u, concretize_u u (concretize_uvalue u).
+    Proof.
+      intros u.
+      induction u using uvalue_ind'; try do_it.
+      - cbn. apply Concretize_Undef. apply dvalue_default.
+      - cbn. (* need to relate map_monad to the forall  *)
+    Admitted.
+      
+    Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} : PickE ~> itree E :=
+      fun T p => match p with
+              | pick u P => lift_undef_or_err ret (concretize_uvalue u)
+              end.
 
     Section PARAMS_INTERP.
       Variable (E F: Type -> Type).
