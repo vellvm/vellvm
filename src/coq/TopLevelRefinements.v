@@ -418,9 +418,9 @@ Proof.
 Qed.
   
 Lemma refine_undef
-  : forall (E F:Type -> Type) T `{LLVMEvents.FailureE -< E} `{LLVMEvents.UBE -< F}
+  : forall (E F:Type -> Type) T  `{LLVMEvents.UBE -< F} `{LLVMEvents.FailureE -< F}
                       (x : itree _ T),
-      model_undef x (exec_undef x).
+      model_undef x (@exec_undef E F _ _ _ x).
 Proof.
   intros E F H H0 T x.
   cbn in *.
@@ -435,22 +435,6 @@ Proof.
   unfold handler_correct. intros. reflexivity.
 Qed.
 
-Lemma refine_both
-  : forall T
-      (x : itree (ExternalCallE +' PickE +' LLVMEvents.UBE +' LLVMEvents.DebugE +' LLVMEvents.FailureE) T),
-    model_UB (model_undef x) (exec_UB (exec_undef x)).
-Proof.
-  intros T x.
-  unfold model_undef.
-  unfold exec_undef.
-  unfold model_UB.
-  eexists.  split.
-  2 : { unfold exec_UB.
-        unfold interp_prop, interp at 1, Basics.iter, MonadIter_Prop.
-        eexists.  split.
-  
-Admitted.  
-
 (**
    SAZ : Possible entry point here
    We should be able to prove that the interpreter belongs to the model.
@@ -462,10 +446,8 @@ Proof.
   unfold interpreter, interpreter_user.
   unfold interp_to_L5.
   unfold interp_to_L5_exec.
-  match goal with
-  | [ |- model_UB (model_undef ?X) (exec_UB (exec_undef _))] => remember X as Y
-  end.
-  apply refine_both.
+  apply refine_UB. 
+  apply refine_undef.
 Qed.
   
 (**
