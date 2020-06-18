@@ -413,8 +413,9 @@ Proof.
   intros.
   destruct e.
   cbn. apply PickD with (res := concretize_uvalue u).
-  
-Admitted.
+  - apply Pick.concretize_u_concretize_uvalue.
+  - reflexivity.
+Qed.
   
 Lemma refine_undef
   : forall (E F:Type -> Type) T `{LLVMEvents.FailureE -< E} `{LLVMEvents.UBE -< F}
