@@ -102,12 +102,20 @@ Qed.
 
 (* This formulation should be easier to use *)
 Instance interp_prop_Proper :
-  forall R E F G (RR : relation R) (h : (E +' F +' G) ~> PropT (E +' G)),
-    Proper (@eutt (E +' F +' G) _ _ RR ==> eq ==> Basics.impl) (@interp_prop (E +' F +' G) _ h R).
+  forall R E F (RR : relation R) (h : E ~> PropT F),
+    Proper (@eutt _ _ _ RR ==> eq ==> Basics.impl) (@interp_prop E _ h R).
 Proof.
-  intros R E F G RR h.
+  intros R E F RR h.
+  unfold interp_prop.
   intros t1 t2 Heutt.
-  unfold PropT in h. 
+  red.
+  unfold impl.
+  intros x y H H0. subst.
+  unfold interp, Basics.iter, MonadIter_Prop.
+  unfold iter. 
+  eexists.  split.
+  (* SAZ: I'm not sure this a very usable definition of iter_prop. *)
+  (* We need either an induction or coinduction principle... *)
 Admitted.
 
 Hint Unfold TT : core.
@@ -272,31 +280,161 @@ Ltac flatten_all :=
   | |- context[match ?x with | _ => _ end] => let Heq := fresh "Heq" in destruct x eqn:Heq
   end.
 
+Instance pick_handler_proper {E R} `{LLVMEvents.UBE -< E}:
+  Proper (eq ==> eq_itree eq ==> iff) (@Pick_handler E _ R).
+Admitted.
+
+
 (* Lemma interp_prop_mon: *)
 (*   forall {E F} (h h': E ~> (PropT (itree F))), *)
 (*     (forall e t, h _ e t -> h' _ e t) -> *)
 (*     forall t, interp_prop h _ t -> interp_prop h' _ t. *)
 
-(* Lemma interp_prop_correct_exec: *)
-(*   forall {E F} (h: E ~> (PropT (itree F))) (h': E ~> itree F), *)
-(*     (forall e t, h _ e (h' _ t)) -> *)
-(*     forall t, interp_prop h _ (interp h' t). *)
 
+Definition handler_correct {E F} (h_spec: E ~> PropT F) (h: E ~> itree F) :=
+    (forall T e, h_spec T e (h T e)).
+
+  
 Lemma interp_prop_correct_exec:
-  forall {E F} (h: E ~> PropT F) (h': E ~> itree F),
-    (forall T e, h T e (h' T e)) ->
-    forall R t, interp_prop h R t (interp h' t).
+  forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),
+    handler_correct h_spec h ->
+    forall R t, interp_prop h_spec R t (interp h t).
 Proof.
   intros.
-  eexists; split; [| reflexivity].
+  eexists; split. 2: { (* SAZ: Not sure why [reflexivity] isn't enough here *)
+                         unfold interp. unfold iter, Iter_Kleisli. reflexivity. }
   intros t'.
   destruct (observe t') eqn:EQ; cbn; rewrite EQ; try reflexivity.
-  exists (h' _ e); auto.
+  exists (h _ e); auto.
 Qed.
 
-Instance pick_handler_proper {E R} `{LLVMEvents.UBE -< E}:
-  Proper (eq ==> eq_itree eq ==> iff) (@Pick_handler E _ R).
+Lemma case_prop_handler_correct:
+  forall {E1 E2 F}
+    (h1_spec: E1 ~> PropT F)
+    (h2_spec: E2 ~> PropT F)
+    (h1: E1 ~> itree F)
+    (h2: E2 ~> itree F)
+    (C1: handler_correct h1_spec h1)
+    (C2: handler_correct h2_spec h2),
+    handler_correct (case_ h1_spec h2_spec) (case_ h1 h2).
+Proof.
+  intros E1 E2 F h1_spec h2_spec h1 h2 C1 C2.
+  unfold handler_correct in *.
+  intros T e.
+  destruct e. apply C1. apply C2.
+Qed.
+
+Lemma UB_handler_correct: handler_correct UB_handler UB_exec.
+Proof.
+  unfold UB_handler. unfold UB_exec.
+  unfold handler_correct.
+  intros. auto.
+Qed.  
+
+
+Definition prop_compose :=
+  fun {F G : Type -> Type } {T : Type}
+    (g_spec : F ~> PropT G) (PF: PropT F T) (g:itree G T) =>
+    exists f : itree F T, PF f /\ (interp_prop g_spec) T f g.
+
+(* Level 5 interpreter Prop to Prop *)
+(* h_spec is the PickHandler *)
+Definition handler_correct_prop
+           {E F G}
+           (h_spec: E ~> PropT F) (h: E ~> itree F)
+           (g_spec: F ~> PropT G) (g: F ~> itree G)
+  :=
+    (forall T e,
+        (prop_compose g_spec (h_spec T e))
+          (interp g (h T e))).
+
+
+(* L4 = ExternalCallE +' LLVMEvents.UBE +' LLVMEvents.DebugE +' LLVMEvents.FailureE *)
+
+(* Check (case_ (E_trigger_prop (F:=LLVMEvents.DebugE +' LLVMEvents.FailureE)) (case_ UB_handler (F_trigger_prop (F:=LLVMEvents.DebugE +' LLVMEvents.FailureE)))). *)
+
+(*
+Check (@F_trigger_prop LLVMEvents.ExternalCallE (LLVMEvents.DebugE +' LLVMEvents.FailureE)).
+Check (case_ (@E_trigger_prop LLVMEvents.ExternalCallE)
+              (case_ UB_handler (@F_trigger_prop _ (LLVMEvents.DebugE +' LLVMEvents.FailureE))): PropT L4 ~> PropT L5).
+
+Check  ((case_ E_trigger_prop (case_ UB_handler F_trigger_prop)) : L4 ~> PropT L5).
+*)
+
+
+Lemma pickE_UB_correct `{LLVMEvents.UBE -< L4} `{LLVMEvents.FailureE -< L4} :
+  handler_correct_prop
+    (Pick_handler : PickE ~> PropT L4)
+    (concretize_picks : PickE ~> itree L4)
+    (case_ (E_trigger_prop (F:=LLVMEvents.DebugE +' LLVMEvents.FailureE)) (case_ UB_handler (F_trigger_prop (F:=LLVMEvents.DebugE +' LLVMEvents.FailureE))))
+    (case_ (E_trigger (F:=LLVMEvents.DebugE +' LLVMEvents.FailureE))
+           (case_ UB_exec (F_trigger (F:=LLVMEvents.DebugE +' LLVMEvents.FailureE)))).
+Proof.
+  unfold handler_correct_prop.
+  intros.
+  unfold prop_compose.
+  destruct e.
+  cbn.
+  assert (P \/ ~P).
+Abort.    
+  
+Lemma refine_UB
+  : forall E F `{LLVMEvents.FailureE -< E +' F} T
+                      (x : _ -> Prop)
+                      (y : itree (E +' LLVMEvents.UBE +' F) T),
+      x y -> model_UB x (exec_UB y).
+  Proof.
+    intros E F H T x y H0.
+    unfold model_UB. unfold exec_UB.
+    exists y. split. assumption.
+    apply interp_prop_correct_exec.
+    intros.
+    apply case_prop_handler_correct.
+    unfold handler_correct. intros. reflexivity.
+    apply case_prop_handler_correct.
+    apply UB_handler_correct.
+    unfold handler_correct. intros. reflexivity.
+Qed.
+
+Lemma Pick_handler_correct :
+  forall E `{LLVMEvents.FailureE -< E} `{LLVMEvents.UBE -< E},
+    handler_correct (@Pick_handler E _) concretize_picks.
+  unfold handler_correct.
 Admitted.
+  
+Lemma refine_undef
+  : forall (E F:Type -> Type) T `{LLVMEvents.FailureE -< E} `{LLVMEvents.UBE -< F}
+                      (x : itree _ T),
+      model_undef x (exec_undef x).
+Proof.
+  intros E F H H0 T x.
+  cbn in *.
+  unfold model_undef.
+  unfold exec_undef.
+  apply interp_prop_correct_exec.
+  apply case_prop_handler_correct.
+  unfold handler_correct. intros. reflexivity.
+  apply case_prop_handler_correct.
+  apply Pick_handler_correct.
+
+  unfold handler_correct. intros. reflexivity.
+Qed.
+
+Lemma refine_both
+  : forall T
+      (x : itree (ExternalCallE +' PickE +' LLVMEvents.UBE +' LLVMEvents.DebugE +' LLVMEvents.FailureE) T),
+    model_UB (model_undef x) (exec_UB (exec_undef x)).
+Proof.
+  intros T x.
+  unfold model_undef.
+  unfold exec_undef.
+  unfold model_UB.
+  eexists.  split.
+  2 : { unfold exec_UB.
+        unfold interp_prop, interp at 1, Basics.iter, MonadIter_Prop.
+        eexists.  split.
+  
+Admitted.  
 
 (**
    SAZ : Possible entry point here
@@ -306,47 +444,15 @@ Theorem interpreter_sound: forall p, model p (interpreter p).
 Proof.
   intros p.
   unfold model, model_user.
-  (* flatten_goal. *)
-  (* 2:{ *)
-  (*   unfold interpreter, interpreter_user. *)
-  (*   rewrite Heq. *)
-  (*   admit. *)
-  (* } *)
-  (* unfold interpreter, interpreter_user; rewrite Heq. *)
-  (* unfold interp_vellvm_model_user, interp_vellvm_exec_user. *)
-  (* match goal with |- model_UB _ (interp_UB ?t) => exists t end. *)
-  (* split. *)
-  (* 2:{ *)
-
-  (*   fold_L3. *)
-  (*   apply interp_prop_correct_exec. *)
-  (*   intros. *)
-  (*   subst. *)
-  (*   destruct e as [|e]; cbn; [reflexivity|]. *)
-  (*   destruct e; cbn; [constructor | reflexivity]. *)
-  (* } *)
-  (* fold_L3. *)
-  (* apply interp_prop_correct_exec. *)
-  (* intros. *)
-  (* destruct e as [|e]; cbn; [reflexivity|]. *)
-  (* destruct e; cbn; [|reflexivity]. *)
-
-  (* Remains to prove refinement of pick handlers.
-     Currently ~untrue due to the predicate
-   *)
-  (*
-  destruct p0 as [uv P].
-  destruct uv.
-  all: try (simpl; setoid_rewrite translate_ret).
-  { constructor; [| constructor; reflexivity].
-    setoid_rewrite (translate_ret _ (DVALUE_Addr a)).
-    eapply pick_handler_proper; [reflexivity | |].
-    apply translate_ret.
-
-    destruct uv; cbn; try rewrite translate_ret.
-    *)
-Admitted.
-
+  unfold interpreter, interpreter_user.
+  unfold interp_to_L5.
+  unfold interp_to_L5_exec.
+  match goal with
+  | [ |- model_UB (model_undef ?X) (exec_UB (exec_undef _))] => remember X as Y
+  end.
+  apply refine_both.
+Qed.
+  
 (**
    Each interpreter commutes with [bind] and [ret].
  **)
