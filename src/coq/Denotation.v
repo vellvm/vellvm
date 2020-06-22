@@ -404,6 +404,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     | _             => trigger (pick uv True)
     end.
 
+  Definition pickUnique {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue
+    := concretize_or_pick uv (unique_prop uv).
+
   (** ** Denotation of expressions
       [denote_exp top o] is the main entry point for evaluating itree expressions.
       top : the type at which the expression should be evaluated (if any)
@@ -734,7 +737,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           uv <- translate exp_E_to_instr_E (denote_exp (Some dt) val) ;;
           dv <- concretize_or_pick uv True ;;
           ua <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
-          da <- concretize_or_pick ua (unique_prop ua) ;;
+          da <- pickUnique ua ;;
           match da with
           | DVALUE_Poison => raiseUB "Store to poisoned address."
           | _ => trigger (Store da dv)
@@ -748,7 +751,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           returned_value <-
           match Intrinsics.intrinsic_exp f with
           | Some s =>
-            dvs <- map_monad (fun uv => trigger (pickUnique uv)) uvs ;;
+            dvs <- map_monad (fun uv => pickUnique uv) uvs ;;
             fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
           | None =>
             fv <- translate exp_E_to_instr_E (denote_exp None f) ;;
@@ -981,7 +984,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                    | Some f_den => (* If the call is internal *)
                      f_den args
                    | None =>
-                     dargs <- map_monad (fun uv => trigger (pickUnique uv)) args ;;
+                     dargs <- map_monad (fun uv => pickUnique uv) args ;;
                      fmap dvalue_to_uvalue (trigger (ExternalCall dt fv dargs))
                    end
                  end)
