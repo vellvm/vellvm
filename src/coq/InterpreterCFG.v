@@ -286,6 +286,26 @@ Section InterpreterCFG.
     auto.
   Qed.
 
+  Lemma interp_cfg_to_L3_intrinsic :
+    forall (defs : intrinsic_definitions) (m : memory_stack) (τ : dtyp) (g : global_env) l fn args df res,
+      assoc Strings.String.string_dec fn (defs_assoc defs) = Some df ->
+      df args = inr res ->
+      interp_cfg_to_L3 defs (trigger (Intrinsic τ fn args)) g l m ≈ ret (m, (l, (g, res))).
+  Proof.
+    intros defs m τ g l fn args df res LUP RES.
+    unfold interp_cfg_to_L3.
+
+    rewrite interp_intrinsics_trigger; cbn.
+    rewrite LUP; cbn.
+    rewrite RES.
+
+    rewrite interp_global_ret.
+    rewrite interp_local_ret.
+    rewrite interp_memory_ret.
+
+    reflexivity.
+  Qed.
+
   (**
      YZ : Should be obsolete. Keeping it around for a bit
    *)
