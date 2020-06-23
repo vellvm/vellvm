@@ -161,14 +161,15 @@ Section MonadLaws.
       * cbn in *.
         repeat red in eqtt'.
         destruct eqtt' as (ta & k & EQ1 & EQ2 & KA).
-        + unfold bind, Monad_itree in EQ2. rewrite EQ1, Eq.bind_ret_l, eq in EQ2.
-          eapply H; [apply EQ2 | apply KA].
-          constructor 1; eauto.
+      + unfold bind, Monad_itree in EQ2. rewrite EQ1, Eq.bind_ret_l, eq in EQ2.
+        eapply H; [apply EQ2 | apply KA].
+        constructor 1; eauto.
      * cbn.
        exists (Ret x), (fun _ => t); split; [reflexivity|]; split.
         + unfold bind, Monad_itree. rewrite Eq.bind_ret_l; reflexivity.
         + intros.
-          apply Returns_Ret in H0. subst. red in H. rewrite eq. assumption.
+          apply Returns_Ret in H0. subst. red in H. rewrite eq.
+          assumption.
 
     - intros t t' EQ; cbn; split; intros HX.
       * destruct HX as (ta & k & EQ1 & EQ2 & KA).
@@ -184,8 +185,8 @@ Section MonadLaws.
           apply eqit_inv_ret in H0; subst.
           eapply H. rewrite EQ1 in EQ2.
           unfold bind, Monad_itree in EQ2.
-          rewrite Eq.bind_ret_l in EQ2. apply EQ2.
-          apply KA. rewrite EQ1. constructor. reflexivity.
+             rewrite Eq.bind_ret_l in EQ2. apply EQ2.
+             apply KA; rewrite EQ1; constructor; reflexivity.
 
       * destruct HX as (ta & k & EQ1 & EQ2 & KA).
         exists (Ret x), (fun _ => t); split; [reflexivity |]; split.
@@ -195,13 +196,16 @@ Section MonadLaws.
           2: { rewrite tau_eutt in H0. rewrite <- H0 in H1. apply Returns_Ret in H1. subst.
                red in H. rewrite EQ. rewrite EQ2. rewrite EQ1.
                unfold bind, Monad_itree.
-               rewrite Eq.bind_ret_l. apply KA. rewrite EQ1. constructor. reflexivity. }
+               rewrite Eq.bind_ret_l. apply KA; rewrite EQ1; constructor 1; reflexivity. 
+          }
           2: exfalso; eapply eutt_ret_vis_abs; eauto.
+          
           apply eqit_inv_ret in H0; subst.
-          eapply H. rewrite EQ1 in EQ2.
-          unfold bind, Monad_itree in EQ2.
-          rewrite Eq.bind_ret_l in EQ2. rewrite EQ. apply EQ2.
-          apply KA. rewrite EQ1. constructor. reflexivity.
+          red in H.
+          rewrite EQ, EQ2, EQ1.
+          unfold bind, Monad_itree.
+          rewrite Eq.bind_ret_l.
+          apply KA; rewrite EQ1; constructor; reflexivity.
     - assumption.
   Qed.
   
@@ -428,6 +432,14 @@ Section MonadLaws.
         econstructor 3. reflexivity.  apply HX.
   Qed.
 
+  Lemma Returns_bind_inversion : forall {E A B} (u : itree E B) (t : itree E A) (k : A -> itree E B) b,
+      Returns b (bind t k) ->
+      exists a, Returns a t /\ Returns b (k a).
+  Proof.
+    intros.
+    eapply Returns_bind_inversion_. apply H. reflexivity.
+  Qed.
+  
   
   (* From Coq.Logic.ChoiceFacts *)
 Definition GuardedFunctionalChoice_on {A B} :=
@@ -448,8 +460,11 @@ Proof.
 Admitted.
     
   
-  Lemma bind_bind: forall {E} (A B C : Type) (PA : PropT E A) (KB : A -> PropT E B) (KC : B -> PropT E C),
-      (* eutt_closed PA -> *)
+Lemma bind_bind: forall {E}
+                   (A B C : Type) (PA : PropT E A)
+                   (KB : A -> PropT E B) (KC : B -> PropT E C)
+                   (KBP : Proper (eq ==> eqm) KB)
+                   (KCP : Proper (eq ==> eqm) KC),
       eqm (bind (bind PA KB) KC) (bind PA (fun b => bind (KB b) KC)).
   Proof.
     (* PA ~a> KB a ~b> KC b *)
@@ -475,12 +490,16 @@ Admitted.
       + cbn in *.
         destruct eqtt' as (ta & kac & (HTA & EQc & HRkac)).
         red.
+        setoid_rewrite eq. clear eq t. setoid_rewrite EQc. clear EQc t'.
+
+
+        
         unfold bind_PropT in HRkac.
         apply guarded_choice in HRkac.
         destruct HRkac as (kab & HKab).
         apply guarded_choice in HKab.
         destruct HKab as (kabc & HKabc).
-        setoid_rewrite eq. clear eq t. setoid_rewrite EQc. clear EQc t'.
+
         exists (bind ta kab).
         setoid_rewrite bind_bind.        
 
@@ -517,9 +536,12 @@ Admitted.
              destruct HKabc as (HK & EQ2 & RET).
 
              apply RET in HX.
-             (* TODO: Need Proper KC *)
-             (* rewrite <- (PARAMETRIC a1 a a0). *)
-             admit.
+             do 2 red in KCP.
+             specialize (KCP a0 a0 eq_refl).
+             destruct KCP as (HKCP & EC & _).
+             specialize (HKCP (kabc a1 a0) (kabc a a0)).
+             apply HKCP. apply PARAMETRIC. assumption.
+
         * exists (fun b => ITree.spin).
           split; [|split].
           -- red.
@@ -529,6 +551,13 @@ Admitted.
           -- apply eutt_clo_bind with (UU:=eq).
              ** reflexivity.
              ** intros. subst.
+                assert (~exists c, Returns c (kac u2)).
+                intro H.
+                destruct H as (c & HRC).
+                
+                
+                
+                
 Admitted.
 
 
