@@ -47,11 +47,35 @@ Section PropMonad.
                                (forall a, Returns a ta -> K a (k a))
                                /\ tb ≈ bind ta k)
                            \/ (forall k, (forall a, K a (k a)) /\ tb ≈ bind ta k)).
+
+  (* SAZ: Here is the proof that the two version of bind are logically equivalent, so
+     it should not matter which one we use. Since bind_PropT has fewer cases, we should
+     use it.*)
+  Lemma bind_PropT_bind_PropT' {E}:
+    forall A B PA K (tb : itree E B), bind_PropT A B PA K tb <-> bind_PropT' A B PA K tb.
+  Proof.
+    intros. split.
+    intros.
+    - red. red in H.
+      destruct H as (ta & ka & HPA & eq & HR).
+      exists ta. split; auto.
+      left.  exists ka. split; auto.
+    - intros.
+      red. red in H.
+      destruct H as  (ta & EQ1 & [(k & KA & EQ2) | HX]).
+      + exists ta. exists k. auto.
+      + exists ta. exists (fun _ => ITree.spin).
+        split; auto.
+        specialize (HX (fun _ => ITree.spin)).
+        destruct HX as (HA & H).
+        split; auto.
+  Qed.
     
+  
   Global Instance Monad_Prop {E} : Monad (PropT E) :=
     {|
       ret := fun _ x y => y ≈ ret x
-      ; bind := bind_PropT'
+      ; bind := bind_PropT
     |}.
 
   
@@ -81,7 +105,6 @@ Section PropMonad.
     fun R t t' => t' ≈ t.
 
 End PropMonad.
-
 
 Section MonadLaws.
 
@@ -137,25 +160,21 @@ Section MonadLaws.
     - intros t t' eq; split; intros eqtt'.
       * cbn in *.
         repeat red in eqtt'.
-        destruct eqtt' as (ta & EQ1 & [(k & KA & EQ2) | HX]).
+        destruct eqtt' as (ta & k & EQ1 & EQ2 & KA).
         + unfold bind, Monad_itree in EQ2. rewrite EQ1, Eq.bind_ret_l, eq in EQ2.
           eapply H; [apply EQ2 | apply KA].
           constructor 1; eauto.
-        + specialize (HX (fun a => t')).
-          cbn in HX. destruct HX. apply H0.
      * cbn.
-       exists (Ret x). split; [reflexivity|].
-       left. exists (fun _ => t); split.
+       exists (Ret x), (fun _ => t); split; [reflexivity|]; split.
+        + unfold bind, Monad_itree. rewrite Eq.bind_ret_l; reflexivity.
         + intros.
           apply Returns_Ret in H0. subst. red in H. rewrite eq. assumption.
-        + unfold bind, Monad_itree. rewrite Eq.bind_ret_l; reflexivity.
-          
 
     - intros t t' EQ; cbn; split; intros HX.
-      * destruct HX as  (ta & EQ1 & [(k & KA & EQ2) | HX]).
-        + exists (Ret x); split; [reflexivity |].
-          left. exists (fun _ => t).
-          split.
+      * destruct HX as (ta & k & EQ1 & EQ2 & KA).
+        exists (Ret x), (fun _ => t); split; [reflexivity |]; split.
+        --  unfold bind, Monad_itree. rewrite Eq.bind_ret_l. symmetry. assumption.
+        -- 
           intros ? RET; inv RET.
           2: { rewrite tau_eutt in H0. rewrite <- H0 in H1. apply Returns_Ret in H1. subst.
                red in H. rewrite EQ2. rewrite EQ1.
@@ -167,20 +186,14 @@ Section MonadLaws.
           unfold bind, Monad_itree in EQ2.
           rewrite Eq.bind_ret_l in EQ2. apply EQ2.
           apply KA. rewrite EQ1. constructor. reflexivity.
-          unfold bind, Monad_itree.
-          rewrite Eq.bind_ret_l. rewrite EQ. reflexivity.
-          
-        + exists (Ret x); split; [reflexivity|].
-          right. intros. specialize (HX k). destruct HX. split;[ tauto | ].
-          rewrite EQ1 in H1. rewrite <- EQ. assumption.
-          
-      * destruct HX as  (ta & EQ1 & [(k & KA & EQ2) | HX]).
-        + exists (Ret x); split; [reflexivity |].
-          left. exists (fun _ => t).
-          split.
+
+      * destruct HX as (ta & k & EQ1 & EQ2 & KA).
+        exists (Ret x), (fun _ => t); split; [reflexivity |]; split.
+        --  unfold bind, Monad_itree. rewrite Eq.bind_ret_l. reflexivity.
+        -- 
           intros ? RET; inv RET.
           2: { rewrite tau_eutt in H0. rewrite <- H0 in H1. apply Returns_Ret in H1. subst.
-               red in H. rewrite EQ. rewrite EQ2. rewrite EQ1. 
+               red in H. rewrite EQ. rewrite EQ2. rewrite EQ1.
                unfold bind, Monad_itree.
                rewrite Eq.bind_ret_l. apply KA. rewrite EQ1. constructor. reflexivity. }
           2: exfalso; eapply eutt_ret_vis_abs; eauto.
@@ -189,15 +202,9 @@ Section MonadLaws.
           unfold bind, Monad_itree in EQ2.
           rewrite Eq.bind_ret_l in EQ2. rewrite EQ. apply EQ2.
           apply KA. rewrite EQ1. constructor. reflexivity.
-          unfold bind, Monad_itree.
-          rewrite Eq.bind_ret_l. rewrite EQ. reflexivity.
-          
-        + exists (Ret x); split; [reflexivity|].
-          right. intros. specialize (HX k). destruct HX. split;[ tauto | ].
-          rewrite EQ1 in H1. rewrite EQ. assumption.
     - assumption.
   Qed.
-
+  
   Section ReturnsBind.
 
     Context {E : Type -> Type} {R : Type}. 
@@ -346,44 +353,31 @@ Section MonadLaws.
     split; [| split].
     + intros t t' eq; split; intros eqtt'.
       * cbn in *.
-        destruct eqtt' as  (ta & HPA & [(k & HRET & EQ) | HX]).
-        - eapply H; [symmetry; eauto | clear eq t'].
-          eapply H; [eauto | clear EQ t].
-          eapply H; eauto.
-          rewrite <- (bind_ret_r _ ta) at 2.
-          apply eqit_Returns_bind'; [reflexivity |].
+        destruct eqtt' as (ta & k & HPA & EQ & HRET).
+        eapply H; [symmetry; eauto | clear eq t'].
+        eapply H; [eauto | clear EQ t].
+        eapply H; eauto.
+        rewrite <- (bind_ret_r _ ta) at 2.
+        apply eqit_Returns_bind'; [reflexivity |].
           intros.
           rewrite (HRET r); auto.
           reflexivity.
-        - specialize (HX (fun x => Ret x)). destruct HX as (_ & HX).
-          unfold bind, Monad_itree in HX. rewrite Eq.bind_ret_r in HX.
-          red in H.
-          rewrite <- eq. rewrite HX. assumption.
           
       * cbn.
-        exists t'. split; [auto|].
-        left. exists (fun x => Ret x); split.  
-        intros ? ?; reflexivity.
+        exists t', (fun x => Ret x); split; [auto|]; split.
         unfold bind, Monad_itree. rewrite Eq.bind_ret_r; auto.
+        intros; reflexivity.
         
     + intros x y EQ; split; intros eqtt'. 
       * cbn in *.
-        destruct eqtt' as  (ta & HPA & [(k & HRET & EQ') | HX]).        
-        - exists ta.  split; [auto|].
-          left.
-          exists k; split. auto. rewrite <- EQ; auto.
-        - exists ta.  split; [auto|].
-          right. intros. specialize (HX k). destruct HX.
-          split; auto. rewrite <- EQ. assumption.
-     * cbn in *.
-        destruct eqtt' as  (ta & HPA & [(k & HRET & EQ') | HX]).        
-        - exists ta.  split; [auto|].
-          left.
-          exists k; split. auto. rewrite EQ; auto.
-        - exists ta.  split; [auto|].
-          right. intros. specialize (HX k). destruct HX.
-          split; auto. rewrite EQ. assumption.
+        destruct eqtt' as (ta & k & HPA & EQ' & HRET).
+        exists ta, k; split; [auto|]; split; auto.
+        rewrite <- EQ; auto.
 
+      * cbn in *.
+        destruct eqtt' as (ta & k & HPA & EQ' & HRET).
+        exists ta, k; split; [auto|]; split; auto.
+        rewrite EQ; auto.
     + auto.
   Qed.
 
@@ -399,21 +393,40 @@ Section MonadLaws.
       eapply (ReturnsVis b e); [reflexivity | cbn; eauto].
   Qed.
 
-  Lemma Returns_bind_inversion : forall {E A B} (t : itree E A) (k : A -> itree E B) b,
-      Returns b (bind t k) ->
-      exists a, Returns a t.
+  Lemma Returns_bind_inversion_ : forall {E A B} (u : itree E B) (t : itree E A) (k : A -> itree E B) b,
+      Returns b u ->
+      u ≈ (bind t k) ->
+      exists a, Returns a t /\ Returns b (k a).
   Proof.
-    intros E A B t k b H.
-    remember (bind t k) as t2.
-    induction H; intros.
-    - rewrite Heqt2 in H.
+    intros E A B u t k b HR eq. 
+    revert A t k eq.
+    induction HR; intros.
+    - rewrite eq in H.
       apply eutt_inv_bind_ret in H.
       destruct H as (a & HEQ & HK).
-      exists a. rewrite HEQ. constructor. reflexivity.
-    - subst.
-      (* SAZ: TODO - pick up here *)
-  Admitted.
-      
+      exists a. split. rewrite HEQ. constructor. reflexivity. rewrite HK. constructor. reflexivity.
+    - rewrite tau_eutt in H.
+      eapply IHHR. rewrite <- H. assumption.
+    - rewrite eq in H; clear eq.
+      apply eutt_inv_bind_vis in H.
+      destruct H as [(kx & HV & eq2) | (a & HRA & KA)].
+      + setoid_rewrite HV.
+        specialize (eq2 x).
+        setoid_rewrite <- eq2 in IHHR.
+        specialize (IHHR _ (kx x) k0).
+        assert (ITree.bind (kx x) k0 ≈ bind (kx x) k0) by reflexivity.
+        apply IHHR in H.
+        destruct H as (a & HRet & HK).
+        exists a. split.  econstructor 3. reflexivity. apply HRet. assumption.
+      + exists a. split.
+        rewrite HRA. constructor 1. reflexivity.
+        specialize (IHHR _ (ret x) k).
+        assert (k x ≈ bind (ret x) k).
+        { rewrite bind_ret_l. reflexivity. }
+        apply IHHR  in H. rewrite KA.
+        destruct H as (x' & _ & HX).
+        econstructor 3. reflexivity.  apply HX.
+  Qed.
 
   
   (* From Coq.Logic.ChoiceFacts *)
@@ -423,6 +436,17 @@ Definition GuardedFunctionalChoice_on {A B} :=
     (forall x : A, P x -> exists y : B, R x y) ->
     (exists f : A->B, forall x, P x -> R x (f x)).
 Axiom guarded_choice : forall {A B}, @GuardedFunctionalChoice_on A B.
+
+Definition RET_EQ {E} {A} (a: A) (ta : itree E A) : A -> A -> Prop :=
+  fun a1 a2 => a1 = a2 /\ (Returns a ta -> Returns a1 ta).
+
+Instance Reflexive_RET_EQ {E} {A} a (ta : itree E A) : Reflexive (RET_EQ a ta).
+Proof.
+  repeat red.
+  intros.
+  split; auto. intros.
+Admitted.
+    
   
   Lemma bind_bind: forall {E} (A B C : Type) (PA : PropT E A) (KB : A -> PropT E B) (KC : B -> PropT E C),
       (* eutt_closed PA -> *)
@@ -431,52 +455,83 @@ Axiom guarded_choice : forall {A B}, @GuardedFunctionalChoice_on A B.
     (* PA ~a> KB a ~b> KC b *)
     intros.
     split; [| split].
-    + intros t t' eq; split; intros eqtt'.
-      * cbn in *.
+    - intros t t' eq; split; intros eqtt'.
+      + cbn in *.
         red in eqtt'.
-        destruct eqtt' as (tb & HBC & [(kbc & KBC & EQc) | HX]).
-        -  destruct HBC as (ta & HTA & [(kab & KAB & EQb) | HY]).
-           -- rewrite eq in EQc; clear eq t.
-              exists ta. split; [auto|].
-              left.
-              exists (fun b => ITree.bind (kab b) kbc).              
-              setoid_rewrite EQc; clear EQc.
-              setoid_rewrite EQb. setoid_rewrite EQb in KBC; clear EQb tb.
-              (* ta ~a> kab a *)
-              (* (ta; kab) ~b> kbc b *)
-              split.
-              ++ intros a HRet.
-                 exists (kab a). split.
-                 ** apply KAB; auto.
-                 ** left.
-                    exists kbc. split.
-                    intros a' HRET'. apply KBC. apply Returns_bind with a; auto.
-                    reflexivity.
-              ++ unfold bind, Monad_itree.
-                 rewrite Eq.bind_bind. reflexivity.
-           -- (* ta diverges *)
-             rewrite eq in EQc; clear eq t.
-             red.
-             exists ta. split; [auto|].
-              right.
-              setoid_rewrite EQc; clear EQc.
-              intros. split.
-             ++ intros a. red.
-                exists (bind ta (fun _ => ITree.spin)).
-                split.
-                2 : { left. exists kbc. split. intros.
-                      assert (~Returns a0 (bind ta (fun _ : A => ITree.spin))).
-                      eapply not_Returns.
-                      admit.
-                (* CONTINUE HERE: USE not_returns? *)
-                exists tb.
-                admit.
-                admit.
-                admit. }
-                admit.
-             ++ admit.
-        - admit.
-      * cbn in *.
+        destruct eqtt' as (tb & kbc & (HBC & EQc & HRkbc)).
+        destruct HBC as (ta & kab & HTA & EQb & HRkab).
+        rewrite eq in EQc; clear eq t.
+        red. exists ta. exists (fun a => ITree.bind (kab a) kbc).
+        split; [auto|]; split.
+        * setoid_rewrite EQc; clear EQc.
+          setoid_rewrite EQb. setoid_rewrite EQb in HRkbc; clear EQb tb.
+          unfold bind, Monad_itree.
+          rewrite Eq.bind_bind. reflexivity.
+        * intros a HRet.
+          exists (kab a), kbc.
+          split; [auto|];split.
+          -- reflexivity.
+          -- intros b HRET. apply HRkbc. rewrite EQb. eapply Returns_bind; eauto.
+      + cbn in *.
+        destruct eqtt' as (ta & kac & (HTA & EQc & HRkac)).
+        red.
+        unfold bind_PropT in HRkac.
+        apply guarded_choice in HRkac.
+        destruct HRkac as (kab & HKab).
+        apply guarded_choice in HKab.
+        destruct HKab as (kabc & HKabc).
+        setoid_rewrite eq. clear eq t. setoid_rewrite EQc. clear EQc t'.
+        exists (bind ta kab).
+        setoid_rewrite bind_bind.        
+
+        assert (forall a1 a2 b, (kabc a1 b) ≈ (kabc a2 b)) as PARAMETRIC.
+        { admit. (* TODO - is this justifiable? *) }
+
+        assert ((exists a, Returns a ta) \/ ~ exists a, Returns a ta).
+        { admit. (* TODO - classical logic *) }
+        destruct H as [(a & HRET) | N].
+        * exists (fun b => kabc a b).
+          split; [|split].
+          -- red.
+             exists ta. exists kab.
+             split; auto. split; [reflexivity|].
+             intros. specialize (HKabc a0 H). tauto.
+          -- rewrite <- bind_bind.
+             rewrite bind_bind.
+             eapply eutt_clo_bind with (UU:= RET_EQ a ta).
+             ** reflexivity.
+             ** intros.
+                inversion H. subst.
+                specialize (HKabc u2 (H1 HRET)).
+                destruct HKabc as (HK & EQ2 & RET).
+                rewrite EQ2. 
+                eapply eutt_clo_bind with (UU:= eq).
+                reflexivity.
+                intros. subst.  apply PARAMETRIC.
+          -- intros.
+             eapply Returns_bind_inversion_ in H.
+             2: reflexivity.
+             destruct H as (a1 & H1 & HX).
+             
+             specialize (HKabc a1 H1).
+             destruct HKabc as (HK & EQ2 & RET).
+
+             apply RET in HX.
+             (* TODO: Need Proper KC *)
+             (* rewrite <- (PARAMETRIC a1 a a0). *)
+             admit.
+        * exists (fun b => ITree.spin).
+          split; [|split].
+          -- red.
+             exists ta. exists kab.
+             split; auto. split; [reflexivity|].
+             intros. specialize (HKabc a H). tauto.
+          -- apply eutt_clo_bind with (UU:=eq).
+             ** reflexivity.
+             ** intros. subst.
+Admitted.
+
+
   (* ta: itree E A  (part 1)
            kac: A -> itree E C (part 2 3)
    *)
@@ -485,7 +540,7 @@ Axiom guarded_choice : forall {A B}, @GuardedFunctionalChoice_on A B.
            the function that given a "a" destruct HRet and returns the bind of ta with
            prefix returned by the destruct.
    *)
-  Abort.
+
 
   (* Instance EqM_PropT {E} : EqM (PropT E) := *)
   (*   fun a PA PA' => *)
