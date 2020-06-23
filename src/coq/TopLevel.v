@@ -93,7 +93,7 @@ Import D IS.
          | None => ret (UVALUE_Undef dt)
          | Some e => D.denote_exp (Some dt) e
          end ;;
-    dv <- trigger (pick uv True) ;;
+    dv <- concretize_or_pick uv True ;;
     trigger (Store a dv).
 
   Definition initialize_globals (gs:list (global dtyp)): itree exp_E unit :=

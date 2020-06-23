@@ -398,10 +398,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   
   (* Pick a possibly poison value, treating poison as nondeterminism.
      This is used for freeze. *)
-  Definition pick_your_poison {E : Type -> Type} `{PickE -< E} (dt : dtyp) (uv : uvalue) : itree E dvalue :=
+  Definition pick_your_poison {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (dt : dtyp) (uv : uvalue) : itree E dvalue :=
     match uv with
-    | UVALUE_Poison => trigger (pick (UVALUE_Undef dt) True)
-    | _             => trigger (pick uv True)
+    | UVALUE_Poison => concretize_or_pick (UVALUE_Undef dt) True
+    | _             => concretize_or_pick uv True
     end.
 
   Definition pickUnique {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue
@@ -518,7 +518,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           v2 <- denote_exp (Some dt) op2 ;;
           if iop_is_div iop && negb (is_concrete v2)
           then
-            dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2)) ;;
+            dv2 <- concretize_or_pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2) ;;
             uvalue_to_dvalue_binop2
               (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
               (fun v1 v2 => translate _failure_UB_to_ExpE
@@ -544,7 +544,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           v2 <- denote_exp (Some dt) op2 ;;
           if fop_is_div fop && negb (is_concrete v2)
           then
-            dv2 <- trigger (pick v2 (forall dv2, concretize v2 dv2 -> dvalue_is_zero dv2)) ;;
+            dv2 <- concretize_or_pick v2 (forall dv2, concretize v2 dv2 -> dvalue_is_zero dv2) ;;
             uvalue_to_dvalue_binop2
               (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
               (fun v1 v2 =>
@@ -634,8 +634,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | inr (dvptr, dvs) => fmap dvalue_to_uvalue (trigger (GEP dt1 dvptr dvs))
           | inl _ =>
             (* Pick to get dvalues *)
-            dvptr <- trigger (pick vptr True) ;;
-            dvs <- map_monad (fun v => trigger (pick v True)) vs ;;
+            dvptr <- concretize_or_pick vptr True ;;
+            dvs <- map_monad (fun v => concretize_or_pick v True) vs ;;
             fmap dvalue_to_uvalue (trigger (GEP dt1 dvptr dvs))
           end
 
@@ -800,7 +800,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         | TERM_Br (dt,op) br1 br2 =>
           uv <- denote_exp (Some dt) op ;;
-          dv <- trigger (pick uv True) ;; (* TODO, should this be unique? *)
+          dv <- concretize_or_pick uv True ;; (* TODO, should this be unique? *)
           match dv with
           | DVALUE_I1 comparison_bit =>
             if eq comparison_bit one then
@@ -979,7 +979,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
               (fun T call =>
                  match call with
                  | Call dt fv args =>
-                   dfv <- trigger (pick fv True) ;; (* TODO, should this be unique? *)
+                   dfv <- concretize_or_pick fv True ;; (* TODO, should this be unique? *)
                    match (lookup_defn dfv fundefs) with
                    | Some f_den => (* If the call is internal *)
                      f_den args
