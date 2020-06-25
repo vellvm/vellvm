@@ -329,12 +329,15 @@ Section InterpreterCFG.
     unfold interp_cfg_to_L3.
     rewrite interp_intrinsics_trigger; cbn.
     unfold Intrinsics.F_trigger.
+    rewrite subevent_subevent.
     rewrite interp_global_trigger; cbn.
+    rewrite subevent_subevent.
     rewrite interp_local_bind, interp_local_trigger.
     cbn.
+    rewrite subevent_subevent.
     rewrite bind_bind.
     rewrite interp_memory_bind.
-    unfold resum, ReSum_inl, cat, Cat_IFun, resum, ReSum_id, id_, Id_IFun, inl_, Inl_sum1.
+
   Admitted.    
 
   (**
