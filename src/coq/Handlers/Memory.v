@@ -2924,7 +2924,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
             interp_memory (trigger (GEP
                                       (DTYPE_Array size t)
                                       (DVALUE_Addr a)
-                                      [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (repr (Z.of_nat i))])) m
+                                      [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat i))])) m
                           ≈ Ret (m,DVALUE_Addr ptr) /\
             read m ptr t = inr val.
       Proof.
