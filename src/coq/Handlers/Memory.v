@@ -775,10 +775,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DTYPE_Float        => 4
       | DTYPE_Double       => 8
       | DTYPE_Half         => 4
-      | DTYPE_X86_fp80     => 4 (* TODO: Unsupported, currently modeled by Float32 *) 
-      | DTYPE_Fp128        => 4 (* TODO: Unsupported, currently modeled by Float32 *) 
-      | DTYPE_Ppc_fp128    => 4 (* TODO: Unsupported, currently modeled by Float32 *) 
-      | DTYPE_Metadata     => 0 
+      | DTYPE_X86_fp80     => 4 (* TODO: Unsupported, currently modeled by Float32 *)
+      | DTYPE_Fp128        => 4 (* TODO: Unsupported, currently modeled by Float32 *)
+      | DTYPE_Ppc_fp128    => 4 (* TODO: Unsupported, currently modeled by Float32 *)
+      | DTYPE_Metadata     => 0
       | DTYPE_X86_mmx      => 0 (* TODO: Unsupported *)
       | DTYPE_Opaque       => 0 (* TODO: Unsupported *)
       | _                  => 0 (* TODO: add support for more types as necessary *)
@@ -2902,6 +2902,46 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         - reflexivity.
         - cbn in *.
       Abort.
+
+      Lemma get_array_succeeds_allocated : forall m a i t val,
+          get_array_cell m a i t = inr val ->
+          allocated a m.
+      Proof.
+        intros m [b o] i t val GET.
+        cbn in GET.
+        unfold get_logical_block in GET.
+        unfold get_logical_block_mem in GET.
+        break_match; inv GET.
+
+        apply lookup_member in Heqo0.
+        destruct m as [[lm cm] f].
+        cbn in *. auto.
+      Qed.
+
+      Lemma interp_memory_GEP_array : forall t a size m val i,
+          get_array_cell m a i t = inr val ->
+          exists ptr,
+            interp_memory (trigger (GEP
+                                      (DTYPE_Array size t)
+                                      (DVALUE_Addr a)
+                                      [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (repr (Z.of_nat i))])) m
+                          ≈ Ret (m,DVALUE_Addr ptr) /\
+            read m ptr t = inr val.
+      Proof.
+        intros t a size m val i GET.
+        pose proof get_array_succeeds_allocated _ _ _ _ GET as ALLOC.
+        pose proof read_array_exists m size t i a ALLOC as RARRAY.
+        destruct RARRAY as (ptr & GEP & READ).
+        exists ptr.
+        split.
+        - rewrite interp_memory_trigger. cbn.
+          cbn in GEP.
+          rewrite GEP.
+          cbn.
+          rewrite bind_ret_l.
+          reflexivity.
+        - rewrite <- GET. auto.
+      Qed.
 
       (* Lemma write_read : *)
       (*   forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr), *)
