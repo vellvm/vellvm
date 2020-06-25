@@ -1,4 +1,4 @@
-From Coq Require Import Ensembles Setoid Morphisms RelationClasses.
+From Coq Require Import Ensembles Setoid Morphisms RelationClasses Logic.Classical_Prop.
 
 From ExtLib Require Import
      Structures.Functor
@@ -8,6 +8,7 @@ From ExtLib Require Import
 
 From ITree Require Import
      Basics.Basics
+     ITreeDefinition
      Eq.Eq
      Eq.UpToTaus
      ITree
@@ -34,9 +35,6 @@ Section PropMonad.
 
   Definition subtree {E} {A B} (ta : itree E A) (tb : itree E B) := exists (k : A -> itree E B), tb ≈ bind ta k.
 
-  
-  
-  
   Definition bind_PropT {E} :=
     fun A B (PA: PropT E A) (K: A -> PropT E B) (tb: itree E B) =>
       exists (ta: itree E A) (k: A -> itree E B),
@@ -44,8 +42,6 @@ Section PropMonad.
         tb ≈ bind ta k /\
         (forall a, Returns a ta -> K a (k a)).
 
-
-  
   Definition bind_PropT_stronger {E} :=
     fun A B (PA: PropT E A) (K: A -> PropT E B) (tb: itree E B) =>
       exists (tak : (itree E A * (A -> itree E B))),
@@ -68,6 +64,13 @@ Section PropMonad.
                                /\ tb ≈ bind ta k)
                            \/ (forall k, (forall a, K a (k a)) /\ tb ≈ bind ta k)).
 
+  (* Definition bind_PropT {E} := *)
+  (*   fun A B (PA: PropT E A) (K: A -> PropT E B) (tb: itree E B) => *)
+  (*     exists (ta: itree E A) (k: A -> itree E B), *)
+  (*       (exists a, Returns a ta /\ *)
+  (*             PA ta /\ tb ≈ bind ta k /\ *)
+  (*             (forall a', Returns a' ta -> K a' (k a'))). *)
+        (* (~ (exists a, Returns a ta)).  *)
   (* SAZ: Here is the proof that the two version of bind are logically equivalent, so
      it should not matter which one we use. Since bind_PropT has fewer cases, we should
      use it.*)
@@ -90,34 +93,64 @@ Section PropMonad.
         destruct HX as (HA & H).
         split; auto.
   Qed.
-    
-  
+
   Global Instance Monad_Prop {E} : Monad (PropT E) :=
     {|
       ret := fun _ x y => y ≈ ret x
       ; bind := bind_PropT
     |}.
 
-  
-  (*
   Inductive iter_Prop {R I : Type} (step : I -> I + R -> Prop) (i : I) (r : R)
     : Prop :=
-  | iter_done
+  | iter_done'
     : step i (inr r) -> iter_Prop step i r
-  | iter_step i'
+  | iter_step' i'
     : step i (inl i') ->
       iter_Prop step i' r ->
       iter_Prop step i r
   .
-  Polymorphic Instance MonadIter_Prop : MonadIter Ensembles.Ensemble := @iter_Prop.
-  *)
+
+  (* Definition _iter {E : Type -> Type} {R I : Type} *)
+  (*           (tau : _) *)
+  (*           (iter_ : I -> itree E R) *)
+  (*           (step_i : I + R) : itree E R := *)
+  (*   match step_i with *)
+  (*   | inl i => tau (iter_ i) *)
+  (*   | inr r => Ret r *)
+  (*   end. *)
+
+  (* Definition iter {E : Type -> Type} {R I: Type} *)
+  (*           (step : I -> itree E (I + R)) : I -> itree E R := *)
+  (*   cofix iter_ i := bind (step i) (_iter (fun t => Tau t) iter_). *)
+
+  Definition _iter {E : Type -> Type} {R I : Type}
+             (iter_ : I -> PropT E R)
+             (step_i : I + R) (r : itree E R) : Prop :=
+    match step_i with
+    | inl i => iter_ i r
+    | inr x => True
+    end.
+
+  (* Definition iter {E : Type -> Type} {R I : Type} *)
+  (*            (step : I -> PropT E (I + R)) : I -> PropT E R := *)
+  (*   cofix iter_ i := bind (step i) (_iter iter_). *)
+
+
+  (* CoInductive iter_PropT {E} {R I : Type} *)
+  (*           (step : I -> PropT E (I + R)) (i : I) (r : itree E R) : Prop := *)
+  (* | iter_done : forall (step' : I -> itree E (I + R)), *)
+  (*               (step i) (step' i) -> *)
+  (*               iter_PropT step i r. *)
 
   (* SAZ: maybe define directly by coinduction  *)
   Global Polymorphic Instance MonadIter_Prop {E} : MonadIter (PropT E) :=
-    fun R I (step : I -> PropT E (I + R)) i (r : itree E R)  =>
-      exists (step': I -> itree E (I + R)%type),
-        (forall j, step j (step' j)) /\ CategoryOps.iter step' i ≈ r.
-  
+    fun R I (step : I -> PropT E (I + R)) i =>
+      fun (r : itree E R) =>
+        (exists step' : I -> itree E (I + R)%type,
+            (* How do we state that something is out of bounds? *)
+            (forall j, step j (step' j)) /\
+            CategoryOps.iter step' i ≈ r).
+
   Definition interp_prop {E F} (h : E ~> PropT F) :
     itree E ~> PropT F := interp h.
 
@@ -125,6 +158,148 @@ Section PropMonad.
     fun R t t' => t' ≈ t.
 
 End PropMonad.
+
+
+From ITree Require Import
+     Basics.Category
+     CategoryKleisli
+     CategoryKleisliFacts
+     KTree
+     KTreeFacts.
+
+Section IterLaws.
+
+  Definition divergent {E A} (ta : itree E A) := (forall k , ta ≈ bind ta k).
+
+  Lemma Returns_divergent {E A}:
+    (forall (ta : itree E A), not (exists a, Returns a ta) -> divergent ta).
+  Proof.
+    intros. red. intros. red in H.
+    unfold bind, Monad_itree.
+    generalize dependent ta. pcofix CIH. cbn. pstep. unfold eqit_.
+    intros. remember (observe ta). destruct i.
+    - destruct H0. assert (ta ≈ Ret r0). rewrite Heqi.
+      rewrite <- itree_eta. reflexivity. exists r0. constructor. auto.
+    - intros. rewrite unfold_bind_. cbn. rewrite <- Heqi. cbn.
+      constructor. right. apply CIH. intros. destruct H. destruct H0.
+      assert (ta ≈ Tau t). rewrite Heqi. rewrite <- itree_eta; reflexivity.
+      eapply ReturnsTau in H; eauto.
+    - rewrite unfold_bind_. cbn. rewrite <- Heqi. cbn. constructor. intros.
+      unfold id. right. apply CIH. intros. destruct H. destruct H0.
+      assert (ta ≈ Vis e k0). rewrite Heqi. rewrite <- itree_eta; reflexivity.
+      eapply ReturnsVis in H; eauto.
+  Qed.
+
+
+  Lemma Returns_divergent' {E A B}:
+    (forall (ta : itree E A) (tb : itree E B),
+        not (exists a, Returns a ta) -> not (exists b, Returns b tb) ->
+        forall (k : A -> itree E B), tb ≈ bind ta k).
+  Proof.
+    intros. red. intros. red in H.
+    unfold bind, Monad_itree.
+    generalize dependent ta. pcofix CIH. cbn. pstep. unfold eqit_.
+    intros. remember (observe ta). destruct i.
+    - destruct H0. assert (ta ≈ Ret r0). rewrite Heqi.
+      rewrite <- itree_eta. reflexivity.
+  Admitted.
+
+  Definition eutt_closed {E X} (P: itree E X -> Prop): Prop :=
+    Proper (eutt eq ==> iff) P.
+
+  Global Polymorphic Instance EqM_PropT {E} : EqM (PropT E) :=
+    fun a PA PA' =>
+      (forall x y, x ≈ y -> (PA x <-> PA' y)) /\
+      eutt_closed PA /\ eutt_closed PA'.
+
+  Ltac simpl_iter :=
+      unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree.
+
+  Import MonadNotation.
+  Local Open Scope monad_scope.
+
+  Global Instance IterUnfold_PropT {E} : IterUnfold (Kleisli (PropT E)) sum.
+    intros A B Pstep a.
+    repeat red. split; [ intros x y EQ | ]; split.
+  - (* Show that there is some looping itree body that Pstep can unfold into. *)
+    intros LOOP. repeat red. repeat red in LOOP.
+    destruct LOOP as (BODY & PROP & RESULT).
+    exists (BODY a).
+    exists (fun ab : A + B => match ab with
+        | inl a => Tau (ITree.iter BODY a)
+        | inr b => Ret b
+                      end). cbn.
+    split. auto. split.
+    + (* Proposition holds over first part of computation. *)
+      rewrite <- EQ, <- RESULT. simpl_iter.
+      rewrite unfold_iter. reflexivity.
+    + (* There is some continuation that satisfies the computation. *)
+      intros ab RET. repeat red.
+      destruct ab eqn: H_ab.
+      * (* Keep loopin' *)
+        cbn. repeat red.
+        exists BODY. split; auto.
+        simpl_iter; rewrite unfold_iter. rewrite tau_eutt.
+        reflexivity.
+      * cbn. reflexivity.
+  - (* An unfolded PropT implies a folded loop. *)
+    (*      cat Pstep (case_ (iter Pstep) (id_ B)) a y -> iter Pstep a x      *)
+    cbn. unfold bind_PropT.
+
+    intros UNFOLD. repeat red. setoid_rewrite EQ. clear EQ x.
+    destruct UNFOLD as (FIRST & CONTINUATION & FIRST_PROP & BIND_EQ &
+                        CONT_PROP).
+    (* Perhaps Returns should be a coinductive proposition? *)
+
+    simpl_iter. setoid_rewrite unfold_iter.
+
+
+    From Coq Require Import Classes.EquivDec.
+    assert (EqDec A eq). admit.
+
+    (* If we unfold a loop, the idea should be that the unfolded part is going
+     * to ... terminate, right? It isn't necessarily a return, though. *)
+    assert (FIRST_SHOULD_RETURN: exists a : A + B, Returns a FIRST). admit.
+    destruct FIRST_SHOULD_RETURN as (AB & RETURN_FIRST).
+    specialize (CONT_PROP _ RETURN_FIRST).
+
+    (* I think that what we need to do, actually, is to encode "Returns" in
+       the iter instance. This is because the definition of "iter" needs to
+       coincide with how "bind" is defined for PropT.
+
+       Let's think about how to define an "iterative PropT", by example.
+
+     *)
+
+    (* ... For this direction, it seems necessary to index the loop body, since
+     the unfolded iter case is strictly more expressive than the folded body.
+
+     Another idea suggestion, from Yannick: try expressing with (option itree),
+     intuitively this makes a lot of sense since the empty predicate cannot
+     be expressed by an itree, and there might be indices in the loop body
+     that map to the empty predicate.
+     *)
+    admit.
+  - repeat intro. repeat red.
+    simpl_iter. unfold MonadIter_Prop. setoid_rewrite H.
+    auto.
+  - repeat intro. repeat red.
+    unfold cat, Cat_Kleisli. cbn. unfold bind_PropT.
+    intuition.
+    setoid_rewrite <- H. auto.
+    setoid_rewrite H. auto.
+  Admitted.
+
+      
+  Global Instance IterDinatural_PropT {E} : IterDinatural (Kleisli (PropT E)) sum.
+  Admitted.
+
+  Global Instance IterCodiagonal_PropT {E} :  IterCodiagonal (Kleisli (PropT E)) sum.
+  Admitted.
+
+
+End IterLaws.  
+
 
 Section MonadLaws.
 
@@ -923,126 +1098,3 @@ Admitted.
 *)
 
 End MonadLaws.
-
-From ITree Require Import
-     Basics.Category
-     CategoryKleisli
-     CategoryKleisliFacts
-     KTree
-     KTreeFacts.
-
-
-Section IterLaws.
-
-  Global Instance IterUnfold_PropT {E} : IterUnfold (Kleisli (PropT E)) sum.
-  intros A B Pstep a.
-
-  repeat red. split.
-  - intros t1 t2 EQ.
-    split.
-    + intros (step & H & EQ2).
-      cbn.
-      admit.
-(* SAZ OLD 
-      exists (step a). exists (fun ab : A + B => match ab with
-                                    | inl a => Tau (ITree.iter step a)
-                                    | inr b => Ret b
-                                    end).
-      split; [|split].
-      * apply H.
-      * rewrite <- EQ2 in EQ.
-        rewrite unfold_iter_ktree in EQ.
-        rewrite <- EQ. reflexivity.
-      * intros a0 H0.
-        destruct a0. cbn.
-        exists step. split. assumption. apply Eq.eqit_tauR. reflexivity.
-        cbn. reflexivity.
-*)
-    + intros H. admit.
-(* SAZ OLD       
-      cbn in H.
-      destruct H as (ta & k & HP & EQ2 & HK).
-      unfold iter, Iter_Kleisli, Basics.iter, MonadIter_Prop.
-      exists (fun a => ITree.bind (ITree.bind ta k) (fun b => ret (inr b))).
-      split.
-      intros. specialize (HK (inl j)).
-      cbn in HK.
-      
-      (iter step') a = (cat step' (case_ (iter step') (id_ b))) a
-      
-      
-      
-      specialize (Hbody (inl a)).
-      cbn in Hbody.
-      (* SAZ: need to decide about Returns (inl a) ta vs. not (Returns (inl a) ta) *)      
-      assert ((Returns (inl a) ta) \/ ~(Returns (inl a) ta)) as CLASSICAL.
-      { admit. (* TODO: Classical logic *) }
-      destruct CLASSICAL as [HRet | HNoRet].
-      apply Hbody in HRet.
-      destruct HRet as (step' & Hfj & HI).
-      exists step'. split. assumption.
- *)
-      
-  - split.
-    + split; intros.
-      destruct H0 as (step & Hstep & EQ).
-      exists step. split; auto. rewrite EQ. assumption.
-      destruct H0 as (step & Hstep & EQ).
-      exists step. split; auto. rewrite EQ. symmetry. assumption.
-    + cbn. admit.
-        (* old destruct H1 as (ta & k & HF & EQ & HR).
-      *
-        exists ta. exists k. split; auto. split. rewrite <- EQ. symmetry. assumption.
-        assumption.
-      * destruct H1 as (ta & k & HF & EQ & HR).
-        exists ta. exists k. split; auto. split. rewrite <- EQ. assumption.
-        assumption. *)
-  Admitted.
-
-  Global Instance IterNatural_PropT {E} : IterNatural (Kleisli (PropT E)) sum.
-  intros A B C f g a.
-  cbn.
-  split.
-  - intros t1 t2 EQ.
-    split.
-  Admitted.
-(*  
-    + intros (tb & k & H & EQ2 & Hk).
-      repeat red in H. destruct H as (step & Hstep & EQ3).
-      repeat red. exists (fun a => bind (step a) (fun ab : A + B => match ab with
-                                                         | inl a => Ret (inl a)
-                                                         | inr b => fmap inr (k b)
-                                                         end)).
-      split.
-      * intros. cbn. exists (step j).
-        exists ((fun ab : A + B => match ab with
-                                          | inl a0 => Ret (inl a0)
-                                          | inr b => ITree.map inr (k b)
-                                          end)).
-        split. apply Hstep.
-        split.  reflexivity.
-        intros. destruct a0. cbn. exists (Ret (a0)). exists (fun a => ret (inl a)).
-        split. reflexivity.
-        split. rewrite Eq.bind_ret_l. reflexivity.
-        intros. reflexivity.
-        cbn. exists (k b).  exists (fun (c:C) => Ret (inr c)).
-        split. apply Hk. rewrite <- EQ3.  (* SAZ: !?!? *) admit.
-        split. unfold ITree.map. reflexivity.
-        intros. reflexivity.
-        
-      * cbn.
-        rewrite <- EQ. rewrite EQ2.
-        (* SAZ: eventually need to use: iter_natural. *)
-        unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree. rewrite unfold_iter.
-  Admitted.
-  *)            
-      
-  Global Instance IterDinatural_PropT {E} : IterDinatural (Kleisli (PropT E)) sum.
-  Admitted.
-
-  Global Instance IterCodiagonal_PropT {E} :  IterCodiagonal (Kleisli (PropT E)) sum.
-  Admitted.
-
-End IterLaws.  
-
-
