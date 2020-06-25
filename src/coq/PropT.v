@@ -320,13 +320,6 @@ Section MonadLaws.
       econstructor 3; [rewrite EQ, H; reflexivity | apply IHHRet; reflexivity].
   Qed.
 
-  Definition eutt_closed {E X} (P: itree E X -> Prop): Prop :=
-    Proper (eutt eq ==> iff) P.
-
-  Global Polymorphic Instance EqM_PropT {E} : EqM (PropT E) :=
-    fun a PA PA' =>
-      (forall x y, x ≈ y -> (PA x <-> PA' y)) /\
-      eutt_closed PA /\ eutt_closed PA'.
 
 
   Definition EqM_PropT' {E} : EqM (PropT E) :=
@@ -955,7 +948,7 @@ Section BIND_BIND_COUNTEREXAMPLE.
   Definition t : itree ND bool :=
     bind (trigger Pick) (fun (b:bool) => if b
                                then bind (trigger Pick) (fun (x:bool) => if x then ret true else ITree.spin)
-                                   else bind (trigger Pick) (fun (x:bool)  => if x then ret false else ITree.spin)).
+                               else bind (trigger Pick) (fun (x:bool)  => if x then ret false else ITree.spin)).
 
   Lemma bind_right_assoc : bind PA (fun a => bind (KB a) KC) t.
   Proof.
