@@ -314,15 +314,15 @@ Section InterpreterCFG.
   Lemma interp_cfg_to_L3_GEP_array : forall defs t a size g l m val i,
       get_array_cell m a i t = inr val ->
       exists ptr,
-        (interp_cfg_to_L3 defs (trigger (GEP
+        interp_cfg_to_L3 defs (trigger (GEP
                                   (DTYPE_Array size t)
                                   (DVALUE_Addr a)
                                   [DVALUE_I64 (Integers.Int64.repr 0); DVALUE_I64 (Integers.Int64.repr (Z.of_nat i))])) g l m
-                      ≈ Ret (m, (l, (g, DVALUE_Addr ptr))))%itree /\
+                      ≈ Ret (m, (l, (g, DVALUE_Addr ptr))) /\
         read m ptr t = inr val.
   Proof.
     intros defs t a size g l m val i GET.
-    epose proof interp_memory_GEP_array t _ size _ GET as [ptr [INTERP READ]].
+    epose proof @interp_memory_GEP_array _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ _ GET as [ptr [INTERP READ]].
     exists ptr.
     split; auto.
 
@@ -336,9 +336,15 @@ Section InterpreterCFG.
     cbn.
     rewrite subevent_subevent.
     repeat rewrite interp_memory_bind.
-    (* Why can't I rewrite? :( *)
-    Fail setoid_rewrite INTERP.
-  Admitted.
+    rewrite INTERP.
+    rewrite bind_bind.
+    rewrite bind_ret_l.
+    rewrite interp_memory_ret.
+    rewrite bind_ret_l.
+    rewrite interp_local_ret.
+    rewrite interp_memory_ret.
+    reflexivity.
+  Qed.
 
   (**
      YZ : Should be obsolete. Keeping it around for a bit
