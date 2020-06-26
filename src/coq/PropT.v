@@ -105,6 +105,14 @@ Section PropMonad.
         split; auto.
   Qed.
 
+  Definition eutt_closed {E X} (P: itree E X -> Prop): Prop :=
+    Proper (eutt eq ==> iff) P.
+
+  Global Polymorphic Instance EqM_PropT {E} : EqM (PropT E) :=
+    fun a PA PA' =>
+      (forall x y, x ≈ y -> (PA x <-> PA' y)) /\
+      eutt_closed PA /\ eutt_closed PA'.
+
   Global Instance Monad_Prop {E} : Monad (PropT E) :=
     {|
       ret := fun _ x y => y ≈ ret x
@@ -151,45 +159,59 @@ Section PropMonad.
   (*   split. *)
   (*   intros H.  *)
 
+  Definition iter_cont {I E R} (step' : I -> itree E (I + R)) :
+    I + R -> itree E R :=
+      (ITree._iter (fun t : itree E R => Tau t) (ITree.iter step')).
 
-  (* SAZ: maybe define directly by coinduction  *)
   Global Polymorphic Instance MonadIter_Prop {E} : MonadIter (PropT E) :=
     fun R I (step : I -> PropT E (I + R)) i =>
       fun (r : itree E R) =>
-        (exists step' : I * nat -> (itree E (I + R)%type),
-            (forall (j : I) (n : nat),
-               (* a, *)
-                (* Returns a (step' (j, n)) -> *)
-                  step j (step' (j, n))) /\
-            (let body :=
-              fun '(x, k) =>
-                bind (step' (x, k))
-                  (fun ir : I + R =>
-                    match ir with
-                    | inl i0 => ret (inl (i0, S k))
-                    | inr r0 => ret (inr r0)
-                    end) in
-                    CategoryOps.iter body (i, 0)) ≈ r).
+        (exists (step' : I -> (itree E (I + R)%type)),
+                ITree.bind (step' i) (@iter_cont I E R step') ≈ r /\
+                (forall j, step j (step' j))).
 
-  Definition eutt_closed {E X} (P: itree E X -> Prop): Prop :=
-    Proper (eutt eq ==> iff) P.
+(* exists a, Returns a (step' i) /\ *)
+(* \/ (~ (exists a, Returns a r) /\ step i r). *)
 
-  Global Polymorphic Instance EqM_PropT {E} : EqM (PropT E) :=
-    fun a PA PA' =>
-      (forall x y, x ≈ y -> (PA x <-> PA' y)) /\
-      eutt_closed PA /\ eutt_closed PA'.
+  From ITree Require Import Basics.CategoryTheory.
+  From Coq Require Import Program.Tactics.
 
-  Definition interp_prop {E F} (h : E ~> PropT F) :
-    itree E ~> PropT F := interp h.
+  Lemma eqit_bind_Returns_inv {E} {R S T} (RS : R -> S -> Prop) 
+        (t : itree E T)  (k1: T -> itree E R) (k2 : T -> itree E S) :
+    (eutt RS  (ITree.bind t k1) (ITree.bind t k2)) ->
+    (forall r, Returns r t -> eutt RS (k1 r) (k2 r)).
+  Proof.
+    intros EQIT r HRET.
+    revert R S RS k1 k2 EQIT.
+    induction HRET; intros.
+    - rewrite H in EQIT.
+      do 2 rewrite Eq.bind_ret_l in EQIT.
+      assumption.
+    - rewrite tau_eutt in H. rewrite H in EQIT.
+      eapply IHHRET; eauto.
+    - rewrite H in EQIT.
+      do 2 rewrite Eq.bind_vis in EQIT.
+      repeat red in EQIT. punfold EQIT.
+      inversion EQIT.
+      apply inj_pair2 in H2.
+      apply inj_pair2 in H3.
+      apply inj_pair2 in H4.
+      apply inj_pair2 in H5.
+      subst.
+      eapply IHHRET.
+      specialize (REL x).
+      red in REL.
+      pclearbot.
+      apply REL.
+  Qed.
 
-  Definition singletonT {E}: itree E ~> PropT E :=
-    fun R t t' => t' ≈ t.
+  Lemma bind_Returns_l {E A B} :
+    forall a (ma : itree E A) (k : A -> itree E B),
+    Returns a ma ->
+    ITree.bind ma k ≈ k a.
+  Proof.
+  Admitted.
 
-End PropMonad.
-
-From ITree Require Import Basics.CategoryTheory.
-
-Section IterLaws.
 
   Definition divergent {E A} (ta : itree E A) := (forall k , ta ≈ bind ta k).
 
@@ -211,6 +233,98 @@ Section IterLaws.
       assert (ta ≈ Vis e k0). rewrite Heqi. rewrite <- itree_eta; reflexivity.
       eapply ReturnsVis in H; eauto.
   Qed.
+
+  Definition divergent_cont {E A B} (ta : itree E A) :=
+    (forall (k1 : A -> itree E B) (k2 : A -> itree E B) , bind ta k1 ≈ bind ta k2).
+
+  Lemma Returns_divergent_cont {E A B}:
+    (forall (ta : itree E A), not (exists a, Returns a ta) -> @divergent_cont _ A B ta).
+  Proof.
+  Admitted.
+
+  Global Instance IterUnfold_PropT {E} : IterUnfold (Kleisli (PropT E)) sum.
+  Proof.
+    intros A B f. split; [ intros x y EQ | ]; split.
+    - intros H. repeat red in H. repeat red.
+      destruct H as (step & H).
+      exists (step a). exists (iter_cont step).
+      destruct H as (BIND & PRED). split. auto.
+      split. rewrite <- EQ.
+      rewrite BIND. reflexivity.
+      intros. repeat red.
+      destruct a0.
+      + cbn. repeat red. unfold iter_cont.
+        setoid_rewrite tau_eutt at 2.
+        exists step.
+        setoid_rewrite unfold_iter. split; auto. reflexivity.
+      + cbn. reflexivity.
+    - intros H. repeat red in H. repeat red.
+      destruct H as (FIRST & CONT & PRED_FIRST & EQ_Y & PRED).
+      unfold iter_cont.
+      setoid_rewrite EQ. clear EQ x.
+      assert ((exists a, Returns a FIRST) \/ ~ (exists a, Returns a FIRST)).
+      apply classic.
+      destruct H.
+      + destruct H.
+        specialize (PRED _ H).
+        setoid_rewrite EQ_Y. clear EQ_Y.
+        cbn. setoid_rewrite bind_Returns_l. 2 : exact H.
+        repeat red in PRED. destruct x.
+        * repeat red in PRED.
+          destruct PRED as (step & H_BIND & H_PRED).
+          unfold iter_cont in H_BIND.
+          setoid_rewrite <- H_BIND.
+          (* We want an unfolded version of step. *)
+          eexists ?[step]. split; auto. admit.
+        * cbn in PRED. setoid_rewrite PRED. admit.
+      + apply (Returns_divergent_cont (B := B)) in H. red in H.
+        cbn in H. setoid_rewrite EQ_Y. cbn. setoid_rewrite <- H.
+        (* It doesn't make sense in terms of unfolding a loop body, that
+           the first part must return a value...
+         *)
+        exists (fun x => FIRST). split; auto. admit.
+    - repeat intro. repeat red. intuition.
+      repeat red in H0.
+      repeat red. setoid_rewrite <- H. auto.
+      repeat red in H0.
+      repeat red. setoid_rewrite H. auto.
+    - repeat intro. repeat red. intuition.
+      repeat red in H0.
+      repeat red. setoid_rewrite <- H. auto.
+      repeat red in H0.
+      repeat red. setoid_rewrite H. auto.
+  Admitted.
+
+  (* SAZ: maybe define directly by coinduction  *)
+  (* Global Polymorphic Instance MonadIter_Prop {E} : MonadIter (PropT E) := *)
+  (*   fun R I (step : I -> PropT E (I + R)) i => *)
+  (*     fun (r : itree E R) => *)
+  (*       (exists step' : I * nat -> (itree E (I + R)%type), *)
+  (*           (forall (j : I) (n : nat), *)
+  (*              (* a, *) *)
+  (*               (* Returns a (step' (j, n)) -> *) *)
+  (*                 step j (step' (j, n))) /\ *)
+  (*           (let body := *)
+  (*             fun '(x, k) => *)
+  (*               bind (step' (x, k)) *)
+  (*                 (fun ir : I + R => *)
+  (*                   match ir with *)
+  (*                   | inl i0 => ret (inl (i0, S k)) *)
+  (*                   | inr r0 => ret (inr r0) *)
+  (*                   end) in *)
+
+  (*            CategoryOps.iter body (i, 0)) ≈ r). *)
+
+  Definition interp_prop {E F} (h : E ~> PropT F) :
+    itree E ~> PropT F := interp h.
+
+  Definition singletonT {E}: itree E ~> PropT E :=
+    fun R t t' => t' ≈ t.
+
+End PropMonad.
+
+
+Section IterLaws.
 
 
   Lemma Returns_divergent' {E A B}:
@@ -699,34 +813,6 @@ Section MonadLaws.
       econstructor; eauto with paco.
     Qed.
 
-    Lemma eqit_bind_Returns_inv {E} {R S T} (RS : R -> S -> Prop) 
-          (t : itree E T)  (k1: T -> itree E R) (k2 : T -> itree E S) :
-      (eutt RS  (ITree.bind t k1) (ITree.bind t k2)) ->
-      (forall r, Returns r t -> eutt RS (k1 r) (k2 r)).
-    Proof.
-      intros EQIT r HRET.
-      revert R S RS k1 k2 EQIT.
-      induction HRET; intros.
-      - rewrite H in EQIT.
-        do 2 rewrite Eq.bind_ret_l in EQIT.
-        assumption.
-      - rewrite tau_eutt in H. rewrite H in EQIT.
-        eapply IHHRET; eauto.
-      - rewrite H in EQIT.
-        do 2 rewrite Eq.bind_vis in EQIT.
-        repeat red in EQIT. punfold EQIT.
-        inversion EQIT.
-        apply inj_pair2 in H2.
-        apply inj_pair2 in H3.
-        apply inj_pair2 in H4.
-        apply inj_pair2 in H5.
-        subst.
-        eapply IHHRET.
-        specialize (REL x).
-        red in REL.
-        pclearbot.
-        apply REL.
-    Qed.
 
    Global Instance bind_PropT_Proper {E} {A B} :
      Proper (eqm ==> (eq ==> eqm) ==> eutt eq ==> iff) (@bind_PropT E A B).
