@@ -365,13 +365,110 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
    *)
   end.
 
+(* Lemma map_monad_app *)
+(*       {m : Type -> Type} *)
+(*       {Mm : Monad m} *)
+(*       {EqMm : EqM m} *)
+(*       {HEQP: EqMProps m} *)
+(*       {ML: MonadLaws m} *)
+(*       {A B} (f:A -> m B) (l0 l1:list A): *)
+(*   map_monad f (l0++l1) ≈ *)
+(*   bs1 <- map_monad f l0;; *)
+(*   bs2 <- map_monad f l1;; *)
+(*   ret (bs1 ++ bs2). *)
+(* Proof. *)
+
+Instance EqM_err: Monad.EqM err := fun a x y => @eq (err a) x y.
+  (* fun (a : Type) (X X0 : err a) => *)
+  (* match X with *)
+  (* | inl s => match X0 with *)
+  (*           | inl s0 => s = s0 *)
+  (*           | inr _ => False *)
+  (*           end *)
+  (* | inr a0 => match X0 with *)
+  (*             | inl _ => False *)
+  (*             | inr a1 => a0 = a1 *)
+  (*             end *)
+  (* end. *)
+
+Instance EqMProps_err: Monad.EqMProps err.
+constructor.
+- repeat intro. repeat red. destruct x; reflexivity.
+- repeat intro. repeat red. repeat red in H.
+  destruct x; destruct y; try auto; try contradiction.
+- repeat intro. repeat red in H, H0. repeat red.
+  destruct x, y, z; auto; try contradiction; try etransitivity; eauto.
+Qed.
+
+Instance MonadLaws_err: Monad.MonadLaws err.
+constructor.
+- intros. repeat red. cbn. auto.
+- intros. repeat red. cbn. destruct x eqn: Hx; auto.
+- intros. repeat red. cbn.
+  destruct x; auto.
+- repeat intro. repeat red. cbn. repeat red in H. rewrite H.
+  repeat red in H0. destruct y; auto.
+Qed.
+
+
+Lemma list_cons_app :
+  forall {A} (x : A) l, x :: l = [x] ++ l.
+Proof.
+  cbn. reflexivity.
+Qed.
 
 Lemma uvalue_to_dvalue_of_dvalue_to_uvalue :
   forall (d : dvalue),
     uvalue_to_dvalue (dvalue_to_uvalue d) = inr d.
 Proof.
   intros.
-Admitted.
+  induction d using @dvalue_ind'; auto.
+  - cbn. induction fields. cbn. reflexivity.
+    assert (forall u : dvalue,
+               In u fields ->
+               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
+    intros. apply H. apply in_cons; auto. specialize (IHfields H0).
+    clear H0. rewrite map_cons. rewrite list_cons_app.
+    rewrite map_monad_app. cbn.
+    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue fields)) eqn: EQ.
+    + discriminate IHfields.
+    + rewrite H. cbn. inversion IHfields. reflexivity.
+      constructor; auto.
+  - cbn. induction fields. cbn. reflexivity.
+    assert (forall u : dvalue,
+               In u fields ->
+               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
+    intros. apply H. apply in_cons; auto. specialize (IHfields H0).
+    clear H0. rewrite map_cons. rewrite list_cons_app.
+    rewrite map_monad_app. cbn.
+    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue fields)) eqn: EQ.
+    + discriminate IHfields.
+    + rewrite H. cbn. inversion IHfields. reflexivity.
+      constructor; auto.
+  - cbn. induction elts. cbn. reflexivity.
+    assert (forall u : dvalue,
+               In u elts ->
+               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
+    intros. apply H. apply in_cons; auto. specialize (IHelts H0).
+    clear H0. rewrite map_cons. rewrite list_cons_app.
+    rewrite map_monad_app. cbn.
+    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue elts)) eqn: EQ.
+    + discriminate IHelts.
+    + rewrite H. cbn. inversion IHelts. reflexivity.
+      constructor; auto.
+  - cbn. induction elts. cbn. reflexivity.
+    assert (forall u : dvalue,
+               In u elts ->
+               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
+    intros. apply H. apply in_cons; auto. specialize (IHelts H0).
+    clear H0. rewrite map_cons. rewrite list_cons_app.
+    rewrite map_monad_app. cbn.
+    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue elts)) eqn: EQ.
+    + discriminate IHelts.
+    + rewrite H. cbn. inversion IHelts. reflexivity.
+      constructor; auto.
+Qed.
+
 
 (* returns true iff the uvalue contains no occurrence of UVALUE_Undef. *)
 (* YZ: See my comment above. If I'm correct, then we should also fail on operators and hence have:
