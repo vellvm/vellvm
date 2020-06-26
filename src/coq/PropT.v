@@ -1139,7 +1139,7 @@ Section BIND_BIND_COUNTEREXAMPLE.
   Definition t : itree ND bool :=
     bind (trigger Pick) (fun (b:bool) => if b
                                then bind (trigger Pick) (fun (x:bool) => if x then ret true else ITree.spin)
-                                   else bind (trigger Pick) (fun (x:bool)  => if x then ret false else ITree.spin)).
+                               else bind (trigger Pick) (fun (x:bool)  => if x then ret false else ITree.spin)).
 
   Lemma bind_right_assoc : bind PA (fun a => bind (KB a) KC) t.
   Proof.
