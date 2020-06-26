@@ -99,18 +99,32 @@ Proof.
               inversion X; subst; contradiction.
 Qed.
 
-(* What's a good way to prove this ? *) 
-Lemma unsupported_cases : forall {X} (sz : Z) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X), 
-    match sz with
-    | 64 => x64
-    | 32 => x32
-    | 8 => x8
-    | 1 => x1
-    | _ => x
-    end = x.
+(* What's a good way to prove this ? *)
+(* IY: This is not ideal, but here is an equivalent formulation with an ugly
+   if-else chain.. I feel like there must be some clean way to prove the
+   original lemma using boolean reflection. *)
+Lemma unsupported_cases : forall {X} (sz : Z) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
+    (if (sz =? 64) then x64
+      else if (sz =? 32) then x32
+          else if (sz =? 8) then x8
+                else if (sz =? 1) then x1
+                    else x) = x.
 Proof.
   intros.
-Admitted.
+  destruct (sz =? 64) eqn: H.
+  rewrite Z.eqb_eq in H.
+  destruct N. rewrite H. constructor.
+  destruct (sz =? 32) eqn: H'.
+  rewrite Z.eqb_eq in H'.
+  destruct N. rewrite H'. constructor.
+  destruct (sz =? 8) eqn: H''.
+  rewrite Z.eqb_eq in H''.
+  destruct N. rewrite H''. constructor.
+  destruct (sz =? 1) eqn: H'''.
+  rewrite Z.eqb_eq in H'''.
+  destruct N. rewrite H'''. constructor.
+  reflexivity.
+Qed.
 
 
 Definition ll_float  := Floats.float32.
@@ -356,6 +370,7 @@ Lemma uvalue_to_dvalue_of_dvalue_to_uvalue :
   forall (d : dvalue),
     uvalue_to_dvalue (dvalue_to_uvalue d) = inr d.
 Proof.
+  intros.
 Admitted.
 
 (* returns true iff the uvalue contains no occurrence of UVALUE_Undef. *)
