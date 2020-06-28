@@ -18,7 +18,8 @@ From Vellvm Require Import
      LLVMAst
      InterpreterMCFG
      InterpreterCFG
-     Handlers.Handlers.
+     Handlers.Handlers
+     LLVMEvents.
 
 From ExtLib Require Import
      Structures.Functor.
@@ -537,5 +538,90 @@ Definition refine_cfg_ret: relation (PropT L5 (memory_stack * (local_env * (glob
 
 (* Definition refine_cfg  (p1 p2: cfg dtyp): Prop := *)
 (*   refine_cfg_ret (model_to_L5_cfg p1) (model_to_L5_cfg p2). *)
+
+(* Reasoning lemmas for [denote_bks] *)
+
+Section Denotation.
+Import CatNotations.
+Import Eq.
+
+Lemma denote_bks_nil: forall s, D.denote_bks [] s ≈ ret (inl s).
+Proof.
+  intros s; unfold D.denote_bks.
+  unfold loop.
+  cbn. rewrite bind_ret_l.
+  match goal with
+  | |- CategoryOps.iter (C := ktree _) ?body ?s ≈ _ =>
+    rewrite (unfold_iter body s)
+  end.
+  repeat (cbn; (rewrite bind_bind || rewrite bind_ret_l)).
+  reflexivity.
+Qed.
+
+Lemma denote_bks_singleton :
+  forall (b : LLVMAst.block dtyp) (bid : block_id) (nextblock : block_id),
+    blk_id b = bid ->
+    (snd (blk_term b)) = (TERM_Br_1 nextblock) ->
+    (blk_id b) <> nextblock ->
+    eutt (Logic.eq) (D.denote_bks [b] bid) (D.denote_block b).
+Proof.
+  intros b bid nextblock Heqid Heqterm Hneq.
+  cbn.
+  rewrite bind_ret_l.
+  rewrite KTreeFacts.unfold_iter_ktree.
+  cbn.
+  destruct (Eqv.eqv_dec_p (blk_id b) bid) eqn:Heq'; try contradiction.
+  repeat rewrite bind_bind.
+  rewrite Heqterm.
+  cbn.
+  setoid_rewrite translate_ret.
+  setoid_rewrite bind_ret_l.
+  destruct (Eqv.eqv_dec_p (blk_id b) nextblock); try contradiction.
+  repeat setoid_rewrite bind_ret_l. unfold Datatypes.id.
+  reflexivity.
+Qed.
+
+Lemma denote_code_app :
+  forall a b,
+    D.denote_code (a ++ b)%list ≈ ITree.bind (D.denote_code a) (fun _ => D.denote_code b).
+Proof.
+  induction a; intros b.
+  - cbn. rewrite bind_ret_l.
+    reflexivity.
+  - cbn. rewrite bind_bind. setoid_rewrite IHa.
+    reflexivity.
+Qed.
+
+Lemma denote_code_cons :
+  forall a l,
+    D.denote_code (a::l) ≈ ITree.bind (D.denote_instr a) (fun _ => D.denote_code l).
+Proof.
+  cbn; reflexivity.
+Qed.
+
+Import MonadNotation.
+Open Scope monad_scope.
+
+Lemma denote_bks_unfold: forall bks bid b,
+    find_block dtyp bks bid = Some b ->
+    D.denote_bks bks bid ≈
+    vob <- D.denote_block b ;;
+    match vob with
+    | inr v => ret (inr v)
+    | inl bid_target =>
+      match find_block DynamicTypes.dtyp bks bid_target with
+      | None => ret (inl bid_target)
+      | Some block_target =>
+        dvs <- Util.map_monad
+                (fun x => translate exp_E_to_instr_E (D.denote_phi bid x))
+                (blk_phis block_target) ;;
+        Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
+        D.denote_bks bks bid_target
+      end
+    end.
+Admitted.
+
+End Denotation.
+
 
 End TopLevelInputs.
