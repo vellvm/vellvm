@@ -621,23 +621,37 @@ Lemma denote_bks_unfold: forall bks bid b,
     end.
 Proof.
   intros.
-  cbn. rewrite Eq.bind_ret_l.
-  rewrite KTreeFacts.unfold_iter_ktree. cbn. rewrite Eq.bind_bind.
-  rewrite H. cbn. rewrite 3 Eq.bind_bind.
+  cbn. rewrite bind_ret_l.
+  rewrite KTreeFacts.unfold_iter_ktree. cbn. rewrite bind_bind.
+  rewrite H. cbn. rewrite 3 bind_bind.
   eapply eutt_clo_bind. reflexivity. intros; subst.
   eapply eutt_clo_bind. reflexivity. intros; subst.
   cbn. destruct u0. cbn.
   - destruct (find_block dtyp bks b0). cbn.
-    + rewrite Eq.bind_bind. eapply eutt_clo_bind. reflexivity. intros.
-      subst. rewrite Eq.bind_bind. eapply eutt_clo_bind. reflexivity.
-      intros; subst. rewrite 2 Eq.bind_ret_l. cbn.
-      rewrite Eq.bind_bind. rewrite Eq.bind_ret_l. rewrite Eq.bind_ret_l.
+    + rewrite bind_bind. eapply eutt_clo_bind. reflexivity. intros.
+      subst. rewrite bind_bind. eapply eutt_clo_bind. reflexivity.
+      intros; subst. rewrite 2 bind_ret_l. cbn.
+      rewrite bind_bind. rewrite bind_ret_l. rewrite bind_ret_l.
       rewrite tau_eutt.
       rewrite 2 KTreeFacts.unfold_iter_ktree. cbn. reflexivity.
-    + rewrite Eq.bind_ret_l. cbn. rewrite Eq.bind_bind.
-      rewrite Eq.bind_ret_l. rewrite Eq.bind_ret_l. reflexivity.
-  - rewrite Eq.bind_ret_l. cbn. rewrite Eq.bind_bind.
-    rewrite Eq.bind_ret_l. rewrite Eq.bind_ret_l. reflexivity.
+    + rewrite bind_ret_l. cbn. rewrite bind_bind.
+      rewrite bind_ret_l. rewrite bind_ret_l. reflexivity.
+  - rewrite bind_ret_l. cbn. rewrite bind_bind.
+    rewrite bind_ret_l. rewrite bind_ret_l. reflexivity.
+Qed.
+
+Lemma denote_bks_unfold_not_in: forall bks bid,
+    find_block dtyp bks bid = None ->
+    D.denote_bks bks bid ≈ Ret (inl bid).
+Proof.
+  intros.
+  cbn; rewrite bind_ret_l.
+  rewrite KTreeFacts.unfold_iter_ktree.
+  cbn; rewrite bind_bind.
+  rewrite H; cbn.
+  rewrite bind_ret_l.
+  cbn; rewrite bind_bind, 2 bind_ret_l.
+  reflexivity.
 Qed.
 
 End Denotation.
