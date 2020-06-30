@@ -177,7 +177,6 @@ Proof.
     intros.
     inversion H.
     - rewrite tau_eutt. rewrite tau_eutt.
-      About eutt_iter_gen'.
       specialize (@eutt_iter_gen' F (itree E R) R (eutt RR) (eutt eq) eq SUB step step) as HX.
       apply HX. red. intros. 
       eapply eqit_mon with (RR0:=(sum_rel (eutt eq) eq)); eauto.
@@ -386,12 +385,13 @@ Proof.
     destruct (observe x).
     + destruct (observe y).
       * inversion H2. subst. gstep. red.  econstructor. 
-
-    
+Admitted.
+(*
   - intros t'.    
   destruct (observe t') eqn:EQ; cbn; rewrite EQ; try reflexivity.
   exists (h _ e); auto.
 Qed.
+*)
 
 Lemma case_prop_handler_correct:
   forall {E1 E2 F}

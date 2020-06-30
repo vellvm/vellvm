@@ -934,7 +934,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       intros dv dt TYP.
       induction TYP using dvalue_has_dtyp_ind';
         try solve [cbn; omega].
-      - cbn.  rewrite DynamicValues.unsupported_cases. omega. assumption.
+      - cbn.  rewrite DynamicValues.unsupported_cases_match. omega. assumption.
       - rewrite sizeof_struct_cons.
         omega.
       - rewrite sizeof_packed_struct_cons.
@@ -970,7 +970,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
       intros dv dt TYP.
       induction TYP using dvalue_has_dtyp_ind'; try solve [cbn; auto].
-      - cbn. rewrite DynamicValues.unsupported_cases; auto.
+      - cbn. rewrite DynamicValues.unsupported_cases_match; auto.
       - cbn.
         rewrite app_length.
         rewrite Nat2Z.inj_add.
@@ -1024,7 +1024,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
       intros dv dt TYP.
       induction TYP using dvalue_has_dtyp_ind'; auto.
-      - cbn. rewrite DynamicValues.unsupported_cases. reflexivity. auto.
+      - cbn. rewrite DynamicValues.unsupported_cases_match. reflexivity. auto.
       - (* Structs *)
         rewrite sizeof_struct_cons.
         cbn.
@@ -1315,7 +1315,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       - (* I8 *) admit.
       - (* I32 *) admit.
       - (* I64 *) admit.
-      - cbn. rewrite DynamicValues.unsupported_cases; auto.
+      - cbn. rewrite DynamicValues.unsupported_cases_match; auto.
       - (* Double *) admit.
       - (* Float *) admit.
       - (* Half *) admit.

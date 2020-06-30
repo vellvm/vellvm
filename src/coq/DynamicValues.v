@@ -99,8 +99,43 @@ Proof.
               inversion X; subst; contradiction.
 Qed.
 
-(* What's a good way to prove this ? *) 
-Lemma unsupported_cases : forall {X} (sz : Z) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X), 
+(* What's a good way to prove this ? *)
+(* IY: This is not ideal, but here is an equivalent formulation with an ugly
+   if-else chain.. I feel like there must be some clean way to prove the
+   original lemma using boolean reflection. *)
+Lemma unsupported_cases : forall {X} (sz : Z) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
+    (if (sz =? 64) then x64
+      else if (sz =? 32) then x32
+          else if (sz =? 8) then x8
+                else if (sz =? 1) then x1
+                    else x) = x.
+Proof.
+  intros.
+  destruct (sz =? 64) eqn: H.
+  rewrite Z.eqb_eq in H.
+  destruct N. rewrite H. constructor.
+  destruct (sz =? 32) eqn: H'.
+  rewrite Z.eqb_eq in H'.
+  destruct N. rewrite H'. constructor.
+  destruct (sz =? 8) eqn: H''.
+  rewrite Z.eqb_eq in H''.
+  destruct N. rewrite H''. constructor.
+  destruct (sz =? 1) eqn: H'''.
+  rewrite Z.eqb_eq in H'''.
+  destruct N. rewrite H'''. constructor.
+  reflexivity.
+Qed.
+
+Function unsupported_cases_match_ {X} (sz : Z) (x64 x32 x8 x1 x : X) :=
+    match sz with
+    | 64 => x64
+    | 32 => x32
+    | 8 => x8
+    | 1 => x1
+    | _ => x
+    end.
+
+Lemma unsupported_cases_match : forall {X} (sz : Z) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X), 
     match sz with
     | 64 => x64
     | 32 => x32
@@ -110,7 +145,16 @@ Lemma unsupported_cases : forall {X} (sz : Z) (N : ~ IX_supported sz) (x64 x32 x
     end = x.
 Proof.
   intros.
-Admitted.
+  change ((unsupported_cases_match_ sz x64 x32 x8 x1 x) = x).
+  revert N.
+  apply unsupported_cases_match__ind; intros.
+  - assert False. apply N.  econstructor. inversion H.
+  - assert False. apply N.  econstructor. inversion H.
+  - assert False. apply N.  econstructor. inversion H.
+  - assert False. apply N.  econstructor. inversion H.
+  - reflexivity.
+Qed.
+
 
 
 Definition ll_float  := Floats.float32.
@@ -351,12 +395,85 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
    *)
   end.
 
+Instance EqM_err: Monad.EqM err := fun a x y => @eq (err a) x y.
+
+Instance EqMProps_err: Monad.EqMProps err.
+constructor.
+- repeat intro. repeat red. destruct x; reflexivity.
+- repeat intro. repeat red. repeat red in H.
+  destruct x; destruct y; try auto; try contradiction.
+- repeat intro. repeat red in H, H0. repeat red.
+  destruct x, y, z; auto; try contradiction; try etransitivity; eauto.
+Qed.
+
+Instance MonadLaws_err: Monad.MonadLaws err.
+constructor.
+- intros. repeat red. cbn. auto.
+- intros. repeat red. cbn. destruct x eqn: Hx; auto.
+- intros. repeat red. cbn.
+  destruct x; auto.
+- repeat intro. repeat red. cbn. repeat red in H. rewrite H.
+  repeat red in H0. destruct y; auto.
+Qed.
+
+Lemma list_cons_app :
+  forall {A} (x : A) l, x :: l = [x] ++ l.
+Proof.
+  cbn. reflexivity.
+Qed.
 
 Lemma uvalue_to_dvalue_of_dvalue_to_uvalue :
   forall (d : dvalue),
     uvalue_to_dvalue (dvalue_to_uvalue d) = inr d.
 Proof.
-Admitted.
+  intros.
+  induction d using @dvalue_ind'; auto.
+  - cbn. induction fields. cbn. reflexivity.
+    assert (forall u : dvalue,
+               In u fields ->
+               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
+    intros. apply H. apply in_cons; auto. specialize (IHfields H0).
+    clear H0. rewrite map_cons. rewrite list_cons_app.
+    rewrite map_monad_app. cbn.
+    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue fields)) eqn: EQ.
+    + discriminate IHfields.
+    + rewrite H. cbn. inversion IHfields. reflexivity.
+      constructor; auto.
+  - cbn. induction fields. cbn. reflexivity.
+    assert (forall u : dvalue,
+               In u fields ->
+               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
+    intros. apply H. apply in_cons; auto. specialize (IHfields H0).
+    clear H0. rewrite map_cons. rewrite list_cons_app.
+    rewrite map_monad_app. cbn.
+    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue fields)) eqn: EQ.
+    + discriminate IHfields.
+    + rewrite H. cbn. inversion IHfields. reflexivity.
+      constructor; auto.
+  - cbn. induction elts. cbn. reflexivity.
+    assert (forall u : dvalue,
+               In u elts ->
+               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
+    intros. apply H. apply in_cons; auto. specialize (IHelts H0).
+    clear H0. rewrite map_cons. rewrite list_cons_app.
+    rewrite map_monad_app. cbn.
+    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue elts)) eqn: EQ.
+    + discriminate IHelts.
+    + rewrite H. cbn. inversion IHelts. reflexivity.
+      constructor; auto.
+  - cbn. induction elts. cbn. reflexivity.
+    assert (forall u : dvalue,
+               In u elts ->
+               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
+    intros. apply H. apply in_cons; auto. specialize (IHelts H0).
+    clear H0. rewrite map_cons. rewrite list_cons_app.
+    rewrite map_monad_app. cbn.
+    destruct (map_monad uvalue_to_dvalue (map dvalue_to_uvalue elts)) eqn: EQ.
+    + discriminate IHelts.
+    + rewrite H. cbn. inversion IHelts. reflexivity.
+      constructor; auto.
+Qed.
+
 
 (* returns true iff the uvalue contains no occurrence of UVALUE_Undef. *)
 (* YZ: See my comment above. If I'm correct, then we should also fail on operators and hence have:

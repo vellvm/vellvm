@@ -100,14 +100,11 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     Fixpoint default_dvalue_of_dtyp (dt : dtyp) : dvalue :=
       match dt with
       | DTYPE_I sz =>
-        (* CB TODO: better way? *)
-        match sz with
-        | 1  => DVALUE_I1 (repr 0)
-        | 8  => DVALUE_I8 (repr 0)
-        | 32 => DVALUE_I32 (repr 0)
-        | 64 => DVALUE_I64 (repr 0)
-        | _  => DVALUE_None
-        end
+            (if (sz =? 64) then DVALUE_I64 (repr 0)
+             else if (sz =? 32) then DVALUE_I32 (repr 0)
+                  else if (sz =? 8) then DVALUE_I8 (repr 0)
+                       else if (sz =? 1) then DVALUE_I1 (repr 0)
+                            else DVALUE_None) 
       | DTYPE_Pointer => DVALUE_Addr A.null
       | DTYPE_Void => DVALUE_None
       | DTYPE_Half => DVALUE_Float Float32.zero (* ??? *)

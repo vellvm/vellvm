@@ -14,9 +14,18 @@ From ITree Require Import
      Eq.UpToTaus
      ITree
      Basics.Monad
-     Core.ITreeMonad.
+     Core.ITreeMonad
+     CategoryKleisli
+     CategoryKleisliFacts
+     KTree
+     KTreeFacts.
 
 From Paco Require Import paco.
+
+Import MonadNotation.
+Import CatNotations.
+Local Open Scope monad_scope.
+Local Open Scope cat_scope.
 
 Section PropMonad.
 
@@ -98,11 +107,13 @@ Section PropMonad.
         split; auto.
   Qed.
 
+
   Global Instance Monad_Prop {E} : Monad (PropT E) :=
     {|
       ret := fun _ x y => y ≈ ret x
       ; bind := bind_PropT
     |}.
+
 
 
   (* SAZ: maybe define directly by coinduction  *)
@@ -132,17 +143,57 @@ Section PropMonad.
   Definition singletonT {E}: itree E ~> PropT E :=
     fun R t t' => t' ≈ t.
 
-End PropMonad.
+  Definition iter_cont {I E R} (step' : I -> itree E (I + R)) :
+    I + R -> itree E R :=
+      (ITree._iter (fun t : itree E R => Tau t) (ITree.iter step')).
+
+  Global Polymorphic Instance MonadIter_Prop {E} : MonadIter (PropT E) :=
+    fun R I (step : I -> PropT E (I + R)) i =>
+      fun (r : itree E R) =>
+        (exists (step' : I -> (itree E (I + R)%type)),
+                ITree.bind (step' i) (@iter_cont I E R step') ≈ r /\
+                (forall j, step j (step' j))).
 
 
-From ITree Require Import
-     Basics.Category
-     CategoryKleisli
-     CategoryKleisliFacts
-     KTree
-     KTreeFacts.
+  From ITree Require Import Basics.CategoryTheory.
+  From Coq Require Import Program.Tactics.
 
-Section IterLaws.
+  Lemma eqit_bind_Returns_inv {E} {R S T} (RS : R -> S -> Prop) 
+        (t : itree E T)  (k1: T -> itree E R) (k2 : T -> itree E S) :
+    (eutt RS  (ITree.bind t k1) (ITree.bind t k2)) ->
+    (forall r, Returns r t -> eutt RS (k1 r) (k2 r)).
+  Proof.
+    intros EQIT r HRET.
+    revert R S RS k1 k2 EQIT.
+    induction HRET; intros.
+    - rewrite H in EQIT.
+      do 2 rewrite Eq.bind_ret_l in EQIT.
+      assumption.
+    - rewrite tau_eutt in H. rewrite H in EQIT.
+      eapply IHHRET; eauto.
+    - rewrite H in EQIT.
+      do 2 rewrite Eq.bind_vis in EQIT.
+      repeat red in EQIT. punfold EQIT.
+      inversion EQIT.
+      apply inj_pair2 in H2.
+      apply inj_pair2 in H3.
+      apply inj_pair2 in H4.
+      apply inj_pair2 in H5.
+      subst.
+      eapply IHHRET.
+      specialize (REL x).
+      red in REL.
+      pclearbot.
+      apply REL.
+  Qed.
+
+  Lemma bind_Returns_l {E A B} :
+    forall a (ma : itree E A) (k : A -> itree E B),
+    Returns a ma ->
+    ITree.bind ma k ≈ k a.
+  Proof.
+  Admitted.
+
 
   Definition divergent {E A} (ta : itree E A) := (forall k , ta ≈ bind ta k).
 
@@ -165,6 +216,92 @@ Section IterLaws.
       eapply ReturnsVis in H; eauto.
   Qed.
 
+  Definition divergent_cont {E A B} (ta : itree E A) :=
+    (forall (k1 : A -> itree E B) (k2 : A -> itree E B) , bind ta k1 ≈ bind ta k2).
+
+  Lemma Returns_divergent_cont {E A B}:
+    (forall (ta : itree E A), not (exists a, Returns a ta) -> @divergent_cont _ A B ta).
+  Proof.
+  Admitted.
+
+  Global Instance IterUnfold_PropT {E} : IterUnfold (Kleisli (PropT E)) sum.
+  Proof.
+    intros A B f. split; [ intros x y EQ | ]; split.
+    - intros H. repeat red in H. repeat red.
+      destruct H as (step & H).
+      exists (step a). exists (iter_cont step).
+      destruct H as (BIND & PRED). split. auto.
+      split. rewrite <- EQ.
+      rewrite BIND. reflexivity.
+      intros. repeat red.
+      destruct a0.
+      + cbn. repeat red. unfold iter_cont.
+        setoid_rewrite tau_eutt at 2.
+        exists step.
+        setoid_rewrite unfold_iter. split; auto. reflexivity.
+      + cbn. reflexivity.
+    - intros H. repeat red in H. repeat red.
+      destruct H as (FIRST & CONT & PRED_FIRST & EQ_Y & PRED).
+      unfold iter_cont.
+      setoid_rewrite EQ. clear EQ x.
+      assert ((exists a, Returns a FIRST) \/ ~ (exists a, Returns a FIRST)).
+      apply classic.
+      destruct H.
+      + destruct H.
+        specialize (PRED _ H).
+        setoid_rewrite EQ_Y. clear EQ_Y.
+        cbn. setoid_rewrite bind_Returns_l. 2 : exact H.
+        repeat red in PRED. destruct x.
+        * repeat red in PRED.
+          destruct PRED as (step & H_BIND & H_PRED).
+          unfold iter_cont in H_BIND.
+          setoid_rewrite <- H_BIND.
+          (* We want an unfolded version of step. *)
+          eexists ?[step]. split; auto. admit.
+        * cbn in PRED. setoid_rewrite PRED. admit.
+      + apply (Returns_divergent_cont (B := B)) in H. red in H.
+        cbn in H. setoid_rewrite EQ_Y. cbn. setoid_rewrite <- H.
+        (* It doesn't make sense in terms of unfolding a loop body, that
+           the first part must return a value...
+         *)
+        exists (fun x => FIRST). split; auto. admit.
+    - repeat intro. repeat red. intuition.
+      repeat red in H0.
+      repeat red. setoid_rewrite <- H. auto.
+      repeat red in H0.
+      repeat red. setoid_rewrite H. auto.
+    - repeat intro. repeat red. intuition.
+      repeat red in H0.
+      repeat red. setoid_rewrite <- H. auto.
+      repeat red in H0.
+      repeat red. setoid_rewrite H. auto.
+  Admitted.
+
+  (* SAZ: maybe define directly by coinduction  *)
+  (* Global Polymorphic Instance MonadIter_Prop {E} : MonadIter (PropT E) := *)
+  (*   fun R I (step : I -> PropT E (I + R)) i => *)
+  (*     fun (r : itree E R) => *)
+  (*       (exists step' : I * nat -> (itree E (I + R)%type), *)
+  (*           (forall (j : I) (n : nat), *)
+  (*              (* a, *) *)
+  (*               (* Returns a (step' (j, n)) -> *) *)
+  (*                 step j (step' (j, n))) /\ *)
+  (*           (let body := *)
+  (*             fun '(x, k) => *)
+  (*               bind (step' (x, k)) *)
+  (*                 (fun ir : I + R => *)
+  (*                   match ir with *)
+  (*                   | inl i0 => ret (inl (i0, S k)) *)
+  (*                   | inr r0 => ret (inr r0) *)
+  (*                   end) in *)
+
+  (*            CategoryOps.iter body (i, 0)) ≈ r). *)
+
+End PropMonad.
+
+
+Section IterLaws.
+
 
   Lemma Returns_divergent' {E A B}:
     (forall (ta : itree E A) (tb : itree E B),
@@ -179,12 +316,126 @@ Section IterLaws.
       rewrite <- itree_eta. reflexivity.
   Admitted.
 
-
   Ltac simpl_iter :=
       unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree.
 
-  Import MonadNotation.
-  Local Open Scope monad_scope.
+  Definition g {a b : Type} {E} (x0 : a * nat -> itree E (a + b)) (a1 : a)
+    := (fun '(x, k) =>
+            bind (x0 (x, k))
+                (fun ir : a + b =>
+                    match ir with
+                    | inl i0 => ret (inl (i0, k))
+                    | inr r0 => ret (inr r0)
+                    end)).
+
+  Definition f {a b : Type} {E} : a * nat  -> itree E (a * nat + b) :=
+    fun '(x, k) => ret (inl ((x, S k))).
+
+  Lemma iter_succ_dinatural:
+    forall {a b : Type} {E} (x0 : a * nat -> itree E (a + b)) (a1 : a),
+      iter (C := Kleisli (itree E)) (bif := sum)
+           (f >>> case_ (g x0 a1) inr_)
+       ⩯
+       f >>> case_ (iter (C := Kleisli (itree E)) (bif := sum) ((g x0 a1) >>> (case_ f inr_))) (id_ _).
+  Proof.
+    intros. rewrite iter_dinatural. reflexivity.
+  Qed.
+
+  Lemma iter_eq_start_index:
+    forall (a b : Type) (E : Type -> Type) (x0 : a * nat -> itree E (a + b)) (a1 : a),
+      iter (C := Kleisli (itree E)) (bif := sum)
+        (fun '(x, k) =>
+            bind (x0 (x, S k))
+                (fun ir : a + b =>
+                    match ir with
+                    | inl i0 => ret (inl (i0, S k))
+                    | inr r0 => ret (inr r0)
+                    end)) (a1, 0)
+        ≈ iter (C := Kleisli (itree E)) (bif := sum)
+        (fun '(x', k) =>
+            bind (x0 (x', k))
+                (fun ir : a + b =>
+                    match ir with
+                    | inl i0 => ret (inl (i0, S k))
+                    | inr r0 => ret (inr r0)
+                    end)) (a1, 1).
+  Proof.
+    intros a b m x0 a1.
+    pose proof (iter_succ_dinatural x0 a1) as H0.
+    specialize (H0 (a1, 0)).
+    unfold f at 1, g at 1 in H0.
+    unfold cat at 1, Cat_Kleisli at 1 in H0.
+    match goal with
+    | H : ?body1 ≈ _ |- ?body2 ≈ _ => remember body1 as s1;
+                                                 remember body2 as s2
+    end.
+    assert (s1 ≈ s2). {
+      subst.
+      match goal with
+      | |- iter ?body1 _ ≈ iter ?body2 _ => remember body1 as k1;
+                                            remember body2 as k2
+      end.
+      assert (iter k1 ⩯ iter k2). {
+        eapply iterative_proper_iter.
+        subst. do 3 red. intros.
+        destruct a0; rewrite bind_ret_l; cbn.
+        reflexivity.
+      }
+      do 3 red in H.
+      apply H.
+    }
+    rewrite <- H. subst. clear H. rewrite H0.
+    unfold f, g.
+    unfold cat, Cat_Kleisli. rewrite bind_ret_l.
+    cbn.
+    match goal with
+    | |- iter ?body1 _ ≈ iter ?body2 _ => remember body1 as i1; remember body2 as i2
+     end.
+    assert (iter i1 ⩯ iter i2). {
+      eapply iterative_proper_iter.
+      subst.
+      do 3 red. intros.
+      destruct a0. rewrite Eq.bind_bind.
+      eapply eutt_clo_bind. reflexivity.
+      intros. rewrite H. destruct u2;
+      rewrite Eq.bind_ret_l; cbn; reflexivity.
+    }
+    do 3 red in H.
+    apply H.
+  Qed.
+
+  Lemma simplify_bind_match {E A B}:
+    forall x BODY,
+     ITree.bind
+       match x with
+       | inl i0 => Ret (inl (i0, 1))
+       | inr r0 => Ret (inr r0)
+       end
+       (ITree._iter (fun t : itree E B => Tau t)
+          (ITree.iter
+             (fun '(x, k) =>
+              ITree.bind (BODY (x, k))
+                (fun ir : A + B =>
+                 match ir with
+                 | inl i0 => Ret (inl (i0, S k))
+                 | inr r0 => Ret (inr r0)
+                 end))))
+      ≈
+      match x with
+      | inl l =>
+          (ITree.iter
+              (fun '(x0, k) =>
+              ITree.bind (BODY (x0, k))
+                (fun ir : A + B =>
+                  match ir with
+                  | inl i0 => Ret (inl (i0, S k))
+                  | inr r0 => Ret (inr r0)
+                  end))) (l, 1)
+      | inr r => Ret r end.
+  Proof.
+    intros. destruct x. rewrite Eq.bind_ret_l. cbn. rewrite tau_eutt.
+    reflexivity. rewrite Eq.bind_ret_l. reflexivity.
+  Qed.
 
   (*
   Global Instance IterUnfold_PropT {E} : IterUnfold (Kleisli (PropT E)) sum.
@@ -192,24 +443,40 @@ Section IterLaws.
     repeat red. split; [ intros x y EQ | ]; split.
   - (* Show that there is some looping itree body that Pstep can unfold into. *)
     intros LOOP. repeat red. repeat red in LOOP.
+    setoid_rewrite <- EQ. clear EQ y.
     destruct LOOP as (BODY & PROP & RESULT).
-    exists (BODY a).
-    exists (fun ab : A + B => match ab with
-        | inl a => Tau (ITree.iter BODY a)
-        | inr b => Ret b
-                      end). cbn.
+    exists (BODY (a, 0)).
+    exists (fun x : A + B =>
+         match x with
+         | inl l =>
+              (ITree.iter
+                  (fun '(x0, k) =>
+                  ITree.bind (BODY (x0, k))
+                    (fun ir : A + B =>
+                      match ir with
+                      | inl i0 => Ret (inl (i0, S k))
+                      | inr r0 => Ret (inr r0)
+                      end))) (l, 1)
+         | inr r => Ret r end).
     split. auto. split.
     + (* Proposition holds over first part of computation. *)
-      rewrite <- EQ, <- RESULT. simpl_iter.
-      rewrite unfold_iter. reflexivity.
+      rewrite <- RESULT. simpl_iter.
+      rewrite unfold_iter. cbn. rewrite Eq.bind_bind.
+      eapply eutt_clo_bind. reflexivity.
+      intros. rewrite <- H. destruct u1. rewrite Eq.bind_ret_l.
+      cbn. rewrite tau_eutt. reflexivity.
+      rewrite Eq.bind_ret_l. cbn. reflexivity.
     + (* There is some continuation that satisfies the computation. *)
       intros ab RET. repeat red.
       destruct ab eqn: H_ab.
       * (* Keep loopin' *)
         cbn. repeat red.
-        exists BODY. split; auto.
-        simpl_iter; rewrite unfold_iter. rewrite tau_eutt.
-        reflexivity.
+        exists (fun x : A * nat => BODY (fst x, S( snd x ))). split; auto.
+        simpl_iter. cbn.
+        (* rewrite Eq.bind_ret_l. cbn. rewrite tau_eutt. *)
+        pose proof iter_eq_start_index.
+        unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree in H.
+        specialize (H _ _ _ BODY). apply H.
       * cbn. reflexivity.
   - (* An unfolded PropT implies a folded loop. *)
     (*      cat Pstep (case_ (iter Pstep) (id_ B)) a y -> iter Pstep a x      *)
@@ -218,19 +485,43 @@ Section IterLaws.
     intros UNFOLD. repeat red. setoid_rewrite EQ. clear EQ x.
     destruct UNFOLD as (FIRST & CONTINUATION & FIRST_PROP & BIND_EQ &
                         CONT_PROP).
-    (* Perhaps Returns should be a coinductive proposition? *)
+    (* Perhaps Returns should be a coinductive proposition?  =>
+       Tried short experiment above, was not working out cleanly..
+       Not convinced that a coinductive definition will give us more expressive
+       power. We seem to be missing some other kind of information.
+     *)
 
     simpl_iter. setoid_rewrite unfold_iter.
-
-
-    From Coq Require Import Classes.EquivDec.
-    assert (EqDec A eq). admit.
+    setoid_rewrite BIND_EQ.
+    eexists ?[step'].
+    assert ((?step' (a, 0)) ≈ FIRST) as H. admit.
+    split.
+    (* IDEA? : Don't hold propositions holding over all index j, but
+       up to a finite unfolding of the step' body. *)
+    + intros.
+      admit.
+    + cbn. rewrite Eq.bind_bind.
+      setoid_rewrite simplify_bind_match.
+      eapply eutt_clo_bind. rewrite H. reflexivity.
+      repeat intro. clear H0.
+      destruct u1.
+      * rewrite unfold_iter.
+        rewrite Eq.bind_bind.
+        destruct (observe FIRST) eqn: OBSERVE_STEP; cbn.
+        -- admit.
+        -- admit.
+        -- admit.
+      * exfalso. (* Should never be reached.... *) admit.
+   (* + eapply eutt_clo_bind. reflexivity. intros. rewrite H. *)
+   (*    clear H u1. destruct u2. *)
+   (*    * rewrite Eq.bind_ret_l. cbn. rewrite tau_eutt. *)
+   (*      rewrite unfold_iter. cbn. rewrite Eq.bind_bind. *)
 
     (* If we unfold a loop, the idea should be that the unfolded part is going
      * to ... terminate, right? It isn't necessarily a return, though. *)
-    assert (FIRST_SHOULD_RETURN: exists a : A + B, Returns a FIRST). admit.
-    destruct FIRST_SHOULD_RETURN as (AB & RETURN_FIRST).
-    specialize (CONT_PROP _ RETURN_FIRST).
+    (* assert (FIRST_SHOULD_RETURN: exists a : A + B, Returns a FIRST). admit. *)
+    (* destruct FIRST_SHOULD_RETURN as (AB & RETURN_FIRST). *)
+    (* specialize (CONT_PROP _ RETURN_FIRST). *)
 
     (* I think that what we need to do, actually, is to encode "Returns" in
        the iter instance. This is because the definition of "iter" needs to
@@ -248,7 +539,6 @@ Section IterLaws.
      be expressed by an itree, and there might be indices in the loop body
      that map to the empty predicate.
      *)
-    admit.
   - repeat intro. repeat red.
     simpl_iter. unfold MonadIter_Prop. setoid_rewrite H.
     auto.
@@ -259,8 +549,34 @@ Section IterLaws.
     setoid_rewrite H. auto.
   Admitted.
 
-      
+
   Global Instance IterDinatural_PropT {E} : IterDinatural (Kleisli (PropT E)) sum.
+  intros A B C f g.
+  split; [intros x y EQ | ]; split.
+  - intros H. repeat red. repeat red in H. setoid_rewrite <- EQ. clear EQ y.
+    destruct H as (STEP & FST & CONT).
+    repeat red in FST.
+    specialize (FST a 0).
+    edestruct FST as (ta & k & H_fa & H_step & H_cont). clear FST.
+    exists ta.
+    unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree in CONT.
+    rewrite unfold_iter in CONT. cbn in CONT.
+    rewrite Eq.bind_bind in CONT.
+    (* exists (fun bc => ITree.bind *)
+    (*             (match r with *)
+    (*                inl *)
+    (*             ) *)
+    (*   ) *)
+    (* bind t *)
+    (* exists *)
+    admit.
+  - admit.
+  - repeat red. intros. intuition.
+    repeat red. setoid_rewrite <- H. auto.
+    repeat red. setoid_rewrite H. auto.
+  - repeat red. intros. intuition.
+    repeat red. setoid_rewrite <- H. auto.
+    repeat red. setoid_rewrite H. auto.
   Admitted.
 
   Global Instance IterCodiagonal_PropT {E} :  IterCodiagonal (Kleisli (PropT E)) sum.
@@ -286,7 +602,6 @@ Section MonadLaws.
       rewrite EQ. rewrite <- H. reflexivity.
       econstructor 3; [rewrite EQ, H; reflexivity | apply IHHRet; reflexivity].
   Qed.
-
 
 
   Definition EqM_PropT' {E} : EqM (PropT E) :=
@@ -329,7 +644,7 @@ Section MonadLaws.
   Proof.
     intros.  eapply Returns_Ret_. 2: eassumption. reflexivity.
   Qed.
-    
+
   Lemma ret_bind: forall {E} (a b : Type) (f : a -> PropT E b) (x : a),
       eutt_closed (f x) ->
       eqm (bind (ret x) f) (f x).
@@ -475,34 +790,6 @@ Section MonadLaws.
       econstructor; eauto with paco.
     Qed.
 
-    Lemma eqit_bind_Returns_inv {E} {R S T} (RS : R -> S -> Prop) 
-          (t : itree E T)  (k1: T -> itree E R) (k2 : T -> itree E S) :
-      (eutt RS  (ITree.bind t k1) (ITree.bind t k2)) ->
-      (forall r, Returns r t -> eutt RS (k1 r) (k2 r)).
-    Proof.
-      intros EQIT r HRET.
-      revert R S RS k1 k2 EQIT.
-      induction HRET; intros.
-      - rewrite H in EQIT.
-        do 2 rewrite Eq.bind_ret_l in EQIT.
-        assumption.
-      - rewrite tau_eutt in H. rewrite H in EQIT.
-        eapply IHHRET; eauto.
-      - rewrite H in EQIT.
-        do 2 rewrite Eq.bind_vis in EQIT.
-        repeat red in EQIT. punfold EQIT.
-        inversion EQIT.
-        apply inj_pair2 in H2.
-        apply inj_pair2 in H3.
-        apply inj_pair2 in H4.
-        apply inj_pair2 in H5.
-        subst.
-        eapply IHHRET.
-        specialize (REL x).
-        red in REL.
-        pclearbot.
-        apply REL.
-    Qed.
 
    Global Instance bind_PropT_Proper {E} {A B} :
      Proper (eqm ==> (eq ==> eqm) ==> eutt eq ==> iff) (@bind_PropT E A B).
