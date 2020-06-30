@@ -31,6 +31,8 @@ Proof.
   repeat intro; auto.
 Qed.
 
+
+
 (* YZ: The following is unlikely to be useful I believe. *)
 (*
 Inductive refine_dvalue: dvalue -> dvalue -> Prop :=
@@ -45,7 +47,7 @@ Proof.
 Qed.
  *)
 
-Infix "×" := prod_rel (at level 90, left associativity).
+Infix"×" := prod_rel (at level 90, left associativity).
 
 Definition TT {A} : relation A := fun _ _ => True.
 

@@ -4,6 +4,7 @@ From ITree Require Import
      Events.State
      Events.StateFacts
      InterpFacts
+     KTreeFacts
      Eq.Eq.
 
 (* YZ TODO : Revisit the dependency w.r.t. Refinement *)
@@ -91,32 +92,104 @@ Proof.
   eapply subrelation_prod_left. apply subrelation_R_TT. all: apply PR.
 Qed.
 
-(* Instance interp_prop_Proper : *)
-(*   forall R E F G (t : itree (E +' G) R) (RR : relation R) (h : (E +' F +' G) ~> PropT.PropT (itree (E +' G))), *)
-(*     Proper (@eutt (E +' F +' G) _ _ RR ==> iff) (fun t' => @PropT.interp_prop (E +' F +' G) _ _ _ _ h _ t' t). *)
-(* Proof. *)
-(*   intros R E F G t RR h. *)
-(*   intros t1 t2 Heutt. *)
-(*   unfold PropT.PropT in h. unfold Ensembles.Ensemble in h. *)
-(* Admitted. *)
+(*  SAZ: Unfortunately it doesn't look this this version of 
+    Proper for interp_prop can be proved.  The problem is that 
+    we need the RR parameter for the Proper instance  because it is instantiated with 
+    the refinement relation in the refine_34 and refine_45 lemmas
+    This is fine, except that the definition of iter_PropT that we use
+    bakes in a use of [eutt eq]   
 
-(* This formulation should be easier to use *)
-Instance interp_prop_Proper :
-  forall R E F (RR : relation R) (h : E ~> PropT F),
-    Proper (@eutt _ _ _ RR ==> eq ==> Basics.impl) (@interp_prop E _ h R).
+  Global Polymorphic Instance MonadIter_Prop {E} : MonadIter (PropT E) :=
+    fun R I (step : I -> PropT E (I + R)) i =>
+      fun (r : itree E R) =>
+        (exists step' : I -> itree E (I + R)%type,
+            (* How do we state that something is out of bounds? *)
+            (forall j, step j (step' j)) /\
+            CategoryOps.iter step' i ≈ r).   (* <---- eutt eq used here, but "should" be eutt RR *)
+
+    We can't parameterize the definition above by RR because the type of 
+    iter is too polymorphic -- there's no way to pass in the RR instance 
+    we need.
+
+    What are the alternatives?
+     - somehow define specialized versions of interp_prop ?  (maybe without using interp?)
+     - somehow avoid using the MonadIter typeclass?
+
+
+
+ *)
+Lemma eutt_iter'' {E I1 I2 R1 R2}
+      (RI1 RI2 : I1 -> I2 -> Prop)
+      (HSUB: RI2 <2= RI1)
+      (RR : R1 -> R2 -> Prop)
+      (body1 : I1 -> itree E (I1 + R1))
+      (body2 : I2 -> itree E (I2 + R2))
+      (eutt_body
+       : forall j1 j2, RI1 j1 j2 -> eutt (sum_rel RI2 RR) (body1 j1) (body2 j2))
+  : forall (i1 : I1) (i2 : I2) (RI_i : RI1 i1 i2),
+    @eutt E _ _ RR (ITree.iter body1 i1) (ITree.iter body2 i2).
 Proof.
-  intros R E F RR h.
-  unfold interp_prop.
-  intros t1 t2 Heutt.
-  red.
-  unfold impl.
-  intros x y H H0. subst.
-  unfold interp, Basics.iter, MonadIter_Prop.
-  unfold iter. 
-  eexists.  split.
-  (* SAZ: I'm not sure this a very usable definition of iter_prop. *)
-  (* We need either an induction or coinduction principle... *)
-Admitted.
+  einit. ecofix CIH. intros.
+  specialize (eutt_body i1 i2 RI_i).
+  do 2 rewrite unfold_iter.
+  ebind; econstructor; eauto with paco.
+  intros ? ? [].
+  - etau.
+  - eauto with paco.
+Qed.
+
+Definition eutt_iter_gen' {F A B R1 R2 S} (HS : R2 <2= R1) :
+  @Proper ((A -> itree F (A + B)) -> A -> itree F B)
+          ((R1 ==> eutt (sum_rel R2 S)) ==> R1 ==> (eutt S))
+          (iter (C := ktree F)).
+Proof.
+  do 3 red;
+  intros body1 body2 EQ_BODY x y Hxy. red in EQ_BODY.
+  eapply eutt_iter''; eauto.
+Qed.
+
+Instance interp_prop_Proper :
+  forall R E F (RR : R -> R -> Prop) (HR : Reflexive RR) (h : E ~> PropT F),
+    Proper (@eutt _ _ _ RR ==> eq ==> Basics.impl) (@interp_prop E _ h R RR).
+Proof.
+  intros.
+  do 5 red.
+  intros t1 t2 eqt s' s eqs HI.
+  subst.
+  unfold interp_prop, interp in HI. red in HI.
+  destruct HI as (step & HP & Hb & HE). 
+  exists step. split; auto. split; auto.
+
+  unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree in *.
+
+  rewrite <- HE.
+  symmetry. clear HE.
+
+  do 2 rewrite unfold_iter. unfold ITree._iter.
+  do 2 red in HP.
+
+  assert (((eutt eq) : itree E R -> _ -> Prop) <2= eutt RR) as SUB.
+  { intros. eapply eqit_mon with (RR0 := eq); eauto. intros. subst. reflexivity. }
+
+  eapply eutt_clo_bind with (UU := sum_rel (eutt RR) eq).
+
+  2 : {
+    intros.
+    inversion H.
+    - rewrite tau_eutt. rewrite tau_eutt.
+      About eutt_iter_gen'.
+      specialize (@eutt_iter_gen' F (itree E R) R (eutt RR) (eutt eq) eq SUB step step) as HX.
+      apply HX. red. intros. 
+      eapply eqit_mon with (RR0:=(sum_rel (eutt eq) eq)); eauto.
+      apply HP. assumption. assumption.
+    - subst. reflexivity.
+  }
+
+  eapply eqit_mon with (RR0 := (sum_rel (eutt eq) eq)); eauto.
+  - intros. inversion PR. left. apply SUB. assumption. right. assumption.
+  - apply HP. assumption.
+Qed.  
+
 
 Hint Unfold TT : core.
 Instance TT_equiv :
@@ -155,27 +228,28 @@ Qed.
 
 (* Things are different for L4 and L5: we get into the [Prop] monad. *)
 Lemma refine_34 : forall t1 t2,
-    refine_L3 t1 t2 -> refine_L4 (model_undef t1) (model_undef t2).
+    refine_L3 t1 t2 -> refine_L4 (model_undef refine_res3 t1) (model_undef refine_res3 t2).
 Proof.
   intros t1 t2 H t Ht.
   exists t; split.
   - unfold model_undef in *.
     unfold L3 in *.
-    match goal with |- PropT.interp_prop ?x _ _ _ => remember x as h end.
-    eapply interp_prop_Proper; eauto.
+    match goal with |- PropT.interp_prop ?x _ _ _ _ => remember x as h end.
+    eapply interp_prop_Proper; eauto.  typeclasses eauto.
   - reflexivity.
 Qed.
 
+
 Lemma refine_45 : forall Pt1 Pt2,
-    refine_L4 Pt1 Pt2 -> refine_L5 (model_UB Pt1) (model_UB Pt2).
+    refine_L4 Pt1 Pt2 -> refine_L5 (model_UB refine_res3 Pt1) (model_UB refine_res3 Pt2).
 Proof.
   intros Pt1 Pt2 HR t2 HM.
   exists t2; split; [| reflexivity].
   destruct HM as (t2' & HPt2 & HPT2).
   apply HR in HPt2; destruct HPt2 as (t1' & HPt1 & HPT1).
   exists t1'; split; auto.
-  match type of HPT2 with | PropT.interp_prop ?h' ?t _ _ => remember h' as h end.
-  eapply interp_prop_Proper; eauto.
+  match type of HPT2 with | PropT.interp_prop ?h' ?t _ _ _ => remember h' as h end.
+  eapply interp_prop_Proper; eauto. typeclasses eauto.
 Qed.
 
 Section TopLevelInputs.
@@ -205,11 +279,11 @@ Definition model_to_L3 (prog: mcfg dtyp) :=
 
 Definition model_to_L4 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L4 user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
+  interp_to_L4 refine_res3 user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
 
 Definition model_to_L5 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L5 user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
+  interp_to_L5 refine_res3 user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
 
 (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -298,12 +372,23 @@ Definition handler_correct {E F} (h_spec: E ~> PropT F) (h: E ~> itree F) :=
 Lemma interp_prop_correct_exec:
   forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),
     handler_correct h_spec h ->
-    forall R t, interp_prop h_spec R t (interp h t).
+    forall R RR `{Reflexive _ RR} t, interp_prop h_spec R RR t (interp h t).
 Proof.
   intros.
-  eexists; split. 2: { (* SAZ: Not sure why [reflexivity] isn't enough here *)
-                         unfold interp. unfold iter, Iter_Kleisli. reflexivity. }
-  intros t'.
+  eexists; split; [| split].
+  3: {  unfold interp. unfold iter, Iter_Kleisli. reflexivity. }
+  - do 2 red.
+
+    ginit.
+    gcofix CIH.
+    intros.
+    punfold H2. red in H2.
+    destruct (observe x).
+    + destruct (observe y).
+      * inversion H2. subst. gstep. red.  econstructor. 
+
+    
+  - intros t'.    
   destruct (observe t') eqn:EQ; cbn; rewrite EQ; try reflexivity.
   exists (h _ e); auto.
 Qed.
@@ -333,9 +418,9 @@ Qed.
 
 
 Definition prop_compose :=
-  fun {F G : Type -> Type } {T : Type}
+  fun {F G : Type -> Type } {T : Type} (TT : relation T)
     (g_spec : F ~> PropT G) (PF: PropT F T) (g:itree G T) =>
-    exists f : itree F T, PF f /\ (interp_prop g_spec) T f g.
+    exists f : itree F T, PF f /\ (interp_prop g_spec) T TT f g.
 
 (* Level 5 interpreter Prop to Prop *)
 (* h_spec is the PickHandler *)
@@ -344,8 +429,8 @@ Definition handler_correct_prop
            (h_spec: E ~> PropT F) (h: E ~> itree F)
            (g_spec: F ~> PropT G) (g: F ~> itree G)
   :=
-    (forall T e,
-        (prop_compose g_spec (h_spec T e))
+    (forall T TT e,
+        (prop_compose TT g_spec (h_spec T e))
           (interp g (h T e))).
 
 
@@ -388,12 +473,12 @@ Abort.
 *)  
 
 Lemma refine_UB
-  : forall E F `{LLVMEvents.FailureE -< E +' F} T
+  : forall E F `{LLVMEvents.FailureE -< E +' F} T TT (HR: Reflexive TT)
                       (x : _ -> Prop)
                       (y : itree (E +' LLVMEvents.UBE +' F) T),
-      x y -> model_UB x (exec_UB y).
+      x y -> model_UB TT x (exec_UB y).
   Proof.
-    intros E F H T x y H0.
+    intros E F H T TT HR x y H0.
     unfold model_UB. unfold exec_UB.
     exists y. split. assumption.
     apply interp_prop_correct_exec.
@@ -403,6 +488,7 @@ Lemma refine_UB
     apply case_prop_handler_correct.
     apply UB_handler_correct.
     unfold handler_correct. intros. reflexivity.
+    assumption.
 Qed.
 
 Lemma Pick_handler_correct :
@@ -418,11 +504,11 @@ Proof.
 Qed.
   
 Lemma refine_undef
-  : forall (E F:Type -> Type) T  `{LLVMEvents.UBE -< F} `{LLVMEvents.FailureE -< F}
+  : forall (E F:Type -> Type) T TT (HR: Reflexive TT)  `{LLVMEvents.UBE -< F} `{LLVMEvents.FailureE -< F}
                       (x : itree _ T),
-      model_undef x (@exec_undef E F _ _ _ x).
+      model_undef TT x (@exec_undef E F _ _ _ x).
 Proof.
-  intros E F H H0 T x.
+  intros E F H H0 T TT HR x.
   cbn in *.
   unfold model_undef.
   unfold exec_undef.
@@ -433,6 +519,7 @@ Proof.
   apply Pick_handler_correct.
 
   unfold handler_correct. intros. reflexivity.
+  assumption.
 Qed.
 
 (**
@@ -446,8 +533,8 @@ Proof.
   unfold interpreter, interpreter_user.
   unfold interp_to_L5.
   unfold interp_to_L5_exec.
-  apply refine_UB. 
-  apply refine_undef.
+  apply refine_UB.  auto.
+  apply refine_undef. auto.
 Qed.
   
 (**
@@ -507,8 +594,8 @@ Definition interp_cfg {R: Type} (trace: itree instr_E R) g l m :=
   let L1_trace       := interp_global uvalue_trace g in
   let L2_trace       := interp_local L1_trace l in
   let L3_trace       := interp_memory L2_trace m in
-  let L4_trace       := model_undef L3_trace in
-  let L5_trace       := model_UB L4_trace in
+  let L4_trace       := model_undef Logic.eq L3_trace in
+  let L5_trace       := model_UB Logic.eq L4_trace in
   L5_trace.
 
 Definition model_to_L5_cfg (prog: cfg dtyp) :=

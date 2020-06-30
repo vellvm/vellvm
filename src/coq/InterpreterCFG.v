@@ -10,7 +10,8 @@ From Vellvm Require Import
      LLVMEvents
      Util
      DynamicTypes
-     Handlers.Handlers.
+     Handlers.Handlers
+     Refinement.
 
 Section InterpreterCFG.
 
@@ -46,21 +47,21 @@ Section InterpreterCFG.
     let L3_trace       := interp_memory L2_trace m in
     L3_trace.
 
-  Definition interp_cfg_to_L4 {R} user_intrinsics (t: itree instr_E R) (g: global_env) (l: local_env) (m: memory_stack) :=
+  Definition interp_cfg_to_L4 {R} RR user_intrinsics (t: itree instr_E R) (g: global_env) (l: local_env) (m: memory_stack) :=
     let L0_trace       := interp_intrinsics user_intrinsics t in
     let L1_trace       := interp_global L0_trace g in
     let L2_trace       := interp_local L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
-    let L4_trace       := model_undef L3_trace in
+    let L4_trace       := model_undef RR L3_trace in
     L4_trace.
 
-  Definition interp_cfg_to_L5 {R} user_intrinsics (t: itree instr_E R) (g: global_env) (l: local_env) (m: memory_stack) :=
+  Definition interp_cfg_to_L5 {R} RR user_intrinsics (t: itree instr_E R) (g: global_env) (l: local_env) (m: memory_stack) :=
     let L0_trace       := interp_intrinsics user_intrinsics t in
     let L1_trace       := interp_global L0_trace g in
     let L2_trace       := interp_local L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
-    let L4_trace       := model_undef L3_trace in
-    model_UB L4_trace.
+    let L4_trace       := model_undef RR L3_trace in
+    model_UB RR L4_trace.
 
   Lemma interp_cfg_to_L1_bind :
     forall ui {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g, 

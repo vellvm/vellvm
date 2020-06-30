@@ -1,3 +1,4 @@
+
 From Coq Require Import Ensembles Setoid Morphisms RelationClasses Logic.Classical_Prop.
 
 From ExtLib Require Import
@@ -22,6 +23,15 @@ Section PropMonad.
   Definition PropT (E: Type -> Type) (X: Type): Type :=
     itree E X -> Prop.
 
+  Definition eutt_closed {E X} (P: itree E X -> Prop): Prop :=
+    Proper (eutt eq ==> iff) P.
+
+  Global Polymorphic Instance EqM_PropT {E} : EqM (PropT E) :=
+    fun a PA PA' =>
+      (forall x y, x ≈ y -> (PA x <-> PA' y)) /\
+      eutt_closed PA /\ eutt_closed PA'.
+
+  
   Global Instance Functor_Prop {E}
     : Functor (PropT E) :=
     {| fmap := fun A B f PA b => exists (a: itree E A), PA a /\ b = fmap f a |}.
@@ -50,14 +60,6 @@ Section PropMonad.
         (forall a, Returns a ta -> K a (k a)).
 
 
-  
-  (* BOGUS "CAST" to test hypotheses in bind_bind *)
-  Lemma bind_PropT_bind_PropT_stronger {E}:
-    forall A B PA K (tb : itree E B), bind_PropT A B PA K tb <-> bind_PropT_stronger A B PA K tb.
-  Proof.
-  Admitted.
-
-  
   Definition bind_PropT' {E} := 
     fun A B (PA: PropT E A) (K: A -> PropT E B) (tb: itree E B) =>
       exists (ta: itree E A),  PA ta /\
@@ -102,59 +104,30 @@ Section PropMonad.
       ; bind := bind_PropT
     |}.
 
-  Inductive iter_Prop {R I : Type} (step : I -> I + R -> Prop) (i : I) (r : R)
-    : Prop :=
-  | iter_done'
-    : step i (inr r) -> iter_Prop step i r
-  | iter_step' i'
-    : step i (inl i') ->
-      iter_Prop step i' r ->
-      iter_Prop step i r
-  .
-
-  (* Definition _iter {E : Type -> Type} {R I : Type} *)
-  (*           (tau : _) *)
-  (*           (iter_ : I -> itree E R) *)
-  (*           (step_i : I + R) : itree E R := *)
-  (*   match step_i with *)
-  (*   | inl i => tau (iter_ i) *)
-  (*   | inr r => Ret r *)
-  (*   end. *)
-
-  (* Definition iter {E : Type -> Type} {R I: Type} *)
-  (*           (step : I -> itree E (I + R)) : I -> itree E R := *)
-  (*   cofix iter_ i := bind (step i) (_iter (fun t => Tau t) iter_). *)
-
-  Definition _iter {E : Type -> Type} {R I : Type}
-             (iter_ : I -> PropT E R)
-             (step_i : I + R) (r : itree E R) : Prop :=
-    match step_i with
-    | inl i => iter_ i r
-    | inr x => True
-    end.
-
-  (* Definition iter {E : Type -> Type} {R I : Type} *)
-  (*            (step : I -> PropT E (I + R)) : I -> PropT E R := *)
-  (*   cofix iter_ i := bind (step i) (_iter iter_). *)
-
-
-  (* CoInductive iter_PropT {E} {R I : Type} *)
-  (*           (step : I -> PropT E (I + R)) (i : I) (r : itree E R) : Prop := *)
-  (* | iter_done : forall (step' : I -> itree E (I + R)), *)
-  (*               (step i) (step' i) -> *)
-  (*               iter_PropT step i r. *)
 
   (* SAZ: maybe define directly by coinduction  *)
-  Global Polymorphic Instance MonadIter_Prop {E} : MonadIter (PropT E) :=
-    fun R I (step : I -> PropT E (I + R)) i =>
-      fun (r : itree E R) =>
-        (exists step' : I -> itree E (I + R)%type,
+  Definition MonadIter_Prop_itree {E F} :=
+    fun R (RR: relation R) (step : itree E R -> PropT F (itree E R + R)) i =>
+      fun (r : itree F R) =>
+        (exists step' : itree E R  -> itree F (itree E R + R)%type,
+            (Proper(eutt RR ==> (eutt (sum_rel (eutt eq) eq))) step') /\
             (* How do we state that something is out of bounds? *)
             (forall j, step j (step' j)) /\
-            CategoryOps.iter step' i ≈ r).
+            eutt eq (CategoryOps.iter step' i) r).
 
+
+  Definition interp_PropT {E F : Type -> Type} (h : E ~> PropT F) :
+  forall R (RR: relation R), itree E R -> PropT F R := fun R RR =>
+  MonadIter_Prop_itree _ RR (fun t =>
+    match observe t with
+    | RetF r => ret (inr r)
+    | TauF t => ret (inl t)
+    | VisF e k => fmap (fun x => inl (k x)) (h _ e)
+    end).
+
+  
   Definition interp_prop {E F} (h : E ~> PropT F) :
-    itree E ~> PropT F := interp h.
+    forall R (RR: relation R), itree E R -> PropT F R := interp_PropT h.
 
   Definition singletonT {E}: itree E ~> PropT E :=
     fun R t t' => t' ≈ t.
@@ -206,13 +179,6 @@ Section IterLaws.
       rewrite <- itree_eta. reflexivity.
   Admitted.
 
-  Definition eutt_closed {E X} (P: itree E X -> Prop): Prop :=
-    Proper (eutt eq ==> iff) P.
-
-  Global Polymorphic Instance EqM_PropT {E} : EqM (PropT E) :=
-    fun a PA PA' =>
-      (forall x y, x ≈ y -> (PA x <-> PA' y)) /\
-      eutt_closed PA /\ eutt_closed PA'.
 
   Ltac simpl_iter :=
       unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree.
@@ -220,6 +186,7 @@ Section IterLaws.
   Import MonadNotation.
   Local Open Scope monad_scope.
 
+  (*
   Global Instance IterUnfold_PropT {E} : IterUnfold (Kleisli (PropT E)) sum.
     intros A B Pstep a.
     repeat red. split; [ intros x y EQ | ]; split.
@@ -298,7 +265,7 @@ Section IterLaws.
 
   Global Instance IterCodiagonal_PropT {E} :  IterCodiagonal (Kleisli (PropT E)) sum.
   Admitted.
-
+*)
 
 End IterLaws.  
 

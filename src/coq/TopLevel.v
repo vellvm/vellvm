@@ -232,7 +232,7 @@ Import D IS.
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L5 (memory_stack * (local_env * lstack * (global_env * uvalue))) :=
     let t := denote_vellvm ret_typ entry args (mcfg_of_tle prog) in
-    interp_to_L5 user_intrinsics t [] ([],[]) empty_memory_stack. 
+    interp_to_L5 Logic.eq user_intrinsics t [] ([],[]) empty_memory_stack. 
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics.

@@ -85,7 +85,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         fun R e => fun t => t = r <- trigger e ;; ret r.
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
-        itree (E +' PickE +' F) ~> PropT (E +' F) :=
+        forall (T:Type) (RR: T -> T -> Prop), itree (E +' PickE +' F) T -> PropT (E +' F) T :=
         interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)).
 
     End PARAMS_MODEL.
