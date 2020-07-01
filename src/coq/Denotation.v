@@ -827,12 +827,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | i::c => denote_instr i;; denote_code c
         end.
 
-      (* A block ends with a terminator, it either jumps to another block,
-         or returns a dynamic value *)
-      Definition denote_block (b: block dtyp) : itree instr_E (block_id + uvalue) :=
-        denote_code (blk_code b);;
-        translate exp_E_to_instr_E (denote_terminator (snd (blk_term b))).
-
       (* YZ FIX: no need to push/pop, but do all the assignments afterward *)
       (* One needs to be careful when denoting phi-nodes: they all must
          be evaluated in the same environment.
@@ -850,6 +844,146 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           uv <- denote_exp (Some dt) op ;;
           ret (id,uv)
         | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
+        end.
+
+      Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp)): itree instr_E unit :=
+        dvs <- Util.map_monad
+                (fun x => translate exp_E_to_instr_E (denote_phi bid_from x))
+                phis;;
+        Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
+        ret tt.
+
+      (* A block ends with a terminator, it either jumps to another block,
+         or returns a dynamic value *)
+      Definition denote_block (b: block dtyp) : itree instr_E (block_id + uvalue) :=
+        'bid_from <- trigger ComeFrom;;
+        denote_phis bid_from (blk_phis b);;
+        denote_code (blk_code b);;
+        translate exp_E_to_instr_E (denote_terminator (snd (blk_term b))).
+
+      (* This function denotes _some_ notion of open cfg: it takes a list of blocks and denote them
+         in such a way that the denotation of a full cfg can be defined by instantiating it over the
+         list of all blocks in the cfg, and its entry point as argument.
+         It is however not a properly compositional way to do so. Abstracting away a little bit,
+         the function is the following:
+
+         [|bks|] = loop (fun bid =>
+                     if bid ∈ (ids bks)                       (* over ids of blocks considered, we evaluate the block *)
+                     then bov <- [|bks[bid]|]
+                          match bov with
+                          | inr v    => ret (inr (inr v))     (* if it returns, we terminate *)
+                          | inl bid' => ret (inl bid')        (* otherwise we _always_ feed it back to the loop *)
+                     else               ret (inr (inl bid))   (* over ids of blocks not considered, it's the id, we return it immediately *)
+                     )
+
+         Intuitively, this means that we tie the recursive knot over all available blocks greedily. In order to be able to define combinators,
+         we need to be a bit more subtle, in the style of [Asm].
+         This branch plans to do such an extension. The current plan is the following:
+
+         Let (Domain := list block_id) and bks be a list of blocks,
+         We want the denotation to take two domain parameters as arguments: ([|bks|] A B) corresponds
+         to the denotation of bks where one can only enter the subcfg through one of the labels provided
+         in A, and do not loop back from a label described in B (or from the opposite perspective,
+         B are the possibly returned labels).
+         Define dom(bks) := {l | l ∈ map blk_id bks}
+         Define codom(bks) := {l | l ∈ map blk_term bks}
+         Compared to Asm, we try a slightly less typed approach: instead of defining the
+         domain of the denotation function itself as A, we have it as a total function over
+         label ids, and maintain invariants instead.
+         Assume the following invariants:
+         A ⊆ dom(bks)
+         B ⊆ codom(bks)
+         dom(bks) \ A ~~ codom(bks) \ B
+         Define I := cod(bks) \ B
+         Then it should be correct to redefine [|bks|] as follows:
+
+         [|bks|] A B = loop (fun bid =>
+                       if bid ∈ A                                 (* over ids in A, we evaluate the block *)
+                       then bov <- [|bks[bid]|]
+                          match bov with
+                          | inr v    => ret (inr (inr v))         (* if it returns, we terminate *)
+                          | inl bid' => if bid' ∈ B
+                                        then ret (inr (inr bid')) (* if we get something in B, we return *)
+                                        else ret (inl bid')       (* otherwise it's in I, hence we loop *)
+                       else             ret (inr (inl bid))       (* over ids of non-entry blocks, it's the id, we return it immediately (should we fail so that we only returns labels in B?) *)
+                     )
+
+        We should then be able to define and prove correct combinators of such open cfgs.
+
+       *)
+
+      Definition interface: Type := list block_id.
+      (* An open cfg is made of a list of blocks and two interface:
+         the set of blocks from which the open cfg can be entered,
+         and the set toward which it can exit.
+       *)
+      Record open_cfg: Type :=
+        {
+          bks: list (block dtyp);
+          inputs : interface;
+          outputs: interface
+        }.
+
+      Definition dom (ocfg: open_cfg): interface := List.map blk_id (bks ocfg).
+      Definition lbl_from_terminator {T} (t: terminator T): interface :=
+        match t with
+        | TERM_Br _ id1 id2 => [id1;id2]
+        | TERM_Br_1 id => [id]
+        | _ => []
+        end.
+      Definition codom (ocfg: open_cfg): interface :=
+        List.fold_left (fun acc block => app (lbl_from_terminator (snd (blk_term block))) acc) (bks ocfg) [].
+      Definition inb {A: Type} {eqa} {H: RelDec.RelDec eqa} (xs: list A) (x: A): bool :=
+        existsb (fun y => RelDec.rel_dec x y) xs.
+      Definition collect_blocks (ocfg: open_cfg) (i: interface): list (block dtyp) :=
+        List.filter (fun block => inb i (blk_id block)) (bks ocfg).
+
+      (* I moved back to denoting the phi-nodes on entry to the block.
+         To do so I use an extra event acting as an oracle feeding me where the control flow comes from.
+       *)
+      Definition denote_open_cfg (ocfg: open_cfg): block_id -> itree instr_E (block_id + uvalue) :=
+        loop (C := ktree _)
+             (fun (bid: block_id + block_id) =>
+                match bid with
+                | inl bid
+                | inr bid =>
+                  (* We only consider the inputs as valid entry point *)
+                  if inb (inputs ocfg) bid
+                  then
+                    match find_block DynamicTypes.dtyp (bks ocfg) bid with
+                    | None => ret (inr (inl bid)) (* This case should never happen for a well-formed open_cfg *)
+                    | Some block =>
+                      (* We denote the block considered *)
+                      bd <- denote_block block;;
+                      match bd with
+                      | inr dv => ret (inr (inr dv)) (* On value we return *)
+                      | inl bid_target =>
+                        (* On jumps, we recall where we come from via the [GoTo] event,
+                           and then return if we have found an exit point, otherwise we loop *)
+                        trigger (GoTo bid);;
+                        if inb (outputs ocfg) bid_target
+                        then ret (inr (inl bid_target))
+                        else ret (inl bid_target)
+                      end
+                    end
+                  else
+                    ret (inr (inl bid)) (* Trying to enter the open_cfg from a non-input label.
+                                           Should it be returned, or should it be failure?
+                                           i.e. is the denotation the identity over other labels,
+                                           or is it a partial function?
+                                         *)
+                end).
+
+      Definition denote_cfg' (f: cfg dtyp): itree instr_E uvalue :=
+        let ocfg :=
+            {| bks := (blks _ f);
+               inputs := [init _ f];
+               outputs := []
+            |} in
+        r <- denote_open_cfg ocfg (init _ f) ;;
+        match r with
+        | inl bid => raise ("Can't find block in denote_cfg " ++ to_string bid)
+        | inr uv  => ret uv
         end.
 
       Definition denote_bks (bks: list _): block_id -> itree instr_E (block_id + uvalue) :=
