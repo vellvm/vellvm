@@ -1731,7 +1731,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          this operation can never fail?  It doesn't return any status code...
        *)
 
-      (* TODO probably doesn't handle sizes correctly... *)
+      (* TODO probably doesn't handle sizes correctly...
+         IY: @Calvin (?) What is the meaning of this comment?
+       *)
       (** ** MemCopy
           Implementation of the [memcpy] intrinsics.
        *)
@@ -1745,6 +1747,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
           src_block <- trywith "memcpy src block not found" (get_logical_block_mem src_b m) ;;
           dst_block <- trywith "memcpy dst block not found" (get_logical_block_mem dst_b m) ;;
+
+          (* IY: TODO Add check: according to the specification, the block is
+             not allowed to overlap. *)
 
           let src_bytes
               := match src_block with
@@ -2025,6 +2030,15 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       rewrite Heq.
       reflexivity.
       apply IM.is_bst.
+    Qed.
+
+    Lemma get_logical_block_of_add_logical_block_mem :
+      forall (m0 : memory) (s : frame_stack) (key : Z) (lb : logical_block),
+        get_logical_block (add_logical_block_mem key lb m0, s) key = Some lb.
+    Proof.
+      intros. erewrite <- get_logical_block_of_add_logical_block.
+      unfold add_logical_block.
+      Unshelve. 3 : exact key. 2 : exact (m0, s). cbn. reflexivity.
     Qed.
 
     Lemma unsigned_I1_in_range : forall (x : DynamicValues.int1),
@@ -2967,6 +2981,63 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       (*     reflexivity. *)
       (*   - inversion Hwrite. *)
       (* Qed. *)
+
+      (* Note : For the current version of subevents, [interp_memory] must get
+        must have subevent clauses assumed in Context, or else the
+        [handle_intrinsic] handler will not get properly invoked. *)
+      Lemma interp_memory_intrinsic_memcpy :
+        forall (m : memory_stack) (dst src : Addr.addr) (i : nat)
+          len align volatile
+          (dst_val src_val : uvalue) (dτ : dtyp),
+        get_array_cell m dst i dτ = inr dst_val ->
+        get_array_cell m src i dτ = inr src_val ->
+        exists m' s,
+        (interp_memory (trigger (Intrinsic DTYPE_Void
+                    "llvm.memcpy.p0i8.p0i8.i32"
+                    [DVALUE_Addr dst; DVALUE_Addr src;
+                    DVALUE_I32 len;
+                    DVALUE_I32 align;
+                    DVALUE_I1 volatile])) m ≈ ret (m', s, DVALUE_None)) /\
+          read (m', s) dst dτ = inr src_val.
+      Proof.
+        intros m dst src i len align volatile dst_val src_val dτ MEM_dst MEM_src.
+        pose proof get_array_succeeds_allocated _ _ _ _ MEM_dst as ALLOC_dst.
+        pose proof get_array_succeeds_allocated _ _ _ _ MEM_src as ALLOC_src.
+        pose proof read_array_exists m
+            (Z.of_nat i) dτ i dst ALLOC_dst as RARRAY_dst.
+        pose proof read_array_exists m
+            (Z.of_nat i) dτ i src ALLOC_src as RARRAY_src.
+        destruct RARRAY_dst as (dst_ptr & GEP_dst & READ_dst).
+        destruct RARRAY_src as (src_ptr & GEP_src & READ_src).
+        - setoid_rewrite interp_memory_trigger.
+          unfold interp_memory_h.
+          cbn.
+          unfold resum, ReSum_id, id_, Id_IFun.
+          unfold handle_intrinsic. cbn.
+          destruct m.
+          destruct dst as (dst_base & dst_offset).
+          destruct src as (src_base & src_offset).
+          apply allocated_get_logical_block in ALLOC_dst.
+          apply allocated_get_logical_block in ALLOC_src.
+          destruct ALLOC_dst as (b_dst & LOG_BLOCK_dst).
+          destruct ALLOC_src as (b_src & LOG_BLOCK_src).
+          cbn in LOG_BLOCK_dst, LOG_BLOCK_src.
+          setoid_rewrite LOG_BLOCK_src. cbn. setoid_rewrite LOG_BLOCK_dst.
+          destruct b_src, b_dst.
+          exists (add_logical_block_mem dst_base
+          (LBlock size0
+              (add_all_index
+                (lookup_all_index src_offset
+                  (DynamicValues.Int32.unsigned len)
+                  bytes SUndef) dst_offset bytes0) concrete_id0) m).
+          exists f. split; try reflexivity.
+          unfold read. cbn.
+
+          rewrite get_logical_block_of_add_logical_block_mem.
+          rewrite <- MEM_src. cbn. rewrite LOG_BLOCK_src.
+          (* IY: Should be equivalent, but we need an invariant stating that
+             the memory locations do not overlap. *)
+      Admitted.
 
     End Structural_Lemmas.
 
