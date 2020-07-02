@@ -840,5 +840,3 @@ Qed.
 
 End Denotation.
 
-
-End TopLevelInputs.
