@@ -1027,6 +1027,8 @@ Class VInt I : Type :=
      These operations are between VInts, which are "vellvm"
      integers. This is a typeclass that wraps all of the integer
      operations that we use for integer types with different bitwidths.
+
+     SAZ: The "undef" here should refer to undefined behavior, not UVALUE_Undef, right?
      *)
     Definition eval_int_op {Int} `{VInt Int} (iop:ibinop) (x y: Int) : undef dvalue :=
       match iop with
@@ -1596,8 +1598,8 @@ Class VInt I : Type :=
   
   Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop := 
   (* Concrete uvalue are contretized into their singleton *)
-  | Pick_concrete             : forall uv dv, uvalue_to_dvalue uv = inr dv -> concretize_u uv (ret dv)
-  | Pick_fail                 : forall uv s, uvalue_to_dvalue uv = inl s  -> concretize_u uv (failwith s)
+  | Pick_concrete             : forall uv (dv : dvalue), uvalue_to_dvalue uv = inr dv -> concretize_u uv (ret dv)
+  | Pick_fail                 : forall uv s, uvalue_to_dvalue uv = inl s  -> concretize_u uv (lift (failwith s))
 
   (* Undef relates to all dvalue of the type *)
   | Concretize_Undef          : forall dt dv, dvalue_has_dtyp dv dt ->  concretize_u (UVALUE_Undef dt) (ret dv)

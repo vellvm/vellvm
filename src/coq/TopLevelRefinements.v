@@ -148,48 +148,148 @@ Proof.
   eapply eutt_iter''; eauto.
 Qed.
 
-Instance interp_prop_Proper :
-  forall R E F (RR : R -> R -> Prop) (HR : Reflexive RR) (h : E ~> PropT F),
-    Proper (@eutt _ _ _ RR ==> eq ==> Basics.impl) (@interp_prop E _ h R RR).
+
+Lemma transpose_transpose_id1 {A} (RR : relation A) : transpose (transpose RR) <2= RR.
+Proof. intros. unfold transpose in *. assumption.
+Qed.
+       
+Lemma transpose_transpose_id2 {A} (RR : relation A) : RR <2= transpose (transpose RR).
+Proof. intros. unfold transpose in *. assumption.
+Qed.
+       
+Lemma eutt_transpose_symmetric : forall
+  {E A} (RR : relation A) (t1 t2 : itree E A),
+    eutt RR t1 t2 <-> eutt (transpose RR) t2 t1.
+Proof.
+Admitted.
+
+Lemma transpose_eutt : forall
+  {E A} (RR : relation A) (t1 t2 : itree E A),
+    transpose (eutt RR) t1 t2 <-> eutt (transpose RR) t1 t2.
+Proof.
+Admitted.
+
+
+Lemma interp_prop_correct_exec:
+  forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),
+    handler_correct h_spec h ->
+    forall R RR `{Reflexive _ RR} t, interp_prop h_spec R RR t (interp h t).
+Proof.
+  intros.
+  exists h; split; auto. reflexivity.
+Qed.
+
+
+Lemma tau_eutt_RR_l : forall E R (RR : relation R) (HRR: Reflexive RR) (HRT: Transitive RR) (t s : itree E R),
+    eutt RR (Tau t) s <-> eutt RR t s.
+Proof.
+  intros.
+  split; intros H.
+  - eapply transitivity. 2 : { apply H. }
+    red. apply eqit_tauR. reflexivity.
+  - red. red. pstep. econstructor. auto. punfold H.
+Qed.  
+
+Lemma tau_eutt_RR_r : forall E R (RR : relation R) (HRR: Reflexive RR) (HRT: Transitive RR) (t s : itree E R),
+    eutt RR t (Tau s) <-> eutt RR t s.
+Proof.
+  intros.
+  split; intros H.
+  - eapply transitivity. apply H.
+    red. apply eqit_tauL. reflexivity.
+  - red. red. pstep. econstructor. auto. punfold H.
+Qed.  
+
+Lemma eutt_bind_RR : forall E X R (RR : relation R) (HRR: Reflexive RR) (HRT: Transitive RR)
+                       (t : itree E X) (k1 k2 : X -> itree E R) (s : itree E R),
+    eutt RR (bind t k1) s ->
+    forall x, eutt RR (k1 x) (k2 x) ->
+         eutt RR (bind t k2) s.
+Proof.
+  intros E X R RR HRR HRT t k1 k2 s Ht x Hk.
+Admitted.  
+
+
+Instance interp_prop_Proper_eq :
+  forall R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR) E F (h_spec : E ~> PropT F),
+    Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_prop E _ h_spec R RR).
 Proof.
   intros.
   do 5 red.
   intros t1 t2 eqt s' s eqs HI.
   subst.
   unfold interp_prop, interp in HI. red in HI.
-  destruct HI as (step & HP & Hb & HE). 
-  exists step. split; auto. split; auto.
 
+  destruct HI as (h & HC & HE).
+
+  exists h. split; auto.
+
+  eapply transitivity. 2 : { apply HE. } clear HE s.
+  
+  revert t1 t2 eqt.
+
+  ginit.
+  gcofix CIH.
+
+  intros.
+
+  unfold interp. 
   unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree in *.
+  do 2 rewrite unfold_iter.
 
-  rewrite <- HE.
-  symmetry. clear HE.
+  punfold eqt. red in eqt.
 
-  do 2 rewrite unfold_iter. unfold ITree._iter.
-  do 2 red in HP.
+  guclo eqit_clo_bind. apply Eq.pbc_intro_h with (RU := sum_rel (eutt RR) RR).
+  - genobs t1 obt1.
+    genobs t2 obt2.
 
-  assert (((eutt eq) : itree E R -> _ -> Prop) <2= eutt RR) as SUB.
-  { intros. eapply eqit_mon with (RR0 := eq); eauto. intros. subst. reflexivity. }
+    revert t1 t2 Heqobt1 Heqobt2.
 
-  eapply eutt_clo_bind with (UU := sum_rel (eutt RR) eq).
+    induction eqt; intros; cbn in *.
+    + pstep. red. econstructor. right. assumption.
+    + pstep. red. econstructor. left. pclearbot. pinversion REL.
+    + unfold ITree.map. eapply eutt_clo_bind with (UU := eq).
+      reflexivity.
+      intros; subst. pstep. red. econstructor.
+      left. specialize (REL u2). pclearbot. pinversion REL.
+    + admit.
+      (* Surprisingly, the case with a Tau on one side but not the other is the
+          hardest!  The problem is that the iterator used by interp runs a "no
+          op" loop when it hits the Tau case, which means that, even though two
+          computations might be eutt, they might unroll the loop a different
+          number of times. This proof strategy that I'm following here unrolls
+          both loops in parallel and expects their iterations to line up...
 
-  2 : {
-    intros.
+          This observation might mean that we need a different, more wholistic
+          approach to this proof... :-(
+       *)
+    + admit.
+  - intros.
+    cbn.
     inversion H.
-    - rewrite tau_eutt. rewrite tau_eutt.
-      specialize (@eutt_iter_gen' F (itree E R) R (eutt RR) (eutt eq) eq SUB step step) as HX.
-      apply HX. red. intros. 
-      eapply eqit_mon with (RR0:=(sum_rel (eutt eq) eq)); eauto.
-      apply HP. assumption. assumption.
-    - subst. reflexivity.
-  }
+    + cbn. gstep. red. econstructor.
+    change (ITree.iter
+          (fun t : itree (fun H : Type => E H) R =>
+           match observe t with
+           | RetF r0 => Ret (inr r0)
+           | TauF t0 => Ret (inl t0)
+           | @VisF _ _ _ X e k => ITree.map (fun x : X => inl (k x)) (h X e)
+           end) a1) with (interp h a1).
+    change (ITree.iter
+          (fun t : itree (fun H : Type => E H) R =>
+           match observe t with
+           | RetF r0 => Ret (inr r0)
+           | TauF t0 => Ret (inl t0)
+           | @VisF _ _ _ X e k => ITree.map (fun x : X => inl (k x)) (h X e)
+           end) a2) with (interp h a2).
+    gfinal. left.
+    apply CIH. assumption.
+    + cbn.
+      gstep. red. econstructor. assumption.
+Admitted.      
 
-  eapply eqit_mon with (RR0 := (sum_rel (eutt eq) eq)); eauto.
-  - intros. inversion PR. left. apply SUB. assumption. right. assumption.
-  - apply HP. assumption.
-Qed.  
-
-
+    
+  
 Hint Unfold TT : core.
 Instance TT_equiv :
   forall A, Equivalence (@TT A).
@@ -225,22 +325,32 @@ Proof.
   apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
 Qed.
 
+Lemma transpose_reflexive : forall {A} (RR : A -> A -> Prop) (HR : Reflexive RR), Reflexive (transpose RR).
+Proof.
+  intros. repeat red. apply HR.
+Qed.  
+
+
 (* Things are different for L4 and L5: we get into the [Prop] monad. *)
 Lemma refine_34 : forall t1 t2,
-    refine_L3 t1 t2 -> refine_L4 (model_undef refine_res3 t1) (model_undef refine_res3 t2).
+    refine_L3 t1 t2 -> refine_L4 (model_undef (transpose refine_res3) t1) (model_undef (transpose refine_res3) t2).
 Proof.
   intros t1 t2 H t Ht.
   exists t; split.
   - unfold model_undef in *.
     unfold L3 in *.
     match goal with |- PropT.interp_prop ?x _ _ _ _ => remember x as h end.
-    eapply interp_prop_Proper; eauto.  typeclasses eauto.
+    eapply interp_prop_Proper_eq in Ht.
+    apply Ht.
+    + apply transpose_reflexive. typeclasses eauto.
+    + admit. (* follows from transitivity of refine_res3 *)
+    + rewrite <- eutt_transpose_symmetric. assumption.
+    + reflexivity.
   - reflexivity.
-Qed.
-
+Admitted.
 
 Lemma refine_45 : forall Pt1 Pt2,
-    refine_L4 Pt1 Pt2 -> refine_L5 (model_UB refine_res3 Pt1) (model_UB refine_res3 Pt2).
+    refine_L4 Pt1 Pt2 -> refine_L5 (model_UB (transpose refine_res3) Pt1) (model_UB (transpose refine_res3) Pt2).
 Proof.
   intros Pt1 Pt2 HR t2 HM.
   exists t2; split; [| reflexivity].
@@ -248,8 +358,11 @@ Proof.
   apply HR in HPt2; destruct HPt2 as (t1' & HPt1 & HPT1).
   exists t1'; split; auto.
   match type of HPT2 with | PropT.interp_prop ?h' ?t _ _ _ => remember h' as h end.
-  eapply interp_prop_Proper; eauto. typeclasses eauto.
-Qed.
+  eapply interp_prop_Proper_eq with (RR := transpose (refine_res3)); eauto.
+  - apply transpose_reflexive. typeclasses eauto.
+  - admit. (* follows from transitivity of refine_res3 *)
+  - rewrite <- eutt_transpose_symmetric. assumption.
+Admitted.
 
 Section TopLevelInputs.
   Variable ret_typ : dtyp.
@@ -278,11 +391,11 @@ Definition model_to_L3 (prog: mcfg dtyp) :=
 
 Definition model_to_L4 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L4 refine_res3 user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
+  interp_to_L4 (transpose refine_res3) user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
 
 Definition model_to_L5 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L5 refine_res3 user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
+  interp_to_L5 (transpose refine_res3) user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
 
 (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -363,18 +476,10 @@ Ltac flatten_all :=
 (*     (forall e t, h _ e t -> h' _ e t) -> *)
 (*     forall t, interp_prop h _ t -> interp_prop h' _ t. *)
 
-
-Definition handler_correct {E F} (h_spec: E ~> PropT F) (h: E ~> itree F) :=
-    (forall T e, h_spec T e (h T e)).
-
   
-Lemma interp_prop_correct_exec:
-  forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),
-    handler_correct h_spec h ->
-    forall R RR `{Reflexive _ RR} t, interp_prop h_spec R RR t (interp h t).
-Proof.
-  intros.
-  eexists; split; [| split].
+    
+  
+(*  
   3: {  unfold interp. unfold iter, Iter_Kleisli. reflexivity. }
   - do 2 red.
 
@@ -386,7 +491,6 @@ Proof.
     + destruct (observe y).
       * inversion H2. subst. gstep. red.  econstructor. 
 Admitted.
-(*
   - intros t'.    
   destruct (observe t') eqn:EQ; cbn; rewrite EQ; try reflexivity.
   exists (h _ e); auto.

@@ -80,6 +80,7 @@ Open Scope Z_scope.
      - Failure                                        (FailureE)
      - Debugging                                      (DebugE)
 
+
     The exact interface used by each denotation function depends slightly on the object of consideration.
     Most specifically, three interfaces are used.
     - At the top level, in order to denote whole _VIR_ programs, we use the interface:

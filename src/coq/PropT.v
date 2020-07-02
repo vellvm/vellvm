@@ -115,19 +115,25 @@ Section PropMonad.
     |}.
 
 
+  Definition transpose {A} (RR : relation A) : relation A :=
+    fun x y => RR y x.
 
+  
   (* SAZ: maybe define directly by coinduction  *)
   Definition MonadIter_Prop_itree {E F} :=
     fun R (RR: relation R) (step : itree E R -> PropT F (itree E R + R)) i =>
       fun (r : itree F R) =>
         (exists step' : itree E R  -> itree F (itree E R + R)%type,
-            (Proper(eutt RR ==> (eutt (sum_rel (eutt eq) eq))) step') /\
+            (Proper(eutt (transpose RR) ==> (eutt (sum_rel (eutt eq) eq))) step') /\
             (* How do we state that something is out of bounds? *)
             (forall j, step j (step' j)) /\
             eutt eq (CategoryOps.iter step' i) r).
 
+  Definition handler_correct {E F} (h_spec: E ~> PropT F) (h: E ~> itree F) :=
+    (forall T e, h_spec T e (h T e)).
 
-  Definition interp_PropT {E F : Type -> Type} (h : E ~> PropT F) :
+
+  Definition interp_PropT' {E F : Type -> Type} (h : E ~> PropT F) :
   forall R (RR: relation R), itree E R -> PropT F R := fun R RR =>
   MonadIter_Prop_itree _ RR (fun t =>
     match observe t with
@@ -136,6 +142,11 @@ Section PropMonad.
     | VisF e k => fmap (fun x => inl (k x)) (h _ e)
     end).
 
+  Definition interp_PropT {E F : Type -> Type} (h_spec : E ~> PropT F) :
+    forall R (RR: relation R), itree E R -> PropT F R :=
+    fun R RR (t : itree E R) s =>
+      exists h, handler_correct h_spec h /\ eutt RR (interp h t) s.
+                                                     
   
   Definition interp_prop {E F} (h : E ~> PropT F) :
     forall R (RR: relation R), itree E R -> PropT F R := interp_PropT h.

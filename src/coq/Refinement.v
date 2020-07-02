@@ -12,6 +12,12 @@ From Vellvm Require Import
      LLVMAst
      Handlers.Handlers.
 
+From ExtLib Require Import
+     Structures.Monads
+     Data.Monads.EitherMonad
+     Structures.Functor.
+
+
 From Coq Require Import Relations RelationClasses.
 
 Module Make (A:MemoryAddress.ADDRESS)(LLVMEvents: LLVM_INTERACTIONS(A)).
@@ -20,9 +26,15 @@ Import LLVMEvents.
 Import DV.
 
 (* Refinement relation for uvalues *)
+(* SAZ: Which way is the RefineConcrete case supposed to go?  I'm expecting that the left-hand-side
+   must be "bigger" than the right-hand-side.  
+
+   Does this do the right thing with respect to uvalues that can raise undefined behavior?
+*)
 Inductive refine_uvalue: uvalue -> uvalue -> Prop :=
 | UndefPoison: forall t, refine_uvalue (UVALUE_Undef t) UVALUE_Poison (* CB / YZ: TODO, type for poison? *)
-| RefineConcrete: forall uv1 uv2, (forall dv, concretize uv1 dv -> concretize uv2 dv) -> refine_uvalue uv1 uv2
+| RefineConcrete: forall uv1 uv2, (forall (dv:dvalue), concretize uv2 dv -> concretize uv1  dv) -> refine_uvalue uv1 uv2
+| RefineUB : forall uv1 uv2 s, concretize_u uv1 (Error.failwith s) -> refine_uvalue uv1 uv2 
 .
 Hint Constructors refine_uvalue : core.
 
@@ -30,6 +42,14 @@ Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
 Proof.
   repeat intro; auto.
 Qed.
+
+(* SAZ: TODO -- try to prove this! *)
+Instance refine_uvalue_Transitive : Transitive refine_uvalue.
+Proof.
+Admitted.
+    
+    
+    
 
 
 
