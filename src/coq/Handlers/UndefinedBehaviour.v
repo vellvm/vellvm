@@ -28,9 +28,9 @@ Section PARAMS_MODEL.
     fun R e => fun t => t = r <- trigger e ;; ret r.
 
   Definition model_UB :
-    PropT (E +' UBE +' F) ~> PropT (E +' F) :=
-    fun T Pt t =>
-      exists t', Pt t' /\ interp_prop (case_ E_trigger_prop (case_ UB_handler F_trigger_prop)) _ t' t.
+    forall T (RR: T -> T -> Prop), PropT (E +' UBE +' F) T -> PropT (E +' F) T :=
+    fun T RR Pt t =>
+      exists t', Pt t' /\ (interp_prop (case_ E_trigger_prop (case_ UB_handler F_trigger_prop)) _ RR t' t).
 
 End PARAMS_MODEL.
 

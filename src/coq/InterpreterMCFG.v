@@ -42,21 +42,21 @@ Section InterpreterMCFG.
     let L3_trace       := interp_memory L2_trace m in
     L3_trace.
 
-  Definition interp_to_L4 {R} user_intrinsics (t: itree L0 R) g l m :=
+  Definition interp_to_L4 {R} RR user_intrinsics (t: itree L0 R) g l m :=
     let uvalue_trace   := interp_intrinsics user_intrinsics t in
     let L1_trace       := interp_global uvalue_trace g in
     let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
-    let L4_trace       := model_undef L3_trace in
+    let L4_trace       := model_undef RR L3_trace in
     L4_trace.
 
-  Definition interp_to_L5 {R} user_intrinsics (t: itree L0 R) g l m :=
+  Definition interp_to_L5 {R} RR user_intrinsics (t: itree L0 R) g l m :=
     let uvalue_trace   := interp_intrinsics user_intrinsics t in
     let L1_trace       := interp_global uvalue_trace g in
     let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
-    let L4_trace       := model_undef L3_trace in
-    model_UB L4_trace.
+    let L4_trace       := model_undef RR L3_trace in
+    model_UB RR L4_trace.
 
   (* The interpreter stray away from the model starting from the fourth layer: we pick an arbitrary valid path of execution *)
   Definition interp_to_L4_exec {R} user_intrinsics (t: itree L0 R) g l m :=
@@ -300,17 +300,17 @@ Ltac fold_L3 :=
 Ltac fold_L4 :=
   match goal with
     |- context[
-          model_undef
+          model_undef ?RR
             (interp_memory
                (interp_local_stack ?h
                                    (interp_global (interp_intrinsics ?ui ?p) ?g) ?l) ?m)] =>
-    replace (model_undef (interp_memory (interp_local_stack h (interp_global (interp_intrinsics ui p) g) l) m)) with
-    (interp_to_L4 ui p g l m) by reflexivity
+    replace (model_undef ?RR (interp_memory (interp_local_stack h (interp_global (interp_intrinsics ui p) g) l) m)) with
+    (interp_to_L4 RR ui p g l m) by reflexivity
   end.
 
 Ltac fold_L5 :=
   match goal with
-    |- context[model_UB (model_undef (interp_memory (interp_local_stack ?h (interp_global (interp_intrinsics ?ui ?p) ?g) ?l) ?m))] =>
-    replace (model_UB (model_undef (interp_memory (interp_local_stack h (interp_global (interp_intrinsics ui p) g) l) m))) with
-    (interp_to_L5 ui p g l m) by reflexivity
+    |- context[model_UB ?RR (model_undef (Logic.eq) (interp_memory (interp_local_stack ?h (interp_global (interp_intrinsics ?ui ?p) ?g) ?l) ?m))] =>
+    replace (model_UB ?RR (model_undef (Logic.eq) (interp_memory (interp_local_stack h (interp_global (interp_intrinsics ui p) g) l) m))) with
+    (interp_to_L5 RR ui p g l m) by reflexivity
   end.
