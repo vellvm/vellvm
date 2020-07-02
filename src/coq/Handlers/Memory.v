@@ -37,6 +37,7 @@ From Vellvm Require Import
      LLVMAst
      Util
      DynamicTypes
+     DynamicValues
      Denotation
      MemoryAddress
      LLVMEvents
@@ -3020,42 +3021,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       (*   - inversion Hwrite. *)
       (* Qed. *)
 
-    Lemma no_overlap_read :
-      forall dst_base src_base dτ dst_offset src_offset len
-        dst_bytes src_bytes i,
-       no_overlap (dst_base, dst_offset) (DynamicValues.Int32.unsigned len)
-         (src_base, src_offset) (DynamicValues.Int32.unsigned len) ->
-      (read_in_mem_block
-        (add_all_index
-            (lookup_all_index src_offset (DynamicValues.Int32.unsigned len)
-              src_bytes SUndef) dst_offset dst_bytes) dst_offset dτ) =
-      (read_in_mem_block src_bytes
-        (src_offset +
-         DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i))
-         * sizeof_dtyp dτ) dτ).
-    Proof.
-      intros dst_base src_base dτ dst_offset src_offset len
-             dst_bytes src_bytes i NO_OVERLAP.
-      unfold read_in_mem_block.
-      rewrite lookup_all_index_add_all_index_no_overlap.
-      2 : {
-        eapply sizeof_dvalue_pos.
-        admit.
-        (* dvalue_has_dtyp dv dτ*)
-      }
-      2 : {
-        unfold no_overlap in NO_OVERLAP. cbn in NO_OVERLAP.
-        destruct NO_OVERLAP. right.
-        admit.
-
-
-
-      Admitted.
-
-            (* interp_memory (trigger (GEP *)
-            (*                           (DTYPE_Array size t) *)
-            (*                           (DVALUE_Addr a) *)
-            (*                           [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat i))])) m *)
     From Vellvm Require Import DynamicValues.
       (* Note : For the current version of subevents, [interp_memory] must
         have subevent clauses assumed in Context, or else the
@@ -3065,7 +3030,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           (dst_val src_val : uvalue) (dτ : dtyp) volatile align,
         get_array_cell m dst i dτ = inr dst_val ->
         get_array_cell m src i dτ = inr src_val ->
-        no_overlap dst (Z.of_nat i) src (Z.of_nat i) ->
+        no_overlap dst (Int32.unsigned (Int32.repr (Z.of_nat i))) src
+                   (Int32.unsigned (Int32.repr (Z.of_nat i))) ->
         exists m' s,
         (interp_memory (trigger (Intrinsic DTYPE_Void
                     "llvm.memcpy.p0i8.p0i8.i32"
@@ -3106,11 +3072,23 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         assert (forall x y s, reflect (no_overlap x s y s) (no_overlap_b x s y s)).
         admit.
         eapply reflect_iff in H2. rewrite H2 in NO_OVERLAP. clear H2.
-        (* IY: Should be equivalent, but we need an invariant stating that
-            the memory locations do not overlap. *)
+        rewrite NO_OVERLAP.
+        exists (add_logical_block_mem dst_base
+         (LBlock dst_size
+            (add_all_index
+               (lookup_all_index src_offset
+                  (Int32.unsigned (Int32.repr (Z.of_nat i))) src_bytes SUndef)
+               dst_offset dst_bytes) dst_concrete_id) m).
+        exists f. split; try reflexivity.
+        rewrite <- MEM_src. unfold get_array_cell. rewrite LOG_BLOCK_src.
+        cbn. unfold read. cbn.
+        setoid_rewrite get_logical_block_of_add_logical_block_mem.
+        cbn.
+        unfold read_in_mem_block.
 
-        (* (add_all_index (lookup_all_index src_offset size src_bytes SUndef) dst_offset dst_bytes) *)
-        (* setoid_rewrite lookup_add_all_index_out.  *)
+        (* IY : SOS @ CALVIN (bless) *)
+        (* IY: Should be equivalent, but how do we show this? *)
+
 
     Admitted.
 
