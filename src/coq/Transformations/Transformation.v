@@ -14,8 +14,8 @@ From Coq Require Export
 Import R.
 
 Definition transformation := mcfg dtyp -> mcfg dtyp.
-
+About refine_mcfg.
 Definition transformation_correct (T: transformation): Prop :=
-  forall ret_typ entry args p, refine_mcfg ret_typ entry args nil p (T p).
+  forall m, refine_mcfg m (T m).
 
 

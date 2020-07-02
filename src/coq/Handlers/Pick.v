@@ -85,7 +85,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         fun R e => fun t => t = r <- trigger e ;; ret r.
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
-        itree (E +' PickE +' F) ~> PropT (E +' F) :=
+        forall (T:Type) (RR: T -> T -> Prop), itree (E +' PickE +' F) T -> PropT (E +' F) T :=
         interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)).
 
     End PARAMS_MODEL.
@@ -100,14 +100,11 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     Fixpoint default_dvalue_of_dtyp (dt : dtyp) : dvalue :=
       match dt with
       | DTYPE_I sz =>
-        (* CB TODO: better way? *)
-        match sz with
-        | 1  => DVALUE_I1 (repr 0)
-        | 8  => DVALUE_I8 (repr 0)
-        | 32 => DVALUE_I32 (repr 0)
-        | 64 => DVALUE_I64 (repr 0)
-        | _  => DVALUE_None
-        end
+            (if (sz =? 64) then DVALUE_I64 (repr 0)
+             else if (sz =? 32) then DVALUE_I32 (repr 0)
+                  else if (sz =? 8) then DVALUE_I8 (repr 0)
+                       else if (sz =? 1) then DVALUE_I1 (repr 0)
+                            else DVALUE_None) 
       | DTYPE_Pointer => DVALUE_Addr A.null
       | DTYPE_Void => DVALUE_None
       | DTYPE_Half => DVALUE_Float Float32.zero (* ??? *)

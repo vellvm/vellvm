@@ -12,6 +12,12 @@ From Vellvm Require Import
      LLVMAst
      Handlers.Handlers.
 
+From ExtLib Require Import
+     Structures.Monads
+     Data.Monads.EitherMonad
+     Structures.Functor.
+
+
 From Coq Require Import Relations RelationClasses.
 
 Module Make (A:MemoryAddress.ADDRESS)(LLVMEvents: LLVM_INTERACTIONS(A)).
@@ -20,16 +26,47 @@ Import LLVMEvents.
 Import DV.
 
 (* Refinement relation for uvalues *)
-Inductive refine_uvalue: uvalue -> uvalue -> Prop :=
-| UndefPoison: forall t, refine_uvalue (UVALUE_Undef t) UVALUE_Poison (* CB / YZ: TODO, type for poison? *)
-| RefineConcrete: forall uv1 uv2, (forall dv, concretize uv1 dv -> concretize uv2 dv) -> refine_uvalue uv1 uv2
+(* SAZ: Which way is the RefineConcrete case supposed to go?  I'm expecting that the left-hand-side
+   must be "bigger" than the right-hand-side.  
+
+   Does this do the right thing with respect to uvalues that can raise undefined behavior?
+*)
+Variant refine_uvalue: uvalue -> uvalue -> Prop :=
+| UndefPoison: forall uv, refine_uvalue UVALUE_Poison uv   (* CB / YZ: TODO, type for poison? *)
+| RefineConcrete: forall uv1 uv2, uv2 <> UVALUE_Poison -> (forall (dv:dvalue), concretize uv2 dv -> concretize uv1  dv) -> refine_uvalue uv1 uv2
 .
 Hint Constructors refine_uvalue : core.
 
 Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
 Proof.
-  repeat intro; auto.
+  repeat intro.
+  destruct x; try (apply RefineConcrete;[intro; inversion H|auto];fail).
+  apply UndefPoison.
 Qed.
+
+Lemma refine_poison : forall uv, refine_uvalue uv UVALUE_Poison -> uv = UVALUE_Poison.
+Proof.
+  intros.
+  inv H.
+  - reflexivity.
+  - contradiction H0.
+    reflexivity.
+Qed.
+
+(* SAZ: TODO -- try to prove this! *)
+Instance refine_uvalue_Transitive : Transitive refine_uvalue.
+Proof.
+  repeat intro.
+  inversion H; subst.
+  - inversion H0; subst.
+    econstructor.
+    econstructor.
+  - inversion H0; subst.
+    apply refine_poison in H. subst. econstructor.
+    apply RefineConcrete. intros. assumption. auto. 
+Qed.
+    
+
 
 (* YZ: The following is unlikely to be useful I believe. *)
 (*
@@ -45,7 +82,7 @@ Proof.
 Qed.
  *)
 
-Infix "×" := prod_rel (at level 90, left associativity).
+Infix"×" := prod_rel (at level 90, left associativity).
 
 Definition TT {A} : relation A := fun _ _ => True.
 
