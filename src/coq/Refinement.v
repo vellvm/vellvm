@@ -40,12 +40,19 @@ Hint Constructors refine_uvalue : core.
 
 Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
 Proof.
-  repeat intro; auto.
+  repeat intro. auto.
 Qed.
+
+
 
 (* SAZ: TODO -- try to prove this! *)
 Instance refine_uvalue_Transitive : Transitive refine_uvalue.
 Proof.
+  repeat intro.
+  inversion H; subst.
+  - inversion H0; subst.
+    + 
+  
 Admitted.
     
     

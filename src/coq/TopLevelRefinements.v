@@ -190,6 +190,13 @@ Proof.
   - red. red. pstep. econstructor. auto. punfold H.
 Qed.  
 
+Lemma tau_eqit_RR_l : forall E R (RR : relation R) (HRR: Reflexive RR) (HRT: Transitive RR) (t s : itree E R),
+    eqit RR true false t s -> eqit RR true false (Tau t) s.
+Proof.
+  intros.
+  red. pstep. econstructor. auto. punfold H.
+Qed.  
+
 Lemma tau_eutt_RR_r : forall E R (RR : relation R) (HRR: Reflexive RR) (HRT: Transitive RR) (t s : itree E R),
     eutt RR t (Tau s) <-> eutt RR t s.
 Proof.
@@ -199,15 +206,6 @@ Proof.
     red. apply eqit_tauL. reflexivity.
   - red. red. pstep. econstructor. auto. punfold H.
 Qed.  
-
-Lemma eutt_bind_RR : forall E X R (RR : relation R) (HRR: Reflexive RR) (HRT: Transitive RR)
-                       (t : itree E X) (k1 k2 : X -> itree E R) (s : itree E R),
-    eutt RR (bind t k1) s ->
-    forall x, eutt RR (k1 x) (k2 x) ->
-         eutt RR (bind t k2) s.
-Proof.
-  intros E X R RR HRR HRT t k1 k2 s Ht x Hk.
-Admitted.  
 
 
 Instance interp_prop_Proper_eq :
@@ -225,68 +223,77 @@ Proof.
   exists h. split; auto.
 
   eapply transitivity. 2 : { apply HE. } clear HE s.
-  
+
   revert t1 t2 eqt.
 
-  ginit.
-  gcofix CIH.
+  einit.
+  ecofix CIH.
 
   intros.
 
   unfold interp. 
   unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree in *.
-  do 2 rewrite unfold_iter.
 
+  rewrite (itree_eta t1). rewrite (itree_eta t2).
   punfold eqt. red in eqt.
+  
+  genobs t1 obt1.
+  genobs t2 obt2.
 
-  guclo eqit_clo_bind. apply Eq.pbc_intro_h with (RU := sum_rel (eutt RR) RR).
-  - genobs t1 obt1.
-    genobs t2 obt2.
+  revert t1 t2 Heqobt1 Heqobt2.
+  induction eqt; intros; cbn in *.
+  
+  - do 2 rewrite unfold_iter. cbn.
+    do 2 rewrite Eq.bind_ret_l. cbn.
+    estep.
 
-    revert t1 t2 Heqobt1 Heqobt2.
+  - do 2 rewrite unfold_iter. cbn.
+    do 2 rewrite Eq.bind_ret_l. cbn.
+    estep.
+    econstructor.
+    change (ITree.iter
+          (fun t : itree (fun H : Type => E H) R =>
+           match observe t with
+           | RetF r0 => Ret (inr r0)
+           | TauF t0 => Ret (inl t0)
+           | @VisF _ _ _ X e k => ITree.map (fun x : X => inl (k x)) (h X e)
+           end) m1) with (interp h m1).
+    change (ITree.iter
+          (fun t : itree (fun H : Type => E H) R =>
+           match observe t with
+           | RetF r0 => Ret (inr r0)
+           | TauF t0 => Ret (inl t0)
+           | @VisF _ _ _ X e k => ITree.map (fun x : X => inl (k x)) (h X e)
+           end) m2) with (interp h m2).
+    gfinal. left. right. apply CIH. pclearbot. apply REL.
 
-    induction eqt; intros; cbn in *.
-    + pstep. red. econstructor. right. assumption.
-    + pstep. red. econstructor. left. pclearbot. pinversion REL.
-    + unfold ITree.map. eapply eutt_clo_bind with (UU := eq).
-      reflexivity.
-      intros; subst. pstep. red. econstructor.
-      left. specialize (REL u2). pclearbot. pinversion REL.
-    + admit.
-      (* Surprisingly, the case with a Tau on one side but not the other is the
-          hardest!  The problem is that the iterator used by interp runs a "no
-          op" loop when it hits the Tau case, which means that, even though two
-          computations might be eutt, they might unroll the loop a different
-          number of times. This proof strategy that I'm following here unrolls
-          both loops in parallel and expects their iterations to line up...
-
-          This observation might mean that we need a different, more wholistic
-          approach to this proof... :-(
-       *)
-    + admit.
-  - intros.
+  - do 2 rewrite unfold_iter. cbn.
+    unfold ITree.map.
+    do 2 rewrite Eq.bind_bind.
+    apply euttG_bind. eapply Eq.pbc_intro_h with (RU := eq).
+    + reflexivity.
+    + intros; subst.
+      do 2 rewrite Eq.bind_ret_l. cbn.
+      econstructor.
+      gstep. red. econstructor.
+      gfinal. left.
+      specialize (REL u2). pclearbot. pinversion REL.  
+  - rewrite unfold_iter. cbn.
+    rewrite Eq.bind_ret_l.
     cbn.
-    inversion H.
-    + cbn. gstep. red. econstructor.
-    change (ITree.iter
-          (fun t : itree (fun H : Type => E H) R =>
-           match observe t with
-           | RetF r0 => Ret (inr r0)
-           | TauF t0 => Ret (inl t0)
-           | @VisF _ _ _ X e k => ITree.map (fun x : X => inl (k x)) (h X e)
-           end) a1) with (interp h a1).
-    change (ITree.iter
-          (fun t : itree (fun H : Type => E H) R =>
-           match observe t with
-           | RetF r0 => Ret (inr r0)
-           | TauF t0 => Ret (inl t0)
-           | @VisF _ _ _ X e k => ITree.map (fun x : X => inl (k x)) (h X e)
-           end) a2) with (interp h a2).
-    gfinal. left.
-    apply CIH. assumption.
-    + cbn.
-      gstep. red. econstructor. assumption.
-Admitted.      
+    specialize (IHeqt t1 t2 eq_refl Heqobt2).
+    eapply euttG_cong_euttge. apply tau_euttge. reflexivity.
+    rewrite (itree_eta t1). assumption.
+  - match goal with
+    | [ |- euttG _ _ _ _ _ ?X _ ] => remember X as XX
+    end.
+    rewrite unfold_iter.
+    rewrite HeqXX in *. clear XX HeqXX.
+    cbn. rewrite Eq.bind_ret_l. cbn.
+    specialize (IHeqt t1 t2 Heqobt1 eq_refl).
+    eapply euttG_cong_euttge. reflexivity. apply tau_euttge.
+    rewrite (itree_eta t2). assumption.
+Qed.
 
     
   
@@ -333,7 +340,7 @@ Qed.
 
 (* Things are different for L4 and L5: we get into the [Prop] monad. *)
 Lemma refine_34 : forall t1 t2,
-    refine_L3 t1 t2 -> refine_L4 (model_undef (transpose refine_res3) t1) (model_undef (transpose refine_res3) t2).
+    refine_L3 t1 t2 -> refine_L4 (model_undef (transpose (refine_res3)) t1) (model_undef (transpose (refine_res3)) t2).
 Proof.
   intros t1 t2 H t Ht.
   exists t; split.

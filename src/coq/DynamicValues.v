@@ -511,13 +511,19 @@ Fixpoint is_concrete (uv : uvalue) : bool :=
   end.
 
 (* YZ: TODO: need a more general induction principle over uvalue to prove this due to Structs/Arrays/Vectors *)
-(*
 Lemma uvalue_to_dvalue_is_concrete: forall uv,
     is_concrete uv = true <-> exists v, uvalue_to_dvalue uv = inr v.
 Proof.
-  induction uv; simpl; split; intros H;
-    first [easy | eexists; reflexivity  | destruct H; easy | idtac].
-*)
+  induction uv using uvalue_ind'; simpl; split; intros HX;
+    first [easy | eexists; reflexivity  | destruct HX; easy | idtac].
+  - exists (match (map_monad uvalue_to_dvalue fields) with
+       | inl _ => DVALUE_None
+       | inr v0 => DVALUE_Struct v0
+       end).
+    admit.
+  - 
+Admitted.  
+
 
 (* If both operands are concrete, uvalue_to_dvalue them and run them through
    opd, else run the abstract ones through opu *)
@@ -1692,6 +1698,7 @@ Class VInt I : Type :=
   .
 
   Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
+
   
   (*
     YZ TODO: Not sure whether those can be uvalues, to figure out
