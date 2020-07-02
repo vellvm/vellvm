@@ -700,9 +700,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         end.
   Arguments denote_exp _ : simpl nomatch.
 
-  Definition eval_op (o:exp dtyp) : itree exp_E uvalue :=
+  Definition denote_op (o:exp dtyp) : itree exp_E uvalue :=
     denote_exp None o.
-  Arguments eval_op _ : simpl nomatch.
+  Arguments denote_op _ : simpl nomatch.
 
       (* An instruction has only side-effects, it therefore returns [unit] *)
 
@@ -712,7 +712,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Pure operations *)
 
         | (IId id, INSTR_Op op) =>
-          dv <- translate exp_E_to_instr_E (eval_op op) ;;
+          dv <- translate exp_E_to_instr_E (denote_op op) ;;
           trigger (LocalWrite id dv)
 
         (* Allocation *)
