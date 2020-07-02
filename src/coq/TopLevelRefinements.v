@@ -25,6 +25,7 @@ From ExtLib Require Import
      Structures.Functor.
 
 From Coq Require Import
+     RelationClasses
      Strings.String
      Logic
      Morphisms
@@ -149,26 +150,6 @@ Proof.
 Qed.
 
 
-Lemma transpose_transpose_id1 {A} (RR : relation A) : transpose (transpose RR) <2= RR.
-Proof. intros. unfold transpose in *. assumption.
-Qed.
-       
-Lemma transpose_transpose_id2 {A} (RR : relation A) : RR <2= transpose (transpose RR).
-Proof. intros. unfold transpose in *. assumption.
-Qed.
-       
-Lemma eutt_transpose_symmetric : forall
-  {E A} (RR : relation A) (t1 t2 : itree E A),
-    eutt RR t1 t2 <-> eutt (transpose RR) t2 t1.
-Proof.
-Admitted.
-
-Lemma transpose_eutt : forall
-  {E A} (RR : relation A) (t1 t2 : itree E A),
-    transpose (eutt RR) t1 t2 <-> eutt (transpose RR) t1 t2.
-Proof.
-Admitted.
-
 
 Lemma interp_prop_correct_exec:
   forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),
@@ -207,6 +188,27 @@ Proof.
   - red. red. pstep. econstructor. auto. punfold H.
 Qed.  
 
+Lemma eutt_flip : forall E R (RR : relation R) (t1 t2 : itree E R),
+    eutt RR t1 t2 -> eutt (flip RR) t2 t1.
+Proof.
+  intros E R RR.
+  einit.
+  ecofix CIH.
+  intros.
+  punfold H0. red in H0.
+  rewrite (itree_eta t2). rewrite (itree_eta t1).
+  genobs t1 ot1.
+  genobs t2 ot2.
+  revert t1 t2 Heqot1 Heqot2.
+  induction H0; intros; pclearbot; try estep.
+  - intros. ebase.
+  - specialize (IHeqitF t1 t2 eq_refl Heqot2).
+    eapply euttG_cong_euttge. reflexivity. apply tau_euttge.
+    rewrite (itree_eta t1). assumption.
+  - specialize (IHeqitF t1 t2 Heqot1 eq_refl).
+    eapply euttG_cong_euttge. apply tau_euttge. reflexivity.
+    rewrite (itree_eta t2). assumption.
+Qed.
 
 Instance interp_prop_Proper_eq :
   forall R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR) E F (h_spec : E ~> PropT F),
@@ -332,15 +334,16 @@ Proof.
   apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
 Qed.
 
+(*
 Lemma transpose_reflexive : forall {A} (RR : A -> A -> Prop) (HR : Reflexive RR), Reflexive (transpose RR).
 Proof.
   intros. repeat red. apply HR.
 Qed.  
-
+*)
 
 (* Things are different for L4 and L5: we get into the [Prop] monad. *)
 Lemma refine_34 : forall t1 t2,
-    refine_L3 t1 t2 -> refine_L4 (model_undef (transpose (refine_res3)) t1) (model_undef (transpose (refine_res3)) t2).
+    refine_L3 t1 t2 -> refine_L4 (model_undef (flip (refine_res3)) t1) (model_undef (flip (refine_res3)) t2).
 Proof.
   intros t1 t2 H t Ht.
   exists t; split.
@@ -349,15 +352,15 @@ Proof.
     match goal with |- PropT.interp_prop ?x _ _ _ _ => remember x as h end.
     eapply interp_prop_Proper_eq in Ht.
     apply Ht.
-    + apply transpose_reflexive. typeclasses eauto.
-    + admit. (* follows from transitivity of refine_res3 *)
-    + rewrite <- eutt_transpose_symmetric. assumption.
+    + typeclasses eauto.
+    + typeclasses eauto.
+    + apply eutt_flip. assumption.
     + reflexivity.
   - reflexivity.
-Admitted.
+Qed.
 
 Lemma refine_45 : forall Pt1 Pt2,
-    refine_L4 Pt1 Pt2 -> refine_L5 (model_UB (transpose refine_res3) Pt1) (model_UB (transpose refine_res3) Pt2).
+    refine_L4 Pt1 Pt2 -> refine_L5 (model_UB (flip refine_res3) Pt1) (model_UB (flip refine_res3) Pt2).
 Proof.
   intros Pt1 Pt2 HR t2 HM.
   exists t2; split; [| reflexivity].
@@ -365,13 +368,13 @@ Proof.
   apply HR in HPt2; destruct HPt2 as (t1' & HPt1 & HPT1).
   exists t1'; split; auto.
   match type of HPT2 with | PropT.interp_prop ?h' ?t _ _ _ => remember h' as h end.
-  eapply interp_prop_Proper_eq with (RR := transpose (refine_res3)); eauto.
-  - apply transpose_reflexive. typeclasses eauto.
-  - admit. (* follows from transitivity of refine_res3 *)
-  - rewrite <- eutt_transpose_symmetric. assumption.
-Admitted.
+  eapply interp_prop_Proper_eq with (RR := flip (refine_res3)); eauto.
+  - typeclasses eauto.
+  - typeclasses eauto.
+  - apply eutt_flip. assumption.
+Qed.
 
-Section TopLevelInputs.
+
   Variable ret_typ : dtyp.
   Variable entry : string.
   Variable args : list uvalue.
@@ -398,11 +401,11 @@ Definition model_to_L3 (prog: mcfg dtyp) :=
 
 Definition model_to_L4 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L4 (transpose refine_res3) user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
+  interp_to_L4 (flip refine_res3) user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
 
 Definition model_to_L5 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L5 (transpose refine_res3) user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
+  interp_to_L5 (flip refine_res3) user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
 
 (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -719,4 +722,3 @@ Definition refine_cfg_ret: relation (PropT L5 (memory_stack * (local_env * (glob
 (* Definition refine_cfg  (p1 p2: cfg dtyp): Prop := *)
 (*   refine_cfg_ret (model_to_L5_cfg p1) (model_to_L5_cfg p2). *)
 
-End TopLevelInputs.

@@ -510,6 +510,7 @@ Fixpoint is_concrete (uv : uvalue) : bool :=
   (* | UVALUE_Select cnd v1 v2 => allb is_concrete [cnd ; v1 ; v2] *)
   end.
 
+(*
 (* YZ: TODO: need a more general induction principle over uvalue to prove this due to Structs/Arrays/Vectors *)
 Lemma uvalue_to_dvalue_is_concrete: forall uv,
     is_concrete uv = true <-> exists v, uvalue_to_dvalue uv = inr v.
@@ -523,6 +524,7 @@ Proof.
     admit.
   - 
 Admitted.  
+*)
 
 
 (* If both operands are concrete, uvalue_to_dvalue them and run them through

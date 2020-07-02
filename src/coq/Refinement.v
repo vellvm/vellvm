@@ -31,19 +31,27 @@ Import DV.
 
    Does this do the right thing with respect to uvalues that can raise undefined behavior?
 *)
-Inductive refine_uvalue: uvalue -> uvalue -> Prop :=
-| UndefPoison: forall t, refine_uvalue (UVALUE_Undef t) UVALUE_Poison (* CB / YZ: TODO, type for poison? *)
-| RefineConcrete: forall uv1 uv2, (forall (dv:dvalue), concretize uv2 dv -> concretize uv1  dv) -> refine_uvalue uv1 uv2
-| RefineUB : forall uv1 uv2 s, concretize_u uv1 (Error.failwith s) -> refine_uvalue uv1 uv2 
+Variant refine_uvalue: uvalue -> uvalue -> Prop :=
+| UndefPoison: forall uv, refine_uvalue UVALUE_Poison uv   (* CB / YZ: TODO, type for poison? *)
+| RefineConcrete: forall uv1 uv2, uv2 <> UVALUE_Poison -> (forall (dv:dvalue), concretize uv2 dv -> concretize uv1  dv) -> refine_uvalue uv1 uv2
 .
 Hint Constructors refine_uvalue : core.
 
 Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
 Proof.
-  repeat intro. auto.
+  repeat intro.
+  destruct x; try (apply RefineConcrete;[intro; inversion H|auto];fail).
+  apply UndefPoison.
 Qed.
 
-
+Lemma refine_poison : forall uv, refine_uvalue uv UVALUE_Poison -> uv = UVALUE_Poison.
+Proof.
+  intros.
+  inv H.
+  - reflexivity.
+  - contradiction H0.
+    reflexivity.
+Qed.
 
 (* SAZ: TODO -- try to prove this! *)
 Instance refine_uvalue_Transitive : Transitive refine_uvalue.
@@ -51,13 +59,13 @@ Proof.
   repeat intro.
   inversion H; subst.
   - inversion H0; subst.
-    + 
-  
-Admitted.
+    econstructor.
+    econstructor.
+  - inversion H0; subst.
+    apply refine_poison in H. subst. econstructor.
+    apply RefineConcrete. intros. assumption. auto. 
+Qed.
     
-    
-    
-
 
 
 (* YZ: The following is unlikely to be useful I believe. *)

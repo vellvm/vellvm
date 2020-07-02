@@ -114,17 +114,12 @@ Section PropMonad.
       ; bind := bind_PropT
     |}.
 
-
-  Definition transpose {A} (RR : relation A) : relation A :=
-    fun x y => RR y x.
-
-  
   (* SAZ: maybe define directly by coinduction  *)
   Definition MonadIter_Prop_itree {E F} :=
     fun R (RR: relation R) (step : itree E R -> PropT F (itree E R + R)) i =>
       fun (r : itree F R) =>
         (exists step' : itree E R  -> itree F (itree E R + R)%type,
-            (Proper(eutt (transpose RR) ==> (eutt (sum_rel (eutt eq) eq))) step') /\
+            (Proper(eutt (flip RR) ==> (eutt (sum_rel (eutt eq) eq))) step') /\
             (* How do we state that something is out of bounds? *)
             (forall j, step j (step' j)) /\
             eutt eq (CategoryOps.iter step' i) r).
@@ -198,13 +193,14 @@ Section PropMonad.
       apply REL.
   Qed.
 
+  (*
   Lemma bind_Returns_l {E A B} :
     forall a (ma : itree E A) (k : A -> itree E B),
     Returns a ma ->
     ITree.bind ma k ≈ k a.
   Proof.
   Admitted.
-
+   *)
 
   Definition divergent {E A} (ta : itree E A) := (forall k , ta ≈ bind ta k).
 
@@ -230,11 +226,13 @@ Section PropMonad.
   Definition divergent_cont {E A B} (ta : itree E A) :=
     (forall (k1 : A -> itree E B) (k2 : A -> itree E B) , bind ta k1 ≈ bind ta k2).
 
+  (*
   Lemma Returns_divergent_cont {E A B}:
     (forall (ta : itree E A), not (exists a, Returns a ta) -> @divergent_cont _ A B ta).
   Proof.
   Admitted.
-
+   *)
+(*
   Global Instance IterUnfold_PropT {E} : IterUnfold (Kleisli (PropT E)) sum.
   Proof.
     intros A B f. split; [ intros x y EQ | ]; split.
@@ -287,7 +285,7 @@ Section PropMonad.
       repeat red in H0.
       repeat red. setoid_rewrite H. auto.
   Admitted.
-
+*)
   (* SAZ: maybe define directly by coinduction  *)
   (* Global Polymorphic Instance MonadIter_Prop {E} : MonadIter (PropT E) := *)
   (*   fun R I (step : I -> PropT E (I + R)) i => *)
@@ -313,7 +311,7 @@ End PropMonad.
 
 Section IterLaws.
 
-
+(*
   Lemma Returns_divergent' {E A B}:
     (forall (ta : itree E A) (tb : itree E B),
         not (exists a, Returns a ta) -> not (exists b, Returns b tb) ->
@@ -326,7 +324,7 @@ Section IterLaws.
     - destruct H0. assert (ta ≈ Ret r0). rewrite Heqi.
       rewrite <- itree_eta. reflexivity.
   Admitted.
-
+*)
   Ltac simpl_iter :=
       unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree.
 

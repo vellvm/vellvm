@@ -104,7 +104,7 @@ Section Swap.
     repeat apply prod_rel_refl; auto.
     eapply list_rel_refl.
     Unshelve.
-    apply prod_rel_refl; auto.
+    apply prod_rel_refl; auto. apply refine_uvalue_Reflexive.
     intros ? ?.
     reflexivity.
   Qed.
@@ -133,9 +133,9 @@ Section Swap.
   *)
 
   Lemma swap_correct_L2:
-    forall p ret_typ entry args, refine_mcfg_L2 ret_typ entry args nil p (swap_mcfg p).
+    forall p, refine_mcfg_L2 p (swap_mcfg p).
   Proof.
-    intros p ret_typ entry args. 
+    intros p.
     unfold refine_mcfg_L2.
     unfold model_to_L2.
 
@@ -310,7 +310,7 @@ Admitted.
   Theorem swap_cfg_correct: transformation_correct swap_mcfg.
   Proof.
     unfold transformation_correct.
-    intros ret_typ entry args p. 
+    intros p.
     apply refine_mcfg_L2_correct, swap_correct_L2.
   Qed.
 
