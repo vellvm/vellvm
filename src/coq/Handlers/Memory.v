@@ -1688,6 +1688,62 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           (cm, add id b lm)
         end.
 
+    (* Check if the block for an address is allocated *)
+    (* TODO: should this check if everything is in range...? *)
+    Definition allocated (a : addr) (m : memory_stack) : Prop :=
+      let '((_,lm),_) := m in member (fst a) lm.
+
+    (* Do two memory regions overlap each other? *)
+    Definition overlaps (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z) : Prop :=
+      let a1_start := snd a1 in
+      let a1_end   := snd a1 + sz1 in
+      let a2_start := snd a2 in
+      let a2_end   := snd a2 + sz2 in
+      fst a1 = fst a2 /\ a1_start <= a2_end /\ a2_start <= a1_end.
+
+    Definition overlaps_dtyp (a1 : addr) (τ1 : dtyp) (a2 : addr) (τ2 : dtyp)
+      : Prop :=
+      overlaps a1 (sizeof_dtyp τ1) a2 (sizeof_dtyp τ2).
+
+    Definition no_overlap (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z) : Prop :=
+      let a1_start := snd a1 in
+      let a1_end   := snd a1 + sz1 in
+      let a2_start := snd a2 in
+      let a2_end   := snd a2 + sz2 in
+      fst a1 <> fst a2 \/ a1_start > a2_end \/ a2_start > a1_end.
+
+    Definition no_overlap_dtyp (a1 : addr) (τ1 : dtyp) (a2 : addr) (τ2 : dtyp)
+      : Prop :=
+      no_overlap a1 (sizeof_dtyp τ1) a2 (sizeof_dtyp τ2).
+
+    Definition no_overlap_b (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z) : bool :=
+      let a1_start := snd a1 in
+      let a1_end   := snd a1 + sz1 in
+      let a2_start := snd a2 in
+      let a2_end   := snd a2 + sz2 in
+      (fst a1 ~=? fst a2) || (a1_start >? a2_end) || (a2_start >? a1_end).
+
+    Lemma not_overlaps__no_overlap :
+      forall a1 τ1 a2 τ2,
+        ~ overlaps_dtyp a1 τ1 a2 τ2 ->
+        no_overlap_dtyp a1 τ1 a2 τ2.
+    Proof.
+      intros [a1_r a1_o] τ1 [a2_r a2_o] τ2 H.
+      unfold overlaps_dtyp, overlaps in H.
+      unfold no_overlap_dtyp, no_overlap.
+      omega.
+    Qed.
+
+    Lemma no_overlap__not_overlaps :
+      forall a1 τ1 a2 τ2,
+        no_overlap_dtyp a1 τ1 a2 τ2 ->
+        ~ overlaps_dtyp a1 τ1 a2 τ2.
+    Proof.
+      intros [a1_r a1_o] τ1 [a2_r a2_o] τ2 H.
+      unfold no_overlap_dtyp, no_overlap in H.
+      unfold overlaps_dtyp, overlaps.
+      omega.
+    Qed.
       (** ** Concretization of blocks
           Look-ups a concrete block in memory. The logical memory acts first as a potential layer of indirection:
           - if no logical block is found, the input is directly returned.
@@ -1732,7 +1788,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        *)
 
       (* TODO probably doesn't handle sizes correctly...
-         IY: @Calvin (?) What is the meaning of this comment?
        *)
       (** ** MemCopy
           Implementation of the [memcpy] intrinsics.
@@ -1745,25 +1800,39 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                       DVALUE_I32 align :: (* alignment ignored *)
                       DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
 
-          src_block <- trywith "memcpy src block not found" (get_logical_block_mem src_b m) ;;
-          dst_block <- trywith "memcpy dst block not found" (get_logical_block_mem dst_b m) ;;
+          let mem_block_size := unsigned len in
+          (* From LLVM Docs : The 'llvm.memcpy.*' intrinsics copy a block of
+             memory from the source location to the destination location,
+             which are not allowed to overlap. *)
+          (* IY: Could clean up with boolean reflection? *)
+          if (no_overlap_b (dst_b, dst_o) mem_block_size
+                                 (src_b, src_o) mem_block_size) then
+            (* No guarantee that src_block has a certain size. *)
+            src_block <- trywith "memcpy src block not found"
+                                (get_logical_block_mem src_b m) ;;
+            dst_block <- trywith "memcpy dst block not found"
+                                (get_logical_block_mem dst_b m) ;;
 
-          (* IY: TODO Add check: according to the specification, the block is
-             not allowed to overlap. *)
+            let src_bytes
+                := match src_block with
+                  | LBlock size bytes concrete_id => bytes
+                  end in
+            let '(dst_sz, dst_bytes, dst_cid)
+                := match dst_block with
+                  | LBlock size bytes concrete_id => (size, bytes, concrete_id)
+                  end in
 
-          let src_bytes
-              := match src_block with
-                 | LBlock size bytes concrete_id => bytes
-                 end in
-          let '(dst_sz, dst_bytes, dst_cid)
-              := match dst_block with
-                 | LBlock size bytes concrete_id => (size, bytes, concrete_id)
-                 end in
-          let sdata := lookup_all_index src_o (unsigned len) src_bytes SUndef in
-          let dst_bytes' := add_all_index sdata dst_o dst_bytes in
-          let dst_block' := LBlock dst_sz dst_bytes' dst_cid in
-          let m' := add_logical_block_mem dst_b dst_block' m in
-          (ret m' : err memory)
+            (* IY: What happens if [src_block_size < mem_block_size]?
+               Since we have logical blocks, there isn't a way to get around
+               this, and SUndef is invoked. Is this desired behavior? *)
+            let sdata := lookup_all_index src_o (unsigned len) src_bytes SUndef in
+            let dst_bytes' := add_all_index sdata dst_o dst_bytes in
+            let dst_block' := LBlock dst_sz dst_bytes' dst_cid in
+            let m' := add_logical_block_mem dst_b dst_block' m in
+            (ret m' : err memory)
+          (* IY: For now, we're returning a "failwith". Maybe it's more ideal
+             to return an "UNDEF" here? *)
+          else failwith "memcpy has overlapping src and dst memory location"
         | _ => failwith "memcpy got incorrect arguments"
         end.
 
@@ -1941,50 +2010,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | Singleton f | Snoc _ f => In (fst a) f
       end.
 
-    (* Check if the block for an address is allocated *)
-    (* TODO: should this check if everything is in range...? *)
-    Definition allocated (a : addr) (m : memory_stack) : Prop :=
-      let '((_,lm),_) := m in member (fst a) lm.
-
-    (* Do two memory regions overlap each other? *)
-    Definition overlaps (a1 : addr) (τ1 : dtyp) (a2 : addr) (τ2 : dtyp) : Prop :=
-      let a1_start := snd a1 in
-      let a1_end   := snd a1 + sizeof_dtyp τ1 in
-      let a2_start := snd a2 in
-      let a2_end   := snd a2 + sizeof_dtyp τ2 in
-      fst a1 = fst a2 /\ a1_start <= a2_end /\ a2_start <= a1_end.
-
-    Definition no_overlap (a1 : addr) (τ1 : dtyp) (a2 : addr) (τ2 : dtyp) : Prop :=
-      let a1_start := snd a1 in
-      let a1_end   := snd a1 + sizeof_dtyp τ1 in
-      let a2_start := snd a2 in
-      let a2_end   := snd a2 + sizeof_dtyp τ2 in
-      fst a1 <> fst a2 \/ a1_start > a2_end \/ a2_start > a1_end.
-
-    Lemma not_overlaps__no_overlap :
-      forall a1 τ1 a2 τ2,
-        ~ overlaps a1 τ1 a2 τ2 -> no_overlap a1 τ1 a2 τ2.
-    Proof.
-      intros [a1_r a1_o] τ1 [a2_r a2_o] τ2 H.
-      unfold overlaps in H.
-      unfold no_overlap.
-      omega.
-    Qed.
-
-    Lemma no_overlap__not_overlaps :
-      forall a1 τ1 a2 τ2,
-        no_overlap a1 τ1 a2 τ2 -> ~ overlaps a1 τ1 a2 τ2.
-    Proof.
-      intros [a1_r a1_o] τ1 [a2_r a2_o] τ2 H.
-      unfold no_overlap in H.
-      unfold overlaps.
-      omega.
-    Qed.
-
     Record ext_memory (m1 : memory_stack) (a : addr) (τ : dtyp) (v : uvalue) (m2 : memory_stack) : Prop :=
       {
       new_lu  : read m2 a τ = inr v;
-      old_lu  : forall a' τ', 0 <= sizeof_dtyp τ' -> allocated a' m1 -> no_overlap a τ a' τ' -> read m2 a' τ' = read m1 a' τ'
+      old_lu  : forall a' τ', 0 <= sizeof_dtyp τ' ->
+                         allocated a' m1 ->
+                         no_overlap_dtyp a τ a' τ' ->
+                         read m2 a' τ' = read m1 a' τ'
       }.
 
     Definition same_reads (m1 m2 : memory_stack) : Prop := forall a τ, read m1 a τ = read m2 a τ.
@@ -1998,7 +2030,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Record write_spec (m1 : memory_stack) (a : addr) (v : dvalue) (m2 : memory_stack) : Prop :=
       {
       was_allocated : allocated a m1;
-      is_written    : forall τ, dvalue_has_dtyp v τ -> ext_memory m1 a τ (dvalue_to_uvalue v) m2
+      is_written    : forall τ, dvalue_has_dtyp v τ ->
+                           ext_memory m1 a τ (dvalue_to_uvalue v) m2
       }.
 
     Record read_spec (m : memory_stack) (a : addr) (τ : dtyp) (v : uvalue) : Prop :=
@@ -2033,12 +2066,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Qed.
 
     Lemma get_logical_block_of_add_logical_block_mem :
-      forall (m0 : memory) (s : frame_stack) (key : Z) (lb : logical_block),
-        get_logical_block (add_logical_block_mem key lb m0, s) key = Some lb.
+      forall (m : memory) (s : frame_stack) (key : Z) (lb : logical_block),
+        get_logical_block (add_logical_block_mem key lb m, s) key = Some lb.
     Proof.
       intros. erewrite <- get_logical_block_of_add_logical_block.
       unfold add_logical_block.
-      Unshelve. 3 : exact key. 2 : exact (m0, s). cbn. reflexivity.
+      Unshelve. 3 : exact key. 2 : exact (m, s). cbn. reflexivity.
     Qed.
 
     Lemma unsigned_I1_in_range : forall (x : DynamicValues.int1),
@@ -2161,14 +2194,19 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Lemma write_untouched:
       forall (m1 : memory_stack) (a : addr) (v : dvalue) (τ : dtyp) (m2 : memory_stack),
         dvalue_has_dtyp v τ ->
-        write m1 a v = inr m2 -> forall (a' : addr) (τ' : dtyp), 0 <= sizeof_dtyp τ' -> no_overlap a τ a' τ' -> read m2 a' τ' = read m1 a' τ'.
+        write m1 a v = inr m2 ->
+        forall (a' : addr) (τ' : dtyp),
+          0 <= sizeof_dtyp τ' ->
+          no_overlap_dtyp a τ a' τ' ->
+          read m2 a' τ' = read m1 a' τ'.
     Proof.
       intros ((cm,lm),s) [a off] v τ ((cm',lm'),s') TYP WR [a' off'] τ' SIZE INEQ.
       unfold read,write in *.
       cbn in *.
       flatten_hyp WR; try inv_sum.
       destruct l; inv_sum.
-      apply no_overlap__not_overlaps in INEQ; unfold overlaps in INEQ; cbn in INEQ.
+      apply no_overlap__not_overlaps in INEQ;
+        unfold overlaps_dtyp, overlaps in INEQ; cbn in INEQ.
       unfold get_logical_block, get_logical_block_mem; cbn.
       destruct (Z.eq_dec a a') eqn:Haa'.
       - subst. rewrite lookup_add_eq.
@@ -2982,25 +3020,64 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       (*   - inversion Hwrite. *)
       (* Qed. *)
 
-      (* Note : For the current version of subevents, [interp_memory] must get
-        must have subevent clauses assumed in Context, or else the
+    Lemma no_overlap_read :
+      forall dst_base src_base dτ dst_offset src_offset len
+        dst_bytes src_bytes i,
+       no_overlap (dst_base, dst_offset) (DynamicValues.Int32.unsigned len)
+         (src_base, src_offset) (DynamicValues.Int32.unsigned len) ->
+      (read_in_mem_block
+        (add_all_index
+            (lookup_all_index src_offset (DynamicValues.Int32.unsigned len)
+              src_bytes SUndef) dst_offset dst_bytes) dst_offset dτ) =
+      (read_in_mem_block src_bytes
+        (src_offset +
+         DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i))
+         * sizeof_dtyp dτ) dτ).
+    Proof.
+      intros dst_base src_base dτ dst_offset src_offset len
+             dst_bytes src_bytes i NO_OVERLAP.
+      unfold read_in_mem_block.
+      rewrite lookup_all_index_add_all_index_no_overlap.
+      2 : {
+        eapply sizeof_dvalue_pos.
+        admit.
+        (* dvalue_has_dtyp dv dτ*)
+      }
+      2 : {
+        unfold no_overlap in NO_OVERLAP. cbn in NO_OVERLAP.
+        destruct NO_OVERLAP. right.
+        admit.
+
+
+
+      Admitted.
+
+            (* interp_memory (trigger (GEP *)
+            (*                           (DTYPE_Array size t) *)
+            (*                           (DVALUE_Addr a) *)
+            (*                           [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat i))])) m *)
+    From Vellvm Require Import DynamicValues.
+      (* Note : For the current version of subevents, [interp_memory] must
+        have subevent clauses assumed in Context, or else the
         [handle_intrinsic] handler will not get properly invoked. *)
       Lemma interp_memory_intrinsic_memcpy :
         forall (m : memory_stack) (dst src : Addr.addr) (i : nat)
-          len align volatile
-          (dst_val src_val : uvalue) (dτ : dtyp),
+          (dst_val src_val : uvalue) (dτ : dtyp) volatile align,
         get_array_cell m dst i dτ = inr dst_val ->
         get_array_cell m src i dτ = inr src_val ->
+        no_overlap dst (Z.of_nat i) src (Z.of_nat i) ->
         exists m' s,
         (interp_memory (trigger (Intrinsic DTYPE_Void
                     "llvm.memcpy.p0i8.p0i8.i32"
                     [DVALUE_Addr dst; DVALUE_Addr src;
-                    DVALUE_I32 len;
-                    DVALUE_I32 align;
-                    DVALUE_I1 volatile])) m ≈ ret (m', s, DVALUE_None)) /\
+                      DVALUE_I32 (Int32.repr (Z.of_nat i));
+                      DVALUE_I32 align ;
+                      DVALUE_I1 volatile])) m ≈
+                       ret (m', s, DVALUE_None)) /\
           read (m', s) dst dτ = inr src_val.
       Proof.
-        intros m dst src i len align volatile dst_val src_val dτ MEM_dst MEM_src.
+        intros m dst src i dst_val src_val dτ volatile align.
+        intros MEM_dst MEM_src NO_OVERLAP.
         pose proof get_array_succeeds_allocated _ _ _ _ MEM_dst as ALLOC_dst.
         pose proof get_array_succeeds_allocated _ _ _ _ MEM_src as ALLOC_src.
         pose proof read_array_exists m
@@ -3009,35 +3086,39 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
             (Z.of_nat i) dτ i src ALLOC_src as RARRAY_src.
         destruct RARRAY_dst as (dst_ptr & GEP_dst & READ_dst).
         destruct RARRAY_src as (src_ptr & GEP_src & READ_src).
-        - setoid_rewrite interp_memory_trigger.
-          unfold interp_memory_h.
-          cbn.
-          unfold resum, ReSum_id, id_, Id_IFun.
-          unfold handle_intrinsic. cbn.
-          destruct m.
-          destruct dst as (dst_base & dst_offset).
-          destruct src as (src_base & src_offset).
-          apply allocated_get_logical_block in ALLOC_dst.
-          apply allocated_get_logical_block in ALLOC_src.
-          destruct ALLOC_dst as (b_dst & LOG_BLOCK_dst).
-          destruct ALLOC_src as (b_src & LOG_BLOCK_src).
-          cbn in LOG_BLOCK_dst, LOG_BLOCK_src.
-          setoid_rewrite LOG_BLOCK_src. cbn. setoid_rewrite LOG_BLOCK_dst.
-          destruct b_src, b_dst.
-          exists (add_logical_block_mem dst_base
-          (LBlock size0
-              (add_all_index
-                (lookup_all_index src_offset
-                  (DynamicValues.Int32.unsigned len)
-                  bytes SUndef) dst_offset bytes0) concrete_id0) m).
-          exists f. split; try reflexivity.
-          unfold read. cbn.
+        setoid_rewrite interp_memory_trigger.
+        unfold interp_memory_h.
+        cbn.
+        unfold resum, ReSum_id, id_, Id_IFun.
+        unfold handle_intrinsic. cbn.
+        destruct m.
+        destruct dst as (dst_base & dst_offset).
+        destruct src as (src_base & src_offset).
+        apply allocated_get_logical_block in ALLOC_dst.
+        apply allocated_get_logical_block in ALLOC_src.
+        destruct ALLOC_dst as (b_dst & LOG_BLOCK_dst).
+        destruct ALLOC_src as (b_src & LOG_BLOCK_src).
+        cbn in LOG_BLOCK_dst, LOG_BLOCK_src.
+        setoid_rewrite LOG_BLOCK_src. cbn. setoid_rewrite LOG_BLOCK_dst.
+        destruct b_src as [src_size src_bytes src_concrete_id].
+        destruct b_dst as [dst_size dst_bytes dst_concrete_id].
+        cbn.
+        assert (forall x y s, reflect (no_overlap x s y s) (no_overlap_b x s y s)).
+        admit.
+        eapply reflect_iff in H2. rewrite H2 in NO_OVERLAP. clear H2.
+        unfold Int32.eqm, Int.eqmod in H2.
+        cbn. rewrite NO_OVERLAP. cbn. reflexivity.
+        unfold read.
+        rewrite get_logical_block_of_add_logical_block_mem.
+        cbn.
+        rewrite <- MEM_src. cbn. rewrite LOG_BLOCK_src.
+        (* IY: Should be equivalent, but we need an invariant stating that
+            the memory locations do not overlap. *)
 
-          rewrite get_logical_block_of_add_logical_block_mem.
-          rewrite <- MEM_src. cbn. rewrite LOG_BLOCK_src.
-          (* IY: Should be equivalent, but we need an invariant stating that
-             the memory locations do not overlap. *)
-      Admitted.
+        (* (add_all_index (lookup_all_index src_offset size src_bytes SUndef) dst_offset dst_bytes) *)
+        (* setoid_rewrite lookup_add_all_index_out.  *)
+
+    Admitted.
 
     End Structural_Lemmas.
 
