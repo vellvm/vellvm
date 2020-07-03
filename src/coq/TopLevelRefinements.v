@@ -36,6 +36,7 @@ From Coq Require Import
 From ITree Require Import
      Basics.Monad
      Basics.MonadState.
+
 Require Import Paco.paco.
 
 Import ListNotations.
@@ -94,214 +95,36 @@ Proof.
   eapply subrelation_prod_left. apply subrelation_R_TT. all: apply PR.
 Qed.
 
-(*  SAZ: Unfortunately it doesn't look this this version of 
-    Proper for interp_prop can be proved.  The problem is that 
-    we need the RR parameter for the Proper instance  because it is instantiated with 
-    the refinement relation in the refine_34 and refine_45 lemmas
-    This is fine, except that the definition of iter_PropT that we use
-    bakes in a use of [eutt eq]   
 
-  Global Polymorphic Instance MonadIter_Prop {E} : MonadIter (PropT E) :=
-    fun R I (step : I -> PropT E (I + R)) i =>
-      fun (r : itree E R) =>
-        (exists step' : I -> itree E (I + R)%type,
-            (* How do we state that something is out of bounds? *)
-            (forall j, step j (step' j)) /\
-            CategoryOps.iter step' i ≈ r).   (* <---- eutt eq used here, but "should" be eutt RR *)
+(* Instance runState_proper_eqit {E A env} : Proper (Monad.eqm ==> Logic.eq ==> eutt Logic.eq) (@runState E A env). *)
+(* Proof. *)
+(*   repeat intro; subst. unfold runState. *)
+(*   unfold eqm, ITreeMonad.EqM_ITree in H. *)
+(*   rewrite H; reflexivity. *)
+(* Qed. *)
 
-    We can't parameterize the definition above by RR because the type of 
-    iter is too polymorphic -- there's no way to pass in the RR instance 
-    we need.
-
-    What are the alternatives?
-     - somehow define specialized versions of interp_prop ?  (maybe without using interp?)
-     - somehow avoid using the MonadIter typeclass?
-
-
-
- *)
-Lemma eutt_iter'' {E I1 I2 R1 R2}
-      (RI1 RI2 : I1 -> I2 -> Prop)
-      (HSUB: RI2 <2= RI1)
-      (RR : R1 -> R2 -> Prop)
-      (body1 : I1 -> itree E (I1 + R1))
-      (body2 : I2 -> itree E (I2 + R2))
-      (eutt_body
-       : forall j1 j2, RI1 j1 j2 -> eutt (sum_rel RI2 RR) (body1 j1) (body2 j2))
-  : forall (i1 : I1) (i2 : I2) (RI_i : RI1 i1 i2),
-    @eutt E _ _ RR (ITree.iter body1 i1) (ITree.iter body2 i2).
+Global Instance interp_state_proper {T E F S}
+         (h: forall T : Type, E T -> Monads.stateT S (itree F) T)
+  : Proper (eutt Logic.eq ==> Monad.eqm) (State.interp_state h (T := T)).
 Proof.
   einit. ecofix CIH. intros.
-  specialize (eutt_body i1 i2 RI_i).
-  do 2 rewrite unfold_iter.
-  ebind; econstructor; eauto with paco.
-  intros ? ? [].
+
+  rewrite !unfold_interp_state. punfold H0. red in H0.
+  induction H0; intros; subst; simpl; pclearbot.
+  - eret.
   - etau.
-  - eauto with paco.
-Qed.
-
-Definition eutt_iter_gen' {F A B R1 R2 S} (HS : R2 <2= R1) :
-  @Proper ((A -> itree F (A + B)) -> A -> itree F B)
-          ((R1 ==> eutt (sum_rel R2 S)) ==> R1 ==> (eutt S))
-          (iter (C := ktree F)).
-Proof.
-  do 3 red;
-  intros body1 body2 EQ_BODY x y Hxy. red in EQ_BODY.
-  eapply eutt_iter''; eauto.
+  - ebind. econstructor; [reflexivity|].
+    intros; subst.
+    etau. ebase.
+  - rewrite tau_euttge, unfold_interp_state; eauto.
+  - rewrite tau_euttge, unfold_interp_state; eauto.
 Qed.
 
 
 
-Lemma interp_prop_correct_exec:
-  forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),
-    handler_correct h_spec h ->
-    forall R RR `{Reflexive _ RR} t, interp_prop h_spec R RR t (interp h t).
-Proof.
-  intros.
-  exists h; split; auto. reflexivity.
-Qed.
-
-
-Lemma tau_eutt_RR_l : forall E R (RR : relation R) (HRR: Reflexive RR) (HRT: Transitive RR) (t s : itree E R),
-    eutt RR (Tau t) s <-> eutt RR t s.
-Proof.
-  intros.
-  split; intros H.
-  - eapply transitivity. 2 : { apply H. }
-    red. apply eqit_tauR. reflexivity.
-  - red. red. pstep. econstructor. auto. punfold H.
-Qed.  
-
-Lemma tau_eqit_RR_l : forall E R (RR : relation R) (HRR: Reflexive RR) (HRT: Transitive RR) (t s : itree E R),
-    eqit RR true false t s -> eqit RR true false (Tau t) s.
-Proof.
-  intros.
-  red. pstep. econstructor. auto. punfold H.
-Qed.  
-
-Lemma tau_eutt_RR_r : forall E R (RR : relation R) (HRR: Reflexive RR) (HRT: Transitive RR) (t s : itree E R),
-    eutt RR t (Tau s) <-> eutt RR t s.
-Proof.
-  intros.
-  split; intros H.
-  - eapply transitivity. apply H.
-    red. apply eqit_tauL. reflexivity.
-  - red. red. pstep. econstructor. auto. punfold H.
-Qed.  
-
-Lemma eutt_flip : forall E R (RR : relation R) (t1 t2 : itree E R),
-    eutt RR t1 t2 -> eutt (flip RR) t2 t1.
-Proof.
-  intros E R RR.
-  einit.
-  ecofix CIH.
-  intros.
-  punfold H0. red in H0.
-  rewrite (itree_eta t2). rewrite (itree_eta t1).
-  genobs t1 ot1.
-  genobs t2 ot2.
-  revert t1 t2 Heqot1 Heqot2.
-  induction H0; intros; pclearbot; try estep.
-  - intros. ebase.
-  - specialize (IHeqitF t1 t2 eq_refl Heqot2).
-    eapply euttG_cong_euttge. reflexivity. apply tau_euttge.
-    rewrite (itree_eta t1). assumption.
-  - specialize (IHeqitF t1 t2 Heqot1 eq_refl).
-    eapply euttG_cong_euttge. apply tau_euttge. reflexivity.
-    rewrite (itree_eta t2). assumption.
-Qed.
-
-Instance interp_prop_Proper_eq :
-  forall R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR) E F (h_spec : E ~> PropT F),
-    Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_prop E _ h_spec R RR).
-Proof.
-  intros.
-  do 5 red.
-  intros t1 t2 eqt s' s eqs HI.
-  subst.
-  unfold interp_prop, interp in HI. red in HI.
-
-  destruct HI as (h & HC & HE).
-
-  exists h. split; auto.
-
-  eapply transitivity. 2 : { apply HE. } clear HE s.
-
-  revert t1 t2 eqt.
-
-  einit.
-  ecofix CIH.
-
-  intros.
-
-  unfold interp. 
-  unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree in *.
-
-  rewrite (itree_eta t1). rewrite (itree_eta t2).
-  punfold eqt. red in eqt.
-  
-  genobs t1 obt1.
-  genobs t2 obt2.
-
-  revert t1 t2 Heqobt1 Heqobt2.
-  induction eqt; intros; cbn in *.
-  
-  - do 2 rewrite unfold_iter. cbn.
-    do 2 rewrite Eq.bind_ret_l. cbn.
-    estep.
-
-  - do 2 rewrite unfold_iter. cbn.
-    do 2 rewrite Eq.bind_ret_l. cbn.
-    estep.
-    econstructor.
-    change (ITree.iter
-          (fun t : itree (fun H : Type => E H) R =>
-           match observe t with
-           | RetF r0 => Ret (inr r0)
-           | TauF t0 => Ret (inl t0)
-           | @VisF _ _ _ X e k => ITree.map (fun x : X => inl (k x)) (h X e)
-           end) m1) with (interp h m1).
-    change (ITree.iter
-          (fun t : itree (fun H : Type => E H) R =>
-           match observe t with
-           | RetF r0 => Ret (inr r0)
-           | TauF t0 => Ret (inl t0)
-           | @VisF _ _ _ X e k => ITree.map (fun x : X => inl (k x)) (h X e)
-           end) m2) with (interp h m2).
-    gfinal. left. right. apply CIH. pclearbot. apply REL.
-
-  - do 2 rewrite unfold_iter. cbn.
-    unfold ITree.map.
-    do 2 rewrite Eq.bind_bind.
-    apply euttG_bind. eapply Eq.pbc_intro_h with (RU := eq).
-    + reflexivity.
-    + intros; subst.
-      do 2 rewrite Eq.bind_ret_l. cbn.
-      econstructor.
-      gstep. red. econstructor.
-      gfinal. left.
-      specialize (REL u2). pclearbot. pinversion REL.  
-  - rewrite unfold_iter. cbn.
-    rewrite Eq.bind_ret_l.
-    cbn.
-    specialize (IHeqt t1 t2 eq_refl Heqobt2).
-    eapply euttG_cong_euttge. apply tau_euttge. reflexivity.
-    rewrite (itree_eta t1). assumption.
-  - match goal with
-    | [ |- euttG _ _ _ _ _ ?X _ ] => remember X as XX
-    end.
-    rewrite unfold_iter.
-    rewrite HeqXX in *. clear XX HeqXX.
-    cbn. rewrite Eq.bind_ret_l. cbn.
-    specialize (IHeqt t1 t2 Heqobt1 eq_refl).
-    eapply euttG_cong_euttge. reflexivity. apply tau_euttge.
-    rewrite (itree_eta t2). assumption.
-Qed.
-
-    
   
 Hint Unfold TT : core.
-Instance TT_equiv :
+Local Instance TT_equiv :
   forall A, Equivalence (@TT A).
 Proof.
   intros A; split; repeat intro; auto.
@@ -477,52 +300,6 @@ Ltac flatten_all :=
   | |- context[match ?x with | _ => _ end] => let Heq := fresh "Heq" in destruct x eqn:Heq
   end.
 
-(* Instance pick_handler_proper {E R} `{LLVMEvents.UBE -< E}: *)
-(*   Proper (eq ==> eq_itree eq ==> iff) (@Pick_handler E _ R). *)
-(* Admitted. *)
-
-
-(* Lemma interp_prop_mon: *)
-(*   forall {E F} (h h': E ~> (PropT (itree F))), *)
-(*     (forall e t, h _ e t -> h' _ e t) -> *)
-(*     forall t, interp_prop h _ t -> interp_prop h' _ t. *)
-
-  
-    
-  
-(*  
-  3: {  unfold interp. unfold iter, Iter_Kleisli. reflexivity. }
-  - do 2 red.
-
-    ginit.
-    gcofix CIH.
-    intros.
-    punfold H2. red in H2.
-    destruct (observe x).
-    + destruct (observe y).
-      * inversion H2. subst. gstep. red.  econstructor. 
-Admitted.
-  - intros t'.    
-  destruct (observe t') eqn:EQ; cbn; rewrite EQ; try reflexivity.
-  exists (h _ e); auto.
-Qed.
-*)
-
-Lemma case_prop_handler_correct:
-  forall {E1 E2 F}
-    (h1_spec: E1 ~> PropT F)
-    (h2_spec: E2 ~> PropT F)
-    (h1: E1 ~> itree F)
-    (h2: E2 ~> itree F)
-    (C1: handler_correct h1_spec h1)
-    (C2: handler_correct h2_spec h2),
-    handler_correct (case_ h1_spec h2_spec) (case_ h1 h2).
-Proof.
-  intros E1 E2 F h1_spec h2_spec h1 h2 C1 C2.
-  unfold handler_correct in *.
-  intros T e.
-  destruct e. apply C1. apply C2.
-Qed.
 
 Lemma UB_handler_correct: handler_correct UB_handler UB_exec.
 Proof.
@@ -531,61 +308,6 @@ Proof.
   intros. auto.
 Qed.  
 
-
-Definition prop_compose :=
-  fun {F G : Type -> Type } {T : Type} (TT : relation T)
-    (g_spec : F ~> PropT G) (PF: PropT F T) (g:itree G T) =>
-    exists f : itree F T, PF f /\ (interp_prop g_spec) T TT f g.
-
-(* Level 5 interpreter Prop to Prop *)
-(* h_spec is the PickHandler *)
-Definition handler_correct_prop
-           {E F G}
-           (h_spec: E ~> PropT F) (h: E ~> itree F)
-           (g_spec: F ~> PropT G) (g: F ~> itree G)
-  :=
-    (forall T TT e,
-        (prop_compose TT g_spec (h_spec T e))
-          (interp g (h T e))).
-
-
-(* L4 = ExternalCallE +' LLVMEvents.UBE +' LLVMEvents.DebugE +' LLVMEvents.FailureE *)
-
-(* Check (case_ (E_trigger_prop (F:=LLVMEvents.DebugE +' LLVMEvents.FailureE)) (case_ UB_handler (F_trigger_prop (F:=LLVMEvents.DebugE +' LLVMEvents.FailureE)))). *)
-
-(*
-Check (@F_trigger_prop LLVMEvents.ExternalCallE (LLVMEvents.DebugE +' LLVMEvents.FailureE)).
-Check (case_ (@E_trigger_prop LLVMEvents.ExternalCallE)
-              (case_ UB_handler (@F_trigger_prop _ (LLVMEvents.DebugE +' LLVMEvents.FailureE))): PropT L4 ~> PropT L5).
-
-Check  ((case_ E_trigger_prop (case_ UB_handler F_trigger_prop)) : L4 ~> PropT L5).
-*)
-
-(*
-Lemma pickE_UB_correct `{LLVMEvents.UBE -< L4} `{LLVMEvents.FailureE -< L4} :
-  handler_correct_prop
-    (Pick_handler : PickE ~> PropT L4)
-    (concretize_picks : PickE ~> itree L4)
-    (case_ (E_trigger_prop (F:=LLVMEvents.DebugE +' LLVMEvents.FailureE)) (case_ UB_handler (F_trigger_prop (F:=LLVMEvents.DebugE +' LLVMEvents.FailureE))))
-    (case_ (E_trigger (F:=LLVMEvents.DebugE +' LLVMEvents.FailureE))
-           (case_ UB_exec (F_trigger (F:=LLVMEvents.DebugE +' LLVMEvents.FailureE)))).
-Proof.
-  unfold handler_correct_prop.
-  intros.
-  unfold prop_compose.
-  destruct e.
-  cbn.
-  assert (P \/ ~P).
-  { admit. (* TODO: Classical logic *) }
-  destruct H1.
-  - eexists (translate _ (concretize_uvalue u)).
-    Unshelve. 2 :
-    {  refine (fun T fu => _).
-       destruct fu; auto. }
-    cbn. split. 
-  
-Abort.    
-*)  
 
 Lemma refine_UB
   : forall E F `{LLVMEvents.FailureE -< E +' F} T TT (HR: Reflexive TT)
@@ -658,32 +380,6 @@ Qed.
 
 (** We hence can also commute them at the various levels of interpretation *)
 
-(** BEGIN MOVE *)
-
-
-(* Instance runState_proper_eqit {E A env} : Proper (Monad.eqm ==> Logic.eq ==> eutt Logic.eq) (@runState E A env). *)
-(* Proof. *)
-(*   repeat intro; subst. unfold runState. *)
-(*   unfold eqm, ITreeMonad.EqM_ITree in H. *)
-(*   rewrite H; reflexivity. *)
-(* Qed. *)
-
-Instance interp_state_proper {T E F S}
-         (h: forall T : Type, E T -> Monads.stateT S (itree F) T)
-  : Proper (eutt Logic.eq ==> Monad.eqm) (State.interp_state h (T := T)).
-Proof.
-  einit. ecofix CIH. intros.
-
-  rewrite !unfold_interp_state. punfold H0. red in H0.
-  induction H0; intros; subst; simpl; pclearbot.
-  - eret.
-  - etau.
-  - ebind. econstructor; [reflexivity|].
-    intros; subst.
-    etau. ebase.
-  - rewrite tau_euttge, unfold_interp_state; eauto.
-  - rewrite tau_euttge, unfold_interp_state; eauto.
-Qed.
 
 (** END MOVE *)
 

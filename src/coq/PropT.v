@@ -1,31 +1,154 @@
-
-From Coq Require Import Ensembles Setoid Morphisms RelationClasses Logic.Classical_Prop.
-
-From ExtLib Require Import
-     Structures.Functor
-     Structures.Monad
-     Structures.MonadTrans
-     Data.Monads.EitherMonad.
-
 From ITree Require Import
-     Basics.Basics
-     ITreeDefinition
-     Eq.Eq
-     Eq.UpToTaus
      ITree
-     Basics.Monad
+     ITreeFacts
+     Events.State
+     Events.StateFacts
+     InterpFacts
+     KTreeFacts
      Core.ITreeMonad
      CategoryKleisli
      CategoryKleisliFacts
-     KTree
-     KTreeFacts.
+     Eq.Eq.
 
-From Paco Require Import paco.
+From ExtLib Require Import
+     Structures.Functor.
+
+From Coq Require Import
+     RelationClasses
+     Strings.String
+     Logic
+     Morphisms
+     Relations
+     List
+     Program.Tactics.
+
+From ITree Require Import
+     Basics.Monad
+     Basics.MonadState.
+
+Require Import Paco.paco.
+
+Import ListNotations.
+Import ITree.Basics.Basics.Monads.
+
+
+(* From Coq Require Import *)
+(*      Ensembles *)
+(*      Setoid *)
+(*      RelationClasses *)
+(*      Logic *)
+(*      Morphisms *)
+(*      Relations *)
+(*      List. *)
+
+(* From ExtLib Require Import *)
+(*      Structures.Functor *)
+(*      Structures.Monad *)
+(*      Structures.MonadTrans *)
+(*      Data.Monads.EitherMonad. *)
+
+(* From ITree Require Import *)
+(*      Basics.Basics *)
+(*      ITreeDefinition *)
+(*      Eq.Eq *)
+(*      Eq.UpToTaus *)
+(*      ITree *)
+(*      Basics.Monad *)
+(*      KTree *)
+(*      KTreeFacts. *)
+
+(* From Paco Require Import paco. *)
 
 Import MonadNotation.
 Import CatNotations.
 Local Open Scope monad_scope.
 Local Open Scope cat_scope.
+
+
+(* TODO: Move to itrees library --------------------------------------------- *)
+
+(* SAZ: Some of these aren't actually needed for Vellvm's PropT *)
+Lemma eutt_iter'' {E I1 I2 R1 R2}
+      (RI1 RI2 : I1 -> I2 -> Prop)
+      (HSUB: RI2 <2= RI1)
+      (RR : R1 -> R2 -> Prop)
+      (body1 : I1 -> itree E (I1 + R1))
+      (body2 : I2 -> itree E (I2 + R2))
+      (eutt_body
+       : forall j1 j2, RI1 j1 j2 -> eutt (sum_rel RI2 RR) (body1 j1) (body2 j2))
+  : forall (i1 : I1) (i2 : I2) (RI_i : RI1 i1 i2),
+    @eutt E _ _ RR (ITree.iter body1 i1) (ITree.iter body2 i2).
+Proof.
+  einit. ecofix CIH. intros.
+  specialize (eutt_body i1 i2 RI_i).
+  do 2 rewrite unfold_iter.
+  ebind; econstructor; eauto with paco.
+  intros ? ? [].
+  - etau.
+  - eauto with paco.
+Qed.
+
+Definition eutt_iter_gen' {F A B R1 R2 S} (HS : R2 <2= R1) :
+  @Proper ((A -> itree F (A + B)) -> A -> itree F B)
+          ((R1 ==> eutt (sum_rel R2 S)) ==> R1 ==> (eutt S))
+          (iter (C := ktree F)).
+Proof.
+  do 3 red;
+  intros body1 body2 EQ_BODY x y Hxy. red in EQ_BODY.
+  eapply eutt_iter''; eauto.
+Qed.
+
+
+Lemma tau_eutt_RR_l : forall E R (RR : relation R) (HRR: Reflexive RR) (HRT: Transitive RR) (t s : itree E R),
+    eutt RR (Tau t) s <-> eutt RR t s.
+Proof.
+  intros.
+  split; intros H.
+  - eapply transitivity. 2 : { apply H. }
+    red. apply eqit_tauR. reflexivity.
+  - red. red. pstep. econstructor. auto. punfold H.
+Qed.  
+
+Lemma tau_eqit_RR_l : forall E R (RR : relation R) (HRR: Reflexive RR) (HRT: Transitive RR) (t s : itree E R),
+    eqit RR true false t s -> eqit RR true false (Tau t) s.
+Proof.
+  intros.
+  red. pstep. econstructor. auto. punfold H.
+Qed.  
+
+Lemma tau_eutt_RR_r : forall E R (RR : relation R) (HRR: Reflexive RR) (HRT: Transitive RR) (t s : itree E R),
+    eutt RR t (Tau s) <-> eutt RR t s.
+Proof.
+  intros.
+  split; intros H.
+  - eapply transitivity. apply H.
+    red. apply eqit_tauL. reflexivity.
+  - red. red. pstep. econstructor. auto. punfold H.
+Qed.  
+
+Lemma eutt_flip : forall E R (RR : relation R) (t1 t2 : itree E R),
+    eutt RR t1 t2 -> eutt (flip RR) t2 t1.
+Proof.
+  intros E R RR.
+  einit.
+  ecofix CIH.
+  intros.
+  punfold H0. red in H0.
+  rewrite (itree_eta t2). rewrite (itree_eta t1).
+  genobs t1 ot1.
+  genobs t2 ot2.
+  revert t1 t2 Heqot1 Heqot2.
+  induction H0; intros; pclearbot; try estep.
+  - intros. ebase.
+  - specialize (IHeqitF t1 t2 eq_refl Heqot2).
+    eapply euttG_cong_euttge. reflexivity. apply tau_euttge.
+    rewrite (itree_eta t1). assumption.
+  - specialize (IHeqitF t1 t2 Heqot1 eq_refl).
+    eapply euttG_cong_euttge. apply tau_euttge. reflexivity.
+    rewrite (itree_eta t2). assumption.
+Qed.
+
+(* END: TO MOVE ------------------------------------------------------------- *)
 
 Section PropMonad.
 
@@ -146,6 +269,138 @@ Section PropMonad.
   Definition interp_prop {E F} (h : E ~> PropT F) :
     forall R (RR: relation R), itree E R -> PropT F R := interp_PropT h.
 
+
+  Lemma interp_prop_correct_exec:
+    forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),
+      handler_correct h_spec h ->
+      forall R RR `{Reflexive _ RR} t, interp_prop h_spec R RR t (interp h t).
+  Proof.
+    intros.
+    exists h; split; auto. reflexivity.
+  Qed.
+  
+
+  Lemma case_prop_handler_correct:
+    forall {E1 E2 F}
+      (h1_spec: E1 ~> PropT F)
+      (h2_spec: E2 ~> PropT F)
+      (h1: E1 ~> itree F)
+      (h2: E2 ~> itree F)
+      (C1: handler_correct h1_spec h1)
+      (C2: handler_correct h2_spec h2),
+      handler_correct (case_ h1_spec h2_spec) (case_ h1 h2).
+  Proof.
+    intros E1 E2 F h1_spec h2_spec h1 h2 C1 C2.
+    unfold handler_correct in *.
+    intros T e.
+    destruct e. apply C1. apply C2.
+  Qed.
+
+
+  Definition prop_compose :=
+    fun {F G : Type -> Type } {T : Type} (TT : relation T)
+      (g_spec : F ~> PropT G) (PF: PropT F T) (g:itree G T) =>
+      exists f : itree F T, PF f /\ (interp_prop g_spec) T TT f g.
+
+
+  Definition handler_correct_prop
+             {E F G}
+             (h_spec: E ~> PropT F) (h: E ~> itree F)
+             (g_spec: F ~> PropT G) (g: F ~> itree G)
+    :=
+      (forall T TT e,
+          (prop_compose TT g_spec (h_spec T e))
+            (interp g (h T e))).
+
+  
+  Instance interp_prop_Proper_eq :
+    forall R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR) E F (h_spec : E ~> PropT F),
+      Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_prop E _ h_spec R RR).
+  Proof.
+    intros.
+    do 5 red.
+    intros t1 t2 eqt s' s eqs HI.
+    subst.
+    unfold interp_prop, interp in HI. red in HI.
+
+    destruct HI as (h & HC & HE).
+
+    exists h. split; auto.
+
+    eapply transitivity. 2 : { apply HE. } clear HE s.
+
+    revert t1 t2 eqt.
+
+    einit.
+    ecofix CIH.
+
+    intros.
+
+    unfold interp. 
+    unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree in *.
+
+    rewrite (itree_eta t1). rewrite (itree_eta t2).
+    punfold eqt. red in eqt.
+    
+    genobs t1 obt1.
+    genobs t2 obt2.
+
+    revert t1 t2 Heqobt1 Heqobt2.
+    induction eqt; intros; cbn in *.
+    
+    - do 2 rewrite unfold_iter. cbn.
+      do 2 rewrite Eq.bind_ret_l. cbn.
+      estep.
+
+    - do 2 rewrite unfold_iter. cbn.
+      do 2 rewrite Eq.bind_ret_l. cbn.
+      estep.
+      econstructor.
+      change (ITree.iter
+                (fun t : itree (fun H : Type => E H) R =>
+                   match observe t with
+                   | RetF r0 => Ret (inr r0)
+                   | TauF t0 => Ret (inl t0)
+                   | @VisF _ _ _ X e k => ITree.map (fun x : X => inl (k x)) (h X e)
+                   end) m1) with (interp h m1).
+      change (ITree.iter
+                (fun t : itree (fun H : Type => E H) R =>
+                   match observe t with
+                   | RetF r0 => Ret (inr r0)
+                   | TauF t0 => Ret (inl t0)
+                   | @VisF _ _ _ X e k => ITree.map (fun x : X => inl (k x)) (h X e)
+                   end) m2) with (interp h m2).
+      gfinal. left. right. apply CIH. pclearbot. apply REL.
+
+    - do 2 rewrite unfold_iter. cbn.
+      unfold ITree.map.
+      do 2 rewrite Eq.bind_bind.
+      apply euttG_bind. eapply Eq.pbc_intro_h with (RU := eq).
+      + reflexivity.
+      + intros; subst.
+        do 2 rewrite Eq.bind_ret_l. cbn.
+        econstructor.
+        gstep. red. econstructor.
+        gfinal. left.
+        specialize (REL u2). pclearbot. pinversion REL.  
+    - rewrite unfold_iter. cbn.
+      rewrite Eq.bind_ret_l.
+      cbn.
+      specialize (IHeqt t1 t2 eq_refl Heqobt2).
+      eapply euttG_cong_euttge. apply tau_euttge. reflexivity.
+      rewrite (itree_eta t1). assumption.
+    - match goal with
+      | [ |- euttG _ _ _ _ _ ?X _ ] => remember X as XX
+      end.
+      rewrite unfold_iter.
+      rewrite HeqXX in *. clear XX HeqXX.
+      cbn. rewrite Eq.bind_ret_l. cbn.
+      specialize (IHeqt t1 t2 Heqobt1 eq_refl).
+      eapply euttG_cong_euttge. reflexivity. apply tau_euttge.
+      rewrite (itree_eta t2). assumption.
+  Qed.
+
+  
   Definition singletonT {E}: itree E ~> PropT E :=
     fun R t t' => t' ≈ t.
 
@@ -161,8 +416,6 @@ Section PropMonad.
                 (forall j, step j (step' j))).
 
 
-  From ITree Require Import Basics.CategoryTheory.
-  From Coq Require Import Program.Tactics.
 
   Lemma eqit_bind_Returns_inv {E} {R S T} (RS : R -> S -> Prop) 
         (t : itree E T)  (k1: T -> itree E R) (k2 : T -> itree E S) :
