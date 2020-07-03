@@ -132,7 +132,8 @@ Qed.
 
 (** END TO MOVE *)
 
-
+Section REFINEMENT.
+  
 (** We first prove that the [itree] refinement at level [i] entails the
     refinement at level [i+1] after running the [i+1] level of interpretation
  *)
@@ -167,7 +168,7 @@ Qed.
 
 (* Things are different for L4 and L5: we get into the [Prop] monad. *)
 Lemma refine_34 : forall t1 t2,
-    refine_L3 t1 t2 -> refine_L4 (model_undef (flip (refine_res3)) t1) (model_undef (flip (refine_res3)) t2).
+    refine_L3 t1 t2 -> refine_L4 (model_undef refine_res3 t1) (model_undef refine_res3 t2).
 Proof.
   intros t1 t2 H t Ht.
   exists t; split.
@@ -178,13 +179,13 @@ Proof.
     apply Ht.
     + typeclasses eauto.
     + typeclasses eauto.
-    + apply eutt_flip. assumption.
+    + assumption.
     + reflexivity.
   - reflexivity.
 Qed.
 
 Lemma refine_45 : forall Pt1 Pt2,
-    refine_L4 Pt1 Pt2 -> refine_L5 (model_UB (flip refine_res3) Pt1) (model_UB (flip refine_res3) Pt2).
+    refine_L4 Pt1 Pt2 -> refine_L5 (model_UB refine_res3 Pt1) (model_UB refine_res3 Pt2).
 Proof.
   intros Pt1 Pt2 HR t2 HM.
   exists t2; split; [| reflexivity].
@@ -192,10 +193,9 @@ Proof.
   apply HR in HPt2; destruct HPt2 as (t1' & HPt1 & HPT1).
   exists t1'; split; auto.
   match type of HPT2 with | PropT.interp_prop ?h' ?t _ _ _ => remember h' as h end.
-  eapply interp_prop_Proper_eq with (RR := flip (refine_res3)); eauto.
+  eapply interp_prop_Proper_eq with (RR := refine_res3); eauto.
   - typeclasses eauto.
   - typeclasses eauto.
-  - apply eutt_flip. assumption.
 Qed.
 
 
@@ -225,11 +225,11 @@ Definition model_to_L3 (prog: mcfg dtyp) :=
 
 Definition model_to_L4 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L4 (flip refine_res3) user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
+  interp_to_L4 (refine_res3) user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
 
 Definition model_to_L5 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L5 (flip refine_res3) user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
+  interp_to_L5 (refine_res3) user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
 
 (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -373,15 +373,14 @@ Proof.
   apply refine_UB.  auto.
   apply refine_undef. auto.
 Qed.
-  
+
+End REFINEMENT.
+
 (**
    Each interpreter commutes with [bind] and [ret].
  **)
 
 (** We hence can also commute them at the various levels of interpretation *)
-
-
-(** END MOVE *)
 
 Lemma interp_to_L2_bind:
   forall ui {R S} (t: itree L0 R) (k: R -> itree L0 S) s1 s2,

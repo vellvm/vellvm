@@ -133,7 +133,7 @@ Section Swap.
   *)
 
   Lemma swap_correct_L2:
-    forall p, refine_mcfg_L2 p (swap_mcfg p).
+    forall dt entry args intrinsics p, refine_mcfg_L2 dt entry args intrinsics p (swap_mcfg p).
   Proof.
     intros p.
     unfold refine_mcfg_L2.
@@ -310,7 +310,7 @@ Admitted.
   Theorem swap_cfg_correct: transformation_correct swap_mcfg.
   Proof.
     unfold transformation_correct.
-    intros p.
+    intros dt entry args intrinsics m. 
     apply refine_mcfg_L2_correct, swap_correct_L2.
   Qed.
 

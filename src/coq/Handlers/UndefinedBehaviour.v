@@ -29,8 +29,8 @@ Section PARAMS_MODEL.
 
   Definition model_UB :
     forall T (RR: T -> T -> Prop), PropT (E +' UBE +' F) T -> PropT (E +' F) T :=
-    fun T RR Pt t =>
-      exists t', Pt t' /\ (interp_prop (case_ E_trigger_prop (case_ UB_handler F_trigger_prop)) _ RR t' t).
+    fun T RR Pt (t : itree (E +' F) T) =>
+      exists (t' : itree (E +' UBE +' F) T) , Pt t' /\ (interp_prop (case_ E_trigger_prop (case_ UB_handler F_trigger_prop)) _ RR t' t).
 
 End PARAMS_MODEL.
 
