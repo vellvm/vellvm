@@ -159,13 +159,6 @@ Proof.
   apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
 Qed.
 
-(*
-Lemma transpose_reflexive : forall {A} (RR : A -> A -> Prop) (HR : Reflexive RR), Reflexive (transpose RR).
-Proof.
-  intros. repeat red. apply HR.
-Qed.  
-*)
-
 (* Things are different for L4 and L5: we get into the [Prop] monad. *)
 Lemma refine_34 : forall t1 t2,
     refine_L3 t1 t2 -> refine_L4 (model_undef refine_res3 t1) (model_undef refine_res3 t2).
@@ -360,8 +353,7 @@ Proof.
 Qed.
 
 (**
-   SAZ : Possible entry point here
-   We should be able to prove that the interpreter belongs to the model.
+   We prove that the interpreter belongs to the model.
  *)
 Theorem interpreter_sound: forall p, model p (interpreter p).
 Proof.

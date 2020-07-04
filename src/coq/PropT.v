@@ -237,37 +237,20 @@ Section PropMonad.
       ; bind := bind_PropT
     |}.
 
-  (* SAZ: maybe define directly by coinduction  *)
-  Definition MonadIter_Prop_itree {E F} :=
-    fun R (RR: relation R) (step : itree E R -> PropT F (itree E R + R)) i =>
-      fun (r : itree F R) =>
-        (exists step' : itree E R  -> itree F (itree E R + R)%type,
-            (Proper(eutt (flip RR) ==> (eutt (sum_rel (eutt eq) eq))) step') /\
-            (* How do we state that something is out of bounds? *)
-            (forall j, step j (step' j)) /\
-            eutt eq (CategoryOps.iter step' i) r).
 
   Definition handler_correct {E F} (h_spec: E ~> PropT F) (h: E ~> itree F) :=
     (forall T e, h_spec T e (h T e)).
 
-
-  Definition interp_PropT' {E F : Type -> Type} (h : E ~> PropT F) :
-  forall R (RR: relation R), itree E R -> PropT F R := fun R RR =>
-  MonadIter_Prop_itree _ RR (fun t =>
-    match observe t with
-    | RetF r => ret (inr r)
-    | TauF t => ret (inl t)
-    | VisF e k => fmap (fun x => inl (k x)) (h _ e)
-    end).
 
   Definition interp_PropT {E F : Type -> Type} (h_spec : E ~> PropT F) :
     forall R (RR: relation R), itree E R -> PropT F R :=
     fun R RR (t : itree E R) s =>
       exists h, handler_correct h_spec h /\ eutt RR (interp h t) s.
                                                      
-  
   Definition interp_prop {E F} (h : E ~> PropT F) :
     forall R (RR: relation R), itree E R -> PropT F R := interp_PropT h.
+
+
 
 
   Lemma interp_prop_correct_exec:
@@ -278,41 +261,8 @@ Section PropMonad.
     intros.
     exists h; split; auto. reflexivity.
   Qed.
-  
-
-  Lemma case_prop_handler_correct:
-    forall {E1 E2 F}
-      (h1_spec: E1 ~> PropT F)
-      (h2_spec: E2 ~> PropT F)
-      (h1: E1 ~> itree F)
-      (h2: E2 ~> itree F)
-      (C1: handler_correct h1_spec h1)
-      (C2: handler_correct h2_spec h2),
-      handler_correct (case_ h1_spec h2_spec) (case_ h1 h2).
-  Proof.
-    intros E1 E2 F h1_spec h2_spec h1 h2 C1 C2.
-    unfold handler_correct in *.
-    intros T e.
-    destruct e. apply C1. apply C2.
-  Qed.
 
 
-  Definition prop_compose :=
-    fun {F G : Type -> Type } {T : Type} (TT : relation T)
-      (g_spec : F ~> PropT G) (PF: PropT F T) (g:itree G T) =>
-      exists f : itree F T, PF f /\ (interp_prop g_spec) T TT f g.
-
-
-  Definition handler_correct_prop
-             {E F G}
-             (h_spec: E ~> PropT F) (h: E ~> itree F)
-             (g_spec: F ~> PropT G) (g: F ~> itree G)
-    :=
-      (forall T TT e,
-          (prop_compose TT g_spec (h_spec T e))
-            (interp g (h T e))).
-
-  
   Instance interp_prop_Proper_eq :
     forall R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR) E F (h_spec : E ~> PropT F),
       Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_prop E _ h_spec R RR).
@@ -400,6 +350,86 @@ Section PropMonad.
       rewrite (itree_eta t2). assumption.
   Qed.
 
+  (* SAZ: maybe define directly by coinduction  *)
+  (* SAZ: For some reason, if this definition is moved below case_prop_handler_correct, I get a universe inconsistency(!) *)
+  Definition MonadIter_Prop_itree {E F} :=
+    fun R (RR: relation R) (step : itree E R -> PropT F (itree E R + R)) i =>
+      fun (r : itree F R) =>
+        (exists step' : itree E R  -> itree F (itree E R + R)%type,
+            (* How do we state that something is out of bounds? *)
+            (forall j, step j (step' j)) /\
+            eutt RR (CategoryOps.iter step' i) r).
+
+  Definition interp_PropT' {E F : Type -> Type} (h : E ~> PropT F) :
+  forall R (RR: relation R), itree E R -> PropT F R := fun R RR =>
+  MonadIter_Prop_itree _ RR (fun t =>
+    match observe t with
+    | RetF r => ret (inr r)
+    | TauF t => ret (inl t)
+    | VisF e k => fmap (fun x => inl (k x)) (h _ e)
+    end).
+
+  Lemma interp_PropT_OK : forall {E F} (h_spec : E ~> PropT F) R RR t u,
+      interp_prop h_spec R RR t u -> interp_PropT' h_spec R RR t u.
+  Proof.
+    intros.
+    do 2 red in H.
+    do 2 red. destruct H as (h & HC & eq).
+    unfold interp in eq.
+    exists (fun t : itree (fun H : Type => E H) R =>
+             match observe t with
+             | RetF r => ret (inr r)
+             | TauF t0 => ret (inl t0)
+             | @VisF _ _ _ X e k => fmap (fun x : X => inl (k x)) (h X e)
+             end).
+    split.
+    - unfold handler_correct in HC.
+      intros j.
+      destruct (observe j).
+      * cbn. reflexivity.
+      * cbn. reflexivity.
+      * cbn. exists (h X e). split. apply HC. reflexivity.
+    - assumption.
+  Qed.
+
+  
+  Lemma case_prop_handler_correct:
+    forall {E1 E2 F}
+      (h1_spec: E1 ~> PropT F)
+      (h2_spec: E2 ~> PropT F)
+      (h1: E1 ~> itree F)
+      (h2: E2 ~> itree F)
+      (C1: handler_correct h1_spec h1)
+      (C2: handler_correct h2_spec h2),
+      handler_correct (case_ h1_spec h2_spec) (case_ h1 h2).
+  Proof.
+    intros E1 E2 F h1_spec h2_spec h1 h2 C1 C2.
+    unfold handler_correct in *.
+    intros T e.
+    destruct e. apply C1. apply C2.
+  Qed.
+
+
+  Definition prop_compose :=
+    fun {F G : Type -> Type } {T : Type} (TT : relation T)
+      (g_spec : F ~> PropT G) (PF: PropT F T) (g:itree G T) =>
+      exists f : itree F T, PF f /\ (interp_prop g_spec) T TT f g.
+
+
+  Definition handler_correct_prop
+             {E F G}
+             (h_spec: E ~> PropT F) (h: E ~> itree F)
+             (g_spec: F ~> PropT G) (g: F ~> itree G)
+    :=
+      (forall T TT e,
+          (prop_compose TT g_spec (h_spec T e))
+            (interp g (h T e))).
+
+
+
+  
+
+  
   
   Definition singletonT {E}: itree E ~> PropT E :=
     fun R t t' => t' ≈ t.

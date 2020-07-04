@@ -53,7 +53,6 @@ Proof.
     reflexivity.
 Qed.
 
-(* SAZ: TODO -- try to prove this! *)
 Instance refine_uvalue_Transitive : Transitive refine_uvalue.
 Proof.
   repeat intro.
@@ -65,22 +64,6 @@ Proof.
     apply refine_poison in H. subst. econstructor.
     apply RefineConcrete. intros. assumption. auto. 
 Qed.
-    
-
-
-(* YZ: The following is unlikely to be useful I believe. *)
-(*
-Inductive refine_dvalue: dvalue -> dvalue -> Prop :=
-| DvalueRefl : forall v, refine_dvalue v v
-| Poison : forall v, refine_dvalue v DVALUE_Poison
-.
-
-Instance refine_dvalue_Reflexive : Reflexive refine_dvalue.
-Proof.
-  unfold Reflexive. intros x.
-  induction x; constructor; auto.
-Qed.
- *)
 
 Infix"×" := prod_rel (at level 90, left associativity).
 
