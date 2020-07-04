@@ -155,7 +155,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
                                                   dv2 <- concretize_uvalue v2 ;;
                                                   eval_fcmp cmp dv1 dv2
-      | _ => failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"
+      | _ => (lift (failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"))
       (*
   | UVALUE_Conversion conv v t_to          =>
   | UVALUE_GetElementPtr t ptrval idxs     => _
@@ -197,7 +197,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         + cbn.
           assert (0 = Z.of_nat 0) by auto. 
           admit.
-    Admitted.          
+    Admitted.
 
     Lemma concretize_u_concretize_uvalue : forall u, concretize_u u (concretize_uvalue u).
     Proof.
@@ -256,16 +256,8 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
             -- destruct s; auto.
                destruct (unEitherT (map_monad concretize_uvalue elts)); auto.
                destruct s; auto.
-      - cbn. (* All the remaning cases should be trivially discharged, concretize_u
-        might be missing something...*) admit.
-      - cbn. admit.
-      - cbn. admit.
-      - cbn. admit. 
-    - (* Packed_struct *) admit.
-    Admitted.
+    Qed.
 
-
-      
     Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} : PickE ~> itree E :=
       fun T p => match p with
               | pick u P => lift_undef_or_err ret (concretize_uvalue u)
