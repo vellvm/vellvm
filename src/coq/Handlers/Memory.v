@@ -1722,7 +1722,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       let a1_end   := snd a1 + sz1 in
       let a2_start := snd a2 in
       let a2_end   := snd a2 + sz2 in
-      (fst a1 ~=? fst a2) || (a1_start >? a2_end) || (a2_start >? a1_end).
+      (fst a1 /~=? fst a2) || (a1_start >? a2_end) || (a2_start >? a1_end).
 
     Lemma not_overlaps__no_overlap :
       forall a1 τ1 a2 τ2,
@@ -3021,76 +3021,258 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       (*   - inversion Hwrite. *)
       (* Qed. *)
 
-    From Vellvm Require Import DynamicValues.
+      Lemma no_overlap_reflect :
+        forall x y s, reflect (no_overlap x s y s) (no_overlap_b x s y s).
+      Proof.
+        intros.
+        destruct x as (x1 & x2).
+        destruct y as (y1 & y2).
+        match goal with
+        | |- reflect ?L ?R => remember L as LHS; remember R as RHS
+        end.
+        destruct RHS; subst; constructor.
+        - unfold no_overlap.
+          unfold no_overlap_b in HeqRHS.
+          cbn in *.
+          destruct (x2 >? y2 + s) eqn: EQ2.
+          + rewrite Z.gtb_lt in EQ2. right. left.
+            rewrite Z.gt_lt_iff. auto.
+          + destruct (y2 >? x2 + s) eqn: EQ3.
+            * rewrite Z.gtb_lt in EQ3. right. right.
+              rewrite Z.gt_lt_iff. auto.
+            * destruct (x1 /~=? y1) eqn: EQ1.
+              -- left. auto.
+              -- cbn in HeqRHS. inversion HeqRHS.
+        - unfold no_overlap.
+          unfold no_overlap_b in HeqRHS.
+          cbn in *.
+          destruct (x1 /~=? y1) eqn: EQ1; try inversion HeqRHS.
+          destruct (x2 >? y2 + s) eqn: EQ2; try inversion HeqRHS.
+          destruct (y2 >? x2 + s) eqn: EQ3; try inversion HeqRHS.
+          intuition.
+          + rewrite Z.gt_lt_iff in H2.
+            rewrite <- Z.gtb_lt in H2.
+            rewrite H2 in EQ2. inversion EQ2.
+          + rewrite Z.gt_lt_iff in H2.
+            rewrite <- Z.gtb_lt in H2.
+            rewrite H2 in EQ3. inversion EQ3.
+          (* TODO: Write symmetric variants of Z.gtb_lt lemmas. *)
+      Qed.
+
+      Lemma app_prefix_eq :
+          forall (A : Type) (a b c: list A),
+            a = b -> a ++ c = b ++ c.
+      Proof.
+        intros.
+        rewrite H2. reflexivity.
+      Qed.
+
+      Lemma Zseq_app : forall off n : Z,
+          0 <= n ->
+          Zseq off (Z.to_nat (Z.succ n)) =
+          Zseq off (Z.to_nat n) ++ [off + n].
+      Proof.
+        intros.
+        unfold Z.succ.
+        setoid_rewrite Z2Nat.inj_add; auto.
+        unfold Z.to_nat at 2. unfold Pos.to_nat. cbn.
+        remember (Z.to_nat n) as sz.
+        assert (off_H: off + n = off + (Z.of_nat sz)). {
+          rewrite Heqsz. rewrite Z2Nat.id. reflexivity. auto.
+        }
+        rewrite off_H.
+        clear Heqsz off_H.
+        induction sz.
+        - cbn.
+          rewrite Zred_factor6 at 1.
+          reflexivity.
+        - rewrite Nat.add_1_r in IHsz.
+          cbn in IHsz.
+          pose proof Zseq_succ.
+          rewrite <- Nat.add_1_r at 2 3.
+          setoid_rewrite IHsz.
+          cbn. 
+          rewrite Nat.add_1_l. 
+      Admitted.
+
+      Lemma Zseq_length :
+        forall (sz : nat) off, sz = length (Zseq off sz).
+      Proof.
+      Admitted.
+
+      Lemma list_nth_z_length:
+        forall A (l : list A) (a : A),
+          list_nth_z (l ++ [a]) (Z.of_nat (length l)) = Some a.
+      Proof.
+      Admitted.
+
+      Lemma list_singleton_eq:
+        forall A (a b: A), a = b -> [a] = [b].
+      Proof.
+        intros. rewrite H2. reflexivity.
+      Qed.
+
+      Lemma lookup_all_index_add_all_length_app:
+        forall a sz l l' offset bytes (def : a),
+          length l = sz ->
+          lookup_all_index offset (Z.of_nat sz)
+                           (add_all_index (l ++ l') offset bytes) def =
+          lookup_all_index offset (Z.of_nat sz)
+                           (add_all_index l offset bytes) def.
+      Proof.
+      Admitted.
+
+      Lemma lookup_all_index_add_all_index :
+            forall (sz : nat) src_bytes src_offset dst_bytes dst_offset def,
+       (lookup_all_index dst_offset (Z.of_nat sz)
+          (add_all_index
+             (lookup_all_index src_offset (Z.of_nat sz) src_bytes def)
+             dst_offset dst_bytes) SUndef) =
+       (lookup_all_index src_offset (Z.of_nat sz) src_bytes def).
+      Proof.
+        intros sz src_bytes src_offset dst_bytes dst_offset def.
+        induction sz.
+        - cbn; reflexivity.
+        - assert (Z.of_nat (S sz) = Z.succ (Z.of_nat sz)). cbn.
+          apply Zpos_P_of_succ_nat.
+          rewrite H2.
+          unfold lookup_all_index in *.
+          remember (fun x0 : IM.key =>
+                match lookup x0 src_bytes with
+                | Some val => val
+                | None => def
+                end).
+          rewrite 2 Zseq_app.
+          unfold lookup_all_index in IHsz.
+          + assert (match
+                lookup (dst_offset + Z.of_nat sz)
+                  (add_all_index
+                    (map s (Zseq src_offset (Z.to_nat (Z.of_nat sz)) ++
+                          [src_offset + Z.of_nat sz]))
+                    dst_offset dst_bytes)
+                    with
+                    | Some val => val
+                    | None => SUndef
+                    end = s (src_offset + Z.of_nat sz)). {
+              erewrite lookup_add_all_index_in. Unshelve.
+              3 : {
+                rewrite Z.add_simpl_l. rewrite list_nth_z_map.
+                unfold option_map.
+                rewrite (@Zseq_length sz src_offset) at 3.
+                rewrite Nat2Z.id.
+                rewrite list_nth_z_length. reflexivity.
+              }
+              reflexivity.
+              - split.
+                + rewrite <- Z.add_0_r at 1.
+                  rewrite <- Z.add_le_mono_l.
+                  apply Zle_0_nat.
+                + rewrite <- Z.add_sub_assoc.
+                  rewrite <- Z.add_le_mono_l.
+                  rewrite Zlength_correct.
+                  rewrite map_length.
+                  rewrite app_length. cbn.
+                  rewrite Nat2Z.id.
+                  rewrite <- Zseq_length at 1.
+                  rewrite Nat2Z.inj_add. cbn.
+                  rewrite Z.add_simpl_r.
+                  apply Z.le_refl.
+            }
+            rewrite 2 map_app. cbn. rewrite map_app in H3.
+            cbn in H3.
+            apply list_singleton_eq in H3. rewrite H3. clear H3.
+            eapply app_prefix_eq.
+            remember (add_all_index
+            (map s (Zseq src_offset (Z.to_nat (Z.of_nat sz))) ++
+             [s (src_offset + Z.of_nat sz)]) dst_offset dst_bytes) as m.
+            remember (add_all_index
+                     (map s (Zseq src_offset (Z.to_nat (Z.of_nat sz))))
+                     dst_offset dst_bytes) as m'.
+            setoid_rewrite <- IHsz at 2.
+            match goal with
+            | |- ?L = ?R => remember L as LHS; remember R as RHS
+            end.
+            assert (LHS = lookup_all_index dst_offset (Z.of_nat sz) m SUndef).
+            {
+              rewrite HeqLHS. unfold lookup_all_index. subst.
+              reflexivity.
+            }
+            assert (RHS = lookup_all_index dst_offset (Z.of_nat sz) m' SUndef).
+            {
+              rewrite HeqRHS. unfold lookup_all_index. reflexivity.
+            }
+            rewrite H3, H4.
+            rewrite Heqm, Heqm'.
+            apply lookup_all_index_add_all_length_app.
+            pose proof Zseq_length as Zseq_length_H.
+            specialize (Zseq_length_H sz src_offset).
+            rewrite Nat2Z.id.
+            symmetry.
+            rewrite map_length. auto.
+          + apply Nat2Z.is_nonneg.
+          + apply Nat2Z.is_nonneg.
+      Qed.
+
       (* Note : For the current version of subevents, [interp_memory] must
         have subevent clauses assumed in Context, or else the
         [handle_intrinsic] handler will not get properly invoked. *)
+      (* IY: This is specialized to DTYPE_Array for practical
+         purposes. We could conjure a more complete definition later. *)
       Lemma interp_memory_intrinsic_memcpy :
-        forall (m : memory_stack) (dst src : Addr.addr) (i : nat)
+        forall (m : memory_stack) (dst src : Addr.addr) (sz : Z)
           (dst_val src_val : uvalue) (dτ : dtyp) volatile align,
-        get_array_cell m dst i dτ = inr dst_val ->
-        get_array_cell m src i dτ = inr src_val ->
-        no_overlap dst (Int32.unsigned (Int32.repr (Z.of_nat i))) src
-                   (Int32.unsigned (Int32.repr (Z.of_nat i))) ->
+        0 <= sz * sizeof_dtyp dτ <= Int32.max_unsigned ->
+        read m dst (DTYPE_Array sz dτ) = inr dst_val ->
+        read m src (DTYPE_Array sz dτ) = inr src_val ->
+        no_overlap dst (Int32.unsigned (Int32.repr (sz * sizeof_dtyp dτ))) src
+                   (Int32.unsigned (Int32.repr (sz * sizeof_dtyp dτ))) ->
         exists m' s,
         (interp_memory (trigger (Intrinsic DTYPE_Void
                     "llvm.memcpy.p0i8.p0i8.i32"
                     [DVALUE_Addr dst; DVALUE_Addr src;
-                      DVALUE_I32 (Int32.repr (Z.of_nat i));
+                      DVALUE_I32 (Int32.repr (sizeof_dtyp (DTYPE_Array sz dτ)));
                       DVALUE_I32 align ;
                       DVALUE_I1 volatile])) m ≈
                        ret (m', s, DVALUE_None)) /\
-          read (m', s) dst dτ = inr src_val.
+          read (m', s) dst (DTYPE_Array sz dτ) = inr src_val.
       Proof.
         intros m dst src i dst_val src_val dτ volatile align.
-        intros MEM_dst MEM_src NO_OVERLAP.
-        pose proof get_array_succeeds_allocated _ _ _ _ MEM_dst as ALLOC_dst.
-        pose proof get_array_succeeds_allocated _ _ _ _ MEM_src as ALLOC_src.
-        pose proof read_array_exists m
-            (Z.of_nat i) dτ i dst ALLOC_dst as RARRAY_dst.
-        pose proof read_array_exists m
-            (Z.of_nat i) dτ i src ALLOC_src as RARRAY_src.
-        destruct RARRAY_dst as (dst_ptr & GEP_dst & READ_dst).
-        destruct RARRAY_src as (src_ptr & GEP_src & READ_src).
+        intros size_H  MEM_dst MEM_src NO_OVERLAP.
+        unfold read in MEM_dst, MEM_src.
+        destruct (get_logical_block m (fst dst)) eqn: HM_dst. cbn in MEM_dst.
+        destruct l. 2 : { inversion MEM_dst. }
+        destruct (get_logical_block m (fst src)) eqn: HM_src. cbn in MEM_src.
+        destruct l. 2 : { inversion MEM_src. }
         setoid_rewrite interp_memory_trigger.
-        unfold interp_memory_h.
-        cbn.
+        unfold interp_memory_h. cbn.
         unfold resum, ReSum_id, id_, Id_IFun.
         unfold handle_intrinsic. cbn.
         destruct m.
         destruct dst as (dst_base & dst_offset).
         destruct src as (src_base & src_offset).
-        apply allocated_get_logical_block in ALLOC_dst.
-        apply allocated_get_logical_block in ALLOC_src.
-        destruct ALLOC_dst as (b_dst & LOG_BLOCK_dst).
-        destruct ALLOC_src as (b_src & LOG_BLOCK_src).
-        cbn in LOG_BLOCK_dst, LOG_BLOCK_src.
-        setoid_rewrite LOG_BLOCK_src. cbn. setoid_rewrite LOG_BLOCK_dst.
-        destruct b_src as [src_size src_bytes src_concrete_id].
-        destruct b_dst as [dst_size dst_bytes dst_concrete_id].
-        cbn.
-        assert (forall x y s, reflect (no_overlap x s y s) (no_overlap_b x s y s)).
-        admit.
-        eapply reflect_iff in H2. rewrite H2 in NO_OVERLAP. clear H2.
-        rewrite NO_OVERLAP.
+        epose proof no_overlap_reflect as reflect_H.
+        eapply reflect_iff in reflect_H.
+        rewrite reflect_iff in NO_OVERLAP. clear reflect_H.
+        setoid_rewrite NO_OVERLAP. cbn in *.
+        setoid_rewrite HM_src. cbn. setoid_rewrite HM_dst. cbn.
         exists (add_logical_block_mem dst_base
-         (LBlock dst_size
+         (LBlock size
             (add_all_index
                (lookup_all_index src_offset
-                  (Int32.unsigned (Int32.repr (Z.of_nat i))) src_bytes SUndef)
-               dst_offset dst_bytes) dst_concrete_id) m).
+                  (Int32.unsigned (Int32.repr (i * sizeof_dtyp dτ))) bytes0
+                  SUndef) dst_offset bytes) concrete_id) m).
         exists f. split; try reflexivity.
-        rewrite <- MEM_src. unfold get_array_cell. rewrite LOG_BLOCK_src.
-        cbn. unfold read. cbn.
-        setoid_rewrite get_logical_block_of_add_logical_block_mem.
-        cbn.
-        unfold read_in_mem_block.
-
-        (* IY : SOS @ CALVIN (bless) *)
-        (* IY: Should be equivalent, but how do we show this? *)
-
-
-    Admitted.
+        rewrite <- MEM_src. unfold read. cbn.
+        unfold read_in_mem_block. cbn.
+        rewrite Int32.unsigned_repr. 2 : apply size_H.
+        rewrite get_logical_block_of_add_logical_block_mem.
+        pose proof lookup_all_index_add_all_index.
+        specialize (H2 (Z.to_nat (i * sizeof_dtyp dτ))).
+        rewrite Z2Nat.id in H2.
+        rewrite H2. reflexivity. apply size_H.
+        apply no_overlap_reflect. Unshelve. unfold addr, Addr.addr.
+        exact (size0, size0). exact (size0, size0). eauto.
+      Qed.
 
     End Structural_Lemmas.
 

@@ -177,15 +177,94 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       - cbn. destruct (@IX_supported_dec sz).
         * inversion i; constructor; auto.
         * rewrite unsupported_cases; auto. constructor. auto.
+      - cbn. destruct (@IX_supported_dec sz).
+        * inversion i; admit.
+        * admit.
+      - cbn. induction fields. cbn. constructor.
+        cbn. constructor.
+        * admit.
+        * auto.
+      - cbn. induction fields. cbn. constructor.
+        cbn. constructor. 2 : auto. admit.
+      - cbn. destruct (@IX_supported_dec sz).
+        + remember (Z.to_nat sz).
+          assert (sz = Z.of_nat n). subst. rewrite Z2Nat.id. reflexivity. inversion i; omega.
+          rewrite H in *. clear H sz.
+          induction n. cbn.
+          * assert (0 = Z.of_nat 0) by auto. rewrite H. constructor.
+            auto. auto. admit.
+          * cbn. admit.
+        + cbn.
+          assert (0 = Z.of_nat 0) by auto. 
+          admit.
     Admitted.          
-      
+
     Lemma concretize_u_concretize_uvalue : forall u, concretize_u u (concretize_uvalue u).
     Proof.
       intros u.
       induction u using uvalue_ind'; try do_it.
       - cbn. apply Concretize_Undef. apply dvalue_default.
-      - cbn. (* need to relate map_monad to the forall  *)
+      - cbn. induction fields.
+        + cbn. constructor. auto.
+        + rewrite list_cons_app. rewrite map_monad_app. cbn.
+          assert (IN: forall u : uvalue, In u fields -> concretize_u u (concretize_uvalue u)).
+          { intros. apply H. apply in_cons; auto. } specialize (IHfields IN).
+          specialize (H a). assert (In a (a :: fields)) by apply in_eq. specialize (H H0).
+          pose proof Concretize_Struct_Cons as CONS.
+          specialize (CONS _ _ _ _ H IHfields). cbn in CONS.
+          * destruct (unEitherT (concretize_uvalue a)).
+            -- auto.
+            -- destruct s; auto.
+               destruct (unEitherT (map_monad concretize_uvalue fields)); auto.
+               destruct s; auto.
+      - cbn. induction fields.
+        + cbn. constructor. auto.
+        + rewrite list_cons_app. rewrite map_monad_app. cbn.
+          assert (IN: forall u : uvalue, In u fields -> concretize_u u (concretize_uvalue u)).
+          { intros. apply H. apply in_cons; auto. } specialize (IHfields IN).
+          specialize (H a). assert (In a (a :: fields)) by apply in_eq. specialize (H H0).
+          pose proof Concretize_Packed_struct_Cons as CONS.
+          specialize (CONS _ _ _ _ H IHfields). cbn in CONS.
+          * destruct (unEitherT (concretize_uvalue a)).
+            -- auto.
+            -- destruct s; auto.
+               destruct (unEitherT (map_monad concretize_uvalue fields)); auto.
+               destruct s; auto.
+      - cbn. induction elts.
+        + cbn. constructor. auto.
+        + rewrite list_cons_app. rewrite map_monad_app. cbn.
+          assert (IN: forall u : uvalue, In u elts -> concretize_u u (concretize_uvalue u)).
+          { intros. apply H. apply in_cons; auto. } specialize (IHelts IN).
+          specialize (H a). assert (In a (a :: elts)) by apply in_eq. specialize (H H0).
+          pose proof Concretize_Array_Cons as CONS.
+          specialize (CONS _ _ _ _ H IHelts). cbn in CONS.
+          * destruct (unEitherT (concretize_uvalue a)).
+            -- auto.
+            -- destruct s; auto.
+               destruct (unEitherT (map_monad concretize_uvalue elts)); auto.
+               destruct s; auto.
+      - cbn. induction elts.
+        + cbn. constructor. auto.
+        + rewrite list_cons_app. rewrite map_monad_app. cbn.
+          assert (IN: forall u : uvalue, In u elts -> concretize_u u (concretize_uvalue u)).
+          { intros. apply H. apply in_cons; auto. } specialize (IHelts IN).
+          specialize (H a). assert (In a (a :: elts)) by apply in_eq. specialize (H H0).
+          pose proof Concretize_Vector_Cons as CONS.
+          specialize (CONS _ _ _ _ H IHelts). cbn in CONS.
+          * destruct (unEitherT (concretize_uvalue a)).
+            -- auto.
+            -- destruct s; auto.
+               destruct (unEitherT (map_monad concretize_uvalue elts)); auto.
+               destruct s; auto.
+      - cbn. (* All the remaning cases should be trivially discharged, concretize_u
+        might be missing something...*) admit.
+      - cbn. admit.
+      - cbn. admit.
+      - cbn. admit. 
+    - (* Packed_struct *) admit.
     Admitted.
+
+
       
     Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} : PickE ~> itree E :=
       fun T p => match p with

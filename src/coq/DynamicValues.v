@@ -395,26 +395,6 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
    *)
   end.
 
-Instance EqM_err: Monad.EqM err := fun a x y => @eq (err a) x y.
-
-Instance EqMProps_err: Monad.EqMProps err.
-constructor.
-- repeat intro. repeat red. destruct x; reflexivity.
-- repeat intro. repeat red. repeat red in H.
-  destruct x; destruct y; try auto; try contradiction.
-- repeat intro. repeat red in H, H0. repeat red.
-  destruct x, y, z; auto; try contradiction; try etransitivity; eauto.
-Qed.
-
-Instance MonadLaws_err: Monad.MonadLaws err.
-constructor.
-- intros. repeat red. cbn. auto.
-- intros. repeat red. cbn. destruct x eqn: Hx; auto.
-- intros. repeat red. cbn.
-  destruct x; auto.
-- repeat intro. repeat red. cbn. repeat red in H. rewrite H.
-  repeat red in H0. destruct y; auto.
-Qed.
 
 Lemma list_cons_app :
   forall {A} (x : A) l, x :: l = [x] ++ l.
@@ -1608,7 +1588,6 @@ Class VInt I : Type :=
   (* Concrete uvalue are contretized into their singleton *)
   | Pick_concrete             : forall uv (dv : dvalue), uvalue_to_dvalue uv = inr dv -> concretize_u uv (ret dv)
   | Pick_fail                 : forall uv s, uvalue_to_dvalue uv = inl s  -> concretize_u uv (lift (failwith s))
-
   (* Undef relates to all dvalue of the type *)
   | Concretize_Undef          : forall dt dv, dvalue_has_dtyp dv dt ->  concretize_u (UVALUE_Undef dt) (ret dv)
 
