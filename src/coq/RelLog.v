@@ -81,5 +81,32 @@ Section State.
     apply (H2 _ _ PRE').
   Qed.
 
+  (* SAZ: Need a better name for this *)
+  Definition REL {A B} (Q : rel (σ1 * A) (σ2 * B)) (a:A) (b:B) : rel (σ1 * A) (σ2 * B) :=
+    fun '(s1, a') '(s2, b') => a = a' /\ b = b' /\ Q (s1, a) (s2, b).
+  
+  Lemma consequence_state_bind:
+    forall {A1 A2 B1 B2}
+      (R: rel σ1 σ2)
+      (Q: rel (σ1 * A1) (σ2 * B1))
+      (S: rel (σ1 * A2) (σ2 * B2))
+      (p1: prog σ1 A1) (p2: A1 -> prog σ1 A2) (q1: prog σ2 B1) (q2: B1 -> prog σ2 B2),
+      {{↑R}}(p1,q1){{Q}} ->
+      (forall a b, {{REL Q a b}}(p2 a, q2 b){{S}}) -> 
+      {{↑R}}
+        (fun s1 => '(s2,a1) <- p1 s1;; p2 a1 s2,
+         fun s1 => '(s2,b1) <- q1 s1;; q2 b1 s2)
+        {{S}}.
+  Proof.
+    intros * H1 H2.
+    intros s1 s2 PRE; specialize (H1 _ _ PRE).
+    destruct s1 as [s1 []], s2 as [s2 []]; cbn.
+    eapply eutt_clo_bind; eauto.
+    intros [s1' ?] [s2' ?] PRE'.
+    specialize (H2 a b (s1', a) (s2', b)). cbn in H2.
+    apply H2. repeat split; auto.
+  Qed.
+
+  
 End State.
 
