@@ -66,16 +66,44 @@ Section State.
       (Q: rel (σ1 * A1) (σ2 * B1))
       (S: rel (σ1 * A2) (σ2 * B2))
       (p1: prog σ1 A1) (p2: prog σ1 A2) (q1: prog σ2 B1) (q2: prog σ2 B2),
-      {{↑R}}(p1,q1){{Q}} ->
-      {{Q}}(p2,q2){{S}} -> 
+
+
+      {{↑R}} (p1,q1) {{Q}} ->
+      {{Q}}  (p2,q2) {{S}} ->
+   (* ---------------------------------- *)
       {{↑R}}
         (fun s1 => '(s2,_) <- p1 s1;; p2 s2,
          fun s1 => '(s2,_) <- q1 s1;; q2 s2)
-        {{S}}.
+      {{S}}.
   Proof.
     intros * H1 H2.
     intros s1 s2 PRE; specialize (H1 _ _ PRE).
     destruct s1 as [s1 []], s2 as [s2 []]; cbn.
+    eapply eutt_clo_bind; eauto.
+    intros [s1' ?] [s2' ?] PRE'.
+    apply (H2 _ _ PRE').
+  Qed.
+
+  Notation "'[[' P ']]' '(' p ',' q ')' '[[' Q ']]'" :=
+    (forall s1 s2, P s1 s2 -> eutt Q (p (snd s1) (fst s1)) (q (snd s2) (fst s2))).
+ 
+  Lemma consequence_state_bind:
+    forall {A1 A2 B1 B2}
+      (R: rel σ1 σ2)
+      (Q: rel (σ1 * A1) (σ2 * B1))
+      (S: rel (σ1 * A2) (σ2 * B2))
+      (p1: prog σ1 A1) (p2: A1 -> prog σ1 A2) (q1: prog σ2 B1) (q2: B1 -> prog σ2 B2),
+      [[↑ R]] (fun _ => p1, fun _ => q1) [[Q]] ->
+      [[ Q ]] (p2, q2) [[S]] ->
+   (* ---------------------------------- *)
+      [[↑R]]
+        (fun _ s1 => '(s2,a) <- p1 s1 ;; p2 a s2,
+         fun _ s1 => '(s2,b) <- q1 s1 ;; q2 b s2)
+      [[S]].
+  Proof.
+    intros * H1 H2.
+    intros s1 s2 PRE; specialize (H1 _ _ PRE).
+    destruct s1 as [s1 ()], s2 as [s2 ()]; cbn.
     eapply eutt_clo_bind; eauto.
     intros [s1' ?] [s2' ?] PRE'.
     apply (H2 _ _ PRE').
