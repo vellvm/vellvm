@@ -3090,9 +3090,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           cbn in IHsz.
           pose proof Zseq_succ.
           rewrite <- Nat.add_1_r at 2 3.
-          setoid_rewrite IHsz.
-          cbn. 
-          rewrite Nat.add_1_l. 
+          (* setoid_rewrite IHsz. *)
+          (* cbn.  *)
+          (* rewrite Nat.add_1_l.  *)
       Admitted.
 
       Lemma Zseq_length :
