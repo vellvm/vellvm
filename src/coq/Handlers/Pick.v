@@ -96,15 +96,17 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
     Open Scope Z_scope.
 
+    Definition default_dvalue_of_dtyp_i sz :=
+      (if (sz =? 64) then DVALUE_I64 (repr 0)
+        else if (sz =? 32) then DVALUE_I32 (repr 0)
+            else if (sz =? 8) then DVALUE_I8 (repr 0)
+                  else if (sz =? 1) then DVALUE_I1 (repr 0)
+                      else DVALUE_None).
+
     (* Handler for PickE which concretizes everything to 0 *)
     Fixpoint default_dvalue_of_dtyp (dt : dtyp) : dvalue :=
       match dt with
-      | DTYPE_I sz =>
-            (if (sz =? 64) then DVALUE_I64 (repr 0)
-             else if (sz =? 32) then DVALUE_I32 (repr 0)
-                  else if (sz =? 8) then DVALUE_I8 (repr 0)
-                       else if (sz =? 1) then DVALUE_I1 (repr 0)
-                            else DVALUE_None) 
+      | DTYPE_I sz => default_dvalue_of_dtyp_i sz
       | DTYPE_Pointer => DVALUE_Addr A.null
       | DTYPE_Void => DVALUE_None
       | DTYPE_Half => DVALUE_Float Float32.zero (* ??? *)
@@ -170,40 +172,62 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
     Ltac do_it := constructor; cbn; auto; fail.
 
-    Lemma dvalue_default : forall t,  dvalue_has_dtyp (default_dvalue_of_dtyp t) t.
+    Lemma forall_repeat_true:
+      forall A (f : A -> Prop) n x, f x -> Forall (fun y : A => f y) (repeat x n).
     Proof.
-      intros t.
-      induction t using dtyp_ind; try do_it.
-      - cbn. destruct (@IX_supported_dec sz).
+      intros. induction n. cbn. constructor.
+      constructor. auto. cbn. apply IHn.
+    Qed.
+
+    Lemma dvalue_default : forall t,
+        well_formed_dtyp t ->
+        dvalue_has_dtyp (default_dvalue_of_dtyp t) t.
+    Proof.
+      intros t H.
+      induction t using dtyp_ind'; try do_it.
+      - intros. cbn. unfold default_dvalue_of_dtyp_i. destruct (@IX_supported_dec a).
         * inversion i; constructor; auto.
         * rewrite unsupported_cases; auto. constructor. auto.
-      - cbn. destruct (@IX_supported_dec sz).
-        * inversion i; admit.
-        * admit.
-      - cbn. induction fields. cbn. constructor.
-        cbn. constructor.
-        * admit.
-        * auto.
-      - cbn. induction fields. cbn. constructor.
-        cbn. constructor. 2 : auto. admit.
-      - cbn. destruct (@IX_supported_dec sz).
-        + remember (Z.to_nat sz).
-          assert (sz = Z.of_nat n). subst. rewrite Z2Nat.id. reflexivity. inversion i; omega.
-          rewrite H in *. clear H sz.
-          induction n. cbn.
-          * assert (0 = Z.of_nat 0) by auto. rewrite H. constructor.
-            auto. auto. admit.
-          * cbn. admit.
-        + cbn.
-          assert (0 = Z.of_nat 0) by auto. 
-          admit.
-    Admitted.
+      - cbn. inversion H.
+        apply Z_of_nat_complete in H2. destruct H2. subst.
+        constructor.
+        apply forall_repeat_true. apply IHt. auto.
+        rewrite Nat2Z.id. apply repeat_length.
+      - cbn.
+        induction fields.
+        + constructor.
+        + apply DVALUE_Struct_Cons_typ.
+          * assert (In a (a :: fields)) by apply in_eq. specialize (H0 _ H1).
+            apply H0. inversion H. auto.
+          * assert (IN: forall u : dtyp, In u fields -> well_formed_dtyp u -> dvalue_has_dtyp (default_dvalue_of_dtyp u) u). {
+              intros. apply H0. apply in_cons; auto. auto.
+            }
+            specialize (IHfields IN).
+            apply IHfields. inversion H; auto.
+      - cbn.
+        induction fields.
+        + constructor.
+        + constructor.
+          * assert (In a (a :: fields)) by apply in_eq. specialize (H0 _ H1).
+            apply H0. inversion H. auto.
+          * assert (IN: forall u : dtyp, In u fields -> well_formed_dtyp u -> dvalue_has_dtyp (default_dvalue_of_dtyp u) u). {
+              intros. apply H0. apply in_cons; auto. auto.
+            }
+            specialize (IHfields IN).
+            apply IHfields. inversion H; auto.
+      - cbn. inversion H.
+        apply Z_of_nat_complete in H2. destruct H2. subst.
+        constructor.
+        apply forall_repeat_true. apply IHt. auto.
+        rewrite Nat2Z.id. apply repeat_length. auto.
+    Qed.
+
 
     Lemma concretize_u_concretize_uvalue : forall u, concretize_u u (concretize_uvalue u).
     Proof.
       intros u.
       induction u using uvalue_ind'; try do_it.
-      - cbn. apply Concretize_Undef. apply dvalue_default.
+      - cbn. apply Concretize_Undef. apply dvalue_default. admit.
       - cbn. induction fields.
         + cbn. constructor. auto.
         + rewrite list_cons_app. rewrite map_monad_app. cbn.
@@ -256,7 +280,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
             -- destruct s; auto.
                destruct (unEitherT (map_monad concretize_uvalue elts)); auto.
                destruct s; auto.
-    Qed.
+    Admitted.
 
     Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} : PickE ~> itree E :=
       fun T p => match p with
