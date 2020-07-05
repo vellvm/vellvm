@@ -318,7 +318,7 @@ Lemma refine_UB
     apply case_prop_handler_correct.
     apply UB_handler_correct.
     unfold handler_correct. intros. reflexivity.
-    assumption.
+    assumption. reflexivity.
 Qed.
 
 Lemma Pick_handler_correct :
@@ -349,7 +349,7 @@ Proof.
   apply Pick_handler_correct.
 
   unfold handler_correct. intros. reflexivity.
-  assumption.
+  assumption. reflexivity.
 Qed.
 
 (**
