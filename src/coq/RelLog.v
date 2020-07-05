@@ -19,7 +19,7 @@ Section Pure.
       
       (p1,q1){{R}} ->
       (p2,q2){{Q}} ->
-      (* --------- *)
+      (* --------------- *)
       (p1;;p2,q1;;q2){{Q}}. 
 
   Proof.
@@ -27,6 +27,22 @@ Section Pure.
     eapply eutt_clo_bind; eauto.
   Qed.
 
+  Lemma consequence_pure_bind:
+    forall {A1 A2 B1 B2}
+      (R: rel A1 B1) (Q: rel A2 B2)
+      (p1: prog A1) (p2: A1 -> prog A2) (q1: prog B1) (q2: B1 -> prog B2),
+      
+      (p1,q1){{R}} ->
+      (forall a b, R a b -> (p2 a,q2 b){{Q}}) ->
+      (* ----------------------------- *)
+      (x <- p1;;p2 x, x <- q1;;q2 x){{Q}}. 
+
+  Proof.
+    intros.
+    eapply eutt_clo_bind; eauto.
+  Qed.
+
+  
 End Pure.
 
 Section State.
