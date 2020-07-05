@@ -1426,10 +1426,6 @@ Class VInt I : Type :=
      it's defined here.
    *)
 
-  Definition vector_dtyp dt :=
-    forall n, dt = DTYPE_I n \/ dt = DTYPE_Pointer \/ dt = DTYPE_Half \/ dt = DTYPE_Float \/
-         dt = DTYPE_Double \/ dt = DTYPE_X86_fp80 \/ dt = DTYPE_Fp128 \/ dt = DTYPE_Ppc_fp128.
-
   (* Poison not included because of concretize *)
   Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
   | DVALUE_Addr_typ   : forall a, dvalue_has_dtyp (DVALUE_Addr a) DTYPE_Pointer
@@ -1589,7 +1585,9 @@ Class VInt I : Type :=
   | Pick_concrete             : forall uv (dv : dvalue), uvalue_to_dvalue uv = inr dv -> concretize_u uv (ret dv)
   | Pick_fail                 : forall uv s, uvalue_to_dvalue uv = inl s  -> concretize_u uv (lift (failwith s))
   (* Undef relates to all dvalue of the type *)
-  | Concretize_Undef          : forall dt dv, dvalue_has_dtyp dv dt ->  concretize_u (UVALUE_Undef dt) (ret dv)
+  | Concretize_Undef          : forall dt dv,
+      dvalue_has_dtyp dv dt ->
+      concretize_u (UVALUE_Undef dt) (ret dv)
 
   (* The other operations proceed non-deterministically *)
   | Concretize_IBinop : forall iop uv1 e1 uv2 e2,
