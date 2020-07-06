@@ -1579,11 +1579,10 @@ Class VInt I : Type :=
     Qed.
   End dvalue_has_dtyp_ind.
 
-  
   Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop := 
   (* Concrete uvalue are contretized into their singleton *)
   | Pick_concrete             : forall uv (dv : dvalue), uvalue_to_dvalue uv = inr dv -> concretize_u uv (ret dv)
-  | Pick_fail                 : forall uv s, uvalue_to_dvalue uv = inl s  -> concretize_u uv (lift (failwith s))
+  | Pick_fail                 : forall uv v s, ~ (uvalue_to_dvalue uv = inr v)  -> concretize_u uv (lift (failwith s))
   (* Undef relates to all dvalue of the type *)
   | Concretize_Undef          : forall dt dv,
       dvalue_has_dtyp dv dt ->

@@ -419,8 +419,6 @@ Import Eq.
 Lemma denote_bks_nil: forall s, D.denote_bks [] s ≈ ret (inl s).
 Proof.
   intros s; unfold D.denote_bks.
-  unfold loop.
-  cbn. rewrite bind_ret_l.
   match goal with
   | |- CategoryOps.iter (C := ktree _) ?body ?s ≈ _ =>
     rewrite (unfold_iter body s)
@@ -438,7 +436,7 @@ Lemma denote_bks_singleton :
 Proof.
   intros b bid nextblock Heqid Heqterm Hneq.
   cbn.
-  rewrite bind_ret_l.
+  unfold D.denote_bks.
   rewrite KTreeFacts.unfold_iter_ktree.
   cbn.
   destruct (Eqv.eqv_dec_p (blk_id b) bid) eqn:Heq'; try contradiction.
@@ -510,7 +508,7 @@ Lemma denote_bks_unfold: forall bks bid b,
     end.
 Proof.
   intros.
-  cbn. rewrite bind_ret_l.
+  cbn. unfold D.denote_bks at 1.
   rewrite KTreeFacts.unfold_iter_ktree. cbn. rewrite bind_bind.
   rewrite H. cbn. rewrite !bind_bind.
   eapply eutt_eq_bind; intros ?.
@@ -520,14 +518,11 @@ Proof.
   - destruct (find_block dtyp bks b0). cbn.
     + rewrite bind_bind. eapply eutt_clo_bind. reflexivity. intros.
       subst. rewrite bind_bind. eapply eutt_clo_bind. reflexivity.
-      intros; subst. rewrite 2 bind_ret_l. cbn.
-      rewrite bind_bind. rewrite bind_ret_l. rewrite bind_ret_l.
+      intros; subst. rewrite bind_ret_l. cbn.
       rewrite tau_eutt.
-      rewrite 2 KTreeFacts.unfold_iter_ktree. cbn. reflexivity.
-    + rewrite bind_ret_l. cbn. rewrite bind_bind.
-      rewrite bind_ret_l. rewrite bind_ret_l. reflexivity.
-  - rewrite bind_ret_l. cbn. rewrite bind_bind.
-    rewrite bind_ret_l. rewrite bind_ret_l. reflexivity.
+      reflexivity.
+    + rewrite bind_ret_l; reflexivity.
+  - rewrite bind_ret_l; reflexivity.
 Qed.
 
 Lemma denote_bks_unfold_not_in: forall bks bid,
@@ -535,12 +530,10 @@ Lemma denote_bks_unfold_not_in: forall bks bid,
     D.denote_bks bks bid ≈ Ret (inl bid).
 Proof.
   intros.
-  cbn; rewrite bind_ret_l.
+  unfold D.denote_bks.
   rewrite KTreeFacts.unfold_iter_ktree.
-  cbn; rewrite bind_bind.
   rewrite H; cbn.
   rewrite bind_ret_l.
-  cbn; rewrite bind_bind, 2 bind_ret_l.
   reflexivity.
 Qed.
 
