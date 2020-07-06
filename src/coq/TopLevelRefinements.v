@@ -494,6 +494,23 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma denote_code_sing :
+  forall a,
+    D.denote_code [a] ≈ D.denote_instr a.
+Proof.
+  intros a.
+  rewrite denote_code_cons.
+  setoid_rewrite denote_code_nil.
+  cbn.
+
+  epose proof bind_ret_r.
+  specialize (H (D.denote_instr a)).
+
+  rewrite <- H.
+  rewrite bind_bind.
+  apply eutt_eq_bind; intros []; rewrite bind_ret_l; reflexivity. 
+Qed.
+
 Import MonadNotation.
 Open Scope monad_scope.
 
