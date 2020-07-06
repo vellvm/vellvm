@@ -124,7 +124,7 @@ Qed.
 
   
 Hint Unfold TT : core.
-Local Instance TT_equiv :
+Instance TT_equiv :
   forall A, Equivalence (@TT A).
 Proof.
   intros A; split; repeat intro; auto.
