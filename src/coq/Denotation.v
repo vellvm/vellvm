@@ -822,11 +822,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         end.
 
       (* Denoting a list of instruction simply binds the trees together *)
-      Fixpoint denote_code (c: code dtyp): itree instr_E unit :=
-        match c with
-        | nil => ret tt
-        | i::c => denote_instr i;; denote_code c
-        end.
+      Definition denote_code (c: code dtyp): itree instr_E unit :=
+        map_monad_ denote_instr c.
 
       (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)

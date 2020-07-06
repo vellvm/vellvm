@@ -445,6 +445,8 @@ Proof.
   repeat rewrite bind_bind.
   rewrite Heqterm.
   cbn.
+  apply eutt_eq_bind; intros ?; rewrite bind_ret_l.
+  cbn.
   setoid_rewrite translate_ret.
   setoid_rewrite bind_ret_l.
   destruct (Eqv.eqv_dec_p (blk_id b) nextblock); try contradiction.
@@ -457,9 +459,19 @@ Lemma denote_code_app :
     D.denote_code (a ++ b)%list ≈ ITree.bind (D.denote_code a) (fun _ => D.denote_code b).
 Proof.
   induction a; intros b.
-  - cbn. rewrite bind_ret_l.
+  - cbn. rewrite 2 bind_ret_l.
     reflexivity.
-  - cbn. rewrite bind_bind. setoid_rewrite IHa.
+  - simpl.
+    unfold D.denote_code, map_monad_ in *.
+    simpl in *.
+    repeat rewrite bind_bind.
+    specialize (IHa b).
+    apply eutt_eq_bind; intros ().
+    rewrite bind_bind.
+    setoid_rewrite bind_ret_l.
+    setoid_rewrite IHa.
+    repeat rewrite bind_bind.
+    setoid_rewrite bind_ret_l.
     reflexivity.
 Qed.
 
@@ -467,7 +479,13 @@ Lemma denote_code_cons :
   forall a l,
     D.denote_code (a::l) ≈ ITree.bind (D.denote_instr a) (fun _ => D.denote_code l).
 Proof.
-  cbn; reflexivity.
+  intros.
+  rewrite list_cons_app, denote_code_app.
+  cbn.
+  repeat rewrite bind_bind.
+  apply eutt_eq_bind; intros ().
+  rewrite !bind_bind, !bind_ret_l.
+  reflexivity.
 Qed.
 
 Import MonadNotation.
@@ -494,10 +512,11 @@ Proof.
   intros.
   cbn. rewrite bind_ret_l.
   rewrite KTreeFacts.unfold_iter_ktree. cbn. rewrite bind_bind.
-  rewrite H. cbn. rewrite 3 bind_bind.
-  eapply eutt_clo_bind. reflexivity. intros; subst.
-  eapply eutt_clo_bind. reflexivity. intros; subst.
-  cbn. destruct u0. cbn.
+  rewrite H. cbn. rewrite !bind_bind.
+  eapply eutt_eq_bind; intros ?.
+  repeat rewrite bind_ret_l.
+  eapply eutt_eq_bind; intros bov. 
+  cbn. destruct bov. cbn.
   - destruct (find_block dtyp bks b0). cbn.
     + rewrite bind_bind. eapply eutt_clo_bind. reflexivity. intros.
       subst. rewrite bind_bind. eapply eutt_clo_bind. reflexivity.
