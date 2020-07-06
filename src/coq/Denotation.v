@@ -849,32 +849,28 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           ret (id,uv)
         | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
         end.
-
-      Definition denote_bks (bks: list _): block_id -> itree instr_E (block_id + uvalue) :=
-        loop (C := ktree _)
-             (fun (bid : block_id + block_id) =>
-                match bid with
-                | inl bid
-                | inr bid =>
-                  (* We lookup the block [bid] to be denoted *)
-                  match find_block DynamicTypes.dtyp bks bid with
-                  | None => ret (inr (inl bid))
-                  | Some block =>
-                    (* We denote the block *)
-                    bd <- denote_block block;;
-                    (* And set the phi-nodes of the new destination, if any *)
-                    match bd with
-                    | inr dv => ret (inr (inr dv))
-                    | inl bid_target =>
-                      match find_block DynamicTypes.dtyp bks bid_target with
-                      | None => ret (inr (inl bid_target))
-                      | Some block_target =>
-                        dvs <- Util.map_monad
-                                (fun x => translate exp_E_to_instr_E (denote_phi bid x))
-                                (blk_phis block_target) ;;
-                        Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
-                        ret (inl bid_target)
-                      end
+      
+      Definition denote_bks (bks: list (block dtyp)): block_id -> itree instr_E (block_id + uvalue) :=
+        iter (C := ktree _) (bif := sum) 
+             (fun (bid_src : block_id) =>
+                (* We lookup the block [bid] to be denoted *)
+                match find_block DynamicTypes.dtyp bks bid_src with
+                | None => ret (inr (inl bid_src))
+                | Some block_src =>
+                  (* We denote the block *)
+                  bd <- denote_block block_src;;
+                  (* And set the phi-nodes of the new destination, if any *)
+                  match bd with
+                  | inr dv => ret (inr (inr dv))
+                  | inl bid_target =>
+                    match find_block DynamicTypes.dtyp bks bid_target with
+                    | None => ret (inr (inl bid_target))
+                    | Some block_target =>
+                      dvs <- Util.map_monad
+                              (fun x => translate exp_E_to_instr_E (denote_phi bid_src x))
+                              (blk_phis block_target) ;;
+                      Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
+                      ret (inl bid_target)
                     end
                   end
                 end).
