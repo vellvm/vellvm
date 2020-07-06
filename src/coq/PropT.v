@@ -680,9 +680,71 @@ Section PropMonad.
       specialize (HP R e e eq_refl). destruct HP as (P & _ & _).
       rewrite P; eauto. 
   Qed.
-        
+
+  (*  Interesting observations about interp_prop:
+
+      Suppose h_spec : E ~> Prop T F
+      then (interp_prop h_spec _ eq spin) : PropT F
+      which itrees should be accepted by that predicate?  
+     
+      - we know by interp_prop_correct_exe that if there is an h such that handler_correct h_spec h then spin is accepted.
+        (I believe we could eliminate the requirement that there is such an h)
+      - what other trees are accepted?  
+
+      Answer: all of them!
+   *)
+  Lemma interp_prop_spin_accepts_anything :
+    forall E F (h_spec : E ~> PropT F) R RR (t : itree F R),
+      interp_prop h_spec R RR ITree.spin t.
+  Proof.
+    intros.
+    pcofix CIH.
+    pstep. red. cbn. econstructor. right. apply CIH.
+  Qed.
+
+
+  Lemma interp_prop_tau :
+    forall E F (h_spec : E ~> PropT F) R RR
+      (t_spec : itree E R),
+      EqM_PropT _ (interp_prop h_spec R RR t_spec) (interp_prop h_spec R RR (Tau t_spec)).
+  Proof.
+    intros.
+    split; [| split].
+    - intros; split; intros.
+      + rewrite <- H. 
+        pstep. red. econstructor. left. apply H0.
+      + rewrite H.
+        pinversion H0. subst.
+        apply HS.
+    - red. typeclasses eauto.
+    - red. typeclasses eauto.
+  Qed.
+
+
+  (* SAZ: Not clear that this one is provable : *)
+  Lemma interp_prop_bind_inv_l :
+    forall E F (h_spec : E ~> PropT F) R RR S
+      (HP : forall T, Proper (eq ==> EqM_PropT T) (h_spec T))
+      (m : itree E S)
+      (k : S -> itree E R)
+      (t : itree F R)
+      (H : interp_prop h_spec R RR (bind m k) t),
+       exists  (mf : itree F S) (kf : S -> itree F R) SS,
+         eutt RR t (bind mf kf) /\ Proper (SS ==> eutt RR) kf /\
+         (interp_prop h_spec S SS m mf) /\ (forall s, SS s s -> interp_prop h_spec R RR (k s) (kf s)).
+  Proof.
+  Abort.
+  
+  
+  Lemma interp_prop_bind :
+    forall E F (h_spec : E ~> PropT F) R S
+      (HP : forall T, Proper (eq ==> EqM_PropT T) (h_spec T))
+      (m : itree E S)
+      (k : S -> itree E R)
+    , EqM_PropT _ (interp_prop h_spec R eq (bind m k)) (bind (interp_prop h_spec S eq m) (fun x => interp_prop h_spec R eq (k x))).
+  Proof.
+  Abort.
       
-    
   
   Lemma case_prop_handler_correct:
     forall {E1 E2 F}
