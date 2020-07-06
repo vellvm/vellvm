@@ -486,6 +486,14 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma denote_code_nil :
+    D.denote_code [] ≈ ret tt.
+Proof.
+  intros.
+  cbn. rewrite bind_ret_l.
+  reflexivity.
+Qed.
+
 Import MonadNotation.
 Open Scope monad_scope.
 
@@ -538,4 +546,3 @@ Proof.
 Qed.
 
 End Denotation.
-
