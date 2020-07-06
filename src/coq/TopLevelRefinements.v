@@ -318,7 +318,7 @@ Lemma refine_UB
     apply case_prop_handler_correct.
     apply UB_handler_correct.
     unfold handler_correct. intros. reflexivity.
-    assumption.
+    assumption. reflexivity.
 Qed.
 
 Lemma Pick_handler_correct :
@@ -349,7 +349,7 @@ Proof.
   apply Pick_handler_correct.
 
   unfold handler_correct. intros. reflexivity.
-  assumption.
+  assumption. reflexivity.
 Qed.
 
 (**
@@ -419,8 +419,6 @@ Import Eq.
 Lemma denote_bks_nil: forall s, D.denote_bks [] s ≈ ret (inl s).
 Proof.
   intros s; unfold D.denote_bks.
-  unfold loop.
-  cbn. rewrite bind_ret_l.
   match goal with
   | |- CategoryOps.iter (C := ktree _) ?body ?s ≈ _ =>
     rewrite (unfold_iter body s)
@@ -438,12 +436,14 @@ Lemma denote_bks_singleton :
 Proof.
   intros b bid nextblock Heqid Heqterm Hneq.
   cbn.
-  rewrite bind_ret_l.
+  unfold D.denote_bks.
   rewrite KTreeFacts.unfold_iter_ktree.
   cbn.
   destruct (Eqv.eqv_dec_p (blk_id b) bid) eqn:Heq'; try contradiction.
   repeat rewrite bind_bind.
   rewrite Heqterm.
+  cbn.
+  apply eutt_eq_bind; intros ?; rewrite bind_ret_l.
   cbn.
   setoid_rewrite translate_ret.
   setoid_rewrite bind_ret_l.
@@ -457,9 +457,19 @@ Lemma denote_code_app :
     D.denote_code (a ++ b)%list ≈ ITree.bind (D.denote_code a) (fun _ => D.denote_code b).
 Proof.
   induction a; intros b.
-  - cbn. rewrite bind_ret_l.
+  - cbn. rewrite 2 bind_ret_l.
     reflexivity.
-  - cbn. rewrite bind_bind. setoid_rewrite IHa.
+  - simpl.
+    unfold D.denote_code, map_monad_ in *.
+    simpl in *.
+    repeat rewrite bind_bind.
+    specialize (IHa b).
+    apply eutt_eq_bind; intros ().
+    rewrite bind_bind.
+    setoid_rewrite bind_ret_l.
+    setoid_rewrite IHa.
+    repeat rewrite bind_bind.
+    setoid_rewrite bind_ret_l.
     reflexivity.
 Qed.
 
@@ -467,7 +477,13 @@ Lemma denote_code_cons :
   forall a l,
     D.denote_code (a::l) ≈ ITree.bind (D.denote_instr a) (fun _ => D.denote_code l).
 Proof.
-  cbn; reflexivity.
+  intros.
+  rewrite list_cons_app, denote_code_app.
+  cbn.
+  repeat rewrite bind_bind.
+  apply eutt_eq_bind; intros ().
+  rewrite !bind_bind, !bind_ret_l.
+  reflexivity.
 Qed.
 
 Import MonadNotation.
@@ -492,23 +508,21 @@ Lemma denote_bks_unfold: forall bks bid b,
     end.
 Proof.
   intros.
-  cbn. rewrite bind_ret_l.
+  cbn. unfold D.denote_bks at 1.
   rewrite KTreeFacts.unfold_iter_ktree. cbn. rewrite bind_bind.
-  rewrite H. cbn. rewrite 3 bind_bind.
-  eapply eutt_clo_bind. reflexivity. intros; subst.
-  eapply eutt_clo_bind. reflexivity. intros; subst.
-  cbn. destruct u0. cbn.
+  rewrite H. cbn. rewrite !bind_bind.
+  eapply eutt_eq_bind; intros ?.
+  repeat rewrite bind_ret_l.
+  eapply eutt_eq_bind; intros bov. 
+  cbn. destruct bov. cbn.
   - destruct (find_block dtyp bks b0). cbn.
     + rewrite bind_bind. eapply eutt_clo_bind. reflexivity. intros.
       subst. rewrite bind_bind. eapply eutt_clo_bind. reflexivity.
-      intros; subst. rewrite 2 bind_ret_l. cbn.
-      rewrite bind_bind. rewrite bind_ret_l. rewrite bind_ret_l.
+      intros; subst. rewrite bind_ret_l. cbn.
       rewrite tau_eutt.
-      rewrite 2 KTreeFacts.unfold_iter_ktree. cbn. reflexivity.
-    + rewrite bind_ret_l. cbn. rewrite bind_bind.
-      rewrite bind_ret_l. rewrite bind_ret_l. reflexivity.
-  - rewrite bind_ret_l. cbn. rewrite bind_bind.
-    rewrite bind_ret_l. rewrite bind_ret_l. reflexivity.
+      reflexivity.
+    + rewrite bind_ret_l; reflexivity.
+  - rewrite bind_ret_l; reflexivity.
 Qed.
 
 Lemma denote_bks_unfold_not_in: forall bks bid,
@@ -516,12 +530,10 @@ Lemma denote_bks_unfold_not_in: forall bks bid,
     D.denote_bks bks bid ≈ Ret (inl bid).
 Proof.
   intros.
-  cbn; rewrite bind_ret_l.
+  unfold D.denote_bks.
   rewrite KTreeFacts.unfold_iter_ktree.
-  cbn; rewrite bind_bind.
   rewrite H; cbn.
   rewrite bind_ret_l.
-  cbn; rewrite bind_bind, 2 bind_ret_l.
   reflexivity.
 Qed.
 
