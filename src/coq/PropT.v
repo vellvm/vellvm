@@ -433,7 +433,7 @@ Section PropMonad.
                          (t2 : itree F R)
                          (ta :itree F A)  (k2 : A -> itree F R) (HTA: h_spec A e ta)
                          (eq2 : t2 ≈ (bind ta k2))
-                         (HK : forall (a : A), sim (k1 a) (k2 a)), 
+                         (HK : forall (a : A), Returns a ta ->  sim (k1 a) (k2 a)), 
       interp_PropTF h_spec RR sim (VisF e k1) t2.
 
   Hint Constructors interp_PropTF : core.
@@ -518,7 +518,7 @@ Section PropMonad.
       + rewrite <- eq. assumption.
       + pclearbot. right. eapply CIH; eauto.
       + rewrite <- eq. apply eq2.
-      + intros. specialize (HK a). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
+      + intros. specialize (HK a H0). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
     - revert t x y H.
       pcofix CIH.
       intros t x y eq HI. 
@@ -528,9 +528,8 @@ Section PropMonad.
       + rewrite eq. assumption.
       + pclearbot. right. eapply CIH; eauto.
       + rewrite eq. apply eq2.
-      + intros. specialize (HK a). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
+      + intros. specialize (HK a H0). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
   Qed.
-
   
   Global Instance interp_prop_Proper2
          {E F} (h_spec : E ~> PropT F) R RR (t : itree E R) :
@@ -548,7 +547,7 @@ Section PropMonad.
       + rewrite <- eq. assumption.
       + pclearbot. right. eapply CIH; eauto.
       + rewrite <- eq. apply eq2.
-      + intros. specialize (HK a). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
+      + intros. specialize (HK a H0). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
     - revert t x y H.
       pcofix CIH.
       intros t x y eq HI. 
@@ -558,7 +557,65 @@ Section PropMonad.
       + rewrite eq. assumption.
       + pclearbot. right. eapply CIH; eauto.
       + rewrite eq. apply eq2.
-      + intros. specialize (HK a). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
+      + intros. specialize (HK a H0). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
+  Qed.
+
+
+
+  Global Instance interp_prop_Proper3
+         {E F} (h_spec : E ~> PropT F) R RR :
+    Proper(eq_itree eq ==> eq  ==> iff) (interp_prop h_spec R RR).
+  Proof.
+    do 4 red.
+    intros; split.
+    - subst.
+      revert x y H y0.
+      pcofix CIH.
+      intros x y eq t H.
+      pstep; red.
+      punfold H. red in H.
+
+      punfold eq. red in eq.
+      genobs x obsx.
+      genobs y obsy.
+      revert x y Heqobsx Heqobsy t H.
+
+      induction eq; intros x y Heqobsx Heqobsy t H; inversion H; subst; pclearbot.
+      + econstructor; eauto.
+      + econstructor. right. eapply CIH. apply REL. apply HS.
+      + apply inj_pair2 in H2.
+        apply inj_pair2 in H3. subst.
+        econstructor; eauto. intros X HX. specialize (REL X). specialize (HK X HX). pclearbot.
+        right. eapply CIH; eauto.
+      + eapply IHeq.  reflexivity. reflexivity.
+        punfold HS.
+      + econstructor. left. pstep. eapply IHeq. reflexivity. reflexivity. assumption.
+      + econstructor. left.  pstep. eapply IHeq. reflexivity. reflexivity. assumption.
+      + econstructor. left.  pstep. eapply IHeq. reflexivity. reflexivity. assumption.
+
+   - subst.
+      revert x y H y0.
+      pcofix CIH.
+      intros x y eq t H.
+      pstep; red.
+      punfold H. red in H.
+
+      punfold eq. red in eq.
+      genobs x obsx.
+      genobs y obsy.
+      revert x y Heqobsx Heqobsy t H.
+
+      induction eq; intros x y Heqobsx Heqobsy t H; inversion H; subst; pclearbot.
+      + econstructor; eauto.
+      + econstructor. right. eapply CIH. apply REL. apply HS.
+      + apply inj_pair2 in H2.
+        apply inj_pair2 in H3. subst.
+        econstructor; eauto. intros X HX. specialize (REL X). specialize (HK X HX). pclearbot.
+        right. eapply CIH; eauto.
+      + econstructor. left. pstep. eapply IHeq. reflexivity. reflexivity. assumption.
+      + econstructor. left. pstep. eapply IHeq. reflexivity. reflexivity. assumption.
+      + econstructor. left. pstep. eapply IHeq. reflexivity. reflexivity. assumption.
+      + eapply IHeq. reflexivity. reflexivity.   punfold HS.
   Qed.
   
   Lemma interp_prop_correct_exec:
@@ -630,7 +687,7 @@ Section PropMonad.
       econstructor.
       apply HTA.
       apply eq2.
-      intros a. specialize (REL a). specialize (HK a). red in REL. pclearbot.
+      intros a Ha. specialize (REL a). specialize (HK a Ha). red in REL. pclearbot.
       right. eapply CIH. apply REL. apply HK.
     - econstructor.
       left. pstep. red. eapply IHeqt. reflexivity. eassumption. assumption.
@@ -638,8 +695,63 @@ Section PropMonad.
       pclearbot.
       eapply IHeqt. reflexivity. reflexivity.
       pinversion HS.
- Qed.      
-      
+  Qed.
+
+    Global Instance Returns_eutt {E A} a: Proper (eutt eq ==> iff) (@Returns E A a).
+  Proof.
+    repeat intro; split; intros HRet.
+    - revert y H. induction HRet; intros.
+      constructor; rewrite <- H, H0; reflexivity.
+      apply IHHRet, eqit_inv_tauL; auto.
+      rewrite <- H0. rewrite H. reflexivity.
+      econstructor 3; [rewrite <- H0, H; reflexivity | apply IHHRet; reflexivity].
+    - revert x H; induction HRet; intros ? EQ.
+      constructor; rewrite EQ; eauto.
+      apply IHHRet, eqit_inv_tauR; auto.
+      rewrite EQ. rewrite <- H. reflexivity.
+      econstructor 3; [rewrite EQ, H; reflexivity | apply IHHRet; reflexivity].
+  Qed.
+
+  Lemma Returns_Vis_sub :  forall {E} {R} X (e : E X) (k : X -> itree E R) u x, Returns u (k x) -> Returns u (Vis e k).
+  Proof.
+    intros.
+    eapply ReturnsVis. reflexivity. apply H.
+  Qed.
+
+  (*
+  Lemma eutt_Returns_Vis : forall {E} {R} X (e : E X) (k : X -> itree E R) (ta' : itree E R),
+      (Vis e k) ≈ ta' ->  eutt (fun u1 u2 => u1 = u2 /\ Returns u1 ta') (Vis e k) (Vis e k).
+  Proof.
+    intros.
+    eapply Eq.eqit_Vis.
+    intros.
+  *)
+    
+    
+  Lemma eutt_Returns_ : forall {E} {R} (RR : R -> Prop) (ta : itree E R) 
+     (IN: forall (a : R), Returns a ta -> RR a), eutt (fun u1 u2 => u1 = u2 /\ RR u1) ta ta.
+  Proof.
+    intros E R.
+    ginit.
+    gcofix CIH; intros.
+
+    setoid_rewrite (itree_eta ta) in IN.
+
+    gstep. red.
+
+    destruct (observe ta).
+    - econstructor.  split; auto. apply IN. econstructor. reflexivity.
+    - econstructor. gfinal. left. apply CIH. intros. eapply IN. rewrite tau_eutt. assumption.
+    - econstructor. intros. red.
+      gfinal. left. apply CIH. intros. eapply IN. eapply Returns_Vis_sub. apply H.
+  Qed.
+
+  Lemma eutt_Returns : forall E R (ta : itree E R), eutt (fun u1 u2 => u1 = u2 /\ Returns u1 ta) ta ta.
+  Proof.
+    intros.
+    apply eutt_Returns_. auto.
+  Qed.
+  
   (* SAZ : morally, we should only work with "proper" triggers everywhere *)
   Lemma interp_prop_trigger :
     forall E F (h_spec : E ~> PropT F) R (e : E R)
@@ -658,9 +770,9 @@ Section PropMonad.
         rewrite eq2 in H.
         assert (x <- ta ;; k2 x ≈ ta).
         { rewrite <- (Eq.bind_ret_r ta).
-          apply eutt_clo_bind with (UU := eq).
-          rewrite Eq.bind_ret_r. reflexivity.
-          intros. subst. specialize (HK u2). pinversion HK. subst.  assumption.
+          apply eutt_clo_bind with (UU := fun u1 u2 => u1 = u2 /\ Returns u1 ta).
+          rewrite Eq.bind_ret_r. apply eutt_Returns.
+          intros. destruct H1. subst. specialize (HK u2 H2). pclearbot. pinversion HK. subst. assumption.
         }
         rewrite H1 in H.
         specialize (HP R e e eq_refl).  unfold EqM_PropT in HP. destruct HP as (P & _ & _).
@@ -720,10 +832,71 @@ Section PropMonad.
     - red. typeclasses eauto.
   Qed.
 
+(* SAZ: Not clear that this one is provable : *)
+  Lemma interp_prop_ret_inv :
+    forall E F (h_spec : E ~> PropT F) R RR
+      (r1 : R)
+      (t : itree F R)
+      (H : interp_prop h_spec R RR (ret r1) t),
+       exists  r2, RR r1 r2 /\ t ≈ ret r2.
+  Proof.
+    intros.
+    punfold H.
+    red in H. inversion H; subst.
+    exists r2; eauto.
+  Qed.
 
+  Lemma interp_prop_vis_inv :
+    forall E F (h_spec : E ~> PropT F) R RR S
+      (e : E S)
+      (k : S -> itree E R)
+      (t : itree F R)
+      (H : interp_prop h_spec R RR (vis e k) t), 
+    exists  ms, exists (ks : S -> itree F R),
+        h_spec S e ms /\ t ≈ (bind ms ks).
+  Proof.
+    intros.
+    punfold H.
+    red in H. inversion H; subst.
+    apply inj_pair2 in H2.
+    apply inj_pair2 in H3.
+    subst.
+    exists ta. exists k2. split; auto.
+  Qed.
+
+  Lemma interp_prop_tau_inv :
+    forall E F (h_spec : E ~> PropT F) R RR 
+      (s : itree E R)
+      (t : itree F R)
+      (H : interp_prop h_spec R RR (Tau s) t), 
+      interp_prop h_spec R RR s t.
+  Proof.
+    intros.
+    punfold H.
+    red in H. inversion H; subst.
+    pclearbot.
+    apply HS.
+  Qed.
+
+
+  Lemma interp_prop_bind :
+    forall E F (h_spec : E ~> PropT F) R S
+      (HP : forall T, Proper (eq ==> EqM_PropT T) (h_spec T))
+      (m : itree E S)
+      (k : S -> itree E R)
+    , EqM_PropT _ (interp_prop h_spec R eq (bind m k)) (bind (interp_prop h_spec S eq m) (fun x => interp_prop h_spec R eq (k x))).
+  Proof.
+    intros.
+    split; [|split].
+    - intros; split; intro HQ.
+      + rewrite H in HQ. clear H.
+  Abort.
+  
+  
+  
   (* SAZ: Not clear that this one is provable : *)
   Lemma interp_prop_bind_inv_l :
-    forall E F (h_spec : E ~> PropT F) R RR S
+    forall E F (h_spec : E ~> PropT F) R RR (HR: Reflexive RR) (HT : Transitive RR) S
       (HP : forall T, Proper (eq ==> EqM_PropT T) (h_spec T))
       (m : itree E S)
       (k : S -> itree E R)
@@ -733,17 +906,31 @@ Section PropMonad.
          eutt RR t (bind mf kf) /\ Proper (SS ==> eutt RR) kf /\
          (interp_prop h_spec S SS m mf) /\ (forall s, SS s s -> interp_prop h_spec R RR (k s) (kf s)).
   Proof.
+    intros.
+    unfold bind, Monad_itree in *. rewrite (itree_eta m) in H. setoid_rewrite (itree_eta m).
+
+    genobs m obsm.
+    destruct obsm.
+    - rewrite Eq.bind_ret_l in H.
+      exists (ret r). exists (fun _ => t). exists (fun r1 r2 => r1 = r /\ r2 = r).
+      split; [| split; [|split]].
+      + cbn. rewrite Eq.bind_ret_l. reflexivity.
+      + do 2 red. intros; subst. reflexivity.
+      + repeat red. pstep. red. econstructor. split; reflexivity. reflexivity.
+      + intros. destruct H0. subst. assumption.
+    - rewrite Eq.bind_tau in H.
+      punfold H. red in H. inv H; subst.
+      pclearbot.
+      assert (inhabited S \/ ~ inhabited S).
+      { admit. (* TODO: classical logic *) }
+      destruct H.
+      * inv H. exists (ret X). (exists (fun _ => t)). exists (fun r1 r2 => True).
+        split; [| split; [|split]].
+      + cbn. rewrite Eq.bind_ret_l. reflexivity.
+      + do 2 red. intros; subst. reflexivity.
   Abort.
   
   
-  Lemma interp_prop_bind :
-    forall E F (h_spec : E ~> PropT F) R S
-      (HP : forall T, Proper (eq ==> EqM_PropT T) (h_spec T))
-      (m : itree E S)
-      (k : S -> itree E R)
-    , EqM_PropT _ (interp_prop h_spec R eq (bind m k)) (bind (interp_prop h_spec S eq m) (fun x => interp_prop h_spec R eq (k x))).
-  Proof.
-  Abort.
       
   
   Lemma case_prop_handler_correct:
@@ -1233,20 +1420,6 @@ End IterLaws.
 
 Section MonadLaws.
 
-  Global Instance Returns_eutt {E A} a: Proper (eutt eq ==> iff) (@Returns E A a).
-  Proof.
-    repeat intro; split; intros HRet.
-    - revert y H. induction HRet; intros.
-      constructor; rewrite <- H, H0; reflexivity.
-      apply IHHRet, eqit_inv_tauL; auto.
-      rewrite <- H0. rewrite H. reflexivity.
-      econstructor 3; [rewrite <- H0, H; reflexivity | apply IHHRet; reflexivity].
-    - revert x H; induction HRet; intros ? EQ.
-      constructor; rewrite EQ; eauto.
-      apply IHHRet, eqit_inv_tauR; auto.
-      rewrite EQ. rewrite <- H. reflexivity.
-      econstructor 3; [rewrite EQ, H; reflexivity | apply IHHRet; reflexivity].
-  Qed.
 
 
   Definition EqM_PropT' {E} : EqM (PropT E) :=
