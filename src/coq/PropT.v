@@ -184,6 +184,134 @@ Section PropMonad.
         tb ≈ bind ta k /\
         (forall a, Returns a ta -> K a (k a)).
 
+  (*  ------------------------------------------------------------------------- *)
+  (* SZ: Here is a coinductive version of bind_propT that might work out better *)
+  Inductive bind_PropTF {E} {A B} (PA: PropT E A) (K: A -> PropT E B) (sim : itree E B -> Prop) : itree' E B -> Prop :=
+    (* If we bind and get a Ret then both the first and second parts of the computation must be (equivalent to) ret *)
+  | bind_PropTF_Ret : forall (b:B) (ta : itree E A) (HP : PA ta) (a:A) (eqA: ta ≈ ret a) (tb : itree E B) (eqB : tb ≈ ret b) (HB : K a tb),
+      bind_PropTF PA K sim (RetF b)
+
+    (* If we bind and get [Tau tb] then we don't know how to break up the tree, so just corecurse *)
+  | bind_PropTF_Tau : forall tb, sim tb -> bind_PropTF PA K sim (TauF tb)
+
+    (* If we bind and get [Vis e k] then either the event is raised in the first part of the compuation: *)                                            
+  | bind_PropTF_Vis_l : forall X (e : E X) (k : X -> itree E B) (ta : itree E A) (HP : PA ta) (ka : X -> itree E A) (eqA : ta ≈ Vis e ka)
+                        (k' : A -> itree E B)
+                        (Hks : forall (x:X), (k x) ≈ (ITree.bind (ka x) k'))
+                        (HK : forall (a : A), Returns a ta -> (K a (k' a))),
+      bind_PropTF PA K sim (VisF e k)
+    (* ... or, it was raised in the second part, and the first part was pure *)
+  | bind_PropTF_Vis_r :  forall X (e : E X) (k : X -> itree E B) (ta : itree E A) (HP : PA ta) (a : A) (eqA : ta ≈ ret a)
+                        (k' : A -> itree E B)
+                        (Hks : (ITree.bind ta k') ≈ (Vis e k))
+                        (HK : K a (Vis e k)),
+      bind_PropTF PA K sim (VisF e k).
+
+  Hint Constructors bind_PropTF : core.
+  
+  Lemma bind_PropTF_mono E A B (PA : PropT E A) (K : A -> PropT E B) sim sim' (t : itree' E B)
+        (IN : bind_PropTF PA K sim t)
+        (LE : sim <1= sim') : 
+    (bind_PropTF PA K sim' t).
+  Proof.
+    induction IN; eauto.
+  Qed.
+
+  Hint Resolve bind_PropTF_mono : paco.
+
+  Definition bind_PropT_ E A B (PA : PropT E A) (K : A -> PropT E B) sim (t : itree E B) :=
+    bind_PropTF PA K sim (observe t).
+  Hint Unfold bind_PropT_ : core.
+
+  Lemma bind_PropT__mono E A B (PA : PropT E A) (K : A -> PropT E B) : monotone1 (bind_PropT_ E A B PA K).
+  Proof.
+    do 2 red. intros. eapply bind_PropTF_mono; eauto.
+  Qed.
+  Hint Resolve bind_PropT__mono : paco.  
+  
+  Definition bind_prop {E A B} (PA : PropT E A) (K : A -> PropT E B) : PropT E B :=
+    paco1 (bind_PropT_ E A B PA K) bot1.
+
+
+  Lemma bind_prop_eutt :
+    forall {E} {A B} (PA: PropT E A) (K: A -> PropT E B)
+      (HK: forall a, EqM_PropT _ (K a) (K a))
+      
+      (t1 t2 : itree E B) (eq : t1 ≈ t2),
+      bind_prop PA K t1 -> bind_prop PA K t2.
+  Proof.
+    intros E A B PA K HK.
+    pcofix CIH.
+    intros t1 t2 eq H.
+    punfold H. red in H.
+    punfold eq. red in eq.
+    pstep. red.
+    genobs t1 obt1. genobs t2 obt2.
+    revert t1 t2 Heqobt1 Heqobt2 H.
+    induction eq; intros; subst; inv H; subst.
+    - econstructor; eauto.
+    - econstructor. pclearbot. right. eapply CIH. apply REL. apply H1.
+    - apply inj_pair2 in H2. apply inj_pair2 in H3. subst.
+      eapply bind_PropTF_Vis_l; eauto. intros. specialize (Hks x). specialize (REL x). pclearbot. rewrite <- REL. assumption.
+    - apply inj_pair2 in H2. apply inj_pair2 in H3. subst.
+      assert (Vis e k1 ≈ Vis e k2).
+      { apply eqit_Vis. intros. specialize (REL u0). pclearbot. apply REL. }
+      eapply bind_PropTF_Vis_r; eauto.
+      + etransitivity. apply Hks. assumption.
+      + specialize (HK a). destruct HK as (HX & _ & _). specialize (HX _ _ H). apply HX. assumption.
+    - eapply IHeq. reflexivity. reflexivity. pclearbot. pinversion H1.
+    - econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H1.
+      econstructor; eauto.
+    - pclearbot. econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H0.
+      econstructor. left. assumption.
+    - econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H1.
+      eapply bind_PropTF_Vis_l; eauto.
+    - econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H1.
+      eapply bind_PropTF_Vis_r; eauto.
+  Qed.
+
+
+  (* This more general version seems much harder *)
+  Lemma bind_prop_Proper {E} {A B} :
+     Proper (eqm ==> (eq ==> eqm) ==> eutt eq ==> iff) (@bind_prop E A B).
+  Proof.
+    do 5 red.
+    intros PA PA' EQA K1 K2 EQK t1 t2 eq.
+    split.
+    - destruct EQA as (PPA & PX & PY).
+      intros H.
+      punfold H. red in H.
+      punfold eq. red in eq.
+      pstep. red.
+      genobs t1 obt1. genobs t2 obt2.
+      revert t1 t2 Heqobt1 Heqobt2 H.
+      induction eq; intros; subst; inv H; subst.
+      + econstructor. rewrite <- PPA. apply HP. reflexivity. eauto. eauto. specialize (EQK a a eq_refl). destruct EQK as (XK & _ & _). rewrite <- XK. apply HB. reflexivity.
+(*        
+    + econstructor. left. pclearbot. right. eapply CIH. apply REL. apply H1.
+    - apply inj_pair2 in H2. apply inj_pair2 in H3. subst.
+      eapply bind_PropTF_Vis_l; eauto. intros. specialize (Hks x). specialize (REL x). pclearbot. rewrite <- REL. assumption.
+    - apply inj_pair2 in H2. apply inj_pair2 in H3. subst.
+      assert (Vis e k1 ≈ Vis e k2).
+      { apply eqit_Vis. intros. specialize (REL u0). pclearbot. apply REL. }
+      eapply bind_PropTF_Vis_r; eauto.
+      + etransitivity. apply Hks. assumption.
+      + specialize (HK a). destruct HK as (HX & _ & _). specialize (HX _ _ H). apply HX. assumption.
+    - eapply IHeq. reflexivity. reflexivity. pclearbot. pinversion H1.
+    - econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H1.
+      econstructor; eauto.
+    - pclearbot. econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H0.
+      econstructor. left. assumption.
+    - econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H1.
+      eapply bind_PropTF_Vis_l; eauto.
+    - econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H1.
+      eapply bind_PropTF_Vis_r; eauto.
+ *)
+  Abort.
+  
+
+  (* end coinductive bind ----------------------------------------------------- *)
+  
   Definition bind_PropT_stronger {E} :=
     fun A B (PA: PropT E A) (K: A -> PropT E B) (tb: itree E B) =>
       exists (ta: itree E A) (k: A -> itree E B),
@@ -878,7 +1006,22 @@ Section PropMonad.
     apply HS.
   Qed.
 
+  Lemma Returns_ret_inv_ : forall {E} A (a b : A) (t : itree E A), t ≈ (Ret b) -> Returns a t -> a = b.
+  Proof.
+    intros E A a b t eq H. 
+    revert b eq.
+    induction H; intros; subst.
+    - rewrite H in eq. apply Eq.eqit_Ret in eq. auto.
+    - eapply IHReturns. rewrite tau_eutt in H. rewrite <- H. assumption.
+    - rewrite H in eq. symmetry in eq. apply eutt_inv_ret_vis in eq. inv eq.
+  Qed.
 
+  Lemma Returns_ret_inv :  forall {E} A (a b : A), Returns a ((ret b) : itree E A) -> a = b.
+  Proof.
+    intros.
+    eapply Returns_ret_inv_. reflexivity. cbn in H. apply H.
+  Qed.
+    
   Lemma interp_prop_bind :
     forall E F (h_spec : E ~> PropT F) R S
       (HP : forall T, Proper (eq ==> EqM_PropT T) (h_spec T))
@@ -890,6 +1033,22 @@ Section PropMonad.
     split; [|split].
     - intros; split; intro HQ.
       + rewrite H in HQ. clear H.
+        setoid_rewrite (itree_eta m) in HQ.
+        repeat red.
+        setoid_rewrite (itree_eta m).
+
+        destruct (observe m).
+        * setoid_rewrite Eq.bind_ret_l in HQ.
+          exists (ret r). exists (fun _ => y).
+          split; [| split].
+          -- repeat red. pstep. red. econstructor. reflexivity. reflexivity.
+          -- unfold bind, Monad_itree. cbn. rewrite Eq.bind_ret_l. reflexivity.
+          -- intros. apply Returns_ret_inv in H. subst. assumption.
+        * setoid_rewrite Eq.bind_tau in HQ. setoid_rewrite tau_eutt in HQ.
+          setoid_rewrite tau_eutt.
+          punfold HQ. red in HQ. 
+        
+        
   Abort.
   
   
@@ -929,8 +1088,6 @@ Section PropMonad.
       + cbn. rewrite Eq.bind_ret_l. reflexivity.
       + do 2 red. intros; subst. reflexivity.
   Abort.
-  
-  
       
   
   Lemma case_prop_handler_correct:
