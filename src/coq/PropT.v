@@ -1021,35 +1021,6 @@ Section PropMonad.
     intros.
     eapply Returns_ret_inv_. reflexivity. cbn in H. apply H.
   Qed.
-    
-  Lemma interp_prop_bind :
-    forall E F (h_spec : E ~> PropT F) R S
-      (HP : forall T, Proper (eq ==> EqM_PropT T) (h_spec T))
-      (m : itree E S)
-      (k : S -> itree E R)
-    , EqM_PropT _ (interp_prop h_spec R eq (bind m k)) (bind (interp_prop h_spec S eq m) (fun x => interp_prop h_spec R eq (k x))).
-  Proof.
-    intros.
-    split; [|split].
-    - intros; split; intro HQ.
-      + rewrite H in HQ. clear H.
-        setoid_rewrite (itree_eta m) in HQ.
-        repeat red.
-        setoid_rewrite (itree_eta m).
-
-        destruct (observe m).
-        * setoid_rewrite Eq.bind_ret_l in HQ.
-          exists (ret r). exists (fun _ => y).
-          split; [| split].
-          -- repeat red. pstep. red. econstructor. reflexivity. reflexivity.
-          -- unfold bind, Monad_itree. cbn. rewrite Eq.bind_ret_l. reflexivity.
-          -- intros. apply Returns_ret_inv in H. subst. assumption.
-        * setoid_rewrite Eq.bind_tau in HQ. setoid_rewrite tau_eutt in HQ.
-          setoid_rewrite tau_eutt.
-          punfold HQ. red in HQ. 
-        
-        
-  Abort.
   
   
   
@@ -1173,6 +1144,286 @@ Section PropMonad.
       apply REL.
   Qed.
 
+  Section ReturnsBind.
+
+    Context {E : Type -> Type} {R S : Type}. 
+
+    Import ITreeNotations.
+    Local Open Scope itree.
+
+    Inductive eqit_Returns_bind_clo b1 b2 (r : itree E R -> itree E S -> Prop) :
+      itree E R -> itree E S -> Prop :=
+    | pbc_intro_h U (t1 t2: itree E U) (k1 : U -> itree E R) (k2 : U -> itree E S)
+                  (EQV: eqit eq b1 b2 t1 t2)
+                  (REL: forall u, Returns u t1 -> r (k1 u) (k2 u))
+      : eqit_Returns_bind_clo b1 b2 r (ITree.bind t1 k1) (ITree.bind t2 k2)
+    .
+    Hint Constructors eqit_Returns_bind_clo: core.
+
+    Lemma eqit_Returns_clo_bind  (RS : R -> S -> Prop) b1 b2 vclo
+          (MON: monotone2 vclo)
+          (CMP: compose (eqitC RS b1 b2) vclo <3= compose vclo (eqitC RS b1 b2))
+          (ID: id <3= vclo):
+      eqit_Returns_bind_clo b1 b2 <3= gupaco2 (eqit_ RS b1 b2 vclo) (eqitC RS b1 b2).
+    Proof.
+      gcofix CIH. intros. destruct PR.
+      guclo eqit_clo_trans.
+      econstructor; auto_ctrans_eq; try (rewrite (itree_eta (x <- _;; _ x)), unfold_bind; reflexivity).
+      punfold EQV. unfold_eqit.
+      genobs t1 ot1.
+      genobs t2 ot2.
+      hinduction EQV before CIH; intros; pclearbot.
+      - guclo eqit_clo_trans.
+        econstructor; auto_ctrans_eq; try (rewrite <- !itree_eta; reflexivity).
+        gbase; cbn.
+        apply REL0.
+        rewrite itree_eta, <- Heqot1; constructor; reflexivity.
+      - gstep. econstructor.
+        gbase.
+        apply CIH.
+        constructor; auto.
+        intros u HR.
+        apply REL0.
+        rewrite itree_eta,  <- Heqot1.  econstructor 2. reflexivity. assumption.
+      - gstep. econstructor.
+        intros; apply ID; unfold id.
+        gbase.
+        apply CIH.
+        constructor; auto.
+        intros ? HR; apply REL0.
+        rewrite itree_eta, <- Heqot1.
+        econstructor 3; eauto; reflexivity.
+      - destruct b1; try discriminate.
+        guclo eqit_clo_trans.
+        econstructor.
+        3:{ eapply IHEQV; eauto.
+            intros ? HR; apply REL.
+            rewrite itree_eta, <- Heqot1; econstructor 2. reflexivity. eauto.
+        }
+        3,4:auto_ctrans_eq.
+        2: reflexivity.
+        eapply eqit_tauL. rewrite unfold_bind, <-itree_eta. reflexivity.
+      - destruct b2; try discriminate.
+        guclo eqit_clo_trans.
+        econstructor; auto_ctrans_eq; cycle -1; eauto; try reflexivity.
+        eapply eqit_tauL. rewrite unfold_bind, <-itree_eta. reflexivity.
+    Qed.
+
+  End ReturnsBind.
+
+    Lemma eqit_Returns_bind' {E} {R} {T} b1 b2
+          (t1 t2: itree E T) (k1 k2: T -> itree E R) :
+      eqit eq b1 b2 t1 t2 ->
+      (forall r, Returns r t1 -> eqit eq b1 b2 (k1 r) (k2 r)) ->
+      @eqit E _ _ eq b1 b2 (ITree.bind t1 k1) (ITree.bind t2 k2).
+    Proof.
+      intros. ginit. guclo (@eqit_Returns_clo_bind E R R eq). unfold eqit in *.
+      econstructor; eauto with paco.
+    Qed.
+
+    Lemma eqit_Returns_bind'' {E} {R S} {T} (RS : R -> S -> Prop) b1 b2
+          (t1 t2: itree E T) (k1: T -> itree E R) (k2 : T -> itree E S) :
+      eqit eq b1 b2 t1 t2 ->
+      (forall r, Returns r t1 -> eqit RS b1 b2 (k1 r) (k2 r)) ->
+      @eqit E _ _ RS b1 b2 (ITree.bind t1 k1) (ITree.bind t2 k2).
+    Proof.
+      intros. ginit. guclo (@eqit_Returns_clo_bind E R S RS). unfold eqit in *.
+      econstructor; eauto with paco.
+    Qed.
+
+
+  Lemma eutt_ret_vis_abs: forall {X Y E} (x: X) (e: E Y) k, Ret x ≈ Vis e k -> False.
+  Proof.
+    intros.
+    punfold H; inv H.
+  Qed.
+
+  Lemma Returns_Ret_ : forall E A (a x : A) (t:itree E A), t ≈ Ret x -> Returns a t -> x = a.
+  Proof.
+    intros E A a x t eq H. 
+    induction H.
+    - rewrite eq in H. eapply eutt_inv_ret. apply H.
+     - rewrite tau_eutt in H. rewrite <- H in IHReturns. apply IHReturns. assumption.
+    - rewrite eq in H. apply eqit_inv_ret_vis in H. contradiction.
+  Qed.
+
+  Lemma Returns_Ret :  forall E A (a x : A), Returns a ((Ret x) : itree E A) -> x = a.
+  Proof.
+    intros.  eapply Returns_Ret_. 2: eassumption. reflexivity.
+  Qed.
+
+  Lemma Returns_bind : forall E A B a b (ma : itree E A) (k : A -> itree E B)
+    (HM: Returns a ma)
+    (HK: Returns b (k a)),
+      Returns b (bind ma k).
+  Proof.
+    intros.
+    revert B b k HK.
+    induction HM; intros.
+    - rewrite H. cbn. rewrite Eq.bind_ret_l. assumption.
+    - rewrite H. cbn. rewrite Eq.bind_tau. rewrite tau_eutt. apply IHHM. assumption.
+    - rewrite H. cbn. rewrite Eq.bind_vis. econstructor 3. reflexivity. apply IHHM. assumption.
+  Qed.
+  
+  Lemma Returns_bind_inversion_ : forall {E A B} (u : itree E B) (t : itree E A) (k : A -> itree E B) b,
+      Returns b u ->
+      u ≈ (bind t k) ->
+      exists a, Returns a t /\ Returns b (k a).
+  Proof.
+    intros E A B u t k b HR eq. 
+    revert A t k eq.
+    induction HR; intros.
+    - rewrite eq in H.
+      apply eutt_inv_bind_ret in H.
+      destruct H as (a & HEQ & HK).
+      exists a. split. rewrite HEQ. constructor. reflexivity. rewrite HK. constructor. reflexivity.
+    - rewrite tau_eutt in H.
+      eapply IHHR. rewrite <- H. assumption.
+    - rewrite eq in H; clear eq.
+      apply eutt_inv_bind_vis in H.
+      destruct H as [(kx & HV & eq2) | (a & HRA & KA)].
+      + setoid_rewrite HV.
+        specialize (eq2 x).
+        setoid_rewrite <- eq2 in IHHR.
+        specialize (IHHR _ (kx x) k0).
+        assert (ITree.bind (kx x) k0 ≈ bind (kx x) k0) by reflexivity.
+        apply IHHR in H.
+        destruct H as (a & HRet & HK).
+        exists a. split.  econstructor 3. reflexivity. apply HRet. assumption.
+      + exists a. split.
+        rewrite HRA. constructor 1. reflexivity.
+        specialize (IHHR _ (ret x) k).
+        assert (k x ≈ bind (ret x) k).
+        { rewrite bind_ret_l. reflexivity. }
+        apply IHHR  in H. rewrite KA.
+        destruct H as (x' & _ & HX).
+        econstructor 3. reflexivity.  apply HX.
+  Qed.
+
+  Lemma Returns_bind_inversion : forall {E A B} (u : itree E B) (t : itree E A) (k : A -> itree E B) b,
+      Returns b (bind t k) ->
+      exists a, Returns a t /\ Returns b (k a).
+  Proof.
+    intros.
+    eapply Returns_bind_inversion_. apply H. reflexivity.
+  Qed.
+
+  Lemma Returns_vis_inversion_ : forall {E A B} (u : itree E B) (e : E A) (k : A -> itree E B) b,
+      Returns b u ->
+      u ≈ (Vis e k) ->
+      exists a, Returns b (k a).
+  Proof.
+    intros E A B u e k b HR eq. 
+    revert A e k eq.
+    induction HR; intros.
+    - rewrite H in eq.
+      apply eutt_inv_ret_vis in eq. inversion eq.
+    - rewrite tau_eutt in H.
+      eapply IHHR. rewrite <- H. apply eq.
+    - rewrite eq in H; clear eq.
+      punfold H.
+      repeat red in H.
+      simpl in H.
+      inversion H. subst.
+      apply inj_pair2 in H2.
+      apply inj_pair2 in H3.
+      apply inj_pair2 in H6.
+      apply inj_pair2 in H5.
+      subst.
+      assert (Vis e k0 ≈ Vis e k).
+      red. red. pfold. red. apply H.
+      apply eqit_inv_vis in H0.
+      destruct H0 as (_ & HX).
+      exists x. specialize (HX x).
+      rewrite HX. assumption.
+  Qed.
+
+  Lemma Returns_vis_inversion : forall {E A B} (e : E A) (k : A -> itree E B) b,
+      Returns b (Vis e k) ->
+      exists a, Returns b (k a).
+  Proof.
+    intros.
+    eapply Returns_vis_inversion_. apply H. reflexivity.
+  Qed.
+
+  Lemma interp_prop_bind_clo :
+    forall E F (h_spec : E ~> PropT F) A B
+      (HP : forall T, Proper (eq ==> EqM_PropT T) (h_spec T))
+      (t1 : itree E A) (t2 : itree F A)
+      (k1 : A -> itree E B) (k2 : A -> itree F B)
+      (HT : interp_prop h_spec A eq t1 t2)
+      (HK :  forall (a : A), Returns a t2 -> interp_prop h_spec B eq (k1 a) (k2 a)),
+      interp_prop h_spec B eq (ITree.bind t1 k1) (ITree.bind t2 k2).
+  Proof.
+  Admitted.
+
+  
+  Lemma interp_prop_bind :
+    forall E F (h_spec : E ~> PropT F) R S
+      (HP : forall T, Proper (eq ==> EqM_PropT T) (h_spec T))
+      (m : itree E S)
+      (k : S -> itree E R)
+    , EqM_PropT _ (interp_prop h_spec R eq (bind m k)) (bind (interp_prop h_spec S eq m) (fun x => interp_prop h_spec R eq (k x))).
+  Proof.
+    intros.
+    split; [|split].
+    - intros; split; intro HQ.
+      + (* SAZ: Thiis direction is the impossible one *)
+        rewrite H in HQ. clear H.
+        setoid_rewrite (itree_eta m) in HQ.
+        repeat red.
+        setoid_rewrite (itree_eta m).
+
+        destruct (observe m).
+        * setoid_rewrite Eq.bind_ret_l in HQ.
+          exists (ret r). exists (fun _ => y).
+          split; [| split].
+          -- repeat red. pstep. red. econstructor. reflexivity. reflexivity.
+          -- unfold bind, Monad_itree. cbn. rewrite Eq.bind_ret_l. reflexivity.
+          -- intros. apply Returns_ret_inv in H. subst. assumption.
+        * setoid_rewrite Eq.bind_tau in HQ. setoid_rewrite tau_eutt in HQ.
+          setoid_rewrite tau_eutt.
+          punfold HQ. red in HQ.
+          admit.
+        * setoid_rewrite Eq.bind_vis in HQ.
+          apply interp_prop_vis_inv in HQ.
+          destruct HQ as (ms & ks & HX & eq2).
+          admit.
+      + rewrite H. clear H.
+        repeat red in HQ.
+        setoid_rewrite (itree_eta m). setoid_rewrite (itree_eta m) in HQ.
+        destruct (observe m).
+        * destruct HQ as (ta & k0 & HI & eq2 & KK).
+          pinversion HI; subst.
+          rewrite eq0 in eq2. unfold bind, Monad_itree in *. rewrite Eq.bind_ret_l.
+          rewrite Eq.bind_ret_l in eq2. rewrite eq2. eapply KK. rewrite eq0. econstructor. reflexivity.
+        * destruct HQ as (ta & k0 & HI & eq2 & KK).
+          pinversion HI; subst.
+          unfold bind, Monad_itree in *.
+          rewrite Eq.bind_tau. rewrite tau_eutt. rewrite eq2.
+          eapply interp_prop_bind_clo. assumption.
+          apply HS. apply KK.
+        * destruct HQ as (ta & k1 & HI & eq2 & KK).
+          pinversion HI; subst; clear HI.
+          apply inj_pair2 in H1. apply inj_pair2 in H2.
+          subst.
+          unfold bind, Monad_itree in *.
+
+          rewrite eq0 in eq2. rewrite Eq.bind_bind in eq2. rewrite eq2.
+          rewrite Eq.bind_vis. pstep. red. econstructor.
+          apply HTA. unfold bind, Monad_itree.
+          red. unfold EqM_ITree. reflexivity.
+          intros.
+          left. (* todo : interp_prop_bind_clo *)
+          eapply interp_prop_bind_clo.
+          assumption.
+          specialize (HK a H). pclearbot. apply HK.
+          intros. apply KK. rewrite eq0. 
+          eapply Returns_bind; eauto.
+  Admitted.          
+
+  
+  
   (*
   Lemma bind_Returns_l {E A B} :
     forall a (ma : itree E A) (k : A -> itree E B),
@@ -1291,20 +1542,6 @@ End PropMonad.
 
 Section IterLaws.
 
-(*
-  Lemma Returns_divergent' {E A B}:
-    (forall (ta : itree E A) (tb : itree E B),
-        not (exists a, Returns a ta) -> not (exists b, Returns b tb) ->
-        forall (k : A -> itree E B), tb ≈ bind ta k).
-  Proof.
-    intros. red. intros. red in H.
-    unfold bind, Monad_itree.
-    generalize dependent ta. pcofix CIH. cbn. pstep. unfold eqit_.
-    intros. remember (observe ta). destruct i.
-    - destruct H0. assert (ta ≈ Ret r0). rewrite Heqi.
-      rewrite <- itree_eta. reflexivity.
-  Admitted.
-*)
   Ltac simpl_iter :=
       unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree.
 
@@ -1600,25 +1837,6 @@ Section MonadLaws.
  Qed.
 
   
-  Lemma eutt_ret_vis_abs: forall {X Y E} (x: X) (e: E Y) k, Ret x ≈ Vis e k -> False.
-  Proof.
-    intros.
-    punfold H; inv H.
-  Qed.
-
-  Lemma Returns_Ret_ : forall E A (a x : A) (t:itree E A), t ≈ Ret x -> Returns a t -> x = a.
-  Proof.
-    intros E A a x t eq H. 
-    induction H.
-    - rewrite eq in H. eapply eutt_inv_ret. apply H.
-     - rewrite tau_eutt in H. rewrite <- H in IHReturns. apply IHReturns. assumption.
-    - rewrite eq in H. apply eqit_inv_ret_vis in H. contradiction.
-  Qed.
-
-  Lemma Returns_Ret :  forall E A (a x : A), Returns a ((Ret x) : itree E A) -> x = a.
-  Proof.
-    intros.  eapply Returns_Ret_. 2: eassumption. reflexivity.
-  Qed.
 
   Lemma ret_bind: forall {E} (a b : Type) (f : a -> PropT E b) (x : a),
       eutt_closed (f x) ->
@@ -1678,92 +1896,6 @@ Section MonadLaws.
     - assumption.
   Qed.
   
-  Section ReturnsBind.
-
-    Context {E : Type -> Type} {R S : Type}. 
-
-    Import ITreeNotations.
-    Local Open Scope itree.
-
-    Inductive eqit_Returns_bind_clo b1 b2 (r : itree E R -> itree E S -> Prop) :
-      itree E R -> itree E S -> Prop :=
-    | pbc_intro_h U (t1 t2: itree E U) (k1 : U -> itree E R) (k2 : U -> itree E S)
-                  (EQV: eqit eq b1 b2 t1 t2)
-                  (REL: forall u, Returns u t1 -> r (k1 u) (k2 u))
-      : eqit_Returns_bind_clo b1 b2 r (ITree.bind t1 k1) (ITree.bind t2 k2)
-    .
-    Hint Constructors eqit_Returns_bind_clo: core.
-
-    Lemma eqit_Returns_clo_bind  (RS : R -> S -> Prop) b1 b2 vclo
-          (MON: monotone2 vclo)
-          (CMP: compose (eqitC RS b1 b2) vclo <3= compose vclo (eqitC RS b1 b2))
-          (ID: id <3= vclo):
-      eqit_Returns_bind_clo b1 b2 <3= gupaco2 (eqit_ RS b1 b2 vclo) (eqitC RS b1 b2).
-    Proof.
-      gcofix CIH. intros. destruct PR.
-      guclo eqit_clo_trans.
-      econstructor; auto_ctrans_eq; try (rewrite (itree_eta (x <- _;; _ x)), unfold_bind; reflexivity).
-      punfold EQV. unfold_eqit.
-      genobs t1 ot1.
-      genobs t2 ot2.
-      hinduction EQV before CIH; intros; pclearbot.
-      - guclo eqit_clo_trans.
-        econstructor; auto_ctrans_eq; try (rewrite <- !itree_eta; reflexivity).
-        gbase; cbn.
-        apply REL0.
-        rewrite itree_eta, <- Heqot1; constructor; reflexivity.
-      - gstep. econstructor.
-        gbase.
-        apply CIH.
-        constructor; auto.
-        intros u HR.
-        apply REL0.
-        rewrite itree_eta,  <- Heqot1.  econstructor 2. reflexivity. assumption.
-      - gstep. econstructor.
-        intros; apply ID; unfold id.
-        gbase.
-        apply CIH.
-        constructor; auto.
-        intros ? HR; apply REL0.
-        rewrite itree_eta, <- Heqot1.
-        econstructor 3; eauto; reflexivity.
-      - destruct b1; try discriminate.
-        guclo eqit_clo_trans.
-        econstructor.
-        3:{ eapply IHEQV; eauto.
-            intros ? HR; apply REL.
-            rewrite itree_eta, <- Heqot1; econstructor 2. reflexivity. eauto.
-        }
-        3,4:auto_ctrans_eq.
-        2: reflexivity.
-        eapply eqit_tauL. rewrite unfold_bind, <-itree_eta. reflexivity.
-      - destruct b2; try discriminate.
-        guclo eqit_clo_trans.
-        econstructor; auto_ctrans_eq; cycle -1; eauto; try reflexivity.
-        eapply eqit_tauL. rewrite unfold_bind, <-itree_eta. reflexivity.
-    Qed.
-
-  End ReturnsBind.
-
-    Lemma eqit_Returns_bind' {E} {R} {T} b1 b2
-          (t1 t2: itree E T) (k1 k2: T -> itree E R) :
-      eqit eq b1 b2 t1 t2 ->
-      (forall r, Returns r t1 -> eqit eq b1 b2 (k1 r) (k2 r)) ->
-      @eqit E _ _ eq b1 b2 (ITree.bind t1 k1) (ITree.bind t2 k2).
-    Proof.
-      intros. ginit. guclo (@eqit_Returns_clo_bind E R R eq). unfold eqit in *.
-      econstructor; eauto with paco.
-    Qed.
-
-    Lemma eqit_Returns_bind'' {E} {R S} {T} (RS : R -> S -> Prop) b1 b2
-          (t1 t2: itree E T) (k1: T -> itree E R) (k2 : T -> itree E S) :
-      eqit eq b1 b2 t1 t2 ->
-      (forall r, Returns r t1 -> eqit RS b1 b2 (k1 r) (k2 r)) ->
-      @eqit E _ _ RS b1 b2 (ITree.bind t1 k1) (ITree.bind t2 k2).
-    Proof.
-      intros. ginit. guclo (@eqit_Returns_clo_bind E R S RS). unfold eqit in *.
-      econstructor; eauto with paco.
-    Qed.
 
 
    Global Instance bind_PropT_Proper {E} {A B} :
@@ -1959,100 +2091,6 @@ Section MonadLaws.
         rewrite EQ; auto.
     + auto.
   Qed.
-
-  Lemma Returns_bind: forall {E A B} (t: itree E A) (k: A -> itree E B) a b,
-      Returns a t ->
-      Returns b (k a) ->
-      Returns b (bind t k).
-  Proof.
-    intros E A B t k a b HRA HRB; induction HRA.
-    - cbn; rewrite H, Eq.bind_ret_l; auto.
-    - cbn in *. rewrite H. rewrite (eqit_tauL true u u); [| reflexivity]; auto. 
-    - cbn in *; rewrite H, bind_vis.
-      eapply (ReturnsVis b e); [reflexivity | cbn; eauto].
-  Qed.
-
-  Lemma Returns_bind_inversion_ : forall {E A B} (u : itree E B) (t : itree E A) (k : A -> itree E B) b,
-      Returns b u ->
-      u ≈ (bind t k) ->
-      exists a, Returns a t /\ Returns b (k a).
-  Proof.
-    intros E A B u t k b HR eq. 
-    revert A t k eq.
-    induction HR; intros.
-    - rewrite eq in H.
-      apply eutt_inv_bind_ret in H.
-      destruct H as (a & HEQ & HK).
-      exists a. split. rewrite HEQ. constructor. reflexivity. rewrite HK. constructor. reflexivity.
-    - rewrite tau_eutt in H.
-      eapply IHHR. rewrite <- H. assumption.
-    - rewrite eq in H; clear eq.
-      apply eutt_inv_bind_vis in H.
-      destruct H as [(kx & HV & eq2) | (a & HRA & KA)].
-      + setoid_rewrite HV.
-        specialize (eq2 x).
-        setoid_rewrite <- eq2 in IHHR.
-        specialize (IHHR _ (kx x) k0).
-        assert (ITree.bind (kx x) k0 ≈ bind (kx x) k0) by reflexivity.
-        apply IHHR in H.
-        destruct H as (a & HRet & HK).
-        exists a. split.  econstructor 3. reflexivity. apply HRet. assumption.
-      + exists a. split.
-        rewrite HRA. constructor 1. reflexivity.
-        specialize (IHHR _ (ret x) k).
-        assert (k x ≈ bind (ret x) k).
-        { rewrite bind_ret_l. reflexivity. }
-        apply IHHR  in H. rewrite KA.
-        destruct H as (x' & _ & HX).
-        econstructor 3. reflexivity.  apply HX.
-  Qed.
-
-  Lemma Returns_bind_inversion : forall {E A B} (u : itree E B) (t : itree E A) (k : A -> itree E B) b,
-      Returns b (bind t k) ->
-      exists a, Returns a t /\ Returns b (k a).
-  Proof.
-    intros.
-    eapply Returns_bind_inversion_. apply H. reflexivity.
-  Qed.
-
-  Lemma Returns_vis_inversion_ : forall {E A B} (u : itree E B) (e : E A) (k : A -> itree E B) b,
-      Returns b u ->
-      u ≈ (Vis e k) ->
-      exists a, Returns b (k a).
-  Proof.
-    intros E A B u e k b HR eq. 
-    revert A e k eq.
-    induction HR; intros.
-    - rewrite H in eq.
-      apply eutt_inv_ret_vis in eq. inversion eq.
-    - rewrite tau_eutt in H.
-      eapply IHHR. rewrite <- H. apply eq.
-    - rewrite eq in H; clear eq.
-      punfold H.
-      repeat red in H.
-      simpl in H.
-      inversion H. subst.
-      apply inj_pair2 in H2.
-      apply inj_pair2 in H3.
-      apply inj_pair2 in H6.
-      apply inj_pair2 in H5.
-      subst.
-      assert (Vis e k0 ≈ Vis e k).
-      red. red. pfold. red. apply H.
-      apply eqit_inv_vis in H0.
-      destruct H0 as (_ & HX).
-      exists x. specialize (HX x).
-      rewrite HX. assumption.
-  Qed.
-
-  Lemma Returns_vis_inversion : forall {E A B} (e : E A) (k : A -> itree E B) b,
-      Returns b (Vis e k) ->
-      exists a, Returns b (k a).
-  Proof.
-    intros.
-    eapply Returns_vis_inversion_. apply H. reflexivity.
-  Qed.
-  
 
   Definition EQ_REL {E A} (ta : itree E A) : A -> A -> Prop :=
     fun a b => a = b /\ Returns a ta.
