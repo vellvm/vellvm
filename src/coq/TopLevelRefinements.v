@@ -124,7 +124,7 @@ Qed.
 
   
 Hint Unfold TT : core.
-Local Instance TT_equiv :
+Instance TT_equiv :
   forall A, Equivalence (@TT A).
 Proof.
   intros A; split; repeat intro; auto.
@@ -486,6 +486,31 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma denote_code_nil :
+    D.denote_code [] ≈ ret tt.
+Proof.
+  intros.
+  cbn. rewrite bind_ret_l.
+  reflexivity.
+Qed.
+
+Lemma denote_code_sing :
+  forall a,
+    D.denote_code [a] ≈ D.denote_instr a.
+Proof.
+  intros a.
+  rewrite denote_code_cons.
+  setoid_rewrite denote_code_nil.
+  cbn.
+
+  epose proof bind_ret_r.
+  specialize (H (D.denote_instr a)).
+
+  rewrite <- H.
+  rewrite bind_bind.
+  apply eutt_eq_bind; intros []; rewrite bind_ret_l; reflexivity. 
+Qed.
+
 Import MonadNotation.
 Open Scope monad_scope.
 
@@ -538,4 +563,3 @@ Proof.
 Qed.
 
 End Denotation.
-

@@ -3082,29 +3082,48 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         }
         rewrite off_H.
         clear Heqsz off_H.
+        revert off.
         induction sz.
-        - cbn.
-          rewrite Zred_factor6 at 1.
+        - intros. cbn.
+          setoid_rewrite Zred_factor6 at 1.
           reflexivity.
-        - rewrite Nat.add_1_r in IHsz.
-          cbn in IHsz.
-          pose proof Zseq_succ.
-          rewrite <- Nat.add_1_r at 2 3.
-          (* setoid_rewrite IHsz. *)
-          (* cbn.  *)
-          (* rewrite Nat.add_1_l.  *)
-      Admitted.
+        - intros.
+          rewrite Nat.add_1_r in *.
+          cbn in *.
+          specialize (IHsz (Z.succ off)).
+          rewrite IHsz.
+          assert (Z.succ off + Z.of_nat sz = off + Z.pos (Pos.of_succ_nat sz)) by lia.
+          rewrite H3. reflexivity.
+        - lia.
+      Qed.
 
       Lemma Zseq_length :
         forall (sz : nat) off, sz = length (Zseq off sz).
       Proof.
-      Admitted.
+        intro sz.
+        induction sz.
+        - intros; auto.
+        - intros. cbn. auto.
+      Qed.
 
       Lemma list_nth_z_length:
         forall A (l : list A) (a : A),
           list_nth_z (l ++ [a]) (Z.of_nat (length l)) = Some a.
       Proof.
-      Admitted.
+        intros. revert a.
+        remember (Datatypes.length l) as LEN. revert LEN HeqLEN.
+        induction l.
+        - intros; subst; auto.
+        - intros; cbn.
+          assert ((Datatypes.length (a :: l) <> 0)%nat).
+          { cbn. lia. }
+          rewrite <- HeqLEN in H2.
+          destruct (zeq (Z.of_nat LEN) 0) eqn: LENZERO.
+          + intuition. (* absurd case *)
+          + Search (Z.pred (Z.of_nat _)).
+            rewrite <- Nat2Z.inj_pred. 2 : lia.
+            apply IHl. cbn in HeqLEN. lia.
+      Qed.
 
       Lemma list_singleton_eq:
         forall A (a b: A), a = b -> [a] = [b].
@@ -3120,7 +3139,14 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           lookup_all_index offset (Z.of_nat sz)
                            (add_all_index l offset bytes) def.
       Proof.
-      Admitted.
+        intros*. revert def bytes offset sz.
+        induction l.
+        - intros; cbn. cbn in H2. subst. auto.
+        - intros; cbn in *. subst.
+          rewrite Nat2Z.inj_succ.
+          rewrite 2 lookup_all_index_add. 2 : lia. 2 : lia.
+          rewrite IHl. reflexivity. reflexivity.
+      Qed.
 
       Lemma lookup_all_index_add_all_index :
             forall (sz : nat) src_bytes src_offset dst_bytes dst_offset def,
