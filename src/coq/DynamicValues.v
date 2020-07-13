@@ -999,6 +999,24 @@ Class VInt I : Type :=
     repr := Int64.repr;
   }.
 
+  (* Check if this is an instruction which can trigger UB with division by 0. *)
+  Definition iop_is_div (iop : ibinop) : bool :=
+    match iop with
+    | UDiv _ => true
+    | SDiv _ => true
+    | URem   => true
+    | SRem   => true
+    | _      => false
+    end.
+
+  (* Check if this is an instruction which can trigger UB with division by 0. *)
+  Definition fop_is_div (fop : fbinop) : bool :=
+    match fop with
+    | FDiv => true
+    | FRem => true
+    | _    => false
+    end.
+
   Definition undef_i1  := UVALUE_Undef (DTYPE_I 1).
   Definition undef_i8  := UVALUE_Undef (DTYPE_I 8).
   Definition undef_i32 := UVALUE_Undef (DTYPE_I 32).
@@ -1145,39 +1163,6 @@ Class VInt I : Type :=
   (* Integer iop evaluation, called from eval_iop.
      Here the values must be integers. Helper defined
      in order to prevent eval_iop from being recursive. *)
-  (* CB TODO: Should this do anything for undef? *)
-
-  (*
-    match iop with
-    | UDiv ex =>
-      if (unsigned y =? 0)
-      then raiseUB "Unsigned division by 0."
-      else if andb ex (negb ((unsigned x) mod (unsigned y) =? 0))
-           then ret DVALUE_Poison
-           else ret (to_dvalue (divu x y))
-
-    | SDiv ex =>
-      (* What does signed i1 mean? *)
-      if (signed y =? 0)
-      then raiseUB "Signed division by 0."
-      else if andb ex (negb ((signed x) mod (signed y) =? 0))
-           then ret DVALUE_Poison
-           else ret (to_dvalue (divs x y))
-
-    | URem =>
-      if unsigned y =? 0
-      then raiseUB "Unsigned mod 0."
-      else ret (to_dvalue (modu x y))
-
-    | SRem =>
-      if signed y =? 0
-      then raiseUB "Signed mod 0."
-      else ret (to_dvalue (mods x y))
-    | _ =>
- *)
-
-
-  (* TODO: make work with undef ??? Maybe this is all dvalues? *)
   Definition eval_iop_integer_h iop v1 v2 : undef_or_err dvalue :=
     match v1, v2 with
     | DVALUE_I1 i1, DVALUE_I1 i2    => lift (eval_int_op iop i1 i2)
@@ -1185,7 +1170,10 @@ Class VInt I : Type :=
     | DVALUE_I32 i1, DVALUE_I32 i2  => lift (eval_int_op iop i1 i2)
     | DVALUE_I64 i1, DVALUE_I64 i2  => lift (eval_int_op iop i1 i2)
     | DVALUE_Poison, _              => lift (ret DVALUE_Poison)
-    | _, DVALUE_Poison              => lift (ret DVALUE_Poison)
+    | _, DVALUE_Poison              =>
+      if iop_is_div iop
+      then lift (raise "Division by poison.")
+      else ret DVALUE_Poison
     | _, _                          => failwith "ill_typed-iop"
     end.
   Arguments eval_iop_integer_h _ _ _ : simpl nomatch.
@@ -1268,7 +1256,10 @@ Class VInt I : Type :=
     | DVALUE_Float f1, DVALUE_Float f2   => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
     | DVALUE_Poison, _                   => ret DVALUE_Poison
-    | _, DVALUE_Poison                   => ret DVALUE_Poison
+    | _, DVALUE_Poison                   =>
+      if fop_is_div fop
+      then lift (raise "Division by poison.")
+      else ret DVALUE_Poison
     | _, _                               => failwith ("ill_typed-fop: " ++ (to_string fop) ++ " " ++ (to_string v1) ++ " " ++ (to_string v2))
     end.
 

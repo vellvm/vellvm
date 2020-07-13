@@ -356,25 +356,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     | ID_Local x  => trigger (LocalRead x)
     end.
 
-  (* YZ TODO: move these somewhere else (DynamicValues most likely) *)
-
-  (* Instructions for which division by 0 is an undefined behavior *)
-  Definition iop_is_div (iop : ibinop) : bool :=
-    match iop with
-    | UDiv _ => true
-    | SDiv _ => true
-    | URem   => true
-    | SRem   => true
-    | _      => false
-    end.
-
-  Definition fop_is_div (fop : fbinop) : bool :=
-    match fop with
-    | FDiv => true
-    | FRem => true
-    | _    => false
-    end.
-
   (* Predicate testing whether a [dvalue] is equal to zero at its type *)
   Definition dvalue_is_zero (dv : dvalue) : Prop :=
     match dv with
