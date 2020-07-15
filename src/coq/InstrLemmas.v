@@ -339,6 +339,25 @@ Proof.
   eapply denote_instr_store; eauto.
 Qed.
 
+Lemma denote_instr_alloca_exists :
+  forall (m : memory_stack) (τ : dtyp) g ρ i align nb defs,
+    non_void τ ->
+    exists m' a,
+      allocate m τ = inr (m', a) /\
+      interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Alloca τ nb align)) g ρ m ≈ Ret (m', (Maps.add i (UVALUE_Addr a) ρ, (g, tt))).
+Proof.
+  intros m τ g ρ i align nb defs NV.
+
+  pose proof interp_cfg_to_L3_alloca defs m τ g ρ NV as (m' & a & ALLOC & TRIGGER).
+  exists m'. exists a. split; auto.
+
+  cbn. rewrite interp_cfg_to_L3_bind.
+  rewrite TRIGGER; cbn.
+  rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_LW. cbn.
+  reflexivity.
+Qed.
+
 (* Lemma denote_instr_op : *)
 (*   forall (i : raw_id) (op : exp dtyp) defs g ρ m t, *)
 (*     interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op op)) g ρ m ≈ t. *)
