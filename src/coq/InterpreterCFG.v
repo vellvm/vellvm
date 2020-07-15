@@ -258,6 +258,28 @@ Section InterpreterCFG.
     reflexivity.
   Qed.
 
+  Lemma interp_cfg_to_L3_store :
+    forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr) g l defs,
+      write m a val = inr m' ->
+      interp_cfg_to_L3 defs (trigger (Store (DVALUE_Addr a) val)) g l m ≈ ret (m',(l,(g,tt))).
+  Proof.
+    intros m m' t val a g l defs WRITE.
+    unfold interp_cfg_to_L3.
+    rewrite interp_intrinsics_trigger.
+    cbn.
+    unfold Intrinsics.F_trigger.
+    rewrite interp_global_trigger.
+    rewrite subevent_subevent.
+    cbn.
+    rewrite interp_local_bind, interp_local_trigger.
+    cbn; rewrite bind_bind.
+    rewrite interp_memory_bind, subevent_subevent.
+    rewrite interp_memory_store; eauto.
+    cbn.
+    rewrite 2 bind_ret_l, interp_local_ret, interp_memory_ret.
+    reflexivity.
+  Qed.
+
   Arguments allocate : simpl never.
   Lemma interp_cfg_to_L3_alloca :
     forall (defs : intrinsic_definitions) (m : memory_stack) (t : dtyp) (g : global_env) l,

@@ -10,6 +10,7 @@ From Vellvm Require Import
      LLVMEvents
      Handlers.Intrinsics
      Handlers.Handlers
+     Handlers.Memory
      Denotation
      InterpreterCFG
      Refinement.
@@ -45,27 +46,7 @@ Module D   := Denotation Memory.Addr LLVMEvents.
 Module IS  := IntrinsicsDefinitions.Make Memory.Addr LLVMEvents.
 Import D IS.
 
-Lemma denote_instr_load :
-  forall (i : raw_id) volatile τ τp ptr align defs g ρ ρ' m a uv,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τp) ptr)) g ρ m ≈ Ret (m, (ρ', (g, UVALUE_Addr a))) ->
-    read m a τ = inr uv ->
-    interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Load volatile τ (τp, ptr) align)) g ρ m ≈ Ret (m, (Maps.add i uv ρ', (g, tt))).
-Proof.
-  intros i volatile τ τp ptr align defs g ρ ρ' m a uv EXP READ.
-  cbn.
-  rewrite interp_cfg_to_L3_bind.
-  rewrite EXP.
-  rewrite bind_ret_l.
-  cbn.
-  rewrite bind_ret_l.
-  rewrite interp_cfg_to_L3_bind.
-  rewrite interp_cfg_to_L3_Load; eauto.
-
-  rewrite bind_ret_l.
-  rewrite interp_cfg_to_L3_LW.
-  cbn.
-  reflexivity.
-Qed.
+(** Helper lemmas that should probably be moved *)
 
 (* TODO: Move this *)
 Lemma interp_cfg_to_L3_concretize_or_pick_concrete :
@@ -159,6 +140,7 @@ Proof with reflexivity.
     reflexivity.    
 Qed.
 
+(* TODO: Move this *)
 Lemma interp_cfg_to_L3_concretize_or_pick_concrete_exists :
   forall (uv : uvalue) P defs g ρ m,
     is_concrete uv ->
@@ -223,29 +205,64 @@ Proof.
   reflexivity.
 Qed.
 
-(* Lemma denote_instr_store : *)
-(*   forall (i : int) volatile τv val τp ptr align defs uv dv g ρ ρ' m, *)
-(*     interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τv) val)) g ρ m ≈ Ret (m, (ρ', (g, uv))) -> *)
-(*     concretize_or_pick uv True ≈ Ret dv -> *)
-(*     interp_cfg_to_L3 defs (denote_instr (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align)) g ρ m ≈ Ret (m, (ρ', (g, tt))). *)
-(* Proof. *)
-(*   intros i volatile τv val τp ptr align defs uv dv g ρ ρ' m EXP CONEXP. *)
-(*   cbn. *)
-(*   rewrite interp_cfg_to_L3_bind. *)
-(*   rewrite EXP. *)
-(*   rewrite bind_ret_l. *)
-(*   rewrite interp_cfg_to_L3_bind. *)
-(*   rewrite CONEXP. *)
-(*   cbn. *)
-(*   rewrite bind_ret_l. *)
-(*   rewrite interp_cfg_to_L3_bind. *)
-(*   rewrite interp_cfg_to_L3_Load; eauto. *)
+(** Lemmas about denote_instr *)
 
-(*   rewrite bind_ret_l. *)
-(*   rewrite interp_cfg_to_L3_LW. *)
-(*   cbn. *)
-(*   reflexivity. *)
-(* Qed. *)
+Lemma denote_instr_load :
+  forall (i : raw_id) volatile τ τp ptr align defs g ρ ρ' m a uv,
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τp) ptr)) g ρ m ≈ Ret (m, (ρ', (g, UVALUE_Addr a))) ->
+    read m a τ = inr uv ->
+    interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Load volatile τ (τp, ptr) align)) g ρ m ≈ Ret (m, (Maps.add i uv ρ', (g, tt))).
+Proof.
+  intros i volatile τ τp ptr align defs g ρ ρ' m a uv EXP READ.
+  cbn.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite EXP.
+  rewrite bind_ret_l.
+  cbn.
+  rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite interp_cfg_to_L3_Load; eauto.
+
+  rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_LW.
+  cbn.
+  reflexivity.
+Qed.
+
+Lemma denote_instr_store :
+  forall (i : int) volatile τv val τp ptr align defs uv dv a g ρ ρ' ρ'' m m',
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τv) val)) g ρ m ≈ Ret (m, (ρ', (g, uv))) ->
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τp) ptr)) g ρ' m ≈ Ret (m, (ρ'', (g, UVALUE_Addr a))) ->
+    is_concrete uv ->
+    uvalue_to_dvalue uv = inr dv ->
+    write m a dv = inr m' ->
+    interp_cfg_to_L3 defs (denote_instr (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align)) g ρ m ≈ Ret (m', (ρ'', (g, tt))).
+Proof.
+  intros i volatile τv val τp ptr align defs uv dv a g ρ ρ' ρ'' m m' EXP PTR CONC_UV CONV_UV WRITE.
+  cbn.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite EXP.
+  rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_bind.
+
+  eapply interp_cfg_to_L3_concretize_or_pick_concrete_exists in CONC_UV as (dv' & CONV_UV' & CONC_UV).
+  rewrite CONV_UV' in CONV_UV.
+  injection CONV_UV; intros; subst.
+  rewrite CONC_UV.
+
+  rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite PTR.
+  rewrite bind_ret_l.
+
+  rewrite interp_cfg_to_L3_bind.
+  cbn.
+  rewrite interp_cfg_to_L3_ret.
+  rewrite bind_ret_l.
+
+  rewrite interp_cfg_to_L3_store; cbn; eauto.
+  reflexivity.
+Qed.
 
 (* Lemma denote_instr_op : *)
 (*   forall (i : raw_id) (op : exp dtyp) defs g ρ m t, *)
