@@ -358,15 +358,53 @@ Proof.
   reflexivity.
 Qed.
 
-(* Lemma denote_instr_op : *)
-(*   forall (i : raw_id) (op : exp dtyp) defs g ρ m t, *)
-(*     interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op op)) g ρ m ≈ t. *)
+Lemma denote_instr_comment :
+  forall i str g ρ m defs,
+    interp_cfg_to_L3 defs (denote_instr (i, INSTR_Comment str)) g ρ m ≈ Ret (m, (ρ, (g, tt))).
+Proof.
+  intros i str g ρ m defs.
+  destruct i; cbn; rewrite interp_cfg_to_L3_ret; reflexivity.
+Qed.
+
+
+Lemma denote_instr_op :
+  forall (i : raw_id) (op : exp dtyp) defs uv g ρ ρ' m,
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp None op)) g ρ m ≈ Ret (m, (ρ', (g, uv))) ->
+    interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op op)) g ρ m ≈ Ret (m, (Maps.add i uv ρ', (g, tt))).
+Proof.
+  intros i op defs uv g ρ ρ' m OP.
+  cbn.
+  unfold denote_op.
+  rewrite interp_cfg_to_L3_bind.
+
+  rewrite OP. rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_LW.
+  reflexivity.
+Qed.
+
+(* Lemma denote_instr_call : *)
+(*   forall defs i τf f args uf uvs g ρ ρ' m t, *)
+(*     map_monad (fun '(t, op) => translate exp_E_to_instr_E (denote_exp (Some t) op)) args ≈ Ret uvs -> *)
+(*     interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp None f)) g ρ m ≈ Ret (m, (ρ', (g, uf))) -> *)
+(*     intrinsic_exp f = None -> *)
+(*     interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Call (τf, f) args)) g ρ m ≈ t. (* interp_cfg_to_L3 defs (ITree.bind (trigger (LLVMEvents.Call τf uf uvs)) (fun x => trigger (LocalWrite i x)) g ρ' m). *) *)
 (* Proof. *)
-(*   intros i op defs g ρ m t. *)
+(*   intros defs i τf f args uf uvs g ρ ρ' m t MAP FEXP INT. *)
 (*   cbn. *)
-(*   unfold denote_op. *)
-(*   unfold denote_exp. *)
-(*   setoid_rewrite interp_cfg_to_L3_LW. *)
-(*   rewrite interp_cfg_to_L3_translate. *)
-(*   rewrite translate_bind. *)
+(*   rewrite MAP. rewrite bind_ret_l. *)
+(*   rewrite INT. rewrite bind_bind. *)
+
+(*   rewrite interp_cfg_to_L3_bind. *)
+(*   rewrite FEXP. rewrite bind_ret_l. *)
+
+(*   rewrite interp_cfg_to_L3_bind. *)
+(*   rewrite interp_cfg_to_L3_LW. *)
+(*   rewrite <- bind_trigger. *)
+
+(*   interp_cfg_to_L3 defs *)
+(*     (ITree.bind (trigger (LLVMEvents.Call τf uf uvs)) *)
+(*        (fun returned_value : uvalue => trigger (LocalWrite i returned_value))) g ρ' m ≈ t *)
+
+(*   rewrite bind_trigger *)
+
 (* Qed. *)
