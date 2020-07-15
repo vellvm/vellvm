@@ -2905,15 +2905,15 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         forall (m : memory_stack) (t : dtyp) (val : dvalue) (a : addr),
           dvalue_has_dtyp val t ->
           dtyp_fits m a t ->
-          exists m', write m a val = inr m' ->
-          interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ ret (m', tt).
+          exists m',
+            write m a val = inr m' /\
+            interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ ret (m', tt).
       Proof.
         intros m t val a TYP CAN.
         apply write_succeeds with (v:=val) in CAN as [m2 WRITE]; auto.
-        exists m2. intros _.
+        exists m2. split; auto.
 
-        rewrite interp_memory_store; eauto.
-        reflexivity.
+        eapply interp_memory_store; eauto.
       Qed.
 
       Lemma interp_memory_alloca :

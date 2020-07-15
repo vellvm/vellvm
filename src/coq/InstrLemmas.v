@@ -13,6 +13,7 @@ From Vellvm Require Import
      Handlers.Memory
      Denotation
      InterpreterCFG
+     Tactics
      Refinement.
 
 
@@ -103,6 +104,38 @@ Proof.
     reflexivity.
 Qed.
 
+Lemma uvalue_to_dvalue_list_concrete :
+  forall fields dfields,
+    (forall u : uvalue,
+        List.In u fields ->
+        (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u) ->
+    map_monad uvalue_to_dvalue fields = inr dfields ->
+    forallb is_concrete fields = true.
+Proof.
+  induction fields; intros dfields H MAP; auto.
+
+  cbn. apply andb_true_intro.
+  split.
+  - apply H.
+    + apply in_eq.
+    + inversion MAP.
+      destruct (uvalue_to_dvalue a) eqn:Hdv; inversion H1.
+      exists d. reflexivity.
+  - inversion MAP.
+    destruct (uvalue_to_dvalue a) eqn:Hdv; inversion H1.
+    destruct (map_monad uvalue_to_dvalue fields) eqn:Hmap; inversion H2.
+
+    assert (forall u : uvalue,
+               In u fields -> (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u) as BLAH.
+    { intros u IN (dv & CONV).
+      apply H.
+      - cbn. auto.
+      - exists dv. auto.
+    }
+
+    apply (IHfields l BLAH eq_refl).
+Qed.
+
 (* TODO: Move this *)
 Lemma is_concrete_uvalue_to_dvalue :
   forall uv,
@@ -138,6 +171,32 @@ Proof with reflexivity.
     pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
     exists (DVALUE_Vector dv). rewrite MAP.
     reflexivity.    
+Qed.
+
+(* TODO: Move this *)
+Lemma uvalue_to_dvalue_is_concrete :
+  forall uv dv,
+    uvalue_to_dvalue uv = inr dv ->
+    is_concrete uv.
+Proof.
+  induction uv using uvalue_ind';
+    intros dv CONV; cbn; inversion CONV; auto.
+  - break_match; inversion H1.
+    eapply uvalue_to_dvalue_list_concrete; eauto.
+    intros u IN (dv' & CONV').
+    eapply H; eauto.
+  - break_match; inversion H1.
+    eapply uvalue_to_dvalue_list_concrete; eauto.
+    intros u IN (dv' & CONV').
+    eapply H; eauto.
+  - break_match; inversion H1.
+    eapply uvalue_to_dvalue_list_concrete; eauto.
+    intros u IN (dv' & CONV').
+    eapply H; eauto.
+  - break_match; inversion H1.
+    eapply uvalue_to_dvalue_list_concrete; eauto.
+    intros u IN (dv' & CONV').
+    eapply H; eauto.
 Qed.
 
 (* TODO: Move this *)
@@ -233,18 +292,18 @@ Lemma denote_instr_store :
   forall (i : int) volatile τv val τp ptr align defs uv dv a g ρ ρ' ρ'' m m',
     interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τv) val)) g ρ m ≈ Ret (m, (ρ', (g, uv))) ->
     interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τp) ptr)) g ρ' m ≈ Ret (m, (ρ'', (g, UVALUE_Addr a))) ->
-    is_concrete uv ->
     uvalue_to_dvalue uv = inr dv ->
     write m a dv = inr m' ->
     interp_cfg_to_L3 defs (denote_instr (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align)) g ρ m ≈ Ret (m', (ρ'', (g, tt))).
 Proof.
-  intros i volatile τv val τp ptr align defs uv dv a g ρ ρ' ρ'' m m' EXP PTR CONC_UV CONV_UV WRITE.
+  intros i volatile τv val τp ptr align defs uv dv a g ρ ρ' ρ'' m m' EXP PTR CONV_UV WRITE.
   cbn.
   rewrite interp_cfg_to_L3_bind.
   rewrite EXP.
   rewrite bind_ret_l.
   rewrite interp_cfg_to_L3_bind.
 
+  pose proof (uvalue_to_dvalue_is_concrete _ _ CONV_UV) as CONC_UV.
   eapply interp_cfg_to_L3_concretize_or_pick_concrete_exists in CONC_UV as (dv' & CONV_UV' & CONC_UV).
   rewrite CONV_UV' in CONV_UV.
   injection CONV_UV; intros; subst.
@@ -262,6 +321,22 @@ Proof.
 
   rewrite interp_cfg_to_L3_store; cbn; eauto.
   reflexivity.
+Qed.
+
+Lemma denote_instr_store_exists :
+  forall (i : int) volatile τv val τp ptr align defs uv dv a g ρ ρ' ρ'' m,
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τv) val)) g ρ m ≈ Ret (m, (ρ', (g, uv))) ->
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τp) ptr)) g ρ' m ≈ Ret (m, (ρ'', (g, UVALUE_Addr a))) ->
+    uvalue_to_dvalue uv = inr dv ->
+    dvalue_has_dtyp dv τv ->
+    dtyp_fits m a τv ->
+    exists m',
+      write m a dv = inr m' /\ interp_cfg_to_L3 defs (denote_instr (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align)) g ρ m ≈ Ret (m', (ρ'', (g, tt))).
+Proof.
+  intros i volatile τv val τp ptr align defs uv dv a g ρ ρ' ρ'' m EXP PTR CONV_UV TYP FITS.
+  apply write_succeeds with (v:=dv) in FITS as [m2 WRITE]; auto.
+  exists m2. split; auto.
+  eapply denote_instr_store; eauto.
 Qed.
 
 (* Lemma denote_instr_op : *)
