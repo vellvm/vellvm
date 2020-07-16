@@ -383,9 +383,9 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma denote_ibinop_not_div :
+(* TODO: Move to place where expression lemmas belong? *)
+Lemma denote_ibinop :
   forall (op : ibinop) τ e0 e1 g ρ m x a av b bv defs,
-    iop_is_div op = false ->
     uvalue_to_dvalue a = inr av ->
     uvalue_to_dvalue b = inr bv ->
     eval_iop op av bv  = ret x ->
@@ -403,7 +403,7 @@ Lemma denote_ibinop_not_div :
          (OP_IBinop op τ (Traversal.fmap (typ_to_dtyp [ ]) e0)
             (Traversal.fmap (typ_to_dtyp [ ]) e1)))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
 Proof.
-  intros op τ e0 e1 g ρ m x a av b bv defs NOTDIV AV BV EVAL A B.
+  intros op τ e0 e1 g ρ m x a av b bv defs AV BV EVAL A B.
 
   (* First subexpression *)
   cbn.
@@ -418,8 +418,9 @@ Proof.
   rewrite <- B.
   rewrite bind_ret_l.
 
-  rewrite NOTDIV.
-  cbn.
+  pose proof (uvalue_to_dvalue_is_concrete _ _ BV) as CONC.
+  rewrite CONC.
+  cbn. rewrite Bool.andb_false_r.
 
   unfold uvalue_to_dvalue_binop.
   rewrite AV, BV.
@@ -432,7 +433,6 @@ Proof.
   rewrite interp_cfg_to_L3_ret.
   reflexivity.
 Qed.
-
 
 (* Lemma denote_instr_call : *)
 (*   forall defs i τf f args uf uvs g ρ ρ' m t, *)
