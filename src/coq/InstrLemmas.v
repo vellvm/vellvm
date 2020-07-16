@@ -384,7 +384,7 @@ Proof.
 Qed.
 
 (* TODO: Move to place where expression lemmas belong? *)
-Lemma denote_ibinop :
+Lemma denote_ibinop_concrete :
   forall (op : ibinop) τ e0 e1 g ρ m x a av b bv defs,
     uvalue_to_dvalue a = inr av ->
     uvalue_to_dvalue b = inr bv ->
