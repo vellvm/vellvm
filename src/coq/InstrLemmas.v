@@ -6,6 +6,7 @@ From Vellvm Require Import
      AstLib
      CFG
      DynamicTypes
+     DynamicValues
      MemoryAddress
      LLVMEvents
      Handlers.Intrinsics
@@ -27,7 +28,7 @@ From ITree Require Import
      Eq.Eq.
 
 From Coq Require Import
-     List.
+     ZArith List.
 
 Import ListNotations.
 
@@ -485,6 +486,72 @@ Proof.
   reflexivity.
 Qed.
 
+(* TODO: something like this exists in tmp_aux_vellvm.v in Helix. Move these. *)
+Lemma exp_E_to_instr_E_subevent : forall {E} {X} `{E -< exp_E} (e : E X),
+    exp_E_to_instr_E (subevent X e) = subevent X e.
+Proof.
+  reflexivity.
+Qed.
+
+
+Lemma denote_instr_gep_array :
+  forall i size τ defs ix ptr a val g ρ m,
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m ≈ Ret (m, (ρ, (g, UVALUE_Addr a))) ->
+    get_array_cell m a ix τ = inr val ->
+    exists ptr_res,
+      read m ptr_res τ = inr val /\
+      interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, EXP_Integer (Z.of_nat ix))]))) g ρ m  ≈ Ret (m, (Maps.add i (UVALUE_Addr ptr_res) ρ, (g, tt))).
+Proof.
+  intros i size τ defs ix ptr a val g ρ m PTR GET.
+
+  pose proof interp_cfg_to_L3_GEP_array defs τ a size g ρ m val ix GET as (ptr_res & EQ & READ).
+  exists ptr_res. split; auto.
+
+  cbn.
+  rewrite translate_bind.
+  rewrite bind_bind.
+  rewrite interp_cfg_to_L3_bind.
+
+  rewrite PTR.
+  rewrite bind_ret_l.
+
+  (* Could probably automate some of this fiddliness *)
+  repeat rewrite translate_bind.
+  repeat rewrite bind_bind.
+  rewrite translate_ret.
+  rewrite bind_ret_l.
+  repeat rewrite translate_bind.
+  repeat rewrite bind_bind.
+  rewrite translate_ret.
+  rewrite bind_ret_l.
+  rewrite translate_bind.
+  rewrite bind_bind.
+  rewrite translate_ret.
+  rewrite bind_ret_l.
+  rewrite translate_ret.
+  rewrite bind_ret_l.
+  rewrite translate_ret.
+  rewrite bind_ret_l.
+  cbn.
+  unfold ITree.map.
+  rewrite translate_bind.
+  rewrite bind_bind.
+
+  rewrite translate_trigger.
+  rewrite interp_cfg_to_L3_bind_trigger.
+  rewrite exp_E_to_instr_E_subevent.
+
+  rewrite EQ.
+
+  rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_bind.
+  cbn.
+  rewrite translate_ret.
+  rewrite interp_cfg_to_L3_ret.
+  rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_LW.
+  reflexivity.
+Qed.
 
 (* Lemma denote_instr_call : *)
 (*   forall defs i τf f args uf uvs g ρ ρ' m t, *)
