@@ -434,6 +434,58 @@ Proof.
   reflexivity.
 Qed.
 
+(* TODO: Move to place where expression lemmas belong? *)
+Lemma denote_fbinop_concrete :
+  forall (op : fbinop) τ e0 e1 g ρ m x a av b bv defs params,
+    uvalue_to_dvalue a = inr av ->
+    uvalue_to_dvalue b = inr bv ->
+    eval_fop op av bv  = ret x ->
+    Ret (m, (ρ, (g, a)))
+        ≈ interp_cfg_to_L3 defs
+        (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e0))) g ρ
+        m ->
+    Ret (m, (ρ, (g, b)))
+        ≈ interp_cfg_to_L3 defs
+        (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e1))) g ρ
+        m ->
+   interp_cfg_to_L3 defs
+   (translate exp_E_to_instr_E
+      (D.denote_exp None
+         (OP_FBinop op params τ (Traversal.fmap (typ_to_dtyp [ ]) e0)
+            (Traversal.fmap (typ_to_dtyp [ ]) e1)))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
+Proof.
+  intros op τ e0 e1 g ρ m x a av b bv defs params AV BV EVAL A B.
+
+  (* First subexpression *)
+  cbn.
+  rewrite translate_bind.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite <- A.
+  rewrite bind_ret_l.
+
+  (* Second subexpression *)
+  rewrite translate_bind.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite <- B.
+  rewrite bind_ret_l.
+
+  pose proof (uvalue_to_dvalue_is_concrete _ _ BV) as CONC.
+  rewrite CONC.
+  cbn. rewrite Bool.andb_false_r.
+
+  unfold uvalue_to_dvalue_binop.
+  rewrite AV, BV.
+  cbn.
+
+  rewrite EVAL.
+  cbn.
+
+  repeat rewrite translate_ret.
+  rewrite interp_cfg_to_L3_ret.
+  reflexivity.
+Qed.
+
+
 (* Lemma denote_instr_call : *)
 (*   forall defs i τf f args uf uvs g ρ ρ' m t, *)
 (*     map_monad (fun '(t, op) => translate exp_E_to_instr_E (denote_exp (Some t) op)) args ≈ Ret uvs -> *)
