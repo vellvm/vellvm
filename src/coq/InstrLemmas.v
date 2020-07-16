@@ -164,7 +164,7 @@ Proof with reflexivity.
   - cbn.
     pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
     exists (DVALUE_Packed_struct dv). rewrite MAP.
-    reflexivity.    
+    reflexivity.
   - cbn.
     pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
     exists (DVALUE_Array dv). rewrite MAP.
@@ -172,7 +172,7 @@ Proof with reflexivity.
   - cbn.
     pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
     exists (DVALUE_Vector dv). rewrite MAP.
-    reflexivity.    
+    reflexivity.
 Qed.
 
 (* TODO: Move this *)
@@ -552,6 +552,52 @@ Proof.
   rewrite interp_cfg_to_L3_LW.
   reflexivity.
 Qed.
+
+Lemma denote_instr_intrinsic :
+  forall i τ defs fn in_n sem_f args arg_vs conc_args res g ρ m,
+    @intrinsic_exp dtyp (EXP_Ident (ID_Global (Name fn))) = Some in_n ->
+    assoc Strings.String.string_dec in_n (defs_assoc defs) = Some sem_f ->
+    interp_cfg_to_L3 defs (map_monad (fun uv : uvalue => pickUnique uv) arg_vs) g ρ m ≈ Ret (m, (ρ, (g, conc_args))) ->
+    sem_f conc_args = inr res ->
+    map_monad (fun '(t, op) => translate exp_E_to_instr_E (denote_exp (Some t) op)) args ≈ Ret arg_vs ->
+    (interp_cfg_to_L3 defs
+       (denote_instr
+          (IId i,
+           INSTR_Call (τ, EXP_Ident (ID_Global (Name fn))) args)) g ρ m) ≈ Ret (m, (FMapAList.alist_add eq_dec_raw_id i (dvalue_to_uvalue res) ρ, (g, tt))).
+Proof.
+  intros i τ defs fn in_n sem_f args arg_vs conc_args res g ρ m INTRINSIC ASSOC CONCARGS RES MAP.
+
+  unfold denote_instr.
+  rewrite MAP.
+  setoid_rewrite bind_ret_l.
+  rewrite INTRINSIC.
+  setoid_rewrite bind_bind.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite CONCARGS.
+  rewrite bind_ret_l.
+
+  cbn; unfold ITree.map.
+  rewrite bind_bind.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite interp_cfg_to_L3_intrinsic; eauto.
+
+  repeat (cbn; rewrite bind_ret_l).
+  rewrite interp_cfg_to_L3_LW.
+  cbn.
+  reflexivity.
+Qed.
+
+(*
+
+interp_cfg_to_L3_intrinsic:
+  forall (defs : Intrinsics.intrinsic_definitions) (m : memory_stack) (τ : dtyp)
+    (g : global_env) (l : local_env) (fn : String.string) (args : list dvalue)
+    (df : Intrinsics.semantic_function) (res : dvalue),
+  assoc Strings.String.string_dec fn (defs_assoc defs) = Some df ->
+  df args = inr res ->
+  Monad.eqm (interp_cfg_to_L3 defs (trigger (Intrinsic τ fn args)) g l m) (ret (m, (l, (g, res))))
+
+*)
 
 (* Lemma denote_instr_call : *)
 (*   forall defs i τf f args uf uvs g ρ ρ' m t, *)
