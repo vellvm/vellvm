@@ -1,54 +1,32 @@
-(** Lemmas pertaining to denote_instr *)
-From Vellvm Require Import
-     Util
-     Error
-     LLVMAst
-     AstLib
-     CFG
-     DynamicTypes
-     DynamicValues
-     MemoryAddress
-     LLVMEvents
-     Handlers.Intrinsics
-     Handlers.Handlers
-     Handlers.Memory
-     Denotation
-     InterpreterCFG
-     Tactics
-     Transformations.Traversal
-     TypToDtyp
-     Refinement.
+From Coq Require Import
+     Morphisms.
+
+Require Import List.
+Import ListNotations.
+Require Import ZArith.
 
 From ITree Require Import
      ITree
-     Interp.Recursion
-     Events.Exception
      Basics.Monad
-     TranslateFacts
-     Eq.Eq.
+     Eq.Eq
+     TranslateFacts.
 
-From Coq Require Import
-     ZArith List.
+From Vellvm Require Import
+     LLVMEvents
+     LLVMAst
+     Util
+     DynamicTypes
+     DynamicValues
+     Handlers.Handlers
+     Refinement
+     TopLevel
+     InterpreterCFG
+     Tactics
+     TypToDtyp
+     AstLib
+.
 
-Import ListNotations.
-
-From ExtLib Require Import
-     Core.RelDec
-     Programming.Eqv
-     Structures.Monads
-     Data.Monads.EitherMonad
-     Structures.Functor
-     Data.Nat
-     Data.List.
-
-
-
-(* TODO: should this be functorized...?
-   Currently interp_cfg_to_L3 is fixed to Handlers.LLVMEvents *)
-Module D   := Denotation Memory.Addr LLVMEvents.
-Module IS  := IntrinsicsDefinitions.Make Memory.Addr LLVMEvents.
-Import D IS.
-
+Import D.
 (** Helper lemmas that should probably be moved *)
 
 (* TODO: Move this *)
