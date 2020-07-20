@@ -806,12 +806,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition denote_code (c: code dtyp): itree instr_E unit :=
         map_monad_ denote_instr c.
 
-      (* A block ends with a terminator, it either jumps to another block,
-         or returns a dynamic value *)
-      Definition denote_block (b: block dtyp) : itree instr_E (block_id + uvalue) :=
-        denote_code (blk_code b);;
-        translate exp_E_to_instr_E (denote_terminator (snd (blk_term b))).
-
       (* YZ FIX: no need to push/pop, but do all the assignments afterward *)
       (* One needs to be careful when denoting phi-nodes: they all must
          be evaluated in the same environment.
@@ -822,37 +816,49 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
        *)
       (* The argument [bid] is the identity of the block from which we are jumping.
          The argument [id_p] are the phi nodes of the block toward which we are jumping. *)
-      Definition denote_phi (bid : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) :=
+      (* Definition denote_phi (bid : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) := *)
+      (*   let '(id, Phi dt args) := id_p in *)
+      (*   match assoc RawIDOrd.eq_dec bid args with *)
+      (*   | Some op => *)
+      (*     uv <- denote_exp (Some dt) op ;; *)
+      (*     ret (id,uv) *)
+      (*   | None => raise ("jump: phi node doesn't include block " ++ to_string bid) *)
+      (*   end. *)
+
+      Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) :=
         let '(id, Phi dt args) := id_p in
-        match assoc RawIDOrd.eq_dec bid args with
+        match assoc RawIDOrd.eq_dec bid_from args with
         | Some op =>
           uv <- denote_exp (Some dt) op ;;
           ret (id,uv)
-        | None => raise ("jump: phi node doesn't include block " ++ to_string bid)
+        | None => raise ("jump: phi node doesn't include block " ++ to_string bid_from)
         end.
-      
-      Definition denote_bks (bks: list (block dtyp)): block_id -> itree instr_E (block_id + uvalue) :=
-        iter (C := ktree _) (bif := sum) 
-             (fun (bid_src : block_id) =>
-                (* We lookup the block [bid] to be denoted *)
+
+      Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp)): itree instr_E unit :=
+        dvs <- Util.map_monad
+                (fun x => translate exp_E_to_instr_E (denote_phi bid_from x))
+                phis;;
+        Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
+        ret tt.
+
+      (* A block ends with a terminator, it either jumps to another block,
+         or returns a dynamic value *)
+      Definition denote_block (bid_from : block_id) (b: block dtyp) : itree instr_E (block_id + uvalue) :=
+        denote_phis bid_from (blk_phis b);;
+        denote_code (blk_code b);;
+        translate exp_E_to_instr_E (denote_terminator (snd (blk_term b))).
+
+      Definition denote_bks (bks: list (block dtyp))
+        : (block_id * block_id) -> itree instr_E ((block_id * block_id) + uvalue) :=
+        iter (C := ktree _) (bif := sum)
+             (fun '((bid_from,bid_src) : block_id * block_id) => 
                 match find_block DynamicTypes.dtyp bks bid_src with
-                | None => ret (inr (inl bid_src))
+                | None => ret (inr (inl (bid_from,bid_src)))
                 | Some block_src =>
-                  (* We denote the block *)
-                  bd <- denote_block block_src;;
-                  (* And set the phi-nodes of the new destination, if any *)
+                  bd <- denote_block bid_from block_src;;
                   match bd with
                   | inr dv => ret (inr (inr dv))
-                  | inl bid_target =>
-                    match find_block DynamicTypes.dtyp bks bid_target with
-                    | None => ret (inr (inl bid_target))
-                    | Some block_target =>
-                      dvs <- Util.map_monad
-                              (fun x => translate exp_E_to_instr_E (denote_phi bid_src x))
-                              (blk_phis block_target) ;;
-                      Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
-                      ret (inl bid_target)
-                    end
+                  | inl bid_target => ret (inl (bid_src,bid_target))
                   end
                 end).
 
@@ -887,7 +893,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         in the type.
        *)
       Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
-        r <- denote_bks (blks _ f) (init _ f) ;;
+        r <- denote_bks (blks _ f) (init _ f,init _ f) ;;
         match r with
         | inl bid => raise ("Can't find block in denote_cfg " ++ to_string bid)
         | inr uv  => ret uv
