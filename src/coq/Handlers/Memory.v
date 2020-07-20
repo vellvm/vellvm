@@ -2313,11 +2313,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       unfold make_empty_mem_block.
       unfold deserialize_sbytes.
       intros τ. induction τ.
-      Focus 12.
-      destruct sz eqn:Hsz.
-      cbn.
-      Focus 2.
-      cbn.
     Admitted.
 
     (* CB TODO: Figure out where these predicates should live, or figure

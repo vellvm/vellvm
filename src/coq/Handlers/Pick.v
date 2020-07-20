@@ -1,7 +1,8 @@
 From Coq Require Import
      ZArith
      String
-     List.
+     List
+     Lia.
 
 From ExtLib Require Import
      Structures.Monads
@@ -236,8 +237,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       intros. induction n. cbn. constructor.
       constructor. auto. cbn. apply IHn.
     Qed.
-
-    Require Import Coq.micromega.Lia.
 
     Lemma dvalue_default : forall t v,
         inr v = (default_dvalue_of_dtyp t) ->
