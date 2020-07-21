@@ -843,7 +843,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
       (* A block ends with a terminator, it either jumps to another block,
          or returns a dynamic value *)
-      Definition denote_block (bid_from : block_id) (b: block dtyp) : itree instr_E (block_id + uvalue) :=
+      Definition denote_block (b: block dtyp) (bid_from : block_id) : itree instr_E (block_id + uvalue) :=
         denote_phis bid_from (blk_phis b);;
         denote_code (blk_code b);;
         translate exp_E_to_instr_E (denote_terminator (snd (blk_term b))).
@@ -855,7 +855,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                 match find_block DynamicTypes.dtyp bks bid_src with
                 | None => ret (inr (inl (bid_from,bid_src)))
                 | Some block_src =>
-                  bd <- denote_block bid_from block_src;;
+                  bd <- denote_block block_src bid_from;;
                   match bd with
                   | inr dv => ret (inr (inr dv))
                   | inl bid_target => ret (inl (bid_src,bid_target))

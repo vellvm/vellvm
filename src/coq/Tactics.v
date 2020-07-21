@@ -119,3 +119,8 @@ Ltac inv_sum :=
   | h: inr _ = inl _ |-  _ => inv h
   end.
 
+Ltac break_sum :=
+  match goal with
+  | v: _ + _ |- _ => destruct v
+  end.
+
