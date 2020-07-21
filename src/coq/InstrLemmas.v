@@ -378,7 +378,7 @@ Lemma denote_ibinop_concrete :
         m ->
    interp_cfg_to_L3 defs
    (translate exp_E_to_instr_E
-      (D.denote_exp None
+      (denote_exp None
          (OP_IBinop op τ (Traversal.fmap (typ_to_dtyp [ ]) e0)
             (Traversal.fmap (typ_to_dtyp [ ]) e1)))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
 Proof.
@@ -429,7 +429,7 @@ Lemma denote_fbinop_concrete :
         m ->
    interp_cfg_to_L3 defs
    (translate exp_E_to_instr_E
-      (D.denote_exp None
+      (denote_exp None
          (OP_FBinop op params τ (Traversal.fmap (typ_to_dtyp [ ]) e0)
             (Traversal.fmap (typ_to_dtyp [ ]) e1)))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
 Proof.
@@ -458,6 +458,88 @@ Proof.
 
   rewrite EVAL.
   cbn.
+
+  repeat rewrite translate_ret.
+  rewrite interp_cfg_to_L3_ret.
+  reflexivity.
+Qed.
+
+(* TODO: Move to place where expression lemmas belong? *)
+Lemma denote_fcmp_concrete :
+  forall (op : fcmp) τ e0 e1 g ρ m x a av b bv defs,
+    uvalue_to_dvalue a = inr av ->
+    uvalue_to_dvalue b = inr bv ->
+    eval_fcmp op av bv  = ret x ->
+    Ret (m, (ρ, (g, a)))
+        ≈ interp_cfg_to_L3 defs
+        (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e0))) g ρ
+        m ->
+    Ret (m, (ρ, (g, b)))
+        ≈ interp_cfg_to_L3 defs
+        (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e1))) g ρ
+        m ->
+   interp_cfg_to_L3 defs
+   (translate exp_E_to_instr_E
+      (denote_exp None
+         (OP_FCmp op τ (Traversal.fmap (typ_to_dtyp [ ]) e0)
+            (Traversal.fmap (typ_to_dtyp [ ]) e1)))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
+Proof.
+  intros op τ e0 e1 g ρ m x a av b bv defs AV BV EVAL A B.
+
+  (* First subexpression *)
+  cbn.
+  rewrite translate_bind.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite <- A.
+  rewrite bind_ret_l.
+
+  (* Second subexpression *)
+  rewrite translate_bind.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite <- B.
+  rewrite bind_ret_l.
+
+  unfold uvalue_to_dvalue_binop.
+  rewrite AV, BV.
+  cbn.
+
+  rewrite EVAL.
+  cbn.
+
+  repeat rewrite translate_ret.
+  rewrite interp_cfg_to_L3_ret.
+  reflexivity.
+Qed.
+
+(* TODO: Move to place where expression lemmas belong? *)
+Lemma denote_conversion_concrete :
+  forall (conv : conversion_type) τ1 τ2 e g ρ m x a av defs,
+    uvalue_to_dvalue a = inr av ->
+    eval_conv conv τ1 av τ2  = ret x ->
+    Ret (m, (ρ, (g, a)))
+        ≈ interp_cfg_to_L3 defs
+        (translate exp_E_to_instr_E (denote_exp (Some τ1) (convert_typ [ ] e))) g ρ m ->
+   interp_cfg_to_L3 defs
+   (translate exp_E_to_instr_E
+      (denote_exp None
+         (OP_Conversion conv τ1 (Traversal.fmap (typ_to_dtyp [ ]) e) τ2))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
+Proof.
+  intros conv τ1 τ2 e g ρ m x a av defs AV EVAL A.
+
+  cbn.
+  rewrite translate_bind.  
+  rewrite interp_cfg_to_L3_bind.
+  rewrite <- A.
+  rewrite bind_ret_l.
+
+  unfold uvalue_to_dvalue_uop.
+  rewrite AV.
+  cbn.
+
+  rewrite EVAL.
+  unfold ITree.map.
+  cbn.
+  rewrite bind_ret_l.
 
   repeat rewrite translate_ret.
   rewrite interp_cfg_to_L3_ret.
@@ -531,13 +613,14 @@ Proof.
   reflexivity.
 Qed.
 
+
 Lemma denote_instr_intrinsic :
   forall i τ defs fn in_n sem_f args arg_vs conc_args res g ρ m,
     @intrinsic_exp dtyp (EXP_Ident (ID_Global (Name fn))) = Some in_n ->
     assoc Strings.String.string_dec in_n (defs_assoc defs) = Some sem_f ->
     interp_cfg_to_L3 defs (map_monad (fun uv : uvalue => pickUnique uv) arg_vs) g ρ m ≈ Ret (m, (ρ, (g, conc_args))) ->
     sem_f conc_args = inr res ->
-    map_monad (fun '(t, op) => translate exp_E_to_instr_E (denote_exp (Some t) op)) args ≈ Ret arg_vs ->
+    Ret (m, (ρ, (g, arg_vs))) ≈ interp_cfg_to_L3 defs (map_monad (fun '(t, op) => translate exp_E_to_instr_E (denote_exp (Some t) op)) args) g ρ m ->
     (interp_cfg_to_L3 defs
        (denote_instr
           (IId i,
@@ -546,7 +629,8 @@ Proof.
   intros i τ defs fn in_n sem_f args arg_vs conc_args res g ρ m INTRINSIC ASSOC CONCARGS RES MAP.
 
   unfold denote_instr.
-  rewrite MAP.
+  setoid_rewrite interp_cfg_to_L3_bind.
+  rewrite <- MAP.
   setoid_rewrite bind_ret_l.
   rewrite INTRINSIC.
   setoid_rewrite bind_bind.
