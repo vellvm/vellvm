@@ -27,6 +27,9 @@ From Vellvm Require Import
 From ITree Require Import
      ITree.
 
+From Flocq.IEEE754 Require Import
+     Bits.
+
 Import MonadNotation.
 Import EqvNotation.
 Import ListNotations.
@@ -139,7 +142,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Definition llvm_fabs_f32 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Float d] => ret (DVALUE_Float (Float32.abs d))
+      | [DVALUE_Float d] => ret (DVALUE_Float (b32_abs d))
       | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed intputs"
       end.
 
@@ -147,7 +150,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Definition llvm_fabs_f64 : semantic_function :=
     fun args =>
       match args with
-      | [DVALUE_Double d] => ret (DVALUE_Double (Float.abs d))
+      | [DVALUE_Double d] => ret (DVALUE_Double (b64_abs d))
       | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed intputs"
       end.
 
