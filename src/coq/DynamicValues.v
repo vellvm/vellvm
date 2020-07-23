@@ -34,6 +34,10 @@ From Vellvm Require Import
 
 Require Import Integers Floats.
 
+From Flocq.IEEE754 Require Import
+     Bits
+     Binary.
+
 Import EqvNotation.
 Import MonadNotation.
 Import ListNotations.
@@ -44,6 +48,9 @@ Set Contextual Implicit.
 Open Scope Z_scope.
 
 Instance Eqv_nat : Eqv nat := (@eq nat).
+
+(* Floating-point rounding mode *)
+Definition FT_Rounding:mode := mode_NE.
 
 (* Set up representations for for i1, i32, and i64 *)
 Module Wordsize1.
@@ -154,7 +161,6 @@ Proof.
   - assert False. apply N.  econstructor. inversion H.
   - reflexivity.
 Qed.
-
 
 
 Definition ll_float  := Floats.float32.
@@ -1231,23 +1237,23 @@ Class VInt I : Type :=
 
   Definition double_op (fop:fbinop) (v1:ll_double) (v2:ll_double) : undef_or_err dvalue :=
     match fop with
-    | FAdd => ret (DVALUE_Double (Float.add v1 v2))
-    | FSub => ret (DVALUE_Double (Float.sub v1 v2))
-    | FMul => ret (DVALUE_Double (Float.mul v1 v2))
+    | FAdd => ret (DVALUE_Double (b64_plus FT_Rounding v1 v2))
+    | FSub => ret (DVALUE_Double (b64_minus FT_Rounding v1 v2))
+    | FMul => ret (DVALUE_Double (b64_mult FT_Rounding v1 v2))
     | FDiv => if (Float.eq_dec v2 Float.zero)
               then lift (raise "Signed division by 0.")
-              else ret (DVALUE_Double (Float.div v1 v2))
+              else ret (DVALUE_Double (b64_div FT_Rounding v1 v2))
     | FRem => failwith "unimplemented double operation"
     end.
 
   Definition float_op (fop:fbinop) (v1:ll_float) (v2:ll_float) : undef_or_err dvalue :=
     match fop with
-    | FAdd => ret (DVALUE_Float (Float32.add v1 v2))
-    | FSub => ret (DVALUE_Float (Float32.sub v1 v2))
-    | FMul => ret (DVALUE_Float (Float32.mul v1 v2))
+    | FAdd => ret (DVALUE_Float (b32_plus FT_Rounding v1 v2))
+    | FSub => ret (DVALUE_Float (b32_minus FT_Rounding v1 v2))
+    | FMul => ret (DVALUE_Float (b32_mult FT_Rounding v1 v2))
     | FDiv => if (Float32.eq_dec v2 Float32.zero)
               then lift (raise "Signed division by 0.")
-              else ret (DVALUE_Float (Float32.div v1 v2))
+              else ret (DVALUE_Float (b32_div FT_Rounding v1 v2))
     | FRem => failwith "unimplemented float operation"
     end.
 

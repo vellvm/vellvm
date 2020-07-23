@@ -170,11 +170,15 @@ let float_tests : (string * float ) list =
     ("../tests/llvm-arith/float/hex_float_literal.ll", 468655825485824.);
     ("../tests/llvm-arith/float/i8_uitofp_float.ll", 10.0);
   ]
+let snan = Stdlib.Int64.float_of_bits (Stdlib.Int64.of_string "0x7FF0000000000001")
+let qnan = Stdlib.Int64.float_of_bits (Stdlib.Int64.of_string "0x7FF8000000000000")
 
 let double_tests : (string * float ) list =
   [
-    ("../tests/llvm-arith/float/double_literal.ll", 125.31999999999999317878973670303821563720703125);
-    ("../tests/llvm-arith/double/i8_uitofp_double.ll", 255.0)
+    ("../tests/llvm-arith/double/double_literal.ll", 125.31999999999999317878973670303821563720703125);
+    ("../tests/llvm-arith/double/i8_uitofp_double.ll", 255.0);
+    ("../tests/llvm-arith/double/snan.ll", snan);
+    ("../tests/llvm-arith/double/qnan.ll", qnan)
   ]
 
 let intrinsics_tests : (string * float) list =
