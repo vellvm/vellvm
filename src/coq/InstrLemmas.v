@@ -527,7 +527,7 @@ Proof.
   intros conv τ1 τ2 e g ρ m x a av defs AV EVAL A.
 
   cbn.
-  rewrite translate_bind.  
+  rewrite translate_bind.
   rewrite interp_cfg_to_L3_bind.
   rewrite <- A.
   rewrite bind_ret_l.
@@ -555,14 +555,15 @@ Qed.
 
 
 Lemma denote_instr_gep_array :
-  forall i size τ defs ix ptr a val g ρ m,
+  forall i size τ defs e_ix ix ptr a val g ρ m,
     interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m ≈ Ret (m, (ρ, (g, UVALUE_Addr a))) ->
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m ≈ Ret (m, (ρ, (g, UVALUE_I64 (repr (Z.of_nat ix))))) ->
     get_array_cell m a ix τ = inr val ->
     exists ptr_res,
       read m ptr_res τ = inr val /\
-      interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, EXP_Integer (Z.of_nat ix))]))) g ρ m  ≈ Ret (m, (Maps.add i (UVALUE_Addr ptr_res) ρ, (g, tt))).
+      interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m  ≈ Ret (m, (Maps.add i (UVALUE_Addr ptr_res) ρ, (g, tt))).
 Proof.
-  intros i size τ defs ix ptr a val g ρ m PTR GET.
+  intros i size τ defs e_ix ix ptr a val g ρ m PTR IX GET.
 
   pose proof interp_cfg_to_L3_GEP_array defs τ a size g ρ m val ix GET as (ptr_res & EQ & READ).
   exists ptr_res. split; auto.
@@ -582,13 +583,15 @@ Proof.
   rewrite bind_ret_l.
   repeat rewrite translate_bind.
   repeat rewrite bind_bind.
-  rewrite translate_ret.
+
+  rewrite interp_cfg_to_L3_bind.
+  rewrite IX.
   rewrite bind_ret_l.
-  rewrite translate_bind.
-  rewrite bind_bind.
-  rewrite translate_ret.
+
+  rewrite interp_cfg_to_L3_bind.
   rewrite bind_ret_l.
   rewrite translate_ret.
+  rewrite interp_cfg_to_L3_ret.
   rewrite bind_ret_l.
   rewrite translate_ret.
   rewrite bind_ret_l.
