@@ -87,12 +87,72 @@ Definition memcpy_8_decl: declaration typ :=
   |}.
 
 
+Definition maxnum_64_decl: declaration typ :=
+  {|
+    dc_name        := Name "llvm.maxnum.f64";
+    dc_type        := TYPE_Function TYPE_Double [TYPE_Double;TYPE_Double] ;
+    dc_param_attrs := ([], [[];[]]);
+    dc_linkage     := None ;
+    dc_visibility  := None ;
+    dc_dll_storage := None ;
+    dc_cconv       := None ;
+    dc_attrs       := [] ;
+    dc_section     := None ;
+    dc_align       := None ;
+    dc_gc          := None
+  |}.
+
+Definition minimum_64_decl: declaration typ :=
+  {|
+    dc_name        := Name "llvm.minimum.f64";
+    dc_type        := TYPE_Function TYPE_Double [TYPE_Double;TYPE_Double] ;
+    dc_param_attrs := ([], [[];[]]);
+    dc_linkage     := None ;
+    dc_visibility  := None ;
+    dc_dll_storage := None ;
+    dc_cconv       := None ;
+    dc_attrs       := [] ;
+    dc_section     := None ;
+    dc_align       := None ;
+    dc_gc          := None
+  |}.
+
+Definition maxnum_32_decl: declaration typ :=
+  {|
+    dc_name        := Name "llvm.maxnum.f32";
+    dc_type        := TYPE_Function TYPE_Float [TYPE_Float;TYPE_Float] ;
+    dc_param_attrs := ([], [[];[]]);
+    dc_linkage     := None ;
+    dc_visibility  := None ;
+    dc_dll_storage := None ;
+    dc_cconv       := None ;
+    dc_attrs       := [] ;
+    dc_section     := None ;
+    dc_align       := None ;
+    dc_gc          := None
+  |}.
+
+Definition minimum_32_decl: declaration typ :=
+  {|
+    dc_name        := Name "minimum.f32";
+    dc_type        := TYPE_Function TYPE_Float [TYPE_Float;TYPE_Float] ;
+    dc_param_attrs := ([], [[];[]]);
+    dc_linkage     := None ;
+    dc_visibility  := None ;
+    dc_dll_storage := None ;
+    dc_cconv       := None ;
+    dc_attrs       := [] ;
+    dc_section     := None ;
+    dc_align       := None ;
+    dc_gc          := None
+  |}.
+
 (* This may seem to overlap with `defined_intrinsics`, but there are few differences:
    1. This one is defined outside of the module and could be used at the LLVM AST generation stage without yet specifying memory model.
    2. It includes declarations for built-in memory-dependent intrinisics such as `memcpy`.
  *)
 Definition defined_intrinsics_decls :=
-  [ fabs_32_decl; fabs_64_decl; memcpy_8_decl ].
+  [ fabs_32_decl; fabs_64_decl; maxnum_32_decl ; maxnum_64_decl; minimum_32_decl; minimum_64_decl; memcpy_8_decl ].
 
 (* This functor module provides a way to (extensibly) add the semantic behavior
    for intrinsics defined outside of the core Vellvm operational semantics.
@@ -154,11 +214,58 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed intputs"
       end.
 
+
+  (* TODO: Should be same as [FSigmaHCOL.Float64Max] ! *)
+  Definition Float_maxnum (a b: float): float :=
+    if Float.cmp Clt a b then b else a.
+
+  Definition Float32_maxnum (a b: float32): float32 :=
+    if Float32.cmp Clt a b then b else a.
+
+  Definition llvm_maxnum_f64 : semantic_function :=
+    fun args =>
+      match args with
+      | [DVALUE_Double a; DVALUE_Double b] => ret (DVALUE_Double (Float_maxnum a b))
+      | _ => failwith "llvm_maxnum_f64 got incorrect / ill-typed intputs"
+      end.
+
+  Definition llvm_maxnum_f32 : semantic_function :=
+    fun args =>
+      match args with
+      | [DVALUE_Float a; DVALUE_Float b] => ret (DVALUE_Float (Float32_maxnum a b))
+      | _ => failwith "llvm_maxnum_f32 got incorrect / ill-typed intputs"
+      end.
+
+  Definition Float_minimum (a b: float): float :=
+    if Float.cmp Clt a b then a else b.
+
+  Definition Float32_minimum (a b: float32): float32 :=
+    if Float32.cmp Clt a b then a else b.
+
+  Definition llvm_minimum_f64 : semantic_function :=
+    fun args =>
+      match args with
+      | [DVALUE_Double a; DVALUE_Double b] => ret (DVALUE_Double (Float_minimum a b))
+      | _ => failwith "llvm_minimum_f64 got incorrect / ill-typed intputs"
+      end.
+
+  Definition llvm_minimum_f32 : semantic_function :=
+    fun args =>
+      match args with
+      | [DVALUE_Float a; DVALUE_Float b] => ret (DVALUE_Float (Float32_minimum a b))
+      | _ => failwith "llvm_minimum_f32 got incorrect / ill-typed intputs"
+      end.
+
   (* Clients of Vellvm can register the names of their own intrinsics
      definitions here. *)
   Definition defined_intrinsics : intrinsic_definitions :=
     [ (fabs_32_decl, llvm_fabs_f32) ;
-      (fabs_64_decl, llvm_fabs_f64) ].
+    (fabs_64_decl, llvm_fabs_f64) ;
+    (maxnum_32_decl , llvm_maxnum_f32) ;
+    (maxnum_64_decl , llvm_maxnum_f64);
+    (minimum_32_decl, llvm_minimum_f32);
+    (minimum_64_decl, llvm_minimum_f64)
+    ].
 
   (* SAZ: TODO: it could be nice to provide a more general/modular way to "lift"
      primitive functions into intrinsics. *)
