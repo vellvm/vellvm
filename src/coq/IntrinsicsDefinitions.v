@@ -28,6 +28,7 @@ From ITree Require Import
      ITree.
 
 From Flocq.IEEE754 Require Import
+     Binary
      Bits.
 
 Import MonadNotation.
@@ -214,13 +215,19 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed intputs"
       end.
 
-
-  (* TODO: Should be same as [FSigmaHCOL.Float64Max] ! *)
   Definition Float_maxnum (a b: float): float :=
-    if Float.cmp Clt a b then b else a.
+    match a, b with
+    | B754_nan _ _ _, _ | _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl64 a b)
+    | _, _ =>
+      if Float.cmp Clt a b then b else a
+    end.
 
   Definition Float32_maxnum (a b: float32): float32 :=
-    if Float32.cmp Clt a b then b else a.
+    match a, b with
+    | B754_nan _ _ _, _ | _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl32 a b)
+    | _, _ =>
+      if Float32.cmp Clt a b then b else a
+    end.
 
   Definition llvm_maxnum_f64 : semantic_function :=
     fun args =>
@@ -237,10 +244,18 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       end.
 
   Definition Float_minimum (a b: float): float :=
-    if Float.cmp Clt a b then a else b.
+    match a, b with
+    | B754_nan _ _ _, _ | _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl64 a b)
+    | _, _ =>
+      if Float.cmp Clt a b then a else b
+    end.
 
   Definition Float32_minimum (a b: float32): float32 :=
-    if Float32.cmp Clt a b then a else b.
+    match a, b with
+    | B754_nan _ _ _, _ | _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl32 a b)
+    | _, _ =>
+      if Float32.cmp Clt a b then a else b
+    end.
 
   Definition llvm_minimum_f64 : semantic_function :=
     fun args =>

@@ -177,12 +177,15 @@ let double_tests : (string * float ) list =
   [
     ("../tests/llvm-arith/double/double_literal.ll", 125.31999999999999317878973670303821563720703125);
     ("../tests/llvm-arith/double/i8_uitofp_double.ll", 255.0);
-    ("../tests/llvm-arith/double/snan.ll", snan);
-    ("../tests/llvm-arith/double/qnan.ll", qnan);
-    ("../tests/llvm-arith/double/max.ll", 2.0) ;
+    ("../tests/llvm-arith/double/snan.ll", snan) ;
+    ("../tests/llvm-arith/double/qnan.ll", qnan) ;
+    ("../tests/llvm-arith/double/max.ll" , 2.0 ) ;
     ("../tests/llvm-arith/double/max1.ll", qnan) ;
     ("../tests/llvm-arith/double/max2.ll", qnan) ;
-    ("../tests/llvm-arith/double/max3.ll", qnan)
+    ("../tests/llvm-arith/double/max3.ll", qnan) ;
+    ("../tests/llvm-arith/double/max4.ll", qnan) ;
+    ("../tests/llvm-arith/double/min.ll" , 1.0 ) ;
+    ("../tests/llvm-arith/double/min4.ll", qnan)
   ]
 
 let intrinsics_tests : (string * float) list =
