@@ -864,6 +864,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition read_in_mem_block (bk : mem_block) (offset : Z) (t : dtyp) : uvalue :=
       deserialize_sbytes (lookup_all_index offset (sizeof_dtyp t) bk SUndef) t.
 
+    (** ** Writing values to memory
+      Serialize [v] into [SByte]s, and store them in the [mem_block] [bk] starting at [offset].
+     *)
+    Definition write_to_mem_block (bk : mem_block) (offset : Z) (v : dvalue) : mem_block
+      := add_all_index (serialize_dvalue v) offset bk.
+
     (* Todo - complete proofs, and think about moving to MemoryProp module. *)
     (* The relation defining serializable dvalues. *)
     Inductive serialize_defined : dvalue -> Prop :=
@@ -1625,11 +1631,51 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                              [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))];;
       inr (read_in_mem_block bk offset t).
 
+    (** ** Array element writing
+      Treat a [mem_block] as though it is an array storing elements of
+      type [t], and write the value [v] to index [i] in this array.
+
+      - [t] should be the type of [v].
+      - [size] does nothing, but we need to provide one for the array type.
+    *)
+    Definition write_array_cell_mem_block (bk : mem_block) (bk_offset : Z) (i : nat) (size : Z) (t : dtyp) (v : dvalue) : err mem_block :=
+      'offset <- handle_gep_h (DTYPE_Array size t)
+                             bk_offset
+                             [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))];;
+      inr (write_to_mem_block bk offset v).
+
     (** ** Array lookups -- mem_block
       Retrieve the values stored at position [from] to position [from + len - 1] in an array stored in a [mem_block].
      *)
     Definition get_array_mem_block (bk : mem_block) (bk_offset : Z) (from len : nat) (size : Z) (t : dtyp) : err (list uvalue) :=
       map_monad (fun i => get_array_cell_mem_block bk bk_offset i size t) (seq from len).
+
+
+    (* TODO: Move this? *)
+    Fixpoint foldM {a b} {M} `{Monad M} (f : b -> a -> M b ) (acc : b) (l : list a) : M b
+      := match l with
+         | [] => ret acc
+         | (x :: xs) =>
+           b <- f acc x;;
+           foldM f b xs
+         end.
+
+    (** ** Array writes -- mem_block
+      Write all of the values in [vs] to an array stored in a [mem_block], starting from index [from].
+
+      - [t] should be the type of each [v] in [vs]
+     *)
+    Fixpoint write_array_mem_block' (bk : mem_block) (bk_offset : Z) (i : nat) (size : Z) (t : dtyp) (vs : list dvalue) : err mem_block :=
+      match vs with
+      | []       => ret bk
+      | (v :: vs) =>
+        bk' <- write_array_cell_mem_block bk bk_offset i size t v;;
+        write_array_mem_block' bk' bk_offset (S i) size t vs
+      end.
+
+    Fixpoint write_array_mem_block (bk : mem_block) (bk_offset : Z) (from : nat) (t : dtyp) (vs : list dvalue) : err mem_block :=
+      let size := (Z.of_nat (length vs)) in
+      write_array_mem_block' bk bk_offset from size t vs.
 
   End Logical_Operations.
 
@@ -1930,8 +1976,30 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         match get_logical_block m b with
         | Some (LBlock _ bk _) =>
           get_array_cell_mem_block bk o i 0 τ
-        | None => failwith "Memory function [get_array] called at a non-allocated address"
+        | None => failwith "Memory function [get_array_cell] called at a non-allocated address"
         end.
+
+    (** ** Array writes -- memory_stack
+     *)
+    Definition write_array (m : memory_stack) (a : addr) (from : nat) (τ : dtyp) (vs : list dvalue) : err memory_stack :=
+      let '(b, o) := a in
+      match get_logical_block m b with
+      | Some (LBlock sz bk cid) =>
+        bk' <- write_array_mem_block bk o from τ vs;;
+        let block' := LBlock sz bk' cid in
+        ret (add_logical_block b block' m)
+      | None => failwith "Memory function [write_array] called at a non-allocated address"
+      end.
+
+    Definition write_array_cell (m : memory_stack) (a : addr) (i : nat) (τ : dtyp) (v : dvalue) : err memory_stack :=
+      let '(b, o) := a in
+      match get_logical_block m b with
+      | Some (LBlock sz bk cid) =>
+        bk' <- write_array_cell_mem_block bk o i 0 τ v;;
+        let block' := LBlock sz bk' cid in
+        ret (add_logical_block b block' m)
+      | None => failwith "Memory function [get_array] called at a non-allocated address"
+      end.
 
     Definition free_frame (m : memory_stack) : err memory_stack :=
       let '(m,sf) := m in
@@ -2555,6 +2623,57 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         reflexivity.
         unfold Int64.max_unsigned. cbn. lia.
       - eapply read_array; cbn; eauto.
+    Qed.
+
+    Lemma write_array_lemma : forall m size τ i a elem_addr v,
+        allocated a m ->
+        handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr elem_addr ->
+        write m elem_addr v = write_array_cell m a i τ v.
+    Proof.
+      intros m size τ i a elem_addr v ALLOC GEP.
+      unfold write_array_cell.
+      destruct a.
+      unfold write.
+      cbn in GEP.
+      inversion GEP. subst.
+      cbn.
+      destruct (get_logical_block m z) eqn:GET.
+      - destruct l.
+        cbn.
+        rewrite Int64.unsigned_repr.
+        + replace (z0 + size * sizeof_dtyp τ * 0 +
+                   DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
+            with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
+            by omega.
+
+          reflexivity.
+        + unfold Int64.max_unsigned. cbn. lia.
+      - pose proof allocated_get_logical_block (z, z0) m ALLOC as [b GETSOME].
+        cbn in GETSOME.
+        rewrite GET in GETSOME.
+        inversion GETSOME.
+    Qed.
+
+    Lemma write_array_exists : forall m size τ i a v,
+        allocated a m ->
+        exists elem_addr,
+          handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr elem_addr /\ write m elem_addr v = write_array_cell m a i τ v.
+    Proof.
+      intros m size τ i a v ALLOC.
+      destruct a.
+      exists (z,
+         z0 + size * sizeof_dtyp τ * DynamicValues.Int64.unsigned (DynamicValues.Int64.repr 0) +
+         DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ).
+      split.
+      - cbn.
+        rewrite Int64.unsigned_repr.
+        replace (z0 + size * sizeof_dtyp τ * 0 +
+                   DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
+            with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
+          by omega.
+        reflexivity.
+        unfold Int64.max_unsigned. cbn. lia.
+      - eapply write_array_lemma; cbn; eauto.
     Qed.
 
     Definition equiv : memory_stack -> memory_stack -> Prop :=
