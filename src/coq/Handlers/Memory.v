@@ -1998,7 +1998,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         bk' <- write_array_cell_mem_block bk o i 0 τ v;;
         let block' := LBlock sz bk' cid in
         ret (add_logical_block b block' m)
-      | None => failwith "Memory function [get_array] called at a non-allocated address"
+      | None => failwith "Memory function [write_array_cell] called at a non-allocated address"
       end.
 
     Definition free_frame (m : memory_stack) : err memory_stack :=
