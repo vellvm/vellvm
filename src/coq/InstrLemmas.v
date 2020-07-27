@@ -652,6 +652,42 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma denote_term_br_l :
+  forall (e : exp dtyp) defs b1 b2 g ρ ρ' m,
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 1)) e)) g ρ m ≈ Ret (m, (ρ', (g, UVALUE_I1 one))) ->
+    interp_cfg_to_L3 defs
+                     (translate exp_E_to_instr_E
+                                (denote_terminator (TERM_Br (DTYPE_I 1%Z, e) b1 b2))) g ρ m ≈ Ret (m, (ρ', (g, inl b1))). 
+Proof.
+  intros * EXP.
+  simpl.
+  rewrite translate_bind, interp_cfg_to_L3_bind.
+  rewrite EXP, bind_ret_l.
+  cbn.
+  rewrite bind_ret_l.
+  cbn.
+  rewrite translate_ret,interp_cfg_to_L3_ret.
+  reflexivity.
+Qed.
+
+Lemma denote_term_br_r :
+  forall (e : exp dtyp) defs b1 b2 g ρ ρ' m,
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 1)) e)) g ρ m ≈ Ret (m, (ρ', (g, UVALUE_I1 zero))) ->
+    interp_cfg_to_L3 defs
+                     (translate exp_E_to_instr_E
+                                (denote_terminator (TERM_Br (DTYPE_I 1%Z, e) b1 b2))) g ρ m ≈ Ret (m, (ρ', (g, inl b2))). 
+Proof.
+  intros * EXP.
+  simpl.
+  rewrite translate_bind, interp_cfg_to_L3_bind.
+  rewrite EXP, bind_ret_l.
+  cbn.
+  rewrite bind_ret_l.
+  cbn.
+  rewrite translate_ret,interp_cfg_to_L3_ret.
+  reflexivity.
+Qed.
+
 (*
 
 interp_cfg_to_L3_intrinsic:
