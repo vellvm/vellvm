@@ -827,7 +827,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
       Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) :=
         let '(id, Phi dt args) := id_p in
-        match assoc RawIDOrd.eq_dec bid_from args with
+        match assoc bid_from args with
         | Some op =>
           uv <- denote_exp (Some dt) op ;;
           ret (id,uv)
@@ -950,7 +950,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     - (m_declarations CFG) is the set of possible ExternalCalls
     - (List.map df_prototype (m_definitions CFG)) is the set of possible Entry Functions  (also internal calls)
  *)
-      Definition lookup_defn {B} := (@assoc _ B (@dvalue_eq_dec)).
+      Definition lookup_defn {B} := @assoc dvalue B _.
 
       (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
       Definition denote_mcfg

@@ -33,16 +33,16 @@ Qed.
 Section WithType.
   Variable (T:Set).
 
-Lemma find_block_same_fid : forall CFG fid br phis p,
-    find_block_entry T CFG fid br = Some (BlockEntry _ phis p) -> (fn p) = fid.
-Proof.
-  intros CFG fid br phis p H.
-  unfold find_block_entry in H.
-  destruct (find_function T CFG fid); simpl in H; try solve [inversion H].
-  destruct (find_block T (blks T (df_instrs d)) br); simpl in H; try solve [inversion H].
-  destruct b. unfold block_to_entry in H. simpl in H. inversion H.
-  simpl. reflexivity.
-Qed.
+(* Lemma find_block_same_fid : forall CFG fid br phis p, *)
+(*     find_block_entry T CFG fid br = Some (BlockEntry _ phis p) -> (fn p) = fid. *)
+(* Proof. *)
+(*   intros CFG fid br phis p H. *)
+(*   unfold find_block_entry in H. *)
+(*   destruct (find_function T CFG fid); simpl in H; try solve [inversion H]. *)
+(*   destruct (find_block T (blks T (df_instrs d)) br); simpl in H; try solve [inversion H]. *)
+(*   destruct b. unfold block_to_entry in H. simpl in H. inversion H. *)
+(*   simpl. reflexivity. *)
+(* Qed. *)
 
 
 

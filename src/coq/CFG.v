@@ -23,59 +23,17 @@ Import EqvNotation.
 Import MonadNotation.
 Open Scope monad_scope.
 
-(* SAZ: The notion of pc, and many other things in this file is now obsolete *)
-(* program counter denotes an instruction with a block of a function -------- *)
-Record pc :=
-  mk_pc {
-      fn : function_id;
-      bk : block_id;
-      pt : instr_id;
-    }.
-
-Section hiding_notations.
-  Local Open Scope sexp_scope.
-  Global Instance serialize_pc : Serialize pc :=
-    fun p => [Atom "@" ; to_sexp (fn p) ; Atom ":" ; to_sexp (bk p) ; Atom ":" ; to_sexp (pt p)].
-End hiding_notations.
-
-
 Ltac unfold_eqv :=
   repeat (unfold eqv in *; unfold eqv_raw_id in *; unfold eqv_instr_id in *).
-
-Module PC <: UsualDecidableTypeFull.
-  Definition t := pc.
-  Include HasUsualEq.
-  Include UsualIsEq.
-  Include UsualIsEqOrig.
-
-
-  Lemma eq_dec : forall (x y : pc), {x = y} + {x <> y}.
-  Proof.
-    intros x y.
-    destruct x as [xf xi xp]; destruct y as [yf yi yp].
-    destruct (xf ~=? yf); unfold_eqv.
-    - destruct (xi ~=? yi); unfold_eqv.
-     + destruct (xp ~=? yp); unfold_eqv.
-        * subst. left. reflexivity.
-        * right. unfold not. intros. apply n. inversion H. auto.
-     + right. unfold not. intros. apply n. inversion H. auto.
-    - right. unfold not. intros. apply n. inversion H. auto.
-  Defined.
-
-  Include HasEqDec2Bool.
-
-End PC.
-Instance eq_dec_pc : RelDec (@eq pc) := RelDec_from_dec (@eq pc) PC.eq_dec.
-
 
 (* control flow graphs (CFGs) ----------------------------------------------- *)
 Section CFG.
   Variable (T:Set).
 
-Inductive cmd : Set :=
-| Inst (i:instr T)
-| Term (t:terminator T)
-.
+  Inductive cmd : Set :=
+  | Inst (i:instr T)
+  | Term (t:terminator T)
+  .
 
 (* each function definition corresponds to a control-flow graph
    - init is the entry block
@@ -110,12 +68,6 @@ Definition blk_terminator (b: block T) := snd (blk_term b).
 
 Definition blk_entry_id (b:block T) : instr_id := fallthrough (blk_code b) (blk_term_id b).
 
-Definition blk_entry_pc (fid:function_id) (b:block T) :=
-  mk_pc fid (blk_id b) (blk_entry_id b).
-
-Definition blk_term_pc (fid:function_id) (b:block T) :=
-  mk_pc fid (blk_id b) (blk_term_id b).
-
 Definition find_block bs block_id : option (block T) :=
   find (fun b => if (blk_id b) ~=? block_id then true else false) bs.
 
@@ -136,45 +88,6 @@ Definition block_to_cmd (b:block T) (iid:instr_id) : option (cmd * option instr_
   else
     find_instr (blk_code b) iid term_id
 .
-
-(*
-Definition fetch (CFG : mcfg) (p:pc) : option cmd:=
-  let 'mk_pc fid bid iid := p in
-  cfg <- find_function CFG fid ;;
-  blk <- find_block (blks (df_instrs T cfg)) bid ;;
-  '(c, _) <- block_to_cmd blk iid ;;
-  ret c.
-
-Definition incr_pc (CFG:mcfg) (p:pc) : option pc :=
-  let 'mk_pc fid bid iid := p in
-  cfg <- find_function CFG fid ;;
-  blk <- find_block (blks (df_instrs T cfg)) bid ;;
-  '(c, n) <- block_to_cmd blk iid ;;
-  iid_next <- n ;;
-  ret (mk_pc fid bid iid_next).
-*)
-
-Inductive block_entry : Set :=
-| BlockEntry (phis:list (local_id * (phi T))) (p:pc).
-
-Definition block_to_entry (fid:function_id) (b:block T) : block_entry :=
-  BlockEntry (blk_phis b) (blk_entry_pc fid b).
-
-Definition find_block_entry (CFG:mcfg) (fid:function_id) (bid:block_id) : option block_entry :=
-  cfg <- find_function CFG fid ;;
-  blk <- find_block (blks (df_instrs cfg)) bid ;;
-  ret (block_to_entry fid blk).
-
-Inductive function_entry : Set :=
-| FunctionEntry (args:list local_id) (p:pc).
-
-
-Definition find_function_entry (CFG:mcfg) (fid:function_id) : option function_entry :=
-  dfn <- find_function CFG fid ;;
-  let cfg := df_instrs dfn in
-  blk <- find_block (blks cfg) (init cfg) ;;
-  ret (FunctionEntry (df_args dfn) (mk_pc fid (init cfg) (blk_entry_id blk))).
-
 
 (*
 Definition code_of_definition (d:definition (list block)) (p:pt) : option cmd :=

@@ -106,7 +106,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     fun X (e : IntrinsicE X) =>
       match e in IntrinsicE Y return X = Y -> itree E Y with
       | (Intrinsic _ fname args) =>
-          match assoc Strings.String.string_dec fname (defs_assoc user_intrinsics) with
+          match assoc fname (defs_assoc user_intrinsics) with
           | Some f => fun pf =>
                        match f args with
                        | inl msg => raise msg

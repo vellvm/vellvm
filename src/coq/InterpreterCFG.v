@@ -316,7 +316,7 @@ Section InterpreterCFG.
 
   Lemma interp_cfg_to_L3_intrinsic :
     forall (defs : intrinsic_definitions) (m : memory_stack) (τ : dtyp) (g : global_env) l fn args df res,
-      assoc Strings.String.string_dec fn (defs_assoc defs) = Some df ->
+      assoc fn (defs_assoc defs) = Some df ->
       df args = inr res ->
       interp_cfg_to_L3 defs (trigger (Intrinsic τ fn args)) g l m ≈ ret (m, (l, (g, res))).
   Proof.

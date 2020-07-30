@@ -620,7 +620,7 @@ Qed.
 Lemma denote_instr_intrinsic :
   forall i τ defs fn in_n sem_f args arg_vs conc_args res g ρ m,
     @intrinsic_exp dtyp (EXP_Ident (ID_Global (Name fn))) = Some in_n ->
-    assoc Strings.String.string_dec in_n (defs_assoc defs) = Some sem_f ->
+    assoc in_n (defs_assoc defs) = Some sem_f ->
     interp_cfg_to_L3 defs (map_monad (fun uv : uvalue => pickUnique uv) arg_vs) g ρ m ≈ Ret (m, (ρ, (g, conc_args))) ->
     sem_f conc_args = inr res ->
     Ret (m, (ρ, (g, arg_vs))) ≈ interp_cfg_to_L3 defs (map_monad (fun '(t, op) => translate exp_E_to_instr_E (denote_exp (Some t) op)) args) g ρ m ->

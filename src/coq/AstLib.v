@@ -300,8 +300,8 @@ Module IdentDec <: MiniDecidableType.
 End IdentDec.
 Module Ident := Make_UDT(IdentDec).
 
-Instance eq_dec_ident : RelDec (@eq ident) := RelDec_from_dec (@eq ident) Ident.eq_dec.
-Instance eqv_ident : Eqv ident := (@eq ident).
+Global Instance eq_dec_ident : RelDec (@eq ident) := RelDec_from_dec (@eq ident) Ident.eq_dec.
+Global Instance eqv_ident : Eqv ident := (@eq ident).
 
 (* Induction Principles ----------------------------------------------------- *)
 

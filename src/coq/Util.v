@@ -1089,102 +1089,125 @@ Qed.
 
 
 (* to appease termination checker *)
-Definition assoc_f {A B C} (a_dec:forall a b:A, {a = b} + {a <> b})
-           (d:C) (f:B -> C) (a:A) (l:list (A * B)) : C :=
-  let fix rec l :=
-      match l with
-      | [] => d
-      | (a',b)::l' => if a_dec a a' then f b else rec l'
-      end in
-  rec l.
+(* Definition assoc_f {A B C} (a_dec:forall a b:A, {a = b} + {a <> b}) *)
+(*            (d:C) (f:B -> C) (a:A) (l:list (A * B)) : C := *)
+(*   let fix rec l := *)
+(*       match l with *)
+(*       | [] => d *)
+(*       | (a',b)::l' => if a_dec a a' then f b else rec l' *)
+(*       end in *)
+(*   rec l. *)
 
-Fixpoint assoc {A B} (a_dec:forall a b:A, {a = b} + {a <> b})
-           (a:A) (l:list (A * B)) : option B :=
-  match l with
-  | [] => None
-  | (a',b)::l' => if a_dec a a' then Some b else assoc a_dec a l'
-  end.
-  
-Lemma assoc_f__assoc : forall A B C l a_dec d (f:B->C) (a:A),
-  assoc_f a_dec d f a l =
-  match assoc a_dec a l with
-  | None => d
-  | Some b => f b
-  end.
-Proof.
-  induction l; intros.
-  - auto.
-  - simpl. destruct a. destruct (a_dec a0 a).
-    auto.
-    apply IHl.
-Qed.
+(*   Lemma assoc_f__assoc : forall A B C l a_dec d (f:B->C) (a:A), *)
+(*       assoc_f a_dec d f a l = *)
+(*       match assoc a_dec a l with *)
+(*       | None => d *)
+(*       | Some b => f b *)
+(*       end. *)
+(*   Proof. *)
+(*     induction l; intros. *)
+(*     - auto. *)
+(*     - simpl. destruct a. destruct (a_dec a0 a). *)
+(*       auto. *)
+(*       apply IHl. *)
+(*   Qed. *)
 
-Lemma assoc_hd : forall A B (a:A) (b:B) l a_dec,
-  assoc a_dec a ((a,b)::l) = Some b.
-Proof.
-  intros A B a b l a_dec.
-  simpl. destruct (a_dec a a); auto.
-  - contradiction n. reflexivity.
-Qed.
+Require Import ExtLib.Programming.Eqv.
+Require Import ExtLib.Core.RelDec.
 
+Section With_Eqv_Rel_Dec.
 
-Lemma assoc_tl : forall A B (a c:A) (b:B) l a_dec
-    (Hneq : a <> c),
-    assoc a_dec a ((c,b)::l) =
-    assoc a_dec a l.
-Proof.
-  destruct l; intros; simpl in *.
-  - destruct (a_dec a c). contradiction Hneq. reflexivity.
-  - destruct p.
-    destruct (a_dec a c). contradiction Hneq.
+  Context {A B : Type}.
+  Context {RD:RelDec (@eq A)} {RDC:RelDec_Correct RD}.
+
+  Lemma eq_dec_eq: forall a,
+    rel_dec a a = true.
+  Proof.
+    intros.
+    rewrite rel_dec_correct.
     reflexivity.
-Qed.
+  Qed.
 
-Lemma assoc_cons_inv :
-  forall A B (a c:A) (b d:B) l a_dec
-    (Hl: assoc a_dec a ((c,b)::l) = Some d),
-    (a = c /\ b = d) \/ (a <> c /\ assoc a_dec a l = Some d).
-Proof.
-  intros A B a c b d l a_dec Hl.
-  simpl in Hl.
-  destruct (a_dec a c).
-  left. inversion Hl. tauto.
-  right. tauto.
-Qed.    
-                         
+  Lemma eq_dec_neq: forall a b,
+      a <> b ->
+      rel_dec a b = false.
+  Proof.
+    intros.
+    rewrite <- neg_rel_dec_correct.
+    apply H.
+  Qed.
 
-Lemma assoc_In_snd : forall A B (l:list (A * B)) eq_dec a b,
-  assoc eq_dec a l = Some b ->
-  In b (map (@snd _ _) l).
-Proof.
-  induction l; intros; simpl in *.
-  - inversion H.
-  - destruct a. destruct (eq_dec _ _).
-    + inversion_clear H; subst. auto.
-    + right. eauto.
-Qed.
+  Fixpoint assoc (a:A) (l:list (A * B)) : option B :=
+    match l with
+    | [] => None
+    | (a',b)::l' => if rel_dec a a' then Some b else assoc a l'
+    end.
 
-Lemma assoc_In : forall A B (l:list (A * B)) eq_dec a b,
-  assoc eq_dec a l = Some b ->
-  In (a,b) l.
-Proof.
-  induction l; intros; simpl in *.
-  - inversion H.
-  - destruct a. destruct (eq_dec _ _).
-    + inversion_clear H; subst. auto.
-    + right. eauto.
-Qed.
+  Lemma assoc_hd: forall a b tl,
+      assoc a ((a,b)::tl) = Some b.
+  Proof.
+    intros; cbn.
+    rewrite eq_dec_eq; reflexivity.
+  Qed.
 
-Lemma assoc_succeeds : forall {A B} (a_dec : forall a b : A, {a = b} + {a <> b})
-  a l, In a (map (fst(B := B)) l) -> exists x, assoc a_dec a l = Some x.
-Proof.
-  induction l; simpl; intros.
-  - contradiction.
-  - destruct a0; simpl in *.
-    destruct (a_dec a a0); eauto.
-    apply IHl; destruct H; auto.
-    contradiction n; auto.
-Qed.
+  Lemma assoc_tl : forall (a c:A) (b:B) l 
+                     (Hneq : a <> c),
+      assoc a ((c,b)::l) =
+      assoc a l.
+  Proof.
+    intros; cbn.
+    rewrite eq_dec_neq; auto.
+  Qed.
+
+  (* Lemma assoc_cons_inv : *)
+  (*   forall A B (a c:A) (b d:B) l a_dec *)
+  (*     (Hl: assoc a_dec a ((c,b)::l) = Some d), *)
+  (*     (a = c /\ b = d) \/ (a <> c /\ assoc a_dec a l = Some d). *)
+  (* Proof. *)
+  (*   intros A B a c b d l a_dec Hl. *)
+  (*   simpl in Hl. *)
+  (*   destruct (a_dec a c). *)
+  (*   left. inversion Hl. tauto. *)
+  (*   right. tauto. *)
+  (* Qed.     *)
+  
+  (* Lemma assoc_In_snd : forall A B (l:list (A * B)) eq_dec a b, *)
+  (*     assoc eq_dec a l = Some b -> *)
+  (*     In b (map (@snd _ _) l). *)
+  (* Proof. *)
+  (*   induction l; intros; simpl in *. *)
+  (*   - inversion H. *)
+  (*   - destruct a. destruct (eq_dec _ _). *)
+  (*     + inversion_clear H; subst. auto. *)
+  (*     + right. eauto. *)
+  (* Qed. *)
+
+  (* Lemma assoc_In : forall A B (l:list (A * B)) eq_dec a b, *)
+  (*     assoc eq_dec a l = Some b -> *)
+  (*     In (a,b) l. *)
+  (* Proof. *)
+  (*   induction l; intros; simpl in *. *)
+  (*   - inversion H. *)
+  (*   - destruct a. destruct (eq_dec _ _). *)
+  (*     + inversion_clear H; subst. auto. *)
+  (*     + right. eauto. *)
+  (* Qed. *)
+
+  (* Lemma assoc_succeeds : forall {A B} (a_dec : forall a b : A, {a = b} + {a <> b}) *)
+  (*                          a l, In a (map (fst(B := B)) l) -> exists x, assoc a_dec a l = Some x. *)
+  (* Proof. *)
+  (*   induction l; simpl; intros. *)
+  (*   - contradiction. *)
+  (*   - destruct a0; simpl in *. *)
+  (*     destruct (a_dec a a0); eauto. *)
+  (*     apply IHl; destruct H; auto. *)
+  (*     contradiction n; auto. *)
+  (* Qed. *)
+
+End With_Eqv_Rel_Dec.
+
+Global Instance string_eqv_dec : Eqv string := eq. 
+
 
 (*
 Theorem assoc_map :
