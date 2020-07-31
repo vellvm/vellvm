@@ -192,3 +192,19 @@ Proof.
   reflexivity.
 Qed.
 
+Opaque assoc.
+Lemma denote_phi_hd : forall bid e id τ tl,
+    denote_phi bid (id, Phi τ ((bid,e)::tl)) ≈ uv <- denote_exp (Some τ) e;; ret (id,uv).
+Proof.
+  intros; cbn.
+  rewrite assoc_hd; reflexivity.
+Qed.
+
+Lemma denote_phi_tl : forall bid bid' e id τ tl,
+    bid <> bid' ->
+    denote_phi bid (id, Phi τ ((bid',e)::tl)) ≈ denote_phi bid (id, Phi τ tl).
+Proof.
+  intros; cbn.
+  rewrite assoc_tl; auto; reflexivity.
+Qed.
+
