@@ -27,6 +27,8 @@ From Vellvm Require Import
 .
 
 Import D.
+Open Scope itree_scope.
+
 (** Helper lemmas that should probably be moved *)
 
 (* TODO: Move this *)
