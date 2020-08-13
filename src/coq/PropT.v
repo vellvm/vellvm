@@ -158,7 +158,7 @@ Section PropMonad.
   Definition eutt_closed {E X} (P: itree E X -> Prop): Prop :=
     Proper (eutt eq ==> iff) P.
 
-  Global Polymorphic Instance EqM_PropT {E} : EqM (PropT E) :=
+  Global Polymorphic Instance Eq1_PropT {E} : Eq1 (PropT E) :=
     fun a PA PA' =>
       (forall x y, x ≈ y -> (PA x <-> PA' y)) /\
       eutt_closed PA /\ eutt_closed PA'.
@@ -235,7 +235,7 @@ Section PropMonad.
 
   Lemma bind_prop_eutt :
     forall {E} {A B} (PA: PropT E A) (K: A -> PropT E B)
-      (HK: forall a, EqM_PropT _ (K a) (K a))
+      (HK: forall a, Eq1_PropT _ (K a) (K a))
       
       (t1 t2 : itree E B) (eq : t1 ≈ t2),
       bind_prop PA K t1 -> bind_prop PA K t2.
@@ -273,7 +273,7 @@ Section PropMonad.
 
   (* This more general version seems much harder *)
   Lemma bind_prop_Proper {E} {A B} :
-     Proper (eqm ==> (eq ==> eqm) ==> eutt eq ==> iff) (@bind_prop E A B).
+     Proper (eq1 ==> (eq ==> eq1) ==> eutt eq ==> iff) (@bind_prop E A B).
   Proof.
     do 5 red.
     intros PA PA' EQA K1 K2 EQK t1 t2 eq.
@@ -485,7 +485,7 @@ Section PropMonad.
   Lemma interp_prop_ret :
     forall R E F (h_spec : E ~> PropT F)
       (r : R)
-    , eqm (interp_prop_old h_spec R eq (ret r)) (ret r).
+    , eq1 (interp_prop_old h_spec R eq (ret r)) (ret r).
   Proof.
     intros.
     repeat red. split; [|split].
@@ -593,7 +593,7 @@ Section PropMonad.
   Lemma interp_prop_ret :
     forall R E F (h_spec : E ~> PropT F)
       (r : R)
-    , EqM_PropT _ (interp_prop h_spec R eq (ret r)) (ret r).
+    , Eq1_PropT _ (interp_prop h_spec R eq (ret r)) (ret r).
   Proof.
     intros.
     repeat red.
@@ -883,8 +883,8 @@ Section PropMonad.
   (* SAZ : morally, we should only work with "proper" triggers everywhere *)
   Lemma interp_prop_trigger :
     forall E F (h_spec : E ~> PropT F) R (e : E R)
-      (HP : forall T, Proper (eq ==> EqM_PropT T) (h_spec T))
-    , EqM_PropT _ (interp_prop h_spec R eq (trigger e)) (h_spec R e).
+      (HP : forall T, Proper (eq ==> Eq1_PropT T) (h_spec T))
+    , Eq1_PropT _ (interp_prop h_spec R eq (trigger e)) (h_spec R e).
   Proof.
     intros.
     red.
@@ -903,7 +903,7 @@ Section PropMonad.
           intros. destruct H1. subst. specialize (HK u2 H2). pclearbot. pinversion HK. subst. assumption.
         }
         rewrite H1 in H.
-        specialize (HP R e e eq_refl).  unfold EqM_PropT in HP. destruct HP as (P & _ & _).
+        specialize (HP R e e eq_refl).  unfold Eq1_PropT in HP. destruct HP as (P & _ & _).
         rewrite P. apply HTA. symmetry. assumption.
       + unfold trigger, subevent, resum, ReSum_id, Id_IFun, id_.
         red. pstep. eapply Interp_PropT_Vis with (k2 := (fun x : R => Ret x)).
@@ -946,7 +946,7 @@ Section PropMonad.
   Lemma interp_prop_tau :
     forall E F (h_spec : E ~> PropT F) R RR
       (t_spec : itree E R),
-      EqM_PropT _ (interp_prop h_spec R RR t_spec) (interp_prop h_spec R RR (Tau t_spec)).
+      Eq1_PropT _ (interp_prop h_spec R RR t_spec) (interp_prop h_spec R RR (Tau t_spec)).
   Proof.
     intros.
     split; [| split].
@@ -1027,7 +1027,7 @@ Section PropMonad.
   (* SAZ: Not clear that this one is provable : *)
   Lemma interp_prop_bind_inv_l :
     forall E F (h_spec : E ~> PropT F) R RR (HR: Reflexive RR) (HT : Transitive RR) S
-      (HP : forall T, Proper (eq ==> EqM_PropT T) (h_spec T))
+      (HP : forall T, Proper (eq ==> Eq1_PropT T) (h_spec T))
       (m : itree E S)
       (k : S -> itree E R)
       (t : itree F R)
@@ -1104,7 +1104,7 @@ Section PropMonad.
 
   Definition iter_cont {I E R} (step' : I -> itree E (I + R)) :
     I + R -> itree E R :=
-      (ITree._iter (fun t : itree E R => Tau t) (ITree.iter step')).
+    fun lr => ITree.on_left lr l (Tau (ITree.iter step' l)).
 
   Global Polymorphic Instance MonadIter_Prop {E} : MonadIter (PropT E) :=
     fun R I (step : I -> PropT E (I + R)) i =>
@@ -1112,8 +1112,6 @@ Section PropMonad.
         (exists (step' : I -> (itree E (I + R)%type)),
                 ITree.bind (step' i) (@iter_cont I E R step') ≈ r /\
                 (forall j, step j (step' j))).
-
-
 
   Lemma eqit_bind_Returns_inv {E} {R S T} (RS : R -> S -> Prop) 
         (t : itree E T)  (k1: T -> itree E R) (k2 : T -> itree E S) :
@@ -1348,7 +1346,7 @@ Section PropMonad.
 
   Lemma interp_prop_bind_clo :
     forall E F (h_spec : E ~> PropT F) A B
-      (HP : forall T, Proper (eq ==> EqM_PropT T) (h_spec T))
+      (HP : forall T, Proper (eq ==> Eq1_PropT T) (h_spec T))
       (t1 : itree E A) (t2 : itree F A)
       (k1 : A -> itree E B) (k2 : A -> itree F B)
       (HT : interp_prop h_spec A eq t1 t2)
@@ -1360,10 +1358,10 @@ Section PropMonad.
   
   Lemma interp_prop_bind :
     forall E F (h_spec : E ~> PropT F) R S
-      (HP : forall T, Proper (eq ==> EqM_PropT T) (h_spec T))
+      (HP : forall T, Proper (eq ==> Eq1_PropT T) (h_spec T))
       (m : itree E S)
       (k : S -> itree E R)
-    , EqM_PropT _ (interp_prop h_spec R eq (bind m k)) (bind (interp_prop h_spec S eq m) (fun x => interp_prop h_spec R eq (k x))).
+    , Eq1_PropT _ (interp_prop h_spec R eq (bind m k)) (bind (interp_prop h_spec S eq m) (fun x => interp_prop h_spec R eq (k x))).
   Proof.
     intros.
     split; [|split].
@@ -1412,7 +1410,7 @@ Section PropMonad.
           rewrite eq0 in eq2. rewrite Eq.bind_bind in eq2. rewrite eq2.
           rewrite Eq.bind_vis. pstep. red. econstructor.
           apply HTA. unfold bind, Monad_itree.
-          red. unfold EqM_ITree. reflexivity.
+          red. unfold Eq1_ITree. reflexivity.
           intros.
           left. (* todo : interp_prop_bind_clo *)
           eapply interp_prop_bind_clo.
@@ -1630,38 +1628,39 @@ Section IterLaws.
     apply H.
   Qed.
 
-  Lemma simplify_bind_match {E A B}:
-    forall x BODY,
-     ITree.bind
-       match x with
-       | inl i0 => Ret (inl (i0, 1))
-       | inr r0 => Ret (inr r0)
-       end
-       (ITree._iter (fun t : itree E B => Tau t)
-          (ITree.iter
-             (fun '(x, k) =>
-              ITree.bind (BODY (x, k))
-                (fun ir : A + B =>
-                 match ir with
-                 | inl i0 => Ret (inl (i0, S k))
-                 | inr r0 => Ret (inr r0)
-                 end))))
-      ≈
-      match x with
-      | inl l =>
-          (ITree.iter
-              (fun '(x0, k) =>
-              ITree.bind (BODY (x0, k))
-                (fun ir : A + B =>
-                  match ir with
-                  | inl i0 => Ret (inl (i0, S k))
-                  | inr r0 => Ret (inr r0)
-                  end))) (l, 1)
-      | inr r => Ret r end.
-  Proof.
-    intros. destruct x. rewrite Eq.bind_ret_l. cbn. rewrite tau_eutt.
-    reflexivity. rewrite Eq.bind_ret_l. reflexivity.
-  Qed.
+  (* If needed back, should rephrase the _iter continuation *)
+  (* Lemma simplify_bind_match {E A B}: *)
+  (*   forall x BODY, *)
+  (*    ITree.bind *)
+  (*      match x with *)
+  (*      | inl i0 => Ret (inl (i0, 1)) *)
+  (*      | inr r0 => Ret (inr r0) *)
+  (*      end *)
+  (*      (ITree._iter (fun t : itree E B => Tau t) *)
+  (*         (ITree.iter *)
+  (*            (fun '(x, k) => *)
+  (*             ITree.bind (BODY (x, k)) *)
+  (*               (fun ir : A + B => *)
+  (*                match ir with *)
+  (*                | inl i0 => Ret (inl (i0, S k)) *)
+  (*                | inr r0 => Ret (inr r0) *)
+  (*                end)))) *)
+  (*     ≈ *)
+  (*     match x with *)
+  (*     | inl l => *)
+  (*         (ITree.iter *)
+  (*             (fun '(x0, k) => *)
+  (*             ITree.bind (BODY (x0, k)) *)
+  (*               (fun ir : A + B => *)
+  (*                 match ir with *)
+  (*                 | inl i0 => Ret (inl (i0, S k)) *)
+  (*                 | inr r0 => Ret (inr r0) *)
+  (*                 end))) (l, 1) *)
+  (*     | inr r => Ret r end. *)
+  (* Proof. *)
+  (*   intros. destruct x. rewrite Eq.bind_ret_l. cbn. rewrite tau_eutt. *)
+  (*   reflexivity. rewrite Eq.bind_ret_l. reflexivity. *)
+  (* Qed. *)
 
   (*
   Global Instance IterUnfold_PropT {E} : IterUnfold (Kleisli (PropT E)) sum.
@@ -1816,13 +1815,13 @@ Section MonadLaws.
 
 
 
-  Definition EqM_PropT' {E} : EqM (PropT E) :=
+  Definition Eq1_PropT' {E} : Eq1 (PropT E) :=
     fun a PA PA' =>
       (forall x, (PA x -> exists y, x ≈ y /\ PA' y)) /\
       (forall y, (PA' y -> exists x, x ≈ y /\ PA x)) /\
       eutt_closed PA /\ eutt_closed PA'.
 
-  Lemma EqM_PropT'_Eqm_PropT : forall E a PA PA', @EqM_PropT E a PA PA' -> EqM_PropT' a PA PA'.
+  Lemma Eq1_PropT'_Eq1_PropT : forall E a PA PA', @Eq1_PropT E a PA PA' -> Eq1_PropT' a PA PA'.
   Proof.
     intros.
     red.
@@ -1840,7 +1839,7 @@ Section MonadLaws.
 
   Lemma ret_bind: forall {E} (a b : Type) (f : a -> PropT E b) (x : a),
       eutt_closed (f x) ->
-      eqm (bind (ret x) f) (f x).
+      eq1 (bind (ret x) f) (f x).
   Proof.
     intros.
     split; [| split].
@@ -1899,7 +1898,7 @@ Section MonadLaws.
 
 
    Global Instance bind_PropT_Proper {E} {A B} :
-     Proper (eqm ==> (eq ==> eqm) ==> eutt eq ==> iff) (@bind_PropT E A B).
+     Proper (eq1 ==> (eq ==> eq1) ==> eutt eq ==> iff) (@bind_PropT E A B).
    Proof.
      repeat red; intros PA1 PA2 EQP K1 K2 EQK t1 t2 EQt; split; intros H.
      - destruct H as (ta & k & HA & eq & HK).
@@ -2058,7 +2057,7 @@ Section MonadLaws.
   
   Lemma bind_ret: forall {E} (A : Type) (PA : PropT E A),
       eutt_closed PA ->
-      eqm (bind PA (fun x => ret x)) PA.
+      eq1 (bind PA (fun x => ret x)) PA.
   Proof.
     intros.
     split; [| split].
@@ -2304,8 +2303,8 @@ Lemma bind_bind: forall {E}
                    (A B C : Type) (PA : PropT E A)
                    (KB : A -> PropT E B) (KC : B -> PropT E C)
                    (PQOK : eutt_closed PA)
-                   (KBP : Proper (eq ==> eqm) KB)
-                   (KCP : Proper (eq ==> eqm) KC)
+                   (KBP : Proper (eq ==> eq1) KB)
+                   (KCP : Proper (eq ==> eq1) KC)
                    (t : itree E C),
       (bind (bind PA KB) KC) t -> (bind PA (fun a => bind (KB a) KC)) t.
   Proof.

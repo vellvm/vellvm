@@ -21,9 +21,9 @@ Notation err := (sum string).
 Instance Monad_err : Monad err := Monad_either string.
 Instance Exception_err : MonadExc string err := Exception_either string.
 
-Instance EqM_err: Monad.EqM err := fun a x y => @eq (err a) x y.
+Instance EqM_err: Monad.Eq1 err := fun a x y => @eq (err a) x y.
 
-Instance EqMProps_err: Monad.EqMProps err.
+Instance EqMProps_err: Monad.Eq1Equivalence err.
   constructor.
   - repeat intro. repeat red. destruct x; reflexivity.
   - repeat intro. repeat red. repeat red in H.
@@ -32,7 +32,7 @@ Instance EqMProps_err: Monad.EqMProps err.
     destruct x, y, z; auto; try contradiction; try etransitivity; eauto.
 Qed.
 
-Instance MonadLaws_err: Monad.MonadLaws err.
+Instance MonadLaws_err: Monad.MonadLawsE err.
   constructor.
   - intros. repeat red. cbn. auto.
   - intros. repeat red. cbn. destruct x eqn: Hx; auto.
@@ -65,15 +65,15 @@ Instance Monad_undef_or_err : Monad undef_or_err.
 unfold undef_or_err. typeclasses eauto.
 Defined.
 
-Instance EqM_undef_or_err : Monad.EqM undef_or_err :=
+Instance EqM_undef_or_err : Monad.Eq1 undef_or_err :=
   fun (a : Type) (x y : undef_or_err a) => x = y.
 
-Instance EqMProps_undef_or_err : Monad.EqMProps undef_or_err.
+Instance EqMProps_undef_or_err : Monad.Eq1Equivalence undef_or_err.
 constructor; intuition.
 repeat intro. etransitivity; eauto.
 Defined.
 
-Instance MonadLaws_undef_or_err: Monad.MonadLaws undef_or_err.
+Instance MonadLaws_undef_or_err: Monad.MonadLawsE undef_or_err.
 constructor.
 - repeat intro. cbn. destruct (f x). cbn. reflexivity.
 - repeat intro. cbn. destruct x. cbn. destruct unEitherT; try reflexivity.

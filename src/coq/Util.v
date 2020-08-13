@@ -477,9 +477,9 @@ From ITree Require Import
 Lemma map_monad_app
       {m : Type -> Type}
       {Mm : Monad m}
-      {EqMm : EqM m}
-      {HEQP: EqMProps m}
-      {ML: MonadLaws m}
+      {EqMm : Eq1 m}
+      {HEQP: Eq1Equivalence m}
+      {ML: MonadLawsE m}
       {A B} (f:A -> m B) (l0 l1:list A):
   map_monad f (l0++l1) ≈
   bs1 <- map_monad f l0;;
