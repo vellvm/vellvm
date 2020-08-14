@@ -1471,6 +1471,202 @@ Class VInt I : Type :=
         dvalue_has_dtyp (DVALUE_Vector xs) (DTYPE_Vector (Z.of_nat sz) dt)
   .
 
+  Inductive uvalue_has_dtyp : uvalue -> dtyp -> Prop :=
+  | UVALUE_Addr_typ   : forall a, uvalue_has_dtyp (UVALUE_Addr a) DTYPE_Pointer
+  | UVALUE_I1_typ     : forall x, uvalue_has_dtyp (UVALUE_I1 x) (DTYPE_I 1)
+  | UVALUE_I8_typ     : forall x, uvalue_has_dtyp (UVALUE_I8 x) (DTYPE_I 8)
+  | UVALUE_I32_typ    : forall x, uvalue_has_dtyp (UVALUE_I32 x) (DTYPE_I 32)
+  | UVALUE_I64_typ    : forall x, uvalue_has_dtyp (UVALUE_I64 x) (DTYPE_I 64)
+  | UVALUE_IX_typ     : forall x, ~IX_supported x -> uvalue_has_dtyp UVALUE_None (DTYPE_I x)
+  | UVALUE_Double_typ : forall x, uvalue_has_dtyp (UVALUE_Double x) DTYPE_Double
+  | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
+  | UVALUE_Half_typ   : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Half (* ??? *)
+  | UVALUE_X86_fp80   : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_X86_fp80 (* ??? *)
+  | UVALUE_Fp128      : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Fp128 (* ??? *)
+  | UVALUE_Ppc_fp128  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Ppc_fp128 (* ??? *)
+  | UVALUE_Metadata   : uvalue_has_dtyp UVALUE_None DTYPE_Metadata (* ??? *)
+  | UVALUE_X86_mmx    : uvalue_has_dtyp UVALUE_None DTYPE_X86_mmx (* ??? *)
+  | UVALUE_Opaque     : uvalue_has_dtyp UVALUE_None DTYPE_Opaque (* ??? *)
+  | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
+
+  | UVALUE_Struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Struct []) (DTYPE_Struct [])
+  | UVALUE_Struct_Cons_typ :
+      forall f dt fields dts,
+        uvalue_has_dtyp f dt ->
+        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct dts) ->
+        uvalue_has_dtyp (UVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts))
+
+  | UVALUE_Packed_struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Packed_struct []) (DTYPE_Packed_struct [])
+  | UVALUE_Packed_struct_Cons_typ :
+      forall f dt fields dts,
+        uvalue_has_dtyp f dt ->
+        uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
+        uvalue_has_dtyp (UVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts))
+
+  (* CB TODO: Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
+  | UVALUE_Array_typ :
+      forall xs sz dt,
+        Forall (fun x => uvalue_has_dtyp x dt) xs ->
+        length xs = sz ->
+        uvalue_has_dtyp (UVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt)
+
+  | UVALUE_Vector_typ :
+      forall xs sz dt,
+        Forall (fun x => uvalue_has_dtyp x dt) xs ->
+        length xs = sz ->
+        vector_dtyp dt ->
+        uvalue_has_dtyp (UVALUE_Vector xs) (DTYPE_Vector (Z.of_nat sz) dt)
+
+  | UVALUE_IBinop_typ :
+      forall x y sz op,
+      IX_supported sz ->
+      uvalue_has_dtyp x (DTYPE_I sz) ->
+      uvalue_has_dtyp y (DTYPE_I sz) ->
+      uvalue_has_dtyp (UVALUE_IBinop op x y) (DTYPE_I sz)
+  | UVALUE_ICmp_typ :
+      forall x y sz op,
+      IX_supported sz ->
+      uvalue_has_dtyp x (DTYPE_I sz) ->
+      uvalue_has_dtyp y (DTYPE_I sz) ->
+      uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_I 1)
+  | UVALUE_FBinop_Float_typ :
+      forall x y op fms,
+      uvalue_has_dtyp x DTYPE_Float ->
+      uvalue_has_dtyp y DTYPE_Float ->
+      uvalue_has_dtyp (UVALUE_FBinop op fms x y) DTYPE_Float
+  | UVALUE_FBinop_Double_typ :
+      forall x y op fms,
+      uvalue_has_dtyp x DTYPE_Double ->
+      uvalue_has_dtyp y DTYPE_Double ->
+      uvalue_has_dtyp (UVALUE_FBinop op fms x y) DTYPE_Double
+  | UVALUE_FCmp_Float_typ :
+      forall x y op,
+        uvalue_has_dtyp x DTYPE_Float ->
+        uvalue_has_dtyp y DTYPE_Float ->
+        uvalue_has_dtyp (UVALUE_FCmp op x y) (DTYPE_I 1)
+  | UVALUE_FCmp_Double_typ :
+      forall x y op,
+        uvalue_has_dtyp x DTYPE_Double ->
+        uvalue_has_dtyp y DTYPE_Double ->
+        uvalue_has_dtyp (UVALUE_FCmp op x y) (DTYPE_I 1)
+  | UVALUE_Conversion_trunc_int_typ :
+      forall from_sz to_sz value,
+        from_sz > to_sz ->
+        uvalue_has_dtyp value (DTYPE_I from_sz) ->
+        uvalue_has_dtyp (UVALUE_Conversion Trunc value (DTYPE_I to_sz)) (DTYPE_I to_sz)
+  | UVALUE_Conversion_trunc_vec_typ :
+      forall from_sz to_sz n value,
+        from_sz > to_sz ->
+        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        uvalue_has_dtyp (UVALUE_Conversion Trunc value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
+
+  | UVALUE_Conversion_zext_int_typ :
+      forall from_sz to_sz value,
+        from_sz < to_sz ->
+        uvalue_has_dtyp value (DTYPE_I from_sz) ->
+        uvalue_has_dtyp (UVALUE_Conversion Zext value (DTYPE_I to_sz)) (DTYPE_I to_sz)
+  | UVALUE_Conversion_zext_vec_typ :
+      forall from_sz to_sz n value,
+        from_sz < to_sz ->
+        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        uvalue_has_dtyp (UVALUE_Conversion Zext value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
+
+  | UVALUE_Conversion_sext_int_typ :
+      forall from_sz to_sz value,
+        from_sz < to_sz ->
+        uvalue_has_dtyp value (DTYPE_I from_sz) ->
+        uvalue_has_dtyp (UVALUE_Conversion Sext value (DTYPE_I to_sz)) (DTYPE_I to_sz)
+  | UVALUE_Conversion_sext_vec_typ :
+      forall from_sz to_sz n value,
+        from_sz < to_sz ->
+        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        uvalue_has_dtyp (UVALUE_Conversion Sext value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
+
+  (* TODO: fill in the rest of the conversions *)
+  | UVALUE_GetElementPtr_typ :
+      forall dt uv idxs,
+        uvalue_has_dtyp (UVALUE_GetElementPtr dt uv idxs) DTYPE_Pointer
+  | UVALUE_ExtractElement_typ :
+      forall n vect idx t sz,
+        IX_supported sz ->
+        uvalue_has_dtyp idx (DTYPE_I sz) ->
+        uvalue_has_dtyp vect (DTYPE_Vector (Z.of_nat n) t) ->
+        uvalue_has_dtyp (UVALUE_ExtractElement vect idx) t
+  | UVALUE_InsertElement_typ :
+      forall n vect val idx t sz,
+        IX_supported sz ->
+        uvalue_has_dtyp idx (DTYPE_I sz) ->
+        uvalue_has_dtyp vect (DTYPE_Vector (Z.of_nat n) t) ->
+        uvalue_has_dtyp val t ->
+        uvalue_has_dtyp (UVALUE_InsertElement vect val idx) (DTYPE_Vector (Z.of_nat n) t)
+  | UVALUE_ShuffleVector_typ :
+      forall n m v1 v2 idxs t,
+        uvalue_has_dtyp idxs (DTYPE_Vector (Z.of_nat m) (DTYPE_I 32)) ->
+        uvalue_has_dtyp v1 (DTYPE_Vector (Z.of_nat n) t) ->
+        uvalue_has_dtyp v2 (DTYPE_Vector (Z.of_nat n) t) ->
+        uvalue_has_dtyp (UVALUE_ShuffleVector v1 v2 idxs) (DTYPE_Vector (Z.of_nat m) t)
+  | UVALUE_ExtractValue_Struct_sing_typ :
+      forall fields fts dt idx,
+        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
+        0 <= Int32.intval idx ->
+        Nth fts (Z.to_nat (Int32.intval idx)) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Struct fields) [idx]) dt
+  | UVALUE_ExtractValue_Struct_cons_typ :
+      forall fields fts fld ft dt idx idxs,
+        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
+        0 <= Int32.intval idx ->
+        Nth fts (Z.to_nat (Int32.intval idx)) dt ->
+        Nth fields (Z.to_nat (Int32.intval idx)) fld ->
+        uvalue_has_dtyp fld ft ->
+        uvalue_has_dtyp (UVALUE_ExtractValue fld idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Struct fields) (idx :: idxs)) dt
+  | UVALUE_ExtractValue_Packed_struct_sing_typ :
+      forall fields fts dt idx,
+        uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
+        0 <= Int32.intval idx ->
+        Nth fts (Z.to_nat (Int32.intval idx)) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Packed_struct fields) [idx]) dt
+  | UVALUE_ExtractValue_Packed_struct_cons_typ :
+      forall fields fts fld ft dt idx idxs,
+        uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
+        0 <= Int32.intval idx ->
+        Nth fts (Z.to_nat (Int32.intval idx)) dt ->
+        Nth fields (Z.to_nat (Int32.intval idx)) fld ->
+        uvalue_has_dtyp fld ft ->
+        uvalue_has_dtyp (UVALUE_ExtractValue fld idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Packed_struct fields) (idx :: idxs)) dt
+  | UVALUE_ExtractValue_Array_sing_typ :
+      forall elements dt idx n,
+        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
+        0 <= Int32.intval idx <= n ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Array elements) [idx]) dt
+  | UVALUE_ExtractValue_Array_cons_typ :
+      forall elements elem et dt n idx idxs,
+        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
+        0 <= Int32.intval idx <= n ->
+        Nth elements (Z.to_nat (Int32.intval idx)) elem ->
+        uvalue_has_dtyp elem et ->
+        uvalue_has_dtyp (UVALUE_ExtractValue elem idxs) dt ->
+        uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Array elements) (idx :: idxs)) dt
+  | UVALUE_InsertValue_typ :
+      forall struc idxs uv st dt,
+        uvalue_has_dtyp (UVALUE_ExtractValue struc idxs) dt ->
+        uvalue_has_dtyp uv dt ->
+        uvalue_has_dtyp struc st ->
+        uvalue_has_dtyp (UVALUE_InsertValue struc uv idxs) st
+  | UVALUE_Select_i1 :
+      forall cond x y t,
+        uvalue_has_dtyp cond (DTYPE_I 1) ->
+        uvalue_has_dtyp x t ->
+        uvalue_has_dtyp y t ->
+        uvalue_has_dtyp (UVALUE_Select cond x y) t
+  | UVALUE_Select_vect :
+      forall cond x y t sz,
+        uvalue_has_dtyp cond (DTYPE_Vector (Z.of_nat sz) (DTYPE_I 1)) ->
+        uvalue_has_dtyp x (DTYPE_Vector (Z.of_nat sz) t) ->
+        uvalue_has_dtyp y (DTYPE_Vector (Z.of_nat sz) t) ->
+        uvalue_has_dtyp (UVALUE_Select cond x y) (DTYPE_Vector (Z.of_nat sz) t).
+
   Section dvalue_has_dtyp_ind.
     Variable P : dvalue -> dtyp -> Prop.
     Hypothesis IH_Addr           : forall a, P (DVALUE_Addr a) DTYPE_Pointer.
