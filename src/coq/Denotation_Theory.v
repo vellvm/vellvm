@@ -20,7 +20,11 @@ From Vellvm Require Import
      LLVMAst
      LLVMEvents
      TopLevel
-     Tactics.
+     Tactics
+     Traversal.
+
+Set Implicit Arguments.
+Set Strict Implicit.
 
 Import ListNotations.
 Import D.
@@ -207,4 +211,270 @@ Proof.
   intros; cbn.
   rewrite assoc_tl; auto; reflexivity.
 Qed.
+
+(* find_block axiomatisation to ease things. TODO: make it opaque *)
+Lemma find_block_nil: forall {T} b, find_block T [] b = None. 
+Proof.
+  reflexivity.
+Qed.
+
+Lemma find_block_eq: forall {T} x b bs,
+    blk_id b = x ->
+    find_block T (b:: bs) x = Some b.
+Proof.
+  intros; cbn.
+  rewrite H.
+  destruct (Eqv.eqv_dec_p x x).
+  reflexivity.
+  contradiction n; reflexivity.
+Qed.
+
+Lemma find_block_ineq: forall {T} x b bs,
+    blk_id b <> x ->
+    find_block T (b::bs) x = find_block T bs x. 
+Proof.
+  intros; cbn.
+  destruct (Eqv.eqv_dec_p (blk_id b)) as [EQ | INEQ].
+  unfold Eqv.eqv, AstLib.eqv_raw_id in *; intuition.
+  reflexivity.
+Qed.
+
+(* Move these *)
+(* Kind of wonder if these should be traversals *)
+Definition bks_labels {t} (bks : list (LLVMAst.block t)) : list block_id
+  := fmap blk_id bks.
+
+Definition terminator_targets {t} (term : LLVMAst.terminator t) : list block_id
+  := match term with
+     | TERM_Ret v => []
+     | TERM_Ret_void => []
+     | TERM_Br v br1 br2 => [br1; br2]
+     | TERM_Br_1 br => [br]
+     | TERM_Switch v default_dest brs => default_dest :: fmap snd brs
+     | TERM_IndirectBr v brs => brs
+     | TERM_Resume v => []
+     | TERM_Invoke fnptrval args to_label unwind_label => [to_label; unwind_label]
+     end.
+
+Definition bks_targets {t} (bks : list (LLVMAst.block t)) : list block_id
+  := fold_left (fun acc bk => terminator_targets (snd (blk_term bk)) ++ acc) bks [].
+
+Lemma find_none_app:
+  forall {A} (l1 l2 : list A) pred,
+    find pred l1 = None ->
+    find pred (l1 ++ l2) = find pred l2.
+Proof.
+  induction l1; intros l2 pred FIND.
+  - reflexivity.
+  - cbn in FIND; cbn.
+    destruct (pred a); inversion FIND.
+    auto.
+Qed.
+
+Lemma find_some_app:
+  forall {A} (l1 l2 : list A) a pred,
+    find pred l1 = Some a ->
+    find pred (l1 ++ l2) = Some a.
+Proof.
+  induction l1 as [|x l1']; intros l2 a pred FIND.
+  - inversion FIND.
+  - cbn in FIND. destruct (pred x) eqn:PRED.
+    + inversion FIND; cbn; subst.
+      rewrite PRED. reflexivity.
+    + cbn. rewrite PRED.
+      auto.
+Qed.
+
+Lemma find_block_none_app:
+  forall {t} l1 l2 bid,
+    find_block t l1 bid = None ->
+    find_block t (l1 ++ l2) bid = find_block t l2 bid.
+Proof.
+  intros t l1 l2 bid FIND.
+  apply find_none_app; auto.
+Qed.
+
+Lemma find_block_some_app:
+  forall {t} l1 l2 bid bk,
+    find_block t l1 bid = Some bk ->
+    find_block t (l1 ++ l2) bid = Some bk.
+Proof.
+  intros t l1 l2 bid bk FIND.
+  apply find_some_app; auto.
+Qed.
+
+(* TODO: replace the too restrictive version from itree *)
+Lemma eutt_eq_bind : forall E R1 R2 RR U (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
+    (forall u, eutt RR (k1 u) (k2 u)) -> eutt RR (ITree.bind t k1) (ITree.bind t k2).
+Proof.
+  intros.
+  apply eutt_clo_bind with (UU := Logic.eq); [reflexivity |].
+  intros ? ? ->; apply H.
+Qed.
+
+Lemma eutt_Ret :
+  forall E (R1 R2 : Type) (RR : R1 -> R2 -> Prop) r1 r2, RR r1 r2 <-> eutt (E := E) RR (Ret r1) (Ret r2).
+Proof.
+  intros; apply eqit_Ret.
+Qed.
+
+Lemma find_block_not_in: forall b l,
+        ~ In b (bks_labels l) ->
+        find_block dtyp l b = None.
+Proof.
+  induction l as [| bk l IH]; intros NIN; auto.
+  cbn.
+  flatten_goal.
+  - exfalso.
+    flatten_hyp Heq; [| inv Heq].
+    apply NIN.
+    left; rewrite e; reflexivity.
+  - flatten_hyp Heq; [inv Heq |].
+    apply IH.
+    intros abs; apply NIN.
+    right; auto.
+Qed.
+
+(* Need to be generalized to hold inductively *)
+Lemma terminator_bks_targets: forall {t} bid br (b: block t) l,
+    In br (terminator_targets (snd (blk_term b))) ->
+    find_block t l bid = Some b ->
+    In br (bks_targets l). 
+Proof.
+  induction l as [| ? l IH].
+  - cbn; intros ? abs; inv abs.
+  - cbn; intros IN FIND.
+    flatten_hyp FIND; inv FIND.
+    + flatten_hyp Heq; inv Heq. 
+      rewrite <- app_nil_end.
+      admit.
+    + flatten_hyp Heq; inv Heq. 
+      rewrite <- app_nil_end.
+      admit.
+Admitted.
+
+Lemma denote_bks_app_no_edges :
+  forall l1 l2 fto,
+    find_block dtyp l1 (snd fto) = None ->
+    (forall bk, In bk (bks_targets l2) -> ~ In bk (bks_labels l1)) ->
+    denote_bks (l1 ++ l2) fto ≈ denote_bks l2 fto.
+Proof.
+  intros l1 l2 [f to] FIND NOBACK.
+  apply (@KTreeFacts.eutt_iter_gen _ _ _ (fun fto fto' => fto' = fto /\ find_block dtyp l1 (snd fto) = None)); auto.
+  clear f to FIND; intros fto fto' [-> FIND]; destruct fto as [f to] .
+  cbn in *.
+  epose proof (find_block_none_app _ l2 _ FIND) as FIND_L1L2.
+  rewrite FIND_L1L2.
+  destruct (find_block dtyp l2 to) eqn:FIND_L2.
+  - do 3  (autorewrite with itree; apply eutt_eq_bind; intros ?).
+    autorewrite with itree.
+    
+    eapply eutt_clo_bind with
+        (fun idv idv' => idv = idv' /\
+                      ((exists bid, idv = inl bid /\ In bid (bks_targets l2)) \/
+                       (exists v, idv = inr v))).
+    + destruct b; cbn.
+      destruct blk_term, t; cbn;
+        unfold raise, Exception.throw, raiseUB;
+        try (rewrite translate_vis; einit; estep; intros []).
+
+      * destruct v. 
+        rewrite translate_bind.
+        apply eutt_eq_bind; intros ?.
+        rewrite translate_ret; apply eutt_Ret; eauto.
+      * rewrite translate_ret; apply eutt_Ret; eauto.
+      * destruct v; cbn.
+        rewrite translate_bind; apply eutt_eq_bind; intros ?.
+        rewrite translate_bind; apply eutt_eq_bind; intros ?.
+        cbn.
+        unfold raise, Exception.throw, raiseUB.
+        destruct u3; cbn;
+        try (rewrite translate_vis);
+        try (einit; estep; intros []).
+        flatten_goal; cbn; rewrite translate_ret; apply eutt_Ret; split; eauto; left.
+        { eexists; split; [ reflexivity |].
+          eapply terminator_bks_targets; cbn; eauto.
+          cbn; auto.
+        }
+        { eexists; split; [ reflexivity |].
+          eapply terminator_bks_targets; cbn; eauto.
+          cbn; auto.
+        }
+      * rewrite translate_ret; apply eutt_Ret; split; eauto.
+        left; eexists; split; [reflexivity |].
+        eapply terminator_bks_targets; cbn; eauto.
+        cbn; auto.
+
+    + intros idov ? (<- & H).
+      destruct idov as [id | v]; cbn; apply eutt_Ret; cbn; eauto.
+      eapply inl_morphism; split; auto.
+      apply find_block_not_in, NOBACK; cbn.
+      destruct H as [(? & eq & IN) | (v & abs)]; [inv eq | inv abs]; auto.
+
+  - apply eutt_Ret; right; auto.
+Qed.
+
+Definition branch_not_in {t} (r : block_id + uvalue) (l : list (LLVMAst.block t)) : Prop :=
+  match r with
+  | inl bid => find_block t l bid = None
+  | _ => True
+  end.
+
+Definition branch_out {t} (l : list (LLVMAst.block t)) (r1 : block_id + uvalue) (r2 : block_id + uvalue) : Prop :=
+  r1 = r2 /\ branch_not_in r1 l.
+
+Lemma denote_bks_app :
+  forall l1 l2 fto,
+    (* No edges from l2 to l1 *)
+    (forall bk, In bk (bks_targets l2) -> ~ In bk (bks_labels l1)) ->
+    denote_bks (l1 ++ l2) fto ≈ ITree.bind (denote_bks l1 fto)
+               (fun x =>
+                  match x with
+                  | inl fto2 => denote_bks l2 fto2
+                  | inr v => ret (inr v)
+                  end).
+Proof.
+  intros l1 l2 [f to] NOBACK.
+  destruct (find_block dtyp l1 to) eqn:FIND.
+  - pose proof denote_bks_unfold_in l1 f to FIND as EQ.
+    pose proof find_block_some_app l1 l2 to FIND as FIND_APP.
+
+    rewrite denote_bks_unfold_in; eauto.
+    rewrite denote_bks_unfold_in; eauto.
+
+    cbn.
+    repeat setoid_rewrite bind_bind.
+
+    do 5 (eapply eutt_eq_bind; intros ?).
+
+    (* denote_terminator *)
+    eapply eutt_clo_bind with (UU:=branch_out l1).
+    { destruct (blk_term b) as [i t] eqn:TERM.
+      eapply eqit_mon with (RR:=Logic.eq); intuition.
+      unfold branch_out. intuition.
+      cbn.
+      admit. admit.
+    }
+
+    intros term' term [EQT BOUT]; subst.
+    destruct term as [branch_to | retv].
+    + (* b0 not in l1 due to bailing out of iter *)
+      assert (find_block dtyp l1 branch_to = None) as FIND_B0.
+      admit.
+
+      rewrite denote_bks_app_no_edges; eauto.
+
+      rewrite (denote_bks_unfold_not_in l1); eauto.
+      rewrite bind_ret_l.
+
+      reflexivity.
+    + rewrite bind_ret_l.
+      reflexivity.
+  - rewrite denote_bks_app_no_edges; eauto.
+
+    rewrite (denote_bks_unfold_not_in l1); eauto.
+    rewrite bind_ret_l.
+
+    reflexivity.
+Admitted.
 
