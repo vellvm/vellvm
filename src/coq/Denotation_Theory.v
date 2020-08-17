@@ -256,8 +256,11 @@ Definition terminator_targets {t} (term : LLVMAst.terminator t) : list block_id
      | TERM_Invoke fnptrval args to_label unwind_label => [to_label; unwind_label]
      end.
 
+Definition bk_targets {t} (bk : block t) : list block_id :=
+  terminator_targets (snd (blk_term bk)).
+
 Definition bks_targets {t} (bks : list (LLVMAst.block t)) : list block_id
-  := fold_left (fun acc bk => terminator_targets (snd (blk_term bk)) ++ acc) bks [].
+  := fold_left (fun acc bk => acc ++ bk_targets bk) bks [].
 
 Lemma find_none_app:
   forall {A} (l1 l2 : list A) pred,
@@ -335,7 +338,34 @@ Proof.
     right; auto.
 Qed.
 
-(* Need to be generalized to hold inductively *)
+Lemma bks_targets_acc: forall {t} (bks: list (block t)) acc,
+    fold_left (fun acc bk => acc ++ bk_targets bk) bks acc =
+    acc ++ fold_left (fun acc bk => acc ++ bk_targets bk) bks [].
+Proof.
+  induction bks using List.list_rev_ind; intros; cbn.
+  - rewrite app_nil_r; reflexivity.
+  - rewrite 2 fold_left_app, IHbks.
+    cbn.
+    rewrite app_assoc.
+    reflexivity.
+Qed.
+
+Lemma bks_targets_app: forall {t} l l',
+    @bks_targets t (l ++ l') = bks_targets l ++ bks_targets l'.
+Proof.
+  intros.
+  unfold bks_targets at 1.
+  rewrite fold_left_app, bks_targets_acc.
+  reflexivity.
+Qed.
+
+Lemma bks_targets_cons: forall {t} b l,
+    @bks_targets t (b :: l) = bk_targets b ++ bks_targets l.
+Proof.
+  intros.
+  rewrite list_cons_app, bks_targets_app; reflexivity.
+Qed.
+
 Lemma terminator_bks_targets: forall {t} bid br (b: block t) l,
     In br (terminator_targets (snd (blk_term b))) ->
     find_block t l bid = Some b ->
@@ -343,16 +373,18 @@ Lemma terminator_bks_targets: forall {t} bid br (b: block t) l,
 Proof.
   induction l as [| ? l IH].
   - cbn; intros ? abs; inv abs.
-  - cbn; intros IN FIND.
+  - intros IN FIND.
+    cbn in FIND.
     flatten_hyp FIND; inv FIND.
+    + flatten_hyp Heq; inv Heq.
+      rewrite bks_targets_cons.
+      apply in_or_app; left; auto.
     + flatten_hyp Heq; inv Heq. 
-      rewrite <- app_nil_end.
-      admit.
-    + flatten_hyp Heq; inv Heq. 
-      rewrite <- app_nil_end.
-      admit.
-Admitted.
-
+      rewrite bks_targets_cons.
+      apply in_or_app; right.
+      auto.
+Qed.
+      
 Lemma denote_bks_app_no_edges :
   forall l1 l2 fto,
     find_block dtyp l1 (snd fto) = None ->
