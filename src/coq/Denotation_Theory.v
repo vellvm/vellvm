@@ -366,7 +366,7 @@ Proof.
   epose proof (find_block_none_app _ l2 _ FIND) as FIND_L1L2.
   rewrite FIND_L1L2.
   destruct (find_block dtyp l2 to) eqn:FIND_L2.
-  - do 3  (autorewrite with itree; apply eutt_eq_bind; intros ?).
+  - do 3 (autorewrite with itree; apply eutt_eq_bind; intros ?).
     autorewrite with itree.
     
     eapply eutt_clo_bind with
@@ -414,15 +414,7 @@ Proof.
   - apply eutt_Ret; right; auto.
 Qed.
 
-Definition branch_not_in {t} (r : block_id + uvalue) (l : list (LLVMAst.block t)) : Prop :=
-  match r with
-  | inl bid => find_block t l bid = None
-  | _ => True
-  end.
-
-Definition branch_out {t} (l : list (LLVMAst.block t)) (r1 : block_id + uvalue) (r2 : block_id + uvalue) : Prop :=
-  r1 = r2 /\ branch_not_in r1 l.
-
+Import ITreeNotations.
 Lemma denote_bks_app :
   forall l1 l2 fto,
     (* No edges from l2 to l1 *)
@@ -434,47 +426,39 @@ Lemma denote_bks_app :
                   | inr v => ret (inr v)
                   end).
 Proof.
-  intros l1 l2 [f to] NOBACK.
+  intros * NOBACK.
+  revert fto.
+  einit.
+  ecofix CIH.
+  intros [f to].
   destruct (find_block dtyp l1 to) eqn:FIND.
-  - pose proof denote_bks_unfold_in l1 f to FIND as EQ.
+  - unfold denote_bks.
+    unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree.
+    match goal with
+      |- euttG _ _ _ _ _ ?t _ => remember t; rewrite unfold_iter; subst
+    end.
+    rewrite unfold_iter; cbn.
+    rewrite FIND.
+    rewrite !bind_bind.
     pose proof find_block_some_app l1 l2 to FIND as FIND_APP.
-
-    rewrite denote_bks_unfold_in; eauto.
-    rewrite denote_bks_unfold_in; eauto.
-
+    rewrite FIND_APP.
     cbn.
-    repeat setoid_rewrite bind_bind.
-
-    do 5 (eapply eutt_eq_bind; intros ?).
-
-    (* denote_terminator *)
-    eapply eutt_clo_bind with (UU:=branch_out l1).
-    { destruct (blk_term b) as [i t] eqn:TERM.
-      eapply eqit_mon with (RR:=Logic.eq); intuition.
-      unfold branch_out. intuition.
-      cbn.
-      admit. admit.
-    }
-
-    intros term' term [EQT BOUT]; subst.
-    destruct term as [branch_to | retv].
-    + (* b0 not in l1 due to bailing out of iter *)
-      assert (find_block dtyp l1 branch_to = None) as FIND_B0.
-      admit.
-
-      rewrite denote_bks_app_no_edges; eauto.
-
-      rewrite (denote_bks_unfold_not_in l1); eauto.
-      rewrite bind_ret_l.
-
-      reflexivity.
-    + rewrite bind_ret_l.
-      reflexivity.
-  - rewrite denote_bks_app_no_edges; eauto.
-
-    rewrite (denote_bks_unfold_not_in l1); eauto.
-    rewrite bind_ret_l.
-
-    reflexivity.
-Admitted.
+    rewrite !bind_bind.
+    match goal with
+      |- euttG _ _ _ _ _ ?t _ => remember t
+    end.
+    subst; ebind; econstructor; [reflexivity | intros ? ? <-].
+    ebind; econstructor; [reflexivity | intros ? ? <-].
+    ebind; econstructor; [reflexivity | intros ? ? <-].
+    destruct u2 as [bid | v].
+    + rewrite !bind_ret_l.
+      rewrite bind_tau.
+      etau.
+    + rewrite !bind_ret_l.
+      eret.
+  - efinal.
+    rewrite denote_bks_app_no_edges; auto.
+    rewrite denote_bks_unfold_not_in with (bks := l1); auto.
+    rewrite bind_ret_l; reflexivity.
+Qed.
 
