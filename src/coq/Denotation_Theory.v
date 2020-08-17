@@ -313,6 +313,9 @@ Infix "⊍" := Coqlib.list_disjoint (at level 60).
 Definition no_reentrance {t} (ocfg1 ocfg2 : @open_cfg t) : Prop :=
   outputs ocfg2 ⊍ inputs ocfg1.
 
+Definition no_duplicate_bid {t} (ocfg1 ocfg2 : @open_cfg t) : Prop :=
+  inputs ocfg1 ⊍ inputs ocfg2.
+
 Lemma no_reentrance_not_in {t} (ocfg1 ocfg2 : @open_cfg t) :
   no_reentrance ocfg1 ocfg2 ->
   forall x, In x (outputs ocfg2) -> ~ In x (inputs ocfg1).
@@ -320,9 +323,46 @@ Proof.
   intros; eauto using Coqlib.list_disjoint_notin.
 Qed.
 
+Lemma no_duplicate_bid_not_in_l {t} (ocfg1 ocfg2 : @open_cfg t) :
+  no_duplicate_bid ocfg1 ocfg2 ->
+  forall x, In x (inputs ocfg2) -> ~ In x (inputs ocfg1).
+Proof.
+  intros; eauto using Coqlib.list_disjoint_notin, Coqlib.list_disjoint_sym.
+Qed.
+
+Lemma no_duplicate_bid_not_in_r {t} (ocfg1 ocfg2 : @open_cfg t) :
+  no_duplicate_bid ocfg1 ocfg2 ->
+  forall x, In x (inputs ocfg1) -> ~ In x (inputs ocfg2).
+Proof.
+  intros; eauto using Coqlib.list_disjoint_notin, Coqlib.list_disjoint_sym.
+Qed.
+
 Definition independent_flows {t} (ocfg1 ocfg2 : @open_cfg t) : Prop :=
   no_reentrance ocfg1 ocfg2 /\ 
+  no_reentrance ocfg2 ocfg1 /\
+  no_duplicate_bid ocfg1 ocfg2.
+
+Lemma independent_flows_no_reentrance_l {t} (ocfg1 ocfg2 : @open_cfg t):
+  independent_flows ocfg1 ocfg2 ->
+  no_reentrance ocfg1 ocfg2.
+Proof.
+  intros INDEP; apply INDEP; auto.
+Qed.
+
+Lemma independent_flows_no_reentrance_r {t} (ocfg1 ocfg2 : @open_cfg t):
+  independent_flows ocfg1 ocfg2 ->
   no_reentrance ocfg2 ocfg1.
+Proof.
+  intros INDEP; apply INDEP; auto.
+Qed.
+
+Lemma independent_flows_no_duplicate_bid {t} (ocfg1 ocfg2 : @open_cfg t):
+  independent_flows ocfg1 ocfg2 ->
+  no_duplicate_bid ocfg1 ocfg2.
+Proof.
+  intros INDEP; apply INDEP; auto.
+Qed.
+
 
 Lemma find_none_app:
   forall {A} (l1 l2 : list A) pred,
@@ -400,6 +440,7 @@ Proof.
     right; auto.
 Qed.
 
+Open Scope itree.
 Lemma denote_bks_app_no_edges :
   forall (l1 l2 : open_cfg) fto,
     find_block dtyp l1 (snd fto) = None ->
@@ -507,5 +548,53 @@ Proof.
     rewrite denote_bks_app_no_edges; auto.
     rewrite denote_bks_unfold_not_in with (bks := ocfg1); auto.
     rewrite bind_ret_l; reflexivity.
+Qed.
+
+Ltac bind_ret_r1 :=
+  match goal with
+    |- eutt _ ?t ?s => let x := fresh in
+                     remember s as x;
+                     rewrite <- (bind_ret_r t); subst x
+  end.
+
+Ltac bind_ret_r2 :=
+  match goal with
+    |- eutt _ ?t ?s => let x := fresh in
+                     remember t as x;
+                     rewrite <- (bind_ret_r s); subst x
+  end.
+
+Lemma denote_bks_flow_left :
+  forall ocfg1 ocfg2 fto,
+    independent_flows ocfg1 ocfg2 ->
+    In (snd fto) (inputs ocfg1) ->
+    denote_bks (ocfg1 ++ ocfg2) fto ≈
+    denote_bks ocfg1 fto.
+Proof.
+  intros * INDEP IN.
+  rewrite denote_bks_app; [| auto using independent_flows_no_reentrance_l].
+  bind_ret_r2. 
+  apply eutt_eq_bind; intros [[f to] | ?]; [| reflexivity].
+  rewrite denote_bks_unfold_not_in; [reflexivity |].
+  apply find_block_not_in_inputs.
+  (* I need to know that [to] is in the outputs of ocfg1.
+     That's always true, but I'm not sure what's the right way to phrase it
+   *)
+  admit.
+Admitted.
+
+Lemma denote_bks_flow_right :
+  forall ocfg1 ocfg2 fto,
+    independent_flows ocfg1 ocfg2 ->
+    In (snd fto) (inputs ocfg2) ->
+    denote_bks (ocfg1 ++ ocfg2) fto ≈
+    denote_bks ocfg2 fto.
+Proof.
+  intros * INDEP IN.
+  rewrite denote_bks_app; [| auto using independent_flows_no_reentrance_l].
+  destruct fto as [f to]; cbn in *.
+  rewrite denote_bks_unfold_not_in.
+  rewrite bind_ret_l; reflexivity.
+  eapply find_block_not_in_inputs, no_duplicate_bid_not_in_l; eauto using independent_flows_no_duplicate_bid.
 Qed.
 
