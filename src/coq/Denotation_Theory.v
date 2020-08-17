@@ -239,12 +239,11 @@ Proof.
   reflexivity.
 Qed.
 
-(* Move these *)
-(* Kind of wonder if these should be traversals *)
-Definition bks_labels {t} (bks : list (LLVMAst.block t)) : list block_id
-  := fmap blk_id bks.
+Definition open_cfg {t} : Type := list (LLVMAst.block t).
+Definition inputs {t} (ocfg : @open_cfg t) :=
+  fmap blk_id ocfg.
 
-Definition terminator_targets {t} (term : LLVMAst.terminator t) : list block_id
+Definition terminator_outputs {t} (term : LLVMAst.terminator t) : list block_id
   := match term with
      | TERM_Ret v => []
      | TERM_Ret_void => []
@@ -256,11 +255,74 @@ Definition terminator_targets {t} (term : LLVMAst.terminator t) : list block_id
      | TERM_Invoke fnptrval args to_label unwind_label => [to_label; unwind_label]
      end.
 
-Definition bk_targets {t} (bk : block t) : list block_id :=
-  terminator_targets (snd (blk_term bk)).
+Definition bk_outputs {t} (bk : block t) : list block_id :=
+  terminator_outputs (snd (blk_term bk)).
 
-Definition bks_targets {t} (bks : list (LLVMAst.block t)) : list block_id
-  := fold_left (fun acc bk => acc ++ bk_targets bk) bks [].
+Definition outputs {t} (bks : @open_cfg t) : List.list block_id
+  := fold_left (fun acc bk => acc ++ bk_outputs bk) bks [].
+
+Lemma outputs_acc: forall {t} (bks: list (block t)) acc,
+    fold_left (fun acc bk => acc ++ bk_outputs bk) bks acc =
+    acc ++ fold_left (fun acc bk => acc ++ bk_outputs bk) bks [].
+Proof.
+  induction bks using List.list_rev_ind; intros; cbn.
+  - rewrite app_nil_r; reflexivity.
+  - rewrite 2 fold_left_app, IHbks.
+    cbn.
+    rewrite app_assoc.
+    reflexivity.
+Qed.
+
+Lemma outputs_app: forall {t} l l',
+    @outputs t (l ++ l') = outputs l ++ outputs l'.
+Proof.
+  intros.
+  unfold outputs at 1.
+  rewrite fold_left_app, outputs_acc.
+  reflexivity.
+Qed.
+
+Lemma outputs_cons: forall {t} b l,
+    @outputs t (b :: l) = bk_outputs b ++ outputs l.
+Proof.
+  intros.
+  rewrite list_cons_app, outputs_app; reflexivity.
+Qed.
+
+Lemma In_bk_outputs: forall {t} bid br (b: block t) l,
+    In br (bk_outputs b) ->
+    find_block t l bid = Some b ->
+    In br (outputs l). 
+Proof.
+  induction l as [| ? l IH].
+  - cbn; intros ? abs; inv abs.
+  - intros IN FIND.
+    cbn in FIND.
+    flatten_hyp FIND; inv FIND.
+    + flatten_hyp Heq; inv Heq.
+      rewrite outputs_cons.
+      apply in_or_app; left; auto.
+    + flatten_hyp Heq; inv Heq. 
+      rewrite outputs_cons.
+      apply in_or_app; right.
+      auto.
+Qed.
+ 
+Infix "⊍" := Coqlib.list_disjoint (at level 60).
+
+Definition no_reentrance {t} (ocfg1 ocfg2 : @open_cfg t) : Prop :=
+  outputs ocfg2 ⊍ inputs ocfg1.
+
+Lemma no_reentrance_not_in {t} (ocfg1 ocfg2 : @open_cfg t) :
+  no_reentrance ocfg1 ocfg2 ->
+  forall x, In x (outputs ocfg2) -> ~ In x (inputs ocfg1).
+Proof.
+  intros; eauto using Coqlib.list_disjoint_notin.
+Qed.
+
+Definition independent_flows {t} (ocfg1 ocfg2 : @open_cfg t) : Prop :=
+  no_reentrance ocfg1 ocfg2 /\ 
+  no_reentrance ocfg2 ocfg1.
 
 Lemma find_none_app:
   forall {A} (l1 l2 : list A) pred,
@@ -321,8 +383,8 @@ Proof.
   intros; apply eqit_Ret.
 Qed.
 
-Lemma find_block_not_in: forall b l,
-        ~ In b (bks_labels l) ->
+Lemma find_block_not_in_inputs: forall b l,
+        ~ In b (inputs l) ->
         find_block dtyp l b = None.
 Proof.
   induction l as [| bk l IH]; intros NIN; auto.
@@ -338,57 +400,10 @@ Proof.
     right; auto.
 Qed.
 
-Lemma bks_targets_acc: forall {t} (bks: list (block t)) acc,
-    fold_left (fun acc bk => acc ++ bk_targets bk) bks acc =
-    acc ++ fold_left (fun acc bk => acc ++ bk_targets bk) bks [].
-Proof.
-  induction bks using List.list_rev_ind; intros; cbn.
-  - rewrite app_nil_r; reflexivity.
-  - rewrite 2 fold_left_app, IHbks.
-    cbn.
-    rewrite app_assoc.
-    reflexivity.
-Qed.
-
-Lemma bks_targets_app: forall {t} l l',
-    @bks_targets t (l ++ l') = bks_targets l ++ bks_targets l'.
-Proof.
-  intros.
-  unfold bks_targets at 1.
-  rewrite fold_left_app, bks_targets_acc.
-  reflexivity.
-Qed.
-
-Lemma bks_targets_cons: forall {t} b l,
-    @bks_targets t (b :: l) = bk_targets b ++ bks_targets l.
-Proof.
-  intros.
-  rewrite list_cons_app, bks_targets_app; reflexivity.
-Qed.
-
-Lemma terminator_bks_targets: forall {t} bid br (b: block t) l,
-    In br (terminator_targets (snd (blk_term b))) ->
-    find_block t l bid = Some b ->
-    In br (bks_targets l). 
-Proof.
-  induction l as [| ? l IH].
-  - cbn; intros ? abs; inv abs.
-  - intros IN FIND.
-    cbn in FIND.
-    flatten_hyp FIND; inv FIND.
-    + flatten_hyp Heq; inv Heq.
-      rewrite bks_targets_cons.
-      apply in_or_app; left; auto.
-    + flatten_hyp Heq; inv Heq. 
-      rewrite bks_targets_cons.
-      apply in_or_app; right.
-      auto.
-Qed.
-      
 Lemma denote_bks_app_no_edges :
-  forall l1 l2 fto,
+  forall (l1 l2 : open_cfg) fto,
     find_block dtyp l1 (snd fto) = None ->
-    (forall bk, In bk (bks_targets l2) -> ~ In bk (bks_labels l1)) ->
+    no_reentrance l1 l2 ->
     denote_bks (l1 ++ l2) fto ≈ denote_bks l2 fto.
 Proof.
   intros l1 l2 [f to] FIND NOBACK.
@@ -403,9 +418,10 @@ Proof.
     
     eapply eutt_clo_bind with
         (fun idv idv' => idv = idv' /\
-                      ((exists bid, idv = inl bid /\ In bid (bks_targets l2)) \/
+                      ((exists bid, idv = inl bid /\ In bid (outputs l2)) \/
                        (exists v, idv = inr v))).
     + destruct b; cbn.
+      (* YZ TODO : extract a general lemma to avoid this inlined case analysis on the structure of the terminator? *)
       destruct blk_term, t; cbn;
         unfold raise, Exception.throw, raiseUB;
         try (rewrite translate_vis; einit; estep; intros []).
@@ -425,22 +441,22 @@ Proof.
         try (einit; estep; intros []).
         flatten_goal; cbn; rewrite translate_ret; apply eutt_Ret; split; eauto; left.
         { eexists; split; [ reflexivity |].
-          eapply terminator_bks_targets; cbn; eauto.
+          eapply In_bk_outputs; cbn; eauto.
           cbn; auto.
         }
         { eexists; split; [ reflexivity |].
-          eapply terminator_bks_targets; cbn; eauto.
+          eapply In_bk_outputs; cbn; eauto.
           cbn; auto.
         }
       * rewrite translate_ret; apply eutt_Ret; split; eauto.
         left; eexists; split; [reflexivity |].
-        eapply terminator_bks_targets; cbn; eauto.
+        eapply In_bk_outputs; cbn; eauto.
         cbn; auto.
 
     + intros idov ? (<- & H).
       destruct idov as [id | v]; cbn; apply eutt_Ret; cbn; eauto.
       eapply inl_morphism; split; auto.
-      apply find_block_not_in, NOBACK; cbn.
+      eapply find_block_not_in_inputs,no_reentrance_not_in; eauto. 
       destruct H as [(? & eq & IN) | (v & abs)]; [inv eq | inv abs]; auto.
 
   - apply eutt_Ret; right; auto.
@@ -448,13 +464,12 @@ Qed.
 
 Import ITreeNotations.
 Lemma denote_bks_app :
-  forall l1 l2 fto,
-    (* No edges from l2 to l1 *)
-    (forall bk, In bk (bks_targets l2) -> ~ In bk (bks_labels l1)) ->
-    denote_bks (l1 ++ l2) fto ≈ ITree.bind (denote_bks l1 fto)
+  forall ocfg1 ocfg2 fto,
+    no_reentrance ocfg1 ocfg2 ->
+    denote_bks (ocfg1 ++ ocfg2) fto ≈ ITree.bind (denote_bks ocfg1 fto)
                (fun x =>
                   match x with
-                  | inl fto2 => denote_bks l2 fto2
+                  | inl fto2 => denote_bks ocfg2 fto2
                   | inr v => ret (inr v)
                   end).
 Proof.
@@ -463,7 +478,7 @@ Proof.
   einit.
   ecofix CIH.
   intros [f to].
-  destruct (find_block dtyp l1 to) eqn:FIND.
+  destruct (find_block dtyp ocfg1 to) eqn:FIND.
   - unfold denote_bks.
     unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree.
     match goal with
@@ -472,7 +487,7 @@ Proof.
     rewrite unfold_iter; cbn.
     rewrite FIND.
     rewrite !bind_bind.
-    pose proof find_block_some_app l1 l2 to FIND as FIND_APP.
+    pose proof find_block_some_app ocfg1 ocfg2 to FIND as FIND_APP.
     rewrite FIND_APP.
     cbn.
     rewrite !bind_bind.
@@ -490,7 +505,7 @@ Proof.
       eret.
   - efinal.
     rewrite denote_bks_app_no_edges; auto.
-    rewrite denote_bks_unfold_not_in with (bks := l1); auto.
+    rewrite denote_bks_unfold_not_in with (bks := ocfg1); auto.
     rewrite bind_ret_l; reflexivity.
 Qed.
 
