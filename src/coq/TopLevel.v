@@ -100,8 +100,8 @@ Import D IS.
     map_monad_ initialize_global gs.
 
   Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree L0 unit :=
-    allocate_globals (m_globals CFG) ;;
     allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
+    allocate_globals (m_globals CFG) ;;
     translate _exp_E_to_L0 (initialize_globals (m_globals CFG)).
 
   (** Local environment implementation
