@@ -566,60 +566,21 @@ Ltac bind_ret_r2 :=
                      rewrite <- (bind_ret_r s); subst x
   end.
 
-Definition has_post {E X} (t : itree E X) (Q : X -> Prop) : Prop :=
-  eutt (fun 'x y => x = y /\ Q x) t t.
+(* Could use directly the rel category we formalized in the propt branches *)
+(* Definition conj_rel {A B : Type} (R S: A -> B -> Prop): A -> B -> Prop := *)
+  (* fun a b => R a b /\ S a b. *)
+(* Definition disj_rel {A B : Type} (R S: A -> B -> Prop): A -> B -> Prop := *)
+  (* fun a b => R a b \/ S a b. *)
+Definition equiv_rel {A B : Type} (R S: A -> B -> Prop): Prop :=
+  forall a b, R a b <-> S a b.
+(* Infix "⨇" := conj_rel (at level 85, right associativity). *)
+(* Infix "⨈" := disj_rel (at level 85, right associativity). *)
+Infix "⇔" :=  equiv_rel (at level 85, right associativity).
 
-Lemma eutt_post_bind : forall E R1 R2 RR U Q (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
-    has_post t Q ->
-    (forall u, Q u -> eutt RR (k1 u) (k2 u)) -> eutt RR (ITree.bind t k1) (ITree.bind t k2).
-Proof.
-  intros * POST ?.
-  apply eutt_clo_bind with (UU := fun x y => x = y /\ Q x); [exact POST |].
-  intros ? ? [-> ?]; auto.
-Qed.
-
-Definition conj_rel {A B : Type} (R S: A -> B -> Prop): A -> B -> Prop :=
-  fun a b => R a b /\ S a b.
-Infix "⩕" := conj_rel (at level 85, right associativity).
+Definition equiv_pred {A : Type} (R S: A -> Prop): Prop :=
+  forall a, R a <-> S a.
 
 Require Import Paco.paco.
-
-Lemma eqit_inv_tauL {E R1 R2 RR} b1 t1 t2 :
-  @eqit E R1 R2 RR b1 true (Tau t1) t2 -> eqit RR b1 true t1 t2.
-Proof.
-  intros. punfold H. red in H. simpl in *.
-  remember (TauF t1) as tt1. genobs t2 ot2.
-  hinduction H before b1; intros; try discriminate.
-  - inv Heqtt1. pclearbot. pstep. red. simpobs. econstructor; eauto. pstep_reverse.
-  - inv Heqtt1. punfold_reverse H.
-  - red in IHeqitF. pstep. red; simpobs. econstructor; eauto. pstep_reverse.
-Qed.
-
-From Coq Require Import Morphisms.
-Instance eutt_interp' {E F : Type -> Type} {R : Type} (RR: R -> R -> Prop) (f : E ~> itree F) :
-  Proper (eutt RR ==> eutt RR)
-         (@interp E (itree F) _ _ _ f R).
-Proof.
-  repeat red.
-  einit.
-  ecofix CIH. intros.
-  rewrite !unfold_interp.
-  punfold H0.
-  induction H0; intros; subst; pclearbot; simpl.
-  - estep.
-  - estep.
-  - ebind; econstructor.
-    + reflexivity.
-    + intros; subst.
-      estep.
-      ebase.
-  - rewrite tau_euttge, unfold_interp.
-    eauto.
-  - rewrite tau_euttge, unfold_interp.
-    eauto.
-Qed.
-
-
 Lemma fold_eqitF:
   forall {E R1 R2} (RR: R1 -> R2 -> Prop) b1 b2 (t1 : itree E R1) (t2 : itree E R2) ot1 ot2,
     eqitF RR b1 b2 id (upaco2 (eqit_ RR b1 b2 id) bot2) ot1 ot2 ->
@@ -630,12 +591,12 @@ Proof.
   intros * eq -> ->; pfold; auto.
 Qed.
 
-Require Import Program.Tactics.
+(* Require Import Program.Tactics. *)
 Lemma eutt_conj {E} {R S} {RS RS'} :
   forall (t : itree E R) (s : itree E S),
     eutt RS  t s ->
     eutt RS' t s ->
-    eutt (RS ⩕ RS') t s. 
+    eutt (RS /2\ RS') t s. 
 Proof.
   repeat red.
   einit.
@@ -672,6 +633,141 @@ Proof.
     assert (eutt RS' t t2).
     rewrite <- H; auto.
     punfold H0.
+Qed.
+
+Lemma eutt_disj_l {E} {R S} {RS RS'} :
+  forall (t : itree E R) (s : itree E S),
+    eutt RS t s ->
+    eutt (RS \2/ RS') t s. 
+Proof.
+  intros.
+  eapply eqit_mon with (RR := RS); eauto.
+Qed.
+
+Lemma eutt_disj_r {E} {R S} {RS RS'} :
+  forall (t : itree E R) (s : itree E S),
+    eutt RS' t s ->
+    eutt (RS \2/ RS') t s. 
+Proof.
+  intros.
+  eapply eqit_mon with (RR := RS'); eauto.
+Qed.
+
+Lemma eutt_equiv {E} {R S} {RS RS'} :
+  forall (t : itree E R) (s : itree E S),
+    (RS ⇔ RS') ->
+    eutt RS t s <-> eutt RS' t s. 
+Proof.
+  intros * EQ; split; intros EUTT; eapply eqit_mon; try apply EUTT; eauto.
+  all:apply EQ.
+Qed.
+
+Definition has_post {E X} (t : itree E X) (Q : X -> Prop) : Prop :=
+  eutt (fun 'x _ => Q x) t t.
+
+(* Note: the following definition is equivalent. To figure out what's more convenient to work with *)
+Definition has_post_strong {E X} (t : itree E X) (Q : X -> Prop) : Prop :=
+  eutt (fun 'x y => x = y /\ Q x) t t.
+
+Lemma has_post_post_strong : forall {E X} (t : itree E X) Q,
+    has_post t Q <-> has_post_strong t Q.
+Proof.
+  intros; split; intros HP.
+  - apply eutt_conj; [reflexivity | auto].
+  - eapply eqit_mon; eauto.
+    intros * H; apply H.
+Qed.
+
+From Coq Require Import Morphisms.
+Lemma has_post_equiv {E X} (t : itree E X) : Proper (equiv_pred ==> iff) (has_post t).
+Proof.
+  repeat red; intros * EQ *; split; intros HP; eapply eutt_equiv; eauto.
+  all:split; apply EQ.
+Qed.
+
+Notation "t ⤳ Q" := (has_post t Q) (at level 50).
+
+Lemma has_post_conj : forall {E X} (t : itree E X) P Q,
+    t ⤳ P ->
+    t ⤳ Q ->
+    t ⤳ (P /1\ Q).
+Proof.
+  intros * HP HQ.
+  pose proof eutt_conj HP HQ.
+  auto.
+Qed.     
+
+Lemma has_post_disj_l : forall {E X} (t : itree E X) P Q,
+    t ⤳ P ->
+    t ⤳ (P \1/ Q).
+Proof.
+  intros * HP.
+  epose proof eutt_disj_l HP as H.
+  apply H.
+Qed.     
+
+Lemma has_post_disj_r : forall {E X} (t : itree E X) P Q,
+    t ⤳ Q ->
+    t ⤳ (P \1/ Q).
+Proof.
+  intros * HQ.
+  epose proof eutt_disj_r HQ as H.
+  apply H.
+Qed.     
+
+Lemma eutt_post_bind : forall E R1 R2 RR U Q (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
+    t ⤳ Q ->
+    (forall u, Q u -> eutt RR (k1 u) (k2 u)) -> eutt RR (ITree.bind t k1) (ITree.bind t k2).
+Proof.
+  intros * POST ?.
+  apply eutt_clo_bind with (UU := fun x y => x = y /\ Q x); [apply has_post_post_strong; exact POST |].
+  intros ? ? [-> ?]; auto.
+Qed.
+
+(* Lemma eutt_post_bind_l : *)
+(*   forall E R1 R2 RR U1 Q1 (t1: itree E U1) (k1: U1 -> itree E R1) (t2: itree E R2), *)
+(*     t1 ⤳ Q1 -> *)
+(*     (forall u1, Q1 u1 -> eutt RR (k1 u1) t2) -> *)
+(*     eutt RR (ITree.bind t1 k1) t2. *)
+(* Proof. *)
+(*   intros * POST ?. *)
+(*   apply eutt_clo_bind with (UU := fun x y => x = y /\ Q x); [apply has_post_post_strong; exact POST |]. *)
+(*   intros ? ? [-> ?]; auto. *)
+(* Qed. *)
+
+
+Lemma eqit_inv_tauL {E R1 R2 RR} b1 t1 t2 :
+  @eqit E R1 R2 RR b1 true (Tau t1) t2 -> eqit RR b1 true t1 t2.
+Proof.
+  intros. punfold H. red in H. simpl in *.
+  remember (TauF t1) as tt1. genobs t2 ot2.
+  hinduction H before b1; intros; try discriminate.
+  - inv Heqtt1. pclearbot. pstep. red. simpobs. econstructor; eauto. pstep_reverse.
+  - inv Heqtt1. punfold_reverse H.
+  - red in IHeqitF. pstep. red; simpobs. econstructor; eauto. pstep_reverse.
+Qed.
+
+Instance eutt_interp' {E F : Type -> Type} {R : Type} (RR: R -> R -> Prop) (f : E ~> itree F) :
+  Proper (eutt RR ==> eutt RR)
+         (@interp E (itree F) _ _ _ f R).
+Proof.
+  repeat red.
+  einit.
+  ecofix CIH. intros.
+  rewrite !unfold_interp.
+  punfold H0.
+  induction H0; intros; subst; pclearbot; simpl.
+  - estep.
+  - estep.
+  - ebind; econstructor.
+    + reflexivity.
+    + intros; subst.
+      estep.
+      ebase.
+  - rewrite tau_euttge, unfold_interp.
+    eauto.
+  - rewrite tau_euttge, unfold_interp.
+    eauto.
 Qed.
 
 Lemma denote_bks_flow_left :
