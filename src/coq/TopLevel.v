@@ -90,7 +90,7 @@ Import D IS.
     end.
 
   Definition allocate_declaration (d:declaration dtyp) : itree L0 unit :=
-    match List.find (fun x => function_name_eq (dc_name d) (dc_name (fst x))) defined_intrinsics with
+    match List.find (fun x => function_name_eq (dc_name d) (dc_name x)) defined_intrinsics_decls with
     | Some _ => Ret tt (* Don't allocate pointers for LLVM intrinsics declarations *)
     | None =>
       'v <- trigger (Alloca DTYPE_Pointer);;
