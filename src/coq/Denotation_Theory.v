@@ -723,16 +723,34 @@ Proof.
   intros ? ? [-> ?]; auto.
 Qed.
 
-(* Lemma eutt_post_bind_l : *)
-(*   forall E R1 R2 RR U1 Q1 (t1: itree E U1) (k1: U1 -> itree E R1) (t2: itree E R2), *)
-(*     t1 ⤳ Q1 -> *)
-(*     (forall u1, Q1 u1 -> eutt RR (k1 u1) t2) -> *)
-(*     eutt RR (ITree.bind t1 k1) t2. *)
-(* Proof. *)
-(*   intros * POST ?. *)
-(*   apply eutt_clo_bind with (UU := fun x y => x = y /\ Q x); [apply has_post_post_strong; exact POST |]. *)
-(*   intros ? ? [-> ?]; auto. *)
-(* Qed. *)
+Lemma eutt_post_bind_gen :
+  forall E R1 R2 RR U1 U2 Q1 Q2
+    (t1 : itree E U1) (k1: U1 -> itree E R1) (t2 : itree E U2) (k2 : U2 -> itree E R2),
+    t1 ⤳ Q1 ->
+    t2 ⤳ Q2 ->
+    (forall u1 u2, Q1 u1 -> Q2 u2 -> eutt RR (k1 u1) (k2 u2)) ->
+    eutt RR (ITree.bind t1 k1) (ITree.bind t2 k2).
+Proof.
+  intros * POST1 POST2 ?.
+  apply eutt_clo_bind with (UU := fun x y => Q1 x /\ Q2 y).
+  2: intros ? ? []; apply H; auto.
+  clear H.
+  admit.
+  (* How to combine this? *)
+Admitted.
+
+Definition exits_in_outputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
+  fun res =>
+    match res with
+    | inl (_,to) => In to (@outputs t ocfg)
+    | _ => True
+    end.
+
+Lemma denote_bks_exits_in_outputs :
+  forall ocfg fto,
+    In (snd fto) (inputs ocfg) ->
+    denote_bks ocfg fto ⤳ exits_in_outputs ocfg.
+Admitted.
 
 Lemma denote_bks_flow_left :
   forall ocfg1 ocfg2 fto,
@@ -745,18 +763,14 @@ Proof.
   rewrite denote_bks_app; [| auto using independent_flows_no_reentrance_l].
   bind_ret_r2.
 
-  (* |- t {Q} ~~ |- eutt (fun '(x,y) => x = y /\ Q x) t t *)
-
-  apply eutt_eq_bind; intros [[f to] | ?]; [| reflexivity].
+  eapply eutt_post_bind; [apply denote_bks_exits_in_outputs; eauto |].
+  intros [[f to] | ?] EXIT; [| reflexivity].
   rewrite denote_bks_unfold_not_in; [reflexivity |].
+  cbn in *.
   apply find_block_not_in_inputs.
-  (* I need to know that [to] is in the outputs of ocfg1.
-     That's always true, but I'm not sure what's the right way to phrase it.
-     More generally, I want to prove a postcondition of a tree. What is the general
-     way to state it so that it can be used in the midst of any simulation?
-   *)
-  admit.
-Admitted.
+  eapply no_reentrance_not_in; eauto.
+  apply INDEP.
+Qed.
 
 Lemma denote_bks_flow_right :
   forall ocfg1 ocfg2 fto,
