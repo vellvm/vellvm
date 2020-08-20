@@ -23,6 +23,8 @@ From Vellvm Require Import
      Tactics
      Traversal.
 
+Remove Hints Eqv.EqvWF_Build : typeclass_instances.
+
 Set Implicit Arguments.
 Set Strict Implicit.
 
@@ -564,6 +566,114 @@ Ltac bind_ret_r2 :=
                      rewrite <- (bind_ret_r s); subst x
   end.
 
+Definition has_post {E X} (t : itree E X) (Q : X -> Prop) : Prop :=
+  eutt (fun 'x y => x = y /\ Q x) t t.
+
+Lemma eutt_post_bind : forall E R1 R2 RR U Q (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
+    has_post t Q ->
+    (forall u, Q u -> eutt RR (k1 u) (k2 u)) -> eutt RR (ITree.bind t k1) (ITree.bind t k2).
+Proof.
+  intros * POST ?.
+  apply eutt_clo_bind with (UU := fun x y => x = y /\ Q x); [exact POST |].
+  intros ? ? [-> ?]; auto.
+Qed.
+
+Definition conj_rel {A B : Type} (R S: A -> B -> Prop): A -> B -> Prop :=
+  fun a b => R a b /\ S a b.
+Infix "⩕" := conj_rel (at level 85, right associativity).
+
+Require Import Paco.paco.
+
+Lemma eqit_inv_tauL {E R1 R2 RR} b1 t1 t2 :
+  @eqit E R1 R2 RR b1 true (Tau t1) t2 -> eqit RR b1 true t1 t2.
+Proof.
+  intros. punfold H. red in H. simpl in *.
+  remember (TauF t1) as tt1. genobs t2 ot2.
+  hinduction H before b1; intros; try discriminate.
+  - inv Heqtt1. pclearbot. pstep. red. simpobs. econstructor; eauto. pstep_reverse.
+  - inv Heqtt1. punfold_reverse H.
+  - red in IHeqitF. pstep. red; simpobs. econstructor; eauto. pstep_reverse.
+Qed.
+
+From Coq Require Import Morphisms.
+Instance eutt_interp' {E F : Type -> Type} {R : Type} (RR: R -> R -> Prop) (f : E ~> itree F) :
+  Proper (eutt RR ==> eutt RR)
+         (@interp E (itree F) _ _ _ f R).
+Proof.
+  repeat red.
+  einit.
+  ecofix CIH. intros.
+  rewrite !unfold_interp.
+  punfold H0.
+  induction H0; intros; subst; pclearbot; simpl.
+  - estep.
+  - estep.
+  - ebind; econstructor.
+    + reflexivity.
+    + intros; subst.
+      estep.
+      ebase.
+  - rewrite tau_euttge, unfold_interp.
+    eauto.
+  - rewrite tau_euttge, unfold_interp.
+    eauto.
+Qed.
+
+
+Lemma fold_eqitF:
+  forall {E R1 R2} (RR: R1 -> R2 -> Prop) b1 b2 (t1 : itree E R1) (t2 : itree E R2) ot1 ot2,
+    eqitF RR b1 b2 id (upaco2 (eqit_ RR b1 b2 id) bot2) ot1 ot2 ->
+    ot1 = observe t1 ->
+    ot2 = observe t2 ->
+    eqit RR b1 b2 t1 t2.
+Proof.
+  intros * eq -> ->; pfold; auto.
+Qed.
+
+Require Import Program.Tactics.
+Lemma eutt_conj {E} {R S} {RS RS'} :
+  forall (t : itree E R) (s : itree E S),
+    eutt RS  t s ->
+    eutt RS' t s ->
+    eutt (RS ⩕ RS') t s. 
+Proof.
+  repeat red.
+  einit.
+  ecofix CIH; intros * EQ EQ'.
+  rewrite itree_eta, (itree_eta s).
+  punfold EQ; punfold EQ'; red in EQ; red in EQ'.
+  genobs t ot; genobs s os.
+  hinduction EQ before CIH0; subst; intros; pclearbot; simpl.
+
+  - estep; split; auto.
+    inv EQ'; auto.
+  - estep; ebase; right; eapply CIH; eauto.
+    rewrite <- tau_eutt.
+    rewrite <- (tau_eutt m2); auto.
+  - estep; ebase; intros ?; right; eapply CIH0; eauto.
+    eapply eqit_Vis; eauto.
+  - eapply fold_eqitF in EQ'; eauto.
+    assert (t ≈ Tau t1) by (rewrite itree_eta, <- Heqot; reflexivity).
+    rewrite H in EQ'.
+    apply eqit_inv_tauL in EQ'.
+    subst; specialize (IHEQ _ _ eq_refl eq_refl).
+    punfold EQ'; red in EQ'.
+    specialize (IHEQ EQ').
+    rewrite eqit_tauL; [|reflexivity].
+    rewrite (itree_eta t1).
+    eapply IHEQ. 
+  - subst; cbn.
+    rewrite tau_euttge.
+    rewrite (itree_eta t2); eapply IHEQ; eauto.
+    eapply fold_eqitF in EQ'; eauto.
+    assert (s ≈ Tau t2).
+    rewrite (itree_eta s), <- Heqos; reflexivity.
+    rewrite tau_eutt in H.
+    assert (eutt RS' t t2).
+    rewrite <- H; auto.
+    punfold H0.
+Qed.
+
 Lemma denote_bks_flow_left :
   forall ocfg1 ocfg2 fto,
     independent_flows ocfg1 ocfg2 ->
@@ -573,12 +683,17 @@ Lemma denote_bks_flow_left :
 Proof.
   intros * INDEP IN.
   rewrite denote_bks_app; [| auto using independent_flows_no_reentrance_l].
-  bind_ret_r2. 
+  bind_ret_r2.
+
+  (* |- t {Q} ~~ |- eutt (fun '(x,y) => x = y /\ Q x) t t *)
+
   apply eutt_eq_bind; intros [[f to] | ?]; [| reflexivity].
   rewrite denote_bks_unfold_not_in; [reflexivity |].
   apply find_block_not_in_inputs.
   (* I need to know that [to] is in the outputs of ocfg1.
-     That's always true, but I'm not sure what's the right way to phrase it
+     That's always true, but I'm not sure what's the right way to phrase it.
+     More generally, I want to prove a postcondition of a tree. What is the general
+     way to state it so that it can be used in the midst of any simulation?
    *)
   admit.
 Admitted.
