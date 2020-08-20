@@ -179,6 +179,15 @@ Proof.
   apply eutt_eq_bind; intros ?; apply POST.
 Qed.
 
+Lemma has_post_bind_strong : forall {E X Y} (t : itree E X) (k : X -> itree E Y) S Q,
+    t ⤳ S ->
+    (forall x, S x -> k x ⤳ Q) ->
+    ITree.bind t k ⤳ Q.
+Proof.
+  intros * POST1 POST2.
+  eapply eutt_post_bind; eauto.
+Qed.
+
 Lemma eutt_post_bind_gen :
   forall E R1 R2 RR S1 S2 SS Q1 Q2
     (t1 : itree E S1) (k1: S1 -> itree E R1) (t2 : itree E S2) (k2 : S2 -> itree E R2),
