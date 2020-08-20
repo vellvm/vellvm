@@ -77,11 +77,25 @@ Import D IS.
   Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
     map_monad_ allocate_global gs.
 
+  Require Import Coq.Lists.ListSet.
   (* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
+
+  (* Returns `true` only if both function are named and have
+     the same name.
+   *)
+  Definition function_name_eq (a b:function_id) : bool :=
+    match a, b with
+    | Name aname, Name bname => eqb aname bname
+    | _, _ => false
+    end.
+
   Definition allocate_declaration (d:declaration dtyp) : itree L0 unit :=
-    (* SAZ TODO:  Don't allocate pointers for LLVM intrinsics declarations *)
-    'v <- trigger (Alloca DTYPE_Pointer);;
-    trigger (GlobalWrite (dc_name d) v).
+    match List.find (fun x => function_name_eq (dc_name d) (dc_name (fst x))) defined_intrinsics with
+    | Some _ => Ret tt (* Don't allocate pointers for LLVM intrinsics declarations *)
+    | None =>
+      'v <- trigger (Alloca DTYPE_Pointer);;
+      trigger (GlobalWrite (dc_name d) v)
+    end.
 
   Definition allocate_declarations (ds:list (declaration dtyp)) : itree L0 unit :=
     map_monad_ allocate_declaration ds.
