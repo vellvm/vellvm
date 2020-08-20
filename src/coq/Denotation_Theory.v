@@ -591,7 +591,6 @@ Proof.
   intros * eq -> ->; pfold; auto.
 Qed.
 
-(* Require Import Program.Tactics. *)
 Lemma eutt_conj {E} {R S} {RS RS'} :
   forall (t : itree E R) (s : itree E S),
     eutt RS  t s ->
@@ -734,41 +733,6 @@ Qed.
 (*   apply eutt_clo_bind with (UU := fun x y => x = y /\ Q x); [apply has_post_post_strong; exact POST |]. *)
 (*   intros ? ? [-> ?]; auto. *)
 (* Qed. *)
-
-
-Lemma eqit_inv_tauL {E R1 R2 RR} b1 t1 t2 :
-  @eqit E R1 R2 RR b1 true (Tau t1) t2 -> eqit RR b1 true t1 t2.
-Proof.
-  intros. punfold H. red in H. simpl in *.
-  remember (TauF t1) as tt1. genobs t2 ot2.
-  hinduction H before b1; intros; try discriminate.
-  - inv Heqtt1. pclearbot. pstep. red. simpobs. econstructor; eauto. pstep_reverse.
-  - inv Heqtt1. punfold_reverse H.
-  - red in IHeqitF. pstep. red; simpobs. econstructor; eauto. pstep_reverse.
-Qed.
-
-Instance eutt_interp' {E F : Type -> Type} {R : Type} (RR: R -> R -> Prop) (f : E ~> itree F) :
-  Proper (eutt RR ==> eutt RR)
-         (@interp E (itree F) _ _ _ f R).
-Proof.
-  repeat red.
-  einit.
-  ecofix CIH. intros.
-  rewrite !unfold_interp.
-  punfold H0.
-  induction H0; intros; subst; pclearbot; simpl.
-  - estep.
-  - estep.
-  - ebind; econstructor.
-    + reflexivity.
-    + intros; subst.
-      estep.
-      ebase.
-  - rewrite tau_euttge, unfold_interp.
-    eauto.
-  - rewrite tau_euttge, unfold_interp.
-    eauto.
-Qed.
 
 Lemma denote_bks_flow_left :
   forall ocfg1 ocfg2 fto,
