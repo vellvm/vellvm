@@ -502,15 +502,9 @@ Lemma find_block_in_inputs : forall {to ocfg},
     In to (inputs ocfg) ->
     exists bk, find_block dtyp ocfg to = Some bk.
 Proof.
-  intros * IN.
-Admitted.
-
-Lemma In_outputs_bk_bks : forall id id' (bk : block _) (ocfg : open_cfg),
-    find_block dtyp ocfg id' = Some bk ->
-    In id (bk_outputs bk) ->
-    In id (outputs ocfg).
-Proof.
-Admitted.
+  induction ocfg as [| id ocfg IH]; cbn; intros IN; [inv IN |].
+  flatten_goal; flatten_hyp Heq; intuition; eauto.
+Qed.
 
 (* YZ TODO: This proof needs to be simplified by proving an analogous to [eutt_iter_gen]
    specialized to postconditions and [denote_bks] *)
@@ -526,9 +520,9 @@ Proof.
   rewrite denote_bks_unfold_in; eauto.
   apply eutt_post_bind with (Q := fun x => match x with | inl id => In id (outputs ocfg) | _ => True end).
   - eapply has_post_weaken; [apply denote_bk_exits_in_outputs |].
-    intros []; auto.
+    intros [] ?; auto.
     cbn in *.
-    eapply In_outputs_bk_bks; eauto.
+    eapply In_bk_outputs; eauto.
   - intros [id | v] ?. 
     + unfold denote_bks.
       eapply (@KTreeFacts.eutt_iter_gen _ _ _ (fun x y => x = y /\ exits_in_outputs ocfg (inl x))); eauto.
