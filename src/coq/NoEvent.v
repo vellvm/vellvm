@@ -1,7 +1,12 @@
 (* begin hide *)
+From Coq Require Import
+     RelationClasses
+     Morphisms.
+
 From Paco Require Import paco.
 From ITree Require Import
      ITree
+     ITreeFacts
      Eq.Eq.
 Set Implicit Arguments.
 Set Strict Implicit.
@@ -20,28 +25,249 @@ Set Strict Implicit.
 (* Note : Need to state/prove the monotony of the functors to reason about their paco *)
 
 (* The left part of the signature is absent *)
-Variant no_event_lF {E F X} (R: itree (E +' F) X -> Prop): itree (E +' F) X -> Prop :=
-| no_event_l_ret: forall (x: X), no_event_lF R (Ret x)
-| no_event_l_tau: forall t, R t -> no_event_lF R (Tau t)
-| no_event_l_vis: forall {Y} (e: F Y) k, (forall x, R (k x)) -> no_event_lF R (Vis (inr1 e) k).
-Definition no_event_l {E F X} := paco1 (@no_event_lF E F X) bot1. 
+Variant no_event_lF {E F X} (R: itree (E +' F) X -> Prop) : itree' (E +' F) X -> Prop :=
+| no_event_l_ret: forall (x: X), no_event_lF R (RetF x)
+| no_event_l_tau: forall t, R t -> no_event_lF R (TauF t)
+| no_event_l_vis: forall {Y} (e: F Y) k, (forall x, R (k x)) -> no_event_lF R (VisF (inr1 e) k).
+Hint Constructors no_event_lF : core.
+
+Lemma no_event_lF_mono : forall {E F X} (R1 R2 : itree (E +' F) X -> Prop) (LE : R1 <1= R2),
+    no_event_lF R1 <1= no_event_lF R2.
+Proof.
+  intros.
+  induction PR; auto.
+Qed.  
+
+Definition no_event_lF_ {E F X} R (t : itree (E +' F) X) := no_event_lF R (observe t).
+Hint Unfold no_event_lF_ : core.
+
+Lemma no_event_lF__mono : forall E F X, (monotone1 (@no_event_lF_ E F X)).
+Proof.
+  do 2 red.
+  intros.
+  eapply no_event_lF_mono; eauto.
+Qed.  
+
+Hint Resolve no_event_lF_mono : paco.
+  
+Definition no_event_l {E F X} := paco1 (@no_event_lF_ E F X) bot1. 
+
+Instance Proper_no_event_l {E F X} : Proper (eutt eq ==> iff) (@no_event_l E F X).
+Proof.
+  do 2 red.
+  repeat red. intros. split; intros.
+  - revert x y H H0.
+    pcofix CIH.
+    intros x y H0 H1. 
+    + punfold H0. red in H0.
+      punfold H1. red in H1.
+      genobs x ox.
+      genobs y oy.
+      pstep. red.
+      revert x Heqox y Heqoy.
+      induction H0; inversion H1; intros; subst.
+      * rewrite <- Heqoy. econstructor.
+      * rewrite <- Heqoy. econstructor. pclearbot. right. eapply CIH. 2:  { apply H0. }  apply REL.
+      * rewrite <- Heqoy. destruct e. inversion H1. econstructor. intros.
+        specialize (REL x0). red in REL. pclearbot. right. eapply CIH. apply REL.
+        apply inj_pair2 in H3. rewrite <- H3. specialize (H0 x0). apply H0.
+      * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
+      * rewrite <- Heqoy. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. apply Heqox. reflexivity.
+      * rewrite <- Heqoy. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. assumption. apply Heqox. reflexivity.
+      * rewrite <- Heqoy. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. intros. apply H. apply Heqox. reflexivity.
+  - revert x y H H0.
+    pcofix CIH.
+    intros x y H0 H1. 
+    + punfold H0. red in H0.
+      punfold H1. red in H1.
+      genobs x ox.
+      genobs y oy.
+      pstep. red.
+      revert x Heqox y Heqoy.
+      induction H0; inversion H1; intros; subst.
+      * rewrite <- Heqox. econstructor.
+      * rewrite <- Heqox. econstructor. pclearbot. right. eapply CIH. 2:  { apply H0. }  apply REL.
+      * rewrite <- Heqox. destruct e. inversion H1. econstructor. intros.
+        specialize (REL x0). red in REL. pclearbot. right. eapply CIH. apply REL.
+        apply inj_pair2 in H3. rewrite <- H3. specialize (H0 x0). apply H0.
+      * rewrite <- Heqox. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. reflexivity. apply Heqoy. 
+      * rewrite <- Heqox. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. assumption. reflexivity. apply Heqoy.
+      * rewrite <- Heqox. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. intros. apply H. reflexivity. apply Heqoy.
+      * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
+Qed.    
+  
 
 (* The right part of the signature is absent *)
-Variant no_event_rF {E F X} (R: itree (E +' F) X -> Prop): itree (E +' F) X -> Prop :=
-| no_event_r_ret: forall (x: X), no_event_rF R (Ret x)
-| no_event_r_tau: forall t, R t -> no_event_rF R (Tau t)
-| no_event_r_vis: forall {Y} (e: E Y) k, (forall x, R (k x)) -> no_event_rF R (Vis (inl1 e) k).
-Definition no_event_r {E F X} := paco1 (@no_event_rF E F X) bot1. 
+Variant no_event_rF {E F X} (R: itree (E +' F) X -> Prop): itree' (E +' F) X -> Prop :=
+| no_event_r_ret: forall (x: X), no_event_rF R (RetF x)
+| no_event_r_tau: forall t, R t -> no_event_rF R (TauF t)
+| no_event_r_vis: forall {Y} (e: E Y) k, (forall x, R (k x)) -> no_event_rF R (VisF (inl1 e) k).
+
+Hint Constructors no_event_rF : core.
+
+Lemma no_event_rF_mono : forall {E F X} (R1 R2 : itree (E +' F) X -> Prop) (LE : R1 <1= R2),
+    no_event_rF R1 <1= no_event_rF R2.
+Proof.
+  intros.
+  induction PR; auto.
+Qed.  
+
+Definition no_event_rF_ {E F X} R (t : itree (E +' F) X) := no_event_rF R (observe t).
+Hint Unfold no_event_rF_ : core.
+
+Lemma no_event_rF__mono : forall E F X, (monotone1 (@no_event_rF_ E F X)).
+Proof.
+  do 2 red.
+  intros.
+  eapply no_event_rF_mono; eauto.
+Qed.  
+
+Hint Resolve no_event_rF_mono : paco.
+
+Definition no_event_r {E F X} := paco1 (@no_event_rF_ E F X) bot1. 
+
+Instance Proper_no_event_r {E F X} : Proper (eutt eq ==> iff) (@no_event_r E F X).
+Proof.
+  do 2 red.
+  repeat red. intros. split; intros.
+  - revert x y H H0.
+    pcofix CIH.
+    intros x y H0 H1. 
+    + punfold H0. red in H0.
+      punfold H1. red in H1.
+      genobs x ox.
+      genobs y oy.
+      pstep. red.
+      revert x Heqox y Heqoy.
+      induction H0; inversion H1; intros; subst.
+      * rewrite <- Heqoy. econstructor.
+      * rewrite <- Heqoy. econstructor. pclearbot. right. eapply CIH. 2:  { apply H0. }  apply REL.
+      * rewrite <- Heqoy. destruct e. econstructor. intros.
+        specialize (REL x0). red in REL. pclearbot. right. eapply CIH. apply REL.
+        apply inj_pair2 in H3. rewrite <- H3. specialize (H0 x0). apply H0.
+        inversion H1.
+      * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
+      * rewrite <- Heqoy. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. apply Heqox. reflexivity.
+      * rewrite <- Heqoy. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. assumption. apply Heqox. reflexivity.
+      * rewrite <- Heqoy. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. intros. apply H. apply Heqox. reflexivity.
+  - revert x y H H0.
+    pcofix CIH.
+    intros x y H0 H1. 
+    + punfold H0. red in H0.
+      punfold H1. red in H1.
+      genobs x ox.
+      genobs y oy.
+      pstep. red.
+      revert x Heqox y Heqoy.
+      induction H0; inversion H1; intros; subst.
+      * rewrite <- Heqox. econstructor.
+      * rewrite <- Heqox. econstructor. pclearbot. right. eapply CIH. 2:  { apply H0. }  apply REL.
+      * rewrite <- Heqox. destruct e. econstructor. intros.
+        specialize (REL x0). red in REL. pclearbot. right. eapply CIH. apply REL.
+        apply inj_pair2 in H3. rewrite <- H3. specialize (H0 x0). apply H0.
+        inversion H1. 
+      * rewrite <- Heqox. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. reflexivity. apply Heqoy. 
+      * rewrite <- Heqox. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. assumption. reflexivity. apply Heqoy.
+      * rewrite <- Heqox. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. intros. apply H. reflexivity. apply Heqoy.
+      * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
+Qed.    
+
 
 (* The tree contains no event *)
-Variant no_eventF {E X} (R: itree E X -> Prop): itree E X -> Prop :=
-| no_event_ret: forall (x: X), no_eventF R (Ret x)
-| no_event_tau: forall t, R t -> no_eventF R (Tau t).
-Definition no_event {E X} := paco1 (@no_eventF E X) bot1. 
+Variant no_eventF {E X} (R: itree E X -> Prop): itree' E X -> Prop :=
+| no_event_ret: forall (x: X), no_eventF R (RetF x)
+| no_event_tau: forall t, R t -> no_eventF R (TauF t).
+
+Hint Constructors no_eventF : core.
+
+Lemma no_eventF_mono : forall {E X} (R1 R2 : itree E X -> Prop) (LE : R1 <1= R2),
+    no_eventF R1 <1= no_eventF R2.
+Proof.
+  intros.
+  induction PR; auto.
+Qed.  
+
+Definition no_eventF_ {E X} R (t : itree E X) := no_eventF R (observe t).
+Hint Unfold no_eventF_ : core.
+
+Lemma no_eventF__mono : forall E X, (monotone1 (@no_eventF_ E X)).
+Proof.
+  do 2 red.
+  intros.
+  eapply no_eventF_mono; eauto.
+Qed.  
+
+Hint Resolve no_eventF_mono : paco.
+
+Definition no_event {E X} := paco1 (@no_eventF_ E X) bot1. 
+
+Instance Proper_no_event {E X} : Proper (eutt eq ==> iff) (@no_event E X).
+Proof.
+  do 2 red.
+  repeat red. intros. split; intros.
+  - revert x y H H0.
+    pcofix CIH.
+    intros x y H0 H1. 
+    + punfold H0. red in H0.
+      punfold H1. red in H1.
+      genobs x ox.
+      genobs y oy.
+      pstep. red.
+      revert x Heqox y Heqoy.
+      induction H0; inversion H1; intros; subst.
+      * rewrite <- Heqoy. econstructor.
+      * rewrite <- Heqoy. econstructor. pclearbot. right. eapply CIH. 2:  { apply H0. }  apply REL.
+      * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
+      * rewrite <- Heqoy. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. apply Heqox. reflexivity.
+      * rewrite <- Heqoy. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. assumption. apply Heqox. reflexivity.
+  - revert x y H H0.
+    pcofix CIH.
+    intros x y H0 H1. 
+    + punfold H0. red in H0.
+      punfold H1. red in H1.
+      genobs x ox.
+      genobs y oy.
+      pstep. red.
+      revert x Heqox y Heqoy.
+      induction H0; inversion H1; intros; subst.
+      * rewrite <- Heqox. econstructor.
+      * rewrite <- Heqox. econstructor. pclearbot. right. eapply CIH. 2:  { apply H0. }  apply REL.
+      * rewrite <- Heqox. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. reflexivity. apply Heqoy. 
+      * rewrite <- Heqox. econstructor. left.
+        pstep. red. eapply IHeqitF. econstructor. assumption. reflexivity. apply Heqoy.
+      * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
+Qed.    
+
 
 (* Sanity check, trees with empty signature should have no event *)
 Lemma no_event_empty {X} : forall (t: itree void1 X), no_event t.
-Admitted.
+Proof.
+  pcofix CIH.
+  intros t.
+  pstep.
+  red.
+  genobs t obt.
+  destruct obt.
+  - econstructor.
+  - econstructor. right. apply CIH.
+  - inversion e.
+Qed.    
+  
 
 (** * Signature elimination
   In order to eliminate a signature from the type,
@@ -80,20 +306,66 @@ Definition elim   {E}  : itree E        ~> itree void1 := interp helim.
 Lemma no_event_elim_l :
   forall {E F X} (t : itree (E +' F) X),
     no_event_l t ->
-    forall h, elim_l t ≈ interp h t.
-Admitted.
+    forall (h : E ~> itree F) , elim_l t  ≈ interp (case_ h (id_ F)) t.
+Proof.
+  intros E F X.
+  unfold elim_l.
+  intros t H h.
+  revert t H.
+  einit.
+  ecofix CIH.
+  intros.
+  rewrite (itree_eta t).
+  pinversion H0.
+  - rewrite interp_ret. rewrite interp_ret. reflexivity.
+  - rewrite interp_tau. rewrite interp_tau. estep.
+  - rewrite interp_vis. rewrite interp_vis. cbn.
+    unfold id_. unfold Id_Handler, Handler.id_.
+    ebind. econstructor. reflexivity.
+    intros. subst. estep.
+    ebase. right. eapply CIH. apply H1.
+Qed.
 
 Lemma no_event_elim_r :
   forall {E F X} (t : itree (E +' F) X),
     no_event_r t ->
-    forall h, elim_r t ≈ interp h t.
-Admitted.
+    forall (h : F ~> itree E), elim_r t ≈ interp (case_ (id_ E) h) t.
+Proof.
+  intros E F X.
+  unfold elim_r.
+  intros t H h.
+  revert t H.
+  einit.
+  ecofix CIH.
+  intros.
+  rewrite (itree_eta t).
+  pinversion H0.
+  - rewrite interp_ret. rewrite interp_ret. reflexivity.
+  - rewrite interp_tau. rewrite interp_tau. estep.
+  - rewrite interp_vis. rewrite interp_vis. cbn.
+    unfold id_. unfold Id_Handler, Handler.id_.
+    ebind. econstructor. reflexivity.
+    intros. subst. estep.
+    ebase. right. eapply CIH. apply H1.
+Qed.
 
 Lemma no_event_elim :
   forall {E X} (t : itree E X),
     no_event t ->
     forall h, elim t ≈ interp h t.
-Admitted.
+Proof.
+  intros E X.
+  unfold elim.
+  intros t H h.
+  revert t H.
+  einit.
+  ecofix CIH.
+  intros.
+  rewrite (itree_eta t).
+  pinversion H0.
+  - rewrite interp_ret. rewrite interp_ret. reflexivity.
+  - rewrite interp_tau. rewrite interp_tau. estep.
+Qed.
 
 (** By expressing that [elim] is an inverse to the signature injection: *)
 
