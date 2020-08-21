@@ -98,6 +98,8 @@ clean-vellvm:
 	rm -f .depend
 	find $(COQDIR) -name "*.vo" -delete
 	find $(COQDIR) -name "*.vio" -delete
+	find $(COQDIR) -name "*.vok" -delete
+	find $(COQDIR) -name "*.vos" -delete
 	rm -f $(VOFILES)
 	rm -rf doc/html doc/*.glob
 	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
