@@ -21,7 +21,8 @@ From Vellvm Require Import
      LLVMEvents
      TopLevel
      Tactics
-     Traversal.
+     Traversal
+     PostConditions.
 
 Remove Hints Eqv.EqvWF_Build : typeclass_instances.
 
@@ -35,7 +36,7 @@ Import Eq.
 
 Import MonadNotation.
 Open Scope monad_scope.
-
+Open Scope itree.
 
 (* end hide *)
 
@@ -51,6 +52,78 @@ In particular, notice that since [interp] is a iterative-monad morphism that res
 [eutt eq], these equations get transported at all levels of interpretations.
 
 *)
+
+(** [find_block] *)
+
+Lemma find_block_nil: forall {T} b, find_block T [] b = None. 
+Proof.
+  reflexivity.
+Qed.
+
+Lemma find_block_eq: forall {T} x b bs,
+    blk_id b = x ->
+    find_block T (b:: bs) x = Some b.
+Proof.
+  intros; cbn.
+  rewrite H.
+  destruct (Eqv.eqv_dec_p x x).
+  reflexivity.
+  contradiction n; reflexivity.
+Qed.
+
+Lemma find_block_ineq: forall {T} x b bs,
+    blk_id b <> x ->
+    find_block T (b::bs) x = find_block T bs x. 
+Proof.
+  intros; cbn.
+  destruct (Eqv.eqv_dec_p (blk_id b)) as [EQ | INEQ].
+  unfold Eqv.eqv, AstLib.eqv_raw_id in *; intuition.
+  reflexivity.
+Qed.
+
+Lemma find_none_app:
+  forall {A} (l1 l2 : list A) pred,
+    find pred l1 = None ->
+    find pred (l1 ++ l2) = find pred l2.
+Proof.
+  induction l1; intros l2 pred FIND.
+  - reflexivity.
+  - cbn in FIND; cbn.
+    destruct (pred a); inversion FIND.
+    auto.
+Qed.
+
+Lemma find_some_app:
+  forall {A} (l1 l2 : list A) a pred,
+    find pred l1 = Some a ->
+    find pred (l1 ++ l2) = Some a.
+Proof.
+  induction l1 as [|x l1']; intros l2 a pred FIND.
+  - inversion FIND.
+  - cbn in FIND. destruct (pred x) eqn:PRED.
+    + inversion FIND; cbn; subst.
+      rewrite PRED. reflexivity.
+    + cbn. rewrite PRED.
+      auto.
+Qed.
+
+Lemma find_block_none_app:
+  forall {t} l1 l2 bid,
+    find_block t l1 bid = None ->
+    find_block t (l1 ++ l2) bid = find_block t l2 bid.
+Proof.
+  intros t l1 l2 bid FIND.
+  apply find_none_app; auto.
+Qed.
+
+Lemma find_block_some_app:
+  forall {t} l1 l2 bid bk,
+    find_block t l1 bid = Some bk ->
+    find_block t (l1 ++ l2) bid = Some bk.
+Proof.
+  intros t l1 l2 bid bk FIND.
+  apply find_some_app; auto.
+Qed.
 
 (** [denote_code] *)
 
@@ -113,7 +186,25 @@ Proof.
   apply eutt_eq_bind; intros []; rewrite bind_ret_l; reflexivity. 
 Qed.
 
-(** denote_bks *)
+(** [denote_phi] *)
+
+Opaque assoc.
+Lemma denote_phi_hd : forall bid e id τ tl,
+    denote_phi bid (id, Phi τ ((bid,e)::tl)) ≈ uv <- denote_exp (Some τ) e;; ret (id,uv).
+Proof.
+  intros; cbn.
+  rewrite assoc_hd; reflexivity.
+Qed.
+
+Lemma denote_phi_tl : forall bid bid' e id τ tl,
+    bid <> bid' ->
+    denote_phi bid (id, Phi τ ((bid',e)::tl)) ≈ denote_phi bid (id, Phi τ tl).
+Proof.
+  intros; cbn.
+  rewrite assoc_tl; auto; reflexivity.
+Qed.
+
+(** [denote_bks] *)
 Lemma denote_bks_nil: forall s, denote_bks [] s ≈ ret (inl s).
 Proof.
   intros []; unfold denote_bks.
@@ -124,48 +215,6 @@ Proof.
   repeat (cbn; (rewrite bind_bind || rewrite bind_ret_l)).
   reflexivity.
 Qed.
-
-(* YZ: I am not sure that we have a good use for such a lemma.
-   In general, a singleton could loop on itself, so that the general
-   lemma for a singleton is exactly [denote_bks_unfold].
-   Ensuring statically that you do not loop requires very strong
-   restrictions on the expression used for the terminals.
- *)
-(*
-Lemma denote_bks_singleton :
-  forall (bk : block dtyp) (bid_from : block_id),
-    eutt Logic.eq (denote_bks [bk] (bid_from, blk_id bk)) 
-         (bd <- denote_block bk bid_from;; 
-          match bd with
-          | inr dv => ret (inr dv)
-          | inl bid_target => ret (inl (blk_id bk,bid_target))
-          end).
-Proof.
-  intros *.
-  cbn.
-  unfold denote_bks.
-  rewrite KTreeFacts.unfold_iter_ktree.
-  cbn.
-  destruct (Eqv.eqv_dec_p (blk_id bk) (blk_id bk)) eqn:Heq'; [| contradiction n; reflexivity].
-  repeat rewrite bind_bind.
-  repeat setoid_rewrite bind_bind.
-  apply eutt_eq_bind; intros ?.
-  apply eutt_eq_bind; intros ?.
-  repeat setoid_rewrite bind_ret_l.
-  apply eutt_eq_bind; intros ?. 
-  apply eutt_eq_bind; intros ?. 
-  setoid_rewrite bind_ret_l.
-  rewrite Heqterm.
-  cbn.
-  apply eutt_eq_bind; intros ?; rewrite bind_ret_l.
-  cbn.
-  setoid_rewrite translate_ret.
-  setoid_rewrite bind_ret_l.
-  destruct (Eqv.eqv_dec_p (blk_id b) nextblock); try contradiction.
-  repeat setoid_rewrite bind_ret_l. unfold Datatypes.id.
-  reflexivity.
-Qed.
-*)
 
 Lemma denote_bks_unfold_in: forall bks bid_from bid_src bk,
     find_block dtyp bks bid_src = Some bk ->
@@ -195,49 +244,6 @@ Proof.
   rewrite KTreeFacts.unfold_iter_ktree.
   rewrite GET_BK; cbn.
   rewrite bind_ret_l.
-  reflexivity.
-Qed.
-
-Opaque assoc.
-Lemma denote_phi_hd : forall bid e id τ tl,
-    denote_phi bid (id, Phi τ ((bid,e)::tl)) ≈ uv <- denote_exp (Some τ) e;; ret (id,uv).
-Proof.
-  intros; cbn.
-  rewrite assoc_hd; reflexivity.
-Qed.
-
-Lemma denote_phi_tl : forall bid bid' e id τ tl,
-    bid <> bid' ->
-    denote_phi bid (id, Phi τ ((bid',e)::tl)) ≈ denote_phi bid (id, Phi τ tl).
-Proof.
-  intros; cbn.
-  rewrite assoc_tl; auto; reflexivity.
-Qed.
-
-(* find_block axiomatisation to ease things. TODO: make it opaque *)
-Lemma find_block_nil: forall {T} b, find_block T [] b = None. 
-Proof.
-  reflexivity.
-Qed.
-
-Lemma find_block_eq: forall {T} x b bs,
-    blk_id b = x ->
-    find_block T (b:: bs) x = Some b.
-Proof.
-  intros; cbn.
-  rewrite H.
-  destruct (Eqv.eqv_dec_p x x).
-  reflexivity.
-  contradiction n; reflexivity.
-Qed.
-
-Lemma find_block_ineq: forall {T} x b bs,
-    blk_id b <> x ->
-    find_block T (b::bs) x = find_block T bs x. 
-Proof.
-  intros; cbn.
-  destruct (Eqv.eqv_dec_p (blk_id b)) as [EQ | INEQ].
-  unfold Eqv.eqv, AstLib.eqv_raw_id in *; intuition.
   reflexivity.
 Qed.
 
@@ -365,66 +371,6 @@ Proof.
   intros INDEP; apply INDEP; auto.
 Qed.
 
-
-Lemma find_none_app:
-  forall {A} (l1 l2 : list A) pred,
-    find pred l1 = None ->
-    find pred (l1 ++ l2) = find pred l2.
-Proof.
-  induction l1; intros l2 pred FIND.
-  - reflexivity.
-  - cbn in FIND; cbn.
-    destruct (pred a); inversion FIND.
-    auto.
-Qed.
-
-Lemma find_some_app:
-  forall {A} (l1 l2 : list A) a pred,
-    find pred l1 = Some a ->
-    find pred (l1 ++ l2) = Some a.
-Proof.
-  induction l1 as [|x l1']; intros l2 a pred FIND.
-  - inversion FIND.
-  - cbn in FIND. destruct (pred x) eqn:PRED.
-    + inversion FIND; cbn; subst.
-      rewrite PRED. reflexivity.
-    + cbn. rewrite PRED.
-      auto.
-Qed.
-
-Lemma find_block_none_app:
-  forall {t} l1 l2 bid,
-    find_block t l1 bid = None ->
-    find_block t (l1 ++ l2) bid = find_block t l2 bid.
-Proof.
-  intros t l1 l2 bid FIND.
-  apply find_none_app; auto.
-Qed.
-
-Lemma find_block_some_app:
-  forall {t} l1 l2 bid bk,
-    find_block t l1 bid = Some bk ->
-    find_block t (l1 ++ l2) bid = Some bk.
-Proof.
-  intros t l1 l2 bid bk FIND.
-  apply find_some_app; auto.
-Qed.
-
-(* TODO: replace the too restrictive version from itree *)
-Lemma eutt_eq_bind : forall E R1 R2 RR U (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
-    (forall u, eutt RR (k1 u) (k2 u)) -> eutt RR (ITree.bind t k1) (ITree.bind t k2).
-Proof.
-  intros.
-  apply eutt_clo_bind with (UU := Logic.eq); [reflexivity |].
-  intros ? ? ->; apply H.
-Qed.
-
-Lemma eutt_Ret :
-  forall E (R1 R2 : Type) (RR : R1 -> R2 -> Prop) r1 r2, RR r1 r2 <-> eutt (E := E) RR (Ret r1) (Ret r2).
-Proof.
-  intros; apply eqit_Ret.
-Qed.
-
 Lemma find_block_not_in_inputs: forall b l,
         ~ In b (inputs l) ->
         find_block dtyp l b = None.
@@ -442,7 +388,121 @@ Proof.
     right; auto.
 Qed.
 
-Open Scope itree.
+(** * outputs soundness *)
+
+Lemma denote_terminator_exits_in_outputs :
+  forall term,
+    denote_terminator term ⤳ sum_pred (fun id => In id (terminator_outputs term)) TT.
+Proof.
+  unfold has_post; intros []; cbn;
+    unfold raise, Exception.throw, raiseUB;
+    try (einit; estep; intros []).
+
+  - destruct v. 
+    apply PostConditions.eutt_eq_bind; intros ?.
+    apply eutt_Ret; cbn; eauto.
+
+  - destruct v; cbn.
+    apply PostConditions.eutt_eq_bind; intros ?.
+    apply PostConditions.eutt_eq_bind; intros ?.
+    unfold raise, Exception.throw, raiseUB.
+    destruct u0; cbn;
+      try (einit; estep; intros []).
+    flatten_goal; cbn; apply eutt_Ret; eauto; left.
+Qed.
+
+Definition exits_in_outputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
+  sum_pred (fun fto => In (snd fto) (@outputs t ocfg)) TT.
+
+Lemma denote_bk_exits_in_outputs :
+  forall b from,
+    denote_block b from ⤳ sum_pred (fun id => In id (bk_outputs b)) TT.
+Proof.
+  intros.
+  cbn.
+  apply has_post_bind; intros [].
+  apply has_post_bind; intros [].
+  apply has_post_translate.
+  apply denote_terminator_exits_in_outputs.
+Qed.
+
+Lemma find_block_in_inputs : forall {to ocfg},
+    In to (inputs ocfg) ->
+    exists bk, find_block dtyp ocfg to = Some bk.
+Proof.
+  induction ocfg as [| id ocfg IH]; cbn; intros IN; [inv IN |].
+  flatten_goal; flatten_hyp Heq; intuition; eauto.
+Qed.
+
+(* Given a predicate [Qb] on pairs of block ids (the origin for phi-nodes and the input)
+   and a predicate [Qv] on values, we establish that both hold after the denotation of an open_cfg if:
+   - [Qb] holds at the initial entry point
+   - [Qb] and [Qv] are preserved by the denotation of any blocks in the open cfg, assuming [Qb]
+ *)
+Lemma denote_bks_has_post_strong :
+  forall ocfg fto (Qb : block_id * block_id -> Prop) (Qv : uvalue -> Prop)
+    (INIT : Qb fto)
+    (IND : forall fto (b : block dtyp),
+        Qb fto ->
+        find_block _ ocfg (snd fto) = Some b ->
+        denote_block b (fst fto) ⤳ sum_pred (fun to => Qb (snd fto, to)) Qv), 
+    denote_bks ocfg fto ⤳ sum_pred Qb Qv.
+Proof.
+  intros * INIT IND.
+  eapply has_post_iter_strong; eauto.
+  intros [f to] PRE.
+  flatten_goal.
+  - specialize (IND (f,to) b).
+    eapply eutt_post_bind; [apply IND |]; auto.
+    intros [id | v]; cbn; intros ?; apply eutt_Ret; auto.
+  - apply eutt_Ret; auto.
+Qed.
+
+(* A weaker but sometimes easier to use modular way to prove postconditions of open cfgs:
+   - assuming that all blocks in the open cfg admits as postconditions [sum_pred Qb Qv]
+   - and assuming that we indeed enter the [open_cfg]
+   then we get [Qb/Qv], and ignore the origin of the jump.
+ *)
+Lemma denote_bks_has_post :
+  forall ocfg fto (Qb : block_id -> Prop) (Qv : uvalue -> Prop)
+    (ENTER : In (snd fto) (inputs ocfg)) 
+    (IND : forall fto (b : block dtyp),
+        find_block _ ocfg (snd fto) = Some b ->
+        denote_block b (fst fto) ⤳ sum_pred Qb Qv),
+    denote_bks ocfg fto ⤳ sum_pred (prod_pred TT Qb) Qv.
+Proof.
+  intros * IN IND.
+  apply has_post_iter_strong with (Inv := fun x => In (snd x) (inputs ocfg) \/ Qb (snd x))
+  ; eauto.
+  intros [f to] HYP.
+  flatten_goal.
+  - specialize (IND (f,to) b).
+    eapply eutt_post_bind; [apply IND |]; auto.
+    intros [id | v]; cbn; intros ?; apply eutt_Ret; cbn; auto.
+  - apply eutt_Ret.
+    split; auto.
+    destruct HYP as [abs | POST]; auto.
+    apply find_block_in_inputs in abs as [? abs]; cbn in abs; rewrite abs in Heq; inv Heq.
+Qed.  
+
+Lemma denote_bks_exits_in_outputs :
+  forall ocfg fto,
+    In (snd fto) (inputs ocfg) ->
+    denote_bks ocfg fto ⤳ exits_in_outputs ocfg.
+Proof.
+  intros * IN.
+  apply has_post_weaken with (P := sum_pred (prod_pred TT (fun b => In b (outputs ocfg))) TT).
+  2: intros [[]|] ?; cbn in *; intuition.
+  apply denote_bks_has_post; eauto.
+  intros.
+  eapply has_post_weaken.
+  eapply denote_bk_exits_in_outputs.
+  intros []; cbn; intuition.
+  eapply In_bk_outputs; eauto.
+Qed.
+
+(** * denote_bks  *)
+
 Lemma denote_bks_app_no_edges :
   forall (l1 l2 : open_cfg) fto,
     find_block dtyp l1 (snd fto) = None ->
@@ -456,51 +516,12 @@ Proof.
   epose proof (find_block_none_app _ l2 _ FIND) as FIND_L1L2.
   rewrite FIND_L1L2.
   destruct (find_block dtyp l2 to) eqn:FIND_L2.
-  - do 3 (autorewrite with itree; apply eutt_eq_bind; intros ?).
-    autorewrite with itree.
-    
-    eapply eutt_clo_bind with
-        (fun idv idv' => idv = idv' /\
-                      ((exists bid, idv = inl bid /\ In bid (outputs l2)) \/
-                       (exists v, idv = inr v))).
-    + destruct b; cbn.
-      (* YZ TODO : extract a general lemma to avoid this inlined case analysis on the structure of the terminator? *)
-      destruct blk_term, t; cbn;
-        unfold raise, Exception.throw, raiseUB;
-        try (rewrite translate_vis; einit; estep; intros []).
-
-      * destruct v. 
-        rewrite translate_bind.
-        apply eutt_eq_bind; intros ?.
-        rewrite translate_ret; apply eutt_Ret; eauto.
-      * rewrite translate_ret; apply eutt_Ret; eauto.
-      * destruct v; cbn.
-        rewrite translate_bind; apply eutt_eq_bind; intros ?.
-        rewrite translate_bind; apply eutt_eq_bind; intros ?.
-        cbn.
-        unfold raise, Exception.throw, raiseUB.
-        destruct u3; cbn;
-        try (rewrite translate_vis);
-        try (einit; estep; intros []).
-        flatten_goal; cbn; rewrite translate_ret; apply eutt_Ret; split; eauto; left.
-        { eexists; split; [ reflexivity |].
-          eapply In_bk_outputs; cbn; eauto.
-          cbn; auto.
-        }
-        { eexists; split; [ reflexivity |].
-          eapply In_bk_outputs; cbn; eauto.
-          cbn; auto.
-        }
-      * rewrite translate_ret; apply eutt_Ret; split; eauto.
-        left; eexists; split; [reflexivity |].
-        eapply In_bk_outputs; cbn; eauto.
-        cbn; auto.
-
-    + intros idov ? (<- & H).
-      destruct idov as [id | v]; cbn; apply eutt_Ret; cbn; eauto.
-      eapply inl_morphism; split; auto.
-      eapply find_block_not_in_inputs,no_reentrance_not_in; eauto. 
-      destruct H as [(? & eq & IN) | (v & abs)]; [inv eq | inv abs]; auto.
+  - eapply eutt_post_bind.
+    apply denote_bk_exits_in_outputs.
+    intros [id | v] ?; cbn; apply eutt_Ret; eauto.
+    eapply inl_morphism; split; auto.
+    eapply find_block_not_in_inputs,no_reentrance_not_in; eauto.
+    eapply In_bk_outputs; eauto.
 
   - apply eutt_Ret; right; auto.
 Qed.
@@ -551,206 +572,6 @@ Proof.
     rewrite denote_bks_unfold_not_in with (bks := ocfg1); auto.
     rewrite bind_ret_l; reflexivity.
 Qed.
-
-Ltac bind_ret_r1 :=
-  match goal with
-    |- eutt _ ?t ?s => let x := fresh in
-                     remember s as x;
-                     rewrite <- (bind_ret_r t); subst x
-  end.
-
-Ltac bind_ret_r2 :=
-  match goal with
-    |- eutt _ ?t ?s => let x := fresh in
-                     remember t as x;
-                     rewrite <- (bind_ret_r s); subst x
-  end.
-
-(* Could use directly the rel category we formalized in the propt branches *)
-(* Definition conj_rel {A B : Type} (R S: A -> B -> Prop): A -> B -> Prop := *)
-  (* fun a b => R a b /\ S a b. *)
-(* Definition disj_rel {A B : Type} (R S: A -> B -> Prop): A -> B -> Prop := *)
-  (* fun a b => R a b \/ S a b. *)
-Definition equiv_rel {A B : Type} (R S: A -> B -> Prop): Prop :=
-  forall a b, R a b <-> S a b.
-(* Infix "⨇" := conj_rel (at level 85, right associativity). *)
-(* Infix "⨈" := disj_rel (at level 85, right associativity). *)
-Infix "⇔" :=  equiv_rel (at level 85, right associativity).
-
-Definition equiv_pred {A : Type} (R S: A -> Prop): Prop :=
-  forall a, R a <-> S a.
-
-Require Import Paco.paco.
-Lemma fold_eqitF:
-  forall {E R1 R2} (RR: R1 -> R2 -> Prop) b1 b2 (t1 : itree E R1) (t2 : itree E R2) ot1 ot2,
-    eqitF RR b1 b2 id (upaco2 (eqit_ RR b1 b2 id) bot2) ot1 ot2 ->
-    ot1 = observe t1 ->
-    ot2 = observe t2 ->
-    eqit RR b1 b2 t1 t2.
-Proof.
-  intros * eq -> ->; pfold; auto.
-Qed.
-
-Lemma eutt_conj {E} {R S} {RS RS'} :
-  forall (t : itree E R) (s : itree E S),
-    eutt RS  t s ->
-    eutt RS' t s ->
-    eutt (RS /2\ RS') t s. 
-Proof.
-  repeat red.
-  einit.
-  ecofix CIH; intros * EQ EQ'.
-  rewrite itree_eta, (itree_eta s).
-  punfold EQ; punfold EQ'; red in EQ; red in EQ'.
-  genobs t ot; genobs s os.
-  hinduction EQ before CIH0; subst; intros; pclearbot; simpl.
-
-  - estep; split; auto.
-    inv EQ'; auto.
-  - estep; ebase; right; eapply CIH; eauto.
-    rewrite <- tau_eutt.
-    rewrite <- (tau_eutt m2); auto.
-  - estep; ebase; intros ?; right; eapply CIH0; eauto.
-    eapply eqit_Vis; eauto.
-  - eapply fold_eqitF in EQ'; eauto.
-    assert (t ≈ Tau t1) by (rewrite itree_eta, <- Heqot; reflexivity).
-    rewrite H in EQ'.
-    apply eqit_inv_tauL in EQ'.
-    subst; specialize (IHEQ _ _ eq_refl eq_refl).
-    punfold EQ'; red in EQ'.
-    specialize (IHEQ EQ').
-    rewrite eqit_tauL; [|reflexivity].
-    rewrite (itree_eta t1).
-    eapply IHEQ. 
-  - subst; cbn.
-    rewrite tau_euttge.
-    rewrite (itree_eta t2); eapply IHEQ; eauto.
-    eapply fold_eqitF in EQ'; eauto.
-    assert (s ≈ Tau t2).
-    rewrite (itree_eta s), <- Heqos; reflexivity.
-    rewrite tau_eutt in H.
-    assert (eutt RS' t t2).
-    rewrite <- H; auto.
-    punfold H0.
-Qed.
-
-Lemma eutt_disj_l {E} {R S} {RS RS'} :
-  forall (t : itree E R) (s : itree E S),
-    eutt RS t s ->
-    eutt (RS \2/ RS') t s. 
-Proof.
-  intros.
-  eapply eqit_mon with (RR := RS); eauto.
-Qed.
-
-Lemma eutt_disj_r {E} {R S} {RS RS'} :
-  forall (t : itree E R) (s : itree E S),
-    eutt RS' t s ->
-    eutt (RS \2/ RS') t s. 
-Proof.
-  intros.
-  eapply eqit_mon with (RR := RS'); eauto.
-Qed.
-
-Lemma eutt_equiv {E} {R S} {RS RS'} :
-  forall (t : itree E R) (s : itree E S),
-    (RS ⇔ RS') ->
-    eutt RS t s <-> eutt RS' t s. 
-Proof.
-  intros * EQ; split; intros EUTT; eapply eqit_mon; try apply EUTT; eauto.
-  all:apply EQ.
-Qed.
-
-Definition has_post {E X} (t : itree E X) (Q : X -> Prop) : Prop :=
-  eutt (fun 'x _ => Q x) t t.
-
-(* Note: the following definition is equivalent. To figure out what's more convenient to work with *)
-Definition has_post_strong {E X} (t : itree E X) (Q : X -> Prop) : Prop :=
-  eutt (fun 'x y => x = y /\ Q x) t t.
-
-Lemma has_post_post_strong : forall {E X} (t : itree E X) Q,
-    has_post t Q <-> has_post_strong t Q.
-Proof.
-  intros; split; intros HP.
-  - apply eutt_conj; [reflexivity | auto].
-  - eapply eqit_mon; eauto.
-    intros * H; apply H.
-Qed.
-
-From Coq Require Import Morphisms.
-Lemma has_post_equiv {E X} (t : itree E X) : Proper (equiv_pred ==> iff) (has_post t).
-Proof.
-  repeat red; intros * EQ *; split; intros HP; eapply eutt_equiv; eauto.
-  all:split; apply EQ.
-Qed.
-
-Notation "t ⤳ Q" := (has_post t Q) (at level 50).
-
-Lemma has_post_conj : forall {E X} (t : itree E X) P Q,
-    t ⤳ P ->
-    t ⤳ Q ->
-    t ⤳ (P /1\ Q).
-Proof.
-  intros * HP HQ.
-  pose proof eutt_conj HP HQ.
-  auto.
-Qed.     
-
-Lemma has_post_disj_l : forall {E X} (t : itree E X) P Q,
-    t ⤳ P ->
-    t ⤳ (P \1/ Q).
-Proof.
-  intros * HP.
-  epose proof eutt_disj_l HP as H.
-  apply H.
-Qed.     
-
-Lemma has_post_disj_r : forall {E X} (t : itree E X) P Q,
-    t ⤳ Q ->
-    t ⤳ (P \1/ Q).
-Proof.
-  intros * HQ.
-  epose proof eutt_disj_r HQ as H.
-  apply H.
-Qed.     
-
-Lemma eutt_post_bind : forall E R1 R2 RR U Q (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
-    t ⤳ Q ->
-    (forall u, Q u -> eutt RR (k1 u) (k2 u)) -> eutt RR (ITree.bind t k1) (ITree.bind t k2).
-Proof.
-  intros * POST ?.
-  apply eutt_clo_bind with (UU := fun x y => x = y /\ Q x); [apply has_post_post_strong; exact POST |].
-  intros ? ? [-> ?]; auto.
-Qed.
-
-Lemma eutt_post_bind_gen :
-  forall E R1 R2 RR U1 U2 Q1 Q2
-    (t1 : itree E U1) (k1: U1 -> itree E R1) (t2 : itree E U2) (k2 : U2 -> itree E R2),
-    t1 ⤳ Q1 ->
-    t2 ⤳ Q2 ->
-    (forall u1 u2, Q1 u1 -> Q2 u2 -> eutt RR (k1 u1) (k2 u2)) ->
-    eutt RR (ITree.bind t1 k1) (ITree.bind t2 k2).
-Proof.
-  intros * POST1 POST2 ?.
-  apply eutt_clo_bind with (UU := fun x y => Q1 x /\ Q2 y).
-  2: intros ? ? []; apply H; auto.
-  clear H.
-  admit.
-  (* How to combine this? *)
-Admitted.
-
-Definition exits_in_outputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
-  fun res =>
-    match res with
-    | inl (_,to) => In to (@outputs t ocfg)
-    | _ => True
-    end.
-
-Lemma denote_bks_exits_in_outputs :
-  forall ocfg fto,
-    In (snd fto) (inputs ocfg) ->
-    denote_bks ocfg fto ⤳ exits_in_outputs ocfg.
-Admitted.
 
 Lemma denote_bks_flow_left :
   forall ocfg1 ocfg2 fto,
