@@ -1,7 +1,9 @@
 Require Import Paco.paco.
+From Coq Require Import Morphisms.
 From ITree Require Import
      ITree
-     Eq.Eq.
+     Eq.Eq
+     Interp.TranslateFacts.
 Set Implicit Arguments.
 Set Strict Implicit.
 
@@ -19,6 +21,27 @@ Lemma eutt_Ret :
 Proof.
   intros; apply eqit_Ret.
 Qed.
+
+(* TODO Move to ITree *)
+Require Import Paco.paco.
+Lemma eutt_translate_gen :
+      forall {E F X Y} (f : E ~> F) (RR : X -> Y -> Prop) (t : itree E X) (s : itree E Y),
+        eutt RR t s ->
+        eutt RR (translate f t) (translate f s).
+Proof.
+  intros *.
+  revert t s.
+  einit.
+  ecofix CIH.
+  intros * EUTT.
+  rewrite !unfold_translate. punfold EUTT. red in EUTT.
+  induction EUTT; intros; subst; simpl; pclearbot.
+  - estep.
+  - estep. 
+  - estep; intros ?; ebase.
+  - rewrite tau_euttge, unfold_translate. eauto.
+  - rewrite tau_euttge, unfold_translate. eauto.
+Qed. 
 
 Definition equiv_rel {A B : Type} (R S: A -> B -> Prop): Prop :=
   forall a b, R a b <-> S a b.
@@ -112,7 +135,7 @@ Qed.
 Definition has_post {E X} (t : itree E X) (Q : X -> Prop) : Prop :=
   eutt (fun 'x _ => Q x) t t.
 
-(* Note: the following definition is equivalent. To figure out what's more convenient to work with *)
+(* Note: the following definition is equivalent. *)
 Definition has_post_strong {E X} (t : itree E X) (Q : X -> Prop) : Prop :=
   eutt (fun 'x y => x = y /\ Q x) t t.
 
@@ -125,14 +148,17 @@ Proof.
     intros * H; apply H.
 Qed.
 
-From Coq Require Import Morphisms.
+Notation "t ⤳ Q" := (has_post t Q) (at level 50).
+
+(** [has_post] logical primitives.
+    Post-conditions can be established by usual elementary logical connectives
+ *)
+
 Lemma has_post_equiv {E X} (t : itree E X) : Proper (equiv_pred ==> iff) (has_post t).
 Proof.
   repeat red; intros * EQ *; split; intros HP; eapply eutt_equiv; eauto.
   all:split; apply EQ.
 Qed.
-
-Notation "t ⤳ Q" := (has_post t Q) (at level 50).
 
 Lemma has_post_conj : forall {E X} (t : itree E X) P Q,
     t ⤳ P ->
@@ -172,14 +198,7 @@ Proof.
   intros; apply INCL; auto.
 Qed.     
 
-Lemma eutt_post_bind : forall E R1 R2 RR U Q (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
-    t ⤳ Q ->
-    (forall u, Q u -> eutt RR (k1 u) (k2 u)) -> eutt RR (ITree.bind t k1) (ITree.bind t k2).
-Proof.
-  intros * POST ?.
-  apply eutt_clo_bind with (UU := fun x y => x = y /\ Q x); [apply has_post_post_strong; exact POST |].
-  intros ? ? [-> ?]; auto.
-Qed.
+(** [has_post] structural constructs *)
 
 Lemma has_post_bind : forall {E X Y} (t : itree E X) (k : X -> itree E Y) Q,
     (forall x, k x ⤳ Q) ->
@@ -195,7 +214,28 @@ Lemma has_post_bind_strong : forall {E X Y} (t : itree E X) (k : X -> itree E Y)
     ITree.bind t k ⤳ Q.
 Proof.
   intros * POST1 POST2.
-  eapply eutt_post_bind; eauto.
+  apply eutt_clo_bind with (UU := fun x y => x = y /\ S x) ; [apply has_post_post_strong; exact POST1 |].
+  intros ? ? [<- ?]; eapply POST2; eauto.
+Qed.
+
+Lemma has_post_translate : forall {E F X} (t : itree E X) Q (h : E ~> F),
+    t ⤳ Q ->
+    translate h t ⤳ Q.
+Proof.
+  unfold has_post; intros * POST.
+  apply eutt_translate_gen; auto.
+Qed.
+
+(** [has_post] reasoning principles
+    The main benefit of the approach: post-conditions can be leveraged to establish simulations
+ *)
+Lemma eutt_post_bind : forall E R1 R2 RR U Q (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
+    t ⤳ Q ->
+    (forall u, Q u -> eutt RR (k1 u) (k2 u)) -> eutt RR (ITree.bind t k1) (ITree.bind t k2).
+Proof.
+  intros * POST ?.
+  apply eutt_clo_bind with (UU := fun x y => x = y /\ Q x); [apply has_post_post_strong; exact POST |].
+  intros ? ? [-> ?]; auto.
 Qed.
 
 Lemma eutt_post_bind_gen :

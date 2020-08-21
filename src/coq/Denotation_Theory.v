@@ -457,35 +457,6 @@ Definition exits_in_outputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
     | _ => True
     end.
 
-(* TODO Move to ITree *)
-Require Import Paco.paco.
-Lemma eutt_translate_gen :
-      forall {E F X Y} (f : E ~> F) (RR : X -> Y -> Prop) (t : itree E X) (s : itree E Y),
-        eutt RR t s ->
-        eutt RR (translate f t) (translate f s).
-Proof.
-  intros *.
-  revert t s.
-  einit.
-  ecofix CIH.
-  intros * EUTT.
-  rewrite !unfold_translate. punfold EUTT. red in EUTT.
-  induction EUTT; intros; subst; simpl; pclearbot.
-  - estep.
-  - estep. 
-  - estep; intros ?; ebase.
-  - rewrite tau_euttge, unfold_translate. eauto.
-  - rewrite tau_euttge, unfold_translate. eauto.
-Qed. 
-
-Lemma has_post_translate : forall {E F X} (t : itree E X) Q (h : E ~> F),
-    t ⤳ Q ->
-    translate h t ⤳ Q.
-Proof.
-  unfold has_post; intros * POST.
-  apply eutt_translate_gen; auto.
-Qed.
-
 Lemma denote_bk_exits_in_outputs :
   forall b from,
     denote_block b from ⤳ fun x => match x with | inl id => In id (bk_outputs b) | _ => True end.
@@ -530,8 +501,8 @@ Proof.
       destruct (find_block dtyp ocfg to') eqn:EQ.
       * apply eutt_post_bind with (Q := fun x => match x with | inl id => In id (outputs ocfg) | _ => True end).
         { eapply has_post_weaken; [apply denote_bk_exits_in_outputs |].
-          intros []; auto.
-          eapply In_outputs_bk_bks; eauto.
+          intros [] ?; auto.
+          eapply In_bk_outputs; eauto.
         }
         intros [] ?; cbn; apply eutt_Ret; eauto.
       * cbn; apply eutt_Ret; eauto.
@@ -558,7 +529,7 @@ Proof.
     intros [id | v] ?; cbn; apply eutt_Ret; eauto.
     eapply inl_morphism; split; auto.
     eapply find_block_not_in_inputs,no_reentrance_not_in; eauto.
-    eapply In_outputs_bk_bks; eauto.
+    eapply In_bk_outputs; eauto.
 
   - apply eutt_Ret; right; auto.
 Qed.
