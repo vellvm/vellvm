@@ -162,6 +162,16 @@ Proof.
   apply H.
 Qed.     
 
+Lemma has_post_weaken : forall {E X} (t : itree E X) P Q,
+    t ⤳ P ->
+    P <1= Q ->
+    t ⤳ Q.
+Proof.
+  intros * HP INCL.
+  eapply eqit_mon; eauto.
+  intros; apply INCL; auto.
+Qed.     
+
 Lemma eutt_post_bind : forall E R1 R2 RR U Q (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
     t ⤳ Q ->
     (forall u, Q u -> eutt RR (k1 u) (k2 u)) -> eutt RR (ITree.bind t k1) (ITree.bind t k2).
