@@ -53,6 +53,12 @@ Definition equiv_pred {A : Type} (R S: A -> Prop): Prop :=
 Definition sum_pred {A B : Type} (PA : A -> Prop) (PB : B -> Prop) : A + B -> Prop :=
   fun x => match x with | inl a => PA a | inr b => PB b end.
 
+Definition prod_pred {A B : Type} (PA : A -> Prop) (PB : B -> Prop) : A * B -> Prop :=
+  fun '(a,b) => PA a /\ PB b.
+
+Definition TT {A : Type} : A -> Prop := fun _ => True.
+Hint Unfold TT sum_pred prod_pred: core.
+
 Lemma fold_eqitF:
   forall {E R1 R2} (RR: R1 -> R2 -> Prop) b1 b2 (t1 : itree E R1) (t2 : itree E R2) ot1 ot2,
     eqitF RR b1 b2 id (upaco2 (eqit_ RR b1 b2 id) bot2) ot1 ot2 ->

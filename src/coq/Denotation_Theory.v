@@ -392,7 +392,7 @@ Qed.
 
 Lemma denote_terminator_exits_in_outputs :
   forall term,
-    denote_terminator term ⤳ fun x => match x with | inl id => In id (terminator_outputs term) | _ => True end.
+    denote_terminator term ⤳ sum_pred (fun id => In id (terminator_outputs term)) TT.
 Proof.
   unfold has_post; intros []; cbn;
     unfold raise, Exception.throw, raiseUB;
@@ -400,7 +400,8 @@ Proof.
 
   - destruct v. 
     apply PostConditions.eutt_eq_bind; intros ?.
-    apply eutt_Ret; eauto.
+    apply eutt_Ret; cbn; eauto.
+
   - destruct v; cbn.
     apply PostConditions.eutt_eq_bind; intros ?.
     apply PostConditions.eutt_eq_bind; intros ?.
@@ -411,15 +412,11 @@ Proof.
 Qed.
 
 Definition exits_in_outputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
-  fun res =>
-    match res with
-    | inl (_,to) => In to (@outputs t ocfg)
-    | _ => True
-    end.
+  sum_pred (fun fto => In (snd fto) (@outputs t ocfg)) TT.
 
 Lemma denote_bk_exits_in_outputs :
   forall b from,
-    denote_block b from ⤳ fun x => match x with | inl id => In id (bk_outputs b) | _ => True end.
+    denote_block b from ⤳ sum_pred (fun id => In id (bk_outputs b)) TT.
 Proof.
   intros.
   cbn.
@@ -437,36 +434,71 @@ Proof.
   flatten_goal; flatten_hyp Heq; intuition; eauto.
 Qed.
 
-(* YZ TODO: This proof needs to be simplified by proving an analogous to [eutt_iter_gen]
-   specialized to postconditions and [denote_bks] *)
+(* Given a predicate [Qb] on pairs of block ids (the origin for phi-nodes and the input)
+   and a predicate [Qv] on values, we establish that both hold after the denotation of an open_cfg if:
+   - [Qb] holds at the initial entry point
+   - [Qb] and [Qv] are preserved by the denotation of any blocks in the open cfg, assuming [Qb]
+ *)
+Lemma denote_bks_has_post_strong :
+  forall ocfg fto (Qb : block_id * block_id -> Prop) (Qv : uvalue -> Prop)
+    (INIT : Qb fto)
+    (IND : forall fto (b : block dtyp),
+        Qb fto ->
+        find_block _ ocfg (snd fto) = Some b ->
+        denote_block b (fst fto) ⤳ sum_pred (fun to => Qb (snd fto, to)) Qv), 
+    denote_bks ocfg fto ⤳ sum_pred Qb Qv.
+Proof.
+  intros * INIT IND.
+  eapply has_post_iter_strong; eauto.
+  intros [f to] PRE.
+  flatten_goal.
+  - specialize (IND (f,to) b).
+    eapply eutt_post_bind; [apply IND |]; auto.
+    intros [id | v]; cbn; intros ?; apply eutt_Ret; auto.
+  - apply eutt_Ret; auto.
+Qed.
+
+(* A weaker but sometimes easier to use modular way to prove postconditions of open cfgs:
+   - assuming that all blocks in the open cfg admits as postconditions [sum_pred Qb Qv]
+   - and assuming that we indeed enter the [open_cfg]
+   then we get [Qb/Qv], and ignore the origin of the jump.
+ *)
+Lemma denote_bks_has_post :
+  forall ocfg fto (Qb : block_id -> Prop) (Qv : uvalue -> Prop)
+    (ENTER : In (snd fto) (inputs ocfg)) 
+    (IND : forall fto (b : block dtyp),
+        find_block _ ocfg (snd fto) = Some b ->
+        denote_block b (fst fto) ⤳ sum_pred Qb Qv),
+    denote_bks ocfg fto ⤳ sum_pred (prod_pred TT Qb) Qv.
+Proof.
+  intros * IN IND.
+  apply has_post_iter_strong with (Inv := fun x => In (snd x) (inputs ocfg) \/ Qb (snd x))
+  ; eauto.
+  intros [f to] HYP.
+  flatten_goal.
+  - specialize (IND (f,to) b).
+    eapply eutt_post_bind; [apply IND |]; auto.
+    intros [id | v]; cbn; intros ?; apply eutt_Ret; cbn; auto.
+  - apply eutt_Ret.
+    split; auto.
+    destruct HYP as [abs | POST]; auto.
+    apply find_block_in_inputs in abs as [? abs]; cbn in abs; rewrite abs in Heq; inv Heq.
+Qed.  
+
 Lemma denote_bks_exits_in_outputs :
   forall ocfg fto,
     In (snd fto) (inputs ocfg) ->
     denote_bks ocfg fto ⤳ exits_in_outputs ocfg.
 Proof.
   intros * IN.
-  unfold has_post.
-  destruct fto as [f to].
-  pose proof find_block_in_inputs IN as [bk FIND].
-  rewrite denote_bks_unfold_in; eauto.
-  apply eutt_post_bind with (Q := fun x => match x with | inl id => In id (outputs ocfg) | _ => True end).
-  - eapply has_post_weaken; [apply denote_bk_exits_in_outputs |].
-    intros [] ?; auto.
-    cbn in *.
-    eapply In_bk_outputs; eauto.
-  - intros [id | v] ?. 
-    + unfold denote_bks.
-      eapply (@KTreeFacts.eutt_iter_gen _ _ _ (fun x y => x = y /\ exits_in_outputs ocfg (inl x))); eauto.
-      intros [f' to'] ? [<- EXIT].
-      destruct (find_block dtyp ocfg to') eqn:EQ.
-      * apply eutt_post_bind with (Q := fun x => match x with | inl id => In id (outputs ocfg) | _ => True end).
-        { eapply has_post_weaken; [apply denote_bk_exits_in_outputs |].
-          intros [] ?; auto.
-          eapply In_bk_outputs; eauto.
-        }
-        intros [] ?; cbn; apply eutt_Ret; eauto.
-      * cbn; apply eutt_Ret; eauto.
-    + cbn; apply eutt_Ret; eauto.
+  apply has_post_weaken with (P := sum_pred (prod_pred TT (fun b => In b (outputs ocfg))) TT).
+  2: intros [[]|] ?; cbn in *; intuition.
+  apply denote_bks_has_post; eauto.
+  intros.
+  eapply has_post_weaken.
+  eapply denote_bk_exits_in_outputs.
+  intros []; cbn; intuition.
+  eapply In_bk_outputs; eauto.
 Qed.
 
 (** * denote_bks  *)
