@@ -36,7 +36,7 @@ Import Eq.
 
 Import MonadNotation.
 Open Scope monad_scope.
-
+Open Scope itree.
 
 (* end hide *)
 
@@ -52,6 +52,78 @@ In particular, notice that since [interp] is a iterative-monad morphism that res
 [eutt eq], these equations get transported at all levels of interpretations.
 
 *)
+
+(** [find_block] *)
+
+Lemma find_block_nil: forall {T} b, find_block T [] b = None. 
+Proof.
+  reflexivity.
+Qed.
+
+Lemma find_block_eq: forall {T} x b bs,
+    blk_id b = x ->
+    find_block T (b:: bs) x = Some b.
+Proof.
+  intros; cbn.
+  rewrite H.
+  destruct (Eqv.eqv_dec_p x x).
+  reflexivity.
+  contradiction n; reflexivity.
+Qed.
+
+Lemma find_block_ineq: forall {T} x b bs,
+    blk_id b <> x ->
+    find_block T (b::bs) x = find_block T bs x. 
+Proof.
+  intros; cbn.
+  destruct (Eqv.eqv_dec_p (blk_id b)) as [EQ | INEQ].
+  unfold Eqv.eqv, AstLib.eqv_raw_id in *; intuition.
+  reflexivity.
+Qed.
+
+Lemma find_none_app:
+  forall {A} (l1 l2 : list A) pred,
+    find pred l1 = None ->
+    find pred (l1 ++ l2) = find pred l2.
+Proof.
+  induction l1; intros l2 pred FIND.
+  - reflexivity.
+  - cbn in FIND; cbn.
+    destruct (pred a); inversion FIND.
+    auto.
+Qed.
+
+Lemma find_some_app:
+  forall {A} (l1 l2 : list A) a pred,
+    find pred l1 = Some a ->
+    find pred (l1 ++ l2) = Some a.
+Proof.
+  induction l1 as [|x l1']; intros l2 a pred FIND.
+  - inversion FIND.
+  - cbn in FIND. destruct (pred x) eqn:PRED.
+    + inversion FIND; cbn; subst.
+      rewrite PRED. reflexivity.
+    + cbn. rewrite PRED.
+      auto.
+Qed.
+
+Lemma find_block_none_app:
+  forall {t} l1 l2 bid,
+    find_block t l1 bid = None ->
+    find_block t (l1 ++ l2) bid = find_block t l2 bid.
+Proof.
+  intros t l1 l2 bid FIND.
+  apply find_none_app; auto.
+Qed.
+
+Lemma find_block_some_app:
+  forall {t} l1 l2 bid bk,
+    find_block t l1 bid = Some bk ->
+    find_block t (l1 ++ l2) bid = Some bk.
+Proof.
+  intros t l1 l2 bid bk FIND.
+  apply find_some_app; auto.
+Qed.
 
 (** [denote_code] *)
 
@@ -114,7 +186,25 @@ Proof.
   apply eutt_eq_bind; intros []; rewrite bind_ret_l; reflexivity. 
 Qed.
 
-(** denote_bks *)
+(** [denote_phi] *)
+
+Opaque assoc.
+Lemma denote_phi_hd : forall bid e id τ tl,
+    denote_phi bid (id, Phi τ ((bid,e)::tl)) ≈ uv <- denote_exp (Some τ) e;; ret (id,uv).
+Proof.
+  intros; cbn.
+  rewrite assoc_hd; reflexivity.
+Qed.
+
+Lemma denote_phi_tl : forall bid bid' e id τ tl,
+    bid <> bid' ->
+    denote_phi bid (id, Phi τ ((bid',e)::tl)) ≈ denote_phi bid (id, Phi τ tl).
+Proof.
+  intros; cbn.
+  rewrite assoc_tl; auto; reflexivity.
+Qed.
+
+(** [denote_bks] *)
 Lemma denote_bks_nil: forall s, denote_bks [] s ≈ ret (inl s).
 Proof.
   intros []; unfold denote_bks.
@@ -125,48 +215,6 @@ Proof.
   repeat (cbn; (rewrite bind_bind || rewrite bind_ret_l)).
   reflexivity.
 Qed.
-
-(* YZ: I am not sure that we have a good use for such a lemma.
-   In general, a singleton could loop on itself, so that the general
-   lemma for a singleton is exactly [denote_bks_unfold].
-   Ensuring statically that you do not loop requires very strong
-   restrictions on the expression used for the terminals.
- *)
-(*
-Lemma denote_bks_singleton :
-  forall (bk : block dtyp) (bid_from : block_id),
-    eutt Logic.eq (denote_bks [bk] (bid_from, blk_id bk)) 
-         (bd <- denote_block bk bid_from;; 
-          match bd with
-          | inr dv => ret (inr dv)
-          | inl bid_target => ret (inl (blk_id bk,bid_target))
-          end).
-Proof.
-  intros *.
-  cbn.
-  unfold denote_bks.
-  rewrite KTreeFacts.unfold_iter_ktree.
-  cbn.
-  destruct (Eqv.eqv_dec_p (blk_id bk) (blk_id bk)) eqn:Heq'; [| contradiction n; reflexivity].
-  repeat rewrite bind_bind.
-  repeat setoid_rewrite bind_bind.
-  apply eutt_eq_bind; intros ?.
-  apply eutt_eq_bind; intros ?.
-  repeat setoid_rewrite bind_ret_l.
-  apply eutt_eq_bind; intros ?. 
-  apply eutt_eq_bind; intros ?. 
-  setoid_rewrite bind_ret_l.
-  rewrite Heqterm.
-  cbn.
-  apply eutt_eq_bind; intros ?; rewrite bind_ret_l.
-  cbn.
-  setoid_rewrite translate_ret.
-  setoid_rewrite bind_ret_l.
-  destruct (Eqv.eqv_dec_p (blk_id b) nextblock); try contradiction.
-  repeat setoid_rewrite bind_ret_l. unfold Datatypes.id.
-  reflexivity.
-Qed.
-*)
 
 Lemma denote_bks_unfold_in: forall bks bid_from bid_src bk,
     find_block dtyp bks bid_src = Some bk ->
@@ -196,49 +244,6 @@ Proof.
   rewrite KTreeFacts.unfold_iter_ktree.
   rewrite GET_BK; cbn.
   rewrite bind_ret_l.
-  reflexivity.
-Qed.
-
-Opaque assoc.
-Lemma denote_phi_hd : forall bid e id τ tl,
-    denote_phi bid (id, Phi τ ((bid,e)::tl)) ≈ uv <- denote_exp (Some τ) e;; ret (id,uv).
-Proof.
-  intros; cbn.
-  rewrite assoc_hd; reflexivity.
-Qed.
-
-Lemma denote_phi_tl : forall bid bid' e id τ tl,
-    bid <> bid' ->
-    denote_phi bid (id, Phi τ ((bid',e)::tl)) ≈ denote_phi bid (id, Phi τ tl).
-Proof.
-  intros; cbn.
-  rewrite assoc_tl; auto; reflexivity.
-Qed.
-
-(* find_block axiomatisation to ease things. TODO: make it opaque *)
-Lemma find_block_nil: forall {T} b, find_block T [] b = None. 
-Proof.
-  reflexivity.
-Qed.
-
-Lemma find_block_eq: forall {T} x b bs,
-    blk_id b = x ->
-    find_block T (b:: bs) x = Some b.
-Proof.
-  intros; cbn.
-  rewrite H.
-  destruct (Eqv.eqv_dec_p x x).
-  reflexivity.
-  contradiction n; reflexivity.
-Qed.
-
-Lemma find_block_ineq: forall {T} x b bs,
-    blk_id b <> x ->
-    find_block T (b::bs) x = find_block T bs x. 
-Proof.
-  intros; cbn.
-  destruct (Eqv.eqv_dec_p (blk_id b)) as [EQ | INEQ].
-  unfold Eqv.eqv, AstLib.eqv_raw_id in *; intuition.
   reflexivity.
 Qed.
 
@@ -366,51 +371,6 @@ Proof.
   intros INDEP; apply INDEP; auto.
 Qed.
 
-
-Lemma find_none_app:
-  forall {A} (l1 l2 : list A) pred,
-    find pred l1 = None ->
-    find pred (l1 ++ l2) = find pred l2.
-Proof.
-  induction l1; intros l2 pred FIND.
-  - reflexivity.
-  - cbn in FIND; cbn.
-    destruct (pred a); inversion FIND.
-    auto.
-Qed.
-
-Lemma find_some_app:
-  forall {A} (l1 l2 : list A) a pred,
-    find pred l1 = Some a ->
-    find pred (l1 ++ l2) = Some a.
-Proof.
-  induction l1 as [|x l1']; intros l2 a pred FIND.
-  - inversion FIND.
-  - cbn in FIND. destruct (pred x) eqn:PRED.
-    + inversion FIND; cbn; subst.
-      rewrite PRED. reflexivity.
-    + cbn. rewrite PRED.
-      auto.
-Qed.
-
-Lemma find_block_none_app:
-  forall {t} l1 l2 bid,
-    find_block t l1 bid = None ->
-    find_block t (l1 ++ l2) bid = find_block t l2 bid.
-Proof.
-  intros t l1 l2 bid FIND.
-  apply find_none_app; auto.
-Qed.
-
-Lemma find_block_some_app:
-  forall {t} l1 l2 bid bk,
-    find_block t l1 bid = Some bk ->
-    find_block t (l1 ++ l2) bid = Some bk.
-Proof.
-  intros t l1 l2 bid bk FIND.
-  apply find_some_app; auto.
-Qed.
-
 Lemma find_block_not_in_inputs: forall b l,
         ~ In b (inputs l) ->
         find_block dtyp l b = None.
@@ -510,7 +470,7 @@ Proof.
 Qed.
 
 (** * denote_bks  *)
-Open Scope itree.
+
 Lemma denote_bks_app_no_edges :
   forall (l1 l2 : open_cfg) fto,
     find_block dtyp l1 (snd fto) = None ->
@@ -580,20 +540,6 @@ Proof.
     rewrite denote_bks_unfold_not_in with (bks := ocfg1); auto.
     rewrite bind_ret_l; reflexivity.
 Qed.
-
-Ltac bind_ret_r1 :=
-  match goal with
-    |- eutt _ ?t ?s => let x := fresh in
-                     remember s as x;
-                     rewrite <- (bind_ret_r t); subst x
-  end.
-
-Ltac bind_ret_r2 :=
-  match goal with
-    |- eutt _ ?t ?s => let x := fresh in
-                     remember t as x;
-                     rewrite <- (bind_ret_r s); subst x
-  end.
 
 Lemma denote_bks_flow_left :
   forall ocfg1 ocfg2 fto,

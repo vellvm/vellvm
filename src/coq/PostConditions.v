@@ -50,6 +50,9 @@ Infix "⇔" :=  equiv_rel (at level 85, right associativity).
 Definition equiv_pred {A : Type} (R S: A -> Prop): Prop :=
   forall a, R a <-> S a.
 
+Definition sum_pred {A B : Type} (PA : A -> Prop) (PB : B -> Prop) : A + B -> Prop :=
+  fun x => match x with | inl a => PA a | inr b => PB b end.
+
 Lemma fold_eqitF:
   forall {E R1 R2} (RR: R1 -> R2 -> Prop) b1 b2 (t1 : itree E R1) (t2 : itree E R2) ot1 ot2,
     eqitF RR b1 b2 id (upaco2 (eqit_ RR b1 b2 id) bot2) ot1 ot2 ->
@@ -216,6 +219,21 @@ Proof.
   intros * POST1 POST2.
   apply eutt_clo_bind with (UU := fun x y => x = y /\ S x) ; [apply has_post_post_strong; exact POST1 |].
   intros ? ? [<- ?]; eapply POST2; eauto.
+Qed.
+
+Lemma has_post_iter_strong :
+  forall {E R I} (body : I -> itree E (I + R)) (entry : I) (Inv : I -> Prop) (Q : R -> Prop),
+    (forall i, Inv i -> body i ⤳ sum_pred Inv Q) ->
+    Inv entry ->
+    ITree.iter body entry ⤳ Q.
+Proof.
+  intros * IND INIT.
+  eapply (@KTreeFacts.eutt_iter_gen _ _ _ (fun x y => x = y /\ Inv x)); eauto.
+  intros i ? [<- ?].
+  specialize (IND i); apply has_post_post_strong in IND; auto.
+  unfold has_post_strong in IND.
+  eapply eqit_mon; try apply IND; auto.
+  intros [] ? [<- ?]; eauto. 
 Qed.
 
 Lemma has_post_translate : forall {E F X} (t : itree E X) Q (h : E ~> F),

@@ -124,3 +124,21 @@ Ltac break_sum :=
   | v: _ + _ |- _ => destruct v
   end.
 
+From ITree Require Import
+     ITree
+     Eq.Eq.
+
+Ltac bind_ret_r1 :=
+  match goal with
+    |- eutt _ ?t ?s => let x := fresh in
+                     remember s as x;
+                     rewrite <- (bind_ret_r t); subst x
+  end.
+
+Ltac bind_ret_r2 :=
+  match goal with
+    |- eutt _ ?t ?s => let x := fresh in
+                     remember t as x;
+                     rewrite <- (bind_ret_r s); subst x
+  end.
+
