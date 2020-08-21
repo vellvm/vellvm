@@ -559,51 +559,12 @@ Proof.
   epose proof (find_block_none_app _ l2 _ FIND) as FIND_L1L2.
   rewrite FIND_L1L2.
   destruct (find_block dtyp l2 to) eqn:FIND_L2.
-  - do 3 (autorewrite with itree; apply PostConditions.eutt_eq_bind; intros ?).
-    autorewrite with itree.
-    
-    eapply eutt_clo_bind with
-        (fun idv idv' => idv = idv' /\
-                      ((exists bid, idv = inl bid /\ In bid (outputs l2)) \/
-                       (exists v, idv = inr v))).
-    + destruct b; cbn.
-      (* YZ TODO : extract a general lemma to avoid this inlined case analysis on the structure of the terminator? *)
-      destruct blk_term, t; cbn;
-        unfold raise, Exception.throw, raiseUB;
-        try (rewrite translate_vis; einit; estep; intros []).
-
-      * destruct v. 
-        rewrite translate_bind.
-        apply PostConditions.eutt_eq_bind; intros ?.
-        rewrite translate_ret; apply eutt_Ret; eauto.
-      * rewrite translate_ret; apply eutt_Ret; eauto.
-      * destruct v; cbn.
-        rewrite translate_bind; apply PostConditions.eutt_eq_bind; intros ?.
-        rewrite translate_bind; apply PostConditions.eutt_eq_bind; intros ?.
-        cbn.
-        unfold raise, Exception.throw, raiseUB.
-        destruct u3; cbn;
-        try (rewrite translate_vis);
-        try (einit; estep; intros []).
-        flatten_goal; cbn; rewrite translate_ret; apply eutt_Ret; split; eauto; left.
-        { eexists; split; [ reflexivity |].
-          eapply In_bk_outputs; cbn; eauto.
-          cbn; auto.
-        }
-        { eexists; split; [ reflexivity |].
-          eapply In_bk_outputs; cbn; eauto.
-          cbn; auto.
-        }
-      * rewrite translate_ret; apply eutt_Ret; split; eauto.
-        left; eexists; split; [reflexivity |].
-        eapply In_bk_outputs; cbn; eauto.
-        cbn; auto.
-
-    + intros idov ? (<- & H).
-      destruct idov as [id | v]; cbn; apply eutt_Ret; cbn; eauto.
-      eapply inl_morphism; split; auto.
-      eapply find_block_not_in_inputs,no_reentrance_not_in; eauto. 
-      destruct H as [(? & eq & IN) | (v & abs)]; [inv eq | inv abs]; auto.
+  - eapply eutt_post_bind.
+    apply denote_bk_exits_in_outputs.
+    intros [id | v] ?; cbn; apply eutt_Ret; eauto.
+    eapply inl_morphism; split; auto.
+    eapply find_block_not_in_inputs,no_reentrance_not_in; eauto.
+    eapply In_outputs_bk_bks; eauto.
 
   - apply eutt_Ret; right; auto.
 Qed.
