@@ -213,3 +213,7 @@ Proof.
     destruct REL2 as [-> ?], REL0 as [<- ?]; eauto.
 Qed.
 
+(* TODO : develop the effect of handlers on this, in particular when interpreting into a state monad *)
+
+
+

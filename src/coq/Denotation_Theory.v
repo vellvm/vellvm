@@ -457,11 +457,53 @@ Definition exits_in_outputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
     | _ => True
     end.
 
+(* TODO Move to ITree *)
+Require Import Paco.paco.
+Lemma eutt_translate_gen :
+      forall {E F X Y} (f : E ~> F) (RR : X -> Y -> Prop) (t : itree E X) (s : itree E Y),
+        eutt RR t s ->
+        eutt RR (translate f t) (translate f s).
+Proof.
+  intros *.
+  revert t s.
+  einit.
+  ecofix CIH.
+  intros * EUTT.
+  rewrite !unfold_translate. punfold EUTT. red in EUTT.
+  induction EUTT; intros; subst; simpl; pclearbot.
+  - estep.
+  - estep. 
+  - estep; intros ?; ebase.
+  - rewrite tau_euttge, unfold_translate. eauto.
+  - rewrite tau_euttge, unfold_translate. eauto.
+Qed. 
+
+Lemma has_post_translate : forall {E F X} (t : itree E X) Q (h : E ~> F),
+    t ⤳ Q ->
+    translate h t ⤳ Q.
+Proof.
+  unfold has_post; intros * POST.
+  apply eutt_translate_gen; auto.
+Qed.
+
+Lemma denote_bk_exits_in_outputs :
+  forall b from,
+    denote_block b from ⤳ fun x => match x with | inl id => In id (bk_outputs b) | _ => True end.
+Proof.
+  intros.
+  cbn.
+  apply has_post_bind; intros [].
+  apply has_post_bind; intros [].
+  apply has_post_translate.
+  apply denote_terminator_exits_in_outputs.
+Qed.
+
 Lemma denote_bks_exits_in_outputs :
   forall ocfg fto,
     In (snd fto) (inputs ocfg) ->
     denote_bks ocfg fto ⤳ exits_in_outputs ocfg.
 Proof.
+  (* Need some result about [iter] and [has_post] *)
 Admitted.
 
 (** * denote_bks  *)
