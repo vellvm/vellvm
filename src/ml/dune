@@ -1,6 +1,6 @@
 (env
   (dev
-    (flags (:standard -warn-error -A))))
+    (flags (:standard -warn-error -A -w -34))))
 
 
 (executables

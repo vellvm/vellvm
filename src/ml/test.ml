@@ -11,7 +11,6 @@
 ;; open Platform
 ;; open Driver
 ;; open Assert
-;; open TopLevel
 ;; open DynamicValues
 ;; open Handlers.LLVMEvents
 
