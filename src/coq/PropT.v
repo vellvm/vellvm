@@ -32,33 +32,6 @@ Import ListNotations.
 Import ITree.Basics.Basics.Monads.
 
 
-(* From Coq Require Import *)
-(*      Ensembles *)
-(*      Setoid *)
-(*      RelationClasses *)
-(*      Logic *)
-(*      Morphisms *)
-(*      Relations *)
-(*      List. *)
-
-(* From ExtLib Require Import *)
-(*      Structures.Functor *)
-(*      Structures.Monad *)
-(*      Structures.MonadTrans *)
-(*      Data.Monads.EitherMonad. *)
-
-(* From ITree Require Import *)
-(*      Basics.Basics *)
-(*      ITreeDefinition *)
-(*      Eq.Eq *)
-(*      Eq.UpToTaus *)
-(*      ITree *)
-(*      Basics.Monad *)
-(*      KTree *)
-(*      KTreeFacts. *)
-
-(* From Paco Require Import paco. *)
-
 Import MonadNotation.
 Import CatNotations.
 Local Open Scope monad_scope.
@@ -184,6 +157,7 @@ Section PropMonad.
         tb ≈ bind ta k /\
         (forall a, Returns a ta -> K a (k a)).
 
+  (*
   (*  ------------------------------------------------------------------------- *)
   (* SZ: Here is a coinductive version of bind_propT that might work out better *)
   Inductive bind_PropTF {E} {A B} (PA: PropT E A) (K: A -> PropT E B) (sim : itree E B -> Prop) : itree' E B -> Prop :=
@@ -308,7 +282,7 @@ Section PropMonad.
       eapply bind_PropTF_Vis_r; eauto.
  *)
   Abort.
-  
+  *)
 
   (* end coinductive bind ----------------------------------------------------- *)
   
@@ -370,6 +344,7 @@ Section PropMonad.
     (forall T e, h_spec T e (h T e)).
 
 
+  (*
   (* SAZ: This definition isn't quite correct because it fails in the case of a 
      vacuous h_spec (i.e. fun e t => False), since there can not exist such
      a handler _but_ the iterpreter should still succeed on trees without
@@ -544,6 +519,8 @@ Section PropMonad.
     - assumption.
   Qed.
 
+*)
+
   (*  ------------------------------------------------------------------------- *)
   (* STARTING HERE IS THE BETTER DEFINITION OF INTERP_PROP -------------------- *)
   
@@ -590,6 +567,7 @@ Section PropMonad.
     forall R (RR: relation R), itree E R -> PropT F R :=
       fun R (RR: relation R) =>  paco2 (interp_PropT_ E F h_spec R RR) bot2.
 
+  (* Figure 8: Interpreter law for Ret *)
   Lemma interp_prop_ret :
     forall R E F (h_spec : E ~> PropT F)
       (r : R)
@@ -846,16 +824,6 @@ Section PropMonad.
     eapply ReturnsVis. reflexivity. apply H.
   Qed.
 
-  (*
-  Lemma eutt_Returns_Vis : forall {E} {R} X (e : E X) (k : X -> itree E R) (ta' : itree E R),
-      (Vis e k) ≈ ta' ->  eutt (fun u1 u2 => u1 = u2 /\ Returns u1 ta') (Vis e k) (Vis e k).
-  Proof.
-    intros.
-    eapply Eq.eqit_Vis.
-    intros.
-  *)
-    
-    
   Lemma eutt_Returns_ : forall {E} {R} (RR : R -> Prop) (ta : itree E R) 
      (IN: forall (a : R), Returns a ta -> RR a), eutt (fun u1 u2 => u1 = u2 /\ RR u1) ta ta.
   Proof.
@@ -879,7 +847,8 @@ Section PropMonad.
     intros.
     apply eutt_Returns_. auto.
   Qed.
-  
+
+  (* Figure 8: interp Trigger law *)
   (* SAZ : morally, we should only work with "proper" triggers everywhere *)
   Lemma interp_prop_trigger :
     forall E F (h_spec : E ~> PropT F) R (e : E R)
@@ -942,7 +911,7 @@ Section PropMonad.
     pstep. red. cbn. econstructor. right. apply CIH.
   Qed.
 
-
+  (* Figure 8: Structural law for tau *)
   Lemma interp_prop_tau :
     forall E F (h_spec : E ~> PropT F) R RR
       (t_spec : itree E R),
@@ -960,7 +929,6 @@ Section PropMonad.
     - red. typeclasses eauto.
   Qed.
 
-(* SAZ: Not clear that this one is provable : *)
   Lemma interp_prop_ret_inv :
     forall E F (h_spec : E ~> PropT F) R RR
       (r1 : R)
@@ -1022,7 +990,7 @@ Section PropMonad.
     eapply Returns_ret_inv_. reflexivity. cbn in H. apply H.
   Qed.
   
-  
+(*  
   
   (* SAZ: Not clear that this one is provable : *)
   Lemma interp_prop_bind_inv_l :
@@ -1059,7 +1027,8 @@ Section PropMonad.
       + cbn. rewrite Eq.bind_ret_l. reflexivity.
       + do 2 red. intros; subst. reflexivity.
   Abort.
-      
+*)  
+    
   
   Lemma case_prop_handler_correct:
     forall {E1 E2 F}
@@ -1093,11 +1062,6 @@ Section PropMonad.
           (prop_compose TT g_spec (h_spec T e))
             (interp g (h T e))).
 
-
-
-  
-
-  
   
   Definition singletonT {E}: itree E ~> PropT E :=
     fun R t t' => t' ≈ t.
@@ -1344,6 +1308,7 @@ Section PropMonad.
     eapply Returns_vis_inversion_. apply H. reflexivity.
   Qed.
 
+  (*
   Lemma interp_prop_bind_clo :
     forall E F (h_spec : E ~> PropT F) A B
       (HP : forall T, Proper (eq ==> Eq1_PropT T) (h_spec T))
@@ -1419,17 +1384,9 @@ Section PropMonad.
           intros. apply KK. rewrite eq0. 
           eapply Returns_bind; eauto.
   Admitted.          
-
+*)
   
   
-  (*
-  Lemma bind_Returns_l {E A B} :
-    forall a (ma : itree E A) (k : A -> itree E B),
-    Returns a ma ->
-    ITree.bind ma k ≈ k a.
-  Proof.
-  Admitted.
-   *)
 
   Definition divergent {E A} (ta : itree E A) := (forall k , ta ≈ bind ta k).
 
@@ -1836,7 +1793,7 @@ Section MonadLaws.
  Qed.
 
   
-
+  (* Figure 8: ret_bind law for PropT  - first law *)
   Lemma ret_bind: forall {E} (a b : Type) (f : a -> PropT E b) (x : a),
       eutt_closed (f x) ->
       eq1 (bind (ret x) f) (f x).
@@ -2054,7 +2011,7 @@ Section MonadLaws.
       intro H. apply eutt_Ret_spin_abs in H. auto.
   Qed.      
 
-  
+  (* Figure 8: bind_ret - second monad law for PropT *)  
   Lemma bind_ret: forall {E} (A : Type) (PA : PropT E A),
       eutt_closed PA ->
       eq1 (bind PA (fun x => ret x)) PA.
@@ -2298,7 +2255,7 @@ Qed.
 End BIND_BIND_COUNTEREXAMPLE.
 
 
-
+(* Figure 8: 3rd monad law, one direction bind associativity *)
 Lemma bind_bind: forall {E}
                    (A B C : Type) (PA : PropT E A)
                    (KB : A -> PropT E B) (KC : B -> PropT E C)
