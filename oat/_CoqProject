@@ -1,0 +1,4 @@
+-Q coq Oat
+-R coq Oat
+-R ../src/coq/ Vellvm
+-R ../lib/InteractionTrees/theories ITree
