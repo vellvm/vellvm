@@ -215,7 +215,6 @@ Definition no_event {E X} := paco1 (@no_eventF_ E X) bot1.
 
 Instance Proper_no_event {E X} : Proper (eutt eq ==> iff) (@no_event E X).
 Proof.
-  do 2 red.
   repeat red. intros. split; intros.
   - revert x y H H0.
     pcofix CIH.
@@ -251,6 +250,41 @@ Proof.
       * rewrite <- Heqox. econstructor. left.
         pstep. red. eapply IHeqitF. econstructor. assumption. reflexivity. apply Heqoy.
       * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
+Qed.    
+
+Instance Proper_no_event_eqit {E X} : Proper (eq_itree eq ==> iff) (@no_event E X).
+Proof.
+  repeat red. intros. split; intros.
+  - revert x y H H0.
+    pcofix CIH.
+    intros x y H0 H1. 
+    + punfold H0. red in H0.
+      punfold H1. red in H1.
+      genobs x ox.
+      genobs y oy.
+      pstep. red.
+      revert x Heqox y Heqoy.
+      induction H0; inversion H1; intros; subst.
+      * rewrite <- Heqoy. econstructor.
+      * rewrite <- Heqoy. econstructor. pclearbot. right. eapply CIH. 2:  { apply H0. }  apply REL.
+      * inversion CHECK.
+      * inversion CHECK.
+      * inversion CHECK.
+  - revert x y H H0.
+    pcofix CIH.
+    intros x y H0 H1. 
+    + punfold H0. red in H0.
+      punfold H1. red in H1.
+      genobs x ox.
+      genobs y oy.
+      pstep. red.
+      revert x Heqox y Heqoy.
+      induction H0; inversion H1; intros; subst.
+      * rewrite <- Heqox. econstructor.
+      * rewrite <- Heqox. econstructor. pclearbot. right. eapply CIH. 2:  { apply H0. }  apply REL.
+      * inversion CHECK.
+      * inversion CHECK.
+      * inversion CHECK.
 Qed.    
 
 
@@ -377,14 +411,44 @@ Definition inject_l {E F}: itree F ~> itree (E +' F) :=
 Lemma elim_inject_l :
   forall {E F X} (t : itree F X),
     elim_l (@inject_l E F _ t) ≈ t.
-Admitted.
+Proof.
+  einit.
+  ecofix CIH.
+  intros.
+  rewrite (itree_eta t).
+  unfold elim_l. unfold inject_l.
+  destruct (observe t).
+  - rewrite translate_ret. rewrite interp_ret.
+    estep.
+  - rewrite translate_tau. rewrite interp_tau.
+    estep.
+  - rewrite translate_vis. rewrite interp_vis. cbn.
+    rewrite bind_trigger. estep.
+    intros.
+    rewrite tau_eutt. ebase.
+Qed.
 
 (* [inject_l] is a left inverse to [elim_l] when considering trees with [no_event_l] *)
 Lemma inject_elim_l :
   forall {E F X} (t : itree (E +' F) X),
     no_event_l t -> 
     inject_l (elim_l t) ≈ t.
-Admitted.
+Proof.
+  einit.
+  ecofix CIH.
+  intros.
+  rewrite (itree_eta t).
+  unfold elim_l in *.
+  unfold inject_l in *.
+  pinversion H0.
+  - rewrite interp_ret. rewrite translate_ret. estep.
+  - rewrite interp_tau. rewrite translate_tau. estep.
+  - rewrite interp_vis. rewrite translate_bind.  cbn.
+    unfold trigger.  rewrite translate_vis. rewrite bind_vis.
+    estep. intros. rewrite translate_ret. rewrite bind_ret_l.
+    rewrite translate_tau. rewrite tau_eutt. ebase.
+    left. apply CIH0. apply H1.
+Qed.
 
 (* Injection to the left *)
 Definition inject_r {E F}: itree E ~> itree (E +' F) :=
@@ -394,14 +458,43 @@ Definition inject_r {E F}: itree E ~> itree (E +' F) :=
 Lemma elim_inject_r :
   forall {E F X} (t : itree E X),
     elim_r (@inject_r E F _ t) ≈ t.
-Admitted.
+Proof.
+  einit.
+  ecofix CIH.
+  intros.
+  rewrite (itree_eta t).
+  unfold elim_r. unfold inject_r.
+  destruct (observe t).
+  - rewrite translate_ret. rewrite interp_ret. estep.
+  - rewrite translate_tau. rewrite interp_tau. estep.
+  - rewrite translate_vis. rewrite interp_vis. cbn.
+    rewrite bind_trigger. estep.
+    intros.
+    rewrite tau_eutt. ebase.
+Qed.
 
 (* [inject_r] is a left inverse to [elim_r] when considering trees with [no_event_r] *)
 Lemma inject_elim_r :
   forall {E F X} (t : itree (E +' F) X),
     no_event_r t -> 
     inject_r (elim_r t) ≈ t.
-Admitted.
+Proof.
+  einit.
+  ecofix CIH.
+  intros.
+  rewrite (itree_eta t).
+  unfold elim_r in *.
+  unfold inject_r in *.
+  pinversion H0.
+  - rewrite interp_ret. rewrite translate_ret. estep.
+  - rewrite interp_tau. rewrite translate_tau. estep.
+  - rewrite interp_vis. rewrite translate_bind.  cbn.
+    unfold trigger.  rewrite translate_vis. rewrite bind_vis.
+    estep. intros. rewrite translate_ret. rewrite bind_ret_l.
+    rewrite translate_tau. rewrite tau_eutt. ebase.
+    left. apply CIH0. apply H1.
+Qed.
+
 
 (* Injection *)
 Definition inject {E}: itree void1 ~> itree E :=
@@ -411,31 +504,176 @@ Definition inject {E}: itree void1 ~> itree E :=
 Lemma elim_inject :
   forall {E X} (t : itree void1 X),
     elim (@inject E _ t) ≈ t.
-Admitted.
+Proof.
+  einit.
+  ecofix CIH.
+  intros.
+  rewrite (itree_eta t).
+  unfold elim. unfold inject.
+  destruct (observe t).
+  - rewrite translate_ret. rewrite interp_ret. estep.
+  - rewrite translate_tau. rewrite interp_tau. estep.
+  - inversion e.
+Qed.
+
 
 (* [inject] is a left inverse to [elim] when considering trees with [no_event] *)
 Lemma inject_elim :
   forall {E X} (t : itree E X),
     no_event t -> 
     inject (elim t) ≈ t.
-Admitted.
+Proof.
+  einit.
+  ecofix CIH.
+  intros.
+  rewrite (itree_eta t).
+  unfold elim. unfold inject.
+  pinversion H0.
+  - rewrite interp_ret. rewrite translate_ret. estep.
+  - rewrite interp_tau. rewrite translate_tau. estep.
+Qed.
 
 (** * Establishing [no_event]
     If two tree are similar after non-trivial injections, they have no events.
     The following probably needs to be refined.
  *)
 
-Lemma eutt_disjoint_no_event :
+(*  ------------------------------------------------------------------------- *)
+(* TODO: Move these to the itrees library? *)
+
+Lemma translate_ret_inv : forall E F A (h : E ~> F) (t : itree E A) a,
+    translate h t ≅ ret a -> t ≅ ret a.
+Proof.
+  intros.
+  rewrite (itree_eta t) in *.
+  pinversion H.
+  destruct (observe t); cbn in *; inversion H1. subst. reflexivity.
+  inversion CHECK.
+Qed.
+
+Lemma translate_tau_inv : forall E F A (h : E ~> F) (t : itree E A) u,
+    translate h t ≅ Tau u -> exists u', t ≅ Tau u'.
+Proof.
+  intros.
+  setoid_rewrite (itree_eta t).
+  rewrite (itree_eta t) in H.
+  pinversion H; try inversion CHECK.
+  destruct (observe t); cbn in *; inversion H1. subst. exists t0. reflexivity.
+Qed.
+
+Lemma translate_tau_vis : forall E F A B (h : E ~> F) (t : itree E B) f k,
+    translate h t ≅ Vis f k -> exists e k', f = @h A e /\ t ≅ Vis e k'.
+Proof.
+  intros.
+  setoid_rewrite (itree_eta t).
+  rewrite (itree_eta t) in H.
+  pinversion H; try inversion CHECK.
+  apply inj_pair2 in H3.
+  apply inj_pair2 in H4. 
+  subst. destruct (observe t). cbn in *. inversion H1. inversion H1. cbn in *.
+  inversion H. cbn in *.
+  apply inj_pair2 in H3.
+  apply inj_pair2 in H4.
+  subst.
+  apply inj_pair2 in H7.
+  apply inj_pair2 in H6. subst.
+  exists e0.
+  exists k2. split; reflexivity.
+Qed.
+(*  ------------------------------------------------------------------------- *)
+
+
+Lemma eutt_disjoint_no_event_l :
   forall {E F X Y} (R : X -> Y -> Prop) (t : itree E X) (s : itree F Y),
     eutt R (inject_r t) (@inject_l E F _ s) ->
-    no_event t /\ no_event s.
+    no_event t.
+Proof.
+  intros E F X Y R.
+  pcofix CIH.
+  intros t s H0.
+  rewrite (itree_eta t) in H0.
+  rewrite (itree_eta s) in H0.
+  repeat red in H0.
+  punfold H0.
+  red in H0.
+  unfold inject_r, inject_l in H0.
+  pstep. red.
+  genobs t obt.
+  genobs s obs.
+  match goal with
+  | [_ : eqitF _ _ _ _ _ ?X ?Y |- _] => remember X; remember Y
+  end.
+  revert t s obt Heqobt obs Heqobs Heqi Heqi0.
+  induction H0; intros. 
+  - destruct obt; cbn in *; inversion Heqi. constructor.
+  - destruct obt; cbn in *; inversion Heqi. constructor. destruct obs; cbn in *; inversion Heqi0. subst.
+    right. eapply CIH. unfold inject_r. unfold inject_l. pclearbot. apply REL.
+  - destruct obt; cbn in *; inversion Heqi. destruct obs; cbn in *; inversion Heqi0. subst.
+    apply inj_pair2 in H4.
+    apply inj_pair2 in H1. rewrite H4 in H1. inversion H1.
+  - destruct obt; cbn in *; inversion Heqi. constructor. right. eapply CIH. unfold inject_r. rewrite <- H1.
+    pstep. red. unfold inject_l. rewrite Heqi0 in H0. apply H0.
+  - destruct obs; cbn in *; inversion Heqi0.
+    eapply IHeqitF. apply Heqobt. 2 : { apply Heqi. } assert (observe t0 = observe t0) by reflexivity. apply H.
+    rewrite H1. reflexivity.
+Qed.
+    
+
+Lemma eutt_disjoint_no_event_r :
+  forall {E F X Y} (R : X -> Y -> Prop) (t : itree E X) (s : itree F Y),
+    eutt R (inject_r t) (@inject_l E F _ s) ->
+    no_event s.
+Proof.
+  intros E F X Y R.
+  pcofix CIH.
+  intros t s H0.
+  rewrite (itree_eta t) in H0.
+  rewrite (itree_eta s) in H0.
+  repeat red in H0.
+  punfold H0.
+  red in H0.
+  unfold inject_r, inject_l in H0.
+  pstep. red.
+  genobs t obt.
+  genobs s obs.
+  match goal with
+  | [_ : eqitF _ _ _ _ _ ?X ?Y |- _] => remember X; remember Y
+  end.
+  revert t s obt Heqobt obs Heqobs Heqi Heqi0.
+  induction H0; intros. 
+  - destruct obs; cbn in *; inversion Heqi0. constructor.
+  - destruct obs; cbn in *; inversion Heqi0. constructor. destruct obt; cbn in *; inversion Heqi. subst.
+    right. eapply CIH. unfold inject_r. unfold inject_l. pclearbot. apply REL.
+  - destruct obs; cbn in *; inversion Heqi0. destruct obt; cbn in *; inversion Heqi. subst.
+    apply inj_pair2 in H4.
+    apply inj_pair2 in H1. rewrite H4 in H1. inversion H1.
+  - destruct obt; cbn in *; inversion Heqi.
+    eapply IHeqitF. assert (observe t0 = observe t0) by reflexivity. apply H. apply Heqobs.
+    rewrite H1. reflexivity. assumption.
+  - destruct obs; cbn in *; inversion Heqi0. constructor. right. eapply CIH. unfold inject_l. rewrite <- H1.
+    pstep. red. unfold inject_r. rewrite Heqi in H0. apply H0.
+Qed.
+
+Instance Proper_inject_l {E F X} : Proper (eq_itree eq ==> eq_itree eq) (@inject_l E F X).
+Proof.
+  do 3 red.
+  intros x y EQ.
+  rewrite EQ. reflexivity.
+Qed.  
+
+
+  
+(* SAZ: My straightforward attempts at proving the next few lemmas fail. *)
+
+Lemma no_event_translate :
+  forall {E F X} (m : E ~> F) (t : itree E X), no_event t -> no_event (translate m t).
+Proof.
 Admitted.
 
 (* And while we're at it, injection should not compromise [no_event] *)
 Lemma no_event_inject_l :
-  forall {E F X} (t : itree F X),
-    no_event t ->
-    no_event (@inject_l E F _ t).
+  forall {E F X} (t : itree F X), no_event t -> forall u, t ≅ u -> no_event (@inject_l E F _ u).
+Proof.
 Admitted.
 
 Lemma no_event_inject_r :
