@@ -13,6 +13,7 @@ From Coq Require Import
 
 From ITree Require Import
      ITree
+     Basics.HeterogeneousRelations
      Eq.Eq
      Interp.Interp
      Interp.InterpFacts
