@@ -6,6 +6,7 @@ From Coq Require Import
 From ITree Require Import
      ITree
      ITreeFacts
+     Basics.HeterogeneousRelations
      Events.State
      Events.StateFacts
      InterpFacts

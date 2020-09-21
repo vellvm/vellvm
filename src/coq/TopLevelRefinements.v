@@ -1,6 +1,7 @@
 From ITree Require Import
      ITree
      ITreeFacts
+     Basics.HeterogeneousRelations
      Events.State
      Events.StateFacts
      InterpFacts
@@ -169,8 +170,8 @@ Proof.
     match goal with |- PropT.interp_prop ?x _ _ _ _ => remember x as h end.
     eapply interp_prop_Proper_eq in Ht.
     apply Ht.
-    + typeclasses eauto.
-    + typeclasses eauto.
+    + apply prod_rel_refl; typeclasses eauto.
+    + apply prod_rel_trans; typeclasses eauto.
     + assumption.
     + reflexivity.
   - reflexivity.

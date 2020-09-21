@@ -1,6 +1,7 @@
 From ITree Require Import
      ITree
      ITreeFacts
+     Basics.HeterogeneousRelations
      Events.State
      Events.StateFacts
      InterpFacts
