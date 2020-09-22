@@ -4,9 +4,5 @@ coq/LL.vo coq/LL.glob coq/LL.v.beautified coq/LL.required_vo: coq/LL.v
 coq/LL.vio: coq/LL.v 
 coq/LLInject.vo coq/LLInject.glob coq/LLInject.v.beautified coq/LLInject.required_vo: coq/LLInject.v ../src/coq/LLVMAst.vo ../src/coq/AstLib.vo coq/LL.vo
 coq/LLInject.vio: coq/LLInject.v ../src/coq/LLVMAst.vio ../src/coq/AstLib.vio coq/LL.vio
-coq/Memory.vo coq/Memory.glob coq/Memory.v.beautified coq/Memory.required_vo: coq/Memory.v coq/AST.vo ../src/coq/Util.vo
-coq/Memory.vio: coq/Memory.v coq/AST.vio ../src/coq/Util.vio
-coq/OatIO.vo coq/OatIO.glob coq/OatIO.v.beautified coq/OatIO.required_vo: coq/OatIO.v ../src/coq/Util.vo coq/AST.vo
-coq/OatIO.vio: coq/OatIO.v ../src/coq/Util.vio coq/AST.vio
-coq/Denotation.vo coq/Denotation.glob coq/Denotation.v.beautified coq/Denotation.required_vo: coq/Denotation.v coq/AST.vo
-coq/Denotation.vio: coq/Denotation.v coq/AST.vio
+coq/Denotation.vo coq/Denotation.glob coq/Denotation.v.beautified coq/Denotation.required_vo: coq/Denotation.v coq/AST.vo ../lib/InteractionTrees/theories/ITree.vo ../lib/InteractionTrees/theories/ITreeFacts.vo ../lib/InteractionTrees/theories/Events/MapDefault.vo ../lib/InteractionTrees/theories/Events/StateFacts.vo
+coq/Denotation.vio: coq/Denotation.v coq/AST.vio ../lib/InteractionTrees/theories/ITree.vio ../lib/InteractionTrees/theories/ITreeFacts.vio ../lib/InteractionTrees/theories/Events/MapDefault.vio ../lib/InteractionTrees/theories/Events/StateFacts.vio

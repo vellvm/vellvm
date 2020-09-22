@@ -12,36 +12,46 @@ Import Monads.
 Import MonadNotation.
 Local Open Scope monad_scope.
 Local Open Scope string_scope.
+(* Pass at denote_expr  *)
 
+(* ======================================================================================== *)
+(** ** Semantics *)
 
-(* Following the Imp.v example, I'm trying to write the semantics for OAT *)
-(*
-  VV: First pass
-  An OAT Environment is a mapping of a variable to an exp 
-  Defintion var : Set := string.
-  Definition value : Type := nat 
-
-  Variant OatState : Type -> Type :=
-  | GetVar (x: var) : OatState value
-  | SetVar (x: var) (v: value) : OatState unit
-  | GetArr ... what should this be?
-  | SetArr ... also not really easy to express here
-
-  IMP only uses int variables so maybe not ?
- *)
-
-
-Check Oat.AST.exp.
-(* Maybe refine the var defintion *)
 Definition var : Set := string.
-Definition value : Set := Oat.AST.ty.
-(* Definition value : Set := Cbool \/ CInt \/ CStr *)
 
 Variant OatValue : Type := 
-   | OBool : Bool -> OatValue Oat.AST.TBool 
-   | OInt : Z -> OatValue Oat.AST.TInt
+| OBool (b: bool)
+| OInt (i: Z)
+.
 
-(* 
+Definition value : Set := OatValue.
+Variant OatState : Type -> Type :=
+| GetVar (x: var) : OatState value 
+| SetVar (x: var) (v: value) : OatState unit
+.
+Context { eff : Type -> Type }.
+Context {HasOatState : OatState -< eff }.
+
+i
+Definition expr := Oat.AST.exp.
+Definition bop := Oat.AST.binop.
+
+(* (e)xpr (i)n (n)ode *)
+
+Fixpoint eval_Oatval (o: oatval)
+Fixpoint denote_expr (e: expr) : itree eff value :=
+  match e with
+  | Id i => trigger (GetVar i)
+  | CBool b => ret (OBool b)
+  | CInt i => ret (OInt i)
+  | Bop Add l r => l' <- denote_expr (elt_of l) ;; r' <- denote_expr (elt_of r) ;; ret (OInt(l' + r'))  
+  | _ => ret (OBool true)
+  end.
+
+                           
+
+        
+ (* 
   Second pass
   Defintion var : Set := string.
 
