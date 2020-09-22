@@ -661,14 +661,91 @@ Proof.
   rewrite EQ. reflexivity.
 Qed.  
 
+Section eqit_closure.
 
-  
-(* SAZ: My straightforward attempts at proving the next few lemmas fail. *)
+  Context {E : Type -> Type} {R : Type}.
+
+  (* SAZ: My straightforward attempts at proving the next few lemmas fail. *)
+  Inductive eq_itree_clo  (r : itree E R -> Prop)
+    : itree E R -> Prop :=
+  | eq_itree_clo_intro t t' (EQVl: eq_itree eq t t') (REL: r t')
+    : eq_itree_clo r t.
+  Hint Constructors eq_itree_clo: core.
+
+  Lemma eq_itree_clo_mon r1 r2 t
+        (IN: eq_itree_clo r1 t)
+        (LE: r1 <1= r2):
+    eq_itree_clo r2 t.
+  Proof.
+    destruct IN. econstructor; eauto.
+  Qed.
+
+  Hint Resolve eq_itree_clo_mon : paco.
+
+  Lemma eq_itree_clo_wcompat :
+    wcompatible1 no_eventF_ eq_itree_clo.
+  Proof.
+    econstructor.
+    pmonauto.
+    intros.
+    inv PR.
+    punfold EQVl.
+    unfold_eqit.
+    unfold no_eventF_ in *.
+    inv REL.
+    - genobs x0 ox0.
+      genobs t' ot'.
+      inv EQVl; intuition.
+      rewrite <- H0 in H1; inv H1.
+      rewrite <- H0 in H1; inv H1.
+    - genobs x0 ox0.
+      genobs t' ot'.
+      inv EQVl; intuition.
+      + rewrite <- H in H2; inv H2.
+        constructor.
+        pclearbot.
+        gclo.
+        econstructor; cycle -1; eauto with paco.
+      + rewrite <- H in H2; inv H2.
+  Qed.
+
+  Global Instance geuttgen_cong_eqit r rg :
+    Proper ((eq_itree eq) ==> flip impl) (gpaco1 no_eventF_ eq_itree_clo r rg).
+  Proof.
+    repeat intro.
+    gclo.
+    econstructor; cycle -1; eauto.
+  Qed.
+
+End eqit_closure.
+Hint Resolve eq_itree_clo_mon : paco.
+Hint Constructors eq_itree_clo: core.
+Hint Resolve eq_itree_clo_wcompat : paco.
 
 Lemma no_event_translate :
   forall {E F X} (m : E ~> F) (t : itree E X), no_event t -> no_event (translate m t).
 Proof.
-Admitted.
+  ginit.
+  intros E F X m t H.
+  rewrite (itree_eta t).
+  revert t H. 
+  gcofix CIH.
+  intros * NEV.
+  rewrite itree_eta in NEV.
+  red in NEV.
+  punfold NEV.
+  inv NEV.
+  - rewrite translate_ret.
+    gstep.
+    constructor.
+  - pclearbot.
+    rewrite translate_tau.
+    gstep.
+    constructor.
+    rewrite (itree_eta t0).
+    gbase.
+    eauto.
+Qed.
 
 (* And while we're at it, injection should not compromise [no_event] *)
 Lemma no_event_inject_l :
