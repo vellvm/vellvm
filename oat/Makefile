@@ -16,7 +16,8 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILES_OAT    := AST LL LLInject Memory OatIO Denotation
+# COQFILES_OAT    := AST LL LLInject Memory OatIO Denotation
+COQFILES_OAT    := AST LL LLInject Denotation
 
 OLLVMFILES :=
 
