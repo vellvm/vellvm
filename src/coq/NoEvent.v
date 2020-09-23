@@ -749,16 +749,55 @@ Qed.
 
 (* And while we're at it, injection should not compromise [no_event] *)
 Lemma no_event_inject_l :
-  forall {E F X} (t : itree F X), no_event t -> forall u, t ≅ u -> no_event (@inject_l E F _ u).
+  forall {E F X} (t : itree F X), no_event t -> no_event (@inject_l E F _ t).
 Proof.
-Admitted.
+  ginit.
+  intros * H.
+  rewrite (itree_eta t).
+  revert t H. 
+  gcofix CIH.
+  intros * NEV.
+  rewrite itree_eta in NEV.
+  red in NEV.
+  punfold NEV.
+  inv NEV.
+  - unfold inject_l; rewrite translate_ret.
+    gstep.
+    constructor.
+  - pclearbot.
+    unfold inject_l; rewrite translate_tau.
+    gstep.
+    constructor.
+    rewrite (itree_eta t0).
+    gbase.
+    eauto.
+Qed.
 
 Lemma no_event_inject_r :
   forall {E F X} (t : itree E X),
     no_event t ->
     no_event (@inject_r E F _ t).
-Admitted.
-
+  ginit.
+  intros * H.
+  rewrite (itree_eta t).
+  revert t H. 
+  gcofix CIH.
+  intros * NEV.
+  rewrite itree_eta in NEV.
+  red in NEV.
+  punfold NEV.
+  inv NEV.
+  - unfold inject_r; rewrite translate_ret.
+    gstep.
+    constructor.
+  - pclearbot.
+    unfold inject_r; rewrite translate_tau.
+    gstep.
+    constructor.
+    rewrite (itree_eta t0).
+    gbase.
+    eauto.
+Qed.
 
 (** * Other discussions  *)
 
