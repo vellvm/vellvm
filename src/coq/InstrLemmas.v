@@ -691,12 +691,12 @@ Proof.
 Qed.
 
 Lemma denote_term_br_1 :
-  forall (e : exp dtyp) defs b g ρ m,
+  forall defs b g ρ m,
     interp_cfg_to_L3 defs
                      (translate exp_E_to_instr_E
                                 (denote_terminator (TERM_Br_1 b))) g ρ m ≈ Ret (m, (ρ, (g, inl b))). 
 Proof.
-  intros e defs b g ρ m.
+  intros defs b g ρ m.
   cbn.
   rewrite translate_ret,interp_cfg_to_L3_ret.
   reflexivity.
