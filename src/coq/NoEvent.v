@@ -722,6 +722,48 @@ Hint Resolve eq_itree_clo_mon : paco.
 Hint Constructors eq_itree_clo: core.
 Hint Resolve eq_itree_clo_wcompat : paco.
 
+(* We should be able to have a more general closure up to [eutt RR]. *)
+(*    I am however having trouble proving the weak compatibility in this case. *)
+(*  *)
+Section eutt_closure.
+
+  Context {E : Type -> Type} {R : Type} {RR : R -> R -> Prop}.
+
+  Inductive eutt_clo  (r : itree E R -> Prop)
+    : itree E R -> Prop :=
+  | eutt_clo_intro t t' (EQVl: eutt RR t t') (REL: r t')
+    : eutt_clo r t.
+  Hint Constructors eutt_clo: core.
+
+  Lemma eutt_clo_mon r1 r2 t
+        (IN: eutt_clo r1 t)
+        (LE: r1 <1= r2):
+    eutt_clo r2 t.
+  Proof.
+    destruct IN. econstructor; eauto.
+  Qed.
+
+  Hint Resolve eutt_clo_mon : paco.
+ 
+  Lemma eutt_clo_wcompat :
+    wcompatible1 no_eventF_ eutt_clo.
+  Proof.
+  Admitted.
+
+  (* Global *) Instance geuttgen_cong_eutt r rg :
+    Proper ((eutt RR) ==> flip impl) (gpaco1 no_eventF_ eutt_clo r rg).
+  Proof.
+    repeat intro.
+    gclo.
+    econstructor; cycle -1; eauto.
+  Qed.
+
+End  eutt_closure.
+(* Hint Resolve eutt_clo_mon : paco. *)
+(* Hint Constructors eutt_clo: core. *)
+(* Hint Resolve eutt_clo_wcompat : paco. *)
+
+
 Lemma no_event_translate :
   forall {E F X} (m : E ~> F) (t : itree E X), no_event t -> no_event (translate m t).
 Proof.
