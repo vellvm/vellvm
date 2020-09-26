@@ -3,141 +3,10 @@ From Coq Require Import Morphisms.
 From ITree Require Import
      ITree
      Eq.Eq
+     Basics.HeterogeneousRelations
      Interp.TranslateFacts.
 Set Implicit Arguments.
 Set Strict Implicit.
-
-(* TODO: replace the too restrictive version from itree *)
-Lemma eutt_eq_bind : forall E R1 R2 RR U (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
-    (forall u, eutt RR (k1 u) (k2 u)) -> eutt RR (ITree.bind t k1) (ITree.bind t k2).
-Proof.
-  intros.
-  apply eutt_clo_bind with (UU := Logic.eq); [reflexivity |].
-  intros ? ? ->; apply H.
-Qed.
-
-Lemma eutt_Ret :
-  forall E (R1 R2 : Type) (RR : R1 -> R2 -> Prop) r1 r2, RR r1 r2 <-> eutt (E := E) RR (Ret r1) (Ret r2).
-Proof.
-  intros; apply eqit_Ret.
-Qed.
-
-(* TODO Move to ITree *)
-Require Import Paco.paco.
-Lemma eutt_translate_gen :
-      forall {E F X Y} (f : E ~> F) (RR : X -> Y -> Prop) (t : itree E X) (s : itree E Y),
-        eutt RR t s ->
-        eutt RR (translate f t) (translate f s).
-Proof.
-  intros *.
-  revert t s.
-  einit.
-  ecofix CIH.
-  intros * EUTT.
-  rewrite !unfold_translate. punfold EUTT. red in EUTT.
-  induction EUTT; intros; subst; simpl; pclearbot.
-  - estep.
-  - estep. 
-  - estep; intros ?; ebase.
-  - rewrite tau_euttge, unfold_translate. eauto.
-  - rewrite tau_euttge, unfold_translate. eauto.
-Qed. 
-
-Definition equiv_rel {A B : Type} (R S: A -> B -> Prop): Prop :=
-  forall a b, R a b <-> S a b.
-Infix "⇔" :=  equiv_rel (at level 85, right associativity).
-
-Definition equiv_pred {A : Type} (R S: A -> Prop): Prop :=
-  forall a, R a <-> S a.
-
-Definition sum_pred {A B : Type} (PA : A -> Prop) (PB : B -> Prop) : A + B -> Prop :=
-  fun x => match x with | inl a => PA a | inr b => PB b end.
-
-Definition prod_pred {A B : Type} (PA : A -> Prop) (PB : B -> Prop) : A * B -> Prop :=
-  fun '(a,b) => PA a /\ PB b.
-
-Definition TT {A : Type} : A -> Prop := fun _ => True.
-Hint Unfold TT sum_pred prod_pred: core.
-
-Lemma fold_eqitF:
-  forall {E R1 R2} (RR: R1 -> R2 -> Prop) b1 b2 (t1 : itree E R1) (t2 : itree E R2) ot1 ot2,
-    eqitF RR b1 b2 id (upaco2 (eqit_ RR b1 b2 id) bot2) ot1 ot2 ->
-    ot1 = observe t1 ->
-    ot2 = observe t2 ->
-    eqit RR b1 b2 t1 t2.
-Proof.
-  intros * eq -> ->; pfold; auto.
-Qed.
-
-Lemma eutt_conj {E} {R S} {RS RS'} :
-  forall (t : itree E R) (s : itree E S),
-    eutt RS  t s ->
-    eutt RS' t s ->
-    eutt (RS /2\ RS') t s. 
-Proof.
-  repeat red.
-  einit.
-  ecofix CIH; intros * EQ EQ'.
-  rewrite itree_eta, (itree_eta s).
-  punfold EQ; punfold EQ'; red in EQ; red in EQ'.
-  genobs t ot; genobs s os.
-  hinduction EQ before CIH0; subst; intros; pclearbot; simpl.
-
-  - estep; split; auto.
-    inv EQ'; auto.
-  - estep; ebase; right; eapply CIH; eauto.
-    rewrite <- tau_eutt.
-    rewrite <- (tau_eutt m2); auto.
-  - estep; ebase; intros ?; right; eapply CIH0; eauto.
-    eapply eqit_Vis; eauto.
-  - eapply fold_eqitF in EQ'; eauto.
-    assert (t ≈ Tau t1) by (rewrite itree_eta, <- Heqot; reflexivity).
-    rewrite H in EQ'.
-    apply eqit_inv_tauL in EQ'.
-    subst; specialize (IHEQ _ _ eq_refl eq_refl).
-    punfold EQ'; red in EQ'.
-    specialize (IHEQ EQ').
-    rewrite eqit_tauL; [|reflexivity].
-    rewrite (itree_eta t1).
-    eapply IHEQ. 
-  - subst; cbn.
-    rewrite tau_euttge.
-    rewrite (itree_eta t2); eapply IHEQ; eauto.
-    eapply fold_eqitF in EQ'; eauto.
-    assert (s ≈ Tau t2).
-    rewrite (itree_eta s), <- Heqos; reflexivity.
-    rewrite tau_eutt in H.
-    assert (eutt RS' t t2).
-    rewrite <- H; auto.
-    punfold H0.
-Qed.
-
-Lemma eutt_disj_l {E} {R S} {RS RS'} :
-  forall (t : itree E R) (s : itree E S),
-    eutt RS t s ->
-    eutt (RS \2/ RS') t s. 
-Proof.
-  intros.
-  eapply eqit_mon with (RR := RS); eauto.
-Qed.
-
-Lemma eutt_disj_r {E} {R S} {RS RS'} :
-  forall (t : itree E R) (s : itree E S),
-    eutt RS' t s ->
-    eutt (RS \2/ RS') t s. 
-Proof.
-  intros.
-  eapply eqit_mon with (RR := RS'); eauto.
-Qed.
-
-Lemma eutt_equiv {E} {R S} {RS RS'} :
-  forall (t : itree E R) (s : itree E S),
-    (RS ⇔ RS') ->
-    eutt RS t s <-> eutt RS' t s. 
-Proof.
-  intros * EQ; split; intros EUTT; eapply eqit_mon; try apply EUTT; eauto.
-  all:apply EQ.
-Qed.
 
 (** * has_post  *)
 
@@ -166,7 +35,7 @@ Notation "t ⤳ Q" := (has_post t Q) (at level 50).
 Lemma has_post_equiv {E X} (t : itree E X) : Proper (equiv_pred ==> iff) (has_post t).
 Proof.
   repeat red; intros * EQ *; split; intros HP; eapply eutt_equiv; eauto.
-  all:split; apply EQ.
+  all:split; red; intros; apply EQ; auto.
 Qed.
 
 Lemma has_post_conj : forall {E X} (t : itree E X) P Q,
@@ -175,7 +44,7 @@ Lemma has_post_conj : forall {E X} (t : itree E X) P Q,
     t ⤳ (P /1\ Q).
 Proof.
   intros * HP HQ.
-  pose proof eutt_conj HP HQ.
+  pose proof eutt_conj _ _ HP HQ.
   auto.
 Qed.     
 
@@ -184,7 +53,7 @@ Lemma has_post_disj_l : forall {E X} (t : itree E X) P Q,
     t ⤳ (P \1/ Q).
 Proof.
   intros * HP.
-  epose proof eutt_disj_l HP as H.
+  epose proof eutt_disj_l _ _ HP as H.
   apply H.
 Qed.     
 
@@ -193,7 +62,7 @@ Lemma has_post_disj_r : forall {E X} (t : itree E X) P Q,
     t ⤳ (P \1/ Q).
 Proof.
   intros * HQ.
-  epose proof eutt_disj_r HQ as H.
+  epose proof eutt_disj_r _ _ HQ as H.
   apply H.
 Qed.     
 
@@ -282,8 +151,8 @@ Proof.
   clear -EQ2.
   eapply eutt_equiv; eauto.
   split.
-  - intros (? & ? & ?); do 2 econstructor; eauto. 
-  - intros ?. inv H. inv REL1.
+  - intros ? ? (? & ? & ?); do 2 econstructor; eauto. 
+  - intros ? ? ?. inv H. inv REL1.
     destruct REL2 as [-> ?], REL0 as [<- ?]; eauto.
 Qed.
 

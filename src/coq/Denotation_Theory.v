@@ -400,12 +400,12 @@ Proof.
     try (einit; estep; intros []).
 
   - destruct v. 
-    apply PostConditions.eutt_eq_bind; intros ?.
+    apply eutt_eq_bind; intros ?.
     apply eutt_Ret; cbn; eauto.
 
   - destruct v; cbn.
-    apply PostConditions.eutt_eq_bind; intros ?.
-    apply PostConditions.eutt_eq_bind; intros ?.
+    apply eutt_eq_bind; intros ?.
+    apply eutt_eq_bind; intros ?.
     unfold raise, Exception.throw, raiseUB.
     destruct u0; cbn;
       try (einit; estep; intros []).
