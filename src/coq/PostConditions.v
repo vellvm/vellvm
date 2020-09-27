@@ -32,10 +32,13 @@ Notation "t ⤳ Q" := (has_post t Q) (at level 50).
     Post-conditions can be established by usual elementary logical connectives
  *)
 
-Lemma has_post_equiv {E X} (t : itree E X) : Proper (equiv_pred ==> iff) (has_post t).
+Lemma has_post_equiv {E X} : Proper (eutt eq ==> equiv_pred ==> iff) (@has_post E X).
 Proof.
-  repeat red; intros * EQ *; split; intros HP; eapply eutt_equiv; eauto.
-  all:split; red; intros; apply EQ; auto.
+  repeat red; unfold has_post; intros * EUTT * EQ *; split; intros HP.
+  - rewrite <- EUTT; eapply eutt_equiv; eauto.
+    split; red; intros; apply EQ; auto.
+  - rewrite EUTT; eapply eutt_equiv; eauto.
+    split; red; intros; apply EQ; auto.
 Qed.
 
 Lemma has_post_conj : forall {E X} (t : itree E X) P Q,
