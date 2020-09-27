@@ -183,7 +183,7 @@ Section InterpreterCFG.
 
   Lemma interp_cfg_to_L3_GR : forall defs id g l m v,
       Maps.lookup id g = Some v ->
-      interp_cfg_to_L3 defs (trigger (GlobalRead id)) g l m ≈ ret (m,(l,(g,v))).
+      interp_cfg_to_L3 defs (trigger (GlobalRead id)) g l m ≈ Ret (m,(l,(g,v))).
   Proof.
     intros * LU.
     unfold interp_cfg_to_L3.
@@ -198,7 +198,7 @@ Section InterpreterCFG.
 
   Lemma interp_cfg_to_L3_LR : forall defs id g l m v,
       Maps.lookup id l = Some v ->
-      interp_cfg_to_L3 defs (trigger (LocalRead id)) g l m ≈ ret (m,(l,(g,v))).
+      interp_cfg_to_L3 defs (trigger (LocalRead id)) g l m ≈ Ret (m,(l,(g,v))).
   Proof.
     intros * LU.
     unfold interp_cfg_to_L3.
@@ -214,7 +214,7 @@ Section InterpreterCFG.
   Qed.
 
   Lemma interp_cfg_to_L3_LW : forall defs id g l m v,
-      interp_cfg_to_L3 defs (trigger (LocalWrite id v)) g l m ≈ ret (m,(Maps.add id v l, (g,tt))).
+      interp_cfg_to_L3 defs (trigger (LocalWrite id v)) g l m ≈ Ret (m,(Maps.add id v l, (g,tt))).
   Proof.
     intros.
     unfold interp_cfg_to_L3.
@@ -227,7 +227,7 @@ Section InterpreterCFG.
   Qed.
 
   Lemma interp_cfg_to_L3_GW : forall defs id g l m v,
-      interp_cfg_to_L3 defs (trigger (GlobalWrite id v)) g l m ≈ ret (m,(l,(Maps.add id v g,tt))).
+      interp_cfg_to_L3 defs (trigger (GlobalWrite id v)) g l m ≈ Ret (m,(l,(Maps.add id v g,tt))).
   Proof.
     intros.
     unfold interp_cfg_to_L3.
@@ -261,7 +261,7 @@ Section InterpreterCFG.
   Lemma interp_cfg_to_L3_store :
     forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr) g l defs,
       write m a val = inr m' ->
-      interp_cfg_to_L3 defs (trigger (Store (DVALUE_Addr a) val)) g l m ≈ ret (m',(l,(g,tt))).
+      interp_cfg_to_L3 defs (trigger (Store (DVALUE_Addr a) val)) g l m ≈ Ret (m',(l,(g,tt))).
   Proof.
     intros m m' t val a g l defs WRITE.
     unfold interp_cfg_to_L3.
@@ -286,7 +286,7 @@ Section InterpreterCFG.
       non_void t ->
       exists m' a',
         allocate m t = inr (m', a') /\
-        interp_cfg_to_L3 defs (trigger (Alloca t)) g l m ≈ ret (m', (l, (g, DVALUE_Addr a'))).
+        interp_cfg_to_L3 defs (trigger (Alloca t)) g l m ≈ Ret (m', (l, (g, DVALUE_Addr a'))).
   Proof.
     intros * NV.
     unfold interp_cfg_to_L3.
@@ -318,7 +318,7 @@ Section InterpreterCFG.
     forall (defs : intrinsic_definitions) (m : memory_stack) (τ : dtyp) (g : global_env) l fn args df res,
       assoc fn (defs_assoc defs) = Some df ->
       df args = inr res ->
-      interp_cfg_to_L3 defs (trigger (Intrinsic τ fn args)) g l m ≈ ret (m, (l, (g, res))).
+      interp_cfg_to_L3 defs (trigger (Intrinsic τ fn args)) g l m ≈ Ret (m, (l, (g, res))).
   Proof.
     intros defs m τ g l fn args df res LUP RES.
     unfold interp_cfg_to_L3.
