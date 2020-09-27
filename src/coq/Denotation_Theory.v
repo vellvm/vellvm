@@ -129,7 +129,7 @@ Qed.
 (** [denote_code] *)
 
 Lemma denote_code_nil :
-  denote_code [] ≈ ret tt.
+  denote_code [] ≈ Ret tt.
 Proof.
   intros.
   cbn. rewrite bind_ret_l.
