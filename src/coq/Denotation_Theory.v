@@ -688,6 +688,56 @@ Proof.
   apply eutt_eq_bind; intros (_ & ? & ? & []).
 Qed.
 
+Lemma translate_map_monad {E F A B} (l : list A) (ts : A -> itree E B) (h : E ~> F) :
+  translate h (map_monad ts l) ≈ map_monad (fun a => translate h (ts a)) l.
+Proof.
+  induction l as [| a l IH].
+  - cbn; rewrite translate_ret; reflexivity.
+  - simpl; rewrite translate_bind.
+    apply eutt_eq_bind; intros ?.
+    rewrite !translate_bind, IH.
+    setoid_rewrite translate_ret.
+    reflexivity.
+Qed.
+
+Lemma interp_map_monad {E F A B} (l : list A) (ts : A -> itree E B) (h : E ~> itree F):
+  interp h (map_monad ts l) ≈ map_monad (fun a => interp h (ts a)) l.
+Proof.
+  intros; induction l as [| a l IH]; simpl.
+  - rewrite interp_ret; reflexivity.
+  - rewrite interp_bind.
+    apply eutt_eq_bind; intros ?; cbn.
+    rewrite interp_bind, IH.
+    apply eutt_eq_bind; intros ?; cbn.
+    rewrite interp_ret; reflexivity.
+Qed.
+
+Lemma interp_state_map_monad {E F S A B} (l : list A) (ts : A -> itree E B) (h : E ~> Monads.stateT S (itree F)) (s : S):
+  interp_state h (map_monad ts l) s ≈ map_monad (m := Monads.stateT S (itree F)) (fun a => interp_state h (ts a)) l s.
+Proof.
+  intros; revert s; induction l as [| a l IH]; simpl; intros s.
+  - rewrite interp_state_ret; reflexivity.
+  - rewrite interp_state_bind.
+    apply eutt_eq_bind; intros []; cbn.
+    rewrite interp_state_bind, IH.
+    apply eutt_eq_bind; intros []; cbn.
+    rewrite interp_state_ret; reflexivity.
+Qed.
+
+Lemma interp_cfg_to_L3_map_monad {A B} defs g l m (xs : list A) (ts : A -> itree _ B) : 
+  interp_cfg_to_L3 defs (map_monad ts xs) g l m ≈
+                   map_monad (m := Monads.stateT _ (Monads.stateT _ (Monads.stateT _ (itree _))))
+                   (fun a => interp_cfg_to_L3 defs (ts a)) xs g l m.
+Proof.
+  intros; revert g l m; induction xs as [| a xs IH]; simpl; intros.
+  - rewrite interp_cfg_to_L3_ret; reflexivity.
+  - rewrite interp_cfg_to_L3_bind.
+    apply eutt_eq_bind; intros (? & ? & ? & ?); cbn.
+    rewrite interp_cfg_to_L3_bind, IH.
+    apply eutt_eq_bind; intros (? & ? & ? & ?); cbn.
+    rewrite interp_cfg_to_L3_ret; reflexivity.
+Qed.
+
 Lemma expr_are_pure : forall defs o e, pure (interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp o e))).
 Proof.
   intros; unfold pure, has_post.
@@ -765,6 +815,12 @@ Proof.
 
   - destruct o; cbn; [| apply failure_is_pure].
     rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; intuition.
+
+  - rewrite translate_bind, interp_cfg_to_L3_bind.
+    rewrite translate_map_monad.
+    
+
+    
 
 Admitted.
 
