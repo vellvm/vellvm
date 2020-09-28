@@ -609,3 +609,161 @@ Proof.
   eapply find_block_not_in_inputs, no_duplicate_bid_not_in_l; eauto using independent_flows_no_duplicate_bid.
 Qed.
 
+From Vellvm Require Import InterpreterCFG Handlers.
+
+Section Translations.
+
+  (* Technicality: translations by [lookup_E_to_exp_E] and [exp_E_to_instr_E] leave these events unphased *)
+  Lemma lookup_E_to_exp_E_Global : forall {X} (e : LLVMGEnvE X),
+      lookup_E_to_exp_E (subevent X e) = subevent X e.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Lemma exp_E_to_instr_E_Global : forall {X} (e : LLVMGEnvE X),
+      exp_E_to_instr_E (subevent X e) = subevent X e.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Lemma lookup_E_to_exp_E_Local : forall {X} (e : LLVMEnvE X),
+      lookup_E_to_exp_E (subevent X e) = subevent X e.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Lemma exp_E_to_instr_E_Local : forall {X} (e : LLVMEnvE X),
+      exp_E_to_instr_E (subevent X e) = subevent X e.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Lemma exp_E_to_instr_E_Memory : forall {X} (e : MemoryE X),
+      exp_E_to_instr_E (subevent X e) = subevent X e.
+  Proof.
+    reflexivity.
+  Qed.
+  
+End Translations.
+
+
+Definition pure {E R} (t : global_env -> local_env -> memory_stack -> itree E (memory_stack * (local_env * (global_env * R)))) : Prop :=
+  forall g l m, t g l m ⤳ fun '(m',(l',(g',_))) => m' = m /\ l' = l /\ g' = g.
+
+Require Import String.
+Opaque append.
+
+Lemma failure_is_pure : forall R s defs,
+    pure (R := R) (interp_cfg_to_L3 defs (translate exp_E_to_instr_E (raise s))).
+Proof.
+  unfold pure, has_post, raise, Exception.throw; intros.
+  rewrite translate_vis.
+  unfold interp_cfg_to_L3.
+  rewrite interp_intrinsics_vis.
+  cbn; unfold Intrinsics.F_trigger; cbn; rewrite subevent_subevent.
+  rewrite interp_global_bind, interp_global_trigger.
+  cbn; rewrite subevent_subevent.
+  rewrite !interp_local_bind, interp_local_trigger.
+  cbn; rewrite subevent_subevent.
+  rewrite !interp_memory_bind, interp_memory_trigger.
+  cbn.
+  apply eutt_eq_bind; intros (_ & ? & ? & []).
+Qed.
+
+Lemma UB_is_pure : forall R s defs,
+    pure (R := R) (interp_cfg_to_L3 defs (translate exp_E_to_instr_E (raiseUB s))).
+Proof.
+  unfold pure, has_post, raiseUB; intros.
+  rewrite translate_vis.
+  unfold interp_cfg_to_L3.
+  rewrite interp_intrinsics_vis.
+  cbn; unfold Intrinsics.F_trigger; cbn; rewrite subevent_subevent.
+  rewrite interp_global_bind, interp_global_trigger.
+  cbn; rewrite subevent_subevent.
+  rewrite !interp_local_bind, interp_local_trigger.
+  cbn; rewrite subevent_subevent.
+  rewrite !interp_memory_bind, interp_memory_trigger.
+  cbn.
+  apply eutt_eq_bind; intros (_ & ? & ? & []).
+Qed.
+
+Lemma expr_are_pure : forall defs o e, pure (interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp o e))).
+Proof.
+  intros; unfold pure, has_post.
+  induction e; simpl; intros.
+
+  - destruct id; cbn.
+    + rewrite translate_bind, translate_trigger, lookup_E_to_exp_E_Global, subevent_subevent.
+      rewrite translate_bind, translate_trigger, exp_E_to_instr_E_Global, subevent_subevent.
+      rewrite interp_cfg_to_L3_bind. 
+      unfold interp_cfg_to_L3.
+      rewrite interp_intrinsics_trigger.
+      cbn; unfold Intrinsics.F_trigger; cbn.
+      rewrite interp_global_trigger.
+      cbn.
+      break_match_goal; cbn.
+      * rewrite interp_local_ret, interp_memory_ret, bind_ret_l.
+        rewrite !translate_ret, interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret.
+        apply eutt_Ret; intuition.
+      * unfold raise, Exception.throw.
+        rewrite interp_local_vis.
+        cbn; rewrite !bind_bind.
+        rewrite interp_memory_bind, interp_memory_trigger.
+        cbn.
+        rewrite !bind_bind.
+        apply eutt_eq_bind; intros [].
+    + rewrite translate_trigger, lookup_E_to_exp_E_Local, subevent_subevent.
+      rewrite translate_trigger, exp_E_to_instr_E_Local, subevent_subevent.
+      unfold interp_cfg_to_L3.
+      rewrite interp_intrinsics_trigger.
+      cbn; unfold Intrinsics.F_trigger; cbn.
+      rewrite interp_global_trigger.
+      cbn.
+      rewrite interp_local_bind, interp_local_trigger.
+      cbn.
+      break_match_goal; cbn.
+      * rewrite bind_ret_l,interp_local_ret, interp_memory_ret.
+        apply eutt_Ret; intuition.
+      * unfold raise, Exception.throw.
+        rewrite interp_memory_bind, interp_memory_vis, !bind_bind.
+        apply eutt_eq_bind; intros [? []].
+
+  - destruct o; cbn; [| apply failure_is_pure].
+    destruct d; simpl.
+    all: match goal with |- context[raise _] => apply failure_is_pure | _ => idtac end.
+    unfold denote_exp, lift_undef_or_err.
+    cbn.
+    break_match_goal; [apply UB_is_pure |].
+    break_match_goal; [apply failure_is_pure|]. 
+    rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; intuition.
+
+  - destruct o; cbn; [| apply failure_is_pure].
+    destruct d; simpl.
+    all: match goal with |- context[raise _] => apply failure_is_pure | _ => idtac end.
+    rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; intuition.
+
+  - destruct o; cbn; [| apply failure_is_pure].
+    destruct d; simpl.
+    all: match goal with |- context[raise _] => apply failure_is_pure | _ => idtac end.
+    rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; intuition.
+
+  - destruct o; cbn; [| apply failure_is_pure].
+    destruct d; simpl.
+    all: match goal with |- context[raise _] => apply failure_is_pure | _ => idtac end.
+    rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; intuition.
+    rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; intuition.
+
+  - destruct b; simpl; rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; intuition.
+
+  - simpl; rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; intuition.
+
+  - destruct o; cbn; [| apply failure_is_pure].
+    apply failure_is_pure.
+
+  - apply failure_is_pure.
+
+  - destruct o; cbn; [| apply failure_is_pure].
+    rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; intuition.
+
+Admitted.
+
