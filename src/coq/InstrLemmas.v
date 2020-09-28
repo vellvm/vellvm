@@ -125,7 +125,7 @@ Lemma is_concrete_uvalue_to_dvalue :
     exists dv, uvalue_to_dvalue uv = inr dv.
 Proof with reflexivity.
   intros uv CONC.
-  induction uv using uvalue_ind';
+  induction uv;
     inversion CONC.
   - exists (DVALUE_Addr a)...
   - exists (DVALUE_I1 x)...
@@ -161,7 +161,7 @@ Lemma uvalue_to_dvalue_is_concrete :
     uvalue_to_dvalue uv = inr dv ->
     is_concrete uv.
 Proof.
-  induction uv using uvalue_ind';
+  induction uv;
     intros dv CONV; cbn; inversion CONV; auto.
   - break_match; inversion H1.
     eapply uvalue_to_dvalue_list_concrete; eauto.

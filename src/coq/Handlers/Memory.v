@@ -939,7 +939,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         0 <= sizeof_dtyp dt.
     Proof.
       intros dv dt TYP.
-      induction TYP using dvalue_has_dtyp_ind';
+      induction TYP;
         try solve [cbn; omega].
       - cbn.  rewrite DynamicValues.unsupported_cases_match. omega. assumption.
       - rewrite sizeof_struct_cons.
@@ -976,7 +976,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         Z.of_nat (List.length (serialize_dvalue dv)) = sizeof_dtyp dt.
     Proof.
       intros dv dt TYP.
-      induction TYP using dvalue_has_dtyp_ind'; try solve [cbn; auto].
+      induction TYP; try solve [cbn; auto].
       - cbn. rewrite DynamicValues.unsupported_cases_match; auto.
       - cbn.
         rewrite app_length.
@@ -1030,7 +1030,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         (firstn (Z.to_nat (sizeof_dtyp dt)) (serialize_dvalue dv)) = serialize_dvalue dv.
     Proof.
       intros dv dt TYP.
-      induction TYP using dvalue_has_dtyp_ind'; auto.
+      induction TYP; auto.
       - cbn. rewrite DynamicValues.unsupported_cases_match. reflexivity. auto.
       - (* Structs *)
         rewrite sizeof_struct_cons.
@@ -1194,7 +1194,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         all_not_sundef (serialize_dvalue dv) = true.
     Proof.
       intros dv.
-      induction dv using dvalue_ind'; auto.
+      induction dv; auto.
       - induction fields.
         + reflexivity.
         + cbn. apply forallb_forall.
@@ -1317,7 +1317,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         deserialize_sbytes (serialize_dvalue dval) t = dvalue_to_uvalue dval.
     Proof.
       intros dval t TYP.
-      induction TYP using dvalue_has_dtyp_ind'; auto.
+      induction TYP; auto.
       - (* I1 *) admit.
       - (* I8 *) admit.
       - (* I32 *) admit.

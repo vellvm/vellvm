@@ -19,6 +19,7 @@ From Vellvm Require Import
      DynamicTypes
      CFG
      LLVMAst
+     AstLib
      LLVMEvents
      TopLevel
      Tactics

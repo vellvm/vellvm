@@ -61,7 +61,7 @@ Theorem wf_typ_order :
     well_founded typ_order.
 Proof.
   unfold well_founded.
-  induction a using typ_ind'; constructor; intros y H'; inversion H'; subst; auto.
+  induction a; constructor; intros y H'; inversion H'; subst; auto.
 Qed.
 
 Theorem wf_lt_typ_order :
