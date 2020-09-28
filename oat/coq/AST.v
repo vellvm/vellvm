@@ -57,9 +57,11 @@ Inductive unop :=                             (* primitive operations *)
 
 Inductive binop :=
   | Add | Sub | Mul
-  | Eq | Neq | Lt | Lte | Gt | Gte
+  | Eq | Neq
+ (* | Lt | Lte | Gt | Gte
   | And | Or | IAnd | IOr
-  | Shl | Shr | Sar.
+  | Shl | Shr | Sar*)
+. 
 (* Derive (Arbitrary, Show) for binop. *)
 
 Inductive exp :=
