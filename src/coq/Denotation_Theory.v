@@ -738,6 +738,42 @@ Proof.
     rewrite interp_cfg_to_L3_ret; reflexivity.
 Qed.
 
+Lemma map_monad_eutt_state_ind :
+  forall {E S A B} (I : S -> Prop) (f : A -> Monads.stateT S (itree E) B) (l : list A) s,
+    (forall a s, In a l -> (f a s) ⤳ fun '(s,_) => I s) ->
+    I s ->
+    map_monad f l s ⤳ fun '(s,_) => I s.
+Proof.
+  induction l as [| a l IH]; intros s HB HI; simpl.
+  - apply eutt_Ret; auto.
+  - setoid_rewrite has_post_post_strong in HB.
+    eapply eutt_clo_bind; [apply HB; left; auto |].
+    intros [s' ?] [] [EQ ?]; inv EQ.
+    simpl.
+    setoid_rewrite has_post_post_strong in IH.
+    eapply eutt_clo_bind; [apply IH |]; auto.
+    intros; apply HB; right; auto.
+    intros [s' ?] [] [EQ ?]; inv EQ; cbn; apply eutt_Ret; auto. 
+Qed.
+
+(* Lemma map_monad_L3_ind : *)
+(*   forall {A B} (I : S -> Prop) (f : A -> Monads.stateT S (itree E) B) (l : list A) s, *)
+(*     (forall a s, In a l -> (f a s) ⤳ fun '(s,_) => I s) -> *)
+(*     I s -> *)
+(*     map_monad f xs g l m ⤳ fun '(s,_) => I s. *)
+(* Proof. *)
+(*   induction l as [| a l IH]; intros s HB HI; simpl. *)
+(*   - apply eutt_Ret; auto. *)
+(*   - setoid_rewrite has_post_post_strong in HB. *)
+(*     eapply eutt_clo_bind; [apply HB; left; auto |]. *)
+(*     intros [s' ?] [] [EQ ?]; inv EQ. *)
+(*     simpl. *)
+(*     setoid_rewrite has_post_post_strong in IH. *)
+(*     eapply eutt_clo_bind; [apply IH |]; auto. *)
+(*     intros; apply HB; right; auto. *)
+(*     intros [s' ?] [] [EQ ?]; inv EQ; cbn; apply eutt_Ret; auto.  *)
+(* Qed. *)
+
 Lemma expr_are_pure : forall defs o e, pure (interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp o e))).
 Proof.
   intros; unfold pure, has_post.
@@ -818,9 +854,10 @@ Proof.
 
   - rewrite translate_bind, interp_cfg_to_L3_bind.
     rewrite translate_map_monad.
-    
+    rewrite interp_cfg_to_L3_map_monad.
+    (* eapply eutt_clo_bind. *)
+    (* Unshelve. *)
 
-    
 
 Admitted.
 
