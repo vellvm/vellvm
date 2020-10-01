@@ -8,8 +8,11 @@ From Vellvm Require Import PostConditions PropT.
 
 From Paco Require Import paco.
 
-From ExtLib Require Export
+From ExtLib Require Import
      Structures.Monad.
+
+From Coq Require Import
+     Morphisms.
 
 Import ITreeNotations.
 Local Open Scope itree.
@@ -56,6 +59,11 @@ Section No_Failure.
 
   Definition no_failure {E X} (t : itree E (option X)) : Prop :=
     t ⤳ fun x => ~ x = None.
+
+  Global Instance no_failure_eutt {E X} : Proper (eutt eq ==> iff) (@no_failure E X).
+  Proof.
+    intros t s EQ; unfold no_failure; split; intros ?; [rewrite <- EQ | rewrite EQ]; auto.
+  Qed.
 
   (* This is a non-trivial proof, not a direct consequence of an inversion lemma.
      This states essentially that if `no_failure` holds at the end of the execution,
