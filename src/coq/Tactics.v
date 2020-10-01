@@ -142,3 +142,10 @@ Ltac bind_ret_r2 :=
                      rewrite <- (bind_ret_r s); subst x
   end.
 
+Ltac forward H :=
+  let H' := fresh in
+  match type of H with
+  | ?P -> _ => assert P as H'; [| specialize (H H'); clear H']
+  end.
+
+
