@@ -3,7 +3,14 @@ Open Scope string_scope.
 Require Import Ascii.
 Require Import Basics.
 Require Import List.
+
+Require Import Integers.
+
+Module Int64 := Integers.Int64.
+Definition int64 := Int64.int.
+
 Export ListNotations.
+
 Open Scope list_scope.
 Open Scope nat.
 Open Scope program_scope.
@@ -58,15 +65,15 @@ Inductive unop :=                             (* primitive operations *)
 Inductive binop :=
   | Add | Sub | Mul
   | Eq | Neq
- (* | Lt | Lte | Gt | Gte
+  | Lt | Lte | Gt | Gte
   | And | Or | IAnd | IOr
-  | Shl | Shr | Sar*)
+  | Shl | Shr | Sar
 . 
 (* Derive (Arbitrary, Show) for binop. *)
 
 Inductive exp :=
   | CBool : bool -> exp                      (* bool literal *)
-  | CInt : Z -> exp                       (* int64 literal *)
+  | CInt : int64 -> exp                       (* int64 literal *)
   | CStr : string -> exp                     (* string literal *)
   | Bop : binop -> node exp -> node exp -> exp (* operations of two arguments *)
   | Uop : unop -> node exp -> exp             (* operations with one argument *)
