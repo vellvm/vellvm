@@ -47,6 +47,7 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 Definition expr := Oat.AST.exp.
 Definition stmt := Oat.AST.stmt.
+Definition unop := Oat.AST.unop.
 Definition binop := Oat.AST.binop.
 
 (* Denote the semantics for binary operations *)
@@ -69,6 +70,15 @@ Definition gt (x y : int64) : bool :=
 Definition gte (x y : int64) : bool :=
   negb (Int64.lt x y).
 
+Fixpoint denote_uop (u: unop) (v: ovalue) : itree OatE ovalue :=
+  match u,v with
+  | Neg,    OVALUE_Int i => ret (OVALUE_Int (Int64.neg i))
+  | Lognot, OVALUE_Bool b => ret (OVALUE_Bool (negb b))
+  | Bitnot, OVALUE_Int i => ret (OVALUE_Int (Int64.not i))
+  | _, _ => raise "err: incompatible types for unary operand"
+  end.
+
+(* Denote basic bop and uop *)
 Fixpoint denote_bop (op: binop) (v1 v2 : ovalue) : itree OatE ovalue :=
   match op, v1, v2 with
   (* Integer arithmetic *)
@@ -94,35 +104,50 @@ Fixpoint denote_bop (op: binop) (v1 v2 : ovalue) : itree OatE ovalue :=
   | _, _, _ => raise "err: incompatible types for binary operand"
  end.
 
-(*
-(* TODO: Denote uop *)
-
-Fixpoint denote_expr (e: expr) : itree expE value :=
+(* Now we can give an ITree semantics for the expressions in oat *)
+Fixpoint denote_expr (e: expr) : itree OatE ovalue :=
   match e with
-  | CBool b => ret (OBool b)
-  | CInt i => ret (OInt i)
-  | Id i => trigger (GetVar i)
+  | CBool b => ret (OVALUE_Bool b)
+  | CInt i => ret (OVALUE_Int i)
+  | Id i => trigger (OLocalRead i) 
+  | CStr s => ret (OVALUE_Str s)
+  | Uop op n =>
+    let e' := elt_of n in
+    v <- denote_expr e' ;;
+    denote_uop op v
   | Bop op l_exp r_exp =>
     let l := elt_of l_exp in
     let r := elt_of r_exp in
     l' <- denote_expr l;;
     r' <- denote_expr r;;
     denote_bop op l' r' 
-  | Uop op ex =>
-    let e' := elt_of ex in
-    raise "todo : fill in"
-  (* Boilerplate fin *)
-  | _ => raise "undefined"
- end.
-
-
-(* cast bools to true *)
-Definition is_true (v: OatValue) : bool :=
-  match v with
-  | OBool b => b
-  (* Should this case even happen? Maybe we raise ub before *)
-  | OInt i => negb (Z.eqb i 0)
   end.
+
+(** 
+    Before we move onto statements, we have to sort out a few things first.
+    1) How are we going to handle if statements
+    2) How are we going to represent function calls 
+    3) How are we going to represent various loops
+*)
+
+Definition is_ovalue_bool (v: ovalue) : bool :=
+  match v with
+  | OVALUE_Bool _ => true
+  | _ => false
+  end.
+
+Definition cast_ovalue_bool (v: ovalue) : itree OatE bool :=
+  match v with
+  | OVALUE_Bool b => ret b
+  (* Hopefully, we can prove something that says well formed OAT
+     programs can't hit this case in an if stmt.
+   *)
+  | _ => raise "err: oat_value wasn't a boolean"
+  end.
+
+
+
+(*
 
 Definition while (step : itree expE (unit + unit)) : itree expE unit :=
   iter (C := Kleisli _) (fun _ => step) tt.

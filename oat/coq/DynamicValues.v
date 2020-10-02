@@ -25,5 +25,6 @@ Definition var : Set := string.
 Inductive ovalue : Type :=
 | OVALUE_Bool (b: bool)
 | OVALUE_Int (i: int64)
+| OVALUE_Str (s : string)
 | OVALUE_Array (elts: list ovalue) 
 .
