@@ -134,34 +134,15 @@ Fixpoint denote_expr (e: expr) : itree OatE ovalue :=
     3) How are we going to represent various loops
     4) Sequencing
 *)
+Definition seq (l : list (node stmt)) (f : stmt -> itree OatE unit) : itree OatE unit :=
+  List.fold_left ( fun acc hd => f (elt stmt hd) ;; acc) (l) (ret tt).
 
-Definition cast_exp_bool (v: expr) : itree OatE bool :=
-  v' <- denote_expr v ;; 
-  match v' with
-  | OVALUE_Bool b => ret b
-  (* Hopefully, we can prove something that says well formed OAT
-     programs can't hit this case in an if stmt.
-   *)
-  | _ => raise "err: oat_value wasn't a boolean"
-  end.
-
-About List.fold_left.
-Locate ";;".
-
-Definition seq (l : list stmt) (f : stmt -> itree OatE unit) : itree OatE unit :=
-  List.fold_left ( fun acc hd => f hd ;; acc) (l) (ret tt).
-             
 Definition while (step : itree OatE (unit + unit)) : itree OatE unit :=
   iter (C := Kleisli _) (fun _ => step) tt.
 
-About iter.
-About Kleisli.
-
-About seq.    
-About fold_left.
 
 (** Finally, we can start to denote the meaning of Oat statements *)
-Program Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
+ Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
   match s with
   | Assn target source =>
     let tgt := elt_of target in
@@ -178,11 +159,26 @@ Program Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
     trigger (OLocalWrite id v)
   | If cond p f =>
     (* Local function  *)
-    seq p denote_stmt
+    let e_cond := elt expr cond in
+    exp <- denote_expr e_cond ;;
+    match exp with
+      | OVALUE_Bool bv => 
+    if bv then seq p denote_stmt else seq f denote_stmt
+      | _ => raise "err"
+    end
+  | While cond stmts =>
+    let e_cond := elt expr cond in
+    while ( exp <- denote_expr e_cond ;;
+            (match exp with
+            | OVALUE_Bool bv =>
+              if bv then (seq stmts denote_stmt) ;; ret (inl tt)
+              else ret (inr tt)
+            | _ => raise "err"
+            end)
+      )
+          | Return None = 
   | _ => raise "unimplemented"
   end.
-Solve All Obligations with (repeat split; discriminate).
-(* alt soln:  denote a block of statements *)
 
 
 

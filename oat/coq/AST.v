@@ -98,7 +98,7 @@ Inductive stmt :=
   | Assn : node exp -> node exp -> stmt         (* assignment *)
   | Decl : vdecl -> stmt                       (* local variable declaration *)
   | Return : option (node exp) -> stmt              (* return a value or void *)
-  | If : node exp -> list (stmt) -> list (stmt) -> stmt      (* conditional *)
+  | If : node exp -> list (node stmt) -> list (node stmt) -> stmt      (* conditional *)
   | While : node exp -> list (node stmt) -> stmt.           (* while loop *)
 (*
   | Return : option (node exp) -> stmt              (* return a value or void *)
