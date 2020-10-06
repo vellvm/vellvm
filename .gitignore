@@ -31,6 +31,6 @@ src/.depend
 output
 src/ml/extracted/.merlin
 src/ml/libvellvm/.merlin
-src/.lia.cache
+.lia.cache
 src/.ll_files.tmp
 src/coq/.lia.cache
