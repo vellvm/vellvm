@@ -9,6 +9,7 @@ From Coq Require Import
      Omega
      Classes.RelationClasses
      Init.Datatypes
+     Program.Basics
 .
 
 From ITree Require Import
@@ -33,6 +34,7 @@ Require Import Oat.OatEvents.
 Import MonadNotation.
 Local Open Scope monad_scope.
 Local Open Scope string_scope.
+Local Open Scope program_scope.
 Module Int64 := Integers.Int64.
 Definition int64 := Int64.int.
 
@@ -70,6 +72,7 @@ Definition gt (x y : int64) : bool :=
 Definition gte (x y : int64) : bool :=
   negb (Int64.lt x y).
 
+
 Fixpoint denote_uop (u: unop) (v: ovalue) : itree OatE ovalue :=
   match u,v with
   | Neg,    OVALUE_Int i => ret (OVALUE_Int (Int64.neg i))
@@ -77,6 +80,7 @@ Fixpoint denote_uop (u: unop) (v: ovalue) : itree OatE ovalue :=
   | Bitnot, OVALUE_Int i => ret (OVALUE_Int (Int64.not i))
   | _, _ => raise "err: incompatible types for unary operand"
   end.
+
 
 (* Denote basic bop and uop *)
 Fixpoint denote_bop (op: binop) (v1 v2 : ovalue) : itree OatE ovalue :=
@@ -128,16 +132,12 @@ Fixpoint denote_expr (e: expr) : itree OatE ovalue :=
     1) How are we going to handle if statements
     2) How are we going to represent function calls 
     3) How are we going to represent various loops
+    4) Sequencing
 *)
 
-Definition is_ovalue_bool (v: ovalue) : bool :=
-  match v with
-  | OVALUE_Bool _ => true
-  | _ => false
-  end.
-
-Definition cast_ovalue_bool (v: ovalue) : itree OatE bool :=
-  match v with
+Definition cast_exp_bool (v: expr) : itree OatE bool :=
+  v' <- denote_expr v ;; 
+  match v' with
   | OVALUE_Bool b => ret b
   (* Hopefully, we can prove something that says well formed OAT
      programs can't hit this case in an if stmt.
@@ -145,14 +145,23 @@ Definition cast_ovalue_bool (v: ovalue) : itree OatE bool :=
   | _ => raise "err: oat_value wasn't a boolean"
   end.
 
+About List.fold_left.
+Locate ";;".
 
-
-(*
-
-Definition while (step : itree expE (unit + unit)) : itree expE unit :=
+Definition seq (l : list stmt) (f : stmt -> itree OatE unit) : itree OatE unit :=
+  List.fold_left ( fun acc hd => f hd ;; acc) (l) (ret tt).
+             
+Definition while (step : itree OatE (unit + unit)) : itree OatE unit :=
   iter (C := Kleisli _) (fun _ => step) tt.
-    
-Fixpoint denote_stmt (s : stmt) : itree expE unit :=
+
+About iter.
+About Kleisli.
+
+About seq.    
+About fold_left.
+
+(** Finally, we can start to denote the meaning of Oat statements *)
+Program Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
   match s with
   | Assn target source =>
     let tgt := elt_of target in
@@ -160,27 +169,23 @@ Fixpoint denote_stmt (s : stmt) : itree expE unit :=
     match tgt with
     | Id i =>
       v <- denote_expr src ;;
-      trigger (SetVar i v)
-    | _ => raiseUB "Non variable target?"
+      trigger (OLocalWrite i v)
+    | _ => raise "err: assignment to a non variable target"
     end
-
-  | While cond stmts =>
-    let e_cond := elt_of cond in
-    let e_stmts := List.map (elt_of) stmts in
-(*    while (v <- denote_expr e_cond ;;
-           if is_true v
-                      then 
-          )
-*)
-    raise "unimplemented"
   | Decl (id, node) =>
-    (* Default initialization with helper *)
-    (* int x; / bool x; *)
-    let src := elt_of target in
+    let src := elt_of node in
     v <- denote_expr src ;;
-    trigger (SetVar id v)
+    trigger (OLocalWrite id v)
+  | If cond p f =>
+    (* Local function  *)
+    seq p denote_stmt
   | _ => raise "unimplemented"
   end.
+Solve All Obligations with (repeat split; discriminate).
+(* alt soln:  denote a block of statements *)
 
+
+
+(*
 (* Write down some proofs for the typesystem ... *)
 *)

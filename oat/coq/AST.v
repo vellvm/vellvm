@@ -97,8 +97,8 @@ Definition vdecl := (id * node exp)%type.              (* local variable declara
 Inductive stmt :=
   | Assn : node exp -> node exp -> stmt         (* assignment *)
   | Decl : vdecl -> stmt                       (* local variable declaration *)
-  | MustReturn : node exp -> stmt              (* return a value *)
-  | If : node exp -> list (node stmt) -> list (node stmt) -> stmt      (* conditional *)
+  | Return : option (node exp) -> stmt              (* return a value or void *)
+  | If : node exp -> list (stmt) -> list (stmt) -> stmt      (* conditional *)
   | While : node exp -> list (node stmt) -> stmt.           (* while loop *)
 (*
   | Return : option (node exp) -> stmt              (* return a value or void *)
@@ -106,6 +106,14 @@ Inductive stmt :=
   | For : list vdecl -> option (node exp) (* for loop *)
            -> option (node stmt) -> list (node stmt) -> stmt
   | SCall : node exp -> list (node exp) -> stmt   (* call a void function - change to exp later*)
+*)
+
+
+(* 
+   TODO: With syntax 
+   - rm node
+   - examples of induction principle in vellvm (ASTLib.v)
+   - 
 *)
 
 (* blocks : statements *)
