@@ -850,3 +850,95 @@ Qed.
    no_pick t ->
    forall t', model_pick t t' -> t' ≈ elim_pick t
  *)
+
+From Vellvm Require Import PropT.
+From Coq Require Import Relation_Definitions.
+
+Import MonadNotation.
+Open Scope monad_scope.
+
+Definition trigger_prop {E F} : F ~> PropT (E +' F) :=
+  fun R e => fun t => t = r <- trigger e ;; ret r.
+
+Definition trigger_prop' {F} : F ~> PropT F :=
+  fun R e => fun t => t = r <- trigger e ;; ret r.
+
+Definition is_singleton {E X} (ts : PropT E X) (t : itree E X) : Prop :=
+  forall u, ts u -> u ≈ t.
+
+(*
+  Initially : E is UB (non det stuff)
+              F is other effects.
+we have E +' F
+E gets interepreted into a non-deterministic computation : PropT ??
+F gets "preserved" 
+ *)
+
+Lemma deterministic_is_singleton : 
+  forall {E F X} (RX : relation X)
+    (t : itree (E +' F) X)
+    (h : E ~> PropT F),
+    no_event_l t -> 
+    is_singleton
+      (interp_prop (case_ h trigger_prop') X RX t)
+      (elim_l t).
+Proof.
+
+Admitted.
+
+(* t --pick> {t} --UB> {t} *)
+
+Definition interp_from_prop {E F} T (RR: T -> T -> Prop) (h : E ~> PropT F) : PropT (E +' F) T -> PropT F T :=
+  fun Pt (t : itree F T) =>
+    exists (t' : itree (E +' F) T) ,
+      Pt t' /\
+      (interp_prop (case_ h trigger_prop') _ RR t' t).
+
+Lemma deterministic_is_singleton' : 
+  forall {E F X} (RX : relation X)
+    (ts : PropT (E +' F) X)
+    (t : itree (E +' F) X)
+    (h : E ~> PropT F),
+    is_singleton ts t ->
+    no_event_l t -> 
+    is_singleton (interp_from_prop RX h ts) (elim_l t).
+Proof.
+Admitted.
+
+From Vellvm Require Import InterpreterMCFG.
+
+Require Export Vellvm.Tactics.
+Require Export Vellvm.Util.
+Require Export Vellvm.LLVMEvents.
+Require Export Vellvm.DynamicTypes.
+Require Export Vellvm.Denotation.
+Require Export Vellvm.Handlers.Handlers.
+Require Export Vellvm.TopLevel.
+Require Export Vellvm.LLVMAst.
+Require Export Vellvm.AstLib.
+Require Export Vellvm.CFG.
+Require Export Vellvm.InterpreterMCFG.
+Require Export Vellvm.InterpreterCFG.
+Require Export Vellvm.TopLevelRefinements.
+Require Export Vellvm.TypToDtyp.
+Require Export Vellvm.LLVMEvents.
+Require Export Vellvm.Transformations.Traversal.
+Require Export Vellvm.PostConditions.
+Require Export Vellvm.Denotation_Theory.
+Require Export Vellvm.InstrLemmas.
+Require Export Vellvm.NoFailure.
+Require Export Vellvm.PropT.
+
+Variable remove_pick_ub : itree (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' DebugE +' FailureE).
+Variable deterministic_vellvm : forall R, itree L0 R -> Prop.
+(* Definition deterministic_vellvm *)
+Lemma deterministc_llvm_is_singleton : forall defs R RR t g sl mem,
+    deterministic_vellvm t ->
+    is_singleton (interp_to_L5 (R := R) RR defs t g sl mem) (remove_pick_ub (interp_to_L3 (R := R) defs t g sl mem)).
+
+  (*
+    Then the same statement on llvm syntax by applying it with (t := denote_llvm p)
+    Then on the helix side:
+    - we know that there is (t: itree void1 X),
+    "inject (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) t ≈ interp_to_L3 (denote_llvm p)"
+   *)
