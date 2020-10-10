@@ -650,7 +650,7 @@ Lemma denote_instr_intrinsic :
     ≈
     Ret (m, (FMapAList.alist_add eq_dec_raw_id i (dvalue_to_uvalue res) ρ, (g, tt))).
 Proof.
-  intros * INTRINSIC ASSOC CONCARGS RES MAP.
+  intros * INTRINSIC ASSOC  MAP CONCARGS RES.
 
   unfold denote_instr.
   setoid_rewrite interp_cfg_to_L3_bind.

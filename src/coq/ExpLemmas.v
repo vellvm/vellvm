@@ -102,6 +102,40 @@ Proof.
   reflexivity.
 Qed.
 
+(* NOTEYZ: I doubt that the following is true, unless proof irrelevance is assumed *)
+Lemma repr_intval (i: int64):
+  DynamicValues.Int64.repr (Int64.intval i) = i.
+Proof.
+Admitted.
+
+Lemma denote_exp_i64 :forall defs t g l m,
+    interp_cfg_to_L3 defs
+                     (translate exp_E_to_instr_E
+                                (denote_exp (Some (DTYPE_I 64))
+                                            (EXP_Integer (Integers.Int64.intval t))))
+                     g l m
+    ≈
+    Ret (m, (l, (g, UVALUE_I64 t))).
+Proof.
+  intros; cbn.
+  rewrite translate_ret, interp_cfg_to_L3_ret, repr_intval.
+  reflexivity.
+Qed.
+
+Lemma denote_exp_double :forall defs t g l m,
+    interp_cfg_to_L3 defs
+                     (translate exp_E_to_instr_E
+                                (denote_exp (Some DTYPE_Double)
+                                            (EXP_Double t)))
+                     g l m
+             ≈
+                     Ret (m, (l, (g, UVALUE_Double t))).
+Proof.
+  intros; unfold denote_exp; cbn.
+  rewrite translate_ret, interp_cfg_to_L3_ret.
+  reflexivity.
+Qed.
+
 Definition pure {E R} (t : global_env -> local_env -> memory_stack -> itree E (memory_stack * (local_env * (global_env * R)))) : Prop :=
   forall g l m, t g l m ⤳ fun '(m',(l',(g',_))) => m' = m /\ l' = l /\ g' = g.
 
