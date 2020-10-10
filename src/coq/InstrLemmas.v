@@ -367,9 +367,6 @@ Qed.
 (* TODO: Move to place where expression lemmas belong? *)
 Lemma denote_ibinop_concrete :
   forall (op : ibinop) τ e0 e1 g ρ m x a av b bv defs,
-    uvalue_to_dvalue a = inr av ->
-    uvalue_to_dvalue b = inr bv ->
-    eval_iop op av bv  = ret x ->
     interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e0))) g ρ m
     ≈
     Ret (m, (ρ, (g, a)))
@@ -377,13 +374,16 @@ Lemma denote_ibinop_concrete :
     interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e1))) g ρ m
     ≈
     Ret (m, (ρ, (g, b))) ->
+    uvalue_to_dvalue a = inr av ->
+    uvalue_to_dvalue b = inr bv ->
+    eval_iop op av bv  = ret x ->
     interp_cfg_to_L3 defs
     (translate exp_E_to_instr_E
       (denote_exp None
          (OP_IBinop op τ (Traversal.fmap (typ_to_dtyp [ ]) e0)
             (Traversal.fmap (typ_to_dtyp [ ]) e1)))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
 Proof.
-  intros * AV BV EVAL A B.
+  intros * A B AV BV EVAL.
 
   (* First subexpression *)
   cbn.
@@ -417,9 +417,6 @@ Qed.
 (* TODO: Move to place where expression lemmas belong? *)
 Lemma denote_fbinop_concrete :
   forall (op : fbinop) τ e0 e1 g ρ m x a av b bv defs params,
-    uvalue_to_dvalue a = inr av ->
-    uvalue_to_dvalue b = inr bv ->
-    eval_fop op av bv  = ret x ->
     interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e0))) g ρ m
     ≈ 
     Ret (m, (ρ, (g, a)))
@@ -428,13 +425,16 @@ Lemma denote_fbinop_concrete :
     ≈
     Ret (m, (ρ, (g, b)))
     ->
+    uvalue_to_dvalue a = inr av ->
+    uvalue_to_dvalue b = inr bv ->
+    eval_fop op av bv  = ret x ->
    interp_cfg_to_L3 defs
    (translate exp_E_to_instr_E
       (denote_exp None
          (OP_FBinop op params τ (Traversal.fmap (typ_to_dtyp [ ]) e0)
             (Traversal.fmap (typ_to_dtyp [ ]) e1)))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
 Proof.
-  intros * AV BV EVAL A B.
+  intros * A B AV BV EVAL.
 
   (* First subexpression *)
   cbn.
@@ -468,9 +468,6 @@ Qed.
 (* TODO: Move to place where expression lemmas belong? *)
 Lemma denote_fcmp_concrete :
   forall (op : fcmp) τ e0 e1 g ρ m x a av b bv defs,
-    uvalue_to_dvalue a = inr av ->
-    uvalue_to_dvalue b = inr bv ->
-    eval_fcmp op av bv  = ret x ->
     interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e0))) g ρ m
     ≈
     Ret (m, (ρ, (g, a)))
@@ -479,13 +476,16 @@ Lemma denote_fcmp_concrete :
     ≈
     Ret (m, (ρ, (g, b)))
     ->
+    uvalue_to_dvalue a = inr av ->
+    uvalue_to_dvalue b = inr bv ->
+    eval_fcmp op av bv  = ret x ->
     interp_cfg_to_L3 defs
     (translate exp_E_to_instr_E
       (denote_exp None
          (OP_FCmp op τ (Traversal.fmap (typ_to_dtyp [ ]) e0)
             (Traversal.fmap (typ_to_dtyp [ ]) e1)))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
 Proof.
-  intros * AV BV EVAL A B.
+  intros * A B AV BV EVAL.
 
   (* First subexpression *)
   cbn.
