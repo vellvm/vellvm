@@ -192,7 +192,7 @@ Qed.
 
 Opaque assoc.
 Lemma denote_phi_hd : forall bid e id τ tl,
-    denote_phi bid (id, Phi τ ((bid,e)::tl)) ≈ uv <- denote_exp (Some τ) e;; ret (id,uv).
+    denote_phi bid (id, Phi τ ((bid,e)::tl)) ≈ uv <- denote_exp (Some τ) e;; Ret (id,uv).
 Proof.
   intros; cbn.
   rewrite assoc_hd; reflexivity.
