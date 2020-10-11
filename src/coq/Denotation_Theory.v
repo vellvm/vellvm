@@ -610,3 +610,13 @@ Proof.
   eapply find_block_not_in_inputs, no_duplicate_bid_not_in_l; eauto using independent_flows_no_duplicate_bid.
 Qed.
 
+Lemma denote_no_phis : forall x,
+    denote_phis x [] ≈ Ret tt.
+Proof.
+  intros.
+  unfold denote_phis; cbn.
+  rewrite bind_ret_l; cbn.
+  rewrite bind_ret_l; cbn.
+  reflexivity.
+Qed.
+

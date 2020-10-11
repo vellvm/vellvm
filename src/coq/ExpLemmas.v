@@ -122,6 +122,20 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma denote_exp_i64_repr :forall defs t g l m,
+    interp_cfg_to_L3 defs
+                     (translate exp_E_to_instr_E
+                                (denote_exp (Some (DTYPE_I 64))
+                                            (EXP_Integer t)))
+                     g l m
+                     ≈
+                     Ret (m, (l, (g, UVALUE_I64 (repr t)))).
+Proof.
+  intros; unfold denote_exp; cbn.
+  rewrite translate_ret, interp_cfg_to_L3_ret.
+  reflexivity.
+Qed.
+
 Lemma denote_exp_double :forall defs t g l m,
     interp_cfg_to_L3 defs
                      (translate exp_E_to_instr_E
@@ -343,6 +357,51 @@ Lemma denote_fcmp_concrete :
     (translate exp_E_to_instr_E
       (denote_exp None
          (OP_FCmp op τ e0 e1))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
+Proof.
+  intros * A B AV BV EVAL.
+
+  (* First subexpression *)
+  cbn.
+  rewrite translate_bind.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite A.
+  rewrite bind_ret_l.
+
+  (* Second subexpression *)
+  rewrite translate_bind.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite B.
+  rewrite bind_ret_l.
+
+  unfold uvalue_to_dvalue_binop.
+  rewrite AV, BV.
+  cbn.
+
+  rewrite EVAL.
+  cbn.
+
+  repeat rewrite translate_ret.
+  rewrite interp_cfg_to_L3_ret.
+  reflexivity.
+Qed.
+
+Lemma denote_icmp_concrete :
+  forall (op : icmp) τ e0 e1 g ρ m x a av b bv defs,
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) e0)) g ρ m
+    ≈
+    Ret (m, (ρ, (g, a)))
+    ->
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) e1)) g ρ m
+    ≈
+    Ret (m, (ρ, (g, b)))
+    ->
+    uvalue_to_dvalue a = inr av ->
+    uvalue_to_dvalue b = inr bv ->
+    eval_icmp op av bv  = ret x ->
+    interp_cfg_to_L3 defs
+    (translate exp_E_to_instr_E
+      (denote_exp None
+         (OP_ICmp op τ e0 e1))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
 Proof.
   intros * A B AV BV EVAL.
 
