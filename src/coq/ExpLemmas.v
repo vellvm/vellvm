@@ -136,6 +136,44 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma denote_conversion_concrete :
+  forall (conv : conversion_type) τ1 τ2 e g ρ m x a av defs,
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ1) e)) g ρ m
+    ≈
+    Ret (m, (ρ, (g, a)))
+    ->
+    uvalue_to_dvalue a = inr av ->
+    eval_conv conv τ1 av τ2  = ret x ->
+    interp_cfg_to_L3 defs
+   (translate exp_E_to_instr_E
+      (denote_exp None
+         (OP_Conversion conv τ1 e τ2))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
+Proof.
+  intros conv τ1 τ2 e g ρ m x a av defs A AV EVAL.
+
+  cbn.
+  rewrite translate_bind.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite A.
+  rewrite bind_ret_l.
+
+  unfold uvalue_to_dvalue_uop.
+  rewrite AV.
+  cbn.
+
+  rewrite EVAL.
+  unfold ITree.map.
+  cbn.
+  rewrite bind_ret_l.
+
+  repeat rewrite translate_ret.
+  rewrite interp_cfg_to_L3_ret.
+  reflexivity.
+Qed.
+
+(* Expressions are "almost pure" computations:
+   they depend on the memory, but do not modify any component on the state *)
+
 Definition pure {E R} (t : global_env -> local_env -> memory_stack -> itree E (memory_stack * (local_env * (global_env * R)))) : Prop :=
   forall g l m, t g l m ⤳ fun '(m',(l',(g',_))) => m' = m /\ l' = l /\ g' = g.
 

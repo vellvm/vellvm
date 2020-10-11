@@ -512,42 +512,6 @@ Proof.
   reflexivity.
 Qed.
 
-(* TODO: Move to place where expression lemmas belong? *)
-Lemma denote_conversion_concrete :
-  forall (conv : conversion_type) τ1 τ2 e g ρ m x a av defs,
-    uvalue_to_dvalue a = inr av ->
-    eval_conv conv τ1 av τ2  = ret x ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ1) (convert_typ [ ] e))) g ρ m
-    ≈
-    Ret (m, (ρ, (g, a)))
-    ->
-    interp_cfg_to_L3 defs
-   (translate exp_E_to_instr_E
-      (denote_exp None
-         (OP_Conversion conv τ1 (Traversal.fmap (typ_to_dtyp [ ]) e) τ2))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
-Proof.
-  intros conv τ1 τ2 e g ρ m x a av defs AV EVAL A.
-
-  cbn.
-  rewrite translate_bind.
-  rewrite interp_cfg_to_L3_bind.
-  rewrite A.
-  rewrite bind_ret_l.
-
-  unfold uvalue_to_dvalue_uop.
-  rewrite AV.
-  cbn.
-
-  rewrite EVAL.
-  unfold ITree.map.
-  cbn.
-  rewrite bind_ret_l.
-
-  repeat rewrite translate_ret.
-  rewrite interp_cfg_to_L3_ret.
-  reflexivity.
-Qed.
-
 (* TODO: something like this exists in tmp_aux_vellvm.v in Helix. Move these. *)
 Lemma exp_E_to_instr_E_subevent : forall {E} {X} `{E -< exp_E} (e : E X),
     exp_E_to_instr_E (subevent X e) = subevent X e.
