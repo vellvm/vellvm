@@ -4,6 +4,7 @@ From Coq Require Import
 Require Import List.
 Import ListNotations.
 Require Import ZArith.
+Require Import Coq.micromega.Lia.
 
 From ITree Require Import
      ITree
@@ -102,11 +103,24 @@ Proof.
   reflexivity.
 Qed.
 
-(* NOTEYZ: I doubt that the following is true, unless proof irrelevance is assumed *)
 Lemma repr_intval (i: int64):
   DynamicValues.Int64.repr (Int64.intval i) = i.
 Proof.
-Admitted.
+  replace (Int64.intval i) with (Int64.unsigned i).
+  -
+    apply Int64.repr_unsigned.
+  -
+    destruct i.
+    reflexivity.
+Qed.
+
+Lemma intval_to_from_nat_id:
+  forall n, (Z.of_nat (Z.to_nat (Int64.intval n))) = Int64.intval n.
+Proof.
+  intros.
+  destruct n.
+  cbn.  lia.
+Qed.
 
 Lemma denote_exp_i64 :forall defs t g l m,
     interp_cfg_to_L3 defs
@@ -642,7 +656,6 @@ Proof.
     rewrite interp_cfg_to_L3_map_monad.
     (* eapply eutt_clo_bind. *)
     (* Unshelve. *)
-
 
 Admitted.
 
