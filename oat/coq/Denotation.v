@@ -108,7 +108,7 @@ Fixpoint denote_bop (op: binop) (v1 v2 : ovalue) : itree OatE ovalue :=
   | _, _, _ => raise "err: incompatible types for binary operand"
  end.
 
-Definition call_func_or_fail (id: expr) (args: list ovalue) : itree OatE ovalue :=
+Definition fcall_return_or_fail (id: expr) (args: list ovalue) : itree OatE ovalue :=
   match id with
   | Id i => trigger (OCallRet i args)
   | _ => raise "err: can't call a thing that's not a func!"
@@ -136,7 +136,7 @@ Fixpoint denote_expr (e: expr) : itree OatE ovalue :=
   | Call f args =>
     let f_id := elt expr f in
     args' <- map_monad ( fun e => denote_expr (elt expr e)) args ;;
-    f_ret <- call_func_or_fail f_id args';;
+    f_ret <- fcall_return_or_fail f_id args';;
     ret f_ret
   end.
 
@@ -153,6 +153,12 @@ Definition seq (l : list (node stmt)) (f : stmt -> itree OatE unit) : itree OatE
 Definition while (step : itree OatE (unit + unit)) : itree OatE unit :=
   iter (C := Kleisli _) (fun _ => step) tt.
 
+
+Definition fcall_noret_or_fail (id: expr) (args: list ovalue) : itree OatE unit :=
+  match id with
+  | Id i => trigger (OCallVoid i args)
+  | _ => raise "err: can't call a thing that's not a func!"
+  end.
 
 (** Finally, we can start to denote the meaning of Oat statements *)
  Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
@@ -192,7 +198,7 @@ Definition while (step : itree OatE (unit + unit)) : itree OatE unit :=
   | SCall f args =>
     let f_id := elt expr f in
     args' <- map_monad ( fun e => denote_expr (elt expr e)) args ;;
-    _ <- call_func_or_fail f_id args';;
+    _ <- fcall_noret_or_fail f_id args';;
     ret tt
   | _ => raise "unimplemented"
   end.
