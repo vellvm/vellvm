@@ -25,7 +25,7 @@ From ExtLib Require Import
      Programming.Eqv
      Structures.Monads.
 
-From Vellvm Require Import Error.
+From Vellvm Require Import Util Error.
 Require Import Integers.
 Require Import Oat.AST.
 Require Import Oat.DynamicValues.
@@ -108,6 +108,14 @@ Fixpoint denote_bop (op: binop) (v1 v2 : ovalue) : itree OatE ovalue :=
   | _, _, _ => raise "err: incompatible types for binary operand"
  end.
 
+Definition call_func_or_fail (id: expr) (args: list ovalue) : itree OatE ovalue :=
+  match id with
+  | Id i => trigger (OCallRet i args)
+  | _ => raise "err: can't call a thing that's not a func!"
+  end.
+
+    
+
 (* Now we can give an ITree semantics for the expressions in oat *)
 Fixpoint denote_expr (e: expr) : itree OatE ovalue :=
   match e with
@@ -125,6 +133,11 @@ Fixpoint denote_expr (e: expr) : itree OatE ovalue :=
     l' <- denote_expr l;;
     r' <- denote_expr r;;
     denote_bop op l' r' 
+  | Call f args =>
+    let f_id := elt expr f in
+    args' <- map_monad ( fun e => denote_expr (elt expr e)) args ;;
+    f_ret <- call_func_or_fail f_id args';;
+    ret f_ret
   end.
 
 (** 
@@ -176,7 +189,11 @@ Definition while (step : itree OatE (unit + unit)) : itree OatE unit :=
             | _ => raise "err"
             end)
       )
-          | Return None = 
+  | SCall f args =>
+    let f_id := elt expr f in
+    args' <- map_monad ( fun e => denote_expr (elt expr e)) args ;;
+    _ <- call_func_or_fail f_id args';;
+    ret tt
   | _ => raise "unimplemented"
   end.
 

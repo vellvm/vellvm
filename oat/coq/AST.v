@@ -78,6 +78,7 @@ Inductive exp :=
   | Bop : binop -> node exp -> node exp -> exp (* operations of two arguments *)
   | Uop : unop -> node exp -> exp             (* operations with one argument *)
   | Id : id -> exp                           (* identifiers *)
+  | Call : node exp -> (list (node exp)) -> exp   (* function call - change to exp later *)
 .
  (*
   | CNull : ty -> exp                         (* null literal for any TRef *)
@@ -86,7 +87,6 @@ Inductive exp :=
   | Proj : node exp -> id -> exp              (* projection from a struct *)
   | NewArr : ty -> node exp -> exp            (* zero-initialized arrays *)
   | Index : node exp -> node exp -> exp       (* index into an array *)
-  | Call : node exp -> (list (node exp)) -> exp   (* function call - change to exp later *)
   | Length : node exp -> exp.
 *)
 Definition cfield := (id * node exp)%type.
@@ -99,22 +99,16 @@ Inductive stmt :=
   | Decl : vdecl -> stmt                       (* local variable declaration *)
   | Return : option (node exp) -> stmt              (* return a value or void *)
   | If : node exp -> list (node stmt) -> list (node stmt) -> stmt      (* conditional *)
-  | While : node exp -> list (node stmt) -> stmt.           (* while loop *)
+  | While : node exp -> list (node stmt) -> stmt           (* while loop *)
+  | SCall : node exp -> list (node exp) -> stmt   (* call a void function - change to exp later*)
+  .
+  
 (*
-  | Return : option (node exp) -> stmt              (* return a value or void *)
   | Cast : ty -> id -> (node exp) -> list (node stmt) -> list (node stmt) -> stmt
   | For : list vdecl -> option (node exp) (* for loop *)
            -> option (node stmt) -> list (node stmt) -> stmt
-  | SCall : node exp -> list (node exp) -> stmt   (* call a void function - change to exp later*)
 *)
 
-
-(* 
-   TODO: With syntax 
-   - rm node
-   - examples of induction principle in vellvm (ASTLib.v)
-   - 
-*)
 
 (* blocks : statements *)
 Definition block := list (node stmt).
