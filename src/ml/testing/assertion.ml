@@ -5,14 +5,16 @@ open Handlers.LLVMEvents
 
 type raw_assertion_string =
   | Eq of { lhs : string ; rhs : string}
+  | Poison' of { fcall: string}
 
 type test =
   | EQTest of DV.uvalue * DynamicTypes.dtyp * string * DV.uvalue list
+  | POISONTest of string * DV.uvalue list
 
 
 (*  Directly converts a piece of syntax to a uvalue without going through semantic interpretation.
     Only works on literals.
-*)
+ *)
 
 let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV.uvalue =
   match typ, exp with
@@ -56,11 +58,30 @@ let instr_to_call_data instr =
     (texp_to_function_name fn,
      List.map texp_to_uvalue args)
     
-  | _ -> failwith "Assertion include unsupported RHS (must be a call)"
+  | _ -> failwith "Assertion includes unsupported instruction (must be a call)"
 
 
-(* ws* "ASSERT" ws+ "EQ" ws* ':' ws* (anything+ as l) ws* '=' ws* (anything+ as r)  *)
-let parse_assertion (line:string) =
+(* Top level for parsing assertions *)  
+let rec parse_assertion (line: string) : test option =
+  begin match parse_poison_assertion line, parse_eq_assertion line with
+  | Some _ as poisontest, _ -> poisontest
+  | _, (Some _ as eqtest) -> eqtest
+  | _, _ -> None
+  end
+
+and parse_poison_assertion (line: string) : test option =
+  (* ws* "ASSERT" ws+ "POISON" ws* ':' ws* (anything+ as r) *)
+  let regex = "^[ \t]*;[ \t]*ASSERT[ \t]+POISON[ \t]*:[ \t]*\\(.*\\)" in
+  if not (Str.string_match (Str.regexp regex) line 0) then
+    None
+  else
+    let assertion = Str.matched_group 1 line in
+    let poisoned_fcall = Llvm_lexer.parse_test_call (Lexing.from_string assertion) in
+    let (fn, args) = instr_to_call_data poisoned_fcall in
+    Some (POISONTest(fn, args))
+
+and parse_eq_assertion (line:string) =
+  (* ws* "ASSERT" ws+ "EQ" ws* ':' ws* (anything+ as l) ws* '=' ws* (anything+ as r)  *)
   let regex = "^[ \t]*;[ \t]*ASSERT[ \t]+EQ[ \t]*:[ \t]*\\(.*\\)=\\(.*\\)" in 
   if not (Str.string_match (Str.regexp regex) line 0) then
     begin
