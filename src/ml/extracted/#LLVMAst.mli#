@@ -1,0 +1,408 @@
+open BinNums
+open Floats
+
+type int = coq_Z
+
+type float = Floats.float
+
+type float32 = Floats.float32
+
+type linkage =
+| LINKAGE_Private
+| LINKAGE_Internal
+| LINKAGE_Available_externally
+| LINKAGE_Linkonce
+| LINKAGE_Weak
+| LINKAGE_Common
+| LINKAGE_Appending
+| LINKAGE_Extern_weak
+| LINKAGE_Linkonce_odr
+| LINKAGE_Weak_odr
+| LINKAGE_External
+
+type dll_storage =
+| DLLSTORAGE_Dllimport
+| DLLSTORAGE_Dllexport
+
+type visibility =
+| VISIBILITY_Default
+| VISIBILITY_Hidden
+| VISIBILITY_Protected
+
+type cconv =
+| CC_Ccc
+| CC_Fastcc
+| CC_Coldcc
+| CC_Cc of int
+
+type param_attr =
+| PARAMATTR_Zeroext
+| PARAMATTR_Signext
+| PARAMATTR_Inreg
+| PARAMATTR_Byval
+| PARAMATTR_Inalloca
+| PARAMATTR_Sret
+| PARAMATTR_Align of int
+| PARAMATTR_Noalias
+| PARAMATTR_Nocapture
+| PARAMATTR_Readonly
+| PARAMATTR_Nest
+| PARAMATTR_Returned
+| PARAMATTR_Nonnull
+| PARAMATTR_Dereferenceable of int
+
+type fn_attr =
+| FNATTR_Alignstack of int
+| FNATTR_Alwaysinline
+| FNATTR_Builtin
+| FNATTR_Cold
+| FNATTR_Inlinehint
+| FNATTR_Jumptable
+| FNATTR_Minsize
+| FNATTR_Naked
+| FNATTR_Nobuiltin
+| FNATTR_Noduplicate
+| FNATTR_Noimplicitfloat
+| FNATTR_Noinline
+| FNATTR_Nonlazybind
+| FNATTR_Noredzone
+| FNATTR_Noreturn
+| FNATTR_Nounwind
+| FNATTR_Optnone
+| FNATTR_Optsize
+| FNATTR_Readnone
+| FNATTR_Readonly
+| FNATTR_Returns_twice
+| FNATTR_Sanitize_address
+| FNATTR_Sanitize_memory
+| FNATTR_Sanitize_thread
+| FNATTR_Ssp
+| FNATTR_Sspreq
+| FNATTR_Sspstrong
+| FNATTR_Uwtable
+| FNATTR_String of char list
+| FNATTR_Key_value of (char list * char list)
+| FNATTR_Attr_grp of int
+
+type thread_local_storage =
+| TLS_Localdynamic
+| TLS_Initialexec
+| TLS_Localexec
+
+type raw_id =
+| Name of char list
+| Anon of int
+| Raw of int
+
+type ident =
+| ID_Global of raw_id
+| ID_Local of raw_id
+
+type local_id = raw_id
+
+type global_id = raw_id
+
+type block_id = raw_id
+
+type function_id = global_id
+
+type typ =
+| TYPE_I of int
+| TYPE_Pointer of typ
+| TYPE_Void
+| TYPE_Half
+| TYPE_Float
+| TYPE_Double
+| TYPE_X86_fp80
+| TYPE_Fp128
+| TYPE_Ppc_fp128
+| TYPE_Metadata
+| TYPE_X86_mmx
+| TYPE_Array of int * typ
+| TYPE_Function of typ * typ list
+| TYPE_Struct of typ list
+| TYPE_Packed_struct of typ list
+| TYPE_Opaque
+| TYPE_Vector of int * typ
+| TYPE_Identified of ident
+
+type icmp =
+| Eq
+| Ne
+| Ugt
+| Uge
+| Ult
+| Ule
+| Sgt
+| Sge
+| Slt
+| Sle
+
+type fcmp =
+| FFalse
+| FOeq
+| FOgt
+| FOge
+| FOlt
+| FOle
+| FOne
+| FOrd
+| FUno
+| FUeq
+| FUgt
+| FUge
+| FUlt
+| FUle
+| FUne
+| FTrue
+
+type ibinop =
+| Add of bool * bool
+| Sub of bool * bool
+| Mul of bool * bool
+| Shl of bool * bool
+| UDiv of bool
+| SDiv of bool
+| LShr of bool
+| AShr of bool
+| URem
+| SRem
+| And
+| Or
+| Xor
+
+type fbinop =
+| FAdd
+| FSub
+| FMul
+| FDiv
+| FRem
+
+type fast_math =
+| Nnan
+| Ninf
+| Nsz
+| Arcp
+| Fast
+
+type conversion_type =
+| Trunc
+| Zext
+| Sext
+| Fptrunc
+| Fpext
+| Uitofp
+| Sitofp
+| Fptoui
+| Fptosi
+| Inttoptr
+| Ptrtoint
+| Bitcast
+
+type 't tident = 't * ident
+
+type 't exp =
+| EXP_Ident of ident
+| EXP_Integer of int
+| EXP_Float of float32
+| EXP_Double of float
+| EXP_Hex of float
+| EXP_Bool of bool
+| EXP_Null
+| EXP_Zero_initializer
+| EXP_Cstring of char list
+| EXP_Undef
+| EXP_Struct of ('t * 't exp) list
+| EXP_Packed_struct of ('t * 't exp) list
+| EXP_Array of ('t * 't exp) list
+| EXP_Vector of ('t * 't exp) list
+| OP_IBinop of ibinop * 't * 't exp * 't exp
+| OP_ICmp of icmp * 't * 't exp * 't exp
+| OP_FBinop of fbinop * fast_math list * 't * 't exp * 't exp
+| OP_FCmp of fcmp * 't * 't exp * 't exp
+| OP_Conversion of conversion_type * 't * 't exp * 't
+| OP_GetElementPtr of 't * ('t * 't exp) * ('t * 't exp) list
+| OP_ExtractElement of ('t * 't exp) * ('t * 't exp)
+| OP_InsertElement of ('t * 't exp) * ('t * 't exp) * ('t * 't exp)
+| OP_ShuffleVector of ('t * 't exp) * ('t * 't exp) * ('t * 't exp)
+| OP_ExtractValue of ('t * 't exp) * int list
+| OP_InsertValue of ('t * 't exp) * ('t * 't exp) * int list
+| OP_Select of ('t * 't exp) * ('t * 't exp) * ('t * 't exp)
+| OP_Freeze of ('t * 't exp)
+
+type 't texp = 't * 't exp
+
+type instr_id =
+| IId of raw_id
+| IVoid of int
+
+type 't phi =
+| Phi of 't * (block_id * 't exp) list
+
+type 't instr =
+| INSTR_Comment of char list
+| INSTR_Op of 't exp
+| INSTR_Call of 't texp * 't texp list
+| INSTR_Alloca of 't * 't texp option * int option
+| INSTR_Load of bool * 't * 't texp * int option
+| INSTR_Store of bool * 't texp * 't texp * int option
+| INSTR_Fence
+| INSTR_AtomicCmpXchg
+| INSTR_AtomicRMW
+| INSTR_Unreachable
+| INSTR_VAArg
+| INSTR_LandingPad
+
+type 't terminator =
+| TERM_Ret of 't texp
+| TERM_Ret_void
+| TERM_Br of 't texp * block_id * block_id
+| TERM_Br_1 of block_id
+| TERM_Switch of 't texp * block_id * ('t texp * block_id) list
+| TERM_IndirectBr of 't texp * block_id list
+| TERM_Resume of 't texp
+| TERM_Invoke of 't tident * 't texp list * block_id * block_id
+
+type 't global = { g_ident : global_id; g_typ : 't; g_constant : bool;
+                   g_exp : 't exp option; g_linkage : linkage option;
+                   g_visibility : visibility option;
+                   g_dll_storage : dll_storage option;
+                   g_thread_local : thread_local_storage option;
+                   g_unnamed_addr : bool; g_addrspace : int option;
+                   g_externally_initialized : bool;
+                   g_section : char list option; g_align : int option }
+
+val g_ident : 'a1 global -> global_id
+
+val g_typ : 'a1 global -> 'a1
+
+val g_constant : 'a1 global -> bool
+
+val g_exp : 'a1 global -> 'a1 exp option
+
+val g_linkage : 'a1 global -> linkage option
+
+val g_visibility : 'a1 global -> visibility option
+
+val g_dll_storage : 'a1 global -> dll_storage option
+
+val g_thread_local : 'a1 global -> thread_local_storage option
+
+val g_unnamed_addr : 'a1 global -> bool
+
+val g_addrspace : 'a1 global -> int option
+
+val g_externally_initialized : 'a1 global -> bool
+
+val g_section : 'a1 global -> char list option
+
+val g_align : 'a1 global -> int option
+
+type 't declaration = { dc_name : function_id; dc_type : 't;
+                        dc_param_attrs : (param_attr list * param_attr list
+                                         list); dc_linkage : linkage option;
+                        dc_visibility : visibility option;
+                        dc_dll_storage : dll_storage option;
+                        dc_cconv : cconv option; dc_attrs : fn_attr list;
+                        dc_section : char list option; dc_align : int option;
+                        dc_gc : char list option }
+
+val dc_name : 'a1 declaration -> function_id
+
+val dc_type : 'a1 declaration -> 'a1
+
+val dc_param_attrs : 'a1 declaration -> param_attr list * param_attr list list
+
+val dc_linkage : 'a1 declaration -> linkage option
+
+val dc_visibility : 'a1 declaration -> visibility option
+
+val dc_dll_storage : 'a1 declaration -> dll_storage option
+
+val dc_cconv : 'a1 declaration -> cconv option
+
+val dc_attrs : 'a1 declaration -> fn_attr list
+
+val dc_section : 'a1 declaration -> char list option
+
+val dc_align : 'a1 declaration -> int option
+
+val dc_gc : 'a1 declaration -> char list option
+
+type 't code = (instr_id * 't instr) list
+
+type 't block = { blk_id : block_id; blk_phis : (local_id * 't phi) list;
+                  blk_code : 't code; blk_term : (instr_id * 't terminator);
+                  blk_comments : char list list option }
+
+val blk_id : 'a1 block -> block_id
+
+val blk_phis : 'a1 block -> (local_id * 'a1 phi) list
+
+val blk_code : 'a1 block -> 'a1 code
+
+val blk_term : 'a1 block -> instr_id * 'a1 terminator
+
+val blk_comments : 'a1 block -> char list list option
+
+type ('t, 'fnBody) definition = { df_prototype : 't declaration;
+                                  df_args : local_id list; df_instrs : 
+                                  'fnBody }
+
+val df_prototype : ('a1, 'a2) definition -> 'a1 declaration
+
+val df_args : ('a1, 'a2) definition -> local_id list
+
+val df_instrs : ('a1, 'a2) definition -> 'a2
+
+type 't metadata =
+| METADATA_Const of 't texp
+| METADATA_Null
+| METADATA_Id of raw_id
+| METADATA_String of char list
+| METADATA_Named of char list list
+| METADATA_Node of 't metadata list
+
+val metadata_rect :
+  ('a1 texp -> 'a2) -> 'a2 -> (raw_id -> 'a2) -> (char list -> 'a2) ->
+  (char list list -> 'a2) -> ('a1 metadata list -> 'a2) -> 'a1 metadata -> 'a2
+
+val metadata_rec :
+  ('a1 texp -> 'a2) -> 'a2 -> (raw_id -> 'a2) -> (char list -> 'a2) ->
+  (char list list -> 'a2) -> ('a1 metadata list -> 'a2) -> 'a1 metadata -> 'a2
+
+type ('t, 'fnBody) toplevel_entity =
+| TLE_Comment of char list
+| TLE_Target of char list
+| TLE_Datalayout of char list
+| TLE_Declaration of 't declaration
+| TLE_Definition of ('t, 'fnBody) definition
+| TLE_Type_decl of ident * 't
+| TLE_Source_filename of char list
+| TLE_Global of 't global
+| TLE_Metadata of raw_id * 't metadata
+| TLE_Attribute_group of int * fn_attr list
+
+type ('t, 'fnBody) toplevel_entities = ('t, 'fnBody) toplevel_entity list
+
+type ('t, 'fnBody) modul = { m_name : char list option;
+                             m_target : char list option;
+                             m_datalayout : char list option;
+                             m_type_defs : (ident * 't) list;
+                             m_globals : 't global list;
+                             m_declarations : 't declaration list;
+                             m_definitions : ('t, 'fnBody) definition list }
+
+val m_name : ('a1, 'a2) modul -> char list option
+
+val m_target : ('a1, 'a2) modul -> char list option
+
+val m_datalayout : ('a1, 'a2) modul -> char list option
+
+val m_type_defs : ('a1, 'a2) modul -> (ident * 'a1) list
+
+val m_globals : ('a1, 'a2) modul -> 'a1 global list
+
+val m_declarations : ('a1, 'a2) modul -> 'a1 declaration list
+
+val m_definitions : ('a1, 'a2) modul -> ('a1, 'a2) definition list

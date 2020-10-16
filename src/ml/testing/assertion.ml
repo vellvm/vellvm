@@ -18,6 +18,8 @@ type test =
 
 let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV.uvalue =
   match typ, exp with
+  (* Allow null pointers literals *)
+  | TYPE_Pointer _, EXP_Null -> UVALUE_None 
   | TYPE_I i, EXP_Integer x ->
     begin match (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned i)) with
     | 1 -> UVALUE_I1 x
@@ -55,18 +57,15 @@ let texp_to_function_name (_, exp) : string =
 let instr_to_call_data instr =
   match instr with
   | INSTR_Call (fn, args) ->
-    (texp_to_function_name fn,
-     List.map texp_to_uvalue args)
-    
+     (texp_to_function_name fn, List.map texp_to_uvalue args)
   | _ -> failwith "Assertion includes unsupported instruction (must be a call)"
 
 
 (* Top level for parsing assertions *)  
 let rec parse_assertion (line: string) : test option =
-  begin match parse_poison_assertion line, parse_eq_assertion line with
-  | Some _ as poisontest, _ -> poisontest
-  | _, (Some _ as eqtest) -> eqtest
-  | _, _ -> None
+  begin match parse_eq_assertion line with
+  | (Some _ as eqtest) -> eqtest
+  | _ -> None
   end
 
 and parse_poison_assertion (line: string) : test option =
@@ -97,7 +96,6 @@ and parse_eq_assertion (line:string) =
     let l = Llvm_lexer.parse_texp (Lexing.from_string lhs) in
     (* let _ = print_endline "PARSED LHS" in         *)
     let r = Llvm_lexer.parse_test_call (Lexing.from_string rhs) in
-    (* let _ = print_endline "PARSED RHS" in         *)
     let uv = texp_to_uvalue l in
     let dt = typ_to_dtyp (fst l) in
     let (fn, args) = instr_to_call_data r in
