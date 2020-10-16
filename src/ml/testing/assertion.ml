@@ -64,7 +64,7 @@ let instr_to_call_data instr =
 (* Top level for parsing assertions *)  
 let rec parse_assertion (line: string) : test option =
   begin match parse_eq_assertion line with
-  | (Some _ as eqtest) -> eqtest
+  | (Some _ as eqtest) -> print_endline "eqtest"; eqtest
   | _ -> None
   end
 

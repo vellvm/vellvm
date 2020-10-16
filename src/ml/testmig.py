@@ -7,7 +7,7 @@ def create_assertion(simp):
         val = "0x7FF0000000000001"
     if v == "snan":
         val = "0x7FF0000000000000"
-    assertion = "; ASSERT_EQ: " + ty + " " + val + " = call " + ty + " @main(i64 0, i8** null)"  
+    assertion = "; ASSERT EQ: " + ty + " " + val + " = call " + ty + " @main(i64 0, i8** null)"  
     return (path, assertion)
 
 def show_assert(a):

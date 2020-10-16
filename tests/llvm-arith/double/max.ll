@@ -5,5 +5,5 @@ define double @main(i8 %argc, i8** %arcv) {
   ret double %1
 }
 
-; ASSERT_EQ: double 2.0  = call double @main(i64 0, i8** null)
+; ASSERT EQ: double 2.0  = call double @main(i64 0, i8** null)
 
