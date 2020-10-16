@@ -9,7 +9,7 @@ type raw_assertion_string =
 
 type test =
   | EQTest of DV.uvalue * DynamicTypes.dtyp * string * DV.uvalue list
-  | POISONTest of string * DV.uvalue list
+  | POISONTest of DynamicTypes.dtyp * string * DV.uvalue list
 
 
 (*  Directly converts a piece of syntax to a uvalue without going through semantic interpretation.
@@ -60,6 +60,19 @@ let instr_to_call_data instr =
      (texp_to_function_name fn, List.map texp_to_uvalue args)
   | _ -> failwith "Assertion includes unsupported instruction (must be a call)"
 
+let texp_to_name_retty (texp : LLVMAst.typ texp) : DynamicTypes.dtyp * string =
+  let (t, exp) = texp in
+  match exp with
+  | EXP_Ident (ID_Global (Name x)) -> t, Camlcoq.camlstring_of_coqstring x
+  | _ -> failwith "found non-function name"
+
+let instr_to_call_data' instr =
+  match instr with
+  | INSTR_Call (fn, args) ->
+     let (t, fname) = texp_to_name_retty fn in
+     (t, fname, List.map texp_to_uvalue args)
+  | _ -> failwith "Assertion includes unsupported instruction (must be a call)"
+  
 
 (* Top level for parsing assertions *)  
 let rec parse_assertion (line: string) : test option =
@@ -76,8 +89,8 @@ and parse_poison_assertion (line: string) : test option =
   else
     let assertion = Str.matched_group 1 line in
     let poisoned_fcall = Llvm_lexer.parse_test_call (Lexing.from_string assertion) in
-    let (fn, args) = instr_to_call_data poisoned_fcall in
-    Some (POISONTest(fn, args))
+    let (ty, fn, args) = instr_to_call_data' poisoned_fcall in
+    Some (POISONTest(ty, fn, args))
 
 and parse_eq_assertion (line:string) =
   (* ws* "ASSERT" ws+ "EQ" ws* ':' ws* (anything+ as l) ws* '=' ws* (anything+ as r)  *)

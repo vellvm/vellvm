@@ -39,6 +39,23 @@ let make_test ll_ast t : string * assertion  =
     let result () = Interpreter.step (TopLevel.interpreter_user dtyp (Camlcoq.coqstring_of_camlstring entry) args [] ll_ast) 
     in
     str, (Assert.assert_eqf result (Ok expected))
+  | Assertion.POISONTest (dtyp, entry, args) ->
+     let str =
+       let expected_str =
+         Interpreter.pp_uvalue Format.str_formatter (Handlers.LLVMEvents.DV.UVALUE_Poison);
+         Format.flush_str_formatter ()
+       in
+      let args_str =
+        Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter args;
+        Format.flush_str_formatter()
+      in
+      Printf.sprintf "%s = %s(%s)" expected_str entry args_str
+     in
+
+     let result () = Interpreter.step(TopLevel.interpreter_user dtyp (Camlcoq.coqstring_of_camlstring entry) args [] ll_ast)
+     in 
+     str, (Assert.assert_eqf result (Ok expected))
+         
 
 
 
