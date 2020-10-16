@@ -2,11 +2,14 @@ import sys
 
 def create_assertion(simp):
     (path, name, ty, v) = simp
-    return "; ASSERT_EQ: " + ty + " " + v + " = call " + ty + " @main()"  
+    assertion = "; ASSERT_EQ: " + ty + " " + v + " = call " + ty + " @main(i64 0, i8** null)"  
+    return (path, assertion)
 
-def gen_assert(a):
-    for asserter in a:
-        print(asserter)
+def show_assert(a):
+    for path in a:
+        print("---" + path + "---")
+        for cmt in a[path]:
+            print(cmt)
 
 def parse_for_assertion(src, ty):
     # get rid of leading and trailing '[]'
@@ -37,15 +40,37 @@ def lines_in_file(f, l_start, l_end):
             if l_start <= linum <= l_end:
                 lines += line
     return lines
+
+def assertion_dict(assertions):
+    dic = {}
+    for (path, cmt) in assertions:
+        if path in dic:
+            dic[path].append(cmt)
+        else:
+            dic[path] = [cmt]
+    return dic
+
+def write_assertion(assertions):
+    for path in assertions:
+        asserts = assertions[path]
+        with open("../" + path, 'a') as fh:
+            fh.write("\n")
+            for a in asserts:
+                fh.write(a + "\n")
+            fh.write("\n")
     
 def main(args):
     l_start = int(args[0])
     l_end = int(args[1])
     ty = args[2]
+    plan = args[3]
     contents = lines_in_file("test.ml", l_start, l_end)
     p = parse_for_assertion(contents, ty)
-    assertions = [create_assertion(i) for i in p]
-    gen_assert(assertions)
+    assertions = assertion_dict([create_assertion(i) for i in p])
+    if plan == "true": 
+      show_assert(assertions)
+    elif plan == "false":
+      write_assertion(assertions)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
