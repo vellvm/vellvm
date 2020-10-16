@@ -2,7 +2,12 @@ import sys
 
 def create_assertion(simp):
     (path, name, ty, v) = simp
-    assertion = "; ASSERT_EQ: " + ty + " " + v + " = call " + ty + " @main(i64 0, i8** null)"  
+    val = v
+    if v == "qnan":
+        val = "0x7FF0000000000001"
+    if v == "snan":
+        val = "0x7FF0000000000000"
+    assertion = "; ASSERT_EQ: " + ty + " " + val + " = call " + ty + " @main(i64 0, i8** null)"  
     return (path, assertion)
 
 def show_assert(a):
