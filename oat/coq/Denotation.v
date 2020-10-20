@@ -27,7 +27,8 @@ From ExtLib Require Import
 
 From Vellvm Require Import Util Error.
 Require Import Integers.
-Require Import Oat.AST.
+Theorem t : 0 = 1 -> False.
+  Require Import Oat.AST.
 Require Import Oat.DynamicValues.
 Require Import Oat.OatEvents.
 
@@ -37,6 +38,8 @@ Local Open Scope string_scope.
 Local Open Scope program_scope.
 Module Int64 := Integers.Int64.
 Definition int64 := Int64.int.
+
+
 
 (******************************* Oat Semantics *******************************)
 (**
