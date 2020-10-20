@@ -15,11 +15,12 @@ University of Pennsylvania as part of the DeepSpec project.
  - Steve Zdancewic
  - Yannick Zakowski
  - Calvin Beck
- - Olek Gierczak
-
+ - Irene Yoon
+ 
 ## Past Contributors
  - Vivien Durey 
  - Dmitri Garbuzov 
+ - Olek Gierczak
  - William Mansky
  - Milo Martin
  - Santosh Nagarakatte 

@@ -12,6 +12,7 @@
 From Vellvm Require Import Tactics.
 
 From Coq Require Import
+     micromega.Lia
      Ascii
      Strings.String
      Arith.Arith
@@ -413,7 +414,7 @@ End nat_Show.
 
 From Coq Require Import
      List
-     Omega
+     Lia
      RelationClasses.
 Import ListNotations.
 
@@ -677,7 +678,7 @@ Proof.
   induction l; simpl; intros.
   - inversion H.
   - destruct n; simpl; try constructor.
-    unfold Nth; simpl; apply IHl; omega.
+    unfold Nth; simpl; apply IHl; lia.
 Qed.
 
 Lemma nth_error_replace : forall {A} l n (a : A) n' (Hn : n < length l),
@@ -686,14 +687,14 @@ Lemma nth_error_replace : forall {A} l n (a : A) n' (Hn : n < length l),
 Proof.
   induction l; intros; try (solve [inversion Hn]); simpl in *.
   destruct n; destruct n'; auto; simpl.
-  apply IHl; omega.
+  apply IHl; lia.
 Qed.
 
 Lemma replace_over : forall {A} l n (a : A) (Hnlt : ~n < length l),
   replace l n a = l.
 Proof.
-  induction l; intros; destruct n; simpl in *; auto; try omega.
-  rewrite IHl; auto; omega.
+  induction l; intros; destruct n; simpl in *; auto; try lia.
+  rewrite IHl; auto; lia.
 Qed.
 
 
@@ -713,7 +714,7 @@ Lemma replicate_Nth : forall {A} n (a : A) n' (Hlt : n' < n),
 Proof.
   induction n; simpl; intros; [inversion Hlt|].
   destruct n'; auto.
-  simpl; apply IHn; omega.
+  simpl; apply IHn; lia.
 Qed.
 
 
@@ -754,7 +755,7 @@ Qed.
 Lemma interval_nil : forall n, interval n n = [].
 Proof.
   intro; destruct n; auto; unfold interval.
-  destruct (le_lt_dec (S n) n); auto; omega.
+  destruct (le_lt_dec (S n) n); auto; lia.
 Qed.
 
 Lemma interval_alt : forall m n, interval n m = 
@@ -762,11 +763,11 @@ Lemma interval_alt : forall m n, interval n m =
 Proof.
   induction m; auto; intro.
   unfold interval at 1; fold interval.
-  destruct (le_lt_dec n m); destruct (lt_dec n (S m)); auto; try omega.
+  destruct (le_lt_dec n m); destruct (lt_dec n (S m)); auto; try lia.
   rewrite IHm.
   destruct (lt_dec n m).
   - unfold interval at 2; fold interval.
-    destruct (le_lt_dec (S n) m); auto; omega.
+    destruct (le_lt_dec (S n) m); auto; lia.
   - rewrite Lt.le_lt_or_eq_iff in *; destruct l; [contradiction | subst].
     rewrite interval_nil; auto.
 Qed.
@@ -776,8 +777,8 @@ Proof.
   induction m; auto; intro; simpl.
   destruct (le_lt_dec n m).
   - rewrite app_length, IHm; simpl.
-    destruct n; omega.
-  - destruct n; simpl; omega.
+    destruct n; lia.
+  - destruct n; simpl; lia.
 Qed.        
 
 Lemma nth_error_nil : forall A n, nth_error ([] : list A) n = None.
@@ -804,8 +805,8 @@ Lemma nth_error_in : forall {A} (l : list A) n a,
   nth_error l n = Some a -> n < length l.
 Proof.
   induction l; intros; destruct n; simpl in *; inversion H; subst.
-  - omega.
-  - specialize (IHl _ _ H); omega.
+  - lia.
+  - specialize (IHl _ _ H); lia.
 Qed.
 
 Lemma nth_error_succeeds : forall {A} (l : list A) n, n < length l ->
@@ -814,7 +815,7 @@ Proof.
   induction l; simpl; intros.
   - inversion H.
   - destruct n; simpl; eauto.
-    apply IHl; omega.
+    apply IHl; lia.
 Qed.
 
 Fixpoint distinct {A} (l : list A) :=
@@ -850,7 +851,7 @@ Proof.
   destruct (le_lt_dec n m); simpl; auto.
   apply distinct_snoc; auto.
   generalize (interval_lt m n); intro Hlt.
-  intro Hin; rewrite Forall_forall in Hlt; specialize (Hlt _ Hin); omega.
+  intro Hin; rewrite Forall_forall in Hlt; specialize (Hlt _ Hin); lia.
 Qed.
 
 
@@ -877,7 +878,7 @@ Proof.
   - rewrite <- minus_n_O; auto.
   - destruct n; simpl in *; auto.
     specialize (IHl _ _ _ Hnth); destruct (lt_dec n (length l));
-      destruct (lt_dec (S n) (S (length l))); auto; omega.
+      destruct (lt_dec (S n) (S (length l))); auto; lia.
 Qed.
 
 Lemma interval_Nth : forall m n i (Hlt : i < m - n),
@@ -887,15 +888,15 @@ Proof.
   - inversion Hlt.
   - destruct (lt_dec i (m - n)).
     + specialize (IHm _ _ l).
-      destruct (le_lt_dec n m); try omega.
+      destruct (le_lt_dec n m); try lia.
       apply Nth_app1; auto.
     + destruct (le_lt_dec n m).
       * generalize (@Nth_app2 _ [m] 0); unfold Nth; simpl; intro.
         specialize (H _ eq_refl (interval n m)).
         rewrite interval_length in H.
-        assert (i = m - n) as Hi by (destruct n; omega).
-        rewrite Hi; assert (m - n + n = m) as Hm by omega; rewrite Hm; auto.
-      * destruct n; omega.
+        assert (i = m - n) as Hi by (destruct n; lia).
+        rewrite Hi; assert (m - n + n = m) as Hm by lia; rewrite Hm; auto.
+      * destruct n; lia.
 Qed.
 
     
@@ -926,14 +927,14 @@ Proof.
   induction j; simpl; auto; intros.
   destruct (Compare_dec.le_lt_dec i j).
   - erewrite IHj; eauto.
-    rewrite <- Minus.minus_Sn_m; simpl; [|omega].
-    destruct (Compare_dec.le_lt_dec (i - k) (j - k)); [|omega].
+    rewrite <- Minus.minus_Sn_m; simpl; [|lia].
+    destruct (Compare_dec.le_lt_dec (i - k) (j - k)); [|lia].
     rewrite map_app; simpl.
-    rewrite Nat.sub_add; auto; omega.
+    rewrite Nat.sub_add; auto; lia.
   - destruct (Compare_dec.le_lt_dec k j).
-    + rewrite <- Minus.minus_Sn_m; simpl; try omega.
-      destruct (Compare_dec.le_lt_dec (i - k) (j - k)); auto; try omega.
-    + assert (S j - k = 0) as Heq by omega; rewrite Heq; auto.
+    + rewrite <- Minus.minus_Sn_m; simpl; try lia.
+      destruct (Compare_dec.le_lt_dec (i - k) (j - k)); auto; try lia.
+    + assert (S j - k = 0) as Heq by lia; rewrite Heq; auto.
 Qed.
 Transparent minus.
 
@@ -941,9 +942,9 @@ Corollary interval_S : forall j i, interval (S i) (S j) =
   map S (interval i j).
 Proof.
   intros.
-  rewrite interval_shift with (k := 1); [simpl | omega].
+  rewrite interval_shift with (k := 1); [simpl | lia].
   repeat rewrite Nat.sub_0_r.
-  apply map_ext; intro; omega.
+  apply map_ext; intro; lia.
 Qed.
 
 Lemma flat_map_map : forall A B C (f : B -> list C) (g : A -> B) l,
@@ -962,9 +963,9 @@ Qed.
 
 Lemma interval_in_iff : forall i j k, In k (interval i j) <-> i <= k < j.
 Proof.
-  intros; induction j; simpl; [omega|].
-  destruct (Compare_dec.le_lt_dec i j); simpl; [|omega].
-  rewrite in_app_iff, IHj; simpl; omega.
+  intros; induction j; simpl; [lia|].
+  destruct (Compare_dec.le_lt_dec i j); simpl; [|lia].
+  rewrite in_app_iff, IHj; simpl; lia.
 Qed.
 
 
@@ -974,7 +975,7 @@ Proof.
   induction l; simpl; intros.
   inversion H.
   destruct n eqn:Heqn; auto.
-  eapply IHl; omega.
+  eapply IHl; lia.
 Qed.
 
 Lemma app_nth_error2 : forall (A : Type) (l l' : list A) (n : nat),
@@ -995,7 +996,7 @@ Proof.
   induction l.
   inversion 1. simpl. intros.
   destruct n eqn:Heqn.
-  auto. simpl. eapply IHl. omega.
+  auto. simpl. eapply IHl. lia.
 Qed.
 
 Section REMOVE.
@@ -1020,7 +1021,7 @@ Lemma remove_length_le : forall l x,
 Proof.
   induction l; intros; auto.
   simpl. destruct (dec x a); simpl; auto.
-  specialize (IHl x). omega.
+  specialize (IHl x). lia.
 Qed.
 
 Lemma remove_length : forall l x,
@@ -1034,7 +1035,7 @@ Proof.
       unfold Peano.lt. eapply le_n_S. apply remove_length_le.
       contradict contra; auto.
     + simpl. specialize (IHl x H0). 
-      destruct (dec x a); subst; simpl; omega.
+      destruct (dec x a); subst; simpl; lia.
 Qed.
 
 End REMOVE.
@@ -1237,8 +1238,8 @@ Lemma nth_error_out:
   nth_error l n = None -> length l <= n.
 Proof.
   induction l; simpl; intros.
-  - omega.
-  - destruct n. inversion H. simpl in H. apply IHl in H. omega.
+  - lia.
+  - destruct n. inversion H. simpl in H. apply IHl in H. lia.
 Qed.
 
 Lemma map_ext_in : forall A B (f g : A -> B) l,
@@ -1463,43 +1464,3 @@ Tactic Notation "inv_bind" hyp(H) :=
       destruct o eqn:hy; [|discriminate]; simpl in H
     end.
 
-(* This should find another place, ideally should be part of itree library. *)
-(* Explicit application of a state to a [stateT] computation: convenient to ease some rewriting,
-     but semantically equivalent to simply applying the state. *)
-
-From ITree Require Import
-     ITree
-     Eq.Eq.
-(* Definition runState {E A env} (R : Monads.stateT env (itree E) A) (st: env) : itree E (env * A) := R st. *)
-
-(* This should move to the library. It's just a specialization of [eqit_bind'], but I like the much more
- informative name. *)
-From ExtLib Require Import
-     Structures.Monads.
-Import MonadNotation.
-Lemma eq_itree_clo_bind {E : Type -> Type} {R1 R2 : Type} (RR : R1 -> R2 -> Prop) {U1 U2 UU} t1 t2 k1 k2
-      (EQT: @eq_itree E U1 U2 UU t1 t2)
-      (EQK: forall u1 u2, UU u1 u2 -> eq_itree RR (k1 u1) (k2 u2)):
-  eq_itree RR (x <- t1;; k1 x) (x <- t2;; k2 x).
-Proof.
-  eapply eqit_bind'; eauto.
-Qed.
-
-Lemma resum_to_subevent : forall (E F : Type -> Type) H T e,
-    @resum _ IFun E F H T e = subevent _ e.
-Proof.
-  intros; reflexivity.
-Qed.
-
-Lemma subevent_subevent' : forall {E F} `{E -< F} {X} (e : E X),
-    @subevent F F _ X (@subevent E F _ X e) = subevent X e.
-Proof.
-  reflexivity.
-Qed.
-
-Lemma subevent_subevent : forall {E F G :Type -> Type} (SEF: E -< F) (SFG: F -< G) T (e : E T),
-    @subevent F G SFG T (@subevent E F SEF T e) =
-    @subevent E G (fun x f => SFG _ (SEF _ f)) T e.
-Proof.
-  reflexivity.
-Qed.

@@ -1,6 +1,7 @@
 From ITree Require Import
      ITree
      Basics
+     Basics.HeterogeneousRelations
      Eq.Eq.
 
 From Vellvm Require Import

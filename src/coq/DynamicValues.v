@@ -168,7 +168,8 @@ Definition ll_double := Floats.float.
 
 Module DVALUE(A:Vellvm.MemoryAddress.ADDRESS).
 
-(* The set of dynamic values manipulated by an LLVM program. *)
+  (* The set of dynamic values manipulated by an LLVM program. *)
+  Unset Elimination Schemes.
 Inductive dvalue : Set :=
 | DVALUE_Addr (a:A.addr)
 | DVALUE_I1 (x:int1)
@@ -184,6 +185,7 @@ Inductive dvalue : Set :=
 | DVALUE_Array         (elts: list dvalue)
 | DVALUE_Vector        (elts: list dvalue)
 .
+Set Elimination Schemes.
 
 Section DvalueInd.
   Variable P : dvalue -> Prop.
@@ -201,7 +203,7 @@ Section DvalueInd.
   Hypothesis IH_Array         : forall (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Array elts).
   Hypothesis IH_Vector        : forall (elts: list dvalue), (forall e, In e elts -> P e) -> P (DVALUE_Vector elts).
 
-  Lemma dvalue_ind' : forall (dv:dvalue), P dv.
+  Lemma dvalue_ind : forall (dv:dvalue), P dv.
     fix IH 1.
     remember P as P0 in IH.
     destruct dv; auto; subst.
@@ -230,6 +232,7 @@ End DvalueInd.
 
 
 (* The set of dynamic values manipulated by an LLVM program. *)
+Unset Elimination Schemes.
 Inductive uvalue : Set :=
 | UVALUE_Addr (a:A.addr)
 | UVALUE_I1 (x:int1)
@@ -258,6 +261,7 @@ Inductive uvalue : Set :=
 | UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list int)
 | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
 .
+Set Elimination Schemes.
 
 Section UvalueInd.
   Variable P : uvalue -> Prop.
@@ -288,7 +292,7 @@ Section UvalueInd.
   Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
   Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
 
-  Lemma uvalue_ind' : forall (uv:uvalue), P uv.
+  Lemma uvalue_ind : forall (uv:uvalue), P uv.
     fix IH 1.
     remember P as P0 in IH.
     destruct uv; auto; subst.
@@ -413,7 +417,7 @@ Lemma uvalue_to_dvalue_of_dvalue_to_uvalue :
     uvalue_to_dvalue (dvalue_to_uvalue d) = inr d.
 Proof.
   intros.
-  induction d using @dvalue_ind'; auto.
+  induction d; auto.
   - cbn. induction fields. cbn. reflexivity.
     assert (forall u : dvalue,
                In u fields ->
@@ -1424,6 +1428,7 @@ Class VInt I : Type :=
    *)
 
   (* Poison not included because of concretize *)
+  Unset Elimination Schemes.
   Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
   | DVALUE_Addr_typ   : forall a, dvalue_has_dtyp (DVALUE_Addr a) DTYPE_Pointer
   | DVALUE_I1_typ     : forall x, dvalue_has_dtyp (DVALUE_I1 x) (DTYPE_I 1)
@@ -1470,6 +1475,7 @@ Class VInt I : Type :=
         vector_dtyp dt ->
         dvalue_has_dtyp (DVALUE_Vector xs) (DTYPE_Vector (Z.of_nat sz) dt)
   .
+  Set Elimination Schemes.
 
   Inductive uvalue_has_dtyp : uvalue -> dtyp -> Prop :=
   | UVALUE_Addr_typ   : forall a, uvalue_has_dtyp (UVALUE_Addr a) DTYPE_Pointer
@@ -1710,7 +1716,7 @@ Class VInt I : Type :=
         Datatypes.length xs = sz ->
         vector_dtyp dt -> P (DVALUE_Vector xs) (DTYPE_Vector (Z.of_nat sz) dt).
 
-    Lemma dvalue_has_dtyp_ind' : forall (dv:dvalue) (dt:dtyp) (TYP: dvalue_has_dtyp dv dt), P dv dt.
+    Lemma dvalue_has_dtyp_ind : forall (dv:dvalue) (dt:dtyp) (TYP: dvalue_has_dtyp dv dt), P dv dt.
       fix IH 3.
       intros dv dt TYP.
       destruct TYP.

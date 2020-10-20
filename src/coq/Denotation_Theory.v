@@ -6,6 +6,7 @@ From Coq Require Import
 From ITree Require Import
      ITree
      ITreeFacts
+     Basics.HeterogeneousRelations
      Events.State
      Events.StateFacts
      InterpFacts
@@ -18,6 +19,7 @@ From Vellvm Require Import
      DynamicTypes
      CFG
      LLVMAst
+     AstLib
      LLVMEvents
      TopLevel
      Tactics
@@ -128,7 +130,7 @@ Qed.
 (** [denote_code] *)
 
 Lemma denote_code_nil :
-  denote_code [] ≈ ret tt.
+  denote_code [] ≈ Ret tt.
 Proof.
   intros.
   cbn. rewrite bind_ret_l.
@@ -190,7 +192,7 @@ Qed.
 
 Opaque assoc.
 Lemma denote_phi_hd : forall bid e id τ tl,
-    denote_phi bid (id, Phi τ ((bid,e)::tl)) ≈ uv <- denote_exp (Some τ) e;; ret (id,uv).
+    denote_phi bid (id, Phi τ ((bid,e)::tl)) ≈ uv <- denote_exp (Some τ) e;; Ret (id,uv).
 Proof.
   intros; cbn.
   rewrite assoc_hd; reflexivity.
@@ -399,12 +401,12 @@ Proof.
     try (einit; estep; intros []).
 
   - destruct v. 
-    apply PostConditions.eutt_eq_bind; intros ?.
+    apply eutt_eq_bind; intros ?.
     apply eutt_Ret; cbn; eauto.
 
   - destruct v; cbn.
-    apply PostConditions.eutt_eq_bind; intros ?.
-    apply PostConditions.eutt_eq_bind; intros ?.
+    apply eutt_eq_bind; intros ?.
+    apply eutt_eq_bind; intros ?.
     unfold raise, Exception.throw, raiseUB.
     destruct u0; cbn;
       try (einit; estep; intros []).
@@ -606,5 +608,15 @@ Proof.
   rewrite denote_bks_unfold_not_in.
   rewrite bind_ret_l; reflexivity.
   eapply find_block_not_in_inputs, no_duplicate_bid_not_in_l; eauto using independent_flows_no_duplicate_bid.
+Qed.
+
+Lemma denote_no_phis : forall x,
+    denote_phis x [] ≈ Ret tt.
+Proof.
+  intros.
+  unfold denote_phis; cbn.
+  rewrite bind_ret_l; cbn.
+  rewrite bind_ret_l; cbn.
+  reflexivity.
 Qed.
 

@@ -13,6 +13,7 @@ From Coq Require Import
 
 From ITree Require Import
      ITree
+     Basics.HeterogeneousRelations
      Eq.Eq
      Interp.Interp
      Interp.InterpFacts
@@ -1147,7 +1148,7 @@ Module RENAMING
     Instance Commute_denote_exp : Commute_eq_LLVM2 denote_exp.
     Proof.
       intros top e; revert top.
-      induction e using exp_ind'; intros top.
+      induction e; intros top.
       - solver.
       - destruct top as [[]|]; solver.
       - destruct top as [[]|]; solver.
@@ -1555,7 +1556,7 @@ Hint Unfold swap_ENV.
   Proof.
     intros CFG g e top.
     unfold err in *.
-    induction o using exp_ind'; bisim.
+    induction o; bisim.
     - cbn. rewrite swap_lookup_id.
       bisim.
 (*

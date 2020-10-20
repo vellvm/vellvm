@@ -34,7 +34,7 @@ Definition int := Z.
 Definition float := Floats.float.  (* 64-bit floating point value *)
 Definition float32 := Floats.float32.
 
-Inductive linkage : Set :=
+Variant linkage : Set :=
 | LINKAGE_Private
 | LINKAGE_Internal
 | LINKAGE_Available_externally
@@ -48,25 +48,25 @@ Inductive linkage : Set :=
 | LINKAGE_External
 .
 
-Inductive dll_storage : Set :=
+Variant dll_storage : Set :=
 | DLLSTORAGE_Dllimport
 | DLLSTORAGE_Dllexport
 .
 
-Inductive visibility : Set :=
+Variant visibility : Set :=
 | VISIBILITY_Default
 | VISIBILITY_Hidden
 | VISIBILITY_Protected
 .
 
-Inductive cconv : Set :=
+Variant cconv : Set :=
 | CC_Ccc
 | CC_Fastcc
 | CC_Coldcc
 | CC_Cc (cc:int)
 .
 
-Inductive param_attr : Set :=
+Variant param_attr : Set :=
 | PARAMATTR_Zeroext
 | PARAMATTR_Signext
 | PARAMATTR_Inreg
@@ -83,7 +83,7 @@ Inductive param_attr : Set :=
 | PARAMATTR_Dereferenceable (a:int)
 .
 
-Inductive fn_attr : Set :=
+Variant fn_attr : Set :=
 | FNATTR_Alignstack (a:int)
 | FNATTR_Alwaysinline
 | FNATTR_Builtin
@@ -117,7 +117,7 @@ Inductive fn_attr : Set :=
 | FNATTR_Attr_grp (g:int)
 .
 
-Inductive thread_local_storage : Set :=
+Variant thread_local_storage : Set :=
 | TLS_Localdynamic
 | TLS_Initialexec
 | TLS_Localexec
@@ -125,13 +125,13 @@ Inductive thread_local_storage : Set :=
 
 
 
-Inductive raw_id : Set :=
+Variant raw_id : Set :=
 | Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)
 | Anon (n:int)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
 | Raw  (n:int)        (* Used for code generation -- serializes as %_RAW_0 %_RAW_1 etc. *)
 .
 
-Inductive ident : Set :=
+Variant ident : Set :=
 | ID_Global (id:raw_id)   (* @id *)
 | ID_Local  (id:raw_id)   (* %id *)
 .
@@ -143,6 +143,7 @@ Definition block_id := raw_id.
 Definition function_id := global_id.
 
 
+Unset Elimination Schemes.
 Inductive typ : Set :=
 | TYPE_I (sz:int)
 | TYPE_Pointer (t:typ)
@@ -165,12 +166,13 @@ Inductive typ : Set :=
 | TYPE_Vector (sz:int) (t:typ)     (* t must be integer, floating point, or pointer type *)
 | TYPE_Identified (id:ident)
 .
+Set Elimination Schemes.
 
 
-Inductive icmp : Set := Eq|Ne|Ugt|Uge|Ult|Ule|Sgt|Sge|Slt|Sle.
-Inductive fcmp : Set := FFalse|FOeq|FOgt|FOge|FOlt|FOle|FOne|FOrd|FUno|FUeq|FUgt|FUge|FUlt|FUle|FUne|FTrue.
+Variant icmp : Set := Eq|Ne|Ugt|Uge|Ult|Ule|Sgt|Sge|Slt|Sle.
+Variant fcmp : Set := FFalse|FOeq|FOgt|FOge|FOlt|FOle|FOne|FOrd|FUno|FUeq|FUgt|FUge|FUlt|FUle|FUne|FTrue.
 
-Inductive ibinop : Set :=
+Variant ibinop : Set :=
 | Add (nuw:bool) (nsw:bool)
 | Sub (nuw:bool) (nsw:bool)
 | Mul (nuw:bool) (nsw:bool)
@@ -182,13 +184,13 @@ Inductive ibinop : Set :=
 | URem | SRem | And | Or | Xor
 .
 
-Inductive fbinop : Set :=
+Variant fbinop : Set :=
   FAdd | FSub | FMul | FDiv | FRem.
 
-Inductive fast_math : Set :=
+Variant fast_math : Set :=
   Nnan | Ninf | Nsz | Arcp | Fast.
 
-Inductive conversion_type : Set :=
+Variant conversion_type : Set :=
   Trunc | Zext | Sext | Fptrunc | Fpext | Uitofp | Sitofp | Fptoui |
   Fptosi | Inttoptr | Ptrtoint | Bitcast.
 
@@ -222,6 +224,9 @@ Section TypedSyntax.
    - EXP_ prefix denotes syntax that LLVM calls a "value"
    - OP_  prefix denotes syntax that requires further evaluation
  *)
+
+Unset Elimination Schemes.
+
 Inductive exp : Set :=
 | EXP_Ident   (id:ident)
 | EXP_Integer (x:int)
@@ -252,19 +257,21 @@ Inductive exp : Set :=
 | OP_Freeze           (v:(T * exp))
 .
 
+Set Elimination Schemes.
+
 Definition texp : Set := T * exp.
 
-Inductive instr_id : Set :=
+Variant instr_id : Set :=
 | IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)
 | IVoid (n:int)        (* "Void" return type, for "store",  "void call", and terminators.
                            Each with unique number (NOTE: these are distinct from Anon raw_id) *)
 .
 
-Inductive phi : Set :=
+Variant phi : Set :=
 | Phi  (t:T) (args:list (block_id * exp))
 .
 
-Inductive instr : Set :=
+Variant instr : Set :=
 | INSTR_Comment (msg:string)
 | INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form SV (OP_ ...) *)
 | INSTR_Call (fn:texp) (args:list texp)      (* CORNER CASE: return type is void treated specially *)
@@ -279,7 +286,7 @@ Inductive instr : Set :=
 | INSTR_LandingPad
 .
 
-Inductive terminator : Set :=
+Variant terminator : Set :=
 (* Terminators *)
 (* Types in branches are TYPE_Label constant *)
 | TERM_Ret        (v:texp)
@@ -357,7 +364,7 @@ Inductive metadata : Set :=
   | METADATA_Node   (mds:list metadata)
 .
 
-Inductive toplevel_entity {FnBody:Set} : Set :=
+Variant toplevel_entity {FnBody:Set} : Set :=
 | TLE_Comment         (msg:string)
 | TLE_Target          (tgt:string)
 | TLE_Datalayout      (layout:string)

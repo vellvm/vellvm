@@ -10,10 +10,10 @@
 
 (* begin hide *)
 From Coq Require Import
-     Morphisms ZArith List String Omega
+     Morphisms ZArith List String Lia
      FSets.FMapAVL
      Structures.OrderedTypeEx
-     ZMicromega
+     micromega.Lia
      Psatz.
 
 From ITree Require Import
@@ -721,12 +721,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       simpl. rewrite Zmod_1_r. auto.
       Opaque Byte.wordsize.
       rewrite Nat2Z.inj_succ. simpl.
-      replace (Z.succ (Z.of_nat n) * 8) with (Z.of_nat n * 8 + 8) by omega.
-      rewrite two_p_is_exp; try omega.
+      replace (Z.succ (Z.of_nat n) * 8) with (Z.of_nat n * 8 + 8) by lia.
+      rewrite two_p_is_exp; try lia.
       rewrite Zmod_recombine. rewrite IHn. rewrite Z.add_comm.
       change (Byte.unsigned (Byte.repr x)) with (Byte.Z_mod_modulus x).
       rewrite Byte.Z_mod_modulus_eq. reflexivity.
-      apply two_p_gt_ZERO. omega. apply two_p_gt_ZERO. omega.
+      apply two_p_gt_ZERO. lia. apply two_p_gt_ZERO. lia.
     Qed.
 
     (** ** Serialization of [dvalue]
@@ -939,13 +939,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         0 <= sizeof_dtyp dt.
     Proof.
       intros dv dt TYP.
-      induction TYP using dvalue_has_dtyp_ind';
+      induction TYP;
         try solve [cbn; omega].
       - cbn.  rewrite DynamicValues.unsupported_cases_match. omega. assumption.
       - rewrite sizeof_struct_cons.
-        omega.
+        lia.
       - rewrite sizeof_packed_struct_cons.
-        omega.
+        lia.
       - cbn. destruct xs.
         + cbn in *; subst.
           reflexivity.
@@ -976,7 +976,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         Z.of_nat (List.length (serialize_dvalue dv)) = sizeof_dtyp dt.
     Proof.
       intros dv dt TYP.
-      induction TYP using dvalue_has_dtyp_ind'; try solve [cbn; auto].
+      induction TYP; try solve [cbn; auto].
       - cbn. rewrite DynamicValues.unsupported_cases_match; auto.
       - cbn.
         rewrite app_length.
@@ -1000,7 +1000,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
             with (sizeof_dtyp dt + Z.of_nat (Datatypes.length xs) * sizeof_dtyp dt).
           * rewrite Nat2Z.inj_add. rewrite IHxs with (sz:=Datatypes.length xs); auto.
             apply Z.add_cancel_r; auto.
-          * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. omega.
+          * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. lia.
       - generalize dependent sz.
         induction xs; intros sz H; cbn.
         + subst; auto.
@@ -1009,7 +1009,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
             with (sizeof_dtyp dt + Z.of_nat (Datatypes.length xs) * sizeof_dtyp dt).
           * rewrite Nat2Z.inj_add. rewrite IHxs with (sz:=Datatypes.length xs); auto.
             apply Z.add_cancel_r; auto.
-          * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. omega.
+          * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. lia.
     Qed.
 
     (* TODO: does this exist somewhere else? *)
@@ -1030,7 +1030,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         (firstn (Z.to_nat (sizeof_dtyp dt)) (serialize_dvalue dv)) = serialize_dvalue dv.
     Proof.
       intros dv dt TYP.
-      induction TYP using dvalue_has_dtyp_ind'; auto.
+      induction TYP; auto.
       - cbn. rewrite DynamicValues.unsupported_cases_match. reflexivity. auto.
       - (* Structs *)
         rewrite sizeof_struct_cons.
@@ -1046,10 +1046,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           cbn in *.
           rewrite IHTYP2.
           reflexivity.
-        + rewrite Z2Nat.inj_add; try omega.
-          rewrite Nat2Z.id. reflexivity.
+        + rewrite Z2Nat.inj_add; try lia.
           inversion TYP2; cbn.
-          omega.
+          lia.
 
           pose proof (sizeof_dvalue_pos H2) as Hsz_fields.
           pose proof (sizeof_dvalue_pos H1) as Hsz_f.
@@ -1057,7 +1056,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           cbn in Hsz_f.
 
           rewrite fold_sizeof.
-          omega.
+          lia.
       - (* Packed Structs *)
         rewrite sizeof_packed_struct_cons.
         cbn.
@@ -1072,10 +1071,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           cbn in *.
           rewrite IHTYP2.
           reflexivity.
-        + rewrite Z2Nat.inj_add; try omega.
-          rewrite Nat2Z.id. reflexivity.
+        + rewrite Z2Nat.inj_add; try lia.
           inversion TYP2; cbn.
-          omega.
+          lia.
 
           pose proof (sizeof_dvalue_pos H2) as Hsz_fields.
           pose proof (sizeof_dvalue_pos H1) as Hsz_f.
@@ -1083,7 +1081,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           cbn in Hsz_f.
 
           rewrite fold_sizeof.
-          omega.
+          lia.
       - (* Arrays *)
         generalize dependent sz.
         induction xs; intros sz H.
@@ -1109,7 +1107,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                pose proof sizeof_dvalue_pos TYP.
                pose proof Zle_0_nat (Datatypes.length xs).
                apply Z.mul_nonneg_nonneg; auto.
-          * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. omega.
+          * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. lia.
       - (* Vectors *)
         generalize dependent sz.
         induction xs; intros sz H.
@@ -1135,7 +1133,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                pose proof sizeof_dvalue_pos TYP.
                pose proof Zle_0_nat (Datatypes.length xs).
                apply Z.mul_nonneg_nonneg; auto.
-          * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. omega.
+          * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. lia.
     Qed.
 
     Lemma skipn_length_app :
@@ -1194,7 +1192,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         all_not_sundef (serialize_dvalue dv) = true.
     Proof.
       intros dv.
-      induction dv using dvalue_ind'; auto.
+      induction dv; auto.
       - induction fields.
         + reflexivity.
         + cbn. apply forallb_forall.
@@ -1317,7 +1315,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         deserialize_sbytes (serialize_dvalue dval) t = dvalue_to_uvalue dval.
     Proof.
       intros dval t TYP.
-      induction TYP using dvalue_has_dtyp_ind'; auto.
+      induction TYP; auto.
       - (* I1 *) admit.
       - (* I8 *) admit.
       - (* I32 *) admit.
@@ -1673,7 +1671,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         write_array_mem_block' bk' bk_offset (S i) size t vs
       end.
 
-    Fixpoint write_array_mem_block (bk : mem_block) (bk_offset : Z) (from : nat) (t : dtyp) (vs : list dvalue) : err mem_block :=
+    Definition write_array_mem_block (bk : mem_block) (bk_offset : Z) (from : nat) (t : dtyp) (vs : list dvalue) : err mem_block :=
       let size := (Z.of_nat (length vs)) in
       write_array_mem_block' bk bk_offset from size t vs.
 
@@ -1778,7 +1776,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       intros [a1_r a1_o] τ1 [a2_r a2_o] τ2 H.
       unfold overlaps_dtyp, overlaps in H.
       unfold no_overlap_dtyp, no_overlap.
-      omega.
+      lia.
     Qed.
 
     Lemma no_overlap__not_overlaps :
@@ -1789,7 +1787,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       intros [a1_r a1_o] τ1 [a2_r a2_o] τ2 H.
       unfold no_overlap_dtyp, no_overlap in H.
       unfold overlaps_dtyp, overlaps.
-      omega.
+      lia.
     Qed.
       (** ** Concretization of blocks
           Look-ups a concrete block in memory. The logical memory acts first as a potential layer of indirection:
@@ -2255,7 +2253,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
       intros A; induction bs; intros off off' m def sz Hsz Hrange; auto.
       cbn.
-      rewrite lookup_all_index_add_out; auto; try omega.
+      rewrite lookup_all_index_add_out; auto; try lia.
       apply IHbs; auto.
       destruct Hrange as [Hleft | Hright]; cbn in *; lia.
     Qed.
@@ -2593,7 +2591,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         + replace (z0 + size * sizeof_dtyp τ * 0 +
                    DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
             with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
-            by omega.
+            by lia.
 
           reflexivity.
         + unfold Int64.max_unsigned. cbn. lia.
@@ -2619,7 +2617,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         replace (z0 + size * sizeof_dtyp τ * 0 +
                    DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
             with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
-          by omega.
+          by lia.
         reflexivity.
         unfold Int64.max_unsigned. cbn. lia.
       - eapply read_array; cbn; eauto.
@@ -2644,7 +2642,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         + replace (z0 + size * sizeof_dtyp τ * 0 +
                    DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
             with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
-            by omega.
+            by lia.
 
           reflexivity.
         + unfold Int64.max_unsigned. cbn. lia.
@@ -2670,7 +2668,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         replace (z0 + size * sizeof_dtyp τ * 0 +
                    DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
             with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
-          by omega.
+          by lia.
         reflexivity.
         unfold Int64.max_unsigned. cbn. lia.
       - eapply write_array_lemma; cbn; eauto.
@@ -3234,8 +3232,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           rewrite <- HeqLEN in H2.
           destruct (zeq (Z.of_nat LEN) 0) eqn: LENZERO.
           + intuition. (* absurd case *)
-          + Search (Z.pred (Z.of_nat _)).
-            rewrite <- Nat2Z.inj_pred. 2 : lia.
+          + rewrite <- Nat2Z.inj_pred. 2 : lia.
             apply IHl. cbn in HeqLEN. lia.
       Qed.
 

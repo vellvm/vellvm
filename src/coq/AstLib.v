@@ -327,7 +327,7 @@ Hypothesis IH_Opaque     : P(TYPE_Opaque).
 Hypothesis IH_Vector     : forall sz t, P t -> P(TYPE_Vector sz t).
 Hypothesis IH_Identified : forall id, P(TYPE_Identified id).
 
-Lemma typ_ind' : forall (t:typ), P t.
+Lemma typ_ind : forall (t:typ), P t.
   fix IH 1.
   destruct t.
   - apply IH_I.
@@ -429,7 +429,7 @@ Inductive value : Set :=
   Hypothesis IH_Select        : forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select cnd v1 v2)).
   Hypothesis IH_Freeze        : forall (v:(T * exp T)), P (snd v) -> P ((OP_Freeze v)).
 
-  Lemma exp_ind' : forall (v:exp T), P v.
+  Lemma exp_ind : forall (v:exp T), P v.
     fix IH 1.
     destruct v.
     - apply IH_Ident.

@@ -31,6 +31,7 @@ Require Import Ceres.Ceres.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
+Unset Elimination Schemes.
 Inductive dtyp : Set :=
 | DTYPE_I (sz:Z)
 | DTYPE_Pointer
@@ -50,6 +51,7 @@ Inductive dtyp : Set :=
                                    (* IY: Why isn't this defined structurally? *)
 | DTYPE_Vector (sz:Z) (t:dtyp)     (* t must be integer, floating point, or pointer type *)
 .
+Set Elimination Schemes.
 
 Definition vector_dtyp dt :=
   (exists n, dt = DTYPE_I n) \/ dt = DTYPE_Pointer \/ dt = DTYPE_Half \/ dt = DTYPE_Float \/
@@ -74,7 +76,7 @@ Section DtypInd.
   Hypothesis IH_Opaque        : P DTYPE_Opaque.
   Hypothesis IH_Vector        : forall sz t, P t -> P (DTYPE_Vector sz t).
 
-  Lemma dtyp_ind' : forall (dt:dtyp), P dt.
+  Lemma dtyp_ind : forall (dt:dtyp), P dt.
     fix IH 1.
     remember P as P0 in IH.
     destruct dt; auto; subst.

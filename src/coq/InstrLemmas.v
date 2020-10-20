@@ -24,6 +24,7 @@ From Vellvm Require Import
      Tactics
      TypToDtyp
      AstLib
+     ExpLemmas
 .
 
 Import D.
@@ -86,38 +87,6 @@ Proof.
     reflexivity.
 Qed.
 
-Lemma uvalue_to_dvalue_list_concrete :
-  forall fields dfields,
-    (forall u : uvalue,
-        List.In u fields ->
-        (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u) ->
-    map_monad uvalue_to_dvalue fields = inr dfields ->
-    forallb is_concrete fields = true.
-Proof.
-  induction fields; intros dfields H MAP; auto.
-
-  cbn. apply andb_true_intro.
-  split.
-  - apply H.
-    + apply in_eq.
-    + inversion MAP.
-      destruct (uvalue_to_dvalue a) eqn:Hdv; inversion H1.
-      exists d. reflexivity.
-  - inversion MAP.
-    destruct (uvalue_to_dvalue a) eqn:Hdv; inversion H1.
-    destruct (map_monad uvalue_to_dvalue fields) eqn:Hmap; inversion H2.
-
-    assert (forall u : uvalue,
-               In u fields -> (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u) as BLAH.
-    { intros u IN (dv & CONV).
-      apply H.
-      - cbn. auto.
-      - exists dv. auto.
-    }
-
-    apply (IHfields l BLAH eq_refl).
-Qed.
-
 (* TODO: Move this *)
 Lemma is_concrete_uvalue_to_dvalue :
   forall uv,
@@ -125,7 +94,7 @@ Lemma is_concrete_uvalue_to_dvalue :
     exists dv, uvalue_to_dvalue uv = inr dv.
 Proof with reflexivity.
   intros uv CONC.
-  induction uv using uvalue_ind';
+  induction uv;
     inversion CONC.
   - exists (DVALUE_Addr a)...
   - exists (DVALUE_I1 x)...
@@ -153,32 +122,6 @@ Proof with reflexivity.
     pose proof uvalue_to_dvalue_list _ H H1 as (dv & MAP).
     exists (DVALUE_Vector dv). rewrite MAP.
     reflexivity.
-Qed.
-
-(* TODO: Move this *)
-Lemma uvalue_to_dvalue_is_concrete :
-  forall uv dv,
-    uvalue_to_dvalue uv = inr dv ->
-    is_concrete uv.
-Proof.
-  induction uv using uvalue_ind';
-    intros dv CONV; cbn; inversion CONV; auto.
-  - break_match; inversion H1.
-    eapply uvalue_to_dvalue_list_concrete; eauto.
-    intros u IN (dv' & CONV').
-    eapply H; eauto.
-  - break_match; inversion H1.
-    eapply uvalue_to_dvalue_list_concrete; eauto.
-    intros u IN (dv' & CONV').
-    eapply H; eauto.
-  - break_match; inversion H1.
-    eapply uvalue_to_dvalue_list_concrete; eauto.
-    intros u IN (dv' & CONV').
-    eapply H; eauto.
-  - break_match; inversion H1.
-    eapply uvalue_to_dvalue_list_concrete; eauto.
-    intros u IN (dv' & CONV').
-    eapply H; eauto.
 Qed.
 
 (* TODO: Move this *)
@@ -348,7 +291,6 @@ Proof.
   destruct i; cbn; rewrite interp_cfg_to_L3_ret; reflexivity.
 Qed.
 
-
 Lemma denote_instr_op :
   forall (i : raw_id) (op : exp dtyp) defs uv g ρ ρ' m,
     interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp None op)) g ρ m ≈ Ret (m, (ρ', (g, uv))) ->
@@ -364,190 +306,6 @@ Proof.
   reflexivity.
 Qed.
 
-(* TODO: Move to place where expression lemmas belong? *)
-Lemma denote_ibinop_concrete :
-  forall (op : ibinop) τ e0 e1 g ρ m x a av b bv defs,
-    uvalue_to_dvalue a = inr av ->
-    uvalue_to_dvalue b = inr bv ->
-    eval_iop op av bv  = ret x ->
-    Ret (m, (ρ, (g, a)))
-        ≈ interp_cfg_to_L3 defs
-        (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e0))) g ρ
-        m ->
-    Ret (m, (ρ, (g, b)))
-        ≈ interp_cfg_to_L3 defs
-        (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e1))) g ρ
-        m ->
-   interp_cfg_to_L3 defs
-   (translate exp_E_to_instr_E
-      (denote_exp None
-         (OP_IBinop op τ (Traversal.fmap (typ_to_dtyp [ ]) e0)
-            (Traversal.fmap (typ_to_dtyp [ ]) e1)))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
-Proof.
-  intros op τ e0 e1 g ρ m x a av b bv defs AV BV EVAL A B.
-
-  (* First subexpression *)
-  cbn.
-  rewrite translate_bind.
-  rewrite interp_cfg_to_L3_bind.
-  rewrite <- A.
-  rewrite bind_ret_l.
-
-  (* Second subexpression *)
-  rewrite translate_bind.
-  rewrite interp_cfg_to_L3_bind.
-  rewrite <- B.
-  rewrite bind_ret_l.
-
-  pose proof (uvalue_to_dvalue_is_concrete _ _ BV) as CONC.
-  rewrite CONC.
-  cbn. rewrite Bool.andb_false_r.
-
-  unfold uvalue_to_dvalue_binop.
-  rewrite AV, BV.
-  cbn.
-
-  rewrite EVAL.
-  cbn.
-
-  repeat rewrite translate_ret.
-  rewrite interp_cfg_to_L3_ret.
-  reflexivity.
-Qed.
-
-(* TODO: Move to place where expression lemmas belong? *)
-Lemma denote_fbinop_concrete :
-  forall (op : fbinop) τ e0 e1 g ρ m x a av b bv defs params,
-    uvalue_to_dvalue a = inr av ->
-    uvalue_to_dvalue b = inr bv ->
-    eval_fop op av bv  = ret x ->
-    Ret (m, (ρ, (g, a)))
-        ≈ interp_cfg_to_L3 defs
-        (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e0))) g ρ
-        m ->
-    Ret (m, (ρ, (g, b)))
-        ≈ interp_cfg_to_L3 defs
-        (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e1))) g ρ
-        m ->
-   interp_cfg_to_L3 defs
-   (translate exp_E_to_instr_E
-      (denote_exp None
-         (OP_FBinop op params τ (Traversal.fmap (typ_to_dtyp [ ]) e0)
-            (Traversal.fmap (typ_to_dtyp [ ]) e1)))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
-Proof.
-  intros op τ e0 e1 g ρ m x a av b bv defs params AV BV EVAL A B.
-
-  (* First subexpression *)
-  cbn.
-  rewrite translate_bind.
-  rewrite interp_cfg_to_L3_bind.
-  rewrite <- A.
-  rewrite bind_ret_l.
-
-  (* Second subexpression *)
-  rewrite translate_bind.
-  rewrite interp_cfg_to_L3_bind.
-  rewrite <- B.
-  rewrite bind_ret_l.
-
-  pose proof (uvalue_to_dvalue_is_concrete _ _ BV) as CONC.
-  rewrite CONC.
-  cbn. rewrite Bool.andb_false_r.
-
-  unfold uvalue_to_dvalue_binop.
-  rewrite AV, BV.
-  cbn.
-
-  rewrite EVAL.
-  cbn.
-
-  repeat rewrite translate_ret.
-  rewrite interp_cfg_to_L3_ret.
-  reflexivity.
-Qed.
-
-(* TODO: Move to place where expression lemmas belong? *)
-Lemma denote_fcmp_concrete :
-  forall (op : fcmp) τ e0 e1 g ρ m x a av b bv defs,
-    uvalue_to_dvalue a = inr av ->
-    uvalue_to_dvalue b = inr bv ->
-    eval_fcmp op av bv  = ret x ->
-    Ret (m, (ρ, (g, a)))
-        ≈ interp_cfg_to_L3 defs
-        (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e0))) g ρ
-        m ->
-    Ret (m, (ρ, (g, b)))
-        ≈ interp_cfg_to_L3 defs
-        (translate exp_E_to_instr_E (denote_exp (Some τ) (convert_typ [ ] e1))) g ρ
-        m ->
-   interp_cfg_to_L3 defs
-   (translate exp_E_to_instr_E
-      (denote_exp None
-         (OP_FCmp op τ (Traversal.fmap (typ_to_dtyp [ ]) e0)
-            (Traversal.fmap (typ_to_dtyp [ ]) e1)))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
-Proof.
-  intros op τ e0 e1 g ρ m x a av b bv defs AV BV EVAL A B.
-
-  (* First subexpression *)
-  cbn.
-  rewrite translate_bind.
-  rewrite interp_cfg_to_L3_bind.
-  rewrite <- A.
-  rewrite bind_ret_l.
-
-  (* Second subexpression *)
-  rewrite translate_bind.
-  rewrite interp_cfg_to_L3_bind.
-  rewrite <- B.
-  rewrite bind_ret_l.
-
-  unfold uvalue_to_dvalue_binop.
-  rewrite AV, BV.
-  cbn.
-
-  rewrite EVAL.
-  cbn.
-
-  repeat rewrite translate_ret.
-  rewrite interp_cfg_to_L3_ret.
-  reflexivity.
-Qed.
-
-(* TODO: Move to place where expression lemmas belong? *)
-Lemma denote_conversion_concrete :
-  forall (conv : conversion_type) τ1 τ2 e g ρ m x a av defs,
-    uvalue_to_dvalue a = inr av ->
-    eval_conv conv τ1 av τ2  = ret x ->
-    Ret (m, (ρ, (g, a)))
-        ≈ interp_cfg_to_L3 defs
-        (translate exp_E_to_instr_E (denote_exp (Some τ1) (convert_typ [ ] e))) g ρ m ->
-   interp_cfg_to_L3 defs
-   (translate exp_E_to_instr_E
-      (denote_exp None
-         (OP_Conversion conv τ1 (Traversal.fmap (typ_to_dtyp [ ]) e) τ2))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
-Proof.
-  intros conv τ1 τ2 e g ρ m x a av defs AV EVAL A.
-
-  cbn.
-  rewrite translate_bind.
-  rewrite interp_cfg_to_L3_bind.
-  rewrite <- A.
-  rewrite bind_ret_l.
-
-  unfold uvalue_to_dvalue_uop.
-  rewrite AV.
-  cbn.
-
-  rewrite EVAL.
-  unfold ITree.map.
-  cbn.
-  rewrite bind_ret_l.
-
-  repeat rewrite translate_ret.
-  rewrite interp_cfg_to_L3_ret.
-  reflexivity.
-Qed.
-
 (* TODO: something like this exists in tmp_aux_vellvm.v in Helix. Move these. *)
 Lemma exp_E_to_instr_E_subevent : forall {E} {X} `{E -< exp_E} (e : E X),
     exp_E_to_instr_E (subevent X e) = subevent X e.
@@ -558,12 +316,21 @@ Qed.
 
 Lemma denote_instr_gep_array :
   forall i size τ defs e_ix ix ptr a val g ρ m,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m ≈ Ret (m, (ρ, (g, UVALUE_Addr a))) ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m ≈ Ret (m, (ρ, (g, UVALUE_I64 (repr (Z.of_nat ix))))) ->
-    get_array_cell m a ix τ = inr val ->
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m
+    ≈
+    Ret (m, (ρ, (g, UVALUE_Addr a)))
+    ->
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m
+    ≈
+    Ret (m, (ρ, (g, UVALUE_I64 (repr (Z.of_nat ix)))))
+    ->
+    get_array_cell m a ix τ = inr val
+    ->
     exists ptr_res,
       read m ptr_res τ = inr val /\
-      interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m  ≈ Ret (m, (Maps.add i (UVALUE_Addr ptr_res) ρ, (g, tt))).
+      interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m
+      ≈
+      Ret (m, (Maps.add i (UVALUE_Addr ptr_res) ρ, (g, tt))).
 Proof.
   intros i size τ defs e_ix ix ptr a val g ρ m PTR IX GET.
 
@@ -618,24 +385,34 @@ Proof.
   reflexivity.
 Qed.
 
-
 Lemma denote_instr_intrinsic :
   forall i τ defs fn in_n sem_f args arg_vs conc_args res g ρ m,
-    @intrinsic_exp dtyp (EXP_Ident (ID_Global (Name fn))) = Some in_n ->
-    assoc in_n (defs_assoc defs) = Some sem_f ->
-    interp_cfg_to_L3 defs (map_monad (fun uv : uvalue => pickUnique uv) arg_vs) g ρ m ≈ Ret (m, (ρ, (g, conc_args))) ->
-    sem_f conc_args = inr res ->
-    Ret (m, (ρ, (g, arg_vs))) ≈ interp_cfg_to_L3 defs (map_monad (fun '(t, op) => translate exp_E_to_instr_E (denote_exp (Some t) op)) args) g ρ m ->
+    @intrinsic_exp dtyp (EXP_Ident (ID_Global (Name fn))) = Some in_n
+    ->
+    assoc in_n (defs_assoc defs) = Some sem_f
+    ->
+    interp_cfg_to_L3 defs (map_monad (fun '(t, op) => translate exp_E_to_instr_E (denote_exp (Some t) op)) args) g ρ m
+    ≈
+    Ret (m, (ρ, (g, arg_vs))) 
+    ->
+    interp_cfg_to_L3 defs (map_monad (fun uv : uvalue => pickUnique uv) arg_vs) g ρ m
+    ≈
+    Ret (m, (ρ, (g, conc_args)))
+    ->
+    sem_f conc_args = inr res
+    ->
     (interp_cfg_to_L3 defs
        (denote_instr
           (IId i,
-           INSTR_Call (τ, EXP_Ident (ID_Global (Name fn))) args)) g ρ m) ≈ Ret (m, (FMapAList.alist_add eq_dec_raw_id i (dvalue_to_uvalue res) ρ, (g, tt))).
+           INSTR_Call (τ, EXP_Ident (ID_Global (Name fn))) args)) g ρ m)
+    ≈
+    Ret (m, (FMapAList.alist_add eq_dec_raw_id i (dvalue_to_uvalue res) ρ, (g, tt))).
 Proof.
-  intros i τ defs fn in_n sem_f args arg_vs conc_args res g ρ m INTRINSIC ASSOC CONCARGS RES MAP.
+  intros * INTRINSIC ASSOC  MAP CONCARGS RES.
 
   unfold denote_instr.
   setoid_rewrite interp_cfg_to_L3_bind.
-  rewrite <- MAP.
+  rewrite MAP.
   setoid_rewrite bind_ret_l.
   rewrite INTRINSIC.
   setoid_rewrite bind_bind.
@@ -656,10 +433,13 @@ Qed.
 
 Lemma denote_term_br_l :
   forall (e : exp dtyp) defs b1 b2 g ρ ρ' m,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 1)) e)) g ρ m ≈ Ret (m, (ρ', (g, UVALUE_I1 one))) ->
-    interp_cfg_to_L3 defs
-                     (translate exp_E_to_instr_E
-                                (denote_terminator (TERM_Br (DTYPE_I 1%Z, e) b1 b2))) g ρ m ≈ Ret (m, (ρ', (g, inl b1))). 
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 1)) e)) g ρ m
+    ≈
+    Ret (m, (ρ', (g, UVALUE_I1 one)))
+    ->
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_terminator (TERM_Br (DTYPE_I 1%Z, e) b1 b2))) g ρ m
+    ≈
+    Ret (m, (ρ', (g, inl b1))).
 Proof.
   intros * EXP.
   simpl.
@@ -674,10 +454,13 @@ Qed.
 
 Lemma denote_term_br_r :
   forall (e : exp dtyp) defs b1 b2 g ρ ρ' m,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 1)) e)) g ρ m ≈ Ret (m, (ρ', (g, UVALUE_I1 zero))) ->
-    interp_cfg_to_L3 defs
-                     (translate exp_E_to_instr_E
-                                (denote_terminator (TERM_Br (DTYPE_I 1%Z, e) b1 b2))) g ρ m ≈ Ret (m, (ρ', (g, inl b2))). 
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 1)) e)) g ρ m
+    ≈
+    Ret (m, (ρ', (g, UVALUE_I1 zero)))
+    ->
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_terminator (TERM_Br (DTYPE_I 1%Z, e) b1 b2))) g ρ m
+    ≈
+    Ret (m, (ρ', (g, inl b2))).
 Proof.
   intros * EXP.
   simpl.
@@ -685,6 +468,18 @@ Proof.
   rewrite EXP, bind_ret_l.
   cbn.
   rewrite bind_ret_l.
+  cbn.
+  rewrite translate_ret,interp_cfg_to_L3_ret.
+  reflexivity.
+Qed.
+
+Lemma denote_term_br_1 :
+  forall defs b g ρ m,
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_terminator (TERM_Br_1 b))) g ρ m
+    ≈
+    Ret (m, (ρ, (g, inl b))).
+Proof.
+  intros defs b g ρ m.
   cbn.
   rewrite translate_ret,interp_cfg_to_L3_ret.
   reflexivity.
