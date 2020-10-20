@@ -101,12 +101,12 @@ Inductive stmt :=
   | If : node exp -> list (node stmt) -> list (node stmt) -> stmt      (* conditional *)
   | While : node exp -> list (node stmt) -> stmt           (* while loop *)
   | SCall : node exp -> list (node exp) -> stmt   (* call a void function - change to exp later*)
+  | For : list vdecl -> option (node exp) (* for loop *)
+           -> option (node stmt) -> list (node stmt) -> stmt
   .
   
 (*
   | Cast : ty -> id -> (node exp) -> list (node stmt) -> list (node stmt) -> stmt
-  | For : list vdecl -> option (node exp) (* for loop *)
-           -> option (node stmt) -> list (node stmt) -> stmt
 *)
 
 

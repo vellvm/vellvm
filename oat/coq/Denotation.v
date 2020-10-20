@@ -27,8 +27,7 @@ From ExtLib Require Import
 
 From Vellvm Require Import Util Error.
 Require Import Integers.
-Theorem t : 0 = 1 -> False.
-  Require Import Oat.AST.
+Require Import Oat.AST.
 Require Import Oat.DynamicValues.
 Require Import Oat.OatEvents.
 
@@ -54,6 +53,7 @@ Definition expr := Oat.AST.exp.
 Definition stmt := Oat.AST.stmt.
 Definition unop := Oat.AST.unop.
 Definition binop := Oat.AST.binop.
+Definition vdecl := Oat.AST.vdecl.
 
 (* Denote the semantics for binary operations *)
 
@@ -163,8 +163,59 @@ Definition fcall_noret_or_fail (id: expr) (args: list ovalue) : itree OatE unit 
   | _ => raise "err: can't call a thing that's not a func!"
   end.
 
+About map_monad.
+Print vdecl.
+Print AST.vdecl.
+Definition for_loop_pre (decl: list vdecl) : itree OatE unit :=
+  _ <- (map_monad (fun vdec =>
+                     let e := denote_expr (elt expr (snd vdec)) in
+                     v <- e ;;
+                     trigger (OLocalWrite (fst vdec) v) ) decl) ;;
+  ret tt.
+
+Definition concrete_post (post : option (node stmt)) : list (node stmt) :=
+  match post with
+  | None => nil
+  | Some s => [s]
+  end.
+
+(* A for loop where no condition is provided *)
+Definition for_infinite
+           (f : stmt -> itree OatE unit)
+           (pre: list vdecl)
+           (post: list(node stmt))
+           (body: list (node stmt)) : itree OatE unit :=
+  for_loop_pre pre ;;
+  while (
+      seq body f;;
+      seq post f;;
+      ret (inl tt)
+    ).
+
+(* A for loop where there is a condition provided *)
+Definition for_eval
+           (f : stmt -> itree OatE unit)
+           (pre: list vdecl)
+           (cond: node expr)
+           (post: list(node stmt))
+           (body : list (node stmt)) : itree OatE unit :=
+  for_loop_pre pre ;;
+  while (
+      e_cond <- denote_expr (elt expr cond) ;;
+      (match e_cond with
+       | OVALUE_Bool bv =>
+        if bv then
+          seq body f ;;
+          seq post f ;;
+          ret (inl tt)
+        else ret (inr tt)
+      | _ => raise "err"
+       end)
+    ).
+                                                        
+
 (** Finally, we can start to denote the meaning of Oat statements *)
- Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
+Program Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
   match s with
   | Assn target source =>
     let tgt := elt_of target in
@@ -185,7 +236,7 @@ Definition fcall_noret_or_fail (id: expr) (args: list ovalue) : itree OatE unit 
     exp <- denote_expr e_cond ;;
     match exp with
       | OVALUE_Bool bv => 
-    if bv then seq p denote_stmt else seq f denote_stmt
+        if bv then seq p denote_stmt else seq f denote_stmt
       | _ => raise "err"
     end
   | While cond stmts =>
@@ -203,6 +254,16 @@ Definition fcall_noret_or_fail (id: expr) (args: list ovalue) : itree OatE unit 
     args' <- map_monad ( fun e => denote_expr (elt expr e)) args ;;
     _ <- fcall_noret_or_fail f_id args';;
     ret tt
+  | For vdecl cond post body =>
+    let post' := concrete_post post in
+    match cond with
+    | None =>
+      (* infinite looping *)
+      for_infinite (denote_stmt) vdecl post' body
+    | Some cond' =>
+      (* not infinite looping *)
+      for_eval (denote_stmt) vdecl cond' post' body
+    end
   | _ => raise "unimplemented"
   end.
 
