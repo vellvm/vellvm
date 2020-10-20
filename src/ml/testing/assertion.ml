@@ -63,7 +63,7 @@ let instr_to_call_data instr =
 let texp_to_name_retty (texp : LLVMAst.typ texp) : DynamicTypes.dtyp * string =
   let (t, exp) = texp in
   match exp with
-  | EXP_Ident (ID_Global (Name x)) -> t, Camlcoq.camlstring_of_coqstring x
+  | EXP_Ident (ID_Global (Name x)) -> typ_to_dtyp t, Camlcoq.camlstring_of_coqstring x
   | _ -> failwith "found non-function name"
 
 let instr_to_call_data' instr =
@@ -77,7 +77,7 @@ let instr_to_call_data' instr =
 (* Top level for parsing assertions *)  
 let rec parse_assertion (line: string) : test option =
   begin match parse_eq_assertion line with
-  | (Some _ as eqtest) -> print_endline "eqtest"; eqtest
+  | (Some _ as eqtest) -> eqtest
   | _ -> None
   end
 
