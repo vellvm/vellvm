@@ -7,11 +7,16 @@ functions might be run.
 
 
 A valid test file is an LLVM `.ll` file some of whose comments are interpreted
-as assertions.  For now, the test infrastructure supports `ASSERT EQ:` comments
+as assertions.  The test infrastructure supports `ASSERT EQ:` comments
 of the form:
 
 ```
 ; ASSERT EQ: <typ> <lit> = call <typ> <@function_name> (<typ_1> <lit_1>, ..., <typ_n> <lit_n>)
+```
+
+and `ASSERT POISON:` comments of the form:
+```
+; ASSERT POISON: call <typ> <@function_name> (<typ_1> <lit_1>, ..., <typ_n> <lit_n>)
 ```
 
 This represents a test case asserting that the result of calling function
@@ -50,4 +55,5 @@ define i32 @shl_test(i32 %x, i32 %amt) {
 ; ASSERT EQ: i32 3 = call i32 @shl_test(i32 3, i32 0)
 ; ASSERT EQ: i32 6 = call i32 @shl_test(i32 3, i32 1)
 ; ASSERT EQ: i32 12 = call i32 @shl_test(i32 3, i32 2)
+; ASSERT POISON: call i32 @main(i32 0, i32 0)
 ```
