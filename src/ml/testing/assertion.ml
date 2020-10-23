@@ -87,15 +87,11 @@ and parse_poison_assertion (line: string) : test option =
   (* ws* "ASSERT" ws+ "POISON" ws* ':' ws* (anything+ as r) *)
   let regex = "^[ \t]*;[ \t]*ASSERT[ \t]+POISON[ \t]*:[ \t]*\\(.*\\)" in
   if not (Str.string_match (Str.regexp regex) line 0) then
-    let _ = print_endline "no match" in
     None
   else
     let assertion = Str.matched_group 1 line in
-    let _ = print_endline "some match" in
     let poisoned_fcall = Llvm_lexer.parse_test_call (Lexing.from_string assertion) in
-    let _ = print_endline "some parse" in
     let (ty, fn, args) = instr_to_call_data' poisoned_fcall in
-    let _ =    "actual poison assertion" in
     Some (POISONTest(ty, fn, args))
 
 and parse_eq_assertion (line:string) =
