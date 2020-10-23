@@ -166,56 +166,16 @@ Definition fcall_noret_or_fail (id: expr) (args: list ovalue) : itree OatE unit 
 About map_monad.
 Print vdecl.
 Print AST.vdecl.
-Definition for_loop_pre (decl: list vdecl) : itree OatE unit :=
+
+ Definition for_loop_pre (decl: list vdecl) : itree OatE unit :=
   _ <- (map_monad (fun vdec =>
                      let e := denote_expr (elt expr (snd vdec)) in
                      v <- e ;;
                      trigger (OLocalWrite (fst vdec) v) ) decl) ;;
   ret tt.
 
-Definition concrete_post (post : option (node stmt)) : list (node stmt) :=
-  match post with
-  | None => nil
-  | Some s => [s]
-  end.
-
-(* A for loop where no condition is provided *)
-Definition for_infinite
-           (f : stmt -> itree OatE unit)
-           (pre: list vdecl)
-           (post: list(node stmt))
-           (body: list (node stmt)) : itree OatE unit :=
-  for_loop_pre pre ;;
-  while (
-      seq body f;;
-      seq post f;;
-      ret (inl tt)
-    ).
-
-(* A for loop where there is a condition provided *)
-Definition for_eval
-           (f : stmt -> itree OatE unit)
-           (pre: list vdecl)
-           (cond: node expr)
-           (post: list(node stmt))
-           (body : list (node stmt)) : itree OatE unit :=
-  for_loop_pre pre ;;
-  while (
-      e_cond <- denote_expr (elt expr cond) ;;
-      (match e_cond with
-       | OVALUE_Bool bv =>
-        if bv then
-          seq body f ;;
-          seq post f ;;
-          ret (inl tt)
-        else ret (inr tt)
-      | _ => raise "err"
-       end)
-    ).
-                                                        
-
 (** Finally, we can start to denote the meaning of Oat statements *)
-Program Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
+Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
   match s with
   | Assn target source =>
     let tgt := elt_of target in
@@ -254,16 +214,50 @@ Program Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
     args' <- map_monad ( fun e => denote_expr (elt expr e)) args ;;
     _ <- fcall_noret_or_fail f_id args';;
     ret tt
-  | For vdecl cond post body =>
-    let post' := concrete_post post in
-    match cond with
-    | None =>
-      (* infinite looping *)
-      for_infinite (denote_stmt) vdecl post' body
-    | Some cond' =>
-      (* not infinite looping *)
-      for_eval (denote_stmt) vdecl cond' post' body
-    end
+  (* For loop stuff *)
+  (* for (vdecl ; cond ; post )  { body } *)
+  | For vdecl (Some cond) (Some post) body =>
+    for_loop_pre vdecl ;;
+    while (
+        (cond' <- denote_expr (elt expr cond) ;; 
+          match cond' with
+          | OVALUE_Bool bv => if bv then
+                              seq body denote_stmt ;;
+                              denote_stmt (elt stmt post) ;;
+                              ret (inl tt)
+                              else
+                                ret (inr tt)
+          | _ => raise "err"
+          end)
+      )
+          
+  | For vdecl (Some cond) None body =>
+    for_loop_pre vdecl ;;
+    while (
+        (cond' <- denote_expr (elt expr cond) ;; 
+          match cond' with
+          | OVALUE_Bool bv => if bv then
+                              seq body denote_stmt ;;
+                              ret (inl tt)
+                              else
+                                ret (inr tt)
+          | _ => raise "err"
+          end)
+      )
+  (* for (vdecl ; cond? ; post? )  { body } - infinite loop *)
+  | For vdecl None (Some post) body =>
+    for_loop_pre vdecl ;;
+    while (
+        seq body denote_stmt ;;
+        denote_stmt (elt stmt post) ;;
+        ret (inl tt)
+      )
+  | For vdecl None None body =>
+    for_loop_pre vdecl ;;
+    while (
+        seq body denote_stmt ;;
+        ret (inl tt)
+      )
   | _ => raise "unimplemented"
   end.
 
