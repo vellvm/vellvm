@@ -72,4 +72,7 @@ Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m : err A) 
     of the sum type, called sum1.
  *)
 
-Definition OatE := OLocalE +' OCallE +' FailureE. 
+Definition OatE :=  OCallE +' OLocalE +' FailureE. 
+
+(* This version of an oat event has no call events - these are interpreted away *)
+Definition OatE' := OLocalE +' FailureE.

@@ -141,6 +141,5 @@ Inductive decl :=
   | Gvdecl : node gdecl -> decl
   | Gtdecl : node tdecl -> decl.
 
-Definition fdecl' := (id * fdecl)%type.
-Definition prog := list fdecl'.
+Definition prog := list fdecl.
 

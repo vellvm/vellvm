@@ -15,6 +15,7 @@ From Coq Require Import
 From ITree Require Import
      ITree
      ITreeFacts
+     Interp.Recursion
      Events.MapDefault
      Events.StateFacts
      Events.Exception
@@ -38,8 +39,10 @@ Local Open Scope program_scope.
 Module Int64 := Integers.Int64.
 Definition int64 := Int64.int.
 
-
-
+About translate.
+About mrec.
+Search mrec.
+About iter.
 (******************************* Oat Semantics *******************************)
 (**
    We'll finally start writing down how OAT should work! To begin, we'll
@@ -76,7 +79,7 @@ Definition gte (x y : int64) : bool :=
   negb (Int64.lt x y).
 
 
-Fixpoint denote_uop (u: unop) (v: ovalue) : itree OatE ovalue :=
+Definition denote_uop (u: unop) (v: ovalue) : itree OatE ovalue :=
   match u,v with
   | Neg,    OVALUE_Int i => ret (OVALUE_Int (Int64.neg i))
   | Lognot, OVALUE_Bool b => ret (OVALUE_Bool (negb b))
@@ -86,7 +89,7 @@ Fixpoint denote_uop (u: unop) (v: ovalue) : itree OatE ovalue :=
 
 
 (* Denote basic bop and uop *)
-Fixpoint denote_bop (op: binop) (v1 v2 : ovalue) : itree OatE ovalue :=
+Definition denote_bop (op: binop) (v1 v2 : ovalue) : itree OatE ovalue :=
   match op, v1, v2 with
   (* Integer arithmetic *)
   | Oat.AST.Add, OVALUE_Int l, OVALUE_Int r => ret (OVALUE_Int (Int64.add l r))
@@ -117,8 +120,6 @@ Definition fcall_return_or_fail (id: expr) (args: list ovalue) : itree OatE oval
   | _ => raise "err: can't call a thing that's not a func!"
   end.
 
-    
-
 (* Now we can give an ITree semantics for the expressions in oat *)
 Fixpoint denote_expr (e: expr) : itree OatE ovalue :=
   match e with
@@ -143,19 +144,30 @@ Fixpoint denote_expr (e: expr) : itree OatE ovalue :=
     ret f_ret
   end.
 
-(** 
-    Before we move onto statements, we have to sort out a few things first.
-    1) How are we going to handle if statements
-    2) How are we going to represent function calls 
-    3) How are we going to represent various loops
-    4) Sequencing
-*)
-Definition seq (l : list (node stmt)) (f : stmt -> itree OatE unit) : itree OatE unit :=
-  List.fold_left ( fun acc hd => f (elt stmt hd) ;; acc) (l) (ret tt).
+(** I'll define some convenient helpers for common things like looping and sequencing here *)
+Definition seq {T : Type } (l : list (node stmt)) (f : stmt -> itree OatE (unit + T)) : itree OatE (unit + T) :=
+  let base : itree OatE (unit + T) := ret (inl tt) in
+  let combine : itree OatE (unit + T)
+                -> node stmt
+                -> itree OatE (unit + T)
+      := fun acc hd =>
+           v <- f (elt stmt hd) ;;
+           ( match v with | inl _ => acc | inr v => ret (inr v) end )
+  in 
+  List.fold_left (combine) (l) (base).
 
-Definition while (step : itree OatE (unit + unit)) : itree OatE unit :=
-  iter (C := Kleisli _) (fun _ => step) tt.
+Definition stmt_t : Type := unit + ovalue.
+Definition cont_stmt : Type := unit + stmt_t.
 
+Definition while (step : itree OatE (unit + stmt_t)) : itree OatE stmt_t :=
+  iter (C := Kleisli _) (fun _ => step) (tt).
+
+(* while combinator: inl unit *)
+
+Definition end_loop : itree OatE (unit + stmt_t) := ret (inr (inl tt)).
+Definition cont_loop_silent : itree OatE (unit + stmt_t) := ret (inl tt). 
+Definition cont_loop_end : ovalue -> itree OatE (unit + stmt_t)
+  := fun v => ret (inr (inr v)).
 
 Definition fcall_noret_or_fail (id: expr) (args: list ovalue) : itree OatE unit :=
   match id with
@@ -163,9 +175,6 @@ Definition fcall_noret_or_fail (id: expr) (args: list ovalue) : itree OatE unit 
   | _ => raise "err: can't call a thing that's not a func!"
   end.
 
-About map_monad.
-Print vdecl.
-Print AST.vdecl.
 
  Definition for_loop_pre (decl: list vdecl) : itree OatE unit :=
   _ <- (map_monad (fun vdec =>
@@ -175,7 +184,18 @@ Print AST.vdecl.
   ret tt.
 
 (** Finally, we can start to denote the meaning of Oat statements *)
-Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
+About inl.
+Definition lift_eff {T} (t: itree OatE T) : itree OatE (unit + T) :=
+ t' <- t ;; ret (inr t').   
+
+Definition fcall (invoke: node exp) (args : list (node exp))  : itree OatE stmt_t :=
+    let f_id := elt expr invoke in
+    args' <- map_monad ( fun e => denote_expr (elt expr e)) args ;;
+    _ <- fcall_noret_or_fail f_id args';;
+    ret (inl tt).
+  
+
+Fixpoint denote_stmt (s : stmt) : itree OatE (unit + ovalue) :=
   match s with
   | Assn target source =>
     let tgt := elt_of target in
@@ -183,13 +203,15 @@ Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
     match tgt with
     | Id i =>
       v <- denote_expr src ;;
-      trigger (OLocalWrite i v)
+      trigger (OLocalWrite i v) ;;
+      ret (inl tt)
     | _ => raise "err: assignment to a non variable target"
     end
   | Decl (id, node) =>
     let src := elt_of node in
     v <- denote_expr src ;;
-    trigger (OLocalWrite id v)
+    trigger (OLocalWrite id v) ;;
+    ret (inl tt)
   | If cond p f =>
     (* Local function  *)
     let e_cond := elt expr cond in
@@ -200,20 +222,24 @@ Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
       | _ => raise "err"
     end
   | While cond stmts =>
-    let e_cond := elt expr cond in
-    while ( exp <- denote_expr e_cond ;;
-            (match exp with
-            | OVALUE_Bool bv =>
-              if bv then (seq stmts denote_stmt) ;; ret (inl tt)
-              else ret (inr tt)
-            | _ => raise "err"
-            end)
-      )
-  | SCall f args =>
-    let f_id := elt expr f in
-    args' <- map_monad ( fun e => denote_expr (elt expr e)) args ;;
-    _ <- fcall_noret_or_fail f_id args';;
-    ret tt
+    while (
+        x <- denote_expr (elt expr cond) ;;
+        match x with
+        | OVALUE_Bool bv =>
+          if bv then lift_eff (seq stmts denote_stmt) else end_loop
+        | _ => raise "err"
+        end)
+  | SCall f args => fcall f args
+  | _ => raise "unimplemented"
+  end.
+Print  fdecl.
+
+Definition fdecl_denotation : Type :=
+  list ovalue -> itree OatE stmt_t. 
+
+Definition denote_fdecl (df : fdecl ) : 
+
+(*
   (* For loop stuff *)
   (* for (vdecl ; cond ; post )  { body } *)
   | For vdecl (Some cond) (Some post) body =>
@@ -260,9 +286,26 @@ Fixpoint denote_stmt (s : stmt) : itree OatE unit :=
       )
   | _ => raise "unimplemented"
   end.
-
-
-
-(*
-(* Write down some proofs for the typesystem ... *)
 *)
+ 
+(*
+  lookups for fname
+
+*)
+About AST.fdecl.
+
+Fixpoint lookup (id: id) (fdecls: list AST.fdecl) : option AST.fdecl :=
+  match fdecls with
+  | nil => None
+  | h :: t => if eqb (fname h) (id) then Some h else lookup id t
+  end.
+  
+Definition denote_fdecl (fdecls : list fdecl) : _ :=
+  @mrec OCallE (OatE')
+        (fun T call =>
+           match call with
+             | OCallRet id args => 
+               dargs <- map_monad (fun e => denote_expr (elt expr e)) args ;; 
+        ).
+
+About denote_fdecl.
