@@ -1263,7 +1263,7 @@ Section PropMonad.
         econstructor 3. reflexivity.  apply HX.
   Qed.
 
-  Lemma Returns_bind_inversion : forall {E A B} (u : itree E B) (t : itree E A) (k : A -> itree E B) b,
+  Lemma Returns_bind_inversion : forall {E A B} (t : itree E A) (k : A -> itree E B) b,
       Returns b (bind t k) ->
       exists a, Returns a t /\ Returns b (k a).
   Proof.
