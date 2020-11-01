@@ -116,7 +116,7 @@ Definition denote_bop (op: binop) (v1 v2 : ovalue) : itree OatE ovalue :=
 
 Definition fcall_return_or_fail (id: expr) (args: list ovalue) : itree OatE ovalue :=
   match id with
-  | Id i => trigger (OCallRet i args)
+  | Id i => trigger (OCall i args)
   | _ => raise "err: can't call a thing that's not a func!"
   end.
 
@@ -141,7 +141,10 @@ Fixpoint denote_expr (e: expr) : itree OatE ovalue :=
     let f_id := elt expr f in
     args' <- map_monad ( fun e => denote_expr (elt expr e)) args ;;
     f_ret <- fcall_return_or_fail f_id args';;
-    ret f_ret
+    match f_ret with
+    | OVALUE_Void => raise "err: using a void function call in an expression"
+    | _ => ret f_ret
+    end
   end.
 
 (** I'll define some convenient helpers for common things like looping and sequencing here *)
@@ -169,13 +172,6 @@ Definition cont_loop_silent : itree OatE (unit + stmt_t) := ret (inl tt).
 Definition cont_loop_end : ovalue -> itree OatE (unit + stmt_t)
   := fun v => ret (inr (inr v)).
 
-Definition fcall_noret_or_fail (id: expr) (args: list ovalue) : itree OatE unit :=
-  match id with
-  | Id i => trigger (OCallVoid i args)
-  | _ => raise "err: can't call a thing that's not a func!"
-  end.
-
-
  Definition for_loop_pre (decl: list vdecl) : itree OatE unit :=
   _ <- (map_monad (fun vdec =>
                      let e := denote_expr (elt expr (snd vdec)) in
@@ -188,13 +184,8 @@ About inl.
 Definition lift_eff {T} (t: itree OatE T) : itree OatE (unit + T) :=
  t' <- t ;; ret (inr t').   
 
-Definition fcall (invoke: node exp) (args : list (node exp))  : itree OatE stmt_t :=
-    let f_id := elt expr invoke in
-    args' <- map_monad ( fun e => denote_expr (elt expr e)) args ;;
-    _ <- fcall_noret_or_fail f_id args';;
-    ret (inl tt).
-  
-
+Set Implicit Arguments.
+Set Contextual Implicit.
 Fixpoint denote_stmt (s : stmt) : itree OatE (unit + ovalue) :=
   match s with
   | Assn target source =>
@@ -206,6 +197,13 @@ Fixpoint denote_stmt (s : stmt) : itree OatE (unit + ovalue) :=
       trigger (OLocalWrite i v) ;;
       ret (inl tt)
     | _ => raise "err: assignment to a non variable target"
+    end
+  | Return e =>
+    match e with
+    | None => ret (inr OVALUE_Void)
+    | Some r =>
+      rv <- denote_expr (elt expr r) ;;
+      ret (inr rv)
     end
   | Decl (id, node) =>
     let src := elt_of node in
@@ -229,15 +227,92 @@ Fixpoint denote_stmt (s : stmt) : itree OatE (unit + ovalue) :=
           if bv then lift_eff (seq stmts denote_stmt) else end_loop
         | _ => raise "err"
         end)
-  | SCall f args => fcall f args
+  | SCall invoke args => 
+    let f_id := elt expr invoke in
+    args' <- map_monad ( fun e => denote_expr (elt expr e)) args ;;
+    _ <- fcall_return_or_fail f_id args';;
+    ret (inl tt)
   | _ => raise "unimplemented"
   end.
-Print  fdecl.
+
+(** VV: Enforcing the fact that a block must terminate in either a void(OVALUE_None) | concrete return type *) 
+
+(**
+   Without any fancy analysis the block:
+   stmt1;
+   stmt2;
+   return 3;
+   stmt_4;
+   stmt_5;
+   ....
+   could either be interpreted as an early return statement, where the
+   denotation of later blocks stops | denote everything.
+   | with some basic analysis we could enforce one terminator only and raise an error ow...
+*)
+(* Todo - rewrite with fold_left *)
+Fixpoint denote_block_acc
+         (denoted: itree OatE (unit + ovalue))
+         (blk: block) : itree OatE ovalue :=
+  match blk with
+  | nil =>
+    v <- denoted ;;
+    match v with
+    | inl _ =>
+    (* denoting the block was a unit - implicitly insert a void return *)
+      ret (OVALUE_Void)
+    | inr v => ret v
+    end
+  | h :: t =>
+    let denoted_so_far :=
+        v <- denoted ;;
+        match v with
+        | inl _ =>
+          denote_stmt (elt stmt h)
+        | inr _ =>
+          (* we returned already *)
+          raise "error: terminator already seen - cannot denote another stmt in a block"
+        end
+    in
+    denote_block_acc denoted_so_far t
+  end.
+
+
+Definition denote_block (b : block) := denote_block_acc (ret (inl tt)) b.
 
 Definition fdecl_denotation : Type :=
-  list ovalue -> itree OatE stmt_t. 
+  list ovalue -> itree OatE ovalue. 
 
-Definition denote_fdecl (df : fdecl ) : 
+Fixpoint combine_lists_err
+         {A B : Type}
+         (l1 : list A)
+         (l2 : list B) : err (list (A * B)) :=
+  match l1, l2 with
+  | nil, nil => ret nil
+  | cons x xs, cons y ys =>
+    l <- combine_lists_err xs ys ;;
+    ret (cons (x,y) l)
+  | _, _ => ret []
+  end.
+
+
+Definition function_denotation : Type :=
+  list ovalue -> itree OatE ovalue.
+
+
+About block.
+Print fdecl.
+
+Definition denote_fdecl (df : fdecl) : function_denotation :=
+  fun (arg: list ovalue) => 
+    let a : err (list (id * ovalue)) := combine_lists_err (List.map snd (args df)) arg in
+    let b : list (id * ovalue) -> itree OatE (list (id * ovalue)) := ret in 
+    let c : itree OatE (list (id * ovalue)) := lift_err b a in
+    bs <- c ;;
+    trigger (OStackE (bs)) ;;
+    rv <- denote_block (body df) ;;
+    trigger OStackPop ;;
+    ret rv.
+
 
 (*
   (* For loop stuff *)
@@ -246,7 +321,7 @@ Definition denote_fdecl (df : fdecl ) :
     for_loop_pre vdecl ;;
     while (
         (cond' <- denote_expr (elt expr cond) ;; 
-          match cond' with
+      match cond' with
           | OVALUE_Bool bv => if bv then
                               seq body denote_stmt ;;
                               denote_stmt (elt stmt post) ;;

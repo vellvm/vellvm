@@ -23,7 +23,7 @@ Definition var : Set := string.
    can't have this behaviour
  *)
 Inductive ovalue : Type :=
-| OVALUE_None
+| OVALUE_Void
 | OVALUE_Bool (b: bool)
 | OVALUE_Int (i: int64)
 | OVALUE_Str (s : string)

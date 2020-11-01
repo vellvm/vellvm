@@ -39,8 +39,6 @@ Open Scope string_scope.
    * Interactions with the Local Environment [LocalE]
    *
 *)
-Set Implicit Arguments.
-Set Contextual Implicit.
 
 Definition value := ovalue.
 
@@ -52,8 +50,12 @@ Variant OLocalE : Type -> Type :=
 (* We need some way of performing function calls *)
 Variant OCallE : Type -> Type :=
   (* A function call to id that returns *)
-  | OCallRet (id: var) (args: list value) : OCallE value
-  | OCallVoid (id: var) (args: list value) : OCallE unit.
+  | OCall (id: var) (args: list value) : OCallE value.
+
+(* We need some way of representing call stacks *)
+Variant OStackE : Type -> Type :=
+| OStackPush (args: list (id * ovalue)) : OStackE unit
+| OStackPop : OStackE unit.
 
 (* We need a notion of failure *)
 Definition FailureE := exceptE string.
@@ -72,7 +74,9 @@ Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m : err A) 
     of the sum type, called sum1.
  *)
 
-Definition OatE :=  OCallE +' OLocalE +' FailureE. 
+Definition OatE :=  OCallE +' OLocalE +' OStackE +' FailureE. 
 
 (* This version of an oat event has no call events - these are interpreted away *)
-Definition OatE' := OLocalE +' FailureE.
+Definition OatE' := OLocalE +' OStackE +' FailureE.
+Set Implicit Arguments.
+Set Contextual Implicit.
