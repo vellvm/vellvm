@@ -15,6 +15,7 @@ From Coq Require Import
 From ITree Require Import
      ITree
      ITreeFacts
+     Interp
      Interp.Recursion
      Events.MapDefault
      Events.StateFacts
@@ -39,7 +40,6 @@ Local Open Scope program_scope.
 Module Int64 := Integers.Int64.
 Definition int64 := Int64.int.
 
-About translate.
 About mrec.
 Search mrec.
 About iter.
@@ -235,7 +235,7 @@ Fixpoint denote_stmt (s : stmt) : itree OatE (unit + ovalue) :=
   | _ => raise "unimplemented"
   end.
 
-(** VV: Enforcing the fact that a block must terminate in either a void(OVALUE_None) | concrete return type *) 
+(** VV: Enforcing the fact that a block must terminate in either a void(OVALUE_Void) | concrete return type *) 
 
 (**
    Without any fancy analysis the block:
@@ -277,7 +277,8 @@ Fixpoint denote_block_acc
   end.
 
 
-Definition denote_block (b : block) := denote_block_acc (ret (inl tt)) b.
+Definition denote_block (b : block) : itree OatE ovalue
+  := denote_block_acc (ret (inl tt)) b.
 
 Definition fdecl_denotation : Type :=
   list ovalue -> itree OatE ovalue. 
@@ -299,74 +300,45 @@ Definition function_denotation : Type :=
   list ovalue -> itree OatE ovalue.
 
 
-About block.
-Print fdecl.
+
+About translate.
+Locate "~>".
+About inl_.
+Print OatE.
+About trigger.
+
+
+Definition t := fun bs => trigger (OStackPush bs).
+
+Definition t' (bs: list (id * ovalue)) (b: block) : itree OatE ovalue :=
+  let basic : itree OatE ovalue := denote_block b in
+  let t'' : itree OatE unit := trigger (OStackPush bs) in
+  t'' ;;
+  basic.
+
+Check t.
+Print  trigger.  
 
 Definition denote_fdecl (df : fdecl) : function_denotation :=
   fun (arg: list ovalue) => 
     let a : err (list (id * ovalue)) := combine_lists_err (List.map snd (args df)) arg in
     let b : list (id * ovalue) -> itree OatE (list (id * ovalue)) := ret in 
     let c : itree OatE (list (id * ovalue)) := lift_err b a in
+    let d : ovalue -> itree OatE ovalue := fun v => ret v in
+    let f : (list (id * ovalue)) -> itree OatE unit :=
+        fun bs => trigger (OStackPush ( bs ) ) in
+    let f' : unit -> itree OatE unit := fun _ => trigger OStackPop in
     bs <- c ;;
-    trigger (OStackE (bs)) ;;
+    f bs;;
     rv <- denote_block (body df) ;;
-    trigger OStackPop ;;
+    f' tt ;;
     ret rv.
-
-
-(*
-  (* For loop stuff *)
-  (* for (vdecl ; cond ; post )  { body } *)
-  | For vdecl (Some cond) (Some post) body =>
-    for_loop_pre vdecl ;;
-    while (
-        (cond' <- denote_expr (elt expr cond) ;; 
-      match cond' with
-          | OVALUE_Bool bv => if bv then
-                              seq body denote_stmt ;;
-                              denote_stmt (elt stmt post) ;;
-                              ret (inl tt)
-                              else
-                                ret (inr tt)
-          | _ => raise "err"
-          end)
-      )
-          
-  | For vdecl (Some cond) None body =>
-    for_loop_pre vdecl ;;
-    while (
-        (cond' <- denote_expr (elt expr cond) ;; 
-          match cond' with
-          | OVALUE_Bool bv => if bv then
-                              seq body denote_stmt ;;
-                              ret (inl tt)
-                              else
-                                ret (inr tt)
-          | _ => raise "err"
-          end)
-      )
-  (* for (vdecl ; cond? ; post? )  { body } - infinite loop *)
-  | For vdecl None (Some post) body =>
-    for_loop_pre vdecl ;;
-    while (
-        seq body denote_stmt ;;
-        denote_stmt (elt stmt post) ;;
-        ret (inl tt)
-      )
-  | For vdecl None None body =>
-    for_loop_pre vdecl ;;
-    while (
-        seq body denote_stmt ;;
-        ret (inl tt)
-      )
-  | _ => raise "unimplemented"
-  end.
-*)
  
 (*
   lookups for fname
 
 *)
+
 About AST.fdecl.
 
 Fixpoint lookup (id: id) (fdecls: list AST.fdecl) : option AST.fdecl :=
@@ -374,13 +346,21 @@ Fixpoint lookup (id: id) (fdecls: list AST.fdecl) : option AST.fdecl :=
   | nil => None
   | h :: t => if eqb (fname h) (id) then Some h else lookup id t
   end.
-  
-Definition denote_fdecl (fdecls : list fdecl) : _ :=
+
+About mrec.
+Definition interp_away_calls (fdecls : list fdecl) (id: string) (args: list ovalue) : _ :=
   @mrec OCallE (OatE')
         (fun T call =>
            match call with
-             | OCallRet id args => 
-               dargs <- map_monad (fun e => denote_expr (elt expr e)) args ;; 
-        ).
+             | OCall id args => 
+               match lookup id fdecls with
+               | None => (* call not found *)
+                 raise "error: function call not in context"
+               | Some fdecl =>
+                 denote_fdecl fdecl args
+               end
+           end
+        ) _ (OCall id args).
 
-About denote_fdecl.
+About Call.
+About interp_away_calls.
