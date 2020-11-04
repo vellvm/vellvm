@@ -348,6 +348,7 @@ Fixpoint lookup (id: id) (fdecls: list AST.fdecl) : option AST.fdecl :=
   end.
 
 About mrec.
+(* tbd - edit fdecls to be a list of denoted functions *)
 Definition interp_away_calls (fdecls : list fdecl) (id: string) (args: list ovalue) : _ :=
   @mrec OCallE (OatE')
         (fun T call =>

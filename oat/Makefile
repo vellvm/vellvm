@@ -17,7 +17,7 @@ MENHIR=menhir
 CP=cp
 
 # COQFILES_OAT    := AST LL LLInject Memory OatIO Denotation
-COQFILES_OAT    := AST DynamicValues OatEvents LL Compiler Compiler
+COQFILES_OAT    := AST DynamicValues OatEvents Plumbing Compiler
 
 OLLVMFILES :=
 

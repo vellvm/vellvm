@@ -1,50 +1,91 @@
-Require Import LL.
 From Coq Require Import List String Init.Datatypes Program.Basics.
 Local Open Scope string_scope.
 Local Open Scope program_scope.
 Local Open Scope list_scope.
-
-(** Flattened representation of LLVM programs *)
-Variant elt : Type :=
-| L (lbl: LL.lbl) (* block labels *)
-| I (uid: uid) (instr: LL.insn) (* instruction *)
-| T (term: LL.terminator) (* block terminators *)
-| G (gid: LL.gid) (gdecl: LL.gdecl) (* hoisted globals (usually strings) *)
-| E (uid: LL.uid) (instr: LL.insn) (* hoisted entry block instructions *)
-.
-
-About app.
-Definition stream : Type := list elt.
-
-Notation "x >@ y" := (y ++ x)
-                     (at level 50, left associativity).
-Notation "x >:: y" := (cons y x)
-                        ( at level 50, left associativity).
-
-Definition lift (instrs: list ((uid * LL.insn)%type) ) : stream :=
-  List.rev (List.map (fun t => I (fst t) (snd t)) instrs).
-
+From Vellvm Require Import LLVMAst Util.
+Require Import AST. 
+Import ListNotations.
 Set Implicit Arguments.
-Set Contextual Implicit.
-Definition bound {A} (l1 l2 l3 : list A) (e1 : A) : list A :=
-  l1 >@ l2 >@ l3 >:: e1.          
+Set Strict Implicit.
+From Coq Require Import FSets.FMapList.
+Require Import FunInd FMapInterface.
+
+Require Import Integers.
+Require Import Integers String ZArith.
+Require Import Plumbing.
+Module Int64 := Integers.Int64. 
+Definition int64 := Int64.int. 
+
+
+From ExtLib Require Import
+     Structures.Monads
+     Structures.Monad
+     Structures.MonadExc
+     Structures.MonadState
+     Data.Monads.EitherMonad.
+Import MonadNotation.
+Open Scope monad_scope.
+
+Variant operand : Type :=
+| Null
+| Const (i: int64)
+| Gid (id: ident)
+| Lid (id: ident).
+
+Local Definition t : Type :=  (AST.id * (operand * typ))%type.
+Local Definition ctxt : Type := list t.
+Record vellvmState := mkVellumState {
+                          block_id: nat;
+                          local_id: nat;
+                          void_id : nat;
+                          Δ : ctxt
+                        }.
+
+Definition cerr := errS vellvmState.
+
+(** Fill these in as part of the compiler *)
+Fixpoint cmp_ty (ty:  AST.ty) : LLVMAst.typ
+(* TODO *). Admitted.
+
+Definition typ_of_binop (op : AST.binop) : (AST.ty * AST.ty * AST.ty)
+(* TODO *). Admitted.
+
+Definition typ_of_unop (op: AST.unop) : (AST.ty * AST.ty * AST.ty)
+(* TODO *). Admitted.
+
+
+Fixpoint cmp_exp (exp: node AST.exp)
+  : cerr (LLVMAst.typ * operand * code typ)
+(* TODO *). Admitted.
+
+Fixpoint cmp_stmt
+         (rt : LLVMAst.typ)
+         (stmt: node AST.stmt) : cerr ( LLVMAst.block typ ) 
+(* TODO *). Admitted.
+(** 
+with cmp_block (rt : LLVMAst.typ) (stmts: AST.block) : cerr (code typ)
+(* TODO *). Admitted.
+*)                                   
+
+(** Initialize a function context, compiler the given prog
+    and run the state ... - work out what the nicest 
+*)
+
+Definition Populate_function_ctxt (c: ctxt) (p: AST.prog) : ctxt 
+(* TODO *). Admitted.
+
+(* TODO - add this once globals are supported in OAT *)
+Fixpoint Populate_global_ctxt (c: ctxt) (p: AST.prog) : ctxt
+(* TODO *). Admitted.
+
+Definition cfg : Set := LLVMAst.block typ * list (LLVMAst.block typ).
+
+Definition cmp_fdecl (f: node AST.fdecl)
+  : cerr ( toplevel_entity typ cfg)
+(* TODO *). Admitted.
+
+Definition cmp_prog (p: AST.prog) : cerr ( toplevel_entities typ cfg) 
+(* TODO *). Admitted.
 
 
 
-(* compiling OAT types --------------------------------------------- *)
-Require Import AST.
-
-Fixpoint cmp_ty (t: AST.ty) : LL.ty :=
-  match t with
-  | AST.TBool => LL.I1
-  | AST.TInt  => LL.I64
-  | AST.TRef rty => LL.Ptr (cmp_rty rty)
-  | _ => LL.I1
-  end
-
-with cmp_rty (rty : AST.rty) : LL.ty :=  
-       match rty with
-       | AST.RString => LL.I8
-       | AST.RArray u => LL.Struct [LL.I64; LL.Array 0 (cmp_ty u)]
-       | _ => LL.I1
-       end.
