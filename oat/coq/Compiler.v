@@ -13,7 +13,6 @@ Set Implicit Arguments.
 Set Strict Implicit.
 From Coq Require Import FSets.FMapList.
 Require Import FunInd FMapInterface.
-
 Require Import Integers.
 Require Import Integers String ZArith.
 Require Import Plumbing.
@@ -31,27 +30,7 @@ Import MonadNotation.
 Open Scope monad_scope.
 
 
-Local Definition t : Type :=  (AST.id * (LLVMAst.raw_id * typ))%type.
-Local Definition ctxt : Type := list t.
-About option.
-Record vellvmState := mkVellumState {
-                          block_id: nat;
-                          local_id: nat;
-                          tmp_id : nat;
-                          void_id : nat;
-                          Δ : ctxt
-                        }.
-
-Definition cerr := errS vellvmState.
-
-Fixpoint lookup_deltas (i : AST.id) (l: ctxt) : cerr (LLVMAst.raw_id * typ) :=
-  match l with
-  | nil => option2errS "did not find id" None
-  | h :: t => if String.eqb (fst h)  i then option2errS "found id" (Some (snd h)) else lookup_deltas i t
-  end.
-
-Definition lookup_vellvm (i: AST.id) (v : vellvmState) : cerr (LLVMAst.raw_id * typ) :=
-  lookup_deltas i (Δ v).
+Require Import CompilerCtxt.
 
 Definition int_ty (i : nat) : LLVMAst.typ := TYPE_I (Z_of_nat i).
 (** Fill these in as part of the compiler *)
@@ -96,21 +75,7 @@ Check (AST.node AST.exp) .
 (** Definitions needed for generating id's *)
 About cerr.
 
-Print  vellvmState.
-
-(* Increment old state and return its value pre increment*)
-Definition inc_tmp : cerr ( raw_id ) :=
-  x <- get ;;
-  let v : nat := local_id x in
-  put {|
-      block_id := block_id x;
-      local_id := S v;
-      tmp_id := tmp_id x;
-      void_id := void_id x;
-      Δ := Δ x
-    |} ;;
-  ret (Anon (Z_of_nat v)).
-
+About cerr.
 
 Definition instr_const (v: Z) (id : raw_id) (t: LLVMAst.typ) : cerr (instr_id * instr typ) :=     
   let binop_flags := LLVMAst.Add false false in
@@ -210,6 +175,16 @@ Definition cmp_binop (op: AST.binop) (src_l : raw_id) (src_r: raw_id) (ty: LLVMA
 (* Handle function call *)
 About List.fold_left.
 
+
+(* Dereference a pointer *)
+Definition deref (id: AST.id) : cerr ( LLVMAst.typ * raw_id * code typ ) :=
+    st <- get ;;
+    '(op_id, op_ty) <- find_local id st ;;
+    match op_ty with
+    | TYPE_Pointer t => ret (t, op_id, nil)
+    | _ => raise "not a valid rhs - should be a pointer"
+    end.
+
 (* the exp is the operand *)
 Fixpoint cmp_exp (expr: AST.exp)
   : cerr (LLVMAst.typ * raw_id * code typ) :=
@@ -234,9 +209,7 @@ Fixpoint cmp_exp (expr: AST.exp)
     '(op_t, op_id, code_res) <- cmp_binop op id_l id_r t_l ;;
     ret (op_t, op_id, code_l ++ code_r ++ code_res)
   | Id i =>
-    vellvmContext <- get ;;
-    '(op_id, op_ty) <- lookup_vellvm i vellvmContext ;;
-    ret (op_ty, op_id, nil)
+    deref i
   | Call id_e args_e =>
     '(f_ty, f_id, s) <- cmp_exp (elt AST.exp id_e) ;;
     '(args, streams) <- List.fold_left (fun acc e =>
@@ -253,11 +226,27 @@ Fixpoint cmp_exp (expr: AST.exp)
   | _ => raise "unimplemented"
   end.
 
-
+Print LLVMAst.block.
 Fixpoint cmp_stmt
          (rt : LLVMAst.typ)
-         (stmt: node AST.stmt) : cerr ( LLVMAst.block typ ) 
-(* TODO *). Admitted.
+         (stmt: AST.stmt) : cerr ( LLVMAst.block typ ) :=
+  let loc_id := fun e => EXP_Ident (ID_Local e) in
+  match stmt with
+    | AST.Decl (i, e) => 
+      '(ty, id, code) <- cmp_exp (elt AST.exp e) ;;
+      let t_ptr_id := TYPE_Pointer ty in
+      alloca_id <- inc_tmp ;;
+      store_id <- inc_tmp ;;
+      (* TODO - instr_alloca nb texp and load volatile? *)
+      let stream := code ++ [
+                           (IId alloca_id, INSTR_Alloca ty None None ) ;
+                         (IId store_id, INSTR_Store false (ty, loc_id id) (t_ptr_id, loc_id alloca_id) None)
+                         ] in 
+      put_local i t_ptr_id alloca_id ;;
+      ret stream
+    | _ => raise "unimplemented"
+  end.
+  
 (** 
 with cmp_block (rt : LLVMAst.typ) (stmts: AST.block) : cerr (code typ)
 (* TODO *). Admitted.
