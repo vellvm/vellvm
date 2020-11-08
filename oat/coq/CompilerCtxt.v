@@ -31,7 +31,7 @@ Definition ctxt (T: Type) := list (AST.id * T).
 
 (* Type of OAT maps *)
 (* TODO: Find a better name for this than t_rhs >:( *)
-Definition t_rhs : Type := (LLVMAst.raw_id * typ)%type. 
+Definition t_rhs : Type := (LLVMAst.ident * typ)%type. 
 Definition global : Type := t_rhs.
 Definition local : Type := t_rhs.
 (* TODO: Figure out if a function type should be passed to the INSTR_Call ty or just the return type ... *)
@@ -61,7 +61,8 @@ Fixpoint find_id  (i: AST.id) (ctxt: ctxt t_rhs) : cerr t_rhs :=
     let '(id, res) := h in
     if String.eqb id i then option2errS "found id" (Some res) else find_id i t
   end.
-    
+
+About map_monad.
 Definition find_global (i: AST.id) (st: cmpState) : cerr global := find_id i (Γ st).
 Definition find_local  (i: AST.id) (st: cmpState) : cerr local := find_id i (Λ st).
 Definition find_func   (i: AST.id) (st: cmpState) : cerr fxn := find_id i (Φ st).
@@ -111,16 +112,12 @@ Definition inc_void : cerr nat :=
 (* State modification *)
 (* Might alias, but will always pick the most recent (allowing for shadowing :( ) *)
 (* TODO: maybe rule this out as an invariant of oat programs - i think so *)
-About ctxt.
-Print ctxt.
-Print t_rhs.
-Print ctxt.
-Definition safe_put (i: AST.id) (ty: LLVMAst.typ) (id: raw_id) (ctx: list (AST.id * t_rhs)) : list (AST.id * t_rhs) :=
+Definition safe_put (i: AST.id) (ty: LLVMAst.typ) (id: LLVMAst.ident) (ctx: list (AST.id * t_rhs)) : list (AST.id * t_rhs) :=
   let to_add := (i, (id, ty)) in
   to_add :: ctx.
 
 (* Will mutate every element with identifier i *)
-Fixpoint unsafe_put (i: AST.id) (ty: LLVMAst.typ) (id': raw_id) (ctx: ctxt t_rhs) : ctxt t_rhs :=
+Fixpoint unsafe_put (i: AST.id) (ty: LLVMAst.typ) (id': ident) (ctx: ctxt t_rhs) : ctxt t_rhs :=
   match ctx with
   | nil => [(i, (id', ty))]
   | h :: t =>
@@ -132,7 +129,7 @@ Fixpoint unsafe_put (i: AST.id) (ty: LLVMAst.typ) (id': raw_id) (ctx: ctxt t_rhs
   end.
 
 (* Safe puts *)
-Definition put_global (id: AST.id) (ty: LLVMAst.typ) (rid: raw_id) : cerr unit :=
+Definition put_global (id: AST.id) (ty: LLVMAst.typ) (rid: ident) : cerr unit :=
   x <- get ;;
   put {|
       block_id := block_id x;
@@ -143,7 +140,7 @@ Definition put_global (id: AST.id) (ty: LLVMAst.typ) (rid: raw_id) : cerr unit :
       Φ        := Φ x
     |}.
 
-Definition put_local (id: AST.id) (ty: LLVMAst.typ) (rid: raw_id) : cerr unit :=
+Definition put_local (id: AST.id) (ty: LLVMAst.typ) (rid: ident) : cerr unit :=
   x <- get ;;
   put {|
       block_id := block_id x;
@@ -154,7 +151,7 @@ Definition put_local (id: AST.id) (ty: LLVMAst.typ) (rid: raw_id) : cerr unit :=
       Φ        := Φ x
     |}.
 
-Definition put_fxn (id: AST.id) (ty: LLVMAst.typ) (rid: raw_id) : cerr unit :=
+Definition put_fxn (id: AST.id) (ty: LLVMAst.typ) (rid: ident) : cerr unit :=
   x <- get ;;
   put {|
       block_id := block_id x;
@@ -166,7 +163,7 @@ Definition put_fxn (id: AST.id) (ty: LLVMAst.typ) (rid: raw_id) : cerr unit :=
     |}.
 
 (* Unsafe puts *)
-Definition unsafe_put_global (id: AST.id) (ty: LLVMAst.typ) (rid: raw_id) : cerr unit :=
+Definition unsafe_put_global (id: AST.id) (ty: LLVMAst.typ) (rid: ident) : cerr unit :=
   x <- get ;;
   put {|
       block_id := block_id x;
@@ -177,7 +174,7 @@ Definition unsafe_put_global (id: AST.id) (ty: LLVMAst.typ) (rid: raw_id) : cerr
       Φ        := Φ x
     |}.
 
-Definition unsafe_put_local (id: AST.id) (ty: LLVMAst.typ) (rid: raw_id) : cerr unit :=
+Definition unsafe_put_local (id: AST.id) (ty: LLVMAst.typ) (rid: ident) : cerr unit :=
   x <- get ;;
   put {|
       block_id := block_id x;
@@ -188,7 +185,7 @@ Definition unsafe_put_local (id: AST.id) (ty: LLVMAst.typ) (rid: raw_id) : cerr 
       Φ        := Φ x
     |}.
 
-Definition unsafe_put_fxn (id: AST.id) (ty: LLVMAst.typ) (rid: raw_id) : cerr unit :=
+Definition unsafe_put_fxn (id: AST.id) (ty: LLVMAst.typ) (rid: ident) : cerr unit :=
   x <- get ;;
   put {|
       block_id := block_id x;
@@ -198,3 +195,13 @@ Definition unsafe_put_fxn (id: AST.id) (ty: LLVMAst.typ) (rid: raw_id) : cerr un
       Λ        := Λ x;
       Φ        := unsafe_put id ty rid (Φ x)
     |}.
+
+(* Lookup an identifier in all contexts -
+   if it's not locally defined, try the globals
+*)
+
+Definition find_ident (id : AST.id) : cerr ( t_rhs ) :=
+  st <- get ;;
+  catch ( find_local id st) (fun _ => find_global id st).
+
+
