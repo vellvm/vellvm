@@ -485,6 +485,47 @@ Proof.
   reflexivity.
 Qed.
 
+
+
+    Lemma write_succeeds : forall m1 v τ a,
+        dvalue_has_dtyp v τ ->
+        dtyp_fits m1 a τ ->
+        exists m2, write m1 a v = inr m2.
+    Proof.
+      intros m1 v τ a TYP CAN.
+      destruct CAN as (sz & bytes & cid & BLOCK & SIZE).
+      exists (add_logical_block (fst a) (LBlock sz (add_all_index (serialize_dvalue v) (snd a) bytes) cid) m1).
+      unfold write.
+      rewrite BLOCK.
+      cbn. destruct a. reflexivity.
+    Qed.
+
+
+
+
+(* Lemma wah : *)
+(*   forall m ptr τ val, *)
+(*     read m ptr τ = inr val -> *)
+(*     dtyp_fits m ptr τ. *)
+(* Proof. *)
+(*   intros m [ptr_blk ptr_idx] τ val READ. *)
+(*   unfold read in READ; cbn in READ. *)
+(*   destruct (get_logical_block m ptr_blk) eqn:GETBLOCK; inversion READ. *)
+(*   destruct l. *)
+
+(*   unfold dtyp_fits. *)
+(*   exists size. exists bytes. exists concrete_id. *)
+(*   cbn. *)
+(*   split; auto. *)
+
+(*   unfold get_logical_block in GETBLOCK. *)
+(*   unfold get_logical_block_mem in GETBLOCK. *)
+
+(*   destruct m. destruct m. cbn in *. *)
+
+(*   unfold read_in_mem_block in READ. *)
+(* Qed. *)
+
 (*
 
 interp_cfg_to_L3_intrinsic:
