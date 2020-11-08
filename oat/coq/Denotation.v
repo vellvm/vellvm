@@ -299,15 +299,6 @@ Fixpoint combine_lists_err
 Definition function_denotation : Type :=
   list ovalue -> itree OatE ovalue.
 
-
-
-About translate.
-Locate "~>".
-About inl_.
-Print OatE.
-About trigger.
-
-
 Definition t := fun bs => trigger (OStackPush bs).
 
 Definition t' (bs: list (id * ovalue)) (b: block) : itree OatE ovalue :=
@@ -341,15 +332,15 @@ Definition denote_fdecl (df : fdecl) : function_denotation :=
 
 About AST.fdecl.
 
-Fixpoint lookup (id: id) (fdecls: list AST.fdecl) : option AST.fdecl :=
+Fixpoint lookup {T} (id: AST.id) (fdecls: list (AST.id * T)) : option T :=
   match fdecls with
   | nil => None
-  | h :: t => if eqb (fname h) (id) then Some h else lookup id t
+  | h :: t => if eqb (fst h) (id) then Some (snd h) else lookup id t
   end.
 
 About mrec.
 (* tbd - edit fdecls to be a list of denoted functions *)
-Definition interp_away_calls (fdecls : list fdecl) (id: string) (args: list ovalue) : _ :=
+Definition interp_away_calls (fdecls : list (id * function_denotation)) (id: string) (args: list ovalue) : _ :=
   @mrec OCallE (OatE')
         (fun T call =>
            match call with
@@ -358,7 +349,7 @@ Definition interp_away_calls (fdecls : list fdecl) (id: string) (args: list oval
                | None => (* call not found *)
                  raise "error: function call not in context"
                | Some fdecl =>
-                 denote_fdecl fdecl args
+                 fdecl args
                end
            end
         ) _ (OCall id args).

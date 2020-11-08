@@ -69,14 +69,7 @@ Definition typ_of_unop (op: AST.unop) : (AST.ty * AST.ty) :=
   | Lognot => (TBool, TBool)
   end.
 
-Check (AST.node AST.exp) .
-
-
 (** Definitions needed for generating id's *)
-About cerr.
-
-About cerr.
-
 Definition instr_const (v: Z) (id : raw_id) (t: LLVMAst.typ) : cerr (instr_id * instr typ) :=     
   let binop_flags := LLVMAst.Add false false in
   match t with
@@ -92,8 +85,6 @@ Definition instr_const (v: Z) (id : raw_id) (t: LLVMAst.typ) : cerr (instr_id * 
     ret (IId id, INSTR_Op op_binop) 
   | _ => raise "err"
   end.
-
-Print code.
 
 Definition cmp_unop (op: AST.unop) ( src: raw_id) (ty: LLVMAst.typ) : cerr (LLVMAst.typ * raw_id * code typ) :=
   raw_id' <- inc_tmp ;;
@@ -229,7 +220,7 @@ Fixpoint cmp_exp (expr: AST.exp)
 Print LLVMAst.block.
 Fixpoint cmp_stmt
          (rt : LLVMAst.typ)
-         (stmt: AST.stmt) : cerr ( LLVMAst.block typ ) :=
+         (stmt: AST.stmt) : cerr ( code typ ) :=
   let loc_id := fun e => EXP_Ident (ID_Local e) in
   match stmt with
     | AST.Decl (i, e) => 
@@ -244,6 +235,17 @@ Fixpoint cmp_stmt
                          ] in 
       put_local i t_ptr_id alloca_id ;;
       ret stream
+    | Assn lhs rhs =>
+      '(dest_ty, dest_id, dest_code) <- cmp_exp (elt AST.exp lhs) ;;
+      '(src_ty, src_id, src_code) <- cmp_exp (elt AST.exp rhs) ;;
+      (* This should generate a store src_ty src_id src *)
+      store_id <- inc_tmp ;;
+      ret ( dest_code ++ src_code ++ [
+                        (IId store_id, INSTR_Store false (src_ty, loc_id src_id) (dest_ty, loc_id dest_id) None)
+          ]) 
+    | If cond pos neg =>  
+      '(cond_ty, cond_id, cond_code) <- 
+      raise "unimp"
     | _ => raise "unimplemented"
   end.
   
