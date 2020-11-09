@@ -486,23 +486,6 @@ Proof.
 Qed.
 
 
-
-    Lemma write_succeeds : forall m1 v τ a,
-        dvalue_has_dtyp v τ ->
-        dtyp_fits m1 a τ ->
-        exists m2, write m1 a v = inr m2.
-    Proof.
-      intros m1 v τ a TYP CAN.
-      destruct CAN as (sz & bytes & cid & BLOCK & SIZE).
-      exists (add_logical_block (fst a) (LBlock sz (add_all_index (serialize_dvalue v) (snd a) bytes) cid) m1).
-      unfold write.
-      rewrite BLOCK.
-      cbn. destruct a. reflexivity.
-    Qed.
-
-
-
-
 (* Lemma wah : *)
 (*   forall m ptr τ val, *)
 (*     read m ptr τ = inr val -> *)
