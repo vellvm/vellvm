@@ -1802,6 +1802,67 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       unfold overlaps_dtyp, overlaps.
       lia.
     Qed.
+
+    Lemma no_overlap_dec :
+      forall ptr1 ptr2 s1 s2,
+        {no_overlap ptr1 s1 ptr2 s2} + {~ (no_overlap ptr1 s1 ptr2 s2)}.
+    Proof.
+      intros [b1 o1] [b2 o2] s1 s2.
+      unfold no_overlap.
+      cbn.
+
+      destruct (Z.eq_dec b1 b2) as [B | B].
+      2: { left. auto. }
+
+      destruct (Int.Z_as_Int.gt_le_dec o1 (o2 + s2)).
+      { left. auto. }
+
+      destruct (Int.Z_as_Int.gt_le_dec o2 (o1 + s1)).
+      { left. auto. }
+
+      right. intuition.
+    Qed.
+
+    Lemma no_overlap_dtyp_dec :
+      forall ptr1 ptr2 τ1 τ2,
+        {no_overlap_dtyp ptr1 τ1 ptr2 τ2} + {~ (no_overlap_dtyp ptr1 τ1 ptr2 τ2)}.
+    Proof.
+      intros ptr1 ptr2 τ1 τ2.
+      apply no_overlap_dec.
+    Qed.
+
+    Lemma gep_array_ptr_overlap_dtyp :
+      forall ptr ix sz τ elem_ptr,
+        DynamicValues.Int64.unsigned ix < sz -> (* Not super happy about this *)
+        0 < sizeof_dtyp τ ->
+        handle_gep_addr (DTYPE_Array sz τ) ptr
+                        [DVALUE_I64 (repr 0); DVALUE_I64 ix] = inr elem_ptr ->
+        ~(no_overlap_dtyp elem_ptr τ ptr (DTYPE_Array sz τ)).
+    Proof.
+      intros ptr ix sz τ elem_ptr BOUNDS SIZE GEP.
+      intros NO_OVER.
+      unfold no_overlap_dtyp, no_overlap in NO_OVER.
+
+      destruct ptr as [ptr_b ptr_i].
+      destruct elem_ptr as [elem_ptr_b elem_ptr_i].
+
+      unfold handle_gep_addr in GEP.
+      cbn in *.
+      inversion GEP; subst.
+
+      destruct NO_OVER as [NO_OVER | [NO_OVER | NO_OVER]].
+      - auto.
+      - rewrite Integers.Int64.unsigned_repr in NO_OVER; [|cbn; lia].
+        replace (ptr_i + sz * sizeof_dtyp τ * 0 + DynamicValues.Int64.unsigned ix * sizeof_dtyp τ) with (ptr_i + DynamicValues.Int64.unsigned ix * sizeof_dtyp τ) in NO_OVER by lia.
+        pose proof (Int64.unsigned_range ix) as [? ?].
+        apply Zorder.Zplus_gt_reg_l in NO_OVER.
+        apply Zorder.Zmult_gt_reg_r in NO_OVER; lia.
+      - rewrite Integers.Int64.unsigned_repr in NO_OVER; [|cbn; lia].
+        replace (ptr_i + sz * sizeof_dtyp τ * 0 + DynamicValues.Int64.unsigned ix * sizeof_dtyp τ) with (ptr_i + DynamicValues.Int64.unsigned ix * sizeof_dtyp τ) in NO_OVER by lia.
+        pose proof (Int64.unsigned_range ix) as [? ?].
+        lia.
+    Qed.
+
       (** ** Concretization of blocks
           Look-ups a concrete block in memory. The logical memory acts first as a potential layer of indirection:
           - if no logical block is found, the input is directly returned.
@@ -2342,6 +2403,44 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
       intros; split; [| split]; eauto using write_allocated, write_read, write_untouched.
     Qed.
+
+    Lemma dtyp_fits_after_write :
+      forall m m' ptr ptr' τ τ',
+        dtyp_fits m ptr τ ->
+        write m ptr' τ' = inr m' ->
+        dtyp_fits m' ptr τ.
+    Proof.
+    Admitted.
+
+    Lemma write_array_cell_get_array_cell :
+      forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr) (i : nat),
+        write_array_cell m a i t val = inr m' ->
+        dvalue_has_dtyp val t ->
+        get_array_cell m' a i t = inr (dvalue_to_uvalue val).
+    Proof.
+    Admitted.
+
+    Lemma write_array_cell_untouched :
+      forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr) (i : nat) (i' : nat),
+        write_array_cell m a i t val = inr m' ->
+        dvalue_has_dtyp val t ->
+        i <> i' ->
+        get_array_cell m' a i' t = get_array_cell m a i' t.
+    Proof.
+      intros m m' t val a i i' H H0 H1.
+    Admitted.
+
+    Lemma write_array_cell_untouched_ptr_block :
+      forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a a' : addr) (i i' : nat),
+        write_array_cell m a i t val = inr m' ->
+        dvalue_has_dtyp val t ->
+        fst a' <> fst a ->
+        get_array_cell m' a' i' t = get_array_cell m a' i' t.
+    Proof.
+      intros m m' t val a a' i i' WRITE TYP BLOCK_NEQ.
+      destruct a as [b1 o1].
+      destruct a' as [b2 o2].
+    Admitted.
 
     Lemma lookup_mapsto :
       forall {A} k m (v : A),
@@ -3231,14 +3330,15 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         cbn in *. auto.
       Qed.
 
-      Lemma interp_memory_GEP_array : forall t a size m val i,
+      Lemma interp_memory_GEP_array' : forall t a size m val i,
           get_array_cell m a i t = inr val ->
           exists ptr,
             interp_memory (trigger (GEP
                                       (DTYPE_Array size t)
                                       (DVALUE_Addr a)
                                       [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat i))])) m
-                          ≈ Ret (m,DVALUE_Addr ptr) /\
+                          ≈ Ret (m, DVALUE_Addr ptr) /\
+            handle_gep_addr (DTYPE_Array size t) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr ptr /\
             read m ptr t = inr val.
       Proof.
         intros t a size m val i GET.
@@ -3254,6 +3354,21 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           rewrite bind_ret_l.
           reflexivity.
         - rewrite <- GET. auto.
+      Qed.
+
+      Lemma interp_memory_GEP_array : forall t a size m val i,
+          get_array_cell m a i t = inr val ->
+          exists ptr,
+            interp_memory (trigger (GEP
+                                      (DTYPE_Array size t)
+                                      (DVALUE_Addr a)
+                                      [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat i))])) m
+                          ≈ Ret (m,DVALUE_Addr ptr) /\
+            read m ptr t = inr val.
+      Proof.
+        intros t a size m val i GET.
+        epose proof (@interp_memory_GEP_array' t a size m val i GET) as [ptr GEP].
+        exists ptr. intuition.
       Qed.
 
       (* Lemma write_read : *)
