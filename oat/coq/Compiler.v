@@ -31,6 +31,68 @@ Open Scope monad_scope.
 
 Require Import CompilerCtxt.
 
+Definition eq_raw (i: raw_id) (r: raw_id) : bool :=
+  match i, r with
+  | Name s, Name r => String.eqb s r
+  | Anon s, Anon r => Z.eqb s r
+  | Raw s, Raw r => Z.eqb s r
+  | _,_ => false
+  end.
+
+Definition eq_ident (i: ident) (r: ident) : bool :=
+  match i, r with
+  | ID_Global s, ID_Global r => eq_raw s r
+  | ID_Local s, ID_Local r => eq_raw s r
+  | _, _ => false
+  end.
+
+Fixpoint eq_typ (t1: LLVMAst.typ) (t2: LLVMAst.typ) : bool :=
+  match (t1, t2) with
+    | (TYPE_I s, TYPE_I r) => Z.eqb s r
+    | (TYPE_Pointer s, TYPE_Pointer r) => eq_typ s r
+    | (TYPE_Void, TYPE_Void) => true
+    | (TYPE_Half, TYPE_Half) => true
+    | (TYPE_Float, TYPE_Float) => true
+    | (TYPE_Double, TYPE_Double) => true
+    | (TYPE_X86_fp80, TYPE_X86_fp80) => true
+    | (TYPE_Fp128, TYPE_Fp128) => true
+    | (TYPE_Ppc_fp128, TYPE_Ppc_fp128) => true
+    | (TYPE_Metadata, TYPE_Metadata) => true
+    | (TYPE_Opaque, TYPE_Opaque) => true
+    | (TYPE_Identified l, TYPE_Identified r) => eq_ident l r      
+    | (TYPE_Vector szl tl, TYPE_Vector szr tr) =>
+      Z.eqb szl szr && eq_typ tl tr
+    | (TYPE_Array sl s, TYPE_Array sr r) =>
+      Z.eqb sl sr && eq_typ s r
+    | (TYPE_Function lrt largs, TYPE_Function rrt rargs) =>
+      let eq_both := fix eq_tls l r : bool :=
+                       match l, r with
+                       | nil, nil => true
+                       | l::t1, r :: t2 => eq_typ l r && eq_tls t1 t2
+                       | _, _ => false
+                       end in
+      eq_typ lrt rrt && eq_both largs rargs 
+    | (TYPE_Struct lf, TYPE_Struct rf) =>
+      let eq_both := fix eq_tls l r : bool :=
+                       match l, r with
+                       | nil, nil => true
+                       | l::t1, r :: t2 => eq_typ l r && eq_tls t1 t2
+                       | _, _ => false
+                       end in
+      eq_both lf rf
+    | (TYPE_Packed_struct lf, TYPE_Packed_struct rf) =>
+      let eq_both := fix eq_tls l r : bool :=
+                       match l, r with
+                       | nil, nil => true
+                       | l::t1, r :: t2 => eq_typ l r && eq_tls t1 t2
+                       | _, _ => false
+                       end in
+      eq_both lf rf
+    | _ => false
+  end.
+   
+
+
 Definition int_ty (i : nat) : LLVMAst.typ := TYPE_I (Z_of_nat i).
 (** Fill these in as part of the compiler *)
  Fixpoint cmp_ty (ty:  AST.ty) : LLVMAst.typ :=
@@ -235,7 +297,7 @@ Fixpoint foldl2_err {A B C : Type}
   | (l :: t1, r :: t2) => let merge := comb base l r in
                         foldl2_err comb merge t1 t2
   end.
-
+About eq_ty.
 Fixpoint cmp_exp (expr: AST.exp)
   : cerr (LLVMAst.typ * ident * code typ) :=
   match expr with
@@ -252,32 +314,9 @@ Fixpoint cmp_exp (expr: AST.exp)
     '(op_t, op_id, code_res) <- cmp_binop op id_l id_r t_l ;;
     ret (op_t, op_id, code_l ++ code_r ++ code_res)
   | Call id_e args_e =>
-    '(f_t, f_ident, f_stream) <- cmp_exp (elt AST.exp id_e) ;;
-    let '(arg_ts, rett) :=
-        match f_t with
-        | TYPE_Pointer (TYPE_Function r l) => (l,r)
-        | _ => raise "cannot invoke a non-functions"
-        end in
-    '(f_args, f_args_code) <- foldl2_err ( fun acc e t =>
-                                             '(args, code) <- acc ;;
-                                             '(arg_t, arg_id, arg_s) <- cmp_exp_as (elt AST.exp e) t ;;
-                                             ret (args ++ [(t, arg_id)], code ++ arg_s)
-                                         ) (ret (nil, nil)) args_e arg_ts ;;
-    raw_id' <- inc_tmp ;;
-    let '(op_id, call_id) := (ID_Local raw_id', IId raw_id') in
-   ret (rett, op_id, f_stream ++ f_args_code ++ [(call_id, INSTR_Call (rett, EXP_Ident f_ident) f_args )])  
-                                             
+    raise "err"
   | _ => raise "unimplemented"
-  end with
-cmp_exp_as (e : AST.exp) (dest_t: typ) : cerr (typ * ident * code typ) :=
-  '(from_t, op, code) <- cmp_exp e ;;
-  if eq_ty from_t dest_t then (from_t, op, code)
-  else
-    raw_id' <- inc_tmp ;;
-    let '(cast_id, instr_id) := (ID_Local raw_id', IId raw_id') in
-    ret (dest_t, cast_id, code ++ [(instr_id, OP_Conversion Bitcast from_t (EXP_Ident op) dest_t)])
-        .
-Definition 
+  end.
 
 Print LLVMAst.block.
 Fixpoint cmp_stmt

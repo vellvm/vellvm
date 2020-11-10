@@ -28,17 +28,19 @@ Definition node (A:Type) := A.
 *)
 (* VV| node type - *)
 Record node (A:Type) := mkNode { elt : A ; loc : t }.
-
-
 Definition elt_of {A} (n:node A) : A :=
   match n with
   | {| elt := a; loc := _ |} => a
   end.
 
+
 Definition no_loc {A} (x:A) := mkNode A x norange.
 
 (* OAT identifiers *)
 Definition id := string.
+
+
+
 
 (* OAT types *)
 Inductive ty :=                                    (* types of identifiers and exprs *)
@@ -68,7 +70,10 @@ Inductive binop :=
   | Lt | Lte | Gt | Gte
   | And | Or | IAnd | IOr
   | Shl | Shr | Sar
-. 
+.
+
+
+
 (* Derive (Arbitrary, Show) for binop. *)
 
 Inductive exp :=
