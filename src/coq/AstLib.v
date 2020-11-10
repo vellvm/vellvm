@@ -11,7 +11,7 @@
 
 From Coq Require Import
      ZArith.ZArith List
-     String Omega.
+     String Omega Bool.
 Require Import Vellvm.LLVMAst Vellvm.Util.
 Require Import Equalities OrderedType OrderedTypeEx Compare_dec.
 Require Import ExtLib.Core.RelDec ExtLib.Data.Z.
@@ -24,6 +24,72 @@ Import EqvNotation.
 (* Equalities --------------------------------------------------------------- *)
 Instance eq_dec_int : RelDec (@eq int) := Data.Z.RelDec_zeq.
 Instance eqv_int : Eqv int := (@eq int).
+
+(* LLVMAst.typ equality *)
+Section TypEquality.
+Definition eq_raw (i: raw_id) (r: raw_id) : bool :=
+  match i, r with
+  | Name s, Name r => String.eqb s r
+  | Anon s, Anon r => Z.eqb s r
+  | Raw s, Raw r => Z.eqb s r
+  | _,_ => false
+  end.
+
+Definition eq_ident (i: ident) (r: ident) : bool :=
+  match i, r with
+  | ID_Global s, ID_Global r => eq_raw s r
+  | ID_Local s, ID_Local r => eq_raw s r
+  | _, _ => false
+  end.
+
+Fixpoint eq_typ (t1: LLVMAst.typ) (t2: LLVMAst.typ) : bool :=
+  match (t1, t2) with
+    | (TYPE_I s, TYPE_I r) => Z.eqb s r
+    | (TYPE_Pointer s, TYPE_Pointer r) => eq_typ s r
+    | (TYPE_Void, TYPE_Void) => true
+    | (TYPE_Half, TYPE_Half) => true
+    | (TYPE_Float, TYPE_Float) => true
+    | (TYPE_Double, TYPE_Double) => true
+    | (TYPE_X86_fp80, TYPE_X86_fp80) => true
+    | (TYPE_Fp128, TYPE_Fp128) => true
+    | (TYPE_Ppc_fp128, TYPE_Ppc_fp128) => true
+    | (TYPE_Metadata, TYPE_Metadata) => true
+    | (TYPE_Opaque, TYPE_Opaque) => true
+    | (TYPE_Identified l, TYPE_Identified r) => eq_ident l r      
+    | (TYPE_Vector szl tl, TYPE_Vector szr tr) =>
+      Z.eqb szl szr && eq_typ tl tr
+    | (TYPE_Array sl s, TYPE_Array sr r) =>
+      Z.eqb sl sr && eq_typ s r
+    | (TYPE_Function lrt largs, TYPE_Function rrt rargs) =>
+      let eq_both := fix eq_tls l r : bool :=
+                       match l, r with
+                       | nil, nil => true
+                       | l::t1, r :: t2 => eq_typ l r && eq_tls t1 t2
+                       | _, _ => false
+                       end in
+      eq_typ lrt rrt && eq_both largs rargs 
+    | (TYPE_Struct lf, TYPE_Struct rf) =>
+      let eq_both := fix eq_tls l r : bool :=
+                       match l, r with
+                       | nil, nil => true
+                       | l::t1, r :: t2 => eq_typ l r && eq_tls t1 t2
+                       | _, _ => false
+                       end in
+      eq_both lf rf
+    | (TYPE_Packed_struct lf, TYPE_Packed_struct rf) =>
+      let eq_both := fix eq_tls l r : bool :=
+                       match l, r with
+                       | nil, nil => true
+                       | l::t1, r :: t2 => eq_typ l r && eq_tls t1 t2
+                       | _, _ => false
+                       end in
+      eq_both lf rf
+    | _ => false
+  end.
+
+Instance eq_dec_typ : RelDec (@eq typ) :=
+  { rel_dec := eq_typ }.
+End TypEquality.
 
 (* SAZ : These should be moved to part of the standard library, or at least to
    ExtLib *)
@@ -753,3 +819,5 @@ Section WithType.
         ++ map ident_of (m_definitions m).
 
 End WithType.
+
+(** VV: Reldec typ equality *)
