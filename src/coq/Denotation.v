@@ -54,8 +54,6 @@ Open Scope monad_scope.
 Open Scope string_scope.
 Open Scope Z_scope.
 
-
-Search (
 (* end hide *)
 
 (** ** Uninterpreted denotation

@@ -149,8 +149,6 @@ eq_retty (t1: AST.ret_ty) (t2: AST.ret_ty) : bool :=
   | (_, _) => false
   end.
 
-Notation "x =? y" := (eq_ty x y). 
-
  
 Definition typ_of_binop (op : AST.binop) : (AST.ty * AST.ty * AST.ty) :=
   match op with
