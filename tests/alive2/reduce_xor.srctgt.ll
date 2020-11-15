@@ -11,3 +11,4 @@ define i8 @tgt(<2 x i8> %x) {
   %r = call i8 @llvm.experimental.vector.reduce.xor.v2i8(<2 x i8> %x)
   ret i8 %r
 }
+

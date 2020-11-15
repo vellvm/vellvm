@@ -47,11 +47,10 @@ let parse_file filename =
 let parse_tests filename =
   let assertions = ref [] in
   let channel = open_in filename in
-  try while true; do
+  try
+    while true; do
       let line = input_line channel in
-      match Assertion.parse_assertion line with
-      | None -> ()
-      | Some x -> assertions := x::!assertions
+      assertions := Assertion.parse_assertion filename line @ !assertions
     done; []
   with End_of_file ->
     close_in channel;

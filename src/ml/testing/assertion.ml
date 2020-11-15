@@ -10,6 +10,9 @@ type raw_assertion_string =
 type test =
   | EQTest of DV.uvalue * DynamicTypes.dtyp * string * DV.uvalue list
   | POISONTest of DynamicTypes.dtyp * string * DV.uvalue list
+  (* Find a better name for this *)
+  (* retty, args for src, (t, args) for arguments to source and test *)
+  | SRCTGTTest of DynamicTypes.dtyp * (LLVMAst.typ * DV.uvalue) list
 
 
 (*  Directly converts a piece of syntax to a uvalue without going through semantic interpretation.
@@ -75,32 +78,32 @@ let instr_to_call_data' instr =
   
 
 (* Top level for parsing assertions *)  
-let rec parse_assertion (line: string) : test option =
-  begin match parse_poison_assertion line,
-                parse_eq_assertion line with
-  | (Some _ as ptest), _ -> ptest
-  | _, (Some _ as etest) -> etest
-  | _, _ -> None
-  end
+let rec parse_assertion (filename: string)(line: string) : test list =
+  let assertions = [
+      parse_poison_assertion line;
+      parse_eq_assertion line ;
+      parse_srctgt_assertion filename line;
+    ] in
+  List.flatten assertions
 
-and parse_poison_assertion (line: string) : test option =
+and parse_poison_assertion (line: string) : test list =
   (* ws* "ASSERT" ws+ "POISON" ws* ':' ws* (anything+ as r) *)
   let regex = "^[ \t]*;[ \t]*ASSERT[ \t]+POISON[ \t]*:[ \t]*\\(.*\\)" in
   if not (Str.string_match (Str.regexp regex) line 0) then
-    None
+    []
   else
     let assertion = Str.matched_group 1 line in
     let poisoned_fcall = Llvm_lexer.parse_test_call (Lexing.from_string assertion) in
     let (ty, fn, args) = instr_to_call_data' poisoned_fcall in
-    Some (POISONTest(ty, fn, args))
+    [ POISONTest(ty, fn, args) ]
 
-and parse_eq_assertion (line:string) =
+and parse_eq_assertion (line:string) : test list =
   (* ws* "ASSERT" ws+ "EQ" ws* ':' ws* (anything+ as l) ws* '=' ws* (anything+ as r)  *)
   let regex = "^[ \t]*;[ \t]*ASSERT[ \t]+EQ[ \t]*:[ \t]*\\(.*\\)=\\(.*\\)" in 
   if not (Str.string_match (Str.regexp regex) line 0) then
     begin
       (* let _ = print_endline ("NO MATCH: " ^ line) in *)
-      None
+      []
     end
   else
     (* let _ = print_endline ("MATCH: " ^ line) in *)
@@ -114,6 +117,57 @@ and parse_eq_assertion (line:string) =
     let uv = texp_to_uvalue l in
     let dt = typ_to_dtyp (fst l) in
     let (fn, args) = instr_to_call_data r in
-    Some (EQTest(uv, dt, fn, args))
+    [ EQTest(uv, dt, fn, args) ]
+
+and parse_srctgt_assertion (filename: string) (line: string) : test list =
+  (* ws* ; ws* "ASSERT" ws+ "SRCTGT" *)
+  let regex = "^[ \t]*;[ \t]*ASSERT[ \t]+SRCTGT[ \t]*" in
+  (* annoying duplication of parse file :( *)
+  let read_and_parse (file:string) =
+    let lines = ref [] in
+    let channel = open_in file in
+    (try while true; do
+           lines := input_line channel :: !lines
+         done; ""
+     with End_of_file ->
+       close_in channel;
+       String.concat "\n" (List.rev !lines) )
+    |> Lexing.from_string |> Llvm_lexer.parse
+  in
+
+  (* Given an ast, find the source and target functions *)
+  let find_fn fname toplevel_entity =
+    match toplevel_entity with
+    | TLE_Definition df ->
+      begin match df.df_prototype.dc_name with
+       | Name coqstr -> Camlcoq.camlstring_of_coqstring coqstr = fname 
+       | _ -> false
+      end
+    | _ -> false
+  in
+  (* Find the function type for a given top level entity *)
+  let find_ty toplevel_entity : (LLVMAst.typ list * LLVMAst.typ) =
+    match toplevel_entity with
+    | TLE_Definition df ->
+       begin match LLVMAst.dc_type df.df_prototype with
+       | LLVMAst.TYPE_Function (rt, args) -> args, rt
+       | _ -> failwith "given entity not a function definition"
+       end
+    | _ -> failwith "not a function definition"
+  in      
 
 
+  if not (Str.string_match (Str.regexp regex) line 0) then
+    []
+  else
+    let ast = read_and_parse filename in
+    let (src_fxn, tgt_fxn) = (List.find_opt (find_fn "src") ast), (List.find_opt (find_fn "tgt") ast) in
+    begin match src_fxn, tgt_fxn with
+    | (Some src), (Some tgt) ->
+       begin  try
+        let  (src_t, tgt_t) = find_ty src, find_ty tgt in
+        let  generated_args : (LLVMAst.typ * DV.uvalue) list list = Generate.generate_n_args 20 (fst src_t) in
+        List.map (fun arg -> SRCTGTTest ((typ_to_dtyp (snd tgt_t)), arg)   ) generated_args
+       with _ -> [] end
+    | _ -> []
+    end

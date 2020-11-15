@@ -30,7 +30,7 @@ let make_test ll_ast t : string * assertion  =
         Interpreter.pp_uvalue Format.str_formatter expected;
         Format.flush_str_formatter ()
       in
-      let args_str =
+      let args_str: doc =
         Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter  args;
         Format.flush_str_formatter()
       in
