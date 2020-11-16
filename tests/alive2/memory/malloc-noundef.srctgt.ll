@@ -13,3 +13,7 @@ define void @tgt(i64 %sz) {
   call void @f(i8* %p)
   ret void
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

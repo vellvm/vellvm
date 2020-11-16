@@ -11,3 +11,7 @@ define <2 x float> @tgt(<2 x float> %v) {
 }
 
 ; ERROR: Target is more poisonous than source
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

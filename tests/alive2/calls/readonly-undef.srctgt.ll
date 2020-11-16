@@ -11,3 +11,7 @@ define i8 @tgt() {
   %V1 = call i8 @func(i8 undef)
   ret i8 0
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

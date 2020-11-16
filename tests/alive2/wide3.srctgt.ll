@@ -7,3 +7,9 @@ define i1000 @tgt(i1000 %x) {
     %r = sub i1000 %x, -11
     ret i1000 %r
 }
+
+
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

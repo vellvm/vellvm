@@ -18,3 +18,7 @@ define i1 @tgt() {
 
 ; ERROR: Value mismatch
 declare i64 @strlen(i8*)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

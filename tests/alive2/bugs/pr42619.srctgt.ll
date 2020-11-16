@@ -17,3 +17,7 @@ define void @tgt(i32 %a, i32 %b) {
 declare void @foo(i32, i32)
 
 ; ERROR: Source is more defined than target
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

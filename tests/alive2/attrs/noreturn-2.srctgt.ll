@@ -13,3 +13,7 @@ define void @tgt(i1 %cond) {
   call void @f()
   ret void
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

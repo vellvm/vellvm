@@ -11,3 +11,7 @@ else:
 }
 
 declare void @exit(i32) noreturn
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

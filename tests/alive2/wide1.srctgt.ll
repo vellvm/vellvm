@@ -7,3 +7,7 @@ define i128 @tgt(i128 %x) {
     %r = udiv i128 %x, 32
     ret i128 %r
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

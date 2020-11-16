@@ -9,3 +9,7 @@ define i32 @src(i32 %x) {
 define i32 @tgt(i32 %x) {
   ret i32 %x
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

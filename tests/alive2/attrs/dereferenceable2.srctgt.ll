@@ -9,3 +9,7 @@ define float @tgt(<4 x float>* dereferenceable(15) %p) {
   %r = load float, float* %bc, align 16
   ret float %r
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

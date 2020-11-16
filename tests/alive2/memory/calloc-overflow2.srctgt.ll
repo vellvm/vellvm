@@ -18,3 +18,7 @@ define i8 @tgt(i64 %num) {
 ; ERROR: Value mismatch
 
 declare noalias i8* @calloc(i64, i64)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

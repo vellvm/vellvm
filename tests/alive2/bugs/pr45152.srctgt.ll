@@ -36,3 +36,7 @@ end:                                              ; preds = %if, %entry
 }
 
 ; ERROR: Mismatch in memory
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

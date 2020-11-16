@@ -5,3 +5,7 @@ define noundef i32 @src() {
 define noundef i32 @tgt() {
   unreachable
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

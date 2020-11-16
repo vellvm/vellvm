@@ -19,3 +19,7 @@ define i8 @tgt(i8* readnone %x, i8* %y) {
 }
 
 ; ERROR: Value mismatch
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

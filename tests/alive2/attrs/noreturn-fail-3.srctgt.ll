@@ -14,3 +14,7 @@ define i8 @tgt(i8* %p) {
 }
 
 ; ERROR: Source is more defined than target
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

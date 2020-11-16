@@ -12,3 +12,7 @@ define i8 @tgt(<2 x i8> %x) {
   ret i8 %r
 }
 
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

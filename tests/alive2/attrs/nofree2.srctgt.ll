@@ -8,3 +8,7 @@ define void @tgt() nofree {
 }
 
 declare void @fn()
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

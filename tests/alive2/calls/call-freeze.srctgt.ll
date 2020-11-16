@@ -12,3 +12,7 @@ define i8 @tgt(i8 %x) {
 }
 
 declare i8 @f(i8)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

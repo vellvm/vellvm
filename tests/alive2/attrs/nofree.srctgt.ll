@@ -18,3 +18,7 @@ define void @tgt(i1 %c) nofree {
 
 declare void @free(i8*)
 declare i8* @malloc(i64)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

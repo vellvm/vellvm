@@ -30,3 +30,7 @@ body:
 exit:
   ret i8 %x
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

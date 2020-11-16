@@ -34,3 +34,7 @@ define void @tgt() {
 
 declare void @f(float, float, float, float, float, float, float, float)
 declare float @llvm.fabs.f32(float)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

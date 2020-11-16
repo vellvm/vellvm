@@ -14,3 +14,7 @@ A:
 B:
   ret i32 1
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

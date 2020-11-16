@@ -12,3 +12,7 @@ define i8 @tgt() {
   %one = load i8, i8* %p
   ret i8 %one
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

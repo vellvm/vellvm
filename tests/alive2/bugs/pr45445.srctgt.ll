@@ -15,3 +15,7 @@ define <2 x i32*> @tgt(i32* %base, i64 %idx) {
 }
 
 ; ERROR: Value mismatch
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

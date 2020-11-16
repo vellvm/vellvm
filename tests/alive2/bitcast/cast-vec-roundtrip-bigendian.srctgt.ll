@@ -10,3 +10,7 @@ define i8 @src(i8 %v){
 define i8 @tgt(i8 %v) {
   ret i8 %v
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

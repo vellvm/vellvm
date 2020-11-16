@@ -7,3 +7,7 @@ define dereferenceable(4) i32* @tgt(i32* dereferenceable(4) %p) {
 }
 
 ; ERROR: Source is more defined than target
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

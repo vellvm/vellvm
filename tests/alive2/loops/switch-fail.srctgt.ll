@@ -30,3 +30,7 @@ bar:
 define i32 @tgt() {
   ret i32 3
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

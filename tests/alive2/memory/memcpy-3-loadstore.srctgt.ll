@@ -12,3 +12,7 @@ define void @tgt(i8* %p, i8* %q) {
 }
 
 declare void @llvm.memcpy.p0i8.p0i8.i64(i8*, i8*, i64, i1)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

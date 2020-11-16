@@ -22,3 +22,7 @@ define void @tgt(i32* %pz, i32* %px, i32* %py) {
 }
 
 ; ERROR: Mismatch in memory
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

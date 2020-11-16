@@ -12,3 +12,7 @@ define i32 @tgt(i32 %x) {
 }
 
 ; CHECK: return = %x / true
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

@@ -17,3 +17,7 @@ define i64 @tgt(i8* %foo, i64 %i, i64 %j) {
 }
 
 ; ERROR: Target is more poisonous than source
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

@@ -115,3 +115,7 @@ attributes #0 = { nounwind ssp "correctly-rounded-divide-sqrt-fp-math"="false" "
 !1 = !{!"clang version 4.0.0 (trunk 283264)"}
 
 ; ERROR: Source is more defined than target
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

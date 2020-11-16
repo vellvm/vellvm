@@ -35,3 +35,7 @@ do.end:
 declare i32 @f()
 declare void @read_error() noreturn
 declare i32* @readnone() readnone
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

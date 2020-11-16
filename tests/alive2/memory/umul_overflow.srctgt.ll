@@ -12,3 +12,7 @@ define void @tgt(i32 %a, i32 %b, {i32, i1}* %p) {
 }
 
 declare { i32, i1 } @llvm.umul.with.overflow.i32(i32, i32) nounwind readnone speculatable willreturn
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

@@ -9,3 +9,7 @@ define { i8, i32 } @tgt({ i8*, i32 } %x) {
   %ins = insertvalue { i8, i32 } undef, i32 %ex, 1
   ret { i8, i32 } %ins
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

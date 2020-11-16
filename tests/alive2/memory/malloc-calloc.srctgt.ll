@@ -13,3 +13,7 @@ define i8* @tgt(i32 %size) {
 
 declare i8* @calloc(i32, i32)
 declare i8* @malloc(i32)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

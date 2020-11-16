@@ -26,3 +26,7 @@ bb3:                                              ; preds = %bb2, %bb
 }
 
 ; ERROR: Target is more poisonous than source
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

@@ -44,3 +44,7 @@ define i32 @tgt() noinline {
 }
 
 declare void @bar(%struct1* sret)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

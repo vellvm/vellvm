@@ -11,3 +11,7 @@ define {} @tgt({}* %p, {}* %q) {
   %w = load {}, {}* %q
   ret {} %w
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

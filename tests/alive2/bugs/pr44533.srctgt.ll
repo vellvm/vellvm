@@ -23,3 +23,7 @@ define void @tgt([10 x [5 x i32]]* %input, i64 %s, i64 %t) {
 declare void @foo(i32*)
 
 ; ERROR: Source is more defined than target
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

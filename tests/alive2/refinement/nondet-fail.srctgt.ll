@@ -24,3 +24,7 @@ EXIT:
 declare void @g()
 
 ; ERROR: Mismatch in memory
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

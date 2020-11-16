@@ -38,3 +38,7 @@ loop:
 BBif:
   br i1 true, label %BB2, label %loop
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

@@ -9,3 +9,7 @@ define i1 @tgt(double %X) {
 }
 
 ; ERROR: Value mismatch
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

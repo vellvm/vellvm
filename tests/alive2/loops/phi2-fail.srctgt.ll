@@ -22,3 +22,7 @@ exit:
 define i32 @tgt() {
   ret i32 2
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

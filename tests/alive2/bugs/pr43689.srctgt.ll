@@ -14,3 +14,7 @@ define <2 x i16> @tgt(i16 %a, i1 %cmp) {
 }
 
 ; ERROR: Source is more defined than target
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

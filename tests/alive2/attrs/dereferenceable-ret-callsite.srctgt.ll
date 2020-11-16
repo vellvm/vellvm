@@ -18,3 +18,7 @@ define i16 @tgt(i1 %c) {
 }
 
 declare i16* @f()
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

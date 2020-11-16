@@ -23,3 +23,7 @@ define void @tgt(i32* %p) {
 }
 
 declare void @test1(i32*)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

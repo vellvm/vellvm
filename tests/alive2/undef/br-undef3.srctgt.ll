@@ -14,3 +14,7 @@ define i8 @tgt() {
 }
 
 ; ERROR: Source is more defined
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

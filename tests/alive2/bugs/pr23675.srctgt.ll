@@ -13,3 +13,7 @@ define i4 @tgt(i2, i1, i4, i2, i1, i4, i2, i1, i4, i2, i1, i4) {
 }
 
 ; ERROR: Target is more poisonous than source
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

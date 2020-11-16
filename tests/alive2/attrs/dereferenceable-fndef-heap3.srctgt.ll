@@ -9,3 +9,7 @@ define dereferenceable(4) i8* @tgt() {
 
 declare i8* @malloc(i64)
 declare void @free(i8*)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

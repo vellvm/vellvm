@@ -11,3 +11,7 @@ define i32 @tgt(i32 %a, i32 %n) {
   ret i32 3
 }
 
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

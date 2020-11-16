@@ -11,3 +11,7 @@ define i8 @tgt(i8 %t) {
 }
 
 ; ERROR: Value mismatch
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

@@ -68,3 +68,7 @@ attributes #2 = { "less-precise-fpmad"="false" "no-frame-pointer-elim"="false" "
 !3 = !{!"omnipotent char", !4, i64 0}
 !4 = !{!"Simple C/C++ TBAA"}
 
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

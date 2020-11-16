@@ -16,3 +16,7 @@ define void @tgt() {
 }
 
 declare i32* @__errno_location() readnone
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

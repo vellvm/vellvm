@@ -14,3 +14,6 @@ define i32 @tgt(i32 %x) {
 
 ; aasdawd ASSERT EQ: i32 -2368 = call i32 @tgt(i32 -2368) 
 ; ASSERT SRCTGT 200
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

@@ -18,3 +18,7 @@ define void @tgt() {
 declare void @foo(i32)
 
 ; XFAIL
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

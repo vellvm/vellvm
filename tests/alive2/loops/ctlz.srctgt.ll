@@ -34,3 +34,7 @@ define i32 @tgt(i32 %0) {
 }
 
 declare i32 @llvm.ctlz.i32(i32, i1 immarg)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

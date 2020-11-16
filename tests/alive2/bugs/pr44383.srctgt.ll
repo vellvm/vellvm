@@ -17,3 +17,7 @@ define <3 x i1> @tgt() {
 declare <3 x i8> @gen3x8()
 
 ; ERROR: Target's return value is more undefined
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

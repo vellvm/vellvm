@@ -11,3 +11,7 @@ define [4 x float]* @tgt([9 x [4 x float]]* %A) {
 }
 
 ; ERROR: Target is more poisonous than source
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

@@ -10,3 +10,7 @@ define i32 @test61(i32* %ptr) {
 define i32 @tgt(i32* %ptr) {
 	ret i32 10
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

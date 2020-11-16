@@ -189,3 +189,7 @@ for.cond19:                                       ; preds = %for.cond15
 for.end45:                                        ; preds = %for.cond15
   unreachable
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

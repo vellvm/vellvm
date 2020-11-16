@@ -9,3 +9,7 @@ define void @tgt(i8* noundef %p) {
   store {} {}, {}* %p2
   ret void
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

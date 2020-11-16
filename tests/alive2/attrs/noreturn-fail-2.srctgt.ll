@@ -11,3 +11,7 @@ define i8 @tgt() {
 }
 
 ; ERROR: Source and target don't have the same return domain
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

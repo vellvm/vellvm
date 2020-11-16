@@ -19,3 +19,7 @@ define i32 @tgt() {
 }
 
 !0 = !{i32 0, i32 3}
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

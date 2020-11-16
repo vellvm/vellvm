@@ -28,3 +28,7 @@ EXIT:
 
 declare i8* @callee2(i8*)
 declare void @free(i8*)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

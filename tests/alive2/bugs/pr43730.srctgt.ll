@@ -11,3 +11,7 @@ define <2 x i1> @tgt(<2 x i8> %a) {
 }
 
 ; ERROR: Target's return value is more undefined
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

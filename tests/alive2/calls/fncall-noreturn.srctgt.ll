@@ -11,3 +11,7 @@ define void @tgt() {
   call void @never_return() noreturn
   unreachable
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

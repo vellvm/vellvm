@@ -14,3 +14,7 @@ entry:
 }
 
 declare i32 @printf(i8* nocapture readonly, ...)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

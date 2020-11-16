@@ -12,3 +12,7 @@ define i32 @tgt(i32* dereferenceable(2) %p) {
 
 
 ; CHECK: min_access_size: 2
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

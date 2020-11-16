@@ -21,3 +21,7 @@ gah:
 foo:
   ret void
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

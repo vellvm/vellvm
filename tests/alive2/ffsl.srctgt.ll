@@ -10,3 +10,7 @@ define i32 @tgt() {
 }
 
 declare i32 @ffsl(i64)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

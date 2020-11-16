@@ -18,3 +18,7 @@ define i8 @tgt(i8 %x, i8 %y) {
   %c = add i8 %a, %b
   ret i8 %c
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

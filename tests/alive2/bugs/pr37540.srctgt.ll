@@ -29,3 +29,7 @@ bb2:                                              ; preds = %0
 
 ; XFAIL: Unsupported metadata: 11
 ; SKIP-IDENTITY
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

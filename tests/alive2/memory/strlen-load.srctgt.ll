@@ -17,3 +17,7 @@ define i1 @tgt() {
 }
 
 declare i64 @strlen(i8*)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

@@ -10,3 +10,7 @@ define i8 @tgt(i8 %v0, i8 %v1) {
   %r = call i8 @llvm.umax.i8(i8 %v0, i8 %v1)
   ret i8 %r
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

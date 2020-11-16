@@ -6,3 +6,7 @@ define i1 @tgt(i8* nocapture %p, i8* %q) {
   ret i1 false
 }
 ; ERROR: Value mismatch
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

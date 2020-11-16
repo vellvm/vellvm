@@ -11,3 +11,7 @@ define void @tgt() {
 }
 
 declare i8* @g()
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

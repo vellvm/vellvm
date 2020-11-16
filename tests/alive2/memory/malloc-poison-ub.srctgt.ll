@@ -18,3 +18,7 @@ CALLOC:
 define void @tgt(i1 %cond) {
   unreachable
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

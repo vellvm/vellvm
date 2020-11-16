@@ -20,3 +20,7 @@ entry:
         %D = trunc i32 %C to i16                ; <i16> [#uses=1]
         ret i16 %D
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

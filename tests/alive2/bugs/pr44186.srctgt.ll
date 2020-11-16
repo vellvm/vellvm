@@ -12,3 +12,7 @@ define <4 x i32> @tgt(<4 x i32> %a0) {
 }
 
 ; ERROR: Target's return value is more undefined
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

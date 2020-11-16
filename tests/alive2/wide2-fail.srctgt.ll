@@ -9,3 +9,7 @@ define i255 @tgt(i255 %x) {
     %r = mul i255 %x, -7
     ret i255 %r
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

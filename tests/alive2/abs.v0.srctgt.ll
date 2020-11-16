@@ -11,3 +11,7 @@ define i8 @tgt(i8 %v0) {
   %r = call i8 @llvm.abs.i8(i8 %v0, i1 0)
   ret i8 %r
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

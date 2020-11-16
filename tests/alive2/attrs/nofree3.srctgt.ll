@@ -10,3 +10,7 @@ define void @tgt() nofree {
 ; ERROR: Source is more defined than target
 
 declare void @fn() nofree
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

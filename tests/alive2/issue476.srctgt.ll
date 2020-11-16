@@ -7,3 +7,7 @@ define i32 @tgt(i8* dereferenceable(8) %p) {
 }
 
 ; ERROR: Unsupported interprocedural transformation: signature mismatch between src and tgt
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

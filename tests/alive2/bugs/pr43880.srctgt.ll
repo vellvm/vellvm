@@ -28,3 +28,7 @@ declare i16 @llvm.bswap.i16(i16) #0
 attributes #0 = { nounwind readnone speculatable willreturn }
 
 ; ERROR: Source is more defined than target
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

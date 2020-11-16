@@ -10,3 +10,7 @@ define void @tgt() {
   call void @f()
   unreachable
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

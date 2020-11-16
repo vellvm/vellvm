@@ -10,3 +10,7 @@ define i32 @tgt(i8* %p, i8* %q) {
 }
 
 declare i32 @memcmp(i8* nocapture, i8* nocapture, i64)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

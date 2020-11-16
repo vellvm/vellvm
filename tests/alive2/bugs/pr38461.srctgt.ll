@@ -15,3 +15,7 @@ define i2 @tgt(i2, i1, i4, i2, i1, i4, i2, i1, i4, i2, i1, i4) {
 }
 
 ; ERROR: Value mismatch
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

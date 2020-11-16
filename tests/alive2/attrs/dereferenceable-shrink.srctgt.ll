@@ -9,3 +9,7 @@ define void @tgt(i8* %p) {
   call void @f(i8* dereferenceable(4) %p)
   ret void
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

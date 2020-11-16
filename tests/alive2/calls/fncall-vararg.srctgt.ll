@@ -12,3 +12,7 @@ define void @tgt() {
   tail call void (i8*, ...) @g(i8* null)
   ret void
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

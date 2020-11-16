@@ -13,3 +13,7 @@ define i1 @tgt(i8 %A, i8 %B) {
 }
 
 ; ERROR: Target's return value is more undefined
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

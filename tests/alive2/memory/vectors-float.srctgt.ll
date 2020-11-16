@@ -11,3 +11,7 @@ define i64 @tgt(<2 x float>* %p) {
 	store <2 x float> <float 1.0, float 2.0>, <2 x float>* %p
 	ret i64 4611686019492741120
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

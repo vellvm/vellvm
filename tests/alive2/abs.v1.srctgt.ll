@@ -13,3 +13,7 @@ define i8 @tgt(i8 %v0) {
 }
 
 ; ERROR: Target is more poisonous than source
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

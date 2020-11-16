@@ -26,3 +26,7 @@ define i1 @tgt(<2 x i32> %x, <2 x i32> %y) {
   %and_of_cmps = and i1 %cmp0, %cmp1
   ret i1 %and_of_cmps
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

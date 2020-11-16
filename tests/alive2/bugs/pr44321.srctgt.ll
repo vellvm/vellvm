@@ -13,3 +13,7 @@ define i32* @tgt(<7 x i32>* %x, i64 %y, i64 %z) {
 }
 
 ; ERROR: Value mismatch
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

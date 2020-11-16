@@ -29,3 +29,7 @@ loop:                                             ; preds = %loop, %entry
 exit:                                             ; preds = %loop
   ret void
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

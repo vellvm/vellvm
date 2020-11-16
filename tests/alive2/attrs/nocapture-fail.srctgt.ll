@@ -12,3 +12,7 @@ define void @tgt(i8* nocapture %p) {
   store i8* %p, i8** @x
   ret void
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

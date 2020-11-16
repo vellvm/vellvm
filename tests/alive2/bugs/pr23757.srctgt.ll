@@ -18,3 +18,7 @@ define zeroext i1 @tgt(i32* %cell_ptr) {
 }
 
 ; ERROR: Value mismatch
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

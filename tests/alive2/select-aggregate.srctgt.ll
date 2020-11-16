@@ -11,3 +11,7 @@ define i64 @tgt() {
 }
 
 
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

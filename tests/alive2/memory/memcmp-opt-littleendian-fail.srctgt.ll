@@ -26,3 +26,7 @@ define i32 @tgt(i64 %x, i64 %y) {
 ; ERROR: Value mismatch
 
 declare i32 @memcmp(i8* nocapture, i8* nocapture, i64)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

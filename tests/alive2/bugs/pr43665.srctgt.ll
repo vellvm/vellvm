@@ -12,3 +12,7 @@ define <2 x i8> @tgt(<2 x i8> %a0) {
 }
 
 ; ERROR: Value mismatch
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

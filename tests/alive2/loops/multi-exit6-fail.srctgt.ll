@@ -32,3 +32,7 @@ exit:
   %y = add i8 %x, 1
   ret i8 %y
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

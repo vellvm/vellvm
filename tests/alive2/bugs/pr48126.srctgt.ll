@@ -85,3 +85,7 @@ scalar.ph:                                        ; preds = %middle.block, %.lr.
   ret i32 %a.0.lcssa
 }
 
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

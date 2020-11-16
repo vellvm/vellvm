@@ -12,3 +12,7 @@ define i32 @tgt(i32 %a) {
 }
 
 ; ERROR: Target is more poisonous than source
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

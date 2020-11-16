@@ -19,3 +19,7 @@ define i8 @tgt() {
 
   ret i8 undef
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

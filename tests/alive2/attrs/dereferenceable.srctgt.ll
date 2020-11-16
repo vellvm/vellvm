@@ -14,3 +14,7 @@ define i32 @tgt(i1 %c, i32* dereferenceable(4) %p) {
   %val = select i1 %c, i32 %v1, i32 0
   ret i32 %val
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

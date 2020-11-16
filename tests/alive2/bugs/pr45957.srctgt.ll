@@ -44,3 +44,7 @@ define <32 x i8> @tgt(<96 x i8>* %ptr) #0 {
   ret <32 x i8> %add2
 }
 ; ERROR: Source is more defined than target
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

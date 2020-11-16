@@ -41,3 +41,7 @@ entry:
 attributes #0 = { "target-cpu"="corei7-avx" }
 
 ; ERROR: Source is more defined than target
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

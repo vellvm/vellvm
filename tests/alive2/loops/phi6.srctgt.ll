@@ -29,3 +29,7 @@ return:
   %.mux = select i1 %cond, i32 %a, i32 0
   ret i32 %.mux
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

@@ -28,3 +28,6 @@ define i32 @tgt() {
 }
 
 ; ASSERT SRCTGT
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

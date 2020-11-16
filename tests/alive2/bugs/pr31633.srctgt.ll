@@ -12,3 +12,7 @@ define i1 @tgt(i1 %c, i32 %y) {
 }
 
 ; ERROR: Value mismatch
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

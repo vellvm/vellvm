@@ -12,3 +12,7 @@ define i8 @tgt(i8 %val, i8 %shamt) {
   %r = call i8 @llvm.ushl.sat.i8(i8 %val, i8 %shamt)
   ret i8 %r
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

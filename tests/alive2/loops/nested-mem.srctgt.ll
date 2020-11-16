@@ -47,3 +47,7 @@ for.end7:
 define i32 @tgt() {
   ret i32 4
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

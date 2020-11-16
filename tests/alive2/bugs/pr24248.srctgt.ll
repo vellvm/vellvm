@@ -51,3 +51,7 @@ exit:                                             ; preds = %loop
 declare void @f(<2 x i32>)
 
 ; ERROR: Source is more defined than target
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

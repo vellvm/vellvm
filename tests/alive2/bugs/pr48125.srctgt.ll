@@ -69,3 +69,7 @@ for.body:                                         ; preds = %entry.peel.newph
 for.exit:                                         ; preds = %for.body, %for.body.peel2, %for.body.peel
   ret void
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

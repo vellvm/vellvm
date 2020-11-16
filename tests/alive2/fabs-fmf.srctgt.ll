@@ -11,3 +11,7 @@ define float @tgt() {
 
 
 declare float @llvm.fabs.f32(float)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

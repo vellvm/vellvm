@@ -19,3 +19,7 @@ define i8 @tgt() {
   store i8 2, i8* %q
   ret i8 1
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

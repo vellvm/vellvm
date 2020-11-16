@@ -36,3 +36,7 @@ define i32 @tgt(i1 %c) {
   %ret = select i1 %c, i32 5, i32 2
   ret i32 %ret
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

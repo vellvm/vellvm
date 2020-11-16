@@ -18,3 +18,7 @@ define float @tgt(i26 %x, i26 %y) {
 }
 
 ; ERROR: Value mismatch
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

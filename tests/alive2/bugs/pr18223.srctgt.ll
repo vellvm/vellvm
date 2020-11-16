@@ -137,3 +137,7 @@ for.end:                                          ; preds = %for.end_us_lcssa, %
 
 
 declare i32 @printf(i8* nocapture readonly, ...)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

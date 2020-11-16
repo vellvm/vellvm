@@ -16,3 +16,7 @@ define void @tgt(i8 %x, i8 %y) {
   call void @foo_i8(i8 0)
   ret void
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

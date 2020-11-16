@@ -50,3 +50,7 @@ while2.latch:
 return:
   ret i8* %p.1
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

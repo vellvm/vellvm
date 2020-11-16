@@ -84,3 +84,7 @@ loop2.exit:                                       ; preds = %loop2.exit.loopexit
 exit:                                             ; preds = %loop2.exit, %loop1
   ret i32 0
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

@@ -15,3 +15,7 @@ define void @tgt(i32 %x) {
   store float 0.0, float* %y
   ret void
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

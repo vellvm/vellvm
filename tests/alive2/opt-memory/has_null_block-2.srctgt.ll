@@ -13,3 +13,7 @@ define i8* @tgt() {
 declare i8* @malloc(i32)
 
 ; CHECK: has_null_block: 1
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

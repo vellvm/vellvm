@@ -12,3 +12,7 @@ define void @tgt() {
 
 declare noalias i8* @calloc(i64, i64)
 ; CHECK: max_alloc_size: 12
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

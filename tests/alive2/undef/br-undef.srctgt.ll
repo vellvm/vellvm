@@ -11,3 +11,7 @@ b:
 define i8 @tgt() {
   unreachable
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

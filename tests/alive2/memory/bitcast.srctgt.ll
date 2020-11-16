@@ -4,3 +4,7 @@ define void @f(i64* %src) {
   %vec = bitcast i64 %data to <2 x i32>
   ret void
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

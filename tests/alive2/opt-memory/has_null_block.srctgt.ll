@@ -17,3 +17,7 @@ define i32 @tgt() {
 }
 
 ; CHECK: has_null_block: 0
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

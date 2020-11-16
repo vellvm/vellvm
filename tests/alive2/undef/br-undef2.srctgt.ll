@@ -12,3 +12,7 @@ define i8 @tgt(i1 %c) {
   %ext = zext i1 %c to i8
   ret i8 %ext
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

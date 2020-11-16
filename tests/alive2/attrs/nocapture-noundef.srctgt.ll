@@ -24,3 +24,7 @@ f:
 
 
 declare i8* @g(i8*)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

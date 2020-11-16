@@ -10,3 +10,7 @@ define <4 x i2> @src(<4 x i2> %t){
 define <4 x i2> @tgt(<4 x i2> %t){
   ret <4 x i2> %t
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

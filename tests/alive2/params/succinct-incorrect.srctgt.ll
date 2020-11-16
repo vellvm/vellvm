@@ -12,3 +12,7 @@ define i32 @tgt(i32 %x) {
 ; CHECK: Transformation doesn't verify!
 ; CHECK-NOT: define i32 @src
 ; CHECK-NOT: ERROR:
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

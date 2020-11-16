@@ -10,3 +10,7 @@ define i8 @tgt(i8*) {
 
 declare void @free(i8*)
 declare i8* @calloc(i64, i64)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

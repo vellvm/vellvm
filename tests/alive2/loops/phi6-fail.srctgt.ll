@@ -29,3 +29,7 @@ header:
 return:
   ret i32 %a
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

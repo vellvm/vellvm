@@ -13,3 +13,7 @@ define void @tgt(i32 %v) {
   call void @g()
   unreachable
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

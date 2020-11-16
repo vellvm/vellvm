@@ -15,3 +15,7 @@ entry:
   call void @llvm.memset.p0i8.i64(i8* align 4 %out, i8 0, i64 0, i1 false)
   ret void
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

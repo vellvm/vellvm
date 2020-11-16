@@ -5,3 +5,7 @@ define i32 @foo(i32, i32) {
   %x4 = udiv i32 %x3, 5
   ret i32 %x4
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

@@ -41,3 +41,7 @@ return:
 
 declare void @scanf(i8*, ...)
 declare void @printf(i8*, ...)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

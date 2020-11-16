@@ -36,3 +36,7 @@ declare void @f(float, float, float, float, float, float, float, float)
 declare float @llvm.fabs.f32(float)
 
 ; ERROR: Source is more defined than target
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

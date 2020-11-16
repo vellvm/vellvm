@@ -20,3 +20,7 @@ define i32 @tgt(i1 %c) {
 declare i32* @f()
 
 ; ERROR: Source is more defined than target
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

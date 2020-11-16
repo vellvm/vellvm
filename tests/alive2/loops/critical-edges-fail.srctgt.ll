@@ -25,3 +25,7 @@ while.end:
 define i8* @tgt(i8* %p, i32 %choice) {
   ret i8* null
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

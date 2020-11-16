@@ -23,3 +23,7 @@ define i8 @tgt(i1 %c, i8 %a, i8 %b) {
   %r = select i1 %c, i8 %b, i8 %a
   ret i8 %r
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

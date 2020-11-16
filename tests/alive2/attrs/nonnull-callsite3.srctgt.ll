@@ -19,3 +19,7 @@ B:
 }
 
 declare void @f(i8*)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

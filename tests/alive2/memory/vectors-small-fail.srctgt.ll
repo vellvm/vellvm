@@ -11,3 +11,7 @@ define void @tgt(<3 x i2>* %p) {
 }
 
 ; ERROR: Mismatch in memory
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

@@ -18,3 +18,7 @@ define i1 @tgt(i8 %y) {
 declare i8 @gen8()
 
 ; ERROR: Value mismatch
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

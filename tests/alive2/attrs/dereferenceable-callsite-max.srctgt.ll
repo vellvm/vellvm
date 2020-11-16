@@ -18,3 +18,7 @@ define i32 @tgt(i1 %c, i32* %p) {
 }
 
 declare void @f(i32* dereferenceable(2) %ptr)
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100

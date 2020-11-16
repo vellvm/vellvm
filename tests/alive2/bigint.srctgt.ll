@@ -6,3 +6,7 @@ define i256 @src() {
 define i256 @tgt() {
   ret i256 undef
 }
+
+; Assertions below this point were automatically generated
+
+; ASSERT SRCTGT 100
