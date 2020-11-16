@@ -26,3 +26,5 @@ for.end:
 define i32 @tgt() {
   ret i32 2
 }
+
+; ASSERT SRCTGT

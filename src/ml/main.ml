@@ -72,11 +72,15 @@ let make_test ll_ast t : string * assertion  =
          | Ok v -> Interpreter.pp_uvalue Format.str_formatter v; Format.flush_str_formatter ()
          | Error e -> e
        in
-       Printf.sprintf "%s = %s" src_str tgt_str
+      let args_str: doc =
+        Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter v_args;
+        Format.flush_str_formatter()
+      in
+       Printf.sprintf "%s = %s on generated input (%s)" src_str tgt_str args_str
      in
      str,  (Assert.assert_eqf (fun () ->
                let s,t = res_src (), res_tgt() in
-               begin match s, t with | Ok sv, Ok tv -> Ok (sv = tv)
+               begin match s, t with | Ok sv, Ok tv -> Ok (Assertion.eq_uvalue sv tv)
                                | Error el, _ -> Error el
                                | _, Error er -> Error er
                end

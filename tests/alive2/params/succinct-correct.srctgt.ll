@@ -11,3 +11,6 @@ define i32 @tgt(i32 %x) {
 
 ; CHECK: Transformation seems to be correct!
 ; CHECK-NOT: define i32 @src
+
+; aasdawd ASSERT EQ: i32 -2368 = call i32 @tgt(i32 -2368) 
+; ASSERT SRCTGT 200
