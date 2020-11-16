@@ -57,10 +57,30 @@ let make_test ll_ast t : string * assertion  =
      in 
      str, (Assert.assert_eqf result (Ok expected))
          
-
-
-
-
+  | Assertion.SRCTGTTest (expected_rett, generated_args) ->
+     let (_t_args, v_args) = List.split generated_args in
+     let res_src () = Interpreter.step(TopLevel.interpreter_user expected_rett (Camlcoq.coqstring_of_camlstring "src") v_args [] ll_ast) in
+     let res_tgt () = Interpreter.step(TopLevel.interpreter_user expected_rett (Camlcoq.coqstring_of_camlstring "tgt") v_args [] ll_ast) in
+     let str =
+       let src_str =
+         match res_src () with
+         | Ok v -> Interpreter.pp_uvalue Format.str_formatter v; Format.flush_str_formatter ()
+         | Error e -> e
+       in
+       let tgt_str =
+         match res_tgt () with
+         | Ok v -> Interpreter.pp_uvalue Format.str_formatter v; Format.flush_str_formatter ()
+         | Error e -> e
+       in
+       Printf.sprintf "%s = %s" src_str tgt_str
+     in
+     str,  (Assert.assert_eqf (fun () ->
+               let s,t = res_src (), res_tgt() in
+               begin match s, t with | Ok sv, Ok tv -> Ok (sv = tv)
+                               | Error el, _ -> Error el
+                               | _, Error er -> Error er
+               end
+             ) (Ok true))
 let test_pp_dir dir =
   Platform.configure();
   let suite = [Test.pp_test_of_dir dir] in
