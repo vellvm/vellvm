@@ -1,0 +1,47 @@
+ -------------- Summary -----------------
+ Files Passed: 0
+ Files Failed: 2
+ Exceptions: 0
+ Hidden (limitations in test suite): 0
+ None of the above: 0
+ ----------------------------------------
+ -------------- Files that reported Passed -------------- 
+
+
+ -------------- Files that reported Hidden -------------- 
+
+Vighnesh look at this 
+
+ -------------- Files that triggered failures ------------- 
+ -------------- Writing first 500 chars of failure -------- 
+
+../tests/alive2/vector/vector-poison-2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+vector-poison-2srctgt:
+  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(3541))
+	   ERROR: not equal
+  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(-1883))
+	   ERROR: not equal
+  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(3658))
+	   <<<<<<<<<<<<<<< 
+
+../tests/alive2/vector/vector-poison.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+vector-poisonsrctgt:
+  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(918))
+	   ERROR: not equal
+  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(-2429))
+	   ERROR: not equal
+  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(7048))
+	   ERR<<<<<<<<<<<<<<< 
+
+ -------------- Files that triggered Exceptions ------------ 
+ -------------- Writing stderr                  ------------ 
+
+ -------------- Files that didn't trigger any of the above ----- 
+
+--------------           END REPORT ---------------------------  

@@ -1,0 +1,86 @@
+ -------------- Summary -----------------
+ Files Passed: 2
+ Files Failed: 3
+ Exceptions: 4
+ Hidden (limitations in test suite): 0
+ None of the above: 0
+ ----------------------------------------
+ -------------- Files that reported Passed -------------- 
+
+../tests/alive2/undef/br-undef2.srctgt.ll
+../tests/alive2/undef/load-undefidx.srctgt.ll
+
+ -------------- Files that reported Hidden -------------- 
+
+Vighnesh look at this 
+
+ -------------- Files that triggered failures ------------- 
+ -------------- Writing first 500 chars of failure -------- 
+
+../tests/alive2/undef/br-undef4.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+br-undef4srctgt:
+  failed - UVALUE_I8(0) = UVALUE_I8(2) on generated input ()
+	   ERROR: not equal
+  failed - UVALUE_I8(0) = UVALUE_I8(2) on generated input ()
+	   ERROR: not equal
+  failed - UVALUE_I8(0) = UVALUE_I8(2) on generated input ()
+	   ERROR: not equal
+  failed - UVALUE_I8(0) = UVALUE_I8(2) on generated input ()
+	   ERROR: not equal
+  failed -<<<<<<<<<<<<<<< 
+
+../tests/alive2/undef/fncall-freeze.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+fncall-freezesrctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(4674), UVALUE_I8(-9643))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(7064), UVALUE_I8(3025))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(<<<<<<<<<<<<<<< 
+
+../tests/alive2/undef/fncall-freeze2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+fncall-freeze2srctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(4784), UVALUE_I8(-340))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(5742), UVALUE_I8(5249))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(<<<<<<<<<<<<<<< 
+
+ -------------- Files that triggered Exceptions ------------ 
+ -------------- Writing stderr                  ------------ 
+
+../tests/alive2/undef/br-undef.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 13, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/undef/br-undef3.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 14, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/undef/fncall-readmem.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 8, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/undef/opt-noundef.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+ -------------- Files that didn't trigger any of the above ----- 
+
+--------------           END REPORT ---------------------------  

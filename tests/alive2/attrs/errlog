@@ -1,0 +1,541 @@
+ -------------- Summary -----------------
+ Files Passed: 1
+ Files Failed: 10
+ Exceptions: 63
+ Hidden (limitations in test suite): 10
+ None of the above: 0
+ ----------------------------------------
+ -------------- Files that reported Passed -------------- 
+
+../tests/alive2/attrs/returned-2.srctgt.ll
+
+ -------------- Files that reported Hidden -------------- 
+
+../tests/alive2/attrs/align-fndef2.srctgt.ll
+../tests/alive2/attrs/dereferenceable-fail.srctgt.ll
+../tests/alive2/attrs/dereferenceable.srctgt.ll
+../tests/alive2/attrs/dereferenceable2.srctgt.ll
+../tests/alive2/attrs/nocapture-fail.srctgt.ll
+../tests/alive2/attrs/nocapture-icmp.srctgt.ll
+../tests/alive2/attrs/nocapture-noundef.srctgt.ll
+../tests/alive2/attrs/nocapture-replace.srctgt.ll
+../tests/alive2/attrs/nonnull-callsite2.srctgt.ll
+../tests/alive2/attrs/noreturn-fail-3.srctgt.ll
+Vighnesh look at this 
+
+ -------------- Files that triggered failures ------------- 
+ -------------- Writing first 500 chars of failure -------- 
+
+../tests/alive2/attrs/align-ret-callsite.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+align-ret-callsitesrctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted C<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/align-ret-callsite2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+align-ret-callsite2srctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted <<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-ret-callsite-align.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+dereferenceable-ret-callsite-alignsrctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1))
+	   ERROR: not e<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-ret-callsite.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+dereferenceable-ret-callsitesrctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1))
+	   ERROR: not equal
+ <<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-ret-callsite2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+dereferenceable-ret-callsite2srctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1))
+	   ERROR: not equal
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noreturn-3.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+noreturn-3srctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on g<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noreturn-fail-2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+noreturn-fail-2srctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noreturn-fail-4.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+noreturn-fail-4srctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noreturn-fail-5.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+noreturn-fail-5srctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/returned-fail.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+returned-failsrctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(7198))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(-5968))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(3496))
+	   ERROR: not equal
+  fail<<<<<<<<<<<<<<< 
+
+ -------------- Files that triggered Exceptions ------------ 
+ -------------- Writing stderr                  ------------ 
+
+../tests/alive2/attrs/align-callsite.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 13, column 25, token '('")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/align-callsite2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 2, column 19, token 'align'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/align-callsite3.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 2, column 19, token 'align'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/align-fndef.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 1, column 26, token '('")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-align-fail.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 3, column 20, token 'dereferenceable'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-callsite-align-fail.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 9, column 20, token 'dereferenceable'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-callsite-fail.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 23, column 41, token 'ptr'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-callsite-max.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 9, column 20, token 'dereferenceable'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-callsite.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 9, column 20, token 'dereferenceable'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-callsite2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 20, column 41, token 'ptr'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-fndef-global.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 9, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-fndef-global2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 10, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-fndef-heap.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 8, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-fndef-heap2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 9, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-fndef-heap3.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 8, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-fndef-null.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 7, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-fndef-stack.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 8, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-fndef.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 7, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-fndef2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 8, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-fndef3.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 8, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-nofree.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 20, column 41, token 'ptr'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/dereferenceable-shrink.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 4, column 19, token 'dereferenceable'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/nofree.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: nofree")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/nofree2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: nofree")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/nofree3.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: nofree")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/nonnull-bugfix.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 19, column 27, token 'nonnull'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/nonnull-callsite.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 2, column 19, token 'nonnull'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/nonnull-callsite3.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 15, column 19, token 'nonnull'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/nonnull-callsite4.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 8, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/nonnull-callsite5.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 8, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/nonnull-fndef.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 7, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/nonnull-fndef2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 7, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/nonnull-ret-callsite.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 8, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noreturn-2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 7, column 0, token 'B:'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noreturn-fail-6.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 7, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noreturn-fail.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 10, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noreturn.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 12, column 0, token '}'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundef-bundle.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 5, column 31, token '['")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundef-callsite.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundef-fndef.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundef-ret-callsite.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundef-ret-fndef.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundef-ret.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundef-ret2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundef-ret3.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundef-ret4.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundef.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundef2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundefaggr-disableall.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundefaggr-disablepoisoninput.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundefaggr-disableundefinput.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundefaggr-empty.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundefaggr-nested.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundefaggr-nested2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundefaggr-ret-fndef.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundefaggr-ret-fndef2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundefaggr-ret-fndef3.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundefaggr-ret.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundefaggr-ret2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundefaggr.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/noundefaggr2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/readnone-fail.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 7, column 19, token 'readnone'")
+<<<<<<<<<<<<<<< 
+
+../tests/alive2/attrs/returned-3.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("Parsing error: line 15, column 0, token 'B:'")
+<<<<<<<<<<<<<<< 
+
+ -------------- Files that didn't trigger any of the above ----- 
+
+--------------           END REPORT ---------------------------  

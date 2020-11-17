@@ -35,4 +35,4 @@ exit:
 
 ; Assertions below this point were automatically generated
 
-; ASSERT SRCTGT 100
+;; ASSERT SRCTGT 100

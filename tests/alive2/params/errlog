@@ -1,0 +1,48 @@
+ -------------- Summary -----------------
+ Files Passed: 1
+ Files Failed: 2
+ Exceptions: 0
+ Hidden (limitations in test suite): 0
+ None of the above: 0
+ ----------------------------------------
+ -------------- Files that reported Passed -------------- 
+
+../tests/alive2/params/succinct-correct.srctgt.ll
+
+ -------------- Files that reported Hidden -------------- 
+
+Vighnesh look at this 
+
+ -------------- Files that triggered failures ------------- 
+ -------------- Writing first 500 chars of failure -------- 
+
+../tests/alive2/params/omit-array.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+omit-arraysrctgt:
+  failed - EXP_Cstring not yet implemented = EXP_Cstring not yet implemented on generated input ()
+	   ERROR: not equal
+  failed - EXP_Cstring not yet implemented = EXP_Cstring not yet implemented on generated input ()
+	   ERROR: not equal
+  failed - EXP_Cstring not yet implemented = EXP_Cstring not yet implemented on generated input (<<<<<<<<<<<<<<< 
+
+../tests/alive2/params/succinct-incorrect.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+succinct-incorrectsrctgt:
+  failed - UVALUE_I32(6236) = UVALUE_I32(6237) on generated input (UVALUE_I32(6236))
+	   ERROR: not equal
+  failed - UVALUE_I32(-1462) = UVALUE_I32(4294965835) on generated input (UVALUE_I32(-1462))
+	   ERROR: not equal
+  failed - UVALUE_I32(7505) = UVALUE_I32(7506) on generated input (UVALUE_I32(7505))
+	   ERROR: not equal
+  f<<<<<<<<<<<<<<< 
+
+ -------------- Files that triggered Exceptions ------------ 
+ -------------- Writing stderr                  ------------ 
+
+ -------------- Files that didn't trigger any of the above ----- 
+
+--------------           END REPORT ---------------------------  

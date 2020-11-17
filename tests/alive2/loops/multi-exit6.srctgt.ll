@@ -33,4 +33,4 @@ exit:
 
 ; Assertions below this point were automatically generated
 
-; ASSERT SRCTGT 100
+;; -- un assert this ASSERT SRCTGT 100
