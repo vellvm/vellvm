@@ -18,9 +18,9 @@ addons:
 env:
   global:
   - NJOBS=1
-  - OCAML_VERSION="4.10.0"
+  - OCAML_VERSION="4.10.1"
   matrix:
-  - TEST_TARGET="8.11.1"
+  - TEST_TARGET="8.12.0"
 
 before_script:
   -  ./ci/keep_alive.sh &
