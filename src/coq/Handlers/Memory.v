@@ -3371,6 +3371,31 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         exists ptr. intuition.
       Qed.
 
+      Lemma interp_memory_GEP_array_no_read : forall t a size m i,
+          dtyp_fits m a (DTYPE_Array size t) ->
+          exists ptr,
+            interp_memory (trigger (GEP
+                                      (DTYPE_Array size t)
+                                      (DVALUE_Addr a)
+                                      [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat i))])) m
+                          ≈ Ret (m, DVALUE_Addr ptr) /\
+            handle_gep_addr (DTYPE_Array size t) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr ptr.
+      Proof.
+        intros t a size m i FITS.
+        pose proof (dtyp_fits_allocated FITS) as ALLOC.
+        pose proof read_array_exists m size t i a ALLOC as RARRAY.
+        destruct RARRAY as (ptr & GEP & READ).
+        exists ptr.
+        split.
+        - rewrite interp_memory_trigger. cbn.
+          cbn in GEP.
+          rewrite GEP.
+          cbn.
+          rewrite bind_ret_l.
+          reflexivity.
+        - auto.
+      Qed.
+
       (* Lemma write_read : *)
       (*   forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr), *)
       (*     write m a val = inr m' -> *)
