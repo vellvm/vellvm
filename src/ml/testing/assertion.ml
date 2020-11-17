@@ -104,6 +104,7 @@ let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
 
 let rec typ_to_dtyp (typ : LLVMAst.typ) : DynamicTypes.dtyp =
   match typ with
+  | TYPE_Void -> DTYPE_Void
   | TYPE_I i -> DTYPE_I i
   | TYPE_Float -> DTYPE_Float
   | TYPE_Double -> DTYPE_Double
