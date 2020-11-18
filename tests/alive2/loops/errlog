@@ -1,7 +1,7 @@
  -------------- Summary -----------------
  Files Passed: 19
- Files Failed: 27
- Exceptions: 3
+ Files Failed: 30
+ Exceptions: 1
  Hidden (limitations in test suite): 7
  None of the above: 0
  ----------------------------------------
@@ -46,24 +46,57 @@ Vighnesh look at this
 (* -------- Vellvm Test Harness -------- *)
 
 const-phi-failsrctgt:
-  failed - UVALUE_I8(0) = UVALUE_I8(1) on generated input (UVALUE_I1(1))
-	   ERROR: not equal
   failed - UVALUE_I8(1) = UVALUE_I8(0) on generated input (UVALUE_I1(0))
 	   ERROR: not equal
   failed - UVALUE_I8(0) = UVALUE_I8(1) on generated input (UVALUE_I1(1))
 	   ERROR: not equal
+  failed - UVALUE_I8(0) = UVALUE_I8(1) on generated input (UVALUE_I1(1))
+	   ERROR: not equal
   failed - UVALUE_I8(0) = UVALUE_I8(1) on generated<<<<<<<<<<<<<<< 
+
+../tests/alive2/loops/ctlz-fail.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+ctlz-failsrctgt:
+  failed - Can't find block in denote_cfg (0 2) = Can't find block in denote_cfg (0 4) on generated input (UVALUE_I32(7409))
+	   ERROR: not equal
+  failed - Can't find block in denote_cfg (0 2) = Can't find block in denote_cfg (0 9) on generated input (UVALUE_I32(-1791))
+	   ERROR: not equal
+  failed - Can't find block in denote_cfg (0 <<<<<<<<<<<<<<< 
+
+../tests/alive2/loops/ctlz.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+ctlzsrctgt:
+  failed - Can't find block in denote_cfg (0 2) = Can't find block in denote_cfg (0 4) on generated input (UVALUE_I32(2603))
+	   ERROR: not equal
+  failed - Can't find block in denote_cfg (0 2) = Can't find block in denote_cfg (0 9) on generated input (UVALUE_I32(-6767))
+	   ERROR: not equal
+  failed - Can't find block in denote_cfg (0 2) = <<<<<<<<<<<<<<< 
 
 ../tests/alive2/loops/exit-phi-fail.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 exit-phi-failsrctgt:
-  failed - UVALUE_I8(662) = UVALUE_I8(-8166) on generated input (UVALUE_I1(1), UVALUE_I8(662), UVALUE_I8(-8166))
+  failed - UVALUE_I8(4786) = UVALUE_I8(-1152) on generated input (UVALUE_I1(1), UVALUE_I8(4786), UVALUE_I8(-1152))
 	   ERROR: not equal
-  failed - UVALUE_I8(5812) = UVALUE_I8(8442) on generated input (UVALUE_I1(0), UVALUE_I8(8442), UVALUE_I8(5812))
+  failed - UVALUE_I8(8551) = UVALUE_I8(2934) on generated input (UVALUE_I1(1), UVALUE_I8(8551), UVALUE_I8(2934))
 	   ERROR: not equal
-  failed - UVALUE_I8(8448) = UVALUE_I8(8128) on generated input (U<<<<<<<<<<<<<<< 
+  failed - UVALUE_I8(7407) = UVALUE_I8(1911) on generated input <<<<<<<<<<<<<<< 
+
+../tests/alive2/loops/issue558.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+issue558srctgt:
+  failed - IMPOSSIBLE: unreachable in reachable position = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - IMPOSSIBLE: unreachable in reachable position = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - IMPOSSIBLE: unreachable in reach<<<<<<<<<<<<<<< 
 
 ../tests/alive2/loops/multi-exit-complex-ssa-fail.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -255,7 +288,7 @@ phi3-failsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 phi4-failsrctgt:
-  failed - UVALUE_I32(3) = UVALUE_I32(2) on generated input (UVALUE_I1(0))
+  failed - UVALUE_I32(3) = UVALUE_I32(2) on generated input (UVALUE_I1(1))
 	   ERROR: not equal
   failed - UVALUE_I32(3) = UVALUE_I32(2) on generated input (UVALUE_I1(0))
 	   ERROR: not equal
@@ -283,20 +316,20 @@ phi5-failsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 phi6-failsrctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1), UVALUE_I1(1))
-	   ERROR: not equal
   failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0), UVALUE_I1(1))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1), UVALUE_I1(1))<<<<<<<<<<<<<<< 
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0), UVALUE_I1(0))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0), UVALUE_I1(1))<<<<<<<<<<<<<<< 
 
 ../tests/alive2/loops/phi6.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 phi6srctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0), UVALUE_I1(0))
-	   ERROR: not equal
   failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1), UVALUE_I1(0))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0), UVALUE_I1(0))
 	   ERROR: not equal
   failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1), UVALUE_I1(0))
 	   <<<<<<<<<<<<<<< 
@@ -380,7 +413,7 @@ switch2-failsrctgt:
 	   ERROR: not equal
   failed - Unsupport itree terminator = UVALUE_I32(5) on generated input (UVALUE_I1(1))
 	   ERROR: not equal
-  failed - Unsupport itree terminator = UVALUE_I32(2) on generated input (UVALUE_I1(0))
+  failed - Unsupport itree terminator = UVALUE_I32(5) on generated input (UVALUE_I1(1))
 	   ERROR: not equal
   failed<<<<<<<<<<<<<<< 
 
@@ -389,9 +422,9 @@ switch2-failsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 switch2srctgt:
-  failed - Unsupport itree terminator = UVALUE_I32(2) on generated input (UVALUE_I1(0))
-	   ERROR: not equal
   failed - Unsupport itree terminator = UVALUE_I32(3) on generated input (UVALUE_I1(1))
+	   ERROR: not equal
+  failed - Unsupport itree terminator = UVALUE_I32(2) on generated input (UVALUE_I1(0))
 	   ERROR: not equal
   failed - Unsupport itree terminator = UVALUE_I32(2) on generated input (UVALUE_I1(0))
 	   ERROR: not equal
@@ -414,22 +447,10 @@ two-backedges-failsrctgt:
  -------------- Files that triggered Exceptions ------------ 
  -------------- Writing stderr                  ------------ 
 
-../tests/alive2/loops/ctlz-fail.srctgt.ll:
+../tests/alive2/loops/errlog:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Unknown or unsupported keyword: immarg")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/loops/ctlz.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Unknown or unsupported keyword: immarg")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/loops/issue558.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 87, column 0, token 'for.end:'")
+Fatal error: exception Failure("found unsupported file type: ../tests/alive2/loops/errlog")
 <<<<<<<<<<<<<<< 
 
  -------------- Files that didn't trigger any of the above ----- 

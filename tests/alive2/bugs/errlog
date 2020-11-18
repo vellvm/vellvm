@@ -1,7 +1,7 @@
  -------------- Summary -----------------
  Files Passed: 6
  Files Failed: 22
- Exceptions: 17
+ Exceptions: 18
  Hidden (limitations in test suite): 24
  None of the above: 0
  ----------------------------------------
@@ -50,11 +50,11 @@ Vighnesh look at this
 (* -------- Vellvm Test Harness -------- *)
 
 pr21256srctgt:
-  failed - UVALUE_I8(218) = UVALUE_I8(157) on generated input (UVALUE_I8(5029), UVALUE_I8(-6408))
+  failed - UVALUE_I8(191) = UVALUE_I8(171) on generated input (UVALUE_I8(442), UVALUE_I8(-5665))
 	   ERROR: not equal
-  failed - UVALUE_I8(51) = UVALUE_I8(19) on generated input (UVALUE_I8(8272), UVALUE_I8(9827))
+  failed - UVALUE_I8(10) = UVALUE_I8(100) on generated input (UVALUE_I8(9258), UVALUE_I8(2660))
 	   ERROR: not equal
-  failed - UVALUE_I8(55) = UVALUE_I8(71) on generated input (UVALUE_I8(455), UVALUE_I8(6695))
+  failed - UVALUE_I8(1) = UVALUE_I8(237) on generated input (UVALUE_I8(516), UVALUE_I8(5173))
 	   ERROR: <<<<<<<<<<<<<<< 
 
 ../tests/alive2/bugs/pr23038.srctgt.ll:
@@ -62,11 +62,11 @@ pr21256srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 pr23038srctgt:
-  failed - TODO: unimplemented numeric conversion = UVALUE_I32(0) on generated input (UVALUE_I8(9426))
+  failed - TODO: unimplemented numeric conversion = UVALUE_I32(0) on generated input (UVALUE_I8(509))
 	   ERROR: not equal
-  failed - TODO: unimplemented numeric conversion = UVALUE_I32(0) on generated input (UVALUE_I8(-3952))
+  failed - TODO: unimplemented numeric conversion = UVALUE_I32(0) on generated input (UVALUE_I8(-7574))
 	   ERROR: not equal
-  failed - TODO: unimplemented numeric conversion = UVALUE_I32(0) on generated input (UVALU<<<<<<<<<<<<<<< 
+  failed - TODO: unimplemented numeric conversion = UVALUE_I32(0) on generated input (UVALUE<<<<<<<<<<<<<<< 
 
 ../tests/alive2/bugs/pr24179-unrolled.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -99,9 +99,9 @@ pr24179srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 pr24248srctgt:
-  failed - insertelement not implemented = insertelement not implemented on generated input (UVALUE_I32(6460))
+  failed - insertelement not implemented = insertelement not implemented on generated input (UVALUE_I32(7132))
 	   ERROR: not equal
-  failed - insertelement not implemented = insertelement not implemented on generated input (UVALUE_I32(-8780))
+  failed - insertelement not implemented = insertelement not implemented on generated input (UVALUE_I32(-7941))
 	   ERROR: not equal
   failed - insertelement not implemented = insertelement not implemented on<<<<<<<<<<<<<<< 
 
@@ -110,35 +110,34 @@ pr24248srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 pr24873srctgt:
-  failed - UVALUE_Poison = UVALUE_I1(0) on generated input (UVALUE_I64(895))
+  failed - UVALUE_Poison = UVALUE_I1(0) on generated input (UVALUE_I64(1289))
 	   ERROR: not equal
-  passed - UVALUE_I1(0) = UVALUE_I1(0) on generated input (UVALUE_I64(-5070))
-  failed - UVALUE_Poison = UVALUE_I1(0) on generated input (UVALUE_I64(9757))
+  passed - UVALUE_I1(0) = UVALUE_I1(0) on generated input (UVALUE_I64(-8109))
+  failed - UVALUE_Poison = UVALUE_I1(0) on generated input (UVALUE_I64(1333))
 	   ERROR: not equal
-  failed - UVALUE_Poison = UVALUE_I1(0) on generated input (UVALU<<<<<<<<<<<<<<< 
+  failed - UVALUE_Poison = UVALUE_I1(0) on generated input (UVAL<<<<<<<<<<<<<<< 
 
 ../tests/alive2/bugs/pr27575.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 pr27575srctgt:
-  passed - UVALUE_Double(6770.) = UVALUE_Double(6770.) on generated input (UVALUE_I32(6770))
-  failed - UVALUE_Double(0.5) = UVALUE_Double(0.) on generated input (UVALUE_I32(-6188))
+  passed - UVALUE_Double(3076.) = UVALUE_Double(3076.) on generated input (UVALUE_I32(3076))
+  failed - UVALUE_Double(0.5) = UVALUE_Double(0.) on generated input (UVALUE_I32(-3936))
 	   ERROR: not equal
-  passed - UVALUE_Double(9356.) = UVALUE_Double(9356.) on generated input (UVALUE_I32(9356))
-  passed - UVALUE_Double(7347.) = UVALUE_Dou<<<<<<<<<<<<<<< 
+  passed - UVALUE_Double(5660.) = UVALUE_Double(5660.) on generated input (UVALUE_I32(5660))
+  passed - UVALUE_Double(8902.) = UVALUE_Dou<<<<<<<<<<<<<<< 
 
 ../tests/alive2/bugs/pr31633.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 pr31633srctgt:
-  failed - todo = UVALUE_I1(1) on generated input (UVALUE_I1(1), UVALUE_I32(6738))
+  passed - UVALUE_I1(1) = UVALUE_I1(1) on generated input (UVALUE_I1(0), UVALUE_I32(1707))
+  passed - UVALUE_I1(1) = UVALUE_I1(1) on generated input (UVALUE_I1(0), UVALUE_I32(-2596))
+  failed - todo = UVALUE_I1(1) on generated input (UVALUE_I1(1), UVALUE_I32(3141))
 	   ERROR: not equal
-  failed - todo = UVALUE_I1(1) on generated input (UVALUE_I1(1), UVALUE_I32(-6079))
-	   ERROR: not equal
-  passed - UVALUE_I1(1) = UVALUE_I1(1) on generated input (UVALUE_I1(0), UVALUE_I32(6123))
-  passed - UVALUE_I1(1) = UVALUE_I1(1) o<<<<<<<<<<<<<<< 
+  failed - todo = UVALUE_I1(1) on generated input (UV<<<<<<<<<<<<<<< 
 
 ../tests/alive2/bugs/pr32078.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -147,7 +146,7 @@ generating vector value
 generating vector value
 
 pr32078srctgt:
-  failed - extractelement not implemented = ill_typed-icmp on generated input (UVALUE_Vector(UVALUE_I32(-3202), UVALUE_I32(8622)), UVALUE_Vector(UVALUE_I32(6838), UVALUE_I32(9378)))
+  failed - extractelement not implemented = ill_typed-icmp on generated input (UVALUE_Vector(UVALUE_I32(-4318), UVALUE_I32(9732)), UVALUE_Vector(UVALUE_I32(8219), UVALUE_I32(2070)))
 	   ERROR: not equal
   failed - extractelement not implemented = ill_typed-icmp on generated input (UVALUE_Vec<<<<<<<<<<<<<<< 
 
@@ -156,11 +155,11 @@ pr32078srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 pr32949srctgt:
-  failed - UVALUE_Poison = UVALUE_I1(1) on generated input (UVALUE_I8(8274))
+  failed - UVALUE_Poison = UVALUE_I1(1) on generated input (UVALUE_I8(5335))
 	   ERROR: not equal
-  failed - UVALUE_Poison = UVALUE_I1(1) on generated input (UVALUE_I8(-6263))
+  failed - UVALUE_Poison = UVALUE_I1(1) on generated input (UVALUE_I8(-6437))
 	   ERROR: not equal
-  failed - UVALUE_Poison = UVALUE_I1(1) on generated input (UVALUE_I8(3038))
+  failed - UVALUE_Poison = UVALUE_I1(1) on generated input (UVALUE_I8(5516))
 	   ERROR: not equal
   failed - UVALUE_Poison = UVALUE_I1(1) on ge<<<<<<<<<<<<<<< 
 
@@ -181,24 +180,24 @@ pr33673srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 pr34349srctgt:
-  failed - ill typed-conv = UVALUE_I8(0) on generated input (UVALUE_I8(771))
+  failed - ill typed-conv = UVALUE_I8(0) on generated input (UVALUE_I8(4802))
 	   ERROR: not equal
-  failed - ill typed-conv = UVALUE_I8(0) on generated input (UVALUE_I8(-7241))
+  failed - ill typed-conv = UVALUE_I8(0) on generated input (UVALUE_I8(-3720))
 	   ERROR: not equal
-  failed - ill typed-conv = UVALUE_I8(0) on generated input (UVALUE_I8(2537))
+  failed - ill typed-conv = UVALUE_I8(0) on generated input (UVALUE_I8(1928))
 	   ERROR: not equal
-  failed - ill typed-conv = UVALUE_I8(0) on<<<<<<<<<<<<<<< 
+  failed - ill typed-conv = UVALUE_I8(0) o<<<<<<<<<<<<<<< 
 
 ../tests/alive2/bugs/pr42198.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 pr42198srctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(5175))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(4486))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(-4292))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(-4091))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(3570))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(3975))
 	   ERROR: not equal
   failed - U<<<<<<<<<<<<<<< 
 
@@ -207,9 +206,9 @@ pr42198srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 pr42619srctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(7446), UVALUE_I32(-8801))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(6597), UVALUE_I32(-3349))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(1371), UVALUE_I32(7313))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(9005), UVALUE_I32(9055))
 	   ERROR: not equal
   failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(5<<<<<<<<<<<<<<< 
 
@@ -219,20 +218,20 @@ pr42619srctgt:
 generating vector value
 
 pr43665srctgt:
-  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I8(-1061), UVALUE_I8(1997)))
+  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I8(-3913), UVALUE_I8(3523)))
 	   ERROR: not equal
-  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I8(7369), UVALUE_I8(5537)))
+  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I8(448), UVALUE_I8(9620)))
 	   ERROR: not equal
-  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I8(2180), UVALUE_I8(3272)<<<<<<<<<<<<<<< 
+  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I8(4331), UVALUE_I8(8133))<<<<<<<<<<<<<<< 
 
 ../tests/alive2/bugs/pr43689.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 pr43689srctgt:
-  failed - insertelement not implemented = insertelement not implemented on generated input (UVALUE_I32(4318), UVALUE_I1(0))
+  failed - insertelement not implemented = insertelement not implemented on generated input (UVALUE_I32(8048), UVALUE_I1(0))
 	   ERROR: not equal
-  failed - insertelement not implemented = insertelement not implemented on generated input (UVALUE_I32(-3211), UVALUE_I1(0))
+  failed - insertelement not implemented = insertelement not implemented on generated input (UVALUE_I32(-4251), UVALUE_I1(0))
 	   ERROR: not equal
   failed - insertelement not implemented = inse<<<<<<<<<<<<<<< 
 
@@ -242,11 +241,11 @@ pr43689srctgt:
 generating vector value
 
 pr43730srctgt:
-  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I8(-6552), UVALUE_I8(6136)))
+  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I8(-123), UVALUE_I8(7315)))
 	   ERROR: not equal
-  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I8(8707), UVALUE_I8(6571)))
+  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I8(570), UVALUE_I8(6370)))
 	   ERROR: not equal
-  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I8(6740), UVALUE_I8(4740)<<<<<<<<<<<<<<< 
+  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I8(6582), UVALUE_I8(7227)))<<<<<<<<<<<<<<< 
 
 ../tests/alive2/bugs/pr44186.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -254,11 +253,11 @@ pr43730srctgt:
 generating vector value
 
 pr44186srctgt:
-  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I32(4621), UVALUE_I32(7350), UVALUE_I32(-5101), UVALUE_I32(6362)))
+  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I32(6941), UVALUE_I32(4229), UVALUE_I32(-946), UVALUE_I32(935)))
 	   ERROR: not equal
-  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I32(-7980), UVALUE_I32(-3712), UVALUE_I32(7514), UVALUE_I32(4545)))
+  failed - todo = todo on generated input (UVALUE_Vector(UVALUE_I32(-1567), UVALUE_I32(-6733), UVALUE_I32(2066), UVALUE_I32(3089)))
 	   ERROR: not equal
-  failed - <<<<<<<<<<<<<<< 
+  failed - to<<<<<<<<<<<<<<< 
 
 ../tests/alive2/bugs/pr44383.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -278,9 +277,9 @@ pr44383srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 pr44536srctgt:
-  failed - dv_zero_initializer unimplemented = dv_zero_initializer unimplemented on generated input (UVALUE_I32(9265))
+  failed - dv_zero_initializer unimplemented = dv_zero_initializer unimplemented on generated input (UVALUE_I32(4029))
 	   ERROR: not equal
-  failed - dv_zero_initializer unimplemented = dv_zero_initializer unimplemented on generated input (UVALUE_I32(-3962))
+  failed - dv_zero_initializer unimplemented = dv_zero_initializer unimplemented on generated input (UVALUE_I32(-5964))
 	   ERROR: not equal
   failed - dv_zero_initializer unimplemented = dv_zero_init<<<<<<<<<<<<<<< 
 
@@ -289,11 +288,11 @@ pr44536srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 pr45210srctgt:
-  failed - unsupported integer size = unsupported integer size on generated input (UVALUE_I32(9226))
+  failed - unsupported integer size = unsupported integer size on generated input (UVALUE_I32(7576))
 	   ERROR: not equal
-  failed - unsupported integer size = unsupported integer size on generated input (UVALUE_I32(-3864))
+  failed - unsupported integer size = unsupported integer size on generated input (UVALUE_I32(-796))
 	   ERROR: not equal
-  failed - unsupported integer size = unsupported integer size on generated input (UVALUE_I32(8<<<<<<<<<<<<<<< 
+  failed - unsupported integer size = unsupported integer size on generated input (UVALUE_I32(41<<<<<<<<<<<<<<< 
 
 ../tests/alive2/bugs/pr6940.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -312,6 +311,12 @@ pr6940srctgt:
 
  -------------- Files that triggered Exceptions ------------ 
  -------------- Writing stderr                  ------------ 
+
+../tests/alive2/bugs/errlog:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("found unsupported file type: ../tests/alive2/bugs/errlog")
+<<<<<<<<<<<<<<< 
 
 ../tests/alive2/bugs/pr10067.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 

@@ -2,7 +2,7 @@
  Files Passed: 0
  Files Failed: 32
  Exceptions: 10
- Hidden (limitations in test suite): 14
+ Hidden (limitations in test suite): 15
  None of the above: 0
  ----------------------------------------
  -------------- Files that reported Passed -------------- 
@@ -12,6 +12,7 @@
 
 ../tests/alive2/emptyaggr-load.srctgt.ll
 ../tests/alive2/emptyaggr-store.srctgt.ll
+../tests/alive2/emptyaggr-store2.srctgt.ll
 ../tests/alive2/emptyaggr.srctgt.ll
 ../tests/alive2/fabs-libcall.srctgt.ll
 ../tests/alive2/insertvalue-emptyelem.srctgt.ll
@@ -34,11 +35,11 @@ Vighnesh look at this
 (* -------- Vellvm Test Harness -------- *)
 
 absv0srctgt:
-  failed - UVALUE_I8(5292) = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(5292))
+  failed - UVALUE_I8(4620) = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(4620))
 	   ERROR: not equal
-  failed - UVALUE_I8(116) = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(-1396))
+  failed - UVALUE_I8(156) = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(-3996))
 	   ERROR: not equal
-  failed - UVALUE_I8(5053) = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(5053))
+  failed - UVALUE_I8(8883) = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(8883))
 	   ERROR<<<<<<<<<<<<<<< 
 
 ../tests/alive2/abs.v1.srctgt.ll:
@@ -46,11 +47,11 @@ absv0srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 absv1srctgt:
-  failed - UVALUE_I8(9693) = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(9693))
+  failed - UVALUE_I8(9252) = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(9252))
 	   ERROR: not equal
-  failed - UVALUE_I8(192) = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(-1728))
+  failed - UVALUE_I8(145) = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(-7313))
 	   ERROR: not equal
-  failed - UVALUE_I8(6354) = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(6354))
+  failed - UVALUE_I8(3490) = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(3490))
 	   ERROR<<<<<<<<<<<<<<< 
 
 ../tests/alive2/abs.v2.srctgt.ll:
@@ -58,23 +59,23 @@ absv1srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 absv2srctgt:
-  failed - UVALUE_Poison = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(4596))
+  failed - UVALUE_Poison = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(2803))
 	   ERROR: not equal
-  failed - UVALUE_Poison = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(-1921))
+  failed - UVALUE_Poison = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(-828))
 	   ERROR: not equal
-  failed - UVALUE_Poison = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(8264))
-	   ERROR: not<<<<<<<<<<<<<<< 
+  failed - UVALUE_Poison = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(6227))
+	   ERROR: not <<<<<<<<<<<<<<< 
 
 ../tests/alive2/abs.v3.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 absv3srctgt:
-  failed - UVALUE_Poison = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(1314))
+  failed - UVALUE_Poison = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(6593))
 	   ERROR: not equal
-  failed - UVALUE_Poison = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(-7642))
+  failed - UVALUE_Poison = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(-2025))
 	   ERROR: not equal
-  failed - UVALUE_Poison = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(4747))
+  failed - UVALUE_Poison = Unknown intrinsic: llvm.abs.i8 on generated input (UVALUE_I8(2125))
 	   ERROR: not<<<<<<<<<<<<<<< 
 
 ../tests/alive2/extractvalue-padding.srctgt.ll:
@@ -204,7 +205,7 @@ freeze-undefsrctgt:
 generating vector value
 
 reduce_addsrctgt:
-  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.add.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-7347), UVALUE_I8(7293)))
+  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.add.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-1794), UVALUE_I8(2648)))
 	   ERROR: not equal
   failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.add.v2i8 on generated i<<<<<<<<<<<<<<< 
 
@@ -214,9 +215,9 @@ reduce_addsrctgt:
 generating vector value
 
 reduce_andsrctgt:
-  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.and.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-6810), UVALUE_I8(1654)))
+  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.and.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-338), UVALUE_I8(1049)))
 	   ERROR: not equal
-  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.and.v2i8 on generated i<<<<<<<<<<<<<<< 
+  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.and.v2i8 on generated in<<<<<<<<<<<<<<< 
 
 ../tests/alive2/reduce_mul.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -224,7 +225,7 @@ reduce_andsrctgt:
 generating vector value
 
 reduce_mulsrctgt:
-  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.mul.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-8546), UVALUE_I8(3883)))
+  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.mul.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-3134), UVALUE_I8(3572)))
 	   ERROR: not equal
   failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.mul.v2i8 on generated i<<<<<<<<<<<<<<< 
 
@@ -234,7 +235,7 @@ reduce_mulsrctgt:
 generating vector value
 
 reduce_orsrctgt:
-  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.or.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-9029), UVALUE_I8(2262)))
+  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.or.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-7094), UVALUE_I8(8935)))
 	   ERROR: not equal
   failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.or.v2i8 on generated inpu<<<<<<<<<<<<<<< 
 
@@ -244,7 +245,7 @@ reduce_orsrctgt:
 generating vector value
 
 reduce_smaxsrctgt:
-  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.smax.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-1608), UVALUE_I8(2418)))
+  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.smax.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-1019), UVALUE_I8(8518)))
 	   ERROR: not equal
   failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.smax.v2i8 on generate<<<<<<<<<<<<<<< 
 
@@ -254,9 +255,9 @@ reduce_smaxsrctgt:
 generating vector value
 
 reduce_sminsrctgt:
-  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.smin.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-3300), UVALUE_I8(202)))
+  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.smin.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-2250), UVALUE_I8(34)))
 	   ERROR: not equal
-  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.smin.v2i8 on generated<<<<<<<<<<<<<<< 
+  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.smin.v2i8 on generated <<<<<<<<<<<<<<< 
 
 ../tests/alive2/reduce_umax.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -264,7 +265,7 @@ reduce_sminsrctgt:
 generating vector value
 
 reduce_umaxsrctgt:
-  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.umax.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-2841), UVALUE_I8(2126)))
+  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.umax.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-8537), UVALUE_I8(7221)))
 	   ERROR: not equal
   failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.umax.v2i8 on generate<<<<<<<<<<<<<<< 
 
@@ -274,9 +275,9 @@ reduce_umaxsrctgt:
 generating vector value
 
 reduce_uminsrctgt:
-  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.umin.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-1882), UVALUE_I8(2068)))
+  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.umin.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-442), UVALUE_I8(7170)))
 	   ERROR: not equal
-  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.umin.v2i8 on generate<<<<<<<<<<<<<<< 
+  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.umin.v2i8 on generated<<<<<<<<<<<<<<< 
 
 ../tests/alive2/reduce_xor.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -284,7 +285,7 @@ reduce_uminsrctgt:
 generating vector value
 
 reduce_xorsrctgt:
-  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.xor.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-2366), UVALUE_I8(7315)))
+  failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.xor.v2i8 on generated input (UVALUE_Vector(UVALUE_I8(-3801), UVALUE_I8(2603)))
 	   ERROR: not equal
   failed - extractelement not implemented = Unknown intrinsic: llvm.experimental.vector.reduce.xor.v2i8 on generated i<<<<<<<<<<<<<<< 
 
@@ -293,11 +294,11 @@ reduce_xorsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 sadd_overflowsrctgt:
-  failed - Unknown intrinsic: llvm.sadd.with.overflow.i32 = TODO on generated input (UVALUE_I8(4511), UVALUE_I8(-6452))
+  failed - Unknown intrinsic: llvm.sadd.with.overflow.i32 = TODO on generated input (UVALUE_I8(385), UVALUE_I8(-1658))
 	   ERROR: not equal
-  failed - Unknown intrinsic: llvm.sadd.with.overflow.i32 = TODO on generated input (UVALUE_I8(2787), UVALUE_I8(5719))
+  failed - Unknown intrinsic: llvm.sadd.with.overflow.i32 = TODO on generated input (UVALUE_I8(2793), UVALUE_I8(8233))
 	   ERROR: not equal
-  failed - Unknown intrinsic: llvm.sadd.with.overflow<<<<<<<<<<<<<<< 
+  failed - Unknown intrinsic: llvm.sadd.with.overflow.<<<<<<<<<<<<<<< 
 
 ../tests/alive2/sadd_overflow_vec.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -328,31 +329,31 @@ select-aggregatesrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 smaxsrctgt:
-  failed - UVALUE_I8(9323) = Unknown intrinsic: llvm.smax.i8 on generated input (UVALUE_I8(9323), UVALUE_I8(-7694))
+  failed - UVALUE_I8(5365) = Unknown intrinsic: llvm.smax.i8 on generated input (UVALUE_I8(5365), UVALUE_I8(-9329))
 	   ERROR: not equal
-  failed - UVALUE_I8(6639) = Unknown intrinsic: llvm.smax.i8 on generated input (UVALUE_I8(6639), UVALUE_I8(571))
+  failed - UVALUE_I8(8986) = Unknown intrinsic: llvm.smax.i8 on generated input (UVALUE_I8(3993), UVALUE_I8(8986))
 	   ERROR: not equal
-  failed - UVALUE_I8(6837) = Unknown intrinsic: llvm.smax.i8 on generat<<<<<<<<<<<<<<< 
+  failed - UVALUE_I8(5267) = Unknown intrinsic: llvm.smax.i8 on genera<<<<<<<<<<<<<<< 
 
 ../tests/alive2/smin.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 sminsrctgt:
-  failed - UVALUE_I8(-3261) = Unknown intrinsic: llvm.smin.i8 on generated input (UVALUE_I8(8596), UVALUE_I8(-3261))
+  failed - UVALUE_I8(-3688) = Unknown intrinsic: llvm.smin.i8 on generated input (UVALUE_I8(3805), UVALUE_I8(-3688))
 	   ERROR: not equal
-  failed - UVALUE_I8(1822) = Unknown intrinsic: llvm.smin.i8 on generated input (UVALUE_I8(1822), UVALUE_I8(5499))
+  failed - UVALUE_I8(3122) = Unknown intrinsic: llvm.smin.i8 on generated input (UVALUE_I8(3122), UVALUE_I8(7284))
 	   ERROR: not equal
-  failed - UVALUE_I8(5164) = Unknown intrinsic: llvm.smin.i8 on gener<<<<<<<<<<<<<<< 
+  failed - UVALUE_I8(9221) = Unknown intrinsic: llvm.smin.i8 on gener<<<<<<<<<<<<<<< 
 
 ../tests/alive2/sshl.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 sshlsrctgt:
-  failed - UVALUE_I8(127) = Unknown intrinsic: llvm.sshl.sat.i8 on generated input (UVALUE_I8(8080), UVALUE_I8(-7391))
+  failed - UVALUE_I8(127) = Unknown intrinsic: llvm.sshl.sat.i8 on generated input (UVALUE_I8(4313), UVALUE_I8(-7561))
 	   ERROR: not equal
-  failed - UVALUE_Poison = Unknown intrinsic: llvm.sshl.sat.i8 on generated input (UVALUE_I8(1166), UVALUE_I8(8969))
+  failed - UVALUE_Poison = Unknown intrinsic: llvm.sshl.sat.i8 on generated input (UVALUE_I8(8790), UVALUE_I8(8217))
 	   ERROR: not equal
   failed - UVALUE_Poison = Unknown intrinsic: llvm.sshl.sat.i8 on<<<<<<<<<<<<<<< 
 
@@ -361,9 +362,9 @@ sshlsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 switchsrctgt:
-  failed - Unsupport itree terminator = Unsupport itree terminator on generated input (UVALUE_I32(9892))
+  failed - Unsupport itree terminator = Unsupport itree terminator on generated input (UVALUE_I32(1615))
 	   ERROR: not equal
-  failed - Unsupport itree terminator = Unsupport itree terminator on generated input (UVALUE_I32(-3914))
+  failed - Unsupport itree terminator = Unsupport itree terminator on generated input (UVALUE_I32(-8793))
 	   ERROR: not equal
   failed - Unsupport itree terminator = Unsupport itree terminator on generated input (U<<<<<<<<<<<<<<< 
 
@@ -372,31 +373,31 @@ switchsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 umaxsrctgt:
-  failed - UVALUE_I8(9277) = Unknown intrinsic: llvm.umax.i8 on generated input (UVALUE_I8(9277), UVALUE_I8(-6884))
+  failed - UVALUE_I8(5517) = Unknown intrinsic: llvm.umax.i8 on generated input (UVALUE_I8(5517), UVALUE_I8(-7958))
 	   ERROR: not equal
-  failed - UVALUE_I8(9403) = Unknown intrinsic: llvm.umax.i8 on generated input (UVALUE_I8(9403), UVALUE_I8(6624))
+  failed - UVALUE_I8(6027) = Unknown intrinsic: llvm.umax.i8 on generated input (UVALUE_I8(5078), UVALUE_I8(6027))
 	   ERROR: not equal
-  failed - UVALUE_I8(5939) = Unknown intrinsic: llvm.umax.i8 on genera<<<<<<<<<<<<<<< 
+  failed - UVALUE_I8(7054) = Unknown intrinsic: llvm.umax.i8 on genera<<<<<<<<<<<<<<< 
 
 ../tests/alive2/umin.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 uminsrctgt:
-  failed - UVALUE_I8(-4986) = Unknown intrinsic: llvm.umin.i8 on generated input (UVALUE_I8(8785), UVALUE_I8(-4986))
+  failed - UVALUE_I8(-9755) = Unknown intrinsic: llvm.umin.i8 on generated input (UVALUE_I8(3325), UVALUE_I8(-9755))
 	   ERROR: not equal
-  failed - UVALUE_I8(1801) = Unknown intrinsic: llvm.umin.i8 on generated input (UVALUE_I8(4537), UVALUE_I8(1801))
+  failed - UVALUE_I8(6292) = Unknown intrinsic: llvm.umin.i8 on generated input (UVALUE_I8(7262), UVALUE_I8(6292))
 	   ERROR: not equal
-  failed - UVALUE_I8(1032) = Unknown intrinsic: llvm.umin.i8 on gener<<<<<<<<<<<<<<< 
+  failed - UVALUE_I8(32) = Unknown intrinsic: llvm.umin.i8 on generat<<<<<<<<<<<<<<< 
 
 ../tests/alive2/ushl.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 ushlsrctgt:
-  failed - UVALUE_I8(255) = Unknown intrinsic: llvm.ushl.sat.i8 on generated input (UVALUE_I8(4689), UVALUE_I8(-276))
+  failed - UVALUE_I8(255) = Unknown intrinsic: llvm.ushl.sat.i8 on generated input (UVALUE_I8(8634), UVALUE_I8(-255))
 	   ERROR: not equal
-  failed - UVALUE_Poison = Unknown intrinsic: llvm.ushl.sat.i8 on generated input (UVALUE_I8(7082), UVALUE_I8(4502))
+  failed - UVALUE_Poison = Unknown intrinsic: llvm.ushl.sat.i8 on generated input (UVALUE_I8(2353), UVALUE_I8(2067))
 	   ERROR: not equal
   failed - UVALUE_Poison = Unknown intrinsic: llvm.ushl.sat.i8 on <<<<<<<<<<<<<<< 
 
@@ -427,10 +428,10 @@ Fatal error: exception Failure("Parsing error: line 1, column 19, token ','")
 Fatal error: exception Failure("Parsing error: line 3, column 17, token ','")
 <<<<<<<<<<<<<<< 
 
-../tests/alive2/emptyaggr-store2.srctgt.ll:
+../tests/alive2/errlog:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+Fatal error: exception Failure("found unsupported file type: ../tests/alive2/errlog")
 <<<<<<<<<<<<<<< 
 
 ../tests/alive2/fabs-fmf.srctgt.ll:

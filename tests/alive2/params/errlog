@@ -1,7 +1,7 @@
  -------------- Summary -----------------
  Files Passed: 1
  Files Failed: 2
- Exceptions: 0
+ Exceptions: 1
  Hidden (limitations in test suite): 0
  None of the above: 0
  ----------------------------------------
@@ -32,16 +32,22 @@ omit-arraysrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 succinct-incorrectsrctgt:
-  failed - UVALUE_I32(6236) = UVALUE_I32(6237) on generated input (UVALUE_I32(6236))
+  failed - UVALUE_I32(2917) = UVALUE_I32(2918) on generated input (UVALUE_I32(2917))
 	   ERROR: not equal
-  failed - UVALUE_I32(-1462) = UVALUE_I32(4294965835) on generated input (UVALUE_I32(-1462))
+  failed - UVALUE_I32(-5483) = UVALUE_I32(4294961814) on generated input (UVALUE_I32(-5483))
 	   ERROR: not equal
-  failed - UVALUE_I32(7505) = UVALUE_I32(7506) on generated input (UVALUE_I32(7505))
+  failed - UVALUE_I32(6642) = UVALUE_I32(6643) on generated input (UVALUE_I32(6642))
 	   ERROR: not equal
   f<<<<<<<<<<<<<<< 
 
  -------------- Files that triggered Exceptions ------------ 
  -------------- Writing stderr                  ------------ 
+
+../tests/alive2/params/errlog:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("found unsupported file type: ../tests/alive2/params/errlog")
+<<<<<<<<<<<<<<< 
 
  -------------- Files that didn't trigger any of the above ----- 
 

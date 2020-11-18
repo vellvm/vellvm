@@ -1,7 +1,7 @@
  -------------- Summary -----------------
  Files Passed: 2
- Files Failed: 3
- Exceptions: 4
+ Files Failed: 7
+ Exceptions: 1
  Hidden (limitations in test suite): 0
  None of the above: 0
  ----------------------------------------
@@ -16,6 +16,30 @@ Vighnesh look at this
 
  -------------- Files that triggered failures ------------- 
  -------------- Writing first 500 chars of failure -------- 
+
+../tests/alive2/undef/br-undef.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+br-undefsrctgt:
+  failed - UVALUE_I8(3) = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - UVALUE_I8(3) = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - UVALUE_I8(3) = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not <<<<<<<<<<<<<<< 
+
+../tests/alive2/undef/br-undef3.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+br-undef3srctgt:
+  failed - UVALUE_I8(3) = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - UVALUE_I8(3) = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - UVALUE_I8(3) = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not<<<<<<<<<<<<<<< 
 
 ../tests/alive2/undef/br-undef4.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -37,48 +61,56 @@ br-undef4srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 fncall-freezesrctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(4674), UVALUE_I8(-9643))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(4841), UVALUE_I8(-882))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(7064), UVALUE_I8(3025))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(5351), UVALUE_I8(9428))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(<<<<<<<<<<<<<<< 
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(2<<<<<<<<<<<<<<< 
 
 ../tests/alive2/undef/fncall-freeze2.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 fncall-freeze2srctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(4784), UVALUE_I8(-340))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(8390), UVALUE_I8(-2999))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(5742), UVALUE_I8(5249))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(4026), UVALUE_I8(5259))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(<<<<<<<<<<<<<<< 
-
- -------------- Files that triggered Exceptions ------------ 
- -------------- Writing stderr                  ------------ 
-
-../tests/alive2/undef/br-undef.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 13, column 0, token '}'")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/undef/br-undef3.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 14, column 0, token '}'")
-<<<<<<<<<<<<<<< 
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8<<<<<<<<<<<<<<< 
 
 ../tests/alive2/undef/fncall-readmem.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 8, column 0, token '}'")
-<<<<<<<<<<<<<<< 
+
+fncall-readmemsrctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(3426))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(-5900))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(5220))
+	   ERROR: not equal
+  <<<<<<<<<<<<<<< 
 
 ../tests/alive2/undef/opt-noundef.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Unknown or unsupported keyword: noundef")
+
+opt-noundefsrctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(637))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(-9187))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(8209))
+	   ERROR: not equal
+  fail<<<<<<<<<<<<<<< 
+
+ -------------- Files that triggered Exceptions ------------ 
+ -------------- Writing stderr                  ------------ 
+
+../tests/alive2/undef/errlog:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("found unsupported file type: ../tests/alive2/undef/errlog")
 <<<<<<<<<<<<<<< 
 
  -------------- Files that didn't trigger any of the above ----- 

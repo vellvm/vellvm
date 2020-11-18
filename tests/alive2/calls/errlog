@@ -1,8 +1,8 @@
  -------------- Summary -----------------
  Files Passed: 0
- Files Failed: 4
- Exceptions: 8
- Hidden (limitations in test suite): 0
+ Files Failed: 9
+ Exceptions: 3
+ Hidden (limitations in test suite): 1
  None of the above: 0
  ----------------------------------------
  -------------- Files that reported Passed -------------- 
@@ -10,6 +10,7 @@
 
  -------------- Files that reported Hidden -------------- 
 
+../tests/alive2/calls/fncall-noreturn2.srctgt.ll
 Vighnesh look at this 
 
  -------------- Files that triggered failures ------------- 
@@ -20,13 +21,76 @@ Vighnesh look at this
 (* -------- Vellvm Test Harness -------- *)
 
 call-freezesrctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(7037))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(4573))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(-5896))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(-6966))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(6175))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(4034))
 	   ERROR: not equal
   failed<<<<<<<<<<<<<<< 
+
+../tests/alive2/calls/escape.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+escapesrctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on gener<<<<<<<<<<<<<<< 
+
+../tests/alive2/calls/escape2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+escape2srctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on gene<<<<<<<<<<<<<<< 
+
+../tests/alive2/calls/fncall-noreturn.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+fncall-noreturnsrctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call<<<<<<<<<<<<<<< 
+
+../tests/alive2/calls/issue455.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+issue455srctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1))
+	   ERROR: not equal
+  failed - IMPOSSIBLE: unreachable in reachable position = IMPOSSIBLE: unreachable in reachable position on generated input (UV<<<<<<<<<<<<<<< 
+
+../tests/alive2/calls/nocapture.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+nocapturesrctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on ge<<<<<<<<<<<<<<< 
 
 ../tests/alive2/calls/readnone-duplicated.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -59,57 +123,27 @@ readonly-undefsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 readonlysrctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(7438))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(687))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(-4635))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(-3170))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(3555))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(7882))
 	   ERROR: not equal
-  failed - <<<<<<<<<<<<<<< 
+  failed - U<<<<<<<<<<<<<<< 
 
  -------------- Files that triggered Exceptions ------------ 
  -------------- Writing stderr                  ------------ 
 
-../tests/alive2/calls/escape.srctgt.ll:
+../tests/alive2/calls/errlog:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 1, column 21, token 'p'")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/calls/escape2.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 2, column 20, token 'p'")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/calls/fncall-noreturn.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 8, column 0, token '}'")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/calls/fncall-noreturn2.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 8, column 0, token 'else:'")
+Fatal error: exception Failure("found unsupported file type: ../tests/alive2/calls/errlog")
 <<<<<<<<<<<<<<< 
 
 ../tests/alive2/calls/fncall-vararg.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 Fatal error: exception Failure("lexing: empty token")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/calls/issue455.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 11, column 0, token 'do.end:'")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/calls/nocapture.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 1, column 41, token 'p'")
 <<<<<<<<<<<<<<< 
 
 ../tests/alive2/calls/ranges.srctgt.ll:

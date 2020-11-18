@@ -1,7 +1,7 @@
  -------------- Summary -----------------
  Files Passed: 3
- Files Failed: 19
- Exceptions: 10
+ Files Failed: 25
+ Exceptions: 5
  Hidden (limitations in test suite): 12
  None of the above: 0
  ----------------------------------------
@@ -50,11 +50,11 @@ aggregate-paddingsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 alloca-vla-failsrctgt:
-  failed - UVALUE_Undef = UVALUE_I32(4) on generated input (UVALUE_I32(1876), UVALUE_I32(-9562))
+  failed - UVALUE_Undef = UVALUE_I32(4) on generated input (UVALUE_I32(2978), UVALUE_I32(-3422))
 	   ERROR: not equal
-  failed - UVALUE_Undef = UVALUE_I32(4) on generated input (UVALUE_I32(2592), UVALUE_I32(4031))
+  failed - UVALUE_Undef = UVALUE_I32(4) on generated input (UVALUE_I32(9859), UVALUE_I32(2323))
 	   ERROR: not equal
-  failed - UVALUE_Undef = UVALUE_I32(4) on generated input (UVALUE_I32(3952), UVALUE_I32(4561))
+  failed - UVALUE_Undef = UVALUE_I32(4) on generated input (UVALUE_I32(2215), UVALUE_I32(9189))
 	<<<<<<<<<<<<<<< 
 
 ../tests/alive2/memory/alloca-vla.srctgt.ll:
@@ -62,11 +62,11 @@ alloca-vla-failsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 alloca-vlasrctgt:
-  failed - UVALUE_Undef = UVALUE_I32(3) on generated input (UVALUE_I32(4461), UVALUE_I32(-7876))
+  failed - UVALUE_Undef = UVALUE_I32(3) on generated input (UVALUE_I32(172), UVALUE_I32(-8516))
 	   ERROR: not equal
-  failed - UVALUE_Undef = UVALUE_I32(3) on generated input (UVALUE_I32(1228), UVALUE_I32(4380))
+  failed - UVALUE_Undef = UVALUE_I32(3) on generated input (UVALUE_I32(3254), UVALUE_I32(7796))
 	   ERROR: not equal
-  failed - UVALUE_Undef = UVALUE_I32(3) on generated input (UVALUE_I32(769), UVALUE_I32(3950))
+  failed - UVALUE_Undef = UVALUE_I32(3) on generated input (UVALUE_I32(3416), UVALUE_I32(9507))
 	   ERR<<<<<<<<<<<<<<< 
 
 ../tests/alive2/memory/calloc-overflow.srctgt.ll:
@@ -74,11 +74,11 @@ alloca-vlasrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 calloc-overflowsrctgt:
-  failed - Uninterpreted Call = UVALUE_I8(1) on generated input (UVALUE_I64(1720))
+  failed - Uninterpreted Call = UVALUE_I8(1) on generated input (UVALUE_I64(2594))
 	   ERROR: not equal
-  failed - Uninterpreted Call = UVALUE_I8(1) on generated input (UVALUE_I64(-9601))
+  failed - Uninterpreted Call = UVALUE_I8(1) on generated input (UVALUE_I64(-5322))
 	   ERROR: not equal
-  failed - Uninterpreted Call = UVALUE_I8(1) on generated input (UVALUE_I64(1780))
+  failed - Uninterpreted Call = UVALUE_I8(1) on generated input (UVALUE_I64(2107))
 	   ERROR: not equal
   failed - Uninterp<<<<<<<<<<<<<<< 
 
@@ -87,26 +87,48 @@ calloc-overflowsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 calloc-overflow2srctgt:
-  failed - Uninterpreted Call = UVALUE_I8(1) on generated input (UVALUE_I64(1167))
+  failed - Uninterpreted Call = UVALUE_I8(1) on generated input (UVALUE_I64(4121))
 	   ERROR: not equal
-  failed - Uninterpreted Call = UVALUE_I8(1) on generated input (UVALUE_I64(-7296))
+  failed - Uninterpreted Call = UVALUE_I8(1) on generated input (UVALUE_I64(-9434))
 	   ERROR: not equal
-  failed - Uninterpreted Call = UVALUE_I8(1) on generated input (UVALUE_I64(2804))
+  failed - Uninterpreted Call = UVALUE_I8(1) on generated input (UVALUE_I64(9148))
 	   ERROR: not equal
   failed - Uninter<<<<<<<<<<<<<<< 
+
+../tests/alive2/memory/lifetime-disjoint.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+lifetime-disjointsrctgt:
+  failed - Unknown intrinsic: llvm.lifetime.start.p0i8 = Unknown intrinsic: llvm.lifetime.start.p0i8 on generated input ()
+	   ERROR: not equal
+  failed - Unknown intrinsic: llvm.lifetime.start.p0i8 = Unknown intrinsic: llvm.lifetime.start.p0i8 on generated input ()
+	   ERROR: not equal
+  failed - Unknown intrinsic: llvm.lifetim<<<<<<<<<<<<<<< 
 
 ../tests/alive2/memory/malloc-noundef.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 malloc-noundefsrctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I64(4474))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I64(1508))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I64(-8590))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I64(-7995))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I64(2207))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I64(8374))
 	   ERROR: not equal
   <<<<<<<<<<<<<<< 
+
+../tests/alive2/memory/malloc-poison-ub.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+malloc-poison-ubsrctgt:
+  failed - Uninterpreted Call = IMPOSSIBLE: unreachable in reachable position on generated input (UVALUE_I1(1))
+	   ERROR: not equal
+  failed - Uninterpreted Call = IMPOSSIBLE: unreachable in reachable position on generated input (UVALUE_I1(0))
+	   ERROR: not equal
+  failed - Uninterpreted Call = IMPOSSIBLE: unreachable in reacha<<<<<<<<<<<<<<< 
 
 ../tests/alive2/memory/memcmp-basic-fail-2.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -152,33 +174,77 @@ memcmp-basic-failsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 memcmp-bcmpsrctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I64(1912), UVALUE_I64(-6932), UVALUE_I64(7556))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I64(8130), UVALUE_I64(-7904), UVALUE_I64(54))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I64(5654), UVALUE_I64(31), UVALUE_I64(2151))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I64(5255), UVALUE_I64(1479), UVALUE_I64(6948))
 	   ERROR: not equal
   failed - Uninterpreted Call = Uninterpreted<<<<<<<<<<<<<<< 
+
+../tests/alive2/memory/memcmp-noub.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+memcmp-noubsrctgt:
+  failed - Uninterpreted Call = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = IMPOSSIBLE: unreachable in reachable position on generated inp<<<<<<<<<<<<<<< 
+
+../tests/alive2/memory/memcmp-noub2.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+memcmp-noub2srctgt:
+  failed - unsupported integer size = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - unsupported integer size = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - unsupported integer size = IMPOSSIBLE: unreachable in reachable positi<<<<<<<<<<<<<<< 
+
+../tests/alive2/memory/memcmp-noub3.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+memcmp-noub3srctgt:
+  failed - Uninterpreted Call = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = IMPOSSIBLE: unreachable in reachable position on generated in<<<<<<<<<<<<<<< 
+
+../tests/alive2/memory/memcmp-noub4.srctgt.ll:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+
+memcmp-noub4srctgt:
+  failed - Uninterpreted Call = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = IMPOSSIBLE: unreachable in reachable position on generated input ()
+	   ERROR: not equal
+  failed - Uninterpreted Call = IMPOSSIBLE: unreachable in reachable position on generated in<<<<<<<<<<<<<<< 
 
 ../tests/alive2/memory/memcmp-opt-bigendian.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 memcmp-opt-bigendiansrctgt:
-  failed - Uninterpreted Call = UVALUE_I32(1) on generated input (UVALUE_I32(3100), UVALUE_I32(-7687))
+  failed - Uninterpreted Call = UVALUE_I32(1) on generated input (UVALUE_I32(3241), UVALUE_I32(-2525))
 	   ERROR: not equal
-  failed - Uninterpreted Call = UVALUE_I32(1) on generated input (UVALUE_I32(4953), UVALUE_I32(3244))
+  failed - Uninterpreted Call = UVALUE_I32(1) on generated input (UVALUE_I32(5113), UVALUE_I32(2464))
 	   ERROR: not equal
-  failed - Uninterpreted Call = UVALUE_I32(1) on generated input (UVALUE_I32(989<<<<<<<<<<<<<<< 
+  failed - Uninterpreted Call = UVALUE_I32(4294967295) on generated input (UVALU<<<<<<<<<<<<<<< 
 
 ../tests/alive2/memory/memcmp-opt-littleendian-fail.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 memcmp-opt-littleendian-failsrctgt:
-  failed - Uninterpreted Call = UVALUE_I32(1) on generated input (UVALUE_I64(8773), UVALUE_I64(-8224))
+  failed - Uninterpreted Call = UVALUE_I32(1) on generated input (UVALUE_I64(61), UVALUE_I64(-4926))
 	   ERROR: not equal
-  failed - Uninterpreted Call = UVALUE_I32(1) on generated input (UVALUE_I64(8850), UVALUE_I64(2871))
+  failed - Uninterpreted Call = UVALUE_I32(1) on generated input (UVALUE_I64(9207), UVALUE_I64(847))
 	   ERROR: not equal
-  failed - Uninterpreted Call = UVALUE_I32(1) on generated input (UVALUE<<<<<<<<<<<<<<< 
+  failed - Uninterpreted Call = UVALUE_I32(4294967295) on generated input (<<<<<<<<<<<<<<< 
 
 ../tests/alive2/memory/memcpy-eq.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -277,40 +343,10 @@ strlen-longsrctgt:
 Fatal error: exception Failure("Parsing error: line 1, column 18, token ')'")
 <<<<<<<<<<<<<<< 
 
-../tests/alive2/memory/lifetime-disjoint.srctgt.ll:
+../tests/alive2/memory/errlog:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 42, column 0, token 'B:'")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/memory/malloc-poison-ub.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 20, column 0, token '}'")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/memory/memcmp-noub.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 16, column 0, token '}'")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/memory/memcmp-noub2.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 19, column 0, token '}'")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/memory/memcmp-noub3.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 13, column 0, token '}'")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/memory/memcmp-noub4.srctgt.ll:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("Parsing error: line 12, column 0, token '}'")
+Fatal error: exception Failure("found unsupported file type: ../tests/alive2/memory/errlog")
 <<<<<<<<<<<<<<< 
 
 ../tests/alive2/memory/memset-align.srctgt.ll:

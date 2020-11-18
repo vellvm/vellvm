@@ -1,7 +1,7 @@
  -------------- Summary -----------------
  Files Passed: 1
  Files Failed: 1
- Exceptions: 0
+ Exceptions: 1
  Hidden (limitations in test suite): 2
  None of the above: 0
  ----------------------------------------
@@ -35,6 +35,12 @@ nondet-fail2srctgt:
 
  -------------- Files that triggered Exceptions ------------ 
  -------------- Writing stderr                  ------------ 
+
+../tests/alive2/refinement/errlog:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("found unsupported file type: ../tests/alive2/refinement/errlog")
+<<<<<<<<<<<<<<< 
 
  -------------- Files that didn't trigger any of the above ----- 
 

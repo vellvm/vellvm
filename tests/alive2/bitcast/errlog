@@ -1,7 +1,7 @@
  -------------- Summary -----------------
  Files Passed: 0
  Files Failed: 2
- Exceptions: 0
+ Exceptions: 1
  Hidden (limitations in test suite): 2
  None of the above: 0
  ----------------------------------------
@@ -22,29 +22,35 @@ Vighnesh look at this
 (* -------- Vellvm Test Harness -------- *)
 
 cast-vec-roundtrip-bigendiansrctgt:
-  failed - ill-typed_conv = UVALUE_I8(5770) on generated input (UVALUE_I8(5770))
+  failed - ill-typed_conv = UVALUE_I8(8025) on generated input (UVALUE_I8(8025))
 	   ERROR: not equal
-  failed - ill-typed_conv = UVALUE_I8(-4033) on generated input (UVALUE_I8(-4033))
+  failed - ill-typed_conv = UVALUE_I8(-7) on generated input (UVALUE_I8(-7))
 	   ERROR: not equal
-  failed - ill-typed_conv = UVALUE_I8(4319) on generated input (UVALUE_I8(4319))
+  failed - ill-typed_conv = UVALUE_I8(1354) on generated input (UVALUE_I8(1354))
 	   ERROR: not equal
-  failed - <<<<<<<<<<<<<<< 
+  failed - ill-ty<<<<<<<<<<<<<<< 
 
 ../tests/alive2/bitcast/cast-vec-roundtrip.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 cast-vec-roundtripsrctgt:
-  failed - ill-typed_conv = UVALUE_I8(6870) on generated input (UVALUE_I8(6870))
+  failed - ill-typed_conv = UVALUE_I8(605) on generated input (UVALUE_I8(605))
 	   ERROR: not equal
-  failed - ill-typed_conv = UVALUE_I8(-8032) on generated input (UVALUE_I8(-8032))
+  failed - ill-typed_conv = UVALUE_I8(-9208) on generated input (UVALUE_I8(-9208))
 	   ERROR: not equal
-  failed - ill-typed_conv = UVALUE_I8(6332) on generated input (UVALUE_I8(6332))
+  failed - ill-typed_conv = UVALUE_I8(8509) on generated input (UVALUE_I8(8509))
 	   ERROR: not equal
-  failed - ill-typed_<<<<<<<<<<<<<<< 
+  failed - ill-typed_co<<<<<<<<<<<<<<< 
 
  -------------- Files that triggered Exceptions ------------ 
  -------------- Writing stderr                  ------------ 
+
+../tests/alive2/bitcast/errlog:
+>>>>>>>>>>>>>>>>>>>> 
+(* -------- Vellvm Test Harness -------- *)
+Fatal error: exception Failure("found unsupported file type: ../tests/alive2/bitcast/errlog")
+<<<<<<<<<<<<<<< 
 
  -------------- Files that didn't trigger any of the above ----- 
 
