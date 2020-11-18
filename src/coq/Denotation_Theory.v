@@ -263,6 +263,7 @@ Definition terminator_outputs {t} (term : LLVMAst.terminator t) : list block_id
      | TERM_IndirectBr v brs => brs
      | TERM_Resume v => []
      | TERM_Invoke fnptrval args to_label unwind_label => [to_label; unwind_label]
+     | TERM_Unreachable => []
      end.
 
 Definition bk_outputs {t} (bk : block t) : list block_id :=

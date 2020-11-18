@@ -748,8 +748,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         | (_, INSTR_Comment _) => ret tt
 
-        | (_, INSTR_Unreachable) => raise "IMPOSSIBLE: unreachable in reachable position"
-
         (* Currently unhandled itree instructions *)
         | (_, INSTR_Fence)
         | (_, INSTR_AtomicCmpXchg)
@@ -794,6 +792,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           end
 
         | TERM_Br_1 br => ret (inl br)
+
+        | TERM_Unreachable => raise "IMPOSSIBLE: unreachable in reachable position"  (* SAZ : TODO should be Undefined Behavior? *)
 
         (* Currently unhandled itree terminators *)
         | TERM_Switch _ _ _

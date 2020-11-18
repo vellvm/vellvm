@@ -159,7 +159,6 @@ let phi_id s : raw_id =
 let id_of = function
   | INSTR_Comment _
   | INSTR_Store _
-  | INSTR_Unreachable
   | INSTR_Fence
   | INSTR_Call ((TYPE_Void, _), _)
     -> IVoid (void_ctr.get ())
@@ -210,6 +209,7 @@ let id_of = function
 %token KW_OEQ KW_OGT KW_OGE KW_OLT KW_OLE KW_ONE KW_ORD KW_UNO KW_UEQ KW_UNE
 %token KW_TAIL
 %token KW_VOLATILE
+%token KW_NOUNDEF KW_IMMARG KW_NOFREE
 
 %token<LLVMAst.raw_id> METADATA_ID
 %token<string> METADATA_STRING
@@ -509,8 +509,14 @@ param_attr:
   | KW_NONNULL                   { PARAMATTR_Nonnull           }
   | KW_DEREFERENCEABLE LPAREN n=INTEGER RPAREN
                                  { PARAMATTR_Dereferenceable n }
+  | KW_IMMARG                    { PARAMATTR_Immarg            }
+  | KW_NOUNDEF                   { PARAMATTR_Noundef           }
+  | KW_NOFREE                    { PARAMATTR_Nofree            }
 
-dc_arg: t=typ p=param_attr*         { (t, p)      }
+dc_arg:
+  | t=typ p=param_attr*         { (t, p)      }
+  | t=typ p=param_attr* lident { (t, p)     }  (* Throw away declaration names? *)
+
 df_arg: t=typ p=param_attr* i=lident { ((t, p), i) }
 call_arg: t=typ i=exp             { (t, i t)      }
 
@@ -730,8 +736,6 @@ phi_table_entry:
   | KW_ATOMICRMW     { failwith"INSTR_AtomicRMW"     }
   | KW_FENCE         { failwith"INSTR_Fence"         }
 
-  | KW_UNREACHABLE
-    { INSTR_Unreachable }
 
 branch_label:
   KW_LABEL o=LOCAL  { o }
@@ -764,6 +768,9 @@ terminator:
     LPAREN a=separated_list(csep, call_arg) RPAREN
     list(fn_attr) KW_TO l1=branch_label KW_UNWIND l2=branch_label
     { TERM_Invoke (ret, a, l1, l2)  }
+
+  | KW_UNREACHABLE
+    { TERM_Unreachable }
 
 
 alloca_opt:

@@ -172,7 +172,6 @@ Section Endo.
         | INSTR_Fence
         | INSTR_AtomicCmpXchg
         | INSTR_AtomicRMW
-        | INSTR_Unreachable
         | INSTR_VAArg
         | INSTR_LandingPad => ins
         end.
@@ -195,6 +194,7 @@ Section Endo.
         | TERM_Resume v => TERM_Resume (endo v)
         | TERM_Invoke fnptrval args to_label unwind_label =>
           TERM_Invoke (endo fnptrval) (endo args) (endo to_label) (endo unwind_label)
+        | TERM_Unreachable => TERM_Unreachable
         end.
 
     Global Instance Endo_phi
@@ -491,7 +491,6 @@ Section Fmap.
         | INSTR_Fence => INSTR_Fence
         | INSTR_AtomicCmpXchg => INSTR_AtomicCmpXchg
         | INSTR_AtomicRMW => INSTR_AtomicRMW
-        | INSTR_Unreachable => INSTR_Unreachable
         | INSTR_VAArg => INSTR_VAArg
         | INSTR_LandingPad => INSTR_LandingPad 
         end.
@@ -514,6 +513,7 @@ Section Fmap.
         | TERM_IndirectBr v brs => TERM_IndirectBr (fmap f v) (endo brs)
         | TERM_Resume v => TERM_Resume (fmap f v)
         | TERM_Invoke fnptrval args to_label unwind_label => TERM_Invoke (fmap f fnptrval) (fmap f args) (endo to_label) (endo unwind_label)
+        | TERM_Unreachable => TERM_Unreachable
         end.
 
     Global Instance Fmap_phi

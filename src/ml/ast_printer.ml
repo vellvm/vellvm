@@ -476,7 +476,6 @@ and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
   | INSTR_AtomicCmpXchg
   | INSTR_AtomicRMW
   | INSTR_Fence -> assert false
-  | INSTR_Unreachable -> pp_print_string ppf "INSTR_Unreachable"
 
 and branch_label : Format.formatter -> LLVMAst.raw_id -> unit =
   fun ppf id ->
@@ -516,6 +515,9 @@ and terminator : Format.formatter -> (LLVMAst.typ LLVMAst.terminator) -> unit =
       (pp_print_list ~pp_sep:pp_sc_space texp) tvl
       raw_id i2
       raw_id i3
+
+  | TERM_Unreachable -> pp_print_string ppf "TERM_Unreachable"
+
 
 and id_instr : Format.formatter -> (LLVMAst.instr_id * (LLVMAst.typ LLVMAst.instr)) -> unit =
   fun ppf ->
@@ -589,6 +591,9 @@ and param_attr : Format.formatter -> LLVMAst.param_attr -> unit =
   | PARAMATTR_Returned  -> pp_print_string ppf "PARAMATTR_Returned"
   | PARAMATTR_Nonnull -> pp_print_string ppf "PARAMATTR_Nonnull"
   | PARAMATTR_Dereferenceable n -> fprintf ppf "PARAMATTR_Dereferenceable %d%%Z" (to_int n)
+  | PARAMATTR_Immarg -> fprintf ppf "PARAMATTR_Immarg"
+  | PARAMATTR_Noundef -> fprintf ppf "PARAMATTR_Noundef"
+  | PARAMATTR_Nofree -> fprintf ppf "PARAMATTR_Nofree"
 
 and thread_local_storage : Format.formatter -> LLVMAst.thread_local_storage -> unit =
   fun ppf ->

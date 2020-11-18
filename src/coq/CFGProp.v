@@ -207,7 +207,6 @@ Definition instr_uses (i:instr T) : (list ident) :=
   | INSTR_Fence
   | INSTR_AtomicCmpXchg
   | INSTR_AtomicRMW
-  | INSTR_Unreachable
   | INSTR_VAArg
   | INSTR_LandingPad => []
   end.
@@ -222,6 +221,7 @@ Definition terminator_uses (t:terminator T) : list ident :=
   | TERM_IndirectBr tv _ => texp_uses tv
   | TERM_Resume tv => texp_uses tv
   | TERM_Invoke (_,fid) args _ _ => [fid] ++ (List.flat_map texp_uses args)
+  | TERM_Unreachable => []
   end.
 
 (*
@@ -244,6 +244,7 @@ Definition lbls (t:terminator T) : list block_id :=
   | TERM_IndirectBr _ brs => brs
   | TERM_Resume _    => []
   | TERM_Invoke  _ _ l1 l2 => [l1; l2]
+  | TERM_Unreachable => []
   end.
 
 (*
