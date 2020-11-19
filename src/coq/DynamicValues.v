@@ -1235,6 +1235,12 @@ Class VInt I : Type :=
     | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
     | DVALUE_Poison, _ => if is_DVALUE_IX v2 then ret DVALUE_Poison else failwith "ill_typed-iop"
     | _, DVALUE_Poison => if is_DVALUE_IX v1 then ret DVALUE_Poison else failwith "ill_typed-iop"
+    | DVALUE_Addr a1, DVALUE_Addr a2 =>
+      match icmp with
+      | Eq => if A.eq_dec a1 a2 then ret (DVALUE_I1 (Int1.one)) else ret (DVALUE_I1 (Int1.zero))
+      | Ne => if A.eq_dec a1 a2 then ret (DVALUE_I1 (Int1.zero)) else ret (DVALUE_I1 (Int1.one))
+      | _ => failwith "non-equality pointer comparison"
+      end
     | _, _ => failwith "ill_typed-icmp"
     end.
   Arguments eval_icmp _ _ _ : simpl nomatch.
