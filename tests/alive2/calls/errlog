@@ -1,7 +1,7 @@
  -------------- Summary -----------------
  Files Passed: 0
  Files Failed: 9
- Exceptions: 3
+ Exceptions: 2
  Hidden (limitations in test suite): 1
  None of the above: 0
  ----------------------------------------
@@ -21,11 +21,11 @@ Vighnesh look at this
 (* -------- Vellvm Test Harness -------- *)
 
 call-freezesrctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(4573))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(9072))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(-6966))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(-8630))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(4034))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(5731))
 	   ERROR: not equal
   failed<<<<<<<<<<<<<<< 
 
@@ -77,7 +77,9 @@ issue455srctgt:
 	   ERROR: not equal
   failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1))
 	   ERROR: not equal
-  failed - IMPOSSIBLE: unreachable in reachable position = IMPOSSIBLE: unreachable in reachable position on generated input (UV<<<<<<<<<<<<<<< 
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1))
+	   ERROR: not equal
+  failed - IMPOSSIBLE<<<<<<<<<<<<<<< 
 
 ../tests/alive2/calls/nocapture.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -123,22 +125,16 @@ readonly-undefsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 readonlysrctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(687))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(9095))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(-3170))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(-8576))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(7882))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(8200))
 	   ERROR: not equal
-  failed - U<<<<<<<<<<<<<<< 
+  failed - <<<<<<<<<<<<<<< 
 
  -------------- Files that triggered Exceptions ------------ 
  -------------- Writing stderr                  ------------ 
-
-../tests/alive2/calls/errlog:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("found unsupported file type: ../tests/alive2/calls/errlog")
-<<<<<<<<<<<<<<< 
 
 ../tests/alive2/calls/fncall-vararg.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 

@@ -1,7 +1,7 @@
  -------------- Summary -----------------
  Files Passed: 2
  Files Failed: 7
- Exceptions: 1
+ Exceptions: 0
  Hidden (limitations in test suite): 0
  None of the above: 0
  ----------------------------------------
@@ -61,20 +61,20 @@ br-undef4srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 fncall-freezesrctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(4841), UVALUE_I8(-882))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(2930), UVALUE_I8(-6498))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(5351), UVALUE_I8(9428))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(2369), UVALUE_I8(1311))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(2<<<<<<<<<<<<<<< 
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(<<<<<<<<<<<<<<< 
 
 ../tests/alive2/undef/fncall-freeze2.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 
 fncall-freeze2srctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(8390), UVALUE_I8(-2999))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(9985), UVALUE_I8(-8721))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(4026), UVALUE_I8(5259))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(8572), UVALUE_I8(6785))
 	   ERROR: not equal
   failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8<<<<<<<<<<<<<<< 
 
@@ -83,11 +83,11 @@ fncall-freeze2srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 fncall-readmemsrctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(3426))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(1237))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(-5900))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(-2169))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(5220))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(1779))
 	   ERROR: not equal
   <<<<<<<<<<<<<<< 
 
@@ -96,22 +96,16 @@ fncall-readmemsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 opt-noundefsrctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(637))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(3983))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(-9187))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(-9992))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(8209))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I32(2765))
 	   ERROR: not equal
-  fail<<<<<<<<<<<<<<< 
+  fai<<<<<<<<<<<<<<< 
 
  -------------- Files that triggered Exceptions ------------ 
  -------------- Writing stderr                  ------------ 
-
-../tests/alive2/undef/errlog:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("found unsupported file type: ../tests/alive2/undef/errlog")
-<<<<<<<<<<<<<<< 
 
  -------------- Files that didn't trigger any of the above ----- 
 

@@ -1,7 +1,7 @@
  -------------- Summary -----------------
  Files Passed: 2
  Files Failed: 2
- Exceptions: 1
+ Exceptions: 0
  Hidden (limitations in test suite): 5
  None of the above: 0
  ----------------------------------------
@@ -48,12 +48,6 @@ memaccess-strlensrctgt:
 
  -------------- Files that triggered Exceptions ------------ 
  -------------- Writing stderr                  ------------ 
-
-../tests/alive2/opt-memory/errlog:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("found unsupported file type: ../tests/alive2/opt-memory/errlog")
-<<<<<<<<<<<<<<< 
 
  -------------- Files that didn't trigger any of the above ----- 
 

@@ -1,7 +1,7 @@
  -------------- Summary -----------------
  Files Passed: 0
  Files Failed: 0
- Exceptions: 1
+ Exceptions: 0
  Hidden (limitations in test suite): 1
  None of the above: 0
  ----------------------------------------
@@ -18,12 +18,6 @@ Vighnesh look at this
 
  -------------- Files that triggered Exceptions ------------ 
  -------------- Writing stderr                  ------------ 
-
-../tests/alive2/globals/errlog:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("found unsupported file type: ../tests/alive2/globals/errlog")
-<<<<<<<<<<<<<<< 
 
  -------------- Files that didn't trigger any of the above ----- 
 

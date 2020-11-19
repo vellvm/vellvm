@@ -1,7 +1,7 @@
  -------------- Summary -----------------
  Files Passed: 3
  Files Failed: 26
- Exceptions: 21
+ Exceptions: 20
  Hidden (limitations in test suite): 35
  None of the above: 0
  ----------------------------------------
@@ -96,9 +96,9 @@ dereferenceable-ret-callsite-alignsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 dereferenceable-ret-callsitesrctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0))
 	   ERROR: not equal
   failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0))
 	   ERROR: not equal
@@ -122,12 +122,11 @@ dereferenceable-ret-callsite2srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 noreturn-2srctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0))
-	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0))
-	   ERROR: not equal
   failed - IMPOSSIBLE: unreachable in reachable position = Uninterpreted Call on generated input (UVALUE_I1(1))
-	   ERROR: no<<<<<<<<<<<<<<< 
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0))
+	   ERROR: not equal
+  failed - IMPOSSIBLE: unreachable in reachable position = Uninterpreted Call on generated input (<<<<<<<<<<<<<<< 
 
 ../tests/alive2/attrs/noreturn-3.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -222,11 +221,11 @@ noreturnsrctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 noundef-fndefsrctgt:
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0))
+	   ERROR: not equal
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0))
+	   ERROR: not equal
   failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(1))
-	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0))
-	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I1(0))
 	   ERROR: not equal
   failed - Unint<<<<<<<<<<<<<<< 
 
@@ -285,11 +284,11 @@ noundef-ret2srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 noundef-ret3srctgt:
-  failed - UVALUE_I32(4183) = IMPOSSIBLE: unreachable in reachable position on generated input (UVALUE_I32(4183))
+  failed - UVALUE_I32(5774) = IMPOSSIBLE: unreachable in reachable position on generated input (UVALUE_I32(5774))
 	   ERROR: not equal
-  failed - UVALUE_I32(-98) = IMPOSSIBLE: unreachable in reachable position on generated input (UVALUE_I32(-98))
+  failed - UVALUE_I32(-1236) = IMPOSSIBLE: unreachable in reachable position on generated input (UVALUE_I32(-1236))
 	   ERROR: not equal
-  failed - UVALUE_I32(5476) = IMPOSSIBLE: unreachable in reachable <<<<<<<<<<<<<<< 
+  failed - UVALUE_I32(1543) = IMPOSSIBLE: unreachable in reacha<<<<<<<<<<<<<<< 
 
 ../tests/alive2/attrs/noundef-ret4.srctgt.ll:
 >>>>>>>>>>>>>>>>>>>> 
@@ -373,11 +372,11 @@ noundefaggr-ret2srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 returned-failsrctgt:
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(8656))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(3281))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(-2888))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(-6541))
 	   ERROR: not equal
-  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(8477))
+  failed - Uninterpreted Call = Uninterpreted Call on generated input (UVALUE_I8(5699))
 	   ERROR: not equal
   fail<<<<<<<<<<<<<<< 
 
@@ -442,12 +441,6 @@ Fatal error: exception Failure("Parsing error: line 20, column 46, token 'nofree
 >>>>>>>>>>>>>>>>>>>> 
 (* -------- Vellvm Test Harness -------- *)
 Fatal error: exception Failure("Parsing error: line 4, column 19, token 'dereferenceable'")
-<<<<<<<<<<<<<<< 
-
-../tests/alive2/attrs/errlog:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("found unsupported file type: ../tests/alive2/attrs/errlog")
 <<<<<<<<<<<<<<< 
 
 ../tests/alive2/attrs/nofree.srctgt.ll:

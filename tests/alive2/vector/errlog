@@ -1,7 +1,7 @@
  -------------- Summary -----------------
  Files Passed: 0
  Files Failed: 2
- Exceptions: 1
+ Exceptions: 0
  Hidden (limitations in test suite): 0
  None of the above: 0
  ----------------------------------------
@@ -20,11 +20,11 @@ Vighnesh look at this
 (* -------- Vellvm Test Harness -------- *)
 
 vector-poison-2srctgt:
-  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(2075))
+  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(6903))
 	   ERROR: not equal
-  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(-3696))
+  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(-5380))
 	   ERROR: not equal
-  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(3406))
+  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(5257))
 	   <<<<<<<<<<<<<<< 
 
 ../tests/alive2/vector/vector-poison.srctgt.ll:
@@ -32,21 +32,15 @@ vector-poison-2srctgt:
 (* -------- Vellvm Test Harness -------- *)
 
 vector-poisonsrctgt:
-  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(4176))
+  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(6226))
 	   ERROR: not equal
-  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(-5994))
+  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(-9621))
 	   ERROR: not equal
-  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(2105))
+  failed - insertelement not implemented = UVALUE_Poison on generated input (UVALUE_I32(6615))
 	   ER<<<<<<<<<<<<<<< 
 
  -------------- Files that triggered Exceptions ------------ 
  -------------- Writing stderr                  ------------ 
-
-../tests/alive2/vector/errlog:
->>>>>>>>>>>>>>>>>>>> 
-(* -------- Vellvm Test Harness -------- *)
-Fatal error: exception Failure("found unsupported file type: ../tests/alive2/vector/errlog")
-<<<<<<<<<<<<<<< 
 
  -------------- Files that didn't trigger any of the above ----- 
 
