@@ -221,6 +221,13 @@ let memory_tests =
   ; "../tests/ll/global1.ll", 12
   ]
 
+let phi_tests =
+  [ "../tests/ll/phi0.ll", 0
+  ; "../tests/ll/phi1.ll", 1
+  ; "../tests/ll/phi2.ll", 0
+  ; "../tests/ll/phi3.ll", 1
+  ]
+
 let terminator_tests =
   [ "../tests/ll/return.ll", 0
   ; "../tests/ll/return42.ll", 42
@@ -234,6 +241,10 @@ let terminator_tests =
 let bitcast_tests =
   [ "../tests/ll/bitcast1.ll", 3
   ]
+
+
+let other_tests =
+  arith_tests @ calling_convention_tests @ memory_tests @ phi_tests @ terminator_tests @ bitcast_tests
 
 
 
@@ -272,8 +283,6 @@ let large_tests = [ "../tests/ll/list1.ll", 3
                   ; "../tests/ll/duplicate_factorial.ll", 240
                   ]
 
-let other_tests =
-  arith_tests @ calling_convention_tests @ memory_tests @ terminator_tests @ bitcast_tests
 
 
 let intrinsics_tests : (string * float) list =
