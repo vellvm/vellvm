@@ -385,6 +385,151 @@ Proof.
   reflexivity.
 Qed.
 
+Lemma denote_instr_gep_array' :
+  forall i size τ defs e_ix ix ptr a val g ρ m,
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m
+    ≈
+    Ret (m, (ρ, (g, UVALUE_Addr a)))
+    ->
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m
+    ≈
+    Ret (m, (ρ, (g, UVALUE_I64 (repr (Z.of_nat ix)))))
+    ->
+    get_array_cell m a ix τ = inr val
+    ->
+    exists ptr_res,
+      read m ptr_res τ = inr val /\
+      handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat ix))] = inr ptr_res /\
+      interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m
+      ≈
+      Ret (m, (Maps.add i (UVALUE_Addr ptr_res) ρ, (g, tt))).
+Proof.
+  intros i size τ defs e_ix ix ptr a val g ρ m PTR IX GET.
+
+  pose proof interp_cfg_to_L3_GEP_array' defs τ a size g ρ m val ix GET as (ptr_res & EQ & GEP & READ).
+  exists ptr_res.
+  split; auto.
+  split; auto.
+
+  cbn.
+  rewrite translate_bind.
+  rewrite bind_bind.
+  rewrite interp_cfg_to_L3_bind.
+
+  rewrite PTR.
+  rewrite bind_ret_l.
+
+  (* Could probably automate some of this fiddliness *)
+  repeat rewrite translate_bind.
+  repeat rewrite bind_bind.
+  rewrite translate_ret.
+  rewrite bind_ret_l.
+  repeat rewrite translate_bind.
+  repeat rewrite bind_bind.
+
+  rewrite interp_cfg_to_L3_bind.
+  rewrite IX.
+  rewrite bind_ret_l.
+
+  rewrite interp_cfg_to_L3_bind.
+  rewrite bind_ret_l.
+  rewrite translate_ret.
+  rewrite interp_cfg_to_L3_ret.
+  rewrite bind_ret_l.
+  rewrite translate_ret.
+  rewrite bind_ret_l.
+  cbn.
+  unfold ITree.map.
+  rewrite translate_bind.
+  rewrite bind_bind.
+
+  rewrite translate_trigger.
+  rewrite interp_cfg_to_L3_bind_trigger.
+  rewrite exp_E_to_instr_E_subevent.
+
+  rewrite EQ.
+
+  rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_bind.
+  cbn.
+  rewrite translate_ret.
+  rewrite interp_cfg_to_L3_ret.
+  rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_LW.
+  reflexivity.
+Qed.
+
+Lemma denote_instr_gep_array_no_read :
+  forall i size τ defs e_ix ix ptr a g ρ m,
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m
+    ≈
+    Ret (m, (ρ, (g, UVALUE_Addr a)))
+    ->
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m
+    ≈
+    Ret (m, (ρ, (g, UVALUE_I64 (repr (Z.of_nat ix)))))
+    ->
+    dtyp_fits m a (DTYPE_Array size τ) ->
+    exists ptr_res,
+      handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat ix))] = inr ptr_res /\
+      interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m
+      ≈
+      Ret (m, (Maps.add i (UVALUE_Addr ptr_res) ρ, (g, tt))).
+Proof.
+  intros i size τ defs e_ix ix ptr a g ρ m PTR IX FITS.
+
+  pose proof interp_cfg_to_L3_GEP_array_no_read defs τ a size g ρ m ix FITS as (ptr_res & EQ & GEP).
+  exists ptr_res.
+  split; auto.
+
+  cbn.
+  rewrite translate_bind.
+  rewrite bind_bind.
+  rewrite interp_cfg_to_L3_bind.
+
+  rewrite PTR.
+  rewrite bind_ret_l.
+
+  (* Could probably automate some of this fiddliness *)
+  repeat rewrite translate_bind.
+  repeat rewrite bind_bind.
+  rewrite translate_ret.
+  rewrite bind_ret_l.
+  repeat rewrite translate_bind.
+  repeat rewrite bind_bind.
+
+  rewrite interp_cfg_to_L3_bind.
+  rewrite IX.
+  rewrite bind_ret_l.
+
+  rewrite interp_cfg_to_L3_bind.
+  rewrite bind_ret_l.
+  rewrite translate_ret.
+  rewrite interp_cfg_to_L3_ret.
+  rewrite bind_ret_l.
+  rewrite translate_ret.
+  rewrite bind_ret_l.
+  cbn.
+  unfold ITree.map.
+  rewrite translate_bind.
+  rewrite bind_bind.
+
+  rewrite translate_trigger.
+  rewrite interp_cfg_to_L3_bind_trigger.
+  rewrite exp_E_to_instr_E_subevent.
+
+  rewrite EQ.
+
+  rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_bind.
+  cbn.
+  rewrite translate_ret.
+  rewrite interp_cfg_to_L3_ret.
+  rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_LW.
+  reflexivity.
+Qed.
+
 Lemma denote_instr_intrinsic :
   forall i τ defs fn in_n sem_f args arg_vs conc_args res g ρ m,
     @intrinsic_exp dtyp (EXP_Ident (ID_Global (Name fn))) = Some in_n
@@ -484,6 +629,30 @@ Proof.
   rewrite translate_ret,interp_cfg_to_L3_ret.
   reflexivity.
 Qed.
+
+
+(* Lemma wah : *)
+(*   forall m ptr τ val, *)
+(*     read m ptr τ = inr val -> *)
+(*     dtyp_fits m ptr τ. *)
+(* Proof. *)
+(*   intros m [ptr_blk ptr_idx] τ val READ. *)
+(*   unfold read in READ; cbn in READ. *)
+(*   destruct (get_logical_block m ptr_blk) eqn:GETBLOCK; inversion READ. *)
+(*   destruct l. *)
+
+(*   unfold dtyp_fits. *)
+(*   exists size. exists bytes. exists concrete_id. *)
+(*   cbn. *)
+(*   split; auto. *)
+
+(*   unfold get_logical_block in GETBLOCK. *)
+(*   unfold get_logical_block_mem in GETBLOCK. *)
+
+(*   destruct m. destruct m. cbn in *. *)
+
+(*   unfold read_in_mem_block in READ. *)
+(* Qed. *)
 
 (*
 

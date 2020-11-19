@@ -942,3 +942,5 @@ Lemma deterministc_llvm_is_singleton : forall defs R RR t g sl mem,
     - we know that there is (t: itree void1 X),
     "inject (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) t ≈ interp_to_L3 (denote_llvm p)"
    *)
+Proof. Admitted.
+
