@@ -2575,7 +2575,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       intros m m' t val a a' i i' WRITE TYP BLOCK_NEQ.
       destruct a as [b1 o1].
       destruct a' as [b2 o2].
-    Admitted.
+      unfold get_array_cell.
+      cbn in WRITE.
+      break_match_hyp; inv WRITE.
+      destruct l.
+      inv H0.
+      rewrite get_logical_block_of_add_logical_block_neq; eauto.
+    Qed.
 
     Lemma lookup_mapsto :
       forall {A} k m (v : A),
