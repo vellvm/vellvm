@@ -2215,6 +2215,29 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       Unshelve. 3 : exact key. 2 : exact (m, s). cbn. reflexivity.
     Qed.
 
+    Lemma get_logical_block_of_add_logical_block_neq :
+      forall (m : memory_stack) (key key' : Z) (lb : logical_block),
+        key <> key' ->
+        get_logical_block (add_logical_block key lb m) key' = get_logical_block m key'.
+    Proof.
+      intros [[cm lm] s] b b' lb NEQ.
+      cbn.
+      rewrite IM.Raw.Proofs.add_find.
+      break_match; eauto.
+      red in e. rewrite e in NEQ. contradiction.
+      apply IM.is_bst.
+    Qed.
+
+    Lemma get_logical_block_of_add_logical_block_mem_neq :
+      forall (m : memory) (s : frame_stack) (key key' : Z) (lb : logical_block),
+        key <> key' ->
+        get_logical_block (add_logical_block_mem key lb m, s) key' = get_logical_block (m, s) key'.
+    Proof.
+      intros m s key key' lb H.
+      change (add_logical_block_mem key lb m, s) with (add_logical_block key lb (m, s)).
+      eapply get_logical_block_of_add_logical_block_neq; eauto.
+    Qed.
+
     Lemma unsigned_I1_in_range : forall (x : DynamicValues.int1),
         0 <= DynamicValues.Int1.unsigned x <= 1.
     Proof.
@@ -2245,7 +2268,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
      *)
     Lemma deserialize_serialize : forall val t (TYP : dvalue_has_dtyp val t),
         forall off (bytes : mem_block),
-          off >= 0 ->
           deserialize_sbytes (lookup_all_index off (sizeof_dtyp t) (add_all_index (serialize_dvalue val) off bytes) SUndef) t = dvalue_to_uvalue val.
     Proof.
       induction 1; try auto.
@@ -2270,7 +2292,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         do 8 (rewrite lookup_all_index_add; try lia).
         cbn; f_equal.
         pose proof (unsigned_I8_in_range x).
-        revert H0; generalize (DynamicValues.Int8.unsigned x) as y; intros y ?.
         repeat rewrite Byte.unsigned_repr.
         all: unfold Byte.max_unsigned, Byte.modulus; cbn.
         all: try lia.
@@ -2300,9 +2321,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       cbn.
       unfold read_in_mem_block.
       rewrite deserialize_serialize; auto.
-      (* The address needs to be well-formed in that the offset is positive *)
-      admit.
-    Admitted.
+    Qed.
 
     Arguments add : simpl never.
     Arguments lookup : simpl never.
@@ -2404,13 +2423,44 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       intros; split; [| split]; eauto using write_allocated, write_read, write_untouched.
     Qed.
 
+    Lemma write_block_preserves :
+      forall m1 m2 (a a' : addr) v sz bytes cid,
+        write m1 a v = inr m2 ->
+        get_logical_block m1 (fst a') = Some (LBlock sz bytes cid) ->
+        exists bytes', get_logical_block m2 (fst a') = Some (LBlock sz bytes' cid).
+    Proof.
+      intros m1 m2 a a' v sz bytes cid WRITE GET.
+      destruct m1, m2; cbn in *.
+      unfold write in WRITE.
+      cbn in WRITE.
+      break_match_hyp; inv WRITE.
+      destruct l.
+      destruct a, a'. cbn in *.
+      inv H0.
+
+      destruct (Z.eq_dec z z1) as [EQ | NEQ].
+      - subst.
+        rewrite GET in Heqo. inv Heqo.
+        rewrite get_logical_block_of_add_logical_block_mem.
+        eexists.
+        reflexivity.
+      - exists bytes.
+        erewrite get_logical_block_of_add_logical_block_mem_neq; eauto.
+    Qed.
+
     Lemma dtyp_fits_after_write :
       forall m m' ptr ptr' τ τ',
         dtyp_fits m ptr τ ->
         write m ptr' τ' = inr m' ->
         dtyp_fits m' ptr τ.
     Proof.
-    Admitted.
+      intros m m' ptr ptr' τ τ' FITS WRITE.
+      unfold dtyp_fits in *.
+      destruct FITS as (sz & bytes & cid & GET & BOUNDS).
+      eapply write_block_preserves in WRITE; eauto. destruct WRITE as (bytes' & WRITE).
+      exists sz. exists bytes'. exists cid.
+      split; eauto.
+    Qed.
 
     Lemma write_array_cell_get_array_cell :
       forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr) (i : nat),
