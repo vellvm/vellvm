@@ -2363,7 +2363,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Lemma lookup_all_index_add_all_index_no_overlap :
       forall {A} bs off off' m (def : A) sz,
         0 <= sz ->
-        off' + sz < off \/ off + (Z.of_nat (length bs)) < off' ->
+        off' + sz <= off \/ off + (Z.of_nat (length bs)) <= off' ->
         lookup_all_index off' sz (add_all_index bs off m) def =
         lookup_all_index off' sz m def.
     Proof.
@@ -2372,6 +2372,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       rewrite lookup_all_index_add_out; auto; try lia.
       apply IHbs; auto.
       destruct Hrange as [Hleft | Hright]; cbn in *; lia.
+      destruct Hrange; cbn in *; lia.
     Qed.
 
     Lemma write_untouched:
@@ -2405,6 +2406,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         + (* off' + sizeof_dtyp τ' < off, so second memory region is "to the left" *)
           unfold read_in_mem_block.
           rewrite lookup_all_index_add_all_index_no_overlap; auto.
+          lia.
       - rewrite lookup_add_ineq; auto.
     Qed.
 
@@ -2485,23 +2487,83 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       split; eauto.
     Qed.
 
+    Lemma read_in_mem_block_write_to_mem_block :
+      forall bytes offset val τ,
+        dvalue_has_dtyp val τ ->
+        read_in_mem_block (write_to_mem_block bytes offset val) offset τ = dvalue_to_uvalue val.
+    Proof.
+      intros bytes offset val τ H.
+      unfold read_in_mem_block, write_to_mem_block.
+      rewrite deserialize_serialize; eauto.
+    Qed.
+
     Lemma write_array_cell_get_array_cell :
       forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr) (i : nat),
         write_array_cell m a i t val = inr m' ->
         dvalue_has_dtyp val t ->
         get_array_cell m' a i t = inr (dvalue_to_uvalue val).
     Proof.
-    Admitted.
+      intros m m' t val a i WRITE TYP.
+      destruct a; cbn in *.
+      break_match_hyp; inv WRITE.
+      destruct l.
+      inversion H0; subst.
+      rewrite get_logical_block_of_add_logical_block.
+      rewrite read_in_mem_block_write_to_mem_block; eauto.
+    Qed.
+
+    (* TODO: make this more general? I.e. write / read different types? *)
+    Lemma read_in_mem_block_write_to_mem_block_untouched :
+      forall offset offset' bytes val τ,
+        dvalue_has_dtyp val τ ->
+        offset' + sizeof_dtyp τ <= offset \/ offset + sizeof_dtyp τ <= offset' ->
+        read_in_mem_block (write_to_mem_block bytes offset val) offset' τ = read_in_mem_block bytes offset' τ.
+    Proof.
+      intros offset offset' bytes val τ TYP OUT.
+      unfold read_in_mem_block, write_to_mem_block.
+      rewrite lookup_all_index_add_all_index_no_overlap; eauto.
+      eapply sizeof_dvalue_pos; eauto.
+      destruct OUT.
+      - left. auto.
+      - right. erewrite sizeof_serialized; eauto.
+    Qed.
 
     Lemma write_array_cell_untouched :
       forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr) (i : nat) (i' : nat),
         write_array_cell m a i t val = inr m' ->
         dvalue_has_dtyp val t ->
-        i <> i' ->
+        DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) <> DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i')) ->
         get_array_cell m' a i' t = get_array_cell m a i' t.
     Proof.
-      intros m m' t val a i i' H H0 H1.
-    Admitted.
+      intros m m' t val a i i' WRITE TYP NEQ.
+      destruct a; cbn in *.
+      break_match_hyp; inv WRITE.
+      destruct l.
+      inversion H0; subst.
+      rewrite get_logical_block_of_add_logical_block.
+      rewrite read_in_mem_block_write_to_mem_block_untouched; eauto.
+
+      destruct (Z_lt_ge_dec (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i'))) (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)))) as [LT | GE].
+      - left.
+        rewrite <- Z.add_assoc.
+        apply Z.add_le_mono_l.
+        replace (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i')) * sizeof_dtyp t + sizeof_dtyp t) with ((1 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i'))) * sizeof_dtyp t) by lia.
+        apply Zmult_le_compat_r; eauto.
+        lia.
+        eapply sizeof_dvalue_pos; eauto.
+      - right.
+        rewrite <- Z.add_assoc.
+        apply Z.add_le_mono_l.
+
+        (* if i <> i' then the conversions shouldn't overlap either *)
+        assert (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i')) >
+                DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i))) by lia.
+
+        replace (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp t + sizeof_dtyp t) with ((1 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i))) * sizeof_dtyp t) by lia.
+        apply Zmult_le_compat_r; eauto.
+        lia.
+        eapply sizeof_dvalue_pos; eauto.
+    Qed.
 
     Lemma write_array_cell_untouched_ptr_block :
       forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a a' : addr) (i i' : nat),
