@@ -2215,6 +2215,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       Unshelve. 3 : exact key. 2 : exact (m, s). cbn. reflexivity.
     Qed.
 
+    (* TODO: looks like this might be duplicated now *)
     Lemma get_logical_block_of_add_logical_block_neq :
       forall (m : memory_stack) (key key' : Z) (lb : logical_block),
         key <> key' ->
@@ -2236,6 +2237,28 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       intros m s key key' lb H.
       change (add_logical_block_mem key lb m, s) with (add_logical_block key lb (m, s)).
       eapply get_logical_block_of_add_logical_block_neq; eauto.
+    Qed.
+
+    Lemma get_logical_block_of_add_to_frame :
+      forall (m : memory_stack) k x, get_logical_block (add_to_frame m k) x = get_logical_block m x.
+    Proof.
+      intros. destruct m. cbn. destruct m.
+      destruct f; unfold get_logical_block; cbn; reflexivity.
+    Qed.
+
+    Lemma get_logical_block_of_add_logical_frame_ineq :
+      forall x m k mv, m <> x ->
+                  get_logical_block (add_logical_block m k mv) x = get_logical_block mv x.
+    Proof.
+      intros.
+      cbn in *.
+      unfold get_logical_block, get_logical_block_mem in *.
+      unfold add_logical_block. destruct mv. cbn.
+      unfold add_logical_block_mem. destruct m0.
+      Opaque lookup.
+      Opaque add.
+      cbn in *.
+      rewrite lookup_add_ineq; auto.
     Qed.
 
     Lemma unsigned_I1_in_range : forall (x : DynamicValues.int1),
