@@ -8,10 +8,10 @@ From ITree Require Import
      Eq.Eq.
 
 From Vellvm Require Import
-     Util
-     Tactics
-     LLVMEvents
-     DynamicTypes
+     Utils.Tactics
+     Utils.Util
+     Syntax.DynamicTypes
+     Semantics.LLVMEvents
      Handlers.Handlers.
 
 Section InterpreterMCFG.

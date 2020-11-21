@@ -5,8 +5,8 @@ From ITree Require Import
      ITree.
 
 From Vellvm Require Import
-     CFG
-     LLVMAst.
+     Syntax.CFG
+     Syntax.LLVMAst.
 
 (** ** Definition of generic transformations on Vellvm's abstract syntax.
     The general idea is to define two functions, an endofunction and an fmap

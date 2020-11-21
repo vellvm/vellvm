@@ -10,10 +10,10 @@ From Coq Require Import
      Logic.FunctionalExtensionality.
 
 From Vellvm Require Import 
-     Util
-     LLVMAst
-     AstLib
-     DynamicTypes.
+     Utils.Util
+     Syntax.LLVMAst
+     Syntax.AstLib
+     Syntax.DynamicTypes.
 
 Require Import Coqlib.
 

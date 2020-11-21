@@ -9,15 +9,22 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import Equalities.
+
 From Coq Require Import ZArith List String Omega.
-Require Import Vellvm.AstLib Vellvm.LLVMAst.
-Require Import Vellvm.Util.
+
+From Vellvm Require Import
+        Syntax.LLVMAst
+        Syntax.AstLib
+        Utils.Util.
+
 From ExtLib Require Import
      Core.RelDec
      Programming.Eqv
      Structures.Monads
      Data.Monads.OptionMonad.
+
 Require Import Ceres.Ceres.
+
 Import ListNotations.
 Import EqvNotation.
 Import MonadNotation.

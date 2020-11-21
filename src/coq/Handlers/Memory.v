@@ -33,18 +33,18 @@ From ExtLib Require Import
      Data.String.
 
 From Vellvm Require Import
-     Tactics
-     LLVMAst
-     Util
-     DynamicTypes
-     DynamicValues
-     Denotation
-     MemoryAddress
-     LLVMEvents
-     Error
-     Coqlib
+     Numeric.Coqlib
      Numeric.Integers
-     Numeric.Floats.
+     Numeric.Floats
+     Utils.Tactics
+     Utils.Util
+     Utils.Error
+     Syntax.LLVMAst
+     Syntax.DynamicTypes
+     Semantics.DynamicValues
+     Semantics.Denotation
+     Semantics.MemoryAddress
+     Semantics.LLVMEvents.
 
 Require Import Ceres.Ceres.
 

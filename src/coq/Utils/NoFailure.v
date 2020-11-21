@@ -4,7 +4,9 @@ From ITree Require Import
      FailFacts
      Events.Exception.
 
-From Vellvm Require Import PostConditions PropT.
+From Vellvm Require Import 
+     Utils.PostConditions
+     Utils.PropT.
 
 From Paco Require Import paco.
 

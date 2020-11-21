@@ -17,10 +17,10 @@ From ExtLib Require Import
      Data.String.
 
 From Vellvm Require Import
-     LLVMEvents
-     LLVMAst
-     Error
-     Coqlib
+     Utils.Error
+     Syntax.LLVMAst
+     Semantics.LLVMEvents
+     Numeric.Coqlib
      Numeric.Integers
      Numeric.Floats.
 

@@ -11,12 +11,12 @@ From Coq Require Import
      Logic.FunctionalExtensionality.
 
 From Vellvm Require Import
-     Util
-     LLVMAst
-     AstLib
-     DynamicTypes
-     CFG
-     Transformations.Traversal.
+     Utils.Util
+     Syntax.LLVMAst
+     Syntax.AstLib
+     Syntax.CFG
+     Syntax.Traversal
+     Syntax.DynamicTypes.
 
 Require Import Coqlib.
 

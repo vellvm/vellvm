@@ -23,18 +23,18 @@ From ExtLib Require Import
      Data.Map.FMapAList.
 
 From Vellvm Require Import
-     LLVMAst
-     AstLib
-     DynamicTypes
-     LLVMEvents
-     Denotation
-     IntrinsicsDefinitions
+     Utils.Util
+     Utils.Error
+     Utils.PropT
+     Syntax.LLVMAst
+     Syntax.AstLib
+     Syntax.DynamicTypes
+     Syntax.TypToDtyp
+     Semantics.LLVMEvents
+     Semantics.Denotation
+     Semantics.IntrinsicsDefinitions
      Handlers.Handlers
-     TypToDtyp
-     Util
-     Error
-     PropT
-     InterpreterMCFG.
+     Theory.InterpreterMCFG.
 
 Import MonadNotation.
 Import ListNotations.

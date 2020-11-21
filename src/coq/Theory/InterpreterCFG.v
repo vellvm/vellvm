@@ -11,10 +11,10 @@ From ITree Require Import
      Eq.Eq.
 
 From Vellvm Require Import
-     LLVMEvents
-     Util
-     DynamicTypes
-     DynamicValues
+     Utils.Util
+     Semantics.LLVMEvents
+     Syntax.DynamicTypes
+     Semantics.DynamicValues
      Handlers.Handlers
      Refinement.
 

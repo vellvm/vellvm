@@ -5,13 +5,12 @@ From ITree Require Import
      Eq.Eq.
 
 From Vellvm Require Import
-     Util
-     UndefinedBehaviour
-     DynamicValues
-     MemoryAddress
-     LLVMEvents
-     LLVMAst
-     Handlers.Handlers.
+     Utils.Util
+     Syntax.LLVMAst
+     Handlers.Handlers
+     Semantics.DynamicValues
+     Semantics.MemoryAddress
+     Semantics.LLVMEvents.
 
 From ExtLib Require Import
      Structures.Monads

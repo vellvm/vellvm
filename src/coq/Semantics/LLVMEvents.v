@@ -27,12 +27,12 @@ From ITree Require Import
      Events.Exception.
 
 From Vellvm Require Import
-     Util
-     LLVMAst
-     MemoryAddress
-     DynamicTypes
-     DynamicValues
-     Error.
+     Utils.Util
+     Utils.Error
+     Syntax.LLVMAst
+     Syntax.DynamicTypes
+     Semantics.MemoryAddress
+     Semantics.DynamicValues.
 
 (****************************** LLVM Events *******************************)
 (**

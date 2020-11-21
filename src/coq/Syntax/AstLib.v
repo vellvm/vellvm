@@ -12,7 +12,9 @@
 From Coq Require Import
      ZArith.ZArith List
      String Omega.
-Require Import Vellvm.LLVMAst Vellvm.Util.
+From Vellvm Require Import
+     Utils.Util
+     Syntax.LLVMAst.
 Require Import Equalities OrderedType OrderedTypeEx Compare_dec.
 Require Import ExtLib.Core.RelDec ExtLib.Data.Z.
 Require Import ExtLib.Programming.Eqv.

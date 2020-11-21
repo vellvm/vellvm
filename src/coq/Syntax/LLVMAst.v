@@ -24,7 +24,8 @@
 
 Require Import Floats.
 From Coq Require Import List String Ascii ZArith.
-Require Import Vellvm.Util.
+From Vellvm Require Import
+     Utisl.Util.
 
 Import ListNotations.
 Open Scope string_scope.

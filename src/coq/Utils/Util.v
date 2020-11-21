@@ -9,7 +9,8 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-From Vellvm Require Import Tactics.
+From Vellvm Require Import
+     Utils.Tactics.
 
 From Coq Require Import
      micromega.Lia

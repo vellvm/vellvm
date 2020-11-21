@@ -10,17 +10,17 @@ From ITree Require Import
 
 (* YZ TODO : Revisit the dependency w.r.t. Refinement *)
 From Vellvm Require Import
-     Util
-     PropT
-     DynamicTypes
-     CFG
-     Refinement
-     TopLevel
-     LLVMAst
-     InterpreterMCFG
-     InterpreterCFG
+     Utils.Util
+     Utils.PropT
+     Syntax.DynamicTypes
+     Syntax.CFG
+     Syntax.LLVMAst
+     Semantics.LLVMEvents
+     Semantics.TopLevel
      Handlers.Handlers
-     LLVMEvents.
+     Theory.Refinement
+     Theory.InterpreterMCFG
+     Theory.InterpreterCFG.
 
 From ExtLib Require Import
      Structures.Functor.
