@@ -783,7 +783,7 @@ and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
 and comment : Format.formatter -> char list -> unit =
   fun ppf s -> fprintf ppf "; %s" (of_str s)
 
-and modul : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block list))) LLVMAst.modul -> unit =
+and modul : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block list))) CFG.modul -> unit =
   fun ppf m ->
 
   pp_option ppf (fun ppf x -> fprintf ppf "; ModuleID = '%s'" (of_str x)) m.m_name ;

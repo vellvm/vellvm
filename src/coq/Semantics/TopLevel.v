@@ -29,6 +29,7 @@ From Vellvm Require Import
      Utils.PropT
      Syntax.LLVMAst
      Syntax.AstLib
+     Syntax.CFG
      Syntax.DynamicTypes
      Syntax.TypToDtyp
      Semantics.LLVMEvents

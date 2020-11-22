@@ -869,12 +869,12 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.Denotation
      Semantics.TopLevel
-     Handlers.Handlers.
-     (* Theory.InterpreterCFG *)
-     (* Theory.InterpreterMCFG. *)
-     (* Theory.TopLevelRefinements *)
-     (* Theory.DenotationTheory *)
-     (* Theory.InstrLemmas. *)
+     Handlers.Handlers
+     Theory.InterpreterCFG
+     Theory.InterpreterMCFG
+     Theory.TopLevelRefinements
+     Theory.DenotationTheory
+     Theory.InstrLemmas.
 
 From Coq Require Import Relation_Definitions.
 
