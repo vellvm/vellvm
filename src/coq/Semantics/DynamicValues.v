@@ -8,6 +8,7 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
+(* begin hide *)
 From Coq Require Import
      ZArith DecidableClass List String Omega Bool.Bool.
 
@@ -46,6 +47,18 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 
 Open Scope Z_scope.
+(* end hide *)
+
+(* YZ TODO: better documentation of this file *)
+
+(** * Dynamic values
+    Definition of the dynamic values manipulated by VIR.
+    They come in two flavors:
+    - [dvalue] are the concrete notion of values computed.
+    - [uvalue] (_under-defined values_) are an extension of [dvalue] as symbolic values:
+      + a special [undef τ] value modeling LLVM's "undef"
+      + delayed numerical operations.
+ *)
 
 Instance Eqv_nat : Eqv nat := (@eq nat).
 

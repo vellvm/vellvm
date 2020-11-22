@@ -8,6 +8,7 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
+(* begin hide *)
 From Coq Require Import
      ZArith
      List
@@ -33,6 +34,7 @@ From Vellvm Require Import
      Syntax.DynamicTypes
      Semantics.MemoryAddress
      Semantics.DynamicValues.
+(* end hide *)
 
 (****************************** LLVM Events *******************************)
 (**
@@ -43,23 +45,24 @@ From Vellvm Require Import
    These events are then concretely interpreted as a succession of handler, as defined in the
    _Handlers_ folder.
    The possible events are:
-   * Function calls [CallE]
+   * Function calls                                                          [CallE]
+   * External function calls                                                 [ExternalCallE]
    * Calls to intrinsics whose implementation _do not_ depends on the memory [IntrinsicE]
-   * Interactions with the global environment [GlobalE]
-   * Interactions with the local environment [LocalE]
-   * Manipulation of the frame stack for local environments [StackE]
-   * Interactions with the memory [MemoryE]
-   * Concretization of a under-defined value [PickE]
-   * Undefined behaviour [UBE]
-   * Failure [FailureE]
-   * Debugging messages [DebugE]
+   * Interactions with the global environment                                [GlobalE]
+   * Interactions with the local environment                                 [LocalE]
+   * Manipulation of the frame stack for local environments                  [StackE]
+   * Interactions with the memory                                            [MemoryE]
+   * Concretization of a under-defined value                                 [PickE]
+   * Undefined behaviour                                                     [UBE]
+   * Failure                                                                 [FailureE]
+   * Debugging messages                                                      [DebugE]
 *)
 
 Set Implicit Arguments.
 Set Contextual Implicit.
 
  (* Interactions with global variables for the LLVM IR *)
- (* YZ: Globals are read-only, except for the initialization. We may want to reflect this in the events. *)
+ (* YZ: Globals are read-only, except for the initialization. We could want to reflect this in the events themselves. *)
   Variant GlobalE (k v:Type) : Type -> Type :=
   | GlobalWrite (id: k) (dv: v): GlobalE k v unit
   | GlobalRead  (id: k): GlobalE k v v.
@@ -116,20 +119,11 @@ Set Contextual Implicit.
       end
     end.
 
-(* SAZ: TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism
-   not functors. *)
+(* SAZ: TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
 Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Global Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.eq_dec.
   Global Instance Eqv_addr : Eqv ADDR.addr := (@eq ADDR.addr).
-
-  (* The set of dynamic types manipulated by an LLVM program.  Mostly
-   isomorphic to LLVMAst.typ but
-     - pointers have no further detail
-     - identified types are not allowed
-   Questions:
-     - What to do with Opaque?
-   *)
 
   Module DV := DynamicValues.DVALUE(ADDR).
   Export DV.
@@ -147,7 +141,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Variant IntrinsicE : Type -> Type :=
   | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE dvalue.
 
-  (* Interactions with the memory for the LLVM IR *)
+  (* Interactions with the memory *)
   Variant MemoryE : Type -> Type :=
   | MemPush : MemoryE unit
   | MemPop  : MemoryE unit
@@ -157,13 +151,11 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   | GEP     : forall (t:dtyp)   (v:dvalue) (vs:list dvalue), (MemoryE dvalue)
   | ItoP    : forall (i:dvalue),                             (MemoryE dvalue)
   | PtoI    : forall (t:dtyp) (a:dvalue),                    (MemoryE dvalue)
-  (* | MemoryIntrinsic : forall (t:dtyp) (f:function_id) (args:list dvalue), MemoryE dvalue *)
   .
 
-  (* An event resolving the non-determinism induced by undef.
-   The argument _P_ is intended to be a predicate over the set
-   of dvalues _u_ can take such that if it is not satisfied, the
-   only possible execution is to raise _UB_.
+  (* An event resolving the non-determinism induced by undef. The argument _P_
+   is intended to be a predicate over the set of dvalues _u_ can take such that
+   if it is not satisfied, the only possible execution is to raise _UB_.
    *)
   Variant PickE : Type -> Type :=
   | pick (u:uvalue) (P : Prop) : PickE dvalue.
@@ -225,9 +217,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
-  (* exp_E = LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE *)
-  (* L0 = ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE *)
-
   Definition _exp_E_to_L0 : exp_E ~> L0 :=
     fun T e =>
       match e with
@@ -235,13 +224,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
       | inr1 (inl1 e) => inr1 (inr1 (inr1 (inl1 (inl1 e))))
       | inr1 (inr1 e) => inr1 (inr1 (inr1 (inr1 e)))
       end.
-
-  (* Definition _L0_to_L0' : L0 ~> L0' := *)
-  (*   fun _ e => *)
-  (*     match e with *)
-  (*     | inl1 e => inl1 (inr1 e) *)
-  (*     | inr1 e => (inr1 e) *)
-  (*     end. *)
 
   (* For multiple CFG, after interpreting [GlobalE] *)
   Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.

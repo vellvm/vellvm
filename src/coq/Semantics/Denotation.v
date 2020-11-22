@@ -34,12 +34,10 @@ From Vellvm Require Import
      Syntax.CFG
      Syntax.DynamicTypes
      Semantics.MemoryAddress
-     Semantics.LLVMEvents
-     Handlers.Intrinsics.
+     Semantics.LLVMEvents.
 
 Require Import Ceres.Ceres.
 
-(* YZ: Undesirable dependency on Handlers/Intrinsics: move [intrinsic_exp] somewhere else? *)
 
 Import Sum.
 Import Subevent.
@@ -731,7 +729,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | (pt, INSTR_Call (dt, f) args) =>
           uvs <- map_monad (fun '(t, op) => (translate exp_E_to_instr_E (denote_exp (Some t) op))) args ;;
           returned_value <-
-          match Intrinsics.intrinsic_exp f with
+          match intrinsic_exp f with
           | Some s =>
             dvs <- map_monad (fun uv => pickUnique uv) uvs ;;
             fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))

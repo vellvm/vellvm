@@ -57,22 +57,6 @@ Set Contextual Implicit.
         call t @llvm._ (args...)
 *)
 
-(* This function extracts the string of the form [llvm._] from an LLVM expression.
-   It returns None if the expression is not an intrinsic definition.
-*)
-Definition intrinsic_ident (id:ident) : option string :=
-  match id with
-  | ID_Global (Name s) =>
-    if String.prefix "llvm." s then Some s else None
-  | _ => None
-  end.
-
-Definition intrinsic_exp {T} (e:exp T) : option string :=
-  match e with
-  | EXP_Ident id => intrinsic_ident id
-  | _ => None
-  end.
-
 
 (* (Pure) Intrinsics -------------------------------------------------------- *)
 

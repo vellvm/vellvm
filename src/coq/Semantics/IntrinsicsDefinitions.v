@@ -8,6 +8,7 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
+(* begin hide *)
 From Coq Require Import
      ZArith List String.
 
@@ -37,6 +38,19 @@ Import ListNotations.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
+(* end hide *)
+
+(** * Intrinsics
+    VIR provides an easily extensible support for instrinsics.
+    In this file are defined the intrinsics suuported by VIR.
+    Each intrinsic must be:
+    - registered by providing a [declaration typ] and added to [defined_intrinsics_decls]
+    - _if_ the intrinsics is a pure computation, it must be implemented as a pure Gallina
+      function of type [semantic_function] and added to [defined_intrinsics]
+    - _if_ it is impure, i.e. depends on the memory, as is the case for [memcpy], its
+    implementation must be provided in [src/coq/Handlers/Memory.v] and an equality test on its
+    name added to [handle_intrinsic].
+*)
 
 Definition fabs_32_decl: declaration typ :=
   {|
