@@ -35,3 +35,6 @@ src/ml/libvellvm/.merlin
 .lia.cache
 src/.ll_files.tmp
 src/coq/.lia.cache
+oat/src/ml/extracted/*.ml
+oat/src/ml/extracted/*.mli
+oat/src/ml/extracted/STAMP
