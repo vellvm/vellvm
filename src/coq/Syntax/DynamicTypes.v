@@ -8,6 +8,7 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
+(* begin hide *)
 From Coq Require Import
      ZArith
      List
@@ -30,6 +31,18 @@ Require Import Ceres.Ceres.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
+(* end hide *)
+
+(** * Dynamic types
+    LLVM types contain information unnecessary to the semantics of programs,
+    and making them structurally annoying to reason about.
+    We therefore pre-process them to convert them into so-called dynamic types,
+    or [dtyp].
+    These dynamic types differ from static ones in two aspects:
+    - we have forget about the nature of the object pointer types point to
+    - type variables have been resolved.
+    The conversion from static types to dynamic types is defined in the module [TypToDtyp].
+ *)
 
 Unset Elimination Schemes.
 Inductive dtyp : Set :=
@@ -48,14 +61,14 @@ Inductive dtyp : Set :=
 | DTYPE_Struct (fields:list dtyp)
 | DTYPE_Packed_struct (fields:list dtyp)
 | DTYPE_Opaque
-                                   (* IY: Why isn't this defined structurally? *)
+(* IY: Why isn't this defined structurally? *)
 | DTYPE_Vector (sz:Z) (t:dtyp)     (* t must be integer, floating point, or pointer type *)
 .
 Set Elimination Schemes.
 
 Definition vector_dtyp dt :=
   (exists n, dt = DTYPE_I n) \/ dt = DTYPE_Pointer \/ dt = DTYPE_Half \/ dt = DTYPE_Float \/
-        dt = DTYPE_Double \/ dt = DTYPE_X86_fp80 \/ dt = DTYPE_Fp128 \/ dt = DTYPE_Ppc_fp128.
+  dt = DTYPE_Double \/ dt = DTYPE_X86_fp80 \/ dt = DTYPE_Fp128 \/ dt = DTYPE_Ppc_fp128.
 
 Section DtypInd.
   Variable P : dtyp -> Prop.
@@ -113,24 +126,24 @@ Section WF_dtyp.
   | Wf_Array : forall (sz : Z),
       Z.le 0 sz ->
       forall t, well_formed_dtyp t ->
-                well_formed_dtyp (DTYPE_Array sz t)
+           well_formed_dtyp (DTYPE_Array sz t)
   | Wf_Vector : forall (sz : Z),
       Z.le 0 sz ->
       forall t, vector_dtyp t ->
-                well_formed_dtyp t ->
-                well_formed_dtyp (DTYPE_Vector sz t)
+           well_formed_dtyp t ->
+           well_formed_dtyp (DTYPE_Vector sz t)
   | Wf_Struct_nil :
       well_formed_dtyp (DTYPE_Struct nil)
   | Wf_Struct_cons :
       forall t, well_formed_dtyp t ->
-                forall l, well_formed_dtyp (DTYPE_Struct l) ->
-                          well_formed_dtyp (DTYPE_Struct (t :: l))
+           forall l, well_formed_dtyp (DTYPE_Struct l) ->
+                well_formed_dtyp (DTYPE_Struct (t :: l))
   | Wf_Packed_struct_nil :
       well_formed_dtyp (DTYPE_Packed_struct nil)
   | Wf_Packed_truct_cons :
       forall t, well_formed_dtyp t ->
-                forall l, well_formed_dtyp (DTYPE_Packed_struct l) ->
-                          well_formed_dtyp (DTYPE_Packed_struct (t :: l))
+           forall l, well_formed_dtyp (DTYPE_Packed_struct l) ->
+                well_formed_dtyp (DTYPE_Packed_struct (t :: l))
   .
 
 End WF_dtyp.

@@ -8,7 +8,7 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-
+(* begin hide *)
 From Coq Require Import
      ZArith.ZArith List
      String Omega.
@@ -22,6 +22,7 @@ Require Import Ascii.
 Import ListNotations.
 
 Import EqvNotation.
+(* end hide *)
 
 (* Equalities --------------------------------------------------------------- *)
 Instance eq_dec_int : RelDec (@eq int) := Data.Z.RelDec_zeq.
@@ -367,37 +368,7 @@ Qed.
 End TypInd.
 
 Section ExpInd.
-(*
-| EXP_Ident   (id:ident)
-| EXP_Integer (x:int)
-| EXP_Float   (f:float)
-| EXP_Bool    (b:bool)
-| EXP_Null
-| EXP_Zero_initializer
-| EXP_Cstring (s:string)
-| EXP_Undef
-| EXP_Struct        (fields: list (typ * a))
-| EXP_Packed_struct (fields: list (typ * a))
-| EXP_Array         (elts: list (typ * a))
-| EXP_Vector        (elts: list (typ * a))
-| OP_IBinop           (iop:ibinop) (t:typ) (v1:a) (v2:a)
-| OP_ICmp             (cmp:icmp)   (t:typ) (v1:a) (v2:a)
-| OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:typ) (v1:a) (v2:a)
-| OP_FCmp             (cmp:fcmp)   (t:typ) (v1:a) (v2:a)
-| OP_Conversion     (conv:conversion_type) (t_from:typ) (v:a) (t_to:typ)
-| OP_GetElementPtr  (t:typ) (ptrval:(typ * a)) (idxs:list (typ * a))
-| OP_ExtractElement (vec:(typ * a)) (idx:(typ * a))
-| OP_InsertElement  (vec:(typ * a)) (elt:(typ * a)) (idx:(typ * a))
-| OP_ShuffleVector  (vec1:(typ * a)) (vec2:(typ * a)) (idxmask:(typ * a))
-| OP_ExtractValue   (vec:(typ * a)) (idxs:list int)
-| OP_InsertValue    (vec:(typ * a)) (elt:(typ * a)) (idxs:list int)
-| OP_Select         (cnd:(typ * a)) (v1:(typ * a)) (v2:(typ * a)) (* if * then * else *)
-.
 
-(* static values *)
-Inductive value : Set :=
-| SV : Expr value -> value.
- *)
   Variable T : Set.
   Variable P : (exp T) -> Prop.
   Hypothesis IH_Ident   : forall (id:ident), P ((EXP_Ident id)).
@@ -685,61 +656,10 @@ Section hiding_notation.
 
 End hiding_notation.
 
+(* YZ: The following code is not used currently. TODO double check if it can be removed *)
+(*
 Section WithType.
   Variable (T:Set).
-
-  Definition target_of {X} (tle : toplevel_entity T X) : option string :=
-    match tle with
-    | TLE_Target tgt => Some tgt
-    | _ => None
-    end.
-
-  Definition datalayout_of {X} (tle : toplevel_entity T X) : option string :=
-    match tle with
-    | TLE_Datalayout l => Some l
-    | _ => None
-    end.
-
-  Definition filename_of {X} (tle : toplevel_entity T X) : option string :=
-    match tle with
-    | TLE_Source_filename l => Some l
-    | _ => None
-    end.
-
-  Definition globals_of {X} (tle : toplevel_entity T X) : list (global T) :=
-    match tle with
-    | TLE_Global g => [g]
-    | _ => []
-    end.
-
-  Definition declarations_of {X} (tle : toplevel_entity T X) : list (declaration T) :=
-    match tle with
-    | TLE_Declaration d => [d]
-    | _ => []
-    end.
-
-  Definition definitions_of {X} (tle : toplevel_entity T X) : list (definition T X) :=
-    match tle with
-    | TLE_Definition d => [d]
-    | _ => []
-    end.
-
-  Definition type_defs_of {X} (tle : toplevel_entity T X) : list (ident * T) :=
-    match tle with
-    | TLE_Type_decl id t => [(id,t)]
-    | _ => []
-    end.
-
-  Definition modul_of_toplevel_entities {X} (tles : list (toplevel_entity T X)) : modul T X :=
-    {|
-      m_name := find_map filename_of tles;
-      m_target := find_map target_of tles;
-      m_datalayout := find_map datalayout_of tles;
-      m_type_defs := flat_map type_defs_of tles;
-      m_globals := flat_map globals_of tles;
-      m_declarations := flat_map declarations_of tles;
-      m_definitions := flat_map definitions_of tles;
-    |}.
 
   (* Identifiers ----------------------------------------------------------- *)
   Class Ident (X:Set) := ident_of : X -> ident.
@@ -755,3 +675,8 @@ Section WithType.
         ++ map ident_of (m_definitions m).
 
 End WithType.
+ *)
+
+Ltac unfold_eqv :=
+  repeat (unfold eqv in *; unfold eqv_raw_id in *; unfold eqv_instr_id in *).
+

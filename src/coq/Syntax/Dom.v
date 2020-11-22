@@ -9,13 +9,15 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-(** Reasoning about dominators in a graph. *)
-
+(* begin hide *)
 Require Import List Equalities Orders RelationClasses Omega.
 Require Import FSets FMaps.
 Import ListNotations.
-Require Import Vellvm.Util.
+From Vellvm Require Import
+     Utils.Util.
+(* end hide *)
 
+(** Reasoning about dominators in a graph. *)
 
 Module Type LATTICE.
   Include EqLe'.

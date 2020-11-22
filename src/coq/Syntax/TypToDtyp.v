@@ -1,10 +1,4 @@
-(** * Conversion from static to dynamic types
-    LLVM admits static types than can be recursive in the case of function types.
-    At run-time, this information is unnecessary, we therefore pre-process them by
-    converting them into a notion of dynamic types whose pointer type contains no
-    further information.
-    The conversion also inlines globally declared types (field [m_type_defs] of a [modul] (i.e. a [mcfg]).
-*)
+(* begin hide *)
 From Coq Require Import
      List
      String
@@ -22,6 +16,16 @@ Require Import Coqlib.
 
 Import ListNotations.
 Open Scope list_scope.
+(* end hide *)
+
+(** * Conversion from static to dynamic types
+    LLVM admits static types than can be recursive in the case of function types.
+    At run-time, this information is unnecessary, we therefore pre-process them by
+    converting them into a notion of dynamic types whose pointer type contains no
+    further information.
+    The conversion also inlines globally declared types (field [m_type_defs] of a [modul] (i.e. a [mcfg]).
+ *)
+
 
 Inductive typ_order : typ -> typ -> Prop :=
 | typ_order_Pointer : forall (t : typ), typ_order t (TYPE_Pointer t)

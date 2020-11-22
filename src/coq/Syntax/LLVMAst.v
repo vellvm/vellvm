@@ -22,14 +22,29 @@
 (* Adapted for use in Vellvm by Steve Zdancewic (c) 2017                      *)
 (*  ------------------------------------------------------------------------- *)
 
+(* begin hide *)
 Require Import Floats.
 From Coq Require Import List String Ascii ZArith.
 From Vellvm Require Import
-     Utisl.Util.
+     Utils.Util.
 
 Import ListNotations.
 Open Scope string_scope.
 Open Scope list_scope.
+(* end hide *)
+
+(** * VIR front AST
+
+    Definition of the internal AST used to represent VIR programs. More
+    specifically, this file contains the first representation produced by the
+    (unverified) OCaml parser of surface IR syntax. In particular, this
+    file defines the structure that a front end for a higher level language
+    should target: [@toplevel_entities typ (block typ * list (block typ))]
+
+    All changes to this file must naturally be mirrored in the parser.
+    "/src/ml/libvellvm/llvm_parser.mly"
+
+*)
 
 Definition int := Z.
 Definition float := Floats.float.  (* 64-bit floating point value *)
@@ -124,8 +139,6 @@ Variant thread_local_storage : Set :=
 | TLS_Localexec
 .
 
-
-
 Variant raw_id : Set :=
 | Name (s:string)     (* Named identifiers are strings: %argc, %val, %x, @foo, @bar etc. *)
 | Anon (n:int)        (* Anonymous identifiers must be sequentially numbered %0, %1, %2, etc. *)
@@ -142,7 +155,6 @@ Definition local_id  := raw_id.
 Definition global_id := raw_id.
 Definition block_id := raw_id.
 Definition function_id := global_id.
-
 
 Unset Elimination Schemes.
 Inductive typ : Set :=
@@ -168,7 +180,6 @@ Inductive typ : Set :=
 | TYPE_Identified (id:ident)
 .
 Set Elimination Schemes.
-
 
 Variant icmp : Set := Eq|Ne|Ugt|Uge|Ult|Ule|Sgt|Sge|Slt|Sle.
 Variant fcmp : Set := FFalse|FOeq|FOgt|FOge|FOlt|FOle|FOne|FOrd|FUno|FUeq|FUgt|FUge|FUlt|FUle|FUne|FTrue.
@@ -380,18 +391,6 @@ Variant toplevel_entity {FnBody:Set} : Set :=
 
 Definition toplevel_entities (FnBody:Set) : Set := list (@toplevel_entity FnBody).
 
-Record modul {FnBody:Set} : Set :=
-  mk_modul
-  {
-    m_name: option string;
-    m_target: option string;
-    m_datalayout: option string;
-    m_type_defs: list (ident * T);
-    m_globals: list global;
-    m_declarations: list declaration;
-    m_definitions: list (@definition FnBody);
-  }.
-
 End TypedSyntax.
 
 Arguments exp: clear implicits.
@@ -407,5 +406,4 @@ Arguments definition: clear implicits.
 Arguments metadata: clear implicits.
 Arguments toplevel_entity: clear implicits.
 Arguments toplevel_entities: clear implicits.
-Arguments modul: clear implicits.
 

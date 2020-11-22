@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import List ZArith String.
 Import ListNotations.
 
@@ -7,6 +8,7 @@ From ITree Require Import
 From Vellvm Require Import
      Syntax.CFG
      Syntax.LLVMAst.
+(* end hide *)
 
 (** ** Definition of generic transformations on Vellvm's abstract syntax.
     The general idea is to define two functions, an endofunction and an fmap
