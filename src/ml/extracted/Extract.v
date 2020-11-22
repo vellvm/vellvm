@@ -43,7 +43,6 @@ Extract Inlined Constant Archi.ppc64 => "false".
 Set Extraction AccessOpaque.
 (* NOTE: assumes that this file is compiled from /src *)
 Cd "ml/extracted".
-
 Extraction Library ExtrOcamlIntConv.
 Recursive Extraction Library TopLevel.
 Extraction Library Transform.

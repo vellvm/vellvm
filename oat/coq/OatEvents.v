@@ -19,7 +19,7 @@ From ITree Require Import
 From Vellvm Require Import
      Error.
 
-Require Import Oat.AST.
+Require Import Oat.Ast.
 Require Import Oat.DynamicValues.
 
 Open Scope list_scope.

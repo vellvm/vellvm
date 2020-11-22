@@ -1,8 +1,13 @@
 {
   open Lexing
-  open Parser
+  open Oat_parser
   open Range
-  
+  module Parser = Oat_parser
+  let str = Camlcoq.coqstring_of_camlstring
+  let of_str = Camlcoq.camlstring_of_coqstring
+  let coq_of_int = Camlcoq.Z.of_sint
+  let coq_of_int64 = Camlcoq.Z.of_sint64
+
   exception Lexer_error of Range.t * string
 
   let reset_lexbuf (filename:string) (lnum:int) lexbuf : unit =

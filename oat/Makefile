@@ -16,10 +16,7 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-# COQFILES_OAT    := AST LL LLInject Memory OatIO Denotation
-COQFILES_OAT    := AST DynamicValues OatEvents Plumbing CompilerCtxt Compiler
-
-OLLVMFILES :=
+COQFILES_OAT    := Ast DynamicValues OatEvents Denotation Plumbing CompilerCtxt Compiler
 
 VFILES  := $(COQFILES_OAT:%=coq/%.v)
 VOFILES := $(COQFILES_OAT:%=coq/%.vo)
@@ -37,13 +34,13 @@ itrees:
 	make -C $(ITREEDIR)
 
 .PHONY: extracted itrees 
+
 extracted: $(EXTRACTDIR)/STAMP $(VOFILES)
 
 $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "Extracting"
 	rm -f $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
 	$(COQEXEC) $(EXTRACTDIR)/Extract.v
-	patch -p0 < CRelationClasses.mli.patch
 	touch $(EXTRACTDIR)/STAMP
 
 
@@ -62,11 +59,12 @@ depend: itrees $(VFILES)
 EXE=_build/default/ml/main.exe
 
 $(EXE): extracted ml/dune ml/extracted/dune ml/testing/dune
-	@echo "Compiling Vellvm"
+	@echo "Compiling Oat"
 	dune build ml/main.exe 
 
-vellvm: $(EXE)
-	cp $(EXE) vellvm
+oatc: $(EXE)
+	cp $(EXE) oatc
+
 
 test: vellvm
 	./vellvm --test
@@ -74,7 +72,20 @@ test: vellvm
 print-includes:
 	@echo $(COQINCLUDES)
 
-clean: clean-vellvm clean-itrees
+clean: clean-vellvm clean-oat clean-itrees
+
+clean-oat:
+	rm -f .depend
+	find $(COQDIR) -name "*.vo" -delete
+	find $(COQDIR) -name "*.vio" -delete
+	find $(COQDIR) -name "*.vok" -delete
+	find $(COQDIR) -name "*.vos" -delete
+	rm -f $(VOFILES)
+	rm -rf doc/html doc/*.glob
+	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
+	chmod +wx -R $(MLDIR)/_build
+	dune clean
+
 clean-vellvm:
 	rm -f .depend
 	find $(COQDIR) -name "*.vo" -delete
@@ -90,7 +101,8 @@ clean-vellvm:
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
 clean-itrees:
 	make -C $(ITREEDIR) clean
-.PHONY: clean-vellvm clean-itrees
+
+.PHONY: clean-vellv clean-oat clean-itrees
 
 doc/coq2html: 
 	make -C ../lib/coq2html

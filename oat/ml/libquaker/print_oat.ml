@@ -7,6 +7,8 @@ open Format
 open Ast
 open Range
 
+let str = Camlcoq.camlstring_of_coqstring
+
 (* Precedence for expressions and operators *)
 (* Higher precedences bind more tightly     *)
 
@@ -53,7 +55,7 @@ let string_of_binop = function
 | IAnd  -> "[&]"
 | IOr   -> "[|]"
 
-let print_id_aux fmt (x:id) = pp_print_string fmt x
+let print_id_aux fmt (x:id) = pp_print_string fmt (Camlcoq.camlstring_of_coqstring x)
 
 let rec print_list_aux fmt sep pp l =
   begin match l with
@@ -68,8 +70,8 @@ let rec print_ty_aux fmt t =
   match t with
   | TBool         -> pps "bool"
   | TInt          -> pps "int"
-  | TRef r        -> print_rty_aux fmt r
-  | TNullRef r    -> pps "("; print_rty_aux fmt r; pps ")?"
+  | TNotNullRef r        -> print_rty_aux fmt r
+  | TRef r    -> pps "("; print_rty_aux fmt r; pps ")?"
 
 and print_ret_ty_aux fmt t =
   let pps = pp_print_string fmt in
@@ -83,7 +85,7 @@ and print_rty_aux fmt r =
   begin match r with
     | RString  -> pps "string"
     | RArray t -> print_ty_aux fmt t; pps "[]"
-    | RStruct id -> pps id
+    | RStruct id -> pps (str id)
     | RFun (ts, t) -> pps "("; 
                       print_list_aux fmt (fun () -> pps ", ") print_ty_aux ts;
                       pps ")"; pps "->"; print_ret_ty_aux fmt t
@@ -98,8 +100,8 @@ and print_exp_aux level fmt e =
   begin match e.elt with
     | CNull r -> print_rty_aux fmt r; pps "null"
     | CBool v -> pps (if v then "true" else "false")
-    | CInt  v -> pps (Int64.to_string v)
-    | CStr  v -> pps (Printf.sprintf "%S" v)
+    | CInt  v -> pps (Stdlib.Int64.to_string @@ Camlcoq.camlint64_of_coqint v)
+    | CStr  v -> pps (Printf.sprintf "%S" (str v))
     | CArr (ty,vs) -> begin
         pps "new "; print_ty_aux fmt ty; pps "[]";
         pps "{";
@@ -115,10 +117,14 @@ and print_exp_aux level fmt e =
     | NewArr(ty, e1) ->
         pps "new"; print_ty_aux fmt ty;
         pps "["; print_exp_aux this_level fmt e1; pps "]"
-    | NewArrInit (ty, e1, u, e2) ->
+        (* 
+    | NewArr (ty, e1) ->
         pps "new"; print_ty_aux fmt ty;
-        pps "["; print_exp_aux this_level fmt e1;
-        pps "] {"; pps u; pps "->"; print_exp_aux this_level fmt e2; pps "}"
+        pps "["; print_exp_aux this_level fmt e1
+        (* Return to this at some point - i have no clue what this syntax is lol *)
+        (* maybe length initialized arrays? *)
+    (*  pps "] {"; pps u; pps "->"; print_exp_aux this_level fmt e2; pps "}" *)
+         *)
     | Bop (o,l,r) ->
         pp_open_box fmt 0;
         print_exp_aux this_level fmt l;
@@ -133,10 +139,10 @@ and print_exp_aux level fmt e =
     | Proj (e, id) ->
         pp_open_box fmt 0;
         print_exp_aux this_level fmt e;
-        ppsp (); pps "."; ppsp (); pps id;
+        ppsp (); pps "."; ppsp (); pps (str id);
         pp_close_box fmt ()
     | CStruct (t, l) ->
-        pps "new "; pps t;
+        pps "new "; pps (str t);
         pp_open_box fmt 0;
         pps "{";
         List.iter (fun s -> print_cfield_aux this_level fmt s; pps "; ") l;
@@ -146,7 +152,7 @@ and print_exp_aux level fmt e =
 
 and print_cfield_aux l fmt (name, exp) =
   pp_open_box fmt 0; 
-  pp_print_string fmt name; 
+  pp_print_string fmt (str name); 
   pp_print_string fmt "="; print_exp_aux l fmt exp;
   pp_close_box fmt ();
 
@@ -208,7 +214,7 @@ and print_stmt_aux fmt s =
     | SCall (e, es) -> 
        print_exp_aux 0 fmt e; print_exps_aux "(" ")" fmt es; pps ";"
 
-    | Ret (eo) ->
+    | Return (eo) ->
         pps "return";
         begin match eo with
           | None -> ()
@@ -219,7 +225,7 @@ and print_stmt_aux fmt s =
         pps "if ("; print_exp_aux 0 fmt e; pps ") ";
         print_cond_aux fmt b_then opt_b_else
 
-    | Cast(t, id, e, b_null, b_notnull) ->
+    | Cast(_t, id, e, b_null, b_notnull) ->
         pps "ifnull ("; print_id_aux fmt id; pps "="; print_exp_aux 0 fmt e; 
         pps ") ";
         print_cond_aux fmt b_null b_notnull
@@ -244,13 +250,13 @@ and print_stmt_aux fmt s =
 	    pps ") "; print_block_aux fmt body
   end
 
-let print_fdecl_aux fmt {elt={frtyp; fname; args; body}} =
+let print_fdecl_aux fmt {elt={frtyp; fname; args; body}; loc =_} =
   let pps = pp_print_string fmt in
   let ppsp = pp_print_space fmt in
   let ppnl = pp_force_newline fmt in
 
   print_ret_ty_aux fmt frtyp;
-  pps @@ Printf.sprintf " %s(" fname;
+  pps @@ Printf.sprintf " %s(" (str fname);
   pp_open_hbox fmt ();
   print_list_aux fmt (fun () -> pps ","; ppsp ())
     (fun fmt -> fun (t, id) ->
@@ -265,21 +271,21 @@ let print_gdecl_aux fmt (gd:Ast.gdecl) =
   let pps = pp_print_string fmt in
   let ppsp = pp_print_space fmt in
   pp_open_hbox fmt ();
-  pps @@ Printf.sprintf "global %s =" gd.name; ppsp ();
+  pps @@ Printf.sprintf "global %s =" (str gd.name); ppsp ();
   print_exp_aux 0 fmt gd.init; pps ";";
   pp_close_box fmt ()
 
 let print_field fmt f =
   let pps = pp_print_string fmt in
   pp_open_hbox fmt ();
-  print_ty_aux fmt f.ftyp; pps " "; pps f.fieldName;
+  print_ty_aux fmt f.ftyp; pps " "; pps (str f.fieldName);
   pp_close_box fmt ()
 
 let print_tdecl_aux fmt ((id, l):Ast.tdecl) =
   let pps = pp_print_string fmt in
   let ppsp = pp_print_space fmt in
   pp_open_hbox fmt ();
-  pps @@ Printf.sprintf "struct %s =" id; ppsp ();
+  pps @@ Printf.sprintf "struct %s =" (str id); ppsp ();
   pps "{";
   List.iter (fun s -> print_field fmt s; pps "; ") l;
   pps "}";
@@ -348,7 +354,7 @@ let rec ml_string_of_ty (t:ty) : string =
   | TBool -> "TBool"
   | TInt -> "TInt"
   | TRef r -> sp "TRef (%s)" (ml_string_of_reft r)
-  | TNullRef r -> sp "TNullRef (%s)" (ml_string_of_reft r)
+  | TNotNullRef r -> sp "TNotNullRef (%s)" (ml_string_of_reft r)
 
 and ml_string_of_ret_ty r =
   match r with
@@ -360,13 +366,13 @@ and ml_string_of_reft (r:rty) : string =
   match r with    
   | RString -> "RString"
   | RArray t -> sp "(RArray (%s))" (ml_string_of_ty t)
-  | RStruct id -> sp "(RStruct (%s))" id
+  | RStruct id -> sp "(RStruct (%s))" (str id)
   | RFun (ts, t) -> sp "RFun (%s, %s)"
                     (ml_string_of_list ml_string_of_ty ts)
                     (ml_string_of_ret_ty t) 
 
 
-let ml_string_of_id : id -> string = (sp "\"%s\"")
+let ml_string_of_id : id -> string =  fun i -> (sp "\"%s\"") (str i)
 
 let ml_string_of_binop : binop -> string = function
   | Add  -> "Add"
@@ -395,13 +401,13 @@ let rec ml_string_of_exp_aux (e: exp) : string =
   begin match e with 
     | CNull r -> sp "CNull %s" (ml_string_of_reft r)
     | CBool b -> sp "CBool %b" b
-    | CInt i -> sp "CInt %LiL" i
-    | CStr s -> sp "CStr %S" s
+    | CInt i -> sp "CInt %LiL" (Camlcoq.camlint64_of_coqint i)
+    | CStr s -> sp "CStr %S" (str s)
     | CArr (t,cs) -> sp "CArr (%s,%s)" 
                          (ml_string_of_ty t) 
                          (ml_string_of_list ml_string_of_exp cs)
     | CStruct (id, l) -> sp "CStruct (%s, %s)"
-                            id
+                            (str id)
                             (ml_string_of_list ml_string_of_field l)
     | Id id -> sp "Id %s" (ml_string_of_id id)
     | Index (e, i) -> sp "Index (%s, %s)" 
@@ -411,8 +417,10 @@ let rec ml_string_of_exp_aux (e: exp) : string =
                             (ml_string_of_list ml_string_of_exp exps)
     | NewArr (t,e1) -> sp "NewArr (%s,%s)"
         (ml_string_of_ty t) (ml_string_of_exp e1)
-    | NewArrInit (t,e1,u,e2) -> sp "NewArrInit (%s,%s,%s,%s)"
-        (ml_string_of_ty t) (ml_string_of_exp e1) (ml_string_of_id u) (ml_string_of_exp e2)
+        (* 
+    | NewArr (t,e1) -> sp "NewArrInit (%s,%s)"
+                         (ml_string_of_ty t) (ml_string_of_exp e1) (* (ml_string_of_id u) (ml_string_of_exp e2) *)
+         *)
     | Proj(exp, id) -> sp "Proj (%s,%s)" (ml_string_of_exp exp) (ml_string_of_id id)
     | Bop (b, e1, e2) -> sp "Bop (%s,%s,%s)"
         (ml_string_of_binop b) (ml_string_of_exp e1) (ml_string_of_exp e2)
@@ -438,14 +446,14 @@ let rec ml_string_of_stmt_aux (s:stmt) : string =
   match s with
   | Assn (p, e) -> sp "Assn (%s,%s)" (ml_string_of_exp p) (ml_string_of_exp e)
   | Decl d -> sp "Decl (%s)" (ml_string_of_vdecl_aux d)
-  | Ret e -> sp "Ret (%s)" (ml_string_of_option ml_string_of_exp e)
+  | Return e -> sp "Ret (%s)" (ml_string_of_option ml_string_of_exp e)
   | SCall (exp, exps) -> 
      sp "SCall (%s, %s)" (ml_string_of_exp exp) (ml_string_of_list ml_string_of_exp exps)
   | If (e,b1,b2) -> sp "If (%s,%s,%s)"
                        (ml_string_of_exp e) (ml_string_of_block b1) (ml_string_of_block b2)
   | Cast (r, id, exp, null, notnull) ->
       sp "Cast (%s,%s,%s,%s,%s)"
-        (ml_string_of_reft r) id (ml_string_of_exp exp)
+        (ml_string_of_reft r) (str id) (ml_string_of_exp exp)
         (ml_string_of_block null) (ml_string_of_block notnull)
   | For (d,e,s,b) -> sp "For (%s,%s,%s,%s)"
                         (ml_string_of_list ml_string_of_vdecl_aux d) 

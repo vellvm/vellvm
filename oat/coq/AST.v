@@ -14,19 +14,15 @@ Export ListNotations.
 Open Scope list_scope.
 Open Scope nat.
 Open Scope program_scope.
-(* VV|TODO: This is col_start, col_end, line_start, line_end and a string???  *)
-Definition t := (string * (Z * Z) * (Z * Z))%type.
-(* This is no_loc right? *)
-Definition norange := ("__internal", (0%Z,0%Z), (0%Z,0%Z)).
 
+Definition t := (string * (Z * Z) * (Z * Z))%type.
+
+(** This is playing badly with extraction so .... *)
+(* Definition norange : t := ("__internal", (0%Z,0%Z), (0%Z,0%Z)). *)
 (* An AST node wraps decorates a datatype with its location in the source
    program. We attach source locations to expressions, statments, and
    top-level definitions to provide better error messages *)
 
-(* Extract node as this: 
-Definition node (A:Type) := A.
-*)
-(* VV| node type - *)
 Record node (A:Type) := mkNode { elt : A ; loc : t }.
 Definition elt_of {A} (n:node A) : A :=
   match n with
@@ -34,11 +30,9 @@ Definition elt_of {A} (n:node A) : A :=
   end.
 
 
-Definition no_loc {A} (x:A) := mkNode A x norange.
 
 (* OAT identifiers *)
 Definition id := string.
-
 
 
 
@@ -84,16 +78,16 @@ Inductive exp :=
   | Uop : unop -> node exp -> exp             (* operations with one argument *)
   | Id : id -> exp                           (* identifiers *)
   | Call : node exp -> (list (node exp)) -> exp   (* function call - change to exp later *)
-.
- (*
-  | CNull : ty -> exp                         (* null literal for any TRef *)
+  | CNull : rty -> exp                         (* null literal for any TRef *)
   | CArr : ty -> (list (node exp)) -> exp          (* array literal *)
   | CStruct : id -> list (id * node exp) -> exp        (* struct literal *)
   | Proj : node exp -> id -> exp              (* projection from a struct *)
   | NewArr : ty -> node exp -> exp            (* zero-initialized arrays *)
   | Index : node exp -> node exp -> exp       (* index into an array *)
   | Length : node exp -> exp.
-*)
+
+
+
 Definition cfield := (id * node exp)%type.
 
 Definition vdecl := (id * node exp)%type.              (* local variable declaration *)
@@ -108,11 +102,10 @@ Inductive stmt :=
   | SCall : node exp -> list (node exp) -> stmt   (* call a void function - change to exp later*)
   | For : list vdecl -> option (node exp) (* for loop *)
            -> option (node stmt) -> list (node stmt) -> stmt
-  .
+  | Cast : rty -> id -> (node exp) -> list (node stmt) -> list (node stmt) -> stmt
+.
   
-(*
-  | Cast : ty -> id -> (node exp) -> list (node stmt) -> list (node stmt) -> stmt
-*)
+  
 
 
 (* blocks : statements *)
@@ -146,5 +139,5 @@ Inductive decl :=
   | Gvdecl : node gdecl -> decl
   | Gtdecl : node tdecl -> decl.
 
-Definition prog := list fdecl.
+Definition prog := list decl.
 

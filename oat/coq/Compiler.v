@@ -6,7 +6,7 @@ Local Open Scope string_scope.
 Local Open Scope program_scope.
 Local Open Scope list_scope.
 From Vellvm Require Import LLVMAst Util.
-Require Import AST. 
+Require Import Ast. 
 Import ListNotations.
 Set Implicit Arguments.
 Set Strict Implicit.
@@ -95,7 +95,7 @@ Fixpoint eq_typ (t1: LLVMAst.typ) (t2: LLVMAst.typ) : bool :=
 
 Definition int_ty (i : nat) : LLVMAst.typ := TYPE_I (Z_of_nat i).
 (** Fill these in as part of the compiler *)
- Fixpoint cmp_ty (ty:  AST.ty) : LLVMAst.typ :=
+ Fixpoint cmp_ty (ty:  Ast.ty) : LLVMAst.typ :=
   match ty with
   | TBool => int_ty 1 
   | TInt => int_ty 64 
@@ -117,8 +117,8 @@ cmp_retty (ret_ty: ret_ty) : LLVMAst.typ :=
   | RetVal v => cmp_ty v
   end.
 
-Check AST.rty_ind.
- Fixpoint eq_ty (t1: AST.ty) (t2: AST.ty) : bool :=
+Check Ast.rty_ind.
+ Fixpoint eq_ty (t1: Ast.ty) (t2: Ast.ty) : bool :=
   match (t1, t2) with
   | (TBool, TBool) => true
   | (TInt, TInt) => true
@@ -126,7 +126,7 @@ Check AST.rty_ind.
   | (TNotNullRef l, TNotNullRef r) => eq_rty l r
   | (_, _) => false
   end with
-eq_rty (t1: AST.rty) (t2: AST.rty) : bool :=
+eq_rty (t1: Ast.rty) (t2: Ast.rty) : bool :=
   match (t1, t2) with
   | (RString, RString) => true
   | (RArray l, RArray r) => eq_ty l r
@@ -142,7 +142,7 @@ eq_rty (t1: AST.rty) (t2: AST.rty) : bool :=
     eq_retty l r
   | (_, _) => false
   end with
-eq_retty (t1: AST.ret_ty) (t2: AST.ret_ty) : bool :=
+eq_retty (t1: Ast.ret_ty) (t2: Ast.ret_ty) : bool :=
   match (t1, t2) with
   | (RetVoid, RetVoid) => true
   | (RetVal l, RetVal r) => eq_ty l r
@@ -150,14 +150,14 @@ eq_retty (t1: AST.ret_ty) (t2: AST.ret_ty) : bool :=
   end.
 
  
-Definition typ_of_binop (op : AST.binop) : (AST.ty * AST.ty * AST.ty) :=
+Definition typ_of_binop (op : Ast.binop) : (Ast.ty * Ast.ty * Ast.ty) :=
   match op with
-    | AST.Add | Mul | Sub | Shl | Shr | Sar | IAnd | IOr => (TInt, TInt, TInt)
+    | Ast.Add | Mul | Sub | Shl | Shr | Sar | IAnd | IOr => (TInt, TInt, TInt)
     | Eq | Neq | Lt | Lte | Gt | Gte => (TInt, TInt, TBool) 
     | And | Or => (TBool, TBool, TBool)
   end.           
                     
-Definition typ_of_unop (op: AST.unop) : (AST.ty * AST.ty) :=
+Definition typ_of_unop (op: Ast.unop) : (Ast.ty * Ast.ty) :=
   match op with
   | Neg | Bitnot => (TInt, TInt)
   | Lognot => (TBool, TBool)
@@ -183,81 +183,81 @@ Definition instr_const (v: Z) (t: LLVMAst.typ) : cerr (LLVMAst.typ * ident * cod
   | _ => raise "err"
   end.
 
-Definition cmp_unop (op: AST.unop) (src: ident) (ty: LLVMAst.typ) : cerr (LLVMAst.typ * ident * code typ) :=
+Definition cmp_unop (op: Ast.unop) (src: ident) (ty: LLVMAst.typ) : cerr (LLVMAst.typ * ident * code typ) :=
   inst_id <- inc_tmp ;;
   let unop_id := IId inst_id in
   let loc_id := ID_Local inst_id in
   match op with
-  | AST.Neg =>
+  | Ast.Neg =>
     (* numerical negation *) 
     let exp_op := OP_IBinop (LLVMAst.Mul false false) ty (EXP_Ident src) (EXP_Integer(-1)%Z) in
     ret (ty, loc_id, [(unop_id, INSTR_Op exp_op)])  
-  | AST.Lognot =>
+  | Ast.Lognot =>
     (* Logical negation *)
     let exp_op := OP_IBinop (LLVMAst.Xor) ty (EXP_Ident src) (EXP_Integer(-1)%Z) in
     ret (int_ty 1, loc_id, [(unop_id, INSTR_Op exp_op)])  
-  | AST.Bitnot =>
+  | Ast.Bitnot =>
     (* Bitwsie negation *)
     let exp_op := OP_IBinop (LLVMAst.Xor) ty (EXP_Ident src) (EXP_Integer (1%Z)) in
     ret (ty, loc_id, [(unop_id, INSTR_Op exp_op)])  
   end.
 
-Definition cmp_binop (op: AST.binop) (src_l : ident) (src_r: ident) (ty: LLVMAst.typ) : cerr (LLVMAst.typ * ident * code typ) :=
+Definition cmp_binop (op: Ast.binop) (src_l : ident) (src_r: ident) (ty: LLVMAst.typ) : cerr (LLVMAst.typ * ident * code typ) :=
   raw_id' <- inc_tmp ;;
   let bop_id := IId raw_id' in
   let loc_id := ID_Local raw_id' in
   match op with
     (* Basic (signed) integer arithmetic *)
-  | AST.Add =>  
+  | Ast.Add =>  
     let exp_op := OP_IBinop (LLVMAst.Add false false) ty (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (ty, loc_id, [(bop_id, INSTR_Op exp_op)])
-  | AST.Sub =>  
+  | Ast.Sub =>  
     let exp_op := OP_IBinop (LLVMAst.Sub false false) ty (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (ty, loc_id, [(bop_id, INSTR_Op exp_op)])
-  | AST.Mul =>  
+  | Ast.Mul =>  
     let exp_op := OP_IBinop (LLVMAst.Mul false false) ty (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (ty, loc_id, [(bop_id, INSTR_Op exp_op)])
   (* Basic (signed) comparison *)
-  | AST.Eq =>
+  | Ast.Eq =>
     let exp_op := OP_ICmp (LLVMAst.Eq) (int_ty 1) (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (int_ty 1, loc_id, [(bop_id, INSTR_Op exp_op)])
-  | AST.Neq =>
+  | Ast.Neq =>
     let exp_op := OP_ICmp (LLVMAst.Ne) (int_ty 1) (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (int_ty 1, loc_id, [(bop_id, INSTR_Op exp_op)])
-  | AST.Lt =>
+  | Ast.Lt =>
     let exp_op := OP_ICmp (LLVMAst.Slt) (int_ty 1) (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (int_ty 1, loc_id, [(bop_id, INSTR_Op exp_op)])
-  | AST.Lte =>
+  | Ast.Lte =>
     let exp_op := OP_ICmp (LLVMAst.Sle) (int_ty 1) (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (int_ty 1, loc_id, [(bop_id, INSTR_Op exp_op)])
-  | AST.Gt =>
+  | Ast.Gt =>
     let exp_op := OP_ICmp (LLVMAst.Sgt) (int_ty 1) (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (int_ty 1, loc_id, [(bop_id, INSTR_Op exp_op)])
-  | AST.Gte =>
+  | Ast.Gte =>
     let exp_op := OP_ICmp (LLVMAst.Sge) (int_ty 1) (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (int_ty 1, loc_id, [(bop_id, INSTR_Op exp_op)])
   (* Basic (logical) operations *)
-  | AST.And =>
+  | Ast.And =>
     let exp_op := OP_IBinop (LLVMAst.And) (int_ty 1) (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (int_ty 1, loc_id, [(bop_id, INSTR_Op exp_op)])
-  | AST.Or =>
+  | Ast.Or =>
     let exp_op := OP_IBinop (LLVMAst.Or) (int_ty 1) (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (int_ty 1, loc_id, [(bop_id, INSTR_Op exp_op)])
   (* Basic bitwise logical operations *)
-  | AST.IAnd =>
+  | Ast.IAnd =>
     let exp_op := OP_IBinop (LLVMAst.And) (int_ty 64) (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (ty, loc_id, [(bop_id, INSTR_Op exp_op)])
-  | AST.IOr =>
+  | Ast.IOr =>
     let exp_op := OP_IBinop (LLVMAst.Or) (int_ty 64) (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (ty, loc_id, [(bop_id, INSTR_Op exp_op)])
   (* Basic shifting operations *)
-  | AST.Shl =>  
+  | Ast.Shl =>  
     let exp_op := OP_IBinop (LLVMAst.Shl false false) ty (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (ty, loc_id, [(bop_id, INSTR_Op exp_op)])
-  | AST.Shr =>  
+  | Ast.Shr =>  
     let exp_op := OP_IBinop (LLVMAst.LShr false)  ty (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (ty, loc_id, [(bop_id, INSTR_Op exp_op)])
-  | AST.Sar =>  
+  | Ast.Sar =>  
     let exp_op := OP_IBinop (LLVMAst.AShr false) ty (EXP_Ident src_l) (EXP_Ident src_r) in
     ret (ty, loc_id, [(bop_id, INSTR_Op exp_op)])
   end.
@@ -271,7 +271,7 @@ Definition cmp_binop (op: AST.binop) (src_l : ident) (src_r: ident) (ty: LLVMAst
   then we emit
   %(i+1) = Load t (ptr r) %i
 *)
-Definition deref (id: AST.id) : cerr ( LLVMAst.typ * ident * code typ ) :=
+Definition deref (id: Ast.id) : cerr ( LLVMAst.typ * ident * code typ ) :=
     '(op_id, op_ty) <- find_ident id;;
     match op_ty with
     | TYPE_Pointer t =>
@@ -296,19 +296,19 @@ Fixpoint foldl2_err {A B C : Type}
                         foldl2_err comb merge t1 t2
   end.
 About eq_ty.
-Fixpoint cmp_exp (expr: AST.exp)
+Fixpoint cmp_exp (expr: Ast.exp)
   : cerr (LLVMAst.typ * ident * code typ) :=
   match expr with
   | CBool b => instr_const (if b then 1%Z else 0%Z) (cmp_ty TBool)
   | CInt i => instr_const (Int64.signed i) (cmp_ty TInt)
   | Id i => deref i
   | Uop op nexp =>
-    '(ty, id, stream) <-  cmp_exp (elt AST.exp nexp) ;;
+    '(ty, id, stream) <-  cmp_exp (elt Ast.exp nexp) ;;
     '(op_t, op_id, s_unop) <- cmp_unop op id ty ;;
     ret (op_t, op_id, stream ++ s_unop)
   | Bop op lexp rexp =>
-    '(t_l, id_l, code_l) <- cmp_exp (elt AST.exp lexp) ;;
-    '(t_r, id_r, code_r) <- cmp_exp (elt AST.exp rexp) ;;
+    '(t_l, id_l, code_l) <- cmp_exp (elt Ast.exp lexp) ;;
+    '(t_r, id_r, code_r) <- cmp_exp (elt Ast.exp rexp) ;;
     '(op_t, op_id, code_res) <- cmp_binop op id_l id_r t_l ;;
     ret (op_t, op_id, code_l ++ code_r ++ code_res)
   | Call id_e args_e =>
@@ -317,39 +317,15 @@ Fixpoint cmp_exp (expr: AST.exp)
   end.
 
 Print LLVMAst.block.
-Fixpoint cmp_stmt
+Definition cmp_stmt
          (rt : LLVMAst.typ)
-         (stmt: AST.stmt) : cerr ( code typ ) :=
-  let loc_id := fun e => EXP_Ident (ID_Local e) in
+         (stmt: Ast.stmt) : cerr ( code typ ) :=
   match stmt with
-    | AST.Decl (i, e) => 
-      '(ty, id, code) <- cmp_exp (elt AST.exp e) ;;
-      let t_ptr_id := TYPE_Pointer ty in
-      alloca_id <- inc_tmp ;;
-      store_id <- inc_tmp ;;
-      (* TODO - instr_alloca nb texp and load volatile? *)
-      let stream := code ++ [
-                           (IId alloca_id, INSTR_Alloca ty None None ) ;
-                         (IId store_id, INSTR_Store false (ty, loc_id id) (t_ptr_id, loc_id alloca_id) None)
-                         ] in 
-      put_local i t_ptr_id alloca_id ;;
-      ret stream
-    | Assn lhs rhs =>
-      '(dest_ty, dest_id, dest_code) <- cmp_exp (elt AST.exp lhs) ;;
-      '(src_ty, src_id, src_code) <- cmp_exp (elt AST.exp rhs) ;;
-      (* This should generate a store src_ty src_id src *)
-      store_id <- inc_tmp ;;
-      ret ( dest_code ++ src_code ++ [
-                        (IId store_id, INSTR_Store false (src_ty, loc_id src_id) (dest_ty, loc_id dest_id) None)
-          ]) 
-    | If cond pos neg =>  
-      '(cond_ty, cond_id, cond_code) <- 
-      raise "unimp"
     | _ => raise "unimplemented"
   end.
   
 (** 
-with cmp_block (rt : LLVMAst.typ) (stmts: AST.block) : cerr (code typ)
+with cmp_block (rt : LLVMAst.typ) (stmts: Ast.block) : cerr (code typ)
 (* TODO *). Admitted.
 *)                                   
 
@@ -357,21 +333,23 @@ with cmp_block (rt : LLVMAst.typ) (stmts: AST.block) : cerr (code typ)
     and run the state ... - work out what the nicest 
 *)
 
-Definition Populate_function_ctxt (c: ctxt) (p: AST.prog) : ctxt 
+(* Commenting out for extraction *)
+(** 
+Definition Populate_function_ctxt (c: ctxt) (p: Ast.prog) :  ctxt 
 (* TODO *). Admitted.
 
 (* TODO - add this once globals are supported in OAT *)
-Fixpoint Populate_global_ctxt (c: ctxt) (p: AST.prog) : ctxt
+Fixpoint Populate_global_ctxt (c: ctxt) (p: Ast.prog) : ctxt
 (* TODO *). Admitted.
 
 Definition cfg : Set := LLVMAst.block typ * list (LLVMAst.block typ).
 
-Definition cmp_fdecl (f: node AST.fdecl)
+Definition cmp_fdecl (f: node Ast.fdecl)
   : cerr ( toplevel_entity typ cfg)
 (* TODO *). Admitted.
 
-Definition cmp_prog (p: AST.prog) : cerr ( toplevel_entities typ cfg) 
+Definition cmp_prog (p: Ast.prog) : cerr ( toplevel_entities typ cfg) 
 (* TODO *). Admitted.
-
+*)
 
 

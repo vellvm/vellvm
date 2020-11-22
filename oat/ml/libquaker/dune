@@ -3,6 +3,7 @@
 	(flags (:standard -g -w -20-32-33-39)))
 	(release
 	(flags (:standard -O3 -w -20-32-33-39))))
+
 (menhir
 (flags --explain)
 (modules oat_parser)
@@ -11,8 +12,8 @@
 (ocamllex oat_lexer)
 
 (library
-	(name oatlib)
+	(name libquaker)
 	(wrapped false)
 	(libraries extracted str)
-	(synopsis "Oat Binary"
-	)
+	(synopsis "Quaker Binary")
+		  )

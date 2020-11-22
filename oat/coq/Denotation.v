@@ -29,7 +29,7 @@ From ExtLib Require Import
 
 From Vellvm Require Import Util Error.
 Require Import Integers.
-Require Import Oat.AST.
+Require Import Oat.Ast.
 Require Import Oat.DynamicValues.
 Require Import Oat.OatEvents.
 
@@ -52,11 +52,11 @@ About iter.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
-Definition expr := Oat.AST.exp.
-Definition stmt := Oat.AST.stmt.
-Definition unop := Oat.AST.unop.
-Definition binop := Oat.AST.binop.
-Definition vdecl := Oat.AST.vdecl.
+Definition expr := Oat.Ast.exp.
+Definition stmt := Oat.Ast.stmt.
+Definition unop := Oat.Ast.unop.
+Definition binop := Oat.Ast.binop.
+Definition vdecl := Oat.Ast.vdecl.
 
 (* Denote the semantics for binary operations *)
 
@@ -92,7 +92,7 @@ Definition denote_uop (u: unop) (v: ovalue) : itree OatE ovalue :=
 Definition denote_bop (op: binop) (v1 v2 : ovalue) : itree OatE ovalue :=
   match op, v1, v2 with
   (* Integer arithmetic *)
-  | Oat.AST.Add, OVALUE_Int l, OVALUE_Int r => ret (OVALUE_Int (Int64.add l r))
+  | Oat.Ast.Add, OVALUE_Int l, OVALUE_Int r => ret (OVALUE_Int (Int64.add l r))
   | Sub, OVALUE_Int l, OVALUE_Int r => ret (OVALUE_Int(Int64.sub l r))
   | Mul, OVALUE_Int l, OVALUE_Int r => ret (OVALUE_Int(Int64.mul l r))
   (* Integer comparison *)
@@ -145,6 +145,7 @@ Fixpoint denote_expr (e: expr) : itree OatE ovalue :=
     | OVALUE_Void => raise "err: using a void function call in an expression"
     | _ => ret f_ret
     end
+  | _ => raise "err: unimplemented"
   end.
 
 (** I'll define some convenient helpers for common things like looping and sequencing here *)
@@ -330,9 +331,9 @@ Definition denote_fdecl (df : fdecl) : function_denotation :=
 
 *)
 
-About AST.fdecl.
+About Ast.fdecl.
 
-Fixpoint lookup {T} (id: AST.id) (fdecls: list (AST.id * T)) : option T :=
+Fixpoint lookup {T} (id: Ast.id) (fdecls: list (Ast.id * T)) : option T :=
   match fdecls with
   | nil => None
   | h :: t => if eqb (fst h) (id) then Some (snd h) else lookup id t
@@ -356,3 +357,4 @@ Definition interp_away_calls (fdecls : list (id * function_denotation)) (id: str
 
 About Call.
 About interp_away_calls.
+

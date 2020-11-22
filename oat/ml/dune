@@ -1,0 +1,8 @@
+(env
+	(dev
+	(flags (:standard -warn-error -A -w -34))))
+
+(executables
+	 (names main)
+	 (libraries extracted libquaker unix str)
+)

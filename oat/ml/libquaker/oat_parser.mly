@@ -1,14 +1,17 @@
 %{
 open Ast
-
+type int64 = Integers.Int64.int
 let loc (startpos:Lexing.position) (endpos:Lexing.position) (elt:'a) : 'a node =
   { elt ; loc=Range.mk_lex_range startpos endpos }
+
+let str = Camlcoq.camlstring_of_coqstring
+let of_str = Camlcoq.coqstring_of_camlstring 
 
 %}
 
 /* Declare your tokens here. */
 %token EOF
-%token <int64>  INT
+%token <Stdlib.Int64.t>  INT
 %token NULL
 %token <string> STRING
 %token <string> IDENT
@@ -105,22 +108,22 @@ prog:
 
 decl:
   | GLOBAL name=IDENT EQ init=gexp SEMI
-    { Gvdecl (loc $startpos $endpos { name; init }) }
+    { Gvdecl (loc $startpos $endpos { name = of_str (name); init }) }
   | frtyp=ret_ty fname=IDENT LPAREN args=arglist RPAREN body=block
-    { Gfdecl (loc $startpos $endpos { frtyp; fname; args; body }) }
+    { Gfdecl (loc $startpos $endpos { frtyp; fname = of_str (fname); args; body }) }
   | STRUCT name=UIDENT LBRACE fs=separated_list(SEMI, decl_field) RBRACE 
-    { Gtdecl (loc $startpos $endpos (name, fs)) }
+    { Gtdecl (loc $startpos $endpos (of_str name, fs)) }
 
 decl_field:
-  | t=ty id=IDENT { { fieldName=id; ftyp=t } }
+  | t=ty id=IDENT { { fieldName=(of_str id); ftyp=t } }
 
 arglist:
-  | l=separated_list(COMMA, pair(ty,IDENT)) { l }
+  | l=separated_list(COMMA, pair(ty,IDENT)) { List.map (fun (v,i) -> (v, of_str i)) l }
     
 ty:
   | TINT   { TInt }
   | r=rtyp { TRef r } %prec LOW
-  | r=rtyp QUESTION { TNullRef r }
+  | r=rtyp QUESTION { TRef r }
   | LPAREN t=ty RPAREN { t } 
   | TBOOL  { TBool } 
 
@@ -131,7 +134,7 @@ ty:
 %inline rtyp:
   | TSTRING { RString }
   | t=ty LBRACKET RBRACKET { RArray t }
-  | id=UIDENT { RStruct id }
+  | id=UIDENT { RStruct (of_str id) }
   | LPAREN RPAREN ARROW ret=ret_ty { RFun ([], ret) }
   | LPAREN t=ty RPAREN ARROW ret=ret_ty { RFun ([t], ret) }
   | LPAREN t=ty COMMA l=separated_list(COMMA, ty) RPAREN ARROW ret=ret_ty
@@ -164,39 +167,41 @@ gexp:
   | r=rtyp NULL{ loc $startpos $endpos @@ CNull r }
   | TRUE       { loc $startpos $endpos @@ CBool true }
   | FALSE      { loc $startpos $endpos @@ CBool false }
-  | i=INT      { loc $startpos $endpos @@ CInt i } 
-  | s=STRING   { loc $startpos $endpos @@ CStr s }
+  | i=INT      { loc $startpos $endpos @@ CInt (Camlcoq.coqint_of_camlint64 i) } 
+  | s=STRING   { loc $startpos $endpos @@ CStr (of_str s) }
   | NEW t=ty LBRACKET RBRACKET LBRACE cs=separated_list(COMMA, gexp) RBRACE
                { loc $startpos $endpos @@ CArr (t, cs) } 
   | NEW i=UIDENT LBRACE fs=separated_list(SEMI, gfield) RBRACE
-               { loc $startpos $endpos @@ CStruct (i, fs) }
-  | id=IDENT {loc $startpos $endpos @@ Id id }
+               { loc $startpos $endpos @@ CStruct ((of_str i), fs) }
+  | id=IDENT {loc $startpos $endpos @@ Id (of_str id) }
 
 gfield:
-  | id=IDENT EQ e=gexp { (id, e) }
+  | id=IDENT EQ e=gexp { (of_str id, e) }
 
 lhs:  
-  | id=IDENT            { loc $startpos $endpos @@ Id id }
+  | id=IDENT            { loc $startpos $endpos @@ Id (of_str id) }
   | e=exp LBRACKET i=exp RBRACKET
                         { loc $startpos $endpos @@ Index (e, i) }
-  | e=exp DOT id=IDENT  { loc $startpos $endpos @@ Proj (e, id) }
+  | e=exp DOT id=IDENT  { loc $startpos $endpos @@ Proj (e, (of_str id)) }
 
 exp:
   | r=rtyp NULL         { loc $startpos $endpos @@ CNull r }
   | TRUE                { loc $startpos $endpos @@ CBool true }
   | FALSE               { loc $startpos $endpos @@ CBool false }
-  | i=INT               { loc $startpos $endpos @@ CInt i }
-  | s=STRING            { loc $startpos $endpos @@ CStr s }
+  | i=INT               { loc $startpos $endpos @@ CInt ( Camlcoq.coqint_of_camlint64 i) }
+  | s=STRING            { loc $startpos $endpos @@ CStr (of_str s) }
   | NEW t=ty LBRACKET RBRACKET LBRACE cs=separated_list(COMMA, exp) RBRACE
     { loc $startpos $endpos @@ CArr (t, cs) }
   | NEW t=ty LBRACKET e1=exp RBRACKET
     { loc $startpos $endpos @@ NewArr(t, e1) }
   | NEW t=UIDENT LBRACE cs=separated_list(SEMI, field) RBRACE
-                        { loc $startpos $endpos @@ CStruct(t, cs) }
-  | e=exp DOT id=IDENT  { loc $startpos $endpos @@ Proj(e, id) }
+                        { loc $startpos $endpos @@ CStruct(of_str t, cs) }
+  | e=exp DOT id=IDENT  { loc $startpos $endpos @@ Proj(e, of_str id) }
+(* 
   | NEW t=ty LBRACKET e1=exp RBRACKET LBRACE u=IDENT ARROW e2=exp RBRACE
                         { loc $startpos $endpos @@ NewArrInit(t, e1, u, e2) }
-  | id=IDENT            { loc $startpos $endpos @@ Id id }
+*)
+  | id=IDENT            { loc $startpos $endpos @@ Id (of_str id) }
   | e=exp LBRACKET i=exp RBRACKET
                         { loc $startpos $endpos @@ Index (e, i) }
   | e=exp LPAREN es=separated_list(COMMA, exp) RPAREN
@@ -208,10 +213,10 @@ exp:
   | LPAREN e=exp RPAREN { e } 
 
 field:
-  | id=IDENT EQ e=exp { (id, e) }
+  | id=IDENT EQ e=exp { (of_str id, e) }
 
 vdecl:
-  | VAR id=IDENT EQ init=exp { (id, init) }
+  | VAR id=IDENT EQ init=exp { (of_str id, init) }
 
 stmt: 
   | d=vdecl SEMI        { loc $startpos $endpos @@ Decl(d) }
@@ -219,8 +224,8 @@ stmt:
   | e=exp LPAREN es=separated_list(COMMA, exp) RPAREN SEMI
                         { loc $startpos $endpos @@ SCall (e, es) }
   | ifs=if_stmt         { ifs }
-  | RETURN SEMI         { loc $startpos $endpos @@ Ret(None) }
-  | RETURN e=exp SEMI   { loc $startpos $endpos @@ Ret(Some e) }
+  | RETURN SEMI         { loc $startpos $endpos @@ Return(None) }
+  | RETURN e=exp SEMI   { loc $startpos $endpos @@ Return(Some e) }
   | WHILE LPAREN e=exp RPAREN b=block  
                         { loc $startpos $endpos @@ While(e, b) } 
   | FOR LPAREN ds=separated_list(COMMA, vdecl) SEMI e=exp? SEMI s=stmt? RPAREN b=block
@@ -233,7 +238,7 @@ if_stmt:
   | IF LPAREN e=exp RPAREN b1=block b2=else_stmt
     { loc $startpos $endpos @@ If(e,b1,b2) }
   | IFQ LPAREN r=rtyp id=IDENT EQ e=exp RPAREN b1=block b2=else_stmt
-    { loc $startpos $endpos @@ Cast(r, id, e, b1, b2) }
+    { loc $startpos $endpos @@ Cast(r, of_str id, e, b1, b2) }
 
 else_stmt:
   | (* empty *)       { [] }
