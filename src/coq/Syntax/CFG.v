@@ -15,6 +15,7 @@ From Coq Require Import ZArith List String Omega.
 
 From Vellvm Require Import
         Syntax.LLVMAst
+        Syntax.AstLib
         Utils.Util.
 
 From ExtLib Require Import
@@ -174,6 +175,10 @@ Section CFG.
       m_declarations := m_declarations m;
       m_definitions := defns
     |}.
+
+  (* Utility to lookup by id a block from a list of blocks *)
+  Definition find_block (bs: list (block T)) block_id : option (block T) :=
+    find (fun b => if (blk_id b) ~=? block_id then true else false) bs.
 
 End CFG.
 

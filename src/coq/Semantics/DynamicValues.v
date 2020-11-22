@@ -179,7 +179,7 @@ Qed.
 Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
-Module DVALUE(A:Vellvm.MemoryAddress.ADDRESS).
+Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS).
 
   (* The set of dynamic values manipulated by an LLVM program. *)
   Unset Elimination Schemes.
