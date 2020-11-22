@@ -337,10 +337,9 @@ Section Endo.
            `{Endo (global T)}
            `{Endo (declaration T)}
            `{Endo raw_id}
-      : Endo (modul T FnBody) | 50 :=
+      : Endo (modul FnBody) | 50 :=
       fun m =>
-        mk_modul _
-                 (endo (m_name m))
+        mk_modul (endo (m_name m))
                  (endo (m_target m))
                  (endo (m_datalayout m))
                  (endo (m_type_defs m))
@@ -352,8 +351,7 @@ Section Endo.
            `{Endo raw_id}
            `{Endo (block T)}
       : Endo (cfg T) | 50 :=
-      fun p => mkCFG _
-                  (endo (init _ p))
+      fun p => mkCFG (endo (init _ p))
                   (endo (blks _ p))
                   (endo (args _ p)).
 
@@ -366,9 +364,8 @@ Section Endo.
            `{Endo (global T)}
            `{Endo (declaration T)}
            `{Endo (definition T FnBody)}
-      : Endo (modul T FnBody) | 50 :=
-      fun p => mk_modul _
-                     (endo (m_name p))
+      : Endo (modul FnBody) | 50 :=
+      fun p => mk_modul (endo (m_name p))
                      (endo (m_target p))
                      (endo (m_datalayout p))
                      (endo (m_type_defs p))
@@ -655,10 +652,9 @@ Section Fmap.
            `{Fmap global}
            `{Fmap declaration}
            `{Endo raw_id}
-      : Fmap (fun T => modul T (FnBody T)) | 50 :=
+      : Fmap (fun T => modul (FnBody T)) | 50 :=
       fun U V f m =>
-        mk_modul _
-                 (endo (m_name m)) 
+        mk_modul (endo (m_name m)) 
                  (endo (m_target m)) (endo (m_datalayout m)) 
                  (fmap (fun '(id,t) => (id, f t)) (m_type_defs m)) 
                  (fmap f (m_globals m))
@@ -669,8 +665,7 @@ Section Fmap.
            `{Endo raw_id}
            `{Fmap block}
       : Fmap cfg | 50 :=
-      fun U V f p => mkCFG _
-                        (endo (init _ p))
+      fun U V f p => mkCFG (endo (init _ p))
                         (fmap f (blks _ p))
                         (endo (args _ p)).
 
@@ -682,9 +677,8 @@ Section Fmap.
            `{Fmap global}
            `{Fmap declaration}
            `{Fmap (fun T => definition T (FnBody T))}
-      : Fmap (fun T => modul T (FnBody T)) | 50 :=
-      fun U V f p => mk_modul _
-                  (endo (m_name p))
+      : Fmap (fun T => modul (FnBody T)) | 50 :=
+      fun U V f p => mk_modul (endo (m_name p))
                   (endo (m_target p))
                   (endo (m_datalayout p))
                   (fmap (fun '(id,t) => (id, f t)) (m_type_defs p))

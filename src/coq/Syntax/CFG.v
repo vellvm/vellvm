@@ -189,3 +189,13 @@ Arguments mcfg_of_modul {T}.
 Definition mcfg_of_tle (p : toplevel_entities typ (block typ * list (block typ))) :=
   mcfg_of_modul (modul_of_toplevel_entities p).
 
+Arguments modul {_} _.
+Arguments mk_modul {_ _}.
+Arguments m_name {_ _}.
+Arguments m_target {_ _}.
+Arguments m_datalayout {_ _}.
+Arguments m_type_defs {_ _}.
+Arguments m_globals {_ _}.
+Arguments m_declarations {_ _}.
+Arguments m_definitions {_ _}.
+Arguments mkCFG {_}.

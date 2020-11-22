@@ -953,8 +953,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Proof.
       intros dv dt TYP.
       induction TYP;
-        try solve [cbn; omega].
-      - cbn.  rewrite DynamicValues.unsupported_cases_match. omega. assumption.
+        try solve [cbn; lia].
+      - cbn.  rewrite DynamicValues.unsupported_cases_match. lia. assumption.
       - rewrite sizeof_struct_cons.
         lia.
       - rewrite sizeof_packed_struct_cons.

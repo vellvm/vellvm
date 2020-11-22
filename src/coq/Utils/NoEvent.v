@@ -843,6 +843,9 @@ Qed.
 
 (** * Other discussions  *)
 
+(* YZ TODO: This file should not depend on VIR, this section should be eventually moved 
+   somewhere in [Theory/]
+*)
 (* We want to express that a tree contains no [pickE] events,
    and that if so that entails that the interpretation by the pick handlers
    leads to the singleton predicate containing the elimination of the pick event.
@@ -851,7 +854,28 @@ Qed.
    forall t', model_pick t t' -> t' ≈ elim_pick t
  *)
 
-From Vellvm Require Import PropT.
+From Vellvm Require Import
+     Utils.Tactics
+     Utils.Util
+     Utils.PropT
+     Utils.PostConditions
+     Utils.NoFailure
+     Syntax.Traversal
+     Syntax.LLVMAst
+     Syntax.AstLib
+     Syntax.CFG
+     Syntax.DynamicTypes
+     Syntax.TypToDtyp
+     Semantics.LLVMEvents
+     Semantics.Denotation
+     Semantics.TopLevel
+     Handlers.Handlers.
+     (* Theory.InterpreterCFG *)
+     (* Theory.InterpreterMCFG. *)
+     (* Theory.TopLevelRefinements *)
+     (* Theory.DenotationTheory *)
+     (* Theory.InstrLemmas. *)
+
 From Coq Require Import Relation_Definitions.
 
 Import MonadNotation.
@@ -904,30 +928,6 @@ Lemma deterministic_is_singleton' :
     is_singleton (interp_from_prop RX h ts) (elim_l t).
 Proof.
 Admitted.
-
-From Vellvm Require Import InterpreterMCFG.
-
-Require Export Vellvm.Tactics.
-Require Export Vellvm.Util.
-Require Export Vellvm.LLVMEvents.
-Require Export Vellvm.DynamicTypes.
-Require Export Vellvm.Denotation.
-Require Export Vellvm.Handlers.Handlers.
-Require Export Vellvm.TopLevel.
-Require Export Vellvm.LLVMAst.
-Require Export Vellvm.AstLib.
-Require Export Vellvm.CFG.
-Require Export Vellvm.InterpreterMCFG.
-Require Export Vellvm.InterpreterCFG.
-Require Export Vellvm.TopLevelRefinements.
-Require Export Vellvm.TypToDtyp.
-Require Export Vellvm.LLVMEvents.
-Require Export Vellvm.Transformations.Traversal.
-Require Export Vellvm.PostConditions.
-Require Export Vellvm.Denotation_Theory.
-Require Export Vellvm.InstrLemmas.
-Require Export Vellvm.NoFailure.
-Require Export Vellvm.PropT.
 
 Variable remove_pick_ub : itree (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' DebugE +' FailureE).
 Variable deterministic_vellvm : forall R, itree L0 R -> Prop.
