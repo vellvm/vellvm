@@ -8,11 +8,11 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-open MemoryTheory.M
+open Handlers.MemTheory.Mem
 open Handlers.Local
 open Handlers.Stack
 open Handlers.Global
-open MemoryTheory.LLVMEvents
+open Handlers.LLVMEvents
 
 open Format
 open ITreeDefinition

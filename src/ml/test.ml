@@ -12,7 +12,7 @@
 ;; open Driver
 ;; open Assert
 ;; open DynamicValues
-;; open MemoryTheory.LLVMEvents
+;; open Handlers.LLVMEvents
 
 (* Vellvm test cases -------------------------------------------------------- *)
 

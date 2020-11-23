@@ -1,4 +1,4 @@
-(* begin hide *)
+
 From Coq Require Import
      Morphisms ZArith List String Lia
      FSets.FMapAVL
@@ -48,13 +48,17 @@ Set Contextual Implicit.
 (* end hide *)
 
 (** * Memory Model: Theory
-
     Reasoning principles for VIR's main memory model.
 *)
 
-Module LLVMEvents := LLVMEvents.Make(Memory.Addr).
-Module M := Memory.Make(LLVMEvents).
-Import LLVMEvents DV M.
+Module Type MEMORY_THEORY (LLVMEvents : LLVM_INTERACTIONS(Addr)).
+  (** ** Theory of the general operations over the finite maps we manipulate *)
+  Import LLVMEvents.
+  Import DV.
+  Open Scope list.
+
+  Module Mem := Memory.Make(LLVMEvents).
+  Export Mem.
 
 (** ** Theory of the general operations over the finite maps we manipulate
  *)
@@ -2719,4 +2723,8 @@ Section PARAMS.
   End Structural_Lemmas.
 
 End PARAMS.
+End MEMORY_THEORY.
 
+Module Make(LLVMEvents : LLVM_INTERACTIONS(Addr)) <: MEMORY_THEORY(LLVMEvents).
+Include MEMORY_THEORY(LLVMEvents).
+End Make.
