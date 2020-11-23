@@ -30,7 +30,7 @@ From Vellvm.Handlers Require Export
 .
 
 (* Handlers get instantiated over the domain of addresses provided by the memory model *)
-Module LLVMEvents := LLVMEvents.Make(Memory.Addr).
+(* Module LLVMEvents := LLVMEvents.Make(Memory.Addr). *)
 Module Global := Global.Make Memory.Addr LLVMEvents.
 Module Local  := Local.Make  Memory.Addr LLVMEvents.
 Module Stack  := Stack.Make  Memory.Addr LLVMEvents.

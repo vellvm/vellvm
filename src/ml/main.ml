@@ -40,7 +40,7 @@ let make_test ll_ast t : string * assertion  =
     in
     str, (Assert.assert_eqf result (Ok expected))
   | Assertion.POISONTest (dtyp, entry, args) ->
-     let expected = Handlers.LLVMEvents.DV.UVALUE_Poison in
+     let expected = MemoryTheory.LLVMEvents.DV.UVALUE_Poison in
      let str =
        let expected_str =
          Interpreter.pp_uvalue Format.str_formatter expected;

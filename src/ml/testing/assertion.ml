@@ -1,6 +1,6 @@
 open LLVMAst
 open TopLevel
-open Handlers.LLVMEvents
+open MemoryTheory.LLVMEvents
 
 
 type raw_assertion_string =
