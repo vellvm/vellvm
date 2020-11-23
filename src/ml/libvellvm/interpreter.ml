@@ -8,7 +8,7 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-open Handlers.Mem
+open Handlers.MemTheory
 open Handlers.Local
 open Handlers.Stack
 open Handlers.Global

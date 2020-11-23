@@ -45,6 +45,7 @@ Import Monads.
 Module D   := Denotation Addr LLVMEvents.
 Module IS  := IntrinsicsDefinitions.Make Addr LLVMEvents.
 Export DV.
+Export Mem.
 Import D IS.
 
 Open Scope string_scope.
