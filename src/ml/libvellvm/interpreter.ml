@@ -12,7 +12,7 @@ open Handlers.MemTheory
 open Handlers.Local
 open Handlers.Stack
 open Handlers.Global
-open MemoryTheory.LLVMEvents
+open Handlers.LLVMEvents
 
 open Format
 open ITreeDefinition
