@@ -649,6 +649,42 @@ Proof.
   ecase IHn; eauto.
 Qed.
 
+Lemma Forall2_Nth_left : forall {A B:Type} n l1 l2 R (a:A),
+    Nth l1 n a ->
+    Forall2 R l1 l2 ->
+    exists (b:B), (Nth l2 n b) /\ R a b.
+Proof.
+  induction n as [| n IH]; cbn; intros.
+  destruct l1; inv H0; inv_option.
+  eexists; eauto.
+  destruct l1; inv H0; try inv_option.
+  edestruct IH; eauto.
+Qed.
+
+Lemma Forall2_Nth_right : forall {A B:Type} n l1 l2 R (b:B),
+    Nth l2 n b ->
+    Forall2 R l1 l2 ->
+    exists (a:A), (Nth l1 n a) /\ R a b.
+Proof.
+  induction n as [| n IH]; cbn; intros.
+  destruct l1; inv H0; inv_option.
+  eexists; eauto.
+  destruct l1; inv H0; try inv_option.
+  edestruct IH; eauto.
+Qed.
+
+Lemma Forall2_Nth : forall {A B:Type} n l1 l2 R (a:A) (b : B),
+    Nth l1 n a ->
+    Nth l2 n b ->
+    Forall2 R l1 l2 ->
+    R a b.
+Proof.
+  induction n as [| n IH]; cbn; intros.
+  destruct l1; inv H1; repeat inv_option; auto.
+  destruct l1; inv H1; repeat inv_option; auto.
+  eapply IH; eauto.
+Qed.
+
 Lemma Forall_map_eq : forall A B (f g : A -> B) l
   (Hall : Forall (fun x => f x = g x) l),
   map f l = map g l.
@@ -698,6 +734,11 @@ Proof.
   rewrite IHl; auto; lia.
 Qed.
 
+Lemma list_cons_app :
+  forall {A} (x : A) l, x :: l = [x] ++ l.
+Proof.
+  cbn. reflexivity.
+Qed.
 
 (* replicate ---------------------------------------------------------------- *)
 

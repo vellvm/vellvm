@@ -418,13 +418,6 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
    *)
   end.
 
-
-Lemma list_cons_app :
-  forall {A} (x : A) l, x :: l = [x] ++ l.
-Proof.
-  cbn. reflexivity.
-Qed.
-
 Lemma uvalue_to_dvalue_of_dvalue_to_uvalue :
   forall (d : dvalue),
     uvalue_to_dvalue (dvalue_to_uvalue d) = inr d.

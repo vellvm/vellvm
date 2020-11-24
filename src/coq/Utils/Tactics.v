@@ -148,4 +148,79 @@ Ltac forward H :=
   | ?P -> _ => assert P as H'; [| specialize (H H'); clear H']
   end.
 
+From ITree Require Import
+     ITree
+     Eq.Eq.
+(* Simple specialization of [eqit_Ret] to [eutt] so that users of the library do not need to know about [eqit] *)
+Ltac ret_bind_l_left v :=
+  match goal with
+    |- eutt _ ?t _ =>
+    rewrite <- (bind_ret_l v (fun _ => t))
+  end.
+
+Ltac simpl_match_hyp h :=
+  match type of h with
+    context[match ?x with | _ => _ end] =>
+    match goal with
+    | EQ: x = _ |- _ => rewrite EQ in h
+    | EQ: _ = x |- _ => rewrite <- EQ in h
+    end
+  end.
+Tactic Notation "simpl_match" "in" hyp(h) := simpl_match_hyp h.
+
+Ltac destruct_unit :=
+  match goal with
+  | x : unit |- _ => destruct x
+  end.
+
+(** [break_inner_match' t] tries to destruct the innermost [match] it
+    find in [t]. *)
+Ltac break_inner_match' t :=
+ match t with
+   | context[match ?X with _ => _ end] =>
+     break_inner_match' X || destruct X eqn:?
+   | _ => destruct t eqn:?
+ end.
+
+(** [break_inner_match_goal] tries to destruct the innermost [match] it
+    find in your goal. *)
+Ltac break_inner_match_goal :=
+ match goal with
+   | [ |- context[match ?X with _ => _ end] ] =>
+     break_inner_match' X
+ end.
+
+(** [break_inner_match_hyp] tries to destruct the innermost [match] it
+    find in a hypothesis. *)
+Ltac break_inner_match_hyp :=
+ match goal with
+   | [ H : context[match ?X with _ => _ end] |- _ ] =>
+     break_inner_match' X
+ end.
+
+(** [break_inner_match] tries to destruct the innermost [match] it
+    find in your goal or a hypothesis. *)
+Ltac break_inner_match := break_inner_match_goal || break_inner_match_hyp.
+
+Ltac forwardr H H' :=
+  match type of H with
+  | ?P -> _ => assert P as H'; [| specialize (H H')]
+  end.
+Tactic Notation "forwardr" ident(H) ident(H') := forwardr H H'.
+
+Ltac match_rewrite :=
+  match goal with
+  | H : (?X = ?v) |-
+    context [ match ?X with | _ => _ end] =>
+    rewrite H
+  end.
+
+Ltac inv_eqs :=
+  repeat 
+    match goal with
+    | h : ?x = ?x |- _ => clear h
+    | h : _ = ?x |- _ => subst x
+    | h : ?x = ?x /\ _ |- _ => destruct h as [_ ?]
+    | h : _ = _ /\ _ |- _ => (destruct h as [<- ?] || destruct h as [?EQ ?])
+    end.
 

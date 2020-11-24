@@ -205,3 +205,4 @@ Arguments m_globals {_ _}.
 Arguments m_declarations {_ _}.
 Arguments m_definitions {_ _}.
 Arguments mkCFG {_}.
+Arguments find_block {_}.
