@@ -39,5 +39,5 @@ let args =
 
 let () =
   Arg.parse args (fun _ -> ())
-    " QUAKER OAT Compile\n\
-     USAGE: --help to see the list of options"
+    " QUAKER OAT Compiler\n\
+      USAGE: --help to see the list of options"

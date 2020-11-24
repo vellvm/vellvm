@@ -58,21 +58,21 @@ depend: itrees $(VFILES)
 
 EXE=_build/default/ml/main.exe
 
-$(EXE): extracted ml/dune ml/extracted/dune ml/testing/dune
-	@echo "Compiling Oat"
+$(EXE): extracted ml/dune ml/extracted/dune
+	@echo "Compiling the Quaker Oat Binary"
 	dune build ml/main.exe 
 
-oatc: $(EXE)
-	cp $(EXE) oatc
-
-
-test: vellvm
-	./vellvm --test
+oat: coq extracted
+	chmod +777 -R .
+	dune build $(MLDIR)/main.exe
+	@echo "Compiling the Quaker Oat Binary"
+	dune build ml/main.exe
+	cp $(EXE) quaker
 
 print-includes:
 	@echo $(COQINCLUDES)
 
-clean: clean-vellvm clean-oat clean-itrees
+clean: clean-oat clean-itrees
 
 clean-oat:
 	rm -f .depend
@@ -83,26 +83,14 @@ clean-oat:
 	rm -f $(VOFILES)
 	rm -rf doc/html doc/*.glob
 	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
-	chmod +wx -R $(MLDIR)/_build
+	chmod +777 _build -R 
 	dune clean
+	rm quaker
 
-clean-vellvm:
-	rm -f .depend
-	find $(COQDIR) -name "*.vo" -delete
-	find $(COQDIR) -name "*.vio" -delete
-	find $(COQDIR) -name "*.vok" -delete
-	find $(COQDIR) -name "*.vos" -delete
-	rm -f $(VOFILES)
-	rm -rf doc/html doc/*.glob
-	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
-	dune clean
-	rm -rf output
-	rm -f vellvm
-	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
 clean-itrees:
 	make -C $(ITREEDIR) clean
 
-.PHONY: clean-vellv clean-oat clean-itrees
+.PHONY: clean-oat clean-itrees
 
 doc/coq2html: 
 	make -C ../lib/coq2html

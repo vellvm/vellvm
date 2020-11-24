@@ -38,3 +38,6 @@ src/coq/.lia.cache
 oat/ml/extracted/*.ml
 oat/ml/extracted/*.mli
 oat/ml/extracted/STAMP
+oat/_build
+oat/ml/_build
+oat/coq/.*.aux
