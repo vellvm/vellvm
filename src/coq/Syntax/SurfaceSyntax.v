@@ -3,9 +3,9 @@ From Coq Require Import List ZArith String.
 Import ListNotations.
 Open Scope Z.
 From Vellvm Require Import
-     LLVMAst
-     CFG
-     DynamicTypes.
+     Syntax.LLVMAst
+     Syntax.CFG
+     Syntax.DynamicTypes.
 (* end hide *)
 
 (** * Surface syntax for VIR

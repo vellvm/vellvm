@@ -54,7 +54,13 @@ Section CFG.
   | Term (t:terminator T)
   .
 
-(* each function definition corresponds to a control-flow graph
+  (** * Open cfg
+      A potentially open cfg ([ocfg]) is simply a list of blocks.
+   *)
+  Definition ocfg := list (block T).
+
+  (** * cfg
+      Each function definition corresponds to a control-flow graph
    - init is the entry block
    - blks is a list of labeled blocks
    - args is the list of identifiers brought into scope by this function
@@ -62,7 +68,7 @@ Section CFG.
   Record cfg := mkCFG
                   {
                     init : block_id;
-                    blks : list (block T);
+                    blks : ocfg;
                     args : list ident;
                   }.
 

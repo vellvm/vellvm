@@ -18,7 +18,9 @@ CP=cp
 COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats\
 									Utils/ParserHelper Utils/Tactics Utils/Util Utils/Error\
 									Utils/PropT Utils/PostConditions Utils/NoFailure\
-                  Syntax/LLVMAst Syntax/AstLib Syntax/CFG Syntax/Traversal Syntax/Dom Syntax/DynamicTypes Syntax/TypToDtyp Syntax/SurfaceSyntax\
+                  Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
+									Syntax/Traversal Syntax/Dom Syntax/DynamicTypes Syntax/TypToDtyp\
+									Syntax/Scope Syntax/SurfaceSyntax\
 									Semantics/MemoryAddress Semantics/DynamicValues Semantics/LLVMEvents Semantics/IntrinsicsDefinitions\
 									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/MemoryTheory Handlers/UndefinedBehaviour Handlers/Handlers\
 								  Semantics/Denotation Semantics/TopLevel\
