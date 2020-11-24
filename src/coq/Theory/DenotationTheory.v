@@ -55,78 +55,6 @@ In particular, notice that since [interp] is a iterative-monad morphism that res
 
 *)
 
-(** [find_block] *)
-
-Lemma find_block_nil: forall {T} b, find_block T [] b = None. 
-Proof.
-  reflexivity.
-Qed.
-
-Lemma find_block_eq: forall {T} x b bs,
-    blk_id b = x ->
-    find_block T (b:: bs) x = Some b.
-Proof.
-  intros; cbn.
-  rewrite H.
-  destruct (Eqv.eqv_dec_p x x).
-  reflexivity.
-  contradiction n; reflexivity.
-Qed.
-
-Lemma find_block_ineq: forall {T} x b bs,
-    blk_id b <> x ->
-    find_block T (b::bs) x = find_block T bs x. 
-Proof.
-  intros; cbn.
-  destruct (Eqv.eqv_dec_p (blk_id b)) as [EQ | INEQ].
-  unfold Eqv.eqv, AstLib.eqv_raw_id in *; intuition.
-  reflexivity.
-Qed.
-
-Lemma find_none_app:
-  forall {A} (l1 l2 : list A) pred,
-    find pred l1 = None ->
-    find pred (l1 ++ l2) = find pred l2.
-Proof.
-  induction l1; intros l2 pred FIND.
-  - reflexivity.
-  - cbn in FIND; cbn.
-    destruct (pred a); inversion FIND.
-    auto.
-Qed.
-
-Lemma find_some_app:
-  forall {A} (l1 l2 : list A) a pred,
-    find pred l1 = Some a ->
-    find pred (l1 ++ l2) = Some a.
-Proof.
-  induction l1 as [|x l1']; intros l2 a pred FIND.
-  - inversion FIND.
-  - cbn in FIND. destruct (pred x) eqn:PRED.
-    + inversion FIND; cbn; subst.
-      rewrite PRED. reflexivity.
-    + cbn. rewrite PRED.
-      auto.
-Qed.
-
-Lemma find_block_none_app:
-  forall {t} l1 l2 bid,
-    find_block t l1 bid = None ->
-    find_block t (l1 ++ l2) bid = find_block t l2 bid.
-Proof.
-  intros t l1 l2 bid FIND.
-  apply find_none_app; auto.
-Qed.
-
-Lemma find_block_some_app:
-  forall {t} l1 l2 bid bk,
-    find_block t l1 bid = Some bk ->
-    find_block t (l1 ++ l2) bid = Some bk.
-Proof.
-  intros t l1 l2 bid bk FIND.
-  apply find_some_app; auto.
-Qed.
-
 (** [denote_code] *)
 
 Lemma denote_code_nil :
@@ -206,10 +134,10 @@ Proof.
   rewrite assoc_tl; auto; reflexivity.
 Qed.
 
-(** [denote_bks] *)
-Lemma denote_bks_nil: forall s, denote_bks [] s ≈ ret (inl s).
+(** [denote_ocfg] *)
+Lemma denote_ocfg_nil: forall s, denote_ocfg [] s ≈ ret (inl s).
 Proof.
-  intros []; unfold denote_bks.
+  intros []; unfold denote_ocfg.
   match goal with
   | |- CategoryOps.iter (C := ktree _) ?body ?s ≈ _ =>
     rewrite (unfold_iter body s)
@@ -218,17 +146,17 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma denote_bks_unfold_in: forall bks bid_from bid_src bk,
-    find_block dtyp bks bid_src = Some bk ->
-    denote_bks bks (bid_from, bid_src) ≈
+Lemma denote_ocfg_unfold_in: forall bks bid_from bid_src bk,
+    find_block bks bid_src = Some bk ->
+    denote_ocfg bks (bid_from, bid_src) ≈
     vob <- denote_block bk bid_from ;;
     match vob with
     | inr v => ret (inr v)
-    | inl bid_target => denote_bks bks (bid_src, bid_target)
+    | inl bid_target => denote_ocfg bks (bid_src, bid_target)
     end.
 Proof.
   intros * GET_BK.
-  cbn. unfold denote_bks at 1.
+  cbn. unfold denote_ocfg at 1.
   rewrite KTreeFacts.unfold_iter_ktree. cbn.
   rewrite GET_BK.
   repeat setoid_rewrite bind_bind.
@@ -237,157 +165,16 @@ Proof.
   rewrite tau_eutt; reflexivity.
 Qed.
 
-Lemma denote_bks_unfold_not_in: forall bks bid_from bid_src, 
-    find_block dtyp bks bid_src = None ->
-    denote_bks bks (bid_from, bid_src) ≈ Ret (inl (bid_from,bid_src)).
+Lemma denote_ocfg_unfold_not_in: forall bks bid_from bid_src, 
+    find_block bks bid_src = None ->
+    denote_ocfg bks (bid_from, bid_src) ≈ Ret (inl (bid_from,bid_src)).
 Proof.
   intros * GET_BK.
-  unfold denote_bks.
+  unfold denote_ocfg.
   rewrite KTreeFacts.unfold_iter_ktree.
   rewrite GET_BK; cbn.
   rewrite bind_ret_l.
   reflexivity.
-Qed.
-
-Definition open_cfg {t} : Type := list (LLVMAst.block t).
-Definition inputs {t} (ocfg : @open_cfg t) :=
-  fmap blk_id ocfg.
-
-Definition terminator_outputs {t} (term : LLVMAst.terminator t) : list block_id
-  := match term with
-     | TERM_Ret v => []
-     | TERM_Ret_void => []
-     | TERM_Br v br1 br2 => [br1; br2]
-     | TERM_Br_1 br => [br]
-     | TERM_Switch v default_dest brs => default_dest :: fmap snd brs
-     | TERM_IndirectBr v brs => brs
-     | TERM_Resume v => []
-     | TERM_Invoke fnptrval args to_label unwind_label => [to_label; unwind_label]
-     end.
-
-Definition bk_outputs {t} (bk : block t) : list block_id :=
-  terminator_outputs (snd (blk_term bk)).
-
-Definition outputs {t} (bks : @open_cfg t) : List.list block_id
-  := fold_left (fun acc bk => acc ++ bk_outputs bk) bks [].
-
-Lemma outputs_acc: forall {t} (bks: list (block t)) acc,
-    fold_left (fun acc bk => acc ++ bk_outputs bk) bks acc =
-    acc ++ fold_left (fun acc bk => acc ++ bk_outputs bk) bks [].
-Proof.
-  induction bks using List.list_rev_ind; intros; cbn.
-  - rewrite app_nil_r; reflexivity.
-  - rewrite 2 fold_left_app, IHbks.
-    cbn.
-    rewrite app_assoc.
-    reflexivity.
-Qed.
-
-Lemma outputs_app: forall {t} l l',
-    @outputs t (l ++ l') = outputs l ++ outputs l'.
-Proof.
-  intros.
-  unfold outputs at 1.
-  rewrite fold_left_app, outputs_acc.
-  reflexivity.
-Qed.
-
-Lemma outputs_cons: forall {t} b l,
-    @outputs t (b :: l) = bk_outputs b ++ outputs l.
-Proof.
-  intros.
-  rewrite list_cons_app, outputs_app; reflexivity.
-Qed.
-
-Lemma In_bk_outputs: forall {t} bid br (b: block t) l,
-    In br (bk_outputs b) ->
-    find_block t l bid = Some b ->
-    In br (outputs l). 
-Proof.
-  induction l as [| ? l IH].
-  - cbn; intros ? abs; inv abs.
-  - intros IN FIND.
-    cbn in FIND.
-    flatten_hyp FIND; inv FIND.
-    + flatten_hyp Heq; inv Heq.
-      rewrite outputs_cons.
-      apply in_or_app; left; auto.
-    + flatten_hyp Heq; inv Heq. 
-      rewrite outputs_cons.
-      apply in_or_app; right.
-      auto.
-Qed.
- 
-Infix "⊍" := Coqlib.list_disjoint (at level 60).
-
-Definition no_reentrance {t} (ocfg1 ocfg2 : @open_cfg t) : Prop :=
-  outputs ocfg2 ⊍ inputs ocfg1.
-
-Definition no_duplicate_bid {t} (ocfg1 ocfg2 : @open_cfg t) : Prop :=
-  inputs ocfg1 ⊍ inputs ocfg2.
-
-Lemma no_reentrance_not_in {t} (ocfg1 ocfg2 : @open_cfg t) :
-  no_reentrance ocfg1 ocfg2 ->
-  forall x, In x (outputs ocfg2) -> ~ In x (inputs ocfg1).
-Proof.
-  intros; eauto using Coqlib.list_disjoint_notin.
-Qed.
-
-Lemma no_duplicate_bid_not_in_l {t} (ocfg1 ocfg2 : @open_cfg t) :
-  no_duplicate_bid ocfg1 ocfg2 ->
-  forall x, In x (inputs ocfg2) -> ~ In x (inputs ocfg1).
-Proof.
-  intros; eauto using Coqlib.list_disjoint_notin, Coqlib.list_disjoint_sym.
-Qed.
-
-Lemma no_duplicate_bid_not_in_r {t} (ocfg1 ocfg2 : @open_cfg t) :
-  no_duplicate_bid ocfg1 ocfg2 ->
-  forall x, In x (inputs ocfg1) -> ~ In x (inputs ocfg2).
-Proof.
-  intros; eauto using Coqlib.list_disjoint_notin, Coqlib.list_disjoint_sym.
-Qed.
-
-Definition independent_flows {t} (ocfg1 ocfg2 : @open_cfg t) : Prop :=
-  no_reentrance ocfg1 ocfg2 /\ 
-  no_reentrance ocfg2 ocfg1 /\
-  no_duplicate_bid ocfg1 ocfg2.
-
-Lemma independent_flows_no_reentrance_l {t} (ocfg1 ocfg2 : @open_cfg t):
-  independent_flows ocfg1 ocfg2 ->
-  no_reentrance ocfg1 ocfg2.
-Proof.
-  intros INDEP; apply INDEP; auto.
-Qed.
-
-Lemma independent_flows_no_reentrance_r {t} (ocfg1 ocfg2 : @open_cfg t):
-  independent_flows ocfg1 ocfg2 ->
-  no_reentrance ocfg2 ocfg1.
-Proof.
-  intros INDEP; apply INDEP; auto.
-Qed.
-
-Lemma independent_flows_no_duplicate_bid {t} (ocfg1 ocfg2 : @open_cfg t):
-  independent_flows ocfg1 ocfg2 ->
-  no_duplicate_bid ocfg1 ocfg2.
-Proof.
-  intros INDEP; apply INDEP; auto.
-Qed.
-
-Lemma find_block_not_in_inputs: forall b l,
-        ~ In b (inputs l) ->
-        find_block dtyp l b = None.
-Proof.
-  induction l as [| bk l IH]; intros NIN; auto.
-  cbn.
-  flatten_goal.
-  - exfalso.
-    flatten_hyp Heq; [| inv Heq].
-    apply NIN.
-    left; rewrite e; reflexivity.
-  - flatten_hyp Heq; [inv Heq |].
-    apply IH.
-    intros abs; apply NIN.
-    right; auto.
 Qed.
 
 (** * outputs soundness *)
@@ -428,11 +215,12 @@ Proof.
   apply denote_terminator_exits_in_outputs.
 Qed.
 
-Lemma find_block_in_inputs : forall {to ocfg},
-    In to (inputs ocfg) ->
-    exists bk, find_block dtyp ocfg to = Some bk.
+Lemma find_block_in_inputs :
+  forall {T} to (bks : ocfg T),
+    In to (inputs bks) ->
+    exists bk, find_block bks to = Some bk.
 Proof.
-  induction ocfg as [| id ocfg IH]; cbn; intros IN; [inv IN |].
+  induction bks as [| id ocfg IH]; cbn; intros IN; [inv IN |].
   flatten_goal; flatten_hyp Heq; intuition; eauto.
 Qed.
 
@@ -441,14 +229,14 @@ Qed.
    - [Qb] holds at the initial entry point
    - [Qb] and [Qv] are preserved by the denotation of any blocks in the open cfg, assuming [Qb]
  *)
-Lemma denote_bks_has_post_strong :
-  forall ocfg fto (Qb : block_id * block_id -> Prop) (Qv : uvalue -> Prop)
+Lemma denote_ocfg_has_post_strong :
+  forall (bks : ocfg _) fto (Qb : block_id * block_id -> Prop) (Qv : uvalue -> Prop)
     (INIT : Qb fto)
     (IND : forall fto (b : block dtyp),
         Qb fto ->
-        find_block _ ocfg (snd fto) = Some b ->
+        find_block bks (snd fto) = Some b ->
         denote_block b (fst fto) ⤳ sum_pred (fun to => Qb (snd fto, to)) Qv), 
-    denote_bks ocfg fto ⤳ sum_pred Qb Qv.
+    denote_ocfg bks fto ⤳ sum_pred Qb Qv.
 Proof.
   intros * INIT IND.
   eapply has_post_iter_strong; eauto.
@@ -465,16 +253,16 @@ Qed.
    - and assuming that we indeed enter the [open_cfg]
    then we get [Qb/Qv], and ignore the origin of the jump.
  *)
-Lemma denote_bks_has_post :
-  forall ocfg fto (Qb : block_id -> Prop) (Qv : uvalue -> Prop)
-    (ENTER : In (snd fto) (inputs ocfg)) 
+Lemma denote_ocfg_has_post :
+  forall (bks : ocfg _) fto (Qb : block_id -> Prop) (Qv : uvalue -> Prop)
+    (ENTER : In (snd fto) (inputs bks)) 
     (IND : forall fto (b : block dtyp),
-        find_block _ ocfg (snd fto) = Some b ->
+        find_block bks (snd fto) = Some b ->
         denote_block b (fst fto) ⤳ sum_pred Qb Qv),
-    denote_bks ocfg fto ⤳ sum_pred (prod_pred TT Qb) Qv.
+    denote_ocfg bks fto ⤳ sum_pred (prod_pred TT Qb) Qv.
 Proof.
   intros * IN IND.
-  apply has_post_iter_strong with (Inv := fun x => In (snd x) (inputs ocfg) \/ Qb (snd x))
+  apply has_post_iter_strong with (Inv := fun x => In (snd x) (inputs bks) \/ Qb (snd x))
   ; eauto.
   intros [f to] HYP.
   flatten_goal.
@@ -487,15 +275,15 @@ Proof.
     apply find_block_in_inputs in abs as [? abs]; cbn in abs; rewrite abs in Heq; inv Heq.
 Qed.  
 
-Lemma denote_bks_exits_in_outputs :
+Lemma denote_ocfg_exits_in_outputs :
   forall ocfg fto,
     In (snd fto) (inputs ocfg) ->
-    denote_bks ocfg fto ⤳ exits_in_outputs ocfg.
+    denote_ocfg ocfg fto ⤳ exits_in_outputs ocfg.
 Proof.
   intros * IN.
   apply has_post_weaken with (P := sum_pred (prod_pred TT (fun b => In b (outputs ocfg))) TT).
   2: intros [[]|] ?; cbn in *; intuition.
-  apply denote_bks_has_post; eauto.
+  apply denote_ocfg_has_post; eauto.
   intros.
   eapply has_post_weaken.
   eapply denote_bk_exits_in_outputs.
@@ -503,21 +291,21 @@ Proof.
   eapply In_bk_outputs; eauto.
 Qed.
 
-(** * denote_bks  *)
+(** * denote_ocfg  *)
 
-Lemma denote_bks_app_no_edges :
-  forall (l1 l2 : open_cfg) fto,
-    find_block dtyp l1 (snd fto) = None ->
-    no_reentrance l1 l2 ->
-    denote_bks (l1 ++ l2) fto ≈ denote_bks l2 fto.
+Lemma denote_ocfg_app_no_edges :
+  forall (bks1 bks2 : ocfg _) fto,
+    find_block bks1 (snd fto) = None ->
+    no_reentrance bks1 bks2 ->
+    denote_ocfg (bks1 ++ bks2) fto ≈ denote_ocfg bks2 fto.
 Proof.
-  intros l1 l2 [f to] FIND NOBACK.
-  apply (@KTreeFacts.eutt_iter_gen _ _ _ (fun fto fto' => fto' = fto /\ find_block dtyp l1 (snd fto) = None)); auto.
+  intros bks1 bks2 [f to] FIND NOBACK.
+  apply (@KTreeFacts.eutt_iter_gen _ _ _ (fun fto fto' => fto' = fto /\ find_block bks1 (snd fto) = None)); auto.
   clear f to FIND; intros fto fto' [-> FIND]; destruct fto as [f to] .
   cbn in *.
-  epose proof (find_block_none_app _ l2 _ FIND) as FIND_L1L2.
+  epose proof (find_block_none_app _ bks2 _ FIND) as FIND_L1L2.
   rewrite FIND_L1L2.
-  destruct (find_block dtyp l2 to) eqn:FIND_L2.
+  destruct (find_block bks2 to) eqn:FIND_L2.
   - eapply eutt_post_bind.
     apply denote_bk_exits_in_outputs.
     intros [id | v] ?; cbn; apply eutt_Ret; eauto.
@@ -529,13 +317,13 @@ Proof.
 Qed.
 
 Import ITreeNotations.
-Lemma denote_bks_app :
-  forall ocfg1 ocfg2 fto,
-    no_reentrance ocfg1 ocfg2 ->
-    denote_bks (ocfg1 ++ ocfg2) fto ≈ ITree.bind (denote_bks ocfg1 fto)
+Lemma denote_ocfg_app :
+  forall bks1 bks2 fto,
+    no_reentrance bks1 bks2 ->
+    denote_ocfg (bks1 ++ bks2) fto ≈ ITree.bind (denote_ocfg bks1 fto)
                (fun x =>
                   match x with
-                  | inl fto2 => denote_bks ocfg2 fto2
+                  | inl fto2 => denote_ocfg bks2 fto2
                   | inr v => ret (inr v)
                   end).
 Proof.
@@ -544,8 +332,8 @@ Proof.
   einit.
   ecofix CIH.
   intros [f to].
-  destruct (find_block dtyp ocfg1 to) eqn:FIND.
-  - unfold denote_bks.
+  destruct (find_block bks1 to) eqn:FIND.
+  - unfold denote_ocfg.
     unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree.
     match goal with
       |- euttG _ _ _ _ _ ?t _ => remember t; rewrite unfold_iter; subst
@@ -553,7 +341,7 @@ Proof.
     rewrite unfold_iter; cbn.
     rewrite FIND.
     rewrite !bind_bind.
-    pose proof find_block_some_app ocfg1 ocfg2 to FIND as FIND_APP.
+    pose proof find_block_some_app bks1 bks2 to FIND as FIND_APP.
     rewrite FIND_APP.
     cbn.
     rewrite !bind_bind.
@@ -570,42 +358,42 @@ Proof.
     + rewrite !bind_ret_l.
       eret.
   - efinal.
-    rewrite denote_bks_app_no_edges; auto.
-    rewrite denote_bks_unfold_not_in with (bks := ocfg1); auto.
+    rewrite denote_ocfg_app_no_edges; auto.
+    rewrite denote_ocfg_unfold_not_in with (bks := bks1); auto.
     rewrite bind_ret_l; reflexivity.
 Qed.
 
-Lemma denote_bks_flow_left :
+Lemma denote_ocfg_flow_left :
   forall ocfg1 ocfg2 fto,
     independent_flows ocfg1 ocfg2 ->
     In (snd fto) (inputs ocfg1) ->
-    denote_bks (ocfg1 ++ ocfg2) fto ≈
-    denote_bks ocfg1 fto.
+    denote_ocfg (ocfg1 ++ ocfg2) fto ≈
+    denote_ocfg ocfg1 fto.
 Proof.
   intros * INDEP IN.
-  rewrite denote_bks_app; [| auto using independent_flows_no_reentrance_l].
+  rewrite denote_ocfg_app; [| auto using independent_flows_no_reentrance_l].
   bind_ret_r2.
 
-  eapply eutt_post_bind; [apply denote_bks_exits_in_outputs; eauto |].
+  eapply eutt_post_bind; [apply denote_ocfg_exits_in_outputs; eauto |].
   intros [[f to] | ?] EXIT; [| reflexivity].
-  rewrite denote_bks_unfold_not_in; [reflexivity |].
+  rewrite denote_ocfg_unfold_not_in; [reflexivity |].
   cbn in *.
   apply find_block_not_in_inputs.
   eapply no_reentrance_not_in; eauto.
   apply INDEP.
 Qed.
 
-Lemma denote_bks_flow_right :
+Lemma denote_ocfg_flow_right :
   forall ocfg1 ocfg2 fto,
     independent_flows ocfg1 ocfg2 ->
     In (snd fto) (inputs ocfg2) ->
-    denote_bks (ocfg1 ++ ocfg2) fto ≈
-    denote_bks ocfg2 fto.
+    denote_ocfg (ocfg1 ++ ocfg2) fto ≈
+    denote_ocfg ocfg2 fto.
 Proof.
   intros * INDEP IN.
-  rewrite denote_bks_app; [| auto using independent_flows_no_reentrance_l].
+  rewrite denote_ocfg_app; [| auto using independent_flows_no_reentrance_l].
   destruct fto as [f to]; cbn in *.
-  rewrite denote_bks_unfold_not_in.
+  rewrite denote_ocfg_unfold_not_in.
   rewrite bind_ret_l; reflexivity.
   eapply find_block_not_in_inputs, no_duplicate_bid_not_in_l; eauto using independent_flows_no_duplicate_bid.
 Qed.

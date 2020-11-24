@@ -846,11 +846,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         denote_code (blk_code b);;
         translate exp_E_to_instr_E (denote_terminator (snd (blk_term b))).
 
-      Definition denote_bks (bks: list (block dtyp))
+      Definition denote_ocfg (bks: ocfg dtyp)
         : (block_id * block_id) -> itree instr_E ((block_id * block_id) + uvalue) :=
         iter (C := ktree _) (bif := sum)
              (fun '((bid_from,bid_src) : block_id * block_id) => 
-                match find_block DynamicTypes.dtyp bks bid_src with
+                match find_block bks bid_src with
                 | None => ret (inr (inl (bid_from,bid_src)))
                 | Some block_src =>
                   bd <- denote_block block_src bid_from;;
@@ -891,7 +891,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         in the type.
        *)
       Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
-        r <- denote_bks (blks _ f) (init _ f,init _ f) ;;
+        r <- denote_ocfg (blks _ f) (init _ f,init _ f) ;;
         match r with
         | inl bid => raise ("Can't find block in denote_cfg " ++ to_string bid)
         | inr uv  => ret uv
