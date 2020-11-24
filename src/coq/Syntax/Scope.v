@@ -257,6 +257,15 @@ Section LABELS_THEORY.
         auto.
   Qed.
 
+  Lemma find_block_in_inputs :
+    forall {T} to (bks : ocfg T),
+      In to (inputs bks) ->
+      exists bk, find_block bks to = Some bk.
+  Proof.
+    induction bks as [| id ocfg IH]; cbn; intros IN; [inv IN |].
+    flatten_goal; flatten_hyp Heq; intuition; eauto.
+  Qed.
+
   Lemma no_reentrance_not_in (bks1 bks2 : ocfg T) :
     no_reentrance bks1 bks2 ->
     forall x, In x (outputs bks2) -> ~ In x (inputs bks1).

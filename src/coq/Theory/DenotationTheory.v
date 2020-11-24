@@ -20,6 +20,7 @@ From Vellvm Require Import
      Syntax.CFG
      Syntax.LLVMAst
      Syntax.AstLib
+     Syntax.Scope
      Semantics.TopLevel
      Syntax.Traversal
      Syntax.DynamicTypes
@@ -107,17 +108,14 @@ Proof.
   rewrite denote_code_cons.
   setoid_rewrite denote_code_nil.
   cbn.
-
   epose proof bind_ret_r.
   specialize (H (denote_instr a)).
-
   rewrite <- H.
   rewrite bind_bind.
   apply eutt_eq_bind; intros []; rewrite bind_ret_l; reflexivity. 
 Qed.
 
 (** [denote_phi] *)
-
 Opaque assoc.
 Lemma denote_phi_hd : forall bid e id τ tl,
     denote_phi bid (id, Phi τ ((bid,e)::tl)) ≈ uv <- denote_exp (Some τ) e;; Ret (id,uv).
@@ -132,6 +130,16 @@ Lemma denote_phi_tl : forall bid bid' e id τ tl,
 Proof.
   intros; cbn.
   rewrite assoc_tl; auto; reflexivity.
+Qed.
+
+Lemma denote_no_phis : forall x,
+    denote_phis x [] ≈ Ret tt.
+Proof.
+  intros.
+  unfold denote_phis; cbn.
+  rewrite bind_ret_l; cbn.
+  rewrite bind_ret_l; cbn.
+  reflexivity.
 Qed.
 
 (** [denote_ocfg] *)
@@ -213,15 +221,6 @@ Proof.
   apply has_post_bind; intros [].
   apply has_post_translate.
   apply denote_terminator_exits_in_outputs.
-Qed.
-
-Lemma find_block_in_inputs :
-  forall {T} to (bks : ocfg T),
-    In to (inputs bks) ->
-    exists bk, find_block bks to = Some bk.
-Proof.
-  induction bks as [| id ocfg IH]; cbn; intros IN; [inv IN |].
-  flatten_goal; flatten_hyp Heq; intuition; eauto.
 Qed.
 
 (* Given a predicate [Qb] on pairs of block ids (the origin for phi-nodes and the input)
@@ -341,7 +340,7 @@ Proof.
     rewrite unfold_iter; cbn.
     rewrite FIND.
     rewrite !bind_bind.
-    pose proof find_block_some_app bks1 bks2 to FIND as FIND_APP.
+    pose proof find_block_some_app bks1 bks2 _ to FIND as FIND_APP.
     rewrite FIND_APP.
     cbn.
     rewrite !bind_bind.
@@ -396,15 +395,5 @@ Proof.
   rewrite denote_ocfg_unfold_not_in.
   rewrite bind_ret_l; reflexivity.
   eapply find_block_not_in_inputs, no_duplicate_bid_not_in_l; eauto using independent_flows_no_duplicate_bid.
-Qed.
-
-Lemma denote_no_phis : forall x,
-    denote_phis x [] ≈ Ret tt.
-Proof.
-  intros.
-  unfold denote_phis; cbn.
-  rewrite bind_ret_l; cbn.
-  rewrite bind_ret_l; cbn.
-  reflexivity.
 Qed.
 
