@@ -46,8 +46,8 @@ Module VIR_Notations.
   Notation "b" := (EXP_Bool b)   (at level 10,only printing).
   Notation "'null'" := (EXP_Null)   (at level 10,only printing). 
   Notation "'zeroinitializer'" := (EXP_Zero_initializer)   (at level 10,only printing). 
-  Coercion EXP_Cstring : string >-> exp.
-  (* Notation "s" := (EXP_Cstring s)   (at level 10,only printing).  *)
+  (* Coercion EXP_Cstring : string >-> exp. *)
+  Notation "s" := (EXP_Cstring s)   (at level 10,only printing).
   Notation "'undef'" := (EXP_Undef)   (at level 10,only printing). 
   
   (* ibinop *)
@@ -243,10 +243,7 @@ Module VIR_Notations.
   Notation "label ':' phis code term" :=
     (mk_block label phis code (_,term) _)
       (at level 10, only printing,
-       format "label ':' '//'
-        phis '//'
-        code '//'
-        term").
+       format "label ':' '//' phis '//' code '//' term").
 
 End VIR_Notations.
 
