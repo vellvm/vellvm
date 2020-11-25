@@ -241,7 +241,7 @@ Module VIR_Notations.
 
   (** * Blocks  *)
   Notation "label ':' phis code term" :=
-    (mk_block label phis code (_,term) _)
+    (mk_block label phis code term _)
       (at level 10, only printing,
        format "label ':' '//' phis '//' code '//' term").
 
