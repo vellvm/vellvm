@@ -759,7 +759,7 @@ and definition : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) *
     pp_print_char ppf '}' ;
 
 and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
-  fun ppf {blk_id=lbl; blk_phis=phis; blk_code=b; blk_term=(_,t); blk_comments=c} ->
+  fun ppf {blk_id=lbl; blk_phis=phis; blk_code=b; blk_term=t; blk_comments=c} ->
     begin match c with
     | None -> ()
     | Some cs ->  pp_print_list ~pp_sep:pp_force_newline comment ppf cs ;
