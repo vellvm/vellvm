@@ -354,8 +354,7 @@ Record block : Set :=
       blk_id    : block_id;
       blk_phis  : list (local_id * phi);
       blk_code  : code;
-      (* SAZ: TODO: remove the instr_id from this syntax -- it's not needed anymore *)
-      blk_term  : instr_id * terminator;
+      blk_term  : terminator;
       blk_comments : option (list string)
     }.
 

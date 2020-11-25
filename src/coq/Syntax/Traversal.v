@@ -538,7 +538,7 @@ Section Fmap.
         mk_block (endo (blk_id b)) 
                  (fmap (fun '(id,phi) => (endo id, fmap f phi)) (blk_phis b))
                  (fmap f (blk_code b))
-                 (endo (fst (blk_term b)), fmap f (snd (blk_term b))) 
+                 (fmap f (blk_term b)) 
                  (blk_comments b).
     
     Global Instance Fmap_global

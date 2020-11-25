@@ -844,7 +844,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition denote_block (b: block dtyp) (bid_from : block_id) : itree instr_E (block_id + uvalue) :=
         denote_phis bid_from (blk_phis b);;
         denote_code (blk_code b);;
-        translate exp_E_to_instr_E (denote_terminator (snd (blk_term b))).
+        translate exp_E_to_instr_E (denote_terminator (blk_term b)).
 
       Definition denote_ocfg (bks: ocfg dtyp)
         : (block_id * block_id) -> itree instr_E ((block_id * block_id) + uvalue) :=

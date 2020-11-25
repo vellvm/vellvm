@@ -59,7 +59,7 @@ Section LABELS_OPERATIONS.
        end.
 
   Definition bk_outputs (bk : block T) : list block_id :=
-    terminator_outputs (snd (blk_term bk)).
+    terminator_outputs (blk_term bk).
 
   Definition outputs (bks : ocfg T) : list block_id
     := fold_left (fun acc bk => acc ++ bk_outputs bk) bks [].

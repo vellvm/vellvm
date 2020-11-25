@@ -25,7 +25,8 @@ From Vellvm Require Import
      Syntax.Traversal
      Syntax.DynamicTypes
      Semantics.LLVMEvents
-     PostConditions.
+     PostConditions
+     Handlers.Handlers.
 
 Remove Hints Eqv.EqvWF_Build : typeclass_instances.
 
@@ -140,6 +141,30 @@ Proof.
   rewrite bind_ret_l; cbn.
   rewrite bind_ret_l; cbn.
   reflexivity.
+Qed.
+
+(** [denote_block] *)
+Lemma denote_block_unfold_cont :
+  forall {R} id phis c t s origin (k : _ -> itree _ R),
+    denote_block (mk_block id phis c t s) origin >>= k
+                 ≈
+    denote_phis origin phis;;
+    denote_code c;;
+    translate exp_E_to_instr_E (denote_terminator t) >>= k.
+Proof.
+  intros; cbn; repeat setoid_rewrite bind_bind.
+  reflexivity.
+Qed.
+
+Lemma denote_block_unfold :
+  forall id phis c t s origin,
+    denote_block (mk_block id phis c t s) origin
+                 ≈
+                 denote_phis origin phis;;
+    denote_code c;;
+    translate exp_E_to_instr_E (denote_terminator t). 
+Proof.
+  intros; cbn; reflexivity.
 Qed.
 
 (** [denote_ocfg] *)
@@ -338,7 +363,7 @@ Proof.
       |- euttG _ _ _ _ _ ?t _ => remember t; rewrite unfold_iter; subst
     end.
     rewrite unfold_iter; cbn.
-    rewrite FIND.
+    match_rewrite.
     rewrite !bind_bind.
     pose proof find_block_some_app bks1 bks2 _ to FIND as FIND_APP.
     rewrite FIND_APP.
@@ -396,4 +421,46 @@ Proof.
   rewrite bind_ret_l; reflexivity.
   eapply find_block_not_in_inputs, no_duplicate_bid_not_in_l; eauto using independent_flows_no_duplicate_bid.
 Qed.
+
+Opaque denote_block.
+Lemma denote_bks_prefix :
+  forall (prefix bks' postfix bks : ocfg dtyp) (from to: block_id),
+    bks = (prefix ++ bks' ++ postfix) ->
+    wf_ocfg_bid bks ->
+    denote_ocfg bks (from, to) ≈
+               ITree.bind (denote_ocfg bks' (from, to))
+               (fun x => match x with
+                      | inl x => denote_ocfg bks x
+                      | inr x => ret (inr x)
+                      end
+               ).
+Proof.
+  intros * ->; revert from to.
+  einit.
+  ecofix CIH.
+  clear CIH0.
+  intros * WF.
+  destruct (find_block bks' to) as [bk |] eqn:EQ.
+  - unfold denote_ocfg at 1 3.
+    rewrite 2 KTreeFacts.unfold_iter_ktree.
+    cbn; rewrite !bind_bind.
+    assert (find_block (prefix ++ bks' ++ postfix) to = Some bk).
+    {
+      erewrite find_block_app_r_wf; eauto.
+      erewrite find_block_app_l_wf; eauto.
+      eapply wf_ocfg_bid_app_r; eauto.
+    }
+    do 2 match_rewrite.
+    rewrite !bind_bind.
+    eapply euttG_bind; econstructor; [reflexivity | intros [] ? <-].
+    + rewrite !bind_ret_l; cbn.
+      rewrite bind_tau; etau.
+    + rewrite !bind_ret_l.
+      reflexivity.
+  - edrop.
+    rewrite (denote_ocfg_unfold_not_in bks'); auto.
+    rewrite bind_ret_l.
+    reflexivity.
+Qed.
+Transparent denote_block.
 
