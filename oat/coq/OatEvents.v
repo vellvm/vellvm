@@ -41,7 +41,7 @@ Open Scope string_scope.
 *)
 
 Definition value := ovalue.
-
+Definition var := Ast.id.
 (* We need some way of manipulating local variable values *)
 Variant OLocalE : Type -> Type :=
 | OLocalRead (id: var) : OLocalE value
@@ -55,7 +55,7 @@ Variant OCallE : Type -> Type :=
 (* We need some way of representing call stacks *)
 Variant OStackE : Type -> Type :=
 | OStackPush (args: list (id * ovalue)) : OStackE unit
-| OStackPop : OStackE unit.
+| OStackPop (args: list (id * ovalue)) : OStackE unit.
 
 (* We need a notion of failure *)
 Definition FailureE := exceptE string.
@@ -78,5 +78,16 @@ Definition OatE :=  OCallE +' OLocalE +' OStackE +' FailureE.
 
 (* This version of an oat event has no call events - these are interpreted away *)
 Definition OatE' := OLocalE +' OStackE +' FailureE.
-Set Implicit Arguments.
-Set Contextual Implicit.
+
+(** Note that just having these events is not enough to extract an interpreter.
+    We'll need to define how to interpret these concretely. We'll do this in levels,
+    interpreting the semantics of each event (what data structures / operations), 
+    until we have an itree over void events. 
+*)
+
+Definition Oat0 := OatE'.
+Definition Oat1 := OStackE +' FailureE.
+Definition Oat2 := FailureE.
+Definition Oat3 := void1.
+                     
+

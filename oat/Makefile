@@ -16,7 +16,7 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILES_OAT    := Ast DynamicValues OatEvents Denotation Plumbing CompilerCtxt Compiler
+COQFILES_OAT    := Ast DynamicValues OatEvents Handlers Denotation Plumbing CompilerCtxt Compiler
 
 VFILES  := $(COQFILES_OAT:%=coq/%.v)
 VOFILES := $(COQFILES_OAT:%=coq/%.vo)

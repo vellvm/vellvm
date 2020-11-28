@@ -319,11 +319,11 @@ Definition denote_fdecl (df : fdecl) : function_denotation :=
     let d : ovalue -> itree OatE ovalue := fun v => ret v in
     let f : (list (id * ovalue)) -> itree OatE unit :=
         fun bs => trigger (OStackPush ( bs ) ) in
-    let f' : unit -> itree OatE unit := fun _ => trigger OStackPop in
+    let f' : (list (id * ovalue)) -> itree OatE unit := fun args => trigger (OStackPop args) in
     bs <- c ;;
-    f bs;;
+    trigger (OStackPush bs);;
     rv <- denote_block (body df) ;;
-    f' tt ;;
+    trigger (OStackPop bs) ;;
     ret rv.
  
 (*
