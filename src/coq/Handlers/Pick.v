@@ -14,15 +14,15 @@ From ITree Require Import
      Events.State.
 
 From Vellvm Require Import
-     LLVMAst
-     AstLib
-     MemoryAddress
-     DynamicValues
-     DynamicTypes
-     LLVMEvents
-     Error
-     Util
-     PropT.
+     Utils.Error
+     Utils.Util
+     Utils.PropT
+     Syntax.LLVMAst
+     Syntax.AstLib
+     Syntax.DynamicTypes
+     Semantics.DynamicValues
+     Semantics.MemoryAddress
+     Semantics.LLVMEvents.
 
 Require Import Floats.
 

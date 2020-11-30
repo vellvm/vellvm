@@ -13,14 +13,14 @@ From ITree Require Import
      Events.State.
 
 From Vellvm Require Import
-     Util
-     LLVMAst
-     AstLib
-     MemoryAddress
-     DynamicValues
-     LLVMEvents
-     Local
-     Error.
+     Utils.Util
+     Utils.Error
+     Syntax.LLVMAst
+     Syntax.AstLib
+     Semantics.MemoryAddress
+     Semantics.DynamicValues
+     Semantics.LLVMEvents
+     Handlers.Local.
 
 Require Import Ceres.Ceres.
 

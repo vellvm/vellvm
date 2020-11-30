@@ -14,9 +14,9 @@ From ITree Require Import
      InterpFacts.
 
 From Vellvm Require Import
-     Util
-     LLVMEvents
-     Error.
+     Utils.Util
+     Utils.Error
+     Semantics.LLVMEvents.
 
 Require Import Ceres.Ceres.
 

@@ -408,7 +408,7 @@ df_blocks:
                                     | Some s -> (IId s, inst))
                        body
                 in
-                {blk_id = l; blk_phis; blk_code; blk_term=(IVoid (void_ctr.get ()), term); blk_comments=None})
+                {blk_id = l; blk_phis; blk_code; blk_term = term; blk_comments=None})
        bs
       in begin match blks with
 	 | [] -> failwith "illegal LLVM function definition: must have non-empty entry block"
