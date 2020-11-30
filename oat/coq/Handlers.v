@@ -27,9 +27,11 @@ Section Locals.
   Context {M: Map var OatEvents.value map}.
   Context {SK: Serialize var}.
 
+
+  
   (** Here, we have a handler for local events.
       Observe that this simply interprets local events into the statemonad, returning an itree free of OLocalE events *)
-  Definition handle_local {E} `{FailureE -< E} : (OLocalE) ~> stateT map (itree Oat1) :=
+  Definition handle_local : (OLocalE) ~> stateT map (itree Oat1) :=
     fun _ e env =>
       match e with
       | OLocalRead id => match Maps.lookup id env with
@@ -47,7 +49,8 @@ Section Locals.
 
   (** Ideally, we need a handler from Oat0 ~> stateT map (itree Oat1)
       - a handler that invokes locals when we have a local event, and proceeds onwards otherwise *)
-  
+
+
   Definition trigger_rest {M} : Oat1 ~> stateT M (itree Oat1) :=
     fun R e m => r <- trigger e ;; ret (m, r).
 
@@ -74,7 +77,7 @@ Section Stack.
 
   (** Here, we have a handler for stack events.
       Observe that this simply interprets stack events into the statemonad, returning an itree free of stack events *)
-  Definition handle_stack {E} `{FailureE -< E} : (OStackE) ~> stateT (map * stack) (itree Oat2) := 
+  Definition handle_stack : (OStackE) ~> stateT (map * stack) (itree Oat2) := 
     fun _ e '(scope, stack) =>
       match e with
       | OStackPush args =>
@@ -88,8 +91,10 @@ Section Stack.
                 This function might not return anything, but it sets its arguments to null.
                 We then have to copy the arguments into the previous environment to ensure future computation knows about the silently mutated value 
              *)
+            let ids := List.map (fst) args in
+            let free_args_env := Maps.filter (fun k _ => List.existsb (String.eqb) ids) env in
             let mutated_env : map := List.fold_left (fun accmap '(id, v) => Maps.add id v accmap)
-                                                   args caller_env in
+                                                   args free_args_env in
             ret ((mutated_env, stk'), tt)
         end
       end.
