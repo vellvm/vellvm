@@ -791,8 +791,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         | TERM_Br_1 br => ret (inl br)
 
-        | TERM_Unreachable => raise "IMPOSSIBLE: unreachable in reachable position"  (* SAZ : TODO should be Undefined Behavior? *)
 
+        | TERM_Unreachable => raise "IMPOSSIBLE: unreachable in reachable position" (* SAZ : TODO should be Undefined Behavior? *)
         (* Currently unhandled itree terminators *)
         | TERM_Switch _ _ _
         | TERM_IndirectBr _ _

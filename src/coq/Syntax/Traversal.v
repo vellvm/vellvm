@@ -196,7 +196,7 @@ Section Endo.
         | TERM_Resume v => TERM_Resume (endo v)
         | TERM_Invoke fnptrval args to_label unwind_label =>
           TERM_Invoke (endo fnptrval) (endo args) (endo to_label) (endo unwind_label)
-        | TERM_Unreachable => TERM_Unreachable
+        | TERM_Unreachable => TERM_Unreachable 
         end.
 
     Global Instance Endo_phi
