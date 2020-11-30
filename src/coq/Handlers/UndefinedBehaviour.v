@@ -4,8 +4,8 @@ From ExtLib Require Import
      Structures.Monads.
 
 From Vellvm Require Import
-     PropT
-     LLVMEvents.
+     Utils.PropT
+     Semantics.LLVMEvents.
 
 From ITree Require Import
      ITree.

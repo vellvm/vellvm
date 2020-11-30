@@ -825,7 +825,7 @@ and definition : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) *
     pp_print_flush ppf ();
 
 and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
-  fun ppf {blk_id=lbl; blk_phis=phis; blk_code=b; blk_term=(t_id,t); blk_comments=cmts} ->
+  fun ppf {blk_id=lbl; blk_phis=phis; blk_code=b; blk_term=t; blk_comments=cmts} ->
     pp_print_string ppf "{|";
     pp_force_newline ppf ();
 
@@ -851,7 +851,7 @@ and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
     pp_force_newline ppf () ;
 
     pp_print_string ppf "  blk_term := ";
-    fprintf ppf "(%a, %a);" instr_id t_id terminator t;
+    fprintf ppf "%a;" terminator t;
     pp_force_newline ppf () ;
 
     pp_print_string ppf "  blk_comments := ";
@@ -866,7 +866,7 @@ and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
 
     pp_print_string ppf "|}";
 
-and modul : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block list))) LLVMAst.modul -> unit =
+and modul : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block list))) CFG.modul -> unit =
   fun ppf m ->
 
   pp_option ppf (fun ppf x -> fprintf ppf "; ModuleID = '%s'" (of_str x)) m.m_name ;

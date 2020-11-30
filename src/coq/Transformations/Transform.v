@@ -9,7 +9,8 @@
  ---------------------------------------------------------------------------- *)
 
 Require Import Ascii Strings.String.
-Require Import Vellvm.LLVMAst.
+From Vellvm Require Import
+     Syntax.LLVMAst.
 Open Scope string_scope.
 
 
