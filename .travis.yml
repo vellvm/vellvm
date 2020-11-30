@@ -42,6 +42,7 @@ install:
   # - opam install -y --verbose -j ${NJOBS} coq-itree
   - opam install -y --verbose -j ${NJOBS} dune
   - opam install -y --verbose -j ${NJOBS} menhir
+  - opam install -y --verbose -j ${NJOBS} qcheck
   - opam upgrade -y --verbose -j ${NJOBS}
 
 script:
