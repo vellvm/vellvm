@@ -253,4 +253,28 @@ Section ConvertTyp.
   Global Instance ConvertTyp_mcfg : ConvertTyp mcfg :=
     fun env => fmap (typ_to_dtyp env).
 
+  Global Instance ConvertTyp_list {A} `{Traversal.Fmap A}: ConvertTyp (fun T => list (A T)) :=
+    fun env => Traversal.fmap (typ_to_dtyp env).
+
 End ConvertTyp.
+
+Lemma convert_typ_list_app :
+  forall {F} `{Traversal.Fmap F} (a b : list (F typ)) (env : list (ident * typ)),
+    convert_typ env (a ++ b)%list = (convert_typ env a ++ convert_typ env b)%list.
+Proof.
+  intros F H a.
+  induction a; cbn; intros; auto.
+  rewrite IHa; reflexivity.
+Qed.
+
+Lemma convert_typ_block_app : forall (a b : list (block typ)) env, (convert_typ env (a ++ b) = convert_typ env a ++ convert_typ env b)%list.
+Proof.
+  intros; rewrite convert_typ_list_app; reflexivity.
+Qed.
+
+Lemma convert_typ_code_app : forall (a b : code typ) env, (convert_typ env (a ++ b) = convert_typ env a ++ convert_typ env b)%list.
+Proof.
+  induction a as [| [] a IH]; cbn; intros; auto.
+  rewrite IH; reflexivity.
+Qed.
+

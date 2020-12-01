@@ -96,6 +96,12 @@ Proof.
   eapply subrelation_prod_left. apply subrelation_R_TT. all: apply PR.
 Qed.
 
+(* TODO and move to DynamicValues. Do not move before proved or it breaks extraction *)
+Global Instance eq_dec_uvalue: RelDec.RelDec (@Logic.eq uvalue).
+Admitted.
+Global Instance eq_dec_uvalue_correct: @RelDec.RelDec_Correct uvalue (@Logic.eq uvalue) _.
+Admitted.
+
 Import AlistNotations.
 Lemma alist_find_eq_dec_local_env : 
   forall k (m1 m2 : local_env),

@@ -690,6 +690,14 @@ Section Fmap.
 
 End Fmap.
 
+Lemma fmap_list_app: forall U V H H' c1 c2 f,
+    @fmap code (@Fmap_code H H') U V f (c1 ++ c2) =
+    fmap f c1  ++ fmap f c2.
+Proof.
+  induction c1 as [| [] c1 IH]; cbn; intros; [reflexivity |].
+  rewrite IH; reflexivity.
+Qed.
+
 From ExtLib Require Import
      Programming.Eqv
      Structures.Monads.

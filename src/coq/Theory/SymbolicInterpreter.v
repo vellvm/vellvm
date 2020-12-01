@@ -1,16 +1,31 @@
+(* begin hide *)
 From Coq Require Import List.
 Import ListNotations.
+
+From ExtLib Require Import
+     Structures.Monad.
+
+From ITree Require Import
+     ITree
+     Eq.Eq
+     TranslateFacts.
 
 From Vellvm Require Import
      Utils.Tactics
      Syntax.LLVMAst
      Syntax.CFG
+     Syntax.Traversal
      Syntax.Scope
      Syntax.TypToDtyp
      Semantics.TopLevel
-     Theory.DenotationTheory.
+     Theory.DenotationTheory
+     Theory.ExpLemmas
+     Theory.InstrLemmas
+     Theory.InterpreterCFG.
 
 Import D.
+(* end hide *)
+
 
 (** * Resolving block fetching
     To reduce [denote_bks bks (b_f,b_s)], one needs to find in [bks] the
@@ -90,20 +105,14 @@ Ltac show_cfg :=
 Notation "'hidden' G" := (hidden_cfg (G = _)) (only printing, at level 10).
 
 (** * Entering a block
-    The [vjmp] tactic exploits [solve_find_block] while being aware of the possiblity of the graph to be
+
+    The [vjmp] tactic exploits [solve_find_block] while being aware of the possibility of the graph to be
     hidden in order to perform automatically the symbolic step described in the comment [Hiding the ambient CFG].
 
-    
+    The tactic [vjmp] always performs the jump, tries to solve the lookup automatically, and present it to the user
+    if it fails.
 
  *)
-(*
-(* TO MOVE *)
-Lemma convert_typ_block_app : forall (a b : list (block typ)) env, (convert_typ env (a ++ b) = convert_typ env a ++ convert_typ env b)%list.
-Proof.
-  induction a as [| [] a IH]; cbn; intros; auto.
-  rewrite IH; reflexivity.
-Qed.
-
 
 Ltac vjmp :=
   rewrite denote_ocfg_unfold_in; cycle 1;
@@ -115,18 +124,141 @@ Ltac vjmp :=
    cbn; rewrite ?convert_typ_block_app;
    try solve_find_block |].
 
+(** * Jumping out of a [ocfg]
+
+    The [vjmp_out] is the alternative to [vjmp] in the case where we jump out of the graph.
+    The tactic tries to trivially discharge the freshness of the block id in the graph, and
+    presents to the user the goal otherwise.
+
+*)
+
 Ltac vjmp_out :=
-  rewrite denote_bks_unfold_not_in; cycle 1;
-  [apply find_block_fresh_id; eauto |]. 
+  rewrite denote_ocfg_unfold_not_in; cycle 1;
+  [apply find_block_free_id; eauto |]. 
+
+(** * Symbolic stepper
+
+    The equational theory of VIR allows an (interpret) denoted program to be stepped through.
+
+    The basic idea for an elementary _contextual reduction_ simply relies on:
+    - Prohibiting reduction of all [denote_] functions
+    - Pattern match on the out-most syntactic construct to rewrite its denotation into a [bind]
+    - Commute the interpreter with the newly introduce [bind]
+    This contextual reduction is performed (at level of interpretation 3) by the tactic [vred_C3].
+
+    By doing so, we end in one of three cases w.r.t. to the new head of the computation (in the
+    sens of the first argument of the out-most [bind]:
+    - we have a new composed syntactic component, i.e. a new context we can reduce further with the
+      same process.
+    - we have a concrete elementary syntactic component -- an expression, an instruction or a terminator.
+      In this case we can perform a proper semantic step.
+      * Tactic [vred_E3] performs this stepping for expressions. The tactic is slightly conservative: it
+        does not support the GEP instruction, its current axiomatization being incomplete.
+      * Tactic [vred_I3] performs this stepping for instructions.
+        The tactic is partial at the moment.
+      * Tactics [vred_BL3] (resp. [vred_BR3]) reduce a conditional branch terminator by picking
+        the left (resp. right) branch.
+
+    Since all these rules are (weak) bisimulation (i.e. based on [eq] as the return relation),
+    note that we can perform this symbolic execution during any simulation proof.
+
+ *)
+
+Ltac vred_C3_k k :=
+  (* Reduce annoying type conversion *)
+  rewrite ?typ_to_dtyp_equation;
+  match goal with
+  | |- context[denote_block] =>
+    (* Structural handling: block case *)
+    first [rewrite denote_block_unfold_cont; cbn | rewrite denote_block_unfold; cbn];
+    do k idtac "Reduced block"
+  | |- context[denote_phis _ _]  =>
+    (* Structural handling: phi case *)
+    (* YZ: Currently no automation for non empty phis. TODO *)
+    first [rewrite denote_no_phis];
+    do k idtac "Reduced phis"
+  | |- context[denote_code] =>
+    (* Structural handling: code case *)
+    first [rewrite denote_code_nil |
+           rewrite denote_code_singleton |
+           rewrite denote_code_cons |
+           rewrite ?convert_typ_list_app, ?fmap_list_app, denote_code_app];
+    do k idtac "Reduced code"
+  | |- context[denote_terminator] =>
+    (* Structural handling: code case *)
+    first [rewrite denote_term_br_1];
+    do k idtac "Reduced direct jump"
+   | |- context[denote_exp] => 
+    (* Structural handling: expression case *)
+    first [rewrite translate_trigger; (rewrite lookup_E_to_exp_E_Local || rewrite lookup_E_to_exp_E_Global);
+           rewrite subevent_subevent, translate_trigger;
+           (rewrite exp_E_to_instr_E_Local || rewrite exp_E_to_instr_E_Global); rewrite subevent_subevent];
+    do k idtac "Reduced exp"
+  | |- _ => do k idtac "no progress made"
+  end;
+  (* clean up *)
+  rewrite 1?interp_cfg_to_L3_ret, 1?bind_ret_l;
+  rewrite 1?interp_cfg_to_L3_bind, 1?bind_bind.
+
+(* Stupid trick to have versions of the tactic supporting light debugging.
+   [vred_C3D] additionally prints the branch it take.
+ *)
+Tactic Notation "vred_C3_k'" integer(k) := vred_C3_k k.
+Tactic Notation "vred_C3" := vred_C3_k' 0.
+Tactic Notation "vred_C3D" := vred_C3_k' 1.
+
+Ltac vred_E3 :=
+first [rewrite denote_exp_LR; cycle 1 |
+         rewrite denote_exp_GR; cycle 1 |
+         rewrite denote_exp_i64 |
+         rewrite denote_exp_i64_repr |
+         rewrite denote_exp_double |
+         rewrite denote_ibinop_concrete; cycle 1; try reflexivity |
+         rewrite denote_fbinop_concrete; cycle 1; try reflexivity |
+         rewrite denote_icmp_concrete; cycle 1; try reflexivity |
+         rewrite denote_fcmp_concrete; cycle 1; try reflexivity |
+         rewrite denote_conversion_concrete; cycle 1 |
+         idtac].
+
+Ltac vred_I3 :=
+  first [rewrite denote_instr_load; eauto; cycle 1 |
+         rewrite denote_instr_intrinsic; cycle 1; try reflexivity |
+         rewrite denote_instr_op; cycle 1 |
+         idtac
+        ].
+
+Ltac vred_BL3 := rewrite denote_term_br_l;
+                 [rewrite 1?interp_cfg_to_L3_ret, 1?bind_ret_l, 1?interp_cfg_to_L3_bind, 1?bind_bind |];
+                 cycle 1.
+Ltac vred_BR3 := rewrite denote_term_br_r;
+                 [rewrite 1?interp_cfg_to_L3_ret, 1?bind_ret_l, 1?interp_cfg_to_L3_bind, 1?bind_bind |];
+                 cycle 1.
+
+Ltac vstep3 :=
+  first [progress vred_E3 | vred_I3];
+  rewrite 1?interp_cfg_to_L3_ret, 1?bind_ret_l;
+  rewrite 1?interp_cfg_to_L3_bind, 1?bind_bind.
 
 
+(** * Focusing during [eutt] proofs
 
-Ltac focus_single_step_v :=
+    During a proof based on [eutt], the recurrent pattern consists in reducing the considered
+    computations as sequences of computations using the equational theory of interest.
+    This leads to situations where the goal is cluttered by continuations where only the prefix
+    is currently of interest.
+
+    The following tactics simply put in the context such continuations.
+
+    YZ: We may want to hide the continuations altogether as is done for the [cfg].
+
+ *)
+
+Ltac focus_single_step_r :=
   match goal with
     |- eutt _ _ (ITree.bind _ ?x) => remember x
   end.
 
-Ltac focus_single_step_h :=
+Ltac focus_single_step_l :=
   match goal with
     |- eutt _ (ITree.bind _ ?x) _ => remember x
   end.
@@ -136,4 +268,50 @@ Ltac focus_single_step :=
     |- eutt _ (ITree.bind _ ?x) (ITree.bind _ ?y) => remember x; remember y
   end.
 
-*)
+(** * Hiding a side during [eutt] proofs
+
+    General tactics to move to the context parts of an [eutt] goal.
+ *)
+
+Ltac eutt_hide_left_named H :=
+  match goal with
+    |- eutt _ ?t _ => remember t as H
+  end.
+
+(* with hypothesis name provided *)
+Tactic Notation "eutt_hide_left" ident(hypname) :=
+  eutt_hide_left_named hypname.
+
+(* with hypothesis name auto-generated *)
+Tactic Notation "eutt_hide_left" :=
+  let H := fresh "EL" in
+  eutt_hide_left_named H.
+
+Ltac eutt_hide_right_named H :=
+  match goal with
+    |- eutt _ _ ?t => remember t as H
+  end.
+
+(* with hypothesis name provided *)
+Tactic Notation "eutt_hide_right" ident(hypname) :=
+  eutt_hide_right_named hypname.
+
+(* with hypothesis name auto-generated *)
+Tactic Notation "eutt_hide_right" :=
+  let H := fresh "ER" in
+  eutt_hide_right_named H.
+
+Ltac eutt_hide_rel_named H :=
+  match goal with
+    |- eutt ?t _ _ => remember t as H
+  end.
+
+(* with hypothesis name provided *)
+Tactic Notation "eutt_hide_rel" ident(hypname) :=
+  eutt_hide_rel_named hypname.
+
+(* with hypothesis name auto-generated *)
+Tactic Notation "eutt_hide_rel" :=
+  let H := fresh "ER" in
+  eutt_hide_rel_named H.
+
