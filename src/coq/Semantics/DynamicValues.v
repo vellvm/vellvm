@@ -1896,5 +1896,11 @@ Class VInt I : Type :=
   .
    *)
 
+  (* TODO *)
+  Global Instance eq_dec_dvalue: RelDec.RelDec (@Logic.eq uvalue).
+  Admitted.
+  Global Instance eq_dec_uvalue_correct: @RelDec.RelDec_Correct uvalue (@Logic.eq uvalue) _.
+  Admitted.
 
 End DVALUE.
+

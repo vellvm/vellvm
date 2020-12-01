@@ -16,7 +16,7 @@ MENHIR=menhir
 CP=cp
 
 COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats\
-									Utils/ParserHelper Utils/Tactics Utils/Util Utils/Error\
+									Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/Error\
 									Utils/PropT Utils/PostConditions Utils/NoFailure\
                   Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
 									Syntax/Traversal Syntax/Dom Syntax/DynamicTypes Syntax/TypToDtyp\
