@@ -54,7 +54,7 @@ Ltac solve_find_block :=
     | h: wf_ocfg_bid _ |- find_block (_ :: _) _ = _ =>
       first [apply find_block_eq; reflexivity |
              apply find_block_tail_wf; [eassumption | apply wf_ocfg_bid_cons in h; solve_find_block]]
-    | h: wf_ocfg_bid _ |- find_block _ (_ ++ _) _ = _ =>
+    | h: wf_ocfg_bid _ |- find_block (_ ++ _) _ = _ =>
       first [apply find_block_app_l_wf; [eassumption | apply wf_ocfg_bid_app_l in h; solve_find_block] |
              apply find_block_app_r_wf; [eassumption | apply wf_ocfg_bid_app_r in h; solve_find_block]]
   end.
@@ -182,7 +182,7 @@ Ltac vred_C3_k k :=
     first [rewrite denote_code_nil |
            rewrite denote_code_singleton |
            rewrite denote_code_cons |
-           rewrite ?convert_typ_list_app, ?fmap_list_app, denote_code_app];
+           rewrite ?convert_typ_code_app, ?fmap_list_app, denote_code_app];
     do k idtac "Reduced code"
   | |- context[denote_terminator] =>
     (* Structural handling: code case *)
