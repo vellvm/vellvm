@@ -65,18 +65,49 @@ Section LABELS_OPERATIONS.
     := fold_left (fun acc bk => acc ++ bk_outputs bk) bks [].
 
   (** * well-formed
-      All labels in a list of blocks are distinct
+      All labels in an open cfg are distinct.
+      Quite natural sanity condition ensuring that despite the representation of
+      the open cfg as a list of block, the order of the blocks in this list is
+      irrelevant.
    *)
   Definition wf_ocfg_bid (bks : ocfg T) : Prop :=
     list_norepet (map blk_id bks).
 
-  Infix "⊍" := Coqlib.list_disjoint (at level 60).
+  Infix "⊍" := list_disjoint (at level 60).
 
+  (** * no reentrance
+      Generally speaking, all blocks in an open cfg are mutually recursive,
+      we therefore can never discard part of the graph without further assumption.
+      We would however still like to capture the idea that two parts of the graph
+      represent two distinct computations that are executed in sequence.
+      This is expressed by observing that the second sub-graph cannot jump back
+      into the first one, i.e. that the [outputs] of the former do not intersect
+      with the [inputs] of the latter.
+
+      Under this assumption, the first part of the graph can be safely discarded
+      once the second part is reached: cf [DenotationTheory.denote_ocfg_app_no_edges] 
+      notably.
+   *)
   Definition no_reentrance (bks1 bks2 : ocfg T) : Prop :=
     outputs bks2 ⊍ inputs bks1.
 
+  (** * no_duplicate_bid
+      Checks that the inputs of two sub-graphs are disjoint. This condition ensures
+      that the well formedness of the two computations entails the one of their join.
+   *)
   Definition no_duplicate_bid (bks1 bks2 : ocfg T) : Prop :=
     inputs bks1 ⊍ inputs bks2.
+
+  (** * independent
+      While [no_reentrance] captures two sequential computations,
+      [independent_flows] captures two completely disjoint sub-graphs.
+      This typically allows us to reason in a modular fashion about
+      the branches of a conditional.
+   *)
+  Definition independent_flows (bks1 bks2 : ocfg T) : Prop :=
+    no_reentrance bks1 bks2 /\ 
+    no_reentrance bks2 bks1 /\
+    no_duplicate_bid bks1 bks2.
 
 End LABELS_OPERATIONS.
 
@@ -286,11 +317,6 @@ Section LABELS_THEORY.
   Proof.
     intros; eauto using Coqlib.list_disjoint_notin, Coqlib.list_disjoint_sym.
   Qed.
-
-  Definition independent_flows (bks1 bks2 : ocfg T) : Prop :=
-    no_reentrance bks1 bks2 /\ 
-    no_reentrance bks2 bks1 /\
-    no_duplicate_bid bks1 bks2.
 
   Lemma independent_flows_no_reentrance_l (bks1 bks2 : ocfg T):
     independent_flows bks1 bks2 ->
