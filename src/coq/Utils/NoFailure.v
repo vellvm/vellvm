@@ -27,6 +27,7 @@ Section Handle_Fail.
   Definition trigger_fail {E} : E ~> failT (itree E)
     := fun _ e => Vis e (fun x => Ret (Some x)).
 
+  (* TODO: Use [over], or possibly [exceptE -< E] *)
   Definition run_fail {E T}
     : itree (exceptE T +' E) ~> failT (itree E)
     := interp_fail (case_ h_fail trigger_fail).

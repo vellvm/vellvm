@@ -486,37 +486,171 @@ Section FIND_BLOCK.
 End FIND_BLOCK.
 
 
-(* TODO:  *)
 
-  (* Lemma def_sites_modified_instr : forall defs id (i : instr _) g l m, *)
-  (*   interp_cfg_to_L3 defs (denote_instr (id,i)) g l m ⤳ (fun '(_,(l',_)) => forall k, l' @ k <> l @ k -> In k (def_sites_instr_id id)). *)
-  (* Proof. *)
+Section LOCAL_SCOPE.
+Import ListNotations.
+
+From Vellvm Require Import
+      DynamicTypes
+      Handlers.Local
+      Semantics.Denotation
+      Semantics.LLVMEvents
+      Semantics.TopLevel
+      Theory.InstrLemmas
+      Theory.InterpreterCFG
+      Utils.NoFailure
+      Utils.PostConditions
+      Utils.PropT.
+
+From ITree Require Import
+     Basics.Monad
+     Eq.Eq
+     Events.FailFacts
+     Interp.TranslateFacts
+     ITree.
+
+From ExtLib Require Import
+     Structures.Maps.
+
+Notation "l @ k" := (lookup k l) (at level 50).
+
+Import D
+       Handlers.Intrinsics
+       Handlers.Global
+       Handlers.Local
+       InterpFacts
+       Global.
+
+Hint Rewrite interp_cfg_to_L3_ret interp_cfg_to_L3_bind @interp_translate interp_cfg_to_L3_GR interp_cfg_to_L3_LR: interp.
+
+Hint Rewrite @translate_bind @interp_bind @bind_bind @bind_ret_l @translate_ret @interp_ret @translate_trigger @interp_trigger: interp.
+Hint Resolve eutt_Ret : interp.
+
+From ITree Require Import
+     Eq.Eq
+     ITree
+     FailFacts
+     Events.Exception.
+
+Definition subevent_commut {E F} : E +' F ~> F +' E :=
+  fun T (X : (E +' F) T) =>
+    match X with
+      | inl1 e => inr1 e
+      | inr1 f => inl1 f
+      end.
+
+Definition subevent_assoc_rl {E F G} : E +' (F +' G) ~> (E +' F) +' G :=
+  fun (T : Type) (X : (E +' F +' G) T) =>
+  match X with
+  | inl1 e => inl1 (inl1 e)
+  | inr1 (inl1 f) => inl1 (inr1 f)
+  | inr1 (inr1 g) => inr1 g
+  end.
+
+Definition subevent_assoc_lr {E F G} : (E +' F) +' G ~> E +' (F +' G) :=
+  fun (T : Type) (X : ((E +' F) +' G) T) =>
+  match X with
+  | inl1 (inl1 e) => inl1 e
+  | inl1 (inr1 f) => inr1 (inl1 f)
+  | inr1 g => inr1 (inr1 g)
+  end.
+
+Definition commut_failure :
+  (Handlers.LLVMEvents.CallE +' Handlers.LLVMEvents.PickE +' UBE +' DebugE +' exceptE string) ~>
+  (exceptE string +' Handlers.LLVMEvents.CallE +' Handlers.LLVMEvents.PickE +' UBE +' DebugE).
+  intros.
+  intros. apply subevent_commut.
+  destruct X. apply inl1. apply inl1. auto.
+  destruct s. apply inl1. apply inr1. apply inl1.  auto.
+  destruct s. apply inl1. apply inr1. apply inr1. apply inl1. auto.
+  destruct s. apply inl1. apply inr1. apply inr1. apply inr1. auto.
+  apply inr1. auto.
+Defined.
+
+(* Interpret failure, and commuted sum so that it works with `run_fail`. *)
+Definition interp_cfg_to_L3_failure {R} (defs : intrinsic_definitions)
+           (t : itree Handlers.LLVMEvents.instr_E R) (g : global_env)
+           (l : local_env) (m : memory_stack) :=
+  run_fail (T := string) (memory_stack * (local_env * (global_env * R)))
+           (translate commut_failure (interp_cfg_to_L3 defs t g l m)).
+
+Definition no_failure_interp_cfg_to_L3 :=
+ forall R (defs : intrinsic_definitions) (t : itree Handlers.LLVMEvents.instr_E R) (g : global_env)
+   (l : local_env) (m : memory_stack),
+   no_failure (interp_cfg_to_L3_failure defs t g l m).
+
+Lemma interp_fail_onto_L3_ret :
+  forall R defs (tt : R) g l m,
+  interp_cfg_to_L3_failure defs (Ret tt) g l m ≈ ret (m := failT _) (m, (l, (g, tt))).
+Proof.
+  intros. unfold interp_cfg_to_L3_failure.
+  rewrite interp_cfg_to_L3_ret.
+  rewrite translate_ret. unfold run_fail. rewrite interp_fail_ret.
+  reflexivity.
+Qed.
+
+Import Handlers.LLVMEvents.
+
+Lemma interp_fail_onto_L3_bind :
+  forall {R S} defs g l m (t : itree instr_E R) (k : R -> itree instr_E S),
+  interp_cfg_to_L3_failure defs (ITree.bind t k) g l m ≈
+      bind (interp_cfg_to_L3_failure defs t g l m)
+        (fun '(m',(l', (g', x))) => interp_cfg_to_L3_failure defs (k x) g' l' m').
+Proof.
+  intros.
+  unfold interp_cfg_to_L3_failure.
+  rewrite interp_cfg_to_L3_bind.
+  rewrite translate_bind. unfold run_fail. rewrite interp_fail_bind.
+  apply eutt_eq_bind. intros []; try reflexivity.
+  destruct p as (? & ? & ? & ?). reflexivity.
+Qed.
+
+
+  Lemma def_sites_modified_instr : forall defs id (i : instr _) g l m,
+    no_failure (interp_cfg_to_L3_failure defs (denote_instr (id,i)) g l m ) ->
+    interp_cfg_to_L3 defs (denote_instr (id,i)) g l m ⤳
+                     (fun '(_,(l',_)) => forall k, l' @ k <> l @ k -> In k (def_sites_instr_id id)).
+  Proof.
+  Admitted.
+
   (*   intros. *)
-  (*   destruct i; cbn. *)
-  (*   - rewrite denote_instr_comment; apply eutt_Ret; intros; intuition. *)
-  (*   - destruct id. *)
-  (*     + admit. *)
-  (*     + Transparent denote_instr. *)
-  (*       cbn. *)
-        
-  (*     has_failure *)
-  (*       unfold has_post. *)
-  (*     rewrite denote_instr_op. apply eutt_Ret; intros; intuition. *)
+  (*   destruct i; cbn; break_match *)
+  (*   ; autorewrite with interp; try (apply eutt_Ret; intros; intuition). *)
+  (*   21 : { *)
 
-  (*     Lemma def_sites_modified_code : forall defs (c : code _) g l m, *)
-  (*         interp_cfg_to_L3 defs (denote_code c) g l m ⤳ (fun '(_,(l',_)) => forall k, l' @ k <> l @ k -> In k (def_sites_code c)). *)
-  (*     Proof. *)
-  (*       induction c as [| i c IH]; intros. *)
-  (*       - cbn. *)
-  (*         rewrite denote_code_nil, interp_cfg_to_L3_ret. *)
-  (*         apply eutt_Ret. *)
-  (*         intros; auto. *)
-  (*       - cbn. *)
-  (*         rewrite denote_code_cons, interp_cfg_to_L3_bind. *)
-  (*         eapply has_post_bind_strong. *)
-          
-  (*         apply eutt_Ret. *)
-  (*         intros ? abs; auto. *)
+  (*   } *)
+  (*   - unfold denote_op, denote_exp. cbn. *)
+
+  (*     eapply eutt_post_bind. unfold denote_op. *)
+  (*     Hint Unfold interp_cfg_to_L3 interp_memory interp_local interp_global interp_intrinsics : interp. *)
+  (*     autounfold with interp. *)
+  (*     autorewrite with interp. *)
+  (*     unfold interp_cfg_to_L3. setoid_rewrite InterpFacts.interp_translate. *)
+  (*   (* - destruct id. *) *)
+  (*   (*   + admit. *) *)
+  (*   (*   + Transparent denote_instr. *) *)
+  (*   (*     cbn. *) *)
+
+  (*   (*   has_failure *) *)
+  (*   (*     unfold has_post. *) *)
+  (*   (*   rewrite denote_instr_op. apply eutt_Ret; intros; intuition. *) *)
+  (* Admitted. *)
+
+
+  (* Lemma def_sites_modified_code : forall defs (c : code _) g l m, *)
+  (*     interp_cfg_to_L3 defs (denote_code c) g l m ⤳ (fun '(_,(l',_)) => forall k, l' @ k <> l @ k -> In k (def_sites_code c)). *)
+  (* Proof. *)
+  (*   induction c as [| i c IH]; intros. *)
+  (*   - cbn. *)
+  (*     rewrite denote_code_nil, interp_cfg_to_L3_ret. *)
+  (*     apply eutt_Ret. *)
+  (*     intros; auto. *)
+  (*   - cbn. *)
+  (*     rewrite denote_code_cons, interp_cfg_to_L3_bind. *)
+  (*     eapply has_post_bind_strong. *)
+
+  (*     apply eutt_Ret. *)
+  (*     intros ? abs; auto. *)
 
 (* TODO move to wherever lemmas about convert_typ get hosted  *)
 
