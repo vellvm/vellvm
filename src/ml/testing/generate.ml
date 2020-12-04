@@ -1,24 +1,3 @@
-(* 
-type typ =
-| TYPE_I of int
-| TYPE_Pointer of typ
-| TYPE_Void
-| TYPE_Half
-| TYPE_Float
-| TYPE_Double
-| TYPE_X86_fp80
-| TYPE_Fp128
-| TYPE_Ppc_fp128
-| TYPE_Metadata
-| TYPE_X86_mmx
-| TYPE_Array of int * typ
-| TYPE_Function of typ * typ list
-| TYPE_Struct of typ list
-| TYPE_Packed_struct of typ list
-| TYPE_Opaque
-| TYPE_Vector of int * typ
-| TYPE_Identified of ident
- *)
 module LL = LLVMAst
 open Handlers.LLVMEvents
 open QCheck
