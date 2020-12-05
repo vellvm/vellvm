@@ -357,6 +357,27 @@ Section LABELS_THEORY.
       right; auto.
   Qed.
 
+  Lemma inputs_app : forall {T} (bks1 bks2 : ocfg T), inputs (bks1 ++ bks2)%list = (inputs bks1 ++ inputs bks2)%list.
+  Proof.
+    intros; apply map_app.
+  Qed.
+
+  Lemma wf_ocfg_bid_singleton : forall {T} (b : _ T), wf_ocfg_bid [b].
+  Proof.
+    intros.
+    red.
+    eapply list_norepet_cons; eauto.
+    eapply list_norepet_nil.
+  Qed.
+
+  Lemma wf_ocfg_bid_cons' : forall {T} (b : _ T) bks,
+      not (In (blk_id b) (inputs bks)) ->
+      wf_ocfg_bid bks ->
+      wf_ocfg_bid (b :: bks).
+  Proof.
+    intros.
+    eapply list_norepet_cons; eauto.
+  Qed.
 
 End LABELS_THEORY.
 
