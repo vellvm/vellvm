@@ -121,7 +121,7 @@ Ltac vjmp :=
    | h: visible_cfg _ |- _ => inv h
    | _ => idtac
    end;
-   cbn; rewrite ?convert_typ_block_app;
+   cbn; rewrite ?convert_typ_ocfg_app;
    try solve_find_block |].
 
 (** * Jumping out of a [ocfg]

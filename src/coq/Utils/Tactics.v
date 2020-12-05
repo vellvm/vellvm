@@ -1,3 +1,6 @@
+From Coq Require Import
+     String.
+
 Ltac flatten_goal :=
   match goal with
   | |- context[match ?x with | _ => _ end] => let Heq := fresh "Heq" in destruct x eqn:Heq
@@ -223,4 +226,83 @@ Ltac inv_eqs :=
     | h : ?x = ?x /\ _ |- _ => destruct h as [_ ?]
     | h : _ = _ /\ _ |- _ => (destruct h as [<- ?] || destruct h as [?EQ ?])
     end.
+
+Ltac splits :=
+  repeat match goal with
+           |- _ /\ _ => split
+         end.
+
+Ltac abs_by H :=
+  exfalso; eapply H; now eauto.
+
+Variant Box (T: Type): Type := box (t: T).
+(* Protects from "direct" pattern matching but not from context one *)
+Ltac protect H := apply box in H.
+Ltac hide_string_hyp' H :=
+  match type of H with
+  | context [String ?x ?y] =>
+    let msg := fresh "msg" in
+    let eqmsg := fresh "EQ_msg" in
+    remember (String x y) as msg eqn:eqmsg; protect eqmsg
+  end.
+
+Ltac hide_strings' :=
+  repeat (
+      match goal with
+      | h: Box _ |- _ => idtac
+      | h: context [String ?x ?y] |- _ =>
+        let msg := fresh "msg" in
+        let eqmsg := fresh "EQ_msg" in
+        remember (String x y) as msg eqn:eqmsg;
+        protect eqmsg
+      | |- context [String ?x ?y] =>
+        let msg := fresh "msg" in
+        let eqmsg := fresh "EQ_msg" in
+        remember (String x y) as msg eqn:eqmsg;
+        protect eqmsg
+      end).
+
+Ltac forget_strings :=
+  repeat (
+      match goal with
+      | h: context [String ?x ?y] |- _ =>
+        let msg := fresh "msg" in
+        generalize (String x y) as msg
+      | |- context [String ?x ?y] =>
+        let msg := fresh "msg" in
+        generalize (String x y) as msg
+      end).
+
+Ltac break_and :=
+  repeat match goal with
+         | h: _ * _ |- _ => destruct h
+         end.
+
+Variant hidden_cont  (T: Type) : Type := boxh_cont (t: T).
+Variant visible_cont (T: Type) : Type := boxv_cont (t: T).
+Ltac hide_cont :=
+  match goal with
+  | h : visible_cont _ |- _ =>
+    let EQ := fresh "HK" in
+    destruct h as [EQ];
+    apply boxh_cont in EQ
+  | |- context[ITree.bind _ ?k] =>
+    remember k as K eqn:VK;
+    apply boxh_cont in VK
+  end.
+Ltac show_cont :=
+  match goal with
+  | h: hidden_cont _ |- _ =>
+    let EQ := fresh "VK" in
+    destruct h as [EQ];
+    apply boxv_cont in EQ
+  end.
+Notation "'hidden' K" := (hidden_cont (K = _)) (only printing, at level 10).
+Ltac subst_cont :=
+  match goal with
+  | h: hidden_cont _ |- _ =>
+    destruct h; subst
+  | h: visible_cont _ |- _ =>
+    destruct h; subst
+  end.
 
