@@ -19,6 +19,64 @@ From Coq Require Import
 Import ITreeNotations.
 Local Open Scope itree.
 
+(* MOVE itree *)
+Lemma interp_state_iter :
+  forall {A R S : Type} (E F : Type -> Type) (s0 : S) (a0 : A) (h : E ~> Monads.stateT S (itree F)) f,
+    State.interp_state (E := E) (T := R) h (ITree.iter f a0) s0 ≈
+                 @Basics.iter _ MonadIter_stateT0 _ _ (fun a s => State.interp_state h (f a) s) a0 s0.
+Proof.
+  unfold iter, CategoryKleisli.Iter_Kleisli, Basics.iter, MonadIter_stateT0, Basics.iter, MonadIter_itree in *; cbn.
+  einit. ecofix CIH; intros.
+  rewrite 2 unfold_iter; cbn.
+  rewrite !Eq.bind_bind.
+  setoid_rewrite bind_ret_l.
+  rewrite StateFacts.interp_state_bind.
+  ebind; econstructor; eauto.
+  - reflexivity.
+  - intros [s' []] _ []; cbn.
+    + rewrite StateFacts.interp_state_tau.
+      estep.
+    + rewrite StateFacts.interp_state_ret; apply reflexivity.
+Qed.
+
+Lemma interp_fail_iter :
+  forall {A R : Type} (E F : Type -> Type) (a0 : A) (h : E ~> failT (itree F)) f,
+    interp_fail (E := E) (T := R) h (ITree.iter f a0) ≈
+                @Basics.iter _ failT_iter _ _ (fun a => interp_fail h (f a)) a0.
+Proof.
+  unfold Basics.iter, failT_iter, Basics.iter, MonadIter_itree in *; cbn.
+  einit. ecofix CIH; intros *.
+  rewrite 2 unfold_iter; cbn.
+  rewrite !Eq.bind_bind.
+  rewrite interp_fail_bind.
+  ebind; econstructor; eauto.
+  reflexivity.
+  intros [[a1|r1]|] [[a2|r2]|] EQ; inv EQ.
+  - rewrite bind_ret_l.
+    rewrite interp_fail_tau.
+    estep.
+  - rewrite bind_ret_l, interp_fail_ret.
+    eret.
+  - rewrite bind_ret_l.
+    eret.
+Qed.
+
+Lemma translate_iter :
+  forall {A R : Type} (E F : Type -> Type) (a0 : A) (h : E ~> F) f,
+    translate (E := E) (F := F) (T := R) h (ITree.iter f a0) ≈
+              ITree.iter (fun a => translate h (f a)) a0.
+Proof.
+  intros; revert a0.
+  einit; ecofix CIH; intros.
+  rewrite 2 unfold_iter; cbn.
+  rewrite TranslateFacts.translate_bind.
+  ebind; econstructor; eauto.
+  - reflexivity.
+  - intros [|] [] EQ; inv EQ.
+    + rewrite TranslateFacts.translate_tau; estep.
+    + rewrite TranslateFacts.translate_ret; apply reflexivity.
+Qed.
+
 Section Handle_Fail.
 
   Definition h_fail {T E} : exceptE T ~> failT (itree E) :=
