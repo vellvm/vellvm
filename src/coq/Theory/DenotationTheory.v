@@ -423,7 +423,7 @@ Proof.
 Qed.
 
 Opaque denote_block.
-Lemma denote_bks_prefix :
+Lemma denote_ocfg_prefix :
   forall (prefix bks' postfix bks : ocfg dtyp) (from to: block_id),
     bks = (prefix ++ bks' ++ postfix) ->
     wf_ocfg_bid bks ->
