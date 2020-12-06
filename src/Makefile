@@ -17,7 +17,7 @@ CP=cp
 
 COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats\
 									Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/Error\
-									Utils/PropT Utils/PostConditions Utils/NoFailure\
+									Utils/PropT Utils/PostConditions Utils/NoFailure Utils/TFor\
                   Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
 									Syntax/Traversal Syntax/Dom Syntax/DynamicTypes Syntax/TypToDtyp\
 									Syntax/Scope Syntax/SurfaceSyntax\
