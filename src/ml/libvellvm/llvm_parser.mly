@@ -30,6 +30,7 @@ open ParserHelper
 
 let str = Camlcoq.coqstring_of_camlstring
 let coq_of_int = Camlcoq.Z.of_sint
+let n_of_z z = Camlcoq.N.of_int64 (Camlcoq.Z.to_int64 z)
 
 let coqfloat_of_string d = Floats.Float.of_bits(Camlcoq.coqint_of_camlint64(Int64.bits_of_float (float_of_string d)))
 let coqfloat32_of_string d = Floats.Float32.of_bits(Camlcoq.coqint_of_camlint(Int32.bits_of_float (float_of_string d)))
@@ -180,7 +181,6 @@ let id_of = function
 
 %token<string> STRING
 %token<Camlcoq.Z.t> INTEGER
-%token<Camlcoq.N.t> NATURAL
 %token<string> FLOAT
 %token<Floats.float> HEXCONSTANT
 %token KW_NULL KW_UNDEF KW_TRUE KW_FALSE KW_ZEROINITIALIZER KW_C
@@ -486,12 +486,12 @@ typ:
   | KW_METADATA                                       { TYPE_Metadata         }
   | KW_X86_MMX                                        { TYPE_X86_mmx          }
   | t=typ STAR                                        { TYPE_Pointer t        }
-  | LSQUARE n=NATURAL KW_X t=typ RSQUARE              { TYPE_Array (n, t)     }
+  | LSQUARE n=INTEGER KW_X t=typ RSQUARE              { TYPE_Array (n_of_z n, t)     }
   | t=typ LPAREN ts=separated_list(csep, typ) RPAREN  { TYPE_Function (t, ts) }
   | LCURLY ts=separated_list(csep, typ) RCURLY        { TYPE_Struct ts        }
   | LTLCURLY ts=separated_list(csep, typ) RCURLYGT    { TYPE_Packed_struct ts }
   | KW_OPAQUE                                         { TYPE_Opaque           }
-  | LT n=NATURAL KW_X t=typ GT                        { TYPE_Vector (n, t)    }
+  | LT n=INTEGER KW_X t=typ GT                        { TYPE_Vector (n_of_z n, t)    }
   | l=lident                                          { TYPE_Identified (ID_Local l)  }
 
 param_attr:
