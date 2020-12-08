@@ -84,9 +84,9 @@ Definition fabs_64_decl: declaration typ :=
   |}.
 
 Definition memcpy_8_decl: declaration typ :=
-  let pt := TYPE_Pointer (TYPE_I 8%Z) in
-  let i32 := TYPE_I 32%Z in
-  let i1 := TYPE_I 1%Z in
+  let pt := TYPE_Pointer (TYPE_I 8%N) in
+  let i32 := TYPE_I 32%N in
+  let i1 := TYPE_I 1%N in
   {|
     dc_name        := Name "llvm.memcpy.p0i8.p0i8.i32";
     dc_type        := TYPE_Function TYPE_Void [pt; pt; i32; i32; i1] ;

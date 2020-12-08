@@ -46,7 +46,7 @@ Set Contextual Implicit.
 
 Unset Elimination Schemes.
 Inductive dtyp : Set :=
-| DTYPE_I (sz:Z)
+| DTYPE_I (sz:N)
 | DTYPE_Pointer
 | DTYPE_Void
 | DTYPE_Half
@@ -57,12 +57,12 @@ Inductive dtyp : Set :=
 | DTYPE_Ppc_fp128
 | DTYPE_Metadata
 | DTYPE_X86_mmx
-| DTYPE_Array (sz:Z) (t:dtyp)
+| DTYPE_Array (sz:N) (t:dtyp)
 | DTYPE_Struct (fields:list dtyp)
 | DTYPE_Packed_struct (fields:list dtyp)
 | DTYPE_Opaque
 (* IY: Why isn't this defined structurally? *)
-| DTYPE_Vector (sz:Z) (t:dtyp)     (* t must be integer, floating point, or pointer type *)
+| DTYPE_Vector (sz:N) (t:dtyp)     (* t must be integer, floating point, or pointer type *)
 .
 Set Elimination Schemes.
 
@@ -123,12 +123,12 @@ Section WF_dtyp.
   | Wf_Metadata : well_formed_dtyp DTYPE_Metadata
   | Wf_X86_mmx : well_formed_dtyp DTYPE_X86_mmx
   | Wf_Opaque : well_formed_dtyp DTYPE_Opaque
-  | Wf_Array : forall (sz : Z),
-      Z.le 0 sz ->
+  | Wf_Array : forall (sz : N),
+      N.le 0 sz ->
       forall t, well_formed_dtyp t ->
            well_formed_dtyp (DTYPE_Array sz t)
-  | Wf_Vector : forall (sz : Z),
-      Z.le 0 sz ->
+  | Wf_Vector : forall (sz : N),
+      N.le 0 sz ->
       forall t, vector_dtyp t ->
            well_formed_dtyp t ->
            well_formed_dtyp (DTYPE_Vector sz t)
@@ -177,4 +177,3 @@ Section hiding_notation.
 
   Global Instance serialize_dtyp : Serialize dtyp := serialize_dtyp'.
 End hiding_notation.
-

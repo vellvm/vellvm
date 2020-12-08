@@ -161,7 +161,7 @@ Definition function_id := global_id.
 
 Unset Elimination Schemes.
 Inductive typ : Set :=
-| TYPE_I (sz:int)
+| TYPE_I (sz:N)
 | TYPE_Pointer (t:typ)
 | TYPE_Void
 | TYPE_Half
@@ -174,12 +174,12 @@ Inductive typ : Set :=
 (* | TYPE_Token -- used with exceptions *)
 | TYPE_Metadata
 | TYPE_X86_mmx
-| TYPE_Array (sz:int) (t:typ)
+| TYPE_Array (sz:N) (t:typ)
 | TYPE_Function (ret:typ) (args:list typ)
 | TYPE_Struct (fields:list typ)
 | TYPE_Packed_struct (fields:list typ)
 | TYPE_Opaque
-| TYPE_Vector (sz:int) (t:typ)     (* t must be integer, floating point, or pointer type *)
+| TYPE_Vector (sz:N) (t:typ)     (* t must be integer, floating point, or pointer type *)
 | TYPE_Identified (id:ident)
 .
 Set Elimination Schemes.

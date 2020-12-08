@@ -251,7 +251,7 @@ Section SurfaceSyntaxTest.
   
   Definition add_twice := mcfg_of_tle [TLE_Definition {|
                                df_prototype := {|dc_name := (Name "main");
-                                                 dc_type := (TYPE_Function (TYPE_I 32%Z) [(TYPE_I 32%Z); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%Z)))]);
+                                                 dc_type := (TYPE_Function (TYPE_I 32%N) [(TYPE_I 32%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))]);
                                                  dc_param_attrs := ([], [
                                                                    ]);
                                                  dc_linkage := None;
@@ -267,9 +267,9 @@ Section SurfaceSyntaxTest.
                                              {|
                                                blk_id := (Anon 0%Z);
                                                blk_phis := [];
-                                               blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%Z) (EXP_Integer (5)%Z) (EXP_Integer (9)%Z))));
-                                                           (IId (Anon 2%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%Z) (EXP_Ident (ID_Local (Anon 1%Z))) (EXP_Integer (15)%Z))))];
-                                               blk_term := TERM_Ret ((TYPE_I 32%Z), (EXP_Ident (ID_Local (Anon 2%Z))));
+                                               blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%N) (EXP_Integer (5)%Z) (EXP_Integer (9)%Z))));
+                                                           (IId (Anon 2%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 32%N) (EXP_Ident (ID_Local (Anon 1%Z))) (EXP_Integer (15)%Z))))];
+                                               blk_term := TERM_Ret ((TYPE_I 32%N), (EXP_Ident (ID_Local (Anon 2%Z))));
                                                blk_comments := None
                                              |}
                                            ,[])
@@ -293,11 +293,11 @@ Section SurfaceSyntaxTest.
 
 
  Definition binarysearch := mcfg_of_tle
-   [TLE_Type_decl (ID_Local (Name "struct.Node")) (TYPE_Struct [(TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))); (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))); (TYPE_I 64%Z)]);
+   [TLE_Type_decl (ID_Local (Name "struct.Node")) (TYPE_Struct [(TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))); (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))); (TYPE_I 64%N)]);
    TLE_Global {|g_ident := (Name "node1");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
-                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node2")))); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node3")))); ((TYPE_I 64%Z),(EXP_Integer (50)%Z))]));
+                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node2")))); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node3")))); ((TYPE_I 64%N),(EXP_Integer (50)%Z))]));
                 g_linkage := None;
                 g_visibility := None;
                 g_dll_storage := None;
@@ -310,7 +310,7 @@ Section SurfaceSyntaxTest.
    TLE_Global {|g_ident := (Name "node2");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
-                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node4")))); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node5")))); ((TYPE_I 64%Z),(EXP_Integer (25)%Z))]));
+                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node4")))); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node5")))); ((TYPE_I 64%N),(EXP_Integer (25)%Z))]));
                 g_linkage := None;
                 g_visibility := None;
                 g_dll_storage := None;
@@ -323,7 +323,7 @@ Section SurfaceSyntaxTest.
    TLE_Global {|g_ident := (Name "node3");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
-                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node6")))); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node7")))); ((TYPE_I 64%Z),(EXP_Integer (75)%Z))]));
+                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node6")))); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node7")))); ((TYPE_I 64%N),(EXP_Integer (75)%Z))]));
                 g_linkage := None;
                 g_visibility := None;
                 g_dll_storage := None;
@@ -336,7 +336,7 @@ Section SurfaceSyntaxTest.
    TLE_Global {|g_ident := (Name "node4");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
-                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node8")))); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%Z),(EXP_Integer (10)%Z))]));
+                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Global (Name "node8")))); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%N),(EXP_Integer (10)%Z))]));
                 g_linkage := None;
                 g_visibility := None;
                 g_dll_storage := None;
@@ -349,7 +349,7 @@ Section SurfaceSyntaxTest.
    TLE_Global {|g_ident := (Name "node5");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
-                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%Z),(EXP_Integer (30)%Z))]));
+                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%N),(EXP_Integer (30)%Z))]));
                 g_linkage := None;
                 g_visibility := None;
                 g_dll_storage := None;
@@ -362,7 +362,7 @@ Section SurfaceSyntaxTest.
    TLE_Global {|g_ident := (Name "node6");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
-                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%Z),(EXP_Integer (60)%Z))]));
+                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%N),(EXP_Integer (60)%Z))]));
                 g_linkage := None;
                 g_visibility := None;
                 g_dll_storage := None;
@@ -375,7 +375,7 @@ Section SurfaceSyntaxTest.
    TLE_Global {|g_ident := (Name "node7");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
-                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%Z),(EXP_Integer (80)%Z))]));
+                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%N),(EXP_Integer (80)%Z))]));
                 g_linkage := None;
                 g_visibility := None;
                 g_dll_storage := None;
@@ -388,7 +388,7 @@ Section SurfaceSyntaxTest.
    TLE_Global {|g_ident := (Name "node8");
                 g_typ := (TYPE_Identified (ID_Local (Name "struct.Node")));
                 g_constant := false;
-                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%Z),(EXP_Integer (1)%Z))]));
+                g_exp := (Some (EXP_Struct [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),EXP_Null); ((TYPE_I 64%N),(EXP_Integer (1)%Z))]));
                 g_linkage := None;
                 g_visibility := None;
                 g_dll_storage := None;
@@ -400,7 +400,7 @@ Section SurfaceSyntaxTest.
                 g_align := None|};
    TLE_Definition {|
        df_prototype := {|dc_name := (Name "contains");
-                         dc_type := (TYPE_Function (TYPE_I 64%Z) [(TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))); (TYPE_I 64%Z)]);
+                         dc_type := (TYPE_Function (TYPE_I 64%N) [(TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))); (TYPE_I 64%N)]);
                          dc_param_attrs := ([], [
                                            ]);
                          dc_linkage := None;
@@ -416,69 +416,69 @@ Section SurfaceSyntaxTest.
                      {|
                        blk_id := (Anon 0%Z);
                        blk_phis := [];
-                       blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%Z),(EXP_Integer (0)%Z)); ((TYPE_I 32%Z),(EXP_Integer (2)%Z))])));
-                                   (IId (Anon 2%Z), (INSTR_Load false (TYPE_I 64%Z) ((TYPE_Pointer (TYPE_I 64%Z)), (EXP_Ident (ID_Local (Anon 1%Z)))) None));
-                                   (IId (Anon 3%Z), (INSTR_Op (OP_ICmp Eq (TYPE_I 64%Z) (EXP_Ident (ID_Local (Anon 2%Z))) (EXP_Ident (ID_Local (Name "value"))))))];
-                       blk_term := TERM_Br ((TYPE_I 1%Z), (EXP_Ident (ID_Local (Anon 3%Z)))) (Name "equal") (Name "notequal");
+                       blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%N),(EXP_Integer (0)%Z)); ((TYPE_I 32%N),(EXP_Integer (2)%Z))])));
+                                   (IId (Anon 2%Z), (INSTR_Load false (TYPE_I 64%N) ((TYPE_Pointer (TYPE_I 64%N)), (EXP_Ident (ID_Local (Anon 1%Z)))) None));
+                                   (IId (Anon 3%Z), (INSTR_Op (OP_ICmp Eq (TYPE_I 64%N) (EXP_Ident (ID_Local (Anon 2%Z))) (EXP_Ident (ID_Local (Name "value"))))))];
+                       blk_term := TERM_Br ((TYPE_I 1%N), (EXP_Ident (ID_Local (Anon 3%Z)))) (Name "equal") (Name "notequal");
                        blk_comments := None
                      |},[
                        {|
                          blk_id := (Name "equal");
                          blk_phis := [];
                          blk_code := [];
-                         blk_term := TERM_Ret ((TYPE_I 64%Z), (EXP_Integer (1)%Z));
+                         blk_term := TERM_Ret ((TYPE_I 64%N), (EXP_Integer (1)%Z));
                          blk_comments := None
                        |};
                    {|
                      blk_id := (Name "notequal");
                      blk_phis := [];
-                     blk_code := [(IId (Anon 4%Z), (INSTR_Op (OP_ICmp Sgt (TYPE_I 64%Z) (EXP_Ident (ID_Local (Anon 2%Z))) (EXP_Ident (ID_Local (Name "value"))))))];
-                     blk_term := TERM_Br ((TYPE_I 1%Z), (EXP_Ident (ID_Local (Anon 4%Z)))) (Name "left") (Name "right");
+                     blk_code := [(IId (Anon 4%Z), (INSTR_Op (OP_ICmp Sgt (TYPE_I 64%N) (EXP_Ident (ID_Local (Anon 2%Z))) (EXP_Ident (ID_Local (Name "value"))))))];
+                     blk_term := TERM_Br ((TYPE_I 1%N), (EXP_Ident (ID_Local (Anon 4%Z)))) (Name "left") (Name "right");
                      blk_comments := None
                    |};
                    {|
                      blk_id := (Name "left");
                      blk_phis := [];
-                     blk_code := [(IId (Anon 5%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%Z),(EXP_Integer (0)%Z)); ((TYPE_I 32%Z),(EXP_Integer (0)%Z))])));
+                     blk_code := [(IId (Anon 5%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%N),(EXP_Integer (0)%Z)); ((TYPE_I 32%N),(EXP_Integer (0)%Z))])));
                                  (IId (Anon 6%Z), (INSTR_Load false (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))) ((TYPE_Pointer (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node"))))), (EXP_Ident (ID_Local (Anon 5%Z)))) None));
                                  (IId (Anon 7%Z), (INSTR_Op (OP_ICmp Eq (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))) (EXP_Ident (ID_Local (Anon 6%Z))) EXP_Null)))];
-                     blk_term := TERM_Br ((TYPE_I 1%Z), (EXP_Ident (ID_Local (Anon 7%Z)))) (Name "none") (Name "left_next");
+                     blk_term := TERM_Br ((TYPE_I 1%N), (EXP_Ident (ID_Local (Anon 7%Z)))) (Name "none") (Name "left_next");
                      blk_comments := None
                    |};
                    {|
                      blk_id := (Name "left_next");
                      blk_phis := [];
-                     blk_code := [(IId (Anon 8%Z), (INSTR_Call ((TYPE_I 64%Z), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Local (Anon 6%Z)))); ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Name "value"))))]))];
-                     blk_term := TERM_Ret ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Anon 8%Z))));
+                     blk_code := [(IId (Anon 8%Z), (INSTR_Call ((TYPE_I 64%N), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Local (Anon 6%Z)))); ((TYPE_I 64%N), (EXP_Ident (ID_Local (Name "value"))))]))];
+                     blk_term := TERM_Ret ((TYPE_I 64%N), (EXP_Ident (ID_Local (Anon 8%Z))));
                      blk_comments := None
                    |};
                    {|
                      blk_id := (Name "right");
                      blk_phis := [];
-                     blk_code := [(IId (Anon 9%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%Z),(EXP_Integer (0)%Z)); ((TYPE_I 32%Z),(EXP_Integer (1)%Z))])));
+                     blk_code := [(IId (Anon 9%Z), (INSTR_Op (OP_GetElementPtr (TYPE_Identified (ID_Local (Name "struct.Node"))) ((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))),(EXP_Ident (ID_Local (Name "root")))) [((TYPE_I 32%N),(EXP_Integer (0)%Z)); ((TYPE_I 32%N),(EXP_Integer (1)%Z))])));
                                  (IId (Anon 10%Z), (INSTR_Load false (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))) ((TYPE_Pointer (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node"))))), (EXP_Ident (ID_Local (Anon 9%Z)))) None));
                                  (IId (Anon 11%Z), (INSTR_Op (OP_ICmp Eq (TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))) (EXP_Ident (ID_Local (Anon 10%Z))) EXP_Null)))];
-                     blk_term := TERM_Br ((TYPE_I 1%Z), (EXP_Ident (ID_Local (Anon 11%Z)))) (Name "none") (Name "right_next");
+                     blk_term := TERM_Br ((TYPE_I 1%N), (EXP_Ident (ID_Local (Anon 11%Z)))) (Name "none") (Name "right_next");
                      blk_comments := None
                    |};
                    {|
                      blk_id := (Name "right_next");
                      blk_phis := [];
-                     blk_code := [(IId (Anon 12%Z), (INSTR_Call ((TYPE_I 64%Z), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Local (Anon 10%Z)))); ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Name "value"))))]))];
-                     blk_term := TERM_Ret ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Anon 12%Z))));
+                     blk_code := [(IId (Anon 12%Z), (INSTR_Call ((TYPE_I 64%N), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Local (Anon 10%Z)))); ((TYPE_I 64%N), (EXP_Ident (ID_Local (Name "value"))))]))];
+                     blk_term := TERM_Ret ((TYPE_I 64%N), (EXP_Ident (ID_Local (Anon 12%Z))));
                      blk_comments := None
                    |};
                    {|
                      blk_id := (Name "none");
                      blk_phis := [];
                      blk_code := [];
-                     blk_term := TERM_Ret ((TYPE_I 64%Z), (EXP_Integer (0)%Z));
+                     blk_term := TERM_Ret ((TYPE_I 64%N), (EXP_Integer (0)%Z));
                      blk_comments := None
                    |}])
      |};
    TLE_Definition {|
        df_prototype := {|dc_name := (Name "main");
-                         dc_type := (TYPE_Function (TYPE_I 64%Z) [(TYPE_I 64%Z); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%Z)))]);
+                         dc_type := (TYPE_Function (TYPE_I 64%N) [(TYPE_I 64%N); (TYPE_Pointer (TYPE_Pointer (TYPE_I 8%N)))]);
                          dc_param_attrs := ([], [
                                            ]);
                          dc_linkage := None;
@@ -494,36 +494,36 @@ Section SurfaceSyntaxTest.
                      {|
                        blk_id := (Anon 0%Z);
                        blk_phis := [];
-                       blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Integer (50)%Z) (EXP_Integer (0)%Z))));
-                                   (IId (Anon 2%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Integer (25)%Z) (EXP_Integer (0)%Z))));
-                                   (IId (Anon 3%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Integer (75)%Z) (EXP_Integer (0)%Z))));
-                                   (IId (Anon 4%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Integer (10)%Z) (EXP_Integer (0)%Z))));
-                                   (IId (Anon 5%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Integer (30)%Z) (EXP_Integer (0)%Z))));
-                                   (IId (Anon 6%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Integer (60)%Z) (EXP_Integer (0)%Z))));
-                                   (IId (Anon 7%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Integer (80)%Z) (EXP_Integer (0)%Z))));
-                                   (IId (Anon 8%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Integer (1)%Z) (EXP_Integer (0)%Z))));
-                                   (IId (Anon 9%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Integer (100)%Z) (EXP_Integer (0)%Z))));
-                                   (IId (Anon 10%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Integer (120)%Z) (EXP_Integer (0)%Z))));
-                                   (IId (Anon 11%Z), (INSTR_Call ((TYPE_I 64%Z), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Anon 1%Z))))]));
-                                   (IId (Anon 12%Z), (INSTR_Call ((TYPE_I 64%Z), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Anon 2%Z))))]));
-                                   (IId (Anon 13%Z), (INSTR_Call ((TYPE_I 64%Z), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Anon 3%Z))))]));
-                                   (IId (Anon 14%Z), (INSTR_Call ((TYPE_I 64%Z), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Anon 4%Z))))]));
-                                   (IId (Anon 15%Z), (INSTR_Call ((TYPE_I 64%Z), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Anon 5%Z))))]));
-                                   (IId (Anon 16%Z), (INSTR_Call ((TYPE_I 64%Z), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Anon 6%Z))))]));
-                                   (IId (Anon 17%Z), (INSTR_Call ((TYPE_I 64%Z), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Anon 7%Z))))]));
-                                   (IId (Anon 18%Z), (INSTR_Call ((TYPE_I 64%Z), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Anon 8%Z))))]));
-                                   (IId (Anon 19%Z), (INSTR_Call ((TYPE_I 64%Z), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Anon 9%Z))))]));
-                                   (IId (Anon 20%Z), (INSTR_Call ((TYPE_I 64%Z), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Anon 10%Z))))]));
-                                   (IId (Anon 21%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Ident (ID_Local (Anon 11%Z))) (EXP_Ident (ID_Local (Anon 12%Z))))));
-                                   (IId (Anon 22%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Ident (ID_Local (Anon 13%Z))) (EXP_Ident (ID_Local (Anon 14%Z))))));
-                                   (IId (Anon 23%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Ident (ID_Local (Anon 15%Z))) (EXP_Ident (ID_Local (Anon 16%Z))))));
-                                   (IId (Anon 24%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Ident (ID_Local (Anon 17%Z))) (EXP_Ident (ID_Local (Anon 18%Z))))));
-                                   (IId (Anon 25%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Ident (ID_Local (Anon 19%Z))) (EXP_Ident (ID_Local (Anon 20%Z))))));
-                                   (IId (Anon 26%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Ident (ID_Local (Anon 21%Z))) (EXP_Ident (ID_Local (Anon 22%Z))))));
-                                   (IId (Anon 27%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Ident (ID_Local (Anon 23%Z))) (EXP_Ident (ID_Local (Anon 24%Z))))));
-                                   (IId (Anon 28%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Ident (ID_Local (Anon 26%Z))) (EXP_Ident (ID_Local (Anon 27%Z))))));
-                                   (IId (Anon 29%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%Z) (EXP_Ident (ID_Local (Anon 28%Z))) (EXP_Ident (ID_Local (Anon 25%Z))))))];
-                       blk_term := TERM_Ret ((TYPE_I 64%Z), (EXP_Ident (ID_Local (Anon 29%Z))));
+                       blk_code := [(IId (Anon 1%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Integer (50)%Z) (EXP_Integer (0)%Z))));
+                                   (IId (Anon 2%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Integer (25)%Z) (EXP_Integer (0)%Z))));
+                                   (IId (Anon 3%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Integer (75)%Z) (EXP_Integer (0)%Z))));
+                                   (IId (Anon 4%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Integer (10)%Z) (EXP_Integer (0)%Z))));
+                                   (IId (Anon 5%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Integer (30)%Z) (EXP_Integer (0)%Z))));
+                                   (IId (Anon 6%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Integer (60)%Z) (EXP_Integer (0)%Z))));
+                                   (IId (Anon 7%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Integer (80)%Z) (EXP_Integer (0)%Z))));
+                                   (IId (Anon 8%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Integer (1)%Z) (EXP_Integer (0)%Z))));
+                                   (IId (Anon 9%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Integer (100)%Z) (EXP_Integer (0)%Z))));
+                                   (IId (Anon 10%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Integer (120)%Z) (EXP_Integer (0)%Z))));
+                                   (IId (Anon 11%Z), (INSTR_Call ((TYPE_I 64%N), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%N), (EXP_Ident (ID_Local (Anon 1%Z))))]));
+                                   (IId (Anon 12%Z), (INSTR_Call ((TYPE_I 64%N), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%N), (EXP_Ident (ID_Local (Anon 2%Z))))]));
+                                   (IId (Anon 13%Z), (INSTR_Call ((TYPE_I 64%N), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%N), (EXP_Ident (ID_Local (Anon 3%Z))))]));
+                                   (IId (Anon 14%Z), (INSTR_Call ((TYPE_I 64%N), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%N), (EXP_Ident (ID_Local (Anon 4%Z))))]));
+                                   (IId (Anon 15%Z), (INSTR_Call ((TYPE_I 64%N), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%N), (EXP_Ident (ID_Local (Anon 5%Z))))]));
+                                   (IId (Anon 16%Z), (INSTR_Call ((TYPE_I 64%N), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%N), (EXP_Ident (ID_Local (Anon 6%Z))))]));
+                                   (IId (Anon 17%Z), (INSTR_Call ((TYPE_I 64%N), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%N), (EXP_Ident (ID_Local (Anon 7%Z))))]));
+                                   (IId (Anon 18%Z), (INSTR_Call ((TYPE_I 64%N), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%N), (EXP_Ident (ID_Local (Anon 8%Z))))]));
+                                   (IId (Anon 19%Z), (INSTR_Call ((TYPE_I 64%N), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%N), (EXP_Ident (ID_Local (Anon 9%Z))))]));
+                                   (IId (Anon 20%Z), (INSTR_Call ((TYPE_I 64%N), (EXP_Ident (ID_Global (Name "contains")))) [((TYPE_Pointer (TYPE_Identified (ID_Local (Name "struct.Node")))), (EXP_Ident (ID_Global (Name "node1")))); ((TYPE_I 64%N), (EXP_Ident (ID_Local (Anon 10%Z))))]));
+                                   (IId (Anon 21%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Ident (ID_Local (Anon 11%Z))) (EXP_Ident (ID_Local (Anon 12%Z))))));
+                                   (IId (Anon 22%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Ident (ID_Local (Anon 13%Z))) (EXP_Ident (ID_Local (Anon 14%Z))))));
+                                   (IId (Anon 23%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Ident (ID_Local (Anon 15%Z))) (EXP_Ident (ID_Local (Anon 16%Z))))));
+                                   (IId (Anon 24%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Ident (ID_Local (Anon 17%Z))) (EXP_Ident (ID_Local (Anon 18%Z))))));
+                                   (IId (Anon 25%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Ident (ID_Local (Anon 19%Z))) (EXP_Ident (ID_Local (Anon 20%Z))))));
+                                   (IId (Anon 26%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Ident (ID_Local (Anon 21%Z))) (EXP_Ident (ID_Local (Anon 22%Z))))));
+                                   (IId (Anon 27%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Ident (ID_Local (Anon 23%Z))) (EXP_Ident (ID_Local (Anon 24%Z))))));
+                                   (IId (Anon 28%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Ident (ID_Local (Anon 26%Z))) (EXP_Ident (ID_Local (Anon 27%Z))))));
+                                   (IId (Anon 29%Z), (INSTR_Op (OP_IBinop (Add false false) (TYPE_I 64%N) (EXP_Ident (ID_Local (Anon 28%Z))) (EXP_Ident (ID_Local (Anon 25%Z))))))];
+                       blk_term := TERM_Ret ((TYPE_I 64%N), (EXP_Ident (ID_Local (Anon 29%Z))));
                        blk_comments := None
                      |},[
                    ])
