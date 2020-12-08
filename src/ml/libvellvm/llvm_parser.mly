@@ -180,6 +180,7 @@ let id_of = function
 
 %token<string> STRING
 %token<Camlcoq.Z.t> INTEGER
+%token<Camlcoq.N.t> NATURAL
 %token<string> FLOAT
 %token<Floats.float> HEXCONSTANT
 %token KW_NULL KW_UNDEF KW_TRUE KW_FALSE KW_ZEROINITIALIZER KW_C
@@ -199,7 +200,7 @@ let id_of = function
 %token KW_GC
 %token KW_ADD KW_FADD KW_SUB KW_FSUB KW_MUL KW_FMUL KW_UDIV KW_SDIV KW_FDIV KW_UREM KW_SREM KW_FREM KW_SHL KW_LSHR KW_ASHR KW_AND KW_OR KW_XOR KW_ICMP KW_FCMP KW_PHI KW_CALL KW_TRUNC KW_ZEXT KW_SEXT KW_FPTRUNC KW_FPEXT KW_UITOFP KW_SITOFP KW_FPTOUI KW_FPTOSI KW_INTTOPTR KW_PTRTOINT KW_BITCAST KW_SELECT KW_FREEZE KW_VAARG KW_RET KW_BR KW_SWITCH KW_INDIRECTBR KW_INVOKE KW_RESUME KW_UNREACHABLE KW_ALLOCA KW_LOAD KW_STORE KW_ATOMICCMPXCHG KW_ATOMICRMW KW_FENCE KW_GETELEMENTPTR KW_INBOUNDS KW_EXTRACTELEMENT KW_INSERTELEMENT KW_SHUFFLEVECTOR KW_EXTRACTVALUE KW_INSERTVALUE KW_LANDINGPAD
 %token KW_NNAN KW_NINF KW_NSZ KW_ARCP KW_FAST
-%token<Camlcoq.Z.t> I
+%token<Camlcoq.N.t> I
 %token KW_VOID KW_HALF KW_FLOAT KW_DOUBLE KW_X86_FP80 KW_FP128 KW_PPC_FP128 KW_LABEL KW_METADATA KW_X86_MMX
 %token KW_UNWIND KW_TO
 %token KW_NUW KW_NSW
@@ -485,12 +486,12 @@ typ:
   | KW_METADATA                                       { TYPE_Metadata         }
   | KW_X86_MMX                                        { TYPE_X86_mmx          }
   | t=typ STAR                                        { TYPE_Pointer t        }
-  | LSQUARE n=INTEGER KW_X t=typ RSQUARE              { TYPE_Array (n, t)     }
+  | LSQUARE n=NATURAL KW_X t=typ RSQUARE              { TYPE_Array (n, t)     }
   | t=typ LPAREN ts=separated_list(csep, typ) RPAREN  { TYPE_Function (t, ts) }
   | LCURLY ts=separated_list(csep, typ) RCURLY        { TYPE_Struct ts        }
   | LTLCURLY ts=separated_list(csep, typ) RCURLYGT    { TYPE_Packed_struct ts }
   | KW_OPAQUE                                         { TYPE_Opaque           }
-  | LT n=INTEGER KW_X t=typ GT                        { TYPE_Vector (n, t)    }
+  | LT n=NATURAL KW_X t=typ GT                        { TYPE_Vector (n, t)    }
   | l=lident                                          { TYPE_Identified (ID_Local l)  }
 
 param_attr:

@@ -87,7 +87,7 @@ let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
   (* Allow null pointers literals *)
   | TYPE_Pointer _, EXP_Null -> UVALUE_Addr Memory.Addr.null
   | TYPE_I i, EXP_Integer x ->
-    begin match (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned i)) with
+    begin match (Camlcoq.N.to_int i) with
     | 1 -> UVALUE_I1 x
     | 8 -> UVALUE_I8 x
     | 32 -> UVALUE_I32 x
