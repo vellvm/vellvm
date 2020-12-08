@@ -267,7 +267,7 @@ Proof.
   rewrite IHa; reflexivity.
 Qed.
 
-Lemma convert_typ_block_app : forall (a b : list (block typ)) env, (convert_typ env (a ++ b) = convert_typ env a ++ convert_typ env b)%list.
+Lemma convert_typ_ocfg_app : forall (a b : ocfg typ) env, (convert_typ env (a ++ b) = convert_typ env a ++ convert_typ env b)%list.
 Proof.
   intros; rewrite convert_typ_list_app; reflexivity.
 Qed.

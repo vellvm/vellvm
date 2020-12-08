@@ -2722,6 +2722,72 @@ Section PARAMS.
 
   End Structural_Lemmas.
 
+  (* TODO: move to appropriate place in this file *)
+  Lemma handle_gep_addr_array_same_block :
+    forall ptr ptr_elem ix sz τ,
+      handle_gep_addr (DTYPE_Array sz τ) ptr
+                      [DVALUE_I64 (repr 0); DVALUE_I64 ix] = inr ptr_elem ->
+      fst ptr = fst ptr_elem.
+  Proof.
+    intros [ptrb ptro] [ptr_elemb ptr_elemo] ix sz τ GEP.
+    cbn in GEP.
+    inversion GEP; subst.
+    reflexivity.
+  Qed.
+
+  Lemma unsigned_repr_0_i64 :
+    DynamicValues.Int64.unsigned (DynamicValues.Int64.repr 0) = 0.
+  Proof.
+    apply Integers.Int64.unsigned_zero.
+  Qed.
+
+ 
+  Lemma handle_gep_addr_array_offset :
+    forall ptr ptr_elem ix sz τ,
+      handle_gep_addr (DTYPE_Array sz τ) ptr
+                      [DVALUE_I64 (repr 0); DVALUE_I64 ix] = inr ptr_elem ->
+      snd ptr + DynamicValues.Int64.unsigned ix * sizeof_dtyp τ = snd ptr_elem.
+  Proof.
+    intros [ptrb ptro] [ptr_elemb ptr_elemo] ix sz τ GEP.
+    cbn in GEP.
+    inversion GEP; subst.
+    cbn.
+    rewrite unsigned_repr_0_i64.
+    lia.
+  Qed.
+
+ Lemma dtyp_fits_array_elem :
+    forall m ptr ptr_elem ix sz τ,
+      dtyp_fits m ptr (DTYPE_Array sz τ) ->
+      handle_gep_addr (DTYPE_Array sz τ) ptr
+                      [DVALUE_I64 (repr 0); DVALUE_I64 ix] = inr ptr_elem ->
+      Int64.intval ix < sz ->
+      0 <= sizeof_dtyp τ ->
+      dtyp_fits m ptr_elem τ.
+  Proof.
+    intros m ptr ptr_elem ix sz τ FITS GEP SZ TYPSZ.
+    cbn in GEP.
+    unfold dtyp_fits in *.
+    destruct FITS as (sz' & bytes & cid & BLOCK & BOUND).
+    exists sz'. exists bytes. exists cid.
+    split.
+    erewrite <- handle_gep_addr_array_same_block; eauto.
+    erewrite <- handle_gep_addr_array_offset; eauto.
+    cbn in BOUND.
+    assert (Int64.unsigned ix = Int64.intval ix) by reflexivity.
+    rewrite H2.
+    assert (1 + Int64.intval ix <= sz) by lia.
+    rewrite <- Z.add_assoc.
+    assert (snd ptr + (Int64.intval ix * sizeof_dtyp τ + sizeof_dtyp τ) <= snd ptr + sz * sizeof_dtyp τ).
+    { eapply Zorder.Zplus_le_compat_l.
+      replace (Int64.intval ix * sizeof_dtyp τ + sizeof_dtyp τ) with ((1 + Int64.intval ix) * sizeof_dtyp τ).
+      eapply Z.mul_le_mono_nonneg_r; lia.
+      lia.
+    }
+    lia.
+  Qed.
+
+
 End PARAMS.
 End MEMORY_THEORY.
 

@@ -117,6 +117,9 @@
   | "unwind"                       -> KW_UNWIND
   | "tail"                         -> KW_TAIL
   | "volatile"                     -> KW_VOLATILE
+  | "immarg"                       -> KW_IMMARG  
+  | "noundef"                      -> KW_NOUNDEF
+  | "nofree"                       -> KW_NOFREE
 
   (* instrs *)
   | "add"            -> KW_ADD
