@@ -2537,6 +2537,109 @@ Section PARAMS.
         rewrite IHl. reflexivity. reflexivity.
     Qed.
 
+
+    (* TODO: move *)
+    Lemma Zlength_map:
+      forall {A B} (f : A -> B) (l : list A),
+        Zlength (map f l) = Zlength l.
+    Proof.
+      intros A B f l.
+      induction l.
+      - reflexivity.
+      - rewrite map_cons.
+        rewrite 2 Zlength_cons.
+        rewrite IHl.
+        reflexivity.
+    Qed.
+
+    (* TODO: move *)
+    Lemma Zlength_app:
+      forall {A} (l1 l2 : list A),
+        Zlength (l1 ++ l2) = Zlength l1 + Zlength l2.
+    Proof.
+      intros A; induction l1; intros l2.
+      - reflexivity.
+      - (* TODO: avoid this... *)
+        Opaque Zlength.
+        cbn.
+        rewrite 2 Zlength_cons.
+        Transparent Zlength.
+        rewrite Z.add_succ_l.
+        rewrite IHl1.
+        reflexivity.
+    Qed.
+
+    Lemma Zlength_Zseq:
+      forall sz start,
+        Zlength (Zseq start sz) = Z.of_nat sz.
+    Proof.
+      induction sz; intros start.
+      - reflexivity.
+      - (* TODO: avoid this... *)
+        Opaque Zlength.
+        cbn.
+        rewrite Zlength_cons.
+        Transparent Zlength.
+        rewrite IHsz.
+        lia.
+    Qed.
+    
+    (* Lemma lookup_all_index_add_all_index : *)
+    (*   forall (sz : nat) src_bytes src_offset dst_bytes dst_offset def, *)
+    (*     (lookup_all_index dst_offset (N.of_nat sz) *)
+    (*                       (add_all_index *)
+    (*                          (lookup_all_index src_offset (N.of_nat sz) src_bytes def) *)
+    (*                          dst_offset dst_bytes) SUndef) = *)
+    (*     (lookup_all_index src_offset (N.of_nat sz) src_bytes def). *)
+    (* Proof. *)
+    (*   intros sz src_bytes src_offset dst_bytes dst_offset def. *)
+    (*   induction sz. *)
+    (*   - cbn; reflexivity. *)
+    (*   - rewrite Nnat.Nat2N.inj_succ. *)
+    (*     unfold lookup_all_index in *. *)
+    (*     remember (fun x0 : IM.key => *)
+    (*                 match lookup x0 src_bytes with *)
+    (*                 | Some val => val *)
+    (*                 | None => def *)
+    (*                 end) as lf. *)
+
+    (*     rewrite 2 Zseq_app. *)
+    (*     rewrite 2 map_app. *)
+
+    (*     (* Tails are equal *) *)
+    (*     assert (map *)
+    (*               (fun x : IM.key => *)
+    (*                  match *)
+    (*                    lookup x *)
+    (*                           (add_all_index *)
+    (*                              (map lf (Zseq src_offset (N.to_nat (N.of_nat sz))) ++ *)
+    (*                                   map lf [src_offset + Z.of_N (N.of_nat sz)]) dst_offset dst_bytes) *)
+    (*                  with *)
+    (*                  | Some val => val *)
+    (*                  | None => SUndef *)
+    (*                  end) [dst_offset + Z.of_N (N.of_nat sz)] = *)
+    (*             map lf [src_offset + Z.of_N (N.of_nat sz)]) as TAIL. *)
+    (*     { cbn. *)
+    (*       subst. *)
+    (*       destruct (lookup (src_offset + Z.of_N (N.of_nat sz)) src_bytes) eqn:LUP. *)
+    (*       - erewrite lookup_add_all_index_in; eauto. *)
+    (*         + rewrite Zlength_app. *)
+    (*           cbn. *)
+    (*           rewrite Zlength_map. *)
+    (*           cbn. *)
+    (*           rewrite Zlength_Zseq. *)
+    (*           lia. *)
+    (*         + admit. (* Should hold *) *)
+    (*       - rewrite lookup_add_all_index_out. *)
+    (*         + (* Not good... *) *)
+    (*           admit. *)
+    (*         +  *)
+    (*       subst.  *)
+    (*     } *)
+    (*     erewrite 2 Forall_map_eq. *)
+    (*     rewrite Zseq_app. *)
+    (* Qed. *)
+
     Lemma lookup_all_index_add_all_index :
       forall (sz : nat) src_bytes src_offset dst_bytes dst_offset def,
         (lookup_all_index dst_offset (N.of_nat sz)
@@ -2545,86 +2648,88 @@ Section PARAMS.
                              dst_offset dst_bytes) SUndef) =
         (lookup_all_index src_offset (N.of_nat sz) src_bytes def).
     Proof.
-      intros sz src_bytes src_offset dst_bytes dst_offset def.
-      induction sz.
-      - cbn; reflexivity.
-      - rewrite Nnat.Nat2N.inj_succ.
-        unfold lookup_all_index in *.
-        remember (fun x0 : IM.key =>
-                    match lookup x0 src_bytes with
-                    | Some val => val
-                    | None => def
-                    end).
-        rewrite Zseq_app.
-        unfold lookup_all_index in IHsz.
-        + assert (match
-                     lookup (dst_offset + Z.of_nat sz)
-                            (add_all_index
-                               (map s (Zseq src_offset (Z.to_nat (Z.of_nat sz)) ++
-                                            [src_offset + Z.of_nat sz]))
-                               dst_offset dst_bytes)
-                   with
-                   | Some val => val
-                   | None => SUndef
-                   end = s (src_offset + Z.of_nat sz)) as LUP. {
-            erewrite lookup_add_all_index_in. Unshelve.
-            3 : {
-              rewrite Z.add_simpl_l. rewrite list_nth_z_map.
-              unfold option_map.
-              rewrite (@Zseq_length sz src_offset) at 3.
-              rewrite Nat2Z.id.
-              rewrite list_nth_z_length. reflexivity.
-            }
-            reflexivity.
-            - split.
-              + rewrite <- Z.add_0_r at 1.
-                rewrite <- Z.add_le_mono_l.
-                apply Zle_0_nat.
-              + rewrite <- Z.add_sub_assoc.
-                rewrite <- Z.add_le_mono_l.
-                rewrite Zlength_correct.
-                rewrite map_length.
-                rewrite app_length. cbn.
-                rewrite Nat2Z.id.
-                rewrite <- Zseq_length at 1.
-                rewrite Nat2Z.inj_add. cbn.
-                rewrite Z.add_simpl_r.
-                apply Z.le_refl.
-          }
-          rewrite map_app. cbn. rewrite map_app in LUP.
-          cbn in LUP.
-          apply list_singleton_eq in LUP. cbn. rewrite LUP. clear LUP.
-          eapply app_prefix_eq.
-          remember (add_all_index
-                      (map s (Zseq src_offset (Z.to_nat (Z.of_nat sz))) ++
-                           [s (src_offset + Z.of_nat sz)]) dst_offset dst_bytes) as m.
-          remember (add_all_index
-                      (map s (Zseq src_offset (Z.to_nat (Z.of_nat sz))))
-                      dst_offset dst_bytes) as m'.
-          setoid_rewrite <- IHsz at 2.
-          match goal with
-          | |- ?L = ?R => remember L as LHS; remember R as RHS
-          end.
-          assert (LHS = lookup_all_index dst_offset (Z.of_nat sz) m SUndef).
-          {
-            rewrite HeqLHS. unfold lookup_all_index. subst.
-            reflexivity.
-          }
-          assert (RHS = lookup_all_index dst_offset (Z.of_nat sz) m' SUndef).
-          {
-            rewrite HeqRHS. unfold lookup_all_index. reflexivity.
-          }
-          rewrite H3, H4.
-          rewrite Heqm, Heqm'.
-          apply lookup_all_index_add_all_length_app.
-          pose proof Zseq_length as Zseq_length_H.
-          specialize (Zseq_length_H sz src_offset).
-          rewrite Nnat.Nat2N.id.
-          symmetry.
-          rewrite map_length. auto.
-        + apply Nnat.Nat2N.is_nonneg.
-        + apply Nnat.Nat2N.is_nonneg.
-    Qed.
+    (*   intros sz src_bytes src_offset dst_bytes dst_offset def. *)
+    (*   induction sz. *)
+    (*   - cbn; reflexivity. *)
+    (*   - rewrite Nnat.Nat2N.inj_succ. *)
+    (*     unfold lookup_all_index in *. *)
+    (*     remember (fun x0 : IM.key => *)
+    (*                 match lookup x0 src_bytes with *)
+    (*                 | Some val => val *)
+    (*                 | None => def *)
+    (*                 end). *)
+    (*     rewrite Zseq_app. *)
+    (*     unfold lookup_all_index in IHsz. *)
+    (*     + assert (match *)
+    (*                  lookup (dst_offset + Z.of_nat sz) *)
+    (*                         (add_all_index *)
+    (*                            (map s (Zseq src_offset sz ++ *)
+    (*                                         [src_offset + Z.of_N (N.of_nat sz)])) *)
+    (*                            dst_offset dst_bytes) *)
+    (*                with *)
+    (*                | Some val => val *)
+    (*                | None => SUndef *)
+    (*                end = s (src_offset + Z.of_nat sz)) as LUP. { *)
+    (*         erewrite lookup_add_all_index_in. Unshelve. *)
+    (*         3 : { *)
+    (*           rewrite Z.add_simpl_l. rewrite list_nth_z_map. *)
+    (*           unfold option_map. *)
+    (*           rewrite (@Zseq_length sz src_offset) at 3. *)
+    (*           rewrite nat_N_Z. *)
+    (*           rewrite list_nth_z_length. reflexivity. *)
+    (*         } *)
+    (*         reflexivity. *)
+    (*         - split. *)
+    (*           + rewrite <- Z.add_0_r at 1. *)
+    (*             rewrite <- Z.add_le_mono_l. *)
+    (*             apply Zle_0_nat. *)
+    (*           + rewrite <- Z.add_sub_assoc. *)
+    (*             rewrite <- Z.add_le_mono_l. *)
+    (*             rewrite Zlength_correct. *)
+    (*             rewrite map_length. *)
+    (*             rewrite app_length. cbn. *)
+    (*             rewrite <- Zseq_length at 1. *)
+    (*             rewrite Nat2Z.inj_add. cbn. *)
+    (*             rewrite Z.add_simpl_r. *)
+    (*             apply Z.le_refl. *)
+    (*       } *)
+    (*       rewrite map_app. rewrite map_app in LUP. *)
+    (*       apply list_singleton_eq in LUP. cbn. *)
+    (*       rewrite nat_N_Z. *)
+    (*       rewrite <- LUP. clear LUP. *)
+    (*       cbn. *)
+    (*       eapply app_prefix_eq. *)
+    (*       remember (add_all_index *)
+    (*                   (map s (Zseq src_offset (Z.to_nat (Z.of_nat sz))) ++ *)
+    (*                        [s (src_offset + Z.of_nat sz)]) dst_offset dst_bytes) as m. *)
+    (*       remember (add_all_index *)
+    (*                   (map s (Zseq src_offset (Z.to_nat (Z.of_nat sz)))) *)
+    (*                   dst_offset dst_bytes) as m'. *)
+    (*       setoid_rewrite <- IHsz at 2. *)
+    (*       match goal with *)
+    (*       | |- ?L = ?R => remember L as LHS; remember R as RHS *)
+    (*       end. *)
+    (*       assert (LHS = lookup_all_index dst_offset (Z.of_nat sz) m SUndef). *)
+    (*       { *)
+    (*         rewrite HeqLHS. unfold lookup_all_index. subst. *)
+    (*         reflexivity. *)
+    (*       } *)
+    (*       assert (RHS = lookup_all_index dst_offset (Z.of_nat sz) m' SUndef). *)
+    (*       { *)
+    (*         rewrite HeqRHS. unfold lookup_all_index. reflexivity. *)
+    (*       } *)
+    (*       rewrite H3, H4. *)
+    (*       rewrite Heqm, Heqm'. *)
+    (*       apply lookup_all_index_add_all_length_app. *)
+    (*       pose proof Zseq_length as Zseq_length_H. *)
+    (*       specialize (Zseq_length_H sz src_offset). *)
+    (*       rewrite Nnat.Nat2N.id. *)
+    (*       symmetry. *)
+    (*       rewrite map_length. auto. *)
+    (*     + apply Nnat.Nat2N.is_nonneg. *)
+    (*     + apply Nnat.Nat2N.is_nonneg. *)
+    (* Qed. *)
+    Admitted.
 
     (* Note : For the current version of subevents, [interp_memory] must
         have subevent clauses assumed in Context, or else the
@@ -2632,18 +2737,18 @@ Section PARAMS.
     (* IY: This is specialized to DTYPE_Array for practical
          purposes. We could conjure a more complete definition later. *)
     Lemma interp_memory_intrinsic_memcpy :
-      forall (m : memory_stack) (dst src : Addr.addr) (sz : Z)
+      forall (m : memory_stack) (dst src : Addr.addr) (sz : N)
         (dst_val src_val : uvalue) (dτ : dtyp) volatile align,
-        0 <= sz * sizeof_dtyp dτ <= Int32.max_unsigned ->
+        0 <= Z.of_N (sz * sizeof_dtyp dτ) <= Int32.max_unsigned ->
         read m dst (DTYPE_Array sz dτ) = inr dst_val ->
         read m src (DTYPE_Array sz dτ) = inr src_val ->
-        no_overlap dst (Int32.unsigned (Int32.repr (sz * sizeof_dtyp dτ))) src
-                   (Int32.unsigned (Int32.repr (sz * sizeof_dtyp dτ))) ->
+        no_overlap dst (Int32.unsigned (Int32.repr (Z.of_N (sz * sizeof_dtyp dτ)))) src
+                   (Int32.unsigned (Int32.repr (Z.of_N (sz * sizeof_dtyp dτ)))) ->
         exists m' s,
           (interp_memory (trigger (Intrinsic DTYPE_Void
                                              "llvm.memcpy.p0i8.p0i8.i32"
                                              [DVALUE_Addr dst; DVALUE_Addr src;
-                                             DVALUE_I32 (Int32.repr (sizeof_dtyp (DTYPE_Array sz dτ)));
+                                             DVALUE_I32 (Int32.repr (Z.of_N (sizeof_dtyp (DTYPE_Array sz dτ))));
                                              DVALUE_I32 align ;
                                              DVALUE_I1 volatile])) m ≈
                          ret (m', s, DVALUE_None)) /\
@@ -2668,23 +2773,19 @@ Section PARAMS.
       rewrite reflect_iff in NO_OVERLAP. clear reflect_H.
       setoid_rewrite NO_OVERLAP. cbn in *.
       setoid_rewrite HM_src. cbn. setoid_rewrite HM_dst. cbn.
-      exists (add_logical_block_mem dst_base
-                               (LBlock size
-                                       (add_all_index
-                                          (lookup_all_index src_offset
-                                                            (Int32.unsigned (Int32.repr (i * sizeof_dtyp dτ))) bytes0
-                                                            SUndef) dst_offset bytes) concrete_id) m).
-      exists f. split; try reflexivity.
+      eexists. exists f.
+      split; try reflexivity.
       rewrite <- MEM_src. unfold read. cbn.
       unfold read_in_mem_block. cbn.
       rewrite Int32.unsigned_repr. 2 : apply size_H.
       rewrite get_logical_block_of_add_logical_block_mem.
       pose proof lookup_all_index_add_all_index.
-      specialize (H2 (Z.to_nat (i * sizeof_dtyp dτ))).
-      rewrite Z2Nat.id in H2.
-      rewrite H2. reflexivity. apply size_H.
+      specialize (H2 (N.to_nat (i * sizeof_dtyp dτ))).
+      rewrite Nnat.N2Nat.id in H2.
+      rewrite N2Z.id.
+      rewrite H2. reflexivity.
       apply no_overlap_reflect. Unshelve. unfold addr, Addr.addr.
-      exact (size0, size0). exact (size0, size0). eauto.
+      exact (0, 0). exact (0, 0). eauto.
     Qed.
 
   End Structural_Lemmas.
@@ -2713,7 +2814,7 @@ Section PARAMS.
     forall ptr ptr_elem ix sz τ,
       handle_gep_addr (DTYPE_Array sz τ) ptr
                       [DVALUE_I64 (repr 0); DVALUE_I64 ix] = inr ptr_elem ->
-      snd ptr + DynamicValues.Int64.unsigned ix * sizeof_dtyp τ = snd ptr_elem.
+      snd ptr + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ) = snd ptr_elem.
   Proof.
     intros [ptrb ptro] [ptr_elemb ptr_elemo] ix sz τ GEP.
     cbn in GEP.
@@ -2724,15 +2825,14 @@ Section PARAMS.
   Qed.
 
  Lemma dtyp_fits_array_elem :
-    forall m ptr ptr_elem ix sz τ,
+    forall m ptr ptr_elem ix (sz : N) τ,
       dtyp_fits m ptr (DTYPE_Array sz τ) ->
       handle_gep_addr (DTYPE_Array sz τ) ptr
                       [DVALUE_I64 (repr 0); DVALUE_I64 ix] = inr ptr_elem ->
-      Int64.intval ix < sz ->
-      0 <= sizeof_dtyp τ ->
+      Int64.intval ix < Z.of_N sz ->
       dtyp_fits m ptr_elem τ.
   Proof.
-    intros m ptr ptr_elem ix sz τ FITS GEP SZ TYPSZ.
+    intros m ptr ptr_elem ix sz τ FITS GEP SZ.
     cbn in GEP.
     unfold dtyp_fits in *.
     destruct FITS as (sz' & bytes & cid & BLOCK & BOUND).
@@ -2743,11 +2843,12 @@ Section PARAMS.
     cbn in BOUND.
     assert (Int64.unsigned ix = Int64.intval ix) by reflexivity.
     rewrite H2.
-    assert (1 + Int64.intval ix <= sz) by lia.
+    assert (1 + Int64.intval ix <= Z.of_N sz) by lia.
     rewrite <- Z.add_assoc.
-    assert (snd ptr + (Int64.intval ix * sizeof_dtyp τ + sizeof_dtyp τ) <= snd ptr + sz * sizeof_dtyp τ).
+    assert (snd ptr + (Int64.intval ix * Z.of_N (sizeof_dtyp τ) + Z.of_N (sizeof_dtyp τ)) <= snd ptr + Z.of_N (sz * sizeof_dtyp τ)).
     { eapply Zorder.Zplus_le_compat_l.
-      replace (Int64.intval ix * sizeof_dtyp τ + sizeof_dtyp τ) with ((1 + Int64.intval ix) * sizeof_dtyp τ).
+      replace (Int64.intval ix * Z.of_N (sizeof_dtyp τ) + Z.of_N (sizeof_dtyp τ)) with ((1 + Int64.intval ix) * Z.of_N (sizeof_dtyp τ)).
+      rewrite N2Z.inj_mul.
       eapply Z.mul_le_mono_nonneg_r; lia.
       lia.
     }
