@@ -193,7 +193,7 @@ Definition main_args := [DV.UVALUE_I64 (DynamicValues.Int64.zero);
                         ].
 
 Definition denote_vellvm_main (mcfg : CFG.mcfg dtyp) : itree L0 uvalue :=
-  denote_vellvm (DTYPE_I (32)%Z) "main" main_args mcfg.
+  denote_vellvm (DTYPE_I (32)%N) "main" main_args mcfg.
 
 (**
      Now that we know how to denote a whole llvm program, we can _interpret_
@@ -213,7 +213,7 @@ Definition interpreter_user
      Finally, the reference interpreter assumes no user-defined intrinsics and starts 
      from "main" using bogus initial inputs.
  *)
-Definition interpreter := interpreter_user (DTYPE_I 32%Z) "main" main_args [].
+Definition interpreter := interpreter_user (DTYPE_I 32%N) "main" main_args [].
 
 (**
      We now turn to the definition of our _model_ of vellvm's semantics. The
@@ -239,5 +239,5 @@ Definition model_user
 (**
      Finally, the official model assumes no user-defined intrinsics.
  *)
-Definition model := model_user (DTYPE_I 32%Z) "main" main_args [].
+Definition model := model_user (DTYPE_I 32%N) "main" main_args [].
 

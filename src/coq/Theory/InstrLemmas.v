@@ -581,7 +581,7 @@ Lemma denote_term_br_l :
     ≈
     Ret (m, (ρ', (g, UVALUE_I1 one)))
     ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_terminator (TERM_Br (DTYPE_I 1%Z, e) b1 b2))) g ρ m
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_terminator (TERM_Br (DTYPE_I 1%N, e) b1 b2))) g ρ m
     ≈
     Ret (m, (ρ', (g, inl b1))).
 Proof.
@@ -602,7 +602,7 @@ Lemma denote_term_br_r :
     ≈
     Ret (m, (ρ', (g, UVALUE_I1 zero)))
     ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_terminator (TERM_Br (DTYPE_I 1%Z, e) b1 b2))) g ρ m
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_terminator (TERM_Br (DTYPE_I 1%N, e) b1 b2))) g ρ m
     ≈
     Ret (m, (ρ', (g, inl b2))).
 Proof.

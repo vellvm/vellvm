@@ -27,7 +27,7 @@ let g_si64 = G.map (fun v -> DV.UVALUE_I64 (Z.of_sint v)) small_gen
 
 let rec gen_uvalue : LL.typ -> DV.uvalue G.t = function
   | LL.TYPE_I i ->
-     begin match Camlcoq.Z.to_int i with
+     begin match Camlcoq.N.to_int i with
      | 1 -> g_i1 | 8 -> g_si8 | 16 | 32 -> g_si32 | 64 -> g_si64
      | _ -> failwith "generating integer values of this type is not implemented"
      end
@@ -36,12 +36,12 @@ let rec gen_uvalue : LL.typ -> DV.uvalue G.t = function
      print_endline "generating vector value";
      let open G in
      let gen_t = gen_uvalue ty in
-     let list_ts = G.list_size (g_const (sz |> Camlcoq.camlint_of_coqint |> Int32.to_int)) gen_t in
+     let list_ts = G.list_size (g_const (sz |> Camlcoq.N.to_int32 |> Int32.to_int)) gen_t in
      list_ts >>= (fun l -> G.return @@ DV.UVALUE_Vector l)
   | LL.TYPE_Array (sz, ty) ->  
      let open G in
      let gen_t = gen_uvalue ty in
-     let list_ts = G.list_size (g_const (sz |> Camlcoq.camlint_of_coqint |> Int32.to_int)) gen_t in
+     let list_ts = G.list_size (g_const (sz |> Camlcoq.N.to_int32 |> Int32.to_int)) gen_t in
      list_ts >>= (fun l -> G.return @@ DV.UVALUE_Vector l)
   | _ -> failwith "generating values of this type is not implemented"
 

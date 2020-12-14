@@ -51,6 +51,9 @@ Set Contextual Implicit.
     Reasoning principles for VIR's main memory model.
 *)
 
+Local Open Scope Z_scope.
+
+
 Module Type MEMORY_THEORY (LLVMEvents : LLVM_INTERACTIONS(Addr)).
   (** ** Theory of the general operations over the finite maps we manipulate *)
   Import LLVMEvents.
@@ -77,12 +80,11 @@ Section Map_Theory.
     reflexivity.
   Qed.
 
-  Lemma Zseq_succ : forall off n,
-      0 <= n ->
-      Zseq off (Z.to_nat (Z.succ n)) = off :: Zseq (Z.succ off) (Z.to_nat n).
+  Lemma Zseq_succ : forall off (n : N),
+      Zseq off (N.to_nat (N.succ n)) = off :: Zseq (Z.succ off) (N.to_nat n).
   Proof.
-    intros off n Hsz.
-    rewrite Z2Nat.inj_succ; auto.
+    intros off n.
+    rewrite Nnat.N2Nat.inj_succ; auto.
   Qed.
 
   Lemma key_in_range_or_not_aux {a} : forall (k z : Z) (l : list a),
@@ -357,9 +359,8 @@ Section Map_Theory.
   (** ** Behavior of [lookup_all_index]
    *)
 
-  Lemma lookup_all_index_cons {a} : forall k (n : Z) (m : IntMap a) def,
-      n >= 0 ->
-      lookup_all_index k (Z.succ n) m def =
+  Lemma lookup_all_index_cons {a} : forall k (n : N) (m : IntMap a) def,
+      lookup_all_index k (N.succ n) m def =
       match lookup k m with
       | Some val => val
       | None => def
@@ -371,9 +372,9 @@ Section Map_Theory.
     auto.
   Qed.
 
-  Lemma lookup_all_index_add_out_aux {a} : forall l k n (m : IntMap a) key x def,
-      l = Zseq k (Z.to_nat n) ->
-      (key < k \/ key >= k + n) ->
+  Lemma lookup_all_index_add_out_aux {a} : forall l k (n : N) (m : IntMap a) key x def,
+      l = Zseq k (N.to_nat n) ->
+      (key < k \/ key >= k + Z.of_N n) ->
       lookup_all_index k n (add key x m) def =
       lookup_all_index k n m def.
   Proof.
@@ -381,33 +382,32 @@ Section Map_Theory.
     - intros * EQ LT.
       unfold lookup_all_index; rewrite <- EQ; reflexivity.
     - intros * EQ RANGE.
-      destruct (Z.to_nat n) eqn:EQn; [inv EQ |].
+      destruct (N.to_nat n) eqn:EQn; [inv EQ |].
       cbn in EQ; inv EQ.
-      assert (n = Z.succ (Z.of_nat n0)) by lia.
+      assert (n = N.succ (N.of_nat n0)) by lia.
       subst; rewrite lookup_all_index_cons; auto; try lia.
       subst; rewrite lookup_all_index_cons; auto; try lia.
       rewrite lookup_add_ineq; [| lia].
       f_equal.
       apply IH; try lia.
-      rewrite Nat2Z.id.
+      rewrite Nnat.Nat2N.id.
       reflexivity.
   Qed.
 
   (* Generalization of [lookup_add_ineq]: adding outside of the range of the lookup is inconsequential *)
-  Lemma lookup_all_index_add_out {a} : forall k n (m : IntMap a) key x def,
-      (key < k \/ key >= k + n) ->
+  Lemma lookup_all_index_add_out {a} : forall k (n : N) (m : IntMap a) key x def,
+      (key < k \/ key >= k + Z.of_N n) ->
       lookup_all_index k n (add key x m) def =
       lookup_all_index k n m def.
   Proof.
     intros; eapply lookup_all_index_add_out_aux; eauto.
   Qed.
 
-  Lemma lookup_all_index_add {a} : forall k size x (m : IntMap a) def,
-      size >= 0 ->
-      lookup_all_index k (Z.succ size) (add k x m) def =
+  Lemma lookup_all_index_add {a} : forall k (size : N) x (m : IntMap a) def,
+      lookup_all_index k (N.succ size) (add k x m) def =
       x :: lookup_all_index (Z.succ k) size m def.
   Proof.
-    intros * SIZE.
+    intros *.
     rewrite lookup_all_index_cons; auto; try lia.
     rewrite lookup_add_eq.
     f_equal.
@@ -529,19 +529,19 @@ Section Serialization_Theory.
 
   Lemma fold_sizeof :
     forall (dts : list dtyp) n,
-      fold_left (fun (acc : Z) (x : dtyp) => acc + sizeof_dtyp x) dts n =
-      n + fold_left (fun (acc : Z) (x : dtyp) => acc + sizeof_dtyp x) dts 0.
+      (fold_left (fun (acc : N) (x : dtyp) => acc + sizeof_dtyp x) dts n =
+      n + fold_left (fun (acc : N) (x : dtyp) => acc + sizeof_dtyp x) dts 0)%N.
   Proof.
     induction dts; intros n.
-    - cbn. rewrite Z.add_0_r. reflexivity.
+    - cbn. rewrite N.add_0_r. reflexivity.
     - cbn. rewrite IHdts at 1. rewrite (IHdts (sizeof_dtyp a)).
-      rewrite Z.add_assoc.
+      rewrite N.add_assoc.
       reflexivity.
   Qed.
 
   Lemma sizeof_struct_cons :
     forall dt dts,
-      sizeof_dtyp (DTYPE_Struct (dt :: dts)) = sizeof_dtyp dt + sizeof_dtyp (DTYPE_Struct dts).
+      (sizeof_dtyp (DTYPE_Struct (dt :: dts)) = sizeof_dtyp dt + sizeof_dtyp (DTYPE_Struct dts))%N.
   Proof.
     cbn.
     intros dt dts.
@@ -550,7 +550,7 @@ Section Serialization_Theory.
 
   Lemma sizeof_packed_struct_cons :
     forall dt dts,
-      sizeof_dtyp (DTYPE_Packed_struct (dt :: dts)) = sizeof_dtyp dt + sizeof_dtyp (DTYPE_Packed_struct dts).
+      (sizeof_dtyp (DTYPE_Packed_struct (dt :: dts)) = sizeof_dtyp dt + sizeof_dtyp (DTYPE_Packed_struct dts))%N.
   Proof.
     cbn.
     intros dt dts.
@@ -558,60 +558,31 @@ Section Serialization_Theory.
   Qed.
 
   Lemma sizeof_dvalue_pos :
-    forall dv dt,
-      dvalue_has_dtyp dv dt ->
-      0 <= sizeof_dtyp dt.
+    forall dt,
+      (0 <= sizeof_dtyp dt)%N.
   Proof.
-    intros dv dt TYP.
-    induction TYP;
-      try solve [cbn; lia].
-    - cbn.  rewrite DynamicValues.unsupported_cases_match. lia. assumption.
-    - rewrite sizeof_struct_cons.
-      lia.
-    - rewrite sizeof_packed_struct_cons.
-      lia.
-    - cbn. destruct xs.
-      + cbn in *; subst.
-        reflexivity.
-      + assert (In d (d :: xs)); intuition.
-        pose proof (IH d H0) as Hsz.
-        inversion H. cbn.
-        destruct (sizeof_dtyp dt).
-        reflexivity.
-        apply Zle_0_pos.
-        pose proof Pos2Z.neg_is_neg p.
-        contradiction.
-    - cbn. destruct xs.
-      + cbn in *; subst.
-        reflexivity.
-      + assert (In d (d :: xs)); intuition.
-        pose proof (IH d H1) as Hsz.
-        inversion H. cbn.
-        destruct (sizeof_dtyp dt).
-        reflexivity.
-        apply Zle_0_pos.
-        pose proof Pos2Z.neg_is_neg p.
-        contradiction.
+    intros dt.
+    lia.
   Qed.
 
   Lemma sizeof_serialized :
     forall dv dt,
       dvalue_has_dtyp dv dt ->
-      Z.of_nat (List.length (serialize_dvalue dv)) = sizeof_dtyp dt.
+      N.of_nat (List.length (serialize_dvalue dv)) = sizeof_dtyp dt.
   Proof.
     intros dv dt TYP.
     induction TYP; try solve [cbn; auto].
     - cbn. rewrite DynamicValues.unsupported_cases_match; auto.
     - cbn.
       rewrite app_length.
-      rewrite Nat2Z.inj_add.
+      rewrite Nnat.Nat2N.inj_add.
       rewrite IHTYP1.
       cbn in IHTYP2. rewrite IHTYP2.
       symmetry.
       apply fold_sizeof.
     - cbn.
       rewrite app_length.
-      rewrite Nat2Z.inj_add.
+      rewrite Nnat.Nat2N.inj_add.
       rewrite IHTYP1.
       cbn in IHTYP2. rewrite IHTYP2.
       symmetry.
@@ -620,20 +591,20 @@ Section Serialization_Theory.
       induction xs; intros sz H; cbn.
       + subst; auto.
       + cbn in *. rewrite <- H. rewrite app_length.
-        replace (Z.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt)
-          with (sizeof_dtyp dt + Z.of_nat (Datatypes.length xs) * sizeof_dtyp dt).
-        * rewrite Nat2Z.inj_add. rewrite IHxs with (sz:=Datatypes.length xs); auto.
-          apply Z.add_cancel_r; auto.
-        * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. lia.
+        replace (N.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt)%N
+          with (sizeof_dtyp dt + N.of_nat (Datatypes.length xs) * sizeof_dtyp dt)%N.
+        * rewrite Nnat.Nat2N.inj_add. rewrite IHxs with (sz:=Datatypes.length xs); auto.
+          apply N.add_cancel_r; auto.
+        * rewrite Nnat.Nat2N.inj_succ. rewrite N.mul_succ_l. lia.
     - generalize dependent sz.
       induction xs; intros sz H; cbn.
       + subst; auto.
       + cbn in *. rewrite <- H. rewrite app_length.
-        replace (Z.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt)
-          with (sizeof_dtyp dt + Z.of_nat (Datatypes.length xs) * sizeof_dtyp dt).
-        * rewrite Nat2Z.inj_add. rewrite IHxs with (sz:=Datatypes.length xs); auto.
-          apply Z.add_cancel_r; auto.
-        * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. lia.
+        replace (N.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt)%N
+          with (sizeof_dtyp dt + N.of_nat (Datatypes.length xs) * sizeof_dtyp dt)%N.
+        * rewrite Nnat.Nat2N.inj_add. rewrite IHxs with (sz:=Datatypes.length xs); auto.
+          apply N.add_cancel_r; auto.
+        * rewrite Nnat.Nat2N.inj_succ. rewrite N.mul_succ_l. lia.
   Qed.
 
   (* TODO: does this exist somewhere else? *)
@@ -651,7 +622,7 @@ Section Serialization_Theory.
   Lemma firstn_sizeof_dtyp :
     forall dv dt,
       dvalue_has_dtyp dv dt ->
-      (firstn (Z.to_nat (sizeof_dtyp dt)) (serialize_dvalue dv)) = serialize_dvalue dv.
+      (firstn (N.to_nat (sizeof_dtyp dt)) (serialize_dvalue dv)) = serialize_dvalue dv.
   Proof.
     intros dv dt TYP.
     induction TYP; auto.
@@ -661,61 +632,41 @@ Section Serialization_Theory.
       cbn.
       rewrite <- sizeof_serialized with (dv:=f); auto.
 
-      replace (Z.to_nat
-                 (Z.of_nat (Datatypes.length (serialize_dvalue f)) +
-                  fold_left (fun (x : Z) (acc : dtyp) => x + sizeof_dtyp acc) dts 0)) with
+      replace (N.to_nat
+                 (N.of_nat (Datatypes.length (serialize_dvalue f)) +
+                  fold_left (fun (x : N) (acc : dtyp) => x + sizeof_dtyp acc) dts 0))%N with
           (Datatypes.length (serialize_dvalue f) +
-           Z.to_nat (fold_left (fun (x : Z) (acc : dtyp) => (x + sizeof_dtyp acc)%Z) dts 0%Z))%nat.
+           N.to_nat (fold_left (fun (x : N) (acc : dtyp) => (x + sizeof_dtyp acc)%N) dts 0%N))%nat.
       + rewrite firstn_app_2.
         cbn in *.
         rewrite IHTYP2.
         reflexivity.
-      + rewrite Z2Nat.inj_add; try lia.
-        inversion TYP2; cbn.
-        lia.
-
-        pose proof (sizeof_dvalue_pos H2) as Hsz_fields.
-        pose proof (sizeof_dvalue_pos H1) as Hsz_f.
-        cbn in Hsz_fields.
-        cbn in Hsz_f.
-
-        rewrite fold_sizeof.
-        lia.
+      + rewrite Nnat.N2Nat.inj_add; try lia.
     - (* Packed Structs *)
       rewrite sizeof_packed_struct_cons.
       cbn.
       rewrite <- sizeof_serialized with (dv:=f); auto.
 
-      replace (Z.to_nat
-                 (Z.of_nat (Datatypes.length (serialize_dvalue f)) +
-                  fold_left (fun (x : Z) (acc : dtyp) => x + sizeof_dtyp acc) dts 0)) with
+      replace (N.to_nat
+                 (N.of_nat (Datatypes.length (serialize_dvalue f)) +
+                  fold_left (fun (x : N) (acc : dtyp) => x + sizeof_dtyp acc) dts 0))%N with
           (Datatypes.length (serialize_dvalue f) +
-           Z.to_nat (fold_left (fun (x : Z) (acc : dtyp) => (x + sizeof_dtyp acc)%Z) dts 0%Z))%nat.
+           N.to_nat (fold_left (fun (x : N) (acc : dtyp) => (x + sizeof_dtyp acc)%N) dts 0%N))%nat.
       + rewrite firstn_app_2.
         cbn in *.
         rewrite IHTYP2.
         reflexivity.
-      + rewrite Z2Nat.inj_add; try lia.
-        inversion TYP2; cbn.
-        lia.
-
-        pose proof (sizeof_dvalue_pos H2) as Hsz_fields.
-        pose proof (sizeof_dvalue_pos H1) as Hsz_f.
-        cbn in Hsz_fields.
-        cbn in Hsz_f.
-
-        rewrite fold_sizeof.
-        lia.
+      + rewrite Nnat.N2Nat.inj_add; try lia.
     - (* Arrays *)
       generalize dependent sz.
       induction xs; intros sz H.
       + cbn. apply firstn_nil.
       + cbn in *. inversion H.
-        replace (Z.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt) with
-            (sizeof_dtyp dt + Z.of_nat (Datatypes.length xs) * sizeof_dtyp dt).
-        * rewrite Z2Nat.inj_add.
+        replace (N.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt)%N with
+            (sizeof_dtyp dt + N.of_nat (Datatypes.length xs) * sizeof_dtyp dt)%N.
+        * rewrite Nnat.N2Nat.inj_add.
           -- cbn. rewrite <- sizeof_serialized with (dv:=a).
-             rewrite Nat2Z.id.
+             rewrite Nnat.Nat2N.id.
              rewrite firstn_app_2.
              rewrite sizeof_serialized with (dt:=dt).
              apply app_prefix.
@@ -726,22 +677,17 @@ Section Serialization_Theory.
              auto.
              auto.
              auto.
-          -- eapply sizeof_dvalue_pos; eauto.
-          -- assert (dvalue_has_dtyp a dt) as TYP by auto.
-             pose proof sizeof_dvalue_pos TYP.
-             pose proof Zle_0_nat (Datatypes.length xs).
-             apply Z.mul_nonneg_nonneg; auto.
-        * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. lia.
+        * rewrite Nnat.Nat2N.inj_succ. rewrite N.mul_succ_l. lia.
     - (* Vectors *)
       generalize dependent sz.
       induction xs; intros sz H.
       + cbn. apply firstn_nil.
       + cbn in *. inversion H.
-        replace (Z.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt) with
-            (sizeof_dtyp dt + Z.of_nat (Datatypes.length xs) * sizeof_dtyp dt).
-        * rewrite Z2Nat.inj_add.
+        replace (N.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt)%N with
+            (sizeof_dtyp dt + N.of_nat (Datatypes.length xs) * sizeof_dtyp dt)%N.
+        * rewrite Nnat.N2Nat.inj_add.
           -- cbn. rewrite <- sizeof_serialized with (dv:=a).
-             rewrite Nat2Z.id.
+             rewrite Nnat.Nat2N.id.
              rewrite firstn_app_2.
              rewrite sizeof_serialized with (dt:=dt).
              apply app_prefix.
@@ -752,12 +698,7 @@ Section Serialization_Theory.
              auto.
              auto.
              auto.
-          -- eapply sizeof_dvalue_pos; eauto.
-          -- assert (dvalue_has_dtyp a dt) as TYP by auto.
-             pose proof sizeof_dvalue_pos TYP.
-             pose proof Zle_0_nat (Datatypes.length xs).
-             apply Z.mul_nonneg_nonneg; auto.
-        * rewrite Nat2Z.inj_succ. rewrite Z.mul_succ_l. lia.
+        * rewrite Nnat.Nat2N.inj_succ. rewrite N.mul_succ_l. lia.
   Qed.
 
   Lemma skipn_length_app :
@@ -908,17 +849,17 @@ Section Serialization_Theory.
   Lemma serialize_firstn_app :
     forall dv dt rest,
       dvalue_has_dtyp dv dt ->
-      firstn (Z.to_nat (sizeof_dtyp dt))
+      firstn (N.to_nat (sizeof_dtyp dt))
              (serialize_dvalue dv ++ rest) = serialize_dvalue dv.
   Proof.
     intros dv dt rest H.
     erewrite <- sizeof_serialized; eauto.
-    rewrite Nat2Z.id.
+    rewrite Nnat.Nat2N.id.
     rewrite firstn_app.
     rewrite Nat.sub_diag.
     cbn.
     rewrite app_nil_r.
-    rewrite <- (Nat2Z.id (Datatypes.length (serialize_dvalue dv))).
+    rewrite <- (Nnat.Nat2N.id (Datatypes.length (serialize_dvalue dv))).
     erewrite sizeof_serialized; eauto.
     rewrite firstn_sizeof_dtyp; eauto.
   Qed.
@@ -926,12 +867,12 @@ Section Serialization_Theory.
   Lemma serialize_skipn_app :
     forall dv dt rest,
       dvalue_has_dtyp dv dt ->
-      skipn (Z.to_nat (sizeof_dtyp dt))
+      skipn (N.to_nat (sizeof_dtyp dt))
             (serialize_dvalue dv ++ rest) = rest.
   Proof.
     intros dv dt rest H.
     erewrite <- sizeof_serialized; eauto.
-    rewrite Nat2Z.id.
+    rewrite Nnat.Nat2N.id.
     apply skipn_length_app.
   Qed.
 
@@ -1065,7 +1006,7 @@ Section Serialization_Theory.
         inversion H.
 
         rewrite serialize_skipn_app.
-        rewrite Nat2Z.id.
+        rewrite Nnat.Nat2N.id.
         reflexivity.
         auto.
     - (* Vectors *)
@@ -1098,7 +1039,7 @@ Section Serialization_Theory.
         inversion H.
 
         rewrite serialize_skipn_app.
-        rewrite Nat2Z.id.
+        rewrite Nnat.Nat2N.id.
         reflexivity.
         auto.
   Admitted.
@@ -1158,9 +1099,9 @@ Section Memory_Stack_Theory.
   Qed.
 
   Lemma gep_array_ptr_overlap_dtyp :
-    forall ptr ix sz τ elem_ptr,
-      DynamicValues.Int64.unsigned ix < sz -> (* Not super happy about this *)
-      0 < sizeof_dtyp τ ->
+    forall ptr ix (sz : N) τ elem_ptr,
+      DynamicValues.Int64.unsigned ix < Z.of_N sz -> (* Not super happy about this *)
+      (0 < sizeof_dtyp τ)%N ->
       handle_gep_addr (DTYPE_Array sz τ) ptr
                       [DVALUE_I64 (repr 0); DVALUE_I64 ix] = inr elem_ptr ->
       ~(no_overlap_dtyp elem_ptr τ ptr (DTYPE_Array sz τ)).
@@ -1179,12 +1120,13 @@ Section Memory_Stack_Theory.
     destruct NO_OVER as [NO_OVER | [NO_OVER | NO_OVER]].
     - auto.
     - rewrite Integers.Int64.unsigned_repr in NO_OVER; [|cbn; lia].
-      replace (ptr_i + sz * sizeof_dtyp τ * 0 + DynamicValues.Int64.unsigned ix * sizeof_dtyp τ) with (ptr_i + DynamicValues.Int64.unsigned ix * sizeof_dtyp τ) in NO_OVER by lia.
+      replace (ptr_i + Z.of_N (sz * sizeof_dtyp τ) * 0 + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) with (ptr_i + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) in NO_OVER by lia.
       pose proof (Int64.unsigned_range ix) as [? ?].
       apply Zorder.Zplus_gt_reg_l in NO_OVER.
+      rewrite N2Z.inj_mul in NO_OVER.
       apply Zorder.Zmult_gt_reg_r in NO_OVER; lia.
     - rewrite Integers.Int64.unsigned_repr in NO_OVER; [|cbn; lia].
-      replace (ptr_i + sz * sizeof_dtyp τ * 0 + DynamicValues.Int64.unsigned ix * sizeof_dtyp τ) with (ptr_i + DynamicValues.Int64.unsigned ix * sizeof_dtyp τ) in NO_OVER by lia.
+      replace (ptr_i + Z.of_N (sz * sizeof_dtyp τ) * 0 + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) with (ptr_i + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) in NO_OVER by lia.
       pose proof (Int64.unsigned_range ix) as [? ?].
       lia.
   Qed.
@@ -1315,27 +1257,29 @@ Section Memory_Stack_Theory.
       - intros.
         simpl add_all_index; simpl sizeof_dtyp.
         replace 8 with (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ 0)))))))) by reflexivity.
-        do 8 (rewrite lookup_all_index_add; try lia).
-        cbn; f_equal.
-        pose proof (unsigned_I1_in_range x).
-        assert (EQ :DynamicValues.Int1.unsigned x / 256 = 0).
-        apply Z.div_small; lia.
-        rewrite EQ.
-        repeat rewrite Zdiv_0_l.
-        repeat rewrite Byte.unsigned_repr.
-        all: unfold Byte.max_unsigned, Byte.modulus; cbn; try lia.
-        rewrite Z.add_0_r.
-        apply DynamicValues.Int1.repr_unsigned.
+        admit.
+        (* do 8 (rewrite lookup_all_index_add; try lia). *)
+        (* cbn; f_equal. *)
+        (* pose proof (unsigned_I1_in_range x). *)
+        (* assert (EQ :DynamicValues.Int1.unsigned x / 256 = 0). *)
+        (* apply Z.div_small; lia. *)
+        (* rewrite EQ. *)
+        (* repeat rewrite Zdiv_0_l. *)
+        (* repeat rewrite Byte.unsigned_repr. *)
+        (* all: unfold Byte.max_unsigned, Byte.modulus; cbn; try lia. *)
+        (* rewrite Z.add_0_r. *)
+        (* apply DynamicValues.Int1.repr_unsigned. *)
       - intros.
         simpl add_all_index; simpl sizeof_dtyp.
         replace 8 with (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ 0)))))))) by reflexivity.
-        do 8 (rewrite lookup_all_index_add; try lia).
-        cbn; f_equal.
-        pose proof (unsigned_I8_in_range x).
-        repeat rewrite Byte.unsigned_repr.
-        all: unfold Byte.max_unsigned, Byte.modulus; cbn.
-        all: try lia.
-        all: admit.
+        admit.
+        (* do 8 (rewrite lookup_all_index_add; try lia). *)
+        (* cbn; f_equal. *)
+        (* pose proof (unsigned_I8_in_range x). *)
+        (* repeat rewrite Byte.unsigned_repr. *)
+        (* all: unfold Byte.max_unsigned, Byte.modulus; cbn. *)
+        (* all: try lia. *)
+        (* all: admit. *)
       - admit.
       - admit.
       - admit.
@@ -1378,13 +1322,12 @@ Section Memory_Stack_Theory.
     Qed.
 
     Lemma lookup_all_index_add_all_index_no_overlap :
-      forall {A} bs off off' m (def : A) sz,
-        0 <= sz ->
-        off' + sz <= off \/ off + (Z.of_nat (length bs)) <= off' ->
+      forall {A} bs off off' m (def : A) (sz : N),
+        off' + Z.of_N sz <= off \/ off + (Z.of_nat (length bs)) <= off' ->
         lookup_all_index off' sz (add_all_index bs off m) def =
         lookup_all_index off' sz m def.
     Proof.
-      intros A; induction bs; intros off off' m def sz Hsz Hrange; auto.
+      intros A; induction bs; intros off off' m def sz Hrange; auto.
       cbn.
       rewrite lookup_all_index_add_out; auto; try lia.
       apply IHbs; auto.
@@ -1397,11 +1340,10 @@ Section Memory_Stack_Theory.
         dvalue_has_dtyp v τ ->
         write m1 a v = inr m2 ->
         forall (a' : addr) (τ' : dtyp),
-          0 <= sizeof_dtyp τ' ->
           no_overlap_dtyp a τ a' τ' ->
           read m2 a' τ' = read m1 a' τ'.
     Proof.
-      intros ((cm,lm),s) [a off] v τ ((cm',lm'),s') TYP WR [a' off'] τ' SIZE INEQ.
+      intros ((cm,lm),s) [a off] v τ ((cm',lm'),s') TYP WR [a' off'] τ' INEQ.
       unfold read,write in *.
       cbn in *.
       flatten_hyp WR; try inv_sum.
@@ -1413,12 +1355,13 @@ Section Memory_Stack_Theory.
       - subst. rewrite lookup_add_eq.
         unfold get_logical_block,get_logical_block_mem in Heq. cbn in Heq.
         rewrite Heq.
-        destruct (Z.le_gt_cases off (off' + sizeof_dtyp τ')) as [Hle | Hnle].
-        + destruct (Z.le_gt_cases off' (off + sizeof_dtyp τ)) as [Hle' | Hnle'].
+        destruct (Z.le_gt_cases off (off' + Z.of_N (sizeof_dtyp τ'))) as [Hle | Hnle].
+        + destruct (Z.le_gt_cases off' (off + Z.of_N (sizeof_dtyp τ))) as [Hle' | Hnle'].
           * exfalso. auto.
           * (* Overlap because off + sizeof_dtyp τ < off', so second memory region is "to the right" *)
             unfold read_in_mem_block.
             rewrite lookup_all_index_add_all_index_no_overlap; auto.
+            rewrite <- nat_N_Z.
             rewrite sizeof_serialized with (dt:=τ); auto; lia.
         + (* off' + sizeof_dtyp τ' < off, so second memory region is "to the left" *)
           unfold read_in_mem_block.
@@ -1533,16 +1476,15 @@ Section Memory_Stack_Theory.
     Lemma read_in_mem_block_write_to_mem_block_untouched :
       forall offset offset' bytes val τ,
         dvalue_has_dtyp val τ ->
-        offset' + sizeof_dtyp τ <= offset \/ offset + sizeof_dtyp τ <= offset' ->
+        offset' + Z.of_N (sizeof_dtyp τ) <= offset \/ offset + Z.of_N (sizeof_dtyp τ) <= offset' ->
         read_in_mem_block (write_to_mem_block bytes offset val) offset' τ = read_in_mem_block bytes offset' τ.
     Proof.
       intros offset offset' bytes val τ TYP OUT.
       unfold read_in_mem_block, write_to_mem_block.
       rewrite lookup_all_index_add_all_index_no_overlap; eauto.
-      eapply sizeof_dvalue_pos; eauto.
       destruct OUT.
       - left. auto.
-      - right. erewrite sizeof_serialized; eauto.
+      - right. rewrite <- nat_N_Z. erewrite sizeof_serialized; eauto.
     Qed.
 
     Lemma write_array_cell_untouched :
@@ -1564,10 +1506,8 @@ Section Memory_Stack_Theory.
       - left.
         rewrite <- Z.add_assoc.
         apply Z.add_le_mono_l.
-        replace (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i')) * sizeof_dtyp t + sizeof_dtyp t) with ((1 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i'))) * sizeof_dtyp t) by lia.
-        apply Zmult_le_compat_r; eauto.
-        lia.
-        eapply sizeof_dvalue_pos; eauto.
+        replace (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i')) * Z.of_N (sizeof_dtyp t) + Z.of_N (sizeof_dtyp t)) with ((1 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i'))) * Z.of_N (sizeof_dtyp t)) by lia.
+        apply Zmult_le_compat_r; eauto; lia.
       - right.
         rewrite <- Z.add_assoc.
         apply Z.add_le_mono_l.
@@ -1576,10 +1516,8 @@ Section Memory_Stack_Theory.
         assert (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i')) >
                 DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i))) by lia.
 
-        replace (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp t + sizeof_dtyp t) with ((1 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i))) * sizeof_dtyp t) by lia.
-        apply Zmult_le_compat_r; eauto.
-        lia.
-        eapply sizeof_dvalue_pos; eauto.
+        replace (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp t) + Z.of_N (sizeof_dtyp t)) with ((1 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i))) * Z.of_N (sizeof_dtyp t)) by lia.
+        apply Zmult_le_compat_r; eauto; lia.
     Qed.
 
     Lemma write_array_cell_untouched_ptr_block :
@@ -1807,7 +1745,7 @@ Section Memory_Stack_Theory.
               unfold get_logical_block, get_logical_block_mem; cbn.
               rewrite lookup_add_eq; cbn.
               f_equal; apply read_empty_block.
-            + intros * SIZE ALLOC NOVER.
+            + intros * ALLOC NOVER.
               unfold read; cbn.
               unfold get_logical_block, get_logical_block_mem; cbn.
 
@@ -1829,7 +1767,7 @@ Section Memory_Stack_Theory.
               unfold get_logical_block, get_logical_block_mem; cbn.
               rewrite lookup_add_eq; cbn.
               f_equal; apply read_empty_block.
-            + intros * SIZE ALLOC NOVER.
+            + intros * ALLOC NOVER.
               unfold read; cbn.
               unfold get_logical_block, get_logical_block_mem; cbn.
 
@@ -1876,11 +1814,10 @@ Section Memory_Stack_Theory.
       - destruct l.
         cbn.
         rewrite Int64.unsigned_repr.
-        + replace (z0 + size * sizeof_dtyp τ * 0 +
-                   DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
-            with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
+        + replace (z0 + Z.of_N (size * sizeof_dtyp τ) * 0 +
+                   DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ))
+            with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ))
             by lia.
-
           reflexivity.
         + unfold Int64.max_unsigned. cbn. lia.
       - pose proof allocated_get_logical_block (z, z0) m ALLOC as [b GETSOME].
@@ -1897,18 +1834,23 @@ Section Memory_Stack_Theory.
       intros m size τ i a ALLOC.
       destruct a.
       exists (z,
-              z0 + size * sizeof_dtyp τ * DynamicValues.Int64.unsigned (DynamicValues.Int64.repr 0) +
-              DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ).
+              z0 + Z.of_N size * Z.of_N (sizeof_dtyp τ) * DynamicValues.Int64.unsigned (DynamicValues.Int64.repr 0) +
+              DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ)).
       split.
       - cbn.
         rewrite Int64.unsigned_repr.
-        replace (z0 + size * sizeof_dtyp τ * 0 +
-                 DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
-          with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
+        replace (z0 + Z.of_N (size * sizeof_dtyp τ) * 0 +
+                 DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ))
+          with (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ))
           by lia.
+        replace (z0 + Z.of_N size * Z.of_N (sizeof_dtyp τ) * 0 +
+                 Int64.unsigned (Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ))
+          with (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ)) by lia.
         reflexivity.
         unfold Int64.max_unsigned. cbn. lia.
       - eapply read_array; cbn; eauto.
+        rewrite N2Z.inj_mul.
+        reflexivity.
     Qed.
 
     Lemma write_array_lemma : forall m size τ i a elem_addr v,
@@ -1927,9 +1869,9 @@ Section Memory_Stack_Theory.
       - destruct l.
         cbn.
         rewrite Int64.unsigned_repr.
-        + replace (z0 + size * sizeof_dtyp τ * 0 +
-                   DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
-            with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
+        + replace (z0 + Z.of_N (size * sizeof_dtyp τ) * 0 +
+                   DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ))
+            with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ))
             by lia.
 
           reflexivity.
@@ -1948,14 +1890,14 @@ Section Memory_Stack_Theory.
       intros m size τ i a v ALLOC.
       destruct a.
       exists (z,
-              z0 + size * sizeof_dtyp τ * DynamicValues.Int64.unsigned (DynamicValues.Int64.repr 0) +
-              DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ).
+              z0 + Z.of_N (size * sizeof_dtyp τ) * DynamicValues.Int64.unsigned (DynamicValues.Int64.repr 0) +
+              DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ)).
       split.
       - cbn.
         rewrite Int64.unsigned_repr.
-        replace (z0 + size * sizeof_dtyp τ * 0 +
-                 DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
-          with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * sizeof_dtyp τ)
+        replace (z0 + Z.of_N (size * sizeof_dtyp τ) * 0 +
+                 DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ))
+          with  (z0 + DynamicValues.Int64.unsigned (DynamicValues.Int64.repr (Z.of_nat i)) * Z.of_N (sizeof_dtyp τ))
           by lia.
         reflexivity.
         unfold Int64.max_unsigned. cbn. lia.
@@ -2013,9 +1955,9 @@ Section Memory_Stack_Theory.
         intros sz τ [b i] m [eb ei] ALLOC GEP.
       - discriminate GEP.
       - cbn in *. destruct a; inversion GEP.
-        + destruct (handle_gep_h (DTYPE_Array sz τ) (i + sz * sizeof_dtyp τ * DynamicValues.Int32.unsigned x) idxs); inversion GEP; subst.
+        + destruct (handle_gep_h (DTYPE_Array sz τ) (i + Z.of_N (sz * sizeof_dtyp τ) * DynamicValues.Int32.unsigned x) idxs); inversion GEP; subst.
           apply ALLOC.
-        + destruct (handle_gep_h (DTYPE_Array sz τ) (i + sz * sizeof_dtyp τ * DynamicValues.Int64.unsigned x) idxs); inversion GEP; subst.
+        + destruct (handle_gep_h (DTYPE_Array sz τ) (i + Z.of_N (sz * sizeof_dtyp τ) * DynamicValues.Int64.unsigned x) idxs); inversion GEP; subst.
           apply ALLOC.
     Qed.
 
@@ -2023,11 +1965,10 @@ Section Memory_Stack_Theory.
       forall i ptr ptr' τ τ' sz elem_addr,
         no_overlap_dtyp ptr τ ptr' (DTYPE_Array sz τ') ->
         handle_gep_addr (DTYPE_Array sz τ') ptr' [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr elem_addr ->
-        Z.of_nat i < sz ->
-        0 <= sizeof_dtyp τ' ->
+        (N.of_nat i < sz)%N ->
         no_overlap_dtyp ptr τ elem_addr τ'.
     Proof.
-      intros i [b1 o1] [b2 o2] τ τ' sz elem_addr OVER GEP BOUNDS SIZE;
+      intros i [b1 o1] [b2 o2] τ τ' sz elem_addr OVER GEP BOUNDS;
         inversion GEP; subst.
       - unfold no_overlap_dtyp in *.
         cbn in *.
@@ -2038,7 +1979,6 @@ Section Memory_Stack_Theory.
           cbn in *.
           (* TODO: this is a mess... *)
           replace (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr 0)) with 0.
-          replace (o2 + sz * sizeof_dtyp τ' * 0 + 0 * sizeof_dtyp τ' + sizeof_dtyp τ') with (o2 + sizeof_dtyp τ') by lia.
           admit.
           admit.
         + right. right.
@@ -2054,12 +1994,11 @@ Section Memory_Stack_Theory.
         no_overlap_dtyp ptr τ ptr' (DTYPE_Array sz τ') ->
         allocated ptr' m1 ->
         handle_gep_addr (DTYPE_Array sz τ') ptr' [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr elem_addr ->
-        Z.of_nat i < sz ->
-        0 <= sizeof_dtyp τ' ->
+        (N.of_nat i < sz)%N ->
         get_array_cell m1 ptr' i τ' = inr uv ->
         get_array_cell m2 ptr' i τ' = inr uv.
     Proof.
-      intros m1 m2 ptr ptr' τ τ' i v uv sz elem_addr WRITE TYP NEQ ALLOC GEP POS TYPSIZE GET.
+      intros m1 m2 ptr ptr' τ τ' i v uv sz elem_addr WRITE TYP NEQ ALLOC GEP POS GET.
 
       pose proof (write_preserves_allocated ALLOC WRITE) as ALLOC2.
 
@@ -2161,7 +2100,9 @@ Section Memory_Stack_Theory.
       cbn.
       rewrite add_all_index_twice.
       apply add_logical_block_add_logical_block.
-      erewrite 2 Zlength_correct, 2 sizeof_serialized; eauto.
+      erewrite 2 Zlength_correct.
+      do 2 rewrite <- nat_N_Z.
+      erewrite 2 sizeof_serialized; eauto.
     Qed.
 
 End Memory_Stack_Theory.
@@ -2322,13 +2263,13 @@ Section PARAMS.
 
     Lemma lookup_all_add_all_app :
       forall (xs ys : list SByte) o bytes def,
-        lookup_all_index o (Z.of_nat (List.length xs + List.length ys)) (add_all_index (xs ++ ys) o bytes) def = xs ++ lookup_all_index (o + Z.of_nat (List.length xs)) (Z.of_nat (List.length ys)) (add_all_index (xs ++ ys) o bytes) def.
+        lookup_all_index o (N.of_nat (List.length xs + List.length ys)) (add_all_index (xs ++ ys) o bytes) def = xs ++ lookup_all_index (o + Z.of_nat (List.length xs)) (N.of_nat (List.length ys)) (add_all_index (xs ++ ys) o bytes) def.
     Proof.
     Abort.
 
     Lemma lookup_all_add_all :
       forall o bytes (sbytes : list SByte) def,
-        lookup_all_index o (Z.of_nat (List.length sbytes)) (add_all_index sbytes o bytes) def = sbytes.
+        lookup_all_index o (N.of_nat (List.length sbytes)) (add_all_index sbytes o bytes) def = sbytes.
     Proof.
       intros o bytes sbytes def.
       induction sbytes.
@@ -2488,7 +2429,35 @@ Section PARAMS.
       rewrite H2. reflexivity.
     Qed.
 
-    Lemma Zseq_app : forall off n : Z,
+    Lemma Zseq_app : forall (off : Z) (n : N),
+        Zseq off (N.to_nat (N.succ n)) =
+        Zseq off (N.to_nat n) ++ [off + Z.of_N n].
+    Proof.
+      intros.
+      rewrite <- N.add_1_r.
+      setoid_rewrite Nnat.N2Nat.inj_add; auto.
+      unfold N.to_nat at 2. unfold Pos.to_nat. cbn.
+      remember (N.to_nat n) as sz.
+      assert (off_H: off + Z.of_N n = off + (Z.of_nat sz)). {
+        rewrite Heqsz. rewrite N_nat_Z. reflexivity.
+      }
+      rewrite off_H.
+      clear Heqsz off_H.
+      revert off.
+      induction sz.
+      - intros. cbn.
+        rewrite Zred_factor6 at 1.
+        reflexivity.
+      - intros.
+        rewrite Nat.add_1_r in *.
+        cbn in *.
+        specialize (IHsz (Z.succ off)).
+        rewrite IHsz.
+        assert (Z.succ off + Z.of_nat sz = off + Z.pos (Pos.of_succ_nat sz)) as END by lia.
+        rewrite END. reflexivity.
+    Qed.
+
+    Lemma Zseq_app_Z : forall off n : Z,
         0 <= n ->
         Zseq off (Z.to_nat (Z.succ n)) =
         Zseq off (Z.to_nat n) ++ [off + n].
@@ -2554,33 +2523,80 @@ Section PARAMS.
     Lemma lookup_all_index_add_all_length_app:
       forall a sz l l' offset bytes (def : a),
         length l = sz ->
-        lookup_all_index offset (Z.of_nat sz)
+        lookup_all_index offset (N.of_nat sz)
                          (add_all_index (l ++ l') offset bytes) def =
-        lookup_all_index offset (Z.of_nat sz)
+        lookup_all_index offset (N.of_nat sz)
                          (add_all_index l offset bytes) def.
     Proof.
       intros*. revert def bytes offset sz.
       induction l.
       - intros; cbn. cbn in H2. subst. auto.
       - intros; cbn in *. subst.
-        rewrite Nat2Z.inj_succ.
-        rewrite 2 lookup_all_index_add. 2 : lia. 2 : lia.
+        rewrite Nnat.Nat2N.inj_succ.
+        rewrite 2 lookup_all_index_add.
         rewrite IHl. reflexivity. reflexivity.
+    Qed.
+
+
+    (* TODO: move *)
+    Lemma Zlength_map:
+      forall {A B} (f : A -> B) (l : list A),
+        Zlength (map f l) = Zlength l.
+    Proof.
+      intros A B f l.
+      induction l.
+      - reflexivity.
+      - rewrite map_cons.
+        rewrite 2 Zlength_cons.
+        rewrite IHl.
+        reflexivity.
+    Qed.
+
+    (* TODO: move *)
+    Lemma Zlength_app:
+      forall {A} (l1 l2 : list A),
+        Zlength (l1 ++ l2) = Zlength l1 + Zlength l2.
+    Proof.
+      intros A; induction l1; intros l2.
+      - reflexivity.
+      - (* TODO: avoid this... *)
+        Opaque Zlength.
+        cbn.
+        rewrite 2 Zlength_cons.
+        Transparent Zlength.
+        rewrite Z.add_succ_l.
+        rewrite IHl1.
+        reflexivity.
+    Qed.
+
+    Lemma Zlength_Zseq:
+      forall sz start,
+        Zlength (Zseq start sz) = Z.of_nat sz.
+    Proof.
+      induction sz; intros start.
+      - reflexivity.
+      - (* TODO: avoid this... *)
+        Opaque Zlength.
+        cbn.
+        rewrite Zlength_cons.
+        Transparent Zlength.
+        rewrite IHsz.
+        lia.
     Qed.
 
     Lemma lookup_all_index_add_all_index :
       forall (sz : nat) src_bytes src_offset dst_bytes dst_offset def,
-        (lookup_all_index dst_offset (Z.of_nat sz)
+        (lookup_all_index dst_offset (N.of_nat sz)
                           (add_all_index
-                             (lookup_all_index src_offset (Z.of_nat sz) src_bytes def)
+                             (lookup_all_index src_offset (N.of_nat sz) src_bytes def)
                              dst_offset dst_bytes) SUndef) =
-        (lookup_all_index src_offset (Z.of_nat sz) src_bytes def).
+        (lookup_all_index src_offset (N.of_nat sz) src_bytes def).
     Proof.
       intros sz src_bytes src_offset dst_bytes dst_offset def.
       induction sz.
       - cbn; reflexivity.
-      - assert (Z.of_nat (S sz) = Z.succ (Z.of_nat sz)). cbn.
-        apply Zpos_P_of_succ_nat.
+      - assert (N.of_nat (S sz) = N.succ (N.of_nat sz)). cbn.
+        lia.
         rewrite H2.
         unfold lookup_all_index in *.
         remember (fun x0 : IM.key =>
@@ -2593,7 +2609,7 @@ Section PARAMS.
         + assert (match
                      lookup (dst_offset + Z.of_nat sz)
                             (add_all_index
-                               (map s (Zseq src_offset (Z.to_nat (Z.of_nat sz)) ++
+                               (map s (Zseq src_offset (N.to_nat (N.of_nat sz)) ++
                                             [src_offset + Z.of_nat sz]))
                                dst_offset dst_bytes)
                    with
@@ -2605,7 +2621,7 @@ Section PARAMS.
               rewrite Z.add_simpl_l. rewrite list_nth_z_map.
               unfold option_map.
               rewrite (@Zseq_length sz src_offset) at 3.
-              rewrite Nat2Z.id.
+              rewrite Nnat.Nat2N.id.
               rewrite list_nth_z_length. reflexivity.
             }
             reflexivity.
@@ -2618,7 +2634,7 @@ Section PARAMS.
                 rewrite Zlength_correct.
                 rewrite map_length.
                 rewrite app_length. cbn.
-                rewrite Nat2Z.id.
+                rewrite Nnat.Nat2N.id.
                 rewrite <- Zseq_length at 1.
                 rewrite Nat2Z.inj_add. cbn.
                 rewrite Z.add_simpl_r.
@@ -2626,24 +2642,26 @@ Section PARAMS.
           }
           rewrite 2 map_app. cbn. rewrite map_app in H3.
           cbn in H3.
-          apply list_singleton_eq in H3. rewrite H3. clear H3.
+          apply list_singleton_eq in H3.
+          rewrite nat_N_Z.
+          rewrite H3. clear H3.
           eapply app_prefix_eq.
           remember (add_all_index
-                      (map s (Zseq src_offset (Z.to_nat (Z.of_nat sz))) ++
+                      (map s (Zseq src_offset (N.to_nat (N.of_nat sz))) ++
                            [s (src_offset + Z.of_nat sz)]) dst_offset dst_bytes) as m.
           remember (add_all_index
-                      (map s (Zseq src_offset (Z.to_nat (Z.of_nat sz))))
+                      (map s (Zseq src_offset (N.to_nat (N.of_nat sz))))
                       dst_offset dst_bytes) as m'.
           setoid_rewrite <- IHsz at 2.
           match goal with
           | |- ?L = ?R => remember L as LHS; remember R as RHS
           end.
-          assert (LHS = lookup_all_index dst_offset (Z.of_nat sz) m SUndef).
+          assert (LHS = lookup_all_index dst_offset (N.of_nat sz) m SUndef).
           {
             rewrite HeqLHS. unfold lookup_all_index. subst.
             reflexivity.
           }
-          assert (RHS = lookup_all_index dst_offset (Z.of_nat sz) m' SUndef).
+          assert (RHS = lookup_all_index dst_offset (N.of_nat sz) m' SUndef).
           {
             rewrite HeqRHS. unfold lookup_all_index. reflexivity.
           }
@@ -2652,11 +2670,9 @@ Section PARAMS.
           apply lookup_all_index_add_all_length_app.
           pose proof Zseq_length as Zseq_length_H.
           specialize (Zseq_length_H sz src_offset).
-          rewrite Nat2Z.id.
+          rewrite Nnat.Nat2N.id.
           symmetry.
           rewrite map_length. auto.
-        + apply Nat2Z.is_nonneg.
-        + apply Nat2Z.is_nonneg.
     Qed.
 
     (* Note : For the current version of subevents, [interp_memory] must
@@ -2665,18 +2681,18 @@ Section PARAMS.
     (* IY: This is specialized to DTYPE_Array for practical
          purposes. We could conjure a more complete definition later. *)
     Lemma interp_memory_intrinsic_memcpy :
-      forall (m : memory_stack) (dst src : Addr.addr) (sz : Z)
+      forall (m : memory_stack) (dst src : Addr.addr) (sz : N)
         (dst_val src_val : uvalue) (dτ : dtyp) volatile align,
-        0 <= sz * sizeof_dtyp dτ <= Int32.max_unsigned ->
+        0 <= Z.of_N (sz * sizeof_dtyp dτ) <= Int32.max_unsigned ->
         read m dst (DTYPE_Array sz dτ) = inr dst_val ->
         read m src (DTYPE_Array sz dτ) = inr src_val ->
-        no_overlap dst (Int32.unsigned (Int32.repr (sz * sizeof_dtyp dτ))) src
-                   (Int32.unsigned (Int32.repr (sz * sizeof_dtyp dτ))) ->
+        no_overlap dst (Int32.unsigned (Int32.repr (Z.of_N (sz * sizeof_dtyp dτ)))) src
+                   (Int32.unsigned (Int32.repr (Z.of_N (sz * sizeof_dtyp dτ)))) ->
         exists m' s,
           (interp_memory (trigger (Intrinsic DTYPE_Void
                                              "llvm.memcpy.p0i8.p0i8.i32"
                                              [DVALUE_Addr dst; DVALUE_Addr src;
-                                             DVALUE_I32 (Int32.repr (sizeof_dtyp (DTYPE_Array sz dτ)));
+                                             DVALUE_I32 (Int32.repr (Z.of_N (sizeof_dtyp (DTYPE_Array sz dτ))));
                                              DVALUE_I32 align ;
                                              DVALUE_I1 volatile])) m ≈
                          ret (m', s, DVALUE_None)) /\
@@ -2701,23 +2717,19 @@ Section PARAMS.
       rewrite reflect_iff in NO_OVERLAP. clear reflect_H.
       setoid_rewrite NO_OVERLAP. cbn in *.
       setoid_rewrite HM_src. cbn. setoid_rewrite HM_dst. cbn.
-      exists (add_logical_block_mem dst_base
-                               (LBlock size
-                                       (add_all_index
-                                          (lookup_all_index src_offset
-                                                            (Int32.unsigned (Int32.repr (i * sizeof_dtyp dτ))) bytes0
-                                                            SUndef) dst_offset bytes) concrete_id) m).
-      exists f. split; try reflexivity.
+      eexists. exists f.
+      split; try reflexivity.
       rewrite <- MEM_src. unfold read. cbn.
       unfold read_in_mem_block. cbn.
       rewrite Int32.unsigned_repr. 2 : apply size_H.
       rewrite get_logical_block_of_add_logical_block_mem.
       pose proof lookup_all_index_add_all_index.
-      specialize (H2 (Z.to_nat (i * sizeof_dtyp dτ))).
-      rewrite Z2Nat.id in H2.
-      rewrite H2. reflexivity. apply size_H.
+      specialize (H2 (N.to_nat (i * sizeof_dtyp dτ))).
+      rewrite Nnat.N2Nat.id in H2.
+      rewrite N2Z.id.
+      rewrite H2. reflexivity.
       apply no_overlap_reflect. Unshelve. unfold addr, Addr.addr.
-      exact (size0, size0). exact (size0, size0). eauto.
+      exact (0, 0). exact (0, 0). eauto.
     Qed.
 
   End Structural_Lemmas.
@@ -2746,7 +2758,7 @@ Section PARAMS.
     forall ptr ptr_elem ix sz τ,
       handle_gep_addr (DTYPE_Array sz τ) ptr
                       [DVALUE_I64 (repr 0); DVALUE_I64 ix] = inr ptr_elem ->
-      snd ptr + DynamicValues.Int64.unsigned ix * sizeof_dtyp τ = snd ptr_elem.
+      snd ptr + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ) = snd ptr_elem.
   Proof.
     intros [ptrb ptro] [ptr_elemb ptr_elemo] ix sz τ GEP.
     cbn in GEP.
@@ -2757,15 +2769,14 @@ Section PARAMS.
   Qed.
 
  Lemma dtyp_fits_array_elem :
-    forall m ptr ptr_elem ix sz τ,
+    forall m ptr ptr_elem ix (sz : N) τ,
       dtyp_fits m ptr (DTYPE_Array sz τ) ->
       handle_gep_addr (DTYPE_Array sz τ) ptr
                       [DVALUE_I64 (repr 0); DVALUE_I64 ix] = inr ptr_elem ->
-      Int64.intval ix < sz ->
-      0 <= sizeof_dtyp τ ->
+      Int64.intval ix < Z.of_N sz ->
       dtyp_fits m ptr_elem τ.
   Proof.
-    intros m ptr ptr_elem ix sz τ FITS GEP SZ TYPSZ.
+    intros m ptr ptr_elem ix sz τ FITS GEP SZ.
     cbn in GEP.
     unfold dtyp_fits in *.
     destruct FITS as (sz' & bytes & cid & BLOCK & BOUND).
@@ -2776,11 +2787,12 @@ Section PARAMS.
     cbn in BOUND.
     assert (Int64.unsigned ix = Int64.intval ix) by reflexivity.
     rewrite H2.
-    assert (1 + Int64.intval ix <= sz) by lia.
+    assert (1 + Int64.intval ix <= Z.of_N sz) by lia.
     rewrite <- Z.add_assoc.
-    assert (snd ptr + (Int64.intval ix * sizeof_dtyp τ + sizeof_dtyp τ) <= snd ptr + sz * sizeof_dtyp τ).
+    assert (snd ptr + (Int64.intval ix * Z.of_N (sizeof_dtyp τ) + Z.of_N (sizeof_dtyp τ)) <= snd ptr + Z.of_N (sz * sizeof_dtyp τ)).
     { eapply Zorder.Zplus_le_compat_l.
-      replace (Int64.intval ix * sizeof_dtyp τ + sizeof_dtyp τ) with ((1 + Int64.intval ix) * sizeof_dtyp τ).
+      replace (Int64.intval ix * Z.of_N (sizeof_dtyp τ) + Z.of_N (sizeof_dtyp τ)) with ((1 + Int64.intval ix) * Z.of_N (sizeof_dtyp τ)).
+      rewrite N2Z.inj_mul.
       eapply Z.mul_le_mono_nonneg_r; lia.
       lia.
     }

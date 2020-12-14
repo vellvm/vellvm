@@ -6,6 +6,7 @@ open Format
 
 let of_str = Camlcoq.camlstring_of_coqstring
 let to_int = Camlcoq.Z.to_int
+let n_to_int = Camlcoq.N.to_int
 let float_of_coqfloat = Camlcoq.camlfloat_of_coqfloat
 
 (* TODO: Use pp_option everywhere instead of inlined matching *)
@@ -154,7 +155,7 @@ and ident : Format.formatter -> LLVMAst.ident -> unit =
 and typ : Format.formatter -> LLVMAst.typ -> unit =
   fun ppf ->
   function
-  | TYPE_I i              -> fprintf ppf "i%d" (to_int i)
+  | TYPE_I i              -> fprintf ppf "i%d" (n_to_int i)
   | TYPE_Pointer t        -> fprintf ppf "%a*" typ t ;
   | TYPE_Void             -> fprintf ppf "void"
   | TYPE_Half             -> fprintf ppf "half"
@@ -165,14 +166,14 @@ and typ : Format.formatter -> LLVMAst.typ -> unit =
   | TYPE_Ppc_fp128        -> fprintf ppf "ppc_fp128"
   | TYPE_Metadata         -> fprintf ppf "metadata"
   | TYPE_X86_mmx          -> fprintf ppf "x86_mmx"
-  | TYPE_Array (i, t)     -> fprintf ppf "[%d x %a]" (to_int i) typ t ;
+  | TYPE_Array (i, t)     -> fprintf ppf "[%d x %a]" (n_to_int i) typ t ;
   | TYPE_Function (t, tl) -> fprintf ppf "%a (%a)" typ t (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Struct tl        -> fprintf ppf "{%a}"
                                      (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Packed_struct tl -> fprintf ppf "<{%a}>"
                                      (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Opaque           -> fprintf ppf "opaque"
-  | TYPE_Vector (i, t)    -> fprintf ppf "<%d x %a>" (to_int i) typ t ;
+  | TYPE_Vector (i, t)    -> fprintf ppf "<%d x %a>" (n_to_int i) typ t ;
   | TYPE_Identified i     -> ident ppf i
 
 and icmp : Format.formatter -> LLVMAst.icmp -> unit =

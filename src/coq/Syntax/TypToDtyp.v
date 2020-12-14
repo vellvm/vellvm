@@ -29,8 +29,8 @@ Open Scope list_scope.
 
 Inductive typ_order : typ -> typ -> Prop :=
 | typ_order_Pointer : forall (t : typ), typ_order t (TYPE_Pointer t)
-| typ_order_Array : forall (sz : int) (t : typ), typ_order t (TYPE_Array sz t)
-| typ_order_Vector : forall (sz : int) (t : typ), typ_order t (TYPE_Vector sz t)
+| typ_order_Array : forall (sz : N) (t : typ), typ_order t (TYPE_Array sz t)
+| typ_order_Vector : forall (sz : N) (t : typ), typ_order t (TYPE_Vector sz t)
 | typ_order_Struct : forall (fields : list typ),
     forall f, In f fields -> typ_order f (TYPE_Struct fields)
 | typ_order_Packed_struct : forall (fields : list typ),

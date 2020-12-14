@@ -50,7 +50,7 @@ Set Contextual Implicit.
 
 Open Scope monad_scope.
 Open Scope string_scope.
-Open Scope Z_scope.
+Open Scope N_scope.
 
 (* end hide *)
 

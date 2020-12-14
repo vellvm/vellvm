@@ -46,7 +46,7 @@ Import ListNotations.
 Set Implicit Arguments.
 Set Contextual Implicit.
 
-Open Scope Z_scope.
+Open Scope N_scope.
 (* end hide *)
 
 (* YZ TODO: better documentation of this file *)
@@ -88,7 +88,7 @@ Definition int8 := Int8.int.
 Definition int32 := Int32.int.
 Definition int64 := Int64.int.
 
-Definition inttyp (x:Z) : Type :=
+Definition inttyp (x:N) : Type :=
   match x with
   | 1 => int1
   | 8 => int8
@@ -97,19 +97,27 @@ Definition inttyp (x:Z) : Type :=
   | _ => False
   end.
 
-Inductive IX_supported : Z -> Prop :=
+Inductive IX_supported : N -> Prop :=
 | I1_Supported : IX_supported 1
 | I8_Supported : IX_supported 8
 | I32_Supported : IX_supported 32
 | I64_Supported : IX_supported 64
 .
 
-Lemma IX_supported_dec : forall (sz:Z), {IX_supported sz} + {~IX_supported sz}.
+(* TODO: This probably should live somewhere else... *)
+Program Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
+  Decidable_witness := N.eqb x y
+}.
+Next Obligation.
+ apply N.eqb_eq.
+Qed.
+
+Lemma IX_supported_dec : forall (sz:N), {IX_supported sz} + {~IX_supported sz}.
 Proof.
   intros sz.
-  - decide (sz = 1).
+  - decide (sz = 1)%N.
     + left. subst. constructor.
-    + decide (sz = 8). 
+    + decide (sz = 8)%N.
       * left. subst. constructor.
       * decide (sz = 32).
         -- left. subst. constructor.
@@ -123,7 +131,7 @@ Qed.
 (* IY: This is not ideal, but here is an equivalent formulation with an ugly
    if-else chain.. I feel like there must be some clean way to prove the
    original lemma using boolean reflection. *)
-Lemma unsupported_cases : forall {X} (sz : Z) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
+Lemma unsupported_cases : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
     (if (sz =? 64) then x64
       else if (sz =? 32) then x32
           else if (sz =? 8) then x8
@@ -132,21 +140,21 @@ Lemma unsupported_cases : forall {X} (sz : Z) (N : ~ IX_supported sz) (x64 x32 x
 Proof.
   intros.
   destruct (sz =? 64) eqn: H.
-  rewrite Z.eqb_eq in H.
+  rewrite N.eqb_eq in H.
   destruct N. rewrite H. constructor.
   destruct (sz =? 32) eqn: H'.
-  rewrite Z.eqb_eq in H'.
+  rewrite N.eqb_eq in H'.
   destruct N. rewrite H'. constructor.
   destruct (sz =? 8) eqn: H''.
-  rewrite Z.eqb_eq in H''.
+  rewrite N.eqb_eq in H''.
   destruct N. rewrite H''. constructor.
   destruct (sz =? 1) eqn: H'''.
-  rewrite Z.eqb_eq in H'''.
+  rewrite N.eqb_eq in H'''.
   destruct N. rewrite H'''. constructor.
   reflexivity.
 Qed.
 
-Function unsupported_cases_match_ {X} (sz : Z) (x64 x32 x8 x1 x : X) :=
+Function unsupported_cases_match_ {X} (sz : N) (x64 x32 x8 x1 x : X) :=
     match sz with
     | 64 => x64
     | 32 => x32
@@ -155,7 +163,7 @@ Function unsupported_cases_match_ {X} (sz : Z) (x64 x32 x8 x1 x : X) :=
     | _ => x
     end.
 
-Lemma unsupported_cases_match : forall {X} (sz : Z) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X), 
+Lemma unsupported_cases_match : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X), 
     match sz with
     | 64 => x64
     | 32 => x32
@@ -1037,7 +1045,7 @@ Class VInt I : Type :=
   Definition undef_i8  := UVALUE_Undef (DTYPE_I 8).
   Definition undef_i32 := UVALUE_Undef (DTYPE_I 32).
   Definition undef_i64 := UVALUE_Undef (DTYPE_I 64).
-  Definition undef_int {Int} `{VInt Int}  := UVALUE_Undef (DTYPE_I (Z.of_nat bitwidth)).
+  Definition undef_int {Int} `{VInt Int}  := UVALUE_Undef (DTYPE_I (N.of_nat bitwidth)).
 
   Definition to_uvalue {Int} `{VInt Int} (i : Int) : uvalue := dvalue_to_uvalue (to_dvalue i).
 
@@ -1070,7 +1078,7 @@ Class VInt I : Type :=
       if (bitwidth ~=? 1)%nat then ret (to_dvalue (mul x y))
       else
         let res := mul x y in
-        let res_s' := (signed x) * (signed y) in
+        let res_s' := ((signed x) * (signed y))%Z in
         if orb (andb nuw ((unsigned x) * (unsigned y) >?
                       unsigned res))
              (andb nsw (orb (min_signed >? res_s')
@@ -1089,21 +1097,21 @@ Class VInt I : Type :=
                   (andb nsw (negb (Z.shiftr (unsigned x)
                                             (bz - unsigned y)
                                    =? (unsigned (negative res))
-                                      * (Z.pow 2 (unsigned y) - 1))))
+                                      * (Z.pow 2 (unsigned y) - 1))%Z))
            then ret DVALUE_Poison else ret (to_dvalue res)
 
     | UDiv ex =>
-      if (unsigned y =? 0)
+      if (unsigned y =? 0)%Z
       then failwith "Unsigned division by 0."
-      else if andb ex (negb ((unsigned x) mod (unsigned y) =? 0))
+      else if andb ex (negb ((unsigned x) mod (unsigned y) =? 0))%Z
            then ret DVALUE_Poison
            else ret (to_dvalue (divu x y))
 
     | SDiv ex =>
       (* What does signed i1 mean? *)
-      if (signed y =? 0)
+      if (signed y =? 0)%Z
       then failwith "Signed division by 0."
-      else if andb ex (negb ((signed x) mod (signed y) =? 0))
+      else if andb ex (negb ((signed x) mod (signed y) =? 0))%Z
            then ret DVALUE_Poison
            else ret (to_dvalue (divs x y))
 
@@ -1111,23 +1119,23 @@ Class VInt I : Type :=
       let bz := Z.of_nat bitwidth in
       if (unsigned y) >=? bz then ret DVALUE_Poison
       else if andb ex (negb ((unsigned x)
-                               mod (Z.pow 2 (unsigned y)) =? 0))
+                               mod (Z.pow 2 (unsigned y)) =? 0))%Z
            then ret DVALUE_Poison else ret (to_dvalue (shru x y))
 
     | AShr ex =>
       let bz := Z.of_nat bitwidth in
       if (unsigned y) >=? bz then ret DVALUE_Poison
       else if andb ex (negb ((unsigned x)
-                               mod (Z.pow 2 (unsigned y)) =? 0))
+                               mod (Z.pow 2 (unsigned y)) =? 0))%Z
            then ret DVALUE_Poison else ret (to_dvalue (shr x y))
 
     | URem =>
-      if unsigned y =? 0
+      if (unsigned y =? 0)%Z
       then failwith "Unsigned mod 0."
       else ret (to_dvalue (modu x y))
 
     | SRem =>
-      if signed y =? 0
+      if (signed y =? 0)%Z
       then failwith "Signed mod 0."
       else ret (to_dvalue (mods x y))
 
@@ -1143,7 +1151,7 @@ Class VInt I : Type :=
   Arguments eval_int_op _ _ _ : simpl nomatch.
 
   (* Evaluate the given iop on the given arguments according to the bitsize *)
-  Definition integer_op (bits:Z) (iop:ibinop) (x y:inttyp bits) : undef_or_err dvalue :=
+  Definition integer_op (bits:N) (iop:ibinop) (x y:inttyp bits) : undef_or_err dvalue :=
     match bits, x, y with
     | 1, x, y  => lift (eval_int_op iop x y)
     | 8, x, y  => lift (eval_int_op iop x y)
@@ -1155,7 +1163,7 @@ Class VInt I : Type :=
 
   (* Convert written integer constant to corresponding integer with bitsize bits.
      Takes the integer modulo 2^bits. *)
-  Definition coerce_integer_to_int (bits:Z) (i:Z) : undef_or_err dvalue :=
+  Definition coerce_integer_to_int (bits:N) (i:Z) : undef_or_err dvalue :=
     match bits with
     | 1  => ret (DVALUE_I1 (repr i))
     | 8  => ret (DVALUE_I8 (repr i))
@@ -1368,7 +1376,7 @@ Class VInt I : Type :=
     | _, _ =>
       match cnd with
       | DVALUE_I1 i =>
-        ret_local (if Int1.unsigned i =? 1 then v1 else v2)
+        ret_local (if (Int1.unsigned i =? 1)%Z then v1 else v2)
       | DVALUE_Poison => ret_local UVALUE_Poison
       | _ => failwith_local "ill_typed select"
       end
@@ -1400,7 +1408,7 @@ Class VInt I : Type :=
         match elts with
         | [] => failwith "index out of bounds"
         | h :: tl =>
-          if idx =? 0 then ret h else loop tl (i-1)
+          if (idx =? 0)%Z then ret h else loop tl (i-1)%Z
         end in
     match v with
     | UVALUE_Struct f => loop f idx
@@ -1415,8 +1423,8 @@ Class VInt I : Type :=
         match elts with
         | [] => failwith "index out of bounds"
         | h :: tl =>
-          if idx =? 0 then ret (acc ++ (v :: tl))
-          else loop (acc ++ [h]) tl (i-1)
+          (if idx =? 0 then ret (acc ++ (v :: tl))
+          else loop (acc ++ [h]) tl (i-1))%Z
         end%list in
     match str with
     | DVALUE_Struct f =>
@@ -1478,14 +1486,14 @@ Class VInt I : Type :=
       forall xs sz dt,
         Forall (fun x => dvalue_has_dtyp x dt) xs ->
         length xs = sz ->
-        dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt)
+        dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt)
 
   | DVALUE_Vector_typ :
       forall xs sz dt,
         Forall (fun x => dvalue_has_dtyp x dt) xs ->
         length xs = sz ->
         vector_dtyp dt ->
-        dvalue_has_dtyp (DVALUE_Vector xs) (DTYPE_Vector (Z.of_nat sz) dt)
+        dvalue_has_dtyp (DVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt)
   .
   Set Elimination Schemes.
 
@@ -1526,14 +1534,14 @@ Class VInt I : Type :=
       forall xs sz dt,
         Forall (fun x => uvalue_has_dtyp x dt) xs ->
         length xs = sz ->
-        uvalue_has_dtyp (UVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt)
+        uvalue_has_dtyp (UVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt)
 
   | UVALUE_Vector_typ :
       forall xs sz dt,
         Forall (fun x => uvalue_has_dtyp x dt) xs ->
         length xs = sz ->
         vector_dtyp dt ->
-        uvalue_has_dtyp (UVALUE_Vector xs) (DTYPE_Vector (Z.of_nat sz) dt)
+        uvalue_has_dtyp (UVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt)
 
   | UVALUE_IBinop_typ :
       forall x y sz op,
@@ -1608,31 +1616,31 @@ Class VInt I : Type :=
       forall n vect idx t sz,
         IX_supported sz ->
         uvalue_has_dtyp idx (DTYPE_I sz) ->
-        uvalue_has_dtyp vect (DTYPE_Vector (Z.of_nat n) t) ->
+        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
         uvalue_has_dtyp (UVALUE_ExtractElement vect idx) t
   | UVALUE_InsertElement_typ :
       forall n vect val idx t sz,
         IX_supported sz ->
         uvalue_has_dtyp idx (DTYPE_I sz) ->
-        uvalue_has_dtyp vect (DTYPE_Vector (Z.of_nat n) t) ->
+        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
         uvalue_has_dtyp val t ->
-        uvalue_has_dtyp (UVALUE_InsertElement vect val idx) (DTYPE_Vector (Z.of_nat n) t)
+        uvalue_has_dtyp (UVALUE_InsertElement vect val idx) (DTYPE_Vector (N.of_nat n) t)
   | UVALUE_ShuffleVector_typ :
       forall n m v1 v2 idxs t,
-        uvalue_has_dtyp idxs (DTYPE_Vector (Z.of_nat m) (DTYPE_I 32)) ->
-        uvalue_has_dtyp v1 (DTYPE_Vector (Z.of_nat n) t) ->
-        uvalue_has_dtyp v2 (DTYPE_Vector (Z.of_nat n) t) ->
-        uvalue_has_dtyp (UVALUE_ShuffleVector v1 v2 idxs) (DTYPE_Vector (Z.of_nat m) t)
+        uvalue_has_dtyp idxs (DTYPE_Vector (N.of_nat m) (DTYPE_I 32)) ->
+        uvalue_has_dtyp v1 (DTYPE_Vector (N.of_nat n) t) ->
+        uvalue_has_dtyp v2 (DTYPE_Vector (N.of_nat n) t) ->
+        uvalue_has_dtyp (UVALUE_ShuffleVector v1 v2 idxs) (DTYPE_Vector (N.of_nat m) t)
   | UVALUE_ExtractValue_Struct_sing_typ :
       forall fields fts dt idx,
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        0 <= Int32.intval idx ->
+        (0 <= Int32.intval idx)%Z ->
         Nth fts (Z.to_nat (Int32.intval idx)) dt ->
         uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Struct fields) [idx]) dt
   | UVALUE_ExtractValue_Struct_cons_typ :
       forall fields fts fld ft dt idx idxs,
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        0 <= Int32.intval idx ->
+        (0 <= Int32.intval idx)%Z ->
         Nth fts (Z.to_nat (Int32.intval idx)) dt ->
         Nth fields (Z.to_nat (Int32.intval idx)) fld ->
         uvalue_has_dtyp fld ft ->
@@ -1641,13 +1649,13 @@ Class VInt I : Type :=
   | UVALUE_ExtractValue_Packed_struct_sing_typ :
       forall fields fts dt idx,
         uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
-        0 <= Int32.intval idx ->
+        (0 <= Int32.intval idx)%Z ->
         Nth fts (Z.to_nat (Int32.intval idx)) dt ->
         uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Packed_struct fields) [idx]) dt
   | UVALUE_ExtractValue_Packed_struct_cons_typ :
       forall fields fts fld ft dt idx idxs,
         uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
-        0 <= Int32.intval idx ->
+        (0 <= Int32.intval idx)%Z ->
         Nth fts (Z.to_nat (Int32.intval idx)) dt ->
         Nth fields (Z.to_nat (Int32.intval idx)) fld ->
         uvalue_has_dtyp fld ft ->
@@ -1656,12 +1664,12 @@ Class VInt I : Type :=
   | UVALUE_ExtractValue_Array_sing_typ :
       forall elements dt idx n,
         uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
-        0 <= Int32.intval idx <= n ->
+        (0 <= Int32.intval idx <= Z.of_N n)%Z ->
         uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Array elements) [idx]) dt
   | UVALUE_ExtractValue_Array_cons_typ :
       forall elements elem et dt n idx idxs,
         uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
-        0 <= Int32.intval idx <= n ->
+        (0 <= Int32.intval idx <= Z.of_N n)%Z ->
         Nth elements (Z.to_nat (Int32.intval idx)) elem ->
         uvalue_has_dtyp elem et ->
         uvalue_has_dtyp (UVALUE_ExtractValue elem idxs) dt ->
@@ -1680,10 +1688,10 @@ Class VInt I : Type :=
         uvalue_has_dtyp (UVALUE_Select cond x y) t
   | UVALUE_Select_vect :
       forall cond x y t sz,
-        uvalue_has_dtyp cond (DTYPE_Vector (Z.of_nat sz) (DTYPE_I 1)) ->
-        uvalue_has_dtyp x (DTYPE_Vector (Z.of_nat sz) t) ->
-        uvalue_has_dtyp y (DTYPE_Vector (Z.of_nat sz) t) ->
-        uvalue_has_dtyp (UVALUE_Select cond x y) (DTYPE_Vector (Z.of_nat sz) t).
+        uvalue_has_dtyp cond (DTYPE_Vector (N.of_nat sz) (DTYPE_I 1)) ->
+        uvalue_has_dtyp x (DTYPE_Vector (N.of_nat sz) t) ->
+        uvalue_has_dtyp y (DTYPE_Vector (N.of_nat sz) t) ->
+        uvalue_has_dtyp (UVALUE_Select cond x y) (DTYPE_Vector (N.of_nat sz) t).
 
   Section dvalue_has_dtyp_ind.
     Variable P : dvalue -> dtyp -> Prop.
@@ -1720,13 +1728,13 @@ Class VInt I : Type :=
     Hypothesis IH_Array : forall (xs : list dvalue) (sz : nat) (dt : dtyp)
                             (IH : forall x, In x xs -> P x dt)
                             (IHdtyp : forall x, In x xs -> dvalue_has_dtyp x dt),
-        Datatypes.length xs = sz -> P (DVALUE_Array xs) (DTYPE_Array (Z.of_nat sz) dt).
+        Datatypes.length xs = sz -> P (DVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt).
 
     Hypothesis IH_Vector : forall (xs : list dvalue) (sz : nat) (dt : dtyp)
                              (IH : forall x, In x xs -> P x dt)
                              (IHdtyp : forall x, In x xs -> dvalue_has_dtyp x dt),
         Datatypes.length xs = sz ->
-        vector_dtyp dt -> P (DVALUE_Vector xs) (DTYPE_Vector (Z.of_nat sz) dt).
+        vector_dtyp dt -> P (DVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt).
 
     Lemma dvalue_has_dtyp_ind : forall (dv:dvalue) (dt:dtyp) (TYP: dvalue_has_dtyp dv dt), P dv dt.
       fix IH 3.
