@@ -781,7 +781,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           dv <- concretize_or_pick uv True ;; (* TODO, should this be unique? *)
           match dv with
           | DVALUE_I1 comparison_bit =>
-            if eq comparison_bit one then
+            if equ comparison_bit one then
               ret (inl br1)
             else
               ret (inl br2)
