@@ -76,8 +76,6 @@ Section LABELS_OPERATIONS.
   Definition wf_ocfg_bid (bks : ocfg T) : Prop :=
     list_norepet (map blk_id bks).
 
-  Infix "⊍" := list_disjoint (at level 60).
-
   (** * no reentrance
       Generally speaking, all blocks in an open cfg are mutually recursive,
       we therefore can never discard part of the graph without further assumption.
@@ -112,6 +110,9 @@ Section LABELS_OPERATIONS.
     no_reentrance bks2 bks1 /\
     no_duplicate_bid bks1 bks2.
 
+  Definition free_in_cfg (cfg : ocfg T ) (id : block_id) : Prop :=
+    not (In id (inputs cfg)).
+
 End LABELS_OPERATIONS.
 
 Section DEF_SITES_OPERATIONS.
@@ -140,7 +141,7 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma wf_ocfg_bid_cons :
-    forall (b : block T) bs,
+    forall (b : block T) (bs : ocfg T),
       wf_ocfg_bid (b :: bs) ->
       wf_ocfg_bid bs.
   Proof.
@@ -148,9 +149,9 @@ Section LABELS_THEORY.
   Qed.
 
   Lemma wf_ocfg_bid_cons_not_in :
-    forall (b : block T) bs,
+    forall (b : block T) (bs : ocfg T),
       wf_ocfg_bid (b :: bs) ->
-      not (In (blk_id b) (map blk_id bs)).
+      not (In (blk_id b) (inputs bs)).
   Proof.
     intros * NOREP; inv NOREP; eauto.
   Qed.
@@ -256,7 +257,22 @@ Section LABELS_THEORY.
       reflexivity.
   Qed.
 
-  Lemma outputs_app: forall l l',
+  Lemma inputs_app: forall (l l' : ocfg T),
+      @inputs T (l ++ l') = inputs l ++ inputs l'.
+  Proof.
+    intros.
+    unfold inputs at 1.
+    rewrite map_app; auto. 
+  Qed.
+
+  Lemma inputs_cons: forall b (l : ocfg T),
+      @inputs T (b :: l) = blk_id b :: inputs l.
+  Proof.
+    intros.
+    rewrite list_cons_app, inputs_app; reflexivity.
+  Qed.
+
+  Lemma outputs_app: forall (l l' : ocfg T),
       @outputs T (l ++ l') = outputs l ++ outputs l'.
   Proof.
     intros.
@@ -265,14 +281,14 @@ Section LABELS_THEORY.
     reflexivity.
   Qed.
 
-  Lemma outputs_cons: forall b l,
+  Lemma outputs_cons: forall b (l : ocfg T),
       @outputs T (b :: l) = bk_outputs b ++ outputs l.
   Proof.
     intros.
     rewrite list_cons_app, outputs_app; reflexivity.
   Qed.
 
-  Lemma In_bk_outputs: forall bid br (b: block T) l,
+  Lemma In_bk_outputs: forall bid br (b: block T) (l : ocfg T),
       In br (bk_outputs b) ->
       find_block l bid = Some b ->
       In br (outputs l). 
@@ -305,6 +321,26 @@ Section LABELS_THEORY.
     forall x, In x (outputs bks2) -> ~ In x (inputs bks1).
   Proof.
     intros; eauto using Coqlib.list_disjoint_notin.
+  Qed.
+
+  Lemma no_reentrance_app_l :
+    forall (bks1 bks1' bks2 : ocfg T),
+      no_reentrance (bks1 ++ bks1') bks2 <->
+      no_reentrance bks1 bks2 /\ no_reentrance bks1' bks2.
+  Proof.
+    intros; unfold no_reentrance; split; [intros H | intros [H1 H2]].
+    - rewrite inputs_app, list_disjoint_app_r in H; auto.
+    - rewrite inputs_app, list_disjoint_app_r; auto.
+  Qed.
+
+  Lemma no_reentrance_app_r :
+    forall (bks1 bks2 bks2' : ocfg T),
+      no_reentrance bks1 (bks2 ++ bks2')%list <->
+      no_reentrance bks1 bks2 /\ no_reentrance bks1 bks2'.
+  Proof.
+    intros; unfold no_reentrance; split; [intros H | intros [H1 H2]].
+    - rewrite outputs_app,list_disjoint_app_l in H; auto.
+    - rewrite outputs_app, list_disjoint_app_l; auto.
   Qed.
 
   Lemma no_duplicate_bid_not_in_l (bks1 bks2 : ocfg T) :
@@ -360,12 +396,7 @@ Section LABELS_THEORY.
       right; auto.
   Qed.
 
-  Lemma inputs_app : forall {T} (bks1 bks2 : ocfg T), inputs (bks1 ++ bks2)%list = (inputs bks1 ++ inputs bks2)%list.
-  Proof.
-    intros; apply map_app.
-  Qed.
-
-  Lemma wf_ocfg_bid_singleton : forall {T} (b : _ T), wf_ocfg_bid [b].
+  Lemma wf_ocfg_bid_singleton : forall (b : _ T), wf_ocfg_bid [b].
   Proof.
     intros.
     red.
@@ -373,13 +404,36 @@ Section LABELS_THEORY.
     eapply list_norepet_nil.
   Qed.
 
-  Lemma wf_ocfg_bid_cons' : forall {T} (b : _ T) bks,
+  Lemma wf_ocfg_bid_cons' : forall (b : _ T) (bks : ocfg T),
       not (In (blk_id b) (inputs bks)) ->
       wf_ocfg_bid bks ->
       wf_ocfg_bid (b :: bks).
   Proof.
     intros.
     eapply list_norepet_cons; eauto.
+  Qed.
+
+  Lemma free_in_cfg_app : forall (bks1 bks2 : ocfg T) b,
+      free_in_cfg (bks1 ++ bks2) b <->
+      (free_in_cfg bks1 b /\ free_in_cfg bks2 b).
+  Proof.
+    intros; split; unfold free_in_cfg; intro FREE.
+    - split; intros abs; eapply FREE; rewrite inputs_app; eauto using in_or_app. 
+    - rewrite inputs_app; intros abs; apply in_app_or in abs; destruct FREE as [FREEL FREER]; destruct abs; [eapply FREEL | eapply FREER]; eauto.
+  Qed.
+
+  Lemma wf_ocfg_bid_distinct_labels :
+    forall (bks1 bks2 : ocfg T) b1 b2,
+      wf_ocfg_bid (bks1 ++ bks2) ->
+      In b1 (inputs bks1) ->
+      In b2 (inputs bks2) ->
+      b1 <> b2.
+  Proof.
+    intros * WF IN1 IN2.
+    eapply wf_ocfg_bid_app_not_in_l in IN2; eauto.
+    destruct (Eqv.eqv_dec_p b1 b2).
+    rewrite e in IN1; contradiction IN2; auto.
+    auto.
   Qed.
 
 End LABELS_THEORY.
@@ -389,7 +443,7 @@ Section FIND_BLOCK.
   Context {T : Set}.
 
   Lemma find_block_app_r_wf :
-    forall  (x : block_id) (b : block T) (bs1 bs2 : ocfg T),
+    forall (x : block_id) (b : block T) (bs1 bs2 : ocfg T),
       wf_ocfg_bid (bs1 ++ bs2)  ->
       find_block bs2 x = Some b ->
       find_block (bs1 ++ bs2) x = Some b.
@@ -397,13 +451,12 @@ Section FIND_BLOCK.
     intros x b; induction bs1 as [| hd bs1 IH]; intros * NOREP FIND.
     - rewrite app_nil_l; auto.
     - cbn; break_inner_match_goal.
-      + cbn in *.
-        apply wf_ocfg_bid_cons_not_in in NOREP.
+      + cbn in NOREP; apply wf_ocfg_bid_cons_not_in in NOREP. 
         exfalso; apply NOREP.
         rewrite e.
         apply find_some in FIND as [FIND EQ].
-        clear - FIND EQ.
-        rewrite map_app; eapply in_or_app; right.
+        clear - FIND EQ. 
+        rewrite inputs_app; eapply in_or_app; right.
         break_match; [| intuition].
         rewrite <- e.
         eapply in_map; auto.
@@ -436,9 +489,6 @@ Section FIND_BLOCK.
     apply find_block_app_r_wf; auto.
   Qed.
 
-  Definition free_in_cfg (cfg : ocfg T ) (id : block_id) : Prop :=
-    not (In id (inputs cfg)).
-
   Lemma free_in_cfg_cons:
     forall b (bs : ocfg T) id,
       free_in_cfg (b::bs) id ->
@@ -462,14 +512,14 @@ Section FIND_BLOCK.
   Qed.
 
   Lemma find_block_nil:
-    forall {T} b,
+    forall b,
       @find_block T [] b = None.
   Proof.
     reflexivity.
   Qed.
 
   Lemma find_block_eq:
-    forall {T} x (b : block T) (bs : ocfg T),
+    forall x (b : block T) (bs : ocfg T),
       blk_id b = x ->
       find_block (b:: bs) x = Some b.
   Proof.
@@ -481,7 +531,7 @@ Section FIND_BLOCK.
   Qed.
 
   Lemma find_block_ineq: 
-    forall {T} x (b : block T) (bs : ocfg T),
+    forall x (b : block T) (bs : ocfg T),
       blk_id b <> x ->
       find_block (b::bs) x = find_block bs x. 
   Proof.
@@ -491,34 +541,8 @@ Section FIND_BLOCK.
     reflexivity.
   Qed.
 
-  Lemma find_none_app:
-    forall {A} (l1 l2 : list A) pred,
-      find pred l1 = None ->
-      find pred (l1 ++ l2) = find pred l2.
-  Proof.
-    induction l1; intros l2 pred FIND.
-    - reflexivity.
-    - cbn in FIND; cbn.
-      destruct (pred a); inversion FIND.
-      auto.
-  Qed.
-
-  Lemma find_some_app:
-    forall {A} (l1 l2 : list A) a pred,
-      find pred l1 = Some a ->
-      find pred (l1 ++ l2) = Some a.
-  Proof.
-    induction l1 as [|x l1']; intros l2 a pred FIND.
-    - inversion FIND.
-    - cbn in FIND. destruct (pred x) eqn:PRED.
-      + inversion FIND; cbn; subst.
-        rewrite PRED. reflexivity.
-      + cbn. rewrite PRED.
-        auto.
-  Qed.
-
   Lemma find_block_none_app:
-    forall {T} (bks1 bks2 : ocfg T) bid,
+    forall (bks1 bks2 : ocfg T) bid,
       find_block bks1 bid = None ->
       find_block (bks1 ++ bks2) bid = find_block bks2 bid.
   Proof.
@@ -526,69 +550,97 @@ Section FIND_BLOCK.
   Qed.
 
   Lemma find_block_some_app:
-    forall {T} (bks1 bks2 : ocfg T) (bk : block T) bid,
+    forall (bks1 bks2 : ocfg T) (bk : block T) bid,
       find_block bks1 bid = Some bk ->
       find_block (bks1 ++ bks2) bid = Some bk.
   Proof.
     intros; apply find_some_app; auto.
   Qed.
 
+  Lemma find_block_Some_In_inputs : forall (bks : ocfg T) b bk,
+      find_block bks b = Some bk ->
+      In b (inputs bks).
+  Proof.
+    induction bks as [| hd bks IH].
+    - intros * H; inv H.
+    - intros * FIND.
+      destruct (Eqv.eqv_dec_p (blk_id hd) b).
+      cbn; rewrite e; auto.
+      right; eapply IH.
+      erewrite <- find_block_ineq; eauto. 
+  Qed.
+
+  Lemma wf_ocfg_bid_find_None_app_l :
+    forall (bks1 bks2 : ocfg T) b bk,
+      wf_ocfg_bid (bks1 ++ bks2)%list ->
+      find_block bks2 b = Some bk ->
+      find_block bks1 b = None.
+  Proof.
+    induction bks1 as [| b bks1 IH]; intros * WF FIND.
+    reflexivity.
+    destruct (Eqv.eqv_dec_p (blk_id b) b0).
+    - exfalso.
+      cbn in WF; eapply wf_ocfg_bid_cons_not_in in WF.
+      apply WF.
+      rewrite inputs_app. 
+      apply in_or_app; right.
+      rewrite e.
+      apply find_block_Some_In_inputs in FIND; auto.
+    - rewrite find_block_ineq; auto.
+      eapply IH; eauto using wf_ocfg_bid_cons.
+  Qed.    
+
 End FIND_BLOCK.
 
+From Vellvm Require Import Syntax.TypToDtyp.
 
-(* TODO:  *)
+Section DTyp.
 
-  (* Lemma def_sites_modified_instr : forall defs id (i : instr _) g l m, *)
-  (*   interp_cfg_to_L3 defs (denote_instr (id,i)) g l m ⤳ (fun '(_,(l',_)) => forall k, l' @ k <> l @ k -> In k (def_sites_instr_id id)). *)
-  (* Proof. *)
-  (*   intros. *)
-  (*   destruct i; cbn. *)
-  (*   - rewrite denote_instr_comment; apply eutt_Ret; intros; intuition. *)
-  (*   - destruct id. *)
-  (*     + admit. *)
-  (*     + Transparent denote_instr. *)
-  (*       cbn. *)
-        
-  (*     has_failure *)
-  (*       unfold has_post. *)
-  (*     rewrite denote_instr_op. apply eutt_Ret; intros; intuition. *)
+  Lemma convert_typ_terminator_outputs : forall t,
+    terminator_outputs (convert_typ [] t) = terminator_outputs t.
+  Proof.
+    intros []; cbn; try reflexivity.
+    - induction brs as [| [τ i] brs IH]; cbn; auto.
+      do 2 f_equal.
+      inv IH; auto.
+    - induction brs; cbn; auto; f_equal; auto. 
+  Qed. 
 
-  (*     Lemma def_sites_modified_code : forall defs (c : code _) g l m, *)
-  (*         interp_cfg_to_L3 defs (denote_code c) g l m ⤳ (fun '(_,(l',_)) => forall k, l' @ k <> l @ k -> In k (def_sites_code c)). *)
-  (*     Proof. *)
-  (*       induction c as [| i c IH]; intros. *)
-  (*       - cbn. *)
-  (*         rewrite denote_code_nil, interp_cfg_to_L3_ret. *)
-  (*         apply eutt_Ret. *)
-  (*         intros; auto. *)
-  (*       - cbn. *)
-  (*         rewrite denote_code_cons, interp_cfg_to_L3_bind. *)
-  (*         eapply has_post_bind_strong. *)
-          
-  (*         apply eutt_Ret. *)
-  (*         intros ? abs; auto. *)
+  Lemma convert_typ_outputs : forall (bks : ocfg typ),
+      outputs (convert_typ [] bks) = outputs bks.
+  Proof.
+    induction bks as [| bk bks IH]; [reflexivity |].
+    unfold convert_typ.
+    simpl ConvertTyp_list.
+    rewrite !outputs_cons, <- IH.
+    f_equal.
+    destruct bk; cbn.
+    unfold bk_outputs.
+    rewrite <- convert_typ_terminator_outputs.
+    reflexivity.
+  Qed.
 
-(* TODO move to wherever lemmas about convert_typ get hosted  *)
+  Lemma inputs_convert_typ : forall env bs,
+      inputs (convert_typ env bs) = inputs bs.
+  Proof.
+    induction bs as [| b bs IH]; cbn; auto.
+    f_equal; auto.
+  Qed.
 
-(* Lemma blk_id_map_convert_typ : forall env bs, *)
-(*     map blk_id (convert_typ env bs) = map blk_id bs. *)
-(* Proof. *)
-(*   induction bs as [| b bs IH]; cbn; auto. *)
-(*   f_equal; auto. *)
-(* Qed. *)
+  Lemma wf_ocfg_bid_convert_typ :
+    forall env (bs : ocfg typ),
+      wf_ocfg_bid bs ->
+      wf_ocfg_bid (convert_typ env bs).
+  Proof.
+    induction bs as [| b bs IH].
+    - cbn; auto.
+    - intros NOREP.
+      change (wf_ocfg_bid (convert_typ env b :: convert_typ env bs)).
+      apply list_norepet_cons.
+      + apply wf_ocfg_bid_cons_not_in in NOREP.
+        cbn. 
+        rewrite inputs_convert_typ; auto.
+      + eapply IH, wf_ocfg_bid_cons; eauto.
+  Qed.
 
-(* Lemma wf_ocfg_bid_convert_typ : *)
-(*   forall env (bs : ocfg typ), *)
-(*     wf_ocfg_bid bs -> *)
-(*     wf_ocfg_bid (convert_typ env bs). *)
-(* Proof. *)
-(*   induction bs as [| b bs IH]; intros NOREP. *)
-(*   - cbn; auto. *)
-(*   - cbn. *)
-(*     apply list_norepet_cons.  *)
-(*     + cbn. *)
-(*       apply wf_ocfg_bid_cons_not_in in NOREP. *)
-(*       rewrite blk_id_map_convert_typ; auto. *)
-(*     + eapply IH, wf_ocfg_bid_cons; eauto.  *)
-(* Qed. *)
-
+End DTyp. 
