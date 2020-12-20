@@ -238,7 +238,7 @@ Definition exits_in_outputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
 
 Lemma denote_bk_exits_in_outputs :
   forall b from,
-    denote_block b from ⤳ sum_pred (fun id => In id (bk_outputs b)) TT.
+    denote_block b from ⤳ sum_pred (fun id => In id (successors b)) TT.
 Proof.
   intros.
   cbn.
