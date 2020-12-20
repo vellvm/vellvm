@@ -61,11 +61,11 @@ Section LABELS_OPERATIONS.
        | TERM_Unreachable => []
        end.
 
-  Definition bk_outputs (bk : block T) : list block_id :=
+  Definition successors (bk : block T) : list block_id :=
     terminator_outputs (blk_term bk).
 
   Definition outputs (bks : ocfg T) : list block_id
-    := fold_left (fun acc bk => acc ++ bk_outputs bk) bks [].
+    := fold_left (fun acc bk => acc ++ successors bk) bks [].
 
   (** * well-formed
       All labels in an open cfg are distinct.
@@ -74,7 +74,7 @@ Section LABELS_OPERATIONS.
       irrelevant.
    *)
   Definition wf_ocfg_bid (bks : ocfg T) : Prop :=
-    list_norepet (map blk_id bks).
+    list_norepet (inputs bks).
 
   (** * no reentrance
       Generally speaking, all blocks in an open cfg are mutually recursive,
@@ -134,6 +134,49 @@ Section LABELS_THEORY.
 
   Context {T : Set}.
 
+  Lemma inputs_app: forall (l l' : ocfg T),
+      @inputs T (l ++ l') = inputs l ++ inputs l'.
+  Proof.
+    intros.
+    unfold inputs at 1.
+    rewrite map_app; auto. 
+  Qed.
+
+  Lemma inputs_cons: forall b (l : ocfg T),
+      @inputs T (b :: l) = blk_id b :: inputs l.
+  Proof.
+    intros.
+    rewrite list_cons_app, inputs_app; reflexivity.
+  Qed.
+
+  Lemma outputs_acc: forall (bks: ocfg T) acc,
+      fold_left (fun acc bk => acc ++ successors bk) bks acc =
+      acc ++ fold_left (fun acc bk => acc ++ successors bk) bks [].
+  Proof.
+    induction bks using list_rev_ind; intros; cbn.
+    - rewrite app_nil_r; reflexivity.
+    - rewrite 2 fold_left_app, IHbks.
+      cbn.
+      rewrite app_assoc.
+      reflexivity.
+  Qed.
+
+  Lemma outputs_app: forall (l l' : ocfg T),
+      @outputs T (l ++ l') = outputs l ++ outputs l'.
+  Proof.
+    intros.
+    unfold outputs at 1.
+    rewrite fold_left_app, outputs_acc.
+    reflexivity.
+  Qed.
+
+  Lemma outputs_cons: forall b (l : ocfg T),
+      @outputs T (b :: l) = successors b ++ outputs l.
+  Proof.
+    intros.
+    rewrite list_cons_app, outputs_app; reflexivity.
+  Qed.
+
   Lemma wf_ocfg_bid_nil:
     wf_ocfg_bid (T := T) []. 
   Proof.
@@ -164,7 +207,7 @@ Section LABELS_THEORY.
     intros * NR.
     eapply list_norepet_append_right.
     unfold wf_ocfg_bid in NR.
-    rewrite map_app in NR.
+    rewrite inputs_app in NR.
     eauto.
   Qed.
 
@@ -176,7 +219,7 @@ Section LABELS_THEORY.
     intros * NR.
     eapply list_norepet_append_left.
     unfold wf_ocfg_bid in NR.
-    rewrite map_app in NR.
+    rewrite inputs_app in NR.
     eauto.
   Qed.
 
@@ -199,8 +242,8 @@ Section LABELS_THEORY.
     inv H.
     apply wf_ocfg_bid_cons_not_in.
     unfold wf_ocfg_bid in *.
-    rewrite map_app in H0.
-    rewrite map_cons. rewrite map_cons in H0.
+    rewrite inputs_app in H0.
+    rewrite inputs_cons. rewrite inputs_cons in H0.
     rewrite list_cons_app in H0.
     rewrite app_assoc in H0.
     apply list_norepet_append_left in H0.
@@ -208,7 +251,7 @@ Section LABELS_THEORY.
     rewrite list_norepet_app in *.
     intuition. apply list_disjoint_sym. auto.
     unfold wf_ocfg_bid in H0.
-    rewrite map_app in H0. rewrite map_cons in H0. rewrite list_cons_app in H0.
+    rewrite inputs_app in H0. rewrite inputs_cons in H0. rewrite list_cons_app in H0.
     apply list_norepet_append_commut in H0. rewrite <- app_assoc in H0.
     apply list_norepet_append_right in H0.
     rewrite list_norepet_app in H0.
@@ -228,8 +271,8 @@ Section LABELS_THEORY.
     inv H.
     apply wf_ocfg_bid_cons_not_in.
     unfold wf_ocfg_bid in *.
-    rewrite map_app in H0.
-    rewrite map_cons. rewrite map_cons in H0.
+    rewrite inputs_app in H0.
+    rewrite inputs_cons. rewrite inputs_cons in H0.
     rewrite list_cons_app in H0.
     rewrite app_assoc in H0.
     apply list_norepet_append_left in H0.
@@ -237,7 +280,7 @@ Section LABELS_THEORY.
     rewrite list_norepet_app in *.
     intuition. apply list_disjoint_sym. auto.
     unfold wf_ocfg_bid in H0.
-    rewrite map_app in H0. rewrite map_cons in H0. rewrite list_cons_app in H0.
+    rewrite inputs_app in H0. rewrite inputs_cons in H0. rewrite list_cons_app in H0.
     apply list_norepet_append_commut in H0. rewrite <- app_assoc in H0.
     apply list_norepet_append_right in H0.
     rewrite list_norepet_app in H0.
@@ -245,51 +288,8 @@ Section LABELS_THEORY.
     red in H2. intro. eapply H2; eauto.
   Qed.
 
-  Lemma outputs_acc: forall (bks: ocfg T) acc,
-      fold_left (fun acc bk => acc ++ bk_outputs bk) bks acc =
-      acc ++ fold_left (fun acc bk => acc ++ bk_outputs bk) bks [].
-  Proof.
-    induction bks using list_rev_ind; intros; cbn.
-    - rewrite app_nil_r; reflexivity.
-    - rewrite 2 fold_left_app, IHbks.
-      cbn.
-      rewrite app_assoc.
-      reflexivity.
-  Qed.
-
-  Lemma inputs_app: forall (l l' : ocfg T),
-      @inputs T (l ++ l') = inputs l ++ inputs l'.
-  Proof.
-    intros.
-    unfold inputs at 1.
-    rewrite map_app; auto. 
-  Qed.
-
-  Lemma inputs_cons: forall b (l : ocfg T),
-      @inputs T (b :: l) = blk_id b :: inputs l.
-  Proof.
-    intros.
-    rewrite list_cons_app, inputs_app; reflexivity.
-  Qed.
-
-  Lemma outputs_app: forall (l l' : ocfg T),
-      @outputs T (l ++ l') = outputs l ++ outputs l'.
-  Proof.
-    intros.
-    unfold outputs at 1.
-    rewrite fold_left_app, outputs_acc.
-    reflexivity.
-  Qed.
-
-  Lemma outputs_cons: forall b (l : ocfg T),
-      @outputs T (b :: l) = bk_outputs b ++ outputs l.
-  Proof.
-    intros.
-    rewrite list_cons_app, outputs_app; reflexivity.
-  Qed.
-
   Lemma In_bk_outputs: forall bid br (b: block T) (l : ocfg T),
-      In br (bk_outputs b) ->
+      In br (successors b) ->
       find_block l bid = Some b ->
       In br (outputs l). 
   Proof.
@@ -615,7 +615,7 @@ Section DTyp.
     rewrite !outputs_cons, <- IH.
     f_equal.
     destruct bk; cbn.
-    unfold bk_outputs.
+    unfold successors.
     rewrite <- convert_typ_terminator_outputs.
     reflexivity.
   Qed.
