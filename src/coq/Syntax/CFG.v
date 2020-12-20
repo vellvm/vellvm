@@ -206,3 +206,6 @@ Arguments m_declarations {_ _}.
 Arguments m_definitions {_ _}.
 Arguments mkCFG {_}.
 Arguments find_block {_}.
+Arguments blks {_}.
+Arguments init {_}.
+Arguments args {_}.

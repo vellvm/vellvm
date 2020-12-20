@@ -351,9 +351,9 @@ Section Endo.
            `{Endo raw_id}
            `{Endo (block T)}
       : Endo (cfg T) | 50 :=
-      fun p => mkCFG (endo (init _ p))
-                  (endo (blks _ p))
-                  (endo (args _ p)).
+      fun p => mkCFG (endo (init p))
+                  (endo (blks p))
+                  (endo (args p)).
 
     Global Instance Endo_mcfg
            {FnBody:Set}
@@ -665,9 +665,9 @@ Section Fmap.
            `{Endo raw_id}
            `{Fmap block}
       : Fmap cfg | 50 :=
-      fun U V f p => mkCFG (endo (init _ p))
-                        (fmap f (blks _ p))
-                        (endo (args _ p)).
+      fun U V f p => mkCFG (endo (init p))
+                        (fmap f (blks p))
+                        (endo (args p)).
 
     Global Instance Fmap_mcfg
            {FnBody : Set -> Set}
