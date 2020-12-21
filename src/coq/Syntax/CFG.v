@@ -69,7 +69,7 @@ Section CFG.
                   {
                     init : block_id;
                     blks : ocfg;
-                    args : list ident;
+                    args : list raw_id;
                   }.
 
   Record modul {FnBody:Set} : Set :=
@@ -159,10 +159,9 @@ Section CFG.
     blk_id (fst (df_instrs d)).
 
   Definition cfg_of_definition (d : definition T (block T * list (block T))) : cfg :=
-    let args := List.map (fun x => ID_Local x) (df_args d) in
     {| init := init_of_definition d;
        blks := fst (df_instrs d) :: snd (df_instrs d);
-       args := args;
+       args := df_args d;
     |}.
 
   Definition mcfg_of_modul (m : @modul (block T * list (block T))) : mcfg :=
