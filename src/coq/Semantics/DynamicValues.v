@@ -764,7 +764,7 @@ Definition is_DVALUE_IX (d:dvalue) : bool :=
 Class VInt I : Type :=
   {
     (* Comparisons *)
-    eq : I -> I -> bool;
+    equ : I -> I -> bool;
     cmp : comparison -> I -> I -> bool;
     cmpu : comparison -> I -> I -> bool;
 
@@ -816,7 +816,7 @@ Class VInt I : Type :=
   Global Instance VInt1 : VInt Int1.int :=
   {
     (* Comparisons *)
-    eq := Int1.eq;
+    equ := Int1.eq;
     cmp := Int1.cmp;
     cmpu := Int1.cmpu;
 
@@ -869,7 +869,7 @@ Class VInt I : Type :=
   Global Instance VInt8 : VInt Int8.int :=
   {
     (* Comparisons *)
-    eq := Int8.eq;
+    equ := Int8.eq;
     cmp := Int8.cmp;
     cmpu := Int8.cmpu;
 
@@ -922,7 +922,7 @@ Class VInt I : Type :=
   Global Instance VInt32 : VInt Int32.int :=
   {
     (* Comparisons *)
-    eq := Int32.eq;
+    equ := Int32.eq;
     cmp := Int32.cmp;
     cmpu := Int32.cmpu;
 
@@ -974,7 +974,7 @@ Class VInt I : Type :=
   Global Instance VInt64 : VInt Int64.int :=
   {
     (* Comparisons *)
-    eq := Int64.eq;
+    equ := Int64.eq;
     cmp := Int64.cmp;
     cmpu := Int64.cmpu;
 
@@ -1064,13 +1064,13 @@ Class VInt I : Type :=
       match iop with
       (* Following to cases are probably right since they use CompCert *)
       | Add nuw nsw =>
-        ret (if orb (andb nuw (eq (add_carry x y zero) one))
-                    (andb nsw (eq (add_overflow x y zero) one))
+        ret (if orb (andb nuw (equ (add_carry x y zero) one))
+                    (andb nsw (equ (add_overflow x y zero) one))
              then DVALUE_Poison else to_dvalue (add x y))
 
     | Sub nuw nsw =>
-      ret (if orb (andb nuw (eq (sub_borrow x y zero) one))
-                  (andb nsw (eq (sub_overflow x y zero) one))
+      ret (if orb (andb nuw (equ (sub_borrow x y zero) one))
+                  (andb nsw (equ (sub_overflow x y zero) one))
            then DVALUE_Poison else to_dvalue (sub x y))
 
     | Mul nuw nsw =>
@@ -1253,7 +1253,7 @@ Class VInt I : Type :=
       match icmp with
       | Eq => if A.eq_dec a1 a2 then ret (DVALUE_I1 (Int1.one)) else ret (DVALUE_I1 (Int1.zero))
       | Ne => if A.eq_dec a1 a2 then ret (DVALUE_I1 (Int1.zero)) else ret (DVALUE_I1 (Int1.one))
-      | _ => failwith "non-equality pointer comparison"
+      | _ => failwith "non-equuality pointer comparison"
       end
     | _, _ => failwith "ill_typed-icmp"
     end.
@@ -1442,7 +1442,7 @@ Class VInt I : Type :=
 (*  ------------------------------------------------------------------------- *)
 
   (* Interpretation of [uvalue] in terms of sets of [dvalue].
-     Essentially used to implemenmt the handler for [pick], but also required to
+     Essentially used to implemenmt the handler for [pick], but also requuired to
      define some predicates passed as arguments to the [pick] events, hence why
      it's defined here.
    *)

@@ -208,9 +208,9 @@ Section Endo.
                | Phi t args => Phi (endo t) (endo args)
                end.
 
-    Global Instance Endo_block
+   Global Instance Endo_block
            `{Endo raw_id}
-           `{Endo (instr T)}
+           `{Endo (code T)}
            `{Endo (terminator T)}
            `{Endo (phi T)}
       : Endo (block T) | 50 :=
@@ -351,9 +351,9 @@ Section Endo.
            `{Endo raw_id}
            `{Endo (block T)}
       : Endo (cfg T) | 50 :=
-      fun p => mkCFG (endo (init _ p))
-                  (endo (blks _ p))
-                  (endo (args _ p)).
+      fun p => mkCFG (endo (init p))
+                  (endo (blks p))
+                  (endo (args p)).
 
     Global Instance Endo_mcfg
            {FnBody:Set}
@@ -665,9 +665,9 @@ Section Fmap.
            `{Endo raw_id}
            `{Fmap block}
       : Fmap cfg | 50 :=
-      fun U V f p => mkCFG (endo (init _ p))
-                        (fmap f (blks _ p))
-                        (endo (args _ p)).
+      fun U V f p => mkCFG (endo (init p))
+                        (fmap f (blks p))
+                        (endo (args p)).
 
     Global Instance Fmap_mcfg
            {FnBody : Set -> Set}
@@ -723,6 +723,8 @@ Section Examples.
     (* The default instance of [Endo raw_id] that would get picked would be [endo_id]. We locally hijack this choice with our swapping function *)
     Instance swap_endo_raw_id : Endo raw_id := swap_raw_id.
 
+    Definition swap_code T: Endo (code T) := endo.
+
     (* We can now get for free the swapping over a whole [cfg] *)
     Definition swap_cfg T: Endo (cfg T) := endo.
 
@@ -762,3 +764,4 @@ Section Examples.
   End SubstCFG.
 
 End Examples.
+

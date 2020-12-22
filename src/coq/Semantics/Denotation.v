@@ -781,7 +781,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           dv <- concretize_or_pick uv True ;; (* TODO, should this be unique? *)
           match dv with
           | DVALUE_I1 comparison_bit =>
-            if eq comparison_bit one then
+            if equ comparison_bit one then
               ret (inl br1)
             else
               ret (inl br2)
@@ -891,7 +891,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         in the type.
        *)
       Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
-        r <- denote_ocfg (blks _ f) (init _ f,init _ f) ;;
+        r <- denote_ocfg (blks f) (init f,init f) ;;
         match r with
         | inl bid => raise ("Can't find block in denote_cfg " ++ to_string bid)
         | inr uv  => ret uv

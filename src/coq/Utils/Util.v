@@ -1506,3 +1506,143 @@ Tactic Notation "inv_bind" hyp(H) :=
       destruct o eqn:hy; [|discriminate]; simpl in H
     end.
 
+From Vellvm Require Import
+     Numeric.Coqlib.
+ 
+Infix "⊍" := list_disjoint (at level 60).
+
+Lemma not_in_app_l : forall {A} (l1 l2 : list A) x,
+    not (In x (l1 ++ l2)) ->
+    not (In x l1).
+Proof.
+  intros * NIN abs; eapply NIN, in_or_app; auto. 
+Qed.
+
+Lemma not_in_app_r : forall {A} (l1 l2 : list A) x,
+    not (In x (l1 ++ l2)) ->
+    not (In x l2).
+Proof.
+  intros * NIN abs; eapply NIN, in_or_app; auto. 
+Qed.
+
+Section DisjointLists.
+
+  Lemma list_disjoint_nil_l : forall {A} (l : list A),
+      [] ⊍ l.
+  Proof.
+    repeat intro; intuition.
+  Qed.
+
+  Lemma list_disjoint_nil_r : forall {A} (l : list A),
+      l ⊍ [].
+  Proof.
+    repeat intro; intuition.
+  Qed.
+
+  Lemma list_disjoint_cons_l_iff:
+    forall (A: Type) (a: A) (l1 l2: list A),
+      (a :: l1) ⊍ l2 <->
+      (l1 ⊍ l2 /\ not (In a l2)).
+  Proof.
+    split; intros H.
+    - split; [eapply list_disjoint_cons_left; eauto |].
+      intros abs; eapply H; eauto; constructor; reflexivity.
+    - apply list_disjoint_cons_l; apply H. 
+  Qed.
+
+  Lemma list_disjoint_singleton_left : forall {A} (l : list A) (x : A),
+    [x] ⊍ l <-> not (In x l).
+  Proof.
+    unfold list_disjoint; intros; split; intro H.
+    intros * IN; eapply H in IN; [|left; eauto]; intuition.
+    intros ? ? [] IN abs; [subst; intuition | intuition].
+  Qed.
+
+  Lemma list_disjoint_singleton_right : forall {A} (l : list A) (x : A),
+      l ⊍ [x] <-> not (In x l).
+  Proof.
+    unfold list_disjoint; intros; split; intro H.
+    intros * IN; eapply H in IN; [|left; eauto]; intuition.
+    intros ? ? IN [] abs; [subst; intuition | intuition].
+  Qed.
+
+  Lemma list_disjoint_app_l : forall {A} (l1 l2 l3 : list A),
+      (l1 ++ l2) ⊍ l3 <->
+      (l1 ⊍ l3 /\ l2 ⊍ l3).
+  Proof.
+    intros; induction l1 as [| hd l1 IH]; cbn.
+    - split; intros H.
+      + split; auto using list_disjoint_nil_l. 
+      + apply H.
+    - split; intros H.
+      + apply list_disjoint_cons_l_iff in H as [H1 H2].
+        apply IH in H1 as [? ?].
+        split; auto. 
+        apply list_disjoint_cons_l; auto. 
+      + destruct H as [H1 H2].
+        apply list_disjoint_cons_l_iff in H1 as [? ?]. 
+        eapply list_disjoint_cons_l.
+        apply IH; auto.
+        auto.
+  Qed.
+
+  Lemma list_disjoint_app_r : forall {A} (l1 l2 l3 : list A),
+      l1 ⊍ (l2 ++ l3) <->
+      (l1 ⊍ l2 /\ l1 ⊍ l3).
+  Proof.
+    intros; induction l1 as [| hd l1 IH]; cbn.
+    - split; intros H.
+      + split; auto using list_disjoint_nil_l. 
+      + auto using list_disjoint_nil_l. 
+    - split; intros H.
+      + apply list_disjoint_cons_l_iff in H as [H1 H2].
+        apply IH in H1 as [? ?].
+        split.
+        apply list_disjoint_cons_l; auto.
+        eapply not_in_app_l; eauto.
+        apply list_disjoint_cons_l; auto.
+        eapply not_in_app_r; eauto.
+      + destruct H as [H1 H2].
+        apply list_disjoint_cons_l_iff in H1 as [? ?].
+        apply list_disjoint_cons_l_iff in H2 as [? ?]. 
+        eapply list_disjoint_cons_l.
+        apply IH; auto.
+        intros abs; apply in_app_or in abs as [|]; eauto.
+  Qed.
+
+  Lemma list_disjoint_singletons : forall {A} (x y : A),
+      [x] ⊍ [y] <-> x <> y.
+  Proof.
+    unfold list_disjoint; intros; split; intro H.
+    apply H; constructor; auto.
+    intros ? ? [] []; subst; auto.
+  Qed.
+
+End DisjointLists.
+
+Lemma find_none_app:
+  forall {A} (l1 l2 : list A) pred,
+    find pred l1 = None ->
+    find pred (l1 ++ l2) = find pred l2.
+Proof.
+  induction l1; intros l2 pred FIND.
+  - reflexivity.
+  - cbn in FIND; cbn.
+    destruct (pred a); inversion FIND.
+    auto.
+Qed.
+
+Lemma find_some_app:
+  forall {A} (l1 l2 : list A) a pred,
+    find pred l1 = Some a ->
+    find pred (l1 ++ l2) = Some a.
+Proof.
+  induction l1 as [|x l1']; intros l2 a pred FIND.
+  - inversion FIND.
+  - cbn in FIND. destruct (pred x) eqn:PRED.
+    + inversion FIND; cbn; subst.
+      rewrite PRED. reflexivity.
+    + cbn. rewrite PRED.
+      auto.
+Qed.
+
