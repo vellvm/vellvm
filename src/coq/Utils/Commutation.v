@@ -101,7 +101,8 @@ Proof.
   eapply eqit_mon; eauto. 2 : apply EQ1. intuition. destruct PR. auto.
 Qed.
 
-Lemma commut_gen :
+(* We can commute computations where each atom coterminates with each other *)
+Lemma commut_gen_coterminating_atoms :
   forall {A : Type}
     (Q1 Q2 : A -> Prop) (QQ : A -> A -> Prop) (a0 : A)
     (t1 t2 t3 t4 : A -> itree void1 A),
@@ -160,3 +161,88 @@ Proof.
         intros. apply eqit_Ret; eauto.
 Qed.
 
+Lemma commut_gen :
+  forall {A : Type}
+    (Q1 Q2 : A -> Prop) (QQ : A -> A -> Prop)
+    (t1 t3 : itree void1 A)
+    (t2 t4 : A -> itree void1 A),
+    (forall x, Q2 x -> t1 ≈ t4 x) ->
+    (forall x, Q1 x -> t2 x ≈ t3) ->
+    (t1 ⤳ Q1) ->
+    (t3 ⤳ Q2) ->
+    (forall a, Q1 a -> t2 a ⤳ (fun x => QQ x a)) ->
+    (forall a, Q2 a -> t4 a ⤳ (fun x => QQ a x)) ->
+    eutt QQ ('a <- t1;; t2 a) ('a <- t3;; t4 a).
+Proof.
+  cbn.
+  einit. ecofix CIH.
+  intros * EQ1 EQ2 PC1 PC2 F1 F2.
+  setoid_rewrite (itree_eta t1) at 1.
+  destruct (observe t1) eqn: EQ; [ | | inv e].
+
+  - (* Ret *)
+    (* Need this rewriting to reason about co-termination on t2 and t3. *)
+    rewrite bind_ret_l. rewrite <- bind_ret_r at 1.
+
+    ebind; econstructor.
+    + (* Prefix *)
+      Unshelve.
+      2 : { exact (fun x y => x = y /\ Q2 x). }
+      rewrite EQ2; cycle 1.
+      setoid_rewrite (itree_eta t1) in PC1.
+      rewrite EQ in PC1. apply eqit_Ret in PC1. auto.
+      rewrite has_post_post_strong in PC2.
+      apply PC2.
+    + (* Continuation. Equate t1 and t4. *)
+      intros * [<- HQ]. efinal.
+      setoid_rewrite (itree_eta t1) in EQ1.
+      rewrite EQ in EQ1. rewrite <- EQ1; auto.
+      apply eqit_Ret.
+      specialize (F2 _ HQ).
+      rewrite <- EQ1 in F2; auto. apply eqit_inv_ret in F2. auto.
+
+  - (* Tau *)
+    rewrite (itree_eta t3).
+    destruct (observe t3) eqn: EQ'; [ | | inv e].
+    + rewrite bind_ret_l. setoid_rewrite <- bind_ret_r at 5.
+      ebind; econstructor.
+      * (* Prefix *)
+        Unshelve.
+        2 : { exact (fun x y => x = y /\ Q1 x). }
+
+        rewrite <- EQ1; cycle 1.
+        setoid_rewrite (itree_eta t3) in PC2.
+        rewrite EQ' in PC2. apply eqit_Ret in PC2. auto.
+
+        setoid_rewrite (itree_eta t1). setoid_rewrite (itree_eta t1) in PC1.
+        rewrite has_post_post_strong in PC1.
+        rewrite EQ. apply eqit_Tau. rewrite EQ in PC1.
+        apply eqit_inv_tauL in PC1.
+        apply eqit_inv_tauR in PC1.
+        apply PC1.
+
+      * (* Continuation. Equate t2 and t3. *)
+        intros * [<- HQ]. efinal.
+        setoid_rewrite (itree_eta t3) in EQ2.
+        rewrite EQ' in EQ2. rewrite EQ2; auto.
+        apply eqit_Ret.
+        specialize (F1 _ HQ).
+        rewrite EQ2 in F1; auto. apply eqit_inv_ret in F1. auto.
+
+    + rewrite !bind_tau.
+
+      assert (t1 ≈ t). rewrite itree_eta. rewrite EQ.
+      apply eqit_tauL. reflexivity.
+
+      assert (t3 ≈ t0). rewrite itree_eta. rewrite EQ'.
+      apply eqit_tauL. reflexivity.
+
+      clear CIH0.
+
+      estep.
+      ebase; right.
+      eapply CIH; eauto.
+      setoid_rewrite <- H. auto.
+      setoid_rewrite <- H0. auto.
+      rewrite <- H. auto. rewrite <- H0. auto.
+Qed.
