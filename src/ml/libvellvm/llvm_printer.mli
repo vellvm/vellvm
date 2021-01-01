@@ -27,4 +27,4 @@ val global : Format.formatter -> LLVMAst.typ LLVMAst.global -> unit
 val declaration : Format.formatter -> LLVMAst.typ LLVMAst.declaration -> unit
 val definition : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.definition -> unit
 val block : Format.formatter -> (LLVMAst.typ LLVMAst.block) -> unit
-val modul : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.modul -> unit
+val modul : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) CFG.modul -> unit

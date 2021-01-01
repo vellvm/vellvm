@@ -10,19 +10,19 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
-     Eq
+     Eq.Eq
      Events.State.
 
 From Vellvm Require Import
-     LLVMAst
-     AstLib
-     MemoryAddress
-     DynamicValues
-     DynamicTypes
-     LLVMEvents
-     Error
-     Util
-     PropT.
+     Utils.Error
+     Utils.Util
+     Utils.PropT
+     Syntax.LLVMAst
+     Syntax.AstLib
+     Syntax.DynamicTypes
+     Semantics.DynamicValues
+     Semantics.MemoryAddress
+     Semantics.LLVMEvents.
 
 Require Import Floats.
 
@@ -95,9 +95,9 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
   Section PickImplementation.
 
-    Open Scope Z_scope.
+    Open Scope N_scope.
 
-    Definition default_dvalue_of_dtyp_i sz : err dvalue:=
+    Definition default_dvalue_of_dtyp_i (sz : N) : err dvalue:=
       (if (sz =? 64) then ret (DVALUE_I64 (repr 0))
         else if (sz =? 32) then ret (DVALUE_I32 (repr 0))
             else if (sz =? 8) then ret (DVALUE_I8 (repr 0))
@@ -124,7 +124,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | DTYPE_Array sz t =>
         if (0 <=? sz) then
           v <- default_dvalue_of_dtyp t ;;
-          (ret (DVALUE_Array (repeat v (Z.to_nat sz))))
+          (ret (DVALUE_Array (repeat v (N.to_nat sz))))
         else
           failwith ("Negative array length for generating default value" ++
           "of DTYPE_Array or DTYPE_Vector")
@@ -133,14 +133,14 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | DTYPE_Vector sz (DTYPE_Half) =>
         if (0 <=? sz) then
           (ret (DVALUE_Vector
-                  (repeat (DVALUE_Float Float32.zero) (Z.to_nat sz))))
+                  (repeat (DVALUE_Float Float32.zero) (N.to_nat sz))))
         else
           failwith ("Negative array length for generating default value" ++
           "of DTYPE_Array or DTYPE_Vector")
       | DTYPE_Vector sz (DTYPE_Float) =>
         if (0 <=? sz) then
           (ret (DVALUE_Vector
-                  (repeat (DVALUE_Float Float32.zero) (Z.to_nat sz))))
+                  (repeat (DVALUE_Float Float32.zero) (N.to_nat sz))))
         else
           failwith ("Negative array length for generating default value" ++
           "of DTYPE_Array or DTYPE_Vector")
@@ -148,28 +148,28 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         if (0 <=? sz) then
           (ret (DVALUE_Vector
                   (repeat (DVALUE_Double (Float32.to_double Float32.zero))
-                          (Z.to_nat sz))))
+                          (N.to_nat sz))))
         else
           failwith ("Negative array length for generating default value" ++
           "of DTYPE_Array or DTYPE_Vector")
       | DTYPE_Vector sz (DTYPE_X86_fp80) =>
         if (0 <=? sz) then
           (ret (DVALUE_Vector
-                  (repeat (DVALUE_Float Float32.zero) (Z.to_nat sz))))
+                  (repeat (DVALUE_Float Float32.zero) (N.to_nat sz))))
         else
           failwith ("Negative array length for generating default value" ++
           "of DTYPE_Array or DTYPE_Vector")
       | DTYPE_Vector sz (DTYPE_Fp128) =>
         if (0 <=? sz) then
           (ret (DVALUE_Vector
-                  (repeat (DVALUE_Float Float32.zero) (Z.to_nat sz))))
+                  (repeat (DVALUE_Float Float32.zero) (N.to_nat sz))))
         else
           failwith ("Negative array length for generating default value" ++
           "of DTYPE_Array or DTYPE_Vector")
       | DTYPE_Vector sz (DTYPE_I n) =>
         if (0 <=? sz) then
           v <- default_dvalue_of_dtyp_i n ;;
-          (ret (DVALUE_Vector (repeat v (Z.to_nat sz))))
+          (ret (DVALUE_Vector (repeat v (N.to_nat sz))))
         else
           failwith ("Negative array length for generating default value" ++
           "of DTYPE_Array or DTYPE_Vector")
@@ -255,20 +255,19 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         + cbn in H1.
           destruct (default_dvalue_of_dtyp t) eqn: HT. inv H1. inv H1.
           pose proof DVALUE_Array_typ.
-          specialize (H nil (Z.to_nat 0) t).
-          rewrite Z2Nat.id in H. 2 : lia.
+          specialize (H nil (N.to_nat 0) t).
+          rewrite Nnat.N2Nat.id in H.
           apply H. auto. auto.
         + cbn in H1.
           destruct (default_dvalue_of_dtyp t) eqn: HT. inv H1. inv H1.
           pose proof DVALUE_Array_typ as ARR.
-          specialize (ARR (repeat d (Pos.to_nat p)) (Z.to_nat (Z.pos p)) t).
-          rewrite Z2Nat.id in ARR. 2 : lia.
+          specialize (ARR (repeat d (Pos.to_nat p)) (N.to_nat (N.pos p)) t).
+          rewrite Nnat.N2Nat.id in ARR.
           cbn in *.
           apply ARR.
           * apply forall_repeat_true.
             apply IHt. reflexivity.
           * apply repeat_length.
-        + inv H1.
       - revert H. induction fields.
         + intros. inv H0. constructor.
         + intros.
@@ -322,8 +321,8 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         induction sz.
         + intros. cbn in H1.
           pose proof DVALUE_Vector_typ.
-          specialize (H nil (Z.to_nat 0)).
-          rewrite Z2Nat.id in H. 2 : lia.
+          specialize (H nil (N.to_nat 0)).
+          rewrite Nnat.N2Nat.id in H.
           destruct t; inv H1;
               try
                 (apply H;
@@ -334,17 +333,16 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
           exists sz. reflexivity.
         + intros. cbn in H1.
           destruct t; inv H1; try (
-            rewrite <- positive_nat_Z;
+            rewrite <- positive_nat_N;
                    constructor; [apply forall_repeat_true ; constructor |
                           apply repeat_length |
                           unfold vector_dtyp ; intuition ]).
           destruct (default_dvalue_of_dtyp_i sz) eqn: SZ; inv H0.
             pose proof DVALUE_Vector_typ.
-            rewrite <- positive_nat_Z. apply H.
+            rewrite <- positive_nat_N. apply H.
             apply forall_repeat_true. apply IHt. symmetry. auto.
             apply repeat_length.
             left. exists sz. reflexivity.
-        + intros. inv H1. destruct t; inv H0.
     Qed.
 
    Transparent map_monad.

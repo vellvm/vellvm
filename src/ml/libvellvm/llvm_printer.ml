@@ -6,6 +6,7 @@ open Format
 
 let of_str = Camlcoq.camlstring_of_coqstring
 let to_int = Camlcoq.Z.to_int
+let n_to_int = Camlcoq.N.to_int
 let float_of_coqfloat = Camlcoq.camlfloat_of_coqfloat
 
 (* TODO: Use pp_option everywhere instead of inlined matching *)
@@ -87,6 +88,9 @@ and param_attr : Format.formatter -> LLVMAst.param_attr -> unit =
   | PARAMATTR_Returned          -> fprintf ppf "returned"
   | PARAMATTR_Nonnull           -> fprintf ppf "nonnull"
   | PARAMATTR_Dereferenceable n -> fprintf ppf "dereferenceable(%d)" (to_int n)
+  | PARAMATTR_Immarg            -> fprintf ppf "immarg"
+  | PARAMATTR_Noundef           -> fprintf ppf "noundef"
+  | PARAMATTR_Nofree            -> fprintf ppf "nofree"
 
 and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   fun ppf ->
@@ -151,7 +155,7 @@ and ident : Format.formatter -> LLVMAst.ident -> unit =
 and typ : Format.formatter -> LLVMAst.typ -> unit =
   fun ppf ->
   function
-  | TYPE_I i              -> fprintf ppf "i%d" (to_int i)
+  | TYPE_I i              -> fprintf ppf "i%d" (n_to_int i)
   | TYPE_Pointer t        -> fprintf ppf "%a*" typ t ;
   | TYPE_Void             -> fprintf ppf "void"
   | TYPE_Half             -> fprintf ppf "half"
@@ -162,14 +166,14 @@ and typ : Format.formatter -> LLVMAst.typ -> unit =
   | TYPE_Ppc_fp128        -> fprintf ppf "ppc_fp128"
   | TYPE_Metadata         -> fprintf ppf "metadata"
   | TYPE_X86_mmx          -> fprintf ppf "x86_mmx"
-  | TYPE_Array (i, t)     -> fprintf ppf "[%d x %a]" (to_int i) typ t ;
+  | TYPE_Array (i, t)     -> fprintf ppf "[%d x %a]" (n_to_int i) typ t ;
   | TYPE_Function (t, tl) -> fprintf ppf "%a (%a)" typ t (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Struct tl        -> fprintf ppf "{%a}"
                                      (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Packed_struct tl -> fprintf ppf "<{%a}>"
                                      (pp_print_list ~pp_sep:pp_comma_space typ) tl
   | TYPE_Opaque           -> fprintf ppf "opaque"
-  | TYPE_Vector (i, t)    -> fprintf ppf "<%d x %a>" (to_int i) typ t ;
+  | TYPE_Vector (i, t)    -> fprintf ppf "<%d x %a>" (n_to_int i) typ t ;
   | TYPE_Identified i     -> ident ppf i
 
 and icmp : Format.formatter -> LLVMAst.icmp -> unit =
@@ -524,7 +528,6 @@ and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
   | INSTR_AtomicCmpXchg
   | INSTR_AtomicRMW
   | INSTR_Fence -> assert false
-  | INSTR_Unreachable -> pp_print_string ppf "unreachable"
 
 and branch_label : Format.formatter -> LLVMAst.raw_id -> unit =
   fun ppf id ->
@@ -566,6 +569,8 @@ and terminator : Format.formatter -> (LLVMAst.typ LLVMAst.terminator) -> unit =
              (pp_print_list ~pp_sep:pp_comma_space texp) tvl
              branch_label i2
              branch_label i3
+
+  | TERM_Unreachable -> pp_print_string ppf "unreachable"
 
 and id_instr : Format.formatter -> (LLVMAst.instr_id * LLVMAst.typ LLVMAst.instr) -> unit =
   fun ppf ->
@@ -759,7 +764,7 @@ and definition : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) *
     pp_print_char ppf '}' ;
 
 and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
-  fun ppf {blk_id=lbl; blk_phis=phis; blk_code=b; blk_term=(_,t); blk_comments=c} ->
+  fun ppf {blk_id=lbl; blk_phis=phis; blk_code=b; blk_term=t; blk_comments=c} ->
     begin match c with
     | None -> ()
     | Some cs ->  pp_print_list ~pp_sep:pp_force_newline comment ppf cs ;
@@ -783,7 +788,7 @@ and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
 and comment : Format.formatter -> char list -> unit =
   fun ppf s -> fprintf ppf "; %s" (of_str s)
 
-and modul : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block list))) LLVMAst.modul -> unit =
+and modul : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block list))) CFG.modul -> unit =
   fun ppf m ->
 
   pp_option ppf (fun ppf x -> fprintf ppf "; ModuleID = '%s'" (of_str x)) m.m_name ;

@@ -15,14 +15,21 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats ParserHelper\
-									Tactics Util PropT Error LLVMAst AstLib Dom CFG CFGProp MemoryAddress DynamicTypes DynamicValues\
-									LLVMEvents TypToDtyp IntrinsicsDefinitions\
-									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/Memory Handlers/UndefinedBehaviour Handlers/Handlers\
-									Denotation InterpreterMCFG InterpreterCFG ExpLemmas InstrLemmas TopLevel PostConditions NoFailure Denotation_Theory Refinement TopLevelRefinements
+COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats\
+									Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/Error\
+									Utils/PropT Utils/PostConditions Utils/NoFailure Utils/TFor\
+                  Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
+									Syntax/Traversal Syntax/Dom Syntax/DynamicTypes Syntax/TypToDtyp\
+									Syntax/Scope Syntax/SurfaceSyntax\
+									Semantics/MemoryAddress Semantics/DynamicValues Semantics/LLVMEvents Semantics/IntrinsicsDefinitions\
+									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/UndefinedBehaviour Handlers/Memory Handlers/MemoryTheory Handlers/Handlers\
+								  Semantics/Denotation Semantics/TopLevel\
+									Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
+									Theory/TopLevelRefinements Theory/SymbolicInterpreter\
+									Utils/NoEvent
 
-COQFILESOPT    := Transformations/Transform Transformations/Renaming Transformations/DeadInstr Transformations/Traversal\
-									Transformations/Transformation 
+COQFILESOPT    := Transformations/Transform
+ # Transformations/Renaming Transformations/DeadInstr Transformations/Transformation
 
 OLLVMFILES :=
 
@@ -100,6 +107,10 @@ clean-vellvm:
 	find $(COQDIR) -name "*.vio" -delete
 	find $(COQDIR) -name "*.vok" -delete
 	find $(COQDIR) -name "*.vos" -delete
+	find $(COQLIBDIR) -name "*.vo" -delete
+	find $(COQLIBDIR) -name "*.vio" -delete
+	find $(COQLIBDIR) -name "*.vok" -delete
+	find $(COQLIBDIR) -name "*.vos" -delete
 	rm -f $(VOFILES)
 	rm -rf doc/html doc/*.glob
 	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli

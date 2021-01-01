@@ -18,11 +18,11 @@ From ExtLib Require Import
      Data.String.
 
 From Vellvm Require Import
-     Util
-     LLVMAst
-     LLVMEvents
-     Error
-     IntrinsicsDefinitions.
+     Utils.Util
+     Utils.Error
+     Syntax.LLVMAst
+     Semantics.LLVMEvents
+     Semantics.IntrinsicsDefinitions.
 
 From ITree Require Import
      ITree
@@ -56,22 +56,6 @@ Set Contextual Implicit.
    of the form:
         call t @llvm._ (args...)
 *)
-
-(* This function extracts the string of the form [llvm._] from an LLVM expression.
-   It returns None if the expression is not an intrinsic definition.
-*)
-Definition intrinsic_ident (id:ident) : option string :=
-  match id with
-  | ID_Global (Name s) =>
-    if String.prefix "llvm." s then Some s else None
-  | _ => None
-  end.
-
-Definition intrinsic_exp {T} (e:exp T) : option string :=
-  match e with
-  | EXP_Ident id => intrinsic_ident id
-  | _ => None
-  end.
 
 
 (* (Pure) Intrinsics -------------------------------------------------------- *)

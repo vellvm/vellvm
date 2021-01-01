@@ -24,6 +24,7 @@ From Vellvm.Handlers Require Export
      Stack
      Intrinsics
      Memory
+     MemoryTheory
      Pick
      UndefinedBehaviour
 .
@@ -34,7 +35,8 @@ Module Global := Global.Make Memory.Addr LLVMEvents.
 Module Local  := Local.Make  Memory.Addr LLVMEvents.
 Module Stack  := Stack.Make  Memory.Addr LLVMEvents.
 Module Intrinsics := Intrinsics.Make Memory.Addr LLVMEvents.
-Module Mem := Memory.Make LLVMEvents.
+Module MemTheory := MemoryTheory.Make(LLVMEvents).
 Module Pick := Pick.Make Memory.Addr LLVMEvents.
 
-Export LLVMEvents LLVMEvents.DV Global Local Stack Mem Pick Intrinsics UndefinedBehaviour.       
+Export LLVMEvents LLVMEvents.DV Global Local Stack MemTheory MemTheory.Mem Pick Intrinsics
+       UndefinedBehaviour.
