@@ -3,11 +3,15 @@ From Coq Require Import
      RelationClasses
      Morphisms.
 
+From Vellvm Require Import Utils.NoEvent.
+
 From Paco Require Import paco.
+
 From ITree Require Import
      ITree
      ITreeFacts
      Eq.Eq.
+
 Set Implicit Arguments.
 Set Strict Implicit.
 (* end hide *)
@@ -246,3 +250,5 @@ Proof.
       setoid_rewrite <- H0. auto.
       rewrite <- H. auto. rewrite <- H0. auto.
 Qed.
+
+(* TODO: [commut_gen] with [no_event] instead of [void1]. *)

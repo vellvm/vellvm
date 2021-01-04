@@ -26,7 +26,7 @@ COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Nu
 								  Semantics/Denotation Semantics/TopLevel\
 									Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
 									Theory/TopLevelRefinements Theory/SymbolicInterpreter\
-									Utils/NoEvent
+									Utils/NoEvent Utils/Commutation
 
 COQFILESOPT    := Transformations/Transform
  # Transformations/Renaming Transformations/DeadInstr Transformations/Transformation
