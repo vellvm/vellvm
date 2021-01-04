@@ -20,7 +20,7 @@ Import MonadNotation.
 Open Scope monad_scope.
 
 Lemma itree_eta_cont : forall {E A B} (t : itree E A) (k : A -> itree E B),
-    'x <- t;; k x ≅ 'x <- t;; (fun y => {| _observe := observe (k y) |}) x.
+    x <- t;; k x ≅ x <- t;; (fun y => {| _observe := observe (k y) |}) x.
 Proof.
   intros.
   eapply eq_itree_clo_bind; [reflexivity | intros ? ? <-].
@@ -30,7 +30,7 @@ Qed.
 Lemma trivial_commut_gen : forall (t1 t2 t3 t4 : unit -> itree void1 unit),
     (forall x, t1 x ≈ t4 x) ->
     (forall x, t2 x ≈ t3 x) ->
-    'x <- t1 tt;; t2 x ≈ 'x <- t3 tt;; t4 x.
+    x <- t1 tt;; t2 x ≈ x <- t3 tt;; t4 x.
 Proof.
   cbn.
   einit; ecofix CIH.
@@ -76,7 +76,7 @@ Proof.
 Qed.
 
 Lemma trivial_commut : forall (t t' : unit -> itree void1 unit),
-    'x <- t tt;; t' x ≈ 'x <- t' tt;; t x.
+    x <- t tt;; t' x ≈ x <- t' tt;; t x.
 Proof.
   intros; apply trivial_commut_gen; intros; reflexivity.
 Qed.
@@ -93,7 +93,7 @@ Lemma eutt_post_bind_het :
     t2 a0 ⤳ Q2 ->
     (forall u1 u2, eutt (fun x y => Q1 x /\ Q2 y) (t1 u1) (t2 u2)) ->
     (forall u1 u2 : A, Q1 u1 -> Q2 u2 -> eutt QQ (k1 u1) (k2 u2)) ->
-    eutt QQ (` x : A <- t1 a0;; k1 x) (` x : A <- t2 a0;; k2 x).
+    eutt QQ (x <- t1 a0;; k1 x) (x <- t2 a0;; k2 x).
 Proof.
   intros * POST1 POST2 EQ1 EQ2.
   apply eutt_clo_bind with (UU := fun x y => Q1 x /\ Q2 y); [ | intuition].
@@ -176,7 +176,7 @@ Lemma commut_gen :
     (t3 ⤳ Q2) ->
     (forall a, Q1 a -> t2 a ⤳ (fun x => QQ x a)) ->
     (forall a, Q2 a -> t4 a ⤳ (fun x => QQ a x)) ->
-    eutt QQ ('a <- t1;; t2 a) ('a <- t3;; t4 a).
+    eutt QQ (a <- t1;; t2 a) (a <- t3;; t4 a).
 Proof.
   cbn.
   einit. ecofix CIH.
