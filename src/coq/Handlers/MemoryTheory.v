@@ -1989,6 +1989,98 @@ Section Memory_Stack_Theory.
       eapply lookup_member; eauto.
     Qed.
 
+    (* TODO: not sure how to show this, but it should be true? *)
+    Lemma IM_key_in_elements :
+      forall key elt m,
+        IM.In (elt:=elt) key m ->
+        In key (map fst (IM.elements (elt:=elt) m)).
+    Proof.
+    Admitted.
+
+    Lemma allocated_next_key_diff :
+      forall m ptr,
+        allocated ptr m ->
+        next_logical_key m <> fst ptr.
+    Proof.
+      intros [[cm lm] fs] [ptr_a ptr_o] H.
+      Transparent next_logical_key.
+      unfold next_logical_key, next_logical_key_mem, logical_next_key.
+      cbn.
+      unfold allocated in H.
+      epose proof maximumBy_Z_correct.
+      assert (In ptr_a (map fst (IM.elements (elt:=logical_block) lm))).
+      { apply IM_key_in_elements.
+        apply IM.mem_2; auto.
+      }
+
+      eapply H0 with (def:= (-1)%Z) in H1.
+      apply Z.leb_le in H1.
+
+      destruct (maximumBy Z.leb (-1)%Z (map fst (IM.elements (elt:=logical_block) lm))) eqn:BLAH.              - lia.
+      - destruct p; lia.
+      - destruct ptr_a; try lia.
+        assert (p0 >= p)%positive by lia.
+        assert (p = 1 \/ 1 < p)%positive by lia.
+        destruct H3.
+        + subst.
+          cbn. lia.
+        + pose proof H3. apply Z.pos_sub_lt in H3. rewrite H3.
+          lia.
+    Qed.
+
+    Lemma get_logical_block_frames :
+      forall cm lm f1 f2,
+        get_logical_block ((cm, lm), f1) = get_logical_block ((cm, lm), f2).
+    Proof.
+      intros cm lm f1 f2.
+      unfold get_logical_block.
+      cbn.
+      reflexivity.
+    Qed.
+
+    Lemma get_logical_block_add_to_frame :
+      forall m key ptr,
+        get_logical_block (add_to_frame m key) ptr = get_logical_block m ptr.
+    Proof.
+      intros [[cm lm] fs] key ptr.
+      cbn.
+      destruct fs;
+        erewrite get_logical_block_frames; reflexivity.
+    Qed.
+
+    Lemma get_logical_block_allocated:
+      forall m1 m2 τ ptr ptr_allocated,
+        allocate m1 τ = inr (m2, ptr_allocated) ->
+        allocated ptr m1 ->
+        get_logical_block m2 (fst ptr) = get_logical_block m1 (fst ptr).
+    Proof.
+      Opaque add_logical_block next_logical_key.
+      intros [[cm1 lm1] fs1] [[cm2 lm2] fs2] τ ptr ptr_allocated ALLOC INm1.
+      pose proof (allocate_correct ALLOC) as (ALLOC_FRESH & ALLOC_NEW & ALLOC_OLD).
+      unfold allocate in ALLOC.
+      destruct τ; inversion ALLOC.
+      all :
+        rewrite get_logical_block_add_to_frame;
+        rewrite get_logical_block_of_add_logical_block_neq;
+        [auto | apply allocated_next_key_diff; auto].
+      Transparent add_logical_block next_logical_key.
+    Qed.
+
+    Lemma dtyp_fits_after_allocated:
+      forall m1 m2 τ ptr τ' ptr_allocated,
+        allocate m1 τ = inr (m2, ptr_allocated) ->
+        dtyp_fits m1 ptr τ' ->
+        dtyp_fits m2 ptr τ'.
+    Proof.
+      intros m1 m2 τ ptr τ' ptr_allocated ALLOC FITS.
+      pose proof FITS as ALLOCATED.
+      apply dtyp_fits_allocated in ALLOCATED.
+      pose proof (freshly_allocated_different_blocks _ _ _ ALLOC ALLOCATED) as DIFF.
+
+      unfold dtyp_fits in *.
+      erewrite get_logical_block_allocated; eauto.
+    Qed.
+
     Lemma handle_gep_addr_allocated :
       forall idxs sz τ ptr m elem_addr,
         allocated ptr m ->
@@ -2157,7 +2249,7 @@ Section PARAMS.
   Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
   Notation Effout := (E +' F).
   Notation interp_memory := (@interp_memory E F _ _ _).
-  
+
   Section Structural_Lemmas.
 
     Lemma interp_memory_bind :
@@ -2797,7 +2889,7 @@ Section PARAMS.
     apply Integers.Int64.unsigned_zero.
   Qed.
 
- 
+
   Lemma handle_gep_addr_array_offset :
     forall ptr ptr_elem ix sz τ,
       handle_gep_addr (DTYPE_Array sz τ) ptr
@@ -2842,7 +2934,6 @@ Section PARAMS.
     }
     lia.
   Qed.
-
 
 End PARAMS.
 End MEMORY_THEORY.
