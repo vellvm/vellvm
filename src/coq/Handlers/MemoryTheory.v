@@ -1826,6 +1826,50 @@ Section Memory_Stack_Theory.
         inversion GETSOME.
     Qed.
 
+    Lemma can_read_allocated :
+      forall ptr τ v m,
+        read m ptr τ = inr v ->
+        allocated ptr m.
+    Proof.
+      intros ptr τ v m READ.
+      unfold read in READ.
+      destruct (get_logical_block m (fst ptr)) eqn:LBLOCK.
+      - destruct l.
+        red. unfold get_logical_block, get_logical_block_mem in LBLOCK.
+        apply lookup_member in LBLOCK.
+        do 2 destruct m.
+        cbn in LBLOCK.
+        auto.
+      - inversion READ.
+    Qed.
+
+    Lemma freshly_allocated_different_blocks :
+      forall ptr1 ptr2 τ m1 m2,
+        allocate m1 τ = inr (m2, ptr2) ->
+        allocated ptr1 m1 ->
+        fst ptr2 <> fst ptr1.
+    Proof.
+      intros ptr1 ptr2 τ m1 m2 ALLOC INM1 EQ.
+      pose proof (allocate_correct ALLOC) as (ALLOC_FRESH & ALLOC_NEW & ALLOC_OLD).
+      apply ALLOC_FRESH.
+      unfold allocated in *.
+      destruct m1 as [[cm1 lm1] fs1].
+      rewrite EQ.
+      auto.
+    Qed.
+
+    Lemma freshly_allocated_no_overlap_dtyp :
+      forall ptr1 ptr2 τ τ' m1 m2,
+        allocate m1 τ' = inr (m2, ptr2) ->
+        allocated ptr1 m1 ->
+        no_overlap_dtyp ptr2 τ' ptr1 τ.
+    Proof.
+      intros ptr1 ptr2 τ τ' m1 m2 ALLOC INM1.
+      repeat red.
+      left.
+      eapply freshly_allocated_different_blocks; eauto.
+    Qed.
+
     Lemma read_array_exists : forall m size τ i a,
         allocated a m ->
         exists elem_addr,
