@@ -2347,7 +2347,7 @@ Section PARAMS.
     Qed.
 
     Lemma interp_memory_store :
-      forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr),
+      forall (m m' : memory_stack) (val : dvalue) (a : addr),
         write m a val = inr m' ->
         interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ ret (m', tt).
     Proof.
