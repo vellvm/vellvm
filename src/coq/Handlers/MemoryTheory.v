@@ -2351,7 +2351,7 @@ Section PARAMS.
         write m a val = inr m' ->
         interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ ret (m', tt).
     Proof.
-      intros m m' t val a Hwrite.
+      intros m m' val a Hwrite.
       rewrite interp_memory_trigger.
       cbn. rewrite Hwrite.
       cbn. rewrite bind_ret_l.

@@ -76,35 +76,49 @@ Section StackMap.
     Definition G_trigger {S} : forall R , G R -> (stateT S (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition interp_local_stack `{FailureE -< E +' F +' G}
-               (h:(LocalE k v) ~> stateT map (itree Effout)) :
+    Definition  interp_local_stack_h (h:(LocalE k v) ~> stateT map (itree Effout)) :=
+      (case_ E_trigger
+             (case_ F_trigger
+                    (case_ (case_ (handle_local_stack h)
+                                  handle_stack)
+                           G_trigger))).
+
+    Definition interp_local_stack `{FailureE -< E +' F +' G} (h:(LocalE k v) ~> stateT map (itree Effout)) :
       (itree Effin) ~>  stateT (map * stack) (itree Effout) :=
-      interp_state (case_ E_trigger
-                   (case_ F_trigger
-                   (case_ (case_ (handle_local_stack h)
-                                 handle_stack)
-                          G_trigger))).
+      interp_state (interp_local_stack_h h).
 
-    Lemma interp_local_stack_bind :
-      forall (R S: Type) (t : itree Effin _) (k : R -> itree Effin S) s,
-        interp_local_stack (handle_local (v:=v)) (ITree.bind t k) s ≅
-        ITree.bind (interp_local_stack (handle_local (v:=v)) t s)
-        (fun '(s',r) => interp_local_stack (handle_local (v:=v)) (k r) s').
-    Proof.
-      intros.
-      unfold interp_local_stack.
-      setoid_rewrite interp_state_bind.
-      apply eq_itree_clo_bind with (UU := Logic.eq).
-      reflexivity.
-      intros [] [] EQ; inv EQ; reflexivity.
-    Qed.
+    Section Structural_Lemmas.
 
-    Lemma interp_local_stack_ret :
-      forall (R : Type) l (x: R),
-        interp_local_stack (handle_local (v:=v)) (Ret x: itree Effin R) l ≅ Ret (l,x).
-    Proof.
-      intros; apply interp_state_ret.
-    Qed.
+      Lemma interp_local_stack_bind :
+        forall (R S: Type) (t : itree Effin _) (k : R -> itree Effin S) s,
+          interp_local_stack (handle_local (v:=v)) (ITree.bind t k) s ≅
+                             ITree.bind (interp_local_stack (handle_local (v:=v)) t s)
+                             (fun '(s',r) => interp_local_stack (handle_local (v:=v)) (k r) s').
+      Proof.
+        intros.
+        unfold interp_local_stack.
+        setoid_rewrite interp_state_bind.
+        apply eq_itree_clo_bind with (UU := Logic.eq).
+        reflexivity.
+        intros [] [] EQ; inv EQ; reflexivity.
+      Qed.
+
+      Lemma interp_local_stack_ret :
+        forall (R : Type) l (x: R),
+          interp_local_stack (handle_local (v:=v)) (Ret x: itree Effin R) l ≅ Ret (l,x).
+      Proof.
+        intros; apply interp_state_ret.
+      Qed.
+
+      Lemma interp_local_stack_trigger ls X (e : Effin X):
+          interp_local_stack (handle_local (v:=v)) (ITree.trigger e) ls ≈ interp_local_stack_h (handle_local (v:=v)) e ls.
+      Proof.
+        unfold interp_local_stack.
+        rewrite interp_state_trigger.
+        reflexivity.
+      Qed.
+
+    End Structural_Lemmas.
 
   End PARAMS.
 
