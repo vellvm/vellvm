@@ -61,7 +61,6 @@ Section Locals.
     Definition interp_local : itree Effin ~> stateT map (itree Effout) :=
       interp_state interp_local_h.
 
-
     Section Structural_Lemmas.
 
       Lemma interp_local_bind :
@@ -157,5 +156,6 @@ From Vellvm Require Import
  *)
 Module Make (A : ADDRESS) (LLVMEvents : LLVM_INTERACTIONS(A)).
   Definition local_env := FMapAList.alist raw_id LLVMEvents.DV.uvalue.
+  Print FMapAList.alist .
 End Make.
 

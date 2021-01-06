@@ -1,3 +1,4 @@
+module D = Denotation
 module Parse = Oat_parser
 module Lex = Oat_lexer
 module Pprint = Print_oat
@@ -26,6 +27,10 @@ module Quaker = struct
   let unimplemented () =
     print_endline "function unimplemented";
     exit 0
+
+  let interpret_main_file f =
+    let prog = parse_oat filename in
+  
 end
 
 
@@ -34,6 +39,7 @@ open Arg
 let args =
   [ ("-c", Unit Quaker.unimplemented, "compile the given oat file")
   ; ("-pp", String Quaker.print_and_parse, "parse and print the given oat file")
+  ; ("-i", Unit 
   ]
 
 

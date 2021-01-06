@@ -183,6 +183,58 @@ Definition instr_const (v: Z) (t: LLVMAst.typ) : cerr (LLVMAst.typ * ident * cod
   | _ => raise "err"
   end.
 
+(** Introduce some useful abstractions for working with resources *)
+Definition resource : Type := LLVMAst.typ * ident * code typ.
+Print code.
+
+(** Casts the resource r to the type dest_ty and emits the appropriate code*)
+Definition cast (r: resource) (dest_ty: LLVMAst.typ) : cerr resource :=
+  let '(ty, id, code) := r in
+  cast_id <- inc_tmp ;;
+  let instr_cast := INSTR_Op (OP_Conversion (Bitcast) (ty) (EXP_Ident id) (dest_ty) ) in
+  let code' := code ++ [( IId cast_id, instr_cast)] in
+  ret (dest_ty, ID_Local cast_id, code')
+.
+
+Notation "x >: y" := (cast x y) (at level 90, left associativity).
+Notation "'FROM' x 'TO' y" := (cast x y) (at level 100).
+Notation "[ x :? y ]" := (cast x y).
+Locate ">:".
+Definition ex  (r: resource) (t: typ) : cerr resource := [ r :? t ].
+(** POINTER OPERATIONS: deref (takes a resource (if it is a pointer ) and tries to get the value if possible 
+    e.g. int* -> int 
+    (e.g. treats as an lhs)
+ *)
+(* Dereference a pointer *)
+(*
+  th    is should take an id with type ptr t,
+  and re   turn a local id dereferencing that
+  e.g.     
+  if it's i     d %i
+  then we emit  
+  %(i+1) = Load         t (ptr r) %i
+ *)
+(* Extend this to work on an AST.exp *)
+Definition deref (id: Ast.id) : cerr ( LLVMAst.typ * ident * code typ ) :=
+  '(op_id, op_ty) <- find_ident id;;
+  match op_ty with
+  | TYPE_Pointer t =>
+    raw_id' <- inc_tmp ;;
+    let '(ld_id, loc_id) := (IId raw_id', ID_Local raw_id') in
+    let ld_instr := INSTR_Load false t (op_ty,  EXP_Ident op_id) None in
+    ret (t, loc_id, [(ld_id, ld_instr)])
+  | _ => raise "not a valid rhs - should be a pointer"
+  end.
+
+
+
+
+
+
+
+
+
+
 Definition cmp_unop (op: Ast.unop) (src: ident) (ty: LLVMAst.typ) : cerr (LLVMAst.typ * ident * code typ) :=
   inst_id <- inc_tmp ;;
   let unop_id := IId inst_id in
@@ -262,40 +314,24 @@ Definition cmp_binop (op: Ast.binop) (src_l : ident) (src_r: ident) (ty: LLVMAst
     ret (ty, loc_id, [(bop_id, INSTR_Op exp_op)])
   end.
                    
-(* Dereference a pointer *)
-(*
-  this should take an id with type ptr t,
-  and return a local id dereferencing that
-  e.g. 
-  if it's id %i
-  then we emit
-  %(i+1) = Load t (ptr r) %i
-*)
-Definition deref (id: Ast.id) : cerr ( LLVMAst.typ * ident * code typ ) :=
-    '(op_id, op_ty) <- find_ident id;;
-    match op_ty with
-    | TYPE_Pointer t =>
-      raw_id' <- inc_tmp ;;
-      let '(ld_id, loc_id) := (IId raw_id', ID_Local raw_id') in
-      let ld_instr := INSTR_Load false t (op_ty,  EXP_Ident op_id) None in
-      ret (t, loc_id, [(ld_id, ld_instr)])
-    | _ => raise "not a valid rhs - should be a pointer"
-    end.
 
 (** Compiling expressions is straightforward - we can just invoke
     the convenient definitions from earlier :) *)
 
-Fixpoint foldl2_err {A B C : Type}
-         (comb: A -> B -> C -> A)
-         (base: A) (l1: list B) (l2: list C) : cerr A :=
+Fixpoint foldl2_err' {A B C : Type}
+         (comb : A -> B -> C -> (cerr A))
+         (base: A) (l1: list B) (l2: list C){struct l2} : cerr A :=
   match (l1, l2) with
-  | (nil, nil) => ret base
-  | (_, nil) => raise "unequal length lists passed to foldlerr"
-  | (nil, _) => raise "unequal length lists passed to foldlerr"
-  | (l :: t1, r :: t2) => let merge := comb base l r in
-                        foldl2_err comb merge t1 t2
+    | (nil, nil) => ret base
+    | (_, nil) => raise "unequal length lists passed to foldlerr"
+    | (nil, _) => raise "unequal length lists passed to foldlerr"
+    | (l :: t1, r :: t2) => merge <- comb base l r ;; foldl2_err' comb merge t1 t2
   end.
 About eq_ty.
+About List.concat.
+About List.append.
+
+
 Fixpoint cmp_exp (expr: Ast.exp)
   : cerr (LLVMAst.typ * ident * code typ) :=
   match expr with
@@ -312,10 +348,31 @@ Fixpoint cmp_exp (expr: Ast.exp)
     '(op_t, op_id, code_res) <- cmp_binop op id_l id_r t_l ;;
     ret (op_t, op_id, code_l ++ code_r ++ code_res)
   | Call id_e args_e =>
-    raise "err"
+    '(f_ty, f_id, f_code) <- cmp_exp (elt Ast.exp id_e) ;;
+    '(t_args, t_ret) <-  (match f_ty with
+                          | TYPE_Pointer (TYPE_Function retty args) => ret (args, retty)
+                          | _ => raise "err: not a function"
+                          end) ;;
+    '(args) <- map_monad (fun e => cmp_exp (elt Ast.exp e)) args_e ;;
+    '(args_ids, args_code) <- foldl2_err' (fun '(arg_ids, arg_codes) res arg_t =>
+                                         '(rty, rid, rcode) <- [ res :? arg_t ];;
+                                         ret (arg_ids ++ [(arg_t, EXP_Ident rid) ], arg_codes ++ rcode)
+                                      ) ([], []) args t_args ;;
+    let fn_texp : texp typ  := (f_ty, EXP_Ident f_id) in
+    let fn_args : list (texp typ) := args_ids in
+    let instr_call := INSTR_Call fn_texp fn_args in 
+    '(raw_ident, inst_id) <- (match t_ret with
+                                 | TYPE_Void =>
+                                   raise "err: Cannot call void function as an expression"
+                                 | _ =>
+                                   call_id <- inc_tmp ;;
+                                   ret (call_id, IId call_id)
+                              end) ;;
+    ret (t_ret, ID_Local raw_ident, args_code ++ [(inst_id, instr_call)])
   | _ => raise "unimplemented"
   end.
 
+                
 Print LLVMAst.block.
 Definition cmp_stmt
          (rt : LLVMAst.typ)

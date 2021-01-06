@@ -12,7 +12,7 @@ From ExtLib Require Import
      Structures.MonadState
      Data.Monads.EitherMonad.
 
-Require Import Vellvm.Error.
+Require Import Vellvm.Utils.Error.
 
 Import MonadNotation.
 Open Scope monad_scope.

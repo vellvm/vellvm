@@ -185,8 +185,6 @@ About inl.
 Definition lift_eff {T} (t: itree OatE T) : itree OatE (unit + T) :=
  t' <- t ;; ret (inr t').   
 
-Set Implicit Arguments.
-Set Contextual Implicit.
 Fixpoint denote_stmt (s : stmt) : itree OatE (unit + ovalue) :=
   match s with
   | Assn target source =>
@@ -296,20 +294,9 @@ Fixpoint combine_lists_err
   | _, _ => ret []
   end.
 
-
+(**  *)
 Definition function_denotation : Type :=
   list ovalue -> itree OatE ovalue.
-
-Definition t := fun bs => trigger (OStackPush bs).
-
-Definition t' (bs: list (id * ovalue)) (b: block) : itree OatE ovalue :=
-  let basic : itree OatE ovalue := denote_block b in
-  let t'' : itree OatE unit := trigger (OStackPush bs) in
-  t'' ;;
-  basic.
-
-Check t.
-Print  trigger.  
 
 Definition denote_fdecl (df : fdecl) : function_denotation :=
   fun (arg: list ovalue) => 
@@ -339,8 +326,6 @@ Fixpoint lookup {T} (id: Ast.id) (fdecls: list (Ast.id * T)) : option T :=
   | h :: t => if eqb (fst h) (id) then Some (snd h) else lookup id t
   end.
 
-About mrec.
-(* tbd - edit fdecls to be a list of denoted functions *)
 Definition interp_away_calls (fdecls : list (id * function_denotation)) (id: string) (args: list ovalue) : _ :=
   @mrec OCallE (OatE')
         (fun T call =>
@@ -355,6 +340,59 @@ Definition interp_away_calls (fdecls : list (id * function_denotation)) (id: str
            end
         ) _ (OCall id args).
 
-About Call.
-About interp_away_calls.
+Check interp_away_calls.
+About mrec.
+(* Start denoting the toplevel program - e.g. what happens when you want to run a function *)
+Definition denote_oat
+           (retty : Oat.Ast.ret_ty)
+           (entry : string)
+           (args : list ovalue)
+           (prog : prog) : itree OatE' ovalue :=
+  denoted_fdecls <- map_monad (fun decl =>
+                    match decl with
+                    | Gfdecl {| elt := dec; loc := _ |} =>
+                      ret (fname dec , denote_fdecl dec)
+                    | _ => raise "unimplemented globals / tdecls"
+                    end
+                      ) prog ;;
+  (** Now that we have denoted the various function declarations,
+      we can interpret away the calls ...
+   *)
+  interp_away_calls denoted_fdecls entry args.
 
+Print OatE'.
+
+
+About  Monads.stateT.
+Check Monads.stateT.
+Require Import Oat.Handlers.
+Print Monads.stateT.
+Compute (Monads.stateT _ (itree Oat1)).
+About prod.
+From ExtLib Require Import
+     Structures.Maps
+     Data.Map.FMapAList
+     Data.String
+.
+
+(* Finally, here is the function that will interpret an oat programs events (excluding the failure events ! *)
+Definition interp_oat_failure {R} (t: itree OatE' R) (l: FMapAList.alist var value * stack) :=
+  let env := FMapAList.alist var value in
+  let inst := FMapAList.Map_alist RelDec_string value in
+  let trace := Oat.Handlers.interp_local_stack handle_local t l
+                                                    (map := env)
+  in
+  trace.
+Check interp_oat_failure.
+
+
+(** Top level section *)
+Check denote_oat.
+Definition interp_user
+           (retty : Oat.Ast.ret_ty)
+           (entry : string)
+           (args : list ovalue)
+           (prog : prog) :=
+  let t : itree OatE' ovalue := denote_oat retty entry args prog in
+  interp_oat_failure t ([], []).  
+           

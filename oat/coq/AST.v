@@ -77,6 +77,7 @@ Inductive exp :=
   | Bop : binop -> node exp -> node exp -> exp (* operations of two arguments *)
   | Uop : unop -> node exp -> exp             (* operations with one argument *)
   | Id : id -> exp                           (* identifiers *)
+  (* Have to change this for the semantics *)
   | Call : node exp -> (list (node exp)) -> exp   (* function call - change to exp later *)
   | CNull : rty -> exp                         (* null literal for any TRef *)
   | CArr : ty -> (list (node exp)) -> exp          (* array literal *)

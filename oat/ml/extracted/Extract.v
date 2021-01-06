@@ -1,6 +1,8 @@
-Require Vellvm.TopLevel.
-Require Vellvm.Transformations.Transform.
-Require Vellvm.ParserHelper.
+
+From Vellvm Require
+     Semantics.TopLevel
+     Transformations.Transform
+     Utils.ParserHelper.
 
 Require Oat.Denotation.
 Require ExtrOcamlBasic.

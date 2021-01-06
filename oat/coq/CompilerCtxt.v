@@ -204,4 +204,6 @@ Definition find_ident (id : Ast.id) : cerr ( t_rhs ) :=
   st <- get ;;
   catch ( find_local id st) (fun _ => find_global id st).
 
-
+Definition find_fxn (id: Ast.id) : cerr (t_rhs) :=
+  st <- get ;;
+  find_func id st.

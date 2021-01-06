@@ -29,13 +29,16 @@ Section InterpreterMCFG.
     let uvalue_trace       := interp_intrinsics user_intrinsics t in
     let L1_trace           := interp_global uvalue_trace g in
     L1_trace.
-
+Check interp_global.
+About interp_global.
   Definition interp_to_L2 {R} user_intrinsics (t: itree L0 R) g l :=
     let uvalue_trace   := interp_intrinsics user_intrinsics t in
     let L1_trace       := interp_global uvalue_trace g in
     let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
     L2_trace.
 
+Check interp_to_L2.
+  
   Definition interp_to_L3 {R} user_intrinsics (t: itree L0 R) g l m :=
     let uvalue_trace   := interp_intrinsics user_intrinsics t in
     let L1_trace       := interp_global uvalue_trace g in

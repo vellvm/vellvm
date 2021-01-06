@@ -17,7 +17,7 @@ From ITree Require Import
      Events.Exception.
 
 From Vellvm Require Import
-     Error.
+     Utils.Error.
 
 Require Import Oat.Ast.
 Require Import Oat.DynamicValues.
@@ -88,6 +88,5 @@ Definition OatE' := OLocalE +' OStackE +' FailureE.
 Definition Oat0 := OatE'.
 Definition Oat1 := OStackE +' FailureE.
 Definition Oat2 := FailureE.
-Definition Oat3 := void1.
                      
 
