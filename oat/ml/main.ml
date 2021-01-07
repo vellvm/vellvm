@@ -28,8 +28,31 @@ module Quaker = struct
     print_endline "function unimplemented";
     exit 0
 
-  let interpret_main_file f =
+  let interpret_main_file filename =
+    let find_fn func (prog: Ast.prog) =
+      let open Ast in
+      match List.find_opt (fun dec -> match dec with
+                                  | Gfdecl {elt = e; loc=_} ->
+                                     (Camlcoq.camlstring_of_coqstring e.fname) = func
+                                  | _ -> false
+              ) prog with
+      | Some (Gfdecl {elt = e; loc=_}) ->
+         (e.fname, e.frtyp, e.args)
+      | _ -> failwith "Could not find function to begin interpreting"
+    in
+                                                
+      
+
     let prog = parse_oat filename in
+    let (fname, ret_ty, _args)  = find_fn "program" prog in
+    (* Arguments are empty for now :) *)
+    let itree = D.interp_user ret_ty fname [] prog in
+    match Interpreter.step itree with
+    | Error e ->
+       print_endline e
+    | Ok dv ->
+       print_endline @@ "Interpreting program yielded : " ^ Interpreter.pp_ovalue dv;
+  
   
 end
 
@@ -39,7 +62,7 @@ open Arg
 let args =
   [ ("-c", Unit Quaker.unimplemented, "compile the given oat file")
   ; ("-pp", String Quaker.print_and_parse, "parse and print the given oat file")
-  ; ("-i", Unit 
+  ; ("-interpret_main", String Quaker.interpret_main_file, "Interpret the given oat program from the 'program' method")
   ]
 
 
