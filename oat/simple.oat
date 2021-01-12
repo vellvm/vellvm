@@ -1,3 +1,12 @@
+int test (int v) {
+    var x = 1;
+    if (v != 1) {
+      x = v * test (v-1);
+    }
+    return x;
+}
+
 int program () {
-    return 1;
+    var r = test(3);
+    return r;
 }

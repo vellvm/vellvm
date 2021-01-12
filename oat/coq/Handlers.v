@@ -19,22 +19,28 @@ Import MonadNotation.
 Import ITree.Basics.Basics.Monads.
 Open Scope string_scope.
 
-Section Locals.
+Section Env.
   Context {map: Type}.
   Context {M: Map OatEvents.var OatEvents.value map}.
   Context {SK: Serialize var}.
-
   
   (** Here, we have a handler for local events.
       Observe that this simply interprets local events into the statemonad, returning an itree free of OLocalE events *)
-  Definition handle_local {E} `{FailureE -< E} : (OLocalE) ~> stateT map (itree E) :=
-    fun _ e env =>
+  Definition handle_env {E} `{FailureE -< E} : (OEnvE) ~> stateT (map * map) (itree E) :=
+    fun _ e '(glob, loc) =>
       match e with
-      | OLocalRead id => match Maps.lookup id env with
-                         | Some v => Ret (env, v)
-                         | None => raise ("Could not lookup id " ++ to_string id)       
-                         end
-      | OLocalWrite id v => ret (Maps.add id v env, tt)
+      | OEnvRead id => 
+        match Maps.lookup id loc with
+        | Some v => Ret ((glob,loc), v)
+        | None =>
+          (** Didn't find the value in the local environment, look in the globals now! *)
+          match Maps.lookup id glob with
+          | Some v => Ret ((glob,loc), v)
+          | None => raise ("err: Could not find id: " ++ id ++ " in environment")
+          end
+        end
+      | OLocalWrite id v => ret ((glob, Maps.add id v loc), tt)
+      | OGlobalWrite id v => ret ((Maps.add id v glob, loc), tt)
       end.
 
   Open Scope monad_scope.
@@ -50,12 +56,12 @@ Section Locals.
   Definition trigger_rest {M} : Oat1 ~> stateT M (itree Oat1) :=
     fun R e m => r <- trigger e ;; ret (m, r).
 
-  Definition interp_local_lower : Oat0 ~> stateT map (itree Oat1)  := case_ handle_local trigger_rest.
-  Definition interp_local : itree Oat0 ~> stateT map (itree Oat1) := interp_state interp_local_lower.
+  Definition interp_env_lower : Oat0 ~> stateT (map * map) (itree Oat1)  := case_ handle_env trigger_rest.
+  Definition interp_env : itree Oat0 ~> stateT (map * map) (itree Oat1) := interp_state interp_env_lower.
 
 
   (** TODO, prove structural lemmas *)
-End Locals.
+End Env.
 
 
 Section Stack.
@@ -67,18 +73,19 @@ Section Stack.
 
   (** Here, we have a handler for stack events.
       Observe that this simply interprets stack events into the statemonad, returning an itree free of stack events *)
-  Definition handle_stack : (OStackE) ~> stateT (map * stack) (itree Oat2) := 
-    fun _ e '(scope, stack) =>
+  Definition handle_stack : (OStackE) ~> stateT (map * map * stack) (itree Oat2) := 
+    (* scope is just the current local environment *)
+    fun _ e '(globals, scope, stack) =>
       match e with
       | OStackPush args =>
         let env : map := List.fold_left (fun accmap '(id, v) => Maps.add id v accmap) args Maps.empty in
-        ret ((env, scope::stack), tt)
+        ret ((globals, env, scope::stack), tt)
       | OStackPop args =>
         match stack with
         | nil => raise "Tried to pop too many stack frames"
         | (prev_env :: stk') => 
           (* TODO: free the arguments here and return them to previous stack frame *)
-          ret ((prev_env, stk'), tt)
+          ret ((globals, prev_env, stk'), tt)
         (*
         match stack with
           | nil => raise "Tried to pop too many stack frames"
@@ -98,25 +105,26 @@ Section Stack.
       end.
 
   (* Literally identical to src/coq/Handlers/Stack.v in vellvm repository *)
-  Definition  handle_local_stack {E : Type -> Type} `{FailureE -< E}
-              (h : OLocalE ~> stateT map (itree E)) :
-    OLocalE ~> stateT (map * stack) (itree E)
+  Definition  handle_env_stack {E : Type -> Type} `{FailureE -< E}
+              (h : OEnvE ~> stateT (map * map) (itree E)) :
+    OEnvE ~> stateT (map * map * stack) (itree E)
     :=
-      fun _ e '(env, stk) => ITree.map (fun '(env', r) => ((env', stk), r)) (h _ e env).
+      fun _ e '(env, stk) => ITree.map (fun '(env', r) =>
+                                          let '(glob, loc) := env' in
+                                          ((glob, loc, stk), r)) (h _ e env).
 
   Open Scope monad_scope.
-  Definition trigger_rest' : Oat2 ~> stateT (map * stack) (itree Oat2) :=
+  Definition trigger_rest' : Oat2 ~> stateT (map * map * stack) (itree Oat2) :=
     fun R e m => r <- trigger e ;; ret (m, r).
 
-  Check Oat2.
   (* Interpret both local and stack events together *)
-  Definition interp_local_stack `{FailureE -< Oat0}
-             (h : OLocalE ~> stateT map (itree Oat2))
-    : itree Oat0 ~> stateT (map * stack) (itree Oat2) :=
-   interp_state (case_ (handle_local_stack h)
+  Definition interp_env_stack `{FailureE -< Oat0}
+             (h : OEnvE ~> stateT (map * map) (itree Oat2))
+    : itree Oat0 ~> stateT (map * map * stack) (itree Oat2) :=
+   interp_state (case_ (handle_env_stack h)
                 (case_ handle_stack trigger_rest')).
 
-  Definition interp_stack_lower : Oat1 ~> stateT (map * stack) (itree Oat2) := case_ handle_stack trigger_rest'.
-  Definition interp_stack : itree Oat1 ~> stateT (map * stack) (itree Oat2) := interp_state interp_stack_lower.
+  Definition interp_stack_lower : Oat1 ~> stateT (map * map * stack) (itree Oat2) := case_ handle_stack trigger_rest'.
+  Definition interp_stack : itree Oat1 ~> stateT (map * map * stack) (itree Oat2) := interp_state interp_stack_lower.
 
 End Stack.

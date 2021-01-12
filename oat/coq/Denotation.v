@@ -25,13 +25,18 @@ From ITree Require Import
 From ExtLib Require Import
      Core.RelDec
      Programming.Eqv
-     Structures.Monads.
+     Structures.Monads
+     Structures.Maps
+     Data.Map.FMapAList
+     Data.String
+.
 
 From Vellvm Require Import Util Error.
-Require Import Integers.
-Require Import Oat.Ast.
-Require Import Oat.DynamicValues.
-Require Import Oat.OatEvents.
+From Oat Require Import
+     Ast
+     DynamicValues
+     OatEvents
+     Handlers.
 
 Import MonadNotation.
 Local Open Scope monad_scope.
@@ -40,9 +45,6 @@ Local Open Scope program_scope.
 Module Int64 := Integers.Int64.
 Definition int64 := Int64.int.
 
-About mrec.
-Search mrec.
-About iter.
 (******************************* Oat Semantics *******************************)
 (**
    We'll finally start writing down how OAT should work! To begin, we'll
@@ -60,12 +62,6 @@ Definition vdecl := Oat.Ast.vdecl.
 
 (* Denote the semantics for binary operations *)
 
-About value.
-Search value.
-About raise.
-About Int64.
-
-(* TODO: these definitions might cause some problems? *)
 Definition neq (x y : int64) : bool :=
   negb (Int64.eq x y).
 
@@ -121,12 +117,52 @@ Definition fcall_return_or_fail (id: expr) (args: list ovalue) : itree OatE oval
   end.
 
 (* Now we can give an ITree semantics for the expressions in oat *)
+Check map_monad.
+Check Z.to_nat.
+Check Z.of_nat.
+About Int64.
+Print Int64.
+About Int64.signed.
+
+Definition default_initialization (t : ty) : ovalue :=
+  match t with
+  | TBool => OVALUE_Bool true
+  | TInt => OVALUE_Int (Int64.repr (0%Z))
+  | TRef _ 
+  (** VV: TODO - what behaviour should default initializing a non-null ref array have? *)
+  | TNotNullRef _ => OVALUE_Ref (REF_Null)
+  end.
+
 Fixpoint denote_expr (e: expr) : itree OatE ovalue :=
   match e with
+  (** Initialization of values *)
+  | CNull _ => ret (OVALUE_Ref (REF_Null))
   | CBool b => ret (OVALUE_Bool b)
   | CInt i => ret (OVALUE_Int i)
-  | Id i => trigger (OLocalRead i) 
   | CStr s => ret (OVALUE_Str s)
+  | CArr ts init =>
+    args <- map_monad (fun e => denote_expr (elt expr e)) init ;;
+    ret (OVALUE_Ref (REF_Array args))
+  | CStruct id init =>   
+    args <- map_monad
+              (fun '(fieldName, e) => (v <- denote_expr (elt expr e) ;; ret (fieldName, v))) init ;;
+    ret (OVALUE_Ref (REF_Struct id args))
+  | NewArr t n =>
+    length_val <- denote_expr (elt expr n) ;;
+    match length_val with
+      | OVALUE_Int i =>
+        if lte i Int64.zero then raise "err: Cannot initialize array of length < 0"
+        else 
+          let idx := Z.to_nat (Int64.signed i ) in
+          let def_v := default_initialization t in
+          ret (OVALUE_Ref (REF_Array (List.repeat def_v idx) ))
+      | _ => raise "err: Cannot use non-integer value as a length initialization argument"
+    end   
+      
+  (** Lookup of values *)
+  | Id i => trigger (OEnvRead i)
+                    
+  (** Binary operators *)
   | Uop op n =>
     let e' := elt_of n in
     v <- denote_expr e' ;;
@@ -137,6 +173,8 @@ Fixpoint denote_expr (e: expr) : itree OatE ovalue :=
     l' <- denote_expr l;;
     r' <- denote_expr r;;
     denote_bop op l' r' 
+               
+  (** Function calls *)
   | Call f args =>
     let f_id := elt expr f in
     args' <- map_monad ( fun e => denote_expr (elt expr e)) args ;;
@@ -145,7 +183,47 @@ Fixpoint denote_expr (e: expr) : itree OatE ovalue :=
     | OVALUE_Void => raise "err: using a void function call in an expression"
     | _ => ret f_ret
     end
-  | _ => raise "err: unimplemented"
+
+  (** Projection out of a struct: e_struct.fieldName *)
+  | Proj e_struct fieldName =>
+    struct' <- denote_expr (elt expr e_struct) ;;
+    match struct' with
+    | OVALUE_Ref (REF_Struct structType elts) =>
+      match Maps.lookup fieldName elts with
+        | None => raise ("err: Cannot find field " ++ fieldName ++ " in struct type " ++ structType)
+        | Some v => ret v
+      end
+    | _ => raise "err: Cannot project a field out of a non-struct"
+    end
+      
+  (** Indexing into an array: n_arr[n_idx]*)
+  | Index n_arr n_idx =>
+    e_arr <- denote_expr (elt expr n_arr) ;;
+    e_idx <- denote_expr (elt expr n_idx) ;;
+    match e_arr with
+    | OVALUE_Ref (REF_Array elts) =>
+      match e_idx with
+      | OVALUE_Int i =>
+        let nat_idx := Z.to_nat (Int64.signed i) in
+        match List.nth_error elts nat_idx with
+          | None => raise "err: Array Index Out of Bounds Exception"
+          | Some v => ret v
+        end
+      | _ => raise "err: Cannot use non-integer as an index"
+      end
+    | _ => raise "err: Cannot index into a non-array value"
+    end
+
+  (** Length of an array: n_arr.length *)
+  | Length n_arr =>
+    e_arr <- denote_expr (elt expr n_arr) ;;
+    match e_arr with
+    | OVALUE_Ref (REF_Array elts) =>
+      ret (OVALUE_Int
+             (Int64.repr (Z.of_nat (List.length elts)))
+          )
+    | _ => raise "err: Cannot take the length of a non-array value" 
+    end
   end.
 
 (** I'll define some convenient helpers for common things like looping and sequencing here *)
@@ -231,6 +309,19 @@ Fixpoint denote_stmt (s : stmt) : itree OatE (unit + ovalue) :=
     args' <- map_monad ( fun e => denote_expr (elt expr e)) args ;;
     _ <- fcall_return_or_fail f_id args';;
     ret (inl tt)
+  | Cast rt bound possibly_null p f =>
+    e_pn <- denote_expr (elt expr possibly_null) ;;
+    match e_pn with
+    | OVALUE_Ref (REF_Null) =>
+      seq f denote_stmt
+    | OVALUE_Ref _ => 
+    (* Otherwise, the value is non-null - add it to the environment and then run the 
+       success block
+     *)
+      trigger (OLocalWrite bound e_pn) ;;
+      seq p denote_stmt
+    | _ => raise "err: Cannot perform checked downcast on a non-reference type"
+    end
   | _ => raise "unimplemented"
   end.
 
@@ -261,23 +352,45 @@ Fixpoint denote_block_acc
       ret (OVALUE_Void)
     | inr v => ret v
     end
-  | h :: t =>
-    let denoted_so_far :=
-        v <- denoted ;;
-        match v with
-        | inl _ =>
-          denote_stmt (elt stmt h)
-        | inr _ =>
-          (* we returned already *)
-          raise "error: terminator already seen - cannot denote another stmt in a block"
-        end
-    in
-    denote_block_acc denoted_so_far t
+  | h :: t => denote_block_acc (denoted ;; denote_stmt (elt stmt h)) t
   end.
 
 
 Definition denote_block (b : block) : itree OatE ovalue
   := denote_block_acc (ret (inl tt)) b.
+
+(** Globals! *)
+Check map_monad.
+Check undef_or_err.
+Print undef_or_err.
+Print eitherT.
+About eitherT.
+About map_monad.
+Definition denote_gdecl (decl: Ast.gdecl) : itree OatE unit
+  :=
+    let id := name decl in
+    let e : Ast.exp := elt expr (init decl) in
+    match e with
+    | CNull _ => trigger (OGlobalWrite id (OVALUE_Ref REF_Null))
+    | CBool b => trigger (OGlobalWrite id (OVALUE_Bool b))
+    | CInt i => trigger (OGlobalWrite id (OVALUE_Int i))
+    | CStr s => trigger (OGlobalWrite id (OVALUE_Str s))
+    | Id i =>
+      v <- denote_expr e ;;
+      trigger (OGlobalWrite id v)
+    | CArr ts init =>
+      v <- denote_expr e ;;
+      trigger (OGlobalWrite id v)
+    | CStruct id init =>   
+      v <- denote_expr e ;;
+      trigger (OGlobalWrite id v)
+    | _ => raise "err: Not a valid global initializer"
+    end.
+
+Definition translate_gdecl_OatE' {V} (dec : itree OatE V) : _ :=
+  interp_mrec (fun T call => raise "Should not be invoking functions as global inits")
+              (D := OCallE)
+              (E := OatE') dec.
 
 Definition fdecl_denotation : Type :=
   list ovalue -> itree OatE ovalue. 
@@ -294,7 +407,7 @@ Fixpoint combine_lists_err
   | _, _ => ret []
   end.
 
-(**  *)
+(** Same tactic as from src/coq/Semantics/Denotation.v *)
 Definition function_denotation : Type :=
   list ovalue -> itree OatE ovalue.
 
@@ -325,7 +438,6 @@ Fixpoint lookup {T} (id: Ast.id) (fdecls: list (Ast.id * T)) : option T :=
   | nil => None
   | h :: t => if eqb (fst h) (id) then Some (snd h) else lookup id t
   end.
-
 Definition interp_away_calls (fdecls : list (id * function_denotation)) (id: string) (args: list ovalue) : _ :=
   @mrec OCallE (OatE')
         (fun T call =>
@@ -340,46 +452,44 @@ Definition interp_away_calls (fdecls : list (id * function_denotation)) (id: str
            end
         ) _ (OCall id args).
 
-Check interp_away_calls.
-About mrec.
+
+
 (* Start denoting the toplevel program - e.g. what happens when you want to run a function *)
+Definition denote_gdecls (p: Ast.prog) : itree OatE' unit :=
+  _ <- map_monad (fun dec =>
+               match dec with
+               | Gvdecl dec => translate_gdecl_OatE' (denote_gdecl (elt Ast.gdecl dec))
+               | _ => ret tt
+               end
+               ) p ;; ret tt.
+
 Definition denote_oat
            (retty : Oat.Ast.ret_ty)
            (entry : string)
            (args : list ovalue)
            (prog : prog) : itree OatE' ovalue :=
+  (* Handle global variable declarations *)
+  denote_gdecls prog ;;
+  (* Denote functions now *)
+  let fdeclsOnly := List.filter (fun e => match e with | Gfdecl _ => true | _ => false end) prog in
   denoted_fdecls <- map_monad (fun decl =>
                     match decl with
                     | Gfdecl {| elt := dec; loc := _ |} =>
                       ret (fname dec , denote_fdecl dec)
-                    | _ => raise "unimplemented globals / tdecls"
+                    | _ => raise "impossible"
                     end
-                      ) prog ;;
+                      ) fdeclsOnly ;;
   (** Now that we have denoted the various function declarations,
       we can interpret away the calls ...
    *)
   interp_away_calls denoted_fdecls entry args.
 
-Print OatE'.
-
-
-About  Monads.stateT.
-Check Monads.stateT.
-Require Import Oat.Handlers.
-Print Monads.stateT.
-Compute (Monads.stateT _ (itree Oat1)).
-About prod.
-From ExtLib Require Import
-     Structures.Maps
-     Data.Map.FMapAList
-     Data.String
-.
-
 (* Finally, here is the function that will interpret an oat programs events (excluding the failure events ! *)
-Definition interp_oat_failure {R} (t: itree OatE' R) (l: FMapAList.alist var value * stack) :=
+Definition interp_oat_failure {R} (t: itree OatE' R)
+           (l: FMapAList.alist var value * FMapAList.alist var value * Handlers.stack) :=
   let env := FMapAList.alist var value in
   let inst := FMapAList.Map_alist RelDec_string value in
-  let trace := Oat.Handlers.interp_local_stack handle_local t l
+  let trace := Oat.Handlers.interp_env_stack handle_env t l
                                                     (map := env)
   in
   trace.
@@ -394,5 +504,5 @@ Definition interp_user
            (args : list ovalue)
            (prog : prog) :=
   let t : itree OatE' ovalue := denote_oat retty entry args prog in
-  interp_oat_failure t ([], []).  
+  interp_oat_failure t ([], [], []).  
            

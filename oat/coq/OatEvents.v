@@ -42,10 +42,12 @@ Open Scope string_scope.
 
 Definition value := ovalue.
 Definition var := Ast.id.
+
 (* We need some way of manipulating local variable values *)
-Variant OLocalE : Type -> Type :=
-| OLocalRead (id: var) : OLocalE value
-| OLocalWrite (id: var) (v: value) : OLocalE unit.
+Variant OEnvE : Type -> Type :=
+| OEnvRead (id: var) : OEnvE (value)
+| OGlobalWrite (id: var) (v: value) : OEnvE unit
+| OLocalWrite (id: var) (v: value) : OEnvE unit.
 
 (* We need some way of performing function calls *)
 Variant OCallE : Type -> Type :=
@@ -73,11 +75,10 @@ Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m : err A) 
     The only difference is that these effects have kind Type -> Type, so we need a variant
     of the sum type, called sum1.
  *)
-
-Definition OatE :=  OCallE +' OLocalE +' OStackE +' FailureE. 
+Definition OatE :=  OCallE +' OEnvE +' OStackE +' FailureE. 
 
 (* This version of an oat event has no call events - these are interpreted away *)
-Definition OatE' := OLocalE +' OStackE +' FailureE.
+Definition OatE' := OEnvE +' OStackE +' FailureE.
 
 (** Note that just having these events is not enough to extract an interpreter.
     We'll need to define how to interpret these concretely. We'll do this in levels,
@@ -88,5 +89,3 @@ Definition OatE' := OLocalE +' OStackE +' FailureE.
 Definition Oat0 := OatE'.
 Definition Oat1 := OStackE +' FailureE.
 Definition Oat2 := FailureE.
-                     
-

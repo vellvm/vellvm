@@ -105,9 +105,6 @@ Inductive stmt :=
            -> option (node stmt) -> list (node stmt) -> stmt
   | Cast : rty -> id -> (node exp) -> list (node stmt) -> list (node stmt) -> stmt
 .
-  
-  
-
 
 (* blocks : statements *)
 Definition block := list (node stmt).
