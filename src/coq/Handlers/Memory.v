@@ -723,7 +723,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       let a1_end   := snd a1 + sz1 in
       let a2_start := snd a2 in
       let a2_end   := snd a2 + sz2 in
-      fst a1 = fst a2 /\ a1_start <= a2_end /\ a2_start <= a1_end.
+      fst a1 = fst a2 /\ a1_start <= (a2_end - 1) /\ a2_start <= (a1_end - 1).
 
     Definition overlaps_dtyp (a1 : addr) (τ1 : dtyp) (a2 : addr) (τ2 : dtyp)
       : Prop :=
@@ -734,7 +734,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       let a1_end   := snd a1 + sz1 in
       let a2_start := snd a2 in
       let a2_end   := snd a2 + sz2 in
-      fst a1 <> fst a2 \/ a1_start > a2_end \/ a2_start > a1_end.
+      fst a1 <> fst a2 \/ a1_start > (a2_end - 1) \/ a2_start > (a1_end - 1).
 
     Definition no_overlap_dtyp (a1 : addr) (τ1 : dtyp) (a2 : addr) (τ2 : dtyp)
       : Prop :=
@@ -745,7 +745,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       let a1_end   := snd a1 + sz1 in
       let a2_start := snd a2 in
       let a2_end   := snd a2 + sz2 in
-      (fst a1 /~=? fst a2) || (a1_start >? a2_end) || (a2_start >? a1_end).
+      (fst a1 /~=? fst a2) || (a1_start >? (a2_end - 1)) || (a2_start >? (a1_end - 1)).
 
       (** ** Concretization of blocks
           Look-ups a concrete block in memory. The logical memory acts first as a potential layer of indirection:

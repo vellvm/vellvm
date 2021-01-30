@@ -1081,10 +1081,10 @@ Section Memory_Stack_Theory.
     destruct (Z.eq_dec b1 b2) as [B | B].
     2: { left. auto. }
 
-    destruct (Int.Z_as_Int.gt_le_dec o1 (o2 + s2)).
+    destruct (Int.Z_as_Int.gt_le_dec (o1) (o2 + s2 - 1)).
     { left. auto. }
 
-    destruct (Int.Z_as_Int.gt_le_dec o2 (o1 + s1)).
+    destruct (Int.Z_as_Int.gt_le_dec (o2) (o1 + s1 - 1)).
     { left. auto. }
 
     right. intuition.
@@ -1122,9 +1122,16 @@ Section Memory_Stack_Theory.
     - rewrite Integers.Int64.unsigned_repr in NO_OVER; [|cbn; lia].
       replace (ptr_i + Z.of_N (sz * sizeof_dtyp τ) * 0 + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) with (ptr_i + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) in NO_OVER by lia.
       pose proof (Int64.unsigned_range ix) as [? ?].
-      apply Zorder.Zplus_gt_reg_l in NO_OVER.
+      assert (Z.of_N sz > 0). lia.
       rewrite N2Z.inj_mul in NO_OVER.
-      apply Zorder.Zmult_gt_reg_r in NO_OVER; lia.
+      replace (ptr_i + Z.of_N sz * Z.of_N (sizeof_dtyp τ) - 1) with (ptr_i + (Z.of_N sz * Z.of_N (sizeof_dtyp τ) - 1)) in NO_OVER by lia.
+      apply Zorder.Zplus_gt_reg_l in NO_OVER.
+
+      assert (Z.of_N sz * Z.of_N (sizeof_dtyp τ) - Z.of_N (sizeof_dtyp τ) <= Z.of_N sz * Z.of_N (sizeof_dtyp τ) - 1).
+      lia.
+      assert (Int64.unsigned ix * Z.of_N (sizeof_dtyp τ) <= (Z.of_N sz - 1) * Z.of_N (sizeof_dtyp τ)).
+      { apply Zmult_le_compat_r; lia. }
+      lia.
     - rewrite Integers.Int64.unsigned_repr in NO_OVER; [|cbn; lia].
       replace (ptr_i + Z.of_N (sz * sizeof_dtyp τ) * 0 + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) with (ptr_i + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) in NO_OVER by lia.
       pose proof (Int64.unsigned_range ix) as [? ?].
@@ -1355,9 +1362,9 @@ Section Memory_Stack_Theory.
       - subst. rewrite lookup_add_eq.
         unfold get_logical_block,get_logical_block_mem in Heq. cbn in Heq.
         rewrite Heq.
-        destruct (Z.le_gt_cases off (off' + Z.of_N (sizeof_dtyp τ'))) as [Hle | Hnle].
-        + destruct (Z.le_gt_cases off' (off + Z.of_N (sizeof_dtyp τ))) as [Hle' | Hnle'].
-          * exfalso. auto.
+        destruct (Z.le_gt_cases off (off' + (Z.of_N (sizeof_dtyp τ') - 1))) as [Hle | Hnle].
+        + destruct (Z.le_gt_cases off' (off + (Z.of_N (sizeof_dtyp τ) - 1))) as [Hle' | Hnle'].
+          * exfalso. apply INEQ. lia.
           * (* Overlap because off + sizeof_dtyp τ < off', so second memory region is "to the right" *)
             unfold read_in_mem_block.
             rewrite lookup_all_index_add_all_index_no_overlap; auto.
@@ -1843,6 +1850,22 @@ Section Memory_Stack_Theory.
       - inversion READ.
     Qed.
 
+    Lemma allocated_can_read :
+      forall a m τ,
+        allocated a m ->
+        exists v, read m a τ = inr v.
+    Proof.
+      intros a [[cm lm] fs] τ ALLOC.
+      apply allocated_get_logical_block in ALLOC.
+      destruct ALLOC as [b GET].
+      unfold read.
+      rewrite GET.
+      destruct b.
+      cbn.
+      exists (read_in_mem_block bytes (snd a) τ). reflexivity.
+    Qed.
+
+
     Lemma freshly_allocated_different_blocks :
       forall ptr1 ptr2 τ m1 m2,
         allocate m1 τ = inr (m2, ptr2) ->
@@ -1868,6 +1891,16 @@ Section Memory_Stack_Theory.
       repeat red.
       left.
       eapply freshly_allocated_different_blocks; eauto.
+    Qed.
+
+    Lemma no_overlap_dtyp_different_blocks :
+      forall a b τ τ',
+        fst a <> fst b ->
+        no_overlap_dtyp a τ b τ'.
+    Proof.
+      intros a b τ τ' H.
+      unfold no_overlap_dtyp, no_overlap.
+      auto.
     Qed.
 
     Lemma read_array_exists : forall m size τ i a,
@@ -2121,6 +2154,127 @@ Section Memory_Stack_Theory.
           cbn in *.
           admit.
     Admitted.
+
+    (* ext_memory only talks in terms of reads... Does not
+       necessarily preserved what's allocated, because you might
+       not be able to read from an allocated block *)
+    Lemma ext_memory_trans :
+      forall m1 m2 m3 τ v1 v2 dst,
+        ext_memory m1 dst τ v1 m2 ->
+        ext_memory m2 dst τ v2 m3 ->
+        ext_memory m1 dst τ v2 m3.
+    Proof.
+      intros m1 m2 m3 τ v1 v2 dst [NEW1 OLD1] [NEW2 OLD2].
+      split; auto.
+
+      intros a' τ' ALLOC DISJOINT.
+
+
+      rewrite <- OLD1; eauto.
+
+      pose proof (allocated_can_read _ _ τ' ALLOC) as [v READ].
+      rewrite <- OLD1 in READ; eauto.
+      apply can_read_allocated in READ.
+      rewrite <- OLD2; eauto.
+    Qed.
+
+    (* If I write to a different area, it doesn't affect the allocation of other addresses *)
+    Lemma write_untouched_allocated:
+      forall m1 m2 a τa v,
+        dvalue_has_dtyp v τa ->
+        write m1 a v = inr m2 ->
+        forall b τb, no_overlap_dtyp a τa b τb ->
+                allocated b m2 ->
+                allocated b m1.
+    Proof.
+      intros m1 m2 a τa v TYP WRITE b τb OVERLAP ALLOC.
+
+      eapply allocated_can_read in ALLOC as [v' READ].
+      eapply can_read_allocated.
+
+      erewrite write_untouched in READ; eauto.
+    Qed.
+
+    Lemma write_get_logical_block_neq :
+      forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a a' : addr) (i i' : nat),
+        write m a val = inr m' ->
+        fst a' <> fst a ->
+        get_logical_block m (fst a') = get_logical_block m' (fst a').
+    Proof.
+      intros m m' t val a a' i i' WRITE NEQ.
+      unfold write in WRITE.
+      break_match_hyp.
+      - destruct l, a.
+        cbn in WRITE; inv WRITE.
+        symmetry.
+        apply get_logical_block_of_add_logical_frame_ineq.
+        eauto.
+      - inv WRITE.
+    Qed.
+
+    Lemma write_untouched_ptr_block_get_array_cell :
+      forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a a' : addr) (i i' : nat),
+        write m a val = inr m' ->
+        fst a' <> fst a ->
+        get_array_cell m' a' i' t = get_array_cell m a' i' t.
+    Proof.
+      intros m m' t val a a' i i' WRITE NEQ.
+
+      destruct a as [b1 o1].
+      destruct a' as [b2 o2].
+      unfold get_array_cell.
+
+      assert (get_logical_block m b2 = get_logical_block m' b2).
+      { change b2 with (fst (b2, o2)).
+        eapply write_get_logical_block_neq; eauto.
+      }
+
+      rewrite H.
+      reflexivity.
+    Qed.
+
+
+    Lemma no_overlap_dtyp_array_different_indices:
+      forall ix i ptrll elem_addr1 elem_addr2 sz τ,
+        handle_gep_addr (DTYPE_Array sz τ) ptrll [DVALUE_I64 (repr 0); DVALUE_I64 ix] = inr elem_addr1 ->
+        Int64.unsigned i <> Int64.unsigned ix ->
+        handle_gep_addr (DTYPE_Array sz τ) ptrll [DVALUE_I64 (repr 0); DVALUE_I64 i] = inr elem_addr2 ->
+        no_overlap_dtyp elem_addr1 τ elem_addr2 τ.
+    Proof.
+      intros ix i [ptr_b ptr_o] elem_addr1 elem_addr2 sz τ GEP1 NEQ GEP2.
+      unfold handle_gep_addr in *.
+      cbn in *; inv GEP1; inv GEP2.
+      unfold no_overlap_dtyp. red.
+      cbn.
+      right.
+
+      rewrite Integers.Int64.unsigned_repr; [|cbn; lia].
+
+      replace (ptr_o + Z.of_N (sz * sizeof_dtyp τ) * 0 + Int64.unsigned ix * Z.of_N (sizeof_dtyp τ))
+        with
+          (ptr_o + Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) by lia.
+      replace (ptr_o + Z.of_N (sz * sizeof_dtyp τ) * 0 + Int64.unsigned i * Z.of_N (sizeof_dtyp τ) + Z.of_N (sizeof_dtyp τ) - 1)
+        with
+          (ptr_o + Int64.unsigned i * Z.of_N (sizeof_dtyp τ) + Z.of_N (sizeof_dtyp τ) - 1) by lia.
+
+      pose proof (ZArith_dec.Z_lt_le_dec (DynamicValues.Int64.unsigned i) (DynamicValues.Int64.unsigned ix)) as [LT | LE].
+      - left.
+        assert (Int64.unsigned i * Z.of_N (sizeof_dtyp τ) <= (Int64.unsigned ix * Z.of_N (sizeof_dtyp τ) - Z.of_N (sizeof_dtyp τ))).
+        { replace (Int64.unsigned ix * Z.of_N (sizeof_dtyp τ) - Z.of_N (sizeof_dtyp τ)) with (Int64.unsigned ix * Z.of_N (sizeof_dtyp τ) - (1 * Z.of_N (sizeof_dtyp τ))) by lia.
+          rewrite <- Z.mul_sub_distr_r.
+          apply Zmult_le_compat_r; lia.
+        }
+
+        lia.
+      - right.
+        assert (Int64.unsigned ix * Z.of_N (sizeof_dtyp τ) <= (Int64.unsigned i * Z.of_N (sizeof_dtyp τ) - Z.of_N (sizeof_dtyp τ))).
+        { replace (Int64.unsigned i * Z.of_N (sizeof_dtyp τ) - Z.of_N (sizeof_dtyp τ)) with (Int64.unsigned i * Z.of_N (sizeof_dtyp τ) - (1 * Z.of_N (sizeof_dtyp τ))) by lia.
+          rewrite <- Z.mul_sub_distr_r.
+          apply Zmult_le_compat_r; lia.
+        }
+        
+        lia.
+    Qed.
 
     Lemma get_array_cell_write_no_overlap :
       forall m1 m2 ptr ptr' τ τ' i v uv sz elem_addr,
@@ -2532,10 +2686,10 @@ Section PARAMS.
       - unfold no_overlap.
         unfold no_overlap_b in HeqRHS.
         cbn in *.
-        destruct (x2 >? y2 + s) eqn: EQ2.
+        destruct (x2 >? (y2 + s) - 1) eqn: EQ2.
         + rewrite Z.gtb_lt in EQ2. right. left.
           rewrite Z.gt_lt_iff. auto.
-        + destruct (y2 >? x2 + s) eqn: EQ3.
+        + destruct (y2 >? (x2 + s) - 1) eqn: EQ3.
           * rewrite Z.gtb_lt in EQ3. right. right.
             rewrite Z.gt_lt_iff. auto.
           * destruct (x1 /~=? y1) eqn: EQ1.
@@ -2545,8 +2699,8 @@ Section PARAMS.
         unfold no_overlap_b in HeqRHS.
         cbn in *.
         destruct (x1 /~=? y1) eqn: EQ1; try inversion HeqRHS.
-        destruct (x2 >? y2 + s) eqn: EQ2; try inversion HeqRHS.
-        destruct (y2 >? x2 + s) eqn: EQ3; try inversion HeqRHS.
+        destruct (x2 >? (y2 + s) - 1) eqn: EQ2; try inversion HeqRHS.
+        destruct (y2 >? (x2 + s) - 1) eqn: EQ3; try inversion HeqRHS.
         intuition.
         + rewrite Z.gt_lt_iff in H2.
           rewrite <- Z.gtb_lt in H2.
