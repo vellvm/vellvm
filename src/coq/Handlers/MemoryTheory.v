@@ -2582,6 +2582,28 @@ Section PARAMS.
       cbn in *. auto.
     Qed.
 
+    Lemma interp_memory_GEP_array_addr : forall t a (size :N) m val i ptr,
+        get_array_cell m a i t = inr val ->
+          handle_gep_addr (DTYPE_Array size t) a [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat i))] = inr ptr ->
+          interp_memory (trigger (GEP
+                                    (DTYPE_Array size t)
+                                    (DVALUE_Addr a)
+                                    [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))])) m
+                        ≈ Ret (m, DVALUE_Addr ptr) /\
+          read m ptr t = inr val.
+    Proof.
+      intros * GET. intros.
+      pose proof get_array_succeeds_allocated _ _ _ _ GET as ALLOC.
+      pose proof @read_array m size t i a ptr ALLOC as RARRAY.
+      split.
+      - rewrite interp_memory_trigger. cbn.
+        cbn in RARRAY. destruct RARRAY. auto.
+        rewrite H2. cbn.
+        rewrite bind_ret_l. cbn. reflexivity.
+      - destruct RARRAY. eauto.
+        auto.
+    Qed.
+
     Lemma interp_memory_GEP_array' : forall t a size m val i,
         get_array_cell m a i t = inr val ->
         exists ptr,
@@ -2621,6 +2643,25 @@ Section PARAMS.
       intros t a size m val i GET.
       epose proof (@interp_memory_GEP_array' t a size m val i GET) as [ptr GEP].
       exists ptr. intuition.
+    Qed.
+
+    Lemma interp_memory_GEP_array_no_read_addr : forall t a size m i ptr,
+      dtyp_fits m a (DTYPE_Array size t) ->
+        handle_gep_addr (DTYPE_Array size t) a [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat i))] = inr ptr ->
+        interp_memory (trigger (GEP
+                                  (DTYPE_Array size t)
+                                  (DVALUE_Addr a)
+                                  [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat i))])) m
+                      ≈ Ret (m, DVALUE_Addr ptr).
+    Proof.
+      intros * FITS HGEP.
+      pose proof (dtyp_fits_allocated FITS) as ALLOC.
+      pose proof @read_array m size t i a ptr ALLOC as RARRAY.
+      destruct RARRAY. eauto.
+      rewrite interp_memory_trigger. cbn.
+      rewrite HGEP. cbn.
+      rewrite bind_ret_l.
+      reflexivity.
     Qed.
 
     Lemma interp_memory_GEP_array_no_read : forall t a size m i,

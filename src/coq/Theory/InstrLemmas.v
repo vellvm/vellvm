@@ -458,6 +458,75 @@ Proof.
   reflexivity.
 Qed.
 
+
+
+Lemma denote_instr_gep_array_no_read_addr :
+  forall i size τ defs e_ix ix ptr a g ρ m ptr_res,
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m
+    ≈
+    Ret (m, (ρ, (g, UVALUE_Addr a)))
+    ->
+    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m
+    ≈
+    Ret (m, (ρ, (g, UVALUE_I64 (repr (Z.of_nat ix)))))
+    ->
+    dtyp_fits m a (DTYPE_Array size τ) ->
+    handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat ix))] = inr ptr_res ->
+    interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m
+      ≈
+      Ret (m, (Maps.add i (UVALUE_Addr ptr_res) ρ, (g, tt))).
+Proof.
+  intros * PTR IX FITS HGEP.
+  pose proof @interp_cfg_to_L3_GEP_array_no_read_addr defs τ a size g ρ m ix ptr_res FITS.
+
+  cbn.
+  rewrite translate_bind.
+  rewrite bind_bind.
+  rewrite interp_cfg_to_L3_bind.
+
+  rewrite PTR.
+  rewrite bind_ret_l.
+
+  (* Could probably automate some of this fiddliness *)
+  repeat rewrite translate_bind.
+  repeat rewrite bind_bind.
+  rewrite translate_ret.
+  rewrite bind_ret_l.
+  repeat rewrite translate_bind.
+  repeat rewrite bind_bind.
+
+  rewrite interp_cfg_to_L3_bind.
+  rewrite IX.
+  rewrite bind_ret_l.
+
+  rewrite interp_cfg_to_L3_bind.
+  rewrite bind_ret_l.
+  rewrite translate_ret.
+  rewrite interp_cfg_to_L3_ret.
+  rewrite bind_ret_l.
+  rewrite translate_ret.
+  rewrite bind_ret_l.
+  cbn.
+  unfold ITree.map.
+  rewrite translate_bind.
+  rewrite bind_bind.
+
+  rewrite translate_trigger.
+  rewrite interp_cfg_to_L3_bind_trigger.
+  rewrite exp_E_to_instr_E_subevent.
+
+  rewrite H; auto.
+
+  rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_bind.
+  cbn.
+  rewrite translate_ret.
+  rewrite interp_cfg_to_L3_ret.
+  rewrite bind_ret_l.
+  rewrite interp_cfg_to_L3_LW.
+  reflexivity.
+Qed.
+
 Lemma denote_instr_gep_array_no_read :
   forall i size τ defs e_ix ix ptr a g ρ m,
     interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m
