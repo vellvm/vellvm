@@ -2022,13 +2022,74 @@ Section Memory_Stack_Theory.
       eapply lookup_member; eauto.
     Qed.
 
-    (* TODO: not sure how to show this, but it should be true? *)
-    Lemma IM_key_in_elements :
-      forall key elt m,
-        IM.In (elt:=elt) key m ->
-        In key (map fst (IM.elements (elt:=elt) m)).
+    Lemma NM_NS_In {elt:Type} (k:IM.key) (m:IM.t elt):
+      IM.In k m ->
+      IS.In k (ISP.of_list (map fst (IM.elements  m))).
     Proof.
-    Admitted.
+      pose proof (IM.elements_3w m) as U.
+      intros H.
+      rewrite <- IP.of_list_3 with (s:=m) in H.
+      unfold IP.of_list, IP.to_list in H.
+      generalize dependent (IM.elements m). intros l U H.
+      induction l.
+      -
+        simpl in H.
+        apply IP.F.empty_in_iff in H.
+        tauto.
+      -
+        destruct a as [k' v].
+        simpl in *.
+        destruct (Z.eq_decidable k k') as [K|NK].
+        +
+          (* k=k' *)
+          apply IS.add_1.
+          auto.
+        +
+          (* k!=k' *)
+          apply ISP.FM.add_neq_iff; try auto.
+          apply IHl.
+          *
+            inversion U.
+            auto.
+          *
+            eapply IP.F.add_neq_in_iff with (x:=k').
+            auto.
+            apply H.
+    Qed.
+
+    Lemma IM_key_in_elements :
+      forall k elt m,
+        IM.In (elt:=elt) k m ->
+        In k (map fst (IM.elements (elt:=elt) m)).
+    Proof.
+      intros k elt m H.
+      apply NM_NS_In in H.
+      pose proof (IM.elements_3w m) as U.
+      generalize dependent (IM.elements m). intros l U H.
+      induction l.
+      -
+        cbn in U.
+        apply ISP.FM.empty_iff in U.
+        trivial.
+      -
+        destruct a as [k' v].
+        simpl in *.
+        destruct (Z.eq_decidable k k') as [K|NK].
+        +
+          (* k=k' *)
+          left.
+          auto.
+        +
+          (* k!=k' *)
+          right.
+          apply IHl.
+          *
+            apply ISP.FM.add_neq_iff in U; auto.
+          *
+            clear IHl.
+            inv H.
+            auto.
+    Qed.
 
     Lemma allocated_next_key_diff :
       forall m ptr,
