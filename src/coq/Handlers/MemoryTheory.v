@@ -1109,16 +1109,20 @@ Section Memory_Stack_Theory.
         apply DynamicValues.Int1.repr_unsigned.
       - intros.
         simpl add_all_index; simpl sizeof_dtyp.
-        replace 8 with (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ 0)))))))) by reflexivity.
-        admit.
-      (* do 8 (rewrite lookup_all_index_add; try lia). *)
-      (* cbn; f_equal. *)
-      (* pose proof (unsigned_I8_in_range x). *)
-      (* repeat rewrite Byte.unsigned_repr. *)
-      (* all: unfold Byte.max_unsigned, Byte.modulus; cbn. *)
-      (* all: try lia. *)
-      (* all: admit. *)
-      - admit.
+        replace 8%N with (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ 0)))))))) by reflexivity.
+        do 8 (rewrite lookup_all_index_add; try lia).
+        cbn; f_equal.
+        pose proof (unsigned_I8_in_range x).
+        repeat rewrite Byte.unsigned_repr.
+        all: unfold Byte.max_unsigned, Byte.modulus; cbn.
+        1:{
+          repeat rewrite Z.div_small; try nia.
+          repeat rewrite Z.add_0_r.
+          apply Int8.repr_unsigned.
+        }
+        all: repeat rewrite Z.div_small; nia.
+      -
+
       - admit.
       - admit.
       - admit.
