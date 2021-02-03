@@ -1067,15 +1067,24 @@ Section Memory_Stack_Theory.
     unfold DynamicValues.Int1.modulus,DynamicValues.Int1.wordsize, DynamicValues.Wordsize1.wordsize, two_power_nat in *.
     cbn in *; lia.
   Qed.
-  {
-    Lemma unsigned_I8_in_range : forall (x : DynamicValues.int8),
+
+  Lemma unsigned_I8_in_range : forall (x : DynamicValues.int8),
       0 <= DynamicValues.Int8.unsigned x <= 255.
-    Proof.
-      destruct x as [x [? ?]].
-      cbn in *.
-      unfold DynamicValues.Int8.modulus,DynamicValues.Int8.wordsize, DynamicValues.Wordsize8.wordsize, two_power_nat in *.
-      cbn in *; lia.
-    Qed.
+  Proof.
+    destruct x as [x [? ?]].
+    cbn in *.
+    unfold DynamicValues.Int8.modulus,DynamicValues.Int8.wordsize, DynamicValues.Wordsize8.wordsize, two_power_nat in *.
+    cbn in *; lia.
+  Qed.
+
+  Lemma unsigned_I32_in_range : forall (x : DynamicValues.int32),
+      0 <= DynamicValues.Int32.unsigned x <= 4294967295.
+  Proof.
+    destruct x as [x [? ?]].
+    cbn in *.
+    unfold DynamicValues.Int32.modulus,DynamicValues.Int8.wordsize, DynamicValues.Wordsize8.wordsize, two_power_nat in *.
+    cbn in *; lia.
+  Qed.
 
     (** ** Deserialize - Serialize
         Starting from a dvalue [val] whose [dtyp] is [t], if:
@@ -1121,8 +1130,22 @@ Section Memory_Stack_Theory.
           apply Int8.repr_unsigned.
         }
         all: repeat rewrite Z.div_small; nia.
-      -
-
+      - intros.
+        simpl add_all_index; simpl sizeof_dtyp.
+        replace 8%N with (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ 0)))))))) by reflexivity.
+        do 8 (rewrite lookup_all_index_add; try lia).
+        cbn; f_equal.
+        pose proof (unsigned_I32_in_range x).
+        repeat rewrite Byte.unsigned_repr.
+        all: unfold Byte.max_unsigned, Byte.modulus; cbn.
+        1:{
+          repeat rewrite Z.div_small; try nia.
+          repeat rewrite Z.add_0_r.
+          apply Int32.repr_unsigned.
+          admit.
+        }
+        (* all: repeat rewrite Z.div_small; nia. *)
+        all: admit.
       - admit.
       - admit.
       - admit.
