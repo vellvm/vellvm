@@ -1138,11 +1138,16 @@ Section Memory_Stack_Theory.
         pose proof (unsigned_I32_in_range x).
         repeat rewrite Byte.unsigned_repr_eq.
         unfold Byte.max_unsigned, Byte.modulus, Byte.wordsize, Wordsize_8.wordsize; cbn.
-        match goal with
-        | [|- context[Int32.repr ?zv]] => remember zv as z
-        end.
+        replace (two_power_nat 8) with 256 by reflexivity.
         remember (Int32.unsigned x) as xv.
-        rewrite Z.add_0_r in Heqz.
+        match goal with
+        | [|- context[Int32.repr ?zv]] => replace zv with xv
+        end.
+        subst xv.
+        apply Int32.repr_unsigned.
+        clear -H.
+
+        rewrite Z.add_0_r.
         admit.
       - admit.
       - admit.
