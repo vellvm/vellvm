@@ -1136,16 +1136,14 @@ Section Memory_Stack_Theory.
         do 8 (rewrite lookup_all_index_add; try lia).
         cbn; f_equal.
         pose proof (unsigned_I32_in_range x).
-        repeat rewrite Byte.unsigned_repr.
-        all: unfold Byte.max_unsigned, Byte.modulus; cbn.
-        1:{
-          repeat rewrite Z.div_small; try nia.
-          repeat rewrite Z.add_0_r.
-          apply Int32.repr_unsigned.
-          admit.
-        }
-        (* all: repeat rewrite Z.div_small; nia. *)
-        all: admit.
+        repeat rewrite Byte.unsigned_repr_eq.
+        unfold Byte.max_unsigned, Byte.modulus, Byte.wordsize, Wordsize_8.wordsize; cbn.
+        match goal with
+        | [|- context[Int32.repr ?zv]] => remember zv as z
+        end.
+        remember (Int32.unsigned x) as xv.
+        rewrite Z.add_0_r in Heqz.
+        admit.
       - admit.
       - admit.
       - admit.
