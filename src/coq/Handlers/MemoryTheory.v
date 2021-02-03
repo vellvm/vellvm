@@ -1095,30 +1095,29 @@ Section Memory_Stack_Theory.
       - admit.
       - intros.
         simpl add_all_index; simpl sizeof_dtyp.
-        replace 8 with (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ 0)))))))) by reflexivity.
-        admit.
-        (* do 8 (rewrite lookup_all_index_add; try lia). *)
-        (* cbn; f_equal. *)
-        (* pose proof (unsigned_I1_in_range x). *)
-        (* assert (EQ :DynamicValues.Int1.unsigned x / 256 = 0). *)
-        (* apply Z.div_small; lia. *)
-        (* rewrite EQ. *)
-        (* repeat rewrite Zdiv_0_l. *)
-        (* repeat rewrite Byte.unsigned_repr. *)
-        (* all: unfold Byte.max_unsigned, Byte.modulus; cbn; try lia. *)
-        (* rewrite Z.add_0_r. *)
-        (* apply DynamicValues.Int1.repr_unsigned. *)
+        replace 8%N with (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ 0)))))))) by reflexivity.
+        do 8 (rewrite lookup_all_index_add; try lia).
+        cbn; f_equal.
+        pose proof (unsigned_I1_in_range x).
+        assert (EQ :DynamicValues.Int1.unsigned x / 256 = 0).
+        apply Z.div_small; lia.
+        rewrite EQ.
+        repeat rewrite Zdiv_0_l.
+        repeat rewrite Byte.unsigned_repr.
+        all: unfold Byte.max_unsigned, Byte.modulus; cbn; try lia.
+        rewrite Z.add_0_r.
+        apply DynamicValues.Int1.repr_unsigned.
       - intros.
         simpl add_all_index; simpl sizeof_dtyp.
         replace 8 with (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ (Z.succ 0)))))))) by reflexivity.
         admit.
-        (* do 8 (rewrite lookup_all_index_add; try lia). *)
-        (* cbn; f_equal. *)
-        (* pose proof (unsigned_I8_in_range x). *)
-        (* repeat rewrite Byte.unsigned_repr. *)
-        (* all: unfold Byte.max_unsigned, Byte.modulus; cbn. *)
-        (* all: try lia. *)
-        (* all: admit. *)
+      (* do 8 (rewrite lookup_all_index_add; try lia). *)
+      (* cbn; f_equal. *)
+      (* pose proof (unsigned_I8_in_range x). *)
+      (* repeat rewrite Byte.unsigned_repr. *)
+      (* all: unfold Byte.max_unsigned, Byte.modulus; cbn. *)
+      (* all: try lia. *)
+      (* all: admit. *)
       - admit.
       - admit.
       - admit.
