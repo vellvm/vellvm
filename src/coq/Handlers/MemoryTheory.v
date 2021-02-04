@@ -1478,7 +1478,47 @@ Section Memory_Stack_Theory.
           subst.
           lia.
       -
-        admit.
+        simpl add_all_index; simpl sizeof_dtyp.
+        replace 4%N with (N.succ (N.succ (N.succ (N.succ 0)))) by reflexivity.
+        do 4 (rewrite lookup_all_index_add; try lia).
+        cbn; f_equal.
+        clear bytes off.
+        remember (Float32.to_bits x) as xb.
+        pose proof (unsigned_I32_in_range xb).
+        repeat rewrite Byte.unsigned_repr_eq.
+        unfold Byte.modulus, Byte.wordsize, Wordsize_8.wordsize; cbn.
+        replace (two_power_nat 8) with 256 by reflexivity.
+        remember (Int32.unsigned xb) as xbv.
+        match goal with
+        | [|- context[Int32.repr ?zv]] => replace zv with xbv
+        end.
+        +
+          subst.
+          rewrite Int32.repr_unsigned.
+          apply Float32.of_to_bits.
+        +
+          clear -H.
+
+          rewrite Z.add_0_r.
+          unfold Z.modulo.
+          repeat break_let.
+          repeat match goal with
+                 | [H : Z.div_eucl _ _ = _ |- _] => apply Z_div_mod' in H; [destruct H | lia]
+                 end.
+          subst.
+          rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+          rewrite Zdiv_small with (x:=z0) in * by lia.
+          rewrite Z.add_0_l in *.
+          subst.
+          rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+          rewrite Zdiv_small with (x:=z2) in * by lia.
+          rewrite Z.add_0_l in *.
+          subst.
+          rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+          rewrite Zdiv_small with (x:=z4) in * by lia.
+          rewrite Z.add_0_l in *.
+          subst.
+          lia.
       -
         admit.
       -
