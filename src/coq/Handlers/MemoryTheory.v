@@ -1100,9 +1100,13 @@ Section Memory_Stack_Theory.
         forall off (bytes : mem_block),
           deserialize_sbytes (lookup_all_index off (sizeof_dtyp t) (add_all_index (serialize_dvalue val) off bytes) SUndef) t = dvalue_to_uvalue val.
     Proof.
-      induction 1; try auto.
-      - admit.
-      - intros.
+      induction 1; try auto; intros.
+      -
+        simpl add_all_index; simpl sizeof_dtyp.
+        replace 8%N with (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ 0)))))))) by reflexivity.
+        do 8 (rewrite lookup_all_index_add; try lia).
+        cbn; f_equal.
+      -
         simpl add_all_index; simpl sizeof_dtyp.
         replace 8%N with (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ 0)))))))) by reflexivity.
         do 8 (rewrite lookup_all_index_add; try lia).
@@ -1116,7 +1120,7 @@ Section Memory_Stack_Theory.
         all: unfold Byte.max_unsigned, Byte.modulus; cbn; try lia.
         rewrite Z.add_0_r.
         apply DynamicValues.Int1.repr_unsigned.
-      - intros.
+      -
         simpl add_all_index; simpl sizeof_dtyp.
         replace 8%N with (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ 0)))))))) by reflexivity.
         do 8 (rewrite lookup_all_index_add; try lia).
@@ -1151,11 +1155,16 @@ Section Memory_Stack_Theory.
         admit.
       - admit.
       -
-        intros off bytes.
         cbn.
         repeat (break_match; try reflexivity);
         contradict H;constructor.
-      - admit.
+      -
+        simpl add_all_index; simpl sizeof_dtyp.
+        replace 8%N with (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ 0)))))))) by reflexivity.
+        do 8 (rewrite lookup_all_index_add; try lia).
+        cbn; f_equal.
+        clear bytes off.
+        admit.
     Admitted.
 
     (** ** Write - Read
