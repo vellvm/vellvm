@@ -1363,7 +1363,58 @@ Section Memory_Stack_Theory.
         rewrite Z.add_0_l in H14.
         subst.
         all: lia.
-      - admit.
+      -
+        intros.
+        simpl add_all_index; simpl sizeof_dtyp.
+        replace 8%N with (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ (N.succ 0)))))))) by reflexivity.
+        do 8 (rewrite lookup_all_index_add; try lia).
+        cbn; f_equal.
+        pose proof (unsigned_I64_in_range x).
+        repeat rewrite Byte.unsigned_repr_eq.
+        unfold Byte.max_unsigned, Byte.modulus, Byte.wordsize, Wordsize_8.wordsize; cbn.
+        replace (two_power_nat 8) with 256 by reflexivity.
+        remember (Int64.unsigned x) as xv.
+        match goal with
+        | [|- context[Int64.repr ?zv]] => replace zv with xv
+        end.
+        subst xv.
+        apply Int64.repr_unsigned.
+        clear -H.
+        unfold Z.modulo.
+        repeat break_let.
+        repeat match goal with
+               | [H : Z.div_eucl _ _ = _ |- _] => apply Z_div_mod' in H; [destruct H | lia]
+               end.
+        subst.
+        rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+        rewrite Zdiv_small with (x:=z0) in * by lia.
+        rewrite Z.add_0_l in *.
+        subst.
+        rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+        rewrite Zdiv_small with (x:=z2) in * by lia.
+        rewrite Z.add_0_l in *.
+        subst.
+        rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+        rewrite Zdiv_small with (x:=z4) in * by lia.
+        rewrite Z.add_0_l in *.
+        subst.
+        rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+        rewrite Zdiv_small with (x:=z6) in * by lia.
+        rewrite Z.add_0_l in *.
+        subst.
+        rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+        rewrite Zdiv_small with (x:=z8) in * by lia.
+        rewrite Z.add_0_l in *.
+        subst.
+        rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+        rewrite Zdiv_small with (x:=z10) in * by lia.
+        rewrite Z.add_0_l in *.
+        subst.
+        rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+        rewrite Zdiv_small with (x:=z12) in * by lia.
+        rewrite Z.add_0_l in *.
+        subst.
+        lia.
       -
         cbn.
         repeat (break_match; try reflexivity);
