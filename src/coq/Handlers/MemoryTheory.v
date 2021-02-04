@@ -1520,6 +1520,10 @@ Section Memory_Stack_Theory.
           subst.
           lia.
       -
+        simpl add_all_index; simpl sizeof_dtyp.
+        replace 4%N with (N.succ (N.succ (N.succ (N.succ 0)))) by reflexivity.
+        do 4 (rewrite lookup_all_index_add; try lia).
+        cbn.
         admit.
       -
         admit.
