@@ -1150,7 +1150,11 @@ Section Memory_Stack_Theory.
         rewrite Z.add_0_r.
         admit.
       - admit.
-      - admit.
+      -
+        intros off bytes.
+        cbn.
+        repeat (break_match; try reflexivity);
+        contradict H;constructor.
       - admit.
     Admitted.
 
