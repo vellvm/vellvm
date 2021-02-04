@@ -1173,6 +1173,30 @@ Section Memory_Stack_Theory.
         (* hacky proof below. TODO: automate *)
         unfold Z.modulo.
         repeat break_let.
+
+        (*
+        repeat
+          match goal with
+          | [H: Z.div_eucl _ _ = _ |- _ ] => apply Z_div_mod' in H; try lia
+          end.
+        repeat match goal with
+        | [H: _ /\ _ |- _] => destruct H
+        end.
+        subst.
+
+        match goal with
+        | [H: context[(256 * _ + ?zz) / _] |- _] =>
+          idtac H;
+            idtac zz;
+            rewrite Z.add_comm in H;
+            rewrite Z.mul_comm in H;
+            rewrite Z_div_plus in H;
+            try rewrite Zdiv_small with (x:=zz) in H ; try lia;
+            try rewrite Z.add_0_l in H;
+            subst
+        end.
+         *)
+
         apply Z_div_mod' in Heqp.
         apply Z_div_mod' in Heqp0.
         apply Z_div_mod' in Heqp1.
