@@ -1374,11 +1374,23 @@ Section Memory_Stack_Theory.
         do 8 (rewrite lookup_all_index_add; try lia).
         cbn; f_equal.
         clear bytes off.
-        remember (Float.to_bits x) as b.
-        pose proof (unsigned_I64_in_range b).
+        remember (Float.to_bits x) as xb.
+        pose proof (unsigned_I64_in_range xb).
         repeat rewrite Byte.unsigned_repr_eq.
         unfold Byte.modulus, Byte.wordsize, Wordsize_8.wordsize; cbn.
         replace (two_power_nat 8) with 256 by reflexivity.
+        remember (Int64.unsigned xb) as xbv.
+        match goal with
+        | [|- context[Int64.repr ?zv]] => replace zv with xbv
+        end.
+        +
+          subst.
+          rewrite Int64.repr_unsigned.
+          apply Float.of_to_bits.
+        +
+          clear -H.
+          rewrite Z.add_0_r.
+          (* this is the same goal as I64 branch! *)
         admit.
     Admitted.
 
