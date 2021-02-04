@@ -1095,6 +1095,15 @@ Section Memory_Stack_Theory.
     cbn in *;lia.
   Qed.
 
+  Lemma Z_div_mod' :
+    forall a b q r : Z, b > 0 -> Z.div_eucl a b = (q, r) -> a = b * q + r /\ 0 <= r < b.
+  Proof.
+    intros.
+    pose proof (Z_div_mod a b H).
+    break_let.
+    congruence.
+  Qed.
+
     (** ** Deserialize - Serialize
         Starting from a dvalue [val] whose [dtyp] is [t], if:
         1. we serialize [val], getting a [list SByte]
@@ -1161,7 +1170,175 @@ Section Memory_Stack_Theory.
         clear -H.
 
         rewrite Z.add_0_r.
-        admit.
+        (* hacky proof below. TODO: automate *)
+        unfold Z.modulo.
+        repeat break_let.
+        apply Z_div_mod' in Heqp.
+        apply Z_div_mod' in Heqp0.
+        apply Z_div_mod' in Heqp1.
+        apply Z_div_mod' in Heqp2.
+        apply Z_div_mod' in Heqp3.
+        apply Z_div_mod' in Heqp4.
+        apply Z_div_mod' in Heqp5.
+        apply Z_div_mod' in Heqp6.
+        all: try lia.
+        destruct Heqp.
+        destruct Heqp0.
+        destruct Heqp1.
+        destruct Heqp2.
+        destruct Heqp3.
+        destruct Heqp4.
+        destruct Heqp5.
+        destruct Heqp6.
+        subst.
+        rewrite Z.add_comm in H2.
+        rewrite Z.mul_comm in H2.
+        rewrite Z_div_plus in H2.
+        rewrite Zdiv_small with (x:=z0) in H2 by lia.
+        rewrite Z.add_0_l in H2.
+        subst.
+        rewrite Z.add_comm in H4.
+        rewrite Z.mul_comm in H4.
+        rewrite Z_div_plus in H4.
+        rewrite Zdiv_small with (x:=z0) in H4 by lia.
+        rewrite Z.add_0_l in H4.
+        rewrite Z.add_comm in H4.
+        rewrite Z.mul_comm in H4.
+        rewrite Z_div_plus in H4.
+        rewrite Zdiv_small with (x:=z2) in H4 by lia.
+        rewrite Z.add_0_l in H4.
+        subst.
+        rewrite Z.add_comm in H6.
+        rewrite Z.mul_comm in H6.
+        rewrite Z_div_plus in H6.
+        rewrite Zdiv_small with (x:=z0) in H6 by lia.
+        rewrite Z.add_0_l in H6.
+        rewrite Z.add_comm in H6.
+        rewrite Z.mul_comm in H6.
+        rewrite Z_div_plus in H6.
+        rewrite Zdiv_small with (x:=z2) in H6 by lia.
+        rewrite Z.add_0_l in H6.
+        rewrite Z.add_comm in H6.
+        rewrite Z.mul_comm in H6.
+        rewrite Z_div_plus in H6.
+        rewrite Zdiv_small with (x:=z4) in H6 by lia.
+        rewrite Z.add_0_l in H6.
+        subst.
+        rewrite Z.add_comm in H8.
+        rewrite Z.mul_comm in H8.
+        rewrite Z_div_plus in H8.
+        rewrite Zdiv_small with (x:=z0) in H8 by lia.
+        rewrite Z.add_0_l in H8.
+        rewrite Z.add_comm in H8.
+        rewrite Z.mul_comm in H8.
+        rewrite Z_div_plus in H8.
+        rewrite Zdiv_small with (x:=z2) in H8 by lia.
+        rewrite Z.add_0_l in H8.
+        rewrite Z.add_comm in H8.
+        rewrite Z.mul_comm in H8.
+        rewrite Z_div_plus in H8.
+        rewrite Zdiv_small with (x:=z4) in H8 by lia.
+        rewrite Z.add_0_l in H8.
+        rewrite Z.add_comm in H8.
+        rewrite Z.mul_comm in H8.
+        rewrite Z_div_plus in H8.
+        rewrite Zdiv_small with (x:=z6) in H8 by lia.
+        rewrite Z.add_0_l in H8.
+        subst.
+        rewrite Z.add_comm in H10.
+        rewrite Z.mul_comm in H10.
+        rewrite Z_div_plus in H10.
+        rewrite Zdiv_small with (x:=z0) in H10 by lia.
+        rewrite Z.add_0_l in H10.
+        rewrite Z.add_comm in H10.
+        rewrite Z.mul_comm in H10.
+        rewrite Z_div_plus in H10.
+        rewrite Zdiv_small with (x:=z2) in H10 by lia.
+        rewrite Z.add_0_l in H10.
+        rewrite Z.add_comm in H10.
+        rewrite Z.mul_comm in H10.
+        rewrite Z_div_plus in H10.
+        rewrite Zdiv_small with (x:=z4) in H10 by lia.
+        rewrite Z.add_0_l in H10.
+        rewrite Z.add_comm in H10.
+        rewrite Z.mul_comm in H10.
+        rewrite Z_div_plus in H10.
+        rewrite Zdiv_small with (x:=z6) in H10 by lia.
+        rewrite Z.add_0_l in H10.
+        rewrite Z.add_comm in H10.
+        rewrite Z.mul_comm in H10.
+        rewrite Z_div_plus in H10.
+        rewrite Zdiv_small with (x:=z8) in H10 by lia.
+        rewrite Z.add_0_l in H10.
+        subst.
+        rewrite Z.add_comm in H12.
+        rewrite Z.mul_comm in H12.
+        rewrite Z_div_plus in H12.
+        rewrite Zdiv_small with (x:=z0) in H12 by lia.
+        rewrite Z.add_0_l in H12.
+        rewrite Z.add_comm in H12.
+        rewrite Z.mul_comm in H12.
+        rewrite Z_div_plus in H12.
+        rewrite Zdiv_small with (x:=z2) in H12 by lia.
+        rewrite Z.add_0_l in H12.
+        rewrite Z.add_comm in H12.
+        rewrite Z.mul_comm in H12.
+        rewrite Z_div_plus in H12.
+        rewrite Zdiv_small with (x:=z4) in H12 by lia.
+        rewrite Z.add_0_l in H12.
+        rewrite Z.add_comm in H12.
+        rewrite Z.mul_comm in H12.
+        rewrite Z_div_plus in H12.
+        rewrite Zdiv_small with (x:=z6) in H12 by lia.
+        rewrite Z.add_0_l in H12.
+        rewrite Z.add_comm in H12.
+        rewrite Z.mul_comm in H12.
+        rewrite Z_div_plus in H12.
+        rewrite Zdiv_small with (x:=z8) in H12 by lia.
+        rewrite Z.add_0_l in H12.
+        rewrite Z.add_comm in H12.
+        rewrite Z.mul_comm in H12.
+        rewrite Z_div_plus in H12.
+        rewrite Zdiv_small with (x:=z10) in H12 by lia.
+        rewrite Z.add_0_l in H12.
+        subst.
+        rewrite Z.add_comm in H14.
+        rewrite Z.mul_comm in H14.
+        rewrite Z_div_plus in H14.
+        rewrite Zdiv_small with (x:=z0) in H14 by lia.
+        rewrite Z.add_0_l in H14.
+        rewrite Z.add_comm in H14.
+        rewrite Z.mul_comm in H14.
+        rewrite Z_div_plus in H14.
+        rewrite Zdiv_small with (x:=z2) in H14 by lia.
+        rewrite Z.add_0_l in H14.
+        rewrite Z.add_comm in H14.
+        rewrite Z.mul_comm in H14.
+        rewrite Z_div_plus in H14.
+        rewrite Zdiv_small with (x:=z4) in H14 by lia.
+        rewrite Z.add_0_l in H14.
+        rewrite Z.add_comm in H14.
+        rewrite Z.mul_comm in H14.
+        rewrite Z_div_plus in H14.
+        rewrite Zdiv_small with (x:=z6) in H14 by lia.
+        rewrite Z.add_0_l in H14.
+        rewrite Z.add_comm in H14.
+        rewrite Z.mul_comm in H14.
+        rewrite Z_div_plus in H14.
+        rewrite Zdiv_small with (x:=z8) in H14 by lia.
+        rewrite Z.add_0_l in H14.
+        rewrite Z.add_comm in H14.
+        rewrite Z.mul_comm in H14.
+        rewrite Z_div_plus in H14.
+        rewrite Zdiv_small with (x:=z10) in H14 by lia.
+        rewrite Z.add_0_l in H14.
+        rewrite Z.add_comm in H14.
+        rewrite Z.mul_comm in H14.
+        rewrite Z_div_plus in H14.
+        rewrite Zdiv_small with (x:=z12) in H14 by lia.
+        rewrite Z.add_0_l in H14.
+        subst.
+        all: lia.
       - admit.
       -
         cbn.

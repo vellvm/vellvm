@@ -35,3 +35,4 @@ src/ml/libvellvm/.merlin
 .lia.cache
 src/.ll_files.tmp
 src/coq/.lia.cache
+*.cache

@@ -106,6 +106,13 @@ Ltac break_match_goal :=
     goal. *)
 Ltac break_match := break_match_goal || break_match_hyp.
 
+(** [break_let] breaks a destructuring [let] for a pair. *)
+Ltac break_let :=
+  match goal with
+    | [ H : context [ (let (_,_) := ?X in _) ] |- _ ] => destruct X eqn:?
+    | [ |- context [ (let (_,_) := ?X in _) ] ] => destruct X eqn:?
+  end.
+
 Ltac inv_option :=
   match goal with
   | h: Some _ = Some _ |-  _ => inv h
