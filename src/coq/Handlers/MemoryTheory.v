@@ -1524,12 +1524,28 @@ Section Memory_Stack_Theory.
         replace 4%N with (N.succ (N.succ (N.succ (N.succ 0)))) by reflexivity.
         do 4 (rewrite lookup_all_index_add; try lia).
         cbn.
+        (* unimplemented type [DTYPE_Half] *)
         admit.
       -
+        simpl add_all_index; simpl sizeof_dtyp.
+        replace 4%N with (N.succ (N.succ (N.succ (N.succ 0)))) by reflexivity.
+        do 4 (rewrite lookup_all_index_add; try lia).
+        cbn.
+        (* unimplemented type [DTYPE_X86_fp80] *)
         admit.
       -
+        simpl add_all_index; simpl sizeof_dtyp.
+        replace 4%N with (N.succ (N.succ (N.succ (N.succ 0)))) by reflexivity.
+        do 4 (rewrite lookup_all_index_add; try lia).
+        cbn.
+        (* unimplemented type [DTYPE_Fp128] *)
         admit.
       -
+        simpl add_all_index; simpl sizeof_dtyp.
+        replace 4%N with (N.succ (N.succ (N.succ (N.succ 0)))) by reflexivity.
+        do 4 (rewrite lookup_all_index_add; try lia).
+        cbn.
+        (* unimplemented type [DTYPE_Ppc_fp128] *)
         admit.
       -
         admit.
