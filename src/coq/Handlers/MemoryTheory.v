@@ -1439,9 +1439,61 @@ Section Memory_Stack_Theory.
           rewrite Int64.repr_unsigned.
           apply Float.of_to_bits.
         +
+          (* this is the same goal as I64 branch! *)
           clear -H.
           rewrite Z.add_0_r.
-          (* this is the same goal as I64 branch! *)
+          unfold Z.modulo.
+          repeat break_let.
+          repeat match goal with
+                 | [H : Z.div_eucl _ _ = _ |- _] => apply Z_div_mod' in H; [destruct H | lia]
+                 end.
+          subst.
+          rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+          rewrite Zdiv_small with (x:=z0) in * by lia.
+          rewrite Z.add_0_l in *.
+          subst.
+          rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+          rewrite Zdiv_small with (x:=z2) in * by lia.
+          rewrite Z.add_0_l in *.
+          subst.
+          rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+          rewrite Zdiv_small with (x:=z4) in * by lia.
+          rewrite Z.add_0_l in *.
+          subst.
+          rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+          rewrite Zdiv_small with (x:=z6) in * by lia.
+          rewrite Z.add_0_l in *.
+          subst.
+          rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+          rewrite Zdiv_small with (x:=z8) in * by lia.
+          rewrite Z.add_0_l in *.
+          subst.
+          rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+          rewrite Zdiv_small with (x:=z10) in * by lia.
+          rewrite Z.add_0_l in *.
+          subst.
+          rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
+          rewrite Zdiv_small with (x:=z12) in * by lia.
+          rewrite Z.add_0_l in *.
+          subst.
+          lia.
+      -
+        admit.
+      -
+        admit.
+      -
+        admit.
+      -
+        admit.
+      -
+        admit.
+      -
+        admit.
+      -
+        admit.
+      -
+        admit.
+      -
         admit.
     Admitted.
 
