@@ -1086,6 +1086,15 @@ Section Memory_Stack_Theory.
     cbn in *; lia.
   Qed.
 
+  Lemma unsigned_I64_in_range : forall (x : DynamicValues.int64),
+      0 <= DynamicValues.Int64.unsigned x <= 18446744073709551615.
+  Proof.
+    destruct x as [x [? ?]].
+    cbn in *.
+    unfold DynamicValues.Int32.modulus,DynamicValues.Int8.wordsize, Int64.modulus, DynamicValues.Wordsize8.wordsize, two_power_nat in *.
+    cbn in *;lia.
+  Qed.
+
     (** ** Deserialize - Serialize
         Starting from a dvalue [val] whose [dtyp] is [t], if:
         1. we serialize [val], getting a [list SByte]
@@ -1164,6 +1173,11 @@ Section Memory_Stack_Theory.
         do 8 (rewrite lookup_all_index_add; try lia).
         cbn; f_equal.
         clear bytes off.
+        remember (Float.to_bits x) as b.
+        pose proof (unsigned_I64_in_range b).
+        repeat rewrite Byte.unsigned_repr_eq.
+        unfold Byte.modulus, Byte.wordsize, Wordsize_8.wordsize; cbn.
+        replace (two_power_nat 8) with 256 by reflexivity.
         admit.
     Admitted.
 
