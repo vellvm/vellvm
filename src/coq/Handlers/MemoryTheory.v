@@ -1,4 +1,3 @@
-
 From Coq Require Import
      Morphisms ZArith List String Lia
      FSets.FMapAVL
@@ -1941,41 +1940,6 @@ Section Memory_Stack_Theory.
           eapply NU; eauto.
     Qed.
 
-    (* Lemma read_value_has_dtyp : forall mem a τ v dv, *)
-    (*     is_supported τ -> *)
-    (*     not_pointer τ -> *)
-    (*     non_void τ -> *)
-    (*     read mem a τ = inr v -> *)
-    (*     uvalue_to_dvalue v = inr dv -> *)
-    (*     dvalue_has_dtyp dv τ. *)
-    (* Proof. *)
-    (*   intros mem a τ v dv SUP NP NV READ CONVERT. *)
-    (*   unfold read in READ. *)
-    (*   break_match; try solve [inversion READ]. *)
-    (*   break_match; subst. *)
-    (*   unfold read_in_mem_block in READ. *)
-    (*   unfold deserialize_sbytes in READ. *)
-    (*   break_match. *)
-    (*   - (* Fully defined *) *)
-    (*     inversion SUP; *)
-    (*       try solve [exfalso; auto]; *)
-    (*       try solve [inversion READ; subst; inversion CONVERT; subst; constructor]. *)
-
-    (*     +  *)
-    (*     unfold deserialize_sbytes_defined in READ. *)
-    (*     cbn in *. *)
-    (*     + inversion READ; subst; inversion CONVERT; subst. *)
-    (*       constructor. *)
-    (*     + unfold deserialize_sbytes_defined in READ *)
-    (*       break_match; inversion SUP; subst. *)
-    (*       inversion READ; subst; inversion CONVERT; subst; *)
-    (*       constructor. *)
-
-    (*   - (* UNDEF, actually a contradiction *) *)
-    (*     inversion READ; subst. *)
-    (*     cbn in CONVERT. inversion CONVERT. *)
-    (* Qed. *)
-
     Lemma allocate_succeeds : forall m1 τ,
         non_void τ ->
         exists m2 a, allocate m1 τ = inr (m2, a).
@@ -2455,31 +2419,6 @@ Section Memory_Stack_Theory.
           apply ALLOC.
     Qed.
 
-    Lemma handle_gep_array_no_overlap :
-      forall i ptr ptr' τ τ' sz elem_addr,
-        no_overlap_dtyp ptr τ ptr' (DTYPE_Array sz τ') ->
-        handle_gep_addr (DTYPE_Array sz τ') ptr' [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr elem_addr ->
-        (N.of_nat i < sz)%N ->
-        no_overlap_dtyp ptr τ elem_addr τ'.
-    Proof.
-      intros i [b1 o1] [b2 o2] τ τ' sz elem_addr OVER GEP BOUNDS;
-        inversion GEP; subst.
-      - unfold no_overlap_dtyp in *.
-        cbn in *.
-        unfold no_overlap in *.
-        destruct OVER as [OVER | [OVER | OVER]].
-        + left. auto.
-        + right. left.
-          cbn in *.
-          (* TODO: this is a mess... *)
-          replace (DynamicValues.Int64.unsigned (DynamicValues.Int64.repr 0)) with 0.
-          admit.
-          admit.
-        + right. right.
-          cbn in *.
-          admit.
-    Admitted.
-
     (* ext_memory only talks in terms of reads... Does not
        necessarily preserved what's allocated, because you might
        not be able to read from an allocated block *)
@@ -2491,12 +2430,8 @@ Section Memory_Stack_Theory.
     Proof.
       intros m1 m2 m3 τ v1 v2 dst [NEW1 OLD1] [NEW2 OLD2].
       split; auto.
-
       intros a' τ' ALLOC DISJOINT.
-
-
       rewrite <- OLD1; eauto.
-
       pose proof (allocated_can_read _ _ τ' ALLOC) as [v READ].
       rewrite <- OLD1 in READ; eauto.
       apply can_read_allocated in READ.
@@ -2558,7 +2493,6 @@ Section Memory_Stack_Theory.
       reflexivity.
     Qed.
 
-
     Lemma no_overlap_dtyp_array_different_indices:
       forall ix i ptrll elem_addr1 elem_addr2 sz τ,
         handle_gep_addr (DTYPE_Array sz τ) ptrll [DVALUE_I64 (repr 0); DVALUE_I64 ix] = inr elem_addr1 ->
@@ -2599,38 +2533,6 @@ Section Memory_Stack_Theory.
         }
         
         lia.
-    Qed.
-
-    Lemma get_array_cell_write_no_overlap :
-      forall m1 m2 ptr ptr' τ τ' i v uv sz elem_addr,
-        write m1 ptr v = inr m2 ->
-        dvalue_has_dtyp v τ ->
-
-        no_overlap_dtyp ptr τ ptr' (DTYPE_Array sz τ') ->
-        allocated ptr' m1 ->
-        handle_gep_addr (DTYPE_Array sz τ') ptr' [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr elem_addr ->
-        (N.of_nat i < sz)%N ->
-        get_array_cell m1 ptr' i τ' = inr uv ->
-        get_array_cell m2 ptr' i τ' = inr uv.
-    Proof.
-      intros m1 m2 ptr ptr' τ τ' i v uv sz elem_addr WRITE TYP NEQ ALLOC GEP POS GET.
-
-      pose proof (write_preserves_allocated ALLOC WRITE) as ALLOC2.
-
-      apply write_correct in WRITE.
-      destruct WRITE.
-      specialize (is_written0 τ TYP).
-      destruct is_written0.
-
-      erewrite <- read_array in GET; eauto.
-      erewrite <- read_array; eauto.
-
-      erewrite -> old_lu0; eauto.
-
-      eapply handle_gep_addr_allocated; eauto.
-
-      cbn in GEP.
-      eapply handle_gep_array_no_overlap; eauto.
     Qed.
 
     Definition equiv : memory_stack -> memory_stack -> Prop :=
@@ -2718,6 +2620,44 @@ Section Memory_Stack_Theory.
       erewrite 2 Zlength_correct.
       do 2 rewrite <- nat_N_Z.
       erewrite 2 sizeof_serialized; eauto.
+    Qed.
+
+    Lemma write_different_blocks :
+      forall m m2 p p' v v2 dv2 τ τ',
+        write m p v = inr m2 ->
+        read m p' τ = inr v2 ->
+        fst p <> fst p' ->
+        uvalue_to_dvalue v2 = inr dv2 ->
+        dvalue_has_dtyp dv2 τ ->
+        dvalue_has_dtyp v τ' ->
+        read m2 p' τ = inr v2.
+    Proof.
+      intros m m2 p p' v v2 dv2 τ τ' WRITE READ NEQ UVDV TYP1 TYP2.
+      erewrite write_untouched; eauto.
+      unfold no_overlap_dtyp.
+      unfold no_overlap.
+      left. auto.
+    Qed.
+
+    Lemma read_in_mem_block_type :
+      forall bytes a τ v,
+        read_in_mem_block bytes a τ = v ->
+        uvalue_has_dtyp v τ.
+    Proof.
+    Admitted.
+
+    Lemma read_type :
+      forall m p τ v,
+        read m p τ = inr v ->
+        uvalue_has_dtyp v τ.
+    Proof.
+      intros m p τ v READ.
+      unfold read in *.
+      break_match; inversion READ.
+      clear H0.
+      break_match; subst.
+      inversion READ.
+      eapply read_in_mem_block_type; eauto.
     Qed.
 
 End Memory_Stack_Theory.
@@ -3013,31 +2953,6 @@ Section PARAMS.
         reflexivity.
       - auto.
     Qed.
-
-    (* Lemma write_read : *)
-    (*   forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr), *)
-    (*     write m a val = inr m' -> *)
-    (*     read m' a t = inr (dvalue_to_uvalue val). *)
-    (* Proof. *)
-    (*   intros m m' t val a Hwrite. *)
-    (*   unfold write in Hwrite. *)
-    (*   unfold read. *)
-    (*   destruct (get_logical_block m a) eqn:Hbk. *)
-    (*   - destruct l eqn:Hl. destruct a as [b o]. *)
-    (*     cbn in Hbk. *)
-    (*     cbn in Hwrite. *)
-    (*     inversion Hwrite. *)
-    (*     cbn. *)
-
-    (*     (* TODO: clean this up *) *)
-    (*     epose proof get_logical_block_of_add_logical_block m (b, o). *)
-    (*     unfold get_logical_block in H2. *)
-    (*     rewrite H2. clear H2. *)
-
-    (*     rewrite blah. *)
-    (*     reflexivity. *)
-    (*   - inversion Hwrite. *)
-    (* Qed. *)
 
     Lemma no_overlap_reflect :
       forall x y s, reflect (no_overlap x s y s) (no_overlap_b x s y s).

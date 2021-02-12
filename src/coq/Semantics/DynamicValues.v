@@ -514,23 +514,6 @@ Fixpoint is_concrete (uv : uvalue) : bool :=
   (* | UVALUE_Select cnd v1 v2 => allb is_concrete [cnd ; v1 ; v2] *)
   end.
 
-(*
-(* YZ: TODO: need a more general induction principle over uvalue to prove this due to Structs/Arrays/Vectors *)
-Lemma uvalue_to_dvalue_is_concrete: forall uv,
-    is_concrete uv = true <-> exists v, uvalue_to_dvalue uv = inr v.
-Proof.
-  induction uv using uvalue_ind'; simpl; split; intros HX;
-    first [easy | eexists; reflexivity  | destruct HX; easy | idtac].
-  - exists (match (map_monad uvalue_to_dvalue fields) with
-       | inl _ => DVALUE_None
-       | inr v0 => DVALUE_Struct v0
-       end).
-    admit.
-  - 
-Admitted.  
-*)
-
-
 (* If both operands are concrete, uvalue_to_dvalue them and run them through
    opd, else run the abstract ones through opu *)
 Definition uvalue_to_dvalue_binop {A : Type}

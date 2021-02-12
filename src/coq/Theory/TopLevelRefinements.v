@@ -56,7 +56,6 @@ Import R.
    * admitted statement of inclusion of the intepreter into the model;
  **)
 
-
 (** The module _Refinement.Make_ defines a series of refinements between
     [itree]s at the various signatures of events a Vellvm goes through during
     the chain of interpretations leading to the definition of the model.
