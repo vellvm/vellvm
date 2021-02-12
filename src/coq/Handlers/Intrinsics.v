@@ -77,20 +77,19 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
      semantic functions.
    *)
 
-  Definition defs_assoc (user_intrinsics: intrinsic_definitions) := List.map (fun '(a,b) =>
+  Definition defs_assoc := List.map (fun '(a,b) =>
                                   match dc_name a with
                                   | Name s => (s,b)
                                   | _ => ("",b)
                                   end
-                               ) (user_intrinsics ++ defined_intrinsics).
+                               ) defined_intrinsics.
 
-  Definition handle_intrinsics {E} `{FailureE -< E} `{IntrinsicE -< E}
-             (user_intrinsics: intrinsic_definitions) : IntrinsicE ~> itree E :=
+  Definition handle_intrinsics {E} `{FailureE -< E} `{IntrinsicE -< E} : IntrinsicE ~> itree E :=
     (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
     fun X (e : IntrinsicE X) =>
       match e in IntrinsicE Y return X = Y -> itree E Y with
       | (Intrinsic _ fname args) =>
-          match assoc fname (defs_assoc user_intrinsics) with
+          match assoc fname defs_assoc with
           | Some f => fun pf =>
                        match f args with
                        | inl msg => raise msg
@@ -108,35 +107,34 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     Definition E_trigger : Handler E Eff := fun _ e => trigger e.
     Definition F_trigger : Handler F Eff := fun _ e => trigger e.
 
-    Definition interp_intrinsics_h (user_intrinsics: intrinsic_definitions) :=
-      (case_ E_trigger (case_ (handle_intrinsics user_intrinsics) F_trigger)).
+    Definition interp_intrinsics_h :=
+      (case_ E_trigger (case_ handle_intrinsics F_trigger)).
 
-    Definition interp_intrinsics (user_intrinsics: intrinsic_definitions):
+    Definition interp_intrinsics :
       forall R, itree Eff R -> itree Eff R :=
-      interp (interp_intrinsics_h user_intrinsics).
-
+      interp interp_intrinsics_h.
 
     Section Structural_Lemmas.
 
       Lemma interp_intrinsics_bind :
-        forall (R S : Type) l (t : itree Eff R) (k : R -> itree _ S),
-          interp_intrinsics l (ITree.bind t k) ≅ ITree.bind (interp_intrinsics l t) (fun r : R => interp_intrinsics l (k r)).
+        forall (R S : Type) (t : itree Eff R) (k : R -> itree _ S),
+          interp_intrinsics (ITree.bind t k) ≅ ITree.bind (interp_intrinsics t) (fun r : R => interp_intrinsics (k r)).
       Proof.
         intros; apply interp_bind.
       Qed.
 
       Lemma interp_intrinsics_ret :
-        forall (R : Type) l (x: R),
-          interp_intrinsics l (Ret x: itree Eff _) ≅ Ret x.
+        forall (R : Type) (x: R),
+          interp_intrinsics (Ret x: itree Eff _) ≅ Ret x.
       Proof.
         intros; apply interp_ret.
       Qed.
 
       Lemma interp_intrinsics_vis_eqit:
         forall {X R} (e : Eff X)
-          (kk : X -> itree Eff R) defs,
-          interp_intrinsics defs (Vis e kk) ≅
-          ITree.bind (interp_intrinsics_h defs e) (fun x : X => Tau (interp (interp_intrinsics_h defs) (kk x))).
+          (kk : X -> itree Eff R),
+          interp_intrinsics (Vis e kk) ≅
+          ITree.bind (interp_intrinsics_h e) (fun x : X => Tau (interp_intrinsics (kk x))).
       Proof.
         intros.
         unfold interp_intrinsics.
@@ -146,9 +144,9 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
       Lemma interp_intrinsics_vis:
         forall X R (e : Eff X)
-          (kk : X -> itree Eff R) defs,
-          interp_intrinsics defs (Vis e kk) ≈
-                            ITree.bind (interp_intrinsics_h defs e) (fun x : X => interp (interp_intrinsics_h defs) (kk x)).
+          (kk : X -> itree Eff R),
+          interp_intrinsics (Vis e kk) ≈
+          ITree.bind (interp_intrinsics_h e) (fun x : X => interp_intrinsics (kk x)).
       Proof.
         intros.
         rewrite interp_intrinsics_vis_eqit.
@@ -157,8 +155,8 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       Qed.
 
       Lemma interp_intrinsics_trigger:
-        forall X (e : Eff X) defs,
-          interp_intrinsics defs (ITree.trigger e) ≈ interp_intrinsics_h defs e.
+        forall X (e : Eff X),
+          interp_intrinsics (ITree.trigger e) ≈ interp_intrinsics_h e.
       Proof.
         intros *.
         unfold interp_intrinsics.
@@ -167,10 +165,9 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       Qed.
 
       Lemma interp_intrinsics_bind_trigger_eqit:
-        forall X R (e : Eff X)
-          (kk : X -> itree Eff R) defs,
-          interp_intrinsics defs (ITree.bind (trigger e) kk) ≅
-                            ITree.bind (interp_intrinsics_h defs e) (fun x : X => Tau (interp (interp_intrinsics_h defs) (kk x))).
+        forall X R (e : Eff X) (kk : X -> itree Eff R),
+          interp_intrinsics (ITree.bind (trigger e) kk) ≅
+          ITree.bind (interp_intrinsics_h e) (fun x : X => Tau (interp_intrinsics (kk x))).
       Proof.
         intros *.
         unfold interp_intrinsics.
@@ -180,10 +177,9 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       Qed.
 
       Lemma interp_intrinsics_bind_trigger:
-        forall X R (e : Eff X)
-          (kk : X -> itree Eff R) defs,
-          interp_intrinsics defs (ITree.bind (trigger e) kk) ≈
-                            ITree.bind (interp_intrinsics_h defs e) (fun x : X => interp (interp_intrinsics_h defs) (kk x)).
+        forall X R (e : Eff X) (kk : X -> itree Eff R),
+          interp_intrinsics (ITree.bind (trigger e) kk) ≈
+          ITree.bind (interp_intrinsics_h e) (fun x : X => interp_intrinsics (kk x)).
       Proof.
         intros.
         rewrite interp_intrinsics_bind_trigger_eqit.
@@ -191,8 +187,8 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         intros ?; tau_steps; reflexivity.
       Qed.
 
-      Global Instance eutt_interp_intrinsics (user_intrinsics: intrinsic_definitions) {R} :
-        Proper (eutt Logic.eq ==> eutt Logic.eq) (@interp_intrinsics user_intrinsics R).
+      Global Instance eutt_interp_intrinsics {R} :
+        Proper (eutt Logic.eq ==> eutt Logic.eq) (@interp_intrinsics R).
       Proof.
         do 2 red; intros * EQ.
         unfold interp_intrinsics.

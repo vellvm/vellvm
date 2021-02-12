@@ -199,21 +199,20 @@ Definition denote_vellvm_main (mcfg : CFG.mcfg dtyp) : itree L0 uvalue :=
      Now that we know how to denote a whole llvm program, we can _interpret_
      the resulting [itree].
  *)
-Definition interpreter_user
+Definition interpreter_gen
            (ret_typ : dtyp)
            (entry : string)
            (args : list uvalue)
-           (user_intrinsics: intrinsic_definitions)
            (prog: list (toplevel_entity typ (block typ * list (block typ))))
   : itree L5 res_L4 :=
   let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-  interp_to_L5_exec user_intrinsics t [] ([],[]) empty_memory_stack.
+  interp_to_L5_exec t [] ([],[]) empty_memory_stack.
 
 (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts 
      from "main" using bogus initial inputs.
  *)
-Definition interpreter := interpreter_user (DTYPE_I 32%N) "main" main_args [].
+Definition interpreter := interpreter_gen (DTYPE_I 32%N) "main" main_args.
 
 (**
      We now turn to the definition of our _model_ of vellvm's semantics. The
@@ -230,14 +229,13 @@ Definition model_user
            (ret_typ : dtyp)
            (entry : string)
            (args : list uvalue)
-           (user_intrinsics: IS.intrinsic_definitions)
            (prog: list (toplevel_entity typ (block typ * list (block typ))))
   : PropT L5 (memory_stack * (local_env * lstack * (global_env * uvalue))) :=
   let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-  interp_to_L5 Logic.eq user_intrinsics t [] ([],[]) empty_memory_stack. 
+  interp_to_L5 Logic.eq t [] ([],[]) empty_memory_stack. 
 
 (**
      Finally, the official model assumes no user-defined intrinsics.
  *)
-Definition model := model_user (DTYPE_I 32%N) "main" main_args [].
+Definition model := model_user (DTYPE_I 32%N) "main" main_args.
 

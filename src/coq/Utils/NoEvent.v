@@ -932,9 +932,9 @@ Admitted.
 Variable remove_pick_ub : itree (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' DebugE +' FailureE).
 Variable deterministic_vellvm : forall R, itree L0 R -> Prop.
 (* Definition deterministic_vellvm *)
-Lemma deterministc_llvm_is_singleton : forall defs R RR t g sl mem,
+Lemma deterministc_llvm_is_singleton : forall R RR t g sl mem,
     deterministic_vellvm t ->
-    is_singleton (interp_to_L5 (R := R) RR defs t g sl mem) (remove_pick_ub (interp_to_L3 (R := R) defs t g sl mem)).
+    is_singleton (interp_to_L5 (R := R) RR t g sl mem) (remove_pick_ub (interp_to_L3 (R := R) t g sl mem)).
 
   (*
     Then the same statement on llvm syntax by applying it with (t := denote_llvm p)
