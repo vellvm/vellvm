@@ -96,12 +96,6 @@ Proof.
   eapply subrelation_prod_left. apply subrelation_R_TT. all: apply PR.
 Qed.
 
-(* TODO and move to DynamicValues. Do not move before proved or it breaks extraction *)
-Global Instance eq_dec_uvalue: RelDec.RelDec (@Logic.eq uvalue).
-Admitted.
-Global Instance eq_dec_uvalue_correct: @RelDec.RelDec_Correct uvalue (@Logic.eq uvalue) _.
-Admitted.
-
 Import AlistNotations.
 Lemma alist_find_eq_dec_local_env : 
   forall k (m1 m2 : local_env),
@@ -206,7 +200,6 @@ Qed.
   Variable ret_typ : dtyp.
   Variable entry : string.
   Variable args : list uvalue.
-  Variable user_intrinsics: IS.intrinsic_definitions.
 
   Definition denote_vellvm_init := denote_vellvm ret_typ entry args.
   
@@ -217,23 +210,23 @@ Qed.
 
 Definition model_to_L1  (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L1 user_intrinsics L0_trace [].
+  interp_to_L1 L0_trace [].
 
 Definition model_to_L2 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L2 user_intrinsics L0_trace [] ([],[]).
+  interp_to_L2 L0_trace [] ([],[]).
 
 Definition model_to_L3 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L3 user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
+  interp_to_L3 L0_trace [] ([],[]) empty_memory_stack.
 
 Definition model_to_L4 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L4 (refine_res3) user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
+  interp_to_L4 (refine_res3) L0_trace [] ([],[]) empty_memory_stack.
 
 Definition model_to_L5 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L5 (refine_res3) user_intrinsics L0_trace [] ([],[]) empty_memory_stack.
+  interp_to_L5 (refine_res3) L0_trace [] ([],[]) empty_memory_stack.
 
 (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -370,7 +363,7 @@ Theorem interpreter_sound: forall p, model p (interpreter p).
 Proof.
   intros p.
   unfold model, model_user.
-  unfold interpreter, interpreter_user.
+  unfold interpreter, interpreter_gen.
   unfold interp_to_L5.
   unfold interp_to_L5_exec.
   apply refine_UB.  auto.
@@ -386,9 +379,9 @@ End REFINEMENT.
 (** We hence can also commute them at the various levels of interpretation *)
 
 Lemma interp_to_L2_bind:
-  forall ui {R S} (t: itree L0 R) (k: R -> itree L0 S) s1 s2,
-    interp_to_L2 ui (ITree.bind t k) s1 s2 ≈
-                 (ITree.bind (interp_to_L2 ui t s1 s2) (fun '(s1',(s2',x)) => interp_to_L2 ui (k x) s2' s1')).
+  forall {R S} (t: itree L0 R) (k: R -> itree L0 S) s1 s2,
+    interp_to_L2 (ITree.bind t k) s1 s2 ≈
+                 (ITree.bind (interp_to_L2 t s1 s2) (fun '(s1',(s2',x)) => interp_to_L2 (k x) s2' s1')).
 Proof.
   intros.
   unfold interp_to_L2.
@@ -396,14 +389,16 @@ Proof.
   apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros ? (? & ? & ?) ->; reflexivity].
 Qed.
 
-Lemma interp_to_L2_ret: forall ui (R : Type) s1 s2 (x : R), interp_to_L2 ui (Ret x) s1 s2 ≈ Ret (s2, (s1, x)).
+Lemma interp_to_L2_ret:
+  forall (R : Type) s1 s2 (x : R),
+    interp_to_L2 (Ret x) s1 s2 ≈ Ret (s2, (s1, x)).
 Proof.
   intros; unfold interp_to_L2.
   rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret; reflexivity.
 Qed.
 
 Definition interp_cfg {R: Type} (trace: itree instr_E R) g l m :=
-  let uvalue_trace   := interp_intrinsics [] trace in
+  let uvalue_trace   := interp_intrinsics trace in
   let L1_trace       := interp_global uvalue_trace g in
   let L2_trace       := interp_local L1_trace l in
   let L3_trace       := interp_memory L2_trace m in

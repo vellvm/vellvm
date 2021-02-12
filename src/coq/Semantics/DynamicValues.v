@@ -666,7 +666,6 @@ Section DecidableEquality.
     | _, _ => false
     end.
 
-
   Lemma dvalue_eq_dec : forall (d1 d2:dvalue), {d1 = d2} + {d1 <> d2}.
     refine (fix f d1 d2 :=
     let lsteq_dec := list_eq_dec f in
@@ -724,6 +723,178 @@ Section DecidableEquality.
   Global Instance eq_dec_dvalue : RelDec (@eq dvalue) := RelDec_from_dec (@eq dvalue) (@dvalue_eq_dec).
   Global Instance eqv_dvalue : Eqv dvalue := (@eq dvalue).
   Hint Unfold eqv_dvalue : core.
+
+	Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
+    refine (fix f t1 t2 :=
+              let lsteq_dec := list_eq_dec f in
+              match t1, t2 with
+              | DTYPE_I n, DTYPE_I m => _
+              | DTYPE_Pointer, DTYPE_Pointer => _
+              | DTYPE_Void, DTYPE_Void => _
+              | DTYPE_Half, DTYPE_Half => _
+              | DTYPE_Float, DTYPE_Float => _
+              | DTYPE_Double, DTYPE_Double => _
+              | DTYPE_Fp128, DTYPE_Fp128 => _
+              | DTYPE_X86_fp80, DTYPE_X86_fp80 => _
+              | DTYPE_Ppc_fp128, DTYPE_Ppc_fp128 => _
+              | DTYPE_Metadata, DTYPE_Metadata => _
+              | DTYPE_X86_mmx, DTYPE_X86_mmx => _
+              | DTYPE_Array n t, DTYPE_Array m t' => _
+              | DTYPE_Struct l, DTYPE_Struct l' => _
+              | DTYPE_Packed_struct l, DTYPE_Packed_struct l' => _
+              | DTYPE_Opaque, DTYPE_Opaque => _
+              | DTYPE_Vector n t, DTYPE_Vector m t' => _
+              | _, _ => _
+              end); try (ltac:(dec_dvalue); fail).
+    - destruct (N.eq_dec n m).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (N.eq_dec n m).
+      * destruct (f t t').
+      + left; subst; reflexivity.
+      + right; intros H; inversion H. contradiction.
+        * right; intros H; inversion H. contradiction.
+    - destruct (lsteq_dec l l').
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (lsteq_dec l l').
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (N.eq_dec n m).
+      * destruct (f t t').
+      + left; subst; reflexivity.
+      + right; intros H; inversion H. contradiction.
+        * right; intros H; inversion H. contradiction.
+  Qed.
+  Arguments dtyp_eq_dec: clear implicits.
+
+ Lemma ibinop_eq_dec : forall (op1 op2:ibinop), {op1 = op2} + {op1 <> op2}.
+    intros.
+    repeat decide equality.
+  Qed.
+
+  Lemma fbinop_eq_dec : forall (op1 op2:fbinop), {op1 = op2} + {op1 <> op2}.
+    intros.
+    repeat decide equality.
+  Qed.
+
+  Lemma icmp_eq_dec : forall (op1 op2:icmp), {op1 = op2} + {op1 <> op2}.
+    intros.
+    repeat decide equality.
+  Qed.
+
+  Lemma fcmp_eq_dec : forall (op1 op2:fcmp), {op1 = op2} + {op1 <> op2}.
+    intros.
+    repeat decide equality.
+  Qed.
+
+  Lemma fast_math_eq_dec : forall (op1 op2:fast_math), {op1 = op2} + {op1 <> op2}.
+    intros.
+    repeat decide equality.
+  Qed.
+
+  Lemma conversion_type_eq_dec : forall (op1 op2:conversion_type), {op1 = op2} + {op1 <> op2}.
+    intros.
+    repeat decide equality.
+  Qed.
+
+  Arguments ibinop_eq_dec: clear implicits.
+  Arguments fbinop_eq_dec: clear implicits.
+  Arguments icmp_eq_dec: clear implicits.
+  Arguments fcmp_eq_dec: clear implicits.
+  Arguments fast_math_eq_dec: clear implicits.
+  Arguments conversion_type_eq_dec: clear implicits.
+
+  Ltac __abs := right; intros H; inversion H; contradiction.
+  Ltac __eq := left; subst; reflexivity.
+
+  Lemma uvalue_eq_dec : forall (u1 u2:uvalue), {u1 = u2} + {u1 <> u2}.
+  Proof with (try (__eq || __abs)).
+    refine (fix f u1 u2 :=
+              let lsteq_dec := list_eq_dec f in
+              match u1, u2 with
+              | UVALUE_Addr a1, UVALUE_Addr a2 => _
+              | UVALUE_I1 x1, UVALUE_I1 x2 => _
+              | UVALUE_I8 x1, UVALUE_I8 x2 => _
+              | UVALUE_I32 x1, UVALUE_I32 x2 => _
+              | UVALUE_I64 x1, UVALUE_I64 x2 => _
+              | UVALUE_Double x1, UVALUE_Double x2 => _
+              | UVALUE_Float x1, UVALUE_Float x2 => _
+              | UVALUE_Undef t1, UVALUE_Undef t2 => _
+              | UVALUE_Poison, UVALUE_Poison => _
+              | UVALUE_None, UVALUE_None => _
+              | UVALUE_Struct f1, UVALUE_Struct f2 => _
+              | UVALUE_Packed_struct f1, UVALUE_Packed_struct f2 => _
+              | UVALUE_Array f1, UVALUE_Array f2 => _
+              | UVALUE_Vector f1, UVALUE_Vector f2 => _
+              | UVALUE_IBinop op uv1 uv2, UVALUE_IBinop op' uv1' uv2' => _
+              | UVALUE_ICmp op uv1 uv2, UVALUE_ICmp op' uv1' uv2' => _
+              | UVALUE_FBinop op fm uv1 uv2, UVALUE_FBinop op' fm' uv1' uv2' => _
+              | UVALUE_FCmp op uv1 uv2, UVALUE_FCmp op' uv1' uv2' => _
+              | UVALUE_Conversion ct u t, UVALUE_Conversion ct' u' t' => _
+              | UVALUE_GetElementPtr t u l, UVALUE_GetElementPtr t' u' l' => _
+              | UVALUE_ExtractElement u v, UVALUE_ExtractElement u' v' => _
+              | UVALUE_InsertElement u v t, UVALUE_InsertElement u' v' t' => _
+              | UVALUE_ShuffleVector u v t, UVALUE_ShuffleVector u' v' t' => _
+              | UVALUE_ExtractValue u l, UVALUE_ExtractValue u' l' => _
+              | UVALUE_InsertValue u v l, UVALUE_InsertValue u' v' l' => _
+              | UVALUE_Select u v t, UVALUE_Select u' v' t' => _
+              | _, _ => _
+              end); try (ltac:(dec_dvalue); fail).
+    - destruct (A.eq_dec a1 a2)...
+    - destruct (Int1.eq_dec x1 x2)...
+    - destruct (Int8.eq_dec x1 x2)...
+    - destruct (Int32.eq_dec x1 x2)...
+    - destruct (Int64.eq_dec x1 x2)...
+    - destruct (Float.eq_dec x1 x2)...
+    - destruct (Float32.eq_dec x1 x2)...
+    - destruct (dtyp_eq_dec t1 t2)...
+    - destruct (lsteq_dec f1 f2)...
+    - destruct (lsteq_dec f1 f2)...
+    - destruct (lsteq_dec f1 f2)...
+    - destruct (lsteq_dec f1 f2)...
+    - destruct (ibinop_eq_dec op op')...
+      destruct (f uv1 uv1')...
+      destruct (f uv2 uv2')...
+    - destruct (icmp_eq_dec op op')...
+      destruct (f uv1 uv1')...
+      destruct (f uv2 uv2')...
+    - destruct (fbinop_eq_dec op op')...
+      destruct (list_eq_dec fast_math_eq_dec fm fm')...
+      destruct (f uv1 uv1')...
+      destruct (f uv2 uv2')...
+    - destruct (fcmp_eq_dec op op')...
+      destruct (f uv1 uv1')...
+      destruct (f uv2 uv2')...
+    - destruct (conversion_type_eq_dec ct ct')...
+      destruct (f u u')...
+      destruct (dtyp_eq_dec t t')...
+    - destruct (dtyp_eq_dec t t')...
+      destruct (f u u')...
+      destruct (lsteq_dec l l')...
+    - destruct (f u u')...
+      destruct (f v v')...
+    - destruct (f u u')...
+      destruct (f v v')...
+      destruct (f t t')...
+    - destruct (f u u')...
+      destruct (f v v')...
+      destruct (f t t')...
+    - destruct (f u u')...
+      destruct (list_eq_dec Int.eq_dec l l')...
+    - destruct (f u u')...
+      destruct (f v v')...
+      destruct (list_eq_dec Int.eq_dec l l')...
+    - destruct (f u u')...
+      destruct (f v v')...
+      destruct (f t t')...
+  Qed.
+
+  Global Instance eq_dec_uvalue : RelDec (@eq uvalue) := RelDec_from_dec (@eq uvalue) (@uvalue_eq_dec).
+  Global Instance eqv_uvalue : Eqv uvalue := (@eq uvalue).
+  Hint Unfold eqv_uvalue : core.
+  Global Instance eq_dec_uvalue_correct: @RelDec.RelDec_Correct uvalue (@Logic.eq uvalue) _ := _.
+
 End DecidableEquality.
 
 (* TODO: include Undefined values in this way? i.e. Undef is really a predicate on values

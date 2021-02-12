@@ -69,9 +69,9 @@ Section Translations.
   
 End Translations.
 
-Lemma denote_exp_GR :forall defs g l m id v τ,
+Lemma denote_exp_GR :forall g l m id v τ,
     Maps.lookup id g = Some v ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) (EXP_Ident (ID_Global id)))) g l m
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) (EXP_Ident (ID_Global id)))) g l m
     ≈
     Ret (m,(l,(g,dvalue_to_uvalue v))).
 Proof.
@@ -88,9 +88,9 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma denote_exp_LR :forall defs g l m id v τ,
+Lemma denote_exp_LR :forall g l m id v τ,
     Maps.lookup id l = Some v ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) (EXP_Ident (ID_Local id)))) g l m
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) (EXP_Ident (ID_Local id)))) g l m
     ≈
     Ret (m,(l,(g,v))).
 Proof.
@@ -121,8 +121,8 @@ Proof.
   cbn.  lia.
 Qed.
 
-Lemma denote_exp_i64 :forall defs t g l m,
-    interp_cfg_to_L3 defs
+Lemma denote_exp_i64 :forall t g l m,
+    interp_cfg_to_L3
                      (translate exp_E_to_instr_E
                                 (denote_exp (Some (DTYPE_I 64))
                                             (EXP_Integer (Integers.Int64.intval t))))
@@ -135,8 +135,8 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma denote_exp_i64_repr :forall defs t g l m,
-    interp_cfg_to_L3 defs
+Lemma denote_exp_i64_repr :forall t g l m,
+    interp_cfg_to_L3
                      (translate exp_E_to_instr_E
                                 (denote_exp (Some (DTYPE_I 64))
                                             (EXP_Integer t)))
@@ -149,8 +149,8 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma denote_exp_double :forall defs t g l m,
-    interp_cfg_to_L3 defs
+Lemma denote_exp_double :forall t g l m,
+    interp_cfg_to_L3
                      (translate exp_E_to_instr_E
                                 (denote_exp (Some DTYPE_Double)
                                             (EXP_Double t)))
@@ -164,19 +164,19 @@ Proof.
 Qed.
 
 Lemma denote_conversion_concrete :
-  forall (conv : conversion_type) τ1 τ2 e g ρ m x a av defs,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ1) e)) g ρ m
+  forall (conv : conversion_type) τ1 τ2 e g ρ m x a av,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ1) e)) g ρ m
     ≈
     Ret (m, (ρ, (g, a)))
     ->
     uvalue_to_dvalue a = inr av ->
     eval_conv conv τ1 av τ2  = ret x ->
-    interp_cfg_to_L3 defs
+    interp_cfg_to_L3
    (translate exp_E_to_instr_E
       (denote_exp None
          (OP_Conversion conv τ1 e τ2))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
 Proof.
-  intros conv τ1 τ2 e g ρ m x a av defs A AV EVAL.
+  intros conv τ1 τ2 e g ρ m x a av A AV EVAL.
 
   cbn.
   rewrite translate_bind.
@@ -257,18 +257,18 @@ Proof.
 Qed.
 
 Lemma denote_ibinop_concrete :
-  forall (op : ibinop) τ e0 e1 g ρ m x a av b bv defs,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) e0)) g ρ m
+  forall (op : ibinop) τ e0 e1 g ρ m x a av b bv,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e0)) g ρ m
     ≈
     Ret (m, (ρ, (g, a)))
     ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) e1)) g ρ m
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e1)) g ρ m
     ≈
     Ret (m, (ρ, (g, b))) ->
     uvalue_to_dvalue a = inr av ->
     uvalue_to_dvalue b = inr bv ->
     eval_iop op av bv  = ret x ->
-    interp_cfg_to_L3 defs
+    interp_cfg_to_L3
     (translate exp_E_to_instr_E
       (denote_exp None
          (OP_IBinop op τ e0 e1))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
@@ -305,19 +305,19 @@ Proof.
 Qed.
 
 Lemma denote_fbinop_concrete :
-  forall (op : fbinop) τ e0 e1 g ρ m x a av b bv defs params,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) e0)) g ρ m
+  forall (op : fbinop) τ e0 e1 g ρ m x a av b bv params,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e0)) g ρ m
     ≈ 
     Ret (m, (ρ, (g, a)))
     ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) e1)) g ρ m
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e1)) g ρ m
     ≈
     Ret (m, (ρ, (g, b)))
     ->
     uvalue_to_dvalue a = inr av ->
     uvalue_to_dvalue b = inr bv ->
     eval_fop op av bv  = ret x ->
-   interp_cfg_to_L3 defs
+   interp_cfg_to_L3
    (translate exp_E_to_instr_E
       (denote_exp None
          (OP_FBinop op params τ e0 e1))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
@@ -354,19 +354,19 @@ Proof.
 Qed.
 
 Lemma denote_fcmp_concrete :
-  forall (op : fcmp) τ e0 e1 g ρ m x a av b bv defs,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) e0)) g ρ m
+  forall (op : fcmp) τ e0 e1 g ρ m x a av b bv,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e0)) g ρ m
     ≈
     Ret (m, (ρ, (g, a)))
     ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) e1)) g ρ m
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e1)) g ρ m
     ≈
     Ret (m, (ρ, (g, b)))
     ->
     uvalue_to_dvalue a = inr av ->
     uvalue_to_dvalue b = inr bv ->
     eval_fcmp op av bv  = ret x ->
-    interp_cfg_to_L3 defs
+    interp_cfg_to_L3
     (translate exp_E_to_instr_E
       (denote_exp None
          (OP_FCmp op τ e0 e1))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
@@ -399,19 +399,19 @@ Proof.
 Qed.
 
 Lemma denote_icmp_concrete :
-  forall (op : icmp) τ e0 e1 g ρ m x a av b bv defs,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) e0)) g ρ m
+  forall (op : icmp) τ e0 e1 g ρ m x a av b bv,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e0)) g ρ m
     ≈
     Ret (m, (ρ, (g, a)))
     ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τ) e1)) g ρ m
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e1)) g ρ m
     ≈
     Ret (m, (ρ, (g, b)))
     ->
     uvalue_to_dvalue a = inr av ->
     uvalue_to_dvalue b = inr bv ->
     eval_icmp op av bv  = ret x ->
-    interp_cfg_to_L3 defs
+    interp_cfg_to_L3
     (translate exp_E_to_instr_E
       (denote_exp None
          (OP_ICmp op τ e0 e1))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
@@ -452,8 +452,8 @@ Definition pure {E R} (t : global_env -> local_env -> memory_stack -> itree E (m
 Require Import String.
 Opaque append.
 
-Lemma failure_is_pure : forall R s defs,
-    pure (R := R) (interp_cfg_to_L3 defs (translate exp_E_to_instr_E (raise s))).
+Lemma failure_is_pure : forall R s,
+    pure (R := R) (interp_cfg_to_L3 (translate exp_E_to_instr_E (raise s))).
 Proof.
   unfold pure, has_post, raise, Exception.throw; intros.
   rewrite translate_vis.
@@ -469,8 +469,8 @@ Proof.
   apply eutt_eq_bind; intros (_ & ? & ? & []).
 Qed.
 
-Lemma UB_is_pure : forall R s defs,
-    pure (R := R) (interp_cfg_to_L3 defs (translate exp_E_to_instr_E (raiseUB s))).
+Lemma UB_is_pure : forall R s,
+    pure (R := R) (interp_cfg_to_L3 (translate exp_E_to_instr_E (raiseUB s))).
 Proof.
   unfold pure, has_post, raiseUB; intros.
   rewrite translate_vis.
@@ -522,10 +522,10 @@ Proof.
     rewrite interp_state_ret; reflexivity.
 Qed.
 
-Lemma interp_cfg_to_L3_map_monad {A B} defs g l m (xs : list A) (ts : A -> itree _ B) : 
-  interp_cfg_to_L3 defs (map_monad ts xs) g l m ≈
+Lemma interp_cfg_to_L3_map_monad {A B} g l m (xs : list A) (ts : A -> itree _ B) : 
+  interp_cfg_to_L3 (map_monad ts xs) g l m ≈
                    map_monad (m := Monads.stateT _ (Monads.stateT _ (Monads.stateT _ (itree _))))
-                   (fun a => interp_cfg_to_L3 defs (ts a)) xs g l m.
+                   (fun a => interp_cfg_to_L3 (ts a)) xs g l m.
 Proof.
   intros; revert g l m; induction xs as [| a xs IH]; simpl; intros.
   - rewrite interp_cfg_to_L3_ret; reflexivity.
@@ -572,7 +572,7 @@ Qed.
 (*     intros [s' ?] [] [EQ ?]; inv EQ; cbn; apply eutt_Ret; auto.  *)
 (* Qed. *)
 
-Lemma expr_are_pure : forall defs o e, pure (interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp o e))).
+Lemma expr_are_pure : forall o e, pure (interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp o e))).
 Proof.
   intros; unfold pure, has_post.
   induction e; simpl; intros.

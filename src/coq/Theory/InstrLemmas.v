@@ -33,12 +33,12 @@ Open Scope itree_scope.
 
 (* TODO: Move this *)
 Lemma interp_cfg_to_L3_concretize_or_pick_concrete :
-  forall (uv : uvalue) (dv : dvalue) P defs g ρ m,
+  forall (uv : uvalue) (dv : dvalue) P g ρ m,
     is_concrete uv ->
     uvalue_to_dvalue uv = inr dv ->
-    interp_cfg_to_L3 defs (concretize_or_pick uv P) g ρ m ≈ Ret (m, (ρ, (g, dv))).
+    interp_cfg_to_L3 (concretize_or_pick uv P) g ρ m ≈ Ret (m, (ρ, (g, dv))).
 Proof.
-  intros uv dv P defs g ρ m CONC CONV.
+  intros uv dv P g ρ m CONC CONV.
   unfold concretize_or_pick.
   rewrite CONC.
   cbn.
@@ -125,11 +125,11 @@ Qed.
 
 (* TODO: Move this *)
 Lemma interp_cfg_to_L3_concretize_or_pick_concrete_exists :
-  forall (uv : uvalue) P defs g ρ m,
+  forall (uv : uvalue) P g ρ m,
     is_concrete uv ->
-    exists dv, uvalue_to_dvalue uv = inr dv /\ interp_cfg_to_L3 defs (concretize_or_pick uv P) g ρ m ≈ Ret (m, (ρ, (g, dv))).
+    exists dv, uvalue_to_dvalue uv = inr dv /\ interp_cfg_to_L3 (concretize_or_pick uv P) g ρ m ≈ Ret (m, (ρ, (g, dv))).
 Proof.
-  intros uv P defs g ρ m CONC.
+  intros uv P g ρ m CONC.
   pose proof is_concrete_uvalue_to_dvalue uv CONC as (dv & CONV).
   exists dv.
   split; auto.
@@ -138,10 +138,10 @@ Qed.
 
 (* TODO: Move this *)
 Lemma interp_cfg_to_L3_pick :
-  forall uv P defs g ρ m,
-    interp_cfg_to_L3 defs (trigger (pick uv P)) g ρ m ≈ ITree.bind (trigger (pick uv P)) (fun dv => Ret (m, (ρ, (g, dv)))).
+  forall uv P g ρ m,
+    interp_cfg_to_L3 (trigger (pick uv P)) g ρ m ≈ ITree.bind (trigger (pick uv P)) (fun dv => Ret (m, (ρ, (g, dv)))).
 Proof.
-  intros uv P defs g ρ m.
+  intros uv P g ρ m.
   unfold interp_cfg_to_L3.
 
   rewrite interp_intrinsics_trigger.
@@ -177,11 +177,11 @@ Qed.
 
 (* TODO; Move this *)
 Lemma interp_cfg_to_L3_concretize_or_pick_not_concrete :
-  forall (uv : uvalue) (dv : dvalue) P defs g ρ m,
+  forall (uv : uvalue) (dv : dvalue) P g ρ m,
     is_concrete uv = false ->
-    interp_cfg_to_L3 defs (concretize_or_pick uv P) g ρ m ≈ ITree.bind (trigger (pick uv P)) (fun dv => Ret (m, (ρ, (g, dv)))).
+    interp_cfg_to_L3 (concretize_or_pick uv P) g ρ m ≈ ITree.bind (trigger (pick uv P)) (fun dv => Ret (m, (ρ, (g, dv)))).
 Proof.
-  intros uv dv P defs g ρ m NCONC.
+  intros uv dv P g ρ m NCONC.
   unfold concretize_or_pick.
   rewrite NCONC.
   rewrite interp_cfg_to_L3_pick.
@@ -191,12 +191,12 @@ Qed.
 (** Lemmas about denote_instr *)
 
 Lemma denote_instr_load :
-  forall (i : raw_id) volatile τ τp ptr align defs g ρ ρ' m a uv,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τp) ptr)) g ρ m ≈ Ret (m, (ρ', (g, UVALUE_Addr a))) ->
+  forall (i : raw_id) volatile τ τp ptr align g ρ ρ' m a uv,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τp) ptr)) g ρ m ≈ Ret (m, (ρ', (g, UVALUE_Addr a))) ->
     read m a τ = inr uv ->
-    interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Load volatile τ (τp, ptr) align)) g ρ m ≈ Ret (m, (Maps.add i uv ρ', (g, tt))).
+    interp_cfg_to_L3 (denote_instr (IId i, INSTR_Load volatile τ (τp, ptr) align)) g ρ m ≈ Ret (m, (Maps.add i uv ρ', (g, tt))).
 Proof.
-  intros i volatile τ τp ptr align defs g ρ ρ' m a uv EXP READ.
+  intros i volatile τ τp ptr align g ρ ρ' m a uv EXP READ.
   cbn.
   rewrite interp_cfg_to_L3_bind.
   rewrite EXP.
@@ -213,14 +213,14 @@ Proof.
 Qed.
 
 Lemma denote_instr_store :
-  forall (i : int) volatile τv val τp ptr align defs uv dv a g ρ ρ' ρ'' m m',
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τv) val)) g ρ m ≈ Ret (m, (ρ', (g, uv))) ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τp) ptr)) g ρ' m ≈ Ret (m, (ρ'', (g, UVALUE_Addr a))) ->
+  forall (i : int) volatile τv val τp ptr align uv dv a g ρ ρ' ρ'' m m',
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τv) val)) g ρ m ≈ Ret (m, (ρ', (g, uv))) ->
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τp) ptr)) g ρ' m ≈ Ret (m, (ρ'', (g, UVALUE_Addr a))) ->
     uvalue_to_dvalue uv = inr dv ->
     write m a dv = inr m' ->
-    interp_cfg_to_L3 defs (denote_instr (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align)) g ρ m ≈ Ret (m', (ρ'', (g, tt))).
+    interp_cfg_to_L3 (denote_instr (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align)) g ρ m ≈ Ret (m', (ρ'', (g, tt))).
 Proof.
-  intros i volatile τv val τp ptr align defs uv dv a g ρ ρ' ρ'' m m' EXP PTR CONV_UV WRITE.
+  intros i volatile τv val τp ptr align uv dv a g ρ ρ' ρ'' m m' EXP PTR CONV_UV WRITE.
   cbn.
   rewrite interp_cfg_to_L3_bind.
   rewrite EXP.
@@ -248,31 +248,31 @@ Proof.
 Qed.
 
 Lemma denote_instr_store_exists :
-  forall (i : int) volatile τv val τp ptr align defs uv dv a g ρ ρ' ρ'' m,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τv) val)) g ρ m ≈ Ret (m, (ρ', (g, uv))) ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some τp) ptr)) g ρ' m ≈ Ret (m, (ρ'', (g, UVALUE_Addr a))) ->
+  forall (i : int) volatile τv val τp ptr align uv dv a g ρ ρ' ρ'' m,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τv) val)) g ρ m ≈ Ret (m, (ρ', (g, uv))) ->
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τp) ptr)) g ρ' m ≈ Ret (m, (ρ'', (g, UVALUE_Addr a))) ->
     uvalue_to_dvalue uv = inr dv ->
     dvalue_has_dtyp dv τv ->
     dtyp_fits m a τv ->
     exists m',
-      write m a dv = inr m' /\ interp_cfg_to_L3 defs (denote_instr (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align)) g ρ m ≈ Ret (m', (ρ'', (g, tt))).
+      write m a dv = inr m' /\ interp_cfg_to_L3 (denote_instr (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align)) g ρ m ≈ Ret (m', (ρ'', (g, tt))).
 Proof.
-  intros i volatile τv val τp ptr align defs uv dv a g ρ ρ' ρ'' m EXP PTR CONV_UV TYP FITS.
+  intros i volatile τv val τp ptr align uv dv a g ρ ρ' ρ'' m EXP PTR CONV_UV TYP FITS.
   apply write_succeeds with (v:=dv) in FITS as [m2 WRITE]; auto.
   exists m2. split; auto.
   eapply denote_instr_store; eauto.
 Qed.
 
 Lemma denote_instr_alloca_exists :
-  forall (m : memory_stack) (τ : dtyp) g ρ i align nb defs,
+  forall (m : memory_stack) (τ : dtyp) g ρ i align nb,
     non_void τ ->
     exists m' a,
       allocate m τ = inr (m', a) /\
-      interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Alloca τ nb align)) g ρ m ≈ Ret (m', (Maps.add i (UVALUE_Addr a) ρ, (g, tt))).
+      interp_cfg_to_L3 (denote_instr (IId i, INSTR_Alloca τ nb align)) g ρ m ≈ Ret (m', (Maps.add i (UVALUE_Addr a) ρ, (g, tt))).
 Proof.
-  intros m τ g ρ i align nb defs NV.
+  intros m τ g ρ i align nb NV.
 
-  pose proof interp_cfg_to_L3_alloca defs m τ g ρ NV as (m' & a & ALLOC & TRIGGER).
+  pose proof interp_cfg_to_L3_alloca m τ g ρ NV as (m' & a & ALLOC & TRIGGER).
   exists m'. exists a. split; auto.
 
   cbn. rewrite interp_cfg_to_L3_bind.
@@ -283,19 +283,19 @@ Proof.
 Qed.
 
 Lemma denote_instr_comment :
-  forall i str g ρ m defs,
-    interp_cfg_to_L3 defs (denote_instr (i, INSTR_Comment str)) g ρ m ≈ Ret (m, (ρ, (g, tt))).
+  forall i str g ρ m,
+    interp_cfg_to_L3 (denote_instr (i, INSTR_Comment str)) g ρ m ≈ Ret (m, (ρ, (g, tt))).
 Proof.
-  intros i str g ρ m defs.
+  intros i str g ρ m.
   destruct i; cbn; rewrite interp_cfg_to_L3_ret; reflexivity.
 Qed.
 
 Lemma denote_instr_op :
-  forall (i : raw_id) (op : exp dtyp) defs uv g ρ ρ' m,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp None op)) g ρ m ≈ Ret (m, (ρ', (g, uv))) ->
-    interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op op)) g ρ m ≈ Ret (m, (Maps.add i uv ρ', (g, tt))).
+  forall (i : raw_id) (op : exp dtyp) uv g ρ ρ' m,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp None op)) g ρ m ≈ Ret (m, (ρ', (g, uv))) ->
+    interp_cfg_to_L3 (denote_instr (IId i, INSTR_Op op)) g ρ m ≈ Ret (m, (Maps.add i uv ρ', (g, tt))).
 Proof.
-  intros i op defs uv g ρ ρ' m OP.
+  intros i op uv g ρ ρ' m OP.
   cbn.
   unfold denote_op.
   rewrite interp_cfg_to_L3_bind.
@@ -314,12 +314,12 @@ Qed.
 
 
 Lemma denote_instr_gep_array :
-  forall i size τ defs e_ix ix ptr a val g ρ m,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m
+  forall i size τ e_ix ix ptr a val g ρ m,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m
     ≈
     Ret (m, (ρ, (g, UVALUE_Addr a)))
     ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m
     ≈
     Ret (m, (ρ, (g, UVALUE_I64 (repr (Z.of_nat ix)))))
     ->
@@ -327,13 +327,13 @@ Lemma denote_instr_gep_array :
     ->
     exists ptr_res,
       read m ptr_res τ = inr val /\
-      interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m
+      interp_cfg_to_L3 (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m
       ≈
       Ret (m, (Maps.add i (UVALUE_Addr ptr_res) ρ, (g, tt))).
 Proof.
-  intros i size τ defs e_ix ix ptr a val g ρ m PTR IX GET.
+  intros i size τ e_ix ix ptr a val g ρ m PTR IX GET.
 
-  pose proof interp_cfg_to_L3_GEP_array defs τ a size g ρ m val ix GET as (ptr_res & EQ & READ).
+  pose proof interp_cfg_to_L3_GEP_array τ a size g ρ m val ix GET as (ptr_res & EQ & READ).
   exists ptr_res. split; auto.
 
   cbn.
@@ -385,12 +385,12 @@ Proof.
 Qed.
 
 Lemma denote_instr_gep_array' :
-  forall i size τ defs e_ix ix ptr a val g ρ m,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m
+  forall i size τ e_ix ix ptr a val g ρ m,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m
     ≈
     Ret (m, (ρ, (g, UVALUE_Addr a)))
     ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m
     ≈
     Ret (m, (ρ, (g, UVALUE_I64 (repr (Z.of_nat ix)))))
     ->
@@ -399,13 +399,13 @@ Lemma denote_instr_gep_array' :
     exists ptr_res,
       read m ptr_res τ = inr val /\
       handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat ix))] = inr ptr_res /\
-      interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m
+      interp_cfg_to_L3 (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m
       ≈
       Ret (m, (Maps.add i (UVALUE_Addr ptr_res) ρ, (g, tt))).
 Proof.
-  intros i size τ defs e_ix ix ptr a val g ρ m PTR IX GET.
+  intros i size τ e_ix ix ptr a val g ρ m PTR IX GET.
 
-  pose proof interp_cfg_to_L3_GEP_array' defs τ a size g ρ m val ix GET as (ptr_res & EQ & GEP & READ).
+  pose proof interp_cfg_to_L3_GEP_array' τ a size g ρ m val ix GET as (ptr_res & EQ & GEP & READ).
   exists ptr_res.
   split; auto.
   split; auto.
@@ -461,23 +461,23 @@ Qed.
 
 
 Lemma denote_instr_gep_array_no_read_addr :
-  forall i size τ defs e_ix ix ptr a g ρ m ptr_res,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m
+  forall i size τ e_ix ix ptr a g ρ m ptr_res,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m
     ≈
     Ret (m, (ρ, (g, UVALUE_Addr a)))
     ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m
     ≈
     Ret (m, (ρ, (g, UVALUE_I64 (repr (Z.of_nat ix)))))
     ->
     dtyp_fits m a (DTYPE_Array size τ) ->
     handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat ix))] = inr ptr_res ->
-    interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m
+    interp_cfg_to_L3 (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m
       ≈
       Ret (m, (Maps.add i (UVALUE_Addr ptr_res) ρ, (g, tt))).
 Proof.
   intros * PTR IX FITS HGEP.
-  pose proof @interp_cfg_to_L3_GEP_array_no_read_addr defs τ a size g ρ m ix ptr_res FITS.
+  pose proof @interp_cfg_to_L3_GEP_array_no_read_addr τ a size g ρ m ix ptr_res FITS.
 
   cbn.
   rewrite translate_bind.
@@ -528,25 +528,25 @@ Proof.
 Qed.
 
 Lemma denote_instr_gep_array_no_read :
-  forall i size τ defs e_ix ix ptr a g ρ m,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m
+  forall i size τ e_ix ix ptr a g ρ m,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some DTYPE_Pointer) ptr)) g ρ m
     ≈
     Ret (m, (ρ, (g, UVALUE_Addr a)))
     ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 64)) e_ix)) g ρ m
     ≈
     Ret (m, (ρ, (g, UVALUE_I64 (repr (Z.of_nat ix)))))
     ->
     dtyp_fits m a (DTYPE_Array size τ) ->
     exists ptr_res,
       handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat ix))] = inr ptr_res /\
-      interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m
+      interp_cfg_to_L3 (denote_instr (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)]))) g ρ m
       ≈
       Ret (m, (Maps.add i (UVALUE_Addr ptr_res) ρ, (g, tt))).
 Proof.
-  intros i size τ defs e_ix ix ptr a g ρ m PTR IX FITS.
+  intros i size τ e_ix ix ptr a g ρ m PTR IX FITS.
 
-  pose proof interp_cfg_to_L3_GEP_array_no_read defs τ a size g ρ m ix FITS as (ptr_res & EQ & GEP).
+  pose proof interp_cfg_to_L3_GEP_array_no_read τ a size g ρ m ix FITS as (ptr_res & EQ & GEP).
   exists ptr_res.
   split; auto.
 
@@ -599,22 +599,22 @@ Proof.
 Qed.
 
 Lemma denote_instr_intrinsic :
-  forall i τ defs fn in_n sem_f args arg_vs conc_args res g ρ m,
+  forall i τ fn in_n sem_f args arg_vs conc_args res g ρ m,
     @intrinsic_exp dtyp (EXP_Ident (ID_Global (Name fn))) = Some in_n
     ->
-    assoc in_n (defs_assoc defs) = Some sem_f
+    assoc in_n (defs_assoc) = Some sem_f
     ->
-    interp_cfg_to_L3 defs (map_monad (fun '(t, op) => translate exp_E_to_instr_E (denote_exp (Some t) op)) args) g ρ m
+    interp_cfg_to_L3 (map_monad (fun '(t, op) => translate exp_E_to_instr_E (denote_exp (Some t) op)) args) g ρ m
     ≈
     Ret (m, (ρ, (g, arg_vs))) 
     ->
-    interp_cfg_to_L3 defs (map_monad (fun uv : uvalue => pickUnique uv) arg_vs) g ρ m
+    interp_cfg_to_L3 (map_monad (fun uv : uvalue => pickUnique uv) arg_vs) g ρ m
     ≈
     Ret (m, (ρ, (g, conc_args)))
     ->
     sem_f conc_args = inr res
     ->
-    (interp_cfg_to_L3 defs
+    (interp_cfg_to_L3
        (denote_instr
           (IId i,
            INSTR_Call (τ, EXP_Ident (ID_Global (Name fn))) args)) g ρ m)
@@ -645,12 +645,12 @@ Proof.
 Qed.
 
 Lemma denote_term_br_l :
-  forall (e : exp dtyp) defs b1 b2 g ρ ρ' m,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 1)) e)) g ρ m
+  forall (e : exp dtyp) b1 b2 g ρ ρ' m,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 1)) e)) g ρ m
     ≈
     Ret (m, (ρ', (g, UVALUE_I1 one)))
     ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_terminator (TERM_Br (DTYPE_I 1%N, e) b1 b2))) g ρ m
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_terminator (TERM_Br (DTYPE_I 1%N, e) b1 b2))) g ρ m
     ≈
     Ret (m, (ρ', (g, inl b1))).
 Proof.
@@ -666,12 +666,12 @@ Proof.
 Qed.
 
 Lemma denote_term_br_r :
-  forall (e : exp dtyp) defs b1 b2 g ρ ρ' m,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 1)) e)) g ρ m
+  forall (e : exp dtyp) b1 b2 g ρ ρ' m,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some (DTYPE_I 1)) e)) g ρ m
     ≈
     Ret (m, (ρ', (g, UVALUE_I1 zero)))
     ->
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_terminator (TERM_Br (DTYPE_I 1%N, e) b1 b2))) g ρ m
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_terminator (TERM_Br (DTYPE_I 1%N, e) b1 b2))) g ρ m
     ≈
     Ret (m, (ρ', (g, inl b2))).
 Proof.
@@ -687,12 +687,12 @@ Proof.
 Qed.
 
 Lemma denote_term_br_1 :
-  forall defs b g ρ m,
-    interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_terminator (TERM_Br_1 b))) g ρ m
+  forall b g ρ m,
+    interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_terminator (TERM_Br_1 b))) g ρ m
     ≈
     Ret (m, (ρ, (g, inl b))).
 Proof.
-  intros defs b g ρ m.
+  intros b g ρ m.
   cbn.
   rewrite translate_ret,interp_cfg_to_L3_ret.
   reflexivity.
@@ -728,20 +728,20 @@ interp_cfg_to_L3_intrinsic:
   forall (defs : Intrinsics.intrinsic_definitions) (m : memory_stack) (τ : dtyp)
     (g : global_env) (l : local_env) (fn : String.string) (args : list dvalue)
     (df : Intrinsics.semantic_function) (res : dvalue),
-  assoc Strings.String.string_dec fn (defs_assoc defs) = Some df ->
+  assoc Strings.String.string_dec fn (defs_assoc) = Some df ->
   df args = inr res ->
-  Monad.eqm (interp_cfg_to_L3 defs (trigger (Intrinsic τ fn args)) g l m) (ret (m, (l, (g, res))))
+  Monad.eqm (interp_cfg_to_L3 (trigger (Intrinsic τ fn args)) g l m) (ret (m, (l, (g, res))))
 
 *)
 
 (* Lemma denote_instr_call : *)
-(*   forall defs i τf f args uf uvs g ρ ρ' m t, *)
+(*   forall i τf f args uf uvs g ρ ρ' m t, *)
 (*     map_monad (fun '(t, op) => translate exp_E_to_instr_E (denote_exp (Some t) op)) args ≈ Ret uvs -> *)
-(*     interp_cfg_to_L3 defs (translate exp_E_to_instr_E (denote_exp None f)) g ρ m ≈ Ret (m, (ρ', (g, uf))) -> *)
+(*     interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp None f)) g ρ m ≈ Ret (m, (ρ', (g, uf))) -> *)
 (*     intrinsic_exp f = None -> *)
-(*     interp_cfg_to_L3 defs (denote_instr (IId i, INSTR_Call (τf, f) args)) g ρ m ≈ t. (* interp_cfg_to_L3 defs (ITree.bind (trigger (LLVMEvents.Call τf uf uvs)) (fun x => trigger (LocalWrite i x)) g ρ' m). *) *)
+(*     interp_cfg_to_L3 (denote_instr (IId i, INSTR_Call (τf, f) args)) g ρ m ≈ t. (* interp_cfg_to_L3 (ITree.bind (trigger (LLVMEvents.Call τf uf uvs)) (fun x => trigger (LocalWrite i x)) g ρ' m). *) *)
 (* Proof. *)
-(*   intros defs i τf f args uf uvs g ρ ρ' m t MAP FEXP INT. *)
+(*   intros i τf f args uf uvs g ρ ρ' m t MAP FEXP INT. *)
 (*   cbn. *)
 (*   rewrite MAP. rewrite bind_ret_l. *)
 (*   rewrite INT. rewrite bind_bind. *)
@@ -753,7 +753,7 @@ interp_cfg_to_L3_intrinsic:
 (*   rewrite interp_cfg_to_L3_LW. *)
 (*   rewrite <- bind_trigger. *)
 
-(*   interp_cfg_to_L3 defs *)
+(*   interp_cfg_to_L3 *)
 (*     (ITree.bind (trigger (LLVMEvents.Call τf uf uvs)) *)
 (*        (fun returned_value : uvalue => trigger (LocalWrite i returned_value))) g ρ' m ≈ t *)
 
