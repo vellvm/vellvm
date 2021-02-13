@@ -34,6 +34,8 @@ From Vellvm Require Import
      Syntax.DynamicTypes
      Semantics.MemoryAddress
      Semantics.DynamicValues.
+
+Import ITreeNotations.
 (* end hide *)
 
 (****************************** LLVM Events *******************************)
@@ -84,8 +86,8 @@ Set Contextual Implicit.
     with any return type. *)
   Definition raiseUB {E : Type -> Type} `{UBE -< E} {X}
              (e : string)
-    : itree E X
-    := vis (ThrowUB e) (fun v : void => match v with end).
+    : itree E X 
+    := v <- trigger (ThrowUB e);; match v: void with end.
 
   (* Debug is identical to the "Trace" effect from the itrees library,
    but debug is probably a less confusing name for us. *)
@@ -98,11 +100,11 @@ Set Contextual Implicit.
   Definition FailureE := exceptE string.
 
   Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
-    throw msg.
-
+    v <- trigger (Throw msg);; match v: void with end.
+    
   Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m:err A) : itree E B :=
     match m with
-    | inl x => throw x
+    | inl x => raise x
     | inr x => f x
     end.
 
@@ -114,7 +116,7 @@ Set Contextual Implicit.
     | mkEitherT m =>
       match m with
       | inl x => raiseUB x
-      | inr (inl x) => throw x
+      | inr (inl x) => raise x
       | inr (inr x) => f x
       end
     end.
