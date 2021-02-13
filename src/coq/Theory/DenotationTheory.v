@@ -1,6 +1,7 @@
 (* begin hide *)
 
 From Coq Require Import
+     String
      List.
 
 From ITree Require Import
@@ -39,6 +40,7 @@ Import Eq.
 (* Import CatNotations. *)
 
 Import MonadNotation.
+Open Scope list_scope.
 Open Scope monad_scope.
 Open Scope itree.
 
@@ -212,25 +214,33 @@ Qed.
 
 (** * outputs soundness *)
 
+Lemma raise_has_all_posts : forall {E X} `{FailureE -< E} s Q,
+    @raise E X _ s ⤳ Q.
+Proof.
+  unfold raise; intros.
+  apply has_post_bind; intros [].
+Qed.
+
+Lemma raiseUB_has_all_posts : forall {E X} `{UBE -< E} s Q,
+    @raiseUB E _ X s ⤳ Q.
+Proof.
+  unfold raise; intros.
+  apply has_post_bind; intros [].
+Qed.
+
 Lemma denote_terminator_exits_in_outputs :
   forall term,
     denote_terminator term ⤳ sum_pred (fun id => In id (terminator_outputs term)) TT.
 Proof.
-  unfold has_post; intros []; cbn;
-    unfold raise, Exception.throw, raiseUB;
-    try (einit; estep; intros []).
-
-  - destruct v. 
-    apply eutt_eq_bind; intros ?.
+  intros []; cbn; try (apply raise_has_all_posts || apply eutt_Ret; cbn; eauto).
+  - destruct v.  
+    apply has_post_bind; intros ?.
     apply eutt_Ret; cbn; eauto.
-
   - destruct v; cbn.
-    apply eutt_eq_bind; intros ?.
-    apply eutt_eq_bind; intros ?.
-    unfold raise, Exception.throw, raiseUB.
-    destruct u0; cbn;
-      try (einit; estep; intros []).
-    flatten_goal; cbn; apply eutt_Ret; eauto; left.
+    apply has_post_bind; intros ?.
+    apply has_post_bind; intros ?.
+    break_match_goal; try (apply raise_has_all_posts || apply raiseUB_has_all_posts).
+    break_match_goal; apply eutt_Ret; cbn; eauto.
 Qed.
 
 Definition exits_in_outputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
