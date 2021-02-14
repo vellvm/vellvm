@@ -31,28 +31,28 @@ Section InterpreterCFG.
    *)
 
   (**
-   NOTE: Can we avoid this duplication w.r.t. [interp_to_Li]?
+   NOTE: Can we avoid this duplication w.r.t. [interpi]?
    *)
 
-  Definition interp_cfg_to_L1 {R} (t: itree instr_E R) (g: global_env) :=
+  Definition interp_cfg1 {R} (t: itree instr_E R) (g: global_env) :=
     let L0_trace       := interp_intrinsics t in
     let L1_trace       := interp_global L0_trace g in
     L1_trace.
 
-  Definition interp_cfg_to_L2 {R} (t: itree instr_E R) (g: global_env) (l: local_env) :=
+  Definition interp_cfg2 {R} (t: itree instr_E R) (g: global_env) (l: local_env) :=
     let L0_trace       := interp_intrinsics t in
     let L1_trace       := interp_global L0_trace g in
     let L2_trace       := interp_local L1_trace l in
     L2_trace.
 
-  Definition interp_cfg_to_L3 {R} (t: itree instr_E R) (g: global_env) (l: local_env) (m: memory_stack) :=
+  Definition interp_cfg3 {R} (t: itree instr_E R) (g: global_env) (l: local_env) (m: memory_stack) :=
     let L0_trace       := interp_intrinsics t in
     let L1_trace       := interp_global L0_trace g in
     let L2_trace       := interp_local L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     L3_trace.
 
-  Definition interp_cfg_to_L4 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: memory_stack) :=
+  Definition interp_cfg4 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: memory_stack) :=
     let L0_trace       := interp_intrinsics t in
     let L1_trace       := interp_global L0_trace g in
     let L2_trace       := interp_local L1_trace l in
@@ -60,7 +60,7 @@ Section InterpreterCFG.
     let L4_trace       := model_undef RR L3_trace in
     L4_trace.
 
-  Definition interp_cfg_to_L5 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: memory_stack) :=
+  Definition interp_cfg5 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: memory_stack) :=
     let L0_trace       := interp_intrinsics t in
     let L1_trace       := interp_global L0_trace g in
     let L2_trace       := interp_local L1_trace l in
@@ -68,92 +68,92 @@ Section InterpreterCFG.
     let L4_trace       := model_undef RR L3_trace in
     model_UB RR L4_trace.
 
-  Lemma interp_cfg_to_L1_bind :
+  Lemma interp_cfg1_bind :
     forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g, 
-      interp_cfg_to_L1 (ITree.bind t k) g ≈
-                       (ITree.bind (interp_cfg_to_L1 t g) (fun '(g',x) => interp_cfg_to_L1 (k x) g')).
+      interp_cfg1 (ITree.bind t k) g ≈
+                       (ITree.bind (interp_cfg1 t g) (fun '(g',x) => interp_cfg1 (k x) g')).
   Proof.
     intros.
-    unfold interp_cfg_to_L1.
+    unfold interp_cfg1.
     rewrite interp_intrinsics_bind, interp_global_bind.
     apply eutt_eq_bind; intros (? & ?); reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L1_ret : forall (R : Type) g (x : R), interp_cfg_to_L1 (Ret x) g ≈ Ret (g,x).
+  Lemma interp_cfg1_ret : forall (R : Type) g (x : R), interp_cfg1 (Ret x) g ≈ Ret (g,x).
   Proof.
-    intros; unfold interp_cfg_to_L1.
+    intros; unfold interp_cfg1.
     rewrite interp_intrinsics_ret, interp_global_ret; reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L2_bind :
+  Lemma interp_cfg2_bind :
     forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g l,
-      interp_cfg_to_L2 (ITree.bind t k) g l ≈
-                       (ITree.bind (interp_cfg_to_L2 t g l) (fun '(g',(l',x)) => interp_cfg_to_L2 (k x) l' g')).
+      interp_cfg2 (ITree.bind t k) g l ≈
+                       (ITree.bind (interp_cfg2 t g l) (fun '(g',(l',x)) => interp_cfg2 (k x) l' g')).
   Proof.
     intros.
-    unfold interp_cfg_to_L2.
+    unfold interp_cfg2.
     rewrite interp_intrinsics_bind, interp_global_bind, interp_local_bind.
     apply eutt_eq_bind; intros (? & ? & ?); reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L2_ret : forall (R : Type) g l (x : R), interp_cfg_to_L2 (Ret x) g l ≈ Ret (l, (g, x)).
+  Lemma interp_cfg2_ret : forall (R : Type) g l (x : R), interp_cfg2 (Ret x) g l ≈ Ret (l, (g, x)).
   Proof.
-    intros; unfold interp_cfg_to_L2.
+    intros; unfold interp_cfg2.
     rewrite interp_intrinsics_ret, interp_global_ret, interp_local_ret; reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_bind :
+  Lemma interp_cfg3_bind :
     forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g l m,
-      interp_cfg_to_L3 (ITree.bind t k) g l m ≈
-                       (ITree.bind (interp_cfg_to_L3 t g l m) (fun '(m',(l',(g',x))) => interp_cfg_to_L3 (k x) g' l' m')).
+      interp_cfg3 (ITree.bind t k) g l m ≈
+                       (ITree.bind (interp_cfg3 t g l m) (fun '(m',(l',(g',x))) => interp_cfg3 (k x) g' l' m')).
   Proof.
     intros.
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_bind, interp_global_bind, interp_local_bind, interp_memory_bind.
     apply eutt_eq_bind; intros (? & ? & ? & ?); reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_ret : forall (R : Type) g l m (x : R), interp_cfg_to_L3 (Ret x) g l m ≈ Ret (m, (l, (g,x))).
+  Lemma interp_cfg3_ret : forall (R : Type) g l m (x : R), interp_cfg3 (Ret x) g l m ≈ Ret (m, (l, (g,x))).
   Proof.
-    intros; unfold interp_cfg_to_L3.
+    intros; unfold interp_cfg3.
     rewrite interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret; reflexivity.
   Qed.
 
-  Global Instance eutt_interp_cfg_to_L1 {T}:
-    Proper (eutt Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@interp_cfg_to_L1 T).
+  Global Instance eutt_interp_cfg1 {T}:
+    Proper (eutt Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@interp_cfg1 T).
   Proof.
     repeat intro.
-    unfold interp_cfg_to_L1.
+    unfold interp_cfg1.
     subst; rewrite H.
     reflexivity.
   Qed.
 
-  Global Instance eutt_interp_cfg_to_L2 {T}:
-    Proper (eutt Logic.eq ==> Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@interp_cfg_to_L2 T).
+  Global Instance eutt_interp_cfg2 {T}:
+    Proper (eutt Logic.eq ==> Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@interp_cfg2 T).
   Proof.
     repeat intro.
-    unfold interp_cfg_to_L2.
+    unfold interp_cfg2.
     subst; rewrite H.
     reflexivity.
   Qed.
 
-  Global Instance eutt_interp_cfg_to_L3 {T}:
-    Proper (eutt Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@interp_cfg_to_L3 T).
+  Global Instance eutt_interp_cfg3 {T}:
+    Proper (eutt Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@interp_cfg3 T).
   Proof.
     repeat intro.
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     subst; rewrite H.
     reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_vis :
+  Lemma interp_cfg3_vis :
     forall T R (e : instr_E T) (k : T -> itree instr_E R) g l m,
-      interp_cfg_to_L3 (Vis e k) g l m ≈ 
-                       ITree.bind (interp_cfg_to_L3 (trigger e) g l m)
-                       (fun '(m, (l, (g, x)))=> interp_cfg_to_L3 (k x) g l m).
+      interp_cfg3 (Vis e k) g l m ≈ 
+                       ITree.bind (interp_cfg3 (trigger e) g l m)
+                       (fun '(m, (l, (g, x)))=> interp_cfg3 (k x) g l m).
   Proof.
     intros.
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_vis.
     rewrite interp_global_bind, interp_local_bind, interp_memory_bind.
     unfold trigger; rewrite interp_intrinsics_vis.
@@ -165,24 +165,24 @@ Section InterpreterCFG.
     reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_bind_trigger :
+  Lemma interp_cfg3_bind_trigger :
     forall T R (e : instr_E T) (k : T -> itree instr_E R) g l m,
-      interp_cfg_to_L3 (ITree.bind (trigger e) k) g l m ≈ 
-                       ITree.bind (interp_cfg_to_L3 (trigger e) g l m)
-                       (fun '(m, (l, (g, x)))=> interp_cfg_to_L3 (k x) g l m).
+      interp_cfg3 (ITree.bind (trigger e) k) g l m ≈ 
+                       ITree.bind (interp_cfg3 (trigger e) g l m)
+                       (fun '(m, (l, (g, x)))=> interp_cfg3 (k x) g l m).
   Proof.
     intros.
     rewrite bind_trigger.
-    rewrite interp_cfg_to_L3_vis at 1.
+    rewrite interp_cfg3_vis at 1.
     reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_GR : forall id g l m v,
+  Lemma interp_cfg3_GR : forall id g l m v,
       Maps.lookup id g = Some v ->
-      interp_cfg_to_L3 (trigger (GlobalRead id)) g l m ≈ Ret (m,(l,(g,v))).
+      interp_cfg3 (trigger (GlobalRead id)) g l m ≈ Ret (m,(l,(g,v))).
   Proof.
     intros * LU.
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger.
     cbn.
     unfold Intrinsics.F_trigger.
@@ -192,12 +192,12 @@ Section InterpreterCFG.
     reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_LR : forall id g l m v,
+  Lemma interp_cfg3_LR : forall id g l m v,
       Maps.lookup id l = Some v ->
-      interp_cfg_to_L3 (trigger (LocalRead id)) g l m ≈ Ret (m,(l,(g,v))).
+      interp_cfg3 (trigger (LocalRead id)) g l m ≈ Ret (m,(l,(g,v))).
   Proof.
     intros * LU.
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger.
     cbn.
     unfold Intrinsics.F_trigger.
@@ -209,11 +209,11 @@ Section InterpreterCFG.
     reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_LW : forall id g l m v,
-      interp_cfg_to_L3 (trigger (LocalWrite id v)) g l m ≈ Ret (m,(Maps.add id v l, (g,tt))).
+  Lemma interp_cfg3_LW : forall id g l m v,
+      interp_cfg3 (trigger (LocalWrite id v)) g l m ≈ Ret (m,(Maps.add id v l, (g,tt))).
   Proof.
     intros.
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger; cbn. 
     unfold Intrinsics.F_trigger.
     rewrite interp_global_trigger; cbn.
@@ -222,11 +222,11 @@ Section InterpreterCFG.
     reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_GW : forall id g l m v,
-      interp_cfg_to_L3 (trigger (GlobalWrite id v)) g l m ≈ Ret (m,(l,(Maps.add id v g,tt))).
+  Lemma interp_cfg3_GW : forall id g l m v,
+      interp_cfg3 (trigger (GlobalWrite id v)) g l m ≈ Ret (m,(l,(Maps.add id v g,tt))).
   Proof.
     intros.
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger; cbn. 
     unfold Intrinsics.F_trigger.
     rewrite interp_global_trigger; cbn.
@@ -234,12 +234,12 @@ Section InterpreterCFG.
     reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_Load : forall t a g l m val,
+  Lemma interp_cfg3_Load : forall t a g l m val,
       read m a t = inr val ->
-      interp_cfg_to_L3 (trigger (Load t (DVALUE_Addr a))) g l m ≈ Ret (m,(l,(g,val))).
+      interp_cfg3 (trigger (Load t (DVALUE_Addr a))) g l m ≈ Ret (m,(l,(g,val))).
   Proof.
     intros * READ.
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger.
     cbn.
     unfold Intrinsics.F_trigger.
@@ -254,13 +254,13 @@ Section InterpreterCFG.
     reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_store :
+  Lemma interp_cfg3_store :
     forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr) g l,
       write m a val = inr m' ->
-      interp_cfg_to_L3 (trigger (Store (DVALUE_Addr a) val)) g l m ≈ Ret (m',(l,(g,tt))).
+      interp_cfg3 (trigger (Store (DVALUE_Addr a) val)) g l m ≈ Ret (m',(l,(g,tt))).
   Proof.
     intros m m' t val a g l WRITE.
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger.
     cbn.
     unfold Intrinsics.F_trigger.
@@ -277,15 +277,15 @@ Section InterpreterCFG.
   Qed.
 
   Arguments allocate : simpl never.
-  Lemma interp_cfg_to_L3_alloca :
+  Lemma interp_cfg3_alloca :
     forall (m : memory_stack) (t : dtyp) (g : global_env) l,
       non_void t ->
       exists m' a',
         allocate m t = inr (m', a') /\
-        interp_cfg_to_L3 (trigger (Alloca t)) g l m ≈ Ret (m', (l, (g, DVALUE_Addr a'))).
+        interp_cfg3 (trigger (Alloca t)) g l m ≈ Ret (m', (l, (g, DVALUE_Addr a'))).
   Proof.
     intros * NV.
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     eapply interp_memory_alloca_exists in NV as [m' [a' [ALLOC INTERP]]].
     exists m'. exists a'.
 
@@ -315,14 +315,14 @@ Section InterpreterCFG.
    *)
   Arguments defs_assoc: simpl never.
 
-  Lemma interp_cfg_to_L3_intrinsic :
+  Lemma interp_cfg3_intrinsic :
     forall (m : memory_stack) (τ : dtyp) (g : global_env) l fn args df res,
       assoc fn defs_assoc = Some df ->
       df args = inr res ->
-      interp_cfg_to_L3 (trigger (Intrinsic τ fn args)) g l m ≈ Ret (m, (l, (g, res))).
+      interp_cfg3 (trigger (Intrinsic τ fn args)) g l m ≈ Ret (m, (l, (g, res))).
   Proof.
     intros m τ g l fn args df res LUP RES.
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger.
     cbn.
     
@@ -336,10 +336,10 @@ Section InterpreterCFG.
     reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_GEP_array' : forall t a size g l m val i,
+  Lemma interp_cfg3_GEP_array' : forall t a size g l m val i,
       get_array_cell m a i t = inr val ->
       exists ptr,
-        interp_cfg_to_L3 (trigger (GEP
+        interp_cfg3 (trigger (GEP
                                   (DTYPE_Array size t)
                                   (DVALUE_Addr a)
                                   [DVALUE_I64 (Integers.Int64.repr 0); DVALUE_I64 (Integers.Int64.repr (Z.of_nat i))])) g l m
@@ -352,7 +352,7 @@ Section InterpreterCFG.
     exists ptr.
     split; auto.
 
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger; cbn.
     unfold Intrinsics.F_trigger.
     rewrite subevent_subevent.
@@ -373,10 +373,10 @@ Section InterpreterCFG.
   Qed.
 
 
-  Lemma interp_cfg_to_L3_GEP_array_no_read_addr : forall t a size g l m i ptr,
+  Lemma interp_cfg3_GEP_array_no_read_addr : forall t a size g l m i ptr,
       dtyp_fits m a (DTYPE_Array size t) ->
       handle_gep_addr (DTYPE_Array size t) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr ptr ->
-        interp_cfg_to_L3 (trigger (GEP
+        interp_cfg3 (trigger (GEP
                                   (DTYPE_Array size t)
                                   (DVALUE_Addr a)
                                   [DVALUE_I64 (Integers.Int64.repr 0); DVALUE_I64 (Integers.Int64.repr (Z.of_nat i))])) g l m
@@ -386,7 +386,7 @@ Section InterpreterCFG.
     epose proof @interp_memory_GEP_array_no_read_addr _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ ptr FITS.
     cbn.
 
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger; cbn.
     unfold Intrinsics.F_trigger.
     rewrite subevent_subevent.
@@ -406,10 +406,10 @@ Section InterpreterCFG.
     reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_GEP_array_no_read : forall t a size g l m i,
+  Lemma interp_cfg3_GEP_array_no_read : forall t a size g l m i,
       dtyp_fits m a (DTYPE_Array size t) ->
       exists ptr,
-        interp_cfg_to_L3 (trigger (GEP
+        interp_cfg3 (trigger (GEP
                                   (DTYPE_Array size t)
                                   (DVALUE_Addr a)
                                   [DVALUE_I64 (Integers.Int64.repr 0); DVALUE_I64 (Integers.Int64.repr (Z.of_nat i))])) g l m
@@ -421,7 +421,7 @@ Section InterpreterCFG.
     exists ptr.
     split; auto.
 
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger; cbn.
     unfold Intrinsics.F_trigger.
     rewrite subevent_subevent.
@@ -442,10 +442,10 @@ Section InterpreterCFG.
     auto.
   Qed.
 
-  Lemma interp_cfg_to_L3_GEP_array : forall t a size g l m val i,
+  Lemma interp_cfg3_GEP_array : forall t a size g l m val i,
       get_array_cell m a i t = inr val ->
       exists ptr,
-        interp_cfg_to_L3 (trigger (GEP
+        interp_cfg3 (trigger (GEP
                                   (DTYPE_Array size t)
                                   (DVALUE_Addr a)
                                   [DVALUE_I64 (Integers.Int64.repr 0); DVALUE_I64 (Integers.Int64.repr (Z.of_nat i))])) g l m
@@ -457,7 +457,7 @@ Section InterpreterCFG.
     exists ptr.
     split; auto.
 
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger; cbn.
     unfold Intrinsics.F_trigger.
     rewrite subevent_subevent.

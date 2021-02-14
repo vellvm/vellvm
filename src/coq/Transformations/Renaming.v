@@ -113,21 +113,21 @@ Section Swap.
   (*
   (* Calvin broke this somehow by changing uvalue to not include
      CallE. Yannick promises not to be mad later when fixing this. :) *)
-  Lemma interp_to_L2_map_monad: forall {X} (f: X -> itree _ (uvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
-      (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))) (interp_to_L2 nil (f x) s1 s2) (interp_to_L2 nil (f (g x)) s1 s2)) ->
-      eutt function_rel (interp_to_L2 nil (map_monad f l) s1 s2) (interp_to_L2 nil (map_monad f (map g l)) s1 s2).
+  Lemma interp2_map_monad: forall {X} (f: X -> itree _ (uvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
+      (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))) (interp2 nil (f x) s1 s2) (interp2 nil (f (g x)) s1 s2)) ->
+      eutt function_rel (interp2 nil (map_monad f l) s1 s2) (interp2 nil (map_monad f (map g l)) s1 s2).
   Proof.
     induction l as [| x l IH]; simpl; intros; [reflexivity |].
-    rewrite 2 interp_to_L2_bind.
+    rewrite 2 interp2_bind.
     eapply eutt_clo_bind; eauto.
     intros (? & ? & ? & ?) (? & ? & ? & ?) EQ.
     repeat match goal with | h: prod_rel _ _ _ _ |- _ => inv h end.
-    rewrite 2 interp_to_L2_bind.
+    rewrite 2 interp2_bind.
     eapply eutt_clo_bind; eauto.
     intros (? & ? & ?) (? & ? & ?) EQ.
     inv EQ.
     repeat match goal with | h: prod_rel _ _ _ _ |- _ => inv h end.
-    rewrite 2 interp_to_L2_ret.
+    rewrite 2 interp2_ret.
     apply eqit_Ret.
     constructor; auto.
   Qed.
@@ -143,7 +143,7 @@ Section Swap.
     (* unfold denote_vellvm. *)
     (* unfold denote_vellvm_init. *)
     (* unfold denote_vellvm. *)
-    (* simpl; rewrite 2 interp_to_L2_bind. *)
+    (* simpl; rewrite 2 interp2_bind. *)
     (* split_bind. *)
 
     {
@@ -151,7 +151,7 @@ Section Swap.
       admit.
     }
 Admitted.
-(*     rewrite 2 interp_to_L2_bind. *)
+(*     rewrite 2 interp2_bind. *)
 (*     (* We use [function_rel] here to establish that we get piece-wise eutt when denoting each function *) *)
 (*     eapply eutt_clo_bind with function_rel. *)
 (*     Focus 2. *)
@@ -161,16 +161,16 @@ Admitted.
 (*     { *)
 (*       (* Denotation of each cfg *) *)
 (*       (* Here we need to actually establish something different than equality of states, but rather extensional agreement after renaming *) *)
-(*       apply interp_to_L2_map_monad. *)
+(*       apply interp2_map_monad. *)
 (*       intros cfg g l HIN. *)
 (*       unfold address_one_function. *)
 (*       simpl. *)
-(*       rewrite 2 interp_to_L2_bind. *)
+(*       rewrite 2 interp2_bind. *)
 (*       split_bind. *)
 (*       { (* Getting the address of the function *) *)
 (*         admit. *)
 (*       } *)
-(*       rewrite 2 interp_to_L2_ret. *)
+(*       rewrite 2 interp2_ret. *)
 (*       apply eqit_Ret. *)
 (*       do 3 constructor; auto. *)
 (*       intros args. *)
@@ -210,7 +210,7 @@ Admitted.
 
 (*     intros (? & ? & ?) (? & ? & ?) EQ. *)
 (*     inv EQ; repeat match goal with | h: prod_rel _ _ _ _ |- _ => inv h end. *)
-(*     rewrite 2 interp_to_L2_bind. *)
+(*     rewrite 2 interp2_bind. *)
 (*     split_bind. *)
 
 (*     { (* Getting the address of "main" *) *)
@@ -220,16 +220,16 @@ Admitted.
 (*     (* Tying the recursive knot *) *)
 
 (*     admit. *)
-(*   (*   rewrite 2 interp_to_L2_bind. *) *)
+(*   (*   rewrite 2 interp2_bind. *) *)
 
 
-(*   (*   2:rewrite interp_to_L2_bind; reflexivity. *) *)
+(*   (*   2:rewrite interp2_bind; reflexivity. *) *)
 (*   (*   unfold f_endo, endo_list. *) *)
-(*   (*   apply interp_to_L2_map_monad. *) *)
+(*   (*   apply interp2_map_monad. *) *)
 (*   (*   intros. *) *)
-(*   (*   remember (interp_to_L2 (address_one_function x) s1 s2). *) *)
+(*   (*   remember (interp2 (address_one_function x) s1 s2). *) *)
 (*   (*   cbn. *) *)
-(*   (*   rewrite 2 interp_to_L2_bind. *) *)
+(*   (*   rewrite 2 interp2_bind. *) *)
 (*   (*   split_bind. *) *)
 (*   (*   { (* Reading the name of the function *) *) *)
 (*   (*     admit. *) *)
@@ -237,11 +237,11 @@ Admitted.
 
 (*   (*     unfold f_endo. *) *)
 (*   (*     Set Printing All. *) *)
-(*   (*     unfold interp_to_L2, INT.interpret_intrinsics, interp_global, interp_local_stack. *) *)
+(*   (*     unfold interp2, INT.interpret_intrinsics, interp_global, interp_local_stack. *) *)
 (*   (*     rewrite interp_trigger; cbn. *) *)
 (*   (*     Lemma refine_cfg_to_mcfg: forall {B} f (l:list (definition dtyp (cfg dtyp))) s1 s2, *) *)
-(*   (*       interp_to_L2 (map_monad (B := B) f l) s1 s2 = *) *)
-(*   (*       interp_to_L2 (map_monad f l) s1 s2. *) *)
+(*   (*       interp2 (map_monad (B := B) f l) s1 s2 = *) *)
+(*   (*       interp2 (map_monad f l) s1 s2. *) *)
 
 (*   (*     (* Denotation of each cfg, need a modularity lemma *) *) *)
 

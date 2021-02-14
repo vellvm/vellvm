@@ -180,24 +180,24 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Definition lookup_E := LLVMGEnvE +' LLVMEnvE.
   Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
-  Definition lookup_E_to_exp_E : lookup_E ~> exp_E :=
+  Definition LU_to_exp : lookup_E ~> exp_E :=
     fun T e =>
       match e with
       | inl1 e => inl1 e
       | inr1 e => inr1 (inl1 e)
       end.
 
-  Definition conv_E_to_exp_E : conv_E ~> exp_E :=
+  Definition conv_to_exp : conv_E ~> exp_E :=
     fun T e => inr1 (inr1 e).
 
   Definition instr_E := CallE +' IntrinsicE +' exp_E.
-  Definition exp_E_to_instr_E : exp_E ~> instr_E:=
+  Definition exp_to_instr : exp_E ~> instr_E:=
     fun T e => inr1 (inr1 e).
 
   (* Core effects. *)
   Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
-  Definition instr_E_to_L0' : instr_E ~> L0' :=
+  Definition instr_to_L0' : instr_E ~> L0' :=
     fun T e =>
       match e with
       | inl1 e => inl1 e
@@ -207,10 +207,10 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
       | inr1 (inr1 (inr1 (inr1 e))) => inr1 (inr1 (inr1 (inr1 (inr1 e))))
       end.
 
-  Definition _exp_E_to_L0' : exp_E ~> L0' :=
-    fun T e => instr_E_to_L0' (exp_E_to_instr_E e).
+  Definition exp_to_L0' : exp_E ~> L0' :=
+    fun T e => instr_to_L0' (exp_to_instr e).
 
-  Definition _failure_UB_to_ExpE : (FailureE +' UBE) ~> exp_E :=
+  Definition FUB_to_exp : (FailureE +' UBE) ~> exp_E :=
     fun T e =>
       match e with
       | inl1 x => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 x)))))
@@ -219,7 +219,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
 
-  Definition _exp_E_to_L0 : exp_E ~> L0 :=
+  Definition exp_to_L0 : exp_E ~> L0 :=
     fun T e =>
       match e with
       | inl1 e => inr1 (inr1 (inl1 e))
@@ -243,7 +243,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Hint Unfold L0 L0' L1 L2 L3 L4 L5 : core.
 
-  Definition _failure_UB_to_L4 : (FailureE +' UBE) ~> L4:=
+  Definition FUB_to_L4 : (FailureE +' UBE) ~> L4:=
     fun T e =>
       match e with
       | inl1 x => inr1 (inr1 (inr1 x))

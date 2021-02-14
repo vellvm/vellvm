@@ -934,13 +934,13 @@ Variable deterministic_vellvm : forall R, itree L0 R -> Prop.
 (* Definition deterministic_vellvm *)
 Lemma deterministc_llvm_is_singleton : forall R RR t g sl mem,
     deterministic_vellvm t ->
-    is_singleton (interp_to_L5 (R := R) RR t g sl mem) (remove_pick_ub (interp_to_L3 (R := R) t g sl mem)).
+    is_singleton (interp5 (R := R) RR t g sl mem) (remove_pick_ub (interp3 (R := R) t g sl mem)).
 
   (*
     Then the same statement on llvm syntax by applying it with (t := denote_llvm p)
     Then on the helix side:
     - we know that there is (t: itree void1 X),
-    "inject (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) t ≈ interp_to_L3 (denote_llvm p)"
+    "inject (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) t ≈ interp3 (denote_llvm p)"
    *)
 Proof. Admitted.
 

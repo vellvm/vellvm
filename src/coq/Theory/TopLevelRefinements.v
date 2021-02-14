@@ -209,23 +209,23 @@ Qed.
 
 Definition model_to_L1  (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L1 L0_trace [].
+  interp1 L0_trace [].
 
 Definition model_to_L2 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L2 L0_trace [] ([],[]).
+  interp2 L0_trace [] ([],[]).
 
 Definition model_to_L3 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L3 L0_trace [] ([],[]) empty_memory_stack.
+  interp3 L0_trace [] ([],[]) empty_memory_stack.
 
 Definition model_to_L4 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L4 (refine_res3) L0_trace [] ([],[]) empty_memory_stack.
+  interp4 (refine_res3) L0_trace [] ([],[]) empty_memory_stack.
 
 Definition model_to_L5 (prog: mcfg dtyp) :=
   let L0_trace := denote_vellvm_init prog in
-  interp_to_L5 (refine_res3) L0_trace [] ([],[]) empty_memory_stack.
+  interp5 (refine_res3) L0_trace [] ([],[]) empty_memory_stack.
 
 (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -363,8 +363,8 @@ Proof.
   intros p.
   unfold model, model_user.
   unfold interpreter, interpreter_gen.
-  unfold interp_to_L5.
-  unfold interp_to_L5_exec.
+  unfold interp5.
+  unfold interp5_exec.
   apply refine_UB.  auto.
   apply refine_undef. auto.
 Qed.
@@ -377,22 +377,22 @@ End REFINEMENT.
 
 (** We hence can also commute them at the various levels of interpretation *)
 
-Lemma interp_to_L2_bind:
+Lemma interp2_bind:
   forall {R S} (t: itree L0 R) (k: R -> itree L0 S) s1 s2,
-    interp_to_L2 (ITree.bind t k) s1 s2 ≈
-                 (ITree.bind (interp_to_L2 t s1 s2) (fun '(s1',(s2',x)) => interp_to_L2 (k x) s2' s1')).
+    interp2 (ITree.bind t k) s1 s2 ≈
+                 (ITree.bind (interp2 t s1 s2) (fun '(s1',(s2',x)) => interp2 (k x) s2' s1')).
 Proof.
   intros.
-  unfold interp_to_L2.
+  unfold interp2.
   rewrite interp_intrinsics_bind, interp_global_bind, interp_local_stack_bind.
   apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros ? (? & ? & ?) ->; reflexivity].
 Qed.
 
-Lemma interp_to_L2_ret:
+Lemma interp2_ret:
   forall (R : Type) s1 s2 (x : R),
-    interp_to_L2 (Ret x) s1 s2 ≈ Ret (s2, (s1, x)).
+    interp2 (Ret x) s1 s2 ≈ Ret (s2, (s1, x)).
 Proof.
-  intros; unfold interp_to_L2.
+  intros; unfold interp2.
   rewrite interp_intrinsics_ret, interp_global_ret, interp_local_stack_ret; reflexivity.
 Qed.
 

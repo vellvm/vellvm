@@ -197,8 +197,8 @@ Ltac vred_C3_k k :=
   | |- _ => do k idtac "no progress made"
   end;
   (* clean up *)
-  rewrite 1?interp_cfg_to_L3_ret, 1?bind_ret_l;
-  rewrite 1?interp_cfg_to_L3_bind, 1?bind_bind.
+  rewrite 1?interp_cfg3_ret, 1?bind_ret_l;
+  rewrite 1?interp_cfg3_bind, 1?bind_bind.
 
 (* Stupid trick to have versions of the tactic supporting light debugging.
    [vred_C3D] additionally prints the branch it take.
@@ -228,16 +228,16 @@ Ltac vred_I3 :=
         ].
 
 Ltac vred_BL3 := rewrite denote_term_br_l;
-                 [rewrite 1?interp_cfg_to_L3_ret, 1?bind_ret_l, 1?interp_cfg_to_L3_bind, 1?bind_bind |];
+                 [rewrite 1?interp_cfg3_ret, 1?bind_ret_l, 1?interp_cfg3_bind, 1?bind_bind |];
                  cycle 1.
 Ltac vred_BR3 := rewrite denote_term_br_r;
-                 [rewrite 1?interp_cfg_to_L3_ret, 1?bind_ret_l, 1?interp_cfg_to_L3_bind, 1?bind_bind |];
+                 [rewrite 1?interp_cfg3_ret, 1?bind_ret_l, 1?interp_cfg3_bind, 1?bind_bind |];
                  cycle 1.
 
 Ltac vstep3 :=
   first [progress vred_E3 | vred_I3];
-  rewrite 1?interp_cfg_to_L3_ret, 1?bind_ret_l;
-  rewrite 1?interp_cfg_to_L3_bind, 1?bind_bind.
+  rewrite 1?interp_cfg3_ret, 1?bind_ret_l;
+  rewrite 1?interp_cfg3_bind, 1?bind_bind.
 
 
 (** * Focusing during [eutt] proofs

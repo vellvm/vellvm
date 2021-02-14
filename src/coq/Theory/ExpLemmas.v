@@ -1,7 +1,7 @@
 From Coq Require Import
      Morphisms.
 
-Require Import List.
+Require Import String List.
 Import ListNotations.
 Require Import ZArith.
 Require Import Coq.micromega.Lia.
@@ -37,451 +37,428 @@ Open Scope itree_scope.
 Section Translations.
 
   (* Technicality: translations by [lookup_E_to_exp_E] and [exp_E_to_instr_E] leave these events unphased *)
-  Lemma lookup_E_to_exp_E_Global : forall {X} (e : LLVMGEnvE X),
-      lookup_E_to_exp_E (subevent X e) = subevent X e.
+
+  Lemma LU_to_exp_Global : forall {X} (e : LLVMGEnvE X),
+    subevent X (LU_to_exp (subevent X e)) = subevent X e.
   Proof.
     reflexivity.
   Qed.
 
-  Lemma exp_E_to_instr_E_Global : forall {X} (e : LLVMGEnvE X),
-      exp_E_to_instr_E (subevent X e) = subevent X e.
+  Lemma exp_to_instr_Global : forall {X} (e : LLVMGEnvE X),
+      subevent X (exp_to_instr (subevent X e)) = subevent X e.
   Proof.
     reflexivity.
   Qed.
 
-  Lemma lookup_E_to_exp_E_Local : forall {X} (e : LLVMEnvE X),
-      lookup_E_to_exp_E (subevent X e) = subevent X e.
+  Lemma LU_to_exp_Local : forall {X} (e : LLVMEnvE X),
+      subevent X (LU_to_exp (subevent X e)) = subevent X e.
   Proof.
     reflexivity.
   Qed.
 
-  Lemma exp_E_to_instr_E_Local : forall {X} (e : LLVMEnvE X),
-      exp_E_to_instr_E (subevent X e) = subevent X e.
+  Lemma exp_to_instr_Local : forall {X} (e : LLVMEnvE X),
+      subevent X (exp_to_instr (subevent X e)) = subevent X e.
   Proof.
     reflexivity.
   Qed.
 
-  Lemma exp_E_to_instr_E_Memory : forall {X} (e : MemoryE X),
-      exp_E_to_instr_E (subevent X e) = subevent X e.
+  Lemma exp_to_instr_Memory : forall {X} (e : MemoryE X),
+      subevent X (exp_to_instr (subevent X e)) = subevent X e.
   Proof.
     reflexivity.
   Qed.
 
-  Lemma exp_E_to_instr_E_Pick : forall {X} (e : PickE X),
-      exp_E_to_instr_E (subevent X e) = subevent X e.
+  Lemma exp_to_instr_Pick : forall {X} (e : PickE X),
+      subevent X (exp_to_instr (subevent X e)) = subevent X e.
   Proof.
     reflexivity.
   Qed.
 
-  Lemma exp_E_to_instr_E_UB : forall {X} (e : UBE X),
-      exp_E_to_instr_E (subevent X e) = subevent X e.
+  Lemma exp_to_instr_UB : forall {X} (e : UBE X),
+      subevent X (exp_to_instr (subevent X e)) = subevent X e.
   Proof.
     reflexivity.
   Qed.
 
-  Lemma exp_E_to_instr_E_Fail : forall {X} (e : FailureE X),
-      exp_E_to_instr_E (subevent X e) = subevent X e.
+  Lemma exp_to_instr_Fail : forall {X} (e : FailureE X),
+      subevent X (exp_to_instr (subevent X e)) = subevent X e.
   Proof.
     reflexivity.
   Qed.
 
-  Lemma _failure_UB_to_ExpE_UB : forall {X} (e : UBE X),
-      _failure_UB_to_ExpE (subevent X e) = subevent X e.
+  Lemma FUB_to_exp_UB : forall {X} (e : UBE X),
+      subevent X (FUB_to_exp (subevent X e)) = subevent X e.
   Proof.
     reflexivity.
   Qed.
 
-  Lemma _failure_UB_to_ExpE_fail : forall {X} (e : FailureE X),
-      _failure_UB_to_ExpE (subevent X e) = subevent X e.
+  Lemma FUB_to_exp_Fail : forall {X} (e : FailureE X),
+      subevent X (FUB_to_exp (subevent X e)) = subevent X e.
   Proof.
     reflexivity.
   Qed.
 
 End Translations.
 
-Section ExpLemmas.
+(* TO MOVE *)
+Lemma interp_cfg3_GR_fail : forall id g l m,
+    Maps.lookup id g = None ->
+    interp_cfg3 (trigger (GlobalRead id)) g l m ≈
+                raise ("Could not look up global id " ++ CeresSerialize.to_string id).
+Proof.
+  intros * LU.
+  unfold interp_cfg3.
+  rewrite interp_intrinsics_trigger.
+  cbn.
+  unfold Intrinsics.F_trigger; cbn; rewrite subevent_subevent.
+  rewrite interp_global_trigger. 
+  cbn in *; rewrite LU.
+  unfold raise; cbn.
+  rewrite interp_local_bind, interp_local_trigger; cbn; rewrite subevent_subevent, bind_bind.
+  rewrite interp_memory_bind, interp_memory_trigger; cbn; rewrite subevent_subevent, bind_bind.
+  apply eutt_eq_bind; intros [].
+Qed.
 
-  Notation "'ℑ'" := interp_cfg_to_L3. 
-  Notation "'Θ'" := (translate exp_E_to_instr_E).
-  Notation "⟦ e : t ⟧" := (denote_exp t e).
-  Notation "⟦ e : t ⟧" := (denote_exp (Some t) e).
-  Notation "⟦ e ⟧" := (denote_exp None e).
+Lemma interp_cfg3_LR_fail : forall id g l m,
+    Maps.lookup id l = None ->
+    interp_cfg3 (trigger (LocalRead id)) g l m ≈
+                raise ("Could not look up id " ++ CeresSerialize.to_string id).
+Proof.
+  intros * LU.
+  unfold interp_cfg3.
+  rewrite interp_intrinsics_trigger.
+  cbn.
+  unfold Intrinsics.F_trigger; cbn; rewrite subevent_subevent.
+  rewrite interp_global_trigger. 
+  cbn in *; rewrite subevent_subevent.
+  rewrite interp_local_bind, interp_local_trigger.
+  cbn; rewrite LU.
+  unfold raise; cbn; rewrite bind_bind.
+  rewrite interp_memory_bind, interp_memory_trigger; cbn; rewrite subevent_subevent, bind_bind.
+  apply eutt_eq_bind; intros [].
+Qed.
+
+Lemma repr_intval (i: int64):
+  DynamicValues.Int64.repr (Int64.intval i) = i.
+Proof.
+  replace (Int64.intval i) with (Int64.unsigned i).
+  - apply Int64.repr_unsigned.
+  - destruct i.
+    reflexivity.
+Qed.
+
+Lemma intval_to_from_nat_id:
+  forall n, (Z.of_nat (Z.to_nat (Int64.intval n))) = Int64.intval n.
+Proof.
+  intros.
+  destruct n.
+  cbn.  lia.
+Qed.
+
+Lemma uvalue_to_dvalue_list_concrete :
+  forall fields dfields,
+    (forall u : uvalue,
+        List.In u fields ->
+        (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u) ->
+    map_monad uvalue_to_dvalue fields = inr dfields ->
+    forallb is_concrete fields = true.
+Proof.
+  induction fields; intros dfields H MAP; auto.
+  cbn. apply andb_true_intro.
+  split.
+  - apply H.
+    + apply in_eq.
+    + inversion MAP.
+      destruct (uvalue_to_dvalue a) eqn:Hdv; inversion H1.
+      exists d. reflexivity.
+  - inversion MAP.
+    destruct (uvalue_to_dvalue a) eqn:Hdv; inversion H1.
+    destruct (map_monad uvalue_to_dvalue fields) eqn:Hmap; inversion H2.
+    assert (forall u : uvalue,
+               In u fields -> (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u) as BLAH.
+    { intros u IN (dv & CONV).
+      apply H.
+      - cbn. auto.
+      - exists dv. auto.
+    }
+    apply (IHfields l BLAH eq_refl).
+Qed.
+
+Lemma uvalue_to_dvalue_is_concrete :
+  forall uv dv,
+    uvalue_to_dvalue uv = inr dv ->
+    is_concrete uv.
+Proof.
+  induction uv;
+    intros dv CONV; cbn; inversion CONV; auto.
+  - break_match; inversion H1.
+    eapply uvalue_to_dvalue_list_concrete; eauto.
+    intros u IN (dv' & CONV').
+    eapply H; eauto.
+  - break_match; inversion H1.
+    eapply uvalue_to_dvalue_list_concrete; eauto.
+    intros u IN (dv' & CONV').
+    eapply H; eauto.
+  - break_match; inversion H1.
+    eapply uvalue_to_dvalue_list_concrete; eauto.
+    intros u IN (dv' & CONV').
+    eapply H; eauto.
+  - break_match; inversion H1.
+    eapply uvalue_to_dvalue_list_concrete; eauto.
+    intros u IN (dv' & CONV').
+    eapply H; eauto.
+Qed.
+
+Module ExpNotations.
+
+  Notation "'ℑ'" := interp_cfg3. 
+  Notation "'Θ'" := (translate exp_to_instr).
+  Notation Ret3 g l m x := (Ret (m,(l,(g,x)))). 
+  Notation "⟦ e 'at' t '⟧e'" := (denote_exp t e).
+  Notation "⟦ e 'at' t '⟧e'" := (denote_exp (Some t) e).
+  Notation "⟦ e '⟧e'" := (denote_exp None e).
+  Notation "⟦ e 'at?' t '⟧e3'" := (interp_cfg3 (translate exp_to_instr (denote_exp t e))).
+  Notation "⟦ e 'at' t '⟧e3'" := (interp_cfg3 (translate exp_to_instr (denote_exp (Some t) e))).
+  Notation "⟦ e '⟧e3'" := (interp_cfg3 (translate exp_to_instr (denote_exp None e))).
   Import ITreeNotations.
 
+  Hint Rewrite @bind_ret_l : rwexp.
+  Hint Rewrite @translate_ret : rwexp.
+  Hint Rewrite @interp_cfg3_ret : rwexp.
+  Hint Rewrite @translate_bind : rwexp.
+  Hint Rewrite @interp_cfg3_bind : rwexp.
+  Hint Rewrite @translate_trigger : rwexp.
 
+  Ltac simplify_translations :=
+    do 2 try first [
+         rewrite @LU_to_exp_Global |
+         rewrite @exp_to_instr_Global |
+         rewrite @LU_to_exp_Local |
+         rewrite @exp_to_instr_Local |
+         rewrite @exp_to_instr_Memory |
+         rewrite @exp_to_instr_Pick |
+         rewrite @exp_to_instr_UB |
+         rewrite @exp_to_instr_Fail |
+         rewrite @FUB_to_exp_UB |
+         rewrite @FUB_to_exp_Fail].
+
+  Ltac go :=
+    autorewrite with rwexp;
+    simplify_translations;
+    autorewrite with rwexp.
+
+  Ltac step :=
+    match goal with
+    | |- context [trigger (GlobalRead _)] =>
+      match goal with
+      | h: Maps.lookup _ _ = Some _ |- _ =>
+        rewrite interp_cfg3_GR; [rewrite ?bind_ret_l | eauto]
+      | h: Maps.lookup _ _ = None |- _ =>
+        rewrite interp_cfg3_GR_fail; [rewrite ?bind_ret_l | eauto]
+      end
+    | |- context [trigger (LocalRead _)] =>
+      match goal with
+      | h: Maps.lookup _ _ = Some _ |- _ =>
+        rewrite interp_cfg3_LR; [rewrite ?bind_ret_l | eauto]
+      | h: Maps.lookup _ _ = None |- _ =>
+        rewrite interp_cfg3_LR_fail; [rewrite ?bind_ret_l | eauto]
+      end
+    end.
+
+End ExpNotations.
+
+Import ExpNotations.
+
+Section ExpLemmas.
+  
   Lemma denote_exp_GR :forall g l m id v τ,
       Maps.lookup id g = Some v ->
-      interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) (EXP_Ident (ID_Global id)))) g l m
-                       ≈
-                       Ret (m,(l,(g,dvalue_to_uvalue v))).
+      ⟦ EXP_Ident (ID_Global id) at τ ⟧e3 g l m
+      ≈
+      Ret (m,(l,(g,dvalue_to_uvalue v))).
   Proof.
     intros; cbn.
-    rewrite !translate_bind.
-    rewrite translate_trigger, lookup_E_to_exp_E_Global, subevent_subevent,
-    translate_trigger, exp_E_to_instr_E_Global, subevent_subevent.
-    rewrite interp_cfg_to_L3_bind.
-    rewrite interp_cfg_to_L3_GR; cycle -1.
-    eauto.
-    rewrite bind_ret_l.
-    rewrite !translate_ret.
-    rewrite interp_cfg_to_L3_ret.
+    go.
+    step.
+    go.
     reflexivity.
   Qed.
 
   Lemma denote_exp_LR :forall g l m id v τ,
       Maps.lookup id l = Some v ->
-      interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) (EXP_Ident (ID_Local id)))) g l m
-                       ≈
-                       Ret (m,(l,(g,v))).
+      ⟦ EXP_Ident (ID_Local id) at τ ⟧e3 g l m ≈ Ret (m,(l,(g,v))).
   Proof.
     intros; cbn.
-    rewrite translate_trigger, lookup_E_to_exp_E_Local, subevent_subevent,
-    translate_trigger, exp_E_to_instr_E_Local, subevent_subevent.
-    rewrite interp_cfg_to_L3_LR; cycle -1.
-    eauto.
+    go.
+    step.
+    go.
     reflexivity.
   Qed.
 
-  Lemma repr_intval (i: int64):
-    DynamicValues.Int64.repr (Int64.intval i) = i.
-  Proof.
-    replace (Int64.intval i) with (Int64.unsigned i).
-    -
-      apply Int64.repr_unsigned.
-    -
-      destruct i.
-      reflexivity.
-  Qed.
-
-  Lemma intval_to_from_nat_id:
-    forall n, (Z.of_nat (Z.to_nat (Int64.intval n))) = Int64.intval n.
-  Proof.
-    intros.
-    destruct n.
-    cbn.  lia.
-  Qed.
-
   Lemma denote_exp_i64 :forall t g l m,
-      interp_cfg_to_L3
-        (translate exp_E_to_instr_E
-                   (denote_exp (Some (DTYPE_I 64))
-                               (EXP_Integer (Integers.Int64.intval t))))
-        g l m
+      ⟦ EXP_Integer (Integers.Int64.intval t) at (DTYPE_I 64) ⟧e3 g l m
         ≈
         Ret (m, (l, (g, UVALUE_I64 t))).
   Proof.
     intros; cbn.
-    rewrite translate_ret, interp_cfg_to_L3_ret, repr_intval.
+    go.
+    rewrite repr_intval.
     reflexivity.
   Qed.
 
   Lemma denote_exp_i64_repr :forall t g l m,
-      interp_cfg_to_L3
-        (translate exp_E_to_instr_E
-                   (denote_exp (Some (DTYPE_I 64))
-                               (EXP_Integer t)))
-        g l m
+      ⟦ EXP_Integer t at (DTYPE_I 64) ⟧e3 g l m
         ≈
         Ret (m, (l, (g, UVALUE_I64 (repr t)))).
   Proof.
-    intros; unfold denote_exp; cbn.
-    rewrite translate_ret, interp_cfg_to_L3_ret.
+    intros; cbn.
+    go.
     reflexivity.
   Qed.
 
   Lemma denote_exp_double :forall t g l m,
-      interp_cfg_to_L3
-        (translate exp_E_to_instr_E
-                   (denote_exp (Some DTYPE_Double)
-                               (EXP_Double t)))
-        g l m
+      ⟦ EXP_Double t at DTYPE_Double ⟧e3 g l m
         ≈
         Ret (m, (l, (g, UVALUE_Double t))).
   Proof.
-    intros; unfold denote_exp; cbn.
-    rewrite translate_ret, interp_cfg_to_L3_ret.
+    intros; cbn.
+    go.
     reflexivity.
   Qed.
 
   Lemma denote_conversion_concrete :
-    forall (conv : conversion_type) τ1 τ2 e g ρ m x a av,
-      interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ1) e)) g ρ m
-                       ≈
-                       Ret (m, (ρ, (g, a)))
-      ->
+    forall (conv : conversion_type) τ1 τ2 e g l m x a av,
+      ⟦ e at τ1 ⟧e3 g l m ≈ Ret3 g l m a ->
       uvalue_to_dvalue a = inr av ->
       eval_conv conv τ1 av τ2  = ret x ->
-      interp_cfg_to_L3
-        (translate exp_E_to_instr_E
-                   (denote_exp None
-                               (OP_Conversion conv τ1 e τ2))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
+      ⟦OP_Conversion conv τ1 e τ2⟧e3 g l m
+      ≈
+      Ret3 g l m (dvalue_to_uvalue x).
   Proof.
-    intros conv τ1 τ2 e g ρ m x a av A AV EVAL.
-
-    cbn.
-    rewrite translate_bind.
-    rewrite interp_cfg_to_L3_bind.
-    rewrite A.
-    rewrite bind_ret_l.
-
+    intros * He EQ Heval; cbn.
+    go.
+    rewrite He.
+    go.
     unfold uvalue_to_dvalue_uop.
-    rewrite AV.
+    rewrite EQ.
     cbn.
-
-    rewrite EVAL.
-    unfold ITree.map.
-    cbn.
-    rewrite bind_ret_l.
-
-    repeat rewrite translate_ret.
-    rewrite interp_cfg_to_L3_ret.
+    rewrite Heval.
+    unfold ITree.map; cbn.
+    go.
     reflexivity.
   Qed.
 
-  Lemma uvalue_to_dvalue_list_concrete :
-    forall fields dfields,
-      (forall u : uvalue,
-          List.In u fields ->
-          (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u) ->
-      map_monad uvalue_to_dvalue fields = inr dfields ->
-      forallb is_concrete fields = true.
-  Proof.
-    induction fields; intros dfields H MAP; auto.
-
-    cbn. apply andb_true_intro.
-    split.
-    - apply H.
-      + apply in_eq.
-      + inversion MAP.
-        destruct (uvalue_to_dvalue a) eqn:Hdv; inversion H1.
-        exists d. reflexivity.
-    - inversion MAP.
-      destruct (uvalue_to_dvalue a) eqn:Hdv; inversion H1.
-      destruct (map_monad uvalue_to_dvalue fields) eqn:Hmap; inversion H2.
-
-      assert (forall u : uvalue,
-                 In u fields -> (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u) as BLAH.
-      { intros u IN (dv & CONV).
-        apply H.
-        - cbn. auto.
-        - exists dv. auto.
-      }
-
-      apply (IHfields l BLAH eq_refl).
-  Qed.
-
-  (* TODO: Move this *)
-  Lemma uvalue_to_dvalue_is_concrete :
-    forall uv dv,
-      uvalue_to_dvalue uv = inr dv ->
-      is_concrete uv.
-  Proof.
-    induction uv;
-      intros dv CONV; cbn; inversion CONV; auto.
-    - break_match; inversion H1.
-      eapply uvalue_to_dvalue_list_concrete; eauto.
-      intros u IN (dv' & CONV').
-      eapply H; eauto.
-    - break_match; inversion H1.
-      eapply uvalue_to_dvalue_list_concrete; eauto.
-      intros u IN (dv' & CONV').
-      eapply H; eauto.
-    - break_match; inversion H1.
-      eapply uvalue_to_dvalue_list_concrete; eauto.
-      intros u IN (dv' & CONV').
-      eapply H; eauto.
-    - break_match; inversion H1.
-      eapply uvalue_to_dvalue_list_concrete; eauto.
-      intros u IN (dv' & CONV').
-      eapply H; eauto.
-  Qed.
-
   Lemma denote_ibinop_concrete :
-    forall (op : ibinop) τ e0 e1 g ρ m x a av b bv,
-      interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e0)) g ρ m
-                       ≈
-                       Ret (m, (ρ, (g, a)))
-      ->
-      interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e1)) g ρ m
-                       ≈
-                       Ret (m, (ρ, (g, b))) ->
+    forall (op : ibinop) τ e0 e1 g l m x a av b bv,
+      ⟦ e0 at τ ⟧e3 g l m ≈ Ret3 g l m a ->
+      ⟦ e1 at τ ⟧e3 g l m ≈ Ret3 g l m b ->
       uvalue_to_dvalue a = inr av ->
       uvalue_to_dvalue b = inr bv ->
       eval_iop op av bv  = ret x ->
-      interp_cfg_to_L3
-        (translate exp_E_to_instr_E
-                   (denote_exp None
-                               (OP_IBinop op τ e0 e1))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
+      ⟦ OP_IBinop op τ e0 e1 ⟧e3 g l m ≈ Ret3 g l m (dvalue_to_uvalue x).
   Proof.
     intros * A B AV BV EVAL.
-
-    (* First subexpression *)
     cbn.
-    rewrite translate_bind.
-    rewrite interp_cfg_to_L3_bind.
+    go.
     rewrite A.
-    rewrite bind_ret_l.
-
-    (* Second subexpression *)
-    rewrite translate_bind.
-    rewrite interp_cfg_to_L3_bind.
+    go.
     rewrite B.
-    rewrite bind_ret_l.
-
+    go.
     pose proof (uvalue_to_dvalue_is_concrete _ _ BV) as CONC.
     rewrite CONC.
     cbn. rewrite Bool.andb_false_r.
-
     unfold uvalue_to_dvalue_binop.
     rewrite AV, BV.
     cbn.
-
     rewrite EVAL.
     cbn.
-
-    repeat rewrite translate_ret.
-    rewrite interp_cfg_to_L3_ret.
+    go.
     reflexivity.
   Qed.
 
   Lemma denote_fbinop_concrete :
-    forall (op : fbinop) τ e0 e1 g ρ m x a av b bv params,
-      interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e0)) g ρ m
-                       ≈ 
-                       Ret (m, (ρ, (g, a)))
-      ->
-      interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e1)) g ρ m
-                       ≈
-                       Ret (m, (ρ, (g, b)))
-      ->
+    forall (op : fbinop) τ e0 e1 g l m x a av b bv params,
+      ⟦ e0 at τ ⟧e3 g l m ≈ Ret3 g l m a ->
+      ⟦ e1 at τ ⟧e3 g l m ≈ Ret3 g l m b ->
       uvalue_to_dvalue a = inr av ->
       uvalue_to_dvalue b = inr bv ->
       eval_fop op av bv  = ret x ->
-      interp_cfg_to_L3
-        (translate exp_E_to_instr_E
-                   (denote_exp None
-                               (OP_FBinop op params τ e0 e1))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
+      ⟦ OP_FBinop op params τ e0 e1 ⟧e3 g l m ≈ Ret3 g l m (dvalue_to_uvalue x).
   Proof.
     intros * A B AV BV EVAL.
-
-    (* First subexpression *)
     cbn.
-    rewrite translate_bind.
-    rewrite interp_cfg_to_L3_bind.
+    go.
     rewrite A.
-    rewrite bind_ret_l.
-
-    (* Second subexpression *)
-    rewrite translate_bind.
-    rewrite interp_cfg_to_L3_bind.
+    go.
     rewrite B.
-    rewrite bind_ret_l.
-
+    go.
     pose proof (uvalue_to_dvalue_is_concrete _ _ BV) as CONC.
     rewrite CONC.
     cbn. rewrite Bool.andb_false_r.
-
     unfold uvalue_to_dvalue_binop.
     rewrite AV, BV.
     cbn.
-
     rewrite EVAL.
     cbn.
-
-    repeat rewrite translate_ret.
-    rewrite interp_cfg_to_L3_ret.
+    go.
     reflexivity.
   Qed.
 
   Lemma denote_fcmp_concrete :
-    forall (op : fcmp) τ e0 e1 g ρ m x a av b bv,
-      interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e0)) g ρ m
-                       ≈
-                       Ret (m, (ρ, (g, a)))
-      ->
-      interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e1)) g ρ m
-                       ≈
-                       Ret (m, (ρ, (g, b)))
-      ->
+    forall (op : fcmp) τ e0 e1 g l m x a av b bv,
+      ⟦ e0 at τ ⟧e3 g l m ≈ Ret3 g l m a ->
+      ⟦ e1 at τ ⟧e3 g l m ≈ Ret3 g l m b ->
       uvalue_to_dvalue a = inr av ->
       uvalue_to_dvalue b = inr bv ->
       eval_fcmp op av bv  = ret x ->
-      interp_cfg_to_L3
-        (translate exp_E_to_instr_E
-                   (denote_exp None
-                               (OP_FCmp op τ e0 e1))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
+      ⟦ OP_FCmp op τ e0 e1 ⟧e3 g l m ≈ Ret3 g l m (dvalue_to_uvalue x).
   Proof.
     intros * A B AV BV EVAL.
-
-    (* First subexpression *)
     cbn.
-    rewrite translate_bind.
-    rewrite interp_cfg_to_L3_bind.
+    go.
     rewrite A.
-    rewrite bind_ret_l.
-
-    (* Second subexpression *)
-    rewrite translate_bind.
-    rewrite interp_cfg_to_L3_bind.
+    go.
     rewrite B.
-    rewrite bind_ret_l.
-
+    go.
     unfold uvalue_to_dvalue_binop.
     rewrite AV, BV.
     cbn.
-
     rewrite EVAL.
     cbn.
-
-    repeat rewrite translate_ret.
-    rewrite interp_cfg_to_L3_ret.
+    go.
     reflexivity.
   Qed.
 
   Lemma denote_icmp_concrete :
-    forall (op : icmp) τ e0 e1 g ρ m x a av b bv,
-      interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e0)) g ρ m
-                       ≈
-                       Ret (m, (ρ, (g, a)))
-      ->
-      interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp (Some τ) e1)) g ρ m
-                       ≈
-                       Ret (m, (ρ, (g, b)))
-      ->
+    forall (op : icmp) τ e0 e1 g l m x a av b bv,
+      ⟦ e0 at τ ⟧e3 g l m ≈ Ret3 g l m a ->
+      ⟦ e1 at τ ⟧e3 g l m ≈ Ret3 g l m b ->
       uvalue_to_dvalue a = inr av ->
       uvalue_to_dvalue b = inr bv ->
       eval_icmp op av bv  = ret x ->
-      interp_cfg_to_L3
-        (translate exp_E_to_instr_E
-                   (denote_exp None
-                               (OP_ICmp op τ e0 e1))) g ρ m ≈ Ret (m, (ρ, (g, (dvalue_to_uvalue x)))).
+      ⟦ OP_ICmp op τ e0 e1 ⟧e3 g l m ≈ Ret3 g l m (dvalue_to_uvalue x).
   Proof.
     intros * A B AV BV EVAL.
-
-    (* First subexpression *)
     cbn.
-    rewrite translate_bind.
-    rewrite interp_cfg_to_L3_bind.
+    go.
     rewrite A.
-    rewrite bind_ret_l.
-
-    (* Second subexpression *)
-    rewrite translate_bind.
-    rewrite interp_cfg_to_L3_bind.
+    go.
     rewrite B.
-    rewrite bind_ret_l.
-
+    go.
     unfold uvalue_to_dvalue_binop.
     rewrite AV, BV.
     cbn.
-
     rewrite EVAL.
     cbn.
-
-    repeat rewrite translate_ret.
-    rewrite interp_cfg_to_L3_ret.
+    go.
     reflexivity.
   Qed.
+
+End ExpLemmas.
+
+Section ExpPure.
+
+  Import ITreeNotations.
 
   (* TODO MOVE *)
   Definition state_cfg : Type := memory_stack * (local_env * global_env).
@@ -504,15 +481,12 @@ Section ExpLemmas.
   Definition pure {E R} (t : global_env -> local_env -> memory_stack -> itree E (memory_stack * (local_env * (global_env * R)))) : Prop :=
     forall g l m, t g l m ⤳ ↑ (pure_P g l m).
 
-  Require Import String.
-  Opaque append.
-
   Lemma failure_is_pure : forall R s,
-      pure (R := R) (interp_cfg_to_L3 (translate exp_E_to_instr_E (raise s))).
+      pure (R := R) (interp_cfg3 (translate exp_to_instr (raise s))).
   Proof.
     unfold pure, raise; intros.
-    rewrite translate_bind,translate_trigger, exp_E_to_instr_E_Fail, subevent_subevent, interp_cfg_to_L3_bind.
-    unfold interp_cfg_to_L3.
+    go.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger.
     cbn.
     unfold Intrinsics.F_trigger; cbn.
@@ -526,11 +500,11 @@ Section ExpLemmas.
     apply has_post_bind; intros [].
   Qed.
 
-  Lemma interp_cfg_to_L3_pick : forall u P m l g,
-      interp_cfg_to_L3 (trigger (pick u P)) g l m ≈ v <- trigger (pick u P);; Ret (m,(l,(g,v))).
+  Lemma interp_cfg3_pick : forall u P m l g,
+      interp_cfg3 (trigger (pick u P)) g l m ≈ v <- trigger (pick u P);; Ret (m,(l,(g,v))).
   Proof.
     intros.
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger.
     cbn.
     unfold Intrinsics.F_trigger; cbn.
@@ -548,11 +522,11 @@ Section ExpLemmas.
     reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_UB : forall s m l g,
-      interp_cfg_to_L3 (trigger (ThrowUB s)) g l m ≈ v <- trigger (ThrowUB s);; Ret (m,(l,(g,v))).
+  Lemma interp_cfg3_UB : forall s m l g,
+      interp_cfg3 (trigger (ThrowUB s)) g l m ≈ v <- trigger (ThrowUB s);; Ret (m,(l,(g,v))).
   Proof.
     intros.
-    unfold interp_cfg_to_L3.
+    unfold interp_cfg3.
     rewrite interp_intrinsics_trigger.
     cbn.
     unfold Intrinsics.F_trigger; cbn.
@@ -569,65 +543,85 @@ Section ExpLemmas.
     rewrite interp_local_ret, interp_memory_ret.
     reflexivity.
   Qed.
+
+  Ltac step :=
+    match goal with
+    | |- context [trigger (GlobalRead _)] =>
+      match goal with
+      | h: Maps.lookup _ _ = Some _ |- _ =>
+        rewrite interp_cfg3_GR; [rewrite ?bind_ret_l | eauto]
+      | h: Maps.lookup _ _ = None |- _ =>
+        rewrite interp_cfg3_GR_fail; [rewrite ?bind_ret_l | eauto]
+      end
+    | |- context [trigger (LocalRead _)] =>
+      match goal with
+      | h: Maps.lookup _ _ = Some _ |- _ =>
+        rewrite interp_cfg3_LR; [rewrite ?bind_ret_l | eauto]
+      | h: Maps.lookup _ _ = None |- _ =>
+        rewrite interp_cfg3_LR_fail; [rewrite ?bind_ret_l | eauto]
+      end
+    | |- context [trigger (pick _ _)] => rewrite interp_cfg3_pick
+    | |- context [trigger (ThrowUB _)] => rewrite interp_cfg3_UB
+    end.
 
   Lemma pick_is_pure : forall u P, pure (ℑ (Θ (trigger (pick u P)))).
   Proof.
     intros.
-    unfold pure; intros. 
-    rewrite translate_trigger.
-    rewrite exp_E_to_instr_E_Pick, subevent_subevent.
-    rewrite interp_cfg_to_L3_pick.
+    unfold pure; intros.
+    go.
+    step.
     apply has_post_bind.
     intros ?; apply eutt_Ret; cbn; auto.
   Qed.
 
   Lemma concretize_or_pick_is_pure : forall v P, pure (ℑ (Θ (concretize_or_pick v P))).
   Proof.
-    intros.
     unfold pure; intros.
     unfold concretize_or_pick.
     break_match_goal; [| apply pick_is_pure].
     unfold lift_err.
     break_match_goal; [apply failure_is_pure |].
     cbn.
-    rewrite !translate_ret, interp_cfg_to_L3_ret.
+    go.
     apply eutt_Ret; cbn; auto.
   Qed.
 
   Lemma UB_is_pure : forall R s,
-      pure (R := R) (interp_cfg_to_L3 (translate exp_E_to_instr_E (raiseUB s))).
+      pure (R := R) (interp_cfg3 (translate exp_to_instr (raiseUB s))).
   Proof.
     unfold pure, raiseUB; intros.
-    rewrite translate_bind, translate_trigger, exp_E_to_instr_E_UB, subevent_subevent.
-    rewrite interp_cfg_to_L3_bind, interp_cfg_to_L3_UB.
+    go.
+    step.
     apply has_post_bind.
     intros (? & ? & ? & []).
   Qed.
 
+  (* TO MOVE *)
   Lemma translate_raiseUB : forall T s,
-      translate _failure_UB_to_ExpE (raiseUB (X := T) s) ≈ raiseUB s.
+      translate FUB_to_exp (raiseUB (X := T) s) ≈ raiseUB s.
   Proof.
-    intros.
-    unfold raiseUB; rewrite translate_bind, translate_trigger, _failure_UB_to_ExpE_UB, subevent_subevent.
+    unfold raiseUB; intros.
+    go.
     apply eutt_eq_bind; intros [].
   Qed.
 
   Lemma translate_raise : forall T s,
-      translate _failure_UB_to_ExpE (raise (A := T) s) ≈ raise s. Proof.
-                                                                    intros.
-                                                                    unfold raise; rewrite translate_bind, translate_trigger, _failure_UB_to_ExpE_fail, subevent_subevent.
-                                                                    apply eutt_eq_bind; intros [].
-                                                                  Qed.
-
+      translate FUB_to_exp (raise (A := T) s) ≈ raise s.
+  Proof.
+    unfold raise; intros.
+    go. 
+    apply eutt_eq_bind; intros [].
+  Qed.
 
   Lemma translate_map_monad {E F A B} (l : list A) (ts : A -> itree E B) (h : E ~> F) :
     translate h (map_monad ts l) ≈ map_monad (fun a => translate h (ts a)) l.
   Proof.
     induction l as [| a l IH].
-    - cbn; rewrite translate_ret; reflexivity.
-    - simpl; rewrite translate_bind.
+    - cbn; go; reflexivity.
+    - cbn; go. 
       apply eutt_eq_bind; intros ?.
-      rewrite !translate_bind, IH.
+      go.
+      rewrite IH.
       setoid_rewrite translate_ret.
       reflexivity.
   Qed.
@@ -656,18 +650,18 @@ Section ExpLemmas.
       rewrite interp_state_ret; reflexivity.
   Qed.
 
-  Lemma interp_cfg_to_L3_map_monad {A B} g l m (xs : list A) (ts : A -> itree _ B) : 
-    interp_cfg_to_L3 (map_monad ts xs) g l m ≈
+  Lemma interp_cfg3_map_monad {A B} g l m (xs : list A) (ts : A -> itree _ B) : 
+    interp_cfg3 (map_monad ts xs) g l m ≈
                      map_monad (m := Monads.stateT _ (Monads.stateT _ (Monads.stateT _ (itree _))))
-                     (fun a => interp_cfg_to_L3 (ts a)) xs g l m.
+                     (fun a => interp_cfg3 (ts a)) xs g l m.
   Proof.
     intros; revert g l m; induction xs as [| a xs IH]; simpl; intros.
-    - rewrite interp_cfg_to_L3_ret; reflexivity.
-    - rewrite interp_cfg_to_L3_bind.
+    - rewrite interp_cfg3_ret; reflexivity.
+    - rewrite interp_cfg3_bind.
       apply eutt_eq_bind; intros (? & ? & ? & ?); cbn.
-      rewrite interp_cfg_to_L3_bind, IH.
+      rewrite interp_cfg3_bind, IH.
       apply eutt_eq_bind; intros (? & ? & ? & ?); cbn.
-      rewrite interp_cfg_to_L3_ret; reflexivity.
+      rewrite interp_cfg3_ret; reflexivity.
   Qed.
 
   Lemma map_monad_eutt_state_ind :
@@ -728,64 +722,25 @@ Section ExpLemmas.
       intros (s1' & s2' & s3' & ?) (? & ? & ? & ?) [EQ ?]; inv EQ; cbn; apply eutt_Ret; auto. 
   Qed.
 
-  Lemma interp_cfg_to_L3_GR_fail : forall id g l m,
-      Maps.lookup id g = None ->
-      interp_cfg_to_L3 (trigger (GlobalRead id)) g l m ≈
-                       raise ("Could not look up global id " ++ CeresSerialize.to_string id).
-  Proof.
-    intros * LU.
-    unfold interp_cfg_to_L3.
-    rewrite interp_intrinsics_trigger.
-    cbn.
-    unfold Intrinsics.F_trigger; cbn; rewrite subevent_subevent.
-    rewrite interp_global_trigger. 
-    cbn in *; rewrite LU.
-    unfold raise; cbn.
-    rewrite interp_local_bind, interp_local_trigger; cbn; rewrite subevent_subevent, bind_bind.
-    rewrite interp_memory_bind, interp_memory_trigger; cbn; rewrite subevent_subevent, bind_bind.
-    apply eutt_eq_bind; intros [].
-  Qed.
-
-  Lemma interp_cfg_to_L3_LR_fail : forall id g l m,
-      Maps.lookup id l = None ->
-      interp_cfg_to_L3 (trigger (LocalRead id)) g l m ≈
-                       raise ("Could not look up id " ++ CeresSerialize.to_string id).
-  Proof.
-    intros * LU.
-    unfold interp_cfg_to_L3.
-    rewrite interp_intrinsics_trigger.
-    cbn.
-    unfold Intrinsics.F_trigger; cbn; rewrite subevent_subevent.
-    rewrite interp_global_trigger. 
-    cbn in *; rewrite subevent_subevent.
-    rewrite interp_local_bind, interp_local_trigger.
-    cbn; rewrite LU.
-    unfold raise; cbn; rewrite bind_bind.
-    rewrite interp_memory_bind, interp_memory_trigger; cbn; rewrite subevent_subevent, bind_bind.
-    apply eutt_eq_bind; intros [].
-  Qed.
-
-  Lemma expr_are_pure : forall o e, pure (interp_cfg_to_L3 (translate exp_E_to_instr_E (denote_exp o e))).
-  Proof.
+  Lemma expr_are_pure : forall (o : option dtyp) e, pure ⟦ e at? o ⟧e3.
+  Proof with (apply eutt_Ret; cbn; auto).
     intros; unfold pure.
     revert o; induction e; simpl; intros.
 
     - destruct id; cbn.
-      + rewrite translate_bind, translate_trigger, lookup_E_to_exp_E_Global, subevent_subevent.
-        rewrite translate_bind, translate_trigger, exp_E_to_instr_E_Global, subevent_subevent.
+      + go.
         destruct (Maps.lookup id g) eqn:EQ.
-        * rewrite interp_cfg_to_L3_bind, interp_cfg_to_L3_GR; eauto.
-          rewrite bind_ret_l, !translate_ret, interp_cfg_to_L3_ret.
-          apply eutt_Ret; cbn; auto.
-        * rewrite interp_cfg_to_L3_bind, interp_cfg_to_L3_GR_fail; auto.
+        * step.
+          go...
+          
+        * step. 
           unfold raise; rewrite bind_bind.
           apply has_post_bind; intros [].
           
-      + rewrite translate_trigger, lookup_E_to_exp_E_Local, subevent_subevent.
+      + go. 
         destruct (Maps.lookup id l) eqn:EQ.
-        * rewrite translate_trigger, exp_E_to_instr_E_Local, subevent_subevent, interp_cfg_to_L3_LR; eauto.
-          apply eutt_Ret; cbn; auto.
-        * rewrite translate_trigger, exp_E_to_instr_E_Local, subevent_subevent, interp_cfg_to_L3_LR_fail; auto. 
+        * step... 
+        * step. 
           unfold raise.
           apply has_post_bind; intros [].
 
@@ -796,34 +751,34 @@ Section ExpLemmas.
       cbn.
       break_match_goal; [apply UB_is_pure |].
       break_match_goal; [apply failure_is_pure|]. 
-      rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
+      rewrite translate_ret, interp_cfg3_ret; apply eutt_Ret; cbn; intuition.
 
     - destruct o; cbn; [| apply failure_is_pure].
       destruct d; simpl.
       all: match goal with |- context[raise _] => apply failure_is_pure | _ => idtac end.
-      rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
+      go...
 
     - destruct o; cbn; [| apply failure_is_pure].
       destruct d; simpl.
       all: match goal with |- context[raise _] => apply failure_is_pure | _ => idtac end.
-      rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
+      go...
 
     - destruct o; cbn; [| apply failure_is_pure].
       destruct d; simpl.
       all: match goal with |- context[raise _] => apply failure_is_pure | _ => idtac end.
-      rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
-      rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
+      go...
+      go...
 
-    - destruct b; simpl; rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
+    - destruct b; simpl; go...
 
-    - simpl; rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
+    - simpl; go...
 
     - destruct o; cbn; [| apply failure_is_pure].
       apply failure_is_pure.
 
-    - rewrite translate_bind, interp_cfg_to_L3_bind.
+    - go.
       rewrite translate_map_monad.
-      rewrite interp_cfg_to_L3_map_monad.
+      rewrite interp_cfg3_map_monad.
       apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
       + eapply has_post_weaken.
         apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
@@ -834,14 +789,14 @@ Section ExpLemmas.
           intros (? & ? & ? & ?) (-> & -> & ->); auto.
         * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
       + intros (? & ? & ? & ?) (-> & -> & ->).
-        simpl; rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
+        go...
 
     - destruct o; cbn; [| apply failure_is_pure].
-      rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
+      go...
 
-    - rewrite translate_bind, interp_cfg_to_L3_bind.
+    - go.
       rewrite translate_map_monad.
-      rewrite interp_cfg_to_L3_map_monad.
+      rewrite interp_cfg3_map_monad.
       apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
       + eapply has_post_weaken.
         apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
@@ -852,7 +807,7 @@ Section ExpLemmas.
           intros (? & ? & ? & ?) (-> & -> & ->); auto.
         * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
       + intros (? & ? & ? & ?) (-> & -> & ->).
-        simpl; rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
+        go...
 
     - destruct o; cbn; [| apply failure_is_pure].
       destruct d;
@@ -861,9 +816,9 @@ Section ExpLemmas.
         | _ => apply failure_is_pure
         end.
       simpl.
-      rewrite translate_bind, interp_cfg_to_L3_bind.
+      go.
       rewrite translate_map_monad.
-      rewrite interp_cfg_to_L3_map_monad.
+      rewrite interp_cfg3_map_monad.
       apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
       + eapply has_post_weaken.
         apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
@@ -874,12 +829,11 @@ Section ExpLemmas.
           intros (? & ? & ? & ?) (-> & -> & ->); auto.
         * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
       + intros (? & ? & ? & ?) (-> & -> & ->).
-        simpl; rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
+        go...
 
-
-    - rewrite translate_bind, interp_cfg_to_L3_bind.
+    - go.
       rewrite translate_map_monad.
-      rewrite interp_cfg_to_L3_map_monad.
+      rewrite interp_cfg3_map_monad.
       apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
       + eapply has_post_weaken.
         apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
@@ -890,11 +844,11 @@ Section ExpLemmas.
           intros (? & ? & ? & ?) (-> & -> & ->); auto.
         * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
       + intros (? & ? & ? & ?) (-> & -> & ->).
-        simpl; rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
+        go...
 
-    - rewrite translate_bind, interp_cfg_to_L3_bind.
+    - go.
       rewrite translate_map_monad.
-      rewrite interp_cfg_to_L3_map_monad.
+      rewrite interp_cfg3_map_monad.
       apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
       + eapply has_post_weaken.
         apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
@@ -905,18 +859,18 @@ Section ExpLemmas.
           intros (? & ? & ? & ?) (-> & -> & ->); auto.
         * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
       + intros (? & ? & ? & ?) (-> & -> & ->).
-        simpl; rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
+        go...
 
-    - rewrite translate_bind, interp_cfg_to_L3_bind.
+    - go.
       eapply has_post_bind_strong.
       apply (IHe1 (Some t) g l m).
       intros (? & ? & ? & ?) (-> & -> & ->).
-      rewrite translate_bind, interp_cfg_to_L3_bind.
+      go.
       eapply has_post_bind_strong.
       apply (IHe2 (Some t) g l m).
       intros (? & ? & ? & ?) (-> & -> & ->).
       break_match_goal.
-      + rewrite translate_bind, interp_cfg_to_L3_bind.
+      + go.
         apply has_post_bind_strong with (↑ (pure_P g l m)).
         * unfold concretize_or_pick.
           break_match_goal.
@@ -925,70 +879,63 @@ Section ExpLemmas.
             unfold lift_err.
             break_match_goal.
             apply failure_is_pure.
-            rewrite translate_ret, interp_cfg_to_L3_ret.
-            apply eutt_Ret; cbn; auto.
+            go...
           }
           apply pick_is_pure.
 
         * intros (? & ? & ? & ?) (-> & -> & ->).
           unfold uvalue_to_dvalue_binop2.
           cbn; break_match_goal.
-          rewrite translate_ret, interp_cfg_to_L3_ret.
-          apply eutt_Ret; cbn; auto.
+          go...
           break_match_hyp; inv_sum.
           break_match_goal.
           rewrite translate_raiseUB; apply UB_is_pure.
           break_match_goal.
           rewrite translate_raise; apply failure_is_pure.
-          rewrite !translate_ret, interp_cfg_to_L3_ret.
-          apply eutt_Ret; cbn; auto.
+          go...
 
       + unfold uvalue_to_dvalue_binop.
         cbn.
         break_match_goal.
-        rewrite !translate_ret, interp_cfg_to_L3_ret.
-        apply eutt_Ret; cbn; auto.
+        go...
         break_match_hyp; try inv_sum.
         break_match_hyp; try inv_sum.
         break_match_goal.
         rewrite translate_raiseUB; apply UB_is_pure.
         break_match_goal.
         rewrite translate_raise; apply failure_is_pure.
-        rewrite !translate_ret, interp_cfg_to_L3_ret.
-        apply eutt_Ret; cbn; auto.
+        go...
 
-    - rewrite translate_bind, interp_cfg_to_L3_bind.
+    - go.
       eapply has_post_bind_strong.
       apply (IHe1 (Some t) g l m).
       intros (? & ? & ? & ?) (-> & -> & ->).
-      rewrite translate_bind, interp_cfg_to_L3_bind.
+      go.
       eapply has_post_bind_strong.
       apply (IHe2 (Some t) g l m).
       intros (? & ? & ? & ?) (-> & -> & ->).
       unfold uvalue_to_dvalue_binop.
       cbn.
       break_match_goal.
-      rewrite !translate_ret, interp_cfg_to_L3_ret.
-      apply eutt_Ret; cbn; auto.
+      go...
       break_match_hyp; try inv_sum.
       break_match_hyp; try inv_sum.
       break_match_goal.
       apply UB_is_pure.
       break_match_goal.
       apply failure_is_pure.
-      rewrite !translate_ret, interp_cfg_to_L3_ret.
-      apply eutt_Ret; cbn; auto.
+      go...
 
-    - rewrite translate_bind, interp_cfg_to_L3_bind.
+    - go.
       eapply has_post_bind_strong.
       apply (IHe1 (Some t) g l m).
       intros (? & ? & ? & ?) (-> & -> & ->).
-      rewrite translate_bind, interp_cfg_to_L3_bind.
+      go.
       eapply has_post_bind_strong.
       apply (IHe2 (Some t) g l m).
       intros (? & ? & ? & ?) (-> & -> & ->).
       break_match_goal.
-      + rewrite translate_bind, interp_cfg_to_L3_bind.
+      + go.
         apply has_post_bind_strong with (↑ (pure_P g l m)).
         * unfold concretize_or_pick.
           break_match_goal.
@@ -997,86 +944,77 @@ Section ExpLemmas.
             unfold lift_err.
             break_match_goal.
             apply failure_is_pure.
-            rewrite translate_ret, interp_cfg_to_L3_ret.
-            apply eutt_Ret; cbn; auto.
+            go...
           }
           apply pick_is_pure.
 
         * intros (? & ? & ? & ?) (-> & -> & ->).
           unfold uvalue_to_dvalue_binop2.
           cbn; break_match_goal.
-          rewrite translate_ret, interp_cfg_to_L3_ret.
-          apply eutt_Ret; cbn; auto.
+          go...
           break_match_hyp; inv_sum.
           break_match_goal.
           rewrite translate_raiseUB; apply UB_is_pure.
           break_match_goal.
           rewrite translate_raise; apply failure_is_pure.
-          rewrite !translate_ret, interp_cfg_to_L3_ret.
-          apply eutt_Ret; cbn; auto.
+          go...
 
       + unfold uvalue_to_dvalue_binop.
         cbn.
         break_match_goal.
-        rewrite !translate_ret, interp_cfg_to_L3_ret.
-        apply eutt_Ret; cbn; auto.
+        go...
         break_match_hyp; try inv_sum.
         break_match_hyp; try inv_sum.
         break_match_goal.
         rewrite translate_raiseUB; apply UB_is_pure.
         break_match_goal.
         rewrite translate_raise; apply failure_is_pure.
-        rewrite !translate_ret, interp_cfg_to_L3_ret.
-        apply eutt_Ret; cbn; auto.
+        go...
 
-    - rewrite translate_bind, interp_cfg_to_L3_bind.
+    - go.
       eapply has_post_bind_strong.
       apply (IHe1 (Some t) g l m).
       intros (? & ? & ? & ?) (-> & -> & ->).
-      rewrite translate_bind, interp_cfg_to_L3_bind.
+      go.
       eapply has_post_bind_strong.
       apply (IHe2 (Some t) g l m).
       intros (? & ? & ? & ?) (-> & -> & ->).
       unfold uvalue_to_dvalue_binop.
       cbn.
       break_match_goal.
-      rewrite !translate_ret, interp_cfg_to_L3_ret.
-      apply eutt_Ret; cbn; auto.
+      go...
       break_match_hyp; try inv_sum.
       break_match_hyp; try inv_sum.
       break_match_goal.
       apply UB_is_pure.
       break_match_goal.
       apply failure_is_pure.
-      rewrite !translate_ret, interp_cfg_to_L3_ret.
-      apply eutt_Ret; cbn; auto.
+      go...
 
-    - rewrite translate_bind, interp_cfg_to_L3_bind.
+    - go.
       eapply has_post_bind_strong.
       apply (IHe (Some t_from) g l m).
       intros (? & ? & ? & ?) (-> & -> & ->).
       unfold uvalue_to_dvalue_uop; cbn.
       break_match_goal.
-      rewrite !translate_ret, interp_cfg_to_L3_ret.
-      apply eutt_Ret; cbn; auto.
+      go...
       break_match_hyp; try inv_sum.
       unfold ITree.map.
-      rewrite !translate_bind, interp_cfg_to_L3_bind.
+      go.
       apply has_post_bind_strong with (↑ (pure_P g l m)).
       + (* What's the right way to reason about eval_conv? *)
         admit.
       + intros (? & ? & ? & ?) (-> & -> & ->).
-        rewrite !translate_ret, interp_cfg_to_L3_ret.
-        apply eutt_Ret; cbn; auto.
+        go...
 
     - destruct ptrval; cbn.
-      rewrite translate_bind, interp_cfg_to_L3_bind.
+      rewrite translate_bind, interp_cfg3_bind.
       eapply has_post_bind_strong.
       apply (IHe (Some d) g l m).
       intros (? & ? & ? & ?) (-> & -> & ->).
-      rewrite translate_bind, interp_cfg_to_L3_bind.
+      rewrite translate_bind, interp_cfg3_bind.
       rewrite translate_map_monad.
-      rewrite interp_cfg_to_L3_map_monad.
+      rewrite interp_cfg3_map_monad.
       apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
       + eapply has_post_weaken.
         apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
@@ -1088,7 +1026,7 @@ Section ExpLemmas.
         * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
       + intros (? & ? & ? & ?) (-> & -> & ->).
         break_match_goal.
-        * rewrite translate_bind, interp_cfg_to_L3_bind.
+        * rewrite translate_bind, interp_cfg3_bind.
           unfold concretize_or_pick.
           apply has_post_bind_strong with (↑ (pure_P g l m)).
           {
@@ -1096,13 +1034,13 @@ Section ExpLemmas.
             unfold lift_err.
             break_match_goal.
             apply failure_is_pure.
-            cbn; rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; auto.
+            cbn; go... 
             apply pick_is_pure.
           }
           intros (? & ? & ? & ?) (-> & -> & ->).
-          rewrite translate_bind, interp_cfg_to_L3_bind.
+          rewrite translate_bind, interp_cfg3_bind.
           rewrite translate_map_monad.
-          rewrite interp_cfg_to_L3_map_monad.
+          rewrite interp_cfg3_map_monad.
           apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
           { eapply has_post_weaken.
             apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
@@ -1111,15 +1049,14 @@ Section ExpLemmas.
               unfold lift_err.
               break_match_goal.
               apply failure_is_pure.
-              cbn; rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; auto.
+              cbn; go... 
               apply pick_is_pure.
             * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
           }
           intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
-          unfold ITree.map. rewrite translate_bind, interp_cfg_to_L3_bind.
-          rewrite translate_trigger, exp_E_to_instr_E_Memory, subevent_subevent.
+          unfold ITree.map; go. 
           (* GEP... *)
-          unfold interp_cfg_to_L3.
+          unfold interp_cfg3.
           rewrite interp_intrinsics_trigger.
           cbn.
           unfold Intrinsics.F_trigger; cbn.
@@ -1135,13 +1072,12 @@ Section ExpLemmas.
           rewrite !bind_ret_l.
           rewrite interp_local_ret, interp_memory_ret, bind_ret_l.
           rewrite translate_ret, interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret. 
-          apply eutt_Ret; cbn; auto.
+          go...
 
         * unfold ITree.map; destruct p; cbn.
-          rewrite translate_bind, interp_cfg_to_L3_bind.
-          rewrite translate_trigger, exp_E_to_instr_E_Memory, subevent_subevent.
+          go.
           (* GEP... *)
-          unfold interp_cfg_to_L3.
+          unfold interp_cfg3.
           rewrite interp_intrinsics_trigger.
           cbn.
           unfold Intrinsics.F_trigger; cbn.
@@ -1157,7 +1093,7 @@ Section ExpLemmas.
           rewrite !bind_ret_l.
           rewrite interp_local_ret, interp_memory_ret, bind_ret_l.
           rewrite translate_ret, interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret. 
-          apply eutt_Ret; cbn; auto.
+          go...
 
     - apply failure_is_pure.
 
@@ -1166,67 +1102,62 @@ Section ExpLemmas.
     - apply failure_is_pure.
 
     - destruct vec; cbn.
-      rewrite translate_bind, interp_cfg_to_L3_bind.
+      go.
       eapply has_post_bind_strong.
       apply (IHe (Some d) g l m).
       intros (? & ? & ? & ?) (-> & -> & ->).
       clear IHe.
       induction idxs as [| n idxs IH].
       + cbn.
-        rewrite !translate_ret, interp_cfg_to_L3_ret.
-        apply eutt_Ret; cbn; auto.
+        go...
       + cbn.
         break_match_goal.
         apply UB_is_pure.
         break_match_goal.
         apply failure_is_pure.
-        rewrite !translate_ret, interp_cfg_to_L3_ret.
-        apply eutt_Ret; cbn; auto.
+        go...
         
     - apply failure_is_pure.
 
     - destruct cnd,v1,v2; cbn.
-      rewrite translate_bind, interp_cfg_to_L3_bind.
+      go.
       eapply has_post_bind_strong; [apply IHe | ].
       intros (? & ? & ? & ?) (-> & -> & ->).
-      rewrite translate_bind, interp_cfg_to_L3_bind.
+      go.
       eapply has_post_bind_strong; [apply IHe0 |]. 
       intros (? & ? & ? & ?) (-> & -> & ->).
-      rewrite translate_bind, interp_cfg_to_L3_bind.
+      go.
       eapply has_post_bind_strong; [apply IHe1 |]. 
       intros (? & ? & ? & ?) (-> & -> & ->).
       break_match_goal.
-      rewrite !translate_ret, interp_cfg_to_L3_ret.
-      apply eutt_Ret; cbn; auto.
+      go...
       unfold lift_undef_or_err.
       break_match_goal.
       break_match_goal.
       apply UB_is_pure.
       break_match_goal.
       apply failure_is_pure.
-      rewrite !translate_ret, interp_cfg_to_L3_ret.
-      apply eutt_Ret; cbn; auto.
+      go...
       
     - destruct v; cbn.
-      rewrite translate_bind, interp_cfg_to_L3_bind.
+      go.
       eapply has_post_bind_strong.
       apply (IHe (Some d) g l m).
       intros (? & ? & ? & ?) (-> & -> & ->).
       clear IHe.
-      rewrite translate_bind, interp_cfg_to_L3_bind.
+      go.
       apply has_post_bind_strong with (↑ (pure_P g l m)).
       { unfold pick_your_poison;
           break_match_goal; cbn;
             match goal with
-              |- context [Ret _] => rewrite !translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; auto
+              |- context [Ret _] => rewrite !translate_ret, interp_cfg3_ret; apply eutt_Ret; cbn; auto
             | |- context [pick] => apply pick_is_pure
             | |- context [concretize_or_pick] => apply concretize_or_pick_is_pure
             end.
       }
       intros (? & ? & ? & ?) (-> & -> & ->).
-      rewrite !translate_ret, interp_cfg_to_L3_ret.
-      apply eutt_Ret; cbn; auto.
+      go...
       
   Admitted.
 
-End ExpLemmas.
+End ExpPure.

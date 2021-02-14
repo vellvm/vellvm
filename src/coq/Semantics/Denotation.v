@@ -410,7 +410,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         (* The translation injects the [lookup_E] interface used by [lookup_id] to the ambient one *)
         | EXP_Ident i =>
-          translate lookup_E_to_exp_E (lookup_id i)
+          translate LU_to_exp (lookup_id i)
 
         | EXP_Integer x =>
           match top with
@@ -503,13 +503,13 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             dv2 <- concretize_or_pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2) ;;
             uvalue_to_dvalue_binop2
               (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-              (fun v1 v2 => translate _failure_UB_to_ExpE
+              (fun v1 v2 => translate FUB_to_exp
                                    (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
               v1 dv2
           else
             uvalue_to_dvalue_binop
               (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-              (fun v1 v2 => translate _failure_UB_to_ExpE
+              (fun v1 v2 => translate FUB_to_exp
                                    (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
               v1 v2
 
@@ -530,7 +530,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             uvalue_to_dvalue_binop2
               (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
               (fun v1 v2 =>
-                 translate _failure_UB_to_ExpE
+                 translate FUB_to_exp
                                    (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
               v1 dv2
           else
@@ -538,7 +538,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             (fun v1 v2 =>
                ret (UVALUE_FBinop fop fm v1 v2))
               (fun v1 v2 =>
-                 translate _failure_UB_to_ExpE
+                 translate FUB_to_exp
                                    (lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
               v1 v2
 
@@ -554,7 +554,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           v <- denote_exp (Some dt1) op ;;
           uvalue_to_dvalue_uop
             (fun v => ret (UVALUE_Conversion conv v t2))
-            (fun v => translate conv_E_to_exp_E
+            (fun v => translate conv_to_exp
                              (fmap dvalue_to_uvalue (eval_conv conv dt1 v t2)))
             v
 
@@ -694,7 +694,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Pure operations *)
 
         | (IId id, INSTR_Op op) =>
-          dv <- translate exp_E_to_instr_E (denote_op op) ;;
+          dv <- translate exp_to_instr (denote_op op) ;;
           trigger (LocalWrite id dv)
 
         (* Allocation *)
@@ -705,7 +705,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Load *)
         | (IId id, INSTR_Load _ dt (du,ptr) _) =>
           (* debug ("Load: " ++ to_string dt);; *)
-          ua <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
+          ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
           da <- concretize_or_pick ua True ;;
           match da with
           | DVALUE_Poison => raiseUB "Load from poisoned address."
@@ -716,9 +716,9 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         (* Store *)
         | (IVoid _, INSTR_Store _ (dt, val) (du, ptr) _) =>
-          uv <- translate exp_E_to_instr_E (denote_exp (Some dt) val) ;;
+          uv <- translate exp_to_instr (denote_exp (Some dt) val) ;;
           dv <- concretize_or_pick uv True ;;
-          ua <- translate exp_E_to_instr_E (denote_exp (Some du) ptr) ;;
+          ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
           da <- pickUnique ua ;;
           match da with
           | DVALUE_Poison => raiseUB "Store to poisoned address."
@@ -729,14 +729,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         (* Call *)
         | (pt, INSTR_Call (dt, f) args) =>
-          uvs <- map_monad (fun '(t, op) => (translate exp_E_to_instr_E (denote_exp (Some t) op))) args ;;
+          uvs <- map_monad (fun '(t, op) => (translate exp_to_instr (denote_exp (Some t) op))) args ;;
           returned_value <-
           match intrinsic_exp f with
           | Some s =>
             dvs <- map_monad (fun uv => pickUnique uv) uvs ;;
             fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
           | None =>
-            fv <- translate exp_E_to_instr_E (denote_exp None f) ;;
+            fv <- translate exp_to_instr (denote_exp None f) ;;
             (* debug ("Call to function: " ++ to_string f) ;; *)
             trigger (Call dt fv uvs)
           end
@@ -836,7 +836,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
       Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp)): itree instr_E unit :=
         dvs <- Util.map_monad
-                (fun x => translate exp_E_to_instr_E (denote_phi bid_from x))
+                (fun x => translate exp_to_instr (denote_phi bid_from x))
                 phis;;
         Util.map_monad (fun '(id,dv) => trigger (LocalWrite id dv)) dvs;;
         ret tt.
@@ -846,7 +846,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition denote_block (b: block dtyp) (bid_from : block_id) : itree instr_E (block_id + uvalue) :=
         denote_phis bid_from (blk_phis b);;
         denote_code (blk_code b);;
-        translate exp_E_to_instr_E (denote_terminator (blk_term b)).
+        translate exp_to_instr (denote_terminator (blk_term b)).
 
       Definition denote_ocfg (bks: ocfg dtyp)
         : (block_id * block_id) -> itree instr_E ((block_id * block_id) + uvalue) :=
@@ -927,7 +927,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
              (* generate the corresponding writes to the local stack frame *)
           trigger MemPush ;;
           trigger (StackPush (map (fun '(k,v) => (k, v)) bs)) ;;
-          rv <- translate instr_E_to_L0' (denote_cfg (df_instrs df)) ;;
+          rv <- translate instr_to_L0' (denote_cfg (df_instrs df)) ;;
           trigger StackPop ;;
           trigger MemPop ;;
           ret rv.

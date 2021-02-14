@@ -115,7 +115,7 @@ Definition initialize_globals (gs:list (global dtyp)): itree exp_E unit :=
 Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree L0 unit :=
   allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
   allocate_globals (m_globals CFG) ;;
-  translate _exp_E_to_L0 (initialize_globals (m_globals CFG)).
+  translate exp_to_L0 (initialize_globals (m_globals CFG)).
 
 (** Local environment implementation
     The map-based handlers are defined parameterized over a domain of key and value.
@@ -206,7 +206,7 @@ Definition interpreter_gen
            (prog: list (toplevel_entity typ (block typ * list (block typ))))
   : itree L5 res_L4 :=
   let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-  interp_to_L5_exec t [] ([],[]) empty_memory_stack.
+  interp5_exec t [] ([],[]) empty_memory_stack.
 
 (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts 
@@ -232,7 +232,7 @@ Definition model_user
            (prog: list (toplevel_entity typ (block typ * list (block typ))))
   : PropT L5 (memory_stack * (local_env * lstack * (global_env * uvalue))) :=
   let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-  interp_to_L5 Logic.eq t [] ([],[]) empty_memory_stack. 
+  interp5 Logic.eq t [] ([],[]) empty_memory_stack. 
 
 (**
      Finally, the official model assumes no user-defined intrinsics.
