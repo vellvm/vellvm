@@ -455,8 +455,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | Some t => lift_err ret (fmap dvalue_to_uvalue (dv_zero_initializer t))
           end
 
-        | EXP_Cstring s => raise "EXP_Cstring not yet implemented"
-
+        | EXP_Cstring es => 
+          vs <- map_monad eval_texp es ;;
+          ret (UVALUE_Array vs)
+          
         | EXP_Undef =>
           match top with
           | None   => raise "denote_exp given untyped EXP_Undef"

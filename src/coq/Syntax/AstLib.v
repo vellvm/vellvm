@@ -379,7 +379,7 @@ Section ExpInd.
   Hypothesis IH_Bool    : forall (b:bool), P ((EXP_Bool b)).
   Hypothesis IH_Null    : P ((EXP_Null)).
   Hypothesis IH_Zero_initializer : P ((EXP_Zero_initializer)).
-  Hypothesis IH_Cstring : forall (s:string), P ((EXP_Cstring s)).
+  Hypothesis IH_Cstring : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Cstring elts)).
   Hypothesis IH_Undef   : P ((EXP_Undef)).
   Hypothesis IH_Struct  : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Struct fields)).
   Hypothesis IH_Packed_struct : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Packed_struct fields)).
@@ -414,6 +414,11 @@ Section ExpInd.
     - apply IH_Null.
     - apply IH_Zero_initializer.
     - apply IH_Cstring.
+      { revert elts.
+        fix IHelts 1. intros [|u elts']. intros. inversion H.
+        intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
+      }
+      
     - apply IH_Undef.
     - apply IH_Struct.
       { revert fields.
@@ -573,7 +578,6 @@ Section hiding_notation.
       | EXP_Bool b => to_sexp b
       | EXP_Null => Atom "null"
       | EXP_Zero_initializer => Atom "zero initializer"
-      | EXP_Cstring s => Atom s
       | EXP_Undef => Atom "undef"
       | OP_IBinop iop t v1 v2 =>
         [to_sexp iop ; to_sexp t
