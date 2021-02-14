@@ -159,40 +159,240 @@ let id_of = function
 %}
 
 %token<LLVMAst.raw_id> GLOBAL LOCAL
-%token LPAREN RPAREN LCURLY RCURLY LTLCURLY RCURLYGT LSQUARE RSQUARE LT GT EQ COMMA EOF EOL STAR
+%token LPAREN RPAREN LCURLY RCURLY LTLCURLY RCURLYGT LSQUARE RSQUARE LT GT EQ COMMA EOF EOL STAR DOTDOTDOT
 
 %token<string> STRING
 %token<Camlcoq.Z.t> INTEGER
 %token<string> FLOAT
 %token<Floats.float> HEXCONSTANT
-%token KW_NULL KW_UNDEF KW_TRUE KW_FALSE KW_ZEROINITIALIZER KW_C
+%token KW_NULL 
+%token KW_UNDEF 
+%token KW_TRUE 
+%token KW_FALSE 
+%token KW_ZEROINITIALIZER 
+%token KW_C
 
 %token<string> LABEL
 
-%token KW_DEFINE KW_DECLARE KW_TARGET KW_DATALAYOUT KW_TRIPLE KW_SOURCE_FILENAME
-%token KW_PRIVATE KW_INTERNAL KW_AVAILABLE_EXTERNALLY KW_LINKONCE KW_WEAK KW_COMMON KW_APPENDING KW_EXTERN_WEAK KW_LINKONCE_ODR KW_WEAK_ODR KW_EXTERNAL KW_DLLIMPORT KW_DLLEXPORT
-%token KW_DEFAULT KW_HIDDEN KW_PROTECTED
-%token KW_CCC KW_FASTCC KW_COLDCC KW_CC
+%token KW_DEFINE 
+%token KW_DECLARE 
+%token KW_TARGET 
+%token KW_DATALAYOUT 
+%token KW_TRIPLE 
+%token KW_SOURCE_FILENAME
+%token KW_PRIVATE 
+%token KW_INTERNAL 
+
+%token KW_AVAILABLE_EXTERNALLY 
+%token KW_LINKONCE 
+%token KW_WEAK 
+%token KW_COMMON 
+%token KW_APPENDING 
+%token KW_EXTERN_WEAK 
+%token KW_LINKONCE_ODR 
+%token KW_WEAK_ODR 
+%token KW_EXTERNAL 
+%token KW_DLLIMPORT 
+%token KW_DLLEXPORT
+%token KW_DEFAULT 
+%token KW_HIDDEN 
+%token KW_PROTECTED
+
+%token KW_CCC 
+%token KW_FASTCC 
+%token KW_COLDCC 
+%token KW_CC
 %token KW_UNNAMED_ADDR
-%token KW_TYPE KW_X KW_OPAQUE
-%token KW_GLOBAL KW_ADDRSPACE KW_CONSTANT KW_SECTION KW_THREAD_LOCAL KW_LOCALDYNAMIC KW_INITIALEXEC KW_LOCALEXEC KW_EXTERNALLY_INITIALIZED
-%token KW_ZEROEXT KW_SIGNEXT KW_INREG KW_BYVAL KW_SRET KW_NOALIAS KW_NOCAPTURE KW_NEST
-%token KW_ALIGNSTACK KW_ALWAYSINLINE KW_BUILTIN KW_COLD KW_INLINEHINT KW_JUMPTABLE KW_MINSIZE KW_NAKED KW_NOBUILTIN KW_NODUPLICATE KW_NOIMPLICITFLOAT KW_NOINLINE KW_NONLAZYBIND KW_NOREDZONE KW_NORETURN KW_NOUNWIND KW_OPTNONE KW_OPTSIZE KW_READNONE KW_READONLY KW_RETURNS_TWICE KW_SANITIZE_ADDRESS KW_SANITIZE_MEMORY KW_SANITIZE_THREAD KW_SSP KW_SSPREQ KW_SSPSTRONG KW_UWTABLE KW_DEREFERENCEABLE KW_INALLOCA KW_RETURNED KW_NONNULL
+%token KW_TYPE 
+%token KW_X 
+%token KW_OPAQUE
+%token KW_GLOBAL 
+%token KW_ADDRSPACE 
+%token KW_CONSTANT 
+%token KW_SECTION 
+%token KW_THREAD_LOCAL 
+%token KW_LOCALDYNAMIC 
+%token KW_INITIALEXEC 
+%token KW_LOCALEXEC 
+%token KW_EXTERNALLY_INITIALIZED
+%token KW_ZEROEXT 
+%token KW_SIGNEXT 
+%token KW_INREG 
+%token KW_BYVAL 
+%token KW_SRET 
+%token KW_NOALIAS 
+%token KW_NOCAPTURE 
+%token KW_NEST
+
+%token KW_ALIGNSTACK
+%token KW_ALLOCSIZE 
+%token KW_ALWAYSINLINE 
+%token KW_BUILTIN 
+%token KW_COLD
+%token KW_CONVERGENT
+%token KW_HOT
+%token KW_INACCESSIBLEMEMONLY
+%token KW_INACCESSIBLEMEM_OR_ARGMEMONLY
+%token KW_INLINEHINT 
+%token KW_JUMPTABLE 
+%token KW_MINSIZE 
+%token KW_NAKED 
+%token KW_NO_JUMP_TABLES
+%token KW_NOBUILTIN 
+%token KW_NODUPLICATE
+%token KW_NOFREE
+%token KW_NOIMPLICITFLOAT 
+%token KW_NOINLINE 
+%token KW_NOMERGE
+%token KW_NONLAZYBIND 
+%token KW_NOREDZONE 
+%token KW_INDIRECT_TLS_SEG_REFS
+%token KW_NORETURN
+%token KW_NORECURSE
+%token KW_WILLRETURN
+%token KW_NOSYNC
+%token KW_NOUNWIND 
+%token KW_NULL_POINTER_IS_VALID
+%token KW_OPTFORFUZZING
+%token KW_OPTNONE 
+%token KW_OPTSIZE 
+%token KW_READNONE 
+%token KW_READONLY 
+%token KW_WRITEONLY
+%token KW_ARGMEMONLY
+%token KW_RETURNS_TWICE
+%token KW_SAFESTACK
+%token KW_SANITIZE_ADDRESS 
+%token KW_SANITIZE_MEMORY 
+%token KW_SANITIZE_THREAD 
+%token KW_SANITIZE_HWADDRESS
+%token KW_SANITIZE_MEMTAG
+%token KW_SPECULATIVE_LOAD_HARDENING
+%token KW_SPECULATABLE
+%token KW_SSP 
+%token KW_SSPREQ 
+%token KW_SSPSTRONG
+%token KW_STRICTFP
+%token KW_UWTABLE
+%token KW_NOCF_CHECK
+%token KW_SHADOWCALLSTACK
+%token KW_MUSTPROGRESS
+
+%token KW_DEREFERENCEABLE 
+%token KW_INALLOCA
+%token KW_RETURNED 
+%token KW_NONNULL
+
+
 %token KW_ALIGN
 %token KW_GC
-%token KW_ADD KW_FADD KW_SUB KW_FSUB KW_MUL KW_FMUL KW_UDIV KW_SDIV KW_FDIV KW_UREM KW_SREM KW_FREM KW_SHL KW_LSHR KW_ASHR KW_AND KW_OR KW_XOR KW_ICMP KW_FCMP KW_PHI KW_CALL KW_TRUNC KW_ZEXT KW_SEXT KW_FPTRUNC KW_FPEXT KW_UITOFP KW_SITOFP KW_FPTOUI KW_FPTOSI KW_INTTOPTR KW_PTRTOINT KW_BITCAST KW_SELECT KW_FREEZE KW_VAARG KW_RET KW_BR KW_SWITCH KW_INDIRECTBR KW_INVOKE KW_RESUME KW_UNREACHABLE KW_ALLOCA KW_LOAD KW_STORE KW_ATOMICCMPXCHG KW_ATOMICRMW KW_FENCE KW_GETELEMENTPTR KW_INBOUNDS KW_EXTRACTELEMENT KW_INSERTELEMENT KW_SHUFFLEVECTOR KW_EXTRACTVALUE KW_INSERTVALUE KW_LANDINGPAD
-%token KW_NNAN KW_NINF KW_NSZ KW_ARCP KW_FAST
+
+%token KW_ADD 
+%token KW_FADD 
+%token KW_SUB 
+%token KW_FSUB 
+%token KW_MUL 
+%token KW_FMUL 
+%token KW_UDIV 
+%token KW_SDIV 
+%token KW_FDIV 
+%token KW_UREM 
+%token KW_SREM 
+%token KW_FREM 
+%token KW_SHL 
+%token KW_LSHR 
+%token KW_ASHR 
+%token KW_AND 
+%token KW_OR 
+%token KW_XOR 
+%token KW_ICMP 
+%token KW_FCMP 
+%token KW_PHI 
+%token KW_CALL 
+%token KW_TRUNC 
+%token KW_ZEXT 
+%token KW_SEXT 
+%token KW_FPTRUNC 
+%token KW_FPEXT 
+%token KW_UITOFP 
+%token KW_SITOFP 
+%token KW_FPTOUI 
+%token KW_FPTOSI 
+%token KW_INTTOPTR 
+%token KW_PTRTOINT 
+%token KW_BITCAST 
+%token KW_SELECT 
+%token KW_FREEZE 
+%token KW_VAARG 
+%token KW_RET 
+%token KW_BR 
+%token KW_SWITCH 
+%token KW_INDIRECTBR 
+%token KW_INVOKE 
+%token KW_RESUME 
+%token KW_UNREACHABLE 
+%token KW_ALLOCA 
+%token KW_LOAD 
+%token KW_STORE 
+%token KW_ATOMICCMPXCHG 
+%token KW_ATOMICRMW 
+%token KW_FENCE 
+%token KW_GETELEMENTPTR 
+%token KW_INBOUNDS 
+%token KW_EXTRACTELEMENT 
+%token KW_INSERTELEMENT 
+%token KW_SHUFFLEVECTOR 
+%token KW_EXTRACTVALUE 
+%token KW_INSERTVALUE 
+%token KW_LANDINGPAD
+
+%token KW_NNAN 
+%token KW_NINF 
+%token KW_NSZ 
+%token KW_ARCP 
+%token KW_FAST
 %token<Camlcoq.N.t> I
-%token KW_VOID KW_HALF KW_FLOAT KW_DOUBLE KW_X86_FP80 KW_FP128 KW_PPC_FP128 KW_LABEL KW_METADATA KW_X86_MMX
-%token KW_UNWIND KW_TO
-%token KW_NUW KW_NSW
+%token KW_VOID 
+%token KW_HALF 
+%token KW_FLOAT 
+%token KW_DOUBLE 
+%token KW_X86_FP80 
+%token KW_FP128 
+%token KW_PPC_FP128 
+%token KW_LABEL 
+%token KW_METADATA 
+%token KW_X86_MMX
+
+%token KW_UNWIND 
+%token KW_TO
+%token KW_NUW 
+%token KW_NSW
 %token KW_EXACT
-%token KW_EQ KW_NE KW_SGT KW_SGE KW_SLT KW_SLE
-%token KW_UGT KW_UGE KW_ULT KW_ULE
-%token KW_OEQ KW_OGT KW_OGE KW_OLT KW_OLE KW_ONE KW_ORD KW_UNO KW_UEQ KW_UNE
+%token KW_EQ 
+%token KW_NE 
+%token KW_SGT 
+%token KW_SGE 
+%token KW_SLT 
+%token KW_SLE
+%token KW_UGT 
+%token KW_UGE 
+%token KW_ULT 
+%token KW_ULE
+%token KW_OEQ 
+%token KW_OGT 
+%token KW_OGE 
+%token KW_OLT 
+%token KW_OLE 
+%token KW_ONE 
+%token KW_ORD 
+%token KW_UNO 
+%token KW_UEQ 
+%token KW_UNE
 %token KW_TAIL
 %token KW_VOLATILE
-%token KW_NOUNDEF KW_IMMARG KW_NOFREE
+%token KW_NOUNDEF 
+%token KW_IMMARG 
+
 
 %token<LLVMAst.raw_id> METADATA_ID
 %token<string> METADATA_STRING
@@ -316,7 +516,10 @@ declaration:
     name=GLOBAL
     LPAREN dc_args=separated_list(csep, dc_arg) RPAREN
     post_attrs=df_post_attr*
-    { {  dc_type=TYPE_Function(df_ret_typ, List.map fst dc_args);
+
+    { let _ = anon_ctr.reset () in
+      let _ = void_ctr.reset () in
+      {  dc_type=TYPE_Function(df_ret_typ, List.map fst dc_args);
          dc_param_attrs=(df_ret_attrs, List.map snd dc_args);
          dc_name = name ;
          dc_linkage = get_linkage pre_attrs;
@@ -340,7 +543,9 @@ definition:
     LCURLY EOL*
     df_blocks=df_blocks
     RCURLY
-    { { df_prototype = {
+    { let _ = anon_ctr.reset () in
+      let _ = void_ctr.reset () in
+      { df_prototype = {
           dc_type = TYPE_Function (df_ret_typ,
                                    List.map (fun x -> fst (fst x)) df_args) ;
           dc_param_attrs = (df_ret_attrs,
@@ -378,8 +583,7 @@ block:
   
 df_blocks: 
   | bs=block+
-    { let _ = anon_ctr.reset () in
-      let _ = void_ctr.reset () in
+    { 
       let blks = List.map (fun (lbl, phis, body, term) ->
                 let l = raw_id_of lbl 
 		in let blk_phis = List.map (fun (id, phi) ->
@@ -508,33 +712,59 @@ call_arg: t=typ i=exp             { (t, i t)      }
 
 fn_attr:
   | KW_ALIGNSTACK LPAREN p=INTEGER RPAREN { FNATTR_Alignstack p     }
+  | KW_ALLOCSIZE LPAREN l=separated_nonempty_list(csep, INTEGER) RPAREN
+                                          { FNATTR_Allocsize l      }
   | KW_ALWAYSINLINE                       { FNATTR_Alwaysinline     }
   | KW_BUILTIN                            { FNATTR_Nobuiltin        }
   | KW_COLD                               { FNATTR_Cold             }
+  | KW_CONVERGENT                         { FNATTR_Convergent       }
+  | KW_HOT                                { FNATTR_Hot              }
+  | KW_INACCESSIBLEMEMONLY                { FNATTR_Inaccessiblememonly }
+  | KW_INACCESSIBLEMEM_OR_ARGMEMONLY      { FNATTR_Inaccessiblemem_or_argmemonly }
   | KW_INLINEHINT                         { FNATTR_Inlinehint       }
   | KW_JUMPTABLE                          { FNATTR_Jumptable        }
   | KW_MINSIZE                            { FNATTR_Minsize          }
   | KW_NAKED                              { FNATTR_Naked            }
+  | KW_NO_JUMP_TABLES                     { FNATTR_No_jump_tables   }
   | KW_NOBUILTIN                          { FNATTR_Nobuiltin        }
   | KW_NODUPLICATE                        { FNATTR_Noduplicate      }
+  | KW_NOFREE                             { FNATTR_Nofree           }
   | KW_NOIMPLICITFLOAT                    { FNATTR_Noimplicitfloat  }
   | KW_NOINLINE                           { FNATTR_Noinline         }
+  | KW_NOMERGE                            { FNATTR_Nomerge          }
   | KW_NONLAZYBIND                        { FNATTR_Nonlazybind      }
   | KW_NOREDZONE                          { FNATTR_Noredzone        }
+  | KW_INDIRECT_TLS_SEG_REFS              { FNATTR_Indirect_tls_seg_refs }
   | KW_NORETURN                           { FNATTR_Noreturn         }
+  | KW_NORECURSE                          { FNATTR_Norecurse        }
+  | KW_WILLRETURN                         { FNATTR_Willreturn       }
+  | KW_NOSYNC                             { FNATTR_Nosync           }
   | KW_NOUNWIND                           { FNATTR_Nounwind         }
+  | KW_NULL_POINTER_IS_VALID              { FNATTR_Null_pointer_is_valid }
+  | KW_OPTFORFUZZING                      { FNATTR_Optforfuzzing    }
   | KW_OPTNONE                            { FNATTR_Optnone          }
   | KW_OPTSIZE                            { FNATTR_Optsize          }
   | KW_READNONE                           { FNATTR_Readnone         }
   | KW_READONLY                           { FNATTR_Readonly         }
+  | KW_WRITEONLY                          { FNATTR_Writeonly        }
+  | KW_ARGMEMONLY                         { FNATTR_Argmemonly       }
   | KW_RETURNS_TWICE                      { FNATTR_Returns_twice    }
+  | KW_SAFESTACK                          { FNATTR_Safestack        }
   | KW_SANITIZE_ADDRESS                   { FNATTR_Sanitize_address }
   | KW_SANITIZE_MEMORY                    { FNATTR_Sanitize_memory  }
   | KW_SANITIZE_THREAD                    { FNATTR_Sanitize_thread  }
+  | KW_SANITIZE_HWADDRESS                 { FNATTR_Sanitize_hwaddress }
+  | KW_SANITIZE_MEMTAG                    { FNATTR_Sanitize_memtag  }
+  | KW_SPECULATIVE_LOAD_HARDENING         { FNATTR_Speculative_load_hardening }
+  | KW_SPECULATABLE                       { FNATTR_Speculatable     }
   | KW_SSP                                { FNATTR_Ssp              }
   | KW_SSPREQ                             { FNATTR_Sspreq           }
   | KW_SSPSTRONG                          { FNATTR_Sspstrong        }
+  | KW_STRICTFP                           { FNATTR_Strictfp         }
   | KW_UWTABLE                            { FNATTR_Uwtable          }
+  | KW_NOCF_CHECK                         { FNATTR_Nocf_check       }
+  | KW_SHADOWCALLSTACK                    { FNATTR_Shadowcallstack  }
+  | KW_MUSTPROGRESS                       { FNATTR_Mustprogress     }
   | s=STRING                              { FNATTR_String (str s)   }
   | k=STRING EQ v=STRING                  { FNATTR_Key_value (str k, str v) }
   | i=ATTR_GRP_ID                         { FNATTR_Attr_grp i       }

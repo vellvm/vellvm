@@ -84,34 +84,61 @@
   | "inalloca"                     -> KW_INALLOCA
   | "returned"                     -> KW_RETURNED
   | "nonnull"                      -> KW_NONNULL
+  
   | "alignstack"                   -> KW_ALIGNSTACK
+  | "allocsize"                    -> KW_ALLOCSIZE
   | "alwaysinline"                 -> KW_ALWAYSINLINE
   | "builtin"                      -> KW_BUILTIN
   | "cold"                         -> KW_COLD
+  | "convergent"                   -> KW_CONVERGENT
+  | "hot"                          -> KW_HOT
+  | "inaccessiblememonly"          -> KW_INACCESSIBLEMEMONLY
+  | "inaccessiblemem_or_argmemeonly" -> KW_INACCESSIBLEMEM_OR_ARGMEMONLY
   | "inlinehint"                   -> KW_INLINEHINT
   | "jumptable"                    -> KW_JUMPTABLE
   | "minsize"                      -> KW_MINSIZE
   | "naked"                        -> KW_NAKED
+  | "no_jump_tables"               -> KW_NO_JUMP_TABLES
   | "nobuiltin"                    -> KW_NOBUILTIN
   | "noduplicate"                  -> KW_NODUPLICATE
+  | "nofree"                       -> KW_NOFREE
   | "noimplicitfloat"              -> KW_NOIMPLICITFLOAT
   | "noinline"                     -> KW_NOINLINE
+  | "nomerge"                      -> KW_NOMERGE
   | "nonlazybind"                  -> KW_NONLAZYBIND
   | "noredzone"                    -> KW_NOREDZONE
+  | "indirect-tls-seg-refs"        -> KW_INDIRECT_TLS_SEG_REFS
   | "noreturn"                     -> KW_NORETURN
+  | "norecurse"                    -> KW_NORECURSE
+  | "willreturn"                   -> KW_WILLRETURN
+  | "nosync"                       -> KW_NOSYNC
   | "nounwind"                     -> KW_NOUNWIND
+  | "null_pointer_is_valid"        -> KW_NULL_POINTER_IS_VALID
+  | "optforfuzzing"                -> KW_OPTFORFUZZING
   | "optnone"                      -> KW_OPTNONE
   | "optsize"                      -> KW_OPTSIZE
   | "readnone"                     -> KW_READNONE
   | "readonly"                     -> KW_READONLY
+  | "writeonly"                    -> KW_WRITEONLY
+  | "argmemonly"                   -> KW_ARGMEMONLY
   | "returns_twice"                -> KW_RETURNS_TWICE
+  | "safestack"                    -> KW_SAFESTACK
   | "sanitize_address"             -> KW_SANITIZE_ADDRESS
   | "sanitize_memory"              -> KW_SANITIZE_MEMORY
   | "sanitize_thread"              -> KW_SANITIZE_THREAD
+  | "sanitize_hwaddress"           -> KW_SANITIZE_HWADDRESS
+  | "sanitize_memtag"              -> KW_SANITIZE_MEMTAG
+  | "speculative_load_hardening"   -> KW_SPECULATIVE_LOAD_HARDENING
+  | "speculatable"                 -> KW_SPECULATABLE
   | "ssp"                          -> KW_SSP
   | "sspreq"                       -> KW_SSPREQ
   | "sspstrong"                    -> KW_SSPSTRONG
+  | "strictfp"                     -> KW_STRICTFP
   | "uwtable"                      -> KW_UWTABLE
+  | "nocf_check"                   -> KW_NOCF_CHECK
+  | "shadowcallstack"              -> KW_SHADOWCALLSTACK
+  | "mustprogress"                 -> KW_MUSTPROGRESS
+
   | "align"                        -> KW_ALIGN
   | "gc"                           -> KW_GC
   | "to"                           -> KW_TO
@@ -120,7 +147,6 @@
   | "volatile"                     -> KW_VOLATILE
   | "immarg"                       -> KW_IMMARG  
   | "noundef"                      -> KW_NOUNDEF
-  | "nofree"                       -> KW_NOFREE
 
   (* instrs *)
   | "add"            -> KW_ADD
@@ -281,6 +307,7 @@ rule token = parse
   | ']'  { RSQUARE }
   | '<'  { LT }
   | '>'  { GT }
+  | "..." { DOTDOTDOT }
 
   (* labels *)
   | ((label_char)+) as l ':' { LABEL l }
@@ -346,7 +373,13 @@ and raw_id = parse
 
   let parse lexbuf =
     try Llvm_parser.toplevel_entities token lexbuf
-    with Llvm_parser.Error -> parsing_err lexbuf
+    with 
+    | Llvm_parser.Error -> parsing_err lexbuf
+    | Failure s -> 
+      begin
+        (Printf.fprintf stderr "Failure: %s\n" s);
+        parsing_err lexbuf
+      end   
 
   let parse_test_call lexbuf = 
     try Llvm_parser.test_call token lexbuf

@@ -702,37 +702,66 @@ and cconv : Format.formatter -> LLVMAst.cconv -> unit =
   | CC_Coldcc -> pp_print_string ppf "CC_Coldcc"
   | CC_Cc n -> fprintf ppf "CC_Cc %d%%Z" (to_int n)
 
+and llvm_int : Format.formatter -> LLVMAst.int -> unit =
+  fun ppf i -> fprintf ppf "%d%%Z" (to_int i)
+
 and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   fun ppf ->
   function
-  | FNATTR_Alignstack n -> fprintf ppf "FNATTR_Alignstack %d%%Z" (to_int n)
+  | FNATTR_Alignstack n -> fprintf ppf "FNATTR_Alignstack %a" llvm_int n
+  | FNATTR_Allocsize l ->
+     fprintf ppf "FNATTR_Allocsize (%a)" (pp_print_list ~pp_sep:pp_sc_space llvm_int) l
   | FNATTR_Alwaysinline -> pp_print_string ppf "FNATTR_Alwaysinline"
   | FNATTR_Builtin -> pp_print_string ppf "FNATTR_Builtin"
   | FNATTR_Cold -> pp_print_string ppf "FNATTR_Cold"
+  | FNATTR_Convergent -> pp_print_string ppf "FNATTR_Convergent"
+  | FNATTR_Hot -> pp_print_string ppf "FNATTR_Hot"
+  | FNATTR_Inaccessiblememonly -> pp_print_string ppf "FNATTR_Inaccessiblememonly"
+  | FNATTR_Inaccessiblemem_or_argmemonly-> pp_print_string ppf "FNATTR_Inaccessible_or_argmemonly"
   | FNATTR_Inlinehint -> pp_print_string ppf "FNATTR_Inlinehint"
   | FNATTR_Jumptable -> pp_print_string ppf "FNATTR_Jumptable"
   | FNATTR_Minsize -> pp_print_string ppf "FNATTR_Minsize"
   | FNATTR_Naked -> pp_print_string ppf "FNATTR_Naked"
+  | FNATTR_No_jump_tables -> pp_print_string ppf "FNATTR_No_jump_tables"
   | FNATTR_Nobuiltin -> pp_print_string ppf "FNATTR_Nobuiltin"
   | FNATTR_Noduplicate -> pp_print_string ppf "FNATTR_Noduplicate"
+  | FNATTR_Nofree -> pp_print_string ppf "FNATTR_Nofree"
   | FNATTR_Noimplicitfloat -> pp_print_string ppf "FNATTR_Noimplicitfloat"
   | FNATTR_Noinline -> pp_print_string ppf "FNATTR_Noinline"
+  | FNATTR_Nomerge -> pp_print_string ppf "FNATTR_Nomerge"
   | FNATTR_Nonlazybind -> pp_print_string ppf "FNATTR_Nonlazybind"
   | FNATTR_Noredzone -> pp_print_string ppf "FNATTR_Noredzone"
+  | FNATTR_Indirect_tls_seg_refs -> pp_print_string ppf "FNATTR_Indirect_tls_seg_refs"
   | FNATTR_Noreturn -> pp_print_string ppf "FNATTR_Noreturn"
+  | FNATTR_Norecurse -> pp_print_string ppf "FNATTR_Norecurse"
+  | FNATTR_Willreturn -> pp_print_string ppf "FNATTR_Willreturn"
+  | FNATTR_Nosync -> pp_print_string ppf "FNATTR_Nosync"
   | FNATTR_Nounwind -> pp_print_string ppf "FNATTR_Nounwind"
+  | FNATTR_Null_pointer_is_valid -> pp_print_string ppf "FNATTR_Null_pointer_is_valid"
+  | FNATTR_Optforfuzzing -> pp_print_string ppf "FNATTR_Optforfuzzing"
   | FNATTR_Optnone -> pp_print_string ppf "FNATTR_Optnone"
   | FNATTR_Optsize -> pp_print_string ppf "FNATTR_Optsize"
   | FNATTR_Readnone -> pp_print_string ppf "FNATTR_Readnone"
   | FNATTR_Readonly -> pp_print_string ppf "FNATTR_Readonly"
+  | FNATTR_Writeonly -> pp_print_string ppf "FNATTR_Writeonly"
+  | FNATTR_Argmemonly -> pp_print_string ppf "FNATTR_Argmemonly"
   | FNATTR_Returns_twice -> pp_print_string ppf "FNATTR_Returns_twice"
+  | FNATTR_Safestack -> pp_print_string ppf "FNATTR_Safestack"
   | FNATTR_Sanitize_address -> pp_print_string ppf "FNATTR_Sanitize_address"
   | FNATTR_Sanitize_memory -> pp_print_string ppf "FNATTR_Sanitize_memory"
   | FNATTR_Sanitize_thread -> pp_print_string ppf "FNATTR_Sanitize_thread"
+  | FNATTR_Sanitize_hwaddress -> pp_print_string ppf "FNATTR_Sanitize_hwaddress"
+  | FNATTR_Sanitize_memtag -> pp_print_string ppf "FNATTR_Santize_memtag"
+  | FNATTR_Speculative_load_hardening -> pp_print_string ppf "FNATTR_Speculative_load_hardening"
+  | FNATTR_Speculatable -> pp_print_string ppf "FNATTR_Speculatable"
   | FNATTR_Ssp -> pp_print_string ppf "FNATTR_Ssp"
   | FNATTR_Sspreq -> pp_print_string ppf "FNATTR_Sspreq"
   | FNATTR_Sspstrong -> pp_print_string ppf "FNATTR_Sspstrong"
+  | FNATTR_Strictfp -> pp_print_string ppf "FNATTR_Strictfp"
   | FNATTR_Uwtable -> pp_print_string ppf "FNATTR_Uwtable"
+  | FNATTR_Nocf_check -> pp_print_string ppf "FNATTR_Nocf_check"
+  | FNATTR_Shadowcallstack -> pp_print_string ppf "FNATTR_Shadowcallstack"
+  | FNATTR_Mustprogress -> pp_print_string ppf "FNATTR_Mustprogress"
   | FNATTR_String s -> fprintf ppf "FNATTR_String %s" (of_str s)
   | FNATTR_Key_value (s,s') -> fprintf ppf "FNATTR_Key_value (%s,%s)" (of_str s) (of_str s')
   | FNATTR_Attr_grp n  -> fprintf ppf "FNATTR_Attr_grp %d%%Z" (to_int n)

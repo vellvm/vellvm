@@ -104,33 +104,58 @@ Variant param_attr : Set :=
 
 Variant fn_attr : Set :=
 | FNATTR_Alignstack (a:int)
+| FNATTR_Allocsize  (l:list int)                    
 | FNATTR_Alwaysinline
 | FNATTR_Builtin
 | FNATTR_Cold
+| FNATTR_Convergent
+| FNATTR_Hot
+| FNATTR_Inaccessiblememonly
+| FNATTR_Inaccessiblemem_or_argmemonly
 | FNATTR_Inlinehint
 | FNATTR_Jumptable
 | FNATTR_Minsize
 | FNATTR_Naked
+| FNATTR_No_jump_tables
 | FNATTR_Nobuiltin
 | FNATTR_Noduplicate
+| FNATTR_Nofree    
 | FNATTR_Noimplicitfloat
 | FNATTR_Noinline
+| FNATTR_Nomerge    
 | FNATTR_Nonlazybind
 | FNATTR_Noredzone
+| FNATTR_Indirect_tls_seg_refs
 | FNATTR_Noreturn
+| FNATTR_Norecurse
+| FNATTR_Willreturn
+| FNATTR_Nosync    
 | FNATTR_Nounwind
+| FNATTR_Null_pointer_is_valid
+| FNATTR_Optforfuzzing    
 | FNATTR_Optnone
 | FNATTR_Optsize
 | FNATTR_Readnone
 | FNATTR_Readonly
+| FNATTR_Writeonly
+| FNATTR_Argmemonly    
 | FNATTR_Returns_twice
+| FNATTR_Safestack    
 | FNATTR_Sanitize_address
 | FNATTR_Sanitize_memory
 | FNATTR_Sanitize_thread
+| FNATTR_Sanitize_hwaddress
+| FNATTR_Sanitize_memtag
+| FNATTR_Speculative_load_hardening    
+| FNATTR_Speculatable
 | FNATTR_Ssp
 | FNATTR_Sspreq
 | FNATTR_Sspstrong
+| FNATTR_Strictfp    
 | FNATTR_Uwtable
+| FNATTR_Nocf_check
+| FNATTR_Shadowcallstack
+| FNATTR_Mustprogress    
 | FNATTR_String (s:string) (* "no-see" *)
 | FNATTR_Key_value (kv : string * string) (* "unsafe-fp-math"="false" *)
 | FNATTR_Attr_grp (g:int)
