@@ -818,7 +818,20 @@ Proof.
   - destruct o; cbn; [| apply failure_is_pure].
     apply failure_is_pure.
 
-  - admit.
+  - rewrite translate_bind, interp_cfg_to_L3_bind.
+    rewrite translate_map_monad.
+    rewrite interp_cfg_to_L3_map_monad.
+    apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
+    + eapply has_post_weaken.
+      apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
+      * intros * IN (-> & -> & ->).
+        destruct a; simpl in *.
+        apply has_post_weaken with (↑ (pure_P g l m)).
+        apply (H _ IN).
+        intros (? & ? & ? & ?) (-> & -> & ->); auto.
+      * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
+    + intros (? & ? & ? & ?) (-> & -> & ->).
+      simpl; rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
 
   - destruct o; cbn; [| apply failure_is_pure].
     rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; cbn; intuition.
