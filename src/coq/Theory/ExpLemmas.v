@@ -645,7 +645,7 @@ Proof.
   - destruct o; cbn; [| apply failure_is_pure].
     apply failure_is_pure.
 
-  - apply failure_is_pure.
+  - admit.
 
   - destruct o; cbn; [| apply failure_is_pure].
     rewrite translate_ret, interp_cfg_to_L3_ret; apply eutt_Ret; intuition.

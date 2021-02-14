@@ -101,8 +101,9 @@ Section Endo.
         | EXP_Bool    _
         | EXP_Null
         | EXP_Zero_initializer
-        | EXP_Cstring _
         | EXP_Undef => e
+        | EXP_Cstring elts =>
+          EXP_Cstring (List.map (fun '(t,e) => (endo t, f_exp e)) elts)          
         | EXP_Struct fields =>
           EXP_Struct (List.map (fun '(t,e) => (endo t, f_exp e)) fields)
         | EXP_Packed_struct fields =>
@@ -450,7 +451,7 @@ Section Fmap.
         | EXP_Bool    b                      => EXP_Bool    b
         | EXP_Null                           => EXP_Null
         | EXP_Zero_initializer               => EXP_Zero_initializer
-        | EXP_Cstring s                      => EXP_Cstring s
+        | EXP_Cstring elts                   => EXP_Cstring (fmap ftexp elts)
         | EXP_Undef                          => EXP_Undef
         | EXP_Struct fields                  => EXP_Struct (fmap ftexp fields)
         | EXP_Packed_struct fields           => EXP_Packed_struct (fmap ftexp fields)

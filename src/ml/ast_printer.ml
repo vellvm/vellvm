@@ -243,7 +243,9 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
 
     | EXP_Zero_initializer  -> pp_print_string ppf "EXP_Zero_initializer"
 
-    | EXP_Cstring s -> fprintf ppf "(EXP_Cstring \"%s\")" (of_str s)
+    | EXP_Cstring tvl         ->
+      fprintf ppf "(EXP_Cstring [%a])"
+        (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
 
     | OP_IBinop (op, t, v1, v2) ->
       fprintf ppf "(OP_IBinop %a %a %a %a)"

@@ -251,7 +251,11 @@ Inductive exp : Set :=
 | EXP_Bool    (b:bool)
 | EXP_Null
 | EXP_Zero_initializer
-| EXP_Cstring         (s:string)
+| EXP_Cstring         (elts: list (T * exp))
+                      (* parsing guarantees that the elts of a Cstring will be of the form
+                         ((TYPE_I 8), Exp_Integer <byte>)
+                      *)
+
 | EXP_Undef
 | EXP_Struct          (fields: list (T * exp))
 | EXP_Packed_struct   (fields: list (T * exp))

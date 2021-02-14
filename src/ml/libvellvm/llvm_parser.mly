@@ -27,27 +27,7 @@
 
 open LLVMAst
 open ParserHelper
-
-let str = Camlcoq.coqstring_of_camlstring
-let coq_of_int = Camlcoq.Z.of_sint
-let n_of_z z = Camlcoq.N.of_int64 (Camlcoq.Z.to_int64 z)
-
-let coqfloat_of_string d = Floats.Float.of_bits(Camlcoq.coqint_of_camlint64(Int64.bits_of_float (float_of_string d)))
-let coqfloat32_of_string d = Floats.Float32.of_bits(Camlcoq.coqint_of_camlint(Int32.bits_of_float (float_of_string d)))
-
-let rec string_of_positive =
-  let open BinNums in
-  function 
-    | Coq_xI p -> string_of_positive p ^ "1"
-    | Coq_xO p -> string_of_positive p ^ "0"
-    | Coq_xH -> "1"
-
-let string_of_Z =
-  let open BinNums in
-  function
-    | Z0 -> "0"
-    | Zpos v -> string_of_positive v
-    | Zneg v -> "-" ^ (string_of_positive v)
+open ParseUtil
 
 (* normalize_float_size : 
    - LLVM floating point literals need different interpretations depending
@@ -698,7 +678,9 @@ expr_val:
   | LSQUARE l=separated_list(csep, tconst) RSQUARE    { fun _ -> EXP_Array l          }
   | LT l=separated_list(csep, tconst) GT              { fun _ -> EXP_Vector l         }
   | i=ident                                           { fun _ -> EXP_Ident i          }
-  | KW_C cstr=STRING                                  { fun _ -> EXP_Cstring (str cstr) }
+  | KW_C cstr=STRING                                  { fun _ -> EXP_Cstring (
+								     cstring_bytes_to_LLVM_i8_array
+								     (unescape (str cstr))) }
 
 exp:
   | eo=expr_op { fun _ -> eo }

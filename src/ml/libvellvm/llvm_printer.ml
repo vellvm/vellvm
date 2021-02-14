@@ -3,11 +3,8 @@
 (*  ------------------------------------------------------------------------- *)
 
 open Format
-
-let of_str = Camlcoq.camlstring_of_coqstring
-let to_int = Camlcoq.Z.to_int
-let n_to_int = Camlcoq.N.to_int
-let float_of_coqfloat = Camlcoq.camlfloat_of_coqfloat
+open LLVMAst
+open ParseUtil
 
 (* TODO: Use pp_option everywhere instead of inlined matching *)
 let pp_option ppf f o =
@@ -21,8 +18,6 @@ let rec pp_print_list ?(pp_sep = Format.pp_print_cut) pp_v ppf = function
 | v :: vs ->
     pp_v ppf v; if vs <> [] then (pp_sep ppf ();
                                   pp_print_list ~pp_sep pp_v ppf vs)
-
-open LLVMAst
 
 let get_function_type dc_type =
   match dc_type with
@@ -286,7 +281,7 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
                                        (pp_print_list ~pp_sep:pp_comma_space texp) tvl
   | EXP_Zero_initializer  -> pp_print_string ppf "zeroinitializer"
 
-  | EXP_Cstring s -> fprintf ppf "c\"%s\"" (of_str s)
+  | EXP_Cstring s -> fprintf ppf "c\"%s\"" (of_str (escape (llvm_i8_array_to_cstring_bytes s)))
 
   | OP_IBinop (op, t, v1, v2) ->
      fprintf ppf "%a (%a %a, %a %a)"
