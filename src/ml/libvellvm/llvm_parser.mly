@@ -127,15 +127,17 @@ let mk_counter () =
 let anon_ctr = mk_counter ()
 let void_ctr = mk_counter ()             
 
+let mk_anon () = Anon (anon_ctr.get ())
+
 let raw_id_of s : raw_id =
    match s with
-   | None -> Anon (anon_ctr.get ())
+   | None -> mk_anon ()
    | Some s -> Name (str s)
 
-let phi_id s : raw_id =
+let mk_raw_id (s : raw_id option) : raw_id =
    match s with
-   | None -> Anon (anon_ctr.get ())
-   | Some s -> s
+   | None -> mk_anon ()
+   | Some r -> r
 
 let id_of = function
   | INSTR_Comment _
@@ -353,7 +355,7 @@ definition:
           dc_align = get_align post_attrs;
           dc_gc = get_gc post_attrs;
 	  } ;
-        df_args=List.map snd df_args;
+        df_args=List.map (fun x -> mk_raw_id (snd x)) df_args;
         df_instrs=df_blocks;
 
         } }
@@ -381,7 +383,7 @@ df_blocks:
       let blks = List.map (fun (lbl, phis, body, term) ->
                 let l = raw_id_of lbl 
 		in let blk_phis = List.map (fun (id, phi) ->
-		                  (phi_id id, phi))
+		                  (mk_raw_id id, phi))
 		       phis
                 in let blk_code = List.map (fun (id, inst) ->
                                     match id with 
@@ -495,10 +497,13 @@ param_attr:
   | KW_NOFREE                    { PARAMATTR_Nofree            }
 
 dc_arg:
-  | t=typ p=param_attr*         { (t, p)      }
-  | t=typ p=param_attr* lident { (t, p)     }  (* Throw away declaration names? *)
+  | t=typ p=param_attr*         { (t, p) }
+  | t=typ p=param_attr* lident  { (t, p) }  (* Throw away declaration names? *)
 
-df_arg: t=typ p=param_attr* i=lident { ((t, p), i) }
+df_arg:
+ | t=typ p=param_attr*          { ((t, p), None)   }
+ | t=typ p=param_attr* i=lident { ((t, p), Some i) }
+
 call_arg: t=typ i=exp             { (t, i t)      }
 
 fn_attr:
