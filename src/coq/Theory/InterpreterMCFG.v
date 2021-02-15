@@ -14,68 +14,6 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Handlers.Handlers.
 
-
-Section InterpreterMCFG.
-
-  (**
-   Partial interpretations of the trees produced by the denotation of _VIR_ programs.
-   The intent is to allow us to only interpret as many layers as needed
-   to perform the required semantic reasoning, and lift for free the
-   equivalence down the pipe.
-   This gives us a _vertical_ notion of compositionality.
-   *)
-
-  Definition interp1 {R} (t: itree L0 R) g :=
-    let uvalue_trace       := interp_intrinsics t in
-    let L1_trace           := interp_global uvalue_trace g in
-    L1_trace.
-
-  Definition interp2 {R} (t: itree L0 R) g l :=
-    let uvalue_trace   := interp_intrinsics t in
-    let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
-    L2_trace.
-
-  Definition interp3 {R} (t: itree L0 R) g l m :=
-    let uvalue_trace   := interp_intrinsics t in
-    let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
-    let L3_trace       := interp_memory L2_trace m in
-    L3_trace.
-
-  Definition interp4 {R} RR (t: itree L0 R) g l m :=
-    let uvalue_trace   := interp_intrinsics t in
-    let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
-    let L3_trace       := interp_memory L2_trace m in
-    let L4_trace       := model_undef RR L3_trace in
-    L4_trace.
-
-  Definition interp5 {R} RR (t: itree L0 R) g l m :=
-    let uvalue_trace   := interp_intrinsics t in
-    let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
-    let L3_trace       := interp_memory L2_trace m in
-    let L4_trace       := model_undef RR L3_trace in
-    model_UB RR L4_trace.
-
-  (* The interpreter stray away from the model starting from the fourth layer: we pick an arbitrary valid path of execution *)
-  Definition interp4_exec {R} (t: itree L0 R) g l m :=
-    let uvalue_trace   := interp_intrinsics t in
-    let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
-    let L3_trace       := interp_memory L2_trace m in
-    let L4_trace       := exec_undef L3_trace in
-    L4_trace.
-
-  Definition interp5_exec {R} (t: itree L0 R) g l m :=
-    let uvalue_trace   := interp_intrinsics t in
-    let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
-    let L3_trace       := interp_memory L2_trace m in
-    let L4_trace       := exec_undef L3_trace in
-    exec_UB L4_trace.
-
   Section Structural_Lemmas.
 
     Lemma interp1_bind :

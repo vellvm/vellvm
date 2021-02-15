@@ -41,10 +41,8 @@ From Vellvm Require Import
 Import MonadNotation.
 Import ListNotations.
 Import Monads.
-
-Open Scope string_scope.
-
 Import SemNotations.
+Open Scope string_scope.
 
 (* end hide *)
 

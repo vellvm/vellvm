@@ -31,8 +31,9 @@ From Vellvm Require Import
      Theory.InterpreterCFG
      PostConditions.
 
-Import D.
 Open Scope itree_scope.
+Import ITreeNotations.
+Import SemNotations.
 
 Section Translations.
 
@@ -103,8 +104,7 @@ End Translations.
 (* TO MOVE *)
 Lemma interp_cfg3_GR_fail : forall id g l m,
     Maps.lookup id g = None ->
-    interp_cfg3 (trigger (GlobalRead id)) g l m ≈
-                raise ("Could not look up global id " ++ CeresSerialize.to_string id).
+    ℑ3 (trigger (GlobalRead id)) g l m ≈ raise ("Could not look up global id " ++ CeresSerialize.to_string id).
 Proof.
   intros * LU.
   unfold interp_cfg3.
@@ -121,8 +121,7 @@ Qed.
 
 Lemma interp_cfg3_LR_fail : forall id g l m,
     Maps.lookup id l = None ->
-    interp_cfg3 (trigger (LocalRead id)) g l m ≈
-                raise ("Could not look up id " ++ CeresSerialize.to_string id).
+    ℑ3 (trigger (LocalRead id)) g l m ≈ raise ("Could not look up id " ++ CeresSerialize.to_string id).
 Proof.
   intros * LU.
   unfold interp_cfg3.
@@ -209,18 +208,8 @@ Proof.
     eapply H; eauto.
 Qed.
 
-Module ExpNotations.
+Module ExpTactics
 
-  Notation "'ℑ'" := interp_cfg3. 
-  Notation "'Θ'" := (translate exp_to_instr).
-  Notation Ret3 g l m x := (Ret (m,(l,(g,x)))). 
-  Notation "⟦ e 'at' t '⟧e'" := (denote_exp t e).
-  Notation "⟦ e 'at' t '⟧e'" := (denote_exp (Some t) e).
-  Notation "⟦ e '⟧e'" := (denote_exp None e).
-  Notation "⟦ e 'at?' t '⟧e3'" := (interp_cfg3 (translate exp_to_instr (denote_exp t e))).
-  Notation "⟦ e 'at' t '⟧e3'" := (interp_cfg3 (translate exp_to_instr (denote_exp (Some t) e))).
-  Notation "⟦ e '⟧e3'" := (interp_cfg3 (translate exp_to_instr (denote_exp None e))).
-  Import ITreeNotations.
 
   Hint Rewrite @bind_ret_l : rwexp.
   Hint Rewrite @translate_ret : rwexp.

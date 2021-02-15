@@ -30,13 +30,14 @@ Import D.
 Open Scope itree_scope.
 
 (** Helper lemmas that should probably be moved *)
+Import ExpNotations.
 
 (* TODO: Move this *)
 Lemma interp_cfg3_concretize_or_pick_concrete :
-  forall (uv : uvalue) (dv : dvalue) P g ρ m,
+  forall (uv : uvalue) (dv : dvalue) P g l m,
     is_concrete uv ->
     uvalue_to_dvalue uv = inr dv ->
-    interp_cfg3 (concretize_or_pick uv P) g ρ m ≈ Ret (m, (ρ, (g, dv))).
+    interp_cfg3 (concretize_or_pick uv P) g l m ≈ Ret (m, (ρ, (g, dv))).
 Proof.
   intros uv dv P g ρ m CONC CONV.
   unfold concretize_or_pick.
@@ -192,7 +193,7 @@ Qed.
 
 Lemma denote_instr_load :
   forall (i : raw_id) volatile τ τp ptr align g ρ ρ' m a uv,
-    interp_cfg3 (translate exp_E_to_instr_E (denote_exp (Some τp) ptr)) g ρ m ≈ Ret (m, (ρ', (g, UVALUE_Addr a))) ->
+    interp_cfg3 (translate exp_to_instr (denote_exp (Some τp) ptr)) g ρ m ≈ Ret (m, (ρ', (g, UVALUE_Addr a))) ->
     read m a τ = inr uv ->
     interp_cfg3 (denote_instr (IId i, INSTR_Load volatile τ (τp, ptr) align)) g ρ m ≈ Ret (m, (Maps.add i uv ρ', (g, tt))).
 Proof.

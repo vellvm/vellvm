@@ -135,10 +135,18 @@ Export D IS.
 
 Module SemNotations.
   
+  Notation ℑ1 := interp_cfg1. 
+  Notation ℑ2 := interp_cfg2. 
   Notation ℑ3 := interp_cfg3. 
-  Notation ℑ := interp_cfg5. 
+  Notation ℑ4 := interp_cfg4. 
+  Notation ℑ5 := interp_cfg5. 
+  Notation ℑ  := interp_cfg5. 
+  Notation ℑs1 := interp_mcfg1. 
+  Notation ℑs2 := interp_mcfg2. 
   Notation ℑs3 := interp_mcfg3. 
-  Notation ℑs := interp_mcfg5. 
+  Notation ℑs4 := interp_mcfg4. 
+  Notation ℑs5 := interp_mcfg5. 
+  Notation ℑs  := interp_mcfg5. 
   Notation Ret3 g l m x := (Ret (m,(l,(g,x)))).
 
   Notation "⟦ e 'at?' t '⟧e'" :=  (denote_exp t e).
