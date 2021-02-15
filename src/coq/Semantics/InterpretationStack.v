@@ -30,20 +30,20 @@ Section InterpreterMCFG.
   Definition interp_mcfg2 {R} (t: itree L0 R) g l :=
     let uvalue_trace   := interp_intrinsics t in
     let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
+    let L2_trace       := interp_local_stack L1_trace l in
     L2_trace.
 
   Definition interp_mcfg3 {R} (t: itree L0 R) g l m :=
     let uvalue_trace   := interp_intrinsics t in
     let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
+    let L2_trace       := interp_local_stack L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     L3_trace.
 
   Definition interp_mcfg4 {R} RR (t: itree L0 R) g l m :=
     let uvalue_trace   := interp_intrinsics t in
     let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
+    let L2_trace       := interp_local_stack L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     let L4_trace       := model_undef RR L3_trace in
     L4_trace.
@@ -51,7 +51,7 @@ Section InterpreterMCFG.
   Definition interp_mcfg5 {R} RR (t: itree L0 R) g l m :=
     let uvalue_trace   := interp_intrinsics t in
     let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
+    let L2_trace       := interp_local_stack L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     let L4_trace       := model_undef RR L3_trace in
     model_UB RR L4_trace.
@@ -60,7 +60,7 @@ Section InterpreterMCFG.
   Definition interp_mcfg4_exec {R} (t: itree L0 R) g l m :=
     let uvalue_trace   := interp_intrinsics t in
     let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
+    let L2_trace       := interp_local_stack L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     let L4_trace       := exec_undef L3_trace in
     L4_trace.
@@ -68,7 +68,7 @@ Section InterpreterMCFG.
   Definition interp_mcfg5_exec {R} (t: itree L0 R) g l m :=
     let uvalue_trace   := interp_intrinsics t in
     let L1_trace       := interp_global uvalue_trace g in
-    let L2_trace       := interp_local_stack (handle_local (v:=uvalue)) L1_trace l in
+    let L2_trace       := interp_local_stack L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     let L4_trace       := exec_undef L3_trace in
     exec_UB L4_trace.
@@ -140,13 +140,17 @@ Module SemNotations.
   Notation ℑ3 := interp_cfg3. 
   Notation ℑ4 := interp_cfg4. 
   Notation ℑ5 := interp_cfg5. 
-  Notation ℑ  := interp_cfg5. 
+  Notation ℑ  := interp_cfg5.
+
   Notation ℑs1 := interp_mcfg1. 
   Notation ℑs2 := interp_mcfg2. 
   Notation ℑs3 := interp_mcfg3. 
   Notation ℑs4 := interp_mcfg4. 
   Notation ℑs5 := interp_mcfg5. 
-  Notation ℑs  := interp_mcfg5. 
+  Notation ℑs  := interp_mcfg5.
+
+  Notation Ret1 g x     := (Ret (g,x)).
+  Notation Ret2 g l x   := (Ret (l,(g,x))).
   Notation Ret3 g l m x := (Ret (m,(l,(g,x)))).
 
   Notation "⟦ e 'at?' t '⟧e'" :=  (denote_exp t e).
