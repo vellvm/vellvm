@@ -2093,7 +2093,6 @@ Section Memory_Stack_Theory.
       exists (read_in_mem_block bytes (snd a) τ). reflexivity.
     Qed.
 
-
     Lemma freshly_allocated_different_blocks :
       forall ptr1 ptr2 τ m1 m2,
         allocate m1 τ = inr (m2, ptr2) ->

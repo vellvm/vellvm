@@ -92,7 +92,7 @@ Proof.
 Qed.
 
 Global Instance eutt_interp1 {T}:
-  Proper (eutt Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@ℑs1 T).
+  Proper (eutt eq ==> eq ==> eutt eq) (@ℑs1 T).
 Proof.
   repeat intro.
   unfold ℑs1.
@@ -101,7 +101,7 @@ Proof.
 Qed.
 
 Global Instance eutt_interp2 {T}:
-  Proper (eutt Logic.eq ==> Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@ℑs2 T).
+  Proper (eutt eq ==> eq ==> eq ==> eutt eq) (@ℑs2 T).
 Proof.
   repeat intro.
   unfold ℑs2.
@@ -110,7 +110,7 @@ Proof.
 Qed.
 
 Global Instance eutt_interp3 {T}:
-  Proper (eutt Logic.eq ==> Logic.eq ==> Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@ℑs3 T).
+  Proper (eutt eq ==> eq ==> eq ==> eq ==> eutt eq) (@ℑs3 T).
 Proof.
   repeat intro.
   unfold ℑs3.

@@ -226,7 +226,7 @@ Definition model_gen
            (prog: list (toplevel_entity typ (block typ * list (block typ))))
   : PropT L5 (memory_stack * (local_env * lstack * (global_env * uvalue))) :=
   let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-  ℑs Logic.eq t [] ([],[]) empty_memory_stack. 
+  ℑs eq t [] ([],[]) empty_memory_stack. 
 
 (**
      Finally, the official model assumes no user-defined intrinsics.
