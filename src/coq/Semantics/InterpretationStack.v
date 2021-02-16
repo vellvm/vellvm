@@ -127,11 +127,8 @@ Section InterpreterCFG.
 
 End InterpreterCFG.
 
-Module D   := Denotation Addr LLVMEvents.
-Module IS  := IntrinsicsDefinitions.Make Addr LLVMEvents.
-Export DV.
-Export Mem.
-Export D IS.
+Module D := Denotation Addr LLVMEvents.
+Export D.
 
 Module SemNotations.
   
