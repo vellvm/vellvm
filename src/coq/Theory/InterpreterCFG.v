@@ -194,6 +194,60 @@ Proof.
   go; reflexivity.
 Qed.
 
+Lemma interp_cfg3_GR_fail : forall id g l m,
+    Maps.lookup id g = None ->
+    ℑ3 (trigger (GlobalRead id)) g l m ≈ raise ("Could not look up global id " ++ CeresSerialize.to_string id).
+Proof.
+  intros * LU.
+  unfold interp_cfg3.
+  go.
+  cbn in *; rewrite LU.
+  unfold raise; cbn.
+  go.
+  rewrite interp_memory_trigger; cbn; rewrite subevent_subevent, bind_bind.
+  apply eutt_eq_bind; intros [].
+Qed.
+
+Lemma interp_cfg3_LR_fail : forall id g l m,
+    Maps.lookup id l = None ->
+    ℑ3 (trigger (LocalRead id)) g l m ≈ raise ("Could not look up id " ++ CeresSerialize.to_string id).
+Proof.
+  intros * LU.
+  unfold interp_cfg3.
+  go.
+  cbn in *; rewrite LU.
+  unfold raise; cbn.
+  go.
+  rewrite interp_memory_trigger; cbn; rewrite subevent_subevent, bind_bind.
+  apply eutt_eq_bind; intros [].
+Qed.
+
+Lemma interp_cfg3_pick : forall u P m l g,
+    ℑ3 (trigger (pick u P)) g l m ≈ v <- trigger (pick u P);; Ret3 g l m v.
+Proof.
+  intros.
+  unfold interp_cfg3.
+  go.
+  rewrite interp_memory_trigger; cbn.
+  rewrite subevent_subevent, bind_bind.
+  apply eutt_eq_bind; intros.
+  go.
+  reflexivity.
+Qed.
+
+Lemma interp_cfg3_UB : forall s m l g,
+    ℑ3 (trigger (ThrowUB s)) g l m ≈ v <- trigger (ThrowUB s);; Ret3 g l m v.
+Proof.
+  intros.
+  unfold interp_cfg3.
+  go.
+  rewrite interp_memory_trigger; cbn.
+  rewrite subevent_subevent, bind_bind.
+  apply eutt_eq_bind; intros.
+  go.
+  reflexivity.
+Qed.
+
 Lemma interp_cfg3_Load : forall t a g l m val,
     read m a t = inr val ->
     ℑ3 (trigger (Load t (DVALUE_Addr a))) g l m ≈ Ret3 g l m val. 

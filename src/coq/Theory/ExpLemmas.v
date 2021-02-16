@@ -102,40 +102,6 @@ Section Translations.
 End Translations.
 
 (* TO MOVE *)
-Lemma interp_cfg3_GR_fail : forall id g l m,
-    Maps.lookup id g = None ->
-    ℑ3 (trigger (GlobalRead id)) g l m ≈ raise ("Could not look up global id " ++ CeresSerialize.to_string id).
-Proof.
-  intros * LU.
-  unfold interp_cfg3.
-  rewrite interp_intrinsics_trigger.
-  cbn.
-  unfold Intrinsics.F_trigger; cbn; rewrite subevent_subevent.
-  rewrite interp_global_trigger. 
-  cbn in *; rewrite LU.
-  unfold raise; cbn.
-  rewrite interp_local_bind, interp_local_trigger; cbn; rewrite subevent_subevent, bind_bind.
-  rewrite interp_memory_bind, interp_memory_trigger; cbn; rewrite subevent_subevent, bind_bind.
-  apply eutt_eq_bind; intros [].
-Qed.
-
-Lemma interp_cfg3_LR_fail : forall id g l m,
-    Maps.lookup id l = None ->
-    ℑ3 (trigger (LocalRead id)) g l m ≈ raise ("Could not look up id " ++ CeresSerialize.to_string id).
-Proof.
-  intros * LU.
-  unfold interp_cfg3.
-  rewrite interp_intrinsics_trigger.
-  cbn.
-  unfold Intrinsics.F_trigger; cbn; rewrite subevent_subevent.
-  rewrite interp_global_trigger. 
-  cbn in *; rewrite subevent_subevent.
-  rewrite interp_local_bind, interp_local_trigger.
-  cbn; rewrite LU.
-  unfold raise; cbn; rewrite bind_bind.
-  rewrite interp_memory_bind, interp_memory_trigger; cbn; rewrite subevent_subevent, bind_bind.
-  apply eutt_eq_bind; intros [].
-Qed.
 
 Lemma repr_intval (i: int64):
   DynamicValues.Int64.repr (Int64.intval i) = i.
@@ -486,50 +452,6 @@ Section ExpPure.
     rewrite interp_memory_bind, interp_memory_trigger; cbn.
     rewrite subevent_subevent, !bind_bind.
     apply has_post_bind; intros [].
-  Qed.
-
-  Lemma interp_cfg3_pick : forall u P m l g,
-      interp_cfg3 (trigger (pick u P)) g l m ≈ v <- trigger (pick u P);; Ret (m,(l,(g,v))).
-  Proof.
-    intros.
-    unfold interp_cfg3.
-    rewrite interp_intrinsics_trigger.
-    cbn.
-    unfold Intrinsics.F_trigger; cbn.
-    rewrite subevent_subevent.
-    rewrite interp_global_trigger; cbn.
-    rewrite subevent_subevent.
-    rewrite interp_local_bind, interp_local_trigger; cbn.
-    rewrite subevent_subevent, bind_bind.
-    rewrite interp_memory_bind, interp_memory_trigger; cbn.
-    rewrite subevent_subevent, bind_bind.
-    apply eutt_eq_bind; intros.
-    rewrite bind_ret_l.
-    rewrite interp_memory_bind, interp_memory_ret, bind_ret_l; cbn.
-    rewrite interp_local_ret, interp_memory_ret.
-    reflexivity.
-  Qed.
-
-  Lemma interp_cfg3_UB : forall s m l g,
-      interp_cfg3 (trigger (ThrowUB s)) g l m ≈ v <- trigger (ThrowUB s);; Ret (m,(l,(g,v))).
-  Proof.
-    intros.
-    unfold interp_cfg3.
-    rewrite interp_intrinsics_trigger.
-    cbn.
-    unfold Intrinsics.F_trigger; cbn.
-    rewrite subevent_subevent.
-    rewrite interp_global_trigger; cbn.
-    rewrite subevent_subevent.
-    rewrite interp_local_bind, interp_local_trigger; cbn.
-    rewrite subevent_subevent, bind_bind.
-    rewrite interp_memory_bind, interp_memory_trigger; cbn.
-    rewrite subevent_subevent, bind_bind.
-    apply eutt_eq_bind; intros.
-    rewrite bind_ret_l.
-    rewrite interp_memory_bind, interp_memory_ret, bind_ret_l; cbn.
-    rewrite interp_local_ret, interp_memory_ret.
-    reflexivity.
   Qed.
 
   Ltac step :=
