@@ -25,9 +25,9 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.DynamicValues
      Semantics.TopLevel
+     Semantics.InterpretationStack
      Handlers.Handlers
      Refinement
-     Theory.InterpreterCFG
      Theory.InterpreterCFG
      PostConditions.
 
@@ -157,7 +157,7 @@ Qed.
 Lemma uvalue_to_dvalue_list_concrete :
   forall fields dfields,
     (forall u : uvalue,
-        List.In u fields ->
+        In u fields ->
         (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u) ->
     map_monad uvalue_to_dvalue fields = inr dfields ->
     forallb is_concrete fields = true.
@@ -208,8 +208,7 @@ Proof.
     eapply H; eauto.
 Qed.
 
-Module ExpTactics
-
+Module ExpTactics.
 
   Hint Rewrite @bind_ret_l : rwexp.
   Hint Rewrite @translate_ret : rwexp.
@@ -254,9 +253,9 @@ Module ExpTactics
       end
     end.
 
-End ExpNotations.
+End ExpTactics.
 
-Import ExpNotations.
+Import ExpTactics.
 
 Section ExpLemmas.
   
@@ -471,7 +470,7 @@ Section ExpPure.
     forall g l m, t g l m ⤳ ↑ (pure_P g l m).
 
   Lemma failure_is_pure : forall R s,
-      pure (R := R) (interp_cfg3 (translate exp_to_instr (raise s))).
+      pure (R := R) (interp_cfg3 (raise s)).
   Proof.
     unfold pure, raise; intros.
     go.
@@ -553,7 +552,7 @@ Section ExpPure.
     | |- context [trigger (ThrowUB _)] => rewrite interp_cfg3_UB
     end.
 
-  Lemma pick_is_pure : forall u P, pure (ℑ (Θ (trigger (pick u P)))).
+  Lemma pick_is_pure : forall u P, pure (ℑ3 (trigger (pick u P))).
   Proof.
     intros.
     unfold pure; intros.
@@ -563,20 +562,8 @@ Section ExpPure.
     intros ?; apply eutt_Ret; cbn; auto.
   Qed.
 
-  Lemma concretize_or_pick_is_pure : forall v P, pure (ℑ (Θ (concretize_or_pick v P))).
-  Proof.
-    unfold pure; intros.
-    unfold concretize_or_pick.
-    break_match_goal; [| apply pick_is_pure].
-    unfold lift_err.
-    break_match_goal; [apply failure_is_pure |].
-    cbn.
-    go.
-    apply eutt_Ret; cbn; auto.
-  Qed.
-
   Lemma UB_is_pure : forall R s,
-      pure (R := R) (interp_cfg3 (translate exp_to_instr (raiseUB s))).
+      pure (R := R) (ℑ3 (raiseUB s)).
   Proof.
     unfold pure, raiseUB; intros.
     go.
@@ -585,8 +572,8 @@ Section ExpPure.
     intros (? & ? & ? & []).
   Qed.
 
-  (* TO MOVE *)
-  Lemma translate_raiseUB : forall T s,
+  (* BEGIN TO MOVE *)
+  Lemma FUB_to_exp_raiseUB : forall T s,
       translate FUB_to_exp (raiseUB (X := T) s) ≈ raiseUB s.
   Proof.
     unfold raiseUB; intros.
@@ -594,12 +581,48 @@ Section ExpPure.
     apply eutt_eq_bind; intros [].
   Qed.
 
-  Lemma translate_raise : forall T s,
+  Lemma exp_to_instr_raiseUB : forall T s,
+      translate exp_to_instr (raiseUB (X := T) s) ≈ raiseUB s.
+  Proof.
+    unfold raiseUB; intros.
+    go.
+    apply eutt_eq_bind; intros [].
+  Qed.
+
+  Lemma FUB_to_exp_raise : forall T s,
       translate FUB_to_exp (raise (A := T) s) ≈ raise s.
   Proof.
     unfold raise; intros.
     go. 
     apply eutt_eq_bind; intros [].
+  Qed.
+
+  Lemma exp_to_instr_raise : forall T s,
+      translate exp_to_instr (raise (A := T) s) ≈ raise s.
+  Proof.
+    unfold raise; intros.
+    go. 
+    apply eutt_eq_bind; intros [].
+  Qed.
+
+  Lemma exp_to_instr_pick : forall P uv,
+      translate exp_to_instr (trigger (pick uv P)) ≈ trigger (pick uv P).
+  Proof.
+    intros.
+    go. 
+    reflexivity.
+  Qed.
+
+  Lemma concretize_or_pick_is_pure : forall v P, pure (ℑ3 (translate exp_to_instr (concretize_or_pick v P))).
+  Proof.
+    unfold pure; intros.
+    unfold concretize_or_pick.
+    break_match_goal; [| rewrite exp_to_instr_pick; apply pick_is_pure].
+    unfold lift_err.
+    break_match_goal; [rewrite exp_to_instr_raise; apply failure_is_pure |].
+    cbn.
+    go.
+    apply eutt_Ret; cbn; auto.
   Qed.
 
   Lemma translate_map_monad {E F A B} (l : list A) (ts : A -> itree E B) (h : E ~> F) :
@@ -639,10 +662,12 @@ Section ExpPure.
       rewrite interp_state_ret; reflexivity.
   Qed.
 
+  (* END TO MOVE *)
+
   Lemma interp_cfg3_map_monad {A B} g l m (xs : list A) (ts : A -> itree _ B) : 
-    interp_cfg3 (map_monad ts xs) g l m ≈
+    ℑ3 (map_monad ts xs) g l m ≈
                      map_monad (m := Monads.stateT _ (Monads.stateT _ (Monads.stateT _ (itree _))))
-                     (fun a => interp_cfg3 (ts a)) xs g l m.
+                     (fun a => ℑ3 (ts a)) xs g l m.
   Proof.
     intros; revert g l m; induction xs as [| a xs IH]; simpl; intros.
     - rewrite interp_cfg3_ret; reflexivity.
@@ -711,8 +736,33 @@ Section ExpPure.
       intros (s1' & s2' & s3' & ?) (? & ? & ? & ?) [EQ ?]; inv EQ; cbn; apply eutt_Ret; auto. 
   Qed.
 
+  Ltac trivial_cases :=
+    try first [apply eutt_Ret; cbn; auto; fail |
+
+               unfold raise; rewrite ?bind_bind; apply has_post_bind; intros [] |
+
+               match goal with
+                 |- context [raise] => rewrite ?FUB_to_exp_raise, ?exp_to_instr_raise;
+                                     apply failure_is_pure
+               end |
+
+               
+               match goal with
+                 |- context [raiseUB] => rewrite ?FUB_to_exp_raiseUB, ?exp_to_instr_raiseUB; 
+                                       apply UB_is_pure
+               end |
+               
+               match goal with
+                 |- context [pick] => rewrite ?exp_to_instr_pick;
+                                    apply pick_is_pure
+               end 
+
+              ].
+
+  Ltac intro_pure := intros (? & ? & ? & ?) (-> & -> & ->).
+
   Lemma expr_are_pure : forall (o : option dtyp) e, pure ⟦ e at? o ⟧e3.
-  Proof with (apply eutt_Ret; cbn; auto).
+  Proof with trivial_cases.
     intros; unfold pure.
     revert o; induction e; simpl; intros.
 
@@ -722,39 +772,31 @@ Section ExpPure.
         * step.
           go...
           
-        * step. 
-          unfold raise; rewrite bind_bind.
-          apply has_post_bind; intros [].
-          
+        * step...
+         
       + go. 
         destruct (Maps.lookup id l) eqn:EQ.
         * step... 
-        * step. 
-          unfold raise.
-          apply has_post_bind; intros [].
-
-    - destruct o; cbn; [| apply failure_is_pure].
-      destruct d; simpl.
-      all: match goal with |- context[raise _] => apply failure_is_pure | _ => idtac end.
+        * step...
+          
+    - destruct o; cbn...
+      destruct d; simpl...
       unfold denote_exp, lift_undef_or_err.
       cbn.
-      break_match_goal; [apply UB_is_pure |].
-      break_match_goal; [apply failure_is_pure|]. 
-      rewrite translate_ret, interp_cfg3_ret; apply eutt_Ret; cbn; intuition.
-
-    - destruct o; cbn; [| apply failure_is_pure].
-      destruct d; simpl.
-      all: match goal with |- context[raise _] => apply failure_is_pure | _ => idtac end.
+      break_match_goal... 
+      break_match_goal...
       go...
 
-    - destruct o; cbn; [| apply failure_is_pure].
-      destruct d; simpl.
-      all: match goal with |- context[raise _] => apply failure_is_pure | _ => idtac end.
+    - destruct o; cbn...
+      destruct d; simpl...
       go...
 
-    - destruct o; cbn; [| apply failure_is_pure].
-      destruct d; simpl.
-      all: match goal with |- context[raise _] => apply failure_is_pure | _ => idtac end.
+    - destruct o; cbn...
+      destruct d; simpl...
+      go...
+
+    - destruct o; cbn...
+      destruct d; simpl...
       go...
       go...
 
@@ -762,8 +804,7 @@ Section ExpPure.
 
     - simpl; go...
 
-    - destruct o; cbn; [| apply failure_is_pure].
-      apply failure_is_pure.
+    - destruct o; cbn...
 
     - go.
       rewrite translate_map_monad.
@@ -775,12 +816,12 @@ Section ExpPure.
           destruct a; simpl in *.
           apply has_post_weaken with (↑ (pure_P g l m)).
           apply (H _ IN).
-          intros (? & ? & ? & ?) (-> & -> & ->); auto.
-        * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
-      + intros (? & ? & ? & ?) (-> & -> & ->).
+          intro_pure; cbn; auto.
+        * intro_pure; cbn; auto. 
+      + intro_pure.
         go...
 
-    - destruct o; cbn; [| apply failure_is_pure].
+    - destruct o; cbn...
       go...
 
     - go.
@@ -793,18 +834,13 @@ Section ExpPure.
           destruct a; simpl in *.
           apply has_post_weaken with (↑ (pure_P g l m)).
           apply (H _ IN).
-          intros (? & ? & ? & ?) (-> & -> & ->); auto.
-        * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
-      + intros (? & ? & ? & ?) (-> & -> & ->).
+          intro_pure; auto.
+        * intro_pure; cbn; auto.
+      + intro_pure.
         go...
 
-    - destruct o; cbn; [| apply failure_is_pure].
-      destruct d;
-        match goal with
-          |- context[denote_exp (Some (DTYPE_Packed_struct _))] => idtac 
-        | _ => apply failure_is_pure
-        end.
-      simpl.
+    - destruct o; cbn...
+      destruct d; cbn...
       go.
       rewrite translate_map_monad.
       rewrite interp_cfg3_map_monad.
@@ -815,9 +851,9 @@ Section ExpPure.
           destruct a; simpl in *.
           apply has_post_weaken with (↑ (pure_P g l m)).
           apply (H _ IN).
-          intros (? & ? & ? & ?) (-> & -> & ->); auto.
-        * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
-      + intros (? & ? & ? & ?) (-> & -> & ->).
+          intro_pure; auto.
+        * intro_pure; cbn; auto.
+      + intro_pure.
         go...
 
     - go.
@@ -830,9 +866,9 @@ Section ExpPure.
           destruct a; simpl in *.
           apply has_post_weaken with (↑ (pure_P g l m)).
           apply (H _ IN).
-          intros (? & ? & ? & ?) (-> & -> & ->); auto.
-        * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
-      + intros (? & ? & ? & ?) (-> & -> & ->).
+          intro_pure; auto.
+        * intro_pure; cbn; auto.
+      + intro_pure.
         go...
 
     - go.
@@ -845,9 +881,9 @@ Section ExpPure.
           destruct a; simpl in *.
           apply has_post_weaken with (↑ (pure_P g l m)).
           apply (H _ IN).
-          intros (? & ? & ? & ?) (-> & -> & ->); auto.
-        * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
-      + intros (? & ? & ? & ?) (-> & -> & ->).
+          intro_pure; auto.
+        * intro_pure; cbn; auto.
+      + intro_pure.
         go...
 
     - go.
@@ -857,30 +893,26 @@ Section ExpPure.
       go.
       eapply has_post_bind_strong.
       apply (IHe2 (Some t) g l m).
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       break_match_goal.
       + go.
         apply has_post_bind_strong with (↑ (pure_P g l m)).
         * unfold concretize_or_pick.
-          break_match_goal.
+          break_match_goal...
           cbn.
           {
             unfold lift_err.
-            break_match_goal.
-            apply failure_is_pure.
+            break_match_goal...
             go...
           }
-          apply pick_is_pure.
 
-        * intros (? & ? & ? & ?) (-> & -> & ->).
+        * intro_pure.
           unfold uvalue_to_dvalue_binop2.
-          cbn; break_match_goal.
+          cbn; break_match_goal...
           go...
           break_match_hyp; inv_sum.
-          break_match_goal.
-          rewrite translate_raiseUB; apply UB_is_pure.
-          break_match_goal.
-          rewrite translate_raise; apply failure_is_pure.
+          break_match_goal...
+          break_match_goal...
           go...
 
       + unfold uvalue_to_dvalue_binop.
@@ -889,63 +921,55 @@ Section ExpPure.
         go...
         break_match_hyp; try inv_sum.
         break_match_hyp; try inv_sum.
-        break_match_goal.
-        rewrite translate_raiseUB; apply UB_is_pure.
-        break_match_goal.
-        rewrite translate_raise; apply failure_is_pure.
+        break_match_goal...
+        break_match_goal...
         go...
 
     - go.
       eapply has_post_bind_strong.
       apply (IHe1 (Some t) g l m).
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       go.
       eapply has_post_bind_strong.
       apply (IHe2 (Some t) g l m).
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       unfold uvalue_to_dvalue_binop.
       cbn.
       break_match_goal.
       go...
       break_match_hyp; try inv_sum.
       break_match_hyp; try inv_sum.
-      break_match_goal.
-      apply UB_is_pure.
-      break_match_goal.
-      apply failure_is_pure.
+      break_match_goal...
+      break_match_goal...
       go...
 
     - go.
       eapply has_post_bind_strong.
       apply (IHe1 (Some t) g l m).
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       go.
       eapply has_post_bind_strong.
       apply (IHe2 (Some t) g l m).
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       break_match_goal.
       + go.
         apply has_post_bind_strong with (↑ (pure_P g l m)).
         * unfold concretize_or_pick.
-          break_match_goal.
+          break_match_goal...
           cbn.
           {
             unfold lift_err.
-            break_match_goal.
-            apply failure_is_pure.
+            break_match_goal...
             go...
           }
-          apply pick_is_pure.
 
-        * intros (? & ? & ? & ?) (-> & -> & ->).
+        * intro_pure.
           unfold uvalue_to_dvalue_binop2.
           cbn; break_match_goal.
           go...
           break_match_hyp; inv_sum.
-          break_match_goal.
-          rewrite translate_raiseUB; apply UB_is_pure.
-          break_match_goal.
-          rewrite translate_raise; apply failure_is_pure.
+          break_match_goal...
+          break_match_goal...
           go...
 
       + unfold uvalue_to_dvalue_binop.
@@ -954,36 +978,32 @@ Section ExpPure.
         go...
         break_match_hyp; try inv_sum.
         break_match_hyp; try inv_sum.
-        break_match_goal.
-        rewrite translate_raiseUB; apply UB_is_pure.
-        break_match_goal.
-        rewrite translate_raise; apply failure_is_pure.
+        break_match_goal...
+        break_match_goal...
         go...
 
     - go.
       eapply has_post_bind_strong.
       apply (IHe1 (Some t) g l m).
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       go.
       eapply has_post_bind_strong.
       apply (IHe2 (Some t) g l m).
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       unfold uvalue_to_dvalue_binop.
       cbn.
       break_match_goal.
       go...
       break_match_hyp; try inv_sum.
       break_match_hyp; try inv_sum.
-      break_match_goal.
-      apply UB_is_pure.
-      break_match_goal.
-      apply failure_is_pure.
+      break_match_goal...
+      break_match_goal...
       go...
 
     - go.
       eapply has_post_bind_strong.
       apply (IHe (Some t_from) g l m).
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       unfold uvalue_to_dvalue_uop; cbn.
       break_match_goal.
       go...
@@ -993,14 +1013,14 @@ Section ExpPure.
       apply has_post_bind_strong with (↑ (pure_P g l m)).
       + (* What's the right way to reason about eval_conv? *)
         admit.
-      + intros (? & ? & ? & ?) (-> & -> & ->).
+      + intro_pure.
         go...
 
     - destruct ptrval; cbn.
       rewrite translate_bind, interp_cfg3_bind.
       eapply has_post_bind_strong.
       apply (IHe (Some d) g l m).
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       rewrite translate_bind, interp_cfg3_bind.
       rewrite translate_map_monad.
       rewrite interp_cfg3_map_monad.
@@ -1011,22 +1031,20 @@ Section ExpPure.
           destruct a; simpl in *.
           apply has_post_weaken with (↑ (pure_P g l m)).
           apply (H _ IN).
-          intros (? & ? & ? & ?) (-> & -> & ->); auto.
-        * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
-      + intros (? & ? & ? & ?) (-> & -> & ->).
+          intro_pure; auto.
+        * intro_pure; cbn; auto.
+      + intro_pure.
         break_match_goal.
         * rewrite translate_bind, interp_cfg3_bind.
           unfold concretize_or_pick.
           apply has_post_bind_strong with (↑ (pure_P g l m)).
           {
-            break_match_goal.
+            break_match_goal...
             unfold lift_err.
-            break_match_goal.
-            apply failure_is_pure.
+            break_match_goal...
             cbn; go... 
-            apply pick_is_pure.
           }
-          intros (? & ? & ? & ?) (-> & -> & ->).
+          intro_pure.
           rewrite translate_bind, interp_cfg3_bind.
           rewrite translate_map_monad.
           rewrite interp_cfg3_map_monad.
@@ -1034,15 +1052,13 @@ Section ExpPure.
           { eapply has_post_weaken.
             apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
             * intros * IN (-> & -> & ->).
-              break_match_goal.
+              break_match_goal...
               unfold lift_err.
-              break_match_goal.
-              apply failure_is_pure.
+              break_match_goal...
               cbn; go... 
-              apply pick_is_pure.
-            * intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
+            * intro_pure; cbn; auto.
           }
-          intros (? & ? & ? & ?) (-> & -> & ->); cbn; auto.
+          intro_pure; cbn; auto.
           unfold ITree.map; go. 
           (* GEP... *)
           unfold interp_cfg3.
@@ -1058,7 +1074,7 @@ Section ExpPure.
           rewrite !bind_bind.
           destruct d0; cbn; try (unfold raise; rewrite bind_bind; apply has_post_bind; intros []).
           break_match_goal; cbn; try (unfold raise; rewrite bind_bind; apply has_post_bind; intros []).
-          rewrite !bind_ret_l.
+          go. 
           rewrite interp_local_ret, interp_memory_ret, bind_ret_l.
           rewrite translate_ret, interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret. 
           go...
@@ -1084,55 +1100,51 @@ Section ExpPure.
           rewrite translate_ret, interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret. 
           go...
 
-    - apply failure_is_pure.
+    - auto...
 
-    - apply failure_is_pure.
+    - auto...
 
-    - apply failure_is_pure.
+    - auto...
 
     - destruct vec; cbn.
       go.
       eapply has_post_bind_strong.
       apply (IHe (Some d) g l m).
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       clear IHe.
       induction idxs as [| n idxs IH].
       + cbn.
         go...
       + cbn.
-        break_match_goal.
-        apply UB_is_pure.
-        break_match_goal.
-        apply failure_is_pure.
+        break_match_goal...
+        break_match_goal...
         go...
         
-    - apply failure_is_pure.
+    - auto...
 
     - destruct cnd,v1,v2; cbn.
       go.
       eapply has_post_bind_strong; [apply IHe | ].
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       go.
       eapply has_post_bind_strong; [apply IHe0 |]. 
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       go.
       eapply has_post_bind_strong; [apply IHe1 |]. 
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       break_match_goal.
       go...
       unfold lift_undef_or_err.
       break_match_goal.
-      break_match_goal.
-      apply UB_is_pure.
-      break_match_goal.
-      apply failure_is_pure.
+      break_match_goal...
+      break_match_goal...
       go...
       
     - destruct v; cbn.
       go.
       eapply has_post_bind_strong.
       apply (IHe (Some d) g l m).
-      intros (? & ? & ? & ?) (-> & -> & ->).
+      intro_pure.
       clear IHe.
       go.
       apply has_post_bind_strong with (↑ (pure_P g l m)).
@@ -1140,9 +1152,9 @@ Section ExpPure.
           break_match_goal; cbn;
             match goal with
               |- context [Ret _] => rewrite !translate_ret, interp_cfg3_ret; apply eutt_Ret; cbn; auto
-            | |- context [pick] => apply pick_is_pure
             | |- context [concretize_or_pick] => apply concretize_or_pick_is_pure
-            end.
+            | _ => idtac
+            end...
       }
       intros (? & ? & ? & ?) (-> & -> & ->).
       go...
