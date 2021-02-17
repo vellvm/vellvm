@@ -180,4 +180,6 @@ Module SemNotations.
 
   Notation "⟦ f '⟧f'"  := (denote_function f).
 
+  Ltac intros3 := intros (? & ? & ? & ?).
+   
 End SemNotations.

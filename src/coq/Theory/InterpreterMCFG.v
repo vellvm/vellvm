@@ -24,26 +24,29 @@ Arguments Intrinsics.F_trigger/.
 Arguments String.append : simpl never.
 Arguments allocate : simpl never.
 Arguments defs_assoc: simpl never.
-Ltac intros3 := intros (? & ? & ? & ?).
 
-(* TO WRAP IN MODULE *)
-(* Note: does not commute triggers for memory since those are more involved, we rely on specific lemmas *)
-Ltac go :=
-  repeat match goal with
-         | |- context [interp_intrinsics (ITree.bind _ _)] => rewrite interp_intrinsics_bind
-         | |- context [interp_global (ITree.bind _ _)] => rewrite interp_global_bind
-         | |- context [interp_local_stack (ITree.bind _ _)] => rewrite interp_local_stack_bind
-         | |- context [interp_memory (ITree.bind _ _)] => rewrite interp_memory_bind
-         | |- context [interp_intrinsics (trigger _)] => rewrite interp_intrinsics_trigger; cbn; rewrite ?subevent_subevent
-         | |- context [interp_global (trigger _)] => rewrite interp_global_trigger; cbn; rewrite ?subevent_subevent
-         | |- context [interp_local_stack (trigger _)] => rewrite interp_local_stack_trigger; cbn; rewrite ?subevent_subevent
-         | |- context [ITree.bind (ITree.bind _ _) _] => rewrite bind_bind
-         | |- context [interp_intrinsics (Ret _)] => rewrite interp_intrinsics_ret
-         | |- context [interp_global (Ret _)] => rewrite interp_global_ret
-         | |- context [interp_local_stack (Ret _)] => rewrite interp_local_stack_ret
-         | |- context [interp_memory (Ret _)] => rewrite interp_memory_ret
-         | |- context [ITree.bind (Ret _) _] => rewrite bind_ret_l
-         end.
+Module MCFGTactics.
+  (* Note: does not commute triggers for memory since those are more involved, we rely on specific lemmas *)
+  Ltac go :=
+    repeat match goal with
+           | |- context [interp_intrinsics (ITree.bind _ _)] => rewrite interp_intrinsics_bind
+           | |- context [interp_global (ITree.bind _ _)] => rewrite interp_global_bind
+           | |- context [interp_local_stack (ITree.bind _ _)] => rewrite interp_local_stack_bind
+           | |- context [interp_memory (ITree.bind _ _)] => rewrite interp_memory_bind
+           | |- context [interp_intrinsics (trigger _)] => rewrite interp_intrinsics_trigger; cbn; rewrite ?subevent_subevent
+           | |- context [interp_global (trigger _)] => rewrite interp_global_trigger; cbn; rewrite ?subevent_subevent
+           | |- context [interp_local_stack (trigger _)] => rewrite interp_local_stack_trigger; cbn; rewrite ?subevent_subevent
+           | |- context [ITree.bind (ITree.bind _ _) _] => rewrite bind_bind
+           | |- context [interp_intrinsics (Ret _)] => rewrite interp_intrinsics_ret
+           | |- context [interp_global (Ret _)] => rewrite interp_global_ret
+           | |- context [interp_local_stack (Ret _)] => rewrite interp_local_stack_ret
+           | |- context [interp_memory (Ret _)] => rewrite interp_memory_ret
+           | |- context [ITree.bind (Ret _) _] => rewrite bind_ret_l
+           end.
+
+End MCFGTactics.
+
+Import MCFGTactics.
 
 Lemma interp1_bind :
   forall {R S} (t: itree L0 R) (k: R -> itree L0 S) g, 
