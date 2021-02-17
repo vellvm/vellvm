@@ -17,13 +17,13 @@ From Vellvm Require Import
      Syntax.Traversal
      Syntax.Scope
      Syntax.TypToDtyp
+     Semantics.InterpretationStack
      Semantics.TopLevel
      Theory.DenotationTheory
      Theory.ExpLemmas
      Theory.InstrLemmas
      Theory.InterpreterCFG.
 
-Import D.
 (* end hide *)
 
 
@@ -190,9 +190,9 @@ Ltac vred_C3_k k :=
     do k idtac "Reduced direct jump"
    | |- context[denote_exp] => 
     (* Structural handling: expression case *)
-    first [rewrite translate_trigger; (rewrite lookup_E_to_exp_E_Local || rewrite lookup_E_to_exp_E_Global);
-           rewrite subevent_subevent, translate_trigger;
-           (rewrite exp_E_to_instr_E_Local || rewrite exp_E_to_instr_E_Global); rewrite subevent_subevent];
+    first [rewrite translate_trigger; (rewrite LU_to_exp_Local || rewrite LU_to_exp_Global);
+           rewrite (* subevent_subevent, *) translate_trigger;
+           (rewrite exp_to_instr_Local || rewrite exp_to_instr_Global)(* ; rewrite subevent_subevent *)];
     do k idtac "Reduced exp"
   | |- _ => do k idtac "no progress made"
   end;
