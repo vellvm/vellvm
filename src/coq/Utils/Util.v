@@ -451,16 +451,15 @@ Definition monad_app_snd {A B C} (f : B -> m C) (p:A * B) : m (A * C)%type :=
   z <- f y ;;
   ret (x,z).
 
-Definition map_monad {A B} (f:A -> m B) (l:list A) : m (list B) :=
-  let fix loop l :=
-      match l with
-      | [] => ret []
-      | a::l' =>
-        b <- f a ;;
-        bs <- loop l' ;;
-        ret (b::bs)  
-      end
-  in loop l.
+Definition map_monad {m : Type -> Type} {H : Monad m} {A B} (f:A -> m B) : list A -> m (list B) :=
+  fix loop l :=
+    match l with
+    | [] => ret []
+    | a::l' =>
+      b <- f a ;;
+      bs <- loop l' ;;
+      ret (b::bs)  
+    end.
 
 Definition map_monad_ {A}
   (f: A -> m unit) (l: list A): m unit :=
@@ -1309,9 +1308,8 @@ Proof.
   generalize (app_eq_nil _ _ H); intros (? & X); inversion X.
 Qed.
 
-
-Definition map_option {A B} (f:A -> option B) (l:list A) : option (list B) :=
-  let fix loop l :=
+Definition map_option {A B} (f:A -> option B) : list A -> option (list B) :=
+  fix loop l :=
       match l with
       | [] => Some []
       | a::l' =>
@@ -1319,8 +1317,7 @@ Definition map_option {A B} (f:A -> option B) (l:list A) : option (list B) :=
         | Some b, Some bl => Some (b::bl)
         | _, _ => None
         end
-      end
-  in loop l.
+      end.
 
 Lemma map_option_map : forall A B C (f:A -> option B) (g:C -> A) (l:list C),
     map_option f (map g l) = map_option (fun x => f (g x)) l.
