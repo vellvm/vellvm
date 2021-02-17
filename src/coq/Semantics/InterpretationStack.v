@@ -163,11 +163,17 @@ Module SemNotations.
   Notation "⟦ t '⟧t'" :=        (denote_terminator t).
   Notation "⟦ t '⟧t3'" :=       (ℑ3 (translate exp_to_instr ⟦ t ⟧t)).
 
-  Notation "⟦ id ⤳ bk '⟧b'" :=  (denote_block bk id).
-  Notation "⟦ id ⤳ bk '⟧b3'" := (ℑ3 ⟦ id ⤳ bk ⟧b ).
+  Notation "⟦ phi '⟧Φ' from"  := (denote_phi from phi) (at level 0, from at next level).
+  Notation "⟦ phi '⟧Φ3' from" := (ℑ3 (denote_phi from phi)) (at level 0, from at next level).
 
-  Notation "⟦ ids ⤳ bks '⟧ocfg'"  := (denote_ocfg bks ids).
-  Notation "⟦ ids ⤳ bks '⟧ocfg3'" := (ℑ3 (denote_ocfg bks ids)).
+  Notation "⟦ phis '⟧Φs' from"  := (denote_phis from phis) (at level 0, from at next level).
+  Notation "⟦ phis '⟧Φs3' from" := (ℑ3 (denote_phis from phis)) (at level 0, from at next level).
+
+  Notation "⟦ bk '⟧b'" :=  (denote_block bk).
+  Notation "⟦ bk '⟧b3' id" := (ℑ3 (⟦ bk ⟧b id)) (at level 0, id at next level).
+
+  Notation "⟦ bks '⟧bs'"  := (denote_ocfg bks).
+  Notation "⟦ bks '⟧bs3' ids" := (ℑ3 (denote_ocfg bks ids)) (at level 0, ids at next level).
 
   Notation "⟦ f '⟧cfg'"  := (denote_cfg f).
   Notation "⟦ f '⟧cfg3'" := (ℑ3 (denote_cfg f)).
