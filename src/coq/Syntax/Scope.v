@@ -230,13 +230,6 @@ Section LABELS_THEORY.
     intros ? []; reflexivity.
   Qed.
 
-  Lemma inputs_convert_typ : forall σ bks,
-      inputs (convert_typ σ bks) = inputs bks.
-  Proof.
-    induction bks as [| bk bks IH]; cbn; auto.
-    f_equal; auto.
-  Qed.
-
   (* TODO: Show symmetric case *)
   Lemma wf_ocfg_bid_app_not_in_l :
     forall id (bs bs' : ocfg T),

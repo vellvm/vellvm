@@ -6,7 +6,9 @@ From ITree Require Import
 
 From Vellvm Require Import 
      Utils.PostConditions
-     Utils.PropT.
+     Utils.PropT
+     Utils.TFor
+     Utils.Tactics.
 
 From Paco Require Import paco.
 
@@ -14,7 +16,7 @@ From ExtLib Require Import
      Structures.Monad.
 
 From Coq Require Import
-     Morphisms.
+     Morphisms Lia.
 
 Import ITreeNotations.
 Local Open Scope itree.

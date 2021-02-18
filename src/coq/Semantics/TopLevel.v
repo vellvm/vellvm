@@ -129,13 +129,6 @@ Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree L0
   ret (fv, ⟦ df ⟧f).
 
 (**
-     Conversion to dynamic types
- *)
-
-Definition convert_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
-  convert_typ (m_type_defs CFG) CFG.
-
-(**
    We are now ready to define our semantics. Guided by the events and handlers,
    we work in layers: the first layer is defined as the uninterpreted [itree]
    resulting from the denotation of the LLVM program. Each successive handler
