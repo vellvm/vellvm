@@ -248,46 +248,46 @@ Section TLE_To_Modul.
       try ((break_match_goal; reflexivity) || (rewrite <- !app_nil_end, app_assoc; reflexivity)).
   Qed.
 
-  Infix "@" := (modul_app) (at level 60).
+  Infix "@@" := (modul_app) (at level 60).
 
   Lemma m_definitions_app: forall {T X} (p1 p2 : @modul T X),
-      m_definitions (p1 @ p2) = m_definitions p1 ++ m_definitions p2.
+      m_definitions (p1 @@ p2) = m_definitions p1 ++ m_definitions p2.
   Proof.
     intros ? ? [] []; reflexivity.
   Qed.
 
   Lemma m_name_app: forall {T X} (p1 p2 : @modul T X),
-      m_name (p1 @ p2) = opt_first (m_name p1) (m_name p2).
+      m_name (p1 @@ p2) = opt_first (m_name p1) (m_name p2).
   Proof.
     intros ? ? [] []; reflexivity.
   Qed.
 
   Lemma m_target_app: forall {T X} (p1 p2 : @modul T X),
-      m_target (p1 @ p2) = opt_first (m_target p1) (m_target p2).
+      m_target (p1 @@ p2) = opt_first (m_target p1) (m_target p2).
   Proof.
     intros ? ? [] []; reflexivity.
   Qed.
 
   Lemma m_datalayout_app: forall {T X} (p1 p2 : @modul T X),
-      m_datalayout (p1 @ p2) = opt_first (m_datalayout p1) (m_datalayout p2).
+      m_datalayout (p1 @@ p2) = opt_first (m_datalayout p1) (m_datalayout p2).
   Proof.
     intros ? ? [] []; reflexivity.
   Qed.
 
   Lemma m_type_defs_app: forall {T X} (p1 p2 : @modul T X),
-      m_type_defs (p1 @ p2) = m_type_defs p1 ++ m_type_defs p2.
+      m_type_defs (p1 @@ p2) = m_type_defs p1 ++ m_type_defs p2.
   Proof.
     intros ? ? [] []; reflexivity.
   Qed.
 
   Lemma m_globals_app: forall {T X} (p1 p2 : @modul T X),
-      m_globals (p1 @ p2) = m_globals p1 ++ m_globals p2.
+      m_globals (p1 @@ p2) = m_globals p1 ++ m_globals p2.
   Proof.
     intros ? ? [] []; reflexivity.
   Qed.
 
   Lemma m_declarations_app: forall {T X} (p1 p2 : @modul T X),
-      m_declarations (p1 @ p2) = m_declarations p1 ++ m_declarations p2.
+      m_declarations (p1 @@ p2) = m_declarations p1 ++ m_declarations p2.
   Proof.
     intros ? ? [] []; reflexivity.
   Qed.
@@ -328,7 +328,7 @@ Section TLE_To_Modul.
   Qed.
 
   Lemma mcfg_of_app_modul: forall {T} (p1 p2 : @modul T _), 
-      mcfg_of_modul (p1 @ p2) = mcfg_of_modul p1 @ mcfg_of_modul p2.
+      mcfg_of_modul (p1 @@ p2) = mcfg_of_modul p1 @@ mcfg_of_modul p2.
   Proof.
     intros; cbn.
     unfold mcfg_of_modul.
@@ -338,4 +338,4 @@ Section TLE_To_Modul.
 
 End TLE_To_Modul.
 
-Infix "@" := (modul_app) (at level 60).
+Infix "@@" := (modul_app) (at level 60).

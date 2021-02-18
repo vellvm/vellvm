@@ -315,8 +315,8 @@ Qed.
 
 Lemma convert_typ_mcfg_app:
   forall mcfg1 mcfg2 : modul (cfg typ),
-    convert_typ [] (mcfg1 @ mcfg2) =
-    convert_typ [] mcfg1 @ convert_typ [] mcfg2.
+    convert_typ [] (mcfg1 @@ mcfg2) =
+    convert_typ [] mcfg1 @@ convert_typ [] mcfg2.
 Proof.
   intros [] []; cbn.
   unfold convert_typ,ConvertTyp_mcfg,Traversal.fmap,Fmap_mcfg; cbn.
