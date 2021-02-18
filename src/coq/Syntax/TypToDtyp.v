@@ -215,6 +215,33 @@ Proof.
   reflexivity.
 Defined.
 
+(* Specialized version of the characteristic equation for contexts where we don't want to compute *)
+Lemma typ_to_dtyp_I : forall s i, typ_to_dtyp s (TYPE_I i) = DTYPE_I i.
+Proof.
+  intros; rewrite typ_to_dtyp_equation; reflexivity.
+Qed.
+
+Lemma typ_to_dtyp_D : forall s, typ_to_dtyp s TYPE_Double = DTYPE_Double.
+Proof.
+  intros; rewrite typ_to_dtyp_equation; reflexivity.
+Qed.
+
+Lemma typ_to_dtyp_P :
+  forall t s,
+    typ_to_dtyp s (TYPE_Pointer t) = DTYPE_Pointer.
+Proof.
+  intros t s.
+  apply typ_to_dtyp_equation.
+Qed.
+
+Lemma typ_to_dtyp_D_array : forall n s, typ_to_dtyp s (TYPE_Array n TYPE_Double) = DTYPE_Array n DTYPE_Double.
+Proof.
+  intros.
+  rewrite typ_to_dtyp_equation.
+  rewrite typ_to_dtyp_D.
+  reflexivity.
+Qed.
+
 (** ** Conversion of syntactic components
 
     Front-ends and optimizations generate code containing static types.

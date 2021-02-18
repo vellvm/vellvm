@@ -700,3 +700,10 @@ Definition intrinsic_exp {T} (e:exp T) : option string :=
   | _ => None
   end.
 
+Lemma Name_inj : forall s1 s2,
+    Name s1 = Name s2 ->
+    s1 = s2.
+Proof.
+  intros * EQ; inv EQ; auto.
+Qed.
+
