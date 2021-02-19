@@ -2093,7 +2093,6 @@ Section Memory_Stack_Theory.
       exists (read_in_mem_block bytes (snd a) τ). reflexivity.
     Qed.
 
-
     Lemma freshly_allocated_different_blocks :
       forall ptr1 ptr2 τ m1 m2,
         allocate m1 τ = inr (m2, ptr2) ->
@@ -2757,7 +2756,7 @@ Section PARAMS.
     Lemma interp_memory_load :
       forall (m : memory_stack) (t : dtyp) (val : uvalue) (a : addr),
         read m a t = inr val ->
-        interp_memory (trigger (Load t (DVALUE_Addr a))) m ≈ ret (m, val).
+        interp_memory (trigger (Load t (DVALUE_Addr a))) m ≈ Ret (m, val).
     Proof.
       intros m t val a Hval.
       rewrite interp_memory_trigger.
@@ -2768,7 +2767,7 @@ Section PARAMS.
     Lemma interp_memory_store :
       forall (m m' : memory_stack) (val : dvalue) (a : addr),
         write m a val = inr m' ->
-        interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ ret (m', tt).
+        interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ Ret (m', tt).
     Proof.
       intros m m' val a Hwrite.
       rewrite interp_memory_trigger.
@@ -2783,7 +2782,7 @@ Section PARAMS.
         dtyp_fits m a t ->
         exists m',
           write m a val = inr m' /\
-          interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ ret (m', tt).
+          interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ Ret (m', tt).
     Proof.
       intros m t val a TYP CAN.
       apply write_succeeds with (v:=val) in CAN as [m2 WRITE]; auto.
@@ -2795,7 +2794,7 @@ Section PARAMS.
     Lemma interp_memory_alloca :
       forall (m m' : memory_stack) (t : dtyp) (a : addr),
         allocate m t = inr (m', a) ->
-        interp_memory (trigger (Alloca t)) m ≈ ret (m', DVALUE_Addr a).
+        interp_memory (trigger (Alloca t)) m ≈ Ret (m', DVALUE_Addr a).
     Proof.
       intros m m' t a ALLOC.
       rewrite interp_memory_trigger.
@@ -2808,7 +2807,7 @@ Section PARAMS.
       forall (m : memory_stack) (t : dtyp),
         non_void t ->
         exists m' a', allocate m t = inr (m', a') /\
-                      interp_memory (trigger (Alloca t)) m ≈ ret (m', DVALUE_Addr a').
+                      interp_memory (trigger (Alloca t)) m ≈ Ret (m', DVALUE_Addr a').
     Proof.
       intros m t NV.
       apply allocate_succeeds with (τ:=t) (m1:=m) in NV as [m' [a' ALLOC]].

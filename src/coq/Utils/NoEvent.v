@@ -868,6 +868,7 @@ From Vellvm Require Import
      Syntax.TypToDtyp
      Semantics.LLVMEvents
      Semantics.Denotation
+     Semantics.InterpretationStack
      Semantics.TopLevel
      Handlers.Handlers
      Theory.InterpreterCFG
@@ -918,29 +919,32 @@ Definition interp_from_prop {E F} T (RR: T -> T -> Prop) (h : E ~> PropT F) : Pr
       Pt t' /\
       (interp_prop (case_ h trigger_prop') _ RR t' t).
 
-Lemma deterministic_is_singleton' : 
-  forall {E F X} (RX : relation X)
-    (ts : PropT (E +' F) X)
-    (t : itree (E +' F) X)
-    (h : E ~> PropT F),
-    is_singleton ts t ->
-    no_event_l t -> 
-    is_singleton (interp_from_prop RX h ts) (elim_l t).
-Proof.
-Admitted.
+Section DeterministicSingleton.
 
-Variable remove_pick_ub : itree (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' DebugE +' FailureE).
-Variable deterministic_vellvm : forall R, itree L0 R -> Prop.
-(* Definition deterministic_vellvm *)
-Lemma deterministc_llvm_is_singleton : forall R RR t g sl mem,
-    deterministic_vellvm t ->
-    is_singleton (interp_to_L5 (R := R) RR t g sl mem) (remove_pick_ub (interp_to_L3 (R := R) t g sl mem)).
+  Lemma deterministic_is_singleton' : 
+    forall {E F X} (RX : relation X)
+      (ts : PropT (E +' F) X)
+      (t : itree (E +' F) X)
+      (h : E ~> PropT F),
+      is_singleton ts t ->
+      no_event_l t -> 
+      is_singleton (interp_from_prop RX h ts) (elim_l t).
+  Proof.
+  Admitted.
+
+  Variable remove_pick_ub : itree (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' DebugE +' FailureE).
+  Variable deterministic_vellvm : forall R, itree L0 R -> Prop.
+  (* Definition deterministic_vellvm *)
+  Lemma deterministc_llvm_is_singleton : forall R RR t g sl mem,
+      deterministic_vellvm t ->
+      is_singleton (interp_mcfg5 (R := R) RR t g sl mem) (remove_pick_ub (interp_mcfg3 (R := R) t g sl mem)).
 
   (*
     Then the same statement on llvm syntax by applying it with (t := denote_llvm p)
     Then on the helix side:
     - we know that there is (t: itree void1 X),
-    "inject (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) t ≈ interp_to_L3 (denote_llvm p)"
+    "inject (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) t ≈ interp_mcfg3 (denote_llvm p)"
    *)
-Proof. Admitted.
+  Proof. Admitted.
 
+End DeterministicSingleton.

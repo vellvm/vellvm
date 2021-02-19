@@ -6,7 +6,9 @@ From ITree Require Import
 
 From Vellvm Require Import 
      Utils.PostConditions
-     Utils.PropT.
+     Utils.PropT
+     Utils.TFor
+     Utils.Tactics.
 
 From Paco Require Import paco.
 
@@ -14,7 +16,7 @@ From ExtLib Require Import
      Structures.Monad.
 
 From Coq Require Import
-     Morphisms.
+     Morphisms Lia.
 
 Import ITreeNotations.
 Local Open Scope itree.
@@ -187,6 +189,118 @@ Section No_Failure.
     unfold h_fail in *; rewrite  !bind_ret_l in abs.
     eapply eutt_Ret in abs.
     apply abs; auto.
+  Qed.
+
+  (* The following lemmas reason about [tfor] in the specific case where the body goes into the failure monad.
+   They are quite a bit ugly as intrinsically [tfor] unfolds using the itree [bind] while [no_failure] relies
+   on the failT [bind].
+   *)
+  Lemma tfor_fail_None : forall {E A} i j (body : nat -> A -> itree E (option A)),
+      (i <= j)%nat ->
+      tfor (fun k x => match x with
+                    | Some a0 => body k a0
+                    | None => Ret None
+                    end) i j None ≈ Ret None.
+  Proof.
+    intros E A i j body; remember (j - i)%nat as k; revert i Heqk; induction k as [| k IH].
+    - intros i EQ INEQ; replace j with i by lia; rewrite tfor_0; reflexivity. 
+    - intros i EQ INEQ.
+      rewrite tfor_unroll; [|lia].
+      rewrite bind_ret_l, IH; [reflexivity | lia | lia].
+  Qed.
+
+  (* One step unrolling of the combinator *)
+  Lemma tfor_unroll_fail: forall {E A} i j (body : nat -> A -> itree E (option A)) a0,
+      (i < j)%nat ->
+      tfor (fun k x => match x with
+                    | Some a0 => body k a0
+                    | None => Ret None
+                    end) i j a0 ≈
+           bind (m := failT (itree E))
+           (match a0 with
+            | Some a0 => body i a0
+            | None => Ret None
+            end) (fun a =>
+                    tfor (fun k x =>
+                            match x with
+                            | Some a0 => body k a0
+                            | None => Ret None
+                            end) (S i) j (Some a)).
+  Proof.
+    intros *.
+    remember (j - i)%nat as k.
+    revert i Heqk a0.
+    induction k as [| k IH].
+    - lia.
+    - intros i EQ a0 INEQ.
+      rewrite tfor_unroll; auto.
+      cbn.
+      destruct a0 as [a0 |]; cycle 1.
+      + rewrite !bind_ret_l.
+        rewrite tfor_fail_None; [reflexivity | lia].
+      + apply eutt_eq_bind.
+        intros [a1|]; cycle 1.
+        * rewrite tfor_fail_None; [reflexivity | lia].
+        * destruct (PeanoNat.Nat.eq_dec (S i) j).
+          {
+            subst.
+            rewrite tfor_0; reflexivity.
+          }
+          destruct k; [lia |].
+          rewrite (IH (S i)); [| lia | lia].
+          reflexivity.
+  Qed.
+
+  Lemma no_failure_tfor : forall {E A} (body : nat -> A -> itree E (option A)) n m a0,
+      no_failure (tfor (fun k x => match x with
+                                | Some a => body k a
+                                | None => Ret None
+                                end) n m a0) ->
+      forall k a,
+        (n <= k < m)%nat ->
+        Returns (Some a) (tfor (fun k x => match x with
+                                        | Some a => body k a
+                                        | None => Ret None
+                                        end) n k a0) ->
+        no_failure (body k a).
+  Proof.
+    intros E A body n m.
+    remember (m - n)%nat as j.
+    revert n Heqj.
+    induction j as [| j IH].
+    - intros n EQ a0 NOFAIL k a [INEQ1 INEQ2] RET.
+      assert (n = m) by lia; subst.
+      lia.
+    - intros n EQ a0 NOFAIL k a [INEQ1 INEQ2] RET.
+      destruct (PeanoNat.Nat.eq_dec k n). 
+      + subst.
+        clear INEQ1.
+        rewrite tfor_unroll_fail in NOFAIL; [| auto].
+        rewrite tfor_0 in RET.
+        apply Returns_Ret in RET.
+        subst.
+        apply no_failure_bind_prefix in NOFAIL; auto.
+      + specialize (IH (S n)).
+        forward IH; [lia |].
+        rewrite tfor_unroll_fail in NOFAIL; [| lia].
+        rewrite tfor_unroll_fail in RET; [| lia].
+        cbn in RET.
+        apply Returns_bind_inversion in RET.
+        destruct RET as (a1 & RET1 & RET2).
+        destruct a0 as [a0|]; cycle 1.
+        { cbn in *.
+          rewrite bind_ret_l in NOFAIL.
+          apply eutt_Ret in NOFAIL; contradiction NOFAIL; auto.
+        }
+        cbn in *.
+        destruct a1 as [a1|]; cycle 1.
+        {
+          apply Returns_Ret in RET2.
+          inv RET2.
+        }
+        apply no_failure_bind_cont with (u := a1) in NOFAIL; auto.
+        eapply IH; eauto.
+        lia.
   Qed.
 
 End No_Failure.

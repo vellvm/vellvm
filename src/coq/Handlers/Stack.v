@@ -83,17 +83,17 @@ Section StackMap.
                                   handle_stack)
                            G_trigger))).
 
-    Definition interp_local_stack `{FailureE -< E +' F +' G} (h:(LocalE k v) ~> stateT map (itree Effout)) :
+    Definition interp_local_stack `{FailureE -< E +' F +' G}  :
       (itree Effin) ~>  stateT (map * stack) (itree Effout) :=
-      interp_state (interp_local_stack_h h).
+      interp_state (interp_local_stack_h (handle_local (v:=v))).
 
     Section Structural_Lemmas.
 
       Lemma interp_local_stack_bind :
         forall (R S: Type) (t : itree Effin _) (k : R -> itree Effin S) s,
-          interp_local_stack (handle_local (v:=v)) (ITree.bind t k) s ≅
-                             ITree.bind (interp_local_stack (handle_local (v:=v)) t s)
-                             (fun '(s',r) => interp_local_stack (handle_local (v:=v)) (k r) s').
+          interp_local_stack (ITree.bind t k) s ≅
+                             ITree.bind (interp_local_stack t s)
+                             (fun '(s',r) => interp_local_stack (k r) s').
       Proof.
         intros.
         unfold interp_local_stack.
@@ -105,13 +105,14 @@ Section StackMap.
 
       Lemma interp_local_stack_ret :
         forall (R : Type) l (x: R),
-          interp_local_stack (handle_local (v:=v)) (Ret x: itree Effin R) l ≅ Ret (l,x).
+          interp_local_stack (Ret x: itree Effin R) l ≅ Ret (l,x).
       Proof.
-        intros; apply interp_state_ret.
+        intros; unfold interp_local_stack.
+        apply interp_state_ret.
       Qed.
 
       Lemma interp_local_stack_trigger ls X (e : Effin X):
-          interp_local_stack (handle_local (v:=v)) (ITree.trigger e) ls ≈ interp_local_stack_h (handle_local (v:=v)) e ls.
+          interp_local_stack (ITree.trigger e) ls ≈ interp_local_stack_h (handle_local (v:=v)) e ls.
       Proof.
         unfold interp_local_stack.
         rewrite interp_state_trigger.

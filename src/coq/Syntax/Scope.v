@@ -413,6 +413,15 @@ Section LABELS_THEORY.
     eapply list_norepet_cons; eauto.
   Qed.
 
+  Lemma free_in_cfg_cons:
+    forall b (bs : ocfg T) id,
+      free_in_cfg (b::bs) id ->
+      free_in_cfg bs id .
+  Proof.
+    intros * FR abs; apply FR; cbn.
+    destruct (Eqv.eqv_dec_p (blk_id b) id); [rewrite e; auto | right; auto].
+  Qed.
+
   Lemma free_in_cfg_app : forall (bks1 bks2 : ocfg T) b,
       free_in_cfg (bks1 ++ bks2) b <->
       (free_in_cfg bks1 b /\ free_in_cfg bks2 b).
@@ -437,6 +446,25 @@ Section LABELS_THEORY.
   Qed.
 
 End LABELS_THEORY.
+
+Lemma free_in_convert_typ :
+  forall env (bs : list (LLVMAst.block typ)) id,
+    free_in_cfg bs id ->
+    free_in_cfg (convert_typ env bs) id.
+Proof.
+  induction bs as [| b bs IH]; intros * FR.
+  - red; cbn; auto.
+  - cbn.
+    intros abs.
+    eapply FR.
+    destruct (Eqv.eqv_dec_p (blk_id b) id).
+    left; rewrite e; auto.
+    destruct abs.
+    + cbn in H; unfold Traversal.endo, Traversal.Endo_id in H; cbn in H.
+      exfalso; apply n; rewrite H; reflexivity.
+    + apply IH in H; intuition.
+      eapply free_in_cfg_cons; eauto.
+Qed.
 
 Section FIND_BLOCK.
 
@@ -487,15 +515,6 @@ Section FIND_BLOCK.
     intros.
     rewrite list_cons_app.
     apply find_block_app_r_wf; auto.
-  Qed.
-
-  Lemma free_in_cfg_cons:
-    forall b (bs : ocfg T) id,
-      free_in_cfg (b::bs) id ->
-      free_in_cfg bs id .
-  Proof.
-    intros * FR abs; apply FR; cbn.
-    destruct (Eqv.eqv_dec_p (blk_id b) id); [rewrite e; auto | right; auto].
   Qed.
 
   Lemma find_block_free_id :

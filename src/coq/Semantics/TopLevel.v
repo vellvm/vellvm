@@ -36,18 +36,12 @@ From Vellvm Require Import
      Semantics.Denotation
      Semantics.IntrinsicsDefinitions
      Handlers.Handlers
-     Theory.InterpreterMCFG.
+     Semantics.InterpretationStack.
 
 Import MonadNotation.
 Import ListNotations.
 Import Monads.
-
-Module D   := Denotation Addr LLVMEvents.
-Module IS  := IntrinsicsDefinitions.Make Addr LLVMEvents.
-Export DV.
-Export Mem.
-Import D IS.
-
+Import SemNotations.
 Open Scope string_scope.
 
 (* end hide *)
@@ -104,7 +98,7 @@ Definition initialize_global (g:global dtyp) : itree exp_E unit :=
   a <- trigger (GlobalRead (g_ident g));;
   uv <- match (g_exp g) with
        | None => ret (UVALUE_Undef dt)
-       | Some e => D.denote_exp (Some dt) e
+       | Some e =>  ⟦ e at dt ⟧e
        end ;;
   dv <- concretize_or_pick uv True ;;
   trigger (Store a dv).
@@ -115,7 +109,7 @@ Definition initialize_globals (gs:list (global dtyp)): itree exp_E unit :=
 Definition build_global_environment (CFG : CFG.mcfg dtyp) : itree L0 unit :=
   allocate_declarations ((m_declarations CFG) ++ (List.map (df_prototype) (m_definitions CFG)));;
   allocate_globals (m_globals CFG) ;;
-  translate _exp_E_to_L0 (initialize_globals (m_globals CFG)).
+  translate exp_to_L0 (initialize_globals (m_globals CFG)).
 
 (** Local environment implementation
     The map-based handlers are defined parameterized over a domain of key and value.
@@ -132,14 +126,7 @@ Definition function_env := FMapAList.alist dvalue D.function_denotation.
 Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree L0 (dvalue * D.function_denotation) :=
   let fid := (dc_name (df_prototype df)) in
   fv <- trigger (GlobalRead fid) ;;
-  ret (fv, D.denote_function df).
-
-(**
-     Conversion to dynamic types
- *)
-
-Definition convert_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
-  convert_typ (m_type_defs CFG) CFG.
+  ret (fv, ⟦ df ⟧f).
 
 (**
    We are now ready to define our semantics. Guided by the events and handlers,
@@ -178,7 +165,7 @@ Definition denote_vellvm
   build_global_environment mcfg ;;
   'defns <- map_monad address_one_function (m_definitions mcfg) ;;
   'addr <- trigger (GlobalRead (Name entry)) ;;
-  D.denote_mcfg defns ret_typ (dvalue_to_uvalue addr) args.
+  denote_mcfg defns ret_typ (dvalue_to_uvalue addr) args.
 
 
 (* SAZ: main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them 
@@ -206,7 +193,7 @@ Definition interpreter_gen
            (prog: list (toplevel_entity typ (block typ * list (block typ))))
   : itree L5 res_L4 :=
   let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-  interp_to_L5_exec t [] ([],[]) empty_memory_stack.
+  interp_mcfg5_exec t [] ([],[]) empty_memory_stack.
 
 (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts 
@@ -225,17 +212,17 @@ Definition interpreter := interpreter_gen (DTYPE_I 32%N) "main" main_args.
      to [mcfg], normalizes the types, denotes the [mcfg] and finally interprets the tree
      starting from empty environments.
  *)
-Definition model_user
+Definition model_gen
            (ret_typ : dtyp)
            (entry : string)
            (args : list uvalue)
            (prog: list (toplevel_entity typ (block typ * list (block typ))))
   : PropT L5 (memory_stack * (local_env * lstack * (global_env * uvalue))) :=
   let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-  interp_to_L5 Logic.eq t [] ([],[]) empty_memory_stack. 
+  ℑs eq t [] ([],[]) empty_memory_stack. 
 
 (**
      Finally, the official model assumes no user-defined intrinsics.
  *)
-Definition model := model_user (DTYPE_I 32%N) "main" main_args.
+Definition model := model_gen (DTYPE_I 32%N) "main" main_args.
 

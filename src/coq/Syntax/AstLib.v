@@ -14,7 +14,9 @@ From Coq Require Import
      String Omega.
 From Vellvm Require Import
      Utils.Util
+     Utils.Tactics
      Syntax.LLVMAst.
+
 Require Import Equalities OrderedType OrderedTypeEx Compare_dec.
 Require Import ExtLib.Core.RelDec ExtLib.Data.Z.
 Require Import ExtLib.Programming.Eqv.
@@ -699,4 +701,11 @@ Definition intrinsic_exp {T} (e:exp T) : option string :=
   | EXP_Ident id => intrinsic_ident id
   | _ => None
   end.
+
+Lemma Name_inj : forall s1 s2,
+    Name s1 = Name s2 ->
+    s1 = s2.
+Proof.
+  intros * EQ; inv EQ; auto.
+Qed.
 

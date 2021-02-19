@@ -451,16 +451,15 @@ Definition monad_app_snd {A B C} (f : B -> m C) (p:A * B) : m (A * C)%type :=
   z <- f y ;;
   ret (x,z).
 
-Definition map_monad {A B} (f:A -> m B) (l:list A) : m (list B) :=
-  let fix loop l :=
-      match l with
-      | [] => ret []
-      | a::l' =>
-        b <- f a ;;
-        bs <- loop l' ;;
-        ret (b::bs)  
-      end
-  in loop l.
+Definition map_monad {m : Type -> Type} {H : Monad m} {A B} (f:A -> m B) : list A -> m (list B) :=
+  fix loop l :=
+    match l with
+    | [] => ret []
+    | a::l' =>
+      b <- f a ;;
+      bs <- loop l' ;;
+      ret (b::bs)  
+    end.
 
 Definition map_monad_ {A}
   (f: A -> m unit) (l: list A): m unit :=
@@ -1309,9 +1308,8 @@ Proof.
   generalize (app_eq_nil _ _ H); intros (? & X); inversion X.
 Qed.
 
-
-Definition map_option {A B} (f:A -> option B) (l:list A) : option (list B) :=
-  let fix loop l :=
+Definition map_option {A B} (f:A -> option B) : list A -> option (list B) :=
+  fix loop l :=
       match l with
       | [] => Some []
       | a::l' =>
@@ -1319,8 +1317,7 @@ Definition map_option {A B} (f:A -> option B) (l:list A) : option (list B) :=
         | Some b, Some bl => Some (b::bl)
         | _, _ => None
         end
-      end
-  in loop l.
+      end.
 
 Lemma map_option_map : forall A B C (f:A -> option B) (g:C -> A) (l:list C),
     map_option f (map g l) = map_option (fun x => f (g x)) l.
@@ -1616,6 +1613,24 @@ Section DisjointLists.
     unfold list_disjoint; intros; split; intro H.
     apply H; constructor; auto.
     intros ? ? [] []; subst; auto.
+  Qed.
+
+  Lemma Forall_disjoint :
+    forall {A} (l1 l2 : list A) (P1 P2 : A -> Prop),
+      Forall P1 l1 ->
+      Forall P2 l2 ->
+      (forall x, P1 x -> ~(P2 x)) ->
+      l1 ⊍ l2.
+  Proof.
+    induction l1;
+      intros l2 P1 P2 L1 L2 P1NP2.
+    - intros ? ? CONTRA. inversion CONTRA.
+    - apply Coqlib.list_disjoint_cons_l.
+      + eapply IHl1; eauto using Forall_inv_tail.
+      + apply Forall_inv in L1.
+        apply P1NP2 in L1.
+        intros IN.
+        eapply Forall_forall in L2; eauto.
   Qed.
 
 End DisjointLists.

@@ -17,12 +17,12 @@ From ITree Require Import
 From Vellvm Require Import
      Utils.Util
      Utils.Tactics
-     Utils.PropT
      Syntax.CFG
      Syntax.LLVMAst
      Syntax.AstLib
      Syntax.Scope
      Semantics.TopLevel
+     Semantics.InterpretationStack
      Syntax.Traversal
      Syntax.DynamicTypes
      Semantics.LLVMEvents
@@ -35,14 +35,15 @@ Set Implicit Arguments.
 Set Strict Implicit.
 
 Import ListNotations.
-Import D.
-Import Eq.
+(* Import Eq. *)
 (* Import CatNotations. *)
 
 Import MonadNotation.
 Open Scope list_scope.
 Open Scope monad_scope.
 Open Scope itree.
+Import ITreeNotations.
+Import SemNotations.
 
 (* end hide *)
 
@@ -59,69 +60,79 @@ In particular, notice that since [interp] is a iterative-monad morphism that res
 
 *)
 
+Module DenoteTactics.
+
+  Hint Rewrite @bind_ret_l : rwexp.
+  Hint Rewrite @bind_bind : rwexp.
+  Hint Rewrite @translate_ret : rwexp.
+  Hint Rewrite @translate_bind : rwexp.
+  Hint Rewrite @translate_trigger : rwexp.
+
+  Ltac go := autorewrite with rwexp.
+
+End DenoteTactics.
+Import DenoteTactics.
+
+Notation "⟦ c '⟧c'" :=          (denote_code c).
+
 (** [denote_code] *)
 
 Lemma denote_code_nil :
-  denote_code [] ≈ Ret tt.
+  ⟦ [] ⟧c ≈ Ret tt.
 Proof.
   intros.
-  cbn. rewrite bind_ret_l.
+  cbn.
+  go.
   reflexivity.
 Qed.
 
 Lemma denote_code_app :
   forall a b,
-    denote_code (a ++ b)%list ≈ ITree.bind (denote_code a) (fun _ => denote_code b).
+    ⟦ a ++ b ⟧c ≈ ⟦ a ⟧c;;  ⟦ b ⟧c.
 Proof.
   induction a; intros b.
-  - cbn. rewrite 2 bind_ret_l.
-    reflexivity.
-  - simpl.
-    unfold denote_code, map_monad_ in *.
-    simpl in *.
-    repeat rewrite bind_bind.
-    specialize (IHa b).
+  - cbn; go; reflexivity.
+  - cbn in *.
+    go.
     apply eutt_eq_bind; intros ().
-    rewrite bind_bind.
+    go.
     setoid_rewrite bind_ret_l.
-    setoid_rewrite IHa.
-    repeat rewrite bind_bind.
-    setoid_rewrite bind_ret_l.
+    rewrite IHa.
+    go.
     reflexivity.
 Qed.
 
 Lemma denote_code_cons :
-  forall a l,
-    denote_code (a::l) ≈ ITree.bind (denote_instr a) (fun _ => denote_code l).
+  forall i c,
+     ⟦ i::c ⟧c ≈  ⟦ i ⟧i;; ⟦ c ⟧c.
 Proof.
   intros.
-  rewrite list_cons_app, denote_code_app.
   cbn.
-  repeat rewrite bind_bind.
+  go.
   apply eutt_eq_bind; intros ().
-  rewrite !bind_bind, !bind_ret_l.
+  go.
+  setoid_rewrite bind_ret_l.
   reflexivity.
 Qed.
 
 Lemma denote_code_singleton :
-  forall a,
-    denote_code [a] ≈ denote_instr a.
+  forall i,
+    ⟦ [i] ⟧c ≈ ⟦ i ⟧i.
 Proof.
   intros a.
-  rewrite denote_code_cons.
-  setoid_rewrite denote_code_nil.
   cbn.
-  epose proof bind_ret_r.
-  specialize (H (denote_instr a)).
-  rewrite <- H.
-  rewrite bind_bind.
-  apply eutt_eq_bind; intros []; rewrite bind_ret_l; reflexivity. 
+  go.
+  bind_ret_r2.
+  apply eutt_eq_bind; intros [].
+  go.
+  reflexivity.
 Qed.
 
 (** [denote_phi] *)
+(* TODO: make a choice about it and move *)
 Opaque assoc.
 Lemma denote_phi_hd : forall bid e id τ tl,
-    denote_phi bid (id, Phi τ ((bid,e)::tl)) ≈ uv <- denote_exp (Some τ) e;; Ret (id,uv).
+    ⟦ (id, Phi τ ((bid,e)::tl)) ⟧Φ bid ≈ uv <- ⟦ e at τ ⟧e;; Ret (id,uv).
 Proof.
   intros; cbn.
   rewrite assoc_hd; reflexivity.
@@ -129,30 +140,30 @@ Qed.
 
 Lemma denote_phi_tl : forall bid bid' e id τ tl,
     bid <> bid' ->
-    denote_phi bid (id, Phi τ ((bid',e)::tl)) ≈ denote_phi bid (id, Phi τ tl).
+    ⟦ (id, Phi τ ((bid',e)::tl)) ⟧Φ bid ≈ ⟦ (id, Phi τ tl) ⟧Φ bid.
 Proof.
   intros; cbn.
   rewrite assoc_tl; auto; reflexivity.
 Qed.
 
 Lemma denote_no_phis : forall x,
-    denote_phis x [] ≈ Ret tt.
+    ⟦ [] ⟧Φs x ≈ Ret tt.
 Proof.
   intros.
+  cbn. go.
+  cbn; go.
   unfold denote_phis; cbn.
-  rewrite bind_ret_l; cbn.
-  rewrite bind_ret_l; cbn.
   reflexivity.
 Qed.
 
 (** [denote_block] *)
 Lemma denote_block_unfold_cont :
   forall {R} id phis c t s origin (k : _ -> itree _ R),
-    denote_block (mk_block id phis c t s) origin >>= k
-                 ≈
-    denote_phis origin phis;;
-    denote_code c;;
-    translate exp_E_to_instr_E (denote_terminator t) >>= k.
+    ⟦ mk_block id phis c t s ⟧b origin >>= k
+    ≈
+    ⟦ phis ⟧Φs origin;;
+    ⟦ c ⟧c;;
+    translate exp_to_instr ⟦ t ⟧t >>= k.
 Proof.
   intros; cbn; repeat setoid_rewrite bind_bind.
   reflexivity.
@@ -160,34 +171,33 @@ Qed.
 
 Lemma denote_block_unfold :
   forall id phis c t s origin,
-    denote_block (mk_block id phis c t s) origin
-                 ≈
-                 denote_phis origin phis;;
-    denote_code c;;
-    translate exp_E_to_instr_E (denote_terminator t). 
+    ⟦ mk_block id phis c t s ⟧b origin ≈
+    ⟦ phis ⟧Φs origin;;
+    ⟦ c ⟧c;;
+    translate exp_to_instr ⟦ t ⟧t. 
 Proof.
   intros; cbn; reflexivity.
 Qed.
 
 (** [denote_ocfg] *)
-Lemma denote_ocfg_nil: forall s, denote_ocfg [] s ≈ ret (inl s).
+Lemma denote_ocfg_nil: forall s, ⟦ [] ⟧bs s ≈ Ret (inl s).
 Proof.
   intros []; unfold denote_ocfg.
   match goal with
   | |- CategoryOps.iter (C := ktree _) ?body ?s ≈ _ =>
     rewrite (unfold_iter body s)
   end.
-  repeat (cbn; (rewrite bind_bind || rewrite bind_ret_l)).
+  cbn; go.
   reflexivity.
 Qed.
 
 Lemma denote_ocfg_unfold_in: forall bks bid_from bid_src bk,
     find_block bks bid_src = Some bk ->
-    denote_ocfg bks (bid_from, bid_src) ≈
-    vob <- denote_block bk bid_from ;;
+    ⟦ bks ⟧bs (bid_from, bid_src) ≈
+    vob <- ⟦ bk ⟧b bid_from ;;
     match vob with
-    | inr v => ret (inr v)
-    | inl bid_target => denote_ocfg bks (bid_src, bid_target)
+    | inr v => Ret (inr v)
+    | inl bid_target => ⟦ bks ⟧bs (bid_src, bid_target)
     end.
 Proof.
   intros * GET_BK.
@@ -202,7 +212,7 @@ Qed.
 
 Lemma denote_ocfg_unfold_not_in: forall bks bid_from bid_src, 
     find_block bks bid_src = None ->
-    denote_ocfg bks (bid_from, bid_src) ≈ Ret (inl (bid_from,bid_src)).
+    ⟦ bks ⟧bs (bid_from, bid_src) ≈ Ret (inl (bid_from,bid_src)).
 Proof.
   intros * GET_BK.
   unfold denote_ocfg.
@@ -230,7 +240,7 @@ Qed.
 
 Lemma denote_terminator_exits_in_outputs :
   forall term,
-    denote_terminator term ⤳ sum_pred (fun id => In id (terminator_outputs term)) TT.
+    ⟦ term ⟧t ⤳ sum_pred (fun id => In id (terminator_outputs term)) TT.
 Proof.
   intros []; cbn; try (apply raise_has_all_posts || apply eutt_Ret; cbn; eauto).
   - destruct v.  
@@ -248,7 +258,7 @@ Definition exits_in_outputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
 
 Lemma denote_bk_exits_in_outputs :
   forall b from,
-    denote_block b from ⤳ sum_pred (fun id => In id (successors b)) TT.
+    ⟦ b ⟧b from ⤳ sum_pred (fun id => In id (successors b)) TT.
 Proof.
   intros.
   cbn.
@@ -269,8 +279,8 @@ Lemma denote_ocfg_has_post_strong :
     (IND : forall fto (b : block dtyp),
         Qb fto ->
         find_block bks (snd fto) = Some b ->
-        denote_block b (fst fto) ⤳ sum_pred (fun to => Qb (snd fto, to)) Qv), 
-    denote_ocfg bks fto ⤳ sum_pred Qb Qv.
+        ⟦ b ⟧b (fst fto) ⤳ sum_pred (fun to => Qb (snd fto, to)) Qv), 
+    ⟦ bks ⟧bs fto ⤳ sum_pred Qb Qv.
 Proof.
   intros * INIT IND.
   eapply has_post_iter_strong; eauto.
@@ -292,8 +302,8 @@ Lemma denote_ocfg_has_post :
     (ENTER : In (snd fto) (inputs bks)) 
     (IND : forall fto (b : block dtyp),
         find_block bks (snd fto) = Some b ->
-        denote_block b (fst fto) ⤳ sum_pred Qb Qv),
-    denote_ocfg bks fto ⤳ sum_pred (prod_pred TT Qb) Qv.
+        ⟦ b ⟧b (fst fto) ⤳ sum_pred Qb Qv),
+    ⟦ bks ⟧bs fto ⤳ sum_pred (prod_pred TT Qb) Qv.
 Proof.
   intros * IN IND.
   apply has_post_iter_strong with (Inv := fun x => In (snd x) (inputs bks) \/ Qb (snd x))
@@ -310,12 +320,12 @@ Proof.
 Qed.  
 
 Lemma denote_ocfg_exits_in_outputs :
-  forall ocfg fto,
-    In (snd fto) (inputs ocfg) ->
-    denote_ocfg ocfg fto ⤳ exits_in_outputs ocfg.
+  forall bks fto,
+    In (snd fto) (inputs bks) ->
+    ⟦ bks ⟧bs fto ⤳ exits_in_outputs bks.
 Proof.
   intros * IN.
-  apply has_post_weaken with (P := sum_pred (prod_pred TT (fun b => In b (outputs ocfg))) TT).
+  apply has_post_weaken with (P := sum_pred (prod_pred TT (fun b => In b (outputs bks))) TT).
   2: intros [[]|] ?; cbn in *; intuition.
   apply denote_ocfg_has_post; eauto.
   intros.
@@ -331,7 +341,7 @@ Lemma denote_ocfg_app_no_edges :
   forall (bks1 bks2 : ocfg _) fto,
     find_block bks1 (snd fto) = None ->
     no_reentrance bks1 bks2 ->
-    denote_ocfg (bks1 ++ bks2) fto ≈ denote_ocfg bks2 fto.
+    ⟦ bks1 ++ bks2 ⟧bs fto ≈ ⟦ bks2 ⟧bs fto.
 Proof.
   intros bks1 bks2 [f to] FIND NOBACK.
   apply (@KTreeFacts.eutt_iter_gen _ _ _ (fun fto fto' => fto' = fto /\ find_block bks1 (snd fto) = None)); auto.
@@ -350,16 +360,15 @@ Proof.
   - apply eutt_Ret; right; auto.
 Qed.
 
-Import ITreeNotations.
 Lemma denote_ocfg_app :
   forall bks1 bks2 fto,
     no_reentrance bks1 bks2 ->
-    denote_ocfg (bks1 ++ bks2) fto ≈ ITree.bind (denote_ocfg bks1 fto)
-               (fun x =>
-                  match x with
-                  | inl fto2 => denote_ocfg bks2 fto2
-                  | inr v => ret (inr v)
-                  end).
+    ⟦ bks1 ++ bks2 ⟧bs fto ≈
+    'x <- ⟦ bks1 ⟧bs fto;;
+    match x with
+    | inl fto2 => ⟦ bks2 ⟧bs fto2
+    | inr v => Ret (inr v)
+    end.
 Proof.
   intros * NOBACK.
   revert fto.
@@ -401,8 +410,8 @@ Lemma denote_ocfg_flow_left :
   forall ocfg1 ocfg2 fto,
     independent_flows ocfg1 ocfg2 ->
     In (snd fto) (inputs ocfg1) ->
-    denote_ocfg (ocfg1 ++ ocfg2) fto ≈
-    denote_ocfg ocfg1 fto.
+    ⟦ ocfg1 ++ ocfg2 ⟧bs fto ≈
+    ⟦ ocfg1 ⟧bs fto.
 Proof.
   intros * INDEP IN.
   rewrite denote_ocfg_app; [| auto using independent_flows_no_reentrance_l].
@@ -421,8 +430,8 @@ Lemma denote_ocfg_flow_right :
   forall ocfg1 ocfg2 fto,
     independent_flows ocfg1 ocfg2 ->
     In (snd fto) (inputs ocfg2) ->
-    denote_ocfg (ocfg1 ++ ocfg2) fto ≈
-    denote_ocfg ocfg2 fto.
+    ⟦ ocfg1 ++ ocfg2 ⟧bs fto ≈
+    ⟦ ocfg2 ⟧bs fto.
 Proof.
   intros * INDEP IN.
   rewrite denote_ocfg_app; [| auto using independent_flows_no_reentrance_l].
@@ -437,13 +446,13 @@ Lemma denote_ocfg_prefix :
   forall (prefix bks' postfix bks : ocfg dtyp) (from to: block_id),
     bks = (prefix ++ bks' ++ postfix) ->
     wf_ocfg_bid bks ->
-    denote_ocfg bks (from, to) ≈
-               ITree.bind (denote_ocfg bks' (from, to))
-               (fun x => match x with
-                      | inl x => denote_ocfg bks x
-                      | inr x => ret (inr x)
-                      end
-               ).
+    ⟦ bks ⟧bs (from, to) ≈
+    'x <- ⟦ bks' ⟧bs (from, to);;
+    match x with
+    | inl x => ⟦ bks ⟧bs x
+    | inr x => Ret (inr x)
+    end
+.
 Proof.
   intros * ->; revert from to.
   einit.
