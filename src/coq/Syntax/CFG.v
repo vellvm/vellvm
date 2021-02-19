@@ -338,4 +338,6 @@ Section TLE_To_Modul.
 
 End TLE_To_Modul.
 
-Infix "@@" := (modul_app) (at level 60).
+Module CFGNotations.
+  Infix "@@" := (modul_app) (at level 60).
+End CFGNotations.

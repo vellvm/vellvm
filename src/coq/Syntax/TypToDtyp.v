@@ -15,6 +15,7 @@ From Vellvm Require Import
 
 Require Import Coqlib.
 
+Import CFGNotations.
 Import ListNotations.
 Open Scope list_scope.
 (* end hide *)
