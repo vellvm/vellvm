@@ -181,11 +181,15 @@ End InstrTactics.
 
 Import InstrTactics.
 
+(* Note: we know that we can prove that [l = l'] is always true.
+   However there is no reason to put this burden on the hypothesis, it is easier to use this way.
+   Arguably we could do the same for [g] and [m] but haven't felt the need for it so far.
+ *)
 Lemma denote_instr_load :
-  forall (i : raw_id) volatile τ τp ptr align g l m a uv,
-    ⟦ ptr at τp ⟧e3 g l m ≈ Ret3 g l m (UVALUE_Addr a) ->
+  forall (i : raw_id) volatile τ τp ptr align g l l' m a uv,
+    ⟦ ptr at τp ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) ->
     read m a τ = inr uv ->
-    ⟦ (IId i, INSTR_Load volatile τ (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g (Maps.add i uv l) m tt.
+    ⟦ (IId i, INSTR_Load volatile τ (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g (Maps.add i uv l') m tt.
 Proof.
   intros * EXP READ.
   cbn.
@@ -200,12 +204,12 @@ Proof.
 Qed.
 
 Lemma denote_instr_store :
-  forall (i : int) volatile τv val τp ptr align uv dv a g l m m',
-    ⟦ val at τv ⟧e3 g l m ≈ Ret3 g l m uv ->
-    ⟦ ptr at τp ⟧e3 g l m ≈ Ret3 g l m (UVALUE_Addr a) ->
+  forall (i : int) volatile τv val τp ptr align uv dv a g l l' l'' m m',
+    ⟦ val at τv ⟧e3 g l m ≈ Ret3 g l' m uv ->
+    ⟦ ptr at τp ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_Addr a) ->
     uvalue_to_dvalue uv = inr dv ->
     write m a dv = inr m' ->
-    ⟦ (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g l m' tt.
+    ⟦ (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g l'' m' tt.
 Proof.
   intros * EXP PTR CONV_UV WRITE.
   cbn.
@@ -228,14 +232,14 @@ Proof.
 Qed.
 
 Lemma denote_instr_store_exists :
-  forall (i : int) volatile τv val τp ptr align uv dv a g l m,
-    ⟦ val at τv ⟧e3 g l m ≈ Ret3 g l m uv ->
-    ⟦ ptr at τp ⟧e3 g l m ≈ Ret3 g l m (UVALUE_Addr a) ->
+  forall (i : int) volatile τv val τp ptr align uv dv a g l l' l'' m,
+    ⟦ val at τv ⟧e3 g l m ≈ Ret3 g l' m uv ->
+    ⟦ ptr at τp ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_Addr a) ->
     uvalue_to_dvalue uv = inr dv ->
     dvalue_has_dtyp dv τv ->
     dtyp_fits m a τv ->
     exists m',
-      write m a dv = inr m' /\ ⟦ (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g l m' tt.
+      write m a dv = inr m' /\ ⟦ (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g l'' m' tt.
 Proof.
   intros * EXP PTR CONV_UV TYP FITS.
   apply write_succeeds with (v:=dv) in FITS as [m2 WRITE]; auto.
@@ -269,9 +273,9 @@ Proof.
 Qed.
 
 Lemma denote_instr_op :
-  forall i op uv g l m,
-    ⟦ op ⟧e3 g l m ≈ Ret3 g l m uv ->
-    ⟦ (IId i, INSTR_Op op) ⟧i3 g l m ≈ Ret3 g (Maps.add i uv l) m tt.
+  forall i op uv g l l' m,
+    ⟦ op ⟧e3 g l m ≈ Ret3 g l' m uv ->
+    ⟦ (IId i, INSTR_Op op) ⟧i3 g l m ≈ Ret3 g (Maps.add i uv l') m tt.
 Proof.
   intros * OP.
   cbn.
@@ -282,10 +286,10 @@ Proof.
 Qed.
 
 Lemma denote_instr_gep_array :
-  forall i size τ e_ix ix ptr a val g l m,
-    ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l m (UVALUE_Addr a)
+  forall i size τ e_ix ix ptr a val g l l' l'' m,
+    ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a)
     ->
-    ⟦ e_ix at DTYPE_I 64 ⟧e3 g l m ≈ Ret3 g l m (UVALUE_I64 (repr (Z.of_nat ix)))
+    ⟦ e_ix at DTYPE_I 64 ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_I64 (repr (Z.of_nat ix)))
     ->
     get_array_cell m a ix τ = inr val
     ->
@@ -293,11 +297,11 @@ Lemma denote_instr_gep_array :
       read m ptr_res τ = inr val /\
       ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m
       ≈
-      Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l) m tt. 
+      Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt. 
 Proof.
   intros * PTR IX GET.
 
-  pose proof interp_cfg3_GEP_array τ a size g l m val ix GET as (ptr_res & EQ & READ).
+  pose proof interp_cfg3_GEP_array τ a size g l'' m val ix GET as (ptr_res & EQ & READ).
   exists ptr_res. split; auto.
 
   cbn.
@@ -317,10 +321,10 @@ Proof.
 Qed.
 
 Lemma denote_instr_gep_array' :
-  forall i size τ e_ix ix ptr a val g l m,
-    ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l m (UVALUE_Addr a)
+  forall i size τ e_ix ix ptr a val g l l' l'' m,
+    ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a)
     ->
-    ⟦ e_ix at DTYPE_I 64 ⟧e3 g l m ≈ Ret3 g l m (UVALUE_I64 (repr (Z.of_nat ix)))
+    ⟦ e_ix at DTYPE_I 64 ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_I64 (repr (Z.of_nat ix)))
     ->
     get_array_cell m a ix τ = inr val
     ->
@@ -329,11 +333,11 @@ Lemma denote_instr_gep_array' :
       handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat ix))] = inr ptr_res /\
       ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m
       ≈
-      Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l) m tt.
+      Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt.
 Proof.
   intros * PTR IX GET.
 
-  pose proof interp_cfg3_GEP_array' τ a size g l m val ix GET as (ptr_res & EQ & GEP & READ).
+  pose proof interp_cfg3_GEP_array' τ a size g l'' m val ix GET as (ptr_res & EQ & GEP & READ).
   exists ptr_res.
   split; auto.
   split; auto.
@@ -354,19 +358,19 @@ Proof.
 Qed.
 
 Lemma denote_instr_gep_array_no_read_addr :
-  forall i size τ e_ix ix ptr a g l m ptr_res,
-    ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l m (UVALUE_Addr a)
+  forall i size τ e_ix ix ptr a g l l' l'' m ptr_res,
+    ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a)
     ->
-    ⟦ e_ix at DTYPE_I 64 ⟧e3 g l m ≈ Ret3 g l m (UVALUE_I64 (repr (Z.of_nat ix)))
+    ⟦ e_ix at DTYPE_I 64 ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_I64 (repr (Z.of_nat ix)))
     ->
     dtyp_fits m a (DTYPE_Array size τ) ->
     handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (Int64.repr 0); DVALUE_I64 (Int64.repr (Z.of_nat ix))] = inr ptr_res ->
     ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m
     ≈
-    Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l) m tt. 
+    Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt. 
 Proof.
   intros * PTR IX FITS HGEP.
-  pose proof @interp_cfg3_GEP_array_no_read_addr τ a size g l m ix ptr_res FITS.
+  pose proof @interp_cfg3_GEP_array_no_read_addr τ a size g l'' m ix ptr_res FITS.
 
   cbn.
   go.
@@ -382,21 +386,21 @@ Proof.
 Qed.
 
 Lemma denote_instr_gep_array_no_read :
-  forall i size τ e_ix ix ptr a g l m,
-    ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l m (UVALUE_Addr a)
+  forall i size τ e_ix ix ptr a g l l' l'' m,
+    ⟦ ptr at DTYPE_Pointer ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a)
     ->
-    ⟦ e_ix at DTYPE_I 64 ⟧e3 g l m ≈ Ret3 g l m (UVALUE_I64 (repr (Z.of_nat ix)))
+    ⟦ e_ix at DTYPE_I 64 ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_I64 (repr (Z.of_nat ix)))
     ->
     dtyp_fits m a (DTYPE_Array size τ) ->
     exists ptr_res,
       handle_gep_addr (DTYPE_Array size τ) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat ix))] = inr ptr_res /\
       ⟦ (IId i, INSTR_Op (OP_GetElementPtr (DTYPE_Array size τ) (DTYPE_Pointer, ptr) [(DTYPE_I 64, EXP_Integer 0%Z); (DTYPE_I 64, e_ix)])) ⟧i3 g l m
       ≈
-      Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l) m tt.
+      Ret3 g (Maps.add i (UVALUE_Addr ptr_res) l'') m tt.
 Proof.
   intros * PTR IX FITS.
 
-  pose proof interp_cfg3_GEP_array_no_read τ a size g l m ix FITS as (ptr_res & EQ & GEP).
+  pose proof interp_cfg3_GEP_array_no_read τ a size g l'' m ix FITS as (ptr_res & EQ & GEP).
   exists ptr_res.
   split; auto.
 
@@ -452,9 +456,9 @@ Proof.
 Qed.
 
 Lemma denote_term_br_l :
-  forall (e : exp dtyp) b1 b2 g l m,
-    ⟦ e at DTYPE_I 1 ⟧e3 g l m ≈ Ret3 g l m (UVALUE_I1 one) ->
-    ⟦ TERM_Br (DTYPE_I 1%N, e) b1 b2 ⟧t3 g l m ≈ Ret3 g l m (inl b1).
+  forall (e : exp dtyp) b1 b2 g l l' m,
+    ⟦ e at DTYPE_I 1 ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_I1 one) ->
+    ⟦ TERM_Br (DTYPE_I 1%N, e) b1 b2 ⟧t3 g l m ≈ Ret3 g l' m (inl b1).
 Proof.
   intros * EXP.
   simpl.
@@ -468,9 +472,9 @@ Proof.
 Qed.
 
 Lemma denote_term_br_r :
-  forall (e : exp dtyp) b1 b2 g l m,
-    ⟦ e at DTYPE_I 1 ⟧e3 g l m ≈ Ret3 g l m (UVALUE_I1 zero) ->
-    ⟦ TERM_Br (DTYPE_I 1%N, e) b1 b2 ⟧t3 g l m ≈ Ret3 g l m (inl b2).
+  forall (e : exp dtyp) b1 b2 g l l' m,
+    ⟦ e at DTYPE_I 1 ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_I1 zero) ->
+    ⟦ TERM_Br (DTYPE_I 1%N, e) b1 b2 ⟧t3 g l m ≈ Ret3 g l' m (inl b2).
 Proof.
   intros * EXP.
   simpl.
