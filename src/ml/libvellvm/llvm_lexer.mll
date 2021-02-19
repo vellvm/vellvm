@@ -313,20 +313,18 @@ rule token = parse
   | ((label_char)+) as l ':' { LABEL l }
 
   (* identifier *)
-  | '@' { GLOBAL (raw_id lexbuf) }
-  | '%' { LOCAL (raw_id lexbuf) }
+  | '@' { GLOBAL (lexed_id lexbuf) }
+  | '%' { LOCAL  (lexed_id lexbuf) }
 
   (* FIXME: support metadata strings and struct. Parsed as identifier here. *)
   | "!{" { BANGLCURLY }
-  | '!'  { let rid = raw_id lexbuf in
+  | '!'  { let rid = lexed_id lexbuf in
            begin match rid with 
-           | LLVMAst.Name id ->
-	   let id = of_str id in
+           | ParseUtil.Named id ->
 	   (if id.[0] = '"' && id.[String.length id - 1] = '"'
                then METADATA_STRING id
-               else METADATA_ID rid)
-	   | LLVMAst.Anon _ -> METADATA_ID rid
-    	   | LLVMAst.Raw _ -> METADATA_ID rid
+               else METADATA_ID (Name (str id)))
+	   | ParseUtil.Anonymous n -> METADATA_ID (Anon (coq_of_int n))
 	   end
          }
 
@@ -355,20 +353,21 @@ and string buf = parse
   | '"'    { Buffer.contents buf }
   | _ as c { Buffer.add_char buf c; string buf lexbuf }
 
-and raw_id = parse
-  | ident_fst ident_nxt* as i { LLVMAst.Name (str i) }
-  | digit+ as i               { LLVMAst.Anon (coq_of_int (int_of_string i)) }
-  | '"'                       { LLVMAst.Name (str ("\"" ^ string (Buffer.create 10) lexbuf ^ "\"")) }
+and lexed_id = parse
+  | ident_fst ident_nxt* as i { ParseUtil.Named i }
+  | digit+ as i               { ParseUtil.Anonymous (int_of_string i) }
+  | '"'                       { ParseUtil.Named ("\"" ^ string (Buffer.create 10) lexbuf ^ "\"") }
 
 {
 
   let parsing_err lexbuf =
     let pos = Lexing.lexeme_start_p lexbuf in
     let msg =
-        Printf.sprintf "Parsing error: line %d, column %d, token '%s'"
+        Printf.sprintf "Parsing error: line %d, column %d, token '%s'\n%s"
                        pos.Lexing.pos_lnum
                        (pos.Lexing.pos_cnum - pos.Lexing.pos_bol)
                        (Lexing.lexeme lexbuf)
+		       (Printexc.get_backtrace ())
       in failwith msg
 
   let parse lexbuf =

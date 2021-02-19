@@ -184,6 +184,21 @@ Definition global_id := raw_id.
 Definition block_id := raw_id.
 Definition function_id := global_id.
 
+(* SAZ:
+   We could separate return types from types, but that needs mutually recursive types.
+   This would entail a lot of down-stream changes to the semantics, but might simplify or
+   eliminate some corner cases.
+
+   ```
+    Inductive type : Set := 
+      ...
+    with
+    rtyp : Set :=
+    | RTYPE_Void 
+    | RTYPE_Typ (t:typ)
+   ```
+*)
+
 Unset Elimination Schemes.
 Inductive typ : Set :=
 | TYPE_I (sz:N)
@@ -317,7 +332,7 @@ Variant phi : Set :=
 
 Variant instr : Set :=
 | INSTR_Comment (msg:string)
-| INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form SV (OP_ ...) *)
+| INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form (OP_ ...) *)
 | INSTR_Call (fn:texp) (args:list texp)      (* CORNER CASE: return type is void treated specially *)
 | INSTR_Alloca (t:T) (nb: option texp) (align:option int)
 | INSTR_Load  (volatile:bool) (t:T) (ptr:texp) (align:option int)

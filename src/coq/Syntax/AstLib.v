@@ -660,6 +660,31 @@ Section hiding_notation.
 
 End hiding_notation.
 
+
+(* Utility function to determine whether a typ is void or is a function type returning void. 
+   This is needed in the parser to determine whether a function call instruction should
+   generate an "anonymous" id or a "void" id.
+
+   Examples:
+      call void @f()             ; generates a void ID since @f returns void
+      call void(i32) @g(i32 3)   ; generates a void ID since @g returns void
+      call i32 @h()              ; generates an anonymous ID since @h returns non-void type
+*)
+Definition is_void_typ (t:typ) : bool :=
+  match t with
+  | TYPE_Void => true
+  | TYPE_Function TYPE_Void _ => true
+  | _ => false
+  end.
+
+Definition is_void_instr (i:instr typ) : bool :=
+  match i with
+  | INSTR_Comment _ => true
+  | INSTR_Call (t,_) _ => is_void_typ t
+  | INSTR_Store _ _ _ _ => true
+  | _ => false
+  end.
+
 (* YZ: The following code is not used currently. TODO double check if it can be removed *)
 (*
 Section WithType.

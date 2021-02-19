@@ -115,50 +115,9 @@ let is_unnamed_addr l =
 let is_externally_initialized l =
   None <> get_opt (function OPT_externally_initialized -> Some () | _ -> None) l
 
-type ctr = {get : unit -> int; reset : unit -> unit}
-  
-let mk_counter () =
-  let c = ref 0 in
-  {
-    get = (fun () -> let cnt = !c in incr c; coq_of_int cnt);
-    reset = (fun () -> c := 0);
-  }
-
-let anon_ctr = mk_counter ()
-let void_ctr = mk_counter ()             
-
-let mk_anon () = Anon (anon_ctr.get ())
-
-let raw_id_of s : raw_id =
-   match s with
-   | None -> mk_anon ()
-   | Some s -> Name (str s)
-
-let mk_raw_id (s : raw_id option) : raw_id =
-   match s with
-   | None -> mk_anon ()
-   | Some r -> r
-
-let id_of = function
-  | INSTR_Comment _
-  | INSTR_Store _
-  | INSTR_Fence
-  | INSTR_Call ((TYPE_Void, _), _)
-    -> IVoid (void_ctr.get ())
-
-  | INSTR_Op _
-  | INSTR_Call _
-  | INSTR_Alloca _
-  | INSTR_Load _
-  | INSTR_AtomicCmpXchg
-  | INSTR_AtomicRMW
-  | INSTR_VAArg
-  | INSTR_LandingPad
-    -> IId (Anon (anon_ctr.get ()))	     
-
 %}
 
-%token<LLVMAst.raw_id> GLOBAL LOCAL
+%token<ParseUtil.lexed_id> GLOBAL LOCAL
 %token LPAREN RPAREN LCURLY RCURLY LTLCURLY RCURLYGT LSQUARE RSQUARE LT GT EQ COMMA EOF EOL STAR DOTDOTDOT
 
 %token<string> STRING
@@ -415,7 +374,12 @@ toplevel_entity:
   | KW_TARGET KW_DATALAYOUT EQ s=STRING { TLE_Datalayout (str s)         }
   | KW_TARGET KW_TRIPLE EQ s=STRING     { TLE_Target (str s)             }
   | KW_SOURCE_FILENAME EQ s=STRING      { TLE_Source_filename (str s)    }
-  | i=LOCAL EQ KW_TYPE t=typ            { TLE_Type_decl (ID_Local i, t)  }
+
+  (* SAZ: It's not clear what the rules for named identifiers are.  It 
+     seems that they don't follow the "anonymous" rules of sequentiality
+     and they also seem to live in another name space.
+   *) 
+  | i=lident EQ KW_TYPE t=typ           { TLE_Type_decl (ID_Local i, t)  }
   | g=global_decl                       { TLE_Global g                   }
   | i=METADATA_ID EQ m=tle_metadata     { TLE_Metadata (i, m)            }
   | KW_ATTRIBUTES i=ATTR_GRP_ID EQ LCURLY a=fn_attr* RCURLY
@@ -441,14 +405,14 @@ metadata_value:
 
 
 global_decl:
-  | ident=GLOBAL EQ
+  | g_ident=gident EQ
     el=external_linkage
     attrs=global_attr*
     g_constant=global_is_constant
     g_typ=typ
     opt=preceded(COMMA, separated_list(csep, global_attr))?
       { let opt = match opt with Some o -> o | None -> [] in
-        { g_ident=ident;
+        { g_ident;
           g_typ;
           g_constant;
 
@@ -463,7 +427,7 @@ global_decl:
           g_section = get_section opt;
           g_align = get_align opt; } }
   
-  | ident=GLOBAL EQ
+  | g_ident=gident EQ
     g_linkage=nonexternal_linkage?
     attrs=global_attr*
     g_constant=global_is_constant
@@ -471,7 +435,7 @@ global_decl:
     gv=exp
     opt=preceded(COMMA, separated_list(csep, global_attr))?
       { let opt = match opt with Some o -> o | None -> [] in
-        { g_ident=ident;
+        { g_ident;
           g_typ;
           g_constant;
           g_exp = Some (gv g_typ);
@@ -514,94 +478,208 @@ declaration:
     df_ret_attrs=param_attr*
     df_ret_typ=typ
     name=GLOBAL
+
+    midrule( { void_ctr.reset () } )   (* reset the void counter to 0 *)
+
     LPAREN dc_args=separated_list(csep, dc_arg) RPAREN
     post_attrs=df_post_attr*
 
-    { let _ = anon_ctr.reset () in
-      let _ = void_ctr.reset () in
-      {  dc_type=TYPE_Function(df_ret_typ, List.map fst dc_args);
-         dc_param_attrs=(df_ret_attrs, List.map snd dc_args);
-         dc_name = name ;
-         dc_linkage = get_linkage pre_attrs;
-         dc_visibility = get_visibility pre_attrs;
+    { 
+      {
+	 dc_type        = TYPE_Function(df_ret_typ, List.map fst dc_args);
+         dc_param_attrs = (df_ret_attrs, List.map snd dc_args);
+         dc_name        = lexed_id_to_raw_id name ;
+         dc_linkage     = get_linkage pre_attrs;
+         dc_visibility  = get_visibility pre_attrs;
          dc_dll_storage = get_dll_storage pre_attrs;
-         dc_cconv = get_cconv pre_attrs;
-         dc_attrs = get_fn_attrs post_attrs;
-         dc_section = get_section post_attrs;
-         dc_align = get_align post_attrs;
-         dc_gc = get_gc post_attrs; }
+         dc_cconv       = get_cconv pre_attrs;
+         dc_attrs       = get_fn_attrs post_attrs;
+         dc_section     = get_section post_attrs;
+         dc_align       = get_align post_attrs;
+         dc_gc          = get_gc post_attrs;
+      }
     }
+
+
+(* Dealing with anonymous identifiers 
+
+   Each function definition in LLVM IR can have so-called "anonymous" local identifiers
+   some of which can be omitted from the concrete syntax of the program.
+
+   These identifiers are either 
+       - temporaries (a.k.a. registers) of the name %NNN, found as function arguments or 
+         on the left-hand-sides of instruction definitions, or
+       - block labels (without the '%') that are numbered
+
+   All "anonymous" identifiers, whether omitted or not, must be bound consecutively (in
+   program order).  This means that a parser for an LLVM IR function 
+   Block labels, function arguments, and local temporaries all share the same counter.
+
+   So-called "void" instructions, that _don't_ have a binding occurrence (i.e. to the left of an =)
+   but we still generate a unique identifier for them for use in the semantics.   
+*)
+
+(* Correctly parsing a CFG definition while generating / checking anonymous
+   instruction identifiers is annoying because what to do for a `call`
+   instruction depends on the type of the call.  If the function's return type
+   is "void" then no identifier is bound (and it is a syntax error to try to
+   bind an identifier).  If the function's return-type is non-void, then
+   an anonymous identifier might need to be generated / checked.
+
+   Also, since some anonymous identifiers can be omitted, we have to process
+   the whole function body and then post-process to either check of generate
+   the appropriate anonymous ids.
+*)
 
 definition:
   | KW_DEFINE
-    pre_attrs=df_pre_attr*
-    df_ret_attrs=param_attr*
-    df_ret_typ=typ
-    name=GLOBAL
-    LPAREN df_args=separated_list(csep, df_arg) RPAREN
-    post_attrs=df_post_attr* EOL*
+    pre_attrs     = df_pre_attr*
+    df_ret_attrs  = param_attr*
+    df_ret_typ    = typ
+    name          = GLOBAL
+
+    midrule( { void_ctr.reset () } )   (* reset the void counter to 0 *)
+
+    LPAREN args=separated_list(csep, df_arg) RPAREN
+
+    post_attrs   = df_post_attr* EOL*
     LCURLY EOL*
-    df_blocks=df_blocks
+    blks=df_blocks
     RCURLY
-    { let _ = anon_ctr.reset () in
-      let _ = void_ctr.reset () in
+    {
+      (* prepare to validate / generate the sequential identifiers *)
+      let _ = anon_ctr.reset ()
+      in
+
+      (* process the arg identifiers *)
+      let df_args =
+	List.map (fun (_, aopt) -> check_or_generate_id aopt) args
+      in
+
+      let process_lhs_phi (lopt, x) = (check_or_generate_id lopt, x)
+      in
+
+      let process_lhs_instr (lopt, i) =
+	if AstLib.is_void_instr i then
+	  match lopt with
+	  | None   -> (generate_void_instr_id (), i)
+	  | Some _ -> failwith "void function has defined left-hand-side"
+	else
+	  (IId (check_or_generate_id lopt), i)
+      in	
+	
+      let process_block (lopt, (phis, instrs), blk_term) =
+	  let blk_id   = check_or_generate_label lopt in
+	  let blk_phis = List.map process_lhs_phi phis in
+	  let blk_code = List.map process_lhs_instr instrs in
+	  { blk_id; blk_phis; blk_code; blk_term; blk_comments = None }
+      in
+
+      let blocks = List.map process_block blks
+      in
+      let df_instrs =
+	match blocks with
+	| [] -> failwith "illegal LLVM function definition: must have non-empty entry block"
+	| entry::body -> (entry, body)
+      in
       { df_prototype = {
-          dc_type = TYPE_Function (df_ret_typ,
-                                   List.map (fun x -> fst (fst x)) df_args) ;
+          dc_type = TYPE_Function (df_ret_typ, 
+                                   List.map (fun x -> fst (fst x)) args) ;
           dc_param_attrs = (df_ret_attrs,
-                           List.map (fun x -> snd (fst x)) df_args) ;
-          dc_name=name ;
-	  dc_linkage = get_linkage pre_attrs;
-          dc_visibility = get_visibility pre_attrs;
+                           List.map (fun x -> snd (fst x)) args) ;
+          dc_name        = lexed_id_to_raw_id name;
+	  dc_linkage     = get_linkage pre_attrs;
+          dc_visibility  = get_visibility pre_attrs;
           dc_dll_storage = get_dll_storage pre_attrs;
-          dc_cconv = get_cconv pre_attrs;
-          dc_attrs = get_fn_attrs post_attrs;
-          dc_section = get_section post_attrs;
-          dc_align = get_align post_attrs;
-          dc_gc = get_gc post_attrs;
+          dc_cconv       = get_cconv pre_attrs;
+          dc_attrs       = get_fn_attrs post_attrs;
+          dc_section     = get_section post_attrs;
+          dc_align       = get_align post_attrs;
+          dc_gc          = get_gc post_attrs;
 	  } ;
-        df_args=List.map (fun x -> mk_raw_id (snd x)) df_args;
-        df_instrs=df_blocks;
-
-        } }
-
-body_list:
-  | /* empty */  { ([], []) }  
-  | id=lident EQ p=phi EOL+ bl=body_list { let (ps,ins) = bl in ((Some id, p)::ps, ins) }
-
-  | p=phi EOL+ bl=body_list { let (ps, ins) = bl in ((None, p)::ps, ins) }
-
-  | id=lident EQ inst=instr EOL+ bl=body_list { let (ps, ins) = bl in (ps, (Some id, inst)::ins) }
-
-  | inst=instr EOL+ bl=body_list {let (ps, ins) = bl in (ps, (None, inst)::ins) }
-  
-block:
-  lbl=terminated(LABEL, EOL+)?
-  bl=body_list
-  term=terminated(terminator, EOL+)
-  { (lbl, fst bl, snd bl, term) }
-  
-df_blocks: 
-  | bs=block+
-    { 
-      let blks = List.map (fun (lbl, phis, body, term) ->
-                let l = raw_id_of lbl 
-		in let blk_phis = List.map (fun (id, phi) ->
-		                  (mk_raw_id id, phi))
-		       phis
-                in let blk_code = List.map (fun (id, inst) ->
-                                    match id with 
-                                    | None -> (id_of inst, inst)
-                                    | Some s -> (IId s, inst))
-                       body
-                in
-                {blk_id = l; blk_phis; blk_code; blk_term = term; blk_comments=None})
-       bs
-      in begin match blks with
-	 | [] -> failwith "illegal LLVM function definition: must have non-empty entry block"
-	 | entry::rest -> (entry, rest)
-	 end
+        df_args;
+        df_instrs;
+      }
     }
+
+(*
+      begin match blks with
+      | [] -> failwith "illegal LLVM function definition: must have non-empty entry block"
+      | entry::rest -> (entry, rest)
+      end
+    }
+*)
+
+
+(* An instruction lhs might have a declared identifier, which can be either
+"anonymous" (i.e. of the form %N where N is a number is sequence order or %x,
+where x is a string.  At this stage, an omitted lhs is parsed as None.  We
+post-process such omitted lhs later to generate the sequence number.  An
+"anonymous" (a.k.a.  sequential, possibly implicit identifier) might not be
+omitted, in which case we have to check that it is indeed the correct number.
+The post-processing takes place after the whole cfg has been parsed as part of
+the declatation parser production.
+
+SAZ: I would prefer the terminology "sequential, possibly implicit identifiers"
+to "anonymous". 
+*)
+
+%inline
+instr_lhs:
+  | /* empty */
+    { None   }   
+
+  | l=bound_lident EQ
+    { Some l }   
+
+(* A block label behaves like the lhs of an instruction (except, strangely, it
+  isn't written with a leading % except when used as a label value in a
+  terminator).  Block labels can be omitted, just like a lhs, and they are
+  post-processed in the same pass since they use the same sequence counter.
+*)
+%inline
+block_label:
+  | /* empty */
+    { None }
+
+  | lbl=LABEL EOL*
+    { Some lbl }
+
+
+block_phis_and_instrs:
+  | /* empty */   { ([], []) }
+
+  | id_opt=instr_lhs p=phi EOL+ bl=block_phis_and_instrs
+    { let (phis, instrs) = bl in ((id_opt, p)::phis, instrs) }
+
+  | id_opt=instr_lhs inst=instr EOL+ ins=block_instrs
+    { ([], (id_opt, inst)::ins) }
+
+block_instrs:
+  | /* empty */  { [] }
+
+  | id_opt=instr_lhs inst=instr EOL+ ins=block_instrs
+    {  (id_opt, inst)::ins }
+
+%inline phi:
+  | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry)
+    { Phi (t, List.map (fun (l,v) -> (l, v t)) table)}
+
+phi_table_entry:
+  | LSQUARE v=exp COMMA l=lident RSQUARE { (l, v) }
+
+block:
+  blk_id   = block_label 
+  body     = block_phis_and_instrs
+  blk_term = terminated(terminator, EOL+)
+    {
+	(blk_id, body, blk_term)
+    }
+
+
+df_blocks: 
+  | blks=block+
+    { blks }
 
 df_pre_attr:
   | a=linkage                            { OPT_linkage a     }
@@ -672,12 +750,12 @@ typ:
   | KW_METADATA                                       { TYPE_Metadata         }
   | KW_X86_MMX                                        { TYPE_X86_mmx          }
   | t=typ STAR                                        { TYPE_Pointer t        }
-  | LSQUARE n=INTEGER KW_X t=typ RSQUARE              { TYPE_Array (n_of_z n, t)     }
+  | LSQUARE n=INTEGER KW_X t=typ RSQUARE              { TYPE_Array (n_of_z n, t)  }
   | t=typ LPAREN ts=separated_list(csep, typ) RPAREN  { TYPE_Function (t, ts) }
   | LCURLY ts=separated_list(csep, typ) RCURLY        { TYPE_Struct ts        }
   | LTLCURLY ts=separated_list(csep, typ) RCURLYGT    { TYPE_Packed_struct ts }
   | KW_OPAQUE                                         { TYPE_Opaque           }
-  | LT n=INTEGER KW_X t=typ GT                        { TYPE_Vector (n_of_z n, t)    }
+  | LT n=INTEGER KW_X t=typ GT                        { TYPE_Vector (n_of_z n, t) }
   | l=lident                                          { TYPE_Identified (ID_Local l)  }
 
 param_attr:
@@ -705,8 +783,8 @@ dc_arg:
   | t=typ p=param_attr* lident  { (t, p) }  (* Throw away declaration names? *)
 
 df_arg:
- | t=typ p=param_attr*          { ((t, p), None)   }
- | t=typ p=param_attr* i=lident { ((t, p), Some i) }
+ | t=typ p=param_attr*                { ((t, p), None)   }  (* Later generate anonymous label *)
+ | t=typ p=param_attr* l=bound_lident { ((t, p), Some l) }  (* Later validate anonymous or use name *)
 
 call_arg: t=typ i=exp             { (t, i t)      }
 
@@ -773,11 +851,13 @@ align: KW_ALIGN p=INTEGER { p }
 
 section: KW_SECTION s=STRING { s }
 
+%inline
 ibinop_nuw_nsw_opt: (* may appear with `nuw`/`nsw` keywords *)
   | KW_ADD { fun nuw nsw -> Add (nuw, nsw) }
   | KW_SUB { fun nuw nsw -> Sub (nuw, nsw) }
   | KW_MUL { fun nuw nsw -> Mul (nuw, nsw) }
   | KW_SHL { fun nuw nsw -> Shl (nuw, nsw) }
+
 
 ibinop_exact_opt: (* may appear with `exact` keyword *)
   | KW_UDIV { fun exact -> UDiv exact }
@@ -786,22 +866,56 @@ ibinop_exact_opt: (* may appear with `exact` keyword *)
   | KW_ASHR { fun exact -> AShr exact }
 
 ibinop_no_opt: (* can not appear with any keyword *)
-  |KW_UREM{URem}|KW_SREM{SRem}|KW_AND{And}|KW_OR{Or}|KW_XOR{Xor}
+  | KW_UREM { URem }
+  | KW_SREM { SRem }
+  | KW_AND  { And  }
+  | KW_OR   { Or   }
+  | KW_XOR  { Xor  }
 
 icmp:
-  |KW_EQ{Eq}|KW_NE{Ne}|KW_UGT{Ugt}|KW_UGE{Uge} |KW_ULT{Ult}|KW_ULE{Ule}
-  |KW_SGT{Sgt}|KW_SGE{Sge}|KW_SLT{Slt}|KW_SLE{Sle}
+  | KW_EQ  { Eq  }
+  | KW_NE  { Ne  }
+  | KW_UGT { Ugt }
+  | KW_UGE { Uge }
+  | KW_ULT { Ult }
+  | KW_ULE { Ule }
+  | KW_SGT { Sgt }
+  | KW_SGE { Sge }
+  | KW_SLT { Slt }
+  | KW_SLE { Sle }
+
 
 fcmp:
-  KW_FALSE{FFalse}|KW_OEQ{FOeq}|KW_OGT{FOgt}|KW_OGE{FOge}|KW_OLT{FOlt}|KW_OLE{FOle}
-  |KW_ONE{FOne}|KW_ORD{FOrd}|KW_UNO{FUno}|KW_UEQ{FUeq}|KW_UGT{FUgt}|KW_UGE{FUge}
-  |KW_ULT{FUlt}|KW_ULE{FUle}|KW_UNE{FUne}|KW_TRUE{FTrue}
+  | KW_FALSE { FFalse }
+  | KW_OEQ   { FOeq   }
+  | KW_OGT   { FOgt   }
+  | KW_OGE   { FOge   }
+  | KW_OLT   { FOlt   }
+  | KW_OLE   { FOle   }
+  | KW_ONE   { FOne   }
+  | KW_ORD   { FOrd   }
+  | KW_UNO   { FUno   }
+  | KW_UEQ   { FUeq   }
+  | KW_UGT   { FUgt   }
+  | KW_UGE   { FUge   }
+  | KW_ULT   { FUlt   }
+  | KW_ULE   { FUle   }
+  | KW_UNE   { FUne   }
+  | KW_TRUE  { FTrue  }
 
 conversion:
-  |KW_TRUNC{Trunc}|KW_ZEXT{Zext}|KW_SEXT{Sext}|KW_FPTRUNC{Fptrunc}
-  |KW_FPEXT{Fpext}|KW_UITOFP{Uitofp}|KW_SITOFP{Sitofp}|KW_FPTOUI{Fptoui}
-  |KW_FPTOSI{Fptosi}|KW_INTTOPTR{Inttoptr}|KW_PTRTOINT{Ptrtoint}
-  |KW_BITCAST{Bitcast}
+  | KW_TRUNC    { Trunc    }
+  | KW_ZEXT     { Zext     }
+  | KW_SEXT     { Sext     }
+  | KW_FPTRUNC  { Fptrunc  }
+  | KW_FPEXT    { Fpext    }
+  | KW_UITOFP   { Uitofp   }
+  | KW_SITOFP   { Sitofp   }
+  | KW_FPTOUI   { Fptoui   }
+  | KW_FPTOSI   { Fptosi   }
+  | KW_INTTOPTR { Inttoptr }
+  | KW_PTRTOINT { Ptrtoint }
+  | KW_BITCAST  { Bitcast  }
 
 ibinop:
   | op=ibinop_nuw_nsw_opt nuw=KW_NUW? nsw=KW_NSW?
@@ -810,10 +924,18 @@ ibinop:
   | op=ibinop_no_opt { op }
 
 fbinop:
-  KW_FADD{FAdd}|KW_FSUB{FSub}|KW_FMUL{FMul}|KW_FDIV{FDiv}|KW_FREM{FRem}
+  | KW_FADD { FAdd }
+  | KW_FSUB { FSub }
+  | KW_FMUL { FMul }
+  | KW_FDIV { FDiv }
+  | KW_FREM { FRem }
 
 fast_math:
-  KW_NNAN{Nnan}|KW_NINF{Ninf}|KW_NSZ{Nsz}|KW_ARCP{Arcp}|KW_FAST{Fast}
+  | KW_NNAN { Nnan }
+  | KW_NINF { Ninf }
+  | KW_NSZ  { Nsz  }
+  | KW_ARCP { Arcp }
+  | KW_FAST { Fast }
 
 instr_op:
   | op=ibinop t=typ o1=exp COMMA o2=exp
@@ -920,13 +1042,6 @@ expr_val:
 exp:
   | eo=expr_op { fun _ -> eo }
   | ev=expr_val { ev }
-
-%inline phi:
-  | KW_PHI t=typ table=separated_nonempty_list(csep, phi_table_entry)
-    { Phi (t, List.map (fun (l,v) -> (l, v t)) table)}
-
-phi_table_entry:
-  | LSQUARE v=exp COMMA l=lident RSQUARE { (l, v) }
   
 %inline instr:
   | eo=instr_op { INSTR_Op eo }
@@ -956,7 +1071,7 @@ phi_table_entry:
 
 
 branch_label:
-  KW_LABEL o=LOCAL  { o }
+  KW_LABEL o=LOCAL  { lexed_id_to_raw_id o }
   
 terminator:  
   | KW_RET tv=texp
@@ -1002,17 +1117,21 @@ switch_table_entry:
 csep:
   COMMA EOL* { () }
 
+
 lident:
+  | l=LOCAL  { (lexed_id_to_raw_id l) }
+
+bound_lident:
   | l=LOCAL  { l }
 
 gident:
-  | g=GLOBAL  { g }
+  | g=GLOBAL  { (lexed_id_to_raw_id g) }
 
 ident:
-  | l=gident  { ID_Global l }
-  | l=lident  { ID_Local l  }
+  | g=gident  { ID_Global g }
+  | l=lident  { ID_Local  l }
 
-texp: t=typ v=exp { (t, v t) }
+texp:   t=typ v=exp { (t, v t) }
 tconst: t=typ c=exp { (t, c t) }
 tident: t=typ i=ident { (t, i) }
 

@@ -8,7 +8,6 @@ let n_to_int = Camlcoq.N.to_int
 
 let n_of_z z = Camlcoq.N.of_int64 (Camlcoq.Z.to_int64 z)
 
-
 let byte_to_i8 (b:char) =
   (LLVMAst.TYPE_I (n_of_z (coq_of_int 8)), LLVMAst.EXP_Integer (coq_of_int (int_of_char b)))
 
@@ -114,8 +113,10 @@ let to_hex_digits (c : char) : char * char =
    (Char.code c) < 32 || (Char.code c) >= 127
  *)
 let escape_char (c:char) : char list =
-  if (Char.code c) < 32 || (Char.code c) >= 127 then
-    let (u,l) = to_hex_digits c in [u;l]
+  let code = Char.code c in 
+  if (code < 32) || (code >= 127) || code = 34 then
+    let (u,l) = to_hex_digits c in ['\\';u;l]
+  else if code = 92 then ['\\';'\\']
   else [c]
 
 let escape (str : char list) : char list =
@@ -151,4 +152,66 @@ let string_of_Z =
 
 let float_of_coqfloat = Camlcoq.camlfloat_of_coqfloat
 
+
+(*  ------------------------------------------------------------------------- *)
+(* Dealing with anonymous LLVM locals / block identifiers *)
+
+type lexed_id =
+  | Anonymous of int
+  | Named of string
+
+exception InvalidAnonymousId of string
+
+type ctr = {peek : unit -> int ; get : unit -> int; reset : unit -> unit}
+let mk_counter () =
+  let c = ref 0 in
+  { peek = (fun () -> !c);
+    get = (fun () -> let cnt = !c in incr c; cnt);
+    reset = (fun () -> c := 0);
+  }
+
+let anon_ctr = mk_counter ()
+let void_ctr = mk_counter ()             
+
+let generate_anon_raw_id () : LLVMAst.raw_id =
+  (* (Printf.fprintf stderr "gnerate_anon_raw_id = %d" (anon_ctr.peek ())); *)
+  LLVMAst.Anon (coq_of_int (anon_ctr.get ()))
+
+let generate_void_instr_id () : LLVMAst.instr_id =
+  LLVMAst.IVoid (coq_of_int (void_ctr.get ()))
+
+let validate_declared_int n =
+  let expected = anon_ctr.get () in
+  if expected = n
+  then (LLVMAst.Anon (coq_of_int n))
+  else
+    let msg = Printf.sprintf "Unexpected sequential id: expected %n but found %n" expected n in
+    raise (InvalidAnonymousId msg)
+
+let validate_bound_lexed_id (r : lexed_id) : LLVMAst.raw_id =
+  match r with
+  | Anonymous n -> validate_declared_int n
+  | Named s     -> LLVMAst.Name (str s)  (* named identifiers are always OK *)
+
+let validate_label (l : string) : LLVMAst.raw_id =
+  try
+    let n = int_of_string l in
+    validate_declared_int n
+  with
+  | Failure _ -> LLVMAst.Name (str l)
+
+let check_or_generate_label (lo : string option) : LLVMAst.raw_id =
+  match lo with
+  | None   -> generate_anon_raw_id ()
+  | Some l -> validate_label l
+
+let check_or_generate_id (lo : lexed_id option) : LLVMAst.raw_id =
+  match lo with
+  | None   -> generate_anon_raw_id ()
+  | Some l -> validate_bound_lexed_id l
+
+let lexed_id_to_raw_id (r : lexed_id) : LLVMAst.raw_id =
+  match r with
+  | Anonymous n -> LLVMAst.Anon (coq_of_int n)
+  | Named s -> LLVMAst.Name (str s)  (* named identifiers are always OK *)
 

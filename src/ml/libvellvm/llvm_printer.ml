@@ -154,7 +154,7 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
 and str_of_raw_id : LLVMAst.raw_id -> string =
     function
     | Anon i -> Printf.sprintf "%d" (to_int i)
-    | Name s -> (of_str s)
+    | Name s -> Printf.sprintf "%s" (of_str s)
     | Raw i -> Printf.sprintf "_RAW_%d" (to_int i)
 
 and lident : Format.formatter -> LLVMAst.local_id -> unit =
