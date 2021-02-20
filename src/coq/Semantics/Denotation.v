@@ -753,10 +753,30 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | (_, INSTR_AtomicCmpXchg)
         | (_, INSTR_AtomicRMW)
         | (_, INSTR_VAArg)
-        | (_, INSTR_LandingPad) => raise "Unsupported itree instruction"
+        | (_, INSTR_LandingPad) => raise "Unsupported VIR instruction"
 
         (* Error states *)
         | (_, _) => raise "ID / Instr mismatch void/non-void"
+        end.
+
+      (* Computes the label to be returned by a switch terminator, after evaluation of values
+         assuming already neither poison nor undef for the selector *)
+      Fixpoint select_switch
+               (value : dvalue) (default_dest : block_id)
+               (switches : list (dvalue * block_id)) : err block_id :=
+        match switches with
+        | [] => ret default_dest
+        | (v,id):: switches =>
+          match value, v with
+          | DVALUE_I1 i1, DVALUE_I1 i2    
+          | DVALUE_I8 i1, DVALUE_I8 i2   
+          | DVALUE_I32 i1, DVALUE_I32 i2
+          | DVALUE_I64 i1, DVALUE_I64 i2
+            => if cmp Ceq i1 i2
+              then ret id
+              else select_switch value default_dest switches
+          | _,_ => failwith "Ill-typed switch."
+          end
         end.
 
       (* A [terminator] either returns from a function call, producing a [dvalue],
@@ -766,21 +786,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         | TERM_Ret (dt, op) =>
           dv <- denote_exp (Some dt) op ;;
-             (* YZ : Hesitant between three options.
-                1. emit the pop events here and return the dvalue (current choice);
-                2. introduce a Return event that would be handled at the same time as Call and do it;
-                3. mix of both: can return the dynamic value and have no Ret event, but pop in denote_mcfg
-              *)
-          (* trigger LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
           ret (inr dv)
 
         | TERM_Ret_void =>
-          (* trigger LocalPop;;  *) (* TODO: actually done in denote_mcfg. Remove after validation *)
           ret (inr UVALUE_None)
 
         | TERM_Br (dt,op) br1 br2 =>
           uv <- denote_exp (Some dt) op ;;
-          dv <- concretize_or_pick uv True ;; (* TODO, should this be unique? *)
+          dv <- concretize_or_pick uv True ;; 
           match dv with
           | DVALUE_I1 comparison_bit =>
             if equ comparison_bit one then
@@ -793,10 +806,22 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         | TERM_Br_1 br => ret (inl br)
 
+        | TERM_Switch (dt,e) default_br dests =>
+          uselector <- denote_exp (Some dt) e;;
+          (* Selection on [undef] is UB *)
+          selector <- pickUnique uselector;;
+          match selector with
+          | DVALUE_Poison => raiseUB "Switching on poison."
+          | _ => (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
+            switches <- map_monad
+                         (fun '((t,e),id) => us <- denote_exp (Some t) e;; s <- pickUnique us;; ret (s,id))
+                         dests;;
+            lift_err (fun b => ret (inl b)) (select_switch selector default_br switches)
+          end
 
-        | TERM_Unreachable => raise "IMPOSSIBLE: unreachable in reachable position" (* SAZ : TODO should be Undefined Behavior? *)
-        (* Currently unhandled itree terminators *)
-        | TERM_Switch _ _ _
+        | TERM_Unreachable => raiseUB "IMPOSSIBLE: unreachable in reachable position" 
+
+        (* Currently unhandled VIR terminators *)
         | TERM_IndirectBr _ _
         | TERM_Resume _
         | TERM_Invoke _ _ _ _ => raise "Unsupport itree terminator"

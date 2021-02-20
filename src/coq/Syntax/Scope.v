@@ -56,8 +56,6 @@ Section LABELS_OPERATIONS.
        | TERM_IndirectBr v brs => brs
        | TERM_Resume v => []
        | TERM_Invoke fnptrval args to_label unwind_label => [to_label; unwind_label]
-
-       (** VV: Merging the unreachable constructor, should do nothing? *)
        | TERM_Unreachable => []
        end.
 
