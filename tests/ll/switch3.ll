@@ -1,19 +1,17 @@
-@val = constant i32 2
-
 define i64 @main(i64 %argc, i8** %arcv) {
 
   ; Implement a jump table:
-  switch i32 @val, label %otherwise [ i32 0, label %onzero
+  switch i32 2, label %otherwise [ i32 0, label %onzero
                                       i32 1, label %onone
                                       i32 2, label %ontwo ]
+
+onzero:
+  unreachable
 
 onone:
   unreachable
 
 ontwo:
-  unreachable
-
-onthree:
   ret i64 0
 
 }
