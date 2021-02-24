@@ -1025,7 +1025,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     Record ext_memory (m1 : memory_stack) (a : addr) (τ : dtyp) (v : uvalue) (m2 : memory_stack) : Prop :=
       {
-      new_lu  : read m2 a τ = inr v;
+      (* TODO: might want to extend this so if the size is 0 I know
+               what the value of read is... *)
+      new_lu  : sizeof_dtyp τ <> 0%N -> read m2 a τ = inr v;
       old_lu  : forall a' τ', allocated a' m1 ->
                          no_overlap_dtyp a τ a' τ' ->
                          read m2 a' τ' = read m1 a' τ'

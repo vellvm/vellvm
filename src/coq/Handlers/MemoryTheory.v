@@ -86,6 +86,13 @@ Section Map_Theory.
     rewrite Nnat.N2Nat.inj_succ; auto.
   Qed.
 
+  Lemma Zseq_succ_nat : forall off (n : nat),
+      Zseq off (S n) = off :: Zseq (Z.succ off) n.
+  Proof.
+    intros off n.
+    auto.
+  Qed.
+
   Lemma key_in_range_or_not_aux {a} : forall (k z : Z) (l : list a),
       {z <= k <= z + Zlength l - 1} + {k < z} + {k >= z + Zlength l}.
   Proof.
@@ -1867,15 +1874,56 @@ Section Memory_Stack_Theory.
         contradiction.
     Qed.
 
+    Lemma lookup_init_block_undef :
+      forall n,
+        lookup 0 (init_block_undef n empty) = Some SUndef.
+    Proof.
+      induction n; auto.
+      cbn.
+      rewrite lookup_add_ineq; [|lia].
+      auto.
+    Qed.
+
+    Lemma lookup_init_block :
+      forall n,
+        (n > 0)%N ->
+        lookup 0 (init_block n) = Some SUndef.
+    Proof.
+      intros n SZ.
+      pose proof Nnat.N2Nat.id n.
+      induction (N.of_nat (N.to_nat n)); [lia|].
+      subst.
+      cbn.
+      apply lookup_init_block_undef.
+    Qed.
+
+    Lemma all_not_sundef_init :
+      forall n,
+        (n > 0)%N ->
+        all_not_sundef (lookup_all_index 0 n (init_block n) SUndef) = false.
+    Proof.
+      destruct n; intros SZ.
+      inv SZ.
+      cbn.
+
+      pose proof Pos2Nat.is_succ p as [n PN].
+      rewrite PN.
+      cbn.
+
+      rewrite lookup_init_block_undef.
+      reflexivity.
+    Qed.
+
     (* This is false for VOID, and 0 length arrays *)
     Lemma read_empty_block : forall τ,
+        (sizeof_dtyp τ > 0)%N ->
         read_in_mem_block (make_empty_mem_block τ) 0 τ = UVALUE_Undef τ.
     Proof.
       unfold read_in_mem_block.
       unfold make_empty_mem_block.
       unfold deserialize_sbytes.
-      intros τ. induction τ.
-    Admitted.
+      intros τ. induction τ; intros SZ; try solve [reflexivity | cbn in SZ; inv SZ | rewrite all_not_sundef_init; auto].
+    Qed.
 
     (* CB TODO: Figure out where these predicates should live, or figure
        out how to get rid of them. Currently not using some of these... *)
@@ -1976,10 +2024,13 @@ Section Memory_Stack_Theory.
       - split.
         + cbn. apply next_logical_key_fresh.
         + { split.
-            + unfold read; cbn.
+            + intros SIZE.
+              unfold read; cbn.
               unfold get_logical_block, get_logical_block_mem; cbn.
               rewrite lookup_add_eq; cbn.
+              unfold non_void in NV.
               f_equal; apply read_empty_block.
+              lia.
             + intros * ALLOC NOVER.
               unfold read; cbn.
               unfold get_logical_block, get_logical_block_mem; cbn.
@@ -1998,10 +2049,12 @@ Section Memory_Stack_Theory.
       - split.
         + cbn. apply next_logical_key_fresh.
         + { split.
-            + unfold read; cbn.
+            + intros SIZE.
+              unfold read; cbn.
               unfold get_logical_block, get_logical_block_mem; cbn.
               rewrite lookup_add_eq; cbn.
               f_equal; apply read_empty_block.
+              lia.
             + intros * ALLOC NOVER.
               unfold read; cbn.
               unfold get_logical_block, get_logical_block_mem; cbn.
