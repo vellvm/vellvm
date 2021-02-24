@@ -35,7 +35,7 @@ COQFILESOPT    := Transformations/Transform
 OLLVMFILES :=
 
 VFILES  := $(COQFILESINTERP:%=coq/%.v) $(COQFILESTHEORY:%=coq/%.v) $(COQFILESOPT:%=coq/%.v)
-VOFILES := $(COQFILESINTERP:%=coq/%.vo) $(COQFILESOPT:%=coq/%.vo)
+VOFILES := $(COQFILESINTERP:%=coq/%.vo) $(COQFILESTHEORY:%=coq/%.vo) $(COQFILESOPT:%=coq/%.vo)
 
 all:
 	@test -f .depend || $(MAKE) depend
