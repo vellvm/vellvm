@@ -46,10 +46,10 @@ Definition raw_id_in := in_dec raw_id_eq_dec.
 
 Infix "∈" := (set_mem raw_id_eq_dec) (at level 70).
 
-Fixpoint remove_block {T} (G : ocfg T) (bk : block T) : ocfg T :=
+Fixpoint remove_block {T} (G : ocfg T) (b : block_id) : ocfg T :=
   match G with
   | [] => []
-  | bk' :: G => if Eqv.eqv_dec bk.(blk_id) bk'.(blk_id) then G else bk':: remove_block G bk
+  | bk :: G => if Eqv.eqv_dec b bk.(blk_id) then G else bk:: remove_block G b
   end.
 
 Infix "∖" := remove_block.
@@ -123,7 +123,7 @@ Section LoopFusion.
         | Some bk_t =>
         (* And if [bk_s] is the only predecessor of this block *)
           if andb (Eqv.neg_eqv_dec b_t bk_s.(blk_id)) (andb (length (predecessors b_t G) =? 1) (has_no_phi bk_t))
-          then (fusion_blocks bk_s bk_t) :: ((G ∖ bk_s) ∖ bk_t)
+          then (fusion_blocks bk_s bk_t) :: ((G ∖ bk_s.(blk_id)) ∖ b_t)
           else fusion_block_aux G bks
         | None => fusion_block_aux G bks
         end
@@ -182,6 +182,7 @@ Section LoopFusionCorrect.
         find_block G f1 = Some b1 /\
         blk_term b1 = TERM_Br_1 f2 /\
         find_block G f2 = Some b2 /\
+        (forall b, In f2 (successors b) -> b = b1) /\
         has_no_phi b2 = true /\
         find_block (fusion_block G) f1 = Some (fusion_blocks b1 b2) /\
         find_block (fusion_block G) f2 = None /\
@@ -221,23 +222,161 @@ Qed.
 
 Arguments denote_phis: simpl never.
 
+Import ITreeNotations.
+Lemma denote_ocfg_unfold_in_euttge: forall bks bid_from bid_src bk,
+    find_block bks bid_src = Some bk ->
+    ⟦ bks ⟧bs (bid_from, bid_src) ≳
+    vob <- ⟦ bk ⟧b bid_from ;;
+    match vob with
+    | inr v => Ret (inr v)
+    | inl bid_target => ⟦ bks ⟧bs (bid_src, bid_target)
+    end.
+Proof.
+  intros * GET_BK.
+  cbn. unfold denote_ocfg at 1.
+  rewrite KTreeFacts.unfold_iter_ktree. cbn.
+  rewrite GET_BK.
+  repeat setoid_rewrite bind_bind.
+  repeat (eapply eqit_bind; [intros ? |reflexivity]).
+  break_sum; rewrite bind_ret_l; [|reflexivity].
+  rewrite tau_euttge; reflexivity.
+Qed.
+
+Lemma denote_ocfg_unfold_in_eq_itree: forall bks bid_from bid_src bk,
+    find_block bks bid_src = Some bk ->
+    ⟦ bks ⟧bs (bid_from, bid_src) ≅
+    vob <- ⟦ bk ⟧b bid_from ;;
+    match vob with
+    | inr v => Ret (inr v)
+    | inl bid_target => Tau (⟦ bks ⟧bs (bid_src, bid_target))
+    end.
+Proof.
+  intros * GET_BK.
+  cbn. unfold denote_ocfg at 1.
+  rewrite KTreeFacts.unfold_iter_ktree. cbn.
+  rewrite GET_BK.
+  repeat setoid_rewrite bind_bind.
+  repeat (eapply eqit_bind; [intros ? |reflexivity]).
+  break_sum; rewrite bind_ret_l; [|reflexivity].
+  apply eqit_Tau.
+  reflexivity.
+Qed.
+
+Lemma denote_ocfg_unfold_not_in_eq_itree: forall bks bid_from bid_src,
+    find_block bks bid_src = None ->
+    ⟦ bks ⟧bs (bid_from, bid_src) ≅ Ret (inl (bid_from,bid_src)).
+Proof.
+  intros * GET_BK.
+  unfold denote_ocfg.
+  rewrite KTreeFacts.unfold_iter_ktree.
+  rewrite GET_BK; cbn.
+  rewrite bind_ret_l.
+  reflexivity.
+Qed.
+
+Lemma denote_ocfg_unfold_eq_itree: forall bks bid_from bid_src,
+    ⟦ bks ⟧bs (bid_from, bid_src) ≅
+    match find_block bks bid_src with
+    | Some bk => vob <- ⟦ bk ⟧b bid_from ;;
+                match vob with
+                | inr v => Ret (inr v)
+                | inl bid_target => Tau (⟦ bks ⟧bs (bid_src, bid_target))
+                end
+    | None => Ret (inl (bid_from,bid_src))
+    end.
+Proof.
+  intros *.
+  break_match_goal.
+  - rewrite denote_ocfg_unfold_in_eq_itree; eauto; reflexivity.
+  - rewrite denote_ocfg_unfold_not_in_eq_itree; eauto; reflexivity.
+Qed.
+
+Require Import Paco.paco.
+
+Lemma has_post_eq_itree_aux : forall {E X} (t : itree E X) (Q : X -> Prop),
+    has_post_strong t Q ->
+    eq_itree (fun 'x y => x = y /\ Q x) t t.
+Proof.
+  intros.
+  unfold has_post_strong in *.
+  rewrite itree_eta in *.
+  genobs t ot.
+  revert t ot H Heqot.
+  ginit.
+  gcofix CIH.
+  intros.
+  pose proof H0 as EQ.
+  punfold H0.
+  red in H0. cbn in H0.
+  subst ot.
+  induction H0.
+  - gstep; constructor; intuition; subst; auto.
+  - gstep; constructor.
+    rewrite itree_eta.
+    gbase.
+    eapply CIH; eauto.
+    rewrite <- tau_eutt at 1 2.
+    rewrite (itree_eta m2) in EQ.
+    apply EQ.
+  - gstep. constructor.
+    intros; red.
+    rewrite (itree_eta (k2 v)).
+    gbase.
+    eapply CIH; eauto.
+    unfold eutt in EQ; rewrite <- eqit_Vis in EQ.
+    specialize (EQ v).
+    rewrite (itree_eta (k2 v)) in EQ.
+    apply EQ.
+  - apply IHeqitF; auto.
+  - gstep; constructor.
+    rewrite itree_eta.
+    gbase.
+    eapply CIH; eauto.
+    rewrite <- tau_eutt at 1 2.
+    rewrite (itree_eta t2) in EQ.
+    apply EQ.
+Qed.
+
+Lemma has_post_eq_itree : forall {E X} (t : itree E X) (Q : X -> Prop),
+    has_post t Q ->
+    eq_itree (fun 'x y => x = y /\ Q x) t t.
+Proof.
+  intros; apply has_post_post_strong in H; apply has_post_eq_itree_aux; auto.
+Qed.
+
+Lemma find_block_has_id : forall {T} (G : ocfg T) b bk,
+    find_block G b = Some bk ->
+    b = bk.(blk_id).
+Proof.
+  induction G as [| bkh G IH].
+  - intros * LU; inv LU.
+  - intros * LU.
+    cbn in LU.
+    break_match_hyp.
+    + inv LU; break_match_hyp; intuition.
+    + apply IH.
+      apply LU.
+Qed.
+
 Lemma fusion_block_correct :
   forall G f to b1 b2,
+    wf_ocfg_bid G ->
     get_fused_block G = Some (b1,b2) ->
     to <> b2 ->
     ⟦ G ⟧bs (f,to) ≈ ⟦ fusion_block G ⟧bs (f,to).
 Proof.
-  intros * FUSED; revert f to.
-  apply fusion_block_changed_block in FUSED; destruct FUSED as (INEQ & bk1 & bk2 & LU1 & TERM & LU2 & NOPHI & LU3 & LU4 & LU5).
-  unfold denote_ocfg.
+  intros * WF FUSED; revert f to.
+  apply fusion_block_changed_block in FUSED; destruct FUSED as (INEQ & bk1 & bk2 & LU1 & TERM & LU2 & PRED & NOPHI & LU3 & LU4 & LU5).
+  (* unfold denote_ocfg. *)
   (* setoid_rewrite KTreeFacts.unfold_iter_ktree. *)
   einit.
   ecofix CIH.
   intros * INEQ'.
   destruct (Eqv.eqv_dec_p to b1).
   - do 2 red in e; subst b1.
-    setoid_rewrite KTreeFacts.unfold_iter_ktree.
-    rewrite LU1, LU3.
+    rewrite 2 denote_ocfg_unfold_in_eq_itree; eauto.
+    (* setoid_rewrite KTreeFacts.unfold_iter_ktree. *)
+    (* rewrite LU1, LU3. *)
     unfold fusion_blocks.
     cbn.
     rewrite !bind_bind.
@@ -249,9 +388,11 @@ Proof.
     ebind; econstructor; [reflexivity | intros ? ? <-].
     rewrite TERM.
     cbn; rewrite translate_ret, !bind_ret_l.
-    rewrite tau_euttge. 
-    rewrite KTreeFacts.unfold_iter_ktree, LU2.
-    rewrite !bind_bind.
+    rewrite tau_euttge.
+    rewrite denote_ocfg_unfold_in_eq_itree; eauto.
+    (* rewrite KTreeFacts.unfold_iter_ktree, LU2. *)
+    unfold denote_block.
+    (* rewrite !bind_bind. *)
     unfold has_no_phi in *.
     destruct (blk_phis bk2) eqn:NOPHI'; [clear NOPHI| inversion NOPHI].
     unfold denote_phis; cbn; rewrite bind_ret_l, !bind_bind.
@@ -260,30 +401,37 @@ Proof.
     rewrite bind_ret_l.
     ebind; econstructor; [reflexivity | intros ? ? <-].
     destruct u4.
-    + rewrite !bind_ret_l.
-      etau.
+    + etau.
       ebase.
       right.
       clear - CIH.
       specialize (CIH b2 b).
-      cbn in CIH.
-      unfold denote_phis in CIH.
-      cbn in *.
       Fail apply CIH.
       (* Problem: we need to update the phi nodes of the target of
          the fused block!*)
       admit.
-    + rewrite !bind_ret_l.
-      reflexivity.
-  - setoid_rewrite KTreeFacts.unfold_iter_ktree.
-    rewrite <- LU5; auto.
-    ebind; econstructor; [reflexivity | intros ? ? <-].
-    destruct u1; [| reflexivity].
+    + reflexivity.
+  - rewrite 2 denote_ocfg_unfold_eq_itree, <- LU5; auto.
+    break_match_goal; [| reflexivity].
+    pose proof denote_bk_exits_in_outputs b f as EXIT;
+      apply has_post_post_strong in EXIT.
+    ebind; econstructor; [apply EXIT | clear EXIT].
+    intros ? ? [<- EXIT]. 
+    destruct u1 as [b_next | ?]; [| reflexivity].
     etau.
     ebase.
     right.
-    destruct p.
     apply CIH.
-    (* Easy argument on which label can be jumped to *)
-    admit.
+    cbn in EXIT.
+    (* Easy argument on which label can be jumped to...
+     *)
+    destruct (Eqv.eqv_dec_p b_next b2); auto.
+    do 2 red in e; subst.
+    apply PRED in EXIT.
+    subst.
+    apply find_block_has_id in Heqo.
+    apply find_block_has_id in LU1.
+    subst.
+    exfalso; apply n; reflexivity.
+
 Admitted.    
