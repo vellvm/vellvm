@@ -11,17 +11,18 @@ From ITree Require Import
      Eq.Eq.
 
 From Vellvm Require Import
-     Util
-     PropT
-     DynamicTypes
-     CFG
-     LLVMAst
-     AstLib
-     LLVMEvents
-     TopLevel
-     Tactics
-     Traversal
-     PostConditions.
+     Utils.Util
+     Utils.PropT
+     Utils.Tactics
+     Utils.PostConditions
+     Syntax.DynamicTypes
+     Syntax.CFG
+     Syntax.LLVMAst
+     Syntax.AstLib
+     Syntax.Traversal
+     Semantics.LLVMEvents
+     Semantics.InterpretationStack
+     Semantics.TopLevel.
 
 Remove Hints Eqv.EqvWF_Build : typeclass_instances.
 
@@ -29,7 +30,6 @@ Set Implicit Arguments.
 Set Strict Implicit.
 
 Import ListNotations.
-Import D.
 Open Scope bool.
 
 Section Peephole.
@@ -245,7 +245,7 @@ Section Liveness.
       {| uses := set_flat_map uses |}.
 
     Global Instance cfg_uses {T} : Uses (cfg T) :=
-      {| uses := fun cfg => set_flat_map uses cfg.(args) +++ uses cfg.(blks) |}.
+      {| uses := fun cfg => cfg.(args) +++ uses cfg.(blks) |}.
 
   End Uses.
 
