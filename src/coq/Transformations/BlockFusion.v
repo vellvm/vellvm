@@ -296,7 +296,7 @@ Section LoopFusionCorrect.
   Qed.
 
 
-  Lemma remove_block_find_block : forall {T} b (G : ocfg T),
+  Lemma remove_block_find_block_eq : forall {T} b (G : ocfg T),
       wf_ocfg_bid G ->
       find_block (G ∖ b) b = None.
   Proof.
@@ -314,6 +314,21 @@ Section LoopFusionCorrect.
     break_match_hyp; intuition.
     apply IH.
     eapply wf_ocfg_bid_cons; eauto.
+  Qed.
+
+  Lemma remove_block_find_block_ineq : forall {T} b b' (G : ocfg T),
+      b <> b' ->
+      find_block (G ∖ b) b' = find_block G b'. 
+  Proof.
+    induction G as [| bk G IH].
+    reflexivity.
+    intros INEQ.
+    simpl remove_block.
+    break_match_goal.
+    break_match_hyp; intuition.
+    subst; rewrite find_block_ineq; auto.
+    break_match_hyp; intuition.
+    cbn; break_match_goal; auto.
   Qed.
 
   Lemma remove_block_remove_inputs:
@@ -437,11 +452,20 @@ Section LoopFusionCorrect.
           apply RelDec.neg_rel_dec_correct in INEQ.
           exfalso; apply INEQ; do 2 red; reflexivity.
         }
-        apply remove_block_find_block.          
+        apply remove_block_find_block_eq.          
         apply wf_ocfg_bid_remove_block; auto.
-      + admit.
 
-  Admitted.
+      + intros f INEQ1 INEQ2.
+        cbn.
+        break_match_goal.
+        * break_match_hyp; intuition.
+        * break_match_hyp; intuition.
+          match goal with
+            |- _ = ?x => replace x with (find_block (((pre ++ bk :: bks) ∖ blk_id bk) ∖ f2) f) by reflexivity
+          end.
+          rewrite remove_block_find_block_ineq; auto.
+          rewrite remove_block_find_block_ineq; auto.
+  Qed.
 
   Lemma fusion_block_changed_block:
     forall G f1 f2,
