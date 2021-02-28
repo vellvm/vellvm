@@ -70,81 +70,6 @@ Definition predecessors (b : block_id) (G : ocfg dtyp) : set block_id :=
   fold_left (fun acc bk => if is_predecessor b bk then bk.(blk_id) :: acc else acc) G [].
 
 
-Section LoopFusion.
-
-  (* If a block has a unique predecessor, its phi-nodes can be trivially converted to straight code.
-     Wrote it a bit carelessly as total right now. Assumes that it is only called on a block having
-     indeed a single predecessor, among a well formed graph: we therefore should always have when
-     called that all lists under a [Phi] constructor are exactly singletons.
-     Actually trickier: by doing this conversion, we are linearizing a set of assignments that were
-     computed in parallel. It is sound because with a unique predecessor it shouldn't be possible to
-     have a recursive dependency in your phi-nodes, but it might be tricky to argue/capture formally.
-     To keep an eye on it.
-   *)
-  (* YZ: Why does the phi node carries this typing information [τ] again? *)
-  Definition phi_to_code {T} (Φs : list (local_id * phi T)) : code T :=
-    fold_left (fun acc '(id, Phi τ l) =>
-                 match l with
-                 | [(_,e)] => acc ++ [(IId id, INSTR_Op e)] (* Keeping the order should not matter, but if we can spare the argument later... *)
-                 | _ => (* This is a failure case, it should not happen if called in the expected context *)
-                   acc
-                 end) Φs [].
-
-  (* We should be able to handle phi-nodes if there is a unique predecessor, but let's not worry for it for now *)
-  (*
-  Definition fusion_blocks (b_s b_t : block dtyp) : block dtyp :=
-    {|
-    blk_id         := b_s.(blk_id);
-    blk_phis       := b_s.(blk_phis);
-    blk_code       := b_s.(blk_code) ++ phi_to_code b_t.(blk_phis) ++ b_t.(blk_code);
-    blk_term       := b_t.(blk_term);
-    blk_comments   := None (* TODO: proper propagation of comments *)
-    |}.
-   *)
-
-  Definition fusion_blocks (b_s b_t : block dtyp) : block dtyp :=
-    {|
-    blk_id         := b_s.(blk_id);
-    blk_phis       := b_s.(blk_phis);
-    blk_code       := b_s.(blk_code) ++ b_t.(blk_code);
-    blk_term       := b_t.(blk_term);
-    blk_comments   := None (* TODO: proper propagation of comments *)
-    |}.
-
-  Definition has_no_phi (b : block dtyp) : bool := match b.(blk_phis) with | [] => true | _ => false end.
-
-  (* Let's start easy: we perform at most one fusion.
-     To perform all available fusions we need to be a bit more clever w.r.t. to termination.
-   *)
-  Fixpoint fusion_block_rec (G : ocfg dtyp) (bks : ocfg dtyp) : ocfg dtyp * option (block_id * block_id) :=
-    (* We scan the blocks in sequence until... *)
-    match bks with
-    | [] => (G,None)
-    | bk_s :: bks =>
-      match bk_s.(blk_term) with
-      | TERM_Br_1 b_t =>
-        (* ... We find a block with a direct jump. *)
-        match find_block G b_t with
-        (* If this direct jump is internal to the [ocfg] considered... *)
-        | Some bk_t =>
-        (* And if [bk_s] is the only predecessor of this block *)
-          if Eqv.neg_eqv_dec b_t bk_s.(blk_id) && (length (predecessors b_t G) =? 1) && has_no_phi bk_t
-          then ((fusion_blocks bk_s bk_t) :: ((G ∖ bk_s.(blk_id)) ∖ b_t), Some (bk_s.(blk_id),b_t))
-          else fusion_block_rec G bks
-        | None => fusion_block_rec G bks
-        end
-      | _ => fusion_block_rec G bks
-      end
-    end.
-
-  Definition fusion_block : ocfg dtyp -> ocfg dtyp * option (block_id * block_id) :=
-    fun G => fusion_block_rec G G.
-
-End LoopFusion.
-
-Import SemNotations.
-Section LoopFusionCorrect.
-
   Lemma app_snoc_app : forall {A} (l l' : list A) x,
       (l ++ [x]) ++ l' = l ++ (x :: l').
   Proof.
@@ -340,6 +265,157 @@ Section LoopFusionCorrect.
     intros IN; apply remove_block_remove_inputs in IN; auto.
   Qed.
 
+  Lemma map_remove_block : forall {T} (f : block T -> block T) (G : ocfg T) b,
+      (forall bk, blk_id (f bk) = blk_id bk) ->
+      map f (G ∖ b) = (map f G) ∖ b.
+  Proof.
+    induction G as [| bk G IH]; intros * ID; [reflexivity |].
+    cbn.
+    break_match_goal.
+    break_match_goal; auto.
+    rewrite ID in Heqb1.
+    rewrite Heqb0 in Heqb1; inv Heqb1.
+    break_match_goal; auto.
+    rewrite ID in Heqb1.
+    rewrite Heqb0 in Heqb1; inv Heqb1.
+    cbn.
+    rewrite IH; auto.
+  Qed.
+
+  Lemma wf_ocfg_map : forall {T} (f : block T -> block T) (G : ocfg T),
+      (forall bk, blk_id (f bk) = blk_id bk) ->
+      wf_ocfg_bid G <-> wf_ocfg_bid (map f G).
+  Proof.
+    intros.
+    unfold wf_ocfg_bid, inputs.
+    rewrite List.map_map.
+    replace (map (fun x : block T => blk_id (f x)) G) with (map blk_id G); [reflexivity |].
+    apply map_ext.
+    intros; rewrite H; auto.
+  Qed.
+
+  Lemma find_block_map_some :
+    forall {T} (f : block T -> block T) G b bk,
+      (forall bk, blk_id (f bk) = blk_id bk) ->
+      find_block G b = Some bk ->
+      find_block (map f G) b = Some (f bk).
+  Proof.
+    intros * ID; induction G as [| hd G IH]; intros FIND ; [inv FIND |].
+    cbn in *.
+    rewrite ID. 
+    break_match_goal; break_match_hyp; intuition.
+    inv FIND; auto.
+  Qed.
+
+  Lemma find_block_map_none :
+    forall {T} (f : block T -> block T) G b,
+      (forall bk, blk_id (f bk) = blk_id bk) ->
+      find_block G b = None ->
+      find_block (map f G) b = None.
+  Proof.
+    intros * ID; induction G as [| hd G IH]; intros FIND; [reflexivity |].
+    cbn in *.
+    rewrite ID. 
+    break_match_goal; break_match_hyp; intuition.
+    inv FIND; auto.
+  Qed.
+
+Section LoopFusion.
+
+  (* If a block has a unique predecessor, its phi-nodes can be trivially converted to straight code.
+     Wrote it a bit carelessly as total right now. Assumes that it is only called on a block having
+     indeed a single predecessor, among a well formed graph: we therefore should always have when
+     called that all lists under a [Phi] constructor are exactly singletons.
+     Actually trickier: by doing this conversion, we are linearizing a set of assignments that were
+     computed in parallel. It is sound because with a unique predecessor it shouldn't be possible to
+     have a recursive dependency in your phi-nodes, but it might be tricky to argue/capture formally.
+     To keep an eye on it.
+   *)
+  (* YZ: Why does the phi node carries this typing information [τ] again? *)
+  Definition phi_to_code {T} (Φs : list (local_id * phi T)) : code T :=
+    fold_left (fun acc '(id, Phi τ l) =>
+                 match l with
+                 | [(_,e)] => acc ++ [(IId id, INSTR_Op e)] (* Keeping the order should not matter, but if we can spare the argument later... *)
+                 | _ => (* This is a failure case, it should not happen if called in the expected context *)
+                   acc
+                 end) Φs [].
+
+  (* We should be able to handle phi-nodes if there is a unique predecessor, but let's not worry for it for now *)
+  (*
+  Definition fusion_blocks (b_s b_t : block dtyp) : block dtyp :=
+    {|
+    blk_id         := b_s.(blk_id);
+    blk_phis       := b_s.(blk_phis);
+    blk_code       := b_s.(blk_code) ++ phi_to_code b_t.(blk_phis) ++ b_t.(blk_code);
+    blk_term       := b_t.(blk_term);
+    blk_comments   := None (* TODO: proper propagation of comments *)
+    |}.
+   *)
+
+  Definition fusion_blocks (b_s b_t : block dtyp) : block dtyp :=
+    {|
+    blk_id         := b_s.(blk_id);
+    blk_phis       := b_s.(blk_phis);
+    blk_code       := b_s.(blk_code) ++ b_t.(blk_code);
+    blk_term       := b_t.(blk_term);
+    blk_comments   := None (* TODO: proper propagation of comments *)
+    |}.
+
+  Definition has_no_phi (b : block dtyp) : bool := match b.(blk_phis) with | [] => true | _ => false end.
+
+  Definition update_provenance_phi {T} (φ : phi T) (old new : block_id) : phi T :=
+    match φ with
+    | Phi τ exps => Phi τ (map (fun '(id,e) => if Eqv.eqv_dec old id then (new,e) else (id,e)) exps)
+    end.
+
+  Definition update_provenance_block {T} (old new : block_id) (bk : block T) : block T :=
+    {|
+    blk_id         := bk.(blk_id);
+    blk_phis       := map (fun '(x,φ) => (x,update_provenance_phi φ old new)) bk.(blk_phis);
+    blk_code       := bk.(blk_code);
+    blk_term       := bk.(blk_term);
+    blk_comments   := None (* TODO: proper propagation of comments *)
+    |}.   
+
+  (* Let's start gently: we perform at most one fusion.
+     To perform all available fusions we'll need to be a bit more clever w.r.t. to termination.
+   *)
+  Fixpoint fusion_block_rec (G : ocfg dtyp) (bks : ocfg dtyp) : ocfg dtyp * option (block_id * block_id) :=
+    (* We scan the blocks in sequence until... *)
+    match bks with
+    | [] => (G,None)
+    | bk_s :: bks =>
+      match bk_s.(blk_term) with
+      | TERM_Br_1 b_t =>
+        (* ... We find a block with a direct jump. *)
+        match find_block G b_t with
+        (* If this direct jump is internal to the [ocfg] considered... *)
+        | Some bk_t =>
+        (* And if [bk_s] is the only predecessor of this block *)
+          if Eqv.neg_eqv_dec b_t bk_s.(blk_id) && (length (predecessors b_t G) =? 1) && has_no_phi bk_t
+          then
+            (* We therefore:
+               - remove the two block A and B getting fused
+               - add their fusion
+               - update the phi-nodes so that anyone expecting a jump from B now expects one from A
+             *)
+            (map (update_provenance_block bk_s.(blk_id) b_t) ((fusion_blocks bk_s bk_t) :: ((G ∖ bk_s.(blk_id)) ∖ b_t)),
+             Some (bk_s.(blk_id),b_t))
+          else fusion_block_rec G bks
+        | None => fusion_block_rec G bks
+        end
+      | _ => fusion_block_rec G bks
+      end
+    end.
+
+  Definition fusion_block : ocfg dtyp -> ocfg dtyp * option (block_id * block_id) :=
+    fun G => fusion_block_rec G G.
+
+End LoopFusion.
+
+Import SemNotations.
+Section LoopFusionCorrect.
+
   Lemma fusion_block_some_rec:
     forall G bks' bks pre f1 f2,
       wf_ocfg_bid G ->
@@ -352,16 +428,17 @@ Section LoopFusionCorrect.
         find_block G f2 = Some b2 /\
         (forall b, find_block G b.(blk_id) = Some b -> In f2 (successors b) -> b.(blk_id) = f1) /\
         has_no_phi b2 = true /\
-        find_block bks' f1 = Some (fusion_blocks b1 b2) /\
+        find_block bks' f1 = Some (update_provenance_block f1 f2 (fusion_blocks b1 b2)) /\
         find_block bks' f2 = None /\
-        (forall f, f <> f1 -> f <> f2 -> find_block G f = find_block bks' f).
+        (forall f bk, f <> f1 -> f <> f2 -> find_block G f = Some bk -> find_block bks' f = Some (update_provenance_block f1 f2 bk)) /\
+        (forall f, f <> f1 -> f <> f2 -> find_block G f = None -> find_block bks' f = None).
   Proof.
     intros * WF; revert pre.
     induction bks as [| bk bks IH]; intros * -> GETF; [inv GETF |].
     cbn in GETF.
-    break_match_hyp; try (destruct (IH (pre ++ [bk])) as (? & ? & ? & ? & ? & ? & ? & ? & ? & ? & ?); eauto using app_snoc_app; fail).
-    break_match_hyp; try (destruct (IH (pre ++ [bk])) as (? & ? & ? & ? & ? & ? & ? & ? & ? & ? & ?); eauto using app_snoc_app; fail).
-    break_match_hyp; try (destruct (IH (pre ++ [bk])) as (? & ? & ? & ? & ? & ? & ? & ? & ? & ? & ?); eauto using app_snoc_app; fail).
+    break_match_hyp; try (destruct (IH (pre ++ [bk])) as (? & ? & ? & ? & ? & ? & ? & ? & ? & ? & ? & ?); eauto using app_snoc_app; fail).
+    break_match_hyp; try (destruct (IH (pre ++ [bk])) as (? & ? & ? & ? & ? & ? & ? & ? & ? & ? & ? & ?); eauto using app_snoc_app; fail).
+    break_match_hyp; try (destruct (IH (pre ++ [bk])) as (? & ? & ? & ? & ? & ? & ? & ? & ? & ? & ? & ?); eauto using app_snoc_app; fail).
     clear IH.
     inv GETF.
     apply andb_prop in Heqb0 as [Heqb NOPHI].
@@ -431,19 +508,40 @@ Section LoopFusionCorrect.
           apply RelDec.neg_rel_dec_correct in INEQ.
           exfalso; apply INEQ; do 2 red; reflexivity.
         }
+
+        rewrite map_remove_block; auto.
         apply remove_block_find_block_eq.          
+        apply wf_ocfg_map; auto.
         apply wf_ocfg_bid_remove_block; auto.
 
-      + intros f INEQ1 INEQ2.
+      + intros f bk' INEQ1 INEQ2 FIND.
         cbn.
         break_match_goal.
         * break_match_hyp; intuition.
         * break_match_hyp; intuition.
           match goal with
-            |- _ = ?x => replace x with (find_block (((pre ++ bk :: bks) ∖ blk_id bk) ∖ f2) f) by reflexivity
+            |- ?x = _ => replace x with (find_block (map (update_provenance_block (blk_id bk) f2) (((pre ++ bk :: bks) ∖ blk_id bk) ∖ f2)) f) by reflexivity
           end.
+          rewrite map_remove_block; auto.
           rewrite remove_block_find_block_ineq; auto.
+          rewrite map_remove_block; auto.
           rewrite remove_block_find_block_ineq; auto.
+          apply find_block_map_some; auto.
+
+      + intros f INEQ1 INEQ2 FIND.
+        cbn.
+        break_match_goal.
+        * break_match_hyp; intuition.
+        * break_match_hyp; intuition.
+          match goal with
+            |- ?x = _ => replace x with (find_block (map (update_provenance_block (blk_id bk) f2) (((pre ++ bk :: bks) ∖ blk_id bk) ∖ f2)) f) by reflexivity
+          end.
+          rewrite map_remove_block; auto.
+          rewrite remove_block_find_block_ineq; auto.
+          rewrite map_remove_block; auto.
+          rewrite remove_block_find_block_ineq; auto.
+          apply find_block_map_none; auto.
+
   Qed.
 
   Lemma fusion_block_some:
@@ -458,9 +556,10 @@ Section LoopFusionCorrect.
         find_block G f2 = Some b2 /\
         (forall b, find_block G b.(blk_id) = Some b -> In f2 (successors b) -> b.(blk_id) = f1) /\
         has_no_phi b2 = true /\
-        find_block G' f1 = Some (fusion_blocks b1 b2) /\
+        find_block G' f1 = Some (update_provenance_block f1 f2 (fusion_blocks b1 b2)) /\
         find_block G' f2 = None /\
-        (forall f, f <> f1 -> f <> f2 -> find_block G f = find_block G' f).
+        (forall f bk, f <> f1 -> f <> f2 -> find_block G f = Some bk -> find_block G' f = Some (update_provenance_block f1 f2 bk)) /\
+        (forall f, f <> f1 -> f <> f2 -> find_block G f = None -> find_block G' f = None).
   Proof.
     intros * WF FUSE.
     pose proof fusion_block_some_rec G [] WF eq_refl FUSE.
@@ -637,6 +736,8 @@ Section LoopFusionCorrect.
     intros; apply has_post_post_strong in H; apply has_post_eq_itree_aux; auto.
   Qed.
 
+  (*
+
   Lemma fusion_block_correct_some :
     forall G G' f to b1 b2,
       wf_ocfg_bid G ->
@@ -729,3 +830,6 @@ Proof.
   apply fusion_block_correct_none; auto.
 Qed.
 
+*)
+
+End LoopFusionCorrect.
