@@ -23,6 +23,7 @@ From Vellvm Require Import
      Syntax.CFG
      Syntax.AstLib
      Syntax.DynamicTypes
+     Semantics.LLVMEvents
      Semantics.InterpretationStack
      Semantics.TopLevel
      Theory.DenotationTheory
@@ -762,17 +763,64 @@ Section LoopFusionCorrect.
     apply find_block_map; auto.
   Qed.
 
+  Lemma map_monad_eq_itree_map_ind :
+    forall {E A B} (f g : A -> itree E B) (h : A -> A) (l : list A),
+      (forall a, In a l -> f a ≅ g (h a)) ->
+      map_monad f l ≅ map_monad g (map h l).
+  Proof.
+    induction l as [| x l IH]; intros EQ; [reflexivity | cbn].
+    apply eq_itree_clo_bind with (UU := eq).
+    apply EQ; left; auto.
+    intros ? ? <-.
+    rewrite IH.
+    reflexivity.
+    intros; apply EQ; right; auto.
+  Qed.
+  
+  Lemma assoc_update_provenance :
+    forall f old new (args : list (block_id * exp dtyp)),
+      assoc f args = assoc (update_provenance old new f) (map (fun '(id, e) => (update_provenance old new id, e)) args).
+  Proof.
+    induction args as [| [] args IH]; [reflexivity |].
+    cbn.
+    break_match_goal.
+    - rewrite RelDec.rel_dec_correct in Heqb0; subst.
+      break_match_goal; auto.
+      rewrite <- RelDec.neg_rel_dec_correct in Heqb0; intuition.
+    - rewrite <- RelDec.neg_rel_dec_correct in Heqb0.
+      break_match_goal; auto.
+      rewrite RelDec.rel_dec_correct in Heqb1; subst.
+      unfold update_provenance in *.
+      repeat break_match_hyp; unfold Eqv.eqv_dec,RelDec.rel_dec in *; cbn in *.
+      repeat break_match_hyp; subst; intuition; subst; intuition.
+      repeat break_match_hyp; subst; intuition; subst; intuition.
+      2:repeat break_match_hyp; subst; intuition; subst; intuition.
+      3:repeat break_match_hyp; subst; intuition; subst; intuition.
+      (* break_match_hyp. *)
+      (* intuition; subst; intuition. *)
+      (* break_match_hyp. *)
+      (* break_match_hyp. *)
+      (* repeat break_match_hyp; intuition; subst; intuition. *)
+      (* subst. intuition. *)
+      (* rewrite RelDec.rel_dec_correct in Heqb2; subst. *)
+  Admitted.
+
   Lemma update_provenance_phis_eq_itree :
     forall phis old new f,
-      ⟦  phis ⟧Φs f ≅ ⟦ map (fun '(x, φ) => (x, update_provenance_phi old new φ)) phis ⟧Φs (update_provenance old new f).
+      ⟦ phis ⟧Φs f ≅ ⟦ map (fun '(x, φ) => (x, update_provenance_phi old new φ)) phis ⟧Φs (update_provenance old new f).
   Proof.
-    intros; induction phis as [| [] phis IH].
-    reflexivity.
+    intros.
     unfold denote_phis.
     cbn.
-    rewrite !bind_bind.
-    apply eq_itree_clo_bind with (UU := eq); [| intros ? ? ->].
-  Admitted.
+    apply eq_itree_clo_bind with (UU := eq).
+    apply map_monad_eq_itree_map_ind.
+    - intros [? []] IN.
+      cbn.
+      rewrite <- assoc_update_provenance.
+      reflexivity.
+    - intros ? ? <-.
+      reflexivity.
+  Qed.
 
   Lemma update_provenance_eq : forall old new,
       update_provenance old new old = new.
