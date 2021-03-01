@@ -1,5 +1,6 @@
 From Coq Require Import
      Lia
+     String
      Morphisms.
 
 Require Import List.
@@ -27,6 +28,7 @@ From Vellvm Require Import
      Theory.DenotationTheory
      Transformations.Peephole.
 
+Opaque append.
 Import ListSet.
 
 Remove Hints Eqv.EqvWF_Build : typeclass_instances.
@@ -331,7 +333,6 @@ Section LoopFusion.
      have a recursive dependency in your phi-nodes, but it might be tricky to argue/capture formally.
      To keep an eye on it.
    *)
-  (* YZ: Why does the phi node carries this typing information [τ] again? *)
   Definition phi_to_code {T} (Φs : list (local_id * phi T)) : code T :=
     fold_left (fun acc '(id, Phi τ l) =>
                  match l with
@@ -363,19 +364,25 @@ Section LoopFusion.
 
   Definition has_no_phi (b : block dtyp) : bool := match b.(blk_phis) with | [] => true | _ => false end.
 
-  Definition update_provenance_phi {T} (φ : phi T) (old new : block_id) : phi T :=
+  Definition update_provenance (old new id : block_id) : block_id :=
+    if Eqv.eqv_dec old id then new else id.
+
+  Definition update_provenance_phi {T} (old new : block_id) (φ : phi T) : phi T :=
     match φ with
-    | Phi τ exps => Phi τ (map (fun '(id,e) => if Eqv.eqv_dec old id then (new,e) else (id,e)) exps)
+    | Phi τ exps => Phi τ (map (fun '(id,e) => (update_provenance old new id, e)) exps)
     end.
 
   Definition update_provenance_block {T} (old new : block_id) (bk : block T) : block T :=
     {|
     blk_id         := bk.(blk_id);
-    blk_phis       := map (fun '(x,φ) => (x,update_provenance_phi φ old new)) bk.(blk_phis);
+    blk_phis       := map (fun '(x,φ) => (x,update_provenance_phi old new φ)) bk.(blk_phis);
     blk_code       := bk.(blk_code);
     blk_term       := bk.(blk_term);
     blk_comments   := None (* TODO: proper propagation of comments *)
     |}.   
+
+  Definition update_provenance_ocfg {T} (old new : block_id) (bks : ocfg T) : ocfg T :=
+    map (update_provenance_block old new) bks.
 
   (* Let's start gently: we perform at most one fusion.
      To perform all available fusions we'll need to be a bit more clever w.r.t. to termination.
@@ -392,14 +399,14 @@ Section LoopFusion.
         (* If this direct jump is internal to the [ocfg] considered... *)
         | Some bk_t =>
         (* And if [bk_s] is the only predecessor of this block *)
-          if Eqv.neg_eqv_dec b_t bk_s.(blk_id) && (length (predecessors b_t G) =? 1) && has_no_phi bk_t
+          if Eqv.neg_eqv_dec b_t bk_s.(blk_id) && (length (predecessors b_t G) =? 1)%nat && has_no_phi bk_t
           then
             (* We therefore:
                - remove the two block A and B getting fused
                - add their fusion
                - update the phi-nodes so that anyone expecting a jump from B now expects one from A
              *)
-            (map (update_provenance_block bk_s.(blk_id) b_t) ((fusion_blocks bk_s bk_t) :: ((G ∖ bk_s.(blk_id)) ∖ b_t)),
+            (update_provenance_ocfg b_t bk_s.(blk_id) ((fusion_blocks bk_s bk_t) :: ((G ∖ bk_s.(blk_id)) ∖ b_t)),
              Some (bk_s.(blk_id),b_t))
           else fusion_block_rec G bks
         | None => fusion_block_rec G bks
@@ -428,9 +435,9 @@ Section LoopFusionCorrect.
         find_block G f2 = Some b2 /\
         (forall b, find_block G b.(blk_id) = Some b -> In f2 (successors b) -> b.(blk_id) = f1) /\
         has_no_phi b2 = true /\
-        find_block bks' f1 = Some (update_provenance_block f1 f2 (fusion_blocks b1 b2)) /\
+        find_block bks' f1 = Some (update_provenance_block f2 f1 (fusion_blocks b1 b2)) /\
         find_block bks' f2 = None /\
-        (forall f bk, f <> f1 -> f <> f2 -> find_block G f = Some bk -> find_block bks' f = Some (update_provenance_block f1 f2 bk)) /\
+        (forall f bk, f <> f1 -> f <> f2 -> find_block G f = Some bk -> find_block bks' f = Some (update_provenance_block f2 f1 bk)) /\
         (forall f, f <> f1 -> f <> f2 -> find_block G f = None -> find_block bks' f = None).
   Proof.
     intros * WF; revert pre.
@@ -520,7 +527,7 @@ Section LoopFusionCorrect.
         * break_match_hyp; intuition.
         * break_match_hyp; intuition.
           match goal with
-            |- ?x = _ => replace x with (find_block (map (update_provenance_block (blk_id bk) f2) (((pre ++ bk :: bks) ∖ blk_id bk) ∖ f2)) f) by reflexivity
+            |- ?x = _ => replace x with (find_block (map (update_provenance_block f2 (blk_id bk)) (((pre ++ bk :: bks) ∖ blk_id bk) ∖ f2)) f) by reflexivity
           end.
           rewrite map_remove_block; auto.
           rewrite remove_block_find_block_ineq; auto.
@@ -534,7 +541,7 @@ Section LoopFusionCorrect.
         * break_match_hyp; intuition.
         * break_match_hyp; intuition.
           match goal with
-            |- ?x = _ => replace x with (find_block (map (update_provenance_block (blk_id bk) f2) (((pre ++ bk :: bks) ∖ blk_id bk) ∖ f2)) f) by reflexivity
+            |- ?x = _ => replace x with (find_block (map (update_provenance_block f2 (blk_id bk)) (((pre ++ bk :: bks) ∖ blk_id bk) ∖ f2)) f) by reflexivity
           end.
           rewrite map_remove_block; auto.
           rewrite remove_block_find_block_ineq; auto.
@@ -556,9 +563,9 @@ Section LoopFusionCorrect.
         find_block G f2 = Some b2 /\
         (forall b, find_block G b.(blk_id) = Some b -> In f2 (successors b) -> b.(blk_id) = f1) /\
         has_no_phi b2 = true /\
-        find_block G' f1 = Some (update_provenance_block f1 f2 (fusion_blocks b1 b2)) /\
+        find_block G' f1 = Some (update_provenance_block f2 f1 (fusion_blocks b1 b2)) /\
         find_block G' f2 = None /\
-        (forall f bk, f <> f1 -> f <> f2 -> find_block G f = Some bk -> find_block G' f = Some (update_provenance_block f1 f2 bk)) /\
+        (forall f bk, f <> f1 -> f <> f2 -> find_block G f = Some bk -> find_block G' f = Some (update_provenance_block f2 f1 bk)) /\
         (forall f, f <> f1 -> f <> f2 -> find_block G f = None -> find_block G' f = None).
   Proof.
     intros * WF FUSE.
@@ -736,75 +743,170 @@ Section LoopFusionCorrect.
     intros; apply has_post_post_strong in H; apply has_post_eq_itree_aux; auto.
   Qed.
 
-  (*
+  Lemma find_block_map :
+    forall {T} (f : block T -> block T) G b,
+      (forall bk, blk_id (f bk) = blk_id bk) ->
+      find_block (map f G) b = option_map f (find_block G b).
+  Proof.
+    intros.
+    destruct (find_block G b) eqn:EQ.
+    eapply find_block_map_some in EQ; eauto.
+    eapply find_block_map_none in EQ; eauto.
+  Qed.
 
+  Lemma update_provenance_find_block :
+    forall {T} (G : ocfg T) old new to,
+    find_block (update_provenance_ocfg old new G) to = option_map (update_provenance_block old new) (find_block G to).
+  Proof.
+    intros.
+    apply find_block_map; auto.
+  Qed.
+
+  Lemma update_provenance_phis_eq_itree :
+    forall phis old new f,
+      ⟦  phis ⟧Φs f ≅ ⟦ map (fun '(x, φ) => (x, update_provenance_phi old new φ)) phis ⟧Φs (update_provenance old new f).
+  Proof.
+    intros; induction phis as [| [] phis IH].
+    reflexivity.
+    unfold denote_phis.
+    cbn.
+    rewrite !bind_bind.
+    apply eq_itree_clo_bind with (UU := eq); [| intros ? ? ->].
+  Admitted.
+
+  Lemma update_provenance_eq : forall old new,
+      update_provenance old new old = new.
+  Proof.
+    intros.
+    unfold update_provenance.
+    break_match_goal; auto.
+    unfold Eqv.eqv_dec,RelDec.rel_dec in Heqb; cbn in *; break_match_hyp; intuition.
+  Qed.
+
+  Lemma update_provenance_block_eq_itree :
+    forall bk old new f,
+      ⟦ bk ⟧b f ≅ ⟦ update_provenance_block old new bk ⟧b (update_provenance old new f).
+  Proof.
+    intros.
+    unfold denote_block.
+    cbn.
+    rewrite <- update_provenance_phis_eq_itree.
+    reflexivity.
+  Qed.
+  Lemma update_provenance_ineq : forall old new to,
+      to <> old ->
+      update_provenance old new to = to.
+  Proof.
+    intros.
+    unfold update_provenance.
+    break_match_goal; auto.
+    unfold Eqv.eqv_dec,RelDec.rel_dec in Heqb; cbn in *; break_match_hyp; intuition.
+  Qed.
+  
   Lemma fusion_block_correct_some :
     forall G G' f to b1 b2,
       wf_ocfg_bid G ->
       fusion_block G = (G', Some (b1,b2)) ->
       to <> b2 ->
-      ⟦ G ⟧bs (f,to) ≈ ⟦ G' ⟧bs (f,to).
+      ⟦ G ⟧bs (f,to) ≈ ⟦ G' ⟧bs (update_provenance b2 b1 f,to).
   Proof.
     intros * WF FUSED; revert f to.
     apply fusion_block_some in FUSED; auto; destruct FUSED as (INEQ & bk1 & bk2 & LU1 & TERM & LU2 & PRED & NOPHI & LU3 & LU4 & LU5).
     einit.
     ecofix CIH.
     intros * INEQ'.
+
+    (* Two cases: are we starting the evaluation from the block b1 being fused with b2? *)
     destruct (Eqv.eqv_dec_p to b1).
-    - do 2 red in e; subst b1.
+    - (* We will match the evaluation of b1 followed by b2 against the fused block *)
+      do 2 red in e; subst b1.
       rewrite 2 denote_ocfg_unfold_in_eq_itree; eauto.
       unfold fusion_blocks.
       cbn.
       rewrite !bind_bind.
+      Opaque denote_phis.
       setoid_rewrite denote_code_app.
       repeat setoid_rewrite bind_bind.
-      ebind; econstructor; [reflexivity | intros ? ? <-].
+      (* Match the phis *)
+      ebind; econstructor; [rewrite <- update_provenance_phis_eq_itree; reflexivity | intros ? ? <-].
+      (* Match the code from b1 *)
       ebind; econstructor; [reflexivity | intros ? ? <-].
       repeat setoid_rewrite bind_ret_l.
-      ebind; econstructor; [reflexivity | intros ? ? <-].
+      (* Constant jump on the left *)
       rewrite TERM.
       cbn; rewrite translate_ret, !bind_ret_l.
+      (* We dismiss the extra tau guard on the left, we'll use the symmetric pair after b2 *)
       rewrite tau_euttge.
       rewrite denote_ocfg_unfold_in_eq_itree; eauto.
       unfold denote_block.
+      (* No phis in b2 *)
       unfold has_no_phi in *.
       destruct (blk_phis bk2) eqn:NOPHI'; [clear NOPHI| inversion NOPHI].
+      Transparent denote_phis.
       unfold denote_phis; cbn; rewrite bind_ret_l, !bind_bind.
       cbn; rewrite !bind_ret_l, !bind_bind; cbn.
+      (* Match the code from b2 *)
       ebind; econstructor; [reflexivity | intros ? ? <-].
       rewrite bind_ret_l.
-      ebind; econstructor; [reflexivity | intros ? ? <-].
-      destruct u4.
-      + etau.
+      (* Match the final jump. We'll need to justify that the destination is not b2:
+         to do that, we pull out the fact that it has to be in the outputs of the terminator.
+       *)
+      pose proof denote_terminator_exits_in_outputs (blk_term bk2) as EXIT;
+        apply has_post_post_strong in EXIT.
+      ebind; econstructor; [apply eutt_translate_gen, EXIT | clear EXIT; intros ? ? [<- EXIT]].
+      (* We either jump or return. In the latter case, it's trivial *)
+      destruct u3 as [next | ?]; [| reflexivity].
+      (* Here is the guard for our coinductive call *)
+      etau.
+      ebase; right.
+      specialize (CIH b2 next).
+      rewrite update_provenance_eq in CIH.
+      apply CIH.
+      (* Remains to prove we did not jump in the middle of the fused block *)
+      cbn in *.
+      destruct (Eqv.eqv_dec_p next b2); auto.
+      do 2 red in e; subst b2.
+      pose proof find_block_has_id _ _ LU2; subst.
+      apply PRED in EXIT; auto.
+        
+    - (* For any other block, we simply match the denotation of the blocks one against another *)
+      rewrite 2 denote_ocfg_unfold_eq_itree.
+
+      Opaque denote_phis.
+      Opaque denote_block.
+      destruct LU5 as [H H'].
+      assert (forall f, f <> b1 -> f <> b2 -> find_block G' f = option_map (update_provenance_block b2 b1) (find_block G f)).
+      {
+        intros.
+        destruct (find_block G f0) eqn:EQ.
+        - apply H in EQ; auto. 
+        - apply H' in EQ; auto. 
+      }
+      clear H H'.
+      rewrite H0; auto.
+      break_match_goal; cbn.
+      +
+        pose proof denote_bk_exits_in_outputs b f as EXIT;
+          apply has_post_post_strong in EXIT.
+        ebind; econstructor; [rewrite <- update_provenance_block_eq_itree; apply EXIT | clear EXIT].
+        intros ? ? [<- EXIT].
+        destruct u1 as [b_next | ?]; [| reflexivity].
+        etau.
         ebase.
         right.
-        clear - CIH.
-        specialize (CIH b2 b).
-        Fail apply CIH.
-        (* Problem: we need to update the phi nodes of the target of
-         the fused block!*)
+        specialize (CIH to b_next).
+        rewrite update_provenance_ineq in CIH; auto.
+        apply CIH.
+        cbn in EXIT.
+        destruct (Eqv.eqv_dec_p b_next b2); auto.
+        do 2 red in e; subst.
+        pose proof find_block_has_id _ _ LU1; subst.
+        pose proof find_block_has_id _ _ Heqo; subst.
+        apply PRED in EXIT; subst; auto.
+
+      + (* If we jump out of the open cfg, we return non equal result *)
         admit.
-      + reflexivity.
-    - rewrite 2 denote_ocfg_unfold_eq_itree, <- LU5; auto.
-      break_match_goal; [| reflexivity].
-      pose proof denote_bk_exits_in_outputs b f as EXIT;
-        apply has_post_post_strong in EXIT.
-      ebind; econstructor; [apply EXIT | clear EXIT].
-      intros ? ? [<- EXIT]. 
-      destruct u1 as [b_next | ?]; [| reflexivity].
-      etau.
-      ebase.
-      right.
-      apply CIH.
-      cbn in EXIT.
-      destruct (Eqv.eqv_dec_p b_next b2); auto.
-      do 2 red in e; subst.
-      apply PRED in EXIT.
-      subst.
-      apply find_block_has_id in Heqo.
-      apply find_block_has_id in LU1.
-      subst.
-      exfalso; apply n; reflexivity.
+
   Admitted.    
 
   Lemma fusion_block_correct_none :
@@ -816,20 +918,5 @@ Section LoopFusionCorrect.
     pose proof fusion_block_none_id G FUSE; subst.
     reflexivity.
   Qed.
-
-Lemma fusion_block_correct:
-  forall G G' modifs f to,
-    wf_ocfg_bid G ->
-    fusion_block G = (G', modifs) ->
-    (match modifs with | Some (_,f2) => f2 <> to | None => True end) ->
-    ⟦ G ⟧bs (f,to) ≈ ⟦ G' ⟧bs (f,to).
-Proof.
-  intros.
-  destruct modifs as [[] |].
-  eapply fusion_block_correct_some; eauto.
-  apply fusion_block_correct_none; auto.
-Qed.
-
-*)
 
 End LoopFusionCorrect.
