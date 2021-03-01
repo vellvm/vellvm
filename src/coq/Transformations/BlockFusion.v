@@ -776,51 +776,6 @@ Section LoopFusionCorrect.
     reflexivity.
     intros; apply EQ; right; auto.
   Qed.
-  
-  Lemma assoc_update_provenance :
-    forall f old new (args : list (block_id * exp dtyp)),
-      assoc f args = assoc (update_provenance old new f) (map (fun '(id, e) => (update_provenance old new id, e)) args).
-  Proof.
-    induction args as [| [] args IH]; [reflexivity |].
-    cbn.
-    break_match_goal.
-    - rewrite RelDec.rel_dec_correct in Heqb0; subst.
-      break_match_goal; auto.
-      rewrite <- RelDec.neg_rel_dec_correct in Heqb0; intuition.
-    - rewrite <- RelDec.neg_rel_dec_correct in Heqb0.
-      break_match_goal; auto.
-      rewrite RelDec.rel_dec_correct in Heqb1; subst.
-      unfold update_provenance in *.
-      repeat break_match_hyp; unfold Eqv.eqv_dec,RelDec.rel_dec in *; cbn in *.
-      repeat break_match_hyp; subst; intuition; subst; intuition.
-      repeat break_match_hyp; subst; intuition; subst; intuition.
-      2:repeat break_match_hyp; subst; intuition; subst; intuition.
-      3:repeat break_match_hyp; subst; intuition; subst; intuition.
-      (* break_match_hyp. *)
-      (* intuition; subst; intuition. *)
-      (* break_match_hyp. *)
-      (* break_match_hyp. *)
-      (* repeat break_match_hyp; intuition; subst; intuition. *)
-      (* subst. intuition. *)
-      (* rewrite RelDec.rel_dec_correct in Heqb2; subst. *)
-  Admitted.
-
-  Lemma update_provenance_phis_eq_itree :
-    forall phis old new f,
-      ⟦ phis ⟧Φs f ≅ ⟦ map (fun '(x, φ) => (x, update_provenance_phi old new φ)) phis ⟧Φs (update_provenance old new f).
-  Proof.
-    intros.
-    unfold denote_phis.
-    cbn.
-    apply eq_itree_clo_bind with (UU := eq).
-    apply map_monad_eq_itree_map_ind.
-    - intros [? []] IN.
-      cbn.
-      rewrite <- assoc_update_provenance.
-      reflexivity.
-    - intros ? ? <-.
-      reflexivity.
-  Qed.
 
   Lemma update_provenance_eq : forall old new,
       update_provenance old new old = new.
@@ -831,16 +786,6 @@ Section LoopFusionCorrect.
     unfold Eqv.eqv_dec,RelDec.rel_dec in Heqb; cbn in *; break_match_hyp; intuition.
   Qed.
 
-  Lemma update_provenance_block_eq_itree :
-    forall bk old new f,
-      ⟦ bk ⟧b f ≅ ⟦ update_provenance_block old new bk ⟧b (update_provenance old new f).
-  Proof.
-    intros.
-    unfold denote_block.
-    cbn.
-    rewrite <- update_provenance_phis_eq_itree.
-    reflexivity.
-  Qed.
   Lemma update_provenance_ineq : forall old new to,
       to <> old ->
       update_provenance old new to = to.
@@ -851,11 +796,132 @@ Section LoopFusionCorrect.
     unfold Eqv.eqv_dec,RelDec.rel_dec in Heqb; cbn in *; break_match_hyp; intuition.
   Qed.
   
+  Lemma assoc_update_provenance :
+    forall old new (args : list (block_id * exp dtyp)) x,
+      ~ In new (map fst args) ->
+      x <> new ->
+      assoc x args = assoc (update_provenance old new x) (map (fun '(id, e) => (update_provenance old new id, e)) args).
+  Proof.
+    induction args as [| [x1 ?] args IH]; [reflexivity |].
+    intros x NIN INEQx.
+    destruct (Eqv.eqv_dec_p x1 old) as [EQ | INEQ].
+    - (* x1 = old *)
+      do 2 red in EQ.
+      cbn.
+      subst.
+      rewrite update_provenance_eq.
+      destruct (Eqv.eqv_dec_p x old) as [EQ' | INEQ'].
+      + (* x1 = old /\ x = old *)
+        do 2 red in EQ'.
+        subst.
+        rewrite update_provenance_eq.
+        cbn.
+        rewrite !eq_dec_eq.
+        reflexivity.
+      + (* x1 = old /\ x <> old *)
+        rewrite update_provenance_ineq; auto.
+        unfold Eqv.eqv, eqv_raw_id in INEQ'.
+        rewrite RelDec.rel_dec_neq_false; auto; [| typeclasses eauto].
+        rewrite RelDec.rel_dec_neq_false; auto; [| typeclasses eauto].
+        rewrite IH; auto.
+        rewrite update_provenance_ineq; auto.
+        intros abs; apply NIN; right; auto.
+    - (* x1 <> old *)
+      unfold Eqv.eqv, eqv_raw_id in INEQ.
+      destruct (Eqv.eqv_dec_p x old) as [EQ' | INEQ'].
+      + (* x1 <> old /\ x = old *)
+        do 2 red in EQ'.
+        subst.
+        rewrite update_provenance_eq.
+        cbn.
+        rewrite RelDec.rel_dec_neq_false; auto; [| typeclasses eauto].
+        rewrite update_provenance_ineq; auto.
+        cbn in *.
+        rewrite RelDec.rel_dec_neq_false; auto; [| typeclasses eauto].
+        rewrite IH; auto.
+        rewrite update_provenance_eq; auto.
+      + (* x1 <> old /\ x <> old *)
+        rewrite update_provenance_ineq; auto.
+        unfold Eqv.eqv, eqv_raw_id in INEQ'.
+        cbn.
+        rewrite update_provenance_ineq; auto.
+        break_match_goal; auto.
+        rewrite IH; auto.
+        rewrite update_provenance_ineq; auto.
+        intros ?; apply NIN; cbn; auto.
+  Qed.
+
+  Definition phi_sources {T} (φ : phi T) : list block_id :=
+    let '(Phi _ l) := φ in
+    map fst l.
+
+  Definition phis_block_id_not_in {T} b (φs : list (local_id * phi T)) :=
+  forall φ, In φ φs -> ~ In b (phi_sources (snd φ)).
+
+  Definition block_phis_block_id_not_in {T} b (bk : block T) :=
+    phis_block_id_not_in b bk.(blk_phis).   
+
+  Lemma update_provenance_phis_eq_itree :
+    forall phis old new f,
+      f <> new ->
+      phis_block_id_not_in new phis ->
+      ⟦ phis ⟧Φs f ≅ ⟦ map (fun '(x, φ) => (x, update_provenance_phi old new φ)) phis ⟧Φs (update_provenance old new f).
+  Proof.
+    intros * INEQ PHIN.
+    unfold denote_phis.
+    cbn.
+    apply eq_itree_clo_bind with (UU := eq).
+    apply map_monad_eq_itree_map_ind.
+    - intros [? []] IN.
+      cbn.
+      apply PHIN in IN; cbn in IN.
+      rewrite <- assoc_update_provenance; auto.
+      reflexivity.
+    - intros ? ? <-.
+      reflexivity.
+  Qed.
+
+  Lemma update_provenance_block_eq_itree :
+    forall bk old new f,
+      f <> new ->
+      block_phis_block_id_not_in new bk ->
+      ⟦ bk ⟧b f ≅ ⟦ update_provenance_block old new bk ⟧b (update_provenance old new f).
+  Proof.
+    intros.
+    unfold denote_block.
+    cbn.
+    rewrite <- update_provenance_phis_eq_itree; auto.
+    reflexivity.
+  Qed.
+
+  Definition ocfg_phis_not_id b (G : ocfg dtyp) :=
+    forall bk, In bk G ->
+          block_phis_block_id_not_in b bk.
+
+  Lemma find_block_In' : forall {T} G b (bk : block T),
+      find_block G b = Some bk ->
+      In bk G.
+  Proof.
+    intros * LU; pose proof find_block_has_id _ _ LU; subst; apply find_block_In; auto.
+  Qed.
+
+  Lemma phis_not_id_ocfg_to_bk : forall b G b' bk,
+      find_block G b' = Some bk ->
+      ocfg_phis_not_id b G ->
+      block_phis_block_id_not_in b bk.
+  Proof.
+    intros * FIND WF.
+    apply find_block_In' in FIND.
+    apply WF; auto.
+  Qed.
+
   Lemma fusion_block_correct_some :
     forall G G' f to b1 b2,
-      wf_ocfg_bid G ->
-      fusion_block G = (G', Some (b1,b2)) ->
-      to <> b2 ->
+      wf_ocfg_bid G ->                       (* All label ids in G are unique *)
+      ocfg_phis_not_id b1 G ->               (* No phi node should refer to b1 since it won't jump anywhere but b2 *)
+      fusion_block G = (G', Some (b1,b2)) -> (* Two blocks are indeed fused *)
+      to <> b2 ->                             (* I don't start the execution in the middle of the fused block *)
+      f <>  b1 ->                             (* and hence cannot come from the upper part of the fused block *)
       eutt (fun res1 res2 =>
               match res1, res2 with
               | inl (f1,to1), inl (f2,to2) => f2 = update_provenance b2 b1 f1 /\ to1 = to2
@@ -866,15 +932,16 @@ Section LoopFusionCorrect.
            (⟦ G ⟧bs (f,to))
            (⟦ G' ⟧bs (update_provenance b2 b1 f,to)).
   Proof.
-    intros * WF FUSED; revert f to.
+    intros * WF PHIS FUSED; revert f to.
     apply fusion_block_some in FUSED; auto; destruct FUSED as (INEQ & bk1 & bk2 & LU1 & TERM & LU2 & PRED & NOPHI & LU3 & LU4 & LU5).
     einit.
     ecofix CIH.
-    intros * INEQ'.
+    intros * INEQ' INEQ''.
 
     (* Two cases: are we starting the evaluation from the block b1 being fused with b2? *)
     destruct (Eqv.eqv_dec_p to b1).
-    - (* We will match the evaluation of b1 followed by b2 against the fused block *)
+    - (* Yes we are: b1 = to *)
+      (* We will match the evaluation of b1 followed by b2 against the fused block *)
       do 2 red in e; subst b1.
       rewrite 2 denote_ocfg_unfold_in_eq_itree; eauto.
       unfold fusion_blocks.
@@ -884,7 +951,12 @@ Section LoopFusionCorrect.
       setoid_rewrite denote_code_app.
       repeat setoid_rewrite bind_bind.
       (* Match the phis *)
-      ebind; econstructor; [rewrite <- update_provenance_phis_eq_itree; reflexivity | intros ? ? <-].
+      ebind; econstructor.
+      { rewrite <- update_provenance_phis_eq_itree; auto.
+        reflexivity.
+        eapply phis_not_id_ocfg_to_bk; eauto.
+      }
+      intros ? ? <-.
       (* Match the code from b1 *)
       ebind; econstructor; [reflexivity | intros ? ? <-].
       repeat setoid_rewrite bind_ret_l.
@@ -917,7 +989,7 @@ Section LoopFusionCorrect.
       ebase; right.
       specialize (CIH b2 next).
       rewrite update_provenance_eq in CIH.
-      apply CIH.
+      apply CIH; auto.
       (* Remains to prove we did not jump in the middle of the fused block *)
       cbn in *.
       destruct (Eqv.eqv_dec_p next b2); auto.
@@ -944,7 +1016,11 @@ Section LoopFusionCorrect.
       +
         pose proof denote_bk_exits_in_outputs b f as EXIT;
           apply has_post_post_strong in EXIT.
-        ebind; econstructor; [rewrite <- update_provenance_block_eq_itree; apply EXIT | clear EXIT].
+        ebind; econstructor; [| clear EXIT].
+        { rewrite <- update_provenance_block_eq_itree; auto.
+          apply EXIT.
+          eapply phis_not_id_ocfg_to_bk; eauto.
+        }
         intros ? ? [<- EXIT].
         destruct u1 as [b_next | ?]; [| eret].
         etau.
@@ -952,7 +1028,7 @@ Section LoopFusionCorrect.
         right.
         specialize (CIH to b_next).
         rewrite update_provenance_ineq in CIH; auto.
-        apply CIH.
+        apply CIH; auto.
         cbn in EXIT.
         destruct (Eqv.eqv_dec_p b_next b2); auto.
         do 2 red in e; subst.
