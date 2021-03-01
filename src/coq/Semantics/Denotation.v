@@ -856,7 +856,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         | Some op =>
           uv <- denote_exp (Some dt) op ;;
           ret (id,uv)
-        | None => raise ("jump: phi node doesn't include block " ++ to_string bid_from)
+        | None => raise ("jump: phi node doesn't include block ")
         end.
 
       Definition denote_phis (bid_from: block_id) (phis: list (local_id * phi dtyp)): itree instr_E unit :=
