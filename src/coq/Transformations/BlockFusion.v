@@ -808,7 +808,15 @@ Section LoopFusionCorrect.
       wf_ocfg_bid G ->
       fusion_block G = (G', Some (b1,b2)) ->
       to <> b2 ->
-      ⟦ G ⟧bs (f,to) ≈ ⟦ G' ⟧bs (update_provenance b2 b1 f,to).
+      eutt (fun res1 res2 =>
+              match res1, res2 with
+              | inl (f1,to1), inl (f2,to2) => f2 = update_provenance b2 b1 f1 /\ to1 = to2
+              | inr v1, inr v2 => v1 = v2
+              | _, _ => False
+              end
+           )
+           (⟦ G ⟧bs (f,to))
+           (⟦ G' ⟧bs (update_provenance b2 b1 f,to)).
   Proof.
     intros * WF FUSED; revert f to.
     apply fusion_block_some in FUSED; auto; destruct FUSED as (INEQ & bk1 & bk2 & LU1 & TERM & LU2 & PRED & NOPHI & LU3 & LU4 & LU5).
@@ -855,7 +863,7 @@ Section LoopFusionCorrect.
         apply has_post_post_strong in EXIT.
       ebind; econstructor; [apply eutt_translate_gen, EXIT | clear EXIT; intros ? ? [<- EXIT]].
       (* We either jump or return. In the latter case, it's trivial *)
-      destruct u3 as [next | ?]; [| reflexivity].
+      destruct u3 as [next | ?]; [| eret].
       (* Here is the guard for our coinductive call *)
       etau.
       ebase; right.
@@ -890,7 +898,7 @@ Section LoopFusionCorrect.
           apply has_post_post_strong in EXIT.
         ebind; econstructor; [rewrite <- update_provenance_block_eq_itree; apply EXIT | clear EXIT].
         intros ? ? [<- EXIT].
-        destruct u1 as [b_next | ?]; [| reflexivity].
+        destruct u1 as [b_next | ?]; [| eret].
         etau.
         ebase.
         right.
@@ -905,9 +913,8 @@ Section LoopFusionCorrect.
         apply PRED in EXIT; subst; auto.
 
       + (* If we jump out of the open cfg, we return non equal result *)
-        admit.
-
-  Admitted.    
+        eret.
+  Qed.
 
   Lemma fusion_block_correct_none :
     forall G G' f to, 
