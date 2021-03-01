@@ -6,6 +6,8 @@ COQLIBDIR = ../lib
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
+OPAMPKGS=coq coq-ext-lib coq-paco coq-ceres coq-flocq coq-mathcomp-ssreflect coq-simple-io dune menhir qcheck
+
 ITREEDIR=../lib/InteractionTrees
 QUICKCHICKDIR=../lib/QuickChick
 
@@ -51,6 +53,10 @@ interp:
 	$(MAKE) vellvm
 
 coq: $(VOFILES)
+
+.PHONY: opam
+opam:
+	opam install $(OPAMPKGS)
 
 coqinterp: $(COQFILESINTERP:%=coq/%.vo)
 

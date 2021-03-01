@@ -113,6 +113,8 @@ Our current test-suite of LLVM programs for which we compare our semantics again
     * paco       (installed via, e.g. opam install coq-paco)
     * flocq      (installed via, e.g. opam install coq-flocq, see note below) 
     * ceres      (installed via, e.g. opam install coq-ceres)
+    * mathcomp   (installed via, e.g. opam install coq-mathcomp-ssreflect)
+    * simple-io  (installed via, e.g. opam install coq-simple-io)
     WARNING: you should not have the itree opam package in your switch to avoid conflict with the extended version of the library we provide locally
   - Additional opam packages: 
     * dune       (installed via, e.g. opam install dune)
@@ -124,7 +126,7 @@ Compilation:
 
 1. Install all external dependencies
 2. Clone the vellvm git repo with the `--recurse-submodule` option
-1. Run `make` in the /src directory: it will first compile the itree libraries, then vir, and finally extract the OCaml executable
+1. Run `make` in the /src directory: it will first compile the itree / quickchick libraries, then vir, and finally extract the OCaml executable
 
 # Running
 
