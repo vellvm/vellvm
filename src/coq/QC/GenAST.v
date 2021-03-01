@@ -9,7 +9,7 @@ From ExtLib.Structures Require Export
 
 Require Import ExtLib.Data.Monads.StateMonad.
 
-From Vellvm Require Import LLVMAst Util AstLib TypeUtil. Syntax.CFG Show Semantics.TopLevel.
+From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Syntax.TypeUtil Semantics.TopLevel.
 Require Import Integers Floats.
 
 Require Import List.
@@ -117,7 +117,7 @@ Section ShowInstances.
       | EXP_Bool b => show b
       | EXP_Null => "null"
       | EXP_Zero_initializer => "zero initializer"
-      | EXP_Cstring s => s (* TODO, this is probably wrong *)
+      | EXP_Cstring s => "unimplemented cstring" (* TODO, this is wrong *)
       | EXP_Undef => "undef"
       | OP_IBinop iop t v1 v2 =>
         show iop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
@@ -144,7 +144,7 @@ Section ShowInstances.
        | Some a => prefix ++ show a
        end.
 
-  Fixpoint show_instr (i : instr typ) : string
+  Definition show_instr (i : instr typ) : string
     := match i with
        | INSTR_Comment s => "; " ++ s
        | INSTR_Op e => show e
@@ -204,7 +204,7 @@ Section ShowInstances.
   Definition show_block (indent : string) (b : block typ) : string
     :=
       let code   := show_code indent (blk_code b) in
-      let term   := indent ++ show (snd (blk_term b)) ++ newline in
+      let term   := indent ++ show (blk_term b) ++ newline in
       show (blk_id b) ++ ":" ++ newline
            ++ code
            ++ term.
@@ -231,7 +231,7 @@ Section ShowInstances.
        | (x::xs), (y::ys) => (x, y) :: zip xs ys
        end.
 
-  Definition show_definition (defn : definition typ (list (block typ))) : string
+  Definition show_definition (defn : definition typ (block typ * list (block typ))) : string
     :=
       let name  := defn.(df_prototype).(dc_name) in
       let ftype := defn.(df_prototype).(dc_type) in
@@ -239,7 +239,10 @@ Section ShowInstances.
       | TYPE_Function ret_t args_t
         =>
         let args := zip defn.(df_args) args_t in
-        let blocks := concat newline (map (show_block "    ") (df_instrs defn)) in
+        let blocks :=
+            match df_instrs defn with
+            | (b, bs) => concat newline (map (show_block "    ") (b::bs))
+            end in
         concatStr
           [ "define "; show ret_t; " @"; show name; show_arg_list args; " {"; newline
           ; blocks
@@ -248,19 +251,19 @@ Section ShowInstances.
       | _ => "Invalid type on function: " ++ show name
       end.
 
-  Global Instance showDefinition: Show (definition typ (list (block typ))) :=
+  Global Instance showDefinition: Show (definition typ (block typ * list (block typ))) :=
     {| show := show_definition |}.
 
-  Definition show_tle (tle : toplevel_entity typ (list (block typ))) : string
+  Definition show_tle (tle : toplevel_entity typ (block typ * list (block typ))) : string
     := match tle with
        | TLE_Definition defn => show_definition defn
        | _ => "todo: show_tle"
        end.
 
-  Global Instance showTLE: Show (toplevel_entity typ (list (block typ))) :=
+  Global Instance showTLE: Show (toplevel_entity typ (block typ * list (block typ))) :=
     {| show := show_tle |}.
 
-  Global Instance showProg : Show (list (toplevel_entity typ (list (block typ)))) :=
+  Global Instance showProg : Show (list (toplevel_entity typ (block typ * list (block typ)))) :=
     {| show tles := concat (newline ++ newline) (map show_tle tles) |}.
 
 End ShowInstances.
@@ -642,6 +645,9 @@ Section TypGenerators.
                 (* ; TYPE_Opaque *)
                 ])).
 
+  Definition genN : G N
+    := n <- arbitrary;; ret (N.of_nat n).
+
   (* TODO: This should probably be mutually recursive with
      gen_sized_typ since pointers of any type are considered sized *)
   Program Fixpoint gen_typ_size (sz : nat) {measure sz} : GenLLVM typ :=
@@ -651,8 +657,8 @@ Section TypGenerators.
                       [ gen_typ_0
                       (* Might want to restrict the size to something reasonable *)
                       (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
-                      ; ret TYPE_Array <*> lift genPosZ <*> gen_sized_typ_size sz'
-                      ; ret TYPE_Vector <*> lift genPosZ <*> gen_sized_typ_size sz'
+                      ; ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz'
+                      ; ret TYPE_Vector <*> lift genN <*> gen_sized_typ_size sz'
                       ; let n := Nat.div sz 2 in
                         ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
                       ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
@@ -703,8 +709,8 @@ Section TypGenerators.
                       [ gen_typ_non_void_0
                       (* Might want to restrict the size to something reasonable *)
                       (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
-                      ; ret TYPE_Array <*> lift genPosZ <*> gen_sized_typ_size sz'
-                      ; ret TYPE_Vector <*> lift genPosZ <*> gen_sized_typ_size sz'
+                      ; ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz'
+                      ; ret TYPE_Vector <*> lift genN <*> gen_sized_typ_size sz'
                       ; let n := Nat.div sz 2 in
                         ret TYPE_Function <*> gen_typ_size n <*> listOf_LLVM (gen_sized_typ_size n)
                       ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
@@ -786,7 +792,7 @@ Section ExpGenerators.
     := match a with
        | TYPE_I sz =>
          match b with
-         | TYPE_I sz' => if Z.eq_dec sz sz' then true else false
+         | TYPE_I sz' => if N.eq_dec sz sz' then true else false
          | _ => false
          end
        | TYPE_Pointer t =>
@@ -842,7 +848,7 @@ Section ExpGenerators.
        | TYPE_Array sz t =>
          match b with
          | TYPE_Array sz' t' =>
-           if Z.eq_dec sz sz'
+           if N.eq_dec sz sz'
            then normalized_typ_eq t t'
            else false
          | _ => false
@@ -871,7 +877,7 @@ Section ExpGenerators.
        | TYPE_Vector sz t =>
          match b with
          | TYPE_Vector sz' t' =>
-           if Z.eq_dec sz sz'
+           if N.eq_dec sz sz'
            then normalized_typ_eq t t'
            else false
          | _ => false
@@ -961,10 +967,10 @@ Section ExpGenerators.
             (* TODO: If I1 also allow ICmp and FCmp *)
             [gen_ibinop_exp isz]
           | TYPE_Array n t =>
-            [es <- vectorOf_LLVM (Z.to_nat n) (gen_exp_size 0 t);;
+            [es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
              ret (EXP_Array (map (fun e => (t, e)) es))]
           | TYPE_Vector n t =>
-            [es <- vectorOf_LLVM (Z.to_nat n) (gen_exp_size 0 t);;
+            [es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
              ret (EXP_Array (map (fun e => (t, e)) es))]
           | TYPE_Struct fields =>
             (* Should we divide size evenly amongst components of struct? *)
@@ -999,11 +1005,11 @@ Section ExpGenerators.
     end
   with
   (* TODO: Make sure we don't divide by 0 *)
-  gen_ibinop_exp (isz : Z) : GenLLVM (exp typ)
+  gen_ibinop_exp (isz : N) : GenLLVM (exp typ)
     :=
       let t := TYPE_I isz in
       ibinop <- lift gen_ibinop;;
-      if D.iop_is_div ibinop
+      if Handlers.LLVMEvents.DV.iop_is_div ibinop
       then ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
       else ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t.
 
@@ -1177,20 +1183,20 @@ Section InstrGenerators.
          (* Need to lift oneOf to GenLLVM ...*)
          freq_LLVM
            [ (6%nat, gen_terminator_sz 0 t)
-           ; (min sz' 6%nat, '(b, bs) <- gen_blocks_sz sz' t;; ret (TERM_Br_1 (blk_id b), bs))
+           ; (min sz' 6%nat, '(b, (bh, bs)) <- gen_blocks_sz sz' t;; ret (TERM_Br_1 (blk_id b), (bh::bs)))
            ; (min sz' 6%nat, ctx <- get_ctx;;
                    c <- gen_exp_size 0 (TYPE_I 1);;
-                   '(b1, bs1) <- gen_blocks_sz sz' t;;
+                   '(b1, (bh1, bs1)) <- gen_blocks_sz sz' t;;
 
                    (* Restore context so blocks in second branch don't refer
                       to variables from the first branch. *)
                    modify (replace_ctx ctx);;
-                   '(b2, bs2) <- gen_blocks_sz sz' t;;
+                   '(b2, (bh2, bs2)) <- gen_blocks_sz sz' t;;
 
-                   ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), bs1 ++ bs2))
+                   ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), (bh1::bs1) ++ (bh2::bs2)))
            ]
        end
-  with gen_blocks_sz (sz : nat) (t : typ) {struct t} : GenLLVM (block typ * list (block typ))
+  with gen_blocks_sz (sz : nat) (t : typ) {struct t} : GenLLVM (block typ * (block typ * list (block typ)))
          :=
            bid <- new_block_id;;
            code <- gen_code;;
@@ -1199,16 +1205,16 @@ Section InstrGenerators.
            let b := {| blk_id   := bid
                      ; blk_phis := []
                      ; blk_code := code
-                     ; blk_term := (IId i, term)
+                     ; blk_term := term
                      ; blk_comments := None
                     |} in
-           ret (b, b :: bs).
+           ret (b, (b, bs)).
 
-  Definition gen_blocks (t : typ) : GenLLVM (list (block typ))
+  Definition gen_blocks (t : typ) : GenLLVM (block typ * list (block typ))
     := sized_LLVM (fun n => fmap snd (gen_blocks_sz n t)).
 
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
-  Definition gen_definition (name : global_id) (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (list (block typ)))
+  Definition gen_definition (name : global_id) (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
       ctx <- get_ctx;;
       (* Add arguments to context *)
@@ -1228,20 +1234,20 @@ Section InstrGenerators.
       in
       (* Reset context *)
       modify (replace_ctx ((ID_Global name, f_type) :: ctx));;
-      ret (mk_definition (list (block typ)) prototype (map fst args) bs).
+      ret (mk_definition (block typ * list (block typ)) prototype (map fst args) bs).
 
-  Definition gen_new_definition (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (list (block typ)))
+  Definition gen_new_definition (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (block typ * list (block typ)))
     :=
       name <- new_global_id;;
       gen_definition name ret_t args.
 
-  Definition gen_main : GenLLVM (definition typ (list (block typ)))
+  Definition gen_main : GenLLVM (definition typ (block typ * list (block typ)))
     := gen_definition (Name "main") (TYPE_I 8) [].
 
-  Definition gen_main_tle : GenLLVM (toplevel_entity typ (list (block typ)))
+  Definition gen_main_tle : GenLLVM (toplevel_entity typ (block typ * list (block typ)))
     := ret TLE_Definition <*> gen_main.
 
-  Definition gen_llvm :GenLLVM (list (toplevel_entity typ (list (block typ))))
+  Definition gen_llvm :GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     := fmap ret gen_main_tle.
 
 End InstrGenerators.
