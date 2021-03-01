@@ -7,8 +7,9 @@ MLDIR = ml
 EXTRACTDIR = ml/extracted
 
 ITREEDIR=../lib/InteractionTrees
+QUICKCHICKDIR=../lib/QuickChick
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(ITREEDIR)/theories/ ITree 
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(ITREEDIR)/theories/ ITree -R $(QUICKCHICKDIR)/src/ QuickChick -I $(QUICKCHICKDIR)/src
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
@@ -23,7 +24,7 @@ COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Nu
 									Syntax/Scope Syntax/SurfaceSyntax\
 									Semantics/MemoryAddress Semantics/DynamicValues Semantics/LLVMEvents Semantics/IntrinsicsDefinitions\
 									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/UndefinedBehaviour Handlers/Memory Handlers/MemoryTheory Handlers/Handlers\
-								  Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel
+								  Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel QC/GenAST QC/QCVellvm
 
 COQFILESTHEORY := Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
 									Theory/TopLevelRefinements Theory/SymbolicInterpreter\
@@ -59,7 +60,15 @@ update-trees:
 itrees:
 	make -C $(ITREEDIR)
 
-.PHONY: extracted itrees 
+quickchick:
+	make -C $(QUICKCHICKDIR)
+
+update-quickchick:
+	git submodule update -- $(QUICKCHICKDIR)
+
+update-submodules: update-trees update-quickchick
+
+.PHONY: extracted update-trees update-quickchick update-submodules itrees quickchick
 extracted: $(EXTRACTDIR)/STAMP $(VOFILES)
 
 $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
@@ -75,7 +84,7 @@ $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "COQC $*.v"
 	@$(COQC) -dump-glob doc/$(*F).glob $*.v
 
-depend: itrees $(VFILES) 
+depend: itrees quickchick $(VFILES) 
 	@echo "Analyzing Coq dependencies"
 	@$(COQDEP) $^ > .depend
 
@@ -117,6 +126,8 @@ clean-vellvm:
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
 clean-itrees:
 	make -C $(ITREEDIR) clean
+	make -C $(QUICKCHICKDIR) clean
+
 .PHONY: clean-vellvm clean-itrees
 
 doc/coq2html: 

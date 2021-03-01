@@ -47,6 +47,16 @@ Definition dec_digits_m := inc_e.
 Definition shift_digits_m (f : bfloat) (ddm : Z) := shift_e f (- ddm).
 Definition set_digits_m (f : bfloat) (dm : Z) := shift_digits_m f (dm - Zdigits (Fnum f)).
 
+(* Deprecated stuff from Coq.ZArith.Zlogarithm *)
+Fixpoint log_inf (p:positive) : Z :=
+  match p with
+  | xH => 0
+  | xO q => Z.succ (log_inf q)
+  | xI q => Z.succ (log_inf q)
+  end.
+
+Axiom Zlog2_log_inf : forall p, Z.log2 (Zpos p) = log_inf p.
+
 (** * normalization *)
 Definition normalize_float (prec emax : Z) (f : bfloat)
   : option bfloat :=

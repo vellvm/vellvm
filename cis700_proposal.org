@@ -1,0 +1,131 @@
+#+TITLE: Quichicking Vellvm
+
+* Vellvm, a formal semantics for LLVM's IR
+
+  Vellvm is a project that aims to provide LLVM's IR with a formal
+  semantics in Coq.  It comes with a propositional model capturing all
+  legal executions, but also an interpreter that is sound with respect
+  to this model.
+
+  The IR's semantics is described by an informal document, written in
+  plain English, the [[https://llvm.org/docs/LangRef.html][LangRef]].  While Vellvm's semantics are intended
+  to reflect this document, the task is not straightforward. For
+  starters, the sheer size of the language makes developing semantics
+  error prone. A more crucial difficulty is that the semantics
+  provided in LangRef are often imprecise, and sometimes
+  ambiguous. Furthermore, some features of the language are known to
+  be inconsistent, requiring careful tip-toeing and an eye towards
+  significant future redesigns.
+
+  While LangRef may leave out important details, the LLVM project also
+  includes an interpreter for the IR. This interpreter can serve as a
+  reference implementation for the language, and so it should be
+  possible to compare Vellvm's interpreter with LLVM's interpreter and
+  check if they are in agreement. An excellent way to do this would be
+  to use QuickChick to randomly generate LLVM IR programs to run on
+  each interpreter --- comparing the results of each program should
+  allow us to find differences and bugs in each implementation.
+
+  Furthermore, Vellvm is also meant to be a tool for reasoning about
+  LLVM IR programs. As Vellvm is still under development there are
+  still many theorems for reasoning about the equivalence of LLVM
+  programs that need to be proven. Furthermore, Vellvm hopes to
+  develop several verified program transformations on LLVM IR in the
+  near future. Proving these lemmas and correctness theorems is
+  expensive, and so it would be prudent to test these theorems early
+  on to ensure that the theorems are stated correctly and that the
+  program transformations are not obviously wrong. The first step to
+  testing these properties is a good generator like the one we might
+  use to perform differential testing between Vellvm and the LLVM
+  interpreter.
+
+  In summary, we make the following observations:
+
+  1. We are developing complex software which is meant to agree with
+     another one: testing for this agreement may help our development
+     process.
+  2. There are strong suspicions that some aspects of these semantics
+     are problematic. Could we find properties expressing sanity that
+     could be tested?
+  3. It is known that some (combinations of) transformations are
+     unsound with respect to the current official semantics, a pitfall
+     that our semantics intends to fix (either by fixing the
+     semantics, or prohibiting such unsound combinations of
+     optimizations). Is there any hope to perform some testing at this
+     level?
+  
+  We propose to start through this project this line of research, by first and foremost focusing
+  on the design and implementation of an efficient random generator of Vellvm programs using the
+  [[https://github.com/QuickChick/QuickChick][QuickChick]] Coq library.
+
+* In the footsteps of CSmith
+
+  [[https://embed.cs.utah.edu/csmith/][CSmith]] is a tool performing random testing of C compilers. It uncovered an unprecedented amount of
+  critical bugs in all the compilers it challenged, with the exception of the verified-at-the-time
+  subset of CompCert. One of the key ingredient to their success is the combination of random generation
+  with static analyses meant to ensure that all program generated admit no undefined behaviors, and do
+  not rely on unspecified behaviors.
+ 
+  While C and IR are not identical, they are similar enough that we believe this work to be the right
+  starting point for the design of our random generator.
+
+* Difficulties, open questions and remarks
+
+  - The approach to testing that CSmith takes is differential testing,
+    simultaneously testing a suite of compiler and letting the majority decide
+    what is the right answer. This approach does not apply to our case, although
+    we will probably be satisfied with simply testing agreement with the reference
+    interpreter (llc).
+  - Since llc is obviously not implemented in Coq, we will need to
+    look into calling llc from ocaml and fiddling with Coq's
+    extraction mechanism to make our properties work.
+  - IR's semantics is non deterministic for some
+    features. Non-agreement on these features is therefore not
+    necessarily sign of a bug. Should and can we restrict ourselves to
+    the deterministic fragment? Can we find a way to meaningfully test
+    the non-deterministic one?
+    + It does make sense to start with the deterministic fragment of
+      the language, but some of the most interesting and difficult
+      behaviour of IR is in the behaviour of nondeterministic things like undef.
+  - What does it mean to compare the implementations? Is testing the return values 
+    sufficient?
+  - What are interesting properties of our compiler that we could test, independently
+    from llc? It feels like when it comes to a compiler, we are mostly interested in
+    clearly non-computable semantic properties of program, and program equivalence in
+    particular.
+    + We'll have to look into how to test things like eutt if we want
+      to check most of our properties.
+
+* Bibliography
+
+  - Finding and understanding bugs in C Compilers (Yang et al., PLDI 2011)
+    This paper introduces the [[https://embed.cs.utah.edu/csmith/][CSmith]] tool.
+
+  - A survey of compiler testing (Chen et al., ACM Computing Survey 2020)
+
+  - Effect-driven QuickChecking of compilers (Midtgaardjan et al., ICFP 2017) 
+
+
+
+* Notes
+
+** Some difficulties
+
+- One of the problems is just that LLVM is a large language, making it
+  a fair amount of work to go through and write a generator.
+  + Had to pick a subset for now. Focusing on simple integer expressions?
+- Derive for Arbitrary might be broken in this version of QuickChick,
+  which makes it a bit more work...
+- There are certain constraints that you might not know about.
+  + Well formed types?
+  + Can I test for these?
+- Difficulties generating phi nodes
+  + For full generality need a kind of dominator analysis to know
+    which identifiers are in scope
+
+** Some contributions
+
+  - Basic generators for a subset of LLVM
+  - Well formedness checking
+    + Might be incomplete, but it's a start of something that we will
+      eventually need in Vellvm as well, regardless of testing.
