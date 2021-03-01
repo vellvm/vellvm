@@ -11,12 +11,9 @@
 From Coq Require Import
      ZArith Ascii Strings.String Setoid Morphisms List.
 
-From ExtLib Require Import
-     Programming.Eqv
-     Structures.Monads.
-
 From ITree Require Import
      ITree
+     Basics.HeterogeneousRelations
      Eq.Eq
      Interp.Interp
      Interp.InterpFacts
@@ -30,35 +27,29 @@ From Vellvm Require Import
      LLVMAst
      AstLib
      CFG
-     TransformTypes
      DynamicTypes
      DynamicValues
      Denotation
-     Handlers.Global
-     Handlers.Local
-     Handlers.Stack
-     Handlers.Memory
+     Handlers.Handlers
      LLVMEvents
      Transformations.Transformation
      Traversal
      TopLevelRefinements.
+
+From ExtLib Require Import
+     Programming.Eqv
+     Structures.Monads.
 
 Import EqvNotation.
 
 Open Scope Z_scope.
 Open Scope string_scope.
 
-From ExtLib Require Import
-     Programming.Eqv
-     Structures.Monads.
-
 From Vellvm Require Import
      AstLib.
 Import ListNotations.
 
-Import EqvNotation.
-Import TopLevel.
-Import TopLevelEnv.
+Import DV.
 Import R.
 
 Import MonadNotation.
@@ -74,10 +65,10 @@ Section Swap.
       if id ~=? id2 then id1 else
         id.
 
-  Instance swap_endo_raw_id : endo raw_id := swap_raw_id.
+  Instance swap_endo_raw_id : Endo raw_id := swap_raw_id.
 
-  Definition swap_mcfg: transformation := f_endo.
-  Definition swap_dmcfg: endo (mcfg dtyp) := f_endo.
+  Definition swap_mcfg: transformation := endo.
+  Definition swap_dmcfg: Endo (mcfg dtyp) := endo.
 
   (*
     For now we forget about normalization of types, we reason after it happened.
@@ -95,14 +86,14 @@ Section Swap.
   | list_rel_nil: list_rel RA [] []
   | list_rel_cons: forall a1 a2 tl1 tl2, RA a1 a2 -> list_rel RA tl1 tl2 -> list_rel RA (a1 :: tl1) (a2 :: tl2)
   .
-  Hint Constructors list_rel.
+  Hint Constructors list_rel : core.
 
   (* In top-level, [address_one_function] is mapped to return notably a mapping from function addresses to itrees.
      We hence want to get extensional eutt over the returned type.
    *)
   Definition function_rel {X}:
-    relation (FMapAList.alist raw_id res_L0 * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (uvalue * (list uvalue -> itree IO.L0 res_L0)))) := (Logic.eq × (Logic.eq × list_rel (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))).
-  Hint Unfold function_rel.
+    relation (FMapAList.alist raw_id uvalue * @Stack.stack X * (FMapAList.alist raw_id dvalue * list (uvalue * (list uvalue -> itree L0 uvalue)))) := (Logic.eq × (Logic.eq × list_rel (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))).
+  Hint Unfold function_rel : core.
 
   Global Instance list_rel_refl {R: Type} {RR: relation R} `{Reflexive _ RR} : Reflexive (list_rel RR).
   Proof.
@@ -114,51 +105,53 @@ Section Swap.
     repeat apply prod_rel_refl; auto.
     eapply list_rel_refl.
     Unshelve.
-    apply prod_rel_refl; auto.
+    apply prod_rel_refl; auto. apply refine_uvalue_Reflexive.
     intros ? ?.
     reflexivity.
   Qed.
 
   (*
-  (* Calvin broke this somehow by changing L0 to not include
+  (* Calvin broke this somehow by changing uvalue to not include
      CallE. Yannick promises not to be mad later when fixing this. :) *)
-  Lemma interp_to_L2_map_monad: forall {X} (f: X -> itree _ (uvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
-      (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))) (interp_to_L2 nil (f x) s1 s2) (interp_to_L2 nil (f (g x)) s1 s2)) ->
-      eutt function_rel (interp_to_L2 nil (map_monad f l) s1 s2) (interp_to_L2 nil (map_monad f (map g l)) s1 s2).
+  Lemma interp2_map_monad: forall {X} (f: X -> itree _ (uvalue * D.function_denotation)) (g: endo X) (l: list X) s1 s2,
+      (forall x s1 s2, In x l -> eutt (Logic.eq × (Logic.eq × (refine_uvalue × (fun d1 d2 => forall x, eutt refine_uvalue (d1 x) (d2 x))))) (interp2 nil (f x) s1 s2) (interp2 nil (f (g x)) s1 s2)) ->
+      eutt function_rel (interp2 nil (map_monad f l) s1 s2) (interp2 nil (map_monad f (map g l)) s1 s2).
   Proof.
     induction l as [| x l IH]; simpl; intros; [reflexivity |].
-    rewrite 2 interp_to_L2_bind.
+    rewrite 2 interp2_bind.
     eapply eutt_clo_bind; eauto.
     intros (? & ? & ? & ?) (? & ? & ? & ?) EQ.
     repeat match goal with | h: prod_rel _ _ _ _ |- _ => inv h end.
-    rewrite 2 interp_to_L2_bind.
+    rewrite 2 interp2_bind.
     eapply eutt_clo_bind; eauto.
     intros (? & ? & ?) (? & ? & ?) EQ.
     inv EQ.
     repeat match goal with | h: prod_rel _ _ _ _ |- _ => inv h end.
-    rewrite 2 interp_to_L2_ret.
+    rewrite 2 interp2_ret.
     apply eqit_Ret.
     constructor; auto.
   Qed.
   *)
 
   Lemma swap_correct_L2:
-    forall p, refine_mcfg_L2 nil p (swap_mcfg p).
+    forall dt entry args intrinsics p, refine_mcfg_L2 dt entry args intrinsics p (swap_mcfg p).
   Proof.
     intros p.
     unfold refine_mcfg_L2.
     unfold model_to_L2.
 
-    unfold denote_vellvm.
-    simpl; rewrite 2 interp_to_L2_bind.
-    split_bind.
+    (* unfold denote_vellvm. *)
+    (* unfold denote_vellvm_init. *)
+    (* unfold denote_vellvm. *)
+    (* simpl; rewrite 2 interp2_bind. *)
+    (* split_bind. *)
 
     {
       (* Reasoning about initialization *)
       admit.
     }
 Admitted.
-(*     rewrite 2 interp_to_L2_bind. *)
+(*     rewrite 2 interp2_bind. *)
 (*     (* We use [function_rel] here to establish that we get piece-wise eutt when denoting each function *) *)
 (*     eapply eutt_clo_bind with function_rel. *)
 (*     Focus 2. *)
@@ -168,16 +161,16 @@ Admitted.
 (*     { *)
 (*       (* Denotation of each cfg *) *)
 (*       (* Here we need to actually establish something different than equality of states, but rather extensional agreement after renaming *) *)
-(*       apply interp_to_L2_map_monad. *)
+(*       apply interp2_map_monad. *)
 (*       intros cfg g l HIN. *)
 (*       unfold address_one_function. *)
 (*       simpl. *)
-(*       rewrite 2 interp_to_L2_bind. *)
+(*       rewrite 2 interp2_bind. *)
 (*       split_bind. *)
 (*       { (* Getting the address of the function *) *)
 (*         admit. *)
 (*       } *)
-(*       rewrite 2 interp_to_L2_ret. *)
+(*       rewrite 2 interp2_ret. *)
 (*       apply eqit_Ret. *)
 (*       do 3 constructor; auto. *)
 (*       intros args. *)
@@ -217,7 +210,7 @@ Admitted.
 
 (*     intros (? & ? & ?) (? & ? & ?) EQ. *)
 (*     inv EQ; repeat match goal with | h: prod_rel _ _ _ _ |- _ => inv h end. *)
-(*     rewrite 2 interp_to_L2_bind. *)
+(*     rewrite 2 interp2_bind. *)
 (*     split_bind. *)
 
 (*     { (* Getting the address of "main" *) *)
@@ -227,16 +220,16 @@ Admitted.
 (*     (* Tying the recursive knot *) *)
 
 (*     admit. *)
-(*   (*   rewrite 2 interp_to_L2_bind. *) *)
+(*   (*   rewrite 2 interp2_bind. *) *)
 
 
-(*   (*   2:rewrite interp_to_L2_bind; reflexivity. *) *)
+(*   (*   2:rewrite interp2_bind; reflexivity. *) *)
 (*   (*   unfold f_endo, endo_list. *) *)
-(*   (*   apply interp_to_L2_map_monad. *) *)
+(*   (*   apply interp2_map_monad. *) *)
 (*   (*   intros. *) *)
-(*   (*   remember (interp_to_L2 (address_one_function x) s1 s2). *) *)
+(*   (*   remember (interp2 (address_one_function x) s1 s2). *) *)
 (*   (*   cbn. *) *)
-(*   (*   rewrite 2 interp_to_L2_bind. *) *)
+(*   (*   rewrite 2 interp2_bind. *) *)
 (*   (*   split_bind. *) *)
 (*   (*   { (* Reading the name of the function *) *) *)
 (*   (*     admit. *) *)
@@ -244,11 +237,11 @@ Admitted.
 
 (*   (*     unfold f_endo. *) *)
 (*   (*     Set Printing All. *) *)
-(*   (*     unfold interp_to_L2, INT.interpret_intrinsics, interp_global, interp_local_stack. *) *)
+(*   (*     unfold interp2, INT.interpret_intrinsics, interp_global, interp_local_stack. *) *)
 (*   (*     rewrite interp_trigger; cbn. *) *)
 (*   (*     Lemma refine_cfg_to_mcfg: forall {B} f (l:list (definition dtyp (cfg dtyp))) s1 s2, *) *)
-(*   (*       interp_to_L2 (map_monad (B := B) f l) s1 s2 = *) *)
-(*   (*       interp_to_L2 (map_monad f l) s1 s2. *) *)
+(*   (*       interp2 (map_monad (B := B) f l) s1 s2 = *) *)
+(*   (*       interp2 (map_monad f l) s1 s2. *) *)
 
 (*   (*     (* Denotation of each cfg, need a modularity lemma *) *) *)
 
@@ -308,7 +301,7 @@ Admitted.
 (*   (*   unfold refine_mcfg_L2. *) *)
 (*   (*   unfold build_to_L2. *) *)
 
-(*   (*   Opaque build_L0. *) *)
+(*   (*   Opaque build_uvalue. *) *)
 (*   (*   cbn. *) *)
 
 (*   (*   cbn. *) *)
@@ -317,7 +310,8 @@ Admitted.
 
   Theorem swap_cfg_correct: transformation_correct swap_mcfg.
   Proof.
-    intros p.
+    unfold transformation_correct.
+    intros dt entry args intrinsics m. 
     apply refine_mcfg_L2_correct, swap_correct_L2.
   Qed.
 
@@ -929,7 +923,7 @@ Module RENAMING
 
     Lemma swap_trigger_Global
           {X} `{Swap X} {INV: SwapInvariant X}:
-      forall (e: LLVMGEnvE X), @ITree.trigger L0 X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
+      forall (e: LLVMGEnvE X), @ITree.trigger uvalue X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
     Proof.
       intros e.
       unfold trigger.
@@ -954,7 +948,7 @@ Module RENAMING
 
     Lemma swap_trigger_Local (* {E F: Type -> Type} `{E -< F} `{forall T, Swap (F T)}  `{Swap (E X)} *)
           {X} `{Swap X} {INV: SwapInvariant X}:
-      forall (e: LLVMEnvE X), @ITree.trigger L0 X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
+      forall (e: LLVMEnvE X), @ITree.trigger uvalue X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
     Proof.
       intros e.
       unfold trigger.
@@ -978,7 +972,7 @@ Module RENAMING
 
     Lemma swap_trigger_Memory (* {E F: Type -> Type} `{E -< F} `{forall T, Swap (F T)}  `{Swap (E X)} *)
           {X} `{Swap X} {INV: SwapInvariant X}:
-      forall (e: MemoryE X), @ITree.trigger L0 X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
+      forall (e: MemoryE X), @ITree.trigger uvalue X (@subevent _ _ _ _ (swap id1 id2 e)) ≅ swap id1 id2 (trigger e).
     Proof.
       intros e.
       unfold trigger.
@@ -1154,7 +1148,7 @@ Module RENAMING
     Instance Commute_denote_exp : Commute_eq_LLVM2 denote_exp.
     Proof.
       intros top e; revert top.
-      induction e using exp_ind'; intros top.
+      induction e; intros top.
       - solver.
       - destruct top as [[]|]; solver.
       - destruct top as [[]|]; solver.
@@ -1562,7 +1556,7 @@ Hint Unfold swap_ENV.
   Proof.
     intros CFG g e top.
     unfold err in *.
-    induction o using exp_ind'; bisim.
+    induction o; bisim.
     - cbn. rewrite swap_lookup_id.
       bisim.
 (*

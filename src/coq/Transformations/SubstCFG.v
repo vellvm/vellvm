@@ -21,15 +21,10 @@ From Vellvm Require Import
      LLVMAst
      AstLib
      CFG
-     TransformTypes
      DynamicTypes
      DynamicValues
      Denotation
-     Handlers.Global
-     Handlers.Local
-     Handlers.Stack
-     Handlers.Memory
-     Handlers.UndefinedBehaviour
+     Handlers.Handlers
      LLVMEvents
      Transformations.Transformation
      Traversal
@@ -66,30 +61,30 @@ End Substitute_cfg.
 Definition transformation_correct (T: endo (mcfg dtyp)) p: Prop :=
   refine_mcfg [] p (T p).
 
-Lemma interp_to_L3_bind:
+Lemma interp3_bind:
   forall ui {R S} (t: itree IO.L0 R) (k: R -> itree IO.L0 S) s1 s2 m,
-    interp_to_L3 ui (ITree.bind t k) s1 s2 m ≈
-                 (ITree.bind (interp_to_L3 ui t s1 s2 m) (fun '(m',(s2',(s1',x))) => interp_to_L3 ui (k x) s1' s2' m')).
+    interp3 ui (ITree.bind t k) s1 s2 m ≈
+                 (ITree.bind (interp3 ui t s1 s2 m) (fun '(m',(s2',(s1',x))) => interp3 ui (k x) s1' s2' m')).
 Proof.
   intros.
-  unfold interp_to_L3.
-  fold_L2; rewrite interp_to_L2_bind, M.interp_memory_bind.
+  unfold interp3.
+  fold_L2; rewrite interp2_bind, M.interp_memory_bind.
   apply eutt_clo_bind with (UU := Logic.eq); [reflexivity | intros ? (? & ? & ? & ?) ->; reflexivity].
 Qed.
 
-Lemma interp_to_L3_ret: forall ui (R : Type) s1 s2 m (x : R), interp_to_L3 ui (Ret x) s1 s2 m ≈ Ret (m, (s2, (s1, x))).
+Lemma interp3_ret: forall ui (R : Type) s1 s2 m (x : R), interp3 ui (Ret x) s1 s2 m ≈ Ret (m, (s2, (s1, x))).
 Proof.
-  intros; unfold interp_to_L3; fold_L2.
-  rewrite interp_to_L2_ret, M.interp_memory_ret; reflexivity.
+  intros; unfold interp3; fold_L2.
+  rewrite interp2_ret, M.interp_memory_ret; reflexivity.
 Qed.
 
-Lemma interp_to_L4_bind: forall {R S} g l m (t: itree _ R) (k: R -> itree _ S) t',
-    interp_to_L4 [] (bind t k) g l m t' ->
-    bind (interp_to_L4 [] t g l m) (fun '(m,(l,(g,x))) => interp_to_L4 [] (k x) g l m) t'.
+Lemma interp4_bind: forall {R S} g l m (t: itree _ R) (k: R -> itree _ S) t',
+    interp4 [] (bind t k) g l m t' ->
+    bind (interp4 [] t g l m) (fun '(m,(l,(g,x))) => interp4 [] (k x) g l m) t'.
 Proof.
   intros.
   cbn in *.
-  unfold interp_to_L4 in H.
+  unfold interp4 in H.
     match type of H with
        context[
             runState (M.interp_memory
@@ -97,10 +92,10 @@ Proof.
               (interp_local_stack ?h
                 (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m] =>
       replace (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m) with
-        (interp_to_L3 ui p g l m) in H by reflexivity
+        (interp3 ui p g l m) in H by reflexivity
     end.
     destruct H as [t1 [H1 H2]].
-    rewrite interp_to_L3_bind in H2.
+    rewrite interp3_bind in H2.
 
 Lemma interp_vellvm_model_user_bind: forall {R S} g l m (t: itree _ R) (k: R -> itree _ S) t',
     interp_vellvm_model_user [] (bind t k) g l m t' ->
@@ -117,7 +112,7 @@ Proof.
               (interp_local_stack ?h
                 (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m)] =>
       replace (P.model_undef (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m)) with
-        (interp_to_L4 ui p g l m) in MODEL1 by reflexivity
+        (interp4 ui p g l m) in MODEL1 by reflexivity
     end.
 
 
@@ -128,7 +123,7 @@ Proof.
               (interp_local_stack ?h
                 (runState (interp_global (INT.interpret_intrinsics ?ui ?p)) ?g)) ?l)) ?m)] =>
       replace (P.model_undef (runState (M.interp_memory (runState (interp_local_stack h (runState (interp_global (INT.interpret_intrinsics ui p)) g)) l)) m)) with
-        (interp_to_L4 ui p g l m) in MODEL1 by reflexivity
+        (interp4 ui p g l m) in MODEL1 by reflexivity
     end.
 
 
@@ -176,7 +171,7 @@ Section Substitute_cfg_correct.
     pattern (normalize_types p); generalize (normalize_types p); clear p; intros p.
 
     unfold denote_vellvm.
-    simpl; rewrite 2 interp_to_L2_bind.
+    simpl; rewrite 2 interp2_bind.
     split_bind.
 
     {
@@ -184,18 +179,18 @@ Section Substitute_cfg_correct.
       admit.
     }
 
-    rewrite 2 interp_to_L2_bind.
+    rewrite 2 interp2_bind.
     apply eutt_clo_bind with foo_rel.
 
     {
       (* Denotation of each cfg *)
-      apply interp_to_L2_map_monad.
+      apply interp2_map_monad.
       admit.
     }
 
     intros (? & ? & ?) (? & ? & ?) EQ.
     inv EQ; repeat match goal with | h: prod_rel _ _ _ _ |- _ => inv h end.
-    rewrite 2 interp_to_L2_bind.
+    rewrite 2 interp2_bind.
     split_bind.
 
     { (* Getting the address of "main" *)
@@ -205,7 +200,7 @@ Section Substitute_cfg_correct.
     (* Tying the recursive knot *)
 
     admit.
-  (*   rewrite 2 interp_to_L2_bind. *)
+  (*   rewrite 2 interp2_bind. *)
 
 
 

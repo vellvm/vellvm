@@ -11,8 +11,8 @@
 ;; open Platform
 ;; open Driver
 ;; open Assert
-;; open TopLevel
 ;; open DynamicValues
+;; open Handlers.LLVMEvents
 
 (* Vellvm test cases -------------------------------------------------------- *)
 
@@ -23,7 +23,8 @@ let parse_pp_test path =
   let vll_file = Platform.gen_name !Platform.output_path filename ".v.ll" in
   let dot_s = Platform.gen_name !Platform.output_path filename ".s" in
   let _ = Printf.fprintf stderr "Running llc on: %s\n%!" path in
-  try 
+  try
+    (* VV: Re-enabled llc *)
     let _ = llc_parse path dot_s in
     let prog = parse_file path in
     let _ = output_file vll_file prog in
@@ -58,7 +59,7 @@ let pp_test_of_dir dir =
   Test ("Parsing files in: " ^ dir,
         List.map (fun f -> (f, fun () -> parse_pp_test f)) (files_of_dir dir))
 
-let run_uvalue_test (test:IO.DV.uvalue -> bool) path =
+let run_uvalue_test (test:DV.uvalue -> bool) path =
   let (res, msg) =
     match run_ll_file path with
     | Error msg -> (false, msg)
@@ -169,12 +170,123 @@ let float_tests : (string * float ) list =
     ("../tests/llvm-arith/float/hex_float_literal.ll", 468655825485824.);
     ("../tests/llvm-arith/float/i8_uitofp_float.ll", 10.0);
   ]
+let snan = Stdlib.Int64.float_of_bits (Stdlib.Int64.of_string "0x7FF0000000000001")
+let qnan = Stdlib.Int64.float_of_bits (Stdlib.Int64.of_string "0x7FF8000000000000")
 
 let double_tests : (string * float ) list =
   [
-    ("../tests/llvm-arith/float/double_literal.ll", 125.31999999999999317878973670303821563720703125);
-    ("../tests/llvm-arith/double/i8_uitofp_double.ll", 255.0)
+    ("../tests/llvm-arith/double/double_literal.ll", 125.31999999999999317878973670303821563720703125);
+    ("../tests/llvm-arith/double/i8_uitofp_double.ll", 255.0);
+    ("../tests/llvm-arith/double/snan.ll", snan) ;
+    ("../tests/llvm-arith/double/qnan.ll", qnan) ;
+    ("../tests/llvm-arith/double/max.ll" , 2.0 ) ;
+    ("../tests/llvm-arith/double/max1.ll", qnan) ;
+    ("../tests/llvm-arith/double/max2.ll", qnan) ;
+    ("../tests/llvm-arith/double/max3.ll", qnan) ;
+    ("../tests/llvm-arith/double/max4.ll", qnan) ;
+    ("../tests/llvm-arith/double/min.ll" , 1.0 ) ;
+    ("../tests/llvm-arith/double/min4.ll", qnan)
   ]
+
+let arith_tests : (string * int) list =
+  [ "../tests/ll/add.ll", 14
+  ; "../tests/ll/sub.ll", 1
+  ; "../tests/ll/mul.ll", 45
+  ; "../tests/ll/and.ll", 0
+  ; "../tests/ll/or.ll",  1
+  ; "../tests/ll/xor.ll", 0
+  ; "../tests/ll/shl.ll", 168
+  ; "../tests/ll/lshr.ll", 10
+  ; "../tests/ll/ashr.ll", 5 ]
+  @
+  [ "../tests/ll/add_twice.ll", 29
+  ; "../tests/ll/sub_neg.ll", -1 (* Why, oh why, does the termianl only report the last byte? *)
+  ; "../tests/ll/arith_combo.ll", 4
+  ; "../tests/ll/return_intermediate.ll", 18 ]
+
+  
+let calling_convention_tests =
+  [ "../tests/ll/call.ll", 42
+  ; "../tests/ll/call1.ll", 17
+  ; "../tests/ll/call2.ll", 19
+  ; "../tests/ll/call3.ll", 34
+  ; "../tests/ll/call4.ll", 34
+  ; "../tests/ll/call5.ll", 24
+  ; "../tests/ll/call6.ll", 26
+  ]
+
+let memory_tests =
+  [ "../tests/ll/alloca1.ll", 17
+  ; "../tests/ll/alloca2.ll", 17
+  ; "../tests/ll/global1.ll", 12
+  ]
+
+let phi_tests =
+  [ "../tests/ll/phi0.ll", 0
+  ; "../tests/ll/phi1.ll", 1
+  ; "../tests/ll/phi2.ll", 0
+  ; "../tests/ll/phi3.ll", 1
+  ]
+
+let terminator_tests =
+  [ "../tests/ll/return.ll", 0
+  ; "../tests/ll/return42.ll", 42
+  ; "../tests/ll/br1.ll", 9
+  ; "../tests/ll/br2.ll", 17
+  ; "../tests/ll/cbr1.ll", 7
+  ; "../tests/ll/cbr2.ll", 9
+  ; "../tests/ll/duplicate_lbl.ll", 1
+  ; "../tests/ll/switch1.ll", 0
+  ; "../tests/ll/switch2.ll", 0
+  ; "../tests/ll/switch3.ll", 0
+  ]
+
+let bitcast_tests =
+  [ "../tests/ll/bitcast1.ll", 3
+  ]
+
+
+let other_tests =
+  arith_tests @ calling_convention_tests @ memory_tests @ phi_tests @ terminator_tests @ bitcast_tests
+
+
+
+let sum_tree_tests = ["../tests/ll/sum_tree.ll", 116]
+let gcd_euclidian_tests = [ "../tests/ll/gcd_euclidian.ll", 2]
+let binary_search_tests = ["../tests/ll/binarysearch.ll", 8]
+let gep_5_deep_tests = ["../tests/ll/qtree.ll", 3]
+let binary_gcd_tests = ["../tests/ll/binary_gcd.ll", 3]
+let linear_search_tests = ["../tests/ll/linear_search.ll", 1]
+let lfsr_tests = ["../tests/ll/lfsr.ll", 108]
+let naive_factor_tests =
+  [ "../tests/ll/naive_factor_prime.ll", 1
+  ; "../tests/ll/naive_factor_nonprime.ll", 0
+  ]
+let euclid_recursive_test = ["../tests/ll/euclid.ll", 2]
+let matmul_tests = ["../tests/ll/matmul.ll", 0]
+
+(* STUBWITH *)
+
+let larger_tests =
+  sum_tree_tests
+  @ gcd_euclidian_tests
+  @ binary_search_tests
+  @ gep_5_deep_tests
+  @ binary_gcd_tests
+  @ linear_search_tests
+  @ lfsr_tests
+  @ naive_factor_tests
+  @ euclid_recursive_test
+  @ matmul_tests
+
+let large_tests = [ "../tests/ll/list1.ll", 3
+                  ; "../tests/ll/cbr.ll", 42
+                  ; "../tests/ll/factorial.ll", 120
+                  ; "../tests/ll/factrect.ll", 120
+                  ; "../tests/ll/duplicate_factorial.ll", 240
+                  ]
+
+
 
 let intrinsics_tests : (string * float) list =
   [
@@ -195,37 +307,37 @@ let test_dirs =
   ]
 
 let poison_test = function
-  | IO.DV.UVALUE_Poison -> true
+  | DV.UVALUE_Poison -> true
   | _ -> false
 
 let i1_test (i1:int1) = function
-  | IO.DV.UVALUE_I1 i2 ->
+  | DV.UVALUE_I1 i2 ->
      Int1.eq i1 i2
   | _ -> false
 
 let i8_test (i1:int8) = function
-  | IO.DV.UVALUE_I1 i2 ->
+  | DV.UVALUE_I1 i2 ->
      Int8.eq i1 i2
   | _ -> false
 
 let i32_test (i1:int32) = function
-  | IO.DV.UVALUE_I32 i2 ->
+  | DV.UVALUE_I32 i2 ->
      Int32.eq i1 i2
   | _ -> false
 
 let i64_test (i1:int64) = function
-  | IO.DV.UVALUE_I64 i2 ->
+  | DV.UVALUE_I64 i2 ->
      Int64.eq i1 i2
   | _ -> false
 
 (* NOTE: OCaml's floats are actually 64-bit doubles, but contain 32-bit floats as a subset *)
 let float_test (i1:float) = function
-  | IO.DV.UVALUE_Float i2 ->
+  | DV.UVALUE_Float i2 ->
     compare i1 (Camlcoq.camlfloat_of_coqfloat32 i2) = 0
   | _ -> false
 
 let double_test (i1:float) = function
-  | IO.DV.UVALUE_Double i2 ->
+  | DV.UVALUE_Double i2 ->
     compare i1 (Camlcoq.camlfloat_of_coqfloat i2) = 0
   | _ -> false
 
@@ -274,10 +386,21 @@ let suite = [Test ("Poison",
                        (f, (fun () -> run_uvalue_test (double_test i) f)))
                        double_tests);
 
-             Test ("Parsing-Must-fail",
-                   List.map (fun (f, p) ->
-                       (f, (fun () -> run_parsefail_test f p)))
-                     must_fail_tests);
+             Test ("Other Tests",
+                   List.map (fun (f, i) ->
+                       (f, fun () -> run_uvalue_test (i64_test (i64_of_int i)) f))
+                     other_tests);
+
+             Test ("Larger Tests",
+                   List.map (fun (f, i) ->
+                       (f, fun () -> run_uvalue_test (i64_test (i64_of_int i)) f))
+                     (larger_tests @ large_tests));
+
+             
+             (* Test ("Parsing-Must-fail",
+              *       List.map (fun (f, p) ->
+              *           (f, (fun () -> run_parsefail_test f p)))
+              *         must_fail_tests); *)
 
              Test ("Intrinsics",
                    List.map (fun (f, i) ->
@@ -288,6 +411,6 @@ let suite = [Test ("Poison",
             ]
 
 
-            @
-              (List.map pp_test_of_dir test_dirs)
+            (* @
+             *   (List.map pp_test_of_dir test_dirs) *)
 

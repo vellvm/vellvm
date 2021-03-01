@@ -1,4 +1,4 @@
-dist: trusty
+dist: focal
 sudo: required
 language: generic
 
@@ -10,22 +10,23 @@ cache:
   - $HOME/.opam
 addons:
   apt:
-    sources:
-    - avsm
     packages:
     - opam
     - aspcud
+    - libipc-system-simple-perl
+    - libstring-shellquote-perl
 env:
   global:
   - NJOBS=1
+  - OCAML_VERSION="4.11.1+flambda"
   matrix:
-  - TEST_TARGET="8.11.0"
+  - TEST_TARGET="8.12.2"
 
 before_script:
   -  ./ci/keep_alive.sh &
 
 install:
-  - opam init -n -y
+  - opam init -n -y -c ${OCAML_VERSION}
   - eval $(opam config env)
   - opam config var root
   # this somehow fails the second time...
@@ -33,7 +34,7 @@ install:
   - opam install -y --verbose -j ${NJOBS} coq.${TEST_TARGET} && opam pin add coq ${TEST_TARGET} -y
   - opam install -y --verbose -j ${NJOBS} ocamlfind camlp5 ${EXTRA_OPAM} 
   - opam install -y --verbose -j ${NJOBS} coq-ext-lib
-  - opam install -y --verbose -j ${NJOBS} coq-flocq
+  - opam pin -y --verbose -j ${NJOBS} add coq-flocq 3.2.1
   - opam install -y --verbose -j ${NJOBS} coq-paco
   - opam install -y --verbose -j ${NJOBS} coq-ceres
   # This branch uses the lib/InteractionTree submodule.
@@ -41,10 +42,11 @@ install:
   # - opam install -y --verbose -j ${NJOBS} coq-itree
   - opam install -y --verbose -j ${NJOBS} dune
   - opam install -y --verbose -j ${NJOBS} menhir
+  - opam install -y --verbose -j ${NJOBS} qcheck
   - opam upgrade -y --verbose -j ${NJOBS}
 
 script:
   - eval $(opam config env)
   - opam config var root
-  - make -C src/
+  - make -j${NJOBS} -C src/
   - cd src && ./vellvm --test

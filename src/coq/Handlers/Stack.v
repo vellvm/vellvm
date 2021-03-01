@@ -9,18 +9,18 @@ From ExtLib Require Import
 From ITree Require Import
      ITree
      Events.StateFacts
-     Eq
+     Eq.Eq
      Events.State.
 
 From Vellvm Require Import
-     Util
-     LLVMAst
-     AstLib
-     MemoryAddress
-     DynamicValues
-     LLVMEvents
-     Local
-     Error.
+     Utils.Util
+     Utils.Error
+     Syntax.LLVMAst
+     Syntax.AstLib
+     Semantics.MemoryAddress
+     Semantics.DynamicValues
+     Semantics.LLVMEvents
+     Handlers.Local.
 
 Require Import Ceres.Ceres.
 
@@ -76,38 +76,52 @@ Section StackMap.
     Definition G_trigger {S} : forall R , G R -> (stateT S (itree Effout) R) :=
       fun R e m => r <- trigger e ;; ret (m, r).
 
-    Definition interp_local_stack `{FailureE -< E +' F +' G}
-               (h:(LocalE k v) ~> stateT map (itree Effout)) :
+    Definition  interp_local_stack_h (h:(LocalE k v) ~> stateT map (itree Effout)) :=
+      (case_ E_trigger
+             (case_ F_trigger
+                    (case_ (case_ (handle_local_stack h)
+                                  handle_stack)
+                           G_trigger))).
+
+    Definition interp_local_stack `{FailureE -< E +' F +' G}  :
       (itree Effin) ~>  stateT (map * stack) (itree Effout) :=
-      interp_state (case_ E_trigger
-                   (case_ F_trigger
-                   (case_ (case_ (handle_local_stack h)
-                                 handle_stack)
-                          G_trigger))).
+      interp_state (interp_local_stack_h (handle_local (v:=v))).
 
-    Lemma interp_local_stack_bind :
-      forall (R S: Type) (t : itree Effin _) (k : R -> itree Effin S) s,
-        runState (interp_local_stack (handle_local (v:=v)) (ITree.bind t k)) s ≅
-                 ITree.bind (runState (interp_local_stack (handle_local (v:=v)) t) s)
-                 (fun '(s',r) => runState (interp_local_stack (handle_local (v:=v)) (k r)) s').
-    Proof.
-      intros.
-      unfold interp_local_stack.
-      setoid_rewrite interp_state_bind.
-      apply eq_itree_clo_bind with (UU := Logic.eq).
-      reflexivity.
-      intros [] [] EQ; inv EQ; reflexivity.
-    Qed.
+    Section Structural_Lemmas.
 
-    Lemma interp_local_stack_ret :
-      forall (R : Type) l (x: R),
-        runState (interp_local_stack (handle_local (v:=v)) (Ret x: itree Effin R)) l ≅ Ret (l,x).
-    Proof.
-      intros; apply interp_state_ret.
-    Qed.
+      Lemma interp_local_stack_bind :
+        forall (R S: Type) (t : itree Effin _) (k : R -> itree Effin S) s,
+          interp_local_stack (ITree.bind t k) s ≅
+                             ITree.bind (interp_local_stack t s)
+                             (fun '(s',r) => interp_local_stack (k r) s').
+      Proof.
+        intros.
+        unfold interp_local_stack.
+        setoid_rewrite interp_state_bind.
+        apply eq_itree_clo_bind with (UU := Logic.eq).
+        reflexivity.
+        intros [] [] EQ; inv EQ; reflexivity.
+      Qed.
+
+      Lemma interp_local_stack_ret :
+        forall (R : Type) l (x: R),
+          interp_local_stack (Ret x: itree Effin R) l ≅ Ret (l,x).
+      Proof.
+        intros; unfold interp_local_stack.
+        apply interp_state_ret.
+      Qed.
+
+      Lemma interp_local_stack_trigger ls X (e : Effin X):
+          interp_local_stack (ITree.trigger e) ls ≈ interp_local_stack_h (handle_local (v:=v)) e ls.
+      Proof.
+        unfold interp_local_stack.
+        rewrite interp_state_trigger.
+        reflexivity.
+      Qed.
+
+    End Structural_Lemmas.
 
   End PARAMS.
-
 
     (* SAZ: I wasn't (yet) able to completey disentangle the ocal events from the stack events.
        This version makes the stack a kind of "wrapper" around the locals and provides a way
@@ -124,3 +138,20 @@ Section StackMap.
     *)
 
 End StackMap.
+
+From ExtLib Require Import
+     Data.Map.FMapAList.
+From Vellvm Require Import
+     LLVMAst
+     MemoryAddress.
+
+(* YZ TODO : Undecided about the status of this over-generalization of these events over domains of keys and values.
+   The interface needs to be specialized anyway in [LLVMEvents].
+   We want to have access to the specialized type both in [InterpreterMCFG] and [InterpreterCFG] so we cannot delay
+   it until [TopLevel] either.
+   So exposing the specialization here, but it is awkward.
+ *)
+Module Make (A : ADDRESS) (LLVMEvents : LLVM_INTERACTIONS(A)).
+  Definition lstack := @stack (list (raw_id * LLVMEvents.DV.uvalue)).
+End Make.
+

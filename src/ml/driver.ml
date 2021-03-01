@@ -14,8 +14,8 @@ let of_str = Camlcoq.camlstring_of_coqstring
 
 let interpret = ref false
 
-let transform (prog : (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list)
-  : (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block list))) LLVMAst.toplevel_entity list =
+let transform (prog : (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list)
+  : (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block list))) LLVMAst.toplevel_entity list =
   Transform.transform prog
 
 let print_banner s =
@@ -42,6 +42,19 @@ let parse_file filename =
   |> Lexing.from_string
   |> Llvm_lexer.parse
 
+
+(* Todo add line count information *)
+let parse_tests filename =
+  let assertions = ref [] in
+  let channel = open_in filename in
+  try
+    while true; do
+      let line = input_line channel in
+      assertions := Assertion.parse_assertion filename line @ !assertions
+    done; []
+  with End_of_file ->
+    close_in channel;
+    List.rev !assertions
 
 let output_file filename ast =
   let open Llvm_printer in

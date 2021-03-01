@@ -12,11 +12,11 @@ From Coq Require Export
      Relations.
 
 Import R.
-Import TopLevelEnv.
 
 Definition transformation := mcfg dtyp -> mcfg dtyp.
-
+About refine_mcfg.
+About refine_mcfg.
 Definition transformation_correct (T: transformation): Prop :=
-  forall p, refine_mcfg nil p (T p).
+  forall dt entry args intrinsics m, refine_mcfg dt entry args intrinsics m (T m).
 
 

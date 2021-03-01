@@ -1,4 +1,7 @@
 **.vo
+**.vos
+**.vio
+**.vok
 **.v.d
 **.glob
 *.v#
@@ -9,7 +12,7 @@
 **/_build
 src/main.native
 src/vellvm
-src/ml/.merlin
+**/.merlin
 *~
 *.v~
 *.log
@@ -29,6 +32,7 @@ src/.depend
 output
 src/ml/extracted/.merlin
 src/ml/libvellvm/.merlin
-src/.lia.cache
+.lia.cache
 src/.ll_files.tmp
 src/coq/.lia.cache
+*.cache

@@ -6,6 +6,7 @@ open Format
 
 let str = Camlcoq.coqstring_of_camlstring
 let of_str = Camlcoq.camlstring_of_coqstring
+let n_to_int = Camlcoq.N.to_int
 let to_int = Camlcoq.Z.to_int
 let to_float = Camlcoq.camlfloat_of_coqfloat
 let to_float32 = Camlcoq.camlfloat_of_coqfloat32
@@ -87,7 +88,7 @@ and ident : Format.formatter -> LLVMAst.ident -> unit =
 and typ : Format.formatter -> LLVMAst.typ -> unit =
   fun ppf ->
   function
-  | TYPE_I i              -> fprintf ppf "(TYPE_I %d%%Z)" (to_int i)
+  | TYPE_I i              -> fprintf ppf "(TYPE_I %d%%Z)" (n_to_int i)
   | TYPE_Pointer t        -> fprintf ppf "(TYPE_Pointer %a)" typ t ;
   | TYPE_Void             -> fprintf ppf "TYPE_Void"
   | TYPE_Function (t, tl) -> fprintf ppf "(TYPE_Function %a [%a])" typ t (pp_print_list ~pp_sep:pp_sc_space typ) tl
@@ -100,11 +101,11 @@ and typ : Format.formatter -> LLVMAst.typ -> unit =
   | TYPE_Ppc_fp128        -> fprintf ppf "TYPE_Ppc_fp128"
   | TYPE_Metadata         -> fprintf ppf "TYPE_Metadata"
   | TYPE_X86_mmx          -> fprintf ppf "TYPE_X86_mmx"
-  | TYPE_Array (i, t)     -> fprintf ppf "(TYPE_Array %d%%Z %a)" (to_int i) typ t
+  | TYPE_Array (i, t)     -> fprintf ppf "(TYPE_Array %d%%Z %a)" (n_to_int i) typ t
   | TYPE_Struct tl        -> fprintf ppf "(TYPE_Struct [%a])" (pp_print_list ~pp_sep:pp_sc_space typ) tl
   | TYPE_Packed_struct tl -> fprintf ppf "(TYPE_Packed_struct [%a])" (pp_print_list ~pp_sep:pp_sc_space typ) tl
   | TYPE_Opaque           -> fprintf ppf "TYPE_Opaque"
-  | TYPE_Vector (i, t)    -> fprintf ppf "(TYPE_Vector %d%%Z %a)" (to_int i) typ t
+  | TYPE_Vector (i, t)    -> fprintf ppf "(TYPE_Vector %d%%Z %a)" (n_to_int i) typ t
   | TYPE_Identified i     -> fprintf ppf "(TYPE_Identified %a)" ident i
 
 and icmp : Format.formatter -> LLVMAst.icmp -> unit =
@@ -242,7 +243,9 @@ and exp : Format.formatter -> (LLVMAst.typ LLVMAst.exp) -> unit =
 
     | EXP_Zero_initializer  -> pp_print_string ppf "EXP_Zero_initializer"
 
-    | EXP_Cstring s -> fprintf ppf "(EXP_Cstring \"%s\")" (of_str s)
+    | EXP_Cstring tvl         ->
+      fprintf ppf "(EXP_Cstring [%a])"
+        (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod typ exp)) tvl
 
     | OP_IBinop (op, t, v1, v2) ->
       fprintf ppf "(OP_IBinop %a %a %a %a)"
@@ -476,7 +479,6 @@ and instr : Format.formatter -> (LLVMAst.typ LLVMAst.instr) -> unit =
   | INSTR_AtomicCmpXchg
   | INSTR_AtomicRMW
   | INSTR_Fence -> assert false
-  | INSTR_Unreachable -> pp_print_string ppf "INSTR_Unreachable"
 
 and branch_label : Format.formatter -> LLVMAst.raw_id -> unit =
   fun ppf id ->
@@ -517,6 +519,9 @@ and terminator : Format.formatter -> (LLVMAst.typ LLVMAst.terminator) -> unit =
       raw_id i2
       raw_id i3
 
+  | TERM_Unreachable -> pp_print_string ppf "TERM_Unreachable"
+
+
 and id_instr : Format.formatter -> (LLVMAst.instr_id * (LLVMAst.typ LLVMAst.instr)) -> unit =
   fun ppf ->
     function (id, inst) ->
@@ -539,14 +544,14 @@ and texp ppf (t, v) = fprintf ppf "(%a, %a)" typ t exp v
 
 and tident ppf (t, v) = fprintf ppf "(%a, %a)" typ t ident v
 
-and toplevel_entities : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities -> unit =
+and toplevel_entities : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entities -> unit =
   fun ppf entries ->
     pp_print_string ppf "[";
     pp_print_list ~pp_sep:(fun ppf () -> pp_sc_space ppf (); pp_force_newline ppf ()) toplevel_entity ppf entries;
     pp_print_string ppf "].";
     pp_print_flush ppf ();
 
-and toplevel_entity : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity -> unit =
+and toplevel_entity : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity -> unit =
   fun ppf ->
   function
   | TLE_Comment msg            -> fprintf ppf "TLE_Comment %s" (of_str msg)
@@ -589,6 +594,9 @@ and param_attr : Format.formatter -> LLVMAst.param_attr -> unit =
   | PARAMATTR_Returned  -> pp_print_string ppf "PARAMATTR_Returned"
   | PARAMATTR_Nonnull -> pp_print_string ppf "PARAMATTR_Nonnull"
   | PARAMATTR_Dereferenceable n -> fprintf ppf "PARAMATTR_Dereferenceable %d%%Z" (to_int n)
+  | PARAMATTR_Immarg -> fprintf ppf "PARAMATTR_Immarg"
+  | PARAMATTR_Noundef -> fprintf ppf "PARAMATTR_Noundef"
+  | PARAMATTR_Nofree -> fprintf ppf "PARAMATTR_Nofree"
 
 and thread_local_storage : Format.formatter -> LLVMAst.thread_local_storage -> unit =
   fun ppf ->
@@ -783,7 +791,7 @@ and declaration : Format.formatter -> (LLVMAst.typ LLVMAst.declaration) -> unit 
 
     pp_close_box ppf ();
 
-and definition : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block list))) LLVMAst.definition -> unit =
+and definition : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block list))) LLVMAst.definition -> unit =
   fun ppf ->
   fun { df_prototype = df
       ; df_args = args
@@ -808,8 +816,10 @@ and definition : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block l
     pp_print_string ppf "  df_instrs := [";
     pp_open_box ppf 0;
     pp_force_newline ppf ();
+    block ppf (fst ins); 
+    pp_force_newline ppf ();
     pp_print_list ~pp_sep:(fun ppf () -> pp_print_string ppf ";"; pp_force_newline ppf ())
-      block ppf ins ;
+      block ppf (snd ins) ;
     pp_print_string ppf "]";
     pp_force_newline ppf ();
 
@@ -818,7 +828,7 @@ and definition : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block l
     pp_print_flush ppf ();
 
 and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
-  fun ppf {blk_id=lbl; blk_phis=phis; blk_code=b; blk_term=(t_id,t); blk_comments=cmts} ->
+  fun ppf {blk_id=lbl; blk_phis=phis; blk_code=b; blk_term=t; blk_comments=cmts} ->
     pp_print_string ppf "{|";
     pp_force_newline ppf ();
 
@@ -844,7 +854,7 @@ and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
     pp_force_newline ppf () ;
 
     pp_print_string ppf "  blk_term := ";
-    fprintf ppf "(%a, %a);" instr_id t_id terminator t;
+    fprintf ppf "%a;" terminator t;
     pp_force_newline ppf () ;
 
     pp_print_string ppf "  blk_comments := ";
@@ -859,7 +869,7 @@ and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
 
     pp_print_string ppf "|}";
 
-and modul : Format.formatter -> (LLVMAst.typ, ((LLVMAst.typ LLVMAst.block list))) LLVMAst.modul -> unit =
+and modul : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) * ((LLVMAst.typ LLVMAst.block list))) CFG.modul -> unit =
   fun ppf m ->
 
   pp_option ppf (fun ppf x -> fprintf ppf "; ModuleID = '%s'" (of_str x)) m.m_name ;
