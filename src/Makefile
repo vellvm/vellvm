@@ -9,7 +9,7 @@ EXTRACTDIR = ml/extracted
 ITREEDIR=../lib/InteractionTrees
 QUICKCHICKDIR=../lib/QuickChick
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(ITREEDIR)/theories/ ITree -R $(QUICKCHICKDIR)/src/ QuickChick
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(ITREEDIR)/theories/ ITree -R $(QUICKCHICKDIR)/src/ QuickChick -I $(QUICKCHICKDIR)/src
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source

@@ -45,7 +45,7 @@ Extract Constant to_caml_str =>
 
 
 Axiom llc_command : string -> int.
-Extract Constant llc_command => "fun prog -> let f = open_out ""temporary_vellvm.ll"" in Printf.fprintf f ""%s"" prog; close_out f; Sys.command ""clang temporary_vellvm.ll -o vellvmqc && ./vellvmqc""".
+Extract Constant llc_command => "fun prog -> let f = open_out ""temporary_vellvm.ll"" in Printf.fprintf f ""%s"" prog; close_out f; Sys.command ""clang -Wno-everything temporary_vellvm.ll -o vellvmqc && ./vellvmqc""".
 
 Definition run_llc (prog : list (toplevel_entity typ (block typ * list (block typ)))) : uvalue
   := UVALUE_I8 (repr (llc_command (to_caml_str (show prog)))).
@@ -58,5 +58,5 @@ Definition vellvm_agrees_with_clang (prog : list (toplevel_entity typ (block typ
             | _, _ => checker true
             end.
 
-Extract Constant defNumTests    => "500".
+Extract Constant defNumTests    => "100".
 QuickChick (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
