@@ -30,7 +30,7 @@ Ltac contra :=
 (* Inductive predicate for types in LLVM with a size *)
 Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
 | sized_typ_I :
-    forall (defs : list (ident * typ)) (sz : int),
+    forall (defs : list (ident * typ)) (sz : N),
       sized_typ defs (TYPE_I sz)
 
 | sized_typ_Pointer :
@@ -70,7 +70,7 @@ Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
       sized_typ defs TYPE_X86_mmx
 
 | sized_typ_Array :
-    forall (defs : list (ident * typ)) (sz : int) (t : typ),
+    forall (defs : list (ident * typ)) (sz : N) (t : typ),
       sized_typ defs t -> sized_typ defs (TYPE_Array sz t)
 
 | sized_typ_Struct :
@@ -82,7 +82,7 @@ Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
       (forall (f : typ), In f fields -> sized_typ defs f) -> sized_typ defs (TYPE_Packed_struct fields)
 
 | sized_typ_Vector :
-    forall (defs : list (ident * typ)) (sz : int) (t : typ),
+    forall (defs : list (ident * typ)) (sz : N) (t : typ),
       sized_typ defs t -> sized_typ defs (TYPE_Vector sz t)
 
 | sized_typ_Identified :
@@ -98,7 +98,7 @@ Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
    https://llvm.org/docs/LangRef.html#vector-type *)
 Inductive element_typ : typ -> Prop :=
 | element_typ_Pointer : forall (t : typ), element_typ (TYPE_Pointer t)
-| element_typ_I : forall (sz : int), element_typ (TYPE_I sz)
+| element_typ_I : forall (sz : N), element_typ (TYPE_I sz)
 | element_typ_Half : element_typ TYPE_Half
 | element_typ_Float : element_typ TYPE_Float
 | element_typ_Double : element_typ TYPE_Double
