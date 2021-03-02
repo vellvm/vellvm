@@ -209,7 +209,7 @@ Section ExpOptim.
         ℑ3 (translate exp_to_instr ⟦ phi ⟧Φ (f)) g l m ≈ ℑ3 (translate exp_to_instr ⟦ endo phi ⟧Φ (f)) g l m.
     Proof.
       intros [id []] f.
-      induction args as [| [] args Ih]; intros; [reflexivity |].
+      induction args as [| [] args IH]; intros; [reflexivity |].
       cbn.
       do 2 break_match_goal.
       - unfold endo,Endo_id in Heqo0.
@@ -217,8 +217,42 @@ Section ExpOptim.
         + inv Heqo; inv Heqo0.
           rewrite 2translate_bind, 2interp_cfg3_bind.
           apply eutt_clo_bind with (UU := eq); [| intro3].
-    Admitted.
-            
+          rewrite opt_correct; reflexivity.
+          reflexivity.
+        + 
+          rewrite 2translate_bind, 2interp_cfg3_bind.
+          apply eutt_clo_bind with (UU := eq); [rewrite opt_correct | intro3; reflexivity].
+          assert (e1 = endo e0).
+          { clear - Heqo Heqo0.
+            revert Heqo Heqo0.
+            induction args as [| [] args IH]; intros LU1 LU2; [inv LU1 |].
+            cbn in *; unfold endo at 1 in LU2.
+            break_match_hyp; auto.
+            inv LU1; inv LU2; auto.
+          }
+          subst.
+          reflexivity.
+      - cbn in *; unfold endo, Endo_id at 1 in Heqo0.
+        break_match_hyp; [inv Heqo0 |].
+        exfalso; revert Heqo Heqo0.
+        clear.
+        induction args as [| [] args IH]; intros LU1 LU2; [inv LU1 |].
+        cbn in *; unfold endo, Endo_id at 1 in LU2.
+        break_match_hyp; auto.
+        inv LU2.
+      - cbn in *; unfold endo, Endo_id at 1 in Heqo0.
+        break_match_hyp; [inv Heqo |].
+        exfalso; revert Heqo Heqo0.
+        clear.
+        induction args as [| [] args IH]; intros LU1 LU2; [inv LU2 |].
+        cbn in *; unfold endo, Endo_id at 1 in LU2.
+        break_match_hyp; auto.
+        inv LU1.
+      - cbn in *; unfold endo, Endo_id at 1 in Heqo0.
+        break_match_hyp; [inv Heqo |].
+        reflexivity.
+    Qed.
+   
     Lemma exp_optim_correct_phis : forall phis f g l m,
         ⟦ phis ⟧Φs3 f g l m ≈ ⟦ endo phis ⟧Φs3 f g l m.
     Proof.
