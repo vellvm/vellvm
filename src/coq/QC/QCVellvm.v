@@ -58,5 +58,7 @@ Definition vellvm_agrees_with_clang (prog : list (toplevel_entity typ (block typ
             | _, _ => checker true
             end.
 
+Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
 Extract Constant defNumTests    => "100".
 QuickChick (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
+(*! QuickChick agrees. *)

@@ -19,7 +19,7 @@ Import MonadNotation.
 Import ApplicativeNotation.
 
 From Coq Require Import
-     ZArith List String Omega Bool.Bool.
+     ZArith List String Lia Bool.Bool.
 
 Open Scope Z_scope.
 
@@ -667,10 +667,10 @@ Section TypGenerators.
     end.
   Next Obligation.
     cbn.
-    assert (0 <= 1)%nat by omega.
+    assert (0 <= 1)%nat by lia.
     pose proof Nat.divmod_spec sz' 1 0 0 H.
     cbn; destruct (Nat.divmod sz' 1 0 0).
-    cbn; omega.
+    cbn; lia.
   Qed.
 
   Definition gen_typ : GenLLVM typ
