@@ -3,6 +3,8 @@ From Coq Require Import
      String
      Morphisms.
 
+Require Import Paco.paco.
+
 Require Import List.
 Import ListNotations.
 Require Import ZArith.
@@ -19,6 +21,7 @@ From Vellvm Require Import
      Utils.Tactics
      Utils.PostConditions
      Syntax.Scope
+     Syntax.ScopeTheory
      Syntax.LLVMAst
      Syntax.CFG
      Syntax.AstLib
@@ -39,285 +42,102 @@ Set Strict Implicit.
 
 Import ListNotations.
 Open Scope bool.
+Import SemNotations.
 
-(* NOTE: Might be worth it to represent [ocfg] as sets of blocks rather than lists, with an efficient implementation of sets *)
+Section RemoveBlock.
 
-(* NOTE: This is stupidly inefficient to recompute the predecessor like that
-   everytime we need it of course, just a temporary stub
- *)
+  Fixpoint remove_block {T} (G : ocfg T) (b : block_id) : ocfg T :=
+    match G with
+    | [] => []
+    | bk :: G => if Eqv.eqv_dec b bk.(blk_id) then G else bk:: remove_block G b
+    end.
 
-Definition raw_id_in := in_dec raw_id_eq_dec.
+  Infix "∖" := remove_block.
 
-Infix "∈" := (set_mem raw_id_eq_dec) (at level 70).
+  Lemma remove_block_find_block_eq : forall {T} b (G : ocfg T),
+      wf_ocfg_bid G ->
+      find_block (G ∖ b) b = None.
+  Proof.
+    induction G as [| bk G IH].
+    reflexivity.
+    intros WF.
+    simpl remove_block.
+    break_match_goal.
+    break_match_hyp; intuition.
+    subst.
+    eapply wf_ocfg_cons_not_in_tail; eauto.
+    cbn.
+    break_match_goal.
+    break_match_hyp; intuition.
+    break_match_hyp; intuition.
+    apply IH.
+    eapply wf_ocfg_bid_cons; eauto.
+  Qed.
 
-Fixpoint remove_block {T} (G : ocfg T) (b : block_id) : ocfg T :=
-  match G with
-  | [] => []
-  | bk :: G => if Eqv.eqv_dec b bk.(blk_id) then G else bk:: remove_block G b
-  end.
+  Lemma remove_block_find_block_ineq : forall {T} b b' (G : ocfg T),
+      b <> b' ->
+      find_block (G ∖ b) b' = find_block G b'. 
+  Proof.
+    induction G as [| bk G IH].
+    reflexivity.
+    intros INEQ.
+    simpl remove_block.
+    break_match_goal.
+    break_match_hyp; intuition.
+    subst; rewrite find_block_ineq; auto.
+    break_match_hyp; intuition.
+    cbn; break_match_goal; auto.
+  Qed.
+
+  Lemma remove_block_remove_inputs:
+    forall {T} (G : ocfg T) b b',
+      In b' (inputs (G ∖ b)) ->
+      In b' (inputs G).
+  Proof.
+    induction G as [| bk G IH]; intros * IN; [inv IN |].
+    cbn in IN.
+    break_match_hyp.
+    - right; auto. 
+    - destruct IN as [EQ | IN].
+      subst; left; reflexivity.
+      right; eapply IH; eauto.
+  Qed.
+
+  Lemma wf_ocfg_bid_remove_block :
+    forall {T} (G : ocfg T) b,
+      wf_ocfg_bid G ->
+      wf_ocfg_bid (G ∖ b).
+  Proof.
+    intros *; induction G as [| bk G IH]; intro WF; auto.
+    cbn.
+    break_match_goal.
+    eapply wf_ocfg_bid_cons; eauto.
+    apply wf_ocfg_bid_cons'.
+    2: eapply IH,wf_ocfg_bid_cons; eauto.
+    inv WF.
+    intros IN; apply remove_block_remove_inputs in IN; auto.
+  Qed.
+
+  Lemma map_remove_block : forall {T} (f : block T -> block T) (G : ocfg T) b,
+      (forall bk, blk_id (f bk) = blk_id bk) ->
+      map f (G ∖ b) = (map f G) ∖ b.
+  Proof.
+    induction G as [| bk G IH]; intros * ID; [reflexivity |].
+    cbn.
+    break_match_goal.
+    break_match_goal; auto.
+    rewrite ID in Heqb1.
+    rewrite Heqb0 in Heqb1; inv Heqb1.
+    break_match_goal; auto.
+    rewrite ID in Heqb1.
+    rewrite Heqb0 in Heqb1; inv Heqb1.
+    cbn.
+    rewrite IH; auto.
+  Qed.
+
+End RemoveBlock.
 
 Infix "∖" := remove_block.
-
-(* Test whether b ∈ successors(bk), i.e.
-  [is_predecessor b bk] iff [bk] is a predecessor to [b].
- *)
-Definition is_predecessor {T} (b : block_id) (bk : block T) : bool :=
-  if raw_id_in b (successors bk) then true else false.
-
-(* Computes the set of predecessors of [b] in [G] *)
-
-Definition predecessors (b : block_id) (G : ocfg dtyp) : list block_id :=
-  fold_left (fun acc bk => if is_predecessor b bk then bk.(blk_id) :: acc else acc) G [].
-
-Lemma app_snoc_app : forall {A} (l l' : list A) x,
-    (l ++ [x]) ++ l' = l ++ (x :: l').
-Proof.
-  induction l as [| y l IH]; [reflexivity | cbn; intros].
-  f_equal; apply IH.
-Qed.
-
-Lemma predecessors_app :
-  forall bks bks' f,
-    predecessors f (bks ++ bks') = predecessors f bks' ++ predecessors f bks.
-Proof.
-  induction bks' as [| bk bks' IH] using rev_ind.
-  - intros; cbn; rewrite !app_nil_r; reflexivity.
-  - intros.
-    unfold predecessors.
-    rewrite app_assoc.
-    rewrite 2 (fold_left_app _ _ [bk]). 
-    simpl.
-    break_match_goal.
-    + cbn; f_equal.
-      apply IH.
-    + apply IH.
-Qed.
-
-Lemma predecessors_cons :
-  forall bks bk f,
-    predecessors f (bk :: bks) = predecessors f bks ++ predecessors f [bk].
-Proof.
-  intros.
-  rewrite list_cons_app, predecessors_app.
-  reflexivity.
-Qed.
-
-
-Lemma find_block_has_id : forall {T} (G : ocfg T) b bk,
-    find_block G b = Some bk ->
-    b = bk.(blk_id).
-Proof.
-  induction G as [| bkh G IH].
-  - intros * LU; inv LU.
-  - intros * LU.
-    cbn in LU.
-    break_match_hyp.
-    + inv LU; break_match_hyp; intuition.
-    + apply IH.
-      apply LU.
-Qed.
-
-Lemma find_block_In : forall {T} G (bk : block T),
-    find_block G bk.(blk_id) = Some bk ->
-    In bk G.
-Proof.
-  induction G as [| x G IH]; intros * FIND; [inv FIND |].
-  cbn in FIND; break_match_hyp; auto.
-  inv FIND; left; reflexivity.
-  right; apply IH; auto.
-Qed.
-
-Lemma successor_predecessor :
-  forall (G : ocfg dtyp) (source : block dtyp) target,
-    In target (successors source) ->
-    find_block G source.(blk_id) = Some source ->
-    In source.(blk_id) (predecessors target G).
-Proof.
-  intros * IN FIND.
-  apply find_block_In in FIND; revert FIND.
-  induction G as [| bki G IH]; intros * FIND. 
-  - inv FIND.
-  - destruct FIND as [EQ | FIND].
-    + subst.
-      clear IH.
-      rewrite predecessors_cons.
-      apply in_or_app; right.
-      cbn.
-      unfold successors in IN.
-      unfold is_predecessor.
-      break_match_goal.
-      left; auto.
-      break_match_hyp; intuition.
-    + rewrite predecessors_cons.
-      apply in_or_app; left.
-      apply IH; auto.
-Qed.
-
-Lemma wf_ocfg_commut :
-  forall {T} (G G' : ocfg T),
-    wf_ocfg_bid (G ++ G') ->
-    wf_ocfg_bid (G' ++ G).
-Proof.
-  intros.
-  red; rewrite inputs_app; apply Coqlib.list_norepet_append_commut; rewrite <- inputs_app; apply H.
-Qed.
-
-Lemma wf_ocfg_commut_hd :
-  forall {T} (bk bk' : block T) G,
-    wf_ocfg_bid (bk::bk'::G) ->
-    wf_ocfg_bid (bk'::bk::G).
-Proof.
-  intros * WF.
-  inv WF.
-  inv H2.
-  constructor.
-  2: constructor; auto.
-  - intros [EQ | IN]; auto.
-    apply H1; left; auto.
-  - intros IN; auto.
-    eapply H1; right; auto.
-Qed.
-
-Lemma wf_ocfg_cons_not_in_tail :
-  forall {T} (bk : block T) G,
-    wf_ocfg_bid (bk :: G) ->
-    find_block G bk.(blk_id) = None.
-Proof.
-  induction G as [| x G IH]; intros; [reflexivity |].
-  cbn; break_match_goal.
-  - break_match_hyp; intuition.
-    do 2 red in e.
-    exfalso; clear Heqb.
-    red in H.
-    cbn in H.
-    rewrite e in H.
-    inv H.
-    eapply H2; left; reflexivity.
-  - break_match_hyp; intuition.
-    apply IH.
-    apply wf_ocfg_commut_hd in H.
-    eapply wf_ocfg_bid_cons; eauto.
-Qed.
-
-
-Lemma remove_block_find_block_eq : forall {T} b (G : ocfg T),
-    wf_ocfg_bid G ->
-    find_block (G ∖ b) b = None.
-Proof.
-  induction G as [| bk G IH].
-  reflexivity.
-  intros WF.
-  simpl remove_block.
-  break_match_goal.
-  break_match_hyp; intuition.
-  subst.
-  eapply wf_ocfg_cons_not_in_tail; eauto.
-  cbn.
-  break_match_goal.
-  break_match_hyp; intuition.
-  break_match_hyp; intuition.
-  apply IH.
-  eapply wf_ocfg_bid_cons; eauto.
-Qed.
-
-Lemma remove_block_find_block_ineq : forall {T} b b' (G : ocfg T),
-    b <> b' ->
-    find_block (G ∖ b) b' = find_block G b'. 
-Proof.
-  induction G as [| bk G IH].
-  reflexivity.
-  intros INEQ.
-  simpl remove_block.
-  break_match_goal.
-  break_match_hyp; intuition.
-  subst; rewrite find_block_ineq; auto.
-  break_match_hyp; intuition.
-  cbn; break_match_goal; auto.
-Qed.
-
-Lemma remove_block_remove_inputs:
-  forall {T} (G : ocfg T) b b',
-    In b' (inputs (G ∖ b)) ->
-    In b' (inputs G).
-Proof.
-  induction G as [| bk G IH]; intros * IN; [inv IN |].
-  cbn in IN.
-  break_match_hyp.
-  - right; auto. 
-  - destruct IN as [EQ | IN].
-    subst; left; reflexivity.
-    right; eapply IH; eauto.
-Qed.
-
-Lemma wf_ocfg_bid_remove_block :
-  forall {T} (G : ocfg T) b,
-    wf_ocfg_bid G ->
-    wf_ocfg_bid (G ∖ b).
-Proof.
-  intros *; induction G as [| bk G IH]; intro WF; auto.
-  cbn.
-  break_match_goal.
-  eapply wf_ocfg_bid_cons; eauto.
-  apply wf_ocfg_bid_cons'.
-  2: eapply IH,wf_ocfg_bid_cons; eauto.
-  inv WF.
-  intros IN; apply remove_block_remove_inputs in IN; auto.
-Qed.
-
-Lemma map_remove_block : forall {T} (f : block T -> block T) (G : ocfg T) b,
-    (forall bk, blk_id (f bk) = blk_id bk) ->
-    map f (G ∖ b) = (map f G) ∖ b.
-Proof.
-  induction G as [| bk G IH]; intros * ID; [reflexivity |].
-  cbn.
-  break_match_goal.
-  break_match_goal; auto.
-  rewrite ID in Heqb1.
-  rewrite Heqb0 in Heqb1; inv Heqb1.
-  break_match_goal; auto.
-  rewrite ID in Heqb1.
-  rewrite Heqb0 in Heqb1; inv Heqb1.
-  cbn.
-  rewrite IH; auto.
-Qed.
-
-Lemma wf_ocfg_map : forall {T} (f : block T -> block T) (G : ocfg T),
-    (forall bk, blk_id (f bk) = blk_id bk) ->
-    wf_ocfg_bid G <-> wf_ocfg_bid (map f G).
-Proof.
-  intros.
-  unfold wf_ocfg_bid, inputs.
-  rewrite List.map_map.
-  replace (map (fun x : block T => blk_id (f x)) G) with (map blk_id G); [reflexivity |].
-  apply map_ext.
-  intros; rewrite H; auto.
-Qed.
-
-Lemma find_block_map_some :
-  forall {T} (f : block T -> block T) G b bk,
-    (forall bk, blk_id (f bk) = blk_id bk) ->
-    find_block G b = Some bk ->
-    find_block (map f G) b = Some (f bk).
-Proof.
-  intros * ID; induction G as [| hd G IH]; intros FIND ; [inv FIND |].
-  cbn in *.
-  rewrite ID. 
-  break_match_goal; break_match_hyp; intuition.
-  inv FIND; auto.
-Qed.
-
-Lemma find_block_map_none :
-  forall {T} (f : block T -> block T) G b,
-    (forall bk, blk_id (f bk) = blk_id bk) ->
-    find_block G b = None ->
-    find_block (map f G) b = None.
-Proof.
-  intros * ID; induction G as [| hd G IH]; intros FIND; [reflexivity |].
-  cbn in *.
-  rewrite ID. 
-  break_match_goal; break_match_hyp; intuition.
-  inv FIND; auto.
-Qed.
 
 Section BlockFusion.
 
@@ -337,18 +157,6 @@ Section BlockFusion.
                  | _ => (* This is a failure case, it should not happen if called in the expected context *)
                    acc
                  end) Φs [].
-
-  (* We should be able to handle phi-nodes if there is a unique predecessor, but let's not worry for it for now *)
-  (*
-  Definition block_fusions (b_s b_t : block dtyp) : block dtyp :=
-    {|
-    blk_id         := b_s.(blk_id);
-    blk_phis       := b_s.(blk_phis);
-    blk_code       := b_s.(blk_code) ++ phi_to_code b_t.(blk_phis) ++ b_t.(blk_code);
-    blk_term       := b_t.(blk_term);
-    blk_comments   := None (* TODO: proper propagation of comments *)
-    |}.
-   *)
 
   Definition block_fusions (b_s b_t : block dtyp) : block dtyp :=
     {|
@@ -443,7 +251,6 @@ Section BlockFusion.
 
 End BlockFusion.
 
-Import SemNotations.
 Section BlockFusionCorrect.
 
   Lemma block_fusion_some_rec:
@@ -619,164 +426,6 @@ Section BlockFusionCorrect.
     intros; eapply block_fusion_none_id_rec with (pre := []); eauto; reflexivity. 
   Qed.
 
-  Lemma denote_code_app :
-    forall a b,
-      ⟦ a ++ b ⟧c ≅ ITree.bind ⟦ a ⟧c (fun _ => ⟦ b ⟧c).
-  Proof.
-    induction a; intros b.
-    - cbn.
-      cbn.
-      rewrite !bind_ret_l.
-      eapply eq_itree_clo_bind with (UU := eq); [reflexivity | intros ? ? ->; reflexivity].
-    - cbn in *.
-      rewrite !bind_bind.
-      eapply eq_itree_clo_bind with (UU := eq); [reflexivity | intros ? ? ->].
-      setoid_rewrite bind_ret_l.
-      setoid_rewrite bind_bind.
-      setoid_rewrite bind_ret_l.
-      rewrite IHa.
-      setoid_rewrite bind_bind.
-      eapply eq_itree_clo_bind with (UU := eq); [reflexivity | intros ? ? ->].
-      setoid_rewrite bind_ret_l.
-      eapply eq_itree_clo_bind with (UU := eq); [reflexivity | intros ? ? ->].
-      reflexivity.
-  Qed.
-
-  Arguments denote_phis: simpl never.
-
-  Import ITreeNotations.
-  Lemma denote_ocfg_unfold_in_euttge: forall bks bid_from bid_src bk,
-      find_block bks bid_src = Some bk ->
-      ⟦ bks ⟧bs (bid_from, bid_src) ≳
-             vob <- ⟦ bk ⟧b bid_from ;;
-      match vob with
-      | inr v => Ret (inr v)
-      | inl bid_target => ⟦ bks ⟧bs (bid_src, bid_target)
-      end.
-  Proof.
-    intros * GET_BK.
-    cbn. unfold denote_ocfg at 1.
-    rewrite KTreeFacts.unfold_iter_ktree. cbn.
-    rewrite GET_BK.
-    repeat setoid_rewrite bind_bind.
-    repeat (eapply eqit_bind; [intros ? |reflexivity]).
-    break_sum; rewrite bind_ret_l; [|reflexivity].
-    rewrite tau_euttge; reflexivity.
-  Qed.
-
-  Lemma denote_ocfg_unfold_in_eq_itree: forall bks bid_from bid_src bk,
-      find_block bks bid_src = Some bk ->
-      ⟦ bks ⟧bs (bid_from, bid_src) ≅
-             vob <- ⟦ bk ⟧b bid_from ;;
-      match vob with
-      | inr v => Ret (inr v)
-      | inl bid_target => Tau (⟦ bks ⟧bs (bid_src, bid_target))
-      end.
-  Proof.
-    intros * GET_BK.
-    cbn. unfold denote_ocfg at 1.
-    rewrite KTreeFacts.unfold_iter_ktree. cbn.
-    rewrite GET_BK.
-    repeat setoid_rewrite bind_bind.
-    repeat (eapply eqit_bind; [intros ? |reflexivity]).
-    break_sum; rewrite bind_ret_l; [|reflexivity].
-    apply eqit_Tau.
-    reflexivity.
-  Qed.
-
-  Lemma denote_ocfg_unfold_not_in_eq_itree: forall bks bid_from bid_src,
-      find_block bks bid_src = None ->
-      ⟦ bks ⟧bs (bid_from, bid_src) ≅ Ret (inl (bid_from,bid_src)).
-  Proof.
-    intros * GET_BK.
-    unfold denote_ocfg.
-    rewrite KTreeFacts.unfold_iter_ktree.
-    rewrite GET_BK; cbn.
-    rewrite bind_ret_l.
-    reflexivity.
-  Qed.
-
-  Lemma denote_ocfg_unfold_eq_itree: forall bks bid_from bid_src,
-      ⟦ bks ⟧bs (bid_from, bid_src) ≅
-             match find_block bks bid_src with
-             | Some bk => vob <- ⟦ bk ⟧b bid_from ;;
-                         match vob with
-                         | inr v => Ret (inr v)
-                         | inl bid_target => Tau (⟦ bks ⟧bs (bid_src, bid_target))
-                         end
-             | None => Ret (inl (bid_from,bid_src))
-             end.
-  Proof.
-    intros *.
-    break_match_goal.
-    - rewrite denote_ocfg_unfold_in_eq_itree; eauto; reflexivity.
-    - rewrite denote_ocfg_unfold_not_in_eq_itree; eauto; reflexivity.
-  Qed.
-
-  Require Import Paco.paco.
-
-  Lemma has_post_eq_itree_aux : forall {E X} (t : itree E X) (Q : X -> Prop),
-      has_post_strong t Q ->
-      eq_itree (fun 'x y => x = y /\ Q x) t t.
-  Proof.
-    intros.
-    unfold has_post_strong in *.
-    rewrite itree_eta in *.
-    genobs t ot.
-    revert t ot H Heqot.
-    ginit.
-    gcofix CIH.
-    intros.
-    pose proof H0 as EQ.
-    punfold H0.
-    red in H0. cbn in H0.
-    subst ot.
-    induction H0.
-    - gstep; constructor; intuition; subst; auto.
-    - gstep; constructor.
-      rewrite itree_eta.
-      gbase.
-      eapply CIH; eauto.
-      rewrite <- tau_eutt at 1 2.
-      rewrite (itree_eta m2) in EQ.
-      apply EQ.
-    - gstep. constructor.
-      intros; red.
-      rewrite (itree_eta (k2 v)).
-      gbase.
-      eapply CIH; eauto.
-      unfold eutt in EQ; rewrite <- eqit_Vis in EQ.
-      specialize (EQ v).
-      rewrite (itree_eta (k2 v)) in EQ.
-      apply EQ.
-    - apply IHeqitF; auto.
-    - gstep; constructor.
-      rewrite itree_eta.
-      gbase.
-      eapply CIH; eauto.
-      rewrite <- tau_eutt at 1 2.
-      rewrite (itree_eta t2) in EQ.
-      apply EQ.
-  Qed.
-
-  Lemma has_post_eq_itree : forall {E X} (t : itree E X) (Q : X -> Prop),
-      has_post t Q ->
-      eq_itree (fun 'x y => x = y /\ Q x) t t.
-  Proof.
-    intros; apply has_post_post_strong in H; apply has_post_eq_itree_aux; auto.
-  Qed.
-
-  Lemma find_block_map :
-    forall {T} (f : block T -> block T) G b,
-      (forall bk, blk_id (f bk) = blk_id bk) ->
-      find_block (map f G) b = option_map f (find_block G b).
-  Proof.
-    intros.
-    destruct (find_block G b) eqn:EQ.
-    eapply find_block_map_some in EQ; eauto.
-    eapply find_block_map_none in EQ; eauto.
-  Qed.
-
   Lemma update_provenance_find_block :
     forall {T} (G : ocfg T) old new to,
       find_block (update_provenance_ocfg old new G) to = option_map (update_provenance_block old new) (find_block G to).
@@ -873,10 +522,6 @@ Section BlockFusionCorrect.
         intros ?; apply NIN; cbn; auto.
   Qed.
 
-  Definition phi_sources {T} (φ : phi T) : list block_id :=
-    let '(Phi _ l) := φ in
-    map fst l.
-
   Definition phis_block_id_not_in {T} b (φs : list (local_id * phi T)) :=
     forall φ, In φ φs -> ~ In b (phi_sources (snd φ)).
 
@@ -903,6 +548,7 @@ Section BlockFusionCorrect.
       reflexivity.
   Qed.
 
+  Arguments denote_phis : simpl never.
   Lemma update_provenance_block_eq_itree :
     forall bk old new f,
       f <> new ->
@@ -919,13 +565,6 @@ Section BlockFusionCorrect.
   Definition ocfg_phis_not_id b (G : ocfg dtyp) :=
     forall bk, In bk G ->
           block_phis_block_id_not_in b bk.
-
-  Lemma find_block_In' : forall {T} G b (bk : block T),
-      find_block G b = Some bk ->
-      In bk G.
-  Proof.
-    intros * LU; pose proof find_block_has_id _ _ LU; subst; apply find_block_In; auto.
-  Qed.
 
   Lemma phis_not_id_ocfg_to_bk : forall b G b' bk,
       find_block G b' = Some bk ->
@@ -970,7 +609,7 @@ Section BlockFusionCorrect.
       cbn.
       rewrite !bind_bind.
       Opaque denote_phis.
-      setoid_rewrite denote_code_app.
+      setoid_rewrite denote_code_app_eq_itree.
       repeat setoid_rewrite bind_bind.
       (* Match the phis *)
       ebind; econstructor.
@@ -1071,119 +710,6 @@ Section BlockFusionCorrect.
     reflexivity.
   Qed.
 
-  (* Over a closed graph, phi nodes should expect exactly jumps from their predecessors:
-     - For any block [bk] in the graph
-     - For any phi node [phi] in this block
-     - the sources of [phi] and the predecessors of [bk] are in bijection
-   *)
-  Definition wf_ocfg_phis (G : ocfg dtyp) :=
-    forall bk pred x phi,
-      In bk G ->
-      In (x,phi) bk.(blk_phis) ->
-      (In pred (phi_sources phi) <-> In pred (predecessors bk.(blk_id) G)).
-
-  Record wf_cfg (G : cfg dtyp): Prop := WF_CFG
-                                      {
-                                        wf_cfg_bid : wf_ocfg_bid G.(blks);
-                                        wf_cfg_phis : wf_ocfg_phis G.(blks)
-                                      }.
-  
-  Lemma wf_ocfg_bid_find_block_unique :
-    forall (bks : ocfg dtyp) bk1 b1 bk2,
-      wf_ocfg_bid bks ->
-      find_block bks b1 = Some bk1 ->
-      find_block bks b1 = Some bk2 ->
-      bk1 = bk2.
-  Proof.
-    induction bks as [| bk bks IH]; intros * WF FIND1 FIND2; [inv FIND1 |].
-    cbn in *.
-    break_match_hyp.
-    inv FIND1; inv FIND2; auto.
-    break_match_hyp; intuition.
-    eapply IH; eauto.
-    eapply wf_ocfg_bid_cons; eauto. 
-  Qed.
-
-  Lemma In_find_block :
-    forall (bks : ocfg dtyp) bk,
-      In bk bks ->
-      exists bk', find_block bks bk.(blk_id) = Some bk'.
-  Proof.
-    induction bks as [| x bks IH]; intros * IN; [inv IN | ].
-    destruct (Eqv.eqv_dec_p x.(blk_id) bk.(blk_id)).
-    - do 2 red in e; exists x; rewrite find_block_eq; auto. 
-    - rewrite find_block_ineq; [| auto].
-      apply IH.
-      destruct IN; auto. 
-      exfalso; subst; eapply n; reflexivity.
-  Qed.
-
-  Lemma wf_ocfg_bid_In_is_found :
-    forall (bks : ocfg dtyp) bk, 
-      wf_ocfg_bid bks ->
-      In bk bks ->
-      find_block bks bk.(blk_id) = Some bk.
-  Proof.
-    induction bks as [| x bks IH]; intros * WF IN; [inv IN |].
-    destruct (Eqv.eqv_dec_p x.(blk_id) bk.(blk_id)).
-    - rewrite find_block_eq; auto.
-      destruct IN as [-> | IN]; auto.
-      apply wf_ocfg_bid_cons_not_in in WF.
-      exfalso; apply WF.
-      do 2 red in e; rewrite e.
-      eapply in_map; auto.
-    - rewrite find_block_ineq; [| auto].
-      apply IH.
-      eapply wf_ocfg_bid_cons; eauto.
-      destruct IN; auto. 
-      exfalso; subst; eapply n; reflexivity.
-  Qed.
-
-  Definition predecessors_aux (b : block_id) (G : ocfg dtyp) acc :=
-    fold_left (fun acc bk => if is_predecessor b bk then bk.(blk_id) :: acc else acc) G acc.
-  
-  Lemma In_predecessors_is_predecessor_aux :
-    forall (G : ocfg dtyp) acc (src tgt : block_id), 
-      In src (predecessors_aux tgt G acc) ->
-      (In src acc \/ exists bk, In bk G /\ src = bk.(blk_id) /\ is_predecessor tgt bk).
-  Proof.
-    intros *; revert acc; induction G as [| bk G IH]; intros acc IN; [left; auto |].
-    cbn in IN.
-    break_match_hyp.
-    - edestruct IH as [INACC | (bk' & INbk & -> & PRED)]; eauto.
-      + destruct INACC as [<- | ?]; [| left; auto].
-        right; exists bk; intuition.
-      + right.
-        exists bk'; intuition.
-    - edestruct IH as [INACC | (bk' & INbk & -> & PRED)]; eauto.
-      right; exists bk'; intuition.
-  Qed.
-
- Lemma In_predecessors_is_predecessor :
-    forall (G : ocfg dtyp) (src tgt : block_id), 
-      In src (predecessors tgt G) ->
-      exists bk, In bk G /\ src = bk.(blk_id) /\ is_predecessor tgt bk.
-  Proof.
-    intros * IN.
-    edestruct In_predecessors_is_predecessor_aux as [INACC | (bk' & INbk & -> & PRED)]; eauto.
-    inv INACC.
-  Qed.
-
-  Lemma predecessor_successor :
-    forall (G : ocfg dtyp) (source target : block_id) (bk : block dtyp),
-      wf_ocfg_bid G ->
-      In source (predecessors target G) ->
-      find_block G source = Some bk ->
-      In target (successors bk).
-  Proof.
-    intros * WF IN FIND.
-    pose proof In_predecessors_is_predecessor _ _ _ IN as (bk' & IN' & -> & ISPRED).
-    apply wf_ocfg_bid_In_is_found in IN'; auto.
-    rewrite FIND in IN'; inv IN'.
-    unfold is_predecessor in ISPRED.
-    break_match_hyp; intuition.
-  Qed.
-
    (* If the closed graph is well formed, and the fusion indeed fuses [src] with [tgt],
    then [src] cannot appear in any phi node *)
   Lemma wf_cfg_src_not_in_phis: forall G bks' src tgt,
@@ -1207,7 +733,8 @@ Section BlockFusionCorrect.
 
   Arguments denote_block : simpl never.
   Arguments append : simpl never.
-  Lemma block_fusion_cfg_correct :
+
+  Theorem block_fusion_cfg_correct :
     forall (G : cfg dtyp),
       wf_cfg G ->
       ⟦ G ⟧cfg ≈ ⟦ block_fusion_cfg G ⟧cfg.
