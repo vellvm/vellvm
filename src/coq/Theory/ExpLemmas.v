@@ -474,6 +474,28 @@ Section ExpPure.
     | |- context [trigger (ThrowUB _)] => rewrite interp_cfg3_UB
     end.
 
+  Lemma eval_conv_h_case : forall conv t1 x t2,
+          (exists s, eval_conv_h conv t1 x t2 = raise s) \/
+          (exists v, eval_conv_h conv t1 x t2 = Ret v) \/
+          (exists z, eval_conv_h conv t1 x t2 = trigger (ItoP z)) \/
+          (exists z, eval_conv_h conv t1 x t2 = trigger (PtoI t2 z)).
+  Proof.
+    intros.
+    destruct conv.
+    { cbn; repeat (break_match ; eauto). }
+    { cbn; repeat (break_match ; eauto). }
+    { cbn; repeat (break_match ; eauto). }
+    { cbn; repeat (break_match ; eauto). cbn. eauto. }
+    { cbn; repeat (break_match ; eauto). cbn. eauto. }
+    { cbn; repeat (break_match ; eauto). }
+    { cbn; repeat (break_match ; eauto). }
+    { cbn; repeat (break_match ; eauto). cbn. eauto. }
+    { cbn; repeat (break_match ; eauto). cbn. eauto. }
+    { cbn; repeat (break_match ; eauto). }
+    { cbn; repeat (break_match ; eauto). }
+    { cbn; repeat (break_match ; eauto). }
+  Qed.
+
   Lemma pick_is_pure : forall u P, pure (ℑ3 (trigger (pick u P))).
   Proof.
     intros.
@@ -492,6 +514,30 @@ Section ExpPure.
     step.
     apply has_post_bind.
     intros (? & ? & ? & []).
+  Qed.
+
+  Lemma ItoP_is_pure : forall z,
+      pure (ℑ3 (trigger (ItoP z))).
+  Proof.
+    unfold pure; intros.
+    unfold ℑ3.
+    rewrite interp_intrinsics_trigger.
+    cbn. rewrite interp_global_trigger. cbn.
+    rewrite interp_local_bind.
+    rewrite interp_local_trigger.
+    cbn. rewrite bind_trigger. rewrite bind_vis.
+    cbn. rewrite interp_memory_vis. cbn.
+    break_match;
+      try solve [unfold raise; rewrite ?bind_bind; apply has_post_bind; intros [];
+    try apply failure_is_pure].
+    1 - 4 : break_match;
+      try solve [unfold raise; rewrite ?bind_bind; apply has_post_bind; intros [];
+    try apply failure_is_pure].
+    1 - 4 : try destruct p; cbn; setoid_rewrite bind_ret_l;
+    rewrite interp_memory_bind; rewrite interp_memory_ret;
+    cbn; rewrite bind_ret_l;
+    try rewrite interp_local_ret; try rewrite interp_memory_ret; cbn;
+      try apply eutt_Ret; cbn; auto.
   Qed.
 
   (* BEGIN TO MOVE *)
@@ -682,6 +728,29 @@ Section ExpPure.
               ].
 
   Ltac intro_pure := intros (? & ? & ? & ?) (-> & -> & ->).
+
+  Lemma conv_to_exp_raise: forall (T : Type) (s : string), translate conv_to_exp (raise (A := T) s) ≈ raise s.
+  Proof.
+    unfold raise; intros.
+    go.
+    apply eutt_eq_bind; intros [].
+  Qed.
+
+  Lemma conv_to_exp_ItoP : forall z,
+      translate exp_to_instr (translate conv_to_exp (trigger (ItoP z))) ≈ trigger (ItoP z).
+  Proof.
+    intros.
+    go.
+    reflexivity.
+  Qed.
+
+  Lemma conv_to_exp_PtoI : forall z t_to,
+      translate exp_to_instr (translate conv_to_exp (trigger (PtoI t_to z))) ≈ trigger (PtoI t_to z).
+  Proof.
+    intros.
+    go.
+    reflexivity.
+  Qed.
 
   Lemma expr_are_pure : forall (o : option dtyp) e, pure ⟦ e at? o ⟧e3.
   Proof with trivial_cases.
@@ -933,11 +1002,34 @@ Section ExpPure.
       unfold ITree.map.
       go.
       apply has_post_bind_strong with (↑ (pure_P g l m)).
+
       + (* What's the right way to reason about eval_conv? *)
+        unfold eval_conv.
+
+
+        pose proof (eval_conv_h_case conv t_from d t_to).
+        destruct H as [ (s & H) | [(v & H)| [ (z & H)| (z & H)]] ].
+        rewrite H.
+
+        destruct t_from; cbn.
+        1 - 15 : (rewrite conv_to_exp_raise; rewrite exp_to_instr_raise); trivial_cases.
+        destruct d; cbn.
+        1 - 13 : (rewrite conv_to_exp_raise; rewrite exp_to_instr_raise); trivial_cases.
+        destruct t_from; cbn; rewrite H; go; trivial_cases.
+
+        destruct d; cbn; go; trivial_cases.
+        rewrite conv_to_exp_raise; rewrite exp_to_instr_raise; trivial_cases.
+
+        destruct t_from; rewrite H; try rewrite conv_to_exp_ItoP; try apply ItoP_is_pure.
+        destruct d; cbn; go; trivial_cases.
+
+        1 - 12 : apply ItoP_is_pure.
+
+        rewrite conv_to_exp_raise; rewrite exp_to_instr_raise. apply failure_is_pure.
+
         admit.
       + intro_pure.
-        go...
-
+              go...
     - destruct ptrval; cbn.
       rewrite translate_bind, interp_cfg3_bind.
       eapply has_post_bind_strong.
