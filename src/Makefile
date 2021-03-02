@@ -28,7 +28,7 @@ COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Nu
 									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/UndefinedBehaviour Handlers/Memory Handlers/MemoryTheory Handlers/Handlers\
 								  Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel QC/GenAST QC/QCVellvm
 
-COQFILESTHEORY := Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
+COQFILESTHEORY := Syntax/ScopeTheory Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
 									Theory/TopLevelRefinements Theory/SymbolicInterpreter\
 									Utils/NoEvent Utils/Commutation
 

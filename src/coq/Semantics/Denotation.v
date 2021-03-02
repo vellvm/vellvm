@@ -920,7 +920,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
         r <- denote_ocfg (blks f) (init f,init f) ;;
         match r with
-        | inl bid => raise ("Can't find block in denote_cfg " ++ to_string bid)
+        | inl bid => raise ("Can't find block in denote_cfg " ++ to_string (snd bid))
         | inr uv  => ret uv
         end.
 

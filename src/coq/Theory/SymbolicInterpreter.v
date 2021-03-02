@@ -16,6 +16,7 @@ From Vellvm Require Import
      Syntax.CFG
      Syntax.Traversal
      Syntax.Scope
+     Syntax.ScopeTheory
      Syntax.TypToDtyp
      Semantics.InterpretationStack
      Semantics.TopLevel

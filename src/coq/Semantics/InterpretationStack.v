@@ -160,6 +160,9 @@ Module SemNotations.
   Notation "⟦ i '⟧i'" :=        (denote_instr i).
   Notation "⟦ i '⟧i3'" :=       (ℑ3 ⟦ i ⟧i).
 
+  Notation "⟦ c '⟧c'" :=          (denote_code c).
+  Notation "⟦ c '⟧c3'" :=         (ℑ3 ⟦ c ⟧c).
+
   Notation "⟦ t '⟧t'" :=        (denote_terminator t).
   Notation "⟦ t '⟧t3'" :=       (ℑ3 (translate exp_to_instr ⟦ t ⟧t)).
 

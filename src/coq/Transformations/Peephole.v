@@ -20,6 +20,7 @@ From Vellvm Require Import
      Syntax.LLVMAst
      Syntax.AstLib
      Syntax.Traversal
+     Syntax.Scope
      Semantics.LLVMEvents
      Semantics.InterpretationStack
      Semantics.TopLevel.
@@ -89,10 +90,7 @@ End DeadCodeElim.
     sets ([MSetRBT.v] for instance)
  *)
 Import ListSet.
-Lemma raw_id_eq_dec : forall (x y : raw_id), {x = y} + {x <> y}.
-Proof.
-  intros. destruct (Eqv.eqv_dec_p x y); auto.
-Qed.
+
 Infix "+++" := (set_union raw_id_eq_dec) (right associativity, at level 60).
 Infix ":::" := (set_add raw_id_eq_dec) (right associativity, at level 60).
 Infix "∖"    := (set_diff raw_id_eq_dec) (right associativity, at level 60).
