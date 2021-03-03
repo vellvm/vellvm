@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      Lia
      String
@@ -36,6 +37,23 @@ From Vellvm Require Import
 
 Import ITreeNotations.
 Import SemNotations.
+
+(* end hide *)
+
+(** * Substitution of equivalent expressions
+    Substitution of expressions impact neither the control flow nor the
+    liveness information of the graph. Their equivalence can therefore
+    be lifted with no restriction to any context: we establish this
+    generic fact as [exp_optim_correct].
+
+    Practically, this means that we can define concrete sound optimizations
+    of this nature purely by proving rewrite rules over expressions.
+
+    Note: The currently justified optimization is stupid: it fmaps
+    a substitution of expressions over the graph.
+    We will naturally want to define ways to iterate rewrites locally
+    rather than over the whole structure.
+ *)
 
 Section ExpOptim.
 
@@ -293,6 +311,45 @@ Section ExpOptim.
       apply exp_optim_correct_term.
     Qed.
 
+    Global Instance eq_itree_interp_cfg3: forall {T : Type}, Proper (eq_itree eq ==> eq ==> eq ==> eq ==> eq_itree eq) (@ℑ3 T).
+    Proof.
+      repeat intro.
+      unfold ℑ3.
+      subst; rewrite H.
+      reflexivity.
+    Qed.
+
+    Lemma interp_cfg3_ret_eq_itree:
+      forall (R : Type) (g : global_env) (l : local_env) (m : memory_stack) (x : R),
+        ℑ3 (Ret x) g l m ≅ Ret3 g l m x.
+    Proof.
+      intros.
+      unfold interp_cfg3.
+      rewrite interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret.
+      reflexivity.
+    Qed.
+
+    Lemma interp_cfg3_bind_eq_itree :
+      forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g l m,
+        ℑ3 (t >>= k) g l m ≅
+           '(m',(l',(g',x))) <- ℑ3 t g l m ;; ℑ3 (k x) g' l' m'.
+    Proof.
+      intros.
+      unfold ℑ3.
+      rewrite interp_intrinsics_bind, interp_global_bind, interp_local_bind, interp_memory_bind.
+      eapply eq_itree_clo_bind; [reflexivity | intro3; reflexivity].
+    Qed.
+
+    Lemma interp_cfg3_Tau :
+      forall {R} (t: itree instr_E R) g l m,
+        ℑ3 (Tau t) g l m ≅ Tau (ℑ3 t g l m).
+    Proof.
+      intros.
+      unfold ℑ3.
+      rewrite interp_intrinsics_Tau, interp_global_Tau, interp_local_Tau, interp_memory_Tau.
+      reflexivity.
+    Qed.
+
     Lemma denote_ocfg_proper :
       forall bks1 bks2 fto g l m,
         (forall b, find_block bks1 b = None <-> find_block bks2 b = None) ->
@@ -303,17 +360,27 @@ Section ExpOptim.
         ⟦ bks1 ⟧bs3 fto g l m ≈ ⟦ bks2 ⟧bs3 fto g l m. 
     Proof.
       intros * BIJ EQ.
-      (* Arg need to commut [interp_cfg3] with [iter], need a lemma for that *)
-
-      (* rewrite interp_iter. *)
-      (* apply eutt_interp_cfg3; auto. *)
-      (* apply KTreeFacts.eutt_iter. *)
-      (* intros [f to]. *)
-      (* do 2 break_match_goal; try reflexivity. *)
-      (* 2: apply BIJ in Heqo0; rewrite Heqo0 in Heqo; inv Heqo. *)
-      (* 2: apply BIJ in Heqo; rewrite Heqo in Heqo0; inv Heqo0. *)
-      (* cbn. *)
-    Admitted.
+      einit.
+      destruct fto as [f to].
+      revert g l m f to.
+      ecofix CIH.
+      intros.
+      destruct (find_block bks1 to) eqn:LU1.
+      - destruct (find_block bks2 to) eqn:LU2; [| apply BIJ in LU2; rewrite LU2 in LU1; inv LU1].
+        rewrite 2denote_ocfg_unfold_in_eq_itree; eauto.
+        rewrite 2interp_cfg3_bind_eq_itree.
+        ebind; econstructor.
+        eapply EQ; eauto.
+        intro3.
+        destruct s.
+        + rewrite 2interp_cfg3_Tau.
+          estep.
+        + rewrite interp_cfg3_ret_eq_itree.
+          reflexivity.
+      - pose proof LU1 as LU2; apply BIJ in LU2.
+        rewrite 2denote_ocfg_unfold_not_in_eq_itree, interp_cfg3_ret_eq_itree; auto.
+        reflexivity.
+    Qed.
 
     Lemma exp_optim_correct :
       forall G g l m, ⟦ G ⟧cfg3 g l m ≈ ⟦ opt_exp_cfg G ⟧cfg3 g l m.
@@ -353,4 +420,4 @@ Section ExpOptim.
         subst; apply exp_optim_correct_block.
     Qed.
 
-End ExpOptim.
+End ExpOptimCorrect.

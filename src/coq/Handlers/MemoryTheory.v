@@ -2737,10 +2737,18 @@ Section PARAMS.
     Qed.
 
     Lemma interp_memory_ret :
-      forall (R : Type) g (x: R),
-        interp_memory (Ret x: itree Effin R) g ≅ Ret (g,x).
+      forall (R : Type) m (x: R),
+        interp_memory (Ret x: itree Effin R) m ≅ Ret (m,x).
     Proof.
       intros; apply interp_state_ret.
+    Qed.
+
+    Lemma interp_memory_Tau :
+      forall {R} (t: itree Effin R) m,
+        interp_memory (Tau t) m ≅ Tau (interp_memory t m).
+    Proof.
+      intros.
+      unfold interp_memory; rewrite interp_state_tau; reflexivity.
     Qed.
 
     Lemma interp_memory_vis_eqit:
