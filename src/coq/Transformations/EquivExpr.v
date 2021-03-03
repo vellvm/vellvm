@@ -420,4 +420,6 @@ Section ExpOptim.
         subst; apply exp_optim_correct_block.
     Qed.
 
-End ExpOptimCorrect.
+  End ExpOptimCorrect.
+
+End ExpOptim.

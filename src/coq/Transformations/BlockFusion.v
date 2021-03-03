@@ -29,8 +29,7 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.InterpretationStack
      Semantics.TopLevel
-     Theory.DenotationTheory
-     Transformations.Peephole.
+     Theory.DenotationTheory.
 
 Opaque append.
 Import ListSet.
@@ -52,7 +51,7 @@ Section RemoveBlock.
     | bk :: G => if Eqv.eqv_dec b bk.(blk_id) then G else bk:: remove_block G b
     end.
 
-  Infix "∖" := remove_block.
+  Infix "∖" := remove_block (right associativity, at level 60).
 
   Lemma remove_block_find_block_eq : forall {T} b (G : ocfg T),
       wf_ocfg_bid G ->
@@ -137,7 +136,7 @@ Section RemoveBlock.
 
 End RemoveBlock.
 
-Infix "∖" := remove_block.
+Infix "∖" := remove_block (right associativity, at level 60).
 
 Section BlockFusion.
 
