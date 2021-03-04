@@ -39,7 +39,7 @@ COQFILESTHEORY := Syntax/ScopeTheory\
 									Utils/NoEvent Utils/Commutation
 
 COQFILESOPT    := Transformations/Transform\
-									Transformations/EquivExpr Transformations/BlockFusion
+									Transformations/EquivExpr Transformations/BlockFusion Transformations/DeadCodeElimination
 
 OLLVMFILES :=
 
