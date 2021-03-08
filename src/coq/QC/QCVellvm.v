@@ -1,5 +1,5 @@
 From QuickChick Require Import QuickChick.
-From Vellvm Require Import GenAST TopLevel LLVMAst DynamicValues.
+From Vellvm Require Import ShowAST GenAST TopLevel LLVMAst DynamicValues.
 Require Import Semantics.LLVMEvents.
 Require Import Semantics.InterpretationStack.
 Require Import Handlers.Handlers.
