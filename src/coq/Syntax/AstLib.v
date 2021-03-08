@@ -552,7 +552,6 @@ Section hiding_notation.
       | IVoid n => Atom ("void<" ++ show_Z n ++ ">")%string
       end.
 
-  Locate Add.
   Global Instance serialize_ibinop : Serialize ibinop :=
     fun binop =>
       match binop with
