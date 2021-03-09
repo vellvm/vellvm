@@ -54,11 +54,12 @@ Definition vellvm_agrees_with_clang (prog : list (toplevel_entity typ (block typ
   := 
     (* collect (show prog) *)
             match interpret prog, run_llc prog with
-            | MlOk (UVALUE_I8 x), UVALUE_I8 y => checker (equ x y)
+            | MlOk (UVALUE_I8 x), UVALUE_I8 y =>
+              whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y)) (equ x y)
             | _, _ => checker true
             end.
 
 Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
-Extract Constant defNumTests    => "100".
+Extract Constant defNumTests    => "10000".
 QuickChick (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
 (*! QuickChick agrees. *)

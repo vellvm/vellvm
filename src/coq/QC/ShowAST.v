@@ -123,9 +123,11 @@ Section ShowInstances.
       | OP_IBinop iop t v1 v2 =>
         show iop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
       | OP_ICmp cmp t v1 v2 =>
-        show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+        "icmp " ++ show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
       | OP_GetElementPtr t ptrval idxs =>
-        "getelementptr"
+        "todo: getelementptr"
+      | OP_Select (tc, cnd) (t1, v1) (t2, v2) =>
+        "select " ++ show tc ++ " " ++ show_exp cnd ++ ", " ++ show t1 ++ " " ++ show_exp v1  ++ ", " ++ show t2 ++ " " ++ show_exp v2
       | _ => "show_exp todo"
       end.
 
@@ -202,11 +204,26 @@ Section ShowInstances.
   Global Instance showCode : Show (code typ)
     := {| show := show_code "    " |}.
 
+  Definition show_phi_block (p : block_id * exp typ) : string :=
+    let '(bid, e) := p in
+    "[ " ++ show e ++ ", " ++ "%" ++ show bid ++ " ]".
+
+  Definition intersperse (sep : string) (l : list string) : string
+    := fold_left (fun acc s => if StringOrdFacts.eqb "" acc then s else s ++ sep ++ acc) l "".
+
+  Global Instance showPhi : Show (phi typ)
+    := {| show p :=
+            let '(Phi t phis) := p in
+            "phi " ++ show t ++ " " ++ intersperse ", " (map show_phi_block phis)
+       |}.
+
   Definition show_block (indent : string) (b : block typ) : string
     :=
+      let phis   := concatStr (map (fun '(l, p) => indent ++ "%" ++ show l ++ " = " ++ show p ++ newline) (blk_phis b)) in
       let code   := show_code indent (blk_code b) in
       let term   := indent ++ show (blk_term b) ++ newline in
       show (blk_id b) ++ ":" ++ newline
+           ++ phis
            ++ code
            ++ term.
 

@@ -319,6 +319,9 @@ Section GenerationState.
 
   Definition run_GenLLVM {A} (g : GenLLVM A) : G A
     := fmap fst (runStateT g init_GenState).
+
+  Definition lift_GenLLVM {A} (g : G A) : GenLLVM A
+    := mkStateT (fun st => a <- g;; ret (a, st)).
 End GenerationState.
 
 Section TypGenerators.
@@ -511,13 +514,13 @@ Section ExpGenerators.
            [ ret LLVMAst.Add <*> ret false <*> ret false
            ; ret Sub <*> ret false <*> ret false
            ; ret Mul <*> ret false <*> ret false
-           ; ret Shl <*> ret false <*> ret false
+(*           ; ret Shl <*> ret false <*> ret false  *)
            ; ret UDiv <*> ret false
            ; ret SDiv <*> ret false
-           ; ret LShr <*> ret false
-           ; ret AShr <*> ret false
-           ; ret URem
-           ; ret SRem
+           (* ; ret LShr <*> ret false *)
+           (* ; ret AShr <*> ret false *)
+           (* ; ret URem *)
+           (* ; ret SRem *)
            ; ret And
            ; ret Or
            ; ret Xor
@@ -918,11 +921,21 @@ Section InstrGenerators.
     := n <- lift arbitrary;;
        gen_code_length n.
 
+
+  Definition instr_id_to_raw_id (fail_msg : string) (i : instr_id) : raw_id :=
+    match i with
+    | IId id => id
+    | IVoid n => Name ("fail (instr_id_to_raw_id): " ++ fail_msg)
+    end.
+
   (* Returns a terminator and a list of new blocks that it reaches *)
   (* Need to make returns more likely than branches so we don't get an
      endless tree of blocks *)
   Fixpoint gen_terminator_sz
-             (sz : nat) (t : typ) {struct t} : GenLLVM (terminator typ * list (block typ))
+           (sz : nat)
+           (t : typ) (* Return type *)
+           (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
+           {struct t} : GenLLVM (terminator typ * list (block typ))
     :=
       ctx <- get_ctx;;
       match sz with
@@ -937,36 +950,143 @@ Section InstrGenerators.
        | S sz' =>
          (* Need to lift oneOf to GenLLVM ...*)
          freq_LLVM
-           [ (6%nat, gen_terminator_sz 0 t)
-           ; (min sz' 6%nat, '(b, (bh, bs)) <- gen_blocks_sz sz' t;; ret (TERM_Br_1 (blk_id b), (bh::bs)))
-           ; (min sz' 6%nat, ctx <- get_ctx;;
+           ([ (6%nat, gen_terminator_sz 0 t back_blocks)
+           (* Simple jump *)
+           ; (min sz' 6%nat, '(b, (bh, bs)) <- gen_blocks_sz sz' t back_blocks;; ret (TERM_Br_1 (blk_id b), (bh::bs)))
+           (* Conditional branch, with no backloops *)
+           ; (min sz' 6%nat,
                    c <- gen_exp_size 0 (TYPE_I 1);;
-                   '(b1, (bh1, bs1)) <- gen_blocks_sz sz' t;;
+
+                   (* Save context *)
+                   ctx <- get_ctx;;
+
+                   (* Generate first branch *)
+                   '(b1, (bh1, bs1)) <- gen_blocks_sz sz' t back_blocks;;
 
                    (* Restore context so blocks in second branch don't refer
                       to variables from the first branch. *)
                    modify (replace_ctx ctx);;
-                   '(b2, (bh2, bs2)) <- gen_blocks_sz sz' t;;
+                   '(b2, (bh2, bs2)) <- gen_blocks_sz sz' t back_blocks;;
 
                    ret (TERM_Br (TYPE_I 1, c) (blk_id b1) (blk_id b2), (bh1::bs1) ++ (bh2::bs2)))
+            (* Sometimes generate a loop *)
+            ; (min sz' 6%nat,
+               '(t, (b, bs)) <- gen_loop_sz sz t back_blocks 10;;
+               ret (t, (b :: bs)))
            ]
+              ++
+              (* Loop back sometimes *)
+              match back_blocks with
+              | (b::bs) =>
+                [(min sz' 1%nat,
+                bid <- lift_GenLLVM (elems_ b back_blocks);;
+                ret (TERM_Br_1 bid, []))]
+              | nil => []
+              end)
        end
-  with gen_blocks_sz (sz : nat) (t : typ) {struct t} : GenLLVM (block typ * (block typ * list (block typ)))
+  with gen_blocks_sz
+         (sz : nat)
+         (t : typ) (* Return type *)
+         (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
+         {struct t} : GenLLVM (block typ * (block typ * list (block typ)))
          :=
            bid <- new_block_id;;
            code <- gen_code;;
-           '(term, bs) <- gen_terminator_sz (sz - 1) t;;
-           i <- new_raw_id;;
+           '(term, bs) <- gen_terminator_sz (sz - 1) t back_blocks;;
            let b := {| blk_id   := bid
                      ; blk_phis := []
                      ; blk_code := code
                      ; blk_term := term
                      ; blk_comments := None
                     |} in
-           ret (b, (b, bs)).
+           ret (b, (b, bs))
+  with gen_loop_sz
+         (sz : nat)
+         (t : typ)
+         (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
+         (bound : LLVMAst.int) {struct t} : GenLLVM (terminator typ * (block typ * list (block typ)))
+    :=
+      bid_entry <- new_block_id;;
+      (* TODO: make it so I can generate constant expressions *)
+      loop_init <- ret INSTR_Op <*> gen_op (TYPE_I 64);; (* gen_exp_size sz (TYPE_I 64);; *)
+      bound' <- lift_GenLLVM (choose (0, bound));;
+      '(loop_init_instr_id, loop_init_instr) <- add_id_to_instr (TYPE_I 64, loop_init);;
+      let loop_init_instr_raw_id := instr_id_to_raw_id "loop init id" loop_init_instr_id in
+      '(loop_cmp_id, loop_cmp) <- add_id_to_instr (TYPE_I 1, INSTR_Op (OP_ICmp Ule (TYPE_I 64) (EXP_Ident (ID_Local loop_init_instr_raw_id)) (EXP_Integer bound')));;
+      let loop_cmp_raw_id := instr_id_to_raw_id "loop_cmp_id" loop_cmp_id in
+      let lower_exp := OP_Select (TYPE_I 1, (EXP_Ident (ID_Local loop_cmp_raw_id)))
+                                 (TYPE_I 64, (EXP_Ident (ID_Local loop_init_instr_raw_id)))
+                                 (TYPE_I 64, EXP_Integer bound') in
+      '(select_id, select_instr) <- add_id_to_instr (TYPE_I 64, INSTR_Op lower_exp);;
+      let loop_final_init_id_raw := instr_id_to_raw_id "loop iterator id" select_id in
+
+      let loop_cond_exp := INSTR_Op (OP_ICmp Ugt (TYPE_I 64) (EXP_Ident (ID_Local loop_final_init_id_raw)) (EXP_Integer 0)) in
+      '(loop_cond_id, loop_cond) <- add_id_to_instr (TYPE_I 1, loop_cond_exp);;
+
+      let entry_code : list (instr_id * instr typ) := [(loop_init_instr_id, loop_init_instr); (loop_cmp_id, loop_cmp); (select_id, select_instr); (loop_cond_id, loop_cond)] in
+
+      (* Generate end blocks *)
+      ctx <- get_ctx;;
+      '(_, (end_b, end_bs)) <- gen_blocks_sz (sz / 2) t back_blocks;;
+      let end_blocks := end_b :: end_bs in
+      let end_bid := blk_id end_b in
+
+      bid_next <- new_block_id;;
+      loop_bid <- new_block_id;;
+      phi_id <- new_raw_id;;
+
+      (* Block for controlling the next iteration of the loop *)
+      let next_exp := OP_IBinop (Sub false false) (TYPE_I 64) (EXP_Ident (ID_Local phi_id)) (EXP_Integer 1) in
+      '(next_instr_id, next_instr) <- add_id_to_instr (TYPE_I 64, INSTR_Op next_exp);;
+      let next_instr_raw_id := instr_id_to_raw_id "next_exp" next_instr_id in
+      let next_cond_exp := OP_ICmp Ugt (TYPE_I 64) (EXP_Ident (ID_Local next_instr_raw_id)) (EXP_Integer 0) in
+      '(next_cond_id, next_cond) <- add_id_to_instr (TYPE_I 1, INSTR_Op next_cond_exp);;
+      let next_cond_raw_id := instr_id_to_raw_id "next_cond_exp" next_cond_id in
+
+      let next_code := [(next_instr_id, next_instr); (next_cond_id, next_cond)] in
+      let next_block := {| blk_id   := bid_next
+                         ; blk_phis := []
+                         ; blk_code := next_code
+                         ; blk_term := TERM_Br (TYPE_I 1, (EXP_Ident (ID_Local next_cond_raw_id))) loop_bid end_bid
+                         ; blk_comments := None
+                         |} in
+
+      (* Generate loop blocks *)
+      modify (replace_ctx ctx);;
+      '(loop_b, loop_bs) <- gen_loop_entry_sz (sz / 2) t loop_bid phi_id bid_entry bid_next (EXP_Ident (ID_Local loop_final_init_id_raw)) (EXP_Ident (ID_Local next_instr_raw_id)) back_blocks;;
+      let loop_blocks := loop_b :: loop_bs in
+      let loop_bid := blk_id loop_b in
+
+      let entry_block := {| blk_id   := bid_entry
+                          ; blk_phis := []
+                          ; blk_code := entry_code
+                          ; blk_term := TERM_Br (TYPE_I 1, (EXP_Ident (ID_Local (instr_id_to_raw_id "loop_cond_id" loop_cond_id)))) loop_bid end_bid
+                          ; blk_comments := None
+                          |} in
+
+      ret (TERM_Br_1 bid_entry, (entry_block, loop_blocks ++ [next_block] ++ end_blocks))
+  with gen_loop_entry_sz
+         (sz : nat)
+         (t : typ)
+         (bid_loop : block_id)
+         (phi_id : local_id)
+         (bid_entry bid_next : block_id)
+         (entry_exp next_exp : exp typ)
+         (back_blocks : list block_id) (* Blocks that I'm allowed to jump back to *)
+         {struct t} : GenLLVM (block typ * list (block typ))
+         := (* This should basically be gen_blocks_sz, but the initial block contains loop control and phi nodes *)
+           code <- gen_code;;
+           '(term, bs) <- gen_terminator_sz (sz - 1) t (bid_next::back_blocks);;
+           let b := {| blk_id   := bid_loop
+                     ; blk_phis := [(phi_id, Phi (TYPE_I 64) [(bid_entry, entry_exp); (bid_next, next_exp)])]
+                     ; blk_code := code
+                     ; blk_term := term
+                     ; blk_comments := None
+                    |} in
+           ret (b, bs).
 
   Definition gen_blocks (t : typ) : GenLLVM (block typ * list (block typ))
-    := sized_LLVM (fun n => fmap snd (gen_blocks_sz n t)).
+    := sized_LLVM (fun n => fmap snd (gen_blocks_sz n t [])).
 
   (* Don't want to generate CFGs, actually. Want to generated TLEs *)
   Definition gen_definition (name : global_id) (ret_t : typ) (args : list (local_id * typ)) : GenLLVM (definition typ (block typ * list (block typ)))
