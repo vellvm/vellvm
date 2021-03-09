@@ -30,7 +30,7 @@ COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Nu
 									Handlers/Pick Handlers/UndefinedBehaviour Handlers/Memory Handlers/MemoryTheory\
 									Handlers/Handlers\
 								  Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
-									QC/GenAST QC/QCVellvm
+									QC/GenAST QC/ShowAST QC/QCVellvm
 
 COQFILESTHEORY := Syntax/ScopeTheory\
 									Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG\
