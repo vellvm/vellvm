@@ -160,6 +160,13 @@ and str_of_raw_id : LLVMAst.raw_id -> string =
 and lident : Format.formatter -> LLVMAst.local_id -> unit =
   fun ppf i -> pp_print_char ppf '%' ; pp_print_string ppf (str_of_raw_id i)
 
+and arg_lident : Format.formatter -> LLVMAst.local_id -> unit =
+  fun ppf i ->
+  match i with
+  | Anon _ -> ()
+  | _ -> pp_print_char ppf '%' ; pp_print_string ppf (str_of_raw_id i)
+
+
 and gident : Format.formatter -> LLVMAst.global_id -> unit =
   fun ppf i -> pp_print_char ppf '@' ; pp_print_string ppf (str_of_raw_id i)
 
@@ -747,7 +754,7 @@ and definition : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) *
         if attrs <> [] then (pp_print_list ~pp_sep:pp_space
                                param_attr ppf attrs ;
                              pp_space ppf ()) ;
-        lident ppf id
+        arg_lident ppf id
     in
     pp_print_string ppf "define " ;
     (match dc_linkage with
