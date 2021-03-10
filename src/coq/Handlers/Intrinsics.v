@@ -130,6 +130,14 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         intros; apply interp_ret.
       Qed.
 
+      Lemma interp_intrinsics_Tau :
+        forall {R} (t: itree Eff R),
+          interp_intrinsics (Tau t) ≅ Tau (interp_intrinsics t).
+      Proof.
+        intros.
+        unfold interp_intrinsics; rewrite interp_tau; reflexivity.
+      Qed.
+
       Lemma interp_intrinsics_vis_eqit:
         forall {X R} (e : Eff X)
           (kk : X -> itree Eff R),

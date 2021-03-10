@@ -6,6 +6,7 @@ From Coq Require Import
 
 From Vellvm Require Import
      Utils.Util
+     Utils.Tactics
      Syntax.LLVMAst
      Syntax.AstLib
      Syntax.CFG
@@ -14,6 +15,7 @@ From Vellvm Require Import
 
 Require Import Coqlib.
 
+Import CFGNotations.
 Import ListNotations.
 Open Scope list_scope.
 (* end hide *)
@@ -215,6 +217,33 @@ Proof.
   reflexivity.
 Defined.
 
+(* Specialized version of the characteristic equation for contexts where we don't want to compute *)
+Lemma typ_to_dtyp_I : forall s i, typ_to_dtyp s (TYPE_I i) = DTYPE_I i.
+Proof.
+  intros; rewrite typ_to_dtyp_equation; reflexivity.
+Qed.
+
+Lemma typ_to_dtyp_D : forall s, typ_to_dtyp s TYPE_Double = DTYPE_Double.
+Proof.
+  intros; rewrite typ_to_dtyp_equation; reflexivity.
+Qed.
+
+Lemma typ_to_dtyp_P :
+  forall t s,
+    typ_to_dtyp s (TYPE_Pointer t) = DTYPE_Pointer.
+Proof.
+  intros t s.
+  apply typ_to_dtyp_equation.
+Qed.
+
+Lemma typ_to_dtyp_D_array : forall n s, typ_to_dtyp s (TYPE_Array n TYPE_Double) = DTYPE_Array n DTYPE_Double.
+Proof.
+  intros.
+  rewrite typ_to_dtyp_equation.
+  rewrite typ_to_dtyp_D.
+  reflexivity.
+Qed.
+
 (** ** Conversion of syntactic components
 
     Front-ends and optimizations generate code containing static types.
@@ -267,6 +296,13 @@ Proof.
   rewrite IHa; reflexivity.
 Qed.
 
+(**
+     Conversion to dynamic types
+ *)
+
+Definition convert_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
+  convert_typ (m_type_defs CFG) CFG.
+
 Lemma convert_typ_ocfg_app : forall (a b : ocfg typ) env, (convert_typ env (a ++ b) = convert_typ env a ++ convert_typ env b)%list.
 Proof.
   intros; rewrite convert_typ_list_app; reflexivity.
@@ -276,5 +312,54 @@ Lemma convert_typ_code_app : forall (a b : code typ) env, (convert_typ env (a ++
 Proof.
   induction a as [| [] a IH]; cbn; intros; auto.
   rewrite IH; reflexivity.
+Qed.
+
+Lemma convert_typ_mcfg_app:
+  forall mcfg1 mcfg2 : modul (cfg typ),
+    convert_typ [] (mcfg1 @@ mcfg2) =
+    convert_typ [] mcfg1 @@ convert_typ [] mcfg2.
+Proof.
+  intros [] []; cbn.
+  unfold convert_typ,ConvertTyp_mcfg,Traversal.fmap,Fmap_mcfg; cbn.
+  f_equal; try (unfold endo, Endo_option; cbn; repeat flatten_goal; now intuition).
+  unfold Traversal.fmap, Fmap_list; rewrite map_app; reflexivity.
+  unfold Traversal.fmap, Fmap_list'; rewrite map_app; reflexivity.
+  unfold Traversal.fmap, Fmap_list'; rewrite map_app; reflexivity.
+  unfold Traversal.fmap, Fmap_list'; rewrite map_app; reflexivity.
+Qed.
+
+Lemma convert_types_app_mcfg : forall mcfg1 mcfg2,
+    m_type_defs mcfg1 = [] ->
+    m_type_defs mcfg2 = [] ->
+    convert_types (modul_app mcfg1 mcfg2) =
+    modul_app (convert_types mcfg1) (convert_types mcfg2).
+Proof.
+  unfold convert_types.
+  intros * EQ1 EQ2.
+  rewrite m_type_defs_app, EQ1,EQ2.
+  cbn; rewrite convert_typ_mcfg_app.
+  reflexivity.
+Qed.
+
+Lemma mcfg_of_tle_app : forall x y,
+    m_type_defs (mcfg_of_modul (modul_of_toplevel_entities x)) = nil ->
+    m_type_defs (mcfg_of_modul (modul_of_toplevel_entities y)) = nil ->
+    convert_types (mcfg_of_tle (x ++ y)) =
+    modul_app (convert_types (mcfg_of_tle x)) (convert_types (mcfg_of_tle y)).
+Proof.
+  intros. 
+  unfold mcfg_of_tle.
+  rewrite modul_of_toplevel_entities_app.
+  rewrite mcfg_of_app_modul.
+  rewrite convert_types_app_mcfg; auto.
+Qed.
+
+Lemma mcfg_of_tle_cons : forall x y,
+    m_type_defs (mcfg_of_modul (modul_of_toplevel_entities [x])) = nil ->
+    m_type_defs (mcfg_of_modul (modul_of_toplevel_entities y)) = nil ->
+    convert_types (mcfg_of_tle (x :: y)) =
+    modul_app (convert_types  (mcfg_of_tle [x])) (convert_types  (mcfg_of_tle y)).
+Proof.
+  intros; rewrite list_cons_app; apply mcfg_of_tle_app; auto.
 Qed.
 

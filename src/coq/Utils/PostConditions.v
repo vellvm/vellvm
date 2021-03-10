@@ -168,5 +168,58 @@ Proof.
     destruct REL2 as [-> ?], REL0 as [<- ?]; eauto.
 Qed.
 
-(* TODO : develop the effect of handlers on this, in particular when interpreting into a state monad *)
+(* A little oddity that can be useful when building bisimulations manually:
+   en [eutt] hypothesis between a tree and itself can be refined into an [eq_itree] one.
+ *)
+Lemma has_post_has_eq_itree_aux : forall {E X} (t : itree E X) (Q : X -> Prop),
+    has_post_strong t Q ->
+    eq_itree (fun 'x y => x = y /\ Q x) t t.
+Proof.
+  intros.
+  unfold has_post_strong in *.
+  rewrite itree_eta in *.
+  genobs t ot.
+  revert t ot H Heqot.
+  ginit.
+  gcofix CIH.
+  intros.
+  pose proof H0 as EQ.
+  punfold H0.
+  red in H0. cbn in H0.
+  subst ot.
+  induction H0.
+  - gstep; constructor; intuition; subst; auto.
+  - gstep; constructor.
+    rewrite itree_eta.
+    gbase.
+    eapply CIH; eauto.
+    rewrite <- tau_eutt at 1 2.
+    rewrite (itree_eta m2) in EQ.
+    apply EQ.
+  - gstep. constructor.
+    intros; red.
+    rewrite (itree_eta (k2 v)).
+    gbase.
+    eapply CIH; eauto.
+    unfold eutt in EQ; rewrite <- eqit_Vis in EQ.
+    specialize (EQ v).
+    rewrite (itree_eta (k2 v)) in EQ.
+    apply EQ.
+  - apply IHeqitF; auto.
+  - gstep; constructor.
+    rewrite itree_eta.
+    gbase.
+    eapply CIH; eauto.
+    rewrite <- tau_eutt at 1 2.
+    rewrite (itree_eta t2) in EQ.
+    apply EQ.
+Qed.
+
+Lemma has_post_has_eq_itree : forall {E X} (t : itree E X) (Q : X -> Prop),
+    has_post t Q ->
+    eq_itree (fun 'x y => x = y /\ Q x) t t.
+Proof.
+  intros; apply has_post_post_strong in H; apply has_post_has_eq_itree_aux; auto.
+Qed.
+
 

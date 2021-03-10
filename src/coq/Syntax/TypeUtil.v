@@ -30,7 +30,7 @@ Ltac contra :=
 (* Inductive predicate for types in LLVM with a size *)
 Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
 | sized_typ_I :
-    forall (defs : list (ident * typ)) (sz : int),
+    forall (defs : list (ident * typ)) (sz : N),
       sized_typ defs (TYPE_I sz)
 
 | sized_typ_Pointer :
@@ -70,7 +70,7 @@ Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
       sized_typ defs TYPE_X86_mmx
 
 | sized_typ_Array :
-    forall (defs : list (ident * typ)) (sz : int) (t : typ),
+    forall (defs : list (ident * typ)) (sz : N) (t : typ),
       sized_typ defs t -> sized_typ defs (TYPE_Array sz t)
 
 | sized_typ_Struct :
@@ -82,7 +82,7 @@ Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
       (forall (f : typ), In f fields -> sized_typ defs f) -> sized_typ defs (TYPE_Packed_struct fields)
 
 | sized_typ_Vector :
-    forall (defs : list (ident * typ)) (sz : int) (t : typ),
+    forall (defs : list (ident * typ)) (sz : N) (t : typ),
       sized_typ defs t -> sized_typ defs (TYPE_Vector sz t)
 
 | sized_typ_Identified :
@@ -98,7 +98,7 @@ Inductive sized_typ : list (ident * typ) -> typ -> Prop :=
    https://llvm.org/docs/LangRef.html#vector-type *)
 Inductive element_typ : typ -> Prop :=
 | element_typ_Pointer : forall (t : typ), element_typ (TYPE_Pointer t)
-| element_typ_I : forall (sz : int), element_typ (TYPE_I sz)
+| element_typ_I : forall (sz : N), element_typ (TYPE_I sz)
 | element_typ_Half : element_typ TYPE_Half
 | element_typ_Float : element_typ TYPE_Float
 | element_typ_Double : element_typ TYPE_Double
@@ -111,7 +111,7 @@ Inductive element_typ : typ -> Prop :=
 (* Predicate to ensure that an ident is guarded by a pointer everywhere in a type in an environment *)
 Inductive guarded_typ : ident -> list (ident * typ) -> typ -> Prop :=
 | guarded_typ_I :
-    forall (id : ident) (env : list (ident * typ)) (sz : int),
+    forall (id : ident) (env : list (ident * typ)) (sz : N),
       guarded_typ id env (TYPE_I sz)
 
 | guarded_typ_Pointer :
@@ -161,7 +161,7 @@ Inductive guarded_typ : ident -> list (ident * typ) -> typ -> Prop :=
       guarded_typ id env (TYPE_Function ret args)
 
 | guarded_typ_Array :
-    forall (id : ident) (env : list (ident * typ)) (sz : int) (t : typ),
+    forall (id : ident) (env : list (ident * typ)) (sz : N) (t : typ),
       guarded_typ id env t -> guarded_typ id env (TYPE_Array sz t)
 
 | guarded_typ_Struct :
@@ -179,7 +179,7 @@ Inductive guarded_typ : ident -> list (ident * typ) -> typ -> Prop :=
       guarded_typ id env TYPE_Opaque
 
 | guarded_typ_Vector :
-    forall (id : ident) (env : list (ident * typ)) (sz : int) (t : typ),
+    forall (id : ident) (env : list (ident * typ)) (sz : N) (t : typ),
       guarded_typ id env (TYPE_Vector sz t)
 
 | guarded_typ_Identified_Some :
@@ -245,8 +245,8 @@ Inductive wf_typ : list (ident * typ) -> typ -> Prop :=
       wf_typ defs t -> wf_typ defs (TYPE_Pointer t)
 
 | wf_typ_I :
-    forall (defs : list (ident * typ)) (sz : int),
-      sz > 0 -> wf_typ defs (TYPE_I sz)
+    forall (defs : list (ident * typ)) (sz : N),
+      (sz > 0)%N -> wf_typ defs (TYPE_I sz)
 
 | wf_typ_Void :
     forall (defs : list (ident * typ)),
@@ -294,13 +294,13 @@ Inductive wf_typ : list (ident * typ) -> typ -> Prop :=
 
 (* Arrays are only well formed if the size is >= 0, and the element type is sized. *)
 | wf_typ_Array :
-    forall (defs : list (ident * typ)) (sz : int) (t : typ),
-      sz >= 0 -> sized_typ defs t -> wf_typ defs t -> wf_typ defs (TYPE_Array sz t)
+    forall (defs : list (ident * typ)) (sz : N) (t : typ),
+      (sz >= 0)%N -> sized_typ defs t -> wf_typ defs t -> wf_typ defs (TYPE_Array sz t)
 
 (* Vectors of size 0 are not allowed, and elements must be of element_typ. *)
 | wf_typ_Vector :
-    forall (defs : list (ident * typ)) (sz : int) (t : typ),
-      sz > 0 -> element_typ t -> wf_typ defs t -> wf_typ defs (TYPE_Vector sz t)
+    forall (defs : list (ident * typ)) (sz : N) (t : typ),
+      (sz > 0)%N -> element_typ t -> wf_typ defs t -> wf_typ defs (TYPE_Vector sz t)
 
 (* Any type identifier must exist in the environment.
 
@@ -345,8 +345,8 @@ Inductive guarded_wf_typ : list (ident * typ) -> typ -> Prop :=
       guarded_wf_typ defs (TYPE_Pointer t)
 
 | guarded_wf_typ_I :
-    forall (defs : list (ident * typ)) (sz : int),
-      sz > 0 -> guarded_wf_typ defs (TYPE_I sz)
+    forall (defs : list (ident * typ)) (sz : N),
+      (sz > 0)%N -> guarded_wf_typ defs (TYPE_I sz)
 
 | guarded_wf_typ_Void :
     forall (defs : list (ident * typ)),
@@ -394,13 +394,13 @@ Inductive guarded_wf_typ : list (ident * typ) -> typ -> Prop :=
 
 (* Arrays are only well formed if the size is >= 0, and the element type is sized. *)
 | guarded_wf_typ_Array :
-    forall (defs : list (ident * typ)) (sz : int) (t : typ),
-      sz >= 0 -> sized_typ defs t -> guarded_wf_typ defs t -> guarded_wf_typ defs (TYPE_Array sz t)
+    forall (defs : list (ident * typ)) (sz : N) (t : typ),
+      (sz >= 0)%N -> sized_typ defs t -> guarded_wf_typ defs t -> guarded_wf_typ defs (TYPE_Array sz t)
 
 (* Vectors of size 0 are not allowed, and elemnts must be of element_typ. *)
 | guarded_wf_typ_Vector :
-    forall (defs : list (ident * typ)) (sz : int) (t : typ),
-      sz > 0 -> element_typ t -> guarded_wf_typ defs t -> guarded_wf_typ defs (TYPE_Vector sz t)
+    forall (defs : list (ident * typ)) (sz : N) (t : typ),
+      (sz > 0)%N -> element_typ t -> guarded_wf_typ defs t -> guarded_wf_typ defs (TYPE_Vector sz t)
 
 (* Identifier must be in the typing environment.
 
@@ -451,7 +451,7 @@ Qed.
 
 Inductive unrolled_typ : typ -> Prop :=
 | unrolled_typ_I :
-    forall (sz : int),
+    forall (sz : N),
       unrolled_typ (TYPE_I sz)
 
 | unrolled_typ_Pointer :
@@ -486,7 +486,7 @@ Inductive unrolled_typ : typ -> Prop :=
     unrolled_typ TYPE_X86_mmx
 
 | unrolled_typ_Array :
-    forall (sz : int) (t : typ),
+    forall (sz : N) (t : typ),
       unrolled_typ t ->
       unrolled_typ (TYPE_Array sz t)
 
@@ -510,14 +510,14 @@ Inductive unrolled_typ : typ -> Prop :=
     unrolled_typ TYPE_Opaque
 
 | unrolled_typ_Vector :
-    forall (sz : int) (t : typ), unrolled_typ (TYPE_Vector sz t)
+    forall (sz : N) (t : typ), unrolled_typ (TYPE_Vector sz t)
 .
 
 
 Inductive typ_order : typ -> typ -> Prop :=
 | typ_order_Pointer : forall (t : typ), typ_order t (TYPE_Pointer t)
-| typ_order_Array : forall (sz : int) (t : typ), typ_order t (TYPE_Array sz t)
-| typ_order_Vector : forall (sz : int) (t : typ), typ_order t (TYPE_Vector sz t)
+| typ_order_Array : forall (sz : N) (t : typ), typ_order t (TYPE_Array sz t)
+| typ_order_Vector : forall (sz : N) (t : typ), typ_order t (TYPE_Vector sz t)
 | typ_order_Struct : forall (fields : list typ),
     forall f, In f fields -> typ_order f (TYPE_Struct fields)
 | typ_order_Packed_struct : forall (fields : list typ),
@@ -555,25 +555,24 @@ Definition length_order {A : Type} (l1 l2 : list A) :=
   (List.length l1 < List.length l2)%nat.
 
 
-Lemma lengthOrder_wf' : forall A len, forall ls, (List.length ls <= len)%nat -> Acc (@length_order A) ls.
-  unfold length_order; induction len;
-    intros ls H; inversion H; subst; constructor; firstorder.
-Defined.
+(* Lemma lengthOrder_wf' : forall A len, forall ls, (List.length ls <= len)%nat -> Acc (@length_order A) ls. *)
+(*   unfold length_order; induction len; *)
+(*     intros ls H; inversion H; subst; constructor; firstorder. *)
+(* Defined. *)
 
 
-Theorem lengthOrder_wf : forall A, well_founded (@length_order A).
-  red; intros A a; eapply lengthOrder_wf'; eauto.
-Defined.
+(* Theorem lengthOrder_wf : forall A, well_founded (@length_order A). *)
+(*   red; intros A a; eapply lengthOrder_wf'; eauto. *)
+(* Defined. *)
 
 
-Theorem wf_length_typ_order :
-  forall A,
-    well_founded (lex_ord (@length_order A) typ_order).
-Proof.
-  intros.
-  apply wf_lex_ord. apply lengthOrder_wf. apply wf_typ_order.
-Defined.
-
+(* Theorem wf_length_typ_order : *)
+(*   forall A, *)
+(*     well_founded (lex_ord (@length_order A) typ_order). *)
+(* Proof. *)
+(*   intros. *)
+(*   apply wf_lex_ord. apply lengthOrder_wf. apply wf_typ_order. *)
+(* Defined. *)
 
 Lemma map_In {A B : Type} (l : list A) (f : forall (x : A), In x l -> B) : list B.
 Proof.
@@ -1301,4 +1300,3 @@ Proof.
       simpl in Hfind. destruct (Ident.eq_dec id id).
       inversion Hfind. contradiction.
 Qed.
-

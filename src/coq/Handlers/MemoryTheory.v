@@ -86,6 +86,13 @@ Section Map_Theory.
     rewrite Nnat.N2Nat.inj_succ; auto.
   Qed.
 
+  Lemma Zseq_succ_nat : forall off (n : nat),
+      Zseq off (S n) = off :: Zseq (Z.succ off) n.
+  Proof.
+    intros off n.
+    auto.
+  Qed.
+
   Lemma key_in_range_or_not_aux {a} : forall (k z : Z) (l : list a),
       {z <= k <= z + Zlength l - 1} + {k < z} + {k >= z + Zlength l}.
   Proof.
@@ -1867,15 +1874,56 @@ Section Memory_Stack_Theory.
         contradiction.
     Qed.
 
+    Lemma lookup_init_block_undef :
+      forall n,
+        lookup 0 (init_block_undef n empty) = Some SUndef.
+    Proof.
+      induction n; auto.
+      cbn.
+      rewrite lookup_add_ineq; [|lia].
+      auto.
+    Qed.
+
+    Lemma lookup_init_block :
+      forall n,
+        (n > 0)%N ->
+        lookup 0 (init_block n) = Some SUndef.
+    Proof.
+      intros n SZ.
+      pose proof Nnat.N2Nat.id n.
+      induction (N.of_nat (N.to_nat n)); [lia|].
+      subst.
+      cbn.
+      apply lookup_init_block_undef.
+    Qed.
+
+    Lemma all_not_sundef_init :
+      forall n,
+        (n > 0)%N ->
+        all_not_sundef (lookup_all_index 0 n (init_block n) SUndef) = false.
+    Proof.
+      destruct n; intros SZ.
+      inv SZ.
+      cbn.
+
+      pose proof Pos2Nat.is_succ p as [n PN].
+      rewrite PN.
+      cbn.
+
+      rewrite lookup_init_block_undef.
+      reflexivity.
+    Qed.
+
     (* This is false for VOID, and 0 length arrays *)
     Lemma read_empty_block : forall τ,
+        (sizeof_dtyp τ > 0)%N ->
         read_in_mem_block (make_empty_mem_block τ) 0 τ = UVALUE_Undef τ.
     Proof.
       unfold read_in_mem_block.
       unfold make_empty_mem_block.
       unfold deserialize_sbytes.
-      intros τ. induction τ.
-    Admitted.
+      intros τ. induction τ; intros SZ; try solve [reflexivity | cbn in SZ; inv SZ | rewrite all_not_sundef_init; auto].
+    Qed.
 
     (* CB TODO: Figure out where these predicates should live, or figure
        out how to get rid of them. Currently not using some of these... *)
@@ -1976,10 +2024,13 @@ Section Memory_Stack_Theory.
       - split.
         + cbn. apply next_logical_key_fresh.
         + { split.
-            + unfold read; cbn.
+            + intros SIZE.
+              unfold read; cbn.
               unfold get_logical_block, get_logical_block_mem; cbn.
               rewrite lookup_add_eq; cbn.
+              unfold non_void in NV.
               f_equal; apply read_empty_block.
+              lia.
             + intros * ALLOC NOVER.
               unfold read; cbn.
               unfold get_logical_block, get_logical_block_mem; cbn.
@@ -1998,10 +2049,12 @@ Section Memory_Stack_Theory.
       - split.
         + cbn. apply next_logical_key_fresh.
         + { split.
-            + unfold read; cbn.
+            + intros SIZE.
+              unfold read; cbn.
               unfold get_logical_block, get_logical_block_mem; cbn.
               rewrite lookup_add_eq; cbn.
               f_equal; apply read_empty_block.
+              lia.
             + intros * ALLOC NOVER.
               unfold read; cbn.
               unfold get_logical_block, get_logical_block_mem; cbn.
@@ -2092,7 +2145,6 @@ Section Memory_Stack_Theory.
       cbn.
       exists (read_in_mem_block bytes (snd a) τ). reflexivity.
     Qed.
-
 
     Lemma freshly_allocated_different_blocks :
       forall ptr1 ptr2 τ m1 m2,
@@ -2685,10 +2737,18 @@ Section PARAMS.
     Qed.
 
     Lemma interp_memory_ret :
-      forall (R : Type) g (x: R),
-        interp_memory (Ret x: itree Effin R) g ≅ Ret (g,x).
+      forall (R : Type) m (x: R),
+        interp_memory (Ret x: itree Effin R) m ≅ Ret (m,x).
     Proof.
       intros; apply interp_state_ret.
+    Qed.
+
+    Lemma interp_memory_Tau :
+      forall {R} (t: itree Effin R) m,
+        interp_memory (Tau t) m ≅ Tau (interp_memory t m).
+    Proof.
+      intros.
+      unfold interp_memory; rewrite interp_state_tau; reflexivity.
     Qed.
 
     Lemma interp_memory_vis_eqit:
@@ -2757,7 +2817,7 @@ Section PARAMS.
     Lemma interp_memory_load :
       forall (m : memory_stack) (t : dtyp) (val : uvalue) (a : addr),
         read m a t = inr val ->
-        interp_memory (trigger (Load t (DVALUE_Addr a))) m ≈ ret (m, val).
+        interp_memory (trigger (Load t (DVALUE_Addr a))) m ≈ Ret (m, val).
     Proof.
       intros m t val a Hval.
       rewrite interp_memory_trigger.
@@ -2768,7 +2828,7 @@ Section PARAMS.
     Lemma interp_memory_store :
       forall (m m' : memory_stack) (val : dvalue) (a : addr),
         write m a val = inr m' ->
-        interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ ret (m', tt).
+        interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ Ret (m', tt).
     Proof.
       intros m m' val a Hwrite.
       rewrite interp_memory_trigger.
@@ -2783,7 +2843,7 @@ Section PARAMS.
         dtyp_fits m a t ->
         exists m',
           write m a val = inr m' /\
-          interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ ret (m', tt).
+          interp_memory (trigger (Store (DVALUE_Addr a) val)) m ≈ Ret (m', tt).
     Proof.
       intros m t val a TYP CAN.
       apply write_succeeds with (v:=val) in CAN as [m2 WRITE]; auto.
@@ -2795,7 +2855,7 @@ Section PARAMS.
     Lemma interp_memory_alloca :
       forall (m m' : memory_stack) (t : dtyp) (a : addr),
         allocate m t = inr (m', a) ->
-        interp_memory (trigger (Alloca t)) m ≈ ret (m', DVALUE_Addr a).
+        interp_memory (trigger (Alloca t)) m ≈ Ret (m', DVALUE_Addr a).
     Proof.
       intros m m' t a ALLOC.
       rewrite interp_memory_trigger.
@@ -2808,7 +2868,7 @@ Section PARAMS.
       forall (m : memory_stack) (t : dtyp),
         non_void t ->
         exists m' a', allocate m t = inr (m', a') /\
-                      interp_memory (trigger (Alloca t)) m ≈ ret (m', DVALUE_Addr a').
+                      interp_memory (trigger (Alloca t)) m ≈ Ret (m', DVALUE_Addr a').
     Proof.
       intros m t NV.
       apply allocate_succeeds with (τ:=t) (m1:=m) in NV as [m' [a' ALLOC]].

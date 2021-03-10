@@ -24,6 +24,7 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.LLVMEvents.
 
+Require Import List.
 Require Import Floats.
 
 Set Implicit Arguments.

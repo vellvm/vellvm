@@ -85,7 +85,7 @@ Theory, in `src/coq/Theory/`:
 - `DenotationTheory`      Equational theory to reason directly about the structure of vir programs;
                           in particular, reasoning principles about open control-flow-graphs.
 
-## OCmal front-end and driver for execution and testing
+## OCaml front-end and driver for execution and testing
 
 On the OCaml side, we provide a parser for legal LLVM IR syntax as well as an
 infrastructure to run differential tests between our interpreter and llc.
@@ -109,10 +109,13 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 ### Assumes: 
   - coq   : version 8.12 
   - External Coq libraries: 
+  Note: if it's the first time you install Coq libraries via Opam, you will have to add the repository first with `opam repo add coq-released https://coq.inria.fr/opam/released`.
     * ext-lib    (installed via, e.g. opam install coq-ext-lib)
     * paco       (installed via, e.g. opam install coq-paco)
     * flocq      (installed via, e.g. opam install coq-flocq, see note below) 
     * ceres      (installed via, e.g. opam install coq-ceres)
+    * mathcomp   (installed via, e.g. opam install coq-mathcomp-ssreflect)
+    * simple-io  (installed via, e.g. opam install coq-simple-io)
     WARNING: you should not have the itree opam package in your switch to avoid conflict with the extended version of the library we provide locally
   - Additional opam packages: 
     * dune       (installed via, e.g. opam install dune)
@@ -124,7 +127,7 @@ Compilation:
 
 1. Install all external dependencies
 2. Clone the vellvm git repo with the `--recurse-submodule` option
-1. Run `make` in the /src directory: it will first compile the itree libraries, then vir, and finally extract the OCaml executable
+1. Run `make` in the /src directory: it will first compile the itree / quickchick libraries, then vir, and finally extract the OCaml executable
 
 # Running
 

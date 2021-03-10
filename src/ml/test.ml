@@ -236,6 +236,9 @@ let terminator_tests =
   ; "../tests/ll/cbr1.ll", 7
   ; "../tests/ll/cbr2.ll", 9
   ; "../tests/ll/duplicate_lbl.ll", 1
+  ; "../tests/ll/switch1.ll", 0
+  ; "../tests/ll/switch2.ll", 0
+  ; "../tests/ll/switch3.ll", 0
   ]
 
 let bitcast_tests =

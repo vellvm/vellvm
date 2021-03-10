@@ -1,3 +1,6 @@
 -Q coq Vellvm
 -R coq Vellvm
 -R ../lib/InteractionTrees/theories ITree
+-I ../lib/QuickChick/src
+-R ../lib/QuickChick/src QuickChick
+-R ../lib/flocq-quickchick FlocqQuickChick

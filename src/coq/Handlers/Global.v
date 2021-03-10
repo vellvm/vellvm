@@ -87,6 +87,14 @@ Section Globals.
         intros; apply interp_state_ret.
       Qed.
 
+      Lemma interp_global_Tau :
+        forall {R} (t: itree Effin R) g,
+          interp_global (Tau t) g ≅ Tau (interp_global t g).
+      Proof.
+        intros.
+        unfold interp_global; rewrite interp_state_tau; reflexivity.
+      Qed.
+
       Lemma interp_global_vis_eqit:
         forall (g : map) S X (kk : X -> itree Effin S) (e : Effin X),
           interp_global (Vis e kk) g ≅ ITree.bind (interp_global_h e g) (fun (sx : map * X) => Tau (interp_global (kk (snd sx)) (fst sx))).

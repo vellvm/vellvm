@@ -78,10 +78,18 @@ Section Locals.
       Qed.
 
       Lemma interp_local_ret :
-        forall (R : Type) g (x: R),
-          interp_local (Ret x: itree Effin R) g ≅ Ret (g,x).
+        forall (R : Type) l (x: R),
+          interp_local (Ret x: itree Effin R) l ≅ Ret (l,x).
       Proof.
         intros; apply interp_state_ret.
+      Qed.
+
+      Lemma interp_local_Tau :
+        forall {R} (t: itree Effin R) l,
+          interp_local (Tau t) l ≅ Tau (interp_local t l).
+      Proof.
+        intros.
+        unfold interp_local; rewrite interp_state_tau; reflexivity.
       Qed.
 
       Lemma interp_local_vis_eqit:

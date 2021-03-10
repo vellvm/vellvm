@@ -6,9 +6,12 @@ COQLIBDIR = ../lib
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
-ITREEDIR=../lib/InteractionTrees
+OPAMPKGS=coq coq-ext-lib coq-paco coq-ceres coq-flocq coq-mathcomp-ssreflect coq-simple-io dune menhir qcheck
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(ITREEDIR)/theories/ ITree 
+ITREEDIR=../lib/InteractionTrees
+QUICKCHICKDIR=../lib/QuickChick
+
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(ITREEDIR)/theories/ ITree -R $(QUICKCHICKDIR)/src/ QuickChick -I $(QUICKCHICKDIR)/src
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
@@ -21,24 +24,27 @@ COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Nu
                   Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
 									Syntax/Traversal Syntax/Dom Syntax/DynamicTypes Syntax/TypToDtyp\
 									Syntax/Scope Syntax/SurfaceSyntax\
-									Semantics/MemoryAddress Semantics/DynamicValues Semantics/LLVMEvents Semantics/IntrinsicsDefinitions\
-									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack Handlers/Pick Handlers/UndefinedBehaviour Handlers/Memory Handlers/MemoryTheory Handlers/Handlers\
-								  Semantics/Denotation Semantics/TopLevel\
-									Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
+									Semantics/MemoryAddress Semantics/DynamicValues Semantics/LLVMEvents\
+									Semantics/IntrinsicsDefinitions\
+									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack\
+									Handlers/Pick Handlers/UndefinedBehaviour Handlers/Memory Handlers/MemoryTheory\
+									Handlers/Handlers\
+								  Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
+									QC/GenAST QC/ShowAST QC/QCVellvm
+
+COQFILESTHEORY := Syntax/ScopeTheory\
+									Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG\
+									Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
 									Theory/TopLevelRefinements Theory/SymbolicInterpreter\
 									Utils/NoEvent Utils/Commutation
 
-COQFILESOPT    := Transformations/Transform
- # Transformations/Renaming Transformations/DeadInstr Transformations/Transformation
+COQFILESOPT    := Transformations/Transform\
+									Transformations/EquivExpr Transformations/BlockFusion Transformations/DeadCodeElimination
 
 OLLVMFILES :=
 
-VFILES  := $(COQFILESINTERP:%=coq/%.v) $(COQFILESOPT:%=coq/%.v)
-VOFILES := $(COQFILESINTERP:%=coq/%.vo) $(COQFILESOPT:%=coq/%.vo)
-
-
-VFILES  := $(COQFILESINTERP:%=coq/%.v) $(COQFILESOPT:%=coq/%.v)
-VOFILES := $(COQFILESINTERP:%=coq/%.vo) $(COQFILESOPT:%=coq/%.vo)
+VFILES  := $(COQFILESINTERP:%=coq/%.v) $(COQFILESTHEORY:%=coq/%.v) $(COQFILESOPT:%=coq/%.v)
+VOFILES := $(COQFILESINTERP:%=coq/%.vo) $(COQFILESTHEORY:%=coq/%.vo) $(COQFILESOPT:%=coq/%.vo)
 
 all:
 	@test -f .depend || $(MAKE) depend
@@ -54,6 +60,10 @@ interp:
 
 coq: $(VOFILES)
 
+.PHONY: opam
+opam:
+	opam install $(OPAMPKGS)
+
 coqinterp: $(COQFILESINTERP:%=coq/%.vo)
 
 update-trees:
@@ -62,7 +72,15 @@ update-trees:
 itrees:
 	make -C $(ITREEDIR)
 
-.PHONY: extracted itrees 
+quickchick:
+	make -C $(QUICKCHICKDIR)
+
+update-quickchick:
+	git submodule update -- $(QUICKCHICKDIR)
+
+update-submodules: update-trees update-quickchick
+
+.PHONY: extracted update-trees update-quickchick update-submodules itrees quickchick
 extracted: $(EXTRACTDIR)/STAMP $(VOFILES)
 
 $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
@@ -78,7 +96,7 @@ $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "COQC $*.v"
 	@$(COQC) -dump-glob doc/$(*F).glob $*.v
 
-depend: itrees $(VFILES) 
+depend: itrees quickchick $(VFILES) 
 	@echo "Analyzing Coq dependencies"
 	@$(COQDEP) $^ > .depend
 
@@ -120,6 +138,8 @@ clean-vellvm:
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
 clean-itrees:
 	make -C $(ITREEDIR) clean
+	make -C $(QUICKCHICKDIR) clean
+
 .PHONY: clean-vellvm clean-itrees
 
 doc/coq2html: 
