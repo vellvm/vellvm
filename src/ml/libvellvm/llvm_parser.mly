@@ -920,6 +920,9 @@ conversion:
 ibinop:
   | op=ibinop_nuw_nsw_opt nuw=KW_NUW? nsw=KW_NSW?
     { op (nuw <> None) (nsw <> None) }
+  (* allow `nsw` to be first *)
+  | op=ibinop_nuw_nsw_opt KW_NSW nuw=KW_NUW?
+    { op (nuw <> None) true }
   | op=ibinop_exact_opt exact=KW_EXACT? { op (exact <> None) }
   | op=ibinop_no_opt { op }
 
