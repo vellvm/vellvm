@@ -484,6 +484,11 @@ and branch_label : Format.formatter -> LLVMAst.raw_id -> unit =
   fun ppf id ->
     pp_print_string ppf (str_of_raw_id id)
 
+and tint_literal : Format.formatter -> LLVMAst.tint_literal -> unit =
+  fun ppf (TInt_Literal(sz, n)) ->
+           fprintf ppf "TInt_Literal (%d)%%Z) (%d)%%Z)" (n_to_int sz) (to_int n)
+
+
 and terminator : Format.formatter -> (LLVMAst.typ LLVMAst.terminator) -> unit =
   fun ppf ->
   function
@@ -501,7 +506,7 @@ and terminator : Format.formatter -> (LLVMAst.typ LLVMAst.terminator) -> unit =
     fprintf ppf "TERM_Switch %a %a %a"
       texp c
       raw_id def
-      (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod texp raw_id)) cases
+      (pp_print_list ~pp_sep:pp_sc_space (pp_print_prod tint_literal raw_id)) cases
 
   | TERM_Resume tv ->
     fprintf ppf "TERM_Resume %a"

@@ -813,9 +813,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           match selector with
           | DVALUE_Poison => raiseUB "Switching on poison."
           | _ => (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
-            switches <- map_monad
-                         (fun '((t,e),id) => us <- denote_exp (Some t) e;; s <- pickUnique us;; ret (s,id))
-                         dests;;
+            switches <- lift_undef_or_err ret
+                       (map_monad
+                         (fun '((TInt_Literal sz x),id) => s <- (coerce_integer_to_int sz x);; ret (s,id))
+                         dests);;
             lift_err (fun b => ret (inl b)) (select_switch selector default_br switches)
           end
 

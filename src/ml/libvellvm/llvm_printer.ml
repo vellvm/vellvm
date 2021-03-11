@@ -95,7 +95,7 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   function
   | FNATTR_Alignstack i     -> fprintf ppf "alignstack(%a)" pp_llvm_int i
   | FNATTR_Allocsize l      ->
-     fprintf ppf "alignstack(%a)" (pp_print_list ~pp_sep:pp_comma_space pp_llvm_int) l
+     fprintf ppf "allocsize(%a)" (pp_print_list ~pp_sep:pp_comma_space pp_llvm_int) l
   | FNATTR_Alwaysinline     -> fprintf ppf "alwaysinline"
   | FNATTR_Builtin          -> fprintf ppf "builtin"
   | FNATTR_Cold             -> fprintf ppf "cold"
@@ -564,6 +564,10 @@ and branch_label : Format.formatter -> LLVMAst.raw_id -> unit =
   fun ppf id ->
     pp_print_string ppf "label %"; pp_print_string ppf (str_of_raw_id id)
 
+and tint_literal : Format.formatter -> LLVMAst.tint_literal -> unit =
+  fun ppf (TInt_Literal(sz, n)) ->
+           fprintf ppf "i%d " (n_to_int sz);
+           pp_print_int ppf (to_int n)
 
 and terminator : Format.formatter -> (LLVMAst.typ LLVMAst.terminator) -> unit =
   fun ppf ->
@@ -583,9 +587,10 @@ and terminator : Format.formatter -> (LLVMAst.typ LLVMAst.terminator) -> unit =
              texp c
              branch_label def
              (pp_print_list ~pp_sep:pp_space
-                            (fun ppf (v, i) -> texp ppf v ;
-                                               pp_print_string ppf ", " ;
-                                               branch_label ppf i)) cases
+                (fun ppf (lit, i) ->
+                  tint_literal ppf lit;
+                  pp_print_string ppf ", " ;
+                  branch_label ppf i)) cases
 
   | TERM_Resume (t, v) -> fprintf ppf "resume %a" texp (t, v)
 

@@ -14,4 +14,6 @@ onone:
 ontwo:
   ret i64 0
 
+otherwise:
+  ret i64 1
 }

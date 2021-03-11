@@ -320,6 +320,12 @@ Set Elimination Schemes.
 
 Definition texp : Set := T * exp.
 
+(* Used in switch branches which insist on integer literals
+   
+*)
+Variant tint_literal : Set :=
+  | TInt_Literal (sz:N) (x:int).
+
 Variant instr_id : Set :=
 | IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)
 | IVoid (n:int)        (* "Void" return type, for "store",  "void call", and terminators.
@@ -351,7 +357,7 @@ Variant terminator : Set :=
 | TERM_Ret_void
 | TERM_Br         (v:texp) (br1:block_id) (br2:block_id)
 | TERM_Br_1       (br:block_id)
-| TERM_Switch     (v:texp) (default_dest:block_id) (brs: list (texp * block_id))
+| TERM_Switch     (v:texp) (default_dest:block_id) (brs: list (tint_literal * block_id))
 | TERM_IndirectBr (v:texp) (brs:list block_id) (* address * possible addresses (labels) *)
 | TERM_Resume     (v:texp)
 | TERM_Invoke     (fnptrval:tident) (args:list texp) (to_label:block_id) (unwind_label:block_id)

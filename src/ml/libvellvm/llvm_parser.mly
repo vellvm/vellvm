@@ -1115,7 +1115,7 @@ alloca_opt:
 
 
 switch_table_entry:
-  | v=texp COMMA i=branch_label EOL? { (v, i) }
+  | sz=I x=INTEGER COMMA i=branch_label EOL? { (TInt_Literal(sz, x), i) }
 
 csep:
   COMMA EOL* { () }
