@@ -38,6 +38,7 @@ install:
   - opam pin -y --verbose -j ${NJOBS} add coq-flocq 3.2.1
   - opam install -y --verbose -j ${NJOBS} coq-paco
   - opam install -y --verbose -j ${NJOBS} coq-ceres
+  - opam install -y --verbose -j ${NJOBS} coq-simple-io
   - opam install -y --verbose -j ${NJOBS} coq-mathcomp-ssreflect
   # This branch uses the lib/InteractionTree submodule.
   # - opam pin -y add coq-itree --dev-repo
