@@ -87,37 +87,66 @@ and param_attr : Format.formatter -> LLVMAst.param_attr -> unit =
   | PARAMATTR_Noundef           -> fprintf ppf "noundef"
   | PARAMATTR_Nofree            -> fprintf ppf "nofree"
 
+and pp_llvm_int : Format.formatter -> LLVMAst.int -> unit =
+  fun ppf i -> fprintf ppf "%d" (to_int i)
+
 and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
   fun ppf ->
   function
-  | FNATTR_Alignstack i     -> fprintf ppf "alignstack(%d)" (to_int i)
+  | FNATTR_Alignstack i     -> fprintf ppf "alignstack(%a)" pp_llvm_int i
+  | FNATTR_Allocsize l      ->
+     fprintf ppf "allocsize(%a)" (pp_print_list ~pp_sep:pp_comma_space pp_llvm_int) l
   | FNATTR_Alwaysinline     -> fprintf ppf "alwaysinline"
   | FNATTR_Builtin          -> fprintf ppf "builtin"
   | FNATTR_Cold             -> fprintf ppf "cold"
+  | FNATTR_Convergent       -> fprintf ppf "convergent"
+  | FNATTR_Hot              -> fprintf ppf "hot"
+  | FNATTR_Inaccessiblememonly -> fprintf ppf "inaccessiblememonly"
+  | FNATTR_Inaccessiblemem_or_argmemonly-> fprintf ppf "inaccessible_or_argmemonly"
   | FNATTR_Inlinehint       -> fprintf ppf "inlinehint"
   | FNATTR_Jumptable        -> fprintf ppf "jumptable"
   | FNATTR_Minsize          -> fprintf ppf "minsize"
   | FNATTR_Naked            -> fprintf ppf "naked"
+  | FNATTR_No_jump_tables   -> fprintf ppf "no_jump_tables"
   | FNATTR_Nobuiltin        -> fprintf ppf "nobuiltin"
   | FNATTR_Noduplicate      -> fprintf ppf "noduplicate"
+  | FNATTR_Nofree           -> fprintf ppf "nofree"
   | FNATTR_Noimplicitfloat  -> fprintf ppf "noimplicitfloat"
   | FNATTR_Noinline         -> fprintf ppf "noinline"
+  | FNATTR_Nomerge          -> fprintf ppf "nomerge"
   | FNATTR_Nonlazybind      -> fprintf ppf "nonlazybind"
   | FNATTR_Noredzone        -> fprintf ppf "noredzone"
+  | FNATTR_Indirect_tls_seg_refs -> fprintf ppf "indirect-tls-seg-refs"
   | FNATTR_Noreturn         -> fprintf ppf "noreturn"
+  | FNATTR_Norecurse        -> fprintf ppf "norecurse"
+  | FNATTR_Willreturn       -> fprintf ppf "willreturn"
+  | FNATTR_Nosync           -> fprintf ppf "nosync"
   | FNATTR_Nounwind         -> fprintf ppf "nounwind"
+  | FNATTR_Null_pointer_is_valid -> fprintf ppf "null_pointer_is_valid"
+  | FNATTR_Optforfuzzing    -> fprintf ppf "optforfuzzing"
   | FNATTR_Optnone          -> fprintf ppf "optnone"
   | FNATTR_Optsize          -> fprintf ppf "optsize"
   | FNATTR_Readnone         -> fprintf ppf "readnone"
   | FNATTR_Readonly         -> fprintf ppf "readonly"
+  | FNATTR_Writeonly        -> fprintf ppf "writeonly"
+  | FNATTR_Argmemonly       -> fprintf ppf "argmemonly"
   | FNATTR_Returns_twice    -> fprintf ppf "returns_twice"
+  | FNATTR_Safestack        -> fprintf ppf "safestack"
   | FNATTR_Sanitize_address -> fprintf ppf "sanitize_address"
   | FNATTR_Sanitize_memory  -> fprintf ppf "sanitize_memory"
   | FNATTR_Sanitize_thread  -> fprintf ppf "sanitize_thread"
+  | FNATTR_Sanitize_hwaddress -> fprintf ppf "sanitize_hwaddress"
+  | FNATTR_Sanitize_memtag  -> fprintf ppf "santize_memtag"
+  | FNATTR_Speculative_load_hardening -> fprintf ppf "speculative_load_hardening"
+  | FNATTR_Speculatable     -> fprintf ppf "speculatable"
   | FNATTR_Ssp              -> fprintf ppf "ssp"
   | FNATTR_Sspreq           -> fprintf ppf "sspreq"
   | FNATTR_Sspstrong        -> fprintf ppf "sspstrong"
+  | FNATTR_Strictfp         -> fprintf ppf "strictfp"
   | FNATTR_Uwtable          -> fprintf ppf "uwtable"
+  | FNATTR_Nocf_check       -> fprintf ppf "nocf_check"
+  | FNATTR_Shadowcallstack  -> fprintf ppf "shadowcallstack"
+  | FNATTR_Mustprogress     -> fprintf ppf "mustprogress"
   | FNATTR_String s         -> fprintf ppf "\"%s\"" (of_str s)
   | FNATTR_Key_value (k, v) -> fprintf ppf "\"%s\"=\"%s\"" (of_str k) (of_str v)
   | FNATTR_Attr_grp i       -> fprintf ppf "#%d" (to_int i)
@@ -125,11 +154,18 @@ and fn_attr : Format.formatter -> LLVMAst.fn_attr -> unit =
 and str_of_raw_id : LLVMAst.raw_id -> string =
     function
     | Anon i -> Printf.sprintf "%d" (to_int i)
-    | Name s -> (of_str s)
+    | Name s -> Printf.sprintf "%s" (of_str s)
     | Raw i -> Printf.sprintf "_RAW_%d" (to_int i)
 
 and lident : Format.formatter -> LLVMAst.local_id -> unit =
   fun ppf i -> pp_print_char ppf '%' ; pp_print_string ppf (str_of_raw_id i)
+
+and arg_lident : Format.formatter -> LLVMAst.local_id -> unit =
+  fun ppf i ->
+  match i with
+  | Anon _ -> ()
+  | _ -> pp_print_char ppf '%' ; pp_print_string ppf (str_of_raw_id i)
+
 
 and gident : Format.formatter -> LLVMAst.global_id -> unit =
   fun ppf i -> pp_print_char ppf '@' ; pp_print_string ppf (str_of_raw_id i)
@@ -528,6 +564,10 @@ and branch_label : Format.formatter -> LLVMAst.raw_id -> unit =
   fun ppf id ->
     pp_print_string ppf "label %"; pp_print_string ppf (str_of_raw_id id)
 
+and tint_literal : Format.formatter -> LLVMAst.tint_literal -> unit =
+  fun ppf (TInt_Literal(sz, n)) ->
+           fprintf ppf "i%d " (n_to_int sz);
+           pp_print_int ppf (to_int n)
 
 and terminator : Format.formatter -> (LLVMAst.typ LLVMAst.terminator) -> unit =
   fun ppf ->
@@ -547,9 +587,10 @@ and terminator : Format.formatter -> (LLVMAst.typ LLVMAst.terminator) -> unit =
              texp c
              branch_label def
              (pp_print_list ~pp_sep:pp_space
-                            (fun ppf (v, i) -> texp ppf v ;
-                                               pp_print_string ppf ", " ;
-                                               branch_label ppf i)) cases
+                (fun ppf (lit, i) ->
+                  tint_literal ppf lit;
+                  pp_print_string ppf ", " ;
+                  branch_label ppf i)) cases
 
   | TERM_Resume (t, v) -> fprintf ppf "resume %a" texp (t, v)
 
@@ -718,7 +759,7 @@ and definition : Format.formatter -> (LLVMAst.typ, (LLVMAst.typ LLVMAst.block) *
         if attrs <> [] then (pp_print_list ~pp_sep:pp_space
                                param_attr ppf attrs ;
                              pp_space ppf ()) ;
-        lident ppf id
+        arg_lident ppf id
     in
     pp_print_string ppf "define " ;
     (match dc_linkage with
@@ -766,7 +807,7 @@ and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
                   pp_force_newline ppf ()
     end;
     begin match lbl with
-      | Anon i -> fprintf ppf "; <label> %d" (to_int i)
+      | Anon i -> fprintf ppf "; <label> %%%d" (to_int i)
       | Name s -> (pp_print_string ppf (of_str s); pp_print_char ppf ':')
       | Raw i -> fprintf ppf "_RAW_%d:" (to_int i)
     end;
@@ -778,6 +819,7 @@ and block : Format.formatter -> LLVMAst.typ LLVMAst.block -> unit =
     pp_print_list ~pp_sep:pp_force_newline id_instr ppf b ;
     pp_force_newline ppf () ;
     terminator ppf t;
+    pp_force_newline ppf () ;    
     pp_close_box ppf ()
 
 and comment : Format.formatter -> char list -> unit =

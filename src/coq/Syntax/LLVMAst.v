@@ -104,33 +104,58 @@ Variant param_attr : Set :=
 
 Variant fn_attr : Set :=
 | FNATTR_Alignstack (a:int)
+| FNATTR_Allocsize  (l:list int)                    
 | FNATTR_Alwaysinline
 | FNATTR_Builtin
 | FNATTR_Cold
+| FNATTR_Convergent
+| FNATTR_Hot
+| FNATTR_Inaccessiblememonly
+| FNATTR_Inaccessiblemem_or_argmemonly
 | FNATTR_Inlinehint
 | FNATTR_Jumptable
 | FNATTR_Minsize
 | FNATTR_Naked
+| FNATTR_No_jump_tables
 | FNATTR_Nobuiltin
 | FNATTR_Noduplicate
+| FNATTR_Nofree    
 | FNATTR_Noimplicitfloat
 | FNATTR_Noinline
+| FNATTR_Nomerge    
 | FNATTR_Nonlazybind
 | FNATTR_Noredzone
+| FNATTR_Indirect_tls_seg_refs
 | FNATTR_Noreturn
+| FNATTR_Norecurse
+| FNATTR_Willreturn
+| FNATTR_Nosync    
 | FNATTR_Nounwind
+| FNATTR_Null_pointer_is_valid
+| FNATTR_Optforfuzzing    
 | FNATTR_Optnone
 | FNATTR_Optsize
 | FNATTR_Readnone
 | FNATTR_Readonly
+| FNATTR_Writeonly
+| FNATTR_Argmemonly    
 | FNATTR_Returns_twice
+| FNATTR_Safestack    
 | FNATTR_Sanitize_address
 | FNATTR_Sanitize_memory
 | FNATTR_Sanitize_thread
+| FNATTR_Sanitize_hwaddress
+| FNATTR_Sanitize_memtag
+| FNATTR_Speculative_load_hardening    
+| FNATTR_Speculatable
 | FNATTR_Ssp
 | FNATTR_Sspreq
 | FNATTR_Sspstrong
+| FNATTR_Strictfp    
 | FNATTR_Uwtable
+| FNATTR_Nocf_check
+| FNATTR_Shadowcallstack
+| FNATTR_Mustprogress    
 | FNATTR_String (s:string) (* "no-see" *)
 | FNATTR_Key_value (kv : string * string) (* "unsafe-fp-math"="false" *)
 | FNATTR_Attr_grp (g:int)
@@ -158,6 +183,21 @@ Definition local_id  := raw_id.
 Definition global_id := raw_id.
 Definition block_id := raw_id.
 Definition function_id := global_id.
+
+(* SAZ:
+   We could separate return types from types, but that needs mutually recursive types.
+   This would entail a lot of down-stream changes to the semantics, but might simplify or
+   eliminate some corner cases.
+
+   ```
+    Inductive type : Set := 
+      ...
+    with
+    rtyp : Set :=
+    | RTYPE_Void 
+    | RTYPE_Typ (t:typ)
+   ```
+*)
 
 Unset Elimination Schemes.
 Inductive typ : Set :=
@@ -280,6 +320,12 @@ Set Elimination Schemes.
 
 Definition texp : Set := T * exp.
 
+(* Used in switch branches which insist on integer literals
+   
+*)
+Variant tint_literal : Set :=
+  | TInt_Literal (sz:N) (x:int).
+
 Variant instr_id : Set :=
 | IId   (id:raw_id)    (* "Anonymous" or explicitly named instructions *)
 | IVoid (n:int)        (* "Void" return type, for "store",  "void call", and terminators.
@@ -292,7 +338,7 @@ Variant phi : Set :=
 
 Variant instr : Set :=
 | INSTR_Comment (msg:string)
-| INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form SV (OP_ ...) *)
+| INSTR_Op   (op:exp)                        (* INVARIANT: op must be of the form (OP_ ...) *)
 | INSTR_Call (fn:texp) (args:list texp)      (* CORNER CASE: return type is void treated specially *)
 | INSTR_Alloca (t:T) (nb: option texp) (align:option int)
 | INSTR_Load  (volatile:bool) (t:T) (ptr:texp) (align:option int)
@@ -311,7 +357,7 @@ Variant terminator : Set :=
 | TERM_Ret_void
 | TERM_Br         (v:texp) (br1:block_id) (br2:block_id)
 | TERM_Br_1       (br:block_id)
-| TERM_Switch     (v:texp) (default_dest:block_id) (brs: list (texp * block_id))
+| TERM_Switch     (v:texp) (default_dest:block_id) (brs: list (tint_literal * block_id))
 | TERM_IndirectBr (v:texp) (brs:list block_id) (* address * possible addresses (labels) *)
 | TERM_Resume     (v:texp)
 | TERM_Invoke     (fnptrval:tident) (args:list texp) (to_label:block_id) (unwind_label:block_id)

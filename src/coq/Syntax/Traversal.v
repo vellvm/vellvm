@@ -157,6 +157,9 @@ Section Endo.
       : Endo (texp T) | 50 :=
       fun te => let '(t,e) := te in (endo t, endo e).
 
+    Global Instance Endo_tint_literal
+      : Endo tint_literal | 50 := id.
+    
     Global Instance Endo_instr
            `{Endo T}
            `{Endo (exp T)}
@@ -500,6 +503,7 @@ Section Fmap.
       := fun U V f '(t,i) => (f t, endo i).
 
     Global Instance Fmap_terminator
+           `{Endo tint_literal}
            `{Endo raw_id}
            `{Fmap exp}
       : Fmap terminator | 50 :=
@@ -509,7 +513,7 @@ Section Fmap.
         | TERM_Ret_void => TERM_Ret_void
         | TERM_Br v br1 br2 => TERM_Br (fmap f v) (endo br1) (endo br2)
         | TERM_Br_1 br => TERM_Br_1 (endo br)
-        | TERM_Switch v default_dest brs => TERM_Switch (fmap f v) (endo default_dest) (List.map (fun '(te,i) => (fmap f te,i)) brs) 
+        | TERM_Switch v default_dest brs => TERM_Switch (fmap f v) (endo default_dest) (endo brs) 
         | TERM_IndirectBr v brs => TERM_IndirectBr (fmap f v) (endo brs)
         | TERM_Resume v => TERM_Resume (fmap f v)
         | TERM_Invoke fnptrval args to_label unwind_label => TERM_Invoke (fmap f fnptrval) (fmap f args) (endo to_label) (endo unwind_label)

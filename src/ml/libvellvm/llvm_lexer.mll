@@ -84,34 +84,61 @@
   | "inalloca"                     -> KW_INALLOCA
   | "returned"                     -> KW_RETURNED
   | "nonnull"                      -> KW_NONNULL
+  
   | "alignstack"                   -> KW_ALIGNSTACK
+  | "allocsize"                    -> KW_ALLOCSIZE
   | "alwaysinline"                 -> KW_ALWAYSINLINE
   | "builtin"                      -> KW_BUILTIN
   | "cold"                         -> KW_COLD
+  | "convergent"                   -> KW_CONVERGENT
+  | "hot"                          -> KW_HOT
+  | "inaccessiblememonly"          -> KW_INACCESSIBLEMEMONLY
+  | "inaccessiblemem_or_argmemeonly" -> KW_INACCESSIBLEMEM_OR_ARGMEMONLY
   | "inlinehint"                   -> KW_INLINEHINT
   | "jumptable"                    -> KW_JUMPTABLE
   | "minsize"                      -> KW_MINSIZE
   | "naked"                        -> KW_NAKED
+  | "no_jump_tables"               -> KW_NO_JUMP_TABLES
   | "nobuiltin"                    -> KW_NOBUILTIN
   | "noduplicate"                  -> KW_NODUPLICATE
+  | "nofree"                       -> KW_NOFREE
   | "noimplicitfloat"              -> KW_NOIMPLICITFLOAT
   | "noinline"                     -> KW_NOINLINE
+  | "nomerge"                      -> KW_NOMERGE
   | "nonlazybind"                  -> KW_NONLAZYBIND
   | "noredzone"                    -> KW_NOREDZONE
+  | "indirect-tls-seg-refs"        -> KW_INDIRECT_TLS_SEG_REFS
   | "noreturn"                     -> KW_NORETURN
+  | "norecurse"                    -> KW_NORECURSE
+  | "willreturn"                   -> KW_WILLRETURN
+  | "nosync"                       -> KW_NOSYNC
   | "nounwind"                     -> KW_NOUNWIND
+  | "null_pointer_is_valid"        -> KW_NULL_POINTER_IS_VALID
+  | "optforfuzzing"                -> KW_OPTFORFUZZING
   | "optnone"                      -> KW_OPTNONE
   | "optsize"                      -> KW_OPTSIZE
   | "readnone"                     -> KW_READNONE
   | "readonly"                     -> KW_READONLY
+  | "writeonly"                    -> KW_WRITEONLY
+  | "argmemonly"                   -> KW_ARGMEMONLY
   | "returns_twice"                -> KW_RETURNS_TWICE
+  | "safestack"                    -> KW_SAFESTACK
   | "sanitize_address"             -> KW_SANITIZE_ADDRESS
   | "sanitize_memory"              -> KW_SANITIZE_MEMORY
   | "sanitize_thread"              -> KW_SANITIZE_THREAD
+  | "sanitize_hwaddress"           -> KW_SANITIZE_HWADDRESS
+  | "sanitize_memtag"              -> KW_SANITIZE_MEMTAG
+  | "speculative_load_hardening"   -> KW_SPECULATIVE_LOAD_HARDENING
+  | "speculatable"                 -> KW_SPECULATABLE
   | "ssp"                          -> KW_SSP
   | "sspreq"                       -> KW_SSPREQ
   | "sspstrong"                    -> KW_SSPSTRONG
+  | "strictfp"                     -> KW_STRICTFP
   | "uwtable"                      -> KW_UWTABLE
+  | "nocf_check"                   -> KW_NOCF_CHECK
+  | "shadowcallstack"              -> KW_SHADOWCALLSTACK
+  | "mustprogress"                 -> KW_MUSTPROGRESS
+
   | "align"                        -> KW_ALIGN
   | "gc"                           -> KW_GC
   | "to"                           -> KW_TO
@@ -120,7 +147,6 @@
   | "volatile"                     -> KW_VOLATILE
   | "immarg"                       -> KW_IMMARG  
   | "noundef"                      -> KW_NOUNDEF
-  | "nofree"                       -> KW_NOFREE
 
   (* instrs *)
   | "add"            -> KW_ADD
@@ -281,25 +307,24 @@ rule token = parse
   | ']'  { RSQUARE }
   | '<'  { LT }
   | '>'  { GT }
+  | "..." { DOTDOTDOT }
 
   (* labels *)
   | ((label_char)+) as l ':' { LABEL l }
 
   (* identifier *)
-  | '@' { GLOBAL (raw_id lexbuf) }
-  | '%' { LOCAL (raw_id lexbuf) }
+  | '@' { GLOBAL (lexed_id lexbuf) }
+  | '%' { LOCAL  (lexed_id lexbuf) }
 
   (* FIXME: support metadata strings and struct. Parsed as identifier here. *)
   | "!{" { BANGLCURLY }
-  | '!'  { let rid = raw_id lexbuf in
+  | '!'  { let rid = lexed_id lexbuf in
            begin match rid with 
-           | LLVMAst.Name id ->
-	   let id = of_str id in
+           | ParseUtil.Named id ->
 	   (if id.[0] = '"' && id.[String.length id - 1] = '"'
                then METADATA_STRING id
-               else METADATA_ID rid)
-	   | LLVMAst.Anon _ -> METADATA_ID rid
-    	   | LLVMAst.Raw _ -> METADATA_ID rid
+               else METADATA_ID (Name (str id)))
+	   | ParseUtil.Anonymous n -> METADATA_ID (Anon (coq_of_int n))
 	   end
          }
 
@@ -328,25 +353,32 @@ and string buf = parse
   | '"'    { Buffer.contents buf }
   | _ as c { Buffer.add_char buf c; string buf lexbuf }
 
-and raw_id = parse
-  | ident_fst ident_nxt* as i { LLVMAst.Name (str i) }
-  | digit+ as i               { LLVMAst.Anon (coq_of_int (int_of_string i)) }
-  | '"'                       { LLVMAst.Name (str ("\"" ^ string (Buffer.create 10) lexbuf ^ "\"")) }
+and lexed_id = parse
+  | ident_fst ident_nxt* as i { ParseUtil.Named i }
+  | digit+ as i               { ParseUtil.Anonymous (int_of_string i) }
+  | '"'                       { ParseUtil.Named ("\"" ^ string (Buffer.create 10) lexbuf ^ "\"") }
 
 {
 
   let parsing_err lexbuf =
     let pos = Lexing.lexeme_start_p lexbuf in
     let msg =
-        Printf.sprintf "Parsing error: line %d, column %d, token '%s'"
+        Printf.sprintf "Parsing error: line %d, column %d, token '%s'\n%s"
                        pos.Lexing.pos_lnum
                        (pos.Lexing.pos_cnum - pos.Lexing.pos_bol)
                        (Lexing.lexeme lexbuf)
+		       (Printexc.get_backtrace ())
       in failwith msg
 
   let parse lexbuf =
     try Llvm_parser.toplevel_entities token lexbuf
-    with Llvm_parser.Error -> parsing_err lexbuf
+    with 
+    | Llvm_parser.Error -> parsing_err lexbuf
+    | Failure s -> 
+      begin
+        (Printf.fprintf stderr "Failure: %s\n" s);
+        parsing_err lexbuf
+      end   
 
   let parse_test_call lexbuf = 
     try Llvm_parser.test_call token lexbuf

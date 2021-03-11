@@ -186,28 +186,56 @@ Section ExpOptim.
         rewrite !translate_bind, !interp_cfg3_bind.
         apply eutt_eq_bind.
         intro3.
+        assert (EQbrs: (brs = endo brs)).
+        { induction brs; cbn; try reflexivity. rewrite <- IHbrs. destruct a; cbn. unfold endo, Endo_id, Endo_tint_literal, id. reflexivity. }
+        assert (EQ1:
+                  (map_monad
+                (fun '(TInt_Literal sz x0, id) =>
+                 {|
+                 EitherMonad.unEitherT := match EitherMonad.unEitherT (coerce_integer_to_int sz x0) with
+                                          | inl v => inl v
+                                          | inr (inl x1) => inr (inl x1)
+                                          | inr (inr x1) => inr (inr (x1, id))
+                                          end |}) brs) =
+                  (map_monad
+                (fun '(TInt_Literal sz x0, id) =>
+                 {|
+                 EitherMonad.unEitherT := match EitherMonad.unEitherT (coerce_integer_to_int sz x0) with
+                                          | inl v => inl v
+                                          | inr (inl x1) => inr (inl x1)
+                                          | inr (inr x1) => inr (inr (x1, id))
+                                          end |}) (endo brs))).
+        { rewrite <- EQbrs. reflexivity. }
         assert (EQ:
-                  ℑ3 (translate exp_to_instr (switches <- map_monad (fun '(t, e0, id) => us <- ⟦ e0 at t ⟧e;; s <- pickUnique us;; Ret1 s id) brs;; lift_err (fun b : block_id => Ret (@inl block_id uvalue b)) (select_switch d0 default_dest switches))) g1 l1 m1
+                  ℑ3
+    (translate exp_to_instr
+       (switches <-
+        lift_undef_or_err (fun x : list (dvalue * block_id) => Ret x)
+          (map_monad
+             (fun '(TInt_Literal sz x, id) =>
+              {|
+              EitherMonad.unEitherT := match EitherMonad.unEitherT (coerce_integer_to_int sz x) with
+                                       | inl v => inl v
+                                       | inr (inl x0) => inr (inl x0)
+                                       | inr (inr x0) => inr (inr (x0, id))
+                                       end |}) brs);; lift_err (fun b : block_id => Ret (@inl block_id uvalue b)) (select_switch d0 default_dest switches)))
+    g1 l1 m1
   ≈ ℑ3
       (translate exp_to_instr
-         (switches <- map_monad (fun '(t, e0, id) => us <- ⟦ e0 at t ⟧e;; s <- pickUnique us;; Ret1 s id) (endo brs);; lift_err (fun b : block_id => Ret (inl b)) (select_switch d0 (endo default_dest) switches)
-      )) g1 l1 m1).
+         (switches <-
+          lift_undef_or_err (fun x : list (dvalue * block_id) => Ret x)
+            (map_monad
+               (fun '(TInt_Literal sz x, id) =>
+                {|
+                EitherMonad.unEitherT := match EitherMonad.unEitherT (coerce_integer_to_int sz x) with
+                                         | inl v => inl v
+                                         | inr (inl x0) => inr (inl x0)
+                                         | inr (inr x0) => inr (inr (x0, id))
+                                         end |}) (endo brs));;
+          lift_err (fun b : block_id => Ret (inl b)) (select_switch d0 (endo default_dest) switches))) g1 l1 m1).
         { 
           rewrite !translate_bind,!interp_cfg3_bind; apply eutt_clo_bind with (UU := eq); [| intro3; reflexivity].
-          revert g1 l1 m1; induction brs as [| x brs IH]; intros; [reflexivity |].
-          cbn.
-          rewrite !translate_bind,!interp_cfg3_bind; apply eutt_clo_bind with (UU := eq).
-          destruct x,t; cbn.
-          rewrite !translate_bind,!interp_cfg3_bind.
-          apply eutt_clo_bind with (UU := eq).
-          rewrite opt_correct; reflexivity.
-          intro3.
-          reflexivity. 
-          intro3.
-          rewrite !translate_bind,!interp_cfg3_bind; apply eutt_clo_bind with (UU := eq).
-          rewrite IH; reflexivity.
-          intro3; reflexivity.
-        }
+          setoid_rewrite EQ1. reflexivity. }
         break_match_goal; try apply EQ; reflexivity.
     Qed.
 

@@ -2,6 +2,39 @@ This file describe the design choices we are following in the way of handling
 the notions of undefined behavior and undefined values (i.e. poison and undef)
 that llvm supports.
 
+
+* Testing Infrastructure
+
+** Feature Support
+ - Cstrings
+ - Varargs
+ - Printf
+ - Vector instructions 
+ - poision
+
+
+** Support OAT-style tests
+ - use "program" rather than "main"
+
+** Step out of "undef -> 0" refinement model?
+ - rather than test with "DValue" executable semantics
+ - test at the "UValue" level and use some kind of SMT-backed solver to prove equivalence in the tester?
+
+** Dig into Alive
+ - How do they deal with "open" code for external function calls
+
+** QuickChick branch
+ - merge LLVM AST pp stuff
+ - modernize the QuickChick (it currently isn't done)
+ - run clang
+
+** LLVM Testing via CSmith
+ - try running with CSmith?
+
+** Expand CI coverage
+
+
+
 * Undefined behaviors
 
 ** List of cases triggering undefined behavior

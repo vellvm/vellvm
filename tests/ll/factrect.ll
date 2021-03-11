@@ -6,7 +6,7 @@ ret1:
   ret i64 1
 
 recurse:
-  %1 = sub i64 %n, 1
+  %1 = sub i64 %n, 1                 
   %2 = call i64 @factorial(i64 %1)
   %3 = mul i64 %n, %2
   ret i64 %3
