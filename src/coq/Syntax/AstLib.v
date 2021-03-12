@@ -635,9 +635,9 @@ Section hiding_notation.
     | TYPE_Metadata => Atom "metadata"
     | TYPE_X86_mmx => Atom "x86_mmx"
     | TYPE_Array sz t => [Atom "["; Atom (show_N sz); Atom "x"; serialize_typ' t; Atom "]"]
-    | TYPE_Function ret args => [serialize_typ' ret; Atom "("; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexpa (serialize_typ' x)) args)); Atom ")"]
-    | TYPE_Struct fields => [Atom "{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexpa (serialize_typ' x)) fields)); Atom "}"]
-    | TYPE_Packed_struct fields => [Atom "<{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexpa (serialize_typ' x)) fields)); Atom "}>"]
+    | TYPE_Function ret args => [serialize_typ' ret; Atom "("; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexp (serialize_typ' x)) args)); Atom ")"]
+    | TYPE_Struct fields => [Atom "{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexp (serialize_typ' x)) fields)); Atom "}"]
+    | TYPE_Packed_struct fields => [Atom "<{"; Atom (String.concat ", " (map (fun x => CeresFormat.string_of_sexp (serialize_typ' x)) fields)); Atom "}>"]
     | TYPE_Opaque => Atom "opaque"
     | TYPE_Vector sz t => [Atom "<"; Atom (show_N sz); Atom "x"; serialize_typ' t; Atom ">"]
     | TYPE_Identified id => Atom (to_string id)
