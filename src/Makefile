@@ -18,19 +18,25 @@ COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
 MENHIR=menhir
 CP=cp
 
-COQFILESINTERP := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats\
-									Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/Error\
-									Utils/PropT Utils/PostConditions Utils/NoFailure Utils/TFor\
-                  Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
+COQFILESNUMERIC := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats
+
+COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/Error\
+								 Utils/PropT Utils/PostConditions Utils/NoFailure Utils/TFor
+
+COQFILESSYNTAX := Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
 									Syntax/Traversal Syntax/Dom Syntax/DynamicTypes Syntax/TypToDtyp\
 									Syntax/Scope Syntax/SurfaceSyntax\
-									Semantics/MemoryAddress Semantics/DynamicValues Semantics/LLVMEvents\
-									Semantics/IntrinsicsDefinitions\
-									Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack\
-									Handlers/Pick Handlers/UndefinedBehaviour Handlers/Memory Handlers/MemoryTheory\
-									Handlers/Handlers\
-								  Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
-									QC/GenAST QC/ShowAST QC/QCVellvm
+
+COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/DynamicValues Semantics/LLVMEvents\
+									   Semantics/IntrinsicsDefinitions\
+									 	 Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack\
+									   Handlers/Pick Handlers/UndefinedBehaviour Handlers/Memory Handlers/MemoryTheory\
+									 	 Handlers/Handlers\
+								  	 Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel
+
+COQFILESANALYSIS := Analysis/Iteration Analysis/Kildall Analysis/Dom Analysis/DomKildall Analysis/ssa Analysis/DomId 
+
+COQFILESQC := QC/GenAST QC/ShowAST QC/QCVellvm
 
 COQFILESTHEORY := Syntax/ScopeTheory\
 									Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG\
@@ -43,8 +49,12 @@ COQFILESOPT    := Transformations/Transform\
 
 OLLVMFILES :=
 
-VFILES  := $(COQFILESINTERP:%=coq/%.v) $(COQFILESTHEORY:%=coq/%.v) $(COQFILESOPT:%=coq/%.v)
-VOFILES := $(COQFILESINTERP:%=coq/%.vo) $(COQFILESTHEORY:%=coq/%.vo) $(COQFILESOPT:%=coq/%.vo)
+COQFILESVIR      := $(COQFILESNUMERIC) $(COQFILESUTILS) $(COQFILESSYNTAX) $(COQFILESSEMANTICS) 
+COQFILESCOMPILER := $(COQFILESVIR) $(COQFILESANALYSIS) $(COQFILESOPT)
+COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) 
+
+VFILES  := $(COQFILESALL:%=coq/%.v)
+VOFILES := $(COQFILESALL:%=coq/%.vo)
 
 all:
 	@test -f .depend || $(MAKE) depend
@@ -64,7 +74,7 @@ coq: $(VOFILES)
 opam:
 	opam install $(OPAMPKGS)
 
-coqinterp: $(COQFILESINTERP:%=coq/%.vo)
+coqinterp: $(COQFILESVIR:%=coq/%.vo)
 
 update-trees:
 	git submodule update -- $(ITREEDIR)
