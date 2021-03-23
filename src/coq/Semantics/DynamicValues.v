@@ -1407,7 +1407,7 @@ Class VInt I : Type :=
       match icmp with
       | Eq => if A.eq_dec a1 a2 then ret (DVALUE_I1 (Int1.one)) else ret (DVALUE_I1 (Int1.zero))
       | Ne => if A.eq_dec a1 a2 then ret (DVALUE_I1 (Int1.zero)) else ret (DVALUE_I1 (Int1.one))
-      | _ => failwith "non-equuality pointer comparison"
+      | _ => failwith "non-equality pointer comparison"
       end
     | _, _ => failwith "ill_typed-icmp"
     end.
