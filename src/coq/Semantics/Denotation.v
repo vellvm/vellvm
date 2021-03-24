@@ -746,7 +746,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | IId id  => trigger (LocalWrite id returned_value)
           end
 
-        | (_, INSTR_Comment _) => ret tt
+        | (IVoid _, INSTR_Comment _) => ret tt
 
         (* Currently unhandled itree instructions *)
         | (_, INSTR_Fence)
