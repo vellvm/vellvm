@@ -41,6 +41,7 @@ COQFILESQC := QC/GenAST QC/ShowAST QC/QCVellvm
 COQFILESTHEORY := Syntax/ScopeTheory\
 									Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG\
 									Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
+									Theory/LocalFrame\
 									Theory/TopLevelRefinements Theory/SymbolicInterpreter\
 									Utils/NoEvent Utils/Commutation
 

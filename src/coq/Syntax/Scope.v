@@ -162,8 +162,9 @@ Section DEF_SITES_OPERATIONS.
     | _ => []
     end.
 
-  Definition def_sites_code (c : code T) : list raw_id :=
-    List.fold_left (fun acc '(id,_) => match id with | IId id => id :: acc | _ => acc end) c [].
+  Definition def_sites_code {T} (c : code T) : list raw_id :=
+    List.fold_right (fun '(id,_) acc => match id with | IId id => id :: acc | _ => acc end) [] c.
+
 
 End DEF_SITES_OPERATIONS.
 

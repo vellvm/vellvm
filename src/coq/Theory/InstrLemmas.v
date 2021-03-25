@@ -266,7 +266,7 @@ Qed.
 
 Lemma denote_instr_comment :
   forall i str g l m,
-    ⟦ (i, INSTR_Comment str) ⟧i3 g l m ≈ Ret3 g l m tt.
+    ⟦ (IVoid i, INSTR_Comment str) ⟧i3 g l m ≈ Ret3 g l m tt.
 Proof.
   intros *.
   destruct i; cbn; go; reflexivity.
@@ -496,3 +496,4 @@ Proof.
   go.
   reflexivity.
 Qed.
+
