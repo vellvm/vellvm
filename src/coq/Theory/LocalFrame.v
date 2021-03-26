@@ -111,7 +111,7 @@ Proof.
   apply pick_is_pure.
 Qed.
 
-Ltac go := repeat vred_C3. 
+Ltac go := repeat (vred_C3 || rewrite translate_ret || rewrite translate_bind). 
 Lemma Intrinsic_preserves_local:
   forall τ f args g l m,
     ℑ3 (trigger (Intrinsic τ f args)) g l m ⤳ lift_pred_L3 _ (fun l' => l' = l).
@@ -413,57 +413,105 @@ Definition def_sites_block {T} (bk : block T) : list raw_id :=
 
 From Vellvm Require Import Theory.DenotationTheory.
 
-Lemma local_frame_phis : forall phis f g l m,
-⟦ phis ⟧Φs3 f g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites_phis phis)).
+Ltac _intros := intros3; first [intros (-> & -> & ->) | intros -> | intros ?HP].
+
+Definition lift_pure_cfgP {T : Type} (P : T -> Prop) : @state_cfg_TP T :=
+  fun '(m,(l,(g,v))) => P v.
+
+Definition andP {T : Type} (A B : T -> Prop) : T -> Prop := fun x => A x /\ B x.
+
+Lemma local_has_changed_mono:
+  forall xs ys l l',
+    (forall x, In x xs -> In x ys) ->
+    local_has_changed l xs l' ->
+    local_has_changed l ys l'.
 Proof.
-  (* induction phis as [| phi phis IH]; intros. *)
-  (* - cbn; go. *)
-  (*   cbn; go. *)
-  (*   __base. *)
-  (* - cbn; go. *)
-  (*   destruct phi as [? []]; cbn. *)
-  (*   break_match_goal; cbn. *)
-  (*   + go. *)
-  (*     rewrite translate_bind. *)
-  (*     go. *)
-  (*     eapply has_post_bind_strong; [apply expr_are_pure |]. *)
-  (*     intros3; intros (-> & -> & ->). *)
-  (*     rewrite translate_ret; go. *)
-Admitted.      
+  intros; red; intros.
+  apply H0.
+  intros abs; apply H1.
+  apply H; auto.
+Qed.
+
+Lemma local_has_changed_trans:
+  forall xs l l' l'',
+    local_has_changed l xs l' ->
+    local_has_changed l' xs l'' ->
+    local_has_changed l xs l''.
+Proof.
+  intros; red; intros.
+  rewrite H, H0; auto.
+Qed.
+
+Lemma local_frame_phis : forall phis f g l m,
+    ⟦ phis ⟧Φs3 f g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites_phis phis)).
+Proof.
+  intros.
+  cbn.
+  go.
+  rewrite interp_cfg3_map_monad.
+  apply has_post_bind_strong
+    with (S := andP (lift_state_cfgP (pure_P g l m))
+                   (lift_pure_cfgP (fun l => forall x, In x (map fst l) -> In x (def_sites_phis phis)))).
+  - induction phis as [| [x []] phis IH].
+    + cbn; apply eutt_Ret; split; cbn; auto.
+    + cbn; go.
+      break_match_goal; cbn.
+      2: rewrite exp_to_instr_raise;unfold raise; go; apply has_post_bind; intros3; inv e.
+      go.
+      eapply has_post_bind_strong; [apply expr_are_pure |].
+      _intros; go.
+      cbn.
+      eapply has_post_bind_strong; [apply IH |].
+      _intros; go.
+      destruct HP as [(-> & -> & ->) HP].
+      cbn in *.
+      apply eutt_Ret.
+      split; cbn; auto.
+      intros ? [<- | IN]; auto.
+  - _intros.
+    destruct HP as [(-> & -> & ->) HP].
+    cbn in *.
+    go.
+    rewrite interp_cfg3_map_monad.
+    apply has_post_bind_strong with (S := fun '(_, (l', (_, _))) => local_has_changed l (def_sites_phis phis) l').
+    2: _intros; go; apply eutt_Ret; cbn; auto.
+    apply map_monad_eutt_state3_ind; [intros [] ? ? ? ? ? | red; auto].
+    eapply has_post_weaken; [apply LocalWrite_local_change |].
+    _intros.
+    cbn in *.
+    apply (in_map fst), HP in H; cbn in H; clear HP.
+    eapply local_has_changed_trans; eauto.
+    eapply local_has_changed_mono; [| eauto].
+    intros ? [-> | []]; auto.
+Qed.
 
 Lemma terminator_are_pure : forall t, 
     pure ⟦ t ⟧t3.  
-Proof.
+Proof with (apply eutt_Ret; do 2 red; auto).
   unfold pure; intros [] *; cbn.
   - destruct v; cbn.
-    rewrite translate_bind; go.
+    go.
     eapply has_post_bind_strong; [apply expr_are_pure |].
-    intros3; intros (-> & -> & ->).
-    rewrite translate_ret; go.
-    apply eutt_Ret; do 2 red; auto.
-  - rewrite translate_ret; go.
-    apply eutt_Ret; do 2 red; auto.
+    _intros; go...
+  - go...
   - destruct v; cbn.
-    rewrite translate_bind; go.
+    go.
     eapply has_post_bind_strong; [apply expr_are_pure |].
-    intros3; intros (-> & -> & ->).
-    rewrite translate_bind; go.
+    _intros; go.
     eapply has_post_bind_strong; [apply ExpLemmas.concretize_or_pick_is_pure |].
-    intros3; intros (-> & -> & ->).
+    _intros.
     destruct d0; try (rewrite exp_to_instr_raise; apply failure_is_pure).
     2: rewrite exp_to_instr_raiseUB; apply UB_is_pure.
-    break_match_goal; rewrite translate_ret; go.
-    all:apply eutt_Ret; do 2 red; auto.
-  - rewrite translate_ret; go.
-    apply eutt_Ret; do 2 red; auto.
+    break_match_goal; go...
+  - go...
   - admit.
     (* destruct v; cbn. *)
     (* rewrite translate_bind; go. *)
     (* eapply has_post_bind_strong; [apply expr_are_pure |]. *)
-    (* intros3; intros (-> & -> & ->). *)
+    (* _intros; intros (-> & -> & ->). *)
     (* rewrite translate_bind; go. *)
     (* eapply has_post_bind_strong; [apply ExpLemmas.concretize_or_pick_is_pure |]. *)
-    (* intros3; intros (-> & -> & ->). *)
+    (* _intros; intros (-> & -> & ->). *)
     (* break_match_goal. *)
   - rewrite exp_to_instr_raise; apply failure_is_pure.
   - rewrite exp_to_instr_raise; apply failure_is_pure.
@@ -478,21 +526,21 @@ Proof.
   rewrite denote_block_unfold.
   go.
   eapply has_post_bind_strong; [apply local_frame_phis |].
-  intros3; intros LOC.
+  _intros.
   go.
   eapply has_post_bind_strong; [apply local_frame_code |].
-  intros3; intros LOC'.
+  _intros.
   eapply has_post_weaken; [apply terminator_are_pure |].
-  intros3; intros (-> & -> & ->).
+  _intros.
   intros ? NIN.
-  red in LOC, LOC'.
+  red in HP,HP0.
   cbn in NIN.
   destruct (in_dec raw_id_eq_dec x (def_sites_phis blk_phis)). 
   apply not_in_app_l in NIN; exfalso; apply NIN; auto.
   destruct (in_dec raw_id_eq_dec x (def_sites_code blk_code)). 
   apply not_in_app_r in NIN; exfalso; apply NIN; auto.
-  apply LOC in n.
-  apply LOC' in n0.
+  apply HP in n.
+  apply HP0 in n0.
   rewrite n,n0; reflexivity.
 Qed.
 
@@ -503,4 +551,7 @@ Lemma local_frame_ocfg : forall bks fto g l m,
     ⟦ bks ⟧bs3 fto g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites_ocfg bks)).
 Proof.
 Admitted.
+
+
+
 
