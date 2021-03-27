@@ -422,14 +422,14 @@ Definition andP {T : Type} (A B : T -> Prop) : T -> Prop := fun x => A x /\ B x.
 
 Lemma local_has_changed_mono:
   forall xs ys l l',
-    (forall x, In x xs -> In x ys) ->
     local_has_changed l xs l' ->
+    (forall x, In x xs -> In x ys) ->
     local_has_changed l ys l'.
 Proof.
-  intros; red; intros.
-  apply H0.
-  intros abs; apply H1.
-  apply H; auto.
+  intros * HL HIN; red; intros.
+  apply HL.
+  intros abs; apply H.
+  apply HIN; auto.
 Qed.
 
 Lemma local_has_changed_trans:
@@ -481,7 +481,7 @@ Proof.
     cbn in *.
     apply (in_map fst), HP in H; cbn in H; clear HP.
     eapply local_has_changed_trans; eauto.
-    eapply local_has_changed_mono; [| eauto].
+    eapply local_has_changed_mono; eauto. 
     intros ? [-> | []]; auto.
 Qed.
 
@@ -547,11 +547,195 @@ Qed.
 Definition def_sites_ocfg {T} (bks : CFG.ocfg T) :=
   List.fold_right (fun bk acc => def_sites_block bk ++ acc) [] bks.
 
+
+From Vellvm Require Import
+     Utils.NoFailure
+     Syntax.CFG.
+
+From ITree Require Import
+     Events.State.
+
+Lemma interp_intrinsics_iter :
+  forall {E F R I} `{FailureE -< F } (t: I -> itree (E +' IntrinsicE +' F) (I + R)) x,
+             interp_intrinsics (iter t x) ≈  
+             ITree.iter (fun x => interp_intrinsics (t x)) x. 
+Proof.
+  intros.
+  unfold interp_intrinsics at 1.
+  rewrite InterpFacts.interp_iter.
+  reflexivity.
+Qed.
+
+Lemma interp_global_iter :
+  forall {k v map E F G R I} `{Map k v map} `{CeresSerialize.Serialize k} `{FailureE -< G }
+    (t: I -> itree (E +' F +' (GlobalE _ _) +' G) (I + R)) x g,
+    interp_global (ITree.iter t x) g ≈  
+    @Basics.iter _ MonadIter_stateT0 _ _ (fun x g => interp_global (t x) g) x g. 
+Proof.
+  intros.
+  apply interp_state_iter.
+Qed.
+
+Lemma interp_local_iter :
+  forall {k v map E F G R I} `{Map k v map} `{CeresSerialize.Serialize k} `{FailureE -< G }
+    (t: I -> itree (E +' F +' (LocalE _ _) +' G) (I + R)) x g,
+    interp_local (ITree.iter t x) g ≈  
+    @Basics.iter _ MonadIter_stateT0 _ _ (fun x g => interp_local (t x) g) x g. 
+Proof.
+  intros.
+  apply interp_state_iter.
+Qed.
+
+Lemma interp_memory_iter :
+  forall {E F R I} `{FailureE -< F} `{UBE -< F} `{PickE -< F}
+    (t: I -> itree (E +' IntrinsicE +' MemoryE +' F) (I + R)) x m,
+    interp_memory (ITree.iter t x) m ≈
+    @Basics.iter _ MonadIter_stateT0 _ _ (fun x g => interp_memory (t x) g) x m.
+Proof.
+  intros.
+  apply interp_state_iter.
+Qed.
+
+Import CatNotations.
+Lemma interp_cfg3_collapse :
+  forall {R I} (t: I -> itree instr_E (I + R)) x g l m,
+    interp_cfg3 (iter t x) g l m ≈
+    ITree.iter (fun '(m,(l,(g,x))) =>
+                  '(m,(l,(g,ir))) <- interp_cfg3 (t x) g l m;; 
+                  match ir with | inl i => Ret (inl (m,(l,(g,i)))) | inr r => Ret (inr (m,(l,(g,r)))) end)
+    (m,(l,(g,x))).
+Proof.
+  intros.
+  unfold interp_cfg3 at 1.
+  rewrite interp_intrinsics_iter.
+  rewrite interp_global_iter.
+  unfold Basics.iter.
+  unfold MonadIter_stateT0, Basics.iter, MonadIter_itree.
+  rewrite interp_local_iter.
+  unfold MonadIter_stateT0, Basics.iter, MonadIter_itree.
+  cbn.
+  rewrite interp_memory_iter.
+  unfold MonadIter_stateT0, Basics.iter, MonadIter_itree.
+  cbn.
+  apply KTreeFacts.eutt_iter.
+  red. intros (? & ? & ? & ?); cbn.
+  unfold interp_cfg3.
+  rewrite interp_local_bind, bind_bind. 
+  rewrite interp_memory_bind, bind_bind. 
+  apply eutt_eq_bind.
+  intros (? & ? & ? & ?); cbn.
+  rewrite interp_local_ret, bind_ret_l; cbn.
+  rewrite interp_memory_ret, bind_ret_l; cbn.
+  destruct s; cbn; reflexivity.
+Qed.
+
+(* Stateful, flow-insensitive inductive reasoning principle:
+ *)
+Arguments denote_block : simpl never.
+Lemma has_post_denote_ocfg3 :
+  forall bks fto g l m (I: state_cfgP),
+    (forall bk id g' l' m' f,
+        CFG.find_block bks id = Some bk -> 
+        I (m',(l',g')) ->
+        ⟦ bk ⟧b3 f g' l' m' ⤳ lift_state_cfgP I) ->
+    I (m,(l,g)) ->
+    ⟦ bks ⟧bs3 fto g l m ⤳ lift_state_cfgP I.
+Proof.
+  intros.
+  unfold denote_ocfg.
+  rewrite interp_cfg3_collapse.
+  apply has_post_iter_strong with (Inv := lift_state_cfgP I); auto.
+  _intros; destruct p; cbn. 
+  break_match_goal.
+  - go.
+    eapply has_post_bind_strong.
+    eapply H; eauto.
+    _intros.
+    break_match_goal; cbn; go.
+    apply eutt_Ret; cbn; auto.
+    apply eutt_Ret; cbn; auto.
+  - go.
+    apply eutt_Ret; cbn; auto.
+Qed.
+
+Definition sublist {A} (xs ys : list A) : Prop :=
+  forall x, In x xs -> In x ys.
+
+Lemma sublist_nil {A} :
+  forall (xs : list A),
+    sublist xs [] ->
+    xs = [].
+Proof.
+  intros [| x xs] SUB; auto.
+  exfalso.
+  specialize (SUB x (or_introl eq_refl)).
+  inv SUB.
+Qed.
+
+Global Instance sublist_refl {A} : Reflexive (@sublist A). 
+Proof.
+  repeat red; intros; auto.
+Qed.
+
+Lemma sublist_app_l {A} :
+  forall (ys xs zs : list A),
+  sublist xs ys ->
+  sublist xs (ys ++ zs).
+Proof.
+  intros; intros x IN.
+  apply in_or_app; auto.
+Qed.
+
+Lemma sublist_app_r {A} :
+  forall (ys xs zs : list A),
+  sublist xs zs ->
+  sublist xs (ys ++ zs).
+Proof.
+  intros; intros x IN.
+  apply in_or_app; auto.
+Qed.
+
+Lemma def_sites_block_in_ocfg :
+  forall {T} (bk : block T) id bks,
+    find_block bks id = Some bk ->
+    sublist (def_sites_block bk) (def_sites_ocfg bks).
+Proof.
+  induction bks as [| bk0 bks IH]; [intros abs; inv abs |].
+  intros FIND.
+  cbn.
+  case_eq_id id bk0.(blk_id).
+  - rewrite ScopeTheory.find_block_eq in FIND; auto.
+    inv FIND.
+    eapply sublist_app_l; reflexivity.
+  - rewrite ScopeTheory.find_block_ineq in FIND; auto. 
+    eapply sublist_app_r, IH; auto.
+Qed.
+
+Lemma local_has_changed_refl : forall l xs,
+    local_has_changed l xs l.
+Proof.
+  intros.
+  red; intros; reflexivity.
+Qed.
+
 Lemma local_frame_ocfg : forall bks fto g l m,
     ⟦ bks ⟧bs3 fto g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites_ocfg bks)).
 Proof.
-Admitted.
-
-
-
-
+  intros.
+  eapply has_post_weaken.
+  apply has_post_denote_ocfg3 with (I := fun '(_,(l',_)) => local_has_changed l (def_sites_ocfg bks) l').
+  - intros * FIND HP.
+    eapply has_post_weaken.
+    apply local_frame_block.
+    intros (? & ? & ? & ?) HP'.
+    cbn in *.
+    eapply local_has_changed_trans.
+    apply HP.
+    eapply local_has_changed_mono. eauto.
+    intros * IN.
+    eapply def_sites_block_in_ocfg; eauto.
+  - apply local_has_changed_refl.
+  - _intros.
+    cbn in *.
+    auto.
+Qed.
