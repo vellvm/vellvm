@@ -485,6 +485,7 @@ Proof.
     intros ? [-> | []]; auto.
 Qed.
 
+
 Lemma terminator_are_pure : forall t, 
     pure ⟦ t ⟧t3.  
 Proof with (apply eutt_Ret; do 2 red; auto).
@@ -504,20 +505,31 @@ Proof with (apply eutt_Ret; do 2 red; auto).
     2: rewrite exp_to_instr_raiseUB; apply UB_is_pure.
     break_match_goal; go...
   - go...
-  - admit.
-    (* destruct v; cbn. *)
-    (* rewrite translate_bind; go. *)
-    (* eapply has_post_bind_strong; [apply expr_are_pure |]. *)
-    (* _intros; intros (-> & -> & ->). *)
-    (* rewrite translate_bind; go. *)
-    (* eapply has_post_bind_strong; [apply ExpLemmas.concretize_or_pick_is_pure |]. *)
-    (* _intros; intros (-> & -> & ->). *)
-    (* break_match_goal. *)
+  - destruct v; cbn.
+    go.
+    eapply has_post_bind_strong; [apply expr_are_pure |].
+    _intros; go.
+    eapply has_post_bind_strong; [apply ExpLemmas.concretize_or_pick_is_pure |].
+    _intros; go.
+    break_match_goal.
+    rewrite exp_to_instr_raiseUB; apply UB_is_pure.
+    go.
+    unfold lift_undef_or_err.
+    break_match_goal.
+    break_match_goal.
+    unfold raiseUB; go; apply has_post_bind; intros (? & ? & ? & []).
+    break_match_goal.
+    unfold raise; go; apply has_post_bind; intros (? & ? & ? & []).
+    go.
+    unfold lift_err.
+    break_match_goal.
+    unfold raise; go; apply has_post_bind; intros (? & ? & ? & []).
+    go...
   - rewrite exp_to_instr_raise; apply failure_is_pure.
   - rewrite exp_to_instr_raise; apply failure_is_pure.
   - rewrite exp_to_instr_raise; apply failure_is_pure.
   - rewrite exp_to_instr_raiseUB; apply UB_is_pure.
-Admitted.
+Qed.
 
 Lemma local_frame_block : forall bk f g l m,
     ⟦ bk ⟧b3 f g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites_block bk)).
