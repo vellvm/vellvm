@@ -779,6 +779,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           end
         end.
 
+      Definition dvalue_is_poison (dv : dvalue) : bool :=
+        match dv with
+        | DVALUE_Poison => true
+        | _ => false
+        end.
+
       (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
       Definition denote_terminator (t: terminator dtyp): itree exp_E (block_id + uvalue) :=
@@ -810,15 +816,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           uselector <- denote_exp (Some dt) e;;
           (* Selection on [undef] is UB *)
           selector <- pickUnique uselector;;
-          match selector with
-          | DVALUE_Poison => raiseUB "Switching on poison."
-          | _ => (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
+          if dvalue_is_poison selector
+          then raiseUB "Switching on poison."
+          else (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
             switches <- lift_undef_or_err ret
-                       (map_monad
-                         (fun '((TInt_Literal sz x),id) => s <- (coerce_integer_to_int sz x);; ret (s,id))
-                         dests);;
+                                         (map_monad
+                                            (fun '((TInt_Literal sz x),id) => s <- (coerce_integer_to_int sz x);; ret (s,id))
+                                            dests);;
             lift_err (fun b => ret (inl b)) (select_switch selector default_br switches)
-          end
 
         | TERM_Unreachable => raiseUB "IMPOSSIBLE: unreachable in reachable position" 
 
