@@ -26,11 +26,8 @@ From ExtLib Require Import
      Data.List.
 
 From Vellvm Require Import
-     Utils.Error
-     Utils.Util
-     Syntax.LLVMAst
-     Syntax.AstLib
-     Syntax.DynamicTypes
+     Utilities
+     Syntax
      Semantics.MemoryAddress.
 
 Require Import Integers Floats.

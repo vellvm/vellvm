@@ -52,7 +52,7 @@ Section Endo.
 
     Global Instance Endo_ident
            `{Endo raw_id}
-    : Endo ident | 50 :=
+      : Endo ident | 50 :=
       fun id =>
         match id with
         | ID_Global rid => ID_Global (endo rid)
@@ -209,10 +209,10 @@ Section Endo.
            `{Endo (exp T)}
       : Endo (phi T) | 50 :=
       fun p => match p with
-               | Phi t args => Phi (endo t) (endo args)
-               end.
+            | Phi t args => Phi (endo t) (endo args)
+            end.
 
-   Global Instance Endo_block
+    Global Instance Endo_block
            `{Endo raw_id}
            `{Endo (code T)}
            `{Endo (terminator T)}
@@ -266,17 +266,17 @@ Section Endo.
            `{Endo fn_attr}
       : Endo (declaration T) | 50 :=
       fun d => mk_declaration
-                 (endo (dc_name d))
-                 (endo (dc_type d))
-                 (endo (dc_param_attrs d))
-                 (endo (dc_linkage d))
-                 (endo (dc_visibility d))
-                 (endo (dc_dll_storage d))
-                 (endo (dc_cconv d))
-                 (endo (dc_attrs d))
-                 (endo (dc_section d))
-                 (endo (dc_align d))
-                 (endo (dc_gc d)).
+              (endo (dc_name d))
+              (endo (dc_type d))
+              (endo (dc_param_attrs d))
+              (endo (dc_linkage d))
+              (endo (dc_visibility d))
+              (endo (dc_dll_storage d))
+              (endo (dc_cconv d))
+              (endo (dc_attrs d))
+              (endo (dc_section d))
+              (endo (dc_align d))
+              (endo (dc_gc d)).
 
     Global Instance Endo_metadata
            `{Endo T}
@@ -396,9 +396,9 @@ Section Endo.
     Global Instance Endo_itree {X E}
            `{Endo X}
            `{forall T, Endo (E T)}
-    : Endo (itree E X) | 50 :=
+      : Endo (itree E X) | 50 :=
       fun t =>
-    ITree.map endo (@translate E E (fun T => endo) _ t).
+        ITree.map endo (@translate E E (fun T => endo) _ t).
 
   End Semantics.
 
@@ -410,39 +410,43 @@ Section Endo.
 
   Global Instance Endo_id (T: Set): Endo T | 100 := fun x: T => x.
 
- End Endo.
+End Endo.
 
-Section Fmap.
+(* This is a duplicate of extlib's functor typeclass. We should cut off one or the other.
+   The "T" prefix is to avoid collision of names so that we don't have to worry when importing
+   in the mean time.
+ *)
+Section TFunctor.
 
-  Class Fmap (T: Set -> Set) := fmap: forall {U V: Set} (f: U -> V), T U -> T V.
+  Class TFunctor (T: Set -> Set) := tfmap: forall {U V: Set} (f: U -> V), T U -> T V.
 
   Section Generics.
 
     Definition compose {A B C: Type} (f: A -> B) (g: B -> C): A -> C := fun a => g (f a).
 
-    Global Instance Fmap_list 
-      : Fmap list | 50 :=
+    Global Instance TFunctor_list 
+      : TFunctor list | 50 :=
       List.map.
 
-    Global Instance Fmap_list' {F} `{Fmap F} 
-      : Fmap (fun T => list (F T)) | 49 :=
-      fun U V f => List.map (fmap f).
+    Global Instance TFunctor_list' {F} `{TFunctor F} 
+      : TFunctor (fun T => list (F T)) | 49 :=
+      fun U V f => List.map (tfmap f).
 
-    Global Instance Fmap_option {F} `{Fmap F}
-      : Fmap (fun T => option (F T)) | 50 :=
-      fun U V f ot => match ot with None => None | Some t => Some (fmap f t) end.
+    Global Instance TFunctor_option {F} `{TFunctor F}
+      : TFunctor (fun T => option (F T)) | 50 :=
+      fun U V f ot => match ot with None => None | Some t => Some (tfmap f t) end.
 
   End Generics.
 
   Section Syntax.
 
-    Global Instance Fmap_exp
+    Global Instance TFunctor_exp
            `{Endo raw_id}
            `{Endo ibinop}
            `{Endo icmp}
            `{Endo fbinop}
            `{Endo fcmp}
-      : Fmap exp | 50 :=
+    : TFunctor exp | 50 :=
       fun (U V: Set) (f: U -> V) => fix f_exp (e:exp U) :=
         let ftexp (te: U * exp U) := (f (fst te), f_exp (snd te)) in
         match e with
@@ -454,18 +458,18 @@ Section Fmap.
         | EXP_Bool    b                      => EXP_Bool    b
         | EXP_Null                           => EXP_Null
         | EXP_Zero_initializer               => EXP_Zero_initializer
-        | EXP_Cstring elts                   => EXP_Cstring (fmap ftexp elts)
+        | EXP_Cstring elts                   => EXP_Cstring (tfmap ftexp elts)
         | EXP_Undef                          => EXP_Undef
-        | EXP_Struct fields                  => EXP_Struct (fmap ftexp fields)
-        | EXP_Packed_struct fields           => EXP_Packed_struct (fmap ftexp fields)
-        | EXP_Array elts                     => EXP_Array (fmap ftexp elts)
-        | EXP_Vector elts                    => EXP_Vector (fmap ftexp elts)
+        | EXP_Struct fields                  => EXP_Struct (tfmap ftexp fields)
+        | EXP_Packed_struct fields           => EXP_Packed_struct (tfmap ftexp fields)
+        | EXP_Array elts                     => EXP_Array (tfmap ftexp elts)
+        | EXP_Vector elts                    => EXP_Vector (tfmap ftexp elts)
         | OP_IBinop iop t v1 v2              => OP_IBinop (endo iop) (f t) (f_exp v1) (f_exp v2)
         | OP_ICmp cmp t v1 v2                => OP_ICmp (endo cmp) (f t) (f_exp v1) (f_exp v2)
         | OP_FBinop fop fm t v1 v2           => OP_FBinop (endo fop) fm (f t) (f_exp v1) (f_exp v2)
         | OP_FCmp cmp t v1 v2                => OP_FCmp (endo cmp) (f t) (f_exp v1) (f_exp v2)
         | OP_Conversion conv t_from v t_to   => OP_Conversion conv (f t_from) (f_exp v) (f t_to)
-        | OP_GetElementPtr t ptr idxs        => OP_GetElementPtr (f t) (ftexp ptr) (fmap ftexp idxs)
+        | OP_GetElementPtr t ptr idxs        => OP_GetElementPtr (f t) (ftexp ptr) (tfmap ftexp idxs)
         | OP_ExtractElement vec idx          => OP_ExtractElement (ftexp vec) (ftexp idx)
         | OP_InsertElement vec elt idx       => OP_InsertElement (ftexp vec) (ftexp elt) (ftexp idx)
         | OP_ShuffleVector vec1 vec2 idxmask => OP_ShuffleVector (ftexp vec1) (ftexp vec2) (ftexp  idxmask)
@@ -475,22 +479,22 @@ Section Fmap.
         | OP_Freeze v                        => OP_Freeze (ftexp v)
         end.
 
-    Global Instance Fmap_texp 
-           `{Fmap exp}
-      : Fmap texp | 50 :=
-      fun _ _ f '(t,e) => (f t, fmap f e).
+    Global Instance TFunctor_texp 
+           `{TFunctor exp}
+      : TFunctor texp | 50 :=
+      fun _ _ f '(t,e) => (f t, tfmap f e).
 
-    Global Instance Fmap_instr
-           `{Fmap exp}
-      : Fmap instr | 50 :=
+    Global Instance TFunctor_instr
+           `{TFunctor exp}
+      : TFunctor instr | 50 :=
       fun U V f ins =>
         match ins with
         | INSTR_Comment s => INSTR_Comment s
-        | INSTR_Op op => INSTR_Op (fmap f op) 
-        | INSTR_Call fn args => INSTR_Call  (fmap f fn) (fmap f args)
-        | INSTR_Alloca t nb align => INSTR_Alloca (f t) (fmap f nb) align
-        | INSTR_Load volatile t ptr align => INSTR_Load volatile (f t) (fmap f ptr) align
-        | INSTR_Store volatile val ptr align => INSTR_Store volatile (fmap f val) (fmap f ptr) align
+        | INSTR_Op op => INSTR_Op (tfmap f op) 
+        | INSTR_Call fn args => INSTR_Call  (tfmap f fn) (tfmap f args)
+        | INSTR_Alloca t nb align => INSTR_Alloca (f t) (tfmap f nb) align
+        | INSTR_Load volatile t ptr align => INSTR_Load volatile (f t) (tfmap f ptr) align
+        | INSTR_Store volatile val ptr align => INSTR_Store volatile (tfmap f val) (tfmap f ptr) align
         | INSTR_Fence => INSTR_Fence
         | INSTR_AtomicCmpXchg => INSTR_AtomicCmpXchg
         | INSTR_AtomicRMW => INSTR_AtomicRMW
@@ -498,71 +502,71 @@ Section Fmap.
         | INSTR_LandingPad => INSTR_LandingPad 
         end.
 
-    Global Instance Fmap_tident
-           `{Endo ident}: Fmap (@tident)
+    Global Instance TFunctor_tident
+           `{Endo ident}: TFunctor (@tident)
       := fun U V f '(t,i) => (f t, endo i).
 
-    Global Instance Fmap_terminator
+    Global Instance TFunctor_terminator
            `{Endo tint_literal}
            `{Endo raw_id}
-           `{Fmap exp}
-      : Fmap terminator | 50 :=
+           `{TFunctor exp}
+      : TFunctor terminator | 50 :=
       fun U V f trm =>
         match trm with
-        | TERM_Ret  v => TERM_Ret (fmap f v)
+        | TERM_Ret  v => TERM_Ret (tfmap f v)
         | TERM_Ret_void => TERM_Ret_void
-        | TERM_Br v br1 br2 => TERM_Br (fmap f v) (endo br1) (endo br2)
+        | TERM_Br v br1 br2 => TERM_Br (tfmap f v) (endo br1) (endo br2)
         | TERM_Br_1 br => TERM_Br_1 (endo br)
-        | TERM_Switch v default_dest brs => TERM_Switch (fmap f v) (endo default_dest) (endo brs) 
-        | TERM_IndirectBr v brs => TERM_IndirectBr (fmap f v) (endo brs)
-        | TERM_Resume v => TERM_Resume (fmap f v)
-        | TERM_Invoke fnptrval args to_label unwind_label => TERM_Invoke (fmap f fnptrval) (fmap f args) (endo to_label) (endo unwind_label)
+        | TERM_Switch v default_dest brs => TERM_Switch (tfmap f v) (endo default_dest) (endo brs) 
+        | TERM_IndirectBr v brs => TERM_IndirectBr (tfmap f v) (endo brs)
+        | TERM_Resume v => TERM_Resume (tfmap f v)
+        | TERM_Invoke fnptrval args to_label unwind_label => TERM_Invoke (tfmap f fnptrval) (tfmap f args) (endo to_label) (endo unwind_label)
         | TERM_Unreachable => TERM_Unreachable
         end.
 
-    Global Instance Fmap_phi
+    Global Instance TFunctor_phi
            `{Endo raw_id}
-           `{Fmap exp}
-      : Fmap phi | 50 :=
+           `{TFunctor exp}
+      : TFunctor phi | 50 :=
       fun U V f '(Phi t args) =>
-        Phi (f t) (fmap (fun '(id,e) => (endo id, fmap f e)) args).
+        Phi (f t) (tfmap (fun '(id,e) => (endo id, tfmap f e)) args).
 
-    Global Instance Fmap_code
+    Global Instance TFunctor_code
            `{Endo raw_id}
-           `{Fmap instr}
-      : Fmap code | 50 :=
-      fun U V f => fmap (fun '(id,i) => (endo id, fmap f i)).
+           `{TFunctor instr}
+      : TFunctor code | 50 :=
+      fun U V f => tfmap (fun '(id,i) => (endo id, tfmap f i)).
 
-    Global Instance Fmap_block
+    Global Instance TFunctor_block
            `{Endo raw_id}
-           `{Fmap instr}
-           `{Fmap terminator}
-           `{Fmap phi}
-      : Fmap block | 50  :=
+           `{TFunctor instr}
+           `{TFunctor terminator}
+           `{TFunctor phi}
+      : TFunctor block | 50  :=
       fun U V f b =>
         mk_block (endo (blk_id b)) 
-                 (fmap (fun '(id,phi) => (endo id, fmap f phi)) (blk_phis b))
-                 (fmap f (blk_code b))
-                 (fmap f (blk_term b)) 
+                 (tfmap (fun '(id,phi) => (endo id, tfmap f phi)) (blk_phis b))
+                 (tfmap f (blk_code b))
+                 (tfmap f (blk_term b)) 
                  (blk_comments b).
     
-    Global Instance Fmap_global
+    Global Instance TFunctor_global
            `{Endo raw_id}
            `{Endo bool}
            `{Endo int}
            `{Endo string}
-           `{Fmap exp}
+           `{TFunctor exp}
            `{Endo linkage}
            `{Endo visibility}
            `{Endo dll_storage}
            `{Endo thread_local_storage}
-      : Fmap global | 50 :=
+      : TFunctor global | 50 :=
       fun U V f g =>
         mk_global
           (endo (g_ident g))
           (f (g_typ g))
           (endo (g_constant g))
-          (fmap f (g_exp g))
+          (tfmap f (g_exp g))
           (endo (g_linkage g))
           (endo (g_visibility g))
           (endo (g_dll_storage g))
@@ -573,7 +577,7 @@ Section Fmap.
           (endo (g_section g))
           (endo (g_align g)).
 
-    Global Instance Fmap_declaration
+    Global Instance TFunctor_declaration
            `{Endo function_id}
            `{Endo string}
            `{Endo int}
@@ -583,121 +587,121 @@ Section Fmap.
            `{Endo dll_storage}
            `{Endo cconv}
            `{Endo fn_attr}
-      : Fmap declaration | 50 :=
+      : TFunctor declaration | 50 :=
       fun U V f d => mk_declaration
-              (endo (dc_name d))
-              (f (dc_type d))
-              (endo (dc_param_attrs d))
-              (endo (dc_linkage d))
-              (endo (dc_visibility d))
-              (endo (dc_dll_storage d))
-              (endo (dc_cconv d))
-              (endo (dc_attrs d))
-              (endo (dc_section d))
-              (endo (dc_align d))
-              (endo (dc_gc d)).
+                       (endo (dc_name d))
+                       (f (dc_type d))
+                       (endo (dc_param_attrs d))
+                       (endo (dc_linkage d))
+                       (endo (dc_visibility d))
+                       (endo (dc_dll_storage d))
+                       (endo (dc_cconv d))
+                       (endo (dc_attrs d))
+                       (endo (dc_section d))
+                       (endo (dc_align d))
+                       (endo (dc_gc d)).
 
-    Global Instance Fmap_metadata
-           `{Fmap exp}
+    Global Instance TFunctor_metadata
+           `{TFunctor exp}
            `{Endo raw_id}
            `{Endo string}
-      : Fmap metadata | 50 :=
+      : TFunctor metadata | 50 :=
       fun U V f => fix endo_metadata m :=
         match m with
-        | METADATA_Const tv => METADATA_Const (fmap f tv)
+        | METADATA_Const tv => METADATA_Const (tfmap f tv)
         | METADATA_Null => METADATA_Null
         | METADATA_Id id => METADATA_Id (endo id)
         | METADATA_String str => METADATA_String (endo str)
         | METADATA_Named strs => METADATA_Named (endo strs)
-        | METADATA_Node mds => METADATA_Node (fmap endo_metadata mds)
+        | METADATA_Node mds => METADATA_Node (tfmap endo_metadata mds)
         end.
 
-    Global Instance Fmap_definition
+    Global Instance TFunctor_definition
            {FnBody:Set -> Set}
-           `{Fmap declaration}
+           `{TFunctor declaration}
            `{Endo raw_id}
-           `{Fmap FnBody}
-      : Fmap (fun T => definition T (FnBody T)) | 50 :=
+           `{TFunctor FnBody}
+      : TFunctor (fun T => definition T (FnBody T)) | 50 :=
       fun U V f d =>
         mk_definition _
-                      (fmap f (df_prototype d))
+                      (tfmap f (df_prototype d))
                       (endo (df_args d))
-                      (fmap f (df_instrs d)).
+                      (tfmap f (df_instrs d)).
 
-    Global Instance Fmap_toplevel_entity
+    Global Instance TFunctor_toplevel_entity
            {FnBody : Set -> Set}
-           `{Fmap FnBody}
-           `{Fmap global}
+           `{TFunctor FnBody}
+           `{TFunctor global}
            `{Endo raw_id}
-           `{Fmap metadata}
-           `{Fmap declaration}
-           `{Fmap (fun T => definition T (FnBody T))}
+           `{TFunctor metadata}
+           `{TFunctor declaration}
+           `{TFunctor (fun T => definition T (FnBody T))}
            `{Endo fn_attr}
            `{Endo int}
            `{Endo string}
-      : Fmap (fun T => toplevel_entity T (FnBody T)) | 50 :=
+      : TFunctor (fun T => toplevel_entity T (FnBody T)) | 50 :=
       fun U V f tle =>
         match tle with
         | TLE_Comment msg => TLE_Comment msg
         | TLE_Target tgt => TLE_Target (endo tgt)
         | TLE_Datalayout layout => TLE_Datalayout (endo layout)
-        | TLE_Declaration decl => TLE_Declaration (fmap f decl)
-        | TLE_Definition defn => TLE_Definition (fmap f defn)
+        | TLE_Declaration decl => TLE_Declaration (tfmap f decl)
+        | TLE_Definition defn => TLE_Definition (tfmap f defn)
         | TLE_Type_decl id t => TLE_Type_decl (endo id) (f t)
         | TLE_Source_filename s => TLE_Source_filename (endo s)
-        | TLE_Global g => TLE_Global (fmap f g)
-        | TLE_Metadata id md => TLE_Metadata (endo id) (fmap f md)
+        | TLE_Global g => TLE_Global (tfmap f g)
+        | TLE_Metadata id md => TLE_Metadata (endo id) (tfmap f md)
         | TLE_Attribute_group i attrs => TLE_Attribute_group (endo i) (endo attrs)
         end.
 
-    Global Instance Fmap_modul
+    Global Instance TFunctor_modul
            {FnBody : Set -> Set}
-           `{Fmap FnBody}
+           `{TFunctor FnBody}
            `{Endo string}
-           `{Fmap global}
-           `{Fmap declaration}
+           `{TFunctor global}
+           `{TFunctor declaration}
            `{Endo raw_id}
-      : Fmap (fun T => modul (FnBody T)) | 50 :=
+      : TFunctor (fun T => modul (FnBody T)) | 50 :=
       fun U V f m =>
         mk_modul (endo (m_name m)) 
                  (endo (m_target m)) (endo (m_datalayout m)) 
-                 (fmap (fun '(id,t) => (id, f t)) (m_type_defs m)) 
-                 (fmap f (m_globals m))
-                 (fmap f (m_declarations m))
-                 (fmap f (m_definitions m)).
+                 (tfmap (fun '(id,t) => (id, f t)) (m_type_defs m)) 
+                 (tfmap f (m_globals m))
+                 (tfmap f (m_declarations m))
+                 (tfmap f (m_definitions m)).
 
-    Global Instance Fmap_cfg
+    Global Instance TFunctor_cfg
            `{Endo raw_id}
-           `{Fmap block}
-      : Fmap cfg | 50 :=
+           `{TFunctor block}
+      : TFunctor cfg | 50 :=
       fun U V f p => mkCFG (endo (init p))
-                        (fmap f (blks p))
+                        (tfmap f (blks p))
                         (endo (args p)).
 
-    Global Instance Fmap_mcfg
+    Global Instance TFunctor_mcfg
            {FnBody : Set -> Set}
-           `{Fmap FnBody}
+           `{TFunctor FnBody}
            `{Endo string}
            `{Endo raw_id}
-           `{Fmap global}
-           `{Fmap declaration}
-           `{Fmap (fun T => definition T (FnBody T))}
-      : Fmap (fun T => modul (FnBody T)) | 50 :=
+           `{TFunctor global}
+           `{TFunctor declaration}
+           `{TFunctor (fun T => definition T (FnBody T))}
+      : TFunctor (fun T => modul (FnBody T)) | 50 :=
       fun U V f p => mk_modul (endo (m_name p))
-                  (endo (m_target p))
-                  (endo (m_datalayout p))
-                  (fmap (fun '(id,t) => (id, f t)) (m_type_defs p))
-                  (fmap f (m_globals p))
-                  (fmap f (m_declarations p))
-                  (fmap f (m_definitions p)).
+                           (endo (m_target p))
+                           (endo (m_datalayout p))
+                           (tfmap (fun '(id,t) => (id, f t)) (m_type_defs p))
+                           (tfmap f (m_globals p))
+                           (tfmap f (m_declarations p))
+                           (tfmap f (m_definitions p)).
 
   End Syntax.
 
-End Fmap.
+End TFunctor.
 
-Lemma fmap_list_app: forall U V H H' c1 c2 f,
-    @fmap code (@Fmap_code H H') U V f (c1 ++ c2) =
-    fmap f c1  ++ fmap f c2.
+Lemma tfmap_list_app: forall U V H H' c1 c2 f,
+    @tfmap code (@TFunctor_code H H') U V f (c1 ++ c2) =
+    tfmap f c1  ++ tfmap f c2.
 Proof.
   induction c1 as [| [] c1 IH]; cbn; intros; [reflexivity |].
   rewrite IH; reflexivity.
@@ -742,7 +746,7 @@ Section Examples.
      *)
 
     (* And we can do the same for a whole [mcfg] *)
-    Definition swap_mcfg T: Endo (mcfg T) := fmap id.
+    Definition swap_mcfg T: Endo (mcfg T) := tfmap id.
 
   End SubstId.
 
@@ -764,7 +768,7 @@ Section Examples.
         then {| df_prototype := df_prototype f; df_args := df_args f ; df_instrs := new_f |}
         else f.
 
-      Definition subst_cfg: Endo (mcfg T) := endo.
+    Definition subst_cfg: Endo (mcfg T) := endo.
 
   End SubstCFG.
 

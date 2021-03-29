@@ -21,11 +21,13 @@ CP=cp
 COQFILESNUMERIC := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats
 
 COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/Error\
-								 Utils/PropT Utils/PostConditions Utils/NoFailure Utils/TFor
+								 Utils/PropT Utils/PostConditions Utils/NoFailure Utils/TFor\
+								 Utilities
 
 COQFILESSYNTAX := Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
 									Syntax/Traversal Syntax/Dom Syntax/DynamicTypes Syntax/TypToDtyp\
 									Syntax/Scope Syntax/SurfaceSyntax\
+									Syntax
 
 COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/DynamicValues Semantics/LLVMEvents\
 									   Semantics/IntrinsicsDefinitions\

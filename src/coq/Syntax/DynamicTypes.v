@@ -23,8 +23,7 @@ From ExtLib Require Import
      Programming.Eqv.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.Error
+     Utilities
      Syntax.LLVMAst.
 
 Require Import Ceres.Ceres.

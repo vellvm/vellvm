@@ -5,8 +5,7 @@ Import ListNotations.
 
 From Vellvm Require Import
      Numeric.Coqlib
-     Utils.Util
-     Utils.Tactics
+     Utilities
      Syntax.LLVMAst
      Syntax.CFG
      Syntax.TypToDtyp.

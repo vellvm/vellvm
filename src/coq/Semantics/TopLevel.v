@@ -24,14 +24,8 @@ From ExtLib Require Import
      Data.Map.FMapAList.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.Error
-     Utils.PropT
-     Syntax.LLVMAst
-     Syntax.AstLib
-     Syntax.CFG
-     Syntax.DynamicTypes
-     Syntax.TypToDtyp
+     Utilities
+     Syntax
      Semantics.LLVMEvents
      Semantics.Denotation
      Semantics.IntrinsicsDefinitions

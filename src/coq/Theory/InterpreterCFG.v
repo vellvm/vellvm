@@ -11,13 +11,10 @@ From ITree Require Import
      Eq.Eq.
 
 From Vellvm Require Import
-     Utils.Util
-     Semantics.LLVMEvents
-     Semantics.InterpretationStack
-     Syntax.DynamicTypes
-     Semantics.DynamicValues
-     Handlers.Handlers
-     Refinement.
+     Utilities
+     Syntax
+     Semantics
+     Theory.Refinement.
 
 Import ITreeNotations.
 Import SemNotations.

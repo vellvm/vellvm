@@ -17,19 +17,11 @@ From ITree Require Import
      TranslateFacts.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.Tactics
+     Utilities
+     Syntax
+     Semantics
+     Theory
      Utils.PostConditions
-     Syntax.Scope
-     Syntax.ScopeTheory
-     Syntax.LLVMAst
-     Syntax.CFG
-     Syntax.AstLib
-     Syntax.DynamicTypes
-     Semantics.LLVMEvents
-     Semantics.InterpretationStack
-     Semantics.TopLevel
-     Theory.DenotationTheory
      Transformations.BlockFusion.
 
 Import SemNotations.
@@ -68,4 +60,15 @@ Proof.
     intros ->; rewrite DEAD in SUCC; inv SUCC.
 Qed.
 
+(* Interestingly, we cannot eliminate blocks marked as unreachable simply based on its semantics:
 
+   b: external_call;;
+      unreachable
+
+   If despite its name [b] is reachable, then its execution contains all behaviors starting with an
+   external call, it does not contain the one consisting in refining it by eliminating it...
+
+   Also: is unreachable an instruction or a terminator?
+https://llvm.org/docs/LangRef.html#unreachable-instruction 
+
+ *)

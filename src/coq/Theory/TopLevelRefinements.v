@@ -10,16 +10,9 @@ From ITree Require Import
 
 (* YZ TODO : Revisit the dependency w.r.t. Refinement *)
 From Vellvm Require Import
-     Utils.Util
-     Utils.AListFacts
-     Utils.PropT
-     Syntax.DynamicTypes
-     Syntax.CFG
-     Syntax.LLVMAst
-     Semantics.LLVMEvents
-     Semantics.TopLevel
-     Semantics.InterpretationStack
-     Handlers.Handlers
+     Utilities
+     Syntax
+     Semantics
      Theory.Refinement
      Theory.InterpreterMCFG
      Theory.InterpreterCFG.

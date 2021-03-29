@@ -14,8 +14,7 @@ From Coq Require Import
      String Omega.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.Tactics
+     Utilities
      Syntax.LLVMAst.
 
 Require Import Equalities OrderedType OrderedTypeEx Compare_dec.

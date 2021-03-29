@@ -16,20 +16,12 @@ From ITree Require Import
      Events.StateFacts.
 
 From Vellvm Require Import
-     Utils.Tactics
-     Utils.Util
-     Syntax.LLVMAst
-     Syntax.AstLib
-     Syntax.DynamicTypes
-     Syntax.TypToDtyp
-     Semantics.LLVMEvents
-     Semantics.DynamicValues
-     Semantics.TopLevel
-     Semantics.InterpretationStack
-     Handlers.Handlers
-     Refinement
+     Utilities
+     Syntax
+     Semantics
+     Theory.Refinement
      Theory.InterpreterCFG
-     PostConditions.
+     Utils.PostConditions.
 
 Open Scope itree_scope.
 Import ITreeNotations.

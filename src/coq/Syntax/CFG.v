@@ -14,10 +14,9 @@ Require Import Equalities.
 From Coq Require Import ZArith List String Omega.
 
 From Vellvm Require Import
-        Utils.Util
-        Utils.Tactics
-        Syntax.LLVMAst
-        Syntax.AstLib.
+     Utilities
+     Syntax.LLVMAst
+     Syntax.AstLib.
 
 From ExtLib Require Import
      Core.RelDec

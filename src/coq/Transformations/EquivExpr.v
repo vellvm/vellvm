@@ -18,22 +18,11 @@ From ITree Require Import
      TranslateFacts.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.Tactics
-     Utils.PostConditions
-     Syntax.Scope
-     Syntax.ScopeTheory
-     Syntax.LLVMAst
-     Syntax.Traversal
-     Syntax.CFG
-     Syntax.AstLib
-     Syntax.DynamicTypes
-     Handlers.Handlers
-     Semantics.LLVMEvents
-     Semantics.InterpretationStack
-     Semantics.TopLevel
-     Theory.InterpreterCFG
-     Theory.DenotationTheory.
+     Utilities
+     Syntax
+     Semantics
+     Theory
+     Utils.PostConditions.
 
 Import ITreeNotations.
 Import SemNotations.
@@ -451,3 +440,30 @@ Section ExpOptim.
   End ExpOptimCorrect.
 
 End ExpOptim.
+
+(* Thinking about [Transforms/InstCombine/InstructionCombining.cpp] in LLVM
+
+// This pass guarantees that the following canonicalizations are performed on
+// the program:
+//    1. If a binary operator has a constant operand, it is moved to the RHS
+//    2. Bitwise operators with constant operands are always grouped so that
+//       shifts are performed first, then or's, then and's, then xor's.
+//    3. Compare instructions are converted from <,>,<=,>= to ==,!= if possible
+//    4. All cmp instructions on boolean values are replaced with logical ops
+//    5. add X, X is represented as (X*2) => (X << 1)
+//    6. Multiplies with a power-of-two constant argument are transformed into
+//       shifts.
+//   ... etc.
+
+ *)
+
+(** * Associative expressions
+ *)
+
+Lemma add_associate : forall b1 b2 τ e1 e2,
+    ⟦ OP_IBinop (Add b1 b2) τ e1 e2 ⟧e ≈ ⟦ OP_IBinop (Add b1 b2) τ e2 e1 ⟧e.
+Proof.
+  intros.
+  cbn.
+Admitted.  
+

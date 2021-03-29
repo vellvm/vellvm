@@ -15,20 +15,11 @@ From ITree Require Import
      Eq.Eq.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.Tactics
-     Syntax.CFG
-     Syntax.LLVMAst
-     Syntax.AstLib
-     Syntax.Scope
+     Utilities
+     Syntax
+     Semantics
      Syntax.ScopeTheory
-     Semantics.TopLevel
-     Semantics.InterpretationStack
-     Syntax.Traversal
-     Syntax.DynamicTypes
-     Semantics.LLVMEvents
-     PostConditions
-     Handlers.Handlers.
+     Utils.PostConditions.
 
 Remove Hints Eqv.EqvWF_Build : typeclass_instances.
 

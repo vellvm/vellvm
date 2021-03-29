@@ -14,8 +14,6 @@ From Coq Require Import
      FSets.FMapWeakList
      Bool.Bool.
 
-Require Import Integers Floats.
-
 From ExtLib Require Import
      Structures.Monads
      Structures.Functor
@@ -27,17 +25,14 @@ From ITree Require Import
      Events.Exception.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.Error
-     Syntax.LLVMAst
-     Syntax.AstLib
-     Syntax.CFG
-     Syntax.DynamicTypes
+     Numeric.Integers
+     Numeric.Floats
+     Utilities
+     Syntax
      Semantics.MemoryAddress
      Semantics.LLVMEvents.
 
 Require Import Ceres.Ceres.
-
 
 Import Sum.
 Import Subevent.
@@ -124,6 +119,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
        several values. Factoring the inference upfront is therefore necessary.
      *)
     (* YZ: Loosen [conv_E] into [exp_E] to reduce the number of interfaces at play? *)
+
     Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
       let raise := @raise conv_E dvalue _
       in

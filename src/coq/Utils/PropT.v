@@ -2257,7 +2257,7 @@ End BIND_BIND_COUNTEREXAMPLE.
 
 
 (* Figure 8: 3rd monad law, one direction bind associativity *)
-Lemma bind_bind: forall {E}
+Lemma bind_bind_Prop: forall {E}
                    (A B C : Type) (PA : PropT E A)
                    (KB : A -> PropT E B) (KC : B -> PropT E C)
                    (PQOK : eutt_closed PA)

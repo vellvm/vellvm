@@ -5,21 +5,15 @@ From ITree Require Import
      ITree
      Basics.Monad
      Eq.Eq
-     TranslateFacts.
+     TranslateFacts
+     Events.State.
 
 From Vellvm Require Import
-     Utils.Tactics
-     Utils.Util
-     Syntax.LLVMAst
-     Syntax.AstLib
-     Syntax.DynamicTypes
-     Syntax.TypToDtyp
-     Semantics.LLVMEvents
-     Semantics.DynamicValues
-     Semantics.TopLevel
-     Semantics.InterpretationStack
-     Handlers.Handlers
-     Refinement
+     Utilities
+     Syntax
+     Semantics
+     Utils.NoFailure
+     Utils.PostConditions
      Theory.InterpreterCFG
      Theory.ExpLemmas
      Theory.InstrLemmas
@@ -30,11 +24,6 @@ From ExtLib Require Import
      Core.RelDec
      Data.Map.FMapAList
      Structures.Maps.
-
-From Vellvm Require Import
-     Utils.AListFacts
-     Utils.PostConditions
-     Syntax.Scope.
 
 Import ListNotations.
 Import AlistNotations.
@@ -559,14 +548,6 @@ Qed.
 Definition def_sites_ocfg {T} (bks : CFG.ocfg T) :=
   List.fold_right (fun bk acc => def_sites_block bk ++ acc) [] bks.
 
-
-From Vellvm Require Import
-     Utils.NoFailure
-     Syntax.CFG.
-
-From ITree Require Import
-     Events.State.
-
 Lemma interp_intrinsics_iter :
   forall {E F R I} `{FailureE -< F } (t: I -> itree (E +' IntrinsicE +' F) (I + R)) x,
              interp_intrinsics (iter t x) ≈  
@@ -608,7 +589,6 @@ Proof.
   apply interp_state_iter.
 Qed.
 
-Import CatNotations.
 Lemma interp_cfg3_collapse :
   forall {R I} (t: I -> itree instr_E (I + R)) x g l m,
     interp_cfg3 (iter t x) g l m ≈
@@ -751,3 +731,4 @@ Proof.
     cbn in *.
     auto.
 Qed.
+

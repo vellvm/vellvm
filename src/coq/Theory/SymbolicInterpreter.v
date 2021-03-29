@@ -11,15 +11,10 @@ From ITree Require Import
      TranslateFacts.
 
 From Vellvm Require Import
-     Utils.Tactics
-     Syntax.LLVMAst
-     Syntax.CFG
-     Syntax.Traversal
-     Syntax.Scope
+     Utilities
+     Syntax
+     Semantics
      Syntax.ScopeTheory
-     Syntax.TypToDtyp
-     Semantics.InterpretationStack
-     Semantics.TopLevel
      Theory.DenotationTheory
      Theory.ExpLemmas
      Theory.InstrLemmas
@@ -183,7 +178,7 @@ Ltac vred_C3_k k :=
     first [rewrite denote_code_nil |
            rewrite denote_code_singleton |
            rewrite denote_code_cons |
-           rewrite ?convert_typ_code_app, ?fmap_list_app, denote_code_app];
+           rewrite ?convert_typ_code_app, ?tfmap_list_app, denote_code_app];
     do k idtac "Reduced code"
   | |- context[denote_terminator] =>
     (* Structural handling: code case *)
