@@ -34,7 +34,8 @@ COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/DynamicValues Semantics/L
 									 	 Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack\
 									   Handlers/Pick Handlers/UndefinedBehaviour Handlers/Memory Handlers/MemoryTheory\
 									 	 Handlers/Handlers\
-								  	 Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel
+								  	 Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
+                     Semantics
 
 COQFILESANALYSIS := Analysis/Iteration Analysis/Kildall Analysis/Dom Analysis/DomKildall Analysis/ssa Analysis/DomId 
 
@@ -45,7 +46,8 @@ COQFILESTHEORY := Syntax/ScopeTheory\
 									Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
 									Theory/LocalFrame\
 									Theory/TopLevelRefinements Theory/SymbolicInterpreter\
-									Utils/NoEvent Utils/Commutation
+									Utils/NoEvent Utils/Commutation\
+							    Theory
 
 COQFILESOPT    := Transformations/Transform\
 									Transformations/EquivExpr Transformations/BlockFusion Transformations/DeadCodeElimination
@@ -53,8 +55,8 @@ COQFILESOPT    := Transformations/Transform\
 OLLVMFILES :=
 
 COQFILESVIR      := $(COQFILESNUMERIC) $(COQFILESUTILS) $(COQFILESSYNTAX) $(COQFILESSEMANTICS) 
-COQFILESCOMPILER := $(COQFILESVIR) $(COQFILESANALYSIS) $(COQFILESOPT)
-COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) 
+COQFILESCOMPILER := $(COQFILESVIR) $(COQFILESANALYSIS) 
+COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT) 
 
 VFILES  := $(COQFILESALL:%=coq/%.v)
 VOFILES := $(COQFILESALL:%=coq/%.vo)
