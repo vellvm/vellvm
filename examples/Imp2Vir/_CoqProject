@@ -7,3 +7,4 @@
 -R ../../lib/flocq-quickchick FlocqQuickChick
 
 Sir.v
+Combinators.v
