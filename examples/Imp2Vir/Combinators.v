@@ -162,6 +162,12 @@ Definition join_cvir {ni no : nat} (b : cvir ni (S (S no))) : cvir ni (S no) :=
     (blocks b) vi (o :: o :: vo)%vector vt
   ).
 
+Definition close_cvir {ni} (b : cvir ni 0) : cvir 0 0 :=
+  mk_cvir (fun vi vo vt =>
+    let '(vi,vt) := Vec.splitat ni vt in
+    (blocks b) vi vo vt
+  ).
+
 (*Definition cond_cvir {ni1 no1 ni2 no2 : nat}
   (b1 : cvir (S ni1) (S no1)) (b2: cvir (S ni2) (S no2)) (e : texp typ) :
   cvir (ni1+ni2) (no1+no2) :=
@@ -181,14 +187,12 @@ Fixpoint compile (next_reg : int) (s : stmt) (env: StringMap.t int)
        ret (next_reg, env, seq_cvir ir_l ir_r)
   | While e b =>
       '(expr_reg, expr_ir) <- compile_expr next_reg e env;;
-      match compile (expr_reg + 1) b env with (* FIXME type inference with monad syntax? *)
-      | None => None
-      | Some (next_reg, _, ir) => let br := branch_cvir expr_ir (texp_i32 expr_reg) in
-        let body := seq_cvir br ir in
-        let ir := loop_cvir_open body in
-        let ir := mk_cvir (fun vi vo vt => (blocks ir) vi (* rev *) vo vt) in
-        ret (next_reg, env, ir)
-      end
+      '(next_reg, _, ir) <- compile (expr_reg + 1) b env;;
+      let br := branch_cvir expr_ir (texp_i32 expr_reg) in
+      let body := seq_cvir br ir in
+      let ir := loop_cvir_open body in
+      let ir := mk_cvir (fun vi vo vt => (blocks ir) vi (rev vo) vt) in
+      ret (next_reg, env, ir) : option (int * (StringMap.t int) * cvir 1 1)
   (*| If e l r =>
       '(expr_reg, expr_ir) <- compile_expr next_reg e env;;
       '(next_reg, _, ir_l) <- compile (expr_reg + 1) l env;;
@@ -198,11 +202,35 @@ Fixpoint compile (next_reg : int) (s : stmt) (env: StringMap.t int)
   | _ => None
   end.
 
-Definition fact_ir := (compile 0 (fact "a" "b" 5) (StringMap.empty int)).
+Definition fnbody := (block typ * list (block typ))%type.
+Definition program := toplevel_entity typ fnbody.
 
-(*Eval compute in match fact_ir with
-| None => None
-| Some (_,_,ir) => Some ((blocks ir) [-1]%vector [-1]%vector (const (-1)%Z (n_int ir)))
-end.*)
+Definition exit_block_cvir : cvir 1 0 :=
+  mk_cvir (fun vi vo (vt : Vec.t int 0) =>
+    [mk_block (Anon (Vec.hd vi)) List.nil List.nil (TERM_Ret_void) None]
+  ).
+
+Definition compile_program (s : stmt) (env : StringMap.t int) :
+  option program :=
+  '(_, _, ir) <- compile 0 s env;;
+  let ir := seq_cvir ir exit_block_cvir in
+  let ir := close_cvir ir in
+  let vt_seq := map Z.of_nat (seq 0 (n_int ir)) in
+  let blocks := (blocks ir) (empty int) (empty int) vt_seq in
+  let body := (
+    List.hd (mk_block (Anon 0) List.nil List.nil TERM_Ret_void None) blocks,
+    List.tl blocks
+  ) in
+  let decl := mk_declaration
+    (Name "main")
+    (TYPE_Function TYPE_Void nil)
+    (nil, nil) None None None None nil None None None
+  in
+  let def := mk_definition fnbody decl nil body in
+  ret (TLE_Definition def).
+
+Definition fact_ir := (compile_program (fact "a" "b" 5) (StringMap.empty int)).
+
+Eval compute in fact_ir.
 
 End compile_cvir.

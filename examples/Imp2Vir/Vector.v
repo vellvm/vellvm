@@ -144,6 +144,29 @@ Next Obligation.
   refine (a, vec' l). exact H0.
 Defined.
 
+Program Definition rev {A} {n} (v : t A n) : t A n :=
+  vec' (rev (proj1_sig v)).
+Next Obligation.
+  destruct v.
+  rewrite rev_length.
+  auto.
+Defined.
+
+Program Definition seq (start len : nat) : t nat len :=
+  vec' (seq start len).
+Next Obligation.
+  rewrite seq_length.
+  reflexivity.
+Defined.
+
+Program Definition map {A B} {n} (f : A -> B) (v : t A n) : t B n :=
+  vec' (map f (proj1_sig v)).
+Next Obligation.
+  destruct v.
+  rewrite map_length.
+  auto.
+Defined.
+
 End Vector.
 
 Declare Scope vector_scope.
