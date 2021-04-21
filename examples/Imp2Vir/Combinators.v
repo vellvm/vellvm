@@ -205,29 +205,31 @@ Fixpoint compile (next_reg : int) (s : stmt) (env: StringMap.t int)
 Definition fnbody := (block typ * list (block typ))%type.
 Definition program := toplevel_entity typ fnbody.
 
+Definition entry_block : block typ :=
+  mk_block (Anon 0) List.nil List.nil (TERM_Br_1 (Anon 1)) None.
+
 Definition exit_block_cvir : cvir 1 0 :=
   mk_cvir (fun vi vo (vt : Vec.t int 0) =>
     [mk_block (Anon (Vec.hd vi)) List.nil List.nil (TERM_Ret_void) None]
   ).
 
-Definition compile_program (s : stmt) (env : StringMap.t int) :
-  option program :=
-  '(_, _, ir) <- compile 0 s env;;
+Definition compile_cvir (ir : cvir 1 1) : program :=
   let ir := seq_cvir ir exit_block_cvir in
-  let ir := close_cvir ir in
-  let vt_seq := map Z.of_nat (seq 0 (n_int ir)) in
-  let blocks := (blocks ir) (empty int) (empty int) vt_seq in
-  let body := (
-    List.hd (mk_block (Anon 0) List.nil List.nil TERM_Ret_void None) blocks,
-    List.tl blocks
-  ) in
+  let vt_seq := map Z.of_nat (seq 2 (n_int ir)) in
+  let blocks := (blocks ir) (cons 1 (empty int)) (empty int) vt_seq in
+  let body := (entry_block, blocks) in
   let decl := mk_declaration
-    (Name "main")
+    (Name "imp_main")
     (TYPE_Function TYPE_Void nil)
     (nil, nil) None None None None nil None None None
   in
   let def := mk_definition fnbody decl nil body in
-  ret (TLE_Definition def).
+  TLE_Definition def.
+
+Definition compile_program (s : stmt) (env : StringMap.t int) :
+  option program :=
+  '(_, _, ir) <- compile 0 s env;;
+  ret (compile_cvir ir).
 
 Definition fact_ir := (compile_program (fact "a" "b" 5) (StringMap.empty int)).
 
