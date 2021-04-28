@@ -83,18 +83,18 @@ Definition compile_assign (next_reg : int) (x: Imp.var) (e: expr) (env : StringM
 Record cvir (n_in n_out : nat) : Type := {
    n_int : nat;
    blocks : forall
-     (v_in : Vec.t int n_in)
-     (v_out : Vec.t int n_out)
-     (v_int : Vec.t int n_int),
+     (v_in : Vec.t raw_id n_in)
+     (v_out : Vec.t raw_id n_out)
+     (v_int : Vec.t raw_id n_int),
      list (block typ);
 }.
 
 Definition mk_cvir
   {n_in n_out n_int : nat}
   (blocks : forall
-    (v_in : Vec.t int n_in)
-    (v_out : Vec.t int n_out)
-    (v_int : Vec.t int n_int),
+    (v_in : Vec.t raw_id n_in)
+    (v_out : Vec.t raw_id n_out)
+    (v_int : Vec.t raw_id n_int),
     list (block typ)
   ) :
   cvir n_in n_out :=
@@ -108,18 +108,18 @@ Arguments blocks {_} {_}.
 
 Definition block_cvir (c : code typ) : cvir 1 1 :=
   mk_cvir (fun
-    (vi : Vec.t int 1)
-    (vo : Vec.t int 1)
-    (vt : Vec.t int 0)
-    => [mk_block (Anon (Vec.hd vi)) (List.nil) c (TERM_Br_1 (Anon (hd vo))) None]
+    (vi : Vec.t raw_id 1)
+    (vo : Vec.t raw_id 1)
+    (vt : Vec.t raw_id 0)
+    => [mk_block (Vec.hd vi) List.nil c (TERM_Br_1 (hd vo)) None]
   ).
 
 Definition branch_cvir (c : code typ) (e : texp typ) : cvir 1 2 :=
   mk_cvir (fun
-    (vi : Vec.t int 1)
-    (vo : Vec.t int 2)
-    (vt : Vec.t int 0)
-    => [mk_block (Anon (Vec.hd vi)) (List.nil) c (TERM_Br e (Anon (Vec.hd vo)) (Anon (Vec.hd (Vec.tl vo)))) None]
+    (vi : Vec.t raw_id 1)
+    (vo : Vec.t raw_id 2)
+    (vt : Vec.t raw_id 0)
+    => [mk_block (Vec.hd vi) (List.nil) c (TERM_Br e (Vec.hd vo) (Vec.hd (Vec.tl vo))) None]
   ).
 
 Definition merge_cvir
@@ -138,7 +138,7 @@ Definition seq_cvir {ni1 no1 ni2 no2 : nat}
   (b1 : cvir ni1 (S no1))
   (b2: cvir (S ni2) no2) :
   cvir (ni1+ni2) (no1+no2) :=
-    mk_cvir (fun vi vo (vt : Vec.t int (S (n_int b1 + n_int b2))) =>
+    mk_cvir (fun vi vo (vt : Vec.t raw_id (S (n_int b1 + n_int b2))) =>
       let '(newint,vt) := Vec.uncons vt in
       let b1 := mk_cvir (fun vi vo vt => (blocks b1) vi (newint :: vo)%vector vt) in
       let b2 := mk_cvir (fun vi vo vt => (blocks b2) (newint :: vi)%vector vo vt) in
@@ -209,14 +209,14 @@ Definition entry_block : block typ :=
   mk_block (Anon 0) List.nil List.nil (TERM_Br_1 (Anon 1)) None.
 
 Definition exit_block_cvir : cvir 1 0 :=
-  mk_cvir (fun vi vo (vt : Vec.t int 0) =>
-    [mk_block (Anon (Vec.hd vi)) List.nil List.nil (TERM_Ret_void) None]
+  mk_cvir (fun vi vo (vt : Vec.t raw_id 0) =>
+    [mk_block (Vec.hd vi) List.nil List.nil (TERM_Ret_void) None]
   ).
 
 Definition compile_cvir (ir : cvir 1 1) : program :=
   let ir := seq_cvir ir exit_block_cvir in
-  let vt_seq := map Z.of_nat (seq 2 (n_int ir)) in
-  let blocks := (blocks ir) (cons 1 (empty int)) (empty int) vt_seq in
+  let vt_seq := map Anon (map Z.of_nat (seq 2 (n_int ir))) in
+  let blocks := (blocks ir) (cons (Anon 1) (empty raw_id)) (empty raw_id) vt_seq in
   let body := (entry_block, blocks) in
   let decl := mk_declaration
     (Name "imp_main")
