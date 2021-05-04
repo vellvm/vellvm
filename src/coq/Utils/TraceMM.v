@@ -181,6 +181,43 @@ Module Simple.
             
       }.
 
+    (* Question : can we easily link both approaches? *)
+    Definition event_of_action (a : action) : {X : Type & StateE X & X} :=
+      match a with
+      | Rd x v => existT2 _ _ _ (GetVar x) v
+      | Wr x v => existT2 _ _ _ (SetVar x v) tt
+      end.
+    (* We could define a notion of "can_do", but at least this attempt lacks something:
+       we also need to constraint the "h" to be reachable
+     *)
+    Definition can_do_step : history -> action -> Prop :=
+      fun h a => 
+        let '(existT2 _ _ X e v) := event_of_action a in
+        handler_prop _ e h (ret (a :: h, v)).
+    Inductive can_extend : history -> history -> Prop :=
+    | Extend_refl : forall h, can_extend h h
+    | Extend_step : forall h h' a,
+        can_extend h h' ->
+        can_do_step h' a ->
+        can_extend h (a :: h').
+
+    Definition valid_history : history -> Prop :=
+      can_extend nil.
+
+    Definition can_do := fun h a => valid_history h /\ can_do_step h a.
+
+    Lemma handler_prop_valid : valid can_do.
+    Proof.
+      constructor.
+      (* - intros * SITE; split; intros CAN. *)
+      (*   + destruct a, a'; try now constructor.  *)
+      (*     * cbn in CAN. *)
+      (*       inv CAN. *)
+      (*       constructor. *)
+      (*       dependent destruction CAN. *)
+      (*       cbn in x. *)
+    Admitted.
+
   End WithDom.
 
 End Simple.
