@@ -1,5 +1,6 @@
 (* begin hide *)
 From Coq Require Import
+     Program
      Lists.List.
 
  From ExtLib Require Import
@@ -53,7 +54,8 @@ Module Simple.
 
     (* We can now define our handler.
    - we simply record writes in the history
-   - Reads are deterministic if we find a write, unspecified otherwise, i.e. can return any value
+   - Reads are deterministic if we find a write.
+   - Reads are unspecified if we haven't written yet to it, i.e. can return any value
    We can remark that we don't use the reads from the history, we could ditch them
      *)
     Variant handler_prop: StateE ~> myMonad :=
@@ -66,6 +68,54 @@ Module Simple.
         read h x = None ->
         handler_prop _ (GetVar x) h (ret (Rd x v :: h, v))
     .
+
+    (* We can also define the model where one cannot read to a variable before it's written to *)
+    Variant handler_prop': StateE ~> myMonad :=
+    | SetVarH' : forall x v h,
+        handler_prop' _ (SetVar x v) h (ret (Wr x v :: h, tt))
+    | GetVarSetH' : forall x v h,
+        read h x = Some v ->
+        handler_prop' _ (GetVar x) h (ret (Rd x v :: h, v))
+    .
+
+    (* We can also define the executable model where a default value is used *)
+    Definition handler_exec (def : value) : StateE ~> stateT history (itree void1) :=
+      fun _ e h =>
+        match e with
+        | SetVar x v => ret (Wr x v :: h, tt)
+        | GetVar x   =>
+          match read h x with
+          | Some v => ret (Rd x v :: h, v)
+          | None   => ret (Rd x def :: h, def)
+          end
+        end 
+    .
+
+    (* Clearly, there is some kind of refinement going on between the models *)
+    Lemma handler_prop_refine :
+      forall X (e : StateE X) h t,
+        handler_prop' _ e h t ->
+        handler_prop _ e h t. 
+    Proof.
+      intros * HP.
+      dependent destruction HP.
+      constructor; auto.
+      constructor; auto.
+    Qed.
+
+    (* Clearly, the implementation is somehow valid *)
+    Lemma handler_exec_refine :
+      forall X (e : StateE X) def h t,
+        handler_exec def _ e h = t ->
+        handler_prop _ e h t. 
+    Proof.
+      intros * HP.
+      destruct e; cbn in *.
+      destruct (read h x) eqn:EQ.
+      subst t; constructor; auto.
+      subst t; constructor 3; auto.
+      subst t; constructor; auto.
+    Qed.
 
     (* MGZ'15 takes a different take: it defines axioms that constraint the legal actions
      given an history that a memory model can allow *)
