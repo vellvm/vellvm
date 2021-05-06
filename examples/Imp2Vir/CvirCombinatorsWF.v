@@ -8,7 +8,7 @@ From Vellvm Require Import Syntax.
 
 From tutorial Require Import Fin.
 
-Require Import Vec Unique Combinators.
+Require Import Vec Unique CvirCombinators.
 
 Open Scope nat_scope.
 Open Scope vec_scope.

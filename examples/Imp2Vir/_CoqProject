@@ -6,8 +6,10 @@
 -R ../../lib/QuickChick/src QuickChick
 -R ../../lib/flocq-quickchick FlocqQuickChick
 
+CompileExpr.v
 Sir.v
 Vec.v
 Unique.v
-Combinators.v
-CombinatorsWF.v
+CvirCombinators.v
+CvirCombinatorsWF.v
+Imp2Cvir.v
