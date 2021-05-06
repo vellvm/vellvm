@@ -1,4 +1,5 @@
 From Coq Require Import
+     Arith
      FSets.FMapList
      Lia
      Lists.List
@@ -15,6 +16,7 @@ Import MonadNotation.
 
 From Vellvm Require Import
      Syntax.
+From tutorial Require Import Fin.
 
 Import ListNotations.
 
@@ -149,6 +151,74 @@ Definition loop_cvir {ni no : nat} (b : cvir (S ni) (S no)) : cvir ni no :=
     let '(newint,vt) := Vec.uncons vt in
     (blocks b) (newint :: vi)%vec (newint :: vo)%vec vt
   ).
+
+Program Definition loop_cvir' {ni no ni' no' : nat} (b : cvir ni no) (Heqi : ni = S ni') (Heqo : no = S no') : cvir ni' no' :=
+  mk_cvir (fun vi vo vt =>
+    let '(newint,vt) := Vec.uncons vt in
+    (blocks b) (Vec.cast (newint :: vi)%vec _) (Vec.cast (newint :: vo)%vec _) vt
+  ).
+
+Program Definition focus_input_cvir {ni no : nat} (b : cvir ni no) (i : Fin.fin ni) : cvir ni no :=
+  match proj1_sig i with
+  | O => b
+  | S i' =>
+    match ni with
+    | S ni =>
+      mk_cvir (fun vi vo vt =>
+        let '(vi1, vi2) := Vec.splitat (S i') (cast vi _) : (Vec.t _ (S i')) * (Vec.t _ (ni - i')) in
+        let '(i1, vi1) := Vec.uncons vi1 in
+        (blocks b) (Vec.cast (vi1 ++ i1 :: vi2)%vec _) vo vt
+      )
+    | _ => b
+    end
+  end.
+Next Obligation.
+  destruct i. simpl in *.
+  rewrite le_plus_minus_r. reflexivity.
+  apply le_S_n.
+  subst.
+  apply Nat.lt_le_incl.
+  assumption.
+Defined.
+Next Obligation.
+  destruct i.
+  simpl in *. clear Heq_anonymous.
+  rewrite minus_Sn_m. rewrite le_plus_minus_r ; auto.
+  apply Nat.le_le_succ_r.
+  all: subst ; apply le_S_n ; apply Nat.lt_le_incl ; assumption.
+Defined.
+
+(*Program Definition focus_output_cvir {ni no : nat} (b : cvir ni (S no)) (i : Fin.fin no) : cvir ni (S no) :=
+  mk_cvir (fun vi vo vt =>
+    let '(vo1, vo2) := Vec.splitat (S (proj1_sig i)) (Vec.cast vo _) : (Vec.t _ (S (proj1_sig i))) * (Vec.t _ (no - proj1_sig i)) in
+    let '(o1, vo1) := Vec.uncons vo1 in
+    (blocks b) vi (Vec.cast (vo1 ++ o1 :: vo2)%vec _) vt
+  ).
+Next Obligation.
+  destruct i. simpl.
+  f_equal.
+  rewrite le_plus_minus_r ; auto.
+  apply Nat.lt_le_incl.
+  assumption.
+Defined.
+Next Obligation.
+  destruct i.
+  simpl. rewrite minus_Sn_m. rewrite le_plus_minus_r ; auto.
+  apply Nat.le_le_succ_r.
+  all: apply Nat.lt_le_incl ; assumption.
+Defined.*)
+
+Program Definition seq_cvir' {ni1 no1 ni2 no2 : nat}
+  (b1 : cvir ni1 (S no1))
+  (b2: cvir (S ni2) no2) :
+  cvir (ni1+ni2) (no1+no2) :=
+    let b := merge_cvir b1 b2 in
+    let b := focus_input_cvir b (fi' ni1) in
+    loop_cvir' b _ _.
+Next Obligation.
+  apply Nat.lt_add_pos_r.
+  apply Nat.lt_0_succ.
+Defined.
 
 Definition loop_cvir_open {ni no : nat} (b : cvir (S ni) (S no)) : cvir (S ni) no :=
   mk_cvir (fun vi vo vt =>
