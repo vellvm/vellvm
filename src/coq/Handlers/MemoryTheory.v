@@ -3042,14 +3042,12 @@ Section PARAMS.
         destruct (x1 /~=? y1) eqn: EQ1; try inversion HeqRHS.
         destruct (x2 >? (y2 + s) - 1) eqn: EQ2; try inversion HeqRHS.
         destruct (y2 >? (x2 + s) - 1) eqn: EQ3; try inversion HeqRHS.
-        intuition.
-        + rewrite Z.gt_lt_iff in H2.
-          rewrite <- Z.gtb_lt in H2.
-          rewrite H2 in EQ2. inversion EQ2.
-        + rewrite Z.gt_lt_iff in H2.
-          rewrite <- Z.gtb_lt in H2.
-          rewrite H2 in EQ3. inversion EQ3.
-          (* TODO: Write symmetric variants of Z.gtb_lt lemmas. *)
+        intuition;
+          try first [rewrite Z.gt_lt_iff,<- Z.gtb_lt in H2;
+                     rewrite H2 in EQ2; inversion EQ2 |
+                     rewrite Z.gt_lt_iff,<- Z.gtb_lt in H2;
+                     rewrite H2 in EQ3; inversion EQ3].
+        (* TODO: Write symmetric variants of Z.gtb_lt lemmas. *)
     Qed.
 
     Lemma app_prefix_eq :

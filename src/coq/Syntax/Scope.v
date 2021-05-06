@@ -151,19 +151,182 @@ Section LABELS_OPERATIONS.
 
 End LABELS_OPERATIONS.
 
-Section DEF_SITES_OPERATIONS.
+(** Note : I'm toying with the concepts and trying to get familiar with everything.
+    Once things are a bit settled, we need to use a more efficient implementation of
+    sets ([MSetRBT.v] for instance)
+ *)
+From Coq Require Import ListSet.
 
-  Context {T : Set}.
+Module SetNotations.
 
-  Definition def_sites_instr_id (id : instr_id) : list raw_id :=
-    match id with
-    | IId id => [id]
-    | _ => []
-    end.
+  (* Notation set := list. *)
+  (* Infix "+++" := List.app (at level 30).  *)
+  (* Notation ":::" := cons. *)
+  (* Notation "∅" := []. *)
 
-  Definition def_sites_code {T} (c : code T) : list raw_id :=
-    List.fold_right (fun '(id,_) acc => match id with | IId id => id :: acc | _ => acc end) [] c.
+  Infix "+++" := (set_union raw_id_eq_dec) (right associativity, at level 60).
+  Infix ":::" := (set_add raw_id_eq_dec) (right associativity, at level 60).
+  Infix "∖"    := (set_diff raw_id_eq_dec) (right associativity, at level 60).
+  Notation "∅" := (empty_set _).
+
+  Definition set_flat_map {A} (f : A -> set raw_id) :=
+    fix flat_map (l:set A) : set raw_id :=
+      match l with
+      | nil => nil
+      | cons x t => (f x) +++ (flat_map t)
+      end.
+
+End SetNotations.
+
+Import SetNotations.
+
+Section REGISTER_OPERATIONS.
+
+  Section Defs.
+
+    (** * Definition sites
+      Simple static collection of all variables assigned to in a piece of syntax.
+     *)
+    Class Def_sites (A : Type) := { def_sites: A -> set raw_id }.
 
 
-End DEF_SITES_OPERATIONS.
+    Global Instance instr_id_defs : Def_sites instr_id :=
+      {| def_sites := fun id =>
+                        match id with
+                        | IId id => [id]
+                        | _ => ∅
+                        end |}
+    .
 
+    Global Instance code_defs {T} : Def_sites (code T) :=
+      {| def_sites := fold_right (fun '(id,_) acc => def_sites id +++ acc) ∅ |}.
+
+    Global Instance block_def_sites {T} : Def_sites (block T) :=
+      {| def_sites := fun bk => map fst bk.(blk_phis) +++ def_sites bk.(blk_code) |}.
+
+    Global Instance ocfg_def_sites {T} : Def_sites (ocfg T) :=
+      {| def_sites := set_flat_map def_sites |}.
+
+    Global Instance cfg_def_sites {T} : Def_sites (cfg T) :=
+      {| def_sites := fun cfg => def_sites cfg.(blks) |}.
+
+  End Defs.
+
+  Section Uses.
+
+    (** * Use sites
+        Simple static collection of all local variables read in a piece of syntax.
+     *)
+
+    Class Use_sites (A : Type) := { use_sites: A -> set raw_id }.
+
+    Global Instance ident_use_sites : Use_sites ident :=
+      {| use_sites := fun id => match id with | ID_Local id => [id] | ID_Global _ => ∅ end |}.
+
+    Global Instance exp_use_sites {T} : Use_sites (exp T) :=
+      {| use_sites :=
+           fix f e := match e with
+                      | EXP_Ident id
+                        => use_sites id
+
+                      | EXP_Integer _
+                      | EXP_Float _ 
+                      | EXP_Double _
+                      | EXP_Hex _
+                      | EXP_Bool _
+                      | EXP_Null 
+                      | EXP_Zero_initializer 
+                      | EXP_Cstring _
+                      | EXP_Undef
+                        => []
+
+                      | OP_Conversion _ _ e _
+                      | OP_ExtractValue (_,e) _
+                      | OP_Freeze (_,e)
+                        => f e
+
+                      | OP_IBinop _ _ e1 e2
+                      | OP_ICmp _ _ e1 e2
+                      | OP_FBinop _ _ _ e1 e2
+                      | OP_FCmp _ _ e1 e2 
+                      | OP_ExtractElement (_,e1) (_,e2)
+                      | OP_InsertValue (_,e1) (_,e2) _
+                        => f e1 +++ f e2
+
+                      | OP_InsertElement (_,e1) (_,e2) (_,e3)
+                      | OP_ShuffleVector (_,e1) (_,e2) (_,e3)
+                      | OP_Select (_,e1) (_,e2) (_,e3)
+                        => f e1 +++ f e2 +++ f e3
+
+                      | EXP_Struct l
+                      | EXP_Packed_struct l
+                      | EXP_Array l 
+                      | EXP_Vector l
+                        => set_flat_map (fun x => f (snd x)) l
+
+                      | OP_GetElementPtr _ (_,e) l
+                        => f e +++ set_flat_map (fun x => f (snd x)) l
+                      end
+      |}.
+
+    Global Instance texp_use_sites {T} : Use_sites (texp T) := {| use_sites := fun x => use_sites (snd x) |}.
+    Global Instance option_use_sites {T} `{Use_sites T} : Use_sites (option T) := {| use_sites := fun x => match x with | Some e => use_sites e | None => ∅ end |}.
+
+    Global Instance instr_use_sites {T} : Use_sites (instr T) :=
+      {| use_sites := fun i => match i with
+                          | INSTR_Op e => use_sites e
+                          | INSTR_Call e l => use_sites e +++ set_flat_map use_sites l
+                          | INSTR_Alloca _ e _ 
+                          | INSTR_Load _ _ e _ 
+                            => use_sites e
+                          | INSTR_Store _ e1 e2 _
+                            => use_sites e1 +++ use_sites e2
+                          | INSTR_Fence
+                          | INSTR_AtomicCmpXchg
+                          | INSTR_AtomicRMW
+                          | INSTR_VAArg
+                          | INSTR_LandingPad
+                          | INSTR_Comment _
+                            => []
+                          end
+      |}.
+
+    Global Instance code_use_sites {T} : Use_sites (code T) :=
+      {| use_sites := set_flat_map (fun x => use_sites (snd x)) |}.
+
+    Global Instance term_use_sites {T} : Use_sites (terminator T) :=
+      {| use_sites := fun t => match t with
+                               | TERM_Ret e
+                               | TERM_Br e _ _
+                               | TERM_IndirectBr e _
+                               | TERM_Resume e
+                                 => use_sites e
+
+                               | TERM_Switch e _ l =>
+                                 use_sites e (* +++ set_flat_map (fun x => use_sites (fst x)) l *)
+
+                               | TERM_Ret_void
+                               | TERM_Br_1 _
+                               | TERM_Unreachable
+                                 => []
+
+                               | TERM_Invoke _ l _ _ =>
+                                 set_flat_map use_sites l
+                               end
+      |}.
+
+    Global Instance phi_use_sites {T} : Use_sites (phi T) :=
+      {| use_sites := fun '(Phi _ l) => set_flat_map (fun x => use_sites (snd x)) l |}.
+
+    Global Instance block_use_sites {T} : Use_sites (block T) :=
+      {| use_sites := fun bk => set_flat_map (fun x => use_sites (snd x)) bk.(blk_phis) +++ use_sites bk.(blk_code) +++ use_sites bk.(blk_term) |}.
+
+    Global Instance ocfg_use_sites {T} : Use_sites (ocfg T) :=
+      {| use_sites := set_flat_map use_sites |}.
+
+    Global Instance cfg_use_sites {T} : Use_sites (cfg T) :=
+      {| use_sites := fun cfg => cfg.(args) +++ use_sites cfg.(blks) |}.
+
+  End Uses.
+
+End REGISTER_OPERATIONS.

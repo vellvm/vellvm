@@ -260,7 +260,7 @@ Ltac __base :=
          apply Ret_local_change | idtac].
 
 Lemma instr_same_local : forall x i g l m,
-    ⟦ (x,i) ⟧i3 g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites_instr_id x)). 
+    ⟦ (x,i) ⟧i3 g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites x)). 
 Proof with __base.
   destruct i; intros.
   - destruct x; cbn; go...
@@ -350,19 +350,50 @@ Proof with __base.
   - cbn; break_match_goal; __base.
 Qed.
 
-Lemma def_sites_code_cons : forall {T} id x i (c : code T),
-    In id (def_sites_code ((x,i):: c))
-    <-> (In id (def_sites_instr_id x) \/ In id (def_sites_code c)).
+From Coq Require Import ListSet.
+Import SetNotations.
+
+Lemma code_def_cons :
+  forall {T} i (c : code T),
+    def_sites (i :: c ) = def_sites (fst i) +++ def_sites c.
 Proof.
-  induction c as [| [x' i'] c IH] using rev_ind; cbn.
-  - destruct x; cbn; intuition.
-  - destruct x; cbn; intuition.
+  intros ? [] ?; reflexivity.
+Qed.
+Arguments code_defs : simpl never.
+
+Lemma set_add_empty_set : forall x xs, In x (∅ +++ xs) <-> In x xs.
+Admitted.
+
+Lemma set_union_empty_set : forall x xs, In x (∅ +++ xs) <-> In x xs.
+Proof.
+  induction xs as [| y xs IH]; [reflexivity |].
+  cbn; split; intros IN.
+Admitted.
+Arguments code_defs : simpl never.
+
+Lemma def_sites_code_cons : forall {T} id x i (c : code T),
+    In id (def_sites (A := code T) ((x,i):: c))
+    <-> (In id (def_sites x) \/ In id (def_sites c)).
+Proof.
+  induction c as [| [x' i'] c IH] using rev_ind.
+  - destruct x; unfold def_sites, code_defs; cbn; intuition.
+  - destruct x; cbn in *.
+    + rewrite (code_def_cons (_,i)); cbn.
+      split; intros IN.
+      * apply set_union_elim in IN; destruct IN as [IN | IN]; intuition.
+      * destruct IN as [[-> | abs] | IN]; try inv abs.
+        apply set_union_intro1; cbn; auto.
+        apply set_union_intro2; cbn; auto.
+    + rewrite (code_def_cons (_,i)); cbn.
+      split; intros IN.
+      * apply set_union_elim in IN; destruct IN as [IN | IN]; intuition.
+      * apply set_union_empty_set.
+        intuition.
 Qed.
 
-Arguments def_sites_code : simpl never.
-
+Arguments code_defs : simpl never.
 Lemma local_frame_code : forall c g l m,
-    ⟦ c ⟧c3 g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites_code c)).
+    ⟦ c ⟧c3 g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites c)).
 Proof.
   induction c as [| i c IH]; intros.
   - vred_C3.
@@ -393,12 +424,6 @@ Proof.
       intros abs; apply NIN; auto.
       symmetry; apply H; auto.
 Qed.
-
-Definition def_sites_phis {T} (phis : list (local_id * phi T)) : list raw_id :=
-  List.map fst phis.
-
-Definition def_sites_block {T} (bk : block T) : list raw_id :=
-  def_sites_phis bk.(blk_phis) ++ def_sites_code bk.(blk_code).
 
 From Vellvm Require Import Theory.DenotationTheory.
 
@@ -432,7 +457,7 @@ Proof.
 Qed.
 
 Lemma local_frame_phis : forall phis f g l m,
-    ⟦ phis ⟧Φs3 f g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites_phis phis)).
+    ⟦ phis ⟧Φs3 f g l m ⤳ lift_pred_L3 _ (local_has_changed l (map fst phis)).
 Proof.
   intros.
   cbn.
@@ -440,7 +465,7 @@ Proof.
   rewrite interp_cfg3_map_monad.
   apply has_post_bind_strong
     with (S := andP (lift_state_cfgP (pure_P g l m))
-                   (lift_pure_cfgP (fun l => forall x, In x (map fst l) -> In x (def_sites_phis phis)))).
+                   (lift_pure_cfgP (fun l => forall x, In x (map fst l) -> In x (map fst phis)))).
   - induction phis as [| [x []] phis IH].
     + cbn; apply eutt_Ret; split; cbn; auto.
     + cbn; go.
@@ -462,7 +487,7 @@ Proof.
     cbn in *.
     go.
     rewrite interp_cfg3_map_monad.
-    apply has_post_bind_strong with (S := fun '(_, (l', (_, _))) => local_has_changed l (def_sites_phis phis) l').
+    apply has_post_bind_strong with (S := fun '(_, (l', (_, _))) => local_has_changed l (map fst phis) l').
     2: _intros; go; apply eutt_Ret; cbn; auto.
     apply map_monad_eutt_state3_ind; [intros [] ? ? ? ? ? | red; auto].
     eapply has_post_weaken; [apply LocalWrite_local_change |].
@@ -473,7 +498,6 @@ Proof.
     eapply local_has_changed_mono; eauto. 
     intros ? [-> | []]; auto.
 Qed.
-
 
 Lemma terminator_are_pure : forall t, 
     pure ⟦ t ⟧t3.  
@@ -520,8 +544,13 @@ Proof with (apply eutt_Ret; do 2 red; auto).
   - rewrite exp_to_instr_raiseUB; apply UB_is_pure.
 Qed.
 
+Lemma not_in_set_union_l : forall (l1 l2 : set _) (x : _), ~ In x (l1 +++ l2) -> ~ In x l1.
+Admitted.
+Lemma not_in_set_union_r : forall (l1 l2 : list _) (x : _), ~ In x (l1 +++ l2) -> ~ In x l2.
+Admitted.
+
 Lemma local_frame_block : forall bk f g l m,
-    ⟦ bk ⟧b3 f g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites_block bk)).
+    ⟦ bk ⟧b3 f g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites bk)).
 Proof.
   intros; destruct bk.
   rewrite denote_block_unfold.
@@ -536,17 +565,14 @@ Proof.
   intros ? NIN.
   red in HP,HP0.
   cbn in NIN.
-  destruct (in_dec raw_id_eq_dec x (def_sites_phis blk_phis)). 
-  apply not_in_app_l in NIN; exfalso; apply NIN; auto.
-  destruct (in_dec raw_id_eq_dec x (def_sites_code blk_code)). 
-  apply not_in_app_r in NIN; exfalso; apply NIN; auto.
+  destruct (in_dec raw_id_eq_dec x (map fst blk_phis)). 
+  apply not_in_set_union_l in NIN; exfalso; apply NIN; auto.
+  destruct (in_dec raw_id_eq_dec x (def_sites blk_code)). 
+  apply not_in_set_union_r in NIN; exfalso; apply NIN; auto.
   apply HP in n.
   apply HP0 in n0.
   rewrite n,n0; reflexivity.
 Qed.
-
-Definition def_sites_ocfg {T} (bks : CFG.ocfg T) :=
-  List.fold_right (fun bk acc => def_sites_block bk ++ acc) [] bks.
 
 Lemma interp_intrinsics_iter :
   forall {E F R I} `{FailureE -< F } (t: I -> itree (E +' IntrinsicE +' F) (I + R)) x,
@@ -687,10 +713,24 @@ Proof.
   apply in_or_app; auto.
 Qed.
 
+Lemma sublist_set_union_l :
+  forall (ys xs zs : list _),
+  sublist xs ys ->
+  sublist xs (ys +++ zs).
+Proof.
+Admitted.
+
+Lemma sublist_set_union_r :
+  forall (ys xs zs : list _),
+  sublist xs zs ->
+  sublist xs (ys +++ zs).
+Proof.
+Admitted.
+
 Lemma def_sites_block_in_ocfg :
   forall {T} (bk : block T) id bks,
     find_block bks id = Some bk ->
-    sublist (def_sites_block bk) (def_sites_ocfg bks).
+    sublist (def_sites bk) (def_sites bks).
 Proof.
   induction bks as [| bk0 bks IH]; [intros abs; inv abs |].
   intros FIND.
@@ -698,9 +738,9 @@ Proof.
   case_eq_id id bk0.(blk_id).
   - rewrite ScopeTheory.find_block_eq in FIND; auto.
     inv FIND.
-    eapply sublist_app_l; reflexivity.
+    eapply sublist_set_union_l; reflexivity.
   - rewrite ScopeTheory.find_block_ineq in FIND; auto. 
-    eapply sublist_app_r, IH; auto.
+    eapply sublist_set_union_r, IH; auto.
 Qed.
 
 Lemma local_has_changed_refl : forall l xs,
@@ -711,11 +751,11 @@ Proof.
 Qed.
 
 Lemma local_frame_ocfg : forall bks fto g l m,
-    ⟦ bks ⟧bs3 fto g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites_ocfg bks)).
+    ⟦ bks ⟧bs3 fto g l m ⤳ lift_pred_L3 _ (local_has_changed l (def_sites bks)).
 Proof.
   intros.
   eapply has_post_weaken.
-  apply has_post_denote_ocfg3 with (I := fun '(_,(l',_)) => local_has_changed l (def_sites_ocfg bks) l').
+  apply has_post_denote_ocfg3 with (I := fun '(_,(l',_)) => local_has_changed l (def_sites bks) l').
   - intros * FIND HP.
     eapply has_post_weaken.
     apply local_frame_block.
