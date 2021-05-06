@@ -8,5 +8,6 @@
 
 Sir.v
 Vec.v
+Unique.v
 Combinators.v
 CombinatorsWF.v

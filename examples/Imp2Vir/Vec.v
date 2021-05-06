@@ -37,6 +37,12 @@ Proof.
   exact e.
 Qed.
 
+Program Definition cast {A} {n n'} (v : t A n) (H : n = n') : t A n' :=
+  exist _ (proj1_sig v) _.
+Next Obligation.
+  apply vector_length.
+Defined.
+
 Program Definition empty (A : Type) : t A 0 := vec' nil.
 
 Program Definition cons {A} {n} h (v : t A n) : t A (S n) := vec' (h::v).
@@ -95,8 +101,33 @@ Proof.
   - subst. rewrite (nth_indep _ a a0 l). reflexivity.
 Qed.
 
-(*Definition unique_vector {A} {n} (v : t A n) : Prop :=
-  forall i1 i2, nth v i1 = nth v i2 -> i1 = i2.*)
+Theorem nth_rewrite_error : forall A n (v : t A n) i, List.nth_error (proj1_sig v) (proj1_sig i) = Some (nth v i).
+Proof.
+  intros ? ? [] [].
+  erewrite nth_destruct.
+  simpl in *.
+  apply nth_error_nth'.
+  lia.
+  Unshelve. destruct x ; [ simpl in * ; lia | assumption ].
+Qed.
+
+Theorem nth_destruct_error : forall A n (v : t A n) i a, nth v i = a <-> List.nth_error (proj1_sig v) (proj1_sig i) = Some a.
+Proof.
+  intros ? ? [] [] ?.
+  split ; intro ; subst ; simpl.
+  - rewrite <- nth_rewrite_error. simpl. reflexivity.
+  - rewrite nth_rewrite_error in H. inversion H. reflexivity.
+Qed.
+
+Theorem nth_destruct_eq : forall A n n' (v : t A n) (v' : t A n') i i', nth v i = nth v' i' <-> List.nth_error (proj1_sig v) (proj1_sig i) = List.nth_error (proj1_sig v') (proj1_sig i').
+Proof.
+  split ; intros ; subst ; simpl.
+  - rewrite 2 nth_rewrite_error.
+    f_equal. assumption.
+  - rewrite 2 nth_rewrite_error in H.
+    inversion H.
+    reflexivity.
+Qed.
 
 Program Definition append {A} {n n'} (v : t A n) (v' : t A n') :
   t A (n + n') := vec' ((proj1_sig v) ++ proj1_sig v').
@@ -106,8 +137,8 @@ Defined.
 
 Definition In {A} {n} a (v : t A n) := List.In a (proj1_sig v).
 
-Theorem vector_in_app_iff : forall A n n' (v : Vec.t A n) (v' : Vec.t A n') (a : A),
-  Vec.In a (append v v') <-> Vec.In a v \/ Vec.In a v'.
+Theorem vector_in_app_iff : forall A n n' (v : t A n) (v' : t A n') (a : A),
+  In a (append v v') <-> In a v \/ In a v'.
 Proof.
   intros ? ? ? [] [] ?.
   unfold In in *. simpl in *.
@@ -118,47 +149,35 @@ Theorem vector_app_nth1 :
   forall A n n' (v : t A n) (v' : t A n') (k : fin n), nth (append v v') (L n' k) = nth v k.
 Proof.
   intros.
-  erewrite 2 nth_destruct.
+  apply nth_destruct_eq.
   destruct v, v', k.
   simpl in *.
-  rewrite app_nth1; [|lia].
-  apply nth_indep.
+  apply nth_error_app1.
   lia.
-  Unshelve.
-  all: destruct v, k ; destruct x ; [ simpl in e ; lia | assumption ].
 Qed.
 
 Theorem vector_app_nth2 :
   forall A n n' (v : t A n) (v' : t A n') (k : fin n'), nth (append v v') (R n k) = nth v' k.
 Proof.
   intros.
-  erewrite 2 nth_destruct.
+  apply nth_destruct_eq.
   destruct v, v', k.
   simpl in *.
-  rewrite app_nth2; [| lia].
-  replace (n + x1 - length x) with x1 by lia.
-  apply nth_indep.
+  replace x1 with (n + x1 - length x) at 2 by lia.
+  apply nth_error_app2.
   lia.
-  Unshelve.
-  all: destruct v', k ; destruct x ; [ simpl in e ; lia | assumption ].
 Qed.
 
 Theorem In_nth :
   forall A n (v : t A n) (x : A), In x v -> exists n : fin n, nth v n = x.
 Proof.
   intros.
-  unfold In in H.
-  eapply In_nth in H.
-  destruct H as [ n0 [ H H0 ]].
+  eapply In_nth_error in H.
+  destruct H as [ n0 H ].
   eexists (fi' n0).
-  erewrite nth_destruct.
-  simpl.
-  exact H0.
-  Unshelve.
-  2: exact x.
-  simpl.
-  rewrite vector_length in H.
+  eapply nth_destruct_error.
   exact H.
+  Unshelve. apply Util.nth_error_in in H. rewrite <- vector_length with (v := v). assumption.
 Qed.
 
 Program Definition splitat {A} i {j} (v : t A (i+j)) :
@@ -171,6 +190,13 @@ Next Obligation.
 Defined.
 Next Obligation.
   destruct v. simpl in *. rewrite skipn_length. apply Nat.add_sub_eq_l. auto.
+Defined.
+
+Program Definition splitat' {A} {k} (i : fin k) (v : t A k) :
+  t A i * t A (k-i) :=
+  splitat i (cast v _).
+Next Obligation.
+  destruct i. simpl. lia.
 Defined.
 
 Theorem splitat_append : forall A n n' (v : t A n) (v' : t A n'),
