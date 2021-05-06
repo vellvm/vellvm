@@ -8,21 +8,21 @@ From Vellvm Require Import Syntax.
 
 From tutorial Require Import Fin.
 
-Require Import Vector Combinators.
+Require Import Vec Combinators.
 
 Open Scope nat_scope.
-Open Scope vector_scope.
+Open Scope vec_scope.
 
 Arguments n_int : default implicits.
 Arguments blocks : default implicits.
 
-Definition unique_vector {A} {n} (v : Vector.t A n) : Prop :=
+Definition unique_vector {A} {n} (v : Vec.t A n) : Prop :=
   forall i1 i2, nth v i1 = nth v i2 -> i1 = i2.
 
 Definition unique_bid {ni no} ir : Prop :=
-  forall (vi : Vector.t raw_id ni) (vo : Vector.t raw_id no) vt,
+  forall (vi : Vec.t raw_id ni) (vo : Vec.t raw_id no) vt,
   forall b1 b2,
-  unique_vector (vi ++ vt)%vector ->
+  unique_vector (vi ++ vt)%vec ->
   List.In b1 (blocks ir vi vo vt) ->
   List.In b2 (blocks ir vi vo vt) ->
   blk_id b1 = blk_id b2 ->
@@ -51,12 +51,12 @@ Definition cvir_ids_WF {ni no} ir : Prop :=
   forall (vi : Vec.t raw_id ni) (vo : Vec.t raw_id no) vt b,
   (
     List.In b (blocks ir vi vo vt) ->
-    In (blk_id b) (vi ++ vt)%vector
+    In (blk_id b) (vi ++ vt)%vec
   ) /\ (
     List.In b (blocks ir vi vo vt) ->
     forall bid,
     out_blk_id bid b ->
-    In bid (vo ++ vt)%vector
+    In bid (vo ++ vt)%vec
   ).
 
 Theorem block_cvir_id_WF : forall c, cvir_ids_WF (block_cvir c).

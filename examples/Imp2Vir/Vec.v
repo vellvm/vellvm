@@ -9,7 +9,7 @@ From Vellvm Require Import
 
 From tutorial Require Import Fin.
 
-Section Vector.
+Section Vec.
 
 Open Scope nat_scope.
 
@@ -106,8 +106,8 @@ Defined.
 
 Definition In {A} {n} a (v : t A n) := List.In a (proj1_sig v).
 
-Theorem vector_in_app_iff : forall A n n' (v : Vector.t A n) (v' : Vector.t A n') (a : A),
-  Vector.In a (append v v') <-> Vector.In a v \/ Vector.In a v'.
+Theorem vector_in_app_iff : forall A n n' (v : Vec.t A n) (v' : Vec.t A n') (a : A),
+  Vec.In a (append v v') <-> Vec.In a v \/ Vec.In a v'.
 Proof.
   intros ? ? ? [] [] ?.
   unfold In in *. simpl in *.
@@ -276,7 +276,7 @@ Next Obligation.
   auto.
 Defined.
 
-End Vector.
+End Vec.
 
 Ltac split_vec v n1 :=
   let vp := fresh "vp" in
@@ -289,8 +289,8 @@ Ltac split_vec v n1 :=
   apply append_splitat in Heqvp;
   subst v.
 
-Declare Scope vector_scope.
-Delimit Scope vector_scope with vector.
+Declare Scope vec_scope.
+Delimit Scope vec_scope with vec.
 Notation "h :: t" := (cons h t) (at level 60, right associativity).
-Infix "++" := append : vector_scope.
+Infix "++" := append : vec_scope.
 Notation vec' l := (exist (fun l' : list _ => _) l _).

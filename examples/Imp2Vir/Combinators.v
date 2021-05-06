@@ -18,8 +18,7 @@ From Vellvm Require Import
 
 Import ListNotations.
 
-Require Import Imp Vector.
-Module Import Vec := Vector.
+Require Import Imp Vec.
 
 Close Scope nat_scope.
 Open Scope Z_scope.
@@ -140,26 +139,26 @@ Definition seq_cvir {ni1 no1 ni2 no2 : nat}
   cvir (ni1+ni2) (no1+no2) :=
     mk_cvir (fun vi vo (vt : Vec.t raw_id (S (n_int b1 + n_int b2))) =>
       let '(newint,vt) := Vec.uncons vt in
-      let b1 := mk_cvir (fun vi vo vt => (blocks b1) vi (newint :: vo)%vector vt) in
-      let b2 := mk_cvir (fun vi vo vt => (blocks b2) (newint :: vi)%vector vo vt) in
+      let b1 := mk_cvir (fun vi vo vt => (blocks b1) vi (newint :: vo)%vec vt) in
+      let b2 := mk_cvir (fun vi vo vt => (blocks b2) (newint :: vi)%vec vo vt) in
       blocks (merge_cvir b1 b2) vi vo vt
     ).
 
 Definition loop_cvir {ni no : nat} (b : cvir (S ni) (S no)) : cvir ni no :=
   mk_cvir (fun vi vo vt =>
     let '(newint,vt) := Vec.uncons vt in
-    (blocks b) (newint :: vi)%vector (newint :: vo)%vector vt
+    (blocks b) (newint :: vi)%vec (newint :: vo)%vec vt
   ).
 
 Definition loop_cvir_open {ni no : nat} (b : cvir (S ni) (S no)) : cvir (S ni) no :=
   mk_cvir (fun vi vo vt =>
-    (blocks b) vi (hd vi :: vo)%vector vt
+    (blocks b) vi (hd vi :: vo)%vec vt
   ).
 
 Definition join_cvir {ni no : nat} (b : cvir ni (S (S no))) : cvir ni (S no) :=
   mk_cvir (fun vi vo vt =>
     let '(o, vo) := Vec.uncons vo in
-    (blocks b) vi (o :: o :: vo)%vector vt
+    (blocks b) vi (o :: o :: vo)%vec vt
   ).
 
 Definition close_cvir {ni} (b : cvir ni 0) : cvir 0 0 :=
