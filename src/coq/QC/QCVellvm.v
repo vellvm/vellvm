@@ -1,5 +1,5 @@
 From QuickChick Require Import QuickChick.
-From Vellvm Require Import ShowAST GenAST TopLevel LLVMAst DynamicValues.
+From Vellvm Require Import ShowAST ReprAST GenAST TopLevel LLVMAst DynamicValues.
 Require Import Semantics.LLVMEvents.
 Require Import Semantics.InterpretationStack.
 Require Import Handlers.Handlers.
@@ -58,7 +58,7 @@ Definition vellvm_agrees_with_clang (prog : list (toplevel_entity typ (block typ
     (* collect (show prog) *)
             match interpret prog, run_llc prog with
             | MlOk (UVALUE_I8 x), UVALUE_I8 y =>
-              whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: ") (equ x y)
+              whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) (equ x y)
             | _, _ => checker true
             end.
 

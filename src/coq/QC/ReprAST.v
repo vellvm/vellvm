@@ -38,7 +38,7 @@ Section ReprInstances.
 
   Global Instance reprInt : Repr LLVMAst.int :=
     {
-      repr := show
+      repr i := ("(" ++ show i ++ ")%Z")%string
     }.
 
   Global Instance reprBool : Repr bool :=
@@ -46,9 +46,12 @@ Section ReprInstances.
       repr := show
     }.
 
+  Global Instance reprString : Repr string
+    := {| repr s := ("" ++ show s ++ "")%string |}.
+
   Definition repr_raw_id (rid : raw_id) : string
     := match rid with
-       | Name s => "(Name " ++ s ++ ")"
+       | Name s => "(Name " ++ repr s ++ ")"
        | Anon i => "(Anon " ++ repr i ++ ")"
        | Raw i  => "(Raw " ++ repr i ++ ")"
        end.
@@ -261,9 +264,9 @@ Section ReprInstances.
       "(EXP_Cstring [" ++ contents_In s (fun '(t, e) HIn => "(" ++ repr t ++ ", " ++ repr_exp e ++ ")") ++ "])"
     | EXP_Undef => "EXP_Undef"
     | OP_IBinop iop t v1 v2 =>
-      "(OP_IBinop " ++ repr iop ++ repr t ++ repr_exp v1 ++ repr_exp v2 ++ ")"
+      "(OP_IBinop " ++ repr iop ++ " " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
     | OP_ICmp cmp t v1 v2 =>
-      "icmp " ++ repr cmp ++ " " ++ repr t ++ " " ++ repr_exp v1 ++ ", " ++ repr_exp v2
+      "(OP_ICmp " ++ repr cmp ++ " " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
     | OP_GetElementPtr t ptrval idxs =>
       "(OP_GetElementPtr " ++ repr t ++
                            "(" ++ repr (fst ptrval) ++ ", " ++ repr_exp (snd ptrval) ++ ") [" ++ contents_In idxs (fun '(t, e) Hin => "(" ++ repr t ++ ", " ++ repr_exp e ++ ")") ++ "])"
@@ -338,9 +341,6 @@ Section ReprInstances.
   Global Instance reprPhi : Repr (phi typ)
     := {| repr := repr_phi
        |}.
-
-  Global Instance reprString : Repr string
-    := {| repr := show |}.
 
   Definition repr_block (b : block typ) : string
     :=
@@ -513,9 +513,9 @@ Section ReprInstances.
     :=
       match defn with
       | mk_definition df_prototype df_args df_instrs =>
-        "(mk_definition " ++ repr df_prototype ++ " "
-                          ++ repr df_args ++ " "
-                          ++ repr df_instrs ++ ")"
+        "(mk_definition _ " ++ repr df_prototype ++ " "
+                            ++ repr df_args ++ " "
+                            ++ repr df_instrs ++ ")"
       end.
 
   Global Instance reprDefinition: Repr (definition typ (block typ * list (block typ))) :=
