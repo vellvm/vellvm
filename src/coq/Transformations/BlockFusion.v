@@ -17,19 +17,11 @@ From ITree Require Import
      TranslateFacts.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.Tactics
-     Utils.PostConditions
-     Syntax.Scope
-     Syntax.ScopeTheory
-     Syntax.LLVMAst
-     Syntax.CFG
-     Syntax.AstLib
-     Syntax.DynamicTypes
-     Semantics.LLVMEvents
-     Semantics.InterpretationStack
-     Semantics.TopLevel
-     Theory.DenotationTheory.
+     Utilities
+     Syntax
+     Semantics
+     Theory
+     Utils.PostConditions.
 
 Opaque append.
 Import ListSet.

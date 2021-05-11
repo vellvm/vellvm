@@ -14,8 +14,6 @@ From Coq Require Import
      FSets.FMapWeakList
      Bool.Bool.
 
-Require Import Integers Floats.
-
 From ExtLib Require Import
      Structures.Monads
      Structures.Functor
@@ -27,17 +25,15 @@ From ITree Require Import
      Events.Exception.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.Error
-     Syntax.LLVMAst
-     Syntax.AstLib
-     Syntax.CFG
-     Syntax.DynamicTypes
+     Numeric.Integers
+     Numeric.Floats
+     Utilities
+     Syntax
+     Semantics.DynamicValues
      Semantics.MemoryAddress
      Semantics.LLVMEvents.
 
 Require Import Ceres.Ceres.
-
 
 Import Sum.
 Import Subevent.
@@ -124,208 +120,181 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
        several values. Factoring the inference upfront is therefore necessary.
      *)
     (* YZ: Loosen [conv_E] into [exp_E] to reduce the number of interfaces at play? *)
-    Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
-      let raise := @raise conv_E dvalue _
-      in
+
+    Variant conv_case : Set :=
+    | Conv_Pure (x : dvalue) 
+    | Conv_ItoP (x : dvalue) 
+    | Conv_PtoI (x : dvalue)
+    | Conv_Illegal (s: string).
+
+    Definition get_conv_case conv (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
       match conv with
       | Trunc =>
         match t1, x, t2 with
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1 =>
-          ret (DVALUE_I1 (repr (unsigned i1)))
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 1 =>
-          ret DVALUE_Poison
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1 =>
-          ret (DVALUE_I1 (repr (unsigned i1)))
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 1 =>
-          ret DVALUE_Poison
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8 =>
-          ret (DVALUE_I8 (repr (unsigned i1)))
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 8 =>
-          ret DVALUE_Poison
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1 
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1 
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 1 =>
-          ret (DVALUE_I1 (repr (unsigned i1)))
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 1 =>
-          ret DVALUE_Poison
+          Conv_Pure (DVALUE_I1 (repr (unsigned i1)))
+
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8 
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 8 =>
-          ret (DVALUE_I8 (repr (unsigned i1)))
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 8 =>
-          ret DVALUE_Poison
+          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
-          ret (DVALUE_I32 (repr (unsigned i1)))
+          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
+
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 1
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 1 
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 8
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 1 
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 8 
         | DTYPE_I 64, DVALUE_Poison, DTYPE_I 32 =>
-          ret DVALUE_Poison
-        | _, _, _ => raise "ill typed-conv"
+          Conv_Pure DVALUE_Poison
+
+        | _, _, _ => Conv_Illegal "ill-typed conv"
         end
+
       | Zext =>
         match t1, x, t2 with
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          ret (DVALUE_I8 (repr (unsigned i1)))
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8 =>
-          ret DVALUE_Poison
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32 =>
-          ret (DVALUE_I32 (repr (unsigned i1)))
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32 =>
-          ret DVALUE_Poison
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64 =>
-          ret (DVALUE_I64 (repr (unsigned i1)))
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64 =>
-          ret DVALUE_Poison
+          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32 
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
-          ret (DVALUE_I32 (repr (unsigned i1)))
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32 =>
-          ret DVALUE_Poison
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64 =>
-          ret (DVALUE_I64 (repr (unsigned i1)))
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64 =>
-          ret DVALUE_Poison
+          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
+
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64 
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          ret (DVALUE_I64 (repr (unsigned i1)))
+          Conv_Pure (DVALUE_I64 (repr (unsigned i1)))
+
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32 
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64 
         | DTYPE_I 32, DVALUE_Poison, DTYPE_I 64 =>
-          ret DVALUE_Poison
-        | _, _, _ => raise "ill typed-conv"
+          Conv_Pure DVALUE_Poison
+
+        | _, _, _ => Conv_Illegal "ill-typed conv"
         end
+
       | Sext =>
         match t1, x, t2 with
         | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          ret (DVALUE_I8 (repr (signed i1)))
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8 =>
-          ret DVALUE_Poison
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32 =>
-          ret (DVALUE_I32 (repr (signed i1)))
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32 =>
-          ret DVALUE_Poison
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64 =>
-          ret (DVALUE_I64 (repr (signed i1)))
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64 =>
-          ret DVALUE_Poison
+          Conv_Pure (DVALUE_I8 (repr (signed i1)))
+
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32 
         | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
-          ret (DVALUE_I32 (repr (signed i1)))
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32 =>
-          ret DVALUE_Poison
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64 =>
-          ret (DVALUE_I64 (repr (signed i1)))
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64 =>
-          ret DVALUE_Poison
+          Conv_Pure (DVALUE_I32 (repr (signed i1)))
+
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64 
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          ret (DVALUE_I64 (repr (signed i1)))
+          Conv_Pure (DVALUE_I64 (repr (signed i1)))
+
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32 
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64 
         | DTYPE_I 32, DVALUE_Poison, DTYPE_I 64 =>
-          ret DVALUE_Poison
-        | _, _, _ => raise "ill typed-conv"
+          Conv_Pure DVALUE_Poison
+
+        | _, _, _ => Conv_Illegal "ill-typed conv"
         end
+
       | Bitcast =>
         match t1, x, t2 with
         | DTYPE_I bits1, x, DTYPE_I bits2 =>
-          if bits1 =? bits2 then ret x else raise "unequal bitsize in cast"
+          if bits1 =? bits2 then Conv_Pure x else Conv_Illegal "unequal bitsize in cast"
         | DTYPE_Pointer, DVALUE_Addr a, DTYPE_Pointer =>
-          ret (DVALUE_Addr a)
+          Conv_Pure (DVALUE_Addr a)
         | DTYPE_Pointer, DVALUE_Poison, DTYPE_Pointer =>
-          ret DVALUE_Poison
-        | _, _, _ => raise "ill-typed_conv"
+          Conv_Pure DVALUE_Poison
+        | _, _, _ => Conv_Illegal "ill-typed conv"
         end
+
       | Uitofp =>
         match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float =>
-          ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float =>
-          ret DVALUE_Poison
-
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float =>
-          ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float =>
-          ret DVALUE_Poison
-
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float =>
-          ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float =>
-          ret DVALUE_Poison
-
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float =>
-          ret DVALUE_Poison
+          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double =>
-          ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double =>
-          ret DVALUE_Poison
-
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double =>
-          ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double =>
-          ret DVALUE_Poison
-
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double =>
-          ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double =>
-          ret DVALUE_Poison
-
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
-          ret DVALUE_Poison
+          Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
 
-        | _, _, _ => raise "ill typed Uitofp"
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float 
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float 
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float 
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float 
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double 
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double 
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double 
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
+          Conv_Pure DVALUE_Poison
+
+        | _, _, _ => Conv_Illegal "ill-typed Uitofp"
         end
+
       | Sitofp =>
         match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float =>
-          ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float =>
-          ret DVALUE_Poison
-
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float =>
-          ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float =>
-          ret DVALUE_Poison
-
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float =>
-          ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float =>
-          ret DVALUE_Poison
-
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float =>
-          ret DVALUE_Poison
+          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
 
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double =>
-          ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double =>
-          ret DVALUE_Poison
-
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double =>
-          ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double =>
-          ret DVALUE_Poison
-
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double =>
-          ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double =>
-          ret DVALUE_Poison
-
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
-          ret DVALUE_Poison
+          Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
 
-        | _, _, _ => raise "ill typed Sitofp"
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float 
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float 
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float 
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float 
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double 
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double 
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double 
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
+          Conv_Pure DVALUE_Poison
+
+        | _, _, _ => Conv_Illegal "ill-typed Sitofp"
         end
-      | Fptoui
-      | Fptosi
-      | Fptrunc
-      | Fpext => raise "TODO: unimplemented numeric conversion"
+
       | Inttoptr =>
         match t1, t2 with
-        | DTYPE_I 64, DTYPE_Pointer => trigger (ItoP x)
-        | _, _ => raise "ERROR: Inttoptr got illegal arguments"
+        | DTYPE_I 64, DTYPE_Pointer => Conv_ItoP x
+        | _, _ => Conv_Illegal "ERROR: Inttoptr got illegal arguments"
         end
       | Ptrtoint =>
         match t1, t2 with
-        | DTYPE_Pointer, DTYPE_I _ => trigger (PtoI t2 x)
-        | _, _ => raise "ERROR: Ptrtoint got illegal arguments"
+        | DTYPE_Pointer, DTYPE_I _ => Conv_PtoI x
+        | _, _ => Conv_Illegal "ERROR: Ptrtoint got illegal arguments"
         end
+          
+      | Fptoui
+      | Fptosi
+      | Fptrunc
+      | Fpext
+        => Conv_Illegal "TODO: unimplemented numeric conversion"
       end.
-    Arguments eval_conv_h _ _ _ _ : simpl nomatch.
+    Arguments get_conv_case _ _ _ _ : simpl nomatch.
+
+    Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
+      match get_conv_case conv t1 x t2 with
+      | Conv_Pure x => ret x
+      | Conv_ItoP x => trigger (ItoP x)
+      | Conv_PtoI x => trigger (PtoI t2 x)
+      | Conv_Illegal s => raise s
+      end.
 
     Definition eval_conv (conv : conversion_type) (t1 : dtyp) (x : dvalue) (t2:dtyp) : itree conv_E dvalue :=
       match t1, x with
@@ -779,6 +748,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           end
         end.
 
+      Definition dvalue_is_poison (dv : dvalue) : bool :=
+        match dv with
+        | DVALUE_Poison => true
+        | _ => false
+        end.
+
       (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
       Definition denote_terminator (t: terminator dtyp): itree exp_E (block_id + uvalue) :=
@@ -810,15 +785,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           uselector <- denote_exp (Some dt) e;;
           (* Selection on [undef] is UB *)
           selector <- pickUnique uselector;;
-          match selector with
-          | DVALUE_Poison => raiseUB "Switching on poison."
-          | _ => (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
+          if dvalue_is_poison selector
+          then raiseUB "Switching on poison."
+          else (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
             switches <- lift_undef_or_err ret
-                       (map_monad
-                         (fun '((TInt_Literal sz x),id) => s <- (coerce_integer_to_int sz x);; ret (s,id))
-                         dests);;
+                                         (map_monad
+                                            (fun '((TInt_Literal sz x),id) => s <- (coerce_integer_to_int sz x);; ret (s,id))
+                                            dests);;
             lift_err (fun b => ret (inl b)) (select_switch selector default_br switches)
-          end
 
         | TERM_Unreachable => raiseUB "IMPOSSIBLE: unreachable in reachable position" 
 

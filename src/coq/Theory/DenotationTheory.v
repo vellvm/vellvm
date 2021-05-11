@@ -15,20 +15,11 @@ From ITree Require Import
      Eq.Eq.
 
 From Vellvm Require Import
-     Utils.Util
-     Utils.Tactics
-     Syntax.CFG
-     Syntax.LLVMAst
-     Syntax.AstLib
-     Syntax.Scope
+     Utilities
+     Syntax
+     Semantics
      Syntax.ScopeTheory
-     Semantics.TopLevel
-     Semantics.InterpretationStack
-     Syntax.Traversal
-     Syntax.DynamicTypes
-     Semantics.LLVMEvents
-     PostConditions
-     Handlers.Handlers.
+     Utils.PostConditions.
 
 Remove Hints Eqv.EqvWF_Build : typeclass_instances.
 
@@ -328,6 +319,13 @@ Section Outputs.
     unfold raise; intros.
     apply has_post_bind; intros [].
   Qed.
+  
+  Lemma unEither_eta : forall {T m A} (x : eitherT T m A), {|unEitherT := unEitherT x|} = x.
+  Proof.
+    intros.
+    destruct x.
+    f_equal.
+  Qed.
 
   Lemma denote_terminator_exits_in_outputs :
     forall term,
@@ -342,7 +340,42 @@ Section Outputs.
       apply has_post_bind; intros ?.
       break_match_goal; try (apply raise_has_all_posts || apply raiseUB_has_all_posts).
       break_match_goal; apply eutt_Ret; cbn; eauto.
-  Admitted.
+    - destruct v; cbn.
+      apply has_post_bind; intros ?.
+      apply has_post_bind; intros ?.
+      break_match_goal;
+        try (apply raise_has_all_posts || apply raiseUB_has_all_posts).
+      unfold lift_undef_or_err.
+      do 2 break_match_goal.
+      unfold raiseUB; go; apply has_post_bind; intros [].
+      break_match_goal.
+      unfold raise; go; apply has_post_bind; intros [].
+      go.
+      subst.
+      assert (List.map snd brs = List.map snd l).
+      {
+        revert l Hequ; induction brs as [| br brs IH].
+        - intros ? eq; inv eq; reflexivity.
+        - intros ? eq; inv eq.
+          repeat (break_match_hyp; cbn in *; try inv_sum).
+          f_equal; apply IH.
+          rewrite <- Heqs1.
+          Set Nested Proofs Allowed.
+
+          rewrite unEither_eta.
+          reflexivity.
+      }
+      rewrite H.
+      clear.
+      induction l as [| br brs IH].
+      + cbn; intros.
+        apply eutt_Ret; red; auto.
+      + cbn; intros.
+        repeat (cbn; break_match_goal; try apply raise_has_all_posts).
+        all: try apply eutt_Ret; red; auto.
+        all: try subst; eapply has_post_weaken; [apply IH | intros [] ?; cbn in *; intuition].
+    - apply raiseUB_has_all_posts.
+  Qed.
 
   Definition exits_in_outputs {t} ocfg : block_id * block_id + uvalue -> Prop :=
     sum_pred (fun fto => In (snd fto) (@outputs t ocfg)) TT.

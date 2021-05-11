@@ -251,7 +251,7 @@ Qed.
     about the sub-components of code produce, we need to be able to convert
     types of any syntactic substructure of Vellvm.
 
-    We leverage the parameterized [Fmap] typeclass to do this in a fairly lightway.
+    We leverage the parameterized [Tfmap] typeclass to do this in a fairly lightway.
  *)
 Section ConvertTyp.
 
@@ -259,36 +259,36 @@ Section ConvertTyp.
     convert_typ : list (ident * typ) -> F typ -> F dtyp.
 
   Global Instance ConvertTyp_exp : ConvertTyp exp :=
-    fun env => fmap (typ_to_dtyp env).
+    fun env => tfmap (typ_to_dtyp env).
 
   Global Instance ConvertTyp_instr : ConvertTyp instr :=
-    fun env => fmap (typ_to_dtyp env).
+    fun env => tfmap (typ_to_dtyp env).
 
   Global Instance ConvertTyp_term : ConvertTyp terminator :=
-    fun env => fmap (typ_to_dtyp env).
+    fun env => tfmap (typ_to_dtyp env).
 
   Global Instance ConvertTyp_code : ConvertTyp code :=
-    fun env => fmap (typ_to_dtyp env).
+    fun env => tfmap (typ_to_dtyp env).
 
   Global Instance ConvertTyp_phi : ConvertTyp phi :=
-    fun env => fmap (typ_to_dtyp env).
+    fun env => tfmap (typ_to_dtyp env).
 
   Global Instance ConvertTyp_block : ConvertTyp block :=
-    fun env => fmap (typ_to_dtyp env).
+    fun env => tfmap (typ_to_dtyp env).
 
   Global Instance ConvertTyp_cfg : ConvertTyp cfg :=
-    fun env => fmap (typ_to_dtyp env).
+    fun env => tfmap (typ_to_dtyp env).
 
   Global Instance ConvertTyp_mcfg : ConvertTyp mcfg :=
-    fun env => fmap (typ_to_dtyp env).
+    fun env => tfmap (typ_to_dtyp env).
 
-  Global Instance ConvertTyp_list {A} `{Traversal.Fmap A}: ConvertTyp (fun T => list (A T)) :=
-    fun env => Traversal.fmap (typ_to_dtyp env).
+  Global Instance ConvertTyp_list {A} `{TFunctor A}: ConvertTyp (fun T => list (A T)) :=
+    fun env => tfmap (typ_to_dtyp env).
 
 End ConvertTyp.
 
 Lemma convert_typ_list_app :
-  forall {F} `{Traversal.Fmap F} (a b : list (F typ)) (env : list (ident * typ)),
+  forall {F} `{TFunctor F} (a b : list (F typ)) (env : list (ident * typ)),
     convert_typ env (a ++ b)%list = (convert_typ env a ++ convert_typ env b)%list.
 Proof.
   intros F H a.
@@ -320,12 +320,12 @@ Lemma convert_typ_mcfg_app:
     convert_typ [] mcfg1 @@ convert_typ [] mcfg2.
 Proof.
   intros [] []; cbn.
-  unfold convert_typ,ConvertTyp_mcfg,Traversal.fmap,Fmap_mcfg; cbn.
+  unfold convert_typ,ConvertTyp_mcfg,tfmap,TFunctor_mcfg; cbn.
   f_equal; try (unfold endo, Endo_option; cbn; repeat flatten_goal; now intuition).
-  unfold Traversal.fmap, Fmap_list; rewrite map_app; reflexivity.
-  unfold Traversal.fmap, Fmap_list'; rewrite map_app; reflexivity.
-  unfold Traversal.fmap, Fmap_list'; rewrite map_app; reflexivity.
-  unfold Traversal.fmap, Fmap_list'; rewrite map_app; reflexivity.
+  unfold tfmap, TFunctor_list; rewrite map_app; reflexivity.
+  unfold tfmap, TFunctor_list'; rewrite map_app; reflexivity.
+  unfold tfmap, TFunctor_list'; rewrite map_app; reflexivity.
+  unfold tfmap, TFunctor_list'; rewrite map_app; reflexivity.
 Qed.
 
 Lemma convert_types_app_mcfg : forall mcfg1 mcfg2,

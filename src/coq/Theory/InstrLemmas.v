@@ -12,18 +12,10 @@ From ITree Require Import
      TranslateFacts.
 
 From Vellvm Require Import
-     Utils.Tactics
-     Utils.Util
-     Syntax.LLVMAst
-     Syntax.AstLib
-     Syntax.DynamicTypes
-     Syntax.TypToDtyp
-     Semantics.LLVMEvents
-     Semantics.DynamicValues
-     Semantics.TopLevel
-     Semantics.InterpretationStack
-     Handlers.Handlers
-     Refinement
+     Utilities
+     Syntax
+     Semantics
+     Theory.Refinement
      Theory.InterpreterCFG
      Theory.ExpLemmas.
 
@@ -436,7 +428,7 @@ Lemma denote_instr_intrinsic :
     ->
     ⟦ (IId i, INSTR_Call (τ, EXP_Ident (ID_Global (Name fn))) args) ⟧i3 g l m
     ≈
-    Ret3 g (FMapAList.alist_add eq_dec_raw_id i (dvalue_to_uvalue res) l) m tt.
+    Ret3 g (FMapAList.alist_add i (dvalue_to_uvalue res) l) m tt.
 Proof.
   intros * INTRINSIC ASSOC MAP CONCARGS RES.
 

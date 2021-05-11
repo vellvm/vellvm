@@ -21,18 +21,21 @@ CP=cp
 COQFILESNUMERIC := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats
 
 COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/Error\
-								 Utils/PropT Utils/PostConditions Utils/NoFailure Utils/TFor
+								 Utils/PropT Utils/PostConditions Utils/NoFailure Utils/TFor\
+								 Utilities
 
 COQFILESSYNTAX := Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
 									Syntax/Traversal Syntax/Dom Syntax/DynamicTypes Syntax/TypToDtyp\
 									Syntax/Scope Syntax/SurfaceSyntax\
+									Syntax
 
 COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/DynamicValues Semantics/LLVMEvents\
 									   Semantics/IntrinsicsDefinitions\
 									 	 Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack\
 									   Handlers/Pick Handlers/UndefinedBehaviour Handlers/Memory Handlers/MemoryTheory\
 									 	 Handlers/Handlers\
-								  	 Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel
+								  	 Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
+                     Semantics
 
 COQFILESANALYSIS := Analysis/Iteration Analysis/Kildall Analysis/Dom Analysis/DomKildall Analysis/ssa Analysis/DomId 
 
@@ -43,7 +46,8 @@ COQFILESTHEORY := Syntax/ScopeTheory\
 									Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
 									Theory/LocalFrame\
 									Theory/TopLevelRefinements Theory/SymbolicInterpreter\
-									Utils/NoEvent Utils/Commutation
+									Utils/NoEvent Utils/Commutation\
+							    Theory
 
 COQFILESOPT    := Transformations/Transform\
 									Transformations/EquivExpr Transformations/BlockFusion Transformations/DeadCodeElimination
@@ -51,8 +55,8 @@ COQFILESOPT    := Transformations/Transform\
 OLLVMFILES :=
 
 COQFILESVIR      := $(COQFILESNUMERIC) $(COQFILESUTILS) $(COQFILESSYNTAX) $(COQFILESSEMANTICS) 
-COQFILESCOMPILER := $(COQFILESVIR) $(COQFILESANALYSIS) $(COQFILESOPT)
-COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) 
+COQFILESCOMPILER := $(COQFILESVIR) $(COQFILESANALYSIS) 
+COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT) 
 
 VFILES  := $(COQFILESALL:%=coq/%.v)
 VOFILES := $(COQFILESALL:%=coq/%.vo)
@@ -136,10 +140,6 @@ clean-vellvm:
 	find $(COQDIR) -name "*.vio" -delete
 	find $(COQDIR) -name "*.vok" -delete
 	find $(COQDIR) -name "*.vos" -delete
-	find $(COQLIBDIR) -name "*.vo" -delete
-	find $(COQLIBDIR) -name "*.vio" -delete
-	find $(COQLIBDIR) -name "*.vok" -delete
-	find $(COQLIBDIR) -name "*.vos" -delete
 	rm -f $(VOFILES)
 	rm -rf doc/html doc/*.glob
 	rm -f $(EXTRACTDIR)/STAMP $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli

@@ -18,8 +18,8 @@ From ExtLib Require Import
      Data.String.
 
 From Vellvm Require Import
-     Utils.Error
-     Syntax.LLVMAst
+     Utilities
+     Syntax
      Semantics.LLVMEvents
      Numeric.Coqlib
      Numeric.Integers

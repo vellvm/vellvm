@@ -16,20 +16,12 @@ From ITree Require Import
      Events.StateFacts.
 
 From Vellvm Require Import
-     Utils.Tactics
-     Utils.Util
-     Syntax.LLVMAst
-     Syntax.AstLib
-     Syntax.DynamicTypes
-     Syntax.TypToDtyp
-     Semantics.LLVMEvents
-     Semantics.DynamicValues
-     Semantics.TopLevel
-     Semantics.InterpretationStack
-     Handlers.Handlers
-     Refinement
+     Utilities
+     Syntax
+     Semantics
+     Theory.Refinement
      Theory.InterpreterCFG
-     PostConditions.
+     Utils.PostConditions.
 
 Open Scope itree_scope.
 Import ITreeNotations.
@@ -481,19 +473,8 @@ Section ExpPure.
           (exists z, eval_conv_h conv t1 x t2 = trigger (PtoI t2 z)).
   Proof.
     intros.
-    destruct conv.
-    { cbn; repeat (break_match ; eauto). }
-    { cbn; repeat (break_match ; eauto). }
-    { cbn; repeat (break_match ; eauto). }
-    { cbn; repeat (break_match ; eauto). cbn. eauto. }
-    { cbn; repeat (break_match ; eauto). cbn. eauto. }
-    { cbn; repeat (break_match ; eauto). }
-    { cbn; repeat (break_match ; eauto). }
-    { cbn; repeat (break_match ; eauto). cbn. eauto. }
-    { cbn; repeat (break_match ; eauto). cbn. eauto. }
-    { cbn; repeat (break_match ; eauto). }
-    { cbn; repeat (break_match ; eauto). }
-    { cbn; repeat (break_match ; eauto). }
+    unfold eval_conv_h.
+    break_match_goal; cbn in *; eauto.
   Qed.
 
   Lemma pick_is_pure : forall u P, pure (ℑ3 (trigger (pick u P))).

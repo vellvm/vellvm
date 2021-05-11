@@ -5,13 +5,9 @@ Import ListNotations.
 
 From Vellvm Require Import
      Numeric.Coqlib
-     Utils.Util
-     Utils.Tactics
-     Syntax.LLVMAst
-     Syntax.CFG
-     Syntax.TypToDtyp
-     Syntax.Scope.
-
+     Utilities
+     Syntax.
+     
 From ExtLib Require Import List.
 
 Set Implicit Arguments.

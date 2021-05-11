@@ -5,9 +5,8 @@ From ITree Require Import
      Eq.Eq.
 
 From Vellvm Require Import
-     Utils.Tactics
-     Utils.Util
-     Syntax.DynamicTypes
+     Utilities
+     Syntax
      Semantics.LLVMEvents
      Semantics.Denotation
      Handlers.Handlers.

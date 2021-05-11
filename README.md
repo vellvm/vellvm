@@ -116,8 +116,10 @@ Our current test-suite of LLVM programs for which we compare our semantics again
     * ceres      (installed via, e.g. opam install coq-ceres)
     * mathcomp   (installed via, e.g. opam install coq-mathcomp-ssreflect)
     * simple-io  (installed via, e.g. opam install coq-simple-io)
-    WARNING: you should not have the itree opam package in your switch to avoid conflict with the extended version of the library we provide locally
+    
+  WARNING: you should not have the itree opam package in your switch to avoid conflict with the extended version of the library we provide locally
   - Additional opam packages: 
+    * ocamlbuild (installed via, e.g. opam install ocaml-build)
     * dune       (installed via, e.g. opam install dune)
     * menhir     (installed via, e.g. opam install menhir)
     * qcheck     (installed via, e.g. opam install qcheck)
