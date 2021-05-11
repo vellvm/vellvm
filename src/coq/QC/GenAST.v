@@ -9,7 +9,7 @@ From ExtLib.Structures Require Export
 
 Require Import ExtLib.Data.Monads.StateMonad.
 
-From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Syntax.TypeUtil Semantics.TopLevel.
+From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Syntax.TypeUtil Semantics.TopLevel QC.Utils.
 Require Import Integers Floats.
 
 Require Import List.
@@ -24,34 +24,6 @@ From Coq Require Import
 Open Scope Z_scope.
 
 Section Helpers.
-  Fixpoint max_nat_list (l : list nat) : nat :=
-    match l with
-    | [] => 0
-    | x::rest => max x (max_nat_list rest)
-    end.
-
-  (* TODO: how big should lists be? *)
-  Fixpoint sizeof_typ (t : typ) : nat :=
-    match t with
-    | TYPE_Pointer t            => S (sizeof_typ t)
-    | TYPE_Array sz t           => S (sizeof_typ t)
-    | TYPE_Function ret args    => max (sizeof_typ ret) (max_nat_list (map sizeof_typ args))
-    | TYPE_Struct fields        => max_nat_list (map sizeof_typ fields)
-    | TYPE_Packed_struct fields => max_nat_list (map sizeof_typ fields)
-    | TYPE_Vector sz t          => S (sizeof_typ t)
-    | _                         => 0
-    end.
-
-  (* TODO: Move these *)
-  Fixpoint find_pred {A} (p : A -> bool) (l : list A) : option A
-    := match l with
-       | []   => None
-       | x::xs =>
-         if p x
-         then Some x
-         else find_pred p xs
-       end.
-
   Fixpoint is_sized_type_h (t : typ) : bool
     := match t with
        | TYPE_I sz                 => true
@@ -512,7 +484,7 @@ Section ExpGenerators.
   Definition gen_ibinop : G ibinop :=
     oneOf_ failGen
            [ ret LLVMAst.Add <*> ret false <*> ret false
-           ; ret Sub <*> ret false <*> ret false
+           (* ; ret Sub <*> ret false <*> ret false *)
            ; ret Mul <*> ret false <*> ret false
 (*           ; ret Shl <*> ret false <*> ret false  *)
            ; ret UDiv <*> ret false
@@ -687,7 +659,7 @@ Section ExpGenerators.
           end in
       let gen_size_0 :=
           match t with
-          | TYPE_I n                  => ret EXP_Integer <*> lift (arbitrary : G Z) (* TODO: should the integer be forced to be in bounds? *)
+          | TYPE_I n                  => ret EXP_Integer <*> lift (arbitrary : G Z) (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x)) (* TODO: should the integer be forced to be in bounds? *) *)
           | TYPE_Pointer t            => lift failGen (* Only pointer type expressions might be conversions? Maybe GEP? *)
           | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
           | TYPE_Function ret args    => lift failGen (* No expressions of function type *)
