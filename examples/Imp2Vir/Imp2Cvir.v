@@ -11,8 +11,9 @@ Import MonadNotation.
 
 From Vellvm Require Import
      Syntax.
+From tutorial Require Import Fin.
 
-Require Import Imp Vec CompileExpr CvirCombinators.
+Require Import Imp Vec CompileExpr CvirCombinators CvirCombinatorsWF.
 
 Open Scope Z_scope.
 
@@ -34,8 +35,8 @@ Fixpoint compile (next_reg : int) (s : stmt) (env: StringMap.t int)
       '(next_reg, _, ir) <- compile (expr_reg + 1) b env;;
       let br := branch_cvir expr_ir (texp_i32 expr_reg) in
       let body := seq_cvir br ir in
+      let body := focus_output_cvir body (exist _ 1%nat Nat.lt_1_2) in
       let ir := loop_cvir_open body in
-      let ir := mk_cvir (fun vi vo vt => (blocks ir) vi (rev vo) vt) in
       ret (next_reg, env, ir) : option (int * (StringMap.t int) * cvir 1 1)
   (*| If e l r =>
       '(expr_reg, expr_ir) <- compile_expr next_reg e env;;
@@ -45,6 +46,38 @@ Fixpoint compile (next_reg : int) (s : stmt) (env: StringMap.t int)
       )*)
   | _ => None
   end.
+
+Theorem compile_WF : forall s next_reg env,
+  match (compile next_reg s env) with
+  | Some p => cvir_ids_WF (snd p)
+  | None => True
+  end.
+Proof.
+  induction s ; intros ; (destruct (compile next_reg _ env) eqn:? ; [| tauto ]) ; simpl in Heqo.
+  - destruct (compile_assign _ _ _ _) as [[[]] |] eqn:? in Heqo ; [| discriminate Heqo ].
+    inversion Heqo.
+    subst.
+    apply block_cvir_id_WF.
+  - destruct (compile next_reg s1 env) as [[[]] |] eqn:? in Heqo ; [| discriminate Heqo ].
+    destruct (compile _ _ _) as [[[]] |] eqn:? in Heqo ; [| discriminate Heqo ].
+    inversion Heqo.
+    subst.
+    simpl in *.
+    specialize (IHs1 next_reg env).
+    rewrite Heqo0 in IHs1.
+    specialize (IHs2 i t).
+    rewrite Heqo1 in IHs2.
+    apply (seq_cvir_id_WF 1 0) ; simpl in *; assumption.
+  - discriminate Heqo.
+  - destruct (compile_expr _ _) as [[] |] eqn:? in Heqo ; [| discriminate Heqo ].
+    destruct (compile _ _ _) as [[[]] |] eqn:? in Heqo ; [| discriminate Heqo ].
+    inversion Heqo.
+    subst.
+    simpl in *.
+    admit.
+  - inversion Heqo.
+    apply block_cvir_id_WF.
+Admitted. 
 
 Definition compile_program (s : stmt) (env : StringMap.t int) :
   option program :=
