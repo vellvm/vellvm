@@ -71,16 +71,67 @@ Definition merge_cvir
       (blocks b1 li lo lt) ++ (blocks b2 ri ro rt)
     ).
 
-Definition seq_cvir {ni1 no1 ni2 no2 : nat}
-  (b1 : cvir ni1 (S no1))
-  (b2: cvir (S ni2) no2) :
-  cvir (ni1+ni2) (no1+no2) :=
-    mk_cvir (fun vi vo (vt : Vec.t raw_id (S (n_int b1 + n_int b2))) =>
-      let '(newint,vt) := Vec.uncons vt in
-      let b1 := mk_cvir (fun vi vo vt => (blocks b1) vi (newint :: vo)%vec vt) in
-      let b2 := mk_cvir (fun vi vo vt => (blocks b2) (newint :: vi)%vec vo vt) in
-      blocks (merge_cvir b1 b2) vi vo vt
-    ).
+Definition sym_i_cvir {ni1 ni2 ni3 no : nat} (b : cvir (ni1 + (ni2 + ni3)) no) :
+  cvir (ni1 + (ni3 + ni2)) no :=
+  mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
+    blocks b (sym_vec vi) vo vt
+  ).
+
+Definition sym_o_cvir {ni no1 no2 no3 : nat} (b : cvir ni (no1 + (no2 + no3))) :
+  cvir ni (no1 + (no3 + no2)) :=
+  mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
+    blocks b vi (sym_vec vo) vt
+  ).
+
+Definition cast_i_cvir {ni ni' no : nat} (b : cvir ni no) (H : ni = ni') : cvir ni' no :=
+  mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
+    blocks b (Vec.cast vi (eq_sym H)) vo vt
+  ).
+
+Definition cast_o_cvir {ni no no' : nat} (b : cvir ni no) (H : no = no') : cvir ni no' :=
+  mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
+    blocks b vi (Vec.cast vo (eq_sym H)) vt
+  ).
+
+Program Definition focus_input_cvir {ni no : nat} (b : cvir ni no) (i : Fin.fin ni) : cvir ni no :=
+  let b := cast_i_cvir b (_ : ni = proj1_sig i + (1 + (ni - proj1_sig i - 1)))%nat in
+  let b := sym_i_cvir b in
+  let b := cast_i_cvir b (_ : _ = 0 + ((ni - 1) + 1))%nat in
+  let b := sym_i_cvir b in
+  cast_i_cvir b (_ : _ = ni).
+Next Obligation.
+  destruct i.
+  simpl.
+  lia.
+Defined.
+Next Obligation.
+  destruct i.
+  simpl.
+  lia.
+Defined.
+Next Obligation.
+  destruct ni ; [ destruct i |] ; lia.
+Defined.
+
+Program Definition focus_output_cvir {ni no : nat} (b : cvir ni no) (o : Fin.fin no) : cvir ni no :=
+  let b := cast_o_cvir b (_ : no = proj1_sig o + (1 + (no - proj1_sig o - 1)))%nat in
+  let b := sym_o_cvir b in
+  let b := cast_o_cvir b (_ : _ = 0 + ((no - 1) + 1))%nat in
+  let b := sym_o_cvir b in
+  cast_o_cvir b (_ : _ = no).
+Next Obligation.
+  destruct o.
+  simpl.
+  lia.
+Defined.
+Next Obligation.
+  destruct o.
+  simpl.
+  lia.
+Defined.
+Next Obligation.
+  destruct no ; [ destruct o |] ; lia.
+Defined.
 
 Definition loop_cvir {ni no : nat} (b : cvir (S ni) (S no)) : cvir ni no :=
   mk_cvir (fun vi vo vt =>
@@ -88,63 +139,12 @@ Definition loop_cvir {ni no : nat} (b : cvir (S ni) (S no)) : cvir ni no :=
     (blocks b) (newint :: vi)%vec (newint :: vo)%vec vt
   ).
 
-Program Definition loop_cvir' {ni no ni' no' : nat} (b : cvir ni no) (Heqi : ni = S ni') (Heqo : no = S no') : cvir ni' no' :=
-  mk_cvir (fun vi vo vt =>
-    let '(newint,vt) := Vec.uncons vt in
-    (blocks b) (Vec.cast (newint :: vi)%vec _) (Vec.cast (newint :: vo)%vec _) vt
-  ).
+Definition loop_cvir' {ni no ni' no' : nat} (b : cvir ni no)
+  (Heqi : ni = S ni') (Heqo : no = S no') :
+  cvir ni' no' :=
+  loop_cvir (cast_o_cvir (cast_i_cvir b Heqi) Heqo).
 
-Program Definition focus_input_cvir {ni no : nat} (b : cvir ni no) (i : Fin.fin ni) : cvir ni no :=
-  match proj1_sig i with
-  | O => b
-  | S i' =>
-    match ni with
-    | S ni =>
-      mk_cvir (fun vi vo vt =>
-        let '(vi1, vi2) := Vec.splitat (S i') (cast vi _) : (Vec.t _ (S i')) * (Vec.t _ (ni - i')) in
-        let '(i1, vi1) := Vec.uncons vi1 in
-        (blocks b) (Vec.cast (vi1 ++ i1 :: vi2)%vec _) vo vt
-      )
-    | _ => b
-    end
-  end.
-Next Obligation.
-  destruct i. simpl in *.
-  rewrite le_plus_minus_r. reflexivity.
-  apply le_S_n.
-  subst.
-  apply Nat.lt_le_incl.
-  assumption.
-Defined.
-Next Obligation.
-  destruct i.
-  simpl in *. clear Heq_anonymous.
-  rewrite minus_Sn_m. rewrite le_plus_minus_r ; auto.
-  apply Nat.le_le_succ_r.
-  all: subst ; apply le_S_n ; apply Nat.lt_le_incl ; assumption.
-Defined.
-
-(*Program Definition focus_output_cvir {ni no : nat} (b : cvir ni (S no)) (i : Fin.fin no) : cvir ni (S no) :=
-  mk_cvir (fun vi vo vt =>
-    let '(vo1, vo2) := Vec.splitat (S (proj1_sig i)) (Vec.cast vo _) : (Vec.t _ (S (proj1_sig i))) * (Vec.t _ (no - proj1_sig i)) in
-    let '(o1, vo1) := Vec.uncons vo1 in
-    (blocks b) vi (Vec.cast (vo1 ++ o1 :: vo2)%vec _) vt
-  ).
-Next Obligation.
-  destruct i. simpl.
-  f_equal.
-  rewrite le_plus_minus_r ; auto.
-  apply Nat.lt_le_incl.
-  assumption.
-Defined.
-Next Obligation.
-  destruct i.
-  simpl. rewrite minus_Sn_m. rewrite le_plus_minus_r ; auto.
-  apply Nat.le_le_succ_r.
-  all: apply Nat.lt_le_incl ; assumption.
-Defined.*)
-
-Program Definition seq_cvir' {ni1 no1 ni2 no2 : nat}
+Program Definition seq_cvir {ni1 no1 ni2 no2 : nat}
   (b1 : cvir ni1 (S no1))
   (b2: cvir (S ni2) no2) :
   cvir (ni1+ni2) (no1+no2) :=

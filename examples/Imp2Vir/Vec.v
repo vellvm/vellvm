@@ -15,6 +15,8 @@ Open Scope nat_scope.
 
 Definition t (A : Type) (n : nat) : Type := { l : list A | length l = n }.
 
+Notation vec := (exist (fun l' : list _ => _)).
+
 Notation vec' l := (exist (fun l' : list _ => _) l _).
 
 Theorem vector_proj1_unique : forall A n (v v' : t A n),
@@ -42,6 +44,16 @@ Program Definition cast {A} {n n'} (v : t A n) (H : n = n') : t A n' :=
 Next Obligation.
   apply vector_length.
 Defined.
+
+Theorem cast_vec : forall A n n' (l : list A) (H : length l = n) (H' : n = n'),
+  cast (vec l H) H' = vec l (eq_trans H H').
+Proof.
+  intros.
+  unfold cast.
+  simpl.
+  apply vector_proj1_unique.
+  reflexivity.
+Qed.
 
 Program Definition empty (A : Type) : t A 0 := vec' nil.
 
@@ -135,6 +147,16 @@ Next Obligation.
   rewrite app_length. destruct v, v'. simpl. subst. reflexivity.
 Defined.
 
+Theorem vector_app_destruct : forall A (l l' : list A) n n' (H : length l = n) (H' : length l' = n') (H'' : length (l ++ l') = n + n'),
+  vec (l ++ l') H'' = append (vec l H) (vec l' H').
+Proof.
+  intros.
+  unfold append.
+  apply vector_proj1_unique.
+  simpl.
+  reflexivity.
+Qed.
+
 Definition In {A} {n} a (v : t A n) := List.In a (proj1_sig v).
 
 Theorem vector_in_app_iff : forall A n n' (v : t A n) (v' : t A n') (a : A),
@@ -180,19 +202,25 @@ Proof.
   Unshelve. apply Util.nth_error_in in H. rewrite <- vector_length with (v := v). assumption.
 Qed.
 
-Program Definition splitat {A} i {j} (v : t A (i+j)) :
-  t A i * t A j :=
-  (vec' (firstn i (proj1_sig v)), vec' (skipn i (proj1_sig v))).
+Program Definition firstn {A} i {j} (v : t A (i+j)) : t A i :=
+  vec' (firstn i (proj1_sig v)).
 Next Obligation.
   destruct v. simpl in *. rewrite firstn_length. rewrite e.
   rewrite (plus_n_O i) at 1. rewrite Nat.add_min_distr_l. rewrite Nat.min_0_l.
   apply Nat.add_0_r.
 Defined.
+
+Program Definition skipn {A} i {j} (v : t A (i+j)) : t A j :=
+  vec' (skipn i (proj1_sig v)).
 Next Obligation.
   destruct v. simpl in *. rewrite skipn_length. apply Nat.add_sub_eq_l. auto.
 Defined.
 
-Program Definition splitat' {A} {k} (i : fin k) (v : t A k) :
+Definition splitat {A} i {j} (v : t A (i+j)) :
+  t A i * t A j :=
+  (firstn i v, skipn i v).
+
+Program Definition splitat' {A} {k} (i : fin (k+1)) (v : t A k) :
   t A i * t A (k-i) :=
   splitat i (cast v _).
 Next Obligation.
@@ -229,6 +257,16 @@ Proof.
   subst x x0.
   apply vector_proj1_unique. simpl.
   rewrite (firstn_skipn n x1).
+  reflexivity.
+Qed.
+
+Theorem append_splitat' : forall A n (n' : fin (n+1)) (v : t A (proj1_sig n')) (v' : t A (n-(proj1_sig n'))) (v'' : t A n),
+  splitat' n' v'' = (v, v') -> proj1_sig v'' = proj1_sig (append v v').
+Proof.
+  intros.
+  simpl.
+  apply append_splitat in H.
+  inversion H.
   reflexivity.
 Qed.
 
@@ -301,6 +339,21 @@ Next Obligation.
   rewrite map_length.
   auto.
 Defined.
+
+Definition sym_vec {A} {n1 n2 n3} (v : Vec.t A (n1 + (n2 + n3))) : Vec.t A (n1 + (n3 + n2)) :=
+  let '(v1,v23) := Vec.splitat n1 v in
+  let '(v2,v3) := Vec.splitat n2 v23 in
+  (append v1 (append v3 v2)).
+
+Theorem sym_vec_app : forall {A} {n1 n2 n3} (v1 : Vec.t A n1) (v2 : Vec.t A n2) (v3 : Vec.t A n3),
+  sym_vec (append v1 (append v2 v3)) = (append v1 (append v3 v2)).
+Proof.
+  intros.
+  unfold sym_vec.
+  rewrite splitat_append.
+  rewrite splitat_append.
+  reflexivity.
+Qed.
 
 End Vec.
 
