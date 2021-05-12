@@ -154,7 +154,7 @@ Section ShowInstances.
        | INSTR_Load vol t ptr align =>
          "load " ++ show t ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
        | INSTR_Store vol tval ptr align =>
-         "store " ++ show tval ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
+         "store " ++ (if vol then "volatile " else "") ++ show tval ++ ", " ++ show ptr ++ show_opt_prefix ", align " align
        | INSTR_Alloca t nb align =>
          "alloca " ++ show t ++ show_opt_prefix ", " nb ++ show_opt_prefix ", align " align
        | _ => "show_instr todo"

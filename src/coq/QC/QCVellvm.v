@@ -73,179 +73,73 @@ QuickChickDebug Debug On.
 QuickChick (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
 (*! QuickChick agrees. *)
 
+Require Import List.
+Import ListNotations.
 
-(* Definition v0 := DVALUE_I64 (match eval_int_op (Sub false false) (Int64.repr 0) (Int64.repr 3) with *)
-(*          | inr (DVALUE_I64 x) => x *)
-(*          | _ => zero *)
-(*          end). *)
+Definition repr_prog : list (toplevel_entity typ (block typ * list (block typ))) := [(TLE_Definition (mk_definition _ (mk_declaration (Name "main") (TYPE_Function ((TYPE_I 8)) []) ([], []) None None None None [] None None None) [] ((mk_block (Name "b0") [] [] (TERM_Br_1 (Name "b1")) None), [(mk_block (Name "b1") [] [((IId (Name "v0")), (INSTR_Op (OP_IBinop And (TYPE_I 64) (EXP_Integer (-3)%Z) (EXP_Integer (-3)%Z)))); ((IId (Name "v1")), (INSTR_Op (OP_ICmp Ule (TYPE_I 64) (EXP_Ident (ID_Local (Name "v0"))) (EXP_Integer (8)%Z)))); ((IId (Name "v2")), (INSTR_Op (OP_Select ( (TYPE_I 1), (EXP_Ident (ID_Local (Name "v1")))) ((TYPE_I 64), (EXP_Ident (ID_Local (Name "v0")))) ((TYPE_I 64), (EXP_Integer (8)%Z))))); ((IId (Name "v3")), (INSTR_Op (OP_ICmp Ugt (TYPE_I 64) (EXP_Ident (ID_Local (Name "v2"))) (EXP_Integer (0)%Z))))] (TERM_Br ((TYPE_I 1), (EXP_Ident (ID_Local (Name "v3")))) (Name "b4") (Name "b2")) None); (mk_block (Name "b4") [((Name "v5"), (Phi (TYPE_I 64)[((Name "b1"), (EXP_Ident (ID_Local (Name "v2")))); ((Name "b3"), (EXP_Ident (ID_Local (Name "v6"))))]))] [((IId (Name "v8")), (INSTR_Op (OP_IBinop And (TYPE_I 32) (EXP_Integer (1)%Z) (EXP_Integer (-3)%Z)))); ((IId (Name "v9")), (INSTR_Alloca (TYPE_I 8) None None)); ((IVoid (1)%Z), (INSTR_Store false ((TYPE_I 8), (EXP_Integer (0)%Z)) ((TYPE_Pointer (TYPE_I 8)), (EXP_Ident (ID_Local (Name "v9")))) None)); ((IId (Name "v10")), (INSTR_Alloca (TYPE_I 8) None None)); ((IVoid (2)%Z), (INSTR_Store false ((TYPE_I 8), (EXP_Integer (0)%Z)) ((TYPE_Pointer (TYPE_I 8)), (EXP_Ident (ID_Local (Name "v10")))) None))] (TERM_Ret ((TYPE_I 8), (EXP_Integer (0)%Z))) None); (mk_block (Name "b3") [] [((IId (Name "v6")), (INSTR_Op (OP_IBinop (Sub false false) (TYPE_I 64) (EXP_Ident (ID_Local (Name "v5"))) (EXP_Integer (1)%Z)))); ((IId (Name "v7")), (INSTR_Op (OP_ICmp Ugt (TYPE_I 64) (EXP_Ident (ID_Local (Name "v6"))) (EXP_Integer (0)%Z))))] (TERM_Br ((TYPE_I 1), (EXP_Ident (ID_Local (Name "v7")))) (Name "b4") (Name "b2")) None); (mk_block (Name "b2") [] [((IId (Name "v4")), (INSTR_Alloca (TYPE_I 1) None None)); ((IVoid (0)%Z), (INSTR_Store true ((TYPE_I 1), (EXP_Ident (ID_Local (Name "v3")))) ((TYPE_Pointer (TYPE_I 1)), (EXP_Ident (ID_Local (Name "v4")))) None))] (TERM_Ret ((TYPE_I 8), (EXP_Integer (3)%Z))) None)])))].
 
-(* Definition v1 := eval_icmp Ule v0 (DVALUE_I64 (Int64.repr 9)). *)
+Definition parsed_prog : list (toplevel_entity typ (block typ * list (block typ))) :=
+  [TLE_Definition {|
+       df_prototype := {|dc_name := (Name "main");
+                         dc_type := (TYPE_Function (TYPE_I 8%N) []);
+                         dc_param_attrs := ([], []);
+                         dc_linkage := None;
+                         dc_visibility := None;
+                         dc_dll_storage := None;
+                         dc_cconv := None;
+                         dc_attrs := [];
+                         dc_section := None;
+                         dc_align := None;
+                         dc_gc := None|};
+       df_args := [];
+       df_instrs := (
+                     {|
+                       blk_id := (Name "b0");
+                       blk_phis := [];
+                       blk_code := [];
+                       blk_term := TERM_Br_1 (Name "b1");
+                       blk_comments := None
+                     |},
+                       [{|
+                         blk_id := (Name "b1");
+                         blk_phis := [];
+                         blk_code := [(IId (Name "v0"), (INSTR_Op (OP_IBinop And (TYPE_I 64%N) (EXP_Integer (-3)%Z) (EXP_Integer (-3)%Z))));
+                                     (IId (Name "v1"), (INSTR_Op (OP_ICmp Ule (TYPE_I 64%N) (EXP_Ident (ID_Local (Name "v0"))) (EXP_Integer (8)%Z))));
+                                     (IId (Name "v2"), (INSTR_Op (OP_Select ((TYPE_I 1%N),(EXP_Ident (ID_Local (Name "v1")))) ((TYPE_I 64%N),(EXP_Ident (ID_Local (Name "v0")))) ((TYPE_I 64%N),(EXP_Integer (8)%Z)))));
+                                     (IId (Name "v3"), (INSTR_Op (OP_ICmp Ugt (TYPE_I 64%N) (EXP_Ident (ID_Local (Name "v2"))) (EXP_Integer (0)%Z))))];
+                         blk_term := TERM_Br ((TYPE_I 1%N), (EXP_Ident (ID_Local (Name "v3")))) (Name "b4") (Name "b2");
+                         blk_comments := None
+                       |};
+                   {|
+                     blk_id := (Name "b4");
+                     blk_phis := [((Name "v5"), Phi (TYPE_I 64%N) [((Name "b3"), (EXP_Ident (ID_Local (Name "v6")))); ((Name "b1"), (EXP_Ident (ID_Local (Name "v2"))))])];
+                     blk_code := [(IId (Name "v8"), (INSTR_Op (OP_IBinop And (TYPE_I 32%N) (EXP_Integer (1)%Z) (EXP_Integer (-3)%Z))));
+                                 (IId (Name "v9"), (INSTR_Alloca (TYPE_I 8%N) None None));
+                                 (IVoid 0%Z, (INSTR_Store false ((TYPE_I 8%N), (EXP_Integer (0)%Z)) ((TYPE_Pointer (TYPE_I 8%N)), (EXP_Ident (ID_Local (Name "v9")))) None));
+                                 (IId (Name "v10"), (INSTR_Alloca (TYPE_I 8%N) None None));
+                                 (IVoid 1%Z, (INSTR_Store false ((TYPE_I 8%N), (EXP_Integer (0)%Z)) ((TYPE_Pointer (TYPE_I 8%N)), (EXP_Ident (ID_Local (Name "v10")))) None))];
+                     blk_term := TERM_Ret ((TYPE_I 8%N), (EXP_Integer (0)%Z));
+                     blk_comments := None
+                   |};
+                   {|
+                     blk_id := (Name "b3");
+                     blk_phis := [];
+                     blk_code := [(IId (Name "v6"), (INSTR_Op (OP_IBinop (Sub false false) (TYPE_I 64%N) (EXP_Ident (ID_Local (Name "v5"))) (EXP_Integer (1)%Z))));
+                                 (IId (Name "v7"), (INSTR_Op (OP_ICmp Ugt (TYPE_I 64%N) (EXP_Ident (ID_Local (Name "v6"))) (EXP_Integer (0)%Z))))];
+                     blk_term := TERM_Br ((TYPE_I 1%N), (EXP_Ident (ID_Local (Name "v7")))) (Name "b4") (Name "b2");
+                     blk_comments := None
+                   |};
+                   {|
+                     blk_id := (Name "b2");
+                     blk_phis := [];
+                     blk_code := [(IId (Name "v4"), (INSTR_Alloca (TYPE_I 1%N) None None));
+                                 (IVoid 2%Z, (INSTR_Store false ((TYPE_I 1%N), (EXP_Ident (ID_Local (Name "v3")))) ((TYPE_Pointer (TYPE_I 1%N)), (EXP_Ident (ID_Local (Name "v4")))) None))];
+                     blk_term := TERM_Ret ((TYPE_I 8%N), (EXP_Integer (3)%Z));
+                     blk_comments := None
+                   |}])
+     |}].
 
-(* Compute v1. *)
-(* Definition v1_dv := (DVALUE_I1 *)
-(*                                         {| *)
-(*                                         Int1.intval := 0; *)
-(*                                         Int1.intrange := Int1.Z_mod_modulus_range' 0 |}). *)
-
-(* Definition v2 := eval_select_h v1_dv (dvalue_to_uvalue v0) (dvalue_to_uvalue (DVALUE_I64 (Int64.repr 9))). *)
-
-(* Compute v2. *)
-
-(* Definition v2_uv := (UVALUE_I64 *)
-(*                                         {| *)
-(*                                         Int64.intval := 9; *)
-(*                                         Int64.intrange := Integers.Int64.Z_mod_modulus_range' 9 |}). *)
-
-(* Definition v2_dv := (DVALUE_I64 *)
-(*                                         {| *)
-(*                                         Int64.intval := 9; *)
-(*                                         Int64.intrange := Integers.Int64.Z_mod_modulus_range' 9 |}). *)
-
-
-(* Definition v3 := eval_icmp Ugt v2_dv (DVALUE_I64 zero). *)
-
-(* Compute v3. *)
-
-(* Compute (Z.rem (-1) 4). *)
-(* Compute (Int64.mods (Int64.repr (-1)) (Int64.repr 4)). *)
-
-
-(* define i8 @main() { *)
-(* b0: *)
-(* br label %b1 *)
-(* b1: *)
-(* %v0 = srem i64 -1, 4 *)
-(* %v1 = icmp ule i64 %v0, 3 *)
-(* %v2 = select i1 %v1, i64 %v0, i64 3 *)
-(* %v3 = icmp ugt i64 %v2, 0 *)
-(* br i1 %v3, label %b4, label %b2 *)
-(* b4: *)
-(* %v4 = phi i64 [ %v5, %b3 ], [ %v2, %b1 ] *)
-(* %v7 = alloca i1 *)
-(* store i1 %v1, i1* %v7 *)
-(* %v8 = add i1 %v3, %v1 *)
-(* %v9 = srem i32 0, 5 *)
-(* %v10 = xor i1 %v1, 3 *)
-(* ret i8 -2 *)
-(* b3: *)
-(* %v5 = sub i64 %v4, 1 *)
-(* %v6 = icmp ugt i64 %v5, 0 *)
-(* br i1 %v6, label %b4, label %b2 *)
-(* b2: *)
-(* ret i8 4 *)
-(* } *)
-(* Vellvm: 4 | Clang: 254 *)
-
-
-(* define i8 @main() { *)
-(* b0: *)
-(* br label %b1 *)
-(* b1: *)
-(* %v0 = lshr i64 -6, -5 *)
-(* %v1 = icmp ule i64 %v0, 10 *)
-(* %v2 = select i1 %v1, i64 %v0, i64 10 *)
-(* %v3 = icmp ugt i64 %v2, 0 *)
-(* br i1 %v3, label %b4, label %b2 *)
-(* b4: *)
-(* %v5 = mul i32 -3, -2 *)
-(* ret i8 -6 *)
-(* b2: *)
-(* ret i8 1 *)
-(* } *)
-
-
-                                                             
-
-(* Definition v0 : uvalue := (match eval_int_op (UDiv false) (Int64.repr (-1)) (Int64.repr 2) with *)
-(*          | inr dv => dvalue_to_uvalue dv *)
-(*          | _ => UVALUE_Poison *)
-(*         end). *)
-
-(* Compute (eval_int_icmp Ule *)
-(*                        (match eval_int_op (UDiv false) (Int64.repr (-1)) (Int64.repr 2) with *)
-(*          | inr (DVALUE_I64 x) => x *)
-(*          | _ => zero *)
-(*         end) (Int64.repr 3)). *)
-
-(* Definition v1 : dvalue := (eval_int_icmp Ule *)
-(*                        (match eval_int_op (UDiv false) (Int64.repr (-1)) (Int64.repr 2) with *)
-(*          | inr (DVALUE_I64 x) => x *)
-(*          | _ => zero *)
-(*         end) (Int64.repr 3)). *)
-
-(* Compute eval_select_h v1 v0 (UVALUE_I64 (Int64.repr 3)). *)
-
-
-
-
-
-
-
-(* define i8 @main() { *)
-(* b0: *)
-(* br label %b1 *)
-(* b1: *)
-(* %v0 = udiv i64 -1, 2 *)
-(* %v1 = icmp ule i64 %v0, 3 ; v1 = 0 *)
-(* %v2 = select i1 %v1, i64 %v0, i64 3 ; v2 = 3 *)
-(* %v3 = icmp ugt i64 %v2, 0 *)
-(* br i1 %v3, label %b4, label %b2 *)
-(* b3: *)
-(* %v5 = sub i64 %v4, 1 *)
-(* %v6 = icmp ugt i64 sub i64 %v4, 1, 0 *)
-(* br i1 %v6, label %b4, label %b2 *)
-(* b4: *)
-(* %v7 = sub i8 -2, -2 *)
-(* ret i8 %v7 *)
-(* b2: *)
-(* ret i8 0 *)
-(* } *)
-(* (0,1) *)
-
-
-(* (* Am I generating next block for loop???? *) *)
-(* define i8 @main() { *)
-(* b0: *)
-(* br label %b1 *)
-(* b1: *)
-(* %v0 = lshr i64 -6, -5 *)
-(* %v1 = icmp ule i64 %v0, 10 *)
-(* %v2 = select i1 %v1, i64 %v0, i64 10 *)
-(* %v3 = icmp ugt i64 %v2, 0 *)
-(* br i1 %v3, label %b4, label %b2 *)
-(* b4: *)
-(* %v5 = mul i32 -3, -2 *)
-(* ret i8 -6 *)
-(* b2: *)
-(* ret i8 1 *)
-(* } *)
-
-(* (1,250) *)
-
-
-(* (* *)
-
-(* define i8 @main() { *)
-(* b0: *)
-(* br label %b1 *)
-(* b1: *)
-(* %v0 = xor i64 -1, 3 *)
-(* %v1 = icmp ule i64 %v0, 4 *)
-(* %v2 = select i1 %v1, i64 %v0, i64 4 *)
-(* %v3 = icmp ugt i64 %v2, 0 *)
-(* br i1 %v3, label %b4, label %b2 *)
-(* b4: *)
-(* %v9 = alloca i32 *)
-(* store i32 0, i32* %v9 *)
-(* %v10 = sub i32 4, 5 *)
-(* ret i8 5 *)
-(* b2: *)
-(* %v4 = mul i32 1, 2 *)
-(* %v5 = alloca i64 *)
-(* store i64 %v2, i64* %v5 *)
-(* %v6 = ashr i8 1, 4 *)
-(* %v7 = alloca i64 *)
-(* store i64 %v0, i64* %v7 *)
-(* ret i8 %v6 *)
-(* } *)
-(* *) *)
+Lemma blah :
+  repr_prog = parsed_prog.
+Proof.
+Admitted.
