@@ -14,6 +14,7 @@ From Vellvm Require Import
      Semantics
      Utils.NoFailure
      Utils.PostConditions
+     Theory.StatePredicates
      Theory.InterpreterCFG
      Theory.ExpLemmas
      Theory.InstrLemmas

@@ -19,6 +19,7 @@ From Vellvm Require Import
      Utilities
      Syntax
      Semantics
+     Theory.StatePredicates
      Theory.Refinement
      Theory.InterpreterCFG
      Utils.PostConditions.
@@ -405,19 +406,6 @@ End ExpLemmas.
 Section ExpPure.
 
   Import ITreeNotations.
-
-  (* TODO MOVE *)
-  Definition state_cfg : Type := memory_stack * (local_env * global_env).
-
-  Definition state_cfg_T (T:Type): Type
-    := memory_stack * (local_env * (global_env * T)).
-
-  Definition state_cfgP := state_cfg -> Prop.
-  Definition state_cfg_TP {T : Type} := state_cfg_T T -> Prop.
-  Definition lift_state_cfgP {T : Type} (P : state_cfgP) : @state_cfg_TP T :=
-    fun '(m,(l,(g,_))) => P (m,(l,g)).
-
-  Notation "↑" :=  lift_state_cfgP.
 
   (* Expressions are "almost pure" computations:
    they depend on the memory, but do not modify any component on the state *)
