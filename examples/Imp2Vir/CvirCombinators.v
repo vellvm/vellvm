@@ -163,8 +163,8 @@ Definition loop_cvir_open {ni no : nat} (b : cvir (S ni) (S no)) : cvir (S ni) n
 
 Definition join_cvir {ni no : nat} (b : cvir ni (S (S no))) : cvir ni (S no) :=
   mk_cvir (fun vi vo vt =>
-    let '(o, vo) := Vec.uncons vo in
-    (blocks b) vi (o :: o :: vo)%vec vt
+    let o := Vec.hd vo in
+    (blocks b) vi (o :: vo)%vec vt
   ).
 
 Definition close_cvir {ni} (b : cvir ni 0) : cvir 0 0 :=
@@ -177,8 +177,10 @@ Definition close_cvir {ni} (b : cvir ni 0) : cvir 0 0 :=
   (b1 : cvir (S ni1) (S no1)) (b2: cvir (S ni2) (S no2)) (e : texp typ) :
   cvir (ni1+ni2) (no1+no2) :=
     let cond_ir := branch_cvir [] e in
-    join_cvir (seq_cvir (seq_cvir cond_ir b1) b2).*)
-
+    let branchs_ir := join_cvir b1 b2 in
+    seq_cvir cond_ir branchs_ir
+    join_cvir (cast_o_cvir (seq_cvir (seq_cvir cond_ir b1) b2) _).
+*)
 
 Definition fnbody := (block typ * list (block typ))%type.
 Definition program := toplevel_entity typ fnbody.

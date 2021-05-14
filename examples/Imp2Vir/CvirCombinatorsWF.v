@@ -506,3 +506,33 @@ Proof.
   apply focus_input_cvir_unique.
   apply merge_cvir_unique ; assumption.
 Qed.
+
+Theorem join_cvir_id_WF :
+  forall (ni no : nat) (ir : cvir ni (S (S no))),
+  cvir_ids_WF ir ->
+  cvir_ids_WF (join_cvir ir).
+Proof.
+  unfold join_cvir, cvir_ids_WF.
+  intros.
+  simpl in *.
+  apply H in H0.
+  split ; [ tauto |].
+  intros.
+  apply H0 in H1.
+  apply in_app_iff in H1. simpl in H1. rewrite in_app_iff in H1.
+  apply vector_in_app_iff. rewrite (vector_in_app_iff _ _ _ vo vt).
+  intuition.
+  subst bid.
+  right. left. apply In_hd.
+Qed.
+
+Theorem join_cvir_unique :
+  forall (ni no : nat) (ir : cvir ni (S (S no))),
+  unique_bid ir ->
+  unique_bid (join_cvir ir).
+Proof.
+  unfold join_cvir, unique_bid.
+  intros.
+  simpl in *.
+  eapply H ; eassumption.
+Qed.

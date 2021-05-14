@@ -12,9 +12,9 @@ Import MonadNotation.
 From Vellvm Require Import
      Syntax
      Utils.Tactics.
-From tutorial Require Import Fin.
+From tutorial Require Import Imp Fin.
 
-Require Import Imp Vec CompileExpr CvirCombinators CvirCombinatorsWF.
+Require Import Vec CompileExpr CvirCombinators CvirCombinatorsWF.
 
 Open Scope Z_scope.
 
@@ -39,13 +39,15 @@ Fixpoint compile (next_reg : int) (s : stmt) (env: StringMap.t int)
       let body := focus_output_cvir body (exist _ 1%nat Nat.lt_1_2) in
       let ir := loop_cvir_open body in
       ret (next_reg, env, ir) : option (int * (StringMap.t int) * cvir 1 1)
-  (*| If e l r =>
+  | If e l r =>
       '(expr_reg, expr_ir) <- compile_expr next_reg e env;;
       '(next_reg, _, ir_l) <- compile (expr_reg + 1) l env;;
       '(next_reg, _, ir_r) <- compile next_reg r env;;
-      ret (next_reg, env, cond_cvir ir_l ir_r (texp_i32 expr_reg)
-      )*)
-  | _ => None
+      let ir := branch_cvir expr_ir (texp_i32 expr_reg) : cvir 1 2 in
+      let ir := seq_cvir ir ir_l : cvir 1 2 in
+      let ir := seq_cvir ir ir_r : cvir 1 2 in
+      let ir := join_cvir ir : cvir 1 1 in
+      ret (next_reg, env, ir) : option (int * (StringMap.t int) * cvir 1 1)
   end.
 
 Theorem compile_WF : forall s next_reg env,
@@ -68,7 +70,20 @@ Proof.
     specialize (IHs2 i t).
     rewrite Heqo1 in IHs2.
     apply (seq_cvir_id_WF 1 0) ; simpl in *; assumption.
-  - discriminate Heqo.
+  - repeat break_match ; try discriminate.
+    inversion Heqo.
+    subst.
+    simpl in *.
+    apply join_cvir_id_WF.
+    apply (seq_cvir_id_WF 1 1).
+    apply (seq_cvir_id_WF 1 1).
+    apply branch_cvir_id_WF.
+    specialize (IHs1 (i0 + 1) env).
+    rewrite Heqo1 in IHs1.
+    apply IHs1.
+    specialize (IHs2 i1 env).
+    rewrite Heqo2 in IHs2.
+    apply IHs2.
   - repeat break_match ; try discriminate.
     inversion Heqo.
     subst.
