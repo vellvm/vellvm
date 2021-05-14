@@ -99,7 +99,6 @@ Proof.
         pstep. red. eapply IHeqitF. econstructor. intros. apply H. reflexivity. apply Heqoy.
       * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
 Qed.    
-  
 
 (* The right part of the signature is absent *)
 Variant no_event_rF {E F X} (R: itree (E +' F) X -> Prop): itree' (E +' F) X -> Prop :=

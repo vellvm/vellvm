@@ -1,3 +1,4 @@
+(* begin hide *)
 Require Import Paco.paco.
 From Coq Require Import Morphisms.
 From ITree Require Import
@@ -7,13 +8,32 @@ From ITree Require Import
      Interp.TranslateFacts.
 Set Implicit Arguments.
 Set Strict Implicit.
+(* end hide *)
 
-(** * has_post  *)
+(** * Unary interpretation for [eutt]: a traditional program logic.
+ 
+  The weak bisimulation supported by [itree]s and the notions of 
+  refinements we build upon it in the various monads we interpret into
+  give us reasoning principles to establish the equivalence or refinement
+  of computations.
+  In particular, it can be seen as a relational program logic.
 
+  We develop here some theory for a unary program logic over itree-based computations.
+  It is defined in terms of [eutt], simply taking its diagonal. 
+  We prove that it respects the expected elemntary proof rules w.r.t. to logical 
+  connectors.
+  Most importantly, we derive a proof rule to leverage such unary facts during a
+  relational refinement proof: see [eutt_post_bind] and [eutt_post_bind_gen].
+
+*)
+
+(* The main predicate: an itree-computation [t] admits [Q] for a postcondition.
+  Defined as the diagonal of [eutt].
+*)
 Definition has_post {E X} (t : itree E X) (Q : X -> Prop) : Prop :=
   eutt (fun 'x _ => Q x) t t.
 
-(* Note: the following definition is equivalent. *)
+(* Note: the following formulation is equivalent. *)
 Definition has_post_strong {E X} (t : itree E X) (Q : X -> Prop) : Prop :=
   eutt (fun 'x y => x = y /\ Q x) t t.
 
@@ -32,7 +52,7 @@ Notation "t ⤳ Q" := (has_post t Q) (at level 50).
     Post-conditions can be established by usual elementary logical connectives
  *)
 
-Global Instance has_post_eutt {E X} : Proper (eutt eq ==> equiv_pred ==> iff) (@has_post E X).
+#[global] Instance has_post_eutt {E X} : Proper (eutt eq ==> equiv_pred ==> iff) (@has_post E X).
 Proof.
   repeat red; unfold has_post; intros * EUTT * EQ *; split; intros HP.
   - rewrite <- EUTT; eapply eutt_equiv; eauto.
@@ -41,7 +61,7 @@ Proof.
     split; red; intros; apply EQ; auto.
 Qed.
 
-Global Instance has_post_eq_itree {E X} : Proper (eq_itree eq ==> eq ==> iff) (@has_post E X).
+#[global] Instance has_post_eq_itree {E X} : Proper (eq_itree eq ==> eq ==> iff) (@has_post E X).
 Proof.
   repeat red; unfold has_post; intros * EUTT * EQ *; split; intros HP.
   - rewrite <- EUTT; eapply eutt_equiv; eauto.
@@ -86,6 +106,14 @@ Proof.
   intros * HP INCL.
   eapply eqit_mon; eauto.
   intros; apply INCL; auto.
+Qed.     
+
+Lemma has_post_True : forall {E X} (t : itree E X),
+    t ⤳ fun _ => True.
+Proof.
+  intros *.
+  eapply eqit_mon; eauto.
+  reflexivity.
 Qed.     
 
 (** [has_post] structural constructs *)
