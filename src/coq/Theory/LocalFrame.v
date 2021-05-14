@@ -85,7 +85,7 @@ Ltac case_eq_id x id :=
   [repeat red in EQ; subst | unfold Eqv.eqv, eqv_raw_id in NEQ].
 
 Arguments alist_find : simpl never.
-Hint Unfold In : core.
+#[export] Hint Unfold In : core.
 
 Lemma pickUnique_is_pure: forall v, pure (ℑ3 (pickUnique v)).
 Proof.
@@ -691,7 +691,7 @@ Proof.
   inv SUB.
 Qed.
 
-Global Instance sublist_refl {A} : Reflexive (@sublist A). 
+#[global] Instance sublist_refl {A} : Reflexive (@sublist A). 
 Proof.
   repeat red; intros; auto.
 Qed.

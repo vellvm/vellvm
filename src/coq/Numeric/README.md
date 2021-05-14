@@ -1,4 +1,4 @@
-This is a subset of CompCert https://github.com/AbsInt/CompCert
+This is a subset of the CompCert https://github.com/AbsInt/CompCert
 project's library dealing with Floats and Integers. It was copied from
 CompCert and ported to Flocq-3.0.0 instead of Flocq-2.6.1 included
 with CompCert.

@@ -59,7 +59,7 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 (* end hide *)
 
-Local Open Scope Z_scope.
+#[local] Open Scope Z_scope.
 
 (** * Memory Model
 
@@ -390,7 +390,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DTYPE_I 8          => 8 (* All integers are padded to 8 bytes. *)
       | DTYPE_I 32         => 8 (* All integers are padded to 8 bytes. *)
       | DTYPE_I 64         => 8 (* All integers are padded to 8 bytes. *)
-      | DTYPE_I x          => 0 (* Unsupported integers *)
+      | DTYPE_I _          => 0 (* Unsupported integers *)
       | DTYPE_Pointer      => 8
       | DTYPE_Packed_struct l
       | DTYPE_Struct l     => fold_left (fun acc x => (acc + sizeof_dtyp x)%N) l 0%N
@@ -878,9 +878,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     Definition equivs : frame_stack -> frame_stack -> Prop := Logic.eq.
 
-    Global Instance equivs_Equiv : Equivalence equivs.
-    split; unfold equivs; typeclasses eauto.
-    Qed.
+    #[global, refine] Instance equivs_Equiv : Equivalence equivs := _. Defined.
 
   End Frame_Stack_Operations.
 

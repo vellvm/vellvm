@@ -122,8 +122,8 @@ Set Contextual Implicit.
 (* SAZ: TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
 Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
-  Global Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.eq_dec.
-  Global Instance Eqv_addr : Eqv ADDR.addr := (@eq ADDR.addr).
+  #[global] Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.eq_dec.
+  #[global] Instance Eqv_addr : Eqv ADDR.addr := (@eq ADDR.addr).
 
   Module DV := DynamicValues.DVALUE(ADDR).
   Export DV.
@@ -239,7 +239,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   Definition L5 := ExternalCallE +' DebugE +' FailureE.
 
-  Hint Unfold L0 L0' L1 L2 L3 L4 L5 : core.
+  #[export] Hint Unfold L0 L0' L1 L2 L3 L4 L5 : core.
 
   Definition FUB_to_L4 : (FailureE +' UBE) ~> L4:=
     fun T e =>

@@ -57,7 +57,7 @@ Open Scope N_scope.
       + delayed numerical operations.
  *)
 
-Instance Eqv_nat : Eqv nat := (@eq nat).
+#[global] Instance Eqv_nat : Eqv nat := (@eq nat).
 
 (* Floating-point rounding mode *)
 Definition FT_Rounding:mode := mode_NE.
@@ -102,10 +102,9 @@ Inductive IX_supported : N -> Prop :=
 .
 
 (* TODO: This probably should live somewhere else... *)
-Program Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
+#[refine] Instance Decidable_eq_N : forall (x y : N), Decidable (eq x y) := {
   Decidable_witness := N.eqb x y
 }.
-Next Obligation.
  apply N.eqb_eq.
 Qed.
 
@@ -541,7 +540,7 @@ Definition uvalue_to_dvalue_uop {A : Type}
 (* TODO: define [refines : uvalue -> dvalue -> Prop] which characterizes the nondeterminism of undef values *)
 
 Section hiding_notation.
-  Local Open Scope sexp_scope.
+  #[local] Open Scope sexp_scope.
 
   Fixpoint serialize_dvalue' (dv:dvalue): sexp :=
     match dv with
@@ -564,7 +563,7 @@ Section hiding_notation.
       => [Atom "<" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom  ","]) elts) ; Atom ">"]
     end.
 
-  Global Instance serialize_dvalue : Serialize dvalue := serialize_dvalue'.
+  #[global] Instance serialize_dvalue : Serialize dvalue := serialize_dvalue'.
 
   Fixpoint serialize_uvalue' (pre post: string) (uv:uvalue): sexp :=
     match uv with
@@ -601,7 +600,7 @@ Section hiding_notation.
     | _ => Atom "TODO: show_uvalue"
     end.
 
-  Global Instance serialize_uvalue : Serialize uvalue := serialize_uvalue' "" "".
+  #[global] Instance serialize_uvalue : Serialize uvalue := serialize_uvalue' "" "".
 
 End hiding_notation.
 
@@ -700,8 +699,8 @@ Section DecidableEquality.
       * right; intros H; inversion H. contradiction.
   Qed.
 
-  Global Instance eq_dec_dvalue : RelDec (@eq dvalue) := RelDec_from_dec (@eq dvalue) (@dvalue_eq_dec).
-  Global Instance eqv_dvalue : Eqv dvalue := (@eq dvalue).
+  #[global] Instance eq_dec_dvalue : RelDec (@eq dvalue) := RelDec_from_dec (@eq dvalue) (@dvalue_eq_dec).
+  #[global] Instance eqv_dvalue : Eqv dvalue := (@eq dvalue).
   Hint Unfold eqv_dvalue : core.
 
 	Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
@@ -870,10 +869,10 @@ Section DecidableEquality.
       destruct (f t t')...
   Qed.
 
-  Global Instance eq_dec_uvalue : RelDec (@eq uvalue) := RelDec_from_dec (@eq uvalue) (@uvalue_eq_dec).
-  Global Instance eqv_uvalue : Eqv uvalue := (@eq uvalue).
+  #[global] Instance eq_dec_uvalue : RelDec (@eq uvalue) := RelDec_from_dec (@eq uvalue) (@uvalue_eq_dec).
+  #[global] Instance eqv_uvalue : Eqv uvalue := (@eq uvalue).
   Hint Unfold eqv_uvalue : core.
-  Global Instance eq_dec_uvalue_correct: @RelDec.RelDec_Correct uvalue (@Logic.eq uvalue) _ := _.
+  #[global] Instance eq_dec_uvalue_correct: @RelDec.RelDec_Correct uvalue (@Logic.eq uvalue) _ := _.
 
 End DecidableEquality.
 
@@ -964,7 +963,7 @@ Class VInt I : Type :=
   }.
 
 
-  Global Instance VInt1 : VInt Int1.int :=
+  #[global] Instance VInt1 : VInt Int1.int :=
   {
     (* Comparisons *)
     equ := Int1.eq;
@@ -1017,7 +1016,7 @@ Class VInt I : Type :=
   }.
 
 
-  Global Instance VInt8 : VInt Int8.int :=
+  #[global] Instance VInt8 : VInt Int8.int :=
   {
     (* Comparisons *)
     equ := Int8.eq;
@@ -1070,7 +1069,7 @@ Class VInt I : Type :=
   }.
 
 
-  Global Instance VInt32 : VInt Int32.int :=
+  #[global] Instance VInt32 : VInt Int32.int :=
   {
     (* Comparisons *)
     equ := Int32.eq;
@@ -1122,7 +1121,7 @@ Class VInt I : Type :=
     repr := Int32.repr;
   }.
 
-  Global Instance VInt64 : VInt Int64.int :=
+  #[global] Instance VInt64 : VInt Int64.int :=
   {
     (* Comparisons *)
     equ := Int64.eq;
@@ -2046,20 +2045,6 @@ Class VInt I : Type :=
   .
 
   Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
-
   
-  (*
-    YZ TODO: Not sure whether those can be uvalues, to figure out
-  | Concretize_Conversion     : pickU (UVALUE_Conversion       _) (DVALUE_Conversion       _)
-  | Concretize_GetElementPtr  : pickU (UVALUE_GetElementPtr    _) (DVALUE_GetElementPtr    _)
-  | Concretize_ExtractElement : pickU (UVALUE_ExtractElement   _) (DVALUE_ExtractElement   _)
-  | Concretize_InsertElement  : pickU (UVALUE_InsertElement    _) (DVALUE_InsertElement    _)
-  | Concretize_ShuffleVector  : pickU (UVALUE_ShuffleVector    _) (DVALUE_ShuffleVector    _)
-  | Concretize_ExtractValue   : pickU (UVALUE_ExtractValue     _) (DVALUE_ExtractValue     _)
-  | Concretize_InsertValue    : pickU (UVALUE_InsertValue      _) (DVALUE_InsertValue      _)
-  | Concretize_Select         : pickU (UVALUE_Select           _) (DVALUE_Select           _)
-  .
-   *)
-
 End DVALUE.
 

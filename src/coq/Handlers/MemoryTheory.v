@@ -50,7 +50,7 @@ Set Contextual Implicit.
     Reasoning principles for VIR's main memory model.
 *)
 
-Local Open Scope Z_scope.
+#[local] Open Scope Z_scope.
 
 
 Module Type MEMORY_THEORY (LLVMEvents : LLVM_INTERACTIONS(Addr)).
@@ -239,7 +239,7 @@ Section Map_Theory.
         Both notions of equivalence of maps that we manipulate are indeed equivalences
         (assuming the relation on values is itself an equivalence for [Equiv]).
    *)
-  Global Instance Equal_Equiv {a}: Equivalence (@Equal a).
+  #[global] Instance Equal_Equiv {a}: Equivalence (@Equal a).
   Proof.
     split.
     - repeat intro; reflexivity.
@@ -249,7 +249,7 @@ Section Map_Theory.
       etransitivity; eauto.
   Qed.
 
-  Global Instance Equiv_Equiv {a} {r: a -> a -> Prop} {rE : Equivalence r} : Equivalence (Equiv r).
+  #[global] Instance Equiv_Equiv {a} {r: a -> a -> Prop} {rE : Equivalence r} : Equivalence (Equiv r).
   Proof.
     split.
     - intros ?; split.
@@ -270,13 +270,13 @@ Section Map_Theory.
       eapply EQ2; eauto.
   Qed.
 
-  Global Instance Proper_lookup {a} k: Proper (@Equal a ==> Logic.eq) (lookup k).
+  #[global] Instance Proper_lookup {a} k: Proper (@Equal a ==> Logic.eq) (lookup k).
   Proof.
     repeat intro.
     apply H.
   Qed.
 
-  Global Instance Proper_add {a} : Proper (Logic.eq ==> Logic.eq ==> Equal ==> Equal) (@add a).
+  #[global] Instance Proper_add {a} : Proper (Logic.eq ==> Logic.eq ==> Equal ==> Equal) (@add a).
   Proof.
     repeat intro; subst.
     destruct (RelDec.rel_dec_p k y); [subst; rewrite 2 lookup_add_eq; auto | rewrite 2 lookup_add_ineq; auto].
@@ -285,7 +285,7 @@ Section Map_Theory.
   Inductive equivlb : logical_block -> logical_block -> Prop :=
   | Equivlb : forall z m m' cid, Equal m m' -> equivlb (LBlock z m cid) (LBlock z m' cid).
 
-  Global Instance equivlb_Equiv : Equivalence equivlb.
+  #[global] Instance equivlb_Equiv : Equivalence equivlb.
   Proof.
     split.
     - intros []; constructor; reflexivity.
@@ -296,13 +296,13 @@ Section Map_Theory.
   Definition equivl : logical_memory -> logical_memory -> Prop :=
     @Equiv _ equivlb.
 
-  Global Instance equivl_Equiv : Equivalence equivl.
+  #[global] Instance equivl_Equiv : Equivalence equivl.
   Proof.
     unfold equivl.
     apply Equiv_Equiv.
   Qed.
 
-  Global Instance equivc_Equiv : Equivalence equivc.
+  #[global] Instance equivc_Equiv : Equivalence equivc.
   Proof.
     unfold equivc; typeclasses eauto.
   Qed.
@@ -2593,7 +2593,7 @@ Section Memory_Stack_Theory.
         equivc cm cm' /\
         equivl lm lm'.
 
-    Global Instance equiv_Equiv : Equivalence equiv.
+    #[global] Instance equiv_Equiv : Equivalence equiv.
     Proof.
       split.
       - intros ((cm,lm),s); cbn; split; [| split]; reflexivity.
@@ -2618,7 +2618,7 @@ Section Memory_Stack_Theory.
       apply add_add_logical.
     Qed.
 
-    Global Instance Proper_add_logical : Proper (Logic.eq ==> equivlb ==> equivl ==> equivl) add.
+    #[global] Instance Proper_add_logical : Proper (Logic.eq ==> equivlb ==> equivl ==> equivl) add.
     Proof.
       repeat intro; subst.
       destruct H1 as [DOM EQUIV].
@@ -2630,7 +2630,7 @@ Section Memory_Stack_Theory.
         eapply EQUIV; eauto.
     Qed.
 
-    Global Instance Proper_add_logical_block :
+    #[global] Instance Proper_add_logical_block :
       Proper (Logic.eq ==> equivlb ==> equiv ==> equiv) add_logical_block.
     Proof.
       repeat intro; subst.
@@ -2640,7 +2640,7 @@ Section Memory_Stack_Theory.
       reflexivity.
     Qed.
 
-    Global Instance Proper_LBlock : Proper (Logic.eq ==> Equal ==> Logic.eq ==> equivlb) LBlock.
+    #[global] Instance Proper_LBlock : Proper (Logic.eq ==> Equal ==> Logic.eq ==> equivlb) LBlock.
     Proof.
       repeat intro; subst.
       constructor; auto.
@@ -2805,7 +2805,7 @@ Section PARAMS.
       intros ?; tau_steps; reflexivity.
     Qed.
 
-    Global Instance eutt_interp_memory {R} :
+    #[global] Instance eutt_interp_memory {R} :
       Proper (eutt Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@interp_memory R).
     Proof.
       repeat intro.

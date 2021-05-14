@@ -26,7 +26,7 @@ From Vellvm Require Import
 Opaque append.
 Import ListSet.
 
-Remove Hints Eqv.EqvWF_Build : typeclass_instances.
+#[export] Remove Hints Eqv.EqvWF_Build : typeclass_instances.
 
 Set Implicit Arguments.
 Set Strict Implicit.
