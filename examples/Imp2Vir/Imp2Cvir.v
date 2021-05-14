@@ -50,53 +50,41 @@ Fixpoint compile (next_reg : int) (s : stmt) (env: StringMap.t int)
       ret (next_reg, env, ir) : option (int * (StringMap.t int) * cvir 1 1)
   end.
 
-Theorem compile_WF : forall s next_reg env,
-  match (compile next_reg s env) with
-  | Some p => cvir_ids_WF (snd p)
-  | None => True
-  end.
+Theorem compile_WF : forall s next_reg next_reg' env env' ir,
+  compile next_reg s env = Some(next_reg', env', ir) -> cvir_ids_WF ir /\ unique_bid ir.
 Proof.
-  induction s ; intros ; (destruct (compile next_reg _ env) eqn:? ; [| tauto ]) ; simpl in Heqo.
+  induction s ; intros ? ? ? ? ? Heqo ; simpl in Heqo.
   - repeat break_match ; try discriminate.
     inversion Heqo.
     subst.
-    apply block_cvir_id_WF.
-  - repeat break_match ; try discriminate.
-    inversion Heqo.
-    subst.
-    simpl in *.
-    specialize (IHs1 next_reg env).
-    rewrite Heqo0 in IHs1.
-    specialize (IHs2 i t).
-    rewrite Heqo1 in IHs2.
-    apply (seq_cvir_id_WF 1 0) ; simpl in *; assumption.
+    split; [apply block_cvir_id_WF | apply block_cvir_unique].
   - repeat break_match ; try discriminate.
     inversion Heqo.
     subst.
     simpl in *.
-    apply join_cvir_id_WF.
-    apply (seq_cvir_id_WF 1 1).
-    apply (seq_cvir_id_WF 1 1).
-    apply branch_cvir_id_WF.
-    specialize (IHs1 (i0 + 1) env).
-    rewrite Heqo1 in IHs1.
-    apply IHs1.
-    specialize (IHs2 i1 env).
-    rewrite Heqo2 in IHs2.
-    apply IHs2.
+    apply IHs1 in Heqo0.
+    apply IHs2 in Heqo1.
+    split; [ apply (seq_cvir_id_WF 1 0) | apply (seq_cvir_unique 1 0)] ; simpl in * ; tauto.
   - repeat break_match ; try discriminate.
     inversion Heqo.
     subst.
     simpl in *.
-    apply loop_cvir_open_id_WF.
-    apply focus_output_cvir_id_WF.
-    eapply (seq_cvir_id_WF 1 1 0 1). (* FIXME *)
-    apply branch_cvir_id_WF.
-    specialize (IHs (i + 1) env).
-    rewrite Heqo1 in IHs.
-    apply IHs.
+    apply IHs1 in Heqo1.
+    apply IHs2 in Heqo2.
+    split; [ apply join_cvir_id_WF | apply join_cvir_unique ];
+    [> apply (seq_cvir_id_WF 1 1) | apply (seq_cvir_unique 1 1)]; try tauto;
+    (apply (seq_cvir_id_WF 1 1) + apply (seq_cvir_unique 1 1)); try tauto;
+    (apply branch_cvir_id_WF + apply branch_cvir_unique).
+  - repeat break_match ; try discriminate.
+    inversion Heqo.
+    subst.
+    apply IHs in Heqo1.
+    split; [ apply loop_cvir_open_id_WF | apply loop_cvir_open_unique ];
+    [> apply focus_output_cvir_id_WF | apply focus_output_cvir_unique ];
+    [> eapply (seq_cvir_id_WF 1 1) | eapply (seq_cvir_unique 1 1) ];
+    (apply branch_cvir_id_WF + apply branch_cvir_unique + tauto).
   - inversion Heqo.
-    apply block_cvir_id_WF.
+    split; [ apply block_cvir_id_WF | apply block_cvir_unique ].
 Qed.
 
 Definition compile_program (s : stmt) (env : StringMap.t int) :
