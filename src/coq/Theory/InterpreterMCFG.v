@@ -91,7 +91,7 @@ Proof.
   go; reflexivity.
 Qed.
 
-Global Instance eutt_interp1 {T}:
+#[global] Instance eutt_interp1 {T}:
   Proper (eutt eq ==> eq ==> eutt eq) (@ℑs1 T).
 Proof.
   repeat intro.
@@ -100,7 +100,7 @@ Proof.
   reflexivity.
 Qed.
 
-Global Instance eutt_interp2 {T}:
+#[global] Instance eutt_interp2 {T}:
   Proper (eutt eq ==> eq ==> eq ==> eutt eq) (@ℑs2 T).
 Proof.
   repeat intro.
@@ -109,7 +109,7 @@ Proof.
   reflexivity.
 Qed.
 
-Global Instance eutt_interp3 {T}:
+#[global] Instance eutt_interp3 {T}:
   Proper (eutt eq ==> eq ==> eq ==> eq ==> eutt eq) (@ℑs3 T).
 Proof.
   repeat intro.

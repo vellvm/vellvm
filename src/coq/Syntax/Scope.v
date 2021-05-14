@@ -190,7 +190,7 @@ Section REGISTER_OPERATIONS.
     Class Def_sites (A : Type) := { def_sites: A -> set raw_id }.
 
 
-    Global Instance instr_id_defs : Def_sites instr_id :=
+    #[global] Instance instr_id_defs : Def_sites instr_id :=
       {| def_sites := fun id =>
                         match id with
                         | IId id => [id]
@@ -198,16 +198,16 @@ Section REGISTER_OPERATIONS.
                         end |}
     .
 
-    Global Instance code_defs {T} : Def_sites (code T) :=
+    #[global] Instance code_defs {T} : Def_sites (code T) :=
       {| def_sites := fold_right (fun '(id,_) acc => def_sites id +++ acc) ∅ |}.
 
-    Global Instance block_def_sites {T} : Def_sites (block T) :=
+    #[global] Instance block_def_sites {T} : Def_sites (block T) :=
       {| def_sites := fun bk => map fst bk.(blk_phis) +++ def_sites bk.(blk_code) |}.
 
-    Global Instance ocfg_def_sites {T} : Def_sites (ocfg T) :=
+    #[global] Instance ocfg_def_sites {T} : Def_sites (ocfg T) :=
       {| def_sites := set_flat_map def_sites |}.
 
-    Global Instance cfg_def_sites {T} : Def_sites (cfg T) :=
+    #[global] Instance cfg_def_sites {T} : Def_sites (cfg T) :=
       {| def_sites := fun cfg => def_sites cfg.(blks) |}.
 
   End Defs.
@@ -220,10 +220,10 @@ Section REGISTER_OPERATIONS.
 
     Class Use_sites (A : Type) := { use_sites: A -> set raw_id }.
 
-    Global Instance ident_use_sites : Use_sites ident :=
+    #[global] Instance ident_use_sites : Use_sites ident :=
       {| use_sites := fun id => match id with | ID_Local id => [id] | ID_Global _ => ∅ end |}.
 
-    Global Instance exp_use_sites {T} : Use_sites (exp T) :=
+    #[global] Instance exp_use_sites {T} : Use_sites (exp T) :=
       {| use_sites :=
            fix f e := match e with
                       | EXP_Ident id
@@ -269,10 +269,10 @@ Section REGISTER_OPERATIONS.
                       end
       |}.
 
-    Global Instance texp_use_sites {T} : Use_sites (texp T) := {| use_sites := fun x => use_sites (snd x) |}.
-    Global Instance option_use_sites {T} `{Use_sites T} : Use_sites (option T) := {| use_sites := fun x => match x with | Some e => use_sites e | None => ∅ end |}.
+    #[global] Instance texp_use_sites {T} : Use_sites (texp T) := {| use_sites := fun x => use_sites (snd x) |}.
+    #[global] Instance option_use_sites {T} `{Use_sites T} : Use_sites (option T) := {| use_sites := fun x => match x with | Some e => use_sites e | None => ∅ end |}.
 
-    Global Instance instr_use_sites {T} : Use_sites (instr T) :=
+    #[global] Instance instr_use_sites {T} : Use_sites (instr T) :=
       {| use_sites := fun i => match i with
                           | INSTR_Op e => use_sites e
                           | INSTR_Call e l => use_sites e +++ set_flat_map use_sites l
@@ -291,10 +291,10 @@ Section REGISTER_OPERATIONS.
                           end
       |}.
 
-    Global Instance code_use_sites {T} : Use_sites (code T) :=
+    #[global] Instance code_use_sites {T} : Use_sites (code T) :=
       {| use_sites := set_flat_map (fun x => use_sites (snd x)) |}.
 
-    Global Instance term_use_sites {T} : Use_sites (terminator T) :=
+    #[global] Instance term_use_sites {T} : Use_sites (terminator T) :=
       {| use_sites := fun t => match t with
                                | TERM_Ret e
                                | TERM_Br e _ _
@@ -315,16 +315,16 @@ Section REGISTER_OPERATIONS.
                                end
       |}.
 
-    Global Instance phi_use_sites {T} : Use_sites (phi T) :=
+    #[global] Instance phi_use_sites {T} : Use_sites (phi T) :=
       {| use_sites := fun '(Phi _ l) => set_flat_map (fun x => use_sites (snd x)) l |}.
 
-    Global Instance block_use_sites {T} : Use_sites (block T) :=
+    #[global] Instance block_use_sites {T} : Use_sites (block T) :=
       {| use_sites := fun bk => set_flat_map (fun x => use_sites (snd x)) bk.(blk_phis) +++ use_sites bk.(blk_code) +++ use_sites bk.(blk_term) |}.
 
-    Global Instance ocfg_use_sites {T} : Use_sites (ocfg T) :=
+    #[global] Instance ocfg_use_sites {T} : Use_sites (ocfg T) :=
       {| use_sites := set_flat_map use_sites |}.
 
-    Global Instance cfg_use_sites {T} : Use_sites (cfg T) :=
+    #[global] Instance cfg_use_sites {T} : Use_sites (cfg T) :=
       {| use_sites := fun cfg => cfg.(args) +++ use_sites cfg.(blks) |}.
 
   End Uses.

@@ -15,13 +15,21 @@ From Coq Require Import
 Import ListNotations.
 (* end hide *)
 
-(** Generic facts about [alist]. Should probably go to ExtLib **)
+(** * Alist
+ Generic facts about the association list datatype [alist] provided by ExtLib.
+ These facts should probably be moved to ExtLib eventually.
+
+ Association lists are currently used in Vellvm to map block identifiers to blocks
+ in control flow graphs.
+ **)
 
 (** * Propositional variant to [alist_find]. *)
-Definition alist_In {K R RD_K V} k m v := @alist_find K R RD_K V k m = Some v.
+Definition alist_In {K R RD_K V} k m v :=
+   @alist_find K R RD_K V k m = Some v.
 
-(** * Freshness predicate *)
-Definition alist_fresh {K R RD_K V} (k : K) (m : alist K V) := @alist_find K R RD_K V k m = None.
+(** * Freshness predicate: [alist_fresh k m] if [k] is a fresh key in [m] *)
+Definition alist_fresh {K R RD_K V} (k : K) (m : alist K V) := 
+  @alist_find K R RD_K V k m = None.
 
 (** * Order on [alist]s
     - Inclusion of domains
@@ -55,6 +63,9 @@ Section alistFacts.
 
   Section Alist_In.
 
+    (* Properties of [alist_in], the propositional lookup in an association map *)
+
+    (* The last key mapped is in the map *)
     Lemma In_add_eq:
       forall k v (m: alist K V),
         alist_In k (alist_add k v m) v.
@@ -95,6 +106,7 @@ Section alistFacts.
         flatten_hyp IN; [rewrite rel_dec_correct in Heq; subst; tauto | eapply IH; eauto].
     Qed.       
 
+    (* Keys that are present in a map after a remove were present before the remove *)
     Lemma In_remove_In_ineq:
       forall (m : alist K V) (k : K) (v : V) (k' : K),
         alist_In k (alist_remove k' m) v ->
@@ -112,6 +124,7 @@ Section alistFacts.
        eapply IH; eauto.
     Qed.       
 
+    (* Keys are present in a map after a remove over a different key iff they were present before the remove *)
     Lemma In_remove_In_ineq_iff:
       forall (m : alist K V) (k : K) (v : V) (k' : K),
         k <> k' ->
@@ -133,6 +146,7 @@ Section alistFacts.
       apply In_In_remove_ineq; auto.
     Qed.
 
+    (* Keys that are present in a map after an add over a different key were present before the add *)
     Lemma In_add_In_ineq:
       forall k v k' v' (m: alist K V),
         k <> k' ->
@@ -144,6 +158,7 @@ Section alistFacts.
       eapply In_remove_In_ineq; eauto.
     Qed.
 
+    (* Keys are present in a map after an add over a different key iff they were present before the add *)
     Lemma In_add_ineq_iff: 
       forall m (v v' : V) (k k' : K),
         k <> k' ->
@@ -152,6 +167,7 @@ Section alistFacts.
       intros; split; eauto using In_In_add_ineq, In_add_In_ineq.
     Qed.
 
+    (* Looking a freshly added key returns the bound value *)
     Lemma alist_In_add_eq : forall m (k:K) (v n:V), alist_In k (alist_add k n m) v -> n = v.
     Proof.
       destruct m as [| [k1 v1]]; intros.
@@ -168,6 +184,7 @@ Section alistFacts.
         contradiction.
     Qed.
 
+    (* Weak relationship between [In] and [alist_In] *)
     Lemma In__alist_In :
       forall {R : K -> K -> Prop} {RD : @RelDec K (@Logic.eq K)} {RDC : RelDec_Correct RD} (k : K) (v : V) l,
         In (k,v) l ->
@@ -196,6 +213,7 @@ Section alistFacts.
           * auto.
     Qed.
 
+    (* [alist_in] is decidable if the domains of keys and values are decidables *)
     Lemma alist_In_dec :
       forall {RDV:RelDec (@Logic.eq V)} {RDCV:RelDec_Correct RDV}
         (id : K) (l : alist K V) (v : V),
@@ -214,6 +232,9 @@ Section alistFacts.
 
   Section Alist_Fresh.
 
+    (* Proporties of [alist_fresh], the freshness of key predicate *)
+
+    (* Binding to fresh keys preserves the [alist_In] predicate *)
     Lemma add_fresh_lu : forall m (k1 k2 : K) (v1 v2 : V),
       alist_fresh k2 m ->
       alist_In k1 m v1 ->
@@ -224,6 +245,7 @@ Section alistFacts.
       rewrite H in H0; inv H0.
     Qed.
 
+    (* All keys are fresh in the empty map *)
     Lemma alist_fresh_nil : forall k,
         alist_fresh (V := V) k [].
     Proof.
@@ -234,7 +256,9 @@ Section alistFacts.
 
   Section Alist_find.
 
-    (* alist_find fails iff no value is associated to the key in the map *)
+    (* Properties of [alist_find], the partial lookup function *)
+
+    (* [alist_find] fails iff no value is associated to the key in the map *)
     Lemma alist_find_None:
       forall k (m: alist K V),
         (forall v, ~ In (k,v) m) <-> alist_find k m = None.
@@ -249,7 +273,10 @@ Section alistFacts.
     Qed.
 
     Lemma alist_find_remove_none:
-      forall (m : list (K*V)) (k1 k2 : K), k2 <> k1 -> alist_find k1 (alist_remove k2 m) = None -> alist_find k1 m = None.
+      forall (m : list (K*V)) (k1 k2 : K), 
+      k2 <> k1 -> 
+      alist_find k1 (alist_remove k2 m) = None -> 
+      alist_find k1 m = None.
     Proof.
       induction m as [| [? ?] m IH]; intros ?k1 ?k2 ineq HF; simpl in *.
       - reflexivity.
@@ -357,7 +384,7 @@ Section alistFacts.
 
   Section Alist_extend.
 
-    Global Instance alist_extend_Reflexive : Reflexive (alist_extend (V := V)).
+    #[global] Instance alist_extend_Reflexive : Reflexive (alist_extend (V := V)).
     Proof.
       unfold Reflexive.
       intros x.
@@ -367,7 +394,7 @@ Section alistFacts.
       auto.
     Qed.
 
-    Global Instance alist_extend_Transitive : Transitive (alist_extend (V := V)).
+    #[global] Instance alist_extend_Transitive : Transitive (alist_extend (V := V)).
     Proof.
       unfold Transitive.
       intros x.
@@ -395,12 +422,12 @@ Section alistFacts.
 
   Section Alist_le.
 
-    Global Instance alist_le_refl : Reflexive (alist_le (V := V)).
+    #[global] Instance alist_le_refl : Reflexive (alist_le (V := V)).
     Proof.
       repeat intro; auto.
     Qed.
 
-    Global Instance alist_le_trans : Transitive (alist_le (V := V)).
+    #[global] Instance alist_le_trans : Transitive (alist_le (V := V)).
     Proof.
       repeat intro; auto.
     Qed.

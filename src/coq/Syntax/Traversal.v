@@ -30,17 +30,17 @@ Section Endo.
 
   Class Endo (T: Type) := endo: T -> T.
 
-  Global Instance Endo_list {T: Set}
+  #[global] Instance Endo_list {T: Set}
          `{Endo T}
     : Endo (list T) | 50 :=
     List.map endo.
 
-  Global Instance Endo_option {T: Set}
+  #[global] Instance Endo_option {T: Set}
          `{Endo T}
     : Endo (option T) | 50 :=
     fun ot => match ot with None => None | Some t => Some (endo t) end.
 
-  Global Instance Endo_prod {T1 T2: Set}
+  #[global] Instance Endo_prod {T1 T2: Set}
          `{Endo T1}
          `{Endo T2}
     : Endo (T1 * T2) | 50 :=
@@ -50,7 +50,7 @@ Section Endo.
 
     Context {T: Set}.
 
-    Global Instance Endo_ident
+    #[global] Instance Endo_ident
            `{Endo raw_id}
       : Endo ident | 50 :=
       fun id =>
@@ -59,7 +59,7 @@ Section Endo.
         | ID_Local lid => ID_Local (endo lid)
         end.
 
-    Global Instance Endo_instr_id
+    #[global] Instance Endo_instr_id
            `{Endo raw_id}
       : Endo instr_id | 50 :=
       fun id =>
@@ -68,7 +68,7 @@ Section Endo.
         | IVoid n => IVoid n
         end.
 
-    Global Instance Endo_typ
+    #[global] Instance Endo_typ
            `{Endo raw_id}
       : Endo typ | 50 :=
       fix endo_typ t :=
@@ -83,7 +83,7 @@ Section Endo.
         | _ => t
         end.
 
-    Global Instance Endo_exp
+    #[global] Instance Endo_exp
            `{Endo T}
            `{Endo raw_id}
            `{Endo ibinop}
@@ -151,16 +151,16 @@ Section Endo.
           OP_Freeze (endo (fst v), f_exp (snd v))
         end.
 
-    Global Instance Endo_texp
+    #[global] Instance Endo_texp
            `{Endo T}
            `{Endo (exp T)}
       : Endo (texp T) | 50 :=
       fun te => let '(t,e) := te in (endo t, endo e).
 
-    Global Instance Endo_tint_literal
+    #[global] Instance Endo_tint_literal
       : Endo tint_literal | 50 := id.
     
-    Global Instance Endo_instr
+    #[global] Instance Endo_instr
            `{Endo T}
            `{Endo (exp T)}
       : Endo (instr T) | 50 :=
@@ -182,7 +182,7 @@ Section Endo.
         | INSTR_LandingPad => ins
         end.
 
-    Global Instance Endo_terminator
+    #[global] Instance Endo_terminator
            `{Endo T}
            `{Endo raw_id}
            `{Endo (exp T)}
@@ -203,7 +203,7 @@ Section Endo.
         | TERM_Unreachable => TERM_Unreachable 
         end.
 
-    Global Instance Endo_phi
+    #[global] Instance Endo_phi
            `{Endo T}
            `{Endo raw_id}
            `{Endo (exp T)}
@@ -212,7 +212,7 @@ Section Endo.
             | Phi t args => Phi (endo t) (endo args)
             end.
 
-    Global Instance Endo_block
+    #[global] Instance Endo_block
            `{Endo raw_id}
            `{Endo (code T)}
            `{Endo (terminator T)}
@@ -225,7 +225,7 @@ Section Endo.
                  (endo (blk_term b))
                  (blk_comments b).
 
-    Global Instance Endo_global
+    #[global] Instance Endo_global
            `{Endo raw_id}
            `{Endo T}
            `{Endo bool}
@@ -253,7 +253,7 @@ Section Endo.
           (endo (g_section g))
           (endo (g_align g)).
 
-    Global Instance Endo_declaration
+    #[global] Instance Endo_declaration
            `{Endo function_id}
            `{Endo T}
            `{Endo string}
@@ -278,7 +278,7 @@ Section Endo.
               (endo (dc_align d))
               (endo (dc_gc d)).
 
-    Global Instance Endo_metadata
+    #[global] Instance Endo_metadata
            `{Endo T}
            `{Endo (exp T)}
            `{Endo raw_id}
@@ -294,7 +294,7 @@ Section Endo.
         | METADATA_Node mds => METADATA_Node (List.map endo_metadata mds)
         end.
 
-    Global Instance Endo_definition
+    #[global] Instance Endo_definition
            {FnBody:Set}
            `{Endo (declaration T)}
            `{Endo raw_id}
@@ -306,7 +306,7 @@ Section Endo.
                       (endo (df_args d))
                       (endo (df_instrs d)).
 
-    Global Instance Endo_toplevel_entity
+    #[global] Instance Endo_toplevel_entity
            {FnBody:Set}
            `{Endo FnBody}
            `{Endo T}
@@ -333,7 +333,7 @@ Section Endo.
         | TLE_Attribute_group i attrs => TLE_Attribute_group (endo i) (endo attrs)
         end.
 
-    Global Instance Endo_modul
+    #[global] Instance Endo_modul
            {FnBody:Set}
            `{Endo FnBody}
            `{Endo string}
@@ -351,7 +351,7 @@ Section Endo.
                  (endo (m_declarations m))
                  (endo (m_definitions m)).
 
-    Global Instance Endo_cfg
+    #[global] Instance Endo_cfg
            `{Endo raw_id}
            `{Endo (block T)}
       : Endo (cfg T) | 50 :=
@@ -359,7 +359,7 @@ Section Endo.
                   (endo (blks p))
                   (endo (args p)).
 
-    Global Instance Endo_mcfg
+    #[global] Instance Endo_mcfg
            {FnBody:Set}
            `{Endo T}
            `{Endo FnBody}
@@ -381,7 +381,7 @@ Section Endo.
 
   Section Semantics.
 
-    Global Instance Endo_of_sum1
+    #[global] Instance Endo_of_sum1
            {A B: Type -> Type}
            {X}
            `{Endo (A X)}
@@ -393,7 +393,7 @@ Section Endo.
         | inr1 b => inr1 (endo b)
         end.
 
-    Global Instance Endo_itree {X E}
+    #[global] Instance Endo_itree {X E}
            `{Endo X}
            `{forall T, Endo (E T)}
       : Endo (itree E X) | 50 :=
@@ -408,7 +408,7 @@ Section Endo.
      instances should always have priority over this, hence the 100.
    *)
 
-  Global Instance Endo_id (T: Set): Endo T | 100 := fun x: T => x.
+  #[global] Instance Endo_id (T: Set): Endo T | 100 := fun x: T => x.
 
 End Endo.
 
@@ -424,15 +424,15 @@ Section TFunctor.
 
     Definition compose {A B C: Type} (f: A -> B) (g: B -> C): A -> C := fun a => g (f a).
 
-    Global Instance TFunctor_list 
+    #[global] Instance TFunctor_list 
       : TFunctor list | 50 :=
       List.map.
 
-    Global Instance TFunctor_list' {F} `{TFunctor F} 
+    #[global] Instance TFunctor_list' {F} `{TFunctor F} 
       : TFunctor (fun T => list (F T)) | 49 :=
       fun U V f => List.map (tfmap f).
 
-    Global Instance TFunctor_option {F} `{TFunctor F}
+    #[global] Instance TFunctor_option {F} `{TFunctor F}
       : TFunctor (fun T => option (F T)) | 50 :=
       fun U V f ot => match ot with None => None | Some t => Some (tfmap f t) end.
 
@@ -440,7 +440,7 @@ Section TFunctor.
 
   Section Syntax.
 
-    Global Instance TFunctor_exp
+    #[global] Instance TFunctor_exp
            `{Endo raw_id}
            `{Endo ibinop}
            `{Endo icmp}
@@ -479,12 +479,12 @@ Section TFunctor.
         | OP_Freeze v                        => OP_Freeze (ftexp v)
         end.
 
-    Global Instance TFunctor_texp 
+    #[global] Instance TFunctor_texp 
            `{TFunctor exp}
       : TFunctor texp | 50 :=
       fun _ _ f '(t,e) => (f t, tfmap f e).
 
-    Global Instance TFunctor_instr
+    #[global] Instance TFunctor_instr
            `{TFunctor exp}
       : TFunctor instr | 50 :=
       fun U V f ins =>
@@ -502,11 +502,11 @@ Section TFunctor.
         | INSTR_LandingPad => INSTR_LandingPad 
         end.
 
-    Global Instance TFunctor_tident
+    #[global] Instance TFunctor_tident
            `{Endo ident}: TFunctor (@tident)
       := fun U V f '(t,i) => (f t, endo i).
 
-    Global Instance TFunctor_terminator
+    #[global] Instance TFunctor_terminator
            `{Endo tint_literal}
            `{Endo raw_id}
            `{TFunctor exp}
@@ -524,20 +524,20 @@ Section TFunctor.
         | TERM_Unreachable => TERM_Unreachable
         end.
 
-    Global Instance TFunctor_phi
+    #[global] Instance TFunctor_phi
            `{Endo raw_id}
            `{TFunctor exp}
       : TFunctor phi | 50 :=
       fun U V f '(Phi t args) =>
         Phi (f t) (tfmap (fun '(id,e) => (endo id, tfmap f e)) args).
 
-    Global Instance TFunctor_code
+    #[global] Instance TFunctor_code
            `{Endo raw_id}
            `{TFunctor instr}
       : TFunctor code | 50 :=
       fun U V f => tfmap (fun '(id,i) => (endo id, tfmap f i)).
 
-    Global Instance TFunctor_block
+    #[global] Instance TFunctor_block
            `{Endo raw_id}
            `{TFunctor instr}
            `{TFunctor terminator}
@@ -550,7 +550,7 @@ Section TFunctor.
                  (tfmap f (blk_term b)) 
                  (blk_comments b).
     
-    Global Instance TFunctor_global
+    #[global] Instance TFunctor_global
            `{Endo raw_id}
            `{Endo bool}
            `{Endo int}
@@ -577,7 +577,7 @@ Section TFunctor.
           (endo (g_section g))
           (endo (g_align g)).
 
-    Global Instance TFunctor_declaration
+    #[global] Instance TFunctor_declaration
            `{Endo function_id}
            `{Endo string}
            `{Endo int}
@@ -601,7 +601,7 @@ Section TFunctor.
                        (endo (dc_align d))
                        (endo (dc_gc d)).
 
-    Global Instance TFunctor_metadata
+    #[global] Instance TFunctor_metadata
            `{TFunctor exp}
            `{Endo raw_id}
            `{Endo string}
@@ -616,7 +616,7 @@ Section TFunctor.
         | METADATA_Node mds => METADATA_Node (tfmap endo_metadata mds)
         end.
 
-    Global Instance TFunctor_definition
+    #[global] Instance TFunctor_definition
            {FnBody:Set -> Set}
            `{TFunctor declaration}
            `{Endo raw_id}
@@ -628,7 +628,7 @@ Section TFunctor.
                       (endo (df_args d))
                       (tfmap f (df_instrs d)).
 
-    Global Instance TFunctor_toplevel_entity
+    #[global] Instance TFunctor_toplevel_entity
            {FnBody : Set -> Set}
            `{TFunctor FnBody}
            `{TFunctor global}
@@ -654,7 +654,7 @@ Section TFunctor.
         | TLE_Attribute_group i attrs => TLE_Attribute_group (endo i) (endo attrs)
         end.
 
-    Global Instance TFunctor_modul
+    #[global] Instance TFunctor_modul
            {FnBody : Set -> Set}
            `{TFunctor FnBody}
            `{Endo string}
@@ -670,7 +670,7 @@ Section TFunctor.
                  (tfmap f (m_declarations m))
                  (tfmap f (m_definitions m)).
 
-    Global Instance TFunctor_cfg
+    #[global] Instance TFunctor_cfg
            `{Endo raw_id}
            `{TFunctor block}
       : TFunctor cfg | 50 :=
@@ -678,7 +678,7 @@ Section TFunctor.
                         (tfmap f (blks p))
                         (endo (args p)).
 
-    Global Instance TFunctor_mcfg
+    #[global] Instance TFunctor_mcfg
            {FnBody : Set -> Set}
            `{TFunctor FnBody}
            `{Endo string}

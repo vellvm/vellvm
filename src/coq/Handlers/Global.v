@@ -150,7 +150,7 @@ Section Globals.
         intros ?; tau_steps; reflexivity.
       Qed.
 
-      Global Instance eutt_interp_global {R} :
+      #[global] Instance eutt_interp_global {R} :
         Proper (eutt eq ==> eq ==> eutt eq) (@interp_global R). 
       Proof.
         repeat intro.

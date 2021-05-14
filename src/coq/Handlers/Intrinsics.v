@@ -195,7 +195,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         intros ?; tau_steps; reflexivity.
       Qed.
 
-      Global Instance eutt_interp_intrinsics {R} :
+      #[global] Instance eutt_interp_intrinsics {R} :
         Proper (eutt Logic.eq ==> eutt Logic.eq) (@interp_intrinsics R).
       Proof.
         do 2 red; intros * EQ.

@@ -25,7 +25,7 @@ COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Ut
 								 Utilities
 
 COQFILESSYNTAX := Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
-									Syntax/Traversal Syntax/Dom Syntax/DynamicTypes Syntax/TypToDtyp\
+									Syntax/Traversal Syntax/DynamicTypes Syntax/TypToDtyp\
 									Syntax/Scope Syntax/SurfaceSyntax\
 									Syntax
 
@@ -42,6 +42,7 @@ COQFILESANALYSIS := Analysis/Iteration Analysis/Kildall Analysis/Dom Analysis/Do
 COQFILESQC := QC/GenAST QC/ShowAST QC/QCVellvm
 
 COQFILESTHEORY := Syntax/ScopeTheory\
+									Theory/StatePredicates\
 									Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG\
 									Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
 									Theory/LocalFrame\

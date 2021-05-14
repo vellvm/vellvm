@@ -42,7 +42,7 @@ Inductive typ_order : typ -> typ -> Prop :=
 | typ_order_Function_ret : forall (ret : typ) (args : list typ),
     typ_order ret (TYPE_Function ret args)
 .
-Hint Constructors typ_order : core.
+#[export] Hint Constructors typ_order : core.
 
 Lemma map_In {A B : Type} (l : list A) (f : forall (x : A), In x l -> B) : list B.
 Proof.
@@ -106,8 +106,8 @@ Proof.
       * assumption.
 Qed.
 
-Hint Resolve wf_lt_typ_order : core.
-Hint Constructors lex_ord : core.
+#[export] Hint Resolve wf_lt_typ_order : core.
+#[export] Hint Constructors lex_ord : core.
 
 Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List.length env, t) (lex_ord lt typ_order)} : dtyp :=
   match t with
@@ -258,31 +258,31 @@ Section ConvertTyp.
   Class ConvertTyp (F: Set -> Set) : Type :=
     convert_typ : list (ident * typ) -> F typ -> F dtyp.
 
-  Global Instance ConvertTyp_exp : ConvertTyp exp :=
+  #[global] Instance ConvertTyp_exp : ConvertTyp exp :=
     fun env => tfmap (typ_to_dtyp env).
 
-  Global Instance ConvertTyp_instr : ConvertTyp instr :=
+  #[global] Instance ConvertTyp_instr : ConvertTyp instr :=
     fun env => tfmap (typ_to_dtyp env).
 
-  Global Instance ConvertTyp_term : ConvertTyp terminator :=
+  #[global] Instance ConvertTyp_term : ConvertTyp terminator :=
     fun env => tfmap (typ_to_dtyp env).
 
-  Global Instance ConvertTyp_code : ConvertTyp code :=
+  #[global] Instance ConvertTyp_code : ConvertTyp code :=
     fun env => tfmap (typ_to_dtyp env).
 
-  Global Instance ConvertTyp_phi : ConvertTyp phi :=
+  #[global] Instance ConvertTyp_phi : ConvertTyp phi :=
     fun env => tfmap (typ_to_dtyp env).
 
-  Global Instance ConvertTyp_block : ConvertTyp block :=
+  #[global] Instance ConvertTyp_block : ConvertTyp block :=
     fun env => tfmap (typ_to_dtyp env).
 
-  Global Instance ConvertTyp_cfg : ConvertTyp cfg :=
+  #[global] Instance ConvertTyp_cfg : ConvertTyp cfg :=
     fun env => tfmap (typ_to_dtyp env).
 
-  Global Instance ConvertTyp_mcfg : ConvertTyp mcfg :=
+  #[global] Instance ConvertTyp_mcfg : ConvertTyp mcfg :=
     fun env => tfmap (typ_to_dtyp env).
 
-  Global Instance ConvertTyp_list {A} `{TFunctor A}: ConvertTyp (fun T => list (A T)) :=
+  #[global] Instance ConvertTyp_list {A} `{TFunctor A}: ConvertTyp (fun T => list (A T)) :=
     fun env => tfmap (typ_to_dtyp env).
 
 End ConvertTyp.

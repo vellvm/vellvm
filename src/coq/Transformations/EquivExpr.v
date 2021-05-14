@@ -328,7 +328,7 @@ Section ExpOptim.
       apply exp_optim_correct_term.
     Qed.
 
-    Global Instance eq_itree_interp_cfg3: forall {T : Type}, Proper (eq_itree eq ==> eq ==> eq ==> eq ==> eq_itree eq) (@ℑ3 T).
+    #[global] Instance eq_itree_interp_cfg3: forall {T : Type}, Proper (eq_itree eq ==> eq ==> eq ==> eq ==> eq_itree eq) (@ℑ3 T).
     Proof.
       repeat intro.
       unfold ℑ3.

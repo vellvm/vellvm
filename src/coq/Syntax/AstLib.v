@@ -269,7 +269,7 @@ End RawIDOrd.
 (* Module RawID := Make_UDT(RawIDDec).  *)
 Instance eq_dec_raw_id : RelDec (@eq raw_id) := RelDec_from_dec (@eq raw_id) RawIDOrd.eq_dec.
 Instance eqv_raw_id : Eqv raw_id := (@eq raw_id).
-Hint Unfold eqv_raw_id: core.
+#[export] Hint Unfold eqv_raw_id: core.
 
 Module InstrIDDec <: MiniDecidableType.
   Definition t := instr_id.
@@ -310,8 +310,8 @@ Module IdentDec <: MiniDecidableType.
 End IdentDec.
 Module Ident := Make_UDT(IdentDec).
 
-Global Instance eq_dec_ident : RelDec (@eq ident) := RelDec_from_dec (@eq ident) Ident.eq_dec.
-Global Instance eqv_ident : Eqv ident := (@eq ident).
+#[global] Instance eq_dec_ident : RelDec (@eq ident) := RelDec_from_dec (@eq ident) Ident.eq_dec.
+#[global] Instance eqv_ident : Eqv ident := (@eq ident).
 
 (* Induction Principles ----------------------------------------------------- *)
 
@@ -525,7 +525,7 @@ End ExpInd.
 Require Import Ceres.Ceres.
 
 Section hiding_notation.
-  Local Open Scope sexp_scope.
+  #[local] Open Scope sexp_scope.
 
   Definition serialize_raw_id (prefix: string): Serialize raw_id :=
     fun r =>
@@ -535,23 +535,23 @@ Section hiding_notation.
       | LLVMAst.Raw n => Atom ("_RAW_" ++ show_Z n)%string
       end.
 
-  Global Instance serialize_raw_id': Serialize raw_id := serialize_raw_id "".
+  #[global] Instance serialize_raw_id': Serialize raw_id := serialize_raw_id "".
 
-  Global Instance serialize_ident : Serialize ident :=
+  #[global] Instance serialize_ident : Serialize ident :=
     fun id =>
       match id with
       | ID_Global r => serialize_raw_id "@" r
       | ID_Local  r => serialize_raw_id "%" r
       end.
 
-  Global Instance serialize_instr_id : Serialize instr_id :=
+  #[global] Instance serialize_instr_id : Serialize instr_id :=
     fun ins =>
       match ins with
       | IId id => serialize_raw_id "%" id
       | IVoid n => Atom ("void<" ++ show_Z n ++ ">")%string
       end.
 
-  Global Instance serialize_ibinop : Serialize ibinop :=
+  #[global] Instance serialize_ibinop : Serialize ibinop :=
     fun binop =>
       match binop with
       | LLVMAst.Add nuw nsw => Atom "add"
@@ -568,7 +568,7 @@ Section hiding_notation.
       | Xor => Atom "xor"
       end.
 
-  Global Instance serialize_fbinop : Serialize fbinop :=
+  #[global] Instance serialize_fbinop : Serialize fbinop :=
     fun fbinop =>
       match fbinop with
       | FAdd => Atom "fadd"
@@ -578,7 +578,7 @@ Section hiding_notation.
       | FRem => Atom "frem"
       end.
 
-  Global Instance serialize_icmp : Serialize icmp :=
+  #[global] Instance serialize_icmp : Serialize icmp :=
     fun cmp =>
       Atom ("icmp "
              ++
@@ -595,7 +595,7 @@ Section hiding_notation.
              | Sle => "sle"
              end)%string.
 
-  Global Instance serialize_fcmp : Serialize fcmp :=
+  #[global] Instance serialize_fcmp : Serialize fcmp :=
     fun cmp =>
       Atom ("fcmp "
              ++
@@ -642,7 +642,7 @@ Section hiding_notation.
     | TYPE_Identified id => Atom (to_string id)
     end.
 
-  Global Instance serialize_typ : Serialize typ := serialize_typ'.
+  #[global] Instance serialize_typ : Serialize typ := serialize_typ'.
 
   Section WithSerializeT.
     Variable (T:Set).
@@ -669,10 +669,10 @@ Section hiding_notation.
       | _ => Atom "to_sexp_exp todo"
       end.
 
-    Global Instance serialize_exp : Serialize (exp T) := serialize_exp'.
-    Global Instance serialize_int : Serialize int := fun i => Atom (show_Z i).
+    #[global] Instance serialize_exp : Serialize (exp T) := serialize_exp'.
+    #[global] Instance serialize_int : Serialize int := fun i => Atom (show_Z i).
 
-    Global Instance serialize_texp : Serialize (texp T) :=
+    #[global] Instance serialize_texp : Serialize (texp T) :=
       fun '(t, e) =>
           [to_sexp t ; Atom " " ; to_sexp e ].
 
@@ -683,7 +683,7 @@ Section hiding_notation.
         | Some a => [Atom s ; to_sexp a]
         end.
 
-    Global Instance serialize_instr : Serialize (instr T) :=
+    #[global] Instance serialize_instr : Serialize (instr T) :=
       fun instr =>
         match instr with
         | INSTR_Op op => to_sexp op
@@ -706,7 +706,7 @@ Section hiding_notation.
         | _ => Atom "string_of_instr todo"
         end.
 
-    Global Instance serialize_terminator : Serialize (terminator T) :=
+    #[global] Instance serialize_terminator : Serialize (terminator T) :=
       fun t =>
         match t with
         | TERM_Ret v => [Atom "ret " ; to_sexp v]
@@ -717,7 +717,7 @@ Section hiding_notation.
         | _ => Atom "string_of_terminator todo"
         end.
 
-    Global Instance serialize_instr_id_instr : Serialize (instr_id * (instr T)) :=
+    #[global] Instance serialize_instr_id_instr : Serialize (instr_id * (instr T)) :=
       fun '(iid, i) =>
         match iid with
         | IId _ =>
@@ -726,7 +726,7 @@ Section hiding_notation.
           [to_sexp i]
         end.
 
-    Global Instance serialize_block : Serialize (block T) :=
+    #[global] Instance serialize_block : Serialize (block T) :=
       fun block =>
         [to_sexp (blk_id block) ; Atom ":\n" ;
         (* TODO: add indentation *)
@@ -734,7 +734,7 @@ Section hiding_notation.
   End WithSerializeT.
 
   Section SerializeTyp.
-    Global Instance serialize_definition_list_block : Serialize (definition typ (list (block typ))) :=
+    #[global] Instance serialize_definition_list_block : Serialize (definition typ (list (block typ))) :=
       fun defn =>
         match defn.(df_prototype).(dc_type) with
         | TYPE_Function ret_t args_t
@@ -747,7 +747,7 @@ Section hiding_notation.
         | _ => Atom "Invalid type on function"
         end.
 
-    Global Instance serialize_tle_list_block : Serialize (toplevel_entity typ (list (block typ))) :=
+    #[global] Instance serialize_tle_list_block : Serialize (toplevel_entity typ (list (block typ))) :=
       fun tle =>
         match tle with
         | TLE_Definition defn => to_sexp defn
@@ -789,10 +789,10 @@ Section WithType.
   (* Identifiers ----------------------------------------------------------- *)
   Class Ident (X:Set) := ident_of : X -> ident.
 
-  Global Instance ident_of_block : Ident (block T) := fun (b:block T) => ID_Local (@blk_id T b).
-  Global Instance ident_of_global : Ident (global T) := fun (g:global T) => ID_Global (@g_ident T g).
-  Global Instance ident_of_declaration : Ident (declaration T) := fun (d:declaration T) => ID_Global (@dc_name T d).
-  Global Instance ident_of_definition : forall X, Ident (definition T X) := fun X => fun (d:definition T X) => ident_of (@df_prototype T _ d).
+  #[global] Instance ident_of_block : Ident (block T) := fun (b:block T) => ID_Local (@blk_id T b).
+  #[global] Instance ident_of_global : Ident (global T) := fun (g:global T) => ID_Global (@g_ident T g).
+  #[global] Instance ident_of_declaration : Ident (declaration T) := fun (d:declaration T) => ID_Global (@dc_name T d).
+  #[global] Instance ident_of_definition : forall X, Ident (definition T X) := fun X => fun (d:definition T X) => ident_of (@df_prototype T _ d).
 
   Definition globals {X} (m:modul T X) : list ident :=
     map ident_of (m_globals m)

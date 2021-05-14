@@ -48,7 +48,7 @@ From Vellvm Require Import
 
 Module FMapProps (E:UsualDecidableType) (M:FMapInterface.WSfun E).
 
-  Local Notation K := M.key.
+  #[local] Notation K := M.key.
 
   Section FMapProps.
   

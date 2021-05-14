@@ -174,7 +174,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         else
           failwith ("Negative array length for generating default value" ++
           "of DTYPE_Array or DTYPE_Vector")
-      | DTYPE_Vector sz _ => failwith ("Non-valid vector type when" ++
+      | DTYPE_Vector _ _ => failwith ("Non-valid vector type when" ++
           "generating default vector")
       | DTYPE_Struct fields =>
         v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;

@@ -1,3 +1,4 @@
+(* begin hide *)
 Require Import Paco.paco.
 From Coq Require Import Morphisms.
 From ITree Require Import
@@ -7,13 +8,32 @@ From ITree Require Import
      Interp.TranslateFacts.
 Set Implicit Arguments.
 Set Strict Implicit.
+(* end hide *)
 
-(** * has_post  *)
+(** * Unary interpretation for [eutt]: a traditional program logic.
+ 
+  The weak bisimulation supported by [itree]s and the notions of 
+  refinements we build upon it in the various monads we interpret into
+  give us reasoning principles to establish the equivalence or refinement
+  of computations.
+  In particular, it can be seen as a relational program logic.
 
+  We develop here some theory for a unary program logic over itree-based computations.
+  It is defined in terms of [eutt], simply taking its diagonal. 
+  We prove that it respects the expected elemntary proof rules w.r.t. to logical 
+  connectors.
+  Most importantly, we derive a proof rule to leverage such unary facts during a
+  relational refinement proof: see [eutt_post_bind] and [eutt_post_bind_gen].
+
+*)
+
+(* The main predicate: an itree-computation [t] admits [Q] for a postcondition.
+  Defined as the diagonal of [eutt].
+*)
 Definition has_post {E X} (t : itree E X) (Q : X -> Prop) : Prop :=
   eutt (fun 'x _ => Q x) t t.
 
-(* Note: the following definition is equivalent. *)
+(* Note: the following formulation is equivalent. *)
 Definition has_post_strong {E X} (t : itree E X) (Q : X -> Prop) : Prop :=
   eutt (fun 'x y => x = y /\ Q x) t t.
 
@@ -32,7 +52,7 @@ Notation "t ⤳ Q" := (has_post t Q) (at level 50).
     Post-conditions can be established by usual elementary logical connectives
  *)
 
-Global Instance has_post_eutt {E X} : Proper (eutt eq ==> equiv_pred ==> iff) (@has_post E X).
+#[global] Instance has_post_eutt {E X} : Proper (eutt eq ==> equiv_pred ==> iff) (@has_post E X).
 Proof.
   repeat red; unfold has_post; intros * EUTT * EQ *; split; intros HP.
   - rewrite <- EUTT; eapply eutt_equiv; eauto.
@@ -41,7 +61,7 @@ Proof.
     split; red; intros; apply EQ; auto.
 Qed.
 
-Global Instance has_post_eq_itree {E X} : Proper (eq_itree eq ==> eq ==> iff) (@has_post E X).
+#[global] Instance has_post_eq_itree {E X} : Proper (eq_itree eq ==> eq ==> iff) (@has_post E X).
 Proof.
   repeat red; unfold has_post; intros * EUTT * EQ *; split; intros HP.
   - rewrite <- EUTT; eapply eutt_equiv; eauto.
@@ -88,6 +108,14 @@ Proof.
   intros; apply INCL; auto.
 Qed.     
 
+Lemma has_post_True : forall {E X} (t : itree E X),
+    t ⤳ fun _ => True.
+Proof.
+  intros *.
+  eapply eqit_mon; eauto.
+  reflexivity.
+Qed.     
+
 (** [has_post] structural constructs *)
 
 Lemma has_post_bind : forall {E X Y} (t : itree E X) (k : X -> itree E Y) Q,
@@ -131,12 +159,14 @@ Proof.
   apply eutt_translate_gen; auto.
 Qed.
 
-(** [has_post] reasoning principles
-    The main benefit of the approach: post-conditions can be leveraged to establish simulations
+(** Relationship between [has_post] and [eutt]
+    The main benefit of the approach: post-conditions can be leveraged when performing a cut
+    during relational proofs.
  *)
 Lemma eutt_post_bind : forall E R1 R2 RR U Q (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
     t ⤳ Q ->
-    (forall u, Q u -> eutt RR (k1 u) (k2 u)) -> eutt RR (ITree.bind t k1) (ITree.bind t k2).
+    (forall u, Q u -> eutt RR (k1 u) (k2 u)) -> 
+    eutt RR (ITree.bind t k1) (ITree.bind t k2).
 Proof.
   intros * POST ?.
   apply eutt_clo_bind with (UU := fun x y => x = y /\ Q x); [apply has_post_post_strong; exact POST |].
@@ -169,7 +199,7 @@ Proof.
 Qed.
 
 (* A little oddity that can be useful when building bisimulations manually:
-   en [eutt] hypothesis between a tree and itself can be refined into an [eq_itree] one.
+   an [eutt] hypothesis between a tree and itself can be refined into an [eq_itree] one.
  *)
 Lemma has_post_has_eq_itree_aux : forall {E X} (t : itree E X) (Q : X -> Prop),
     has_post_strong t Q ->
@@ -221,5 +251,3 @@ Lemma has_post_has_eq_itree : forall {E X} (t : itree E X) (Q : X -> Prop),
 Proof.
   intros; apply has_post_post_strong in H; apply has_post_has_eq_itree_aux; auto.
 Qed.
-
-

@@ -24,8 +24,8 @@ From Coq Require Import
 Require Import FunInd Recdef.
 
 Section nat_Show.
-  Local Open Scope string.
-  Local Open Scope nat.
+  #[local] Open Scope string.
+  #[local] Open Scope nat.
   Definition get_last_digit (n: nat): string :=
     match n mod 10 with
     | 0 => "0" | 1 => "1" | 2 => "2" | 3 => "3" | 4 => "4" | 5 => "5"
@@ -584,7 +584,7 @@ Proof.
   destruct n; discriminate. 
 Qed.
 
-Hint Resolve not_Nth_nil : core.
+#[export] Hint Resolve not_Nth_nil : core.
 
 Lemma Nth_nth_default : forall X l n (a:X) d,
   Nth l n a ->
@@ -1248,7 +1248,7 @@ Section With_Eqv_Rel_Dec.
 
 End With_Eqv_Rel_Dec.
 
-Global Instance string_eqv_dec : Eqv string := eq. 
+#[global] Instance string_eqv_dec : Eqv string := eq. 
 
 
 (*
@@ -1297,7 +1297,7 @@ Ltac destruct_Forall_cons :=
   match goal with
     | H : Forall _ (_::_) |- _ => inversion H; subst; clear H
   end.
-Hint Extern 2 => destruct_Forall_cons : inversions.
+#[export] Hint Extern 2 => destruct_Forall_cons : inversions.
 
 Definition snoc {A} (a:A) (l:list A) : list A :=
   l ++ [a].
@@ -1434,10 +1434,10 @@ Definition option_bind2 {A B C} (m: option (A * B)) (f: A -> B -> option C) : op
 Module OptionNotations.
 
   Notation "'do' x <- m ; f" := (option_bind m (fun x => f)) 
-    (at level 200, x ident, m at level 100, f at level 200).
+    (at level 200, x name, m at level 100, f at level 200).
 
   Notation "'do' x , y <- m ; f" := (option_bind2 m (fun x y => f))
-    (at level 200, x ident, y ident, m at level 100, f at level 200).
+    (at level 200, x name, y name, m at level 100, f at level 200).
 
 End OptionNotations.
 

@@ -13,7 +13,7 @@ Set Strict Implicit.
 (* end hide *)
 
 (** * NoEvent
-    We develop in this file a tiny theory to reason about absence of a given event signature
+    We develop in this file a theory to reason about absence of a given event signature
     in a tree, and how to use this absence to safely eliminate this signature from the tree.
  *)
 
@@ -22,14 +22,12 @@ Set Strict Implicit.
   We define straightforward non-recursive functors and take the cofixed points.
  *)
 
-(* Note : Need to state/prove the monotony of the functors to reason about their paco *)
-
 (* The left part of the signature is absent *)
 Variant no_event_lF {E F X} (R: itree (E +' F) X -> Prop) : itree' (E +' F) X -> Prop :=
 | no_event_l_ret: forall (x: X), no_event_lF R (RetF x)
 | no_event_l_tau: forall t, R t -> no_event_lF R (TauF t)
 | no_event_l_vis: forall {Y} (e: F Y) k, (forall x, R (k x)) -> no_event_lF R (VisF (inr1 e) k).
-Hint Constructors no_event_lF : core.
+#[export] Hint Constructors no_event_lF : core.
 
 Lemma no_event_lF_mono : forall {E F X} (R1 R2 : itree (E +' F) X -> Prop) (LE : R1 <1= R2),
     no_event_lF R1 <1= no_event_lF R2.
@@ -39,7 +37,7 @@ Proof.
 Qed.  
 
 Definition no_event_lF_ {E F X} R (t : itree (E +' F) X) := no_event_lF R (observe t).
-Hint Unfold no_event_lF_ : core.
+#[export] Hint Unfold no_event_lF_ : core.
 
 Lemma no_event_lF__mono : forall E F X, (monotone1 (@no_event_lF_ E F X)).
 Proof.
@@ -48,7 +46,7 @@ Proof.
   eapply no_event_lF_mono; eauto.
 Qed.  
 
-Hint Resolve no_event_lF_mono : paco.
+#[export] Hint Resolve no_event_lF_mono : paco.
   
 Definition no_event_l {E F X} := paco1 (@no_event_lF_ E F X) bot1. 
 
@@ -101,7 +99,6 @@ Proof.
         pstep. red. eapply IHeqitF. econstructor. intros. apply H. reflexivity. apply Heqoy.
       * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
 Qed.    
-  
 
 (* The right part of the signature is absent *)
 Variant no_event_rF {E F X} (R: itree (E +' F) X -> Prop): itree' (E +' F) X -> Prop :=
@@ -109,7 +106,7 @@ Variant no_event_rF {E F X} (R: itree (E +' F) X -> Prop): itree' (E +' F) X -> 
 | no_event_r_tau: forall t, R t -> no_event_rF R (TauF t)
 | no_event_r_vis: forall {Y} (e: E Y) k, (forall x, R (k x)) -> no_event_rF R (VisF (inl1 e) k).
 
-Hint Constructors no_event_rF : core.
+#[export] Hint Constructors no_event_rF : core.
 
 Lemma no_event_rF_mono : forall {E F X} (R1 R2 : itree (E +' F) X -> Prop) (LE : R1 <1= R2),
     no_event_rF R1 <1= no_event_rF R2.
@@ -119,7 +116,7 @@ Proof.
 Qed.  
 
 Definition no_event_rF_ {E F X} R (t : itree (E +' F) X) := no_event_rF R (observe t).
-Hint Unfold no_event_rF_ : core.
+#[export] Hint Unfold no_event_rF_ : core.
 
 Lemma no_event_rF__mono : forall E F X, (monotone1 (@no_event_rF_ E F X)).
 Proof.
@@ -128,7 +125,7 @@ Proof.
   eapply no_event_rF_mono; eauto.
 Qed.  
 
-Hint Resolve no_event_rF_mono : paco.
+#[export] Hint Resolve no_event_rF_mono : paco.
 
 Definition no_event_r {E F X} := paco1 (@no_event_rF_ E F X) bot1. 
 
@@ -190,7 +187,7 @@ Variant no_eventF {E X} (R: itree E X -> Prop): itree' E X -> Prop :=
 | no_event_ret: forall (x: X), no_eventF R (RetF x)
 | no_event_tau: forall t, R t -> no_eventF R (TauF t).
 
-Hint Constructors no_eventF : core.
+#[export] Hint Constructors no_eventF : core.
 
 Lemma no_eventF_mono : forall {E X} (R1 R2 : itree E X -> Prop) (LE : R1 <1= R2),
     no_eventF R1 <1= no_eventF R2.
@@ -200,7 +197,7 @@ Proof.
 Qed.  
 
 Definition no_eventF_ {E X} R (t : itree E X) := no_eventF R (observe t).
-Hint Unfold no_eventF_ : core.
+#[export] Hint Unfold no_eventF_ : core.
 
 Lemma no_eventF__mono : forall E X, (monotone1 (@no_eventF_ E X)).
 Proof.
@@ -209,7 +206,7 @@ Proof.
   eapply no_eventF_mono; eauto.
 Qed.  
 
-Hint Resolve no_eventF_mono : paco.
+#[export] Hint Resolve no_eventF_mono : paco.
 
 Definition no_event {E X} := paco1 (@no_eventF_ E X) bot1. 
 
@@ -709,7 +706,7 @@ Section eqit_closure.
       + rewrite <- H in H2; inv H2.
   Qed.
 
-  Global Instance geuttgen_cong_eqit r rg :
+  #[global] Instance geuttgen_cong_eqit r rg :
     Proper ((eq_itree eq) ==> flip impl) (gpaco1 no_eventF_ eq_itree_clo r rg).
   Proof.
     repeat intro.
@@ -718,9 +715,9 @@ Section eqit_closure.
   Qed.
 
 End eqit_closure.
-Hint Resolve eq_itree_clo_mon : paco.
-Hint Constructors eq_itree_clo: core.
-Hint Resolve eq_itree_clo_wcompat : paco.
+#[export] Hint Resolve eq_itree_clo_mon : paco.
+#[export] Hint Constructors eq_itree_clo: core.
+#[export] Hint Resolve eq_itree_clo_wcompat : paco.
 
 (* We should be able to have a more general closure up to [eutt RR]. *)
 (*    I am however having trouble proving the weak compatibility in this case. *)

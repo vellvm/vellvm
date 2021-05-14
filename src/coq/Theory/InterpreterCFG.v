@@ -101,7 +101,7 @@ Proof.
   reflexivity.
 Qed.
 
-Global Instance eutt_interp_cfg1 {T}:
+#[global] Instance eutt_interp_cfg1 {T}:
   Proper (eutt eq ==> eq ==> eutt eq) (@ℑ1 T).
 Proof.
   repeat intro.
@@ -110,7 +110,7 @@ Proof.
   reflexivity.
 Qed.
 
-Global Instance eutt_interp_cfg2 {T}:
+#[global] Instance eutt_interp_cfg2 {T}:
   Proper (eutt eq ==> eq ==> eq ==> eutt eq) (@ℑ2 T).
 Proof.
   repeat intro.
@@ -119,7 +119,7 @@ Proof.
   reflexivity.
 Qed.
 
-Global Instance eutt_interp_cfg3 {T}:
+#[global] Instance eutt_interp_cfg3 {T}:
   Proper (eutt eq ==> eq ==> eq ==> eq ==> eutt eq) (@ℑ3 T).
 Proof.
   repeat intro.

@@ -148,7 +148,7 @@ Section WF_dtyp.
 End WF_dtyp.
 
 Section hiding_notation.
-  Local Open Scope sexp_scope.
+  #[local] Open Scope sexp_scope.
   
   Fixpoint serialize_dtyp' (dt:dtyp): sexp :=
     match dt with
@@ -174,5 +174,5 @@ Section hiding_notation.
       => [Atom ("<" ++ to_string sz) ; Atom "x" ; serialize_dtyp' t ; Atom ">"]%string  (* TODO: right notation? *)
     end.
 
-  Global Instance serialize_dtyp : Serialize dtyp := serialize_dtyp'.
+  #[global] Instance serialize_dtyp : Serialize dtyp := serialize_dtyp'.
 End hiding_notation.

@@ -105,7 +105,7 @@ Qed.
 (*   rewrite H; reflexivity. *)
 (* Qed. *)
 
-Global Instance interp_state_proper {T E F S}
+#[global] Instance interp_state_proper {T E F S}
          (h: forall T : Type, E T -> Monads.stateT S (itree F) T)
   : Proper (eutt Logic.eq ==> Monad.eq1) (State.interp_state h (T := T)).
 Proof.
