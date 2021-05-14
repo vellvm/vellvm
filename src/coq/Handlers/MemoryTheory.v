@@ -429,7 +429,7 @@ Section Map_Theory.
     rewrite lookup_all_index_add_out; auto; try lia.
   Qed.
 
-  Lemma lookup_all_index_add_all_index :
+  Lemma lookup_all_index_add_all_index_same_length :
     forall serialized_bytes off len mem,
       len = Datatypes.length serialized_bytes ->
       lookup_all_index off (N.of_nat len) (add_all_index serialized_bytes off mem) SUndef = serialized_bytes.
@@ -986,6 +986,36 @@ Section Serialization_Theory.
     apply skipn_length_app.
   Qed.
 
+  Lemma serialize_fold_length :
+    forall xs dt,
+      (forall x, In x xs -> dvalue_has_dtyp x dt) ->
+      N.to_nat (N.of_nat (Datatypes.length xs) * sizeof_dtyp dt) =
+      Datatypes.length
+        (fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) [] xs).
+  Proof.
+    induction xs; intros dt H; auto.
+
+    cbn.
+    rewrite app_length.
+    apply Nnat.Nat2N.inj.
+    rewrite Nnat.N2Nat.id.
+    rewrite Nnat.Nat2N.inj_add.
+
+    break_match.
+    - erewrite sizeof_serialized; intuition.
+
+      rewrite Heqn. cbn.
+      erewrite <- IHxs; intuition.
+      lia.
+    - erewrite sizeof_serialized; intuition.
+
+      rewrite Heqn. cbn.
+      erewrite <- IHxs; intuition.
+      rewrite Nnat.N2Nat.id.
+      break_match; lia.
+  Qed.
+
+
 End Serialization_Theory.
 
 Section Memory_Stack_Theory.
@@ -1217,34 +1247,6 @@ Section Memory_Stack_Theory.
     (* CB TODO: Figure out where these predicates should live, or figure
        out how to get rid of them. Currently not using some of these... *)
 
-    (* Is a dtyp supported in the memory model?
-
-       This is mostly to rule out:
-
-       - arbitrary bitwidth integers
-       - half
-       - x86_fp80
-       - fp128
-       - ppc_fp128
-       - metadata
-       - x86_mmx
-       - opaque
-     *)
-    Inductive is_supported : dtyp -> Prop :=
-    | is_supported_DTYPE_I1 : is_supported (DTYPE_I 1)
-    | is_supported_DTYPE_I8 : is_supported (DTYPE_I 8)
-    | is_supported_DTYPE_I32 : is_supported (DTYPE_I 32)
-    | is_supported_DTYPE_I64 : is_supported (DTYPE_I 64)
-    | is_supported_DTYPE_Pointer : is_supported (DTYPE_Pointer)
-    | is_supported_DTYPE_Void : is_supported (DTYPE_Void)
-    | is_supported_DTYPE_Float : is_supported (DTYPE_Float)
-    | is_supported_DTYPE_Double : is_supported (DTYPE_Double)
-    | is_supported_DTYPE_Array : forall sz τ, is_supported τ -> is_supported (DTYPE_Array sz τ)
-    | is_supported_DTYPE_Struct : forall fields, Forall is_supported fields -> is_supported (DTYPE_Struct fields)
-    | is_supported_DTYPE_Packed_struct : forall fields, Forall is_supported fields -> is_supported (DTYPE_Packed_struct fields)
-    | is_supported_DTYPE_Vector : forall sz τ, is_supported (DTYPE_Vector sz τ)
-    .
-
     Definition not_pointer (τ : dtyp) : Prop
       := τ <> DTYPE_Pointer.
 
@@ -1433,6 +1435,93 @@ Section Memory_Stack_Theory.
         congruence.
     Qed.
 
+    Lemma deserialize_array_element :
+      forall sz elt elts ft elt_bytes elts_bytes,
+        is_supported (DTYPE_Array sz ft) ->
+        all_not_sundef elt_bytes = true ->
+        all_not_sundef elts_bytes = true ->
+        N.to_nat (sizeof_dtyp ft) = Datatypes.length elt_bytes ->
+        deserialize_sbytes elt_bytes ft = elt ->
+        deserialize_sbytes elts_bytes (DTYPE_Array sz ft) = UVALUE_Array elts ->
+        deserialize_sbytes (elt_bytes ++ elts_bytes) (DTYPE_Array (N.succ sz) ft) =
+        UVALUE_Array (elt :: elts).
+    Proof.
+      induction sz;
+        intros elt elts ft elt_bytes elts_bytes SUP UNDEF_BYTES UNDEF_ELTS SIZE ELT ELTS.
+      
+      - rewrite <- all_not_sundef_deserialized in ELT; auto.
+        rewrite <- all_not_sundef_deserialized in ELTS; auto.
+        rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app.
+
+        cbn in ELTS; inversion ELTS; subst; cbn.
+
+        replace (N.to_nat (sizeof_dtyp ft)) with (Datatypes.length elt_bytes + 0)%nat by lia.
+        rewrite Pos2Nat.inj_1.
+        rewrite firstn_app_2; cbn.
+        rewrite app_nil_r.
+
+        congruence.
+      - rewrite <- all_not_sundef_deserialized in ELT; auto.
+        rewrite <- all_not_sundef_deserialized in ELTS; auto.
+        rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app.
+
+        cbn in ELTS; inversion ELTS; subst; cbn.
+        
+        replace (N.to_nat (sizeof_dtyp ft)) with (Datatypes.length elt_bytes + 0)%nat by lia.
+        rewrite Pos2Nat.inj_succ.
+        rewrite firstn_app_2; cbn.
+        rewrite app_nil_r.
+
+        do 2 f_equal.
+
+        replace (Datatypes.length elt_bytes + 0)%nat with (Datatypes.length elt_bytes) by lia.
+        rewrite skipn_length_app.
+        congruence.
+    Qed.
+
+    Lemma deserialize_vector_element :
+      forall sz elt elts ft elt_bytes elts_bytes,
+        is_supported (DTYPE_Vector sz ft) ->
+        all_not_sundef elt_bytes = true ->
+        all_not_sundef elts_bytes = true ->
+        N.to_nat (sizeof_dtyp ft) = Datatypes.length elt_bytes ->
+        deserialize_sbytes elt_bytes ft = elt ->
+        deserialize_sbytes elts_bytes (DTYPE_Vector sz ft) = UVALUE_Vector elts ->
+        deserialize_sbytes (elt_bytes ++ elts_bytes) (DTYPE_Vector (N.succ sz) ft) =
+        UVALUE_Vector (elt :: elts).
+    Proof.
+      induction sz;
+        intros elt elts ft elt_bytes elts_bytes SUP UNDEF_BYTES UNDEF_ELTS SIZE ELT ELTS.
+      
+      - rewrite <- all_not_sundef_deserialized in ELT; auto.
+        rewrite <- all_not_sundef_deserialized in ELTS; auto.
+        rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app.
+
+        cbn in ELTS; inversion ELTS; subst; cbn.
+
+        replace (N.to_nat (sizeof_dtyp ft)) with (Datatypes.length elt_bytes + 0)%nat by lia.
+        rewrite Pos2Nat.inj_1.
+        rewrite firstn_app_2; cbn.
+        rewrite app_nil_r.
+
+        congruence.
+      - rewrite <- all_not_sundef_deserialized in ELT; auto.
+        rewrite <- all_not_sundef_deserialized in ELTS; auto.
+        rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app.
+
+        cbn in ELTS; inversion ELTS; subst; cbn.
+        
+        replace (N.to_nat (sizeof_dtyp ft)) with (Datatypes.length elt_bytes + 0)%nat by lia.
+        rewrite Pos2Nat.inj_succ.
+        rewrite firstn_app_2; cbn.
+        rewrite app_nil_r.
+
+        do 2 f_equal.
+
+        replace (Datatypes.length elt_bytes + 0)%nat with (Datatypes.length elt_bytes) by lia.
+        rewrite skipn_length_app.
+        congruence.
+    Qed.
 
     (** ** Deserialize - Serialize
         Starting from a dvalue [val] whose [dtyp] is [t], if:
@@ -1553,7 +1642,7 @@ Section Memory_Stack_Theory.
 
         erewrite deserialize_struct_element; auto.
         +  erewrite <- sizeof_serialized; eauto.
-          rewrite lookup_all_index_add_all_index; eauto.
+          rewrite lookup_all_index_add_all_index_same_length; eauto.
 
           apply dvalue_serialized_not_sundef.
         + pose proof deserialize_sbytes_dvalue_all_not_sundef (DVALUE_Struct fields) (DTYPE_Struct dts) (lookup_all_index (off + Z.of_N (sizeof_dtyp dt)) (sizeof_dtyp (DTYPE_Struct dts))
@@ -1577,7 +1666,7 @@ Section Memory_Stack_Theory.
 
         erewrite deserialize_packed_struct_element; auto.
         + erewrite <- sizeof_serialized; eauto.
-          rewrite lookup_all_index_add_all_index; eauto.
+          rewrite lookup_all_index_add_all_index_same_length; eauto.
 
           apply dvalue_serialized_not_sundef.
         + pose proof deserialize_sbytes_dvalue_all_not_sundef (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) (lookup_all_index (off + Z.of_N (sizeof_dtyp dt)) (sizeof_dtyp (DTYPE_Packed_struct dts))
@@ -1587,9 +1676,227 @@ Section Memory_Stack_Theory.
         + rewrite lookup_all_index_length.
           reflexivity.
       - (* Arrays *)
-        admit.
+        rename H into SZ.
+        generalize dependent sz.
+        generalize dependent xs.
+        induction xs;
+          intros IH IHdtyp sz SZ SUP.
+        + cbn in *.
+          subst.
+          reflexivity.
+        + cbn in SZ.
+          subst.
+          rewrite Nnat.Nat2N.inj_succ.
+          cbn.
+
+          assert (dvalue_has_dtyp a dt) as DTa.
+          {
+            apply IHdtyp.
+            cbn. auto.
+          }
+
+          rewrite Nmult_Sn_m.
+          rewrite lookup_all_index_append; [|apply sizeof_serialized; auto].
+
+          erewrite deserialize_array_element; auto.
+          * inversion SUP; constructor; auto.
+          * erewrite <- sizeof_serialized; eauto.
+            rewrite lookup_all_index_add_all_index_same_length; eauto.
+
+            apply dvalue_serialized_not_sundef.
+          * (* Should be serialization of DVALUE_array xs *)
+            replace (N.of_nat (Datatypes.length xs) * sizeof_dtyp dt)%N
+              with (N.of_nat (N.to_nat (N.of_nat (Datatypes.length xs) * sizeof_dtyp dt))) by lia.
+            rewrite lookup_all_index_add_all_index_same_length.
+
+            apply all_not_sundef_fold_right_serialize.
+
+            apply serialize_fold_length; intuition.
+          * replace (sizeof_dtyp dt) with (N.of_nat (N.to_nat (sizeof_dtyp dt))) by lia.
+            rewrite lookup_all_index_add_all_index_same_length.
+            erewrite <- sizeof_serialized; intuition.
+            lia.
+            erewrite <- sizeof_serialized; intuition.
+            lia.
+          * rewrite IH; intuition.
+            inversion SUP; auto.
+          * cbn.
+
+            unfold deserialize_sbytes.
+            break_match.
+
+            2: {
+              assert (all_not_sundef
+                        (lookup_all_index (off + Z.of_N (sizeof_dtyp dt))
+                                          (N.of_nat (Datatypes.length xs) * sizeof_dtyp dt)
+                                          (add_all_index
+                                             (fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) []
+                                                         xs) (off + Z.of_N (sizeof_dtyp dt)) bytes) SUndef) = true) as CONTRA.
+              replace (N.of_nat (Datatypes.length xs) * sizeof_dtyp dt)%N
+                with (N.of_nat (N.to_nat (N.of_nat (Datatypes.length xs) * sizeof_dtyp dt))) by lia.
+              rewrite lookup_all_index_add_all_index_same_length.
+
+              apply all_not_sundef_fold_right_serialize.
+
+              apply serialize_fold_length; intuition.
+
+              rewrite Heqb in CONTRA.
+              inversion CONTRA.
+            }
+
+            forward IHxs; intuition.
+            forward IHxs; intuition.
+            specialize (IHxs (Datatypes.length xs) eq_refl).
+            forward IHxs.
+            { inversion SUP; constructor; eauto. }
+
+            cbn in IHxs.
+            rewrite <- IHxs.
+
+            rewrite all_not_sundef_deserialized; auto.
+            erewrite <- sizeof_serialized.
+
+            f_equal.
+
+            repeat rewrite <- Nnat.Nat2N.inj_mul.
+            rewrite lookup_all_index_add_all_index_same_length.
+            rewrite lookup_all_index_add_all_index_same_length.
+            reflexivity.
+
+            { erewrite <- serialize_fold_length.
+              erewrite <- sizeof_serialized.
+
+              repeat rewrite <- Nnat.Nat2N.inj_mul.
+              rewrite Nnat.Nat2N.id.
+              reflexivity.
+
+              eauto.
+              intuition.
+            }
+
+            { erewrite <- serialize_fold_length.
+              erewrite <- sizeof_serialized.
+
+              repeat rewrite <- Nnat.Nat2N.inj_mul.
+              rewrite Nnat.Nat2N.id.
+              reflexivity.
+
+              eauto.
+              intuition.
+            }
+
+            eauto.
       - (* Vectors *)
-        admit.
+        rename H into SZ.
+        generalize dependent sz.
+        generalize dependent xs.
+        induction xs;
+          intros IH IHdtyp sz SZ SUP.
+        + cbn in *.
+          subst.
+          reflexivity.
+        + cbn in SZ.
+          subst.
+          rewrite Nnat.Nat2N.inj_succ.
+          cbn.
+
+          assert (dvalue_has_dtyp a dt) as DTa.
+          {
+            apply IHdtyp.
+            cbn. auto.
+          }
+
+          rewrite Nmult_Sn_m.
+          rewrite lookup_all_index_append; [|apply sizeof_serialized; auto].
+
+          erewrite deserialize_vector_element; auto.
+          * inversion SUP; constructor; auto.
+          * erewrite <- sizeof_serialized; eauto.
+            rewrite lookup_all_index_add_all_index_same_length; eauto.
+
+            apply dvalue_serialized_not_sundef.
+          * (* Should be serialization of DVALUE_vector xs *)
+            replace (N.of_nat (Datatypes.length xs) * sizeof_dtyp dt)%N
+              with (N.of_nat (N.to_nat (N.of_nat (Datatypes.length xs) * sizeof_dtyp dt))) by lia.
+            rewrite lookup_all_index_add_all_index_same_length.
+
+            apply all_not_sundef_fold_right_serialize.
+
+            apply serialize_fold_length; intuition.
+          * replace (sizeof_dtyp dt) with (N.of_nat (N.to_nat (sizeof_dtyp dt))) by lia.
+            rewrite lookup_all_index_add_all_index_same_length.
+            erewrite <- sizeof_serialized; intuition.
+            lia.
+            erewrite <- sizeof_serialized; intuition.
+            lia.
+          * rewrite IH; intuition.
+            inversion SUP; subst; auto.
+          * cbn.
+
+            unfold deserialize_sbytes.
+            break_match.
+
+            2: {
+              assert (all_not_sundef
+                        (lookup_all_index (off + Z.of_N (sizeof_dtyp dt))
+                                          (N.of_nat (Datatypes.length xs) * sizeof_dtyp dt)
+                                          (add_all_index
+                                             (fold_right (fun (dv : dvalue) (acc : list SByte) => serialize_dvalue dv ++ acc) []
+                                                         xs) (off + Z.of_N (sizeof_dtyp dt)) bytes) SUndef) = true) as CONTRA.
+              replace (N.of_nat (Datatypes.length xs) * sizeof_dtyp dt)%N
+                with (N.of_nat (N.to_nat (N.of_nat (Datatypes.length xs) * sizeof_dtyp dt))) by lia.
+              rewrite lookup_all_index_add_all_index_same_length.
+
+              apply all_not_sundef_fold_right_serialize.
+
+              apply serialize_fold_length; intuition.
+
+              rewrite Heqb in CONTRA.
+              inversion CONTRA.
+            }
+
+            forward IHxs; intuition.
+            forward IHxs; intuition.
+            specialize (IHxs (Datatypes.length xs) eq_refl).
+            forward IHxs.
+            { inversion SUP; constructor; eauto. }
+
+            cbn in IHxs.
+            rewrite <- IHxs.
+
+            rewrite all_not_sundef_deserialized; auto.
+            erewrite <- sizeof_serialized.
+
+            f_equal.
+
+            repeat rewrite <- Nnat.Nat2N.inj_mul.
+            rewrite lookup_all_index_add_all_index_same_length.
+            rewrite lookup_all_index_add_all_index_same_length.
+            reflexivity.
+
+            { erewrite <- serialize_fold_length.
+              erewrite <- sizeof_serialized.
+
+              repeat rewrite <- Nnat.Nat2N.inj_mul.
+              rewrite Nnat.Nat2N.id.
+              reflexivity.
+
+              eauto.
+              intuition.
+            }
+
+            { erewrite <- serialize_fold_length.
+              erewrite <- sizeof_serialized.
+
+              repeat rewrite <- Nnat.Nat2N.inj_mul.
+              rewrite Nnat.Nat2N.id.
+              reflexivity.
+
+              eauto.
+              intuition.
+            }
+
+            eauto.
     Qed.
 
     (** ** Write - Read
@@ -1599,12 +1906,13 @@ Section Memory_Stack_Theory.
      *)
     Lemma write_read :
       forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr),
+        is_supported t ->
         write m a val = inr m' ->
         dvalue_has_dtyp val t ->
         read m' a t = inr (dvalue_to_uvalue val).
     Proof.
       unfold write, read; cbn.
-      intros * WR TYP.
+      intros * SUP WR TYP.
       flatten_hyp WR; try inv_sum.
       destruct l,a as [id off]; inv_sum.
       rewrite get_logical_block_of_add_logical_block.
@@ -1755,10 +2063,11 @@ Section Memory_Stack_Theory.
 
     Lemma read_in_mem_block_write_to_mem_block :
       forall bytes offset val τ,
+        is_supported τ ->
         dvalue_has_dtyp val τ ->
         read_in_mem_block (write_to_mem_block bytes offset val) offset τ = dvalue_to_uvalue val.
     Proof.
-      intros bytes offset val τ H.
+      intros bytes offset val τ SUP H.
       unfold read_in_mem_block, write_to_mem_block.
       rewrite deserialize_serialize; eauto.
     Qed.
@@ -1766,10 +2075,11 @@ Section Memory_Stack_Theory.
     Lemma write_array_cell_get_array_cell :
       forall (m m' : memory_stack) (t : dtyp) (val : dvalue) (a : addr) (i : nat),
         write_array_cell m a i t val = inr m' ->
+        is_supported t ->
         dvalue_has_dtyp val t ->
         get_array_cell m' a i t = inr (dvalue_to_uvalue val).
     Proof.
-      intros m m' t val a i WRITE TYP.
+      intros m m' t val a i WRITE SUP TYP.
       destruct a; cbn in *.
       break_match_hyp; inv WRITE.
       destruct l.
@@ -3108,15 +3418,6 @@ Section PARAMS.
       - lia.
     Qed.
 
-    Lemma Zseq_length :
-      forall (sz : nat) off, sz = length (Zseq off sz).
-    Proof.
-      intro sz.
-      induction sz.
-      - intros; auto.
-      - intros. cbn. auto.
-    Qed.
-
     Lemma list_nth_z_length:
       forall A (l : list A) (a : A),
         list_nth_z (l ++ [a]) (Z.of_nat (length l)) = Some a.
@@ -3241,7 +3542,7 @@ Section PARAMS.
             3 : {
               rewrite Z.add_simpl_l. rewrite list_nth_z_map.
               unfold option_map.
-              rewrite (@Zseq_length sz src_offset) at 3.
+              rewrite <- (@Zseq_length sz src_offset) at 3.
               rewrite Nnat.Nat2N.id.
               rewrite list_nth_z_length. reflexivity.
             }
