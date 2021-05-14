@@ -13,7 +13,7 @@ Set Strict Implicit.
 (* end hide *)
 
 (** * NoEvent
-    We develop in this file a tiny theory to reason about absence of a given event signature
+    We develop in this file a theory to reason about absence of a given event signature
     in a tree, and how to use this absence to safely eliminate this signature from the tree.
  *)
 
@@ -21,8 +21,6 @@ Set Strict Implicit.
   A simple way to assert the absence of a signature is based on the shape of the signature.
   We define straightforward non-recursive functors and take the cofixed points.
  *)
-
-(* Note : Need to state/prove the monotony of the functors to reason about their paco *)
 
 (* The left part of the signature is absent *)
 Variant no_event_lF {E F X} (R: itree (E +' F) X -> Prop) : itree' (E +' F) X -> Prop :=

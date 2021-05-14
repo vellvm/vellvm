@@ -8,6 +8,7 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
+(* begin hide *)
 From Coq Require Import String.
 Require Import ExtLib.Structures.Monads.
 Require Export ExtLib.Data.Monads.EitherMonad.
@@ -15,6 +16,16 @@ Require Export ExtLib.Data.Monads.EitherMonad.
 From ITree Require Import
      ITree
      Events.Exception.
+(* end hide *)
+
+(** * Error and exception monads 
+  The arithmetic performed by vir programs being essentially pure, we have chosen
+  not to wrap it in the [itree] monad. It gets instead injected into it when 
+  representing syntactic constructs relying on it.
+
+  It is however not completely pure: it is partial, and may raise undefined behavior.
+  We hence use a nested "double" error monad for this purpose.
+*)
 
 Notation err := (sum string).
 
@@ -57,6 +68,8 @@ Arguments failwith _ _ _ _: simpl nomatch.
 (* SAZ:
    I believe that these refer to "undefined behavior", not "undef" values.  
    Raname them to "UB" and "UB_or_err"?
+   YZ: I agree 
+   TODO
 *)
 Definition undef := err.
 Definition undef_or_err := eitherT string err.

@@ -14,10 +14,27 @@ From ITree Require Import
 
 Set Implicit Arguments.
 Set Strict Implicit.
-(* end hide *)
 
 Import MonadNotation.
 Open Scope monad_scope.
+
+(* end hide *)
+
+(** * Commutation of computations described as [itree]s
+  This file develops some theory to justify when two computations described as
+  interaction trees can be commuted, i.e. looks for sufficient condition under 
+  which we have: [t1 ;; t2 ≈ t2 ;; t1].
+
+  We prove the obvious result that it always hold for computations that have no 
+  effects (E == void1) and computes no meaningful value (R == unit): [trivial_commut].
+  While it is not surprising, it is not a completely trivial fact as it must
+  account for divergence of either of the computation. 
+
+  We also establish more interesting results for computations involving a state.
+  These lemmas are currently used in Helix in order to justify that the order of
+  iteration of bounded loops over appropriate bodies can be reversed.
+
+*)
 
 Lemma itree_eta_cont : forall {E A B} (t : itree E A) (k : A -> itree E B),
     x <- t;; k x ≅ x <- t;; (fun y => {| _observe := observe (k y) |}) x.
