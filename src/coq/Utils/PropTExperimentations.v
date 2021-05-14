@@ -40,6 +40,12 @@ Local Open Scope monad_scope.
 Local Open Scope cat_scope.
 (* end hide *)
 
+(* This file is a version of [PropT] still containing all the comments
+    and experiments conducted.
+    The first release contains a curated and cleaned up version, but this
+    should probably be kept as a starting point for further improvement.
+   *)
+
 (* LLVM IR is a non-deterministic language: the [undef] value can be refined
   into any dynamic value at the concerned type, and [Undefined Behaviors] can
   be refined into any computation.
@@ -149,12 +155,12 @@ Section PropMonad.
   Definition eutt_closed {E X} (P: itree E X -> Prop): Prop :=
     Proper (eutt eq ==> iff) P.
 
-  #[global] Polymorphic Instance Eq1_PropT {E} : Eq1 (PropT E) :=
+  Global Polymorphic Instance Eq1_PropT {E} : Eq1 (PropT E) :=
     fun a PA PA' =>
       (forall x y, x ≈ y -> (PA x <-> PA' y)) /\
       eutt_closed PA /\ eutt_closed PA'.
   
-  #[global] Instance Functor_Prop {E}
+  Global Instance Functor_Prop {E}
     : Functor (PropT E) :=
     {| fmap := fun A B f PA b => exists (a: itree E A), PA a /\ b = fmap f a |}.
 
@@ -174,6 +180,135 @@ Section PropMonad.
         tb ≈ bind ta k /\
         (forall a, Returns a ta -> K a (k a)).
 
+  (*
+  (*  ------------------------------------------------------------------------- *)
+  (* SZ: Here is a coinductive version of bind_propT that might work out better *)
+  Inductive bind_PropTF {E} {A B} (PA: PropT E A) (K: A -> PropT E B) (sim : itree E B -> Prop) : itree' E B -> Prop :=
+    (* If we bind and get a Ret then both the first and second parts of the computation must be (equivalent to) ret *)
+  | bind_PropTF_Ret : forall (b:B) (ta : itree E A) (HP : PA ta) (a:A) (eqA: ta ≈ ret a) (tb : itree E B) (eqB : tb ≈ ret b) (HB : K a tb),
+      bind_PropTF PA K sim (RetF b)
+
+    (* If we bind and get [Tau tb] then we don't know how to break up the tree, so just corecurse *)
+  | bind_PropTF_Tau : forall tb, sim tb -> bind_PropTF PA K sim (TauF tb)
+
+    (* If we bind and get [Vis e k] then either the event is raised in the first part of the compuation: *)                                            
+  | bind_PropTF_Vis_l : forall X (e : E X) (k : X -> itree E B) (ta : itree E A) (HP : PA ta) (ka : X -> itree E A) (eqA : ta ≈ Vis e ka)
+                        (k' : A -> itree E B)
+                        (Hks : forall (x:X), (k x) ≈ (ITree.bind (ka x) k'))
+                        (HK : forall (a : A), Returns a ta -> (K a (k' a))),
+      bind_PropTF PA K sim (VisF e k)
+    (* ... or, it was raised in the second part, and the first part was pure *)
+  | bind_PropTF_Vis_r :  forall X (e : E X) (k : X -> itree E B) (ta : itree E A) (HP : PA ta) (a : A) (eqA : ta ≈ ret a)
+                        (k' : A -> itree E B)
+                        (Hks : (ITree.bind ta k') ≈ (Vis e k))
+                        (HK : K a (Vis e k)),
+      bind_PropTF PA K sim (VisF e k).
+
+  Hint Constructors bind_PropTF : core.
+  
+  Lemma bind_PropTF_mono E A B (PA : PropT E A) (K : A -> PropT E B) sim sim' (t : itree' E B)
+        (IN : bind_PropTF PA K sim t)
+        (LE : sim <1= sim') : 
+    (bind_PropTF PA K sim' t).
+  Proof.
+    induction IN; eauto.
+  Qed.
+
+  Hint Resolve bind_PropTF_mono : paco.
+
+  Definition bind_PropT_ E A B (PA : PropT E A) (K : A -> PropT E B) sim (t : itree E B) :=
+    bind_PropTF PA K sim (observe t).
+  Hint Unfold bind_PropT_ : core.
+
+  Lemma bind_PropT__mono E A B (PA : PropT E A) (K : A -> PropT E B) : monotone1 (bind_PropT_ E A B PA K).
+  Proof.
+    do 2 red. intros. eapply bind_PropTF_mono; eauto.
+  Qed.
+  Hint Resolve bind_PropT__mono : paco.  
+  
+  Definition bind_prop {E A B} (PA : PropT E A) (K : A -> PropT E B) : PropT E B :=
+    paco1 (bind_PropT_ E A B PA K) bot1.
+
+
+  Lemma bind_prop_eutt :
+    forall {E} {A B} (PA: PropT E A) (K: A -> PropT E B)
+      (HK: forall a, Eq1_PropT _ (K a) (K a))
+      
+      (t1 t2 : itree E B) (eq : t1 ≈ t2),
+      bind_prop PA K t1 -> bind_prop PA K t2.
+  Proof.
+    intros E A B PA K HK.
+    pcofix CIH.
+    intros t1 t2 eq H.
+    punfold H. red in H.
+    punfold eq. red in eq.
+    pstep. red.
+    genobs t1 obt1. genobs t2 obt2.
+    revert t1 t2 Heqobt1 Heqobt2 H.
+    induction eq; intros; subst; inv H; subst.
+    - econstructor; eauto.
+    - econstructor. pclearbot. right. eapply CIH. apply REL. apply H1.
+    - apply inj_pair2 in H2. apply inj_pair2 in H3. subst.
+      eapply bind_PropTF_Vis_l; eauto. intros. specialize (Hks x). specialize (REL x). pclearbot. rewrite <- REL. assumption.
+    - apply inj_pair2 in H2. apply inj_pair2 in H3. subst.
+      assert (Vis e k1 ≈ Vis e k2).
+      { apply eqit_Vis. intros. specialize (REL u0). pclearbot. apply REL. }
+      eapply bind_PropTF_Vis_r; eauto.
+      + etransitivity. apply Hks. assumption.
+      + specialize (HK a). destruct HK as (HX & _ & _). specialize (HX _ _ H). apply HX. assumption.
+    - eapply IHeq. reflexivity. reflexivity. pclearbot. pinversion H1.
+    - econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H1.
+      econstructor; eauto.
+    - pclearbot. econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H0.
+      econstructor. left. assumption.
+    - econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H1.
+      eapply bind_PropTF_Vis_l; eauto.
+    - econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H1.
+      eapply bind_PropTF_Vis_r; eauto.
+  Qed.
+
+
+  (* This more general version seems much harder *)
+  Lemma bind_prop_Proper {E} {A B} :
+     Proper (eq1 ==> (eq ==> eq1) ==> eutt eq ==> iff) (@bind_prop E A B).
+  Proof.
+    do 5 red.
+    intros PA PA' EQA K1 K2 EQK t1 t2 eq.
+    split.
+    - destruct EQA as (PPA & PX & PY).
+      intros H.
+      punfold H. red in H.
+      punfold eq. red in eq.
+      pstep. red.
+      genobs t1 obt1. genobs t2 obt2.
+      revert t1 t2 Heqobt1 Heqobt2 H.
+      induction eq; intros; subst; inv H; subst.
+      + econstructor. rewrite <- PPA. apply HP. reflexivity. eauto. eauto. specialize (EQK a a eq_refl). destruct EQK as (XK & _ & _). rewrite <- XK. apply HB. reflexivity.
+(*        
+    + econstructor. left. pclearbot. right. eapply CIH. apply REL. apply H1.
+    - apply inj_pair2 in H2. apply inj_pair2 in H3. subst.
+      eapply bind_PropTF_Vis_l; eauto. intros. specialize (Hks x). specialize (REL x). pclearbot. rewrite <- REL. assumption.
+    - apply inj_pair2 in H2. apply inj_pair2 in H3. subst.
+      assert (Vis e k1 ≈ Vis e k2).
+      { apply eqit_Vis. intros. specialize (REL u0). pclearbot. apply REL. }
+      eapply bind_PropTF_Vis_r; eauto.
+      + etransitivity. apply Hks. assumption.
+      + specialize (HK a). destruct HK as (HX & _ & _). specialize (HX _ _ H). apply HX. assumption.
+    - eapply IHeq. reflexivity. reflexivity. pclearbot. pinversion H1.
+    - econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H1.
+      econstructor; eauto.
+    - pclearbot. econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H0.
+      econstructor. left. assumption.
+    - econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H1.
+      eapply bind_PropTF_Vis_l; eauto.
+    - econstructor. left. pstep. red. eapply IHeq. reflexivity. reflexivity. rewrite <- H1.
+      eapply bind_PropTF_Vis_r; eauto.
+ *)
+  Abort.
+  *)
+
+  (* end coinductive bind ----------------------------------------------------- *)
+  
   Definition bind_PropT_stronger {E} :=
     fun A B (PA: PropT E A) (K: A -> PropT E B) (tb: itree E B) =>
       exists (ta: itree E A) (k: A -> itree E B),
@@ -181,9 +316,6 @@ Section PropMonad.
         tb ≈ bind ta k /\
         (forall a, Returns a ta -> K a (k a)).
 
-(* Alternate, logically equivalent version of bind.
-   It should not matter which one we use. Since bind_PropT has fewer cases, we should
-   stick to it.*)
   Definition bind_PropT' {E} := 
     fun A B (PA: PropT E A) (K: A -> PropT E B) (tb: itree E B) =>
       exists (ta: itree E A),  PA ta /\
@@ -192,6 +324,16 @@ Section PropMonad.
                                /\ tb ≈ bind ta k)
                            \/ (forall k, (forall a, K a (k a)) /\ tb ≈ bind ta k)).
 
+  (* Definition bind_PropT {E} := *)
+  (*   fun A B (PA: PropT E A) (K: A -> PropT E B) (tb: itree E B) => *)
+  (*     exists (ta: itree E A) (k: A -> itree E B), *)
+  (*       (exists a, Returns a ta /\ *)
+  (*             PA ta /\ tb ≈ bind ta k /\ *)
+  (*             (forall a', Returns a' ta -> K a' (k a'))). *)
+        (* (~ (exists a, Returns a ta)).  *)
+  (* SAZ: Here is the proof that the two version of bind are logically equivalent, so
+     it should not matter which one we use. Since bind_PropT has fewer cases, we should
+     use it.*)
   Lemma bind_PropT_bind_PropT' {E}:
     forall A B PA K (tb : itree E B), bind_PropT A B PA K tb <-> bind_PropT' A B PA K tb.
   Proof.
@@ -212,7 +354,7 @@ Section PropMonad.
         split; auto.
   Qed.
 
-  #[global] Instance Monad_Prop {E} : Monad (PropT E) :=
+  Global Instance Monad_Prop {E} : Monad (PropT E) :=
     {|
       ret := fun _ x y => y ≈ ret x
       ; bind := bind_PropT
@@ -221,6 +363,187 @@ Section PropMonad.
   Definition handler_correct {E F} (h_spec: E ~> PropT F) (h: E ~> itree F) :=
     (forall T e, h_spec T e (h T e)).
 
+
+  (*
+  (* SAZ: This definition isn't quite correct because it fails in the case of a 
+     vacuous h_spec (i.e. fun e t => False), since there can not exist such
+     a handler _but_ the iterpreter should still succeed on trees without
+     Vis events.
+  *)
+  Definition interp_PropT {E F : Type -> Type} (h_spec : E ~> PropT F) :
+    forall R (RR: relation R), itree E R -> PropT F R :=
+    fun R RR (t : itree E R) s =>
+      exists h, handler_correct h_spec h /\ eutt RR (interp h t) s.
+                                                     
+  Definition interp_prop_old {E F} (h : E ~> PropT F) :
+    forall R (RR: relation R), itree E R -> PropT F R := interp_PropT h.
+
+
+  Lemma interp_prop_old_correct_exec:
+    forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),
+      handler_correct h_spec h ->
+      forall R RR `{Reflexive _ RR} t, interp_prop_old h_spec R RR t (interp h t).
+  Proof.
+    intros.
+    exists h; split; auto. reflexivity.
+  Qed.
+
+
+  Instance interp_prop_old_Proper_eq :
+    forall R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR) E F (h_spec : E ~> PropT F),
+      Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_prop_old E _ h_spec R RR).
+  Proof.
+    intros.
+    do 5 red.
+    intros t1 t2 eqt s' s eqs HI.
+    subst.
+    unfold interp_prop_old, interp in HI. red in HI.
+
+    destruct HI as (h & HC & HE).
+
+    exists h. split; auto.
+
+    eapply transitivity. 2 : { apply HE. } clear HE s.
+
+    revert t1 t2 eqt.
+
+    einit.
+    ecofix CIH.
+
+    intros.
+
+    unfold interp. 
+    unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree in *.
+
+    rewrite (itree_eta t1). rewrite (itree_eta t2).
+    punfold eqt. red in eqt.
+    
+    genobs t1 obt1.
+    genobs t2 obt2.
+
+    revert t1 t2 Heqobt1 Heqobt2.
+    induction eqt; intros; cbn in *.
+    
+    - do 2 rewrite unfold_iter. cbn.
+      do 2 rewrite Eq.bind_ret_l. cbn.
+      estep.
+
+    - do 2 rewrite unfold_iter. cbn.
+      do 2 rewrite Eq.bind_ret_l. cbn.
+      estep.
+      econstructor.
+      change (ITree.iter
+                (fun t : itree (fun H : Type => E H) R =>
+                   match observe t with
+                   | RetF r0 => Ret (inr r0)
+                   | TauF t0 => Ret (inl t0)
+                   | @VisF _ _ _ X e k => ITree.map (fun x : X => inl (k x)) (h X e)
+                   end) m1) with (interp h m1).
+      change (ITree.iter
+                (fun t : itree (fun H : Type => E H) R =>
+                   match observe t with
+                   | RetF r0 => Ret (inr r0)
+                   | TauF t0 => Ret (inl t0)
+                   | @VisF _ _ _ X e k => ITree.map (fun x : X => inl (k x)) (h X e)
+                   end) m2) with (interp h m2).
+      gfinal. left. right. apply CIH. pclearbot. apply REL.
+
+    - do 2 rewrite unfold_iter. cbn.
+      unfold ITree.map.
+      do 2 rewrite Eq.bind_bind.
+      apply euttG_bind. eapply Eq.pbc_intro_h with (RU := eq).
+      + reflexivity.
+      + intros; subst.
+        do 2 rewrite Eq.bind_ret_l. cbn.
+        econstructor.
+        gstep. red. econstructor.
+        gfinal. left.
+        specialize (REL u2). pclearbot. pinversion REL.  
+    - rewrite unfold_iter. cbn.
+      rewrite Eq.bind_ret_l.
+      cbn.
+      specialize (IHeqt t1 t2 eq_refl Heqobt2).
+      eapply euttG_cong_euttge. apply tau_euttge. reflexivity.
+      rewrite (itree_eta t1). assumption.
+    - match goal with
+      | [ |- euttG _ _ _ _ _ ?X _ ] => remember X as XX
+      end.
+      rewrite unfold_iter.
+      rewrite HeqXX in *. clear XX HeqXX.
+      cbn. rewrite Eq.bind_ret_l. cbn.
+      specialize (IHeqt t1 t2 Heqobt1 eq_refl).
+      eapply euttG_cong_euttge. reflexivity. apply tau_euttge.
+      rewrite (itree_eta t2). assumption.
+  Qed.
+
+  (* SAZ: This is where the bad definition of interp_prop_old bites... *)
+  Lemma interp_prop_ret :
+    forall R E F (h_spec : E ~> PropT F)
+      (r : R)
+    , eq1 (interp_prop_old h_spec R eq (ret r)) (ret r).
+  Proof.
+    intros.
+    repeat red. split; [|split].
+    - intros.
+      split; intros.
+      + repeat red in H0. destruct H0 as (h & HC & eq).
+        cbn in eq. rewrite interp_ret in eq. red. red. rewrite <- H. symmetry.  apply eq.
+      + cbn. repeat red. (* There may not exist such a handler but that shouldn't matter *)
+  Abort.        
+
+  
+  (* SAZ: maybe define directly by coinduction  *)
+  (* SAZ: For some reason, if this definition is moved below case_prop_handler_correct, I get a universe inconsistency(!) *)
+  (* This definition of monad_iter suffers from the same problem of vacous specs as the interp_prop_old above *)
+  Definition MonadIter_Prop_itree' {E F} :=
+    fun R (RR: relation R) (step : itree E R -> PropT F (itree E R + R)) i =>
+      fun (r : itree F R) =>
+        (exists step' : itree E R  -> itree F (itree E R + R)%type,
+            (* How do we state that something is out of bounds? *)
+            (forall j, step j (step' j)) /\
+            eutt RR (CategoryOps.iter step' i) r).
+
+  Definition interp_PropT' {E F : Type -> Type} (h : E ~> PropT F) :
+  forall R (RR: relation R), itree E R -> PropT F R := fun R RR =>
+  MonadIter_Prop_itree' _ RR (fun t =>
+    match observe t with
+    | RetF r => ret (inr r)
+    | TauF t => ret (inl t)
+    | VisF e k => fmap (fun x => inl (k x)) (h _ e)
+    end).
+
+
+  (* SAZ: This lemma proves that the definition of interp_prop_old given above
+  refines the more liberal one, which allows a different choice of handler for
+  each iteration. *)
+  Lemma interp_PropT_OK : forall {E F} (h_spec : E ~> PropT F) R RR t u,
+      interp_prop_old h_spec R RR t u -> interp_PropT' h_spec R RR t u.
+  Proof.
+    intros.
+    do 2 red in H.
+    do 2 red. destruct H as (h & HC & eq).
+    unfold interp in eq.
+    exists (fun t : itree (fun H : Type => E H) R =>
+             match observe t with
+             | RetF r => ret (inr r)
+             | TauF t0 => ret (inl t0)
+             | @VisF _ _ _ X e k => fmap (fun x : X => inl (k x)) (h X e)
+             end).
+    split.
+    - unfold handler_correct in HC.
+      intros j.
+      destruct (observe j).
+      * cbn. reflexivity.
+      * cbn. reflexivity.
+      * cbn. exists (h X e). split. apply HC. reflexivity.
+    - assumption.
+  Qed.
+
+*)
+
+  (*  ------------------------------------------------------------------------- *)
+  (* STARTING HERE IS THE BETTER DEFINITION OF INTERP_PROP -------------------- *)
+  
   Inductive interp_PropTF {E F} (h_spec : forall T, E T -> itree F T -> Prop)
             {R : Type} (RR : relation R) (sim : itree E R -> itree F R -> Prop)
             : itree' E R -> itree F R -> Prop := 
@@ -285,7 +608,7 @@ Section PropMonad.
    - do 3 red. intros. split; intros; cbn in *. rewrite <- H. assumption. rewrite H; assumption.
   Qed.      
 
-  #[global] Instance interp_PropTF_Proper
+  Global Instance interp_PropTF_Proper
          {E F} (h_spec : E ~> PropT F) R RR (t : itree' E R)
          (sim : itree E R -> itree F R -> Prop)
          (HS: forall t, Proper(eutt eq ==> flip impl) (sim t))
@@ -305,7 +628,7 @@ Section PropMonad.
       rewrite H. assumption.
   Qed.
 
-  #[global] Instance interp_prop_Proper
+  Global Instance interp_prop_Proper
          {E F} (h_spec : E ~> PropT F) R RR (t : itree E R) :
     Proper(eq_itree Logic.eq ==> iff) (interp_prop h_spec R RR t).
   Proof.
@@ -334,7 +657,7 @@ Section PropMonad.
       + intros. specialize (HK a H0). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
   Qed.
   
-  #[global] Instance interp_prop_Proper2
+  Global Instance interp_prop_Proper2
          {E F} (h_spec : E ~> PropT F) R RR (t : itree E R) :
     Proper(eutt Logic.eq ==> iff) (interp_prop h_spec R RR t).
   Proof.
@@ -363,7 +686,9 @@ Section PropMonad.
       + intros. specialize (HK a H0). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
   Qed.
 
-  #[global] Instance interp_prop_Proper3
+
+
+  Global Instance interp_prop_Proper3
          {E F} (h_spec : E ~> PropT F) R RR :
     Proper(eq_itree eq ==> eq  ==> iff) (interp_prop h_spec R RR).
   Proof.
@@ -450,6 +775,7 @@ Section PropMonad.
       reflexivity.
   Qed.
 
+
   Instance interp_prop_Proper_eq :
     forall R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR) E F (h_spec : E ~> PropT F),
       Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_prop E _ h_spec R RR).
@@ -497,7 +823,7 @@ Section PropMonad.
       pinversion HS.
   Qed.
 
-  #[global] Instance Returns_eutt {E A} a: Proper (eutt eq ==> iff) (@Returns E A a).
+    Global Instance Returns_eutt {E A} a: Proper (eutt eq ==> iff) (@Returns E A a).
   Proof.
     repeat intro; split; intros HRet.
     - revert y H. induction HRet; intros.
@@ -764,7 +1090,7 @@ Section PropMonad.
     I + R -> itree E R :=
     fun lr => ITree.on_left lr l (Tau (ITree.iter step' l)).
 
-  #[global] Polymorphic Instance MonadIter_Prop {E} : MonadIter (PropT E) :=
+  Global Polymorphic Instance MonadIter_Prop {E} : MonadIter (PropT E) :=
     fun R I (step : I -> PropT E (I + R)) i =>
       fun (r : itree E R) =>
         (exists (step' : I -> (itree E (I + R)%type)),
@@ -867,25 +1193,26 @@ Section PropMonad.
 
   End ReturnsBind.
 
-  Lemma eqit_Returns_bind' {E} {R} {T} b1 b2
-      (t1 t2: itree E T) (k1 k2: T -> itree E R) :
+    Lemma eqit_Returns_bind' {E} {R} {T} b1 b2
+          (t1 t2: itree E T) (k1 k2: T -> itree E R) :
       eqit eq b1 b2 t1 t2 ->
       (forall r, Returns r t1 -> eqit eq b1 b2 (k1 r) (k2 r)) ->
-    @eqit E _ _ eq b1 b2 (ITree.bind t1 k1) (ITree.bind t2 k2).
-  Proof.
-  intros. ginit. guclo (@eqit_Returns_clo_bind E R R eq). unfold eqit in *.
-  econstructor; eauto with paco.
-  Qed.
+      @eqit E _ _ eq b1 b2 (ITree.bind t1 k1) (ITree.bind t2 k2).
+    Proof.
+      intros. ginit. guclo (@eqit_Returns_clo_bind E R R eq). unfold eqit in *.
+      econstructor; eauto with paco.
+    Qed.
 
-  Lemma eqit_Returns_bind'' {E} {R S} {T} (RS : R -> S -> Prop) b1 b2
-      (t1 t2: itree E T) (k1: T -> itree E R) (k2 : T -> itree E S) :
+    Lemma eqit_Returns_bind'' {E} {R S} {T} (RS : R -> S -> Prop) b1 b2
+          (t1 t2: itree E T) (k1: T -> itree E R) (k2 : T -> itree E S) :
       eqit eq b1 b2 t1 t2 ->
       (forall r, Returns r t1 -> eqit RS b1 b2 (k1 r) (k2 r)) ->
-    @eqit E _ _ RS b1 b2 (ITree.bind t1 k1) (ITree.bind t2 k2).
-  Proof.
-  intros. ginit. guclo (@eqit_Returns_clo_bind E R S RS). unfold eqit in *.
-  econstructor; eauto with paco.
-  Qed.
+      @eqit E _ _ RS b1 b2 (ITree.bind t1 k1) (ITree.bind t2 k2).
+    Proof.
+      intros. ginit. guclo (@eqit_Returns_clo_bind E R S RS). unfold eqit in *.
+      econstructor; eauto with paco.
+    Qed.
+
 
   Lemma eutt_ret_vis_abs: forall {X Y E} (x: X) (e: E Y) k, Ret x ≈ Vis e k -> False.
   Proof.
@@ -1001,6 +1328,86 @@ Section PropMonad.
     eapply Returns_vis_inversion_. apply H. reflexivity.
   Qed.
 
+  (*
+  Lemma interp_prop_bind_clo :
+    forall E F (h_spec : E ~> PropT F) A B
+      (HP : forall T, Proper (eq ==> Eq1_PropT T) (h_spec T))
+      (t1 : itree E A) (t2 : itree F A)
+      (k1 : A -> itree E B) (k2 : A -> itree F B)
+      (HT : interp_prop h_spec A eq t1 t2)
+      (HK :  forall (a : A), Returns a t2 -> interp_prop h_spec B eq (k1 a) (k2 a)),
+      interp_prop h_spec B eq (ITree.bind t1 k1) (ITree.bind t2 k2).
+  Proof.
+  Admitted.
+
+  
+  Lemma interp_prop_bind :
+    forall E F (h_spec : E ~> PropT F) R S
+      (HP : forall T, Proper (eq ==> Eq1_PropT T) (h_spec T))
+      (m : itree E S)
+      (k : S -> itree E R)
+    , Eq1_PropT _ (interp_prop h_spec R eq (bind m k)) (bind (interp_prop h_spec S eq m) (fun x => interp_prop h_spec R eq (k x))).
+  Proof.
+    intros.
+    split; [|split].
+    - intros; split; intro HQ.
+      + (* SAZ: Thiis direction is the impossible one *)
+        rewrite H in HQ. clear H.
+        setoid_rewrite (itree_eta m) in HQ.
+        repeat red.
+        setoid_rewrite (itree_eta m).
+
+        destruct (observe m).
+        * setoid_rewrite Eq.bind_ret_l in HQ.
+          exists (ret r). exists (fun _ => y).
+          split; [| split].
+          -- repeat red. pstep. red. econstructor. reflexivity. reflexivity.
+          -- unfold bind, Monad_itree. cbn. rewrite Eq.bind_ret_l. reflexivity.
+          -- intros. apply Returns_ret_inv in H. subst. assumption.
+        * setoid_rewrite Eq.bind_tau in HQ. setoid_rewrite tau_eutt in HQ.
+          setoid_rewrite tau_eutt.
+          punfold HQ. red in HQ.
+          admit.
+        * setoid_rewrite Eq.bind_vis in HQ.
+          apply interp_prop_vis_inv in HQ.
+          destruct HQ as (ms & ks & HX & eq2).
+          admit.
+      + rewrite H. clear H.
+        repeat red in HQ.
+        setoid_rewrite (itree_eta m). setoid_rewrite (itree_eta m) in HQ.
+        destruct (observe m).
+        * destruct HQ as (ta & k0 & HI & eq2 & KK).
+          pinversion HI; subst.
+          rewrite eq0 in eq2. unfold bind, Monad_itree in *. rewrite Eq.bind_ret_l.
+          rewrite Eq.bind_ret_l in eq2. rewrite eq2. eapply KK. rewrite eq0. econstructor. reflexivity.
+        * destruct HQ as (ta & k0 & HI & eq2 & KK).
+          pinversion HI; subst.
+          unfold bind, Monad_itree in *.
+          rewrite Eq.bind_tau. rewrite tau_eutt. rewrite eq2.
+          eapply interp_prop_bind_clo. assumption.
+          apply HS. apply KK.
+        * destruct HQ as (ta & k1 & HI & eq2 & KK).
+          pinversion HI; subst; clear HI.
+          apply inj_pair2 in H1. apply inj_pair2 in H2.
+          subst.
+          unfold bind, Monad_itree in *.
+
+          rewrite eq0 in eq2. rewrite Eq.bind_bind in eq2. rewrite eq2.
+          rewrite Eq.bind_vis. pstep. red. econstructor.
+          apply HTA. unfold bind, Monad_itree.
+          red. unfold Eq1_ITree. reflexivity.
+          intros.
+          left. (* todo : interp_prop_bind_clo *)
+          eapply interp_prop_bind_clo.
+          assumption.
+          specialize (HK a H). pclearbot. apply HK.
+          intros. apply KK. rewrite eq0. 
+          eapply Returns_bind; eauto.
+  Admitted.          
+*)
+  
+  
+
   Definition divergent {E A} (ta : itree E A) := (forall k , ta ≈ bind ta k).
 
   Lemma Returns_divergent {E A}:
@@ -1025,7 +1432,88 @@ Section PropMonad.
   Definition divergent_cont {E A B} (ta : itree E A) :=
     (forall (k1 : A -> itree E B) (k2 : A -> itree E B) , bind ta k1 ≈ bind ta k2).
 
+  (*
+  Lemma Returns_divergent_cont {E A B}:
+    (forall (ta : itree E A), not (exists a, Returns a ta) -> @divergent_cont _ A B ta).
+  Proof.
+  Admitted.
+   *)
+(*
+  Global Instance IterUnfold_PropT {E} : IterUnfold (Kleisli (PropT E)) sum.
+  Proof.
+    intros A B f. split; [ intros x y EQ | ]; split.
+    - intros H. repeat red in H. repeat red.
+      destruct H as (step & H).
+      exists (step a). exists (iter_cont step).
+      destruct H as (BIND & PRED). split. auto.
+      split. rewrite <- EQ.
+      rewrite BIND. reflexivity.
+      intros. repeat red.
+      destruct a0.
+      + cbn. repeat red. unfold iter_cont.
+        setoid_rewrite tau_eutt at 2.
+        exists step.
+        setoid_rewrite unfold_iter. split; auto. reflexivity.
+      + cbn. reflexivity.
+    - intros H. repeat red in H. repeat red.
+      destruct H as (FIRST & CONT & PRED_FIRST & EQ_Y & PRED).
+      unfold iter_cont.
+      setoid_rewrite EQ. clear EQ x.
+      assert ((exists a, Returns a FIRST) \/ ~ (exists a, Returns a FIRST)).
+      apply classic.
+      destruct H.
+      + destruct H.
+        specialize (PRED _ H).
+        setoid_rewrite EQ_Y. clear EQ_Y.
+        cbn. setoid_rewrite bind_Returns_l. 2 : exact H.
+        repeat red in PRED. destruct x.
+        * repeat red in PRED.
+          destruct PRED as (step & H_BIND & H_PRED).
+          unfold iter_cont in H_BIND.
+          setoid_rewrite <- H_BIND.
+          (* We want an unfolded version of step. *)
+          eexists ?[step]. split; auto. admit.
+        * cbn in PRED. setoid_rewrite PRED. admit.
+      + apply (Returns_divergent_cont (B := B)) in H. red in H.
+        cbn in H. setoid_rewrite EQ_Y. cbn. setoid_rewrite <- H.
+        (* It doesn't make sense in terms of unfolding a loop body, that
+           the first part must return a value...
+         *)
+        exists (fun x => FIRST). split; auto. admit.
+    - repeat intro. repeat red. intuition.
+      repeat red in H0.
+      repeat red. setoid_rewrite <- H. auto.
+      repeat red in H0.
+      repeat red. setoid_rewrite H. auto.
+    - repeat intro. repeat red. intuition.
+      repeat red in H0.
+      repeat red. setoid_rewrite <- H. auto.
+      repeat red in H0.
+      repeat red. setoid_rewrite H. auto.
+  Admitted.
+*)
+  (* SAZ: maybe define directly by coinduction  *)
+  (* Global Polymorphic Instance MonadIter_Prop {E} : MonadIter (PropT E) := *)
+  (*   fun R I (step : I -> PropT E (I + R)) i => *)
+  (*     fun (r : itree E R) => *)
+  (*       (exists step' : I * nat -> (itree E (I + R)%type), *)
+  (*           (forall (j : I) (n : nat), *)
+  (*              (* a, *) *)
+  (*               (* Returns a (step' (j, n)) -> *) *)
+  (*                 step j (step' (j, n))) /\ *)
+  (*           (let body := *)
+  (*             fun '(x, k) => *)
+  (*               bind (step' (x, k)) *)
+  (*                 (fun ir : I + R => *)
+  (*                   match ir with *)
+  (*                   | inl i0 => ret (inl (i0, S k)) *)
+  (*                   | inr r0 => ret (inr r0) *)
+  (*                   end) in *)
+
+  (*            CategoryOps.iter body (i, 0)) ≈ r). *)
+
 End PropMonad.
+
 
 Section IterLaws.
 
@@ -1117,9 +1605,192 @@ Section IterLaws.
     apply H.
   Qed.
 
+  (* If needed back, should rephrase the _iter continuation *)
+  (* Lemma simplify_bind_match {E A B}: *)
+  (*   forall x BODY, *)
+  (*    ITree.bind *)
+  (*      match x with *)
+  (*      | inl i0 => Ret (inl (i0, 1)) *)
+  (*      | inr r0 => Ret (inr r0) *)
+  (*      end *)
+  (*      (ITree._iter (fun t : itree E B => Tau t) *)
+  (*         (ITree.iter *)
+  (*            (fun '(x, k) => *)
+  (*             ITree.bind (BODY (x, k)) *)
+  (*               (fun ir : A + B => *)
+  (*                match ir with *)
+  (*                | inl i0 => Ret (inl (i0, S k)) *)
+  (*                | inr r0 => Ret (inr r0) *)
+  (*                end)))) *)
+  (*     ≈ *)
+  (*     match x with *)
+  (*     | inl l => *)
+  (*         (ITree.iter *)
+  (*             (fun '(x0, k) => *)
+  (*             ITree.bind (BODY (x0, k)) *)
+  (*               (fun ir : A + B => *)
+  (*                 match ir with *)
+  (*                 | inl i0 => Ret (inl (i0, S k)) *)
+  (*                 | inr r0 => Ret (inr r0) *)
+  (*                 end))) (l, 1) *)
+  (*     | inr r => Ret r end. *)
+  (* Proof. *)
+  (*   intros. destruct x. rewrite Eq.bind_ret_l. cbn. rewrite tau_eutt. *)
+  (*   reflexivity. rewrite Eq.bind_ret_l. reflexivity. *)
+  (* Qed. *)
+
+  (*
+  Global Instance IterUnfold_PropT {E} : IterUnfold (Kleisli (PropT E)) sum.
+    intros A B Pstep a.
+    repeat red. split; [ intros x y EQ | ]; split.
+  - (* Show that there is some looping itree body that Pstep can unfold into. *)
+    intros LOOP. repeat red. repeat red in LOOP.
+    setoid_rewrite <- EQ. clear EQ y.
+    destruct LOOP as (BODY & PROP & RESULT).
+    exists (BODY (a, 0)).
+    exists (fun x : A + B =>
+         match x with
+         | inl l =>
+              (ITree.iter
+                  (fun '(x0, k) =>
+                  ITree.bind (BODY (x0, k))
+                    (fun ir : A + B =>
+                      match ir with
+                      | inl i0 => Ret (inl (i0, S k))
+                      | inr r0 => Ret (inr r0)
+                      end))) (l, 1)
+         | inr r => Ret r end).
+    split. auto. split.
+    + (* Proposition holds over first part of computation. *)
+      rewrite <- RESULT. simpl_iter.
+      rewrite unfold_iter. cbn. rewrite Eq.bind_bind.
+      eapply eutt_clo_bind. reflexivity.
+      intros. rewrite <- H. destruct u1. rewrite Eq.bind_ret_l.
+      cbn. rewrite tau_eutt. reflexivity.
+      rewrite Eq.bind_ret_l. cbn. reflexivity.
+    + (* There is some continuation that satisfies the computation. *)
+      intros ab RET. repeat red.
+      destruct ab eqn: H_ab.
+      * (* Keep loopin' *)
+        cbn. repeat red.
+        exists (fun x : A * nat => BODY (fst x, S( snd x ))). split; auto.
+        simpl_iter. cbn.
+        (* rewrite Eq.bind_ret_l. cbn. rewrite tau_eutt. *)
+        pose proof iter_eq_start_index.
+        unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree in H.
+        specialize (H _ _ _ BODY). apply H.
+      * cbn. reflexivity.
+  - (* An unfolded PropT implies a folded loop. *)
+    (*      cat Pstep (case_ (iter Pstep) (id_ B)) a y -> iter Pstep a x      *)
+    cbn. unfold bind_PropT.
+
+    intros UNFOLD. repeat red. setoid_rewrite EQ. clear EQ x.
+    destruct UNFOLD as (FIRST & CONTINUATION & FIRST_PROP & BIND_EQ &
+                        CONT_PROP).
+    (* Perhaps Returns should be a coinductive proposition?  =>
+       Tried short experiment above, was not working out cleanly..
+       Not convinced that a coinductive definition will give us more expressive
+       power. We seem to be missing some other kind of information.
+     *)
+
+    simpl_iter. setoid_rewrite unfold_iter.
+    setoid_rewrite BIND_EQ.
+    eexists ?[step'].
+    assert ((?step' (a, 0)) ≈ FIRST) as H. admit.
+    split.
+    (* IDEA? : Don't hold propositions holding over all index j, but
+       up to a finite unfolding of the step' body. *)
+    + intros.
+      admit.
+    + cbn. rewrite Eq.bind_bind.
+      setoid_rewrite simplify_bind_match.
+      eapply eutt_clo_bind. rewrite H. reflexivity.
+      repeat intro. clear H0.
+      destruct u1.
+      * rewrite unfold_iter.
+        rewrite Eq.bind_bind.
+        destruct (observe FIRST) eqn: OBSERVE_STEP; cbn.
+        -- admit.
+        -- admit.
+        -- admit.
+      * exfalso. (* Should never be reached.... *) admit.
+   (* + eapply eutt_clo_bind. reflexivity. intros. rewrite H. *)
+   (*    clear H u1. destruct u2. *)
+   (*    * rewrite Eq.bind_ret_l. cbn. rewrite tau_eutt. *)
+   (*      rewrite unfold_iter. cbn. rewrite Eq.bind_bind. *)
+
+    (* If we unfold a loop, the idea should be that the unfolded part is going
+     * to ... terminate, right? It isn't necessarily a return, though. *)
+    (* assert (FIRST_SHOULD_RETURN: exists a : A + B, Returns a FIRST). admit. *)
+    (* destruct FIRST_SHOULD_RETURN as (AB & RETURN_FIRST). *)
+    (* specialize (CONT_PROP _ RETURN_FIRST). *)
+
+    (* I think that what we need to do, actually, is to encode "Returns" in
+       the iter instance. This is because the definition of "iter" needs to
+       coincide with how "bind" is defined for PropT.
+
+       Let's think about how to define an "iterative PropT", by example.
+
+     *)
+
+    (* ... For this direction, it seems necessary to index the loop body, since
+     the unfolded iter case is strictly more expressive than the folded body.
+
+     Another idea suggestion, from Yannick: try expressing with (option itree),
+     intuitively this makes a lot of sense since the empty predicate cannot
+     be expressed by an itree, and there might be indices in the loop body
+     that map to the empty predicate.
+     *)
+  - repeat intro. repeat red.
+    simpl_iter. unfold MonadIter_Prop. setoid_rewrite H.
+    auto.
+  - repeat intro. repeat red.
+    unfold cat, Cat_Kleisli. cbn. unfold bind_PropT.
+    intuition.
+    setoid_rewrite <- H. auto.
+    setoid_rewrite H. auto.
+  Admitted.
+
+
+  Global Instance IterDinatural_PropT {E} : IterDinatural (Kleisli (PropT E)) sum.
+  intros A B C f g.
+  split; [intros x y EQ | ]; split.
+  - intros H. repeat red. repeat red in H. setoid_rewrite <- EQ. clear EQ y.
+    destruct H as (STEP & FST & CONT).
+    repeat red in FST.
+    specialize (FST a 0).
+    edestruct FST as (ta & k & H_fa & H_step & H_cont). clear FST.
+    exists ta.
+    unfold iter, Iter_Kleisli, Basics.iter, MonadIter_itree in CONT.
+    rewrite unfold_iter in CONT. cbn in CONT.
+    rewrite Eq.bind_bind in CONT.
+    (* exists (fun bc => ITree.bind *)
+    (*             (match r with *)
+    (*                inl *)
+    (*             ) *)
+    (*   ) *)
+    (* bind t *)
+    (* exists *)
+    admit.
+  - admit.
+  - repeat red. intros. intuition.
+    repeat red. setoid_rewrite <- H. auto.
+    repeat red. setoid_rewrite H. auto.
+  - repeat red. intros. intuition.
+    repeat red. setoid_rewrite <- H. auto.
+    repeat red. setoid_rewrite H. auto.
+  Admitted.
+
+  Global Instance IterCodiagonal_PropT {E} :  IterCodiagonal (Kleisli (PropT E)) sum.
+  Admitted.
+*)
+
 End IterLaws.  
 
+
 Section MonadLaws.
+
+
 
   Definition Eq1_PropT' {E} : Eq1 (PropT E) :=
     fun a PA PA' =>
@@ -1201,7 +1872,9 @@ Section MonadLaws.
     - assumption.
   Qed.
   
-   #[global] Instance bind_PropT_Proper {E} {A B} :
+
+
+   Global Instance bind_PropT_Proper {E} {A B} :
      Proper (eq1 ==> (eq ==> eq1) ==> eutt eq ==> iff) (@bind_PropT E A B).
    Proof.
      repeat red; intros PA1 PA2 EQP K1 K2 EQK t1 t2 EQt; split; intros H.
@@ -1221,7 +1894,7 @@ Section MonadLaws.
          rewrite H0. apply HK. assumption. reflexivity.
    Qed.
 
-   #[global] Instance bind_Propt_Proper2 {E} {A B} (PA : PropT E A) (K : A -> PropT E B) :
+   Global Instance bind_Propt_Proper2 {E} {A B} (PA : PropT E A) (K : A -> PropT E B) :
      Proper (eutt eq ==> flip impl) (bind PA K).
    Proof.
      repeat red.
@@ -1230,6 +1903,7 @@ Section MonadLaws.
      destruct H0 as (ta & k & HA & eq & HK).
      exists ta, k. split; auto. split. rewrite H; auto. assumption.
    Qed.
+
    
   Definition agrees_itree {E} {A} (ta1 : itree E A) (ta2 : itree E (A -> Prop)) :=
     eutt (fun a p => p a) ta1 ta2.
@@ -1240,6 +1914,8 @@ Section MonadLaws.
                           (exists (k: A -> itree E B),
                                (agrees_itree (fmap k ta) (fmap K ta)
                                /\ tb ≈ bind ta k)).
+
+
   
   Lemma agree_itree_Returns : forall E A B (ta : itree E A) (K : A -> PropT E B) (k : A -> itree E B),
       (forall a, Returns a ta -> K a (k a)) <-> (agrees_itree (fmap k ta) (fmap K ta)).
@@ -1318,6 +1994,7 @@ Section MonadLaws.
       apply HI.
   Qed.
   
+
   Lemma not_Returns {E} {A B} : inhabited B ->
     forall (ta: itree E A), (exists tb, forall (k : A -> itree E B), tb ≈ bind ta k) -> forall (a:A), ~ Returns a ta.
   Proof.
@@ -1470,6 +2147,7 @@ Section MonadLaws.
     apply eutt_EQ_REL_Reflexive_.
     auto.
   Qed.
+
   
   (* From Coq.Logic.ChoiceFacts *)
 Definition GuardedFunctionalChoice_on {A B} :=
@@ -1479,40 +2157,25 @@ Definition GuardedFunctionalChoice_on {A B} :=
     (exists f : A->B, forall x, P x -> R x (f x)).
 Axiom guarded_choice : forall {A B}, @GuardedFunctionalChoice_on A B.
 
+
 Definition RET_EQ {E} {A} (ta : itree E A) : A -> A -> Prop :=
   fun x y => Returns x ta /\ Returns y ta.
 
-(* Figure 8: 3rd monad law, one direction bind associativity *)
-Lemma bind_bind_Prop: forall {E}
-                   (A B C : Type) (PA : PropT E A)
-                   (KB : A -> PropT E B) (KC : B -> PropT E C)
-                   (PQOK : eutt_closed PA)
-                   (KBP : Proper (eq ==> eq1) KB)
-                   (KCP : Proper (eq ==> eq1) KC)
-                   (t : itree E C),
-      (bind (bind PA KB) KC) t -> (bind PA (fun a => bind (KB a) KC)) t.
-  Proof.
-    (* PA ~a> KB a ~b> KC b *)
-    intros E A B C PA KB KC PQOK KBP KCP t eqtt'. 
-        red in eqtt'.
-        destruct eqtt' as (tb & kbc & (HBC & EQc & HRkbc)).
-        destruct HBC as (ta & kab & HTA & EQb & HRkab).
-        red. exists ta. exists (fun a => ITree.bind (kab a) kbc).
-        split; [auto|]; split.
-        * setoid_rewrite EQc; clear EQc.
-          setoid_rewrite EQb. setoid_rewrite EQb in HRkbc; clear EQb tb.
-          unfold bind, Monad_itree.
-          rewrite Eq.bind_bind. reflexivity.
-        * intros a HRet.
-          exists (kab a), kbc.
-          split; [auto|];split.
-          -- reflexivity.
-          -- intros b HRET. apply HRkbc. rewrite EQb. eapply Returns_bind; eauto.
-  Qed.
-  
-End MonadLaws.
 
-Module BIND_BIND_COUNTEREXAMPLE.
+(*
+Lemma commute {E} {A B} (ta : itree E A) 
+forall x : A,
+       Returns x ta ->
+       exists k0 : B -> itree E C,
+         KB x (kab x) /\ k x ≈ bind (kab x) k0 /\ (forall a : B, Returns a (kab x) -> KC a (k0 a))
+         ->
+         exists k0 : B -> itree E C,
+forall x : A,
+       Returns x ta ->
+         KB x (kab x) /\ k x ≈ bind (kab x) k0 /\ (forall a : B, Returns a (kab x) -> KC a (k0 a))
+*)
+
+Section BIND_BIND_COUNTEREXAMPLE.
 
   Inductive ND : Type -> Type :=
   | Pick : ND bool.
@@ -1610,3 +2273,36 @@ Proof.
 Qed.  
 
 End BIND_BIND_COUNTEREXAMPLE.
+
+
+(* Figure 8: 3rd monad law, one direction bind associativity *)
+Lemma bind_bind_Prop: forall {E}
+                   (A B C : Type) (PA : PropT E A)
+                   (KB : A -> PropT E B) (KC : B -> PropT E C)
+                   (PQOK : eutt_closed PA)
+                   (KBP : Proper (eq ==> eq1) KB)
+                   (KCP : Proper (eq ==> eq1) KC)
+                   (t : itree E C),
+      (bind (bind PA KB) KC) t -> (bind PA (fun a => bind (KB a) KC)) t.
+  Proof.
+    (* PA ~a> KB a ~b> KC b *)
+    intros E A B C PA KB KC PQOK KBP KCP t eqtt'. 
+        red in eqtt'.
+        destruct eqtt' as (tb & kbc & (HBC & EQc & HRkbc)).
+        destruct HBC as (ta & kab & HTA & EQb & HRkab).
+        red. exists ta. exists (fun a => ITree.bind (kab a) kbc).
+        split; [auto|]; split.
+        * setoid_rewrite EQc; clear EQc.
+          setoid_rewrite EQb. setoid_rewrite EQb in HRkbc; clear EQb tb.
+          unfold bind, Monad_itree.
+          rewrite Eq.bind_bind. reflexivity.
+        * intros a HRet.
+          exists (kab a), kbc.
+          split; [auto|];split.
+          -- reflexivity.
+          -- intros b HRET. apply HRkbc. rewrite EQb. eapply Returns_bind; eauto.
+  Qed.
+  
+
+
+End MonadLaws.

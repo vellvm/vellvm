@@ -159,12 +159,14 @@ Proof.
   apply eutt_translate_gen; auto.
 Qed.
 
-(** [has_post] reasoning principles
-    The main benefit of the approach: post-conditions can be leveraged to establish simulations
+(** Relationship between [has_post] and [eutt]
+    The main benefit of the approach: post-conditions can be leveraged when performing a cut
+    during relational proofs.
  *)
 Lemma eutt_post_bind : forall E R1 R2 RR U Q (t: itree E U) (k1: U -> itree E R1) (k2: U -> itree E R2),
     t ⤳ Q ->
-    (forall u, Q u -> eutt RR (k1 u) (k2 u)) -> eutt RR (ITree.bind t k1) (ITree.bind t k2).
+    (forall u, Q u -> eutt RR (k1 u) (k2 u)) -> 
+    eutt RR (ITree.bind t k1) (ITree.bind t k2).
 Proof.
   intros * POST ?.
   apply eutt_clo_bind with (UU := fun x y => x = y /\ Q x); [apply has_post_post_strong; exact POST |].
@@ -197,7 +199,7 @@ Proof.
 Qed.
 
 (* A little oddity that can be useful when building bisimulations manually:
-   en [eutt] hypothesis between a tree and itself can be refined into an [eq_itree] one.
+   an [eutt] hypothesis between a tree and itself can be refined into an [eq_itree] one.
  *)
 Lemma has_post_has_eq_itree_aux : forall {E X} (t : itree E X) (Q : X -> Prop),
     has_post_strong t Q ->
@@ -249,5 +251,3 @@ Lemma has_post_has_eq_itree : forall {E X} (t : itree E X) (Q : X -> Prop),
 Proof.
   intros; apply has_post_post_strong in H; apply has_post_has_eq_itree_aux; auto.
 Qed.
-
-
