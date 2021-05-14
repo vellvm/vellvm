@@ -53,7 +53,7 @@ Definition cvir_ids_WF {ni no} ir : Prop :=
   ) /\ (
     forall bid,
     out_blk_id bid b ->
-    In bid (vo ++ vt)%vec
+    In bid (vi ++ vo ++ vt)%vec
   ).
 
 Theorem block_cvir_id_WF : forall c, cvir_ids_WF (block_cvir c).
@@ -73,8 +73,8 @@ Proof.
   - unfold out_blk_id in H0.
     simpl in *.
     destruct H ; [| contradiction ].
-    apply vector_in_app_iff.
-    left.
+    apply vector_in_app_iff. right.
+    apply vector_in_app_iff. left.
     unfold In.
     subst.
     simpl in *.
@@ -110,8 +110,8 @@ Proof.
   - unfold out_blk_id in H0.
     simpl in *.
     destruct H ; [| contradiction ].
-    apply vector_in_app_iff.
-    left.
+    apply vector_in_app_iff. right.
+    apply vector_in_app_iff. left.
     unfold In.
     subst.
     simpl in *.
@@ -163,8 +163,9 @@ Proof.
   split ; intros ; rewrite 3 vector_in_app_iff.
   - destruct H1 ; apply H in H1 + apply H0 in H1 ;
     rewrite vector_in_app_iff in H1 ; intuition.
-  - destruct H1 ; apply H in H1 + apply H0 in H1 ; apply H1 in H2 ;
-    rewrite vector_in_app_iff in H2 ; intuition.
+  - rewrite 2 vector_in_app_iff.
+    destruct H1 ; apply H in H1 + apply H0 in H1 ; apply H1 in H2 ;
+    rewrite 2 vector_in_app_iff in H2 ; intuition.
 Qed.
 
 Theorem merge_cvir_blocks :
@@ -248,7 +249,32 @@ Proof.
   simpl in H0.
   rewrite 3 in_app_iff in H0.
   rewrite 3 vector_in_app_iff.
-  intuition.
+  split; [ tauto |].
+  intros. destruct H0 as [ _ H0 ]. apply H0 in H1.
+  rewrite 4 in_app_iff in H1.
+  rewrite 4 vector_in_app_iff.
+  tauto.
+Qed.
+
+Theorem sym_o_cvir_id_WF :
+  forall ni no1 no2 no3 (ir : cvir ni (no1+(no2+no3))),
+  cvir_ids_WF ir -> cvir_ids_WF (sym_o_cvir ir).
+Proof.
+  unfold cvir_ids_WF. intros.
+  unfold sym_o_cvir in H0.
+  split_vec vo no1.
+  split_vec vo2 no3.
+  rename vo21 into vo2, vo22 into vo3.
+  simpl in H0.
+  rewrite sym_vec_app in H0.
+  apply H in H0.
+  unfold In in H0.
+  simpl in H0.
+  split; [ tauto |].
+  intros. destruct H0 as [ _ H0 ]. apply H0 in H1.
+  rewrite 4 in_app_iff in H1.
+  rewrite 4 vector_in_app_iff.
+  tauto.
 Qed.
 
 Theorem sym_i_cvir_unique :
@@ -269,6 +295,17 @@ Proof.
   rewrite <- app_assoc. rewrite <- 2 app_assoc in H0. exact H0.
 Qed.
 
+Theorem sym_o_cvir_unique :
+  forall ni no1 no2 no3 (ir : cvir ni (no1+(no2+no3))),
+  unique_bid ir ->
+  unique_bid (sym_o_cvir ir).
+Proof.
+  unfold sym_o_cvir, unique_bid.
+  intros.
+  simpl in *.
+  eapply H ; eassumption.
+Qed.
+
 Theorem cast_i_cvir_id_WF :
   forall ni ni' no (ir : cvir ni no) (H : ni = ni'),
   cvir_ids_WF ir -> cvir_ids_WF (cast_i_cvir ir H).
@@ -286,8 +323,6 @@ Theorem cast_o_cvir_id_WF :
   cvir_ids_WF ir -> cvir_ids_WF (cast_o_cvir ir H).
 Proof.
   unfold cvir_ids_WF. intros.
-  simpl in H1.
-  destruct vi.
   simpl in H1.
   apply H0 in H1.
   apply H1.
@@ -344,6 +379,34 @@ Proof.
   exact H.
 Qed.
 
+Theorem focus_output_cvir_id_WF :
+  forall ni no (ir : cvir ni no) (i : fin no),
+  cvir_ids_WF ir -> cvir_ids_WF (focus_output_cvir ir i).
+Proof.
+  unfold focus_input_cvir.
+  intros.
+  apply cast_o_cvir_id_WF.
+  apply sym_o_cvir_id_WF.
+  apply cast_o_cvir_id_WF.
+  apply sym_o_cvir_id_WF.
+  apply cast_o_cvir_id_WF.
+  exact H.
+Qed.
+
+Theorem focus_output_cvir_unique :
+  forall ni no (ir : cvir ni no) (i : fin no),
+  unique_bid ir -> unique_bid (focus_output_cvir ir i).
+Proof.
+  unfold focus_output_cvir.
+  intros.
+  apply cast_o_cvir_unique.
+  apply sym_o_cvir_unique.
+  apply cast_o_cvir_unique.
+  apply sym_o_cvir_unique.
+  apply cast_o_cvir_unique.
+  exact H.
+Qed.
+
 Theorem loop_cvir_open_id_WF :
   forall (ni no : nat) (ir : cvir (S ni) (S no)),
   cvir_ids_WF ir -> cvir_ids_WF (loop_cvir_open ir).
@@ -355,10 +418,21 @@ Proof.
   specialize (H vi (hd vi :: vo) vt b).
   intuition.
   specialize (H2 _ H1).
-  apply in_app_iff in H2. simpl in H2. apply in_app_iff.
+  apply in_app_iff in H2. simpl in H2. rewrite in_app_iff in H2.
+  apply vector_in_app_iff. rewrite vector_in_app_iff.
   intuition.
-  subst.
-Admitted.
+  left. subst bid. apply In_hd.
+Qed.
+
+Theorem loop_cvir_open_unique :
+  forall (ni no : nat) (ir : cvir (S ni) (S no)),
+  unique_bid ir -> unique_bid (loop_cvir_open ir).
+Proof.
+  unfold loop_cvir_open, unique_bid.
+  intros.
+  simpl in *.
+  eapply H with (vo := (hd vi :: vo)) ; try eassumption.
+Qed.
 
 Theorem loop_cvir_id_WF :
   forall (ni no : nat) (ir : cvir (S ni) (S no)),
@@ -380,8 +454,8 @@ Proof.
     tauto.
   - destruct H0 as [_ H0].
     intros. specialize (H0 bid H1).
-    apply in_app_iff.
-    apply in_app_iff in H0.
+    apply in_app_iff in H0. simpl in H0. rewrite in_app_iff in H0. (* FIXME *)
+    apply in_app_iff. simpl. rewrite in_app_iff.
     simpl in *.
     tauto.
 Qed.

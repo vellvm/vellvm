@@ -317,6 +317,17 @@ Proof.
     reflexivity.
 Qed.
 
+Theorem In_hd : forall A n (v : t A (S n)), In (hd v) v.
+Proof.
+  intros.
+  destruct (uncons v) eqn:?.
+  apply cons_uncons in Heqp.
+  subst v.
+  unfold In, hd, cons.
+  simpl.
+  tauto.
+Qed.
+
 Program Definition rev {A} {n} (v : t A n) : t A n :=
   vec' (rev (proj1_sig v)).
 Next Obligation.

@@ -10,7 +10,8 @@ From ExtLib Require Import
 Import MonadNotation.
 
 From Vellvm Require Import
-     Syntax.
+     Syntax
+     Utils.Tactics.
 From tutorial Require Import Fin.
 
 Require Import Imp Vec CompileExpr CvirCombinators CvirCombinatorsWF.
@@ -54,12 +55,11 @@ Theorem compile_WF : forall s next_reg env,
   end.
 Proof.
   induction s ; intros ; (destruct (compile next_reg _ env) eqn:? ; [| tauto ]) ; simpl in Heqo.
-  - destruct (compile_assign _ _ _ _) as [[[]] |] eqn:? in Heqo ; [| discriminate Heqo ].
+  - repeat break_match ; try discriminate.
     inversion Heqo.
     subst.
     apply block_cvir_id_WF.
-  - destruct (compile next_reg s1 env) as [[[]] |] eqn:? in Heqo ; [| discriminate Heqo ].
-    destruct (compile _ _ _) as [[[]] |] eqn:? in Heqo ; [| discriminate Heqo ].
+  - repeat break_match ; try discriminate.
     inversion Heqo.
     subst.
     simpl in *.
@@ -69,15 +69,20 @@ Proof.
     rewrite Heqo1 in IHs2.
     apply (seq_cvir_id_WF 1 0) ; simpl in *; assumption.
   - discriminate Heqo.
-  - destruct (compile_expr _ _) as [[] |] eqn:? in Heqo ; [| discriminate Heqo ].
-    destruct (compile _ _ _) as [[[]] |] eqn:? in Heqo ; [| discriminate Heqo ].
+  - repeat break_match ; try discriminate.
     inversion Heqo.
     subst.
     simpl in *.
-    admit.
+    apply loop_cvir_open_id_WF.
+    apply focus_output_cvir_id_WF.
+    eapply (seq_cvir_id_WF 1 1 0 1). (* FIXME *)
+    apply branch_cvir_id_WF.
+    specialize (IHs (i + 1) env).
+    rewrite Heqo1 in IHs.
+    apply IHs.
   - inversion Heqo.
     apply block_cvir_id_WF.
-Admitted. 
+Qed.
 
 Definition compile_program (s : stmt) (env : StringMap.t int) :
   option program :=
