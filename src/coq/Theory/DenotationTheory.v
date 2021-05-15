@@ -21,14 +21,12 @@ From Vellvm Require Import
      Syntax.ScopeTheory
      Utils.PostConditions.
 
-Remove Hints Eqv.EqvWF_Build : typeclass_instances.
+#[export] Remove Hints Eqv.EqvWF_Build : typeclass_instances.
 
 Set Implicit Arguments.
 Set Strict Implicit.
 
 Import ListNotations.
-(* Import Eq. *)
-(* Import CatNotations. *)
 
 Import MonadNotation.
 Open Scope list_scope.

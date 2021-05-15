@@ -122,7 +122,7 @@ Proof.
   - rewrite tau_euttge, unfold_interp_state; eauto.
 Qed.
 
-Hint Unfold TT : core.
+#[export] Hint Unfold TT : core.
 Instance TT_equiv :
   forall A, Equivalence (@TT A).
 Proof.
