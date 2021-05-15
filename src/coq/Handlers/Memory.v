@@ -61,6 +61,35 @@ Set Contextual Implicit.
 
 #[local] Open Scope Z_scope.
 
+(* Is a dtyp supported in the memory model?
+
+       This is mostly to rule out:
+
+       - arbitrary bitwidth integers
+       - half
+       - x86_fp80
+       - fp128
+       - ppc_fp128
+       - metadata
+       - x86_mmx
+       - opaque
+ *)
+Inductive is_supported : dtyp -> Prop :=
+| is_supported_DTYPE_I1 : is_supported (DTYPE_I 1)
+| is_supported_DTYPE_I8 : is_supported (DTYPE_I 8)
+| is_supported_DTYPE_I32 : is_supported (DTYPE_I 32)
+| is_supported_DTYPE_I64 : is_supported (DTYPE_I 64)
+| is_supported_DTYPE_Pointer : is_supported (DTYPE_Pointer)
+| is_supported_DTYPE_Void : is_supported (DTYPE_Void)
+| is_supported_DTYPE_Float : is_supported (DTYPE_Float)
+| is_supported_DTYPE_Double : is_supported (DTYPE_Double)
+| is_supported_DTYPE_Array : forall sz τ, is_supported τ -> is_supported (DTYPE_Array sz τ)
+| is_supported_DTYPE_Struct : forall fields, Forall is_supported fields -> is_supported (DTYPE_Struct fields)
+| is_supported_DTYPE_Packed_struct : forall fields, Forall is_supported fields -> is_supported (DTYPE_Packed_struct fields)
+(* TODO: unclear if is_supported τ is good enough here. Might need to make sure it's a sized type *)
+| is_supported_DTYPE_Vector : forall sz τ, is_supported τ -> is_supported (DTYPE_Vector sz τ)
+.
+
 (** * Memory Model
 
     This file implements VIR's memory model as an handler for the [MemoryE] family of events.
@@ -1042,7 +1071,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Record write_spec (m1 : memory_stack) (a : addr) (v : dvalue) (m2 : memory_stack) : Prop :=
       {
       was_allocated : allocated a m1;
-      is_written    : forall τ, dvalue_has_dtyp v τ ->
+      is_written    : forall τ, is_supported τ ->
+                           dvalue_has_dtyp v τ ->
                            ext_memory m1 a τ (dvalue_to_uvalue v) m2
       }.
 
