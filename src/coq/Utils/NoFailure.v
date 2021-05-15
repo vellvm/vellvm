@@ -1,3 +1,4 @@
+(* begin hide *)
 From ITree Require Import
      Eq.Eq
      ITree
@@ -20,8 +21,37 @@ From Coq Require Import
 
 Import ITreeNotations.
 Local Open Scope itree.
+(* end hide *)
 
-(* MOVE itree *)
+(** * Reasoning about successful computations
+
+  Compilers are typically only required to preserve the behavior of valid programs.
+  Correctness statements are therefore phrased in terms "for any program c, if c
+  has a well defined semantics, then ...".
+  Having a well defined semantics when manipulating an operational semantics is 
+  typically expressed as never reaching a blocking state, or an error state.
+  In this file, we develop the necessary machinery to express and reason about 
+  this same fact in an itree-based semantics.
+
+  We choose here to assume that failure is represented using the [exceptT] domain of
+  events, and to interpret this failure into a trivial option monad. 
+  The property of "well definedness" of a computation is then expressed after interpretation
+  using the [has_post] unary logic developed in [./Utils/PostConditions.v]: it simply asserts
+  that the computation does not fail (see [no_failure]).
+
+  Interestingly, this requires to process [eutt]-based equations forward as opposed to 
+  backward: we know for an hypothesis an evidence of the form [has_post (x <- c;; k) P]
+  and need to deduce information about [c] and [k]. It so happens that one needs to be
+  a little bit more careful when processing monadic equivalences forward than backward:
+  we use to this end notably [eutt_clo_bind_returns].
+
+  This approach is heavily used in the Helix development.
+
+*)
+
+Section ITreeUtilities.
+
+(* TODO: move to itree *)
 Lemma interp_state_iter :
   forall {A R S : Type} (E F : Type -> Type) (s0 : S) (a0 : A) (h : E ~> Monads.stateT S (itree F)) f,
     State.interp_state (E := E) (T := R) h (ITree.iter f a0) s0 ≈
@@ -79,6 +109,11 @@ Proof.
     + rewrite TranslateFacts.translate_ret; apply reflexivity.
 Qed.
 
+End ITreeUtilities.
+
+(* We don't care in this context about having an informative failure, 
+  we just dive into the option monad.
+   *)
 Section Handle_Fail.
 
   Definition h_fail {T E} : exceptE T ~> failT (itree E) :=
@@ -191,9 +226,12 @@ Section No_Failure.
     apply abs; auto.
   Qed.
 
-  (* The following lemmas reason about [tfor] in the specific case where the body goes into the failure monad.
-   They are quite a bit ugly as intrinsically [tfor] unfolds using the itree [bind] while [no_failure] relies
-   on the failT [bind].
+  (* The following lemmas reason about [tfor] in the specific case where the body goes 
+   into the failure monad.
+   They are quite a bit ugly as intrinsically [tfor] unfolds using the itree [bind] while
+   [no_failure] relies on the failT [bind]. Improving the situation will require to 
+   develop better general monadic reasoning principles rather than re-internalize things
+   into the [itree E] monad forcibly.
    *)
   Lemma tfor_fail_None : forall {E A} i j (body : nat -> A -> itree E (option A)),
       (i <= j)%nat ->
