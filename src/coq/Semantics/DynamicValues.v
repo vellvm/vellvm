@@ -1608,13 +1608,13 @@ Class VInt I : Type :=
   | DVALUE_IX_typ     : forall x, ~IX_supported x -> dvalue_has_dtyp DVALUE_None (DTYPE_I x)
   | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
-  | DVALUE_Half_typ   : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Half (* ??? *)
-  | DVALUE_X86_fp80   : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_X86_fp80 (* ??? *)
-  | DVALUE_Fp128      : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Fp128 (* ??? *)
-  | DVALUE_Ppc_fp128  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Ppc_fp128 (* ??? *)
-  | DVALUE_Metadata   : dvalue_has_dtyp DVALUE_None DTYPE_Metadata (* ??? *)
-  | DVALUE_X86_mmx    : dvalue_has_dtyp DVALUE_None DTYPE_X86_mmx (* ??? *)
-  | DVALUE_Opaque     : dvalue_has_dtyp DVALUE_None DTYPE_Opaque (* ??? *)
+  (* | DVALUE_Half_typ   : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Half (* ??? *) *)
+  (* | DVALUE_X86_fp80   : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_X86_fp80 (* ??? *) *)
+  (* | DVALUE_Fp128      : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Fp128 (* ??? *) *)
+  (* | DVALUE_Ppc_fp128  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Ppc_fp128 (* ??? *) *)
+  (* | DVALUE_Metadata   : dvalue_has_dtyp DVALUE_None DTYPE_Metadata (* ??? *) *)
+  (* | DVALUE_X86_mmx    : dvalue_has_dtyp DVALUE_None DTYPE_X86_mmx (* ??? *) *)
+  (* | DVALUE_Opaque     : dvalue_has_dtyp DVALUE_None DTYPE_Opaque (* ??? *) *)
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
 
   | DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
@@ -1656,14 +1656,15 @@ Class VInt I : Type :=
   | UVALUE_IX_typ     : forall x, ~IX_supported x -> uvalue_has_dtyp UVALUE_None (DTYPE_I x)
   | UVALUE_Double_typ : forall x, uvalue_has_dtyp (UVALUE_Double x) DTYPE_Double
   | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
-  | UVALUE_Half_typ   : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Half (* ??? *)
-  | UVALUE_X86_fp80   : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_X86_fp80 (* ??? *)
-  | UVALUE_Fp128      : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Fp128 (* ??? *)
-  | UVALUE_Ppc_fp128  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Ppc_fp128 (* ??? *)
-  | UVALUE_Metadata   : uvalue_has_dtyp UVALUE_None DTYPE_Metadata (* ??? *)
-  | UVALUE_X86_mmx    : uvalue_has_dtyp UVALUE_None DTYPE_X86_mmx (* ??? *)
-  | UVALUE_Opaque     : uvalue_has_dtyp UVALUE_None DTYPE_Opaque (* ??? *)
+  (* | UVALUE_Half_typ   : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Half (* ??? *) *)
+  (* | UVALUE_X86_fp80   : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_X86_fp80 (* ??? *) *)
+  (* | UVALUE_Fp128      : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Fp128 (* ??? *) *)
+  (* | UVALUE_Ppc_fp128  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Ppc_fp128 (* ??? *) *)
+  (* | UVALUE_Metadata   : uvalue_has_dtyp UVALUE_None DTYPE_Metadata (* ??? *) *)
+  (* | UVALUE_X86_mmx    : uvalue_has_dtyp UVALUE_None DTYPE_X86_mmx (* ??? *) *)
+  (* | UVALUE_Opaque     : uvalue_has_dtyp UVALUE_None DTYPE_Opaque (* ??? *) *)
   | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
+  | UVALUE_Undef_typ  : forall τ, uvalue_has_dtyp (UVALUE_Undef τ) τ
 
   | UVALUE_Struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Struct []) (DTYPE_Struct [])
   | UVALUE_Struct_Cons_typ :
@@ -1705,6 +1706,22 @@ Class VInt I : Type :=
       uvalue_has_dtyp x (DTYPE_I sz) ->
       uvalue_has_dtyp y (DTYPE_I sz) ->
       uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_I 1)
+  | UVALUE_ICmp_pointer_typ :
+      forall x y op,
+      uvalue_has_dtyp x DTYPE_Pointer ->
+      uvalue_has_dtyp y DTYPE_Pointer ->
+      uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_I 1)
+  | UVALUE_ICmp_vector_typ :
+      forall x y vsz isz op,
+      IX_supported isz ->
+      uvalue_has_dtyp x (DTYPE_Vector vsz (DTYPE_I isz)) ->
+      uvalue_has_dtyp y (DTYPE_Vector vsz (DTYPE_I isz)) ->
+      uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))
+  | UVALUE_ICmp_vector_pointer_typ :
+      forall x y vsz op,
+      uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_Pointer) ->
+      uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_Pointer) ->
+      uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))
   | UVALUE_FBinop_Float_typ :
       forall x y op fms,
       uvalue_has_dtyp x DTYPE_Float ->
@@ -1853,13 +1870,13 @@ Class VInt I : Type :=
     Hypothesis IH_IX             : forall x, ~IX_supported x -> P DVALUE_None (DTYPE_I x).
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
-    Hypothesis IH_Half           : forall x, P (DVALUE_Float x) DTYPE_Half. (* ??? *)
-    Hypothesis IH_X86_fp80       : forall x, P (DVALUE_Float x) DTYPE_X86_fp80. (* ??? *)
-    Hypothesis IH_Fp128          : forall x, P (DVALUE_Float x) DTYPE_Fp128. (* ??? *)
-    Hypothesis IH_Ppc_fp128      : forall x, P (DVALUE_Float x) DTYPE_Ppc_fp128. (* ??? *)
-    Hypothesis IH_Metadata       : P DVALUE_None DTYPE_Metadata. (* ??? *)
-    Hypothesis IH_X86_mmx        : P DVALUE_None DTYPE_X86_mmx. (* ??? *)
-    Hypothesis IH_Opaque         : P DVALUE_None DTYPE_Opaque. (* ??? *)
+    (* Hypothesis IH_Half           : forall x, P (DVALUE_Float x) DTYPE_Half. (* ??? *) *)
+    (* Hypothesis IH_X86_fp80       : forall x, P (DVALUE_Float x) DTYPE_X86_fp80. (* ??? *) *)
+    (* Hypothesis IH_Fp128          : forall x, P (DVALUE_Float x) DTYPE_Fp128. (* ??? *) *)
+    (* Hypothesis IH_Ppc_fp128      : forall x, P (DVALUE_Float x) DTYPE_Ppc_fp128. (* ??? *) *)
+    (* Hypothesis IH_Metadata       : P DVALUE_None DTYPE_Metadata. (* ??? *) *)
+    (* Hypothesis IH_X86_mmx        : P DVALUE_None DTYPE_X86_mmx. (* ??? *) *)
+    (* Hypothesis IH_Opaque         : P DVALUE_None DTYPE_Opaque. (* ??? *) *)
     Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
     Hypothesis IH_Struct_nil     : P (DVALUE_Struct []) (DTYPE_Struct []).
     Hypothesis IH_Struct_cons    : forall (f : dvalue) (dt : dtyp) (fields : list dvalue) (dts : list dtyp),
@@ -1898,13 +1915,13 @@ Class VInt I : Type :=
       - apply IH_IX. assumption.
       - apply IH_Double.
       - apply IH_Float.
-      - apply IH_Half.
-      - apply IH_X86_fp80.
-      - apply IH_Fp128.
-      - apply IH_Ppc_fp128.
-      - apply IH_Metadata.
-      - apply IH_X86_mmx.
-      - apply IH_Opaque.
+      (* - apply IH_Half. *)
+      (* - apply IH_X86_fp80. *)
+      (* - apply IH_Fp128. *)
+      (* - apply IH_Ppc_fp128. *)
+      (* - apply IH_Metadata. *)
+      (* - apply IH_X86_mmx. *)
+      (* - apply IH_Opaque. *)
       - apply IH_None.
       - apply IH_Struct_nil.
       - apply (IH_Struct_cons TYP1 (IH f dt TYP1) TYP2 (IH (DVALUE_Struct fields) (DTYPE_Struct dts) TYP2)).
@@ -2047,4 +2064,3 @@ Class VInt I : Type :=
   Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
   
 End DVALUE.
-

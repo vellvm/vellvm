@@ -2995,17 +2995,31 @@ Section Memory_Stack_Theory.
 
     Lemma read_in_mem_block_type :
       forall bytes a τ v,
+        is_supported τ ->
         read_in_mem_block bytes a τ = v ->
         uvalue_has_dtyp v τ.
     Proof.
+      intros bytes a τ v SUP READ.
+
+      unfold read_in_mem_block in READ.
+      unfold deserialize_sbytes in READ.
+      break_match_hyp.
+      2: {
+        (* If any byte is undef, then we get a UVALUE_Undef of the appropriate type *)
+        subst.
+        constructor.
+      }
+
+      (* Issue with pointers deserializing to None... *)
     Admitted.
 
     Lemma read_type :
       forall m p τ v,
+        is_supported τ ->
         read m p τ = inr v ->
         uvalue_has_dtyp v τ.
     Proof.
-      intros m p τ v READ.
+      intros m p τ v SUP READ.
       unfold read in *.
       break_match; inversion READ.
       clear H0.

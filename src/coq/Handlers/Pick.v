@@ -113,15 +113,15 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | DTYPE_I sz => default_dvalue_of_dtyp_i sz
       | DTYPE_Pointer => ret (DVALUE_Addr A.null)
       | DTYPE_Void => ret DVALUE_None
-      | DTYPE_Half => ret (DVALUE_Float Float32.zero) (* ??? *)
+      | DTYPE_Half => failwith "Unimplemented default type: half"
       | DTYPE_Float => ret (DVALUE_Float Float32.zero)
       | DTYPE_Double => ret (DVALUE_Double (Float32.to_double Float32.zero))
-      | DTYPE_X86_fp80 => ret (DVALUE_Float Float32.zero) (* ??? *)
-      | DTYPE_Fp128 => ret (DVALUE_Float Float32.zero) (* ??? *)
-      | DTYPE_Ppc_fp128 => ret (DVALUE_Float Float32.zero) (* ??? *)
-      | DTYPE_Metadata => ret DVALUE_None (* ??? *)
-      | DTYPE_X86_mmx => ret DVALUE_None (* ??? *)
-      | DTYPE_Opaque => ret DVALUE_None (* ??? *)
+      | DTYPE_X86_fp80 => failwith "Unimplemented default type: x86_fp80"
+      | DTYPE_Fp128 => failwith "Unimplemented default type: fp128"
+      | DTYPE_Ppc_fp128 => failwith "Unimplemented default type: ppc_fp128"
+      | DTYPE_Metadata => failwith "Unimplemented default type: metadata"
+      | DTYPE_X86_mmx => failwith "Unimplemented default type: x86_mmx"
+      | DTYPE_Opaque => failwith "Unimplemented default type: opaque"
       | DTYPE_Array sz t =>
         if (0 <=? sz) then
           v <- default_dvalue_of_dtyp t ;;
@@ -131,13 +131,14 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
           "of DTYPE_Array or DTYPE_Vector")
 
       (* Matching valid Vector types... *)
-      | DTYPE_Vector sz (DTYPE_Half) =>
-        if (0 <=? sz) then
-          (ret (DVALUE_Vector
-                  (repeat (DVALUE_Float Float32.zero) (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-          "of DTYPE_Array or DTYPE_Vector")
+      (* Currently commented out unsupported ones *)
+      (* | DTYPE_Vector sz (DTYPE_Half) => *)
+      (*   if (0 <=? sz) then *)
+      (*     (ret (DVALUE_Vector *)
+      (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
+      (*   else *)
+      (*     failwith ("Negative array length for generating default value" ++ *)
+      (*     "of DTYPE_Array or DTYPE_Vector") *)
       | DTYPE_Vector sz (DTYPE_Float) =>
         if (0 <=? sz) then
           (ret (DVALUE_Vector
@@ -153,20 +154,20 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
         else
           failwith ("Negative array length for generating default value" ++
           "of DTYPE_Array or DTYPE_Vector")
-      | DTYPE_Vector sz (DTYPE_X86_fp80) =>
-        if (0 <=? sz) then
-          (ret (DVALUE_Vector
-                  (repeat (DVALUE_Float Float32.zero) (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-          "of DTYPE_Array or DTYPE_Vector")
-      | DTYPE_Vector sz (DTYPE_Fp128) =>
-        if (0 <=? sz) then
-          (ret (DVALUE_Vector
-                  (repeat (DVALUE_Float Float32.zero) (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-          "of DTYPE_Array or DTYPE_Vector")
+      (* | DTYPE_Vector sz (DTYPE_X86_fp80) => *)
+      (*   if (0 <=? sz) then *)
+      (*     (ret (DVALUE_Vector *)
+      (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
+      (*   else *)
+      (*     failwith ("Negative array length for generating default value" ++ *)
+      (*     "of DTYPE_Array or DTYPE_Vector") *)
+      (* | DTYPE_Vector sz (DTYPE_Fp128) => *)
+      (*   if (0 <=? sz) then *)
+      (*     (ret (DVALUE_Vector *)
+      (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
+      (*   else *)
+      (*     failwith ("Negative array length for generating default value" ++ *)
+      (*     "of DTYPE_Array or DTYPE_Vector") *)
       | DTYPE_Vector sz (DTYPE_I n) =>
         if (0 <=? sz) then
           v <- default_dvalue_of_dtyp_i n ;;
@@ -333,8 +334,9 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
           apply H. constructor. auto. unfold vector_dtyp. left.
           exists sz. reflexivity.
         + intros. cbn in H1.
-          destruct t; inv H1; try (
-            rewrite <- positive_nat_N;
+          destruct t; inv H1;
+            try (
+                rewrite <- positive_nat_N;
                    constructor; [apply forall_repeat_true ; constructor |
                           apply repeat_length |
                           unfold vector_dtyp ; intuition ]).
