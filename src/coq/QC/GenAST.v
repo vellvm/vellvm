@@ -1,3 +1,15 @@
+(** This file contains QuickChick generators for LLVM programs.
+
+    There are many different ways of generating values of different
+    types which have different constraints (e.g., positive values,
+    sized types, etc). This is necessary to satisfy the invariants of
+    LLVM programs.
+
+    Currently programs are rather simple, only generating integer
+    types and simple loops, but we hope to expand this soon.
+
+    See vellvm-quickchick-overview.org in the root of the project for
+    more details. *)
 Require Import Ceres.Ceres.
 
 From QuickChick Require Import QuickChick.

@@ -1,7 +1,11 @@
 (** 
-    Show instances for Vellvm. These serialize Vellvm ASTs into the
-    standard format for .ll files. The result of show on a Vellvm
-    program should give you a string that can be read by clang.
+    These "Repr" instances for Vellvm should serialize Vellvm ASTs
+    into a Coq string which represents the AST, allowing ASTs to be
+    serialized and read back into Coq later.
+
+    One potential use for this is for test case generation with
+    QuickChick. It may be worthwhile to serialize a counterexample
+    into a format that it can be imported into Coq for debugging.
 *)
 
 From QuickChick Require Import QuickChick.

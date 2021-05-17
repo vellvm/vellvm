@@ -1,3 +1,6 @@
+(*** This file sets up some testing infrastructure.
+
+     See README.md for more details. *)
 open LLVMAst
 open TopLevel
 open Handlers.LLVMEvents
