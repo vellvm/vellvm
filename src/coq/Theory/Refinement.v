@@ -32,7 +32,7 @@ Variant refine_uvalue: uvalue -> uvalue -> Prop :=
 | UndefPoison: forall uv, refine_uvalue UVALUE_Poison uv   (* CB / YZ: TODO, type for poison? *)
 | RefineConcrete: forall uv1 uv2, uv2 <> UVALUE_Poison -> (forall (dv:dvalue), concretize uv2 dv -> concretize uv1  dv) -> refine_uvalue uv1 uv2
 .
-Hint Constructors refine_uvalue : core.
+#[export] Hint Constructors refine_uvalue : core.
 
 Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
 Proof.

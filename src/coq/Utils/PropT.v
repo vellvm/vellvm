@@ -684,46 +684,6 @@ Section PropMonad.
     eapply Returns_ret_inv_. reflexivity. cbn in H. apply H.
   Qed.
   
-(*  
-  
-  (* SAZ: Not clear that this one is provable : *)
-  Lemma interp_prop_bind_inv_l :
-    forall E F (h_spec : E ~> PropT F) R RR (HR: Reflexive RR) (HT : Transitive RR) S
-      (HP : forall T, Proper (eq ==> Eq1_PropT T) (h_spec T))
-      (m : itree E S)
-      (k : S -> itree E R)
-      (t : itree F R)
-      (H : interp_prop h_spec R RR (bind m k) t),
-       exists  (mf : itree F S) (kf : S -> itree F R) SS,
-         eutt RR t (bind mf kf) /\ Proper (SS ==> eutt RR) kf /\
-         (interp_prop h_spec S SS m mf) /\ (forall s, SS s s -> interp_prop h_spec R RR (k s) (kf s)).
-  Proof.
-    intros.
-    unfold bind, Monad_itree in *. rewrite (itree_eta m) in H. setoid_rewrite (itree_eta m).
-
-    genobs m obsm.
-    destruct obsm.
-    - rewrite Eq.bind_ret_l in H.
-      exists (ret r). exists (fun _ => t). exists (fun r1 r2 => r1 = r /\ r2 = r).
-      split; [| split; [|split]].
-      + cbn. rewrite Eq.bind_ret_l. reflexivity.
-      + do 2 red. intros; subst. reflexivity.
-      + repeat red. pstep. red. econstructor. split; reflexivity. reflexivity.
-      + intros. destruct H0. subst. assumption.
-    - rewrite Eq.bind_tau in H.
-      punfold H. red in H. inv H; subst.
-      pclearbot.
-      assert (inhabited S \/ ~ inhabited S).
-      { admit. (* TODO: classical logic *) }
-      destruct H.
-      * inv H. exists (ret X). (exists (fun _ => t)). exists (fun r1 r2 => True).
-        split; [| split; [|split]].
-      + cbn. rewrite Eq.bind_ret_l. reflexivity.
-      + do 2 red. intros; subst. reflexivity.
-  Abort.
-*)  
-    
-  
   Lemma case_prop_handler_correct:
     forall {E1 E2 F}
       (h1_spec: E1 ~> PropT F)
@@ -739,7 +699,6 @@ Section PropMonad.
     intros T e.
     destruct e. apply C1. apply C2.
   Qed.
-
 
   Definition prop_compose :=
     fun {F G : Type -> Type } {T : Type} (TT : relation T)
