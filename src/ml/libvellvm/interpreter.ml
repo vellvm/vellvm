@@ -52,11 +52,26 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
   | UVALUE_Vector        l -> fprintf ppf "UVALUE_Vector(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
   | _ -> fprintf ppf "todo"
 
-let debug_flag = ref false 
+let debug_flag = ref false
+
+(** Print a debug message to stdout if the `debug_flag` is enabled.
+
+    This is used to implement `debugE` events.
+*)
 let debug (msg:string) =
   if !debug_flag then
     Printf.printf "DEBUG: %s\n%!" msg
 
+(** The `step` function walks through an itree and handles some
+    remaining events.
+
+    In particular, `step` handles `debugE`, `failE`, and
+    `ExternalCallE` events, which are not handled by the
+    TopLevel.interpreter function extracted from Coq.
+
+    Calling `step` could either loop forever, return an error,
+    or return the uvalue result returned from the itree.
+ *)
 let rec step (m : ('a coq_L5, memory_stack * ((local_env * lstack) * (global_env * DV.uvalue))) itree) : (DV.uvalue, string) result =
   let open ITreeDefinition in
   match observe m with
@@ -69,16 +84,16 @@ let rec step (m : ('a coq_L5, memory_stack * ((local_env * lstack) * (global_env
 
   (* The ExternalCallE effect *)
   | VisF (Sum.Coq_inl1 (ExternalCall(_, _, _)), _) ->
-    Error "Uninterpreted Call"
+     Error "Uninterpreted Call"
 
   (* The debugE effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 msg), k) ->
-        (debug (Camlcoq.camlstring_of_coqstring msg);
-         step (k (Obj.magic DV.UVALUE_None)))
+     (debug (Camlcoq.camlstring_of_coqstring msg);
+      step (k (Obj.magic DV.UVALUE_None)))
 
   (* The failE effect is a failure *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 f), _) ->
-    Error (Camlcoq.camlstring_of_coqstring f)
+     Error (Camlcoq.camlstring_of_coqstring f)
 
   (* The UndefinedBehaviourE effect is a failure *)
   (* | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 f)), _) -> *)
@@ -95,5 +110,11 @@ let rec step (m : ('a coq_L5, memory_stack * ((local_env * lstack) * (global_env
        *   step (k (Obj.magic (DV.DVALUE_I64 DynamicValues.Int64.zero))) *)
 
 
+(** Interpret an LLVM program, returning a result that contains either the
+    uvalue result returned by the LLVM program, or an error message.
+
+    Note: programs consist of a non-empty list of blocks, represented by a
+    tuple of a single block, and a possibly empty list of blocks.
+ *)
 let interpret (prog:(LLVMAst.typ, (LLVMAst.typ LLVMAst.block * (LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.uvalue, string) result =
   step (TopLevel.interpreter prog)
