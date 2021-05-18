@@ -39,7 +39,7 @@ COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/DynamicValues Semantics/L
 
 COQFILESANALYSIS := Analysis/Iteration Analysis/Kildall Analysis/Dom Analysis/DomKildall Analysis/ssa Analysis/DomId 
 
-COQFILESQC := QC/GenAST QC/ShowAST QC/QCVellvm
+COQFILESQC := QC/GenAST QC/ShowAST QC/ReprAST QC/QCVellvm
 
 COQFILESTHEORY := Syntax/ScopeTheory\
 									Theory/StatePredicates\
