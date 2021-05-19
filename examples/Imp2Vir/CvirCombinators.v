@@ -199,8 +199,8 @@ Definition compile_cvir (ir : cvir 1 1) : program :=
   let blocks := (blocks ir) (cons (Anon 1) (empty raw_id)) (empty raw_id) vt_seq in
   let body := (entry_block, blocks) in
   let decl := mk_declaration
-    (Name "imp_main")
-    (TYPE_Function TYPE_Void nil)
+    (Name "main")
+    (TYPE_Function (TYPE_I 32) [TYPE_I 64 ; TYPE_Pointer (TYPE_Pointer (TYPE_I 8))])
     (nil, nil) None None None None nil None None None
   in
   let def := mk_definition fnbody decl nil body in

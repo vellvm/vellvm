@@ -32,18 +32,18 @@ Fixpoint compile (next_reg : int) (s : stmt) (env: StringMap.t int)
       '(next_reg, env, ir_r) <- compile next_reg r env;;
        ret (next_reg, env, seq_cvir ir_l ir_r)
   | While e b =>
-      '(expr_reg, expr_ir) <- compile_expr next_reg e env;;
-      '(next_reg, _, ir) <- compile (expr_reg + 1) b env;;
-      let br := branch_cvir expr_ir (texp_i32 expr_reg) in
+      '(cond_reg, expr_ir) <- compile_cond next_reg e env;;
+      '(next_reg, _, ir) <- compile (cond_reg + 1) b env;;
+      let br := branch_cvir expr_ir (texp_i1 cond_reg) in
       let body := seq_cvir br ir in
       let body := focus_output_cvir body (exist _ 1%nat Nat.lt_1_2) in
       let ir := loop_cvir_open body in
       ret (next_reg, env, ir) : option (int * (StringMap.t int) * cvir 1 1)
   | If e l r =>
-      '(expr_reg, expr_ir) <- compile_expr next_reg e env;;
-      '(next_reg, _, ir_l) <- compile (expr_reg + 1) l env;;
+      '(cond_reg, expr_ir) <- compile_cond next_reg e env;;
+      '(next_reg, _, ir_l) <- compile (cond_reg + 1) l env;;
       '(next_reg, _, ir_r) <- compile next_reg r env;;
-      let ir := branch_cvir expr_ir (texp_i32 expr_reg) : cvir 1 2 in
+      let ir := branch_cvir expr_ir (texp_i1 cond_reg) : cvir 1 2 in
       let ir := seq_cvir ir ir_l : cvir 1 2 in
       let ir := seq_cvir ir ir_r : cvir 1 2 in
       let ir := join_cvir ir : cvir 1 1 in
