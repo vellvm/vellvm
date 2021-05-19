@@ -1,0 +1,11 @@
+(env
+ (dev
+  (flags (:standard -g -w -1-20-32-33-34-39)))
+ (release
+  (flags (:standard -O3 -w -1-20-32-33-34-39))))
+
+(library
+  (name extracted)
+  (wrapped false)
+  (synopsis "ML code extracted from Coq")
+  )
