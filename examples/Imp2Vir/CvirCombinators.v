@@ -59,6 +59,16 @@ Definition branch_cvir (c : code typ) (e : texp typ) : cvir 1 2 :=
     => [mk_block (Vec.hd vi) (List.nil) c (TERM_Br e (Vec.hd vo) (Vec.hd (Vec.tl vo))) None]
   ).
 
+Definition ret_cvir (c : code typ) (e : texp typ) : cvir 1 0 :=
+  mk_cvir (fun vi vo (vt : Vec.t raw_id 0) =>
+    [mk_block (Vec.hd vi) List.nil c (TERM_Ret e) None]
+  ).
+
+Definition ret_void_cvir (c : code typ) : cvir 1 0 :=
+  mk_cvir (fun vi vo (vt : Vec.t raw_id 0) =>
+    [mk_block (Vec.hd vi) List.nil c (TERM_Ret_void) None]
+  ).
+
 Definition merge_cvir
   {ni1 no1 ni2 no2 : nat}
   (b1: cvir ni1 no1)
@@ -187,24 +197,6 @@ Definition program := toplevel_entity typ fnbody.
 
 Definition entry_block : block typ :=
   mk_block (Anon 0) List.nil List.nil (TERM_Br_1 (Anon 1)) None.
-
-Definition exit_block_cvir : cvir 1 0 :=
-  mk_cvir (fun vi vo (vt : Vec.t raw_id 0) =>
-    [mk_block (Vec.hd vi) List.nil List.nil (TERM_Ret_void) None]
-  ).
-
-Definition compile_cvir (ir : cvir 1 1) : program :=
-  let ir := seq_cvir ir exit_block_cvir in
-  let vt_seq := map Anon (map Z.of_nat (seq 2 (n_int ir))) in
-  let blocks := (blocks ir) (cons (Anon 1) (empty raw_id)) (empty raw_id) vt_seq in
-  let body := (entry_block, blocks) in
-  let decl := mk_declaration
-    (Name "main")
-    (TYPE_Function (TYPE_I 32) [TYPE_I 64 ; TYPE_Pointer (TYPE_Pointer (TYPE_I 8))])
-    (nil, nil) None None None None nil None None None
-  in
-  let def := mk_definition fnbody decl nil body in
-  TLE_Definition def.
 
 End CvirCombinators.
 

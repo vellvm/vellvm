@@ -87,10 +87,23 @@ Proof.
     split; [ apply block_cvir_id_WF | apply block_cvir_unique ].
 Qed.
 
+Definition compile_imp_cvir (ir : cvir 1 1) : program :=
+  let ir := seq_cvir ir (ret_cvir nil (texp_i32 10)) in (* hack to print the result of fact *)
+  let vt_seq := map Anon (map Z.of_nat (seq 2 (n_int ir))) in
+  let blocks := (blocks ir) (cons (Anon 1) (empty raw_id)) (empty raw_id) vt_seq in
+  let body := (entry_block, blocks) in
+  let decl := mk_declaration
+    (Name "main")
+    (TYPE_Function (TYPE_I 32) [TYPE_I 64 ; TYPE_Pointer (TYPE_Pointer (TYPE_I 8))])
+    (nil, nil) None None None None nil None None None
+  in
+  let def := mk_definition fnbody decl nil body in
+  TLE_Definition def.
+
 Definition compile_program (s : stmt) (env : StringMap.t int) :
   option program :=
   '(_, _, ir) <- compile 0 s env;;
-  ret (compile_cvir ir).
+  ret (compile_imp_cvir ir).
 
 Definition fact_ir := (compile_program (fact "a" "b" 5) (StringMap.empty int)).
 
