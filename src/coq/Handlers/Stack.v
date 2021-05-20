@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      List
      String.
@@ -31,6 +32,11 @@ Import ListNotations.
 Import MonadNotation.
 
 Import ITree.Basics.Basics.Monads.
+(* end hide *)
+
+(** * Stack handler
+  Definition of the handler interpreting the [StackE] events to push and pop the stack of local frames during function calls.
+*)
 
 Section StackMap.
   Variable (k v:Type).
@@ -48,7 +54,6 @@ Section StackMap.
           Ret ((init, env::stk), tt)
         | StackPop =>
           match stk with
-          (* CB TODO: should this raise an error? Is this UB? *)
           | [] => raise "Tried to pop too many stack frames."
           | (env'::stk') => Ret ((env',stk'), tt)
           end
@@ -123,20 +128,6 @@ Section StackMap.
 
   End PARAMS.
 
-    (* SAZ: I wasn't (yet) able to completey disentangle the ocal events from the stack events.
-       This version makes the stack a kind of "wrapper" around the locals and provides a way
-       of lifting locals into this new state.
-
-       There should be some kind of lemma long the lines of:
-
-        [forall (t:itree (E +' LocalE k v +' F) V) (env:map) (s:stack),
-         run_local t env ≅
-         Itree.map fst (run_local_stack (translate _into_stack t) (env, s))]
-
-       Here, [_into_stack : (E +' LocalE k v +' F) ~> (E +' ((LocalE k v) +' StackE k v) +' F)]
-       is the inclusion into stack events.
-    *)
-
 End StackMap.
 
 From ExtLib Require Import
@@ -145,11 +136,11 @@ From Vellvm Require Import
      LLVMAst
      MemoryAddress.
 
-(* YZ TODO : Undecided about the status of this over-generalization of these events over domains of keys and values.
+(* Undecided about the status of this over-generalization of these events over domains of keys and values.
    The interface needs to be specialized anyway in [LLVMEvents].
    We want to have access to the specialized type both in [InterpreterMCFG] and [InterpreterCFG] so we cannot delay
    it until [TopLevel] either.
-   So exposing the specialization here, but it is awkward.
+   We are hence exposing the specialization here, but it is slightly awkward.
  *)
 Module Make (A : ADDRESS) (LLVMEvents : LLVM_INTERACTIONS(A)).
   Definition lstack := @stack (list (raw_id * LLVMEvents.DV.uvalue)).
