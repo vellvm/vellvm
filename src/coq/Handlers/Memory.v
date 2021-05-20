@@ -135,6 +135,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Module Import ISP := FSetProperties.WProperties_fun(Coq.Structures.OrderedTypeEx.Z_as_OT)(IS).
   Module Import IP := FMapFacts.WProperties_fun(Coq.Structures.OrderedTypeEx.Z_as_OT)(IM).
 
+  #[global] Coercion is_true : bool >-> Sortclass.
 
   (** ** Finite maps
       We use finite maps in several place of the memory model. We rely on the AVL implementation from the standard library.
@@ -143,6 +144,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
    *)
   Section Map_Operations.
 
+  
     (* Polymorphic type of maps indexed by [Z] *)
     Definition IntMap := IM.t.
     

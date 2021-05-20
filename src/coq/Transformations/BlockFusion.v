@@ -639,9 +639,9 @@ Section BlockFusionCorrect.
       (* Here is the guard for our coinductive call *)
       etau.
       ebase; right.
-      specialize (CIH b2 next).
-      rewrite update_provenance_eq in CIH.
-      apply CIH; auto.
+      specialize (CIHL b2 next).
+      rewrite update_provenance_eq in CIHL.
+      apply CIHL; auto.
       (* Remains to prove we did not jump in the middle of the fused block *)
       cbn in *.
       destruct (Eqv.eqv_dec_p next b2); auto.
@@ -678,9 +678,9 @@ Section BlockFusionCorrect.
         etau.
         ebase.
         right.
-        specialize (CIH to b_next).
-        rewrite update_provenance_ineq in CIH; auto.
-        apply CIH; auto.
+        specialize (CIHL to b_next).
+        rewrite update_provenance_ineq in CIHL; auto.
+        apply CIHL; auto.
         cbn in EXIT.
         destruct (Eqv.eqv_dec_p b_next b2); auto.
         do 2 red in e; subst.

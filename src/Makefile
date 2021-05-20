@@ -6,12 +6,11 @@ COQLIBDIR = ../lib
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
-OPAMPKGS=coq coq-ext-lib coq-paco coq-ceres coq-flocq coq-mathcomp-ssreflect coq-simple-io dune menhir qcheck
+OPAMPKGS=coq coq-ext-lib coq-paco coq-ceres coq-flocq coq-mathcomp-ssreflect coq-simple-io coq-itree dune menhir qcheck
 
-ITREEDIR=../lib/InteractionTrees
 QUICKCHICKDIR=../lib/QuickChick
 
-COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(ITREEDIR)/theories/ ITree -R $(QUICKCHICKDIR)/src/ QuickChick -I $(QUICKCHICKDIR)/src
+COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract -R $(QUICKCHICKDIR)/src/ QuickChick -I $(QUICKCHICKDIR)/src
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
 COQDEP="$(COQBIN)coqdep" $(COQINCLUDES)
 COQEXEC="$(COQBIN)coqtop" -q -w none $(COQINCLUDES) -batch -load-vernac-source
@@ -39,7 +38,7 @@ COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/DynamicValues Semantics/L
 
 COQFILESANALYSIS := Analysis/Iteration Analysis/Kildall Analysis/Dom Analysis/DomKildall Analysis/ssa Analysis/DomId 
 
-COQFILESQC := QC/GenAST QC/ShowAST QC/ReprAST QC/QCVellvm
+COQFILESQC := Syntax/TypeUtil QC/Utils QC/GenAST QC/ShowAST QC/ReprAST QC/QCVellvm 
 
 COQFILESTHEORY := Syntax/ScopeTheory\
 									Theory/StatePredicates\
@@ -57,7 +56,7 @@ OLLVMFILES :=
 
 COQFILESVIR      := $(COQFILESNUMERIC) $(COQFILESUTILS) $(COQFILESSYNTAX) $(COQFILESSEMANTICS) 
 COQFILESCOMPILER := $(COQFILESVIR) $(COQFILESANALYSIS) 
-COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT) 
+COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT) $(COQFILESQC)
 
 VFILES  := $(COQFILESALL:%=coq/%.v)
 VOFILES := $(COQFILESALL:%=coq/%.vo)
@@ -82,21 +81,15 @@ opam:
 
 coqinterp: $(COQFILESVIR:%=coq/%.vo)
 
-update-trees:
-	git submodule update -- $(ITREEDIR)
-
-itrees:
-	make -C $(ITREEDIR)
-
 quickchick:
 	make -C $(QUICKCHICKDIR)
 
 update-quickchick:
 	git submodule update -- $(QUICKCHICKDIR)
 
-update-submodules: update-trees update-quickchick
+update-submodules: update-quickchick
 
-.PHONY: extracted update-trees update-quickchick update-submodules itrees quickchick
+.PHONY: extracted update-quickchick update-submodules quickchick
 extracted: $(EXTRACTDIR)/STAMP $(VOFILES)
 
 $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
@@ -112,7 +105,7 @@ $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
 	@echo "COQC $*.v"
 	@$(COQC) -dump-glob doc/$(*F).glob $*.v
 
-depend: itrees quickchick $(VFILES) 
+depend: quickchick $(VFILES) 
 	@echo "Analyzing Coq dependencies"
 	@$(COQDEP) $^ > .depend
 
@@ -134,7 +127,7 @@ test: vellvm
 print-includes:
 	@echo $(COQINCLUDES)
 
-clean: clean-vellvm clean-itrees
+clean: clean-vellvm 
 clean-vellvm:
 	rm -f .depend
 	find $(COQDIR) -name "*.vo" -delete
@@ -148,11 +141,8 @@ clean-vellvm:
 	rm -rf output
 	rm -f vellvm
 	rm -f doc/coq2html.ml doc/coq2html doc/*.cm? doc/*.o
-clean-itrees:
-	make -C $(ITREEDIR) clean
-	make -C $(QUICKCHICKDIR) clean
 
-.PHONY: clean-vellvm clean-itrees
+.PHONY: clean-vellvm 
 
 doc/coq2html: 
 	make -C ../lib/coq2html

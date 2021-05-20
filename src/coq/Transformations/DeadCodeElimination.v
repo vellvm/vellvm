@@ -52,7 +52,7 @@ Proof.
   - intros ? ? [<- SUCC]. 
     destruct u1; [| reflexivity].
     estep; ebase; right.
-    apply CIH.
+    apply CIHL.
     cbn in SUCC.
     clear - Heqo SUCC DEAD.
     pose proof find_block_has_id _ _ Heqo; subst.

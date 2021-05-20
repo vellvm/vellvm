@@ -246,7 +246,7 @@ Proof.
   rewrite KTreeFacts.unfold_iter_ktree. cbn.
   rewrite GET_BK.
   repeat setoid_rewrite bind_bind.
-  repeat (eapply eqit_bind; [intros ? |reflexivity]).
+  repeat (eapply eqit_bind; [reflexivity | intros ?]).
   break_sum; rewrite bind_ret_l; [|reflexivity].
   rewrite tau_euttge; reflexivity.
 Qed.
@@ -265,7 +265,7 @@ Proof.
   rewrite KTreeFacts.unfold_iter_ktree. cbn.
   rewrite GET_BK.
   repeat setoid_rewrite bind_bind.
-  repeat (eapply eqit_bind; [intros ? |reflexivity]).
+  repeat (eapply eqit_bind; [reflexivity | intros ?]).
   break_sum; rewrite bind_ret_l; [|reflexivity].
   apply eqit_Tau.
   reflexivity.
@@ -581,11 +581,11 @@ Proof.
   intros * ->; revert from to.
   einit.
   ecofix CIH.
-  clear CIH0.
+  clear CIHH.
   intros * WF.
   destruct (find_block bks' to) as [bk |] eqn:EQ.
-  - unfold denote_ocfg at 1 3.
-    rewrite 2 KTreeFacts.unfold_iter_ktree.
+  - unfold denote_ocfg at 1 3. 
+    setoid_rewrite KTreeFacts.unfold_iter_ktree.
     cbn; rewrite !bind_bind.
     assert (find_block (prefix ++ bks' ++ postfix) to = Some bk).
     {
