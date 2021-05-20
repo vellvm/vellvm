@@ -60,7 +60,6 @@ Inductive dtyp : Set :=
 | DTYPE_Struct (fields:list dtyp)
 | DTYPE_Packed_struct (fields:list dtyp)
 | DTYPE_Opaque
-(* IY: Why isn't this defined structurally? *)
 | DTYPE_Vector (sz:N) (t:dtyp)     (* t must be integer, floating point, or pointer type *)
 .
 Set Elimination Schemes.

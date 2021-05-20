@@ -21,8 +21,8 @@ From ExtLib Require Import List.
     - [inputs]: input labels of an [ocfg]
     - [outputs]: output labels of an [ocfg]
     - [wf_ocfg_bid]: no duplicate block identifiers
-
-
+    - [uses]: use sites of pieces of syntax
+    - [def_sites]: definition sites of pieces of syntax
  *)
 
 (** * Well-formedness w.r.t. block identifiers
@@ -158,11 +158,6 @@ End LABELS_OPERATIONS.
 From Coq Require Import ListSet.
 
 Module SetNotations.
-
-  (* Notation set := list. *)
-  (* Infix "+++" := List.app (at level 30).  *)
-  (* Notation ":::" := cons. *)
-  (* Notation "∅" := []. *)
 
   Infix "+++" := (set_union raw_id_eq_dec) (right associativity, at level 60).
   Infix ":::" := (set_add raw_id_eq_dec) (right associativity, at level 60).
@@ -303,7 +298,7 @@ Section REGISTER_OPERATIONS.
                                  => use_sites e
 
                                | TERM_Switch e _ l =>
-                                 use_sites e (* +++ set_flat_map (fun x => use_sites (fst x)) l *)
+                                 use_sites e 
 
                                | TERM_Ret_void
                                | TERM_Br_1 _
