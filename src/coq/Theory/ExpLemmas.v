@@ -721,9 +721,45 @@ Section ExpPure.
     reflexivity.
   Qed.
 
-  Lemma expr_are_pure : forall (o : option dtyp) e, pure ⟦ e at? o ⟧e3.
+  Inductive no_conv :  exp dtyp -> Prop :=
+    no_conv_Ident x : no_conv (EXP_Ident x)
+  | no_conv_Integer z : no_conv (EXP_Integer z)
+  | no_conv_Float f : no_conv (EXP_Float f)
+  | no_conv_Double f : no_conv (EXP_Double f)
+  | no_conv_Hex f : no_conv (EXP_Hex f)
+  | no_conv_Bool b : no_conv (EXP_Bool b)
+  | no_conv_Null : no_conv (EXP_Null)
+  | no_conv_Zero_initializer : no_conv (EXP_Zero_initializer)
+  | no_conv_Cstring : forall l, (forall t x, In (t, x) l -> no_conv x) -> no_conv (EXP_Cstring l)
+  | no_conv_Undef : no_conv (EXP_Undef)
+  | no_conv_Struct : forall l, (forall t x, In (t, x) l -> no_conv x) -> no_conv (EXP_Struct l)
+  | no_conv_Packed_struct : forall l, (forall t x, In (t, x) l -> no_conv x) -> no_conv (EXP_Packed_struct l)
+  | no_conv_Array : forall l, (forall t x, In (t, x) l -> no_conv x) -> no_conv (EXP_Array l)
+  | no_conv_Vector : forall l, (forall t x, In (t, x) l -> no_conv x) -> no_conv (EXP_Vector l)
+  | no_conv_IBinop: forall b T x x', no_conv x -> no_conv x' -> no_conv (OP_IBinop b T x x')
+  | no_conv_ICmp : forall b T x x', no_conv x -> no_conv x' -> no_conv (OP_ICmp b T x x')
+  | no_conv_FBinop : forall b l T x x', no_conv x -> no_conv x' -> no_conv (OP_FBinop b l T x x')
+  | no_conv_FCmp : forall f T x x', no_conv x -> no_conv x' -> no_conv (OP_FCmp f T x x')
+  | no_conv_GetElementPtr : forall T t x l, no_conv x -> (forall t' x', In (t', x') l -> no_conv x') ->
+                                       no_conv (OP_GetElementPtr T (t, x) l)
+  | no_conv_ExtractElement : forall t x t' x', no_conv x -> no_conv x' ->
+                                            no_conv (OP_ExtractElement (t, x) (t', x'))
+  | no_conv_InsertElement : forall t x t' x' t'' x'', no_conv x -> no_conv x' -> no_conv x'' ->
+                                            no_conv (OP_InsertElement (t, x) (t', x') (t'', x''))
+  | no_conv_ShuffleVector : forall t x t' x' t'' x'', no_conv x -> no_conv x' -> no_conv x'' ->
+                                            no_conv (OP_ShuffleVector (t, x) (t', x') (t'', x''))
+  | no_conv_ExtractValue : forall t x l, no_conv x -> no_conv (OP_ExtractValue (t, x) l)
+  | no_conv_InsertValue : forall t x t' x' l, no_conv x -> no_conv x' -> no_conv (OP_InsertValue (t, x) (t', x') l)
+  | no_conv_Select : forall t x t' x' t'' x'', no_conv x -> no_conv x' -> no_conv x'' ->
+                                            no_conv (OP_Select (t, x) (t', x') (t'', x''))
+  | no_conv_Freeze : forall t x, no_conv x -> no_conv (OP_Freeze (t, x)).
+
+
+  Lemma expr_are_pure : forall (o : option dtyp) e, 
+   no_conv e ->
+   pure ⟦ e at? o ⟧e3.
   Proof with trivial_cases.
-    intros; unfold pure.
+    intros * NO_CONV; unfold pure.
     revert o; induction e; simpl; intros.
 
     - destruct id; cbn.
@@ -775,7 +811,7 @@ Section ExpPure.
         * intros * IN (-> & -> & ->).
           destruct a; simpl in *.
           apply has_post_weaken with (↑ (pure_P g l m)).
-          apply (H _ IN).
+          apply (H _ IN). inv NO_CONV. eauto.
           intro_pure; cbn; auto.
         * intro_pure; cbn; auto. 
       + intro_pure.
@@ -794,6 +830,7 @@ Section ExpPure.
           destruct a; simpl in *.
           apply has_post_weaken with (↑ (pure_P g l m)).
           apply (H _ IN).
+          inv NO_CONV. eauto.
           intro_pure; auto.
         * intro_pure; cbn; auto.
       + intro_pure.
@@ -811,6 +848,7 @@ Section ExpPure.
           destruct a; simpl in *.
           apply has_post_weaken with (↑ (pure_P g l m)).
           apply (H _ IN).
+          inv NO_CONV. eauto.
           intro_pure; auto.
         * intro_pure; cbn; auto.
       + intro_pure.
@@ -826,6 +864,7 @@ Section ExpPure.
           destruct a; simpl in *.
           apply has_post_weaken with (↑ (pure_P g l m)).
           apply (H _ IN).
+          inv NO_CONV. eauto.
           intro_pure; auto.
         * intro_pure; cbn; auto.
       + intro_pure.
@@ -841,18 +880,20 @@ Section ExpPure.
           destruct a; simpl in *.
           apply has_post_weaken with (↑ (pure_P g l m)).
           apply (H _ IN).
+          inv NO_CONV. eauto.
           intro_pure; auto.
         * intro_pure; cbn; auto.
       + intro_pure.
         go...
 
     - go.
+      inv NO_CONV.
       eapply has_post_bind_strong.
-      apply (IHe1 (Some t) g l m).
+      specialize (IHe1 H1 (Some t) g l m). apply IHe1.
       intros (? & ? & ? & ?) (-> & -> & ->).
       go.
       eapply has_post_bind_strong.
-      apply (IHe2 (Some t) g l m).
+      apply (IHe2 H4 (Some t) g l m).
       intro_pure.
       break_match_goal.
       + go.
@@ -886,12 +927,13 @@ Section ExpPure.
         go...
 
     - go.
+      inv NO_CONV.
       eapply has_post_bind_strong.
-      apply (IHe1 (Some t) g l m).
+      specialize (IHe1 H1 (Some t) g l m); eapply IHe1.
       intro_pure.
       go.
       eapply has_post_bind_strong.
-      apply (IHe2 (Some t) g l m).
+      apply (IHe2 H4 (Some t) g l m).
       intro_pure.
       unfold uvalue_to_dvalue_binop.
       cbn.
@@ -904,12 +946,13 @@ Section ExpPure.
       go...
 
     - go.
+      inv NO_CONV.
       eapply has_post_bind_strong.
-      apply (IHe1 (Some t) g l m).
+      specialize (IHe1 H1 (Some t) g l m); eapply IHe1.
       intro_pure.
       go.
       eapply has_post_bind_strong.
-      apply (IHe2 (Some t) g l m).
+      apply (IHe2 H5 (Some t) g l m).
       intro_pure.
       break_match_goal.
       + go.
@@ -943,12 +986,13 @@ Section ExpPure.
         go...
 
     - go.
+      inv NO_CONV.
       eapply has_post_bind_strong.
-      apply (IHe1 (Some t) g l m).
+      specialize (IHe1 H1 (Some t) g l m); eapply IHe1.
       intro_pure.
       go.
       eapply has_post_bind_strong.
-      apply (IHe2 (Some t) g l m).
+      apply (IHe2 H4 (Some t) g l m).
       intro_pure.
       unfold uvalue_to_dvalue_binop.
       cbn.
@@ -960,49 +1004,13 @@ Section ExpPure.
       break_match_goal...
       go...
 
-    - go.
-      eapply has_post_bind_strong.
-      apply (IHe (Some t_from) g l m).
-      intro_pure.
-      unfold uvalue_to_dvalue_uop; cbn.
-      break_match_goal.
-      go...
-      break_match_hyp; try inv_sum.
-      unfold ITree.map.
-      go.
-      apply has_post_bind_strong with (↑ (pure_P g l m)).
+    - inv NO_CONV.
 
-      + (* What's the right way to reason about eval_conv? *)
-        unfold eval_conv.
-
-
-        pose proof (eval_conv_h_case conv t_from d t_to).
-        destruct H as [ (s & H) | [(v & H)| [ (z & H)| (z & H)]] ].
-        rewrite H.
-
-        destruct t_from; cbn.
-        1 - 15 : (rewrite conv_to_exp_raise; rewrite exp_to_instr_raise); trivial_cases.
-        destruct d; cbn.
-        1 - 13 : (rewrite conv_to_exp_raise; rewrite exp_to_instr_raise); trivial_cases.
-        destruct t_from; cbn; rewrite H; go; trivial_cases.
-
-        destruct d; cbn; go; trivial_cases.
-        rewrite conv_to_exp_raise; rewrite exp_to_instr_raise; trivial_cases.
-
-        destruct t_from; rewrite H; try rewrite conv_to_exp_ItoP; try apply ItoP_is_pure.
-        destruct d; cbn; go; trivial_cases.
-
-        1 - 12 : apply ItoP_is_pure.
-
-        rewrite conv_to_exp_raise; rewrite exp_to_instr_raise. apply failure_is_pure.
-
-        admit.
-      + intro_pure.
-              go...
     - destruct ptrval; cbn.
+      inv NO_CONV.
       rewrite translate_bind, interp_cfg3_bind.
       eapply has_post_bind_strong.
-      apply (IHe (Some d) g l m).
+      apply (IHe H2 (Some d) g l m).
       intro_pure.
       rewrite translate_bind, interp_cfg3_bind.
       rewrite translate_map_monad.
@@ -1013,7 +1021,7 @@ Section ExpPure.
         * intros * IN (-> & -> & ->).
           destruct a; simpl in *.
           apply has_post_weaken with (↑ (pure_P g l m)).
-          apply (H _ IN).
+          apply (H _ IN); cbn; eauto.
           intro_pure; auto.
         * intro_pure; cbn; auto.
       + intro_pure.
@@ -1091,8 +1099,9 @@ Section ExpPure.
 
     - destruct vec; cbn.
       go.
+      inv NO_CONV.
       eapply has_post_bind_strong.
-      apply (IHe (Some d) g l m).
+      apply (IHe H0 (Some d) g l m).
       intro_pure.
       clear IHe.
       induction idxs as [| n idxs IH].
@@ -1106,14 +1115,15 @@ Section ExpPure.
     - auto...
 
     - destruct cnd,v1,v2; cbn.
+      inv NO_CONV.
       go.
-      eapply has_post_bind_strong; [apply IHe | ].
+      eapply has_post_bind_strong; [apply IHe | ]; auto.
       intro_pure.
       go.
-      eapply has_post_bind_strong; [apply IHe0 |]. 
+      eapply has_post_bind_strong; [apply IHe0 |]; auto. 
       intro_pure.
       go.
-      eapply has_post_bind_strong; [apply IHe1 |]. 
+      eapply has_post_bind_strong; [apply IHe1 |]; auto. 
       intro_pure.
       break_match_goal.
       go...
@@ -1124,9 +1134,10 @@ Section ExpPure.
       go...
       
     - destruct v; cbn.
+      inv NO_CONV.
       go.
       eapply has_post_bind_strong.
-      apply (IHe (Some d) g l m).
+      apply (IHe H0 (Some d) g l m).
       intro_pure.
       clear IHe.
       go.
@@ -1142,6 +1153,6 @@ Section ExpPure.
       intros (? & ? & ? & ?) (-> & -> & ->).
       go...
       
-  Admitted.
+  Qed.
 
 End ExpPure.

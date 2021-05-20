@@ -44,7 +44,6 @@ COQFILESTHEORY := Syntax/ScopeTheory\
 									Theory/StatePredicates\
 									Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG\
 									Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
-									Theory/LocalFrame\
 									Theory/TopLevelRefinements Theory/SymbolicInterpreter\
 									Utils/NoEvent Utils/Commutation\
 							    Theory
@@ -56,7 +55,7 @@ OLLVMFILES :=
 
 COQFILESVIR      := $(COQFILESNUMERIC) $(COQFILESUTILS) $(COQFILESSYNTAX) $(COQFILESSEMANTICS) 
 COQFILESCOMPILER := $(COQFILESVIR) $(COQFILESANALYSIS) 
-COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT) $(COQFILESQC)
+COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT) 
 
 VFILES  := $(COQFILESALL:%=coq/%.v)
 VOFILES := $(COQFILESALL:%=coq/%.vo)
