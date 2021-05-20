@@ -5,8 +5,8 @@
 
 The description below has been augmented with comments that indicate the
 relevant parts of the ICFP paper.  We've called them out using by marking them
-with **ARTIFACT** so they are eaier to find.  We also list the specific claims
-in the and their locations in the development below:
+with **ARTIFACT** so they are easier to find.  We also list the specific claims
+in the paper and their locations in the development below:
 
 ### Definitions / Lemmas 
 
@@ -32,8 +32,6 @@ the source directory. This test generates random LLVM programs that
 are then run with the Vellvm interpreter and the `clang` compiler
 (which must also be installed).
 
-[comment]: # (TODO: Calvin add something here)
-
 
 ### HELIX Case Study
 
@@ -41,10 +39,31 @@ The paper's Section 6 refers to our use of this library for verifying a
 front-end for the Helix tool chain.  That development is available in a separate
 repository [Helix](https://github.com/vzaliva/helix) and it relies on a slightly
 older version of Vellvm (Helix requires MetaCoq which isn't compatible yet with
-coq v. 8.13) that was current at the time the paper was submitted.  The Helix
-development points to a specific version of this repository, but, since
-compiling it requires a different version of Coq we 
+coq v. 8.13) that was current at the time the paper was submitted. 
+Since the Helix development points to another specific version of this repository and
+is still under active development, we chose to not include it in this artifact. 
+The interested reviewer can however get it and run it directly from its Github.
 
+## Getting started
+
+There are two options: build Vellvm from scratch in your own environment, or
+use the virtual machine image we provide.
+
+### Building in your own environment
+See [Installing and Compiling Vellvm](#installing-and-compiling-vellvm).
+
+### Using the virtual machine image
+The Debian QEmu image has been packaged into `vellvm.tar.gz`. 
+Run the image with `start.sh` for Unix-like systems (you might need `sudo` for 
+Linux) and `start.bat` for Windows.
+
+ * Username: artifact
+ * Password: password
+
+If the VM does not start, check `Debugging.md` provided in the directory.
+
+See [Installing and Compiling Vellvm](#installing-and-compiling-vellvm) to 
+compile and run the project.
 
 # Vellvm
 [![Build Status](https://travis-ci.com/vellvm/vellvm.svg?branch=master)](https://travis-ci.com/vellvm/vellvm)
@@ -69,24 +88,10 @@ a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of 
  - [LLVM](http://llvm.org)
 
 # Participants
- - Steve Zdancewic
- - Yannick Zakowski
- - Calvin Beck
- - Irene Yoon
+  REDACTED
  
 ## Past Contributors
- - Vivien Durey 
- - Dmitri Garbuzov 
- - Olek Gierczak
- - William Mansky
- - Milo Martin
- - Santosh Nagarakatte 
- - Emmett Neyman 
- - Christine Rizkallah 
- - Robert Zajac
- - Richard Zhang 
- - Jianzhou Zhao
-
+  REDACTED
 ---
 
 # Structure of the development
@@ -95,7 +100,7 @@ The development is organized as follows.
 
 ## Local libraries
 
-Stored in the `lib` folder. Currently the only dependency that needs to be installed locally is the QuickChick one:
+Stored in the `lib` folder. Currently, the only dependency that needs to be installed locally is the QuickChick one:
 - `lib/QuickChick` points to a branch of the QuickChick library that we have used in our testing
 
 The library will be built as the same time as the Vellvm development via the `Makefile`.
@@ -157,7 +162,7 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 
 ### Assumes: 
   - coq   : version 8.13
-  - Clang 7.0.1+ (available for Mac OSX for XCode 4.2+, or installed via, e.g. opam install llvm)
+  - Clang 7.0.1+ (available for Mac OSX for XCode 4.2+, or installed via, e.g. sudo apt-get install clang; opam install llvm)
   - External Coq libraries: 
   Note: if it's the first time you install Coq libraries via Opam, you will have to add the repository first with `opam repo add coq-released https://coq.inria.fr/opam/released`.
     * ext-lib    (installed via, e.g. opam install coq-ext-lib)

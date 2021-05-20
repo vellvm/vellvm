@@ -1,3 +1,4 @@
+%{
 open LLVMAst
 open ParserHelper
 open ParseUtil
