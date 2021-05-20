@@ -230,7 +230,6 @@ Module ForwardSolver (PC:UsualDecidableType) (LAT:LATTICE)<:
     apply IHbs; assumption.
   Qed.
   
-
   Lemma prop_n_out : forall o ns s s' n,
     s' = fold_left (prop_succ o) ns s ->
     ~ In n (wlist s') ->
