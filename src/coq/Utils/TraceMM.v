@@ -17,7 +17,9 @@ Import MonadNotation.
 Local Open Scope monad_scope.
 (* end hide *)
 
-(** * A trace-based axiomatic memory model? *)
+(** * A trace-based axiomatic memory model? 
+  This is currently a very naive experiment, nothing well thought out.
+*)
 
 Module Simple.
 

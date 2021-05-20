@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      Morphisms
      String.
@@ -26,6 +27,11 @@ Set Contextual Implicit.
 Import MonadNotation.
 Import ITree.Basics.Basics.Monads.
 Open Scope string_scope.
+(* end hide *)
+
+(** * Global handler
+  Interpretation of the [GlobalE] events into a state monad.
+*)
 
 Section Globals.
   Variable (k v:Type).

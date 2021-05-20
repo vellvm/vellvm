@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      ZArith
      String
@@ -31,49 +32,21 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 
 Import MonadNotation.
+(* end hide *)
 
+(** * Pick handler
+  Definition of the propositional and executable handlers for the [Pick] event.
+  - The propositional one capture in [Prop] all possible values
+  - The executable one interprets [undef] as 0 at the type  
+*)
 
 Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
   Import LLVMIO.
 
   Section PickPropositional.
-
-    (*  Semantics with the Pick + Predicates:
-        expr = div 1 undef 
-           intepreter: "evaluate"   div 1 0   ==> trigger UBE   ==> interpret UBE as trigger Fail
-           model:  trigger UBE ==> all Trees  (including trigger Fail)
-
-       expr = div 1 (1 - undef)
-           interpreter:  div 1 1 ==> ret 1
-           model:  trigger UBE ==> all Trees  (including ret 1)
-
-
-       Four cases:
-       C   exists dv, concretize_uvalue uv = ret dv  => easy by relation between concretize and 
-       C   concretize_uvalue uv = trigger UBE        => in this case, later interpretation of UBE
-       C   concretize_uvalue uv = trigger fail 
-      ~C   --> pick UBE
-    
-       Lemma: concretize_uvalue uv = Ret dv  ->  concretize uv dv
-
-
-
-       Semantics without the predicates in Pick:
-        expr = div 1 undef 
-           intepreter: "evaluate"   div 1 0      ==> trigger UB   ==> interpret UBE as trigger Fail
-           model: after Pick_handler:  {trigger UBE, ret (1/n) | n }  ==> 
-                  after UBE_handler :  { all trees }    (including trigger Fail)
-
-       expr = div 1 (1 - undef)
-           interpreter:  div 1 1 ==> ret 1
-           model: after Pick_handler:  {trigger UBE, ret (1/n) | n }  ==> 
-                  after UBE_handler :  { all trees }    (including ret 1)
-    *)
-    (* YZ: TODO: better UB error message *)
-    (* SAZ: For now, leaving the "C" parameter, but just ignoring it here *)
-    
-    
+   
+    (* The parameter [C] is currently not used *)
     Inductive Pick_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E}: PickE ~> PropT E :=
     | PickD: forall uv C res t,  concretize_u uv res -> t ≈ (lift_undef_or_err ret res) -> Pick_handler (pick uv C) t.
                                                                       
@@ -219,16 +192,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                                                   dv2 <- concretize_uvalue v2 ;;
                                                   eval_fcmp cmp dv1 dv2
       | _ => (lift (failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"))
-      (*
-  | UVALUE_Conversion conv v t_to          =>
-  | UVALUE_GetElementPtr t ptrval idxs     => _
-  | UVALUE_ExtractElement vec idx          => _
-  | UVALUE_InsertElement vec elt idx       => _
-  | UVALUE_ShuffleVector vec1 vec2 idxmask => _
-  | UVALUE_ExtractValue vec idxs           => _
-  | UVALUE_InsertValue vec elt idxs        => _
-  | UVALUE_Select cnd v1 v2                => _
-       *)
+      
       end.
 
     Ltac do_it := constructor; cbn; auto; fail.

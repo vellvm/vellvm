@@ -167,10 +167,11 @@ Section PropMonad.
 
   Definition subtree {E} {A B} (ta : itree E A) (tb : itree E B) := exists (k : A -> itree E B), tb ≈ bind ta k.
 
+  (* Definition 5.1 *)
   Definition bind_PropT {E} :=
-    fun A B (PA: PropT E A) (K: A -> PropT E B) (tb: itree E B) =>
+    fun A B (specA : PropT E A) (K: A -> PropT E B) (tb: itree E B) =>
       exists (ta: itree E A) (k: A -> itree E B),
-        PA ta /\
+        specA ta /\
         tb ≈ bind ta k /\
         (forall a, Returns a ta -> K a (k a)).
 
@@ -212,12 +213,15 @@ Section PropMonad.
         split; auto.
   Qed.
 
+
+  (* Definition 5.1 *)
   #[global] Instance Monad_Prop {E} : Monad (PropT E) :=
     {|
       ret := fun _ x y => y ≈ ret x
       ; bind := bind_PropT
     |}.
 
+  (* Definition 5.3: Handler Correctness *)
   Definition handler_correct {E F} (h_spec: E ~> PropT F) (h: E ~> itree F) :=
     (forall T e, h_spec T e (h T e)).
 
@@ -259,12 +263,13 @@ Section PropMonad.
     do 2 red. intros. eapply interp_PropTF_mono; eauto.
   Qed.
   Hint Resolve interp_PropT__mono : paco.  
-  
+
+  (* Definition 5.2 *)
   Definition interp_prop {E F} (h_spec : E ~> PropT F) :
     forall R (RR: relation R), itree E R -> PropT F R :=
       fun R (RR: relation R) =>  paco2 (interp_PropT_ E F h_spec R RR) bot2.
 
-  (* Figure 8: Interpreter law for Ret *)
+  (* Figure 7: Interpreter law for Ret *)
   Lemma interp_prop_ret :
     forall R E F (h_spec : E ~> PropT F)
       (r : R)
@@ -434,7 +439,8 @@ Section PropMonad.
       + econstructor. left. pstep. eapply IHeq. reflexivity. reflexivity. assumption.
       + eapply IHeq. reflexivity. reflexivity.   punfold HS.
   Qed.
-  
+
+  (* Lemma 5.4: interp_prop_correct - note that the paper presents a slightly simpler formulation where t = t' *)
   Lemma interp_prop_correct_exec:
     forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),
       handler_correct h_spec h ->
@@ -466,6 +472,8 @@ Section PropMonad.
       reflexivity.
   Qed.
 
+  (* Lemma 5.5 - note that the paper presents this lemma after unfolding the definition of Proper.
+   *)
   Instance interp_prop_Proper_eq :
     forall R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR) E F (h_spec : E ~> PropT F),
       Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_prop E _ h_spec R RR).
@@ -558,8 +566,8 @@ Section PropMonad.
     apply eutt_Returns_. auto.
   Qed.
 
-  (* Figure 8: interp Trigger law *)
-  (* SAZ : morally, we should only work with "proper" triggers everywhere *)
+  (* Figure 7: interp Trigger law *)
+  (* morally, we should only work with "proper" triggers everywhere *)
   Lemma interp_prop_trigger :
     forall E F (h_spec : E ~> PropT F) R (e : E R)
       (HP : forall T, Proper (eq ==> Eq1_PropT T) (h_spec T))
@@ -621,7 +629,7 @@ Section PropMonad.
     pstep. red. cbn. econstructor. right. apply CIH.
   Qed.
 
-  (* Figure 8: Structural law for tau *)
+  (* Figure 7: Structural law for tau *)
   Lemma interp_prop_tau :
     forall E F (h_spec : E ~> PropT F) R RR
       (t_spec : itree E R),
@@ -1117,7 +1125,7 @@ Section MonadLaws.
  Qed.
 
   
-  (* Figure 8: ret_bind law for PropT  - first law *)
+  (* Figure 7: ret_bind law for PropT  - first law *)
   Lemma ret_bind: forall {E} (a b : Type) (f : a -> PropT E b) (x : a),
       eutt_closed (f x) ->
       eq1 (bind (ret x) f) (f x).
@@ -1327,7 +1335,7 @@ Section MonadLaws.
       intro H'. apply eutt_Ret_spin_abs in H'. auto.
   Qed.      
 
-  (* Figure 8: bind_ret - second monad law for PropT *)  
+  (* Figure 7: bind_ret - second monad law for PropT *)  
   Lemma bind_ret: forall {E} (A : Type) (PA : PropT E A),
       eutt_closed PA ->
       eq1 (bind PA (fun x => ret x)) PA.
@@ -1455,7 +1463,7 @@ Axiom guarded_choice : forall {A B}, @GuardedFunctionalChoice_on A B.
 Definition RET_EQ {E} {A} (ta : itree E A) : A -> A -> Prop :=
   fun x y => Returns x ta /\ Returns y ta.
 
-(* Figure 8: 3rd monad law, one direction bind associativity *)
+(* Figure 7: 3rd monad law, one direction bind associativity *)
 Lemma bind_bind_Prop: forall {E}
                    (A B C : Type) (PA : PropT E A)
                    (KB : A -> PropT E B) (KC : B -> PropT E C)
