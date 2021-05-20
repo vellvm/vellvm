@@ -30,7 +30,8 @@ After compiling vellvm the development, running `src/vellvm --test` should succe
 The QuickChick tests can be run using the command `make qc-tests` in
 the source directory. This test generates random LLVM programs that
 are then run with the Vellvm interpreter and the `clang` compiler
-(which must also be installed).
+(which must also be installed). If QuickChick fails to find a
+counterexample (i.e., the tests pass) it will say "Gave up!"
 
 
 ### HELIX Case Study
