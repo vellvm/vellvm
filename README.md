@@ -51,10 +51,12 @@ There are two options: build Vellvm from scratch in your own environment, or
 use the virtual machine image we provide.
 
 ### Building in your own environment
-See [Installing and Compiling Vellvm](#installing-and-compiling-vellvm).
+Our development has been packaged into `vellvm.tar.gz`.
+See [Installing and Compiling Vellvm](#installing-and-compiling-vellvm) for 
+build instructions.
 
 ### Using the virtual machine image
-The Debian QEmu image has been packaged into `vellvm.tar.gz`. 
+The Debian QEmu image has been packaged into `vellvm-qemu.tar.gz`. 
 Run the image with `start.sh` for Unix-like systems (you might need `sudo` for 
 Linux) and `start.bat` for Windows.
 
