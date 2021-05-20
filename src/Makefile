@@ -56,10 +56,12 @@ OLLVMFILES :=
 
 COQFILESVIR      := $(COQFILESNUMERIC) $(COQFILESUTILS) $(COQFILESSYNTAX) $(COQFILESSEMANTICS) 
 COQFILESCOMPILER := $(COQFILESVIR) $(COQFILESANALYSIS) 
-COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT) 
+COQFILESALL      := $(COQFILESCOMPILER) $(COQFILESTHEORY) $(COQFILESOPT)
 
 VFILES  := $(COQFILESALL:%=coq/%.v)
 VOFILES := $(COQFILESALL:%=coq/%.vo)
+
+QCVOFILES := $(COQFILESQC:%=coq/%.vo)
 
 all:
 	@test -f .depend || $(MAKE) depend
@@ -75,6 +77,13 @@ interp:
 
 .PHONY: coq
 coq: $(VOFILES)
+
+.PHONY: qc-tests
+qc-tests: rm-qc-test-vo coq $(QCVOFILES)
+
+.PHONY: rm-qc-test-vo
+rm-qc-test-vo:
+	rm -f coq/QC/QCVellvm.vo
 
 .PHONY: opam
 opam:
