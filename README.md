@@ -1,3 +1,45 @@
+
+[comment]: # (this is a markdown comment! I think it must be after a blank line)
+
+# FOR ARTIFACT EVALUATION
+
+The description below has been augmented with comments that indicate the
+relevant parts of the ICFP paper.  We've called them out using by marking them
+with **ARTIFACT** so they are eaier to find.  We also list the specific claims
+in the and their locations in the development below:
+
+### Definitions / Lemmas 
+
+- [PropT laws from Figure 7](src/coq/Utils/PropT.v) search for comments including "Figure 7"
+- [laws from Figure 8](src/coq/Utils/PropT.v) search for comments including "Figure 8"
+- [Definition 5.1](src/coq/Utils/PropT.v) search for "Definition 5.1"
+- [Definition 5.2](src/coq/Utils/PropT.v) search for "Definition 5.2"
+- [Lemma 5.4](src/coq/Utils/PropT.v) search for "Lemma 5.4"
+- [Lemma 5.5](src/coq/Utils/PropT.v) search for "Lemma 5.5"
+- [Definition 5.6](src/coq/Theory/Refinement.v) search for "Definition 5.6"
+- [Lemma 5.7](src/coq/Theory/TopLevelRefinements.v) search for "Lemma 5.7" (see related definitions in [Refinement.v](src/coq/Theory/Refinement.v)
+- [Lemma 5.8](src/coq/Theory/TopLevelRefinements.v) search for "Lemma 5.8"
+
+### Unit Tests
+
+After compiling vellvm the development, running `src/vellvm --test` should successfully run 145 unit tests.
+
+### QuickChick Tests
+
+[comment]: # (TODO: Calvin add something here)
+
+
+### HELIX Case Study
+
+The paper's Section 6 refers to our use of this library for verifying a
+front-end for the Helix tool chain.  That development is available in a separate
+repository [Helix](https://github.com/vzaliva/helix) and it relies on a slightly
+older version of Vellvm (Helix requires MetaCoq which isn't compatible yet with
+coq v. 8.13) that was current at the time the paper was submitted.  The Helix
+development points to a specific version of this repository, but, since
+compiling it requires a different version of Coq we 
+
+
 # Vellvm
 [![Build Status](https://travis-ci.com/vellvm/vellvm.svg?branch=master)](https://travis-ci.com/vellvm/vellvm)
 
@@ -12,8 +54,11 @@ It is being developed at the University of Pennsylvania as part of the DeepSpec 
 After VIR, the second component whose development is reaching maturity is the verification of 
 a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of compilation.
 
-### See:
- - [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/)
+[comment]: # (TODO: delete names for artifact evaluation)
+
+
+### See also:
+ - [Vellvm](http://www.cis.upenn.edu/~stevez/vellvm/) (somewhat out of date)
  - [DeepSpec](http://deepspec.org)
  - [LLVM](http://llvm.org)
 
@@ -44,16 +89,19 @@ The development is organized as follows.
 
 ## Local libraries
 
-Stored in the `lib` folder. Currently the only dependency that needs to be installed locally is the itree one:
-- `lib/InteractionTrees` contains the version of the ITrees library that we have used in our development. 
+Stored in the `lib` folder. Currently the only dependency that needs to be installed locally is the QuickChick one:
+- `lib/QuickChick` points to a branch of the QuickChick library that we have used in our testing
 
-The library will be built as the same time as the Vir development via the Makefile.
+The library will be built as the same time as the Vellvm development via the `Makefile`.
 
+## Interaction Trees
+
+**ARTIFACT**
 Although we have made significant contributions to the itree library for the sake of this project, most of it
 is orthogonal to the material described in this paper, and can be treated entirely as an external library to understand this project.
 
 The content of Section 5.1 that gives a taste of how the underlying equational theory works can be found in more details in
-the files`lib/InteractionTrees/theories/Eq/Eq.v` and `lib/InteractionTrees/theories/Eq/UpToTaus.v`.
+the files [Eq.v](https://github.com/DeepSpec/InteractionTrees/blob/master/theories/Eq/Eq.v) and [UpToTaus.v](https://github.com/DeepSpec/InteractionTrees/blob/master/theories/Eq/UpToTaus.v) in the [Interaction Trees github repo](https://github.com/DeepSpec/InteractionTrees)
 
 ## Coq formalization
 
@@ -67,23 +115,19 @@ Syntax, in `src/coq/Syntax/`
 - `CFG.v`     the VIR internal AST as used for the semantics. 
 
 Semantics, in `src/coq/Semantics/`:
-- `DynamicValues.v` definition of the dynamic values and underdefined values discussed in Section 2.2.
-- `LLVMEvents.v`    inventory of all events as described in Section 4.1.
-- `Denotation.v`    definitions of the representation of VIR programs as ITrees as described in Section 4.2.
-- `Handlers/`       includes the code for all of the handlers described in Section 4.3. They are broken up into files 
-                    based on the nature of the event handled, each file hence corresponding to a subsection.
-- `TopLevel.v`      provides the full model and the full interpreter, by plugging all components together, 
-                    i.e. the final result of Section 4.4.
+- `DynamicValues.v` definition of the dynamic values and underdefined values **ARTIFACT** discussed in Section 2.2.
+- `LLVMEvents.v`    inventory of all events **ARTIFACT** as described in Section 4.1.
+- `Denotation.v`    definitions of the representation of VIR programs as ITrees **ARTIFACT** as described in Section 4.2.
+- `Handlers/`       includes the code for all of the handlers **ARTIFACT** described in Section 4.3. They are broken up into files based on the nature of the event handled, each file hence corresponding to a subsection.
+- `TopLevel.v`      provides the full model and the full interpreter, by plugging all components together, **ARTIFACT** i.e. the final result of Section 4.4.
 
 Theory, in `src/coq/Theory/`:
 - `src/coq/Utils/PropT.v` metatheory required to reason about sets of itrees, i.e. about the propositional monad transformer.
-- `InterpreterMCFG.v`     the layers of interpretation shown in Figure 6 and some of their metatheory
+- `InterpreterMCFG.v`     the layers of interpretation **ARTIFACT** shown in Figure 6 and some of their metatheory
 - `InterpreterCFG.v`      the same layers of interpretation and metatheory, but when reasoning about single functions (i.e. single cfg)
 - `Refinement.v`          definition of the refinement relations between layers of interpretations
-- `TopLevelRefinements.v` proof of inclusion of the refinement relations between layers of interpretations;
-                          proof of soundness of the interpreter as described in Section 5
-- `DenotationTheory`      Equational theory to reason directly about the structure of vir programs;
-                          in particular, reasoning principles about open control-flow-graphs.
+- `TopLevelRefinements.v` proof of inclusion of the refinement relations between layers of interpretations; proof of soundness of the interpreter as described in Section 5
+- `DenotationTheory`      Equational theory to reason directly about the structure of vir programs; in particular, reasoning principles about open control-flow-graphs.
 
 ## OCaml front-end and driver for execution and testing
 
@@ -92,9 +136,8 @@ infrastructure to run differential tests between our interpreter and llc.
 These unverified parts of the development live in the `src/ml` folder.
 
 - `extracted/Extract.v`    instructions for the extraction of the development to OCaml
-- `libvir/interpreter.ml`  OCaml driver for running the interpreter; the `step` function 
-                                 walks over the ITree that remains after complete interpretation of the denotation of a program
-- `libvir/llvm_parser.mly` the parser, adapted from Vellvm, as discussed in Section 4.5.
+- `libvellvm/interpreter.ml`  OCaml driver for running the interpreter; the `step` function walks over the ITree that remains after complete interpretation of the denotation of a program
+- `libvellvm/llvm_parser.mly` the parser, adapted from Vellvm, **ARTIFACT** as discussed in Section 4.5.
 - `testing/assertion.ml`   custom annotations of llvm programs as comments used to define our tests.
 - `main.ml`                top-level from which our executable is obtained.
 
@@ -104,41 +147,40 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 
 - `tests/` directory containing the test suite of LLVM IR programs discussed in Section 6
 
-# Installing / Compiling Vir
+# Installing / Compiling Vellvm
 
 ### Assumes: 
-  - coq   : version 8.12 
+  - coq   : version 8.13
   - External Coq libraries: 
   Note: if it's the first time you install Coq libraries via Opam, you will have to add the repository first with `opam repo add coq-released https://coq.inria.fr/opam/released`.
     * ext-lib    (installed via, e.g. opam install coq-ext-lib)
     * paco       (installed via, e.g. opam install coq-paco)
+    * itrees     (installed via, e.g. opam install coq-itrees)
     * flocq      (installed via, e.g. opam install coq-flocq, see note below) 
     * ceres      (installed via, e.g. opam install coq-ceres)
     * mathcomp   (installed via, e.g. opam install coq-mathcomp-ssreflect)
     * simple-io  (installed via, e.g. opam install coq-simple-io)
-    
-  WARNING: you should not have the itree opam package in your switch to avoid conflict with the extended version of the library we provide locally
+
   - Additional opam packages: 
     * ocamlbuild (installed via, e.g. opam install ocaml-build)
     * dune       (installed via, e.g. opam install dune)
     * menhir     (installed via, e.g. opam install menhir)
     * qcheck     (installed via, e.g. opam install qcheck)
-  - llvm (not required for compiling, only for differential testing)
 
 Compilation:
 
 1. Install all external dependencies
 2. Clone the vellvm git repo with the `--recurse-submodule` option
-1. Run `make` in the /src directory: it will first compile the itree / quickchick libraries, then vir, and finally extract the OCaml executable
+1. Run `make` in the /src directory: it will first compile the quickchick libraries, then Vellvm, and finally extract the OCaml executable
 
 # Running
 
-The executable `vir` will be found in `src/`.
-Do `src/vir -help` from the command line to see all available options.
+The executable `vellvm` will be found in `src/`.
+Do `src/vellvm -help` from the command line to see all available options.
 In particular:
-- `src/vir -interpret tests/ll/factorial.ll` to run our interpreter on a given file.
-- `src/vir --test` to run the test suite against llc
-- `src/vir --test-file tests/ll/factorial.ll` to test a specific file against llc
+- `src/vellvm -interpret tests/ll/factorial.ll` to run the interpreter on a given file.
+- `cd src && ./vellvm --test` to run the test suite against llc
+- `src/vellvm --test-file tests/ll/gep2.ll` to test a specific file using inlined assertions
 
 
 

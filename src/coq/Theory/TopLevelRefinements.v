@@ -42,7 +42,7 @@ Module R := Refinement.Make Memory.Addr LLVMEvents.
 Import R. 
 
 (**
-   YZ: Trying to figure how to tidy up everything. This file is currently a holdall.
+   This file is currently a holdall.
    In here, we have:
    * partial interpreters to each levels;
    * hierarchies of refinements of mcfgs and proofs of inclusions;
@@ -98,12 +98,6 @@ Proof.
   intros; eapply alist_find_eq_dec.
 Qed.
 
-(* Instance runState_proper_eqit {E A env} : Proper (Monad.eqm ==> Logic.eq ==> eutt Logic.eq) (@runState E A env). *)
-(* Proof. *)
-(*   repeat intro; subst. unfold runState. *)
-(*   unfold eqm, ITreeMonad.EqM_ITree in H. *)
-(*   rewrite H; reflexivity. *)
-(* Qed. *)
 
 #[global] Instance interp_state_proper {T E F S}
          (h: forall T : Type, E T -> Monads.stateT S (itree F) T)
@@ -137,6 +131,11 @@ Section REFINEMENT.
     refinement at level [i+1] after running the [i+1] level of interpretation
    *)
 
+  (* Lemma 5.7 
+     See the related definition of [refine_L0] in Refinement.v. (Search for Lemma 5.7)
+
+     The similar results mentioned in the paper are listed below.
+  *)
   Lemma refine_01: forall t1 t2 g,
     refine_L0 t1 t2 -> refine_L1 (interp_global t1 g) (interp_global t2 g).
   Proof.
@@ -349,7 +348,7 @@ Section REFINEMENT.
   Qed.
 
   (**
-   We prove that the interpreter belongs to the model.
+   Theorem 5.8: We prove that the interpreter belongs to the model.
    *)
   Theorem interpreter_sound: forall p, model p (interpreter p).
   Proof.
