@@ -17,7 +17,7 @@ From ExtLib Require Import
      Structures.Functor
      Eqv.
 
-From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Syntax.TypeUtil Semantics.TopLevel QC.Utils.
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Semantics.TopLevel QC.Utils.
 Require Import Integers Floats.
 
 Require Import List.
@@ -254,6 +254,7 @@ Section ReprInstances.
             pose proof (list_sum_map f x xs HIn)
           end;
           cbn in *; lia
+          | repeat split; discriminate
           ].
 
   Obligation Tactic := try Tactics.program_simpl; try solve [exp_measure_solve].
@@ -278,7 +279,6 @@ Section ReprInstances.
       "(OP_Select ( " ++ repr tc ++ ", " ++ repr_exp cnd ++ ") (" ++ repr t1 ++ ", " ++ repr_exp v1  ++ ") (" ++ repr t2 ++ ", " ++ repr_exp v2 ++ "))"
     | _ => "repr_exp todo"
     end.
-  Admit Obligations.
 
   Global Instance reprExp : Repr (exp typ)
     := {| repr := repr_exp |}.
