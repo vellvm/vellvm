@@ -5,8 +5,8 @@
 
 The description below has been augmented with comments that indicate the
 relevant parts of the ICFP paper.  We've called them out using by marking them
-with **ARTIFACT** so they are eaier to find.  We also list the specific claims
-in the and their locations in the development below:
+with **ARTIFACT** so they are easier to find.  We also list the specific claims
+in the paper and their locations in the development below:
 
 ### Definitions / Lemmas 
 
@@ -41,10 +41,10 @@ The paper's Section 6 refers to our use of this library for verifying a
 front-end for the Helix tool chain.  That development is available in a separate
 repository [Helix](https://github.com/vzaliva/helix) and it relies on a slightly
 older version of Vellvm (Helix requires MetaCoq which isn't compatible yet with
-coq v. 8.13) that was current at the time the paper was submitted.  The Helix
-development points to a specific version of this repository, but, since
-compiling it requires a different version of Coq we 
-
+coq v. 8.13) that was current at the time the paper was submitted. 
+Since the Helix development points to another specific version of this repository and
+is still under active development, we chose to not include it in this artifact. 
+The interested reviewer can however get it and run it directly from its Github.
 
 # Vellvm
 [![Build Status](https://travis-ci.com/vellvm/vellvm.svg?branch=master)](https://travis-ci.com/vellvm/vellvm)
@@ -95,7 +95,7 @@ The development is organized as follows.
 
 ## Local libraries
 
-Stored in the `lib` folder. Currently the only dependency that needs to be installed locally is the QuickChick one:
+Stored in the `lib` folder. Currently, the only dependency that needs to be installed locally is the QuickChick one:
 - `lib/QuickChick` points to a branch of the QuickChick library that we have used in our testing
 
 The library will be built as the same time as the Vellvm development via the `Makefile`.
