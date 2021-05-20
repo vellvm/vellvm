@@ -46,6 +46,27 @@ Since the Helix development points to another specific version of this repositor
 is still under active development, we chose to not include it in this artifact. 
 The interested reviewer can however get it and run it directly from its Github.
 
+## Getting started
+
+There are two options: build Vellvm from scratch in your own environment, or
+use the virtual machine image we provide.
+
+### Building in your own environment
+See [Installing and Compiling Vellvm](#installing-and-compiling-vellvm).
+
+### Using the virtual machine image
+The Debian QEmu image has been packaged into `vellvm.tar.gz`. 
+Run the image with `start.sh` for Unix-like systems (you might need `sudo` for 
+Linux) and `start.bat` for Windows.
+
+ * Username: artifact
+ * Password: password
+
+If the VM does not start, check `Debugging.md` provided in the directory.
+
+See [Installing and Compiling Vellvm](#installing-and-compiling-vellvm) to 
+compile and run the project.
+
 # Vellvm
 [![Build Status](https://travis-ci.com/vellvm/vellvm.svg?branch=master)](https://travis-ci.com/vellvm/vellvm)
 
@@ -157,7 +178,7 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 
 ### Assumes: 
   - coq   : version 8.13
-  - Clang 7.0.1+ (available for Mac OSX for XCode 4.2+, or installed via, e.g. opam install llvm)
+  - Clang 7.0.1+ (available for Mac OSX for XCode 4.2+, or installed via, e.g. sudo apt-get install clang; opam install llvm)
   - External Coq libraries: 
   Note: if it's the first time you install Coq libraries via Opam, you will have to add the repository first with `opam repo add coq-released https://coq.inria.fr/opam/released`.
     * ext-lib    (installed via, e.g. opam install coq-ext-lib)
