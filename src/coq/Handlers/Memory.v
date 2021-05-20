@@ -57,12 +57,21 @@ Import ListNotations.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
-(* end hide *)
 
 #[local] Open Scope Z_scope.
+(* end hide *)
 
-(* Is a dtyp supported in the memory model?
 
+(** * Memory Model
+
+    This file implements VIR's memory model as an handler for the [MemoryE] family of events.
+    The model is inspired by CompCert's memory model, but differs in that it maintains two
+    representation of the memory, a logical one and a low-level one.
+    Pointers (type signature [MemoryAddress.ADDRESS]) are implemented as a pair containing
+    an address and an offset.
+*)
+
+(* Specifying the currently supported dynamic types.
        This is mostly to rule out:
 
        - arbitrary bitwidth integers
@@ -90,14 +99,6 @@ Inductive is_supported : dtyp -> Prop :=
 | is_supported_DTYPE_Vector : forall sz τ, is_supported τ -> is_supported (DTYPE_Vector sz τ)
 .
 
-(** * Memory Model
-
-    This file implements VIR's memory model as an handler for the [MemoryE] family of events.
-    The model is inspired by CompCert's memory model, but differs in that it maintains two
-    representation of the memory, a logical one and a low-level one.
-    Pointers (type signature [MemoryAddress.ADDRESS]) are implemented as a pair containing
-    an address and an offset.
-*)
 
 (** ** Type of pointers
     Implementation of the notion of pointer used: an address and an offset.
@@ -273,14 +274,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
   End Map_Operations.
 
-  (* TODO SAZ: mem_block should keep track of its allocation size so
-    that operations can fail if they are out of range
-
-    CB: I think this might happen implicitly with make_empty_block --
-    it initializes the IntMap with only the valid indices. As long as the
-    lookup functions handle this properly, anyway.
-   *)
-
   Section Datatype_Definition.
 
     (** ** Simple view of memory
@@ -403,7 +396,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DVALUE_Vector fields =>
         (* note the _right_ fold is necessary for byte ordering. *)
         fold_right (fun 'dv acc => ((serialize_dvalue dv) ++ acc) % list) [] fields
-      | _ => [] (* TODO add more dvalues as necessary *)
+      | _ => [] 
       end.
 
     (** ** Well defined block
@@ -845,8 +838,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          this operation can never fail?  It doesn't return any status code...
        *)
 
-      (* TODO probably doesn't handle sizes correctly...
-       *)
       (** ** MemCopy
           Implementation of the [memcpy] intrinsics.
        *)
@@ -862,7 +853,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           (* From LLVM Docs : The 'llvm.memcpy.*' intrinsics copy a block of
              memory from the source location to the destination location,
              which are not allowed to overlap. *)
-          (* IY: Could clean up with boolean reflection? *)
           if (no_overlap_b (dst_b, dst_o) mem_block_size
                                  (src_b, src_o) mem_block_size) then
             (* No guarantee that src_block has a certain size. *)

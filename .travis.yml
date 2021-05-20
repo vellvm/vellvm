@@ -20,7 +20,7 @@ env:
   - NJOBS=1
   - OCAML_VERSION="4.11.1+flambda"
   matrix:
-  - TEST_TARGET="8.12.2"
+  - TEST_TARGET="8.13.2"
 
 before_script:
   -  ./ci/keep_alive.sh &
@@ -40,9 +40,7 @@ install:
   - opam install -y --verbose -j ${NJOBS} coq-ceres
   - opam install -y --verbose -j ${NJOBS} coq-simple-io
   - opam install -y --verbose -j ${NJOBS} coq-mathcomp-ssreflect
-  # This branch uses the lib/InteractionTree submodule.
-  # - opam pin -y add coq-itree --dev-repo
-  # - opam install -y --verbose -j ${NJOBS} coq-itree
+  - opam install -y --verbose -j ${NJOBS} coq-itree
   - opam install -y --verbose -j ${NJOBS} dune
   - opam install -y --verbose -j ${NJOBS} menhir
   - opam install -y --verbose -j ${NJOBS} qcheck

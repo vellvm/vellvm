@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      Morphisms ZArith List String Lia
      FSets.FMapAVL
@@ -44,14 +45,13 @@ Import ListNotations.
 
 Set Implicit Arguments.
 Set Contextual Implicit.
+
+#[local] Open Scope Z_scope.
 (* end hide *)
 
 (** * Memory Model: Theory
     Reasoning principles for VIR's main memory model.
 *)
-
-#[local] Open Scope Z_scope.
-
 
 Module Type MEMORY_THEORY (LLVMEvents : LLVM_INTERACTIONS(Addr)).
   (** ** Theory of the general operations over the finite maps we manipulate *)

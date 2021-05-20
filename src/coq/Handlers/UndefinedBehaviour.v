@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import String.
 
 From ExtLib Require Import
@@ -15,6 +16,13 @@ Set Contextual Implicit.
 
 Import MonadNotation.
 Open Scope monad_scope.
+(* end hide *)
+
+(** * Handler for undefined behaviors 
+  Definition of the propositional and executable handlers for undefined behaviors.
+  - The model interpret the event as an arbitrary computation : in this model, UB can be anything, but cannot travel back in time.
+  - The interpreter simply fails.
+*)
 
 Definition UB_handler {E}: UBE ~> PropT E := fun _ _ _ => True.
 

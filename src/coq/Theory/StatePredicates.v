@@ -1,7 +1,9 @@
+(* begin hide *)
 From Vellvm Require Import
      Utilities
      Syntax
      Semantics.
+(* end hide *)
 
 (** * Utilities to build predicates and relations over VIR's state *)
 
@@ -15,7 +17,6 @@ Definition conj_rel {T} (R1 R2: rel T) : rel T :=
   fun x y => R1 x y /\ R2 x y.
 
 Infix "×" := conj_rel (at level 30, right associativity).
-Infix "×" := conj_pred (at level 30, right associativity).
 
 Section CFG_LEVEL.
 

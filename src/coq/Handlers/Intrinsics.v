@@ -8,7 +8,7 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-
+(* begin hide *)
 From Coq Require Import
      ZArith List String Morphisms.
 
@@ -33,11 +33,12 @@ Import MonadNotation.
 Import EqvNotation.
 Import ListNotations.
 
-
 Set Implicit Arguments.
 Set Contextual Implicit.
+(* end hide *)
 
-(*
+(** * Handler for intrinsics
+
    LLVM _intrinsic_ functions are used like ordinary function calls, but
    they have a special interpretation.
 
