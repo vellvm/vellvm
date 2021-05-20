@@ -108,10 +108,7 @@ Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List
     DTYPE_Array sz nt
 
   | TYPE_Function ret args =>
-    (*
-    let nret := (normalize_type env ret) in
-    let nargs := map_In args (fun t _ => normalize_type env t) in *)
-    DTYPE_Pointer (* Function nret nargs *)
+    DTYPE_Pointer 
 
   | TYPE_Struct fields =>
     let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
@@ -161,9 +158,6 @@ Lemma typ_to_dtyp_equation  : forall env t,
       DTYPE_Array sz nt
 
     | TYPE_Function ret args =>
-      (*
-    let nret := (normalize_type env ret) in
-    let nargs := map_In args (fun t _ => normalize_type env t) in *)
       DTYPE_Pointer (* Function nret nargs *)
 
     | TYPE_Struct fields =>

@@ -10,12 +10,12 @@ From Vellvm Require Import
 
 (** * Surface syntax for VIR
     A VIR program, even a trivial one, is quite a lousy piece of syntax.
-    We define here a series of notations allowing us to recover a LLVM-like
-    surface syntax.
+    We define here a series of notations allowing us to recover a LLVM-like surface syntax.
     The purpose is to ease readability of proof goals while reasoning interactively.
     As such, the notation are display-only, and hence can be very liberal.
     Note that we currently completely hide some of the type annotations. That might be
     a bit too audacious.
+    This file is quite experimental.
  *)
 
 Module VIR_Notations.

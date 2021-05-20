@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      String Morphisms.
 
@@ -22,10 +23,16 @@ From Vellvm Require Import
 Open Scope list_scope.
 Open Scope itree_scope.
 
-(** Helper lemmas that should probably be moved *)
 Import ITreeNotations.
 Import SemNotations.
+(* end hide *)
 
+(** * Lemmas related to the semantics of instructions (and terminators)
+  This file contains essentially proof rules specifying the behavior of instructions,
+   allowing for symbolic execution in refinement proofs.
+*)
+
+(** Helper lemmas that should probably be moved *)
 (* TODO: Move this *)
 Lemma interp_cfg3_concretize_or_pick_concrete :
   forall (uv : uvalue) (dv : dvalue) P g l m,

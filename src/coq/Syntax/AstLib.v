@@ -35,8 +35,7 @@ Require Import QuickChick.Show.
 Instance eq_dec_int : RelDec (@eq int) := Data.Z.RelDec_zeq.
 Instance eqv_int : Eqv int := (@eq int).
 
-(* SAZ : These should be moved to part of the standard library, or at least to
-   ExtLib *)
+(* These should be moved to part of the standard library, or at least to ExtLib *)
 Module AsciiOrd <: UsualOrderedType.
   Definition t := ascii.
   Definition eq := @eq t.
@@ -255,18 +254,6 @@ Module RawIDOrd <: UsualOrderedType.
 
 End RawIDOrd.
 
-(* Module RawIDDec <: MiniDecidableType. *)
-(*   Definition t := raw_id. *)
-(*   Lemma eq_dec : forall (x y : raw_id), {x = y} + {x <> y}. *)
-(*   Proof. *)
-(*     decide equality. *)
-(*     - destruct (string_dec s s0); tauto. *)
-(*     - destruct (n == n0); tauto. *)
-(*     - destruct (n == n0); tauto. *)
-(*   Defined. *)
-(* End RawIDDec. *)
-
-(* Module RawID := Make_UDT(RawIDDec).  *)
 Instance eq_dec_raw_id : RelDec (@eq raw_id) := RelDec_from_dec (@eq raw_id) RawIDOrd.eq_dec.
 Instance eqv_raw_id : Eqv raw_id := (@eq raw_id).
 #[export] Hint Unfold eqv_raw_id: core.
@@ -780,27 +767,6 @@ Definition is_void_instr (i:instr typ) : bool :=
   | INSTR_Store _ _ _ _ => true
   | _ => false
   end.
-
-(* YZ: The following code is not used currently. TODO double check if it can be removed *)
-(*
-Section WithType.
-  Variable (T:Set).
-
-  (* Identifiers ----------------------------------------------------------- *)
-  Class Ident (X:Set) := ident_of : X -> ident.
-
-  #[global] Instance ident_of_block : Ident (block T) := fun (b:block T) => ID_Local (@blk_id T b).
-  #[global] Instance ident_of_global : Ident (global T) := fun (g:global T) => ID_Global (@g_ident T g).
-  #[global] Instance ident_of_declaration : Ident (declaration T) := fun (d:declaration T) => ID_Global (@dc_name T d).
-  #[global] Instance ident_of_definition : forall X, Ident (definition T X) := fun X => fun (d:definition T X) => ident_of (@df_prototype T _ d).
-
-  Definition globals {X} (m:modul T X) : list ident :=
-    map ident_of (m_globals m)
-        ++ map ident_of (m_declarations m)
-        ++ map ident_of (m_definitions m).
-
-End WithType.
- *)
 
 Ltac unfold_eqv :=
   repeat (unfold eqv in *; unfold eqv_raw_id in *; unfold eqv_instr_id in * ).

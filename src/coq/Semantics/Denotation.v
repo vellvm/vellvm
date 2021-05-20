@@ -100,7 +100,6 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-(* YZ Ask Steve: why is LLVMEvents an argument to the functor rather than have Make(A) inside the module? *)
 Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Import LLVMEvents.
 
@@ -119,8 +118,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
        and has to be done here hundreds and hundreds of times due to the brutal pattern matching on
        several values. Factoring the inference upfront is therefore necessary.
      *)
-    (* YZ: Loosen [conv_E] into [exp_E] to reduce the number of interfaces at play? *)
 
+    (* A trick avoiding proofs that involve thousands of cases: we split the conversion into
+      the composition of a huge case analysis that builds a value of [conv_case], and a function
+      with only four cases to actually build the tree.
+    *)
     Variant conv_case : Set :=
     | Conv_Pure (x : dvalue) 
     | Conv_ItoP (x : dvalue) 
@@ -316,7 +318,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Note: global maps contain [dvalue]s, while local maps contain [uvalue]s.
       We perform the conversion here.
    *)
-  (* YZ: Loosen [lookup_E] into [exp_E] to reduce the number of interfaces at play? *)
   Definition lookup_id (i:ident) : itree lookup_E uvalue :=
     match i with
     | ID_Global x => dv <- trigger (GlobalRead x);; ret (dvalue_to_uvalue dv)
@@ -434,7 +435,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           | Some t => ret (UVALUE_Undef t)
           end
 
-        (* YZ TODO : Unsure what this means. Expand on it *)
         (* Question: should we do any typechecking for aggregate types here? *)
         (* Option 1: do no typechecking: *)
         | EXP_Struct es =>
@@ -546,20 +546,12 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           end
 
         | OP_ExtractElement vecop idx =>
-          (*  'vec <- monad_app_snd (denote_exp e) vecop;
-              'vidx <- monad_app_snd (denote_exp e) idx;  *)
           raise "extractelement not implemented" (* TODO: Extract Element *)
 
         | OP_InsertElement vecop eltop idx =>
-          (*  'vec <- monad_app_snd (denote_exp e) vecop;
-              'v <- monad_app_snd (denote_exp e) eltop;
-              'vidx <- monad_app_snd (denote_exp e) idx; *)
           raise "insertelement not implemented" (* TODO *)
 
         | OP_ShuffleVector vecop1 vecop2 idxmask =>
-          (*  'vec1 <- monad_app_snd (denote_exp e) vecop1;
-              'vec2 <- monad_app_snd (denote_exp e) vecop2;
-              'vidx <- monad_app_snd (denote_exp e) idxmask; *)
           raise "shufflevector not implemented" (* TODO *)
 
         | OP_ExtractValue (dt, str) idxs =>
@@ -611,7 +603,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Arguments denote_op _ : simpl nomatch.
 
       (* An instruction has only side-effects, it therefore returns [unit] *)
-
       Definition denote_instr
                  (i: (instr_id * instr dtyp)): itree instr_E unit :=
         match i with
@@ -628,13 +619,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
         (* Load *)
         | (IId id, INSTR_Load _ dt (du,ptr) _) =>
-          (* debug ("Load: " ++ to_string dt);; *)
           ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
           da <- concretize_or_pick ua True ;;
           match da with
           | DVALUE_Poison => raiseUB "Load from poisoned address."
           | _ => dv <- trigger (Load dt da);;
-                (* debug ("Loading: " ++ to_string dv);; *)
                 trigger (LocalWrite id dv)
           end
 
@@ -661,7 +650,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
           | None =>
             fv <- translate exp_to_instr (denote_exp None f) ;;
-            (* debug ("Call to function: " ++ to_string f) ;; *)
             trigger (Call dt fv uvs)
           end
           ;;
@@ -761,25 +749,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition denote_code (c: code dtyp): itree instr_E unit :=
         map_monad_ denote_instr c.
 
-      (* YZ FIX: no need to push/pop, but do all the assignments afterward *)
-      (* One needs to be careful when denoting phi-nodes: they all must
-         be evaluated in the same environment.
-         We therefore starts the denotation of a phi-node by pushing a
-         local copy of the environment of the stack, that we pop back
-         once we are finished evaluating the expression.
-         We then bind the resulting value in the underlying environment.
-       *)
-      (* The argument [bid] is the identity of the block from which we are jumping.
-         The argument [id_p] are the phi nodes of the block toward which we are jumping. *)
-      (* Definition denote_phi (bid : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) := *)
-      (*   let '(id, Phi dt args) := id_p in *)
-      (*   match assoc RawIDOrd.eq_dec bid args with *)
-      (*   | Some op => *)
-      (*     uv <- denote_exp (Some dt) op ;; *)
-      (*     ret (id,uv) *)
-      (*   | None => raise ("jump: phi node doesn't include block " ++ to_string bid) *)
-      (*   end. *)
-
       Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp) : itree exp_E (local_id * uvalue) :=
         let '(id, Phi dt args) := id_p in
         match assoc bid_from args with
@@ -803,6 +772,19 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         denote_code (blk_code b);;
         translate exp_to_instr (denote_terminator (blk_term b)).
 
+      (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
+         a cfg, and calls to functions, that jump from a cfg to another.
+         In order to denote a single [cfg], we tie the first knot by linking together all the blocks
+         contain in the [cfg].
+         Note that contrary to calls, no events have been explicitely introduced for internal jumps.
+         This is due to the _tail recursive_ nature of these jumps: they only occur as the last
+         instruction of blocks. We hence can use a [loop] operator to do the linking, as opposed
+         to the more general [mrec] operator that will be used to link internal calls.
+   
+         The idea here is simply to enter the body through the [init] [block_id] of the [cfg].
+         As long as the computation returns a new label to jump to, we feed it back to the loop.
+         If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
+       *)
       Definition denote_ocfg (bks: ocfg dtyp)
         : (block_id * block_id) -> itree instr_E ((block_id * block_id) + uvalue) :=
         iter (C := ktree _) (bif := sum)
@@ -817,44 +799,13 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                   end
                 end).
 
-      (* Our denotation currently contains two kinds of indirections: jumps to labels, internal to
-         a cfg, and calls to functions, that jump from a cfg to another.
-         In order to denote a single [cfg], we tie the first knot by linking together all the blocks
-         contain in the [cfg].
-         Note that contrary to calls, no events have been explicitely introduced for internal jumps.
-         This is due to the _tail recursive_ nature of these jumps: they only occur as the last
-         instruction of blocks. We hence can use a [loop] operator to do the linking, as opposed
-         to the more general [mrec] operator that will be used to link internal calls.
-       *)
-      (* The idea here is simply to enter the body through the [init] [block_id] of the [cfg].
-         As long as the computation returns a new label to jump to, we feed it back to the loop.
-         If it ever returns a dynamic value, we exit the loop by returning the [dvalue].
-       *)
-      (* Note that perhaps surprisingly, this is the place where phi-nodes get handled.
-         The intuition is that the semantics of phi-nodes depends on the identity of the block
-         jumping into the phi-nodes. It's hence actually at the time the jump is performed that
-         we have enough information to perform it.
-       *)
-      (* YZ Note: This should be sufficient to denote itree programs.
-         However, it does not give a denotation to open fragments of a [cfg], which might be
-         useful to facilitate some reasoning.
-         To do so, we would need to introduce sub-types of the universe of [block_id] and expose
-         in the type of the constructions the interface of the components, in a fashion similar
-         to the _Asm_ language introduced in the POPL paper on itrees.
-       *)
-      (*
-        We actually might be able to denote open programs without sending things at the level
-        of types, just by deciding internally to loop or not and not reflect the invariant
-        in the type.
-       *)
-      Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
+     Definition denote_cfg (f: cfg dtyp) : itree instr_E uvalue :=
         r <- denote_ocfg (blks f) (init f,init f) ;;
         match r with
         | inl bid => raise ("Can't find block in denote_cfg " ++ to_string (snd bid))
         | inr uv  => ret uv
         end.
 
-      (* TODO : Move this somewhere else *)
       Fixpoint combine_lists_err {A B:Type} (l1:list A) (l2:list B) : err (list (A * B)) :=
         match l1, l2 with
         | [], [] => ret []
@@ -873,9 +824,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
         fun (args : list uvalue) =>
           (* We match the arguments variables to the inputs *)
-          (* debug ("Denoting function " ++ to_string (dc_name (df_prototype df)) ++ " with args: " ++ to_string args ++ " against prototype: " ++ to_string (df_args df));; *)
           bs <- lift_err ret (combine_lists_err (df_args df) args) ;;
-             (* generate the corresponding writes to the local stack frame *)
+          (* generate the corresponding writes to the local stack frame *)
           trigger MemPush ;;
           trigger (StackPush (map (fun '(k,v) => (k, v)) bs)) ;;
           rv <- translate instr_to_L0' (denote_cfg (df_instrs df)) ;;
@@ -897,13 +847,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          that life in the "right" injection of the [_CFG_INTERNAL] effect
        *)
 
-(* SAZ: for "open" MCFGs we have
-    - (m_declarations CFG) is the set of possible ExternalCalls
-    - (List.map df_prototype (m_definitions CFG)) is the set of possible Entry Functions  (also internal calls)
- *)
       Definition lookup_defn {B} := @assoc dvalue B _.
 
-      (* YZ Note: we could have chosen to distinguish both kinds of calls in [denote_instr] *)
       Definition denote_mcfg
                  (fundefs:list (dvalue * function_denotation)) (dt : dtyp)
                  (f_value : uvalue) (args : list uvalue) : itree L0 uvalue :=
@@ -911,7 +856,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
               (fun T call =>
                  match call with
                  | Call dt fv args =>
-                   dfv <- concretize_or_pick fv True ;; (* TODO, should this be unique? *)
+                   dfv <- concretize_or_pick fv True ;; 
                    match (lookup_defn dfv fundefs) with
                    | Some f_den => (* If the call is internal *)
                      f_den args

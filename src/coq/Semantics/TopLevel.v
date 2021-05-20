@@ -130,10 +130,10 @@ Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree L0
    In order to limit bloated type signature, we name the successive return types.
  *)
 
-Notation res_L1 := (global_env * uvalue)%type (* (only parsing) *).
-Notation res_L2 := (local_env * lstack * res_L1)%type (* (only parsing) *).
-Notation res_L3 := (memory_stack * res_L2)%type (* (only parsing) *).
-Notation res_L4 := (memory_stack * (local_env * lstack * (global_env * uvalue)))%type (* (only parsing) *).
+Notation res_L1 := (global_env * uvalue)%type.
+Notation res_L2 := (local_env * lstack * res_L1)%type.
+Notation res_L3 := (memory_stack * res_L2)%type.
+Notation res_L4 := (memory_stack * (local_env * lstack * (global_env * uvalue)))%type.
 
 (**
      Full denotation of a Vellvm program as an interaction tree:
@@ -160,7 +160,7 @@ Definition denote_vellvm
   denote_mcfg defns ret_typ (dvalue_to_uvalue addr) args.
 
 
-(* SAZ: main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them 
+(* main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them 
      For backwards compatibility.
  *)
 (* (for now) assume that [main (i64 argc, i8** argv)]

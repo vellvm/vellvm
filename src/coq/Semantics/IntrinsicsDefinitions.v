@@ -203,8 +203,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
      (e.g. if the wrong number and/or type of arguments is given to the intrinsic)
 
    *)
-  (* SAZ: TODO - unify this with the Denotational notion of semantic function?
-  *)
   Definition semantic_function := (list dvalue) -> err dvalue.
 
   (* An association list mapping intrinsic names to their semantic definitions *)
@@ -295,9 +293,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     (minimum_32_decl, llvm_minimum_f32);
     (minimum_64_decl, llvm_minimum_f64)
     ].
-
-  (* SAZ: TODO: it could be nice to provide a more general/modular way to "lift"
-     primitive functions into intrinsics. *)
 
 
 End Make.
