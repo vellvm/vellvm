@@ -1,13 +1,3 @@
-(* -------------------------------------------------------------------------- *
- *                     Vellvm - the Verified LLVM project                     *
- *                                                                            *
- *     Copyright (c) 2018 Steve Zdancewic <stevez@cis.upenn.edu>              *
- *                                                                            *
- *   This file is distributed under the terms of the GNU General Public       *
- *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
- ---------------------------------------------------------------------------- *)
-
 (* begin hide *)
 From Coq Require Import
      Morphisms ZArith List String Lia
@@ -870,7 +860,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                   | LBlock size bytes concrete_id => (size, bytes, concrete_id)
                   end in
 
-            (* IY: What happens if [src_block_size < mem_block_size]?
+            (* What happens if [src_block_size < mem_block_size]?
                Since we have logical blocks, there isn't a way to get around
                this, and SUndef is invoked. Is this desired behavior? *)
             let sdata := lookup_all_index src_o (Z.to_N (unsigned len)) src_bytes SUndef in
@@ -878,7 +868,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
             let dst_block' := LBlock dst_sz dst_bytes' dst_cid in
             let m' := add_logical_block_mem dst_b dst_block' m in
             (ret m' : err memory)
-          (* IY: For now, we're returning a "failwith". Maybe it's more ideal
+          (* For now, we're returning a "failwith". Maybe it's more ideal
              to return an "UNDEF" here? *)
           else failwith "memcpy has overlapping src and dst memory location"
         | _ => failwith "memcpy got incorrect arguments"

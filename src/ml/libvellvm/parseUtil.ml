@@ -45,7 +45,7 @@ let hex_digit (c : char) : int option  =
 
 
 (* 
-   SAZ: Despite their name, the so called "c string" literals in LLVM IR
+   Despite their name, the so called "c string" literals in LLVM IR
    really don't have anything to do with C strings.  They don't use any of
    the same syntactic conventions for escape characters.
 

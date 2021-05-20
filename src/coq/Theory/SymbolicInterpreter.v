@@ -170,7 +170,7 @@ Ltac vred_C3_k k :=
     do k idtac "Reduced block"
   | |- context[denote_phis _ _]  =>
     (* Structural handling: phi case *)
-    (* YZ: Currently no automation for non empty phis. TODO *)
+    (* Currently no automation for non empty phis. TODO *)
     first [rewrite denote_no_phis];
     do k idtac "Reduced phis"
   | |- context[denote_code] =>

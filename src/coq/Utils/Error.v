@@ -1,13 +1,3 @@
-(* -------------------------------------------------------------------------- *
- *                     Vellvm - the Verified LLVM project                     *
- *                                                                            *
- *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
- *                                                                            *
- *   This file is distributed under the terms of the GNU General Public       *
- *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
- ---------------------------------------------------------------------------- *)
-
 (* begin hide *)
 From Coq Require Import String.
 Require Import ExtLib.Structures.Monads.
@@ -65,12 +55,6 @@ Definition failwith {A:Type} {F} `{Monad F} `{MonadExc string F} (s:string) : F 
 #[export] Hint Unfold failwith: core.
 Arguments failwith _ _ _ _: simpl nomatch.
 
-(* SAZ:
-   I believe that these refer to "undefined behavior", not "undef" values.  
-   Raname them to "UB" and "UB_or_err"?
-   YZ: I agree 
-   TODO
-*)
 Definition undef := err.
 Definition undef_or_err := eitherT string err.
 

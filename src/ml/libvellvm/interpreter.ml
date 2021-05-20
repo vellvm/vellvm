@@ -1,13 +1,3 @@
-(* -------------------------------------------------------------------------- *
- *                     Vellvm - the Verified LLVM project                     *
- *                                                                            *
- *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
- *                                                                            *
- *   This file is distributed under the terms of the GNU General Public       *
- *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
- ---------------------------------------------------------------------------- *)
-
 open Handlers.MemTheory.Mem
 open Handlers.Local
 open Handlers.Stack
@@ -78,7 +68,7 @@ let rec step (m : ('a coq_L5, memory_stack * ((local_env * lstack) * (global_env
   (* Internal steps compute as nothing *)
   | TauF x -> step x
 
-  (* SAZ: Could inspect the memory or stack here too. *)
+  (* Could inspect the memory or stack here too. *)
   (* We finished the computation *)
   | RetF (_,(_,(_,v))) -> Ok v
 

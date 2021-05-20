@@ -1244,9 +1244,6 @@ Section Memory_Stack_Theory.
     congruence.
   Qed.
 
-    (* CB TODO: Figure out where these predicates should live, or figure
-       out how to get rid of them. Currently not using some of these... *)
-
     Definition not_pointer (τ : dtyp) : Prop
       := τ <> DTYPE_Pointer.
 
@@ -2948,7 +2945,6 @@ Section Memory_Stack_Theory.
       constructor; auto.
     Qed.
 
-    (* YZ : Either exists, or define more properly *)
     Definition equiv_sum {A : Type} (R : A -> A -> Prop) : err A -> err A -> Prop :=
       fun ma ma' => match ma,ma' with
                     | inr a, inr a' => R a a'
@@ -3579,8 +3575,8 @@ Section PARAMS.
     (* Note : For the current version of subevents, [interp_memory] must
         have subevent clauses assumed in Context, or else the
         [handle_intrinsic] handler will not get properly invoked. *)
-    (* IY: This is specialized to DTYPE_Array for practical
-         purposes. We could conjure a more complete definition later. *)
+    (* This is specialized to DTYPE_Array for practical
+       purposes. We could conjure a more complete definition later. *)
     Lemma interp_memory_intrinsic_memcpy :
       forall (m : memory_stack) (dst src : Addr.addr) (sz : N)
         (dst_val src_val : uvalue) (dτ : dtyp) volatile align,

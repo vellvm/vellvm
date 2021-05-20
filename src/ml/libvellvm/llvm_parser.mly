@@ -1,30 +1,3 @@
-%{ (* {{{ LICENSE                                                              *
-  * vi: set fdm=marker fdl=0:                                                *
-  *                                                                          *
-  * Copyright (c) 2012 Raphaël Proust <raphlalou@gmail.com>                  *
-  * Copyright (c) 2012 INRIA - Raphaël Proust <raphlalou@gmail.com>          *
-  * Copyright (c) 2012 ENS - Raphaël Proust <raphlalou@gmail.com>            *
-  * Copyright (c) 2014 OCamlPro - Julien Sagot <ju.sagot@gmail.com>          *
-  * Copyright (c) 2017 U. Penn. Steve Zdancewic <stevez@cis.upenn.edu>       *
-  *                                                                          *
-  * Permission to use, copy, modify, and distribute this software for any    *
-  * purpose with or without fee is hereby granted, provided that the above   *
-  * copyright notice and this permission notice appear in all copies.        *
-  *                                                                          *
-  * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
-  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
-  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
-  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
-  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
-  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
-  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
-  * }}}                                                                      *)
-(*  ------------------------------------------------------------------------- *)
-(* Adapted for use in Vellvm by Steve Zdancewic (c) 2017                      *)
-(*  ------------------------------------------------------------------------- *)
-
-
-
 open LLVMAst
 open ParserHelper
 open ParseUtil
@@ -375,7 +348,7 @@ toplevel_entity:
   | KW_TARGET KW_TRIPLE EQ s=STRING     { TLE_Target (str s)             }
   | KW_SOURCE_FILENAME EQ s=STRING      { TLE_Source_filename (str s)    }
 
-  (* SAZ: It's not clear what the rules for named identifiers are.  It 
+  (* It's not clear what the rules for named identifiers are.  It 
      seems that they don't follow the "anonymous" rules of sequentiality
      and they also seem to live in another name space.
    *) 
@@ -620,7 +593,7 @@ omitted, in which case we have to check that it is indeed the correct number.
 The post-processing takes place after the whole cfg has been parsed as part of
 the declatation parser production.
 
-SAZ: I would prefer the terminology "sequential, possibly implicit identifiers"
+I would prefer the terminology "sequential, possibly implicit identifiers"
 to "anonymous". 
 *)
 
@@ -1138,7 +1111,7 @@ texp:   t=typ v=exp { (t, v t) }
 tconst: t=typ c=exp { (t, c t) }
 tident: t=typ i=ident { (t, i) }
 
-(* SAZ: Copying this here is a bit unfortunate but works for now.
+(* Copying this here is a bit unfortunate but works for now.
    It might be better to experiment with eliminating the "inline" keyword
    for the instr nonterminal and then add a new nonterminal like this:
 test_instr:

@@ -47,7 +47,7 @@ Proof.
   rewrite remove_block_find_block_ineq; auto.
   break_match_goal; [| reflexivity].
   ebind; econstructor.
-  - (* YZ TODO: exploiting the strong version of HasPost should be painless, maybe the default. *)
+  - (* TODO: exploiting the strong version of HasPost should be painless, maybe the default. *)
     pose proof denote_bk_exits_in_outputs b f.
     apply has_post_post_strong in H.
     apply H.
