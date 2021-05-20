@@ -527,51 +527,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
                              (fmap dvalue_to_uvalue (eval_conv conv dt1 v t2)))
             v
 
-        (* CB TODO: Do we actually need to pick here? GEP doesn't do any derefs. Does it make sense to leave it as a UVALUE? *)
-        (* CB TODO: This is probably not what we want in the long term!
-
-           There are a couple of points here:
-
-           1. We do not want to use uvalue_to_dvalue
-           2. We do not want to do picks instead of uvalue_to_dvalue (current situation)
-           3. We do not want to use UVALUE_GetElementPtr
-
-           For each of these points:
-
-           1. This is bad because uvalue_to_dvalue is "partial". It
-              raises an error when the uvalue given to it is not fully
-              concrete already. Arguably most of the time we would
-              want the arguments to GetElementPtr to be concrete,
-              because nondeterministic addresses likely causes
-              UB... But it might not, and for instance an index could
-              reasonably be `0 * undef`
-           2. We could concretize everything using `pick` events,
-              which initially might seem like a good option. Things
-              like `0 * undef` will go through without a hitch. BUT
-              suppose r = GetElementPtr a i such that r ≈ {v1, v2},
-              i.e., the result is nondeterministically one of v1 or
-              v2. Then a store to r should raise UB, which is
-              currently handled using the predicate for pick events:
-
-              da <- trigger (pick ua (exists x, forall da, concretize ua da -> da = x)) ;;
-
-              However, if we pick before calling store the address
-              will be concrete at this point, and so UB will not be
-              raised, the nondeterminism is collapsed too early :(.
-           3. Using UVALUE_GetElementPtr to delay the evaluation of
-              GetElementPtr until it's used. This would be ideal
-              because it would keep the address nondeterministic and
-              allow us to raise UB if the address to a store
-              concretizes to two different addresses... But this is
-              problematic because GEP is handled by memory events,
-              which should be interpreted before pick events, so
-              raising more when handling pick is :(.
-
-           This may be something worth readdressing when we modify the
-           memory model interface to take uvalues. The problem should,
-           essentially, go away?
-
-         *)
         | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
           vptr <- denote_exp (Some dt2) ptrval ;;
           vs <- map_monad (fun '(dt, index) => denote_exp (Some dt) index) idxs ;;
@@ -907,10 +862,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           l <- combine_lists_err xs ys ;;
             ret ((x,y)::l)
         | _, _ =>
-          (* YZ: This should be a failure, but we first need to have a proper
-          story to handle main arguments since at the moment we expect exactly
-          argc and argv, and feed default values to them *)
-          (* failwith "combine_lists_err: different length lists" *)
           ret []
         end.
 

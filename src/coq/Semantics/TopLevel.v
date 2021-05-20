@@ -65,8 +65,6 @@ Definition allocate_global (g:global dtyp) : itree L0 unit :=
 Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
   map_monad_ allocate_global gs.
 
-(* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
-
 (* Returns `true` only if both function are named and have
      the same name.
  *)
