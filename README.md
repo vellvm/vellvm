@@ -47,9 +47,9 @@ compiling it requires a different version of Coq we
 Vellvm is an ongoing project aiming at the formal verification in the Coq proof
 assistant of a compilation infrastructure inspired by the LLVM compiler.
 
-As such, its central piece is Verified IR (VIR), a Coq formalization of the
+The central piece of Vellvm is the Verified IR (VIR), a Coq formalization of the
 semantics of (a subset of) the LLVM IR that is intended for _formal
-verification_ of LLVM-based software. 
+verification_ of LLVM-based software.
 It is being developed at the University of Pennsylvania as part of the DeepSpec project.
 
 After VIR, the second component whose development is reaching maturity is the verification of 
