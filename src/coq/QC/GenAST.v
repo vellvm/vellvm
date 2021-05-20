@@ -526,7 +526,7 @@ Section ExpGenerators.
     := match a, b with
        | DTYPE_I sz, DTYPE_I sz' =>
          if N.eq_dec sz sz' then true else false
-       | DTYPE_I sz, _ => false
+       | DTYPE_I _, _ => false
        | DTYPE_Pointer, DTYPE_Pointer => true
        | DTYPE_Pointer, _ => false
        | DTYPE_Void, DTYPE_Void => true
@@ -551,24 +551,24 @@ Section ExpGenerators.
            if N.eq_dec sz sz'
            then dtyp_eq t t'
            else false
-       | DTYPE_Array sz t, _ => false
+       | DTYPE_Array _ _, _ => false
        | DTYPE_Struct fields, DTYPE_Struct fields' =>
          if Nat.eqb (Datatypes.length fields) (Datatypes.length fields')
          then forallb id (map_In (zip fields fields') (fun '(a, b) HIn => dtyp_eq a b))
          else false
-       | DTYPE_Struct fields, _ => false
+       | DTYPE_Struct _, _ => false
        | DTYPE_Packed_struct fields, DTYPE_Packed_struct fields' =>
          if Nat.eqb (Datatypes.length fields) (Datatypes.length fields')
          then forallb id (map_In (zip fields fields') (fun '(a, b) HIn => dtyp_eq a b))
          else false
-       | DTYPE_Packed_struct fields, _ => false
+       | DTYPE_Packed_struct _, _ => false
        | DTYPE_Opaque, DTYPE_Opaque => false (* TODO: Unsure if this should compare equal *)
        | DTYPE_Opaque, _ => false
        | DTYPE_Vector sz t, DTYPE_Vector sz' t' =>
            if N.eq_dec sz sz'
            then dtyp_eq t t'
            else false
-       | DTYPE_Vector sz t, _ => false
+       | DTYPE_Vector _ _, _ => false
        end.
 
   (* TODO: Move this*)
