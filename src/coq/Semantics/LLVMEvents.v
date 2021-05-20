@@ -62,7 +62,7 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 
  (* Interactions with global variables for the LLVM IR *)
- (* YZ: Globals are read-only, except for the initialization. We could want to reflect this in the events themselves. *)
+ (* Note: Globals are read-only, except for the initialization. We could want to reflect this in the events themselves. *)
   Variant GlobalE (k v:Type) : Type -> Type :=
   | GlobalWrite (id: k) (dv: v): GlobalE k v unit
   | GlobalRead  (id: k): GlobalE k v v.
@@ -119,7 +119,7 @@ Set Contextual Implicit.
       end
     end.
 
-(* SAZ: TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
+(* TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
 Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   #[global] Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.eq_dec.
@@ -130,11 +130,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   (* Generic calls, refined by [denote_mcfg] *)
   Variant CallE : Type -> Type :=
-    (* TODO: not sure about uvalue for f here *)
   | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue), CallE uvalue.
 
   Variant ExternalCallE : Type -> Type :=
-    (* TODO: is f a dvalue or a uvalue? *)
   | ExternalCall        : forall (t:dtyp) (f:uvalue) (args:list dvalue), ExternalCallE dvalue.
 
   (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
@@ -166,7 +164,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Definition pickAll (p : uvalue -> PickE dvalue) := map_monad (fun uv => trigger (p uv)).
 
   (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
-  (* YZ TODO: The events and handlers are parameterized by the types of key and value.
+  (* TODO: The events and handlers are parameterized by the types of key and value.
      It's weird for it to be the case if the events are concretely instantiated right here.
      At least TODO: remove these prefixes that are inconsistent with other names.
    *)

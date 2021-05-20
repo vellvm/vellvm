@@ -46,7 +46,6 @@ Set Contextual Implicit.
 Open Scope N_scope.
 (* end hide *)
 
-(* YZ TODO: better documentation of this file *)
 
 (** * Dynamic values
     Definition of the dynamic values manipulated by VIR.
@@ -123,10 +122,6 @@ Proof.
               inversion X; subst; contradiction.
 Qed.
 
-(* What's a good way to prove this ? *)
-(* IY: This is not ideal, but here is an equivalent formulation with an ugly
-   if-else chain.. I feel like there must be some clean way to prove the
-   original lemma using boolean reflection. *)
 Lemma unsupported_cases : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
     (if (sz =? 64) then x64
       else if (sz =? 32) then x32
@@ -186,7 +181,7 @@ Definition ll_double := Floats.float.
 Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS).
 
   (* The set of dynamic values manipulated by an LLVM program. *)
-  Unset Elimination Schemes.
+ Unset Elimination Schemes.
 Inductive dvalue : Set :=
 | DVALUE_Addr (a:A.addr)
 | DVALUE_I1 (x:int1)
@@ -401,26 +396,7 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
     ret (DVALUE_Vector elts')
 
   | _ => failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"
-                 (* YZ: likely useless to recurse: I think it should be an invariant that:
-                    1: We only call [uvalue_to_dvalue] on concrete [uvalue]s
-                    2: That concrete [uvalue] do not contain any operators, i.e. are already fully reduced
-                  *)
-                 (* TODO: recursively convert dvalue to uvalue with evaluation*)
-  (*
-  | UVALUE_IBinop iop v1 v2                => ret (DVALUE_IBinop iop v1 v2)
-  | UVALUE_ICmp cmp v1 v2                  => ret (DVALUE_ICmp cmp v1 v2)
-  | UVALUE_FBinop fop fm v1 v2             => ret (DVALUE_FBinop fop fm v1 v2)
-  | UVALUE_FCmp cmp v1 v2                  => ret (DVALUE_FCmp cmp v1 v2)
-  | UVALUE_Conversion conv v t_to          => ret (DVALUE_Conversion conv v t_to)
-  | UVALUE_GetElementPtr t ptrval idxs     => ret (DVALUE_GetElementPtr t ptrval idxs)
-  | UVALUE_ExtractElement vec idx          => ret (DVALUE_ExtractElement vec idx)
-  | UVALUE_InsertElement vec elt idx       => ret (DVALUE_InsertElement vec elt idx)
-  | UVALUE_ShuffleVector vec1 vec2 idxmask => ret (DVALUE_ShuffleVector vec1 vec2 idxmask)
-  | UVALUE_ExtractValue vec idxs           => ret (DVALUE_ExtractValue vec idxs)
-  | UVALUE_InsertValue vec elt idxs        => ret (DVALUE_InsertValue vec elt idxs)
-  | UVALUE_Select cnd v1 v2                => ret (DVALUE_Select cnd v1 v2)
-   *)
-  end.
+end.
 
 Lemma uvalue_to_dvalue_of_dvalue_to_uvalue :
   forall (d : dvalue),
@@ -496,18 +472,6 @@ Fixpoint is_concrete (uv : uvalue) : bool :=
   | UVALUE_Array elts => forallb is_concrete elts
   | UVALUE_Vector elts => forallb is_concrete elts
   | _ => false
-  (* | UVALUE_IBinop iop v1 v2 => allb is_concrete [v1 ; v2] *)
-  (* | UVALUE_ICmp cmp v1 v2 => allb is_concrete [v1 ; v2] *)
-  (* | UVALUE_FBinop fop fm v1 v2 => allb is_concrete [v1 ; v2] *)
-  (* | UVALUE_FCmp cmp v1 v2 => allb is_concrete [v1 ; v2] *)
-  (* | UVALUE_Conversion conv v t_to => is_concrete v *)
-  (* | UVALUE_GetElementPtr t ptrval idxs => allb is_concrete (ptrval :: idxs) *)
-  (* | UVALUE_ExtractElement vec idx => allb is_concrete [vec ; idx] *)
-  (* | UVALUE_InsertElement vec elt idx => allb is_concrete [vec ; elt ; idx] *)
-  (* | UVALUE_ShuffleVector vec1 vec2 idxmask => allb is_concrete [vec1 ; vec2 ; idxmask] *)
-  (* | UVALUE_ExtractValue vec idxs => is_concrete vec *)
-  (* | UVALUE_InsertValue vec elt idxs => allb is_concrete [vec ; elt] *)
-  (* | UVALUE_Select cnd v1 v2 => allb is_concrete [cnd ; v1 ; v2] *)
   end.
 
 (* If both operands are concrete, uvalue_to_dvalue them and run them through
@@ -536,8 +500,6 @@ Definition uvalue_to_dvalue_uop {A : Type}
      | inl e => opu uv
      | inr a => a
      end.
-
-(* TODO: define [refines : uvalue -> dvalue -> Prop] which characterizes the nondeterminism of undef values *)
 
 Section hiding_notation.
   #[local] Open Scope sexp_scope.
@@ -589,14 +551,6 @@ Section hiding_notation.
     | UVALUE_ICmp cmp v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp cmp; serialize_uvalue' "" ")" v2]
     | UVALUE_FBinop fop _ v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp fop; serialize_uvalue' "" ")" v2]
     | UVALUE_FCmp cmp v1 v2 => [serialize_uvalue' "(" "" v1; to_sexp cmp; serialize_uvalue' "" ")" v2]
-    (* | UVALUE_Conversion       (conv:conversion_type) (v:uvalue) (t_to:dtyp) *)
-    (* | UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)) (* TODO: do we ever need this? GEP raises an event? *) *)
-    (* | UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue) *)
-    (* | UVALUE_InsertElement    (vec: uvalue) (elt:uvalue) (idx:uvalue) *)
-    (* | UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue) *)
-    (* | UVALUE_ExtractValue     (vec:uvalue) (idxs:list int) *)
-    (* | UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list int) *)
-    (* | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue) *)
     | _ => Atom "TODO: show_uvalue"
     end.
 
@@ -875,13 +829,6 @@ Section DecidableEquality.
   #[global] Instance eq_dec_uvalue_correct: @RelDec.RelDec_Correct uvalue (@Logic.eq uvalue) _ := _.
 
 End DecidableEquality.
-
-(* TODO: include Undefined values in this way? i.e. Undef is really a predicate on values
-   Note: this isn't correct because it won't allow for undef fields of a struct or elts of an array
-Inductive dvalue' : Set :=
-| DVALUE_Undef (p:dvalue -> bool) (* TODO: used to include type information. is it necessary? (t:dtyp)  *)
-| DVALUE_Val (d:dvalue).
-*)
 
 Definition is_DVALUE_I1 (d:dvalue) : bool :=
   match d with
@@ -1208,7 +1155,6 @@ Class VInt I : Type :=
      integers. This is a typeclass that wraps all of the integer
      operations that we use for integer types with different bitwidths.
 
-     SAZ: The "undef" here should refer to undefined behavior, not UVALUE_Undef, right?
      *)
     Definition eval_int_op {Int} `{VInt Int} (iop:ibinop) (x y: Int) : undef dvalue :=
       match iop with
@@ -1355,7 +1301,7 @@ Class VInt I : Type :=
   (* I split the definition between the vector and other evaluations because
      otherwise eval_iop should be recursive to allow for vector calculations,
      but coq can't find a fixpoint. *)
-  (* SAZ: Here is where we want to add the case distinction  for uvalues
+  (* Here is where we want to add the case distinction  for uvalues
 
        - this should check for "determined" uvalues and then use eval_iop_integer_h
          otherwise leave the op symbolic
@@ -1608,13 +1554,6 @@ Class VInt I : Type :=
   | DVALUE_IX_typ     : forall x, ~IX_supported x -> dvalue_has_dtyp DVALUE_None (DTYPE_I x)
   | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
-  (* | DVALUE_Half_typ   : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Half (* ??? *) *)
-  (* | DVALUE_X86_fp80   : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_X86_fp80 (* ??? *) *)
-  (* | DVALUE_Fp128      : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Fp128 (* ??? *) *)
-  (* | DVALUE_Ppc_fp128  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Ppc_fp128 (* ??? *) *)
-  (* | DVALUE_Metadata   : dvalue_has_dtyp DVALUE_None DTYPE_Metadata (* ??? *) *)
-  (* | DVALUE_X86_mmx    : dvalue_has_dtyp DVALUE_None DTYPE_X86_mmx (* ??? *) *)
-  (* | DVALUE_Opaque     : dvalue_has_dtyp DVALUE_None DTYPE_Opaque (* ??? *) *)
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
 
   | DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
@@ -1631,7 +1570,7 @@ Class VInt I : Type :=
         dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
         dvalue_has_dtyp (DVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts))
 
-  (* CB TODO: Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
+  (* Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
   | DVALUE_Array_typ :
       forall xs sz dt,
         Forall (fun x => dvalue_has_dtyp x dt) xs ->
@@ -1656,13 +1595,6 @@ Class VInt I : Type :=
   | UVALUE_IX_typ     : forall x, ~IX_supported x -> uvalue_has_dtyp UVALUE_None (DTYPE_I x)
   | UVALUE_Double_typ : forall x, uvalue_has_dtyp (UVALUE_Double x) DTYPE_Double
   | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
-  (* | UVALUE_Half_typ   : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Half (* ??? *) *)
-  (* | UVALUE_X86_fp80   : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_X86_fp80 (* ??? *) *)
-  (* | UVALUE_Fp128      : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Fp128 (* ??? *) *)
-  (* | UVALUE_Ppc_fp128  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Ppc_fp128 (* ??? *) *)
-  (* | UVALUE_Metadata   : uvalue_has_dtyp UVALUE_None DTYPE_Metadata (* ??? *) *)
-  (* | UVALUE_X86_mmx    : uvalue_has_dtyp UVALUE_None DTYPE_X86_mmx (* ??? *) *)
-  (* | UVALUE_Opaque     : uvalue_has_dtyp UVALUE_None DTYPE_Opaque (* ??? *) *)
   | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
   | UVALUE_Undef_typ  : forall τ, uvalue_has_dtyp (UVALUE_Undef τ) τ
 
@@ -1680,7 +1612,7 @@ Class VInt I : Type :=
         uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
         uvalue_has_dtyp (UVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts))
 
-  (* CB TODO: Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
+  (* Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
   | UVALUE_Array_typ :
       forall xs sz dt,
         Forall (fun x => uvalue_has_dtyp x dt) xs ->
@@ -1775,7 +1707,6 @@ Class VInt I : Type :=
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
         uvalue_has_dtyp (UVALUE_Conversion Sext value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
 
-  (* TODO: fill in the rest of the conversions *)
   | UVALUE_GetElementPtr_typ :
       forall dt uv idxs,
         uvalue_has_dtyp (UVALUE_GetElementPtr dt uv idxs) DTYPE_Pointer
@@ -1870,13 +1801,6 @@ Class VInt I : Type :=
     Hypothesis IH_IX             : forall x, ~IX_supported x -> P DVALUE_None (DTYPE_I x).
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
-    (* Hypothesis IH_Half           : forall x, P (DVALUE_Float x) DTYPE_Half. (* ??? *) *)
-    (* Hypothesis IH_X86_fp80       : forall x, P (DVALUE_Float x) DTYPE_X86_fp80. (* ??? *) *)
-    (* Hypothesis IH_Fp128          : forall x, P (DVALUE_Float x) DTYPE_Fp128. (* ??? *) *)
-    (* Hypothesis IH_Ppc_fp128      : forall x, P (DVALUE_Float x) DTYPE_Ppc_fp128. (* ??? *) *)
-    (* Hypothesis IH_Metadata       : P DVALUE_None DTYPE_Metadata. (* ??? *) *)
-    (* Hypothesis IH_X86_mmx        : P DVALUE_None DTYPE_X86_mmx. (* ??? *) *)
-    (* Hypothesis IH_Opaque         : P DVALUE_None DTYPE_Opaque. (* ??? *) *)
     Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
     Hypothesis IH_Struct_nil     : P (DVALUE_Struct []) (DTYPE_Struct []).
     Hypothesis IH_Struct_cons    : forall (f : dvalue) (dt : dtyp) (fields : list dvalue) (dts : list dtyp),
@@ -1915,13 +1839,6 @@ Class VInt I : Type :=
       - apply IH_IX. assumption.
       - apply IH_Double.
       - apply IH_Float.
-      (* - apply IH_Half. *)
-      (* - apply IH_X86_fp80. *)
-      (* - apply IH_Fp128. *)
-      (* - apply IH_Ppc_fp128. *)
-      (* - apply IH_Metadata. *)
-      (* - apply IH_X86_mmx. *)
-      (* - apply IH_Opaque. *)
       - apply IH_None.
       - apply IH_Struct_nil.
       - apply (IH_Struct_cons TYP1 (IH f dt TYP1) TYP2 (IH (DVALUE_Struct fields) (DTYPE_Struct dts) TYP2)).
