@@ -21,7 +21,7 @@ From ExtLib.Structures Require Export
 
 Require Import ExtLib.Data.Monads.StateMonad.
 
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils.
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils.
 Require Import Integers Floats.
 
 Require Import List.
@@ -492,11 +492,13 @@ End TypGenerators.
 Section ExpGenerators.
   (* nuw / nsw make poison values likely *)
   Definition gen_ibinop : G ibinop :=
+    (* Note: some of these binops are currently commented out due to a
+       bug with extraction and QC. *)
     oneOf_ failGen
            [ ret LLVMAst.Add <*> ret false <*> ret false
            (* ; ret Sub <*> ret false <*> ret false *)
            ; ret Mul <*> ret false <*> ret false
-(*           ; ret Shl <*> ret false <*> ret false  *)
+           (* ; ret Shl <*> ret false <*> ret false  *)
            ; ret UDiv <*> ret false
            ; ret SDiv <*> ret false
            (* ; ret LShr <*> ret false *)
@@ -528,12 +530,6 @@ Section ExpGenerators.
   Unset Guard Checking.
 
   (* TODO: Move this*)
-  (* This only returns what you expect on normalized typs *)
-  (* TODO: I don't think this does the right thing for pointers to
-           identified types... It should be conservative and say that
-           the types are *not* equal always, though.
-   *)
-
   Fixpoint dtyp_eq (a : dtyp) (b : dtyp) {struct a} : bool
     := match a, b with
        | DTYPE_I sz, DTYPE_I sz' =>
@@ -583,6 +579,109 @@ Section ExpGenerators.
        | DTYPE_Vector sz t, _ => false
        end.
 
+  (* TODO: Move this*)
+  (* This only returns what you expect on normalized typs *)
+  (* TODO: I don't think this does the right thing for pointers to
+           identified types... It should be conservative and say that
+           the types are *not* equal always, though.
+   *)
+  Fixpoint normalized_typ_eq (a : typ) (b : typ) {struct a} : bool
+    := match a with
+       | TYPE_I sz =>
+         match b with
+         | TYPE_I sz' => if N.eq_dec sz sz' then true else false
+         | _ => false
+         end
+       | TYPE_Pointer t =>
+         match b with
+         | TYPE_Pointer t' => normalized_typ_eq t t'
+         | _ => false
+         end
+       | TYPE_Void =>
+         match b with
+         | TYPE_Void => true
+         | _ => false
+         end
+       | TYPE_Half =>
+         match b with
+         | TYPE_Half => true
+         | _ => false
+         end
+       | TYPE_Float =>
+         match b with
+         | TYPE_Float => true
+         | _ => false
+         end
+       | TYPE_Double =>
+         match b with
+         | TYPE_Double => true
+         | _ => false
+         end
+       | TYPE_X86_fp80 =>
+         match b with
+         | TYPE_X86_fp80 => true
+         | _ => false
+         end
+       | TYPE_Fp128 =>
+         match b with
+         | TYPE_Fp128 => true
+         | _ => false
+         end
+       | TYPE_Ppc_fp128 =>
+         match b with
+         | TYPE_Ppc_fp128 => true
+         | _ => false
+         end
+       | TYPE_Metadata =>
+         match b with
+         | TYPE_Metadata => true
+         | _ => false
+         end
+       | TYPE_X86_mmx =>
+         match b with
+         | TYPE_X86_mmx => true
+         | _ => false
+         end
+       | TYPE_Array sz t =>
+         match b with
+         | TYPE_Array sz' t' =>
+           if N.eq_dec sz sz'
+           then normalized_typ_eq t t'
+           else false
+         | _ => false
+         end
+       | TYPE_Function ret args =>
+         match b with
+         | TYPE_Function ret' args' =>
+           normalized_typ_eq ret ret' && forallb id (zipWith (fun a b => normalized_typ_eq a b) args args')
+         | _ => false
+         end
+       | TYPE_Struct fields =>
+         match b with
+         | TYPE_Struct fields' => forallb id (zipWith (fun a b => normalized_typ_eq a b) fields fields')
+         | _ => false
+         end
+       | TYPE_Packed_struct fields =>
+         match b with
+         | TYPE_Packed_struct fields' => forallb id (zipWith (fun a b => normalized_typ_eq a b) fields fields')
+         | _ => false
+         end
+       | TYPE_Opaque =>
+         match b with
+         | TYPE_Opaque => false (* TODO: Unsure if this should compare equal *)
+         | _ => false
+         end
+       | TYPE_Vector sz t =>
+         match b with
+         | TYPE_Vector sz' t' =>
+           if N.eq_dec sz sz'
+           then normalized_typ_eq t t'
+           else false
+         | _ => false
+         end
+       | TYPE_Identified id => false
+       end.
+
   (* TODO: Move this *)
   Fixpoint replicateM {M : Type -> Type} {A} `{Monad M} (n : nat) (ma : M A) : M (list A)
     := match n with
@@ -590,8 +689,12 @@ Section ExpGenerators.
        | S n' => a <- ma;; rest <- replicateM n' ma;; ret (a :: rest)
        end.
 
+  (* This needs to use normalized_typ_eq, instead of dtyp_eq because of pointer types...
+     dtyps only tell you that a type is a pointer, the other type
+     information about the pointers is erased.
+   *)
   Definition filter_type (ty : typ) (ctx : list (ident * typ)) : list (ident * typ)
-    := filter (fun '(i, t) => dtyp_eq (typ_to_dtyp ctx ty) (typ_to_dtyp ctx t)) ctx.
+    := filter (fun '(i, t) => normalized_typ_eq (normalize_type ctx ty) (normalize_type ctx t)) ctx.
 
   (* TODO: Also generate negative numbers *)
   Definition gen_non_zero : G Z
