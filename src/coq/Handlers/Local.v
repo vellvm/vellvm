@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      String.
 
@@ -24,6 +25,11 @@ Set Contextual Implicit.
 Import MonadNotation.
 Import ITree.Basics.Basics.Monads.
 Open Scope string_scope.
+(* end hide *)
+
+(** * Local handler
+  Interpretation of the [LocalE] events into a state monad.
+*)
 
 Section Locals.
   Variable (k v:Type).
