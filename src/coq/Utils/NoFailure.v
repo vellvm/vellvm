@@ -49,6 +49,20 @@ Local Open Scope itree.
 
 *)
 
+(* For some reason the new definition of [ecofix] in itrees loops here.
+  We redefine the old one for now.
+*)
+Require Import Paco.pacotac_internal.
+
+ Tactic Notation "ecofix" ident(CIH) "with" ident(gL) ident(gH) :=
+   repeat red;
+   paco_pre2;
+   eapply euttG_cofix;
+   paco_post2 CIH with gL;
+   paco_post2 CIH with gH.
+
+ Tactic Notation "ecofix" ident(CIH) := ecofix CIH with gL gH.
+
 Section ITreeUtilities.
 
 (* TODO: move to itree *)
@@ -189,7 +203,7 @@ Section No_Failure.
       cbn in *.
       intros ?; ebase.
       right; eapply CIH0.
-      eapply eqit_Vis in NOFAIL; eauto.
+      eapply eqit_inv_Vis in NOFAIL; eauto.
   Qed.
 
   Lemma no_failure_bind_cont : forall {E X Y} (t : _ X) (k : X -> _ Y),

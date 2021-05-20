@@ -231,10 +231,9 @@ Proof.
     rewrite (itree_eta (k2 v)).
     gbase.
     eapply CIH; eauto.
-    unfold eutt in EQ; rewrite <- eqit_Vis in EQ.
-    specialize (EQ v).
-    rewrite (itree_eta (k2 v)) in EQ.
-    apply EQ.
+    pose proof eqit_inv_Vis _ _ _ _ _ _ _ EQ v.
+    rewrite (itree_eta (k2 v)) in H.
+    apply H.
   - apply IHeqitF; auto.
   - gstep; constructor.
     rewrite itree_eta.
