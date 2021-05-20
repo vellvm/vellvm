@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      Lia
      String
@@ -34,6 +35,13 @@ Set Strict Implicit.
 Import ListNotations.
 Open Scope bool.
 Import SemNotations.
+(* end hide *)
+
+(** * BlockFusion
+  Definition and proof of correctness of a simple optimization pass fusing
+  two blocks [b1] and [b2] together when [b1] performs a direct jump to
+  [b2], and [b1] is the only entry point to [b2].
+*)
 
 Section RemoveBlock.
 

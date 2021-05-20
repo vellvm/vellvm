@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      Morphisms String.
 
@@ -18,6 +19,11 @@ From Vellvm Require Import
 
 Import ITreeNotations.
 Import SemNotations.
+(* end hide *)
+
+(** * General facts on the CFG-level interpretation
+  A collection of elementary facts about the interpretation when considering an intra-function piece of syntax 
+*)
 
 (* TO MOVE *)
 Arguments Intrinsics.F_trigger/.
@@ -292,7 +298,6 @@ Proof.
   Unshelve.
   auto.
 Qed.
-
 
 Lemma interp_cfg3_intrinsic :
   forall (m : memory_stack) (τ : dtyp) (g : global_env) l fn args df res,

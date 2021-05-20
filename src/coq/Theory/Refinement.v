@@ -1,3 +1,4 @@
+(* begin hide *)
 From ITree Require Import
      ITree
      Basics
@@ -16,6 +17,7 @@ From ExtLib Require Import
 
 
 From Coq Require Import Relations RelationClasses.
+(* end hide *)
 
 Module Make (A:MemoryAddress.ADDRESS)(LLVMEvents: LLVM_INTERACTIONS(A)).
 
@@ -91,11 +93,6 @@ Definition refine_L3 : relation (itree L3 (memory_stack * (local_env * stack * (
 (* Refinement for after interpreting pick. *)
 Definition refine_L4 : relation ((itree L4 (memory_stack * (local_env * stack * (global_env * uvalue)))) -> Prop)
   := fun ts ts' => forall t', ts' t' -> exists t, ts t /\ eutt refine_res3 t t'.
-
-(*
-Definition refine_res4 : relation (memory * (local_env * stack * (global_env * dvalue)))
-  := TT × (TT × (TT × refine_dvalue)).
- *)
 
 Definition refine_L5 : relation ((itree L5 (memory_stack * (local_env * stack * (global_env * uvalue)))) -> Prop)
   := fun ts ts' => forall t', ts' t' -> exists t, ts t /\ eutt refine_res3 t t'.

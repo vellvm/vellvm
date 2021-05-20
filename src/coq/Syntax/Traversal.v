@@ -22,7 +22,7 @@ From Vellvm Require Import
 
     Examples of use are provided at the end of the file.
 
-   NOTE YZ: I wrote the code as such for historical reasons, but I believe all instances of [endo] for
+   NOTE: I wrote the code as such for historical reasons, but I believe all instances of [endo] for
    structures that are family of types could be redefined as [endo id].
  *)
 
@@ -403,7 +403,7 @@ Section Endo.
   End Semantics.
 
   (** **
-      By default, the solver can always pick the identity as an instance.
+     By default, the solver can always pick the identity as an instance.
      However both structural traversal from this section and local
      instances should always have priority over this, hence the 100.
    *)

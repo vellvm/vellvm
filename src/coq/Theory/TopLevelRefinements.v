@@ -1,3 +1,4 @@
+(* begin hide *)
 From ITree Require Import
      ITree
      ITreeFacts
@@ -8,7 +9,6 @@ From ITree Require Import
      KTreeFacts
      Eq.Eq.
 
-(* YZ TODO : Revisit the dependency w.r.t. Refinement *)
 From Vellvm Require Import
      Utilities
      Syntax
@@ -40,6 +40,7 @@ Import SemNotations.
 
 Module R := Refinement.Make Memory.Addr LLVMEvents.
 Import R. 
+(* end hide *)
 
 (**
    This file is currently a holdall.

@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      Morphisms ZArith String.
 
@@ -14,6 +15,11 @@ From Vellvm Require Import
 
 Import ITreeNotations.
 Import SemNotations.
+(* end hide *)
+
+(** * General facts on the MCFG-level interpretation
+  A collection of elementary facts about the interpretation when considering mcfgs
+*)
 
 (* TO MOVE *)
 (* COMMON WITH CFG *)

@@ -1,3 +1,4 @@
+(* begin hide *)
 From ITree Require Import
      ITree
      Basics.Monad
@@ -10,6 +11,7 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Semantics.Denotation
      Handlers.Handlers.
+(* end hide *)
 
 Section InterpreterMCFG.
 
