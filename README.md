@@ -32,8 +32,6 @@ the source directory. This test generates random LLVM programs that
 are then run with the Vellvm interpreter and the `clang` compiler
 (which must also be installed).
 
-[comment]: # (TODO: Calvin add something here)
-
 
 ### HELIX Case Study
 
@@ -90,24 +88,10 @@ a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of 
  - [LLVM](http://llvm.org)
 
 # Participants
- - Steve Zdancewic
- - Yannick Zakowski
- - Calvin Beck
- - Irene Yoon
+  REDACTED
  
 ## Past Contributors
- - Vivien Durey 
- - Dmitri Garbuzov 
- - Olek Gierczak
- - William Mansky
- - Milo Martin
- - Santosh Nagarakatte 
- - Emmett Neyman 
- - Christine Rizkallah 
- - Robert Zajac
- - Richard Zhang 
- - Jianzhou Zhao
-
+  REDACTED
 ---
 
 # Structure of the development
