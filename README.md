@@ -171,9 +171,11 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 
 Compilation:
 
-1. Install all external dependencies
-2. Clone the vellvm git repo with the `--recurse-submodule` option
-1. Run `make` in the /src directory: it will first compile the quickchick libraries, then Vellvm, and finally extract the OCaml executable
+
+1. Clone the vellvm git repo with the `--recurse-submodule` option
+2. Install all external dependencies
+   - Note: you should be able to install all of the opam libraries  with `make opam` in the `src/` directory.
+3. Run `make` in the `src/` directory: it will first compile the quickchick library, then vir, and finally extract the OCaml executable
 
 # Running
 
