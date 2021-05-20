@@ -147,6 +147,26 @@ Section WF_dtyp.
 
 End WF_dtyp.
 
+Fixpoint dtyp_measure (t : dtyp) : nat :=
+  match t with
+  | DTYPE_I sz => 0
+  | DTYPE_Pointer => 0
+  | DTYPE_Void => 0
+  | DTYPE_Half => 0
+  | DTYPE_Float => 0
+  | DTYPE_Double => 0
+  | DTYPE_X86_fp80 => 0
+  | DTYPE_Fp128 => 0
+  | DTYPE_Ppc_fp128 => 0
+  | DTYPE_Metadata => 0
+  | DTYPE_X86_mmx => 0
+  | DTYPE_Array sz t => S (dtyp_measure t)
+  | DTYPE_Struct fields => S (list_sum (map dtyp_measure fields))
+  | DTYPE_Packed_struct fields => S (list_sum (map dtyp_measure fields))
+  | DTYPE_Opaque => 0
+  | DTYPE_Vector sz t => S (dtyp_measure t)
+  end.
+
 Section hiding_notation.
   #[local] Open Scope sexp_scope.
   

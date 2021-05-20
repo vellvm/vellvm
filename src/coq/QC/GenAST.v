@@ -21,7 +21,7 @@ From ExtLib.Structures Require Export
 
 Require Import ExtLib.Data.Monads.StateMonad.
 
-From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Syntax.TypeUtil Semantics.TopLevel QC.Utils.
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils.
 Require Import Integers Floats.
 
 Require Import List.
@@ -36,41 +36,39 @@ From Coq Require Import
 Open Scope Z_scope.
 
 Section Helpers.
-  Fixpoint is_sized_type_h (t : typ) : bool
+  Fixpoint is_sized_type_h (t : dtyp) : bool
     := match t with
-       | TYPE_I sz                 => true
-       | TYPE_Pointer t            => true
-       | TYPE_Void                 => false
-       | TYPE_Half                 => true
-       | TYPE_Float                => true
-       | TYPE_Double               => true
-       | TYPE_X86_fp80             => true
-       | TYPE_Fp128                => true
-       | TYPE_Ppc_fp128            => true
-       | TYPE_Metadata             => true (* Is this right? *)
-       | TYPE_X86_mmx              => true
-       | TYPE_Array sz t           => is_sized_type_h t
-       | TYPE_Function ret args    => false
-       | TYPE_Struct fields        => true
-       | TYPE_Packed_struct fields => true
-       | TYPE_Opaque               => false
-       | TYPE_Vector sz t          => is_sized_type_h t
-       | TYPE_Identified id        => false (* Shouldn't happen *)
+       | DTYPE_I sz                 => true
+       | DTYPE_Pointer              => true
+       | DTYPE_Void                 => false
+       | DTYPE_Half                 => true
+       | DTYPE_Float                => true
+       | DTYPE_Double               => true
+       | DTYPE_X86_fp80             => true
+       | DTYPE_Fp128                => true
+       | DTYPE_Ppc_fp128            => true
+       | DTYPE_Metadata             => true (* Is this right? *)
+       | DTYPE_X86_mmx              => true
+       | DTYPE_Array sz t           => is_sized_type_h t
+       | DTYPE_Struct fields        => true
+       | DTYPE_Packed_struct fields => true
+       | DTYPE_Opaque               => false
+       | DTYPE_Vector sz t          => is_sized_type_h t
        end.
 
   (* Only works correctly if the type is well formed *)
   Definition is_sized_type (typ_ctx : list (ident * typ)) (t : typ) : bool
-    := is_sized_type_h (normalize_type typ_ctx t).
+    := is_sized_type_h (typ_to_dtyp typ_ctx t).
 
-  Definition is_int_type_h (t : typ) : bool
+  Definition is_int_type_h (t : dtyp) : bool
     := match t with
-       | TYPE_I sz => true
+       | DTYPE_I sz => true
        | _ => false
        end.
 
   (* Only works correctly if the type is well formed *)
   Definition is_int_type (typ_ctx : list (ident * typ)) (t : typ) : bool
-    := is_int_type_h (normalize_type typ_ctx t).
+    := is_int_type_h (typ_to_dtyp typ_ctx t).
 
   (* TODO: incomplete. Should typecheck *)
   Fixpoint well_formed_op (typ_ctx : list (ident * typ)) (op : exp typ) : bool :=
@@ -515,14 +513,19 @@ Section ExpGenerators.
            (map ret
                 [ Eq; Ne; Ugt; Uge; Ult; Ule; Sgt; Sge; Slt; Sle]).
 
+  (* Generate an expression of a given type *)
+  (* Context should probably not have duplicate ids *)
+  (* May want to decrease size more for arrays and vectors *)
+  (* TODO: Need a restricted version of the type generator for this? *)
+  (* TODO: look up named types from the context *)
+  (* TODO: generate conversions? *)
 
-  (* TODO: Move. Also, do I really have to define this? *)
-  Fixpoint zipWith {A B C} (f : A -> B -> C) (xs : list A) (ys : list B) : list C
-    := match xs, ys with
-       | [], _        => []
-       | _, []        => []
-       | a::xs', b::ys' => f a b :: zipWith f xs' ys'
-       end.
+ (* Disable guard checking. This file is only used for generating test
+    cases. Some of our generation functions terminate in non-trivial
+    ways, but since they're only used to generate test cases (and are
+    not used in proofs) it's not terribly important to prove that they
+    actually terminate.  *)
+  Unset Guard Checking.
 
   (* TODO: Move this*)
   (* This only returns what you expect on normalized typs *)
@@ -530,111 +533,55 @@ Section ExpGenerators.
            identified types... It should be conservative and say that
            the types are *not* equal always, though.
    *)
-  Program Fixpoint normalized_typ_eq (a : typ) (b : typ) {measure (sizeof_typ a)} : bool
-    := match a with
-       | TYPE_I sz =>
-         match b with
-         | TYPE_I sz' => if N.eq_dec sz sz' then true else false
-         | _ => false
-         end
-       | TYPE_Pointer t =>
-         match b with
-         | TYPE_Pointer t' => normalized_typ_eq t t'
-         | _ => false
-         end
-       | TYPE_Void =>
-         match b with
-         | TYPE_Void => true
-         | _ => false
-         end
-       | TYPE_Half =>
-         match b with
-         | TYPE_Half => true
-         | _ => false
-         end
-       | TYPE_Float =>
-         match b with
-         | TYPE_Float => true
-         | _ => false
-         end
-       | TYPE_Double =>
-         match b with
-         | TYPE_Double => true
-         | _ => false
-         end
-       | TYPE_X86_fp80 =>
-         match b with
-         | TYPE_X86_fp80 => true
-         | _ => false
-         end
-       | TYPE_Fp128 =>
-         match b with
-         | TYPE_Fp128 => true
-         | _ => false
-         end
-       | TYPE_Ppc_fp128 =>
-         match b with
-         | TYPE_Ppc_fp128 => true
-         | _ => false
-         end
-       | TYPE_Metadata =>
-         match b with
-         | TYPE_Metadata => true
-         | _ => false
-         end
-       | TYPE_X86_mmx =>
-         match b with
-         | TYPE_X86_mmx => true
-         | _ => false
-         end
-       | TYPE_Array sz t =>
-         match b with
-         | TYPE_Array sz' t' =>
-           if N.eq_dec sz sz'
-           then normalized_typ_eq t t'
-           else false
-         | _ => false
-         end
-       | TYPE_Function ret args =>
-         match b with
-         | TYPE_Function ret' args' =>
-           normalized_typ_eq ret ret' && forallb id (zipWith (fun a b => @normalized_typ_eq a b _) args args')
-         | _ => false
-         end
-       | TYPE_Struct fields =>
-         match b with
-         | TYPE_Struct fields' => forallb id (zipWith (fun a b => @normalized_typ_eq a b _) fields fields')
-         | _ => false
-         end
-       | TYPE_Packed_struct fields =>
-         match b with
-         | TYPE_Packed_struct fields' => forallb id (zipWith (fun a b => @normalized_typ_eq a b _) fields fields')
-         | _ => false
-         end
-       | TYPE_Opaque =>
-         match b with
-         | TYPE_Opaque => false (* TODO: Unsure if this should compare equal *)
-         | _ => false
-         end
-       | TYPE_Vector sz t =>
-         match b with
-         | TYPE_Vector sz' t' =>
-           if N.eq_dec sz sz'
-           then normalized_typ_eq t t'
-           else false
-         | _ => false
-         end
-       | TYPE_Identified id => false
-       end.
-  Admit Obligations.
 
-  (* Generate an expression of a given type *)
-  (* Context should probably not have duplicate ids *)
-  (* May want to decrease size more for arrays and vectors *)
-  (* TODO: Need a restricted version of the type generator for this? *)
-  (* TODO: look up named types from the context *)
-  (* TODO: generate conversions? *)
-  Unset Guard Checking.
+  Fixpoint dtyp_eq (a : dtyp) (b : dtyp) {struct a} : bool
+    := match a, b with
+       | DTYPE_I sz, DTYPE_I sz' =>
+         if N.eq_dec sz sz' then true else false
+       | DTYPE_I sz, _ => false
+       | DTYPE_Pointer, DTYPE_Pointer => true
+       | DTYPE_Pointer, _ => false
+       | DTYPE_Void, DTYPE_Void => true
+       | DTYPE_Void, _ => false
+       | DTYPE_Half, DTYPE_Half => true
+       | DTYPE_Half, _ => false
+       | DTYPE_Float, DTYPE_Float => true
+       | DTYPE_Float, _ => false
+       | DTYPE_Double, DTYPE_Double => true
+       | DTYPE_Double, _ => false
+       | DTYPE_X86_fp80, DTYPE_X86_fp80 => true
+       | DTYPE_X86_fp80, _ => false
+       | DTYPE_Fp128, DTYPE_Fp128 => true
+       | DTYPE_Fp128, _ => false
+       | DTYPE_Ppc_fp128, DTYPE_Ppc_fp128 => true
+       | DTYPE_Ppc_fp128, _ => false
+       | DTYPE_Metadata, DTYPE_Metadata => true
+       | DTYPE_Metadata, _ => false
+       | DTYPE_X86_mmx, DTYPE_X86_mmx => true
+       | DTYPE_X86_mmx, _ => false
+       | DTYPE_Array sz t, DTYPE_Array sz' t' =>
+           if N.eq_dec sz sz'
+           then dtyp_eq t t'
+           else false
+       | DTYPE_Array sz t, _ => false
+       | DTYPE_Struct fields, DTYPE_Struct fields' =>
+         if Nat.eqb (Datatypes.length fields) (Datatypes.length fields')
+         then forallb id (map_In (zip fields fields') (fun '(a, b) HIn => dtyp_eq a b))
+         else false
+       | DTYPE_Struct fields, _ => false
+       | DTYPE_Packed_struct fields, DTYPE_Packed_struct fields' =>
+         if Nat.eqb (Datatypes.length fields) (Datatypes.length fields')
+         then forallb id (map_In (zip fields fields') (fun '(a, b) HIn => dtyp_eq a b))
+         else false
+       | DTYPE_Packed_struct fields, _ => false
+       | DTYPE_Opaque, DTYPE_Opaque => false (* TODO: Unsure if this should compare equal *)
+       | DTYPE_Opaque, _ => false
+       | DTYPE_Vector sz t, DTYPE_Vector sz' t' =>
+           if N.eq_dec sz sz'
+           then dtyp_eq t t'
+           else false
+       | DTYPE_Vector sz t, _ => false
+       end.
 
   (* TODO: Move this *)
   Fixpoint replicateM {M : Type -> Type} {A} `{Monad M} (n : nat) (ma : M A) : M (list A)
@@ -644,7 +591,7 @@ Section ExpGenerators.
        end.
 
   Definition filter_type (ty : typ) (ctx : list (ident * typ)) : list (ident * typ)
-    := filter (fun '(i, t) => normalized_typ_eq (normalize_type ctx ty) (normalize_type ctx t)) ctx.
+    := filter (fun '(i, t) => dtyp_eq (typ_to_dtyp ctx ty) (typ_to_dtyp ctx t)) ctx.
 
   (* TODO: Also generate negative numbers *)
   Definition gen_non_zero : G Z
@@ -925,8 +872,8 @@ Section InstrGenerators.
       match sz with
        | 0%nat =>
          (* Only returns allowed *)
-         match (normalize_type ctx t) with
-         | TYPE_Void => ret (TERM_Ret_void, [])
+         match (typ_to_dtyp ctx t) with
+         | DTYPE_Void => ret (TERM_Ret_void, [])
          | _ =>
            e <- gen_exp_size 0 t;;
            ret (TERM_Ret (t, e), [])

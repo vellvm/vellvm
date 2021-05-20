@@ -20,7 +20,7 @@ CP=cp
 
 COQFILESNUMERIC := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats
 
-COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/Error\
+COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/ListUtil Utils/Error\
 								 Utils/PropT Utils/PostConditions Utils/NoFailure Utils/TFor\
 								 Utilities
 
@@ -74,6 +74,7 @@ interp:
 	$(MAKE) extracted
 	$(MAKE) vellvm
 
+.PHONY: coq
 coq: $(VOFILES)
 
 .PHONY: opam

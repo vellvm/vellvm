@@ -6,6 +6,7 @@ From Coq Require Import
 
 From Vellvm Require Import
      Utils.Util
+     Utils.ListUtil
      Utils.Tactics
      Syntax.LLVMAst
      Syntax.AstLib
@@ -43,15 +44,6 @@ Inductive typ_order : typ -> typ -> Prop :=
     typ_order ret (TYPE_Function ret args)
 .
 #[export] Hint Constructors typ_order : core.
-
-Lemma map_In {A B : Type} (l : list A) (f : forall (x : A), In x l -> B) : list B.
-Proof.
-  induction l.
-  - exact [].
-  - refine (f a _ :: IHl _).
-    + simpl. auto.
-    + intros x H. apply (f x). simpl. auto.
-Defined.
 
 Fixpoint remove_key {A B : Type} (eq_dec : (forall (x y : A), {x = y} + {x <> y})) (a : A) (l : list (A * B)) : list (A * B) :=
   match l with
