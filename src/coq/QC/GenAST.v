@@ -492,19 +492,11 @@ End TypGenerators.
 Section ExpGenerators.
   (* nuw / nsw make poison values likely *)
   Definition gen_ibinop : G ibinop :=
-    (* Note: some of these binops are currently commented out due to a
-       bug with extraction and QC. *)
     oneOf_ failGen
            [ ret LLVMAst.Add <*> ret false <*> ret false
-           (* ; ret Sub <*> ret false <*> ret false *)
            ; ret Mul <*> ret false <*> ret false
-           (* ; ret Shl <*> ret false <*> ret false  *)
            ; ret UDiv <*> ret false
            ; ret SDiv <*> ret false
-           (* ; ret LShr <*> ret false *)
-           (* ; ret AShr <*> ret false *)
-           (* ; ret URem *)
-           (* ; ret SRem *)
            ; ret And
            ; ret Or
            ; ret Xor
@@ -721,7 +713,7 @@ Section ExpGenerators.
           end in
       let gen_size_0 :=
           match t with
-          | TYPE_I n                  => ret EXP_Integer <*> lift (arbitrary : G Z) (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x)) (* TODO: should the integer be forced to be in bounds? *) *)
+          | TYPE_I n                  => ret EXP_Integer <*> lift (x <- (arbitrary : G nat);; ret (Z.of_nat x)) (* TODO: should the integer be forced to be in bounds? *)
           | TYPE_Pointer t            => lift failGen (* Only pointer type expressions might be conversions? Maybe GEP? *)
           | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
           | TYPE_Function ret args    => lift failGen (* No expressions of function type *)
