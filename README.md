@@ -22,7 +22,8 @@ in the and their locations in the development below:
 
 ### Unit Tests
 
-After compiling vellvm the development, running `src/vellvm --test` should successfully run 145 unit tests.
+After compiling vellvm the development, running `src/vellvm --test` should successfully run 145 unit tests.  Running
+`src/vellvm --test-file tests/helix/test_dynwin64.ll` should successfully run the HELIX test case mentioned in Section 7 of the paper.
 
 ### QuickChick Tests
 
@@ -125,7 +126,7 @@ Theory, in `src/coq/Theory/`:
 - `src/coq/Utils/PropT.v` metatheory required to reason about sets of itrees, i.e. about the propositional monad transformer.
 - `InterpreterMCFG.v`     the layers of interpretation **ARTIFACT** shown in Figure 6 and some of their metatheory
 - `InterpreterCFG.v`      the same layers of interpretation and metatheory, but when reasoning about single functions (i.e. single cfg)
-- `Refinement.v`          definition of the refinement relations between layers of interpretations
+- `Refinement.v`          definition of the refinement relations between layers of interpretations **ARTIFACT** mentioned in Section 5.4
 - `TopLevelRefinements.v` proof of inclusion of the refinement relations between layers of interpretations; proof of soundness of the interpreter as described in Section 5
 - `DenotationTheory`      Equational theory to reason directly about the structure of vir programs; in particular, reasoning principles about open control-flow-graphs.
 
