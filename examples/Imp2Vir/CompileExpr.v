@@ -15,7 +15,7 @@ Import MonadNotation.
 
 From Vellvm Require Import
      Syntax.
-From tutorial Require Import Imp.
+From Imp2Vir Require Import Imp.
 
 Open Scope Z_scope.
 

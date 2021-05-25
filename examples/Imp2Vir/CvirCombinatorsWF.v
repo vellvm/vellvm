@@ -6,7 +6,7 @@ From Coq Require Import
 
 From Vellvm Require Import Syntax.
 
-From tutorial Require Import Fin.
+From Imp2Vir Require Import Fin.
 
 Require Import Vec Unique CvirCombinators.
 

@@ -12,7 +12,7 @@ Import MonadNotation.
 From Vellvm Require Import
      Syntax
      Utils.Tactics.
-From tutorial Require Import Imp Fin.
+From Imp2Vir Require Import Imp Fin.
 
 Require Import Vec CompileExpr CvirCombinators CvirCombinatorsWF.
 

@@ -2,7 +2,7 @@ From Coq Require Import
     Lia
     List.
 
-From tutorial Require Import Fin.
+From Imp2Vir Require Import Fin.
 
 Require Import Vec.
 

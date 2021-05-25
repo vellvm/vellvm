@@ -1,11 +1,13 @@
 -R . Imp2Vir
 -R ../../src/coq Vellvm
--R ../../lib/InteractionTrees/tutorial tutorial
--R ../../lib/InteractionTrees/theories ITree
 -I ../../lib/QuickChick/src
 -R ../../lib/QuickChick/src QuickChick
 -R ../../lib/flocq-quickchick FlocqQuickChick
 
+Utils_tutorial.v
+Fin.v
+Vec.v
+Imp.v
 CompileExpr.v
 Sir.v
 Vec.v
