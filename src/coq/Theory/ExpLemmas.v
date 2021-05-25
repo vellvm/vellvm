@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      Morphisms.
 
@@ -27,6 +28,13 @@ From Vellvm Require Import
 Open Scope itree_scope.
 Import ITreeNotations.
 Import SemNotations.
+(* end hide *)
+
+(** * Lemmas related to the semantics of expressions
+  This file contains essentially:
+  - Proof rules specifying the behavior of expressions, allowing for symbolic execution in refinement proofs.
+  - A proof that expressions that do not perform conversion are "pure", i.e. do not modify any part of the state.
+*)
 
 Section Translations.
 

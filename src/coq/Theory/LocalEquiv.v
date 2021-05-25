@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      String Morphisms List.
 
@@ -29,6 +30,7 @@ Import ListNotations.
 Import AlistNotations.
 Import ITreeNotations.
 Import SemNotations.
+(* end hide *)
 
 (** * Live-equivalence
     Optimizations do not preserve functional equivalence of local environment in general.

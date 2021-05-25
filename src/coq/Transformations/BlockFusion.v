@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      Lia
      String
@@ -34,6 +35,13 @@ Set Strict Implicit.
 Import ListNotations.
 Open Scope bool.
 Import SemNotations.
+(* end hide *)
+
+(** * BlockFusion
+  Definition and proof of correctness of a simple optimization pass fusing
+  two blocks [b1] and [b2] together when [b1] performs a direct jump to
+  [b2], and [b1] is the only entry point to [b2].
+*)
 
 Section RemoveBlock.
 
@@ -639,9 +647,9 @@ Section BlockFusionCorrect.
       (* Here is the guard for our coinductive call *)
       etau.
       ebase; right.
-      specialize (CIH b2 next).
-      rewrite update_provenance_eq in CIH.
-      apply CIH; auto.
+      specialize (CIHL b2 next).
+      rewrite update_provenance_eq in CIHL.
+      apply CIHL; auto.
       (* Remains to prove we did not jump in the middle of the fused block *)
       cbn in *.
       destruct (Eqv.eqv_dec_p next b2); auto.
@@ -678,9 +686,9 @@ Section BlockFusionCorrect.
         etau.
         ebase.
         right.
-        specialize (CIH to b_next).
-        rewrite update_provenance_ineq in CIH; auto.
-        apply CIH; auto.
+        specialize (CIHL to b_next).
+        rewrite update_provenance_ineq in CIHL; auto.
+        apply CIHL; auto.
         cbn in EXIT.
         destruct (Eqv.eqv_dec_p b_next b2); auto.
         do 2 red in e; subst.

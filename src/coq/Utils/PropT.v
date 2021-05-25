@@ -91,7 +91,7 @@ Section ITreeMisc.
     intros.
     split; intros H.
     - eapply transitivity. 2 : { apply H. }
-      red. apply eqit_tauR. reflexivity.
+      red. apply eqit_Tau_r. reflexivity.
     - red. red. pstep. econstructor. auto. punfold H.
   Qed.  
 
@@ -108,7 +108,7 @@ Section ITreeMisc.
     intros.
     split; intros H.
     - eapply transitivity. apply H.
-      red. apply eqit_tauL. reflexivity.
+      red. apply eqit_Tau_l. reflexivity.
     - red. red. pstep. econstructor. auto. punfold H.
   Qed.  
 
@@ -167,10 +167,11 @@ Section PropMonad.
 
   Definition subtree {E} {A B} (ta : itree E A) (tb : itree E B) := exists (k : A -> itree E B), tb ≈ bind ta k.
 
+  (* Definition 5.1 *)
   Definition bind_PropT {E} :=
-    fun A B (PA: PropT E A) (K: A -> PropT E B) (tb: itree E B) =>
+    fun A B (specA : PropT E A) (K: A -> PropT E B) (tb: itree E B) =>
       exists (ta: itree E A) (k: A -> itree E B),
-        PA ta /\
+        specA ta /\
         tb ≈ bind ta k /\
         (forall a, Returns a ta -> K a (k a)).
 
@@ -212,12 +213,15 @@ Section PropMonad.
         split; auto.
   Qed.
 
+
+  (* Definition 5.1 *)
   #[global] Instance Monad_Prop {E} : Monad (PropT E) :=
     {|
       ret := fun _ x y => y ≈ ret x
       ; bind := bind_PropT
     |}.
 
+  (* Definition 5.3: Handler Correctness *)
   Definition handler_correct {E F} (h_spec: E ~> PropT F) (h: E ~> itree F) :=
     (forall T e, h_spec T e (h T e)).
 
@@ -259,12 +263,13 @@ Section PropMonad.
     do 2 red. intros. eapply interp_PropTF_mono; eauto.
   Qed.
   Hint Resolve interp_PropT__mono : paco.  
-  
+
+  (* Definition 5.2 *)
   Definition interp_prop {E F} (h_spec : E ~> PropT F) :
     forall R (RR: relation R), itree E R -> PropT F R :=
       fun R (RR: relation R) =>  paco2 (interp_PropT_ E F h_spec R RR) bot2.
 
-  (* Figure 8: Interpreter law for Ret *)
+  (* Figure 7: Interpreter law for Ret *)
   Lemma interp_prop_ret :
     forall R E F (h_spec : E ~> PropT F)
       (r : R)
@@ -363,6 +368,22 @@ Section PropMonad.
       + intros. specialize (HK a H0). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
   Qed.
 
+  (* This exists in the stdlib as [ProofIrrelevance.inj_pair2], but we reprove
+   it to not depend on proof irrelevance (we use axiom [JMeq.JMeq_eq] instead).
+   The itree library now avoids as much as possible using this axiom, we may want
+   to see if it's possible to do so here.
+   *)
+  Lemma inj_pair2 :
+    forall (U : Type) (P : U -> Type) (p : U) (x y : P p),
+      existT P p x = existT P p y -> x = y.
+  Proof.
+    intros. apply JMeq.JMeq_eq.
+    refine (
+        match H in _ = w return JMeq.JMeq x (projT2 w) with
+        | eq_refl => JMeq.JMeq_refl
+        end).
+  Qed.
+
   #[global] Instance interp_prop_Proper3
          {E F} (h_spec : E ~> PropT F) R RR :
     Proper(eq_itree eq ==> eq  ==> iff) (interp_prop h_spec R RR).
@@ -418,7 +439,8 @@ Section PropMonad.
       + econstructor. left. pstep. eapply IHeq. reflexivity. reflexivity. assumption.
       + eapply IHeq. reflexivity. reflexivity.   punfold HS.
   Qed.
-  
+
+  (* Lemma 5.4: interp_prop_correct - note that the paper presents a slightly simpler formulation where t = t' *)
   Lemma interp_prop_correct_exec:
     forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),
       handler_correct h_spec h ->
@@ -438,7 +460,7 @@ Section PropMonad.
       eapply CIH. rewrite tau_eutt in eq. rewrite eq. reflexivity.
     - econstructor. 
       2 : { rewrite <- eq. rewrite unfold_iter. cbn.
-            red. red. unfold ITree.map. rewrite Eq.bind_bind.
+            unfold ITree.map. rewrite Eq.bind_bind.
             setoid_rewrite Eq.bind_ret_l at 1. cbn. setoid_rewrite tau_eutt.
             reflexivity. }
       apply H.
@@ -450,6 +472,8 @@ Section PropMonad.
       reflexivity.
   Qed.
 
+  (* Lemma 5.5 - note that the paper presents this lemma after unfolding the definition of Proper.
+   *)
   Instance interp_prop_Proper_eq :
     forall R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR) E F (h_spec : E ~> PropT F),
       Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_prop E _ h_spec R RR).
@@ -502,12 +526,12 @@ Section PropMonad.
     repeat intro; split; intros HRet.
     - revert y H. induction HRet; intros.
       constructor; rewrite <- H, H0; reflexivity.
-      apply IHHRet, eqit_inv_tauL; auto.
+      apply IHHRet, eqit_inv_Tau_l; auto.
       rewrite <- H0. rewrite H. reflexivity.
       econstructor 3; [rewrite <- H0, H; reflexivity | apply IHHRet; reflexivity].
     - revert x H; induction HRet; intros ? EQ.
       constructor; rewrite EQ; eauto.
-      apply IHHRet, eqit_inv_tauR; auto.
+      apply IHHRet, eqit_inv_Tau_r; auto.
       rewrite EQ. rewrite <- H. reflexivity.
       econstructor 3; [rewrite EQ, H; reflexivity | apply IHHRet; reflexivity].
   Qed.
@@ -542,8 +566,8 @@ Section PropMonad.
     apply eutt_Returns_. auto.
   Qed.
 
-  (* Figure 8: interp Trigger law *)
-  (* SAZ : morally, we should only work with "proper" triggers everywhere *)
+  (* Figure 7: interp Trigger law *)
+  (* morally, we should only work with "proper" triggers everywhere *)
   Lemma interp_prop_trigger :
     forall E F (h_spec : E ~> PropT F) R (e : E R)
       (HP : forall T, Proper (eq ==> Eq1_PropT T) (h_spec T))
@@ -605,7 +629,7 @@ Section PropMonad.
     pstep. red. cbn. econstructor. right. apply CIH.
   Qed.
 
-  (* Figure 8: Structural law for tau *)
+  (* Figure 7: Structural law for tau *)
   Lemma interp_prop_tau :
     forall E F (h_spec : E ~> PropT F) R RR
       (t_spec : itree E R),
@@ -675,7 +699,7 @@ Section PropMonad.
     induction H; intros; subst.
     - rewrite H in eq. apply Eq.eqit_Ret in eq. auto.
     - eapply IHReturns. rewrite tau_eutt in H. rewrite <- H. assumption.
-    - rewrite H in eq. symmetry in eq. apply eutt_inv_ret_vis in eq. inv eq.
+    - rewrite H in eq. symmetry in eq. apply eqit_inv in eq; inv eq.
   Qed.
 
   Lemma Returns_ret_inv :  forall {E} A (a b : A), Returns a ((ret b) : itree E A) -> a = b.
@@ -817,11 +841,11 @@ Section PropMonad.
         }
         3,4:auto_ctrans_eq.
         2: reflexivity.
-        eapply eqit_tauL. rewrite unfold_bind, <-itree_eta. reflexivity.
+        eapply eqit_Tau_l. rewrite unfold_bind, <-itree_eta. reflexivity.
       - destruct b2; try discriminate.
         guclo eqit_clo_trans.
         econstructor; auto_ctrans_eq; cycle -1; eauto; try reflexivity.
-        eapply eqit_tauL. rewrite unfold_bind, <-itree_eta. reflexivity.
+        eapply eqit_Tau_l. rewrite unfold_bind, <-itree_eta. reflexivity.
     Qed.
 
   End ReturnsBind.
@@ -856,9 +880,9 @@ Section PropMonad.
   Proof.
     intros E A a x t eq H. 
     induction H.
-    - rewrite eq in H. eapply eutt_inv_ret. apply H.
+    - rewrite eq in H. eapply eqit_inv in H. apply H.
      - rewrite tau_eutt in H. rewrite <- H in IHReturns. apply IHReturns. assumption.
-    - rewrite eq in H. apply eqit_inv_ret_vis in H. contradiction.
+    - rewrite eq in H. apply eqit_inv in H. contradiction.
   Qed.
 
   Lemma Returns_Ret :  forall E A (a x : A), Returns a ((Ret x) : itree E A) -> x = a.
@@ -931,7 +955,7 @@ Section PropMonad.
     revert A e k eq.
     induction HR; intros.
     - rewrite H in eq.
-      apply eutt_inv_ret_vis in eq. inversion eq.
+      apply eqit_inv in eq. inversion eq.
     - rewrite tau_eutt in H.
       eapply IHHR. rewrite <- H. apply eq.
     - rewrite eq in H; clear eq.
@@ -946,8 +970,7 @@ Section PropMonad.
       subst.
       assert (Vis e k0 ≈ Vis e k).
       red. red. pfold. red. apply H.
-      apply eqit_inv_vis in H0.
-      destruct H0 as (_ & HX).
+      pose proof eqit_inv_Vis eq true true _ _ _ _ H0 as HX.
       exists x. specialize (HX x).
       rewrite HX. assumption.
   Qed.
@@ -971,11 +994,11 @@ Section PropMonad.
     intros. remember (observe ta). destruct i.
     - destruct H0. assert (ta ≈ Ret r0). rewrite Heqi.
       rewrite <- itree_eta. reflexivity. exists r0. constructor. auto.
-    - intros. rewrite unfold_bind_. cbn. rewrite <- Heqi. cbn.
+    - intros. unfold observe. cbn. rewrite <- Heqi. cbn.
       constructor. right. apply CIH. intros. destruct H. destruct H0.
       assert (ta ≈ Tau t). rewrite Heqi. rewrite <- itree_eta; reflexivity.
       eapply ReturnsTau in H; eauto.
-    - rewrite unfold_bind_. cbn. rewrite <- Heqi. cbn. constructor. intros.
+    - unfold observe. cbn. rewrite <- Heqi. cbn. constructor. intros.
       unfold id. right. apply CIH. intros. destruct H. destruct H0.
       assert (ta ≈ Vis e k0). rewrite Heqi. rewrite <- itree_eta; reflexivity.
       eapply ReturnsVis in H; eauto.
@@ -1037,11 +1060,12 @@ Section IterLaws.
     specialize (H0 (a1, 0)).
     unfold f at 1, g at 1 in H0.
     unfold cat at 1, Cat_Kleisli at 1 in H0.
-    match goal with
-    | H : ?body1 ≈ _ |- ?body2 ≈ _ => remember body1 as s1;
-                                                 remember body2 as s2
+    match goal with 
+    | H : (?body1 ≈ _)%monad |- ?body2 ≈ _ => 
+     remember body1 as s1; 
+     remember body2 as s2 
     end.
-    assert (s1 ≈ s2). {
+   assert (s1 ≈ s2). {
       subst.
       match goal with
       | |- iter ?body1 _ ≈ iter ?body2 _ => remember body1 as k1;
@@ -1101,7 +1125,7 @@ Section MonadLaws.
  Qed.
 
   
-  (* Figure 8: ret_bind law for PropT  - first law *)
+  (* Figure 7: ret_bind law for PropT  - first law *)
   Lemma ret_bind: forall {E} (a b : Type) (f : a -> PropT E b) (x : a),
       eutt_closed (f x) ->
       eq1 (bind (ret x) f) (f x).
@@ -1133,7 +1157,7 @@ Section MonadLaws.
                unfold bind, Monad_itree.
                rewrite Eq.bind_ret_l. apply KA. rewrite EQ1. constructor. reflexivity. }
           2: exfalso; eapply eutt_ret_vis_abs; eauto.
-          apply eqit_inv_ret in H0; subst.
+          apply eqit_inv_Ret in H0; subst.
           eapply H. rewrite EQ1 in EQ2.
           unfold bind, Monad_itree in EQ2.
              rewrite Eq.bind_ret_l in EQ2. apply EQ2.
@@ -1151,7 +1175,7 @@ Section MonadLaws.
           }
           2: exfalso; eapply eutt_ret_vis_abs; eauto.
           
-          apply eqit_inv_ret in H0; subst.
+          apply eqit_inv_Ret in H0; subst.
           red in H.
           rewrite EQ, EQ2, EQ1.
           unfold bind, Monad_itree.
@@ -1272,9 +1296,8 @@ Section MonadLaws.
       do 2 rewrite tau_eutt in HI. apply HI.
     - apply IHHRET. rewrite H in HI.
       do 2 rewrite bind_vis in HI.
-      apply eqit_inv_vis in HI.
-      destruct HI as (_ & HI).
-      apply HI.
+      pose proof eqit_inv_Vis _ _ _ _ _ _ _ HI as HI'.
+      apply HI'.
   Qed.
   
   Lemma not_Returns {E} {A B} : inhabited B ->
@@ -1304,16 +1327,15 @@ Section MonadLaws.
       rewrite <- t2. rewrite <- t3.
       reflexivity.
       rewrite bind_vis in H. rewrite bind_vis in H.
-      apply eqit_inv_vis in H.
-      destruct H as (_ & H).
-      specialize (H x).
-      revert H.
+      pose proof eqit_inv_Vis _ _ _ _ _ _ _ H as H'.
+      specialize (H' x).
+      revert H'.
       change (~((ITree.bind (k x) ( fun _ : A => Ret X)) ≈ ITree.bind (k x) (fun _ : A => ITree.spin))).
       eapply distinguish_bind. apply HRet.
-      intro H. apply eutt_Ret_spin_abs in H. auto.
+      intro H'. apply eutt_Ret_spin_abs in H'. auto.
   Qed.      
 
-  (* Figure 8: bind_ret - second monad law for PropT *)  
+  (* Figure 7: bind_ret - second monad law for PropT *)  
   Lemma bind_ret: forall {E} (A : Type) (PA : PropT E A),
       eutt_closed PA ->
       eq1 (bind PA (fun x => ret x)) PA.
@@ -1441,7 +1463,7 @@ Axiom guarded_choice : forall {A B}, @GuardedFunctionalChoice_on A B.
 Definition RET_EQ {E} {A} (ta : itree E A) : A -> A -> Prop :=
   fun x y => Returns x ta /\ Returns y ta.
 
-(* Figure 8: 3rd monad law, one direction bind associativity *)
+(* Figure 7: 3rd monad law, one direction bind associativity *)
 Lemma bind_bind_Prop: forall {E}
                    (A B C : Type) (PA : PropT E A)
                    (KB : A -> PropT E B) (KC : B -> PropT E C)
@@ -1554,7 +1576,7 @@ Module BIND_BIND_COUNTEREXAMPLE.
     rewrite H3 in H1.
     rewrite <- H0 in H1.
     apply eqit_bind_Returns_inv with (r := true) in H1 .
-    apply eqit_inv_ret in H1. inversion H1.
+    apply eqit_inv_Ret in H1. inversion H1.
     { unfold trigger. econstructor 3. reflexivity. constructor 1. reflexivity. }
 Qed.
     

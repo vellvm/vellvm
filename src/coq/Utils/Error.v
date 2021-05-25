@@ -58,11 +58,11 @@ Definition trywith {E A:Type} {F} `{Monad F} `{MonadExc E F} (e:E) (o:option A) 
     | Some x => ret x
     | None => raise e
     end.
-Hint Unfold trywith: core.
+#[export] Hint Unfold trywith: core.
 Arguments trywith _ _ _ _ _: simpl nomatch.
 
 Definition failwith {A:Type} {F} `{Monad F} `{MonadExc string F} (s:string) : F A := raise s.
-Hint Unfold failwith: core.
+#[export] Hint Unfold failwith: core.
 Arguments failwith _ _ _ _: simpl nomatch.
 
 (* SAZ:

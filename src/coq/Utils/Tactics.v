@@ -1,5 +1,7 @@
+(* begin hide *)
 From Coq Require Import
      String.
+(* end hide *)
 
 Ltac flatten_goal :=
   match goal with

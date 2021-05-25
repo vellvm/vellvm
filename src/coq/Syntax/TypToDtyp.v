@@ -6,6 +6,7 @@ From Coq Require Import
 
 From Vellvm Require Import
      Utils.Util
+     Utils.ListUtil
      Utils.Tactics
      Syntax.LLVMAst
      Syntax.AstLib
@@ -43,15 +44,6 @@ Inductive typ_order : typ -> typ -> Prop :=
     typ_order ret (TYPE_Function ret args)
 .
 #[export] Hint Constructors typ_order : core.
-
-Lemma map_In {A B : Type} (l : list A) (f : forall (x : A), In x l -> B) : list B.
-Proof.
-  induction l.
-  - exact [].
-  - refine (f a _ :: IHl _).
-    + simpl. auto.
-    + intros x H. apply (f x). simpl. auto.
-Defined.
 
 Fixpoint remove_key {A B : Type} (eq_dec : (forall (x y : A), {x = y} + {x <> y})) (a : A) (l : list (A * B)) : list (A * B) :=
   match l with
@@ -116,10 +108,7 @@ Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List
     DTYPE_Array sz nt
 
   | TYPE_Function ret args =>
-    (*
-    let nret := (normalize_type env ret) in
-    let nargs := map_In args (fun t _ => normalize_type env t) in *)
-    DTYPE_Pointer (* Function nret nargs *)
+    DTYPE_Pointer 
 
   | TYPE_Struct fields =>
     let nfields := map_In fields (fun t _ => typ_to_dtyp env t) in
@@ -169,9 +158,6 @@ Lemma typ_to_dtyp_equation  : forall env t,
       DTYPE_Array sz nt
 
     | TYPE_Function ret args =>
-      (*
-    let nret := (normalize_type env ret) in
-    let nargs := map_In args (fun t _ => normalize_type env t) in *)
       DTYPE_Pointer (* Function nret nargs *)
 
     | TYPE_Struct fields =>

@@ -50,6 +50,22 @@ Qed.
   
 Definition no_event_l {E F X} := paco1 (@no_event_lF_ E F X) bot1. 
 
+(* This exists in the stdlib as [ProofIrrelevance.inj_pair2], but we reprove
+   it to not depend on proof irrelevance (we use axiom [JMeq.JMeq_eq] instead).
+   The itree library now avoids as much as possible using this axiom, we may want
+   to see if it's possible to do so here.
+ *)
+Lemma inj_pair2 :
+  forall (U : Type) (P : U -> Type) (p : U) (x y : P p),
+    existT P p x = existT P p y -> x = y.
+  Proof.
+    intros. apply JMeq.JMeq_eq.
+    refine (
+        match H in _ = w return JMeq.JMeq x (projT2 w) with
+        | eq_refl => JMeq.JMeq_refl
+        end).
+  Qed.
+
 Instance Proper_no_event_l {E F X} : Proper (eutt eq ==> iff) (@no_event_l E F X).
 Proof.
   do 2 red.
@@ -354,7 +370,7 @@ Proof.
     unfold id_. unfold Id_Handler, Handler.id_.
     ebind. econstructor. reflexivity.
     intros. subst. estep.
-    ebase. right. eapply CIH. apply H1.
+    ebase. right. eapply CIHL. apply H1.
 Qed.
 
 Lemma no_event_elim_r :
@@ -377,7 +393,7 @@ Proof.
     unfold id_. unfold Id_Handler, Handler.id_.
     ebind. econstructor. reflexivity.
     intros. subst. estep.
-    ebase. right. eapply CIH. apply H1.
+    ebase. right. eapply CIHL. apply H1.
 Qed.
 
 Lemma no_event_elim :
@@ -403,6 +419,20 @@ Qed.
 (* Injection to the left *)
 Definition inject_l {E F}: itree F ~> itree (E +' F) :=
   translate inr_.
+
+(* For some reason the new definition of [ecofix] in itrees loops here.
+  We redefine the old one for now.
+*)
+Require Import Paco.pacotac_internal.
+
+ Tactic Notation "ecofix" ident(CIH) "with" ident(gL) ident(gH) :=
+   repeat red;
+   paco_pre2;
+   eapply euttG_cofix;
+   paco_post2 CIH with gL;
+   paco_post2 CIH with gH.
+
+ Tactic Notation "ecofix" ident(CIH) := ecofix CIH with gL gH.
 
 (* [elim_l] is _always_ a left inverse to [inject_l] *)
 Lemma elim_inject_l :

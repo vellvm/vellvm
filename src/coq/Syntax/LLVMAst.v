@@ -1,27 +1,3 @@
-(* {{{ LICENSE                                                              *
-  * vi: set fdm=marker fdl=0:                                                *
-  *                                                                          *
-  * Copyright (c) 2012 Raphaël Proust <raphlalou@gmail.com>                  *
-  * Copyright (c) 2012 INRIA - Raphaël Proust <raphlalou@gmail.com>          *
-  * Copyright (c) 2012 ENS - Raphaël Proust <raphlalou@gmail.com>            *
-  * Copyright (c) 2014 OCamlPro - Julien Sagot <ju.sagot@gmail.com>          *
-  *                                                                          *
-  * Permission to use, copy, modify, and distribute this software for any    *
-  * purpose with or without fee is hereby granted, provided that the above   *
-  * copyright notice and this permission notice appear in all copies.        *
-  *                                                                          *
-  * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES *
-  * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF         *
-  * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR  *
-  * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES   *
-  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN    *
-  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF  *
-  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.           *
-   }}}                                                                       *)
-(*  ------------------------------------------------------------------------- *)
-(* Adapted for use in Vellvm by Steve Zdancewic (c) 2017                      *)
-(*  ------------------------------------------------------------------------- *)
-
 (* begin hide *)
 Require Import Floats.
 From Coq Require Import List String Ascii ZArith.
@@ -184,7 +160,7 @@ Definition global_id := raw_id.
 Definition block_id := raw_id.
 Definition function_id := global_id.
 
-(* SAZ:
+(* NOTE:
    We could separate return types from types, but that needs mutually recursive types.
    This would entail a lot of down-stream changes to the semantics, but might simplify or
    eliminate some corner cases.

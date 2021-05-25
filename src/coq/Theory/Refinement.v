@@ -1,3 +1,4 @@
+(* begin hide *)
 From ITree Require Import
      ITree
      Basics
@@ -16,6 +17,7 @@ From ExtLib Require Import
 
 
 From Coq Require Import Relations RelationClasses.
+(* end hide *)
 
 Module Make (A:MemoryAddress.ADDRESS)(LLVMEvents: LLVM_INTERACTIONS(A)).
 
@@ -23,13 +25,9 @@ Import LLVMEvents.
 Import DV.
 
 (* Refinement relation for uvalues *)
-(* SAZ: Which way is the RefineConcrete case supposed to go?  I'm expecting that the left-hand-side
-   must be "bigger" than the right-hand-side.  
-
-   Does this do the right thing with respect to uvalues that can raise undefined behavior?
-*)
+(* Definition 5.6 UValue refinement *)
 Variant refine_uvalue: uvalue -> uvalue -> Prop :=
-| UndefPoison: forall uv, refine_uvalue UVALUE_Poison uv   (* CB / YZ: TODO, type for poison? *)
+| UndefPoison: forall uv, refine_uvalue UVALUE_Poison uv   
 | RefineConcrete: forall uv1 uv2, uv2 <> UVALUE_Poison -> (forall (dv:dvalue), concretize uv2 dv -> concretize uv1  dv) -> refine_uvalue uv1 uv2
 .
 #[export] Hint Constructors refine_uvalue : core.
@@ -66,6 +64,8 @@ Infix"×" := prod_rel (at level 90, left associativity).
 
 Definition TT {A} : relation A := fun _ _ => True.
 
+(* Lemma 5.7 - uses this definition of refinement 
+   note that refine_uvalue is the basic Uvalue refinement given by Definition 5.6 *)
 (* Refinement of uninterpreted mcfg *)
 Definition refine_L0: relation (itree L0 uvalue) := eutt refine_uvalue.
 
@@ -91,14 +91,8 @@ Definition refine_L3 : relation (itree L3 (memory_stack * (local_env * stack * (
   := eutt refine_res3.
 
 (* Refinement for after interpreting pick. *)
-(* SAZ: we still want the "bigger" set to be on the left so every thing in ts' should be found in ts, right? *)
 Definition refine_L4 : relation ((itree L4 (memory_stack * (local_env * stack * (global_env * uvalue)))) -> Prop)
   := fun ts ts' => forall t', ts' t' -> exists t, ts t /\ eutt refine_res3 t t'.
-
-(*
-Definition refine_res4 : relation (memory * (local_env * stack * (global_env * dvalue)))
-  := TT × (TT × (TT × refine_dvalue)).
- *)
 
 Definition refine_L5 : relation ((itree L5 (memory_stack * (local_env * stack * (global_env * uvalue)))) -> Prop)
   := fun ts ts' => forall t', ts' t' -> exists t, ts t /\ eutt refine_res3 t t'.

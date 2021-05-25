@@ -17,6 +17,7 @@ Set Strict Implicit.
 Local Open Scope nat_scope.
 
 Import ITreeNotations.
+Local Open Scope itree.
 
 (* end hide *)
 
@@ -36,14 +37,14 @@ Section TFor.
      for i = from, i < to, i++ do
          acc <- body i acc
      return acc
-
    *)
+
   Definition tfor {E X} (body : nat -> X -> itree E X) (from to : nat) : X -> itree E X :=
     fun x => ITree.iter (fun '(p,x) =>
                         if beq_nat p to
                         then Ret (inr x)
                         else
-                          y <- (body p x);; (Ret (inl (S p,y)))
+                          y <- (body p x);; Ret (inl (S p,y))
                      ) (from,x).
 
   (* [tfor] excludes the upper bound, hence [tfor body k k] does nothing *)

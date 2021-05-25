@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      String Morphisms List.
 
@@ -30,6 +31,7 @@ Import ListNotations.
 Import AlistNotations.
 Import ITreeNotations.
 Import SemNotations.
+(* end hide *)
 
 Definition local_has_changed (l1 : local_env) (defs: list raw_id) : local_env -> Prop :=
   fun l2 => forall x, ~ In x defs -> l1 @ x = l2 @ x.

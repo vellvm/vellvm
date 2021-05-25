@@ -1,3 +1,4 @@
+(* begin hide *)
 From Coq Require Import
      Lia
      String
@@ -26,11 +27,12 @@ From Vellvm Require Import
 
 Import SemNotations.
 Import ITreeNotations.
+(* end hide *)
 
 (** * Elimination of unreachable blocks
     A block that admits no predecessor can be eliminated.
 
-    YZ TODO: prove a VIR reasoning principle for such proofs that do not require to build the simulation manually.
+    TODO: prove a VIR reasoning principle for such proofs that do not require to build the simulation manually.
  *)
 Lemma remove_predecessorless_correct :
   forall (bks : ocfg dtyp) dead,
@@ -52,7 +54,7 @@ Proof.
   - intros ? ? [<- SUCC]. 
     destruct u1; [| reflexivity].
     estep; ebase; right.
-    apply CIH.
+    apply CIHL.
     cbn in SUCC.
     clear - Heqo SUCC DEAD.
     pose proof find_block_has_id _ _ Heqo; subst.
@@ -65,10 +67,10 @@ Qed.
    b: external_call;;
       unreachable
 
-   If despite its name [b] is reachable, then its execution contains all behaviors starting with an
-   external call, it does not contain the one consisting in refining it by eliminating it...
+   [unreachable] indicates that the end of the block is unreachable, not the block itself.
+   The execution of the block above hence contains all behaviors starting with an
+   external call, it does not contain the one consisting in refining it by eliminating it.
 
-   Also: is unreachable an instruction or a terminator?
-https://llvm.org/docs/LangRef.html#unreachable-instruction 
+  See: https://llvm.org/docs/LangRef.html#unreachable-instruction 
 
  *)

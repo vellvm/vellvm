@@ -163,10 +163,10 @@ Proof.
     + rewrite !bind_tau.
 
       assert (t1 a0 ≈ t). rewrite itree_eta. rewrite EQ.
-      apply eqit_tauL. reflexivity.
+      apply eqit_Tau_l. reflexivity.
 
       assert (t3 a0 ≈ t0). rewrite itree_eta. rewrite EQ'.
-      apply eqit_tauL. reflexivity.
+      apply eqit_Tau_l. reflexivity.
 
       clear CIH0.
 
@@ -220,7 +220,7 @@ Proof.
       rewrite EQ in EQ1. rewrite <- EQ1; auto.
       apply eqit_Ret.
       specialize (F2 _ HQ).
-      rewrite <- EQ1 in F2; auto. apply eqit_inv_ret in F2. auto.
+      rewrite <- EQ1 in F2; auto. apply eqit_inv_Ret in F2. auto.
 
   - (* Tau *)
     rewrite (itree_eta t3).
@@ -238,8 +238,8 @@ Proof.
         setoid_rewrite (itree_eta t1). setoid_rewrite (itree_eta t1) in PC1.
         rewrite has_post_post_strong in PC1.
         rewrite EQ. apply eqit_Tau. rewrite EQ in PC1.
-        apply eqit_inv_tauL in PC1.
-        apply eqit_inv_tauR in PC1.
+        apply eqit_inv_Tau_l in PC1.
+        apply eqit_inv_Tau_r in PC1. 
         apply PC1.
 
       * (* Continuation. Equate t2 and t3. *)
@@ -248,15 +248,15 @@ Proof.
         rewrite EQ' in EQ2. rewrite EQ2; auto.
         apply eqit_Ret.
         specialize (F1 _ HQ).
-        rewrite EQ2 in F1; auto. apply eqit_inv_ret in F1. auto.
+        rewrite EQ2 in F1; auto. apply eqit_inv_Ret in F1. auto.
 
     + rewrite !bind_tau.
 
       assert (t1 ≈ t). rewrite itree_eta. rewrite EQ.
-      apply eqit_tauL. reflexivity.
+      apply eqit_Tau_l. reflexivity.
 
       assert (t3 ≈ t0). rewrite itree_eta. rewrite EQ'.
-      apply eqit_tauL. reflexivity.
+      apply eqit_Tau_l. reflexivity.
 
       clear CIH0.
 
@@ -332,7 +332,7 @@ Proof.
 
       setoid_rewrite (itree_eta (t4 r)) in EQ1.
       destruct (observe (t4 r)) eqn: EQ'; [ | | inv e].
-      apply eqit_inv_ret in EQ1. destruct EQ1. auto.
+      apply eqit_inv_Ret in EQ1. destruct EQ1. auto.
 
       Set Nested Proofs Allowed.
 
@@ -351,11 +351,11 @@ Proof.
     setoid_rewrite (itree_eta (t4 u2)) in EQ1.
     destruct (observe (t4 u2)) eqn: EQ'; [ | | inv e].
     apply eqit_Ret. split; eauto.
-    apply eqit_inv_ret in EQ1. destruct EQ1.
+    apply eqit_inv_Ret in EQ1. destruct EQ1.
     specialize (PC2 _ H0).
     setoid_rewrite (itree_eta (t4 u2)) in PC2.
     setoid_rewrite (itree_eta t1) in PC2.
-    rewrite EQ', EQ in PC2. apply eqit_inv_ret in PC2. destruct PC2. auto.
+    rewrite EQ', EQ in PC2. apply eqit_inv_Ret in PC2. destruct PC2. auto.
 
 
     specialize (PC2 _ H0).
@@ -381,10 +381,10 @@ Proof.
     + rewrite !bind_tau.
 
       assert (t1 ≈ t). rewrite itree_eta. rewrite EQ.
-      apply eqit_tauL. reflexivity.
+      apply eqit_Tau_l. reflexivity.
 
       assert (t3 ≈ t0). rewrite itree_eta. rewrite EQ'.
-      apply eqit_tauL. reflexivity.
+      apply eqit_Tau_l. reflexivity.
 
       estep.
 
