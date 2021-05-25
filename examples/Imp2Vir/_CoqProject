@@ -10,7 +10,6 @@ Vec.v
 Imp.v
 CompileExpr.v
 Sir.v
-Vec.v
 Unique.v
 CvirCombinators.v
 CvirCombinatorsWF.v
