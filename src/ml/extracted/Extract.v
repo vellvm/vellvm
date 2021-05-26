@@ -72,5 +72,3 @@ Extraction Library ExtrOcamlIntConv.
 Recursive Extraction Library TopLevel.
 Extraction Library Transform.
 Extraction Library ParserHelper.
-
-Extraction "test" repr_prog parsed_prog.
