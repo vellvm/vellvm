@@ -13,7 +13,8 @@ From Vellvm Require Import
      Handlers.Handlers
      Semantics
      Syntax
-     Syntax.ScopeTheory.
+     Syntax.ScopeTheory
+     Utils.Tactics.
 From Imp2Vir Require Import Fin Imp.
 
 Require Import Vec Unique CvirCombinators CvirCombinatorsWF CompileExpr Imp2Cvir.
@@ -26,7 +27,7 @@ Definition Rmem (env : Imp.env) (vmap : StringMap.t int) (venv : local_env) (vme
           Int32.intval v32 = Z.of_nat v
   ).
 
-Definition R
+Definition Rimpvir
   (vmap : StringMap.t int)
   (env1 : Imp.env * unit)
   (env2 : memory_stack * (local_env * (global_env * (block_id * block_id + uvalue)))) :
@@ -47,11 +48,14 @@ Definition R
 Definition build_map a b :=
   map Anon (map Z.of_nat (seq a b)).
 
+Definition denote_cvir_gen {ni no} (ir : cvir ni no) vi vo vt (bid : fin ni) bid' :=
+  denote_ocfg (convert_typ nil (blocks ir vi vo vt)) (bid', nth vi bid).
+
 Definition denote_cvir {ni no} (ir : cvir ni no) (bid : fin ni) bid' :=
   let vi := build_map 0 ni in
   let vo := build_map ni no in
   let vt := build_map (ni + no) (n_int ir) in
-  denote_ocfg (convert_typ nil (blocks ir vi vo vt)) (bid', nth vi bid).
+  denote_cvir_gen ir vi vo vt bid bid'.
 
 (* In particular: can we have a reasoning principle to prove that two
   cvir are related?
@@ -85,10 +89,82 @@ Lemma skipn_build_map : forall i n m,
 skipn n (build_map i (n + m)) = build_map (i + n) m.
 Admitted.
 
+Lemma nth_build_map : forall i n k,
+  nth (build_map i n) k = Anon (Z.of_nat(i + proj1_sig k)).
+Proof.
+  intros.
+  unfold build_map, seq.
+  erewrite nth_destruct.
+  destruct k.
+  simpl.
+  rewrite !List.map_nth.
+  rewrite List.seq_nth ; try auto.
+  Unshelve. exact O.
+Qed.
+
 From Coq Require Import Morphisms.
 Require Import ITree.Basics.HeterogeneousRelations.
 Import ITreeNotations.
 Import SemNotations.
+
+Lemma find_block_map_some' :
+  forall {T T'} (f : block T -> block T') G b bk,
+    (forall bk, blk_id (f bk) = blk_id bk) ->
+    find_block G b = Some bk ->
+    find_block (List.map f G) b = Some (f bk).
+Proof.
+  intros * ID; induction G as [| hd G IH]; intros FIND ; [inv FIND |].
+  cbn in *.
+  rewrite ID. 
+  break_match_goal; break_match_hyp; intuition.
+  inv FIND; auto.
+Qed.
+
+Lemma find_block_map_none' :
+  forall {T T'} (f : block T -> block T') G b,
+    (forall bk, blk_id (f bk) = blk_id bk) ->
+    find_block G b = None ->
+    find_block (List.map f G) b = None.
+Proof.
+  intros * ID; induction G as [| hd G IH]; intros FIND; [reflexivity |].
+  cbn in *.
+  rewrite ID. 
+  break_match_goal; break_match_hyp; intuition.
+  inv FIND; auto.
+Qed.
+
+Lemma find_block_map' :
+  forall {T T'} (f : block T -> block T') G b,
+    (forall bk, blk_id (f bk) = blk_id bk) ->
+    find_block (List.map f G) b = option_map f (find_block G b).
+Proof.
+  intros.
+  destruct (find_block G b) eqn:EQ.
+  eapply find_block_map_some' in EQ; eauto.
+  eapply find_block_map_none' in EQ; eauto.
+Qed.
+
+(* This convenient lemma is not true. *)
+Lemma cvir_inputs_used :
+  forall {ni no} (ir : cvir ni no) vi vo vt bid,
+  cvir_ids_WF ir ->
+  In bid (vi ++ vt) -> List.In bid (inputs (blocks ir vi vo vt)).
+Admitted.
+
+Lemma find_block_cvir :
+  forall {ni no} (ir : cvir ni no) vi vo vt bid,
+  cvir_ids_WF ir ->
+  In bid (vi ++ vt) ->
+  exists bk, find_block (blocks ir vi vo vt) bid = Some bk.
+Proof.
+  intros.
+  eapply cvir_inputs_used in H.
+  apply find_block_in_inputs in H.
+  destruct H.
+  exists x.
+  apply H.
+  exact H0.
+Qed.
 
 (*  *)
 Theorem denote_cvir_merge : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid bid',
@@ -106,8 +182,8 @@ Proof.
   intros * WF11 WF12 WF21 WF22.
   (* case analysis on which subgraph we are in: *)
   destruct (split_fin_sum ni1 ni2 bid) eqn:Eq. 
-  - rename f into bid1. 
-    unfold denote_cvir.
+  - rename f into bid1.
+    unfold denote_cvir, denote_cvir_gen.
     unfold merge_cvir.
     cbn.
     rewrite !firstn_build_map.
@@ -130,6 +206,17 @@ Proof.
       intros [? ?b1] [? ?b2] HI.
       destruct HI as [HI | HI].
       * destruct HI as (k & EQ1 & EQ2 & INEQ); cbn in * |-.
+        unfold convert_typ, ConvertTyp_list, tfmap, TFunctor_list'.
+        rewrite !find_block_map' ; try auto.
+        assert (In b1 ((build_map 0 ni1) ++ (build_map (ni1 + ni2 + (no1 + no2)) (n_int ir1)))) by admit.
+        eapply find_block_cvir in H ; try assumption.
+        destruct H.
+        rewrite (find_block_some_app _ _ _ H).
+        assert (In b2 ((build_map 0 ni1) ++ (build_map (ni1 + no1) (n_int ir1)))) by admit.
+        eapply find_block_cvir in H0 ; try assumption.
+        destruct H0.
+        rewrite H0.
+        simpl.
         (* 
   Step 1: renaming and lookups
  
@@ -155,14 +242,21 @@ find_block
         admit.
       * admit.
     + (* The invariant holds initially *)
-      admit.
+      left.
+      subst I.
+      simpl.
+      assert (proj1_sig bid = proj1_sig bid1) by admit.
+      exists (proj1_sig bid).
+      rewrite !nth_build_map.
+      simpl.
+      rewrite !H.
+      intuition.
+      apply (proj2_sig bid1).
 - admit.
 Admitted.
 
 
   (*
-  Approach started by Nicolas:
-
   clear f to FIND; intros fto fto' [-> FIND]; destruct fto as [f to] .
   cbn in *.
   epose proof (find_block_none_app _ bks2 _ FIND) as FIND_L1L2.
@@ -195,9 +289,9 @@ Admitted.
 Definition sym_fin {n1 n2 n3 : nat} (f : fin (n1 + (n2 + n3))) : fin (n1 + (n3 + n2)) :=
   match split_fin_sum _ _ f with
   | inl l => L (n3 + n2) l
-  | inr r => Fin.R n1 (
+  | inr r => R n1 (
     match split_fin_sum _ _ r with
-    | inl l => Fin.R _ l
+    | inl l => R _ l
     | inr r => L _ r
     end
   )
@@ -209,6 +303,14 @@ Theorem denote_cvir_sym_i : forall {ni1 ni2 ni3 no : nat} (ir : cvir (ni1 + (ni2
   eutt eq
     (denote_cvir ir bid bid')
     (denote_cvir (sym_i_cvir ir) (sym_fin bid) bid').
+Proof.
+  intros.
+  unfold denote_cvir, denote_cvir_gen, sym_i_cvir, sym_fin.
+  cbn.
+  rewrite !firstn_build_map.
+  rewrite !skipn_build_map.
+  cbn.
+  destruct (split_fin_sum _ _ _) eqn:?.
 Admitted.
 
 Theorem denote_cvir_relabel : forall ni no (ir : cvir ni no) vi vi' vo vo' vt vt' (bid : fin ni) bid',
@@ -217,13 +319,13 @@ Theorem denote_cvir_relabel : forall ni no (ir : cvir ni no) vi vi' vo vo' vt vt
   unique_vector (vi ++ vo ++ vt) ->
   unique_vector (vi' ++ vo' ++ vt') ->
   eutt eq
-    (denote_ocfg (convert_typ nil (blocks ir vi vo vt)) (bid', nth vi bid))
-    (denote_ocfg (convert_typ nil (blocks ir vi' vo' vt')) (bid', nth vi' bid)).
+    (denote_cvir_gen ir vi vo vt bid bid')
+    (denote_cvir_gen ir vi' vo' vt' bid bid').
 Admitted.
 
 Theorem compile_seq_correct : forall next_reg l r env next_reg' env' ir mem bid genv lenv vmem,
   compile next_reg (Seq l r) env = Some(next_reg', env', ir) ->
-  eutt (R env)
+  eutt (Rimpvir env)
   (interp_imp (denote_imp (Seq l r)) mem)
   (interp_cfg3 (denote_cvir ir f0 bid) genv lenv vmem).
 Admitted.
