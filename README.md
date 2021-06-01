@@ -178,6 +178,7 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 
 ### Assumes: 
   - coq   : version 8.13
+  - opam  : version 4.12.0
   - Clang 7.0.1+ (available for Mac OSX for XCode 4.2+, or installed via, e.g. sudo apt-get install clang; opam install llvm)
   - External Coq libraries: 
   Note: if it's the first time you install Coq libraries via Opam, you will have to add the repository first with `opam repo add coq-released https://coq.inria.fr/opam/released`.
