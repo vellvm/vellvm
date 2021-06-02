@@ -199,10 +199,10 @@ Our current test-suite of LLVM programs for which we compare our semantics again
     * simple-io  (installed via, e.g. `opam install coq-simple-io`)
 
   - Additional opam packages: 
-    * ocamlbuild (installed via, e.g. opam `install ocaml-build`)
-    * dune       (installed via, e.g. opam `install dune`)
-    * menhir     (installed via, e.g. opam `install menhir`)
-    * qcheck     (installed via, e.g. opam `install qcheck`)
+    * ocamlbuild (installed via, e.g. `opam install ocaml-build`)
+    * dune       (installed via, e.g. `opam install dune`)
+    * menhir     (installed via, e.g. `opam install menhir`)
+    * qcheck     (installed via, e.g. `opam install qcheck`)
 
 Compilation:
 
