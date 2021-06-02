@@ -19,93 +19,17 @@ From Vellvm Require Import
      Semantics
      Syntax
      Syntax.ScopeTheory
+     Utils.AListFacts
      Utils.Tactics.
 From Imp2Vir Require Import Unique.
 
-Module raw_id_as_OT <: UsualOrderedType.
-  Open Scope Z_scope.
-
-  Definition t := raw_id.
-  Definition eq := @eq t.
-  Definition eq_refl := @eq_refl t.
-  Definition eq_sym := @eq_sym t.
-  Definition eq_trans := @eq_trans t.
-
-  Definition lt (x y: t) := match x, y with
-  | Name x, Name y => String_as_OT.lt x y
-  | Name _, _ => True
-  | Anon _, Name _ => False
-  | Anon x, Anon y => x < y
-  | Anon _, _ => True
-  | Raw x, Raw y => x < y
-  | Raw _, _ => False
-  end.
-
-  Lemma lt_trans : forall x y z, lt x y -> lt y z -> lt x z.
-  Proof.
-    intros.
-    destruct x, y, z;
-    simpl in *;
-    tauto +
-      apply (String_as_OT.lt_trans _ _ _ H H0) +
-      apply (Z_as_OT.lt_trans H H0).
-  Qed.
-
-  Lemma lt_not_eq : forall x y, lt x y -> ~ x=y.
-  Proof.
-    intros.
-    destruct x, y;
-    try discriminate;
-    intro;
-    injection H0 as H0;
-    subst;
-    simpl in H;
-    apply String_as_OT.lt_not_eq in H + apply Z_as_OT.lt_not_eq in H;
-    compute in H;
-    tauto.
-  Qed.
-
-  Definition cmp x y : comparison :=
-    match x, y with
-    | Name x, Name y => String_as_OT.cmp x y
-    | Name _, _ => Lt
-    | Anon _, Name _ => Gt
-    | Anon x, Anon y => Z.compare x y
-    | Anon _, _ => Lt
-    | Raw x, Raw y => Z.compare x y
-    | Raw _, _ => Gt
-    end.
-
-  Definition compare x y : Compare lt eq x y.
-  Proof.
-    unfold eq.
-    case_eq (cmp x y); intros H; unfold cmp in H.
-    - apply EQ.
-      destruct x, y; try discriminate; f_equal;
-      now (apply String_as_OT.cmp_eq + apply Z.compare_eq).
-    - apply LT.
-      destruct x, y; try discriminate; f_equal;
-      now (apply String_as_OT.cmp_lt + apply Z.compare_lt_iff + simpl).
-    - apply GT.
-      destruct x, y; try discriminate; f_equal;
-      try now (apply Z.compare_gt_iff + simpl).
-      apply String_as_OT.cmp_lt.
-      rewrite String_as_OT.cmp_antisym.
-      now rewrite H.
-  Defined.
-
-  Definition eq_dec := raw_id_eq_dec.
-
-End raw_id_as_OT.
-
-Module Import RawIdMap := Coq.FSets.FMapList.Make(raw_id_as_OT).
-Definition bid_map := RawIdMap.t raw_id.
+Definition bid_map := alist block_id block_id.
 Import MonadNotation.
 
 Definition blk_id_relabel_get_map (bid bid' : raw_id) m : option bid_map :=
-  match find bid m with
+  match alist_find bid m with
   | Some bid => if raw_id_eq_dec bid bid' then Some m else None
-  | None => Some (add bid bid' m)
+  | None => Some (alist_add bid bid' m)
   end.
 
 Definition blk_term_relabel_get_map {typ} (t t' : terminator typ) m : option bid_map :=
@@ -133,17 +57,16 @@ Fixpoint ocfg_relabel_get_map' {typ} (cfg cfg' : ocfg typ) m : option bid_map :=
   end.
 
 Definition ocfg_relabel_get_map {typ} (cfg cfg' : ocfg typ) : option bid_map :=
-  ocfg_relabel_get_map' cfg cfg' (empty raw_id).
+  ocfg_relabel_get_map' cfg cfg' nil.
 
 Definition blk_id_relabel m bid : block_id :=
-  match find bid m with
+  match alist_find bid m with
   | Some bid => bid
   | None => bid
   end.
 
 Definition blk_id_relabel_rel m bid bid' : Prop :=
   blk_id_relabel m bid = bid'.
-
 
 Definition blk_term_relabel {typ} m t : terminator typ :=
   match t with
@@ -170,9 +93,9 @@ Definition ocfg_relabel_rel' {typ} (cfg cfg' : ocfg typ) m : Prop :=
   end.
 
 Definition ocfg_relabel_rel {typ} (cfg cfg' : ocfg typ) : Prop :=
-  ocfg_relabel_rel' cfg cfg' (empty raw_id).
+  ocfg_relabel_rel' cfg cfg' nil.
 
-Theorem bk_relabel_id : forall {typ} (bk : block typ), bk_relabel (empty raw_id) bk = bk.
+Theorem bk_relabel_id : forall {typ} (bk : block typ), bk_relabel nil bk = bk.
 Proof.
   intros.
   destruct bk.
@@ -181,25 +104,15 @@ Proof.
   now break_match.
 Qed.
 
-Theorem map_In_find : forall m bid,
-  In bid m -> exists (bid' : block_id), find bid m = Some bid'.
-Proof.
-  intros.
-  unfold In, Raw.PX.In in H.
-  destruct H.
-  exists x.
-  apply Raw.find_1.
-  apply sorted.
-  apply H.
-Qed.
-
 Definition inj_map (m : bid_map) : Prop :=
-  (* unique_list (snd (split (elements m))). *)
-  forall a b, find a m = find b m -> a = b.
+  forall a b, alist_find a m = alist_find b m -> a = b.
+
+Definition surj_map (m : bid_map) (bids : list block_id) : Prop :=
+  forall i : block_id, List.In i bids -> exists i', alist_find i m = Some i'.
 
 Theorem ocfg_relabel_inputs : forall {typ} (cfg cfg' : ocfg typ) m m' (i : block_id),
   ocfg_relabel_get_map' cfg cfg' m = Some m' ->
-  List.In i (inputs cfg) -> In (elt:=raw_id) i m'.
+  List.In i (inputs cfg) -> exists i', alist_find i m' = Some i'.
 Proof.
   induction cfg; intros; [ destruct H0 |].
   simpl in *.
@@ -217,7 +130,7 @@ Admitted.
 Theorem blk_id_relabel_find_block1 : forall {typ} (cfg cfg' : ocfg typ) m bid bk,
   ocfg_relabel m cfg = cfg' ->
   find_block cfg bid = Some bk ->
-  (forall i, List.In i (inputs cfg) -> In i m) ->
+  surj_map m (inputs cfg) ->
   inj_map m ->
   find_block cfg' (blk_id_relabel m bid) = Some (bk_relabel m bk).
 Proof.
@@ -226,7 +139,7 @@ Admitted. (* should be easy, see blk_id_relabel_find_block *)
 Theorem blk_id_relabel_find_block2 : forall {typ} (cfg cfg' : ocfg typ) m bid bk',
   ocfg_relabel m cfg = cfg' ->
   find_block cfg' (blk_id_relabel m bid) = Some bk' ->
-  (forall i, List.In i (inputs cfg) -> In i m) ->
+  (forall i, List.In i (inputs cfg) -> exists i', alist_find i m = Some i') ->
   inj_map m ->
   exists bk, bk' = bk_relabel m bk /\ find_block cfg bid = Some bk.
 Proof.
@@ -236,10 +149,11 @@ Theorem blk_id_relabel_find_block : forall {typ} (cfg cfg' : ocfg typ) m bid bk 
   ocfg_relabel m cfg = cfg' ->
   find_block cfg bid = Some bk ->
   find_block cfg' (blk_id_relabel m bid) = Some bk' ->
-  (forall i, List.In i (inputs cfg) -> In i m) ->
+  surj_map m (inputs cfg) ->
   inj_map m ->
   bk' = bk_relabel m bk.
 Proof.
+  unfold surj_map.
   induction cfg ; intros.
   - compute in H.
     now destruct cfg'.
@@ -258,10 +172,10 @@ Proof.
       apply find_block_Some_In_inputs in H0 as ?.
       pose proof (H2 bid (or_intror H)).
       unfold blk_id_relabel in e.
-      apply map_In_find in H1. destruct H1.
+      destruct H1.
       rewrite H1 in e.
       specialize (H2 (blk_id a) (or_introl eq_refl)).
-      apply map_In_find in H2. destruct H2.
+      destruct H2.
       rewrite H2 in e.
       subst x0.
       rewrite <- H1 in H2.
@@ -271,21 +185,10 @@ Proof.
       intuition.
 Qed.
 
-Theorem map_find_add : forall (m : bid_map) bid bid' nbid nbid',
-  find bid m = Some bid' ->
-  nbid <> bid ->
-  find bid (add nbid nbid' m) = Some bid'.
-Proof.
-  intros.
-  apply find_2 in H.
-  apply find_1.
-  apply add_2; assumption.
-Qed.
-
 Theorem bk_relabel_get_map_preserve : forall {typ} (bk bk' : block typ) m m' bid bid',
-  find bid m = Some bid' ->
+  alist_find bid m = Some bid' ->
   bk_relabel_get_map bk bk' m = Some m' ->
-  find bid m' = Some bid'.
+  alist_find bid m' = Some bid'.
 Proof.
   intros.
   unfold bk_relabel_get_map, blk_id_relabel_get_map, blk_term_relabel_get_map in H0.
@@ -293,17 +196,16 @@ Proof.
   repeat break_match;
     try discriminate;
     try injection Heqo as Heqo; try injection H0 as H0; subst; try assumption.
-  1,2: apply map_find_add; [ assumption | intro; subst; now rewrite H in * ].
+  1,2: rewrite alist_find_neq; [ assumption | intro; subst; now rewrite H in * ].
   - unfold blk_id_relabel_get_map in *.
     repeat break_match;
       try discriminate;
       try injection Heqo0 as Heqo0; try injection H0 as H0; subst; try assumption.
-    1,2: apply map_find_add; [ assumption | intro; subst; now rewrite H in * ].
-    repeat apply map_find_add; try assumption;
+    1,2: rewrite alist_find_neq; [ assumption | intro; subst; now rewrite H in * ].
+    repeat rewrite alist_find_neq; try assumption;
       intro; subst.
     + now rewrite H in *.
-    + apply find_2 in H. eapply add_2 in H. apply find_1 in H. now rewrite H in *.
-      intro. subst. apply find_1 in H. now rewrite H in *.
+    + apply alist_find_add_none in Heqo. now rewrite H in *.
   - unfold blk_id_relabel_get_map in *.
     repeat break_match;
       try discriminate;
@@ -311,9 +213,9 @@ Proof.
 Admitted. (* easy but tedious, automate? *)
 
 Theorem ocfg_relabel_get_map_preserve : forall {typ} (cfg cfg' : ocfg typ) m m' bid bid',
-  find bid m = Some bid' ->
+  alist_find bid m = Some bid' ->
   ocfg_relabel_get_map' cfg cfg' m = Some m' ->
-  find bid m' = Some bid'.
+  alist_find bid m' = Some bid'.
 Proof.
   induction cfg; intros.
   - simpl in H0. destruct cfg'; try discriminate. inversion H0. subst m. assumption.
@@ -335,13 +237,15 @@ Definition ocfg_relabel_helper_rel m (bidsv bidsv' : block_id * block_id + uvalu
 Theorem eutt_ocfg_relabel : forall cfg cfg' bidf0 bidf0' bidt0 bidt0' m,
   (bidf0 = bidt0 <-> bidf0' = bidt0') ->
   ocfg_relabel m cfg = cfg' ->
-  ocfg_relabel_get_map' cfg cfg' (add bidt0 bidt0' (add bidf0 bidf0' (empty raw_id))) = Some m ->
+  ocfg_relabel_get_map' cfg cfg' (alist_add bidt0 bidt0' (alist_add bidf0 bidf0' nil)) = Some m ->
   inj_map m ->
-  eutt (ocfg_relabel_helper_rel m) (denote_ocfg cfg (bidf0, bidt0)) (denote_ocfg cfg' (bidf0', bidt0')).
+  eutt (ocfg_relabel_helper_rel m)
+    (denote_ocfg cfg (bidf0, bidt0))
+    (denote_ocfg cfg' (bidf0', bidt0')).
 Proof.
   intros ? ? ? ? ? ? ? H4 ? ? H5.
-  assert (H6 : forall i : block_id, List.In i (inputs cfg) -> In (elt:=raw_id) i m). {
-    intros. eapply ocfg_relabel_inputs; eassumption.
+  assert (H6 : surj_map m (inputs cfg)). {
+    unfold surj_map. intros. eapply ocfg_relabel_inputs; eassumption.
   }
   set (I := blk_id_relabel_rel m).
   set (I' := fun fto fto' =>
@@ -426,22 +330,19 @@ Proof.
       destruct H1.
       - rewrite <- H1.
         rewrite <- ((proj1 H4) H1).
-        apply find_1.
-        now apply add_1.
-      - apply map_find_add; [| auto ].
-        apply find_1.
-        now apply add_1.
+        apply alist_find_add_eq.
+      - rewrite alist_find_neq; [| assumption ].
+        apply alist_find_add_eq.
     }
     split; [ reflexivity |].
     erewrite ocfg_relabel_get_map_preserve with (bid' := bidt0'); try eassumption.
     reflexivity.
-    apply find_1.
-    now apply add_1.
+    apply alist_find_add_eq.
 Admitted.
 
 Theorem eutt_cfg_relabel : forall cfg cfg' bid0 bid0' m,
   ocfg_relabel m (blks cfg) = (blks cfg') ->
-  ocfg_relabel_get_map' (blks cfg) (blks cfg') (add bid0 bid0' (empty raw_id)) = Some m ->
+  ocfg_relabel_get_map' (blks cfg) (blks cfg') (alist_add bid0 bid0' nil) = Some m ->
   inj_map m ->
   eutt eq (denote_cfg cfg) (denote_cfg cfg').
 Proof.
