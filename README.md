@@ -179,15 +179,15 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 ### Assumes: 
   - Coq: version 8.13 (installed via *opam*, see below)
   - OCaml: version 4.12.0 (installed via *opam*, see below)
-  - opam: version 2.0.5 .
-    It is ailable via [homebrew](https://brew.sh/) on Mac or via system package manager on Linux e.g. `sudo apt-get install opam`).
+  - opam: version 2.0.5.
+    It is ailable via [homebrew](https://brew.sh/) on Mac or via system package manager on Linux e.g. `sudo apt-get install opam`.
     If this is the first time you are using opam you need to initialize it: 
     with `opam init` on Linux
-    or   `opam init --disable-sandboxing` (sandboxind is disable due to known [issue](https://github.com/ocaml/opam-repository/issues/12973).
+    or   `opam init --disable-sandboxing` on Mac (sandboxing is disable due to known [issue](https://github.com/ocaml/opam-repository/issues/12973)).
     Add Coq package repository:
     `opam repo add coq-released https://coq.inria.fr/opam/released`.
     Finally, create a *switch* with:
-    `opam switch create vellvm ocaml-base-compiler.4.12.0`
+    `opam switch create vellvm ocaml-base-compiler.4.12.0`.
   - Clang 7.0.1+ (available for Mac OSX in XCode 4.2+, or installed via, e.g. `sudo apt-get install clang`)
   - External Coq libraries: 
     * ext-lib    (installed via, e.g. `opam install coq-ext-lib`)
