@@ -87,13 +87,10 @@ Definition ocfg_relabel {typ} m cfg : ocfg typ :=
   List.map (bk_relabel m) cfg.
 
 Definition ocfg_relabel_rel' {typ} (cfg cfg' : ocfg typ) m : Prop :=
-  match ocfg_relabel_get_map' cfg cfg' m with
-  | Some m => ocfg_relabel m cfg = cfg'
-  | None => False
-  end.
+  ocfg_relabel m cfg = cfg'.
 
 Definition ocfg_relabel_rel {typ} (cfg cfg' : ocfg typ) : Prop :=
-  ocfg_relabel_rel' cfg cfg' nil.
+  exists m, ocfg_relabel_rel' cfg cfg' m.
 
 Theorem bk_relabel_id : forall {typ} (bk : block typ), bk_relabel nil bk = bk.
 Proof.
@@ -237,22 +234,21 @@ Definition ocfg_relabel_helper_rel m (bidsv bidsv' : block_id * block_id + uvalu
 Theorem eutt_ocfg_relabel : forall cfg cfg' bidf0 bidf0' bidt0 bidt0' m,
   (bidf0 = bidt0 <-> bidf0' = bidt0') ->
   ocfg_relabel m cfg = cfg' ->
-  ocfg_relabel_get_map' cfg cfg' (alist_add bidt0 bidt0' (alist_add bidf0 bidf0' nil)) = Some m ->
+  alist_find bidf0 m = Some bidf0' ->
+  alist_find bidt0 m = Some bidt0' ->
   inj_map m ->
+  surj_map m (inputs cfg) ->
   eutt (ocfg_relabel_helper_rel m)
     (denote_ocfg cfg (bidf0, bidt0))
     (denote_ocfg cfg' (bidf0', bidt0')).
 Proof.
-  intros ? ? ? ? ? ? ? H4 ? ? H5.
-  assert (H6 : surj_map m (inputs cfg)). {
-    unfold surj_map. intros. eapply ocfg_relabel_inputs; eassumption.
-  }
+  intros ? ? ? ? ? ? ? H4 ? H0 H7 H5 H6.
   set (I := blk_id_relabel_rel m).
   set (I' := fun fto fto' =>
     I (fst fto) (fst fto') /\ I (snd fto) (snd fto')).
   apply (@eutt_iter_gen _ _ _ I').
   - simpl.
-    intros [bidf bidt] [bidf' bidt'] ?.
+    intros [bidf bidt] [bidf' bidt'] H1.
     unfold I' in H1. simpl in H1. destruct H1.
     do 2 break_match.
     + assert (b0 = bk_relabel m b). {
@@ -324,26 +320,15 @@ Proof.
   - (* Proof that the relation holds initially. *)
     unfold I', I, blk_id_relabel_rel, blk_id_relabel.
     simpl.
-    erewrite ocfg_relabel_get_map_preserve with (bid' := bidf0'); try eassumption.
-    2: {
-      assert (bidf0 = bidt0 \/ bidf0 <> bidt0) by tauto.
-      destruct H1.
-      - rewrite <- H1.
-        rewrite <- ((proj1 H4) H1).
-        apply alist_find_add_eq.
-      - rewrite alist_find_neq; [| assumption ].
-        apply alist_find_add_eq.
-    }
-    split; [ reflexivity |].
-    erewrite ocfg_relabel_get_map_preserve with (bid' := bidt0'); try eassumption.
-    reflexivity.
-    apply alist_find_add_eq.
+    setoid_rewrite H0. setoid_rewrite H7.
+    tauto.
 Admitted.
 
-Theorem eutt_cfg_relabel : forall cfg cfg' bid0 bid0' m,
+Theorem eutt_cfg_relabel : forall cfg cfg' m,
   ocfg_relabel m (blks cfg) = (blks cfg') ->
-  ocfg_relabel_get_map' (blks cfg) (blks cfg') (alist_add bid0 bid0' nil) = Some m ->
+  alist_find (init cfg) m = Some (init cfg') ->
   inj_map m ->
+  surj_map m (inputs (blks cfg)) ->
   eutt eq (denote_cfg cfg) (denote_cfg cfg').
 Proof.
   intros.
@@ -351,9 +336,8 @@ Proof.
   apply eutt_clo_bind with (UU := ocfg_relabel_helper_rel m).
   apply eutt_ocfg_relabel; try assumption.
   tauto.
-  admit. (* easy *)
   intros.
-  unfold ocfg_relabel_helper_rel in H2.
+  unfold ocfg_relabel_helper_rel in H3.
   repeat break_match; subst; try easy.
   admit. (* the strings do not match... *)
 Admitted.
