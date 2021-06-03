@@ -23,41 +23,10 @@ From Vellvm Require Import
      Utils.Tactics.
 From Imp2Vir Require Import Unique.
 
+Section Relabel.
+
 Definition bid_map := alist block_id block_id.
 Import MonadNotation.
-
-Definition blk_id_relabel_get_map (bid bid' : raw_id) m : option bid_map :=
-  match alist_find bid m with
-  | Some bid => if raw_id_eq_dec bid bid' then Some m else None
-  | None => Some (alist_add bid bid' m)
-  end.
-
-Definition blk_term_relabel_get_map {typ} (t t' : terminator typ) m : option bid_map :=
-  match t, t' with
-  | TERM_Br_1 bid, TERM_Br_1 bid' =>
-    blk_id_relabel_get_map bid bid' m
-  | TERM_Br e bid1 bid2, TERM_Br e' bid1' bid2' =>
-    m <- blk_id_relabel_get_map bid1 bid1' m;;
-    blk_id_relabel_get_map bid2 bid2' m
-  | TERM_Ret _, TERM_Ret _ | TERM_Ret_void, TERM_Ret_void => Some m
-  | _, _ => None
-  end.
-
-Definition bk_relabel_get_map {typ} (bk bk' : block typ) m : option bid_map :=
-  m <- blk_id_relabel_get_map (blk_id bk) (blk_id bk') m;;
-  blk_term_relabel_get_map (blk_term bk) (blk_term bk') m.
-
-Fixpoint ocfg_relabel_get_map' {typ} (cfg cfg' : ocfg typ) m : option bid_map :=
-  match cfg, cfg' with
-  | (bk::t), (bk'::t') =>
-    m <- bk_relabel_get_map bk bk' m;;
-    ocfg_relabel_get_map' t t' m
-  | nil, nil => Some m
-  | _, _ => None
-  end.
-
-Definition ocfg_relabel_get_map {typ} (cfg cfg' : ocfg typ) : option bid_map :=
-  ocfg_relabel_get_map' cfg cfg' nil.
 
 Definition blk_id_relabel m bid : block_id :=
   match alist_find bid m with
@@ -107,22 +76,40 @@ Definition inj_map (m : bid_map) : Prop :=
 Definition surj_map (m : bid_map) (bids : list block_id) : Prop :=
   forall i : block_id, List.In i bids -> exists i', alist_find i m = Some i'.
 
-Theorem ocfg_relabel_inputs : forall {typ} (cfg cfg' : ocfg typ) m m' (i : block_id),
-  ocfg_relabel_get_map' cfg cfg' m = Some m' ->
-  List.In i (inputs cfg) -> exists i', alist_find i m' = Some i'.
-Proof.
-  induction cfg; intros; [ destruct H0 |].
-  simpl in *.
-  destruct cfg'; [ discriminate |].
-  destruct H0.
-  - subst.
-    break_match; [| discriminate ].
-    unfold bk_relabel_get_map in Heqo.
-    simpl in Heqo.
-    admit. (* tedious *)
-  - break_match; eapply IHcfg; try eassumption; discriminate.
-  Unshelve. all: auto.
-Admitted.
+(* Definitions to build a bid mapping. Not used anywhere. *)
+
+Definition blk_id_relabel_build_map (bid bid' : raw_id) m : option bid_map :=
+  match alist_find bid m with
+  | Some bid => if raw_id_eq_dec bid bid' then Some m else None
+  | None => Some (alist_add bid bid' m)
+  end.
+
+Definition blk_term_relabel_build_map {typ} (t t' : terminator typ) m : option bid_map :=
+  match t, t' with
+  | TERM_Br_1 bid, TERM_Br_1 bid' =>
+    blk_id_relabel_build_map bid bid' m
+  | TERM_Br e bid1 bid2, TERM_Br e' bid1' bid2' =>
+    m <- blk_id_relabel_build_map bid1 bid1' m;;
+    blk_id_relabel_build_map bid2 bid2' m
+  | TERM_Ret _, TERM_Ret _ | TERM_Ret_void, TERM_Ret_void => Some m
+  | _, _ => None
+  end.
+
+Definition bk_relabel_build_map {typ} (bk bk' : block typ) m : option bid_map :=
+  m <- blk_id_relabel_build_map (blk_id bk) (blk_id bk') m;;
+  blk_term_relabel_build_map (blk_term bk) (blk_term bk') m.
+
+Fixpoint ocfg_relabel_build_map' {typ} (cfg cfg' : ocfg typ) m : option bid_map :=
+  match cfg, cfg' with
+  | (bk::t), (bk'::t') =>
+    m <- bk_relabel_build_map bk bk' m;;
+    ocfg_relabel_build_map' t t' m
+  | nil, nil => Some m
+  | _, _ => None
+  end.
+
+Definition ocfg_relabel_build_map {typ} (cfg cfg' : ocfg typ) : option bid_map :=
+  ocfg_relabel_build_map' cfg cfg' nil.
 
 Theorem blk_id_relabel_find_block1 : forall {typ} (cfg cfg' : ocfg typ) m bid bk,
   ocfg_relabel m cfg = cfg' ->
@@ -182,19 +169,37 @@ Proof.
       intuition.
 Qed.
 
-Theorem bk_relabel_get_map_preserve : forall {typ} (bk bk' : block typ) m m' bid bid',
+Theorem ocfg_relabel_build_map_surj : forall {typ} (cfg cfg' : ocfg typ) m m',
+  ocfg_relabel_build_map' cfg cfg' m = Some m' ->
+  surj_map m' (inputs cfg).
+Proof.
+  unfold surj_map.
+  induction cfg; intros; [ destruct H0 |].
+  simpl in *.
+  destruct cfg'; [ discriminate |].
+  destruct H0.
+  - subst.
+    break_match; [| discriminate ].
+    unfold bk_relabel_build_map in Heqo.
+    simpl in Heqo.
+    admit. (* tedious *)
+  - break_match; eapply IHcfg; try eassumption; discriminate.
+  Unshelve. all: auto.
+Abort.
+
+Theorem bk_relabel_build_map_preserve : forall {typ} (bk bk' : block typ) m m' bid bid',
   alist_find bid m = Some bid' ->
-  bk_relabel_get_map bk bk' m = Some m' ->
+  bk_relabel_build_map bk bk' m = Some m' ->
   alist_find bid m' = Some bid'.
 Proof.
   intros.
-  unfold bk_relabel_get_map, blk_id_relabel_get_map, blk_term_relabel_get_map in H0.
+  unfold bk_relabel_build_map, blk_id_relabel_build_map, blk_term_relabel_build_map in H0.
   simpl in H0.
   repeat break_match;
     try discriminate;
     try injection Heqo as Heqo; try injection H0 as H0; subst; try assumption.
   1,2: rewrite alist_find_neq; [ assumption | intro; subst; now rewrite H in * ].
-  - unfold blk_id_relabel_get_map in *.
+  - unfold blk_id_relabel_build_map in *.
     repeat break_match;
       try discriminate;
       try injection Heqo0 as Heqo0; try injection H0 as H0; subst; try assumption.
@@ -203,15 +208,15 @@ Proof.
       intro; subst.
     + now rewrite H in *.
     + apply alist_find_add_none in Heqo. now rewrite H in *.
-  - unfold blk_id_relabel_get_map in *.
+  - unfold blk_id_relabel_build_map in *.
     repeat break_match;
       try discriminate;
       try injection Heqo0 as Heqo0; try injection H0 as H0; subst; try assumption.
-Admitted. (* easy but tedious, automate? *)
+Abort. (* easy but tedious, automate? *)
 
-Theorem ocfg_relabel_get_map_preserve : forall {typ} (cfg cfg' : ocfg typ) m m' bid bid',
+Theorem ocfg_relabel_build_map_preserve : forall {typ} (cfg cfg' : ocfg typ) m m' bid bid',
   alist_find bid m = Some bid' ->
-  ocfg_relabel_get_map' cfg cfg' m = Some m' ->
+  ocfg_relabel_build_map' cfg cfg' m = Some m' ->
   alist_find bid m' = Some bid'.
 Proof.
   induction cfg; intros.
@@ -220,8 +225,9 @@ Proof.
     simpl in *.
     break_match; [| discriminate ].
     eapply IHcfg; [| eassumption ].
-    eapply bk_relabel_get_map_preserve; eassumption.
-Qed.
+Abort.
+    (*eapply bk_relabel_get_map_preserve; eassumption.
+Qed.*)
 
 Definition ocfg_relabel_helper_rel m (bidsv bidsv' : block_id * block_id + uvalue) : Prop :=
   match bidsv, bidsv' with
@@ -341,3 +347,5 @@ Proof.
   repeat break_match; subst; try easy.
   admit. (* the strings do not match... *)
 Admitted.
+
+End Relabel.
