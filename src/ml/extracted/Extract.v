@@ -51,6 +51,15 @@ Extract Inlined Constant ascii_dec => "(=)".
 Extract Inductive string => "string" [ "str_nil" "str_cons" ].
 *)
 
+(* camlstring_of_coqstring is from Camlcoq *)
+Extract Constant print_msg => "let camlstring_of_coqstring (s: char list) =
+  let r = Bytes.create (List.length s) in
+  let rec fill pos = function
+  | [] -> r
+  | c :: s -> Bytes.set r pos c; fill (pos + 1) s
+  in Bytes.to_string (fill 0 s)
+in fun msg -> print_string (camlstring_of_coqstring msg ^ ""\n"")".
+
 (* OCaml pervasive types ---------------------------------------------------- *)
 (* Extract Inlined Constant LLVMAst.int => "int". *)
 (* Extract Inlined Constant LLVMAst.float => "float". *)
