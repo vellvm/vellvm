@@ -16,6 +16,7 @@ From Vellvm Require Import
      Syntax
      Syntax.ScopeTheory
      Utils.AListFacts
+     Utils.PostConditions
      Utils.Tactics.
 From Imp2Vir Require Import Fin Imp.
 
@@ -199,6 +200,17 @@ Lemma unique_vector_build_map :
   unique_vector (build_map fi ni ++ build_map fo no ++ build_map ft nt).
 Admitted.
 
+Lemma unique_vector_build_map' :
+  forall fi fo ni no,
+  (fi + ni <= fo)%nat ->
+  unique_vector (build_map fi ni ++ build_map fo no).
+Proof.
+  intros.
+  eapply unique_vector_app1 with (v2 := build_map (fo + no) 0).
+  apply unique_vector_assoc.
+  apply unique_vector_build_map; lia.
+Qed.
+
 Theorem merge_cvir_relabel_WF :
   forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2),
   cvir_relabel_WF ir1 -> cvir_relabel_WF ir2 ->
@@ -281,7 +293,35 @@ Proof.
   - admit.
 Admitted.
 
-Theorem denote_cvir_merge' : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
+(* TODO rewrite with has_post *)
+Theorem denote_terminator_has_post_block_id :
+  forall (I : block_id -> block_id -> Prop) bk,
+  (forall (bid : block_id), List.In bid (successors bk) -> I bid bid) ->
+  eutt (sum_rel I eq) (denote_terminator (blk_term bk)) (denote_terminator (blk_term bk)).
+Proof.
+  intros.
+  unfold successors in H.
+  unfold denote_terminator. simpl bind.
+  break_match; try (apply eutt_eq_bind; tauto).
+  - break_let.
+    apply eutt_eq_bind.
+    intro.
+    apply eutt_Ret.
+    now right.
+  - apply eutt_Ret.
+    now right.
+  - break_let.
+    apply eutt_eq_bind.
+    intro.
+    apply eutt_eq_bind.
+    intro.
+    break_match; try (apply eutt_eq_bind; tauto).
+    break_match; apply eutt_Ret; left; apply H; cbn; tauto.
+  - apply eutt_Ret. left. apply H. cbn. tauto.
+  - admit. (* TERM_Switch *)
+Admitted.
+
+Theorem denote_cvir_merge_l' : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
   cvir_ids_WF ir1 ->
   cvir_ids_WF ir2 ->
   cvir_inputs_used ir1 ->
@@ -289,23 +329,18 @@ Theorem denote_cvir_merge' : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : 
   unique_bid ir1 ->
   unique_bid ir2 ->
   eutt eq
-    (denote_cvir (merge_cvir ir1 ir2) bid bid)
-    (match split_fin_sum ni1 ni2 bid with
-    | inl bid1 => denote_cvir_gen ir1 (build_map 0 ni1) (build_map (ni1+ni2) no1) (build_map (ni1+ni2+(no1+no2)) (n_int ir1)) bid1 bid1
-    | inr bid2 => denote_cvir_gen ir2 (build_map ni1 ni2) (build_map (ni1+ni2+no1) no2) (build_map (ni1+ni2+(no1+no2)+n_int ir1) (n_int ir2)) bid2 bid2
-    end).
+    (denote_cvir (merge_cvir ir1 ir2) (L ni2 bid) (L ni2 bid))
+    (denote_cvir_gen ir1 (build_map 0 ni1) (build_map (ni1+ni2) no1) (build_map (ni1+ni2+(no1+no2)) (n_int ir1)) bid bid).
 Proof.
   intros * WF11 WF12 WF21 WF22 WF31 WF32.
   assert (WF3 : wf_ocfg_bid (blocks_default (merge_cvir ir1 ir2))). {
     apply unique_bid_wf_ocfg_bid.
     apply merge_cvir_unique; assumption.
-    admit.
+    apply unique_vector_build_map'; lia.
   }
   cbn in WF3. rewrite !firstn_build_map, !skipn_build_map in WF3.
   (* case analysis on which subgraph we are in: *)
-  destruct (split_fin_sum ni1 ni2 bid) eqn:Eq.
-  - rename f into bid1.
-    unfold denote_cvir, denote_cvir_gen.
+  - unfold denote_cvir, denote_cvir_gen.
     unfold merge_cvir.
     cbn.
     rewrite !firstn_build_map.
@@ -328,7 +363,7 @@ Proof.
       unfold convert_typ, ConvertTyp_list, tfmap, TFunctor_list' in *.
       rewrite !find_block_map'; try tauto.
       unfold option_map.
-      repeat break_match; try easy.
+      repeat break_match; try discriminate.
       * apply find_block_app_wf in Heqo2; try assumption.
         destruct Heqo2. 2: {
           apply find_block_Some_In_inputs in H. destruct H1. simpl in H0. subst b2.
@@ -342,7 +377,7 @@ Proof.
         apply eutt_eq_bind. intros _.
         apply eutt_translate_gen.
         (* hard part: the terminator *)
-        assert ((forall bid, List.In bid (successors b1) -> I bid bid)). {
+        apply denote_terminator_has_post_block_id. {
           intros.
           unfold I.
           split; try reflexivity.
@@ -352,30 +387,10 @@ Proof.
           eapply successors_outputs; try eassumption.
           apply find_block_In' in H. assumption.
         }
-        unfold successors in H0.
-        unfold denote_terminator. simpl bind.
         intros.
-        break_match; try (apply eutt_eq_bind; tauto).
-        --break_let.
-          apply eutt_eq_bind.
-          intro.
-          apply eutt_Ret.
-          now right.
-        --apply eutt_Ret.
-          now right.
-        --break_let.
-          apply eutt_eq_bind.
-          intro.
-          apply eutt_eq_bind.
-          intro.
-          break_match; try (apply eutt_eq_bind; tauto).
-          break_match; apply eutt_Ret; left; apply H0; cbn; tauto.
-        --apply eutt_Ret. left. apply H0. cbn. tauto.
-        --admit. (* TERM_Switch *)
-        --intros.
-          repeat break_match; apply eutt_Ret; try easy.
-          ++ left. unfold I', I. inv H0. unfold I in H4. simpl. split; f_equal; tauto.
-          ++ right. now inv H0.
+        repeat break_match; apply eutt_Ret; try easy.
+        -- left. unfold I', I. inv H0. unfold I in H4. simpl. split; f_equal; tauto.
+        -- right. now inv H0.
       * exfalso.
         clear Heqo Heqo0.
         eapply find_block_app_wf in Heqo2; [| assumption ].
@@ -389,16 +404,25 @@ Proof.
         now right.
     + unfold I', I.
       rewrite !nth_build_map.
-      apply split_fin_sum_inl in Eq.
-      subst bid. destruct bid1.
+      destruct bid.
       intuition.
-      simpl.
       exists x.
       intuition.
-  - admit. (* this case is similar *)
+Qed.
+
+Theorem denote_cvir_merge_r' : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
+  cvir_ids_WF ir1 ->
+  cvir_ids_WF ir2 ->
+  cvir_inputs_used ir1 ->
+  cvir_inputs_used ir2 ->
+  unique_bid ir1 ->
+  unique_bid ir2 ->
+  eutt eq
+    (denote_cvir (merge_cvir ir1 ir2) (R ni1 bid) (R ni1 bid))
+    (denote_cvir_gen ir2 (build_map ni1 ni2) (build_map (ni1+ni2+no1) no2) (build_map (ni1+ni2+(no1+no2)+n_int ir1) (n_int ir2)) bid bid).
 Admitted.
 
-Theorem denote_cvir_merge1 : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
+Theorem denote_cvir_merge_l : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
   cvir_ids_WF ir1 ->
   cvir_ids_WF ir2 ->
   cvir_inputs_used ir1 ->
@@ -416,14 +440,12 @@ Theorem denote_cvir_merge1 : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : 
     (denote_cvir ir1 bid bid).
 Proof.
   intros.
-  setoid_rewrite denote_cvir_merge'; try assumption.
-  break_match; rewrite split_fin_sum_L in Heqs; try discriminate.
-  inv Heqs.
+  rewrite denote_cvir_merge_l'; try assumption.
   eapply eutt_cvir_relabel; try assumption;
   apply unique_vector_build_map; lia.
 Qed.
 
-Theorem denote_cvir_merge2 : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
+Theorem denote_cvir_merge_r : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
   cvir_ids_WF ir1 ->
   cvir_ids_WF ir2 ->
   cvir_inputs_used ir1 ->
@@ -441,9 +463,7 @@ Theorem denote_cvir_merge2 : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : 
     (denote_cvir ir2 bid bid).
 Proof.
   intros.
-  setoid_rewrite denote_cvir_merge'; try assumption.
-  break_match; rewrite split_fin_sum_R in Heqs; try discriminate.
-  inv Heqs.
+  rewrite denote_cvir_merge_r'; try assumption.
   eapply eutt_cvir_relabel; try assumption;
   apply unique_vector_build_map; lia.
 Qed.
@@ -474,16 +494,6 @@ Proof.
   cbn.
   destruct (split_fin_sum _ _ _) eqn:?.
   apply split_fin_sum_inl in Heqs. subst bid.
-Admitted.
-
-Theorem denote_cvir_relabel : forall ni no (ir : cvir ni no) vi vi' vo vo' vt vt' (bid : fin ni) bid',
-  cvir_ids_WF ir ->
-  unique_bid ir ->
-  unique_vector (vi ++ vo ++ vt) ->
-  unique_vector (vi' ++ vo' ++ vt') ->
-  eutt eq
-    (denote_cvir_gen ir vi vo vt bid bid')
-    (denote_cvir_gen ir vi' vo' vt' bid bid').
 Admitted.
 
 (* Relation between Imp env and vellvm env *)
