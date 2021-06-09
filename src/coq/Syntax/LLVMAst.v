@@ -1,6 +1,10 @@
 (* begin hide *)
 Require Import Floats.
-From Coq Require Import List String Ascii ZArith.
+From Coq Require Import
+     List
+     String
+     Ascii
+     ZArith.
 From Vellvm Require Import
      Utilities.
 
@@ -20,7 +24,7 @@ Open Scope list_scope.
     All changes to this file must naturally be mirrored in the parser.
     "/src/ml/libvellvm/llvm_parser.mly"
 
-*)
+ *)
 
 Definition int := Z.
 Definition float := Floats.float.  (* 64-bit floating point value *)
