@@ -272,7 +272,7 @@ Proof.
     break_match; [| discriminate ].
     unfold bk_relabel_build_map in Heqo.
     simpl in Heqo.
-    admit. (* tedious *)
+    shelve. (* tedious *)
   - break_match; eapply IHcfg; try eassumption; discriminate.
   Unshelve. all: auto.
 Abort.
@@ -373,20 +373,19 @@ Qed.
 Theorem eutt_phi_relabel : forall {typ} (cfg : ocfg typ) bidf bidf' lid phi m,
   inj_map m ->
   defined_map m (phi_sources phi) ->
-  In bidf (inputs cfg) ->
   alist_find bidf m = Some bidf' ->
   eutt eq (denote_phi bidf (lid, phi)) (denote_phi bidf' (lid, blk_phi_relabel m phi)).
 Proof.
-  intros.
+  intros ? ? ? ? ? ? ? ? ? H2.
   unfold denote_phi.
   repeat break_let. simpl in *.
   inv Heqp0.
   rewrite !assoc_alist_find.
-  assert (forall (k' : block_id) (v' : exp dtyp),
+  assert (H3 : forall (k' : block_id) (v' : exp dtyp),
     alist_find k' args = Some v' -> blk_id_relabel m bidf = blk_id_relabel m k' -> bidf = k'). {
-    intros.
+    intros ? ? H3 H4.
     apply alist_find_key_in in H3.
-    apply H0 in H3 as [].
+    apply H0 in H3 as [? H3].
     unfold blk_id_relabel in H4.
     rewrite H2, H3 in H4. subst.
     eapply H; try eassumption.
@@ -409,6 +408,50 @@ Proof.
     erewrite Heqo0 in Heqo.
     discriminate. apply RelDec.RelDec_Correct_eq_typ. apply H3.
   - reflexivity.
+Qed.
+
+Definition phis_sources {typ} (phis : list (local_id * phi typ)) : list (block_id) :=
+  concat (List.map (compose snd phi_sources) phis).
+
+Theorem eutt_phis_relabel : forall {typ} (cfg : ocfg typ) bidf bidf' phis m,
+  inj_map m ->
+  defined_map m (phis_sources phis) ->
+  alist_find bidf m = Some bidf' ->
+  eutt eq (denote_phis bidf phis) (denote_phis bidf' (blk_phis_relabel m phis)).
+Proof.
+  intros ? ? ? ? ? ? ? ? H2.
+  cbn.
+  apply eutt_clo_bind with (UU := eq).
+  induction phis.
+  - cbn.
+    reflexivity.
+  - cbn.
+    apply eutt_clo_bind with (UU := eq).
+    apply eutt_translate; [ reflexivity |].
+    break_let.
+    eapply eutt_phi_relabel; try eassumption.
+    {
+      unfold defined_map.
+      intros.
+      apply H0.
+      unfold phis_sources, compose.
+      simpl. apply in_app_iff. now left.
+    }
+    intros.
+    apply eutt_clo_bind with (UU := eq).
+    apply IHphis.
+    {
+      unfold defined_map.
+      intros.
+      apply H0.
+      unfold phis_sources, compose.
+      simpl.
+      apply in_app_iff.
+      now right.
+    }
+    intros.
+    now subst.
+  - intros. now subst.
 Qed.
 
 Definition term_relabel_helper_rel m (bidv bidv' : block_id + uvalue) :=
@@ -498,11 +541,12 @@ Theorem eutt_ocfg_relabel : forall cfg bidf0 bidf0' bidt0 bidt0' m,
   inj_map m ->
   defined_map m (inputs cfg) ->
   defined_map m (outputs cfg) ->
+  Forall (fun bk => defined_map m (phis_sources (blk_phis bk))) cfg ->
   eutt (ocfg_relabel_helper_rel m)
     (denote_ocfg cfg (bidf0, bidt0))
     (denote_ocfg (ocfg_relabel m cfg) (bidf0', bidt0')).
 Proof.
-  intros ? ? ? ? ? ? H4 H0 H7 H5 H6 H8.
+  intros ? ? ? ? ? ? H4 H0 H7 H5 H6 H8 H10.
   set (I := blk_id_relabel_rel m).
   set (I' := fun fto fto' =>
     I (fst fto) (fst fto') /\ I (snd fto) (snd fto')).
@@ -520,7 +564,9 @@ Proof.
       unfold denote_block.
       (* phis *)
       apply eutt_clo_bind with (UU := @eq unit).
-      admit.
+      eapply eutt_phis_relabel; try eassumption.
+      eapply Forall_forall in H10; try eassumption.
+      now apply find_block_In' in Heqo.
       intros.
       (* code *)
       apply eutt_eq_bind.
@@ -557,7 +603,7 @@ Proof.
     simpl.
     setoid_rewrite H0. setoid_rewrite H7.
     tauto.
-Admitted.
+Qed.
 
 Theorem eutt_cfg_relabel : forall cfg cfg' m,
   ocfg_relabel m (blks cfg) = (blks cfg') ->
@@ -565,6 +611,7 @@ Theorem eutt_cfg_relabel : forall cfg cfg' m,
   inj_map m ->
   defined_map m (inputs (blks cfg)) ->
   defined_map m (outputs (blks cfg)) ->
+  Forall (fun bk => defined_map m (phis_sources (blk_phis bk))) (blks cfg) ->
   eutt eq (denote_cfg cfg) (denote_cfg cfg').
 Proof.
   intros.
@@ -574,7 +621,7 @@ Proof.
   apply eutt_ocfg_relabel; try assumption.
   tauto.
   intros.
-  unfold ocfg_relabel_helper_rel in H4.
+  unfold ocfg_relabel_helper_rel in H5.
   repeat break_match; subst; try easy.
 Abort. (* the strings do not match... *)
 
