@@ -10,6 +10,7 @@ Fin.v
 Imp.v
 
 # own sources
+Utils.v
 CompileExpr.v
 Sir.v
 Vec.v
@@ -18,3 +19,4 @@ Relabel.v
 CvirCombinators.v
 CvirCombinatorsWF.v
 Imp2Cvir.v
+Semantics.v
