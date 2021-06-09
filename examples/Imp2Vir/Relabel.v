@@ -625,4 +625,37 @@ Proof.
   repeat break_match; subst; try easy.
 Abort. (* the strings do not match... *)
 
+Theorem ocfg_relabel_convert_typ : forall cfg m,
+  ocfg_relabel m (convert_typ nil cfg) = convert_typ nil (ocfg_relabel m cfg).
+Proof.
+  intros.
+  unfold convert_typ, ConvertTyp_list, tfmap, TFunctor_list'.
+  unfold ocfg_relabel.
+  rewrite 2 List.map_map. apply List.map_ext. intro.
+  unfold tfmap, TFunctor_block.
+  unfold bk_relabel.
+  cbn.
+  f_equal.
+  - unfold tfmap, TFunctor_list.
+    unfold blk_phis_relabel.
+    rewrite 2 List.map_map. apply List.map_ext. intro.
+    do 2 break_let. inv Heqp.
+    f_equal.
+    unfold blk_phi_relabel, TFunctor_phi.
+    do 2 break_let. inv Heqp.
+    f_equal.
+    unfold tfmap, TFunctor_list.
+    rewrite 2 List.map_map. apply List.map_ext. intro.
+    do 2 break_let. inv Heqp.
+    f_equal.
+  - unfold tfmap, TFunctor_terminator.
+    unfold blk_term_relabel.
+    do 3 break_match;
+    inv Heqt; inv Heqt0; try easy.
+    f_equal.
+    unfold endo, Endo_list.
+    rewrite 2 List.map_map. apply List.map_ext. intro.
+    do 2 break_let. now inv Heqp.
+Qed.
+
 End Relabel.
