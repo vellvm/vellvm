@@ -130,6 +130,7 @@ Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List
     end
 
   | TYPE_I sz => DTYPE_I sz
+  | TYPE_IPTR => DTYPE_IPTR
   | TYPE_Pointer t' => DTYPE_Pointer
   | TYPE_Void => DTYPE_Void
   | TYPE_Half => DTYPE_Half
@@ -180,6 +181,7 @@ Lemma typ_to_dtyp_equation  : forall env t,
       end
 
     | TYPE_I sz => DTYPE_I sz
+    | TYPE_IPTR => DTYPE_IPTR
     | TYPE_Pointer t' => DTYPE_Pointer
     | TYPE_Void => DTYPE_Void
     | TYPE_Half => DTYPE_Half

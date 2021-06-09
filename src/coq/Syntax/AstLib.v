@@ -306,6 +306,7 @@ Section TypInd.
 
 Variable P : typ -> Prop.
 Hypothesis IH_I          : forall sz, P (TYPE_I sz).
+Hypothesis IH_IPTR       : P TYPE_IPTR.
 Hypothesis IH_Pointer    : forall t, P t -> P(TYPE_Pointer t).
 Hypothesis IH_Void       : P(TYPE_Void).
 Hypothesis IH_Half       : P(TYPE_Half).
@@ -328,6 +329,7 @@ Lemma typ_ind : forall (t:typ), P t.
   fix IH 1.
   destruct t.
   - apply IH_I.
+  - apply IH_IPTR.
   - apply IH_Pointer. apply IH.
   - apply IH_Void.
   - apply IH_Half.
@@ -365,6 +367,7 @@ Section TypRect.
 
 Variable P : typ -> Type.
 Hypothesis IH_I          : forall sz, P (TYPE_I sz).
+Hypothesis IH_IPTR       : P TYPE_IPTR.
 Hypothesis IH_Pointer    : forall t, P t -> P(TYPE_Pointer t).
 Hypothesis IH_Void       : P(TYPE_Void).
 Hypothesis IH_Half       : P(TYPE_Half).
@@ -387,6 +390,7 @@ Lemma typ_rect' : forall (t:typ), P t.
   fix IH 1.
   destruct t.
   - apply IH_I.
+  - apply IH_IPTR.
   - apply IH_Pointer. apply IH.
   - apply IH_Void.
   - apply IH_Half.
@@ -610,6 +614,7 @@ Section hiding_notation.
   Fixpoint serialize_typ' typ: sexp :=
     match typ with
     | TYPE_I sz => Atom ("i" ++ show_N sz)%string
+    | TYPE_IPTR => Atom ("iptr")%string
     | TYPE_Pointer t => [serialize_typ' t ; Atom "*"]
     | TYPE_Void => Atom "void"
     | TYPE_Half => Atom "half"

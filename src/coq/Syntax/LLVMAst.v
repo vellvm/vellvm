@@ -178,6 +178,7 @@ Definition function_id := global_id.
 Unset Elimination Schemes.
 Inductive typ : Set :=
 | TYPE_I (sz:N)
+| TYPE_IPTR
 | TYPE_Pointer (t:typ)
 | TYPE_Void
 | TYPE_Half
