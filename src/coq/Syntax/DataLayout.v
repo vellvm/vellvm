@@ -20,9 +20,7 @@ Module NS := FSetAVL.Make(Coq.Structures.OrderedTypeEx.N_as_OT).
 Definition NSet := NS.t.
 
 
-(* Memory model layout information...
-
-   TODO: should this live elsewhere? *)
+(* Memory model layout information... *)
 Variant Alignment : Type :=
 | ALIGN_ABI (abi : N)
 | ALIGN_ABI_PREF (abi pref : N)
