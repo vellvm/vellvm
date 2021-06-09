@@ -84,6 +84,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     Fixpoint default_dvalue_of_dtyp (dt : dtyp) : err dvalue :=
       match dt with
       | DTYPE_I sz => default_dvalue_of_dtyp_i sz
+      | DTYPE_IPTR => ret (DVALUE_IPTR 0)
       | DTYPE_Pointer => ret (DVALUE_Addr A.null)
       | DTYPE_Void => ret DVALUE_None
       | DTYPE_Half => failwith "Unimplemented default type: half"
@@ -166,6 +167,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | UVALUE_I8 x                            => ret (DVALUE_I8 x)
       | UVALUE_I32 x                           => ret (DVALUE_I32 x)
       | UVALUE_I64 x                           => ret (DVALUE_I64 x)
+      | UVALUE_IPTR x                           => ret (DVALUE_IPTR x)
       | UVALUE_Double x                        => ret (DVALUE_Double x)
       | UVALUE_Float x                         => ret (DVALUE_Float x)
       | UVALUE_Undef t                         => lift (default_dvalue_of_dtyp t)
@@ -317,7 +319,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
     Proof.
       intros u.
       induction u; try do_it.
-
       - cbn. destruct (default_dvalue_of_dtyp t) eqn: EQ.
         econstructor. Unshelve. 3 : { exact DVALUE_None. }
         intro. inv H.

@@ -989,9 +989,9 @@ Section ExpPure.
         rewrite H.
 
         destruct t_from; cbn.
-        1 - 15 : (rewrite conv_to_exp_raise; rewrite exp_to_instr_raise); trivial_cases.
+        1 - 16 : (rewrite conv_to_exp_raise; rewrite exp_to_instr_raise); trivial_cases.
         destruct d; cbn.
-        1 - 13 : (rewrite conv_to_exp_raise; rewrite exp_to_instr_raise); trivial_cases.
+        1 - 14 : (rewrite conv_to_exp_raise; rewrite exp_to_instr_raise); trivial_cases.
         destruct t_from; cbn; rewrite H; go; trivial_cases.
 
         destruct d; cbn; go; trivial_cases.
@@ -1000,7 +1000,7 @@ Section ExpPure.
         destruct t_from; rewrite H; try rewrite conv_to_exp_ItoP; try apply ItoP_is_pure.
         destruct d; cbn; go; trivial_cases.
 
-        1 - 12 : apply ItoP_is_pure.
+        1 - 13 : apply ItoP_is_pure.
 
         rewrite conv_to_exp_raise; rewrite exp_to_instr_raise. apply failure_is_pure.
 

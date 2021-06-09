@@ -46,6 +46,7 @@ Set Contextual Implicit.
 Unset Elimination Schemes.
 Inductive dtyp : Set :=
 | DTYPE_I (sz:N)
+| DTYPE_IPTR
 | DTYPE_Pointer
 | DTYPE_Void
 | DTYPE_Half
@@ -71,6 +72,7 @@ Definition vector_dtyp dt :=
 Section DtypInd.
   Variable P : dtyp -> Prop.
   Hypothesis IH_I             : forall a, P (DTYPE_I a).
+  Hypothesis IH_IPTR          : P (DTYPE_IPTR).
   Hypothesis IH_Pointer       : P DTYPE_Pointer.
   Hypothesis IH_Void          : P DTYPE_Void.
   Hypothesis IH_Half          : P DTYPE_Half.
@@ -110,6 +112,7 @@ Section WF_dtyp.
 
   Inductive well_formed_dtyp : dtyp -> Prop :=
   | Wf_I : forall sz, well_formed_dtyp (DTYPE_I sz)
+  | Wf_IPTR : well_formed_dtyp DTYPE_IPTR
   | Wf_Pointer : well_formed_dtyp DTYPE_Pointer
   | Wf_Void : well_formed_dtyp DTYPE_Void
   | Wf_Half : well_formed_dtyp DTYPE_Half
@@ -149,6 +152,7 @@ End WF_dtyp.
 Fixpoint dtyp_measure (t : dtyp) : nat :=
   match t with
   | DTYPE_I sz => 0
+  | DTYPE_IPTR => 0
   | DTYPE_Pointer => 0
   | DTYPE_Void => 0
   | DTYPE_Half => 0
@@ -172,6 +176,7 @@ Section hiding_notation.
   Fixpoint serialize_dtyp' (dt:dtyp): sexp :=
     match dt with
     | DTYPE_I sz     => Atom ("i" ++ to_string sz)%string
+    | DTYPE_IPTR     => Atom ("iptr")%string
     | DTYPE_Pointer  => Atom "ptr"
     | DTYPE_Void     => Atom "dvoid"
     | DTYPE_Half     => Atom "half"

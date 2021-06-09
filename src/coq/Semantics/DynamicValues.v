@@ -188,6 +188,7 @@ Inductive dvalue : Set :=
 | DVALUE_I8 (x:int8)
 | DVALUE_I32 (x:int32)
 | DVALUE_I64 (x:int64)
+| DVALUE_IPTR (x:Z) (* TODO: should this be unsigned...? *)
 | DVALUE_Double (x:ll_double)
 | DVALUE_Float (x:ll_float)
 | DVALUE_Poison
@@ -206,6 +207,7 @@ Section DvalueInd.
   Hypothesis IH_I8            : forall x, P (DVALUE_I8 x).
   Hypothesis IH_I32           : forall x, P (DVALUE_I32 x).
   Hypothesis IH_I64           : forall x, P (DVALUE_I64 x).
+  Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x).
   Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
   Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
   Hypothesis IH_Poison        : P DVALUE_Poison.
@@ -251,6 +253,7 @@ Inductive uvalue : Set :=
 | UVALUE_I8 (x:int8)
 | UVALUE_I32 (x:int32)
 | UVALUE_I64 (x:int64)
+| UVALUE_IPTR (x:Z) (* TODO: Should this be unsigned? *)
 | UVALUE_Double (x:ll_double)
 | UVALUE_Float (x:ll_float)
 | UVALUE_Undef (t:dtyp)
@@ -282,6 +285,7 @@ Section UvalueInd.
   Hypothesis IH_I8             : forall x, P (UVALUE_I8 x).
   Hypothesis IH_I32            : forall x, P (UVALUE_I32 x).
   Hypothesis IH_I64            : forall x, P (UVALUE_I64 x).
+  Hypothesis IH_IPTR            : forall x, P (UVALUE_IPTR x).
   Hypothesis IH_Double         : forall x, P (UVALUE_Double x).
   Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
   Hypothesis IH_Undef          : forall t, P (UVALUE_Undef t).
@@ -355,6 +359,7 @@ Fixpoint dvalue_to_uvalue (dv : dvalue) : uvalue :=
   | DVALUE_I8 x => UVALUE_I8 x
   | DVALUE_I32 x => UVALUE_I32 x
   | DVALUE_I64 x => UVALUE_I64 x
+  | DVALUE_IPTR x => UVALUE_IPTR x
   | DVALUE_Double x => UVALUE_Double x
   | DVALUE_Float x => UVALUE_Float x
   | DVALUE_Poison => UVALUE_Poison
@@ -373,6 +378,7 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
   | UVALUE_I8 x                            => ret (DVALUE_I8 x)
   | UVALUE_I32 x                           => ret (DVALUE_I32 x)
   | UVALUE_I64 x                           => ret (DVALUE_I64 x)
+  | UVALUE_IPTR x                           => ret (DVALUE_IPTR x)
   | UVALUE_Double x                        => ret (DVALUE_Double x)
   | UVALUE_Float x                         => ret (DVALUE_Float x)
   | UVALUE_Undef t                         => failwith "Attempting to convert a non-defined uvalue to dvalue. The conversion should be guarded by is_concrete"
@@ -462,6 +468,7 @@ Fixpoint is_concrete (uv : uvalue) : bool :=
   | UVALUE_I8 x => true
   | UVALUE_I32 x => true
   | UVALUE_I64 x => true
+  | UVALUE_IPTR x => true
   | UVALUE_Double x => true
   | UVALUE_Float x => true
   | UVALUE_Undef t => false
@@ -511,6 +518,7 @@ Section hiding_notation.
     | DVALUE_I8 x => Atom "dvalue(i8)"
     | DVALUE_I32 x => Atom "dvalue(i32)"
     | DVALUE_I64 x => Atom "dvalue(i64)"
+    | DVALUE_IPTR x => Atom "dvalue(iptr)"
     | DVALUE_Double x => Atom "dvalue(double)"
     | DVALUE_Float x => Atom "dvalue(float)"
     | DVALUE_Poison => Atom "poison"
@@ -608,6 +616,7 @@ Section DecidableEquality.
     | DVALUE_I8 x1, DVALUE_I8 x2 => _
     | DVALUE_I32 x1, DVALUE_I32 x2 => _
     | DVALUE_I64 x1, DVALUE_I64 x2 => _
+    | DVALUE_IPTR x1, DVALUE_IPTR x2 => _
     | DVALUE_Double x1, DVALUE_Double x2 => _
     | DVALUE_Float x1, DVALUE_Float x2 => _
     | DVALUE_Poison, DVALUE_Poison => _
@@ -631,6 +640,9 @@ Section DecidableEquality.
       * left; subst; reflexivity.
       * right; intros H; inversion H. contradiction.
     - destruct (Int64.eq_dec x1 x2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (Z.eq_dec x1 x2).
       * left; subst; reflexivity.
       * right; intros H; inversion H. contradiction.
     - destruct (Float.eq_dec x1 x2).
@@ -662,6 +674,7 @@ Section DecidableEquality.
               let lsteq_dec := list_eq_dec f in
               match t1, t2 with
               | DTYPE_I n, DTYPE_I m => _
+              | DTYPE_IPTR , DTYPE_IPTR => _
               | DTYPE_Pointer, DTYPE_Pointer => _
               | DTYPE_Void, DTYPE_Void => _
               | DTYPE_Half, DTYPE_Half => _
@@ -751,6 +764,7 @@ Section DecidableEquality.
               | UVALUE_I8 x1, UVALUE_I8 x2 => _
               | UVALUE_I32 x1, UVALUE_I32 x2 => _
               | UVALUE_I64 x1, UVALUE_I64 x2 => _
+              | UVALUE_IPTR x1, UVALUE_IPTR x2 => _
               | UVALUE_Double x1, UVALUE_Double x2 => _
               | UVALUE_Float x1, UVALUE_Float x2 => _
               | UVALUE_Undef t1, UVALUE_Undef t2 => _
@@ -779,6 +793,7 @@ Section DecidableEquality.
     - destruct (Int8.eq_dec x1 x2)...
     - destruct (Int32.eq_dec x1 x2)...
     - destruct (Int64.eq_dec x1 x2)...
+    - destruct (Z.eq_dec x1 x2)...
     - destruct (Float.eq_dec x1 x2)...
     - destruct (Float32.eq_dec x1 x2)...
     - destruct (dtyp_eq_dec t1 t2)...
@@ -1551,6 +1566,7 @@ Class VInt I : Type :=
   | DVALUE_I8_typ     : forall x, dvalue_has_dtyp (DVALUE_I8 x) (DTYPE_I 8)
   | DVALUE_I32_typ    : forall x, dvalue_has_dtyp (DVALUE_I32 x) (DTYPE_I 32)
   | DVALUE_I64_typ    : forall x, dvalue_has_dtyp (DVALUE_I64 x) (DTYPE_I 64)
+  | DVALUE_IPTR_typ   : forall x, dvalue_has_dtyp (DVALUE_IPTR x) DTYPE_IPTR
   | DVALUE_IX_typ     : forall x, ~IX_supported x -> dvalue_has_dtyp DVALUE_None (DTYPE_I x)
   | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
@@ -1798,6 +1814,7 @@ Class VInt I : Type :=
     Hypothesis IH_I8             : forall x, P (DVALUE_I8 x) (DTYPE_I 8).
     Hypothesis IH_I32            : forall x, P (DVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (DVALUE_I64 x) (DTYPE_I 64).
+    Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x) DTYPE_IPTR.
     Hypothesis IH_IX             : forall x, ~IX_supported x -> P DVALUE_None (DTYPE_I x).
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
@@ -1836,6 +1853,7 @@ Class VInt I : Type :=
       - apply IH_I8.
       - apply IH_I32.
       - apply IH_I64.
+      - apply IH_IPTR.
       - apply IH_IX. assumption.
       - apply IH_Double.
       - apply IH_Float.
