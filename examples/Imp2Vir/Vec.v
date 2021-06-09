@@ -5,7 +5,8 @@ From Coq Require Import
      ZArith.
 
 From Vellvm Require Import
-     Syntax.
+     Utils.Tactics
+     Utils.Util.
 
 From Imp2Vir Require Import Fin.
 
@@ -210,12 +211,42 @@ Next Obligation.
   apply Nat.add_0_r.
 Defined.
 
+Theorem firstn_app_exact : forall {A} {i} {j} (v : t A i) (v' : t A j),
+  firstn i (append v v') = v.
+Proof.
+  intros.
+  destruct v, v'.
+  unfold firstn.
+  apply vector_proj1_unique.
+  cbn.
+  subst.
+  rewrite firstn_app.
+  rewrite firstn_all.
+  rewrite Nat.sub_diag.
+  now rewrite app_nil_r.
+Qed.
+
 Program Definition skipn {A} i {j} (v : t A (i+j)) : t A j :=
   vec' (skipn i (proj1_sig v)).
 Next Obligation.
   destruct v. simpl in *. rewrite skipn_length. apply Nat.add_sub_eq_l. auto.
 Defined.
 
+Theorem skipn_app_exact : forall {A} {i} {j} (v : t A i) (v' : t A j),
+  skipn i (append v v') = v'.
+Proof.
+  intros.
+  destruct v, v'.
+  unfold skipn.
+  apply vector_proj1_unique.
+  cbn.
+  subst.
+  rewrite skipn_app.
+  rewrite skipn_all.
+  now rewrite Nat.sub_diag.
+Qed.
+
+(* FIXME i could be an implicit argument *)
 Definition splitat {A} i {j} (v : t A (i+j)) :
   t A i * t A j :=
   (firstn i v, skipn i v).
@@ -230,20 +261,11 @@ Defined.
 Theorem splitat_append : forall A n n' (v : t A n) (v' : t A n'),
   splitat n (append v v') = (v,v').
 Proof.
-  unfold splitat, append.
-  destruct v, v'.
-  simpl.
-  subst.
-  f_equal ; apply vector_proj1_unique ; simpl.
-  - rewrite firstn_app.
-    rewrite firstn_all.
-    rewrite Nat.sub_diag.
-    rewrite app_nil_r.
-    reflexivity.
-  - rewrite skipn_app.
-    rewrite skipn_all.
-    rewrite Nat.sub_diag.
-    reflexivity.
+  unfold splitat.
+  intros.
+  f_equal.
+  - apply firstn_app_exact.
+  - apply skipn_app_exact.
 Qed.
 
 Theorem append_splitat : forall A n n' (v : t A n) (v' : t A n') (v'' : t A (n+n')),
@@ -366,7 +388,45 @@ Proof.
   reflexivity.
 Qed.
 
+(* Misc lemmas about fin *)
+
+Lemma split_fin_sum_inl :
+  forall n m f l, split_fin_sum n m f = inl l -> f = L m l.
+Proof.
+  intros.
+  unfold split_fin_sum in H.
+  break_match; [| discriminate ].
+  inv H.
+  now apply unique_fin.
+Qed.
+
+Lemma split_fin_sum_inr :
+  forall n m f r, split_fin_sum n m f = inr r -> f = R n r.
+Proof.
+  intros.
+  unfold split_fin_sum in H.
+  break_match; [ discriminate |].
+  inv H.
+  apply unique_fin.
+  simpl.
+  lia.
+Qed.
+
 End Vec.
+
+Ltac destruct_vec0 v :=
+  let H := fresh "H" in
+  let l := fresh "l" in
+  destruct v as [l H]; apply length_zero_iff_nil in H as ?; subst l.
+
+Ltac destruct_vec1 v :=
+  let H := fresh "H" in
+  let H' := fresh "H'" in
+  let l := fresh "l" in
+  destruct v as [[] H]; [
+    simpl in H; lia |
+    simpl in H; apply eq_add_S in H as H'; apply length_zero_iff_nil in H'; subst l
+  ].
 
 Ltac split_vec v n1 :=
   let vp := fresh "vp" in
