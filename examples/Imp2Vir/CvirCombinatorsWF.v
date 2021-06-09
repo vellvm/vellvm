@@ -4,11 +4,14 @@ From Coq Require Import
      NArith
      ZArith.
 
-From Vellvm Require Import Syntax.
+From Vellvm Require Import
+     Syntax
+     Syntax.ScopeTheory
+     Utils.Tactics.
 
 From Imp2Vir Require Import Fin.
 
-Require Import Vec Unique CvirCombinators.
+From Imp2Vir Require Import Utils Vec Unique CvirCombinators.
 
 Open Scope nat_scope.
 Open Scope vec_scope.
@@ -56,6 +59,11 @@ Definition cvir_ids_WF {ni no} ir : Prop :=
     In bid (vi ++ vo ++ vt)%vec
   ).
 
+Definition cvir_inputs_used {ni no} (ir : cvir ni no) : Prop :=
+  forall vi vo vt bid,
+  In bid (vi ++ vt) ->
+  List.In bid (inputs (blocks ir vi vo vt)).
+
 Theorem block_cvir_id_WF : forall c, cvir_ids_WF (block_cvir c).
 Proof.
   unfold cvir_ids_WF.
@@ -81,6 +89,14 @@ Proof.
     subst.
     destruct x0 ; simpl in * ; [lia |].
     unfold Vec.hd. simpl. intuition.
+Qed.
+
+Theorem block_cvir_inputs_used : forall c, cvir_inputs_used (block_cvir c).
+Proof.
+  unfold cvir_inputs_used.
+  intros.
+  destruct_vec0 vt.
+  now destruct_vec1 vi.
 Qed.
 
 Theorem block_cvir_unique : forall c, unique_bid (block_cvir c).
@@ -176,6 +192,25 @@ Proof.
   simpl.
   rewrite 3 splitat_append.
   reflexivity.
+Qed.
+
+Theorem merge_cvir_inputs_used :
+  forall {ni1 no1 ni2 no2} (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2),
+  cvir_inputs_used ir1 -> cvir_inputs_used ir2 ->
+  cvir_inputs_used (merge_cvir ir1 ir2).
+Proof.
+  unfold cvir_inputs_used.
+  intros.
+  split_vec vi ni1.
+  split_vec vo no1.
+  split_vec vt (n_int ir1).
+  rewrite merge_cvir_blocks.
+  rewrite inputs_app.
+  apply in_app_iff.
+  do 2 setoid_rewrite vector_in_app_iff in H1.
+  setoid_rewrite vector_in_app_iff in H.
+  setoid_rewrite vector_in_app_iff in H0.
+  intuition.
 Qed.
 
 Theorem merge_cvir_unique :
@@ -536,3 +571,35 @@ Proof.
   simpl in *.
   eapply H ; eassumption.
 Qed.
+
+Lemma cvir_inputs : forall {ni no} (ir : cvir ni no) vi vo vt i,
+  cvir_ids_WF ir ->
+  cvir_inputs_used ir ->
+  List.In i (inputs (blocks ir vi vo vt)) <-> In i (vi ++ vt).
+Proof.
+  split; intros.
+  - apply find_block_in_inputs in H1.
+    destruct H1.
+    apply find_block_has_id in H1 as ?. subst i.
+    apply find_block_In in H1.
+    now apply H in H1.
+  - now apply H0.
+Qed.
+
+Lemma cvir_outputs : forall {ni no} (ir : cvir ni no) vi vo vt o,
+  cvir_ids_WF ir ->
+  List.In o (outputs (blocks ir vi vo vt)) -> In o (vi ++ vo ++ vt).
+Proof.
+  intros.
+  unfold cvir_ids_WF in H.
+  apply outputs_successors in H0. destruct H0 as (? & ? & ?).
+  apply H in H0 as [_ ?].
+  apply H0.
+Admitted. (* easy, but I should probably get rid of out_blk_id *)
+
+(* maybe redefine unique_vector from NoDup to have this property for free? *)
+Theorem unique_bid_wf_ocfg_bid : forall ni no (ir : cvir ni no) vi vo vt,
+  unique_bid ir ->
+  unique_vector (vi ++ vt) ->
+  wf_ocfg_bid (blocks ir vi vo vt).
+Admitted.
