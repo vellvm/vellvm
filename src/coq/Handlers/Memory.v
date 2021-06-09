@@ -1160,19 +1160,25 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           | None => raise "Invalid concrete address"
           | Some (b, o) => ret (m, DVALUE_Addr (b, o))
           end
+        | DVALUE_IPTR i =>
+          match concrete_address_to_logical i m with
+          | None => raise "Invalid concrete address"
+          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
+          end
         | _            => raise "Non integer passed to ItoP"
         end
 
-      (* TODO take integer size into account *)
       | PtoI t a =>
         match a, t with
         | DVALUE_Addr ptr, DTYPE_I sz =>
           let (cid, m') := concretize_block ptr m in
           'addr <- lift_undef_or_err ret (coerce_integer_to_int sz (cid + (snd ptr))) ;;
           ret (m', addr)
+        | DVALUE_Addr ptr, DTYPE_IPTR =>
+          let (cid, m') := concretize_block ptr m in
+          ret (m', DVALUE_IPTR (cid + (snd ptr)))
         | _, _ => raise "PtoI type error."
         end
-
       end.
 
   Definition handle_intrinsic {E} `{FailureE -< E} `{PickE -< E}: IntrinsicE ~> stateT memory_stack (itree E) :=
