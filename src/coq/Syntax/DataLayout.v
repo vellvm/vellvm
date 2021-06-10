@@ -8,17 +8,30 @@ From Coq Require Import
      ZArith.
 
 From Vellvm Require Import
-     Utils.NonEmpty.
+     Utils.NonEmpty
+     Utils.Default.
 
+Import ListNotations.
 
 (* N maps *)
 Module NM := FMapAVL.Make(Coq.Structures.OrderedTypeEx.N_as_OT).
 Definition NMap := NM.t.
 
+Fixpoint NM_from_list {A} (kvs : list (N * A)) : NMap A
+  := match kvs with
+     | [] => @NM.empty _
+     | ((k, v)::xs) => @NM.add _ k v (NM_from_list xs)
+     end.
+
 (* N sets *)
 Module NS := FSetAVL.Make(Coq.Structures.OrderedTypeEx.N_as_OT).
 Definition NSet := NS.t.
 
+Fixpoint NS_from_list (kvs : list N) : NSet
+  := match kvs with
+     | [] => NS.empty
+     | (x::xs) => NS.add x (NS_from_list xs)
+     end.
 
 (* Memory model layout information... *)
 Variant Alignment : Type :=
@@ -57,7 +70,7 @@ Record DataLayout : Type :=
   mk_DataLayout
     {
       dl_endianess             : Endianess;
-      dl_stack_align           : N;
+      dl_stack_align           : option N;
       dl_program_address_space : N;
       dl_global_address_space  : N;
       dl_alloca_address_space  : N;
@@ -84,3 +97,71 @@ Record DataLayout : Type :=
       (* Alignment for aggregate types *)
       dl_aggregate_alignment : Alignment
     }.
+
+Record Foo : Type :=
+  mkFoo { blah : bool; flurp : nat }.
+
+#[global] Instance DefaultEndianess : Default Endianess :=
+  {
+  def := ENDIAN_BIG
+  }.
+
+#[global] Instance DefaultAlignment : Default Alignment :=
+  {
+  def := ALIGN_ABI_PREF 64 64
+  }.
+
+#[global] Instance DefaultPointerSize : Default PointerSize :=
+  {
+  def := {| ps_size := 64;
+            ps_alignment := def;
+            ps_index_size := None
+         |}
+  }.
+
+#[global] Instance DefaultFunctionPointerAlignment : Default FunctionPointerAlignment :=
+  {
+  (* TODO: Double check this, not specified in LangRef. *)
+  def := FPA_I 64
+  }.
+
+#[global] Instance DefaultMangling : Default Mangling :=
+  {
+  (* TODO: Double check this, not specified in LangRef. *)
+  def := MANGLING_ELF
+  }.
+
+#[global] Instance DefaultDataLayout : Default DataLayout :=
+  {
+  def :=
+    {| dl_endianess := def;
+       dl_stack_align := None;
+       dl_program_address_space := 0;
+       dl_global_address_space  := 0;
+       dl_alloca_address_space  := 0;
+       dl_pointer_alignments  := nempty def [];
+       dl_integer_alignments :=
+         NM_from_list [(1, ALIGN_ABI_PREF 8 8);
+                       (8, ALIGN_ABI_PREF 8 8);
+                       (16, ALIGN_ABI_PREF 16 16);
+                       (32, ALIGN_ABI_PREF 32 32);
+                       (64, ALIGN_ABI_PREF 32 64)
+                      ]%N;
+       dl_vector_alignments :=
+         NM_from_list [(64, ALIGN_ABI_PREF 64 64);
+                       (128, ALIGN_ABI_PREF 128 128)
+                      ]%N;
+       dl_floating_point_alignments :=
+         NM_from_list [(16, ALIGN_ABI_PREF 16 16);
+                       (32, ALIGN_ABI_PREF 32 32);
+                       (64, ALIGN_ABI_PREF 64 64);
+                       (128, ALIGN_ABI_PREF 128 128)
+                      ]%N;
+       dl_function_pointer_alignment := def;
+       dl_mangling := def;
+       (* TODO: double check this, not specified in LangRef... *)
+       dl_native_integer_widths :=
+         NS_from_list [8; 16; 32; 64]%N;
+       dl_aggregate_alignment := ALIGN_ABI_PREF 0 64
+    |}
+  }.
