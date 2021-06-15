@@ -42,6 +42,7 @@ From Vellvm Require Import
      Utils.Tactics
      Utils.Util
      Utils.Error
+     Utils.ListUtil
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Semantics.DynamicValues
@@ -183,18 +184,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       match vs with
       | [] => m
       | v :: tl => add i v (add_all_index tl (i+1) m)
-      end.
-
-    Fixpoint Zseq (start : Z) (len : nat) : list Z :=
-      match len with
-      | O => []
-      | S x => start :: Zseq (Z.succ start) x
-      end.
-
-    Fixpoint Nseq (start : N) (len : nat) : list N :=
-      match len with
-      | O => []
-      | S x => start :: Nseq (N.succ start) x
       end.
 
     (* Give back a list of values from [|i|] to [|i| + |sz| - 1] in [m].

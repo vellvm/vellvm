@@ -1,4 +1,4 @@
-From Coq Require Import List Lia.
+From Coq Require Import List Lia ZArith.
 
 Import ListNotations.
 
@@ -33,3 +33,15 @@ Proof.
     unfold list_sum in IHxs.
     lia.
 Qed.
+
+Fixpoint Zseq (start : Z) (len : nat) : list Z :=
+  match len with
+  | O => []
+  | S x => start :: Zseq (Z.succ start) x
+  end.
+
+Fixpoint Nseq (start : N) (len : nat) : list N :=
+  match len with
+  | O => []
+  | S x => start :: Nseq (N.succ start) x
+  end.
