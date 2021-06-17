@@ -193,6 +193,11 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
                                                   dv2 <- concretize_uvalue v2 ;;
                                                   eval_fcmp cmp dv1 dv2
+      | UVALUE_JoinBytes bytes dt =>
+        
+      | UVALUE_ExtractByte byte idx =>
+        (* TODO: maybe this is just an error? ExtractByte should be guarded by JoinBytes? *)
+        _
       | _ => (lift (failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"))
       
       end.

@@ -275,6 +275,9 @@ Inductive uvalue : Set :=
 | UVALUE_ExtractValue     (vec:uvalue) (idxs:list int)
 | UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list int)
 | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
+(* Extract the `idx` byte from a uvalue `uv`. `idx` 0 is the least significant byte. *)
+| UVALUE_ExtractByte      (uv : uvalue) (idx : uvalue)
+| UVALUE_ConcatBytes      (uvs : list uvalue) (dt : dtyp)
 .
 Set Elimination Schemes.
 
@@ -307,6 +310,8 @@ Section UvalueInd.
   Hypothesis IH_ExtractValue   : forall (vec:uvalue) (idxs:list int), P vec -> P (UVALUE_ExtractValue vec idxs).
   Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
   Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
+  Hypothesis IH_ExtractByte : forall (uv : uvalue) (idx : uvalue), P uv -> P idx -> P (UVALUE_ExtractByte uv idx).
+  Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue), (forall u, In u uvs -> P u) -> P (UVALUE_ConcatBytes uvs dt).
 
   Lemma uvalue_ind : forall (uv:uvalue), P uv.
     fix IH 1.
@@ -348,6 +353,12 @@ Section UvalueInd.
     - apply IH_ExtractValue; auto.
     - apply IH_InsertValue; auto.
     - apply IH_Select; auto.
+    - apply IH_ExtractByte; auto.
+    - apply IH_ConcatBytes.
+      { revert uvs.
+        fix IHuvs 1. intros [|u uvs']. intros. inversion H.
+        intros u' [<-|Hin]. apply IH. eapply IHuvs. apply Hin.
+      }
   Qed.
 End UvalueInd.
 
@@ -378,7 +389,7 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
   | UVALUE_I8 x                            => ret (DVALUE_I8 x)
   | UVALUE_I32 x                           => ret (DVALUE_I32 x)
   | UVALUE_I64 x                           => ret (DVALUE_I64 x)
-  | UVALUE_IPTR x                           => ret (DVALUE_IPTR x)
+  | UVALUE_IPTR x                          => ret (DVALUE_IPTR x)
   | UVALUE_Double x                        => ret (DVALUE_Double x)
   | UVALUE_Float x                         => ret (DVALUE_Float x)
   | UVALUE_Undef t                         => failwith "Attempting to convert a non-defined uvalue to dvalue. The conversion should be guarded by is_concrete"
@@ -786,6 +797,8 @@ Section DecidableEquality.
               | UVALUE_ExtractValue u l, UVALUE_ExtractValue u' l' => _
               | UVALUE_InsertValue u v l, UVALUE_InsertValue u' v' l' => _
               | UVALUE_Select u v t, UVALUE_Select u' v' t' => _
+              | UVALUE_ExtractByte uv idx, UVALUE_ExtractByte uv' idx' => _
+              | UVALUE_ConcatBytes uvs dt, UVALUE_ConcatBytes uvs' dt' => _
               | _, _ => _
               end); try (ltac:(dec_dvalue); fail).
     - destruct (A.eq_dec a1 a2)...
@@ -836,6 +849,10 @@ Section DecidableEquality.
     - destruct (f u u')...
       destruct (f v v')...
       destruct (f t t')...
+    - destruct (f uv uv')...
+      destruct (f idx idx')...
+    - destruct (lsteq_dec uvs uvs')...
+      destruct (dtyp_eq_dec dt dt')...
   Qed.
 
   #[global] Instance eq_dec_uvalue : RelDec (@eq uvalue) := RelDec_from_dec (@eq uvalue) (@uvalue_eq_dec).
