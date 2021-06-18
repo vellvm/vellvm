@@ -194,7 +194,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
                                                   dv2 <- concretize_uvalue v2 ;;
                                                   eval_fcmp cmp dv1 dv2
       | UVALUE_JoinBytes bytes dt =>
-        
+        _
       | UVALUE_ExtractByte byte idx =>
         (* TODO: maybe this is just an error? ExtractByte should be guarded by JoinBytes? *)
         _
