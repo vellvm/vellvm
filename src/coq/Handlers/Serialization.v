@@ -123,11 +123,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition uvalue_bytes (e : Endianess) (uv :  uvalue) : list uvalue
       := correct_endianess e (uvalue_bytes_little_endian uv).
 
-    Definition to_ubytes_little_endian (uv : uvalue) : list SByte
+    Definition to_ubytes (uv :  uvalue) : list SByte
       := map (fun n => UByte uv (UVALUE_IPTR (Z.of_N n))) (Nseq 0 ptr_size).
-
-    Definition to_ubytes (e : Endianess) (uv :  uvalue) : list SByte
-      := correct_endianess e (to_ubytes_little_endian uv).
 
     Definition ubyte_to_extractbyte (byte : SByte) : uvalue
       := match byte with
@@ -148,32 +145,28 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition guard_opt (x : bool) : option unit
       := if x then Some tt else None.
 
-    Fixpoint all_bytes_from_uvalue_little_endian_helper (idx' : Z) (parent : uvalue) (bytes : list SByte) : option uvalue
+    Fixpoint all_bytes_from_uvalue_helper (idx' : Z) (parent : uvalue) (bytes : list SByte) : option uvalue
       := match bytes with
          | [] => None
          | (UByte uv idx)::bytes =>
            guard_opt (uvalue_int_eq_Z idx idx');;
            guard_opt (RelDec.rel_dec uv parent);;
-           all_bytes_from_uvalue_little_endian_helper (Z.succ idx') parent bytes
+           all_bytes_from_uvalue_helper (Z.succ idx') parent bytes
          end.
 
-    Definition all_bytes_from_uvalue_little_endian (bytes : list SByte) : option uvalue
+    Definition all_bytes_from_uvalue (bytes : list SByte) : option uvalue
       := match bytes with
          | nil => None
          | cons (UByte uv idx) xs =>
-           all_bytes_from_uvalue_little_endian_helper 0 uv bytes
+           all_bytes_from_uvalue_helper 0 uv bytes
          end.
 
-    Definition from_ubytes_little_endian (bytes : list SByte) (dt : dtyp) : uvalue
+    Definition from_ubytes (bytes : list SByte) (dt : dtyp) : uvalue
       :=
-        match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_bytes_from_uvalue_little_endian bytes with
+        match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_bytes_from_uvalue bytes with
         | true, Some uv => uv
         | _, _ => UVALUE_ConcatBytes (map ubyte_to_extractbyte bytes) dt
         end.
-
-    (* This will only work properly on non-aggregate types *)
-    Definition from_ubytes (e : Endianess) (bytes : list SByte) (dt : dtyp) : uvalue
-      := from_ubytes_little_endian (correct_endianess e bytes) dt.
 
     (* TODO: move to utils? *)
     Definition from_option {A} (def : A) (opt : option A) : A
@@ -302,7 +295,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | UVALUE_Double _
        | UVALUE_Undef _
        | UVALUE_Poison =>
-         ret (to_ubytes endianess uv)
+         ret (to_ubytes uv)
        | UVALUE_None => ret nil
 
        (* Padded aggregate types *)
@@ -345,7 +338,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           Vectors must have elements of "primitive type"
         *)
        | _ =>
-         ret (to_ubytes endianess uv)
+         ret (to_ubytes uv)
        (* | UVALUE_IBinop iop v1 v2 => _ *)
        (* | UVALUE_ICmp cmp v1 v2 => _ *)
        (* | UVALUE_FBinop fop fm v1 v2 => _ *)
@@ -397,7 +390,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | DTYPE_Fp128
        | DTYPE_Ppc_fp128
        | DTYPE_X86_mmx =>
-         ret (from_ubytes endianess bytes dt)
+         ret (from_ubytes bytes dt)
 
        (* Unimplemented *)
        | DTYPE_Void =>
