@@ -92,8 +92,8 @@ let rec step (m : ('a coq_L5, memory_stack * ((local_env * lstack) * (global_env
       step (k (Obj.magic DV.UVALUE_None)))
 
   (* The failE effect is a failure *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 f), _) ->
-     Error (Camlcoq.camlstring_of_coqstring f)
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 _), _) ->
+     Error "Failure effect"
 
   (* The UndefinedBehaviourE effect is a failure *)
   (* | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 f)), _) -> *)

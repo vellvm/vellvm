@@ -23,9 +23,11 @@ Import ListNotations.
 
 
 
-(*** Potential Extraction Bug *)
+(*** Extraction Bug *)
 
 (* There seems to be an issue with how QuickChick is running the test cases.
+
+   More info here: https://github.com/vellvm/vellvm/issues/161
 
    QC sometimes reports that vellvm disagrees with clang. However,
    when the test case is run with `./vellvm -interpret`, we see that

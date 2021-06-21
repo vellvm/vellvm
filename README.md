@@ -177,26 +177,34 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 # Installing / Compiling Vellvm
 
 ### Assumes: 
-  - coq   : version 8.13
-  - Clang 7.0.1+ (available for Mac OSX for XCode 4.2+, or installed via, e.g. sudo apt-get install clang; opam install llvm)
+  - Coq: version 8.13 (installed via *opam*, see below)
+  - OCaml: version 4.12.0 (installed via *opam*, see below)
+  - opam: version 2.0.5.
+    It is available via [homebrew](https://brew.sh/) on Mac, and most system's package managers on Linux, e.g. `sudo apt-get install opam`.
+    If this is the first time you are using opam you need to initialize it: 
+    + On Linux: `opam init`
+    + On Mac:  `opam init --disable-sandboxing` (sandboxing needs to be disabled due to a known [issue](https://github.com/ocaml/opam-repository/issues/12973)).
+- Add the Coq package repository:
+    `opam repo add coq-released https://coq.inria.fr/opam/released`.
+- Finally, create an opam *switch* with:
+    `opam switch create vellvm ocaml-base-compiler.4.12.0`.
+  - Clang 7.0.1+ (available for Mac OSX in XCode 4.2+, or installed via, e.g. `sudo apt-get install clang`)
   - External Coq libraries: 
-  Note: if it's the first time you install Coq libraries via Opam, you will have to add the repository first with `opam repo add coq-released https://coq.inria.fr/opam/released`.
-    * ext-lib    (installed via, e.g. opam install coq-ext-lib)
-    * paco       (installed via, e.g. opam install coq-paco)
-    * itrees     (installed via, e.g. opam install coq-itrees)
-    * flocq      (installed via, e.g. opam install coq-flocq, see note below) 
-    * ceres      (installed via, e.g. opam install coq-ceres)
-    * mathcomp   (installed via, e.g. opam install coq-mathcomp-ssreflect)
-    * simple-io  (installed via, e.g. opam install coq-simple-io)
+    * ext-lib    (installed via, e.g. `opam install coq-ext-lib`)
+    * paco       (installed via, e.g. `opam install coq-paco`)
+    * itrees     (installed via, e.g. `opam install coq-itrees`)
+    * flocq      (installed via, e.g. `opam install coq-flocq`) 
+    * ceres      (installed via, e.g. `opam install coq-ceres`)
+    * mathcomp   (installed via, e.g. `opam install coq-mathcomp-ssreflect`)
+    * simple-io  (installed via, e.g. `opam install coq-simple-io`)
 
   - Additional opam packages: 
-    * ocamlbuild (installed via, e.g. opam install ocaml-build)
-    * dune       (installed via, e.g. opam install dune)
-    * menhir     (installed via, e.g. opam install menhir)
-    * qcheck     (installed via, e.g. opam install qcheck)
+    * ocamlbuild (installed via, e.g. `opam install ocamlbuild`)
+    * dune       (installed via, e.g. `opam install dune`)
+    * menhir     (installed via, e.g. `opam install menhir`)
+    * qcheck     (installed via, e.g. `opam install qcheck`)
 
 Compilation:
-
 
 1. Clone the vellvm git repo with the `--recurse-submodule` option
 2. Install all external dependencies

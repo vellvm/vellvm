@@ -324,7 +324,8 @@ Section TypGenerators.
                 [ TYPE_I 1
                 ; TYPE_I 8
                 ; TYPE_I 32
-                ; TYPE_I 64
+                (* TODO: big ints *)
+                (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
                 (* TODO: Could generate TYPE_Identified if we filter for sized types *)
                 (* ; TYPE_Half *)
@@ -372,7 +373,8 @@ Section TypGenerators.
                 [ TYPE_I 1
                 ; TYPE_I 8
                 ; TYPE_I 32
-                ; TYPE_I 64
+                (* TODO: big ints*)
+               (* ; TYPE_I 64 *)
                 ; TYPE_Void
                 (* TODO: Generate floats and stuff *)
                 (* ; TYPE_Half *)
@@ -430,7 +432,8 @@ Section TypGenerators.
                 [ TYPE_I 1
                 ; TYPE_I 8
                 ; TYPE_I 32
-                ; TYPE_I 64
+                (* TODO: big ints *)
+                (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
                 (* ; TYPE_Half *)
                 (* ; TYPE_Double *)
@@ -466,7 +469,8 @@ Section TypGenerators.
                 [ TYPE_I 1
                 ; TYPE_I 8
                 ; TYPE_I 32
-                ; TYPE_I 64
+                (* TODO: big ints *)
+                (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
                 (* ; TYPE_Half *)
                 (* ; TYPE_Double *)
@@ -485,7 +489,8 @@ Section TypGenerators.
                 [ TYPE_I 1
                 ; TYPE_I 8
                 ; TYPE_I 32
-                ; TYPE_I 64
+                (* TODO: big ints *)
+                (* ; TYPE_I 64 *)
                 ]).
 End TypGenerators.
 
@@ -496,15 +501,15 @@ Section ExpGenerators.
        bug with extraction and QC. *)
     oneOf_ failGen
            [ ret LLVMAst.Add <*> ret false <*> ret false
-           (* ; ret Sub <*> ret false <*> ret false *)
+           ; ret Sub <*> ret false <*> ret false
            ; ret Mul <*> ret false <*> ret false
-           (* ; ret Shl <*> ret false <*> ret false  *)
+           ; ret Shl <*> ret false <*> ret false
            ; ret UDiv <*> ret false
            ; ret SDiv <*> ret false
-           (* ; ret LShr <*> ret false *)
-           (* ; ret AShr <*> ret false *)
-           (* ; ret URem *)
-           (* ; ret SRem *)
+           ; ret LShr <*> ret false
+           ; ret AShr <*> ret false
+           ; ret URem
+           ; ret SRem
            ; ret And
            ; ret Or
            ; ret Xor
@@ -1042,19 +1047,19 @@ Section InstrGenerators.
     :=
       bid_entry <- new_block_id;;
       (* TODO: make it so I can generate constant expressions *)
-      loop_init <- ret INSTR_Op <*> gen_op (TYPE_I 64);; (* gen_exp_size sz (TYPE_I 64);; *)
+      loop_init <- ret INSTR_Op <*> gen_op (TYPE_I 32 (* TODO: big ints *));; (* gen_exp_size sz (TYPE_I 64);; *)
       bound' <- lift_GenLLVM (choose (0, bound));;
-      '(loop_init_instr_id, loop_init_instr) <- add_id_to_instr (TYPE_I 64, loop_init);;
+      '(loop_init_instr_id, loop_init_instr) <- add_id_to_instr (TYPE_I 32 (* TODO: big ints *), loop_init);;
       let loop_init_instr_raw_id := instr_id_to_raw_id "loop init id" loop_init_instr_id in
-      '(loop_cmp_id, loop_cmp) <- add_id_to_instr (TYPE_I 1, INSTR_Op (OP_ICmp Ule (TYPE_I 64) (EXP_Ident (ID_Local loop_init_instr_raw_id)) (EXP_Integer bound')));;
+      '(loop_cmp_id, loop_cmp) <- add_id_to_instr (TYPE_I 1, INSTR_Op (OP_ICmp Ule (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local loop_init_instr_raw_id)) (EXP_Integer bound')));;
       let loop_cmp_raw_id := instr_id_to_raw_id "loop_cmp_id" loop_cmp_id in
       let lower_exp := OP_Select (TYPE_I 1, (EXP_Ident (ID_Local loop_cmp_raw_id)))
-                                 (TYPE_I 64, (EXP_Ident (ID_Local loop_init_instr_raw_id)))
-                                 (TYPE_I 64, EXP_Integer bound') in
-      '(select_id, select_instr) <- add_id_to_instr (TYPE_I 64, INSTR_Op lower_exp);;
+                                 (TYPE_I 32 (* TODO: big ints *), (EXP_Ident (ID_Local loop_init_instr_raw_id)))
+                                 (TYPE_I 32 (* TODO: big ints *), EXP_Integer bound') in
+      '(select_id, select_instr) <- add_id_to_instr (TYPE_I 32 (* TODO: big ints *), INSTR_Op lower_exp);;
       let loop_final_init_id_raw := instr_id_to_raw_id "loop iterator id" select_id in
 
-      let loop_cond_exp := INSTR_Op (OP_ICmp Ugt (TYPE_I 64) (EXP_Ident (ID_Local loop_final_init_id_raw)) (EXP_Integer 0)) in
+      let loop_cond_exp := INSTR_Op (OP_ICmp Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local loop_final_init_id_raw)) (EXP_Integer 0)) in
       '(loop_cond_id, loop_cond) <- add_id_to_instr (TYPE_I 1, loop_cond_exp);;
 
       let entry_code : list (instr_id * instr typ) := [(loop_init_instr_id, loop_init_instr); (loop_cmp_id, loop_cmp); (select_id, select_instr); (loop_cond_id, loop_cond)] in
@@ -1070,10 +1075,10 @@ Section InstrGenerators.
       phi_id <- new_raw_id;;
 
       (* Block for controlling the next iteration of the loop *)
-      let next_exp := OP_IBinop (Sub false false) (TYPE_I 64) (EXP_Ident (ID_Local phi_id)) (EXP_Integer 1) in
-      '(next_instr_id, next_instr) <- add_id_to_instr (TYPE_I 64, INSTR_Op next_exp);;
+      let next_exp := OP_IBinop (Sub false false) (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local phi_id)) (EXP_Integer 1) in
+      '(next_instr_id, next_instr) <- add_id_to_instr (TYPE_I 32 (* TODO: big ints *), INSTR_Op next_exp);;
       let next_instr_raw_id := instr_id_to_raw_id "next_exp" next_instr_id in
-      let next_cond_exp := OP_ICmp Ugt (TYPE_I 64) (EXP_Ident (ID_Local next_instr_raw_id)) (EXP_Integer 0) in
+      let next_cond_exp := OP_ICmp Ugt (TYPE_I 32 (* TODO: big ints *)) (EXP_Ident (ID_Local next_instr_raw_id)) (EXP_Integer 0) in
       '(next_cond_id, next_cond) <- add_id_to_instr (TYPE_I 1, INSTR_Op next_cond_exp);;
       let next_cond_raw_id := instr_id_to_raw_id "next_cond_exp" next_cond_id in
 
@@ -1112,7 +1117,7 @@ Section InstrGenerators.
            code <- gen_code;;
            '(term, bs) <- gen_terminator_sz (sz - 1) t (bid_next::back_blocks);;
            let b := {| blk_id   := bid_loop
-                     ; blk_phis := [(phi_id, Phi (TYPE_I 64) [(bid_entry, entry_exp); (bid_next, next_exp)])]
+                     ; blk_phis := [(phi_id, Phi (TYPE_I 32 (* TODO: big ints *)) [(bid_entry, entry_exp); (bid_next, next_exp)])]
                      ; blk_code := code
                      ; blk_term := term
                      ; blk_comments := None
