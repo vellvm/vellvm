@@ -622,8 +622,8 @@ Proof.
   tauto.
   intros.
   unfold ocfg_relabel_helper_rel in H5.
-  repeat break_match; subst; try easy.
-Abort. (* the strings do not match... *)
+  repeat break_match; subst; easy.
+Qed.
 
 Theorem ocfg_relabel_convert_typ : forall cfg m,
   ocfg_relabel m (convert_typ nil cfg) = convert_typ nil (ocfg_relabel m cfg).
