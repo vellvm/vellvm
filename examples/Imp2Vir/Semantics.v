@@ -211,6 +211,24 @@ Proof.
   apply unique_vector_build_map; lia.
 Qed.
 
+Theorem block_cvir_relabel_WF : forall b, cvir_relabel_WF (block_cvir b).
+Proof.
+  unfold cvir_relabel_WF.
+  intros.
+  destruct_vec1 vi. destruct_vec1 vi'.
+  destruct_vec1 vo. destruct_vec1 vo'.
+  destruct_vec0 vt. destruct_vec0 vt'.
+  cbn. unfold bk_relabel. f_equal. cbn.
+  unfold blk_id_relabel. cbn.
+  rewrite !Util.eq_dec_eq.
+  f_equal.
+  rewrite Util.eq_dec_neq; try trivial.
+  intro. unfold unique_vector in H. apply unique_list_vector in H.
+  specialize (H 1 0)%nat. simpl in H.
+  assert (Some r1 = Some r) by (f_equal; assumption).
+  apply H in H8; lia.
+Qed.
+
 Theorem merge_cvir_relabel_WF :
   forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2),
   cvir_relabel_WF ir1 -> cvir_relabel_WF ir2 ->

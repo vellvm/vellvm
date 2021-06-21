@@ -12,6 +12,19 @@ Definition unique_list {A} (l : list A) : Prop :=
   forall i1 i2, i1 < length l -> i2 < length l ->
   List.nth_error l i1 = List.nth_error l i2 -> i1 = i2.
 
+(* I should have used NoDup from the start. *)
+Theorem unique_list_NoDup : forall {A} (l : list A),
+  NoDup l <-> unique_list l.
+Proof.
+  intros.
+  unfold unique_list. split; intros.
+  - eapply NoDup_nth_error; eassumption.
+  - apply NoDup_nth_error. intros. apply H; try assumption.
+    apply nth_error_Some in H0.
+    rewrite H1 in H0.
+    now apply nth_error_Some in H0.
+Qed.
+
 Ltac nth_error_app123 H :=
   (rewrite nth_error_app1 in H ; [|lia]) +
   (rewrite nth_error_app2 in H ; [|lia] ; (

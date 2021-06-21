@@ -24,22 +24,11 @@ Definition unique_bid {ni no} ir : Prop :=
   forall (vi : Vec.t raw_id ni) (vo : Vec.t raw_id no) vt,
   forall b1 b2,
   unique_vector (vi ++ vt)%vec ->
+  (* unique_list (inputs (blocks ir vi vo vt)). *)
   List.In b1 (blocks ir vi vo vt) ->
   List.In b2 (blocks ir vi vo vt) ->
   blk_id b1 = blk_id b2 ->
   b1 = b2.
-
-Theorem nth_firstn : forall A (l : list A) i n a,
-  i < n -> List.nth i (List.firstn n l) a = List.nth i l a.
-Proof.
-  induction l ; intros.
-  - rewrite firstn_nil. reflexivity.
-  - induction n.
-    + lia.
-    + rewrite firstn_cons. simpl. induction i.
-      * reflexivity.
-      * rewrite IHl. reflexivity. lia.
-Qed.
 
 Definition out_blk_id id (b : block typ) : Prop :=
   match blk_term b with
@@ -312,6 +301,31 @@ Proof.
   tauto.
 Qed.
 
+Theorem sym_i_cvir_inputs_used :
+  forall ni1 ni2 ni3 no (ir : cvir (ni1+(ni2+ni3)) no),
+  cvir_inputs_used ir ->
+  cvir_inputs_used (sym_i_cvir ir).
+Proof.
+  unfold cvir_inputs_used.
+  intros.
+  simpl.
+  apply H.
+  rewrite vector_in_app_iff in H0.
+  rewrite vector_in_app_iff.
+  rewrite <- sym_vec_In.
+  assumption.
+Qed.
+
+Theorem sym_o_cvir_inputs_used :
+  forall ni no1 no2 no3 (ir : cvir ni (no1+(no2+no3))),
+  cvir_inputs_used ir ->
+  cvir_inputs_used (sym_o_cvir ir).
+Proof.
+  unfold cvir_inputs_used.
+  intros.
+  now apply H.
+Qed.
+
 Theorem sym_i_cvir_unique :
   forall ni1 ni2 ni3 no (ir : cvir (ni1+(ni2+ni3)) no),
   unique_bid ir ->
@@ -363,6 +377,28 @@ Proof.
   apply H1.
 Qed.
 
+Theorem cast_i_cvir_inputs_used :
+  forall ni ni' no (ir : cvir ni no) (H : ni = ni'),
+  cvir_inputs_used ir ->
+  cvir_inputs_used (cast_i_cvir ir H).
+Proof.
+  unfold cvir_inputs_used.
+  intros.
+  destruct vi.
+  apply H0.
+  apply H1.
+Qed.
+
+Theorem cast_o_cvir_inputs_used :
+  forall ni no no' (ir : cvir ni no) (H : no = no'),
+  cvir_inputs_used ir ->
+  cvir_inputs_used (cast_o_cvir ir H).
+Proof.
+  unfold cvir_inputs_used.
+  intros.
+  now apply H0.
+Qed.
+
 Theorem cast_i_cvir_unique :
   forall ni ni' no (ir : cvir ni no) (H : ni = ni'),
   unique_bid ir -> unique_bid (cast_i_cvir ir H).
@@ -400,6 +436,20 @@ Proof.
   exact H.
 Qed.
 
+Theorem focus_input_cvir_inputs_used :
+  forall ni no (ir : cvir ni no) (i : fin ni),
+  cvir_inputs_used ir -> cvir_inputs_used (focus_input_cvir ir i).
+Proof.
+  unfold focus_input_cvir.
+  intros.
+  apply cast_i_cvir_inputs_used.
+  apply sym_i_cvir_inputs_used.
+  apply cast_i_cvir_inputs_used.
+  apply sym_i_cvir_inputs_used.
+  apply cast_i_cvir_inputs_used.
+  exact H.
+Qed.
+
 Theorem focus_input_cvir_unique :
   forall ni no (ir : cvir ni no) (i : fin ni),
   unique_bid ir -> unique_bid (focus_input_cvir ir i).
@@ -425,6 +475,20 @@ Proof.
   apply cast_o_cvir_id_WF.
   apply sym_o_cvir_id_WF.
   apply cast_o_cvir_id_WF.
+  exact H.
+Qed.
+
+Theorem focus_output_cvir_inputs_used :
+  forall ni no (ir : cvir ni no) (o : fin no),
+  cvir_inputs_used ir -> cvir_inputs_used (focus_output_cvir ir o).
+Proof.
+  unfold focus_input_cvir.
+  intros.
+  apply cast_o_cvir_inputs_used.
+  apply sym_o_cvir_inputs_used.
+  apply cast_o_cvir_inputs_used.
+  apply sym_o_cvir_inputs_used.
+  apply cast_o_cvir_inputs_used.
   exact H.
 Qed.
 
@@ -457,6 +521,16 @@ Proof.
   apply vector_in_app_iff. rewrite vector_in_app_iff.
   intuition.
   left. subst bid. apply In_hd.
+Qed.
+
+Theorem loop_cvir_open_inputs_used :
+  forall (ni no : nat) (ir : cvir (S ni) (S no)),
+  cvir_inputs_used ir -> cvir_inputs_used (loop_cvir_open ir).
+Proof.
+  unfold loop_cvir_open, cvir_inputs_used.
+  intros.
+  simpl in *.
+  now apply H.
 Qed.
 
 Theorem loop_cvir_open_unique :
@@ -495,6 +569,21 @@ Proof.
     tauto.
 Qed.
 
+Theorem loop_cvir_inputs_used :
+  forall (ni no : nat) (ir : cvir (S ni) (S no)),
+  cvir_inputs_used ir -> cvir_inputs_used (loop_cvir ir).
+Proof.
+  unfold loop_cvir, cvir_inputs_used.
+  intros.
+  simpl in *.
+  break_let.
+  apply cons_uncons in Heqp. subst vt.
+  apply H.
+  unfold In in *.
+  apply in_app_iff. apply in_app_iff in H0. simpl in *.
+  tauto.
+Qed.
+
 Theorem loop_cvir_unique :
   forall (ni no : nat) (ir : cvir (S ni) (S no)),
   unique_bid ir -> unique_bid (loop_cvir ir).
@@ -525,6 +614,20 @@ Proof.
   apply cast_i_cvir_id_WF.
   apply focus_input_cvir_id_WF.
   apply merge_cvir_id_WF ; assumption.
+Qed.
+
+Theorem seq_cvir_inputs_used :
+  forall ni1 no1 ni2 no2 (ir1 : cvir ni1 (S no1)) (ir2 : cvir (S ni2) no2),
+  cvir_inputs_used ir1 -> cvir_inputs_used ir2 ->
+  cvir_inputs_used (seq_cvir ir1 ir2).
+Proof.
+  unfold seq_cvir.
+  intros.
+  apply loop_cvir_inputs_used.
+  apply cast_o_cvir_inputs_used.
+  apply cast_i_cvir_inputs_used.
+  apply focus_input_cvir_inputs_used.
+  apply merge_cvir_inputs_used; assumption.
 Qed.
 
 Theorem seq_cvir_unique :
@@ -561,6 +664,17 @@ Proof.
   right. left. apply In_hd.
 Qed.
 
+Theorem join_cvir_inputs_used :
+  forall (ni no : nat) (ir : cvir ni (S (S no))),
+  cvir_inputs_used ir ->
+  cvir_inputs_used (join_cvir ir).
+Proof.
+  unfold join_cvir, cvir_inputs_used.
+  intros.
+  simpl in *.
+  now apply H.
+Qed.
+
 Theorem join_cvir_unique :
   forall (ni no : nat) (ir : cvir ni (S (S no))),
   unique_bid ir ->
@@ -571,6 +685,7 @@ Proof.
   simpl in *.
   eapply H ; eassumption.
 Qed.
+
 
 Lemma cvir_inputs : forall {ni no} (ir : cvir ni no) vi vo vt i,
   cvir_ids_WF ir ->

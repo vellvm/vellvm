@@ -439,6 +439,16 @@ Ltac split_vec v n1 :=
   apply append_splitat in Heqvp;
   subst v.
 
+Theorem sym_vec_In : forall {A} {n1 n2 n3} (v : Vec.t A (n1 + (n2 + n3))) a,
+  In a v <-> In a (sym_vec v).
+Proof.
+  intros.
+  split_vec v n1.
+  split_vec v2 n2.
+  rewrite sym_vec_app.
+  rewrite !vector_in_app_iff. tauto.
+Qed.
+
 Declare Scope vec_scope.
 Delimit Scope vec_scope with vec.
 Notation "h :: t" := (cons h t) (at level 60, right associativity).
