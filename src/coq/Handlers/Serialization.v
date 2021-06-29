@@ -57,7 +57,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Definition addr := Addr.addr.
 
   Inductive SByte :=
-  | UByte (uv : uvalue) (idx : uvalue) : SByte.
+  | UByte (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : store_id) : SByte.
 
   Variable ptr_size : nat.
   Variable datalayout : DataLayout.
@@ -117,18 +117,18 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       end.
 
 
-    Definition uvalue_bytes_little_endian (uv :  uvalue) : list uvalue
-      := map (fun n => UVALUE_ExtractByte uv (UVALUE_IPTR (Z.of_N n))) (Nseq 0 ptr_size).
+    Definition uvalue_bytes_little_endian (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
+      := map (fun n => UVALUE_ExtractByte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq 0 ptr_size).
 
-    Definition uvalue_bytes (e : Endianess) (uv :  uvalue) : list uvalue
-      := correct_endianess e (uvalue_bytes_little_endian uv).
+    Definition uvalue_bytes (e : Endianess) (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
+      := correct_endianess e (uvalue_bytes_little_endian uv dt sid).
 
-    Definition to_ubytes (uv :  uvalue) : list SByte
-      := map (fun n => UByte uv (UVALUE_IPTR (Z.of_N n))) (Nseq 0 ptr_size).
+    Definition to_ubytes (uv :  uvalue) (dt : dtyp) (sid : store_id) : list SByte
+      := map (fun n => UByte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq 0 ptr_size).
 
     Definition ubyte_to_extractbyte (byte : SByte) : uvalue
       := match byte with
-         | UByte uv idx => UVALUE_ExtractByte uv idx
+         | UByte uv dt idx sid => UVALUE_ExtractByte uv dt idx sid
          end.
 
     (* Is a uvalue a concrete integer equal to i? *)
@@ -145,20 +145,40 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition guard_opt (x : bool) : option unit
       := if x then Some tt else None.
 
-    Fixpoint all_bytes_from_uvalue_helper (idx' : Z) (parent : uvalue) (bytes : list SByte) : option uvalue
+    Fixpoint all_bytes_from_uvalue_helper (idx' : Z) (sid' : store_id) (parent : uvalue) (bytes : list SByte) : option uvalue
       := match bytes with
-         | [] => None
-         | (UByte uv idx)::bytes =>
+         | [] => Some parent
+         | (UByte uv dt idx sid)::bytes =>
            guard_opt (uvalue_int_eq_Z idx idx');;
            guard_opt (RelDec.rel_dec uv parent);;
-           all_bytes_from_uvalue_helper (Z.succ idx') parent bytes
+           guard_opt (N.eqb sid sid');;
+           all_bytes_from_uvalue_helper (Z.succ idx') sid' parent bytes
          end.
 
     Definition all_bytes_from_uvalue (bytes : list SByte) : option uvalue
       := match bytes with
          | nil => None
-         | cons (UByte uv idx) xs =>
-           all_bytes_from_uvalue_helper 0 uv bytes
+         | cons (UByte uv dt idx sid) xs =>
+           all_bytes_from_uvalue_helper 0 sid uv bytes
+         end.
+
+    Fixpoint all_extract_bytes_from_uvalue_helper (idx' : Z) (sid' : store_id) (parent : uvalue) (bytes : list uvalue) : option uvalue
+      := match bytes with
+         | [] => Some parent
+         | (UVALUE_ExtractByte uv dt idx sid)::bytes =>
+           guard_opt (uvalue_int_eq_Z idx idx');;
+           guard_opt (RelDec.rel_dec uv parent);;
+           guard_opt (N.eqb sid sid');;
+           all_extract_bytes_from_uvalue_helper (Z.succ idx') sid' parent bytes
+         | _ => None
+         end.
+
+    Definition all_extract_bytes_from_uvalue (bytes : list uvalue) : option uvalue
+      := match bytes with
+         | nil => None
+         | (UVALUE_ExtractByte uv dt idx sid)::xs =>
+           all_extract_bytes_from_uvalue_helper 0 sid uv bytes
+         | _ => None
          end.
 
     Definition from_ubytes (bytes : list SByte) (dt : dtyp) : uvalue
@@ -276,13 +296,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     Definition extract_byte_to_ubyte (uv : uvalue) : err SByte
       := match uv with
-         | UVALUE_ExtractByte uv idx =>
-           ret (UByte uv idx)
+         | UVALUE_ExtractByte uv dt idx sid =>
+           ret (UByte uv dt idx sid)
          | _ => inl "extract_byte_to_ubyte invalid conversion."
          end.
 
   Unset Guard Checking. (* TODO: Packed aggregate types *)
-  Fixpoint serialize_sbytes (uv : uvalue) (dt : dtyp) {struct uv} : err (list SByte)
+  Fixpoint serialize_sbytes (uv : uvalue) (dt : dtyp) (sid : store_id) {struct uv} : err (list SByte)
     := match uv with
        (* Base types *)
        | UVALUE_Addr _
@@ -312,7 +332,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          monad_fold_right (fun acc '(uv, dt) => (bytes <- (serialize_sbytes uv dt);; ret (bytes ++ acc)) % list) (zip fields dts) []
 
        (* Byte manipulation. *)
-       | UVALUE_ExtractByte uv idx =>
+       | UVALUE_ExtractByte uv idx sid =>
          inl "serialize_sbytes: UVALUE_ExtractByte not guarded by UVALUE_ConcatBytes."
        | UVALUE_ConcatBytes bytes t =>
          map_monad extract_byte_to_ubyte bytes
@@ -338,7 +358,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           Vectors must have elements of "primitive type"
         *)
        | _ =>
-         ret (to_ubytes uv)
+         inr (to_ubytes uv sid)
        (* | UVALUE_IBinop iop v1 v2 => _ *)
        (* | UVALUE_ICmp cmp v1 v2 => _ *)
        (* | UVALUE_FBinop fop fm v1 v2 => _ *)
@@ -377,48 +397,48 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Definition between {A} (lo hi : N) (l : list A) : list A
     := take (hi - lo) (drop lo l).
 
-  Fixpoint deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err uvalue
-    := match dt with
-       (* Base types *)
-       | DTYPE_I _
-       | DTYPE_IPTR
-       | DTYPE_Pointer
-       | DTYPE_Half
-       | DTYPE_Float
-       | DTYPE_Double
-       | DTYPE_X86_fp80
-       | DTYPE_Fp128
-       | DTYPE_Ppc_fp128
-       | DTYPE_X86_mmx =>
-         ret (from_ubytes bytes dt)
+  (* Fixpoint deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err uvalue *)
+  (*   := match dt with *)
+  (*      (* Base types *) *)
+  (*      | DTYPE_I _ *)
+  (*      | DTYPE_IPTR *)
+  (*      | DTYPE_Pointer *)
+  (*      | DTYPE_Half *)
+  (*      | DTYPE_Float *)
+  (*      | DTYPE_Double *)
+  (*      | DTYPE_X86_fp80 *)
+  (*      | DTYPE_Fp128 *)
+  (*      | DTYPE_Ppc_fp128 *)
+  (*      | DTYPE_X86_mmx => *)
+  (*        ret (from_ubytes bytes dt) *)
 
-       (* Unimplemented *)
-       | DTYPE_Void =>
-         inl "deserialize_sbytes: attempting to deserialize void."
-       | DTYPE_Metadata =>
-         inl "deserialize_sbytes: metadata."
+  (*      (* Unimplemented *) *)
+  (*      | DTYPE_Void => *)
+  (*        inl "deserialize_sbytes: attempting to deserialize void." *)
+  (*      | DTYPE_Metadata => *)
+  (*        inl "deserialize_sbytes: metadata." *)
 
-       (* Padded aggregate types *)
-       | DTYPE_Struct fields =>
-         inl "deserialize_sbytes: padded structures unimplemented."
+  (*      (* Padded aggregate types *) *)
+  (*      | DTYPE_Struct fields => *)
+  (*        inl "deserialize_sbytes: padded structures unimplemented." *)
 
-       (* Packed aggregate types *)
-       | DTYPE_Array sz t =>
-         let size := sizeof_dtyp t in
-         let size_nat := N.to_nat size in
-         fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];;
-         ret (UVALUE_Array fields)
-       | DTYPE_Vector sz t =>
-         let size := sizeof_dtyp t in
-         let size_nat := N.to_nat size in
-         fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];;
-         ret (UVALUE_Vector fields)
-       | DTYPE_Packed_struct fields =>
-         inl "deserialize_sbytes: unimplemented packed structs."
+  (*      (* Packed aggregate types *) *)
+  (*      | DTYPE_Array sz t => *)
+  (*        let size := sizeof_dtyp t in *)
+  (*        let size_nat := N.to_nat size in *)
+  (*        fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];; *)
+  (*        ret (UVALUE_Array fields) *)
+  (*      | DTYPE_Vector sz t => *)
+  (*        let size := sizeof_dtyp t in *)
+  (*        let size_nat := N.to_nat size in *)
+  (*        fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];; *)
+  (*        ret (UVALUE_Vector fields) *)
+  (*      | DTYPE_Packed_struct fields => *)
+  (*        inl "deserialize_sbytes: unimplemented packed structs." *)
 
-       | DTYPE_Opaque =>
-         inl "deserialize_sbytes: opaque."
-       end.
+  (*      | DTYPE_Opaque => *)
+  (*        inl "deserialize_sbytes: opaque." *)
+  (*      end. *)
 
   (* TODO: if I have 8 bytes concatenated together... And they all
   have the same uvalue, will I evaluate the UVALUE 8 times???
@@ -603,3 +623,174 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 (*    Will probably need an equivalence relation on UVALUEs, likely won't *)
 (*    end up with a round-trip property with regular equality... *)
 (* *) *)
+
+    Definition default_dvalue_of_dtyp_i (sz : N) : err dvalue:=
+      (if (sz =? 64) then ret (DVALUE_I64 (repr 0))
+        else if (sz =? 32) then ret (DVALUE_I32 (repr 0))
+            else if (sz =? 8) then ret (DVALUE_I8 (repr 0))
+                  else if (sz =? 1) then ret (DVALUE_I1 (repr 0))
+                       else failwith
+              "Illegal size for generating default dvalue of DTYPE_I").
+
+
+    (* Handler for PickE which concretizes everything to 0 *)
+    Fixpoint default_dvalue_of_dtyp (dt : dtyp) : err dvalue :=
+      match dt with
+      | DTYPE_I sz => default_dvalue_of_dtyp_i sz
+      | DTYPE_IPTR => ret (DVALUE_IPTR 0)
+      | DTYPE_Pointer => ret (DVALUE_Addr Addr.null)
+      | DTYPE_Void => ret DVALUE_None
+      | DTYPE_Half => failwith "Unimplemented default type: half"
+      | DTYPE_Float => ret (DVALUE_Float Float32.zero)
+      | DTYPE_Double => ret (DVALUE_Double (Float32.to_double Float32.zero))
+      | DTYPE_X86_fp80 => failwith "Unimplemented default type: x86_fp80"
+      | DTYPE_Fp128 => failwith "Unimplemented default type: fp128"
+      | DTYPE_Ppc_fp128 => failwith "Unimplemented default type: ppc_fp128"
+      | DTYPE_Metadata => failwith "Unimplemented default type: metadata"
+      | DTYPE_X86_mmx => failwith "Unimplemented default type: x86_mmx"
+      | DTYPE_Opaque => failwith "Unimplemented default type: opaque"
+      | DTYPE_Array sz t =>
+        if (0 <=? sz) then
+          v <- default_dvalue_of_dtyp t ;;
+          (ret (DVALUE_Array (repeat v (N.to_nat sz))))
+        else
+          failwith ("Negative array length for generating default value" ++
+          "of DTYPE_Array or DTYPE_Vector")
+
+      (* Matching valid Vector types... *)
+      (* Currently commented out unsupported ones *)
+      (* | DTYPE_Vector sz (DTYPE_Half) => *)
+      (*   if (0 <=? sz) then *)
+      (*     (ret (DVALUE_Vector *)
+      (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
+      (*   else *)
+      (*     failwith ("Negative array length for generating default value" ++ *)
+      (*     "of DTYPE_Array or DTYPE_Vector") *)
+      | DTYPE_Vector sz (DTYPE_Float) =>
+        if (0 <=? sz) then
+          (ret (DVALUE_Vector
+                  (repeat (DVALUE_Float Float32.zero) (N.to_nat sz))))
+        else
+          failwith ("Negative array length for generating default value" ++
+          "of DTYPE_Array or DTYPE_Vector")
+      | DTYPE_Vector sz (DTYPE_Double) =>
+        if (0 <=? sz) then
+          (ret (DVALUE_Vector
+                  (repeat (DVALUE_Double (Float32.to_double Float32.zero))
+                          (N.to_nat sz))))
+        else
+          failwith ("Negative array length for generating default value" ++
+          "of DTYPE_Array or DTYPE_Vector")
+      (* | DTYPE_Vector sz (DTYPE_X86_fp80) => *)
+      (*   if (0 <=? sz) then *)
+      (*     (ret (DVALUE_Vector *)
+      (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
+      (*   else *)
+      (*     failwith ("Negative array length for generating default value" ++ *)
+      (*     "of DTYPE_Array or DTYPE_Vector") *)
+      (* | DTYPE_Vector sz (DTYPE_Fp128) => *)
+      (*   if (0 <=? sz) then *)
+      (*     (ret (DVALUE_Vector *)
+      (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
+      (*   else *)
+      (*     failwith ("Negative array length for generating default value" ++ *)
+      (*     "of DTYPE_Array or DTYPE_Vector") *)
+      | DTYPE_Vector sz (DTYPE_I n) =>
+        if (0 <=? sz) then
+          v <- default_dvalue_of_dtyp_i n ;;
+          (ret (DVALUE_Vector (repeat v (N.to_nat sz))))
+        else
+          failwith ("Negative array length for generating default value" ++
+          "of DTYPE_Array or DTYPE_Vector")
+      | DTYPE_Vector _ _ => failwith ("Non-valid vector type when" ++
+          "generating default vector")
+      | DTYPE_Struct fields =>
+        v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
+        ret (DVALUE_Struct v)
+      | DTYPE_Packed_struct fields =>
+        v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
+        ret (DVALUE_Packed_struct v)
+      end.
+
+
+    Section Concretize.
+
+      
+
+      Variable endianess : Endianess.
+
+      (* Convert a list of UVALUE_ExtractByte values into a dvalue of a given type
+
+         Assumes bytes are in little endian form...
+
+         Note: I believe this function has to be endianess aware.
+       *)
+      (* Fixpoint extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) *)
+      (*   := match dt with *)
+      (*      | DTYPE_I sz =>   *)
+      (*      | DTYPE_IPTR => _ *)
+      (*      | DTYPE_Pointer => _ *)
+      (*      | DTYPE_Void => _ *)
+      (*      | DTYPE_Half => _ *)
+      (*      | DTYPE_Float => _ *)
+      (*      | DTYPE_Double => _ *)
+      (*      | DTYPE_X86_fp80 => _ *)
+      (*      | DTYPE_Fp128 => _ *)
+      (*      | DTYPE_Ppc_fp128 => _ *)
+      (*      | DTYPE_Metadata => _ *)
+      (*      | DTYPE_X86_mmx => _ *)
+      (*      | DTYPE_Array sz t => _ *)
+      (*      | DTYPE_Struct fields => _ *)
+      (*      | DTYPE_Packed_struct fields => _ *)
+      (*      | DTYPE_Opaque => _ *)
+      (*      | DTYPE_Vector sz t => _ *)
+      (*      end. *)
+      
+      Fixpoint concretize_uvalue (u : uvalue) : undef_or_err dvalue :=
+        match u with
+        | UVALUE_Addr a                          => ret (DVALUE_Addr a)
+        | UVALUE_I1 x                            => ret (DVALUE_I1 x)
+        | UVALUE_I8 x                            => ret (DVALUE_I8 x)
+        | UVALUE_I32 x                           => ret (DVALUE_I32 x)
+        | UVALUE_I64 x                           => ret (DVALUE_I64 x)
+        | UVALUE_IPTR x                          => ret (DVALUE_IPTR x)
+        | UVALUE_Double x                        => ret (DVALUE_Double x)
+        | UVALUE_Float x                         => ret (DVALUE_Float x)
+        | UVALUE_Undef t                         => lift (default_dvalue_of_dtyp t)
+        | UVALUE_Poison                          => ret (DVALUE_Poison)
+        | UVALUE_None                            => ret DVALUE_None
+        | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalue fields ;;
+                                                   ret (DVALUE_Struct dfields)
+        | UVALUE_Packed_struct fields            => 'dfields <- map_monad concretize_uvalue fields ;;
+                                                   ret (DVALUE_Packed_struct dfields)
+        | UVALUE_Array elts                      => 'delts <- map_monad concretize_uvalue elts ;;
+                                                   ret (DVALUE_Array delts)
+        | UVALUE_Vector elts                     => 'delts <- map_monad concretize_uvalue elts ;;
+                                                   ret (DVALUE_Vector delts)
+        | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalue v1 ;;
+                                                   dv2 <- concretize_uvalue v2 ;;
+                                                   eval_iop iop dv1 dv2
+        | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
+                                                   dv2 <- concretize_uvalue v2 ;;
+                                                   eval_icmp cmp dv1 dv2
+        | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalue v1 ;;
+                                                   dv2 <- concretize_uvalue v2 ;;
+                                                   eval_fop fop dv1 dv2
+        | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
+                                                   dv2 <- concretize_uvalue v2 ;;
+                                                   eval_fcmp cmp dv1 dv2
+        | UVALUE_ConcatBytes bytes dt sid =>
+          (* TODO: BUG... don't the types have to be equal too...? *)
+          match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
+          | true, Some uv => concretize_uvalue uv
+          | _, _ => extractbytes_to_dvalue bytes dt
+          end
+
+        | UVALUE_ExtractByte byte idx =>
+          (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
+          lift (failwith "Attempting to concretize UVALUE_ExtractByte, should not happen.")
+        | _ => (lift (failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"))
+                
+        end.
+
+    End Concretize.

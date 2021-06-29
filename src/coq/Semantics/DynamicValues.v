@@ -244,6 +244,7 @@ Section DvalueInd.
   Qed.
 End DvalueInd.
 
+Definition store_id := N.
 
 (* The set of dynamic values manipulated by an LLVM program. *)
 Unset Elimination Schemes.
@@ -275,8 +276,10 @@ Inductive uvalue : Set :=
 | UVALUE_ExtractValue     (vec:uvalue) (idxs:list int)
 | UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list int)
 | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
-(* Extract the `idx` byte from a uvalue `uv`. `idx` 0 is the least significant byte. *)
-| UVALUE_ExtractByte      (uv : uvalue) (idx : uvalue)
+(* Extract the `idx` byte from a uvalue `uv`, which was stored with
+   type `dt`. `idx` 0 is the least significant byte. `sid` is the "store
+   id". *)
+| UVALUE_ExtractByte      (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : store_id)
 | UVALUE_ConcatBytes      (uvs : list uvalue) (dt : dtyp)
 .
 Set Elimination Schemes.
@@ -310,7 +313,7 @@ Section UvalueInd.
   Hypothesis IH_ExtractValue   : forall (vec:uvalue) (idxs:list int), P vec -> P (UVALUE_ExtractValue vec idxs).
   Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
   Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
-  Hypothesis IH_ExtractByte : forall (uv : uvalue) (idx : uvalue), P uv -> P idx -> P (UVALUE_ExtractByte uv idx).
+  Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
   Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue), (forall u, In u uvs -> P u) -> P (UVALUE_ConcatBytes uvs dt).
 
   Lemma uvalue_ind : forall (uv:uvalue), P uv.
@@ -797,7 +800,7 @@ Section DecidableEquality.
               | UVALUE_ExtractValue u l, UVALUE_ExtractValue u' l' => _
               | UVALUE_InsertValue u v l, UVALUE_InsertValue u' v' l' => _
               | UVALUE_Select u v t, UVALUE_Select u' v' t' => _
-              | UVALUE_ExtractByte uv idx, UVALUE_ExtractByte uv' idx' => _
+              | UVALUE_ExtractByte uv dt idx sid, UVALUE_ExtractByte uv' dt' idx' sid' => _
               | UVALUE_ConcatBytes uvs dt, UVALUE_ConcatBytes uvs' dt' => _
               | _, _ => _
               end); try (ltac:(dec_dvalue); fail).
@@ -851,6 +854,8 @@ Section DecidableEquality.
       destruct (f t t')...
     - destruct (f uv uv')...
       destruct (f idx idx')...
+      destruct (N.eq_dec sid sid')...
+      destruct (dtyp_eq_dec dt dt')...
     - destruct (lsteq_dec uvs uvs')...
       destruct (dtyp_eq_dec dt dt')...
   Qed.
