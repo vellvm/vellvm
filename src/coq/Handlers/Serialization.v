@@ -162,22 +162,32 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
            all_bytes_from_uvalue_helper 0 sid uv bytes
          end.
 
-    Fixpoint all_extract_bytes_from_uvalue_helper (idx' : Z) (sid' : store_id) (parent : uvalue) (bytes : list uvalue) : option uvalue
+    (* TODO: move this *)
+    Definition dtyp_eqb (dt1 dt2 : dtyp) : bool
+      := match @dtyp_eq_dec dt1 dt2 with
+         | left x => true
+         | right x => false
+         end.
+
+    Fixpoint all_extract_bytes_from_uvalue_helper (idx' : Z) (sid' : store_id) (dt' : dtyp) (parent : uvalue) (bytes : list uvalue) : option uvalue
       := match bytes with
          | [] => Some parent
          | (UVALUE_ExtractByte uv dt idx sid)::bytes =>
            guard_opt (uvalue_int_eq_Z idx idx');;
            guard_opt (RelDec.rel_dec uv parent);;
            guard_opt (N.eqb sid sid');;
-           all_extract_bytes_from_uvalue_helper (Z.succ idx') sid' parent bytes
+           guard_opt (dtyp_eqb dt dt');;
+           all_extract_bytes_from_uvalue_helper (Z.succ idx') sid' dt' parent bytes
          | _ => None
          end.
 
+    (* Check that store ids, uvalues, and types match up, as well as
+       that the extract byte indices are in the right order *)
     Definition all_extract_bytes_from_uvalue (bytes : list uvalue) : option uvalue
       := match bytes with
          | nil => None
          | (UVALUE_ExtractByte uv dt idx sid)::xs =>
-           all_extract_bytes_from_uvalue_helper 0 sid uv bytes
+           all_extract_bytes_from_uvalue_helper 0 sid dt uv bytes
          | _ => None
          end.
 
