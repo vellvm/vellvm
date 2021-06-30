@@ -124,7 +124,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       := correct_endianess e (uvalue_bytes_little_endian uv dt sid).
 
     Definition to_ubytes (uv :  uvalue) (dt : dtyp) (sid : store_id) : list SByte
-      := map (fun n => UByte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq 0 ptr_size).
+      := map (fun n => UByte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq 0 (N.to_nat (sizeof_dtyp dt))).
 
     Definition ubyte_to_extractbyte (byte : SByte) : uvalue
       := match byte with
@@ -301,7 +301,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          | _ => inl "extract_byte_to_ubyte invalid conversion."
          end.
 
-  Unset Guard Checking. (* TODO: Packed aggregate types *)
   Fixpoint serialize_sbytes (uv : uvalue) (dt : dtyp) (sid : store_id) {struct uv} : err (list SByte)
     := match uv with
        (* Base types *)
@@ -314,12 +313,14 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | UVALUE_Float _
        | UVALUE_Double _
        | UVALUE_Undef _
-       | UVALUE_Poison =>
-         ret (to_ubytes uv)
+       | UVALUE_Poison
+       | UVALUE_Struct fields
+         =>
+         ret (to_ubytes uv dt sid)
        | UVALUE_None => ret nil
 
        (* Padded aggregate types *)
-       | UVALUE_Struct fields =>
+
          (* TODO: Structs WITH padding *)
          inl "Unimplemented"
 
