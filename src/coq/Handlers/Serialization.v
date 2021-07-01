@@ -453,17 +453,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        Naively, maybe, but I think I can optimize this when looking at ConcatBytes...
    *)
 
-    (* TODO: probably move this *)
-  Definition extract_byte_vint {I} `{VInt I} (i : I) (idx : Z) : I
-    := modu (shru i (repr (idx * 8))) (repr 256).
-
-  Fixpoint concat_bytes_vint {I} `{VInt I} (bytes : list I) : I
-    := match bytes with
-       | [] => repr 0
-       | (byte::bytes) =>
-         add byte (shl (concat_bytes_vint bytes) (repr 8))
-       end.
-
 (*     (* TODO: probably move this *) *)
 (*   Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop :=  *)
 (*   (* Concrete uvalue are contretized into their singleton *) *)
@@ -726,30 +715,120 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
       Variable endianess : Endianess.
 
-      (* Convert a list of UVALUE_ExtractByte values into a dvalue of a given type
+      (* Convert a list of UVALUE_ExtractByte values into a dvalue of
+      a given type
 
          Assumes bytes are in little endian form...
 
          Note: I believe this function has to be endianess aware.
 
-         This probably also needs to be mutually recursive with concretize_uvalue...
+         This probably also needs to be mutually recursive with
+         concretize_uvalue...
 
          Idea:
 
-         For each byte in the list, find uvalues that are from the same store.
+         For each byte in the list, find uvalues that are from the
+         same store.
 
-         - Can I have bytes that are from the same store, but different uvalues?
-           + Might not be possible, actually, because if I store a
-             concatbytes I get the old sids...
-           + TODO: Getting the old sids might be a problem,
-             though. Should be new, but entangled wherever they were
-             entangled before. This needs to be changed in serialize...
-             * I.e., If I load bytes from one store, and then store
-               them beside them... It should have a different sid,
-               allowing the bytes from that store to vary
-               independently.
-             * ALSO bytes that are entangled should *stay* entangled.
+         - Can I have bytes that are from the same store, but
+           different uvalues?  + Might not be possible, actually,
+           because if I store a concatbytes I get the old sids...  +
+           TODO: Getting the old sids might be a problem,
+           though. Should be new, but entangled wherever they were
+           entangled before. This needs to be changed in serialize...
+           * I.e., If I load bytes from one store, and then store them
+           beside them... It should have a different sid, allowing the
+           bytes from that store to vary independently.  * ALSO bytes
+           that are entangled should *stay* entangled.
+
+         The above is largely an issue with serialize_sbytes...
+
+         The idea here should be to take equal uvalues in our byte
+         list with the same sid and concretize the uvalue exactly
+         once.
+
+         After all uvalues in our list are concretized we then need to
+         convert the corresponding byte extractions into a single
+         dvalue.
+
        *)
+
+      (* TODO: probably move this *)
+      (* TODO: Make these take endianess into account.
+
+         Can probably use bitwidth from VInt to do big-endian...
+       *)
+      Definition extract_byte_vint {I} `{VInt I} (i : I) (idx : Z) : Z
+        := unsigned (modu (shru i (repr (idx * 8))) (repr 256)).
+
+      Fixpoint concat_bytes_vint {I} `{VInt I} (bytes : list I) : I
+        := match bytes with
+           | [] => repr 0
+           | (byte::bytes) =>
+             add byte (shl (concat_bytes_vint bytes) (repr 8))
+           end.
+
+      (* TODO: Endianess *)
+      (* TODO: does this work correctly with negative x? *)
+      Definition extract_byte_Z (x : Z) (idx : Z) : Z
+        := (Z.shiftr x (idx * 8)) mod 256.
+
+      Definition dvalue_extract_byte {I} `{VInt I} (dv : dvalue) (idx : Z) : Z
+        := match dv with
+           | DVALUE_I1 x
+           | DVALUE_I8 x
+           | DVALUE_I32 x
+           | DVALUE_I64 x =>
+             extract_byte_vint x idx
+           | DVALUE_IPTR x =>
+             extract_byte_Z x idx
+           | DVALUE_Addr (addr,_) =>
+             (* Note: this throws away provenance *)
+             extract_byte_Z addr idx
+           | DVALUE_Float f =>
+             extract_byte_Z (unsigned (Float32.to_bits f)) idx
+           | DVALUE_Double d =>
+             extract_byte_Z (unsigned (Float.to_bits d)) idx
+           | _ => 0
+           end.
+           (* Err, right, poison bytes... *)
+           | DVALUE_Poison => _
+           | DVALUE_None => _
+           | DVALUE_Struct fields => _
+           | DVALUE_Packed_struct fields => _
+           | DVALUE_Array elts => _
+           | DVALUE_Vector elts => _
+           end.
+
+      (* Taking a byte out of a dvalue...
+
+      Unlike UVALUE_ExtractByte, I don't think this needs an sid
+      (store id). There should be no nondeterminism in this value. *)
+      Inductive dvalue_byte : Type :=
+      | DVALUE_ExtractByte (dv : dvalue) (dt : dtyp) (idx : N) : dvalue_byte
+      .
+
+      Fixpoint dvalue_bytes_to_dvalue (dbs : list dvalue_byte) (dt : dtyp)
+        := match dt with
+           | DTYPE_I sz => _
+           | DTYPE_IPTR => _
+           | DTYPE_Pointer => _
+           | DTYPE_Void => _
+           | DTYPE_Half => _
+           | DTYPE_Float => _
+           | DTYPE_Double => _
+           | DTYPE_X86_fp80 => _
+           | DTYPE_Fp128 => _
+           | DTYPE_Ppc_fp128 => _
+           | DTYPE_Metadata => _
+           | DTYPE_X86_mmx => _
+           | DTYPE_Array sz t => _
+           | DTYPE_Struct fields => _
+           | DTYPE_Packed_struct fields => _
+           | DTYPE_Opaque => _
+           | DTYPE_Vector sz t => _
+           end.
+
       Fixpoint extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp)
         := match dt with
            | DTYPE_I sz =>
