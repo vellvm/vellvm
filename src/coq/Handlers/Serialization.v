@@ -301,6 +301,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          | _ => inl "extract_byte_to_ubyte invalid conversion."
          end.
 
+    (* This is mostly to_ubytes, except it will also unwrap concatbytes *)
   Fixpoint serialize_sbytes (uv : uvalue) (dt : dtyp) (sid : store_id) {struct uv} : err (list SByte)
     := match uv with
        (* Base types *)

@@ -1,0 +1,8 @@
+* Notes About New Memory Model Implementation
+
+
+* TODO Fix sizeof_dtype
+  
+ - ~to_ubytes~ takes a value and turns it into a sequence of UByte
+   values, which are essentially extractbytes for memory.
+   + Need to update ~sizeof_dtype~ to take into account padding, etc.
