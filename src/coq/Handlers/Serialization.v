@@ -311,6 +311,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          | _ => inl "extract_byte_to_ubyte invalid conversion."
          end.
 
+    (* TODO: probably put this in a fresh sid monad... *)
   Fixpoint serialize_sbytes (uv : uvalue) (dt : dtyp) (sid : store_id) {struct uv} : err (list SByte)
     := match uv with
        (* Base types *)
@@ -340,6 +341,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | UVALUE_ExtractByte uv dt' idx sid =>
          inl "serialize_sbytes: UVALUE_ExtractByte not guarded by UVALUE_ConcatBytes."
        | UVALUE_ConcatBytes bytes t =>
+         (* TODO: should provide *new* sids... May need to make this function in a fresh sid monad *)
          map_monad extract_byte_to_ubyte bytes
 
        | _ =>
@@ -728,27 +730,53 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          Assumes bytes are in little endian form...
 
          Note: I believe this function has to be endianess aware.
+
+         This probably also needs to be mutually recursive with concretize_uvalue...
+
+         Idea:
+
+         For each byte in the list, find uvalues that are from the same store.
+
+         - Can I have bytes that are from the same store, but different uvalues?
+           + Might not be possible, actually, because if I store a
+             concatbytes I get the old sids...
+           + TODO: Getting the old sids might be a problem,
+             though. Should be new, but entangled wherever they were
+             entangled before. This needs to be changed in serialize...
+             * I.e., If I load bytes from one store, and then store
+               them beside them... It should have a different sid,
+               allowing the bytes from that store to vary
+               independently.
+             * ALSO bytes that are entangled should *stay* entangled.
        *)
-      (* Fixpoint extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) *)
-      (*   := match dt with *)
-      (*      | DTYPE_I sz =>   *)
-      (*      | DTYPE_IPTR => _ *)
-      (*      | DTYPE_Pointer => _ *)
-      (*      | DTYPE_Void => _ *)
-      (*      | DTYPE_Half => _ *)
-      (*      | DTYPE_Float => _ *)
-      (*      | DTYPE_Double => _ *)
-      (*      | DTYPE_X86_fp80 => _ *)
-      (*      | DTYPE_Fp128 => _ *)
-      (*      | DTYPE_Ppc_fp128 => _ *)
-      (*      | DTYPE_Metadata => _ *)
-      (*      | DTYPE_X86_mmx => _ *)
-      (*      | DTYPE_Array sz t => _ *)
-      (*      | DTYPE_Struct fields => _ *)
-      (*      | DTYPE_Packed_struct fields => _ *)
-      (*      | DTYPE_Opaque => _ *)
-      (*      | DTYPE_Vector sz t => _ *)
-      (*      end. *)
+      Fixpoint extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp)
+        := match dt with
+           | DTYPE_I sz =>
+             _
+           | DTYPE_IPTR =>
+             (* TODO: What should this do when loading an IPTR?
+
+                Might largely not matter because we do the simple
+                thing when all of the bytes are of the same type, sid,
+                etc.
+              *)
+             _
+           | DTYPE_Pointer => _
+           | DTYPE_Void => _
+           | DTYPE_Half => _
+           | DTYPE_Float => _
+           | DTYPE_Double => _
+           | DTYPE_X86_fp80 => _
+           | DTYPE_Fp128 => _
+           | DTYPE_Ppc_fp128 => _
+           | DTYPE_Metadata => _
+           | DTYPE_X86_mmx => _
+           | DTYPE_Array sz t => _
+           | DTYPE_Struct fields => _
+           | DTYPE_Packed_struct fields => _
+           | DTYPE_Opaque => _
+           | DTYPE_Vector sz t => _
+           end.
       
       Fixpoint concretize_uvalue (u : uvalue) : undef_or_err dvalue :=
         match u with
@@ -783,8 +811,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
                                                    dv2 <- concretize_uvalue v2 ;;
                                                    eval_fcmp cmp dv1 dv2
-        | UVALUE_ConcatBytes bytes dt sid =>
-          (* TODO: BUG... don't the types have to be equal too...? *)
+        | UVALUE_ConcatBytes bytes dt =>
           match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
           | true, Some uv => concretize_uvalue uv
           | _, _ => extractbytes_to_dvalue bytes dt
