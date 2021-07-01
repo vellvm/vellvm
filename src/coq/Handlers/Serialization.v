@@ -162,22 +162,32 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
            all_bytes_from_uvalue_helper 0 sid uv bytes
          end.
 
-    Fixpoint all_extract_bytes_from_uvalue_helper (idx' : Z) (sid' : store_id) (parent : uvalue) (bytes : list uvalue) : option uvalue
+    (* TODO: move this *)
+    Definition dtyp_eqb (dt1 dt2 : dtyp) : bool
+      := match @dtyp_eq_dec dt1 dt2 with
+         | left x => true
+         | right x => false
+         end.
+
+    Fixpoint all_extract_bytes_from_uvalue_helper (idx' : Z) (sid' : store_id) (dt' : dtyp) (parent : uvalue) (bytes : list uvalue) : option uvalue
       := match bytes with
          | [] => Some parent
          | (UVALUE_ExtractByte uv dt idx sid)::bytes =>
            guard_opt (uvalue_int_eq_Z idx idx');;
            guard_opt (RelDec.rel_dec uv parent);;
            guard_opt (N.eqb sid sid');;
-           all_extract_bytes_from_uvalue_helper (Z.succ idx') sid' parent bytes
+           guard_opt (dtyp_eqb dt dt');;
+           all_extract_bytes_from_uvalue_helper (Z.succ idx') sid' dt' parent bytes
          | _ => None
          end.
 
+    (* Check that store ids, uvalues, and types match up, as well as
+       that the extract byte indices are in the right order *)
     Definition all_extract_bytes_from_uvalue (bytes : list uvalue) : option uvalue
       := match bytes with
          | nil => None
          | (UVALUE_ExtractByte uv dt idx sid)::xs =>
-           all_extract_bytes_from_uvalue_helper 0 sid uv bytes
+           all_extract_bytes_from_uvalue_helper 0 sid dt uv bytes
          | _ => None
          end.
 
@@ -315,29 +325,26 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | UVALUE_Double _
        | UVALUE_Undef _
        | UVALUE_Poison
-       | UVALUE_Struct fields
-         =>
-         ret (to_ubytes uv dt sid)
-       | UVALUE_None => ret nil
 
        (* Padded aggregate types *)
-
-         (* TODO: Structs WITH padding *)
-         inl "Unimplemented"
+       | UVALUE_Struct _
 
        (* Packed aggregate types *)
-       | UVALUE_Packed_struct fields
-       | UVALUE_Array fields
-       | UVALUE_Vector fields =>
-         dts <- dtyp_extract_fields dt;;
-         (* note the _right_ fold is necessary for byte ordering. *)
-         monad_fold_right (fun acc '(uv, dt) => (bytes <- (serialize_sbytes uv dt);; ret (bytes ++ acc)) % list) (zip fields dts) []
+       | UVALUE_Packed_struct _
+       | UVALUE_Array _
+       | UVALUE_Vector _ =>
+         ret (to_ubytes uv dt sid)
+
+       | UVALUE_None => ret nil
 
        (* Byte manipulation. *)
-       | UVALUE_ExtractByte uv idx sid =>
+       | UVALUE_ExtractByte uv dt' idx sid =>
          inl "serialize_sbytes: UVALUE_ExtractByte not guarded by UVALUE_ConcatBytes."
        | UVALUE_ConcatBytes bytes t =>
          map_monad extract_byte_to_ubyte bytes
+
+       | _ =>
+         ret (to_ubytes uv dt sid)
 
        (* Expressions *)
        (* TODO: this probably only works when the result is not an aggregate type...
@@ -359,8 +366,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
           Vectors must have elements of "primitive type"
         *)
-       | _ =>
-         inr (to_ubytes uv sid)
        (* | UVALUE_IBinop iop v1 v2 => _ *)
        (* | UVALUE_ICmp cmp v1 v2 => _ *)
        (* | UVALUE_FBinop fop fm v1 v2 => _ *)
@@ -374,8 +379,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        (* | UVALUE_InsertValue vec elt idxs => _ *)
        (* | UVALUE_Select cnd v1 v2 => _ *)
        end.
-
-  Set Guard Checking.
 
   (* TODO: move these ?*)
   Fixpoint drop {A} (n : N) (l : list A) : list A
