@@ -312,6 +312,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          end.
 
     (* TODO: probably put this in a fresh sid monad... *)
+    (* This is mostly to_ubytes, except it will also unwrap concatbytes *)
   Fixpoint serialize_sbytes (uv : uvalue) (dt : dtyp) (sid : store_id) {struct uv} : err (list SByte)
     := match uv with
        (* Base types *)
