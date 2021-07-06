@@ -29,6 +29,9 @@ Definition Iptr := Z. (* Integer pointer type (physical addresses) *)
 (* TODO: should there be a way to express nil / wildcard provenance? *)
 Definition Prov := list N. (* Provenance *)
 
+(* TODO: May want to make this something else so we can have nil provenance...? *)
+Definition wildcard_prov : Prov := [].
+
 (* TODO: If Prov is an NSet, I get a universe inconsistency here... *)
 Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type.
   Definition addr := (Iptr * Prov) % type.
@@ -772,30 +775,51 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       Definition extract_byte_Z (x : Z) (idx : Z) : Z
         := (Z.shiftr x (idx * 8)) mod 256.
 
+      (* TODO: Endianess *)
+      Definition concat_bytes_Z_vint {I} `{VInt I} (bytes : list Z) : I
+        := concat_bytes_vint (map repr bytes).
+
+      (* TODO: Endianess *)
+      Fixpoint concat_bytes_Z (bytes : list Z) : Z
+        := match bytes with
+           | [] => 0
+           | (byte::bytes) =>
+             byte + (Z.shiftl (concat_bytes_Z bytes) 8)
+           end.
+
       (* TODO: Move this? *)
       Inductive Poisonable (A : Type) : Type :=
-      | Poison : Poisonable A
       | Unpoisoned : A -> Poisonable A
+      | Poison : Poisonable A
       .
 
       Arguments Unpoisoned {A} a.
       Arguments Poison {A}.
 
+      Global Instance MonadPoisonable : Monad Poisonable
+        := { ret  := @Unpoisoned;
+             bind := fun _ _ ma mab => match ma with
+                                   | Poison => Poison
+                                   | Unpoisoned v => mab v
+                                    end
+           }.
+
+      Definition ErrPoison := eitherT string Poisonable.
 
       (* Walk through a list *)
       (* Returns field index + number of bytes remaining *)
-      Fixpoint extract_field_byte_helper (fields : list dtyp) (field_idx : N) (byte_idx : N) : err (dtyp * (N * N))
+      Fixpoint extract_field_byte_helper {M} `{Monad M} (fields : list dtyp) (field_idx : N) (byte_idx : N) : eitherT string M (dtyp * (N * N))
         := match fields with
            | [] =>
-             inl "No fields left for byte-indexing..."
+             raise "No fields left for byte-indexing..."
            | (x::xs) =>
              let sz := sizeof_dtyp x
              in if N.ltb byte_idx sz
-                then inr (x, (field_idx, byte_idx))
+                then ret (x, (field_idx, byte_idx))
                 else extract_field_byte_helper xs (N.succ field_idx) (byte_idx - sz)
            end.
 
-      Fixpoint extract_field_byte (fields : list dtyp) (byte_idx : N) : err (dtyp * (N * N))
+      Fixpoint extract_field_byte {M} `{Monad M} (fields : list dtyp) (byte_idx : N) : eitherT string M (dtyp * (N * N))
         := extract_field_byte_helper fields 0 byte_idx.
       
       (* Need the type of the dvalue in order to know how big fields and array elements are.
@@ -805,26 +829,26 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        *)
       (* TODO: make termination checker happy *)
       Unset Guard Checking.
-      Fixpoint dvalue_extract_byte {I} `{VInt I} (dv : dvalue) (dt : dtyp) (idx : Z) {struct dv}: err (Poisonable Z)
+      Fixpoint dvalue_extract_byte (dv : dvalue) (dt : dtyp) (idx : Z) {struct dv}: ErrPoison Z
         := match dv with
            | DVALUE_I1 x
            | DVALUE_I8 x
            | DVALUE_I32 x
            | DVALUE_I64 x =>
-             inr (Unpoisoned (extract_byte_vint x idx))
+             ret (extract_byte_vint x idx)
            | DVALUE_IPTR x =>
-             inr (Unpoisoned (extract_byte_Z x idx))
+             ret (extract_byte_Z x idx)
            | DVALUE_Addr (addr,_) =>
              (* Note: this throws away provenance *)
-             inr (Unpoisoned (extract_byte_Z addr idx))
+             ret (extract_byte_Z addr idx)
            | DVALUE_Float f =>
-             inr (Unpoisoned (extract_byte_Z (unsigned (Float32.to_bits f)) idx))
+             ret (extract_byte_Z (unsigned (Float32.to_bits f)) idx)
            | DVALUE_Double d =>
-             inr (Unpoisoned (extract_byte_Z (unsigned (Float.to_bits d)) idx))
-           | DVALUE_Poison => inr Poison
+             ret (extract_byte_Z (unsigned (Float.to_bits d)) idx)
+           | DVALUE_Poison => lift Poison
            | DVALUE_None =>
              (* TODO: Not sure if this should be an error, poison, or what. *)
-             inl "dvalue_extract_byte on DVALUE_None"
+             raise "dvalue_extract_byte on DVALUE_None"
            (* TODO: Take padding into account. *)
            | DVALUE_Struct fields =>
              match dt with
@@ -833,12 +857,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                '(fdt, (field_idx, byte_idx)) <- extract_field_byte dts (Z.to_N idx) ;;
                match List.nth_error fields (N.to_nat field_idx) with
                | Some f =>
-               (* call dvalue_extract_byte recursively on the field *)
+                 (* call dvalue_extract_byte recursively on the field *)
                  dvalue_extract_byte f fdt (Z.of_N byte_idx)
                | None =>
-                 inl "dvalue_extract_byte: more fields in dvalue than in dtyp."
+                 raise "dvalue_extract_byte: more fields in dvalue than in dtyp."
                end
-             | _ => inl "dvalue_extract_byte: type mismatch on DVALUE_Struct."
+             | _ => raise "dvalue_extract_byte: type mismatch on DVALUE_Struct."
              end
            | DVALUE_Packed_struct fields =>
              match dt with
@@ -850,9 +874,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                  (* call dvalue_extract_byte recursively on the field *)
                  dvalue_extract_byte f fdt (Z.of_N byte_idx)
                | None =>
-                 inl "dvalue_extract_byte: more fields in dvalue than in dtyp."
+                 raise "dvalue_extract_byte: more fields in dvalue than in dtyp."
                end
-             | _ => inl "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
+             | _ => raise "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
              end
            | DVALUE_Array elts =>
              match dt with
@@ -865,10 +889,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                  (* call dvalue_extract_byte recursively on the field *)
                  dvalue_extract_byte elmt dt (Z.of_N byte_idx)
                | None =>
-                 inl "dvalue_extract_byte: more fields in dvalue than in dtyp."
+                 raise "dvalue_extract_byte: more fields in dvalue than in dtyp."
                end
              | _ =>
-               inl "dvalue_extract_byte: type mismatch on DVALUE_Array."
+               raise "dvalue_extract_byte: type mismatch on DVALUE_Array."
              end
            | DVALUE_Vector elts =>
              match dt with
@@ -881,12 +905,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
                  (* call dvalue_extract_byte recursively on the field *)
                  dvalue_extract_byte elmt dt (Z.of_N byte_idx)
                | None =>
-                 inl "dvalue_extract_byte: more fields in dvalue than in dtyp."
+                 raise "dvalue_extract_byte: more fields in dvalue than in dtyp."
                end
              | _ =>
-               inl "dvalue_extract_byte: type mismatch on DVALUE_Vector."
+               raise "dvalue_extract_byte: type mismatch on DVALUE_Vector."
              end
            end.
+      Set Guard Checking.
 
       (* Taking a byte out of a dvalue...
 
@@ -896,12 +921,38 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DVALUE_ExtractByte (dv : dvalue) (dt : dtyp) (idx : N) : dvalue_byte
       .
 
-      Fixpoint dvalue_bytes_to_dvalue (dbs : list dvalue_byte) (dt : dtyp)
+      Definition dvalue_byte_value (db : dvalue_byte) : ErrPoison Z
+        := match db with
+           | DVALUE_ExtractByte dv dt idx =>
+             dvalue_extract_byte dv dt (Z.of_N idx)
+           end.
+
+      Fixpoint dvalue_bytes_to_dvalue (dbs : list dvalue_byte) (dt : dtyp) : ErrPoison dvalue
         := match dt with
-           | DTYPE_I sz => _
-           | DTYPE_IPTR => _
-           | DTYPE_Pointer => _
-           | DTYPE_Void => _
+           | DTYPE_I sz =>
+             zs <- map_monad dvalue_byte_value dbs;;
+             match sz with
+             | 1 =>
+               ret (DVALUE_I1 (concat_bytes_Z_vint zs))
+             | 8 =>
+               ret (DVALUE_I8 (concat_bytes_Z_vint zs))
+             | 32 =>
+               ret (DVALUE_I32 (concat_bytes_Z_vint zs))
+             | 64 =>
+               ret (DVALUE_I64 (concat_bytes_Z_vint zs))
+             | _ => raise "Unsupported integer size."
+             end
+           | DTYPE_IPTR =>
+             zs <- map_monad dvalue_byte_value dbs;;
+             ret (DVALUE_IPTR (concat_bytes_Z zs))
+           | DTYPE_Pointer =>
+             (* TODO: not sure if this should be wildcard provenance.
+                TODO: not sure if this should truncate iptr value...
+              *)
+             zs <- map_monad dvalue_byte_value dbs;;
+             ret (DVALUE_Addr (concat_bytes_Z zs, wildcard_prov))
+           | DTYPE_Void =>
+             raise "dvalue_bytes_to_dvalue on void type."
            | DTYPE_Half => _
            | DTYPE_Float => _
            | DTYPE_Double => _
