@@ -953,14 +953,24 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
              ret (DVALUE_Addr (concat_bytes_Z zs, wildcard_prov))
            | DTYPE_Void =>
              raise "dvalue_bytes_to_dvalue on void type."
-           | DTYPE_Half => _
-           | DTYPE_Float => _
-           | DTYPE_Double => _
-           | DTYPE_X86_fp80 => _
-           | DTYPE_Fp128 => _
-           | DTYPE_Ppc_fp128 => _
-           | DTYPE_Metadata => _
-           | DTYPE_X86_mmx => _
+           | DTYPE_Half =>
+             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_Half."
+           | DTYPE_Float =>
+             zs <- map_monad dvalue_byte_value dbs;;
+             ret (DVALUE_Float (Float32.of_bits (concat_bytes_Z_vint zs)))
+           | DTYPE_Double =>
+             zs <- map_monad dvalue_byte_value dbs;;
+             ret (DVALUE_Float (Float32.of_bits (concat_bytes_Z_vint zs)))
+           | DTYPE_X86_fp80 =>
+             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_fp80."
+           | DTYPE_Fp128 =>
+             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_Fp128."
+           | DTYPE_Ppc_fp128 =>
+             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_Ppc_fp128."
+           | DTYPE_Metadata =>
+             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_Metadata."
+           | DTYPE_X86_mmx =>
+             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
            | DTYPE_Array sz t => _
            | DTYPE_Struct fields => _
            | DTYPE_Packed_struct fields => _
