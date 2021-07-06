@@ -927,6 +927,16 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
              dvalue_extract_byte dv dt (Z.of_N idx)
            end.
 
+      (* TODO: probably satisfy the termination checker with length of xs... *)
+      Unset Guard Checking.
+      Fixpoint split_every {A} (n : N) (xs : list A) {struct xs} : (list (list A))
+        := match xs with
+           | [] => []
+           | _ =>
+             take n xs :: split_every n (drop n xs)
+           end.
+      Set Guard Checking.
+
       Fixpoint dvalue_bytes_to_dvalue (dbs : list dvalue_byte) (dt : dtyp) : ErrPoison dvalue
         := match dt with
            | DTYPE_I sz =>
@@ -971,11 +981,20 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
              raise "dvalue_bytes_to_dvalue: unsupported DTYPE_Metadata."
            | DTYPE_X86_mmx =>
              raise "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
-           | DTYPE_Array sz t => _
+           | DTYPE_Array sz t =>
+             let sz := sizeof_dtyp t in
+             let elt_bytes := split_every sz dbs in
+             elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
+             ret (DVALUE_Array elts)
+           | DTYPE_Vector sz t =>
+             let sz := sizeof_dtyp t in
+             let elt_bytes := split_every sz dbs in
+             elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
+             ret (DVALUE_Vector elts)
            | DTYPE_Struct fields => _
            | DTYPE_Packed_struct fields => _
-           | DTYPE_Opaque => _
-           | DTYPE_Vector sz t => _
+           | DTYPE_Opaque =>
+             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_Opaque."
            end.
 
       Fixpoint extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp)
