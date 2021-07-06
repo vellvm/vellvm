@@ -116,11 +116,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | _                  => 0 (* TODO: add support for more types as necessary *)
       end.
 
-
     Definition uvalue_bytes_little_endian (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
       := map (fun n => UVALUE_ExtractByte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq 0 ptr_size).
-
-    Definition uvalue_bytes (e : Endianess) (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
+ 
+   Definition uvalue_bytes (e : Endianess) (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
       := correct_endianess e (uvalue_bytes_little_endian uv dt sid).
 
     Definition to_ubytes (uv :  uvalue) (dt : dtyp) (sid : store_id) : list SByte
@@ -716,7 +715,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       Variable endianess : Endianess.
 
       (* Convert a list of UVALUE_ExtractByte values into a dvalue of
-      a given type
+         a given type.
 
          Assumes bytes are in little endian form...
 
@@ -773,31 +772,120 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       Definition extract_byte_Z (x : Z) (idx : Z) : Z
         := (Z.shiftr x (idx * 8)) mod 256.
 
-      Definition dvalue_extract_byte {I} `{VInt I} (dv : dvalue) (idx : Z) : Z
+      (* TODO: Move this? *)
+      Inductive Poisonable (A : Type) : Type :=
+      | Poison : Poisonable A
+      | Unpoisoned : A -> Poisonable A
+      .
+
+      Arguments Unpoisoned {A} a.
+      Arguments Poison {A}.
+
+
+      (* Walk through a list *)
+      (* Returns field index + number of bytes remaining *)
+      Fixpoint extract_field_byte_helper (fields : list dtyp) (field_idx : N) (byte_idx : N) : err (dtyp * (N * N))
+        := match fields with
+           | [] =>
+             inl "No fields left for byte-indexing..."
+           | (x::xs) =>
+             let sz := sizeof_dtyp x
+             in if N.ltb byte_idx sz
+                then inr (x, (field_idx, byte_idx))
+                else extract_field_byte_helper xs (N.succ field_idx) (byte_idx - sz)
+           end.
+
+      Fixpoint extract_field_byte (fields : list dtyp) (byte_idx : N) : err (dtyp * (N * N))
+        := extract_field_byte_helper fields 0 byte_idx.
+      
+      (* Need the type of the dvalue in order to know how big fields and array elements are.
+
+         It's not possible to use the dvalue alone, as DVALUE_Poison's
+         size depends on the type.
+       *)
+      (* TODO: make termination checker happy *)
+      Unset Guard Checking.
+      Fixpoint dvalue_extract_byte {I} `{VInt I} (dv : dvalue) (dt : dtyp) (idx : Z) {struct dv}: err (Poisonable Z)
         := match dv with
            | DVALUE_I1 x
            | DVALUE_I8 x
            | DVALUE_I32 x
            | DVALUE_I64 x =>
-             extract_byte_vint x idx
+             inr (Unpoisoned (extract_byte_vint x idx))
            | DVALUE_IPTR x =>
-             extract_byte_Z x idx
+             inr (Unpoisoned (extract_byte_Z x idx))
            | DVALUE_Addr (addr,_) =>
              (* Note: this throws away provenance *)
-             extract_byte_Z addr idx
+             inr (Unpoisoned (extract_byte_Z addr idx))
            | DVALUE_Float f =>
-             extract_byte_Z (unsigned (Float32.to_bits f)) idx
+             inr (Unpoisoned (extract_byte_Z (unsigned (Float32.to_bits f)) idx))
            | DVALUE_Double d =>
-             extract_byte_Z (unsigned (Float.to_bits d)) idx
-           | _ => 0
-           end.
-           (* Err, right, poison bytes... *)
-           | DVALUE_Poison => _
-           | DVALUE_None => _
-           | DVALUE_Struct fields => _
-           | DVALUE_Packed_struct fields => _
-           | DVALUE_Array elts => _
-           | DVALUE_Vector elts => _
+             inr (Unpoisoned (extract_byte_Z (unsigned (Float.to_bits d)) idx))
+           | DVALUE_Poison => inr Poison
+           | DVALUE_None =>
+             (* TODO: Not sure if this should be an error, poison, or what. *)
+             inl "dvalue_extract_byte on DVALUE_None"
+           (* TODO: Take padding into account. *)
+           | DVALUE_Struct fields =>
+             match dt with
+             | DTYPE_Struct dts =>
+               (* Step to field which contains the byte we want *)
+               '(fdt, (field_idx, byte_idx)) <- extract_field_byte dts (Z.to_N idx) ;;
+               match List.nth_error fields (N.to_nat field_idx) with
+               | Some f =>
+               (* call dvalue_extract_byte recursively on the field *)
+                 dvalue_extract_byte f fdt (Z.of_N byte_idx)
+               | None =>
+                 inl "dvalue_extract_byte: more fields in dvalue than in dtyp."
+               end
+             | _ => inl "dvalue_extract_byte: type mismatch on DVALUE_Struct."
+             end
+           | DVALUE_Packed_struct fields =>
+             match dt with
+             | DTYPE_Packed_struct dts =>
+               (* Step to field which contains the byte we want *)
+               '(fdt, (field_idx, byte_idx)) <- extract_field_byte dts (Z.to_N idx) ;;
+               match List.nth_error fields (N.to_nat field_idx) with
+               | Some f =>
+                 (* call dvalue_extract_byte recursively on the field *)
+                 dvalue_extract_byte f fdt (Z.of_N byte_idx)
+               | None =>
+                 inl "dvalue_extract_byte: more fields in dvalue than in dtyp."
+               end
+             | _ => inl "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
+             end
+           | DVALUE_Array elts =>
+             match dt with
+             | DTYPE_Array sz dt =>
+               let elmt_sz  := sizeof_dtyp dt in
+               let elmt_idx := N.div (Z.to_N idx) elmt_sz in
+               let byte_idx := (Z.to_N idx) mod elmt_sz in
+               match List.nth_error elts (N.to_nat elmt_idx) with
+               | Some elmt =>
+                 (* call dvalue_extract_byte recursively on the field *)
+                 dvalue_extract_byte elmt dt (Z.of_N byte_idx)
+               | None =>
+                 inl "dvalue_extract_byte: more fields in dvalue than in dtyp."
+               end
+             | _ =>
+               inl "dvalue_extract_byte: type mismatch on DVALUE_Array."
+             end
+           | DVALUE_Vector elts =>
+             match dt with
+             | DTYPE_Vector sz dt =>
+               let elmt_sz  := sizeof_dtyp dt in
+               let elmt_idx := N.div (Z.to_N idx) elmt_sz in
+               let byte_idx := (Z.to_N idx) mod elmt_sz in
+               match List.nth_error elts (N.to_nat elmt_idx) with
+               | Some elmt =>
+                 (* call dvalue_extract_byte recursively on the field *)
+                 dvalue_extract_byte elmt dt (Z.of_N byte_idx)
+               | None =>
+                 inl "dvalue_extract_byte: more fields in dvalue than in dtyp."
+               end
+             | _ =>
+               inl "dvalue_extract_byte: type mismatch on DVALUE_Vector."
+             end
            end.
 
       (* Taking a byte out of a dvalue...
