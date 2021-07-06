@@ -16,6 +16,8 @@ From QuickChick Require Import QuickChick.
 Import QcDefaultNotation. Open Scope qc_scope.
 Set Warnings "-extraction-opaque-accessed,-extraction".
 
+From FlocqQuickChick Require Import Generators.
+
 From ExtLib.Structures Require Export
      Functor Applicative Monads.
 
