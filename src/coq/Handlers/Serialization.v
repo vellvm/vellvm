@@ -937,7 +937,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
            end.
       Set Guard Checking.
 
-      Fixpoint dvalue_bytes_to_dvalue (dbs : list dvalue_byte) (dt : dtyp) : ErrPoison dvalue
+      Unset Guard Checking.
+      Fixpoint dvalue_bytes_to_dvalue (dbs : list dvalue_byte) (dt : dtyp) {struct dt} : ErrPoison dvalue
         := match dt with
            | DTYPE_I sz =>
              zs <- map_monad dvalue_byte_value dbs;;
@@ -991,11 +992,42 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
              let elt_bytes := split_every sz dbs in
              elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
              ret (DVALUE_Vector elts)
-           | DTYPE_Struct fields => _
-           | DTYPE_Packed_struct fields => _
+           | DTYPE_Struct fields =>
+             match fields with
+             | [] => ret (DVALUE_Struct []) (* TODO: Not 100% sure about this. *)
+             | (dt::dts) =>
+               let sz := sizeof_dtyp dt in
+               let init_bytes := take sz dbs in
+               let rest_bytes := drop sz dbs in
+               f <- dvalue_bytes_to_dvalue init_bytes dt;;
+               rest <- dvalue_bytes_to_dvalue rest_bytes (DTYPE_Struct dts);;
+               match rest with
+               | DVALUE_Struct fs =>
+                 ret (DVALUE_Struct (f::fs))
+               | _ =>
+                 raise "dvalue_bytes_to_dvalue: DTYPE_Struct recursive call did not return a struct."
+               end
+             end
+           | DTYPE_Packed_struct fields =>
+             match fields with
+             | [] => ret (DVALUE_Packed_struct []) (* TODO: Not 100% sure about this. *)
+             | (dt::dts) =>
+               let sz := sizeof_dtyp dt in
+               let init_bytes := take sz dbs in
+               let rest_bytes := drop sz dbs in
+               f <- dvalue_bytes_to_dvalue init_bytes dt;;
+               rest <- dvalue_bytes_to_dvalue rest_bytes (DTYPE_Struct dts);;
+               match rest with
+               | DVALUE_Packed_struct fs =>
+                 ret (DVALUE_Packed_struct (f::fs))
+               | _ =>
+                 raise "dvalue_bytes_to_dvalue: DTYPE_Packed_struct recursive call did not return a struct."
+               end
+             end
            | DTYPE_Opaque =>
              raise "dvalue_bytes_to_dvalue: unsupported DTYPE_Opaque."
            end.
+      Set Guard Checking.
 
       Fixpoint extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp)
         := match dt with
