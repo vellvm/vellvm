@@ -1115,7 +1115,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         | UVALUE_ConcatBytes bytes dt =>
           match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
           | true, Some uv => concretize_uvalue uv
-          | _, _ => ErrPoison_to_undef_or_err_dvalue (extractbytes_to_dvalue bytes dt)
+          | _, _ => extractbytes_to_dvalue bytes dt
           end
 
         | UVALUE_ExtractByte byte dt idx sid =>
@@ -1184,37 +1184,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           | None => lift (failwith "concretize_uvalue_bytes: missing indices.")
           end
       
-        with
-          extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : ErrPoison dvalue
-            := ret DVALUE_None
-
-      (* match dt with
-             | DTYPE_I sz =>
-               _
-             | DTYPE_IPTR =>
-               (* TODO: What should this do when loading an IPTR?
-
-                Might largely not matter because we do the simple
-                thing when all of the bytes are of the same type, sid,
-                etc.
-                *)
-               _
-             | DTYPE_Pointer => _
-             | DTYPE_Void => _
-             | DTYPE_Half => _
-             | DTYPE_Float => _
-             | DTYPE_Double => _
-             | DTYPE_X86_fp80 => _
-             | DTYPE_Fp128 => _
-             | DTYPE_Ppc_fp128 => _
-             | DTYPE_Metadata => _
-             | DTYPE_X86_mmx => _
-             | DTYPE_Array sz t => _
-             | DTYPE_Struct fields => _
-             | DTYPE_Packed_struct fields => _
-             | DTYPE_Opaque => _
-             | DTYPE_Vector sz t => _
-             end *).
+      with
+      extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : undef_or_err dvalue
+        := dvbs <- concretize_uvalue_bytes uvs;;
+           ErrPoison_to_undef_or_err_dvalue (dvalue_bytes_to_dvalue dvbs dt).
       Set Guard Checking.
 
     End Concretize.
