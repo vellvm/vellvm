@@ -144,6 +144,16 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          | _ => false
          end.
 
+    Definition dvalue_int_unsigned (dv : dvalue) : Z
+      := match dv with
+         | DVALUE_I1 x => unsigned x
+         | DVALUE_I8 x => unsigned x
+         | DVALUE_I32 x => unsigned x
+         | DVALUE_I64 x => unsigned x
+         | DVALUE_IPTR x => x (* TODO: unsigned???? *)
+         | _ => 0
+         end.
+
     Definition guard_opt (x : bool) : option unit
       := if x then Some tt else None.
 
@@ -1029,35 +1039,30 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
            end.
       Set Guard Checking.
 
-      Fixpoint extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp)
-        := match dt with
-           | DTYPE_I sz =>
-             _
-           | DTYPE_IPTR =>
-             (* TODO: What should this do when loading an IPTR?
+      (* Probably has to be mutually recursive with concretize_uvalue *)
+      (* Pick out uvalue bytes that are the same + have same sid 
 
-                Might largely not matter because we do the simple
-                thing when all of the bytes are of the same type, sid,
-                etc.
-              *)
-             _
-           | DTYPE_Pointer => _
-           | DTYPE_Void => _
-           | DTYPE_Half => _
-           | DTYPE_Float => _
-           | DTYPE_Double => _
-           | DTYPE_X86_fp80 => _
-           | DTYPE_Fp128 => _
-           | DTYPE_Ppc_fp128 => _
-           | DTYPE_Metadata => _
-           | DTYPE_X86_mmx => _
-           | DTYPE_Array sz t => _
-           | DTYPE_Struct fields => _
-           | DTYPE_Packed_struct fields => _
-           | DTYPE_Opaque => _
-           | DTYPE_Vector sz t => _
+         Concretize these identical uvalues...
+
+         How do I do this? Can this be reasonably efficient?
+
+         Could walk through list, checking if each matches...
+       *)
+
+      Definition uvalue_sid_match (a b : uvalue) : bool
+        :=
+          match a, b with
+          | UVALUE_ExtractByte uv dt idx sid, UVALUE_ExtractByte uv' dt' idx' sid' =>
+            RelDec.rel_dec uv uv' && N.eqb sid sid'
+          | _, _ => false
+          end.
+
+      Definition ErrPoison_to_undef_or_err_dvalue (ep : ErrPoison dvalue) : undef_or_err dvalue
+        := match unEitherT ep with
+           | Unpoisoned dv => lift dv
+           | Poisoin => ret DVALUE_Poison
            end.
-      
+
       Fixpoint concretize_uvalue (u : uvalue) : undef_or_err dvalue :=
         match u with
         | UVALUE_Addr a                          => ret (DVALUE_Addr a)
@@ -1094,14 +1099,83 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         | UVALUE_ConcatBytes bytes dt =>
           match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
           | true, Some uv => concretize_uvalue uv
-          | _, _ => extractbytes_to_dvalue bytes dt
+          | _, _ => ErrPoison_to_undef_or_err_dvalue (extractbytes_to_dvalue bytes dt)
           end
 
-        | UVALUE_ExtractByte byte idx =>
+        | UVALUE_ExtractByte byte dt idx sid =>
           (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
           lift (failwith "Attempting to concretize UVALUE_ExtractByte, should not happen.")
         | _ => (lift (failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"))
                 
-        end.
+        end
+
+      with
+
+      (* Take a UVALUE_ExtractByte, and replace the uvalue with a given dvalue... 
+
+         Note: this also concretizes the index.
+       *)
+      uvalue_byte_replace_with_dvalue_byte (uv : uvalue) (dv : dvalue) : undef_or_err dvalue_byte
+        := match uv with
+           | UVALUE_ExtractByte uv dt idx sid =>
+             cidx <- concretize_uvalue idx;;
+             ret (DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx)))
+           | _ => lift (failwith "uvalue_byte_replace_with_dvalue_byte called with non-UVALUE_ExtractByte value.")
+           end
+
+      with
+      (* Concretize the uvalues in a list of UVALUE_ExtractBytes...
+
+       *)
+      concretize_uvalue_bytes_helper (uvs : list (N * uvalue)) : list dvalue_byte
+        :=
+          (* Find each index where the uvalue matches the first one... *)
+
+          (* Concretize the uvalue *)
+
+          (* Turn into dvalue_bytes *)
+
+          (* Place bytes in map at the appropriate indices *)
+
+          (* Continue with the rest of the list *)
+          []
+      
+          (* let indexed_uvs := zip (Nseq 0 (length uvs)) uvs in *)
+          (* match indexed_uvs with *)
+          (* | . *)
+
+          (* NM.add *)
+          
+      
+        with
+
+          extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) : ErrPoison dvalue
+          := match dt with
+             | DTYPE_I sz =>
+               _
+             | DTYPE_IPTR =>
+               (* TODO: What should this do when loading an IPTR?
+
+                Might largely not matter because we do the simple
+                thing when all of the bytes are of the same type, sid,
+                etc.
+                *)
+               _
+             | DTYPE_Pointer => _
+             | DTYPE_Void => _
+             | DTYPE_Half => _
+             | DTYPE_Float => _
+             | DTYPE_Double => _
+             | DTYPE_X86_fp80 => _
+             | DTYPE_Fp128 => _
+             | DTYPE_Ppc_fp128 => _
+             | DTYPE_Metadata => _
+             | DTYPE_X86_mmx => _
+             | DTYPE_Array sz t => _
+             | DTYPE_Struct fields => _
+             | DTYPE_Packed_struct fields => _
+             | DTYPE_Opaque => _
+             | DTYPE_Vector sz t => _
+             end.
 
     End Concretize.
