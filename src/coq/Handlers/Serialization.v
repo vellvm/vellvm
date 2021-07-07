@@ -1039,16 +1039,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
            end.
       Set Guard Checking.
 
-      (* Probably has to be mutually recursive with concretize_uvalue *)
-      (* Pick out uvalue bytes that are the same + have same sid 
-
-         Concretize these identical uvalues...
-
-         How do I do this? Can this be reasonably efficient?
-
-         Could walk through list, checking if each matches...
-       *)
-
       Definition uvalue_sid_match (a b : uvalue) : bool
         :=
           match a, b with
@@ -1057,13 +1047,39 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           | _, _ => false
           end.
 
+      (* TODO: move to utils? *)
+      (* Filter elements in a list, giving an (ins * outs) tuple of lists. *)
+      Fixpoint filter_split {A} (pred : A -> bool) (xs : list A) : (list A * list A)
+        := match xs with
+           | [] => ([], [])
+           | (x::xs) =>
+             let '(ins, outs) := filter_split pred xs in
+             if pred x
+             then (x::ins, outs)
+             else (ins, x::outs)
+           end.
+
+      Definition filter_uvalue_sid_matches (byte : uvalue) (uvs : list (N * uvalue)) : (list (N * uvalue) * list (N * uvalue))
+        := filter_split (fun '(n, uv) => uvalue_sid_match byte uv) uvs.
+
       Definition ErrPoison_to_undef_or_err_dvalue (ep : ErrPoison dvalue) : undef_or_err dvalue
         := match unEitherT ep with
            | Unpoisoned dv => lift dv
            | Poisoin => ret DVALUE_Poison
            end.
 
-      Fixpoint concretize_uvalue (u : uvalue) : undef_or_err dvalue :=
+      Fixpoint NM_find_many {A} (xs : list N) (nm : NMap A) : option (list A)
+        := match xs with
+           | [] => ret []
+           | (x::xs) =>
+             elt  <- NM.find x nm;;
+             elts <- NM_find_many xs nm;;
+             ret (elt :: elts)
+           end.
+
+      (* TODO: satisfy the termination checker here. *)
+      Unset Guard Checking.
+      Fixpoint concretize_uvalue (u : uvalue) {struct u} : undef_or_err dvalue :=
         match u with
         | UVALUE_Addr a                          => ret (DVALUE_Addr a)
         | UVALUE_I1 x                            => ret (DVALUE_I1 x)
@@ -1115,7 +1131,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
          Note: this also concretizes the index.
        *)
-      uvalue_byte_replace_with_dvalue_byte (uv : uvalue) (dv : dvalue) : undef_or_err dvalue_byte
+      uvalue_byte_replace_with_dvalue_byte (uv : uvalue) (dv : dvalue) {struct uv} : undef_or_err dvalue_byte
         := match uv with
            | UVALUE_ExtractByte uv dt idx sid =>
              cidx <- concretize_uvalue idx;;
@@ -1127,30 +1143,52 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       (* Concretize the uvalues in a list of UVALUE_ExtractBytes...
 
        *)
-      concretize_uvalue_bytes_helper (uvs : list (N * uvalue)) : list dvalue_byte
+        (* Pick out uvalue bytes that are the same + have same sid 
+
+         Concretize these identical uvalues...
+
+         How do I do this? Can this be reasonably efficient?
+
+         Could walk through list, checking if each matches...
+         *)
+
+      concretize_uvalue_bytes_helper (uvs : list (N * uvalue)) (acc : NMap dvalue_byte) {struct uvs} : undef_or_err (NMap dvalue_byte)
+        := match uvs with
+           | [] => ret acc
+           | ((n, uv)::uvs) =>
+             match uv with
+             | UVALUE_ExtractByte byte_uv dt idx sid =>
+               let '(ins, outs) := filter_uvalue_sid_matches uv uvs in
+               (* Concretize first uvalue *)
+               dv <- concretize_uvalue byte_uv;;
+               cidx <- concretize_uvalue idx;;
+               let dv_byte := DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx)) in
+               let acc := @NM.add _ n dv_byte acc in
+               (* Concretize entangled bytes *)
+               acc <- monad_fold_right (fun acc '(n, uv) =>
+                                         dvb <- uvalue_byte_replace_with_dvalue_byte uv dv;;
+                                         ret (@NM.add _ n dvb acc)) ins acc;;
+               (* Concretize the rest of the bytes *)
+               concretize_uvalue_bytes_helper outs acc
+             | _ => lift (failwith "concretize_uvalue_bytes_helper: non-byte in uvs.")
+             end
+           end
+
+      with
+      concretize_uvalue_bytes (uvs : list uvalue) {struct uvs} : undef_or_err (list dvalue_byte)
         :=
-          (* Find each index where the uvalue matches the first one... *)
-
-          (* Concretize the uvalue *)
-
-          (* Turn into dvalue_bytes *)
-
-          (* Place bytes in map at the appropriate indices *)
-
-          (* Continue with the rest of the list *)
-          []
-      
-          (* let indexed_uvs := zip (Nseq 0 (length uvs)) uvs in *)
-          (* match indexed_uvs with *)
-          (* | . *)
-
-          (* NM.add *)
-          
+          let len := length uvs in
+          byte_map <- concretize_uvalue_bytes_helper (zip (Nseq 0 len) uvs) (@NM.empty _);;
+          match NM_find_many (Nseq 0 len) byte_map with
+          | Some dvbs => ret dvbs
+          | None => lift (failwith "concretize_uvalue_bytes: missing indices.")
+          end
       
         with
+          extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : ErrPoison dvalue
+            := ret DVALUE_None
 
-          extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) : ErrPoison dvalue
-          := match dt with
+      (* match dt with
              | DTYPE_I sz =>
                _
              | DTYPE_IPTR =>
@@ -1176,6 +1214,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
              | DTYPE_Packed_struct fields => _
              | DTYPE_Opaque => _
              | DTYPE_Vector sz t => _
-             end.
+             end *).
+      Set Guard Checking.
 
     End Concretize.
