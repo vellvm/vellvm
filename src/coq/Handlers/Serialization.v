@@ -16,6 +16,7 @@ From Vellvm Require Import
      Semantics.LLVMEvents.
 
 From ExtLib Require Import
+     Core.RelDec
      Structures.Monads
      Data.Monads.EitherMonad.
 
@@ -114,7 +115,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | DTYPE_Fp128        => 16 (* TODO: Unsupported, currently modeled by Float32 *)
       | DTYPE_Ppc_fp128    => 16 (* TODO: Unsupported, currently modeled by Float32 *)
       | DTYPE_Metadata     => 0
-      | DTYPE_X86_mmx      => 0 (* TODO: Unsupported *)
+      | DTYPE_X86_mmx      => 8 (* TODO: Unsupported *)
       | DTYPE_Opaque       => 0 (* TODO: Unsupported *)
       | _                  => 0 (* TODO: add support for more types as necessary *)
       end.
@@ -324,7 +325,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          end.
 
     (* TODO: probably put this in a fresh sid monad... Need to
-       generate fresh store ids for each entangled byte each time... *)
+       generate fresh store ids for each entangled byte each
+       time... See comment on UVALUE_ContactBytes. *)
     (* This is mostly to_ubytes, except it will also unwrap concatbytes *)
   Fixpoint serialize_sbytes (uv : uvalue) (dt : dtyp) (sid : store_id) {struct uv} : err (list SByte)
     := match uv with
@@ -373,8 +375,19 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          map_monad extract_byte_to_ubyte bytes
        end.
 
+  (* deserialize_sbytes takes a list of SBytes and turns them into a uvalue.
+
+     This relies on the similar, but different, from_ubytes function
+     which given a set of bytes checks if all of the bytes are from
+     the same uvalue, and if so returns the original uvalue, and
+     otherwise returns a UVALUE_ConcatBytes value instead.
+
+     The reason we also have deserialize_sbytes is in order to deal
+     with aggregate data types.
+   *)
   Fixpoint deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err uvalue
-    := match dt with
+    :=
+      match dt with
        (* Base types *)
        | DTYPE_I _
        | DTYPE_IPTR
@@ -385,36 +398,73 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | DTYPE_X86_fp80
        | DTYPE_Fp128
        | DTYPE_Ppc_fp128
-       | DTYPE_X86_mmx =>
+       | DTYPE_X86_mmx
+       | _ =>
          ret (from_ubytes bytes dt)
+      end.
 
-       (* Padded aggregate types *)
-       | DTYPE_Struct fields =>
-         inl "deserialize_sbytes: padded structures unimplemented."
+       (* serialize_sbytes does not take aggregate structures into
+          account. We just extract individual bytes from aggregate
+          uvalues. This was necessary for dealing with endianess and
+          expressions which yield aggregate structures.
 
-       (* Packed aggregate types *)
-       | DTYPE_Array sz t =>
-         let size := sizeof_dtyp t in
-         let size_nat := N.to_nat size in
-         fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];;
-         ret (UVALUE_Array fields)
-       | DTYPE_Vector sz t =>
-         let size := sizeof_dtyp t in
-         let size_nat := N.to_nat size in
-         fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];;
-         ret (UVALUE_Vector fields)
-       | DTYPE_Packed_struct fields =>
-         inl "deserialize_sbytes: unimplemented structs."
+          That said, it would still be nice to be able to edit elements of
+          arrays / structures and be able to load them back...
 
-       (* Unimplemented *)
-       | DTYPE_Void =>
-         inl "deserialize_sbytes: attempting to deserialize void."
-       | DTYPE_Metadata =>
-         inl "deserialize_sbytes: metadata."
+        *)
 
-       | DTYPE_Opaque =>
-         inl "deserialize_sbytes: opaque."
-       end.
+       (* TODO: should we bother with this? *)
+       (* Array and vector types *)
+       (* | DTYPE_Array sz t => *)
+       (*   let size := sizeof_dtyp t in *)
+       (*   let size_nat := N.to_nat size in *)
+       (*   fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];; *)
+       (*   ret (UVALUE_Array fields) *)
+       (* | DTYPE_Vector sz t => *)
+       (*   let size := sizeof_dtyp t in *)
+       (*   let size_nat := N.to_nat size in *)
+       (*   fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];; *)
+       (*   ret (UVALUE_Vector fields) *)
+
+       (* (* Padded aggregate types *) *)
+       (* | DTYPE_Struct fields => *)
+       (*   (* TODO: Add padding *) *)
+       (*   match fields with *)
+       (*   | [] => ret (UVALUE_Struct []) (* TODO: Not 100% sure about this. *) *)
+       (*   | (dt::dts) => *)
+       (*     let sz := sizeof_dtyp dt in *)
+       (*     let init_bytes := take sz bytes in *)
+       (*     let rest_bytes := drop sz bytes in *)
+       (*     f <- deserialize_sbytes init_bytes dt;; *)
+       (*     rest <- deserialize_sbytes rest_bytes (DTYPE_Struct dts);; *)
+       (*     match rest with *)
+       (*     | UVALUE_Struct fs => *)
+       (*       ret (UVALUE_Struct (f::fs)) *)
+       (*     | _ => *)
+       (*       raise "deserialize_sbytes: DTYPE_Struct recursive call did not return a struct." *)
+       (*     end *)
+       (*   end *)
+
+       (*   (* match fields with *) *)
+       (*   (* | [] => ret (DVALUE_Struct []) *) *)
+       (*   (* | (x::xs) => _ *) *)
+       (*   (* end *) *)
+       (*   (* inl "deserialize_sbytes: padded structures unimplemented." *) *)
+
+       (* (* Structures with no padding *) *)
+       (* | DTYPE_Packed_struct fields => *)
+         
+       (*   inl "deserialize_sbytes: unimplemented packed structs." *)
+
+       (* (* Unimplemented *) *)
+       (* | DTYPE_Void => *)
+       (*   inl "deserialize_sbytes: attempting to deserialize void." *)
+       (* | DTYPE_Metadata => *)
+       (*   inl "deserialize_sbytes: metadata." *)
+
+       (* | DTYPE_Opaque => *)
+       (*   inl "deserialize_sbytes: opaque." *)
+       (* end. *)
 
 (*     (* TODO: probably move this *) *)
 (*   Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop :=  *)
@@ -1142,3 +1192,147 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       Set Guard Checking.
 
     End Concretize.
+
+    (* Specifying the currently supported dynamic types.
+       This is mostly to rule out:
+
+       - arbitrary bitwidth integers
+       - half
+       - x86_fp80
+       - fp128
+       - ppc_fp128
+       - metadata
+       - x86_mmx
+       - opaque
+     *)
+    (* TODO: stolen from Memory.v *)
+    Inductive is_supported : dtyp -> Prop :=
+    | is_supported_DTYPE_I1 : is_supported (DTYPE_I 1)
+    | is_supported_DTYPE_I8 : is_supported (DTYPE_I 8)
+    | is_supported_DTYPE_I32 : is_supported (DTYPE_I 32)
+    | is_supported_DTYPE_I64 : is_supported (DTYPE_I 64)
+    | is_supported_DTYPE_Pointer : is_supported (DTYPE_Pointer)
+    | is_supported_DTYPE_Void : is_supported (DTYPE_Void)
+    | is_supported_DTYPE_Float : is_supported (DTYPE_Float)
+    | is_supported_DTYPE_Double : is_supported (DTYPE_Double)
+    | is_supported_DTYPE_Array : forall sz τ, is_supported τ -> is_supported (DTYPE_Array sz τ)
+    | is_supported_DTYPE_Struct : forall fields, Forall is_supported fields -> is_supported (DTYPE_Struct fields)
+    | is_supported_DTYPE_Packed_struct : forall fields, Forall is_supported fields -> is_supported (DTYPE_Packed_struct fields)
+    (* TODO: unclear if is_supported τ is good enough here. Might need to make sure it's a sized type *)
+    | is_supported_DTYPE_Vector : forall sz τ, is_supported τ -> is_supported (DTYPE_Vector sz τ)
+.
+
+Ltac eval_nseq :=
+  match goal with
+  | |- context[Nseq ?start ?len] =>
+    let HS := fresh "HS" in
+    let HSeq := fresh "HSeq" in
+    remember (Nseq start len) as HS eqn:HSeq;
+    cbv in HSeq;
+    subst HS
+  end.
+
+Ltac uvalue_eq_dec_refl_true :=
+  rewrite rel_dec_eq_true; [|exact eq_dec_uvalue_correct|reflexivity].
+
+Ltac solve_guards_all_bytes :=
+  rewrite N.eqb_refl; uvalue_eq_dec_refl_true; cbn.
+
+
+Lemma to_ubytes_all_bytes_from_uvalue :
+  forall uv dt sid sbytes,
+    is_supported dt ->
+    to_ubytes uv dt sid = sbytes ->
+    all_bytes_from_uvalue sbytes = Some uv.
+Proof.
+  intros uv dt sid sbytes SUP TO.
+
+  unfold to_ubytes in TO.
+  induction dt;
+    try solve [cbn in TO; subst; eval_nseq; cbn;
+               solve_guards_all_bytes;
+               reflexivity].
+
+  admit.
+  admit.
+  admit.
+  admit.
+  admit.
+Abort.
+
+Lemma serialize_sbytes_deserialize_sbytes :
+  forall uv dt sid sbytes ,
+    uvalue_has_dtyp uv dt ->
+    is_supported dt ->
+    serialize_sbytes uv dt sid = inr (sbytes) ->
+    deserialize_sbytes sbytes dt = inr uv.
+Proof.
+  intros uv dt sid sbytes TYP SUP SER.
+  induction TYP.
+  - cbn in *.
+    unfold deserialize_sbytes.
+    unfold from_ubytes.
+    inv SER.
+    unfold deserialize_sbytes, to_ubytes.
+    cbn.
+
+    induction ptr_size.
+    cbn.
+    unfold from_ubytes.
+    admit. (* May have to make pointer size > 0 *)
+
+    cbn.
+    rewrite SuccNat2Pos.id_succ.
+    cbn.
+    admit.
+    
+  - cbn in *.
+    inv SER.
+    unfold deserialize_sbytes.
+    unfold to_ubytes.
+    cbn.
+
+    destruct uvalue_eq_dec; [|contradiction].
+    inv e.
+
+    rewrite N.eqb_refl.
+    cbn.
+    reflexivity.
+  - cbn in *.
+    inv SER.
+    unfold deserialize_sbytes.
+    unfold to_ubytes.
+    cbn.
+
+    destruct uvalue_eq_dec; [|contradiction].
+    inv e.
+
+    rewrite N.eqb_refl.
+    cbn.
+    reflexivity.
+  - cbn in *.
+    inv SER.
+    unfold deserialize_sbytes.
+    unfold to_ubytes.
+    cbn.
+
+    destruct uvalue_eq_dec; [|contradiction].
+    inv e.
+
+    rewrite N.eqb_refl.
+    cbn.
+    reflexivity.
+  - cbn in *.
+    inv SER.
+    unfold deserialize_sbytes.
+    unfold to_ubytes.
+    cbn.
+
+    destruct uvalue_eq_dec; [|contradiction].
+    inv e.
+
+    rewrite N.eqb_refl.
+    cbn.
+    reflexivity.
+  - inv SUP; exfalso; apply H; constructor.
+Abort.
