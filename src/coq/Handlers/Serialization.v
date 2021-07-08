@@ -323,7 +323,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          | _ => inl "extract_byte_to_ubyte invalid conversion."
          end.
 
-    (* TODO: probably put this in a fresh sid monad... *)
+    (* TODO: probably put this in a fresh sid monad... Need to
+       generate fresh store ids for each entangled byte each time... *)
     (* This is mostly to_ubytes, except it will also unwrap concatbytes *)
   Fixpoint serialize_sbytes (uv : uvalue) (dt : dtyp) (sid : store_id) {struct uv} : err (list SByte)
     := match uv with
@@ -345,7 +346,21 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        (* Packed aggregate types *)
        | UVALUE_Packed_struct _
        | UVALUE_Array _
-       | UVALUE_Vector _ =>
+       | UVALUE_Vector _
+
+       (* Expressions *)
+       | UVALUE_IBinop _ _ _
+       | UVALUE_ICmp _ _ _
+       | UVALUE_FBinop _ _ _ _
+       | UVALUE_FCmp _ _ _
+       | UVALUE_Conversion _ _ _
+       | UVALUE_GetElementPtr _ _ _
+       | UVALUE_ExtractElement _ _
+       | UVALUE_InsertElement _ _ _
+       | UVALUE_ShuffleVector _ _ _
+       | UVALUE_ExtractValue _ _
+       | UVALUE_InsertValue _ _ _
+       | UVALUE_Select _ _ _ =>
          ret (to_ubytes uv dt sid)
 
        | UVALUE_None => ret nil
@@ -356,114 +371,50 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | UVALUE_ConcatBytes bytes t =>
          (* TODO: should provide *new* sids... May need to make this function in a fresh sid monad *)
          map_monad extract_byte_to_ubyte bytes
-
-       | _ =>
-         ret (to_ubytes uv dt sid)
-
-       (* Expressions *)
-       (* TODO: this probably only works when the result is not an aggregate type...
-
-          I believe select, for instance, can have an aggregate type
-          as the result. Same with others...
-
-          If it ends up being an aggregate type, then ExtractByte
-          needs to understand the layout of aggregate types in order
-          to understand which byte corresponds to what... Which is
-          likely not ideal.
-
-          For select result must be first class type... (This includes
-          vectors, AND also arrays and structs): https://llvm.org/docs/LangRef.html#id1363
-
-          Conversions must be ints or vectors...
-
-          ExtractValue operates on structs... Can probably pull out struct types.
-
-          Vectors must have elements of "primitive type"
-        *)
-       (* | UVALUE_IBinop iop v1 v2 => _ *)
-       (* | UVALUE_ICmp cmp v1 v2 => _ *)
-       (* | UVALUE_FBinop fop fm v1 v2 => _ *)
-       (* | UVALUE_FCmp cmp v1 v2 => _ *)
-       (* | UVALUE_Conversion conv v t_to => _ *)
-       (* | UVALUE_GetElementPtr t ptrval idxs => _ *)
-       (* | UVALUE_ExtractElement vec idx => _ *)
-       (* | UVALUE_InsertElement vec elt idx => _ *)
-       (* | UVALUE_ShuffleVector vec1 vec2 idxmask => _ *)
-       (* | UVALUE_ExtractValue vec idxs => _ *)
-       (* | UVALUE_InsertValue vec elt idxs => _ *)
-       (* | UVALUE_Select cnd v1 v2 => _ *)
        end.
 
-  (* TODO: move these ?*)
-  Fixpoint drop {A} (n : N) (l : list A) : list A
-    := match l with
-       | [] => []
-       | (x::xs) =>
-         if N.eqb 0 n
-         then l
-         else drop (N.pred n) xs
+  Fixpoint deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err uvalue
+    := match dt with
+       (* Base types *)
+       | DTYPE_I _
+       | DTYPE_IPTR
+       | DTYPE_Pointer
+       | DTYPE_Half
+       | DTYPE_Float
+       | DTYPE_Double
+       | DTYPE_X86_fp80
+       | DTYPE_Fp128
+       | DTYPE_Ppc_fp128
+       | DTYPE_X86_mmx =>
+         ret (from_ubytes bytes dt)
+
+       (* Padded aggregate types *)
+       | DTYPE_Struct fields =>
+         inl "deserialize_sbytes: padded structures unimplemented."
+
+       (* Packed aggregate types *)
+       | DTYPE_Array sz t =>
+         let size := sizeof_dtyp t in
+         let size_nat := N.to_nat size in
+         fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];;
+         ret (UVALUE_Array fields)
+       | DTYPE_Vector sz t =>
+         let size := sizeof_dtyp t in
+         let size_nat := N.to_nat size in
+         fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];;
+         ret (UVALUE_Vector fields)
+       | DTYPE_Packed_struct fields =>
+         inl "deserialize_sbytes: unimplemented structs."
+
+       (* Unimplemented *)
+       | DTYPE_Void =>
+         inl "deserialize_sbytes: attempting to deserialize void."
+       | DTYPE_Metadata =>
+         inl "deserialize_sbytes: metadata."
+
+       | DTYPE_Opaque =>
+         inl "deserialize_sbytes: opaque."
        end.
-
-  Fixpoint take {A} (n : N) (l : list A) : list A
-    := match l with
-       | [] => []
-       | (x::xs) =>
-         if N.eqb 0 n
-         then []
-         else x :: take (N.pred n) xs
-       end.
-
-  Definition between {A} (lo hi : N) (l : list A) : list A
-    := take (hi - lo) (drop lo l).
-
-  (* Fixpoint deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err uvalue *)
-  (*   := match dt with *)
-  (*      (* Base types *) *)
-  (*      | DTYPE_I _ *)
-  (*      | DTYPE_IPTR *)
-  (*      | DTYPE_Pointer *)
-  (*      | DTYPE_Half *)
-  (*      | DTYPE_Float *)
-  (*      | DTYPE_Double *)
-  (*      | DTYPE_X86_fp80 *)
-  (*      | DTYPE_Fp128 *)
-  (*      | DTYPE_Ppc_fp128 *)
-  (*      | DTYPE_X86_mmx => *)
-  (*        ret (from_ubytes bytes dt) *)
-
-  (*      (* Unimplemented *) *)
-  (*      | DTYPE_Void => *)
-  (*        inl "deserialize_sbytes: attempting to deserialize void." *)
-  (*      | DTYPE_Metadata => *)
-  (*        inl "deserialize_sbytes: metadata." *)
-
-  (*      (* Padded aggregate types *) *)
-  (*      | DTYPE_Struct fields => *)
-  (*        inl "deserialize_sbytes: padded structures unimplemented." *)
-
-  (*      (* Packed aggregate types *) *)
-  (*      | DTYPE_Array sz t => *)
-  (*        let size := sizeof_dtyp t in *)
-  (*        let size_nat := N.to_nat size in *)
-  (*        fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];; *)
-  (*        ret (UVALUE_Array fields) *)
-  (*      | DTYPE_Vector sz t => *)
-  (*        let size := sizeof_dtyp t in *)
-  (*        let size_nat := N.to_nat size in *)
-  (*        fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];; *)
-  (*        ret (UVALUE_Vector fields) *)
-  (*      | DTYPE_Packed_struct fields => *)
-  (*        inl "deserialize_sbytes: unimplemented packed structs." *)
-
-  (*      | DTYPE_Opaque => *)
-  (*        inl "deserialize_sbytes: opaque." *)
-  (*      end. *)
-
-  (* TODO: if I have 8 bytes concatenated together... And they all
-  have the same uvalue, will I evaluate the UVALUE 8 times???
-
-       Naively, maybe, but I think I can optimize this when looking at ConcatBytes...
-   *)
 
 (*     (* TODO: probably move this *) *)
 (*   Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop :=  *)
@@ -722,7 +673,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
 
     Section Concretize.
-
+ 
       
 
       Variable endianess : Endianess.

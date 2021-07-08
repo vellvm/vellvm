@@ -45,3 +45,24 @@ Fixpoint Nseq (start : N) (len : nat) : list N :=
   | O => []
   | S x => start :: Nseq (N.succ start) x
   end.
+
+Fixpoint drop {A} (n : N) (l : list A) : list A
+  := match l with
+     | [] => []
+     | (x::xs) =>
+       if N.eqb 0 n
+       then l
+       else drop (N.pred n) xs
+     end.
+
+Fixpoint take {A} (n : N) (l : list A) : list A
+  := match l with
+     | [] => []
+     | (x::xs) =>
+       if N.eqb 0 n
+       then []
+       else x :: take (N.pred n) xs
+     end.
+
+Definition between {A} (lo hi : N) (l : list A) : list A
+  := take (hi - lo) (drop lo l).
