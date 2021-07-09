@@ -46,6 +46,36 @@ Fixpoint Nseq (start : N) (len : nat) : list N :=
   | S x => start :: Nseq (N.succ start) x
   end.
 
+Lemma cons_Nseq :
+  forall len start,
+    start :: Nseq (N.succ start) len = Nseq start (S len).
+Proof.
+  reflexivity.
+Qed.
+
+Lemma Nseq_app :
+  forall len1 len2 start,
+    Nseq start (len1 + len2) = Nseq start len1 ++ Nseq (start + (N.of_nat len1)) len2.
+Proof.
+  intro len1; induction len1 as [|len1' IHlen]; intros.
+  - now rewrite N.add_0_r.
+  - rewrite Nnat.Nat2N.inj_succ.
+    rewrite <- N.add_succ_comm.
+    cbn.
+    rewrite IHlen.
+    reflexivity.
+Qed.
+
+Lemma Nseq_S :
+  forall len start,
+    Nseq start (S len) = Nseq start len ++ [(start + N.of_nat len)%N].
+Proof.
+  intros len start.
+  change [(start + N.of_nat len)%N] with (Nseq (start + N.of_nat len) 1).
+  rewrite <- Nseq_app.
+  rewrite <- plus_n_Sm, <- plus_n_O; reflexivity.
+Qed.
+
 Fixpoint drop {A} (n : N) (l : list A) : list A
   := match l with
      | [] => []
