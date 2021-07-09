@@ -20,6 +20,8 @@ From ExtLib Require Import
      Structures.Monads
      Data.Monads.EitherMonad.
 
+Require Import Lia.
+
 
 Import ListNotations.
 Import MonadNotation.
@@ -1236,9 +1238,64 @@ Ltac uvalue_eq_dec_refl_true :=
   rewrite rel_dec_eq_true; [|exact eq_dec_uvalue_correct|reflexivity].
 
 Ltac solve_guards_all_bytes :=
-  rewrite N.eqb_refl; uvalue_eq_dec_refl_true; cbn.
+  rewrite N.eqb_refl; rewrite Z.eqb_refl; uvalue_eq_dec_refl_true; cbn.
+
+Lemma all_bytes_helper_app :
+  forall  sbytes sbytes2 start sid uv,
+    all_bytes_from_uvalue_helper (Z.of_N start) sid uv sbytes = Some uv ->
+    all_bytes_from_uvalue_helper (Z.of_N (start + N.of_nat (length sbytes))) sid uv sbytes2 = Some uv ->
+    all_bytes_from_uvalue_helper (Z.of_N start) sid uv (sbytes ++ sbytes2) = Some uv.
+Proof.
+  induction sbytes;
+    intros sbytes2 start sid uv INIT REST.
+  - now rewrite N.add_0_r in REST.
+  - cbn.
+    destruct a.
+    cbn in INIT.
+    do 3 (break_match; [|solve [inv INIT]]).
 
 
+    cbn in REST. auto.
+    replace (Z.of_N (start + N.pos (Pos.of_succ_nat (Datatypes.length sbytes)))) with (Z.of_N (N.succ start + N.of_nat (Datatypes.length sbytes))) in REST by lia.
+
+    rewrite <- N2Z.inj_succ in *.
+    
+    apply IHsbytes; auto.
+Qed.
+
+Lemma to_ubytes_all_bytes_from_uvalue' :
+  forall len uv dt sid sbytes start,
+    is_supported dt ->
+    map (fun n : N => UByte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq start len) = sbytes ->
+    all_bytes_from_uvalue_helper (Z.of_N start) sid uv sbytes = Some uv.
+Proof.
+  induction len;
+    intros uv dt sid sbytes start SUP TO.
+  - inv TO; reflexivity.
+  - inv TO.
+    rewrite Nseq_S.
+    rewrite map_app.
+    apply all_bytes_helper_app; eauto.
+    + cbn.
+      rewrite map_length.
+      rewrite Nseq_length.
+      solve_guards_all_bytes.
+      reflexivity.
+Qed.
+
+Lemma to_ubytes_all_bytes_from_uvalue :
+  forall uv dt sid sbytes,
+    is_supported dt ->
+    to_ubytes uv dt sid = sbytes ->
+    all_bytes_from_uvalue_helper 0 sid uv sbytes = Some uv.
+Proof.  
+  intros uv dt sid sbytes SUP TO.
+
+  change 0%Z with (Z.of_N 0).
+  eapply to_ubytes_all_bytes_from_uvalue'; eauto.    
+Qed.
+
+(* TODO: What should all_bytes_from_uvalue do for size 0 types *)
 Lemma to_ubytes_all_bytes_from_uvalue :
   forall uv dt sid sbytes,
     is_supported dt ->
@@ -1248,6 +1305,10 @@ Proof.
   intros uv dt sid sbytes SUP TO.
 
   unfold to_ubytes in TO.
+  unfold all_bytes_from_uvalue.
+  unfold all_bytes_from_uvalue_helper
+
+
   induction dt;
     try solve [cbn in TO; subst; eval_nseq; cbn;
                solve_guards_all_bytes;
@@ -1258,6 +1319,17 @@ Proof.
   admit.
   admit.
   admit.
+
+  (* Aggregate types *)
+  - (* Arrays *)
+    induction sz.
+    cbn in *.
+    admit.
+
+    cbn in *.
+    apply IHdt.
+    inv SUP. auto.
+    auto.
 Abort.
 
 Lemma serialize_sbytes_deserialize_sbytes :

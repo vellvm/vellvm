@@ -76,6 +76,12 @@ Proof.
   rewrite <- plus_n_Sm, <- plus_n_O; reflexivity.
 Qed.
 
+Lemma Nseq_length :
+  forall len start, length (Nseq start len) = len.
+Proof.
+  intro len; induction len; simpl; auto.
+Qed.
+
 Fixpoint drop {A} (n : N) (l : list A) : list A
   := match l with
      | [] => []
