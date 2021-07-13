@@ -1352,82 +1352,24 @@ Lemma serialize_sbytes_deserialize_sbytes :
   forall uv dt sid sbytes ,
     uvalue_has_dtyp uv dt ->
     is_supported dt ->
+    sizeof_dtyp dt > 0 ->
     serialize_sbytes uv dt sid = inr (sbytes) ->
     deserialize_sbytes sbytes dt = inr uv.
 Proof.
-  intros uv dt sid sbytes TYP SUP SER.
-  induction TYP.
-  - cbn in *; inv SER.
-    unfold deserialize_sbytes.
-    cbn.
-    unfold serialize_sbytes in SER.
-
-
-
-cbn in *.
-    unfold deserialize_sbytes.
-    unfold from_ubytes.
-    inv SER.
-    unfold deserialize_sbytes, to_ubytes.
-    cbn.
-
-    induction ptr_size.
-    cbn.
-    unfold from_ubytes.
-    admit. (* May have to make pointer size > 0 *)
-
-    cbn.
-    rewrite SuccNat2Pos.id_succ.
-    cbn.
-    admit.
-    
-  - cbn in *.
-    inv SER.
-    unfold deserialize_sbytes.
-    unfold to_ubytes.
-    cbn.
-
-    destruct uvalue_eq_dec; [|contradiction].
-    inv e.
-
-    rewrite N.eqb_refl.
-    cbn.
-    reflexivity.
-  - cbn in *.
-    inv SER.
-    unfold deserialize_sbytes.
-    unfold to_ubytes.
-    cbn.
-
-    destruct uvalue_eq_dec; [|contradiction].
-    inv e.
-
-    rewrite N.eqb_refl.
-    cbn.
-    reflexivity.
-  - cbn in *.
-    inv SER.
-    unfold deserialize_sbytes.
-    unfold to_ubytes.
-    cbn.
-
-    destruct uvalue_eq_dec; [|contradiction].
-    inv e.
-
-    rewrite N.eqb_refl.
-    cbn.
-    reflexivity.
-  - cbn in *.
-    inv SER.
-    unfold deserialize_sbytes.
-    unfold to_ubytes.
-    cbn.
-
-    destruct uvalue_eq_dec; [|contradiction].
-    inv e.
-
-    rewrite N.eqb_refl.
-    cbn.
-    reflexivity.
+  intros uv dt sid sbytes TYP SUP SIZE SER.
+  induction TYP;
+    try solve [unfold serialize_sbytes in SER;
+               inv SER;
+               unfold deserialize_sbytes;
+               rewrite from_ubytes_to_ubytes; eauto
+              | cbn in *;
+                match goal with
+                | |- deserialize_sbytes _ ?t = _ =>
+                  cbn in *;
+                  destruct t; cbn; inv SER;
+                  rewrite from_ubytes_to_ubytes; eauto
+                end
+              ].
   - inv SUP; exfalso; apply H; constructor.
-Abort.
+  - inv SIZE.
+Qed.
