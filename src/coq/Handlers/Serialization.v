@@ -387,7 +387,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
      The reason we also have deserialize_sbytes is in order to deal
      with aggregate data types.
    *)
-  Fixpoint deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err uvalue
+  Definition deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err uvalue
     :=
       match dt with
        (* Base types *)
@@ -1238,7 +1238,7 @@ Ltac uvalue_eq_dec_refl_true :=
   rewrite rel_dec_eq_true; [|exact eq_dec_uvalue_correct|reflexivity].
 
 Ltac solve_guards_all_bytes :=
-  rewrite N.eqb_refl; rewrite Z.eqb_refl; uvalue_eq_dec_refl_true; cbn.
+  try rewrite N.eqb_refl; try rewrite Z.eqb_refl; uvalue_eq_dec_refl_true; cbn.
 
 Lemma all_bytes_helper_app :
   forall  sbytes sbytes2 start sid uv,
@@ -1263,7 +1263,7 @@ Proof.
     apply IHsbytes; auto.
 Qed.
 
-Lemma to_ubytes_all_bytes_from_uvalue' :
+Lemma to_ubytes_all_bytes_from_uvalue_helper' :
   forall len uv dt sid sbytes start,
     is_supported dt ->
     map (fun n : N => UByte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq start len) = sbytes ->
@@ -1283,7 +1283,7 @@ Proof.
       reflexivity.
 Qed.
 
-Lemma to_ubytes_all_bytes_from_uvalue :
+Lemma to_ubytes_all_bytes_from_uvalue_helper :
   forall uv dt sid sbytes,
     is_supported dt ->
     to_ubytes uv dt sid = sbytes ->
@@ -1292,45 +1292,61 @@ Proof.
   intros uv dt sid sbytes SUP TO.
 
   change 0%Z with (Z.of_N 0).
-  eapply to_ubytes_all_bytes_from_uvalue'; eauto.    
+  eapply to_ubytes_all_bytes_from_uvalue_helper'; eauto.    
 Qed.
 
-(* TODO: What should all_bytes_from_uvalue do for size 0 types *)
-Lemma to_ubytes_all_bytes_from_uvalue :
-  forall uv dt sid sbytes,
-    is_supported dt ->
-    to_ubytes uv dt sid = sbytes ->
-    all_bytes_from_uvalue sbytes = Some uv.
+Lemma to_ubytes_sizeof_dtyp :
+  forall uv dt sid,  
+    N.of_nat (length (to_ubytes uv dt sid)) = sizeof_dtyp dt.
 Proof.
-  intros uv dt sid sbytes SUP TO.
+  intros uv dt sid.
+  unfold to_ubytes.
+  rewrite map_length, Nseq_length.
+  lia.
+Qed.
 
-  unfold to_ubytes in TO.
+Lemma from_ubytes_to_ubytes :
+  forall uv dt sid,
+    is_supported dt ->
+    sizeof_dtyp dt > 0 ->
+    from_ubytes (to_ubytes uv dt sid) dt = uv.
+Proof.
+  intros uv dt sid SUP SIZE.
+
+  unfold from_ubytes.
   unfold all_bytes_from_uvalue.
-  unfold all_bytes_from_uvalue_helper
 
+  rewrite to_ubytes_sizeof_dtyp.
+  rewrite N.eqb_refl.
 
-  induction dt;
-    try solve [cbn in TO; subst; eval_nseq; cbn;
-               solve_guards_all_bytes;
-               reflexivity].
-
-  admit.
-  admit.
-  admit.
-  admit.
-  admit.
-
-  (* Aggregate types *)
-  - (* Arrays *)
-    induction sz.
-    cbn in *.
-    admit.
+  break_inner_match.
+  - (* Contradiction by size *)
+    pose proof to_ubytes_sizeof_dtyp uv dt sid.
+    rewrite Heql in H.
 
     cbn in *.
-    apply IHdt.
-    inv SUP. auto.
-    auto.
-Abort.
+    lia.
+  - destruct s.
+    cbn in *.
+
+    unfold to_ubytes in Heql.
+    remember (sizeof_dtyp dt) as sz.
+    destruct sz; [inv SIZE|].
+    cbn in *.
+    pose proof Pos2Nat.is_succ p as [sz Hsz].
+    rewrite Hsz in Heql.
+    rewrite <- cons_Nseq in Heql.
+
+    cbn in Heql.
+    inv Heql.
+    cbn.
+
+    solve_guards_all_bytes.
+
+    cbn.
+    change 1%Z with (Z.of_N 1).
+    erewrite to_ubytes_all_bytes_from_uvalue_helper'; eauto.
+Qed.
 
 Lemma serialize_sbytes_deserialize_sbytes :
   forall uv dt sid sbytes ,
@@ -1341,7 +1357,14 @@ Lemma serialize_sbytes_deserialize_sbytes :
 Proof.
   intros uv dt sid sbytes TYP SUP SER.
   induction TYP.
-  - cbn in *.
+  - cbn in *; inv SER.
+    unfold deserialize_sbytes.
+    cbn.
+    unfold serialize_sbytes in SER.
+
+
+
+cbn in *.
     unfold deserialize_sbytes.
     unfold from_ubytes.
     inv SER.
