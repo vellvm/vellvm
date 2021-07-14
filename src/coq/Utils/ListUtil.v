@@ -102,3 +102,14 @@ Fixpoint take {A} (n : N) (l : list A) : list A
 
 Definition between {A} (lo hi : N) (l : list A) : list A
   := take (hi - lo) (drop lo l).
+
+(* Filter elements in a list, giving an (ins * outs) tuple of lists. *)
+Fixpoint filter_split {A} (pred : A -> bool) (xs : list A) : (list A * list A)
+  := match xs with
+     | [] => ([], [])
+     | (x::xs) =>
+       let '(ins, outs) := filter_split pred xs in
+       if pred x
+       then (x::ins, outs)
+       else (ins, x::outs)
+     end.
