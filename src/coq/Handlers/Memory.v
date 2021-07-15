@@ -11,10 +11,6 @@
 (* begin hide *)
 From Coq Require Import
      Morphisms ZArith List String Lia
-     FSets.FMapAVL
-     FSets.FSetAVL
-     FSetProperties
-     FMapFacts
      Structures.OrderedTypeEx
      micromega.Lia
      Psatz.
@@ -43,6 +39,7 @@ From Vellvm Require Import
      Utils.Util
      Utils.Error
      Utils.ListUtil
+     Utils.IntMaps
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Semantics.DynamicValues
@@ -131,13 +128,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Open Scope list.
 
   Definition addr := Addr.addr.
-
-  Module IM := FMapAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
-  Module IS := FSetAVL.Make(Coq.Structures.OrderedTypeEx.Z_as_OT).
-  Module Import ISP := FSetProperties.WProperties_fun(Coq.Structures.OrderedTypeEx.Z_as_OT)(IS).
-  Module Import IP := FMapFacts.WProperties_fun(Coq.Structures.OrderedTypeEx.Z_as_OT)(IM).
-
-  #[global] Coercion is_true : bool >-> Sortclass.
 
   (** ** Finite maps
       We use finite maps in several place of the memory model. We rely on the AVL implementation from the standard library.
