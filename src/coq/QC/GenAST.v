@@ -37,6 +37,8 @@ From Coq Require Import
 
 Open Scope Z_scope.
 
+Check fing32.
+
 Section Helpers.
   Fixpoint is_sized_type_h (t : dtyp) : bool
     := match t with
@@ -329,6 +331,7 @@ Section TypGenerators.
                 (* TODO: big ints *)
                 (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
+                ; TYPE_Float
                 (* TODO: Could generate TYPE_Identified if we filter for sized types *)
                 (* ; TYPE_Half *)
                 (* ; TYPE_Double *)
@@ -379,6 +382,7 @@ Section TypGenerators.
                (* ; TYPE_I 64 *)
                 ; TYPE_Void
                 (* TODO: Generate floats and stuff *)
+                ; TYPE_Float
                 (* ; TYPE_Half *)
                 (* ; TYPE_Double *)
                 (* ; TYPE_X86_fp80 *)
@@ -437,6 +441,7 @@ Section TypGenerators.
                 (* TODO: big ints *)
                 (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
+                ; TYPE_Float
                 (* ; TYPE_Half *)
                 (* ; TYPE_Double *)
                 (* ; TYPE_X86_fp80 *)
@@ -474,6 +479,7 @@ Section TypGenerators.
                 (* TODO: big ints *)
                 (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
+                ; TYPE_Float
                 (* ; TYPE_Half *)
                 (* ; TYPE_Double *)
                 (* ; TYPE_X86_fp80 *)
@@ -517,11 +523,27 @@ Section ExpGenerators.
            ; ret Xor
            ].
 
+  (*Float operations*)
+  Definition gen_fbinop : G fbinop :=
+    oneOf_ failGen
+            [ ret LLVMAst.FAdd
+            ; ret FSub
+            ; ret FMul 
+            ; ret FDiv 
+            ; ret FRem
+            ].
+
   Definition gen_icmp : G icmp :=
     oneOf_ failGen
            (map ret
                 [ Eq; Ne; Ugt; Uge; Ult; Ule; Sgt; Sge; Slt; Sle]).
 
+  Definition gen_fcmp : G fcmp :=
+    oneOf_ failGen
+            (map ret 
+                  [FFalse; FOeq; FOgt; FOge; FOlt; FOle; FOne; FOrd; 
+                   FUno; FUeq; FUgt; FUge; FUlt; FUle; FUne; FTrue]).
+              
   (* Generate an expression of a given type *)
   (* Context should probably not have duplicate ids *)
   (* May want to decrease size more for arrays and vectors *)
@@ -707,10 +729,10 @@ Section ExpGenerators.
   Definition gen_non_zero : G Z
     := n <- (arbitrary : G nat);;
        ret (Z.of_nat (S n)).
-
   Definition gen_non_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
     := match t with
        | TYPE_I n => ret EXP_Integer <*> lift gen_non_zero (* TODO: should integer be forced to be in bounds? *)
+       | TYPE_Float => ret EXP_Float <*> lift fing32 (*TODO: Verify that fing32 won't generate zero*)
        | _ => lift failGen
        end.
 
@@ -745,7 +767,7 @@ Section ExpGenerators.
             end
           (* Not generating these types for now *)
           | TYPE_Half                 => lift failGen
-          | TYPE_Float                => lift failGen
+          | TYPE_Float                => lift failGen(*ret EXP_Float <*> lift fing32*) (* referred to genarators in flocq-quickchick*)
           | TYPE_Double               => lift failGen
           | TYPE_X86_fp80             => lift failGen
           | TYPE_Fp128                => lift failGen
@@ -811,6 +833,17 @@ Section ExpGenerators.
       if Handlers.LLVMEvents.DV.iop_is_div ibinop
       then ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
       else ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t.
+  Definition test :=
+    fbinop <- lift gen_fbinop;;
+    fbinop.
+  (* gen_fbinop_exp. Not successfully compiled.
+  Definition gen_fbinop_exp : GenLLVM (exp typ) := 
+    let t := TYPE_Float in
+    fbinop <- lift gen_fbinop;;
+    if Handlers.LLVMEvents.DV.fop_is_div fbinop
+    then ret (OP_FBinop fbinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t 
+    else ret (OP_FBinop fbinop) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t.*)
+  
 
   Definition gen_exp (t : typ) : GenLLVM (exp typ)
     := sized_LLVM (fun sz => gen_exp_size sz t).
@@ -832,6 +865,7 @@ Section ExpGenerators.
             | TYPE_I isz =>
               (* TODO: If I1 also allow ICmp and FCmp *)
               gen_ibinop_exp isz
+            | TYPE_Float => lift failGen
             | _ => lift failGen
             end).
 
