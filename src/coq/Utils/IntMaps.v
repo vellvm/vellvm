@@ -143,4 +143,8 @@ Section Map_Operations.
     | None => false
     end.
 
+  Definition next_key {A} (m : IntMap A) : Z
+    := let keys := map fst (IM.elements m) in
+       1 + maximumBy Z.leb (-1)%Z keys.
+
 End Map_Operations.
