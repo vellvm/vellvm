@@ -111,17 +111,24 @@ Definition Iptr := Z. (* Integer pointer type (physical addresses) *)
 Definition Provenance := N.
 Definition AllocationId := Provenance.
 
-(* TODO: this should probably be an NSet or something... *)
-(* TODO: should there be a way to express nil / wildcard provenance? *)
-Definition Prov := list Provenance. (* Provenance *)
+(* TODO: Should probably make this an NSet, but it gives universe inconsistency with Module addr *)
+Definition Prov := option (list Provenance). (* Provenance *)
 
-(* TODO: May want to make this something else so we can have nil provenance...? *)
-Definition wildcard_prov : Prov := [].
+(* Does the provenance set pr allow for access to aid? *)
+Definition access_allowed (pr : Prov) (aid : AllocationId) : bool
+  := match pr with
+     | None => true (* Wildcard can access anything. *)
+     | Some prset =>
+       existsb (N.eqb aid) prset
+     end.
+
+Definition wildcard_prov : Prov := None.
+Definition nil_prov : Prov := Some [].
 
 (* TODO: If Prov is an NSet, I get a universe inconsistency here... *)
 Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type.
   Definition addr := (Iptr * Prov) % type.
-  Definition null : addr := (0, nil)%Z.
+  Definition null : addr := (0, nil_prov)%Z.
   Definition t := addr.
 
   (* TODO: is this what we should be using for equality on pointers? Probably *NOT* because of provenance. *)
@@ -130,7 +137,7 @@ Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type
     intros [a1 a2] [b1 b2].
 
     destruct (Z.eq_dec a1 b1);
-      destruct (list_eq_dec N.eq_dec a2 b2); subst.
+      destruct (option_eq (fun x y => list_eq_dec N.eq_dec x y) a2 b2); subst.
     - left; reflexivity.
     - right. intros H. inversion H; subst. apply n. reflexivity.
     - right. intros H. inversion H; subst. apply n. reflexivity.
@@ -875,7 +882,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
 
     (** ** Reading values from memory *)
-    Definition read_memory (bk : memory) (offset : Z) (t : dtyp) : ErrSID uvalue :=
+    Definition read_memory (bk : memory) (offset : Z) (pr : Prov) (t : dtyp) : ErrSID uvalue :=
       sid <- fresh_sid;;
       lift_err (deserialize_sbytes (lookup_all_index offset (sizeof_dtyp t) bk (UByte (UVALUE_Undef t) t (UVALUE_IPTR 0) sid)) t).
 
