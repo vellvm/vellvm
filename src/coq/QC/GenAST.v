@@ -735,6 +735,8 @@ Section ExpGenerators.
        | TYPE_Float => ret EXP_Float <*> lift fing32 (*TODO: Verify that fing32 won't generate zero*)
        | _ => lift failGen
        end.
+Check OP_FBinop.
+Check OP_IBinop.
 
   (* TODO: should make it much more likely to pick an identifier for
            better test cases *)
@@ -767,7 +769,7 @@ Section ExpGenerators.
             end
           (* Not generating these types for now *)
           | TYPE_Half                 => lift failGen
-          | TYPE_Float                => lift failGen(*ret EXP_Float <*> lift fing32*) (* referred to genarators in flocq-quickchick*)
+          | TYPE_Float                => ret EXP_Float <*> lift fing32(* referred to genarators in flocq-quickchick*)
           | TYPE_Double               => lift failGen
           | TYPE_X86_fp80             => lift failGen
           | TYPE_Fp128                => lift failGen
@@ -806,7 +808,7 @@ Section ExpGenerators.
           | TYPE_Function ret args => [lift failGen] (* These shouldn't exist, I think *)
           | TYPE_Opaque            => [lift failGen] (* TODO: not sure what these should be... *)
           | TYPE_Half              => [lift failGen]
-          | TYPE_Float             => [lift failGen]
+          | TYPE_Float             => [gen_fbinop_exp tt]
           | TYPE_Double            => [lift failGen]
           | TYPE_X86_fp80          => [lift failGen]
           | TYPE_Fp128             => [lift failGen]
@@ -832,18 +834,17 @@ Section ExpGenerators.
       ibinop <- lift gen_ibinop;;
       if Handlers.LLVMEvents.DV.iop_is_div ibinop
       then ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
-      else ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t.
-  Definition test :=
-    fbinop <- lift gen_fbinop;;
-    fbinop.
-  (* gen_fbinop_exp. Not successfully compiled.
-  Definition gen_fbinop_exp : GenLLVM (exp typ) := 
-    let t := TYPE_Float in
-    fbinop <- lift gen_fbinop;;
-    if Handlers.LLVMEvents.DV.fop_is_div fbinop
-    then ret (OP_FBinop fbinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t 
-    else ret (OP_FBinop fbinop) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t.*)
+      else ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t
+  with 
+  gen_fbinop_exp (u: unit) : GenLLVM (exp typ)
+    :=
+      let t := TYPE_Float in
+      fbinop <- lift gen_fbinop;;
+      if (Handlers.LLVMEvents.DV.fop_is_div fbinop)
+      then ret (OP_FBinop fbinop nil) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t 
+      else ret (OP_FBinop fbinop nil) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t.
   
+(*ret EXP_Float <*> lift fing32.*)
 
   Definition gen_exp (t : typ) : GenLLVM (exp typ)
     := sized_LLVM (fun sz => gen_exp_size sz t).
@@ -865,7 +866,7 @@ Section ExpGenerators.
             | TYPE_I isz =>
               (* TODO: If I1 also allow ICmp and FCmp *)
               gen_ibinop_exp isz
-            | TYPE_Float => lift failGen
+            | TYPE_Float => gen_fbinop_exp tt 
             | _ => lift failGen
             end).
 
@@ -948,7 +949,7 @@ Section InstrGenerators.
       ; gen_store
       (* TODO: Generate atomic operations and other instructions *)
       ].
-
+      
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
 
