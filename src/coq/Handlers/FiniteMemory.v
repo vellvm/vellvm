@@ -108,9 +108,11 @@ Inductive is_supported : dtyp -> Prop :=
  *)
 Definition Iptr := Z. (* Integer pointer type (physical addresses) *)
 
+Definition Provenance := N.
+
 (* TODO: this should probably be an NSet or something... *)
 (* TODO: should there be a way to express nil / wildcard provenance? *)
-Definition Prov := list N. (* Provenance *)
+Definition Prov := list Provenance. (* Provenance *)
 
 (* TODO: May want to make this something else so we can have nil provenance...? *)
 Definition wildcard_prov : Prov := [].
