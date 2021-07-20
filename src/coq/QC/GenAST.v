@@ -37,8 +37,6 @@ From Coq Require Import
 
 Open Scope Z_scope.
 
-Check fing32.
-
 Section Helpers.
   Fixpoint is_sized_type_h (t : dtyp) : bool
     := match t with

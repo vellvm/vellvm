@@ -94,6 +94,18 @@ Section ShowInstances.
   Global Instance showIBinop : Show ibinop
     := {| show := show_ibinop |}.
 
+  Definition show_fbinop (fop : fbinop) : string
+    := match fop with
+       | FAdd => "fadd"
+       | FSub => "fsub"
+       | FMul => "fmul"
+       | FDiv => "fdiv"
+       | FRem => "frem"
+       end.
+
+  Global Instance showFBinop : Show fbinop
+    := {| show := show_fbinop |}.
+
   Definition show_icmp (cmp : icmp) : string
     := match cmp with
        | Eq  => "eq"
@@ -122,6 +134,12 @@ Section ShowInstances.
       | EXP_Undef => "undef"
       | OP_IBinop iop t v1 v2 =>
         show iop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+      | OP_FBinop fop fmath t v1 v2 =>
+        match fmath with
+        | nil => "show_exp: Need to implement fastmath show instances."
+        | _ =>
+          show fop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+        end
       | OP_ICmp cmp t v1 v2 =>
         "icmp " ++ show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
       | OP_GetElementPtr t ptrval idxs =>
