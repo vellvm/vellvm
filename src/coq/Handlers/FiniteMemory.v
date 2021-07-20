@@ -109,6 +109,7 @@ Inductive is_supported : dtyp -> Prop :=
 Definition Iptr := Z. (* Integer pointer type (physical addresses) *)
 
 Definition Provenance := N.
+Definition AllocationId := Provenance.
 
 (* TODO: this should probably be an NSet or something... *)
 (* TODO: should there be a way to express nil / wildcard provenance? *)
@@ -160,28 +161,20 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
   Section Datatype_Definition.
 
-    (* This map of bytes is used to represent a contiguous block of
-       bytes. It should just enable better random access. *)
-    Definition mem_block := IntMap SByte.
-
-    (** ** Simple view of memory
-      A concrete block is determined by its id and its size.
-
-     *)
-    Inductive block :=
-    | Block (size : N) (bytes : mem_block) : block.
+    (* Memory consists of bytes which have a provenance associated with them. *)
+    Definition mem_byte := (SByte * AllocationId)%type.
 
     (** ** Memory
         Memory is just a map of blocks.
      *)
-    Definition memory := IntMap block.
+    Definition memory := IntMap mem_byte.
 
     (** ** Stack frames
       A frame contains the list of block ids that need to be freed when popped,
       i.e. when the function returns.
       A [frame_stack] is a list of such frames.
      *)
-    Definition mem_frame := list Z.
+    Definition mem_frame := list AllocationId.
     Inductive frame_stack : Type := | Singleton (f : mem_frame) | Snoc (s : frame_stack) (f : mem_frame).
     (* Definition frame_stack := list mem_frame. *)
 
@@ -459,7 +452,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          end.
 
     Import StateMonad.
-    Definition ErrSID := eitherT string (state store_id).
+    (* Need failure, UB, state for store_ids, and state for provenances *)
+    Definition ErrSID := eitherT string (eitherT string (stateT store_id (state AllocationId))).
 
     Definition lift_err {M A} `{MonadExc string M} `{Monad M} (e : err A) : (M A)
         := match e with
@@ -467,11 +461,21 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          | inr x => ret x
          end.
 
-    Definition evalErrSID {A} (m : ErrSID A) (sid : store_id) : err A
-      := evalState (unEitherT m) sid.
+    Definition evalErrSID {A} (m : ErrSID A) (sid : store_id) (aid : AllocationId) : err (err A)
+      := evalState (evalStateT (unEitherT (unEitherT m)) sid) aid.
 
     Definition fresh_sid : ErrSID store_id
-      := lift (modify N.succ).
+      := lift (lift (modify N.succ)).
+
+    Definition fresh_allocation_id : ErrSID AllocationId
+      := lift (lift (lift (modify N.succ))).
+
+    Definition raise_error {A} (msg : string) : ErrSID A
+      := MonadExc.raise msg.
+
+    Definition raise_ub {A} (msg : string) : ErrSID A
+      := lift (MonadExc.raise msg).
+
 
     Definition sbyte_sid_match (a b : SByte) : bool
       := match a, b with
@@ -570,7 +574,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
        (* Byte manipulation. *)
        | UVALUE_ExtractByte uv dt' idx sid =>
-         MonadExc.raise "serialize_sbytes: UVALUE_ExtractByte not guarded by UVALUE_ConcatBytes."
+         raise_error "serialize_sbytes: UVALUE_ExtractByte not guarded by UVALUE_ConcatBytes."
        | UVALUE_ConcatBytes bytes t =>
          (* TODO: should provide *new* sids... May need to make this function in a fresh sid monad *)
          bytes' <- lift_err (map_monad extract_byte_to_ubyte bytes);;
@@ -779,19 +783,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       end.
 
 
-
-    Definition read_in_mem_block (bk : mem_block) (offset : Z) (t : dtyp) : ErrSID uvalue :=
-      sid <- fresh_sid;;
-      lift_err (deserialize_sbytes (lookup_all_index offset (sizeof_dtyp t) bk (UByte (UVALUE_Undef t) t (UVALUE_IPTR 0) sid)) t).
-
-    (** ** Writing values to memory
-      Serialize [v] into [SByte]s, and store them in the [mem_block] [bk] starting at [offset].
-     *)
-    Definition write_to_mem_block (bk : mem_block) (offset : Z) (v : uvalue) (dt : dtyp) : ErrSID mem_block
-      :=
-        bytes <- serialize_sbytes v dt;;
-        ret (add_all_index bytes offset bk).
-
   End Serialization.
 
   Section GEP.
@@ -882,39 +873,28 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       sid <- fresh_sid;;
       ret (UByte (UVALUE_Undef DTYPE_Void) DTYPE_Void (UVALUE_IPTR 0) sid).
 
-    (** ** Initialization of blocks
-      Constructs an initial [mem_block] of undefined [SByte]s, indexed from 0 to n.
-     *)
-    Fixpoint init_block_undef (n:nat) (m:mem_block) : ErrSID mem_block :=
-      match n with
-      | O =>
-        undef <- SUndef;;
-        ret (IM.add 0%Z undef m)
-      | S n' =>
-        m' <- init_block_undef n' m;;
-        undef <- SUndef;;
-        ret (IM.add (Z.of_nat n) undef m')
-      end.
 
-    (* Constructs an initial [mem_block] containing [n] undefined [SByte]s, indexed from [0] to [n - 1].
-     If [n] is negative, it is treated as [0].
-     *)
-    Definition init_block (n:N) : ErrSID mem_block :=
-      match n with
-      | 0%N => ret empty
-      | N.pos n' => init_block_undef (BinPosDef.Pos.to_nat (n' - 1)) empty
-      end.
+    (** ** Reading values from memory *)
+    Definition read_memory (bk : memory) (offset : Z) (t : dtyp) : ErrSID uvalue :=
+      sid <- fresh_sid;;
+      lift_err (deserialize_sbytes (lookup_all_index offset (sizeof_dtyp t) bk (UByte (UVALUE_Undef t) t (UVALUE_IPTR 0) sid)) t).
 
-    (* Constructs an initial [mem_block] appropriately sized for a given type [ty]. *)
-    Definition make_empty_mem_block (ty:dtyp) : ErrSID mem_block :=
-      init_block (sizeof_dtyp ty).
+    (** ** Writing values to memory
+      Serialize [v] into [SByte]s, and store them in the [mem_block] [bk] starting at [offset].
+     *)
+    Definition write_to_mem_block (bk : mem_block) (offset : Z) (v : uvalue) (dt : dtyp) : ErrSID mem_block
+      :=
+        bytes <- serialize_sbytes v dt;;
+
+    Definition read_in_mem_block (bk : memory) (offset : Z) (t : dtyp) : uvalue :=
+      deserialize_sbytes (lookup_all_index offset (sizeof_dtyp t) bk SUndef) t.
 
     (** ** Array element lookup
       A [mem_block] can be seen as storing an array of elements of [dtyp] [t], from which we retrieve
       the [i]th [uvalue].
       The [size] argument has no effect, but we need to provide one to the array type.
      *)
-    Definition get_array_cell_mem_block (bk : mem_block) (bk_offset : Z) (i : nat) (size : N) (t : dtyp) : ErrSID uvalue :=
+    Definition get_array_cell (bk : memory) (bk_offset : Z) (i : nat) (size : N) (t : dtyp) : ErrSID uvalue :=
       'offset <- lift_err (handle_gep_h (DTYPE_Array size t)
                                        bk_offset
                                        [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]);;
@@ -1297,7 +1277,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         ret (m', DVALUE_Addr a)
 
       | Load t dv =>
-        match dv with
+         match dv with
         | DVALUE_Addr ptr =>
           match read m ptr t with
           | inr v => ret (m, v)
