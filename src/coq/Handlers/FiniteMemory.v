@@ -129,6 +129,20 @@ Definition access_allowed (pr : Prov) (aid : AllocationId) : bool
 Definition all_accesses_allowed (pr : Prov) (aids : list AllocationId) : bool
   := forallb (access_allowed pr) aids.
 
+Definition aid_access_allowed (pr : AllocationId) (aid : AllocationId) : bool
+  := match pr with
+     | None => true
+     | Some pr =>
+       match aid with
+       | None => true
+       | Some aid =>
+         N.eqb pr aid
+       end
+     end.
+
+Definition all_aid_accesses_allowed (pr : AllocationId) (aids : list AllocationId) : bool
+  := forallb (aid_access_allowed pr) aids.
+
 Definition wildcard_prov : Prov := None.
 Definition nil_prov : Prov := Some [].
 
@@ -892,9 +906,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       ret (UByte (UVALUE_Undef DTYPE_Void) DTYPE_Void (UVALUE_IPTR 0) sid).
 
     (** ** Reading values from memory *)
-    Definition read_memory (bk : memory) (offset : Z) (pr : Prov) (t : dtyp) : ErrSID uvalue :=
+    Definition read_memory (mem : memory) (addr : Z) (pr : Prov) (t : dtyp) : ErrSID uvalue :=
       sid <- fresh_sid;;
-      let mem_bytes := lookup_all_index offset (sizeof_dtyp t) bk ((UByte (UVALUE_Undef t) t (UVALUE_IPTR 0) sid), None) in
+      let mem_bytes := lookup_all_index addr (sizeof_dtyp t) mem ((UByte (UVALUE_Undef t) t (UVALUE_IPTR 0) sid), None) in
       let bytes     := map fst mem_bytes in
       let alloc_ids := map snd mem_bytes in
       if all_accesses_allowed pr alloc_ids
@@ -903,14 +917,31 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
 
     (** ** Writing values to memory
-      Serialize [v] into [SByte]s, and store them in the [mem_block] [bk] starting at [offset].
-     *)
-    Definition write_to_mem_block (bk : mem_block) (offset : Z) (v : uvalue) (dt : dtyp) : ErrSID mem_block
-      :=
-        bytes <- serialize_sbytes v dt;;
+      Serialize [v] into [SByte]s, and store them in the [memory] starting at [addr].
 
-    Definition read_in_mem_block (bk : memory) (offset : Z) (t : dtyp) : uvalue :=
-      deserialize_sbytes (lookup_all_index offset (sizeof_dtyp t) bk SUndef) t.
+      Also make sure that the write of provenance [pr] is allowed.
+     *)
+    Definition write_allowed (mem : memory) (addr : Z) (aid : AllocationId) (dt : dtyp) : ErrSID unit
+      :=
+        let mem_bytes := IM_find_many (Zseq 0 (N.to_nat (sizeof_dtyp dt))) mem in
+        match mem_bytes with
+        | None => raise_ub "Trying to write to unallocated memory."
+        | Some mem_bytes =>
+          let alloc_ids := map snd mem_bytes in
+          if all_aid_accesses_allowed aid alloc_ids
+          then ret tt
+          else raise_ub "Trying to write to memory with invalid provenance."
+        end.
+
+    Definition write_memory (mem : memory) (addr : Z) (aid : AllocationId) (v : uvalue) (dt : dtyp) : ErrSID memory
+      :=
+        (* Check that we're allowed to write to each place in memory *)
+        write_allowed mem addr aid dt;;
+        bytes <- serialize_sbytes v dt;;
+        let mem_bytes := map (fun b => (b, aid)) bytes in
+
+        (* TODO: should we allow provenance to change like this when access is allowed...? *)
+        ret (add_all_index mem_bytes (Z.of_N (sizeof_dtyp dt)) mem).
 
     (** ** Array element lookup
       A [mem_block] can be seen as storing an array of elements of [dtyp] [t], from which we retrieve
