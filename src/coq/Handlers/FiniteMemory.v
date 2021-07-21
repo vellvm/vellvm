@@ -894,7 +894,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     (** ** Reading values from memory *)
     Definition read_memory (bk : memory) (offset : Z) (pr : Prov) (t : dtyp) : ErrSID uvalue :=
       sid <- fresh_sid;;
-      lift_err (deserialize_sbytes (lookup_all_index offset (sizeof_dtyp t) bk (UByte (UVALUE_Undef t) t (UVALUE_IPTR 0) sid)) t).
+      let mem_bytes := lookup_all_index offset (sizeof_dtyp t) bk ((UByte (UVALUE_Undef t) t (UVALUE_IPTR 0) sid), None) in
+      let bytes     := map fst mem_bytes in
+      let alloc_ids := map snd mem_bytes in
+      if all_accesses_allowed pr alloc_ids
+      then lift_err (deserialize_sbytes bytes t)
+      else raise_ub "Read to memory with different provenance.".
+
 
     (** ** Writing values to memory
       Serialize [v] into [SByte]s, and store them in the [mem_block] [bk] starting at [offset].
