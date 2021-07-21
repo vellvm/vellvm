@@ -944,51 +944,51 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         ret (add_all_index mem_bytes (Z.of_N (sizeof_dtyp dt)) mem).
 
     (** ** Array element lookup
-      A [mem_block] can be seen as storing an array of elements of [dtyp] [t], from which we retrieve
+      A [memory] can be seen as storing an array of elements of [dtyp] [t], from which we retrieve
       the [i]th [uvalue].
       The [size] argument has no effect, but we need to provide one to the array type.
      *)
-    Definition get_array_cell (bk : memory) (bk_offset : Z) (i : nat) (size : N) (t : dtyp) : ErrSID uvalue :=
+    Definition get_array_cell_memory (mem : memory) (addr : Z) (pr : Prov) (i : nat) (size : N) (t : dtyp) : ErrSID uvalue :=
       'offset <- lift_err (handle_gep_h (DTYPE_Array size t)
-                                       bk_offset
+                                       addr
                                        [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]);;
-      read_in_mem_block bk offset t.
+      read_memory mem offset pr t.
 
     (** ** Array element writing
-      Treat a [mem_block] as though it is an array storing elements of
+      Treat a [memory] as though it is an array storing elements of
       type [t], and write the value [v] to index [i] in this array.
 
       - [t] should be the type of [v].
       - [size] does nothing, but we need to provide one for the array type.
     *)
-    Definition write_array_cell_mem_block (bk : mem_block) (bk_offset : Z) (i : nat) (size : N) (t : dtyp) (v : uvalue) : ErrSID mem_block :=
+    Definition write_array_cell_memory (mem : memory) (addr : Z) (aid : AllocationId) (i : nat) (size : N) (t : dtyp) (v : uvalue) : ErrSID memory :=
       'offset <- lift_err (handle_gep_h (DTYPE_Array size t)
-                                       bk_offset
+                                       addr
                                        [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]);;
-      write_to_mem_block bk offset v t.
+      write_memory mem offset aid v t.
 
     (** ** Array lookups -- mem_block
-      Retrieve the values stored at position [from] to position [from + len - 1] in an array stored in a [mem_block].
+      Retrieve the values stored at position [from] to position [from + len - 1] in an array stored in a [memory].
      *)
-    Definition get_array_mem_block (bk : mem_block) (bk_offset : Z) (from len : nat) (size : N) (t : dtyp) : ErrSID (list uvalue) :=
-      map_monad (fun i => get_array_cell_mem_block bk bk_offset i size t) (seq from len).
+    Definition get_array_memory (mem : memory) (addr : Z) (pr : Prov) (from len : nat) (size : N) (t : dtyp) : ErrSID (list uvalue) :=
+      map_monad (fun i => get_array_cell_memory mem addr pr i size t) (seq from len).
 
     (** ** Array writes -- mem_block
-      Write all of the values in [vs] to an array stored in a [mem_block], starting from index [from].
+      Write all of the values in [vs] to an array stored in a [memory], starting from index [from].
 
       - [t] should be the type of each [v] in [vs]
      *)
-    Fixpoint write_array_mem_block' (bk : mem_block) (bk_offset : Z) (i : nat) (size : N) (t : dtyp) (vs : list uvalue) : ErrSID mem_block :=
+    Fixpoint write_array_memory' (mem : memory) (addr : Z) (aid : AllocationId) (i : nat) (size : N) (t : dtyp) (vs : list uvalue) : ErrSID memory :=
       match vs with
-      | []       => ret bk
+      | []       => ret mem
       | (v :: vs) =>
-        bk' <- write_array_cell_mem_block bk bk_offset i size t v;;
-        write_array_mem_block' bk' bk_offset (S i) size t vs
+        mem' <- write_array_cell_memory mem addr aid i size t v;;
+        write_array_memory' mem' addr aid (S i) size t vs
       end.
 
-    Definition write_array_mem_block (bk : mem_block) (bk_offset : Z) (from : nat) (t : dtyp) (vs : list uvalue) : ErrSID mem_block :=
+    Definition write_array_mem_block (mem : memory) (addr : Z) (aid : AllocationId) (from : nat) (t : dtyp) (vs : list uvalue) : ErrSID memory :=
       let size := (N.of_nat (length vs)) in
-      write_array_mem_block' bk bk_offset from size t vs.
+      write_array_memory' mem addr aid from size t vs.
 
   End Logical_Operations.
 
