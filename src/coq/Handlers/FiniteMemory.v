@@ -109,7 +109,7 @@ Inductive is_supported : dtyp -> Prop :=
 Definition Iptr := Z. (* Integer pointer type (physical addresses) *)
 
 Definition Provenance := N.
-Definition AllocationId := Provenance.
+Definition AllocationId := option Provenance. (* None is wildcard *)
 
 (* TODO: Should probably make this an NSet, but it gives universe inconsistency with Module addr *)
 Definition Prov := option (list Provenance). (* Provenance *)
@@ -119,8 +119,15 @@ Definition access_allowed (pr : Prov) (aid : AllocationId) : bool
   := match pr with
      | None => true (* Wildcard can access anything. *)
      | Some prset =>
-       existsb (N.eqb aid) prset
+       match aid with
+       | None => true (* Wildcard, can be accessed by anything. *)
+       | Some aid =>
+         existsb (N.eqb aid) prset
+       end
      end.
+
+Definition all_accesses_allowed (pr : Prov) (aids : list AllocationId) : bool
+  := forallb (access_allowed pr) aids.
 
 Definition wildcard_prov : Prov := None.
 Definition nil_prov : Prov := Some [].
@@ -181,7 +188,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       i.e. when the function returns.
       A [frame_stack] is a list of such frames.
      *)
-    Definition mem_frame := list AllocationId.
+    Definition mem_frame := list Provenance.
     Inductive frame_stack : Type := | Singleton (f : mem_frame) | Snoc (s : frame_stack) (f : mem_frame).
     (* Definition frame_stack := list mem_frame. *)
 
@@ -460,7 +467,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
     Import StateMonad.
     (* Need failure, UB, state for store_ids, and state for provenances *)
-    Definition ErrSID := eitherT string (eitherT string (stateT store_id (state AllocationId))).
+    Definition ErrSID := eitherT string (eitherT string (stateT store_id (state Provenance))).
 
     Definition lift_err {M A} `{MonadExc string M} `{Monad M} (e : err A) : (M A)
         := match e with
@@ -468,14 +475,18 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          | inr x => ret x
          end.
 
-    Definition evalErrSID {A} (m : ErrSID A) (sid : store_id) (aid : AllocationId) : err (err A)
-      := evalState (evalStateT (unEitherT (unEitherT m)) sid) aid.
+    Definition evalErrSID {A} (m : ErrSID A) (sid : store_id) (prov : Provenance) : err (err A)
+      := evalState (evalStateT (unEitherT (unEitherT m)) sid) prov.
 
     Definition fresh_sid : ErrSID store_id
       := lift (lift (modify N.succ)).
 
-    Definition fresh_allocation_id : ErrSID AllocationId
+    Definition fresh_provenance : ErrSID Provenance
       := lift (lift (lift (modify N.succ))).
+
+    Definition fresh_allocation_id : ErrSID AllocationId
+      := prov <- fresh_provenance;;
+         ret (Some prov).
 
     Definition raise_error {A} (msg : string) : ErrSID A
       := MonadExc.raise msg.
@@ -879,7 +890,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition SUndef : ErrSID SByte :=
       sid <- fresh_sid;;
       ret (UByte (UVALUE_Undef DTYPE_Void) DTYPE_Void (UVALUE_IPTR 0) sid).
-
 
     (** ** Reading values from memory *)
     Definition read_memory (bk : memory) (offset : Z) (pr : Prov) (t : dtyp) : ErrSID uvalue :=
