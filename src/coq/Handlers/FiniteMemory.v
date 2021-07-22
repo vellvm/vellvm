@@ -50,6 +50,7 @@ From Vellvm Require Import
      Semantics.DynamicValues
      Semantics.Denotation
      Semantics.MemoryAddress
+     Semantics.Memory.Sizeof
      Semantics.LLVMEvents.
 
 Require Import Ceres.Ceres.
@@ -725,95 +726,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 (*    Will probably need an equivalence relation on UVALUEs, likely won't *)
 (*    end up with a round-trip property with regular equality... *)
 (* *) *)
-
-    Definition default_dvalue_of_dtyp_i (sz : N) : err dvalue:=
-      (if (sz =? 64)%N then ret (DVALUE_I64 (repr 0))
-        else if (sz =? 32)%N then ret (DVALUE_I32 (repr 0))
-            else if (sz =? 8)%N then ret (DVALUE_I8 (repr 0))
-                  else if (sz =? 1)%N then ret (DVALUE_I1 (repr 0))
-                       else failwith
-              "Illegal size for generating default dvalue of DTYPE_I").
-
-
-    (* Handler for PickE which concretizes everything to 0 *)
-    Fixpoint default_dvalue_of_dtyp (dt : dtyp) : err dvalue :=
-      match dt with
-      | DTYPE_I sz => default_dvalue_of_dtyp_i sz
-      | DTYPE_IPTR => ret (DVALUE_IPTR 0)
-      | DTYPE_Pointer => ret (DVALUE_Addr Addr.null)
-      | DTYPE_Void => ret DVALUE_None
-      | DTYPE_Half => failwith "Unimplemented default type: half"
-      | DTYPE_Float => ret (DVALUE_Float Float32.zero)
-      | DTYPE_Double => ret (DVALUE_Double (Float32.to_double Float32.zero))
-      | DTYPE_X86_fp80 => failwith "Unimplemented default type: x86_fp80"
-      | DTYPE_Fp128 => failwith "Unimplemented default type: fp128"
-      | DTYPE_Ppc_fp128 => failwith "Unimplemented default type: ppc_fp128"
-      | DTYPE_Metadata => failwith "Unimplemented default type: metadata"
-      | DTYPE_X86_mmx => failwith "Unimplemented default type: x86_mmx"
-      | DTYPE_Opaque => failwith "Unimplemented default type: opaque"
-      | DTYPE_Array sz t =>
-        if (0 <=? sz)%N then
-          v <- default_dvalue_of_dtyp t ;;
-          (ret (DVALUE_Array (repeat v (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-          "of DTYPE_Array or DTYPE_Vector")
-
-      (* Matching valid Vector types... *)
-      (* Currently commented out unsupported ones *)
-      (* | DTYPE_Vector sz (DTYPE_Half) => *)
-      (*   if (0 <=? sz) then *)
-      (*     (ret (DVALUE_Vector *)
-      (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
-      (*   else *)
-      (*     failwith ("Negative array length for generating default value" ++ *)
-      (*     "of DTYPE_Array or DTYPE_Vector") *)
-      | DTYPE_Vector sz (DTYPE_Float) =>
-        if (0 <=? sz)%N then
-          (ret (DVALUE_Vector
-                  (repeat (DVALUE_Float Float32.zero) (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-          "of DTYPE_Array or DTYPE_Vector")
-      | DTYPE_Vector sz (DTYPE_Double) =>
-        if (0 <=? sz)%N then
-          (ret (DVALUE_Vector
-                  (repeat (DVALUE_Double (Float32.to_double Float32.zero))
-                          (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-          "of DTYPE_Array or DTYPE_Vector")
-      (* | DTYPE_Vector sz (DTYPE_X86_fp80) => *)
-      (*   if (0 <=? sz) then *)
-      (*     (ret (DVALUE_Vector *)
-      (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
-      (*   else *)
-      (*     failwith ("Negative array length for generating default value" ++ *)
-      (*     "of DTYPE_Array or DTYPE_Vector") *)
-      (* | DTYPE_Vector sz (DTYPE_Fp128) => *)
-      (*   if (0 <=? sz) then *)
-      (*     (ret (DVALUE_Vector *)
-      (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
-      (*   else *)
-      (*     failwith ("Negative array length for generating default value" ++ *)
-      (*     "of DTYPE_Array or DTYPE_Vector") *)
-      | DTYPE_Vector sz (DTYPE_I n) =>
-        if (0 <=? sz)%N then
-          v <- default_dvalue_of_dtyp_i n ;;
-          (ret (DVALUE_Vector (repeat v (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-          "of DTYPE_Array or DTYPE_Vector")
-      | DTYPE_Vector _ _ => failwith ("Non-valid vector type when" ++
-          "generating default vector")
-      | DTYPE_Struct fields =>
-        v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
-        ret (DVALUE_Struct v)
-      | DTYPE_Packed_struct fields =>
-        v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
-        ret (DVALUE_Packed_struct v)
-      end.
-
 
   End Serialization.
 

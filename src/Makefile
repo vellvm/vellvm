@@ -20,8 +20,8 @@ CP=cp
 
 COQFILESNUMERIC := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats
 
-COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/ListUtil Utils/Error\
-		Utils/PropT Utils/PostConditions Utils/NoFailure Utils/TFor Utils/NonEmpty Utils/Default\
+COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/ListUtil Utils/IntMaps Utils/NMaps Utils/Error\
+		Utils/Monads Utils/PropT Utils/PostConditions Utils/NoFailure Utils/TFor Utils/NonEmpty Utils/Default\
 		Utilities
 
 COQFILESSYNTAX := Syntax/DataLayout Syntax/LLVMAst Syntax/AstLib Syntax/CFG\

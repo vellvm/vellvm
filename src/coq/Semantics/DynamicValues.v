@@ -28,6 +28,7 @@ From ExtLib Require Import
 From Vellvm Require Import
      Utilities
      Syntax
+     Syntax.DataLayout
      Semantics.MemoryAddress.
 
 Require Import Integers Floats.
@@ -683,51 +684,6 @@ Section DecidableEquality.
   #[global] Instance eqv_dvalue : Eqv dvalue := (@eq dvalue).
   Hint Unfold eqv_dvalue : core.
 
-	Lemma dtyp_eq_dec : forall (t1 t2:dtyp), {t1 = t2} + {t1 <> t2}.
-    refine (fix f t1 t2 :=
-              let lsteq_dec := list_eq_dec f in
-              match t1, t2 with
-              | DTYPE_I n, DTYPE_I m => _
-              | DTYPE_IPTR , DTYPE_IPTR => _
-              | DTYPE_Pointer, DTYPE_Pointer => _
-              | DTYPE_Void, DTYPE_Void => _
-              | DTYPE_Half, DTYPE_Half => _
-              | DTYPE_Float, DTYPE_Float => _
-              | DTYPE_Double, DTYPE_Double => _
-              | DTYPE_Fp128, DTYPE_Fp128 => _
-              | DTYPE_X86_fp80, DTYPE_X86_fp80 => _
-              | DTYPE_Ppc_fp128, DTYPE_Ppc_fp128 => _
-              | DTYPE_Metadata, DTYPE_Metadata => _
-              | DTYPE_X86_mmx, DTYPE_X86_mmx => _
-              | DTYPE_Array n t, DTYPE_Array m t' => _
-              | DTYPE_Struct l, DTYPE_Struct l' => _
-              | DTYPE_Packed_struct l, DTYPE_Packed_struct l' => _
-              | DTYPE_Opaque, DTYPE_Opaque => _
-              | DTYPE_Vector n t, DTYPE_Vector m t' => _
-              | _, _ => _
-              end); try (ltac:(dec_dvalue); fail).
-    - destruct (N.eq_dec n m).
-      * left; subst; reflexivity.
-      * right; intros H; inversion H. contradiction.
-    - destruct (N.eq_dec n m).
-      * destruct (f t t').
-      + left; subst; reflexivity.
-      + right; intros H; inversion H. contradiction.
-        * right; intros H; inversion H. contradiction.
-    - destruct (lsteq_dec l l').
-      * left; subst; reflexivity.
-      * right; intros H; inversion H. contradiction.
-    - destruct (lsteq_dec l l').
-      * left; subst; reflexivity.
-      * right; intros H; inversion H. contradiction.
-    - destruct (N.eq_dec n m).
-      * destruct (f t t').
-      + left; subst; reflexivity.
-      + right; intros H; inversion H. contradiction.
-        * right; intros H; inversion H. contradiction.
-  Qed.
-  Arguments dtyp_eq_dec: clear implicits.
-
  Lemma ibinop_eq_dec : forall (op1 op2:ibinop), {op1 = op2} + {op1 <> op2}.
     intros.
     repeat decide equality.
@@ -1156,6 +1112,27 @@ Class VInt I : Type :=
 
     repr := Int64.repr;
   }.
+
+  (* Is a uvalue a concrete integer equal to i? *)
+  Definition uvalue_int_eq_Z (uv : uvalue) (i : Z)
+    := match uv with
+       | UVALUE_I1 x
+       | UVALUE_I8 x
+       | UVALUE_I32 x
+       | UVALUE_I64 x => Z.eqb (unsigned x) i
+       | UVALUE_IPTR x => Z.eqb x i
+       | _ => false
+       end.
+
+  Definition dvalue_int_unsigned (dv : dvalue) : Z
+    := match dv with
+       | DVALUE_I1 x => unsigned x
+       | DVALUE_I8 x => unsigned x
+       | DVALUE_I32 x => unsigned x
+       | DVALUE_I64 x => unsigned x
+       | DVALUE_IPTR x => x (* TODO: unsigned???? *)
+       | _ => 0
+       end.
 
   (* Check if this is an instruction which can trigger UB with division by 0. *)
   Definition iop_is_div (iop : ibinop) : bool :=
@@ -1939,7 +1916,7 @@ Class VInt I : Type :=
                    (dv1 <- e1 ;;
                     dv2 <- e2 ;;
                     (eval_iop iop dv1 dv2))
-  
+                   
   | Concretize_ICmp : forall cmp uv1 e1 uv2 e2 ,
       concretize_u uv1 e1 ->
       concretize_u uv2 e2 ->
@@ -2019,5 +1996,5 @@ Class VInt I : Type :=
   .
 
   Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
-  
-End DVALUE.
+    
+  End DVALUE.

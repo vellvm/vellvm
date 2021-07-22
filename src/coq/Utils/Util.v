@@ -1661,3 +1661,5 @@ Proof.
       auto.
 Qed.
 
+Definition guard_opt (x : bool) : option unit
+  := if x then Some tt else None.

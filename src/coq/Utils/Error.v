@@ -96,3 +96,5 @@ constructor.
   destruct s0; [reflexivity | rewrite H0; reflexivity].
   destruct s0; [reflexivity | rewrite H0; reflexivity].
 Qed.
+
+

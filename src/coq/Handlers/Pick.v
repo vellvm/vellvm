@@ -162,57 +162,6 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
     Import MonadNotation.
 
-    Section Concretize.
-
-      Variable endianess : Endianess.
-      Fixpoint concretize_uvalue (u : uvalue) : undef_or_err dvalue :=
-        match u with
-        | UVALUE_Addr a                          => ret (DVALUE_Addr a)
-        | UVALUE_I1 x                            => ret (DVALUE_I1 x)
-        | UVALUE_I8 x                            => ret (DVALUE_I8 x)
-        | UVALUE_I32 x                           => ret (DVALUE_I32 x)
-        | UVALUE_I64 x                           => ret (DVALUE_I64 x)
-        | UVALUE_IPTR x                          => ret (DVALUE_IPTR x)
-        | UVALUE_Double x                        => ret (DVALUE_Double x)
-        | UVALUE_Float x                         => ret (DVALUE_Float x)
-        | UVALUE_Undef t                         => lift (default_dvalue_of_dtyp t)
-        | UVALUE_Poison                          => ret (DVALUE_Poison)
-        | UVALUE_None                            => ret DVALUE_None
-        | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalue fields ;;
-                                                   ret (DVALUE_Struct dfields)
-        | UVALUE_Packed_struct fields            => 'dfields <- map_monad concretize_uvalue fields ;;
-                                                   ret (DVALUE_Packed_struct dfields)
-        | UVALUE_Array elts                      => 'delts <- map_monad concretize_uvalue elts ;;
-                                                   ret (DVALUE_Array delts)
-        | UVALUE_Vector elts                     => 'delts <- map_monad concretize_uvalue elts ;;
-                                                   ret (DVALUE_Vector delts)
-        | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalue v1 ;;
-                                                   dv2 <- concretize_uvalue v2 ;;
-                                                   eval_iop iop dv1 dv2
-        | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
-                                                   dv2 <- concretize_uvalue v2 ;;
-                                                   eval_icmp cmp dv1 dv2
-        | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalue v1 ;;
-                                                   dv2 <- concretize_uvalue v2 ;;
-                                                   eval_fop fop dv1 dv2
-        | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
-                                                   dv2 <- concretize_uvalue v2 ;;
-                                                   eval_fcmp cmp dv1 dv2
-        | UVALUE_ConcatBytes bytes dt =>
-          match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
-          | true, Some uv => concretize_uvalue uv
-          | _, _ => UVALUE_ConcatBytes (map ubyte_to_extractbyte bytes) dt
-          end
-
-        | UVALUE_ExtractByte byte idx =>
-          (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
-          lift (failwith "Attempting to concretize UVALUE_ExtractByte, should not happen.")
-        | _ => (lift (failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"))
-                
-        end.
-
-    End Concretize.
-
     Ltac do_it := constructor; cbn; auto; fail.
 
     Lemma forall_repeat_true:

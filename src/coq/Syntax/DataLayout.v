@@ -9,29 +9,10 @@ From Coq Require Import
 
 From Vellvm Require Import
      Utils.NonEmpty
-     Utils.Default.
+     Utils.Default
+     Utils.NMaps.
 
 Import ListNotations.
-
-(* N maps *)
-Module NM := FMapAVL.Make(Coq.Structures.OrderedTypeEx.N_as_OT).
-Definition NMap := NM.t.
-
-Fixpoint NM_from_list {A} (kvs : list (N * A)) : NMap A
-  := match kvs with
-     | [] => @NM.empty _
-     | ((k, v)::xs) => @NM.add _ k v (NM_from_list xs)
-     end.
-
-(* N sets *)
-Module NS := FSetAVL.Make(Coq.Structures.OrderedTypeEx.N_as_OT).
-Definition NSet := NS.t.
-
-Fixpoint NS_from_list (kvs : list N) : NSet
-  := match kvs with
-     | [] => NS.empty
-     | (x::xs) => NS.add x (NS_from_list xs)
-     end.
 
 (* Memory model layout information... *)
 Variant Alignment : Type :=
