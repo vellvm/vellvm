@@ -129,6 +129,28 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     | Conv_PtoI (x : dvalue)
     | Conv_Illegal (s: string).
 
+    Variant ptr_conv_cases : Set :=
+    | PtrConv_ItoP
+    | PtrConv_PtoI
+    | PtrConv_Neither.
+
+    Definition get_conv_case_ptr conv (t1 : dtyp) (t2 : dtyp) : ptr_conv_cases
+      := match conv with
+         | Inttoptr =>
+           match t1, t2 with
+           | DTYPE_I 64, DTYPE_Pointer => PtrConv_ItoP
+           | DTYPE_IPTR, DTYPE_Pointer => PtrConv_ItoP
+           | _, _ => PtrConv_Neither
+           end
+         | Ptrtoint =>
+           match t1, t2 with
+           | DTYPE_Pointer, DTYPE_I _ => PtrConv_PtoI
+           | DTYPE_Pointer, DTYPE_IPTR => PtrConv_PtoI
+           | _, _ => PtrConv_Neither
+           end
+         | _ => PtrConv_Neither
+         end.
+
     Definition get_conv_case conv (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
       match conv with
       | Trunc =>
@@ -290,22 +312,23 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       end.
     Arguments get_conv_case _ _ _ _ : simpl nomatch.
 
-    Definition eval_conv_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
+    
+
+    Definition eval_conv_pure_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
       match get_conv_case conv t1 x t2 with
       | Conv_Pure x => ret x
-      | Conv_ItoP x => trigger (ItoP x)
-      | Conv_PtoI x => trigger (PtoI t2 x)
       | Conv_Illegal s => raise s
+      | _ => raise "Non-pure conversion..."
       end.
 
-    Definition eval_conv (conv : conversion_type) (t1 : dtyp) (x : dvalue) (t2:dtyp) : itree conv_E dvalue :=
+    Definition eval_conv_pure (conv : conversion_type) (t1 : dtyp) (x : dvalue) (t2:dtyp) : itree conv_E dvalue :=
       match t1, x with
       | DTYPE_Vector s t, (DVALUE_Vector elts) =>
         (* In the future, implement bitcast and etc with vectors *)
         raise "vectors unimplemented"
-      | _, _ => eval_conv_h conv t1 x t2
+      | _, _ => eval_conv_pure_h conv t1 x t2
       end.
-    Arguments eval_conv _ _ _ _ : simpl nomatch.
+    Arguments eval_conv_pure _ _ _ _ : simpl nomatch.
 
   End CONVERSIONS.
 
@@ -519,13 +542,18 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             (fun v1 v2 => lift_undef_or_err ret (fmap dvalue_to_uvalue (eval_fcmp fcmp v1 v2)))
             v1 v2
 
-        | OP_Conversion conv dt1 op t2 =>
+        | OP_Conversion conv dt1 op dt2 =>
           v <- denote_exp (Some dt1) op ;;
-          uvalue_to_dvalue_uop
-            (fun v => ret (UVALUE_Conversion conv v t2))
-            (fun v => translate conv_to_exp
-                             (fmap dvalue_to_uvalue (eval_conv conv dt1 v t2)))
-            v
+          match get_conv_case_ptr conv dt1 dt2 with
+          | PtrConv_ItoP => trigger (ItoP v)
+          | PtrConv_PtoI => trigger (PtoI dt2 v)
+          | PtrConv_Neither =>
+            uvalue_to_dvalue_uop
+              (fun v => ret (UVALUE_Conversion conv v dt2))
+              (fun v => translate conv_to_exp
+                               (fmap dvalue_to_uvalue (eval_conv_pure conv dt1 v dt2)))
+              v
+          end
 
         (* CB TODO: Do we actually need to pick here? GEP doesn't do any derefs. Does it make sense to leave it as a UVALUE? *)
         (* CB TODO: This is probably not what we want in the long term!
@@ -582,12 +610,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           in
 
           match maybe_dvs with
-          | inr (dvptr, dvs) => fmap dvalue_to_uvalue (trigger (GEP dt1 dvptr dvs))
+          | inr (dvptr, dvs) =>
+            trigger (GEP dt1 (dvalue_to_uvalue dvptr) (fmap dvalue_to_uvalue dvs))
           | inl _ =>
-            (* Pick to get dvalues *)
-            dvptr <- concretize_or_pick vptr True ;;
-            dvs <- map_monad (fun v => concretize_or_pick v True) vs ;;
-            fmap dvalue_to_uvalue (trigger (GEP dt1 dvptr dvs))
+            (* Nondeterministic GEP *)
+            trigger (GEP dt1 vptr vs)
           end
 
         | OP_ExtractElement vecop idx =>
@@ -654,33 +681,29 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         (* Pure operations *)
 
         | (IId id, INSTR_Op op) =>
-          dv <- translate exp_to_instr (denote_op op) ;;
-          trigger (LocalWrite id dv)
+          uv <- translate exp_to_instr (denote_op op) ;;
+          trigger (LocalWrite id uv)
 
         (* Allocation *)
         | (IId id, INSTR_Alloca dt _ _) =>
-          dv <- trigger (Alloca dt);;
-          trigger (LocalWrite id (dvalue_to_uvalue dv))
+          uv <- trigger (Alloca dt);;
+          trigger (LocalWrite id uv)
 
         (* Load *)
         | (IId id, INSTR_Load _ dt (du,ptr) _) =>
           ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
-          da <- concretize_or_pick ua True ;;
-          match da with
-          | DVALUE_Poison => raiseUB "Load from poisoned address."
-          | _ => dv <- trigger (Load dt da);;
-                trigger (LocalWrite id dv)
-          end
+          uv <- trigger (Load dt ua);;
+          trigger (LocalWrite id uv)
 
         (* Store *)
         | (IVoid _, INSTR_Store _ (dt, val) (du, ptr) _) =>
           uv <- translate exp_to_instr (denote_exp (Some dt) val) ;;
-          dv <- concretize_or_pick uv True ;;
           ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
+          (* TODO: should I make sure address is unique here...? *)
           da <- pickUnique ua ;;
           match da with
           | DVALUE_Poison => raiseUB "Store to poisoned address."
-          | _ => trigger (Store da dv)
+          | _ => trigger (Store da uv)
           end
 
         | (_, INSTR_Store _ _ _ _) => raise "ILL-FORMED itree ERROR: Store to non-void ID"
