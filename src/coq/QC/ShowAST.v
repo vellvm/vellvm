@@ -124,10 +124,10 @@ Section ShowInstances.
     := {| show := show_icmp |}.
 
   Definition double_to_hex_string (f : float) : string
-    := "0x" ++ NilEmpty.string_of_int (Z.to_hex_int (Int64.unsigned (Float.to_bits f))).
+    := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (Int64.unsigned (Float.to_bits f)))).
 
   Definition float_to_hex_string (f : float32) : string
-    := "0x" ++ NilEmpty.string_of_int (Z.to_hex_int (Int.unsigned (Float32.to_bits f))).
+    := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (Int.unsigned (Float32.to_bits f)))).
 
   Global Instance showFloat : Show float
     := {| show := double_to_hex_string |}.
