@@ -22,7 +22,7 @@ Import ListNotations.
 Import MonadNotation.
 
 From Coq Require Import
-     ZArith List String Lia Bool.Bool.
+     ZArith List String Lia Bool.Bool Hexadecimal Numbers.HexadecimalString Numbers.HexadecimalZ.
 
 Section ShowInstances.
   Definition show_raw_id (rid : raw_id) : string
@@ -123,10 +123,24 @@ Section ShowInstances.
   Global Instance showICmp : Show icmp
     := {| show := show_icmp |}.
 
+  Definition double_to_hex_string (f : float) : string
+    := "0x" ++ NilEmpty.string_of_int (Z.to_hex_int (Int64.unsigned (Float.to_bits f))).
+
+  Definition float_to_hex_string (f : float32) : string
+    := "0x" ++ NilEmpty.string_of_int (Z.to_hex_int (Int.unsigned (Float32.to_bits f))).
+
+  Global Instance showFloat : Show float
+    := {| show := double_to_hex_string |}.
+
+  Global Instance showFloat32 : Show float32
+    := {| show := float_to_hex_string |}.
+
   Fixpoint show_exp (v : exp typ) :=
       match v with
       | EXP_Ident id => show id
       | EXP_Integer x => show x
+      | EXP_Float f => show f
+      | EXP_Double f => show f
       | EXP_Bool b => show b
       | EXP_Null => "null"
       | EXP_Zero_initializer => "zero initializer"
