@@ -24,7 +24,9 @@ From Vellvm Require Import
      Syntax.DataLayout
      Semantics.DynamicValues
      Semantics.MemoryAddress
-     Semantics.LLVMEvents.
+     Semantics.Memory.Sizeof
+     Semantics.LLVMEvents
+     Handlers.Serialization.
 
 Require Import List.
 Require Import Floats.
@@ -41,7 +43,10 @@ Import MonadNotation.
   - The executable one interprets [undef] as 0 at the type  
 *)
 
-Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
+Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A))(SIZEOF: Sizeof)(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE)).
+
+  Module SER := Serialization.Make(A)(LLVMIO)(SIZEOF)(PTOI)(PROVENANCE)(ITOP).
+  Import SER.
 
   Import LLVMIO.
 
@@ -285,70 +290,71 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
       intros u.
       induction u; try do_it.
       - cbn. destruct (default_dvalue_of_dtyp t) eqn: EQ.
-        econstructor. Unshelve. 3 : { exact DVALUE_None. }
-        intro. inv H.
-        apply Concretize_Undef. apply dvalue_default. symmetry. auto.
-      - cbn. induction fields.
-        + cbn. constructor. auto.
-        + rewrite list_cons_app. rewrite map_monad_app. cbn.
-          assert (IN: forall u : uvalue, In u fields -> concretize_u u (concretize_uvalue u)).
-          { intros. apply H. apply in_cons; auto. } specialize (IHfields IN).
-          specialize (H a). assert (In a (a :: fields)) by apply in_eq. specialize (H H0).
-          pose proof Concretize_Struct_Cons as CONS.
-          specialize (CONS _ _ _ _ H IHfields). cbn in CONS.
-          * destruct (unEitherT (concretize_uvalue a)).
-            -- auto.
-            -- destruct s; auto.
-               destruct (unEitherT (map_monad concretize_uvalue fields)); auto.
-               destruct s; auto.
-      - cbn. induction fields.
-        + cbn. constructor. auto.
-        + rewrite list_cons_app. rewrite map_monad_app. cbn.
-          assert (IN: forall u : uvalue, In u fields -> concretize_u u (concretize_uvalue u)).
-          { intros. apply H. apply in_cons; auto. } specialize (IHfields IN).
-          specialize (H a). assert (In a (a :: fields)) by apply in_eq. specialize (H H0).
-          pose proof Concretize_Packed_struct_Cons as CONS.
-          specialize (CONS _ _ _ _ H IHfields). cbn in CONS.
-          * destruct (unEitherT (concretize_uvalue a)).
-            -- auto.
-            -- destruct s; auto.
-               destruct (unEitherT (map_monad concretize_uvalue fields)); auto.
-               destruct s; auto.
-      - cbn. induction elts.
-        + cbn. constructor. auto.
-        + rewrite list_cons_app. rewrite map_monad_app. cbn.
-          assert (IN: forall u : uvalue, In u elts -> concretize_u u (concretize_uvalue u)).
-          { intros. apply H. apply in_cons; auto. } specialize (IHelts IN).
-          specialize (H a). assert (In a (a :: elts)) by apply in_eq. specialize (H H0).
-          pose proof Concretize_Array_Cons as CONS.
-          specialize (CONS _ _ _ _ H IHelts). cbn in CONS.
-          * destruct (unEitherT (concretize_uvalue a)).
-            -- auto.
-            -- destruct s; auto.
-               destruct (unEitherT (map_monad concretize_uvalue elts)); auto.
-               destruct s; auto.
-      - cbn. induction elts.
-        + cbn. constructor. auto.
-        + rewrite list_cons_app. rewrite map_monad_app. cbn.
-          assert (IN: forall u : uvalue, In u elts -> concretize_u u (concretize_uvalue u)).
-          { intros. apply H. apply in_cons; auto. } specialize (IHelts IN).
-          specialize (H a). assert (In a (a :: elts)) by apply in_eq. specialize (H H0).
-          pose proof Concretize_Vector_Cons as CONS.
-          specialize (CONS _ _ _ _ H IHelts). cbn in CONS.
-          * destruct (unEitherT (concretize_uvalue a)).
-            -- auto.
-            -- destruct s; auto.
-               destruct (unEitherT (map_monad concretize_uvalue elts)); auto.
-               destruct s; auto.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-      - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'.
-    Qed.
+    (*     econstructor. Unshelve. 3 : { exact DVALUE_None. } *)
+    (*     intro. inv H. *)
+    (*     apply Concretize_Undef. apply dvalue_default. symmetry. auto. *)
+    (*   - cbn. induction fields. *)
+    (*     + cbn. constructor. auto. *)
+    (*     + rewrite list_cons_app. rewrite map_monad_app. cbn. *)
+    (*       assert (IN: forall u : uvalue, In u fields -> concretize_u u (concretize_uvalue u)). *)
+    (*       { intros. apply H. apply in_cons; auto. } specialize (IHfields IN). *)
+    (*       specialize (H a). assert (In a (a :: fields)) by apply in_eq. specialize (H H0). *)
+    (*       pose proof Concretize_Struct_Cons as CONS. *)
+    (*       specialize (CONS _ _ _ _ H IHfields). cbn in CONS. *)
+    (*       * destruct (unEitherT (concretize_uvalue a)). *)
+    (*         -- auto. *)
+    (*         -- destruct s; auto. *)
+    (*            destruct (unEitherT (map_monad concretize_uvalue fields)); auto. *)
+    (*            destruct s; auto. *)
+    (*   - cbn. induction fields. *)
+    (*     + cbn. constructor. auto. *)
+    (*     + rewrite list_cons_app. rewrite map_monad_app. cbn. *)
+    (*       assert (IN: forall u : uvalue, In u fields -> concretize_u u (concretize_uvalue u)). *)
+    (*       { intros. apply H. apply in_cons; auto. } specialize (IHfields IN). *)
+    (*       specialize (H a). assert (In a (a :: fields)) by apply in_eq. specialize (H H0). *)
+    (*       pose proof Concretize_Packed_struct_Cons as CONS. *)
+    (*       specialize (CONS _ _ _ _ H IHfields). cbn in CONS. *)
+    (*       * destruct (unEitherT (concretize_uvalue a)). *)
+    (*         -- auto. *)
+    (*         -- destruct s; auto. *)
+    (*            destruct (unEitherT (map_monad concretize_uvalue fields)); auto. *)
+    (*            destruct s; auto. *)
+    (*   - cbn. induction elts. *)
+    (*     + cbn. constructor. auto. *)
+    (*     + rewrite list_cons_app. rewrite map_monad_app. cbn. *)
+    (*       assert (IN: forall u : uvalue, In u elts -> concretize_u u (concretize_uvalue u)). *)
+    (*       { intros. apply H. apply in_cons; auto. } specialize (IHelts IN). *)
+    (*       specialize (H a). assert (In a (a :: elts)) by apply in_eq. specialize (H H0). *)
+    (*       pose proof Concretize_Array_Cons as CONS. *)
+    (*       specialize (CONS _ _ _ _ H IHelts). cbn in CONS. *)
+    (*       * destruct (unEitherT (concretize_uvalue a)). *)
+    (*         -- auto. *)
+    (*         -- destruct s; auto. *)
+    (*            destruct (unEitherT (map_monad concretize_uvalue elts)); auto. *)
+    (*            destruct s; auto. *)
+    (*   - cbn. induction elts. *)
+    (*     + cbn. constructor. auto. *)
+    (*     + rewrite list_cons_app. rewrite map_monad_app. cbn. *)
+    (*       assert (IN: forall u : uvalue, In u elts -> concretize_u u (concretize_uvalue u)). *)
+    (*       { intros. apply H. apply in_cons; auto. } specialize (IHelts IN). *)
+    (*       specialize (H a). assert (In a (a :: elts)) by apply in_eq. specialize (H H0). *)
+    (*       pose proof Concretize_Vector_Cons as CONS. *)
+    (*       specialize (CONS _ _ _ _ H IHelts). cbn in CONS. *)
+    (*       * destruct (unEitherT (concretize_uvalue a)). *)
+    (*         -- auto. *)
+    (*         -- destruct s; auto. *)
+    (*            destruct (unEitherT (map_monad concretize_uvalue elts)); auto. *)
+    (*            destruct s; auto. *)
+    (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
+    (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
+    (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
+    (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
+    (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
+    (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
+    (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
+    (*   - cbn; apply (Pick_fail (v := DVALUE_None)); intro H'; inv H'. *)
+        (* Qed. *)
+    Admitted.
 
     Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} : PickE ~> itree E :=
       fun T p => match p with

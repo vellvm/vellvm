@@ -1095,7 +1095,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         '(m',a) <- lift_pure_err (allocate m t);;
         ret (m', DVALUE_Addr a)
 
-      | Load t dv =>
+      | Load t uv =>
         match dv with
         | DVALUE_Addr ptr =>
           match read m ptr t with

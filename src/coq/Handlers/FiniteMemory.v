@@ -44,6 +44,7 @@ From Vellvm Require Import
      Utils.Error
      Utils.ListUtil
      Utils.IntMaps
+     Utils.NMaps
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
