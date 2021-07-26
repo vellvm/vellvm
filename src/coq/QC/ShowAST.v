@@ -127,13 +127,25 @@ Section ShowInstances.
     := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (Int64.unsigned (Float.to_bits f)))).
 
   Definition float_to_hex_string (f : float32) : string
-    := "0x00000000" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (Int.unsigned (Float32.to_bits f)))).
+    := double_to_hex_string (Float32.to_double f).
 
   Global Instance showFloat : Show float
     := {| show := double_to_hex_string |}.
 
   Global Instance showFloat32 : Show float32
     := {| show := float_to_hex_string |}.
+
+  Definition show_fast_math (fm : fast_math) : string
+    := match fm with
+       | Nnan => "nnan"
+       | Ninf => "ninf"
+       | Nsz => "nsz"
+       | Arcp => "arcp"
+       | Fast => "fast"
+       end.
+
+  Global Instance showFastMatch : Show fast_math
+    := {| show := show_fast_math |}.
 
   Fixpoint show_exp (v : exp typ) :=
       match v with
@@ -150,9 +162,10 @@ Section ShowInstances.
         show iop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
       | OP_FBinop fop fmath t v1 v2 =>
         match fmath with
-        | nil => "show_exp: Need to implement fastmath show instances."
-        | _ =>
+        | nil => 
           show fop ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
+        | _ =>
+          "show_exp: Need to implement fastmath show instances."
         end
       | OP_ICmp cmp t v1 v2 =>
         "icmp " ++ show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
