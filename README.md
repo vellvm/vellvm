@@ -244,6 +244,7 @@ int foo(int x) {
 ```
 
 3. The resulting `.ll` file should look something like this:
+```
 ~/vellvm/tests/c> cat example.ll
 ; ModuleID = 'example.c'
 source_filename = "example.c"
