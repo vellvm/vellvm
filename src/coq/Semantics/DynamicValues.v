@@ -179,7 +179,9 @@ Qed.
 Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
-Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS).
+Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(MEMORY:MEMORYSTATE).
+
+  Import MEMORY.
 
   (* The set of dynamic values manipulated by an LLVM program. *)
  Unset Elimination Schemes.
@@ -249,7 +251,7 @@ Definition store_id := N.
 
 (* The set of dynamic values manipulated by an LLVM program. *)
 Unset Elimination Schemes.
-Inductive uvalue : Set :=
+Inductive uvalue : Type :=
 | UVALUE_Addr (a:A.addr)
 | UVALUE_I1 (x:int1)
 | UVALUE_I8 (x:int8)
@@ -282,6 +284,7 @@ Inductive uvalue : Set :=
    id". *)
 | UVALUE_ExtractByte      (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : store_id)
 | UVALUE_ConcatBytes      (uvs : list uvalue) (dt : dtyp)
+| UVALUE_Load             (t:dtyp) (a:uvalue) (m:memory)
 .
 Set Elimination Schemes.
 
@@ -316,6 +319,7 @@ Section UvalueInd.
   Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
   Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
   Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue), (forall u, In u uvs -> P u) -> P (UVALUE_ConcatBytes uvs dt).
+  Hypothesis IH_Load : forall (dt : dtyp) (ua : uvalue) (m : memory), P ua -> P (UVALUE_Load dt ua m).
 
   Lemma uvalue_ind : forall (uv:uvalue), P uv.
     fix IH 1.
@@ -363,6 +367,8 @@ Section UvalueInd.
         fix IHuvs 1. intros [|u uvs']. intros. inversion H.
         intros u' [<-|Hin]. apply IH. eapply IHuvs. apply Hin.
       }
+    - apply IH_Load.
+      apply IH.
   Qed.
 End UvalueInd.
 
@@ -758,6 +764,7 @@ Section DecidableEquality.
               | UVALUE_Select u v t, UVALUE_Select u' v' t' => _
               | UVALUE_ExtractByte uv dt idx sid, UVALUE_ExtractByte uv' dt' idx' sid' => _
               | UVALUE_ConcatBytes uvs dt, UVALUE_ConcatBytes uvs' dt' => _
+              | UVALUE_Load dt ua m, UVALUE_Load dt' ua' m' => _
               | _, _ => _
               end); try (ltac:(dec_dvalue); fail).
     - destruct (A.eq_dec a1 a2)...
@@ -814,6 +821,9 @@ Section DecidableEquality.
       destruct (dtyp_eq_dec dt dt')...
     - destruct (lsteq_dec uvs uvs')...
       destruct (dtyp_eq_dec dt dt')...
+    - destruct (f ua ua')...
+      destruct (dtyp_eq_dec dt dt')...
+      destruct (MEMORY.eq_dec m m')...
   Qed.
 
   #[global] Instance eq_dec_uvalue : RelDec (@eq uvalue) := RelDec_from_dec (@eq uvalue) (@uvalue_eq_dec).

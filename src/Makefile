@@ -31,10 +31,10 @@ COQFILESSYNTAX := Syntax/DataLayout Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
 
 COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/DynamicValues Semantics/LLVMEvents\
 		Semantics/IntrinsicsDefinitions\
+		Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
 		Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack\
 		Handlers/Pick Handlers/UndefinedBehaviour Handlers/Memory Handlers/MemoryTheory\
 		Handlers/Handlers\
-		Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
 		Semantics
 
 COQFILESANALYSIS := Analysis/Iteration Analysis/Kildall Analysis/Dom Analysis/DomKildall Analysis/ssa Analysis/DomId 

@@ -124,12 +124,12 @@ Set Contextual Implicit.
     end.
 
 (* TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
-Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
+Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS)(MEMORY : MemoryAddress.MEMORYSTATE).
 
   #[global] Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.eq_dec.
   #[global] Instance Eqv_addr : Eqv ADDR.addr := (@eq ADDR.addr).
 
-  Module DV := DynamicValues.DVALUE(ADDR).
+  Module DV := DynamicValues.DVALUE(ADDR)(MEMORY).
   Export DV.
 
   (* Generic calls, refined by [denote_mcfg] *)
@@ -253,6 +253,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
 End LLVM_INTERACTIONS.
 
-Module Make(ADDR : MemoryAddress.ADDRESS) <: LLVM_INTERACTIONS(ADDR).
-Include LLVM_INTERACTIONS(ADDR).
+Module Make(ADDR : MemoryAddress.ADDRESS)(MEM : MemoryAddress.MEMORYSTATE) <: LLVM_INTERACTIONS(ADDR)(MEM).
+Include LLVM_INTERACTIONS(ADDR)(MEM).
 End Make.

@@ -100,7 +100,7 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
+Module Denotation(A:MemoryAddress.ADDRESS)(MEM:MemoryAddress.MEMORYSTATE)(LLVMEvents:LLVM_INTERACTIONS(A)(MEM)).
   Import LLVMEvents.
 
   Section CONVERSIONS.

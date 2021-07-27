@@ -169,7 +169,7 @@ From Vellvm Require Import
    it until [TopLevel] either.
    So exposing the specialization here, but it is awkward.
  *)
-Module Make (A : ADDRESS) (LLVMEvents : LLVM_INTERACTIONS(A)).
+Module Make (A : ADDRESS)(MEM : MEMORYSTATE)(LLVMEvents : LLVM_INTERACTIONS(A)(MEM)).
   Definition local_env := FMapAList.alist raw_id LLVMEvents.DV.uvalue.
 End Make.
 

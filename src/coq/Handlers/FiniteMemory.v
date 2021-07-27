@@ -152,7 +152,6 @@ Definition nil_prov : Prov := Some [].
 Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type.
   Definition addr := (Iptr * Prov) % type.
   Definition null : addr := (0, nil_prov)%Z.
-  Definition t := addr.
 
   (* TODO: is this what we should be using for equality on pointers? Probably *NOT* because of provenance. *)
   Lemma eq_dec : forall (a b : addr), {a = b} + {a <> b}.
@@ -168,12 +167,19 @@ Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type
   Qed.
 End Addr.
 
+Module Mem : MemoryAddress.MEMORYSTATE.
+  Parameter SByte : Set.
+  Definition memory := IntMap SByte.
+  Lemma eq_dec : forall (a b : memory), {a = b} + {a <> b}.
+  Admitted.
+End Mem.
+
 (** ** Memory model
     Implementation of the memory model, i.e. a handler for [MemoryE].
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
     indexed on [Z].
  *)
-Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
+Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)(Mem)).
   Import LLVMEvents.
   Import DV.
   Open Scope list.
@@ -600,7 +606,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | UVALUE_ShuffleVector _ _ _
        | UVALUE_ExtractValue _ _
        | UVALUE_InsertValue _ _ _
-       | UVALUE_Select _ _ _ =>
+       | UVALUE_Select _ _ _
+       | UVALUE_Load _ _ _ =>
          sid <- fresh_sid;;
          ret (to_ubytes uv dt sid)
 
