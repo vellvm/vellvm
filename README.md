@@ -272,6 +272,9 @@ attributes #0 = { noinline nounwind optnone ssp uwtable "correctly-rounded-divid
 
 4. Edit the `.ll` file to add some assertions about the behavior of the program.  For example, we could add the following three assertions (the last of which is actually incorrect):
 
+ - The syntax for each assertion is a comment of the form: `; ASSERT EQ: <typ> <val> = call <typ> @<fun>(<typ1> arg1, ..., <typN> argN)`
+
+
 ```
 ; ASSERT EQ: i32 0 = call i32 @foo(i32 0)
 ; ASSERT EQ: i32 3 = call i32 @foo(i32 1)
@@ -293,3 +296,5 @@ example:
 Passed: 2/3
 Failed: 1/3
 ```
+
+6. The command `vellvm --test-dir <dir>` will run the `ASSERT`s found in all the `.ll` files in directory `<dir>`.
