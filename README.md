@@ -67,17 +67,17 @@ Syntax, in `src/coq/Syntax/`
 - `CFG.v`     the VIR internal AST as used for the semantics. 
 
 Semantics, in `src/coq/Semantics/`:
-- `DynamicValues.v` definition of the dynamic values and underdefined values **ARTIFACT** discussed in Section 2.2.
-- `LLVMEvents.v`    inventory of all events **ARTIFACT** as described in Section 4.1.
-- `Denotation.v`    definitions of the representation of VIR programs as ITrees **ARTIFACT** as described in Section 4.2.
-- `Handlers/`       includes the code for all of the handlers **ARTIFACT** described in Section 4.3. They are broken up into files based on the nature of the event handled, each file hence corresponding to a subsection.
-- `TopLevel.v`      provides the full model and the full interpreter, by plugging all components together, **ARTIFACT** i.e. the final result of Section 4.4.
+- `DynamicValues.v` definition of the dynamic values and underdefined values.
+- `LLVMEvents.v`    inventory of all events.
+- `Denotation.v`    definitions of the representation of VIR programs as ITrees.
+- `Handlers/`       includes the code for all of the handlers. They are broken up into files based on the nature of the event handled, each file hence corresponding to a subsection.
+- `TopLevel.v`      provides the full model and the full interpreter, by plugging all components together.
 
 Theory, in `src/coq/Theory/`:
 - `src/coq/Utils/PropT.v` metatheory required to reason about sets of itrees, i.e. about the propositional monad transformer.
-- `InterpreterMCFG.v`     the layers of interpretation **ARTIFACT** shown in Figure 6 and some of their metatheory
+- `InterpreterMCFG.v`     the layers of interpretation and some of their metatheory
 - `InterpreterCFG.v`      the same layers of interpretation and metatheory, but when reasoning about single functions (i.e. single cfg)
-- `Refinement.v`          definition of the refinement relations between layers of interpretations **ARTIFACT** mentioned in Section 5.4
+- `Refinement.v`          definition of the refinement relations between layers of interpretations 
 - `TopLevelRefinements.v` proof of inclusion of the refinement relations between layers of interpretations; proof of soundness of the interpreter as described in Section 5
 - `DenotationTheory`      Equational theory to reason directly about the structure of vir programs; in particular, reasoning principles about open control-flow-graphs.
 
@@ -89,7 +89,7 @@ These unverified parts of the development live in the `src/ml` folder.
 
 - `extracted/Extract.v`    instructions for the extraction of the development to OCaml
 - `libvellvm/interpreter.ml`  OCaml driver for running the interpreter; the `step` function walks over the ITree that remains after complete interpretation of the denotation of a program
-- `libvellvm/llvm_parser.mly` the parser, adapted from Vellvm, **ARTIFACT** as discussed in Section 4.5.
+- `libvellvm/llvm_parser.mly` the parser, adapted from Vellvm, 
 - `testing/assertion.ml`   custom annotations of llvm programs as comments used to define our tests.
 - `main.ml`                top-level from which our executable is obtained.
 
