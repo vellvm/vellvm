@@ -17,6 +17,15 @@ in the paper and their locations in the development below:
 - [Lemma 5.7](src/coq/Theory/TopLevelRefinements.v) search for "Lemma 5.7" (see related definitions in [Refinement.v](src/coq/Theory/Refinement.v)
 - [Lemma 5.8](src/coq/Theory/TopLevelRefinements.v) search for "Lemma 5.8"
 
+### ITrees ###
+
+Although we have made significant contributions to the itree library for the sake of this project, most of it
+is orthogonal to the material described in this paper, and can be treated entirely as an external library to understand this project.
+
+The content of Section 5.1 that gives a taste of how the underlying equational theory works can be found in more details in
+the files [Eq.v](https://github.com/DeepSpec/InteractionTrees/blob/master/theories/Eq/Eq.v) and [UpToTaus.v](https://github.com/DeepSpec/InteractionTrees/blob/master/theories/Eq/UpToTaus.v) in the [Interaction Trees github repo](https://github.com/DeepSpec/InteractionTrees)
+
+
 ### Unit Tests
 
 After compiling vellvm the development, running `src/vellvm --test` should successfully run 145 unit tests.  Running

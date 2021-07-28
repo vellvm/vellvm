@@ -51,12 +51,9 @@ The library will be built as the same time as the Vellvm development via the `Ma
 
 ## Interaction Trees
 
-**ARTIFACT**
-Although we have made significant contributions to the itree library for the sake of this project, most of it
-is orthogonal to the material described in this paper, and can be treated entirely as an external library to understand this project.
-
-The content of Section 5.1 that gives a taste of how the underlying equational theory works can be found in more details in
-the files [Eq.v](https://github.com/DeepSpec/InteractionTrees/blob/master/theories/Eq/Eq.v) and [UpToTaus.v](https://github.com/DeepSpec/InteractionTrees/blob/master/theories/Eq/UpToTaus.v) in the [Interaction Trees github repo](https://github.com/DeepSpec/InteractionTrees)
+Vellvm heavily relies on the [Interaction Trees](https://github.com/DeepSpec/InteractionTrees). Its development is hence 
+tied to contributions to the itree libraries. Temporary itree contributions not yet ready for merge are stored in the `src/coq/Utils` 
+folder.
 
 ## Coq formalization
 
