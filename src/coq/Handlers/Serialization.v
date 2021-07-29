@@ -1017,7 +1017,11 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
         | UVALUE_ExtractByte byte dt idx sid =>
           (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
           lift (failwith "Attempting to concretize UVALUE_ExtractByte, should not happen.")
+        | UVALUE_Load dt uv mem =>
+          UVALUE_Load dt
+
         | _ => (lift (failwith "Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen"))
+
                 
         end
 

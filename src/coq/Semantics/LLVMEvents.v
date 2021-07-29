@@ -144,7 +144,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
     (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
     Variant IntrinsicE : Type -> Type :=
-    | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE dvalue.
+    | Intrinsic : forall (t:dtyp) (f:string) (args:list uvalue), IntrinsicE uvalue.
 
     (* Interactions with the memory *)
     Variant MemoryE : Type -> Type :=

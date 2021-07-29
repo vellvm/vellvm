@@ -828,7 +828,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       then lift_err (deserialize_sbytes bytes t)
       else raise_ub "Read to memory with different provenance.".
 
-
     (** ** Writing values to memory
       Serialize [v] into [SByte]s, and store them in the [memory] starting at [addr].
 
