@@ -967,48 +967,48 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       (** ** MemCopy
           Implementation of the [memcpy] intrinsics.
        *)
-      Definition handle_memcpy (args : list dvalue) (m:memory) : err memory :=
-        match args with
-        | DVALUE_Addr (dst_id, dst_prov) ::
-                      DVALUE_Addr (src_id, src_prov) ::
-                      DVALUE_I32 len ::
-                      DVALUE_I32 align :: (* alignment ignored *)
-                      DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+      (* Definition handle_memcpy (args : list dvalue) (m:memory) : err memory := *)
+      (*   match args with *)
+      (*   | DVALUE_Addr (dst_id, dst_prov) :: *)
+      (*                 DVALUE_Addr (src_id, src_prov) :: *)
+      (*                 DVALUE_I32 len :: *)
+      (*                 DVALUE_I32 align :: (* alignment ignored *) *)
+      (*                 DVALUE_I1 volatile :: [] (* volatile ignored *)  => *)
 
-          let mem_block_size := unsigned len in
-          (* From LLVM Docs : The 'llvm.memcpy.*' intrinsics copy a block of
-             memory from the source location to the destination location,
-             which are not allowed to overlap. *)
-          if (no_overlap_b (dst_id, dst_prov) mem_block_size
-                                 (src_id, src_prov) mem_block_size) then
-            (* No guarantee that src_block has a certain size. *)
-            src_block <- trywith "memcpy src block not found"
-                                (lookup src_id m) ;;
-            dst_block <- trywith "memcpy dst block not found"
-                                (lookup dst_id m) ;;
+      (*     let mem_block_size := unsigned len in *)
+      (*     (* From LLVM Docs : The 'llvm.memcpy.*' intrinsics copy a block of *)
+      (*        memory from the source location to the destination location, *)
+      (*        which are not allowed to overlap. *) *)
+      (*     if (no_overlap_b (dst_id, dst_prov) mem_block_size *)
+      (*                            (src_id, src_prov) mem_block_size) then *)
+      (*       (* No guarantee that src_block has a certain size. *) *)
+      (*       src_block <- trywith "memcpy src block not found" *)
+      (*                           (lookup src_id m) ;; *)
+      (*       dst_block <- trywith "memcpy dst block not found" *)
+      (*                           (lookup dst_id m) ;; *)
 
-            let src_bytes
-                := match src_block with
-                  | Block size bytes => bytes
-                  end in
-            let '(dst_sz, dst_bytes)
-                := match dst_block with
-                  | Block size bytes => (size, bytes)
-                  end in
+      (*       let src_bytes *)
+      (*           := match src_block with *)
+      (*             | Block size bytes => bytes *)
+      (*             end in *)
+      (*       let '(dst_sz, dst_bytes) *)
+      (*           := match dst_block with *)
+      (*             | Block size bytes => (size, bytes) *)
+      (*             end in *)
 
-            (* IY: What happens if [src_block_size < mem_block_size]?
-               Since we have logical blocks, there isn't a way to get around
-               this, and SUndef is invoked. Is this desired behavior? *)
-            let sdata := lookup_all_index src_prov (Z.to_N (unsigned len)) src_bytes SUndef in
-            let dst_bytes' := add_all_index sdata dst_prov dst_bytes in
-            let dst_block' := Block dst_sz dst_bytes' in
-            let m' := IM.add dst_id dst_block' m in
-            (ret m' : err memory)
-          (* IY: For now, we're returning a "failwith". Maybe it's more ideal
-             to return an "UNDEF" here? *)
-          else failwith "memcpy has overlapping src and dst memory location"
-        | _ => failwith "memcpy got incorrect arguments"
-        end.
+      (*       (* IY: What happens if [src_block_size < mem_block_size]? *)
+      (*          Since we have logical blocks, there isn't a way to get around *)
+      (*          this, and SUndef is invoked. Is this desired behavior? *) *)
+      (*       let sdata := lookup_all_index src_prov (Z.to_N (unsigned len)) src_bytes SUndef in *)
+      (*       let dst_bytes' := add_all_index sdata dst_prov dst_bytes in *)
+      (*       let dst_block' := Block dst_sz dst_bytes' in *)
+      (*       let m' := IM.add dst_id dst_block' m in *)
+      (*       (ret m' : err memory) *)
+      (*     (* IY: For now, we're returning a "failwith". Maybe it's more ideal *)
+      (*        to return an "UNDEF" here? *) *)
+      (*     else failwith "memcpy has overlapping src and dst memory location" *)
+      (*   | _ => failwith "memcpy got incorrect arguments" *)
+      (*   end. *)
 
   End Memory_Operations.
 
@@ -1025,20 +1025,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         if it is bounded to a logical block, and if so if this logical block contains an associated
         concrete block. If so, we delete this association from the concrete memory.
      *)
-    Definition free_concrete_of_logical
-               (b : Z)
-               (lm : logical_memory)
-               (cm : concrete_memory) : concrete_memory
-      := match lookup b lm with
-         | None => cm
-         | Some (LBlock _ _ None) => cm
-         | Some (LBlock _ _ (Some cid)) => delete cid cm
-         end.
+    Definition free_byte
+               (b : Provenance)
+               (m : memory) : memory
+      := delete (Z.of_N b) m.
 
     Definition free_frame_memory (f : mem_frame) (m : memory) : memory :=
-      let '(cm, lm) := m in
-      let cm' := fold_left (fun m key => free_concrete_of_logical key lm m) f cm in
-      (cm', fold_left (fun m key => delete key m) f lm).
+      fold_left (fun m key => free_byte key m) f m.
 
     Definition equivs : frame_stack -> frame_stack -> Prop := Logic.eq.
 
@@ -1058,25 +1051,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         It is a matter of convention, by we consider the empty memory to contain a single empty frame
         in its stack, rather than an empty stack.
      *)
-    Definition empty_memory_stack : memory_stack := ((concrete_empty, logical_empty), frame_empty).
-
-    (** ** Smart lookups *)
-
-    Definition get_concrete_block (m : memory_stack) (key : Z) : option concrete_block :=
-      get_concrete_block_mem key (fst m).
-
-    Definition get_logical_block (m : memory_stack) (key : Z) : option logical_block :=
-      get_logical_block_mem key (fst m).
+    Definition empty_memory_stack : memory_stack := (memory_empty, frame_empty).
 
     (** ** Fresh key getters *)
 
-    (* Get the next key in the logical map *)
-    Definition next_logical_key (m : memory_stack) : Z :=
-      next_logical_key_mem (fst m).
-
-    (* Get the next key in the concrete map *)
-    Definition next_concrete_key (m : memory_stack) : Z :=
-      next_concrete_key_mem (fst m).
+    (* Get the next key in the memory *)
+    Definition next_memory_key (m : memory_stack) : Z :=
+      next_key (fst m).
 
     (** ** Extending the memory  *)
     Definition add_concrete_block (id : Z) (b : concrete_block) (m : memory_stack) : memory_stack :=
