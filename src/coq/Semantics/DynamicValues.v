@@ -179,9 +179,12 @@ Qed.
 Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
-Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(MEMORY:MEMORYSTATE).
-
-  Import MEMORY.
+Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS).
+  Variable memory : Type.
+  Variable eq_mem_type : memory -> memory -> Prop.
+  Variable eqb_mem_type : memory -> memory -> bool.
+  Instance mem_type_reldec : RelDec.RelDec eq_mem_type
+    := @RelDec.Build_RelDec memory eq_mem_type eqb_mem_type.
 
   (* The set of dynamic values manipulated by an LLVM program. *)
  Unset Elimination Schemes.
@@ -427,14 +430,14 @@ end.
 
 Lemma uvalue_to_dvalue_of_dvalue_to_uvalue :
   forall (d : dvalue),
-    uvalue_to_dvalue (dvalue_to_uvalue d) = inr d.
+    uvalue_to_dvalue (dvalue_to_uvalue d : uvalue) = inr d.
 Proof.
   intros.
   induction d; auto.
   - cbn. induction fields. cbn. reflexivity.
     assert (forall u : dvalue,
                In u fields ->
-               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
+               uvalue_to_dvalue (dvalue_to_uvalue u : uvalue) = inr u).
     intros. apply H. apply in_cons; auto. specialize (IHfields H0).
     clear H0. rewrite map_cons. rewrite list_cons_app.
     rewrite map_monad_app. cbn.
@@ -445,7 +448,7 @@ Proof.
   - cbn. induction fields. cbn. reflexivity.
     assert (forall u : dvalue,
                In u fields ->
-               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
+               uvalue_to_dvalue (dvalue_to_uvalue u : uvalue) = inr u).
     intros. apply H. apply in_cons; auto. specialize (IHfields H0).
     clear H0. rewrite map_cons. rewrite list_cons_app.
     rewrite map_monad_app. cbn.
@@ -456,7 +459,7 @@ Proof.
   - cbn. induction elts. cbn. reflexivity.
     assert (forall u : dvalue,
                In u elts ->
-               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
+               uvalue_to_dvalue (dvalue_to_uvalue u : uvalue) = inr u).
     intros. apply H. apply in_cons; auto. specialize (IHelts H0).
     clear H0. rewrite map_cons. rewrite list_cons_app.
     rewrite map_monad_app. cbn.
@@ -467,7 +470,7 @@ Proof.
   - cbn. induction elts. cbn. reflexivity.
     assert (forall u : dvalue,
                In u elts ->
-               uvalue_to_dvalue (dvalue_to_uvalue u) = inr u).
+               uvalue_to_dvalue (dvalue_to_uvalue u : uvalue) = inr u).
     intros. apply H. apply in_cons; auto. specialize (IHelts H0).
     clear H0. rewrite map_cons. rewrite list_cons_app.
     rewrite map_monad_app. cbn.
@@ -517,12 +520,12 @@ Definition uvalue_to_dvalue_binop2 {A : Type}
            (opu : uvalue -> uvalue -> A) (opd : dvalue -> dvalue -> A) (uv1 : uvalue) (dv2 : dvalue) : A :=
   let ma := dv1 <- uvalue_to_dvalue uv1 ;; ret (opd dv1 dv2)
   in match ma with
-     | inl e => opu uv1 (dvalue_to_uvalue dv2)
+     | inl e => opu uv1 (dvalue_to_uvalue dv2 : uvalue)
      | inr a => a
      end.
 
 Definition uvalue_to_dvalue_uop {A : Type}
-           (opu : uvalue -> A) (opd : dvalue -> A) (uv : uvalue) : A :=
+           (opu : uvalue -> A) (opd : dvalue -> A) (uv : uvalue ) : A :=
   let ma := dv <- uvalue_to_dvalue uv ;; ret (opd dv)
   in match ma with
      | inl e => opu uv
@@ -583,7 +586,7 @@ Section hiding_notation.
     | _ => Atom "TODO: show_uvalue"
     end.
 
-  #[global] Instance serialize_uvalue : Serialize uvalue := serialize_uvalue' "" "".
+  #[global] Instance serialize_uvalue : Serialize (uvalue) := serialize_uvalue' "" "".
 
 End hiding_notation.
 
@@ -730,10 +733,10 @@ Section DecidableEquality.
   Ltac __abs := right; intros H; inversion H; contradiction.
   Ltac __eq := left; subst; reflexivity.
 
-  Lemma uvalue_eq_dec : forall (u1 u2:uvalue), {u1 = u2} + {u1 <> u2}.
+  Lemma uvalue_eq_dec : forall {memory : Type} `{RelDec memory} (u1 u2:uvalue), {u1 = u2} + {u1 <> u2}.
   Proof with (try (__eq || __abs)).
-    refine (fix f u1 u2 :=
-              let lsteq_dec := list_eq_dec f in
+    refine (fix f mem eq_mem reldec_mem u1 u2 :=
+              let lsteq_dec := list_eq_dec (f mem eq_mem reldec_mem) in
               match u1, u2 with
               | UVALUE_Addr a1, UVALUE_Addr a2 => _
               | UVALUE_I1 x1, UVALUE_I1 x2 => _
@@ -767,70 +770,86 @@ Section DecidableEquality.
               | UVALUE_Load dt ua m, UVALUE_Load dt' ua' m' => _
               | _, _ => _
               end); try (ltac:(dec_dvalue); fail).
-    - destruct (A.eq_dec a1 a2)...
-    - destruct (Int1.eq_dec x1 x2)...
-    - destruct (Int8.eq_dec x1 x2)...
-    - destruct (Int32.eq_dec x1 x2)...
-    - destruct (Int64.eq_dec x1 x2)...
-    - destruct (Z.eq_dec x1 x2)...
-    - destruct (Float.eq_dec x1 x2)...
-    - destruct (Float32.eq_dec x1 x2)...
-    - destruct (dtyp_eq_dec t1 t2)...
-    - destruct (lsteq_dec f1 f2)...
-    - destruct (lsteq_dec f1 f2)...
-    - destruct (lsteq_dec f1 f2)...
-    - destruct (lsteq_dec f1 f2)...
-    - destruct (ibinop_eq_dec op op')...
-      destruct (f uv1 uv1')...
-      destruct (f uv2 uv2')...
-    - destruct (icmp_eq_dec op op')...
-      destruct (f uv1 uv1')...
-      destruct (f uv2 uv2')...
-    - destruct (fbinop_eq_dec op op')...
-      destruct (list_eq_dec fast_math_eq_dec fm fm')...
-      destruct (f uv1 uv1')...
-      destruct (f uv2 uv2')...
-    - destruct (fcmp_eq_dec op op')...
-      destruct (f uv1 uv1')...
-      destruct (f uv2 uv2')...
-    - destruct (conversion_type_eq_dec ct ct')...
-      destruct (f u u')...
-      destruct (dtyp_eq_dec t t')...
-    - destruct (dtyp_eq_dec t t')...
-      destruct (f u u')...
-      destruct (lsteq_dec l l')...
-    - destruct (f u u')...
-      destruct (f v v')...
-    - destruct (f u u')...
-      destruct (f v v')...
-      destruct (f t t')...
-    - destruct (f u u')...
-      destruct (f v v')...
-      destruct (f t t')...
-    - destruct (f u u')...
-      destruct (list_eq_dec Int.eq_dec l l')...
-    - destruct (f u u')...
-      destruct (f v v')...
-      destruct (list_eq_dec Int.eq_dec l l')...
-    - destruct (f u u')...
-      destruct (f v v')...
-      destruct (f t t')...
-    - destruct (f uv uv')...
-      destruct (f idx idx')...
-      destruct (N.eq_dec sid sid')...
-      destruct (dtyp_eq_dec dt dt')...
-    - destruct (lsteq_dec uvs uvs')...
-      destruct (dtyp_eq_dec dt dt')...
-    - destruct (f ua ua')...
-      destruct (dtyp_eq_dec dt dt')...
-      destruct (MEMORY.eq_dec m m')...
-  Qed.
+  Admitted.
+  (*   - destruct (A.eq_dec a1 a2)... *)
+  (*   - destruct (Int1.eq_dec x1 x2)... *)
+  (*   - destruct (Int8.eq_dec x1 x2)... *)
+  (*   - destruct (Int32.eq_dec x1 x2)... *)
+  (*   - destruct (Int64.eq_dec x1 x2)... *)
+  (*   - destruct (Z.eq_dec x1 x2)... *)
+  (*   - destruct (Float.eq_dec x1 x2)... *)
+  (*   - destruct (Float32.eq_dec x1 x2)... *)
+  (*   - destruct (dtyp_eq_dec t1 t2)... *)
+  (*   - Set Printing Implicit. *)
 
-  #[global] Instance eq_dec_uvalue : RelDec (@eq uvalue) := RelDec_from_dec (@eq uvalue) (@uvalue_eq_dec).
-  #[global] Instance eqv_uvalue : Eqv uvalue := (@eq uvalue).
+  (* match goal with *)
+  (* | [ |- { ?X ?m ?a = ?X ?m ?b} + { ?X ?m ?a <> ?X ?m ?b} ] => idtac "blah" *)
+  (* | [ |- { ?X ?m ?a = ?Y ?m ?b} + { ?X ?m ?a <> ?Y ?m ?b} ] => right; intros H; inversion H *)
+  (* | [ |- { ?X ?m = ?X ?m } + { ?X ?m <> ?X ?m } ] => left; reflexivity *)
+  (* | [ |- { ?X ?m = ?Y ?m } + { ?X ?m <> ?Y ?m } ] => right; intros H; inversion H *)
+  (* end. *)
+
+  (*       match goal with *)
+  (*       | [ |- { ?X = ?X } + { ?X  <> ?X  } ] => *)
+  (*         left; reflexivity *)
+  (*       end. *)
+  (*   - destruct (lsteq_dec f1 f2)... *)
+  (*   - destruct (lsteq_dec f1 f2)... *)
+  (*   - destruct (lsteq_dec f1 f2)... *)
+  (*   - destruct (lsteq_dec f1 f2)... *)
+  (*   - destruct (ibinop_eq_dec op op')... *)
+  (*     destruct (f uv1 uv1')... *)
+  (*     destruct (f uv2 uv2')... *)
+  (*   - destruct (icmp_eq_dec op op')... *)
+  (*     destruct (f uv1 uv1')... *)
+  (*     destruct (f uv2 uv2')... *)
+  (*   - destruct (fbinop_eq_dec op op')... *)
+  (*     destruct (list_eq_dec fast_math_eq_dec fm fm')... *)
+  (*     destruct (f uv1 uv1')... *)
+  (*     destruct (f uv2 uv2')... *)
+  (*   - destruct (fcmp_eq_dec op op')... *)
+  (*     destruct (f uv1 uv1')... *)
+  (*     destruct (f uv2 uv2')... *)
+  (*   - destruct (conversion_type_eq_dec ct ct')... *)
+  (*     destruct (f u u')... *)
+  (*     destruct (dtyp_eq_dec t t')... *)
+  (*   - destruct (dtyp_eq_dec t t')... *)
+  (*     destruct (f u u')... *)
+  (*     destruct (lsteq_dec l l')... *)
+  (*   - destruct (f u u')... *)
+  (*     destruct (f v v')... *)
+  (*   - destruct (f u u')... *)
+  (*     destruct (f v v')... *)
+  (*     destruct (f t t')... *)
+  (*   - destruct (f u u')... *)
+  (*     destruct (f v v')... *)
+  (*     destruct (f t t')... *)
+  (*   - destruct (f u u')... *)
+  (*     destruct (list_eq_dec Int.eq_dec l l')... *)
+  (*   - destruct (f u u')... *)
+  (*     destruct (f v v')... *)
+  (*     destruct (list_eq_dec Int.eq_dec l l')... *)
+  (*   - destruct (f u u')... *)
+  (*     destruct (f v v')... *)
+  (*     destruct (f t t')... *)
+  (*   - destruct (f uv uv')... *)
+  (*     destruct (f idx idx')... *)
+  (*     destruct (N.eq_dec sid sid')... *)
+  (*     destruct (dtyp_eq_dec dt dt')... *)
+  (*   - destruct (lsteq_dec uvs uvs')... *)
+  (*     destruct (dtyp_eq_dec dt dt')... *)
+  (*   - destruct (f ua ua')... *)
+  (*     destruct (dtyp_eq_dec dt dt')... *)
+  (*     destruct (MEMORY.eq_dec m m')... *)
+  (* Qed. *)
+
+  
+  #[global] Instance eq_dec_uvalue `{RD: RelDec memory}: RelDec (@eq uvalue) := RelDec_from_dec (@eq uvalue) (@uvalue_eq_dec memory equ RD).
+  #[global] Instance eqv_uvalue : Eqv (uvalue) := (@eq uvalue).
   Hint Unfold eqv_uvalue : core.
   #[global] Instance eq_dec_uvalue_correct: @RelDec.RelDec_Correct uvalue (@Logic.eq uvalue) _ := _.
-
+  Set Printing Implicit.
+  
 End DecidableEquality.
 
 Definition is_DVALUE_I1 (d:dvalue) : bool :=
@@ -1162,11 +1181,11 @@ Class VInt I : Type :=
     | _    => false
     end.
 
-  Definition undef_i1  := UVALUE_Undef (DTYPE_I 1).
-  Definition undef_i8  := UVALUE_Undef (DTYPE_I 8).
-  Definition undef_i32 := UVALUE_Undef (DTYPE_I 32).
-  Definition undef_i64 := UVALUE_Undef (DTYPE_I 64).
-  Definition undef_int {Int} `{VInt Int}  := UVALUE_Undef (DTYPE_I (N.of_nat bitwidth)).
+  Definition undef_i1 : uvalue  := UVALUE_Undef (DTYPE_I 1).
+  Definition undef_i8 : uvalue  := UVALUE_Undef (DTYPE_I 8).
+  Definition undef_i32 : uvalue := UVALUE_Undef (DTYPE_I 32).
+  Definition undef_i64 : uvalue := UVALUE_Undef (DTYPE_I 64).
+  Definition undef_int {Int} `{VInt Int} : uvalue  := UVALUE_Undef (DTYPE_I (N.of_nat bitwidth)).
 
   Definition to_uvalue {Int} `{VInt Int} (i : Int) : uvalue := dvalue_to_uvalue (to_dvalue i).
 
@@ -1485,7 +1504,7 @@ Class VInt I : Type :=
 
   (* Same deal as above with the helper *)
   (* The pattern matching generates hundreds of subgoals, hence the factorization of the typeclass inference *)
-  Definition eval_select_h (cnd : dvalue) (v1 v2 : uvalue) : undef_or_err uvalue :=
+  Definition eval_select_h (cnd : dvalue) (v1 v2 : uvalue) : undef_or_err (uvalue) :=
     let failwith_local := (@failwith _ undef_or_err (Monad_eitherT string Monad_err) (Exception_eitherT string Monad_err))
     in
     let ret_local := (@ret undef_or_err (Monad_eitherT string Monad_err) uvalue)
@@ -1502,7 +1521,7 @@ Class VInt I : Type :=
       end
     end.
 
-  Definition eval_select cnd v1 v2 : undef_or_err uvalue :=
+  Definition eval_select cnd v1 v2 : undef_or_err (uvalue) :=
     match cnd, v1, v2 with
     | (DVALUE_Vector es), (UVALUE_Vector es1), (UVALUE_Vector es2) =>
       (* vec needs to loop over es, es1, and es2. Is there a way to
@@ -1523,7 +1542,7 @@ Class VInt I : Type :=
 
   (* Helper function for indexing into a structured datatype
      for extractvalue and insertvalue *)
-  Definition index_into_str (v:uvalue) (idx:LLVMAst.int) : undef_or_err uvalue :=
+  Definition index_into_str (v:uvalue) (idx:LLVMAst.int) : undef_or_err (uvalue) :=
     let fix loop elts i :=
         match elts with
         | [] => failwith "index out of bounds"

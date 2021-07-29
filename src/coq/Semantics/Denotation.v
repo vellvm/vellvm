@@ -100,10 +100,27 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation(A:MemoryAddress.ADDRESS)(MEM:MemoryAddress.MEMORYSTATE)(LLVMEvents:LLVM_INTERACTIONS(A)(MEM)).
+Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
   Import LLVMEvents.
 
-  Section CONVERSIONS.
+  Section Denotation.
+    Variable memory : Type.
+    Definition PickE := LLVMEvents.PickE memory.
+    Definition exp_E := LLVMEvents.exp_E memory.
+    Definition LU_to_exp := @LLVMEvents.LU_to_exp memory.
+    Definition FUB_to_exp := @LLVMEvents.FUB_to_exp memory.
+    Definition conv_to_exp := @conv_to_exp memory.
+    Definition instr_E := LLVMEvents.instr_E memory.
+    Definition exp_to_instr := @LLVMEvents.exp_to_instr memory.
+    Definition L0' := @L0' memory.
+    Definition uvalue := @uvalue memory.
+    Definition lookup_E := lookup_E memory.
+    Definition instr_to_L0' := @instr_to_L0' memory.
+    Definition L0 := @L0 memory.
+    Definition CallE := CallE memory.
+    Definition ExternalCallE := ExternalCallE memory.
+
+    Section CONVERSIONS.
 
     (** ** Typed conversion
         Performs a dynamic conversion of a [dvalue] of type [t1] to one of type [t2].
@@ -314,14 +331,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(MEM:MemoryAddress.MEMORYSTATE)(LLVMEv
 
     
 
-    Definition eval_conv_pure_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
+    Definition eval_conv_pure_h {memory} conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree (conv_E memory) dvalue :=
       match get_conv_case conv t1 x t2 with
       | Conv_Pure x => ret x
       | Conv_Illegal s => raise s
       | _ => raise "Non-pure conversion..."
       end.
 
-    Definition eval_conv_pure (conv : conversion_type) (t1 : dtyp) (x : dvalue) (t2:dtyp) : itree conv_E dvalue :=
+    Definition eval_conv_pure {memory} (conv : conversion_type) (t1 : dtyp) (x : dvalue) (t2:dtyp) : itree (conv_E memory) dvalue :=
       match t1, x with
       | DTYPE_Vector s t, (DVALUE_Vector elts) =>
         (* In the future, implement bitcast and etc with vectors *)
@@ -938,5 +955,5 @@ Module Denotation(A:MemoryAddress.ADDRESS)(MEM:MemoryAddress.MEMORYSTATE)(LLVMEv
                    end
                  end)
               _ (Call dt f_value args).
-
+  End Denotation.
 End Denotation.

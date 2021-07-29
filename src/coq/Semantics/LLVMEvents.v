@@ -124,36 +124,39 @@ Set Contextual Implicit.
     end.
 
 (* TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
-Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS)(MEMORY : MemoryAddress.MEMORYSTATE).
+Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
   #[global] Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.eq_dec.
   #[global] Instance Eqv_addr : Eqv ADDR.addr := (@eq ADDR.addr).
 
-  Module DV := DynamicValues.DVALUE(ADDR)(MEMORY).
+  Module DV := DynamicValues.DVALUE(ADDR).
   Export DV.
 
-  (* Generic calls, refined by [denote_mcfg] *)
-  Variant CallE : Type -> Type :=
-  | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue), CallE uvalue.
+  Section Events.
+    Variable memory : Type.
 
-  Variant ExternalCallE : Type -> Type :=
-  | ExternalCall        : forall (t:dtyp) (f:uvalue) (args:list dvalue), ExternalCallE dvalue.
+    (* Generic calls, refined by [denote_mcfg] *)
+    Variant CallE : Type -> Type :=
+    | Call        : forall (t:dtyp) (f:@uvalue memory) (args:list (@uvalue memory)), CallE (@uvalue memory).
 
-  (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
-  Variant IntrinsicE : Type -> Type :=
-  | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE dvalue.
+    Variant ExternalCallE : Type -> Type :=
+    | ExternalCall        : forall (t:dtyp) (f:@uvalue memory) (args:list dvalue), ExternalCallE dvalue.
 
-  (* Interactions with the memory *)
-  Variant MemoryE : Type -> Type :=
-  | MemPush : MemoryE unit
-  | MemPop  : MemoryE unit
-  | Alloca  : forall (t:dtyp),                               (MemoryE uvalue)
-  | Load    : forall (t:dtyp)   (a:uvalue),                  (MemoryE uvalue)
-  (* Store address should be unique... *)
-  | Store   : forall (a:dvalue) (v:uvalue),                  (MemoryE unit)
-  | GEP     : forall (t:dtyp)   (v:uvalue) (vs:list uvalue), (MemoryE uvalue)
-  | ItoP    : forall (i:uvalue),                             (MemoryE uvalue)
-  | PtoI    : forall (t:dtyp) (a:uvalue),                    (MemoryE uvalue)
+    (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
+    Variant IntrinsicE : Type -> Type :=
+    | Intrinsic : forall (t:dtyp) (f:string) (args:list dvalue), IntrinsicE dvalue.
+
+    (* Interactions with the memory *)
+    Variant MemoryE : Type -> Type :=
+    | MemPush : MemoryE unit
+    | MemPop  : MemoryE unit
+    | Alloca  : forall (t:dtyp),                               (MemoryE (@uvalue memory))
+    | Load    : forall (t:dtyp)   (a:@uvalue memory),                  (MemoryE (@uvalue memory))
+    (* Store address should be unique... *)
+    | Store   : forall (a:dvalue) (v:@uvalue memory),                  (MemoryE unit)
+    | GEP     : forall (t:dtyp)   (v:@uvalue memory) (vs:list (@uvalue memory)), (MemoryE (@uvalue memory))
+    | ItoP    : forall (i:@uvalue memory),                             (MemoryE (@uvalue memory))
+    | PtoI    : forall (t:dtyp) (a:@uvalue memory),                    (MemoryE (@uvalue memory))
   .
 
   (* An event resolving the non-determinism induced by undef. The argument _P_
@@ -161,12 +164,12 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS)(MEMORY : MemoryAddr
    if it is not satisfied, the only possible execution is to raise _UB_.
    *)
   Variant PickE : Type -> Type :=
-  | pick (u:uvalue) (P : Prop) : PickE dvalue.
+  | pick (u:@uvalue memory) (P : Prop) : PickE dvalue.
 
-  Definition unique_prop (uv : uvalue) : Prop
+  Definition unique_prop (uv : @uvalue memory) : Prop
     := exists x, forall dv, concretize uv dv -> dv = x.
 
-  Definition pickAll (p : uvalue -> PickE dvalue) := map_monad (fun uv => trigger (p uv)).
+  Definition pickAll (p : @uvalue memory -> PickE dvalue) := map_monad (fun uv => trigger (p uv)).
 
   (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
   (* TODO: The events and handlers are parameterized by the types of key and value.
@@ -174,8 +177,8 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS)(MEMORY : MemoryAddr
      At least TODO: remove these prefixes that are inconsistent with other names.
    *)
   Definition LLVMGEnvE := (GlobalE raw_id dvalue).
-  Definition LLVMEnvE := (LocalE raw_id uvalue).
-  Definition LLVMStackE := (StackE raw_id uvalue).
+  Definition LLVMEnvE := (LocalE raw_id (@uvalue memory)).
+  Definition LLVMStackE := (StackE raw_id (@uvalue memory)).
 
   Definition conv_E := MemoryE +' PickE +' UBE +' DebugE +' FailureE.
   Definition lookup_E := LLVMGEnvE +' LLVMEnvE.
@@ -192,7 +195,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS)(MEMORY : MemoryAddr
     fun T e => inr1 (inr1 e).
 
   Definition instr_E := CallE +' IntrinsicE +' exp_E.
-  Definition exp_to_instr : exp_E ~> instr_E:=
+  Definition exp_to_instr : exp_E ~> instr_E :=
     fun T e => inr1 (inr1 e).
 
   (* Core effects. *)
@@ -242,17 +245,18 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS)(MEMORY : MemoryAddr
 
   Definition L5 := ExternalCallE +' DebugE +' FailureE.
 
-  #[export] Hint Unfold L0 L0' L1 L2 L3 L4 L5 : core.
-
   Definition FUB_to_L4 : (FailureE +' UBE) ~> L4:=
     fun T e =>
       match e with
       | inl1 x => inr1 (inr1 (inr1 x))
       | inr1 x => inr1 (inl1 x)
       end.
+  End Events.
+
+  #[export] Hint Unfold L0 L0' L1 L2 L3 L4 L5 : core.
 
 End LLVM_INTERACTIONS.
 
-Module Make(ADDR : MemoryAddress.ADDRESS)(MEM : MemoryAddress.MEMORYSTATE) <: LLVM_INTERACTIONS(ADDR)(MEM).
-Include LLVM_INTERACTIONS(ADDR)(MEM).
+Module Make(ADDR : MemoryAddress.ADDRESS) <: LLVM_INTERACTIONS(ADDR).
+Include LLVM_INTERACTIONS(ADDR).
 End Make.

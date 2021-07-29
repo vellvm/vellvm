@@ -22,8 +22,3 @@ Module Type ADDRESS.
   Parameter null : addr.
   Parameter eq_dec : forall (a b : addr), {a = b} + {a <> b}.
 End ADDRESS.
-
-Module Type MEMORYSTATE.
-  Parameter memory : Type.
-  Parameter eq_dec : forall (m1 m2 : memory), {m1 = m2} + {m1 <> m2}.
-End MEMORYSTATE.

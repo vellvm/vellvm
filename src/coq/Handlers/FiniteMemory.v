@@ -167,19 +167,12 @@ Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type
   Qed.
 End Addr.
 
-Module Mem : MemoryAddress.MEMORYSTATE.
-  Parameter SByte : Set.
-  Definition memory := IntMap SByte.
-  Lemma eq_dec : forall (a b : memory), {a = b} + {a <> b}.
-  Admitted.
-End Mem.
-
 (** ** Memory model
     Implementation of the memory model, i.e. a handler for [MemoryE].
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
     indexed on [Z].
  *)
-Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)(Mem)).
+Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Import LLVMEvents.
   Import DV.
   Open Scope list.
@@ -187,7 +180,14 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)(Mem)).
   Variable ptr_size : nat.
   Variable datalayout : DataLayout.
 
+  Variable mem_type : Type.
+  Variable eq_mem_type : mem_type -> mem_type -> Prop.
+  Variable eqb_mem_type : mem_type -> mem_type -> bool.
+  Instance mem_type_reldec : RelDec.RelDec eq_mem_type
+    := @RelDec.Build_RelDec mem_type eq_mem_type eqb_mem_type.
+
   Definition addr := Addr.addr.
+  Definition uvalue := @uvalue mem_type.
   
   Inductive SByte :=
   | UByte (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : store_id) : SByte.
@@ -203,7 +203,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)(Mem)).
     (** ** Memory
         Memory is just a map of blocks.
      *)
-    Definition memory := IntMap mem_byte.
+    Definition memory := IntMap mem_byte.  
 
     (** ** Stack frames
       A frame contains the list of block ids that need to be freed when popped,
