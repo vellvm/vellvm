@@ -848,7 +848,6 @@ Section DecidableEquality.
   #[global] Instance eqv_uvalue : Eqv (uvalue) := (@eq uvalue).
   Hint Unfold eqv_uvalue : core.
   #[global] Instance eq_dec_uvalue_correct: @RelDec.RelDec_Correct uvalue (@Logic.eq uvalue) _ := _.
-  Set Printing Implicit.
   
 End DecidableEquality.
 
