@@ -180,14 +180,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Variable ptr_size : nat.
   Variable datalayout : DataLayout.
 
-  Variable mem_type : Type.
-  Variable eq_mem_type : mem_type -> mem_type -> Prop.
-  Variable eqb_mem_type : mem_type -> mem_type -> bool.
-  Instance mem_type_reldec : RelDec.RelDec eq_mem_type
-    := @RelDec.Build_RelDec mem_type eq_mem_type eqb_mem_type.
-
   Definition addr := Addr.addr.
-  Definition uvalue := @uvalue mem_type.
   
   Inductive SByte :=
   | UByte (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : store_id) : SByte.

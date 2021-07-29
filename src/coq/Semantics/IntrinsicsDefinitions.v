@@ -187,7 +187,7 @@ Definition defined_intrinsics_decls :=
    any other effects.
 
 *)
-Module Make(A:MemoryAddress.ADDRESS)(MEM:MemoryAddress.MEMORYSTATE)(LLVMIO: LLVM_INTERACTIONS(A)(MEM)).
+Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Open Scope string_scope.
 
   Import LLVMIO.

@@ -46,23 +46,6 @@ Module Type ITOP(Addr:MemoryAddress.ADDRESS)(PROV:PROVENANCE(Addr)).
   Parameter int_to_ptr : Z -> PROV.Prov -> Addr.addr.
 End ITOP.
 
-
-Require Import Vellvm.Utils.IntMaps.
-Inductive uvalue (addr : Type) (memory : Type) :=
-| UVALUE_Addr (a : addr)
-| UVALUE_Load (t : dtyp) (a : uvalue addr memory) (m : memory).
-
-Definition store_id := nat.
-
-Inductive SByte (addr : Type) (memory : Type) :=
-| UByte (uv : uvalue addr memory) (idx : uvalue addr memory) (sid : store_id).
-
-Require Import ZArith.
-
-
-Inductive memory (addr : Type) :=
-| Memory (m : IntMap (SByte addr (memory addr))).
-
 Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF: Sizeof)(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE)).
 
   Import LLVMIO.
@@ -76,15 +59,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
   Variable ptr_size : nat.
   Variable datalayout : DataLayout.
 
-  Variable mem_type : Type.
-  Variable eq_mem_type : mem_type -> mem_type -> Prop.
-  Variable eqb_mem_type : mem_type -> mem_type -> bool.
-  Instance mem_type_reldec : RelDec.RelDec eq_mem_type
-    := @RelDec.Build_RelDec mem_type eq_mem_type eqb_mem_type.
-
-
   Definition addr := Addr.addr.
-  Definition uvalue := @uvalue mem_type.
 
   (* TODO: move this? *)
   Inductive SByte :=
@@ -1194,19 +1169,6 @@ Proof.
       rewrite map_length.
       rewrite Nseq_length.
       solve_guards_all_bytes.
-
-      rewrite rel_dec_eq_true.
-      * cbn. reflexivity.
-      * Set Printing Implicit.
-
-        
-
-
-Ltac uvalue_eq_dec_refl_true :=
-  rewrite rel_dec_eq_true; [|exact eq_dec_uvalue_correct|reflexivity].
-
-      [|exact eq_dec_uvalue_correct|reflexivity].
-      solve_guards_all_bytes
       reflexivity.
 Qed.
 
