@@ -148,6 +148,9 @@ Definition all_aid_accesses_allowed (pr : AllocationId) (aids : list AllocationI
 Definition wildcard_prov : Prov := None.
 Definition nil_prov : Prov := Some [].
 
+Definition allocation_id_to_prov (aid : AllocationId) : Prov
+  := fmap (fun x => [x]) aid.
+
 (* TODO: If Prov is an NSet, I get a universe inconsistency here... *)
 Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type.
   Definition addr := (Iptr * Prov) % type.
@@ -1110,31 +1113,38 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | Snoc s f => (m, Snoc s (k :: f))
       end.
 
+    Definition add_all_to_frame (m : memory_stack) (ks : list Z) : memory_stack
+      := fold_left (fun ms k => add_to_frame ms k) ks m.      
+
     (* TODO: figure out allocation address *)
     (* Where does this address come from? *)
     (* Should I make sure that the bytes pointed to by this address
        have not been allocated to? *)
-    Definition allocate_undef_bytes_size (m : memory) (addr : Z) (aid : AllocationId) (sz : N) (x : N) (t :  dtyp) : ErrSID memory
+    Definition allocate_undef_bytes_size (m : memory) (addr : Z) (aid : AllocationId) (sz : N) (x : N) (t :  dtyp) : ErrSID (memory * list Z)
       := (N.recursion
-           (fun (x : N) => ret m)
+           (fun (x : N) => ret (m, []))
            (fun n mf x =>
-              m <- mf (N.succ x);;
+              '(m, addrs) <- mf (N.succ x);;
               sid <- fresh_sid;;
               let undef := UByte (UVALUE_Undef t) t (UVALUE_IPTR (Z.of_N x)) sid in
-              ret (IM.add (addr + Z.of_N x) (undef, aid) m))
+              let new_addr := addr + Z.of_N x in
+              ret (IM.add new_addr (undef, aid) m, (addr::addrs)))
            sz) 0%N.
 
-    Definition allocate_undef_bytes (m : memory) (addr : Z) (aid : AllocationId) (t :  dtyp) : ErrSID memory
+    Definition allocate_undef_bytes (m : memory) (addr : Z) (aid : AllocationId) (t :  dtyp) : ErrSID (memory * list Z)
       := allocate_undef_bytes_size m addr aid (sizeof_dtyp t) 0%N t.
 
-    Definition allocate (m : memory_stack) (t : dtyp) : ErrSID (memory_stack * addr) :=
+    (* TODO: make 'addr' nondeterministic, see issue #170 *)
+    Definition allocate (ms : memory_stack) (t : dtyp) : ErrSID (memory_stack * addr) :=
       match t with
-      | DTYPE_Void => failwith "Allocation of type void"
+      | DTYPE_Void => raise_ub "Allocation of type void"
       | _ =>
-        let new_block := make_empty_logical_block t in
-        let key       := next_logical_key m in
-        let m         := add_logical_block key new_block m in
-        ret (add_to_frame m key, (key,0))
+        let '(m, fs) := ms in
+        aid <- fresh_allocation_id;;
+        let addr := next_memory_key ms in
+        '(m', addrs) <- allocate_undef_bytes m addr aid t;;
+        let ms' := add_all_to_frame (m', fs) addrs in
+        ret (ms', (addr, allocation_id_to_prov aid))
       end.
 
     (* TODO: very similar to overlaps *)
