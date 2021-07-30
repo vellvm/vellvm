@@ -120,7 +120,8 @@ Section Helpers.
       n <- (arbitrary : G nat);;
       ret (Z.of_nat n).
 End Helpers.
-
+Check show Decimal.int.
+Sample genPosZ.
 Section GenerationState.
   Record GenState :=
     mkGenState
@@ -330,9 +331,9 @@ Section TypGenerators.
                 (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
                 ; TYPE_Float
+                ; TYPE_Double
                 (* TODO: Could generate TYPE_Identified if we filter for sized types *)
                 (* ; TYPE_Half *)
-                (* ; TYPE_Double *)
                 (* ; TYPE_X86_fp80 *)
                 (* ; TYPE_Fp128 *)
                 (* ; TYPE_Ppc_fp128 *)
@@ -381,8 +382,8 @@ Section TypGenerators.
                 ; TYPE_Void
                 (* TODO: Generate floats and stuff *)
                 ; TYPE_Float
+                ; TYPE_Double
                 (* ; TYPE_Half *)
-                (* ; TYPE_Double *)
                 (* ; TYPE_X86_fp80 *)
                 (* ; TYPE_Fp128 *)
                 (* ; TYPE_Ppc_fp128 *)
@@ -440,8 +441,8 @@ Section TypGenerators.
                 (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
                 ; TYPE_Float
+                ; TYPE_Double
                 (* ; TYPE_Half *)
-                (* ; TYPE_Double *)
                 (* ; TYPE_X86_fp80 *)
                 (* ; TYPE_Fp128 *)
                 (* ; TYPE_Ppc_fp128 *)
@@ -478,8 +479,8 @@ Section TypGenerators.
                 (* ; TYPE_I 64 *)
                 (* TODO: Generate floats and stuff *)
                 ; TYPE_Float
+                ; TYPE_Double
                 (* ; TYPE_Half *)
-                (* ; TYPE_Double *)
                 (* ; TYPE_X86_fp80 *)
                 (* ; TYPE_Fp128 *)
                 (* ; TYPE_Ppc_fp128 *)
@@ -541,7 +542,7 @@ Section ExpGenerators.
             (map ret 
                   [FFalse; FOeq; FOgt; FOge; FOlt; FOle; FOne; FOrd; 
                    FUno; FUeq; FUgt; FUge; FUlt; FUle; FUne; FTrue]).
-              
+
   (* Generate an expression of a given type *)
   (* Context should probably not have duplicate ids *)
   (* May want to decrease size more for arrays and vectors *)
@@ -730,7 +731,8 @@ Section ExpGenerators.
   Definition gen_non_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
     := match t with
        | TYPE_I n => ret EXP_Integer <*> lift gen_non_zero (* TODO: should integer be forced to be in bounds? *)
-       | TYPE_Float => ret EXP_Float <*> lift fing32 (*TODO: Verify that fing32 won't generate zero*)
+       | TYPE_Float => ret EXP_Float <*> lift fing32 
+       | TYPE_Double => ret EXP_Double <*> lift fing64
        | _ => lift failGen
        end.
 Check OP_FBinop.
@@ -768,7 +770,7 @@ Check OP_IBinop.
           (* Not generating these types for now *)
           | TYPE_Half                 => lift failGen
           | TYPE_Float                => ret EXP_Float <*> lift fing32(* referred to genarators in flocq-quickchick*)
-          | TYPE_Double               => lift failGen
+          | TYPE_Double               => ret EXP_Double <*> lift fing64
           | TYPE_X86_fp80             => lift failGen
           | TYPE_Fp128                => lift failGen
           | TYPE_Ppc_fp128            => lift failGen
@@ -806,8 +808,8 @@ Check OP_IBinop.
           | TYPE_Function ret args => [lift failGen] (* These shouldn't exist, I think *)
           | TYPE_Opaque            => [lift failGen] (* TODO: not sure what these should be... *)
           | TYPE_Half              => [lift failGen]
-          | TYPE_Float             => [gen_fbinop_exp tt]
-          | TYPE_Double            => [lift failGen]
+          | TYPE_Float             => [gen_fbinop_exp TYPE_Float]
+          | TYPE_Double            => [gen_fbinop_exp TYPE_Double]
           | TYPE_X86_fp80          => [lift failGen]
           | TYPE_Fp128             => [lift failGen]
           | TYPE_Ppc_fp128         => [lift failGen]
@@ -834,15 +836,19 @@ Check OP_IBinop.
       then ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
       else ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t
   with 
-  gen_fbinop_exp (u: unit) : GenLLVM (exp typ)
+  gen_fbinop_exp (ty: typ) : GenLLVM (exp typ)
     :=
-      let t := TYPE_Float in
-      fbinop <- lift gen_fbinop;;
-      if (Handlers.LLVMEvents.DV.fop_is_div fbinop)
-      then ret (OP_FBinop fbinop nil) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t 
-      else ret (OP_FBinop fbinop nil) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t.
-  
-(*ret EXP_Float <*> lift fing32.*)
+      match ty with 
+       | TYPE_Float => fbinop <- lift gen_fbinop;;
+       if (Handlers.LLVMEvents.DV.fop_is_div fbinop)
+       then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_non_zero_exp_size 0 ty 
+       else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty
+       | TYPE_Double => fbinop <- lift gen_fbinop;;
+       if (Handlers.LLVMEvents.DV.fop_is_div fbinop)
+       then ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_non_zero_exp_size 0 ty 
+       else ret (OP_FBinop fbinop nil) <*> ret ty <*> gen_exp_size 0 ty <*> gen_exp_size 0 ty
+       | _ => lift failGen
+      end.
 
   Definition gen_exp (t : typ) : GenLLVM (exp typ)
     := sized_LLVM (fun sz => gen_exp_size sz t).
@@ -864,7 +870,8 @@ Check OP_IBinop.
             | TYPE_I isz =>
               (* TODO: If I1 also allow ICmp and FCmp *)
               gen_ibinop_exp isz
-            | TYPE_Float => gen_fbinop_exp tt 
+            | TYPE_Float => gen_fbinop_exp TYPE_Float
+            | TYPE_Double => gen_fbinop_exp TYPE_Double
             | _ => lift failGen
             end).
 
@@ -947,7 +954,7 @@ Section InstrGenerators.
       ; gen_store
       (* TODO: Generate atomic operations and other instructions *)
       ].
-      
+
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
 

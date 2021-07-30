@@ -123,6 +123,28 @@ Section ShowInstances.
   Global Instance showICmp : Show icmp
     := {| show := show_icmp |}.
 
+  Definition show_fcmp (cmp: fcmp) : string
+    := match cmp with 
+      |FFalse => "ffalse"
+      |FOeq => "foeq"
+      |FOgt => "fogt"
+      |FOge => "foge"
+      |FOlt => "folt"
+      |FOle => "fole"
+      |FOne => "fone"
+      |FOrd => "ford"
+      |FUno => "funo"
+      |FUeq => "fueq"
+      |FUgt => "fugt"
+      |FUge => "fuge"
+      |FUlt => "fult"
+      |FUle => "fule"
+      |FUne => "fune"
+      |FTrue => "ftrue"
+    end.
+  Global Instance showFCmp : Show fcmp 
+  := {| show := show_fcmp|}.
+
   Definition double_to_hex_string (f : float) : string
     := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (Int64.unsigned (Float.to_bits f)))).
 
@@ -134,6 +156,12 @@ Section ShowInstances.
 
   Global Instance showFloat32 : Show float32
     := {| show := float_to_hex_string |}.
+
+  Definition show_int (x : Integers.Int.int) : string
+    := show (Int.unsigned x).
+  
+  Global Instance Show_Int : Show Integers.Int.int
+  := {| show := show_int|}.
 
   Definition show_fast_math (fm : fast_math) : string
     := match fm with
