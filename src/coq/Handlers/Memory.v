@@ -117,22 +117,12 @@ Module Addr : MemoryAddress.ADDRESS with Definition addr := (Z * Z) % type.
   Qed.
 End Addr.
 
-Module Mem : MemoryAddress.MEMORYSTATE with Definition memory := unit.
-  Definition memory := unit.
-  Lemma eq_dec : forall (a b : unit), {a = b} + {a <> b}.
-  Proof.
-    intros a b.
-    destruct a. destruct b.
-    left. reflexivity.
-  Qed.
-End Mem.
-
 (** ** Memory model
     Implementation of the memory model, i.e. a handler for [MemoryE].
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
     indexed on [Z].
  *)
-Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)(Mem)).
+Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Import LLVMEvents.
   Import DV.
   Open Scope list.
