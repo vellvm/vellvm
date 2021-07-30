@@ -203,7 +203,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       i.e. when the function returns.
       A [frame_stack] is a list of such frames.
      *)
-    Definition mem_frame := list Provenance.
+    Definition mem_frame := list Iptr.
     Inductive frame_stack : Type := | Singleton (f : mem_frame) | Snoc (s : frame_stack) (f : mem_frame).
     (* Definition frame_stack := list mem_frame. *)
 
@@ -509,6 +509,11 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition raise_ub {A} (msg : string) : ErrSID A
       := lift (MonadExc.raise msg).
 
+    Definition err_to_ub {A} (e : err A) : ErrSID A
+      := match e with
+         | inl msg => raise_ub msg
+         | inr x => ret x
+         end.
 
     Definition sbyte_sid_match (a b : SByte) : bool
       := match a, b with
@@ -599,8 +604,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | UVALUE_ShuffleVector _ _ _
        | UVALUE_ExtractValue _ _
        | UVALUE_InsertValue _ _ _
-       | UVALUE_Select _ _ _
-       | UVALUE_Load _ _ _ =>
+       | UVALUE_Select _ _ _ =>
          sid <- fresh_sid;;
          ret (to_ubytes uv dt sid)
 
@@ -819,41 +823,44 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       ret (UByte (UVALUE_Undef DTYPE_Void) DTYPE_Void (UVALUE_IPTR 0) sid).
 
     (** ** Reading values from memory *)
-    Definition read_memory (mem : memory) (addr : Z) (pr : Prov) (t : dtyp) : ErrSID uvalue :=
-      sid <- fresh_sid;;
-      (* TODO: Should I get a fresh_sid for each missing value in the map? *)
-      let mem_bytes := lookup_all_index addr (sizeof_dtyp t) mem ((UByte (UVALUE_Undef t) t (UVALUE_IPTR 0) sid), None) in
-      let bytes     := map fst mem_bytes in
-      let alloc_ids := map snd mem_bytes in
-      if all_accesses_allowed pr alloc_ids
-      then lift_err (deserialize_sbytes bytes t)
-      else raise_ub "Read to memory with different provenance.".
+    Definition read_memory (mem : memory) (addr : Z) (pr : Prov) (t : dtyp) : err uvalue :=
+      match IM_find_many (Zseq addr (N.to_nat (sizeof_dtyp t))) mem with
+      | None => failwith "Reading from unallocated memory."
+      | Some mem_bytes =>
+        let bytes     := map fst mem_bytes in
+        let alloc_ids := map snd mem_bytes in
+        if all_accesses_allowed pr alloc_ids
+        then lift_err (deserialize_sbytes bytes t)
+        else failwith "Read to memory with different provenance."
+      end.
 
     (** ** Writing values to memory
       Serialize [v] into [SByte]s, and store them in the [memory] starting at [addr].
 
       Also make sure that the write of provenance [pr] is allowed.
+
+      Returns a list of all the AllocationIds for the bytes that would be written in order.
+      This is useful for preserving the allocation ids when writing new bytes.
      *)
-    Definition write_allowed (mem : memory) (addr : Z) (aid : AllocationId) (dt : dtyp) : ErrSID unit
+    Definition write_allowed (mem : memory) (addr : Z) (pr : Prov) (dt : dtyp) : ErrSID (list AllocationId)
       :=
         let mem_bytes := IM_find_many (Zseq 0 (N.to_nat (sizeof_dtyp dt))) mem in
         match mem_bytes with
         | None => raise_ub "Trying to write to unallocated memory."
         | Some mem_bytes =>
           let alloc_ids := map snd mem_bytes in
-          if all_aid_accesses_allowed aid alloc_ids
-          then ret tt
+          if all_accesses_allowed pr alloc_ids
+          then ret alloc_ids
           else raise_ub "Trying to write to memory with invalid provenance."
         end.
 
-    Definition write_memory (mem : memory) (addr : Z) (aid : AllocationId) (v : uvalue) (dt : dtyp) : ErrSID memory
+    Definition write_memory (mem : memory) (addr : Z) (pr : Prov) (v : uvalue) (dt : dtyp) : ErrSID memory
       :=
         (* Check that we're allowed to write to each place in memory *)
-        write_allowed mem addr aid dt;;
+        aids <- write_allowed mem addr pr dt;;
         bytes <- serialize_sbytes v dt;;
-        let mem_bytes := map (fun b => (b, aid)) bytes in
+        let mem_bytes := zip bytes aids in
 
-        (* TODO: should we allow provenance to change like this when access is allowed...? *)
         ret (add_all_index mem_bytes (Z.of_N (sizeof_dtyp dt)) mem).
 
     (** ** Array element lookup
@@ -865,7 +872,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       'offset <- lift_err (handle_gep_h (DTYPE_Array size t)
                                        addr
                                        [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]);;
-      read_memory mem offset pr t.
+      err_to_ub (read_memory mem offset pr t).
 
     (** ** Array element writing
       Treat a [memory] as though it is an array storing elements of
@@ -874,11 +881,11 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       - [t] should be the type of [v].
       - [size] does nothing, but we need to provide one for the array type.
     *)
-    Definition write_array_cell_memory (mem : memory) (addr : Z) (aid : AllocationId) (i : nat) (size : N) (t : dtyp) (v : uvalue) : ErrSID memory :=
+    Definition write_array_cell_memory (mem : memory) (addr : Z) (pr : Prov) (i : nat) (size : N) (t : dtyp) (v : uvalue) : ErrSID memory :=
       'offset <- lift_err (handle_gep_h (DTYPE_Array size t)
                                        addr
                                        [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]);;
-      write_memory mem offset aid v t.
+      write_memory mem offset pr v t.
 
     (** ** Array lookups -- mem_block
       Retrieve the values stored at position [from] to position [from + len - 1] in an array stored in a [memory].
@@ -891,17 +898,17 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
       - [t] should be the type of each [v] in [vs]
      *)
-    Fixpoint write_array_memory' (mem : memory) (addr : Z) (aid : AllocationId) (i : nat) (size : N) (t : dtyp) (vs : list uvalue) : ErrSID memory :=
+    Fixpoint write_array_memory' (mem : memory) (addr : Z) (pr : Prov) (i : nat) (size : N) (t : dtyp) (vs : list uvalue) : ErrSID memory :=
       match vs with
       | []       => ret mem
       | (v :: vs) =>
-        mem' <- write_array_cell_memory mem addr aid i size t v;;
-        write_array_memory' mem' addr aid (S i) size t vs
+        mem' <- write_array_cell_memory mem addr pr i size t v;;
+        write_array_memory' mem' addr pr (S i) size t vs
       end.
 
-    Definition write_array_mem_block (mem : memory) (addr : Z) (aid : AllocationId) (from : nat) (t : dtyp) (vs : list uvalue) : ErrSID memory :=
+    Definition write_array_memory (mem : memory) (addr : Z) (pr : Prov) (from : nat) (t : dtyp) (vs : list uvalue) : ErrSID memory :=
       let size := (N.of_nat (length vs)) in
-      write_array_memory' mem addr aid from size t vs.
+      write_array_memory' mem addr pr from size t vs.
 
   End Logical_Operations.
 
@@ -1027,9 +1034,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         concrete block. If so, we delete this association from the concrete memory.
      *)
     Definition free_byte
-               (b : Provenance)
+               (b : Iptr)
                (m : memory) : memory
-      := delete (Z.of_N b) m.
+      := delete b m.
 
     Definition free_frame_memory (f : mem_frame) (m : memory) : memory :=
       fold_left (fun m key => free_byte key m) f m.
@@ -1060,53 +1067,31 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition next_memory_key (m : memory_stack) : Z :=
       next_key (fst m).
 
-    (** ** Extending the memory  *)
-    Definition add_concrete_block (id : Z) (b : concrete_block) (m : memory_stack) : memory_stack :=
-      let '(m,s) := m in (add_concrete_block_mem id b m,s).
-
-    Definition add_logical_block (id : Z) (b : logical_block) (m : memory_stack) : memory_stack :=
-      let '(m,s) := m in (add_logical_block_mem id b m,s).
-
     (** ** Array lookups -- memory_stack
       Retrieve the values stored at position [from] to position [from + len - 1] in an array stored at address [a] in memory.
      *)
-    Definition get_array (m: memory_stack) (a : addr) (from len: nat) (size : N) (t : dtyp) : err (list uvalue) :=
-      let '(b, o) := a in
-      match get_logical_block m b with
-      | Some (LBlock _ bk _) =>
-        get_array_mem_block bk o from len size t
-      | None => failwith "Memory function [get_array] called at a non-allocated address"
-      end.
+    Definition get_array (m: memory_stack) (a : addr) (from len: nat) (size : N) (t : dtyp) : ErrSID (list uvalue) :=
+      let '(addr, pr) := a in
+      get_array_memory (fst m) addr pr from len size t.
 
-    Definition get_array_cell (m : memory_stack) (a : addr) (i : nat) (τ : dtyp) : err uvalue :=
-        let '(b, o) := a in
-        match get_logical_block m b with
-        | Some (LBlock _ bk _) =>
-          get_array_cell_mem_block bk o i 0 τ
-        | None => failwith "Memory function [get_array_cell] called at a non-allocated address"
-        end.
+    Definition get_array_cell (m : memory_stack) (a : addr) (i : nat) (τ : dtyp) : ErrSID uvalue :=
+        let '(addr, pr) := a in
+        get_array_cell_memory (fst m) addr pr i (sizeof_dtyp τ) τ.
 
     (** ** Array writes -- memory_stack
      *)
-    Definition write_array (m : memory_stack) (a : addr) (from : nat) (τ : dtyp) (vs : list dvalue) : err memory_stack :=
-      let '(b, o) := a in
-      match get_logical_block m b with
-      | Some (LBlock sz bk cid) =>
-        bk' <- write_array_mem_block bk o from τ vs;;
-        let block' := LBlock sz bk' cid in
-        ret (add_logical_block b block' m)
-      | None => failwith "Memory function [write_array] called at a non-allocated address"
-      end.
+    Definition write_array (ms : memory_stack) (a : addr) (from : nat) (τ : dtyp) (vs : list uvalue) : ErrSID memory_stack :=
+      let '(addr, pr) := a in
+      let '(m, fs) := ms in
+      m' <- write_array_memory m addr pr from τ vs;;
+      ret (m', fs)
+    .
 
-    Definition write_array_cell (m : memory_stack) (a : addr) (i : nat) (τ : dtyp) (v : dvalue) : err memory_stack :=
-      let '(b, o) := a in
-      match get_logical_block m b with
-      | Some (LBlock sz bk cid) =>
-        bk' <- write_array_cell_mem_block bk o i 0 τ v;;
-        let block' := LBlock sz bk' cid in
-        ret (add_logical_block b block' m)
-      | None => failwith "Memory function [write_array_cell] called at a non-allocated address"
-      end.
+    Definition write_array_cell (ms : memory_stack) (a : addr) (i : nat) (τ : dtyp) (v : uvalue) : ErrSID memory_stack :=
+      let '(addr, pr) := a in
+      let '(m, fs) := ms in
+      m' <- write_array_cell_memory m addr pr i 0 τ v;;
+      ret (m', fs).
 
     Definition free_frame (m : memory_stack) : err memory_stack :=
       let '(m,sf) := m in
@@ -1125,7 +1110,24 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | Snoc s f => (m, Snoc s (k :: f))
       end.
 
-    Definition allocate (m : memory_stack) (t : dtyp) : err (memory_stack * addr) :=
+    (* TODO: figure out allocation address *)
+    (* Where does this address come from? *)
+    (* Should I make sure that the bytes pointed to by this address
+       have not been allocated to? *)
+    Definition allocate_undef_bytes_size (m : memory) (addr : Z) (aid : AllocationId) (sz : N) (x : N) (t :  dtyp) : ErrSID memory
+      := (N.recursion
+           (fun (x : N) => ret m)
+           (fun n mf x =>
+              m <- mf (N.succ x);;
+              sid <- fresh_sid;;
+              let undef := UByte (UVALUE_Undef t) t (UVALUE_IPTR (Z.of_N x)) sid in
+              ret (IM.add (addr + Z.of_N x) (undef, aid) m))
+           sz) 0%N.
+
+    Definition allocate_undef_bytes (m : memory) (addr : Z) (aid : AllocationId) (t :  dtyp) : ErrSID memory
+      := allocate_undef_bytes_size m addr aid (sizeof_dtyp t) 0%N t.
+
+    Definition allocate (m : memory_stack) (t : dtyp) : ErrSID (memory_stack * addr) :=
       match t with
       | DTYPE_Void => failwith "Allocation of type void"
       | _ =>
