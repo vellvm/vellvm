@@ -821,6 +821,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     (** ** Reading values from memory *)
     Definition read_memory (mem : memory) (addr : Z) (pr : Prov) (t : dtyp) : ErrSID uvalue :=
       sid <- fresh_sid;;
+      (* TODO: Should I get a fresh_sid for each missing value in the map? *)
       let mem_bytes := lookup_all_index addr (sizeof_dtyp t) mem ((UByte (UVALUE_Undef t) t (UVALUE_IPTR 0) sid), None) in
       let bytes     := map fst mem_bytes in
       let alloc_ids := map snd mem_bytes in
