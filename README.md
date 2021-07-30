@@ -17,6 +17,10 @@ a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of 
  - [DeepSpec](http://deepspec.org)
  - [LLVM](http://llvm.org)
 
+### Related publication:
+ - "Modular, Compositional, and Executable Formal Semantics for LLVM IR" ([ICFP'21](https://icfp21.sigplan.org/details/icfp-2021-papers/6/Modular-Compositional-and-Executable-Formal-Semantics-for-LLVM-IR)),
+    Yannick Zakowski, Calvin Beck, Irene Yoon, Ilia Zaichuk, Vadim Zaliva, Steve Zdancewic
+
 # Participants
  - Steve Zdancewic
  - Yannick Zakowski
