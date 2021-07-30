@@ -1147,28 +1147,16 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         ret (ms', (addr, allocation_id_to_prov aid))
       end.
 
-    (* TODO: very similar to overlaps *)
-    Definition dtyp_fits (m : memory_stack) (a : addr) (τ : dtyp) :=
-      exists sz bytes cid,
-        get_logical_block m (fst a) = Some (LBlock sz bytes cid) /\
-        snd a + (Z.of_N (sizeof_dtyp τ)) <= Z.of_N sz.
+    Definition read (ms : memory_stack) (ptr : addr) (t : dtyp) : err uvalue :=
+      let '(m, fs) := ms in
+      let '(addr, pr) := ptr in
+      read_memory m addr pr t.
 
-    Definition read (m : memory_stack) (ptr : addr) (t : dtyp) : err uvalue :=
-      match get_logical_block m (fst ptr) with
-      | Some (LBlock _ block _) =>
-        ret (read_in_mem_block block (snd ptr) t)
-      | None => failwith "Attempting to read a non-allocated address"
-      end.
-
-    Definition write (m : memory_stack) (ptr : addr) (v : dvalue) : err memory_stack :=
-      match get_logical_block m (fst ptr) with
-      | Some (LBlock sz bytes cid) =>
-        let '(b,off) := ptr in
-        let bytes' := add_all_index (serialize_dvalue v) off bytes in
-        let block' := LBlock sz bytes' cid in
-        ret (add_logical_block b block' m)
-      | None => failwith "Attempting to write to a non-allocated address"
-      end.
+    Definition write (ms : memory_stack) (ptr : addr) (v : uvalue) (t : dtyp) : ErrSID memory_stack :=
+      let '(m, fs) := ms in
+      let '(addr, pr) := ptr in
+      m' <- write_memory m addr pr v t;;
+      ret (m', fs).
 
     (* Test whether a given address belong to the current main frame,
        and hence if it will be collected when the current function returns
@@ -1209,13 +1197,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       {
       is_read : read m a τ = inr v
       }.
-
-    Definition concrete_address_to_logical (cid : Z) (m : memory_stack) : option (Z * Z) :=
-      concrete_address_to_logical_mem cid (fst m).
-
-    Definition concretize_block (ptr : addr) (m : memory_stack) : Z * memory_stack :=
-      let '(b', m') := concretize_block_mem (fst ptr) (fst m) in
-      (b', (m', snd m)).
 
   End Memory_Stack_Operations.
 
