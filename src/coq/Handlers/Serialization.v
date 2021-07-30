@@ -28,24 +28,6 @@ Require Import Lia.
 Import ListNotations.
 Import MonadNotation.
 
-(* TODO: move this? *)
-Module Type PTOI(Addr:MemoryAddress.ADDRESS).  
-  Parameter ptr_to_int : Addr.addr -> Z.
-End PTOI.
-
-(* TODO: move this? *)
-Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
-  Parameter Prov : Set.
-  Parameter wildcard_prov : Prov.
-  Parameter nil_prov : Prov.
-  Parameter address_provenance : Addr.addr -> Prov.
-End PROVENANCE.
-
-(* TODO: move this? *)
-Module Type ITOP(Addr:MemoryAddress.ADDRESS)(PROV:PROVENANCE(Addr)).
-  Parameter int_to_ptr : Z -> PROV.Prov -> Addr.addr.
-End ITOP.
-
 Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF: Sizeof)(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE)).
 
   Import LLVMIO.

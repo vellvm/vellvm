@@ -170,6 +170,13 @@ Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type
   Qed.
 End Addr.
 
+
+(* TODO: Put these in modules? *)
+Definition ptr_to_int (ptr : Addr.addr) := fst ptr.
+Definition int_to_ptr (i : Z) (pr : Prov) : Addr.addr
+  := (i, pr).
+
+
 (** ** Memory model
     Implementation of the memory model, i.e. a handler for [MemoryE].
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
@@ -1215,7 +1222,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
       | Alloca t =>
         '(m',a) <- lift_pure_err (allocate m t);;
-        ret (m', DVALUE_Addr a)
+        ret (m', UVALUE_Addr a)
+
+      | _ =>
+        raise "wah"
+      end.
+
 
       | Load t dv =>
          match dv with
@@ -1240,44 +1252,27 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         ret (m, dv')
 
       | ItoP x =>
+        (* TODO: should this take signedness into account...? *)
         match x with
-        | DVALUE_I64 i =>
-          match concrete_address_to_logical (unsigned i) m with
-          | None => raise ("Invalid concrete address " ++ (to_string x))
-          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
-          end
-        | DVALUE_I32 i =>
-          match concrete_address_to_logical (unsigned i) m with
-          | None => raise "Invalid concrete address "
-          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
-          end
-        | DVALUE_I8 i  =>
-          match concrete_address_to_logical (unsigned i) m with
-          | None => raise "Invalid concrete address"
-          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
-          end
-        | DVALUE_I1 i  =>
-          match concrete_address_to_logical (unsigned i) m with
-          | None => raise "Invalid concrete address"
-          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
-          end
+        | DVALUE_I64 i
+        | DVALUE_I32 i
+        | DVALUE_I8  i
+        | DVALUE_I1 i =>
+          raise "wah" (* ret (m, DVALUE_Addr (int_to_ptr i wildcard_prov)) *)
         | DVALUE_IPTR i =>
-          match concrete_address_to_logical i m with
-          | None => raise "Invalid concrete address"
-          | Some (b, o) => ret (m, DVALUE_Addr (b, o))
-          end
+          ret (m, DVALUE_Addr (int_to_ptr i wildcard_prov))
+
         | _            => raise "Non integer passed to ItoP"
         end
 
       | PtoI t a =>
         match a, t with
         | DVALUE_Addr ptr, DTYPE_I sz =>
-          let (cid, m') := concretize_block ptr m in
-          'addr <- lift_undef_or_err ret (coerce_integer_to_int sz (cid + (snd ptr))) ;;
-          ret (m', addr)
+          let addr := coerce_integer_to_int sz (ptr_to_int ptr) in
+          ret (m, addr)
         | DVALUE_Addr ptr, DTYPE_IPTR =>
-          let (cid, m') := concretize_block ptr m in
-          ret (m', DVALUE_IPTR (cid + (snd ptr)))
+          let addr := ptr_to_int ptr in
+          ret (m, addr)
         | _, _ => raise "PtoI type error."
         end
       end.

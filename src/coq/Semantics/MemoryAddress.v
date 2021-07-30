@@ -10,6 +10,7 @@
 
 (* begin hide *)
 Require Import OrderedType OrderedTypeEx.
+Require Import ZArith.
 (* end hide *)
 
 (** * Signature for addresses
@@ -22,3 +23,21 @@ Module Type ADDRESS.
   Parameter null : addr.
   Parameter eq_dec : forall (a b : addr), {a = b} + {a <> b}.
 End ADDRESS.
+
+(* TODO: move this? *)
+Module Type PTOI(Addr:MemoryAddress.ADDRESS).  
+  Parameter ptr_to_int : Addr.addr -> Z.
+End PTOI.
+
+(* TODO: move this? *)
+Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
+  Parameter Prov : Set.
+  Parameter wildcard_prov : Prov.
+  Parameter nil_prov : Prov.
+  Parameter address_provenance : Addr.addr -> Prov.
+End PROVENANCE.
+
+(* TODO: move this? *)
+Module Type ITOP(Addr:MemoryAddress.ADDRESS)(PROV:PROVENANCE(Addr)).
+  Parameter int_to_ptr : Z -> PROV.Prov -> Addr.addr.
+End ITOP.
