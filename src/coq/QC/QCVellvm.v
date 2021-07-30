@@ -84,6 +84,5 @@ QCInclude "../../ml/libvellvm/*".
 (* QCInclude "../../ml/libvellvm/llvm_printer.ml". *)
 (* QCInclude "../../ml/libvellvm/Camlcoq.ml". *)
 (* QCInclude "../../ml/extracted/*ml". *)
-QuickChickDebug Debug On.
 QuickChick (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
 (*! QuickChick agrees. *)

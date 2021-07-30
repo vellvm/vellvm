@@ -85,10 +85,14 @@ Set Contextual Implicit.
   Definition debug {E} `{DebugE -< E} (msg : string) : itree E unit :=
     trigger (Debug msg).
 
-  Definition FailureE := exceptE string.
+  Definition FailureE := exceptE unit.
+
+  (* This function can be replaced with print_string during extraction
+     to print the error messages of Throw and (indirectly) ThrowUB. *)
+  Definition print_msg (msg : string) : unit := tt.
 
   Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
-    v <- trigger (Throw msg);; match v: void with end.
+    v <- trigger (Throw (print_msg msg));; match v: void with end.
     
   Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m:err A) : itree E B :=
     match m with
