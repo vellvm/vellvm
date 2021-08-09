@@ -56,6 +56,8 @@ From Vellvm Require Import
 
 Require Import Ceres.Ceres.
 
+Import StateMonad.
+
 Import MonadNotation.
 Import EqvNotation.
 Import ListNotations.
@@ -65,6 +67,40 @@ Set Contextual Implicit.
 
 #[local] Open Scope Z_scope.
 (* end hide *)
+
+(* TODO: move these and use them in more places, so I'm less
+       confused by what string is which, e.g., in undef_or_err *)
+Inductive UB_MESSAGE :=
+| UB_message : string -> UB_MESSAGE
+.
+
+Inductive ERR_MESSAGE :=
+| ERR_message : string -> ERR_MESSAGE
+.
+
+Notation UB := (sum UB_MESSAGE).
+Notation ERR := (sum ERR_MESSAGE).
+
+Instance Exception_UB : MonadExc UB_MESSAGE UB := Exception_either UB_MESSAGE.
+Instance Exception_ERR : MonadExc ERR_MESSAGE ERR := Exception_either ERR_MESSAGE.
+
+Instance Exception_UB_string : MonadExc string UB :=
+  {| MonadExc.raise := fun _ msg => inl (UB_message msg);
+     catch := fun T c h =>
+                match c with
+                | inl (UB_message msg) => h msg
+                | inr _ => c
+                end
+  |}.
+
+Instance Exception_ERR_string : MonadExc string ERR :=
+  {| MonadExc.raise := fun _ msg => inl (ERR_message msg);
+     catch := fun T c h =>
+                match c with
+                | inl (ERR_message msg) => h msg
+                | inr _ => c
+                end
+  |}.
 
 
 (** * Memory Model
@@ -483,16 +519,15 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          | _ => inl "No fields."
          end.
 
-    Definition extract_byte_to_ubyte (uv : uvalue) : err SByte
+    Definition extract_byte_to_ubyte (uv : uvalue) : ERR SByte
       := match uv with
          | UVALUE_ExtractByte uv dt idx sid =>
            ret (UByte uv dt idx sid)
-         | _ => inl "extract_byte_to_ubyte invalid conversion."
+         | _ => inl (ERR_message "extract_byte_to_ubyte invalid conversion.")
          end.
 
-    Import StateMonad.
     (* Need failure, UB, state for store_ids, and state for provenances *)
-    Definition ErrSID := eitherT string (eitherT string (stateT store_id (state Provenance))).
+    Definition ErrSID := eitherT ERR_MESSAGE (eitherT UB_MESSAGE (stateT store_id (state Provenance))).
 
     Definition lift_err {M A} `{MonadExc string M} `{Monad M} (e : err A) : (M A)
         := match e with
@@ -500,7 +535,13 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          | inr x => ret x
          end.
 
-    Definition evalErrSID {A} (m : ErrSID A) (sid : store_id) (prov : Provenance) : err (err A)
+    Definition lift_ERR {M A} `{MonadExc ERR_MESSAGE M} `{Monad M} (e : ERR A) : (M A)
+        := match e with
+         | inl (ERR_message e) => MonadExc.raise (ERR_message e)
+         | inr x => ret x
+         end.
+
+    Definition evalErrSID {A} (m : ErrSID A) (sid : store_id) (prov : Provenance) : (UB (ERR A))
       := evalState (evalStateT (unEitherT (unEitherT m)) sid) prov.
 
     Definition fresh_sid : ErrSID store_id
@@ -514,10 +555,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          ret (Some prov).
 
     Definition raise_error {A} (msg : string) : ErrSID A
-      := MonadExc.raise msg.
+      := MonadExc.raise (ERR_message msg).
 
     Definition raise_ub {A} (msg : string) : ErrSID A
-      := lift (MonadExc.raise msg).
+      := lift (MonadExc.raise (UB_message msg)).
 
     Definition err_to_ub {A} (e : err A) : ErrSID A
       := match e with
@@ -576,7 +617,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     re_sid_ubytes (bytes : list SByte) : ErrSID (list SByte)
       := let len := length bytes in
          byte_map <- re_sid_ubytes_helper (zip (Nseq 0 len) bytes) (@NM.empty _);;
-         trywith "re_sid_ubytes: missing indices." (NM_find_many (Nseq 0 len) byte_map). 
+         trywith (ERR_message "re_sid_ubytes: missing indices.") (NM_find_many (Nseq 0 len) byte_map). 
     Set Guard Checking.
 
     (* This is mostly to_ubytes, except it will also unwrap concatbytes *)
@@ -623,9 +664,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        (* Byte manipulation. *)
        | UVALUE_ExtractByte uv dt' idx sid =>
          raise_error "serialize_sbytes: UVALUE_ExtractByte not guarded by UVALUE_ConcatBytes."
+
        | UVALUE_ConcatBytes bytes t =>
          (* TODO: should provide *new* sids... May need to make this function in a fresh sid monad *)
-         bytes' <- lift_err (map_monad extract_byte_to_ubyte bytes);;
+         bytes' <- lift_ERR (map_monad extract_byte_to_ubyte bytes);;
          re_sid_ubytes bytes'
        end.
 
@@ -755,7 +797,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       The offset is therefore incremented by this index times the size of the type of elements stored. Finally, a recursive call
       at this new offset allows for deeper unbundling of a nested structure.
      *)
-    Fixpoint handle_gep_h (t:dtyp) (off:Z) (vs:list dvalue): err Z :=
+    Fixpoint handle_gep_h (t:dtyp) (off:Z) (vs:list dvalue): ERR Z :=
       match vs with
       | v :: vs' =>
         match v with
@@ -803,7 +845,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     (* At the toplevel, GEP takes a [dvalue] as an argument that must contain a pointer, but no other pointer can be recursively followed.
      The pointer set the block into which we look, and the initial offset. The first index value add to the initial offset passed to [handle_gep_h] for the actual access to structured data.
      *)
-    Definition handle_gep_addr (t:dtyp) (a:addr) (vs:list dvalue) : err addr :=
+    Definition handle_gep_addr (t:dtyp) (a:addr) (vs:list dvalue) : ERR addr :=
       let '(ptr, prov) := a in
       match vs with
       | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 / i64 indices *)
@@ -815,7 +857,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | _ => failwith "non-I32 index"
       end.
 
-    Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
+    Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : ERR dvalue :=
       match dv with
       | DVALUE_Addr a => fmap DVALUE_Addr (handle_gep_addr t a vs)
       | _ => failwith "non-address"
@@ -879,7 +921,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       The [size] argument has no effect, but we need to provide one to the array type.
      *)
     Definition get_array_cell_memory (mem : memory) (addr : Z) (pr : Prov) (i : nat) (size : N) (t : dtyp) : ErrSID uvalue :=
-      'offset <- lift_err (handle_gep_h (DTYPE_Array size t)
+      'offset <- lift_ERR (handle_gep_h (DTYPE_Array size t)
                                        addr
                                        [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]);;
       err_to_ub (read_memory mem offset pr t).
@@ -892,9 +934,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       - [size] does nothing, but we need to provide one for the array type.
     *)
     Definition write_array_cell_memory (mem : memory) (addr : Z) (pr : Prov) (i : nat) (size : N) (t : dtyp) (v : uvalue) : ErrSID memory :=
-      'offset <- lift_err (handle_gep_h (DTYPE_Array size t)
-                                       addr
-                                       [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]);;
+      'offset <- lift_ERR
+                  (handle_gep_h (DTYPE_Array size t)
+                                addr
+                                [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]);;
       write_memory mem offset pr v t.
 
     (** ** Array lookups -- mem_block
@@ -1211,10 +1254,11 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       Implementation of the memory model per se as a memory handler to the [MemoryE] interface.
    *)
   Definition handle_memory {E} `{FailureE -< E} `{UBE -< E}: MemoryE ~> stateT memory_stack (itree E) :=
-    fun _ e m =>
+    fun _ e =>
       match e with
       | MemPush =>
-        ret (push_fresh_frame m, tt)
+        modify push_fresh_frame;;
+        ret tt
 
       | MemPop =>
         'm' <- lift_pure_err (free_frame m);;
