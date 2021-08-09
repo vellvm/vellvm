@@ -715,7 +715,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       returned_value <-
       match intrinsic_exp f with
       | Some s =>
-        trigger (Intrinsic dt s uvs)
+        dvs <- map_monad (fun uv => pickUnique uv) uvs ;;
+        fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
       | None =>
         fv <- translate exp_to_instr (denote_exp None f) ;;
         trigger (Call dt fv uvs)
