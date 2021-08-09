@@ -33,7 +33,8 @@ From ExtLib Require Import
      Structures.Monads
      Structures.Functor
      Programming.Eqv
-     Data.String.
+     Data.String
+     Data.Monads.IdentityMonad.
 
 From Vellvm Require Import
      Numeric.Coqlib
@@ -57,6 +58,7 @@ From Vellvm Require Import
 Require Import Ceres.Ceres.
 
 Import StateMonad.
+Import IdentityMonad.
 
 Import MonadNotation.
 Import EqvNotation.
@@ -527,7 +529,15 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          end.
 
     (* Need failure, UB, state for store_ids, and state for provenances *)
-    Definition ErrSID := eitherT ERR_MESSAGE (eitherT UB_MESSAGE (stateT store_id (state Provenance))).
+    Definition ErrSID_T M := eitherT ERR_MESSAGE (eitherT UB_MESSAGE (stateT store_id (stateT Provenance M))).
+    Definition ErrSID := ErrSID_T ident.
+
+    Definition err_to_ERR {A} (e : err A) : ERR A
+      := match e with
+         | inl e => inl (ERR_message e)
+         | inr x => inr x
+         end.
+      
 
     Definition lift_err {M A} `{MonadExc string M} `{Monad M} (e : err A) : (M A)
         := match e with
@@ -541,8 +551,17 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          | inr x => ret x
          end.
 
-    Definition evalErrSID {A} (m : ErrSID A) (sid : store_id) (prov : Provenance) : (UB (ERR A))
-      := evalState (evalStateT (unEitherT (unEitherT m)) sid) prov.
+    Definition evalErrSID_T {A} {M} `{Monad M} (m : ErrSID_T M A) (sid : store_id) (prov : Provenance) : M (UB (ERR A))
+      := evalStateT (evalStateT (unEitherT (unEitherT m)) sid) prov.
+
+    Definition evalErrSID {A} (m : ErrSID A) (sid : store_id) (prov : Provenance) : UB (ERR A)
+      := unIdent (evalErrSID_T m sid prov).
+
+    Definition runErrSID_T {A} {M} `{Monad M} (m : ErrSID_T M A) (sid : store_id) (prov : Provenance) : M (UB (ERR A) * store_id * Provenance)%type
+      := runStateT (runStateT (unEitherT (unEitherT m)) sid) prov.
+
+    Definition runErrSID {A} (m : ErrSID A) (sid : store_id) (prov : Provenance) : UB (ERR A) * store_id * Provenance%type
+      := unIdent (runErrSID_T m sid prov).
 
     Definition fresh_sid : ErrSID store_id
       := lift (lift (modify N.succ)).
@@ -797,7 +816,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       The offset is therefore incremented by this index times the size of the type of elements stored. Finally, a recursive call
       at this new offset allows for deeper unbundling of a nested structure.
      *)
-    Fixpoint handle_gep_h (t:dtyp) (off:Z) (vs:list dvalue): ERR Z :=
+    Fixpoint handle_gep_h (t:dtyp) (off:Z) (vs:list dvalue): err Z :=
       match vs with
       | v :: vs' =>
         match v with
@@ -845,7 +864,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     (* At the toplevel, GEP takes a [dvalue] as an argument that must contain a pointer, but no other pointer can be recursively followed.
      The pointer set the block into which we look, and the initial offset. The first index value add to the initial offset passed to [handle_gep_h] for the actual access to structured data.
      *)
-    Definition handle_gep_addr (t:dtyp) (a:addr) (vs:list dvalue) : ERR addr :=
+    Definition handle_gep_addr (t:dtyp) (a:addr) (vs:list dvalue) : err addr :=
       let '(ptr, prov) := a in
       match vs with
       | DVALUE_I32 i :: vs' => (* TODO: Handle non i32 / i64 indices *)
@@ -857,7 +876,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | _ => failwith "non-I32 index"
       end.
 
-    Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : ERR dvalue :=
+    Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
       match dv with
       | DVALUE_Addr a => fmap DVALUE_Addr (handle_gep_addr t a vs)
       | _ => failwith "non-address"
@@ -921,9 +940,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       The [size] argument has no effect, but we need to provide one to the array type.
      *)
     Definition get_array_cell_memory (mem : memory) (addr : Z) (pr : Prov) (i : nat) (size : N) (t : dtyp) : ErrSID uvalue :=
-      'offset <- lift_ERR (handle_gep_h (DTYPE_Array size t)
-                                       addr
-                                       [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]);;
+      'offset <- lift_ERR (err_to_ERR
+                            (handle_gep_h (DTYPE_Array size t)
+                                          addr
+                                          [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]));;
       err_to_ub (read_memory mem offset pr t).
 
     (** ** Array element writing
@@ -934,10 +954,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       - [size] does nothing, but we need to provide one for the array type.
     *)
     Definition write_array_cell_memory (mem : memory) (addr : Z) (pr : Prov) (i : nat) (size : N) (t : dtyp) (v : uvalue) : ErrSID memory :=
-      'offset <- lift_ERR
-                  (handle_gep_h (DTYPE_Array size t)
-                                addr
-                                [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]);;
+      'offset <- lift_ERR (err_to_ERR
+                            (handle_gep_h (DTYPE_Array size t)
+                                          addr
+                                          [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]));;
       write_memory mem offset pr v t.
 
     (** ** Array lookups -- mem_block
@@ -1250,74 +1270,120 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
   End Memory_Stack_Operations.
 
+  Definition MemStateT M := stateT memory_stack (stateT store_id (stateT Provenance M)).
+
+  Definition mem_state_lift_itree {E A} (t : itree E A) : MemStateT (itree E) A
+    := lift (lift (lift t)).
+
+  Definition mem_state_raiseUB {E A} `{UBE -< E} (msg : string) : MemStateT (itree E) A
+    := mem_state_lift_itree (raiseUB msg).
+  
+  Definition mem_state_raise {E A} `{FailureE -< E} (msg : string) : MemStateT (itree E) A
+    := mem_state_lift_itree (raise msg).
+
+  Definition mem_state_lift_err {E} `{FailureE -< E} {A} (e : err A) : MemStateT (itree E) A
+    := mem_state_lift_itree (lift_pure_err e).
+
+  Definition mem_state_lift_ErrSID {E} `{FailureE -< E} `{UBE -< E} {A} (e : ErrSID A) : MemStateT (itree E) A
+    :=
+      sid <- lift MonadState.get;;
+      pr <-  lift (lift MonadState.get);;
+      match runErrSID e sid pr with
+      | (inl (UB_message msg), sid, pr) =>
+        mem_state_raiseUB msg
+      | (inr (inl (ERR_message msg)), sid, pr) =>
+        mem_state_raise msg
+      | (inr (inr x), sid, pr) =>
+        lift (put sid);;
+        lift (lift (put pr));;
+        ret x
+      end.
+
+  Definition mem_state_lift_undef_or_err {E} `{FailureE -< E} `{UBE -< E} {A} (e : undef_or_err A) : MemStateT (itree E) A
+    := match unEitherT e with
+       | inl ub => mem_state_raiseUB ub
+       | inr (inl err) => mem_state_raise err
+       | inr (inr x) => ret x
+       end.
+
   (** ** Memory Handler
       Implementation of the memory model per se as a memory handler to the [MemoryE] interface.
    *)
-  Definition handle_memory {E} `{FailureE -< E} `{UBE -< E}: MemoryE ~> stateT memory_stack (itree E) :=
-    fun _ e =>
+  Definition handle_memory {E} `{FailureE -< E} `{UBE -< E}: MemoryE ~> MemStateT (itree E) :=
+    fun T e =>
       match e with
       | MemPush =>
         modify push_fresh_frame;;
         ret tt
 
       | MemPop =>
-        'm' <- lift_pure_err (free_frame m);;
-        ret (m',tt)
+        m <- MonadState.get;;
+        'm' <- mem_state_lift_err (free_frame m);;
+        put m';;
+        ret tt
 
       | Alloca t =>
-        '(m',a) <- lift_pure_err (allocate m t);;
-        ret (m', UVALUE_Addr a)
-
-      | _ =>
-        raise "wah"
-      end.
-
+        m <- MonadState.get;;
+        '(m',a) <- mem_state_lift_ErrSID (allocate m t);;
+        put m';;
+        ret (UVALUE_Addr a)
 
       | Load t dv =>
          match dv with
-        | DVALUE_Addr ptr =>
-          match read m ptr t with
-          | inr v => ret (m, v)
-          | inl s => raiseUB s
-          end
-        | _ => raise "Attempting to load from a non-address dvalue"
+         | DVALUE_Addr ptr =>
+           m <- MonadState.get;;
+           match read m ptr t with
+           | inr v => ret v
+           | inl s => mem_state_raiseUB s
+           end
+        | _ => mem_state_raise "Attempting to load from a non-address dvalue"
         end
 
-      | Store dv v =>
-        match dv with
+      | Store dt da v =>
+        m <- MonadState.get;;
+        match da with
         | DVALUE_Addr ptr =>
-          'm' <- lift_pure_err (write m ptr v);;
-          ret (m', tt)
-        | _ => raise ("Attempting to store to a non-address dvalue: " ++ (to_string dv))
+          'm' <- mem_state_lift_ErrSID (write m ptr v dt);;
+          put m';;
+          ret tt
+        | _ => mem_state_raise ("Attempting to store to a non-address dvalue: " ++ (to_string da))
         end
 
-      | GEP t dv vs =>
-        'dv' <- lift_pure_err (handle_gep t dv vs);;
-        ret (m, dv')
-
+      | GEP dt ua uvs =>
+        match (dvs <- map_monad uvalue_to_dvalue uvs;; da <- uvalue_to_dvalue ua;; ret (da, dvs)) with
+        | inr (da, dvs) =>
+          (* If everything is well defined, just use handle_gep... *)
+          a' <- mem_state_lift_err (handle_gep dt da dvs);;
+          ret (dvalue_to_uvalue a')
+        | inl _ =>
+          (* Otherwise build a UVALUE_GEP *)
+          ret (UVALUE_GetElementPtr dt ua uvs)
+        end
+        
       | ItoP x =>
         (* TODO: should this take signedness into account...? *)
         match x with
-        | DVALUE_I64 i
-        | DVALUE_I32 i
-        | DVALUE_I8  i
-        | DVALUE_I1 i =>
-          raise "wah" (* ret (m, DVALUE_Addr (int_to_ptr i wildcard_prov)) *)
-        | DVALUE_IPTR i =>
-          ret (m, DVALUE_Addr (int_to_ptr i wildcard_prov))
-
-        | _            => raise "Non integer passed to ItoP"
+        | UVALUE_I64 i
+        | UVALUE_I32 i
+        | UVALUE_I8  i
+        | UVALUE_I1  i =>
+          ret (UVALUE_Addr (int_to_ptr (unsigned i) wildcard_prov))
+        | UVALUE_IPTR i =>
+          ret (UVALUE_Addr (int_to_ptr i wildcard_prov))
+        | _ => ret (UVALUE_Conversion Inttoptr x DTYPE_Pointer)
         end
 
       | PtoI t a =>
         match a, t with
-        | DVALUE_Addr ptr, DTYPE_I sz =>
+        | UVALUE_Addr ptr, DTYPE_I sz =>
           let addr := coerce_integer_to_int sz (ptr_to_int ptr) in
-          ret (m, addr)
-        | DVALUE_Addr ptr, DTYPE_IPTR =>
+          addr' <- mem_state_lift_undef_or_err addr;;
+          ret (dvalue_to_uvalue addr')
+        | UVALUE_Addr ptr, DTYPE_IPTR =>
           let addr := ptr_to_int ptr in
-          ret (m, addr)
-        | _, _ => raise "PtoI type error."
+          ret (UVALUE_IPTR addr)
+        | _, _ =>
+          ret (UVALUE_Conversion Ptrtoint a t)
         end
       end.
 
