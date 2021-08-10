@@ -1416,15 +1416,16 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
 
-    Definition E_trigger {M} : forall R, E R -> (stateT M (itree Effout) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
+    Definition E_trigger : forall R, E R -> (MemStateT (itree Effout) R) :=
+      fun R e => mem_state_lift_itree (trigger e).
 
-    Definition F_trigger {M} : forall R, F R -> (stateT M (itree Effout) R) :=
-      fun R e m => r <- trigger e ;; ret (m, r).
+    Definition F_trigger : forall R, F R -> (MemStateT (itree Effout) R) :=
+      fun R e => mem_state_lift_itree (trigger e).
 
-    Definition interp_memory_h := case_ E_trigger (case_ handle_intrinsic  (case_ handle_memory  F_trigger)).
+    Definition interp_memory_h := case_ E_trigger (case_ handle_intrinsic  (case_ handle_memory F_trigger)).
+
     Definition interp_memory :
-      itree Effin ~> stateT memory_stack (itree Effout) :=
+      itree Effin ~> MemStateT (itree Effout) :=
       interp_state interp_memory_h.
 
   End PARAMS.
