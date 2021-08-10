@@ -1276,10 +1276,17 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
 
   End Memory_Stack_Operations.
 
-  Definition MemStateT M := stateT memory_stack (stateT store_id (stateT Provenance M)).
+  Record MemState :=
+    mkMemState
+      { ms_memory_stack : memory_stack;
+        ms_sid : store_id;
+        ms_prov : Provenance
+      }.
+
+  Definition MemStateT M := stateT MemState M.
 
   Definition mem_state_lift_itree {E A} (t : itree E A) : MemStateT (itree E) A
-    := lift (lift (lift t)).
+    := lift t.
 
   Definition mem_state_raiseUB {E A} `{UBE -< E} (msg : string) : MemStateT (itree E) A
     := mem_state_lift_itree (raiseUB msg).
@@ -1290,18 +1297,63 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Definition mem_state_lift_err {E} `{FailureE -< E} {A} (e : err A) : MemStateT (itree E) A
     := mem_state_lift_itree (lift_pure_err e).
 
+  Definition mem_state_get_sid {M} `{Monad M} : MemStateT M store_id
+    := fmap ms_sid MonadState.get.
+
+  Definition MemState_set_sid (sid : store_id) (ms : MemState) : MemState
+    := match ms with
+       | mkMemState ms_memory_stack ms_sid ms_prov =>
+         mkMemState ms_memory_stack sid ms_prov
+       end.
+
+  Definition MemState_set_prov (prov : Provenance) (ms : MemState) : MemState
+    := match ms with
+       | mkMemState ms_memory_stack ms_sid ms_prov =>
+         mkMemState ms_memory_stack ms_sid prov
+       end.
+
+  Definition MemState_set_memory_stack (m : memory_stack) (ms : MemState) : MemState
+    := match ms with
+       | mkMemState ms_memory_stack ms_sid ms_prov =>
+         mkMemState m ms_sid ms_prov
+       end.
+
+  Definition mem_state_put_sid {M} `{Monad M} (sid : store_id) : MemStateT M unit
+    := modify (MemState_set_sid sid);; ret tt.
+
+  Definition mem_state_put_prov {M} `{Monad M} (prov : Provenance) : MemStateT M unit
+    := modify (MemState_set_prov prov);; ret tt.
+
+  Definition mem_state_put_memory_stack {M} `{Monad M} (m : memory_stack) : MemStateT M unit
+    := modify (MemState_set_memory_stack m);; ret tt.
+
+  Definition mem_state_get_prov {M} `{Monad M} : MemStateT M Provenance
+    := fmap ms_prov MonadState.get.
+
+  Definition mem_state_get_memory_stack {M} `{Monad M} : MemStateT M memory_stack
+    := fmap ms_memory_stack MonadState.get.
+
+  Definition MemState_modify_memory_stack {M} `{Monad M} (f : memory_stack -> memory_stack) (ms : MemState) : MemState
+    := match ms with
+       | mkMemState ms_memory_stack ms_sid ms_prov =>
+         mkMemState (f ms_memory_stack) ms_sid ms_prov
+       end.
+
+  Definition mem_state_modify_memory_stack {M} `{Monad M} (f : memory_stack -> memory_stack) : MemStateT M unit
+    := modify (MemState_modify_memory_stack f);; ret tt.
+
   Definition mem_state_lift_ErrSID {E} `{FailureE -< E} `{UBE -< E} {A} (e : ErrSID A) : MemStateT (itree E) A
     :=
-      sid <- lift MonadState.get;;
-      pr <-  lift (lift MonadState.get);;
+      sid <- mem_state_get_sid;;
+      pr <-  mem_state_get_prov;;
       match runErrSID e sid pr with
       | (inl (UB_message msg), sid, pr) =>
         mem_state_raiseUB msg
       | (inr (inl (ERR_message msg)), sid, pr) =>
         mem_state_raise msg
       | (inr (inr x), sid, pr) =>
-        lift (put sid);;
-        lift (lift (put pr));;
+        mem_state_put_sid sid;;
+        mem_state_put_prov pr;;
         ret x
       end.
 
@@ -1319,25 +1371,25 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     fun T e =>
       match e with
       | MemPush =>
-        modify push_fresh_frame;;
+        mem_state_modify_memory_stack push_fresh_frame;;
         ret tt
 
       | MemPop =>
-        m <- MonadState.get;;
+        m <- mem_state_get_memory_stack;;
         'm' <- mem_state_lift_err (free_frame m);;
-        put m';;
+        mem_state_put_memory_stack m';;
         ret tt
 
       | Alloca t =>
-        m <- MonadState.get;;
+        m <- mem_state_get_memory_stack;;
         '(m',a) <- mem_state_lift_ErrSID (allocate m t);;
-        put m';;
+        mem_state_put_memory_stack m';;
         ret (UVALUE_Addr a)
 
       | Load t dv =>
          match dv with
          | DVALUE_Addr ptr =>
-           m <- MonadState.get;;
+           m <- mem_state_get_memory_stack;;
            match read m ptr t with
            | inr v => ret v
            | inl s => mem_state_raiseUB s
@@ -1346,11 +1398,11 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         end
 
       | Store dt da v =>
-        m <- MonadState.get;;
+        m <- mem_state_get_memory_stack;;
         match da with
         | DVALUE_Addr ptr =>
           'm' <- mem_state_lift_ErrSID (write m ptr v dt);;
-          put m';;
+          mem_state_put_memory_stack m';;
           ret tt
         | _ => mem_state_raise ("Attempting to store to a non-address dvalue: " ++ (to_string da))
         end
@@ -1399,11 +1451,11 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | Intrinsic t name args =>
         (* Pick all arguments, they should all be unique. *)
         if string_dec name "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
-          '(m, s) <- MonadState.get;;
+          '(m, s) <- mem_state_get_memory_stack;;
           match handle_memcpy args m with
           | inl err => mem_state_raiseUB err
           | inr m' =>
-            put (m', s);;
+            mem_state_put_memory_stack (m', s);;
             ret DVALUE_None
           end
         else
