@@ -57,7 +57,6 @@ From Vellvm Require Import
 
 Require Import Ceres.Ceres.
 
-Import StateMonad.
 Import IdentityMonad.
 
 Import MonadNotation.
@@ -550,6 +549,22 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          | inl (ERR_message e) => MonadExc.raise (ERR_message e)
          | inr x => ret x
          end.
+
+    (* TODO: move this? *)
+    Definition runStateT {S M A} `{Monad M} (m: stateT S M A) (s : S) : M (A * S)%type
+      := '(s', a) <- m s;;
+         ret (a, s').
+
+    Definition evalStateT {S M A} `{Monad M} (m: stateT S M A) (s : S) : M A
+      := fmap fst (runStateT m s).
+
+    Global Instance MonadT_stateT_itree {S : Type} {M : Type -> Type} `{Monad M} : MonadT (stateT S M) M
+      := {| lift := fun (t : Type) (c : M t) => fun s => t0 <- c;; ret (s, t0) |}.
+
+    Global Instance MonadState_stateT_itree {S : Type} {M : Type -> Type} `{Monad M} : MonadState S (stateT S M)
+      := {| MonadState.get := fun s => ret (s, s);
+            put := fun x s => ret (x, tt);
+        |}.
 
     Definition evalErrSID_T {A} {M} `{Monad M} (m : ErrSID_T M A) (sid : store_id) (prov : Provenance) : M (UB (ERR A))
       := evalStateT (evalStateT (unEitherT (unEitherT m)) sid) prov.
