@@ -203,7 +203,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
      (e.g. if the wrong number and/or type of arguments is given to the intrinsic)
 
    *)
-  Definition semantic_function := (list uvalue) -> err uvalue.
+  Definition semantic_function := (list dvalue) -> err dvalue.
 
   (* An association list mapping intrinsic names to their semantic definitions *)
   Definition intrinsic_definitions := list (declaration typ * semantic_function).
@@ -215,7 +215,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Definition llvm_fabs_f32 : semantic_function :=
     fun args =>
       match args with
-      | [UVALUE_Float d] => ret (UVALUE_Float (b32_abs d))
+      | [DVALUE_Float d] => ret (DVALUE_Float (b32_abs d))
       | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed intputs"
       end.
 
@@ -223,7 +223,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Definition llvm_fabs_f64 : semantic_function :=
     fun args =>
       match args with
-      | [UVALUE_Double d] => ret (UVALUE_Double (b64_abs d))
+      | [DVALUE_Double d] => ret (DVALUE_Double (b64_abs d))
       | _ => failwith "llvm_fabs_f64 got incorrect / ill-typed intputs"
       end.
 
@@ -244,14 +244,14 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Definition llvm_maxnum_f64 : semantic_function :=
     fun args =>
       match args with
-      | [UVALUE_Double a; UVALUE_Double b] => ret (UVALUE_Double (Float_maxnum a b))
+      | [DVALUE_Double a; DVALUE_Double b] => ret (DVALUE_Double (Float_maxnum a b))
       | _ => failwith "llvm_maxnum_f64 got incorrect / ill-typed intputs"
       end.
 
   Definition llvm_maxnum_f32 : semantic_function :=
     fun args =>
       match args with
-      | [UVALUE_Float a; UVALUE_Float b] => ret (UVALUE_Float (Float32_maxnum a b))
+      | [DVALUE_Float a; DVALUE_Float b] => ret (DVALUE_Float (Float32_maxnum a b))
       | _ => failwith "llvm_maxnum_f32 got incorrect / ill-typed intputs"
       end.
 
@@ -272,14 +272,14 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
   Definition llvm_minimum_f64 : semantic_function :=
     fun args =>
       match args with
-      | [UVALUE_Double a; UVALUE_Double b] => ret (UVALUE_Double (Float_minimum a b))
+      | [DVALUE_Double a; DVALUE_Double b] => ret (DVALUE_Double (Float_minimum a b))
       | _ => failwith "llvm_minimum_f64 got incorrect / ill-typed intputs"
       end.
 
   Definition llvm_minimum_f32 : semantic_function :=
     fun args =>
       match args with
-      | [UVALUE_Float a; UVALUE_Float b] => ret (UVALUE_Float (Float32_minimum a b))
+      | [DVALUE_Float a; DVALUE_Float b] => ret (DVALUE_Float (Float32_minimum a b))
       | _ => failwith "llvm_minimum_f32 got incorrect / ill-typed intputs"
       end.
 
