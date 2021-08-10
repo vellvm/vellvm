@@ -103,14 +103,14 @@ Section InterpreterCFG.
     let L2_trace       := interp_local L1_trace l in
     L2_trace.
 
-  Definition interp_cfg3 {R} (t: itree instr_E R) (g: global_env) (l: local_env) (m: memory_stack) :=
+  Definition interp_cfg3 {R} (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) :=
     let L0_trace       := interp_intrinsics t in
     let L1_trace       := interp_global L0_trace g in
     let L2_trace       := interp_local L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     L3_trace.
 
-  Definition interp_cfg4 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: memory_stack) :=
+  Definition interp_cfg4 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) :=
     let L0_trace       := interp_intrinsics t in
     let L1_trace       := interp_global L0_trace g in
     let L2_trace       := interp_local L1_trace l in
@@ -118,7 +118,7 @@ Section InterpreterCFG.
     let L4_trace       := model_undef RR L3_trace in
     L4_trace.
 
-  Definition interp_cfg5 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: memory_stack) :=
+  Definition interp_cfg5 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) :=
     let L0_trace       := interp_intrinsics t in
     let L1_trace       := interp_global L0_trace g in
     let L2_trace       := interp_local L1_trace l in

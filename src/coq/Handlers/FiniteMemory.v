@@ -207,12 +207,56 @@ Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type
   Qed.
 End Addr.
 
+Module FinPTOI : PTOI(Addr).
+  Definition ptr_to_int (ptr : Addr.addr) := fst ptr.
+End FinPTOI.
 
-(* TODO: Put these in modules? *)
-Definition ptr_to_int (ptr : Addr.addr) := fst ptr.
-Definition int_to_ptr (i : Z) (pr : Prov) : Addr.addr
-  := (i, pr).
+Module FinPROV : PROVENANCE(Addr) with Definition Prov := Prov.
+  Definition Prov := Prov.
+  Definition wildcard_prov : Prov := wildcard_prov.
+  Definition nil_prov : Prov := nil_prov.
+  Definition address_provenance (a : Addr.addr) : Prov
+    := snd a.
+End FinPROV.
 
+Module FinITOP : ITOP(Addr)(FinPROV).
+  Definition int_to_ptr (i : Z) (pr : Prov) : Addr.addr
+    := (i, pr).
+End FinITOP.
+
+Module FinSizeof <: Sizeof.
+  Parameter ptr_size : nat.
+  Fixpoint sizeof_dtyp (ty:dtyp) : N :=
+    match ty with
+    | DTYPE_I 1          => 1 (* TODO: i1 sizes... *)
+    | DTYPE_I 8          => 1
+    | DTYPE_I 32         => 4
+    | DTYPE_I 64         => 8
+    | DTYPE_I _          => 0 (* Unsupported integers *)
+    | DTYPE_IPTR         => N.of_nat ptr_size
+    | DTYPE_Pointer      => N.of_nat ptr_size
+    | DTYPE_Packed_struct l
+    | DTYPE_Struct l     => fold_left (fun acc x => (acc + sizeof_dtyp x)%N) l 0%N
+    | DTYPE_Vector sz ty'
+    | DTYPE_Array sz ty' => sz * sizeof_dtyp ty'
+    | DTYPE_Float        => 4
+    | DTYPE_Double       => 8
+    | DTYPE_Half         => 4
+    | DTYPE_X86_fp80     => 10 (* TODO: Unsupported, currently modeled by Float32 *)
+    | DTYPE_Fp128        => 16 (* TODO: Unsupported, currently modeled by Float32 *)
+    | DTYPE_Ppc_fp128    => 16 (* TODO: Unsupported, currently modeled by Float32 *)
+    | DTYPE_Metadata     => 0
+    | DTYPE_X86_mmx      => 8 (* TODO: Unsupported *)
+    | DTYPE_Opaque       => 0 (* TODO: Unsupported *)
+    | _                  => 0 (* TODO: add support for more types as necessary *)
+    end.
+End FinSizeof.
+
+Import FinPTOI.
+Import FinPROV.
+Import FinITOP.
+
+Import FinSizeof.
 
 (** ** Memory model
     Implementation of the memory model, i.e. a handler for [MemoryE].
@@ -295,33 +339,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   (*
   Definition sbytes_of_int (e : Endianess) (count:nat) (z:Z) : list SByte :=
     List.map Byte (bytes_of_int e count z). *)
-
-    (** ** Size of a dynamic type
-      Computes the byte size of a [dtyp]. *)
-    Fixpoint sizeof_dtyp (ty:dtyp) : N :=
-      match ty with
-      | DTYPE_I 1          => 1 (* TODO: i1 sizes... *)
-      | DTYPE_I 8          => 1
-      | DTYPE_I 32         => 4
-      | DTYPE_I 64         => 8
-      | DTYPE_I _          => 0 (* Unsupported integers *)
-      | DTYPE_IPTR         => N.of_nat ptr_size
-      | DTYPE_Pointer      => N.of_nat ptr_size
-      | DTYPE_Packed_struct l
-      | DTYPE_Struct l     => fold_left (fun acc x => (acc + sizeof_dtyp x)%N) l 0%N
-      | DTYPE_Vector sz ty'
-      | DTYPE_Array sz ty' => sz * sizeof_dtyp ty'
-      | DTYPE_Float        => 4
-      | DTYPE_Double       => 8
-      | DTYPE_Half         => 4
-      | DTYPE_X86_fp80     => 10 (* TODO: Unsupported, currently modeled by Float32 *)
-      | DTYPE_Fp128        => 16 (* TODO: Unsupported, currently modeled by Float32 *)
-      | DTYPE_Ppc_fp128    => 16 (* TODO: Unsupported, currently modeled by Float32 *)
-      | DTYPE_Metadata     => 0
-      | DTYPE_X86_mmx      => 8 (* TODO: Unsupported *)
-      | DTYPE_Opaque       => 0 (* TODO: Unsupported *)
-      | _                  => 0 (* TODO: add support for more types as necessary *)
-      end.
 
     Definition uvalue_bytes_little_endian (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
       := map (fun n => UVALUE_ExtractByte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq 0 ptr_size).

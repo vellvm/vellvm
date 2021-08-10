@@ -137,3 +137,23 @@ Fixpoint filter_split {A} (pred : A -> bool) (xs : list A) : (list A * list A)
        then (x::ins, outs)
        else (ins, x::outs)
      end.
+
+(* TODO: does this exist somewhere else? *)
+Lemma app_prefix :
+  forall {A} (a b c : list A),
+    b = c -> a ++ b = a ++ c.
+Proof.
+  intros A a b c H.
+  induction a.
+  - cbn; auto.
+  - cbn. rewrite IHa.
+    reflexivity.
+Qed.
+
+Lemma skipn_length_app :
+  forall {A} (xs ys : list A),
+    skipn (Datatypes.length xs) (xs ++ ys) = ys.
+Proof.
+  intros A xs ys.
+  induction xs; cbn; auto.
+Qed.

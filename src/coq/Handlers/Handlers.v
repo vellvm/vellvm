@@ -23,20 +23,23 @@ From Vellvm.Handlers Require Export
      Local
      Stack
      Intrinsics
-     Memory
-     MemoryTheory
+     FiniteMemory
+     FiniteMemoryTheory
      Pick
      UndefinedBehaviour
 .
 
+From Vellvm.Semantics Require Import Memory.Sizeof.
+
 (* Handlers get instantiated over the domain of addresses provided by the memory model *)
-Module LLVMEvents := LLVMEvents.Make(Memory.Addr).
-Module Global := Global.Make Memory.Addr LLVMEvents.
-Module Local  := Local.Make  Memory.Addr LLVMEvents.
-Module Stack  := Stack.Make  Memory.Addr LLVMEvents.
-Module Intrinsics := Intrinsics.Make Memory.Addr LLVMEvents.
-Module MemTheory := MemoryTheory.Make(LLVMEvents).
-Module Pick := Pick.Make Memory.Addr LLVMEvents.
+Module LLVMEvents := LLVMEvents.Make(FiniteMemory.Addr).
+Module Global := Global.Make FiniteMemory.Addr LLVMEvents.
+Module Local  := Local.Make  FiniteMemory.Addr LLVMEvents.
+Module Stack  := Stack.Make  FiniteMemory.Addr LLVMEvents.
+Module Intrinsics := Intrinsics.Make FiniteMemory.Addr LLVMEvents.
+Module MemTheory := FiniteMemoryTheory.Make(LLVMEvents).
+
+Module Pick := Pick.Make FiniteMemory.Addr LLVMEvents FinSizeof FinPTOI FinPROV FinITOP.
 
 Export LLVMEvents LLVMEvents.DV Global Local Stack MemTheory MemTheory.Mem Pick Intrinsics
        UndefinedBehaviour.

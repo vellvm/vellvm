@@ -78,7 +78,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A))(SIZEOF: Sizeo
     Open Scope N_scope.
 
     Definition default_dvalue_of_dtyp_i (sz : N) : err dvalue:=
-      (if (sz =? 64) then ret (DVALUE_I64 (repr 0))
+       (if (sz =? 64) then ret (DVALUE_I64 (repr 0))
         else if (sz =? 32) then ret (DVALUE_I32 (repr 0))
             else if (sz =? 8) then ret (DVALUE_I8 (repr 0))
                   else if (sz =? 1) then ret (DVALUE_I1 (repr 0))
