@@ -82,6 +82,30 @@ Proof.
   intro len; induction len; simpl; auto.
 Qed.
 
+Lemma Zseq_succ : forall off (n : N),
+    Zseq off (N.to_nat (N.succ n)) = off :: Zseq (Z.succ off) (N.to_nat n).
+Proof.
+  intros off n.
+  rewrite Nnat.N2Nat.inj_succ; auto.
+Qed.
+
+Lemma Zseq_succ_nat : forall off (n : nat),
+    Zseq off (S n) = off :: Zseq (Z.succ off) n.
+Proof.
+  intros off n.
+  auto.
+Qed.
+
+Lemma Zseq_length :
+  forall len off,
+    Datatypes.length (Zseq off len) = len.
+Proof.
+  induction len; intros; auto.
+  cbn.
+  congruence.
+Qed.
+
+
 Fixpoint drop {A} (n : N) (l : list A) : list A
   := match l with
      | [] => []
