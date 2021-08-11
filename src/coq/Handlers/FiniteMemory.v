@@ -225,7 +225,9 @@ Module FinITOP : ITOP(Addr)(FinPROV).
 End FinITOP.
 
 Module FinSizeof <: Sizeof.
-  Parameter ptr_size : nat.
+  (* TODO: make parameter? *)
+  Definition ptr_size : nat := 8.
+  
   Fixpoint sizeof_dtyp (ty:dtyp) : N :=
     match ty with
     | DTYPE_I 1          => 1 (* TODO: i1 sizes... *)
@@ -268,16 +270,21 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   Import DV.
   Open Scope list.
 
-  Variable ptr_size : nat.
-  Variable datalayout : DataLayout.
+  (* TODO: Make these parameters? *)
+  (* Variable ptr_size : nat. *)
+  (* Variable datalayout : DataLayout. *)
+  Definition ptr_size : nat := 8.
+         
 
   Definition addr := Addr.addr.
   
   Inductive SByte :=
   | UByte (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : store_id) : SByte.
 
+  (* Definition endianess : Endianess *)
+  (*   := dl_endianess datalayout. *)
   Definition endianess : Endianess
-    := dl_endianess datalayout.
+    := ENDIAN_LITTLE.
 
   Section Datatype_Definition.
 
@@ -438,9 +445,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          | None => def
          end.
 
-    Definition fp_alignment (bits : N) : option Alignment :=
-      let fp_map := dl_floating_point_alignments datalayout
-      in NM.find bits fp_map.
+    (* TODO: revive this *)
+    (* Definition fp_alignment (bits : N) : option Alignment := *)
+    (*   let fp_map := dl_floating_point_alignments datalayout *)
+    (*   in NM.find bits fp_map. *)
 
     Definition option_pick_large {A} (leq : A -> A -> bool) (a b : option A) : option A
       := match a, b with
@@ -477,18 +485,19 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       let max := maximumByOpt leq l
       in fold_left (fun a b => if leq n b then option_pick_small leq a (Some b) else a) l max.
 
-    Definition int_alignment (bits : N) : option Alignment :=
-      let int_map := dl_integer_alignments datalayout
-      in match NM.find bits int_map with
-         | Some align => Some align
-         | None =>
-           let keys  := map fst (NM.elements int_map) in
-           let bits' := nextOrMaximumOpt N.leb bits keys 
-           in match bits' with
-              | Some bits => NM.find bits int_map
-              | None => None
-              end
-         end.
+    (*  TODO: revive this *)
+    (* Definition int_alignment (bits : N) : option Alignment := *)
+    (*   let int_map := dl_integer_alignments datalayout *)
+    (*   in match NM.find bits int_map with *)
+    (*      | Some align => Some align *)
+    (*      | None => *)
+    (*        let keys  := map fst (NM.elements int_map) in *)
+    (*        let bits' := nextOrMaximumOpt N.leb bits keys  *)
+    (*        in match bits' with *)
+    (*           | Some bits => NM.find bits int_map *)
+    (*           | None => None *)
+    (*           end *)
+    (*      end. *)
 
     (* TODO: Finish this function *)
     (* Fixpoint dtyp_alignment (dt : dtyp) : option Alignment := *)

@@ -88,7 +88,7 @@ let rec eq_uvalue (l: DV.uvalue) (r: DV.uvalue) : bool =
 let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV.uvalue =
   match typ, exp with
   (* Allow null pointers literals *)
-  | TYPE_Pointer _, EXP_Null -> UVALUE_Addr Memory.Addr.null
+  | TYPE_Pointer _, EXP_Null -> UVALUE_Addr FiniteMemory.Addr.null
   | TYPE_I i, EXP_Integer x ->
     begin match (Camlcoq.N.to_int i) with
     | 1 -> UVALUE_I1 x
