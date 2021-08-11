@@ -92,8 +92,7 @@ Definition initialize_global (g:global dtyp) : itree exp_E unit :=
        | None => ret (UVALUE_Undef dt)
        | Some e =>  ⟦ e at dt ⟧e
        end ;;
-  dv <- concretize_or_pick uv True ;;
-  trigger (Store a dv).
+  trigger (Store dt a uv).
 
 Definition initialize_globals (gs:list (global dtyp)): itree exp_E unit :=
   map_monad_ initialize_global gs.
@@ -132,8 +131,8 @@ Definition address_one_function (df : definition dtyp (CFG.cfg dtyp)) : itree L0
 
 Notation res_L1 := (global_env * uvalue)%type.
 Notation res_L2 := (local_env * lstack * res_L1)%type.
-Notation res_L3 := (memory_stack * res_L2)%type.
-Notation res_L4 := (memory_stack * (local_env * lstack * (global_env * uvalue)))%type.
+Notation res_L3 := (MemState * res_L2)%type.
+Notation res_L4 := (MemState * (local_env * lstack * (global_env * uvalue)))%type.
 
 (**
      Full denotation of a Vellvm program as an interaction tree:
@@ -185,7 +184,7 @@ Definition interpreter_gen
            (prog: list (toplevel_entity typ (block typ * list (block typ))))
   : itree L5 res_L4 :=
   let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-  interp_mcfg5_exec t [] ([],[]) empty_memory_stack.
+  interp_mcfg5_exec t [] ([],[]) emptyMemState.
 
 (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts 
@@ -209,9 +208,9 @@ Definition model_gen
            (entry : string)
            (args : list uvalue)
            (prog: list (toplevel_entity typ (block typ * list (block typ))))
-  : PropT L5 (memory_stack * (local_env * lstack * (global_env * uvalue))) :=
+  : PropT L5 (MemState * (local_env * lstack * (global_env * uvalue))) :=
   let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-  ℑs eq t [] ([],[]) empty_memory_stack. 
+  ℑs eq t [] ([],[]) emptyMemState. 
 
 (**
      Finally, the official model assumes no user-defined intrinsics.

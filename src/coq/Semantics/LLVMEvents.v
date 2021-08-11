@@ -150,7 +150,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
     Variant MemoryE : Type -> Type :=
     | MemPush : MemoryE unit
     | MemPop  : MemoryE unit
-    | Alloca  : forall (t:dtyp),                               (MemoryE uvalue)
+    | Alloca  : forall (t:dtyp),                               (MemoryE dvalue)
     | Load    : forall (t:dtyp) (a:dvalue),                    (MemoryE uvalue)
     (* Store address should be unique... *)
     | Store   : forall (t:dtyp) (a:dvalue) (v:uvalue),         (MemoryE unit)

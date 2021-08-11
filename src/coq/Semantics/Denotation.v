@@ -686,8 +686,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
 
     (* Allocation *)
     | (IId id, INSTR_Alloca dt _ _) =>
-      uv <- trigger (Alloca dt);;
-      trigger (LocalWrite id uv)
+      dv <- trigger (Alloca dt);;
+      trigger (LocalWrite id (dvalue_to_uvalue dv))
 
     (* Load *)
     | (IId id, INSTR_Load _ dt (du,ptr) _) =>

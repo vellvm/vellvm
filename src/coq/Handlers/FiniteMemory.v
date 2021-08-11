@@ -1300,6 +1300,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         ms_prov : Provenance
       }.
 
+  Definition emptyMemState : MemState :=
+    mkMemState empty_memory_stack 0%N 0%N.
+
   Definition MemStateT M := stateT MemState M.
 
   Definition mem_state_lift_itree {E A} (t : itree E A) : MemStateT (itree E) A
@@ -1401,7 +1404,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         m <- mem_state_get_memory_stack;;
         '(m',a) <- mem_state_lift_ErrSID (allocate m t);;
         mem_state_put_memory_stack m';;
-        ret (UVALUE_Addr a)
+        ret (DVALUE_Addr a)
 
       | Load t dv =>
          match dv with
