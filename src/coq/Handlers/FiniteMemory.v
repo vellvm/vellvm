@@ -595,6 +595,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition runErrSID {A} (m : ErrSID A) (sid : store_id) (prov : Provenance) : UB (ERR A) * store_id * Provenance%type
       := unIdent (runErrSID_T m sid prov).
 
+    (* TODO: move this? *)
+    Definition ErrSID_evals_to {A} (e : ErrSID A) (x : A) sid pr : Prop
+      := evalErrSID e sid pr = inr (inr x).
+
     Definition fresh_sid : ErrSID store_id
       := lift (lift (modify N.succ)).
 
@@ -945,22 +949,28 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       Returns a list of all the AllocationIds for the bytes that would be written in order.
       This is useful for preserving the allocation ids when writing new bytes.
      *)
-    Definition write_allowed (mem : memory) (addr : Z) (pr : Prov) (len : nat) : ErrSID (list AllocationId)
+    Definition write_allowed (mem : memory) (addr : Z) (pr : Prov) (len : nat) : err (list AllocationId)
       :=
         let mem_bytes := IM_find_many (Zseq 0 len) mem in
         match mem_bytes with
-        | None => raise_ub "Trying to write to unallocated memory."
+        | None => failwith "Trying to write to unallocated memory."
         | Some mem_bytes =>
           let alloc_ids := map snd mem_bytes in
           if all_accesses_allowed pr alloc_ids
           then ret alloc_ids
-          else raise_ub "Trying to write to memory with invalid provenance."
+          else failwith "Trying to write to memory with invalid provenance."
         end.
+
+    Definition write_allowed_errsid (mem : memory) (addr : Z) (pr : Prov) (len : nat) : ErrSID (list AllocationId)
+      := match write_allowed mem addr pr len with
+         | inr aids => ret aids
+         | inl ub => raise_ub ub
+         end.
 
     Definition write_memory (mem : memory) (addr : Z) (pr : Prov) (v : uvalue) (dt : dtyp) : ErrSID memory
       :=
         (* Check that we're allowed to write to each place in memory *)
-        aids <- write_allowed mem addr pr (N.to_nat (sizeof_dtyp dt));;
+        aids <- write_allowed_errsid mem addr pr (N.to_nat (sizeof_dtyp dt));;
         bytes <- serialize_sbytes v dt;;
         let mem_bytes := zip bytes aids in
 

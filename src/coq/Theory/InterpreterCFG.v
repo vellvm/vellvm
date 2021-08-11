@@ -256,8 +256,8 @@ Proof.
 Qed.
 
 Lemma interp_cfg3_Load : forall t a g l m val,
-    read m a t = inr val ->
-    ℑ3 (trigger (Load t (DVALUE_Addr a))) g l m ≈ Ret3 g l m val. 
+    read (ms_memory_stack m) a t = inr val ->
+    ℑ3 (trigger (Load t (DVALUE_Addr a))) g l m ≈ Ret3 g l m val.
 Proof.
   intros * READ.
   unfold ℑ3.
@@ -268,9 +268,9 @@ Proof.
 Qed.
 
 Lemma interp_cfg3_store :
-  forall (m m' : memory_stack) (val : dvalue) (a : addr) g l,
-    write m a val = inr m' ->
-    ℑ3 (trigger (Store (DVALUE_Addr a) val)) g l m ≈ Ret3 g l m' tt.
+  forall (m m' : MemState) (val : uvalue) (dt : dtyp) (a : addr) g l,
+    ErrSID_evals_to (write (ms_memory_stack m) a val dt) (ms_memory_stack m') ->
+    ℑ3 (trigger (Store dt (DVALUE_Addr a) val)) g l m ≈ Ret3 g l m' tt.
 Proof.
   intros * WRITE.
   unfold ℑ3.
@@ -280,27 +280,27 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma interp_cfg3_alloca :
-  forall (m : memory_stack) (t : dtyp) (g : global_env) l,
-    non_void t ->
-    exists m' a',
-      allocate m t = inr (m', a') /\
-      ℑ3 (trigger (Alloca t)) g l m ≈ Ret3 g l m' (DVALUE_Addr a').
-Proof.
-  intros * NV.
-  unfold ℑ3.
-  eapply interp_memory_alloca_exists in NV as (m' & a' & ALLOC & INTERP).
-  exists m', a'. 
-  split; eauto.
-  go.
-  rewrite interp_memory_alloca; eauto.
-  go. reflexivity.
-  Unshelve.
-  auto.
-Qed.
+(* Lemma interp_cfg3_alloca : *)
+(*   forall (m : memory_stack) (t : dtyp) (g : global_env) l, *)
+(*     non_void t -> *)
+(*     exists m' a', *)
+(*       allocate m t = inr (m', a') /\ *)
+(*       ℑ3 (trigger (Alloca t)) g l m ≈ Ret3 g l m' (DVALUE_Addr a'). *)
+(* Proof. *)
+(*   intros * NV. *)
+(*   unfold ℑ3. *)
+(*   eapply interp_memory_alloca_exists in NV as (m' & a' & ALLOC & INTERP). *)
+(*   exists m', a'.  *)
+(*   split; eauto. *)
+(*   go. *)
+(*   rewrite interp_memory_alloca; eauto. *)
+(*   go. reflexivity. *)
+(*   Unshelve. *)
+(*   auto. *)
+(* Qed. *)
 
 Lemma interp_cfg3_intrinsic :
-  forall (m : memory_stack) (τ : dtyp) (g : global_env) l fn args df res,
+  forall (m : MemState) (τ : dtyp) (g : global_env) l fn args df res,
     assoc fn defs_assoc = Some df ->
     df args = inr res ->
     ℑ3 (trigger (Intrinsic τ fn args)) g l m ≈ Ret3 g l m res.
@@ -314,89 +314,89 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma interp_cfg3_GEP_array' : forall t a size g l m val i,
-    get_array_cell m a i t = inr val ->
-    exists ptr,
-      ℑ3 (trigger (GEP
-                     (DTYPE_Array size t)
-                     (DVALUE_Addr a)
-                     [DVALUE_I64 (Integers.Int64.repr 0); DVALUE_I64 (Integers.Int64.repr (Z.of_nat i))])) g l m
-         ≈ Ret3 g l m (DVALUE_Addr ptr) /\
-      handle_gep_addr (DTYPE_Array size t) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr ptr /\
-      read m ptr t = inr val.
-Proof.
-  intros * GET.
-  epose proof @interp_memory_GEP_array' _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ _ GET as [ptr [INTERP READ]].
-  exists ptr.
-  split; auto.
+(* Lemma interp_cfg3_GEP_array' : forall t a size g l m val i, *)
+(*     get_array_cell m a i t = inr val -> *)
+(*     exists ptr, *)
+(*       ℑ3 (trigger (GEP *)
+(*                      (DTYPE_Array size t) *)
+(*                      (DVALUE_Addr a) *)
+(*                      [DVALUE_I64 (Integers.Int64.repr 0); DVALUE_I64 (Integers.Int64.repr (Z.of_nat i))])) g l m *)
+(*          ≈ Ret3 g l m (DVALUE_Addr ptr) /\ *)
+(*       handle_gep_addr (DTYPE_Array size t) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr ptr /\ *)
+(*       read m ptr t = inr val. *)
+(* Proof. *)
+(*   intros * GET. *)
+(*   epose proof @interp_memory_GEP_array' _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ _ GET as [ptr [INTERP READ]]. *)
+(*   exists ptr. *)
+(*   split; auto. *)
 
-  unfold ℑ3.
-  go.
-  rewrite INTERP.
-  go.
-  reflexivity.
-Qed.
+(*   unfold ℑ3. *)
+(*   go. *)
+(*   rewrite INTERP. *)
+(*   go. *)
+(*   reflexivity. *)
+(* Qed. *)
 
-Lemma interp_cfg3_GEP_array_no_read_addr : forall t a size g l m i ptr,
-    dtyp_fits m a (DTYPE_Array size t) ->
-    handle_gep_addr (DTYPE_Array size t) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr ptr ->
-    ℑ3 (trigger (GEP
-                   (DTYPE_Array size t)
-                   (DVALUE_Addr a)
-                   [DVALUE_I64 (Integers.Int64.repr 0); DVALUE_I64 (Integers.Int64.repr (Z.of_nat i))])) g l m
-       ≈ Ret3 g l m (DVALUE_Addr ptr).
-Proof.
-  intros * FITS GEP.
-  epose proof @interp_memory_GEP_array_no_read_addr _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ ptr FITS as EQ.
-  unfold ℑ3.
-  go.
-  rewrite EQ; eauto.
-  go.
-  reflexivity.
-Qed.
+(* Lemma interp_cfg3_GEP_array_no_read_addr : forall t a size g l m i ptr, *)
+(*     dtyp_fits m a (DTYPE_Array size t) -> *)
+(*     handle_gep_addr (DTYPE_Array size t) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr ptr -> *)
+(*     ℑ3 (trigger (GEP *)
+(*                    (DTYPE_Array size t) *)
+(*                    (DVALUE_Addr a) *)
+(*                    [DVALUE_I64 (Integers.Int64.repr 0); DVALUE_I64 (Integers.Int64.repr (Z.of_nat i))])) g l m *)
+(*        ≈ Ret3 g l m (DVALUE_Addr ptr). *)
+(* Proof. *)
+(*   intros * FITS GEP. *)
+(*   epose proof @interp_memory_GEP_array_no_read_addr _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ ptr FITS as EQ. *)
+(*   unfold ℑ3. *)
+(*   go. *)
+(*   rewrite EQ; eauto. *)
+(*   go. *)
+(*   reflexivity. *)
+(* Qed. *)
 
-Lemma interp_cfg3_GEP_array_no_read : forall t a size g l m i,
-    dtyp_fits m a (DTYPE_Array size t) ->
-    exists ptr,
-      ℑ3 (trigger (GEP
-                     (DTYPE_Array size t)
-                     (DVALUE_Addr a)
-                     [DVALUE_I64 (Integers.Int64.repr 0); DVALUE_I64 (Integers.Int64.repr (Z.of_nat i))])) g l m
-         ≈ Ret3 g l m (DVALUE_Addr ptr) /\
-      handle_gep_addr (DTYPE_Array size t) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr ptr.
-Proof.
-  intros * FITS.
-  epose proof @interp_memory_GEP_array_no_read _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ FITS as [ptr [INTERP GEP]]. 
-  exists ptr.
-  split; auto.
+(* Lemma interp_cfg3_GEP_array_no_read : forall t a size g l m i, *)
+(*     dtyp_fits m a (DTYPE_Array size t) -> *)
+(*     exists ptr, *)
+(*       ℑ3 (trigger (GEP *)
+(*                      (DTYPE_Array size t) *)
+(*                      (DVALUE_Addr a) *)
+(*                      [DVALUE_I64 (Integers.Int64.repr 0); DVALUE_I64 (Integers.Int64.repr (Z.of_nat i))])) g l m *)
+(*          ≈ Ret3 g l m (DVALUE_Addr ptr) /\ *)
+(*       handle_gep_addr (DTYPE_Array size t) a [DVALUE_I64 (repr 0); DVALUE_I64 (repr (Z.of_nat i))] = inr ptr. *)
+(* Proof. *)
+(*   intros * FITS. *)
+(*   epose proof @interp_memory_GEP_array_no_read _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ FITS as [ptr [INTERP GEP]].  *)
+(*   exists ptr. *)
+(*   split; auto. *)
 
-  unfold ℑ3.
-  go.
-  rewrite INTERP.
-  go.
-  reflexivity.
-  auto.
-Qed.
+(*   unfold ℑ3. *)
+(*   go. *)
+(*   rewrite INTERP. *)
+(*   go. *)
+(*   reflexivity. *)
+(*   auto. *)
+(* Qed. *)
 
-Lemma interp_cfg3_GEP_array : forall t a size g l m val i,
-    get_array_cell m a i t = inr val ->
-    exists ptr,
-      ℑ3 (trigger (GEP
-                     (DTYPE_Array size t)
-                     (DVALUE_Addr a)
-                     [DVALUE_I64 (Integers.Int64.repr 0); DVALUE_I64 (Integers.Int64.repr (Z.of_nat i))])) g l m
-         ≈ Ret3 g l m (DVALUE_Addr ptr) /\
-      read m ptr t = inr val.
-Proof.
-  intros * GET.
-  epose proof @interp_memory_GEP_array _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ _ GET as [ptr [INTERP READ]].
-  exists ptr.
-  split; auto.
+(* Lemma interp_cfg3_GEP_array : forall t a size g l m val i, *)
+(*     get_array_cell m a i t = inr val -> *)
+(*     exists ptr, *)
+(*       ℑ3 (trigger (GEP *)
+(*                      (DTYPE_Array size t) *)
+(*                      (DVALUE_Addr a) *)
+(*                      [DVALUE_I64 (Integers.Int64.repr 0); DVALUE_I64 (Integers.Int64.repr (Z.of_nat i))])) g l m *)
+(*          ≈ Ret3 g l m (DVALUE_Addr ptr) /\ *)
+(*       read m ptr t = inr val. *)
+(* Proof. *)
+(*   intros * GET. *)
+(*   epose proof @interp_memory_GEP_array _ (PickE +' UBE +' DebugE +' FailureE) _ _ _ t _ size _ _ _ GET as [ptr [INTERP READ]]. *)
+(*   exists ptr. *)
+(*   split; auto. *)
 
-  unfold ℑ3.
-  go.
-  rewrite INTERP.
-  go.
-  reflexivity.
-Qed.
+(*   unfold ℑ3. *)
+(*   go. *)
+(*   rewrite INTERP. *)
+(*   go. *)
+(*   reflexivity. *)
+(* Qed. *)
 

@@ -125,7 +125,7 @@ Lemma uvalue_to_dvalue_list_concrete :
   forall fields dfields,
     (forall u : uvalue,
         In u fields ->
-        (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u) ->
+        (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u = true) ->
     map_monad uvalue_to_dvalue fields = inr dfields ->
     forallb is_concrete fields = true.
 Proof.
@@ -141,7 +141,7 @@ Proof.
     destruct (uvalue_to_dvalue a) eqn:Hdv; inversion H1.
     destruct (map_monad uvalue_to_dvalue fields) eqn:Hmap; inversion H2.
     assert (forall u : uvalue,
-               In u fields -> (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u) as BLAH.
+               In u fields -> (exists dv : dvalue, uvalue_to_dvalue u = inr dv) -> is_concrete u = true) as BLAH.
     { intros u IN (dv & CONV).
       apply H.
       - cbn. auto.
@@ -153,7 +153,7 @@ Qed.
 Lemma uvalue_to_dvalue_is_concrete :
   forall uv dv,
     uvalue_to_dvalue uv = inr dv ->
-    is_concrete uv.
+    is_concrete uv = true.
 Proof.
   induction uv;
     intros dv CONV; cbn; inversion CONV; auto.
@@ -281,27 +281,27 @@ Section ExpLemmas.
     reflexivity.
   Qed.
 
-  Lemma denote_conversion_concrete :
-    forall (conv : conversion_type) τ1 τ2 e g l m x a av,
-      ⟦ e at τ1 ⟧e3 g l m ≈ Ret3 g l m a ->
-      uvalue_to_dvalue a = inr av ->
-      eval_conv conv τ1 av τ2  = ret x ->
-      ⟦OP_Conversion conv τ1 e τ2⟧e3 g l m
-      ≈
-      Ret3 g l m (dvalue_to_uvalue x).
-  Proof.
-    intros * He EQ Heval; cbn.
-    go.
-    rewrite He.
-    go.
-    unfold uvalue_to_dvalue_uop.
-    rewrite EQ.
-    cbn.
-    rewrite Heval.
-    unfold ITree.map; cbn.
-    go.
-    reflexivity.
-  Qed.
+  (* Lemma denote_conversion_concrete : *)
+  (*   forall (conv : conversion_type) τ1 τ2 e g l m x a av, *)
+  (*     ⟦ e at τ1 ⟧e3 g l m ≈ Ret3 g l m a -> *)
+  (*     uvalue_to_dvalue a = inr av -> *)
+  (*     eval_conv_pure conv τ1 av τ2  = ret x -> *)
+  (*     ⟦OP_Conversion conv τ1 e τ2⟧e3 g l m *)
+  (*     ≈ *)
+  (*     Ret3 g l m (dvalue_to_uvalue x). *)
+  (* Proof. *)
+  (*   intros * He EQ Heval; cbn. *)
+  (*   go. *)
+  (*   rewrite He. *)
+  (*   go. *)
+  (*   unfold uvalue_to_dvalue_uop. *)
+  (*   rewrite EQ. *)
+  (*   cbn. *)
+  (*   rewrite Heval. *)
+  (*   unfold ITree.map; cbn. *)
+  (*   go. *)
+  (*   reflexivity. *)
+  (* Qed. *)
 
   Lemma denote_ibinop_concrete :
     forall (op : ibinop) τ e0 e1 g l m x a av b bv,
@@ -420,7 +420,7 @@ Section ExpPure.
 
   Definition pure_P g l m : state_cfgP := fun '(m',(l',g')) => m' = m /\ l' = l /\ g' = g.
 
-  Definition pure {E R} (t : global_env -> local_env -> memory_stack -> itree E (memory_stack * (local_env * (global_env * R)))) : Prop :=
+  Definition pure {E R} (t : global_env -> local_env -> MemState -> itree E (MemState * (local_env * (global_env * R)))) : Prop :=
     forall g l m, t g l m ⤳ ↑ (pure_P g l m).
 
   Lemma failure_is_pure : forall R s,
@@ -462,16 +462,16 @@ Section ExpPure.
     | |- context [trigger (ThrowUB _)] => rewrite interp_cfg3_UB
     end.
 
-  Lemma eval_conv_h_case : forall conv t1 x t2,
-          (exists s, eval_conv_h conv t1 x t2 = raise s) \/
-          (exists v, eval_conv_h conv t1 x t2 = Ret v) \/
-          (exists z, eval_conv_h conv t1 x t2 = trigger (ItoP z)) \/
-          (exists z, eval_conv_h conv t1 x t2 = trigger (PtoI t2 z)).
-  Proof.
-    intros.
-    unfold eval_conv_h.
-    break_match_goal; cbn in *; eauto.
-  Qed.
+  (* Lemma eval_conv_h_case : forall conv t1 x t2, *)
+  (*         (exists s, eval_conv_h conv t1 x t2 = raise s) \/ *)
+  (*         (exists v, eval_conv_h conv t1 x t2 = Ret v) \/ *)
+  (*         (exists z, eval_conv_h conv t1 x t2 = trigger (ItoP z)) \/ *)
+  (*         (exists z, eval_conv_h conv t1 x t2 = trigger (PtoI t2 z)). *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   unfold eval_conv_h. *)
+  (*   break_match_goal; cbn in *; eauto. *)
+  (* Qed. *)
 
   Lemma pick_is_pure : forall u P, pure (ℑ3 (trigger (pick u P))).
   Proof.
@@ -493,29 +493,29 @@ Section ExpPure.
     intros (? & ? & ? & []).
   Qed.
 
-  Lemma ItoP_is_pure : forall z,
-      pure (ℑ3 (trigger (ItoP z))).
-  Proof.
-    unfold pure; intros.
-    unfold ℑ3.
-    rewrite interp_intrinsics_trigger.
-    cbn. rewrite interp_global_trigger. cbn.
-    rewrite interp_local_bind.
-    rewrite interp_local_trigger.
-    cbn. rewrite bind_trigger. rewrite bind_vis.
-    cbn. rewrite interp_memory_vis. cbn.
-    break_match;
-      try solve [unfold raise; rewrite ?bind_bind; apply has_post_bind; intros [];
-    try apply failure_is_pure].
-    1 - 4 : break_match;
-      try solve [unfold raise; rewrite ?bind_bind; apply has_post_bind; intros [];
-    try apply failure_is_pure].
-    1 - 4 : try destruct p; cbn; setoid_rewrite bind_ret_l;
-    rewrite interp_memory_bind; rewrite interp_memory_ret;
-    cbn; rewrite bind_ret_l;
-    try rewrite interp_local_ret; try rewrite interp_memory_ret; cbn;
-      try apply eutt_Ret; cbn; auto.
-  Qed.
+  (* Lemma ItoP_is_pure : forall z, *)
+  (*     pure (ℑ3 (trigger (ItoP z))). *)
+  (* Proof. *)
+  (*   unfold pure; intros. *)
+  (*   unfold ℑ3. *)
+  (*   rewrite interp_intrinsics_trigger. *)
+  (*   cbn. rewrite interp_global_trigger. cbn. *)
+  (*   rewrite interp_local_bind. *)
+  (*   rewrite interp_local_trigger. *)
+  (*   cbn. rewrite bind_trigger. rewrite bind_vis. *)
+  (*   cbn. rewrite interp_memory_vis. cbn. *)
+  (*   break_match; *)
+  (*     try solve [unfold raise; rewrite ?bind_bind; apply has_post_bind; intros []; *)
+  (*   try apply failure_is_pure]. *)
+  (*   1 - 4 : break_match; *)
+  (*     try solve [unfold raise; rewrite ?bind_bind; apply has_post_bind; intros []; *)
+  (*   try apply failure_is_pure]. *)
+  (*   1 - 4 : try destruct p; cbn; setoid_rewrite bind_ret_l; *)
+  (*   rewrite interp_memory_bind; rewrite interp_memory_ret; *)
+  (*   cbn; rewrite bind_ret_l; *)
+  (*   try rewrite interp_local_ret; try rewrite interp_memory_ret; cbn; *)
+  (*     try apply eutt_Ret; cbn; auto. *)
+  (* Qed. *)
 
   (* BEGIN TO MOVE *)
   Lemma FUB_to_exp_raiseUB : forall T s,
@@ -729,427 +729,427 @@ Section ExpPure.
     reflexivity.
   Qed.
 
-  Lemma expr_are_pure : forall (o : option dtyp) e, pure ⟦ e at? o ⟧e3.
-  Proof with trivial_cases.
-    intros; unfold pure.
-    revert o; induction e; simpl; intros.
+  (* Lemma expr_are_pure : forall (o : option dtyp) e, pure ⟦ e at? o ⟧e3. *)
+  (* Proof with trivial_cases. *)
+  (*   intros; unfold pure. *)
+  (*   revert o; induction e; simpl; intros. *)
 
-    - destruct id; cbn.
-      + go.
-        destruct (Maps.lookup id g) eqn:EQ.
-        * step.
-          go...
+  (*   - destruct id; cbn. *)
+  (*     + go. *)
+  (*       destruct (Maps.lookup id g) eqn:EQ. *)
+  (*       * step. *)
+  (*         go... *)
           
-        * step...
+  (*       * step... *)
          
-      + go. 
-        destruct (Maps.lookup id l) eqn:EQ.
-        * step... 
-        * step...
+  (*     + go.  *)
+  (*       destruct (Maps.lookup id l) eqn:EQ. *)
+  (*       * step...  *)
+  (*       * step... *)
           
-    - destruct o; cbn...
-      destruct d; simpl...
-      unfold denote_exp, lift_undef_or_err.
-      cbn.
-      break_match_goal... 
-      break_match_goal...
-      go...
+  (*   - destruct o; cbn... *)
+  (*     destruct d; simpl... *)
+  (*     unfold denote_exp, lift_undef_or_err. *)
+  (*     cbn. *)
+  (*     break_match_goal...  *)
+  (*     break_match_goal... *)
+  (*     go... *)
 
-    - destruct o; cbn...
-      destruct d; simpl...
-      go...
+  (*   - destruct o; cbn... *)
+  (*     destruct d; simpl... *)
+  (*     go... *)
 
-    - destruct o; cbn...
-      destruct d; simpl...
-      go...
+  (*   - destruct o; cbn... *)
+  (*     destruct d; simpl... *)
+  (*     go... *)
 
-    - destruct o; cbn...
-      destruct d; simpl...
-      go...
-      go...
+  (*   - destruct o; cbn... *)
+  (*     destruct d; simpl... *)
+  (*     go... *)
+  (*     go... *)
 
-    - destruct b; simpl; go...
+  (*   - destruct b; simpl; go... *)
 
-    - simpl; go...
+  (*   - simpl; go... *)
 
-    - destruct o; cbn...
+  (*   - destruct o; cbn... *)
 
-    - go.
-      rewrite translate_map_monad.
-      rewrite interp_cfg3_map_monad.
-      apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
-      + eapply has_post_weaken.
-        apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
-        * intros * IN (-> & -> & ->).
-          destruct a; simpl in *.
-          apply has_post_weaken with (↑ (pure_P g l m)).
-          apply (H _ IN).
-          intro_pure; cbn; auto.
-        * intro_pure; cbn; auto. 
-      + intro_pure.
-        go...
+  (*   - go. *)
+  (*     rewrite translate_map_monad. *)
+  (*     rewrite interp_cfg3_map_monad. *)
+  (*     apply has_post_bind_strong with (S := ↑ (pure_P g l m)). *)
+  (*     + eapply has_post_weaken. *)
+  (*       apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition]. *)
+  (*       * intros * IN (-> & -> & ->). *)
+  (*         destruct a; simpl in *. *)
+  (*         apply has_post_weaken with (↑ (pure_P g l m)). *)
+  (*         apply (H _ IN). *)
+  (*         intro_pure; cbn; auto. *)
+  (*       * intro_pure; cbn; auto.  *)
+  (*     + intro_pure. *)
+  (*       go... *)
 
-    - destruct o; cbn...
-      go...
+  (*   - destruct o; cbn... *)
+  (*     go... *)
 
-    - go.
-      rewrite translate_map_monad.
-      rewrite interp_cfg3_map_monad.
-      apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
-      + eapply has_post_weaken.
-        apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
-        * intros * IN (-> & -> & ->).
-          destruct a; simpl in *.
-          apply has_post_weaken with (↑ (pure_P g l m)).
-          apply (H _ IN).
-          intro_pure; auto.
-        * intro_pure; cbn; auto.
-      + intro_pure.
-        go...
+  (*   - go. *)
+  (*     rewrite translate_map_monad. *)
+  (*     rewrite interp_cfg3_map_monad. *)
+  (*     apply has_post_bind_strong with (S := ↑ (pure_P g l m)). *)
+  (*     + eapply has_post_weaken. *)
+  (*       apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition]. *)
+  (*       * intros * IN (-> & -> & ->). *)
+  (*         destruct a; simpl in *. *)
+  (*         apply has_post_weaken with (↑ (pure_P g l m)). *)
+  (*         apply (H _ IN). *)
+  (*         intro_pure; auto. *)
+  (*       * intro_pure; cbn; auto. *)
+  (*     + intro_pure. *)
+  (*       go... *)
 
-    - destruct o; cbn...
-      destruct d; cbn...
-      go.
-      rewrite translate_map_monad.
-      rewrite interp_cfg3_map_monad.
-      apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
-      + eapply has_post_weaken.
-        apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
-        * intros * IN (-> & -> & ->).
-          destruct a; simpl in *.
-          apply has_post_weaken with (↑ (pure_P g l m)).
-          apply (H _ IN).
-          intro_pure; auto.
-        * intro_pure; cbn; auto.
-      + intro_pure.
-        go...
+  (*   - destruct o; cbn... *)
+  (*     destruct d; cbn... *)
+  (*     go. *)
+  (*     rewrite translate_map_monad. *)
+  (*     rewrite interp_cfg3_map_monad. *)
+  (*     apply has_post_bind_strong with (S := ↑ (pure_P g l m)). *)
+  (*     + eapply has_post_weaken. *)
+  (*       apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition]. *)
+  (*       * intros * IN (-> & -> & ->). *)
+  (*         destruct a; simpl in *. *)
+  (*         apply has_post_weaken with (↑ (pure_P g l m)). *)
+  (*         apply (H _ IN). *)
+  (*         intro_pure; auto. *)
+  (*       * intro_pure; cbn; auto. *)
+  (*     + intro_pure. *)
+  (*       go... *)
 
-    - go.
-      rewrite translate_map_monad.
-      rewrite interp_cfg3_map_monad.
-      apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
-      + eapply has_post_weaken.
-        apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
-        * intros * IN (-> & -> & ->).
-          destruct a; simpl in *.
-          apply has_post_weaken with (↑ (pure_P g l m)).
-          apply (H _ IN).
-          intro_pure; auto.
-        * intro_pure; cbn; auto.
-      + intro_pure.
-        go...
+  (*   - go. *)
+  (*     rewrite translate_map_monad. *)
+  (*     rewrite interp_cfg3_map_monad. *)
+  (*     apply has_post_bind_strong with (S := ↑ (pure_P g l m)). *)
+  (*     + eapply has_post_weaken. *)
+  (*       apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition]. *)
+  (*       * intros * IN (-> & -> & ->). *)
+  (*         destruct a; simpl in *. *)
+  (*         apply has_post_weaken with (↑ (pure_P g l m)). *)
+  (*         apply (H _ IN). *)
+  (*         intro_pure; auto. *)
+  (*       * intro_pure; cbn; auto. *)
+  (*     + intro_pure. *)
+  (*       go... *)
 
-    - go.
-      rewrite translate_map_monad.
-      rewrite interp_cfg3_map_monad.
-      apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
-      + eapply has_post_weaken.
-        apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
-        * intros * IN (-> & -> & ->).
-          destruct a; simpl in *.
-          apply has_post_weaken with (↑ (pure_P g l m)).
-          apply (H _ IN).
-          intro_pure; auto.
-        * intro_pure; cbn; auto.
-      + intro_pure.
-        go...
+  (*   - go. *)
+  (*     rewrite translate_map_monad. *)
+  (*     rewrite interp_cfg3_map_monad. *)
+  (*     apply has_post_bind_strong with (S := ↑ (pure_P g l m)). *)
+  (*     + eapply has_post_weaken. *)
+  (*       apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition]. *)
+  (*       * intros * IN (-> & -> & ->). *)
+  (*         destruct a; simpl in *. *)
+  (*         apply has_post_weaken with (↑ (pure_P g l m)). *)
+  (*         apply (H _ IN). *)
+  (*         intro_pure; auto. *)
+  (*       * intro_pure; cbn; auto. *)
+  (*     + intro_pure. *)
+  (*       go... *)
 
-    - go.
-      eapply has_post_bind_strong.
-      apply (IHe1 (Some t) g l m).
-      intros (? & ? & ? & ?) (-> & -> & ->).
-      go.
-      eapply has_post_bind_strong.
-      apply (IHe2 (Some t) g l m).
-      intro_pure.
-      break_match_goal.
-      + go.
-        apply has_post_bind_strong with (↑ (pure_P g l m)).
-        * unfold concretize_or_pick.
-          break_match_goal...
-          cbn.
-          {
-            unfold lift_err.
-            break_match_goal...
-            go...
-          }
+  (*   - go. *)
+  (*     eapply has_post_bind_strong. *)
+  (*     apply (IHe1 (Some t) g l m). *)
+  (*     intros (? & ? & ? & ?) (-> & -> & ->). *)
+  (*     go. *)
+  (*     eapply has_post_bind_strong. *)
+  (*     apply (IHe2 (Some t) g l m). *)
+  (*     intro_pure. *)
+  (*     break_match_goal. *)
+  (*     + go. *)
+  (*       apply has_post_bind_strong with (↑ (pure_P g l m)). *)
+  (*       * unfold concretize_or_pick. *)
+  (*         break_match_goal... *)
+  (*         cbn. *)
+  (*         { *)
+  (*           unfold lift_err. *)
+  (*           break_match_goal... *)
+  (*           go... *)
+  (*         } *)
 
-        * intro_pure.
-          unfold uvalue_to_dvalue_binop2.
-          cbn; break_match_goal...
-          go...
-          break_match_hyp; inv_sum.
-          break_match_goal...
-          break_match_goal...
-          go...
+  (*       * intro_pure. *)
+  (*         unfold uvalue_to_dvalue_binop2. *)
+  (*         cbn; break_match_goal... *)
+  (*         go... *)
+  (*         break_match_hyp; inv_sum. *)
+  (*         break_match_goal... *)
+  (*         break_match_goal... *)
+  (*         go... *)
 
-      + unfold uvalue_to_dvalue_binop.
-        cbn.
-        break_match_goal.
-        go...
-        break_match_hyp; try inv_sum.
-        break_match_hyp; try inv_sum.
-        break_match_goal...
-        break_match_goal...
-        go...
+  (*     + unfold uvalue_to_dvalue_binop. *)
+  (*       cbn. *)
+  (*       break_match_goal. *)
+  (*       go... *)
+  (*       break_match_hyp; try inv_sum. *)
+  (*       break_match_hyp; try inv_sum. *)
+  (*       break_match_goal... *)
+  (*       break_match_goal... *)
+  (*       go... *)
 
-    - go.
-      eapply has_post_bind_strong.
-      apply (IHe1 (Some t) g l m).
-      intro_pure.
-      go.
-      eapply has_post_bind_strong.
-      apply (IHe2 (Some t) g l m).
-      intro_pure.
-      unfold uvalue_to_dvalue_binop.
-      cbn.
-      break_match_goal.
-      go...
-      break_match_hyp; try inv_sum.
-      break_match_hyp; try inv_sum.
-      break_match_goal...
-      break_match_goal...
-      go...
+  (*   - go. *)
+  (*     eapply has_post_bind_strong. *)
+  (*     apply (IHe1 (Some t) g l m). *)
+  (*     intro_pure. *)
+  (*     go. *)
+  (*     eapply has_post_bind_strong. *)
+  (*     apply (IHe2 (Some t) g l m). *)
+  (*     intro_pure. *)
+  (*     unfold uvalue_to_dvalue_binop. *)
+  (*     cbn. *)
+  (*     break_match_goal. *)
+  (*     go... *)
+  (*     break_match_hyp; try inv_sum. *)
+  (*     break_match_hyp; try inv_sum. *)
+  (*     break_match_goal... *)
+  (*     break_match_goal... *)
+  (*     go... *)
 
-    - go.
-      eapply has_post_bind_strong.
-      apply (IHe1 (Some t) g l m).
-      intro_pure.
-      go.
-      eapply has_post_bind_strong.
-      apply (IHe2 (Some t) g l m).
-      intro_pure.
-      break_match_goal.
-      + go.
-        apply has_post_bind_strong with (↑ (pure_P g l m)).
-        * unfold concretize_or_pick.
-          break_match_goal...
-          cbn.
-          {
-            unfold lift_err.
-            break_match_goal...
-            go...
-          }
+  (*   - go. *)
+  (*     eapply has_post_bind_strong. *)
+  (*     apply (IHe1 (Some t) g l m). *)
+  (*     intro_pure. *)
+  (*     go. *)
+  (*     eapply has_post_bind_strong. *)
+  (*     apply (IHe2 (Some t) g l m). *)
+  (*     intro_pure. *)
+  (*     break_match_goal. *)
+  (*     + go. *)
+  (*       apply has_post_bind_strong with (↑ (pure_P g l m)). *)
+  (*       * unfold concretize_or_pick. *)
+  (*         break_match_goal... *)
+  (*         cbn. *)
+  (*         { *)
+  (*           unfold lift_err. *)
+  (*           break_match_goal... *)
+  (*           go... *)
+  (*         } *)
 
-        * intro_pure.
-          unfold uvalue_to_dvalue_binop2.
-          cbn; break_match_goal.
-          go...
-          break_match_hyp; inv_sum.
-          break_match_goal...
-          break_match_goal...
-          go...
+  (*       * intro_pure. *)
+  (*         unfold uvalue_to_dvalue_binop2. *)
+  (*         cbn; break_match_goal. *)
+  (*         go... *)
+  (*         break_match_hyp; inv_sum. *)
+  (*         break_match_goal... *)
+  (*         break_match_goal... *)
+  (*         go... *)
 
-      + unfold uvalue_to_dvalue_binop.
-        cbn.
-        break_match_goal.
-        go...
-        break_match_hyp; try inv_sum.
-        break_match_hyp; try inv_sum.
-        break_match_goal...
-        break_match_goal...
-        go...
+  (*     + unfold uvalue_to_dvalue_binop. *)
+  (*       cbn. *)
+  (*       break_match_goal. *)
+  (*       go... *)
+  (*       break_match_hyp; try inv_sum. *)
+  (*       break_match_hyp; try inv_sum. *)
+  (*       break_match_goal... *)
+  (*       break_match_goal... *)
+  (*       go... *)
 
-    - go.
-      eapply has_post_bind_strong.
-      apply (IHe1 (Some t) g l m).
-      intro_pure.
-      go.
-      eapply has_post_bind_strong.
-      apply (IHe2 (Some t) g l m).
-      intro_pure.
-      unfold uvalue_to_dvalue_binop.
-      cbn.
-      break_match_goal.
-      go...
-      break_match_hyp; try inv_sum.
-      break_match_hyp; try inv_sum.
-      break_match_goal...
-      break_match_goal...
-      go...
+  (*   - go. *)
+  (*     eapply has_post_bind_strong. *)
+  (*     apply (IHe1 (Some t) g l m). *)
+  (*     intro_pure. *)
+  (*     go. *)
+  (*     eapply has_post_bind_strong. *)
+  (*     apply (IHe2 (Some t) g l m). *)
+  (*     intro_pure. *)
+  (*     unfold uvalue_to_dvalue_binop. *)
+  (*     cbn. *)
+  (*     break_match_goal. *)
+  (*     go... *)
+  (*     break_match_hyp; try inv_sum. *)
+  (*     break_match_hyp; try inv_sum. *)
+  (*     break_match_goal... *)
+  (*     break_match_goal... *)
+  (*     go... *)
 
-    - go.
-      eapply has_post_bind_strong.
-      apply (IHe (Some t_from) g l m).
-      intro_pure.
-      unfold uvalue_to_dvalue_uop; cbn.
-      break_match_goal.
-      go...
-      break_match_hyp; try inv_sum.
-      unfold ITree.map.
-      go.
-      apply has_post_bind_strong with (↑ (pure_P g l m)).
+  (*   - go. *)
+  (*     eapply has_post_bind_strong. *)
+  (*     apply (IHe (Some t_from) g l m). *)
+  (*     intro_pure. *)
+  (*     unfold uvalue_to_dvalue_uop; cbn. *)
+  (*     break_match_goal. *)
+  (*     go... *)
+  (*     break_match_hyp; try inv_sum. *)
+  (*     unfold ITree.map. *)
+  (*     go. *)
+  (*     apply has_post_bind_strong with (↑ (pure_P g l m)). *)
 
-      + (* What's the right way to reason about eval_conv? *)
-        unfold eval_conv.
+  (*     + (* What's the right way to reason about eval_conv? *) *)
+  (*       unfold eval_conv. *)
 
 
-        pose proof (eval_conv_h_case conv t_from d t_to).
-        destruct H as [ (s & H) | [(v & H)| [ (z & H)| (z & H)]] ].
-        rewrite H.
+  (*       pose proof (eval_conv_h_case conv t_from d t_to). *)
+  (*       destruct H as [ (s & H) | [(v & H)| [ (z & H)| (z & H)]] ]. *)
+  (*       rewrite H. *)
 
-        destruct t_from; cbn.
-        1 - 16 : (rewrite conv_to_exp_raise; rewrite exp_to_instr_raise); trivial_cases.
-        destruct d; cbn.
-        1 - 14 : (rewrite conv_to_exp_raise; rewrite exp_to_instr_raise); trivial_cases.
-        destruct t_from; cbn; rewrite H; go; trivial_cases.
+  (*       destruct t_from; cbn. *)
+  (*       1 - 16 : (rewrite conv_to_exp_raise; rewrite exp_to_instr_raise); trivial_cases. *)
+  (*       destruct d; cbn. *)
+  (*       1 - 14 : (rewrite conv_to_exp_raise; rewrite exp_to_instr_raise); trivial_cases. *)
+  (*       destruct t_from; cbn; rewrite H; go; trivial_cases. *)
 
-        destruct d; cbn; go; trivial_cases.
-        rewrite conv_to_exp_raise; rewrite exp_to_instr_raise; trivial_cases.
+  (*       destruct d; cbn; go; trivial_cases. *)
+  (*       rewrite conv_to_exp_raise; rewrite exp_to_instr_raise; trivial_cases. *)
 
-        destruct t_from; rewrite H; try rewrite conv_to_exp_ItoP; try apply ItoP_is_pure.
-        destruct d; cbn; go; trivial_cases.
+  (*       destruct t_from; rewrite H; try rewrite conv_to_exp_ItoP; try apply ItoP_is_pure. *)
+  (*       destruct d; cbn; go; trivial_cases. *)
 
-        1 - 13 : apply ItoP_is_pure.
+  (*       1 - 13 : apply ItoP_is_pure. *)
 
-        rewrite conv_to_exp_raise; rewrite exp_to_instr_raise. apply failure_is_pure.
+  (*       rewrite conv_to_exp_raise; rewrite exp_to_instr_raise. apply failure_is_pure. *)
 
-        admit.
-      + intro_pure.
-              go...
-    - destruct ptrval; cbn.
-      rewrite translate_bind, interp_cfg3_bind.
-      eapply has_post_bind_strong.
-      apply (IHe (Some d) g l m).
-      intro_pure.
-      rewrite translate_bind, interp_cfg3_bind.
-      rewrite translate_map_monad.
-      rewrite interp_cfg3_map_monad.
-      apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
-      + eapply has_post_weaken.
-        apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
-        * intros * IN (-> & -> & ->).
-          destruct a; simpl in *.
-          apply has_post_weaken with (↑ (pure_P g l m)).
-          apply (H _ IN).
-          intro_pure; auto.
-        * intro_pure; cbn; auto.
-      + intro_pure.
-        break_match_goal.
-        * rewrite translate_bind, interp_cfg3_bind.
-          unfold concretize_or_pick.
-          apply has_post_bind_strong with (↑ (pure_P g l m)).
-          {
-            break_match_goal...
-            unfold lift_err.
-            break_match_goal...
-            cbn; go... 
-          }
-          intro_pure.
-          rewrite translate_bind, interp_cfg3_bind.
-          rewrite translate_map_monad.
-          rewrite interp_cfg3_map_monad.
-          apply has_post_bind_strong with (S := ↑ (pure_P g l m)).
-          { eapply has_post_weaken.
-            apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition].
-            * intros * IN (-> & -> & ->).
-              break_match_goal...
-              unfold lift_err.
-              break_match_goal...
-              cbn; go... 
-            * intro_pure; cbn; auto.
-          }
-          intro_pure; cbn; auto.
-          unfold ITree.map; go. 
-          (* GEP... *)
-          unfold interp_cfg3.
-          rewrite interp_intrinsics_trigger.
-          cbn.
-          unfold Intrinsics.F_trigger; cbn.
-          rewrite subevent_subevent.
-          rewrite interp_global_trigger; cbn.
-          rewrite subevent_subevent.
-          rewrite interp_local_bind, interp_local_trigger; cbn.
-          rewrite subevent_subevent, bind_bind.
-          rewrite interp_memory_bind, interp_memory_trigger; cbn.
-          rewrite !bind_bind.
-          destruct d0; cbn; try (unfold raise; rewrite bind_bind; apply has_post_bind; intros []).
-          break_match_goal; cbn; try (unfold raise; rewrite bind_bind; apply has_post_bind; intros []).
-          go. 
-          rewrite interp_local_ret, interp_memory_ret, bind_ret_l.
-          rewrite translate_ret, interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret. 
-          go...
+  (*       admit. *)
+  (*     + intro_pure. *)
+  (*             go... *)
+  (*   - destruct ptrval; cbn. *)
+  (*     rewrite translate_bind, interp_cfg3_bind. *)
+  (*     eapply has_post_bind_strong. *)
+  (*     apply (IHe (Some d) g l m). *)
+  (*     intro_pure. *)
+  (*     rewrite translate_bind, interp_cfg3_bind. *)
+  (*     rewrite translate_map_monad. *)
+  (*     rewrite interp_cfg3_map_monad. *)
+  (*     apply has_post_bind_strong with (S := ↑ (pure_P g l m)). *)
+  (*     + eapply has_post_weaken. *)
+  (*       apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition]. *)
+  (*       * intros * IN (-> & -> & ->). *)
+  (*         destruct a; simpl in *. *)
+  (*         apply has_post_weaken with (↑ (pure_P g l m)). *)
+  (*         apply (H _ IN). *)
+  (*         intro_pure; auto. *)
+  (*       * intro_pure; cbn; auto. *)
+  (*     + intro_pure. *)
+  (*       break_match_goal. *)
+  (*       * rewrite translate_bind, interp_cfg3_bind. *)
+  (*         unfold concretize_or_pick. *)
+  (*         apply has_post_bind_strong with (↑ (pure_P g l m)). *)
+  (*         { *)
+  (*           break_match_goal... *)
+  (*           unfold lift_err. *)
+  (*           break_match_goal... *)
+  (*           cbn; go...  *)
+  (*         } *)
+  (*         intro_pure. *)
+  (*         rewrite translate_bind, interp_cfg3_bind. *)
+  (*         rewrite translate_map_monad. *)
+  (*         rewrite interp_cfg3_map_monad. *)
+  (*         apply has_post_bind_strong with (S := ↑ (pure_P g l m)). *)
+  (*         { eapply has_post_weaken. *)
+  (*           apply (map_monad_eutt_state3_ind (fun g' l' m' => pure_P g l m (m',(l',g')))); [| cbn; intuition]. *)
+  (*           * intros * IN (-> & -> & ->). *)
+  (*             break_match_goal... *)
+  (*             unfold lift_err. *)
+  (*             break_match_goal... *)
+  (*             cbn; go...  *)
+  (*           * intro_pure; cbn; auto. *)
+  (*         } *)
+  (*         intro_pure; cbn; auto. *)
+  (*         unfold ITree.map; go.  *)
+  (*         (* GEP... *) *)
+  (*         unfold interp_cfg3. *)
+  (*         rewrite interp_intrinsics_trigger. *)
+  (*         cbn. *)
+  (*         unfold Intrinsics.F_trigger; cbn. *)
+  (*         rewrite subevent_subevent. *)
+  (*         rewrite interp_global_trigger; cbn. *)
+  (*         rewrite subevent_subevent. *)
+  (*         rewrite interp_local_bind, interp_local_trigger; cbn. *)
+  (*         rewrite subevent_subevent, bind_bind. *)
+  (*         rewrite interp_memory_bind, interp_memory_trigger; cbn. *)
+  (*         rewrite !bind_bind. *)
+  (*         destruct d0; cbn; try (unfold raise; rewrite bind_bind; apply has_post_bind; intros []). *)
+  (*         break_match_goal; cbn; try (unfold raise; rewrite bind_bind; apply has_post_bind; intros []). *)
+  (*         go.  *)
+  (*         rewrite interp_local_ret, interp_memory_ret, bind_ret_l. *)
+  (*         rewrite translate_ret, interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret.  *)
+  (*         go... *)
 
-        * unfold ITree.map; destruct p; cbn.
-          go.
-          (* GEP... *)
-          unfold interp_cfg3.
-          rewrite interp_intrinsics_trigger.
-          cbn.
-          unfold Intrinsics.F_trigger; cbn.
-          rewrite subevent_subevent.
-          rewrite interp_global_trigger; cbn.
-          rewrite subevent_subevent.
-          rewrite interp_local_bind, interp_local_trigger; cbn.
-          rewrite subevent_subevent, bind_bind.
-          rewrite interp_memory_bind, interp_memory_trigger; cbn.
-          rewrite !bind_bind.
-          destruct d0; cbn; try (unfold raise; rewrite bind_bind; apply has_post_bind; intros []).
-          break_match_goal; cbn; try (unfold raise; rewrite bind_bind; apply has_post_bind; intros []).
-          rewrite !bind_ret_l.
-          rewrite interp_local_ret, interp_memory_ret, bind_ret_l.
-          rewrite translate_ret, interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret. 
-          go...
+  (*       * unfold ITree.map; destruct p; cbn. *)
+  (*         go. *)
+  (*         (* GEP... *) *)
+  (*         unfold interp_cfg3. *)
+  (*         rewrite interp_intrinsics_trigger. *)
+  (*         cbn. *)
+  (*         unfold Intrinsics.F_trigger; cbn. *)
+  (*         rewrite subevent_subevent. *)
+  (*         rewrite interp_global_trigger; cbn. *)
+  (*         rewrite subevent_subevent. *)
+  (*         rewrite interp_local_bind, interp_local_trigger; cbn. *)
+  (*         rewrite subevent_subevent, bind_bind. *)
+  (*         rewrite interp_memory_bind, interp_memory_trigger; cbn. *)
+  (*         rewrite !bind_bind. *)
+  (*         destruct d0; cbn; try (unfold raise; rewrite bind_bind; apply has_post_bind; intros []). *)
+  (*         break_match_goal; cbn; try (unfold raise; rewrite bind_bind; apply has_post_bind; intros []). *)
+  (*         rewrite !bind_ret_l. *)
+  (*         rewrite interp_local_ret, interp_memory_ret, bind_ret_l. *)
+  (*         rewrite translate_ret, interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret.  *)
+  (*         go... *)
 
-    - auto...
+  (*   - auto... *)
 
-    - auto...
+  (*   - auto... *)
 
-    - auto...
+  (*   - auto... *)
 
-    - destruct vec; cbn.
-      go.
-      eapply has_post_bind_strong.
-      apply (IHe (Some d) g l m).
-      intro_pure.
-      clear IHe.
-      induction idxs as [| n idxs IH].
-      + cbn.
-        go...
-      + cbn.
-        break_match_goal...
-        break_match_goal...
-        go...
+  (*   - destruct vec; cbn. *)
+  (*     go. *)
+  (*     eapply has_post_bind_strong. *)
+  (*     apply (IHe (Some d) g l m). *)
+  (*     intro_pure. *)
+  (*     clear IHe. *)
+  (*     induction idxs as [| n idxs IH]. *)
+  (*     + cbn. *)
+  (*       go... *)
+  (*     + cbn. *)
+  (*       break_match_goal... *)
+  (*       break_match_goal... *)
+  (*       go... *)
         
-    - auto...
+  (*   - auto... *)
 
-    - destruct cnd,v1,v2; cbn.
-      go.
-      eapply has_post_bind_strong; [apply IHe | ].
-      intro_pure.
-      go.
-      eapply has_post_bind_strong; [apply IHe0 |]. 
-      intro_pure.
-      go.
-      eapply has_post_bind_strong; [apply IHe1 |]. 
-      intro_pure.
-      break_match_goal.
-      go...
-      unfold lift_undef_or_err.
-      break_match_goal.
-      break_match_goal...
-      break_match_goal...
-      go...
+  (*   - destruct cnd,v1,v2; cbn. *)
+  (*     go. *)
+  (*     eapply has_post_bind_strong; [apply IHe | ]. *)
+  (*     intro_pure. *)
+  (*     go. *)
+  (*     eapply has_post_bind_strong; [apply IHe0 |].  *)
+  (*     intro_pure. *)
+  (*     go. *)
+  (*     eapply has_post_bind_strong; [apply IHe1 |].  *)
+  (*     intro_pure. *)
+  (*     break_match_goal. *)
+  (*     go... *)
+  (*     unfold lift_undef_or_err. *)
+  (*     break_match_goal. *)
+  (*     break_match_goal... *)
+  (*     break_match_goal... *)
+  (*     go... *)
       
-    - destruct v; cbn.
-      go.
-      eapply has_post_bind_strong.
-      apply (IHe (Some d) g l m).
-      intro_pure.
-      clear IHe.
-      go.
-      apply has_post_bind_strong with (↑ (pure_P g l m)).
-      { unfold pick_your_poison;
-          break_match_goal; cbn;
-            match goal with
-              |- context [Ret _] => rewrite !translate_ret, interp_cfg3_ret; apply eutt_Ret; cbn; auto
-            | |- context [concretize_or_pick] => apply concretize_or_pick_is_pure
-            | _ => idtac
-            end...
-      }
-      intros (? & ? & ? & ?) (-> & -> & ->).
-      go...
+  (*   - destruct v; cbn. *)
+  (*     go. *)
+  (*     eapply has_post_bind_strong. *)
+  (*     apply (IHe (Some d) g l m). *)
+  (*     intro_pure. *)
+  (*     clear IHe. *)
+  (*     go. *)
+  (*     apply has_post_bind_strong with (↑ (pure_P g l m)). *)
+  (*     { unfold pick_your_poison; *)
+  (*         break_match_goal; cbn; *)
+  (*           match goal with *)
+  (*             |- context [Ret _] => rewrite !translate_ret, interp_cfg3_ret; apply eutt_Ret; cbn; auto *)
+  (*           | |- context [concretize_or_pick] => apply concretize_or_pick_is_pure *)
+  (*           | _ => idtac *)
+  (*           end... *)
+  (*     } *)
+  (*     intros (? & ? & ? & ?) (-> & -> & ->). *)
+  (*     go... *)
       
-  Admitted.
+  (* Admitted. *)
 
 End ExpPure.

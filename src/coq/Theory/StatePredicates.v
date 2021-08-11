@@ -20,10 +20,10 @@ Infix "×" := conj_rel (at level 30, right associativity).
 
 Section CFG_LEVEL.
 
-  Definition state_cfg : Type := memory_stack * (local_env * global_env).
+  Definition state_cfg : Type := MemState * (local_env * global_env).
 
   Definition state_cfg_T (T:Type): Type
-    := memory_stack * (local_env * (global_env * T)).
+    := MemState * (local_env * (global_env * T)).
 
   Definition state_cfgP := pred state_cfg.
   Definition state_cfg_TP {T : Type} := pred (state_cfg_T T).

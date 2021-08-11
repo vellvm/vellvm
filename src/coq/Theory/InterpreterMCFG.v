@@ -159,37 +159,37 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma interp_cfg3_LM : forall t a size offset g l m v bytes concrete_id,
-    get_logical_block m a = Some (LBlock size bytes concrete_id) ->
-    deserialize_sbytes (lookup_all_index offset (sizeof_dtyp t) bytes SUndef) t = v ->
-    ℑs3 (trigger (Load t (DVALUE_Addr (a, offset)))) g l m ≈ Ret3 g l m v.
-Proof.
-  intros * LUL EQ.
-  unfold ℑs3.
-  go.
-  rewrite interp_memory_load; cycle -1.
-  unfold read.
-  cbn in *; rewrite LUL; reflexivity.
-  go.
-  unfold read_in_mem_block; rewrite EQ.
-  reflexivity.
-Qed.
+(* Lemma interp_cfg3_LM : forall t a size offset g l m v bytes concrete_id, *)
+(*     get_logical_block m a = Some (LBlock size bytes concrete_id) -> *)
+(*     deserialize_sbytes (lookup_all_index offset (sizeof_dtyp t) bytes SUndef) t = v -> *)
+(*     ℑs3 (trigger (Load t (DVALUE_Addr (a, offset)))) g l m ≈ Ret3 g l m v. *)
+(* Proof. *)
+(*   intros * LUL EQ. *)
+(*   unfold ℑs3. *)
+(*   go. *)
+(*   rewrite interp_memory_load; cycle -1. *)
+(*   unfold read. *)
+(*   cbn in *; rewrite LUL; reflexivity. *)
+(*   go. *)
+(*   unfold read_in_mem_block; rewrite EQ. *)
+(*   reflexivity. *)
+(* Qed. *)
 
-Lemma interp3_alloca :
-  forall (m : memory_stack) (t : dtyp) (g : global_env) l,
-    non_void t ->
-    exists m' a',
-      allocate m t = inr (m', a') /\
-      ℑs3 (trigger (Alloca t)) g l m ≈ ret (m', (l, (g, DVALUE_Addr a'))).
-Proof.
-  intros * NV.
-  unfold ℑs3.
-  eapply interp_memory_alloca_exists in NV as [m' [a' [ALLOC INTERP]]].
-  exists m', a'.
-  split; eauto.
-  go.
-  rewrite interp_memory_alloca; eauto.
-  go; reflexivity.
-  Unshelve.
-  auto.
-Qed.
+(* Lemma interp3_alloca : *)
+(*   forall (m : memory_stack) (t : dtyp) (g : global_env) l, *)
+(*     non_void t -> *)
+(*     exists m' a', *)
+(*       allocate m t = inr (m', a') /\ *)
+(*       ℑs3 (trigger (Alloca t)) g l m ≈ ret (m', (l, (g, DVALUE_Addr a'))). *)
+(* Proof. *)
+(*   intros * NV. *)
+(*   unfold ℑs3. *)
+(*   eapply interp_memory_alloca_exists in NV as [m' [a' [ALLOC INTERP]]]. *)
+(*   exists m', a'. *)
+(*   split; eauto. *)
+(*   go. *)
+(*   rewrite interp_memory_alloca; eauto. *)
+(*   go; reflexivity. *)
+(*   Unshelve. *)
+(*   auto. *)
+(* Qed. *)

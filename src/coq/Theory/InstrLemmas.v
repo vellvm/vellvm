@@ -36,7 +36,7 @@ Import SemNotations.
 (* TODO: Move this *)
 Lemma interp_cfg3_concretize_or_pick_concrete :
   forall (uv : uvalue) (dv : dvalue) P g l m,
-    is_concrete uv ->
+    is_concrete uv = true ->
     uvalue_to_dvalue uv = inr dv ->
     ℑ3 (concretize_or_pick uv P) g l m ≈ Ret3 g l m dv.
 Proof.
@@ -55,7 +55,7 @@ Lemma uvalue_to_dvalue_list :
   forall fields,
     (forall u : uvalue,
         List.In u fields ->
-        is_concrete u -> exists dv : dvalue, uvalue_to_dvalue u = inr dv) ->
+        is_concrete u = true -> exists dv : dvalue, uvalue_to_dvalue u = inr dv) ->
     forallb is_concrete fields = true ->
     exists dfields, map_monad uvalue_to_dvalue fields = inr dfields.
 Proof.
@@ -72,7 +72,7 @@ Proof.
     pose proof (H a IN CONC_A) as (dv & CONV_A).
 
     assert (forall u : uvalue,
-               List.In u fields -> is_concrete u -> exists dv : dvalue, uvalue_to_dvalue u = inr dv) as HCONV.
+               List.In u fields -> is_concrete u = true -> exists dv : dvalue, uvalue_to_dvalue u = inr dv) as HCONV.
     { intros u INFS CONCU.
       apply H; intuition.
     }
@@ -91,7 +91,7 @@ Qed.
 (* TODO: Move this *)
 Lemma is_concrete_uvalue_to_dvalue :
   forall uv,
-    is_concrete uv ->
+    is_concrete uv = true ->
     exists dv, uvalue_to_dvalue uv = inr dv.
 Proof.
   intros uv CONC.
@@ -118,7 +118,7 @@ Qed.
 (* TODO: Move this *)
 Lemma interp_cfg3_concretize_or_pick_concrete_exists :
   forall (uv : uvalue) P g l m,
-    is_concrete uv ->
+    is_concrete uv = true ->
     exists dv, uvalue_to_dvalue uv = inr dv /\ ℑ3 (concretize_or_pick uv P) g l m ≈ Ret3 g l m dv.
 Proof.
   intros uv P g ρ m CONC.
