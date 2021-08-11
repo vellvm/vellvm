@@ -269,7 +269,7 @@ Qed.
 
 Lemma interp_cfg3_store :
   forall (m m' : MemState) (val : uvalue) (dt : dtyp) (a : addr) g l,
-    ErrSID_evals_to (write (ms_memory_stack m) a val dt) (ms_memory_stack m') ->
+    ErrSID_MemState_ms_runs_to (fun ms : memory_stack => write ms a val dt) m m' ->
     ℑ3 (trigger (Store dt (DVALUE_Addr a) val)) g l m ≈ Ret3 g l m' tt.
 Proof.
   intros * WRITE.

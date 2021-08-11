@@ -256,7 +256,7 @@ Import FinPTOI.
 Import FinPROV.
 Import FinITOP.
 
-Import FinSizeof.
+Export FinSizeof.
 
 (** ** Memory model
     Implementation of the memory model, i.e. a handler for [MemoryE].

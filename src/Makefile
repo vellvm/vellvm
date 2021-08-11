@@ -33,9 +33,11 @@ COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/DynamicValues Semantics/L
 		Semantics/IntrinsicsDefinitions\
 		Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
 		Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack\
-		Handlers/Pick Handlers/UndefinedBehaviour Handlers/Memory Handlers/MemoryTheory\
+		Handlers/Pick Handlers/UndefinedBehaviour Handlers/FiniteMemory Handlers/FiniteMemoryTheory\
 		Handlers/Handlers\
 		Semantics
+
+# Handlers/Memory Handlers/MemoryTheory\
 
 COQFILESANALYSIS := Analysis/Iteration Analysis/Kildall Analysis/Dom Analysis/DomKildall Analysis/ssa Analysis/DomId 
 

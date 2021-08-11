@@ -182,275 +182,275 @@ Proof.
         intros. apply eqit_Ret; eauto.
 Qed.
 
-Lemma commut_gen :
-  forall {A : Type}
-    (Q1 Q2 : A -> Prop) (QQ : A -> A -> Prop)
-    (t1 t3 : itree void1 A)
-    (t2 t4 : A -> itree void1 A),
-    (forall x, Q2 x -> t1 ≈ t4 x) ->
-    (forall x, Q1 x -> t2 x ≈ t3) ->
-    (t1 ⤳ Q1) ->
-    (t3 ⤳ Q2) ->
-    (forall a, Q1 a -> t2 a ⤳ (fun x => QQ x a)) ->
-    (forall a, Q2 a -> t4 a ⤳ (fun x => QQ a x)) ->
-    eutt QQ (a <- t1;; t2 a) (a <- t3;; t4 a).
-Proof.
-  cbn.
-  einit. ecofix CIH.
-  intros * EQ1 EQ2 PC1 PC2 F1 F2.
-  setoid_rewrite (itree_eta t1) at 1.
-  destruct (observe t1) eqn: EQ; [ | | inv e].
+(* Lemma commut_gen : *)
+(*   forall {A : Type} *)
+(*     (Q1 Q2 : A -> Prop) (QQ : A -> A -> Prop) *)
+(*     (t1 t3 : itree void1 A) *)
+(*     (t2 t4 : A -> itree void1 A), *)
+(*     (forall x, Q2 x -> t1 ≈ t4 x) -> *)
+(*     (forall x, Q1 x -> t2 x ≈ t3) -> *)
+(*     (t1 ⤳ Q1) -> *)
+(*     (t3 ⤳ Q2) -> *)
+(*     (forall a, Q1 a -> t2 a ⤳ (fun x => QQ x a)) -> *)
+(*     (forall a, Q2 a -> t4 a ⤳ (fun x => QQ a x)) -> *)
+(*     eutt QQ (a <- t1;; t2 a) (a <- t3;; t4 a). *)
+(* Proof. *)
+(*   cbn. *)
+(*   einit. ecofix CIH. *)
+(*   intros * EQ1 EQ2 PC1 PC2 F1 F2. *)
+(*   setoid_rewrite (itree_eta t1) at 1. *)
+(*   destruct (observe t1) eqn: EQ; [ | | inv e]. *)
 
-  - (* Ret *)
-    (* Need this rewriting to reason about co-termination on t2 and t3. *)
-    rewrite bind_ret_l. rewrite <- bind_ret_r at 1.
+(*   - (* Ret *) *)
+(*     (* Need this rewriting to reason about co-termination on t2 and t3. *) *)
+(*     rewrite bind_ret_l. rewrite <- bind_ret_r at 1. *)
 
-    ebind; econstructor.
-    + (* Prefix *)
-      Unshelve.
-      2 : { exact (fun x y => x = y /\ Q2 x). }
-      rewrite EQ2; cycle 1.
-      setoid_rewrite (itree_eta t1) in PC1.
-      rewrite EQ in PC1. apply eqit_Ret in PC1. auto.
-      rewrite has_post_post_strong in PC2.
-      apply PC2.
-    + (* Continuation. Equate t1 and t4. *)
-      intros * [<- HQ]. efinal.
-      setoid_rewrite (itree_eta t1) in EQ1.
-      rewrite EQ in EQ1. rewrite <- EQ1; auto.
-      apply eqit_Ret.
-      specialize (F2 _ HQ).
-      rewrite <- EQ1 in F2; auto. apply eqit_inv_Ret in F2. auto.
+(*     ebind; econstructor. *)
+(*     + (* Prefix *) *)
+(*       Unshelve. *)
+(*       2 : { exact (fun x y => x = y /\ Q2 x). } *)
+(*       rewrite EQ2; cycle 1. *)
+(*       setoid_rewrite (itree_eta t1) in PC1. *)
+(*       rewrite EQ in PC1. apply eqit_Ret in PC1. auto. *)
+(*       rewrite has_post_post_strong in PC2. *)
+(*       apply PC2. *)
+(*     + (* Continuation. Equate t1 and t4. *) *)
+(*       intros * [<- HQ]. efinal. *)
+(*       setoid_rewrite (itree_eta t1) in EQ1. *)
+(*       rewrite EQ in EQ1. rewrite <- EQ1; auto. *)
+(*       apply eqit_Ret. *)
+(*       specialize (F2 _ HQ). *)
+(*       rewrite <- EQ1 in F2; auto. apply eqit_inv_Ret in F2. auto. *)
 
-  - (* Tau *)
-    rewrite (itree_eta t3).
-    destruct (observe t3) eqn: EQ'; [ | | inv e].
-    + rewrite bind_ret_l. setoid_rewrite <- bind_ret_r at 5.
-      ebind; econstructor.
-      * (* Prefix *)
-        Unshelve.
-        2 : { exact (fun x y => x = y /\ Q1 x). }
+(*   - (* Tau *) *)
+(*     rewrite (itree_eta t3). *)
+(*     destruct (observe t3) eqn: EQ'; [ | | inv e]. *)
+(*     + rewrite bind_ret_l. setoid_rewrite <- bind_ret_r at 5. *)
+(*       ebind; econstructor. *)
+(*       * (* Prefix *) *)
+(*         Unshelve. *)
+(*         2 : { exact (fun x y => x = y /\ Q1 x). } *)
 
-        rewrite <- EQ1; cycle 1.
-        setoid_rewrite (itree_eta t3) in PC2.
-        rewrite EQ' in PC2. apply eqit_Ret in PC2. auto.
+(*         rewrite <- EQ1; cycle 1. *)
+(*         setoid_rewrite (itree_eta t3) in PC2. *)
+(*         rewrite EQ' in PC2. apply eqit_Ret in PC2. auto. *)
 
-        setoid_rewrite (itree_eta t1). setoid_rewrite (itree_eta t1) in PC1.
-        rewrite has_post_post_strong in PC1.
-        rewrite EQ. apply eqit_Tau. rewrite EQ in PC1.
-        apply eqit_inv_Tau_l in PC1.
-        apply eqit_inv_Tau_r in PC1. 
-        apply PC1.
+(*         setoid_rewrite (itree_eta t1). setoid_rewrite (itree_eta t1) in PC1. *)
+(*         rewrite has_post_post_strong in PC1. *)
+(*         rewrite EQ. apply eqit_Tau. rewrite EQ in PC1. *)
+(*         apply eqit_inv_Tau_l in PC1. *)
+(*         apply eqit_inv_Tau_r in PC1.  *)
+(*         apply PC1. *)
 
-      * (* Continuation. Equate t2 and t3. *)
-        intros * [<- HQ]. efinal.
-        setoid_rewrite (itree_eta t3) in EQ2.
-        rewrite EQ' in EQ2. rewrite EQ2; auto.
-        apply eqit_Ret.
-        specialize (F1 _ HQ).
-        rewrite EQ2 in F1; auto. apply eqit_inv_Ret in F1. auto.
+(*       * (* Continuation. Equate t2 and t3. *) *)
+(*         intros * [<- HQ]. efinal. *)
+(*         setoid_rewrite (itree_eta t3) in EQ2. *)
+(*         rewrite EQ' in EQ2. rewrite EQ2; auto. *)
+(*         apply eqit_Ret. *)
+(*         specialize (F1 _ HQ). *)
+(*         rewrite EQ2 in F1; auto. apply eqit_inv_Ret in F1. auto. *)
 
-    + rewrite !bind_tau.
+(*     + rewrite !bind_tau. *)
 
-      assert (t1 ≈ t). rewrite itree_eta. rewrite EQ.
-      apply eqit_Tau_l. reflexivity.
+(*       assert (t1 ≈ t). rewrite itree_eta. rewrite EQ. *)
+(*       apply eqit_Tau_l. reflexivity. *)
 
-      assert (t3 ≈ t0). rewrite itree_eta. rewrite EQ'.
-      apply eqit_Tau_l. reflexivity.
+(*       assert (t3 ≈ t0). rewrite itree_eta. rewrite EQ'. *)
+(*       apply eqit_Tau_l. reflexivity. *)
 
-      clear CIH0.
+(*       clear CIH0. *)
 
-      estep.
-      ebase; right.
-      eapply CIH; eauto.
-      setoid_rewrite <- H. auto.
-      setoid_rewrite <- H0. auto.
-      rewrite <- H. auto. rewrite <- H0. auto.
-Qed.
+(*       estep. *)
+(*       ebase; right. *)
+(*       eapply CIH; eauto. *)
+(*       setoid_rewrite <- H. auto. *)
+(*       setoid_rewrite <- H0. auto. *)
+(*       rewrite <- H. auto. rewrite <- H0. auto. *)
+(* Qed. *)
 
-Lemma eutt_inv_ret_l :
-  forall E A Q r t1, eutt (E := E) (fun x y : A => Q x) (Ret r) t1 -> Q r.
-Proof.
-  intros.
-  punfold H.
-  unfold eqit_ in H.
-  remember (observe (Ret r)) as x.
-  revert Heqx .
-  induction H; intros EQ; try now inv EQ.
-  - apply IHeqitF; auto.
-Qed.
+(* Lemma eutt_inv_ret_l : *)
+(*   forall E A Q r t1, eutt (E := E) (fun x y : A => Q x) (Ret r) t1 -> Q r. *)
+(* Proof. *)
+(*   intros. *)
+(*   punfold H. *)
+(*   unfold eqit_ in H. *)
+(*   remember (observe (Ret r)) as x. *)
+(*   revert Heqx . *)
+(*   induction H; intros EQ; try now inv EQ. *)
+(*   - apply IHeqitF; auto. *)
+(* Qed. *)
 
-Lemma eutt_inv_ret_r :
-  forall E A Q r t1, eutt (E := E) (fun x y : A => Q y) t1 (Ret r) -> Q r.
-Proof.
-  intros.
-  punfold H.
-  unfold eqit_ in H.
-  remember (observe (Ret r)) as x.
-  revert Heqx .
-  induction H; intros EQ; try now inv EQ.
-  - apply IHeqitF; auto.
-Qed.
+(* Lemma eutt_inv_ret_r : *)
+(*   forall E A Q r t1, eutt (E := E) (fun x y : A => Q y) t1 (Ret r) -> Q r. *)
+(* Proof. *)
+(*   intros. *)
+(*   punfold H. *)
+(*   unfold eqit_ in H. *)
+(*   remember (observe (Ret r)) as x. *)
+(*   revert Heqx . *)
+(*   induction H; intros EQ; try now inv EQ. *)
+(*   - apply IHeqitF; auto. *)
+(* Qed. *)
 
-Lemma commut_gen' :
-  forall {A : Type}
-    (Q1 Q2 : A -> Prop) (QQ : A -> Prop)
-    (t1 t3 : itree void1 A)
-    (t2 t4 : A -> itree void1 A),
-    (forall i, eutt (fun x y => Q1 x /\ Q1 y) t1 (t4 i)) ->
-    (forall i, eutt (fun x y => Q2 x /\ Q2 y) t3 (t2 i)) ->
-      (forall a, Q1 a -> eutt (fun x y => QQ x /\ QQ y) t3 (t2 a)) ->
-      (forall a, Q2 a -> eutt (fun x y => QQ x /\ QQ y) t1 (t4 a)) ->
-    eutt (fun x y => QQ x /\ QQ y) (a <- t1 ;; t2 a) (a <- t3 ;; t4 a).
-Proof.
-  cbn.
+(* Lemma commut_gen' : *)
+(*   forall {A : Type} *)
+(*     (Q1 Q2 : A -> Prop) (QQ : A -> Prop) *)
+(*     (t1 t3 : itree void1 A) *)
+(*     (t2 t4 : A -> itree void1 A), *)
+(*     (forall i, eutt (fun x y => Q1 x /\ Q1 y) t1 (t4 i)) -> *)
+(*     (forall i, eutt (fun x y => Q2 x /\ Q2 y) t3 (t2 i)) -> *)
+(*       (forall a, Q1 a -> eutt (fun x y => QQ x /\ QQ y) t3 (t2 a)) -> *)
+(*       (forall a, Q2 a -> eutt (fun x y => QQ x /\ QQ y) t1 (t4 a)) -> *)
+(*     eutt (fun x y => QQ x /\ QQ y) (a <- t1 ;; t2 a) (a <- t3 ;; t4 a). *)
+(* Proof. *)
+(*   cbn. *)
 
-  einit. ecofix CIH.
-  intros * EQ1 EQ2 * PC1 PC2.
-  setoid_rewrite (itree_eta t1) at 1.
-  destruct (observe t1) eqn: EQ; [ | | inv e].
+(*   einit. ecofix CIH. *)
+(*   intros * EQ1 EQ2 * PC1 PC2. *)
+(*   setoid_rewrite (itree_eta t1) at 1. *)
+(*   destruct (observe t1) eqn: EQ; [ | | inv e]. *)
 
-  clear CIH0.
-  - (* Ret *)
-    (* Need this rewriting to reason about co-termination on t2 and t3. *)
+(*   clear CIH0. *)
+(*   - (* Ret *) *)
+(*     (* Need this rewriting to reason about co-termination on t2 and t3. *) *)
 
-    rewrite bind_ret_l.
+(*     rewrite bind_ret_l. *)
 
-    setoid_rewrite (itree_eta t1) in EQ1. rewrite EQ in EQ1.
+(*     setoid_rewrite (itree_eta t1) in EQ1. rewrite EQ in EQ1. *)
 
-    rewrite <- bind_ret_r.
-    ebind. econstructor.
-    Unshelve. 3 : exact (fun x y => QQ x /\ Q2 y).
+(*     rewrite <- bind_ret_r. *)
+(*     ebind. econstructor. *)
+(*     Unshelve. 3 : exact (fun x y => QQ x /\ Q2 y). *)
 
-    {
-      specialize (EQ1 r).
+(*     { *)
+(*       specialize (EQ1 r). *)
 
-      apply eutt_conj; cycle 1.
-      eapply eqit_mon; auto. 2 : eapply eqit_flip; apply EQ2. intuition. destruct PR. auto.
-      eapply eqit_mon; auto.
-      2 : eapply eqit_flip; eapply PC1. intros * []; auto.
+(*       apply eutt_conj; cycle 1. *)
+(*       eapply eqit_mon; auto. 2 : eapply eqit_flip; apply EQ2. intuition. destruct PR. auto. *)
+(*       eapply eqit_mon; auto. *)
+(*       2 : eapply eqit_flip; eapply PC1. intros * []; auto. *)
 
-      setoid_rewrite (itree_eta (t4 r)) in EQ1.
-      destruct (observe (t4 r)) eqn: EQ'; [ | | inv e].
-      apply eqit_inv_Ret in EQ1. destruct EQ1. auto.
+(*       setoid_rewrite (itree_eta (t4 r)) in EQ1. *)
+(*       destruct (observe (t4 r)) eqn: EQ'; [ | | inv e]. *)
+(*       apply eqit_inv_Ret in EQ1. destruct EQ1. auto. *)
 
-      Set Nested Proofs Allowed.
+(*       Set Nested Proofs Allowed. *)
 
-      eapply eutt_inv_ret_l. eapply eqit_mon; auto.
-      2 : eauto.
-      intros * []; auto.
-    }
+(*       eapply eutt_inv_ret_l. eapply eqit_mon; auto. *)
+(*       2 : eauto. *)
+(*       intros * []; auto. *)
+(*     } *)
 
-    intros * [].
+(*     intros * []. *)
 
-    efinal.
+(*     efinal. *)
 
-    specialize (EQ1 u2).
+(*     specialize (EQ1 u2). *)
 
-    setoid_rewrite (itree_eta (t4 u2)).
-    setoid_rewrite (itree_eta (t4 u2)) in EQ1.
-    destruct (observe (t4 u2)) eqn: EQ'; [ | | inv e].
-    apply eqit_Ret. split; eauto.
-    apply eqit_inv_Ret in EQ1. destruct EQ1.
-    specialize (PC2 _ H0).
-    setoid_rewrite (itree_eta (t4 u2)) in PC2.
-    setoid_rewrite (itree_eta t1) in PC2.
-    rewrite EQ', EQ in PC2. apply eqit_inv_Ret in PC2. destruct PC2. auto.
+(*     setoid_rewrite (itree_eta (t4 u2)). *)
+(*     setoid_rewrite (itree_eta (t4 u2)) in EQ1. *)
+(*     destruct (observe (t4 u2)) eqn: EQ'; [ | | inv e]. *)
+(*     apply eqit_Ret. split; eauto. *)
+(*     apply eqit_inv_Ret in EQ1. destruct EQ1. *)
+(*     specialize (PC2 _ H0). *)
+(*     setoid_rewrite (itree_eta (t4 u2)) in PC2. *)
+(*     setoid_rewrite (itree_eta t1) in PC2. *)
+(*     rewrite EQ', EQ in PC2. apply eqit_inv_Ret in PC2. destruct PC2. auto. *)
 
 
-    specialize (PC2 _ H0).
-    setoid_rewrite (itree_eta t1) in PC2.
-    rewrite EQ in PC2.
-    setoid_rewrite (itree_eta (t4 u2)) in PC2.
-    rewrite EQ' in PC2.
+(*     specialize (PC2 _ H0). *)
+(*     setoid_rewrite (itree_eta t1) in PC2. *)
+(*     rewrite EQ in PC2. *)
+(*     setoid_rewrite (itree_eta (t4 u2)) in PC2. *)
+(*     rewrite EQ' in PC2. *)
 
-    eapply eqit_mon; auto; cycle 1.
-    eapply eqit_trans; cycle 2.
-    apply eqit_Ret. Unshelve. 7 : exact (fun x y => QQ x /\ QQ y). cbn. split; auto.
-    eapply eutt_inv_ret_l. eapply eqit_mon; auto; cycle 1. eapply PC2.
-    intros * []; auto. apply PC2.
-    intros * []; auto. destruct REL1, REL2. split; auto.
+(*     eapply eqit_mon; auto; cycle 1. *)
+(*     eapply eqit_trans; cycle 2. *)
+(*     apply eqit_Ret. Unshelve. 7 : exact (fun x y => QQ x /\ QQ y). cbn. split; auto. *)
+(*     eapply eutt_inv_ret_l. eapply eqit_mon; auto; cycle 1. eapply PC2. *)
+(*     intros * []; auto. apply PC2. *)
+(*     intros * []; auto. destruct REL1, REL2. split; auto. *)
 
-  - (* Tau *)
-    clear CIH0.
+(*   - (* Tau *) *)
+(*     clear CIH0. *)
 
-    (* specialize (EQ1 i). *)
-    setoid_rewrite (itree_eta t3).
-    destruct (observe t3) eqn: EQ'; [ | | inv e]; cycle 1.
+(*     (* specialize (EQ1 i). *) *)
+(*     setoid_rewrite (itree_eta t3). *)
+(*     destruct (observe t3) eqn: EQ'; [ | | inv e]; cycle 1. *)
 
-    + rewrite !bind_tau.
+(*     + rewrite !bind_tau. *)
 
-      assert (t1 ≈ t). rewrite itree_eta. rewrite EQ.
-      apply eqit_Tau_l. reflexivity.
+(*       assert (t1 ≈ t). rewrite itree_eta. rewrite EQ. *)
+(*       apply eqit_Tau_l. reflexivity. *)
 
-      assert (t3 ≈ t0). rewrite itree_eta. rewrite EQ'.
-      apply eqit_Tau_l. reflexivity.
+(*       assert (t3 ≈ t0). rewrite itree_eta. rewrite EQ'. *)
+(*       apply eqit_Tau_l. reflexivity. *)
 
-      estep.
+(*       estep. *)
 
-      ebase; right.
-      eapply CIH; eauto.
-      intros; rewrite <- H; eauto.
-      intros; rewrite <- H0; eauto.
-      intros; rewrite <- H0; eauto.
-      intros; rewrite <- H; eauto.
+(*       ebase; right. *)
+(*       eapply CIH; eauto. *)
+(*       intros; rewrite <- H; eauto. *)
+(*       intros; rewrite <- H0; eauto. *)
+(*       intros; rewrite <- H0; eauto. *)
+(*       intros; rewrite <- H; eauto. *)
 
-    + rewrite bind_ret_l.
-      setoid_rewrite (itree_eta t1) in EQ1. rewrite EQ in EQ1.
+(*     + rewrite bind_ret_l. *)
+(*       setoid_rewrite (itree_eta t1) in EQ1. rewrite EQ in EQ1. *)
 
-      setoid_rewrite <- bind_ret_r at 5.
-      ebind. econstructor.
-      Unshelve. 3 : exact (fun x y => Q1 x /\ QQ y).
+(*       setoid_rewrite <- bind_ret_r at 5. *)
+(*       ebind. econstructor. *)
+(*       Unshelve. 3 : exact (fun x y => Q1 x /\ QQ y). *)
 
-      apply eutt_conj; cycle 1.
-      specialize (PC2 r). setoid_rewrite (itree_eta t1) in PC2.
-      rewrite EQ in PC2.
-      eapply eqit_mon; auto.
-      Unshelve.
-      2 : eapply eqit_flip. 2 : unfold flip.
-      5 : exact (fun _ x => QQ x). cbn. intros; auto.
-      apply eqit_flip. eapply eqit_mon; auto. 2 : eapply PC2.
-      intros * []; intuition.
+(*       apply eutt_conj; cycle 1. *)
+(*       specialize (PC2 r). setoid_rewrite (itree_eta t1) in PC2. *)
+(*       rewrite EQ in PC2. *)
+(*       eapply eqit_mon; auto. *)
+(*       Unshelve. *)
+(*       2 : eapply eqit_flip. 2 : unfold flip. *)
+(*       5 : exact (fun _ x => QQ x). cbn. intros; auto. *)
+(*       apply eqit_flip. eapply eqit_mon; auto. 2 : eapply PC2. *)
+(*       intros * []; intuition. *)
 
-      setoid_rewrite (itree_eta t3) in EQ2.
-      rewrite EQ' in EQ2. eapply eutt_inv_ret_l.
-      eapply eqit_mon; auto. 2 : eapply EQ2.
-      intros * []; eauto.
+(*       setoid_rewrite (itree_eta t3) in EQ2. *)
+(*       rewrite EQ' in EQ2. eapply eutt_inv_ret_l. *)
+(*       eapply eqit_mon; auto. 2 : eapply EQ2. *)
+(*       intros * []; eauto. *)
 
-      eapply eqit_mon; auto; cycle 1.
-      apply EQ1. intros * []; auto.
+(*       eapply eqit_mon; auto; cycle 1. *)
+(*       apply EQ1. intros * []; auto. *)
 
-      intros * [].
+(*       intros * []. *)
 
-      efinal.
+(*       efinal. *)
 
-      specialize (EQ1 u2).
-      setoid_rewrite (itree_eta (t2 u1)).
-      destruct (observe (t2 u1)) eqn: EQ''; [ | | inv e].
-      apply eqit_Ret. split; eauto.
-      specialize (EQ2 u1). setoid_rewrite (itree_eta (t2 u1)) in EQ2.
-      rewrite EQ'' in EQ2.
-      specialize (PC1 _ H).
+(*       specialize (EQ1 u2). *)
+(*       setoid_rewrite (itree_eta (t2 u1)). *)
+(*       destruct (observe (t2 u1)) eqn: EQ''; [ | | inv e]. *)
+(*       apply eqit_Ret. split; eauto. *)
+(*       specialize (EQ2 u1). setoid_rewrite (itree_eta (t2 u1)) in EQ2. *)
+(*       rewrite EQ'' in EQ2. *)
+(*       specialize (PC1 _ H). *)
 
-      setoid_rewrite (itree_eta (t2 u1)) in PC1.
-      rewrite EQ'' in PC1. clear EQ2.
+(*       setoid_rewrite (itree_eta (t2 u1)) in PC1. *)
+(*       rewrite EQ'' in PC1. clear EQ2. *)
 
-      eapply eutt_inv_ret_r. eapply eqit_mon; eauto; cycle 1.
-      intros * []; auto.
+(*       eapply eutt_inv_ret_r. eapply eqit_mon; eauto; cycle 1. *)
+(*       intros * []; auto. *)
 
-      specialize (PC1 _ H).
-      setoid_rewrite (itree_eta (t2 u1)) in PC1.
-      rewrite EQ'' in PC1.
-      setoid_rewrite (itree_eta t3) in PC1.
-      rewrite EQ' in PC1.
+(*       specialize (PC1 _ H). *)
+(*       setoid_rewrite (itree_eta (t2 u1)) in PC1. *)
+(*       rewrite EQ'' in PC1. *)
+(*       setoid_rewrite (itree_eta t3) in PC1. *)
+(*       rewrite EQ' in PC1. *)
 
-      eapply eqit_mon; auto; cycle 1.
-      eapply eqit_trans; cycle 2.
-      2 : apply eqit_Ret. Unshelve. 9 : exact (fun x y => QQ x /\ QQ y). 2 : split ; auto.
-      2 : {
-        eapply eutt_inv_ret_l. eapply eqit_mon; auto; cycle 1. eapply PC1.
-        intros * []; auto.
-      }
-      apply eqit_flip. apply PC1. 2 : auto.
-      intros * []; auto. destruct REL1, REL2. split; auto.
-Qed.
+(*       eapply eqit_mon; auto; cycle 1. *)
+(*       eapply eqit_trans; cycle 2. *)
+(*       2 : apply eqit_Ret. Unshelve. 9 : exact (fun x y => QQ x /\ QQ y). 2 : split ; auto. *)
+(*       2 : { *)
+(*         eapply eutt_inv_ret_l. eapply eqit_mon; auto; cycle 1. eapply PC1. *)
+(*         intros * []; auto. *)
+(*       } *)
+(*       apply eqit_flip. apply PC1. 2 : auto. *)
+(*       intros * []; auto. destruct REL1, REL2. split; auto. *)
+(* Qed. *)
