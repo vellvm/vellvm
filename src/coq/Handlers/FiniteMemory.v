@@ -984,8 +984,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         aids <- write_allowed_errsid mem address (N.to_nat (sizeof_dtyp dt));;
         bytes <- serialize_sbytes v dt;;
         let mem_bytes := zip bytes aids in
-
-        ret (add_all_index mem_bytes (Z.of_N (sizeof_dtyp dt)) mem).
+        ret (add_all_index mem_bytes (fst address) mem).
 
     (** ** Array element lookup
       A [memory] can be seen as storing an array of elements of [dtyp] [t], from which we retrieve
