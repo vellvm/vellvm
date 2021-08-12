@@ -1366,11 +1366,11 @@ Section Memory_Stack_Theory.
     Lemma write_succeeds : forall m1 v τ a aids,
         uvalue_has_dtyp v τ ->
         (* dtyp_fits m1 a τ -> *)
-        write_allowed (fst (ms_memory_stack m1)) (fst a) (snd a) (N.to_nat (sizeof_dtyp τ)) = inr aids ->
+        write_allowed (fst (ms_memory_stack m1)) a (N.to_nat (sizeof_dtyp τ)) = inr aids ->
         exists m2,
           ErrSID_MemState_ms_runs_to (fun ms => write ms a v τ) m1 m2.
     Proof.
-      intros m1 v τ a aids TYP CAN.
+      intros m1 v τ [a pr] aids TYP CAN.
       (* destruct CAN as (sz & bytes & cid & BLOCK & SIZE). *)
 
       exists m1. (* (mkMemState (add_all_index mem) (ms_sid m1) (ms_prov m1)). *)
@@ -1389,8 +1389,6 @@ Section Memory_Stack_Theory.
       break_match; subst.
 
       cbn in CAN.
-      rewrite CAN.
-
       cbn.
     Admitted.
 
@@ -2562,7 +2560,7 @@ Section PARAMS.
     Lemma interp_memory_store_exists :
       forall (m : MemState) (t : dtyp) (val : uvalue) (a : addr) aids,
         uvalue_has_dtyp val t ->
-        write_allowed (fst (ms_memory_stack m)) (fst a) (snd a) (N.to_nat (sizeof_dtyp t)) = inr aids ->
+        write_allowed (fst (ms_memory_stack m)) a (N.to_nat (sizeof_dtyp t)) = inr aids ->
         exists m',
           ErrSID_MemState_ms_runs_to (fun ms => write ms a val t) m m' /\
           interp_memory (trigger (Store t (DVALUE_Addr a) val)) m ≈ Ret (m', tt).
