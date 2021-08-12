@@ -13,7 +13,7 @@ From ExtLib Require Import
      Structures.Functor
      Eqv.
 
-From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Semantics.TopLevel.
+From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG.
 Require Import Integers Floats.
 
 Require Import List.
@@ -49,6 +49,7 @@ Section ShowInstances.
   Fixpoint show_typ (t : typ) : string :=
     match t with
     | TYPE_I sz                 => "i" ++ show sz
+    | TYPE_IPTR                 => "iptr"
     | TYPE_Pointer t            => show_typ t ++ "*"
     | TYPE_Void                 => "void"
     | TYPE_Half                 => "half"

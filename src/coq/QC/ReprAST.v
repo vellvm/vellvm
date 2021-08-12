@@ -17,7 +17,7 @@ From ExtLib Require Import
      Structures.Functor
      Eqv.
 
-From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Semantics.TopLevel QC.Utils.
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG QC.Utils DynamicTypes.
 Require Import Integers Floats.
 
 Require Import List.
@@ -95,6 +95,7 @@ Section ReprInstances.
   Fixpoint typ_measure (t : typ) : nat :=
     match t with
     | TYPE_I sz => 0
+    | TYPE_IPTR => 0
     | TYPE_Pointer t => S (typ_measure t)
     | TYPE_Void => 0
     | TYPE_Half => 0
@@ -114,9 +115,62 @@ Section ReprInstances.
     | TYPE_Identified id => 0
     end.
 
+  Fixpoint dtyp_measure (t : dtyp) : nat :=
+    match t with
+    | DTYPE_I sz => 0
+    | DTYPE_IPTR => 0
+    | DTYPE_Pointer => 0
+    | DTYPE_Void => 0
+    | DTYPE_Half => 0
+    | DTYPE_Float => 0
+    | DTYPE_Double => 0
+    | DTYPE_X86_fp80 => 0
+    | DTYPE_Fp128 => 0
+    | DTYPE_Ppc_fp128 => 0
+    | DTYPE_Metadata => 0
+    | DTYPE_X86_mmx => 0
+    | DTYPE_Array sz t => S (dtyp_measure t)
+    | DTYPE_Struct fields => S (list_sum (map dtyp_measure fields))
+    | DTYPE_Packed_struct fields => S (list_sum (map dtyp_measure fields))
+    | DTYPE_Opaque => 0
+    | DTYPE_Vector sz t => S (dtyp_measure t)
+    end.
+
+  Program Fixpoint repr_dtyp (t : dtyp) {measure (dtyp_measure t)} : string :=
+    match t with
+    | DTYPE_I sz => "(DTYPE_I " ++ repr sz ++ ")"
+    | DTYPE_IPTR => "DTYPE_IPTR"
+    | DTYPE_Pointer => "DTYPE_Pointer"
+    | DTYPE_Void => "DTYPE_Void"
+    | DTYPE_Half => "DTYPE_Half"
+    | DTYPE_Float => "DTYPE_Float"
+    | DTYPE_Double => "DTYPE_Double"
+    | DTYPE_X86_fp80 => "DTYPE_X86_fp80"
+    | DTYPE_Fp128 => "DTYPE_Fp128"
+    | DTYPE_Ppc_fp128 => "DTYPE_Ppc_fp128"
+    | DTYPE_Metadata => "DTYPE_Metadata"
+    | DTYPE_X86_mmx => "DTYPE_X86_mmx"
+    | DTYPE_Array sz t => "(DTYPE_Array (" ++ repr sz ++ ") (" ++ repr_dtyp t ++ "))"
+    | DTYPE_Struct fields => "(DTYPE_Struct [" ++ contents_In fields (fun fld HIn => repr_dtyp fld) ++ "])"
+    | DTYPE_Packed_struct fields => "(DTYPE_Packed_struct [" ++ contents_In fields (fun fld HIn => repr_dtyp fld) ++ "])"
+    | DTYPE_Opaque => "DTYPE_Opaque"
+    | DTYPE_Vector sz t => "(DTYPE_Vector (" ++ repr sz ++ ") (" ++ repr_dtyp t ++ ")"
+    end.
+  Next Obligation.
+    cbn.
+    pose proof (list_sum_map dtyp_measure fld fields HIn).
+    lia.
+  Qed.
+  Next Obligation.
+    cbn.
+    pose proof (list_sum_map dtyp_measure fld fields HIn).
+    lia.
+  Qed.
+
   Program Fixpoint repr_typ (t : typ) {measure (typ_measure t)} : string :=
     match t with
     | TYPE_I sz                 => "(TYPE_I " ++ repr sz ++ ")"
+    | TYPE_IPTR                 => "TYPE_IPTR"
     | TYPE_Pointer t            => "(TYPE_Pointer " ++ repr_typ t ++ ")"
     | TYPE_Void                 => "TYPE_Void"
     | TYPE_Half                 => "TYPE_Half"
