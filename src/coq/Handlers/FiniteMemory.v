@@ -948,7 +948,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         let alloc_ids := map snd mem_bytes in
         if all_accesses_allowed pr alloc_ids
         then lift_err (deserialize_sbytes bytes t)
-        else failwith ("Read from memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ Show.show pr ++ ", memory allocation ids: " ++ Show.show alloc_ids)
+        else failwith ("Read from memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ Show.show pr ++ ", memory allocation ids: " ++ Show.show alloc_ids ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, aid)) (IM.elements mem)))
       end.
 
     (** ** Writing values to memory
@@ -962,14 +962,14 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
     Definition write_allowed (mem : memory) (address : addr) (len : nat) : err (list AllocationId)
       :=
         let '(addr, pr) := address in
-        let mem_bytes := IM_find_many (Zseq 0 len) mem in
+        let mem_bytes := IM_find_many (Zseq addr len) mem in
         match mem_bytes with
         | None => failwith "Trying to write to unallocated memory."
         | Some mem_bytes =>
           let alloc_ids := map snd mem_bytes in
           if all_accesses_allowed pr alloc_ids
           then ret alloc_ids
-          else failwith ("Trying to write to memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ Show.show pr ++ ", memory allocation ids: " ++ Show.show alloc_ids)
+          else failwith ("Trying to write to memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ Show.show pr ++ ", memory allocation ids: " ++ Show.show alloc_ids ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, aid)) (IM.elements mem)))
         end.
 
     Definition write_allowed_errsid (mem : memory) (address : addr) (len : nat) : ErrSID (list AllocationId)
@@ -1404,7 +1404,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
   (** ** Memory Handler
       Implementation of the memory model per se as a memory handler to the [MemoryE] interface.
    *)
-  Definition handle_memory {E} `{FailureE -< E} `{UBE -< E}: MemoryE ~> MemStateT (itree E) :=
+  Definition handle_memory {E} `{FailureE -< E} `{UBE -< E} : MemoryE ~> MemStateT (itree E) :=
     fun T e =>
       match e with
       | MemPush =>

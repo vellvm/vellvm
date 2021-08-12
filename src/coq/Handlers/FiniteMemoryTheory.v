@@ -2521,7 +2521,10 @@ Section PARAMS.
     Proof.
       repeat intro.
       unfold interp_memory.
-      subst; rewrite H2.
+      subst;
+        match goal with
+        | H: ?x   ?y |- _ => rewrite H
+        end.
       reflexivity.
     Qed.
 
