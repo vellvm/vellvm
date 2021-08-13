@@ -731,6 +731,7 @@ Program Fixpoint normalize_type (env : list (ident * typ)) (t : typ) {measure (L
     end
 
   | TYPE_I sz => t
+  | TYPE_IPTR => t
   | TYPE_Pointer t' => t
   | TYPE_Void => t
   | TYPE_Half => t
@@ -784,6 +785,7 @@ Lemma normalize_type_equation : forall env t,
     end
 
   | TYPE_I sz => TYPE_I sz
+  | TYPE_IPTR => TYPE_IPTR
   | TYPE_Pointer t' => TYPE_Pointer t'
   | TYPE_Void => TYPE_Void
   | TYPE_Half => TYPE_Half

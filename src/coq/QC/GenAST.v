@@ -39,6 +39,7 @@ Section Helpers.
   Fixpoint is_sized_type_h (t : dtyp) : bool
     := match t with
        | DTYPE_I sz                 => true
+       | DTYPE_IPTR                 => true
        | DTYPE_Pointer              => true
        | DTYPE_Void                 => false
        | DTYPE_Half                 => true
@@ -540,6 +541,8 @@ Section ExpGenerators.
        | DTYPE_I sz, DTYPE_I sz' =>
          if N.eq_dec sz sz' then true else false
        | DTYPE_I sz, _ => false
+       | DTYPE_IPTR, DTYPE_IPTR => true
+       | DTYPE_IPTR, _ => false
        | DTYPE_Pointer, DTYPE_Pointer => true
        | DTYPE_Pointer, _ => false
        | DTYPE_Void, DTYPE_Void => true
@@ -595,6 +598,11 @@ Section ExpGenerators.
        | TYPE_I sz =>
          match b with
          | TYPE_I sz' => if N.eq_dec sz sz' then true else false
+         | _ => false
+         end
+       | TYPE_IPTR =>
+         match b with
+         | TYPE_IPTR => true
          | _ => false
          end
        | TYPE_Pointer t =>
@@ -727,6 +735,7 @@ Section ExpGenerators.
       let gen_size_0 :=
           match t with
           | TYPE_I n                  => ret EXP_Integer <*> lift (arbitrary : G Z) (* lift (x <- (arbitrary : G nat);; ret (Z.of_nat x)) (* TODO: should the integer be forced to be in bounds? *) *)
+          | TYPE_IPTR => ret EXP_Integer <*> lift (arbitrary : G Z)
           | TYPE_Pointer t            => lift failGen (* Only pointer type expressions might be conversions? Maybe GEP? *)
           | TYPE_Void                 => lift failGen (* There should be no expressions of type void *)
           | TYPE_Function ret args    => lift failGen (* No expressions of function type *)
@@ -763,6 +772,9 @@ Section ExpGenerators.
           | TYPE_I isz =>
             (* TODO: If I1 also allow ICmp and FCmp *)
             [gen_ibinop_exp isz]
+          | TYPE_IPTR =>
+            (* TODO: If I1 also allow ICmp and FCmp *)
+            [gen_ibinop_exp_typ TYPE_IPTR]
           | TYPE_Array n t =>
             [es <- vectorOf_LLVM (N.to_nat n) (gen_exp_size 0 t);;
              ret (EXP_Array (map (fun e => (t, e)) es))]
@@ -802,13 +814,17 @@ Section ExpGenerators.
     end
   with
   (* TODO: Make sure we don't divide by 0 *)
-  gen_ibinop_exp (isz : N) : GenLLVM (exp typ)
+  gen_ibinop_exp_typ (t : typ) : GenLLVM (exp typ)
     :=
-      let t := TYPE_I isz in
       ibinop <- lift gen_ibinop;;
       if Handlers.LLVMEvents.DV.iop_is_div ibinop
       then ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_non_zero_exp_size 0 t
-      else ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t.
+      else ret (OP_IBinop ibinop) <*> ret t <*> gen_exp_size 0 t <*> gen_exp_size 0 t
+  with
+  gen_ibinop_exp (isz : N) : GenLLVM (exp typ)
+    :=
+      let t := TYPE_I isz in
+      gen_ibinop_exp_typ t.
 
   Definition gen_exp (t : typ) : GenLLVM (exp typ)
     := sized_LLVM (fun sz => gen_exp_size sz t).
