@@ -851,9 +851,60 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
      The reason we also have deserialize_sbytes is in order to deal
      with aggregate data types.
    *)
-  Definition deserialize_sbytes (bytes : list SByte) (dt : dtyp) : err uvalue
+  Program Fixpoint deserialize_sbytes (bytes : list SByte) (dt : dtyp) {measure (dtyp_measure dt)} : err uvalue
     :=
       match dt with
+       (* TODO: should we bother with this? *)
+       (* Array and vector types *)
+       | DTYPE_Array sz t =>
+         let size := sizeof_dtyp t in
+         let size_nat := N.to_nat size in
+         fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];;
+         ret (UVALUE_Array fields)
+
+       | DTYPE_Vector sz t =>
+         let size := sizeof_dtyp t in
+         let size_nat := N.to_nat size in
+         fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];;
+         ret (UVALUE_Vector fields)
+
+       (* Padded aggregate types *)
+       | DTYPE_Struct fields =>
+         (* TODO: Add padding *)
+         match fields with
+         | [] => ret (UVALUE_Struct []) (* TODO: Not 100% sure about this. *)
+         | (dt::dts) =>
+           let sz := sizeof_dtyp dt in
+           let init_bytes := take sz bytes in
+           let rest_bytes := drop sz bytes in
+           f <- deserialize_sbytes init_bytes dt;;
+           rest <- deserialize_sbytes rest_bytes (DTYPE_Struct dts);;
+           match rest with
+           | UVALUE_Struct fs =>
+             ret (UVALUE_Struct (f::fs))
+           | _ =>
+             inl "deserialize_sbytes: DTYPE_Struct recursive call did not return a struct."
+           end
+         end
+
+       (* Structures with no padding *)
+       | DTYPE_Packed_struct fields =>
+         match fields with
+         | [] => ret (UVALUE_Packed_struct []) (* TODO: Not 100% sure about this. *)
+         | (dt::dts) =>
+           let sz := sizeof_dtyp dt in
+           let init_bytes := take sz bytes in
+           let rest_bytes := drop sz bytes in
+           f <- deserialize_sbytes init_bytes dt;;
+           rest <- deserialize_sbytes rest_bytes (DTYPE_Packed_struct dts);;
+           match rest with
+           | UVALUE_Packed_struct fs =>
+             ret (UVALUE_Packed_struct (f::fs))
+           | _ =>
+             inl "deserialize_sbytes: DTYPE_Struct recursive call did not return a struct."
+           end
+         end
+
        (* Base types *)
        | DTYPE_I _
        | DTYPE_IPTR
@@ -865,72 +916,36 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | DTYPE_Fp128
        | DTYPE_Ppc_fp128
        | DTYPE_X86_mmx
-       | _ =>
+       | DTYPE_Opaque
+       | DTYPE_Metadata =>
          ret (from_ubytes bytes dt)
+       | DTYPE_Void =>
+         inl "deserialize_sbytes: Attempt to deserialize void."
       end.
-
-       (* serialize_sbytes does not take aggregate structures into
-          account. We just extract individual bytes from aggregate
-          uvalues. This was necessary for dealing with endianess and
-          expressions which yield aggregate structures.
-
-          That said, it would still be nice to be able to edit elements of
-          arrays / structures and be able to load them back...
-
-        *)
-
-       (* TODO: should we bother with this? *)
-       (* Array and vector types *)
-       (* | DTYPE_Array sz t => *)
-       (*   let size := sizeof_dtyp t in *)
-       (*   let size_nat := N.to_nat size in *)
-       (*   fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];; *)
-       (*   ret (UVALUE_Array fields) *)
-       (* | DTYPE_Vector sz t => *)
-       (*   let size := sizeof_dtyp t in *)
-       (*   let size_nat := N.to_nat size in *)
-       (*   fields <- monad_fold_right (fun acc idx => uv <- deserialize_sbytes (between (idx*size) ((idx+1) * size) bytes) t;; ret (uv::acc)) (Nseq 0 size_nat) [];; *)
-       (*   ret (UVALUE_Vector fields) *)
-
-       (* (* Padded aggregate types *) *)
-       (* | DTYPE_Struct fields => *)
-       (*   (* TODO: Add padding *) *)
-       (*   match fields with *)
-       (*   | [] => ret (UVALUE_Struct []) (* TODO: Not 100% sure about this. *) *)
-       (*   | (dt::dts) => *)
-       (*     let sz := sizeof_dtyp dt in *)
-       (*     let init_bytes := take sz bytes in *)
-       (*     let rest_bytes := drop sz bytes in *)
-       (*     f <- deserialize_sbytes init_bytes dt;; *)
-       (*     rest <- deserialize_sbytes rest_bytes (DTYPE_Struct dts);; *)
-       (*     match rest with *)
-       (*     | UVALUE_Struct fs => *)
-       (*       ret (UVALUE_Struct (f::fs)) *)
-       (*     | _ => *)
-       (*       raise "deserialize_sbytes: DTYPE_Struct recursive call did not return a struct." *)
-       (*     end *)
-       (*   end *)
-
-       (*   (* match fields with *) *)
-       (*   (* | [] => ret (DVALUE_Struct []) *) *)
-       (*   (* | (x::xs) => _ *) *)
-       (*   (* end *) *)
-       (*   (* inl "deserialize_sbytes: padded structures unimplemented." *) *)
-
-       (* (* Structures with no padding *) *)
-       (* | DTYPE_Packed_struct fields => *)
-         
-       (*   inl "deserialize_sbytes: unimplemented packed structs." *)
-
-       (* (* Unimplemented *) *)
-       (* | DTYPE_Void => *)
-       (*   inl "deserialize_sbytes: attempting to deserialize void." *)
-       (* | DTYPE_Metadata => *)
-       (*   inl "deserialize_sbytes: metadata." *)
-
-       (* | DTYPE_Opaque => *)
-       (*   inl "deserialize_sbytes: opaque." *)
-       (* end. *)
+  Next Obligation.
+    assert (In dt (dt :: dts)) as Hin by (cbn;auto).
+    pose proof (list_sum_map dtyp_measure dt (dt :: dts) Hin).
+    cbn.
+    lia.
+  Qed.
+  Next Obligation.
+    assert (In dt (dt :: dts)) as Hin by (cbn;auto).
+    pose proof (list_sum_map dtyp_measure dt (dt :: dts) Hin).
+    pose proof dtyp_measure_gt_0 dt.
+    destruct dts; cbn; lia.
+  Qed.
+  Next Obligation.
+    assert (In dt (dt :: dts)) as Hin by (cbn;auto).
+    pose proof (list_sum_map dtyp_measure dt (dt :: dts) Hin).
+    cbn.
+    lia.
+  Qed.
+  Next Obligation.
+    assert (In dt (dt :: dts)) as Hin by (cbn;auto).
+    pose proof (list_sum_map dtyp_measure dt (dt :: dts) Hin).
+    pose proof dtyp_measure_gt_0 dt.
+    destruct dts; cbn; lia.
+  Qed.
 
 (* (* TODO: *)
 

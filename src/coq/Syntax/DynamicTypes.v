@@ -210,24 +210,32 @@ End WF_dtyp.
 
 Fixpoint dtyp_measure (t : dtyp) : nat :=
   match t with
-  | DTYPE_I sz => 0
-  | DTYPE_IPTR => 0
-  | DTYPE_Pointer => 0
-  | DTYPE_Void => 0
-  | DTYPE_Half => 0
-  | DTYPE_Float => 0
-  | DTYPE_Double => 0
-  | DTYPE_X86_fp80 => 0
-  | DTYPE_Fp128 => 0
-  | DTYPE_Ppc_fp128 => 0
-  | DTYPE_Metadata => 0
-  | DTYPE_X86_mmx => 0
+  | DTYPE_I sz => 1
+  | DTYPE_IPTR => 1
+  | DTYPE_Pointer => 1
+  | DTYPE_Void => 1
+  | DTYPE_Half => 1
+  | DTYPE_Float => 1
+  | DTYPE_Double => 1
+  | DTYPE_X86_fp80 => 1
+  | DTYPE_Fp128 => 1
+  | DTYPE_Ppc_fp128 => 1
+  | DTYPE_Metadata => 1
+  | DTYPE_X86_mmx => 1
   | DTYPE_Array sz t => S (dtyp_measure t)
   | DTYPE_Struct fields => S (list_sum (map dtyp_measure fields))
   | DTYPE_Packed_struct fields => S (list_sum (map dtyp_measure fields))
-  | DTYPE_Opaque => 0
+  | DTYPE_Opaque => 1
   | DTYPE_Vector sz t => S (dtyp_measure t)
   end.
+
+Lemma dtyp_measure_gt_0 :
+  forall (t : dtyp),
+    0 < dtyp_measure t.
+Proof.
+  destruct t; cbn; auto.
+  all: apply Nat.lt_0_succ.
+Qed.
 
 Section hiding_notation.
   #[local] Open Scope sexp_scope.

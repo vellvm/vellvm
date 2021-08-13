@@ -92,6 +92,7 @@ Section ReprInstances.
   Defined.
 
   (* I don't think I want to use sizeof_typ for measures... *)
+  (* TODO: Move this *)
   Fixpoint typ_measure (t : typ) : nat :=
     match t with
     | TYPE_I sz => 0
@@ -113,27 +114,6 @@ Section ReprInstances.
     | TYPE_Opaque => 0
     | TYPE_Vector sz t => S (typ_measure t)
     | TYPE_Identified id => 0
-    end.
-
-  Fixpoint dtyp_measure (t : dtyp) : nat :=
-    match t with
-    | DTYPE_I sz => 0
-    | DTYPE_IPTR => 0
-    | DTYPE_Pointer => 0
-    | DTYPE_Void => 0
-    | DTYPE_Half => 0
-    | DTYPE_Float => 0
-    | DTYPE_Double => 0
-    | DTYPE_X86_fp80 => 0
-    | DTYPE_Fp128 => 0
-    | DTYPE_Ppc_fp128 => 0
-    | DTYPE_Metadata => 0
-    | DTYPE_X86_mmx => 0
-    | DTYPE_Array sz t => S (dtyp_measure t)
-    | DTYPE_Struct fields => S (list_sum (map dtyp_measure fields))
-    | DTYPE_Packed_struct fields => S (list_sum (map dtyp_measure fields))
-    | DTYPE_Opaque => 0
-    | DTYPE_Vector sz t => S (dtyp_measure t)
     end.
 
   Program Fixpoint repr_dtyp (t : dtyp) {measure (dtyp_measure t)} : string :=
