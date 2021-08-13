@@ -1400,6 +1400,40 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | inr (inr x) => ret x
        end.
 
+      Fixpoint uvalue_to_string (u : uvalue) : string
+        := match u with
+           | UVALUE_Addr a => "UVALUE_Addr"
+           | UVALUE_I1 x => "UVALUE_I1"
+           | UVALUE_I8 x => "UVALUE_I8"
+           | UVALUE_I32 x => "UVALUE_I32"
+           | UVALUE_I64 x => "UVALUE_I64"
+           | UVALUE_IPTR x => "UVALUE_IPTR"
+           | UVALUE_Double x => "UVALUE_Double"
+           | UVALUE_Float x => "UVALUE_Float"
+           | UVALUE_Undef t => "UVALUE_Undef"
+           | UVALUE_Poison => "UVALUE_Poison"
+           | UVALUE_None => "UVALUE_None"
+           | UVALUE_Struct fields => "UVALUE_Struct"
+           | UVALUE_Packed_struct fields => "UVALUE_Packed_struct"
+           | UVALUE_Array elts => "UVALUE_Array"
+           | UVALUE_Vector elts => "UVALUE_Vector"
+           | UVALUE_IBinop iop v1 v2 => "UVALUE_IBinop"
+           | UVALUE_ICmp cmp v1 v2 => "UVALUE_ICmp"
+           | UVALUE_FBinop fop fm v1 v2 => "UVALUE_FBinop"
+           | UVALUE_FCmp cmp v1 v2 => "UVALUE_FCmp"
+           | UVALUE_Conversion conv v t_to => "UVALUE_Conversion"
+           | UVALUE_GetElementPtr t ptrval idxs => "UVALUE_GetElementPtr"
+           | UVALUE_ExtractElement vec idx => "UVALUE_ExtractElement"
+           | UVALUE_InsertElement vec elt idx => "UVALUE_InsertElement"
+           | UVALUE_ShuffleVector vec1 vec2 idxmask => "UVALUE_ShuffleVector"
+           | UVALUE_ExtractValue vec idxs => "UVALUE_ExtractValue"
+           | UVALUE_InsertValue vec elt idxs => "UVALUE_InsertValue"
+           | UVALUE_Select cnd v1 v2 => "UVALUE_Select"
+           | UVALUE_ExtractByte uv dt idx sid => "UVALUE_ExtractByte " ++ uvalue_to_string uv ++ " typ " ++ uvalue_to_string idx ++ " " ++ Show.show sid
+           | UVALUE_ConcatBytes uvs dt => "UVALUE_ConcatBytes " ++ Show.show (map uvalue_to_string uvs)
+           end.
+
+
   (** ** Memory Handler
       Implementation of the memory model per se as a memory handler to the [MemoryE] interface.
    *)

@@ -358,7 +358,7 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A))(SIZEOF: Sizeo
 
     Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} : PickE ~> itree E :=
       fun T p => match p with
-              | pick u P => lift_undef_or_err ret (ret DVALUE_None) (*(concretize_uvalue u) *)
+              | pick u P => lift_undef_or_err ret (concretize_uvalue u)
               end.
 
     Section PARAMS_INTERP.
