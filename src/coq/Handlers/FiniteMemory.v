@@ -46,6 +46,7 @@ From Vellvm Require Import
      Utils.ListUtil
      Utils.IntMaps
      Utils.NMaps
+     Utils.Monads
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
@@ -684,8 +685,52 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          trywith (ERR_message "re_sid_ubytes: missing indices.") (NM_find_many (Nseq 0 len) byte_map). 
     Set Guard Checking.
 
+    Fixpoint uvalue_measure (uv : uvalue) : nat :=
+      match uv with
+      | UVALUE_Addr a => 0
+      | UVALUE_I1 x => 0
+      | UVALUE_I8 x => 0
+      | UVALUE_I32 x => 0
+      | UVALUE_I64 x => 0
+      | UVALUE_IPTR x => 0
+      | UVALUE_Double x => 0
+      | UVALUE_Float x => 0
+      | UVALUE_Undef t => 0
+      | UVALUE_Poison => 0
+      | UVALUE_None => 0
+      | UVALUE_Struct fields => S (list_sum (map uvalue_measure fields))
+      | UVALUE_Packed_struct fields => S (list_sum (map uvalue_measure fields))
+      | UVALUE_Array elts => S (list_sum (map uvalue_measure elts))
+      | UVALUE_Vector elts => S (list_sum (map uvalue_measure elts))
+      | UVALUE_IBinop _ v1 v2
+      | UVALUE_ICmp _ v1 v2
+      | UVALUE_FBinop _ _ v1 v2
+      | UVALUE_FCmp _ v1 v2 =>
+        S (uvalue_measure v1 + uvalue_measure v2)
+      | UVALUE_Conversion conv v t_to =>
+        S (uvalue_measure v)
+      | UVALUE_GetElementPtr t ptrval idxs =>
+        S (uvalue_measure ptrval + list_sum (map uvalue_measure idxs))
+      | UVALUE_ExtractElement vec idx =>
+        S (uvalue_measure vec + uvalue_measure idx) 
+      | UVALUE_InsertElement vec elt idx =>
+        S (uvalue_measure vec + uvalue_measure elt + uvalue_measure idx) 
+      | UVALUE_ShuffleVector vec1 vec2 idxmask =>
+        S (uvalue_measure vec1 + uvalue_measure vec2 + uvalue_measure idxmask) 
+      | UVALUE_ExtractValue vec idxs =>
+        S (uvalue_measure vec)
+      | UVALUE_InsertValue vec elt idxs =>
+        S (uvalue_measure vec + uvalue_measure elt)
+      | UVALUE_Select cnd v1 v2 =>
+        S (uvalue_measure cnd + uvalue_measure v1 + uvalue_measure v2)
+      | UVALUE_ExtractByte uv dt idx sid =>
+        S (uvalue_measure uv + uvalue_measure idx)
+      | UVALUE_ConcatBytes uvs dt =>
+        S (list_sum (map uvalue_measure uvs))
+      end.
+    
     (* This is mostly to_ubytes, except it will also unwrap concatbytes *)
-  Fixpoint serialize_sbytes (uv : uvalue) (dt : dtyp) {struct uv} : ErrSID (list SByte)
+  Program Fixpoint serialize_sbytes (uv : uvalue) (dt : dtyp) {measure (uvalue_measure uv)} : ErrSID (list SByte)
     := match uv with
        (* Base types *)
        | UVALUE_Addr _
@@ -698,14 +743,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | UVALUE_Double _
        | UVALUE_Undef _
        | UVALUE_Poison
-
-       (* Padded aggregate types *)
-       | UVALUE_Struct _
-
-       (* Packed aggregate types *)
-       | UVALUE_Packed_struct _
-       | UVALUE_Array _
-       | UVALUE_Vector _
 
        (* Expressions *)
        | UVALUE_IBinop _ _ _
@@ -723,6 +760,53 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          sid <- fresh_sid;;
          ret (to_ubytes uv dt sid)
 
+       (* TODO: each field gets a separate store id... Is that sensible? *)
+       (* Padded aggregate types *)
+       | UVALUE_Struct fields =>
+         (* TODO: take padding into account *)
+         match dt with
+         | DTYPE_Struct ts =>
+           if Nat.eqb (length ts) (length fields)
+           then
+             let fts := zip fields ts in
+             field_bytes <- map_monad_In fts (fun '(f, t) Hin => serialize_sbytes f t);;
+             ret (concat field_bytes)
+           else raise_error "serialize_sbytes: UVALUE_Struct field / type mismatch."
+         | _ =>
+           raise_error "serialize_sbytes: UVALUE_Struct with incorrect type."
+         end
+
+       (* Packed aggregate types *)
+       | UVALUE_Packed_struct fields =>
+         match dt with
+         | DTYPE_Packed_struct ts =>
+           if Nat.eqb (length ts) (length fields)
+           then
+             let fts := zip fields ts in
+             field_bytes <- map_monad_In fts (fun '(f, t) Hin => serialize_sbytes f t);;
+             ret (concat field_bytes)
+           else raise_error "serialize_sbytes: UVALUE_Packed_struct field / type mismatch."
+         | _ =>
+           raise_error "serialize_sbytes: UVALUE_Packed_struct with incorrect type."
+         end
+
+       | UVALUE_Array elts =>
+         match dt with
+         | DTYPE_Array sz t =>
+           field_bytes <- map_monad_In elts (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+         | _ =>
+           raise_error "serialize_sbytes: UVALUE_Array with incorrect type."
+         end
+       | UVALUE_Vector elts =>
+         match dt with
+         | DTYPE_Vector sz t =>
+           field_bytes <- map_monad_In elts (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+         | _ =>
+           raise_error "serialize_sbytes: UVALUE_Array with incorrect type."
+         end
+
        | UVALUE_None => ret nil
 
        (* Byte manipulation. *)
@@ -734,6 +818,28 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
          bytes' <- lift_ERR (map_monad extract_byte_to_ubyte bytes);;
          re_sid_ubytes bytes'
        end.
+  Next Obligation.
+    pose proof (zip_In_both _ _ _ _ Hin) as [IN_FIELDS IN_TYPS].
+    cbn.
+    pose proof (list_sum_map uvalue_measure u fields IN_FIELDS).
+    lia.
+  Qed.
+  Next Obligation.
+    pose proof (zip_In_both _ _ _ _ Hin) as [IN_FIELDS IN_TYPS].
+    cbn.
+    pose proof (list_sum_map uvalue_measure u fields IN_FIELDS).
+    lia.
+  Qed.
+  Next Obligation.
+    cbn.
+    pose proof (list_sum_map uvalue_measure elt elts Hin).
+    lia.
+  Qed.
+  Next Obligation.
+    cbn.
+    pose proof (list_sum_map uvalue_measure elt elts Hin).
+    lia.
+  Qed.
 
   (* deserialize_sbytes takes a list of SBytes and turns them into a uvalue.
 
@@ -1478,14 +1584,22 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
         end
 
       | GEP dt ua uvs =>
-        match (dvs <- map_monad uvalue_to_dvalue uvs;; da <- uvalue_to_dvalue ua;; ret (da, dvs)) with
-        | inr (da, dvs) =>
-          (* If everything is well defined, just use handle_gep... *)
-          a' <- mem_state_lift_err (handle_gep dt da dvs);;
-          ret (dvalue_to_uvalue a')
-        | inl _ =>
-          (* Otherwise build a UVALUE_GEP *)
-          ret (UVALUE_GetElementPtr dt ua uvs)
+        match map_monad uvalue_to_dvalue uvs with
+        | inl err => mem_state_raise ("Bleh uvs: " ++ err)
+        | _ =>
+          match uvalue_to_dvalue ua with
+          | inl err => mem_state_raise ("Bleh ua: " ++ uvalue_to_string ua)
+          | _ =>
+            match (dvs <- map_monad uvalue_to_dvalue uvs;; da <- uvalue_to_dvalue ua;; ret (da, dvs)) with
+            | inr (da, dvs) =>
+              (* If everything is well defined, just use handle_gep... *)
+              a' <- mem_state_lift_err (handle_gep dt da dvs);;
+              ret (dvalue_to_uvalue a')
+            | inl _ =>
+              (* Otherwise build a UVALUE_GEP *)
+              ret (UVALUE_GetElementPtr dt ua uvs)
+            end
+          end
         end
         
       | ItoP x =>

@@ -12,6 +12,20 @@ Fixpoint zipWith {A B C} (f : A -> B -> C) (xs : list A) (ys : list B) : list C
 
 Definition zip {X Y} (xs : list X) (ys : list Y) := zipWith (fun a b => (a, b)) xs ys.
 
+Lemma zip_In_both :
+  forall {A} {B} xs ys (x : A) (y : B) ,
+    In (x, y) (zip xs ys) ->
+    In x xs /\ In y ys.
+Proof.
+  induction xs, ys;
+    intros x y H; inversion H.
+  - inversion H0; subst.
+    intuition.
+  - clear H.
+    specialize (IHxs _ _ _ H0).
+    intuition.
+Qed.
+
 Lemma map_In {A B : Type} (l : list A) (f : forall (x : A), In x l -> B) : list B.
 Proof.
   induction l.
