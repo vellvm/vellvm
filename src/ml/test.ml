@@ -243,6 +243,7 @@ let terminator_tests =
 
 let bitcast_tests =
   [ "../tests/ll/bitcast1.ll", 3
+  ; "../tests/ll/bitcast2.ll", 0
   ]
 
 let larger_memory_tests =
