@@ -232,6 +232,22 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         match t1, x, t2 with
         | DTYPE_I bits1, x, DTYPE_I bits2 =>
           if bits1 =? bits2 then Conv_Pure x else Conv_Illegal "unequal bitsize in cast"
+        | DTYPE_Float, DVALUE_Float x, DTYPE_I bits =>
+          if bits =? 32
+          then Conv_Pure (DVALUE_I32 (Float32.to_bits x))
+          else Conv_Illegal "Float to integer with different bitwidth."
+        | DTYPE_I bits, DVALUE_I32 x, DTYPE_Float =>
+          if bits =? 32
+          then Conv_Pure (DVALUE_Float (Float32.of_bits x))
+          else Conv_Illegal "Integer to float with different bitwidth."
+        | DTYPE_Double, DVALUE_Double x, DTYPE_I bits =>
+          if bits =? 64
+          then Conv_Pure (DVALUE_I64 (Float.to_bits x))
+          else Conv_Illegal "Double to integer with different bitwidth."
+        | DTYPE_I bits, DVALUE_I64 x, DTYPE_Double =>
+          if bits =? 64
+          then Conv_Pure (DVALUE_Double (Float.of_bits x))
+          else Conv_Illegal "Integer to double with different bitwidth."
         | DTYPE_Pointer, DVALUE_Addr a, DTYPE_Pointer =>
           Conv_Pure (DVALUE_Addr a)
         | DTYPE_Pointer, DVALUE_Poison, DTYPE_Pointer =>
@@ -312,7 +328,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
       end.
     Arguments get_conv_case _ _ _ _ : simpl nomatch.
 
-    
 
     Definition eval_conv_pure_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
       match get_conv_case conv t1 x t2 with
