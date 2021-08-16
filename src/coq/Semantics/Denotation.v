@@ -545,11 +545,11 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
     | OP_Conversion conv dt1 op dt2 =>
       v <- denote_exp (Some dt1) op ;;
       match get_conv_case_ptr conv dt1 dt2 with
-      | PtrConv_ItoP => trigger (ItoP v)
+      | PtrConv_ItoP => trigger (ItoP dt1 v)
       | PtrConv_PtoI => trigger (PtoI dt2 v)
       | PtrConv_Neither =>
         uvalue_to_dvalue_uop
-          (fun v => ret (UVALUE_Conversion conv v dt2))
+          (fun v => ret (UVALUE_Conversion conv dt1 v dt2))
           (fun v => translate conv_to_exp
                               (fmap dvalue_to_uvalue (eval_conv_pure conv dt1 v dt2)))
           v

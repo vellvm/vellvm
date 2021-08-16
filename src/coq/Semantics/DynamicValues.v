@@ -268,7 +268,7 @@ Inductive uvalue : Type :=
 | UVALUE_ICmp             (cmp:icmp)   (v1:uvalue) (v2:uvalue)
 | UVALUE_FBinop           (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue)
 | UVALUE_FCmp             (cmp:fcmp)   (v1:uvalue) (v2:uvalue)
-| UVALUE_Conversion       (conv:conversion_type) (v:uvalue) (t_to:dtyp)
+| UVALUE_Conversion       (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp)
 | UVALUE_GetElementPtr    (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)) (* TODO: do we ever need this? GEP raises an event? *)
 | UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue)
 | UVALUE_InsertElement    (vec: uvalue) (elt:uvalue) (idx:uvalue)
@@ -305,7 +305,7 @@ Section UvalueInd.
   Hypothesis IH_ICmp           : forall (cmp:icmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_ICmp cmp v1 v2).
   Hypothesis IH_FBinop         : forall (fop:fbinop) (fm:list fast_math) (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FBinop fop fm v1 v2).
   Hypothesis IH_FCmp           : forall (cmp:fcmp)   (v1:uvalue) (v2:uvalue), P v1 -> P v2 -> P (UVALUE_FCmp cmp v1 v2).
-  Hypothesis IH_Conversion     : forall (conv:conversion_type) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv v t_to).
+  Hypothesis IH_Conversion     : forall (conv:conversion_type) (t_from:dtyp) (v:uvalue) (t_to:dtyp), P v -> P (UVALUE_Conversion conv t_from v t_to).
   Hypothesis IH_GetElementPtr  : forall (t:dtyp) (ptrval:uvalue) (idxs:list (uvalue)), P ptrval -> (forall idx, In idx idxs -> P idx) -> P (UVALUE_GetElementPtr t ptrval idxs).
   Hypothesis IH_ExtractElement : forall (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement vec idx).
   Hypothesis IH_InsertElement  : forall (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement vec elt idx).
@@ -747,7 +747,7 @@ Section DecidableEquality.
               | UVALUE_ICmp op uv1 uv2, UVALUE_ICmp op' uv1' uv2' => _
               | UVALUE_FBinop op fm uv1 uv2, UVALUE_FBinop op' fm' uv1' uv2' => _
               | UVALUE_FCmp op uv1 uv2, UVALUE_FCmp op' uv1' uv2' => _
-              | UVALUE_Conversion ct u t, UVALUE_Conversion ct' u' t' => _
+              | UVALUE_Conversion ct tf u t, UVALUE_Conversion ct' tf' u' t' => _
               | UVALUE_GetElementPtr t u l, UVALUE_GetElementPtr t' u' l' => _
               | UVALUE_ExtractElement u v, UVALUE_ExtractElement u' v' => _
               | UVALUE_InsertElement u v t, UVALUE_InsertElement u' v' t' => _
@@ -787,6 +787,7 @@ Section DecidableEquality.
       destruct (f uv2 uv2')...
     - destruct (conversion_type_eq_dec ct ct')...
       destruct (f u u')...
+      destruct (dtyp_eq_dec tf tf')...
       destruct (dtyp_eq_dec t t')...
     - destruct (dtyp_eq_dec t t')...
       destruct (f u u')...
@@ -1693,34 +1694,34 @@ Class VInt I : Type :=
       forall from_sz to_sz value,
         from_sz > to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        uvalue_has_dtyp (UVALUE_Conversion Trunc value (DTYPE_I to_sz)) (DTYPE_I to_sz)
+        uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
   | UVALUE_Conversion_trunc_vec_typ :
       forall from_sz to_sz n value,
         from_sz > to_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Trunc value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
+        uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
 
   | UVALUE_Conversion_zext_int_typ :
       forall from_sz to_sz value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        uvalue_has_dtyp (UVALUE_Conversion Zext value (DTYPE_I to_sz)) (DTYPE_I to_sz)
+        uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
   | UVALUE_Conversion_zext_vec_typ :
       forall from_sz to_sz n value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Zext value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
+        uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
 
   | UVALUE_Conversion_sext_int_typ :
       forall from_sz to_sz value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
-        uvalue_has_dtyp (UVALUE_Conversion Sext value (DTYPE_I to_sz)) (DTYPE_I to_sz)
+        uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
   | UVALUE_Conversion_sext_vec_typ :
       forall from_sz to_sz n value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
-        uvalue_has_dtyp (UVALUE_Conversion Sext value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
+        uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
 
   | UVALUE_GetElementPtr_typ :
       forall dt uv idxs,

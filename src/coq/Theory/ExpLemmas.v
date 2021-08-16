@@ -713,8 +713,8 @@ Section ExpPure.
     apply eutt_eq_bind; intros [].
   Qed.
 
-  Lemma conv_to_exp_ItoP : forall z,
-      translate exp_to_instr (translate conv_to_exp (trigger (ItoP z))) ≈ trigger (ItoP z).
+  Lemma conv_to_exp_ItoP : forall t z,
+      translate exp_to_instr (translate conv_to_exp (trigger (ItoP t z))) ≈ trigger (ItoP t z).
   Proof.
     intros.
     go.

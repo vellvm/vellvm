@@ -63,8 +63,8 @@ let rec eq_uvalue (l: DV.uvalue) (r: DV.uvalue) : bool =
      fl = fr && ml = mr && eq_uvalue l1 r1 && eq_uvalue l2 r2
   | UVALUE_FCmp (bl, l1, l2), UVALUE_FCmp (br, r1, r2) ->
      bl = br && eq_uvalue l1 r1 && eq_uvalue l2 r2
-  | UVALUE_Conversion (t, l, tl), UVALUE_Conversion (t', r, tr) ->
-     t = t' && eq_uvalue l r && tl = tr
+  | UVALUE_Conversion (t, t_from, l, tl), UVALUE_Conversion (t', t_from', r, tr) ->
+     t = t' && t_from = t_from' && eq_uvalue l r && tl = tr
   | UVALUE_GetElementPtr (ctl, l', ls), UVALUE_GetElementPtr(ctr, r', rs) ->
      ctl = ctr && eq_uvalue l' r' && List.for_all2 eq_uvalue ls rs
   | UVALUE_ExtractElement (a,b), UVALUE_ExtractElement (c,d) ->

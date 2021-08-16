@@ -707,7 +707,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       | UVALUE_FBinop _ _ v1 v2
       | UVALUE_FCmp _ v1 v2 =>
         S (uvalue_measure v1 + uvalue_measure v2)
-      | UVALUE_Conversion conv v t_to =>
+      | UVALUE_Conversion conv t_from v t_to =>
         S (uvalue_measure v)
       | UVALUE_GetElementPtr t ptrval idxs =>
         S (uvalue_measure ptrval + list_sum (map uvalue_measure idxs))
@@ -749,7 +749,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | UVALUE_ICmp _ _ _
        | UVALUE_FBinop _ _ _ _
        | UVALUE_FCmp _ _ _
-       | UVALUE_Conversion _ _ _
+       | UVALUE_Conversion _ _ _ _
        | UVALUE_GetElementPtr _ _ _
        | UVALUE_ExtractElement _ _
        | UVALUE_InsertElement _ _ _
@@ -1542,7 +1542,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
            | UVALUE_ICmp cmp v1 v2 => "UVALUE_ICmp"
            | UVALUE_FBinop fop fm v1 v2 => "UVALUE_FBinop"
            | UVALUE_FCmp cmp v1 v2 => "UVALUE_FCmp"
-           | UVALUE_Conversion conv v t_to => "UVALUE_Conversion"
+           | UVALUE_Conversion conv t_from v t_to => "UVALUE_Conversion"
            | UVALUE_GetElementPtr t ptrval idxs => "UVALUE_GetElementPtr"
            | UVALUE_ExtractElement vec idx => "UVALUE_ExtractElement"
            | UVALUE_InsertElement vec elt idx => "UVALUE_InsertElement"
@@ -1617,7 +1617,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           end
         end
         
-      | ItoP x =>
+      | ItoP t_from x =>
         (* TODO: should this take signedness into account...? *)
         match x with
         | UVALUE_I64 i
@@ -1627,7 +1627,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           ret (UVALUE_Addr (int_to_ptr (unsigned i) wildcard_prov))
         | UVALUE_IPTR i =>
           ret (UVALUE_Addr (int_to_ptr i wildcard_prov))
-        | _ => ret (UVALUE_Conversion Inttoptr x DTYPE_Pointer)
+        | _ => ret (UVALUE_Conversion Inttoptr t_from x DTYPE_Pointer)
         end
 
       | PtoI t a =>
@@ -1640,7 +1640,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
           let addr := ptr_to_int ptr in
           ret (UVALUE_IPTR addr)
         | _, _ =>
-          ret (UVALUE_Conversion Ptrtoint a t)
+          ret (UVALUE_Conversion Ptrtoint DTYPE_Pointer a t)
         end
       end.
 

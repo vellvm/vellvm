@@ -36,6 +36,8 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
   Import PROVENANCE.
   Import ITOP.
   Import DV.
+  Module Den := Denotation Addr LLVMIO.
+  Import Den.
   Open Scope list.
 
   (* Variable ptr_size : nat. *)
@@ -395,7 +397,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
        | UVALUE_ICmp _ _ _
        | UVALUE_FBinop _ _ _ _
        | UVALUE_FCmp _ _ _
-       | UVALUE_Conversion _ _ _
+       | UVALUE_Conversion _ _ _ _
        | UVALUE_GetElementPtr _ _ _
        | UVALUE_ExtractElement _ _
        | UVALUE_InsertElement _ _ _
@@ -976,7 +978,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
            | UVALUE_ICmp cmp v1 v2 => "UVALUE_ICmp"
            | UVALUE_FBinop fop fm v1 v2 => "UVALUE_FBinop"
            | UVALUE_FCmp cmp v1 v2 => "UVALUE_FCmp"
-           | UVALUE_Conversion conv v t_to => "UVALUE_Conversion"
+           | UVALUE_Conversion conv t_from v t_to => "UVALUE_Conversion"
            | UVALUE_GetElementPtr t ptrval idxs => "UVALUE_GetElementPtr"
            | UVALUE_ExtractElement vec idx => "UVALUE_ExtractElement"
            | UVALUE_InsertElement vec elt idx => "UVALUE_InsertElement"
@@ -1023,6 +1025,20 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
         | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
                                                    dv2 <- concretize_uvalue v2 ;;
                                                    eval_fcmp cmp dv1 dv2
+        | UVALUE_Conversion conv t_from v t_to    =>
+          dv <- concretize_uvalue v ;;
+          match get_conv_case conv t_from dv t_to with
+          | Conv_PtoI x =>
+            match x, t_to with
+            | DVALUE_Addr addr, DTYPE_I sz =>
+              coerce_integer_to_int sz (ptr_to_int addr)
+            | _, _ =>
+              lift (raise "Invalid PTOI conversion")
+            end
+          | Conv_ItoP x => ret (DVALUE_Addr (int_to_ptr (dvalue_int_unsigned x) wildcard_prov))
+          | Conv_Pure x => ret x
+          | Conv_Illegal s => raise s
+          end
         | UVALUE_ConcatBytes bytes dt =>
           match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
           | true, Some uv => concretize_uvalue uv
@@ -1033,7 +1049,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
           (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
           lift (failwith "Attempting to concretize UVALUE_ExtractByte, should not happen.")
 
-        | _ => lift (failwith ("concretize_uvalue: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u))
+         | _ => lift (failwith ("concretize_uvalue: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u))
 
                 
         end
