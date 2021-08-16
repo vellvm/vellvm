@@ -151,6 +151,25 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
          | _ => PtrConv_Neither
          end.
 
+    (* TODO: move / replace with show instance *)
+    Definition dvalue_to_string (x : dvalue) : string
+      := match x with
+       | DVALUE_Addr a => "DVALUE_Addr"
+       | DVALUE_I1 x => "DVALUE_I1"
+       | DVALUE_I8 x => "DVALUE_I8"
+       | DVALUE_I32 x => "DVALUE_I32"
+       | DVALUE_I64 x => "DVALUE_I64"
+       | DVALUE_IPTR x => "DVALUE_IPTR"
+       | DVALUE_Double x => "DVALUE_Double"
+       | DVALUE_Float x => "DVALUE_Float"
+       | DVALUE_Poison => "DVALUE_Poison"
+       | DVALUE_None => "DVALUE_None"
+       | DVALUE_Struct fields => "DVALUE_Struct"
+       | DVALUE_Packed_struct fields => "DVALUE_Packed_struct"
+       | DVALUE_Array elts => "DVALUE_Array"
+       | DVALUE_Vector elts => "DVALUE_Vector"
+       end.
+
     Definition get_conv_case conv (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
       match conv with
       | Trunc =>
@@ -244,6 +263,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           if bits =? 64
           then Conv_Pure (DVALUE_I64 (Float.to_bits x))
           else Conv_Illegal "Double to integer with different bitwidth."
+        | DTYPE_Double, x, DTYPE_I bits =>
+          Conv_Illegal ("Double to integer:" ++ dvalue_to_string x)
         | DTYPE_I bits, DVALUE_I64 x, DTYPE_Double =>
           if bits =? 64
           then Conv_Pure (DVALUE_Double (Float.of_bits x))

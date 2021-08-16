@@ -919,6 +919,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr)).
        | DTYPE_Opaque
        | DTYPE_Metadata =>
          ret (from_ubytes bytes dt)
+
        | DTYPE_Void =>
          inl "deserialize_sbytes: Attempt to deserialize void."
       end.

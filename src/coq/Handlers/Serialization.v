@@ -881,7 +881,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
              ret (DVALUE_Float (Float32.of_bits (concat_bytes_Z_vint zs)))
            | DTYPE_Double =>
              zs <- map_monad dvalue_byte_value dbs;;
-             ret (DVALUE_Float (Float32.of_bits (concat_bytes_Z_vint zs)))
+             ret (DVALUE_Double (Float.of_bits (concat_bytes_Z_vint zs)))
            | DTYPE_X86_fp80 =>
              raise "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_fp80."
            | DTYPE_Fp128 =>
@@ -1039,6 +1039,12 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
           | Conv_Pure x => ret x
           | Conv_Illegal s => raise s
           end
+
+        | UVALUE_Select cond v1 v2 =>
+          dcond <- concretize_uvalue cond;;
+          uv <- eval_select dcond v1 v2;;
+          concretize_uvalue uv
+
         | UVALUE_ConcatBytes bytes dt =>
           match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
           | true, Some uv => concretize_uvalue uv
