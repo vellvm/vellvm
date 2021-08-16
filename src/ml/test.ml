@@ -245,6 +245,10 @@ let bitcast_tests =
   [ "../tests/ll/bitcast1.ll", 3
   ]
 
+let larger_memory_tests =
+  [ "../tests/memory/arrayloadandsum.ll", 15
+  ; "../tests/memory/structloadandsum.ll", 116
+  ]
 
 let other_tests =
   arith_tests @ calling_convention_tests @ memory_tests @ phi_tests @ terminator_tests @ bitcast_tests
@@ -395,6 +399,11 @@ let suite = [Test ("Poison",
                    List.map (fun (f, i) ->
                        (f, fun () -> run_uvalue_test (i64_test (i64_of_int i)) f))
                      (larger_tests @ large_tests));
+
+             Test ("Memory Tests",
+                   List.map (fun (f, i) ->
+                       (f, fun () -> run_uvalue_test (i64_test (i64_of_int i)) f))
+                     (larger_memory_tests));
 
              
              (* Test ("Parsing-Must-fail",
