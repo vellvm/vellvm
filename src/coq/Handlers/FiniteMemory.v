@@ -254,6 +254,10 @@ Module FinSizeof <: Sizeof.
     | DTYPE_Opaque       => 0 (* TODO: Unsupported *)
     | _                  => 0 (* TODO: add support for more types as necessary *)
     end.
+
+  Lemma sizeof_dtyp_void :
+    sizeof_dtyp DTYPE_Void = 0%N.
+  Proof. reflexivity. Qed.
 End FinSizeof.
 
 Import FinPTOI.
