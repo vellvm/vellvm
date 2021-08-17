@@ -2015,5 +2015,5 @@ Class VInt I : Type :=
   .
 
   Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
-    
-  End DVALUE.
+
+End DVALUE.
