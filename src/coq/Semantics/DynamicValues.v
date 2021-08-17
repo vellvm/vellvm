@@ -273,8 +273,8 @@ Inductive uvalue : Type :=
 | UVALUE_ExtractElement   (vec: uvalue) (idx: uvalue)
 | UVALUE_InsertElement    (vec: uvalue) (elt:uvalue) (idx:uvalue)
 | UVALUE_ShuffleVector    (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue)
-| UVALUE_ExtractValue     (vec:uvalue) (idxs:list int)
-| UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list int)
+| UVALUE_ExtractValue     (vec:uvalue) (idxs:list LLVMAst.int)
+| UVALUE_InsertValue      (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int)
 | UVALUE_Select           (cnd:uvalue) (v1:uvalue) (v2:uvalue)
 (* Extract the `idx` byte from a uvalue `uv`, which was stored with
    type `dt`. `idx` 0 is the least significant byte. `sid` is the "store
@@ -310,8 +310,8 @@ Section UvalueInd.
   Hypothesis IH_ExtractElement : forall (vec: uvalue) (idx: uvalue), P vec -> P idx -> P (UVALUE_ExtractElement vec idx).
   Hypothesis IH_InsertElement  : forall (vec: uvalue) (elt:uvalue) (idx:uvalue), P vec -> P elt -> P idx -> P (UVALUE_InsertElement vec elt idx).
   Hypothesis IH_ShuffleVector  : forall (vec1:uvalue) (vec2:uvalue) (idxmask:uvalue), P vec1 -> P vec2 -> P idxmask -> P (UVALUE_ShuffleVector vec1 vec2 idxmask).
-  Hypothesis IH_ExtractValue   : forall (vec:uvalue) (idxs:list int), P vec -> P (UVALUE_ExtractValue vec idxs).
-  Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
+  Hypothesis IH_ExtractValue   : forall (vec:uvalue) (idxs:list LLVMAst.int), P vec -> P (UVALUE_ExtractValue vec idxs).
+  Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
   Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
   Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
   Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue), (forall u, In u uvs -> P u) -> P (UVALUE_ConcatBytes uvs dt).
@@ -801,10 +801,10 @@ Section DecidableEquality.
       destruct (f v v')...
       destruct (f t t')...
     - destruct (f u u')...
-      destruct (list_eq_dec Int.eq_dec l l')...
+      destruct (list_eq_dec Z.eq_dec l l')...
     - destruct (f u u')...
       destruct (f v v')...
-      destruct (list_eq_dec Int.eq_dec l l')...
+      destruct (list_eq_dec Z.eq_dec l l')...
     - destruct (f u u')...
       destruct (f v v')...
       destruct (f t t')...
@@ -1523,10 +1523,28 @@ Class VInt I : Type :=
         end in
     match v with
     | UVALUE_Struct f => loop f idx
+    | UVALUE_Packed_struct f => loop f idx
     | UVALUE_Array e => loop e idx
     | _ => failwith "invalid aggregate data"
     end.
   Arguments index_into_str _ _ : simpl nomatch.
+
+  (* Helper function for indexing into a structured datatype
+     for extractvalue and insertvalue *)
+  Definition index_into_str_dv (v:dvalue) (idx:LLVMAst.int) : undef_or_err (dvalue) :=
+    let fix loop elts i :=
+        match elts with
+        | [] => failwith "index out of bounds"
+        | h :: tl =>
+          if (idx =? 0)%Z then ret h else loop tl (i-1)%Z
+        end in
+    match v with
+    | DVALUE_Struct f => loop f idx
+    | DVALUE_Packed_struct f => loop f idx
+    | DVALUE_Array e => loop e idx
+    | _ => failwith "invalid aggregate data"
+    end.
+  Arguments index_into_str_dv _ _ : simpl nomatch.
 
   (* Helper function for inserting into a structured datatype for insertvalue *)
   Definition insert_into_str (str:dvalue) (v:dvalue) (idx:LLVMAst.int) : undef_or_err dvalue :=
@@ -1746,45 +1764,45 @@ Class VInt I : Type :=
         uvalue_has_dtyp v2 (DTYPE_Vector (N.of_nat n) t) ->
         uvalue_has_dtyp (UVALUE_ShuffleVector v1 v2 idxs) (DTYPE_Vector (N.of_nat m) t)
   | UVALUE_ExtractValue_Struct_sing_typ :
-      forall fields fts dt idx,
+      forall fields fts dt (idx : LLVMAst.int),
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        (0 <= Int32.intval idx)%Z ->
-        Nth fts (Z.to_nat (Int32.intval idx)) dt ->
+        (0 <= idx)%Z ->
+        Nth fts (Z.to_nat idx) dt ->
         uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Struct fields) [idx]) dt
   | UVALUE_ExtractValue_Struct_cons_typ :
       forall fields fts fld ft dt idx idxs,
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
-        (0 <= Int32.intval idx)%Z ->
-        Nth fts (Z.to_nat (Int32.intval idx)) dt ->
-        Nth fields (Z.to_nat (Int32.intval idx)) fld ->
+        (0 <= idx)%Z ->
+        Nth fts (Z.to_nat idx) dt ->
+        Nth fields (Z.to_nat idx) fld ->
         uvalue_has_dtyp fld ft ->
         uvalue_has_dtyp (UVALUE_ExtractValue fld idxs) dt ->
         uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Struct fields) (idx :: idxs)) dt
   | UVALUE_ExtractValue_Packed_struct_sing_typ :
       forall fields fts dt idx,
         uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
-        (0 <= Int32.intval idx)%Z ->
-        Nth fts (Z.to_nat (Int32.intval idx)) dt ->
+        (0 <= idx)%Z ->
+        Nth fts (Z.to_nat idx) dt ->
         uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Packed_struct fields) [idx]) dt
   | UVALUE_ExtractValue_Packed_struct_cons_typ :
       forall fields fts fld ft dt idx idxs,
         uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct fts) ->
-        (0 <= Int32.intval idx)%Z ->
-        Nth fts (Z.to_nat (Int32.intval idx)) dt ->
-        Nth fields (Z.to_nat (Int32.intval idx)) fld ->
+        (0 <= idx)%Z ->
+        Nth fts (Z.to_nat idx) dt ->
+        Nth fields (Z.to_nat idx) fld ->
         uvalue_has_dtyp fld ft ->
         uvalue_has_dtyp (UVALUE_ExtractValue fld idxs) dt ->
         uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Packed_struct fields) (idx :: idxs)) dt
   | UVALUE_ExtractValue_Array_sing_typ :
       forall elements dt idx n,
         uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
-        (0 <= Int32.intval idx <= Z.of_N n)%Z ->
+        (0 <= idx <= Z.of_N n)%Z ->
         uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Array elements) [idx]) dt
   | UVALUE_ExtractValue_Array_cons_typ :
       forall elements elem et dt n idx idxs,
         uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
-        (0 <= Int32.intval idx <= Z.of_N n)%Z ->
-        Nth elements (Z.to_nat (Int32.intval idx)) elem ->
+        (0 <= idx <= Z.of_N n)%Z ->
+        Nth elements (Z.to_nat idx) elem ->
         uvalue_has_dtyp elem et ->
         uvalue_has_dtyp (UVALUE_ExtractValue elem idxs) dt ->
         uvalue_has_dtyp (UVALUE_ExtractValue (UVALUE_Array elements) (idx :: idxs)) dt

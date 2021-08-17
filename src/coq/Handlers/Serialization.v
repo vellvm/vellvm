@@ -1050,16 +1050,16 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
           | inl err => lift (failwith err)
           end
 
-      (* | GEP dt ua uvs => *)
-      (*   match (dvs <- map_monad uvalue_to_dvalue uvs;; da <- uvalue_to_dvalue ua;; ret (da, dvs)) with *)
-      (*   | inr (da, dvs) => *)
-      (*     (* If everything is well defined, just use handle_gep... *) *)
-      (*     a' <- mem_state_lift_err (handle_gep dt da dvs);; *)
-      (*     ret (dvalue_to_uvalue a') *)
-      (*   | inl _ => *)
-      (*     (* Otherwise build a UVALUE_GEP *) *)
-      (*     ret (UVALUE_GetElementPtr dt ua uvs) *)
-      (*   end *)
+        | UVALUE_ExtractValue uv idxs =>
+          str <- concretize_uvalue uv;;
+          let fix loop str idxs : undef_or_err dvalue :=
+              match idxs with
+              | [] => ret str
+              | i :: tl =>
+                v <- index_into_str_dv str i ;;
+                loop v tl
+              end in
+          loop str idxs
 
         | UVALUE_Select cond v1 v2 =>
           dcond <- concretize_uvalue cond;;

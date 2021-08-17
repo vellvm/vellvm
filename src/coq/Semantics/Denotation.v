@@ -669,8 +669,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             v <- index_into_str str i ;;
             loop v tl
           end in
-      lift_undef_or_err ret (loop str idxs)
-
+      match str with
+      | UVALUE_Struct _
+      | UVALUE_Packed_struct _
+      | UVALUE_Array _ =>
+        lift_undef_or_err ret (loop str idxs)
+      | _ =>
+        ret (UVALUE_ExtractValue str idxs)
+      end
     | OP_InsertValue strop eltop idxs =>
       (*
             '(t1, str) <- monad_app_snd (denote_exp e) strop;
