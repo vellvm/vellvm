@@ -37,6 +37,7 @@ From Vellvm Require Import
      Semantics.DynamicValues
      Semantics.Denotation
      Semantics.MemoryAddress
+     Semantics.GepM
      Semantics.LLVMEvents
      Handlers.FiniteMemory.
 
@@ -58,13 +59,16 @@ Set Contextual Implicit.
 
 Import FinSizeof.
 
-Module Type MEMORY_THEORY (LLVMEvents : LLVM_INTERACTIONS(Addr)).
+Module Type MEMORY_THEORY (LLVMEvents : LLVM_INTERACTIONS(Addr))(GEP : GEPM(Addr)(LLVMEvents)).
   (** ** Theory of the general operations over the finite maps we manipulate *)
   Import LLVMEvents.
   Import DV.
+
+  Import GEP.
+  
   Open Scope list.
 
-  Module Mem := FiniteMemory.Make(LLVMEvents).
+  Module Mem := FiniteMemory.Make(LLVMEvents)(GEP).
   Export Mem.
 
   (* TODO: move this? *)
@@ -535,44 +539,44 @@ Section Memory_Stack_Theory.
     apply no_overlap_dec.
   Qed.
 
-  Lemma gep_array_ptr_overlap_dtyp :
-    forall ptr ix (sz : N) τ elem_ptr,
-      DynamicValues.Int64.unsigned ix < Z.of_N sz -> (* Not super happy about this *)
-      (0 < sizeof_dtyp τ)%N ->
-      handle_gep_addr (DTYPE_Array sz τ) ptr
-                      [DVALUE_I64 (repr 0); DVALUE_I64 ix] = inr elem_ptr ->
-      ~(no_overlap_dtyp elem_ptr τ ptr (DTYPE_Array sz τ)).
-  Proof.
-    intros ptr ix sz τ elem_ptr BOUNDS SIZE GEP.
-    intros NO_OVER.
-    unfold no_overlap_dtyp, no_overlap in NO_OVER.
+  (* Lemma gep_array_ptr_overlap_dtyp : *)
+  (*   forall ptr ix (sz : N) τ elem_ptr, *)
+  (*     DynamicValues.Int64.unsigned ix < Z.of_N sz -> (* Not super happy about this *) *)
+  (*     (0 < sizeof_dtyp τ)%N -> *)
+  (*     handle_gep_addr (DTYPE_Array sz τ) ptr *)
+  (*                     [DVALUE_I64 (repr 0); DVALUE_I64 ix] = inr elem_ptr -> *)
+  (*     ~(no_overlap_dtyp elem_ptr τ ptr (DTYPE_Array sz τ)). *)
+  (* Proof. *)
+  (*   intros ptr ix sz τ elem_ptr BOUNDS SIZE GEP. *)
+  (*   intros NO_OVER. *)
+  (*   unfold no_overlap_dtyp, no_overlap in NO_OVER. *)
 
-    destruct ptr as [ptr_a prov].
-    destruct elem_ptr as [elem_ptr_b elem_ptr_i].
+  (*   destruct ptr as [ptr_a prov]. *)
+  (*   destruct elem_ptr as [elem_ptr_b elem_ptr_i]. *)
 
-    unfold handle_gep_addr in GEP.
-    cbn in *.
-    inversion GEP; subst.
+  (*   unfold handle_gep_addr in GEP. *)
+  (*   cbn in *. *)
+  (*   inversion GEP; subst. *)
 
-    destruct NO_OVER as [NO_OVER | NO_OVER].
-    - rewrite Integers.Int64.unsigned_repr in NO_OVER; [|cbn; lia].
-      replace (ptr_a + Z.of_N (sz * sizeof_dtyp τ) * 0 + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) with (ptr_a + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) in NO_OVER by lia.
-      pose proof (Int64.unsigned_range ix) as [? ?].
-      assert (Z.of_N sz > 0). lia.
-      rewrite N2Z.inj_mul in NO_OVER.
-      replace (ptr_a + Z.of_N sz * Z.of_N (sizeof_dtyp τ) - 1) with (ptr_a + (Z.of_N sz * Z.of_N (sizeof_dtyp τ) - 1)) in NO_OVER by lia.
-      apply Zorder.Zplus_gt_reg_l in NO_OVER.
+  (*   destruct NO_OVER as [NO_OVER | NO_OVER]. *)
+  (*   - rewrite Integers.Int64.unsigned_repr in NO_OVER; [|cbn; lia]. *)
+  (*     replace (ptr_a + Z.of_N (sz * sizeof_dtyp τ) * 0 + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) with (ptr_a + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) in NO_OVER by lia. *)
+  (*     pose proof (Int64.unsigned_range ix) as [? ?]. *)
+  (*     assert (Z.of_N sz > 0). lia. *)
+  (*     rewrite N2Z.inj_mul in NO_OVER. *)
+  (*     replace (ptr_a + Z.of_N sz * Z.of_N (sizeof_dtyp τ) - 1) with (ptr_a + (Z.of_N sz * Z.of_N (sizeof_dtyp τ) - 1)) in NO_OVER by lia. *)
+  (*     apply Zorder.Zplus_gt_reg_l in NO_OVER. *)
 
-      assert (Z.of_N sz * Z.of_N (sizeof_dtyp τ) - Z.of_N (sizeof_dtyp τ) <= Z.of_N sz * Z.of_N (sizeof_dtyp τ) - 1).
-      lia.
-      assert (Int64.unsigned ix * Z.of_N (sizeof_dtyp τ) <= (Z.of_N sz - 1) * Z.of_N (sizeof_dtyp τ)).
-      { apply Zmult_le_compat_r; lia. }
-      lia.
-    - rewrite Integers.Int64.unsigned_repr in NO_OVER; [|cbn; lia].
-      replace (ptr_a + Z.of_N (sz * sizeof_dtyp τ) * 0 + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) with (ptr_a + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) in NO_OVER by lia.
-      pose proof (Int64.unsigned_range ix) as [? ?].
-      lia.
-  Qed.
+  (*     assert (Z.of_N sz * Z.of_N (sizeof_dtyp τ) - Z.of_N (sizeof_dtyp τ) <= Z.of_N sz * Z.of_N (sizeof_dtyp τ) - 1). *)
+  (*     lia. *)
+  (*     assert (Int64.unsigned ix * Z.of_N (sizeof_dtyp τ) <= (Z.of_N sz - 1) * Z.of_N (sizeof_dtyp τ)). *)
+  (*     { apply Zmult_le_compat_r; lia. } *)
+  (*     lia. *)
+  (*   - rewrite Integers.Int64.unsigned_repr in NO_OVER; [|cbn; lia]. *)
+  (*     replace (ptr_a + Z.of_N (sz * sizeof_dtyp τ) * 0 + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) with (ptr_a + DynamicValues.Int64.unsigned ix * Z.of_N (sizeof_dtyp τ)) in NO_OVER by lia. *)
+  (*     pose proof (Int64.unsigned_range ix) as [? ?]. *)
+  (*     lia. *)
+  (* Qed. *)
 
   Definition non_void (τ : dtyp) : Prop :=
     τ <> DTYPE_Void.
@@ -3149,6 +3153,6 @@ Section PARAMS.
 End PARAMS.
 End MEMORY_THEORY.
 
-Module Make(LLVMEvents : LLVM_INTERACTIONS(Addr)) <: MEMORY_THEORY(LLVMEvents).
-Include MEMORY_THEORY(LLVMEvents).
+Module Make(LLVMEvents : LLVM_INTERACTIONS(Addr))(GEP : GEPM(Addr)(LLVMEvents)) <: MEMORY_THEORY(LLVMEvents)(GEP).
+Include MEMORY_THEORY(LLVMEvents)(GEP).
 End Make.

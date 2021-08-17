@@ -14,6 +14,7 @@ From Vellvm Require Import
      Semantics.DynamicValues
      Semantics.Denotation
      Semantics.MemoryAddress
+     Semantics.GepM
      Semantics.Memory.Sizeof
      Semantics.LLVMEvents.
 
@@ -28,7 +29,7 @@ Require Import Lia.
 Import ListNotations.
 Import MonadNotation.
 
-Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF: Sizeof)(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE)).
+Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF: Sizeof)(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(LLVMIO)).
 
   Import LLVMIO.
   Import SIZEOF.
@@ -36,6 +37,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
   Import PROVENANCE.
   Import ITOP.
   Import DV.
+  Import GEP.
   Module Den := Denotation Addr LLVMIO.
   Import Den.
   Open Scope list.
@@ -1039,6 +1041,25 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
           | Conv_Pure x => ret x
           | Conv_Illegal s => raise s
           end
+
+        | UVALUE_GetElementPtr t ua uvs =>
+          da <- concretize_uvalue ua;;
+          dvs <- map_monad concretize_uvalue uvs;;
+          match handle_gep t da dvs with
+          | inr dv  => ret dv
+          | inl err => lift (failwith err)
+          end
+
+      (* | GEP dt ua uvs => *)
+      (*   match (dvs <- map_monad uvalue_to_dvalue uvs;; da <- uvalue_to_dvalue ua;; ret (da, dvs)) with *)
+      (*   | inr (da, dvs) => *)
+      (*     (* If everything is well defined, just use handle_gep... *) *)
+      (*     a' <- mem_state_lift_err (handle_gep dt da dvs);; *)
+      (*     ret (dvalue_to_uvalue a') *)
+      (*   | inl _ => *)
+      (*     (* Otherwise build a UVALUE_GEP *) *)
+      (*     ret (UVALUE_GetElementPtr dt ua uvs) *)
+      (*   end *)
 
         | UVALUE_Select cond v1 v2 =>
           dcond <- concretize_uvalue cond;;

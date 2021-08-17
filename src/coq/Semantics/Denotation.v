@@ -263,8 +263,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
           if bits =? 64
           then Conv_Pure (DVALUE_I64 (Float.to_bits x))
           else Conv_Illegal "Double to integer with different bitwidth."
-        | DTYPE_Double, x, DTYPE_I bits =>
-          Conv_Illegal ("Double to integer:" ++ dvalue_to_string x)
         | DTYPE_I bits, DVALUE_I64 x, DTYPE_Double =>
           if bits =? 64
           then Conv_Pure (DVALUE_Double (Float.of_bits x))

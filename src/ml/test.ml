@@ -249,6 +249,7 @@ let bitcast_tests =
 let larger_memory_tests =
   [ "../tests/memory/arrayloadandsum.ll", 15
   ; "../tests/memory/structloadandsum.ll", 116
+  ; "../tests/ll/gep_undef.ll", 0
   ]
 
 let other_tests =
