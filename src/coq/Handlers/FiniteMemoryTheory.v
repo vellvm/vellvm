@@ -37,6 +37,7 @@ From Vellvm Require Import
      Semantics.DynamicValues
      Semantics.Denotation
      Semantics.MemoryAddress
+     Semantics.Memory.Sizeof
      Semantics.GepM
      Semantics.LLVMEvents
      Handlers.FiniteMemory.
@@ -57,18 +58,19 @@ Set Contextual Implicit.
     Reasoning principles for VIR's main memory model.
 *)
 
-Import FinSizeof.
-
-Module Type MEMORY_THEORY (LLVMEvents : LLVM_INTERACTIONS(Addr))(GEP : GEPM(Addr)(LLVMEvents)).
+Module Type MEMORY_THEORY (LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(SIZE:Sizeof)(GEP : GEPM(Addr)(LLVMEvents)).
   (** ** Theory of the general operations over the finite maps we manipulate *)
   Import LLVMEvents.
   Import DV.
-
+  Import PTOI.
+  Import PROV.
+  Import ITOP.
+  Import SIZE.
   Import GEP.
   
   Open Scope list.
 
-  Module Mem := FiniteMemory.Make(LLVMEvents)(GEP).
+  Module Mem := FiniteMemory.Make(LLVMEvents)(PTOI)(PROV)(ITOP)(SIZE)(GEP).
   Export Mem.
 
   (* TODO: move this? *)
@@ -129,43 +131,24 @@ Section Serialization_Theory.
       serialize_defined (DVALUE_Array fields_list) ->
       serialize_defined (DVALUE_Array (dval :: fields_list)).
 
-  Lemma fold_sizeof :
-    forall (dts : list dtyp) n,
-      (fold_left (fun (acc : N) (x : dtyp) => acc + sizeof_dtyp x) dts n =
-      n + fold_left (fun (acc : N) (x : dtyp) => acc + sizeof_dtyp x) dts 0)%N.
-  Proof.
-    induction dts; intros n.
-    - cbn. rewrite N.add_0_r. reflexivity.
-    - cbn. rewrite IHdts at 1. rewrite (IHdts (sizeof_dtyp a)).
-      rewrite N.add_assoc.
-      reflexivity.
-  Qed.
+  (* TODO: this likely isn't true with padding... *)
+  (* Lemma sizeof_struct_cons : *)
+  (*   forall dt dts, *)
+  (*     (sizeof_dtyp (DTYPE_Struct (dt :: dts)) = sizeof_dtyp dt + sizeof_dtyp (DTYPE_Struct dts))%N. *)
+  (* Proof. *)
+  (*   cbn. *)
+  (*   intros dt dts. *)
+  (*   rewrite fold_sizeof. reflexivity. *)
+  (* Qed. *)
 
-  Lemma sizeof_struct_cons :
-    forall dt dts,
-      (sizeof_dtyp (DTYPE_Struct (dt :: dts)) = sizeof_dtyp dt + sizeof_dtyp (DTYPE_Struct dts))%N.
-  Proof.
-    cbn.
-    intros dt dts.
-    rewrite fold_sizeof. reflexivity.
-  Qed.
-
-  Lemma sizeof_packed_struct_cons :
-    forall dt dts,
-      (sizeof_dtyp (DTYPE_Packed_struct (dt :: dts)) = sizeof_dtyp dt + sizeof_dtyp (DTYPE_Packed_struct dts))%N.
-  Proof.
-    cbn.
-    intros dt dts.
-    rewrite fold_sizeof. reflexivity.
-  Qed.
-
-  Lemma sizeof_dvalue_pos :
-    forall dt,
-      (0 <= sizeof_dtyp dt)%N.
-  Proof.
-    intros dt.
-    lia.
-  Qed.
+  (* Lemma sizeof_packed_struct_cons : *)
+  (*   forall dt dts, *)
+  (*     (sizeof_dtyp (DTYPE_Packed_struct (dt :: dts)) = sizeof_dtyp dt + sizeof_dtyp (DTYPE_Packed_struct dts))%N. *)
+  (* Proof. *)
+  (*   cbn. *)
+  (*   intros dt dts. *)
+  (*   rewrite fold_sum_acc. reflexivity. *)
+  (* Qed. *)
 
   (* Lemma sizeof_serialized : *)
   (*   forall uv dt, *)
@@ -3153,6 +3136,6 @@ Section PARAMS.
 End PARAMS.
 End MEMORY_THEORY.
 
-Module Make(LLVMEvents : LLVM_INTERACTIONS(Addr))(GEP : GEPM(Addr)(LLVMEvents)) <: MEMORY_THEORY(LLVMEvents)(GEP).
-Include MEMORY_THEORY(LLVMEvents)(GEP).
+Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(SIZE:Sizeof)(GEP : GEPM(Addr)(LLVMEvents)) <: MEMORY_THEORY(LLVMEvents)(PTOI)(PROV)(ITOP)(SIZE)(GEP).
+Include MEMORY_THEORY(LLVMEvents)(PTOI)(PROV)(ITOP)(SIZE)(GEP).
 End Make.

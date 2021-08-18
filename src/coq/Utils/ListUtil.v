@@ -219,3 +219,15 @@ Definition split_every {A} (n : N) (xs : list A) : err (list (list A))
      | Npos n =>
        inr (split_every_pos n xs)
      end.
+
+Lemma fold_sum_acc :
+  forall {A} (dts : list A) n (f : A -> N),
+    (fold_left (fun (acc : N) (x : A) => acc + f x) dts n =
+     n + fold_left (fun (acc : N) (x : A) => acc + f x) dts 0)%N.
+Proof.
+  induction dts; intros n f.
+  - cbn. rewrite N.add_0_r. reflexivity.
+  - cbn. rewrite IHdts at 1. rewrite (IHdts (f a)).
+    rewrite N.add_assoc.
+    reflexivity.
+Qed.

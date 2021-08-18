@@ -50,10 +50,11 @@ From ExtLib Require Import
 
 Import MonadNotation.
 
-Module GEP : GEPM(FiniteMemory.Addr)(LLVMEvents).
+Module GEP(SIZEOF:Sizeof) : GEPM(FiniteMemory.Addr)(LLVMEvents).
   Import Addr.
   Import LLVMEvents.
   Import DV.
+  Import SIZEOF.
 
   (** ** Get Element Pointer
       Retrieve the address of a subelement of an indexable (i.e. aggregate) [dtyp] [t] (i.e. vector, array, struct, packed struct).
@@ -131,10 +132,12 @@ Module GEP : GEPM(FiniteMemory.Addr)(LLVMEvents).
     end.
 End GEP.
 
-Module Intrinsics := Intrinsics.Make FiniteMemory.Addr LLVMEvents.
-Module MemTheory := FiniteMemoryTheory.Make(LLVMEvents)(GEP).
+Module GEPF := GEP(FiniteMemory.FinSizeof).
 
-Module Pick := Pick.Make FiniteMemory.Addr LLVMEvents FinSizeof FinPTOI FinPROV FinITOP GEP.
+Module Intrinsics := Intrinsics.Make FiniteMemory.Addr LLVMEvents.
+Module MemTheory := FiniteMemoryTheory.Make(LLVMEvents)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(FiniteMemory.FinSizeof)(GEPF).
+
+Module Pick := Pick.Make FiniteMemory.Addr LLVMEvents FinSizeof FinPTOI FinPROV FinITOP GEPF.
 
 Export LLVMEvents LLVMEvents.DV Global Local Stack MemTheory MemTheory.Mem Pick Intrinsics
        UndefinedBehaviour.

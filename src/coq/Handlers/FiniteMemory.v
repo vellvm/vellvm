@@ -258,23 +258,28 @@ Module FinSizeof <: Sizeof.
   Lemma sizeof_dtyp_void :
     sizeof_dtyp DTYPE_Void = 0%N.
   Proof. reflexivity. Qed.
+
+  Lemma sizeof_dtyp_pos :
+    forall dt,
+      (0 <= sizeof_dtyp dt)%N.
+  Proof.
+    intros dt.
+    lia.
+  Qed.
 End FinSizeof.
-
-Import FinPTOI.
-Import FinPROV.
-Import FinITOP.
-
-Export FinSizeof.
 
 (** ** Memory model
     Implementation of the memory model, i.e. a handler for [MemoryE].
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
     indexed on [Z].
  *)
-Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(GEP : GEPM(Addr)(LLVMEvents)).
+Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(SIZE:Sizeof)(GEP : GEPM(Addr)(LLVMEvents)).
   Import LLVMEvents.
   Import DV.
-
+  Import PTOI.
+  Import PROV.
+  Import ITOP.
+  Import SIZE.
   Import GEP.
   
   Open Scope list.
