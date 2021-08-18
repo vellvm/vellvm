@@ -16,6 +16,7 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.GepM
      Semantics.Memory.Sizeof
+     Semantics.Memory.MemBytes
      Semantics.LLVMEvents.
 
 From ExtLib Require Import
@@ -29,7 +30,7 @@ Require Import Lia.
 Import ListNotations.
 Import MonadNotation.
 
-Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF: Sizeof)(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(LLVMIO)).
+Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF: Sizeof)(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(LLVMIO)).
 
   Import LLVMIO.
   Import SIZEOF.
@@ -41,6 +42,10 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
   Module Den := Denotation Addr LLVMIO.
   Import Den.
   Open Scope list.
+
+  Module BYTE := Byte Addr LLVMIO BYTE_IMPL.
+  Import BYTE.
+
 
   (* Variable ptr_size : nat. *)
   (* Variable datalayout : DataLayout. *)
@@ -980,12 +985,12 @@ Section ConcretizeInductive.
 
      This means we can just take the corresponding uvalue, and concretize it.
    *)
-  (* | Concretize_ConcatBytes_Exact : *)
-  (*     forall bytes dt uv dv, *)
-  (*       all_bytes_from_uvalue bytes = Some uv -> *)
-  (*       N.of_nat (List.length bytes) = sizeof_dtyp dt -> *)
-  (*       concretize_u uv dv -> *)
-  (*       concretize_u (UVALUE_ConcatBytes (map ubyte_to_extractbyte bytes) dt) dv *)
+  | Concretize_ConcatBytes_Exact :
+      forall bytes dt uv dv,
+        all_bytes_from_uvalue bytes = Some uv ->
+        N.of_nat (List.length bytes) = sizeof_dtyp dt ->
+        concretize_u uv dv ->
+        concretize_u (UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt) dv
   (* with *)
   (*   concretize_u_dvalue_bytes : list uvalue -> NMap dvalue_byte -> undef_or_err (NMap dvalue_byte) -> Prop := *)
   (* | concretize_u_dvalue_bytes_nil : forall acc, concretize_u_dvalue_bytes [] acc (ret acc) *)

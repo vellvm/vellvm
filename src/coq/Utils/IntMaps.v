@@ -9,6 +9,7 @@ From Coq Require Import
 
 From Vellvm Require Import
      Utils.Tactics
+     Utils.Monads
      Numeric.Coqlib
      ListUtil.
 
@@ -21,6 +22,7 @@ From ExtLib Require Import
 
 Import EqvNotation.
 Import ListNotations.
+Import MonadNotation.
 
 #[local] Open Scope Z_scope.
 
@@ -548,5 +550,14 @@ Section Map_Operations.
     - rewrite 3 lookup_add_all_index_out; eauto.
       rewrite EQ; auto.
   Qed.
+
+  Fixpoint IM_find_many {A} (xs : list Z) (im : IntMap A) : option (list A)
+    := match xs with
+       | [] => ret []
+       | (x::xs) =>
+         elt  <- IM.find x im;;
+         elts <- IM_find_many xs im;;
+         ret (elt :: elts)
+       end.
 
 End Map_Operations.

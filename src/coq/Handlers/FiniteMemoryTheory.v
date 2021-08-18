@@ -38,6 +38,7 @@ From Vellvm Require Import
      Semantics.Denotation
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
+     Semantics.Memory.MemBytes
      Semantics.GepM
      Semantics.LLVMEvents
      Handlers.FiniteMemory.
@@ -58,7 +59,7 @@ Set Contextual Implicit.
     Reasoning principles for VIR's main memory model.
 *)
 
-Module Type MEMORY_THEORY (LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(SIZE:Sizeof)(GEP : GEPM(Addr)(LLVMEvents)).
+Module Type MEMORY_THEORY (LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(SIZE:Sizeof)(GEP : GEPM(Addr)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(LLVMEvents)).
   (** ** Theory of the general operations over the finite maps we manipulate *)
   Import LLVMEvents.
   Import DV.
@@ -67,10 +68,13 @@ Module Type MEMORY_THEORY (LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))
   Import ITOP.
   Import SIZE.
   Import GEP.
-  
+
+  Module BYTE := Byte Addr LLVMEvents BYTE_IMPL.
+  Import BYTE.
+
   Open Scope list.
 
-  Module Mem := FiniteMemory.Make(LLVMEvents)(PTOI)(PROV)(ITOP)(SIZE)(GEP).
+  Module Mem := FiniteMemory.Make(LLVMEvents)(PTOI)(PROV)(ITOP)(SIZE)(GEP)(BYTE_IMPL).
   Export Mem.
 
   (* TODO: move this? *)
@@ -3136,6 +3140,6 @@ Section PARAMS.
 End PARAMS.
 End MEMORY_THEORY.
 
-Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(SIZE:Sizeof)(GEP : GEPM(Addr)(LLVMEvents)) <: MEMORY_THEORY(LLVMEvents)(PTOI)(PROV)(ITOP)(SIZE)(GEP).
-Include MEMORY_THEORY(LLVMEvents)(PTOI)(PROV)(ITOP)(SIZE)(GEP).
+Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(SIZE:Sizeof)(GEP : GEPM(Addr)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(LLVMEvents)) <: MEMORY_THEORY(LLVMEvents)(PTOI)(PROV)(ITOP)(SIZE)(GEP)(BYTE_IMPL).
+Include MEMORY_THEORY(LLVMEvents)(PTOI)(PROV)(ITOP)(SIZE)(GEP)(BYTE_IMPL).
 End Make.

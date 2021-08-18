@@ -26,6 +26,7 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.GepM
      Semantics.Memory.Sizeof
+     Semantics.Memory.MemBytes
      Semantics.LLVMEvents
      Handlers.Serialization.
 
@@ -44,9 +45,9 @@ Import MonadNotation.
   - The executable one interprets [undef] as 0 at the type  
 *)
 
-Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A))(SIZEOF: Sizeof)(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(LLVMIO)).
+Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A))(SIZEOF: Sizeof)(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(LLVMIO))(BYTE_IMPL : ByteImpl(A)(LLVMIO)).
 
-  Module SER := Serialization.Make(A)(LLVMIO)(SIZEOF)(PTOI)(PROVENANCE)(ITOP)(GEP).
+  Module SER := Serialization.Make(A)(LLVMIO)(SIZEOF)(PTOI)(PROVENANCE)(ITOP)(GEP)(BYTE_IMPL).
   Import SER.
 
   Import LLVMIO.

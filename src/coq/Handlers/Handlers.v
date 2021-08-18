@@ -29,7 +29,7 @@ From Vellvm.Handlers Require Export
      UndefinedBehaviour
 .
 
-From Vellvm.Semantics Require Import Memory.Sizeof GepM.
+From Vellvm.Semantics Require Import Memory.Sizeof Memory.MemBytes GepM.
 
 (* Handlers get instantiated over the domain of addresses provided by the memory model *)
 Module LLVMEvents := LLVMEvents.Make(FiniteMemory.Addr).
@@ -135,9 +135,11 @@ End GEP.
 Module GEPF := GEP(FiniteMemory.FinSizeof).
 
 Module Intrinsics := Intrinsics.Make FiniteMemory.Addr LLVMEvents.
-Module MemTheory := FiniteMemoryTheory.Make(LLVMEvents)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(FiniteMemory.FinSizeof)(GEPF).
 
-Module Pick := Pick.Make FiniteMemory.Addr LLVMEvents FinSizeof FinPTOI FinPROV FinITOP GEPF.
+Module Byte := FinByte LLVMEvents.
+Module MemTheory := FiniteMemoryTheory.Make LLVMEvents FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP FiniteMemory.FinSizeof GEPF Byte.
+
+Module Pick := Pick.Make FiniteMemory.Addr LLVMEvents FinSizeof FinPTOI FinPROV FinITOP GEPF Byte.
 
 Export LLVMEvents LLVMEvents.DV Global Local Stack MemTheory MemTheory.Mem Pick Intrinsics
        UndefinedBehaviour.

@@ -55,6 +55,7 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.GepM
      Semantics.Memory.Sizeof
+     Semantics.Memory.MemBytes
      Semantics.LLVMEvents.
 
 Require Import Ceres.Ceres.
@@ -226,7 +227,7 @@ Module FinITOP : ITOP(Addr)(FinPROV).
     := (i, pr).
 End FinITOP.
 
-Module FinSizeof <: Sizeof.
+Module FinSizeof : Sizeof.
   (* TODO: make parameter? *)
   Definition ptr_size : nat := 8.
   
@@ -268,12 +269,29 @@ Module FinSizeof <: Sizeof.
   Qed.
 End FinSizeof.
 
+Module FinByte (LLVMEvents:LLVM_INTERACTIONS(Addr)) : ByteImpl(Addr)(LLVMEvents).
+  Import LLVMEvents.
+  Import DV.
+
+  Inductive UByte :=
+  | mkUByte (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : store_id) : UByte.
+
+  Definition SByte := UByte.
+  
+  Definition uvalue_sbyte := mkUByte.
+
+  Definition sbyte_to_extractbyte (byte : SByte) : uvalue
+    := match byte with
+       | mkUByte uv dt idx sid => UVALUE_ExtractByte uv dt idx sid
+       end.
+End FinByte.
+
 (** ** Memory model
     Implementation of the memory model, i.e. a handler for [MemoryE].
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
     indexed on [Z].
  *)
-Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(SIZE:Sizeof)(GEP : GEPM(Addr)(LLVMEvents)).
+Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(SIZE:Sizeof)(GEP : GEPM(Addr)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(LLVMEvents)).
   Import LLVMEvents.
   Import DV.
   Import PTOI.
@@ -281,6 +299,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
   Import ITOP.
   Import SIZE.
   Import GEP.
+
+  Module BYTE := Byte Addr LLVMEvents BYTE_IMPL.
+  Import BYTE.
   
   Open Scope list.
 
@@ -291,9 +312,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
          
 
   Definition addr := Addr.addr.
-  
-  Inductive SByte :=
-  | UByte (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : store_id) : SByte.
 
   (* Definition endianess : Endianess *)
   (*   := dl_endianess datalayout. *)
@@ -368,12 +386,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
       := correct_endianess e (uvalue_bytes_little_endian uv dt sid).
 
     Definition to_ubytes (uv :  uvalue) (dt : dtyp) (sid : store_id) : list SByte
-      := map (fun n => UByte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq 0 (N.to_nat (sizeof_dtyp dt))).
-
-    Definition ubyte_to_extractbyte (byte : SByte) : uvalue
-      := match byte with
-         | UByte uv dt idx sid => UVALUE_ExtractByte uv dt idx sid
-         end.
+      := map (fun n => uvalue_sbyte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq 0 (N.to_nat (sizeof_dtyp dt))).
 
     (* Is a uvalue a concrete integer equal to i? *)
     Definition uvalue_int_eq_Z (uv : uvalue) (i : Z)
@@ -394,26 +407,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
          | DVALUE_I64 x => unsigned x
          | DVALUE_IPTR x => x (* TODO: unsigned???? *)
          | _ => 0
-         end.
-
-    Definition guard_opt (x : bool) : option unit
-      := if x then Some tt else None.
-
-    Fixpoint all_bytes_from_uvalue_helper (idx' : Z) (sid' : store_id) (parent : uvalue) (bytes : list SByte) : option uvalue
-      := match bytes with
-         | [] => Some parent
-         | (UByte uv dt idx sid)::bytes =>
-           guard_opt (uvalue_int_eq_Z idx idx');;
-           guard_opt (RelDec.rel_dec uv parent);;
-           guard_opt (N.eqb sid sid');;
-           all_bytes_from_uvalue_helper (Z.succ idx') sid' parent bytes
-         end.
-
-    Definition all_bytes_from_uvalue (bytes : list SByte) : option uvalue
-      := match bytes with
-         | nil => None
-         | cons (UByte uv dt idx sid) xs =>
-           all_bytes_from_uvalue_helper 0 sid uv bytes
          end.
 
     (* TODO: move this *)
@@ -449,15 +442,8 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
       :=
         match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_bytes_from_uvalue bytes with
         | true, Some uv => uv
-        | _, _ => UVALUE_ConcatBytes (map ubyte_to_extractbyte bytes) dt
+        | _, _ => UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt
         end.
-
-    (* TODO: move to utils? *)
-    Definition from_option {A} (def : A) (opt : option A) : A
-      := match opt with
-         | Some x => x
-         | None => def
-         end.
 
     (* TODO: revive this *)
     (* Definition fp_alignment (bits : N) : option Alignment := *)
@@ -560,10 +546,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
          | _ => inl "No fields."
          end.
 
-    Definition extract_byte_to_ubyte (uv : uvalue) : ERR SByte
+    Definition extract_byte_to_sbyte (uv : uvalue) : ERR SByte
       := match uv with
          | UVALUE_ExtractByte uv dt idx sid =>
-           ret (UByte uv dt idx sid)
+           ret (uvalue_sbyte uv dt idx sid)
          | _ => inl (ERR_message "extract_byte_to_ubyte invalid conversion.")
          end.
 
@@ -645,51 +631,40 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
          end.
 
     Definition sbyte_sid_match (a b : SByte) : bool
-      := match a, b with
-         | UByte uv dt idx sid, UByte uv' dt' idx' sid' =>
+      := match sbyte_to_extractbyte a, sbyte_to_extractbyte b with
+         | UVALUE_ExtractByte uv dt idx sid, UVALUE_ExtractByte uv' dt' idx' sid' =>
            N.eqb sid sid'
+         | _, _ => false
          end.
 
     Definition replace_sid (sid : store_id) (ub : SByte) : SByte
-      := let '(UByte uv dt idx sid_old) := ub in
-         UByte uv dt idx sid.
+      := match sbyte_to_extractbyte ub with
+         | UVALUE_ExtractByte uv dt idx sid_old =>
+           uvalue_sbyte uv dt idx sid
+         | _ =>
+           ub (* Should not happen... *)
+         end.
 
     Definition filter_sid_matches (byte : SByte) (sbytes : list (N * SByte)) : (list (N * SByte) * list (N * SByte))
       := filter_split (fun '(n, uv) => sbyte_sid_match byte uv) sbytes.
 
-    (* TODO: move to some utility file? *)
-    Fixpoint NM_find_many {A} (xs : list N) (nm : NMap A) : option (list A)
-      := match xs with
-         | [] => ret []
-         | (x::xs) =>
-           elt  <- NM.find x nm;;
-           elts <- NM_find_many xs nm;;
-           ret (elt :: elts)
-         end.
-
-    (* TODO: move to some utility file? *)
-    Fixpoint IM_find_many {A} (xs : list Z) (im : IntMap A) : option (list A)
-      := match xs with
-         | [] => ret []
-         | (x::xs) =>
-           elt  <- IM.find x im;;
-           elts <- IM_find_many xs im;;
-           ret (elt :: elts)
-         end.
-
+    (* TODO: should I move this? *)
     (* Assign fresh sids to ubytes while preserving entanglement *)
     Unset Guard Checking.
     Fixpoint re_sid_ubytes_helper (bytes : list (N * SByte)) (acc : NMap SByte) {struct bytes} : ErrSID (NMap SByte)
       := match bytes with
          | [] => ret acc
          | ((n, x)::xs) =>
-           let '(UByte uv dt idx sid) := x in
-           let '(ins, outs) := filter_sid_matches x xs in
-           nsid <- fresh_sid;;
-           let acc := @NM.add _ n (replace_sid nsid x) acc in
-           (* Assign new sid to entangled bytes *)
-           let acc := fold_left (fun acc '(n, ub) => @NM.add _ n (replace_sid nsid ub) acc) ins acc in
-           re_sid_ubytes_helper outs acc
+           match sbyte_to_extractbyte x with
+           | UVALUE_ExtractByte uv dt idx sid =>
+             let '(ins, outs) := filter_sid_matches x xs in
+             nsid <- fresh_sid;;
+             let acc := @NM.add _ n (replace_sid nsid x) acc in
+             (* Assign new sid to entangled bytes *)
+             let acc := fold_left (fun acc '(n, ub) => @NM.add _ n (replace_sid nsid ub) acc) ins acc in
+             re_sid_ubytes_helper outs acc
+           | _ => raise_error "re_sid_ubytes_helper: sbyte_to_extractbyte did not yield UVALUE_ExtractByte"
+           end
          end
     with
     re_sid_ubytes (bytes : list SByte) : ErrSID (list SByte)
@@ -784,7 +759,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
 
        | UVALUE_ConcatBytes bytes t =>
          (* TODO: should provide *new* sids... May need to make this function in a fresh sid monad *)
-         bytes' <- lift_ERR (map_monad extract_byte_to_ubyte bytes);;
+         bytes' <- lift_ERR (map_monad extract_byte_to_sbyte bytes);;
          re_sid_ubytes bytes'
        end.
   Next Obligation.
@@ -948,7 +923,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
     (*  TODO: Is DTYPE_Void fine here? *)
     Definition SUndef : ErrSID SByte :=
       sid <- fresh_sid;;
-      ret (UByte (UVALUE_Undef DTYPE_Void) DTYPE_Void (UVALUE_IPTR 0) sid).
+      ret (uvalue_sbyte (UVALUE_Undef DTYPE_Void) DTYPE_Void (UVALUE_IPTR 0) sid).
 
     (** ** Reading values from memory *)
     Definition read_memory (mem : memory) (address : addr) (t : dtyp) : err uvalue :=
@@ -1249,7 +1224,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
            (fun n mf x =>
               '(m, addrs) <- mf (N.succ x);;
               sid <- fresh_sid;;
-              let undef := UByte (UVALUE_Undef t) t (UVALUE_IPTR (Z.of_N x)) sid in
+              let undef := uvalue_sbyte (UVALUE_Undef t) t (UVALUE_IPTR (Z.of_N x)) sid in
               let new_addr := addr + Z.of_N x in
               ret (IM.add new_addr (undef, aid) m, (addr::addrs)))
            sz) 0%N.
