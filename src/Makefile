@@ -29,7 +29,8 @@ COQFILESSYNTAX := Syntax/DataLayout Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
 		Syntax/Scope Syntax/SurfaceSyntax\
 		Syntax
 
-COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/DynamicValues Semantics/LLVMEvents\
+COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/Memory/Sizeof Semantics/GepM Semantics/Memory/MemBytes\
+		Semantics/DynamicValues Semantics/LLVMEvents\
 		Semantics/IntrinsicsDefinitions\
 		Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
 		Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack\
