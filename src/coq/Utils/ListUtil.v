@@ -1,4 +1,6 @@
-From Coq Require Import List Lia ZArith.
+From Coq Require Import String List Lia ZArith Program.Wf.
+
+From Vellvm.Utils Require Import Error.
 
 Import ListNotations.
 
@@ -171,3 +173,49 @@ Proof.
   intros A xs ys.
   induction xs; cbn; auto.
 Qed.
+
+Lemma drop_length_le :
+  forall {A} (xs : list A) n,
+    (length (drop n xs) <= length xs)%nat.
+Proof.
+  intros A xs.
+  induction xs;
+    intros n;
+    cbn; [lia|].
+  destruct n; cbn; [lia|].
+  rewrite IHxs.
+  lia.
+Qed.
+
+Lemma drop_length_lt :
+  forall {A} (xs : list A) n,
+    (n >= 1)%N ->
+    xs <> [] ->
+    (length (drop n xs) < length xs)%nat.
+Proof.
+  intros A xs.
+  induction xs;
+    intros n N XS;
+    cbn; [contradiction|].
+  destruct n; cbn; [lia|].
+  pose proof drop_length_le xs (Pos.pred_N p).
+  lia.
+Qed.
+
+Program Fixpoint split_every_pos {A} (n : positive) (xs : list A) {measure (length xs)} : list (list A)
+  := match xs with
+     | [] => []
+     | _ =>
+       take (Npos n) xs :: split_every_pos n (drop (Npos n) xs)
+     end.
+Next Obligation.
+  destruct xs; try contradiction.
+  apply drop_length_lt; auto; lia.
+Qed.
+
+Definition split_every {A} (n : N) (xs : list A) : err (list (list A))
+  := match n with
+     | N0 => failwith "split_every: called with n = 0."
+     | Npos n =>
+       inr (split_every_pos n xs)
+     end.

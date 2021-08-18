@@ -200,6 +200,24 @@ Inductive dvalue : Set :=
 .
 Set Elimination Schemes.
 
+Fixpoint dvalue_measure (dv : dvalue) : nat :=
+  match dv with
+  | DVALUE_Addr a => 1
+  | DVALUE_I1 x => 1
+  | DVALUE_I8 x => 1
+  | DVALUE_I32 x => 1
+  | DVALUE_I64 x => 1
+  | DVALUE_IPTR x => 1
+  | DVALUE_Double x => 1
+  | DVALUE_Float x => 1
+  | DVALUE_Poison => 1
+  | DVALUE_None => 1
+  | DVALUE_Struct fields => S (list_sum (map dvalue_measure fields))
+  | DVALUE_Packed_struct fields => S (list_sum (map dvalue_measure fields))
+  | DVALUE_Array elts => S (list_sum (map dvalue_measure elts))
+  | DVALUE_Vector elts => S (list_sum (map dvalue_measure elts))
+  end.
+
 Section DvalueInd.
   Variable P : dvalue -> Prop.
   Hypothesis IH_Addr          : forall a, P (DVALUE_Addr a).
@@ -283,6 +301,50 @@ Inductive uvalue : Type :=
 | UVALUE_ConcatBytes      (uvs : list uvalue) (dt : dtyp)
 .
 Set Elimination Schemes.
+
+Fixpoint uvalue_measure (uv : uvalue) : nat :=
+  match uv with
+  | UVALUE_Addr a => 1
+  | UVALUE_I1 x => 1
+  | UVALUE_I8 x => 1
+  | UVALUE_I32 x => 1
+  | UVALUE_I64 x => 1
+  | UVALUE_IPTR x => 1
+  | UVALUE_Double x => 1
+  | UVALUE_Float x => 1
+  | UVALUE_Undef t => 1
+  | UVALUE_Poison => 1
+  | UVALUE_None => 1
+  | UVALUE_Struct fields => S (list_sum (map uvalue_measure fields))
+  | UVALUE_Packed_struct fields => S (list_sum (map uvalue_measure fields))
+  | UVALUE_Array elts => S (list_sum (map uvalue_measure elts))
+  | UVALUE_Vector elts => S (list_sum (map uvalue_measure elts))
+  | UVALUE_IBinop _ v1 v2
+  | UVALUE_ICmp _ v1 v2
+  | UVALUE_FBinop _ _ v1 v2
+  | UVALUE_FCmp _ v1 v2 =>
+    S (uvalue_measure v1 + uvalue_measure v2)
+  | UVALUE_Conversion conv t_from v t_to =>
+    S (uvalue_measure v)
+  | UVALUE_GetElementPtr t ptrval idxs =>
+    S (uvalue_measure ptrval + list_sum (map uvalue_measure idxs))
+  | UVALUE_ExtractElement vec idx =>
+    S (uvalue_measure vec + uvalue_measure idx) 
+  | UVALUE_InsertElement vec elt idx =>
+    S (uvalue_measure vec + uvalue_measure elt + uvalue_measure idx) 
+  | UVALUE_ShuffleVector vec1 vec2 idxmask =>
+    S (uvalue_measure vec1 + uvalue_measure vec2 + uvalue_measure idxmask) 
+  | UVALUE_ExtractValue vec idxs =>
+    S (uvalue_measure vec)
+  | UVALUE_InsertValue vec elt idxs =>
+    S (uvalue_measure vec + uvalue_measure elt)
+  | UVALUE_Select cnd v1 v2 =>
+    S (uvalue_measure cnd + uvalue_measure v1 + uvalue_measure v2)
+  | UVALUE_ExtractByte uv dt idx sid =>
+    S (uvalue_measure uv + uvalue_measure idx)
+  | UVALUE_ConcatBytes uvs dt =>
+    S (list_sum (map uvalue_measure uvs))
+  end.
 
 Section UvalueInd.
   Variable P : uvalue -> Prop.

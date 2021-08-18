@@ -233,20 +233,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
     Definition fresh_sid : ErrSID store_id
       := lift (modify N.succ).
 
-    (* TODO: move to some utility file? *)
-    Fixpoint NM_find_many {A} (xs : list N) (nm : NMap A) : option (list A)
-      := match xs with
-         | [] => ret []
-         | (x::xs) =>
-           elt  <- NM.find x nm;;
-           elts <- NM_find_many xs nm;;
-           ret (elt :: elts)
-         end.
-
-
     (* Assign fresh sids to ubytes while preserving entanglement *)
-    Unset Guard Checking.
-
     Definition default_dvalue_of_dtyp_i (sz : N) : err dvalue:=
       (if (sz =? 64) then ret (DVALUE_I64 (repr 0))
         else if (sz =? 32) then ret (DVALUE_I32 (repr 0))
@@ -431,6 +418,18 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
 
       Definition ErrPoison := eitherT string Poisonable.
 
+      Definition ErrPoison_to_undef_or_err_dvalue (ep : ErrPoison dvalue) : undef_or_err dvalue
+        := match unEitherT ep with
+           | Unpoisoned dv => lift dv
+           | Poisoin => ret DVALUE_Poison
+           end.
+
+      Definition err_to_ErrPoison {A} (e : err A) : ErrPoison A
+        := match e with
+           | inl x => failwith x
+           | inr x => ret x
+           end.
+
       (* Walk through a list *)
       (* Returns field index + number of bytes remaining *)
       Fixpoint extract_field_byte_helper {M} `{Monad M} (fields : list dtyp) (field_idx : N) (byte_idx : N) : eitherT string M (dtyp * (N * N))
@@ -446,15 +445,24 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
 
       Fixpoint extract_field_byte {M} `{Monad M} (fields : list dtyp) (byte_idx : N) : eitherT string M (dtyp * (N * N))
         := extract_field_byte_helper fields 0 byte_idx.
-      
+
+      (* TODO: move this? *)
+      Ltac solve_dvalue_measure :=
+        match goal with
+        | H: Some ?f = List.nth_error ?fields _ |- context [dvalue_measure ?f]
+          => symmetry in H; apply nth_error_In in H;
+            pose proof list_sum_map dvalue_measure _ _ H;
+            cbn; lia
+        end.
+
+
       (* Need the type of the dvalue in order to know how big fields and array elements are.
 
          It's not possible to use the dvalue alone, as DVALUE_Poison's
          size depends on the type.
        *)
-      (* TODO: make termination checker happy *)
-      Unset Guard Checking.
-      Fixpoint dvalue_extract_byte (dv : dvalue) (dt : dtyp) (idx : Z) {struct dv}: ErrPoison Z
+      Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure].
+      Program Fixpoint dvalue_extract_byte (dv : dvalue) (dt : dtyp) (idx : Z) {measure (dvalue_measure dv)}: ErrPoison Z
         := match dv with
            | DVALUE_I1 x
            | DVALUE_I8 x
@@ -479,28 +487,30 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
              match dt with
              | DTYPE_Struct dts =>
                (* Step to field which contains the byte we want *)
-               '(fdt, (field_idx, byte_idx)) <- extract_field_byte dts (Z.to_N idx) ;;
-               match List.nth_error fields (N.to_nat field_idx) with
-               | Some f =>
-                 (* call dvalue_extract_byte recursively on the field *)
-                 dvalue_extract_byte f fdt (Z.of_N byte_idx)
-               | None =>
-                 raise "dvalue_extract_byte: more fields in dvalue than in dtyp."
-               end
+               @bind ErrPoison _ _ _ (extract_field_byte dts (Z.to_N idx))
+                    (fun '(fdt, (field_idx, byte_idx)) =>
+                       match List.nth_error fields (N.to_nat field_idx) with
+                       | Some f =>
+                         (* call dvalue_extract_byte recursively on the field *)
+                         dvalue_extract_byte f fdt (Z.of_N byte_idx )
+                       | None =>
+                         raise "dvalue_extract_byte: more fields in DVALUE_Struct than in dtyp."
+                       end)
              | _ => raise "dvalue_extract_byte: type mismatch on DVALUE_Struct."
              end
            | DVALUE_Packed_struct fields =>
              match dt with
              | DTYPE_Packed_struct dts =>
                (* Step to field which contains the byte we want *)
-               '(fdt, (field_idx, byte_idx)) <- extract_field_byte dts (Z.to_N idx) ;;
-               match List.nth_error fields (N.to_nat field_idx) with
-               | Some f =>
-                 (* call dvalue_extract_byte recursively on the field *)
-                 dvalue_extract_byte f fdt (Z.of_N byte_idx)
-               | None =>
-                 raise "dvalue_extract_byte: more fields in dvalue than in dtyp."
-               end
+               @bind ErrPoison _ _ _ (extract_field_byte dts (Z.to_N idx))
+                     (fun '(fdt, (field_idx, byte_idx)) =>
+                        match List.nth_error fields (N.to_nat field_idx) with
+                        | Some f =>
+                          (* call dvalue_extract_byte recursively on the field *)
+                          dvalue_extract_byte f fdt (Z.of_N byte_idx )
+                        | None =>
+                          raise "dvalue_extract_byte: more fields in DVALUE_Packed_struct than in dtyp."
+                        end)
              | _ => raise "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
              end
            | DVALUE_Array elts =>
@@ -536,7 +546,6 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
                raise "dvalue_extract_byte: type mismatch on DVALUE_Vector."
              end
            end.
-      Set Guard Checking.
 
       (* Taking a byte out of a dvalue...
 
@@ -551,16 +560,6 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
            | DVALUE_ExtractByte dv dt idx =>
              dvalue_extract_byte dv dt (Z.of_N idx)
            end.
-
-      (* TODO: probably satisfy the termination checker with length of xs... *)
-      Unset Guard Checking.
-      Fixpoint split_every {A} (n : N) (xs : list A) {struct xs} : (list (list A))
-        := match xs with
-           | [] => []
-           | _ =>
-             take n xs :: split_every n (drop n xs)
-           end.
-      Set Guard Checking.
 
       Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
       Program Fixpoint dvalue_bytes_to_dvalue (dbs : list dvalue_byte) (dt : dtyp) {measure (dtyp_measure dt)} : ErrPoison dvalue
@@ -609,12 +608,12 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
              raise "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
            | DTYPE_Array sz t =>
              let sz := sizeof_dtyp t in
-             let elt_bytes := split_every sz dbs in
+             elt_bytes <- err_to_ErrPoison (split_every sz dbs);;
              elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
              ret (DVALUE_Array elts)
            | DTYPE_Vector sz t =>
              let sz := sizeof_dtyp t in
-             let elt_bytes := split_every sz dbs in
+             elt_bytes <- err_to_ErrPoison (split_every sz dbs);;
              elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
              ret (DVALUE_Vector elts)
            | DTYPE_Struct fields =>
@@ -675,13 +674,6 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
 
       Definition filter_uvalue_sid_matches (byte : uvalue) (uvs : list (N * uvalue)) : (list (N * uvalue) * list (N * uvalue))
         := filter_split (fun '(n, uv) => uvalue_sid_match byte uv) uvs.
-
-
-      Definition ErrPoison_to_undef_or_err_dvalue (ep : ErrPoison dvalue) : undef_or_err dvalue
-        := match unEitherT ep with
-           | Unpoisoned dv => lift dv
-           | Poisoin => ret DVALUE_Poison
-           end.
 
       Definition uvalue_constructor_string (u : uvalue) : string
         := match u with
@@ -864,8 +856,8 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
       extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : undef_or_err dvalue
         := dvbs <- concretize_uvalue_bytes uvs;;
            ErrPoison_to_undef_or_err_dvalue (dvalue_bytes_to_dvalue dvbs dt).
-      Set Guard Checking.
 
+      Set Guard Checking.
     End Concretize.
 
 Ltac eval_nseq :=

@@ -692,50 +692,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(GEP : GEPM(Addr)(LLVMEvents)).
          byte_map <- re_sid_ubytes_helper (zip (Nseq 0 len) bytes) (@NM.empty _);;
          trywith (ERR_message "re_sid_ubytes: missing indices.") (NM_find_many (Nseq 0 len) byte_map). 
     Set Guard Checking.
-
-    Fixpoint uvalue_measure (uv : uvalue) : nat :=
-      match uv with
-      | UVALUE_Addr a => 0
-      | UVALUE_I1 x => 0
-      | UVALUE_I8 x => 0
-      | UVALUE_I32 x => 0
-      | UVALUE_I64 x => 0
-      | UVALUE_IPTR x => 0
-      | UVALUE_Double x => 0
-      | UVALUE_Float x => 0
-      | UVALUE_Undef t => 0
-      | UVALUE_Poison => 0
-      | UVALUE_None => 0
-      | UVALUE_Struct fields => S (list_sum (map uvalue_measure fields))
-      | UVALUE_Packed_struct fields => S (list_sum (map uvalue_measure fields))
-      | UVALUE_Array elts => S (list_sum (map uvalue_measure elts))
-      | UVALUE_Vector elts => S (list_sum (map uvalue_measure elts))
-      | UVALUE_IBinop _ v1 v2
-      | UVALUE_ICmp _ v1 v2
-      | UVALUE_FBinop _ _ v1 v2
-      | UVALUE_FCmp _ v1 v2 =>
-        S (uvalue_measure v1 + uvalue_measure v2)
-      | UVALUE_Conversion conv t_from v t_to =>
-        S (uvalue_measure v)
-      | UVALUE_GetElementPtr t ptrval idxs =>
-        S (uvalue_measure ptrval + list_sum (map uvalue_measure idxs))
-      | UVALUE_ExtractElement vec idx =>
-        S (uvalue_measure vec + uvalue_measure idx) 
-      | UVALUE_InsertElement vec elt idx =>
-        S (uvalue_measure vec + uvalue_measure elt + uvalue_measure idx) 
-      | UVALUE_ShuffleVector vec1 vec2 idxmask =>
-        S (uvalue_measure vec1 + uvalue_measure vec2 + uvalue_measure idxmask) 
-      | UVALUE_ExtractValue vec idxs =>
-        S (uvalue_measure vec)
-      | UVALUE_InsertValue vec elt idxs =>
-        S (uvalue_measure vec + uvalue_measure elt)
-      | UVALUE_Select cnd v1 v2 =>
-        S (uvalue_measure cnd + uvalue_measure v1 + uvalue_measure v2)
-      | UVALUE_ExtractByte uv dt idx sid =>
-        S (uvalue_measure uv + uvalue_measure idx)
-      | UVALUE_ConcatBytes uvs dt =>
-        S (list_sum (map uvalue_measure uvs))
-      end.
     
     (* This is mostly to_ubytes, except it will also unwrap concatbytes *)
   Program Fixpoint serialize_sbytes (uv : uvalue) (dt : dtyp) {measure (uvalue_measure uv)} : ErrSID (list SByte)
