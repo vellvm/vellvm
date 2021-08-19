@@ -985,12 +985,90 @@ Section ConcretizeInductive.
 
      This means we can just take the corresponding uvalue, and concretize it.
    *)
+  (* TODO: I'll need something separate for aggregate types to split the bytes up... *)
   | Concretize_ConcatBytes_Exact :
       forall bytes dt uv dv,
         all_bytes_from_uvalue bytes = Some uv ->
         N.of_nat (List.length bytes) = sizeof_dtyp dt ->
         concretize_u uv dv ->
         concretize_u (UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt) dv
+
+  | Concretize_ConcatBytes_Array_nil :
+      forall dt,
+        concretize_u (UVALUE_ConcatBytes [] (DTYPE_Array 0 dt)) (ret (DVALUE_Array []))
+  | Concretize_ConcatBytes_Array_cons :
+      forall bytes elt_bytes rest_bytes sz dt e es,
+        sizeof_dtyp dt > 0 ->
+        take (sizeof_dtyp dt) bytes = elt_bytes ->
+        drop (sizeof_dtyp dt) bytes = rest_bytes ->
+        concretize_u (UVALUE_ConcatBytes elt_bytes dt) e ->
+        concretize_u (UVALUE_ConcatBytes rest_bytes (DTYPE_Array sz dt)) es ->
+        concretize_u (UVALUE_ConcatBytes bytes (DTYPE_Array (N.succ sz) dt))
+                     (dv <- e;;
+                      dvs <- es;;
+                      match dvs with
+                      | DVALUE_Array elts =>
+                        ret (DVALUE_Array (dv :: elts))
+                      | _ => failwith "ConcatBytes array cons failure."
+                      end)
+
+  | Concretize_ConcatBytes_Vector_nil :
+      forall dt,
+        concretize_u (UVALUE_ConcatBytes [] (DTYPE_Vector 0 dt)) (ret (DVALUE_Vector []))
+  | Concretize_ConcatBytes_Vector_cons :
+      forall bytes elt_bytes rest_bytes sz dt e es,
+        sizeof_dtyp dt > 0 ->
+        take (sizeof_dtyp dt) bytes = elt_bytes ->
+        drop (sizeof_dtyp dt) bytes = rest_bytes ->
+        concretize_u (UVALUE_ConcatBytes elt_bytes dt) e ->
+        concretize_u (UVALUE_ConcatBytes rest_bytes (DTYPE_Vector sz dt)) es ->
+        concretize_u (UVALUE_ConcatBytes bytes (DTYPE_Vector (N.succ sz) dt))
+                     (dv <- e;;
+                      dvs <- es;;
+                      match dvs with
+                      | DVALUE_Vector elts =>
+                        ret (DVALUE_Vector (dv :: elts))
+                      | _ => failwith "ConcatBytes array cons failure."
+                      end)
+
+  (* TODO: Take padding into account *)
+  | Concretize_ConcatBytes_Struct_nil :
+      concretize_u (UVALUE_ConcatBytes [] (DTYPE_Struct [])) (ret (DVALUE_Struct []))
+  | Concretize_ConcatBytes_Struct_cons :
+      forall bytes elt_bytes rest_bytes dt dts e es,
+        sizeof_dtyp dt > 0 ->
+        take (sizeof_dtyp dt) bytes = elt_bytes ->
+        drop (sizeof_dtyp dt) bytes = rest_bytes ->
+        concretize_u (UVALUE_ConcatBytes elt_bytes dt) e ->
+        concretize_u (UVALUE_ConcatBytes rest_bytes (DTYPE_Struct dts)) es ->
+        concretize_u (UVALUE_ConcatBytes bytes (DTYPE_Struct (dt::dts)))
+                     (dv <- e;;
+                      dvs <- es;;
+                      match dvs with
+                      | DVALUE_Struct elts =>
+                        ret (DVALUE_Struct (dv :: elts))
+                      | _ => failwith "ConcatBytes array cons failure."
+                      end)
+
+  | Concretize_ConcatBytes_Packed_struct_nil :
+      concretize_u (UVALUE_ConcatBytes [] (DTYPE_Packed_struct [])) (ret (DVALUE_Packed_struct []))
+  | Concretize_ConcatBytes_Packed_struct_cons :
+      forall bytes elt_bytes rest_bytes dt dts e es,
+        sizeof_dtyp dt > 0 ->
+        take (sizeof_dtyp dt) bytes = elt_bytes ->
+        drop (sizeof_dtyp dt) bytes = rest_bytes ->
+        concretize_u (UVALUE_ConcatBytes elt_bytes dt) e ->
+        concretize_u (UVALUE_ConcatBytes rest_bytes (DTYPE_Packed_struct dts)) es ->
+        concretize_u (UVALUE_ConcatBytes bytes (DTYPE_Packed_struct (dt::dts)))
+                     (dv <- e;;
+                      dvs <- es;;
+                      match dvs with
+                      | DVALUE_Packed_struct elts =>
+                        ret (DVALUE_Packed_struct (dv :: elts))
+                      | _ => failwith "ConcatBytes array cons failure."
+                      end)
+
+
   (* with *)
   (*   concretize_u_dvalue_bytes : list uvalue -> NMap dvalue_byte -> undef_or_err (NMap dvalue_byte) -> Prop := *)
   (* | concretize_u_dvalue_bytes_nil : forall acc, concretize_u_dvalue_bytes [] acc (ret acc) *)
