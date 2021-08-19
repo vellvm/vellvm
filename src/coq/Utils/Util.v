@@ -465,6 +465,9 @@ Definition map_monad_ {A}
   (f: A -> m unit) (l: list A): m unit :=
   map_monad f l;; ret tt.
 
+Fixpoint sequence {a} {M} `{Monad M} (ms : list (M a)) : M (list a)
+  := map_monad id ms.
+
 End monad.
 Arguments monad_fold_right {_ _ _ _}.
 Arguments monad_app_fst {_ _ _ _ _}.

@@ -928,6 +928,54 @@ Section ConcretizeInductive.
                     dv2 <- e2 ;;
                     eval_fcmp cmp dv1 dv2)
 
+  | Concretize_Conversion : forall conv t_from v t_to e,
+      concretize_u v e ->
+      concretize_u (UVALUE_Conversion conv t_from v t_to)
+                   (dv <- e;;
+                    match get_conv_case conv t_from dv t_to with
+                    | Conv_PtoI x =>
+                      match x, t_to with
+                      | DVALUE_Addr addr, DTYPE_I sz =>
+                        coerce_integer_to_int sz (ptr_to_int addr)
+                      | _, _ =>
+                        lift (raise "Invalid PTOI conversion")
+                      end
+                    | Conv_ItoP x => ret (DVALUE_Addr (int_to_ptr (dvalue_int_unsigned x) wildcard_prov))
+                    | Conv_Pure x => ret x
+                    | Conv_Illegal s => raise s
+                    end)
+
+  | Concretize_GetElementPtr : forall t ua uvs ea es,
+      concretize_u ua ea ->
+      Forall2 concretize_u uvs es ->
+      concretize_u (UVALUE_GetElementPtr t ua uvs)
+                   (da <- ea;;
+                    dvs <- sequence es;;
+                    match handle_gep t da dvs with
+                    | inr dv  => ret dv
+                    | inl err => lift (failwith err)
+                    end)
+
+  | Concretize_ExtractValue : forall uv idxs e,
+      concretize_u uv e ->
+      concretize_u (UVALUE_ExtractValue uv idxs)
+                   (str <- e;;
+                    let fix loop str idxs : undef_or_err dvalue :=
+                        match idxs with
+                        | [] => ret str
+                        | i :: tl =>
+                          v <- index_into_str_dv str i ;;
+                          loop v tl
+                        end in
+                    loop str idxs)
+
+  | UVALUE_Select : forall cond v1 v2 econd (uv : uvalue) dv,
+      concretize_u cond econd ->
+      (dcond <- econd;; eval_select dcond v1 v2) = ret uv ->
+      concretize_u uv dv ->
+      concretize_u (UVALUE_Select cond v1 v2)
+                   dv
+
   | Concretize_Struct_Nil     : concretize_u (UVALUE_Struct []) (ret (DVALUE_Struct []))
   | Concretize_Struct_Cons    : forall u e us es,
       concretize_u u e ->
