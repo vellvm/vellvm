@@ -164,7 +164,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
    if it is not satisfied, the only possible execution is to raise _UB_.
    *)
   Variant PickE : Type -> Type :=
-  | pick (u:uvalue) (P : Prop) : PickE dvalue.
+  | pick {X} (P : X -> Prop) : PickE X.
 
   Definition unique_prop (uv : uvalue) : Prop
     := exists x, forall dv, concretize uv dv -> dv = x.

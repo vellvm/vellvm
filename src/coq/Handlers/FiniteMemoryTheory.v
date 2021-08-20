@@ -154,11 +154,49 @@ Section Serialization_Theory.
   (*   rewrite fold_sum_acc. reflexivity. *)
   (* Qed. *)
 
-  (* Lemma sizeof_serialized : *)
-  (*   forall uv dt, *)
-  (*     uvalue_has_dtyp uv dt -> *)
-  (*     N.of_nat (List.length (serialize_sbytes uv)) = sizeof_dtyp dt. *)
-  (* Proof. *)
+  Lemma to_ubytes_sizeof :
+    forall uv dt sid,
+      N.of_nat (length (to_ubytes uv dt sid)) = sizeof_dtyp dt.
+  Proof.
+    intros uv dt sid.
+    unfold to_ubytes.
+    rewrite map_length. rewrite Nseq_length.
+    apply Nnat.N2Nat.id.
+  Qed.
+              
+  Lemma sizeof_serialized :
+    forall uv dt sid prov bytes,
+      uvalue_has_dtyp uv dt ->
+      ErrSID_evals_to (serialize_sbytes uv dt) sid prov bytes ->
+      N.of_nat (List.length bytes) = sizeof_dtyp dt.
+  Proof.
+    intros uv dt sid prov bytes TYP BYTES.
+    induction TYP.
+    { cbn in BYTES; inversion BYTES;
+        apply to_ubytes_sizeof. }
+    { cbn in BYTES; inversion BYTES;
+        apply to_ubytes_sizeof. }
+    { cbn in BYTES; inversion BYTES;
+        apply to_ubytes_sizeof. }
+    { cbn in BYTES; inversion BYTES;
+        apply to_ubytes_sizeof. }
+    { cbn in BYTES; inversion BYTES;
+        apply to_ubytes_sizeof. }
+    { cbn in BYTES; inversion BYTES.
+        apply to_ubytes_sizeof. }
+    { cbn in BYTES; inversion BYTES.
+        apply to_ubytes_sizeof. }
+    { cbn in BYTES; inversion BYTES.
+      rewrite sizeof_dtyp_void.
+      reflexivity. }
+    { cbn in BYTES; inversion BYTES.
+        apply to_ubytes_sizeof. }
+    { cbn in BYTES; inversion BYTES.
+      rewrite sizeof_dtyp_struct_0.
+      reflexivity. }
+  Admitted.
+
+    
   (*   intros dv dt TYP. *)
   (*   induction TYP; try solve [cbn; auto]. *)
   (*   - cbn. rewrite DynamicValues.unsupported_cases_match; auto. *)

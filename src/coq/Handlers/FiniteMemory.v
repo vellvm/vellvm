@@ -267,6 +267,32 @@ Module FinSizeof : Sizeof.
     intros dt.
     lia.
   Qed.
+
+  Lemma sizeof_dtyp_packed_struct_0 :
+    sizeof_dtyp (DTYPE_Packed_struct nil) = 0%N.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Lemma sizeof_dtyp_struct_0 :
+    sizeof_dtyp (DTYPE_Struct nil) = 0%N.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Lemma sizeof_dtyp_array :
+    forall sz t,
+      sizeof_dtyp (DTYPE_Array sz t) = (sz * sizeof_dtyp t)%N.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Lemma sizeof_dtyp_vector :
+    forall sz t,
+      sizeof_dtyp (DTYPE_Array sz t) = (sz * sizeof_dtyp t)%N.
+  Proof.
+    reflexivity.
+  Qed.
 End FinSizeof.
 
 Module FinByte (LLVMEvents:LLVM_INTERACTIONS(Addr)) : ByteImpl(Addr)(LLVMEvents).
