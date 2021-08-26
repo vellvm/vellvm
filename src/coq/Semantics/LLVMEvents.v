@@ -164,7 +164,26 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
    if it is not satisfied, the only possible execution is to raise _UB_.
    *)
   Variant PickE : Type -> Type :=
-  | pick {X} (P : X -> Prop) : PickE X.
+  | pick (u:uvalue) (P : Prop) : PickE dvalue.
+  (* Need to change handler to actually use prop, need to parameterize... *)
+
+  (* Variant PickE (X : Type) : Type := *)
+  (* | pick (x:X) (P : X -> Prop) : PickE dvalue. *)
+
+
+  (* Variant PickE (X Y : Type) : Type := *)
+  (* | pick (x:X) (P : X -> Y -> Prop) : PickE X Y. *)
+
+  (* Variant PickE (X Y : Type) : Type := *)
+  (* | pick (x:X) (concrete_handler : X -> Y) (pick_handler : X -> Y -> Prop) : PickE X Y. *)
+
+  (* Variant PickE (X Y : Type) : Type := *)
+  (* | pick (x:X) : PickE X Y. (* Predicate is just part of handler?  Different pick event for each kind of choice we make... *) *)
+
+  (*
+  X = uvalue / memory
+  Y = dvalue / address
+   *)
 
   Definition unique_prop (uv : uvalue) : Prop
     := exists x, forall dv, concretize uv dv -> dv = x.

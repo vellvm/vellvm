@@ -712,6 +712,24 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
            | UVALUE_ExtractByte uv dt idx sid => "UVALUE_ExtractByte"
            | UVALUE_ConcatBytes uvs dt => "UVALUE_ConcatBytes"
            end.
+
+
+      (* Change this to take an undef handler... *)
+      (* dtyp -> r *)
+      (* lift dvalue to r too? dvalue -> r ? *)
+      (*
+        default_dvalue_of_dtyp : dtyp -> err dvalue
+
+        pick_dtyp : dtyp -> (dvalue -> Prop)
+
+
+        Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop :=
+        Fixpoint concretize_uvalue (u : uvalue) {struct u} : undef_or_err dvalue :=
+
+        
+
+        Maybe it should be a monad???
+       *)
       
       (* TODO: satisfy the termination checker here. *)
       Unset Guard Checking.

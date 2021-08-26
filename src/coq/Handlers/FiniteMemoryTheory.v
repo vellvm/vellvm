@@ -163,15 +163,16 @@ Section Serialization_Theory.
     rewrite map_length. rewrite Nseq_length.
     apply Nnat.N2Nat.id.
   Qed.
-              
+
   Lemma sizeof_serialized :
     forall uv dt sid prov bytes,
       uvalue_has_dtyp uv dt ->
       ErrSID_evals_to (serialize_sbytes uv dt) sid prov bytes ->
       N.of_nat (List.length bytes) = sizeof_dtyp dt.
   Proof.
-    intros uv dt sid prov bytes TYP BYTES.
-    induction TYP.
+    intros uv dt sid prov bytes TYP.
+    generalize dependent bytes.
+    induction TYP; intros bytes BYTES.
     { cbn in BYTES; inversion BYTES;
         apply to_ubytes_sizeof. }
     { cbn in BYTES; inversion BYTES;
@@ -194,9 +195,53 @@ Section Serialization_Theory.
     { cbn in BYTES; inversion BYTES.
       rewrite sizeof_dtyp_struct_0.
       reflexivity. }
+    { rewrite serialize_sbytes_equation in BYTES.
+      
+      Set Nested Proofs Allowed.
+
+      Lemma dvalue_has_dtyp_struct_length :
+        forall fields dts,
+          uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct dts) ->
+          length fields = length dts.
+      Proof.
+        induction fields;
+          intros dts H; inversion H; cbn; auto.
+      Qed.
+
+      Lemma dvalue_has_dtyp_packed_struct_length :
+        forall fields dts,
+          uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
+          length fields = length dts.
+      Proof.
+        induction fields;
+          intros dts H; inversion H; cbn; auto.
+      Qed.
+
+      (* Need to find out what bytes actually is by unfolding BYTES *)
+      assert (length fields = length dts) as HLen by
+            (apply dvalue_has_dtyp_struct_length; auto).
+
+      assert (length (dt :: dts) =? length (f :: fields))%nat as HLen'.
+      { cbn. rewrite HLen.
+        apply Nat.eqb_refl.
+      }
+
+      rewrite HLen' in BYTES.
+      unfold zip in BYTES.
+      
+      cbn in BYTES.
+
+        unfold ErrSID_evals_to in BYTES.
+      unfold serialize_sbytes in BYTES.
+      unfold serialize_sbytes_func in BYTES.
+      rewrite Wf.WfExtensionality.fix_sub_eq_ext in BYTES.
+      simpl in BYTES.
+      cbv in BYTES.
+      unfold serialize_sbytes_func in BYTES.
+      cbn in BYTES.
   Admitted.
 
-    
+
   (*   intros dv dt TYP. *)
   (*   induction TYP; try solve [cbn; auto]. *)
   (*   - cbn. rewrite DynamicValues.unsupported_cases_match; auto. *)

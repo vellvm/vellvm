@@ -42,7 +42,7 @@ Import MonadNotation.
 (** * Pick handler
   Definition of the propositional and executable handlers for the [Pick] event.
   - The propositional one capture in [Prop] all possible values
-  - The executable one interprets [undef] as 0 at the type  
+  - The executable one interprets [undef] as 0 at the type
 *)
 
 Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A))(SIZEOF: Sizeof)(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(LLVMIO))(BYTE_IMPL : ByteImpl(A)(LLVMIO)).
@@ -53,11 +53,11 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A))(SIZEOF: Sizeo
   Import LLVMIO.
 
   Section PickPropositional.
-   
+
     (* The parameter [C] is currently not used *)
     Inductive Pick_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E}: PickE ~> PropT E :=
     | PickD: forall uv C res t,  concretize_u uv res -> t ≈ (lift_undef_or_err ret res) -> Pick_handler (pick uv C) t.
-                                                                      
+
     Section PARAMS_MODEL.
       Variable (E F: Type -> Type).
 

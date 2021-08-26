@@ -793,23 +793,135 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
     cbn.
     pose proof (list_sum_map uvalue_measure u fields IN_FIELDS).
     lia.
-  Qed.
+  Defined.
   Next Obligation.
     pose proof (zip_In_both _ _ _ _ Hin) as [IN_FIELDS IN_TYPS].
     cbn.
     pose proof (list_sum_map uvalue_measure u fields IN_FIELDS).
     lia.
-  Qed.
+  Defined.
   Next Obligation.
     cbn.
     pose proof (list_sum_map uvalue_measure elt elts Hin).
     lia.
-  Qed.
+  Defined.
   Next Obligation.
     cbn.
     pose proof (list_sum_map uvalue_measure elt elts Hin).
     lia.
-  Qed.
+  Defined.
+
+  Lemma serialize_sbytes_equation : forall (uv : uvalue) (dt : dtyp),
+      serialize_sbytes uv dt =
+       match uv with
+       (* Base types *)
+       | UVALUE_Addr _
+       | UVALUE_I1 _
+       | UVALUE_I8 _
+       | UVALUE_I32 _
+       | UVALUE_I64 _
+       | UVALUE_IPTR _
+       | UVALUE_Float _
+       | UVALUE_Double _
+       | UVALUE_Undef _
+       | UVALUE_Poison
+
+       (* Expressions *)
+       | UVALUE_IBinop _ _ _
+       | UVALUE_ICmp _ _ _
+       | UVALUE_FBinop _ _ _ _
+       | UVALUE_FCmp _ _ _
+       | UVALUE_Conversion _ _ _ _
+       | UVALUE_GetElementPtr _ _ _
+       | UVALUE_ExtractElement _ _
+       | UVALUE_InsertElement _ _ _
+       | UVALUE_ShuffleVector _ _ _
+       | UVALUE_ExtractValue _ _
+       | UVALUE_InsertValue _ _ _
+       | UVALUE_Select _ _ _ =>
+         sid <- fresh_sid;;
+         ret (to_ubytes uv dt sid)
+
+       (* TODO: each field gets a separate store id... Is that sensible? *)
+       (* Padded aggregate types *)
+       | UVALUE_Struct fields =>
+         (* TODO: take padding into account *)
+         match dt with
+         | DTYPE_Struct ts =>
+           if Nat.eqb (length ts) (length fields)
+           then
+             let fts := zip fields ts in
+             field_bytes <- map_monad_In fts (fun '(f, t) Hin => serialize_sbytes f t);;
+             ret (concat field_bytes)
+           else raise_error "serialize_sbytes: UVALUE_Struct field / type mismatch."
+         | _ =>
+           raise_error "serialize_sbytes: UVALUE_Struct with incorrect type."
+         end
+
+       (* Packed aggregate types *)
+       | UVALUE_Packed_struct fields =>
+         match dt with
+         | DTYPE_Packed_struct ts =>
+           if Nat.eqb (length ts) (length fields)
+           then
+             let fts := zip fields ts in
+             field_bytes <- map_monad_In fts (fun '(f, t) Hin => serialize_sbytes f t);;
+             ret (concat field_bytes)
+           else raise_error "serialize_sbytes: UVALUE_Packed_struct field / type mismatch."
+         | _ =>
+           raise_error "serialize_sbytes: UVALUE_Packed_struct with incorrect type."
+         end
+
+       | UVALUE_Array elts =>
+         match dt with
+         | DTYPE_Array sz t =>
+           field_bytes <- map_monad_In elts (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+         | _ =>
+           raise_error "serialize_sbytes: UVALUE_Array with incorrect type."
+         end
+       | UVALUE_Vector elts =>
+         match dt with
+         | DTYPE_Vector sz t =>
+           field_bytes <- map_monad_In elts (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+         | _ =>
+           raise_error "serialize_sbytes: UVALUE_Array with incorrect type."
+         end
+
+       | UVALUE_None => ret nil
+
+       (* Byte manipulation. *)
+       | UVALUE_ExtractByte uv dt' idx sid =>
+         raise_error "serialize_sbytes: UVALUE_ExtractByte not guarded by UVALUE_ConcatBytes."
+
+       | UVALUE_ConcatBytes bytes t =>
+         (* TODO: should provide *new* sids... May need to make this function in a fresh sid monad *)
+         bytes' <- lift_ERR (map_monad extract_byte_to_sbyte bytes);;
+         re_sid_ubytes bytes'
+       end.
+  Proof.
+    (* intros uv dt. *)
+    (* unfold serialize_sbytes. *)
+    (* unfold serialize_sbytes_func at 1. *)
+    (* rewrite Wf.WfExtensionality.fix_sub_eq_ext. *)
+    (* destruct uv. *)
+    (* all: try reflexivity. *)
+    (* all: cbn. *)
+    (* - destruct dt; try reflexivity. *)
+    (*   destruct (Datatypes.length fields0 =? Datatypes.length fields)%nat eqn:Hlen. *)
+    (*   + cbn. *)
+    (*     reflexivity. *)
+    (*   + *)
+
+
+    (* destruct uv; try reflexivity. simpl. *)
+    (* destruct dt; try reflexivity. simpl. *)
+    (* break_match. *)
+    (*  destruct (find (fun a : ident * typ => Ident.eq_dec id (fst a)) env). *)
+    (* destruct p; simpl; eauto. *)
+    (* reflexivity. *)
+  Admitted.
 
   (* deserialize_sbytes takes a list of SBytes and turns them into a uvalue.
 
@@ -898,25 +1010,25 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
     pose proof (list_sum_map dtyp_measure dt (dt :: dts) Hin).
     cbn.
     lia.
-  Qed.
+  Defined.
   Next Obligation.
     assert (In dt (dt :: dts)) as Hin by (cbn;auto).
     pose proof (list_sum_map dtyp_measure dt (dt :: dts) Hin).
     pose proof dtyp_measure_gt_0 dt.
     destruct dts; cbn; lia.
-  Qed.
+  Defined.
   Next Obligation.
     assert (In dt (dt :: dts)) as Hin by (cbn;auto).
     pose proof (list_sum_map dtyp_measure dt (dt :: dts) Hin).
     cbn.
     lia.
-  Qed.
+  Defined.
   Next Obligation.
     assert (In dt (dt :: dts)) as Hin by (cbn;auto).
     pose proof (list_sum_map dtyp_measure dt (dt :: dts) Hin).
     pose proof dtyp_measure_gt_0 dt.
     destruct dts; cbn; lia.
-  Qed.
+  Defined.
 
 (* (* TODO: *)
 
