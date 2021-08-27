@@ -274,9 +274,30 @@ Module FinSizeof : Sizeof.
     reflexivity.
   Qed.
 
+  Lemma sizeof_dtyp_packed_struct_cons :
+    forall dt dts,
+      sizeof_dtyp (DTYPE_Packed_struct (dt :: dts)) = (sizeof_dtyp dt + sizeof_dtyp (DTYPE_Packed_struct dts))%N.
+  Proof.
+    intros dt dts.
+    cbn.
+    rewrite fold_sum_acc.
+    reflexivity.
+  Qed.
+
   Lemma sizeof_dtyp_struct_0 :
     sizeof_dtyp (DTYPE_Struct nil) = 0%N.
   Proof.
+    reflexivity.
+  Qed.
+
+  (* TODO: this should take padding into account *)
+  Lemma sizeof_dtyp_struct_cons :
+    forall dt dts,
+      sizeof_dtyp (DTYPE_Struct (dt :: dts)) = (sizeof_dtyp dt + sizeof_dtyp (DTYPE_Struct dts))%N.
+  Proof.
+    intros dt dts.
+    cbn.
+    rewrite fold_sum_acc.
     reflexivity.
   Qed.
 
@@ -732,32 +753,31 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
 
        (* TODO: each field gets a separate store id... Is that sensible? *)
        (* Padded aggregate types *)
-       | UVALUE_Struct fields =>
+       | UVALUE_Struct [] =>
+         ret []
+       | UVALUE_Struct (f::fields) =>
          (* TODO: take padding into account *)
          match dt with
-         | DTYPE_Struct ts =>
-           if Nat.eqb (length ts) (length fields)
-           then
-             let fts := zip fields ts in
-             field_bytes <- map_monad_In fts (fun '(f, t) Hin => serialize_sbytes f t);;
-             ret (concat field_bytes)
-           else raise_error "serialize_sbytes: UVALUE_Struct field / type mismatch."
+         | DTYPE_Struct (t::ts) =>
+           f_bytes <- serialize_sbytes f t;;
+           fields_bytes <- serialize_sbytes (UVALUE_Struct fields) (DTYPE_Struct ts);;
+           ret (f_bytes ++ fields_bytes)
          | _ =>
-           raise_error "serialize_sbytes: UVALUE_Struct with incorrect type."
+           raise_error "serialize_sbytes: UVALUE_Struct field / type mismatch."
          end
 
        (* Packed aggregate types *)
-       | UVALUE_Packed_struct fields =>
+       | UVALUE_Packed_struct [] =>
+         ret []
+       | UVALUE_Packed_struct (f::fields) =>
+         (* TODO: take padding into account *)
          match dt with
-         | DTYPE_Packed_struct ts =>
-           if Nat.eqb (length ts) (length fields)
-           then
-             let fts := zip fields ts in
-             field_bytes <- map_monad_In fts (fun '(f, t) Hin => serialize_sbytes f t);;
-             ret (concat field_bytes)
-           else raise_error "serialize_sbytes: UVALUE_Packed_struct field / type mismatch."
+         | DTYPE_Packed_struct (t::ts) =>
+           f_bytes <- serialize_sbytes f t;;
+           fields_bytes <- serialize_sbytes (UVALUE_Packed_struct fields) (DTYPE_Packed_struct ts);;
+           ret (f_bytes ++ fields_bytes)
          | _ =>
-           raise_error "serialize_sbytes: UVALUE_Packed_struct with incorrect type."
+           raise_error "serialize_sbytes: UVALUE_Packed_struct field / type mismatch."
          end
 
        | UVALUE_Array elts =>
@@ -789,16 +809,18 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
          re_sid_ubytes bytes'
        end.
   Next Obligation.
-    pose proof (zip_In_both _ _ _ _ Hin) as [IN_FIELDS IN_TYPS].
-    cbn.
-    pose proof (list_sum_map uvalue_measure u fields IN_FIELDS).
-    lia.
+    cbn. lia.
   Defined.
   Next Obligation.
-    pose proof (zip_In_both _ _ _ _ Hin) as [IN_FIELDS IN_TYPS].
-    cbn.
-    pose proof (list_sum_map uvalue_measure u fields IN_FIELDS).
-    lia.
+    pose proof (uvalue_measure_gt_0 f).
+    cbn. unfold list_sum. lia.
+  Defined.
+  Next Obligation.
+    cbn. lia.
+  Defined.
+  Next Obligation.
+    pose proof (uvalue_measure_gt_0 f).
+    cbn. unfold list_sum. lia.
   Defined.
   Next Obligation.
     cbn.
@@ -813,7 +835,7 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
 
   Lemma serialize_sbytes_equation : forall (uv : uvalue) (dt : dtyp),
       serialize_sbytes uv dt =
-       match uv with
+match uv with
        (* Base types *)
        | UVALUE_Addr _
        | UVALUE_I1 _
@@ -844,32 +866,31 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
 
        (* TODO: each field gets a separate store id... Is that sensible? *)
        (* Padded aggregate types *)
-       | UVALUE_Struct fields =>
+       | UVALUE_Struct [] =>
+         ret []
+       | UVALUE_Struct (f::fields) =>
          (* TODO: take padding into account *)
          match dt with
-         | DTYPE_Struct ts =>
-           if Nat.eqb (length ts) (length fields)
-           then
-             let fts := zip fields ts in
-             field_bytes <- map_monad_In fts (fun '(f, t) Hin => serialize_sbytes f t);;
-             ret (concat field_bytes)
-           else raise_error "serialize_sbytes: UVALUE_Struct field / type mismatch."
+         | DTYPE_Struct (t::ts) =>
+           f_bytes <- serialize_sbytes f t;;
+           fields_bytes <- serialize_sbytes (UVALUE_Struct fields) (DTYPE_Struct ts);;
+           ret (f_bytes ++ fields_bytes)
          | _ =>
-           raise_error "serialize_sbytes: UVALUE_Struct with incorrect type."
+           raise_error "serialize_sbytes: UVALUE_Struct field / type mismatch."
          end
 
        (* Packed aggregate types *)
-       | UVALUE_Packed_struct fields =>
+       | UVALUE_Packed_struct [] =>
+         ret []
+       | UVALUE_Packed_struct (f::fields) =>
+         (* TODO: take padding into account *)
          match dt with
-         | DTYPE_Packed_struct ts =>
-           if Nat.eqb (length ts) (length fields)
-           then
-             let fts := zip fields ts in
-             field_bytes <- map_monad_In fts (fun '(f, t) Hin => serialize_sbytes f t);;
-             ret (concat field_bytes)
-           else raise_error "serialize_sbytes: UVALUE_Packed_struct field / type mismatch."
+         | DTYPE_Packed_struct (t::ts) =>
+           f_bytes <- serialize_sbytes f t;;
+           fields_bytes <- serialize_sbytes (UVALUE_Packed_struct fields) (DTYPE_Packed_struct ts);;
+           ret (f_bytes ++ fields_bytes)
          | _ =>
-           raise_error "serialize_sbytes: UVALUE_Packed_struct with incorrect type."
+           raise_error "serialize_sbytes: UVALUE_Packed_struct field / type mismatch."
          end
 
        | UVALUE_Array elts =>
@@ -1005,6 +1026,12 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
        | DTYPE_Void =>
          inl "deserialize_sbytes: Attempt to deserialize void."
       end.
+  Next Obligation.
+    cbn. lia.
+  Defined.
+  Next Obligation.
+    cbn. lia.
+  Defined.
   Next Obligation.
     assert (In dt (dt :: dts)) as Hin by (cbn;auto).
     pose proof (list_sum_map dtyp_measure dt (dt :: dts) Hin).

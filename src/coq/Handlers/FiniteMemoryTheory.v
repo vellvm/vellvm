@@ -91,6 +91,64 @@ Module Type MEMORY_THEORY (LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))
   Definition ErrSID_MemState_ms_runs_to (e : memory_stack -> ErrSID memory_stack) (m m' : MemState) : Prop
     := runErrSID (e (ms_memory_stack m)) (ms_sid m) (ms_prov m) = (inr (inr (ms_memory_stack m')), ms_sid m', ms_prov m').
 
+  (* TODO: move these lemmas? *)
+  Lemma ErrSID_evals_to_bind :
+    forall {A X} sid prov (m : ErrSID X) k (res : A),
+      ErrSID_evals_to (bind m k) sid prov res ->
+      exists sid' prov' x,
+        ErrSID_runs_to m sid prov x sid' prov' /\
+        ErrSID_evals_to (k x) sid' prov' res.
+  Proof.
+    intros A X sid prov m k res EVAL.
+    
+    cbn in EVAL.
+    inversion EVAL as [EVAL'].
+    clear EVAL.
+    rename EVAL' into EVAL.
+    cbn in EVAL.
+
+    unfold ErrSID_runs_to.
+    unfold runErrSID.
+    cbn.
+
+    destruct (IdentityMonad.unIdent (unEitherT (unEitherT m) sid prov)) as (p, p0) eqn:BLAH.
+    destruct p0.
+    cbn in *.
+
+    destruct s0; cbn in *; inversion EVAL.
+    destruct s0; cbn in *; inversion EVAL.
+
+    do 3 eexists.
+    split.
+    { 
+      reflexivity.
+    }
+    {
+      unfold ErrSID_evals_to.
+      cbn.
+      auto.
+    }
+  Qed.
+
+  Lemma ErrSID_runs_to_ErrSID_evals_to :
+    forall {X} sid prov sid' prov' (m : ErrSID X) (res : X),
+      ErrSID_runs_to m sid prov res sid' prov' ->
+      ErrSID_evals_to m sid prov res.
+  Proof.
+    intros X sid prov sid' prov' m res H.
+    unfold ErrSID_runs_to in H.
+    unfold ErrSID_evals_to.
+    cbn.
+    unfold runErrSID in H.
+    cbn in H.
+    match goal with
+    |  H: _ |- fst (snd ?x) = _
+       => destruct x
+    end.
+    cbn in H.
+    inversion H.
+    reflexivity.
+  Qed.
 
 Section Serialization_Theory.
 
@@ -171,76 +229,82 @@ Section Serialization_Theory.
       N.of_nat (List.length bytes) = sizeof_dtyp dt.
   Proof.
     intros uv dt sid prov bytes TYP.
+    generalize dependent sid.
+    generalize dependent prov.
     generalize dependent bytes.
-    induction TYP; intros bytes BYTES.
-    { cbn in BYTES; inversion BYTES;
-        apply to_ubytes_sizeof. }
-    { cbn in BYTES; inversion BYTES;
-        apply to_ubytes_sizeof. }
-    { cbn in BYTES; inversion BYTES;
-        apply to_ubytes_sizeof. }
-    { cbn in BYTES; inversion BYTES;
-        apply to_ubytes_sizeof. }
-    { cbn in BYTES; inversion BYTES;
-        apply to_ubytes_sizeof. }
-    { cbn in BYTES; inversion BYTES.
-        apply to_ubytes_sizeof. }
-    { cbn in BYTES; inversion BYTES.
-        apply to_ubytes_sizeof. }
-    { cbn in BYTES; inversion BYTES.
-      rewrite sizeof_dtyp_void.
-      reflexivity. }
-    { cbn in BYTES; inversion BYTES.
-        apply to_ubytes_sizeof. }
-    { cbn in BYTES; inversion BYTES.
-      rewrite sizeof_dtyp_struct_0.
-      reflexivity. }
-    { rewrite serialize_sbytes_equation in BYTES.
-      
+    induction TYP; intros bytes prov sid BYTES;
+      rewrite serialize_sbytes_equation in BYTES.
+    1-7: inversion BYTES; apply to_ubytes_sizeof.
+
+    (* Void *)
+    { inversion BYTES;
+      rewrite sizeof_dtyp_void;
+      reflexivity.
+    }
+
+    (* Undef *)
+    { inversion BYTES; apply to_ubytes_sizeof. }
+
+    (* Struct size 0 *)
+    { inversion BYTES;
+      rewrite sizeof_dtyp_struct_0;
+      reflexivity.
+    }
+
+    (* Struct fields *)
+    {      
+      (* Need to find out what bytes actually is by unfolding BYTES *)
+      apply ErrSID_evals_to_bind in BYTES.
+      destruct BYTES as (sid' & prov' & f_bytes & SER_f & EVALS).
+      apply ErrSID_evals_to_bind in EVALS.
+      destruct EVALS as (sid'' & prov'' & fields_bytes & SER_fields & EVALS).
+
+      apply ErrSID_runs_to_ErrSID_evals_to in SER_f, SER_fields.
+      apply IHTYP1 in SER_f.
+      apply IHTYP2 in SER_fields.
+
+      cbn in EVALS. inversion EVALS as [BYTES].
+      rewrite sizeof_dtyp_struct_cons.
+
+      rewrite app_length.
+      rewrite Nnat.Nat2N.inj_add.
+      lia.
+    }
+
+    (* Packed struct size 0 *)
+    { inversion BYTES;
+      rewrite sizeof_dtyp_packed_struct_0;
+      reflexivity.
+    }
+
+    (* Packed struct fields *)
+    {      
+      (* Need to find out what bytes actually is by unfolding BYTES *)
+      apply ErrSID_evals_to_bind in BYTES.
+      destruct BYTES as (sid' & prov' & f_bytes & SER_f & EVALS).
+      apply ErrSID_evals_to_bind in EVALS.
+      destruct EVALS as (sid'' & prov'' & fields_bytes & SER_fields & EVALS).
+
+      apply ErrSID_runs_to_ErrSID_evals_to in SER_f, SER_fields.
+      apply IHTYP1 in SER_f.
+      apply IHTYP2 in SER_fields.
+
+      cbn in EVALS. inversion EVALS as [BYTES].
+      rewrite sizeof_dtyp_packed_struct_cons.
+
+      rewrite app_length.
+      rewrite Nnat.Nat2N.inj_add.
+      lia.
+    }
+
+    (* Arrays *)
+    {
+      (* TODO: Need something about map_monad_In... *)
+      (* TODO: no IH??? *)
       Set Nested Proofs Allowed.
 
-      Lemma dvalue_has_dtyp_struct_length :
-        forall fields dts,
-          uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct dts) ->
-          length fields = length dts.
-      Proof.
-        induction fields;
-          intros dts H; inversion H; cbn; auto.
-      Qed.
-
-      Lemma dvalue_has_dtyp_packed_struct_length :
-        forall fields dts,
-          uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
-          length fields = length dts.
-      Proof.
-        induction fields;
-          intros dts H; inversion H; cbn; auto.
-      Qed.
-
-      (* Need to find out what bytes actually is by unfolding BYTES *)
-      assert (length fields = length dts) as HLen by
-            (apply dvalue_has_dtyp_struct_length; auto).
-
-      assert (length (dt :: dts) =? length (f :: fields))%nat as HLen'.
-      { cbn. rewrite HLen.
-        apply Nat.eqb_refl.
-      }
-
-      rewrite HLen' in BYTES.
-      unfold zip in BYTES.
-      
-      cbn in BYTES.
-
-        unfold ErrSID_evals_to in BYTES.
-      unfold serialize_sbytes in BYTES.
-      unfold serialize_sbytes_func in BYTES.
-      rewrite Wf.WfExtensionality.fix_sub_eq_ext in BYTES.
-      simpl in BYTES.
-      cbv in BYTES.
-      unfold serialize_sbytes_func in BYTES.
-      cbn in BYTES.
-  Admitted.
-
+    }
+  Qed.
 
   (*   intros dv dt TYP. *)
   (*   induction TYP; try solve [cbn; auto]. *)

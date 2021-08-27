@@ -212,11 +212,19 @@ Fixpoint dvalue_measure (dv : dvalue) : nat :=
   | DVALUE_Float x => 1
   | DVALUE_Poison => 1
   | DVALUE_None => 1
-  | DVALUE_Struct fields => S (list_sum (map dvalue_measure fields))
-  | DVALUE_Packed_struct fields => S (list_sum (map dvalue_measure fields))
-  | DVALUE_Array elts => S (list_sum (map dvalue_measure elts))
-  | DVALUE_Vector elts => S (list_sum (map dvalue_measure elts))
+  | DVALUE_Struct fields => S (S (list_sum (map dvalue_measure fields)))
+  | DVALUE_Packed_struct fields => S (S (list_sum (map dvalue_measure fields)))
+  | DVALUE_Array elts => S (S (list_sum (map dvalue_measure elts)))
+  | DVALUE_Vector elts => S (S (list_sum (map dvalue_measure elts)))
   end.
+
+Lemma dvalue_measure_gt_0 :
+  forall (dv : dvalue),
+    (0 < dvalue_measure dv)%nat.
+Proof.
+  destruct dv; cbn; auto.
+  all: apply Nat.lt_0_succ.
+Qed.
 
 Section DvalueInd.
   Variable P : dvalue -> Prop.
@@ -315,10 +323,10 @@ Fixpoint uvalue_measure (uv : uvalue) : nat :=
   | UVALUE_Undef t => 1
   | UVALUE_Poison => 1
   | UVALUE_None => 1
-  | UVALUE_Struct fields => S (list_sum (map uvalue_measure fields))
-  | UVALUE_Packed_struct fields => S (list_sum (map uvalue_measure fields))
-  | UVALUE_Array elts => S (list_sum (map uvalue_measure elts))
-  | UVALUE_Vector elts => S (list_sum (map uvalue_measure elts))
+  | UVALUE_Struct fields => S (S (list_sum (map uvalue_measure fields)))
+  | UVALUE_Packed_struct fields => S (S (list_sum (map uvalue_measure fields)))
+  | UVALUE_Array elts => S (S (list_sum (map uvalue_measure elts)))
+  | UVALUE_Vector elts => S (S (list_sum (map uvalue_measure elts)))
   | UVALUE_IBinop _ v1 v2
   | UVALUE_ICmp _ v1 v2
   | UVALUE_FBinop _ _ v1 v2
@@ -345,6 +353,14 @@ Fixpoint uvalue_measure (uv : uvalue) : nat :=
   | UVALUE_ConcatBytes uvs dt =>
     S (list_sum (map uvalue_measure uvs))
   end.
+
+Lemma uvalue_measure_gt_0 :
+  forall (uv : uvalue),
+    (0 < uvalue_measure uv)%nat.
+Proof.
+  destruct uv; cbn; auto.
+  all: apply Nat.lt_0_succ.
+Qed.
 
 Section UvalueInd.
   Variable P : uvalue -> Prop.
@@ -1975,6 +1991,42 @@ Class VInt I : Type :=
         apply Forall_forall; auto.
     Qed.
   End dvalue_has_dtyp_ind.
+
+  Lemma uvalue_has_dtyp_struct_length :
+    forall fields dts,
+      uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct dts) ->
+      length fields = length dts.
+  Proof.
+    induction fields;
+      intros dts H; inversion H; cbn; auto.
+  Qed.
+
+  Lemma uvalue_has_dtyp_packed_struct_length :
+    forall fields dts,
+      uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
+      length fields = length dts.
+  Proof.
+    induction fields;
+      intros dts H; inversion H; cbn; auto.
+  Qed.
+
+  Lemma dvalue_has_dtyp_struct_length :
+    forall fields dts,
+      dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
+      length fields = length dts.
+  Proof.
+    induction fields;
+      intros dts H; inversion H; cbn; auto.
+  Qed.
+
+  Lemma dvalue_has_dtyp_packed_struct_length :
+    forall fields dts,
+      dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
+      length fields = length dts.
+  Proof.
+    induction fields;
+      intros dts H; inversion H; cbn; auto.
+  Qed.
 
   Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop := 
   (* Concrete uvalue are contretized into their singleton *)

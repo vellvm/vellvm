@@ -222,11 +222,11 @@ Fixpoint dtyp_measure (t : dtyp) : nat :=
   | DTYPE_Ppc_fp128 => 1
   | DTYPE_Metadata => 1
   | DTYPE_X86_mmx => 1
-  | DTYPE_Array sz t => S (dtyp_measure t)
-  | DTYPE_Struct fields => S (list_sum (map dtyp_measure fields))
-  | DTYPE_Packed_struct fields => S (list_sum (map dtyp_measure fields))
+  | DTYPE_Array sz t => S (S (dtyp_measure t))
+  | DTYPE_Struct fields => S (S (list_sum (map dtyp_measure fields)))
+  | DTYPE_Packed_struct fields => S (S (list_sum (map dtyp_measure fields)))
   | DTYPE_Opaque => 1
-  | DTYPE_Vector sz t => S (dtyp_measure t)
+  | DTYPE_Vector sz t => S (S (dtyp_measure t))
   end.
 
 Lemma dtyp_measure_gt_0 :
