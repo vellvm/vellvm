@@ -1697,12 +1697,14 @@ Class VInt I : Type :=
   .
   Set Elimination Schemes.
 
+  Unset Elimination Schemes.
   Inductive uvalue_has_dtyp : uvalue -> dtyp -> Prop :=
   | UVALUE_Addr_typ   : forall a, uvalue_has_dtyp (UVALUE_Addr a) DTYPE_Pointer
   | UVALUE_I1_typ     : forall x, uvalue_has_dtyp (UVALUE_I1 x) (DTYPE_I 1)
   | UVALUE_I8_typ     : forall x, uvalue_has_dtyp (UVALUE_I8 x) (DTYPE_I 8)
   | UVALUE_I32_typ    : forall x, uvalue_has_dtyp (UVALUE_I32 x) (DTYPE_I 32)
   | UVALUE_I64_typ    : forall x, uvalue_has_dtyp (UVALUE_I64 x) (DTYPE_I 64)
+  | UVALUE_IPTR_typ    : forall x, uvalue_has_dtyp (UVALUE_IPTR x) (DTYPE_IPTR)
   | UVALUE_Double_typ : forall x, uvalue_has_dtyp (UVALUE_Double x) DTYPE_Double
   | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
   | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
@@ -1742,6 +1744,11 @@ Class VInt I : Type :=
       uvalue_has_dtyp x (DTYPE_I sz) ->
       uvalue_has_dtyp y (DTYPE_I sz) ->
       uvalue_has_dtyp (UVALUE_IBinop op x y) (DTYPE_I sz)
+  | UVALUE_IBinop_ptr_typ :
+      forall x y op,
+      uvalue_has_dtyp x DTYPE_IPTR ->
+      uvalue_has_dtyp y DTYPE_IPTR ->
+      uvalue_has_dtyp (UVALUE_IBinop op x y) DTYPE_IPTR
   | UVALUE_ICmp_typ :
       forall x y sz op,
       IX_supported sz ->
@@ -1758,6 +1765,12 @@ Class VInt I : Type :=
       IX_supported isz ->
       uvalue_has_dtyp x (DTYPE_Vector vsz (DTYPE_I isz)) ->
       uvalue_has_dtyp y (DTYPE_Vector vsz (DTYPE_I isz)) ->
+      uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))
+  | UVALUE_ICmp_vector_typ_ptr :
+      forall x y vsz isz op,
+      IX_supported isz ->
+      uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_IPTR) ->
+      uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_IPTR) ->
       uvalue_has_dtyp (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1))
   | UVALUE_ICmp_vector_pointer_typ :
       forall x y vsz op,
@@ -1789,33 +1802,58 @@ Class VInt I : Type :=
         from_sz > to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
         uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
+  | UVALUE_Conversion_trunc_int_ptr_typ :
+      forall to_sz value,
+        uvalue_has_dtyp value (DTYPE_IPTR) ->
+        uvalue_has_dtyp (UVALUE_Conversion Trunc DTYPE_IPTR value (DTYPE_I to_sz)) (DTYPE_I to_sz)
   | UVALUE_Conversion_trunc_vec_typ :
       forall from_sz to_sz n value,
         from_sz > to_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
         uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
+  | UVALUE_Conversion_trunc_vec_ptr_typ :
+      forall to_sz n value,
+        uvalue_has_dtyp value (DTYPE_Vector n DTYPE_IPTR) ->
+        uvalue_has_dtyp (UVALUE_Conversion Trunc (DTYPE_Vector n DTYPE_IPTR) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
 
   | UVALUE_Conversion_zext_int_typ :
       forall from_sz to_sz value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
         uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
+  | UVALUE_Conversion_zext_int_ptr_typ :
+      forall from_sz value,
+        uvalue_has_dtyp value (DTYPE_I from_sz) ->
+        uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_I from_sz) value DTYPE_IPTR) DTYPE_IPTR
   | UVALUE_Conversion_zext_vec_typ :
       forall from_sz to_sz n value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
         uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
+  | UVALUE_Conversion_zext_vec_ptr_typ :
+      forall from_sz n value,
+        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        uvalue_has_dtyp (UVALUE_Conversion Zext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n DTYPE_IPTR)) (DTYPE_Vector n DTYPE_IPTR)
+
 
   | UVALUE_Conversion_sext_int_typ :
       forall from_sz to_sz value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_I from_sz) ->
         uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz)
+  | UVALUE_Conversion_sext_int_ptr_typ :
+      forall from_sz value,
+        uvalue_has_dtyp value (DTYPE_I from_sz) ->
+        uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_I from_sz) value DTYPE_IPTR) DTYPE_IPTR
   | UVALUE_Conversion_sext_vec_typ :
       forall from_sz to_sz n value,
         from_sz < to_sz ->
         uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
         uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n (DTYPE_I to_sz))) (DTYPE_Vector n (DTYPE_I to_sz))
+  | UVALUE_Conversion_sext_vec_ptr_typ :
+      forall from_sz n value,
+        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        uvalue_has_dtyp (UVALUE_Conversion Sext (DTYPE_Vector n (DTYPE_I from_sz)) value (DTYPE_Vector n DTYPE_IPTR)) (DTYPE_Vector n DTYPE_IPTR)
 
   | UVALUE_GetElementPtr_typ :
       forall dt uv idxs,
@@ -1826,10 +1864,21 @@ Class VInt I : Type :=
         uvalue_has_dtyp idx (DTYPE_I sz) ->
         uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
         uvalue_has_dtyp (UVALUE_ExtractElement vect idx) t
+  | UVALUE_ExtractElement_ptr_typ :
+      forall n vect idx t,
+        uvalue_has_dtyp idx DTYPE_IPTR ->
+        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
+        uvalue_has_dtyp (UVALUE_ExtractElement vect idx) t
   | UVALUE_InsertElement_typ :
       forall n vect val idx t sz,
         IX_supported sz ->
         uvalue_has_dtyp idx (DTYPE_I sz) ->
+        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
+        uvalue_has_dtyp val t ->
+        uvalue_has_dtyp (UVALUE_InsertElement vect val idx) (DTYPE_Vector (N.of_nat n) t)
+  | UVALUE_InsertElement_ptr_typ :
+      forall n vect val idx t,
+        uvalue_has_dtyp idx DTYPE_IPTR ->
         uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
         uvalue_has_dtyp val t ->
         uvalue_has_dtyp (UVALUE_InsertElement vect val idx) (DTYPE_Vector (N.of_nat n) t)
@@ -1900,6 +1949,7 @@ Class VInt I : Type :=
         uvalue_has_dtyp x (DTYPE_Vector (N.of_nat sz) t) ->
         uvalue_has_dtyp y (DTYPE_Vector (N.of_nat sz) t) ->
         uvalue_has_dtyp (UVALUE_Select cond x y) (DTYPE_Vector (N.of_nat sz) t).
+  Set Elimination Schemes.
 
   Section dvalue_has_dtyp_ind.
     Variable P : dvalue -> dtyp -> Prop.
@@ -1940,20 +1990,13 @@ Class VInt I : Type :=
     Lemma dvalue_has_dtyp_ind : forall (dv:dvalue) (dt:dtyp) (TYP: dvalue_has_dtyp dv dt), P dv dt.
       fix IH 3.
       intros dv dt TYP.
-      destruct TYP.
-      - apply IH_Addr.
-      - apply IH_I1.
-      - apply IH_I8.
-      - apply IH_I32.
-      - apply IH_I64.
-      - apply IH_IPTR.
-      - apply IH_Double.
-      - apply IH_Float.
-      - apply IH_None.
-      - apply IH_Struct_nil.
-      - apply (IH_Struct_cons TYP1 (IH f dt TYP1) TYP2 (IH (DVALUE_Struct fields) (DTYPE_Struct dts) TYP2)).
-      - apply IH_Packed_Struct_nil.
-      - apply (IH_Packed_Struct_cons TYP1 (IH f dt TYP1) TYP2 (IH (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) TYP2)).
+      destruct TYP;
+        try (solve [let IH := fresh in
+                    remember (forall (dv : dvalue) (dt : dtyp), dvalue_has_dtyp dv dt -> P dv dt) as IH;
+                    match goal with
+                    | H: _ |- _ =>
+                      solve [eapply H; subst IH; eauto]
+                    end]).
       - rename H into Hforall.
         rename H0 into Hlen.
         refine (IH_Array _ _ Hlen).
@@ -1991,6 +2034,426 @@ Class VInt I : Type :=
         apply Forall_forall; auto.
     Qed.
   End dvalue_has_dtyp_ind.
+
+  Section uvalue_has_dtyp_ind.
+    Variable P : uvalue -> dtyp -> Prop.
+    Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a) DTYPE_Pointer.
+    Hypothesis IH_I1             : forall x, P (UVALUE_I1 x) (DTYPE_I 1).
+    Hypothesis IH_I8             : forall x, P (UVALUE_I8 x) (DTYPE_I 8).
+    Hypothesis IH_I32            : forall x, P (UVALUE_I32 x) (DTYPE_I 32).
+    Hypothesis IH_I64            : forall x, P (UVALUE_I64 x) (DTYPE_I 64).
+    Hypothesis IH_IPTR           : forall x, P (UVALUE_IPTR x) DTYPE_IPTR.
+    Hypothesis IH_Undef          : forall t, P (UVALUE_Undef t) t.
+    Hypothesis IH_Double         : forall x, P (UVALUE_Double x) DTYPE_Double.
+    Hypothesis IH_Float          : forall x, P (UVALUE_Float x) DTYPE_Float.
+    Hypothesis IH_None           : P UVALUE_None DTYPE_Void.
+    Hypothesis IH_Struct_nil     : P (UVALUE_Struct []) (DTYPE_Struct []).
+    Hypothesis IH_Struct_cons    : forall (f : uvalue) (dt : dtyp) (fields : list uvalue) (dts : list dtyp),
+        uvalue_has_dtyp f dt ->
+        P f dt ->
+        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct dts) ->
+        P (UVALUE_Struct fields) (DTYPE_Struct dts) ->
+        P (UVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts)).
+    Hypothesis IH_Packed_Struct_nil     : P (UVALUE_Packed_struct []) (DTYPE_Packed_struct []).
+    Hypothesis IH_Packed_Struct_cons    : forall (f : uvalue) (dt : dtyp) (fields : list uvalue) (dts : list dtyp),
+        uvalue_has_dtyp f dt ->
+        P f dt ->
+        uvalue_has_dtyp (UVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
+        P (UVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
+        P (UVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts)).
+    Hypothesis IH_Array : forall (xs : list uvalue) (sz : nat) (dt : dtyp)
+                            (IH : forall x, In x xs -> P x dt)
+                            (IHdtyp : forall x, In x xs -> uvalue_has_dtyp x dt),
+        Datatypes.length xs = sz -> P (UVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt).
+
+    Hypothesis IH_Vector : forall (xs : list uvalue) (sz : nat) (dt : dtyp)
+                             (IH : forall x, In x xs -> P x dt)
+                             (IHdtyp : forall x, In x xs -> uvalue_has_dtyp x dt),
+        Datatypes.length xs = sz ->
+        vector_dtyp dt -> P (UVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt).
+
+    Hypothesis IH_IBinop : forall (x y : uvalue) (sz : N) (op : ibinop),
+        IX_supported sz ->
+        uvalue_has_dtyp x (DTYPE_I sz) ->
+        P x (DTYPE_I sz) ->
+        uvalue_has_dtyp y (DTYPE_I sz) ->
+        P y (DTYPE_I sz) ->
+        P (UVALUE_IBinop op x y) (DTYPE_I sz).
+
+    Hypothesis IH_IBinop_ptr : forall (x y : uvalue) (op : ibinop),
+        uvalue_has_dtyp x DTYPE_IPTR ->
+        P x DTYPE_IPTR ->
+        uvalue_has_dtyp y DTYPE_IPTR ->
+        P y DTYPE_IPTR ->
+        P (UVALUE_IBinop op x y) DTYPE_IPTR.
+
+    Hypothesis IH_ICmp : forall (x y : uvalue) (sz : N) (op : icmp),
+        IX_supported sz ->
+        uvalue_has_dtyp x (DTYPE_I sz) ->
+        P x (DTYPE_I sz) ->
+        uvalue_has_dtyp y (DTYPE_I sz) ->
+        P y (DTYPE_I sz) ->
+        P (UVALUE_ICmp op x y) (DTYPE_I 1).
+
+    Hypothesis IH_ICmp_ptr : forall (x y : uvalue) (op : icmp),
+        uvalue_has_dtyp x DTYPE_IPTR ->
+        P x DTYPE_IPTR ->
+        uvalue_has_dtyp y DTYPE_IPTR ->
+        P y DTYPE_IPTR ->
+        P (UVALUE_ICmp op x y) (DTYPE_I 1).
+
+    Hypothesis IH_ICmp_pointer : forall (x y : uvalue) (op : icmp),
+        uvalue_has_dtyp x DTYPE_Pointer ->
+        P x DTYPE_Pointer ->
+        uvalue_has_dtyp y DTYPE_Pointer ->
+        P y DTYPE_Pointer ->
+        P (UVALUE_ICmp op x y) (DTYPE_I 1).
+
+    Hypothesis IH_ICmp_vector : forall (x y : uvalue) (vsz isz : N) (op : icmp),
+        IX_supported isz ->
+        uvalue_has_dtyp x (DTYPE_Vector vsz (DTYPE_I isz)) ->
+        P x (DTYPE_Vector vsz (DTYPE_I isz)) ->
+        uvalue_has_dtyp y (DTYPE_Vector vsz (DTYPE_I isz)) ->
+        P y (DTYPE_Vector vsz (DTYPE_I isz)) ->
+        P (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1)).
+
+    Hypothesis IH_ICmp_vector_ptr : forall (x y : uvalue) (vsz : N) (op : icmp),
+        uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_IPTR) ->
+        P x (DTYPE_Vector vsz DTYPE_IPTR) ->
+        uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_IPTR) ->
+        P y (DTYPE_Vector vsz DTYPE_IPTR) ->
+        P (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1)).
+
+    Hypothesis IH_ICmp_vector_pointer : forall (x y : uvalue) (vsz : N) (op : icmp),
+        uvalue_has_dtyp x (DTYPE_Vector vsz DTYPE_Pointer) ->
+        P x (DTYPE_Vector vsz DTYPE_Pointer) ->
+        uvalue_has_dtyp y (DTYPE_Vector vsz DTYPE_Pointer) ->
+        P y (DTYPE_Vector vsz DTYPE_Pointer) ->
+        P (UVALUE_ICmp op x y) (DTYPE_Vector vsz (DTYPE_I 1)).
+
+    Hypothesis IH_FBinop_Float : forall (x y : uvalue) (op : fbinop) (fms : list fast_math),
+        uvalue_has_dtyp x DTYPE_Float ->
+        P x DTYPE_Float ->
+        uvalue_has_dtyp y DTYPE_Float ->
+        P y DTYPE_Float ->
+        P (UVALUE_FBinop op fms x y) DTYPE_Float.
+
+    Hypothesis IH_FBinop_Double : forall (x y : uvalue) (op : fbinop) (fms : list fast_math),
+        uvalue_has_dtyp x DTYPE_Double ->
+        P x DTYPE_Double ->
+        uvalue_has_dtyp y DTYPE_Double ->
+        P y DTYPE_Double ->
+        P (UVALUE_FBinop op fms x y) DTYPE_Double.
+
+    Hypothesis IH_FCmp_Float : forall (x y : uvalue) (op : fcmp),
+        uvalue_has_dtyp x DTYPE_Float ->
+        P x DTYPE_Float ->
+        uvalue_has_dtyp y DTYPE_Float ->
+        P y DTYPE_Float ->
+        P (UVALUE_FCmp op x y) (DTYPE_I 1).
+
+    Hypothesis IH_FCmp_Double : forall (x y : uvalue) (op : fcmp),
+        uvalue_has_dtyp x DTYPE_Double ->
+        P x DTYPE_Double ->
+        uvalue_has_dtyp y DTYPE_Double ->
+        P y DTYPE_Double ->
+        P (UVALUE_FCmp op x y) (DTYPE_I 1).
+
+    Hypothesis IH_Conversion_trunc_int : forall (from_sz to_sz : N) (value : uvalue),
+        from_sz > to_sz ->
+        uvalue_has_dtyp value (DTYPE_I from_sz) ->
+        P value (DTYPE_I from_sz)  ->
+        P (UVALUE_Conversion Trunc (DTYPE_I from_sz) value
+                             (DTYPE_I to_sz)) (DTYPE_I to_sz).
+
+    Hypothesis IH_Conversion_trunc_int_ptr : forall (to_sz : N) (value : uvalue),
+        uvalue_has_dtyp value DTYPE_IPTR ->
+        P value DTYPE_IPTR  ->
+        P (UVALUE_Conversion Trunc DTYPE_IPTR value
+                             (DTYPE_I to_sz)) (DTYPE_I to_sz).
+
+    Hypothesis IH_Conversion_trunc_vec : forall (from_sz to_sz n : N) (value : uvalue),
+        from_sz > to_sz ->
+        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        P value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        P
+          (UVALUE_Conversion Trunc (DTYPE_Vector n (DTYPE_I from_sz))
+                             value (DTYPE_Vector n (DTYPE_I to_sz)))
+          (DTYPE_Vector n (DTYPE_I to_sz)).
+
+    Hypothesis IH_Conversion_trunc_vec_ptr : forall (to_sz n : N) (value : uvalue),
+        uvalue_has_dtyp value (DTYPE_Vector n DTYPE_IPTR) ->
+        P value (DTYPE_Vector n DTYPE_IPTR) ->
+        P
+          (UVALUE_Conversion Trunc (DTYPE_Vector n DTYPE_IPTR)
+                             value (DTYPE_Vector n (DTYPE_I to_sz)))
+          (DTYPE_Vector n (DTYPE_I to_sz)).
+
+    Hypothesis IH_Conversion_zext_int : forall from_sz to_sz value,
+          from_sz < to_sz ->
+          uvalue_has_dtyp value (DTYPE_I from_sz) ->
+          P value (DTYPE_I from_sz) ->
+          P (UVALUE_Conversion Zext (DTYPE_I from_sz) value (DTYPE_I to_sz)) (DTYPE_I to_sz).
+
+    Hypothesis IH_Conversion_zext_int_ptr : forall (from_sz : N) (value : uvalue),
+        uvalue_has_dtyp value (DTYPE_I from_sz) ->
+        P value (DTYPE_I from_sz) ->
+        P
+          (UVALUE_Conversion Zext (DTYPE_I from_sz) value DTYPE_IPTR)
+          DTYPE_IPTR.
+
+    Hypothesis IH_Conversion_zext_vec : forall (from_sz to_sz n : N) (value : uvalue),
+        from_sz < to_sz ->
+        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        P value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        P
+          (UVALUE_Conversion Zext (DTYPE_Vector n (DTYPE_I from_sz)) value
+                             (DTYPE_Vector n (DTYPE_I to_sz)))
+          (DTYPE_Vector n (DTYPE_I to_sz)).
+
+    Hypothesis IH_Conversion_zext_vec_ptr : forall (from_sz n : N) (value : uvalue),
+        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        P value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        P
+          (UVALUE_Conversion Zext (DTYPE_Vector n (DTYPE_I from_sz))
+                             value (DTYPE_Vector n DTYPE_IPTR))
+          (DTYPE_Vector n DTYPE_IPTR).
+
+    Hypothesis IH_Conversion_sext_int : forall (from_sz to_sz : N) (value : uvalue),
+        from_sz < to_sz ->
+        uvalue_has_dtyp value (DTYPE_I from_sz) ->
+        P value (DTYPE_I from_sz) ->
+        P
+          (UVALUE_Conversion Sext (DTYPE_I from_sz) value (DTYPE_I to_sz))
+          (DTYPE_I to_sz).
+
+    Hypothesis IH_Conversion_sext_int_ptr : forall (from_sz : N) (value : uvalue),
+        uvalue_has_dtyp value (DTYPE_I from_sz) ->
+        P value (DTYPE_I from_sz) ->
+        P
+          (UVALUE_Conversion Sext (DTYPE_I from_sz) value DTYPE_IPTR)
+          DTYPE_IPTR.
+
+    Hypothesis IH_Conversion_sext_vec : forall (from_sz to_sz n : N) (value : uvalue),
+        from_sz < to_sz ->
+        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        P value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        P
+          (UVALUE_Conversion Sext (DTYPE_Vector n (DTYPE_I from_sz)) value
+                             (DTYPE_Vector n (DTYPE_I to_sz)))
+          (DTYPE_Vector n (DTYPE_I to_sz)).
+
+    Hypothesis IH_Conversion_sext_vec_ptr : forall (from_sz n : N) (value : uvalue),
+        uvalue_has_dtyp value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        P value (DTYPE_Vector n (DTYPE_I from_sz)) ->
+        P
+          (UVALUE_Conversion Sext (DTYPE_Vector n (DTYPE_I from_sz))
+                             value (DTYPE_Vector n DTYPE_IPTR))
+          (DTYPE_Vector n DTYPE_IPTR).
+
+    Hypothesis IH_GetElementPtr : forall (dt : dtyp) (uv : uvalue) (idxs : list uvalue),
+        P (UVALUE_GetElementPtr dt uv idxs) DTYPE_Pointer.
+
+    Hypothesis IH_ExtractElement : forall (n : nat) (vect idx : uvalue) (t : dtyp) (sz : N),
+        IX_supported sz ->
+        uvalue_has_dtyp idx (DTYPE_I sz) ->
+        P idx (DTYPE_I sz) ->
+        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
+        P vect (DTYPE_Vector (N.of_nat n) t) ->
+        P (UVALUE_ExtractElement vect idx) t.
+
+    Hypothesis IH_ExtractElement_ptr : forall (n : nat) (vect idx : uvalue) (t : dtyp),
+        uvalue_has_dtyp idx DTYPE_IPTR ->
+        P idx DTYPE_IPTR ->
+        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
+        P vect (DTYPE_Vector (N.of_nat n) t) ->
+        P (UVALUE_ExtractElement vect idx) t.
+
+    Hypothesis IH_InsertElement : forall (n : nat) (vect val idx : uvalue) (t : dtyp) (sz : N),
+        IX_supported sz ->
+        uvalue_has_dtyp idx (DTYPE_I sz) ->
+        P idx (DTYPE_I sz) ->
+        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
+        P vect (DTYPE_Vector (N.of_nat n) t) ->
+        uvalue_has_dtyp val t ->
+        P val t ->
+        P (UVALUE_InsertElement vect val idx)
+          (DTYPE_Vector (N.of_nat n) t).
+
+    Hypothesis IH_InsertElement_ptr : forall (n : nat) (vect val idx : uvalue) (t : dtyp),
+        uvalue_has_dtyp idx DTYPE_IPTR ->
+        P idx DTYPE_IPTR ->
+        uvalue_has_dtyp vect (DTYPE_Vector (N.of_nat n) t) ->
+        P vect (DTYPE_Vector (N.of_nat n) t) ->
+        uvalue_has_dtyp val t ->
+        P val t ->
+        P (UVALUE_InsertElement vect val idx)
+          (DTYPE_Vector (N.of_nat n) t).
+
+    Hypothesis IH_ShuffleVector : forall (n m : nat) (v1 v2 idxs : uvalue) (t : dtyp),
+        uvalue_has_dtyp idxs (DTYPE_Vector (N.of_nat m) (DTYPE_I 32)) ->
+        P idxs (DTYPE_Vector (N.of_nat m) (DTYPE_I 32)) ->
+        uvalue_has_dtyp v1 (DTYPE_Vector (N.of_nat n) t) ->
+        P v1 (DTYPE_Vector (N.of_nat n) t) ->
+        uvalue_has_dtyp v2 (DTYPE_Vector (N.of_nat n) t) ->
+        P v2 (DTYPE_Vector (N.of_nat n) t) ->
+        P (UVALUE_ShuffleVector v1 v2 idxs)
+                        (DTYPE_Vector (N.of_nat m) t).
+
+    Hypothesis IH_ExtractValue_Struct_sing : forall (fields : list uvalue) (fts : list dtyp) 
+                                               (dt : dtyp) (idx : LLVMAst.int),
+        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
+        P (UVALUE_Struct fields) (DTYPE_Struct fts) ->
+        (0 <= idx)%Z ->
+        Nth fts (Z.to_nat idx) dt ->
+        P
+          (UVALUE_ExtractValue (UVALUE_Struct fields) [idx]) dt.
+
+    Hypothesis IH_ExtractValue_Struct_cons : forall (fields : list uvalue) (fts : list dtyp)
+                                               (fld : uvalue) (ft dt : dtyp) (idx : Z)
+                                               (idxs : list LLVMAst.int),
+        uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
+        P (UVALUE_Struct fields) (DTYPE_Struct fts) ->
+        (0 <= idx)%Z ->
+        Nth fts (Z.to_nat idx) dt ->
+        Nth fields (Z.to_nat idx) fld ->
+        uvalue_has_dtyp fld ft ->
+        P fld ft ->
+        uvalue_has_dtyp (UVALUE_ExtractValue fld idxs) dt ->
+        P (UVALUE_ExtractValue fld idxs) dt ->
+        P
+          (UVALUE_ExtractValue (UVALUE_Struct fields) (idx :: idxs))
+          dt.
+
+    Hypothesis IH_ExtractValue_Packed_struct_sing : forall (fields : list uvalue) 
+                                                      (fts : list dtyp) (dt : dtyp) 
+                                                      (idx : Z),
+        uvalue_has_dtyp (UVALUE_Packed_struct fields)
+                        (DTYPE_Packed_struct fts) ->
+        P (UVALUE_Packed_struct fields)
+          (DTYPE_Packed_struct fts) ->
+        (0 <= idx)%Z ->
+        Nth fts (Z.to_nat idx) dt ->
+        P
+          (UVALUE_ExtractValue (UVALUE_Packed_struct fields)
+                               [idx]) dt.
+
+    Hypothesis IH_ExtractValue_Packed_struct_cons : forall (fields : list uvalue) 
+                                                      (fts : list dtyp) (fld : uvalue) 
+                                                      (ft dt : dtyp) (idx : Z) 
+                                                      (idxs : list LLVMAst.int),
+        uvalue_has_dtyp (UVALUE_Packed_struct fields)
+                        (DTYPE_Packed_struct fts) ->
+        P (UVALUE_Packed_struct fields)
+                        (DTYPE_Packed_struct fts) ->
+        (0 <= idx)%Z ->
+        Nth fts (Z.to_nat idx) dt ->
+        Nth fields (Z.to_nat idx) fld ->
+        uvalue_has_dtyp fld ft ->
+        P fld ft ->
+        uvalue_has_dtyp (UVALUE_ExtractValue fld idxs) dt ->
+        P (UVALUE_ExtractValue fld idxs) dt ->
+        P
+          (UVALUE_ExtractValue (UVALUE_Packed_struct fields)
+                               (idx :: idxs)) dt.
+
+    Hypothesis IH_ExtractValue_Array_sing : forall (elements : list uvalue) (dt : dtyp) (idx : Z) (n : N),
+        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
+        P (UVALUE_Array elements) (DTYPE_Array n dt) ->
+        (0 <= idx <= Z.of_N n)%Z ->
+        P
+          (UVALUE_ExtractValue (UVALUE_Array elements) [idx]) dt.
+
+    Hypothesis IH_ExtractValue_Array_cons : forall (elements : list uvalue) (elem : uvalue) 
+                                              (et dt : dtyp) (n : N) (idx : Z) 
+                                              (idxs : list LLVMAst.int),
+        uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
+        P (UVALUE_Array elements) (DTYPE_Array n dt) ->
+        (0 <= idx <= Z.of_N n)%Z ->
+        Nth elements (Z.to_nat idx) elem ->
+        uvalue_has_dtyp elem et ->
+        P elem et ->
+        uvalue_has_dtyp (UVALUE_ExtractValue elem idxs) dt ->
+        P (UVALUE_ExtractValue elem idxs) dt ->
+        P
+          (UVALUE_ExtractValue (UVALUE_Array elements) (idx :: idxs))
+          dt.
+
+    Hypothesis IH_InsertValue : forall (struc : uvalue) (idxs : list LLVMAst.int) 
+                                  (uv : uvalue) (st dt : dtyp),
+        uvalue_has_dtyp (UVALUE_ExtractValue struc idxs) dt ->
+        P (UVALUE_ExtractValue struc idxs) dt ->
+        uvalue_has_dtyp uv dt ->
+        P uv dt ->
+        uvalue_has_dtyp struc st ->
+        P struc st ->
+        P (UVALUE_InsertValue struc uv idxs) st.
+
+    Hypothesis IH_Select_i1 : forall (cond x y : uvalue) (t : dtyp),
+        uvalue_has_dtyp cond (DTYPE_I 1) ->
+        P cond (DTYPE_I 1) ->
+        uvalue_has_dtyp x t ->
+        P x t ->
+        uvalue_has_dtyp y t ->
+        P y t ->
+        P (UVALUE_Select cond x y) t.
+
+    Hypothesis IH_Select_vect : forall (cond x y : uvalue) (t : dtyp) (sz : nat),
+        uvalue_has_dtyp cond (DTYPE_Vector (N.of_nat sz) (DTYPE_I 1)) ->
+        P cond (DTYPE_Vector (N.of_nat sz) (DTYPE_I 1)) ->
+        uvalue_has_dtyp x (DTYPE_Vector (N.of_nat sz) t) ->
+        P x (DTYPE_Vector (N.of_nat sz) t) ->
+        uvalue_has_dtyp y (DTYPE_Vector (N.of_nat sz) t) ->
+        P y (DTYPE_Vector (N.of_nat sz) t) ->
+        P (UVALUE_Select cond x y) (DTYPE_Vector (N.of_nat sz) t).
+
+    Lemma uvalue_has_dtyp_ind : forall (uv:uvalue) (dt:dtyp) (TYP: uvalue_has_dtyp uv dt), P uv dt.
+      fix IH 3.
+      intros uv dt TYP.
+      destruct TYP;
+        try (solve [let IH := fresh in
+                    remember (forall (uv : uvalue) (dt : dtyp), uvalue_has_dtyp uv dt -> P uv dt) as IH;
+                    match goal with
+                    | H: _ |- _ =>
+                      solve [eapply H; subst IH; eauto]
+                    end]).
+      - rename H into Hforall.
+        rename H0 into Hlen.
+        refine (IH_Array _ _ Hlen).
+
+        { generalize dependent sz.
+          generalize dependent xs.
+          fix IHxs 2.
+          intros xs Hforall sz Hlen x H.
+          destruct xs.
+          + inversion H.
+          + inversion H; subst.
+            * inversion Hforall; subst; auto.
+            * eapply IHxs. inversion Hforall; subst.
+              all: try eassumption. reflexivity.
+        }
+
+        apply Forall_forall; auto.
+      - rename H into Hforall.
+        rename H0 into Hlen.
+        rename H1 into Hvect.
+        refine (IH_Vector _ _ Hlen Hvect).
+
+        { generalize dependent sz.
+          generalize dependent xs.
+          fix IHxs 2.
+          intros xs Hforall sz Hlen x H.
+          destruct xs.
+          + inversion H.
+          + inversion H; subst.
+            * inversion Hforall; subst; auto.
+            * eapply IHxs. inversion Hforall; subst.
+              all: try eassumption. reflexivity.
+        }
+
+        apply Forall_forall; auto.
+    Qed.
+  End uvalue_has_dtyp_ind.
 
   Lemma uvalue_has_dtyp_struct_length :
     forall fields dts,
