@@ -31,6 +31,7 @@ From Vellvm Require Import
      Utils.Error
      Utils.IntMaps
      Utils.ListUtil
+     Utils.Monads
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
@@ -114,6 +115,45 @@ Module Type MEMORY_THEORY (LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))
     destruct (IdentityMonad.unIdent (unEitherT (unEitherT m) sid prov)) as (p, p0) eqn:BLAH.
     destruct p0.
     cbn in *.
+
+    destruct s0; cbn in *; inversion EVAL.
+    destruct s0; cbn in *; inversion EVAL.
+
+    do 3 eexists.
+    split.
+    { 
+      reflexivity.
+    }
+    {
+      unfold ErrSID_evals_to.
+      cbn.
+      auto.
+    }
+  Qed.
+
+  Lemma ErrSID_runs_to_bind :
+    forall {A X} sid prov (m : ErrSID X) k (res : A) sid_final prov_final,
+      ErrSID_runs_to (bind m k) sid prov res sid_final prov_final ->
+      exists sid' prov' x,
+        ErrSID_runs_to m sid prov x sid' prov' /\
+        ErrSID_runs_to (k x) sid' prov' res sid_final prov_final.
+  Proof.
+    intros A X sid prov m k res sid_final prov_final EVAL.
+    
+    cbn in EVAL.
+    inversion EVAL as [EVAL'].
+    clear EVAL.
+    rename EVAL' into EVAL.
+    cbn in EVAL.
+
+    unfold ErrSID_runs_to.
+    unfold runErrSID in *.
+    cbn.
+
+    destruct (IdentityMonad.unIdent (unEitherT (unEitherT m) sid prov)) as (p, p0) eqn:BLAH.
+    destruct p0.
+    cbn in *.
+    rewrite BLAH in EVAL.
 
     destruct s0; cbn in *; inversion EVAL.
     destruct s0; cbn in *; inversion EVAL.
@@ -234,16 +274,14 @@ Section Serialization_Theory.
     generalize dependent bytes.
     induction TYP; intros bytes prov sid BYTES;
       rewrite serialize_sbytes_equation in BYTES.
-    1-7: inversion BYTES; apply to_ubytes_sizeof.
+    1-9: inversion BYTES; apply to_ubytes_sizeof.
+    8-45: inversion BYTES; apply to_ubytes_sizeof.
 
     (* Void *)
     { inversion BYTES;
       rewrite sizeof_dtyp_void;
       reflexivity.
     }
-
-    (* Undef *)
-    { inversion BYTES; apply to_ubytes_sizeof. }
 
     (* Struct size 0 *)
     { inversion BYTES;
@@ -299,49 +337,134 @@ Section Serialization_Theory.
 
     (* Arrays *)
     {
-      (* TODO: Need something about map_monad_In... *)
-      (* TODO: no IH??? *)
-      Set Nested Proofs Allowed.
+      apply ErrSID_evals_to_bind in BYTES.
+      destruct BYTES as (sid' & prov' & concat_fields & RUNS & EVAL).
 
+      (*
+        I know that concat_fields is the result of map_monad_In, which
+        serializes each element of the array, and stores the
+        serialization of each element in concat_fields.
+
+        I know by IH that each element in the array when serialized
+        has sizeof_dtyp dt bytes.
+
+        Because of this, the result of concat (concat_fields) should
+        have the size of sz * sizeof_dtyp dt.
+       *)
+      generalize dependent sz.
+      generalize dependent IH.
+      generalize dependent IHdtyp.
+      generalize dependent concat_fields.
+      generalize dependent sid'.
+      generalize dependent prov'.
+      revert bytes sid prov.
+      induction xs; intros bytes sid prov sid' prov' concat_fields RUNS EVAL IHdtyp IH sz H.
+      - cbn in H. subst.
+        cbn in RUNS. inversion RUNS.
+        subst.
+        cbn in EVAL. inversion EVAL.
+        cbn.
+        rewrite sizeof_dtyp_array.
+        reflexivity.
+      - rewrite map_monad_In_unfold in RUNS.
+        apply ErrSID_runs_to_bind in RUNS.
+        destruct RUNS as (sid'' & prov'' & first_res & SERFIRST & RUNS).
+
+        apply ErrSID_runs_to_bind in RUNS.
+        destruct RUNS as (sid''' & prov''' & rest_res & SERREST & RUNS).
+
+        apply ErrSID_runs_to_ErrSID_evals_to in SERFIRST.
+        apply IH in SERFIRST; cbn; auto.
+
+        specialize (IHxs (concat rest_res) _ _ _ _ rest_res SERREST). cbn; auto.
+
+        forward IHxs; [reflexivity|].
+        forward IHxs; [intuition|].
+        forward IHxs;
+          [intros; eapply IH; [right; eauto|eauto]|].
+
+        cbn in H; inv H.
+        specialize (IHxs (length xs) eq_refl).
+
+        (* Use RUNS to get concat_fields, EVAL to get bytes *)
+        inv RUNS.
+        inv EVAL.
+
+        rewrite app_length.
+        rewrite Nnat.Nat2N.inj_add.
+
+        rewrite SERFIRST.
+        rewrite IHxs.
+
+        do 2 rewrite sizeof_dtyp_array.
+        lia.
+    }
+
+    (* Vectors *)
+    {
+      apply ErrSID_evals_to_bind in BYTES.
+      destruct BYTES as (sid' & prov' & concat_fields & RUNS & EVAL).
+
+      (*
+        I know that concat_fields is the result of map_monad_In, which
+        serializes each element of the array, and stores the
+        serialization of each element in concat_fields.
+
+        I know by IH that each element in the array when serialized
+        has sizeof_dtyp dt bytes.
+
+        Because of this, the result of concat (concat_fields) should
+        have the size of sz * sizeof_dtyp dt.
+       *)
+      generalize dependent sz.
+      generalize dependent IH.
+      generalize dependent IHdtyp.
+      generalize dependent concat_fields.
+      generalize dependent sid'.
+      generalize dependent prov'.
+      revert bytes sid prov.
+      induction xs; intros bytes sid prov sid' prov' concat_fields RUNS EVAL IHdtyp IH sz H.
+      - cbn in H. subst.
+        cbn in RUNS. inversion RUNS.
+        subst.
+        cbn in EVAL. inversion EVAL.
+        cbn.
+        rewrite sizeof_dtyp_vector.
+        reflexivity.
+      - rewrite map_monad_In_unfold in RUNS.
+        apply ErrSID_runs_to_bind in RUNS.
+        destruct RUNS as (sid'' & prov'' & first_res & SERFIRST & RUNS).
+
+        apply ErrSID_runs_to_bind in RUNS.
+        destruct RUNS as (sid''' & prov''' & rest_res & SERREST & RUNS).
+
+        apply ErrSID_runs_to_ErrSID_evals_to in SERFIRST.
+        apply IH in SERFIRST; cbn; auto.
+
+        specialize (IHxs (concat rest_res) _ _ _ _ rest_res SERREST). cbn; auto.
+
+        forward IHxs; [reflexivity|].
+        forward IHxs; [intuition|].
+        forward IHxs;
+          [intros; eapply IH; [right; eauto|eauto]|].
+
+        cbn in H; inv H.
+        specialize (IHxs (length xs) eq_refl).
+
+        (* Use RUNS to get concat_fields, EVAL to get bytes *)
+        inv RUNS.
+        inv EVAL.
+
+        rewrite app_length.
+        rewrite Nnat.Nat2N.inj_add.
+
+        rewrite SERFIRST.
+        rewrite IHxs.
+
+        do 2 rewrite sizeof_dtyp_vector.
+        lia.
     }
   Qed.
-
-  (*   intros dv dt TYP. *)
-  (*   induction TYP; try solve [cbn; auto]. *)
-  (*   - cbn. rewrite DynamicValues.unsupported_cases_match; auto. *)
-  (*   - cbn. *)
-  (*     rewrite app_length. *)
-  (*     rewrite Nnat.Nat2N.inj_add. *)
-  (*     rewrite IHTYP1. *)
-  (*     cbn in IHTYP2. rewrite IHTYP2. *)
-  (*     symmetry. *)
-  (*     apply fold_sizeof. *)
-  (*   - cbn. *)
-  (*     rewrite app_length. *)
-  (*     rewrite Nnat.Nat2N.inj_add. *)
-  (*     rewrite IHTYP1. *)
-  (*     cbn in IHTYP2. rewrite IHTYP2. *)
-  (*     symmetry. *)
-  (*     apply fold_sizeof. *)
-  (*   - generalize dependent sz. *)
-  (*     induction xs; intros sz H; cbn. *)
-  (*     + subst; auto. *)
-  (*     + cbn in *. rewrite <- H. rewrite app_length. *)
-  (*       replace (N.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt)%N *)
-  (*         with (sizeof_dtyp dt + N.of_nat (Datatypes.length xs) * sizeof_dtyp dt)%N. *)
-  (*       * rewrite Nnat.Nat2N.inj_add. rewrite IHxs with (sz:=Datatypes.length xs); auto. *)
-  (*         apply N.add_cancel_r; auto. *)
-  (*       * rewrite Nnat.Nat2N.inj_succ. rewrite N.mul_succ_l. lia. *)
-  (*   - generalize dependent sz. *)
-  (*     induction xs; intros sz H; cbn. *)
-  (*     + subst; auto. *)
-  (*     + cbn in *. rewrite <- H. rewrite app_length. *)
-  (*       replace (N.of_nat (S (Datatypes.length xs)) * sizeof_dtyp dt)%N *)
-  (*         with (sizeof_dtyp dt + N.of_nat (Datatypes.length xs) * sizeof_dtyp dt)%N. *)
-  (*       * rewrite Nnat.Nat2N.inj_add. rewrite IHxs with (sz:=Datatypes.length xs); auto. *)
-  (*         apply N.add_cancel_r; auto. *)
-  (*       * rewrite Nnat.Nat2N.inj_succ. rewrite N.mul_succ_l. lia. *)
-  (* Qed. *)
 
   (* Lemma firstn_sizeof_dtyp : *)
   (*   forall dv dt, *)

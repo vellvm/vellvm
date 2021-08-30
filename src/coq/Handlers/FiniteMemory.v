@@ -310,7 +310,7 @@ Module FinSizeof : Sizeof.
 
   Lemma sizeof_dtyp_vector :
     forall sz t,
-      sizeof_dtyp (DTYPE_Array sz t) = (sz * sizeof_dtyp t)%N.
+      sizeof_dtyp (DTYPE_Vector sz t) = (sz * sizeof_dtyp t)%N.
   Proof.
     reflexivity.
   Qed.
