@@ -43,10 +43,12 @@ From Vellvm Require Import
      Utils.Tactics
      Utils.Util
      Utils.Error
+     Utils.UBAndErrors
      Utils.ListUtil
      Utils.IntMaps
      Utils.NMaps
      Utils.Monads
+     Utils.StateMonads
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
@@ -71,41 +73,6 @@ Set Contextual Implicit.
 
 #[local] Open Scope Z_scope.
 (* end hide *)
-
-(* TODO: move these and use them in more places, so I'm less
-       confused by what string is which, e.g., in undef_or_err *)
-Inductive UB_MESSAGE :=
-| UB_message : string -> UB_MESSAGE
-.
-
-Inductive ERR_MESSAGE :=
-| ERR_message : string -> ERR_MESSAGE
-.
-
-Notation UB := (sum UB_MESSAGE).
-Notation ERR := (sum ERR_MESSAGE).
-
-Instance Exception_UB : MonadExc UB_MESSAGE UB := Exception_either UB_MESSAGE.
-Instance Exception_ERR : MonadExc ERR_MESSAGE ERR := Exception_either ERR_MESSAGE.
-
-Instance Exception_UB_string : MonadExc string UB :=
-  {| MonadExc.raise := fun _ msg => inl (UB_message msg);
-     catch := fun T c h =>
-                match c with
-                | inl (UB_message msg) => h msg
-                | inr _ => c
-                end
-  |}.
-
-Instance Exception_ERR_string : MonadExc string ERR :=
-  {| MonadExc.raise := fun _ msg => inl (ERR_message msg);
-     catch := fun T c h =>
-                match c with
-                | inl (ERR_message msg) => h msg
-                | inr _ => c
-                end
-  |}.
-
 
 (** * Memory Model
 
@@ -621,41 +588,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
     Definition ErrSID_T M := eitherT ERR_MESSAGE (eitherT UB_MESSAGE (stateT store_id (stateT Provenance M))).
     Definition ErrSID := ErrSID_T ident.
 
-    Definition err_to_ERR {A} (e : err A) : ERR A
-      := match e with
-         | inl e => inl (ERR_message e)
-         | inr x => inr x
-         end.
-      
-
-    Definition lift_err {M A} `{MonadExc string M} `{Monad M} (e : err A) : (M A)
-        := match e with
-         | inl e => MonadExc.raise e
-         | inr x => ret x
-         end.
-
-    Definition lift_ERR {M A} `{MonadExc ERR_MESSAGE M} `{Monad M} (e : ERR A) : (M A)
-        := match e with
-         | inl (ERR_message e) => MonadExc.raise (ERR_message e)
-         | inr x => ret x
-         end.
-
-    (* TODO: move this? *)
-    Definition runStateT {S M A} `{Monad M} (m: stateT S M A) (s : S) : M (A * S)%type
-      := '(s', a) <- m s;;
-         ret (a, s').
-
-    Definition evalStateT {S M A} `{Monad M} (m: stateT S M A) (s : S) : M A
-      := fmap fst (runStateT m s).
-
-    Global Instance MonadT_stateT_itree {S : Type} {M : Type -> Type} `{Monad M} : MonadT (stateT S M) M
-      := {| lift := fun (t : Type) (c : M t) => fun s => t0 <- c;; ret (s, t0) |}.
-
-    Global Instance MonadState_stateT_itree {S : Type} {M : Type -> Type} `{Monad M} : MonadState S (stateT S M)
-      := {| MonadState.get := fun s => ret (s, s);
-            put := fun x s => ret (x, tt);
-        |}.
-
     Definition evalErrSID_T {A} {M} `{Monad M} (m : ErrSID_T M A) (sid : store_id) (prov : Provenance) : M (UB (ERR A))
       := evalStateT (evalStateT (unEitherT (unEitherT m)) sid) prov.
 
@@ -1116,7 +1048,7 @@ match uv with
         let bytes     := map fst mem_bytes in
         let alloc_ids := map snd mem_bytes in
         if all_accesses_allowed pr alloc_ids
-        then lift_err (deserialize_sbytes bytes t)
+        then deserialize_sbytes bytes t
         else failwith ("Read from memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ Show.show pr ++ ", memory allocation ids: " ++ Show.show alloc_ids ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, aid)) (IM.elements mem)))
       end.
 

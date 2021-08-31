@@ -95,6 +95,8 @@ End MemBytesTheory.
 
 Module SerializationTheory(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF: Sizeof)(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(LLVMIO)).
 
+  Import LLVMIO.
+
   Module MBT := MemBytesTheory Addr LLVMIO SIZEOF PTOI PROVENANCE ITOP GEP BYTE_IMPL.
   Import MBT.
   Import MBT.SER.
