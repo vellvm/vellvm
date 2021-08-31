@@ -1163,6 +1163,141 @@ Section Memory_Stack_Theory.
     (*     congruence. *)
     (* Qed. *)
 
+Lemma all_bytes_helper_app :
+  forall  sbytes sbytes2 start sid uv,
+    all_bytes_from_uvalue_helper (Z.of_N start) sid uv sbytes = Some uv ->
+    all_bytes_from_uvalue_helper (Z.of_N (start + N.of_nat (length sbytes))) sid uv sbytes2 = Some uv ->
+    all_bytes_from_uvalue_helper (Z.of_N start) sid uv (sbytes ++ sbytes2) = Some uv.
+Proof.
+  induction sbytes;
+    intros sbytes2 start sid uv INIT REST.
+  - now rewrite N.add_0_r in REST.
+  - cbn.
+    destruct a.
+    cbn in INIT.
+    do 3 (break_match; [|solve [inv INIT]]).
+
+
+    cbn in REST. auto.
+    replace (Z.of_N (start + N.pos (Pos.of_succ_nat (Datatypes.length sbytes)))) with (Z.of_N (N.succ start + N.of_nat (Datatypes.length sbytes))) in REST by lia.
+
+    rewrite <- N2Z.inj_succ in *.
+    
+    apply IHsbytes; auto.
+Qed.
+
+Lemma to_ubytes_all_bytes_from_uvalue_helper' :
+  forall len uv dt sid sbytes start,
+    is_supported dt ->
+    map (fun n : N => UByte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq start len) = sbytes ->
+    all_bytes_from_uvalue_helper (Z.of_N start) sid uv sbytes = Some uv.
+Proof.
+  induction len;
+    intros uv dt sid sbytes start SUP TO.
+  - inv TO; reflexivity.
+  - inv TO.
+    rewrite Nseq_S.
+    rewrite map_app.
+    apply all_bytes_helper_app; eauto.
+    + cbn.
+      rewrite map_length.
+      rewrite Nseq_length.
+      solve_guards_all_bytes.
+      reflexivity.
+Qed.
+
+Lemma to_ubytes_all_bytes_from_uvalue_helper :
+  forall uv dt sid sbytes,
+    is_supported dt ->
+    to_ubytes uv dt sid = sbytes ->
+    all_bytes_from_uvalue_helper 0 sid uv sbytes = Some uv.
+Proof.  
+  intros uv dt sid sbytes SUP TO.
+
+  change 0%Z with (Z.of_N 0).
+  eapply to_ubytes_all_bytes_from_uvalue_helper'; eauto.    
+Qed.
+
+Lemma to_ubytes_sizeof_dtyp :
+  forall uv dt sid,  
+    N.of_nat (length (to_ubytes uv dt sid)) = sizeof_dtyp dt.
+Proof.
+  intros uv dt sid.
+  unfold to_ubytes.
+  rewrite map_length, Nseq_length.
+  lia.
+Qed.
+
+Lemma from_ubytes_to_ubytes :
+  forall uv dt sid,
+    is_supported dt ->
+    sizeof_dtyp dt > 0 ->
+    from_ubytes (to_ubytes uv dt sid) dt = uv.
+Proof.
+  intros uv dt sid SUP SIZE.
+
+  unfold from_ubytes.
+  unfold all_bytes_from_uvalue.
+
+  rewrite to_ubytes_sizeof_dtyp.
+  rewrite N.eqb_refl.
+
+  break_inner_match.
+  - (* Contradiction by size *)
+    pose proof to_ubytes_sizeof_dtyp uv dt sid.
+    rewrite Heql in H.
+
+    cbn in *.
+    lia.
+  - destruct s.
+    cbn in *.
+
+    unfold to_ubytes in Heql.
+    remember (sizeof_dtyp dt) as sz.
+    destruct sz; [inv SIZE|].
+    cbn in *.
+    pose proof Pos2Nat.is_succ p as [sz Hsz].
+    rewrite Hsz in Heql.
+    rewrite <- cons_Nseq in Heql.
+
+    cbn in Heql.
+    inv Heql.
+    cbn.
+
+    solve_guards_all_bytes.
+
+    cbn.
+    change 1%Z with (Z.of_N 1).
+    erewrite to_ubytes_all_bytes_from_uvalue_helper'; eauto.
+Qed.
+
+Lemma serialize_sbytes_deserialize_sbytes :
+  forall uv dt sid sbytes ,
+    uvalue_has_dtyp uv dt ->
+    is_supported dt ->
+    sizeof_dtyp dt > 0 ->
+    evalErrSID (serialize_sbytes uv dt) sid = inr (sbytes) ->
+    deserialize_sbytes sbytes dt = inr uv.
+Proof.
+  intros uv dt sid sbytes TYP SUP SIZE SER.
+  induction TYP;
+    try solve [unfold serialize_sbytes in SER;
+               inv SER;
+               unfold deserialize_sbytes;
+               rewrite from_ubytes_to_ubytes; eauto
+              | cbn in *;
+                match goal with
+                | |- deserialize_sbytes _ ?t = _ =>
+                  cbn in *;
+                  destruct t; cbn; inv SER;
+                  rewrite from_ubytes_to_ubytes; eauto
+                end
+              ].
+  - inv SUP; exfalso; apply H; constructor.
+  - rewrite sizeof_dtyp_void in SIZE. inv SIZE.
+Qed.
+
+
     (** ** Deserialize - Serialize
         Starting from a dvalue [val] whose [dtyp] is [t], if:
         1. we serialize [val], getting a [list SByte]
@@ -1173,6 +1308,19 @@ Section Memory_Stack_Theory.
 
         The proof should go by induction over [TYP] I think, and rely on [lookup_all_index_add] notably.
      *)
+    Lemma deserialize_serialize : forall val dt sid prov bytes,
+        uvalue_has_dtyp val dt ->
+        ErrSID_evals_to (serialize_sbytes val dt) sid prov bytes ->
+        deserialize_sbytes bytes dt = inr val.
+    Proof.
+      intros val dt sid prov bytes TYP SER.
+      induction TYP.
+      - cbn in SER; inv SER.
+        cbn.
+        rewrite 
+    Qed.
+
+    
     (* Lemma deserialize_serialize : forall val t (TYP : dvalue_has_dtyp val t), *)
     (*     forall off (bytes : mem_block) (SUP : is_supported t), *)
     (*       deserialize_sbytes (lookup_all_index off (sizeof_dtyp t) (add_all_index (serialize_dvalue val) off bytes) SUndef) t = dvalue_to_uvalue val. *)

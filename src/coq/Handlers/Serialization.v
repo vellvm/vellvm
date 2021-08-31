@@ -883,22 +883,6 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
       Set Guard Checking.
     End Concretize.
 
-Ltac eval_nseq :=
-  match goal with
-  | |- context[Nseq ?start ?len] =>
-    let HS := fresh "HS" in
-    let HSeq := fresh "HSeq" in
-    remember (Nseq start len) as HS eqn:HSeq;
-    cbv in HSeq;
-    subst HS
-  end.
-
-Ltac uvalue_eq_dec_refl_true :=
-  rewrite rel_dec_eq_true; [|exact eq_dec_uvalue_correct|reflexivity].
-
-Ltac solve_guards_all_bytes :=
-  try rewrite N.eqb_refl; try rewrite Z.eqb_refl; try uvalue_eq_dec_refl_true; cbn.
-
 Section ConcretizeInductive.
 
   Variable endianess : Endianess.

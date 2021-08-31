@@ -331,6 +331,23 @@ Module FinByte (LLVMEvents:LLVM_INTERACTIONS(Addr)) : ByteImpl(Addr)(LLVMEvents)
     := match byte with
        | mkUByte uv dt idx sid => UVALUE_ExtractByte uv dt idx sid
        end.
+
+  Lemma sbyte_to_extractbyte_inv :
+    forall (b : SByte),
+    exists uv dt idx sid,
+      sbyte_to_extractbyte b = UVALUE_ExtractByte uv dt idx sid.
+  Proof.
+    intros b. destruct b.
+    cbn; eauto.
+  Qed.
+
+  Lemma sbyte_to_extractbyte_of_uvalue_sbyte :
+    forall uv dt idx sid,
+      sbyte_to_extractbyte (uvalue_sbyte uv dt idx sid) =  UVALUE_ExtractByte uv dt idx sid.
+  Proof.
+    auto.
+  Qed.
+
 End FinByte.
 
 (** ** Memory model
