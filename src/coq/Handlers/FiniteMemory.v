@@ -117,9 +117,6 @@ Inductive is_supported : dtyp -> Prop :=
  *)
 Definition Iptr := Z. (* Integer pointer type (physical addresses) *)
 
-Definition Provenance := N.
-Definition AllocationId := option Provenance. (* None is wildcard *)
-
 (* TODO: Should probably make this an NSet, but it gives universe inconsistency with Module addr *)
 Definition Prov := option (list Provenance). (* Provenance *)
 
@@ -582,48 +579,6 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
          | UVALUE_ExtractByte uv dt idx sid =>
            ret (uvalue_sbyte uv dt idx sid)
          | _ => inl (ERR_message "extract_byte_to_ubyte invalid conversion.")
-         end.
-
-    (* Need failure, UB, state for store_ids, and state for provenances *)
-    Definition ErrSID_T M := eitherT ERR_MESSAGE (eitherT UB_MESSAGE (stateT store_id (stateT Provenance M))).
-    Definition ErrSID := ErrSID_T ident.
-
-    Definition evalErrSID_T {A} {M} `{Monad M} (m : ErrSID_T M A) (sid : store_id) (prov : Provenance) : M (UB (ERR A))
-      := evalStateT (evalStateT (unEitherT (unEitherT m)) sid) prov.
-
-    Definition evalErrSID {A} (m : ErrSID A) (sid : store_id) (prov : Provenance) : UB (ERR A)
-      := unIdent (evalErrSID_T m sid prov).
-
-    Definition runErrSID_T {A} {M} `{Monad M} (m : ErrSID_T M A) (sid : store_id) (prov : Provenance) : M (UB (ERR A) * store_id * Provenance)%type
-      := runStateT (runStateT (unEitherT (unEitherT m)) sid) prov.
-
-    Definition runErrSID {A} (m : ErrSID A) (sid : store_id) (prov : Provenance) : UB (ERR A) * store_id * Provenance%type
-      := unIdent (runErrSID_T m sid prov).
-
-    (* TODO: move this? *)
-    Definition ErrSID_evals_to {A} (e : ErrSID A) (x : A) sid pr : Prop
-      := evalErrSID e sid pr = inr (inr x).
-
-    Definition fresh_sid : ErrSID store_id
-      := lift (lift (modify N.succ)).
-
-    Definition fresh_provenance : ErrSID Provenance
-      := lift (lift (lift (modify N.succ))).
-
-    Definition fresh_allocation_id : ErrSID AllocationId
-      := prov <- fresh_provenance;;
-         ret (Some prov).
-
-    Definition raise_error {A} (msg : string) : ErrSID A
-      := MonadExc.raise (ERR_message msg).
-
-    Definition raise_ub {A} (msg : string) : ErrSID A
-      := lift (MonadExc.raise (UB_message msg)).
-
-    Definition err_to_ub {A} (e : err A) : ErrSID A
-      := match e with
-         | inl msg => raise_ub msg
-         | inr x => ret x
          end.
 
     Definition sbyte_sid_match (a b : SByte) : bool
