@@ -90,7 +90,6 @@ Section Helpers.
     | OP_Freeze v                        => true
     | _                                  => false
     end.
-
   (*
   Fixpoint well_formed_instr (ctx : list (ident * typ)) (i : instr typ) : bool :=
     match i with
@@ -728,7 +727,7 @@ Section ExpGenerators.
   Definition gen_non_zero : G Z
     := n <- (arbitrary : G nat);;
        ret (Z.of_nat (S n)).
-Sample fing64.
+
   Definition gen_non_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
     := match t with
        | TYPE_I n => ret EXP_Integer <*> lift gen_non_zero (* TODO: should integer be forced to be in bounds? *)
@@ -736,7 +735,70 @@ Sample fing64.
        | TYPE_Double => lift failGen(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
        | _ => lift failGen
        end.
-Print OP_IBinop.
+Search dtyp.
+Print N.
+Fixpoint gen_index_from_array_vector (sz : nat) (loc : list nat) (ls : list (list nat)) :=
+  match sz with
+  | 0%nat => [loc ++ [0%nat]] ++ ls
+  | S z => let lss := [loc ++ [z]] ++ ls in
+          gen_index_from_array_vector z loc lss
+  end.
+Search N.
+
+Fixpoint gen_dtyp_from_dtyp (t: dtyp) (m : dtyp) (loc : list N) (ls: list (list N)) : list (list N) :=
+  let ls := if dtyp_eq t m then [loc] ++ ls else ls in
+  match m with 
+  | DTYPE_Array sz t1 => gen_index_array_vector t t1 sz loc ls (*Not exactly on this one, specificaly on loc*)
+  | DTYPE_Vector sz t1 => []
+  | DTYPE_Struct field => []
+  | DTYPE_Packed_struct field => []
+  | _ => ls
+  end with 
+  gen_index_array_vector (t1: dtyp) (t2: dtyp) (sz: N) (loc: list N) (ls: list (list N)) : list (list N):= 
+match sz with
+| N0 => ls
+| Npos pos => let oneSmaller : N := N.pred (Npos pos) in
+let lss := gen_dtyp_from_dtyp t1 t2 (loc ++ [oneSmaller]) ls in
+gen_index_array_vector t1 t2 oneSmaller loc lss
+  end.
+
+
+
+
+Fixpoint gen_dtyp_from_dtyp (t: dtyp) (m : dtyp) (loc : list N) (ls: list (list N)) : list (list N) :=
+  let ls := if dtyp_eq t m then [loc] ++ ls else ls in
+  match m with 
+  | DTYPE_Array sz t1 => if (N.eqb sz 0%N) then [] else let lss := gen_dtyp_from_dtyp t t1 ()
+  | DTYPE_Vector sz t1 => []
+  | DTYPE_Struct field => []
+  | DTYPE_Packed_struct field => []
+  | _ => ls
+  end with 
+  gen_index_array_vector (t1: dtyp) (t2: dtyp) (sz: N) (loc: list N) (ls : list (list N)) : list (list N):=
+  match sz with
+  ｜ 0%nat => ls
+  | S z => let lss := gen_dtyp_from_dtyp t1 t2 (loc ++ [N.of_nat z]) ls in lss 
+  end.
+  Fixpoint gen_dtyp_from_dtyp (t: dtyp) (m : dtyp) (loc : list N) (ls: list (list N)) : list (list N) :=
+    let ls := if dtyp_eq t m then [loc] ++ ls else ls in
+    match m with 
+    | DTYPE_Array sz t1 => if (N.eqb sz 0%N) then [] else let lss := gen_dtyp_from_dtyp t t1 ()
+    | DTYPE_Vector sz t1 => []
+    | DTYPE_Struct field => []
+    | DTYPE_Packed_struct field => []
+    | _ => ls
+    end with 
+    gen_index_array_vector (t1: dtyp) (t2: dtyp) (sz: N) (loc: list N) (ls : list (list N)) : list (list N):=
+    [].
+
+  Definition get_typ_in_aggr (t : dtyp) (s : dtyp) : list (list N) :=
+    match s with 
+    | DTYPE_Array sz t1=> if (dtyp_eq t s) then gen_index_from_array_vector sz [] [] else []
+    | DTYPE_Vector sz t1 => if (dtyp_eq t s) then [[]] else []
+    | DTYPE_Struct fields => [[]]
+    | DTYPE_Packed_struct fields => []
+    | _ => [[]]
+    end.
 
   (* TODO: should make it much more likely to pick an identifier for
            better test cases *)
@@ -862,7 +924,7 @@ Print OP_IBinop.
     := t <- gen_sized_typ;;
        e <- gen_exp t;;
        ret (t, e).
-
+Print filter_type.
   Definition gen_op (t : typ) : GenLLVM (exp typ)
     := sized_LLVM
          (fun sz =>
