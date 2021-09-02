@@ -728,15 +728,15 @@ Section ExpGenerators.
   Definition gen_non_zero : G Z
     := n <- (arbitrary : G nat);;
        ret (Z.of_nat (S n)).
+Sample fing64.
   Definition gen_non_zero_exp_size (sz : nat) (t : typ) : GenLLVM (exp typ)
     := match t with
        | TYPE_I n => ret EXP_Integer <*> lift gen_non_zero (* TODO: should integer be forced to be in bounds? *)
        | TYPE_Float => ret EXP_Float <*> lift fing32 
-       | TYPE_Double => ret EXP_Double <*> lift fing64
+       | TYPE_Double => lift failGen(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
        | _ => lift failGen
        end.
-Check OP_FBinop.
-Check OP_IBinop.
+Print OP_IBinop.
 
   (* TODO: should make it much more likely to pick an identifier for
            better test cases *)
@@ -770,7 +770,7 @@ Check OP_IBinop.
           (* Not generating these types for now *)
           | TYPE_Half                 => lift failGen
           | TYPE_Float                => ret EXP_Float <*> lift fing32(* referred to genarators in flocq-quickchick*)
-          | TYPE_Double               => ret EXP_Double <*> lift fing64
+          | TYPE_Double               => lift failGen (*ret EXP_Double <*> lift fing64*) (* TODO: Fix generator for double*)
           | TYPE_X86_fp80             => lift failGen
           | TYPE_Fp128                => lift failGen
           | TYPE_Ppc_fp128            => lift failGen
@@ -809,7 +809,7 @@ Check OP_IBinop.
           | TYPE_Opaque            => [lift failGen] (* TODO: not sure what these should be... *)
           | TYPE_Half              => [lift failGen]
           | TYPE_Float             => [gen_fbinop_exp TYPE_Float]
-          | TYPE_Double            => [gen_fbinop_exp TYPE_Double]
+          | TYPE_Double            => [(*gen_fbinop_exp TYPE_Double*)lift failGen]
           | TYPE_X86_fp80          => [lift failGen]
           | TYPE_Fp128             => [lift failGen]
           | TYPE_Ppc_fp128         => [lift failGen]
