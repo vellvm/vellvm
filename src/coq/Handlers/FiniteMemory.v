@@ -58,6 +58,8 @@ From Vellvm Require Import
      Semantics.GepM
      Semantics.Memory.Sizeof
      Semantics.Memory.MemBytes
+     Semantics.Memory.FiniteProvenance
+     Semantics.Memory.ErrSID
      Semantics.LLVMEvents.
 
 Require Import Ceres.Ceres.
@@ -330,6 +332,9 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
 
   Module BYTE := Byte Addr LLVMEvents BYTE_IMPL.
   Import BYTE.
+
+  Module ESID := ERRSID Addr LLVMEvents PROV.
+  Import ESID.
   
   Open Scope list.
 

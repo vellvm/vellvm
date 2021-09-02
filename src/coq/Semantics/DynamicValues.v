@@ -1948,7 +1948,13 @@ Class VInt I : Type :=
         uvalue_has_dtyp cond (DTYPE_Vector (N.of_nat sz) (DTYPE_I 1)) ->
         uvalue_has_dtyp x (DTYPE_Vector (N.of_nat sz) t) ->
         uvalue_has_dtyp y (DTYPE_Vector (N.of_nat sz) t) ->
-        uvalue_has_dtyp (UVALUE_Select cond x y) (DTYPE_Vector (N.of_nat sz) t).
+        uvalue_has_dtyp (UVALUE_Select cond x y) (DTYPE_Vector (N.of_nat sz) t)
+  | UVALUE_ExtractByte_typ :
+      forall uv dt idx sid,
+        uvalue_has_dtyp (UVALUE_ExtractByte uv dt idx sid) (DTYPE_I 8)
+  | UVALUE_ConcatBytes_typ :
+      forall bytes dt,
+        uvalue_has_dtyp (UVALUE_ConcatBytes bytes dt) dt.
   Set Elimination Schemes.
 
   Section dvalue_has_dtyp_ind.
@@ -2406,6 +2412,14 @@ Class VInt I : Type :=
         uvalue_has_dtyp y (DTYPE_Vector (N.of_nat sz) t) ->
         P y (DTYPE_Vector (N.of_nat sz) t) ->
         P (UVALUE_Select cond x y) (DTYPE_Vector (N.of_nat sz) t).
+
+    Hypothesis IH_UVALUE_ExtractByte :
+      forall uv dt idx sid,
+        P (UVALUE_ExtractByte uv dt idx sid) (DTYPE_I 8).
+        
+    Hypothesis IH_UVALUE_ConcatBytes :
+      forall bytes dt,
+        P (UVALUE_ConcatBytes bytes dt) dt.
 
     Lemma uvalue_has_dtyp_ind : forall (uv:uvalue) (dt:dtyp) (TYP: uvalue_has_dtyp uv dt), P uv dt.
       fix IH 3.

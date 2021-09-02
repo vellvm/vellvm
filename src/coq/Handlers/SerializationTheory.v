@@ -13,7 +13,8 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.GepM
      Semantics.Memory.Sizeof
-     Semantics.Memory.MemBytes.
+     Semantics.Memory.MemBytes
+     Semantics.Memory.ErrSID.
 
 Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF: Sizeof)(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(LLVMIO)).
 
@@ -106,6 +107,9 @@ Module SerializationTheory(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF: Sizeof)(PTOI
   Module Mem := FiniteMemory.Make LLVMIO PTOI PROVENANCE ITOP SIZEOF GEP BYTE_IMPL.
   Export Mem.
 
+  Module ESID := ERRSID Addr LLVMIO PROVENANCE.
+  Import ESID.
+
   Lemma to_ubytes_all_bytes_from_uvalue_helper :
     forall uv dt sid sbytes,
       is_supported dt ->
@@ -174,15 +178,143 @@ Module SerializationTheory(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF: Sizeof)(PTOI
       erewrite to_ubytes_all_bytes_from_uvalue_helper'; eauto.
   Qed.
 
+  (* TODO: move this *)
+  Ltac tactic_on_non_aggregate_uvalues x t :=
+    match x with
+    | (UVALUE_Struct _) =>
+      idtac
+    | (UVALUE_Packed_struct _) =>
+      idtac
+    | (UVALUE_Array _ _) =>
+      idtac
+    | (UVALUE_Vector _ _) =>
+      idtac
+    | _ =>
+      t
+    end.
+
+  Ltac eval_serialize_sbytes_hyp :=
+    match goal with
+    (* Try easy case first for speedup *)
+    | H: ErrSID_evals_to
+           (serialize_sbytes ?x ?dt)
+           ?sbytes ?sid ?prov |- _ =>
+      tactic_on_non_aggregate_uvalues x ltac:(cbn in H; inv H)
+    | H: context[serialize_sbytes ?x ?dt] |- _ =>
+      tactic_on_non_aggregate_uvalues x ltac:(cbn in H; inv H)
+    end.
+
   Lemma serialize_sbytes_deserialize_sbytes :
-    forall uv dt sid sbytes ,
+    forall uv dt sid prov sbytes ,
       uvalue_has_dtyp uv dt ->
       is_supported dt ->
       sizeof_dtyp dt > 0 ->
-      evalErrSID (serialize_sbytes uv dt) sid = inr (sbytes) ->
+      ErrSID_evals_to (serialize_sbytes uv dt) sbytes sid prov ->
       deserialize_sbytes sbytes dt = inr uv.
   Proof.
-    intros uv dt sid sbytes TYP SUP SIZE SER.
+    intros uv dt sid prov sbytes TYP SUP SIZE SER.
+    induction TYP.
+    match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER)
+          end;
+      cbn; rewrite from_ubytes_to_ubytes; eauto.
+    match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER)
+          end;
+      cbn; rewrite from_ubytes_to_ubytes; eauto.
+    match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER)
+          end;
+      cbn; rewrite from_ubytes_to_ubytes; eauto.
+    match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER)
+          end;
+      cbn; rewrite from_ubytes_to_ubytes; eauto.
+    match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER)
+          end;
+      cbn; rewrite from_ubytes_to_ubytes; eauto.
+    match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER)
+          end;
+      cbn; rewrite from_ubytes_to_ubytes; eauto.
+
+    - unfold deserialize_sbytes.
+      cbn.
+cbn in *;
+        destruct t.
+      cbn.
+      reflexivity.
+      destruct t.
+
+      cbn; inv SER.
+          rewrite from_ubytes_to_ubytes; eauto.
+
+
+
+    solve [match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER)
+          end;
+      cbn; rewrite from_ubytes_to_ubytes; eauto].
+    match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER)
+          end;
+      cbn; rewrite from_ubytes_to_ubytes; eauto.
+    match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER)
+          end;
+      cbn; rewrite from_ubytes_to_ubytes; eauto.
+    match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER)
+          end;
+      cbn; rewrite from_ubytes_to_ubytes; eauto.
+    match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER)
+          end;
+      cbn; rewrite from_ubytes_to_ubytes; eauto.
+    match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(cbn in SER; inv SER)
+          end;
+      cbn; rewrite from_ubytes_to_ubytes; eauto.
+
+
+    49: { eval_serialize_sbytes_hyp.
+    56: { cbn in SER. destruct bytes. cbn in *. }
+    all:eval_serialize_sbytes_hyp.
+    1-30:eval_serialize_sbytes_hyp.
+    12: {
+      eval_serialize_sbytes_hyp.
+      
+      rewrite serialize_sbytes_equation in SER.
+    }
+    rewrite serialize_sbytes_equation in SER.
+      try solve [cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto].
+
+    
     induction TYP;
       try solve [unfold serialize_sbytes in SER;
                  inv SER;
