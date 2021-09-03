@@ -32,6 +32,7 @@ From Vellvm Require Import
      Utils.IntMaps
      Utils.ListUtil
      Utils.Monads
+     Utils.UBAndErrors
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
@@ -40,6 +41,7 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Semantics.Memory.MemBytes
+     Semantics.Memory.ErrSID
      Semantics.GepM
      Semantics.LLVMEvents
      Handlers.FiniteMemory.
@@ -60,7 +62,7 @@ Set Contextual Implicit.
     Reasoning principles for VIR's main memory model.
 *)
 
-Module Type MEMORY_THEORY (LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(SIZE:Sizeof)(GEP : GEPM(Addr)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(LLVMEvents)).
+Module Type MEMORY_THEORY (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)).
   (** ** Theory of the general operations over the finite maps we manipulate *)
   Import LLVMEvents.
   Import DV.
@@ -70,13 +72,17 @@ Module Type MEMORY_THEORY (LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))
   Import SIZE.
   Import GEP.
 
-  Module BYTE := Byte Addr LLVMEvents BYTE_IMPL.
+  Module BYTE := Byte Addr SIZE LLVMEvents BYTE_IMPL.
   Import BYTE.
 
   Open Scope list.
 
-  Module Mem := FiniteMemory.Make(LLVMEvents)(PTOI)(PROV)(ITOP)(SIZE)(GEP)(BYTE_IMPL).
+  Module Mem := FiniteMemory.Make(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
   Export Mem.
+
+  Module ESID := ERRSID Addr SIZE LLVMEvents PROV.
+  Import ESID.
+
 
   (* TODO: move this? *)
   Definition ErrSID_evals_to {A} (e : ErrSID A) sid pr (x : A) : Prop
@@ -272,7 +278,7 @@ Section Serialization_Theory.
     generalize dependent sid.
     generalize dependent prov.
     generalize dependent bytes.
-    induction TYP; intros bytes prov sid BYTES;
+    induction TYP; intros bytes' prov sid' BYTES;
       rewrite serialize_sbytes_equation in BYTES.
     1-9: inversion BYTES; apply to_ubytes_sizeof.
     8-45: inversion BYTES; apply to_ubytes_sizeof.
@@ -293,9 +299,9 @@ Section Serialization_Theory.
     {      
       (* Need to find out what bytes actually is by unfolding BYTES *)
       apply ErrSID_evals_to_bind in BYTES.
-      destruct BYTES as (sid' & prov' & f_bytes & SER_f & EVALS).
+      destruct BYTES as (sid'' & prov'' & f_bytes & SER_f & EVALS).
       apply ErrSID_evals_to_bind in EVALS.
-      destruct EVALS as (sid'' & prov'' & fields_bytes & SER_fields & EVALS).
+      destruct EVALS as (sid''' & prov''' & fields_bytes & SER_fields & EVALS).
 
       apply ErrSID_runs_to_ErrSID_evals_to in SER_f, SER_fields.
       apply IHTYP1 in SER_f.
@@ -319,9 +325,9 @@ Section Serialization_Theory.
     {      
       (* Need to find out what bytes actually is by unfolding BYTES *)
       apply ErrSID_evals_to_bind in BYTES.
-      destruct BYTES as (sid' & prov' & f_bytes & SER_f & EVALS).
+      destruct BYTES as (sid'' & prov'' & f_bytes & SER_f & EVALS).
       apply ErrSID_evals_to_bind in EVALS.
-      destruct EVALS as (sid'' & prov'' & fields_bytes & SER_fields & EVALS).
+      destruct EVALS as (sid''' & prov''' & fields_bytes & SER_fields & EVALS).
 
       apply ErrSID_runs_to_ErrSID_evals_to in SER_f, SER_fields.
       apply IHTYP1 in SER_f.
@@ -338,7 +344,7 @@ Section Serialization_Theory.
     (* Arrays *)
     {
       apply ErrSID_evals_to_bind in BYTES.
-      destruct BYTES as (sid' & prov' & concat_fields & RUNS & EVAL).
+      destruct BYTES as (sid'' & prov'' & concat_fields & RUNS & EVAL).
 
       (*
         I know that concat_fields is the result of map_monad_In, which
@@ -355,10 +361,10 @@ Section Serialization_Theory.
       generalize dependent IH.
       generalize dependent IHdtyp.
       generalize dependent concat_fields.
-      generalize dependent sid'.
-      generalize dependent prov'.
-      revert bytes sid prov.
-      induction xs; intros bytes sid prov sid' prov' concat_fields RUNS EVAL IHdtyp IH sz H.
+      generalize dependent sid''.
+      generalize dependent prov''.
+      revert bytes' sid' prov.
+      induction xs; intros bytes' sid' prov' sid'' prov'' concat_fields RUNS EVAL IHdtyp IH sz H.
       - cbn in H. subst.
         cbn in RUNS. inversion RUNS.
         subst.
@@ -368,10 +374,10 @@ Section Serialization_Theory.
         reflexivity.
       - rewrite map_monad_In_unfold in RUNS.
         apply ErrSID_runs_to_bind in RUNS.
-        destruct RUNS as (sid'' & prov'' & first_res & SERFIRST & RUNS).
+        destruct RUNS as (sid''' & prov''' & first_res & SERFIRST & RUNS).
 
         apply ErrSID_runs_to_bind in RUNS.
-        destruct RUNS as (sid''' & prov''' & rest_res & SERREST & RUNS).
+        destruct RUNS as (sid'''' & prov'''' & rest_res & SERREST & RUNS).
 
         apply ErrSID_runs_to_ErrSID_evals_to in SERFIRST.
         apply IH in SERFIRST; cbn; auto.
@@ -403,7 +409,7 @@ Section Serialization_Theory.
     (* Vectors *)
     {
       apply ErrSID_evals_to_bind in BYTES.
-      destruct BYTES as (sid' & prov' & concat_fields & RUNS & EVAL).
+      destruct BYTES as (sid'' & prov'' & concat_fields & RUNS & EVAL).
 
       (*
         I know that concat_fields is the result of map_monad_In, which
@@ -420,10 +426,10 @@ Section Serialization_Theory.
       generalize dependent IH.
       generalize dependent IHdtyp.
       generalize dependent concat_fields.
-      generalize dependent sid'.
-      generalize dependent prov'.
-      revert bytes sid prov.
-      induction xs; intros bytes sid prov sid' prov' concat_fields RUNS EVAL IHdtyp IH sz H.
+      generalize dependent sid''.
+      generalize dependent prov''.
+      revert bytes' sid' prov.
+      induction xs; intros bytes' sid' prov' sid'' prov'' concat_fields RUNS EVAL IHdtyp IH sz H.
       - cbn in H. subst.
         cbn in RUNS. inversion RUNS.
         subst.
@@ -433,10 +439,10 @@ Section Serialization_Theory.
         reflexivity.
       - rewrite map_monad_In_unfold in RUNS.
         apply ErrSID_runs_to_bind in RUNS.
-        destruct RUNS as (sid'' & prov'' & first_res & SERFIRST & RUNS).
+        destruct RUNS as (sid''' & prov''' & first_res & SERFIRST & RUNS).
 
         apply ErrSID_runs_to_bind in RUNS.
-        destruct RUNS as (sid''' & prov''' & rest_res & SERREST & RUNS).
+        destruct RUNS as (sid'''' & prov'''' & rest_res & SERREST & RUNS).
 
         apply ErrSID_runs_to_ErrSID_evals_to in SERFIRST.
         apply IH in SERFIRST; cbn; auto.
@@ -464,6 +470,96 @@ Section Serialization_Theory.
         do 2 rewrite sizeof_dtyp_vector.
         lia.
     }
+
+    Set Nested Proofs Allowed.
+    Lemma map_monad_unfold :
+      forall {A B : Type} {M : Type -> Type} {H : Monad M} (x : A) (xs : list A)
+        (f : A -> M B),
+        map_monad f (x :: xs) =
+        b <- f x;;
+        bs <- map_monad (fun (x0 : A) => f x0) xs;;
+        ret (b :: bs).
+    Proof.
+      intros A B M H x xs f.
+      induction xs; cbn; auto.
+    Qed.
+
+    Lemma map_monad_ErrSID_length :
+      forall {A B} (xs : list A) (f : A -> ErrSID B) sid prov res,
+        ErrSID_evals_to (map_monad f xs) sid prov res ->
+        length xs = length res.
+    Proof.
+      intros A B xs.
+      induction xs; intros f sid prov res Hmap.
+      - inv Hmap.
+        reflexivity.
+      - rewrite map_monad_unfold in Hmap.
+
+        apply ErrSID_evals_to_bind in Hmap as (sid' & prov' & x & RUNS & EVALS).
+        apply ErrSID_evals_to_bind in EVALS as (sid'' & prov'' & bs & RUNS' & EVALS).
+
+        apply ErrSID_runs_to_ErrSID_evals_to in RUNS'.
+        apply IHxs in RUNS'.
+
+        inv EVALS.
+        cbn.
+        auto.
+    Qed.
+
+    apply ErrSID_evals_to_bind in BYTES as (sid'' & prov'' & bytes'' & EXTRACT & BYTES).
+
+    Lemma map_monad_lift_ERR :
+      forall {A B M} `{HM : Monad M} `{EQ : Monad.Eq1 M} `{EQE : Monad.Eq1 (eitherT ERR_MESSAGE M)} `{@Eq1Equivalence _ _ EQE} `{@Monad.MonadLawsE M EQ HM} (xs : list A) (f : A -> ERR B),
+        Monad.eq1 (@lift_ERR (eitherT ERR_MESSAGE M) _ _ _ (map_monad f xs)) (map_monad (fun x => lift_ERR (f x)) xs).
+    Proof.
+      intros A B M HM EQ EQE EQEV LAWS xs.
+      induction xs; intros f.
+      - reflexivity.
+      - cbn.
+        destruct (map_monad f xs) eqn:MAP;
+          destruct (f a) eqn:F.
+        + cbn.
+          break_match.
+          cbn.
+(*           break_match. *)
+(*           cbn. *)
+(*           unfold ret. *)
+(*           destruct HM. *)
+(*           cbn. *)
+(*           destruct LAWS. *)
+
+(*           rewrite rewrite bind_ret_l. *)
+(*           reflexivity. *)
+(*           setoid_rewrite Monad.bind_ret_l. *)
+(*         +  *)
+
+
+(*         rewrite Monad.bind_ret_l. *)
+(*         Unset Printing Notations. *)
+(*         Set Printing Implicit. *)
+
+
+(* cbn  in *.        repeat (break_match; cbn; auto). *)
+
+(*     epose proof map_monad_lift_ERR bytes extract_byte_to_sbyte. *)
+(*     apply ErrSID_runs_to_ErrSID_evals_to in EXTRACT. *)
+(*     assert (ErrSID_evals_to (map_monad (fun x => lift_ERR (extract_byte_to_sbyte x)) bytes) sid' prov bytes'') as EXTRACT'. *)
+(*     { admit. *)
+(*     } *)
+
+(*     Set Printing Implicit.  *)
+(*     unfold ErrSID_runs_to in EXTRACT. *)
+(*     unfold runErrSID in EXTRACT. *)
+(*     cbn in EXTRACT. *)
+
+
+(*     rewrite map_monad_lift_ERR in EXTRACT. *)
+(*   Qed. *)
+    Admitted.
+
+    apply ErrSID_runs_to_ErrSID_evals_to in EXTRACT.
+    assert (lift_ERR (map_monad extract_byte_to_sbyte bytes)).
+    
   Qed.
 
   (* Lemma firstn_sizeof_dtyp : *)

@@ -22,6 +22,7 @@ From Vellvm Require Import
      Utils.Error
      Syntax.LLVMAst
      Semantics.LLVMEvents
+     Semantics.Memory.Sizeof
      Semantics.IntrinsicsDefinitions.
 
 From ITree Require Import
@@ -66,9 +67,9 @@ Set Contextual Implicit.
    exception.  Unknown Calls (either to other intrinsics or external calls) are
    passed through unchanged.
 *)
-Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
+Module Make(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(SIZEOF)).
 
-  Module IS := IntrinsicsDefinitions.Make(A)(LLVMIO).
+  Module IS := IntrinsicsDefinitions.Make(A)(SIZEOF)(LLVMIO).
   Include IS.
   Import LLVMIO.
   Import DV.

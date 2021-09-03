@@ -31,6 +31,7 @@ From Vellvm Require Import
      Utilities
      Syntax
      Semantics.MemoryAddress
+     Semantics.Memory.Sizeof
      Semantics.DynamicValues.
 
 Import ITreeNotations.
@@ -124,12 +125,12 @@ Set Contextual Implicit.
     end.
 
 (* TODO: decouple these definitions from the instance of DVALUE and DTYP by using polymorphism not functors. *)
-Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
+Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (SIZEOF : Sizeof).
 
   #[global] Instance eq_dec_addr : RelDec (@eq ADDR.addr) := RelDec_from_dec _ ADDR.eq_dec.
   #[global] Instance Eqv_addr : Eqv ADDR.addr := (@eq ADDR.addr).
 
-  Module DV := DynamicValues.DVALUE(ADDR).
+  Module DV := DynamicValues.DVALUE(ADDR)(SIZEOF).
   Export DV.
 
   Section Events.
@@ -276,6 +277,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
 
 End LLVM_INTERACTIONS.
 
-Module Make(ADDR : MemoryAddress.ADDRESS) <: LLVM_INTERACTIONS(ADDR).
-Include LLVM_INTERACTIONS(ADDR).
+Module Make(ADDR : MemoryAddress.ADDRESS)(SIZEOF : Sizeof) <: LLVM_INTERACTIONS(ADDR)(SIZEOF).
+Include LLVM_INTERACTIONS(ADDR)(SIZEOF).
 End Make.

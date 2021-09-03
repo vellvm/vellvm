@@ -31,6 +31,7 @@ From Vellvm Require Import
      Syntax
      Semantics.DynamicValues
      Semantics.MemoryAddress
+     Semantics.Memory.Sizeof
      Semantics.LLVMEvents.
 
 Require Import Ceres.Ceres.
@@ -100,7 +101,7 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
+Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(A)(SIZEOF)).
   Import LLVMEvents.
 
   Section CONVERSIONS.

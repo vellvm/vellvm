@@ -15,7 +15,8 @@ From ITree Require Import
 From Vellvm Require Import
      Utils.Util
      Utils.Error
-     Semantics.LLVMEvents.
+     Semantics.LLVMEvents
+     Semantics.Memory.Sizeof.
 
 Require Import Ceres.Ceres.
 
@@ -169,7 +170,7 @@ From Vellvm Require Import
    it until [TopLevel] either.
    So exposing the specialization here, but it is awkward.
  *)
-Module Make (A : ADDRESS)(LLVMEvents : LLVM_INTERACTIONS(A)).
+Module Make (A : ADDRESS)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(SIZEOF)).
   Definition local_env := FMapAList.alist raw_id LLVMEvents.DV.uvalue.
 End Make.
 

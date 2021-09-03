@@ -282,7 +282,7 @@ Module FinSizeof : Sizeof.
   Qed.
 End FinSizeof.
 
-Module FinByte (LLVMEvents:LLVM_INTERACTIONS(Addr)) : ByteImpl(Addr)(LLVMEvents).
+Module FinByte (LLVMEvents:LLVM_INTERACTIONS(Addr)(FinSizeof)) : ByteImpl(Addr)(FinSizeof)(LLVMEvents).
   Import LLVMEvents.
   Import DV.
 
@@ -321,7 +321,7 @@ End FinByte.
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
     indexed on [Z].
  *)
-Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(SIZE:Sizeof)(GEP : GEPM(Addr)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(LLVMEvents)).
+Module Make (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)).
   Import LLVMEvents.
   Import DV.
   Import PTOI.
@@ -330,10 +330,10 @@ Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANC
   Import SIZE.
   Import GEP.
 
-  Module BYTE := Byte Addr LLVMEvents BYTE_IMPL.
+  Module BYTE := Byte Addr SIZE LLVMEvents BYTE_IMPL.
   Import BYTE.
 
-  Module ESID := ERRSID Addr LLVMEvents PROV.
+  Module ESID := ERRSID Addr SIZE LLVMEvents PROV.
   Import ESID.
   
   Open Scope list.

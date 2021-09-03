@@ -6,9 +6,10 @@ From ExtLib Require Import
 From Vellvm Require Import
      DynamicTypes
      LLVMEvents
+     Semantics.Memory.Sizeof
      Utils.Error.
 
-Module Type GEPM(Addr:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(Addr)).
+Module Type GEPM(Addr:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(SIZEOF)).
   Import LLVMEvents.
   Import DV.
 

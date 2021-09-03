@@ -19,6 +19,7 @@ From Vellvm Require Import
      Syntax.LLVMAst
      Syntax.AstLib
      Semantics.MemoryAddress
+     Semantics.Memory.Sizeof
      Semantics.DynamicValues
      Semantics.LLVMEvents
      Handlers.Local.
@@ -142,7 +143,7 @@ From Vellvm Require Import
    it until [TopLevel] either.
    We are hence exposing the specialization here, but it is slightly awkward.
  *)
-Module Make (A : ADDRESS)(LLVMEvents : LLVM_INTERACTIONS(A)).
+Module Make (A : ADDRESS)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(SIZEOF)).
   Definition lstack := @stack (list (raw_id * LLVMEvents.DV.uvalue)).
 End Make.
 

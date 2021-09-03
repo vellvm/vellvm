@@ -29,7 +29,8 @@ From Vellvm Require Import
      Utilities
      Syntax
      Syntax.DataLayout
-     Semantics.MemoryAddress.
+     Semantics.MemoryAddress
+     Semantics.Memory.Sizeof.
 
 Require Import Integers Floats.
 
@@ -179,7 +180,11 @@ Qed.
 Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
-Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS).
+(* Sizeof is needed for uvalue_has_dtyp for ConcatBytes case *)
+Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(SIZEOF:Sizeof).
+
+  Import SIZEOF.
+
   (* The set of dynamic values manipulated by an LLVM program. *)
  Unset Elimination Schemes.
 Inductive dvalue : Set :=
@@ -392,7 +397,9 @@ Section UvalueInd.
   Hypothesis IH_InsertValue    : forall (vec:uvalue) (elt:uvalue) (idxs:list LLVMAst.int), P vec -> P elt -> P (UVALUE_InsertValue vec elt idxs).
   Hypothesis IH_Select         : forall (cnd:uvalue) (v1:uvalue) (v2:uvalue), P cnd -> P v1 -> P v2 -> P (UVALUE_Select cnd v1 v2).
   Hypothesis IH_ExtractByte : forall (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : N), P uv -> P idx -> P (UVALUE_ExtractByte uv dt idx sid).
-  Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue), (forall u, In u uvs -> P u) -> P (UVALUE_ConcatBytes uvs dt).
+  Hypothesis IH_ConcatBytes : forall (dt : dtyp) (uvs : list uvalue),
+      (forall u, In u uvs -> P u) ->
+      P (UVALUE_ConcatBytes uvs dt).
 
   Lemma uvalue_ind : forall (uv:uvalue), P uv.
     fix IH 1.
@@ -1949,11 +1956,14 @@ Class VInt I : Type :=
         uvalue_has_dtyp x (DTYPE_Vector (N.of_nat sz) t) ->
         uvalue_has_dtyp y (DTYPE_Vector (N.of_nat sz) t) ->
         uvalue_has_dtyp (UVALUE_Select cond x y) (DTYPE_Vector (N.of_nat sz) t)
-  | UVALUE_ExtractByte_typ :
-      forall uv dt idx sid,
-        uvalue_has_dtyp (UVALUE_ExtractByte uv dt idx sid) (DTYPE_I 8)
+  (* Maybe ExtractByte just doesn't have a type because no values should be raw ExtractByte values... *)
+  (* | UVALUE_ExtractByte_typ : *)
+  (*     forall uv dt idx sid, *)
+  (*       uvalue_has_dtyp (UVALUE_ExtractByte uv dt idx sid) (DTYPE_I 8) *)
   | UVALUE_ConcatBytes_typ :
       forall bytes dt,
+        (forall byte, In byte bytes -> exists uv dt idx sid, byte = UVALUE_ExtractByte uv dt idx sid) ->
+        N.of_nat (length bytes) = sizeof_dtyp dt ->
         uvalue_has_dtyp (UVALUE_ConcatBytes bytes dt) dt.
   Set Elimination Schemes.
 
@@ -2419,6 +2429,8 @@ Class VInt I : Type :=
         
     Hypothesis IH_UVALUE_ConcatBytes :
       forall bytes dt,
+        (forall byte, In byte bytes -> exists uv dt idx sid, byte = UVALUE_ExtractByte uv dt idx sid) ->
+        N.of_nat (length bytes) = sizeof_dtyp dt ->
         P (UVALUE_ConcatBytes bytes dt) dt.
 
     Lemma uvalue_has_dtyp_ind : forall (uv:uvalue) (dt:dtyp) (TYP: uvalue_has_dtyp uv dt), P uv dt.

@@ -13,6 +13,7 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.LLVMEvents
      Semantics.Memory.FiniteProvenance
+     Semantics.Memory.Sizeof
      Utils.StateMonads
      Utils.Monads.
 
@@ -29,7 +30,7 @@ Import Basics.Basics.Monads.
 Import MonadNotation.
 
 (* TODO: Provenance is an issue... *)
-Module ERRSID (Addr:ADDRESS) (LLVMEvents:LLVM_INTERACTIONS(Addr)) (PROV:PROVENANCE(Addr)).
+Module ERRSID (Addr:ADDRESS) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(SIZEOF)) (PROV:PROVENANCE(Addr)).
   Import LLVMEvents.
   Import PROV.
 

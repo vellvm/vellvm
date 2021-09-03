@@ -6,6 +6,7 @@ From Vellvm Require Import
      Syntax.DynamicTypes
      Semantics.DynamicValues
      Semantics.MemoryAddress
+     Semantics.Memory.Sizeof
      Semantics.LLVMEvents
      Utils.Monads
      Utils.NMaps
@@ -16,7 +17,7 @@ Import Basics.Basics.Monads.
 Import ListNotations.
 Import MonadNotation.
 
-Module Type ByteImpl(Addr:ADDRESS)(LLVMEvents: LLVM_INTERACTIONS(Addr)).
+Module Type ByteImpl(Addr:ADDRESS)(SIZEOF:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZEOF)).
   Import LLVMEvents.
   Import DV.
 
@@ -46,7 +47,7 @@ Module Type ByteImpl(Addr:ADDRESS)(LLVMEvents: LLVM_INTERACTIONS(Addr)).
       sbyte_to_extractbyte (uvalue_sbyte uv dt idx sid) =  UVALUE_ExtractByte uv dt idx sid.
 End ByteImpl.
 
-Module Byte(Addr:ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(Addr))(Byte:ByteImpl(Addr)(LLVMEvents)).
+Module Byte(Addr:ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(SIZEOF))(Byte:ByteImpl(Addr)(SIZEOF)(LLVMEvents)).
   Export Byte.
   Import LLVMEvents.
   Import DV.

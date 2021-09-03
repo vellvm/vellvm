@@ -21,6 +21,7 @@ From Vellvm Require Import
      Utilities
      Syntax
      Semantics.LLVMEvents
+     Semantics.Memory.Sizeof
      Numeric.Coqlib
      Numeric.Integers
      Numeric.Floats.
@@ -187,7 +188,7 @@ Definition defined_intrinsics_decls :=
    any other effects.
 
 *)
-Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
+Module Make(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(SIZEOF)).
   Open Scope string_scope.
 
   Import LLVMIO.
