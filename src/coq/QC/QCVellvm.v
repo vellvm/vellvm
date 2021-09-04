@@ -21,14 +21,12 @@ From ITree Require Import
 
 Require Import ExtrOcamlBasic.
 Require Import ExtrOcamlString.
-
 (* TODO: Use the existing vellvm version of this? Might actually just be ocaml result type. *)
 Inductive MlResult a e :=
 | MlOk : a -> MlResult a e
 | MlError : e -> MlResult a e.
 
 Extract Inductive MlResult => "result" [ "Ok" "Error" ].
-
 Unset Guard Checking.
 Fixpoint step (t : ITreeDefinition.itree L5 TopLevel.res_L4) : MlResult DV.uvalue string
   := match observe t with
@@ -43,14 +41,13 @@ Definition interpret (prog : list (toplevel_entity typ (block typ * list (block 
   := step (TopLevel.interpreter prog).
 
 Axiom to_caml_str : string -> string.
-Extract Constant to_caml_str =>
+Extract Constant to_caml_str => 
 "fun (s: char list) ->
   let r = Bytes.create (List.length s) in
   let rec fill pos = function
   | [] -> r
   | c :: s -> Bytes.set r pos c; fill (pos + 1) s
   in Bytes.to_string (fill 0 s)".
-
 
 (** Write our LLVM program to a file ("temporary_vellvm.ll"), and then
     use clang to compile this file to an executable, which we then run in
@@ -76,13 +73,24 @@ Definition vellvm_agrees_with_clang (prog : list (toplevel_entity typ (block typ
               whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) (equ x y)
             | _, _ => checker true
             end.
-
 Definition agrees := (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
-Extract Constant defNumTests    => "1000".
+Extract Constant defNumTests    => "100".
 QCInclude "../../ml/*".
 QCInclude "../../ml/libvellvm/*".
+
+
 (* QCInclude "../../ml/libvellvm/llvm_printer.ml". *)
 (* QCInclude "../../ml/libvellvm/Camlcoq.ml". *)
 (* QCInclude "../../ml/extracted/*ml". *)
 QuickChick (forAll (run_GenLLVM gen_llvm) vellvm_agrees_with_clang).
 (*! QuickChick agrees. *)
+
+
+
+
+(*TypeClasses*)
+(*QuickChick*)
+
+
+(*GenLLVM -> G*)
+Sample (run_GenLLVM (gen_exp_size 0 TYPE_Float)).
