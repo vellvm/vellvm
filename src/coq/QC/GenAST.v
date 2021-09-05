@@ -735,70 +735,53 @@ Section ExpGenerators.
        | TYPE_Double => lift failGen(*ret EXP_Double <*> lift fing64*) (*TODO : Fix generator for double*)
        | _ => lift failGen
        end.
-Search dtyp.
-Print N.
-Fixpoint gen_index_from_array_vector (sz : nat) (loc : list nat) (ls : list (list nat)) :=
-  match sz with
-  | 0%nat => [loc ++ [0%nat]] ++ ls
-  | S z => let lss := [loc ++ [z]] ++ ls in
-          gen_index_from_array_vector z loc lss
-  end.
-Search N.
 
-Fixpoint gen_dtyp_from_dtyp (t: dtyp) (m : dtyp) (loc : list N) (ls: list (list N)) : list (list N) :=
-  let ls := if dtyp_eq t m then [loc] ++ ls else ls in
-  match m with 
-  | DTYPE_Array sz t1 => gen_index_array_vector t t1 sz loc ls (*Not exactly on this one, specificaly on loc*)
-  | DTYPE_Vector sz t1 => []
-  | DTYPE_Struct field => []
-  | DTYPE_Packed_struct field => []
-  | _ => ls
-  end with 
-  gen_index_array_vector (t1: dtyp) (t2: dtyp) (sz: N) (loc: list N) (ls: list (list N)) : list (list N):= 
-match sz with
-| N0 => ls
-| Npos pos => let oneSmaller : N := N.pred (Npos pos) in
-let lss := gen_dtyp_from_dtyp t1 t2 (loc ++ [oneSmaller]) ls in
-gen_index_array_vector t1 t2 oneSmaller loc lss
+Fixpoint get_array_index (ls : list (list N)) (sz : nat) : list (list N) :=
+  match sz with 
+  | 0%nat => []
+  | S z =>
+  (get_array_index ls z) ++ (map (fun x => (N.of_nat z)::x) ls)
   end.
 
-
-
-
-Fixpoint gen_dtyp_from_dtyp (t: dtyp) (m : dtyp) (loc : list N) (ls: list (list N)) : list (list N) :=
-  let ls := if dtyp_eq t m then [loc] ++ ls else ls in
-  match m with 
-  | DTYPE_Array sz t1 => if (N.eqb sz 0%N) then [] else let lss := gen_dtyp_from_dtyp t t1 ()
-  | DTYPE_Vector sz t1 => []
-  | DTYPE_Struct field => []
-  | DTYPE_Packed_struct field => []
-  | _ => ls
-  end with 
-  gen_index_array_vector (t1: dtyp) (t2: dtyp) (sz: N) (loc: list N) (ls : list (list N)) : list (list N):=
-  match sz with
-  ｜ 0%nat => ls
-  | S z => let lss := gen_dtyp_from_dtyp t1 t2 (loc ++ [N.of_nat z]) ls in lss 
-  end.
-  Fixpoint gen_dtyp_from_dtyp (t: dtyp) (m : dtyp) (loc : list N) (ls: list (list N)) : list (list N) :=
-    let ls := if dtyp_eq t m then [loc] ++ ls else ls in
-    match m with 
-    | DTYPE_Array sz t1 => if (N.eqb sz 0%N) then [] else let lss := gen_dtyp_from_dtyp t t1 ()
-    | DTYPE_Vector sz t1 => []
-    | DTYPE_Struct field => []
-    | DTYPE_Packed_struct field => []
-    | _ => ls
-    end with 
-    gen_index_array_vector (t1: dtyp) (t2: dtyp) (sz: N) (loc: list N) (ls : list (list N)) : list (list N):=
-    [].
-
-  Definition get_typ_in_aggr (t : dtyp) (s : dtyp) : list (list N) :=
-    match s with 
-    | DTYPE_Array sz t1=> if (dtyp_eq t s) then gen_index_from_array_vector sz [] [] else []
-    | DTYPE_Vector sz t1 => if (dtyp_eq t s) then [[]] else []
-    | DTYPE_Struct fields => [[]]
-    | DTYPE_Packed_struct fields => []
-    | _ => [[]]
+Fixpoint get_index_paths_to_typ (t_in t_from : dtyp) : list (list N) :=
+  let this_stage := if (dtyp_eq t_in t_from) then [[]] else [] in
+  let other_stage :=
+    match t_from with 
+    | DTYPE_Array sz t => let lss := get_index_paths_to_typ t_in t in
+    get_array_index lss (N.to_nat sz)
+    | DTYPE_Vector sz t => let lss := get_index_paths_to_typ t_in t in
+    get_array_index lss (N.to_nat sz)
+    | DTYPE_Struct fields=> get_index_paths_from_struct t_in fields 0
+    | DTYPE_Packed_struct fields=> get_index_paths_from_struct t_in fields 0
+    | _ => []
+    end in
+    this_stage ++ other_stage
+     with 
+    get_index_paths_from_struct (t_in : dtyp) (lt: list dtyp) (current_index : N) : list (list N) :=
+    match lt with
+    | nil => nil 
+    | h::t => let lss := get_index_paths_to_typ t_in h in
+    (map (fun x => current_index::x) lss) ++ (get_index_paths_from_struct t_in t (current_index + 1%N))
     end.
+
+Example test1:
+get_index_paths_to_typ_helper DTYPE_Metadata DTYPE_Metadata 0 = [[]].
+Proof. simpl. reflexivity. Qed.
+
+Example test2:
+get_index_paths_to_typ_helper DTYPE_Metadata (DTYPE_Array 5 DTYPE_Metadata) 0 = [[0%N];[1%N];[2%N];[3%N];[4%N]].
+Proof. simpl. reflexivity. Qed.
+
+Example test3:
+get_index_paths_to_typ_helper DTYPE_Metadata (DTYPE_Array 3 (DTYPE_Array 2 DTYPE_Metadata)) 0 = [[0%N;0%N]; [0%N;1%N]; [1%N;0%N]; [1%N;1%N]; [2%N;0%N]; [2%N;1%N]].
+Proof. simpl. reflexivity. Qed.
+
+
+
+
+
+  
+
 
   (* TODO: should make it much more likely to pick an identifier for
            better test cases *)
