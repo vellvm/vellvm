@@ -561,7 +561,7 @@ Section ExpGenerators.
     := match a, b with
        | DTYPE_I sz, DTYPE_I sz' =>
          if N.eq_dec sz sz' then true else false
-       | DTYPE_I sz, _ => false
+       | DTYPE_I _, _ => false
        | DTYPE_Pointer, DTYPE_Pointer => true
        | DTYPE_Pointer, _ => false
        | DTYPE_Void, DTYPE_Void => true
@@ -586,24 +586,24 @@ Section ExpGenerators.
            if N.eq_dec sz sz'
            then dtyp_eq t t'
            else false
-       | DTYPE_Array sz t, _ => false
+       | DTYPE_Array _ _, _ => false
        | DTYPE_Struct fields, DTYPE_Struct fields' =>
          if Nat.eqb (Datatypes.length fields) (Datatypes.length fields')
          then forallb id (map_In (zip fields fields') (fun '(a, b) HIn => dtyp_eq a b))
          else false
-       | DTYPE_Struct fields, _ => false
+       | DTYPE_Struct _, _ => false
        | DTYPE_Packed_struct fields, DTYPE_Packed_struct fields' =>
          if Nat.eqb (Datatypes.length fields) (Datatypes.length fields')
          then forallb id (map_In (zip fields fields') (fun '(a, b) HIn => dtyp_eq a b))
          else false
-       | DTYPE_Packed_struct fields, _ => false
+       | DTYPE_Packed_struct _, _ => false
        | DTYPE_Opaque, DTYPE_Opaque => false (* TODO: Unsure if this should compare equal *)
        | DTYPE_Opaque, _ => false
        | DTYPE_Vector sz t, DTYPE_Vector sz' t' =>
            if N.eq_dec sz sz'
            then dtyp_eq t t'
            else false
-       | DTYPE_Vector sz t, _ => false
+       | DTYPE_Vector _ _, _ => false
        end.
 
   (* TODO: Move this*)
@@ -743,7 +743,8 @@ Fixpoint get_array_index (ls : list (list N)) (sz : nat) : list (list N) :=
   (get_array_index ls z) ++ (map (fun x => (N.of_nat z)::x) ls)
   end.
 
-Fixpoint get_index_paths_to_typ (t_in t_from : dtyp) : list (list N) :=
+  Unset Guard Checking.
+Fixpoint get_index_paths_to_typ (t_in t_from : dtyp) {struct t_from} : list (list N) :=
   let this_stage := if (dtyp_eq t_in t_from) then [[]] else [] in
   let other_stage :=
     match t_from with 
@@ -755,32 +756,39 @@ Fixpoint get_index_paths_to_typ (t_in t_from : dtyp) : list (list N) :=
     | DTYPE_Packed_struct fields=> get_index_paths_from_struct t_in fields 0
     | _ => []
     end in
-    this_stage ++ other_stage
-     with 
-    get_index_paths_from_struct (t_in : dtyp) (lt: list dtyp) (current_index : N) : list (list N) :=
-    match lt with
+    this_stage ++ other_stage with 
+    get_index_paths_from_struct (t_in : dtyp) (fields : list dtyp) (current_index : N) {struct fields} : list (list N) :=
+    match fields with 
     | nil => nil 
-    | h::t => let lss := get_index_paths_to_typ t_in h in
-    (map (fun x => current_index::x) lss) ++ (get_index_paths_from_struct t_in t (current_index + 1%N))
+    | h::t => let head_list := get_index_paths_to_typ t_in h in
+    let tail_list := get_index_paths_from_struct t_in fields (current_index + 1%N) in
+    (map (fun x => 0%N::x) head_list) ++ tail_list
     end.
 
 Example test1:
-get_index_paths_to_typ_helper DTYPE_Metadata DTYPE_Metadata 0 = [[]].
+get_index_paths_to_typ DTYPE_Metadata DTYPE_Metadata = [[]].
 Proof. simpl. reflexivity. Qed.
 
 Example test2:
-get_index_paths_to_typ_helper DTYPE_Metadata (DTYPE_Array 5 DTYPE_Metadata) 0 = [[0%N];[1%N];[2%N];[3%N];[4%N]].
+get_index_paths_to_typ DTYPE_Metadata (DTYPE_Array 5 DTYPE_Metadata)  = [[0%N];[1%N];[2%N];[3%N];[4%N]].
 Proof. simpl. reflexivity. Qed.
 
 Example test3:
-get_index_paths_to_typ_helper DTYPE_Metadata (DTYPE_Array 3 (DTYPE_Array 2 DTYPE_Metadata)) 0 = [[0%N;0%N]; [0%N;1%N]; [1%N;0%N]; [1%N;1%N]; [2%N;0%N]; [2%N;1%N]].
+get_index_paths_to_typ DTYPE_Metadata (DTYPE_Array 3 (DTYPE_Array 2 DTYPE_Metadata)) = [[0%N;0%N]; [0%N;1%N]; [1%N;0%N]; [1%N;1%N]; [2%N;0%N]; [2%N;1%N]].
 Proof. simpl. reflexivity. Qed.
 
+Example test4:
+get_index_paths_to_typ DTYPE_Metadata (DTYPE_Struct [DTYPE_Metadata]) = [[0%N]].
+Proof.
+
+Example test4:
+get_index_paths_to_typ DTYPE_Metadata (DTYPE_Struct [DTYPE_Metadata; DTYPE_Array 3 DTYPE_Metadata]) = [[0%N]; [1%N;0%N]; [1%N;1%N]; [1%N;2%N]].
+Proof. Abort. (* Cannnot simpl to prove that it works*)
 
 
 
 
-  
+
 
 
   (* TODO: should make it much more likely to pick an identifier for
