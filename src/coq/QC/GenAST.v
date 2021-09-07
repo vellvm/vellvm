@@ -743,7 +743,7 @@ Fixpoint get_array_index (ls : list (list N)) (sz : nat) : list (list N) :=
   (get_array_index ls z) ++ (map (fun x => (N.of_nat z)::x) ls)
   end.
 
-  Unset Guard Checking.
+
 Fixpoint get_index_paths_to_typ (t_in t_from : dtyp) {struct t_from} : list (list N) :=
   let this_stage := if (dtyp_eq t_in t_from) then [[]] else [] in
   let other_stage :=
@@ -776,10 +776,6 @@ Proof. simpl. reflexivity. Qed.
 Example test3:
 get_index_paths_to_typ DTYPE_Metadata (DTYPE_Array 3 (DTYPE_Array 2 DTYPE_Metadata)) = [[0%N;0%N]; [0%N;1%N]; [1%N;0%N]; [1%N;1%N]; [2%N;0%N]; [2%N;1%N]].
 Proof. simpl. reflexivity. Qed.
-
-Example test4:
-get_index_paths_to_typ DTYPE_Metadata (DTYPE_Struct [DTYPE_Metadata]) = [[0%N]].
-Proof.
 
 Example test4:
 get_index_paths_to_typ DTYPE_Metadata (DTYPE_Struct [DTYPE_Metadata; DTYPE_Array 3 DTYPE_Metadata]) = [[0%N]; [1%N;0%N]; [1%N;1%N]; [1%N;2%N]].
