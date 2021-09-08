@@ -1,3 +1,6 @@
+From Coq Require Import
+     Morphisms.
+
 From ITree Require Import
      Basics.Monad.
 
@@ -73,3 +76,83 @@ Section Either.
     }.
 
 End Either.
+
+Section EitherT.
+  Variable T : Type.
+  Variable E : Type.
+  Variable M : Type -> Type.
+  Context {HM : Monad M}.
+  Context {EQM : Eq1 M}.
+  Context {EQE : Eq1Equivalence M}.
+  Context {MLAWS : MonadLawsE M}.
+
+  Import EitherMonad.
+
+  Global Instance Eq1_eitherT `{Eq1 M} : Eq1 (eitherT E M) :=
+    { eq1 :=
+        fun a x y =>
+          eq1 (unEitherT x) (unEitherT y)
+    }.
+
+  Arguments eq1 {M _ _}.
+  Infix "≈" := eq1 (at level 70) : monad_scope.
+
+  Context {proper_eq1_mkEitherT : forall {A}, Proper (@eq1 M EQM (E + A) ==> @eq1 (eitherT E M) _ A) mkEitherT}.
+
+  Open Scope monad_scope.
+
+  From Coq Require Import Setoid.
+
+  (* Instance proper_eq1_mkEitherT : forall {A}, Proper (@eq1 M EQM (E + A) ==> @eq1 (eitherT E M) _ A) mkEitherT. *)
+  (* Proof. *)
+  (*   intros A. *)
+  (*   unfold Proper. *)
+  (*   unfold respectful. *)
+  (*   unfold eq1. *)
+  (*   unfold Eq1_eitherT. *)
+  (*   intros x y H. *)
+  (* Admitted. *)
+
+
+
+  Lemma raise_bind_eitherT :
+    forall A B (f : A -> eitherT E M B) (x : E),
+      bind (raise x) f ≈ raise x.
+  Proof.
+    intros A B f x.
+    cbn.
+    destruct MLAWS.
+    unfold Proper, respectful in proper_eq1_mkEitherT.
+    pose proof bind_ret_l _ _ (fun xM : E + A => match xM with
+                                                   | inl x0 => ret (inl x0)
+                                                   | inr x0 => unEitherT (f x0)
+                                              end) (inl x).
+    
+    epose proof (proper_eq1_mkEitherT _ _ _ H).
+    apply H0.
+  Qed.
+
+  Lemma raise_catch_eitherT :
+    forall A (handler : E -> eitherT E M A) (x : E) , catch (raise x) handler ≈ handler x.
+  Proof.
+    intros A handler x.
+    cbn.
+    unfold Proper, respectful in proper_eq1_mkEitherT.
+    pose proof bind_ret_l _ _ (fun xM : E + A => match xM with
+                                                   | inl x0 => unEitherT (handler x0)
+                                                   | inr x0 => ret (inr x0)
+                                              end) (inl x).
+    
+    epose proof (proper_eq1_mkEitherT _ _ _ H).
+
+    apply H0.
+  Qed.
+
+  Global Instance MonadExcLaws_eitherT : MonadExcLaws (eitherT E M) E :=
+    { raise_bind := raise_bind_eitherT;
+      raise_catch := raise_catch_eitherT;
+    }.
+
+End EitherT.
+
+

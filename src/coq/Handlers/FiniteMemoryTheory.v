@@ -32,6 +32,9 @@ From Vellvm Require Import
      Utils.IntMaps
      Utils.ListUtil
      Utils.Monads
+     Utils.MonadExcLaws
+     Utils.MonadEq1Laws
+     Utils.MonadReturnsLaws
      Utils.UBAndErrors
      Syntax.LLVMAst
      Syntax.DynamicTypes
@@ -484,6 +487,32 @@ Section Serialization_Theory.
       induction xs; cbn; auto.
     Qed.
 
+    Lemma map_monad_length :
+      forall {A B M} `{HM: Monad M} `{EQM : Monad.Eq1 M} `{LAWS : @Monad.MonadLawsE M EQM HM} `{MRET : @MonadReturns M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM} (xs : list A) (f : A -> M B) res,
+        MReturns res (map_monad f xs) ->
+        length xs = length res.
+    Proof.
+      intros A B M HM EQ LAWS MRET EQRET xs.
+      induction xs; intros f res Hmap.
+      - cbn in Hmap.
+        apply MReturns_ret_inv in Hmap; subst; auto.
+      - rewrite map_monad_unfold in Hmap.
+        destruct LAWS.
+        destruct MRET.
+
+        pose proof Hmap as RET.
+        apply MReturns_bind_inv in RET as (b & Hb & RET).
+        apply MReturns_bind_inv in RET as (bs & Hbs & RET).
+
+        apply MReturns_ret_inv in RET.
+        subst.
+
+        apply IHxs in Hbs.
+        cbn.
+        lia.
+    Qed.
+
+
     Lemma map_monad_ErrSID_length :
       forall {A B} (xs : list A) (f : A -> ErrSID B) sid prov res,
         ErrSID_evals_to (map_monad f xs) sid prov res ->
@@ -509,18 +538,25 @@ Section Serialization_Theory.
     apply ErrSID_evals_to_bind in BYTES as (sid'' & prov'' & bytes'' & EXTRACT & BYTES).
 
     Lemma map_monad_lift_ERR :
-      forall {A B M} `{HM : Monad M} `{EQ : Monad.Eq1 M} `{EQE : Monad.Eq1 (eitherT ERR_MESSAGE M)} `{@Eq1Equivalence _ _ EQE} `{@Monad.MonadLawsE M EQ HM} (xs : list A) (f : A -> ERR B),
+      forall {A B M} `{HM : Monad M}  (* `{EQ : Monad.Eq1 M} *) (*`{EQV : Monad.Eq1Equivalence M} `{EQE : Monad.Eq1Equivalence (eitherT ERR_MESSAGE M)} (* `{@Monad.MonadLawsE M EQ HM} *) *) (xs : list A) (f : A -> ERR B),
         Monad.eq1 (@lift_ERR (eitherT ERR_MESSAGE M) _ _ _ (map_monad f xs)) (map_monad (fun x => lift_ERR (f x)) xs).
     Proof.
-      intros A B M HM EQ EQE EQEV LAWS xs.
-      induction xs; intros f.
-      - reflexivity.
-      - cbn.
-        destruct (map_monad f xs) eqn:MAP;
-          destruct (f a) eqn:F.
-        + cbn.
-          break_match.
-          cbn.
+      (* intros A B M HM EQ EQV HME EEQ EEQV xs. *)
+      (* Opaque MonadExc.raise. *)
+      (* induction xs; intros f.       *)
+      (* - cbn. reflexivity. *)
+      (* - cbn. *)
+      (*   destruct (map_monad f xs) eqn:MAP; *)
+      (*     destruct (f a) eqn:F. *)
+      (*   + cbn. *)
+          (* rewrite raise_bind. *)
+          (* assert ({| unEitherT := ret (inl (ERR_message s)) |} = @MonadExc.raise _ _ _ B (ERR_message s)). *)
+          (* { cbn. reflexivity. } *)
+          (* rewrite H. *)
+          
+          (* rewrite bind_ret_l. *)
+          (* break_match. *)
+          (* cbn. *)
 (*           break_match. *)
 (*           cbn. *)
 (*           unfold ret. *)
@@ -557,9 +593,29 @@ Section Serialization_Theory.
 (*   Qed. *)
     Admitted.
 
-    apply ErrSID_runs_to_ErrSID_evals_to in EXTRACT.
-    assert (lift_ERR (map_monad extract_byte_to_sbyte bytes)).
-    
+  Instance proper_eq1_runs_to : forall {A sid prov a sid' prov'}, Proper (@Monad.eq1 (eitherT _ _) _ A ==> iff) (fun ma => ErrSID_runs_to ma sid prov a sid' prov').
+  Proof.
+    intros sid prov sid' prov' A a.
+    unfold Proper.
+    unfold respectful.
+    intros x y EQ.
+
+    unfold Monad.eq1, Eq1_eitherT in EQ.
+    subst.
+    reflexivity.
+  Qed.
+
+  pose proof (@proper_eq1_runs_to _ sid' prov bytes'' sid'' prov'').
+  unfold Proper in H1.
+  unfold respectful in H1.
+  rewrite H1 in EXTRACT.
+  2: { unfold Monad.eq1, Eq1_eitherT.
+       apply map_monad_lift_ERR.
+  }
+
+  apply ErrSID_runs_to_ErrSID_evals_to in EXTRACT.
+  apply map_monad_ErrSID_length in EXTRACT.
+  lia.
   Qed.
 
   (* Lemma firstn_sizeof_dtyp : *)

@@ -55,6 +55,6 @@ Definition lift_err {M A} `{MonadExc string M} `{Monad M} (e : err A) : (M A)
 
 Definition lift_ERR {M A} `{MonadExc ERR_MESSAGE M} `{Monad M} (e : ERR A) : (M A)
   := match e with
-     | inl (ERR_message e) => MonadExc.raise (ERR_message e)
+     | inl e => MonadExc.raise e
      | inr x => ret x
      end.
