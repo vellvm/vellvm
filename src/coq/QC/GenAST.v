@@ -743,21 +743,21 @@ Fixpoint get_array_index (ls : list (list N)) (sz : nat) : list (list N) :=
   (get_array_index ls z) ++ (map (fun x => (N.of_nat z)::x) ls)
   end.
 
-
-Fixpoint get_index_paths_to_typ (t_in t_from : dtyp) {struct t_from} : list (list N) :=
-  let this_stage := if (dtyp_eq t_in t_from) then [[]] else [] in
+Search typ.
+Fixpoint get_index_paths_to_typ (t_in t_from : typ) {struct t_from} : list (list N) :=
+  let this_stage := if (normalized_typ_eq t_in t_from) then [[]] else [] in
   let other_stage :=
     match t_from with 
-    | DTYPE_Array sz t => let lss := get_index_paths_to_typ t_in t in
+    | TYPE_Array sz t => let lss := get_index_paths_to_typ t_in t in
     get_array_index lss (N.to_nat sz)
-    | DTYPE_Vector sz t => let lss := get_index_paths_to_typ t_in t in
+    | TYPE_Vector sz t => let lss := get_index_paths_to_typ t_in t in
     get_array_index lss (N.to_nat sz)
-    | DTYPE_Struct fields=> get_index_paths_from_struct t_in fields 0
-    | DTYPE_Packed_struct fields=> get_index_paths_from_struct t_in fields 0
+    | TYPE_Struct fields=> get_index_paths_from_struct t_in fields 0
+    | TYPE_Packed_struct fields=> get_index_paths_from_struct t_in fields 0
     | _ => []
     end in
     this_stage ++ other_stage with 
-    get_index_paths_from_struct (t_in : dtyp) (fields : list dtyp) (current_index : N) {struct fields} : list (list N) :=
+    get_index_paths_from_struct (t_in : typ) (fields : list typ) (current_index : N) {struct fields} : list (list N) :=
     match fields with 
     | nil => nil 
     | h::t => let head_list := get_index_paths_to_typ t_in h in
@@ -766,20 +766,22 @@ Fixpoint get_index_paths_to_typ (t_in t_from : dtyp) {struct t_from} : list (lis
     end.
 
 Example test1:
-get_index_paths_to_typ DTYPE_Metadata DTYPE_Metadata = [[]].
+get_index_paths_to_typ TYPE_Metadata TYPE_Metadata = [[]].
 Proof. simpl. reflexivity. Qed.
 
 Example test2:
-get_index_paths_to_typ DTYPE_Metadata (DTYPE_Array 5 DTYPE_Metadata)  = [[0%N];[1%N];[2%N];[3%N];[4%N]].
+get_index_paths_to_typ TYPE_Metadata (TYPE_Array 5 TYPE_Metadata)  = [[0%N];[1%N];[2%N];[3%N];[4%N]].
 Proof. simpl. reflexivity. Qed.
 
 Example test3:
-get_index_paths_to_typ DTYPE_Metadata (DTYPE_Array 3 (DTYPE_Array 2 DTYPE_Metadata)) = [[0%N;0%N]; [0%N;1%N]; [1%N;0%N]; [1%N;1%N]; [2%N;0%N]; [2%N;1%N]].
+get_index_paths_to_typ TYPE_Metadata (TYPE_Array 3 (TYPE_Array 2 TYPE_Metadata)) = [[0%N;0%N]; [0%N;1%N]; [1%N;0%N]; [1%N;1%N]; [2%N;0%N]; [2%N;1%N]].
 Proof. simpl. reflexivity. Qed.
 
 Example test4:
-get_index_paths_to_typ DTYPE_Metadata (DTYPE_Struct [DTYPE_Metadata; DTYPE_Array 3 DTYPE_Metadata]) = [[0%N]; [1%N;0%N]; [1%N;1%N]; [1%N;2%N]].
+get_index_paths_to_typ TYPE_Metadata (TYPE_Struct [TYPE_Metadata; TYPE_Array 3 TYPE_Metadata]) = [[0%N]; [1%N;0%N]; [1%N;1%N]; [1%N;2%N]].
 Proof. Abort. (* Cannnot simpl to prove that it works*)
+
+
 
 
 
