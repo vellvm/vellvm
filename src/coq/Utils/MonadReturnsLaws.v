@@ -125,6 +125,18 @@ Section EitherT.
 
 End EitherT.
 
+(* TODO: Move this *)
+Section Inhabited.
+  Variable A: Type.
+  Class Inhabited :=
+    { has_value : A }.
+End Inhabited.
+
+(* TODO: Move this *)
+Require Import ZArith.
+Instance Inhabited_N : Inhabited N
+  := { has_value := 0%N }.
+
 Section StateT.
   From ITree Require Import
        ITree
@@ -137,6 +149,7 @@ Section StateT.
   From Vellvm Require Import Utils.StateMonads.
 
   Context {S : Type}.
+  Context {SINHAB : Inhabited S}.
   Context {M : Type -> Type}.
   Context {HM : Monad M}.
   Context {EQM : @Eq1 M}.
@@ -144,38 +157,38 @@ Section StateT.
   Context {MRET : @MonadReturns M HM EQM}.
           
 
-  Definition StateTReturns {A} (a : A) (ma : stateT S M A) : Prop
-    := forall s, exists s', MReturns (a, s') (runStateT ma s).
+  Definition StateTReturns {A} {s1 s2 : S} (a : A) (ma : stateT S M A) : Prop
+    := MReturns (a, s2) (runStateT ma s1).
 
   Lemma StateTReturns_bind :
-    forall {A B} (a : A) (b : B) (ma : stateT S M A) (k : A -> stateT S M B),
-      StateTReturns a ma -> StateTReturns b (k a) -> StateTReturns b (bind ma k).
+    forall {A B} (s sa sb : S) (a : A) (b : B) (ma : stateT S M A) (k : A -> stateT S M B),
+      @StateTReturns A s sa a ma -> @StateTReturns B sa sb b (k a) -> @StateTReturns B s sb b (bind ma k).
   Proof.
     intros * Ha Hb.
     unfold StateTReturns in *.
-
-    intros s.
-    specialize (Ha s) as (sa & Ha).
-    specialize (Hb sa) as (sb & Hb).
-
-    exists sb.
-
+    cbn in *.
     unfold runStateT in *.
+    intros s.
+
+    specialize (Ha s).
+    destruct Ha as (sa & Ha).
 
     apply MReturns_bind_inv in Ha as (a' & Ha' & Ha).
-    destruct a'.
+    destruct a' as (sa' & a').
     apply MReturns_ret_inv in Ha.
-    inversion Ha; subst.
+    inv Ha.
+
+    specialize (Hb sa').
+    destruct Hb as (sb & Hb).
 
     apply MReturns_bind_inv in Hb as (b' & Hb' & Hb).
-    destruct b'.
+    destruct b' as (sb' & b').
     apply MReturns_ret_inv in Hb.
-    inversion Hb; subst.
+    inv Hb.
 
-    eapply MReturns_bind.
-    cbn.
-    eapply MReturns_bind; cbn; eauto.
+    exists sb'.
 
+    repeat eapply MReturns_bind; eauto.
     cbn.
 
     apply MReturns_ret.
@@ -188,14 +201,39 @@ Section StateT.
   Proof.
     intros * Hb.
     unfold StateTReturns in *.
+    unfold runStateT in Hb.
 
-    (* Somehow I need to pull out an `S` state value in order to get
-       `a`, which is the result from `ma` that gets passed to `k`. 
+    unfold MReturns.
+    specialize (Hb (@has_value S _)).
+    destruct Hb as (sb & Hb).
 
-       I don't think I can do this. Suppose `S` is `void`... May not
-       be able to get a state value at all because the type is
-       uninhabited, and then `a` would come out of thin air...
-     *)
+    unfold runStateT in *.
+
+    apply MReturns_bind_inv in Hb as (b' & Hb' & Hb).
+    destruct b'.
+    apply MReturns_ret_inv in Hb.
+    inversion Hb; subst.
+
+    apply MReturns_bind_inv in Hb' as (a' & Ha & Hb').
+    destruct a'.
+    exists a.
+
+    split; intros sfoo.
+    - eexists. eapply MReturns_bind; eauto.
+      cbn.
+
+      apply MReturns_ret.
+
+    
+    apply MReturns_ret_inv in Ha.
+
+    (* Somehow I need to pull out an `S` state value in order to get *)
+(*        `a`, which is the result from `ma` that gets passed to `k`.  *)
+
+(*        I don't think I can do this. Suppose `S` is `void`... May not *)
+(*        be able to get a state value at all because the type is *)
+(*        uninhabited, and then `a` would come out of thin air... *)
+(*      *)
     eexists.
     split.
     - intros s.
