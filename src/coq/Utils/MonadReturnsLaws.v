@@ -157,133 +157,83 @@ Section StateT.
   Context {MRET : @MonadReturns M HM EQM}.
           
 
-  Definition StateTReturns {A} {s1 s2 : S} (a : A) (ma : stateT S M A) : Prop
-    := MReturns (a, s2) (runStateT ma s1).
+  Definition StateTReturns {A} (a : A) (ma : stateT S M A) : Prop
+    := forall s, exists s', MReturns (a, s') (runStateT ma s).
 
-  Lemma StateTReturns_bind :
-    forall {A B} (s sa sb : S) (a : A) (b : B) (ma : stateT S M A) (k : A -> stateT S M B),
-      @StateTReturns A s sa a ma -> @StateTReturns B sa sb b (k a) -> @StateTReturns B s sb b (bind ma k).
-  Proof.
-    intros * Ha Hb.
-    unfold StateTReturns in *.
-    cbn in *.
-    unfold runStateT in *.
-    intros s.
+  (* Lemma StateTReturns_bind : *)
+  (*   forall {A B} (s sa sb : S) (a : A) (b : B) (ma : stateT S M A) (k : A -> stateT S M B), *)
+  (*     @StateTReturns A s sa a ma -> @StateTReturns B sa sb b (k a) -> @StateTReturns B s sb b (bind ma k). *)
+  (* Proof. *)
+  (*   intros * Ha Hb. *)
+  (*   unfold StateTReturns in *. *)
+  (*   cbn in *. *)
+  (*   unfold runStateT in *. *)
 
-    specialize (Ha s).
-    destruct Ha as (sa & Ha).
+  (*   apply MReturns_bind_inv in Ha as (a' & Ha' & Ha). *)
+  (*   apply MReturns_bind_inv in Hb as (b' & Hb' & Hb). *)
+  (*   destruct a' as (sa' & a'). *)
+  (*   destruct b' as (sb' & b'). *)
+  (*   apply MReturns_ret_inv in Ha. *)
+  (*   apply MReturns_ret_inv in Hb. *)
+  (*   inv Ha. *)
+  (*   inv Hb. *)
 
-    apply MReturns_bind_inv in Ha as (a' & Ha' & Ha).
-    destruct a' as (sa' & a').
-    apply MReturns_ret_inv in Ha.
-    inv Ha.
+  (*   repeat eapply MReturns_bind; eauto. *)
+  (*   cbn. *)
 
-    specialize (Hb sa').
-    destruct Hb as (sb & Hb).
-
-    apply MReturns_bind_inv in Hb as (b' & Hb' & Hb).
-    destruct b' as (sb' & b').
-    apply MReturns_ret_inv in Hb.
-    inv Hb.
-
-    exists sb'.
-
-    repeat eapply MReturns_bind; eauto.
-    cbn.
-
-    apply MReturns_ret.
-    reflexivity.
-  Qed.
+  (*   apply MReturns_ret. *)
+  (*   reflexivity. *)
+  (* Qed. *)
 
   Lemma StateTReturns_bind_inv :
     forall {A B} (ma : stateT S M A) (k : A -> stateT S M B) (b : B),
-      StateTReturns b (bind ma k) -> exists a : A , StateTReturns a ma /\ StateTReturns b (k a).
+      (forall s, exists sb, MReturns (b, sb) (runStateT (bind ma k) s)) -> forall s, exists (sa : S) (sb : S) (a : A), MReturns (a, sa) (runStateT ma s) /\ MReturns (b, sb) (runStateT (k a) sa).
   Proof.
-    intros * Hb.
-    unfold StateTReturns in *.
-    unfold runStateT in Hb.
+    intros A B ma k b H s.
 
-    unfold MReturns.
-    specialize (Hb (@has_value S _)).
-    destruct Hb as (sb & Hb).
+    specialize (H s) as (sb & RET).
+    cbn in RET.
+    apply MReturns_bind_inv in RET as ((s' & b') & Hbind & Hb).
+    apply MReturns_bind_inv in Hbind as ((sa & a) & Hbind & Hb').
 
-    unfold runStateT in *.
-
-    apply MReturns_bind_inv in Hb as (b' & Hb' & Hb).
-    destruct b'.
-    apply MReturns_ret_inv in Hb.
-    inversion Hb; subst.
-
-    apply MReturns_bind_inv in Hb' as (a' & Ha & Hb').
-    destruct a'.
-    exists a.
-
-    split; intros sfoo.
-    - eexists. eapply MReturns_bind; eauto.
-      cbn.
-
-      apply MReturns_ret.
-
-    
-    apply MReturns_ret_inv in Ha.
-
-    (* Somehow I need to pull out an `S` state value in order to get *)
-(*        `a`, which is the result from `ma` that gets passed to `k`.  *)
-
-(*        I don't think I can do this. Suppose `S` is `void`... May not *)
-(*        be able to get a state value at all because the type is *)
-(*        uninhabited, and then `a` would come out of thin air... *)
-(*      *)
-    eexists.
+    exists sa. exists sb. exists a.
     split.
-    - intros s.
-      specialize (Hb s) as (sb & Hb).
-      unfold runStateT in *.
-      eapply MReturns_bind_inv in Hb as ((sb' & b') & Ha & Hb).
-      eapply MReturns_bind_inv in Ha as ((sa' & a') & Ha' & Hb').
-      exists sa'.
+    - unfold runStateT.
       eapply MReturns_bind; eauto.
-      cbn in *.
-      apply MReturns_ret.
-      reflexivity.
-
-
-
-
-    destruct ea; eauto.
-
-    apply MReturns_ret_inv in Hb.
-    inversion Hb.
+      cbn.
+      apply MReturns_ret; reflexivity.
+    - unfold runStateT.
+      eapply MReturns_bind; eauto.
   Qed.
 
-  Lemma StateTReturns_ret :
-    forall {A} (a : A) (ma : stateT S M A),
-      eq1 ma (ret a) -> StateTReturns a ma.
-  Proof.
-    intros * Hma.
-    eapply MReturns_ret; eauto.
-  Qed.
+  (* Lemma StateTReturns_ret : *)
+  (*   forall {A} (a : A) (ma : stateT S M A), *)
+  (*     eq1 ma (ret a) -> StateTReturns a ma. *)
+  (* Proof. *)
+  (*   intros * Hma. *)
+  (*   eapply MReturns_ret; eauto. *)
+  (* Qed. *)
 
-  Lemma StateTReturns_ret_inv :
-    forall {A} (x y : A),
-      StateTReturns x (ret y) -> x = y.
-  Proof.
-    intros * H.
-    unfold StateTReturns in H.
-    eapply MReturns_ret_inv; eauto.
-    eapply MReturns_ret_inv in H.
-    inversion H.
-    apply MReturns_ret.
-    reflexivity.
-  Qed.
+  (* Lemma StateTReturns_ret_inv : *)
+  (*   forall {A} (x y : A), *)
+  (*     StateTReturns x (ret y) -> x = y. *)
+  (* Proof. *)
+  (*   intros * H. *)
+  (*   unfold StateTReturns in H. *)
+  (*   eapply MReturns_ret_inv; eauto. *)
+  (*   eapply MReturns_ret_inv in H. *)
+  (*   inversion H. *)
+  (*   apply MReturns_ret. *)
+  (*   reflexivity. *)
+  (* Qed. *)
 
-  Instance MonadReturns_StateT : MonadReturns (stateT S M)
-    := { MReturns := fun A => StateTReturns;
-         MReturns_bind := fun A B => StateTReturns_bind;
-         MReturns_bind_inv := fun A B => StateTReturns_bind_inv;
-         MReturns_ret := fun A => StateTReturns_ret;
-         MReturns_ret_inv := fun A => StateTReturns_ret_inv
-       }.
+  (* Instance MonadReturns_StateT : MonadReturns (stateT S M) *)
+  (*   := { MReturns := fun A => StateTReturns; *)
+  (*        MReturns_bind := fun A B => StateTReturns_bind; *)
+  (*        MReturns_bind_inv := fun A B => StateTReturns_bind_inv; *)
+  (*        MReturns_ret := fun A => StateTReturns_ret; *)
+  (*        MReturns_ret_inv := fun A => StateTReturns_ret_inv *)
+  (*      }. *)
 
 End StateT.
 
