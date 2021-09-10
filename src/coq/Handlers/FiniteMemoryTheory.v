@@ -535,65 +535,73 @@ Section Serialization_Theory.
         auto.
     Qed.
 
+    Lemma re_sid_ubytes_ErrSID_length :
+      forall bytes bytes' sid prov,
+        ErrSID_evals_to (re_sid_ubytes bytes) sid prov bytes' ->
+        length bytes = length bytes'.
+    Proof.
+      intros bytes bytes' sid prov EVAL.
+      induction bytes.
+      - inv EVAL; auto.
+      - cbn in EVAL.
+    Admitted.
+    
     apply ErrSID_evals_to_bind in BYTES as (sid'' & prov'' & bytes'' & EXTRACT & BYTES).
 
     Lemma map_monad_lift_ERR :
-      forall {A B M} `{HM : Monad M}  (* `{EQ : Monad.Eq1 M} *) (*`{EQV : Monad.Eq1Equivalence M} `{EQE : Monad.Eq1Equivalence (eitherT ERR_MESSAGE M)} (* `{@Monad.MonadLawsE M EQ HM} *) *) (xs : list A) (f : A -> ERR B),
+      forall {A B M} `{HM : Monad M}  `{EQ : Monad.Eq1 M} `{EQV : @Monad.Eq1Equivalence M HM EQ} `{EQE : @Monad.Eq1Equivalence (eitherT ERR_MESSAGE M) _ _} `{@Monad.MonadLawsE M EQ HM} (xs : list A) (f : A -> ERR B),
         Monad.eq1 (@lift_ERR (eitherT ERR_MESSAGE M) _ _ _ (map_monad f xs)) (map_monad (fun x => lift_ERR (f x)) xs).
     Proof.
-      (* intros A B M HM EQ EQV HME EEQ EEQV xs. *)
-      (* Opaque MonadExc.raise. *)
-      (* induction xs; intros f.       *)
-      (* - cbn. reflexivity. *)
-      (* - cbn. *)
-      (*   destruct (map_monad f xs) eqn:MAP; *)
-      (*     destruct (f a) eqn:F. *)
-      (*   + cbn. *)
-          (* rewrite raise_bind. *)
-          (* assert ({| unEitherT := ret (inl (ERR_message s)) |} = @MonadExc.raise _ _ _ B (ERR_message s)). *)
-          (* { cbn. reflexivity. } *)
-          (* rewrite H. *)
-          
-          (* rewrite bind_ret_l. *)
-          (* break_match. *)
-          (* cbn. *)
-(*           break_match. *)
-(*           cbn. *)
-(*           unfold ret. *)
-(*           destruct HM. *)
-(*           cbn. *)
-(*           destruct LAWS. *)
+      intros A B M HM EQ EQV EEQV LAWS xs.
+      induction xs; intros f.
+      - cbn. reflexivity.
+      - cbn.
 
-(*           rewrite rewrite bind_ret_l. *)
-(*           reflexivity. *)
-(*           setoid_rewrite Monad.bind_ret_l. *)
-(*         +  *)
+        (* TODO: move this to a proper instance *)
+        assert (forall A, @Proper (M (ERR A) -> eitherT ERR_MESSAGE M A)
+                             (@Monad.eq1 M EQ (ERR A) ==> @Monad.eq1 (eitherT ERR_MESSAGE M) _ _) (@mkEitherT ERR_MESSAGE M A)).
+        { unfold Proper, respectful. intros R.
+          intros x y H.
+          unfold Monad.eq1, Eq1_eitherT.
+          cbn.
+          auto.
+        }
 
+        (* TODO: Turn this into a proper proper instance too *)
+        assert (forall A, @Proper (eitherT ERR_MESSAGE M A -> M (ERR A))
+                             (@Monad.eq1 (eitherT ERR_MESSAGE M) (@Eq1_eitherT ERR_MESSAGE M EQ) A ==> @Monad.eq1 M EQ (ERR A))
+                             (@unEitherT ERR_MESSAGE M A)).
+        { unfold Proper, respectful.
+          intros R x y EQxy.
+          destruct x eqn:Hx.
+          destruct y eqn:Hy.
+          cbn.
+          unfold Monad.eq1, Eq1_eitherT in EQxy.
+          cbn in EQxy.
+          auto.
+        }
 
-(*         rewrite Monad.bind_ret_l. *)
-(*         Unset Printing Notations. *)
-(*         Set Printing Implicit. *)
+        (* TODO: this is annoying *)
+        destruct LAWS.
+        destruct (f a) eqn:F.
 
+        { cbn.
+          rewrite bind_ret_l; reflexivity.
+        }
 
-(* cbn  in *.        repeat (break_match; cbn; auto). *)
+        { cbn.
+          rewrite bind_ret_l.
 
-(*     epose proof map_monad_lift_ERR bytes extract_byte_to_sbyte. *)
-(*     apply ErrSID_runs_to_ErrSID_evals_to in EXTRACT. *)
-(*     assert (ErrSID_evals_to (map_monad (fun x => lift_ERR (extract_byte_to_sbyte x)) bytes) sid' prov bytes'') as EXTRACT'. *)
-(*     { admit. *)
-(*     } *)
+          rewrite <- IHxs.
+          destruct (map_monad f xs) eqn:Hfxs;
+            cbn; rewrite bind_ret_l; reflexivity.
+        }
+  Qed.
 
-(*     Set Printing Implicit.  *)
-(*     unfold ErrSID_runs_to in EXTRACT. *)
-(*     unfold runErrSID in EXTRACT. *)
-(*     cbn in EXTRACT. *)
+    Instance Eq1_ident : Monad.Eq1 IdentityMonad.ident
+      := {eq1 := fun A => Logic.eq}.
 
-
-(*     rewrite map_monad_lift_ERR in EXTRACT. *)
-(*   Qed. *)
-    Admitted.
-
-  Instance proper_eq1_runs_to : forall {A sid prov a sid' prov'}, Proper (@Monad.eq1 (eitherT _ _) _ A ==> iff) (fun ma => ErrSID_runs_to ma sid prov a sid' prov').
+  Instance proper_eq1_runs_to : forall {A sid prov a sid' prov'}, Proper (@Monad.eq1 (eitherT ERR_MESSAGE _) _ A ==> iff) (fun ma => ErrSID_runs_to ma sid prov a sid' prov').
   Proof.
     intros sid prov sid' prov' A a.
     unfold Proper.
@@ -601,20 +609,66 @@ Section Serialization_Theory.
     intros x y EQ.
 
     unfold Monad.eq1, Eq1_eitherT in EQ.
-    subst.
-    reflexivity.
+    split; intros RUNS.
+    - unfold Monad.eq1 in EQ.
+      unfold MonadState.Eq1_stateTM in EQ.
+      unfold pointwise_relation in EQ.
+      unfold Monad.eq1 in EQ.
+      unfold Eq1_ident in EQ.
+
+      specialize (EQ prov sid').
+
+      cbn in EQ.
+      unfold unEitherT in EQ.
+      destruct x as [x].
+      destruct y as [y].
+      destruct x as [x].
+      destruct y as [y].
+
+      unfold ErrSID_runs_to, runErrSID, runErrSID_T in *.
+      cbn in *.
+      rewrite <- EQ.
+      auto.
+    - unfold Monad.eq1 in EQ.
+      unfold MonadState.Eq1_stateTM in EQ.
+      unfold pointwise_relation in EQ.
+      unfold Monad.eq1 in EQ.
+      unfold Eq1_ident in EQ.
+
+      specialize (EQ prov sid').
+
+      cbn in EQ.
+      unfold unEitherT in EQ.
+      destruct x as [x].
+      destruct y as [y].
+      destruct x as [x].
+      destruct y as [y].
+
+      unfold ErrSID_runs_to, runErrSID, runErrSID_T in *.
+      cbn in *.
+      rewrite EQ.
+      auto.
   Qed.
 
-  pose proof (@proper_eq1_runs_to _ sid' prov bytes'' sid'' prov'').
-  unfold Proper in H1.
-  unfold respectful in H1.
-  rewrite H1 in EXTRACT.
-  2: { unfold Monad.eq1, Eq1_eitherT.
-       apply map_monad_lift_ERR.
-  }
+  pose proof @proper_eq1_runs_to (list SByte) sid' prov bytes'' sid'' prov''.
+
+  unfold Proper, respectful in H1.
+  pose proof @map_monad_lift_ERR.
+
+  specialize (H2 uvalue SByte (eitherT UB_MESSAGE (stateT store_id (stateT FiniteProvenance.Provenance IdentityMonad.ident))) _ _).
+  forward H2.
+  admit.
+  forward H2.
+  admit.
+  forward  H2.
+  admit.
+  specialize (H2 bytes extract_byte_to_sbyte).
+  specialize (H1 _ _ H2).
+  apply H1 in EXTRACT. (* Why can't proper do this? *)
 
   apply ErrSID_runs_to_ErrSID_evals_to in EXTRACT.
   apply map_monad_ErrSID_length in EXTRACT.
+  apply re_sid_ubytes_ErrSID_length in BYTES.
   lia.
   Qed.
 
