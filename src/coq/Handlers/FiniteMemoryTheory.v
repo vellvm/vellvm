@@ -2646,7 +2646,7 @@ Section PARAMS.
       cbn.
       repeat rewrite bind_ret_l.
       cbn.
-      (* Can I avoid this rewriting? *)
+      (* TODO: Can I avoid this unfolding? *)
       unfold ErrSID_MemState_ms_runs_to in Hwrite.
       unfold Mem.ESID.runErrSID.
       unfold runErrSID in Hwrite.
@@ -2681,6 +2681,11 @@ Section PARAMS.
       rewrite interp_memory_trigger.
       cbn in *.
       repeat rewrite bind_ret_l; cbn.
+      (* TODO: Can I avoid this unfolding? *)
+      unfold ErrSID_runs_to in *.
+      unfold Mem.ESID.runErrSID.
+      unfold runErrSID in ALLOC.
+      unfold runErrSID_T, Mem.ESID.runErrSID_T in *.
       rewrite ALLOC. 
       repeat rewrite bind_ret_l; cbn.
       repeat rewrite bind_ret_l; cbn.
@@ -3246,6 +3251,6 @@ Section PARAMS.
 End PARAMS.
 End MEMORY_THEORY.
 
-Module Make(LLVMEvents: LLVM_INTERACTIONS(Addr))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(SIZE:Sizeof)(GEP : GEPM(Addr)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(LLVMEvents)) <: MEMORY_THEORY(LLVMEvents)(PTOI)(PROV)(ITOP)(SIZE)(GEP)(BYTE_IMPL).
-Include MEMORY_THEORY(LLVMEvents)(PTOI)(PROV)(ITOP)(SIZE)(GEP)(BYTE_IMPL).
+Module Make(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)) <: MEMORY_THEORY(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
+Include MEMORY_THEORY(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
 End Make.
