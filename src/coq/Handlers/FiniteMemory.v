@@ -418,9 +418,6 @@ Module Make (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(A
    Definition uvalue_bytes (e : Endianess) (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
       := correct_endianess e (uvalue_bytes_little_endian uv dt sid).
 
-    Definition to_ubytes (uv :  uvalue) (dt : dtyp) (sid : store_id) : list SByte
-      := map (fun n => uvalue_sbyte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq 0 (N.to_nat (sizeof_dtyp dt))).
-
     (* Is a uvalue a concrete integer equal to i? *)
     Definition uvalue_int_eq_Z (uv : uvalue) (i : Z)
       := match uv with
@@ -448,35 +445,6 @@ Module Make (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(A
          | left x => true
          | right x => false
          end.
-
-    Fixpoint all_extract_bytes_from_uvalue_helper (idx' : Z) (sid' : store_id) (dt' : dtyp) (parent : uvalue) (bytes : list uvalue) : option uvalue
-      := match bytes with
-         | [] => Some parent
-         | (UVALUE_ExtractByte uv dt idx sid)::bytes =>
-           guard_opt (uvalue_int_eq_Z idx idx');;
-           guard_opt (RelDec.rel_dec uv parent);;
-           guard_opt (N.eqb sid sid');;
-           guard_opt (dtyp_eqb dt dt');;
-           all_extract_bytes_from_uvalue_helper (Z.succ idx') sid' dt' parent bytes
-         | _ => None
-         end.
-
-    (* Check that store ids, uvalues, and types match up, as well as
-       that the extract byte indices are in the right order *)
-    Definition all_extract_bytes_from_uvalue (bytes : list uvalue) : option uvalue
-      := match bytes with
-         | nil => None
-         | (UVALUE_ExtractByte uv dt idx sid)::xs =>
-           all_extract_bytes_from_uvalue_helper 0 sid dt uv bytes
-         | _ => None
-         end.
-
-    Definition from_ubytes (bytes : list SByte) (dt : dtyp) : uvalue
-      :=
-        match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_bytes_from_uvalue bytes with
-        | true, Some uv => uv
-        | _, _ => UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt
-        end.
 
     (* TODO: revive this *)
     (* Definition fp_alignment (bits : N) : option Alignment := *)
@@ -626,7 +594,7 @@ Module Make (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(A
     re_sid_ubytes (bytes : list SByte) : ErrSID (list SByte)
       := let len := length bytes in
          byte_map <- re_sid_ubytes_helper (zip (Nseq 0 len) bytes) (@NM.empty _);;
-         trywith (ERR_message "re_sid_ubytes: missing indices.") (NM_find_many (Nseq 0 len) byte_map). 
+         trywith (ERR_message "re_sid_ubytes: missing indices.") (NM_find_many (Nseq 0 len) byte_map).
     Set Guard Checking.
     
     (* This is mostly to_ubytes, except it will also unwrap concatbytes *)

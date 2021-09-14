@@ -30,7 +30,7 @@ Require Import Lia.
 Import ListNotations.
 Import MonadNotation.
 
-Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF: Sizeof)(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(LLVMIO)).
+Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(SIZEOF)(LLVMIO)).
 
   Import LLVMIO.
   Import SIZEOF.
@@ -39,11 +39,11 @@ Module Make(Addr:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(Addr))(SIZEOF:
   Import ITOP.
   Import DV.
   Import GEP.
-  Module Den := Denotation Addr LLVMIO.
+  Module Den := Denotation Addr SIZEOF LLVMIO.
   Import Den.
   Open Scope list.
 
-  Module BYTE := Byte Addr LLVMIO BYTE_IMPL.
+  Module BYTE := Byte Addr SIZEOF LLVMIO BYTE_IMPL.
   Import BYTE.
 
 
