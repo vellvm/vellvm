@@ -32,10 +32,10 @@ From Vellvm.Handlers Require Export
 From Vellvm.Semantics Require Import Memory.Sizeof Memory.MemBytes GepM.
 
 (* Handlers get instantiated over the domain of addresses provided by the memory model *)
-Module LLVMEvents := LLVMEvents.Make(FiniteMemory.Addr).
-Module Global := Global.Make FiniteMemory.Addr LLVMEvents.
-Module Local  := Local.Make  FiniteMemory.Addr LLVMEvents.
-Module Stack  := Stack.Make  FiniteMemory.Addr LLVMEvents.
+Module LLVMEvents := LLVMEvents.Make(FiniteMemory.Addr)(FiniteMemory.FinSizeof).
+Module Global := Global.Make FiniteMemory.Addr FiniteMemory.FinSizeof LLVMEvents.
+Module Local  := Local.Make  FiniteMemory.Addr FiniteMemory.FinSizeof LLVMEvents.
+Module Stack  := Stack.Make  FiniteMemory.Addr FiniteMemory.FinSizeof LLVMEvents.
 
 Require Import List ZArith String.
 Import ListNotations.
@@ -50,11 +50,11 @@ From ExtLib Require Import
 
 Import MonadNotation.
 
-Module GEP(SIZEOF:Sizeof) : GEPM(FiniteMemory.Addr)(LLVMEvents).
+Module GEP : GEPM(FiniteMemory.Addr)(FiniteMemory.FinSizeof)(LLVMEvents).
   Import Addr.
   Import LLVMEvents.
   Import DV.
-  Import SIZEOF.
+  Import FiniteMemory.FinSizeof.
 
   (** ** Get Element Pointer
       Retrieve the address of a subelement of an indexable (i.e. aggregate) [dtyp] [t] (i.e. vector, array, struct, packed struct).
@@ -132,14 +132,12 @@ Module GEP(SIZEOF:Sizeof) : GEPM(FiniteMemory.Addr)(LLVMEvents).
     end.
 End GEP.
 
-Module GEPF := GEP(FiniteMemory.FinSizeof).
-
-Module Intrinsics := Intrinsics.Make FiniteMemory.Addr LLVMEvents.
+Module Intrinsics := Intrinsics.Make FiniteMemory.Addr FiniteMemory.FinSizeof LLVMEvents.
 
 Module Byte := FinByte LLVMEvents.
-Module MemTheory := FiniteMemoryTheory.Make LLVMEvents FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP FiniteMemory.FinSizeof GEPF Byte.
+Module MemTheory := FiniteMemoryTheory.Make FiniteMemory.Addr FiniteMemory.FinSizeof LLVMEvents FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP GEP Byte.
 
-Module Pick := Pick.Make FiniteMemory.Addr LLVMEvents FinSizeof FinPTOI FinPROV FinITOP GEPF Byte.
+Module Pick := Pick.Make FiniteMemory.Addr FinSizeof LLVMEvents FinPTOI FinPROV FinITOP GEP Byte.
 
 Export LLVMEvents LLVMEvents.DV Global Local Stack MemTheory MemTheory.Mem Pick Intrinsics
        UndefinedBehaviour.

@@ -60,6 +60,7 @@ From Vellvm Require Import
      Semantics.Memory.MemBytes
      Semantics.Memory.FiniteProvenance
      Semantics.Memory.ErrSID
+     Semantics.Memory.Overlaps
      Semantics.LLVMEvents.
 
 Require Import Ceres.Ceres.
@@ -122,40 +123,8 @@ Definition Iptr := Z. (* Integer pointer type (physical addresses) *)
 (* TODO: Should probably make this an NSet, but it gives universe inconsistency with Module addr *)
 Definition Prov := option (list Provenance). (* Provenance *)
 
-(* Does the provenance set pr allow for access to aid? *)
-Definition access_allowed (pr : Prov) (aid : AllocationId) : bool
-  := match pr with
-     | None => true (* Wildcard can access anything. *)
-     | Some prset =>
-       match aid with
-       | None => true (* Wildcard, can be accessed by anything. *)
-       | Some aid =>
-         existsb (N.eqb aid) prset
-       end
-     end.
-
-Definition all_accesses_allowed (pr : Prov) (aids : list AllocationId) : bool
-  := forallb (access_allowed pr) aids.
-
-Definition aid_access_allowed (pr : AllocationId) (aid : AllocationId) : bool
-  := match pr with
-     | None => true
-     | Some pr =>
-       match aid with
-       | None => true
-       | Some aid =>
-         N.eqb pr aid
-       end
-     end.
-
-Definition all_aid_accesses_allowed (pr : AllocationId) (aids : list AllocationId) : bool
-  := forallb (aid_access_allowed pr) aids.
-
 Definition wildcard_prov : Prov := None.
 Definition nil_prov : Prov := Some [].
-
-Definition allocation_id_to_prov (aid : AllocationId) : Prov
-  := fmap (fun x => [x]) aid.
 
 (* TODO: If Prov is an NSet, I get a universe inconsistency here... *)
 Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type.
@@ -174,6 +143,8 @@ Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type
     - right. intros H. inversion H; subst. apply n. reflexivity.
     - right. intros H. inversion H; subst. apply n. reflexivity.
   Qed.
+
+  Definition show_addr (a : addr) := Show.show a.
 End Addr.
 
 Module FinPTOI : PTOI(Addr).
@@ -181,11 +152,53 @@ Module FinPTOI : PTOI(Addr).
 End FinPTOI.
 
 Module FinPROV : PROVENANCE(Addr) with Definition Prov := Prov.
+  Definition Provenance := Provenance.
+  Definition AllocationId := AllocationId.
   Definition Prov := Prov.
   Definition wildcard_prov : Prov := wildcard_prov.
   Definition nil_prov : Prov := nil_prov.
   Definition address_provenance (a : Addr.addr) : Prov
     := snd a.
+
+  (* Does the provenance set pr allow for access to aid? *)
+  Definition access_allowed (pr : Prov) (aid : AllocationId) : bool
+    := match pr with
+       | None => true (* Wildcard can access anything. *)
+       | Some prset =>
+         match aid with
+         | None => true (* Wildcard, can be accessed by anything. *)
+         | Some aid =>
+           existsb (N.eqb aid) prset
+         end
+       end.
+
+  Definition aid_access_allowed (pr : AllocationId) (aid : AllocationId) : bool
+    := match pr with
+       | None => true
+       | Some pr =>
+         match aid with
+         | None => true
+         | Some aid =>
+           N.eqb pr aid
+         end
+       end.
+
+  Definition allocation_id_to_prov (aid : AllocationId) : Prov
+    := fmap (fun x => [x]) aid.
+
+  Definition provenance_to_allocation_id (pr : Provenance) : AllocationId
+    := Some pr.
+
+  Definition next_provenance (pr : Provenance) : Provenance
+    := N.succ pr.
+
+  Definition initial_provenance : Provenance
+    := 0%N.
+
+  (* Debug *)
+  Definition show_prov (pr : Prov) := Show.show pr.
+  Definition show_provenance (pr : Provenance) := Show.show pr.
+  Definition show_allocation_id (aid : AllocationId) := Show.show aid.
 End FinPROV.
 
 Module FinITOP : ITOP(Addr)(FinPROV).
@@ -321,7 +334,7 @@ End FinByte.
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
     indexed on [Z].
  *)
-Module Make (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)).
+Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)).
   Import LLVMEvents.
   Import DV.
   Import PTOI.
@@ -329,13 +342,21 @@ Module Make (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(A
   Import ITOP.
   Import SIZE.
   Import GEP.
+  Import Addr.
+  Import PROV.
 
   Module BYTE := Byte Addr SIZE LLVMEvents BYTE_IMPL.
   Import BYTE.
 
   Module ESID := ERRSID Addr SIZE LLVMEvents PROV.
   Import ESID.
-  
+
+  Module PROV_F := PROV_FUNCS Addr PROV.
+  Import PROV_F.
+
+  Module OVER := Overlaps Addr PTOI SIZE.
+  Export OVER.
+
   Open Scope list.
 
   (* TODO: Make these parameters? *)
@@ -969,7 +990,8 @@ match uv with
 
     (** ** Reading values from memory *)
     Definition read_memory (mem : memory) (address : addr) (t : dtyp) : err uvalue :=
-      let '(addr, pr) := address in
+      let addr := ptr_to_int address in
+      let pr := address_provenance address in
       match IM_find_many (Zseq addr (N.to_nat (sizeof_dtyp t))) mem with
       | None => failwith "Reading from unallocated memory."
       | Some mem_bytes =>
@@ -977,7 +999,7 @@ match uv with
         let alloc_ids := map snd mem_bytes in
         if all_accesses_allowed pr alloc_ids
         then deserialize_sbytes bytes t
-        else failwith ("Read from memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ Show.show pr ++ ", memory allocation ids: " ++ Show.show alloc_ids ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, aid)) (IM.elements mem)))
+        else failwith ("Read from memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation ids: " ++ Show.show (map show_allocation_id alloc_ids) ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem)))
       end.
 
     (** ** Writing values to memory
@@ -990,7 +1012,8 @@ match uv with
      *)
     Definition write_allowed (mem : memory) (address : addr) (len : nat) : err (list AllocationId)
       :=
-        let '(addr, pr) := address in
+        let addr := ptr_to_int address in
+        let pr := address_provenance address in
         let mem_bytes := IM_find_many (Zseq addr len) mem in
         match mem_bytes with
         | None => failwith "Trying to write to unallocated memory."
@@ -998,7 +1021,7 @@ match uv with
           let alloc_ids := map snd mem_bytes in
           if all_accesses_allowed pr alloc_ids
           then ret alloc_ids
-          else failwith ("Trying to write to memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ Show.show pr ++ ", memory allocation ids: " ++ Show.show alloc_ids ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, aid)) (IM.elements mem)))
+          else failwith ("Trying to write to memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation ids: " ++ Show.show (map show_allocation_id alloc_ids) ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem)))
         end.
 
     Definition write_allowed_errsid (mem : memory) (address : addr) (len : nat) : ErrSID (list AllocationId)
@@ -1013,7 +1036,7 @@ match uv with
         aids <- write_allowed_errsid mem address (N.to_nat (sizeof_dtyp dt));;
         bytes <- serialize_sbytes v dt;;
         let mem_bytes := zip bytes aids in
-        ret (add_all_index mem_bytes (fst address) mem).
+        ret (add_all_index mem_bytes (ptr_to_int address) mem).
 
     (** ** Array element lookup
       A [memory] can be seen as storing an array of elements of [dtyp] [t], from which we retrieve
@@ -1021,12 +1044,13 @@ match uv with
       The [size] argument has no effect, but we need to provide one to the array type.
      *)
     Definition get_array_cell_memory (mem : memory) (address : addr) (i : nat) (size : N) (t : dtyp) : ErrSID uvalue :=
-      let '(addr, pr) := address in
+      let addr := ptr_to_int address in
+      let pr := address_provenance address in
       'offset <- lift_ERR (err_to_ERR
                             (handle_gep_h (DTYPE_Array size t)
                                           addr
                                           [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]));;
-      err_to_ub (read_memory mem (offset, pr) t).
+      err_to_ub (read_memory mem (int_to_ptr offset pr) t).
 
     (** ** Array element writing
       Treat a [memory] as though it is an array storing elements of
@@ -1036,12 +1060,13 @@ match uv with
       - [size] does nothing, but we need to provide one for the array type.
     *)
     Definition write_array_cell_memory (mem : memory) (address : addr) (i : nat) (size : N) (t : dtyp) (v : uvalue) : ErrSID memory :=
-      let '(addr, pr) := address in
+      let addr := ptr_to_int address in
+      let pr := address_provenance address in
       'offset <- lift_ERR (err_to_ERR
                             (handle_gep_h (DTYPE_Array size t)
                                           addr
                                           [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]));;
-      write_memory mem (offset, pr) v t.
+      write_memory mem (int_to_ptr offset pr) v t.
 
     (** ** Array lookups -- mem_block
       Retrieve the values stored at position [from] to position [from + len - 1] in an array stored in a [memory].
@@ -1077,51 +1102,7 @@ match uv with
         block. *)
     (* TODO: should this check if everything is in range...? *)
     Definition allocated (a : addr) (m : memory_stack) : Prop :=
-      member (fst a) (fst m).
-
-    (** Do two memory regions overlap each other?
-
-        - *a1* and *a2* are addresses to the start of each region.
-        - *sz1* and *sz2* are the sizes of the two regions.
-
-        Proposition should hold whenever the two regions overlap each
-        other. *)
-    Definition overlaps (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z) : Prop :=
-      let a1_start := fst a1 in
-      let a1_end   := fst a1 + sz1 in
-      let a2_start := fst a2 in
-      let a2_end   := fst a2 + sz2 in
-      a1_start <= (a2_end - 1) /\ a2_start <= (a1_end - 1).
-
-    (** Checks if two regions of memory overlap each other. The types
-        *τ1* and *τ2* are used to determine the size of the two memory
-        regions.
-     *)
-    Definition overlaps_dtyp (a1 : addr) (τ1 : dtyp) (a2 : addr) (τ2 : dtyp)
-      : Prop :=
-      overlaps a1 (Z.of_N (sizeof_dtyp τ1)) a2 (Z.of_N (sizeof_dtyp τ2)).
-
-    (** Make sure that two regions of memory do not overlap *)
-    Definition no_overlap (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z) : Prop :=
-      let a1_start := fst a1 in
-      let a1_end   := fst a1 + sz1 in
-      let a2_start := fst a2 in
-      let a2_end   := fst a2 + sz2 in
-      a1_start > (a2_end - 1) \/ a2_start > (a1_end - 1).
-
-    (** Same as *no_overlap*, but using *dtyp*s *τ1* and *τ2* to
-        determine the size of the regions. *)
-    Definition no_overlap_dtyp (a1 : addr) (τ1 : dtyp) (a2 : addr) (τ2 : dtyp)
-      : Prop :=
-      no_overlap a1 (Z.of_N (sizeof_dtyp τ1)) a2 (Z.of_N (sizeof_dtyp τ2)).
-
-    (** Boolean version of *no_overlap* *)
-    Definition no_overlap_b (a1 : addr) (sz1 : Z) (a2 : addr) (sz2 : Z) : bool :=
-      let a1_start := fst a1 in
-      let a1_end   := fst a1 + sz1 in
-      let a2_start := fst a2 in
-      let a2_end   := fst a2 + sz2 in
-      (a1_start >? (a2_end - 1)) || (a2_start >? (a1_end - 1)).
+      member (ptr_to_int a) (fst m).
 
       (* LLVM 5.0 memcpy
          According to the documentation: http://releases.llvm.org/5.0.0/docs/LangRef.html#llvm-memcpy-intrinsic
@@ -1133,18 +1114,20 @@ match uv with
        *)
       Definition handle_memcpy (args : list dvalue) (m:memory) : err memory :=
         match args with
-        | DVALUE_Addr (dst_id, dst_prov) ::
-                      DVALUE_Addr (src_id, src_prov) ::
+        | DVALUE_Addr dst ::
+                      DVALUE_Addr src ::
                       DVALUE_I32 len ::
                       DVALUE_I32 align :: (* alignment ignored *)
                       DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
 
+          let src_id := ptr_to_int src in
+          let dst_id := ptr_to_int dst in
           let mem_block_size := unsigned len in
           (* From LLVM Docs : The 'llvm.memcpy.*' intrinsics copy a block of *)
       (*        memory from the source location to the destination location, *)
       (*        which are not allowed to overlap. *)
-          if (no_overlap_b (dst_id, dst_prov) mem_block_size
-                           (src_id, src_prov) mem_block_size) then
+          if (no_overlap_b dst mem_block_size
+                           src mem_block_size) then
             (* Check that everything in src / dst is actually
                allocated, and that provenances match up. *)
             let maybe_sbytes := IM_find_many (Zseq src_id (Z.to_nat mem_block_size)) m in
@@ -1153,7 +1136,7 @@ match uv with
             | Some sbytes, Some dbytes =>
               let saids := map snd sbytes in
               let daids := map snd dbytes in
-              if all_accesses_allowed src_prov saids && all_accesses_allowed dst_prov daids
+              if all_accesses_allowed (address_provenance src) saids && all_accesses_allowed (address_provenance dst) daids
               then
                 let mbytes := zip (map fst sbytes) daids in
                 ret (add_all_index mbytes dst_id m)
@@ -1284,7 +1267,7 @@ match uv with
         let addr := next_memory_key ms in
         '(m', addrs) <- allocate_undef_bytes m addr aid t;;
         let ms' := add_all_to_frame (m', fs) addrs in
-        ret (ms', (addr, allocation_id_to_prov aid))
+        ret (ms', (int_to_ptr addr (allocation_id_to_prov aid)))
       end.
 
     Definition read (ms : memory_stack) (ptr : addr) (t : dtyp) : err uvalue :=
@@ -1302,7 +1285,7 @@ match uv with
     Definition in_frame (a : addr) (m : memory_stack) : Prop :=
       let '(_,s) := m in
       match s with
-      | Singleton f | Snoc _ f => In (fst a) f
+      | Singleton f | Snoc _ f => In (ptr_to_int a) f
       end.
 
     Record ext_memory (m1 : memory_stack) (a : addr) (τ : dtyp) (v : uvalue) (m2 : memory_stack) : Prop :=
@@ -1346,7 +1329,7 @@ match uv with
       }.
 
   Definition emptyMemState : MemState :=
-    mkMemState empty_memory_stack 0%N 0%N.
+    mkMemState empty_memory_stack 0%N initial_provenance.
 
   Definition MemStateT M := stateT MemState M.
 

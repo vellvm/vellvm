@@ -45,9 +45,9 @@ Import MonadNotation.
   - The executable one interprets [undef] as 0 at the type
 *)
 
-Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A))(SIZEOF: Sizeof)(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(LLVMIO))(BYTE_IMPL : ByteImpl(A)(LLVMIO)).
+Module Make(A:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(SIZEOF))(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(SIZEOF)(LLVMIO))(BYTE_IMPL : ByteImpl(A)(SIZEOF)(LLVMIO)).
 
-  Module SER := Serialization.Make(A)(LLVMIO)(SIZEOF)(PTOI)(PROVENANCE)(ITOP)(GEP)(BYTE_IMPL).
+  Module SER := Serialization.Make(A)(SIZEOF)(LLVMIO)(PTOI)(PROVENANCE)(ITOP)(GEP)(BYTE_IMPL).
   Import SER.
 
   Import LLVMIO.

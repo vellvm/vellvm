@@ -57,11 +57,11 @@ Module ERRSID (Addr:ADDRESS) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)
     := lift (lift (modify N.succ)).
 
   Definition fresh_provenance : ErrSID Provenance
-    := lift (lift (lift (modify N.succ))).
+    := lift (lift (lift (modify next_provenance))).
 
   Definition fresh_allocation_id : ErrSID AllocationId
     := prov <- fresh_provenance;;
-       ret (Some prov).
+       ret (provenance_to_allocation_id prov).
 
   Definition raise_error {A} (msg : string) : ErrSID A
     := MonadExc.raise (ERR_message msg).

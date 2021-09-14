@@ -66,7 +66,7 @@ Set Contextual Implicit.
     Reasoning principles for VIR's main memory model.
 *)
 
-Module Type MEMORY_THEORY (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)).
+Module Type MEMORY_THEORY (Addr:MemoryAddress.ADDRESS) (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)).
   (** ** Theory of the general operations over the finite maps we manipulate *)
   Import LLVMEvents.
   Import DV.
@@ -75,13 +75,14 @@ Module Type MEMORY_THEORY (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE
   Import ITOP.
   Import SIZE.
   Import GEP.
+  Import Addr.
 
   Module BYTE := Byte Addr SIZE LLVMEvents BYTE_IMPL.
   Import BYTE.
 
   Open Scope list.
 
-  Module Mem := FiniteMemory.Make(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
+  Module Mem := FiniteMemory.Make(Addr)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
   Export Mem.
 
   Module ESID := ERRSID Addr SIZE LLVMEvents PROV.
@@ -90,7 +91,7 @@ Module Type MEMORY_THEORY (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE
   Module MBT := MemBytesTheory Addr SIZE LLVMEvents PTOI PROV ITOP GEP BYTE_IMPL.
   Import MBT.
 
-  Module ST := SerializationTheory SIZE LLVMEvents PTOI PROV ITOP GEP BYTE_IMPL.
+  Module ST := SerializationTheory Addr SIZE LLVMEvents PTOI PROV ITOP GEP BYTE_IMPL.
   Import ST.
 
   (* TODO: move this? *)
@@ -656,7 +657,7 @@ Section Serialization_Theory.
   unfold Proper, respectful in H1.
   pose proof @map_monad_lift_ERR.
 
-  specialize (H2 uvalue SByte (eitherT UB_MESSAGE (stateT store_id (stateT FiniteProvenance.Provenance IdentityMonad.ident))) _ _).
+  specialize (H2 uvalue SByte (eitherT UB_MESSAGE (stateT store_id (stateT Provenance IdentityMonad.ident))) _ _).
   forward H2.
   admit.
   forward H2.
@@ -961,7 +962,7 @@ Section Memory_Stack_Theory.
       ~ overlaps_dtyp a1 τ1 a2 τ2 ->
       no_overlap_dtyp a1 τ1 a2 τ2.
   Proof.
-    intros [a1_r a1_o] τ1 [a2_r a2_o] τ2 H.
+    intros a1 τ1 a2 τ2 H.
     unfold overlaps_dtyp, overlaps in H.
     unfold no_overlap_dtyp, no_overlap.
     lia.
@@ -972,7 +973,7 @@ Section Memory_Stack_Theory.
       no_overlap_dtyp a1 τ1 a2 τ2 ->
       ~ overlaps_dtyp a1 τ1 a2 τ2.
   Proof.
-    intros [a1_r a1_o] τ1 [a2_r a2_o] τ2 H.
+    intros a1 τ1 a2 τ2 H.
     unfold no_overlap_dtyp, no_overlap in H.
     unfold overlaps_dtyp, overlaps.
     lia.
@@ -982,14 +983,14 @@ Section Memory_Stack_Theory.
     forall ptr1 ptr2 s1 s2,
       {no_overlap ptr1 s1 ptr2 s2} + {~ (no_overlap ptr1 s1 ptr2 s2)}.
   Proof.
-    intros [a1 pr1] [a2 pr2] s1 s2.
+    intros a1 a2 s1 s2.
     unfold no_overlap.
     cbn.
 
-    destruct (Int.Z_as_Int.gt_le_dec (a1) (a2 + s2 - 1)).
+    destruct (Int.Z_as_Int.gt_le_dec (ptr_to_int a1) (ptr_to_int a2 + s2 - 1)).
     { left. auto. }
 
-    destruct (Int.Z_as_Int.gt_le_dec (a2) (a1 + s1 - 1)).
+    destruct (Int.Z_as_Int.gt_le_dec (ptr_to_int a2) (ptr_to_int a1 + s1 - 1)).
     { left. auto. }
 
     right. intuition.
@@ -1462,7 +1463,7 @@ Section Memory_Stack_Theory.
         exists m2,
           ErrSID_MemState_ms_runs_to (fun ms => write ms a v τ) m1 m2.
     Proof.
-      intros m1 v τ [a pr] aids TYP CAN.
+      intros m1 v τ addr aids TYP CAN.
       (* destruct CAN as (sz & bytes & cid & BLOCK & SIZE). *)
 
       exists m1. (* (mkMemState (add_all_index mem) (ms_sid m1) (ms_prov m1)). *)
@@ -2648,9 +2649,9 @@ Section PARAMS.
       cbn.
       (* TODO: Can I avoid this unfolding? *)
       unfold ErrSID_MemState_ms_runs_to in Hwrite.
-      unfold Mem.ESID.runErrSID.
+      unfold MEMORY_THEORY.Mem.ESID.runErrSID.
       unfold runErrSID in Hwrite.
-      unfold runErrSID_T, Mem.ESID.runErrSID_T in *.
+      unfold runErrSID_T, MEMORY_THEORY.Mem.ESID.runErrSID_T in *.
       rewrite Hwrite.
       repeat rewrite bind_ret_l; cbn.
       destruct m, m'; cbn.
@@ -2683,9 +2684,9 @@ Section PARAMS.
       repeat rewrite bind_ret_l; cbn.
       (* TODO: Can I avoid this unfolding? *)
       unfold ErrSID_runs_to in *.
-      unfold Mem.ESID.runErrSID.
+      unfold MEMORY_THEORY.Mem.ESID.runErrSID.
       unfold runErrSID in ALLOC.
-      unfold runErrSID_T, Mem.ESID.runErrSID_T in *.
+      unfold runErrSID_T, MEMORY_THEORY.Mem.ESID.runErrSID_T in *.
       rewrite ALLOC. 
       repeat rewrite bind_ret_l; cbn.
       repeat rewrite bind_ret_l; cbn.
@@ -3251,6 +3252,6 @@ Section PARAMS.
 End PARAMS.
 End MEMORY_THEORY.
 
-Module Make(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)) <: MEMORY_THEORY(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
-Include MEMORY_THEORY(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
+Module Make(Addr:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)) <: MEMORY_THEORY(Addr)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
+Include MEMORY_THEORY(Addr)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
 End Make.

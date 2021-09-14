@@ -8,7 +8,8 @@ From ITree Require Import
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics.
+     Semantics
+     Semantics.Memory.Sizeof.
 
 From ExtLib Require Import
      Structures.Monads
@@ -19,7 +20,7 @@ From ExtLib Require Import
 From Coq Require Import Relations RelationClasses.
 (* end hide *)
 
-Module Make (A:MemoryAddress.ADDRESS)(LLVMEvents: LLVM_INTERACTIONS(A)).
+Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(A)(SIZE)).
 
 Import LLVMEvents.
 Import DV.

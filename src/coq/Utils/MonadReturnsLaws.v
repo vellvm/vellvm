@@ -35,8 +35,8 @@ Section Laws.
           MReturns x (ret y) -> x = y;
 
       MReturns_Proper :> forall {A} (a : A),
-          Proper (eq1 ==> iff) (MReturns a)
-    }.
+          Proper (eq1 ==> iff) (MReturns a) 
+   }.
 
 End Laws.
 

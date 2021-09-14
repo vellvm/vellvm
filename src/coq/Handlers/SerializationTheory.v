@@ -163,7 +163,7 @@ Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_I
   Qed.
 End MemBytesTheory.
 
-Module SerializationTheory(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(SIZEOF)(LLVMIO)).
+Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(SIZEOF)(LLVMIO)).
 
   Import LLVMIO.
 
@@ -173,8 +173,8 @@ Module SerializationTheory(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEO
   Import BYTE.
   Import SIZEOF.
 
-  Module Mem := FiniteMemory.Make SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
-  Export Mem.
+  Module Mem := FiniteMemory.Make Addr SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
+  Import Mem.
 
   Module ESID := ERRSID Addr SIZEOF LLVMIO PROVENANCE.
   Import ESID.
