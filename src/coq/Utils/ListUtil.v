@@ -231,3 +231,33 @@ Proof.
     rewrite N.add_assoc.
     reflexivity.
 Qed.
+
+Definition repeatN {X} (n : N) (x : X) : list X
+  := N.recursion
+       []
+       (fun n xs => x :: xs)
+       n.
+
+Lemma repeatN_succ :
+  forall {X} sz (x : X),
+    repeatN (N.succ sz) x = x :: repeatN sz x.
+Proof.
+  intros X sz.
+  induction sz using N.peano_ind; intros x; auto.
+  unfold repeatN.
+  rewrite N.recursion_succ; eauto.
+  intuition.
+Qed.
+
+Lemma In_repeatN :
+  forall {X} sz (x elt : X),
+    In elt (repeatN sz x) ->
+    elt = x.
+Proof.
+  intros X sz.
+  induction sz using N.peano_ind; intros x elt H.
+  - inversion H.
+  - rewrite repeatN_succ in H.
+    cbn in H.
+    inversion H; auto.
+Qed.

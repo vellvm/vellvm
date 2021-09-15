@@ -17,6 +17,8 @@ From Coq Require Import
      FMapFacts
      Structures.OrderedTypeEx
      micromega.Lia
+     Relations
+     Wellfounded
      Psatz.
 
 From ITree Require Import
@@ -209,7 +211,7 @@ End FinITOP.
 Module FinSizeof : Sizeof.
   (* TODO: make parameter? *)
   Definition ptr_size : nat := 8.
-  
+
   Fixpoint sizeof_dtyp (ty:dtyp) : N :=
     match ty with
     | DTYPE_I 1          => 1 (* TODO: i1 sizes... *)
@@ -303,7 +305,7 @@ Module FinByte (LLVMEvents:LLVM_INTERACTIONS(Addr)(FinSizeof)) : ByteImpl(Addr)(
   | mkUByte (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : store_id) : UByte.
 
   Definition SByte := UByte.
-  
+
   Definition uvalue_sbyte := mkUByte.
 
   Definition sbyte_to_extractbyte (byte : SByte) : uvalue
@@ -363,7 +365,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
   (* Variable ptr_size : nat. *)
   (* Variable datalayout : DataLayout. *)
   Definition ptr_size : nat := 8.
-         
+
 
   Definition addr := Addr.addr.
 
@@ -380,7 +382,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
     (** ** Memory
         Memory is just a map of blocks.
      *)
-    Definition memory := IntMap mem_byte.  
+    Definition memory := IntMap mem_byte.
 
     (** ** Stack frames
       A frame contains the list of block ids that need to be freed when popped,
@@ -435,7 +437,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
 
     Definition uvalue_bytes_little_endian (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
       := map (fun n => UVALUE_ExtractByte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq 0 ptr_size).
- 
+
    Definition uvalue_bytes (e : Endianess) (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
       := correct_endianess e (uvalue_bytes_little_endian uv dt sid).
 
@@ -617,10 +619,91 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
          byte_map <- re_sid_ubytes_helper (zip (Nseq 0 len) bytes) (@NM.empty _);;
          trywith (ERR_message "re_sid_ubytes: missing indices.") (NM_find_many (Nseq 0 len) byte_map).
     Set Guard Checking.
-    
+
+    Definition sigT_of_prod {A B : Type} (p : A * B) : {_ : A & B} :=
+      let (a, b) := p in existT (fun _ : A => B) a b.
+
+    Definition uvalue_measure_rel (uv1 uv2 : uvalue) : Prop :=
+      (uvalue_measure uv1 < uvalue_measure uv2)%nat.
+
+    Lemma wf_uvalue_measure_rel :
+      @well_founded uvalue uvalue_measure_rel.
+    Proof.
+      unfold uvalue_measure_rel.
+      apply wf_inverse_image.
+      apply Wf_nat.lt_wf.
+    Defined.
+
+    Definition lt_uvalue_dtyp (uvdt1 uvdt2 : (uvalue * dtyp)) : Prop :=
+      lexprod uvalue (fun uv => dtyp) uvalue_measure_rel (fun uv dt1f dt2f => dtyp_measure dt1f < dtyp_measure dt2f)%nat (sigT_of_prod uvdt1) (sigT_of_prod uvdt2).
+
+    Lemma wf_lt_uvalue_dtyp : well_founded lt_uvalue_dtyp.
+    Proof.
+      unfold lt_uvalue_dtyp.
+      apply wf_inverse_image.
+      apply wf_lexprod.
+      - unfold well_founded; intros a.
+        exact wf_uvalue_measure_rel.
+      - intros uv.
+        apply wf_inverse_image.
+        apply Wf_nat.lt_wf.
+    Defined.
+
+    Definition lex_nats (ns1 ns2 : (nat * nat)) : Prop :=
+      lexprod nat (fun n => nat) lt (fun _ => lt) (sigT_of_prod ns1) (sigT_of_prod ns2).
+
+    Lemma well_founded_lex_nats :
+      well_founded lex_nats.
+    Proof.
+      unfold lex_nats.
+      apply wf_inverse_image.
+      apply wf_lexprod; intros;
+      apply Wf_nat.lt_wf.
+    Qed.
+
+    Ltac solve_dtyp_measure :=
+      cbn;
+      first [ lia
+            | match goal with
+              | _ : _ |- context [(dtyp_measure ?t + fold_right _ _ _)%nat]
+                => pose proof (dtyp_measure_gt_0 t); unfold list_sum; lia
+              end
+            | match goal with
+              | HIn : In ?x ?xs |- context [ list_sum (map ?f _)] =>
+                pose proof (list_sum_map f x xs HIn)
+              end;
+              cbn in *; lia
+            ].
+
+    Ltac solve_uvalue_measure :=
+      cbn;
+      first [ lia
+            | match goal with
+              | _ : _ |- context [(uvalue_measure ?t + fold_right _ _ _)%nat]
+                => pose proof (uvalue_measure_gt_0 t); unfold list_sum; lia
+              end
+            | match goal with
+              | HIn : In ?x ?xs |- context [ list_sum (map ?f _)] =>
+                pose proof (list_sum_map f x xs HIn)
+              end;
+              cbn in *; lia
+            ].
+
+    Ltac solve_uvalue_dtyp_measure :=
+      red; cbn;
+      repeat match goal with
+             | Hin : In _ (repeatN _ _) |- _ =>
+               apply In_repeatN in Hin; subst
+             end;
+      solve [ apply right_lex; solve_dtyp_measure
+            | apply left_lex; solve_uvalue_measure
+            ].
+
     (* This is mostly to_ubytes, except it will also unwrap concatbytes *)
-  Program Fixpoint serialize_sbytes (uv : uvalue) (dt : dtyp) {measure (uvalue_measure uv)} : ErrSID (list SByte)
-    := match uv with
+  Obligation Tactic := try Tactics.program_simpl; try solve [solve_uvalue_dtyp_measure | intuition; try (inversion H); try (inversion H0)].
+  Program Fixpoint serialize_sbytes (uv : uvalue) (dt : dtyp) {measure (uvalue_measure uv, dtyp_measure dt) lex_nats} : ErrSID (list SByte)
+    :=
+      match uv with
        (* Base types *)
        | UVALUE_Addr _
        | UVALUE_I1 _
@@ -630,7 +713,6 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
        | UVALUE_IPTR _
        | UVALUE_Float _
        | UVALUE_Double _
-       | UVALUE_Undef _
        | UVALUE_Poison
 
        (* Expressions *)
@@ -648,6 +730,35 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
        | UVALUE_Select _ _ _ =>
          sid <- fresh_sid;;
          ret (to_ubytes uv dt sid)
+
+       (* Undef values, these can possibly be aggregates *)
+       | UVALUE_Undef _ =>
+         match dt with
+         | DTYPE_Struct [] =>
+           ret []
+         | DTYPE_Struct (t::ts) =>
+           f_bytes <- serialize_sbytes (UVALUE_Undef t) t;; (* How do I know this is smaller? *)
+           fields_bytes <- serialize_sbytes (UVALUE_Undef (DTYPE_Struct ts)) (DTYPE_Struct ts);;
+           ret (f_bytes ++ fields_bytes)
+
+         | DTYPE_Packed_struct [] =>
+           ret []
+         | DTYPE_Packed_struct (t::ts) =>
+           f_bytes <- serialize_sbytes (UVALUE_Undef t) t;; (* How do I know this is smaller? *)
+           fields_bytes <- serialize_sbytes (UVALUE_Undef (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
+           ret (f_bytes ++ fields_bytes)
+
+         | DTYPE_Array sz t =>
+           field_bytes <- map_monad_In (repeatN sz (UVALUE_Undef t)) (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+
+         | DTYPE_Vector sz t =>
+           field_bytes <- map_monad_In (repeatN sz (UVALUE_Undef t)) (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+         | _ =>
+           sid <- fresh_sid;;
+           ret (to_ubytes uv dt sid)
+         end
 
        (* TODO: each field gets a separate store id... Is that sensible? *)
        (* Padded aggregate types *)
@@ -707,33 +818,16 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
          re_sid_ubytes bytes'
        end.
   Next Obligation.
-    cbn. lia.
-  Defined.
-  Next Obligation.
-    pose proof (uvalue_measure_gt_0 f).
-    cbn. unfold list_sum. lia.
-  Defined.
-  Next Obligation.
-    cbn. lia.
-  Defined.
-  Next Obligation.
-    pose proof (uvalue_measure_gt_0 f).
-    cbn. unfold list_sum. lia.
-  Defined.
-  Next Obligation.
-    cbn.
-    pose proof (list_sum_map uvalue_measure elt elts Hin).
-    lia.
-  Defined.
-  Next Obligation.
-    cbn.
-    pose proof (list_sum_map uvalue_measure elt elts Hin).
-    lia.
-  Defined.
+    unfold Wf.MR.
+    unfold lex_nats.
+    apply wf_inverse_image.
+    apply wf_lexprod; intros;
+      apply Wf_nat.lt_wf.
+  Qed.
 
   Lemma serialize_sbytes_equation : forall (uv : uvalue) (dt : dtyp),
       serialize_sbytes uv dt =
-match uv with
+      match uv with
        (* Base types *)
        | UVALUE_Addr _
        | UVALUE_I1 _
@@ -743,7 +837,6 @@ match uv with
        | UVALUE_IPTR _
        | UVALUE_Float _
        | UVALUE_Double _
-       | UVALUE_Undef _
        | UVALUE_Poison
 
        (* Expressions *)
@@ -761,6 +854,35 @@ match uv with
        | UVALUE_Select _ _ _ =>
          sid <- fresh_sid;;
          ret (to_ubytes uv dt sid)
+
+       (* Undef values, these can possibly be aggregates *)
+       | UVALUE_Undef _ =>
+         match dt with
+         | DTYPE_Struct [] =>
+           ret []
+         | DTYPE_Struct (t::ts) =>
+           f_bytes <- serialize_sbytes (UVALUE_Undef t) t;; (* How do I know this is smaller? *)
+           fields_bytes <- serialize_sbytes (UVALUE_Undef (DTYPE_Struct ts)) (DTYPE_Struct ts);;
+           ret (f_bytes ++ fields_bytes)
+
+         | DTYPE_Packed_struct [] =>
+           ret []
+         | DTYPE_Packed_struct (t::ts) =>
+           f_bytes <- serialize_sbytes (UVALUE_Undef t) t;; (* How do I know this is smaller? *)
+           fields_bytes <- serialize_sbytes (UVALUE_Undef (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
+           ret (f_bytes ++ fields_bytes)
+
+         | DTYPE_Array sz t =>
+           field_bytes <- map_monad_In (repeatN sz (UVALUE_Undef t)) (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+
+         | DTYPE_Vector sz t =>
+           field_bytes <- map_monad_In (repeatN sz (UVALUE_Undef t)) (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+         | _ =>
+           sid <- fresh_sid;;
+           ret (to_ubytes uv dt sid)
+         end
 
        (* TODO: each field gets a separate store id... Is that sensible? *)
        (* Padded aggregate types *)
@@ -852,6 +974,7 @@ match uv with
      The reason we also have deserialize_sbytes is in order to deal
      with aggregate data types.
    *)
+  Obligation Tactic := try Tactics.program_simpl; try solve [solve_dtyp_measure].
   Program Fixpoint deserialize_sbytes (bytes : list SByte) (dt : dtyp) {measure (dtyp_measure dt)} : err uvalue
     :=
       match dt with
@@ -924,36 +1047,6 @@ match uv with
        | DTYPE_Void =>
          inl "deserialize_sbytes: Attempt to deserialize void."
       end.
-  Next Obligation.
-    cbn. lia.
-  Defined.
-  Next Obligation.
-    cbn. lia.
-  Defined.
-  Next Obligation.
-    assert (In dt (dt :: dts)) as Hin by (cbn;auto).
-    pose proof (list_sum_map dtyp_measure dt (dt :: dts) Hin).
-    cbn.
-    lia.
-  Defined.
-  Next Obligation.
-    assert (In dt (dt :: dts)) as Hin by (cbn;auto).
-    pose proof (list_sum_map dtyp_measure dt (dt :: dts) Hin).
-    pose proof dtyp_measure_gt_0 dt.
-    destruct dts; cbn; lia.
-  Defined.
-  Next Obligation.
-    assert (In dt (dt :: dts)) as Hin by (cbn;auto).
-    pose proof (list_sum_map dtyp_measure dt (dt :: dts) Hin).
-    cbn.
-    lia.
-  Defined.
-  Next Obligation.
-    assert (In dt (dt :: dts)) as Hin by (cbn;auto).
-    pose proof (list_sum_map dtyp_measure dt (dt :: dts) Hin).
-    pose proof dtyp_measure_gt_0 dt.
-    destruct dts; cbn; lia.
-  Defined.
 
 (* (* TODO: *)
 
@@ -967,7 +1060,7 @@ match uv with
 (*   Provenance in UVALUE_IPTR probably means we need provenance in *all* *)
 (*   data types... i1, i8, i32, etc, and even doubles and floats... *)
 (*  *) *)
-  
+
 (* (* TODO: *)
 
 (*    Should uvalue have something like... UVALUE_ExtractByte which *)
@@ -1237,7 +1330,7 @@ match uv with
       end.
 
     Definition add_all_to_frame (m : memory_stack) (ks : list Z) : memory_stack
-      := fold_left (fun ms k => add_to_frame ms k) ks m.      
+      := fold_left (fun ms k => add_to_frame ms k) ks m.
 
     (* TODO: figure out allocation address *)
     (* Where does this address come from? *)
@@ -1338,7 +1431,7 @@ match uv with
 
   Definition mem_state_raiseUB {E A} `{UBE -< E} (msg : string) : MemStateT (itree E) A
     := mem_state_lift_itree (raiseUB msg).
-  
+
   Definition mem_state_raise {E A} `{FailureE -< E} (msg : string) : MemStateT (itree E) A
     := mem_state_lift_itree (raise msg).
 

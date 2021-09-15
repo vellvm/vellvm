@@ -283,6 +283,50 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
   Proof.
     intros uv dt sid prov sbytes TYP SUP SIZE SER.
     induction TYP.
+    
+    1-6: match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(try (cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
+          end.
+
+    { cbn in SER.
+      inv SER.
+      inv SUP.
+      - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto].
+      - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto].
+      - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto].
+      - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto].
+      - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto].
+      - (* Void... Shouldn't have void undef *)
+        rewrite sizeof_dtyp_void in SIZE. lia.
+      - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto].
+      - cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto].
+      - (* Arrays... Aggregate types *)
+        cbn.
+        cbn; rewrite from_ubytes_to_ubytes; [reflexivity|constructor|auto].
+
+      cbn.
+      rewrite from_ubytes_to_ubytes.
+      reflexivity.
+      unfold deserialize_sbytes, deserialize_sbytes_func.
+
+
+      match goal with          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(try (cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
+    end.
+
+    cbn.
+    cbn.
+
+
+    cbn.
+    cbn in SER.
+    inv SER.
+    cbn.
+    rewrite from_ubytes_to_ubytes.
+    eauto.
 (*     match goal with *)
 (*           (* Try easy case first for speedup *) *)
 (*           | |- _ = inr ?x => *)
