@@ -2,6 +2,7 @@ From Coq Require Import ZArith String.
 
 From ExtLib Require Import
      Structures.Monads
+     Structures.Functor
      Structures.MonadExc
      Data.Monads.EitherMonad
      Data.Monads.StateMonad
@@ -38,6 +39,21 @@ Module ERRSID (Addr:ADDRESS) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)
   Definition ErrSID_T M := eitherT ERR_MESSAGE (eitherT UB_MESSAGE (stateT store_id (stateT Provenance M))).
   Definition ErrSID := ErrSID_T ident.
 
+  Definition blah {T} (v : T) : UB (ERR T)
+    := inr (inr v).
+
+  (* I can make this work using ltac, but  for some reason I can't write the definition directly... *)
+  Instance ErrSID_T_MT {M : Type -> Type} `{HM: Monad M} : MonadT (ErrSID_T M) M.
+  Proof.
+    constructor.
+    refine (fun T mt => mkEitherT (mkEitherT (fun sid prov => _))).
+    refine (fmap (fun v => (prov, (sid, blah v))) mt : M (Provenance * (store_id * UB (ERR T)))%type).
+  Defined.
+
+  #[global] Instance UBM_ErrSID_T {M : Type -> Type} `{HM :  Monad M} : UBM (ErrSID_T M) :=
+    { raise_ub := fun A e => lift (raise_ub e);
+    }.
+
   Definition evalErrSID_T {A} {M} `{Monad M} (m : ErrSID_T M A) (sid : store_id) (prov : Provenance) : M (UB (ERR A))
     := evalStateT (evalStateT (unEitherT (unEitherT m)) sid) prov.
 
@@ -63,15 +79,12 @@ Module ERRSID (Addr:ADDRESS) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)
     := prov <- fresh_provenance;;
        ret (provenance_to_allocation_id prov).
 
-  Definition raise_error {A} (msg : string) : ErrSID A
-    := MonadExc.raise (ERR_message msg).
-
-  Definition raise_ub {A} (msg : string) : ErrSID A
-    := lift (MonadExc.raise (UB_message msg)).
-
   Definition err_to_ub {A} (e : err A) : ErrSID A
     := match e with
-       | inl msg => raise_ub msg
+       | inl msg =>
+         (* TODO: can this be inferred...? *)
+         @raise_ub ErrSID (@UBM_E_MT _ _ _ (@UBM_MonadExc (eitherT UB_MESSAGE (stateT store_id (stateT Provenance ident))) _)) _ msg
        | inr x => ret x
        end.
+
 End ERRSID.

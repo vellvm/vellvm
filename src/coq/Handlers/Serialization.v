@@ -8,6 +8,7 @@ From Vellvm Require Import
      Utils.ListUtil
      Utils.NonEmpty
      Utils.NMaps
+     Utils.MonadReturnsLaws
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
@@ -729,158 +730,225 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
         
 
         Maybe it should be a monad???
+
+
+        M (undef_or_err dvalue)
+
+        Identity for actual concretization...
+
+        M X = X -> Prop otherwise...
+
+        Is X -> Prop a monad?
        *)
+
+      (* TODO: PropT??? *)
+      Definition MPropT (M : Type -> Type) `{Monad M} (X : Type) : Type := M X -> Prop.
+
+
+      Definition bind_MPropT {M : Type -> Type} `{HM: Monad M} `{MEQ: @Monad.Eq1 M} `{MR: @MonadReturns M HM MEQ}
+                 {A B : Type} (pa : MPropT M A) (k : A -> MPropT M B) : MPropT M B
+        := (fun mb => exists (ma : M A) (k' : A -> M B),
+                pa ma /\
+                Monad.eq1 mb (Monad.bind ma k') /\
+                (forall a, MReturns a ma -> k a (k' a))).
       
-      (* TODO: satisfy the termination checker here. *)
-      Unset Guard Checking.
-      Fixpoint concretize_uvalue (u : uvalue) {struct u} : undef_or_err dvalue :=
-        match u with
-        | UVALUE_Addr a                          => ret (DVALUE_Addr a)
-        | UVALUE_I1 x                            => ret (DVALUE_I1 x)
-        | UVALUE_I8 x                            => ret (DVALUE_I8 x)
-        | UVALUE_I32 x                           => ret (DVALUE_I32 x)
-        | UVALUE_I64 x                           => ret (DVALUE_I64 x)
-        | UVALUE_IPTR x                          => ret (DVALUE_IPTR x)
-        | UVALUE_Double x                        => ret (DVALUE_Double x)
-        | UVALUE_Float x                         => ret (DVALUE_Float x)
-        | UVALUE_Undef t                         => lift (default_dvalue_of_dtyp t)
-        | UVALUE_Poison                          => ret (DVALUE_Poison)
-        | UVALUE_None                            => ret DVALUE_None
-        | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalue fields ;;
-                                                   ret (DVALUE_Struct dfields)
-        | UVALUE_Packed_struct fields            => 'dfields <- map_monad concretize_uvalue fields ;;
-                                                   ret (DVALUE_Packed_struct dfields)
-        | UVALUE_Array elts                      => 'delts <- map_monad concretize_uvalue elts ;;
-                                                   ret (DVALUE_Array delts)
-        | UVALUE_Vector elts                     => 'delts <- map_monad concretize_uvalue elts ;;
-                                                   ret (DVALUE_Vector delts)
-        | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalue v1 ;;
-                                                   dv2 <- concretize_uvalue v2 ;;
-                                                   eval_iop iop dv1 dv2
-        | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
-                                                   dv2 <- concretize_uvalue v2 ;;
-                                                   eval_icmp cmp dv1 dv2
-        | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalue v1 ;;
-                                                   dv2 <- concretize_uvalue v2 ;;
-                                                   eval_fop fop dv1 dv2
-        | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalue v1 ;;
-                                                   dv2 <- concretize_uvalue v2 ;;
-                                                   eval_fcmp cmp dv1 dv2
-        | UVALUE_Conversion conv t_from v t_to    =>
-          dv <- concretize_uvalue v ;;
-          match get_conv_case conv t_from dv t_to with
-          | Conv_PtoI x =>
-            match x, t_to with
-            | DVALUE_Addr addr, DTYPE_I sz =>
-              coerce_integer_to_int sz (ptr_to_int addr)
-            | _, _ =>
-              lift (raise "Invalid PTOI conversion")
+      #[global] Instance Monad_MProp {M} `{HM: Monad M} `{MEQ: @Monad.Eq1 M} `{MR: @MonadReturns M HM MEQ} : Monad (MPropT M) :=
+        {|
+        ret := fun _ x y => Monad.eq1 y (ret x)
+        ; bind := @bind_MPropT M HM MEQ MR
+        |}.
+
+      Section Concretize.
+        Context (M : Type -> Type).
+        Context {Monad : Monad M}.
+        Variable undef_handler : dtyp -> M dvalue.
+        Variable lift_ue : forall {A}, undef_or_err A -> M A.
+
+        (* TODO: satisfy the termination checker here. *)
+        (* M will be undef_or_err / MPropT undef_or_err? *)
+        Unset Guard Checking.
+        (* Define a sum type f a, g b.... a + b. Mutual recursive
+           function as one big function with sum type to select between
+           which "function" is being called *)
+        Fixpoint concretize_uvalueM (u : uvalue) {struct u} : M dvalue:=
+          match u with
+          | UVALUE_Addr a                          => ret (DVALUE_Addr a)
+          | UVALUE_I1 x                            => ret (DVALUE_I1 x)
+          | UVALUE_I8 x                            => ret (DVALUE_I8 x)
+          | UVALUE_I32 x                           => ret (DVALUE_I32 x)
+          | UVALUE_I64 x                           => ret (DVALUE_I64 x)
+          | UVALUE_IPTR x                          => ret (DVALUE_IPTR x)
+          | UVALUE_Double x                        => ret (DVALUE_Double x)
+          | UVALUE_Float x                         => ret (DVALUE_Float x)
+          | UVALUE_Undef t                         => undef_handler t
+          | UVALUE_Poison                          => ret (DVALUE_Poison)
+          | UVALUE_None                            => ret DVALUE_None
+          | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalueM fields ;;
+                                                     ret (DVALUE_Struct dfields)
+          | UVALUE_Packed_struct fields            => 'dfields <- map_monad concretize_uvalueM fields ;;
+                                                     ret (DVALUE_Packed_struct dfields)
+          | UVALUE_Array elts                      => 'delts <- map_monad concretize_uvalueM elts ;;
+                                                     ret (DVALUE_Array delts)
+          | UVALUE_Vector elts                     => 'delts <- map_monad concretize_uvalueM elts ;;
+                                                     ret (DVALUE_Vector delts)
+          | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalueM v1 ;;
+                                                     dv2 <- concretize_uvalueM v2 ;;
+                                                     lift_ue (eval_iop iop dv1 dv2)
+          | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
+                                                     dv2 <- concretize_uvalueM v2 ;;
+                                                     lift_ue (eval_icmp cmp dv1 dv2)
+          | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalueM v1 ;;
+                                                     dv2 <- concretize_uvalueM v2 ;;
+                                                     lift_ue (eval_fop fop dv1 dv2)
+          | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
+                                                     dv2 <- concretize_uvalueM v2 ;;
+                                                     lift_ue (eval_fcmp cmp dv1 dv2)
+          | UVALUE_Conversion conv t_from v t_to    =>
+            dv <- concretize_uvalueM v ;;
+            match get_conv_case conv t_from dv t_to with
+            | Conv_PtoI x =>
+              match x, t_to with
+              | DVALUE_Addr addr, DTYPE_I sz =>
+                lift_ue (coerce_integer_to_int sz (ptr_to_int addr))
+              | _, _ =>
+                lift_ue (lift (raise "Invalid PTOI conversion"))
+              end
+            | Conv_ItoP x => ret (DVALUE_Addr (int_to_ptr (dvalue_int_unsigned x) wildcard_prov))
+            | Conv_Pure x => ret x
+            | Conv_Illegal s => lift_ue (raise s)
             end
-          | Conv_ItoP x => ret (DVALUE_Addr (int_to_ptr (dvalue_int_unsigned x) wildcard_prov))
-          | Conv_Pure x => ret x
-          | Conv_Illegal s => raise s
+
+          | UVALUE_GetElementPtr t ua uvs =>
+            da <- concretize_uvalueM ua;;
+            dvs <- map_monad concretize_uvalueM uvs;;
+            match handle_gep t da dvs with
+            | inr dv  => ret dv
+            | inl err => lift_ue (lift (failwith err))
+            end
+
+          | UVALUE_ExtractValue uv idxs =>
+            str <- concretize_uvalueM uv;;
+            let fix loop str idxs : undef_or_err dvalue :=
+                match idxs with
+                | [] => ret str
+                | i :: tl =>
+                  v <- index_into_str_dv str i ;;
+                  loop v tl
+                end in
+            lift_ue (loop str idxs)
+
+          | UVALUE_Select cond v1 v2 =>
+            dcond <- concretize_uvalueM cond;;
+            uv <- lift_ue (eval_select dcond v1 v2);;
+            concretize_uvalueM uv
+
+          | UVALUE_ConcatBytes bytes dt =>
+            match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
+            | true, Some uv => concretize_uvalueM uv
+            | _, _ => extractbytes_to_dvalue bytes dt
+            end
+
+
+          | UVALUE_ExtractByte byte dt idx sid =>
+            (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
+            lift_ue (lift (failwith "Attempting to concretize UVALUE_ExtractByte, should not happen."))
+
+          | _ => lift_ue (lift (failwith ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u)))
+
           end
 
-        | UVALUE_GetElementPtr t ua uvs =>
-          da <- concretize_uvalue ua;;
-          dvs <- map_monad concretize_uvalue uvs;;
-          match handle_gep t da dvs with
-          | inr dv  => ret dv
-          | inl err => lift (failwith err)
-          end
+        with
 
-        | UVALUE_ExtractValue uv idxs =>
-          str <- concretize_uvalue uv;;
-          let fix loop str idxs : undef_or_err dvalue :=
-              match idxs with
-              | [] => ret str
-              | i :: tl =>
-                v <- index_into_str_dv str i ;;
-                loop v tl
-              end in
-          loop str idxs
-
-        | UVALUE_Select cond v1 v2 =>
-          dcond <- concretize_uvalue cond;;
-          uv <- eval_select dcond v1 v2;;
-          concretize_uvalue uv
-
-        | UVALUE_ConcatBytes bytes dt =>
-          match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
-          | true, Some uv => concretize_uvalue uv
-          | _, _ => extractbytes_to_dvalue bytes dt
-          end
-
-        | UVALUE_ExtractByte byte dt idx sid =>
-          (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
-          lift (failwith "Attempting to concretize UVALUE_ExtractByte, should not happen.")
-
-         | _ => lift (failwith ("concretize_uvalue: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u))
-
-                
-        end
-
-      with
-
-      (* Take a UVALUE_ExtractByte, and replace the uvalue with a given dvalue... 
+        (* Take a UVALUE_ExtractByte, and replace the uvalue with a given dvalue... 
 
          Note: this also concretizes the index.
-       *)
-      uvalue_byte_replace_with_dvalue_byte (uv : uvalue) (dv : dvalue) {struct uv} : undef_or_err dvalue_byte
-        := match uv with
-           | UVALUE_ExtractByte uv dt idx sid =>
-             cidx <- concretize_uvalue idx;;
-             ret (DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx)))
-           | _ => lift (failwith "uvalue_byte_replace_with_dvalue_byte called with non-UVALUE_ExtractByte value.")
-           end
+         *)
+        uvalue_byte_replace_with_dvalue_byte (uv : uvalue) (dv : dvalue) {struct uv} : M dvalue_byte
+          := match uv with
+             | UVALUE_ExtractByte uv dt idx sid =>
+               cidx <- concretize_uvalueM idx;;
+               ret (DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx)))
+             | _ => lift_ue (lift (failwith "uvalue_byte_replace_with_dvalue_byte called with non-UVALUE_ExtractByte value."))
+             end
 
-      with
-      (* Concretize the uvalues in a list of UVALUE_ExtractBytes...
+        with
+        (* Concretize the uvalues in a list of UVALUE_ExtractBytes...
 
-       *)
+         *)
         (* Pick out uvalue bytes that are the same + have same sid 
 
          Concretize these identical uvalues...
          *)
 
-      concretize_uvalue_bytes_helper (uvs : list (N * uvalue)) (acc : NMap dvalue_byte) {struct uvs} : undef_or_err (NMap dvalue_byte)
-        := match uvs with
-           | [] => ret acc
-           | ((n, uv)::uvs) =>
-             match uv with
-             | UVALUE_ExtractByte byte_uv dt idx sid =>
-               let '(ins, outs) := filter_uvalue_sid_matches uv uvs in
-               (* Concretize first uvalue *)
-               dv <- concretize_uvalue byte_uv;;
-               cidx <- concretize_uvalue idx;;
-               let dv_byte := DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx)) in
-               let acc := @NM.add _ n dv_byte acc in
-               (* Concretize entangled bytes *)
-               acc <- monad_fold_right (fun acc '(n, uv) =>
-                                         dvb <- uvalue_byte_replace_with_dvalue_byte uv dv;;
-                                         ret (@NM.add _ n dvb acc)) ins acc;;
-               (* Concretize the rest of the bytes *)
-               concretize_uvalue_bytes_helper outs acc
-             | _ => lift (failwith "concretize_uvalue_bytes_helper: non-byte in uvs.")
+        concretize_uvalue_bytes_helper (uvs : list (N * uvalue)) (acc : NMap dvalue_byte) {struct uvs} : M (NMap dvalue_byte)
+          := match uvs with
+             | [] => ret acc
+             | ((n, uv)::uvs) =>
+               match uv with
+               | UVALUE_ExtractByte byte_uv dt idx sid =>
+                 let '(ins, outs) := filter_uvalue_sid_matches uv uvs in
+                 (* Concretize first uvalue *)
+                 dv <- concretize_uvalueM byte_uv;;
+                 cidx <- concretize_uvalueM idx;;
+                 let dv_byte := DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx)) in
+                 let acc := @NM.add _ n dv_byte acc in
+                 (* Concretize entangled bytes *)
+                 acc <- monad_fold_right (fun acc '(n, uv) =>
+                                           dvb <- uvalue_byte_replace_with_dvalue_byte uv dv;;
+                                           ret (@NM.add _ n dvb acc)) ins acc;;
+                 (* Concretize the rest of the bytes *)
+                 concretize_uvalue_bytes_helper outs acc
+               | _ => lift_ue (lift (failwith "concretize_uvalue_bytes_helper: non-byte in uvs."))
+               end
              end
-           end
 
-      with
-      concretize_uvalue_bytes (uvs : list uvalue) {struct uvs} : undef_or_err (list dvalue_byte)
-        :=
-          let len := length uvs in
-          byte_map <- concretize_uvalue_bytes_helper (zip (Nseq 0 len) uvs) (@NM.empty _);;
-          match NM_find_many (Nseq 0 len) byte_map with
-          | Some dvbs => ret dvbs
-          | None => lift (failwith "concretize_uvalue_bytes: missing indices.")
-          end
+        with
+        concretize_uvalue_bytes (uvs : list uvalue) {struct uvs} : M (list dvalue_byte)
+          :=
+            let len := length uvs in
+            byte_map <- concretize_uvalue_bytes_helper (zip (Nseq 0 len) uvs) (@NM.empty _);;
+            match NM_find_many (Nseq 0 len) byte_map with
+            | Some dvbs => ret dvbs
+            | None => lift_ue (lift (failwith "concretize_uvalue_bytes: missing indices."))
+            end
+              
+        with
+        extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : M dvalue
+          := dvbs <- concretize_uvalue_bytes uvs;;
+             lift_ue (ErrPoison_to_undef_or_err_dvalue (dvalue_bytes_to_dvalue dvbs dt)).
+
+        Set Guard Checking.
+      End Concretize.
+
+      Arguments concretize_uvalueM {_ _}.
+
+      Definition concretize_uvalue (uv : uvalue) : undef_or_err dvalue
+        := concretize_uvalueM (fun dt => lift (default_dvalue_of_dtyp dt)) (fun _ x => x) uv.
+
+      Definition concretize_u (uv : uvalue) : MPropT undef_or_err dvalue.
+        refine (concretize_uvalueM
+             (fun dt => _)
+             (fun _ x => _) uv).
+        admit.
+        { unfold MPropT.
+          refine (fun edv =>
+                    match edv with
+                    | mkEitherT (inr (inr dv)) =>
+                      (* As long as the dvalue has the same type, it's a refinement *)
+                      dvalue_has_dtyp dv dt
+                    | _ => False
+                    end).
+          (*           match uvalue_to_dvalue uv with *)
+          (*           | inr dv => _ *)
+          (*           | inl e => _ *)
+          (*           end). *)
+          (* - refine . *)
+        }
+        { unfold MPropT.
+          intros ue.
+
+        }
       
-      with
-      extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : undef_or_err dvalue
-        := dvbs <- concretize_uvalue_bytes uvs;;
-           ErrPoison_to_undef_or_err_dvalue (dvalue_bytes_to_dvalue dvbs dt).
-
-      Set Guard Checking.
     End Concretize.
 
 Section ConcretizeInductive.

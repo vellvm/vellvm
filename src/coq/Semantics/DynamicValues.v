@@ -1715,7 +1715,7 @@ Class VInt I : Type :=
   | UVALUE_Double_typ : forall x, uvalue_has_dtyp (UVALUE_Double x) DTYPE_Double
   | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
   | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
-  | UVALUE_Undef_typ  : forall τ, uvalue_has_dtyp (UVALUE_Undef τ) τ
+  | UVALUE_Undef_typ  : forall τ, τ <> DTYPE_Void -> uvalue_has_dtyp (UVALUE_Undef τ) τ
 
   | UVALUE_Struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Struct []) (DTYPE_Struct [])
   | UVALUE_Struct_Cons_typ :
@@ -2059,7 +2059,7 @@ Class VInt I : Type :=
     Hypothesis IH_I32            : forall x, P (UVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (UVALUE_I64 x) (DTYPE_I 64).
     Hypothesis IH_IPTR           : forall x, P (UVALUE_IPTR x) DTYPE_IPTR.
-    Hypothesis IH_Undef          : forall t, P (UVALUE_Undef t) t.
+    Hypothesis IH_Undef          : forall t, t <> DTYPE_Void -> P (UVALUE_Undef t) t.
     Hypothesis IH_Double         : forall x, P (UVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x) DTYPE_Float.
     Hypothesis IH_None           : P UVALUE_None DTYPE_Void.

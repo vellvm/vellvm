@@ -23,6 +23,26 @@ Notation ERR := (sum ERR_MESSAGE).
 Instance Exception_UB : MonadExc UB_MESSAGE UB := Exception_either UB_MESSAGE.
 Instance Exception_ERR : MonadExc ERR_MESSAGE ERR := Exception_either ERR_MESSAGE.
 
+Class VErrorM (M : Type -> Type) : Type :=
+  { raise_error : forall {A}, string -> M A }.
+
+Class UBM (M : Type -> Type) : Type :=
+  { raise_ub : forall {A}, string -> M A }.
+
+#[global] Instance VErrorM_E_MT {M : Type -> Type} {MT : (Type -> Type) -> Type -> Type} `{MonadT (MT M) M} `{VErrorM M} : VErrorM (MT M) :=
+  { raise_error := fun A e => lift (raise_error e);
+  }.
+
+#[global] Instance UBM_E_MT {M : Type -> Type} {MT : (Type -> Type) -> Type -> Type} `{MonadT (MT M) M} `{UBM M} : UBM (MT M) :=
+  { raise_ub := fun A e => lift (raise_ub e);
+  }.
+
+#[global] Instance VErrorM_MonadExc {M} `{MonadExc ERR_MESSAGE M} : VErrorM M
+  := { raise_error := fun _ msg => MonadExc.raise (ERR_message msg) }.
+
+#[global] Instance UBM_MonadExc {M} `{MonadExc UB_MESSAGE M} : UBM M
+  := { raise_ub := fun _ msg => MonadExc.raise (UB_message msg) }.
+
 Instance Exception_UB_string : MonadExc string UB :=
   {| MonadExc.raise := fun _ msg => inl (UB_message msg);
      catch := fun T c h =>

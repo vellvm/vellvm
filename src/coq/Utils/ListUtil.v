@@ -154,6 +154,46 @@ Fixpoint filter_split {A} (pred : A -> bool) (xs : list A) : (list A * list A)
        else (ins, x::outs)
      end.
 
+Lemma filter_split_in_length :
+  forall {A} pred (xs ins outs : list A),
+    filter_split pred xs = (ins, outs) ->
+    length ins <= length xs.
+Proof.
+  intros A pred xs;
+    induction xs; intros ins outs LEN.
+  - cbn in LEN. inversion LEN.
+    reflexivity.
+  - cbn in LEN.
+    destruct (pred a).
+    + destruct (filter_split pred xs) as (in' & out') eqn:FILTER.
+      inversion LEN; subst; cbn.
+      apply le_n_S.
+      eauto.
+    + destruct (filter_split pred xs) as (in' & out') eqn:FILTER.
+      inversion LEN; subst; cbn.
+      eauto.
+Qed.
+
+Lemma filter_split_out_length :
+  forall {A} pred (xs ins outs : list A),
+    filter_split pred xs = (ins, outs) ->
+    length outs <= length xs.
+Proof.
+  intros A pred xs;
+    induction xs; intros ins outs LEN.
+  - cbn in LEN. inversion LEN.
+    reflexivity.
+  - cbn in LEN.
+    destruct (pred a).
+    + destruct (filter_split pred xs) as (in' & out') eqn:FILTER.
+      inversion LEN; subst; cbn.
+      eauto.
+    + destruct (filter_split pred xs) as (in' & out') eqn:FILTER.
+      inversion LEN; subst; cbn.
+      apply le_n_S.
+      eauto.
+Qed.
+
 (* TODO: does this exist somewhere else? *)
 Lemma app_prefix :
   forall {A} (a b c : list A),

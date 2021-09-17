@@ -283,11 +283,80 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
   Proof.
     intros uv dt sid prov sbytes TYP SUP SIZE SER.
     induction TYP.
-    
-    1-6: match goal with
+
+    rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto.
+
+    1-5: match goal with
           (* Try easy case first for speedup *)
           | |- _ = inr ?x =>
-            tactic_on_non_aggregate_uvalues x ltac:(try (cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
+            tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
+          end.
+
+
+    { destruct t.
+      1-12: match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
+          end.
+
+      (* No void undefs *)
+      contradiction.
+
+      (* Aggregates *)
+      (* Arrays *)
+      - rewrite serialize_sbytes_equation in SER.
+
+        (* Errr... 
+
+           Right hand side is: 
+
+           inr (UVALUE_Undef (DynamicTypes.DTYPE_Array sz t))
+
+           Because this lemma is saying that if I serialize
+           UVALUE_Undef (DynamicTypes.DTYPE_Array sz t), then when I
+           deserialize the result I should get
+           UVALUE_Undef (DynamicTypes.DTYPE_Array sz t) back.
+
+           I've added special cases for aggregate types in
+           serialize_sbytes for undef so they get serialized with
+           undef for each element / field...
+
+           The problem is that when these are deserialized I should
+           get, for instance...
+
+           UVALUE_Array [UVALUE_Undef t; ... ; UVALUE_Undef t ]
+
+           Instead of just
+
+           UVALUE_Undef (DynamicTypes.DTYPE_Array sz t)
+
+           These values should be equivalent, but they have different
+           representations...
+         *)
+        unfold deserialize_sbytes,deserialize_sbytes_func.
+        cbn.
+      
+      match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
+          end.
+
+      cbn.
+      match goal with
+      (* Try easy case first for speedup *)
+      | |- _ = inr ?x =>
+        tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
+      end.
+
+
+    }
+    
+    1-12: match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+            tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
           end.
 
     { cbn in SER.

@@ -597,8 +597,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
 
     (* TODO: should I move this? *)
     (* Assign fresh sids to ubytes while preserving entanglement *)
-    Unset Guard Checking.
-    Fixpoint re_sid_ubytes_helper (bytes : list (N * SByte)) (acc : NMap SByte) {struct bytes} : ErrSID (NMap SByte)
+    Program Fixpoint re_sid_ubytes_helper (bytes : list (N * SByte)) (acc : NMap SByte) {measure (length bytes)} : ErrSID (NMap SByte)
       := match bytes with
          | [] => ret acc
          | ((n, x)::xs) =>
@@ -612,13 +611,18 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
              re_sid_ubytes_helper outs acc
            | _ => raise_error "re_sid_ubytes_helper: sbyte_to_extractbyte did not yield UVALUE_ExtractByte"
            end
-         end
-    with
-    re_sid_ubytes (bytes : list SByte) : ErrSID (list SByte)
+         end.
+    Next Obligation.
+      cbn.
+      symmetry in Heq_anonymous.
+      apply filter_split_out_length in Heq_anonymous.
+      lia.
+    Defined.
+
+    Definition re_sid_ubytes (bytes : list SByte) : ErrSID (list SByte)
       := let len := length bytes in
          byte_map <- re_sid_ubytes_helper (zip (Nseq 0 len) bytes) (@NM.empty _);;
          trywith (ERR_message "re_sid_ubytes: missing indices.") (NM_find_many (Nseq 0 len) byte_map).
-    Set Guard Checking.
 
     Definition sigT_of_prod {A B : Type} (p : A * B) : {_ : A & B} :=
       let (a, b) := p in existT (fun _ : A => B) a b.
