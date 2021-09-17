@@ -39,15 +39,12 @@ Module ERRSID (Addr:ADDRESS) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)
   Definition ErrSID_T M := eitherT ERR_MESSAGE (eitherT UB_MESSAGE (stateT store_id (stateT Provenance M))).
   Definition ErrSID := ErrSID_T ident.
 
-  Definition blah {T} (v : T) : UB (ERR T)
-    := inr (inr v).
-
   (* I can make this work using ltac, but  for some reason I can't write the definition directly... *)
   Instance ErrSID_T_MT {M : Type -> Type} `{HM: Monad M} : MonadT (ErrSID_T M) M.
   Proof.
     constructor.
     refine (fun T mt => mkEitherT (mkEitherT (fun sid prov => _))).
-    refine (fmap (fun v => (prov, (sid, blah v))) mt : M (Provenance * (store_id * UB (ERR T)))%type).
+    refine (fmap (fun v => (prov, (sid, inr (inr v)))) mt : M (Provenance * (store_id * UB (ERR T)))%type).
   Defined.
 
   #[global] Instance UBM_ErrSID_T {M : Type -> Type} `{HM :  Monad M} : UBM (ErrSID_T M) :=
