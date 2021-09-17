@@ -21,7 +21,8 @@ From Coq Require Import
 From ExtLib Require Import
      Core.RelDec
      Programming.Eqv
-     Structures.Monads.
+     Structures.Monads
+     Data.Monads.EitherMonad.
 
 From ITree Require Import
      ITree
@@ -114,12 +115,12 @@ Set Contextual Implicit.
   Definition lift_pure_err {A} {E} `{FailureE -< E} (m:err A) : itree E A :=
     lift_err ret m.
 
-  Definition lift_undef_or_err {A B} {E} `{FailureE -< E} `{UBE -< E} (f : A -> itree E B) (m:undef_or_err A) : itree E B :=
+  Definition lift_err_or_ub {A B} {E} `{FailureE -< E} `{UBE -< E} (f : A -> itree E B) (m:err_or_ub A) : itree E B :=
     match m with
     | mkEitherT m =>
       match m with
-      | inl x => raiseUB x
-      | inr (inl x) => raise x
+      | inl (UB_message x) => raiseUB x
+      | inr (inl (ERR_message x)) => raise x
       | inr (inr x) => f x
       end
     end.

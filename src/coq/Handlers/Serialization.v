@@ -424,10 +424,14 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
 
       Definition ErrPoison := eitherT string Poisonable.
 
-      Definition ErrPoison_to_undef_or_err_dvalue (ep : ErrPoison dvalue) : undef_or_err dvalue
+      Definition ErrPoison_to_err_or_ub_dvalue (ep : ErrPoison dvalue) : err_or_ub dvalue
         := match unEitherT ep with
-           | Unpoisoned dv => lift dv
-           | Poisoin => ret DVALUE_Poison
+           | Unpoisoned edv =>
+             match edv with
+             | inr dv => ret dv
+             | inl e => raise_error e
+             end
+           | Poison => ret DVALUE_Poison
            end.
 
       Definition err_to_ErrPoison {A} (e : err A) : ErrPoison A
@@ -724,15 +728,15 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
         pick_dtyp : dtyp -> (dvalue -> Prop)
 
 
-        Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop :=
-        Fixpoint concretize_uvalue (u : uvalue) {struct u} : undef_or_err dvalue :=
+        Inductive concretize_u : uvalue -> err_or_ub dvalue -> Prop :=
+        Fixpoint concretize_uvalue (u : uvalue) {struct u} : err_or_ub dvalue :=
 
         
 
         Maybe it should be a monad???
 
 
-        M (undef_or_err dvalue)
+        M (err_or_ub dvalue)
 
         Identity for actual concretization...
 
@@ -762,10 +766,10 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
         Context (M : Type -> Type).
         Context {Monad : Monad M}.
         Variable undef_handler : dtyp -> M dvalue.
-        Variable lift_ue : forall {A}, undef_or_err A -> M A.
+        Variable lift_ue : forall {A}, err_or_ub A -> M A.
 
         (* TODO: satisfy the termination checker here. *)
-        (* M will be undef_or_err / MPropT undef_or_err? *)
+        (* M will be err_or_ub / MPropT err_or_ub? *)
         Unset Guard Checking.
         (* Define a sum type f a, g b.... a + b. Mutual recursive
            function as one big function with sum type to select between
@@ -811,11 +815,11 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
               | DVALUE_Addr addr, DTYPE_I sz =>
                 lift_ue (coerce_integer_to_int sz (ptr_to_int addr))
               | _, _ =>
-                lift_ue (lift (raise "Invalid PTOI conversion"))
+                lift_ue (raise_error "Invalid PTOI conversion")
               end
             | Conv_ItoP x => ret (DVALUE_Addr (int_to_ptr (dvalue_int_unsigned x) wildcard_prov))
             | Conv_Pure x => ret x
-            | Conv_Illegal s => lift_ue (raise s)
+            | Conv_Illegal s => lift_ue (raise_error s)
             end
 
           | UVALUE_GetElementPtr t ua uvs =>
@@ -828,7 +832,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
 
           | UVALUE_ExtractValue uv idxs =>
             str <- concretize_uvalueM uv;;
-            let fix loop str idxs : undef_or_err dvalue :=
+            let fix loop str idxs : err_or_ub dvalue :=
                 match idxs with
                 | [] => ret str
                 | i :: tl =>
@@ -915,17 +919,17 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
         with
         extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : M dvalue
           := dvbs <- concretize_uvalue_bytes uvs;;
-             lift_ue (ErrPoison_to_undef_or_err_dvalue (dvalue_bytes_to_dvalue dvbs dt)).
+             lift_ue (ErrPoison_to_err_or_ub_dvalue (dvalue_bytes_to_dvalue dvbs dt)).
 
         Set Guard Checking.
       End Concretize.
 
       Arguments concretize_uvalueM {_ _}.
 
-      Definition concretize_uvalue (uv : uvalue) : undef_or_err dvalue
+      Definition concretize_uvalue (uv : uvalue) : err_or_ub dvalue
         := concretize_uvalueM (fun dt => lift (default_dvalue_of_dtyp dt)) (fun _ x => x) uv.
 
-      Definition concretize_u (uv : uvalue) : MPropT undef_or_err dvalue.
+      Definition concretize_u (uv : uvalue) : MPropT err_or_ub dvalue.
         refine (concretize_uvalueM
              (fun dt => _)
              (fun _ x => _) uv).
@@ -955,7 +959,7 @@ Section ConcretizeInductive.
 
   Variable endianess : Endianess.
 
-  Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop :=
+  Inductive concretize_u : uvalue -> err_or_ub dvalue -> Prop :=
   (* TODO: should uvalue_to_dvalue be modified to handle concatbytes? *)
   (* Concrete uvalue are concretized into their singleton *)
   | Pick_concrete             : forall uv (dv : dvalue), uvalue_to_dvalue uv = inr dv -> concretize_u uv (ret dv)
@@ -1030,7 +1034,7 @@ Section ConcretizeInductive.
       concretize_u uv e ->
       concretize_u (UVALUE_ExtractValue uv idxs)
                    (str <- e;;
-                    let fix loop str idxs : undef_or_err dvalue :=
+                    let fix loop str idxs : err_or_ub dvalue :=
                         match idxs with
                         | [] => ret str
                         | i :: tl =>
@@ -1188,7 +1192,7 @@ Section ConcretizeInductive.
 
 
   (* with *)
-  (*   concretize_u_dvalue_bytes : list uvalue -> NMap dvalue_byte -> undef_or_err (NMap dvalue_byte) -> Prop := *)
+  (*   concretize_u_dvalue_bytes : list uvalue -> NMap dvalue_byte -> err_or_ub (NMap dvalue_byte) -> Prop := *)
   (* | concretize_u_dvalue_bytes_nil : forall acc, concretize_u_dvalue_bytes [] acc (ret acc) *)
   (* | concretize_u_dvalue_bytes_cons : *)
   (*     forall uv byte_uv dt idx sid cidx dv ins outs, *)
@@ -1223,7 +1227,7 @@ Section ConcretizeInductive.
   (* . *)
 
   (* (* *)
-  (*     concretize_uvalue_bytes_helper (uvs : list (N * uvalue)) (acc : NMap dvalue_byte) {struct uvs} : undef_or_err (NMap dvalue_byte) *)
+  (*     concretize_uvalue_bytes_helper (uvs : list (N * uvalue)) (acc : NMap dvalue_byte) {struct uvs} : err_or_ub (NMap dvalue_byte) *)
   (*       := match uvs with *)
   (*          | [] => ret acc *)
   (*          | ((n, uv)::uvs) => *)
@@ -1253,7 +1257,7 @@ Section ConcretizeInductive.
 
 (*          Note: this also concretizes the index. *)
 (*        *) *)
-(*       uvalue_byte_replace_with_dvalue_byte (uv : uvalue) (dv : dvalue) {struct uv} : undef_or_err dvalue_byte *)
+(*       uvalue_byte_replace_with_dvalue_byte (uv : uvalue) (dv : dvalue) {struct uv} : err_or_ub dvalue_byte *)
 (*         := match uv with *)
 (*            | UVALUE_ExtractByte uv dt idx sid => *)
 (*              cidx <- concretize_uvalue idx;; *)
@@ -1270,7 +1274,7 @@ Section ConcretizeInductive.
 (*          Concretize these identical uvalues... *)
 (*          *) *)
 
-(*       concretize_uvalue_bytes_helper (uvs : list (N * uvalue)) (acc : NMap dvalue_byte) {struct uvs} : undef_or_err (NMap dvalue_byte) *)
+(*       concretize_uvalue_bytes_helper (uvs : list (N * uvalue)) (acc : NMap dvalue_byte) {struct uvs} : err_or_ub (NMap dvalue_byte) *)
 (*         := match uvs with *)
 (*            | [] => ret acc *)
 (*            | ((n, uv)::uvs) => *)
@@ -1293,7 +1297,7 @@ Section ConcretizeInductive.
 (*            end *)
 
 (*       with *)
-(*       concretize_uvalue_bytes (uvs : list uvalue) {struct uvs} : undef_or_err (list dvalue_byte) *)
+(*       concretize_uvalue_bytes (uvs : list uvalue) {struct uvs} : err_or_ub (list dvalue_byte) *)
 (*         := *)
 (*           let len := length uvs in *)
 (*           byte_map <- concretize_uvalue_bytes_helper (zip (Nseq 0 len) uvs) (@NM.empty _);; *)
@@ -1303,9 +1307,9 @@ Section ConcretizeInductive.
 (*           end *)
       
 (*       with *)
-(*       extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : undef_or_err dvalue *)
+(*       extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : err_or_ub dvalue *)
 (*         := dvbs <- concretize_uvalue_bytes uvs;; *)
-(*            ErrPoison_to_undef_or_err_dvalue (dvalue_bytes_to_dvalue dvbs dt). *)
+(*            ErrPoison_to_err_or_ub_dvalue (dvalue_bytes_to_dvalue dvbs dt). *)
 (*       Set Guard Checking. *)
 (*****************************)
   (* | Concretize_ConcatBytes_Int : *)

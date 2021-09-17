@@ -36,6 +36,7 @@ From ExtLib Require Import
      Structures.Functor
      Programming.Eqv
      Data.String
+     Data.Monads.EitherMonad
      Data.Monads.IdentityMonad.
 
 From Vellvm Require Import
@@ -1502,10 +1503,10 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
         ret x
       end.
 
-  Definition mem_state_lift_undef_or_err {E} `{FailureE -< E} `{UBE -< E} {A} (e : undef_or_err A) : MemStateT (itree E) A
+  Definition mem_state_lift_err_or_ub {E} `{FailureE -< E} `{UBE -< E} {A} (e : err_or_ub A) : MemStateT (itree E) A
     := match unEitherT e with
-       | inl ub => mem_state_raiseUB ub
-       | inr (inl err) => mem_state_raise err
+       | inl (UB_message ub) => mem_state_raiseUB ub
+       | inr (inl (ERR_message err)) => mem_state_raise err
        | inr (inr x) => ret x
        end.
 
@@ -1614,7 +1615,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
         match a, t with
         | UVALUE_Addr ptr, DTYPE_I sz =>
           let addr := coerce_integer_to_int sz (ptr_to_int ptr) in
-          addr' <- mem_state_lift_undef_or_err addr;;
+          addr' <- mem_state_lift_err_or_ub addr;;
           ret (dvalue_to_uvalue addr')
         | UVALUE_Addr ptr, DTYPE_IPTR =>
           let addr := ptr_to_int ptr in
