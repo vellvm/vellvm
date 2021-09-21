@@ -14,11 +14,18 @@ Section Vec.
 
 Open Scope nat_scope.
 
+(* t is the type of list A of size n *)
 Definition t (A : Type) (n : nat) : Type := { l : list A | length l = n }.
 
-Notation vec := (exist (fun l' : list _ => _)).
 
+Notation vec := (exist (fun l' : list _ => _)).
 Notation vec' l := (exist (fun l' : list _ => _) l _).
+
+
+(* (v : t A n) is a list A of size n *)
+(* v -> (a:list A, Ha proof of P a), where is "a" the witnesses and "Ha" the
+proof that a respects the property (here, length a = n) *)
+
 
 Theorem vector_proj1_unique : forall A n (v v' : t A n),
     proj1_sig v = proj1_sig v' -> v = v'.

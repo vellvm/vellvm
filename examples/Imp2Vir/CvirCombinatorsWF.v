@@ -19,17 +19,38 @@ Open Scope vec_scope.
 Arguments n_int : default implicits.
 Arguments blocks : default implicits.
 
+(** There is 4 properties of WF:
+ - unique block ID
+ - cvir IDs WF
+ - cvir used inputs
+ - relabeling (actually, it is in Semantic.v) *)
 
+(** Well-Formness properties *)
+
+(* NOTE Here, I understand:
+
+For all blocks of the given CVIR,
+If the union of the provided inputs and internals has no duplicate, and if
+the block id are similar, then the blocks are the same. *)
+
+(* If the union of inputs and internals has no duplicate, then there will be
+no duplicates block_id in the ir. *)
 Definition unique_bid {ni no} ir : Prop :=
   forall (vi : Vec.t raw_id ni) (vo : Vec.t raw_id no) vt,
   forall b1 b2,
+  (* The union of inputs and intervals has no duplicate *)
   unique_vector (vi ++ vt)%vec ->
   (* unique_list (inputs (blocks ir vi vo vt)). *)
+  (* b1 is a block in the given CVIR *)
   List.In b1 (blocks ir vi vo vt) ->
+  (* b2 is a block in the given CVIR *)
   List.In b2 (blocks ir vi vo vt) ->
+  (* b1 and b2 have the same id *)
   blk_id b1 = blk_id b2 ->
+  (* b1 and b2 must be equals *)
   b1 = b2.
 
+(* id is an output of the block b if the terminator of b branches to id *)
 Definition out_blk_id id (b : block typ) : Prop :=
   match blk_term b with
   | TERM_Br_1 bid => id = bid
@@ -37,22 +58,31 @@ Definition out_blk_id id (b : block typ) : Prop :=
   | _ => False
   end.
 
+(* If a block belongs to a CVIR,
+   - its id must be in the inputs or the internals (input WF)
+   and
+   - all branchs must be to a block which id in one of the provided vector
+   (output WF)
+
+NOTE: for output WF, shouldn't it be in output only ?
+ *)
 Definition cvir_ids_WF {ni no} ir : Prop :=
   forall (vi : Vec.t raw_id ni) (vo : Vec.t raw_id no) vt b,
   List.In b (blocks ir vi vo vt) ->
-  (
-    In (blk_id b) (vi ++ vt)%vec
-  ) /\ (
-    forall bid,
-    out_blk_id bid b ->
-    In bid (vi ++ vo ++ vt)%vec
-  ).
+  (In (blk_id b) (vi ++ vt)%vec) (* input WF *)
+  /\
+  (forall bid, out_blk_id bid b -> In bid (vi ++ vo ++ vt)%vec). (* output WF *)
 
+(* Each block id used in input or internals must be used as an input in the
+returned CFG *)
 Definition cvir_inputs_used {ni no} (ir : cvir ni no) : Prop :=
   forall vi vo vt bid,
   In bid (vi ++ vt) ->
   List.In bid (inputs (blocks ir vi vo vt)).
 
+(** ---- Proof of WF combinators ---- *)
+
+(* block_cvir WF *)
 Theorem block_cvir_id_WF : forall c, cvir_ids_WF (block_cvir c).
 Proof.
   unfold cvir_ids_WF.
@@ -98,6 +128,8 @@ Proof.
   reflexivity.
 Qed.
 
+(* branch_cvir WF *)
+
 Theorem branch_cvir_id_WF : forall c e, cvir_ids_WF (branch_cvir c e).
 Proof.
   unfold cvir_ids_WF.
@@ -136,6 +168,15 @@ Proof.
   reflexivity.
 Qed.
 
+Theorem branch_cvir_inputs_used : forall c e, cvir_inputs_used (branch_cvir c e).
+  unfold cvir_inputs_used.
+  intros.
+  destruct_vec0 vt.
+  now destruct_vec1 vi.
+Qed.
+
+
+(* NOTE I don't understand why this property is here (where should it be ?) *)
 Theorem unique_vector_reorder :
   forall A n1 n2 n3 n4 (v1 : Vec.t A n1) (v2 : Vec.t A n2) (v3 : Vec.t A n3) (v4 : Vec.t A n4),
   unique_vector ((v1 ++ v2) ++ v3 ++ v4) -> unique_vector ((v1 ++ v3) ++ v2 ++ v4).
@@ -150,6 +191,8 @@ Proof.
   rewrite <- app_assoc.
   assumption.
 Qed.
+
+(* merge_cvir WF *)
 
 Theorem merge_cvir_id_WF :
   forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2),
@@ -257,6 +300,8 @@ Proof.
     all: assumption.
 Qed.
 
+(* sym_i and sym_o WF *)
+
 Theorem sym_i_cvir_id_WF :
   forall ni1 ni2 ni3 no (ir : cvir (ni1+(ni2+ni3)) no),
   cvir_ids_WF ir -> cvir_ids_WF (sym_i_cvir ir).
@@ -355,6 +400,9 @@ Proof.
   eapply H ; eassumption.
 Qed.
 
+
+(* cast_i and cast_o WF *)
+
 Theorem cast_i_cvir_id_WF :
   forall ni ni' no (ir : cvir ni no) (H : ni = ni'),
   cvir_ids_WF ir -> cvir_ids_WF (cast_i_cvir ir H).
@@ -422,6 +470,8 @@ Proof.
   eapply H0 ; try eassumption.
 Qed.
 
+(* focus_input WF *)
+
 Theorem focus_input_cvir_id_WF :
   forall ni no (ir : cvir ni no) (i : fin ni),
   cvir_ids_WF ir -> cvir_ids_WF (focus_input_cvir ir i).
@@ -463,6 +513,8 @@ Proof.
   apply cast_i_cvir_unique.
   exact H.
 Qed.
+
+(* focus_output WF *)
 
 Theorem focus_output_cvir_id_WF :
   forall ni no (ir : cvir ni no) (i : fin no),
@@ -506,6 +558,8 @@ Proof.
   exact H.
 Qed.
 
+(* loop_cvir_open WF *)
+
 Theorem loop_cvir_open_id_WF :
   forall (ni no : nat) (ir : cvir (S ni) (S no)),
   cvir_ids_WF ir -> cvir_ids_WF (loop_cvir_open ir).
@@ -542,6 +596,9 @@ Proof.
   simpl in *.
   eapply H with (vo := (hd vi :: vo)) ; try eassumption.
 Qed.
+
+
+(* loop_cvir WF *)
 
 Theorem loop_cvir_id_WF :
   forall (ni no : nat) (ir : cvir (S ni) (S no)),
@@ -602,6 +659,8 @@ Proof.
   apply H0.
 Qed.
 
+(* seq_cvir WF *)
+
 Theorem seq_cvir_id_WF :
   forall ni1 no1 ni2 no2 (ir1 : cvir ni1 (S no1)) (ir2 : cvir (S ni2) no2),
   cvir_ids_WF ir1 -> cvir_ids_WF ir2 ->
@@ -645,6 +704,8 @@ Proof.
   apply merge_cvir_unique ; assumption.
 Qed.
 
+(* join_cvir WF *)
+
 Theorem join_cvir_id_WF :
   forall (ni no : nat) (ir : cvir ni (S (S no))),
   cvir_ids_WF ir ->
@@ -687,6 +748,7 @@ Proof.
 Qed.
 
 
+(** TODO Explain these lemmas *)
 Lemma cvir_inputs : forall {ni no} (ir : cvir ni no) vi vo vt i,
   cvir_ids_WF ir ->
   cvir_inputs_used ir ->
@@ -712,8 +774,8 @@ Proof.
   apply H0.
 Admitted. (* easy, but I should probably get rid of out_blk_id *)
 
-(* maybe redefine unique_vector from NoDup to have this property for free? *)
 Theorem unique_bid_wf_ocfg_bid : forall ni no (ir : cvir ni no) vi vo vt,
+(* maybe redefine unique_vector from NoDup to have this property for free? *)
   unique_bid ir ->
   unique_vector (vi ++ vt) ->
   wf_ocfg_bid (blocks ir vi vo vt).

@@ -99,14 +99,16 @@ Qed.
 
 Theorem unique_vector_assoc :
   forall A n1 n2 n3 (v1 : Vec.t A n1) (v2 : Vec.t A n2) (v3 : Vec.t A n3),
-  unique_vector (v1 ++ v2 ++ v3)%vec -> unique_vector ((v1 ++ v2) ++ v3)%vec.
+  unique_vector (v1 ++ v2 ++ v3)%vec <-> unique_vector ((v1 ++ v2) ++ v3)%vec.
 Proof.
-  intros.
-  apply unique_list_vector.
-  apply unique_list_vector in H.
-  simpl in *.
-  rewrite <- app_assoc.
-  exact H.
+  split ;
+    ( intros ;
+      apply unique_list_vector ;
+      apply unique_list_vector in H ;
+      simpl in *;
+      try (rewrite app_assoc ; assumption) ;
+      try (rewrite <- app_assoc ; assumption)
+    ).
 Qed.
 
 Theorem unique_vector_sym : forall A n1 n2 (v1 : Vec.t A n1) (v2 : Vec.t A n2),
@@ -169,5 +171,4 @@ Proof.
   - rewrite 2 vector_app_nth2.
     exact H0.
 Qed.
-
 End Unique.

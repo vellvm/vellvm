@@ -279,6 +279,26 @@ Section Example_Fact.
 End Example_Fact.
 
 (* ========================================================================== *)
+(** ** EXAMPLE: If *)
+
+Section Example_If.
+
+  Open Scope expr_scope.
+  Open Scope stmt_scope.
+  Variable input: var.
+  Variable output: var.
+
+  Definition trivial_if (n:nat): stmt :=
+    input ← n;;;
+    IF input
+    THEN output ← 0
+    ELSE output ← 1
+    FI .
+
+End Example_If.
+
+
+(* ========================================================================== *)
 (** ** Interpretation *)
 
 (* begin hide *)

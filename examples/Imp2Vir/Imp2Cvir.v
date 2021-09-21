@@ -40,18 +40,21 @@ Fixpoint compile (next_reg : int) (s : stmt) (env: StringMap.t int)
       let ir := loop_cvir_open body in
       ret (next_reg, env, ir) : option (int * (StringMap.t int) * cvir 1 1)
   | If e l r =>
-      '(cond_reg, expr_ir) <- compile_cond next_reg e env;;
+      '(cond_reg, expr_code) <- compile_cond next_reg e env;;
       '(next_reg, _, ir_l) <- compile (cond_reg + 1) l env;;
       '(next_reg, _, ir_r) <- compile next_reg r env;;
-      let ir := branch_cvir expr_ir (texp_i1 cond_reg) : cvir 1 2 in
+      let ir := branch_cvir expr_code (texp_i1 cond_reg) : cvir 1 2 in
       let ir := seq_cvir ir ir_l : cvir 1 2 in
       let ir := seq_cvir ir ir_r : cvir 1 2 in
       let ir := join_cvir ir : cvir 1 1 in
       ret (next_reg, env, ir) : option (int * (StringMap.t int) * cvir 1 1)
   end.
 
+(* TODO it misses cvir_inputs_used and relabel_WF properties *)
 Theorem compile_WF : forall s next_reg next_reg' env env' ir,
-  compile next_reg s env = Some(next_reg', env', ir) -> cvir_ids_WF ir /\ unique_bid ir.
+compile next_reg s env = Some(next_reg', env', ir) ->
+cvir_ids_WF ir /\
+unique_bid ir.
 Proof.
   induction s ; intros ? ? ? ? ? Heqo ; simpl in Heqo.
   - repeat break_match ; try discriminate.
@@ -64,7 +67,8 @@ Proof.
     simpl in *.
     apply IHs1 in Heqo0.
     apply IHs2 in Heqo1.
-    split; [ apply (seq_cvir_id_WF 1 0) | apply (seq_cvir_unique 1 0)] ; simpl in * ; tauto.
+    split; [ apply (seq_cvir_id_WF 1 0) | apply (seq_cvir_unique 1 0)]
+    ; simpl in * ; tauto.
   - repeat break_match ; try discriminate.
     inversion Heqo.
     subst.
@@ -106,6 +110,11 @@ Definition compile_program (s : stmt) (env : StringMap.t int) :
   ret (compile_imp_cvir ir).
 
 Definition fact_ir := (compile_program (fact "a" "b" 5) (StringMap.empty int)).
+
+Definition if_ir :=
+  (compile_program (trivial_if "a" "b" 0) (StringMap.empty int)).
+
+Compute if_ir.
 
 Eval compute in fact_ir.
 

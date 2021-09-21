@@ -25,9 +25,11 @@ From Vellvm Require Import
 
 Section Relabel.
 
+(* A relabeling is just a map from bid to bid *)
 Definition bid_map := alist block_id block_id.
 Import MonadNotation.
 
+(* Relabeling a block id *)
 Definition blk_id_relabel m bid : block_id :=
   match alist_find bid m with
   | Some bid => bid
@@ -42,9 +44,10 @@ Proof.
   now rewrite H.
 Qed.
 
-Definition blk_id_relabel_rel (m : alist block_id block_id) bid bid' : Prop :=
+Definition blk_id_relabel_rel (m : bid_map) bid bid' : Prop :=
   alist_find bid m = Some bid'.
 
+(* Relabeling a terminator *)
 Definition blk_term_relabel {typ} m t : terminator typ :=
   match t with
   | TERM_Br_1 bid => TERM_Br_1 (blk_id_relabel m bid)
@@ -55,6 +58,7 @@ Definition blk_term_relabel {typ} m t : terminator typ :=
   | t => t
   end.
 
+(* Relabeling phi *)
 Definition blk_phi_relabel {typ} m ph : phi typ :=
   let '(Phi t l) := ph in
   Phi t (List.map (fun '(bid, e) => (blk_id_relabel m bid, e)) l).
@@ -62,6 +66,7 @@ Definition blk_phi_relabel {typ} m ph : phi typ :=
 Definition blk_phis_relabel {typ} m l : list (local_id * phi typ) :=
   List.map (fun '(lid, phi) => (lid, blk_phi_relabel m phi)) l.
 
+(* Relabeling a single block *)
 Definition bk_relabel {typ} (m : bid_map) (bk : block typ) : block typ :=
   mk_block
     (blk_id_relabel m (blk_id bk))
@@ -70,6 +75,7 @@ Definition bk_relabel {typ} (m : bid_map) (bk : block typ) : block typ :=
     (blk_term_relabel m (blk_term bk))
     (blk_comments bk).
 
+(* Relabeling an ocfg *)
 Definition ocfg_relabel {typ} m cfg : ocfg typ :=
   List.map (bk_relabel m) cfg.
 
@@ -79,6 +85,7 @@ Definition ocfg_relabel_rel' {typ} (cfg cfg' : ocfg typ) m : Prop :=
 Definition ocfg_relabel_rel {typ} (cfg cfg' : ocfg typ) : Prop :=
   exists m, ocfg_relabel_rel' cfg cfg' m.
 
+(* relabeling identity *)
 Theorem bk_relabel_id : forall {typ} (bk : block typ), bk_relabel nil bk = bk.
 Proof.
   intros.

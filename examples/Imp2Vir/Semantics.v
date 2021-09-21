@@ -180,6 +180,9 @@ Definition vec_build_map {A n} (v v' : Vec.t A n) : alist A A :=
   List.combine (proj1_sig v) (proj1_sig v').
 
 (* TODO move to CvirCombinatorsWF.v *)
+(* If the blocks function is called twice with different vectors of block ids,
+the returned list of blocks will be identical modulo relabelling of the block
+ids *)
 Definition cvir_relabel_WF {ni no} (ir : cvir ni no) :=
   forall vi vi' vo vo' vt vt',
   unique_vector (vi ++ vo ++ vt) ->
@@ -211,7 +214,7 @@ Proof.
   apply unique_vector_build_map; lia.
 Qed.
 
-Theorem block_cvir_relabel_WF : forall b, cvir_relabel_WF (block_cvir b).
+Theorem block_cvir_relabel_WF : forall c, cvir_relabel_WF (block_cvir c).
 Proof.
   unfold cvir_relabel_WF.
   intros.
@@ -231,7 +234,8 @@ Qed.
 
 Theorem merge_cvir_relabel_WF :
   forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2),
-  cvir_relabel_WF ir1 -> cvir_relabel_WF ir2 ->
+  cvir_relabel_WF ir1 ->
+  cvir_relabel_WF ir2 ->
   cvir_relabel_WF (merge_cvir ir1 ir2).
 Proof.
   unfold cvir_relabel_WF.
@@ -255,9 +259,21 @@ Proof.
   fold (ocfg_relabel m (blocks ir1 vi1 vo1 vt1)).
   fold (ocfg_relabel m (blocks ir2 vi2 vo2 vt2)).
   f_equal.
-  - admit. (* the mappings are identical for the relevant keys *)
-  - admit.
+  - f_equal. subst m.
+    admit. (* the mappings are identical for the relevant keys *)
+  - f_equal. subst m.
+    admit.
 Admitted.
+
+(* NOTE branch_cvir_relabel_WF ? *)
+(* NOTE sym_cvir_relabel_WF ? *)
+(* NOTE cast_cvir_relabel_WF ? *)
+(* NOTE focus_cvir_relabel_WF ? *)
+(* NOTE loop_cvir_relabel_WF ? *)
+(* NOTE loop_open_cvir_relabel_WF ? *)
+(* NOTE seq_cvir_relabel_WF ? *)
+(* NOTE join_cvir_relabel_WF ? *)
+
 
 Theorem cvir_relabel : forall {ni no} (ir : cvir ni no) vi vi' vo vo' vt vt',
   cvir_relabel_WF ir ->
@@ -270,6 +286,8 @@ Proof.
   apply H; try assumption.
 Qed.
 
+(* TODO (reformulate ) If a CVIR is WF, we can label a CVIR using 2 different
+maps, the denotation is eutt. *)
 Theorem eutt_cvir_relabel : forall {ni no} (ir : cvir ni no) vi vi' vo vo' vt vt' bid bid',
   cvir_ids_WF ir ->
   cvir_inputs_used ir ->
@@ -514,6 +532,19 @@ Proof.
   apply split_fin_sum_inl in Heqs. subst bid.
 Admitted.
 
+
+(* NOTE denote_cvir_block ? *)
+(* NOTE denote_cvir_branch ? *)
+(* NOTE denote_cvir_sym ? *)
+(* NOTE denote_cvir_cast ? *)
+(* NOTE denote_cvir_focus ? *)
+(* NOTE denote_cvir_loop ? *)
+(* NOTE denote_cvir_loop_open ? *)
+(* NOTE denote_cvir_seq ? *)
+(* NOTE denote_cvir_join ? *)
+
+
+
 (* Relation between Imp env and vellvm env *)
 
 Definition Rmem (env : Imp.env) (vmap : StringMap.t int) (venv : local_env) (vmem : memory_stack) : Prop :=
@@ -537,3 +568,9 @@ Theorem compile_seq_correct : forall next_reg l r env next_reg' env' ir mem bid 
   (interp_imp (denote_imp (Seq l r)) mem)
   (interp_cfg3 (denote_cvir ir f0 bid) genv lenv vmem).
 Admitted.
+
+Fail Theorem compile_assign_correct : TODO.
+Fail Theorem compile_if_correct : TODO.
+Fail Theorem compile_while_correct : TODO.
+Fail Theorem compile_skip_correct : TODO.
+Fail Theorem compile_correct : TODO.
