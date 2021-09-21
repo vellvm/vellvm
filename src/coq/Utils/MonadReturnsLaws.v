@@ -35,16 +35,89 @@ Section Laws.
           MReturns x (ret y) -> x = y;
 
       MReturns_Proper :> forall {A} (a : A),
-          Proper (eq1 ==> iff) (MReturns a) 
+          Proper (eq1 ==> iff) (MReturns a)
    }.
-
 End Laws.
+
+Section MonadReturnsInv.
+  Context (M : Type -> Type).
+  Context {Monad : Monad M}.
+  Context {Eq1 : @Eq1 M}.
+  Context {MRET : @MonadReturns M Monad Eq1}.
+  Class MonadReturns_Proper_inv :=
+    { MReturns_Proper_inv :> forall {A} (a: A),
+        Proper ((fun (x y : M A) => MReturns M a x <-> MReturns M a y) ==> Monad.eq1) (fun x => x) }.
+End MonadReturnsInv.
 
 Arguments MReturns {M _ _ _ _}.
 Arguments MReturns_bind {M _ _ _ _}.
 Arguments MReturns_bind_inv {M _ _ _ _}.
 Arguments MReturns_ret {M _ _ _ _}.
 Arguments MReturns_ret_inv {M _ _ _ _}.
+
+Section Sum.
+  Context {E : Type}.
+
+  Definition SumReturns {A} (a : A) (ma : sum E A) : Prop
+    := ma = inr a.
+
+  Lemma SumReturns_bind :
+    forall {A B} (a : A) (b : B) (ma : sum E A) (k : A -> sum E B),
+      SumReturns a ma -> SumReturns b (k a) -> SumReturns b (bind ma k).
+  Proof.
+    intros * Ha Hb.
+    unfold SumReturns in *.
+    subst.
+    auto.
+  Qed.
+
+  Lemma SumReturns_bind_inv :
+    forall {A B} (ma : sum E A) (k : A -> sum E B) (b : B),
+      SumReturns b (bind ma k) -> exists a : A , SumReturns a ma /\ SumReturns b (k a).
+  Proof.
+    intros * Hb.
+    unfold SumReturns in *.
+    destruct ma; inversion Hb.
+    - exists a.
+      auto.
+  Qed.
+
+  Lemma SumReturns_ret :
+    forall {A} (a : A) (ma : sum E A),
+      eq1 ma (ret a) -> SumReturns a ma.
+  Proof.
+    intros * Hma.
+    auto.
+  Qed.
+
+  Lemma SumReturns_ret_inv :
+    forall {A} (x y : A),
+      SumReturns x (ret y) -> x = y.
+  Proof.
+    intros * H.
+    unfold SumReturns in H.
+    inversion H; auto.
+  Qed.
+
+  #[global] Instance SumReturns_Proper : forall {A} (a : A),
+      Proper (eq1 ==> iff) (SumReturns a).
+  Proof.
+    intros A a.
+    unfold Proper, respectful.
+    intros x y H.
+    split; intros Hret; unfold SumReturns in *; subst; auto.
+  Qed.
+
+  Instance MonadReturns_Sum : MonadReturns (sum E )
+    := { MReturns := fun A => SumReturns;
+         MReturns_bind := fun A B => SumReturns_bind;
+         MReturns_bind_inv := fun A B => SumReturns_bind_inv;
+         MReturns_ret := fun A => SumReturns_ret;
+         MReturns_ret_inv := fun A => SumReturns_ret_inv
+       }.
+
+End Sum.
+
 
 Section EitherT.
   Import EitherMonad.
@@ -55,7 +128,7 @@ Section EitherT.
   Context {EQM : @Eq1 M}.
   Context {EQV : @Eq1Equivalence M HM EQM}.
   Context {MRET : @MonadReturns M HM EQM}.
-          
+
 
   Definition EitherTReturns {A} (a : A) (ma : eitherT E M A) : Prop
     := MReturns (inr a) (unEitherT ma).
@@ -114,7 +187,7 @@ Section EitherT.
       auto.
     - eapply MReturns_Proper; eauto.
   Qed.
-  
+
   Instance MonadReturns_EitherT : MonadReturns (eitherT E M)
     := { MReturns := fun A => EitherTReturns;
          MReturns_bind := fun A B => EitherTReturns_bind;
@@ -155,7 +228,7 @@ Section StateT.
   Context {EQM : @Eq1 M}.
   Context {EQV : @Eq1Equivalence M HM EQM}.
   Context {MRET : @MonadReturns M HM EQM}.
-          
+
 
   Definition StateTReturns {A} (a : A) (ma : stateT S M A) : Prop
     := forall s, exists s', MReturns (a, s') (runStateT ma s).

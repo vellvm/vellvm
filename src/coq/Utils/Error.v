@@ -9,6 +9,8 @@
  ---------------------------------------------------------------------------- *)
 
 (* begin hide *)
+Require Import FunctionalExtensionality.
+
 From Coq Require Import String.
 
 From ExtLib Require Import
@@ -20,6 +22,9 @@ From ExtLib Require Import
 From ITree Require Import
      ITree
      Events.Exception.
+
+From Vellvm.Utils Require Import MonadReturnsLaws.
+
 (* end hide *)
 
 (** * Error and exception monads 
@@ -33,21 +38,15 @@ From ITree Require Import
 
 Notation err := (sum string).
 
-Instance Monad_err : Monad err := Monad_either string.
-Instance Exception_err : MonadExc string err := Exception_either string.
+Instance EqM_sum {E} : Monad.Eq1 (sum E) :=
+  fun (a : Type) (x y : sum E a) => x = y.
 
-Instance EqM_err: Monad.Eq1 err := fun a x y => @eq (err a) x y.
+Instance EqMProps_sum {E} : Monad.Eq1Equivalence (sum E).
+constructor; intuition.
+repeat intro. etransitivity; eauto.
+Defined.
 
-Instance EqMProps_err: Monad.Eq1Equivalence err.
-  constructor.
-  - repeat intro. repeat red. destruct x; reflexivity.
-  - repeat intro. repeat red. repeat red in H.
-    destruct x; destruct y; try auto; try contradiction.
-  - repeat intro. repeat red in H, H0. repeat red.
-    destruct x, y, z; auto; try contradiction; try etransitivity; eauto.
-Qed.
-
-Instance MonadLaws_err: Monad.MonadLawsE err.
+Instance MonadLaws_sum {T} : Monad.MonadLawsE (sum T).
   constructor.
   - intros. repeat red. cbn. auto.
   - intros. repeat red. cbn. destruct x eqn: Hx; auto.
@@ -141,27 +140,112 @@ Definition lift_ERR {M A} `{MonadExc ERR_MESSAGE M} `{Monad M} (e : ERR A) : (M 
 
 Definition err_or_ub := eitherT ERR_MESSAGE UB.
 
-Instance Monad_err_or_ub : Monad err_or_ub.
-unfold err_or_ub. typeclasses eauto.
+Instance EqM_eitherT {E} {M} `{Monad.Eq1 M} : Monad.Eq1 (eitherT E M)
+  := fun (a : Type) x y => Monad.eq1 (unEitherT x) (unEitherT y).
+
+Instance EqMProps_eitherT {E} {M} `{Monad.Eq1Equivalence M} : Monad.Eq1Equivalence (eitherT E M).
+constructor; intuition;
+repeat intro.
+- unfold Monad.eq1, EqM_eitherT.
+  reflexivity.
+- unfold Monad.eq1, EqM_eitherT.
+  symmetry.
+  auto.
+- unfold Monad.eq1, EqM_eitherT.
+  etransitivity; eauto.
 Defined.
 
-Instance EqM_err_or_ub : Monad.Eq1 err_or_ub :=
-  fun (a : Type) (x y : err_or_ub a) => x = y.
+(* Instance MonadLaws_eitherT {E} {M} `{HM: Monad M} `{MEQ1 : Monad.Eq1 M} `{MEQ1V : @Monad.Eq1Equivalence M HM MEQ1} `{LAWS: @Monad.MonadLawsE M MEQ1 HM} `{MRETS : @MonadReturns M HM MEQ1} `{MRETSINV : @MonadReturns_Proper_inv M HM MEQ1 MRETS} : Monad.MonadLawsE (eitherT E M). *)
+(* destruct LAWS. *)
 
-Instance EqMProps_err_or_ub : Monad.Eq1Equivalence err_or_ub.
-constructor; intuition.
-repeat intro. etransitivity; eauto.
-Defined.
+(* constructor. *)
+(* - repeat intro. cbn. destruct (f x) as [fx] eqn:Hfx. cbn. unfold Monad.eq1, EqM_eitherT. *)
+(*   cbn. *)
+(*   etransitivity; eauto. *)
+(*   rewrite Hfx. *)
+(*   cbn. *)
+(*   reflexivity. *)
+(* - repeat intro. cbn. destruct x as [x'] eqn:Hx. subst. cbn. unfold Monad.eq1, EqM_eitherT. *)
+(*   cbn. *)
+(*   replace (fun xM : E + A => *)
+(*         match xM with *)
+(*         | inl x => ret (inl x) *)
+(*         | inr x => ret (inr x) *)
+(*         end) with (fun xM : E + A => ret xM). *)
+(*   etransitivity; eauto. *)
+(*   reflexivity. *)
 
-Instance MonadLaws_err_or_ub: Monad.MonadLawsE err_or_ub.
-constructor.
-- repeat intro. cbn. destruct (f x). cbn. reflexivity.
-- repeat intro. cbn. destruct x. cbn. destruct unEitherT; try reflexivity.
-  destruct s; reflexivity.
-- repeat intro. cbn. destruct x. destruct unEitherT.
-  destruct u; destruct s; reflexivity.
-  destruct s; reflexivity.
-- repeat intro. destruct x, y. rewrite H. destruct unEitherT, unEitherT0; cbn; try reflexivity.
-  destruct s; [reflexivity | rewrite H0; reflexivity].
-  destruct s0; [reflexivity | rewrite H0; reflexivity].
-Qed.
+(*   apply functional_extensionality. *)
+(*   intros x. *)
+(*   destruct x; auto. *)
+(* - repeat intro. cbn. destruct x as [x'] eqn:Hx. *)
+(*   unfold Monad.eq1, EqM_eitherT. cbn. *)
+(*   rewrite bind_bind. *)
+
+(*   destruct MRETS. *)
+(*   destruct MRETSINV. *)
+
+(*   eapply MReturns_Proper_inv. *)
+(*   split. *)
+(*   + intros H. *)
+(*     eapply MReturns_bind_inv in H as (xv & Hxv & RET). *)
+(*     eapply MReturns_bind; eauto. *)
+(*     destruct xv; eauto. *)
+(*     rewrite bind_ret_l in RET; eauto. *)
+(*   + intros H. *)
+(*     eapply MReturns_bind_inv in H as (xv & Hxv & RET). *)
+(*     eapply MReturns_bind; eauto. *)
+(*     destruct xv; eauto. *)
+(*     rewrite bind_ret_l; eauto. *)
+
+(* - repeat intro. *)
+(*   destruct x as [x'] eqn:Hx. *)
+(*   destruct y as [y'] eqn:Hy. *)
+(*   unfold Monad.eq1, EqM_eitherT. *)
+(*   cbn in *. *)
+
+(*   destruct MRETS. *)
+(*   destruct MRETSINV. *)
+
+(*   subst. *)
+(*   unfold Monad.eq1, EqM_eitherT in H. *)
+(*   cbn in H. *)
+(*   rewrite <- H. *)
+
+(*   eapply MReturns_Proper_inv. *)
+(*   split. *)
+(*   + intros RETS. *)
+(*     eapply MReturns_bind_inv in RETS as (xv & Hxv & RETS). *)
+
+(*     destruct xv; eauto. *)
+(*     cbn in *. *)
+(*     eapply MReturns_bind; eauto. *)
+(*     eapply MReturns_bind; eauto. *)
+(*     cbn. *)
+
+(*     unfold Morphisms.pointwise_relation in H0. *)
+(*     specialize (H0 a). *)
+
+(*     unfold Monad.eq1, EqM_eitherT in H0. *)
+(*     rewrite H0 in RETS; eauto. *)
+(*   + intros RETS. *)
+(*     eapply MReturns_bind_inv in RETS as (xv & Hxv & RETS). *)
+
+(*     destruct xv; eauto. *)
+(*     cbn in *. *)
+(*     eapply MReturns_bind; eauto. *)
+(*     eapply MReturns_bind; eauto. *)
+(*     cbn. *)
+
+(*     unfold Morphisms.pointwise_relation in H0. *)
+(*     specialize (H0 a). *)
+
+(*     unfold Monad.eq1, EqM_eitherT in H0. *)
+(*     rewrite H0; eauto. *)
+(* Defined. *)
+
+Definition err_to_err_or_ub {A} (e : err A) : err_or_ub A
+  := match e with
+     | inr a => ret a
+     | inl e => raise_error e
+     end.

@@ -427,10 +427,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
       Definition ErrPoison_to_err_or_ub_dvalue (ep : ErrPoison dvalue) : err_or_ub dvalue
         := match unEitherT ep with
            | Unpoisoned edv =>
-             match edv with
-             | inr dv => ret dv
-             | inl e => raise_error e
-             end
+             err_to_err_or_ub edv
            | Poison => ret DVALUE_Poison
            end.
 
@@ -748,6 +745,14 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
       (* TODO: PropT??? *)
       Definition MPropT (M : Type -> Type) `{Monad M} (X : Type) : Type := M X -> Prop.
 
+      Global Instance MonadT_MPropT {M} `{HM: Monad M} `{MEQ: @Monad.Eq1 M} : MonadT (MPropT M) M.
+      Proof.
+        constructor.
+        intros T mt.
+        unfold MPropT.
+        intros mt'.
+        exact (Monad.eq1 mt mt').
+      Defined.
 
       Definition bind_MPropT {M : Type -> Type} `{HM: Monad M} `{MEQ: @Monad.Eq1 M} `{MR: @MonadReturns M HM MEQ}
                  {A B : Type} (pa : MPropT M A) (k : A -> MPropT M B) : MPropT M B
@@ -756,7 +761,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
                 Monad.eq1 mb (Monad.bind ma k') /\
                 (forall a, MReturns a ma -> k a (k' a))).
       
-      #[global] Instance Monad_MProp {M} `{HM: Monad M} `{MEQ: @Monad.Eq1 M} `{MR: @MonadReturns M HM MEQ} : Monad (MPropT M) :=
+      #[global] Instance Monad_MPropT {M} `{HM: Monad M} `{MEQ: @Monad.Eq1 M} `{MR: @MonadReturns M HM MEQ} : Monad (MPropT M) :=
         {|
         ret := fun _ x y => Monad.eq1 y (ret x)
         ; bind := @bind_MPropT M HM MEQ MR
@@ -927,13 +932,14 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
       Arguments concretize_uvalueM {_ _}.
 
       Definition concretize_uvalue (uv : uvalue) : err_or_ub dvalue
-        := concretize_uvalueM (fun dt => lift (default_dvalue_of_dtyp dt)) (fun _ x => x) uv.
+        := concretize_uvalueM (fun dt => err_to_err_or_ub (default_dvalue_of_dtyp dt)) (fun _ x => x) uv.
 
       Definition concretize_u (uv : uvalue) : MPropT err_or_ub dvalue.
         refine (concretize_uvalueM
              (fun dt => _)
              (fun _ x => _) uv).
-        admit.
+        eapply Monad_MPropT.
+        Unshelve.
         { unfold MPropT.
           refine (fun edv =>
                     match edv with
@@ -950,415 +956,21 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
         }
         { unfold MPropT.
           intros ue.
-
+          destruct ue.
+          destruct unEitherT.
+          - exact True.
+          - exact False.
         }
-      
-    End Concretize.
+        typeclasses eauto.
+        unfold err_or_ub.
+        pose proof @MonadReturns_EitherT.
+ 
+        pose proof (@MonadReturns_EitherT ERR_MESSAGE UB _ _ _ (MonadReturns_Sum)).
 
-Section ConcretizeInductive.
-
-  Variable endianess : Endianess.
-
-  Inductive concretize_u : uvalue -> err_or_ub dvalue -> Prop :=
-  (* TODO: should uvalue_to_dvalue be modified to handle concatbytes? *)
-  (* Concrete uvalue are concretized into their singleton *)
-  | Pick_concrete             : forall uv (dv : dvalue), uvalue_to_dvalue uv = inr dv -> concretize_u uv (ret dv)
-  | Pick_fail                 : forall uv v s, ~ (uvalue_to_dvalue uv = inr v)  -> concretize_u uv (lift (failwith s))
-  (* Undef relates to all dvalue of the type *)
-  | Concretize_Undef          : forall dt dv,
-      dvalue_has_dtyp dv dt ->
-      concretize_u (UVALUE_Undef dt) (ret dv)
-
-  (* The other operations proceed non-deterministically *)
-  | Concretize_IBinop : forall iop uv1 e1 uv2 e2,
-      concretize_u uv1 e1 ->
-      concretize_u uv2 e2 ->
-      concretize_u (UVALUE_IBinop iop uv1 uv2)
-                   (dv1 <- e1 ;;
-                    dv2 <- e2 ;;
-                    (eval_iop iop dv1 dv2))
-                   
-  | Concretize_ICmp : forall cmp uv1 e1 uv2 e2 ,
-      concretize_u uv1 e1 ->
-      concretize_u uv2 e2 ->
-      concretize_u (UVALUE_ICmp cmp uv1 uv2)
-                   (dv1 <- e1 ;;
-                    dv2 <- e2 ;;
-                    eval_icmp cmp dv1 dv2)
-
-  | Concretize_FBinop : forall fop fm uv1 e1 uv2 e2,
-      concretize_u uv1 e1 ->
-      concretize_u uv2 e2 ->
-      concretize_u (UVALUE_FBinop fop fm uv1 uv2)
-                   (dv1 <- e1 ;;
-                    dv2 <- e2 ;;
-                    eval_fop fop dv1 dv2)
-
-  | Concretize_FCmp : forall cmp uv1 e1 uv2 e2,
-      concretize_u uv1 e1 ->
-      concretize_u uv2 e2 ->
-      concretize_u (UVALUE_FCmp cmp uv1 uv2)
-                   (dv1 <- e1 ;;
-                    dv2 <- e2 ;;
-                    eval_fcmp cmp dv1 dv2)
-
-  | Concretize_Conversion : forall conv t_from v t_to e,
-      concretize_u v e ->
-      concretize_u (UVALUE_Conversion conv t_from v t_to)
-                   (dv <- e;;
-                    match get_conv_case conv t_from dv t_to with
-                    | Conv_PtoI x =>
-                      match x, t_to with
-                      | DVALUE_Addr addr, DTYPE_I sz =>
-                        coerce_integer_to_int sz (ptr_to_int addr)
-                      | _, _ =>
-                        lift (raise "Invalid PTOI conversion")
-                      end
-                    | Conv_ItoP x => ret (DVALUE_Addr (int_to_ptr (dvalue_int_unsigned x) wildcard_prov))
-                    | Conv_Pure x => ret x
-                    | Conv_Illegal s => raise s
-                    end)
-
-  | Concretize_GetElementPtr : forall t ua uvs ea es,
-      concretize_u ua ea ->
-      Forall2 concretize_u uvs es ->
-      concretize_u (UVALUE_GetElementPtr t ua uvs)
-                   (da <- ea;;
-                    dvs <- sequence es;;
-                    match handle_gep t da dvs with
-                    | inr dv  => ret dv
-                    | inl err => lift (failwith err)
-                    end)
-
-  | Concretize_ExtractValue : forall uv idxs e,
-      concretize_u uv e ->
-      concretize_u (UVALUE_ExtractValue uv idxs)
-                   (str <- e;;
-                    let fix loop str idxs : err_or_ub dvalue :=
-                        match idxs with
-                        | [] => ret str
-                        | i :: tl =>
-                          v <- index_into_str_dv str i ;;
-                          loop v tl
-                        end in
-                    loop str idxs)
-
-  | UVALUE_Select : forall cond v1 v2 econd (uv : uvalue) dv,
-      concretize_u cond econd ->
-      (dcond <- econd;; eval_select dcond v1 v2) = ret uv ->
-      concretize_u uv dv ->
-      concretize_u (UVALUE_Select cond v1 v2)
-                   dv
-
-  | Concretize_Struct_Nil     : concretize_u (UVALUE_Struct []) (ret (DVALUE_Struct []))
-  | Concretize_Struct_Cons    : forall u e us es,
-      concretize_u u e ->
-      concretize_u (UVALUE_Struct us) es ->
-      concretize_u (UVALUE_Struct (u :: us))
-                   (d <- e ;;
-                    vs <- es ;;
-                    match vs with
-                    | (DVALUE_Struct ds) => ret (DVALUE_Struct (d :: ds))
-                    | _ => failwith "illegal Struct Cons"
-                    end)
-
-
-  | Concretize_Packed_struct_Nil     : concretize_u (UVALUE_Packed_struct []) (ret (DVALUE_Packed_struct []))
-  | Concretize_Packed_struct_Cons    : forall u e us es,
-      concretize_u u e ->
-      concretize_u (UVALUE_Packed_struct us) es ->
-      concretize_u (UVALUE_Packed_struct (u :: us))
-                   (d <- e ;;
-                    vs <- es ;;
-                    match vs with
-                    | (DVALUE_Packed_struct ds) => ret (DVALUE_Packed_struct (d :: ds))
-                    | _ => failwith "illegal Packed_struct cons"
-                    end)
-
-  | Concretize_Array_Nil :
-      concretize_u (UVALUE_Array []) (ret (DVALUE_Array []))
-
-  | Concretize_Array_Cons : forall u e us es,
-      concretize_u u e ->
-      concretize_u (UVALUE_Array us) es ->
-      concretize_u (UVALUE_Array (u :: us))
-                   (d <- e ;;
-                    vs <- es ;;
-                    match vs with
-                    | (DVALUE_Array ds) => ret (DVALUE_Array (d :: ds))
-                    | _ => failwith "illegal Array cons"
-                    end)
-
-  | Concretize_Vector_Nil :
-      concretize_u (UVALUE_Vector []) (ret (DVALUE_Vector []))
-
-  | Concretize_Vector_Cons : forall u e us es,
-      concretize_u u e ->
-      concretize_u (UVALUE_Vector us) es ->
-      concretize_u (UVALUE_Vector (u :: us))
-                   (d <- e ;;
-                    vs <- es ;;
-                    match vs with
-                    | (DVALUE_Vector ds) => ret (DVALUE_Vector (d :: ds))
-                    | _ => failwith "illegal Vector cons"
-                    end)
-
-  (* The list of bytes contained here exactly match the serialization of a value of the data type.
-
-     This means we can just take the corresponding uvalue, and concretize it.
-   *)
-  (* TODO: I'll need something separate for aggregate types to split the bytes up... *)
-  | Concretize_ConcatBytes_Exact :
-      forall bytes dt uv dv,
-        all_bytes_from_uvalue bytes = Some uv ->
-        N.of_nat (List.length bytes) = sizeof_dtyp dt ->
-        concretize_u uv dv ->
-        concretize_u (UVALUE_ConcatBytes (map sbyte_to_extractbyte bytes) dt) dv
-
-  | Concretize_ConcatBytes_Array_nil :
-      forall dt,
-        concretize_u (UVALUE_ConcatBytes [] (DTYPE_Array 0 dt)) (ret (DVALUE_Array []))
-  | Concretize_ConcatBytes_Array_cons :
-      forall bytes elt_bytes rest_bytes sz dt e es,
-        sizeof_dtyp dt > 0 ->
-        take (sizeof_dtyp dt) bytes = elt_bytes ->
-        drop (sizeof_dtyp dt) bytes = rest_bytes ->
-        concretize_u (UVALUE_ConcatBytes elt_bytes dt) e ->
-        concretize_u (UVALUE_ConcatBytes rest_bytes (DTYPE_Array sz dt)) es ->
-        concretize_u (UVALUE_ConcatBytes bytes (DTYPE_Array (N.succ sz) dt))
-                     (dv <- e;;
-                      dvs <- es;;
-                      match dvs with
-                      | DVALUE_Array elts =>
-                        ret (DVALUE_Array (dv :: elts))
-                      | _ => failwith "ConcatBytes array cons failure."
-                      end)
-
-  | Concretize_ConcatBytes_Vector_nil :
-      forall dt,
-        concretize_u (UVALUE_ConcatBytes [] (DTYPE_Vector 0 dt)) (ret (DVALUE_Vector []))
-  | Concretize_ConcatBytes_Vector_cons :
-      forall bytes elt_bytes rest_bytes sz dt e es,
-        sizeof_dtyp dt > 0 ->
-        take (sizeof_dtyp dt) bytes = elt_bytes ->
-        drop (sizeof_dtyp dt) bytes = rest_bytes ->
-        concretize_u (UVALUE_ConcatBytes elt_bytes dt) e ->
-        concretize_u (UVALUE_ConcatBytes rest_bytes (DTYPE_Vector sz dt)) es ->
-        concretize_u (UVALUE_ConcatBytes bytes (DTYPE_Vector (N.succ sz) dt))
-                     (dv <- e;;
-                      dvs <- es;;
-                      match dvs with
-                      | DVALUE_Vector elts =>
-                        ret (DVALUE_Vector (dv :: elts))
-                      | _ => failwith "ConcatBytes array cons failure."
-                      end)
-
-  (* TODO: Take padding into account *)
-  | Concretize_ConcatBytes_Struct_nil :
-      concretize_u (UVALUE_ConcatBytes [] (DTYPE_Struct [])) (ret (DVALUE_Struct []))
-  | Concretize_ConcatBytes_Struct_cons :
-      forall bytes elt_bytes rest_bytes dt dts e es,
-        sizeof_dtyp dt > 0 ->
-        take (sizeof_dtyp dt) bytes = elt_bytes ->
-        drop (sizeof_dtyp dt) bytes = rest_bytes ->
-        concretize_u (UVALUE_ConcatBytes elt_bytes dt) e ->
-        concretize_u (UVALUE_ConcatBytes rest_bytes (DTYPE_Struct dts)) es ->
-        concretize_u (UVALUE_ConcatBytes bytes (DTYPE_Struct (dt::dts)))
-                     (dv <- e;;
-                      dvs <- es;;
-                      match dvs with
-                      | DVALUE_Struct elts =>
-                        ret (DVALUE_Struct (dv :: elts))
-                      | _ => failwith "ConcatBytes array cons failure."
-                      end)
-
-  | Concretize_ConcatBytes_Packed_struct_nil :
-      concretize_u (UVALUE_ConcatBytes [] (DTYPE_Packed_struct [])) (ret (DVALUE_Packed_struct []))
-  | Concretize_ConcatBytes_Packed_struct_cons :
-      forall bytes elt_bytes rest_bytes dt dts e es,
-        sizeof_dtyp dt > 0 ->
-        take (sizeof_dtyp dt) bytes = elt_bytes ->
-        drop (sizeof_dtyp dt) bytes = rest_bytes ->
-        concretize_u (UVALUE_ConcatBytes elt_bytes dt) e ->
-        concretize_u (UVALUE_ConcatBytes rest_bytes (DTYPE_Packed_struct dts)) es ->
-        concretize_u (UVALUE_ConcatBytes bytes (DTYPE_Packed_struct (dt::dts)))
-                     (dv <- e;;
-                      dvs <- es;;
-                      match dvs with
-                      | DVALUE_Packed_struct elts =>
-                        ret (DVALUE_Packed_struct (dv :: elts))
-                      | _ => failwith "ConcatBytes array cons failure."
-                      end)
-
-
-  (* with *)
-  (*   concretize_u_dvalue_bytes : list uvalue -> NMap dvalue_byte -> err_or_ub (NMap dvalue_byte) -> Prop := *)
-  (* | concretize_u_dvalue_bytes_nil : forall acc, concretize_u_dvalue_bytes [] acc (ret acc) *)
-  (* | concretize_u_dvalue_bytes_cons : *)
-  (*     forall uv byte_uv dt idx sid cidx dv ins outs, *)
-  (*     uv = UVALUE_ExtractByte byte_uv dt idx sid -> *)
-  (*     filter_uvalue_sid_matches uv uvs = (ins, outs) -> *)
-  (*     concretize_u byte_uv dv -> *)
-  (*     concretize_u idx cidx -> *)
-  (*     dv_byte = DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx)) -> *)
-  (*     acc' = monad_fold_right (fun acc '(n, uv) => *)
-  (*                              dvb <- uvalue_byte_replace_with_dvalue_byte . *)
-
-  (* The list of bytes in the UVALUE_ConcatBytes does not correspond
-     directly to the serialization of the data type. I.e., it is not a
-     list of ExtractBytes that directly come from a value of the given
-     type.
-
-     This means we essentially have to read the raw byte values and
-     combine them together in order to construct a dvalue. 
-   *)
-  (* | Concretize_ConcatBytes_Raw : *)
-  (*     (* extractbytes_to_dvalue is used in concretize_uvalue *) *)
-  (*     (* Need to find the entangled bytes *) *)
-  (*     (* Concretize the entangled bytes *) *)
-  (*     (* Put them back together... *) *)
-  (*     uv = UVALUE_ExtractByte byte_uv dt idx sid -> *)
-  (*     filter_uvalue_sid_matches uv uvs = (ins, outs) -> *)
-  (*     concretize_u byte_uv dv -> *)
-  (*     concretize_u idx cidx -> *)
-  (*     dv_byte = DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx)) -> *)
-  (*     concretize_u_bytes bytes dvbs -> *)
-  (*     blah dvbs dv *)
-  (* . *)
-
-  (* (* *)
-  (*     concretize_uvalue_bytes_helper (uvs : list (N * uvalue)) (acc : NMap dvalue_byte) {struct uvs} : err_or_ub (NMap dvalue_byte) *)
-  (*       := match uvs with *)
-  (*          | [] => ret acc *)
-  (*          | ((n, uv)::uvs) => *)
-  (*            match uv with *)
-  (*            | UVALUE_ExtractByte byte_uv dt idx sid => *)
-  (*              let '(ins, outs) := filter_uvalue_sid_matches uv uvs in *)
-  (*              (* Concretize first uvalue *) *)
-  (*              dv <- concretize_uvalue byte_uv;; *)
-  (*              cidx <- concretize_uvalue idx;; *)
-  (*              let dv_byte := DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx)) in *)
-  (*              let acc := @NM.add _ n dv_byte acc in *)
-  (*              (* Concretize entangled bytes *) *)
-  (*              acc <- monad_fold_right (fun acc '(n, uv) => *)
-  (*                                        dvb <- uvalue_byte_replace_with_dvalue_byte uv dv;; *)
-  (*                                        ret (@NM.add _ n dvb acc)) ins acc;; *)
-  (*              (* Concretize the rest of the bytes *) *)
-  (*              concretize_uvalue_bytes_helper outs acc *)
-  (*            | _ => lift (failwith "concretize_uvalue_bytes_helper: non-byte in uvs.") *)
-  (*            end *)
-  (*          end *)
-
-  (*  *) *)
-
+        typeclasses eauto.
+      Defined.
   
-(* (*****************************) *)
-(*       (* Take a UVALUE_ExtractByte, and replace the uvalue with a given dvalue...  *)
+      Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
 
-(*          Note: this also concretizes the index. *)
-(*        *) *)
-(*       uvalue_byte_replace_with_dvalue_byte (uv : uvalue) (dv : dvalue) {struct uv} : err_or_ub dvalue_byte *)
-(*         := match uv with *)
-(*            | UVALUE_ExtractByte uv dt idx sid => *)
-(*              cidx <- concretize_uvalue idx;; *)
-(*              ret (DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx))) *)
-(*            | _ => lift (failwith "uvalue_byte_replace_with_dvalue_byte called with non-UVALUE_ExtractByte value.") *)
-(*            end *)
-
-(*       with *)
-(*       (* Concretize the uvalues in a list of UVALUE_ExtractBytes... *)
-
-(*        *) *)
-(*         (* Pick out uvalue bytes that are the same + have same sid  *)
-
-(*          Concretize these identical uvalues... *)
-(*          *) *)
-
-(*       concretize_uvalue_bytes_helper (uvs : list (N * uvalue)) (acc : NMap dvalue_byte) {struct uvs} : err_or_ub (NMap dvalue_byte) *)
-(*         := match uvs with *)
-(*            | [] => ret acc *)
-(*            | ((n, uv)::uvs) => *)
-(*              match uv with *)
-(*              | UVALUE_ExtractByte byte_uv dt idx sid => *)
-(*                let '(ins, outs) := filter_uvalue_sid_matches uv uvs in *)
-(*                (* Concretize first uvalue *) *)
-(*                dv <- concretize_uvalue byte_uv;; *)
-(*                cidx <- concretize_uvalue idx;; *)
-(*                let dv_byte := DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx)) in *)
-(*                let acc := @NM.add _ n dv_byte acc in *)
-(*                (* Concretize entangled bytes *) *)
-(*                acc <- monad_fold_right (fun acc '(n, uv) => *)
-(*                                          dvb <- uvalue_byte_replace_with_dvalue_byte uv dv;; *)
-(*                                          ret (@NM.add _ n dvb acc)) ins acc;; *)
-(*                (* Concretize the rest of the bytes *) *)
-(*                concretize_uvalue_bytes_helper outs acc *)
-(*              | _ => lift (failwith "concretize_uvalue_bytes_helper: non-byte in uvs.") *)
-(*              end *)
-(*            end *)
-
-(*       with *)
-(*       concretize_uvalue_bytes (uvs : list uvalue) {struct uvs} : err_or_ub (list dvalue_byte) *)
-(*         := *)
-(*           let len := length uvs in *)
-(*           byte_map <- concretize_uvalue_bytes_helper (zip (Nseq 0 len) uvs) (@NM.empty _);; *)
-(*           match NM_find_many (Nseq 0 len) byte_map with *)
-(*           | Some dvbs => ret dvbs *)
-(*           | None => lift (failwith "concretize_uvalue_bytes: missing indices.") *)
-(*           end *)
-      
-(*       with *)
-(*       extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : err_or_ub dvalue *)
-(*         := dvbs <- concretize_uvalue_bytes uvs;; *)
-(*            ErrPoison_to_err_or_ub_dvalue (dvalue_bytes_to_dvalue dvbs dt). *)
-(*       Set Guard Checking. *)
-(*****************************)
-  (* | Concretize_ConcatBytes_Int : *)
-  (*     forall bytes sz, *)
-  (*       (forall byte, In byte bytes -> exists idx, byte = UVALUE_ExtractByte byte idx) *)
-  (*         concretize_u (UVALUE_ConcatBytes bytes (DTYPE_I sz)) *)
-  (*         _ *)
-  (* . *)
-
-  (* (* The thing that's bothering me... *) *)
-
-  (* (*      Converting to DVALUE destroys information... *) *)
-
-  (* (*      Maybe it doesn't matter, though... *) *)
-
-  (* (*    *) *)
-
-  (* (* May not concretize to anything. Should be a type error *) *)
-  (* | Concretize_ExtractByte : *)
-  (*     forall byte idx c_byte c_idx, *)
-  (*       concretize_u byte c_byte -> *)
-  (*       concretize_u idx  c_idx -> *)
-  (*       concretize_u (UVALUE_ExtractByte byte idx) *)
-  (*                    (c_byte' <- c_byte;; *)
-  (*                     c_idx'  <- c_idx;; *)
-  (*                     match c_byte' with *)
-  (*                     | DVALUE_Addr a => _ *)
-  (*                     | DVALUE_I1 x => _ *)
-  (*                     | DVALUE_I8 x => _ *)
-  (*                     | DVALUE_I32 x => _ *)
-  (*                     | DVALUE_I64 x => _ *)
-  (*                     | DVALUE_IPTR x => _ *)
-  (*                     | DVALUE_Double x => _ *)
-  (*                     | DVALUE_Float x => _ *)
-  (*                     | DVALUE_Poison => _ *)
-  (*                     | DVALUE_None => _ *)
-  (*                     | DVALUE_Struct fields => _ *)
-  (*                     | DVALUE_Packed_struct fields => _ *)
-  (*                     | DVALUE_Array elts => _ *)
-  (*                     | DVALUE_Vector elts => _ *)
-  (*                     end *)
-  (*                    ) *)
-  (* | Concretize_ConcatBytes_Int : *)
-  (*     forall bytes sz, *)
-  (*       concretize_u (UVALUE_ConcatBytes bytes (DTYPE_I sz)) *)
-  (*                    (ret DVALUE_None) *)
-  .
-
-  Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
-
-  End ConcretizeInductive.
+    End Concretize.
 End Make.

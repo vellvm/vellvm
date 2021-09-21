@@ -56,7 +56,7 @@ Module Make(A:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(A
 
     (* The parameter [C] is currently not used *)
     Inductive Pick_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E}: PickE ~> PropT E :=
-    | PickD: forall uv C res t,  concretize_u uv res -> t ≈ (lift_undef_or_err ret res) -> Pick_handler (pick uv C) t.
+    | PickD: forall uv C res t,  concretize_u uv res -> t ≈ (lift_err_or_ub ret res) -> Pick_handler (pick uv C) t.
 
     Section PARAMS_MODEL.
       Variable (E F: Type -> Type).
@@ -360,7 +360,7 @@ Module Make(A:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(A
 
     Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} : PickE ~> itree E :=
       fun T p => match p with
-              | pick u P => lift_undef_or_err ret (concretize_uvalue u)
+              | pick u P => lift_err_or_ub ret (concretize_uvalue u)
               end.
 
     Section PARAMS_INTERP.

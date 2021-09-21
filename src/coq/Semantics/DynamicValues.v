@@ -1570,7 +1570,7 @@ Class VInt I : Type :=
                      (@VErrorM_MonadExc err_or_ub
                                         (@Exception_eitherT ERR_MESSAGE UB (Monad_either UB_MESSAGE))) uvalue
     in
-    let ret_local := @ret err_or_ub Monad_err_or_ub uvalue in
+    let ret_local := @ret err_or_ub _ uvalue in
     match v1, v2 with
     | UVALUE_Poison, _ => ret_local UVALUE_Poison
     | _, UVALUE_Poison => ret_local UVALUE_Poison

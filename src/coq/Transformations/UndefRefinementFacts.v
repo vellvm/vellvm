@@ -14,7 +14,7 @@ From Vellvm Require Import
      CFG
      DynamicTypes
      PropT
-     Transformations.Traversal.
+     Syntax.Traversal.
 
 From Vellvm.Handlers Require Import
      Stack
