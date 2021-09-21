@@ -456,6 +456,12 @@ Proof.
   rewrite !vector_in_app_iff. tauto.
 Qed.
 
+From ExtLib Require Import FMapAList.
+From Vellvm Require Import Utils.AListFacts.
+
+Definition vec_build_map {A n} (v v' : Vec.t A n) : alist A A :=
+  List.combine (proj1_sig v) (proj1_sig v').
+
 Declare Scope vec_scope.
 Delimit Scope vec_scope with vec.
 Notation "h :: t" := (cons h t) (at level 60, right associativity).

@@ -22,23 +22,24 @@ From Imp2Vir Require Import Fin Imp.
 
 From Imp2Vir Require Import Utils Relabel Vec Unique CvirCombinators CvirCombinatorsWF CompileExpr Imp2Cvir.
 
-(* Denotation of a [cvir] construct.
-  Note: we should be able to take any three disjoint sets 
-  of names [vi,vo,vt] to feed our [ir].
-  One way is to take as a "canonical" name the first integers:
-  this is what the current version does with [build_map].
-  Another would be to be parameterized by three such sets ---
-  lemmas about it would assume that they are disjoint.
-  We currently suspect that the later formulation might be
-  necessary to express generic lemmas, even if "at the top level"
-  we will always use the canonical naming. It is not yet clear though. 
-*)
+(* Denotation of a [cvir] construct. *)
 
 Definition denote_cvir_gen {ni no} (ir : cvir ni no) vi vo vt (bid bid' : fin ni) :=
   denote_ocfg (convert_typ nil (blocks ir vi vo vt)) (nth vi bid', nth vi bid).
 
-Definition build_map a b :=
-  map Anon (map Z.of_nat (seq a b)).
+(*
+NOTE: we should be able to take any three disjoint sets
+of names [vi,vo,vt] to feed our [ir].
+One way is to take as a "canonical" name the first integers:
+this is what the current version does with [build_map].
+Another would be to be parameterized by three such sets ---
+lemmas about it would assume that they are disjoint.
+We currently suspect that the later formulation might be
+necessary to express generic lemmas, even if "at the top level"
+we will always use the canonical naming. It is not yet clear though.
+*)
+
+Definition build_map a b := map Anon (map Z.of_nat (seq a b)).
 
 Definition blocks_default {ni no} (ir : cvir ni no) :=
   let vi := build_map 0 ni in
@@ -176,25 +177,6 @@ Require Import ITree.Basics.HeterogeneousRelations.
 Import ITreeNotations.
 (*Import SemNotations.*)
 
-Definition vec_build_map {A n} (v v' : Vec.t A n) : alist A A :=
-  List.combine (proj1_sig v) (proj1_sig v').
-
-(* TODO move to CvirCombinatorsWF.v *)
-(* If the blocks function is called twice with different vectors of block ids,
-the returned list of blocks will be identical modulo relabelling of the block
-ids *)
-Definition cvir_relabel_WF {ni no} (ir : cvir ni no) :=
-  forall vi vi' vo vo' vt vt',
-  unique_vector (vi ++ vo ++ vt) ->
-  unique_vector (vi' ++ vo' ++ vt') ->
-  blocks ir vi' vo' vt' =
-  ocfg_relabel (vec_build_map (vi++vo++vt) (vi'++vo'++vt')) (blocks ir vi vo vt).
-
-Lemma unique_vector_split6 :
-  forall A n1 n2 n3 n4 n5 n6 v1 v2 v3 v4 v5 v6,
-  unique_vector ((v1 ++ v2) ++ (v3 ++ v4) ++ (v5 ++ v6) : Vec.t A (n1 + n2 + (n3 + n4 + (n5 + n6)))) ->
-  unique_vector (v1 ++ v3 ++ v5) /\ unique_vector (v2 ++ v4 ++ v6).
-Admitted.
 
 Lemma unique_vector_build_map :
   forall fi fo ft ni no nt,
@@ -214,67 +196,6 @@ Proof.
   apply unique_vector_build_map; lia.
 Qed.
 
-Theorem block_cvir_relabel_WF : forall c, cvir_relabel_WF (block_cvir c).
-Proof.
-  unfold cvir_relabel_WF.
-  intros.
-  destruct_vec1 vi. destruct_vec1 vi'.
-  destruct_vec1 vo. destruct_vec1 vo'.
-  destruct_vec0 vt. destruct_vec0 vt'.
-  cbn. unfold bk_relabel. f_equal. cbn.
-  unfold blk_id_relabel. cbn.
-  rewrite !Util.eq_dec_eq.
-  f_equal.
-  rewrite Util.eq_dec_neq; try trivial.
-  intro. unfold unique_vector in H. apply unique_list_vector in H.
-  specialize (H 1 0)%nat. simpl in H.
-  assert (Some r1 = Some r) by (f_equal; assumption).
-  apply H in H8; lia.
-Qed.
-
-Theorem merge_cvir_relabel_WF :
-  forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2),
-  cvir_relabel_WF ir1 ->
-  cvir_relabel_WF ir2 ->
-  cvir_relabel_WF (merge_cvir ir1 ir2).
-Proof.
-  unfold cvir_relabel_WF.
-  intros.
-  set (m := vec_build_map (vi++vo++vt) (vi'++vo'++vt')).
-  simpl in *.
-  split_vec vi ni1.
-  split_vec vo no1.
-  split_vec vt (n_int ir1).
-  split_vec vi' ni1.
-  split_vec vo' no1.
-  split_vec vt' (n_int ir1).
-  apply unique_vector_split6 in H1, H2.
-  specialize (H vi1 vi'1 vo1 vo'1 vt1 vt'1 (proj1 H1) (proj1 H2)).
-  specialize (H0 vi2 vi'2 vo2 vo'2 vt2 vt'2 (proj2 H1) (proj2 H2)).
-  rewrite 6 firstn_app_exact.
-  rewrite 6 skipn_app_exact.
-  unfold ocfg_relabel.
-  rewrite List.map_app.
-  rewrite H, H0.
-  fold (ocfg_relabel m (blocks ir1 vi1 vo1 vt1)).
-  fold (ocfg_relabel m (blocks ir2 vi2 vo2 vt2)).
-  f_equal.
-  - f_equal. subst m.
-    admit. (* the mappings are identical for the relevant keys *)
-  - f_equal. subst m.
-    admit.
-Admitted.
-
-(* NOTE branch_cvir_relabel_WF ? *)
-(* NOTE sym_cvir_relabel_WF ? *)
-(* NOTE cast_cvir_relabel_WF ? *)
-(* NOTE focus_cvir_relabel_WF ? *)
-(* NOTE loop_cvir_relabel_WF ? *)
-(* NOTE loop_open_cvir_relabel_WF ? *)
-(* NOTE seq_cvir_relabel_WF ? *)
-(* NOTE join_cvir_relabel_WF ? *)
-
-
 Theorem cvir_relabel : forall {ni no} (ir : cvir ni no) vi vi' vo vo' vt vt',
   cvir_relabel_WF ir ->
   unique_vector (vi ++ vo ++ vt) ->
@@ -286,7 +207,7 @@ Proof.
   apply H; try assumption.
 Qed.
 
-(* TODO (reformulate ) If a CVIR is WF, we can label a CVIR using 2 different
+(* TODO (reformulate) If a CVIR is WF, we can label a CVIR using 2 different
 maps, the denotation is eutt. *)
 Theorem eutt_cvir_relabel : forall {ni no} (ir : cvir ni no) vi vi' vo vo' vt vt' bid bid',
   cvir_ids_WF ir ->
@@ -542,7 +463,6 @@ Admitted.
 (* NOTE denote_cvir_loop_open ? *)
 (* NOTE denote_cvir_seq ? *)
 (* NOTE denote_cvir_join ? *)
-
 
 
 (* Relation between Imp env and vellvm env *)

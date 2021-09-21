@@ -171,4 +171,28 @@ Proof.
   - rewrite 2 vector_app_nth2.
     exact H0.
 Qed.
+
+Theorem unique_vector_reorder :
+  forall A n1 n2 n3 n4 (v1 : Vec.t A n1) (v2 : Vec.t A n2) (v3 : Vec.t A n3) (v4 : Vec.t A n4),
+  unique_vector ((v1 ++ v2) ++ v3 ++ v4)%vec -> unique_vector ((v1 ++ v3) ++ v2 ++ v4)%vec.
+Proof.
+  intros.
+  apply unique_list_vector. simpl.
+  apply unique_list_vector in H. simpl in H.
+  rewrite <- app_assoc in H.
+  apply unique_list_sym2 in H.
+  apply unique_list_sym2.
+  rewrite <- app_assoc in H.
+  rewrite <- app_assoc.
+  assumption.
+Qed.
+
+Lemma unique_vector_split6 :
+  forall A n1 n2 n3 n4 n5 n6 v1 v2 v3 v4 v5 v6,
+  unique_vector ((v1 ++ v2) ++ (v3 ++ v4) ++ (v5 ++ v6) : Vec.t A (n1 + n2 + (n3 + n4 + (n5 + n6))))%vec ->
+  unique_vector (v1 ++ v3 ++ v5)%vec /\ unique_vector (v2 ++ v4 ++ v6)%vec.
+Admitted.
+
+
+
 End Unique.

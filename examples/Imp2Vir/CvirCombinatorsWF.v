@@ -11,7 +11,7 @@ From Vellvm Require Import
 
 From Imp2Vir Require Import Fin.
 
-From Imp2Vir Require Import Utils Vec Unique CvirCombinators.
+From Imp2Vir Require Import Utils Vec Unique CvirCombinators Relabel.
 
 Open Scope nat_scope.
 Open Scope vec_scope.
@@ -80,6 +80,16 @@ Definition cvir_inputs_used {ni no} (ir : cvir ni no) : Prop :=
   In bid (vi ++ vt) ->
   List.In bid (inputs (blocks ir vi vo vt)).
 
+(* If the blocks function is called twice with different vectors of block ids,
+the returned list of blocks will be identical modulo relabelling of the block
+ids *)
+Definition cvir_relabel_WF {ni no} (ir : cvir ni no) :=
+  forall vi vi' vo vo' vt vt',
+  unique_vector (vi ++ vo ++ vt) ->
+  unique_vector (vi' ++ vo' ++ vt') ->
+  blocks ir vi' vo' vt' =
+  ocfg_relabel (vec_build_map (vi++vo++vt) (vi'++vo'++vt')) (blocks ir vi vo vt).
+
 (** ---- Proof of WF combinators ---- *)
 
 (* block_cvir WF *)
@@ -126,6 +136,24 @@ Proof.
   intuition.
   subst.
   reflexivity.
+Qed.
+
+Theorem block_cvir_relabel_WF : forall c, cvir_relabel_WF (block_cvir c).
+Proof.
+  unfold cvir_relabel_WF.
+  intros.
+  destruct_vec1 vi. destruct_vec1 vi'.
+  destruct_vec1 vo. destruct_vec1 vo'.
+  destruct_vec0 vt. destruct_vec0 vt'.
+  cbn. unfold bk_relabel. f_equal. cbn.
+  unfold blk_id_relabel. cbn.
+  rewrite !Util.eq_dec_eq.
+  f_equal.
+  rewrite Util.eq_dec_neq; try trivial.
+  intro. unfold unique_vector in H. apply unique_list_vector in H.
+  specialize (H 1 0)%nat. simpl in H.
+  assert (Some r1 = Some r) by (f_equal; assumption).
+  apply H in H8; lia.
 Qed.
 
 (* branch_cvir WF *)
@@ -175,22 +203,8 @@ Theorem branch_cvir_inputs_used : forall c e, cvir_inputs_used (branch_cvir c e)
   now destruct_vec1 vi.
 Qed.
 
+(* TODO branch_cvir_relabel_WF ? *)
 
-(* NOTE I don't understand why this property is here (where should it be ?) *)
-Theorem unique_vector_reorder :
-  forall A n1 n2 n3 n4 (v1 : Vec.t A n1) (v2 : Vec.t A n2) (v3 : Vec.t A n3) (v4 : Vec.t A n4),
-  unique_vector ((v1 ++ v2) ++ v3 ++ v4) -> unique_vector ((v1 ++ v3) ++ v2 ++ v4).
-Proof.
-  intros.
-  apply unique_list_vector. simpl.
-  apply unique_list_vector in H. simpl in H.
-  rewrite <- app_assoc in H.
-  apply unique_list_sym2 in H.
-  apply unique_list_sym2.
-  rewrite <- app_assoc in H.
-  rewrite <- app_assoc.
-  assumption.
-Qed.
 
 (* merge_cvir WF *)
 
@@ -300,6 +314,39 @@ Proof.
     all: assumption.
 Qed.
 
+Theorem merge_cvir_relabel_WF :
+  forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2),
+  cvir_relabel_WF ir1 ->
+  cvir_relabel_WF ir2 ->
+  cvir_relabel_WF (merge_cvir ir1 ir2).
+Proof.
+  unfold cvir_relabel_WF.
+  intros.
+  set (m := vec_build_map (vi++vo++vt) (vi'++vo'++vt')).
+  simpl in *.
+  split_vec vi ni1.
+  split_vec vo no1.
+  split_vec vt (n_int ir1).
+  split_vec vi' ni1.
+  split_vec vo' no1.
+  split_vec vt' (n_int ir1).
+  apply unique_vector_split6 in H1, H2.
+  specialize (H vi1 vi'1 vo1 vo'1 vt1 vt'1 (proj1 H1) (proj1 H2)).
+  specialize (H0 vi2 vi'2 vo2 vo'2 vt2 vt'2 (proj2 H1) (proj2 H2)).
+  (* rewrite 6 firstn_app_exact. *)
+  (* rewrite 6 skipn_app_exact. *)
+  unfold ocfg_relabel.
+  rewrite List.map_app.
+  rewrite H, H0.
+  fold (ocfg_relabel m (blocks ir1 vi1 vo1 vt1)).
+  fold (ocfg_relabel m (blocks ir2 vi2 vo2 vt2)).
+  f_equal.
+  - f_equal. subst m.
+    admit. (* the mappings are identical for the relevant keys *)
+  - f_equal. subst m.
+    admit.
+Admitted.
+
 (* sym_i and sym_o WF *)
 
 Theorem sym_i_cvir_id_WF :
@@ -400,6 +447,7 @@ Proof.
   eapply H ; eassumption.
 Qed.
 
+(* TODO sym_cvir_relabel_WF ? *)
 
 (* cast_i and cast_o WF *)
 
@@ -470,6 +518,8 @@ Proof.
   eapply H0 ; try eassumption.
 Qed.
 
+(* TODO cast_cvir_relabel_WF ? *)
+
 (* focus_input WF *)
 
 Theorem focus_input_cvir_id_WF :
@@ -513,6 +563,9 @@ Proof.
   apply cast_i_cvir_unique.
   exact H.
 Qed.
+
+(* TODO focus_cvir_relabel_WF ? *)
+
 
 (* focus_output WF *)
 
@@ -558,6 +611,8 @@ Proof.
   exact H.
 Qed.
 
+(* TODO focus_cvir_relabel_WF ? *)
+
 (* loop_cvir_open WF *)
 
 Theorem loop_cvir_open_id_WF :
@@ -597,6 +652,7 @@ Proof.
   eapply H with (vo := (hd vi :: vo)) ; try eassumption.
 Qed.
 
+(* TODO loop_open_cvir_relabel_WF ? *)
 
 (* loop_cvir WF *)
 
@@ -659,6 +715,8 @@ Proof.
   apply H0.
 Qed.
 
+(* TODO loop_cvir_relabel_WF ? *)
+
 (* seq_cvir WF *)
 
 Theorem seq_cvir_id_WF :
@@ -704,6 +762,9 @@ Proof.
   apply merge_cvir_unique ; assumption.
 Qed.
 
+(* TODO seq_cvir_relabel_WF ? *)
+
+
 (* join_cvir WF *)
 
 Theorem join_cvir_id_WF :
@@ -747,6 +808,7 @@ Proof.
   eapply H ; eassumption.
 Qed.
 
+(* Todo join_cvir_relabel_WF ? *)
 
 (** TODO Explain these lemmas *)
 Lemma cvir_inputs : forall {ni no} (ir : cvir ni no) vi vo vt i,
