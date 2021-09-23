@@ -2213,7 +2213,7 @@ Class VInt I : Type :=
         P (UVALUE_Undef (DTYPE_Packed_struct dts)) (DTYPE_Packed_struct dts) ->
         P (UVALUE_Undef (DTYPE_Packed_struct (dt :: dts))) (DTYPE_Packed_struct (dt :: dts)).
 
-    Hypothesis IH_Undef          : forall t sz et dts, (NO_VOID t /\ t <> DTYPE_Struct dts /\ t <> DTYPE_Packed_struct dts /\ t <> DTYPE_Array sz et /\ t <> DTYPE_Vector sz et) -> P (UVALUE_Undef t) t
+    Hypothesis IH_Undef          : forall t, (NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Undef t) t
 .
     Hypothesis IH_Double         : forall x, P (UVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x) DTYPE_Float.
@@ -2603,7 +2603,7 @@ Class VInt I : Type :=
         intros τ NV.
         destruct τ eqn:Hτ; try contradiction;
           try solve [eapply IH_Undef;
-                     repeat split; intros CONTRA; inversion CONTRA].
+                     repeat split; solve [intros * CONTRA; inversion CONTRA]].
         
         (* Undef Arrays *)
         { pose proof NV as NVd.

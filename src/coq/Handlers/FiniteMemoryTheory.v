@@ -330,120 +330,107 @@ Section Serialization_Theory.
     }
 
     (* Undef vectors *)
-    { admit.
+    { apply ErrSID_evals_to_bind in BYTES.
+      destruct BYTES as (sid'' & prov'' & concat_fields & RUNS & EVAL).
 
-    }
-
-    (* Undef structs *)
-    { (* apply ErrSID_evals_to_bind in BYTES. *)
-      (* destruct BYTES as (sid'' & prov'' & dt_bytes & RUNS & EVAL). *)
-
-      (* apply ErrSID_evals_to_bind in EVAL. *)
-      (* destruct EVAL as (sid''' & prov''' & dts_bytes & RUNS_DTS & EVAL_CONCAT). *)
-
-      (* generalize dependent sid''. *)
-      (* generalize dependent prov''. *)
-      (* generalize dependent sid'''. *)
-      (* generalize dependent prov'''. *)
-      (* generalize dependent bytes'. *)
-      (* generalize dependent dts_bytes. *)
+      (* Induction on sz *)
       generalize dependent sid'.
       generalize dependent prov.
+      generalize dependent sid''.
+      generalize dependent prov''.
+      generalize dependent concat_fields.
       generalize dependent bytes'.
-      induction dts; intros bytes' prov sid' BYTES.
-      - inversion BYTES; subst.
-        rewrite sizeof_dtyp_struct_0.
-        reflexivity.
-      - rewrite sizeof_dtyp_struct_cons.
+      induction sz using N.peano_ind; intros bytes' concat_fields prov'' sid'' EVAL prov sid' RUNS.
+      - cbn in RUNS. inversion RUNS.
+        cbn in EVAL. inversion EVAL.
+        subst.
+        cbn.
+        rewrite sizeof_dtyp_vector.
+        lia.
+      - rewrite repeatN_succ in RUNS.
+        rewrite map_monad_In_unfold in RUNS.
+        apply ErrSID_runs_to_bind in RUNS.
 
-        apply ErrSID_evals_to_bind in BYTES.
-        destruct BYTES as (sid'' & prov'' & dt_bytes & RUNS & EVAL).
+        destruct RUNS as (sid''' & prov''' & first_res & SERFIRST & RUNS).
+        apply ErrSID_runs_to_ErrSID_evals_to in SERFIRST.
+        apply IHTYP in SERFIRST.
 
-        apply ErrSID_evals_to_bind in EVAL.
-        destruct EVAL as (sid''' & prov''' & dts_bytes & RUNS_DTS & EVAL_CONCAT).
+        apply ErrSID_runs_to_bind in RUNS.
+        destruct RUNS as (sid'''' & prov'''' & rest_res & SERREST & RUNS).
 
-        rewrite serialize_sbytes_equation in RUNS_DTS.
+        inversion RUNS; subst.
+        inversion EVAL; subst.
+        
+        assert (ErrSID_evals_to (ret (concat rest_res)) sid'' prov'' (concat rest_res)) as REST_EVAL by reflexivity.
+        specialize (@IHsz (concat rest_res) rest_res _ _ REST_EVAL _ _ SERREST).
 
-        apply ErrSID_runs_to_ErrSID_evals_to in RUNS_DTS.
-        apply IHdts0 in RUNS_DTS.
+        rewrite app_length.
+        rewrite Nnat.Nat2N.inj_add.
+        rewrite SERFIRST.
+        rewrite IHsz.
 
-        { inversion EVAL_CONCAT; subst.
-          rewrite app_length.
-          rewrite Nnat.Nat2N.inj_add.
-          rewrite RUNS_DTS.
-
-          apply ErrSID_runs_to_ErrSID_evals_to in RUNS.
-          apply IHdts in RUNS; [|cbn; auto].
-
-          lia.
-        }
-
-        intros dt H bytes prov0 sid H0.
-        eapply IHdts; eauto.
-        right. auto.
+        do 2 rewrite sizeof_dtyp_vector.
+        lia.
     }
 
-      (* (* *)
-      (*   I know that concat_fields is the result of map_monad_In, which *)
-      (*   serializes each element of the array, and stores the *)
-      (*   serialization of each element in concat_fields. *)
+    (* Undef struct nil *)
+    { inversion BYTES; subst.
+      rewrite sizeof_dtyp_struct_0; reflexivity.
+    }
 
-      (*   I know by IH that each element in the array when serialized *)
-      (*   has sizeof_dtyp dt bytes. *)
+    (* Undef struct cons *)
+    { apply ErrSID_evals_to_bind in BYTES.
+      destruct BYTES as (sid'' & prov'' & dt_bytes & RUNS & EVAL).
 
-      (*   Because of this, the result of concat (concat_fields) should *)
-      (*   have the size of sz * sizeof_dtyp dt. *)
-      (*  *) *)
-      (* generalize dependent sz. *)
-      (* generalize dependent IH. *)
-      (* generalize dependent IHdtyp. *)
-      (* generalize dependent concat_fields. *)
-      (* generalize dependent sid''. *)
-      (* generalize dependent prov''. *)
-      (* revert bytes' sid' prov. *)
-      (* induction xs; intros bytes' sid' prov' sid'' prov'' concat_fields RUNS EVAL IHdtyp IH sz H. *)
-      (* - cbn in H. subst. *)
-      (*   cbn in RUNS. inversion RUNS. *)
-      (*   subst. *)
-      (*   cbn in EVAL. inversion EVAL. *)
-      (*   cbn. *)
-      (*   rewrite sizeof_dtyp_array. *)
-      (*   reflexivity. *)
-      (* - rewrite map_monad_In_unfold in RUNS. *)
-      (*   apply ErrSID_runs_to_bind in RUNS. *)
-      (*   destruct RUNS as (sid''' & prov''' & first_res & SERFIRST & RUNS). *)
+      apply ErrSID_evals_to_bind in EVAL.
+      destruct EVAL as (sid''' & prov''' & dts_bytes & RUNS_DTS & EVAL_CONCAT).
 
-      (*   apply ErrSID_runs_to_bind in RUNS. *)
-      (*   destruct RUNS as (sid'''' & prov'''' & rest_res & SERREST & RUNS). *)
+      inversion EVAL_CONCAT; subst.
 
-      (*   apply ErrSID_runs_to_ErrSID_evals_to in SERFIRST. *)
-      (*   apply IH in SERFIRST; cbn; auto. *)
+      apply ErrSID_runs_to_ErrSID_evals_to in RUNS.
+      apply IHTYP in RUNS.
 
-      (*   specialize (IHxs (concat rest_res) _ _ _ _ rest_res SERREST). cbn; auto. *)
+      apply ErrSID_runs_to_ErrSID_evals_to in RUNS_DTS.
+      apply IHTYP0 in RUNS_DTS.
 
-      (*   forward IHxs; [reflexivity|]. *)
-      (*   forward IHxs; [intuition|]. *)
-      (*   forward IHxs; *)
-      (*     [intros; eapply IH; [right; eauto|eauto]|]. *)
+      rewrite app_length.
+      rewrite Nnat.Nat2N.inj_add.
+      rewrite sizeof_dtyp_struct_cons.
+      lia.
+    }
 
-      (*   cbn in H; inv H. *)
-      (*   specialize (IHxs (length xs) eq_refl). *)
+    (* Undef Packed struct nil *)
+    { inversion BYTES; subst.
+      rewrite sizeof_dtyp_packed_struct_0; reflexivity.
+    }
 
-      (*   (* Use RUNS to get concat_fields, EVAL to get bytes *) *)
-      (*   inv RUNS. *)
-      (*   inv EVAL. *)
+    (* Undef Packed struct cons *)
+    { apply ErrSID_evals_to_bind in BYTES.
+      destruct BYTES as (sid'' & prov'' & dt_bytes & RUNS & EVAL).
 
-      (*   rewrite app_length. *)
-      (*   rewrite Nnat.Nat2N.inj_add. *)
+      apply ErrSID_evals_to_bind in EVAL.
+      destruct EVAL as (sid''' & prov''' & dts_bytes & RUNS_DTS & EVAL_CONCAT).
 
-      (*   rewrite SERFIRST. *)
-      (*   rewrite IHxs. *)
+      inversion EVAL_CONCAT; subst.
 
-      (*   do 2 rewrite sizeof_dtyp_array. *)
-      (*   lia. *)
+      apply ErrSID_runs_to_ErrSID_evals_to in RUNS.
+      apply IHTYP in RUNS.
 
-      all: admit.
+      apply ErrSID_runs_to_ErrSID_evals_to in RUNS_DTS.
+      apply IHTYP0 in RUNS_DTS.
 
+      rewrite app_length.
+      rewrite Nnat.Nat2N.inj_add.
+      rewrite sizeof_dtyp_packed_struct_cons.
+      lia.
+    }
+
+    (* Undef, non-aggregate *)
+    { destruct H as (NV & NSTRUCT & NPACKED & NARRAY & NVECTOR).
+      destruct t;
+        solve [inversion BYTES; apply to_ubytes_sizeof
+              | exfalso; intuition; eauto
+              ].
     }
 
     1-2: inversion BYTES; apply to_ubytes_sizeof.
@@ -636,6 +623,8 @@ Section Serialization_Theory.
         lia.
     }
 
+    1-38: solve [inversion BYTES; apply to_ubytes_sizeof].
+
     Set Nested Proofs Allowed.
     Lemma map_monad_unfold :
       forall {A B : Type} {M : Type -> Type} {H : Monad M} (x : A) (xs : list A)
@@ -674,7 +663,6 @@ Section Serialization_Theory.
         lia.
     Qed.
 
-
     Lemma map_monad_ErrSID_length :
       forall {A B} (xs : list A) (f : A -> ErrSID B) sid prov res,
         ErrSID_evals_to (map_monad f xs) sid prov res ->
@@ -710,7 +698,6 @@ Section Serialization_Theory.
         unfold IdentityMonad.unIdent in EVAL.
         unfold evalErrSID_T in EVAL.
         unfold re_sid_ubytes in EVAL.
-        cbn in EVAL.
     Admitted.
 
     apply ErrSID_evals_to_bind in BYTES as (sid'' & prov'' & bytes'' & EXTRACT & BYTES).
@@ -837,7 +824,7 @@ Section Serialization_Theory.
   apply map_monad_ErrSID_length in EXTRACT.
   apply re_sid_ubytes_ErrSID_length in BYTES.
   lia.
-  Admitted.
+  Qed.
 
   (* Lemma firstn_sizeof_dtyp : *)
   (*   forall dv dt, *)
