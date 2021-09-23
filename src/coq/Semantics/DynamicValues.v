@@ -1709,6 +1709,129 @@ Class VInt I : Type :=
   .
   Set Elimination Schemes.
 
+  (* TODO: Move this *)
+  Require Import Lia.
+  Program Fixpoint NO_VOID (dt : dtyp) {measure (dtyp_measure dt)} : Prop
+    := match dt with
+       | DTYPE_I _
+       | DTYPE_IPTR
+       | DTYPE_Pointer
+       | DTYPE_Half
+       | DTYPE_Float
+       | DTYPE_Double
+       | DTYPE_X86_fp80
+       | DTYPE_Fp128
+       | DTYPE_Ppc_fp128
+       | DTYPE_Metadata
+       | DTYPE_X86_mmx
+       | DTYPE_Opaque =>
+         True
+       | DTYPE_Void => False
+       | DTYPE_Vector sz t
+       | DTYPE_Array sz t =>
+         NO_VOID t
+       | DTYPE_Struct dts
+       | DTYPE_Packed_struct dts =>
+         Forall_HIn dts (fun dt HIn => @NO_VOID dt _)
+       end.
+  Next Obligation.
+    cbn.
+    lia.
+  Defined.
+  Next Obligation.
+    cbn.
+    lia.
+  Defined.
+  Next Obligation.
+    cbn.
+    pose proof (list_sum_map dtyp_measure dt dts HIn).
+    lia.
+  Defined.
+  Next Obligation.
+    cbn.
+    pose proof (list_sum_map dtyp_measure dt dts HIn).
+    lia.
+  Defined.
+
+  Lemma NO_VOID_equation :
+    forall (dt : dtyp),
+      NO_VOID dt = match dt with
+                   | DTYPE_I _
+                   | DTYPE_IPTR
+                   | DTYPE_Pointer
+                   | DTYPE_Half
+                   | DTYPE_Float
+                   | DTYPE_Double
+                   | DTYPE_X86_fp80
+                   | DTYPE_Fp128
+                   | DTYPE_Ppc_fp128
+                   | DTYPE_Metadata
+                   | DTYPE_X86_mmx
+                   | DTYPE_Opaque =>
+                     True
+                   | DTYPE_Void => False
+                   | DTYPE_Vector sz t
+                   | DTYPE_Array sz t =>
+                     NO_VOID t
+                   | DTYPE_Struct dts
+                   | DTYPE_Packed_struct dts =>
+                     Forall_HIn dts (fun dt HIn => NO_VOID dt)
+                   end.
+  Proof.
+  Admitted.
+
+  Lemma NO_VOID_Struct_fields :
+    forall dts,
+      NO_VOID (DTYPE_Struct dts) ->
+      (forall dt, In dt dts -> NO_VOID dt).
+  Proof.
+    intros dts NV dt IN.
+    rewrite NO_VOID_equation in NV.
+    induction dts.
+    - contradiction.
+    - inversion IN; subst.
+      + apply NV.
+      + apply IHdts; auto.
+        eapply Forall_HIn_cons; eauto.
+  Qed.
+
+  Lemma NO_VOID_Packed_struct_fields :
+    forall dts,
+      NO_VOID (DTYPE_Packed_struct dts) ->
+      (forall dt, In dt dts -> NO_VOID dt).
+  Proof.
+    intros dts NV dt IN.
+    rewrite NO_VOID_equation in NV.
+    induction dts.
+    - contradiction.
+    - inversion IN; subst.
+      + apply NV.
+      + apply IHdts; auto.
+        eapply Forall_HIn_cons; eauto.
+  Qed.
+
+  Lemma NO_VOID_Struct_cons :
+    forall dt dts,
+      NO_VOID (DTYPE_Struct (dt :: dts)) ->
+      NO_VOID (DTYPE_Struct dts).
+  Proof.
+    intros dt dts H.
+    rewrite NO_VOID_equation.
+    rewrite NO_VOID_equation in H.
+    eapply Forall_HIn_cons; eauto.
+  Qed.
+
+  Lemma NO_VOID_Packed_struct_cons :
+    forall dt dts,
+      NO_VOID (DTYPE_Packed_struct (dt :: dts)) ->
+      NO_VOID (DTYPE_Packed_struct dts).
+  Proof.
+    intros dt dts H.
+    rewrite NO_VOID_equation.
+    rewrite NO_VOID_equation in H.
+    eapply Forall_HIn_cons; eauto.
+  Qed.
+  
   Unset Elimination Schemes.
   Inductive uvalue_has_dtyp : uvalue -> dtyp -> Prop :=
   | UVALUE_Addr_typ   : forall a, uvalue_has_dtyp (UVALUE_Addr a) DTYPE_Pointer
@@ -1720,7 +1843,7 @@ Class VInt I : Type :=
   | UVALUE_Double_typ : forall x, uvalue_has_dtyp (UVALUE_Double x) DTYPE_Double
   | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
   | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
-  | UVALUE_Undef_typ  : forall τ, τ <> DTYPE_Void -> uvalue_has_dtyp (UVALUE_Undef τ) τ
+  | UVALUE_Undef_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Undef τ) τ
 
   | UVALUE_Struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Struct []) (DTYPE_Struct [])
   | UVALUE_Struct_Cons_typ :
@@ -2064,7 +2187,34 @@ Class VInt I : Type :=
     Hypothesis IH_I32            : forall x, P (UVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (UVALUE_I64 x) (DTYPE_I 64).
     Hypothesis IH_IPTR           : forall x, P (UVALUE_IPTR x) DTYPE_IPTR.
-    Hypothesis IH_Undef          : forall t, t <> DTYPE_Void -> P (UVALUE_Undef t) t.
+
+    Hypothesis IH_Undef_Array    : forall sz t
+                                     (NV: NO_VOID t)
+                                     (IH: P (UVALUE_Undef t) t),
+        P (UVALUE_Undef (DTYPE_Array sz t)) (DTYPE_Array sz t).
+    Hypothesis IH_Undef_Vector    : forall sz t
+                                     (NV: NO_VOID t)
+                                     (IH: P (UVALUE_Undef t) t),
+        P (UVALUE_Undef (DTYPE_Vector sz t)) (DTYPE_Vector sz t).
+
+    Hypothesis IH_Undef_Struct_nil    :
+        P (UVALUE_Undef (DTYPE_Struct [])) (DTYPE_Struct []).
+
+    Hypothesis IH_Undef_Struct_cons    : forall dt dts,
+        P (UVALUE_Undef dt) dt ->
+        P (UVALUE_Undef (DTYPE_Struct dts)) (DTYPE_Struct dts) ->
+        P (UVALUE_Undef (DTYPE_Struct (dt :: dts))) (DTYPE_Struct (dt :: dts)).
+
+    Hypothesis IH_Undef_Packed_struct_nil    :
+        P (UVALUE_Undef (DTYPE_Packed_struct [])) (DTYPE_Packed_struct []).
+
+    Hypothesis IH_Undef_Packed_struct_cons    : forall dt dts,
+        P (UVALUE_Undef dt) dt ->
+        P (UVALUE_Undef (DTYPE_Packed_struct dts)) (DTYPE_Packed_struct dts) ->
+        P (UVALUE_Undef (DTYPE_Packed_struct (dt :: dts))) (DTYPE_Packed_struct (dt :: dts)).
+
+    Hypothesis IH_Undef          : forall t sz et dts, (NO_VOID t /\ t <> DTYPE_Struct dts /\ t <> DTYPE_Packed_struct dts /\ t <> DTYPE_Array sz et /\ t <> DTYPE_Vector sz et) -> P (UVALUE_Undef t) t
+.
     Hypothesis IH_Double         : forall x, P (UVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (UVALUE_Float x) DTYPE_Float.
     Hypothesis IH_None           : P UVALUE_None DTYPE_Void.
@@ -2448,7 +2598,66 @@ Class VInt I : Type :=
                     | H: _ |- _ =>
                       solve [eapply H; subst IH; eauto]
                     end]).
-      - rename H into Hforall.
+      - generalize dependent τ.
+        fix IHτ 1. 
+        intros τ NV.
+        destruct τ eqn:Hτ; try contradiction;
+          try solve [eapply IH_Undef;
+                     repeat split; intros CONTRA; inversion CONTRA].
+        
+        (* Undef Arrays *)
+        { pose proof NV as NVd.
+          rewrite NO_VOID_equation in NVd.
+          apply IH_Undef_Array; auto.
+        }
+
+        (* Undef Structs *)
+        { pose proof NV as NVfs.
+          rewrite NO_VOID_equation in NVfs.
+          clear Hτ.
+          generalize dependent fields.
+          induction fields; intros NV NVfs.
+          - apply IH_Undef_Struct_nil.
+          - apply IH_Undef_Struct_cons.
+            apply IHτ.
+            eapply NO_VOID_Struct_fields in NV.
+            apply NV.
+            left; auto.
+            apply IHfields.
+
+            eapply NO_VOID_Struct_cons; eauto.
+            eapply Forall_HIn_cons; eauto.
+        }
+
+        (* Undef Packed structs *)
+        { pose proof NV as NVfs.
+          rewrite NO_VOID_equation in NVfs.
+          clear Hτ.
+          generalize dependent fields.
+          induction fields; intros NV NVfs.
+          - apply IH_Undef_Packed_struct_nil.
+          - apply IH_Undef_Packed_struct_cons.
+            apply IHτ.
+            eapply NO_VOID_Packed_struct_fields in NV.
+            apply NV.
+            left; auto.
+            apply IHfields.
+
+            eapply NO_VOID_Packed_struct_cons; eauto.
+            eapply Forall_HIn_cons; eauto.
+        }
+
+        (* Undef Vectors *)
+        { pose proof NV as NVd.
+          rewrite NO_VOID_equation in NVd.
+          apply IH_Undef_Vector; auto.
+        }
+
+        Unshelve.
+        all: try solve [exact 0%N | exact DTYPE_Void | exact ([] : list dtyp)].
+
+      - (* Arrays *)
+        rename H into Hforall.
         rename H0 into Hlen.
         refine (IH_Array _ _ Hlen).
 
@@ -2465,7 +2674,8 @@ Class VInt I : Type :=
         }
 
         apply Forall_forall; auto.
-      - rename H into Hforall.
+      - (* Vectors *)
+        rename H into Hforall.
         rename H0 into Hlen.
         rename H1 into Hvect.
         refine (IH_Vector _ _ Hlen Hvect).

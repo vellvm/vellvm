@@ -37,6 +37,15 @@ Proof.
     + intros x H. apply (f x). simpl. auto.
 Defined.
 
+Lemma Forall_HIn {A : Type} (l : list A) (f : forall (x : A), In x l -> Prop) : Prop.
+Proof.
+  induction l.
+  - exact True.
+  - refine (f a _ /\ IHl _).
+    + simpl. auto.
+    + intros x H. apply (f x). simpl. auto.
+Defined.
+
 Lemma list_sum_map :
   forall {X} (f : X -> nat) x xs,
     In x xs ->
@@ -300,4 +309,13 @@ Proof.
   - rewrite repeatN_succ in H.
     cbn in H.
     inversion H; auto.
+Qed.
+
+Lemma Forall_HIn_cons:
+  forall {X} (x : X) (xs : list X) f,
+    Forall_HIn (x::xs) (fun x HIn => f x) ->
+    Forall_HIn (xs) (fun x HIn => f x).
+Proof.
+  intros X x xs f H.
+  apply H.
 Qed.
