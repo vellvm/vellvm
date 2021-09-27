@@ -20,10 +20,11 @@ From ExtLib Require Import
 From Coq Require Import Relations RelationClasses.
 (* end hide *)
 
-Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(A)(SIZE)).
+Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(A)(SIZE))(Conc : Concretize A SIZE LLVMEvents).
 
 Import LLVMEvents.
 Import DV.
+Import Conc.
 
 (* Refinement relation for uvalues *)
 (* Definition 5.6 UValue refinement *)

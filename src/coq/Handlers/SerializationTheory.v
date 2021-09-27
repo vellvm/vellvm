@@ -28,8 +28,12 @@ Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_I
 
   Module SER := Serialization.Make Addr SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
   Import SER.
+
+  Module BYTE := Byte Addr SIZEOF LLVMIO BYTE_IMPL.
+  Export BYTE.
+
   Import BYTE.
-  Import Den.
+  Import BYTE_IMPL.
 
   Ltac eval_nseq :=
     match goal with

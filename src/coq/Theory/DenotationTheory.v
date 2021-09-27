@@ -34,6 +34,7 @@ Open Scope monad_scope.
 Open Scope itree.
 Import ITreeNotations.
 Import SemNotations.
+Import EitherMonad.
 
 (* end hide *)
 
@@ -343,16 +344,15 @@ Section Outputs.
       apply has_post_bind; intros ?.
       break_match_goal;
         try (apply raise_has_all_posts || apply raiseUB_has_all_posts).
-      unfold lift_undef_or_err.
-      do 2 break_match_goal.
+      unfold lift_err_or_ub.
+      do 2 break_match_goal; break_match_goal.
       unfold raiseUB; go; apply has_post_bind; intros [].
-      break_match_goal.
-      unfold raise; go; apply has_post_bind; intros [].
+      break_match_goal; unfold raise; go; apply has_post_bind; intros [].
       go.
       subst.
       assert (List.map snd brs = List.map snd l).
       {
-        revert l Hequ; induction brs as [| br brs IH].
+        revert l Heqe0; induction brs as [| br brs IH].
         - intros ? eq; inv eq; reflexivity.
         - intros ? eq; inv eq.
           repeat (break_match_hyp; cbn in *; try inv_sum).
@@ -606,5 +606,3 @@ Proof.
     reflexivity.
 Qed.
 Transparent denote_block.
-
-

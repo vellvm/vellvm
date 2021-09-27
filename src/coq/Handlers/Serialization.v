@@ -13,7 +13,6 @@ From Vellvm Require Import
      Syntax.DynamicTypes
      Syntax.DataLayout
      Semantics.DynamicValues
-     Semantics.Denotation
      Semantics.MemoryAddress
      Semantics.GepM
      Semantics.Memory.Sizeof
@@ -31,7 +30,14 @@ Require Import Lia.
 Import ListNotations.
 Import MonadNotation.
 
-Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(SIZEOF)(LLVMIO)).
+Module Type Concretize (Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEOF)).
+  Import LLVMIO.
+  Parameter concretize : uvalue -> dvalue -> Prop.
+  Parameter concretize_u : uvalue -> err_or_ub dvalue -> Prop.
+  Parameter concretize_uvalue : uvalue -> err_or_ub dvalue.
+End Concretize.
+
+Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(SIZEOF)(LLVMIO)) : Concretize Addr SIZEOF LLVMIO.
 
   Import LLVMIO.
   Import SIZEOF.
@@ -40,13 +46,10 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
   Import ITOP.
   Import DV.
   Import GEP.
-  Module Den := Denotation Addr SIZEOF LLVMIO.
-  Import Den.
   Open Scope list.
 
   Module BYTE := Byte Addr SIZEOF LLVMIO BYTE_IMPL.
-  Import BYTE.
-
+  Export BYTE.
 
   (* Variable ptr_size : nat. *)
   (* Variable datalayout : DataLayout. *)

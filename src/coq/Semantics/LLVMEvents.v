@@ -188,7 +188,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (SIZEOF : Sizeof).
    *)
 
   Definition unique_prop (uv : uvalue) : Prop
-    := exists x, forall dv, concretize uv dv -> dv = x.
+    := True.
 
   Definition pickAll (p : uvalue -> PickE dvalue) := map_monad (fun uv => trigger (p uv)).
 

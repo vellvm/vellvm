@@ -32,7 +32,8 @@ From Vellvm Require Import
      Semantics.DynamicValues
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
-     Semantics.LLVMEvents.
+     Semantics.LLVMEvents
+     Handlers.Serialization.
 
 Require Import Ceres.Ceres.
 
@@ -101,271 +102,25 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(A)(SIZEOF)).
+Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(A)(SIZEOF))(CONC:Concretize A SIZEOF LLVMEvents).
   Import LLVMEvents.
+  Import CONC.
 
-  Section CONVERSIONS.
+  Definition eval_conv_pure_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
+    match get_conv_case conv t1 x t2 with
+    | Conv_Pure x => ret x
+    | Conv_Illegal s => raise s
+    | _ => raise "Non-pure conversion..."
+    end.
 
-    (** ** Typed conversion
-        Performs a dynamic conversion of a [dvalue] of type [t1] to one of type [t2].
-        For instance, convert an integer over 8 bits to one over 1 bit by truncation.
-
-        The conversion function is not pure, i.e. in particular cannot live in [DynamicValues.v]
-        as would be natural, due to the [Int2Ptr] and [Ptr2Int] cases. At those types, the conversion
-        needs to cast between integers and pointers, which depends on the memory model.
-     *)
-
-    (* Note: Inferring the subevent instance takes a small but non-trivial amount of time,
-       and has to be done here hundreds and hundreds of times due to the brutal pattern matching on
-       several values. Factoring the inference upfront is therefore necessary.
-     *)
-
-    (* A trick avoiding proofs that involve thousands of cases: we split the conversion into
-      the composition of a huge case analysis that builds a value of [conv_case], and a function
-      with only four cases to actually build the tree.
-     *)
-    Variant conv_case : Set :=
-    | Conv_Pure (x : dvalue) 
-    | Conv_ItoP (x : dvalue) 
-    | Conv_PtoI (x : dvalue)
-    | Conv_Illegal (s: string).
-
-    Variant ptr_conv_cases : Set :=
-    | PtrConv_ItoP
-    | PtrConv_PtoI
-    | PtrConv_Neither.
-
-    Definition get_conv_case_ptr conv (t1 : dtyp) (t2 : dtyp) : ptr_conv_cases
-      := match conv with
-         | Inttoptr =>
-           match t1, t2 with
-           | DTYPE_I 64, DTYPE_Pointer => PtrConv_ItoP
-           | DTYPE_IPTR, DTYPE_Pointer => PtrConv_ItoP
-           | _, _ => PtrConv_Neither
-           end
-         | Ptrtoint =>
-           match t1, t2 with
-           | DTYPE_Pointer, DTYPE_I _ => PtrConv_PtoI
-           | DTYPE_Pointer, DTYPE_IPTR => PtrConv_PtoI
-           | _, _ => PtrConv_Neither
-           end
-         | _ => PtrConv_Neither
-         end.
-
-    (* TODO: move / replace with show instance *)
-    Definition dvalue_to_string (x : dvalue) : string
-      := match x with
-       | DVALUE_Addr a => "DVALUE_Addr"
-       | DVALUE_I1 x => "DVALUE_I1"
-       | DVALUE_I8 x => "DVALUE_I8"
-       | DVALUE_I32 x => "DVALUE_I32"
-       | DVALUE_I64 x => "DVALUE_I64"
-       | DVALUE_IPTR x => "DVALUE_IPTR"
-       | DVALUE_Double x => "DVALUE_Double"
-       | DVALUE_Float x => "DVALUE_Float"
-       | DVALUE_Poison => "DVALUE_Poison"
-       | DVALUE_None => "DVALUE_None"
-       | DVALUE_Struct fields => "DVALUE_Struct"
-       | DVALUE_Packed_struct fields => "DVALUE_Packed_struct"
-       | DVALUE_Array elts => "DVALUE_Array"
-       | DVALUE_Vector elts => "DVALUE_Vector"
-       end.
-
-    Definition get_conv_case conv (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
-      match conv with
-      | Trunc =>
-        match t1, x, t2 with
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1 
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1 
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 1 =>
-          Conv_Pure (DVALUE_I1 (repr (unsigned i1)))
-
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8 
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
-
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
-
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 1
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 1 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 8
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 1 
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 8 
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 32 =>
-          Conv_Pure DVALUE_Poison
-
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
-
-      | Zext =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
-
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32 
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
-
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64 
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (unsigned i1)))
-
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 64 =>
-          Conv_Pure DVALUE_Poison
-
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
-
-      | Sext =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
-          Conv_Pure (DVALUE_I8 (repr (signed i1)))
-
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32 
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
-          Conv_Pure (DVALUE_I32 (repr (signed i1)))
-
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64 
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
-          Conv_Pure (DVALUE_I64 (repr (signed i1)))
-
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 64 =>
-          Conv_Pure DVALUE_Poison
-
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
-
-      | Bitcast =>
-        match t1, x, t2 with
-        | DTYPE_I bits1, x, DTYPE_I bits2 =>
-          if bits1 =? bits2 then Conv_Pure x else Conv_Illegal "unequal bitsize in cast"
-        | DTYPE_Float, DVALUE_Float x, DTYPE_I bits =>
-          if bits =? 32
-          then Conv_Pure (DVALUE_I32 (Float32.to_bits x))
-          else Conv_Illegal "Float to integer with different bitwidth."
-        | DTYPE_I bits, DVALUE_I32 x, DTYPE_Float =>
-          if bits =? 32
-          then Conv_Pure (DVALUE_Float (Float32.of_bits x))
-          else Conv_Illegal "Integer to float with different bitwidth."
-        | DTYPE_Double, DVALUE_Double x, DTYPE_I bits =>
-          if bits =? 64
-          then Conv_Pure (DVALUE_I64 (Float.to_bits x))
-          else Conv_Illegal "Double to integer with different bitwidth."
-        | DTYPE_I bits, DVALUE_I64 x, DTYPE_Double =>
-          if bits =? 64
-          then Conv_Pure (DVALUE_Double (Float.of_bits x))
-          else Conv_Illegal "Integer to double with different bitwidth."
-        | DTYPE_Pointer, DVALUE_Addr a, DTYPE_Pointer =>
-          Conv_Pure (DVALUE_Addr a)
-        | DTYPE_Pointer, DVALUE_Poison, DTYPE_Pointer =>
-          Conv_Pure DVALUE_Poison
-        | _, _, _ => Conv_Illegal "ill-typed conv"
-        end
-
-      | Uitofp =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
-
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
-
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double 
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
-          Conv_Pure DVALUE_Poison
-
-        | _, _, _ => Conv_Illegal "ill-typed Uitofp"
-        end
-
-      | Sitofp =>
-        match t1, x, t2 with
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
-          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
-
-        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
-        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
-        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
-        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
-          Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
-
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float 
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double 
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double 
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
-          Conv_Pure DVALUE_Poison
-
-        | _, _, _ => Conv_Illegal "ill-typed Sitofp"
-        end
-
-      | Inttoptr =>
-        match t1, t2 with
-        | DTYPE_I 64, DTYPE_Pointer => Conv_ItoP x
-        | _, _ => Conv_Illegal "ERROR: Inttoptr got illegal arguments"
-        end
-      | Ptrtoint =>
-        match t1, t2 with
-        | DTYPE_Pointer, DTYPE_I _ => Conv_PtoI x
-        | _, _ => Conv_Illegal "ERROR: Ptrtoint got illegal arguments"
-        end
-          
-      | Fptoui
-      | Fptosi
-      | Fptrunc
-      | Fpext
-        => Conv_Illegal "TODO: unimplemented numeric conversion"
-      end.
-    Arguments get_conv_case _ _ _ _ : simpl nomatch.
-
-
-    Definition eval_conv_pure_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
-      match get_conv_case conv t1 x t2 with
-      | Conv_Pure x => ret x
-      | Conv_Illegal s => raise s
-      | _ => raise "Non-pure conversion..."
-      end.
-
-    Definition eval_conv_pure (conv : conversion_type) (t1 : dtyp) (x : dvalue) (t2:dtyp) : itree conv_E dvalue :=
-      match t1, x with
-      | DTYPE_Vector s t, (DVALUE_Vector elts) =>
-        (* In the future, implement bitcast and etc with vectors *)
-        raise "vectors unimplemented"
-      | _, _ => eval_conv_pure_h conv t1 x t2
-      end.
-    Arguments eval_conv_pure _ _ _ _ : simpl nomatch.
-
-  End CONVERSIONS.
+  Definition eval_conv_pure (conv : conversion_type) (t1 : dtyp) (x : dvalue) (t2:dtyp) : itree conv_E dvalue :=
+    match t1, x with
+    | DTYPE_Vector s t, (DVALUE_Vector elts) =>
+      (* In the future, implement bitcast and etc with vectors *)
+      raise "vectors unimplemented"
+    | _, _ => eval_conv_pure_h conv t1 x t2
+    end.
+  Arguments eval_conv_pure _ _ _ _ : simpl nomatch.
 
   Definition dv_zero_initializer (t:dtyp) : err dvalue :=
     failwith "dv_zero_initializer unimplemented".

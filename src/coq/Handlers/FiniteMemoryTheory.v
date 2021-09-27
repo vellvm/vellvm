@@ -685,6 +685,38 @@ Section Serialization_Theory.
         auto.
     Qed.
 
+    (* Lemma re_sid_ubytes_ErrSID_length : *)
+    (*   forall bytes bytes' sid prov sid' prov', *)
+    (*     ErrSID_runs_to (re_sid_ubytes bytes) sid prov bytes' sid' prov' -> *)
+    (*     length bytes = length bytes'. *)
+    (* Proof. *)
+    (*   intros bytes bytes' sid prov sid' prov' RUNS. *)
+    (*   induction bytes. *)
+    (*   - inv RUNS; auto. *)
+    (*   - red in RUNS. *)
+    (*     unfold runErrSID in RUNS. *)
+    (*     unfold runErrSID_T in RUNS. *)
+
+    (*     unfold re_sid_ubytes in RUNS. *)
+
+    (*     match goal with *)
+    (*     | H: IdentityMonad.unIdent (StateMonads.runStateT (StateMonads.runStateT (unEitherT (unEitherT (bind ?ma ?k))) ?sid) ?prov) = _ |- _ => *)
+    (*       idtac ma; idtac k; *)
+    (*         epose proof EitherTReturns_bind_inv ma k bytes'; *)
+    (*         pose proof ma *)
+    (*     end. *)
+
+    (*     forward H. *)
+    (*     red. *)
+    (*     unfold EitherTReturns in H. *)
+
+    (*     (* This is where I needed the bind_inv lemma for state *) *)
+    (*     match goal with *)
+    (*     | H: IdentityMonad.unIdent (StateMonads.runStateT (StateMonads.runStateT ?ma ?sid) ?prov) = _ |- _ => *)
+    (*       epose proof (@StateTReturns_bind_inv store_id (stateT Provenance IdentityMonad.ident) _ _ _ _ _ _ ma) *)
+    (*     end. *)
+    (* Admitted. *)
+
     Lemma re_sid_ubytes_ErrSID_length :
       forall bytes bytes' sid prov,
         ErrSID_evals_to (re_sid_ubytes bytes) sid prov bytes' ->
@@ -698,6 +730,10 @@ Section Serialization_Theory.
         unfold IdentityMonad.unIdent in EVAL.
         unfold evalErrSID_T in EVAL.
         unfold re_sid_ubytes in EVAL.
+
+        (* This is where I needed the bind_inv lemma for state *)
+        epose proof StateTReturns_bind_inv.
+        unfold StateMonads.evalStateT in EVAL.
     Admitted.
 
     apply ErrSID_evals_to_bind in BYTES as (sid'' & prov'' & bytes'' & EXTRACT & BYTES).
@@ -824,7 +860,7 @@ Section Serialization_Theory.
   apply map_monad_ErrSID_length in EXTRACT.
   apply re_sid_ubytes_ErrSID_length in BYTES.
   lia.
-  Qed.
+  Admitted.
 
   (* Lemma firstn_sizeof_dtyp : *)
   (*   forall dv dt, *)

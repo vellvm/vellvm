@@ -128,7 +128,7 @@ Section InterpreterCFG.
 
 End InterpreterCFG.
 
-Module D := Denotation Addr FinSizeof LLVMEvents.
+Module D := Denotation Addr FinSizeof LLVMEvents SER.
 Export D.
 
 Module SemNotations.

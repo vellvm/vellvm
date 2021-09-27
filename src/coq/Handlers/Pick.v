@@ -45,11 +45,8 @@ Import MonadNotation.
   - The executable one interprets [undef] as 0 at the type
 *)
 
-Module Make(A:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(SIZEOF))(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(SIZEOF)(LLVMIO))(BYTE_IMPL : ByteImpl(A)(SIZEOF)(LLVMIO)).
-
-  Module SER := Serialization.Make(A)(SIZEOF)(LLVMIO)(PTOI)(PROVENANCE)(ITOP)(GEP)(BYTE_IMPL).
-  Import SER.
-
+Module Make(A:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(SIZEOF))(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(SIZEOF)(LLVMIO))(BYTE_IMPL : ByteImpl(A)(SIZEOF)(LLVMIO))(Conc : Concretize A SIZEOF LLVMIO).
+  Import Conc.
   Import LLVMIO.
 
   Section PickPropositional.
@@ -291,7 +288,7 @@ Module Make(A:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(A
     Proof.
       intros u.
       induction u; try do_it.
-      - cbn. destruct (default_dvalue_of_dtyp t) eqn: EQ.
+      - cbn. (* destruct (default_dvalue_of_dtyp t) eqn: EQ. *)
     (*     econstructor. Unshelve. 3 : { exact DVALUE_None. } *)
     (*     intro. inv H. *)
     (*     apply Concretize_Undef. apply dvalue_default. symmetry. auto. *)

@@ -156,7 +156,7 @@ Function unsupported_cases_match_ {X} (sz : N) (x64 x32 x8 x1 x : X) :=
     | _ => x
     end.
 
-Lemma unsupported_cases_match : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X), 
+Lemma unsupported_cases_match : forall {X} (sz : N) (N : ~ IX_supported sz) (x64 x32 x8 x1 x : X),
     match sz with
     | 64 => x64
     | 32 => x32
@@ -342,11 +342,11 @@ Fixpoint uvalue_measure (uv : uvalue) : nat :=
   | UVALUE_GetElementPtr t ptrval idxs =>
     S (uvalue_measure ptrval + list_sum (map uvalue_measure idxs))
   | UVALUE_ExtractElement vec idx =>
-    S (uvalue_measure vec + uvalue_measure idx) 
+    S (uvalue_measure vec + uvalue_measure idx)
   | UVALUE_InsertElement vec elt idx =>
-    S (uvalue_measure vec + uvalue_measure elt + uvalue_measure idx) 
+    S (uvalue_measure vec + uvalue_measure elt + uvalue_measure idx)
   | UVALUE_ShuffleVector vec1 vec2 idxmask =>
-    S (uvalue_measure vec1 + uvalue_measure vec2 + uvalue_measure idxmask) 
+    S (uvalue_measure vec1 + uvalue_measure vec2 + uvalue_measure idxmask)
   | UVALUE_ExtractValue vec idxs =>
     S (uvalue_measure vec)
   | UVALUE_InsertValue vec elt idxs =>
@@ -901,7 +901,7 @@ Section DecidableEquality.
       destruct (dtyp_eq_dec dt dt')...
   Qed.
 
-  
+
   #[global] Instance eq_dec_uvalue : RelDec (@eq uvalue) := RelDec_from_dec (@eq uvalue) (@uvalue_eq_dec).
   #[global] Instance eqv_uvalue : Eqv (uvalue) := (@eq uvalue).
   Hint Unfold eqv_uvalue : core.
@@ -1245,6 +1245,252 @@ Class VInt I : Type :=
   Definition undef_int {Int} `{VInt Int} : uvalue  := UVALUE_Undef (DTYPE_I (N.of_nat bitwidth)).
 
   Definition to_uvalue {Int} `{VInt Int} (i : Int) : uvalue := dvalue_to_uvalue (to_dvalue i).
+
+  Section CONVERSIONS.
+
+    (** ** Typed conversion
+        Performs a dynamic conversion of a [dvalue] of type [t1] to one of type [t2].
+        For instance, convert an integer over 8 bits to one over 1 bit by truncation.
+
+        The conversion function is not pure, i.e. in particular cannot live in [DynamicValues.v]
+        as would be natural, due to the [Int2Ptr] and [Ptr2Int] cases. At those types, the conversion
+        needs to cast between integers and pointers, which depends on the memory model.
+     *)
+
+    (* Note: Inferring the subevent instance takes a small but non-trivial amount of time,
+       and has to be done here hundreds and hundreds of times due to the brutal pattern matching on
+       several values. Factoring the inference upfront is therefore necessary.
+     *)
+
+    (* A trick avoiding proofs that involve thousands of cases: we split the conversion into
+      the composition of a huge case analysis that builds a value of [conv_case], and a function
+      with only four cases to actually build the tree.
+     *)
+    Variant conv_case : Set :=
+    | Conv_Pure (x : dvalue)
+    | Conv_ItoP (x : dvalue)
+    | Conv_PtoI (x : dvalue)
+    | Conv_Illegal (s: string).
+
+    Variant ptr_conv_cases : Set :=
+    | PtrConv_ItoP
+    | PtrConv_PtoI
+    | PtrConv_Neither.
+
+    Definition get_conv_case_ptr conv (t1 : dtyp) (t2 : dtyp) : ptr_conv_cases
+      := match conv with
+         | Inttoptr =>
+           match t1, t2 with
+           | DTYPE_I 64, DTYPE_Pointer => PtrConv_ItoP
+           | DTYPE_IPTR, DTYPE_Pointer => PtrConv_ItoP
+           | _, _ => PtrConv_Neither
+           end
+         | Ptrtoint =>
+           match t1, t2 with
+           | DTYPE_Pointer, DTYPE_I _ => PtrConv_PtoI
+           | DTYPE_Pointer, DTYPE_IPTR => PtrConv_PtoI
+           | _, _ => PtrConv_Neither
+           end
+         | _ => PtrConv_Neither
+         end.
+
+    (* TODO: move / replace with show instance *)
+    Definition dvalue_to_string (x : dvalue) : string
+      := match x with
+       | DVALUE_Addr a => "DVALUE_Addr"
+       | DVALUE_I1 x => "DVALUE_I1"
+       | DVALUE_I8 x => "DVALUE_I8"
+       | DVALUE_I32 x => "DVALUE_I32"
+       | DVALUE_I64 x => "DVALUE_I64"
+       | DVALUE_IPTR x => "DVALUE_IPTR"
+       | DVALUE_Double x => "DVALUE_Double"
+       | DVALUE_Float x => "DVALUE_Float"
+       | DVALUE_Poison => "DVALUE_Poison"
+       | DVALUE_None => "DVALUE_None"
+       | DVALUE_Struct fields => "DVALUE_Struct"
+       | DVALUE_Packed_struct fields => "DVALUE_Packed_struct"
+       | DVALUE_Array elts => "DVALUE_Array"
+       | DVALUE_Vector elts => "DVALUE_Vector"
+       end.
+
+    Definition get_conv_case conv (t1:dtyp) (x:dvalue) (t2:dtyp) : conv_case :=
+      match conv with
+      | Trunc =>
+        match t1, x, t2 with
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 1
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 1
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 1 =>
+          Conv_Pure (DVALUE_I1 (repr (unsigned i1)))
+
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 8
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 8 =>
+          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
+          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
+
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 1
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 1
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 8
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 1
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 8
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 32 =>
+          Conv_Pure DVALUE_Poison
+
+        | _, _, _ => Conv_Illegal "ill-typed conv"
+        end
+
+      | Zext =>
+        match t1, x, t2 with
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
+          Conv_Pure (DVALUE_I8 (repr (unsigned i1)))
+
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
+          Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
+
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
+          Conv_Pure (DVALUE_I64 (repr (unsigned i1)))
+
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 64 =>
+          Conv_Pure DVALUE_Poison
+
+        | _, _, _ => Conv_Illegal "ill-typed conv"
+        end
+
+      | Sext =>
+        match t1, x, t2 with
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 8 =>
+          Conv_Pure (DVALUE_I8 (repr (signed i1)))
+
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 32
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 32 =>
+          Conv_Pure (DVALUE_I32 (repr (signed i1)))
+
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_I 64
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_I 64
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
+          Conv_Pure (DVALUE_I64 (repr (signed i1)))
+
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 64 =>
+          Conv_Pure DVALUE_Poison
+
+        | _, _, _ => Conv_Illegal "ill-typed conv"
+        end
+
+      | Bitcast =>
+        match t1, x, t2 with
+        | DTYPE_I bits1, x, DTYPE_I bits2 =>
+          if bits1 =? bits2 then Conv_Pure x else Conv_Illegal "unequal bitsize in cast"
+        | DTYPE_Float, DVALUE_Float x, DTYPE_I bits =>
+          if bits =? 32
+          then Conv_Pure (DVALUE_I32 (Float32.to_bits x))
+          else Conv_Illegal "Float to integer with different bitwidth."
+        | DTYPE_I bits, DVALUE_I32 x, DTYPE_Float =>
+          if bits =? 32
+          then Conv_Pure (DVALUE_Float (Float32.of_bits x))
+          else Conv_Illegal "Integer to float with different bitwidth."
+        | DTYPE_Double, DVALUE_Double x, DTYPE_I bits =>
+          if bits =? 64
+          then Conv_Pure (DVALUE_I64 (Float.to_bits x))
+          else Conv_Illegal "Double to integer with different bitwidth."
+        | DTYPE_I bits, DVALUE_I64 x, DTYPE_Double =>
+          if bits =? 64
+          then Conv_Pure (DVALUE_Double (Float.of_bits x))
+          else Conv_Illegal "Integer to double with different bitwidth."
+        | DTYPE_Pointer, DVALUE_Addr a, DTYPE_Pointer =>
+          Conv_Pure (DVALUE_Addr a)
+        | DTYPE_Pointer, DVALUE_Poison, DTYPE_Pointer =>
+          Conv_Pure DVALUE_Poison
+        | _, _, _ => Conv_Illegal "ill-typed conv"
+        end
+
+      | Uitofp =>
+        match t1, x, t2 with
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
+          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
+          Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
+          Conv_Pure DVALUE_Poison
+
+        | _, _, _ => Conv_Illegal "ill-typed Uitofp"
+        end
+
+      | Sitofp =>
+        match t1, x, t2 with
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Float
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Float
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Float
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Float =>
+          Conv_Pure (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+
+        | DTYPE_I 1, DVALUE_I1 i1, DTYPE_Double
+        | DTYPE_I 8, DVALUE_I8 i1, DTYPE_Double
+        | DTYPE_I 32, DVALUE_I32 i1, DTYPE_Double
+        | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
+          Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
+
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float
+        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double
+        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double
+        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double
+        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
+          Conv_Pure DVALUE_Poison
+
+        | _, _, _ => Conv_Illegal "ill-typed Sitofp"
+        end
+
+      | Inttoptr =>
+        match t1, t2 with
+        | DTYPE_I 64, DTYPE_Pointer => Conv_ItoP x
+        | _, _ => Conv_Illegal "ERROR: Inttoptr got illegal arguments"
+        end
+      | Ptrtoint =>
+        match t1, t2 with
+        | DTYPE_Pointer, DTYPE_I _ => Conv_PtoI x
+        | _, _ => Conv_Illegal "ERROR: Ptrtoint got illegal arguments"
+        end
+
+      | Fptoui
+      | Fptosi
+      | Fptrunc
+      | Fpext
+        => Conv_Illegal "TODO: unimplemented numeric conversion"
+      end.
+    Arguments get_conv_case _ _ _ _ : simpl nomatch.
+
+  End CONVERSIONS.
 
   (* Arithmetic Operations ---------------------------------------------------- *)
   Section ARITHMETIC.
@@ -1831,7 +2077,7 @@ Class VInt I : Type :=
     rewrite NO_VOID_equation in H.
     eapply Forall_HIn_cons; eauto.
   Qed.
-  
+
   Unset Elimination Schemes.
   Inductive uvalue_has_dtyp : uvalue -> dtyp -> Prop :=
   | UVALUE_Addr_typ   : forall a, uvalue_has_dtyp (UVALUE_Addr a) DTYPE_Pointer
@@ -2471,7 +2717,7 @@ Class VInt I : Type :=
         P (UVALUE_ShuffleVector v1 v2 idxs)
                         (DTYPE_Vector (N.of_nat m) t).
 
-    Hypothesis IH_ExtractValue_Struct_sing : forall (fields : list uvalue) (fts : list dtyp) 
+    Hypothesis IH_ExtractValue_Struct_sing : forall (fields : list uvalue) (fts : list dtyp)
                                                (dt : dtyp) (idx : LLVMAst.int),
         uvalue_has_dtyp (UVALUE_Struct fields) (DTYPE_Struct fts) ->
         P (UVALUE_Struct fields) (DTYPE_Struct fts) ->
@@ -2496,8 +2742,8 @@ Class VInt I : Type :=
           (UVALUE_ExtractValue (UVALUE_Struct fields) (idx :: idxs))
           dt.
 
-    Hypothesis IH_ExtractValue_Packed_struct_sing : forall (fields : list uvalue) 
-                                                      (fts : list dtyp) (dt : dtyp) 
+    Hypothesis IH_ExtractValue_Packed_struct_sing : forall (fields : list uvalue)
+                                                      (fts : list dtyp) (dt : dtyp)
                                                       (idx : Z),
         uvalue_has_dtyp (UVALUE_Packed_struct fields)
                         (DTYPE_Packed_struct fts) ->
@@ -2509,9 +2755,9 @@ Class VInt I : Type :=
           (UVALUE_ExtractValue (UVALUE_Packed_struct fields)
                                [idx]) dt.
 
-    Hypothesis IH_ExtractValue_Packed_struct_cons : forall (fields : list uvalue) 
-                                                      (fts : list dtyp) (fld : uvalue) 
-                                                      (ft dt : dtyp) (idx : Z) 
+    Hypothesis IH_ExtractValue_Packed_struct_cons : forall (fields : list uvalue)
+                                                      (fts : list dtyp) (fld : uvalue)
+                                                      (ft dt : dtyp) (idx : Z)
                                                       (idxs : list LLVMAst.int),
         uvalue_has_dtyp (UVALUE_Packed_struct fields)
                         (DTYPE_Packed_struct fts) ->
@@ -2535,8 +2781,8 @@ Class VInt I : Type :=
         P
           (UVALUE_ExtractValue (UVALUE_Array elements) [idx]) dt.
 
-    Hypothesis IH_ExtractValue_Array_cons : forall (elements : list uvalue) (elem : uvalue) 
-                                              (et dt : dtyp) (n : N) (idx : Z) 
+    Hypothesis IH_ExtractValue_Array_cons : forall (elements : list uvalue) (elem : uvalue)
+                                              (et dt : dtyp) (n : N) (idx : Z)
                                               (idxs : list LLVMAst.int),
         uvalue_has_dtyp (UVALUE_Array elements) (DTYPE_Array n dt) ->
         P (UVALUE_Array elements) (DTYPE_Array n dt) ->
@@ -2550,7 +2796,7 @@ Class VInt I : Type :=
           (UVALUE_ExtractValue (UVALUE_Array elements) (idx :: idxs))
           dt.
 
-    Hypothesis IH_InsertValue : forall (struc : uvalue) (idxs : list LLVMAst.int) 
+    Hypothesis IH_InsertValue : forall (struc : uvalue) (idxs : list LLVMAst.int)
                                   (uv : uvalue) (st dt : dtyp),
         uvalue_has_dtyp (UVALUE_ExtractValue struc idxs) dt ->
         P (UVALUE_ExtractValue struc idxs) dt ->
@@ -2581,7 +2827,7 @@ Class VInt I : Type :=
     Hypothesis IH_UVALUE_ExtractByte :
       forall uv dt idx sid,
         P (UVALUE_ExtractByte uv dt idx sid) (DTYPE_I 8).
-        
+
     Hypothesis IH_UVALUE_ConcatBytes :
       forall bytes dt,
         (forall byte, In byte bytes -> exists uv dt idx sid, byte = UVALUE_ExtractByte uv dt idx sid) ->
@@ -2599,12 +2845,12 @@ Class VInt I : Type :=
                       solve [eapply H; subst IH; eauto]
                     end]).
       - generalize dependent τ.
-        fix IHτ 1. 
+        fix IHτ 1.
         intros τ NV.
         destruct τ eqn:Hτ; try contradiction;
           try solve [eapply IH_Undef;
                      repeat split; solve [intros * CONTRA; inversion CONTRA]].
-        
+
         (* Undef Arrays *)
         { pose proof NV as NVd.
           rewrite NO_VOID_equation in NVd.
@@ -2731,103 +2977,5 @@ Class VInt I : Type :=
     induction fields;
       intros dts H; inversion H; cbn; auto.
   Qed.
-
-  Inductive concretize_u : uvalue -> err_or_ub dvalue -> Prop := 
-  (* Concrete uvalue are contretized into their singleton *)
-  | Pick_concrete             : forall uv (dv : dvalue), uvalue_to_dvalue uv = inr dv -> concretize_u uv (ret dv)
-  | Pick_fail                 : forall uv v s, ~ (uvalue_to_dvalue uv = inr v)  -> concretize_u uv (lift (failwith s))
-  (* Undef relates to all dvalue of the type *)
-  | Concretize_Undef          : forall dt dv,
-      dvalue_has_dtyp dv dt ->
-      concretize_u (UVALUE_Undef dt) (ret dv)
-
-  (* The other operations proceed non-deterministically *)
-  | Concretize_IBinop : forall iop uv1 e1 uv2 e2,
-      concretize_u uv1 e1 ->
-      concretize_u uv2 e2 ->
-      concretize_u (UVALUE_IBinop iop uv1 uv2)
-                   (dv1 <- e1 ;;
-                    dv2 <- e2 ;;
-                    (eval_iop iop dv1 dv2))
-                   
-  | Concretize_ICmp : forall cmp uv1 e1 uv2 e2 ,
-      concretize_u uv1 e1 ->
-      concretize_u uv2 e2 ->
-      concretize_u (UVALUE_ICmp cmp uv1 uv2)
-                   (dv1 <- e1 ;;
-                    dv2 <- e2 ;;
-                    eval_icmp cmp dv1 dv2)
-
-  | Concretize_FBinop : forall fop fm uv1 e1 uv2 e2,
-      concretize_u uv1 e1 ->
-      concretize_u uv2 e2 ->
-      concretize_u (UVALUE_FBinop fop fm uv1 uv2)
-                   (dv1 <- e1 ;;
-                    dv2 <- e2 ;;
-                    eval_fop fop dv1 dv2)
-
-  | Concretize_FCmp : forall cmp uv1 e1 uv2 e2,
-      concretize_u uv1 e1 ->
-      concretize_u uv2 e2 ->
-      concretize_u (UVALUE_FCmp cmp uv1 uv2)
-                   (dv1 <- e1 ;;
-                    dv2 <- e2 ;;
-                    eval_fcmp cmp dv1 dv2)
-
-  | Concretize_Struct_Nil     : concretize_u (UVALUE_Struct []) (ret (DVALUE_Struct []))
-  | Concretize_Struct_Cons    : forall u e us es,
-      concretize_u u e ->
-      concretize_u (UVALUE_Struct us) es ->
-      concretize_u (UVALUE_Struct (u :: us))
-                   (d <- e ;;
-                    vs <- es ;;
-                    match vs with
-                    | (DVALUE_Struct ds) => ret (DVALUE_Struct (d :: ds))
-                    | _ => raise_error "illegal Struct Cons"
-                    end)
-
-
-  | Concretize_Packed_struct_Nil     : concretize_u (UVALUE_Packed_struct []) (ret (DVALUE_Packed_struct []))
-  | Concretize_Packed_struct_Cons    : forall u e us es,
-      concretize_u u e ->
-      concretize_u (UVALUE_Packed_struct us) es ->
-      concretize_u (UVALUE_Packed_struct (u :: us))
-                   (d <- e ;;
-                    vs <- es ;;
-                    match vs with
-                    | (DVALUE_Packed_struct ds) => ret (DVALUE_Packed_struct (d :: ds))
-                    | _ => raise_error "illegal Packed_struct cons"
-                    end)
-
-  | Concretize_Array_Nil :
-      concretize_u (UVALUE_Array []) (ret (DVALUE_Array []))
-
-  | Concretize_Array_Cons : forall u e us es,
-      concretize_u u e ->
-      concretize_u (UVALUE_Array us) es ->      
-      concretize_u (UVALUE_Array (u :: us))
-                   (d <- e ;;
-                    vs <- es ;;
-                    match vs with
-                    | (DVALUE_Array ds) => ret (DVALUE_Array (d :: ds))
-                    | _ => raise_error "illegal Array cons"
-                    end)
-
-  | Concretize_Vector_Nil :
-      concretize_u (UVALUE_Vector []) (ret (DVALUE_Vector []))
-
-  | Concretize_Vector_Cons : forall u e us es,
-      concretize_u u e ->
-      concretize_u (UVALUE_Vector us) es ->      
-      concretize_u (UVALUE_Vector (u :: us))
-                   (d <- e ;;
-                    vs <- es ;;
-                    match vs with
-                    | (DVALUE_Vector ds) => ret (DVALUE_Vector (d :: ds))
-                    | _ => raise_error "illegal Vector cons"
-                    end)
-  .
-
-  Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
 
 End DVALUE.
