@@ -34,12 +34,22 @@ Variant refine_uvalue: uvalue -> uvalue -> Prop :=
 .
 #[export] Hint Constructors refine_uvalue : core.
 
+Definition uvalue_eq (uv1 uv2 : uvalue) : Prop
+  := refine_uvalue uv1 uv2 /\ refine_uvalue uv2 uv1.
+
 Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
 Proof.
   repeat intro.
   destruct x; try (apply RefineConcrete;[intro; inversion H|auto];fail).
   apply UndefPoison.
 Qed.
+
+Instance uvalue_eq_Reflexive : Reflexive uvalue_eq.
+Proof.
+  repeat intro.
+  split; reflexivity.
+Qed.
+
 
 Lemma refine_poison : forall uv, refine_uvalue uv UVALUE_Poison -> uv = UVALUE_Poison.
 Proof.
@@ -60,6 +70,26 @@ Proof.
   - inversion H0; subst.
     apply refine_poison in H. subst. econstructor.
     apply RefineConcrete. intros. assumption. auto. 
+Qed.
+
+Instance uvalue_eq_Transitive : Transitive uvalue_eq.
+Proof.
+  intros x y z [Rxy Ryx] [Ryz Rzy].
+  split; etransitivity; eauto.
+Qed.
+
+Instance uvalue_eq_Symmetric : Symmetric uvalue_eq.
+Proof.
+  intros x y [Rxy Ryx].
+  split; auto.
+Qed.
+
+Instance uvalue_eq_Equivalence : Equivalence uvalue_eq.
+Proof.
+  split.
+  - apply uvalue_eq_Reflexive.
+  - apply uvalue_eq_Symmetric.
+  - apply uvalue_eq_Transitive.
 Qed.
 
 Infix"×" := prod_rel (at level 90, left associativity).
