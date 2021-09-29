@@ -319,3 +319,10 @@ Proof.
   intros X x xs f H.
   apply H.
 Qed.
+
+Lemma forall_repeat_true:
+  forall A (f : A -> Prop) n x, f x -> Forall (fun y : A => f y) (repeat x n).
+Proof.
+  intros. induction n. cbn. constructor.
+  constructor. auto. cbn. apply IHn.
+Qed.

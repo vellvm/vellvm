@@ -9,6 +9,10 @@ From Vellvm Require Import
      Utilities
      Syntax
      Semantics
+     Semantics.MemoryAddress
+     Semantics.GepM
+     Semantics.Memory.Sizeof
+     Semantics.Memory.MemBytes
      Semantics.Memory.Sizeof.
 
 From ExtLib Require Import
@@ -20,7 +24,9 @@ From ExtLib Require Import
 From Coq Require Import Relations RelationClasses.
 (* end hide *)
 
-Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(A)(SIZE))(Conc : Concretize A SIZE LLVMEvents).
+Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(A)(SIZE))(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(A)(SIZE)(LLVMEvents)).
+
+  Module Conc := Serialization.Make A SIZE LLVMEvents PTOI PROVENANCE ITOP GEP BYTE_IMPL.
 
 Import LLVMEvents.
 Import DV.

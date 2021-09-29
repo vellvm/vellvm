@@ -30,14 +30,32 @@ Require Import Lia.
 Import ListNotations.
 Import MonadNotation.
 
+(*
 Module Type Concretize (Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEOF)).
   Import LLVMIO.
   Parameter concretize : uvalue -> dvalue -> Prop.
   Parameter concretize_u : uvalue -> err_or_ub dvalue -> Prop.
   Parameter concretize_uvalue : uvalue -> err_or_ub dvalue.
-End Concretize.
 
-Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(SIZEOF)(LLVMIO)) : Concretize Addr SIZEOF LLVMIO.
+  Parameter Concretize_Undef : forall dt dv,
+      dvalue_has_dtyp dv dt ->
+      concretize_u (UVALUE_Undef dt) (ret dv).
+
+  Parameter Concretize_IBinop : forall iop uv1 e1 uv2 e2,
+      concretize_u uv1 e1 ->
+      concretize_u uv2 e2 ->
+      concretize_u (UVALUE_IBinop iop uv1 uv2)
+                   (dv1 <- e1 ;;
+                    dv2 <- e2 ;;
+                    (eval_iop iop dv1 dv2)).
+
+  Parameter concretize_equation : forall (uv: uvalue) (dv : dvalue),
+      concretize uv dv = concretize_u uv (ret dv).
+
+End Concretize.
+*)
+
+Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(SIZEOF)(LLVMIO)).
 
   Import LLVMIO.
   Import SIZEOF.
@@ -216,32 +234,6 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
     (*   | DTYPE_Vector sz t => _ *)
     (*   end. *)
 
-    Definition dtyp_extract_fields (dt : dtyp) : err (list dtyp)
-      := match dt with
-         | DTYPE_Struct fields
-         | DTYPE_Packed_struct fields =>
-           ret fields
-         | DTYPE_Array sz t
-         | DTYPE_Vector sz t =>
-           ret (repeat t (N.to_nat sz))
-         | _ => inl "No fields."
-         end.
-
-    Import StateMonad.
-    Definition ErrSID := eitherT string (state store_id).
-
-    Definition lift_err {M A} `{MonadExc string M} `{Monad M} (e : err A) : (M A)
-        := match e with
-         | inl e => raise e
-         | inr x => ret x
-         end.
-
-    Definition evalErrSID {A} (m : ErrSID A) (sid : store_id) : err A
-      := evalState (unEitherT m) sid.
-
-    Definition fresh_sid : ErrSID store_id
-      := lift (modify N.succ).
-
     (* Assign fresh sids to ubytes while preserving entanglement *)
     Definition default_dvalue_of_dtyp_i (sz : N) : err dvalue:=
       (if (sz =? 64) then ret (DVALUE_I64 (repr 0))
@@ -331,6 +323,115 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
         ret (DVALUE_Packed_struct v)
       end.
 
+    Ltac do_it := constructor; cbn; auto; fail.
+
+    Lemma dvalue_default : forall t v,
+        inr v = (default_dvalue_of_dtyp t) ->
+        dvalue_has_dtyp v t.
+    Proof.
+      intros t v. revert v.
+      induction t; try do_it;
+        try (intros; subst; inversion H; constructor).
+      - intros. subst. cbn in H.
+        unfold default_dvalue_of_dtyp_i in H.
+        destruct (@IX_supported_dec a).
+        * inversion i; subst; cbn in H; inversion H; constructor; auto.
+        * rewrite unsupported_cases in H; auto. inversion H.
+      - intros. subst. inversion H. clear H.
+        induction sz.
+        + cbn in H1.
+          destruct (default_dvalue_of_dtyp t) eqn: HT. inv H1. inv H1.
+          pose proof DVALUE_Array_typ.
+          specialize (H nil (N.to_nat 0) t).
+          rewrite Nnat.N2Nat.id in H.
+          apply H. auto. auto.
+        + cbn in H1.
+          destruct (default_dvalue_of_dtyp t) eqn: HT. inv H1. inv H1.
+          pose proof DVALUE_Array_typ as ARR.
+          specialize (ARR (repeat d (Pos.to_nat p)) (N.to_nat (N.pos p)) t).
+          rewrite Nnat.N2Nat.id in ARR.
+          cbn in *.
+          apply ARR.
+          * apply forall_repeat_true.
+            apply IHt. reflexivity.
+          * apply repeat_length.
+      - revert H. induction fields.
+        + intros. inv H0. constructor.
+        + intros.
+          assert (forall u : dtyp,
+              In u fields ->
+              forall v : dvalue,
+                inr v = default_dvalue_of_dtyp u -> dvalue_has_dtyp v u).
+          { intros. apply H. apply in_cons. auto. auto. }
+          specialize (IHfields H1). clear H1.
+          Opaque map_monad.
+          (* Reduce H0 *)
+          cbn in H0.
+          rewrite list_cons_app in H0.
+          rewrite map_monad_app in H0. cbn in H0.
+          Transparent map_monad.
+          unfold map_monad at 1 in H0.
+          Opaque map_monad. cbn in H0.
+          destruct (default_dvalue_of_dtyp a) eqn: A_DEFAULT.
+          inv H0.
+          destruct (map_monad default_dvalue_of_dtyp fields) eqn: FIELDS.
+          inv H0.
+          inv H0. constructor. apply H. apply in_eq.
+          symmetry. auto.
+          apply IHfields. cbn. rewrite FIELDS. reflexivity.
+      - revert H. induction fields.
+        + intros. inv H0. constructor.
+        + intros.
+          assert (forall u : dtyp,
+              In u fields ->
+              forall v : dvalue,
+                inr v = default_dvalue_of_dtyp u -> dvalue_has_dtyp v u).
+          { intros. apply H. apply in_cons. auto. auto. }
+          specialize (IHfields H1). clear H1.
+          Opaque map_monad.
+          (* Reduce H0 *)
+          cbn in H0.
+          rewrite list_cons_app in H0.
+          rewrite map_monad_app in H0. cbn in H0.
+          Transparent map_monad.
+          unfold map_monad at 1 in H0.
+          Opaque map_monad. cbn in H0.
+          destruct (default_dvalue_of_dtyp a) eqn: A_DEFAULT.
+          inv H0.
+          destruct (map_monad default_dvalue_of_dtyp fields) eqn: FIELDS.
+          inv H0.
+          inv H0. constructor. apply H. apply in_eq.
+          symmetry. auto.
+          apply IHfields. cbn. rewrite FIELDS. reflexivity.
+      - intros. subst. inversion H. clear H.
+        revert H1. revert v. revert IHt. revert t.
+        induction sz.
+        + intros. cbn in H1.
+          pose proof DVALUE_Vector_typ.
+          specialize (H nil (N.to_nat 0)).
+          rewrite Nnat.N2Nat.id in H.
+          destruct t; inv H1;
+              try
+                (apply H;
+                 [constructor | constructor |
+                  unfold vector_dtyp; intuition]).
+          destruct (default_dvalue_of_dtyp_i sz) eqn: HI; inv H2.
+          apply H. constructor. auto. unfold vector_dtyp. left.
+          exists sz. reflexivity.
+        + intros. cbn in H1.
+          destruct t; inv H1;
+            try (
+                rewrite <- positive_nat_N;
+                   constructor; [apply forall_repeat_true ; constructor |
+                          apply repeat_length |
+                          unfold vector_dtyp ; intuition ]).
+          destruct (default_dvalue_of_dtyp_i sz) eqn: SZ; inv H0.
+            pose proof DVALUE_Vector_typ.
+            rewrite <- positive_nat_N. apply H.
+            apply forall_repeat_true. apply IHt. symmetry. auto.
+            apply repeat_length.
+            left. exists sz. reflexivity.
+    Qed.
 
     Section Concretize.
  
@@ -929,6 +1030,100 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
           := dvbs <- concretize_uvalue_bytes uvs;;
              lift_ue (ErrPoison_to_err_or_ub_dvalue (dvalue_bytes_to_dvalue dvbs dt)).
 
+        Lemma concretize_uvalueM_equation :
+          forall u,
+            concretize_uvalueM u =
+            match u with
+            | UVALUE_Addr a                          => ret (DVALUE_Addr a)
+            | UVALUE_I1 x                            => ret (DVALUE_I1 x)
+            | UVALUE_I8 x                            => ret (DVALUE_I8 x)
+            | UVALUE_I32 x                           => ret (DVALUE_I32 x)
+            | UVALUE_I64 x                           => ret (DVALUE_I64 x)
+            | UVALUE_IPTR x                          => ret (DVALUE_IPTR x)
+            | UVALUE_Double x                        => ret (DVALUE_Double x)
+            | UVALUE_Float x                         => ret (DVALUE_Float x)
+            | UVALUE_Undef t                         => undef_handler t
+            | UVALUE_Poison                          => ret (DVALUE_Poison)
+            | UVALUE_None                            => ret DVALUE_None
+            | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalueM fields ;;
+                                                       ret (DVALUE_Struct dfields)
+            | UVALUE_Packed_struct fields            => 'dfields <- map_monad concretize_uvalueM fields ;;
+                                                       ret (DVALUE_Packed_struct dfields)
+            | UVALUE_Array elts                      => 'delts <- map_monad concretize_uvalueM elts ;;
+                                                       ret (DVALUE_Array delts)
+            | UVALUE_Vector elts                     => 'delts <- map_monad concretize_uvalueM elts ;;
+                                                       ret (DVALUE_Vector delts)
+            | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalueM v1 ;;
+                                                       dv2 <- concretize_uvalueM v2 ;;
+                                                       lift_ue (eval_iop iop dv1 dv2)
+            | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
+                                                       dv2 <- concretize_uvalueM v2 ;;
+                                                       lift_ue (eval_icmp cmp dv1 dv2)
+            | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalueM v1 ;;
+                                                       dv2 <- concretize_uvalueM v2 ;;
+                                                       lift_ue (eval_fop fop dv1 dv2)
+            | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
+                                                       dv2 <- concretize_uvalueM v2 ;;
+                                                       lift_ue (eval_fcmp cmp dv1 dv2)
+            | UVALUE_Conversion conv t_from v t_to    =>
+              dv <- concretize_uvalueM v ;;
+              match get_conv_case conv t_from dv t_to with
+              | Conv_PtoI x =>
+                match x, t_to with
+                | DVALUE_Addr addr, DTYPE_I sz =>
+                  lift_ue (coerce_integer_to_int sz (ptr_to_int addr))
+                | _, _ =>
+                  lift_ue (raise_error "Invalid PTOI conversion")
+                end
+              | Conv_ItoP x => ret (DVALUE_Addr (int_to_ptr (dvalue_int_unsigned x) wildcard_prov))
+              | Conv_Pure x => ret x
+              | Conv_Illegal s => lift_ue (raise_error s)
+              end
+
+            | UVALUE_GetElementPtr t ua uvs =>
+              da <- concretize_uvalueM ua;;
+              dvs <- map_monad concretize_uvalueM uvs;;
+              match handle_gep t da dvs with
+              | inr dv  => ret dv
+              | inl err => lift_ue (lift (failwith err))
+              end
+
+            | UVALUE_ExtractValue uv idxs =>
+              str <- concretize_uvalueM uv;;
+              let fix loop str idxs : err_or_ub dvalue :=
+                  match idxs with
+                  | [] => ret str
+                  | i :: tl =>
+                    v <- index_into_str_dv str i ;;
+                    loop v tl
+                  end in
+              lift_ue (loop str idxs)
+
+            | UVALUE_Select cond v1 v2 =>
+              dcond <- concretize_uvalueM cond;;
+              uv <- lift_ue (eval_select dcond v1 v2);;
+              concretize_uvalueM uv
+
+            | UVALUE_ConcatBytes bytes dt =>
+              match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
+              | true, Some uv => concretize_uvalueM uv
+              | _, _ => extractbytes_to_dvalue bytes dt
+              end
+
+
+            | UVALUE_ExtractByte byte dt idx sid =>
+              (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
+              lift_ue (lift (failwith "Attempting to concretize UVALUE_ExtractByte, should not happen."))
+
+            | _ => lift_ue (lift (failwith ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u)))
+
+            end.
+        Proof.
+          intros u.
+          unfold concretize_uvalueM.
+          destruct u; try reflexivity.
+        Qed.
+
         Set Guard Checking.
       End Concretize.
 
@@ -943,9 +1138,10 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
              (fun _ x => _) uv).
         eapply Monad_MPropT.
         Unshelve.
+
+        (* Undef handler *)
         { unfold MPropT.
-          refine (fun edv =>
-                    match edv with
+         refine (fun edv =>                    match edv with
                     | mkEitherT (inr (inr dv)) =>
                       (* As long as the dvalue has the same type, it's a refinement *)
                       dvalue_has_dtyp dv dt
@@ -957,12 +1153,27 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
           (*           end). *)
           (* - refine . *)
         }
+        Show Proof.
+
+        (* lift_ue *)
         { unfold MPropT.
           intros ue.
-          destruct ue.
-          destruct unEitherT.
-          - exact True.
-          - exact False.
+
+          (* Is x or ue the thing that should be the refinement? *)
+          (* I think ue is the refinement *)
+          destruct x as [[ubx | [errx | x]]].
+          - (* UB *)
+            exact True.
+          - (* ERR *)
+            (* Preserve errors? *)
+            destruct ue as [[ubue | [errue | ue]]].
+            + exact False.
+            + exact (errx = errue).
+            + exact False.
+          - destruct ue as [[ubue | [errue | ue]]].
+            + exact False.
+            + exact False.
+            + exact (x = ue).
         }
         typeclasses eauto.
         unfold err_or_ub.
@@ -975,5 +1186,171 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
   
       Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
 
+      Lemma concretize_equation : forall (uv: uvalue) (dv : dvalue),
+          concretize uv dv = concretize_u uv (ret dv).
+      Proof.
+        reflexivity.
+      Qed.
+
+
+      Lemma Concretize_Undef : forall dt dv,
+          dvalue_has_dtyp dv dt ->
+          concretize_u (UVALUE_Undef dt) (ret dv).
+      Proof.
+        intros dt dv H.
+        unfold concretize_u.
+        red; cbn; auto.
+      Qed.
+
+      Lemma Concretize_IBinop : forall iop uv1 e1 uv2 e2,
+          concretize_u uv1 e1 ->
+          concretize_u uv2 e2 ->
+          concretize_u (UVALUE_IBinop iop uv1 uv2)
+                       (dv1 <- e1 ;;
+                        dv2 <- e2 ;;
+                        (eval_iop iop dv1 dv2)).
+      Proof.
+        intros iop uv1 e1 uv2 e2 C1 C2.
+        unfold concretize_u in *.
+
+        rewrite concretize_uvalueM_equation.
+        red.
+
+        unfold bind.
+        cbn.
+        unfold bind_MPropT.
+
+        eexists.
+        exists (fun x => match unEitherT e2 with
+           | inl (UB_message ub) => raise_ub ub (* inl v0 *)
+           | inr (inl (ERR_message err)) => raise_error err (* inr (inl x0) *)
+           | inr (inr x0) => eval_iop iop x x0
+           end).
+        split; eauto.
+        split.
+
+        { (* Monad.eq1 mb (x <- ma;; k' x) *)
+          unfold bind.
+          cbn.
+          destruct e1 as [[[ub_message] | [[err_message] | e1]]]; cbn; try reflexivity.
+          destruct e2 as [[[ub_message] | [[err_message] | e2]]]; cbn; try reflexivity.
+        }
+
+        intros dv1 Re1.
+
+        eexists.
+        exists (fun x0 => eval_iop iop dv1 x0).
+        split; eauto.
+        split.
+
+        { (* Monad.eq1 mb (x <- ma;; k' x) *)
+          unfold bind.
+          cbn.
+          destruct e2 as [[[ub_message] | [[err_message] | e2]]]; cbn; try reflexivity.
+        }
+
+        intros dv2 Re2.
+        destruct (eval_iop iop dv1 dv2) as [[[ub_message] | [[err_message] | res]]]; reflexivity.
+      Qed.
+  
+
+
+  (* Inductive concretize_u : uvalue -> undef_or_err dvalue -> Prop :=  *)
+  (* (* Concrete uvalue are contretized into their singleton *) *)
+  (* | Pick_concrete             : forall uv (dv : dvalue), uvalue_to_dvalue uv = inr dv -> concretize_u uv (ret dv) *)
+  (* | Pick_fail                 : forall uv v s, ~ (uvalue_to_dvalue uv = inr v)  -> concretize_u uv (lift (failwith s)) *)
+  (* (* Undef relates to all dvalue of the type *) *)
+  (* | Concretize_Undef          : forall dt dv, *)
+  (*     dvalue_has_dtyp dv dt -> *)
+  (*     concretize_u (UVALUE_Undef dt) (ret dv) *)
+
+  (* (* The other operations proceed non-deterministically *) *)
+  (* | Concretize_IBinop : forall iop uv1 e1 uv2 e2, *)
+  (*     concretize_u uv1 e1 -> *)
+  (*     concretize_u uv2 e2 -> *)
+  (*     concretize_u (UVALUE_IBinop iop uv1 uv2) *)
+  (*                  (dv1 <- e1 ;; *)
+  (*                   dv2 <- e2 ;; *)
+  (*                   (eval_iop iop dv1 dv2)) *)
+  
+  (* | Concretize_ICmp : forall cmp uv1 e1 uv2 e2 , *)
+  (*     concretize_u uv1 e1 -> *)
+  (*     concretize_u uv2 e2 -> *)
+  (*     concretize_u (UVALUE_ICmp cmp uv1 uv2) *)
+  (*                  (dv1 <- e1 ;; *)
+  (*                   dv2 <- e2 ;; *)
+  (*                   eval_icmp cmp dv1 dv2) *)
+
+  (* | Concretize_FBinop : forall fop fm uv1 e1 uv2 e2, *)
+  (*     concretize_u uv1 e1 -> *)
+  (*     concretize_u uv2 e2 -> *)
+  (*     concretize_u (UVALUE_FBinop fop fm uv1 uv2) *)
+  (*                  (dv1 <- e1 ;; *)
+  (*                   dv2 <- e2 ;; *)
+  (*                   eval_fop fop dv1 dv2) *)
+
+  (* | Concretize_FCmp : forall cmp uv1 e1 uv2 e2, *)
+  (*     concretize_u uv1 e1 -> *)
+  (*     concretize_u uv2 e2 -> *)
+  (*     concretize_u (UVALUE_FCmp cmp uv1 uv2) *)
+  (*                  (dv1 <- e1 ;; *)
+  (*                   dv2 <- e2 ;; *)
+  (*                   eval_fcmp cmp dv1 dv2) *)
+
+  (* | Concretize_Struct_Nil     : concretize_u (UVALUE_Struct []) (ret (DVALUE_Struct [])) *)
+  (* | Concretize_Struct_Cons    : forall u e us es, *)
+  (*     concretize_u u e -> *)
+  (*     concretize_u (UVALUE_Struct us) es -> *)
+  (*     concretize_u (UVALUE_Struct (u :: us)) *)
+  (*                  (d <- e ;; *)
+  (*                   vs <- es ;; *)
+  (*                   match vs with *)
+  (*                   | (DVALUE_Struct ds) => ret (DVALUE_Struct (d :: ds)) *)
+  (*                   | _ => failwith "illegal Struct Cons" *)
+  (*                   end) *)
+
+
+  (* | Concretize_Packed_struct_Nil     : concretize_u (UVALUE_Packed_struct []) (ret (DVALUE_Packed_struct [])) *)
+  (* | Concretize_Packed_struct_Cons    : forall u e us es, *)
+  (*     concretize_u u e -> *)
+  (*     concretize_u (UVALUE_Packed_struct us) es -> *)
+  (*     concretize_u (UVALUE_Packed_struct (u :: us)) *)
+  (*                  (d <- e ;; *)
+  (*                   vs <- es ;; *)
+  (*                   match vs with *)
+  (*                   | (DVALUE_Packed_struct ds) => ret (DVALUE_Packed_struct (d :: ds)) *)
+  (*                   | _ => failwith "illegal Packed_struct cons" *)
+  (*                   end) *)
+
+  (* | Concretize_Array_Nil : *)
+  (*     concretize_u (UVALUE_Array []) (ret (DVALUE_Array [])) *)
+
+  (* | Concretize_Array_Cons : forall u e us es, *)
+  (*     concretize_u u e -> *)
+  (*     concretize_u (UVALUE_Array us) es ->       *)
+  (*     concretize_u (UVALUE_Array (u :: us)) *)
+  (*                  (d <- e ;; *)
+  (*                   vs <- es ;; *)
+  (*                   match vs with *)
+  (*                   | (DVALUE_Array ds) => ret (DVALUE_Array (d :: ds)) *)
+  (*                   | _ => failwith "illegal Array cons" *)
+  (*                   end) *)
+
+  (* | Concretize_Vector_Nil : *)
+  (*     concretize_u (UVALUE_Vector []) (ret (DVALUE_Vector [])) *)
+
+  (* | Concretize_Vector_Cons : forall u e us es, *)
+  (*     concretize_u u e -> *)
+  (*     concretize_u (UVALUE_Vector us) es ->       *)
+  (*     concretize_u (UVALUE_Vector (u :: us)) *)
+  (*                  (d <- e ;; *)
+  (*                   vs <- es ;; *)
+  (*                   match vs with *)
+  (*                   | (DVALUE_Vector ds) => ret (DVALUE_Vector (d :: ds)) *)
+  (*                   | _ => failwith "illegal Vector cons" *)
+  (*                   end) *)
+  (* . *)
+
+      
     End Concretize.
 End Make.

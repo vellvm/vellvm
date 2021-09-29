@@ -140,7 +140,7 @@ Module MemTheory := FiniteMemoryTheory.Make FiniteMemory.Addr FiniteMemory.FinSi
 
 Module SER := Serialization.Make(FiniteMemory.Addr)(FiniteMemory.FinSizeof)(LLVMEvents)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(GEP)(Byte).
 
-Module Pick := Pick.Make FiniteMemory.Addr FinSizeof LLVMEvents FinPTOI FinPROV FinITOP GEP Byte SER.
+Module Pick := Pick.Make FiniteMemory.Addr FinSizeof LLVMEvents FinPTOI FinPROV FinITOP GEP Byte.
 
 Export LLVMEvents LLVMEvents.DV Global Local Stack MemTheory MemTheory.Mem Pick Intrinsics
        UndefinedBehaviour.

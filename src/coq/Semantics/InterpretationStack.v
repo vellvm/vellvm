@@ -128,7 +128,7 @@ Section InterpreterCFG.
 
 End InterpreterCFG.
 
-Module D := Denotation Addr FinSizeof LLVMEvents SER.
+Module D := Denotation Addr FinSizeof LLVMEvents FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP GEP Byte.
 Export D.
 
 Module SemNotations.

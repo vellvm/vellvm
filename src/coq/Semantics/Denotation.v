@@ -31,7 +31,9 @@ From Vellvm Require Import
      Syntax
      Semantics.DynamicValues
      Semantics.MemoryAddress
+     Semantics.GepM
      Semantics.Memory.Sizeof
+     Semantics.Memory.MemBytes
      Semantics.LLVMEvents
      Handlers.Serialization.
 
@@ -102,9 +104,12 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(A)(SIZEOF))(CONC:Concretize A SIZEOF LLVMEvents).
+Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(A)(SIZEOF))(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(SIZEOF)(LLVMEvents))(BYTE_IMPL : ByteImpl(A)(SIZEOF)(LLVMEvents)).
+
+  Module Conc := Serialization.Make A SIZEOF LLVMEvents PTOI PROVENANCE ITOP GEP BYTE_IMPL.
+
   Import LLVMEvents.
-  Import CONC.
+  Import Conc.
 
   Definition eval_conv_pure_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
     match get_conv_case conv t1 x t2 with
