@@ -512,7 +512,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
       (* TODO: Move this? *)
       Inductive Poisonable (A : Type) : Type :=
       | Unpoisoned : A -> Poisonable A
-      | Poison : Poisonable A
+      | Poison : forall (dt : dtyp), Poisonable A
       .
 
       Arguments Unpoisoned {A} a.
@@ -521,7 +521,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
       Global Instance MonadPoisonable : Monad Poisonable
         := { ret  := @Unpoisoned;
              bind := fun _ _ ma mab => match ma with
-                                   | Poison => Poison
+                                   | Poison dt => Poison dt
                                    | Unpoisoned v => mab v
                                     end
            }.
@@ -532,7 +532,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
         := match unEitherT ep with
            | Unpoisoned edv =>
              err_to_err_or_ub edv
-           | Poison => ret DVALUE_Poison
+           | Poison dt => ret (DVALUE_Poison dt)
            end.
 
       Definition err_to_ErrPoison {A} (e : err A) : ErrPoison A
@@ -589,7 +589,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
              ret (extract_byte_Z (unsigned (Float32.to_bits f)) idx)
            | DVALUE_Double d =>
              ret (extract_byte_Z (unsigned (Float.to_bits d)) idx)
-           | DVALUE_Poison => lift Poison
+           | DVALUE_Poison dt => lift (Poison dt)
            | DVALUE_None =>
              (* TODO: Not sure if this should be an error, poison, or what. *)
              raise "dvalue_extract_byte on DVALUE_None"
@@ -797,7 +797,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
            | UVALUE_Double x => "UVALUE_Double"
            | UVALUE_Float x => "UVALUE_Float"
            | UVALUE_Undef t => "UVALUE_Undef"
-           | UVALUE_Poison => "UVALUE_Poison"
+           | UVALUE_Poison t => "UVALUE_Poison"
            | UVALUE_None => "UVALUE_None"
            | UVALUE_Struct fields => "UVALUE_Struct"
            | UVALUE_Packed_struct fields => "UVALUE_Packed_struct"
@@ -894,7 +894,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
           | UVALUE_Double x                        => ret (DVALUE_Double x)
           | UVALUE_Float x                         => ret (DVALUE_Float x)
           | UVALUE_Undef t                         => undef_handler t
-          | UVALUE_Poison                          => ret (DVALUE_Poison)
+          | UVALUE_Poison t                        => ret (DVALUE_Poison t)
           | UVALUE_None                            => ret DVALUE_None
           | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalueM fields ;;
                                                      ret (DVALUE_Struct dfields)
@@ -1043,7 +1043,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
             | UVALUE_Double x                        => ret (DVALUE_Double x)
             | UVALUE_Float x                         => ret (DVALUE_Float x)
             | UVALUE_Undef t                         => undef_handler t
-            | UVALUE_Poison                          => ret (DVALUE_Poison)
+            | UVALUE_Poison t                        => ret (DVALUE_Poison t)
             | UVALUE_None                            => ret DVALUE_None
             | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalueM fields ;;
                                                        ret (DVALUE_Struct dfields)

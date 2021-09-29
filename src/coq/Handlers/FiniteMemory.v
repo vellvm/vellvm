@@ -718,7 +718,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
        | UVALUE_IPTR _
        | UVALUE_Float _
        | UVALUE_Double _
-       | UVALUE_Poison
+       | UVALUE_Poison _
 
        (* Expressions *)
        | UVALUE_IBinop _ _ _
@@ -842,7 +842,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
        | UVALUE_IPTR _
        | UVALUE_Float _
        | UVALUE_Double _
-       | UVALUE_Poison
+       | UVALUE_Poison _
 
        (* Expressions *)
        | UVALUE_IBinop _ _ _
@@ -1521,7 +1521,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
            | UVALUE_Double x => "UVALUE_Double"
            | UVALUE_Float x => "UVALUE_Float"
            | UVALUE_Undef t => "UVALUE_Undef"
-           | UVALUE_Poison => "UVALUE_Poison"
+           | UVALUE_Poison t => "UVALUE_Poison"
            | UVALUE_None => "UVALUE_None"
            | UVALUE_Struct fields => "UVALUE_Struct"
            | UVALUE_Packed_struct fields => "UVALUE_Packed_struct"

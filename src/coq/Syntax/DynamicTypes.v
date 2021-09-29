@@ -167,6 +167,53 @@ Section DtypInd.
   Qed.
 End DtypInd.
 
+Section DtypRec.
+  Variable P : dtyp -> Set.
+  Hypothesis IH_I             : forall a, P (DTYPE_I a).
+  Hypothesis IH_IPTR          : P (DTYPE_IPTR).
+  Hypothesis IH_Pointer       : P DTYPE_Pointer.
+  Hypothesis IH_Void          : P DTYPE_Void.
+  Hypothesis IH_Half          : P DTYPE_Half.
+  Hypothesis IH_Float         : P DTYPE_Float.
+  Hypothesis IH_Double        : P DTYPE_Double.
+  Hypothesis IH_X86_fp80      : P DTYPE_X86_fp80.
+  Hypothesis IH_Fp128         : P DTYPE_Fp128.
+  Hypothesis IH_Ppc_fp128     : P DTYPE_Ppc_fp128.
+  Hypothesis IH_Metadata      : P DTYPE_Metadata.
+  Hypothesis IH_X86_mmx       : P DTYPE_X86_mmx.
+  Hypothesis IH_Array         : forall sz t, P t -> P (DTYPE_Array sz t).
+  Hypothesis IH_Struct        : forall (fields: list dtyp), (forall u, In u fields -> P u) -> P (DTYPE_Struct fields).
+  Hypothesis IH_Packed_Struct : forall (fields: list dtyp), (forall u, In u fields -> P u) -> P (DTYPE_Packed_struct fields).
+  Hypothesis IH_Opaque        : P DTYPE_Opaque.
+  Hypothesis IH_Vector        : forall sz t, P t -> P (DTYPE_Vector sz t).
+
+  Lemma dtyp_rec : forall (dt:dtyp), P dt.
+    fix IH 1.
+    remember P as P0 in IH.
+    destruct dt; auto; subst.
+    - apply IH_Array. auto.
+    - apply IH_Struct.
+      { revert fields.
+        fix IHfields 1. intros [|u fields']. intros. inversion H.
+        intros u' Hin.
+        pose proof In_cons_dec _ _ _ dtyp_eq_dec Hin.
+        destruct H.
+        subst. apply IH.
+        eapply IHfields. apply i.
+      }
+    - apply IH_Packed_Struct.
+      { revert fields.
+        fix IHfields 1. intros [|u fields']. intros. inversion H.
+        intros u' Hin.
+        pose proof In_cons_dec _ _ _ dtyp_eq_dec Hin.
+        destruct H.
+        subst. apply IH.
+        eapply IHfields. apply i.
+      }
+    - apply IH_Vector. auto.
+  Qed.
+End DtypRec.
+
 Section WF_dtyp.
 
   Inductive well_formed_dtyp : dtyp -> Prop :=

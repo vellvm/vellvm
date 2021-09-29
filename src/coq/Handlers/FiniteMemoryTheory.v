@@ -281,7 +281,7 @@ Section Serialization_Theory.
     generalize dependent bytes.
     induction TYP; intros bytes' prov sid' BYTES;
       rewrite serialize_sbytes_equation in BYTES.
-    1-6: inversion BYTES; apply to_ubytes_sizeof.
+    1-7: inversion BYTES; apply to_ubytes_sizeof.
 
     (* Undef, could be aggregate *)
 

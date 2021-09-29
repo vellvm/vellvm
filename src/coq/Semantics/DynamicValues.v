@@ -196,7 +196,7 @@ Inductive dvalue : Set :=
 | DVALUE_IPTR (x:Z) (* TODO: should this be unsigned...? *)
 | DVALUE_Double (x:ll_double)
 | DVALUE_Float (x:ll_float)
-| DVALUE_Poison
+| DVALUE_Poison (t:dtyp)
 | DVALUE_None
 | DVALUE_Struct        (fields: list dvalue)
 | DVALUE_Packed_struct (fields: list dvalue)
@@ -215,7 +215,7 @@ Fixpoint dvalue_measure (dv : dvalue) : nat :=
   | DVALUE_IPTR x => 1
   | DVALUE_Double x => 1
   | DVALUE_Float x => 1
-  | DVALUE_Poison => 1
+  | DVALUE_Poison t => 1
   | DVALUE_None => 1
   | DVALUE_Struct fields => S (S (list_sum (map dvalue_measure fields)))
   | DVALUE_Packed_struct fields => S (S (list_sum (map dvalue_measure fields)))
@@ -241,7 +241,7 @@ Section DvalueInd.
   Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x).
   Hypothesis IH_Double        : forall x, P (DVALUE_Double x).
   Hypothesis IH_Float         : forall x, P (DVALUE_Float x).
-  Hypothesis IH_Poison        : P DVALUE_Poison.
+  Hypothesis IH_Poison        : forall t, P (DVALUE_Poison t).
   Hypothesis IH_None          : P DVALUE_None.
   Hypothesis IH_Struct        : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Struct fields).
   Hypothesis IH_Packed_Struct : forall (fields: list dvalue), (forall u, In u fields -> P u) -> P (DVALUE_Packed_struct fields).
@@ -289,7 +289,7 @@ Inductive uvalue : Type :=
 | UVALUE_Double (x:ll_double)
 | UVALUE_Float (x:ll_float)
 | UVALUE_Undef (t:dtyp)
-| UVALUE_Poison
+| UVALUE_Poison (t:dtyp)
 | UVALUE_None
 | UVALUE_Struct        (fields: list uvalue)
 | UVALUE_Packed_struct (fields: list uvalue)
@@ -326,7 +326,7 @@ Fixpoint uvalue_measure (uv : uvalue) : nat :=
   | UVALUE_Double x => 1
   | UVALUE_Float x => 1
   | UVALUE_Undef t => 1
-  | UVALUE_Poison => 1
+  | UVALUE_Poison t => 1
   | UVALUE_None => 1
   | UVALUE_Struct fields => S (S (list_sum (map uvalue_measure fields)))
   | UVALUE_Packed_struct fields => S (S (list_sum (map uvalue_measure fields)))
@@ -378,7 +378,7 @@ Section UvalueInd.
   Hypothesis IH_Double         : forall x, P (UVALUE_Double x).
   Hypothesis IH_Float          : forall x, P (UVALUE_Float x).
   Hypothesis IH_Undef          : forall t, P (UVALUE_Undef t).
-  Hypothesis IH_Poison         : P UVALUE_Poison.
+  Hypothesis IH_Poison         : forall t, P (UVALUE_Poison t).
   Hypothesis IH_None           : P UVALUE_None.
   Hypothesis IH_Struct         : forall (fields: list uvalue), (forall u, In u fields -> P u) -> P (UVALUE_Struct fields).
   Hypothesis IH_Packed_Struct  : forall (fields: list uvalue), (forall u, In u fields -> P u) -> P (UVALUE_Packed_struct fields).
@@ -461,7 +461,7 @@ Fixpoint dvalue_to_uvalue (dv : dvalue) : uvalue :=
   | DVALUE_IPTR x => UVALUE_IPTR x
   | DVALUE_Double x => UVALUE_Double x
   | DVALUE_Float x => UVALUE_Float x
-  | DVALUE_Poison => UVALUE_Poison
+  | DVALUE_Poison t => UVALUE_Poison t
   | DVALUE_None => UVALUE_None
   | DVALUE_Struct fields => UVALUE_Struct (map dvalue_to_uvalue fields)
   | DVALUE_Packed_struct fields => UVALUE_Packed_struct (map dvalue_to_uvalue fields)
@@ -481,7 +481,7 @@ Fixpoint uvalue_to_dvalue (uv : uvalue) : err dvalue :=
   | UVALUE_Double x                        => ret (DVALUE_Double x)
   | UVALUE_Float x                         => ret (DVALUE_Float x)
   | UVALUE_Undef t                         => failwith "Attempting to convert a non-defined uvalue to dvalue. The conversion should be guarded by is_concrete"
-  | UVALUE_Poison                          => ret (DVALUE_Poison)
+  | UVALUE_Poison t                        => ret (DVALUE_Poison t)
   | UVALUE_None                            => ret (DVALUE_None)
 
   | UVALUE_Struct fields                   =>
@@ -571,7 +571,7 @@ Fixpoint is_concrete (uv : uvalue) : bool :=
   | UVALUE_Double x => true
   | UVALUE_Float x => true
   | UVALUE_Undef t => false
-  | UVALUE_Poison => true
+  | UVALUE_Poison t => true
   | UVALUE_None => true
   | UVALUE_Struct fields => forallb is_concrete fields
   | UVALUE_Packed_struct fields => forallb is_concrete fields
@@ -620,7 +620,7 @@ Section hiding_notation.
     | DVALUE_IPTR x => Atom "dvalue(iptr)"
     | DVALUE_Double x => Atom "dvalue(double)"
     | DVALUE_Float x => Atom "dvalue(float)"
-    | DVALUE_Poison => Atom "poison"
+    | DVALUE_Poison t => Atom "poison"
     | DVALUE_None => Atom "none"
     | DVALUE_Struct fields
       => [Atom "{" ; to_sexp (List.map (fun x => [serialize_dvalue' x ; Atom ","]) fields) ; Atom "}"]
@@ -643,7 +643,7 @@ Section hiding_notation.
     | UVALUE_I64 x => Atom (pre ++ "uvalue(i64)" ++ post)%string
     | UVALUE_Double x => Atom (pre ++ "uvalue(double)" ++ post)%string
     | UVALUE_Float x => Atom (pre ++ "uvalue(float)" ++ post)%string
-    | UVALUE_Poison => Atom (pre ++ "poison" ++ post)%string
+    | UVALUE_Poison t => Atom (pre ++ "poison" ++ post)%string
     | UVALUE_None => Atom (pre ++ "none" ++ post)%string
     | UVALUE_Struct fields
       => [Atom "{" ; to_sexp (List.map (serialize_uvalue' "" ",") fields) ; Atom "}"]
@@ -693,7 +693,8 @@ Section DecidableEquality.
       if Float.eq_dec x1 x2 then true else false
     | DVALUE_Float x1, DVALUE_Float x2 =>
       if Float32.eq_dec x1 x2 then true else false
-    | DVALUE_Poison, DVALUE_Poison => true
+    | DVALUE_Poison t1, DVALUE_Poison t2 =>
+      dtyp_eqb t1 t2
     | DVALUE_None, DVALUE_None => true
     | DVALUE_Struct f1, DVALUE_Struct f2 =>
       lsteq f1 f2
@@ -718,7 +719,7 @@ Section DecidableEquality.
     | DVALUE_IPTR x1, DVALUE_IPTR x2 => _
     | DVALUE_Double x1, DVALUE_Double x2 => _
     | DVALUE_Float x1, DVALUE_Float x2 => _
-    | DVALUE_Poison, DVALUE_Poison => _
+    | DVALUE_Poison _, DVALUE_Poison _ => _
     | DVALUE_None, DVALUE_None => _
     | DVALUE_Struct f1, DVALUE_Struct f2 => _
     | DVALUE_Packed_struct f1, DVALUE_Packed_struct f2 => _
@@ -748,6 +749,9 @@ Section DecidableEquality.
       * left; subst; reflexivity.
       * right; intros H; inversion H. contradiction.
     - destruct (Float32.eq_dec x1 x2).
+      * left; subst; reflexivity.
+      * right; intros H; inversion H. contradiction.
+    - destruct (dtyp_eq_dec d d0).
       * left; subst; reflexivity.
       * right; intros H; inversion H. contradiction.
     - destruct (lsteq_dec f1 f2).
@@ -822,7 +826,7 @@ Section DecidableEquality.
               | UVALUE_Double x1, UVALUE_Double x2 => _
               | UVALUE_Float x1, UVALUE_Float x2 => _
               | UVALUE_Undef t1, UVALUE_Undef t2 => _
-              | UVALUE_Poison, UVALUE_Poison => _
+              | UVALUE_Poison t1, UVALUE_Poison t2 => _
               | UVALUE_None, UVALUE_None => _
               | UVALUE_Struct f1, UVALUE_Struct f2 => _
               | UVALUE_Packed_struct f1, UVALUE_Packed_struct f2 => _
@@ -852,6 +856,7 @@ Section DecidableEquality.
     - destruct (Z.eq_dec x1 x2)...
     - destruct (Float.eq_dec x1 x2)...
     - destruct (Float32.eq_dec x1 x2)...
+    - destruct (dtyp_eq_dec t1 t2)...
     - destruct (dtyp_eq_dec t1 t2)...
     - destruct (lsteq_dec f1 f2)...
     - destruct (lsteq_dec f1 f2)...
@@ -1305,7 +1310,7 @@ Class VInt I : Type :=
        | DVALUE_IPTR x => "DVALUE_IPTR"
        | DVALUE_Double x => "DVALUE_Double"
        | DVALUE_Float x => "DVALUE_Float"
-       | DVALUE_Poison => "DVALUE_Poison"
+       | DVALUE_Poison t => "DVALUE_Poison"
        | DVALUE_None => "DVALUE_None"
        | DVALUE_Struct fields => "DVALUE_Struct"
        | DVALUE_Packed_struct fields => "DVALUE_Packed_struct"
@@ -1329,13 +1334,13 @@ Class VInt I : Type :=
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_I 32 =>
           Conv_Pure (DVALUE_I32 (repr (unsigned i1)))
 
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 1
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 1
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 8
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 1
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 8
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_I 32 =>
-          Conv_Pure DVALUE_Poison
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 1
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 1
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 8
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 1
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 8
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_I 32 =>
+          Conv_Pure (DVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
@@ -1354,13 +1359,13 @@ Class VInt I : Type :=
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
           Conv_Pure (DVALUE_I64 (repr (unsigned i1)))
 
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 64 =>
-          Conv_Pure DVALUE_Poison
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
+          Conv_Pure (DVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
@@ -1379,13 +1384,13 @@ Class VInt I : Type :=
         | DTYPE_I 32, DVALUE_I32 i1, DTYPE_I 64 =>
           Conv_Pure (DVALUE_I64 (repr (signed i1)))
 
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 8
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 32
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 32
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_I 64
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_I 64
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_I 64 =>
-          Conv_Pure DVALUE_Poison
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 8
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 32
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 32
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_I 64
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_I 64
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_I 64 =>
+          Conv_Pure (DVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
@@ -1412,8 +1417,8 @@ Class VInt I : Type :=
           else Conv_Illegal "Integer to double with different bitwidth."
         | DTYPE_Pointer, DVALUE_Addr a, DTYPE_Pointer =>
           Conv_Pure (DVALUE_Addr a)
-        | DTYPE_Pointer, DVALUE_Poison, DTYPE_Pointer =>
-          Conv_Pure DVALUE_Poison
+        | DTYPE_Pointer, DVALUE_Poison t, DTYPE_Pointer =>
+          Conv_Pure (DVALUE_Poison t)
         | _, _, _ => Conv_Illegal "ill-typed conv"
         end
 
@@ -1431,15 +1436,15 @@ Class VInt I : Type :=
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
           Conv_Pure (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
 
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
-          Conv_Pure DVALUE_Poison
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
+          Conv_Pure (DVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed Uitofp"
         end
@@ -1458,15 +1463,15 @@ Class VInt I : Type :=
         | DTYPE_I 64, DVALUE_I64 i1, DTYPE_Double =>
           Conv_Pure (DVALUE_Double (Float.of_longu (repr (signed i1))))
 
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Float
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Float
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Float
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Float
-        | DTYPE_I 1, DVALUE_Poison, DTYPE_Double
-        | DTYPE_I 8, DVALUE_Poison, DTYPE_Double
-        | DTYPE_I 32, DVALUE_Poison, DTYPE_Double
-        | DTYPE_I 64, DVALUE_Poison, DTYPE_Double =>
-          Conv_Pure DVALUE_Poison
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Float
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Float
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Float
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Float
+        | DTYPE_I 1, DVALUE_Poison t, DTYPE_Double
+        | DTYPE_I 8, DVALUE_Poison t, DTYPE_Double
+        | DTYPE_I 32, DVALUE_Poison t, DTYPE_Double
+        | DTYPE_I 64, DVALUE_Poison t, DTYPE_Double =>
+          Conv_Pure (DVALUE_Poison t)
 
         | _, _, _ => Conv_Illegal "ill-typed Sitofp"
         end
@@ -1508,12 +1513,12 @@ Class VInt I : Type :=
       | Add nuw nsw =>
         ret (if orb (andb nuw (equ (add_carry x y zero) one))
                     (andb nsw (equ (add_overflow x y zero) one))
-             then DVALUE_Poison else to_dvalue (add x y))
+             then (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth))) else to_dvalue (add x y))
 
     | Sub nuw nsw =>
       ret (if orb (andb nuw (equ (sub_borrow x y zero) one))
                   (andb nsw (equ (sub_overflow x y zero) one))
-           then DVALUE_Poison else to_dvalue (sub x y))
+           then (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth))) else to_dvalue (sub x y))
 
     | Mul nuw nsw =>
       (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
@@ -1525,7 +1530,7 @@ Class VInt I : Type :=
                       unsigned res))
              (andb nsw (orb (min_signed >? res_s')
                             (res_s' >? max_signed)))
-      then ret DVALUE_Poison else ret (to_dvalue res)
+      then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth))) else ret (to_dvalue res)
 
     | Shl nuw nsw =>
       let bz := Z.of_nat bitwidth in
@@ -1534,42 +1539,43 @@ Class VInt I : Type :=
       let res_u' := Z.shiftl (unsigned x) (unsigned y) in
       (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
          then there is overflow. *)
-      if (unsigned y) >=? bz then ret DVALUE_Poison
+      if (unsigned y) >=? bz then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth)))
       else if orb (andb nuw (res_u' >? res_u))
                   (andb nsw (negb (Z.shiftr (unsigned x)
                                             (bz - unsigned y)
                                    =? (unsigned (negative res))
                                       * (Z.pow 2 (unsigned y) - 1))%Z))
-           then ret DVALUE_Poison else ret (to_dvalue res)
+           then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth))) else ret (to_dvalue res)
 
     | UDiv ex =>
       if (unsigned y =? 0)%Z
       then raise_ub "Unsigned division by 0."
       else if andb ex (negb ((unsigned x) mod (unsigned y) =? 0))%Z
-           then ret DVALUE_Poison
+           then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth)))
            else ret (to_dvalue (divu x y))
+
 
     | SDiv ex =>
       (* What does signed i1 mean? *)
       if (signed y =? 0)%Z
       then raise_ub "Signed division by 0."
       else if andb ex (negb ((signed x) mod (signed y) =? 0))%Z
-           then ret DVALUE_Poison
+           then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth)))
            else ret (to_dvalue (divs x y))
 
     | LShr ex =>
       let bz := Z.of_nat bitwidth in
-      if (unsigned y) >=? bz then ret DVALUE_Poison
+      if (unsigned y) >=? bz then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth)))
       else if andb ex (negb ((unsigned x)
                                mod (Z.pow 2 (unsigned y)) =? 0))%Z
-           then ret DVALUE_Poison else ret (to_dvalue (shru x y))
+           then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth))) else ret (to_dvalue (shru x y))
 
     | AShr ex =>
       let bz := Z.of_nat bitwidth in
-      if (unsigned y) >=? bz then ret DVALUE_Poison
+      if (unsigned y) >=? bz then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth)))
       else if andb ex (negb ((unsigned x)
                                mod (Z.pow 2 (unsigned y)) =? 0))%Z
-           then ret DVALUE_Poison else ret (to_dvalue (shr x y))
+           then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth))) else ret (to_dvalue (shr x y))
 
     | URem =>
       if (unsigned y =? 0)%Z
@@ -1635,11 +1641,11 @@ Class VInt I : Type :=
     | DVALUE_I8 i1, DVALUE_I8 i2    => lift (eval_int_op iop i1 i2)
     | DVALUE_I32 i1, DVALUE_I32 i2  => lift (eval_int_op iop i1 i2)
     | DVALUE_I64 i1, DVALUE_I64 i2  => lift (eval_int_op iop i1 i2)
-    | DVALUE_Poison, _              => lift (ret DVALUE_Poison)
-    | _, DVALUE_Poison              =>
+    | DVALUE_Poison t, _              => lift (ret (DVALUE_Poison t))
+    | _, DVALUE_Poison t              =>
       if iop_is_div iop
       then raise_ub "Division by poison."
-      else ret DVALUE_Poison
+      else ret (DVALUE_Poison t)
     | _, _                          => raise_error "ill_typed-iop"
     end.
   Arguments eval_iop_integer_h _ _ _ : simpl nomatch.
@@ -1688,9 +1694,9 @@ Class VInt I : Type :=
     | DVALUE_I8 i1, DVALUE_I8 i2 => ret (eval_int_icmp icmp i1 i2)
     | DVALUE_I32 i1, DVALUE_I32 i2 => ret (eval_int_icmp icmp i1 i2)
     | DVALUE_I64 i1, DVALUE_I64 i2 => ret (eval_int_icmp icmp i1 i2)
-    | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
-    | DVALUE_Poison, _ => if is_DVALUE_IX v2 then ret DVALUE_Poison else raise_error "ill_typed-iop"
-    | _, DVALUE_Poison => if is_DVALUE_IX v1 then ret DVALUE_Poison else raise_error "ill_typed-iop"
+    | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
+    | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+    | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
     | DVALUE_Addr a1, DVALUE_Addr a2 =>
       match icmp with
       | Eq => if A.eq_dec a1 a2 then ret (DVALUE_I1 (Int1.one)) else ret (DVALUE_I1 (Int1.zero))
@@ -1727,11 +1733,11 @@ Class VInt I : Type :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2   => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
-    | DVALUE_Poison, _                   => ret DVALUE_Poison
-    | _, DVALUE_Poison                   =>
+    | DVALUE_Poison t, _                 => ret (DVALUE_Poison t)
+    | _, DVALUE_Poison t                 =>
       if fop_is_div fop
       then raise_ub "Division by poison."
-      else ret DVALUE_Poison
+      else ret (DVALUE_Poison t)
     | _, _                               => raise_error ("ill_typed-fop: " ++ (to_string fop) ++ " " ++ (to_string v1) ++ " " ++ (to_string v2))
     end.
 
@@ -1795,11 +1801,11 @@ Class VInt I : Type :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2 => ret (float_cmp fcmp f1 f2)
     | DVALUE_Double f1, DVALUE_Double f2 => ret (double_cmp fcmp f1 f2)
-    | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
-    | DVALUE_Poison, DVALUE_Double _ => ret DVALUE_Poison
-    | DVALUE_Poison, DVALUE_Float _ => ret DVALUE_Poison
-    | DVALUE_Double _, DVALUE_Poison => ret DVALUE_Poison
-    | DVALUE_Float _, DVALUE_Poison => ret DVALUE_Poison
+    | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
+    | DVALUE_Poison t, DVALUE_Double _ => ret (DVALUE_Poison t)
+    | DVALUE_Poison t, DVALUE_Float _ => ret (DVALUE_Poison t)
+    | DVALUE_Double _, DVALUE_Poison t => ret (DVALUE_Poison t)
+    | DVALUE_Float _, DVALUE_Poison t => ret (DVALUE_Poison t)
     | _, _ => raise_error "ill_typed-fcmp"
     end.
 
@@ -1818,13 +1824,13 @@ Class VInt I : Type :=
     in
     let ret_local := @ret err_or_ub _ uvalue in
     match v1, v2 with
-    | UVALUE_Poison, _ => ret_local UVALUE_Poison
-    | _, UVALUE_Poison => ret_local UVALUE_Poison
+    | UVALUE_Poison t, _ => ret_local (UVALUE_Poison t)
+    | _, UVALUE_Poison t => ret_local (UVALUE_Poison t)
     | _, _ =>
       match cnd with
       | DVALUE_I1 i =>
         ret_local (if (Int1.unsigned i =? 1)%Z then v1 else v2)
-      | DVALUE_Poison => ret_local UVALUE_Poison
+      | DVALUE_Poison t => ret_local (UVALUE_Poison t)
       | _ => raise_error_local "ill_typed select"
       end
     end.
@@ -1911,49 +1917,6 @@ Class VInt I : Type :=
      define some predicates passed as arguments to the [pick] events, hence why
      it's defined here.
    *)
-
-  (* Poison not included because of concretize *)
-  Unset Elimination Schemes.
-  Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
-  | DVALUE_Addr_typ   : forall a, dvalue_has_dtyp (DVALUE_Addr a) DTYPE_Pointer
-  | DVALUE_I1_typ     : forall x, dvalue_has_dtyp (DVALUE_I1 x) (DTYPE_I 1)
-  | DVALUE_I8_typ     : forall x, dvalue_has_dtyp (DVALUE_I8 x) (DTYPE_I 8)
-  | DVALUE_I32_typ    : forall x, dvalue_has_dtyp (DVALUE_I32 x) (DTYPE_I 32)
-  | DVALUE_I64_typ    : forall x, dvalue_has_dtyp (DVALUE_I64 x) (DTYPE_I 64)
-  | DVALUE_IPTR_typ   : forall x, dvalue_has_dtyp (DVALUE_IPTR x) DTYPE_IPTR
-  | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
-  | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
-  | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
-
-  | DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
-  | DVALUE_Struct_Cons_typ :
-      forall f dt fields dts,
-        dvalue_has_dtyp f dt ->
-        dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
-        dvalue_has_dtyp (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts))
-
-  | DVALUE_Packed_struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Packed_struct []) (DTYPE_Packed_struct [])
-  | DVALUE_Packed_struct_Cons_typ :
-      forall f dt fields dts,
-        dvalue_has_dtyp f dt ->
-        dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
-        dvalue_has_dtyp (DVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts))
-
-  (* Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
-  | DVALUE_Array_typ :
-      forall xs sz dt,
-        Forall (fun x => dvalue_has_dtyp x dt) xs ->
-        length xs = sz ->
-        dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt)
-
-  | DVALUE_Vector_typ :
-      forall xs sz dt,
-        Forall (fun x => dvalue_has_dtyp x dt) xs ->
-        length xs = sz ->
-        vector_dtyp dt ->
-        dvalue_has_dtyp (DVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt)
-  .
-  Set Elimination Schemes.
 
   (* TODO: Move this *)
   Require Import Lia.
@@ -2078,6 +2041,83 @@ Class VInt I : Type :=
     eapply Forall_HIn_cons; eauto.
   Qed.
 
+  Lemma NO_VOID_dec :
+    forall dt,
+      {NO_VOID dt} + {~NO_VOID dt}.
+  Proof.
+    intros dt.
+    induction dt.  
+    all:
+      try match goal with
+          | NV : {NO_VOID _} + {~ NO_VOID _} |- _ =>
+            destruct NV
+          end;
+      try rewrite NO_VOID_equation;
+      try solve [left; cbn; auto | right; cbn; auto].
+
+    all: apply Forall_HIn_dec; auto.
+  Qed.
+
+  Lemma NO_VOID_neq_dtyp :
+    forall dt1 dt2,
+      NO_VOID dt1 ->
+      ~ NO_VOID dt2 ->
+      dt1 <> dt2.
+  Proof.
+    intros dt1 dt2 NV NNV.
+    intros EQ.
+    induction dt1, dt2; inversion EQ.
+    all: rewrite NO_VOID_equation in NNV; try contradiction.
+
+    all: inversion EQ; subst;
+      rewrite NO_VOID_equation in NV;
+      contradiction.
+  Qed.
+
+  (* Poison not included because of concretize *)
+  Unset Elimination Schemes.
+  Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
+  | DVALUE_Addr_typ   : forall a, dvalue_has_dtyp (DVALUE_Addr a) DTYPE_Pointer
+  | DVALUE_I1_typ     : forall x, dvalue_has_dtyp (DVALUE_I1 x) (DTYPE_I 1)
+  | DVALUE_I8_typ     : forall x, dvalue_has_dtyp (DVALUE_I8 x) (DTYPE_I 8)
+  | DVALUE_I32_typ    : forall x, dvalue_has_dtyp (DVALUE_I32 x) (DTYPE_I 32)
+  | DVALUE_I64_typ    : forall x, dvalue_has_dtyp (DVALUE_I64 x) (DTYPE_I 64)
+  | DVALUE_IPTR_typ   : forall x, dvalue_has_dtyp (DVALUE_IPTR x) DTYPE_IPTR
+  | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
+  | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
+  | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
+  | DVALUE_Poison_typ  : forall τ, NO_VOID τ -> dvalue_has_dtyp (DVALUE_Poison τ) τ
+
+  | DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
+  | DVALUE_Struct_Cons_typ :
+      forall f dt fields dts,
+        dvalue_has_dtyp f dt ->
+        dvalue_has_dtyp (DVALUE_Struct fields) (DTYPE_Struct dts) ->
+        dvalue_has_dtyp (DVALUE_Struct (f :: fields)) (DTYPE_Struct (dt :: dts))
+
+  | DVALUE_Packed_struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Packed_struct []) (DTYPE_Packed_struct [])
+  | DVALUE_Packed_struct_Cons_typ :
+      forall f dt fields dts,
+        dvalue_has_dtyp f dt ->
+        dvalue_has_dtyp (DVALUE_Packed_struct fields) (DTYPE_Packed_struct dts) ->
+        dvalue_has_dtyp (DVALUE_Packed_struct (f :: fields)) (DTYPE_Packed_struct (dt :: dts))
+
+  (* Do we have to exclude mmx? "There are no arrays, vectors or constants of this type" *)
+  | DVALUE_Array_typ :
+      forall xs sz dt,
+        Forall (fun x => dvalue_has_dtyp x dt) xs ->
+        length xs = sz ->
+        dvalue_has_dtyp (DVALUE_Array xs) (DTYPE_Array (N.of_nat sz) dt)
+
+  | DVALUE_Vector_typ :
+      forall xs sz dt,
+        Forall (fun x => dvalue_has_dtyp x dt) xs ->
+        length xs = sz ->
+        vector_dtyp dt ->
+        dvalue_has_dtyp (DVALUE_Vector xs) (DTYPE_Vector (N.of_nat sz) dt)
+  .
+  Set Elimination Schemes.
+
   Unset Elimination Schemes.
   Inductive uvalue_has_dtyp : uvalue -> dtyp -> Prop :=
   | UVALUE_Addr_typ   : forall a, uvalue_has_dtyp (UVALUE_Addr a) DTYPE_Pointer
@@ -2089,6 +2129,7 @@ Class VInt I : Type :=
   | UVALUE_Double_typ : forall x, uvalue_has_dtyp (UVALUE_Double x) DTYPE_Double
   | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
   | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
+  | UVALUE_Poison_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Poison τ) τ
   | UVALUE_Undef_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Undef τ) τ
 
   | UVALUE_Struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Struct []) (DTYPE_Struct [])
@@ -2349,6 +2390,7 @@ Class VInt I : Type :=
     Hypothesis IH_I32            : forall x, P (DVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (DVALUE_I64 x) (DTYPE_I 64).
     Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x) DTYPE_IPTR.
+    Hypothesis IH_Poison         : forall t, NO_VOID t -> P (DVALUE_Poison t) t.
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
     Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
@@ -2433,6 +2475,7 @@ Class VInt I : Type :=
     Hypothesis IH_I32            : forall x, P (UVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (UVALUE_I64 x) (DTYPE_I 64).
     Hypothesis IH_IPTR           : forall x, P (UVALUE_IPTR x) DTYPE_IPTR.
+    Hypothesis IH_Poison         : forall t, NO_VOID t -> P (UVALUE_Poison t) t.
 
     Hypothesis IH_Undef_Array    : forall sz t
                                      (NV: NO_VOID t)

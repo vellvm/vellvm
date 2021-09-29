@@ -320,9 +320,113 @@ Proof.
   apply H.
 Qed.
 
+Lemma Forall_HIn_cons':
+  forall {X} (x : X) (xs : list X) f,
+    Forall_HIn (x::xs) (fun x HIn => f x HIn) ->
+    Forall_HIn (xs) (fun x HIn => f x (or_intror HIn)).
+Proof.
+  intros X x xs f H.
+  apply H.
+Qed.
+
+Lemma Forall_HIn_cons_elem:
+  forall {X} (x : X) (xs : list X) f,
+    Forall_HIn (x::xs) (fun x HIn => f x HIn) ->
+    f x (or_introl eq_refl).
+Proof.
+  intros X x xs f H.
+  apply H.
+Qed.
+
+Lemma not_Forall_HIn_cons:
+  forall {X} (x : X) (xs : list X) (f : forall y : X, List.In y (x :: xs) -> Prop),
+    ~Forall_HIn (xs) (fun (x : X) (H : List.In x xs) => f x (or_intror H)) ->
+    ~Forall_HIn (x::xs) f.
+Proof.
+  intros X x xs.
+  revert x.
+  induction xs; intros x f H.
+  - cbn in H; contradiction.
+  - intros FORALL.
+    apply H.
+    apply Forall_HIn_cons'.
+    apply FORALL.
+Qed.
+
+Lemma not_Forall_HIn_cons_elem :
+  forall {X} (x : X) (xs : list X) (f : forall y : X, List.In y (x :: xs) -> Prop),
+  ~ f x (or_introl eq_refl) ->
+  ~Forall_HIn (x::xs) f.
+Proof.
+  intros X x xs.
+  revert x.
+  induction xs; intros x f H.
+  - cbn. intros [CONTRA _].
+    contradiction.
+  - intros FORALL.
+    apply H.
+    apply Forall_HIn_cons_elem in FORALL.
+    auto.
+Qed.
+
+Lemma Forall_HIn_dec :
+  forall {A} (l : list A) f,
+  (forall (u : A) (In : List.In u l), {f u In} + {~ f u In}) ->
+  {Forall_HIn l f} + {~Forall_HIn l f}.
+Proof.
+  intros A l.
+  induction l; intros f EQDEC.
+  left; cbn; auto.
+
+  remember (fun (x : A) (H : List.In x l) => f x (or_intror H)) as fl.
+
+  assert (forall (u : A) (In : List.In u l), {fl u In} + {~ fl u In}) as FLDEC.
+  { subst.
+    intros u In.
+    apply EQDEC.
+  }
+
+  specialize (IHl fl FLDEC).
+
+  assert (List.In a (a :: l)) as Ainl.
+  { left; auto.
+  }
+
+  pose proof (EQDEC a (or_introl eq_refl)) as [af | naf]; destruct IHl.
+  - left; split; subst; cbn; auto.
+  - right.
+    apply not_Forall_HIn_cons. subst.
+    auto.
+  - right.
+    apply not_Forall_HIn_cons_elem.
+    auto.
+  - right.
+    apply not_Forall_HIn_cons_elem.
+    auto.
+Qed.
+
 Lemma forall_repeat_true:
   forall A (f : A -> Prop) n x, f x -> Forall (fun y : A => f y) (repeat x n).
 Proof.
   intros. induction n. cbn. constructor.
   constructor. auto. cbn. apply IHn.
+Qed.
+
+Lemma In_cons_dec :
+  forall {A} (a x : A) xs,
+    (forall (x y : A), {x = y} + {x <> y}) ->
+    In a (x :: xs) -> {a = x} + {In a xs}.
+Proof.
+  intros A a x xs EQDEC H.
+  destruct (EQDEC a x); subst.
+  left. reflexivity.
+  right.
+  pose proof H as HIn.
+  pose proof In_dec EQDEC a xs as [IN | NIN].
+  auto.
+  pose proof not_in_cons.
+  assert (a <> x /\ ~ In a xs).
+  auto.
+  apply H0 in H1.
+  contradiction.
 Qed.

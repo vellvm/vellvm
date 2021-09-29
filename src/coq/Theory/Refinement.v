@@ -35,8 +35,8 @@ Import Conc.
 (* Refinement relation for uvalues *)
 (* Definition 5.6 UValue refinement *)
 Variant refine_uvalue: uvalue -> uvalue -> Prop :=
-| UndefPoison: forall uv, refine_uvalue UVALUE_Poison uv   
-| RefineConcrete: forall uv1 uv2, uv2 <> UVALUE_Poison -> (forall (dv:dvalue), concretize uv2 dv -> concretize uv1  dv) -> refine_uvalue uv1 uv2
+| UndefPoison: forall dt uv, (NO_VOID dt -> uvalue_has_dtyp uv dt) -> refine_uvalue (UVALUE_Poison dt) uv   
+| RefineConcrete: forall uv1 uv2 dt, uv2 <> (UVALUE_Poison dt) -> (forall (dv:dvalue), concretize uv2 dv -> concretize uv1  dv) -> refine_uvalue uv1 uv2
 .
 #[export] Hint Constructors refine_uvalue : core.
 
@@ -46,8 +46,9 @@ Definition uvalue_eq (uv1 uv2 : uvalue) : Prop
 Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
 Proof.
   repeat intro.
-  destruct x; try (apply RefineConcrete;[intro; inversion H|auto];fail).
+  destruct x; try (apply RefineConcrete with (dt:=DTYPE_Void);[intro; inversion H|auto];fail).  
   apply UndefPoison.
+  constructor; auto.
 Qed.
 
 Instance uvalue_eq_Reflexive : Reflexive uvalue_eq.
@@ -56,12 +57,19 @@ Proof.
   split; reflexivity.
 Qed.
 
-
-Lemma refine_poison : forall uv, refine_uvalue uv UVALUE_Poison -> uv = UVALUE_Poison.
+Lemma refine_poison : forall dt uv, refine_uvalue uv (UVALUE_Poison dt) -> uv = UVALUE_Poison dt.
 Proof.
-  intros.
+  intros * H.
   inv H.
-  - reflexivity.
+  - pose proof (dtyp_eq_dec dt0 dt) as [EQ | NEQ]; subst; auto.
+    pose proof (NO_VOID_dec dt0) as [NV | NNV].
+    + specialize (H0 NV). inversion H0.
+      reflexivity.
+    + 
+  - 
+  assert (NO_VOID dt0 
+  admit.
+  - specialize (H0 NV).
   - contradiction H0.
     reflexivity.
 Qed.

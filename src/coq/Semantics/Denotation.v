@@ -166,9 +166,10 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
   
   (* Pick a possibly poison value, treating poison as nondeterminism.
      This is used for freeze. *)
+  (* TODO: could probably get rid of dtyp argument and use poison's? *)
   Definition pick_your_poison {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (dt : dtyp) (uv : uvalue) : itree E dvalue :=
     match uv with
-    | UVALUE_Poison => concretize_or_pick (UVALUE_Undef dt) True
+    | UVALUE_Poison _ => concretize_or_pick (UVALUE_Undef dt) True
     | _             => concretize_or_pick uv True
     end.
 
@@ -504,7 +505,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
       (* TODO: should I make sure address is unique here...? *)
       da <- pickUnique ua ;;
       match da with
-      | DVALUE_Poison => raiseUB "Store to poisoned address."
+      | DVALUE_Poison dt => raiseUB "Store to poisoned address."
       | _ => trigger (Store dt da uv)
       end
 
@@ -563,7 +564,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
 
   Definition dvalue_is_poison (dv : dvalue) : bool :=
     match dv with
-    | DVALUE_Poison => true
+    | DVALUE_Poison dt => true
     | _ => false
     end.
 
@@ -588,7 +589,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
           ret (inl br1)
         else
           ret (inl br2)
-      | DVALUE_Poison => raiseUB "Branching on poison."
+      | DVALUE_Poison dt => raiseUB "Branching on poison."
       | _ => raise "Br got non-bool value"
       end
 
