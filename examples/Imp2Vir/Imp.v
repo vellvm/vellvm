@@ -279,6 +279,23 @@ Section Example_Fact.
 End Example_Fact.
 
 (* ========================================================================== *)
+(** ** EXAMPLE: Sequence *)
+
+Section Example_Sequence.
+
+  Open Scope expr_scope.
+  Open Scope stmt_scope.
+  Variable input: var.
+  Variable output: var.
+
+  Definition trivial_seq (n : nat) : stmt :=
+    input ← n;;;
+    output ← input.
+
+End Example_Sequence.
+
+
+(* ========================================================================== *)
 (** ** EXAMPLE: If *)
 
 Section Example_If.
@@ -295,8 +312,35 @@ Section Example_If.
     ELSE output ← 1
     FI .
 
+  Definition nested_if (n1:nat) (n2:nat) : stmt :=
+    input ← n1;;;
+    IF input
+    THEN (trivial_if n2)
+    ELSE output ← 2
+    FI .
+
+  Definition nested_if2 (n1:nat) (n2:nat) : stmt :=
+        input ← n1;;;
+    IF input
+    THEN (trivial_if n2)
+    ELSE output ← 2
+    FI ;;;
+          output ← 69.
+
 End Example_If.
 
+(* ========================================================================== *)
+(** ** EXAMPLE: Infinite_loop *)
+
+Section Example_Infinite_loop.
+
+  Open Scope expr_scope.
+  Open Scope stmt_scope.
+
+  Definition infinite_loop : stmt :=
+    (While (Lit 1) Skip).
+
+End Example_Infinite_loop.
 
 (* ========================================================================== *)
 (** ** Interpretation *)

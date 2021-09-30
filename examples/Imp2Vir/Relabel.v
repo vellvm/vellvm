@@ -29,6 +29,8 @@ Section Relabel.
 Definition bid_map := alist block_id block_id.
 Import MonadNotation.
 
+(** Relabel LLVM AST *)
+
 (* Relabeling a block id *)
 Definition blk_id_relabel m bid : block_id :=
   match alist_find bid m with
@@ -44,6 +46,7 @@ Proof.
   now rewrite H.
 Qed.
 
+(* bid and bid' are related if m maps bid to bid' *)
 Definition blk_id_relabel_rel (m : bid_map) bid bid' : Prop :=
   alist_find bid m = Some bid'.
 
@@ -79,11 +82,14 @@ Definition bk_relabel {typ} (m : bid_map) (bk : block typ) : block typ :=
 Definition ocfg_relabel {typ} m cfg : ocfg typ :=
   List.map (bk_relabel m) cfg.
 
+
+(* NOTE seems to be never used.... why ?*)
 Definition ocfg_relabel_rel' {typ} (cfg cfg' : ocfg typ) m : Prop :=
   ocfg_relabel m cfg = cfg'.
 
 Definition ocfg_relabel_rel {typ} (cfg cfg' : ocfg typ) : Prop :=
   exists m, ocfg_relabel_rel' cfg cfg' m.
+(* NOTE *)
 
 (* relabeling identity *)
 Theorem bk_relabel_id : forall {typ} (bk : block typ), bk_relabel nil bk = bk.
@@ -114,9 +120,11 @@ Definition inj_map (m : bid_map) : Prop :=
     alist_find b m = Some a' ->
     a = b.
 
+(* All id in bids are relabeled using m *)
 Definition defined_map (m : bid_map) (bids : list block_id) : Prop :=
   forall i : block_id, List.In i bids -> exists i', alist_find i m = Some i'.
 
+(* *)
 Definition map_domain (m : bid_map) (bids : list block_id) : Prop :=
   forall bid,
     (In bid bids -> exists bid', alist_find bid m = Some bid') /\
@@ -124,6 +132,7 @@ Definition map_domain (m : bid_map) (bids : list block_id) : Prop :=
 
 
 (* Definitions to build a bid mapping. Not used anywhere. *)
+(* NOTE seems to be used finally... *)
 
 Definition blk_id_relabel_build_map (bid bid' : raw_id) m : option bid_map :=
   match alist_find bid m with
@@ -162,17 +171,20 @@ Fixpoint ocfg_relabel_build_map' {typ} (cfg cfg' : ocfg typ) m : option bid_map 
   | _, _ => None
   end.
 
+(* Given two CFGs, builds the map which relabels cfg into cfg' *)
 Definition ocfg_relabel_build_map {typ} (cfg cfg' : ocfg typ) : option bid_map :=
   ocfg_relabel_build_map' cfg cfg' nil.
 
+(** ------------------------ *)
 
+(* find_block is stable by relabeling *)
 Theorem blk_id_relabel_find_block1 : forall {typ} (cfg : ocfg typ) m bid bk,
-  find_block cfg bid = Some bk ->
-  defined_map m (inputs cfg) ->
-  inj_map m ->
+  defined_map m (inputs cfg) -> (* m is defined for all inputs of cfg *)
+  inj_map m -> (* m in injective*)
+  find_block cfg bid = Some bk -> (* the block `bk` with id bid is in cfg *)
   find_block (ocfg_relabel m cfg) (blk_id_relabel m bid) = Some (bk_relabel m bk).
 Proof.
-  induction cfg; intros ? ? ? H0 H1 H2.
+  induction cfg; intros ? ? ? H1 H2 H0.
   - now simpl in H0.
   - simpl in *.
     inv_all.
@@ -202,11 +214,11 @@ Proof.
 Qed.
 
 Theorem blk_id_relabel_find_block2 : forall {typ} (cfg : ocfg typ) m bid bid' bk',
-  find_block (ocfg_relabel m cfg) bid' = Some bk' ->
-  defined_map m (inputs cfg) ->
-  inj_map m ->
-  alist_find bid m = Some bid' ->
-  exists bk, bk' = bk_relabel m bk /\ find_block cfg bid = Some bk.
+  find_block (ocfg_relabel m cfg) bid' = Some bk' -> (* the block `bk'` with id bid' is in the relabeled cfg *)
+  defined_map m (inputs cfg) -> (* m is defined for all inputs of cfg *)
+  inj_map m -> (* m is injective *)
+  alist_find bid m = Some bid' -> (* bid is relabeled into bid' using m *)
+  exists bk, bk' = bk_relabel m bk /\ find_block cfg bid = Some bk. (* it exists a block bk in cfg which is relabeled into bk' *)
 Proof.
   induction cfg; intros ? ? ? ? H0 H1 H2 H3.
   - now simpl in H0.
@@ -230,11 +242,11 @@ Proof.
 Qed.
 
 Theorem blk_id_relabel_find_block : forall {typ} (cfg : ocfg typ) m bid bk bk',
-  find_block cfg bid = Some bk ->
-  find_block (ocfg_relabel m cfg) (blk_id_relabel m bid) = Some bk' ->
-  defined_map m (inputs cfg) ->
-  inj_map m ->
-  bk' = bk_relabel m bk.
+  find_block cfg bid = Some bk -> (* bk is the block of id bid in the cfg *)
+  find_block (ocfg_relabel m cfg) (blk_id_relabel m bid) = Some bk' -> (* if we relabel bid, bk' is the block in the relabeled cfg *)
+  defined_map m (inputs cfg) -> (* m is defined for all inputs of cfg *)
+  inj_map m -> (* m is injective *)
+  bk' = bk_relabel m bk. (* bk' is the relabeled block bk *)
 Proof.
   unfold defined_map.
   induction cfg; intros ? ? ? ? H0 H1 H2 H3.
@@ -266,6 +278,7 @@ Proof.
       intuition.
 Qed.
 
+(* If we define a mapping from cfg to cfg', it will be defined on all inputs of cfg *)
 Theorem ocfg_relabel_build_map_def_inputs : forall {typ} (cfg cfg' : ocfg typ) m m',
   ocfg_relabel_build_map' cfg cfg' m = Some m' ->
   defined_map m' (inputs cfg).
@@ -274,20 +287,28 @@ Proof.
   induction cfg; intros; [ destruct H0 |].
   simpl in *.
   destruct cfg'; [ discriminate |].
-  destruct H0.
+  induction H0.
   - subst.
     break_match; [| discriminate ].
     unfold bk_relabel_build_map in Heqo.
     simpl in Heqo.
     shelve. (* tedious *)
   - break_match; eapply IHcfg; try eassumption; discriminate.
-  Unshelve. all: auto.
+    Unshelve. all: auto.
+    (* TODO *)
+    break_match ; inv Heqo.
+    apply IHcfg with (cfg':= cfg') (m := b0). assumption.
+    unfold blk_term_relabel_build_map in H1.
+    break_match ; inv H1.
+    + (*Term_ret v*)
+    break_match ; inv H2.
 Abort.
 
+(* bk_relabel_build_map don't modify the relabeling already existing *)
 Theorem bk_relabel_build_map_preserve : forall {typ} (bk bk' : block typ) m m' bid bid',
-  alist_find bid m = Some bid' ->
-  bk_relabel_build_map bk bk' m = Some m' ->
-  alist_find bid m' = Some bid'.
+  alist_find bid m = Some bid' -> (* m relabel bid into bid' *)
+  bk_relabel_build_map bk bk' m = Some m' -> (* m' is the mapping construct from m which relabel bk into bk' *)
+  alist_find bid m' = Some bid'. (* m' preserves the relabeling from bid to bid' *)
 Proof.
   intros.
   unfold bk_relabel_build_map, blk_id_relabel_build_map, blk_term_relabel_build_map in H0.
@@ -309,8 +330,9 @@ Proof.
     repeat break_match;
       try discriminate;
       try injection Heqo0 as Heqo0; try injection H0 as H0; subst; try assumption.
-Abort. (* easy but tedious, automate? *)
+Admitted. (* easy but tedious, automate? *)
 
+(* ocfg_relabel_build_map don't modify the relabeling already existing *)
 Theorem ocfg_relabel_build_map_preserve : forall {typ} (cfg cfg' : ocfg typ) m m' bid bid',
   alist_find bid m = Some bid' ->
   ocfg_relabel_build_map' cfg cfg' m = Some m' ->
@@ -321,11 +343,14 @@ Proof.
   - destruct cfg'; try discriminate.
     simpl in *.
     break_match; [| discriminate ].
+    (* apply bk_relabel_build_map_preserve with (bk := a) (bk' := b) (m0 := m).
+    assumption. *)
     eapply IHcfg; [| eassumption ].
 Abort.
     (*eapply bk_relabel_get_map_preserve; eassumption.
 Qed.*)
 
+(** Properties on associations list *)
 Lemma assoc_alist_find : forall A B k (m : list (A * B)) {RD : RelDec.RelDec eq},
   assoc k m = alist_find k m.
 Proof.
@@ -377,6 +402,8 @@ Proof.
   - tauto.
 Qed.
 
+
+(** Properties on phi relabeling *)
 Theorem eutt_phi_relabel : forall {typ} (cfg : ocfg typ) bidf bidf' lid phi m,
   inj_map m ->
   defined_map m (phi_sources phi) ->
@@ -461,6 +488,9 @@ Proof.
   - intros. now subst.
 Qed.
 
+(** Relabel helper rel *)
+(* TODO I don't know what it is yet *)
+
 Definition term_relabel_helper_rel m (bidv bidv' : block_id + uvalue) :=
   match bidv, bidv' with
   | inl bid, inl bid' => blk_id_relabel_rel m bid bid'
@@ -533,6 +563,12 @@ Proof.
     apply eutt_clo_bind with (UU := switch_relabel_helper_rel m); admit. (* TERM_Switch *)
 Admitted.
 
+(* NOTE why "ocfg" ?? *)
+(* bidsv and bidsv' are related with m if:
+   - both bid are related with m
+    or
+   - both uvalues are the same
+ *)
 Definition ocfg_relabel_helper_rel m (bidsv bidsv' : block_id * block_id + uvalue) : Prop :=
   match bidsv, bidsv' with
   | inl (bidf, bidt), inl (bidf', bidt') =>
