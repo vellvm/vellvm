@@ -36,8 +36,6 @@ Fixpoint step (t : ITreeDefinition.itree L5 TopLevel.res_L4) : MlResult DV.uvalu
      end.
 Set Guard Checking.
 
-Search genAggreType.
-
 (** Top level interpreter to run LLVM programs. Yields either a uvalue, or an error string. *)
 Definition interpret (prog : list (toplevel_entity typ (block typ * list (block typ)))) : MlResult uvalue string
   := step (TopLevel.interpreter prog).

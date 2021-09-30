@@ -74,7 +74,6 @@ Section ShowInstances.
     show := show_typ
     |}.
 
-
   Definition show_dtyp (t : dtyp) : string
     := match t with
     | DTYPE_I sz                 => "Integer" ++ (show sz)
