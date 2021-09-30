@@ -14,6 +14,7 @@ From ExtLib Require Import
      Eqv.
 
 From Vellvm Require Import LLVMAst Util AstLib Syntax.CFG Semantics.TopLevel.
+From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils. (*Needs to be changed*)
 Require Import Integers Floats.
 
 Require Import List.
@@ -72,6 +73,27 @@ Section ShowInstances.
     {|
     show := show_typ
     |}.
+
+
+  Definition show_dtyp (t : dtyp) : string
+    := match t with
+    | DTYPE_I sz                 => "Integer" ++ (show sz)
+    | DTYPE_Pointer              => "Pointer"
+    | DTYPE_Void                 => "Void"
+    | DTYPE_Half                 => "Half"
+    | DTYPE_Float                => "Float"
+    | DTYPE_Double               => "Double"
+    | DTYPE_X86_fp80             => "x86 fp80"
+    | DTYPE_Fp128                => "Fp128"
+    | DTYPE_Ppc_fp128            => "Ppc_fp128"
+    | DTYPE_Metadata             => "Metadata"
+    | DTYPE_X86_mmx              => "X86_mmx"
+    | DTYPE_Array sz t           => "Array"
+    | DTYPE_Struct fields        => "Struct"
+    | DTYPE_Packed_struct fields => "Packed struct"
+    | DTYPE_Opaque               => "Opaque"
+    | DTYPE_Vector sz t          => "Vector"
+    end.
 
   Definition show_ibinop (iop : ibinop) : string
     := match iop with

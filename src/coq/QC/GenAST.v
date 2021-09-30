@@ -25,7 +25,7 @@ Require Import ExtLib.Data.Monads.StateMonad.
 
 From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils.
 Require Import Integers Floats.
-
+From Vellvm Require Import ShowAST.
 Require Import List.
 
 Import ListNotations.
@@ -121,6 +121,7 @@ Section Helpers.
 End Helpers.
 Check show Decimal.int.
 Sample genPosZ.
+Sample genPosInt.
 Section GenerationState.
   Record GenState :=
     mkGenState
@@ -743,7 +744,7 @@ Fixpoint get_array_index (ls : list (list N)) (sz : nat) : list (list N) :=
   (get_array_index ls z) ++ (map (fun x => (N.of_nat z)::x) ls)
   end.
 
-Search typ.
+
 Fixpoint get_index_paths_to_typ (t_in t_from : typ) {struct t_from} : list (list N) :=
   let this_stage := if (normalized_typ_eq t_in t_from) then [[]] else [] in
   let other_stage :=
@@ -781,13 +782,14 @@ Example test4:
 get_index_paths_to_typ TYPE_Metadata (TYPE_Struct [TYPE_Metadata; TYPE_Array 3 TYPE_Metadata]) = [[0%N]; [1%N;0%N]; [1%N;1%N]; [1%N;2%N]].
 Proof. Abort. (* Cannnot simpl to prove that it works*)
 
+Definition genAggreType : G (typ) :=
+  run_GenLLVM (gen_typ_non_void_size 3).
 
+Definition genTypHelper (n: nat): G (typ) :=
+  run_GenLLVM (gen_typ_non_void_size n).
 
-
-
-
-
-
+Definition genType: G (typ) :=
+  sized genTypHelper.
 
   (* TODO: should make it much more likely to pick an identifier for
            better test cases *)
@@ -1258,3 +1260,4 @@ Section InstrGenerators.
     := fmap ret gen_main_tle.
 
 End InstrGenerators.
+Sample (genType).
