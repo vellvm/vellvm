@@ -35,8 +35,8 @@ Import Conc.
 (* Refinement relation for uvalues *)
 (* Definition 5.6 UValue refinement *)
 Variant refine_uvalue: uvalue -> uvalue -> Prop :=
-| UndefPoison: forall dt uv, (NO_VOID dt -> uvalue_has_dtyp uv dt) -> refine_uvalue (UVALUE_Poison dt) uv   
-| RefineConcrete: forall uv1 uv2 dt, uv2 <> (UVALUE_Poison dt) -> (forall (dv:dvalue), concretize uv2 dv -> concretize uv1  dv) -> refine_uvalue uv1 uv2
+| UndefPoison: forall dt uv uv1, concretize uv1 (DVALUE_Poison dt) -> uvalue_has_dtyp uv dt -> refine_uvalue uv1 uv
+| RefineConcrete: forall uv1 uv2, (forall (dv:dvalue), concretize uv2 dv -> concretize uv1 dv) -> refine_uvalue uv1 uv2
 .
 #[export] Hint Constructors refine_uvalue : core.
 
@@ -46,9 +46,7 @@ Definition uvalue_eq (uv1 uv2 : uvalue) : Prop
 Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
 Proof.
   repeat intro.
-  destruct x; try (apply RefineConcrete with (dt:=DTYPE_Void);[intro; inversion H|auto];fail).  
-  apply UndefPoison.
-  constructor; auto.
+  destruct x; (apply RefineConcrete; solve [auto]).
 Qed.
 
 Instance uvalue_eq_Reflexive : Reflexive uvalue_eq.
@@ -57,33 +55,46 @@ Proof.
   split; reflexivity.
 Qed.
 
-Lemma refine_poison : forall dt uv, refine_uvalue uv (UVALUE_Poison dt) -> uv = UVALUE_Poison dt.
+Lemma concretize_dtyp :
+  forall uv dv dt,
+    uvalue_has_dtyp uv dt ->
+    concretize uv dv ->
+    dvalue_has_dtyp dv dt.
 Proof.
-  intros * H.
-  inv H.
-  - pose proof (dtyp_eq_dec dt0 dt) as [EQ | NEQ]; subst; auto.
-    pose proof (NO_VOID_dec dt0) as [NV | NNV].
-    + specialize (H0 NV). inversion H0.
-      reflexivity.
-    + 
-  - 
-  assert (NO_VOID dt0 
-  admit.
-  - specialize (H0 NV).
-  - contradiction H0.
-    reflexivity.
-Qed.
+  intros uv dv dt DTYP CONC.
+  induction DTYP.
+  1-17: inversion CONC; subst; solve [auto | constructor].
+Admitted.
+
+Lemma refine_uvalue_dtyp :
+  forall uv1 uv2 dt,
+    uvalue_has_dtyp uv1 dt ->
+    refine_uvalue uv1 uv2 ->
+    uvalue_has_dtyp uv2 dt.
+Proof.
+  intros uv1 uv2 dt DTYP REF.
+  induction DTYP.
+  - inversion REF; subst.
+Admitted.
 
 Instance refine_uvalue_Transitive : Transitive refine_uvalue.
 Proof.
   repeat intro.
   inversion H; subst.
-  - inversion H0; subst.
-    econstructor.
-    econstructor.
-  - inversion H0; subst.
-    apply refine_poison in H. subst. econstructor.
-    apply RefineConcrete. intros. assumption. auto. 
+  - (* x concretizes to poison *)
+    eapply UndefPoison; eauto.
+    eapply refine_uvalue_dtyp; eauto.
+  - (* x may not be poison  *)
+    inversion H0; subst.
+    + (* y is poison *)
+      pose proof (H1 (DVALUE_Poison dt)) as POISON.
+      forward POISON.
+      auto.
+
+      (* x refines to poison... *)
+      eapply UndefPoison; eauto.
+    + constructor.
+      auto.
 Qed.
 
 Instance uvalue_eq_Transitive : Transitive uvalue_eq.

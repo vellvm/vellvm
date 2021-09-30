@@ -562,12 +562,6 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
       end
     end.
 
-  Definition dvalue_is_poison (dv : dvalue) : bool :=
-    match dv with
-    | DVALUE_Poison dt => true
-    | _ => false
-    end.
-
   (* A [terminator] either returns from a function call, producing a [dvalue],
          or jumps to a new [block_id]. *)
   Definition denote_terminator (t: terminator dtyp): itree exp_E (block_id + uvalue) :=

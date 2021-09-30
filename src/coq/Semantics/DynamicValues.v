@@ -367,6 +367,18 @@ Proof.
   all: apply Nat.lt_0_succ.
 Qed.
 
+Definition dvalue_is_poison (dv : dvalue) : bool :=
+  match dv with
+  | DVALUE_Poison dt => true
+  | _ => false
+  end.
+
+Definition uvalue_is_poison (uv : uvalue) : bool :=
+  match uv with
+  | UVALUE_Poison dt => true
+  | _ => false
+  end.
+
 Section UvalueInd.
   Variable P : uvalue -> Prop.
   Hypothesis IH_Addr           : forall a, P (UVALUE_Addr a).
@@ -2086,7 +2098,7 @@ Class VInt I : Type :=
   | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
-  | DVALUE_Poison_typ  : forall τ, NO_VOID τ -> dvalue_has_dtyp (DVALUE_Poison τ) τ
+  | DVALUE_Poison_typ  : forall τ, dvalue_has_dtyp (DVALUE_Poison τ) τ
 
   | DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
   | DVALUE_Struct_Cons_typ :
@@ -2129,7 +2141,7 @@ Class VInt I : Type :=
   | UVALUE_Double_typ : forall x, uvalue_has_dtyp (UVALUE_Double x) DTYPE_Double
   | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
   | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
-  | UVALUE_Poison_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Poison τ) τ
+  | UVALUE_Poison_typ  : forall τ, uvalue_has_dtyp (UVALUE_Poison τ) τ
   | UVALUE_Undef_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Undef τ) τ
 
   | UVALUE_Struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Struct []) (DTYPE_Struct [])
@@ -2390,7 +2402,7 @@ Class VInt I : Type :=
     Hypothesis IH_I32            : forall x, P (DVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (DVALUE_I64 x) (DTYPE_I 64).
     Hypothesis IH_IPTR           : forall x, P (DVALUE_IPTR x) DTYPE_IPTR.
-    Hypothesis IH_Poison         : forall t, NO_VOID t -> P (DVALUE_Poison t) t.
+    Hypothesis IH_Poison         : forall t, P (DVALUE_Poison t) t.
     Hypothesis IH_Double         : forall x, P (DVALUE_Double x) DTYPE_Double.
     Hypothesis IH_Float          : forall x, P (DVALUE_Float x) DTYPE_Float.
     Hypothesis IH_None           : P DVALUE_None DTYPE_Void.
@@ -2475,7 +2487,7 @@ Class VInt I : Type :=
     Hypothesis IH_I32            : forall x, P (UVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (UVALUE_I64 x) (DTYPE_I 64).
     Hypothesis IH_IPTR           : forall x, P (UVALUE_IPTR x) DTYPE_IPTR.
-    Hypothesis IH_Poison         : forall t, NO_VOID t -> P (UVALUE_Poison t) t.
+    Hypothesis IH_Poison         : forall t, P (UVALUE_Poison t) t.
 
     Hypothesis IH_Undef_Array    : forall sz t
                                      (NV: NO_VOID t)
