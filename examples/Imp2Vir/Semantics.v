@@ -412,6 +412,15 @@ Proof.
   apply unique_vector_build_map; lia.
 Qed.
 
+(* Theorem merge_cvir_correct : forall *)
+(*   ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid bid', *)
+(*   cvir_WF ir1 -> *)
+(*   cvir_WF ir2 -> *)
+(*   eutt eq *)
+(*     (denote_cvir (merge_cvir ir1 ir2) bid bid') *)
+(*     (bimap (denote_cvir ir1 bid bid) (denote_cvir ir2 bid' bid')). *)
+
+(* NOTE shouldn't it be in Fin.v ? *)
 Definition sym_fin {n1 n2 n3 : nat} (f : fin (n1 + (n2 + n3))) : fin (n1 + (n3 + n2)) :=
   match split_fin_sum _ _ f with
   | inl l => L (n3 + n2) l
@@ -453,7 +462,7 @@ Admitted.
 
 (* Relation between Imp env and vellvm env *)
 
-Definition Rmem (env : Imp.env) (vmap : StringMap.t int) (venv : local_env) (vmem : memory_stack) : Prop :=
+Definition Rmem (vmap : StringMap.t int)(env : Imp.env) (venv : local_env) (vmem : memory_stack) : Prop :=
   forall k v, alist_find k env = Some v <-> (
     exists reg, StringMap.find k vmap = Some reg /\
       exists addr, alist_find (Anon reg) venv = Some (UVALUE_Addr addr) /\
@@ -466,17 +475,105 @@ Definition Rimpvir
   (env1 : Imp.env * unit)
   (env2 : memory_stack * (local_env * (global_env * (block_id * block_id + uvalue)))) :
   Prop :=
-  Rmem (fst env1) vmap (fst (snd env2)) (fst env2).
+  Rmem vmap (fst env1) (fst (snd env2)) (fst env2).
 
+(* NOTE it misses the induction hypothesus on l and r *)
 Theorem compile_seq_correct : forall next_reg l r env next_reg' env' ir mem bid genv lenv vmem,
   compile next_reg (Seq l r) env = Some(next_reg', env', ir) ->
   eutt (Rimpvir env)
   (interp_imp (denote_imp (Seq l r)) mem)
   (interp_cfg3 (denote_cvir ir f0 bid) genv lenv vmem).
-Admitted.
+Abort.
 
 Fail Theorem compile_assign_correct : TODO.
 Fail Theorem compile_if_correct : TODO.
 Fail Theorem compile_while_correct : TODO.
 Fail Theorem compile_skip_correct : TODO.
-Fail Theorem compile_correct : TODO.
+
+
+Import ITreeNotations.
+Import SemNotations.
+
+
+Theorem compile_correct : forall (next_reg : int) env (p : stmt)
+                            (next_reg': int) env' (ir : cvir 1 1)
+                            mem bid genv lenv vmem,
+
+  (* The environments of Imp and Cvir are related *)
+  Rmem env mem lenv vmem ->
+  (* The compilation of p with env produce a new env' and an ir *)
+  compile next_reg p env = Some(next_reg', env', ir) ->
+
+  eutt (Rimpvir env')
+       (interp_imp (denote_imp p) mem)
+       (interp_cfg3 (denote_cvir ir f0 bid) genv lenv vmem).
+
+Proof.
+  induction p ; intros.
+  - (* Assign *)
+    simpl.
+    simpl in *.
+    break_match_hyp ; inv H0.
+    destruct p ;  destruct p.
+    inv H2.
+    unfold compile_assign in *.
+    cbn in *.
+    break_match_hyp ; inv Heqo.
+    destruct p. inv H1.
+    break_match_hyp ; inv H2.
+    (* unfold compile_expr in Heqo0. *)
+    (* cbn in *. *)
+    (* destruct e. *)
+    (* Focus 2. *)
+    (* inv Heqo0. *)
+    (* cbn. *)
+    (* rewrite interp_imp_bind. *)
+    (* unfold interp_imp. *)
+    (* unfold MapDefault.interp_map. *)
+    (* unfold State.interp_state. *)
+    (* rewrite interp_ret. *)
+
+    (* need denote_block_cvir here *)
+    admit. admit.
+
+  - (* Seq *)
+    simpl. simpl in *.
+    break_match_hyp ; inv H0.
+    destruct p ;  destruct p.
+    break_match_hyp ; inv H2.
+    destruct p ;  destruct p.
+    inv H1.
+    rewrite interp_imp_bind.
+    (* need denote_seq_cvir here *)
+    admit.
+
+  - (* If *)
+    simpl ; simpl in *.
+    break_match_hyp ; inv H0. destruct p.
+    break_match_hyp ; inv H2. destruct p ; destruct p.
+    break_match_hyp ; inv H1. destruct p ; destruct p.
+    inv H2.
+    (* need denote_seq_cvir, denote_join_cvir, denote_branch_cvir here *)
+
+    admit.
+  - (* While *)
+    simpl ; simpl in *.
+    break_match_hyp ; inv H0. destruct p0.
+    break_match_hyp ; inv H2. destruct p0; destruct p0.
+    inv H1.
+    (* need denote_loop_open_cvir, denote_focus_output_cvir, denote_branch_cvir, denote_seq_cvir here *)
+
+    admit.
+  - (* Skip *)
+    simpl.
+    simpl in *.
+    inv H0.
+
+    cbn.
+    unfold denote_cvir, denote_cvir_gen.
+    cbn. simpl.
+    unfold tfmap.
+
+    (* need denote_block_cvir here *)
+    admit.
+Admitted.
