@@ -83,7 +83,6 @@ Definition ret_void_cvir (c : code typ) : cvir 1 0 :=
 
 (** Combinators over CVIR *)
 
-
 (* Taking 2 cvir as input, create a new cvir concanating inputs and ouputs
 // similar to app_asm in itree tutorial *)
 Definition merge_cvir
@@ -120,6 +119,12 @@ Definition cast_o_cvir {ni no no' : nat} (b : cvir ni no) (H : no = no') : cvir 
   mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
     blocks b vi (Vec.cast vo (eq_sym H)) vt
           ).
+
+Definition swap_i_input_cvir {ni no: nat} (i : Fin.fin ni) (b : cvir ni no) : cvir ni no :=
+  mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
+    blocks b (Vec.swap_i i vi) vo vt
+  ).
+
 
 (* NOTE (vi=(0,1,2,3,4,5), i = 4) => (vi->(4,0,1,2,3,5)) *)
 (* Bring the i-th input at the head of the input vector *)
@@ -165,43 +170,59 @@ Next Obligation.
   destruct no ; [ destruct o |] ; lia.
 Defined.
 
-(* Connect the fist input and the first output of a CVIR and internalize them *)
-Definition loop_cvir {ni no : nat} (b : cvir (S ni) (S no)) : cvir ni no :=
+(* Connect the n first input and the n first output of a CVIR and internalize them *)
+Definition loop_cvir {ni no : nat} (n : nat) (b : cvir (n+ni) (n+no)) : cvir ni no :=
   mk_cvir (fun vi vo vt =>
-    let '(newint,vt) := Vec.uncons vt in
-    (blocks b) (newint :: vi)%vec (newint :: vo)%vec vt
-  ).
+    let '(vi',vt') := Vec.splitat n vt in
+    (blocks b) (vi'++ vi)%vec (vi'++vo)%vec vt').
 
 (* wrapper for loop_cvir *)
-Definition loop_cvir' {ni no ni' no' : nat} (b : cvir ni no)
-  (Heqi : ni = S ni') (Heqo : no = S no') :
+Definition loop_cvir' {ni no ni' no' : nat} (n : nat) (b : cvir ni no)
+  (Heqi : ni = (n+ni')%nat ) (Heqo : no = (n+no')%nat) :
   cvir ni' no' :=
-  loop_cvir (cast_o_cvir (cast_i_cvir b Heqi) Heqo).
+  loop_cvir n (cast_o_cvir (cast_i_cvir b Heqi) Heqo).
 
 
-(* Connect the first input of b2 to the first output of b1 *)
-Program Definition seq_cvir {ni1 no1 ni2 no2 : nat}
-  (b1 : cvir ni1 (S no1))
-  (b2: cvir (S ni2) no2) :
-  cvir (ni1+ni2) (no1+no2) :=
-  (* firstly, merge b1 and b2 *)
-  let b := merge_cvir b1 b2 in
-  (* bring the first output of b2 at the first place of b *)
-  let b := focus_input_cvir b (fi' ni1) in
-  (* connect the first input of b (ie. 1st input of b2)
-     to the first output of b (ie. 1st ouput of b1) *)
-  loop_cvir' b _ _.
+Program Definition seq_cvir {ni n no : nat}
+  (b1 : cvir (S ni) n) (b2 : cvir n no) : cvir (S ni) no :=
+    let b := merge_cvir b1 b2 in
+    let b := swap_i_input_cvir (fi' n) b in
+    loop_cvir' n b _ _.
 Next Obligation.
-  apply Nat.lt_add_pos_r.
-  apply Nat.lt_0_succ.
+lia.
+Defined.
+Next Obligation.
+lia.
 Defined.
 
+(* Create a block with (n+1) inputs and (n+1) outputs, with no code *)
+(* NOTE it's a trick to avoid n=0.... *)
+(* Fixpoint block_cvir_n (n : nat) : cvir (S n) (S n) := *)
+(*   match n with *)
+(*   | 0%nat => block_cvir [] *)
+(*   | S n' => merge_cvir (block_cvir []) (block_cvir_n n') *)
+(*   end. *)
+
+
+(* Program Definition seq_gen_cvir {ni1 no1 ni2 no2 n : nat} *)
+(*         (b1 : cvir (S ni1) (n+(S no1))) *)
+(*         (b2 : cvir (n+(S ni2)) no2) *)
+(*   : cvir (S (ni1+ni2)) (no1+no2) := *)
+(*   if (leb ni2 no1) (* no1 > n*) *)
+(*   then let b2' := merge_cvir b2 (block_cvir_n (no1-1)) in *)
+(*        seq_cvir (ni:= ni1) b1 b2' *)
+(*   else let b1' := merge_cvir b1 (block_cvir_n (ni2-1)) in *)
+(*        seq_cvir (ni:= ni1) b1' b2 *)
+(* . *)
+(* Next Obligation. *)
+(* lia. *)
+
+
 (* Connect the first output of b to its first input, and internalize the only
-the ouput *)
+the output *)
 Definition loop_cvir_open {ni no : nat} (b : cvir (S ni) (S no)) : cvir (S ni) no :=
   mk_cvir (fun vi vo vt =>
     (blocks b) vi (hd vi :: vo)%vec vt).
-
 
 (* Merge the first output with the second one *)
 Definition join_cvir {ni no : nat} (b : cvir ni (S (S no))) : cvir ni (S no) :=

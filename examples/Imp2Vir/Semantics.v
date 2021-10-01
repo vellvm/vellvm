@@ -207,19 +207,19 @@ Proof.
   apply H; try assumption.
 Qed.
 
-(* TODO (reformulate) If a CVIR is WF, we can label a CVIR using 2 different
-maps, the denotation is eutt. *)
+(* If a CVIR is WF, its denotation is equivalent to itself modulo relabeling *)
 Theorem eutt_cvir_relabel : forall {ni no} (ir : cvir ni no) vi vi' vo vo' vt vt' bid bid',
-  cvir_ids_WF ir ->
-  cvir_inputs_used ir ->
-  cvir_relabel_WF ir ->
+  cvir_WF ir ->
   unique_vector (vi ++ vo ++ vt) ->
   unique_vector (vi' ++ vo' ++ vt') ->
   eutt (ocfg_relabel_helper_rel (vec_build_map (vi++vo++vt) (vi'++vo'++vt')))
     (denote_cvir_gen ir vi vo vt bid bid')
     (denote_cvir_gen ir vi' vo' vt' bid bid').
 Proof.
-  intros.
+  intros * H H2 H3.
+  unfold cvir_WF in H. destruct H as [_ [H' [H'' [H0 H1]]]].
+  assert (H : cvir_ids_WF ir).
+  { apply cvir_combine_in_out_ids_WF ; auto. }
   unfold denote_cvir_gen.
   rewrite (cvir_relabel ir vi vi' vo vo' vt vt'); try assumption.
   erewrite <- ocfg_relabel_convert_typ.
@@ -278,18 +278,21 @@ Proof.
   - admit. (* TERM_Switch *)
 Admitted.
 
-Theorem denote_cvir_merge_l' : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
-  cvir_ids_WF ir1 ->
-  cvir_ids_WF ir2 ->
-  cvir_inputs_used ir1 ->
-  cvir_inputs_used ir2 ->
-  unique_bid ir1 ->
-  unique_bid ir2 ->
+Theorem denote_cvir_merge_l' : forall
+  ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
+  cvir_WF ir1 ->
+  cvir_WF ir2 ->
   eutt eq
     (denote_cvir (merge_cvir ir1 ir2) (L ni2 bid) (L ni2 bid))
     (denote_cvir_gen ir1 (build_map 0 ni1) (build_map (ni1+ni2) no1) (build_map (ni1+ni2+(no1+no2)) (n_int ir1)) bid bid).
 Proof.
-  intros * WF11 WF12 WF21 WF22 WF31 WF32.
+  intros.
+  unfold cvir_WF in H; destruct H as [WF31 [WF11' [WF11'' [WF21 _]]]].
+  unfold cvir_WF in H0; destruct H0 as [WF32 [WF12' [WF12'' [WF22 _]]]].
+  assert (WF11 : cvir_ids_WF ir1).
+  { apply cvir_combine_in_out_ids_WF ; auto. }
+  assert (WF12 : cvir_ids_WF ir2).
+  { apply cvir_combine_in_out_ids_WF ; auto. }
   assert (WF3 : wf_ocfg_bid (blocks_default (merge_cvir ir1 ir2))). {
     apply unique_bid_wf_ocfg_bid.
     apply merge_cvir_unique; assumption.
@@ -368,26 +371,16 @@ Proof.
 Qed.
 
 Theorem denote_cvir_merge_r' : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
-  cvir_ids_WF ir1 ->
-  cvir_ids_WF ir2 ->
-  cvir_inputs_used ir1 ->
-  cvir_inputs_used ir2 ->
-  unique_bid ir1 ->
-  unique_bid ir2 ->
+  cvir_WF ir1 ->
+  cvir_WF ir2 ->
   eutt eq
     (denote_cvir (merge_cvir ir1 ir2) (R ni1 bid) (R ni1 bid))
     (denote_cvir_gen ir2 (build_map ni1 ni2) (build_map (ni1+ni2+no1) no2) (build_map (ni1+ni2+(no1+no2)+n_int ir1) (n_int ir2)) bid bid).
 Admitted.
 
 Theorem denote_cvir_merge_l : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
-  cvir_ids_WF ir1 ->
-  cvir_ids_WF ir2 ->
-  cvir_inputs_used ir1 ->
-  cvir_inputs_used ir2 ->
-  cvir_relabel_WF ir1 ->
-  cvir_relabel_WF ir2 ->
-  unique_bid ir1 ->
-  unique_bid ir2 ->
+  cvir_WF ir1 ->
+  cvir_WF ir2 ->
   eutt
     (ocfg_relabel_helper_rel (vec_build_map
       ((build_map 0 ni1) ++ (build_map (ni1+ni2) no1) ++ (build_map (ni1+ni2+(no1+no2)) (n_int ir1)))
@@ -398,19 +391,13 @@ Theorem denote_cvir_merge_l : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 :
 Proof.
   intros.
   rewrite denote_cvir_merge_l'; try assumption.
-  eapply eutt_cvir_relabel; try assumption;
+  eapply eutt_cvir_relabel; try assumption ;
   apply unique_vector_build_map; lia.
 Qed.
 
 Theorem denote_cvir_merge_r : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
-  cvir_ids_WF ir1 ->
-  cvir_ids_WF ir2 ->
-  cvir_inputs_used ir1 ->
-  cvir_inputs_used ir2 ->
-  cvir_relabel_WF ir1 ->
-  cvir_relabel_WF ir2 ->
-  unique_bid ir1 ->
-  unique_bid ir2 ->
+  cvir_WF ir1 ->
+  cvir_WF ir2 ->
   eutt
     (ocfg_relabel_helper_rel (vec_build_map
       ((build_map ni1 ni2) ++ (build_map (ni1+ni2+no1) no2) ++ (build_map (ni1+ni2+(no1+no2)+n_int ir1) (n_int ir2)))
@@ -452,7 +439,6 @@ Proof.
   destruct (split_fin_sum _ _ _) eqn:?.
   apply split_fin_sum_inl in Heqs. subst bid.
 Admitted.
-
 
 (* NOTE denote_cvir_block ? *)
 (* NOTE denote_cvir_branch ? *)

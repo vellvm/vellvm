@@ -366,7 +366,7 @@ Next Obligation.
 Defined.
 
 Program Definition seq (start len : nat) : t nat len :=
-  vec' (seq start len).
+  vec' (List.seq start len).
 Next Obligation.
   rewrite seq_length.
   reflexivity.
@@ -435,6 +435,19 @@ Ltac destruct_vec1 v :=
     simpl in H; apply eq_add_S in H as H'; apply length_zero_iff_nil in H'; subst l
   ].
 
+Ltac destruct_vec2 v :=
+  let H := fresh "H" in
+  let H' := fresh "H'" in
+  let H'' := fresh "H''" in
+  let l := fresh "l" in
+  destruct v as [[] H]; [
+  simpl in H; lia |
+  destruct l ;
+  [ simpl in H ; lia |
+    simpl in H; apply eq_add_S in H as H'; apply eq_add_S in H' as H'';
+    apply length_zero_iff_nil in H''; subst l]].
+
+
 Ltac split_vec v n1 :=
   let vp := fresh "vp" in
   let v1 := fresh v "1" in
@@ -461,6 +474,88 @@ From Vellvm Require Import Utils.AListFacts.
 
 Definition vec_build_map {A n} (v v' : Vec.t A n) : alist A A :=
   List.combine (proj1_sig v) (proj1_sig v').
+
+
+(* Theorem vec_build_map_assoc : *)
+(*   forall A n1 n2 n3 (v1 v1': Vec.t A n1) (v2 v2': Vec.t A n2) (v3 v3': Vec.t A n3), *)
+(*   vec_build_map (append (append v1 v2) v3) (append (append v1' v2') v3') *)
+(*   = *)
+(*   vec_build_map (append v1 (append v2 v3)) (append v1' (append v2' v3')). *)
+(* Proof. *)
+(*   intros. *)
+(*   destruct v1 ; subst ; cbn in *. *)
+(*   destruct v2 ; subst ; cbn in *. *)
+(*   destruct v3 ; subst ; cbn in *. *)
+(*   destruct v1' ; subst ; cbn in *. *)
+(*   destruct v2' ; subst ; cbn in *. *)
+(*   destruct v3' ; subst ; cbn in *. *)
+(*   rewrite !List.app_assoc ; auto. *)
+(* Qed. *)
+
+
+
+(* Swap vectors *)
+Definition swap_vec {A} {n1 n2} (v : Vec.t A (n1 + n2)) : Vec.t A (n2 + n1) :=
+  let '(v1,v2) := Vec.splitat n1 v in
+  append v2 v1.
+
+Theorem swap_vec_app : forall {A} {n1 n2} (v1 : Vec.t A n1) (v2 : Vec.t A n2),
+  swap_vec (append v1 v2) = (append v2 v1).
+Proof.
+  intros.
+  unfold swap_vec.
+  rewrite splitat_append.
+  reflexivity.
+Qed.
+
+
+Theorem swap_vec_In : forall {A} {n1 n2} (v : Vec.t A (n1 + n2)) a,
+  In a v <-> In a (swap_vec v).
+Proof.
+  intros.
+  split_vec v n1.
+  rewrite swap_vec_app.
+  rewrite !vector_in_app_iff. tauto.
+Qed.
+
+
+
+Theorem cast_In : forall {A} {n n'} (v : Vec.t A n) (H : n=n') a,
+  In a v <-> In a (cast v H).
+Proof.
+  intros.
+  destruct v.
+  unfold cast. subst.
+  cbn. tauto.
+Qed.
+
+(* [0,1,...,i-1,i,i+1,...,n] ->
+   [i,i+1,...,n,0,1,...,i-1] *)
+Program Definition swap_i {A} {n} (i : Fin.fin n) (v : t A n) : t A n :=
+  let v' := Vec.cast v (_ : n = (proj1_sig i + (n-proj1_sig i))) in
+  let v'' := swap_vec v' in
+  Vec.cast v'' (_ : _ = n).
+Next Obligation.
+destruct i ; simpl in * ; lia.
+Qed.
+Next Obligation.
+  destruct i ; simpl in * ; lia.
+Qed.
+
+Theorem swap_i_In : forall {A} {n} (i: Fin.fin n) (v : Vec.t A n) a,
+  In a v <-> In a (swap_i i v).
+Proof.
+  intros.
+  unfold swap_i.
+  split ; intros.
+  - apply cast_In.
+    rewrite <- swap_vec_In.
+    apply cast_In. assumption.
+  - apply cast_In in H.
+    rewrite <- swap_vec_In in H.
+    apply cast_In in H. assumption.
+Qed.
+
 
 Declare Scope vec_scope.
 Delimit Scope vec_scope with vec.

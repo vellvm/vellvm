@@ -172,6 +172,16 @@ Proof.
     exact H0.
 Qed.
 
+
+Theorem unique_vector_app :
+  forall A n1 n2 (v1 : Vec.t A n1) (v2 : Vec.t A n2),
+  unique_vector (v1 ++ v2)%vec -> unique_vector v1 /\ unique_vector v2.
+Proof.
+  intros A n1 n2 v1 v2 H ; split.
+  apply unique_vector_app1 in H ; auto.
+  apply unique_vector_app2 in H ; auto.
+Qed.
+
 Theorem unique_vector_reorder :
   forall A n1 n2 n3 n4 (v1 : Vec.t A n1) (v2 : Vec.t A n2) (v3 : Vec.t A n3) (v4 : Vec.t A n4),
   unique_vector ((v1 ++ v2) ++ v3 ++ v4)%vec -> unique_vector ((v1 ++ v3) ++ v2 ++ v4)%vec.

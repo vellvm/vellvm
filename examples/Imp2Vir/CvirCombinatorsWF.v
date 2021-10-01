@@ -19,35 +19,24 @@ Open Scope vec_scope.
 Arguments n_int : default implicits.
 Arguments blocks : default implicits.
 
-(** There is 4 properties of WF:
+(** There is 5 properties of WF:
  - unique block ID
- - cvir IDs WF
+ - cvir input IDs WF
+ - cvir outputs IDs WF
  - cvir used inputs
  - relabeling (actually, it is in Semantic.v) *)
 
 (** Well-Formness properties *)
-
-(* NOTE Here, I understand:
-
-For all blocks of the given CVIR,
-If the union of the provided inputs and internals has no duplicate, and if
-the block id are similar, then the blocks are the same. *)
 
 (* If the union of inputs and internals has no duplicate, then there will be
 no duplicates block_id in the ir. *)
 Definition unique_bid {ni no} ir : Prop :=
   forall (vi : Vec.t raw_id ni) (vo : Vec.t raw_id no) vt,
   forall b1 b2,
-  (* The union of inputs and intervals has no duplicate *)
   unique_vector (vi ++ vt)%vec ->
-  (* unique_list (inputs (blocks ir vi vo vt)). *)
-  (* b1 is a block in the given CVIR *)
   List.In b1 (blocks ir vi vo vt) ->
-  (* b2 is a block in the given CVIR *)
   List.In b2 (blocks ir vi vo vt) ->
-  (* b1 and b2 have the same id *)
   blk_id b1 = blk_id b2 ->
-  (* b1 and b2 must be equals *)
   b1 = b2.
 
 (* id is an output of the block b if the terminator of b branches to id *)
@@ -59,19 +48,38 @@ Definition out_blk_id id (b : block typ) : Prop :=
   end.
 
 (* If a block belongs to a CVIR,
-   - its id must be in the inputs or the internals (input WF)
-   and
-   - all branchs must be to a block which id in one of the provided vector
-   (output WF)
+   its id must be in the inputs or the internals (input WF) *)
+Definition cvir_input_ids_WF {ni no} ir : Prop :=
+  forall (vi : Vec.t raw_id ni) (vo : Vec.t raw_id no) vt b,
+  List.In b (blocks ir vi vo vt) ->
+  (In (blk_id b) (vi ++ vt)%vec). (* input WF *)
 
-NOTE: for output WF, shouldn't it be in output only ?
- *)
+(* If a block belongs to a CVIR,
+   all branchs must be to a block which id in one of the provided vector
+   (output WF)
+NOTE: for output WF, shouldn't it be in output+internals only ? *)
+Definition cvir_output_ids_WF {ni no} ir : Prop :=
+  forall (vi : Vec.t raw_id ni) (vo : Vec.t raw_id no) vt b,
+  List.In b (blocks ir vi vo vt) ->
+  (forall bid, out_blk_id bid b -> In bid (vi ++ vo ++ vt)%vec).
+
 Definition cvir_ids_WF {ni no} ir : Prop :=
   forall (vi : Vec.t raw_id ni) (vo : Vec.t raw_id no) vt b,
   List.In b (blocks ir vi vo vt) ->
   (In (blk_id b) (vi ++ vt)%vec) (* input WF *)
   /\
   (forall bid, out_blk_id bid b -> In bid (vi ++ vo ++ vt)%vec). (* output WF *)
+
+Lemma cvir_combine_in_out_ids_WF : forall (ni no : nat) (ir : cvir ni no),
+  cvir_input_ids_WF ir /\ cvir_output_ids_WF ir ->
+  cvir_ids_WF ir.
+Proof.
+  unfold cvir_ids_WF. intros. intuition.
+  - unfold cvir_input_ids_WF in H1; apply H1 in H0 ; assumption.
+  - unfold cvir_output_ids_WF in H2; apply H2 with (bid:= bid) in H0 ; assumption.
+Qed.
+
+
 
 (* Each block id used in input or internals must be used as an input in the
 returned CFG *)
@@ -90,37 +98,52 @@ Definition cvir_relabel_WF {ni no} (ir : cvir ni no) :=
   blocks ir vi' vo' vt' =
   ocfg_relabel (vec_build_map (vi++vo++vt) (vi'++vo'++vt')) (blocks ir vi vo vt).
 
+(* A CVIR is WF if it respects all the above WF properties *)
+Definition cvir_WF {ni no} (ir : cvir ni no) :=
+  unique_bid ir /\
+  cvir_input_ids_WF ir /\
+  cvir_output_ids_WF ir /\
+  cvir_inputs_used ir /\
+  cvir_relabel_WF ir.
+
 (** ---- Proof of WF combinators ---- *)
 
+(** Intermediate lemmas *)
 (* block_cvir WF *)
-Theorem block_cvir_id_WF : forall c, cvir_ids_WF (block_cvir c).
-Proof.
-  unfold cvir_ids_WF.
-  intros ? [] [] [].
-  split ; intros.
-  - simpl in H.
-    destruct H ; [| contradiction ].
-    apply vector_in_app_iff.
-    left.
-    unfold In.
-    subst.
-    simpl.
-    destruct x ; simpl in * ; [lia |].
-    unfold Vec.hd. simpl. intuition.
-  - unfold out_blk_id in H0.
-    simpl in *.
-    destruct H ; [| contradiction ].
-    apply vector_in_app_iff. right.
-    apply vector_in_app_iff. left.
-    unfold In.
-    subst.
-    simpl in *.
-    subst.
-    destruct x0 ; simpl in * ; [lia |].
-    unfold Vec.hd. simpl. intuition.
+Lemma block_cvir_input_id_WF : forall c, cvir_input_ids_WF (block_cvir c).
+  unfold cvir_input_ids_WF.
+  intros.
+  simpl in H.
+  destruct H ; [| contradiction ].
+  apply vector_in_app_iff.
+  left.
+  unfold In.
+  subst.
+  simpl.
+  destruct vi.
+  destruct x ; simpl in * ; [lia |].
+  unfold Vec.hd. simpl. intuition.
 Qed.
 
-Theorem block_cvir_inputs_used : forall c, cvir_inputs_used (block_cvir c).
+Lemma block_cvir_output_id_WF : forall c, cvir_output_ids_WF (block_cvir c).
+Proof.
+  unfold cvir_output_ids_WF.
+  intros.
+  unfold out_blk_id in H0.
+  simpl in *.
+  destruct H ; [| contradiction ].
+  apply vector_in_app_iff. right.
+  apply vector_in_app_iff. left.
+  unfold In.
+  subst.
+  simpl in *.
+  subst.
+  destruct vo.
+  destruct x ; simpl in * ; [lia |].
+  unfold Vec.hd. simpl. intuition.
+Qed.
+
+Lemma block_cvir_inputs_used : forall c, cvir_inputs_used (block_cvir c).
 Proof.
   unfold cvir_inputs_used.
   intros.
@@ -128,7 +151,7 @@ Proof.
   now destruct_vec1 vi.
 Qed.
 
-Theorem block_cvir_unique : forall c, unique_bid (block_cvir c).
+Lemma block_cvir_unique : forall c, unique_bid (block_cvir c).
 Proof.
   unfold unique_bid, block_cvir.
   simpl.
@@ -138,7 +161,7 @@ Proof.
   reflexivity.
 Qed.
 
-Theorem block_cvir_relabel_WF : forall c, cvir_relabel_WF (block_cvir c).
+Lemma block_cvir_relabel_WF : forall c, cvir_relabel_WF (block_cvir c).
 Proof.
   unfold cvir_relabel_WF.
   intros.
@@ -158,35 +181,43 @@ Qed.
 
 (* branch_cvir WF *)
 
-Theorem branch_cvir_id_WF : forall c e, cvir_ids_WF (branch_cvir c e).
+Lemma branch_cvir_input_id_WF : forall c e, cvir_input_ids_WF (branch_cvir c e).
 Proof.
-  unfold cvir_ids_WF.
-  intros ? ? [] [] [].
-  split ; intros.
-  - simpl in H.
-    destruct H ; [| contradiction ].
-    apply vector_in_app_iff.
-    left.
-    unfold In.
-    subst.
-    simpl.
-    destruct x ; simpl in * ; [lia |].
-    unfold Vec.hd. simpl. intuition.
-  - unfold out_blk_id in H0.
-    simpl in *.
-    destruct H ; [| contradiction ].
-    apply vector_in_app_iff. right.
-    apply vector_in_app_iff. left.
-    unfold In.
-    subst.
-    simpl in *.
-    subst.
-    destruct x0 ; simpl in * ; [lia |].
-    destruct x0 ; simpl in * ; [lia |].
-    unfold Vec.hd in *. simpl in *. intuition.
+  unfold cvir_input_ids_WF.
+  intros.
+  simpl in H.
+  destruct H ; [| contradiction ].
+  apply vector_in_app_iff.
+  left.
+  unfold In.
+  subst.
+  simpl.
+  destruct vi;
+  destruct x ; simpl in * ; [lia |].
+  unfold Vec.hd. simpl. intuition.
 Qed.
 
-Theorem branch_cvir_unique : forall c e, unique_bid (branch_cvir c e).
+
+Lemma branch_cvir_output_id_WF : forall c e, cvir_output_ids_WF (branch_cvir c e).
+Proof.
+  unfold cvir_output_ids_WF.
+  intros.
+  unfold out_blk_id in H0.
+  simpl in *.
+  destruct H ; [| contradiction ].
+  apply vector_in_app_iff. right.
+  apply vector_in_app_iff. left.
+  unfold In.
+  subst.
+  simpl in *.
+  subst.
+  destruct vo;
+  destruct x ; simpl in * ; [lia |].
+  destruct x ; simpl in * ; [lia |].
+  unfold Vec.hd in *. simpl in *. intuition.
+Qed.
+
+Lemma branch_cvir_unique : forall c e, unique_bid (branch_cvir c e).
 Proof.
   unfold unique_bid, block_cvir.
   simpl.
@@ -196,25 +227,51 @@ Proof.
   reflexivity.
 Qed.
 
-Theorem branch_cvir_inputs_used : forall c e, cvir_inputs_used (branch_cvir c e).
+Lemma branch_cvir_inputs_used : forall c e, cvir_inputs_used (branch_cvir c e).
   unfold cvir_inputs_used.
   intros.
   destruct_vec0 vt.
   now destruct_vec1 vi.
 Qed.
 
-(* TODO branch_cvir_relabel_WF ? *)
+Lemma branch_cvir_relabel_WF : forall c e, cvir_relabel_WF (branch_cvir c e).
+Proof.
+  unfold cvir_relabel_WF.
+  intros.
+  destruct_vec1 vi. destruct_vec1 vi'.
+  destruct_vec2 vo. destruct_vec2 vo'.
+  destruct_vec0 vt. destruct_vec0 vt'.
+  cbn. unfold bk_relabel. f_equal. cbn.
+  unfold blk_id_relabel. cbn.
+  rewrite !Util.eq_dec_eq.
+  f_equal.
+  rewrite !Util.eq_dec_neq. trivial.
+  - intro. unfold unique_vector in H.
+    apply unique_list_vector in H.
+    specialize (H 1 2)%nat. simpl in H.
+    assert (Some r1 = Some r2) by (f_equal; symmetry ; assumption).
+    apply H in H8; lia.
+  - intro. unfold unique_vector in H.
+    apply unique_list_vector in H.
+    specialize (H 2 0)%nat. simpl in H.
+    assert (Some r2 = Some r) by (f_equal; assumption).
+    apply H in H8; lia.
+  - intro. unfold unique_vector in H. apply unique_list_vector in H.
+    specialize (H 1 0)%nat. simpl in H.
+    assert (Some r1 = Some r) by (f_equal; assumption).
+    apply H in H8; lia.
+Qed.
 
 
 (* merge_cvir WF *)
 
-Theorem merge_cvir_id_WF :
+Lemma merge_cvir_input_id_WF :
   forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2),
-  cvir_ids_WF ir1 -> cvir_ids_WF ir2 ->
-  cvir_ids_WF (merge_cvir ir1 ir2).
+  cvir_input_ids_WF ir1 -> cvir_input_ids_WF ir2 ->
+  cvir_input_ids_WF (merge_cvir ir1 ir2).
 Proof.
-  unfold cvir_ids_WF.
-  intros ? ? ? ? ? ? ? ? ? ? ? ? ?.
+  unfold cvir_input_ids_WF.
+  intros.
   split_vec vi ni1.
   split_vec vo no1.
   split_vec vt (n_int ir1).
@@ -222,15 +279,36 @@ Proof.
   simpl in *.
   rewrite 3 splitat_append in H1.
   apply in_app_iff in H1.
-  split ; intros ; rewrite 3 vector_in_app_iff.
-  - destruct H1 ; apply H in H1 + apply H0 in H1 ;
-    rewrite vector_in_app_iff in H1 ; intuition.
-  - rewrite 2 vector_in_app_iff.
-    destruct H1 ; apply H in H1 + apply H0 in H1 ; apply H1 in H2 ;
-    rewrite 2 vector_in_app_iff in H2 ; intuition.
+  rewrite 3 vector_in_app_iff.
+  destruct H1 ; apply H in H1 + apply H0 in H1 ;
+  rewrite vector_in_app_iff in H1 ; intuition.
 Qed.
 
-Theorem merge_cvir_blocks :
+
+Lemma merge_cvir_output_id_WF :
+  forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2),
+  cvir_output_ids_WF ir1 -> cvir_output_ids_WF ir2 ->
+  cvir_output_ids_WF (merge_cvir ir1 ir2).
+Proof.
+  unfold cvir_output_ids_WF.
+  intros ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?.
+  split_vec vi ni1.
+  split_vec vo no1.
+  split_vec vt (n_int ir1).
+  Opaque Vec.splitat.
+  simpl in *.
+  rewrite 3 splitat_append in H1.
+  apply in_app_iff in H1.
+  rewrite 2 vector_in_app_iff.
+  destruct H1 ;
+  apply H with (bid:= bid) in H1 + apply H0 with (bid:= bid) in H1 ;
+  auto ;
+  rewrite !vector_in_app_iff ;
+  rewrite !vector_in_app_iff in H1 ;
+  intuition.
+Qed.
+
+Lemma merge_cvir_blocks :
   forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) vi1 vi2 vo1 vo2 vt1 vt2,
   blocks (merge_cvir ir1 ir2) (vi1++vi2) (vo1++vo2) (vt1++vt2) = (blocks ir1 vi1 vo1 vt1 ++ blocks ir2 vi2 vo2 vt2)%list.
 Proof.
@@ -240,7 +318,7 @@ Proof.
   reflexivity.
 Qed.
 
-Theorem merge_cvir_inputs_used :
+Lemma merge_cvir_inputs_used :
   forall {ni1 no1 ni2 no2} (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2),
   cvir_inputs_used ir1 -> cvir_inputs_used ir2 ->
   cvir_inputs_used (merge_cvir ir1 ir2).
@@ -259,16 +337,23 @@ Proof.
   intuition.
 Qed.
 
-Theorem merge_cvir_unique :
+Lemma merge_cvir_unique :
   forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2),
-  cvir_ids_WF ir1 ->
-  cvir_ids_WF ir2 ->
+  cvir_input_ids_WF ir1 ->
+  cvir_output_ids_WF ir1 ->
+  cvir_input_ids_WF ir2 ->
+  cvir_output_ids_WF ir2 ->
   unique_bid ir1 ->
   unique_bid ir2 ->
   unique_bid (merge_cvir ir1 ir2).
 Proof.
   unfold unique_bid.
-  intros.
+  intros ? ? ? ? ? ? H' H'' H0' H0'' H1 H2 vi vo vt b1 b2 H3 H4 H5 H6.
+  assert (H : cvir_ids_WF ir1).
+  { apply cvir_combine_in_out_ids_WF ; auto. }
+  assert (H0: cvir_ids_WF ir2).
+  { apply cvir_combine_in_out_ids_WF ; auto. }
+  clear H'; clear H''; clear H0'; clear H0''.
   split_vec vi ni1.
   split_vec vo no1.
   split_vec vt (n_int ir1).
@@ -314,7 +399,7 @@ Proof.
     all: assumption.
 Qed.
 
-Theorem merge_cvir_relabel_WF :
+Lemma merge_cvir_relabel_WF :
   forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2),
   cvir_relabel_WF ir1 ->
   cvir_relabel_WF ir2 ->
@@ -349,7 +434,46 @@ Admitted.
 
 (* sym_i and sym_o WF *)
 
-Theorem sym_i_cvir_id_WF :
+Lemma sym_i_cvir_input_id_WF :
+  forall ni1 ni2 ni3 no (ir : cvir (ni1+(ni2+ni3)) no),
+  cvir_input_ids_WF ir -> cvir_input_ids_WF (sym_i_cvir ir).
+Proof.
+  unfold cvir_input_ids_WF. intros.
+  unfold sym_i_cvir in H0.
+  split_vec vi ni1.
+  split_vec vi2 ni3.
+  rename vi21 into vi2, vi22 into vi3.
+  simpl in H0.
+  rewrite sym_vec_app in H0.
+  apply H in H0.
+  unfold In in H0.
+  simpl in H0.
+  rewrite 3 in_app_iff in H0.
+  rewrite 3 vector_in_app_iff. tauto.
+Qed.
+
+
+Lemma sym_i_cvir_output_id_WF :
+  forall ni1 ni2 ni3 no (ir : cvir (ni1+(ni2+ni3)) no),
+  cvir_output_ids_WF ir -> cvir_output_ids_WF (sym_i_cvir ir).
+Proof.
+  unfold cvir_output_ids_WF. intros.
+  unfold sym_i_cvir in H0.
+  split_vec vi ni1.
+  split_vec vi2 ni3.
+  rename vi21 into vi2, vi22 into vi3.
+  simpl in H0.
+  rewrite sym_vec_app in H0.
+  apply H with (bid := bid) in H0.
+  unfold In in H0.
+  simpl in H0.
+  rewrite 3 in_app_iff in H0.
+  rewrite 3 vector_in_app_iff. tauto.
+  intros. assumption.
+Qed.
+
+
+Lemma sym_i_cvir_id_WF :
   forall ni1 ni2 ni3 no (ir : cvir (ni1+(ni2+ni3)) no),
   cvir_ids_WF ir -> cvir_ids_WF (sym_i_cvir ir).
 Proof.
@@ -372,7 +496,47 @@ Proof.
   tauto.
 Qed.
 
-Theorem sym_o_cvir_id_WF :
+
+Lemma sym_o_cvir_input_id_WF :
+  forall ni no1 no2 no3 (ir : cvir ni (no1+(no2+no3))),
+  cvir_input_ids_WF ir -> cvir_input_ids_WF (sym_o_cvir ir).
+Proof.
+  unfold cvir_input_ids_WF. intros.
+  unfold sym_o_cvir in H0.
+  split_vec vo no1.
+  split_vec vo2 no3.
+  rename vo21 into vo2, vo22 into vo3.
+  simpl in H0.
+  rewrite sym_vec_app in H0.
+  apply H in H0.
+  unfold In in H0.
+  simpl in H0.
+  rewrite in_app_iff in H0.
+  rewrite vector_in_app_iff. tauto.
+Qed.
+
+
+Lemma sym_o_cvir_output_id_WF :
+  forall ni no1 no2 no3 (ir : cvir ni (no1+(no2+no3))),
+  cvir_output_ids_WF ir -> cvir_output_ids_WF (sym_o_cvir ir).
+Proof.
+  unfold cvir_output_ids_WF. intros.
+  unfold sym_o_cvir in H0.
+  split_vec vo no1.
+  split_vec vo2 no3.
+  rename vo21 into vo2, vo22 into vo3.
+  simpl in H0.
+  rewrite sym_vec_app in H0.
+  apply H with (bid := bid) in H0 ; auto.
+  unfold In in H0.
+  simpl in H0.
+  rewrite !in_app_iff in H0.
+  rewrite !vector_in_app_iff. intuition.
+Qed.
+
+
+
+Lemma sym_o_cvir_id_WF :
   forall ni no1 no2 no3 (ir : cvir ni (no1+(no2+no3))),
   cvir_ids_WF ir -> cvir_ids_WF (sym_o_cvir ir).
 Proof.
@@ -393,7 +557,7 @@ Proof.
   tauto.
 Qed.
 
-Theorem sym_i_cvir_inputs_used :
+Lemma sym_i_cvir_inputs_used :
   forall ni1 ni2 ni3 no (ir : cvir (ni1+(ni2+ni3)) no),
   cvir_inputs_used ir ->
   cvir_inputs_used (sym_i_cvir ir).
@@ -408,7 +572,7 @@ Proof.
   assumption.
 Qed.
 
-Theorem sym_o_cvir_inputs_used :
+Lemma sym_o_cvir_inputs_used :
   forall ni no1 no2 no3 (ir : cvir ni (no1+(no2+no3))),
   cvir_inputs_used ir ->
   cvir_inputs_used (sym_o_cvir ir).
@@ -418,7 +582,7 @@ Proof.
   now apply H.
 Qed.
 
-Theorem sym_i_cvir_unique :
+Lemma sym_i_cvir_unique :
   forall ni1 ni2 ni3 no (ir : cvir (ni1+(ni2+ni3)) no),
   unique_bid ir ->
   unique_bid (sym_i_cvir ir).
@@ -436,7 +600,7 @@ Proof.
   rewrite <- app_assoc. rewrite <- 2 app_assoc in H0. exact H0.
 Qed.
 
-Theorem sym_o_cvir_unique :
+Lemma sym_o_cvir_unique :
   forall ni no1 no2 no3 (ir : cvir ni (no1+(no2+no3))),
   unique_bid ir ->
   unique_bid (sym_o_cvir ir).
@@ -447,11 +611,76 @@ Proof.
   eapply H ; eassumption.
 Qed.
 
-(* TODO sym_cvir_relabel_WF ? *)
+
+Lemma sym_i_cvir_relabel_WF :
+  forall ni1 ni2 ni3 no (ir : cvir (ni1+(ni2+ni3)) no),
+  cvir_relabel_WF ir ->
+  cvir_relabel_WF (sym_i_cvir ir).
+Proof.
+  unfold cvir_relabel_WF.
+  intros.
+  set (m := vec_build_map (vi++vo++vt) (vi'++vo'++vt')).
+  simpl in *.
+  split_vec vi ni1.
+  split_vec vi' ni1.
+  split_vec vi2 ni3.
+  split_vec vi'2 ni3.
+  rewrite !sym_vec_app in *.
+  specialize (H (vi1++vi22++vi21) (vi'1++vi'22++vi'21) vo vo' vt vt' ).
+  assert (H0' : unique_vector ((vi1++vi22++vi21) ++ vo ++ vt)).
+  {
+  clear H; clear H1; clear m ;
+  rewrite !unique_vector_assoc in H0;
+  apply unique_vector_sym in H0;
+  apply unique_vector_sym2 in H0;
+  rewrite unique_vector_assoc in H0;
+  rewrite unique_vector_assoc in H0;
+  apply unique_vector_sym2 in H0;
+  rewrite <- !unique_vector_assoc in H0;
+  apply unique_vector_sym in H0;
+  rewrite <- unique_vector_assoc in H0;
+  apply unique_vector_sym in H0;
+  rewrite <- unique_vector_assoc in H0;
+  apply unique_vector_sym2 in H0;
+  assumption.
+  }
+  apply H in H0'.
+  subst m.
+  admit.
+  (* NOTE We want a property on the vec_build_map such that we can re-order it and it preserves
+     ocfg_relabel... Such a property is that, each mapping in vec_build_map must be similar
+     and thus we don't care about, the order of the mapping
+   *)
+  assert (H1' : unique_vector ((vi'1++vi'22++vi'21) ++ vo' ++ vt')).
+  {
+  clear H; clear H0 ; clear H0' ; clear m ;
+  rewrite !unique_vector_assoc in H1 ;
+  apply unique_vector_sym in H1;
+  apply unique_vector_sym2 in H1;
+  rewrite unique_vector_assoc in H1;
+  rewrite unique_vector_assoc in H1;
+  apply unique_vector_sym2 in H1;
+  rewrite <- !unique_vector_assoc in H1;
+  apply unique_vector_sym in H1;
+  rewrite <- unique_vector_assoc in H1;
+  apply unique_vector_sym in H1;
+  rewrite <- unique_vector_assoc in H1;
+  apply unique_vector_sym2 in H1;
+  assumption.
+  }.
+assumption.
+Admitted.
+
+
+Lemma sym_o_cvir_relabel_WF :
+  forall ni no1 no2 no3 (ir : cvir ni (no1+(no2+no3))),
+  cvir_relabel_WF ir ->
+  cvir_relabel_WF (sym_o_cvir ir).
+Admitted.
 
 (* cast_i and cast_o WF *)
 
-Theorem cast_i_cvir_id_WF :
+Lemma cast_i_cvir_id_WF :
   forall ni ni' no (ir : cvir ni no) (H : ni = ni'),
   cvir_ids_WF ir -> cvir_ids_WF (cast_i_cvir ir H).
 Proof.
@@ -463,7 +692,30 @@ Proof.
   apply H1.
 Qed.
 
-Theorem cast_o_cvir_id_WF :
+
+Lemma cast_i_cvir_input_id_WF :
+  forall ni ni' no (ir : cvir ni no) (H : ni = ni'),
+  cvir_input_ids_WF ir -> cvir_input_ids_WF (cast_i_cvir ir H).
+Proof.
+  unfold cvir_input_ids_WF. intros.
+  cbn in H1.
+  destruct vi.
+  apply H0 in H1.
+  apply H1.
+Qed.
+
+Lemma cast_i_cvir_output_id_WF :
+  forall ni ni' no (ir : cvir ni no) (H : ni = ni'),
+  cvir_output_ids_WF ir -> cvir_output_ids_WF (cast_i_cvir ir H).
+Proof.
+  unfold cvir_output_ids_WF. intros.
+  cbn in H1.
+  destruct vi.
+  eapply H0 in H1 ; eauto.
+Qed.
+
+
+Lemma cast_o_cvir_id_WF :
   forall ni no no' (ir : cvir ni no) (H : no = no'),
   cvir_ids_WF ir -> cvir_ids_WF (cast_o_cvir ir H).
 Proof.
@@ -473,7 +725,27 @@ Proof.
   apply H1.
 Qed.
 
-Theorem cast_i_cvir_inputs_used :
+Lemma cast_o_cvir_input_id_WF :
+  forall no no' ni (ir : cvir ni no) (H : no = no'),
+  cvir_input_ids_WF ir -> cvir_input_ids_WF (cast_o_cvir ir H).
+Proof.
+  unfold cvir_input_ids_WF. intros.
+  cbn in H1.
+  apply H0 in H1.
+  apply H1.
+Qed.
+
+Lemma cast_o_cvir_output_id_WF :
+  forall no no' ni (ir : cvir ni no) (H : no = no'),
+  cvir_output_ids_WF ir -> cvir_output_ids_WF (cast_o_cvir ir H).
+Proof.
+  unfold cvir_output_ids_WF. intros.
+  cbn in H1.
+  eapply H0 in H1 ; eauto.
+Qed.
+
+
+Lemma cast_i_cvir_inputs_used :
   forall ni ni' no (ir : cvir ni no) (H : ni = ni'),
   cvir_inputs_used ir ->
   cvir_inputs_used (cast_i_cvir ir H).
@@ -485,7 +757,7 @@ Proof.
   apply H1.
 Qed.
 
-Theorem cast_o_cvir_inputs_used :
+Lemma cast_o_cvir_inputs_used :
   forall ni no no' (ir : cvir ni no) (H : no = no'),
   cvir_inputs_used ir ->
   cvir_inputs_used (cast_o_cvir ir H).
@@ -495,7 +767,7 @@ Proof.
   now apply H0.
 Qed.
 
-Theorem cast_i_cvir_unique :
+Lemma cast_i_cvir_unique :
   forall ni ni' no (ir : cvir ni no) (H : ni = ni'),
   unique_bid ir -> unique_bid (cast_i_cvir ir H).
 Proof.
@@ -509,7 +781,7 @@ Proof.
   exact H1.
 Qed.
 
-Theorem cast_o_cvir_unique :
+Lemma cast_o_cvir_unique :
   forall ni no no' (ir : cvir ni no) (H : no = no'),
   unique_bid ir -> unique_bid (cast_o_cvir ir H).
 Proof.
@@ -518,11 +790,23 @@ Proof.
   eapply H0 ; try eassumption.
 Qed.
 
-(* TODO cast_cvir_relabel_WF ? *)
+Lemma cast_i_cvir_relabel_WF :
+  forall ni ni' no (ir : cvir ni no) (H : ni = ni'),
+  cvir_relabel_WF ir ->
+  cvir_relabel_WF (cast_i_cvir ir H).
+Admitted.
+
+
+Lemma cast_o_cvir_relabel_WF :
+  forall ni no no' (ir : cvir ni no) (H : no = no'),
+  cvir_relabel_WF ir ->
+  cvir_relabel_WF (cast_o_cvir ir H).
+Admitted.
+
 
 (* focus_input WF *)
 
-Theorem focus_input_cvir_id_WF :
+Lemma focus_input_cvir_id_WF :
   forall ni no (ir : cvir ni no) (i : fin ni),
   cvir_ids_WF ir -> cvir_ids_WF (focus_input_cvir ir i).
 Proof.
@@ -536,7 +820,7 @@ Proof.
   exact H.
 Qed.
 
-Theorem focus_input_cvir_inputs_used :
+Lemma focus_input_cvir_inputs_used :
   forall ni no (ir : cvir ni no) (i : fin ni),
   cvir_inputs_used ir -> cvir_inputs_used (focus_input_cvir ir i).
 Proof.
@@ -550,7 +834,7 @@ Proof.
   exact H.
 Qed.
 
-Theorem focus_input_cvir_unique :
+Lemma focus_input_cvir_unique :
   forall ni no (ir : cvir ni no) (i : fin ni),
   unique_bid ir -> unique_bid (focus_input_cvir ir i).
 Proof.
@@ -564,12 +848,112 @@ Proof.
   exact H.
 Qed.
 
-(* TODO focus_cvir_relabel_WF ? *)
+Lemma focus_input_cvir_relabel_WF :
+  forall ni no (ir : cvir ni no) (i : fin ni),
+  cvir_relabel_WF ir ->
+  cvir_relabel_WF (focus_input_cvir ir i).
+Admitted.
 
+
+(* swap_i_input_n WF *)
+
+Lemma swap_i_cvir_id_WF :
+  forall ni no (ir : cvir ni no) (i : fin ni),
+  cvir_ids_WF ir -> cvir_ids_WF (swap_i_input_cvir i ir).
+Proof.
+  unfold cvir_ids_WF.
+  unfold swap_i_input_cvir.
+  intros.
+  apply H in H0.
+  clear H.
+  destruct H0 as [ H1 H2 ].
+  destruct vi ; subst.
+  destruct vt ; subst.
+  cbn in *.
+  rewrite in_app_iff in H1.
+  split.
+  - clear H2.
+    rewrite in_app_iff.
+    destruct H1 as [ H1 | H2 ] ; auto.
+    left.
+    apply swap_vec_In in H1.
+    apply cast_In in H1. auto.
+  - intros. apply H2 in H.
+    rewrite in_app_iff.
+    rewrite in_app_iff in H.
+    destruct H1 as [ H3 | H4 ] ; auto ;
+    ( destruct H ; auto ;
+    apply swap_vec_In in H ;
+    apply cast_In in H ;auto).
+Qed.
+
+Lemma swap_i_cvir_input_id_WF :
+  forall ni no (ir : cvir ni no) (i : fin ni),
+  cvir_input_ids_WF ir -> cvir_input_ids_WF (swap_i_input_cvir i ir).
+Proof.
+  unfold cvir_input_ids_WF.
+  unfold swap_i_input_cvir.
+  intros.
+  apply H in H0.
+  clear H.
+  destruct vi ; subst; cbn in *.
+  destruct vt ; subst; cbn in *.
+  rewrite ?in_app_iff in *.
+  destruct H0 as [ H1 | H2 ] ; auto.
+  apply swap_vec_In in H1.
+  apply cast_In in H1. auto.
+ Qed.
+
+Lemma swap_i_cvir_output_id_WF :
+  forall ni no (ir : cvir ni no) (i : fin ni),
+  cvir_output_ids_WF ir -> cvir_output_ids_WF (swap_i_input_cvir i ir).
+Proof.
+  unfold cvir_output_ids_WF.
+  unfold swap_i_input_cvir.
+  intros.
+  cbn in *.
+  apply H with (bid:= bid) in H0 ; auto.
+  destruct vi ; subst.
+  destruct vt ; subst.
+  cbn in *.
+  rewrite ?in_app_iff in *.
+  destruct H0 as [ H3 | H4 ] ; auto.
+  apply swap_vec_In in H3 ;
+  apply cast_In in H3 ; auto.
+ Qed.
+
+Lemma swap_i_cvir_inputs_used :
+  forall ni no (ir : cvir ni no) (i : fin ni),
+  cvir_inputs_used ir -> cvir_inputs_used (swap_i_input_cvir i ir).
+Proof.
+  unfold swap_i_input_cvir, cvir_inputs_used.
+  intros.
+  apply H with (vo:= vo) in H0.
+  cbn in *.
+  destruct vi ; subst.
+  unfold inputs in H0.
+Admitted.
+
+Lemma swap_i_cvir_unique :
+  forall ni no (ir : cvir ni no) (i : fin ni),
+  unique_bid ir -> unique_bid (swap_i_input_cvir i ir).
+Proof.
+  unfold swap_i_input_cvir, unique_bid.
+  intros ni no ir i HRec vi vo vt b1 b2 Huniq Hb1 Hb2 Hid.
+  cbn in *.
+  apply HRec with (vi:= (swap_i i vi)) (vo := vo) (vt := vt) ; auto.
+Admitted.
+
+
+Lemma swap_i_cvir_relabel_WF :
+  forall ni no (ir : cvir ni no) (i : fin ni),
+  cvir_relabel_WF ir -> cvir_relabel_WF (swap_i_input_cvir i ir).
+Proof.
+Admitted.
 
 (* focus_output WF *)
 
-Theorem focus_output_cvir_id_WF :
+Lemma focus_output_cvir_id_WF :
   forall ni no (ir : cvir ni no) (i : fin no),
   cvir_ids_WF ir -> cvir_ids_WF (focus_output_cvir ir i).
 Proof.
@@ -583,7 +967,7 @@ Proof.
   exact H.
 Qed.
 
-Theorem focus_output_cvir_inputs_used :
+Lemma focus_output_cvir_inputs_used :
   forall ni no (ir : cvir ni no) (o : fin no),
   cvir_inputs_used ir -> cvir_inputs_used (focus_output_cvir ir o).
 Proof.
@@ -597,7 +981,7 @@ Proof.
   exact H.
 Qed.
 
-Theorem focus_output_cvir_unique :
+Lemma focus_output_cvir_unique :
   forall ni no (ir : cvir ni no) (i : fin no),
   unique_bid ir -> unique_bid (focus_output_cvir ir i).
 Proof.
@@ -611,11 +995,16 @@ Proof.
   exact H.
 Qed.
 
-(* TODO focus_cvir_relabel_WF ? *)
+Lemma focus_output_cvir_relabel_WF :
+  forall ni no (ir : cvir ni no) (i : fin no),
+  cvir_relabel_WF ir ->
+  cvir_relabel_WF (focus_output_cvir ir i).
+Admitted.
+
 
 (* loop_cvir_open WF *)
 
-Theorem loop_cvir_open_id_WF :
+Lemma loop_open_cvir_id_WF :
   forall (ni no : nat) (ir : cvir (S ni) (S no)),
   cvir_ids_WF ir -> cvir_ids_WF (loop_cvir_open ir).
 Proof.
@@ -632,7 +1021,36 @@ Proof.
   left. subst bid. apply In_hd.
 Qed.
 
-Theorem loop_cvir_open_inputs_used :
+Lemma loop_open_cvir_input_id_WF :
+  forall (ni no : nat) (ir : cvir (S ni) (S no)),
+  cvir_input_ids_WF ir -> cvir_input_ids_WF (loop_cvir_open ir).
+Proof.
+  unfold loop_cvir_open.
+  unfold cvir_input_ids_WF.
+  intros.
+  simpl in *.
+  specialize (H vi (hd vi :: vo) vt b).
+  intuition.
+Qed.
+
+Lemma loop_open_cvir_output_id_WF :
+  forall (ni no : nat) (ir : cvir (S ni) (S no)),
+  cvir_output_ids_WF ir -> cvir_output_ids_WF (loop_cvir_open ir).
+Proof.
+  unfold loop_cvir_open.
+  unfold cvir_output_ids_WF.
+  intros.
+  simpl in *.
+  specialize (H vi (hd vi :: vo) vt b).
+  intuition.
+  specialize (H2 _ H1).
+  apply in_app_iff in H2. simpl in H2. rewrite in_app_iff in H2.
+  apply vector_in_app_iff. rewrite vector_in_app_iff.
+  intuition.
+  left. subst bid. apply In_hd.
+Qed.
+
+Lemma loop_open_cvir_inputs_used :
   forall (ni no : nat) (ir : cvir (S ni) (S no)),
   cvir_inputs_used ir -> cvir_inputs_used (loop_cvir_open ir).
 Proof.
@@ -642,7 +1060,7 @@ Proof.
   now apply H.
 Qed.
 
-Theorem loop_cvir_open_unique :
+Lemma loop_open_cvir_unique :
   forall (ni no : nat) (ir : cvir (S ni) (S no)),
   unique_bid ir -> unique_bid (loop_cvir_open ir).
 Proof.
@@ -652,122 +1070,135 @@ Proof.
   eapply H with (vo := (hd vi :: vo)) ; try eassumption.
 Qed.
 
-(* TODO loop_open_cvir_relabel_WF ? *)
+Lemma loop_open_cvir_relabel_WF :
+  forall (ni no : nat) (ir : cvir (S ni) (S no)),
+  cvir_relabel_WF ir ->
+  cvir_relabel_WF (loop_cvir_open ir).
+Admitted.
 
 (* loop_cvir WF *)
 
-Theorem loop_cvir_id_WF :
-  forall (ni no : nat) (ir : cvir (S ni) (S no)),
-  cvir_ids_WF ir -> cvir_ids_WF (loop_cvir ir).
+Lemma loop_cvir_input_id_WF :
+  forall (ni no n : nat) (ir : cvir (n+ni) (n+no)),
+  cvir_input_ids_WF ir -> cvir_input_ids_WF (loop_cvir n ir).
 Proof.
   unfold loop_cvir.
-  unfold cvir_ids_WF.
+  unfold cvir_input_ids_WF.
   intros.
-  simpl in *.
-  destruct (uncons vt) eqn:? in H0.
-  apply cons_uncons in Heqp. subst vt.
-  specialize (H (r::vi) (r::vo) t b).
+  split_vec vt n.
+  cbn in *.
   apply H in H0.
-  split.
-  - destruct H0 as [H0 _].
-    apply in_app_iff.
-    apply in_app_iff in H0.
-    simpl in *.
-    tauto.
-  - destruct H0 as [_ H0].
-    intros. specialize (H0 bid H1).
-    apply in_app_iff in H0. simpl in H0. rewrite in_app_iff in H0. (* FIXME *)
-    apply in_app_iff. simpl. rewrite in_app_iff.
-    simpl in *.
-    tauto.
+  destruct vi ; subst ; cbn in *.
+  destruct vo ; subst ; cbn in *.
+  destruct vt1 ; subst ; cbn in *.
+  destruct vt2 ; subst ; cbn in *.
+  rewrite !in_app_iff.
+  rewrite !in_app_iff in H0.
+  rewrite firstn_app in H0 ; cbn in *.
+  rewrite skipn_app in H0 ; cbn in *.
+  rewrite firstn_all in H0 ; cbn in *.
+  rewrite skipn_all in H0 ; cbn in *.
+  assert (length x1 - length x1 = 0).
+  { lia. }
+  rewrite H1 in H0. clear H1.
+  rewrite firstn_O in H0.
+  rewrite skipn_O in H0.
+  rewrite app_nil_r in H0.
+  intuition.
 Qed.
 
-Theorem loop_cvir_inputs_used :
-  forall (ni no : nat) (ir : cvir (S ni) (S no)),
-  cvir_inputs_used ir -> cvir_inputs_used (loop_cvir ir).
+Lemma loop_cvir_output_id_WF :
+  forall (ni no n : nat) (ir : cvir (n+ni) (n+no)),
+  cvir_output_ids_WF ir -> cvir_output_ids_WF (loop_cvir n ir).
 Proof.
-  unfold loop_cvir, cvir_inputs_used.
+  unfold loop_cvir.
+  unfold cvir_output_ids_WF.
   intros.
-  simpl in *.
-  break_let.
-  apply cons_uncons in Heqp. subst vt.
-  apply H.
-  unfold In in *.
-  apply in_app_iff. apply in_app_iff in H0. simpl in *.
-  tauto.
+  split_vec vt n.
+  cbn in *.
+  apply H with (vi:= vt1++vi) (vo:=vt1++vo) (vt:=vt2) in H1.
+  - destruct vi ; subst ; cbn in *.
+    destruct vo ; subst ; cbn in *.
+    destruct vt1 ; subst ; cbn in *.
+    destruct vt2 ; subst ; cbn in *.
+    rewrite !in_app_iff.
+    rewrite !in_app_iff in H1.
+    intuition.
+  - destruct vi ; subst ; cbn in *.
+    destruct vo ; subst ; cbn in *.
+    destruct vt1 ; subst ; cbn in *.
+    destruct vt2 ; subst ; cbn in *.
+    rewrite splitat_append in H0.
+    assumption.
 Qed.
 
-Theorem loop_cvir_unique :
-  forall (ni no : nat) (ir : cvir (S ni) (S no)),
-  unique_bid ir -> unique_bid (loop_cvir ir).
+
+Lemma loop_cvir_inputs_used :
+  forall (ni no n : nat) (ir : cvir (n+ni) (n+no)),
+  cvir_inputs_used ir -> cvir_inputs_used (loop_cvir n ir).
+Proof.
+  unfold loop_cvir.
+  unfold cvir_inputs_used.
+  intros.
+  split_vec vt n.
+  cbn in *.
+  (* apply H in H0. *)
+  destruct vi ; subst ; cbn in *.
+  destruct vo ; subst ; cbn in *.
+  destruct vt1 ; subst ; cbn in *.
+  destruct vt2 ; subst ; cbn in *.
+  rewrite !in_app_iff in H0.
+Admitted.
+
+Lemma loop_cvir_unique :
+  forall (ni no n : nat) (ir : cvir (n+ni) (n+no)),
+  unique_bid ir -> unique_bid (loop_cvir n ir).
 Proof.
   unfold loop_cvir, unique_bid.
   intros.
-  simpl in *.
-  destruct (uncons vt) eqn:? in H1, H2.
-  apply cons_uncons in Heqp. subst vt.
-  eapply H ; try eassumption.
-  apply unique_list_vector. apply unique_list_vector in H0. simpl in *.
-  replace (r :: proj1_sig t)%list with ((r :: nil) ++ proj1_sig t)%list in H0 by reflexivity.
-  apply unique_list_sym in H0.
-  rewrite <- app_assoc in H0.
-  apply unique_list_sym2 in H0.
-  apply H0.
-Qed.
+  cbn in *.
+  split_vec vt n.
+  apply H with (vi:= vt1++vi) (vo:=vt1++vo) (vt:=vt2) ; auto.
+  apply unique_vector_sym2 in H0.
+  apply unique_vector_assoc in H0.
+  apply unique_vector_sym in H0.
+  apply unique_vector_assoc in H0.
+  assumption.
+ Qed.
 
-(* TODO loop_cvir_relabel_WF ? *)
-
-(* seq_cvir WF *)
-
-Theorem seq_cvir_id_WF :
-  forall ni1 no1 ni2 no2 (ir1 : cvir ni1 (S no1)) (ir2 : cvir (S ni2) no2),
-  cvir_ids_WF ir1 -> cvir_ids_WF ir2 ->
-  cvir_ids_WF (seq_cvir ir1 ir2).
-Proof.
-  unfold seq_cvir.
-  intros.
-  apply loop_cvir_id_WF.
-  apply cast_o_cvir_id_WF.
-  apply cast_i_cvir_id_WF.
-  apply focus_input_cvir_id_WF.
-  apply merge_cvir_id_WF ; assumption.
-Qed.
-
-Theorem seq_cvir_inputs_used :
-  forall ni1 no1 ni2 no2 (ir1 : cvir ni1 (S no1)) (ir2 : cvir (S ni2) no2),
-  cvir_inputs_used ir1 -> cvir_inputs_used ir2 ->
-  cvir_inputs_used (seq_cvir ir1 ir2).
-Proof.
-  unfold seq_cvir.
-  intros.
-  apply loop_cvir_inputs_used.
-  apply cast_o_cvir_inputs_used.
-  apply cast_i_cvir_inputs_used.
-  apply focus_input_cvir_inputs_used.
-  apply merge_cvir_inputs_used; assumption.
-Qed.
-
-Theorem seq_cvir_unique :
-  forall ni1 no1 ni2 no2 (ir1 : cvir ni1 (S no1)) (ir2 : cvir (S ni2) no2),
-  cvir_ids_WF ir1 -> cvir_ids_WF ir2 ->
-  unique_bid ir1 -> unique_bid ir2 ->
-  unique_bid (seq_cvir ir1 ir2).
-Proof.
-  unfold seq_cvir.
-  intros.
-  apply loop_cvir_unique.
-  apply cast_o_cvir_unique.
-  apply cast_i_cvir_unique.
-  apply focus_input_cvir_unique.
-  apply merge_cvir_unique ; assumption.
-Qed.
-
-(* TODO seq_cvir_relabel_WF ? *)
-
+Lemma loop_cvir_relabel_WF :
+  forall (ni no n : nat) (ir : cvir (n+ni) (n+no)),
+  cvir_relabel_WF ir -> cvir_relabel_WF (loop_cvir n ir).
+Admitted.
 
 (* join_cvir WF *)
 
-Theorem join_cvir_id_WF :
+Lemma join_cvir_input_id_WF :
+  forall (ni no : nat) (ir : cvir ni (S (S no))),
+  cvir_input_ids_WF ir ->
+  cvir_input_ids_WF (join_cvir ir).
+Proof.
+  unfold join_cvir, cvir_input_ids_WF.
+  intros.
+  simpl in *.
+  apply H in H0. tauto.
+Qed.
+
+Lemma join_cvir_output_id_WF :
+  forall (ni no : nat) (ir : cvir ni (S (S no))),
+  cvir_output_ids_WF ir ->
+  cvir_output_ids_WF (join_cvir ir).
+Proof.
+  unfold join_cvir, cvir_output_ids_WF.
+  intros.
+  simpl in *.
+  apply H with (bid:= bid) in H0 ; auto.
+  apply in_app_iff in H0. simpl in H0. rewrite in_app_iff in H0.
+  apply vector_in_app_iff. rewrite (vector_in_app_iff _ _ _ vo vt).
+  intuition. subst. right. left. apply In_hd.
+Qed.
+
+Lemma join_cvir_id_WF :
   forall (ni no : nat) (ir : cvir ni (S (S no))),
   cvir_ids_WF ir ->
   cvir_ids_WF (join_cvir ir).
@@ -786,7 +1217,8 @@ Proof.
   right. left. apply In_hd.
 Qed.
 
-Theorem join_cvir_inputs_used :
+
+Lemma join_cvir_inputs_used :
   forall (ni no : nat) (ir : cvir ni (S (S no))),
   cvir_inputs_used ir ->
   cvir_inputs_used (join_cvir ir).
@@ -797,7 +1229,7 @@ Proof.
   now apply H.
 Qed.
 
-Theorem join_cvir_unique :
+Lemma join_cvir_unique :
   forall (ni no : nat) (ir : cvir ni (S (S no))),
   unique_bid ir ->
   unique_bid (join_cvir ir).
@@ -808,9 +1240,193 @@ Proof.
   eapply H ; eassumption.
 Qed.
 
-(* Todo join_cvir_relabel_WF ? *)
+Lemma join_cvir_relabel_WF :
+  forall (ni no : nat) (ir : cvir ni (S (S no))),
+  cvir_relabel_WF ir ->
+  cvir_relabel_WF (join_cvir ir).
+Admitted.
 
-(** TODO Explain these lemmas *)
+
+
+(** ----- Theorem WF combinators ---- *)
+
+Theorem block_cvir_WF :
+  forall c, cvir_WF (block_cvir c).
+Proof.
+  unfold cvir_WF. intros c.
+  split. now apply block_cvir_unique.
+  split. now apply block_cvir_input_id_WF.
+  split. now apply block_cvir_output_id_WF.
+  split. now apply block_cvir_inputs_used.
+  now apply block_cvir_relabel_WF.
+Qed.
+
+Theorem branch_cvir_WF : forall c e, cvir_WF (branch_cvir c e).
+Proof.
+  unfold cvir_WF. intros c e.
+  split. now apply branch_cvir_unique.
+  split. now apply branch_cvir_input_id_WF.
+  split. now apply branch_cvir_output_id_WF.
+  split. now apply branch_cvir_inputs_used.
+  now apply branch_cvir_relabel_WF.
+Qed.
+
+Theorem sym_i_cvir_WF :
+  forall ni1 ni2 ni3 no (ir : cvir (ni1+(ni2+ni3)) no),
+  cvir_WF ir -> cvir_WF (sym_i_cvir ir).
+Proof.
+  unfold cvir_WF ; intros ni1 ni2 ni3 no ir [? [? [? [? ?]]]].
+  split. now apply sym_i_cvir_unique.
+  split. now apply sym_i_cvir_input_id_WF.
+  split. now apply sym_i_cvir_output_id_WF.
+  split. now apply sym_i_cvir_inputs_used.
+  now apply sym_i_cvir_relabel_WF.
+Qed.
+
+Theorem sym_o_cvir_WF :
+  forall ni no1 no2 no3 (ir : cvir ni (no1+(no2+no3))),
+  cvir_WF ir -> cvir_WF (sym_o_cvir ir).
+Proof.
+  unfold cvir_WF ; intros ni no1 no2 no3 ir [? [? [? [? ?]]]].
+  split. now apply sym_o_cvir_unique.
+  split. now apply sym_o_cvir_input_id_WF.
+  split. now apply sym_o_cvir_output_id_WF.
+  split. now apply sym_o_cvir_inputs_used.
+  now apply sym_o_cvir_relabel_WF.
+Qed.
+
+Theorem cast_i_cvir_WF :
+  forall ni ni' no (ir : cvir ni no) (H : ni = ni'),
+  cvir_WF ir -> cvir_WF (cast_i_cvir ir H).
+Proof.
+  unfold cvir_WF ; intros ni ni' no ir H [? [? [? [? ?]]]].
+  split. now apply cast_i_cvir_unique.
+  split. now apply cast_i_cvir_input_id_WF.
+  split. now apply cast_i_cvir_output_id_WF.
+  split. now apply cast_i_cvir_inputs_used.
+  now apply cast_i_cvir_relabel_WF.
+Qed.
+
+Theorem cast_o_cvir_WF :
+  forall ni no no' (ir : cvir ni no) (H : no = no'),
+  cvir_WF ir -> cvir_WF (cast_o_cvir ir H).
+Proof.
+  unfold cvir_WF ; intros ni no no' ir H [? [? [? [? ?]]]].
+  split. now apply cast_o_cvir_unique.
+  split. now apply cast_o_cvir_input_id_WF.
+  split. now apply cast_o_cvir_output_id_WF.
+  split. now apply cast_o_cvir_inputs_used.
+  now apply cast_o_cvir_relabel_WF.
+Qed.
+
+Theorem focus_input_cvir_WF :
+  forall ni no (ir : cvir ni no) (i : fin ni),
+  cvir_WF ir -> cvir_WF (focus_input_cvir ir i).
+Proof.
+  unfold focus_input_cvir.
+  intros.
+  apply cast_i_cvir_WF.
+  apply sym_i_cvir_WF.
+  apply cast_i_cvir_WF.
+  apply sym_i_cvir_WF.
+  apply cast_i_cvir_WF.
+  assumption.
+Qed.
+
+Theorem focus_output_cvir_WF :
+  forall ni no (ir : cvir ni no) (i : fin no),
+  cvir_WF ir -> cvir_WF (focus_output_cvir ir i).
+Proof.
+  unfold focus_output_cvir.
+  intros.
+  apply cast_o_cvir_WF.
+  apply sym_o_cvir_WF.
+  apply cast_o_cvir_WF.
+  apply sym_o_cvir_WF.
+  apply cast_o_cvir_WF.
+  assumption.
+Qed.
+
+Theorem swap_i_cvir_WF :
+  forall ni no (ir : cvir ni no) (i : fin ni),
+  cvir_WF ir -> cvir_WF (swap_i_input_cvir i ir).
+Proof.
+  unfold cvir_WF ; intros ni no ir i [? [? [? [? ?]]]].
+  split. now apply swap_i_cvir_unique.
+  split. now apply swap_i_cvir_input_id_WF.
+  split. now apply swap_i_cvir_output_id_WF.
+  split. now apply swap_i_cvir_inputs_used.
+  now apply swap_i_cvir_relabel_WF.
+Qed.
+
+Theorem loop_cvir_WF :
+  forall (ni no n : nat) (ir : cvir (n+ni) (n+no)),
+  cvir_WF ir -> cvir_WF (loop_cvir n ir).
+Proof.
+  unfold cvir_WF ; intros ni no ir i [? [? [? [? ?]]]].
+  split. now apply loop_cvir_unique.
+  split. now apply loop_cvir_input_id_WF.
+  split. now apply loop_cvir_output_id_WF.
+  split. now apply loop_cvir_inputs_used.
+  now apply loop_cvir_relabel_WF.
+Qed.
+
+Theorem loop_open_cvir_WF :
+  forall (ni no : nat) (ir : cvir (S ni) (S no)),
+  cvir_WF ir -> cvir_WF (loop_cvir_open ir).
+Proof.
+  unfold cvir_WF ; intros ni no ir [? [? [? [? ?]]]].
+  split. now apply loop_open_cvir_unique.
+  split. now apply loop_open_cvir_input_id_WF.
+  split. now apply loop_open_cvir_output_id_WF.
+  split. now apply loop_open_cvir_inputs_used.
+  now apply loop_open_cvir_relabel_WF.
+Qed.
+
+
+Theorem merge_cvir_WF :
+  forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2),
+  cvir_WF ir1 -> cvir_WF ir2 ->
+  cvir_WF (merge_cvir ir1 ir2).
+Proof.
+  unfold cvir_WF.
+  intuition.
+  now apply merge_cvir_unique.
+  now apply merge_cvir_input_id_WF.
+  now apply merge_cvir_output_id_WF.
+  now apply merge_cvir_inputs_used.
+  now apply merge_cvir_relabel_WF.
+Qed.
+
+Theorem seq_cvir_WF :
+  forall ni n no (ir1 : cvir (S ni) n) (ir2 : cvir n no),
+  cvir_WF ir1 -> cvir_WF ir2 ->
+  cvir_WF (seq_cvir ir1 ir2).
+Proof.
+  unfold seq_cvir.
+  intros.
+  apply loop_cvir_WF.
+  apply cast_o_cvir_WF.
+  apply cast_i_cvir_WF.
+  apply swap_i_cvir_WF.
+  apply merge_cvir_WF ; assumption.
+Qed.
+
+
+Theorem join_cvir_WF :
+  forall (ni no : nat) (ir : cvir ni (S (S no))),
+  cvir_WF ir -> cvir_WF (join_cvir ir).
+Proof.
+  unfold cvir_WF ; intros ni no ir [? [? [? [? ?]]]].
+  split. now apply join_cvir_unique.
+  split. now apply join_cvir_input_id_WF.
+  split. now apply join_cvir_output_id_WF.
+  split. now apply join_cvir_inputs_used.
+  now apply join_cvir_relabel_WF.
+Qed.
+
+
+(** TODO Documente these lemmas *)
 Lemma cvir_inputs : forall {ni no} (ir : cvir ni no) vi vo vt i,
   cvir_ids_WF ir ->
   cvir_inputs_used ir ->
