@@ -76,6 +76,8 @@ leads to some non-trivial arithmetic and reasoning on renaming.
 Maybe using this hypothetical higher level lemma could sooth the pain.
  *)
 
+(** Some lemmas about build_map *)
+
 Lemma firstn_build_map : forall i n m,
 firstn n (build_map i (n + m)) = build_map i n.
 Proof.

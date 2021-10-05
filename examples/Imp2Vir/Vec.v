@@ -476,24 +476,6 @@ Definition vec_build_map {A n} (v v' : Vec.t A n) : alist A A :=
   List.combine (proj1_sig v) (proj1_sig v').
 
 
-(* Theorem vec_build_map_assoc : *)
-(*   forall A n1 n2 n3 (v1 v1': Vec.t A n1) (v2 v2': Vec.t A n2) (v3 v3': Vec.t A n3), *)
-(*   vec_build_map (append (append v1 v2) v3) (append (append v1' v2') v3') *)
-(*   = *)
-(*   vec_build_map (append v1 (append v2 v3)) (append v1' (append v2' v3')). *)
-(* Proof. *)
-(*   intros. *)
-(*   destruct v1 ; subst ; cbn in *. *)
-(*   destruct v2 ; subst ; cbn in *. *)
-(*   destruct v3 ; subst ; cbn in *. *)
-(*   destruct v1' ; subst ; cbn in *. *)
-(*   destruct v2' ; subst ; cbn in *. *)
-(*   destruct v3' ; subst ; cbn in *. *)
-(*   rewrite !List.app_assoc ; auto. *)
-(* Qed. *)
-
-
-
 (* Swap vectors *)
 Definition swap_vec {A} {n1 n2} (v : Vec.t A (n1 + n2)) : Vec.t A (n2 + n1) :=
   let '(v1,v2) := Vec.splitat n1 v in
@@ -556,6 +538,17 @@ Proof.
     apply cast_In in H. assumption.
 Qed.
 
+
+
+Lemma hd_app: forall {A n1 n2} (v1 : t A (S n1)) (v2 : t A n2),
+  hd (append v1 v2) = hd v1.
+Proof.
+  intros.
+  destruct v1 as [l1 H1] ; subst ; simpl in *.
+  induction l1.
+  - discriminate.
+  - cbn ; reflexivity.
+Qed.
 
 Declare Scope vec_scope.
 Delimit Scope vec_scope with vec.

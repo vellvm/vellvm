@@ -81,6 +81,31 @@ Proof.
     break_match; tauto.
 Qed.
 
+
+Lemma combine_app : forall {A} (l1 l2 l1' l2' : list A) ,
+  List.length l1 = List.length l1' ->
+  List.length l2 = List.length l2' ->
+  combine (l1++l2) (l1'++l2') = (combine l1 l1')++(combine l2 l2').
+Proof.
+  induction l1 ; intros.
+  - simpl in H ; symmetry in H ; apply length_zero_iff_nil in H ; subst.
+    auto.
+  - destruct l1' ; try (discriminate).
+    simpl in H ; inv H.
+    simpl. rewrite IHl1 ; auto.
+Qed.
+
+
+Lemma combine_cons : forall {A} (a a' : A) (l l' : list A),
+  (* List.length l = List.length l' -> *)
+  combine (a::l) (a'::l') = (combine (a::nil) (a'::nil) )++(combine l l').
+Proof.
+  induction l eqn:E ; intros.
+  - auto.
+  - destruct l' ; auto.
+Qed.
+
+
 (* Misc lemmas related to extlib *)
 
 Lemma key_in_alist_find : forall {A B : Type} {RD : RelDec.RelDec eq},

@@ -195,29 +195,6 @@ Next Obligation.
 lia.
 Defined.
 
-(* Create a block with (n+1) inputs and (n+1) outputs, with no code *)
-(* NOTE it's a trick to avoid n=0.... *)
-(* Fixpoint block_cvir_n (n : nat) : cvir (S n) (S n) := *)
-(*   match n with *)
-(*   | 0%nat => block_cvir [] *)
-(*   | S n' => merge_cvir (block_cvir []) (block_cvir_n n') *)
-(*   end. *)
-
-
-(* Program Definition seq_gen_cvir {ni1 no1 ni2 no2 n : nat} *)
-(*         (b1 : cvir (S ni1) (n+(S no1))) *)
-(*         (b2 : cvir (n+(S ni2)) no2) *)
-(*   : cvir (S (ni1+ni2)) (no1+no2) := *)
-(*   if (leb ni2 no1) (* no1 > n*) *)
-(*   then let b2' := merge_cvir b2 (block_cvir_n (no1-1)) in *)
-(*        seq_cvir (ni:= ni1) b1 b2' *)
-(*   else let b1' := merge_cvir b1 (block_cvir_n (ni2-1)) in *)
-(*        seq_cvir (ni:= ni1) b1' b2 *)
-(* . *)
-(* Next Obligation. *)
-(* lia. *)
-
-
 (* Connect the first output of b to its first input, and internalize the only
 the output *)
 Definition loop_cvir_open {ni no : nat} (b : cvir (S ni) (S no)) : cvir (S ni) no :=

@@ -23,6 +23,7 @@ From Vellvm Require Import
      Utils.Tactics
      Utils.Util.
 
+
 Section Relabel.
 
 (* A relabeling is just a map from bid to bid *)
@@ -81,6 +82,7 @@ Definition bk_relabel {typ} (m : bid_map) (bk : block typ) : block typ :=
 (* Relabeling an ocfg *)
 Definition ocfg_relabel {typ} m cfg : ocfg typ :=
   List.map (bk_relabel m) cfg.
+
 
 
 (* NOTE seems to be never used.... why ?*)
@@ -401,6 +403,185 @@ Proof.
     now left.
   - tauto.
 Qed.
+
+
+(* Equivalence between bid_map *)
+
+Definition map_equivalent (m m' : bid_map) :=
+  forall k v,
+  alist_find k m = Some v <-> alist_find k m' = Some v.
+
+#[global] Instance map_equiv : Equivalence map_equivalent.
+Proof.
+  constructor.
+  - constructor ; auto.
+  - constructor ; intros ;
+    unfold map_equivalent in H ;
+    apply H in H0 ; assumption.
+  - constructor ; intros ; auto ;
+    unfold map_equivalent in H,H0.
+    + apply H in H1 ; apply H0 in H1 ; assumption.
+    + apply H ; apply H0 ; assumption.
+Qed.
+
+Lemma map_nil_cons_not_equivalent: forall p (m : bid_map),
+  ~ map_equivalent nil (p::m).
+Proof.
+  unfold map_equivalent.
+  repeat intro.
+  simpl in H.
+Admitted.
+
+
+Lemma map_equivalent_app: forall (m1 m1' m2 m2' : bid_map),
+  map_equivalent m1 m1' ->
+  map_equivalent m2 m2' ->
+  map_equivalent (m1++m2)%list (m1'++m2').
+Proof.
+  intros.
+  (* generalize dependent m1'. *)
+  induction m1 ; intros.
+  - destruct m1' ; auto.
+    apply map_nil_cons_not_equivalent in H.
+    contradiction.
+  - destruct m1' ; auto.
+    symmetry in H ;
+    apply map_nil_cons_not_equivalent in H ;
+    contradiction.
+    (* I probably failed my proof somewhere *)
+Admitted.
+
+Lemma blk_id_relabel_equivalent :
+  forall (m m' : bid_map) id,
+  map_equivalent m m' ->
+  blk_id_relabel m id = blk_id_relabel m' id.
+Proof.
+  unfold map_equivalent, blk_id_relabel.
+  intros.
+  destruct (alist_find id m) eqn:E.
+  - apply H in E ; rewrite E ; reflexivity.
+  - destruct (alist_find id m') eqn:E' ;
+    [ apply H in E' ; rewrite E in E' ; discriminate | reflexivity ].
+Qed.
+
+
+Lemma blk_phi_relabel_equivalent :
+  forall (m m' : bid_map) {T} (p : phi T),
+  map_equivalent m m' ->
+  blk_phi_relabel m p = blk_phi_relabel m' p.
+Proof.
+  unfold map_equivalent, blk_phi_relabel.
+  intros.
+  destruct p.
+  repeat f_equal.
+  (* Import FunctionalExtensionality. *)
+  (* apply functional_extensionality. *)
+  (* NOTE Do I need functional_extensionality or do I introduce a new equivalence relation ? *)
+  (* assert (forall bid e, (blk_id_relabel m bid, e) = (blk_id_relabel m' bid, e)). *)
+Admitted.
+
+
+Lemma blk_phis_relabel_equivalent :
+  forall (m m' : bid_map) {T} (l : list (local_id * phi T)),
+  map_equivalent m m' ->
+  blk_phis_relabel m l = blk_phis_relabel m' l.
+Proof.
+  unfold map_equivalent, blk_phis_relabel.
+  intros.
+  cbn.
+  f_equal.
+  (* assert (forall T (lid phi, (lid, @blk_phi_relabel T m phi) = (lid, @blk_phi_relabel T m' phi)). *)
+Admitted.
+
+Lemma blk_term_relabel_equivalent :
+  forall (m m' : bid_map) {T} (t : terminator T),
+  map_equivalent m m' ->
+  blk_term_relabel m t = blk_term_relabel m' t.
+Proof.
+  unfold map_equivalent, blk_term_relabel.
+  intros.
+  destruct t ; auto ;
+  rewrite blk_id_relabel_equivalent with (m':=m') ; auto.
+  assert ((blk_id_relabel m br2) = (blk_id_relabel m' br2)).
+  rewrite blk_id_relabel_equivalent with (m':=m') ; auto.
+  rewrite H0 ; clear H0. reflexivity.
+  repeat f_equal.
+Admitted.
+
+
+
+Lemma bk_relabel_equivalent :
+  forall (m m' : bid_map) (b : block typ),
+  map_equivalent m m' ->
+  bk_relabel m b = bk_relabel m' b.
+Proof.
+  unfold map_equivalent.
+  intros.
+  unfold bk_relabel.
+  rewrite blk_id_relabel_equivalent with (m':=m') ; auto.
+  rewrite blk_phis_relabel_equivalent with (m':=m') ; auto.
+  rewrite blk_term_relabel_equivalent with (m':=m') ; auto.
+Qed.
+
+Theorem ocfg_relabel_equivalent :
+  forall (m m' : bid_map) (b : list (block typ)),
+  map_equivalent m m' ->
+  ocfg_relabel m b = ocfg_relabel m' b.
+Proof.
+  unfold map_equivalent, ocfg_relabel.
+  intros.
+  induction b.
+  - auto.
+  - cbn.
+    rewrite bk_relabel_equivalent with (m' := m') ; auto.
+    f_equal ; assumption.
+Qed.
+
+
+(* vec_build_map : forall {A : Type} {n : nat}, t A n -> t A n -> FMapAList.alist A A *)
+
+(* TODO how to define this kind of theorem ? *)
+(* NOTE me from the future... ????? *)
+From Imp2Vir Require Import Vec.
+Theorem find_vec_build_map_assoc :
+  forall n1 n2 n3 (v1 v1': Vec.t block_id n1) (v2 v2': Vec.t block_id n2) (v3 v3': Vec.t block_id n3),
+  map_equivalent
+  (vec_build_map ((v1++v2)++v3)%vec ((v1'++v2')++v3')%vec)
+  (vec_build_map (v1++(v2++v3))%vec (v1'++(v2'++v3'))%vec).
+Proof.
+  unfold map_equivalent.
+  intros.
+  destruct v1 ; subst ; cbn in *.
+  destruct v2 ; subst ; cbn in *.
+  destruct v3 ; subst ; cbn in *.
+  destruct v1' ; subst ; cbn in *.
+  destruct v2' ; subst ; cbn in *.
+  destruct v3' ; subst ; cbn in *.
+  rewrite !List.app_assoc ; auto ; tauto.
+Qed.
+
+Theorem find_vec_build_map_comm :
+  forall n1 n2 (v1 v1': Vec.t block_id n1) (v2 v2': Vec.t block_id n2),
+  map_equivalent
+  (vec_build_map (v1++v2)%vec (v1'++v2')%vec)
+  (vec_build_map (v2++v1)%vec (v2'++v1')%vec).
+Proof.
+  unfold map_equivalent.
+  intros.
+  destruct v1 ; subst ; cbn in *.
+  destruct v2 ; subst ; cbn in *.
+  destruct v1' ; subst ; cbn in *.
+  destruct v2' ; subst ; cbn in *.
+Admitted.
+
+Theorem find_vec_build_map_comm2 :
+  forall n1 n2 n3 (v1 v1': Vec.t block_id n1) (v2 v2': Vec.t block_id n2) (v3 v3': Vec.t block_id n3),
+  map_equivalent
+  (vec_build_map (v1++(v2++v3))%vec (v1'++(v2'++v3'))%vec)
+  (vec_build_map (v1++(v3++v2))%vec (v1'++(v3'++v2'))%vec).
+Admitted.
+
+
 
 
 (** Properties on phi relabeling *)

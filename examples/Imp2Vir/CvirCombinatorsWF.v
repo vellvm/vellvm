@@ -415,20 +415,24 @@ Proof.
   split_vec vi' ni1.
   split_vec vo' no1.
   split_vec vt' (n_int ir1).
-  apply unique_vector_split6 in H1, H2.
+  apply unique_vector_split6 in H1, H2. (* re-order automatically then split *)
   specialize (H vi1 vi'1 vo1 vo'1 vt1 vt'1 (proj1 H1) (proj1 H2)).
   specialize (H0 vi2 vi'2 vo2 vo'2 vt2 vt'2 (proj2 H1) (proj2 H2)).
-  (* rewrite 6 firstn_app_exact. *)
-  (* rewrite 6 skipn_app_exact. *)
   unfold ocfg_relabel.
   rewrite List.map_app.
   rewrite H, H0.
+  set (m1 := (vec_build_map (vi1 ++ vo1 ++ vt1)%vec (vi'1 ++ vo'1 ++ vt'1)%vec)).
+  set (m2 := (vec_build_map (vi2 ++ vo2 ++ vt2)%vec (vi'2 ++ vo'2 ++ vt'2)%vec)).
   fold (ocfg_relabel m (blocks ir1 vi1 vo1 vt1)).
   fold (ocfg_relabel m (blocks ir2 vi2 vo2 vt2)).
   f_equal.
-  - f_equal. subst m.
-    admit. (* the mappings are identical for the relevant keys *)
-  - f_equal. subst m.
+  - subst m1 ; subst m.
+    (* we would like a property establishing that if m maps ids which are not
+      in the list block, we can ignore them and prune them away the map *)
+    (* in other words, we can prune the irrelevant keys and we prove the the mapping
+       is identical for the relevant keys *)
+    admit.
+  - subst m.
     admit.
 Admitted.
 
@@ -611,7 +615,6 @@ Proof.
   eapply H ; eassumption.
 Qed.
 
-
 Lemma sym_i_cvir_relabel_WF :
   forall ni1 ni2 ni3 no (ir : cvir (ni1+(ni2+ni3)) no),
   cvir_relabel_WF ir ->
@@ -644,13 +647,6 @@ Proof.
   apply unique_vector_sym2 in H0;
   assumption.
   }
-  apply H in H0'.
-  subst m.
-  admit.
-  (* NOTE We want a property on the vec_build_map such that we can re-order it and it preserves
-     ocfg_relabel... Such a property is that, each mapping in vec_build_map must be similar
-     and thus we don't care about, the order of the mapping
-   *)
   assert (H1' : unique_vector ((vi'1++vi'22++vi'21) ++ vo' ++ vt')).
   {
   clear H; clear H0 ; clear H0' ; clear m ;
@@ -667,16 +663,60 @@ Proof.
   rewrite <- unique_vector_assoc in H1;
   apply unique_vector_sym2 in H1;
   assumption.
-  }.
-assumption.
-Admitted.
+  }
+  apply H in H0' ; auto.
+  set (m' := (vec_build_map ((vi1 ++ vi22 ++ vi21) ++ vo ++ vt) ((vi'1 ++ vi'22 ++ vi'21) ++ vo' ++ vt'))).
+  rewrite ocfg_relabel_equivalent with (m:= m) (m':= m').
+  assumption.
+  clear.
+  subst m; subst m' ; intros.
+  unfold map_equivalent.
+  split ; intros ; (
+  apply find_vec_build_map_comm in H; (* comm and comm2 are still unproved *)
+  apply find_vec_build_map_assoc in H;
+  apply find_vec_build_map_assoc in H;
+  apply find_vec_build_map_comm in H;
+  apply find_vec_build_map_comm2 in H;
+  apply find_vec_build_map_assoc in H;
+  apply find_vec_build_map_assoc in H;
+  apply find_vec_build_map_comm in H;
+  apply find_vec_build_map_assoc in H;
+  assumption). (* ugly... *)
+Qed.
 
 
 Lemma sym_o_cvir_relabel_WF :
   forall ni no1 no2 no3 (ir : cvir ni (no1+(no2+no3))),
   cvir_relabel_WF ir ->
   cvir_relabel_WF (sym_o_cvir ir).
+Proof.
+  unfold cvir_relabel_WF.
+  intros.
+  set (m := vec_build_map (vi++vo++vt) (vi'++vo'++vt')).
+  simpl in *.
+  split_vec vo no1.
+  split_vec vo' no1.
+  split_vec vo2 no3.
+  split_vec vo'2 no3.
+  rewrite !sym_vec_app in *.
+  specialize (H vi vi' (vo1++vo22++vo21) (vo'1++vo'22++vo'21) vt vt' ).
+  assert (H0' : unique_vector (vi ++ (vo1++vo22++vo21) ++ vt)).
+  { admit. } (* do it automatically *)
+  assert (H1' : unique_vector (vi' ++ (vo'1++vo'22++vo'21) ++ vt')).
+  { admit. } (* do it automatically *)
+  apply H in H0' ; auto.
+  (* subst m. *)
+  set (m' := (vec_build_map (vi ++ (vo1 ++ vo22 ++ vo21) ++ vt) (vi' ++ (vo'1 ++ vo'22 ++ vo'21)++ vt'))).
+  rewrite ocfg_relabel_equivalent with (m:= m) (m':= m').
+  assumption.
+  clear.
+  subst m; subst m' ; intros.
+  unfold map_equivalent.
+  split ; intros.
+  - admit. (* do it automatically *)
+  - admit. (* do it automatically *)
 Admitted.
+
 
 (* cast_i and cast_o WF *)
 
@@ -794,14 +834,46 @@ Lemma cast_i_cvir_relabel_WF :
   forall ni ni' no (ir : cvir ni no) (H : ni = ni'),
   cvir_relabel_WF ir ->
   cvir_relabel_WF (cast_i_cvir ir H).
-Admitted.
+Proof.
+  unfold cvir_relabel_WF.
+  intros.
+  set (m := vec_build_map (vi++vo++vt) (vi'++vo'++vt')).
+  simpl in *.
+  erewrite ocfg_relabel_equivalent.
+  apply H0.
+  - destruct vi as [li Hli'].
+    rewrite (cast_vec raw_id ni' ni li Hli' (eq_sym H)).
+    rewrite H.
+    apply H1.
+  - destruct vi' as [li' Hli'].
+    rewrite (cast_vec raw_id ni' ni li' Hli' (eq_sym H)).
+    rewrite H.
+    apply H2.
+  - reflexivity.
+Qed.
 
 
 Lemma cast_o_cvir_relabel_WF :
   forall ni no no' (ir : cvir ni no) (H : no = no'),
   cvir_relabel_WF ir ->
   cvir_relabel_WF (cast_o_cvir ir H).
-Admitted.
+Proof.
+  unfold cvir_relabel_WF.
+  intros.
+  set (m := vec_build_map (vi++vo++vt) (vi'++vo'++vt')).
+  simpl in *.
+  erewrite ocfg_relabel_equivalent.
+  apply H0.
+  - destruct vo as [lo Hlo'].
+    rewrite (cast_vec raw_id no' no lo Hlo' (eq_sym H)).
+    rewrite H.
+    apply H1.
+  - destruct vo' as [lo' Hlo'].
+    rewrite (cast_vec raw_id no' no lo' Hlo' (eq_sym H)).
+    rewrite H.
+    apply H2.
+  - reflexivity.
+Qed.
 
 
 (* focus_input WF *)
@@ -852,7 +924,16 @@ Lemma focus_input_cvir_relabel_WF :
   forall ni no (ir : cvir ni no) (i : fin ni),
   cvir_relabel_WF ir ->
   cvir_relabel_WF (focus_input_cvir ir i).
-Admitted.
+Proof.
+  unfold focus_input_cvir.
+  intros.
+  apply cast_i_cvir_relabel_WF.
+  apply sym_i_cvir_relabel_WF.
+  apply cast_i_cvir_relabel_WF.
+  apply sym_i_cvir_relabel_WF.
+  apply cast_i_cvir_relabel_WF.
+  assumption.
+Qed.
 
 
 (* swap_i_input_n WF *)
@@ -928,20 +1009,25 @@ Lemma swap_i_cvir_inputs_used :
 Proof.
   unfold swap_i_input_cvir, cvir_inputs_used.
   intros.
-  apply H with (vo:= vo) in H0.
-  cbn in *.
-  destruct vi ; subst.
-  unfold inputs in H0.
-Admitted.
+  simpl in *.
+  apply H.
+  rewrite vector_in_app_iff.
+  rewrite vector_in_app_iff in H0.
+  destruct H0 ; auto.
+  left. rewrite swap_i_In in H0.
+  eapply H0.
+Qed.
 
 Lemma swap_i_cvir_unique :
   forall ni no (ir : cvir ni no) (i : fin ni),
-  unique_bid ir -> unique_bid (swap_i_input_cvir i ir).
+  unique_bid ir ->
+  unique_bid (swap_i_input_cvir i ir).
 Proof.
   unfold swap_i_input_cvir, unique_bid.
-  intros ni no ir i HRec vi vo vt b1 b2 Huniq Hb1 Hb2 Hid.
-  cbn in *.
-  apply HRec with (vi:= (swap_i i vi)) (vo := vo) (vt := vt) ; auto.
+  intros ; simpl in *.
+  apply H with (vi := (swap_i i vi)) (vo := vo) (vt := vt) ; auto.
+  clear -H0.
+  (* should i defined a relation between unique_vector ? *)
 Admitted.
 
 
@@ -949,6 +1035,10 @@ Lemma swap_i_cvir_relabel_WF :
   forall ni no (ir : cvir ni no) (i : fin ni),
   cvir_relabel_WF ir -> cvir_relabel_WF (swap_i_input_cvir i ir).
 Proof.
+  unfold cvir_relabel_WF.
+  intros.
+  set (m := vec_build_map (vi++vo++vt) (vi'++vo'++vt')).
+  simpl in *.
 Admitted.
 
 (* focus_output WF *)
@@ -997,9 +1087,17 @@ Qed.
 
 Lemma focus_output_cvir_relabel_WF :
   forall ni no (ir : cvir ni no) (i : fin no),
-  cvir_relabel_WF ir ->
-  cvir_relabel_WF (focus_output_cvir ir i).
-Admitted.
+  cvir_relabel_WF ir -> cvir_relabel_WF (focus_output_cvir ir i).
+ Proof.
+  unfold focus_output_cvir.
+  intros.
+  apply cast_o_cvir_relabel_WF;
+  apply sym_o_cvir_relabel_WF;
+  apply cast_o_cvir_relabel_WF;
+  apply sym_o_cvir_relabel_WF;
+  apply cast_o_cvir_relabel_WF;
+  assumption.
+Qed.
 
 
 (* loop_cvir_open WF *)
@@ -1070,10 +1168,76 @@ Proof.
   eapply H with (vo := (hd vi :: vo)) ; try eassumption.
 Qed.
 
+
 Lemma loop_open_cvir_relabel_WF :
   forall (ni no : nat) (ir : cvir (S ni) (S no)),
   cvir_relabel_WF ir ->
   cvir_relabel_WF (loop_cvir_open ir).
+Proof.
+  unfold cvir_relabel_WF.
+  intros.
+  set (m := vec_build_map (vi++vo++vt) (vi'++vo'++vt')).
+  simpl in *.
+  split_vec vi 1 ; split_vec vi' 1.
+  set (m' :=
+         (vec_build_map
+          ((vi1 ++ vi2) ++ (hd (vi1 ++ vi2) :: vo) ++ vt)
+          ((vi'1 ++ vi'2) ++ (hd (vi'1 ++ vi'2) :: vo') ++ vt'))).
+  rewrite ocfg_relabel_equivalent with (m' := m').
+  shelve.
+
+  (* First, prove that m and m' are equivalent *)
+  unfold map_equivalent.
+  cbn. intros.
+  rewrite (hd_app vi1 vi2), (hd_app vi'1 vi'2).
+  rewrite app_comm_cons.
+  rewrite !combine_app ;
+  try ( rewrite !vector_length ; auto) ;
+  try ( simpl ; rewrite !app_length ; rewrite !vector_length ; auto).
+  rewrite app_comm_cons.
+  rewrite (combine_app (hd vi1 :: proj1_sig vo) (proj1_sig vt)
+                       (hd vi'1 :: proj1_sig vo') (proj1_sig vt'))
+  ; try (rewrite !vector_length)
+  ; try (simpl ; rewrite !vector_length)
+  ; auto .
+  rewrite combine_cons.
+  rewrite <- !app_assoc.
+
+  assert (
+  map_equivalent
+  (combine (proj1_sig vi1) (proj1_sig vi'1) ++
+  combine (proj1_sig vi2) (proj1_sig vi'2) ++
+  combine (hd vi1 :: nil) (hd vi'1 :: nil) ++
+  combine (proj1_sig vo) (proj1_sig vo') ++
+  combine (proj1_sig vt) (proj1_sig vt'))%list
+  (combine (hd vi1 :: nil) (hd vi'1 :: nil) ++
+  combine (proj1_sig vi1) (proj1_sig vi'1) ++
+  combine (proj1_sig vi2) (proj1_sig vi'2) ++
+  combine (proj1_sig vo) (proj1_sig vo') ++
+  combine (proj1_sig vt) (proj1_sig vt'))%list).
+  {admit. } (* do it automatically using commutativity and assoc... *)
+  unfold map_equivalent in H2 ; rewrite H2 ; clear H2.
+  set (m0 := (combine (proj1_sig vi2) (proj1_sig vi'2) ++
+                    combine (proj1_sig vo) (proj1_sig vo') ++
+                    combine (proj1_sig vt) (proj1_sig vt'))%list).
+  rewrite List.app_assoc.
+  apply map_equivalent_app ; try (reflexivity).
+  clear.
+  simpl.
+  unfold map_equivalent.
+  intros.
+  admit.
+  (*
+       prove that
+       combine [hd vi1] [hd vi2] ++ (combine (proj1_sig vi1) (proj1_sig vi'1))
+       ~=
+       (combine (proj1_sig vi1) (proj1_sig vi'1))
+   *)
+
+  Unshelve.
+  apply H ; auto.
+  (* Here, unique_vector is clearly false... find another way to prove
+     the lemma *)
 Admitted.
 
 (* loop_cvir WF *)
@@ -1141,13 +1305,11 @@ Proof.
   unfold cvir_inputs_used.
   intros.
   split_vec vt n.
-  cbn in *.
-  (* apply H in H0. *)
-  destruct vi ; subst ; cbn in *.
-  destruct vo ; subst ; cbn in *.
-  destruct vt1 ; subst ; cbn in *.
-  destruct vt2 ; subst ; cbn in *.
-  rewrite !in_app_iff in H0.
+  simpl in *.
+  destruct (splitat n (vt1 ++ vt2)) eqn:E.
+  rewrite splitat_append in E.
+  apply H. inv E.
+  (* In up_to assoc/comm... easy but TODO automatically *)
 Admitted.
 
 Lemma loop_cvir_unique :
@@ -1169,6 +1331,19 @@ Proof.
 Lemma loop_cvir_relabel_WF :
   forall (ni no n : nat) (ir : cvir (n+ni) (n+no)),
   cvir_relabel_WF ir -> cvir_relabel_WF (loop_cvir n ir).
+Proof.
+  unfold cvir_relabel_WF.
+  intros.
+  set (m := vec_build_map (vi++vo++vt) (vi'++vo'++vt')).
+  simpl in *.
+  split_vec vt n ; split_vec vt' n.
+  set (m' := (vec_build_map
+              ((vt1 ++ vi) ++ (vt1 ++ vo) ++ vt2)
+              ((vt'1 ++ vi') ++ (vt'1 ++ vo') ++ vt'2))).
+  rewrite ocfg_relabel_equivalent with (m' := m').
+  apply H.
+  (* here, unique_vector is clearly not unique... find another way to
+prove the lemma *)
 Admitted.
 
 (* join_cvir WF *)
@@ -1244,6 +1419,15 @@ Lemma join_cvir_relabel_WF :
   forall (ni no : nat) (ir : cvir ni (S (S no))),
   cvir_relabel_WF ir ->
   cvir_relabel_WF (join_cvir ir).
+Proof.
+  unfold cvir_relabel_WF.
+  intros.
+  set (m := vec_build_map (vi++vo++vt) (vi'++vo'++vt')).
+  split_vec vo 1; split_vec vo' 1.
+  simpl.
+  erewrite ocfg_relabel_equivalent.
+  eapply H.
+  (* Here again, unique_vector is clearly not true... *)
 Admitted.
 
 
