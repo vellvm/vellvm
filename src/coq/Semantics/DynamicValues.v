@@ -1613,10 +1613,10 @@ Class VInt I : Type :=
   (* Evaluate the given iop on the given arguments according to the bitsize *)
   Definition integer_op (bits:N) (iop:ibinop) (x y:inttyp bits) : err_or_ub dvalue :=
     match bits, x, y with
-    | 1, x, y  => lift (eval_int_op iop x y)
-    | 8, x, y  => lift (eval_int_op iop x y)
-    | 32, x, y => lift (eval_int_op iop x y)
-    | 64, x, y => lift (eval_int_op iop x y)
+    | 1, x, y  => UB_to_err_or_ub (eval_int_op iop x y)
+    | 8, x, y  => UB_to_err_or_ub (eval_int_op iop x y)
+    | 32, x, y => UB_to_err_or_ub (eval_int_op iop x y)
+    | 64, x, y => UB_to_err_or_ub (eval_int_op iop x y)
     | _, _, _  => raise_error "unsupported bitsize"
     end.
   Arguments integer_op _ _ _ _ : simpl nomatch.
@@ -1649,11 +1649,11 @@ Class VInt I : Type :=
      in order to prevent eval_iop from being recursive. *)
   Definition eval_iop_integer_h iop v1 v2 : err_or_ub dvalue :=
     match v1, v2 with
-    | DVALUE_I1 i1, DVALUE_I1 i2    => lift (eval_int_op iop i1 i2)
-    | DVALUE_I8 i1, DVALUE_I8 i2    => lift (eval_int_op iop i1 i2)
-    | DVALUE_I32 i1, DVALUE_I32 i2  => lift (eval_int_op iop i1 i2)
-    | DVALUE_I64 i1, DVALUE_I64 i2  => lift (eval_int_op iop i1 i2)
-    | DVALUE_Poison t, _              => lift (ret (DVALUE_Poison t))
+    | DVALUE_I1 i1, DVALUE_I1 i2    => UB_to_err_or_ub (eval_int_op iop i1 i2)
+    | DVALUE_I8 i1, DVALUE_I8 i2    => UB_to_err_or_ub (eval_int_op iop i1 i2)
+    | DVALUE_I32 i1, DVALUE_I32 i2  => UB_to_err_or_ub (eval_int_op iop i1 i2)
+    | DVALUE_I64 i1, DVALUE_I64 i2  => UB_to_err_or_ub (eval_int_op iop i1 i2)
+    | DVALUE_Poison t, _              => ret (DVALUE_Poison t)
     | _, DVALUE_Poison t              =>
       if iop_is_div iop
       then raise_ub "Division by poison."
@@ -1831,8 +1831,7 @@ Class VInt I : Type :=
   Definition eval_select_h (cnd : dvalue) (v1 v2 : uvalue) : err_or_ub (uvalue) :=
     let raise_error_local :=
         @raise_error err_or_ub
-                     (@VErrorM_MonadExc err_or_ub
-                                        (@Exception_eitherT ERR_MESSAGE UB (Monad_either UB_MESSAGE))) uvalue
+                     (@VErrorM_err_or_ub) uvalue
     in
     let ret_local := @ret err_or_ub _ uvalue in
     match v1, v2 with

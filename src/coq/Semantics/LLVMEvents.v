@@ -117,7 +117,7 @@ Set Contextual Implicit.
 
   Definition lift_err_or_ub {A B} {E} `{FailureE -< E} `{UBE -< E} (f : A -> itree E B) (m:err_or_ub A) : itree E B :=
     match m with
-    | mkEitherT m =>
+    | ERR_OR_UB (mkEitherT m) =>
       match m with
       | inl (UB_message x) => raiseUB x
       | inr (inl (ERR_message x)) => raise x

@@ -22,7 +22,9 @@ From Vellvm.Semantics Require Import
      GepM.
 
 From Vellvm.Utils Require Import
-     Tactics.
+     Tactics
+     Error
+     MonadReturnsLaws.
 
 From Vellvm.Handlers Require Import
      Stack
@@ -74,10 +76,61 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
   (* -------------------------------------------------------- *)
   (* Facts about multiplication and undef                     *)
   (* -------------------------------------------------------- *)
+  Lemma refine_uvalue_ub :
+    forall uv1 uv2 (str : string),
+      concretize_u uv1 (raise_ub str) ->
+      refine_uvalue uv1 uv2.
+  Proof.
+    intros uv1 uv2 str CONC.
+    constructor.
+    intros dv H.
+    destruct uv1.
+
+    all:
+      try solve [red in CONC;
+                 rewrite concretize_uvalueM_equation in CONC;
+                 inversion CONC].
+
+    (* IBinop *)
+    5: {
+      red in CONC.
+      rewrite concretize_uvalueM_equation in CONC.
+
+      destruct CONC as (ma & k' & CONC' & mbeq & REST).
+
+      cbn in mbeq.
+      inversion mbeq.
+
+      destruct ma as [[uba | [erra | a]]] eqn:Hma.
+      - (* UB from uv1 *)
+        cbn in H1.
+        inversion H1; subst.
+
+        rewrite concretize_equation.
+        red.
+        rewrite concretize_uvalueM_equation.
+
+        cbn.
+        unfold bind_MPropT.
+
+        eexists.
+        eexists.
+
+        split.
+        apply CONC'.
+
+        split.
+
+        Set Printing Implicit.
+        cbn.
+        (* This seems like a problem *)
+        admit.
+        cbn.
+  Abort.
 
   Lemma refine_uvalue_op_poison_l :
     forall op dt uv2 dv2,
-      concretize_u uv2 (ret dv2) ->
+      concretize uv2 dv2 ->
       refine_uvalue (UVALUE_IBinop op (UVALUE_Poison dt) uv2) (UVALUE_Poison dt).
   Proof.
     intros op dt uv2 dv2 CONC.
@@ -144,7 +197,17 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
         concretize uv2 dv2 /\
         eval_iop op dv1 dv2 = ret dv.
   Proof.
-  Admitted.
+    intros op uv1 uv2 dv CONC.
+
+    rewrite concretize_equation in CONC.
+    red in CONC.
+    rewrite concretize_uvalueM_equation in CONC.
+
+    inversion CONC.
+    inversion H.
+
+    destruct H0 as (CONC1 & EQ1 & CONT).
+  Qed.
   
   Instance proper_refine_uvalue_ibinop {op v2 rv} : Proper ((fun x y => refine_uvalue y x) ==> (fun (x y : Prop) => x -> y)) (fun v1 => refine_uvalue (UVALUE_IBinop op v1 v2) rv).
   Proof.    
@@ -168,7 +231,7 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
       rewrite concretize_equation.
       pose proof Concretize_IBinop op.
       epose proof Concretize_IBinop op (UVALUE_Poison dt) _ v2 _.
-c    
+    
     constructor.
     - intros CONTRA. subst.
       apply refine_poison in Ribop. inversion Ribop.

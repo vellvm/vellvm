@@ -138,7 +138,10 @@ Definition lift_ERR {M A} `{MonadExc ERR_MESSAGE M} `{Monad M} (e : ERR A) : (M 
      | inr x => ret x
      end.
 
-Definition err_or_ub := eitherT ERR_MESSAGE UB.
+Inductive err_or_ub A :=
+  ERR_OR_UB { unERR_OR_UB : eitherT ERR_MESSAGE UB A }.
+Arguments ERR_OR_UB {_} _.
+Arguments unERR_OR_UB {_} _.
 
 Instance EqM_eitherT {E} {M} `{Monad.Eq1 M} : Monad.Eq1 (eitherT E M)
   := fun (a : Type) x y => Monad.eq1 (unEitherT x) (unEitherT y).
@@ -153,6 +156,163 @@ repeat intro.
   auto.
 - unfold Monad.eq1, EqM_eitherT.
   etransitivity; eauto.
+Defined.
+
+Instance EqM_err_or_ub : Monad.Eq1 err_or_ub.
+Proof.
+  refine (fun T mt1 mt2 => _).
+  destruct mt1 as [[[ub_mt1 | [err_mt1 | t1]]]].
+  - (* UB *)
+    exact True.
+  - (* Error *)
+    (* TODO: is this right? Should Error be treated as UB? *)
+    destruct mt2 as [[[ub_mt2 | [err_mt2 | t2]]]].
+    + exact False.
+    + exact (err_mt1 = err_mt2).
+    + exact False. (* Maybe allow for refinement here??? *)
+  - (* Success *)
+    destruct mt2 as [[[ub_mt2 | [err_mt2 | t2]]]].
+    + exact False.
+    + exact False.
+    + exact (t1 = t2).
+Defined.
+
+Import MonadNotation.
+Import Utils.Monads.
+
+#[global] Instance Monad_err_or_ub : Monad err_or_ub.
+Proof.
+  split.
+  - exact (fun T t => ERR_OR_UB (ret t)).
+  - exact (fun A B ema k =>
+             match ema with
+             | ERR_OR_UB ma =>
+               ERR_OR_UB (bind ma (fun a => unERR_OR_UB (k a)))
+             end).
+Defined.
+
+#[global] Instance Functor_err_or_ub : Functor err_or_ub.
+Proof.
+  split.
+  - exact (fun A B f ema =>
+             ERR_OR_UB (fmap f (unERR_OR_UB ema))).
+Defined.
+
+#[global] Instance VErrorM_err_or_ub : VErrorM err_or_ub
+  := { raise_error := fun _ msg => ERR_OR_UB (raise_error msg) }.
+
+#[global] Instance UBM_err_or_ub : UBM err_or_ub
+  := { raise_ub := fun _ msg => ERR_OR_UB (raise_ub msg) }.
+
+Lemma unERR_OR_UB_bind :
+  forall {A B} (ma : err_or_ub A) (k : A -> err_or_ub B),
+    Monad.eq1 (unERR_OR_UB (x <- ma;; k x)) (x <- unERR_OR_UB ma;; (unERR_OR_UB (k x))).
+Proof.
+  intros A B ma k.
+  cbn.
+  destruct ma as [[[ub_a | [err_a | a]]]]; cbn; reflexivity.
+Qed.
+
+Section MonadReturns.
+  Definition ErrOrUBReturns {A} (a : A) (ma : err_or_ub A) : Prop
+    := match unEitherT (unERR_OR_UB ma) with
+       | inl ub => True
+       | inr (inl failure) => False
+       | inr (inr val) => a = val
+       end.
+
+  Lemma ErrOrUBReturns_bind :
+    forall {A B} (a : A) (b : B) (ma : err_or_ub A) (k : A -> err_or_ub B),
+      ErrOrUBReturns a ma -> ErrOrUBReturns b (k a) -> ErrOrUBReturns b (bind ma k).
+  Proof.
+    intros * Ha Hb.
+    unfold ErrOrUBReturns in *.
+    rewrite unERR_OR_UB_bind.
+    destruct ma as [[[ub_a | [err_a | a']]]]; cbn.
+    - auto.
+    - inversion Ha.
+    - cbn in *.
+      inversion Ha; subst.
+      auto.
+  Qed.
+
+  Lemma ErrOrUBReturns_bind_inv :
+    forall {A B} (ma : err_or_ub A) (k : A -> err_or_ub B) (b : B),
+      ErrOrUBReturns b (bind ma k) -> exists a : A , ErrOrUBReturns a ma /\ ErrOrUBReturns b (k a).
+  Proof.
+    intros * Hb.
+    unfold ErrOrUBReturns in *.
+    cbn in Hb.
+
+    Require Import Utils.Tactics.
+
+    break_match_hyp.
+    - break_match_hyp; subst.
+      cbn.
+      break_match_hyp; subst.
+
+      (* ma raises ub...
+
+         So, ErrOrUBReturns a ma holds for any a... But A may be void, so
+         there may not exist an intermediate void...
+
+       *)
+      exists ; split; auto.
+      
+
+    apply EitherTReturns_bind_inv.
+    rewrite <- unERR_OR_UB_bind.
+    auto.
+  Qed.
+
+  Lemma ErrOrUBReturns_ret :
+    forall {A} (a : A) (ma : err_or_ub A),
+      Monad.eq1 ma (ret a) -> ErrOrUBReturns a ma.
+  Proof.
+    intros * Hma.
+    unfold ErrOrUBReturns.
+    apply EitherTReturns_ret.
+    cbn.
+    unfold Monad.eq1, MonadExcLaws.Eq1_eitherT.
+    cbn.
+    destruct ma as [[[ub_a | [err_a | a']]]]; cbn.
+    unfold Monad.eq1, EqM_err_or_ub in Hma.
+    unfold Monad.eq1, MonadExcLaws.Eq1_either.
+    EqM_err_or_ub
+    inversion Hma.
+  Qed.
+
+  Lemma ErrOrUBReturns_ret_inv :
+    forall {A} (x y : A),
+      ErrOrUBReturns x (ret y) -> x = y.
+  Proof.
+    intros * H.
+    unfold ErrOrUBReturns in H.
+    inversion H; auto.
+  Qed.
+
+  #[global] Instance ErrOrUBReturns_Proper : forall {A} (a : A),
+      Proper (eq1 ==> iff) (ErrOrUBReturns a).
+  Proof.
+    intros A a.
+    unfold Proper, respectful.
+    intros x y H.
+    split; intros Hret; unfold ErrOrUBReturns in *; subst; auto.
+  Qed.
+
+  Instance MonadReturns_ErrOrUB : MonadReturns (err_or_ub )
+    := { MReturns := fun A => ErrOrUBReturns;
+         MReturns_bind := fun A B => ErrOrUBReturns_bind;
+         MReturns_bind_inv := fun A B => ErrOrUBReturns_bind_inv;
+         MReturns_ret := fun A => ErrOrUBReturns_ret;
+         MReturns_ret_inv := fun A => ErrOrUBReturns_ret_inv
+       }.
+
+End Sum.
+
+#[global] Instance MonadReturns_err_or_ub : MonadReturns err_or_ub.
+Proof.
+  split.
 Defined.
 
 (* Instance MonadLaws_eitherT {E} {M} `{HM: Monad M} `{MEQ1 : Monad.Eq1 M} `{MEQ1V : @Monad.Eq1Equivalence M HM MEQ1} `{LAWS: @Monad.MonadLawsE M MEQ1 HM} `{MRETS : @MonadReturns M HM MEQ1} `{MRETSINV : @MonadReturns_Proper_inv M HM MEQ1 MRETS} : Monad.MonadLawsE (eitherT E M). *)
@@ -249,3 +409,6 @@ Definition err_to_err_or_ub {A} (e : err A) : err_or_ub A
      | inr a => ret a
      | inl e => raise_error e
      end.
+
+Definition UB_to_err_or_ub {A} (ub : UB A) : err_or_ub A
+  := ERR_OR_UB (lift ub).

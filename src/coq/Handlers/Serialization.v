@@ -936,7 +936,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
             dvs <- map_monad concretize_uvalueM uvs;;
             match handle_gep t da dvs with
             | inr dv  => ret dv
-            | inl err => lift_ue (lift (failwith err))
+            | inl err => lift_ue (raise_error err)
             end
 
           | UVALUE_ExtractValue uv idxs =>
@@ -961,12 +961,11 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
             | _, _ => extractbytes_to_dvalue bytes dt
             end
 
-
           | UVALUE_ExtractByte byte dt idx sid =>
             (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
-            lift_ue (lift (failwith "Attempting to concretize UVALUE_ExtractByte, should not happen."))
+            lift_ue (raise_error "Attempting to concretize UVALUE_ExtractByte, should not happen.")
 
-          | _ => lift_ue (lift (failwith ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u)))
+          | _ => lift_ue (raise_error ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u))
 
           end
 
@@ -981,7 +980,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
              | UVALUE_ExtractByte uv dt idx sid =>
                cidx <- concretize_uvalueM idx;;
                ret (DVALUE_ExtractByte dv dt (Z.to_N (dvalue_int_unsigned cidx)))
-             | _ => lift_ue (lift (failwith "uvalue_byte_replace_with_dvalue_byte called with non-UVALUE_ExtractByte value."))
+             | _ => lift_ue (raise_error "uvalue_byte_replace_with_dvalue_byte called with non-UVALUE_ExtractByte value.")
              end
 
         with
@@ -1011,7 +1010,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
                                            ret (@NM.add _ n dvb acc)) ins acc;;
                  (* Concretize the rest of the bytes *)
                  concretize_uvalue_bytes_helper outs acc
-               | _ => lift_ue (lift (failwith "concretize_uvalue_bytes_helper: non-byte in uvs."))
+               | _ => lift_ue (raise_error "concretize_uvalue_bytes_helper: non-byte in uvs.")
                end
              end
 
@@ -1022,7 +1021,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
             byte_map <- concretize_uvalue_bytes_helper (zip (Nseq 0 len) uvs) (@NM.empty _);;
             match NM_find_many (Nseq 0 len) byte_map with
             | Some dvbs => ret dvbs
-            | None => lift_ue (lift (failwith "concretize_uvalue_bytes: missing indices."))
+            | None => lift_ue (raise_error "concretize_uvalue_bytes: missing indices.")
             end
               
         with
@@ -1085,7 +1084,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
               dvs <- map_monad concretize_uvalueM uvs;;
               match handle_gep t da dvs with
               | inr dv  => ret dv
-              | inl err => lift_ue (lift (failwith err))
+              | inl err => lift_ue (raise_error err)
               end
 
             | UVALUE_ExtractValue uv idxs =>
@@ -1110,12 +1109,11 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
               | _, _ => extractbytes_to_dvalue bytes dt
               end
 
-
             | UVALUE_ExtractByte byte dt idx sid =>
               (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
-              lift_ue (lift (failwith "Attempting to concretize UVALUE_ExtractByte, should not happen."))
+              lift_ue (raise_error "Attempting to concretize UVALUE_ExtractByte, should not happen.")
 
-            | _ => lift_ue (lift (failwith ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u)))
+            | _ => lift_ue (raise_error ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u))
 
             end.
         Proof.
@@ -1141,7 +1139,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
 
         (* Undef handler *)
         { unfold MPropT.
-         refine (fun edv =>                    match edv with
+         refine (fun edv =>                    match unERR_OR_UB edv with
                     | mkEitherT (inr (inr dv)) =>
                       (* As long as the dvalue has the same type, it's a refinement *)
                       dvalue_has_dtyp dv dt
@@ -1161,22 +1159,21 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
 
           (* Is x or ue the thing that should be the refinement? *)
           (* I think ue is the refinement *)
-          destruct x as [[ubx | [errx | x]]].
+          destruct x as [[[ubx | [errx | x]]]].
           - (* UB *)
             exact True.
           - (* ERR *)
             (* Preserve errors? *)
-            destruct ue as [[ubue | [errue | ue]]].
+            destruct ue as [[[ubue | [errue | ue]]]].
             + exact False.
             + exact (errx = errue).
             + exact False.
-          - destruct ue as [[ubue | [errue | ue]]].
+          - destruct ue as [[[ubue | [errue | ue]]]].
             + exact False.
             + exact False.
             + exact (x = ue).
         }
         typeclasses eauto.
-        unfold err_or_ub.
         pose proof @MonadReturns_EitherT.
  
         pose proof (@MonadReturns_EitherT ERR_MESSAGE UB _ _ _ (MonadReturns_Sum)).
