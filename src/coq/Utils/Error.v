@@ -216,7 +216,7 @@ Qed.
 Section MonadReturns.
   Definition ErrOrUBReturns {A} (a : A) (ma : err_or_ub A) : Prop
     := match unEitherT (unERR_OR_UB ma) with
-       | inl ub => True
+       | inl ub => False
        | inr (inl failure) => False
        | inr (inr val) => a = val
        end.
@@ -244,25 +244,9 @@ Section MonadReturns.
     unfold ErrOrUBReturns in *.
     cbn in Hb.
 
-    Require Import Utils.Tactics.
+    destruct ma as [[[ub_a | [err_a | a']]]]; cbn in  Hb; try contradiction.
 
-    break_match_hyp.
-    - break_match_hyp; subst.
-      cbn.
-      break_match_hyp; subst.
-
-      (* ma raises ub...
-
-         So, ErrOrUBReturns a ma holds for any a... But A may be void, so
-         there may not exist an intermediate void...
-
-       *)
-      exists ; split; auto.
-      
-
-    apply EitherTReturns_bind_inv.
-    rewrite <- unERR_OR_UB_bind.
-    auto.
+    exists a'; cbn; split; auto.
   Qed.
 
   Lemma ErrOrUBReturns_ret :
@@ -271,6 +255,8 @@ Section MonadReturns.
   Proof.
     intros * Hma.
     unfold ErrOrUBReturns.
+    destruct ma as [[[ub_a | [err_a | a']]]].
+    - cbn in Hma.
     apply EitherTReturns_ret.
     cbn.
     unfold Monad.eq1, MonadExcLaws.Eq1_eitherT.
