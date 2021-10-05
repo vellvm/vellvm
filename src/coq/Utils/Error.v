@@ -11,7 +11,9 @@
 (* begin hide *)
 Require Import FunctionalExtensionality.
 
-From Coq Require Import String.
+From Coq Require Import
+     String
+     Classes.Morphisms.
 
 From ExtLib Require Import
      Structures.Monads
@@ -24,6 +26,8 @@ From ITree Require Import
      Events.Exception.
 
 From Vellvm.Utils Require Import MonadReturnsLaws.
+
+Import Monad.
 
 (* end hide *)
 
@@ -161,20 +165,23 @@ Defined.
 Instance EqM_err_or_ub : Monad.Eq1 err_or_ub.
 Proof.
   refine (fun T mt1 mt2 => _).
-  destruct mt1 as [[[ub_mt1 | [err_mt1 | t1]]]].
-  - (* UB *)
-    exact True.
-  - (* Error *)
-    (* TODO: is this right? Should Error be treated as UB? *)
-    destruct mt2 as [[[ub_mt2 | [err_mt2 | t2]]]].
-    + exact False.
-    + exact (err_mt1 = err_mt2).
-    + exact False. (* Maybe allow for refinement here??? *)
-  - (* Success *)
-    destruct mt2 as [[[ub_mt2 | [err_mt2 | t2]]]].
-    + exact False.
-    + exact False.
-    + exact (t1 = t2).
+  destruct mt1, mt2.
+  apply (Monad.eq1 unERR_OR_UB0 unERR_OR_UB1).
+  
+  (* destruct mt1 as [[[ub_mt1 | [err_mt1 | t1]]]]. *)
+  (* - (* UB *) *)
+  (*   exact True. *)
+  (* - (* Error *) *)
+  (*   (* TODO: is this right? Should Error be treated as UB? *) *)
+  (*   destruct mt2 as [[[ub_mt2 | [err_mt2 | t2]]]]. *)
+  (*   + exact False. *)
+  (*   + exact (err_mt1 = err_mt2). *)
+  (*   + exact False. (* Maybe allow for refinement here??? *) *)
+  (* - (* Success *) *)
+  (*   destruct mt2 as [[[ub_mt2 | [err_mt2 | t2]]]]. *)
+  (*   + exact False. *)
+  (*   + exact False. *)
+  (*   + exact (t1 = t2). *)
 Defined.
 
 Import MonadNotation.
@@ -215,11 +222,7 @@ Qed.
 
 Section MonadReturns.
   Definition ErrOrUBReturns {A} (a : A) (ma : err_or_ub A) : Prop
-    := match unEitherT (unERR_OR_UB ma) with
-       | inl ub => False
-       | inr (inl failure) => False
-       | inr (inr val) => a = val
-       end.
+    := @EitherTReturns _ _ (Monad_either _) _ MonadReturns_Sum _ a (unERR_OR_UB ma).
 
   Lemma ErrOrUBReturns_bind :
     forall {A B} (a : A) (b : B) (ma : err_or_ub A) (k : A -> err_or_ub B),
@@ -228,12 +231,7 @@ Section MonadReturns.
     intros * Ha Hb.
     unfold ErrOrUBReturns in *.
     rewrite unERR_OR_UB_bind.
-    destruct ma as [[[ub_a | [err_a | a']]]]; cbn.
-    - auto.
-    - inversion Ha.
-    - cbn in *.
-      inversion Ha; subst.
-      auto.
+    eapply EitherTReturns_bind; eauto.
   Qed.
 
   Lemma ErrOrUBReturns_bind_inv :
@@ -242,11 +240,8 @@ Section MonadReturns.
   Proof.
     intros * Hb.
     unfold ErrOrUBReturns in *.
-    cbn in Hb.
-
-    destruct ma as [[[ub_a | [err_a | a']]]]; cbn in  Hb; try contradiction.
-
-    exists a'; cbn; split; auto.
+    apply EitherTReturns_bind_inv.
+    rewrite unERR_OR_UB_bind in Hb; auto.
   Qed.
 
   Lemma ErrOrUBReturns_ret :
@@ -255,17 +250,8 @@ Section MonadReturns.
   Proof.
     intros * Hma.
     unfold ErrOrUBReturns.
-    destruct ma as [[[ub_a | [err_a | a']]]].
-    - cbn in Hma.
     apply EitherTReturns_ret.
-    cbn.
-    unfold Monad.eq1, MonadExcLaws.Eq1_eitherT.
-    cbn.
-    destruct ma as [[[ub_a | [err_a | a']]]]; cbn.
-    unfold Monad.eq1, EqM_err_or_ub in Hma.
-    unfold Monad.eq1, MonadExcLaws.Eq1_either.
-    EqM_err_or_ub
-    inversion Hma.
+    destruct ma as [[[ub_a | [err_a | a']]]]; auto.
   Qed.
 
   Lemma ErrOrUBReturns_ret_inv :
@@ -283,23 +269,20 @@ Section MonadReturns.
     intros A a.
     unfold Proper, respectful.
     intros x y H.
-    split; intros Hret; unfold ErrOrUBReturns in *; subst; auto.
+    unfold ErrOrUBReturns in *.
+    apply EitherTReturns_Proper.
+    destruct x as [[[ub_x | [err_x | x]]]];
+      destruct y as [[[ub_y | [err_y | y]]]]; inversion H; subst; auto.
   Qed.
 
-  Instance MonadReturns_ErrOrUB : MonadReturns (err_or_ub )
+  Instance MonadReturns_ErrOrUB : MonadReturns err_or_ub
     := { MReturns := fun A => ErrOrUBReturns;
          MReturns_bind := fun A B => ErrOrUBReturns_bind;
          MReturns_bind_inv := fun A B => ErrOrUBReturns_bind_inv;
          MReturns_ret := fun A => ErrOrUBReturns_ret;
          MReturns_ret_inv := fun A => ErrOrUBReturns_ret_inv
        }.
-
-End Sum.
-
-#[global] Instance MonadReturns_err_or_ub : MonadReturns err_or_ub.
-Proof.
-  split.
-Defined.
+End MonadReturns.
 
 (* Instance MonadLaws_eitherT {E} {M} `{HM: Monad M} `{MEQ1 : Monad.Eq1 M} `{MEQ1V : @Monad.Eq1Equivalence M HM MEQ1} `{LAWS: @Monad.MonadLawsE M MEQ1 HM} `{MRETS : @MonadReturns M HM MEQ1} `{MRETSINV : @MonadReturns_Proper_inv M HM MEQ1 MRETS} : Monad.MonadLawsE (eitherT E M). *)
 (* destruct LAWS. *)
