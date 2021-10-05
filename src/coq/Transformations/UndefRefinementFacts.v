@@ -75,10 +75,100 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
   (* Facts about multiplication and undef                     *)
   (* -------------------------------------------------------- *)
 
+  Lemma refine_uvalue_op_poison_l :
+    forall op dt uv2 dv2,
+      concretize_u uv2 (ret dv2) ->
+      refine_uvalue (UVALUE_IBinop op (UVALUE_Poison dt) uv2) (UVALUE_Poison dt).
+  Proof.
+    intros op dt uv2 dv2 CONC.
+    eapply UndefPoison.
+    2: constructor.
+
+    rewrite concretize_equation.
+    red.
+    rewrite concretize_uvalueM_equation.
+    cbn.
+
+    match goal with
+    | |- bind_MPropT ?pa ?k ?mb =>
+      idtac pa;
+        idtac k
+    end.
+    
+    unfold bind_MPropT.
+    cbn.
+    exists (ret (DVALUE_Poison dt)).
+    exists (fun poison_res => ret poison_res). (* k' *)
+
+    (* pa ma *)
+    split.
+    reflexivity.
+
+    (* Monad.eq1 mb (x <- ma;; k' x) *)
+    split.
+    cbn.
+    reflexivity.
+
+    intros poison_res MRets_poison.
+
+    (* Goal is from k a (k' a) *)
+    exists (ret dv2). (* ma' *)
+    exists (fun _ => ret (DVALUE_Poison dt)). (* k'' *)
+
+    (*
+      poison_res <- eval poison (* ma *)
+      (* k' *)
+      dv2_res <- eval uv2 (* ma' *)
+      (* k'' *)
+      lift_ue (eval_iop poison_res edv2)
+     *)
+
+    (* pa' ma' *)
+    split.
+    apply CONC.
+
+    (* Monad.eq' mb' (x <- ma';; k'' x) *)
+    split; cbn; inversion MRets_poison; subst.
+    reflexivity.
+
+    intros dv2' MRets_dv2.
+    inversion MRets_dv2; subst.
+    cbn. reflexivity.
+  Qed.
+
+  Lemma concretize_ibinop_inv :
+    forall op uv1 uv2 dv,
+      concretize (UVALUE_IBinop op uv1 uv2) dv ->
+      exists dv1 dv2,
+        concretize uv1 dv1 /\
+        concretize uv2 dv2 /\
+        eval_iop op dv1 dv2 = ret dv.
+  Proof.
+  Admitted.
+  
   Instance proper_refine_uvalue_ibinop {op v2 rv} : Proper ((fun x y => refine_uvalue y x) ==> (fun (x y : Prop) => x -> y)) (fun v1 => refine_uvalue (UVALUE_IBinop op v1 v2) rv).
   Proof.    
     unfold Proper, respectful.
     intros x y Ryx Ribop.
+
+    transitivity (UVALUE_IBinop op x v2); auto.
+    
+    inversion Ryx; subst.
+    - constructor; auto.
+      intros dv Conc.
+
+      apply concretize_ibinop_inv in Conc as (dv1 & dv2 & Conc1 & Conc2 & EVAL).
+
+      (* Concretize of poison has to be poison...
+
+         x doesn't have to be poison here.
+
+       *)
+
+      rewrite concretize_equation.
+      pose proof Concretize_IBinop op.
+      epose proof Concretize_IBinop op (UVALUE_Poison dt) _ v2 _.
+c    
     constructor.
     - intros CONTRA. subst.
       apply refine_poison in Ribop. inversion Ribop.
