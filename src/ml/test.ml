@@ -314,7 +314,7 @@ let test_dirs =
   ]
 
 let poison_test = function
-  | DV.UVALUE_Poison -> true
+  | DV.UVALUE_Poison _ -> true
   | _ -> false
 
 let i1_test (i1:int1) = function

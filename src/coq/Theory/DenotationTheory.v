@@ -345,7 +345,7 @@ Section Outputs.
       break_match_goal;
         try (apply raise_has_all_posts || apply raiseUB_has_all_posts).
       unfold lift_err_or_ub.
-      do 2 break_match_goal; break_match_goal.
+      do 3 break_match_goal; break_match_goal.
       unfold raiseUB; go; apply has_post_bind; intros [].
       break_match_goal; unfold raise; go; apply has_post_bind; intros [].
       go.
@@ -355,7 +355,20 @@ Section Outputs.
         revert l Heqe0; induction brs as [| br brs IH].
         - intros ? eq; inv eq; reflexivity.
         - intros ? eq; inv eq.
-          repeat (break_match_hyp; cbn in *; try inv_sum).
+
+          repeat (break_match_hyp; cbn in *; try inv_err_or_ub).
+
+          inversion Heqe0; subst.
+          inversion Heqs.
+
+          inversion Heqe0; subst.
+          inversion Heqs.
+
+          inversion Heqe0; subst.
+          inversion Heqs.
+
+          cbn.
+          
           f_equal; apply IH.
           rewrite <- Heqs1.
           Set Nested Proofs Allowed.

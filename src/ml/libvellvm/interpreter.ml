@@ -43,7 +43,7 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
   | UVALUE_I64    x -> fprintf ppf "UVALUE_I64(%s)" (Int64.to_string (Z.to_int64 (DynamicValues.Int64.unsigned x)))
   | UVALUE_Double x -> fprintf ppf "UVALUE_Double(%s)" (string_of_float_full (camlfloat_of_coqfloat x))
   | UVALUE_Float  x -> fprintf ppf "UVALUE_Float(%s)"  (string_of_float_full (camlfloat_of_coqfloat32 x))
-  | UVALUE_Poison   -> fprintf ppf "UVALUE_Poison"
+  | UVALUE_Poison _ -> fprintf ppf "UVALUE_Poison"
   | UVALUE_None     -> fprintf ppf "UVALUE_None"
   | UVALUE_Undef _  -> fprintf ppf "UVALUE_Undef"
   | UVALUE_Struct        l -> fprintf ppf "UVALUE_Struct(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l

@@ -554,7 +554,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
                 else extract_field_byte_helper xs (N.succ field_idx) (byte_idx - sz)
            end.
 
-      Fixpoint extract_field_byte {M} `{Monad M} (fields : list dtyp) (byte_idx : N) : eitherT string M (dtyp * (N * N))
+      Definition extract_field_byte {M} `{Monad M} (fields : list dtyp) (byte_idx : N) : eitherT string M (dtyp * (N * N))
         := extract_field_byte_helper fields 0 byte_idx.
 
       (* TODO: move this? *)
@@ -1178,7 +1178,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
  
         pose proof (@MonadReturns_EitherT ERR_MESSAGE UB _ _ _ (MonadReturns_Sum)).
 
-        typeclasses eauto.
+        apply MonadReturns_ErrOrUB.
       Defined.
   
       Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
@@ -1192,9 +1192,10 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
 
       Lemma Concretize_Undef : forall dt dv,
           dvalue_has_dtyp dv dt ->
-          concretize_u (UVALUE_Undef dt) (ret dv).
+          concretize (UVALUE_Undef dt) dv.
       Proof.
         intros dt dv H.
+        rewrite concretize_equation.
         unfold concretize_u.
         red; cbn; auto.
       Qed.
@@ -1218,7 +1219,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
         unfold bind_MPropT.
 
         eexists.
-        exists (fun x => match unEitherT e2 with
+        exists (fun x => match unEitherT (unERR_OR_UB e2) with
            | inl (UB_message ub) => raise_ub ub (* inl v0 *)
            | inr (inl (ERR_message err)) => raise_error err (* inr (inl x0) *)
            | inr (inr x0) => eval_iop iop x x0
@@ -1229,8 +1230,8 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
         { (* Monad.eq1 mb (x <- ma;; k' x) *)
           unfold bind.
           cbn.
-          destruct e1 as [[[ub_message] | [[err_message] | e1]]]; cbn; try reflexivity.
-          destruct e2 as [[[ub_message] | [[err_message] | e2]]]; cbn; try reflexivity.
+          destruct e1 as [[[[ub_message] | [[err_message] | e1]]]]; cbn; try reflexivity.
+          destruct e2 as [[[[ub_message] | [[err_message] | e2]]]]; cbn; try reflexivity.
         }
 
         intros dv1 Re1.
@@ -1243,11 +1244,14 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
         { (* Monad.eq1 mb (x <- ma;; k' x) *)
           unfold bind.
           cbn.
-          destruct e2 as [[[ub_message] | [[err_message] | e2]]]; cbn; try reflexivity.
+          destruct e2 as [[[[ub_message] | [[err_message] | e2]]]]; cbn; try reflexivity.
+
+          unfold Monad.eq1, EqM_err_or_ub.
+          destruct (eval_iop iop dv1 e2) as [[[[ub_message] | [[err_message] | res]]]]; reflexivity.
         }
 
         intros dv2 Re2.
-        destruct (eval_iop iop dv1 dv2) as [[[ub_message] | [[err_message] | res]]]; reflexivity.
+        destruct (eval_iop iop dv1 dv2) as [[[[ub_message] | [[err_message] | res]]]]; reflexivity.
       Qed.
   
 

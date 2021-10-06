@@ -1504,7 +1504,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
       end.
 
   Definition mem_state_lift_err_or_ub {E} `{FailureE -< E} `{UBE -< E} {A} (e : err_or_ub A) : MemStateT (itree E) A
-    := match unEitherT e with
+    := match unEitherT (unERR_OR_UB e) with
        | inl (UB_message ub) => mem_state_raiseUB ub
        | inr (inl (ERR_message err)) => mem_state_raise err
        | inr (inr x) => ret x

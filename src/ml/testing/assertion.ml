@@ -45,7 +45,7 @@ let rec eq_uvalue (l: DV.uvalue) (r: DV.uvalue) : bool =
   | UVALUE_Double l', UVALUE_Double r' -> l' = r'
   | UVALUE_Float l', UVALUE_Float r' -> l' = r'
   | UVALUE_Undef l', UVALUE_Undef r' -> l' = r'
-  | UVALUE_Poison, UVALUE_Poison -> true
+  | UVALUE_Poison l', UVALUE_Poison r' -> l' = r'
   | UVALUE_None, UVALUE_None -> true
   | UVALUE_Struct ul, UVALUE_Struct ur ->
      List.for_all2 eq_uvalue ul ur

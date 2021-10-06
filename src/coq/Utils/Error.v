@@ -381,3 +381,15 @@ Definition err_to_err_or_ub {A} (e : err A) : err_or_ub A
 
 Definition UB_to_err_or_ub {A} (ub : UB A) : err_or_ub A
   := ERR_OR_UB (lift ub).
+
+Ltac inv_err_or_ub :=
+  match goal with
+  | h: {| unERR_OR_UB := {| unEitherT := inl _ |} |} =
+       {| unERR_OR_UB := {| unEitherT := inl _ |} |} |- _ => inv h
+  | h: {| unERR_OR_UB := {| unEitherT := inr _ |} |} =
+       {| unERR_OR_UB := {| unEitherT := inr _ |} |} |- _ => inv h
+  | h: {| unERR_OR_UB := {| unEitherT := inr _ |} |} =
+       {| unERR_OR_UB := {| unEitherT := inl _ |} |} |- _ => inv h
+  | h: {| unERR_OR_UB := {| unEitherT := inl _ |} |} =
+       {| unERR_OR_UB := {| unEitherT := inr _ |} |} |- _ => inv h
+  end.
