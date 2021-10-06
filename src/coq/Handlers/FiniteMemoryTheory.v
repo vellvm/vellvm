@@ -804,63 +804,34 @@ Section Serialization_Theory.
 
     1-38: solve [inversion BYTES; apply to_ubytes_sizeof].
 
-    Set Nested Proofs Allowed.
-
-
-    (* Lemma re_sid_ubytes_ErrSID_length : *)
-    (*   forall bytes bytes' sid prov sid' prov', *)
-    (*     ErrSID_runs_to (re_sid_ubytes bytes) sid prov bytes' sid' prov' -> *)
-    (*     length bytes = length bytes'. *)
-    (* Proof. *)
-    (*   intros bytes bytes' sid prov sid' prov' RUNS. *)
-    (*   induction bytes. *)
-    (*   - inv RUNS; auto. *)
-    (*   - red in RUNS. *)
-    (*     unfold runErrSID in RUNS. *)
-    (*     unfold runErrSID_T in RUNS. *)
-
-    (*     unfold re_sid_ubytes in RUNS. *)
-
-    (*     match goal with *)
-    (*     | H: IdentityMonad.unIdent (StateMonads.runStateT (StateMonads.runStateT (unEitherT (unEitherT (bind ?ma ?k))) ?sid) ?prov) = _ |- _ => *)
-    (*       idtac ma; idtac k; *)
-    (*         epose proof EitherTReturns_bind_inv ma k bytes'; *)
-    (*         pose proof ma *)
-    (*     end. *)
-
-    (*     forward H. *)
-    (*     red. *)
-    (*     unfold EitherTReturns in H. *)
-
-    (*     (* This is where I needed the bind_inv lemma for state *) *)
-    (*     match goal with *)
-    (*     | H: IdentityMonad.unIdent (StateMonads.runStateT (StateMonads.runStateT ?ma ?sid) ?prov) = _ |- _ => *)
-    (*       epose proof (@StateTReturns_bind_inv store_id (stateT Provenance IdentityMonad.ident) _ _ _ _ _ _ ma) *)
-    (*     end. *)
-    (* Admitted. *)
-
     apply ErrSID_evals_to_bind in BYTES as (sid'' & prov'' & bytes'' & EXTRACT & BYTES).
 
-  pose proof @proper_eq1_runs_to (list SByte) sid' prov bytes'' sid'' prov''.
+    pose proof @proper_eq1_runs_to (list SByte) sid' prov bytes'' sid'' prov''.
 
-  unfold Proper, respectful in H1.
-  pose proof @map_monad_lift_ERR.
+    unfold Proper, respectful in H1.
+    pose proof @map_monad_lift_ERR.
 
-  specialize (H2 uvalue SByte (eitherT UB_MESSAGE (stateT store_id (stateT Provenance IdentityMonad.ident))) _ _).
-  repeat (forward H2; [typeclasses eauto|]).
-  forward H2.
-  { apply MonadLawsE_eitherT.
+    specialize (H2 uvalue SByte (eitherT UB_MESSAGE (stateT store_id (stateT Provenance IdentityMonad.ident))) _ _).
+    repeat (forward H2; [typeclasses eauto|]).
+    forward H2.
+    { eapply MonadLawsE_either.
+      Unshelve.
+      apply MonadState.MonadLawsE_stateTM.
+      typeclasses eauto.
+      apply MonadState.MonadLawsE_stateTM.
+      typeclasses eauto.
+      typeclasses eauto.
+    }
 
-  }
-  specialize (H2 bytes extract_byte_to_sbyte).
-  specialize (H1 _ _ H2).
-  apply H1 in EXTRACT. (* Why can't proper do this? *)
+    specialize (H2 bytes extract_byte_to_sbyte).
+    specialize (H1 _ _ H2).
+    apply H1 in EXTRACT. (* Why can't proper do this? *)
 
-  apply ErrSID_runs_to_ErrSID_evals_to in EXTRACT.
-  apply map_monad_ErrSID_length in EXTRACT.
-  apply re_sid_ubytes_ErrSID_length in BYTES.
-  lia.
-  Admitted.
+    apply ErrSID_runs_to_ErrSID_evals_to in EXTRACT.
+    apply map_monad_ErrSID_length in EXTRACT.
+    apply re_sid_ubytes_ErrSID_length in BYTES.
+    lia.
+  Qed.
 
   (* Lemma firstn_sizeof_dtyp : *)
   (*   forall dv dt, *)
