@@ -42,24 +42,6 @@ Import Monad.
 
 Notation err := (sum string).
 
-Instance EqM_sum {E} : Monad.Eq1 (sum E) :=
-  fun (a : Type) (x y : sum E a) => x = y.
-
-Instance EqMProps_sum {E} : Monad.Eq1Equivalence (sum E).
-constructor; intuition.
-repeat intro. etransitivity; eauto.
-Defined.
-
-Instance MonadLaws_sum {T} : Monad.MonadLawsE (sum T).
-  constructor.
-  - intros. repeat red. cbn. auto.
-  - intros. repeat red. cbn. destruct x eqn: Hx; auto.
-  - intros. repeat red. cbn.
-    destruct x; auto.
-  - repeat intro. repeat red. cbn. repeat red in H. rewrite H.
-    repeat red in H0. destruct y; auto.
-Qed.
-
 Definition trywith {E A:Type} {F} `{Monad F} `{MonadExc E F} (e:E) (o:option A) : F A :=
     match o with
     | Some x => ret x
@@ -146,21 +128,6 @@ Inductive err_or_ub A :=
   ERR_OR_UB { unERR_OR_UB : eitherT ERR_MESSAGE UB A }.
 Arguments ERR_OR_UB {_} _.
 Arguments unERR_OR_UB {_} _.
-
-Instance EqM_eitherT {E} {M} `{Monad.Eq1 M} : Monad.Eq1 (eitherT E M)
-  := fun (a : Type) x y => Monad.eq1 (unEitherT x) (unEitherT y).
-
-Instance EqMProps_eitherT {E} {M} `{Monad.Eq1Equivalence M} : Monad.Eq1Equivalence (eitherT E M).
-constructor; intuition;
-repeat intro.
-- unfold Monad.eq1, EqM_eitherT.
-  reflexivity.
-- unfold Monad.eq1, EqM_eitherT.
-  symmetry.
-  auto.
-- unfold Monad.eq1, EqM_eitherT.
-  etransitivity; eauto.
-Defined.
 
 Instance EqM_err_or_ub : Monad.Eq1 err_or_ub.
 Proof.
