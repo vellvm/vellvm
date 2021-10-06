@@ -183,6 +183,8 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
   Module ESID := ERRSID Addr SIZEOF LLVMIO PROVENANCE.
   Import ESID.
 
+  Import DynamicTypes.
+
   Lemma to_ubytes_all_bytes_from_uvalue_helper :
     forall uv dt sid sbytes,
       is_supported dt ->
@@ -266,6 +268,21 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
       t
     end.
 
+  Ltac tactic_on_non_aggregate_dtyps x t :=
+    match x with
+    | (DTYPE_Struct _) =>
+      idtac
+    | (DTYPE_Packed_struct _) =>
+      idtac
+    | (DTYPE_Array _ _) =>
+      idtac
+    | (DTYPE_Vector _ _) =>
+      idtac
+    | _ =>
+      t
+    end.
+
+
   Ltac eval_serialize_sbytes_hyp :=
     match goal with
     (* Try easy case first for speedup *)
@@ -296,6 +313,92 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
             tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
           end.
 
+    (* Poison arrays *)
+    { admit.
+    }
+
+    (* Poison vectors *)
+    { admit.
+    }
+
+    (* Poison structs *)
+    { admit.
+    }
+
+    { admit.
+    }
+
+    (* Poison packed structs *)
+    { admit.
+    }
+
+    { admit.
+    }
+
+    (* Poison *)
+    { destruct H as (NV & NSTRUCT & NPACKED & NARRAY & NVECTOR).
+      destruct t;
+      match goal with
+      (* Try easy case first for speedup *)
+      | |- _ = inr (UVALUE_Poison DynamicTypes.DTYPE_Void) =>
+        cbn in NV; contradiction
+      | |- _ = inr (UVALUE_Poison ?x) =>
+        tactic_on_non_aggregate_dtyps x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
+      end.
+
+      all: exfalso;
+        match goal with
+        | H: _ |- _ =>
+          solve [eapply H; eauto]
+        end.
+    }
+
+    (* Undef arrays *)
+    { admit.
+    }
+
+    (* Undef vectors *)
+    { admit.
+    }
+
+    (* Undef structs *)
+    { admit.
+    }
+
+    { admit.
+    }
+
+    (* Undef packed structs *)
+    { admit.
+    }
+
+    { admit.
+    }
+
+
+    (* Undef *)
+    { destruct H as (NV & NSTRUCT & NPACKED & NARRAY & NVECTOR).
+      destruct t;
+      match goal with
+      (* Try easy case first for speedup *)
+      | |- _ = inr (UVALUE_Undef DynamicTypes.DTYPE_Void) =>
+        cbn in NV; contradiction
+      | |- _ = inr (UVALUE_Undef ?x) =>
+        tactic_on_non_aggregate_dtyps x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
+      end.
+
+      all: exfalso;
+        match goal with
+        | H: _ |- _ =>
+          solve [eapply H; eauto]
+        end.
+    }
+
+    match goal with
+    (* Try easy case first for speedup *)
+    | |- _ = inr ?x =>
+      tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
+    end.    
 
 (*     { destruct t. *)
 (*       1-12: match goal with *)

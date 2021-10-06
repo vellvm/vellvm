@@ -99,6 +99,7 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
       destruct CONC as (ma & k' & CONC' & mbeq & REST).
 
       cbn in mbeq.
+      destruct ma as [ma].
       inversion mbeq.
 
       destruct ma as [[uba | [erra | a]]] eqn:Hma.
@@ -121,7 +122,6 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
 
         split.
 
-        Set Printing Implicit.
         cbn.
         (* This seems like a problem *)
         admit.
@@ -130,10 +130,11 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
 
   Lemma refine_uvalue_op_poison_l :
     forall op dt uv2 dv2,
+      NO_VOID dt ->
       concretize uv2 dv2 ->
       refine_uvalue (UVALUE_IBinop op (UVALUE_Poison dt) uv2) (UVALUE_Poison dt).
   Proof.
-    intros op dt uv2 dv2 CONC.
+    intros op dt uv2 dv2 NV CONC.
     eapply UndefPoison.
     2: constructor.
 
@@ -187,6 +188,8 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
     intros dv2' MRets_dv2.
     inversion MRets_dv2; subst.
     cbn. reflexivity.
+
+    auto.
   Qed.
 
   Lemma concretize_ibinop_inv :
@@ -207,7 +210,7 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
     inversion H.
 
     destruct H0 as (CONC1 & EQ1 & CONT).
-  Qed.
+  Admitted.
   
   Instance proper_refine_uvalue_ibinop {op v2 rv} : Proper ((fun x y => refine_uvalue y x) ==> (fun (x y : Prop) => x -> y)) (fun v1 => refine_uvalue (UVALUE_IBinop op v1 v2) rv).
   Proof.    

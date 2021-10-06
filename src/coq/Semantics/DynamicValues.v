@@ -2097,7 +2097,7 @@ Class VInt I : Type :=
   | DVALUE_Double_typ : forall x, dvalue_has_dtyp (DVALUE_Double x) DTYPE_Double
   | DVALUE_Float_typ  : forall x, dvalue_has_dtyp (DVALUE_Float x) DTYPE_Float
   | DVALUE_None_typ   : dvalue_has_dtyp DVALUE_None DTYPE_Void
-  | DVALUE_Poison_typ  : forall τ, dvalue_has_dtyp (DVALUE_Poison τ) τ
+  | DVALUE_Poison_typ  : forall τ, NO_VOID τ -> dvalue_has_dtyp (DVALUE_Poison τ) τ
 
   | DVALUE_Struct_Nil_typ  : dvalue_has_dtyp (DVALUE_Struct []) (DTYPE_Struct [])
   | DVALUE_Struct_Cons_typ :
@@ -2140,7 +2140,7 @@ Class VInt I : Type :=
   | UVALUE_Double_typ : forall x, uvalue_has_dtyp (UVALUE_Double x) DTYPE_Double
   | UVALUE_Float_typ  : forall x, uvalue_has_dtyp (UVALUE_Float x) DTYPE_Float
   | UVALUE_None_typ   : uvalue_has_dtyp UVALUE_None DTYPE_Void
-  | UVALUE_Poison_typ  : forall τ, uvalue_has_dtyp (UVALUE_Poison τ) τ
+  | UVALUE_Poison_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Poison τ) τ
   | UVALUE_Undef_typ  : forall τ, NO_VOID τ -> uvalue_has_dtyp (UVALUE_Undef τ) τ
 
   | UVALUE_Struct_Nil_typ  : uvalue_has_dtyp (UVALUE_Struct []) (DTYPE_Struct [])
@@ -2486,8 +2486,37 @@ Class VInt I : Type :=
     Hypothesis IH_I32            : forall x, P (UVALUE_I32 x) (DTYPE_I 32).
     Hypothesis IH_I64            : forall x, P (UVALUE_I64 x) (DTYPE_I 64).
     Hypothesis IH_IPTR           : forall x, P (UVALUE_IPTR x) DTYPE_IPTR.
-    Hypothesis IH_Poison         : forall t, P (UVALUE_Poison t) t.
 
+    (* Poison *)
+    Hypothesis IH_Poison_Array    : forall sz t
+                                     (NV: NO_VOID t)
+                                     (IH: P (UVALUE_Poison t) t),
+        P (UVALUE_Poison (DTYPE_Array sz t)) (DTYPE_Array sz t).
+    Hypothesis IH_Poison_Vector    : forall sz t
+                                     (NV: NO_VOID t)
+                                     (IH: P (UVALUE_Poison t) t),
+        P (UVALUE_Poison (DTYPE_Vector sz t)) (DTYPE_Vector sz t).
+
+    Hypothesis IH_Poison_Struct_nil    :
+        P (UVALUE_Poison (DTYPE_Struct [])) (DTYPE_Struct []).
+
+    Hypothesis IH_Poison_Struct_cons    : forall dt dts,
+        P (UVALUE_Poison dt) dt ->
+        P (UVALUE_Poison (DTYPE_Struct dts)) (DTYPE_Struct dts) ->
+        P (UVALUE_Poison (DTYPE_Struct (dt :: dts))) (DTYPE_Struct (dt :: dts)).
+
+    Hypothesis IH_Poison_Packed_struct_nil    :
+        P (UVALUE_Poison (DTYPE_Packed_struct [])) (DTYPE_Packed_struct []).
+
+    Hypothesis IH_Poison_Packed_struct_cons    : forall dt dts,
+        P (UVALUE_Poison dt) dt ->
+        P (UVALUE_Poison (DTYPE_Packed_struct dts)) (DTYPE_Packed_struct dts) ->
+        P (UVALUE_Poison (DTYPE_Packed_struct (dt :: dts))) (DTYPE_Packed_struct (dt :: dts)).
+
+    Hypothesis IH_Poison          : forall t, (NO_VOID t /\ (forall dts, t <> DTYPE_Struct dts) /\ (forall dts, t <> DTYPE_Packed_struct dts) /\ (forall sz et, t <> DTYPE_Array sz et) /\ (forall sz et, t <> DTYPE_Vector sz et)) -> P (UVALUE_Poison t) t
+.
+
+    (* Undef *)
     Hypothesis IH_Undef_Array    : forall sz t
                                      (NV: NO_VOID t)
                                      (IH: P (UVALUE_Undef t) t),
@@ -2898,6 +2927,65 @@ Class VInt I : Type :=
                     | H: _ |- _ =>
                       solve [eapply H; subst IH; eauto]
                     end]).
+      - generalize dependent τ.
+        fix IHτ 1.
+        intros τ NV.
+        destruct τ eqn:Hτ; try contradiction;
+          try solve [eapply IH_Poison;
+                     repeat split; solve [intros * CONTRA; inversion CONTRA]].
+
+        (* Poison Arrays *)
+        { pose proof NV as NVd.
+          rewrite NO_VOID_equation in NVd.
+          apply IH_Poison_Array; auto.
+        }
+
+        (* Poison Structs *)
+        { pose proof NV as NVfs.
+          rewrite NO_VOID_equation in NVfs.
+          clear Hτ.
+          generalize dependent fields.
+          induction fields; intros NV NVfs.
+          - apply IH_Poison_Struct_nil.
+          - apply IH_Poison_Struct_cons.
+            apply IHτ.
+            eapply NO_VOID_Struct_fields in NV.
+            apply NV.
+            left; auto.
+            apply IHfields.
+
+            eapply NO_VOID_Struct_cons; eauto.
+            eapply Forall_HIn_cons; eauto.
+        }
+
+        (* Poison Packed structs *)
+        { pose proof NV as NVfs.
+          rewrite NO_VOID_equation in NVfs.
+          clear Hτ.
+          generalize dependent fields.
+          induction fields; intros NV NVfs.
+          - apply IH_Poison_Packed_struct_nil.
+          - apply IH_Poison_Packed_struct_cons.
+            apply IHτ.
+            eapply NO_VOID_Packed_struct_fields in NV.
+            apply NV.
+            left; auto.
+            apply IHfields.
+
+            eapply NO_VOID_Packed_struct_cons; eauto.
+            eapply Forall_HIn_cons; eauto.
+        }
+
+        (* Poison Vectors *)
+        { pose proof NV as NVd.
+          rewrite NO_VOID_equation in NVd.
+          apply IH_Poison_Vector; auto.
+        }
+
+        Unshelve.
+        all: try solve [exact 0%N | exact DTYPE_Void | exact ([] : list dtyp)].
+
+
       - generalize dependent τ.
         fix IHτ 1.
         intros τ NV.

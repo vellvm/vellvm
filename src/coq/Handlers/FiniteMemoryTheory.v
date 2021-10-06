@@ -460,7 +460,157 @@ Section Serialization_Theory.
     generalize dependent bytes.
     induction TYP; intros bytes' prov sid' BYTES;
       rewrite serialize_sbytes_equation in BYTES.
-    1-7: inversion BYTES; apply to_ubytes_sizeof.
+    1-6: inversion BYTES; apply to_ubytes_sizeof.
+
+    (* Poison, could be aggregate *)
+
+    (* Poison arrays *)
+    { apply ErrSID_evals_to_bind in BYTES.
+      destruct BYTES as (sid'' & prov'' & concat_fields & RUNS & EVAL).
+
+      (* Induction on sz *)
+      generalize dependent sid'.
+      generalize dependent prov.
+      generalize dependent sid''.
+      generalize dependent prov''.
+      generalize dependent concat_fields.
+      generalize dependent bytes'.
+      induction sz using N.peano_ind; intros bytes' concat_fields prov'' sid'' EVAL prov sid' RUNS.
+      - cbn in RUNS. inversion RUNS.
+        cbn in EVAL. inversion EVAL.
+        subst.
+        cbn.
+        rewrite sizeof_dtyp_array.
+        lia.
+      - rewrite repeatN_succ in RUNS.
+        rewrite map_monad_In_unfold in RUNS.
+        apply ErrSID_runs_to_bind in RUNS.
+
+        destruct RUNS as (sid''' & prov''' & first_res & SERFIRST & RUNS).
+        apply ErrSID_runs_to_ErrSID_evals_to in SERFIRST.
+        apply IHTYP in SERFIRST.
+
+        apply ErrSID_runs_to_bind in RUNS.
+        destruct RUNS as (sid'''' & prov'''' & rest_res & SERREST & RUNS).
+
+        inversion RUNS; subst.
+        inversion EVAL; subst.
+        
+        assert (ErrSID_evals_to (ret (concat rest_res)) sid'' prov'' (concat rest_res)) as REST_EVAL by reflexivity.
+        specialize (@IHsz (concat rest_res) rest_res _ _ REST_EVAL _ _ SERREST).
+
+        rewrite app_length.
+        rewrite Nnat.Nat2N.inj_add.
+        rewrite SERFIRST.
+        rewrite IHsz.
+
+        do 2 rewrite sizeof_dtyp_array.
+        lia.
+    }
+
+    (* Poison vectors *)
+    { apply ErrSID_evals_to_bind in BYTES.
+      destruct BYTES as (sid'' & prov'' & concat_fields & RUNS & EVAL).
+
+      (* Induction on sz *)
+      generalize dependent sid'.
+      generalize dependent prov.
+      generalize dependent sid''.
+      generalize dependent prov''.
+      generalize dependent concat_fields.
+      generalize dependent bytes'.
+      induction sz using N.peano_ind; intros bytes' concat_fields prov'' sid'' EVAL prov sid' RUNS.
+      - cbn in RUNS. inversion RUNS.
+        cbn in EVAL. inversion EVAL.
+        subst.
+        cbn.
+        rewrite sizeof_dtyp_vector.
+        lia.
+      - rewrite repeatN_succ in RUNS.
+        rewrite map_monad_In_unfold in RUNS.
+        apply ErrSID_runs_to_bind in RUNS.
+
+        destruct RUNS as (sid''' & prov''' & first_res & SERFIRST & RUNS).
+        apply ErrSID_runs_to_ErrSID_evals_to in SERFIRST.
+        apply IHTYP in SERFIRST.
+
+        apply ErrSID_runs_to_bind in RUNS.
+        destruct RUNS as (sid'''' & prov'''' & rest_res & SERREST & RUNS).
+
+        inversion RUNS; subst.
+        inversion EVAL; subst.
+        
+        assert (ErrSID_evals_to (ret (concat rest_res)) sid'' prov'' (concat rest_res)) as REST_EVAL by reflexivity.
+        specialize (@IHsz (concat rest_res) rest_res _ _ REST_EVAL _ _ SERREST).
+
+        rewrite app_length.
+        rewrite Nnat.Nat2N.inj_add.
+        rewrite SERFIRST.
+        rewrite IHsz.
+
+        do 2 rewrite sizeof_dtyp_vector.
+        lia.
+    }
+
+    (* Poison struct nil *)
+    { inversion BYTES; subst.
+      rewrite sizeof_dtyp_struct_0; reflexivity.
+    }
+
+    (* Poison struct cons *)
+    { apply ErrSID_evals_to_bind in BYTES.
+      destruct BYTES as (sid'' & prov'' & dt_bytes & RUNS & EVAL).
+
+      apply ErrSID_evals_to_bind in EVAL.
+      destruct EVAL as (sid''' & prov''' & dts_bytes & RUNS_DTS & EVAL_CONCAT).
+
+      inversion EVAL_CONCAT; subst.
+
+      apply ErrSID_runs_to_ErrSID_evals_to in RUNS.
+      apply IHTYP in RUNS.
+
+      apply ErrSID_runs_to_ErrSID_evals_to in RUNS_DTS.
+      apply IHTYP0 in RUNS_DTS.
+
+      rewrite app_length.
+      rewrite Nnat.Nat2N.inj_add.
+      rewrite sizeof_dtyp_struct_cons.
+      lia.
+    }
+
+    (* Poison Packed struct nil *)
+    { inversion BYTES; subst.
+      rewrite sizeof_dtyp_packed_struct_0; reflexivity.
+    }
+
+    (* Poison Packed struct cons *)
+    { apply ErrSID_evals_to_bind in BYTES.
+      destruct BYTES as (sid'' & prov'' & dt_bytes & RUNS & EVAL).
+
+      apply ErrSID_evals_to_bind in EVAL.
+      destruct EVAL as (sid''' & prov''' & dts_bytes & RUNS_DTS & EVAL_CONCAT).
+
+      inversion EVAL_CONCAT; subst.
+
+      apply ErrSID_runs_to_ErrSID_evals_to in RUNS.
+      apply IHTYP in RUNS.
+
+      apply ErrSID_runs_to_ErrSID_evals_to in RUNS_DTS.
+      apply IHTYP0 in RUNS_DTS.
+
+      rewrite app_length.
+      rewrite Nnat.Nat2N.inj_add.
+      rewrite sizeof_dtyp_packed_struct_cons.
+      lia.
+    }
+
+    (* Poison, non-aggregate *)
+    { destruct H as (NV & NSTRUCT & NPACKED & NARRAY & NVECTOR).
+      destruct t;
+        solve [inversion BYTES; apply to_ubytes_sizeof
+              | exfalso; intuition; eauto
+              ].
+    }
 
     (* Undef, could be aggregate *)
 

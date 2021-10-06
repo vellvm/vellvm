@@ -718,7 +718,6 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
        | UVALUE_IPTR _
        | UVALUE_Float _
        | UVALUE_Double _
-       | UVALUE_Poison _
 
        (* Expressions *)
        | UVALUE_IBinop _ _ _
@@ -759,6 +758,35 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
 
          | DTYPE_Vector sz t =>
            field_bytes <- map_monad_In (repeatN sz (UVALUE_Undef t)) (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+         | _ =>
+           sid <- fresh_sid;;
+           ret (to_ubytes uv dt sid)
+         end
+
+       (* Poison values, possibly aggregates *)
+       | UVALUE_Poison _ =>
+         match dt with
+         | DTYPE_Struct [] =>
+           ret []
+         | DTYPE_Struct (t::ts) =>
+           f_bytes <- serialize_sbytes (UVALUE_Poison t) t;; (* How do I know this is smaller? *)
+           fields_bytes <- serialize_sbytes (UVALUE_Poison (DTYPE_Struct ts)) (DTYPE_Struct ts);;
+           ret (f_bytes ++ fields_bytes)
+
+         | DTYPE_Packed_struct [] =>
+           ret []
+         | DTYPE_Packed_struct (t::ts) =>
+           f_bytes <- serialize_sbytes (UVALUE_Poison t) t;; (* How do I know this is smaller? *)
+           fields_bytes <- serialize_sbytes (UVALUE_Poison (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
+           ret (f_bytes ++ fields_bytes)
+
+         | DTYPE_Array sz t =>
+           field_bytes <- map_monad_In (repeatN sz (UVALUE_Poison t)) (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+
+         | DTYPE_Vector sz t =>
+           field_bytes <- map_monad_In (repeatN sz (UVALUE_Poison t)) (fun elt Hin => serialize_sbytes elt t);;
            ret (concat field_bytes)
          | _ =>
            sid <- fresh_sid;;
@@ -842,7 +870,6 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
        | UVALUE_IPTR _
        | UVALUE_Float _
        | UVALUE_Double _
-       | UVALUE_Poison _
 
        (* Expressions *)
        | UVALUE_IBinop _ _ _
@@ -883,6 +910,35 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
 
          | DTYPE_Vector sz t =>
            field_bytes <- map_monad_In (repeatN sz (UVALUE_Undef t)) (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+         | _ =>
+           sid <- fresh_sid;;
+           ret (to_ubytes uv dt sid)
+         end
+
+       (* Poison values, possibly aggregates *)
+       | UVALUE_Poison _ =>
+         match dt with
+         | DTYPE_Struct [] =>
+           ret []
+         | DTYPE_Struct (t::ts) =>
+           f_bytes <- serialize_sbytes (UVALUE_Poison t) t;; (* How do I know this is smaller? *)
+           fields_bytes <- serialize_sbytes (UVALUE_Poison (DTYPE_Struct ts)) (DTYPE_Struct ts);;
+           ret (f_bytes ++ fields_bytes)
+
+         | DTYPE_Packed_struct [] =>
+           ret []
+         | DTYPE_Packed_struct (t::ts) =>
+           f_bytes <- serialize_sbytes (UVALUE_Poison t) t;; (* How do I know this is smaller? *)
+           fields_bytes <- serialize_sbytes (UVALUE_Poison (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
+           ret (f_bytes ++ fields_bytes)
+
+         | DTYPE_Array sz t =>
+           field_bytes <- map_monad_In (repeatN sz (UVALUE_Poison t)) (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+
+         | DTYPE_Vector sz t =>
+           field_bytes <- map_monad_In (repeatN sz (UVALUE_Poison t)) (fun elt Hin => serialize_sbytes elt t);;
            ret (concat field_bytes)
          | _ =>
            sid <- fresh_sid;;

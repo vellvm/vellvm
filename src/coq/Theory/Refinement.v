@@ -63,7 +63,7 @@ Lemma concretize_dtyp :
 Proof.
   intros uv dv dt DTYP CONC.
   induction DTYP.
-  1-17: inversion CONC; subst; solve [auto | constructor].
+  1-6: inversion CONC; subst; solve [auto | constructor].
 Admitted.
 
 Lemma refine_uvalue_dtyp :
