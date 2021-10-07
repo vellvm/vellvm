@@ -758,6 +758,7 @@ Definition ocfg_relabel_helper_rel m (bidsv bidsv' : block_id * block_id + uvalu
   | _, _ => False
   end.
 
+(* Conditions over the relabeling map to have eutt *)
 Theorem eutt_ocfg_relabel : forall cfg bidf0 bidf0' bidt0 bidt0' m,
   (bidf0 = bidt0 <-> bidf0' = bidt0') ->
   alist_find bidf0 m = Some bidf0' ->

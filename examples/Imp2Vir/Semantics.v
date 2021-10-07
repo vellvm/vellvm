@@ -56,9 +56,9 @@ Definition denote_cvir {ni no} (ir : cvir ni no) bid bid' :=
 (* In particular: can we have a reasoning principle to prove that two
   cvir are related?
   That is a lemma that would allow us to conclude something along the lines of:
-  [eutt R (denote_cvir ir1 n org) (denote_cvir ir2 m org)]
+  [eutt R (denote_cvir ir1 m org) (denote_cvir ir2 m' org)]
   by chosing an invariant I and having two proof obligations:
-  - I holds initially (of n m and org?)
+  - I holds initially (of m m' and org?)
   - If we start from arguments in I, then we prove something about
   ir1.(blocks) and ir2.(blocks) at these arguments.
 
@@ -277,16 +277,29 @@ Proof.
     break_match; try (apply eutt_eq_bind; tauto).
     break_match; apply eutt_Ret; left; apply H; cbn; tauto.
   - apply eutt_Ret. left. apply H. cbn. tauto.
-  - admit. (* TERM_Switch *)
+  - break_let.
+    apply eutt_eq_bind ; intros.
+    apply eutt_eq_bind ; intros.
+    destruct (dvalue_is_poison u0).
+    + unfold raiseUB. apply eutt_eq_bind ; intros. break_match_goal.
+    + apply eutt_eq_bind ; intros. unfold lift_err. break_match_goal.
+      * unfold raise. apply eutt_eq_bind ; intros. break_match_goal.
+      * apply eutt_Ret. left ; apply H ; cbn.
+    admit. (* TERM_Switch *)
 Admitted.
 
 Theorem denote_cvir_merge_l' : forall
-  ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
+    ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
   cvir_WF ir1 ->
   cvir_WF ir2 ->
   eutt eq
-    (denote_cvir (merge_cvir ir1 ir2) (L ni2 bid) (L ni2 bid))
-    (denote_cvir_gen ir1 (build_map 0 ni1) (build_map (ni1+ni2) no1) (build_map (ni1+ni2+(no1+no2)) (n_int ir1)) bid bid).
+  (denote_cvir (merge_cvir ir1 ir2) (L ni2 bid) (L ni2 bid))
+  (denote_cvir_gen ir1
+                    (build_map 0 ni1)
+                    (build_map (ni1+ni2) no1)
+                    (build_map (ni1+ni2+(no1+no2)) (n_int ir1))
+                    bid bid).
+
 Proof.
   intros.
   unfold cvir_WF in H; destruct H as [WF31 [WF11' [WF11'' [WF21 _]]]].
@@ -377,7 +390,11 @@ Theorem denote_cvir_merge_r' : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 
   cvir_WF ir2 ->
   eutt eq
     (denote_cvir (merge_cvir ir1 ir2) (R ni1 bid) (R ni1 bid))
-    (denote_cvir_gen ir2 (build_map ni1 ni2) (build_map (ni1+ni2+no1) no2) (build_map (ni1+ni2+(no1+no2)+n_int ir1) (n_int ir2)) bid bid).
+    (denote_cvir_gen ir2
+                     (build_map ni1 ni2)
+                     (build_map (ni1+ni2+no1) no2)
+                     (build_map (ni1+ni2+(no1+no2)+n_int ir1) (n_int ir2))
+                     bid bid).
 Admitted.
 
 Theorem denote_cvir_merge_l : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
@@ -435,13 +452,13 @@ Definition sym_fin {n1 n2 n3 : nat} (f : fin (n1 + (n2 + n3))) : fin (n1 + (n3 +
   end.
 
 Theorem denote_cvir_sym_i : forall {ni1 ni2 ni3 no : nat} (ir : cvir (ni1 + (ni2 + ni3)) no) bid bid',
-  cvir_ids_WF ir ->
-  unique_bid ir ->
+  cvir_WF ir ->
   eutt eq
     (denote_cvir ir bid bid')
     (denote_cvir (sym_i_cvir ir) (sym_fin bid) (sym_fin bid)).
 Proof.
   intros.
+  unfold cvir_WF in H ; intuition.
   unfold denote_cvir, denote_cvir_gen, sym_i_cvir, sym_fin.
   cbn.
   rewrite !skipn_build_map.

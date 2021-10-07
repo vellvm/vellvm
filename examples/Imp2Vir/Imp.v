@@ -290,6 +290,8 @@ Section Example_Sequence.
 
   Definition trivial_seq (n : nat) : stmt :=
     input ← n;;;
+    input ← input+1;;;
+    input ← input-1;;;
     output ← input.
 
 End Example_Sequence.

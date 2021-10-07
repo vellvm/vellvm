@@ -101,30 +101,32 @@ Definition merge_cvir
 Definition sym_i_cvir {ni1 ni2 ni3 no : nat} (b : cvir (ni1 + (ni2 + ni3)) no) :
   cvir (ni1 + (ni3 + ni2)) no :=
   mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
-    blocks b (sym_vec vi) vo vt
-  ).
+    blocks b (sym_vec vi) vo vt).
 
 Definition sym_o_cvir {ni no1 no2 no3 : nat} (b : cvir ni (no1 + (no2 + no3))) :
   cvir ni (no1 + (no3 + no2)) :=
   mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
-    blocks b vi (sym_vec vo) vt
-  ).
+    blocks b vi (sym_vec vo) vt).
 
 Definition cast_i_cvir {ni ni' no : nat} (b : cvir ni no) (H : ni = ni') : cvir ni' no :=
   mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
-    blocks b (Vec.cast vi (eq_sym H)) vo vt
-  ).
+    blocks b (Vec.cast vi (eq_sym H)) vo vt).
 
 Definition cast_o_cvir {ni no no' : nat} (b : cvir ni no) (H : no = no') : cvir ni no' :=
   mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
-    blocks b vi (Vec.cast vo (eq_sym H)) vt
-          ).
+    blocks b vi (Vec.cast vo (eq_sym H)) vt).
 
-Definition swap_i_input_cvir {ni no: nat} (i : Fin.fin ni) (b : cvir ni no) : cvir ni no :=
-  mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
-    blocks b (Vec.swap_i i vi) vo vt
-  ).
-
+Program Definition swap_i_input_cvir {ni no :nat} (i : Fin.fin ni) (b : cvir ni no)
+  : cvir ni no :=
+  let b' := cast_i_cvir b (_ : ni = 0 + (i + (ni-i)))%nat in
+  let b'' := sym_i_cvir b' in
+  cast_i_cvir b'' (_ : (0 + ((ni-i) + i))%nat = ni).
+Next Obligation.
+  destruct i ; simpl ; lia.
+Qed.
+Next Obligation.
+  destruct i ; simpl ; lia.
+Qed.
 
 (* NOTE (vi=(0,1,2,3,4,5), i = 4) => (vi->(4,0,1,2,3,5)) *)
 (* Bring the i-th input at the head of the input vector *)
@@ -184,10 +186,10 @@ Definition loop_cvir' {ni no ni' no' : nat} (n : nat) (b : cvir ni no)
 
 
 Program Definition seq_cvir {ni n no : nat}
-  (b1 : cvir (S ni) n) (b2 : cvir n no) : cvir (S ni) no :=
+  (b1 : cvir ni (S n)) (b2 : cvir (S n) no) : cvir ni no :=
     let b := merge_cvir b1 b2 in
-    let b := swap_i_input_cvir (fi' n) b in
-    loop_cvir' n b _ _.
+    let b := swap_i_input_cvir ni b in
+    loop_cvir' (S n) b _ _.
 Next Obligation.
 lia.
 Defined.
@@ -212,16 +214,6 @@ Definition close_cvir {ni} (b : cvir ni 0) : cvir 0 0 :=
   mk_cvir (fun vi vo vt =>
     let '(vi,vt) := Vec.splitat ni vt in
     (blocks b) vi vo vt).
-
-(*
-Definition cond_cvir {ni1 no1 ni2 no2 : nat}
-  (b1 : cvir (S ni1) (S no1)) (b2: cvir (S ni2) (S no2)) (e : texp typ) :
-  cvir (ni1+ni2) (no1+no2) :=
-    let cond_ir := branch_cvir [] e in
-    let branchs_ir := join_cvir b1 b2 in
-    seq_cvir cond_ir branchs_ir
-    join_cvir (cast_o_cvir (seq_cvir (seq_cvir cond_ir b1) b2) _).
- *)
 
 Definition fnbody := (block typ * list (block typ))%type.
 Definition program := toplevel_entity typ fnbody.

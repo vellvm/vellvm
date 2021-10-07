@@ -475,33 +475,6 @@ From Vellvm Require Import Utils.AListFacts.
 Definition vec_build_map {A n} (v v' : Vec.t A n) : alist A A :=
   List.combine (proj1_sig v) (proj1_sig v').
 
-
-(* Swap vectors *)
-Definition swap_vec {A} {n1 n2} (v : Vec.t A (n1 + n2)) : Vec.t A (n2 + n1) :=
-  let '(v1,v2) := Vec.splitat n1 v in
-  append v2 v1.
-
-Theorem swap_vec_app : forall {A} {n1 n2} (v1 : Vec.t A n1) (v2 : Vec.t A n2),
-  swap_vec (append v1 v2) = (append v2 v1).
-Proof.
-  intros.
-  unfold swap_vec.
-  rewrite splitat_append.
-  reflexivity.
-Qed.
-
-
-Theorem swap_vec_In : forall {A} {n1 n2} (v : Vec.t A (n1 + n2)) a,
-  In a v <-> In a (swap_vec v).
-Proof.
-  intros.
-  split_vec v n1.
-  rewrite swap_vec_app.
-  rewrite !vector_in_app_iff. tauto.
-Qed.
-
-
-
 Theorem cast_In : forall {A} {n n'} (v : Vec.t A n) (H : n=n') a,
   In a v <-> In a (cast v H).
 Proof.
@@ -510,35 +483,6 @@ Proof.
   unfold cast. subst.
   cbn. tauto.
 Qed.
-
-(* [0,1,...,i-1,i,i+1,...,n] ->
-   [i,i+1,...,n,0,1,...,i-1] *)
-Program Definition swap_i {A} {n} (i : Fin.fin n) (v : t A n) : t A n :=
-  let v' := Vec.cast v (_ : n = (proj1_sig i + (n-proj1_sig i))) in
-  let v'' := swap_vec v' in
-  Vec.cast v'' (_ : _ = n).
-Next Obligation.
-destruct i ; simpl in * ; lia.
-Qed.
-Next Obligation.
-  destruct i ; simpl in * ; lia.
-Qed.
-
-Theorem swap_i_In : forall {A} {n} (i: Fin.fin n) (v : Vec.t A n) a,
-  In a v <-> In a (swap_i i v).
-Proof.
-  intros.
-  unfold swap_i.
-  split ; intros.
-  - apply cast_In.
-    rewrite <- swap_vec_In.
-    apply cast_In. assumption.
-  - apply cast_In in H.
-    rewrite <- swap_vec_In in H.
-    apply cast_In in H. assumption.
-Qed.
-
-
 
 Lemma hd_app: forall {A n1 n2} (v1 : t A (S n1)) (v2 : t A n2),
   hd (append v1 v2) = hd v1.
