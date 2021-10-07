@@ -436,6 +436,71 @@ Proof.
     admit.
 Admitted.
 
+
+(* Reordering *)
+
+Lemma reorder_input_cvir_input_id_WF :
+  forall ni no (ir : cvir ni no) (f : t raw_id ni -> t raw_id ni) {reorder_f : Reorder f} ,
+  cvir_input_ids_WF ir -> cvir_input_ids_WF (reorder_input_cvir ir f).
+Proof.
+  unfold cvir_input_ids_WF. intros.
+  simpl in H0.
+  apply H in H0.
+  unfold In in *. simpl in *.
+  rewrite in_app_iff in *; intuition.
+  apply reordering in H1; intuition.
+Qed.
+
+Lemma reorder_input_cvir_output_id_WF :
+  forall ni no (ir : cvir ni no) (f : t raw_id ni -> t raw_id ni) {reorder_f : Reorder f} ,
+  cvir_output_ids_WF ir -> cvir_output_ids_WF (reorder_input_cvir ir f).
+Proof.
+  unfold cvir_output_ids_WF. intros.
+  simpl in H0.
+  apply H with (bid := bid) in H0 ; auto.
+  unfold In in * ; simpl in *.
+  rewrite !in_app_iff in * ; intuition.
+  apply reordering in H2; intuition.
+Qed.
+
+
+Lemma reorder_input_cvir_inputs_used :
+  forall ni no (ir : cvir ni no) (f : t raw_id ni -> t raw_id ni) {reorder_f : Reorder f} ,
+  cvir_inputs_used ir ->
+  cvir_inputs_used (reorder_input_cvir ir f).
+Proof.
+  unfold cvir_inputs_used.
+  intros; simpl in *.
+  apply H.
+  rewrite vector_in_app_iff in H0.
+  rewrite vector_in_app_iff ; intuition.
+  unfold In in *. now left ; apply reordering in H1.
+Qed.
+
+Lemma reorder_input_cvir_unique :
+  forall ni no (ir : cvir ni no) (f : t raw_id ni -> t raw_id ni) {reorder_f : Reorder f} ,
+  unique_bid ir ->
+  unique_bid (reorder_input_cvir ir f).
+Proof.
+  unfold unique_bid.
+  intros; simpl in *.
+  eapply H. 4: apply H3. 3: apply H2. 2: apply H1.
+  (* Property unicity with re-ordering *)
+Admitted.
+
+
+Lemma reorder_input_cvir_relabel_WF :
+  forall ni no (ir : cvir ni no) (f : t raw_id ni -> t raw_id ni) {reorder_f : Reorder f} ,
+  cvir_relabel_WF ir ->
+  cvir_relabel_WF (reorder_input_cvir ir f).
+Proof.
+  unfold cvir_relabel_WF.
+  intros; simpl in *.
+  set (m := vec_build_map (vi++vo++vt) (vi'++vo'++vt')).
+  specialize (H (f vi) (f vi') vo vo' vt vt' ).
+  (* need property on unique_vector with (Reorder f)*)
+Admitted.
+
 (* sym_i and sym_o WF *)
 
 Lemma sym_i_cvir_input_id_WF :
@@ -1285,12 +1350,23 @@ Proof.
   auto 6 using cast_o_cvir_WF, sym_o_cvir_WF.
 Qed.
 
+Theorem reoder_input_cvir_WF :
+  forall ni no (ir : cvir ni no) (f : t raw_id ni -> t raw_id ni) {reorder_f : Reorder f} ,
+  cvir_WF ir ->
+  cvir_WF (reorder_input_cvir ir f).
+Proof.
+  unfold cvir_WF.
+  intros ; intuition;
+  auto using reorder_input_cvir_unique, reorder_input_cvir_input_id_WF,
+      reorder_input_cvir_output_id_WF, reorder_input_cvir_inputs_used, reorder_input_cvir_relabel_WF.
+Qed.
+
 Theorem swap_i_cvir_WF :
-  forall ni no (ir : cvir ni no) (i : Fin.fin ni),
+  forall ni no (ir : cvir ni no) (i : Fin.fin (S ni)),
   cvir_WF ir -> cvir_WF (swap_i_input_cvir i ir).
 Proof.
   unfold swap_i_input_cvir.
-  auto using cast_i_cvir_WF, sym_i_cvir_WF.
+  intros. apply reoder_input_cvir_WF ; auto.
 Qed.
 
 
@@ -1327,7 +1403,7 @@ Proof.
 Qed.
 
 Theorem seq_cvir_WF :
-  forall ni n no (ir1 : cvir ni (S n)) (ir2 : cvir (S n) no),
+forall ni n no (ir1 : cvir ni n) (ir2 : cvir n no),
   cvir_WF ir1 -> cvir_WF ir2 ->
   cvir_WF (seq_cvir ir1 ir2).
 Proof.

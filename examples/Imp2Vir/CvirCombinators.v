@@ -116,17 +116,14 @@ Definition cast_o_cvir {ni no no' : nat} (b : cvir ni no) (H : no = no') : cvir 
   mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
     blocks b vi (Vec.cast vo (eq_sym H)) vt).
 
-Program Definition swap_i_input_cvir {ni no :nat} (i : Fin.fin ni) (b : cvir ni no)
-  : cvir ni no :=
-  let b' := cast_i_cvir b (_ : ni = 0 + (i + (ni-i)))%nat in
-  let b'' := sym_i_cvir b' in
-  cast_i_cvir b'' (_ : (0 + ((ni-i) + i))%nat = ni).
-Next Obligation.
-  destruct i ; simpl ; lia.
-Qed.
-Next Obligation.
-  destruct i ; simpl ; lia.
-Qed.
+
+Definition reorder_input_cvir {ni no : nat} (b : cvir ni no) f
+        {reorder_f : Reorder f} : cvir ni no :=
+  mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
+    blocks b (f vi) vo vt).
+
+Program Definition swap_i_input_cvir {ni no :nat} (i : Fin.fin (S ni)) (b : cvir ni no) :=
+  reorder_input_cvir b (swap i).
 
 (* NOTE (vi=(0,1,2,3,4,5), i = 4) => (vi->(4,0,1,2,3,5)) *)
 (* Bring the i-th input at the head of the input vector *)
@@ -186,16 +183,16 @@ Definition loop_cvir' {ni no ni' no' : nat} (n : nat) (b : cvir ni no)
 
 
 Program Definition seq_cvir {ni n no : nat}
-  (b1 : cvir ni (S n)) (b2 : cvir (S n) no) : cvir ni no :=
-    let b := merge_cvir b1 b2 in
-    let b := swap_i_input_cvir ni b in
-    loop_cvir' (S n) b _ _.
+        (b1 : cvir ni n) (b2 : cvir n no) : cvir ni no :=
+  let b := merge_cvir b1 b2 in
+  let b' := swap_i_input_cvir n b in
+  loop_cvir' n b' _ _.
 Next Obligation.
-lia.
-Defined.
+  lia.
+Qed.
 Next Obligation.
-lia.
-Defined.
+  lia.
+Qed.
 
 (* Connect the first output of b to its first input, and internalize the only
 the output *)

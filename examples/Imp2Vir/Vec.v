@@ -494,6 +494,63 @@ Proof.
   - cbn ; reflexivity.
 Qed.
 
+
+Class Reorder {A n} (f : t A n -> t A n) :=
+  {
+    reordering : forall (v : t A n) e, In e v <-> In e (f v)
+  }.
+
+Definition reorder_vec {A n} (v : t A n) (f : t A n -> t A n) {f_reorder : Reorder f} :=
+  f v.
+
+(* Swap vectors *)
+Definition swap_vec {A} {n1 n2} (v : Vec.t A (n1 + n2)) : Vec.t A (n2 + n1) :=
+  let '(v1,v2) := Vec.splitat n1 v in
+  append v2 v1.
+
+Theorem swap_vec_app : forall {A} {n1 n2} (v1 : Vec.t A n1) (v2 : Vec.t A n2),
+  swap_vec (append v1 v2) = (append v2 v1).
+Proof.
+  intros.
+  unfold swap_vec.
+  rewrite splitat_append.
+  reflexivity.
+Qed.
+
+Theorem swap_vec_In : forall {A} {n1 n2} (v : Vec.t A (n1 + n2)) a,
+  In a v <-> In a (swap_vec v).
+Proof.
+  intros.
+  split_vec v n1.
+  rewrite swap_vec_app.
+  rewrite !vector_in_app_iff. tauto.
+Qed.
+
+Program Definition swap {A} {n} (i : Fin.fin (S n)) (v : t A n) : t A n :=
+  let v' := Vec.cast v (_ : n = (proj1_sig i + (n-proj1_sig i))) in
+  let v'' := swap_vec v' in
+  Vec.cast v'' (_ : _ = n).
+Next Obligation.
+destruct i ; simpl in * ; lia.
+Qed.
+Next Obligation.
+  destruct i ; simpl in * ; lia.
+Qed.
+
+#[global] Instance swap_reorder : forall {A n} (i : Fin.fin (S n)), @Reorder A n (swap i ).
+Proof.
+  intros.
+  constructor. unfold swap.
+   split ; intros.
+  - apply cast_In.
+    rewrite <- swap_vec_In.
+    apply cast_In. assumption.
+  - apply cast_In in H.
+    rewrite <- swap_vec_In in H.
+    apply cast_In in H. assumption.
+Qed.
+
+
 Declare Scope vec_scope.
 Delimit Scope vec_scope with vec.
 Notation "h :: t" := (cons h t) (at level 60, right associativity).
