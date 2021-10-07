@@ -96,10 +96,9 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
       red in CONC.
       rewrite concretize_uvalueM_equation in CONC.
 
-      destruct CONC as (ma & k' & CONC' & mbeq & REST).
+      destruct CONC as ([ma] & k' & CONC' & mbeq & REST).
 
       cbn in mbeq.
-      destruct ma as [ma].
       inversion mbeq.
 
       destruct ma as [[uba | [erra | a]]] eqn:Hma.
@@ -118,6 +117,8 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
         eexists.
 
         split.
+
+        (* ma = inl ub *)
         apply CONC'.
 
         split.

@@ -22,6 +22,17 @@ Section Laws.
   Class MonadReturns :=
     { MReturns : forall {A} (x : A) (ma : M A), Prop;
 
+      MFails : forall {A} (ma : M A), Prop;
+
+      MFails_MReturns : forall {A} (ma : M A),
+          MFails ma -> forall a, ~ MReturns a ma;
+
+      MReturns_MFails : forall {A} (ma : M A) (a : A),
+          MReturns a ma -> ~ MFails ma;
+
+      MFails_ret : forall {A} (a : A),
+          ~ MFails (ret a);
+
       MReturns_bind : forall {A B} (a : A) (b : B) (ma : M A) (k : A -> M B),
           MReturns a ma -> MReturns b (k a) -> MReturns b (bind ma k);
 
@@ -29,15 +40,30 @@ Section Laws.
           MReturns b (bind ma k) -> exists a : A , MReturns a ma /\ MReturns b (k a);
 
       MReturns_ret : forall {A} (a : A) (ma : M A),
-        eq1 ma (ret a) -> MReturns a ma;
+          ~MFails ma -> eq1 ma (ret a) -> MReturns a ma;
 
       MReturns_ret_inv : forall {A} (x y : A),
           MReturns x (ret y) -> x = y;
 
       MReturns_Proper :> forall {A} (a : A),
-          Proper (eq1 ==> iff) (MReturns a)
+          Proper (eq1 ==> Basics.impl) (MReturns a)
    }.
 End Laws.
+
+Set Printing Implicit.
+Unset Printing Notations.
+
+Section MReturns_ProperFlip.
+  Context (M : Type -> Type).
+  Context {Monad : Monad M}.
+  Context {Eq1 : @Eq1 M}.
+  Context {MRET : @MonadReturns M Monad Eq1}.
+
+  Class MonadReturns_ProperFlip :=
+    { MReturns_ProperFlip :> forall {A} (a : A),
+        Proper (eq1 ==> fun A B => Basics.impl B A) (MReturns _ a)
+    }.
+End MReturns_ProperFlip.
 
 Section MonadReturnsInv.
   Context (M : Type -> Type).
@@ -50,6 +76,7 @@ Section MonadReturnsInv.
 End MonadReturnsInv.
 
 Arguments MReturns {M _ _ _ _}.
+Arguments MFails {M _ _ _ _}.
 Arguments MReturns_bind {M _ _ _ _}.
 Arguments MReturns_bind_inv {M _ _ _ _}.
 Arguments MReturns_ret {M _ _ _ _}.
@@ -60,6 +87,39 @@ Section Sum.
 
   Definition SumReturns {A} (a : A) (ma : sum E A) : Prop
     := ma = inr a.
+
+  Definition SumFails {A} (ma : sum E A) : Prop
+    := exists e, ma = inl e.
+
+  Lemma SumFails_SumReturns :
+    forall {A} (ma : sum E A),
+      SumFails ma -> forall a, ~ SumReturns a ma.
+  Proof.
+    intros A ma H a.
+    destruct H as (e & FAILS).
+    subst.
+    intros CONTRA; inversion CONTRA.
+  Qed.
+
+  Lemma SumReturns_SumFails :
+    forall {A} (ma : sum E A) (a : A),
+      SumReturns a ma -> ~ SumFails ma.
+  Proof.
+    intros A ma a H.
+    inversion H; subst.
+    intros CONTRA; inversion CONTRA.
+    inversion H0.
+  Qed.
+
+  Lemma SumFails_ret :
+    forall {A} (a : A),
+      ~SumFails (ret a).
+  Proof.
+    intros A a.
+    intros FAILS.
+    inversion FAILS.
+    inversion H.
+  Qed.
 
   Lemma SumReturns_bind :
     forall {A B} (a : A) (b : B) (ma : sum E A) (k : A -> sum E B),
@@ -84,7 +144,7 @@ Section Sum.
 
   Lemma SumReturns_ret :
     forall {A} (a : A) (ma : sum E A),
-      eq1 ma (ret a) -> SumReturns a ma.
+      ~SumFails ma -> eq1 ma (ret a) -> SumReturns a ma.
   Proof.
     intros * Hma.
     auto.
@@ -99,7 +159,7 @@ Section Sum.
     inversion H; auto.
   Qed.
 
-  #[global] Instance SumReturns_Proper : forall {A} (a : A),
+  #[global] Instance SumReturns_ProperIff : forall {A} (a : A),
       Proper (eq1 ==> iff) (SumReturns a).
   Proof.
     intros A a.
@@ -108,8 +168,30 @@ Section Sum.
     split; intros Hret; unfold SumReturns in *; subst; auto.
   Qed.
 
+  #[global] Instance SumReturns_Proper : forall {A} (a : A),
+      Proper (eq1 ==> Basics.impl) (SumReturns a).
+  Proof.
+    intros A a.
+    unfold Proper, respectful.
+    intros x y H.
+    intros Hret; unfold SumReturns in *; subst; auto.
+  Qed.
+
+  #[global] Instance SumReturns_ProperFlip : forall {A} (a : A),
+      Proper (eq1 ==> fun A B => Basics.impl B A) (SumReturns a).
+  Proof.
+    intros A a.
+    unfold Proper, respectful.
+    intros x y H.
+    intros Hret; unfold SumReturns in *; subst; auto.
+  Qed.
+
   Instance MonadReturns_Sum : MonadReturns (sum E )
     := { MReturns := fun A => SumReturns;
+         MFails := fun A => SumFails;
+         MReturns_MFails := fun A => SumReturns_SumFails;
+         MFails_MReturns := fun A => SumFails_SumReturns;
+         MFails_ret := fun A => SumFails_ret;
          MReturns_bind := fun A B => SumReturns_bind;
          MReturns_bind_inv := fun A B => SumReturns_bind_inv;
          MReturns_ret := fun A => SumReturns_ret;
@@ -132,6 +214,40 @@ Section EitherT.
 
   Definition EitherTReturns {A} (a : A) (ma : eitherT E M A) : Prop
     := MReturns (inr a) (unEitherT ma).
+
+  Definition EitherTFails {A} (ma : eitherT E M A) : Prop
+    := MFails (unEitherT ma).
+
+  Lemma EitherTFails_EitherTReturns :
+    forall {A} (ma : eitherT E M A),
+      EitherTFails ma -> forall a, ~ EitherTReturns a ma.
+  Proof.
+    intros A ma FAILS a.
+    unfold EitherTFails in FAILS.
+    intros CONTRA.
+    unfold EitherTReturns in CONTRA.
+    eapply (MFails_MReturns M _ _ (inr a)); eauto.
+    Unshelve.
+    eauto.
+  Qed.
+
+  Lemma EitherTReturns_EitherTFails :
+    forall {A} (ma : eitherT E M A) (a : A),
+      EitherTReturns a ma -> ~ EitherTFails ma.
+  Proof.
+    intros A ma a RETS.
+    unfold EitherTReturns, EitherTFails in *.
+    eapply MReturns_MFails; eauto.
+  Qed.
+
+  Lemma EitherTFails_ret :
+    forall {A} (a : A),
+      ~ EitherTFails (ret a).
+  Proof.
+    intros A a.
+    unfold EitherTFails.
+    apply MFails_ret.
+  Qed.
 
   Lemma EitherTReturns_bind :
     forall {A B} (a : A) (b : B) (ma : eitherT E M A) (k : A -> eitherT E M B),
@@ -156,9 +272,9 @@ Section EitherT.
 
   Lemma EitherTReturns_ret :
     forall {A} (a : A) (ma : eitherT E M A),
-      eq1 ma (ret a) -> EitherTReturns a ma.
+      ~EitherTFails ma -> eq1 ma (ret a) -> EitherTReturns a ma.
   Proof.
-    intros * Hma.
+    intros * NFAILS Hma.
     eapply MReturns_ret; eauto.
   Qed.
 
@@ -172,24 +288,38 @@ Section EitherT.
     eapply MReturns_ret_inv in H.
     inversion H.
     apply MReturns_ret.
+    apply MFails_ret.
     reflexivity.
   Qed.
 
   #[global] Instance EitherTReturns_Proper : forall {A} (a : A),
-      Proper (eq1 ==> iff) (EitherTReturns a).
+      Proper (eq1 ==> Basics.impl) (EitherTReturns a).
   Proof.
     intros A a.
     unfold Proper, respectful.
     intros x y H.
-    split; intros Hret; unfold EitherTReturns in *.
-    - eapply MReturns_Proper; eauto.
-      symmetry.
-      auto.
-    - eapply MReturns_Proper; eauto.
+    intros Hret; unfold EitherTReturns in *.
+    eapply MReturns_Proper; eauto.
+  Qed.
+
+  #[global] Instance EitherTReturns_ProperFlip : forall {A} (a : A),
+      Proper (eq1 ==> fun A B => Basics.impl B A) (EitherTReturns a).
+  Proof.
+    intros A a.
+    unfold Proper, respectful.
+    intros x y H.
+    intros Hret; unfold EitherTReturns in *.
+    eapply MReturns_Proper; eauto.
+    symmetry.
+    auto.
   Qed.
 
   Instance MonadReturns_EitherT : MonadReturns (eitherT E M)
     := { MReturns := fun A => EitherTReturns;
+         MFails := fun A => EitherTFails;
+         MReturns_MFails := fun A => EitherTReturns_EitherTFails;
+         MFails_MReturns := fun A => EitherTFails_EitherTReturns;
+         MFails_ret := fun A => EitherTFails_ret;
          MReturns_bind := fun A B => EitherTReturns_bind;
          MReturns_bind_inv := fun A B => EitherTReturns_bind_inv;
          MReturns_ret := fun A => EitherTReturns_ret;
@@ -274,7 +404,7 @@ Section StateT.
     - unfold runStateT.
       eapply MReturns_bind; eauto.
       cbn.
-      apply MReturns_ret; reflexivity.
+      apply MReturns_ret; [apply MFails_ret|reflexivity].
     - unfold runStateT.
       eapply MReturns_bind; eauto.
   Qed.
@@ -310,18 +440,28 @@ Section StateT.
 
 End StateT.
 
-From ITree Require Import
-     ITree
-     Basics.Basics
-     Events.Exception
-     Eq.Eq
-     Events.StateFacts
-     Events.State.
 
-Instance ITree_MonadReturns {E} : MonadReturns (itree E)
-  := { MReturns := fun A => Returns;
-       MReturns_bind := Returns_bind E;
-       MReturns_bind_inv := fun A B => Returns_bind_inversion;
-       MReturns_ret := fun A => ReturnsRet;
-       MReturns_ret_inv := Returns_ret_inv
-     }.
+Section ITree.
+  From ITree Require Import
+       ITree
+       Basics.Basics
+       Events.Exception
+       Eq.Eq
+       Events.StateFacts
+       Events.State.
+
+  (* Definition ITreeFails := fun {E A} (ma : itree E A) => False. *)
+
+  (* Lemma ITreeReturns_ret : *)
+    
+
+  (* Instance ITree_MonadReturns {E} : MonadReturns (itree E) *)
+  (*   := { MReturns := fun A => Returns; *)
+  (*        MFails := fun A => ITreeFails; *)
+  (*        MReturns_bind := Returns_bind E; *)
+  (*        MReturns_bind_inv := fun A B => Returns_bind_inversion; *)
+  (*        MReturns_ret := fun A => ReturnsRet; *)
+  (*        MReturns_ret_inv := Returns_ret_inv *)
+  (*      }. *)
+
+End ITree.

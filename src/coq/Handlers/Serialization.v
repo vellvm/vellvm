@@ -1232,6 +1232,8 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
           cbn.
           destruct e1 as [[[[ub_message] | [[err_message] | e1]]]]; cbn; try reflexivity.
           destruct e2 as [[[[ub_message] | [[err_message] | e2]]]]; cbn; try reflexivity.
+
+          destruct (eval_iop iop e1 e2) as [[[[ub_message] | [[err_message] | res]]]]; reflexivity.
         }
 
         intros dv1 Re1.
