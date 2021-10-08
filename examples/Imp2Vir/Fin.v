@@ -25,6 +25,10 @@ From ITree Require Import
      ITreeFacts
      Basics.Category
      Basics.CategorySub.
+
+
+From Vellvm Require Import
+     Utils.Tactics.
 (* end hide *)
 
 (* Type with [n] inhabitants. *)
@@ -188,6 +192,70 @@ Proof.
     try (f_equal; apply unique_fin; simpl; reflexivity + lia);
     try contradiction + exfalso; lia.
 Qed.
+
+
+(** Misc functions/lemmas about fin (for CVIR purposes)*)
+
+Lemma split_fin_sum_inl :
+  forall n m f l, split_fin_sum n m f = inl l -> f = L m l.
+Proof.
+  intros.
+  unfold split_fin_sum in H.
+  break_match; [| discriminate ].
+  inv H.
+  now apply unique_fin.
+Qed.
+
+Lemma split_fin_sum_inr :
+  forall n m f r, split_fin_sum n m f = inr r -> f = R n r.
+Proof.
+  intros.
+  unfold split_fin_sum in H.
+  break_match; [ discriminate |].
+  inv H.
+  apply unique_fin.
+  simpl.
+  lia.
+Qed.
+
+Program Definition cast_fin {n n'} (f : Fin.fin n) (H : n = n') : Fin.fin n' :=
+  exist _ (proj1_sig f) _.
+Next Obligation.
+  destruct f; simpl ; assumption.
+Qed.
+
+Definition sym_fin {n1 n2 n3 : nat} (f : fin (n1 + (n2 + n3))) : fin (n1 + (n3 + n2)) :=
+  match split_fin_sum _ _ f with
+  | inl l => L (n3 + n2) l
+  | inr r => R n1 (
+    match split_fin_sum _ _ r with
+    | inl l => R _ l
+    | inr r => L _ r
+    end
+  )
+  end.
+
+Definition swap_fin {n1 n2 : nat} (f : fin (n1 + n2)) : fin (n2 + n1) :=
+  match split_fin_sum _ _ f with
+  | inl l => R _ l
+  | inr r => L _ r
+  end.
+
+Program Definition swap_i_fin {n : nat} (i : Fin.fin (S n)) (f : fin n) : fin n :=
+  let f' := cast_fin f (_ : n = (i+(n-i))%nat) in
+  let f'' := swap_fin f' in
+  cast_fin f'' (_ : _ = n).
+Next Obligation.
+  destruct i ; simpl ; lia.
+Qed.
+Next Obligation.
+  destruct i ; simpl ; lia.
+Qed.
+
+
+
+
+
 
 Instance ToBifunctor_ktree_fin {E} : ToBifunctor (ktree E) fin sum Nat.add :=
   fun n m y => Ret (split_fin_sum n m y).

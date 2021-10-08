@@ -98,16 +98,6 @@ Definition merge_cvir
 
 (* Reordering of the vectors *)
 
-Definition sym_i_cvir {ni1 ni2 ni3 no : nat} (b : cvir (ni1 + (ni2 + ni3)) no) :
-  cvir (ni1 + (ni3 + ni2)) no :=
-  mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
-    blocks b (sym_vec vi) vo vt).
-
-Definition sym_o_cvir {ni no1 no2 no3 : nat} (b : cvir ni (no1 + (no2 + no3))) :
-  cvir ni (no1 + (no3 + no2)) :=
-  mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
-    blocks b vi (sym_vec vo) vt).
-
 Definition cast_i_cvir {ni ni' no : nat} (b : cvir ni no) (H : ni = ni') : cvir ni' no :=
   mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
     blocks b (Vec.cast vi (eq_sym H)) vo vt).
@@ -122,8 +112,33 @@ Definition reorder_input_cvir {ni no : nat} (b : cvir ni no) f
   mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
     blocks b (f vi) vo vt).
 
-Program Definition swap_i_input_cvir {ni no :nat} (i : Fin.fin (S ni)) (b : cvir ni no) :=
+Definition reorder_output_cvir {ni no : nat} (b : cvir ni no) f
+        {reorder_f : Reorder f} : cvir ni no :=
+  mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
+    blocks b vi (f vo) vt).
+
+Definition swap_input_cvir {ni no :nat} (i : Fin.fin (S ni)) (b : cvir ni no) :=
   reorder_input_cvir b (swap i).
+
+(* Definition sym_i_cvir {ni no : nat} *)
+(*            (i : Fin.fin ni) (j : Fin.fin (ni-(proj1_sig i))) (b : cvir ni no) := *)
+(*   reorder_input_cvir b (sym i j). *)
+
+(* Definition sym_o_cvir {ni no : nat} *)
+(*            (i : Fin.fin no) (j : Fin.fin (no-(proj1_sig i))) (b : cvir ni no) := *)
+(*   reorder_output_cvir b (sym i j). *)
+
+
+Definition sym_i_cvir {ni1 ni2 ni3 no : nat} (b : cvir (ni1 + (ni2 + ni3)) no) :
+  cvir (ni1 + (ni3 + ni2)) no :=
+  mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
+    blocks b (sym_vec vi) vo vt).
+
+Definition sym_o_cvir {ni no1 no2 no3 : nat} (b : cvir ni (no1 + (no2 + no3))) :
+  cvir ni (no1 + (no3 + no2)) :=
+  mk_cvir (fun vi vo (vt : Vec.t raw_id (n_int b)) =>
+    blocks b vi (sym_vec vo) vt).
+
 
 (* NOTE (vi=(0,1,2,3,4,5), i = 4) => (vi->(4,0,1,2,3,5)) *)
 (* Bring the i-th input at the head of the input vector *)
@@ -185,7 +200,7 @@ Definition loop_cvir' {ni no ni' no' : nat} (n : nat) (b : cvir ni no)
 Program Definition seq_cvir {ni n no : nat}
         (b1 : cvir ni n) (b2 : cvir n no) : cvir ni no :=
   let b := merge_cvir b1 b2 in
-  let b' := swap_i_input_cvir n b in
+  let b' := swap_input_cvir n b in
   loop_cvir' n b' _ _.
 Next Obligation.
   lia.

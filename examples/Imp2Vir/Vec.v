@@ -10,6 +10,9 @@ From Vellvm Require Import
 
 From Imp2Vir Require Import Fin.
 
+From ExtLib Require Import FMapAList.
+From Vellvm Require Import Utils.AListFacts.
+
 Section Vec.
 
 Open Scope nat_scope.
@@ -63,6 +66,8 @@ Proof.
   reflexivity.
 Qed.
 
+(** Functions over vectors *)
+
 Program Definition empty (A : Type) : t A 0 := vec' nil.
 
 Program Definition cons {A} {n} h (v : t A n) : t A (S n) := vec' (h::v).
@@ -98,6 +103,53 @@ Next Obligation.
   destruct x.
   - discriminate e.
   - simpl in *. discriminate Heq_anonymous.
+Qed.
+
+Program Definition uncons {A} {n} (v : t A (S n)) : A * t A n :=
+  match proj1_sig v with
+  | a :: t => (a, vec' t)
+  | _ => _
+  end.
+Next Obligation.
+  destruct v as [[] ?].
+  discriminate e.
+  simpl in *.
+  injection Heq_anonymous as ?.
+  subst.
+  auto.
+Defined.
+Next Obligation.
+  destruct v as [[] ?].
+  discriminate e.
+  simpl in *. injection e as ?.
+  refine (a, vec' l). exact H0.
+Defined.
+
+Theorem uncons_cons : forall A n (v : t A n) a, uncons (cons a v) = (a, v).
+Proof.
+  intros.
+  unfold uncons.
+  simpl.
+  f_equal.
+  apply vector_proj1_unique.
+  simpl.
+  reflexivity.
+Qed.
+
+Theorem cons_uncons : forall A n (v : t A (S n)) (v' : t A n) a, uncons v = (a, v') -> v = cons a v'.
+Proof.
+  intros.
+  destruct v, v'.
+  unfold uncons in H.
+  destruct x.
+  - simpl in e. lia.
+  - simpl in *.
+    unfold cons.
+    simpl.
+    inversion H.
+    subst.
+    apply vector_proj1_unique.
+    reflexivity.
 Qed.
 
 Program Definition nth {A} {n} (v : t A n) (i : fin n) : A :=
@@ -165,16 +217,6 @@ Proof.
   reflexivity.
 Qed.
 
-Definition In {A} {n} a (v : t A n) := List.In a (proj1_sig v).
-
-Theorem vector_in_app_iff : forall A n n' (v : t A n) (v' : t A n') (a : A),
-  In a (append v v') <-> In a v \/ In a v'.
-Proof.
-  intros ? ? ? [] [] ?.
-  unfold In in *. simpl in *.
-  apply in_app_iff.
-Qed.
-
 Theorem vector_app_nth1 :
   forall A n n' (v : t A n) (v' : t A n') (k : fin n), nth (append v v') (L n' k) = nth v k.
 Proof.
@@ -198,16 +240,14 @@ Proof.
   lia.
 Qed.
 
-Theorem In_nth :
-  forall A n (v : t A n) (x : A), In x v -> exists n : fin n, nth v n = x.
+Lemma hd_app: forall {A n1 n2} (v1 : t A (S n1)) (v2 : t A n2),
+  hd (append v1 v2) = hd v1.
 Proof.
   intros.
-  eapply In_nth_error in H.
-  destruct H as [ n0 H ].
-  eexists (fi' n0).
-  eapply nth_destruct_error.
-  exact H.
-  Unshelve. apply Util.nth_error_in in H. rewrite <- vector_length with (v := v). assumption.
+  destruct v1 as [l1 H1] ; subst ; simpl in *.
+  induction l1.
+  - discriminate.
+  - cbn ; reflexivity.
 Qed.
 
 Program Definition firstn {A} i {j} (v : t A (i+j)) : t A i :=
@@ -299,72 +339,6 @@ Proof.
   reflexivity.
 Qed.
 
-Program Definition uncons {A} {n} (v : t A (S n)) : A * t A n :=
-  match proj1_sig v with
-  | a :: t => (a, vec' t)
-  | _ => _
-  end.
-Next Obligation.
-  destruct v as [[] ?].
-  discriminate e.
-  simpl in *.
-  injection Heq_anonymous as ?.
-  subst.
-  auto.
-Defined.
-Next Obligation.
-  destruct v as [[] ?].
-  discriminate e.
-  simpl in *. injection e as ?.
-  refine (a, vec' l). exact H0.
-Defined.
-
-Theorem uncons_cons : forall A n (v : t A n) a, uncons (cons a v) = (a, v).
-Proof.
-  intros.
-  unfold uncons.
-  simpl.
-  f_equal.
-  apply vector_proj1_unique.
-  simpl.
-  reflexivity.
-Qed.
-
-Theorem cons_uncons : forall A n (v : t A (S n)) (v' : t A n) a, uncons v = (a, v') -> v = cons a v'.
-Proof.
-  intros.
-  destruct v, v'.
-  unfold uncons in H.
-  destruct x.
-  - simpl in e. lia.
-  - simpl in *.
-    unfold cons.
-    simpl.
-    inversion H.
-    subst.
-    apply vector_proj1_unique.
-    reflexivity.
-Qed.
-
-Theorem In_hd : forall A n (v : t A (S n)), In (hd v) v.
-Proof.
-  intros.
-  destruct (uncons v) eqn:?.
-  apply cons_uncons in Heqp.
-  subst v.
-  unfold In, hd, cons.
-  simpl.
-  tauto.
-Qed.
-
-Program Definition rev {A} {n} (v : t A n) : t A n :=
-  vec' (rev (proj1_sig v)).
-Next Obligation.
-  destruct v.
-  rewrite rev_length.
-  auto.
-Defined.
-
 Program Definition seq (start len : nat) : t nat len :=
   vec' (List.seq start len).
 Next Obligation.
@@ -380,10 +354,37 @@ Next Obligation.
   auto.
 Defined.
 
+(** Function reordering vectors *)
+
+Program Definition rev {A} {n} (v : t A n) : t A n :=
+  vec' (rev (proj1_sig v)).
+Next Obligation.
+  destruct v.
+  rewrite rev_length.
+  auto.
+Defined.
+
 Definition sym_vec {A} {n1 n2 n3} (v : Vec.t A (n1 + (n2 + n3))) : Vec.t A (n1 + (n3 + n2)) :=
   let '(v1,v23) := Vec.splitat n1 v in
   let '(v2,v3) := Vec.splitat n2 v23 in
   (append v1 (append v3 v2)).
+
+Program Definition sym {A n} (i : Fin.fin n) (j : Fin.fin (n-(proj1_sig i))) (v : t A n) : t A n :=
+  let i := proj1_sig i in
+  let j := proj1_sig j in
+  let v := Vec.cast v (_ : _ = i + (j + (n-i-j))) in
+  let v' := sym_vec v in
+  Vec.cast v' (_ : _ = n).
+Next Obligation.
+  destruct i0 as [i Hi]; subst ; simpl in *.
+  destruct j0 as [j Hj]; subst ; simpl in *.
+  lia.
+Qed.
+Next Obligation.
+  destruct i0 as [i Hi]; subst ; simpl in *.
+  destruct j0 as [j Hj]; subst ; simpl in *.
+  lia.
+Qed.
 
 Theorem sym_vec_app : forall {A} {n1 n2 n3} (v1 : Vec.t A n1) (v2 : Vec.t A n2) (v3 : Vec.t A n3),
   sym_vec (append v1 (append v2 v3)) = (append v1 (append v3 v2)).
@@ -395,31 +396,39 @@ Proof.
   reflexivity.
 Qed.
 
-(* Misc lemmas about fin *)
+(* Swap vectors *)
+Definition swap_vec {A} {n1 n2} (v : Vec.t A (n1 + n2)) : Vec.t A (n2 + n1) :=
+  let '(v1,v2) := Vec.splitat n1 v in
+  append v2 v1.
 
-Lemma split_fin_sum_inl :
-  forall n m f l, split_fin_sum n m f = inl l -> f = L m l.
-Proof.
-  intros.
-  unfold split_fin_sum in H.
-  break_match; [| discriminate ].
-  inv H.
-  now apply unique_fin.
+(* swap 3 [1,2,3,4,5,6,7] --> [5,6,7,1,2,3,4] *)
+Program Definition swap {A} {n} (i : Fin.fin (S n)) (v : t A n) : t A n :=
+  let v' := Vec.cast v (_ : n = (proj1_sig i + (n-proj1_sig i))) in
+  let v'' := swap_vec v' in
+  Vec.cast v'' (_ : _ = n).
+Next Obligation.
+destruct i ; simpl in * ; lia.
+Qed.
+Next Obligation.
+  destruct i ; simpl in * ; lia.
 Qed.
 
-Lemma split_fin_sum_inr :
-  forall n m f r, split_fin_sum n m f = inr r -> f = R n r.
+Theorem swap_vec_app : forall {A} {n1 n2} (v1 : Vec.t A n1) (v2 : Vec.t A n2),
+  swap_vec (append v1 v2) = (append v2 v1).
 Proof.
   intros.
-  unfold split_fin_sum in H.
-  break_match; [ discriminate |].
-  inv H.
-  apply unique_fin.
-  simpl.
-  lia.
+  unfold swap_vec.
+  rewrite splitat_append.
+  reflexivity.
 Qed.
+
+(** Properties on vectors *)
+
+Definition In {A} {n} a (v : t A n) := List.In a (proj1_sig v).
 
 End Vec.
+
+(** Tactics over vectors *)
 
 Ltac destruct_vec0 v :=
   let H := fresh "H" in
@@ -447,7 +456,6 @@ Ltac destruct_vec2 v :=
     simpl in H; apply eq_add_S in H as H'; apply eq_add_S in H' as H'';
     apply length_zero_iff_nil in H''; subst l]].
 
-
 Ltac split_vec v n1 :=
   let vp := fresh "vp" in
   let v1 := fresh v "1" in
@@ -459,7 +467,47 @@ Ltac split_vec v n1 :=
   apply append_splitat in Heqvp;
   subst v.
 
-Theorem sym_vec_In : forall {A} {n1 n2 n3} (v : Vec.t A (n1 + (n2 + n3))) a,
+Theorem vector_in_app_iff : forall A n n' (v : t A n) (v' : t A n') (a : A),
+  In a (append v v') <-> In a v \/ In a v'.
+Proof.
+  intros ? ? ? [] [] ?.
+  unfold In in *. simpl in *.
+  apply in_app_iff.
+Qed.
+
+Theorem In_hd : forall A n (v : t A (S n)), In (hd v) v.
+Proof.
+  intros.
+  destruct (uncons v) eqn:?.
+  apply cons_uncons in Heqp.
+  subst v.
+  unfold In, hd, cons.
+  simpl.
+  tauto.
+Qed.
+
+Theorem In_nth :
+  forall A n (v : t A n) (x : A), In x v -> exists n : fin n, nth v n = x.
+Proof.
+  intros.
+  eapply In_nth_error in H.
+  destruct H as [ n0 H ].
+  eexists (fi' n0).
+  eapply nth_destruct_error.
+  exact H.
+  Unshelve. apply Util.nth_error_in in H. rewrite <- vector_length with (v := v). assumption.
+Qed.
+
+Theorem In_cast : forall {A} {n n'} (v : Vec.t A n) (H : n=n') a,
+  In a v <-> In a (cast v H).
+Proof.
+  intros.
+  destruct v.
+  unfold cast. subst.
+  cbn. tauto.
+Qed.
+
+Theorem In_sym_vec : forall {A} {n1 n2 n3} (v : Vec.t A (n1 + (n2 + n3))) a,
   In a v <-> In a (sym_vec v).
 Proof.
   intros.
@@ -469,55 +517,7 @@ Proof.
   rewrite !vector_in_app_iff. tauto.
 Qed.
 
-From ExtLib Require Import FMapAList.
-From Vellvm Require Import Utils.AListFacts.
-
-Definition vec_build_map {A n} (v v' : Vec.t A n) : alist A A :=
-  List.combine (proj1_sig v) (proj1_sig v').
-
-Theorem cast_In : forall {A} {n n'} (v : Vec.t A n) (H : n=n') a,
-  In a v <-> In a (cast v H).
-Proof.
-  intros.
-  destruct v.
-  unfold cast. subst.
-  cbn. tauto.
-Qed.
-
-Lemma hd_app: forall {A n1 n2} (v1 : t A (S n1)) (v2 : t A n2),
-  hd (append v1 v2) = hd v1.
-Proof.
-  intros.
-  destruct v1 as [l1 H1] ; subst ; simpl in *.
-  induction l1.
-  - discriminate.
-  - cbn ; reflexivity.
-Qed.
-
-
-Class Reorder {A n} (f : t A n -> t A n) :=
-  {
-    reordering : forall (v : t A n) e, In e v <-> In e (f v)
-  }.
-
-Definition reorder_vec {A n} (v : t A n) (f : t A n -> t A n) {f_reorder : Reorder f} :=
-  f v.
-
-(* Swap vectors *)
-Definition swap_vec {A} {n1 n2} (v : Vec.t A (n1 + n2)) : Vec.t A (n2 + n1) :=
-  let '(v1,v2) := Vec.splitat n1 v in
-  append v2 v1.
-
-Theorem swap_vec_app : forall {A} {n1 n2} (v1 : Vec.t A n1) (v2 : Vec.t A n2),
-  swap_vec (append v1 v2) = (append v2 v1).
-Proof.
-  intros.
-  unfold swap_vec.
-  rewrite splitat_append.
-  reflexivity.
-Qed.
-
-Theorem swap_vec_In : forall {A} {n1 n2} (v : Vec.t A (n1 + n2)) a,
+Theorem In_swap_vec : forall {A} {n1 n2} (v : Vec.t A (n1 + n2)) a,
   In a v <-> In a (swap_vec v).
 Proof.
   intros.
@@ -526,28 +526,43 @@ Proof.
   rewrite !vector_in_app_iff. tauto.
 Qed.
 
-Program Definition swap {A} {n} (i : Fin.fin (S n)) (v : t A n) : t A n :=
-  let v' := Vec.cast v (_ : n = (proj1_sig i + (n-proj1_sig i))) in
-  let v'' := swap_vec v' in
-  Vec.cast v'' (_ : _ = n).
-Next Obligation.
-destruct i ; simpl in * ; lia.
-Qed.
-Next Obligation.
-  destruct i ; simpl in * ; lia.
-Qed.
+Definition vec_build_map {A n} (v v' : Vec.t A n) : alist A A :=
+  List.combine (proj1_sig v) (proj1_sig v').
+
+
+(* f \in Reorder => only reorder the vector *)
+Class Reorder {A n} (f : t A n -> t A n) :=
+  {
+    reordering : forall (v : t A n) e, In e v <-> In e (f v)
+  }.
+
+Definition reorder_vec {A n} (v : t A n) (f : t A n -> t A n) {f_reorder : Reorder f} :=
+  f v.
 
 #[global] Instance swap_reorder : forall {A n} (i : Fin.fin (S n)), @Reorder A n (swap i ).
 Proof.
   intros.
   constructor. unfold swap.
    split ; intros.
-  - apply cast_In.
-    rewrite <- swap_vec_In.
-    apply cast_In. assumption.
-  - apply cast_In in H.
-    rewrite <- swap_vec_In in H.
-    apply cast_In in H. assumption.
+  - apply In_cast.
+    rewrite <- In_swap_vec.
+    apply In_cast ; assumption.
+  - apply In_cast in H.
+    rewrite <- In_swap_vec in H.
+    apply In_cast in H. assumption.
+Qed.
+
+#[global] Instance sym_reorder : forall {A n} (i : Fin.fin n) (j : Fin.fin (n-(proj1_sig i))), @Reorder A n (sym i j).
+Proof.
+  intros.
+  constructor. unfold sym.
+   split ; intros.
+  - apply In_cast.
+    rewrite <- In_sym_vec.
+    apply In_cast ; assumption.
+  - apply In_cast in H.
+    rewrite <- In_sym_vec in H.
+    apply In_cast in H. assumption.
 Qed.
 
 

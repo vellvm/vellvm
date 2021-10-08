@@ -9,9 +9,8 @@ From Vellvm Require Import
      Syntax.ScopeTheory
      Utils.Tactics.
 
-From Imp2Vir Require Import Fin.
 
-From Imp2Vir Require Import Utils Vec Unique CvirCombinators Relabel.
+From Imp2Vir Require Import Fin Utils Vec Unique CvirCombinators Relabel.
 
 Open Scope nat_scope.
 Open Scope vec_scope.
@@ -637,7 +636,7 @@ Proof.
   apply H.
   rewrite vector_in_app_iff in H0.
   rewrite vector_in_app_iff.
-  rewrite <- sym_vec_In.
+  rewrite <- In_sym_vec.
   assumption.
 Qed.
 
@@ -1361,11 +1360,11 @@ Proof.
       reorder_input_cvir_output_id_WF, reorder_input_cvir_inputs_used, reorder_input_cvir_relabel_WF.
 Qed.
 
-Theorem swap_i_cvir_WF :
+Theorem swap_cvir_WF :
   forall ni no (ir : cvir ni no) (i : Fin.fin (S ni)),
-  cvir_WF ir -> cvir_WF (swap_i_input_cvir i ir).
+  cvir_WF ir -> cvir_WF (swap_input_cvir i ir).
 Proof.
-  unfold swap_i_input_cvir.
+  unfold swap_input_cvir.
   intros. apply reoder_input_cvir_WF ; auto.
 Qed.
 
@@ -1409,7 +1408,7 @@ forall ni n no (ir1 : cvir ni n) (ir2 : cvir n no),
 Proof.
   unfold seq_cvir. intros.
   apply loop_cvir_WF.
-  auto using cast_o_cvir_WF , cast_i_cvir_WF , swap_i_cvir_WF , merge_cvir_WF.
+  auto using cast_o_cvir_WF , cast_i_cvir_WF , swap_cvir_WF , merge_cvir_WF.
 Qed.
 
 
