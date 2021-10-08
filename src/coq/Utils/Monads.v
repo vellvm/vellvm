@@ -10,6 +10,9 @@ From ExtLib Require Import
 From ITree Require Import
      Basics.Monad.
 
+From Vellvm Require Import
+     Utils.Util.
+
 Import Monads.
 
 Import MonadNotation.
@@ -24,6 +27,18 @@ Fixpoint foldM {a b} {M} `{Monad M} (f : b -> a -> M b ) (acc : b) (l : list a) 
        b <- f acc x;;
        foldM f b xs
      end.
+
+Lemma map_monad_unfold :
+  forall {A B : Type} {M : Type -> Type} {H : Monad M} (x : A) (xs : list A)
+    (f : A -> M B),
+    map_monad f (x :: xs) =
+    b <- f x;;
+    bs <- map_monad (fun (x0 : A) => f x0) xs;;
+    ret (b :: bs).
+Proof.
+  intros A B M H x xs f.
+  induction xs; cbn; auto.
+Qed.
 
 Lemma map_monad_In {m : Type -> Type} {H : Monad m} {A B} (l : list A) (f: forall (x : A), In x l -> m B) : m (list B).
 Proof.

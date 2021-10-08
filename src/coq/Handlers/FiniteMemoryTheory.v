@@ -269,19 +269,6 @@ Section Serialization_Theory.
   (*   rewrite fold_sum_acc. reflexivity. *)
   (* Qed. *)
 
-  (* TODO: move these *)
-  Lemma map_monad_unfold :
-    forall {A B : Type} {M : Type -> Type} {H : Monad M} (x : A) (xs : list A)
-      (f : A -> M B),
-      map_monad f (x :: xs) =
-      b <- f x;;
-      bs <- map_monad (fun (x0 : A) => f x0) xs;;
-      ret (b :: bs).
-  Proof.
-    intros A B M H x xs f.
-    induction xs; cbn; auto.
-  Qed.
-
   Lemma map_monad_length :
     forall {A B M} `{HM: Monad M} `{EQM : Monad.Eq1 M} `{LAWS : @Monad.MonadLawsE M EQM HM} `{MRET : @MonadReturns M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM} (xs : list A) (f : A -> M B) res,
       MReturns res (map_monad f xs) ->

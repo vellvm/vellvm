@@ -207,6 +207,56 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
           cbn in mbeq.
           contradiction.
     }
+
+    (* Structs *)
+    { induction fields.
+      - red in CONC.
+        rewrite concretize_uvalueM_equation in CONC.
+        cbn in CONC.
+
+        destruct CONC as ([ma] & k' & CONC' & mbeq & REST).
+        destruct ma as [[uba | [erra | a]]] eqn:Hma; try contradiction.
+        subst.
+
+        cbn in mbeq.
+        
+        specialize (REST []).
+        forward REST; [reflexivity|].
+        
+        destruct (k' []) as [[[ubk' | [errk' | k'nil]]]] eqn:Hk'; contradiction.
+      - (* Multiple fields *)
+        do 2 red.
+        rewrite concretize_uvalueM_equation.
+        red in CONC.
+        rewrite concretize_uvalueM_equation in CONC.
+
+        
+        Import Util.
+        rewrite Monads.map_monad_unfold in CONC.
+        rewrite Monads.map_monad_unfold.
+
+        match goal with
+        | H: _ |- (x <- (bind ?conc_a ?conc_rest) ;; _) _ =>
+          remember conc_a as conc_a';
+            remember conc_rest as conc_rest'
+        end.
+
+        epose proof Monad.bind_bind _ _ _ conc_a' conc_rest' (fun x => ret (DVALUE_Struct x)).
+
+        Unset Printing Notations.
+        Set Printing Implicit.
+        assert ((y <- conc_a';; x <- conc_rest' y;; (@ret err_or_ub Monad_err_or_ub dvalue (DVALUE_Struct x))) (@ret err_or_ub Monad_err_or_ub dvalue dv)).
+        replace ((x <- (x <- conc_a';; conc_rest' x);; ret (DVALUE_Struct x)) (ret dv)) with ((y <- conc_a';; x <- conc_rest' y;; ret (DVALUE_Struct x)) (ret dv)).
+        (fun b => conc_rest'). (ret (b :: bs)).
+        
+        erewrite 
+
+        pose proof _ _ _ m
+        rewrite Monad.bind_bind.
+        rewrite map_monad_cons.
+
+    }
+    
   Abort.
 
   Lemma refine_uvalue_op_poison_l :
