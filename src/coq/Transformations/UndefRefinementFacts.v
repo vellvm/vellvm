@@ -99,15 +99,9 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
       destruct CONC as ([ma] & k' & CONC' & mbeq & REST).
 
       cbn in mbeq.
-      inversion mbeq.
-
       destruct ma as [[uba | [erra | a]]] eqn:Hma.
       - (* UB from uv1 *)
-        cbn in H1.
-        inversion H1; subst.
-
-        rewrite concretize_equation.
-        red.
+        do 2 red.
         rewrite concretize_uvalueM_equation.
 
         cbn.
@@ -121,12 +115,98 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
         (* ma = inl ub *)
         apply CONC'.
 
-        split.
+        split; auto.
+        intros a Rets.
+        cbn in Rets.
+        destruct uba.
+        inversion Rets.
+      - (* Failure in uv1 *)
+        do 2 red.
+        rewrite concretize_uvalueM_equation.
 
         cbn.
-        (* This seems like a problem *)
-        admit.
-        cbn.
+        unfold bind_MPropT.
+
+        eexists.
+        eexists.
+
+        split.
+
+        (* ma = inl (inl err) *)
+        apply CONC'.
+
+        split; auto.
+        intros a Rets.
+        cbn in Rets.
+        destruct erra.
+        inversion Rets.
+      - (* uv1 succeeds *)
+        do 2 red.
+        rewrite concretize_uvalueM_equation.
+
+        (* Get fate of uv2 *)
+        assert (@MReturns _ _ _ MonadReturns_ErrOrUB dvalue a
+                          {| unERR_OR_UB := {| EitherMonad.unEitherT := inr (inr a) |} |}) as ARet by reflexivity.
+        specialize (REST a ARet).
+
+        (* Get past evaluation of uv1 *)
+        eexists.
+        exists (fun _ => ret dv).
+
+        split.
+        apply CONC'.
+
+        split; cbn; auto.
+        intros a0 H0; subst.
+
+        destruct REST as ([mb] & k'' & CONC'' & mceq & REST).
+        destruct mb as [[ubb | [errb | b]]] eqn:Hmb.
+        + (* UB from uv2 *)
+
+          (* Evaluation of uv2 *)
+          eexists.
+          eexists.
+
+          split.
+          apply CONC''.
+
+          split; cbn; auto.
+          intros a H0.
+          destruct ubb; contradiction.
+        + (* Failure from uv2 *)
+
+          (* Evaluation of uv2 *)
+          eexists.
+          eexists.
+
+          split.
+          apply CONC''.
+
+          split; cbn; auto.
+          intros a H0.
+          destruct errb; contradiction.
+        + (* uv2 succeeds *)
+          eexists.
+          exists (fun _ => ret dv).
+          split; [eauto|].
+          split; cbn; auto.
+
+          intros a H0; subst.
+
+          assert (@MReturns  _ _ _ MonadReturns_ErrOrUB dvalue a
+                             {| unERR_OR_UB := {| EitherMonad.unEitherT := inr (inr a) |} |}) as ARet' by reflexivity.
+          specialize (REST a ARet').
+
+          cbn in mceq.
+          destruct (eval_iop iop a0 a) as [[[ubop | [errop | op_res]]]] eqn:Hop; auto.
+          destruct (k'' a) as [[[ubk''a | [errk''a | k''a_res]]]] eqn:Hk''a; auto; inversion REST; subst; auto.
+
+          (* No UB / failure... *)
+          destruct (k' a0) as [[[ubk'a0 | [errk'a0 | k'a0_res]]]] eqn:Hk'a0; cbn in mceq, mbeq; subst; try contradiction.
+          rewrite Hk'a0 in mbeq.
+          cbn in mbeq.
+          contradiction.
+    }
   Abort.
 
   Lemma refine_uvalue_op_poison_l :

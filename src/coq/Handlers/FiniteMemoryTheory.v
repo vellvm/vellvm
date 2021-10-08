@@ -344,8 +344,8 @@ Section Serialization_Theory.
       unfold re_sid_ubytes in EVAL.
 
       (* This is where I needed the bind_inv lemma for state *)
-      epose proof StateTReturns_bind_inv.
-      unfold StateMonads.evalStateT in EVAL.
+      (* epose proof StateTReturns_bind_inv. *)
+      (* unfold StateMonads.evalStateT in EVAL. *)
   Admitted.
 
   Lemma map_monad_lift_ERR :
@@ -3564,3 +3564,4 @@ End MEMORY_THEORY.
 Module Make(Addr:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)) <: MEMORY_THEORY(Addr)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
 Include MEMORY_THEORY(Addr)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
 End Make.
+ 

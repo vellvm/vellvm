@@ -862,12 +862,12 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
                  {A B : Type} (pa : MPropT M A) (k : A -> MPropT M B) : MPropT M B
         := (fun mb => exists (ma : M A) (k' : A -> M B),
                 pa ma /\
-                Monad.eq1 mb (Monad.bind ma k') /\
+                Monad.eq1 (Monad.bind ma k') mb /\
                 (forall a, MReturns a ma -> k a (k' a))).
       
       #[global] Instance Monad_MPropT {M} `{HM: Monad M} `{MEQ: @Monad.Eq1 M} `{MR: @MonadReturns M HM MEQ} : Monad (MPropT M) :=
         {|
-        ret := fun _ x y => Monad.eq1 y (ret x)
+        ret := fun _ x y => Monad.eq1 (ret x) y
         ; bind := @bind_MPropT M HM MEQ MR
         |}.
 
@@ -1163,11 +1163,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
           - (* UB *)
             exact True.
           - (* ERR *)
-            (* Preserve errors? *)
-            destruct ue as [[[ubue | [errue | ue]]]].
-            + exact False.
-            + exact (errx = errue).
-            + exact False.
+            exact True.
           - destruct ue as [[[ubue | [errue | ue]]]].
             + exact False.
             + exact False.
