@@ -1016,141 +1016,46 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
         }
       Qed.
 
+      Require Import Morphisms.
+      #[global] Instance RefineProp_Proper_bind {A B : Type} :
+        @Proper (RefineProp A -> (A -> RefineProp B) -> RefineProp B)
+                (@eq1 RefineProp EQM_RefineProp A ==>
+                      @pointwise_relation A (RefineProp B) (@eq1 RefineProp EQM_RefineProp B) ==>
+                      @eq1 RefineProp EQM_RefineProp B)
+                (@bind RefineProp Monad_RefineProp A B).
+      Proof.
+        unfold Proper, respectful.
+        intros A1 A2 H pa1 pa2 pw EB.
+
+        unfold RefineProp in *.
+        unfold eq1, EQM_RefineProp; cbn.
+        unfold bind_RefineProp.
+
+        intros Bind2.
+
+        destruct Bind2 as (ma & k' & pa1ma & meq & REST).
+
+        exists ma.
+        exists k'.
+        split; auto.
+        split; auto.
+        intros a Rets.
+        specialize (REST a Rets).
+
+        unfold pointwise_relation in pw.
+        specialize (pw a).
+
+        unfold eq1, EQM_RefineProp in pw.
+        auto.
+      Qed.
+
       #[global] Instance MonadLawsE_RefineProp : MonadLawsE RefineProp.
       Proof.
         split.
         - apply RefineProp_bind_ret_l.
         - apply RefineProp_bind_ret_r.
-        - intros A B C pa f g.
-          unfold RefineProp in *.
-          unfold eq1, EQM_RefineProp; cbn.
-          unfold bind_RefineProp.
-          intros ec H.
-
-          destruct H as (ea & k' & paea & ea_eq_ec & REST).
-
-          destruct ea as [[[uba | [erra | a]]]] eqn:Hma; cbn; auto.
-
-          { exists (raise_ub "blah").
-            exists (fun b => ec).
-            split.
-
-            { eexists.
-              eexists.
-
-              split.
-              apply paea.
-              cbn.
-              split; auto.
-              intros.
-              destruct uba; inversion H.
-            }
-
-            split.
-
-            break_match.
-            cbn.
-            destruct unERR_OR_UB.
-            destruct unEitherT; cbn; auto.
-            destruct s; cbn; auto.
-
-            destruct ec as [[[uba' | [erra' | a']]]] eqn:Hma'; cbn; auto.
-            intros b H.
-            inversion H.
-          }
-
-          { exists (raise_error "blah").
-            exists (fun b => ec).
-            split.
-
-            { eexists.
-              eexists.
-
-              split.
-              apply paea.
-              cbn.
-              split; auto.
-              intros.
-              destruct erra; inversion H.
-            }
-
-            split.
-
-            break_match.
-            cbn.
-            destruct unERR_OR_UB.
-            destruct unEitherT; cbn; auto.
-            destruct s; cbn; auto.
-
-            destruct ec as [[[uba' | [erra' | a']]]] eqn:Hma'; cbn; auto.
-            intros b H.
-            inversion H.
-          }
-
-          { specialize (REST a).
-            forward REST; [reflexivity|].
-            destruct REST as (mb & kb & fmb & eqkb & RETS).
-
-            exists mb.
-            exists (fun b => ec).
-            split.
-
-            { exists ea.
-              exists (fun _ => mb).
-              
-              split; subst; auto.
-              split.
-              destruct mb as [[[ubb | [errb | b]]]] eqn:Hmb; cbn; split; auto.
-
-              intros a' RETSa.
-              cbn in RETSa; subst; auto.
-            }
-
-            split.
-            destruct mb as [[[ubb | [errb | b]]]] eqn:Hmb; cbn; auto.
-            destruct ec as [[[ubc | [errc | c]]]] eqn:Hmc; cbn; auto.
-
-            intros b RETSb.
-
-            (* If k' a is fail / UB, then ea_eq_ec does not say
-               anything about what ec is.
-
-             *)
-            cbn in ea_eq_ec.
-            destruct (k' a) as [[[ubk'a | [errk'a | k'a]]]] eqn:Hk'a; cbn in ea_eq_ec.
-            3: {
-              destruct ec as [[[ubc | [errc | c]]]] eqn:Hmc; cbn; try contradiction.
-              subst.
-
-              destruct mb as [[[ubb | [errb | b']]]] eqn:Hmb; cbn in RETSb; try break_match_hyp; try contradiction; subst.
-              cbn in eqkb.
-
-              destruct (kb b) as [[[ubkbb | [errkbb | kbb]]]] eqn:Hkbb; cbn in eqkb; subst.
-
-              3: {
-                inversion Hkbb.
-                apply RETS.
-                reflexivity.
-              }
-              
-            }
-
-            destruct mb as [[[ubb | [errb | b']]]] eqn:Hmb; cbn in RETSb; try break_match_hyp; try contradiction.
-            subst.
-
-            specialize (RETS b).
-            forward RETS; try reflexivity.
-
-            cbn in eqkb.
-            destruct (kb b) as [[[ubkbb | [errkbb | kbb]]]] eqn:Hkbb; cbn in eqkb.
-
-            all: try contradiction.
-
-            cbn in RETSb.
-
-
-            destruct ec as [[[ubc | [errc | c]]]] eqn:Hmc; cbn; auto.
-          }
+        - apply RefineProp_bind_bind.
+        - apply @RefineProp_Proper_bind.
       Defined.
 
       Section Concretize.
