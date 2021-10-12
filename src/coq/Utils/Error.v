@@ -65,8 +65,8 @@ Inductive ERR_MESSAGE :=
 Notation UB := (sum UB_MESSAGE).
 Notation ERR := (sum ERR_MESSAGE).
 
-Instance Exception_UB : MonadExc UB_MESSAGE UB := Exception_either UB_MESSAGE.
-Instance Exception_ERR : MonadExc ERR_MESSAGE ERR := Exception_either ERR_MESSAGE.
+#[global] Instance Exception_UB : MonadExc UB_MESSAGE UB := Exception_either UB_MESSAGE.
+#[global] Instance Exception_ERR : MonadExc ERR_MESSAGE ERR := Exception_either ERR_MESSAGE.
 
 Class VErrorM (M : Type -> Type) : Type :=
   { raise_error : forall {A}, string -> M A }.
@@ -88,7 +88,7 @@ Class UBM (M : Type -> Type) : Type :=
 #[global] Instance UBM_MonadExc {M} `{MonadExc UB_MESSAGE M} : UBM M
   := { raise_ub := fun _ msg => MonadExc.raise (UB_message msg) }.
 
-Instance Exception_UB_string : MonadExc string UB :=
+#[global] Instance Exception_UB_string : MonadExc string UB :=
   {| MonadExc.raise := fun _ msg => inl (UB_message msg);
      catch := fun T c h =>
                 match c with
@@ -97,7 +97,7 @@ Instance Exception_UB_string : MonadExc string UB :=
                 end
   |}.
 
-Instance Exception_ERR_string : MonadExc string ERR :=
+#[global] Instance Exception_ERR_string : MonadExc string ERR :=
   {| MonadExc.raise := fun _ msg => inl (ERR_message msg);
      catch := fun T c h =>
                 match c with
@@ -129,7 +129,7 @@ Inductive err_or_ub A :=
 Arguments ERR_OR_UB {_} _.
 Arguments unERR_OR_UB {_} _.
 
-Instance EqM_err_or_ub : Monad.Eq1 err_or_ub.
+#[global] Instance EqM_err_or_ub : Monad.Eq1 err_or_ub.
 Proof.
   (* refine (fun T mt1 mt2 => _). *)
   (* destruct mt1, mt2. *)
@@ -316,7 +316,7 @@ Section MonadReturns.
     intros YA; auto.
   Qed.
 
-  Instance MonadReturns_ErrOrUB : MonadReturns err_or_ub
+  #[global] Instance MonadReturns_ErrOrUB : MonadReturns err_or_ub
     := { MReturns := fun A => ErrOrUBReturns;
          MFails := fun A => ErrOrUBFails;
          MReturns_MFails := fun A => ErrOrUBReturns_ErrOrUBFails;

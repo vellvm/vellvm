@@ -846,30 +846,312 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
         Is X -> Prop a monad?
        *)
 
-      (* TODO: PropT??? *)
-      Definition MPropT (M : Type -> Type) `{Monad M} (X : Type) : Type := M X -> Prop.
+      Definition RefineProp (X : Type) : Type := err_or_ub X -> Prop.
 
-      Global Instance MonadT_MPropT {M} `{HM: Monad M} `{MEQ: @Monad.Eq1 M} : MonadT (MPropT M) M.
-      Proof.
-        constructor.
-        intros T mt.
-        unfold MPropT.
-        intros mt'.
-        exact (Monad.eq1 mt mt').
-      Defined.
-
-      Definition bind_MPropT {M : Type -> Type} `{HM: Monad M} `{MEQ: @Monad.Eq1 M} `{MR: @MonadReturns M HM MEQ}
-                 {A B : Type} (pa : MPropT M A) (k : A -> MPropT M B) : MPropT M B
-        := (fun mb => exists (ma : M A) (k' : A -> M B),
+      Definition bind_RefineProp {A B : Type} (pa : RefineProp A) (k : A -> RefineProp B) : RefineProp B
+        := (fun mb => exists (ma : err_or_ub A) (k' : A -> err_or_ub B),
                 pa ma /\
                 Monad.eq1 (Monad.bind ma k') mb /\
                 (forall a, MReturns a ma -> k a (k' a))).
       
-      #[global] Instance Monad_MPropT {M} `{HM: Monad M} `{MEQ: @Monad.Eq1 M} `{MR: @MonadReturns M HM MEQ} : Monad (MPropT M) :=
+      #[global] Instance Monad_RefineProp : Monad RefineProp :=
         {|
-        ret := fun _ x y => Monad.eq1 (ret x) y
-        ; bind := @bind_MPropT M HM MEQ MR
+        ret := fun _ x y => Monad.eq1 (ret x) y;
+        bind := @bind_RefineProp
         |}.
+
+      From ITree Require Import Basics.Monad.
+
+      #[global] Instance EQM_RefineProp : Eq1 RefineProp.
+      Proof.
+        unfold Eq1.
+        intros A X Y.
+        refine (forall ma, Y ma -> X ma).
+      Defined.
+
+      Lemma RefineProp_bind_ret_l :
+        forall (A B : Type) (f : A -> RefineProp B) (x : A),
+          x <- ret x;; f x ≈ f x.
+      Proof.
+        intros A B f x.
+        unfold eq1, EQM_RefineProp; cbn.
+        intros ma H.
+        unfold bind_RefineProp.
+
+        exists ({| unERR_OR_UB := {| unEitherT := inr (inr x) |} |}).
+        exists (fun _ => ma).
+        split; eauto.
+        cbn.
+        split.
+        + destruct ma as [[[uba | [erra | a]]]] eqn:Hma; cbn; auto.
+        + intros; subst; auto.
+      Qed.
+
+      Lemma RefineProp_bind_ret_r :
+        forall (A : Type) (x : RefineProp A), y <- x;; ret y ≈ x.
+      Proof.
+        intros A x.
+        unfold eq1, EQM_RefineProp; cbn.
+        intros ma H.
+        unfold bind_RefineProp.
+
+        exists ma.
+        exists ret.
+
+        split; eauto.
+        split.
+        + apply bind_ret_r.
+        + reflexivity.  
+      Qed.
+
+      Lemma RefineProp_bind_bind :
+        forall (A B C : Type) (ma : RefineProp A) (fab : A -> RefineProp B) (fbc : B -> RefineProp C),
+          b <- (a <- ma;; fab a);; fbc b ≈ a <- ma;; b <- fab a;; fbc b.
+      Proof.
+        intros A B C ma fab fbc.
+
+        unfold RefineProp in *.
+        unfold eq1, EQM_RefineProp; cbn.
+        unfold bind_RefineProp.
+
+        intros ec H.
+        destruct H as (ea & k' & paea & ea_eq_ec & REST).
+
+        destruct ea as [[[uba | [erra | a]]]] eqn:Hma; cbn; auto.
+
+        { (* The 'a' action raises ub *)
+          exists (raise_ub "blah").
+          exists (fun b => ec).
+          split.
+
+          { eexists.
+            exists (fun a => raise_ub "bogus").
+
+            split.
+            apply paea.
+            cbn.
+            split; auto.
+            intros.
+            destruct uba; inversion H.
+          }
+
+          split.
+
+          break_match.
+          cbn.
+          destruct unERR_OR_UB.
+          destruct unEitherT; cbn; auto.
+          destruct s; cbn; auto.
+
+          destruct ec as [[[uba' | [erra' | a']]]] eqn:Hma'; cbn; auto.
+          intros b H.
+          inversion H.
+        }
+
+        { (* The 'a' action raises a failure *)
+          exists (raise_error "blah").
+          exists (fun b => ec).
+          split.
+
+          { eexists.
+            exists (fun a => raise_error "bogus").
+
+            split.
+            apply paea.
+            cbn.
+            split; auto.
+            intros.
+            destruct erra; inversion H.
+          }
+
+          split.
+
+          break_match.
+          cbn.
+          destruct unERR_OR_UB.
+          destruct unEitherT; cbn; auto.
+          destruct s; cbn; auto.
+
+          destruct ec as [[[uba' | [erra' | a']]]] eqn:Hma'; cbn; auto.
+          intros b H.
+          inversion H.
+        }
+
+        { (* The 'a' action actually returns a value *)
+          specialize (REST a).
+          forward REST; [reflexivity|].
+          destruct REST as (mb & kb & fmb & eqkb & RETS).
+
+          exists mb.
+          exists kb.
+
+          split.
+          { exists ea.
+            exists (fun _ => mb).
+            
+            split; subst; auto.
+            split.
+            destruct mb as [[[ubb | [errb | b]]]] eqn:Hmb; cbn; split; auto.
+
+            intros a' RETSa.
+            cbn in RETSa; subst; auto.
+          }
+
+          split.
+          { destruct mb as [[[ubb | [errb | b]]]] eqn:Hmb; cbn; auto.
+            destruct (kb b) as [[[ubkbb | [errkbb | kbb]]]] eqn:Hkbb; cbn in eqkb; subst; cbn; auto.
+
+            rewrite Hkbb in eqkb; cbn in eqkb.
+            destruct (k' a) as [[[ubk'a | [errk'a | k'a]]]] eqn:Hk'a; cbn in ea_eq_ec; try contradiction.
+            subst.
+
+            destruct ec as [[[ubc | [errc | c]]]] eqn:Hmc; cbn; cbn in ea_eq_ec; auto;
+              rewrite Hk'a in ea_eq_ec; cbn in ea_eq_ec; try contradiction.
+
+            auto.
+          }
+
+          intros b RETSb.
+          auto.
+        }
+      Qed.
+
+      #[global] Instance MonadLawsE_RefineProp : MonadLawsE RefineProp.
+      Proof.
+        split.
+        - apply RefineProp_bind_ret_l.
+        - apply RefineProp_bind_ret_r.
+        - intros A B C pa f g.
+          unfold RefineProp in *.
+          unfold eq1, EQM_RefineProp; cbn.
+          unfold bind_RefineProp.
+          intros ec H.
+
+          destruct H as (ea & k' & paea & ea_eq_ec & REST).
+
+          destruct ea as [[[uba | [erra | a]]]] eqn:Hma; cbn; auto.
+
+          { exists (raise_ub "blah").
+            exists (fun b => ec).
+            split.
+
+            { eexists.
+              eexists.
+
+              split.
+              apply paea.
+              cbn.
+              split; auto.
+              intros.
+              destruct uba; inversion H.
+            }
+
+            split.
+
+            break_match.
+            cbn.
+            destruct unERR_OR_UB.
+            destruct unEitherT; cbn; auto.
+            destruct s; cbn; auto.
+
+            destruct ec as [[[uba' | [erra' | a']]]] eqn:Hma'; cbn; auto.
+            intros b H.
+            inversion H.
+          }
+
+          { exists (raise_error "blah").
+            exists (fun b => ec).
+            split.
+
+            { eexists.
+              eexists.
+
+              split.
+              apply paea.
+              cbn.
+              split; auto.
+              intros.
+              destruct erra; inversion H.
+            }
+
+            split.
+
+            break_match.
+            cbn.
+            destruct unERR_OR_UB.
+            destruct unEitherT; cbn; auto.
+            destruct s; cbn; auto.
+
+            destruct ec as [[[uba' | [erra' | a']]]] eqn:Hma'; cbn; auto.
+            intros b H.
+            inversion H.
+          }
+
+          { specialize (REST a).
+            forward REST; [reflexivity|].
+            destruct REST as (mb & kb & fmb & eqkb & RETS).
+
+            exists mb.
+            exists (fun b => ec).
+            split.
+
+            { exists ea.
+              exists (fun _ => mb).
+              
+              split; subst; auto.
+              split.
+              destruct mb as [[[ubb | [errb | b]]]] eqn:Hmb; cbn; split; auto.
+
+              intros a' RETSa.
+              cbn in RETSa; subst; auto.
+            }
+
+            split.
+            destruct mb as [[[ubb | [errb | b]]]] eqn:Hmb; cbn; auto.
+            destruct ec as [[[ubc | [errc | c]]]] eqn:Hmc; cbn; auto.
+
+            intros b RETSb.
+
+            (* If k' a is fail / UB, then ea_eq_ec does not say
+               anything about what ec is.
+
+             *)
+            cbn in ea_eq_ec.
+            destruct (k' a) as [[[ubk'a | [errk'a | k'a]]]] eqn:Hk'a; cbn in ea_eq_ec.
+            3: {
+              destruct ec as [[[ubc | [errc | c]]]] eqn:Hmc; cbn; try contradiction.
+              subst.
+
+              destruct mb as [[[ubb | [errb | b']]]] eqn:Hmb; cbn in RETSb; try break_match_hyp; try contradiction; subst.
+              cbn in eqkb.
+
+              destruct (kb b) as [[[ubkbb | [errkbb | kbb]]]] eqn:Hkbb; cbn in eqkb; subst.
+
+              3: {
+                inversion Hkbb.
+                apply RETS.
+                reflexivity.
+              }
+              
+            }
+
+            destruct mb as [[[ubb | [errb | b']]]] eqn:Hmb; cbn in RETSb; try break_match_hyp; try contradiction.
+            subst.
+
+            specialize (RETS b).
+            forward RETS; try reflexivity.
+
+            cbn in eqkb.
+            destruct (kb b) as [[[ubkbb | [errkbb | kbb]]]] eqn:Hkbb; cbn in eqkb.
+
+            all: try contradiction.
+
+            cbn in RETSb.
+
+
+            destruct ec as [[[ubc | [errc | c]]]] eqn:Hmc; cbn; auto.
+          }
+      Defined.
 
       Section Concretize.
         Context (M : Type -> Type).

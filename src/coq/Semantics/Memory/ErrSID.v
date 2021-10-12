@@ -40,7 +40,7 @@ Module ERRSID (Addr:ADDRESS) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)
   Definition ErrSID := ErrSID_T ident.
 
   (* I can make this work using ltac, but  for some reason I can't write the definition directly... *)
-  Instance ErrSID_T_MT {M : Type -> Type} `{HM: Monad M} : MonadT (ErrSID_T M) M.
+  #[global] Instance ErrSID_T_MT {M : Type -> Type} `{HM: Monad M} : MonadT (ErrSID_T M) M.
   Proof.
     constructor.
     refine (fun T mt => mkEitherT (mkEitherT (fun sid prov => _))).
