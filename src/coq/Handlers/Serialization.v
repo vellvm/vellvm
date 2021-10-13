@@ -1349,8 +1349,44 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
             + exact (x = ue).
         }
       Defined.
+
+      Definition concretize_u_succeeds (uv : uvalue) : RefineProp dvalue.
+        refine (concretize_uvalueM (fun dt => _) (fun _ x => _) uv).
+
+        (* Undef handler *)
+        { unfold RefineProp.
+          refine (fun edv => match unERR_OR_UB edv with
+                          | mkEitherT (inr (inr dv)) =>
+                              (* As long as the dvalue has the same type, it's a refinement *)
+                              dvalue_has_dtyp dv dt
+                          | _ => False
+                          end).
+        }
+
+        (* lift_ue *)
+        { unfold RefineProp.
+          intros ue.
+
+          destruct x as [[[ubx | [errx | x]]]].
+          - (* UB *)
+            exact False.
+          - (* ERR *)
+            exact False.
+          - destruct ue as [[[ubue | [errue | ue]]]].
+            + exact False.
+            + exact False.
+            + (* This is the only case where concretize succeeds without failure anywhere *)
+              exact (x = ue).
+        }
+      Defined.
   
       Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
+
+      Definition concretize_fails (uv : uvalue) : Prop
+        := concretize_u uv (raise_ub "").
+
+      Definition concretize_succeeds (uv : uvalue) : Prop
+        := ~ concretize_fails uv.                                                       
 
       Lemma concretize_equation : forall (uv: uvalue) (dv : dvalue),
           concretize uv dv = concretize_u uv (ret dv).

@@ -323,8 +323,10 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
     auto.
   Qed.
 
+  (* May have proven in other file (Refinement.v *) *)
   Lemma concretize_ibinop_inv :
     forall op uv1 uv2 dv,
+      concretize_succeeds (UVALUE_IBinop op uv1 uv2) ->
       concretize (UVALUE_IBinop op uv1 uv2) dv ->
       exists dv1 dv2,
         concretize uv1 dv1 /\

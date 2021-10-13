@@ -1,11 +1,13 @@
-From Coq Require Import ZArith Lia List.
+From Coq Require Import ZArith Lia List String.
 
 From ExtLib Require Import
-     Core.RelDec.
+     Core.RelDec
+     Structures.Monads.
 
 From Vellvm Require Import
      Utils.Tactics
      Utils.ListUtil
+     Utils.Error
      Handlers.FiniteMemory
      Handlers.Serialization
      Semantics.LLVMEvents
@@ -60,7 +62,7 @@ Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_I
   Lemma all_bytes_helper_app :
     forall  sbytes sbytes2 start sid uv,
       all_bytes_from_uvalue_helper (Z.of_N start) sid uv sbytes = Some uv ->
-      all_bytes_from_uvalue_helper (Z.of_N (start + N.of_nat (length sbytes))) sid uv sbytes2 = Some uv ->
+      all_bytes_from_uvalue_helper (Z.of_N (start + N.of_nat (List.length sbytes))) sid uv sbytes2 = Some uv ->
       all_bytes_from_uvalue_helper (Z.of_N start) sid uv (sbytes ++ sbytes2) = Some uv.
   Proof.
     induction sbytes;
@@ -111,7 +113,7 @@ Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_I
 
   Lemma to_ubytes_sizeof_dtyp :
     forall uv dt sid,  
-      N.of_nat (length (to_ubytes uv dt sid)) = sizeof_dtyp dt.
+      N.of_nat (List.length (to_ubytes uv dt sid)) = sizeof_dtyp dt.
   Proof.
     intros uv dt sid.
     unfold to_ubytes.
@@ -199,7 +201,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
 
   Lemma to_ubytes_sizeof_dtyp :
     forall uv dt sid,  
-      N.of_nat (length (to_ubytes uv dt sid)) = sizeof_dtyp dt.
+      N.of_nat (List.length (to_ubytes uv dt sid)) = sizeof_dtyp dt.
   Proof.
     intros uv dt sid.
     unfold to_ubytes.
@@ -293,6 +295,206 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
     | H: context[serialize_sbytes ?x ?dt] |- _ =>
       tactic_on_non_aggregate_uvalues x ltac:(cbn in H; inv H)
     end.
+
+  Lemma concretize_ibinop_inv:
+    forall op x y dv,
+      concretize_succeeds (UVALUE_IBinop op x y) ->
+      concretize (UVALUE_IBinop op x y) dv ->
+      exists dx dy,
+        concretize x dx /\
+          concretize y dy /\
+          eval_iop op dx dy = ret dv.
+  Proof.
+    intros op x y dv SUCC CONC.
+
+    rewrite concretize_equation in CONC.
+    red in CONC.
+    rewrite concretize_uvalueM_equation in CONC.
+
+    cbn in CONC.
+    destruct CONC as (ma & k' & pama & eqm & REST).
+
+    destruct ma as [[[uba | [erra | a]]]] eqn:Hma; cbn; auto.
+
+    (* First thing is ub... *)
+    (* This should be ruled out by SUCC *)
+    { cbn in SUCC.
+      unfold concretize_succeeds, concretize_fails in SUCC.
+      red in SUCC.
+
+      exfalso.
+      apply SUCC.
+
+      red. rewrite concretize_uvalueM_equation.
+      cbn.
+
+      unfold bind_RefineProp.
+
+      eexists.
+      exists ret.
+
+      split; [apply pama|].
+      split; auto.
+
+      intros a H.
+      cbn in H.
+      destruct uba; contradiction.
+    }
+
+    (* First thing is failure... *)
+    (* This should be ruled out by SUCC *)
+    { cbn in SUCC.
+      unfold concretize_succeeds, concretize_fails in SUCC.
+      red in SUCC.
+
+      exfalso.
+      apply SUCC.
+
+      red. rewrite concretize_uvalueM_equation.
+      cbn.
+
+      unfold bind_RefineProp.
+
+      eexists.
+      exists ret.
+
+      split; [apply pama|].
+      split; auto.
+
+      intros a H.
+      cbn in H.
+      destruct erra; contradiction.
+    }
+
+    specialize (REST a).
+    forward REST; [reflexivity|].
+
+    destruct REST as (mb & kb & pbmb & eqmb & REST).
+
+    unfold concretize_succeeds, concretize_fails, concretize_u in SUCC.
+    rewrite concretize_uvalueM_equation in SUCC.
+    cbn in SUCC.
+    unfold bind_RefineProp in SUCC.
+
+    destruct mb as [[[ubb | [errb | b]]]] eqn:Hmb; cbn; auto.
+
+    (* y raises UB *)
+    { exfalso.
+      apply SUCC.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      
+      split; [apply pama|].
+      split; cbn; auto.
+
+      intros a0 H; subst.
+
+      eexists.
+      exists ret.
+
+      split; [apply pbmb|].
+      split; auto.
+
+      intros a H.
+      cbn in H.
+      destruct ubb; contradiction.
+    }
+
+    (* y fails *)
+    { exfalso.
+      apply SUCC.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      
+      split; [apply pama|].
+      split; cbn; auto.
+
+      intros a0 H; subst.
+
+      eexists.
+      exists ret.
+
+      split; [apply pbmb|].
+      split; auto.
+
+      intros a H.
+      cbn in H.
+      destruct errb; contradiction.
+    }
+
+    (* Both x and y successfully concretized.
+
+         Now eval_iop must succeed too.
+     *)
+    specialize (REST b).
+    forward REST; [reflexivity|].
+
+    destruct (eval_iop op a b) as [[[ubz | [errz | z]]]] eqn:Hmz; cbn; auto.
+
+    (* Eval raises ub *)
+    { exfalso.
+      apply SUCC.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split; [apply pama|].
+      split; cbn; auto.
+
+      intros a0 H; subst.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split; [apply pbmb|].
+      split; cbn; auto.
+
+      intros a H; subst.
+
+      rewrite Hmz.
+      reflexivity.
+    }
+
+    (* Eval fails *)
+    { exfalso.
+      apply SUCC.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split; [apply pama|].
+      split; cbn; auto.
+
+      intros a0 H; subst.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split; [apply pbmb|].
+      split; cbn; auto.
+
+      intros a H; subst.
+
+      rewrite Hmz.
+      reflexivity.
+    }
+
+    cbn in eqmb.
+    cbn in eqm.
+
+    destruct (kb b) as [[[ubkbb | [errkbb | kbb]]]] eqn:Hkbb; try contradiction; subst.
+    cbn in eqmb.
+    
+    destruct (k' a) as [[[ubka | [errka | ka]]]] eqn:Hka; try contradiction; subst.
+    cbn in eqm; subst.
+
+    exists a. exists b.
+    auto.
+  Qed.
 
   Lemma serialize_sbytes_deserialize_sbytes :
     forall uv dt sid prov sbytes ,
