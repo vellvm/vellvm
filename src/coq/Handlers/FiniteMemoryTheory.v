@@ -385,13 +385,9 @@ Section Serialization_Theory.
       }
   Qed.
 
-  (* TODO: move this *)
-  Instance proper_eq1_runs_to : forall {A sid prov a sid' prov'}, Proper (@Monad.eq1 (eitherT ERR_MESSAGE _) _ A ==> iff) (fun ma => ErrSID_runs_to ma sid prov a sid' prov').
+ Instance proper_eq1_runs_to : forall {A}, Proper (@Monad.eq1 (eitherT ERR_MESSAGE (eitherT UB_MESSAGE _)) _ A ==> eq ==> eq ==> eq ==> eq  ==> eq ==> iff) (ErrSID_runs_to).
   Proof.
-    intros sid prov sid' prov' A a.
-    unfold Proper.
-    unfold respectful.
-    intros x y EQ.
+    repeat intro; subst. rename H into EQ.
 
     unfold Monad.eq1, Eq1_eitherT in EQ.
     split; intros RUNS.
@@ -400,8 +396,6 @@ Section Serialization_Theory.
       unfold pointwise_relation in EQ.
       unfold Monad.eq1 in EQ.
       unfold Eq1_ident in EQ.
-
-      specialize (EQ prov sid').
 
       cbn in EQ.
       unfold unEitherT in EQ.
@@ -419,8 +413,6 @@ Section Serialization_Theory.
       unfold pointwise_relation in EQ.
       unfold Monad.eq1 in EQ.
       unfold Eq1_ident in EQ.
-
-      specialize (EQ prov sid').
 
       cbn in EQ.
       unfold unEitherT in EQ.
@@ -943,26 +935,7 @@ Section Serialization_Theory.
 
     apply ErrSID_evals_to_bind in BYTES as (sid'' & prov'' & bytes'' & EXTRACT & BYTES).
 
-    pose proof @proper_eq1_runs_to (list SByte) sid' prov bytes'' sid'' prov''.
-
-    unfold Proper, respectful in H1.
-    pose proof @map_monad_lift_ERR.
-
-    specialize (H2 uvalue SByte (eitherT UB_MESSAGE (stateT store_id (stateT Provenance IdentityMonad.ident))) _ _).
-    repeat (forward H2; [typeclasses eauto|]).
-    forward H2.
-    { eapply MonadLawsE_either.
-      Unshelve.
-      apply MonadState.MonadLawsE_stateTM.
-      typeclasses eauto.
-      apply MonadState.MonadLawsE_stateTM.
-      typeclasses eauto.
-      typeclasses eauto.
-    }
-
-    specialize (H2 bytes extract_byte_to_sbyte).
-    specialize (H1 _ _ H2).
-    apply H1 in EXTRACT. (* Why can't proper do this? *)
+    setoid_rewrite map_monad_lift_ERR in EXTRACT.
 
     apply ErrSID_runs_to_ErrSID_evals_to in EXTRACT.
     apply map_monad_ErrSID_length in EXTRACT.
