@@ -301,7 +301,9 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
       concretize_succeeds (UVALUE_IBinop op x y) ->
       concretize (UVALUE_IBinop op x y) dv ->
       exists dx dy,
-        concretize x dx /\
+        concretize_succeeds x /\
+          concretize x dx /\
+          concretize_succeeds y /\
           concretize y dy /\
           eval_iop op dx dy = ret dv.
   Proof.
@@ -493,8 +495,194 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
     cbn in eqm; subst.
 
     exists a. exists b.
-    auto.
+    repeat split; auto.
+
+    { unfold concretize_succeeds, concretize_fails, concretize_u.
+      intros CONC.
+      apply SUCC.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split.
+      apply CONC.
+
+      split; cbn; auto.
+      intros a0 CONTRA.
+      contradiction.
+    }
+
+    { unfold concretize_succeeds, concretize_fails, concretize_u.
+      intros CONC.
+      apply SUCC.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split; [apply pama|].
+      split; cbn; auto.
+
+      intros a0 H; subst.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split.
+      apply CONC.
+
+      split; cbn; auto.
+
+      intros a CONTRA.
+      contradiction.
+    }
   Qed.
+
+  Lemma concretize_succeeds_poison :
+    forall dt,
+      concretize_succeeds (UVALUE_Poison dt).
+  Proof.
+    induction dt;
+      unfold concretize_succeeds, concretize_fails, concretize_u;
+      rewrite concretize_uvalueM_equation;
+      cbn; auto.
+  Qed.
+
+  Lemma concretize_dtyp :
+    forall uv dv dt,
+      uvalue_has_dtyp uv dt ->
+      concretize_succeeds uv ->
+      concretize uv dv ->
+      dvalue_has_dtyp dv dt.
+  Proof.
+    intros uv dv dt DTYP SUCC CONC.
+    generalize dependent dv.
+    induction DTYP; intros dv CONC.
+    1-8: inversion CONC; subst; solve [auto | constructor; try solve_no_void].
+
+    (* Poison structs *)
+    { inversion CONC.
+      constructor.
+      rewrite NO_VOID_equation.
+      cbn. auto.
+    }
+    { inversion CONC.
+      constructor.
+
+      subst.
+
+      (* Recover NO_VOID information *)
+      specialize (IHDTYP (concretize_succeeds_poison _) (DVALUE_Poison dt)).
+      forward IHDTYP.
+      { do 2 red.
+        cbn.
+        reflexivity.
+      }
+
+      specialize (IHDTYP0 (concretize_succeeds_poison _) (DVALUE_Poison (DTYPE_Struct dts))).
+      forward IHDTYP0.
+      { do 2 red.
+        cbn.
+        reflexivity.
+      }
+      
+      inversion IHDTYP; subst.
+      inversion IHDTYP0; subst.
+
+      solve_no_void.
+    }
+
+    (* Poison packed structs *)
+    { inversion CONC.
+      constructor.
+      rewrite NO_VOID_equation.
+      cbn. auto.
+    }
+    { inversion CONC.
+      constructor.
+
+      subst.
+
+      (* Recover NO_VOID information *)
+      specialize (IHDTYP (concretize_succeeds_poison _) (DVALUE_Poison dt)).
+      forward IHDTYP.
+      { do 2 red.
+        cbn.
+        reflexivity.
+      }
+
+      specialize (IHDTYP0 (concretize_succeeds_poison _) (DVALUE_Poison (DTYPE_Packed_struct dts))).
+      forward IHDTYP0.
+      { do 2 red.
+        cbn.
+        reflexivity.
+      }
+      
+      inversion IHDTYP; subst.
+      inversion IHDTYP0; subst.
+
+      solve_no_void.
+    }
+
+    1-11: inversion CONC; subst; solve [auto | constructor; try solve_no_void].
+
+    (* Structs *)
+    { (* Nil structs *)
+      do 2 red in CONC.
+      cbn in CONC.
+      unfold bind_RefineProp in CONC.
+      destruct CONC as (ma & k' & pama & eqm & REST).
+      destruct ma as [[[uba | [erra | a]]]] eqn:Hma; cbn; auto; try contradiction.
+      subst.
+
+      specialize (REST nil).
+      forward REST; [reflexivity|].
+
+      destruct (k' nil) as [[[ubk' | [errk' | k'nil]]]] eqn:Hk'nil; cbn; auto; try contradiction.
+      subst.
+
+      cbn in eqm.
+      rewrite Hk'nil in eqm.
+      cbn in eqm.
+      subst.
+
+      constructor.
+    }
+    { (* Non-nil structs *)
+      do 2 red in CONC.
+      rewrite concretize_uvalueM_equation in CONC.
+      cbn in CONC.
+
+      (* Urgggghhh... Missing proper instance, I think *)
+      Fail rewrite RefineProp_bind_bind in CONC.
+      admit.
+    }
+
+    (* Packed Structs *)
+    admit.
+    admit.
+
+    (* Arrays *)
+    { admit.
+
+    }
+
+    (* Vectors *)
+    { admit.
+
+    }
+
+    (* Binops *)
+    { apply concretize_ibinop_inv in CONC; auto.
+      destruct CONC as (dx & dy & CONCx & CONCy & EVAL).
+
+      
+      Set Nested Proofs Allowed.
+
+    }
+    1: inversion CONC; subst; solve [auto | constructor; try solve_no_void].
+    
+  Admitted.
+
 
   Lemma serialize_sbytes_deserialize_sbytes :
     forall uv dt sid prov sbytes ,

@@ -322,28 +322,6 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
 
     auto.
   Qed.
-
-  (* May have proven in other file (Refinement.v *) *)
-  Lemma concretize_ibinop_inv :
-    forall op uv1 uv2 dv,
-      concretize_succeeds (UVALUE_IBinop op uv1 uv2) ->
-      concretize (UVALUE_IBinop op uv1 uv2) dv ->
-      exists dv1 dv2,
-        concretize uv1 dv1 /\
-        concretize uv2 dv2 /\
-        eval_iop op dv1 dv2 = ret dv.
-  Proof.
-    intros op uv1 uv2 dv CONC.
-
-    rewrite concretize_equation in CONC.
-    red in CONC.
-    rewrite concretize_uvalueM_equation in CONC.
-
-    inversion CONC.
-    inversion H.
-
-    destruct H0 as (CONC1 & EQ1 & CONT).
-  Admitted.
   
   Instance proper_refine_uvalue_ibinop {op v2 rv} : Proper ((fun x y => refine_uvalue y x) ==> (fun (x y : Prop) => x -> y)) (fun v1 => refine_uvalue (UVALUE_IBinop op v1 v2) rv).
   Proof.    

@@ -2085,6 +2085,45 @@ Class VInt I : Type :=
       contradiction.
   Qed.
 
+  Lemma NO_VOID_Struct_cons_inv :
+    forall dt dts,
+      NO_VOID dt ->
+      NO_VOID (DTYPE_Struct dts) ->
+      NO_VOID (DTYPE_Struct (dt :: dts)).
+  Proof.
+    intros dt dts NVdt NVdts.
+    rewrite NO_VOID_equation in NVdts.
+    rewrite NO_VOID_equation.
+
+    apply Forall_HIn_cons_inv; auto.
+  Qed.
+
+  Lemma NO_VOID_Packed_struct_cons_inv :
+    forall dt dts,
+      NO_VOID dt ->
+      NO_VOID (DTYPE_Packed_struct dts) ->
+      NO_VOID (DTYPE_Packed_struct (dt :: dts)).
+  Proof.
+    intros dt dts NVdt NVdts.
+    rewrite NO_VOID_equation in NVdts.
+    rewrite NO_VOID_equation.
+
+    apply Forall_HIn_cons_inv; auto.
+  Qed.
+
+  Hint Rewrite NO_VOID_equation : NO_VOID.
+  Hint Resolve NO_VOID_Struct_cons_inv : NO_VOID.
+  Hint Resolve NO_VOID_Packed_struct_cons_inv : NO_VOID.
+  Ltac solve_no_void :=
+    solve
+      [ auto with NO_VOID
+      | match goal with
+        | H: NO_VOID _ /\ _ |- _
+          => destruct H; solve_no_void
+        end
+      | rewrite NO_VOID_equation; solve_no_void
+      ].
+
   (* Poison not included because of concretize *)
   Unset Elimination Schemes.
   Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=

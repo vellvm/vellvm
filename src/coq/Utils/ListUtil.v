@@ -430,3 +430,13 @@ Proof.
   apply H0 in H1.
   contradiction.
 Qed.
+
+Lemma Forall_HIn_cons_inv :
+  forall {X} (x : X) (xs : list X) (f : X -> Prop),
+    f x ->
+    Forall_HIn xs (fun x _ => f x) ->
+    Forall_HIn (x::xs) (fun x _ => f x).
+Proof.
+  intros X x xs f Hfx Hfxs.
+  constructor; auto.
+Qed.
