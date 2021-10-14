@@ -673,13 +673,13 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
 
     (* Binops *)
     { apply concretize_ibinop_inv in CONC; auto.
-      destruct CONC as (dx & dy & CONCx & CONCy & EVAL).
+      destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
 
-      
-      Set Nested Proofs Allowed.
-
+      eapply eval_iop_dtyp_i.
+      eapply IHDTYP1; eauto.
+      eapply IHDTYP2; eauto.
+      eauto.
     }
-    1: inversion CONC; subst; solve [auto | constructor; try solve_no_void].
     
   Admitted.
 
