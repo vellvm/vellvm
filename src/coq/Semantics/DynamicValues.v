@@ -3188,4 +3188,33 @@ Class VInt I : Type :=
     all: eapply eval_iop_integer_h_dtyp in EVAL; eauto.
   Qed.
 
+  Lemma eval_iop_integer_h_dtyp_iptr :
+    forall dx dy dv op,
+      dvalue_has_dtyp dx DTYPE_IPTR ->
+      dvalue_has_dtyp dy DTYPE_IPTR ->
+      eval_iop_integer_h op dx dy = ret dv ->
+      dvalue_has_dtyp dv DTYPE_IPTR.
+  Proof.
+    intros dx dy dv op TYPx TYPy EVAL.
+    inversion TYPx; inversion TYPy; subst;
+      destruct op;
+      cbn in EVAL;
+      repeat break_match_hyp;
+      inversion EVAL;
+      constructor; try solve_no_void.
+  Qed.
+
+  Lemma eval_iop_dtyp_iptr :
+    forall dx dy dv op,
+      dvalue_has_dtyp dx DTYPE_IPTR ->
+      dvalue_has_dtyp dy DTYPE_IPTR ->
+      eval_iop op dx dy = ret dv ->
+      dvalue_has_dtyp dv DTYPE_IPTR.
+  Proof.
+    intros dx dy dv op TYPx TYPy EVAL.
+    unfold eval_iop in EVAL.
+    inversion TYPx; inversion TYPy; subst; try lia.
+    all: eapply eval_iop_integer_h_dtyp_iptr in EVAL; eauto.
+  Qed.
+
 End DVALUE.

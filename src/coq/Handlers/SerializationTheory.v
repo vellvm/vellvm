@@ -654,6 +654,14 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
 
       (* Urgggghhh... Missing proper instance, I think *)
       Fail rewrite RefineProp_bind_bind in CONC.
+
+      epose proof RefineProp_Proper_bind.
+      Import Morphisms.
+      unfold Proper, respectful in H.
+      eapply H in CONC.
+
+      admit.
+      admit.
       admit.
     }
 
@@ -680,7 +688,74 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
       eapply IHDTYP2; eauto.
       eauto.
     }
+
+    { apply concretize_ibinop_inv in CONC; auto.
+      destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
+
+      eapply eval_iop_dtyp_iptr.
+      eapply IHDTYP1; eauto.
+      eapply IHDTYP2; eauto.
+      eauto.
+    }
+
+    (* Integer Comparisons *)
+    admit.
+    admit.
+    admit.
+    admit.
+    admit.
+
+    (* Floating point comparisons *)
+    admit.
+    admit.
+    admit.
+    admit.
+
+    (* Conversions *)
+    admit.
+    admit.
+    admit.
+    admit.
+    admit.
+    admit.
+    admit.
+    admit.
+    admit.
+    admit.
+    admit.
+    admit.
+
+    (* GetElementPtr *)
+    admit.
+
+    (* ExtractElement *)
+    admit.
+    admit.
+
+    (* InsertElement *)
+    admit.
+    admit.
+
+    (* ShuffleVector *)
+    admit.
+
+    (* ExtractValue *)
+    admit.
+    admit.
+    admit.
+    admit.
+    admit.
+    admit.
+
+    (* InsertValue *)
+    admit.
+
+    (* Select *)
+    admit.
+    admit.
     
+    (* ConcatBytes *)
+    admit.
   Admitted.
 
 
