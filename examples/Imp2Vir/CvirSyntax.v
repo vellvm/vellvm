@@ -4,7 +4,7 @@ From Coq Require Import
      Lists.List
      ZArith.
 
-From Vellvm Require Import Syntax.
+From Vellvm Require Import Syntax Semantics .
 From Imp2Vir Require Import Relabel.
 
 Import ListNotations.
@@ -15,34 +15,67 @@ Definition mk_anon (n : nat) := Anon (Z.of_nat n).
 
 Variant block_typ : Type :=
   | Simple
-  | Ret ( _ : texp typ )
+  | Return ( _ : texp typ )
   | Void
   | Branch ( _ : texp typ ).
 
 Inductive icvir : Type :=
 | Block (_ : block_typ) ( _ : code typ )
-| PermuteInputs ( _ : (list block_id) -> (list block_id)) (_ : icvir)
-| PermuteOutputs ( _ : (list block_id) -> (list block_id)) (_ : icvir)
+| PermuteInputs (_ : icvir)  (* Do we want more generally an arbitrary permutation? *)
+| PermuteOutputs (_ : icvir)
 | Loop (_ : nat) (_ : icvir)
 | Merge (_ : icvir) (_ : icvir)
 | Join (_ : nat) (_ : icvir).
 
-Record cvir := {
+Definition Seq (c1 c2 : icvir) : icvir := 
+  Loop 1 (PermuteInputs (Merge c1 c2)).
+
+Record cvir := mk_cvir {
     ins : list block_id;
     outs : list block_id;
     cfg : list (block typ);
   }.
 
-Definition mk_cvir (ins outs : list block_id) (cfg : list (block typ))
-  : cvir :=
-  {|
-    ins := ins ;
-    outs := outs ;
-    cfg := cfg;
-  |}.
-
 Definition relabel_cvir (m : bid_map) (ir : cvir) : cvir :=
   mk_cvir (ins ir) (outs ir) (ocfg_relabel m (cfg ir)).
+
+From ExtLib Require Import
+     Structures.Monads.
+From ITree Require Import ITree.
+From ITree Require Import Eq.
+
+Record FST := mk_FST
+  { 
+    counter_reg : nat; 
+    counter_bid : nat
+  }.
+
+Definition fresh_init : FST := mk_FST 0 0.
+
+Definition bump_bid : FST -> FST  :=
+  fun '(mk_FST r b) => mk_FST r (S b).
+
+Definition bump_reg : FST -> FST  :=
+  fun '(mk_FST r b) => mk_FST (S r) b.
+
+Definition fresh : Type -> Type := fun X => FST -> (FST * X). 
+
+#[global] Instance freshM : Monad fresh := 
+ {|
+  ret := fun _ x s => (s,x);
+  bind := fun _ _ c k s => let '(s',x) := c s in k x s'
+  |}.
+Import MonadNotation.  
+
+Variable (name : nat -> block_id).
+
+Definition getReg : fresh block_id :=
+  fun '(mk_FST r b) => 
+    (mk_FST (S r) b , name r).
+
+Definition getLab : fresh block_id :=
+  fun '(mk_FST r b) => 
+    (mk_FST r (S b) , name b).
 
 Fixpoint mk_map (l : list block_id) (l' : list block_id) : bid_map :=
   match l with
@@ -53,58 +86,99 @@ Fixpoint mk_map (l : list block_id) (l' : list block_id) : bid_map :=
              end)
   end.
 
+  Definition cycle {A} (l : list A) : list A :=
+    match l with 
+    | [] => []
+    | x::tl => tl ++ [x]
+    end.
 
-(* TODO monadic version *)
-Fixpoint eval_icvir (n : nat) (cir : icvir) : (nat * cvir) :=
+Fixpoint eval_icvir (cir : icvir) : fresh cvir :=
   match cir with
+
   | Block Simple c =>
-    ( n+2, mk_cvir [(mk_anon n)] [(mk_anon (n+1))]
-                   [mk_block (mk_anon n) List.nil c (TERM_Br_1 (mk_anon (n+1))) None]
+    input <- getLab;;
+    output <- getLab;;
+    ret (mk_cvir [input] [output]
+                 [mk_block input [] c (TERM_Br_1 output) None]
     )
-  | Block (Ret e) c =>
-    ( n+1, mk_cvir [(mk_anon n)] []
-                   [mk_block (mk_anon n) List.nil c (TERM_Ret e) None])
-  | Block Void c =>
-    ( n+1, mk_cvir [(mk_anon n)] []
-                   [mk_block (mk_anon n) List.nil c TERM_Ret_void None])
-  | Block (Branch e) c =>
-    ( n+3, mk_cvir [(mk_anon n)] [(mk_anon (n+1));(mk_anon (n+2))]
-                   [mk_block (mk_anon n) (List.nil) c (TERM_Br e (mk_anon (n+1)) (mk_anon (n+2))) None])
-  (* TODO *)
-  | PermuteInputs f ir =>
-    let (n', ir') := eval_icvir n ir in
-    (n',
-      mk_cvir
-        (f (ins ir'))
-        (outs ir')
-        (cfg ir')
-    )
-  | PermuteOutputs f ir =>
-    let (n', ir') := eval_icvir n ir in (n', ir')
+
+  | Block (Return e) c =>
+    input <- getLab;;
+    ret (mk_cvir [input] [] [mk_block input [] c (TERM_Ret e) None])
+
+ | Block Void c =>
+    input <- getLab;;
+    ret (mk_cvir [input] [] [mk_block input [] c TERM_Ret_void None])
+
+ | Block (Branch e) c =>
+    input <- getLab;;
+    outL <- getLab;;
+    outR <- getLab;;
+    ret (mk_cvir [input] [outL;outR] [mk_block input [] c (TERM_Br e outL outR) None])
+
+  | PermuteInputs ir => (* Note: has been simplified. General Case? *)
+    '(mk_cvir ins outs g) <- eval_icvir ir;;
+    ret (mk_cvir
+        (cycle ins)
+        outs
+        g)
+    
+  | PermuteOutputs ir => (* Note: has been simplified. General Case? Is it useful at all anyway? *)
+    '(mk_cvir ins outs g) <- eval_icvir ir;;
+    ret (mk_cvir
+        ins
+        (cycle outs)
+        g)
+    
   | Join k ir =>
-    let (n', ir') := eval_icvir n ir in
-    let rename_map := (mk_map (firstn k (outs ir')) (List.repeat (mk_anon (n'+1)) k)) in
-    (n'+1,
-      mk_cvir
-        (ins ir') (* inputs stays untouched *)
-        (skipn k (outs ir')) (* we rename the k-first and don't touch the others *)
-        (ocfg_relabel rename_map (cfg ir'))
+    '(mk_cvir ins outs g) <- eval_icvir ir;;
+    merge <- getLab;;
+    let rename_map := (mk_map (firstn k outs) (List.repeat merge k)) in
+    ret (mk_cvir ins                     (* inputs stays untouched *)
+                 (merge :: skipn k outs) (* we rename the k-first and don't touch the others *)
+        (ocfg_relabel rename_map g)
     )
-  | Loop k ir =>
-    let (n', ir') := eval_icvir n ir in
-    let rename_map := (mk_map (firstn k (ins ir')) (firstn k (outs ir'))) in
-    ( n', mk_cvir
-            (skipn k (ins ir'))
-            (skipn k (outs ir'))
-            (ocfg_relabel rename_map (cfg ir')))
+
+ | Loop k ir =>
+    '(mk_cvir ins outs g) <- eval_icvir ir;;
+    let rename_map := (mk_map (firstn k ins) (firstn k outs)) in
+    ret (mk_cvir (skipn k ins)
+                 (skipn k outs)
+                 (ocfg_relabel rename_map g))
+
   | Merge ir1 ir2 =>
-    let (n1', ir1') := eval_icvir n ir1 in
-    let (n2', ir2') := eval_icvir n1' ir2 in
-    (n2',
-      mk_cvir ((ins ir1')++(ins ir2'))
-              ((outs ir1')++(outs ir2'))
-              ((cfg ir1')++(cfg ir2')))
-  end.
+    '(mk_cvir ins1 outs1 g1) <- eval_icvir ir1;;
+    '(mk_cvir ins2 outs2 g2) <- eval_icvir ir2;;
+    ret (mk_cvir (ins1 ++ ins2)
+                 (outs1 ++ outs2)
+                 (g1 ++ g2))
+
+ end.
+
+Definition eval (cir : icvir) : fresh _ :=
+  ir <- eval_icvir cir;; 
+  ret (cfg ir). 
+
+Definition eval_top (cir : icvir) :=
+  eval cir fresh_init.
+
+Notation conv := (convert_typ []).
+
+Definition sem (i : icvir): fresh _ :=
+   bks <- eval i;;
+   ret (denote_ocfg (conv bks)).
+
+Lemma seq_sound : Prop. 
+refine (forall (ir1 ir2 : icvir), _ : Prop).
+refine (forall σ fto, 
+eutt eq _ _).
+
+refine (snd (sem (Seq ir1 ir2) σ) fto).
+refine (x <- snd (sem ir1 σ) fto;; _ (sem ir2)).
+ sem (Seq ir1 ir2)) == _ (sem ir1) (sem ir2). 
+
+
+
 
 From ExtLib Require Import
      Structures.Monads
