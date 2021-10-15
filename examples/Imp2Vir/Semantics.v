@@ -17,7 +17,9 @@ From Vellvm Require Import
      Syntax.ScopeTheory
      Utils.AListFacts
      Utils.PostConditions
-     Utils.Tactics.
+     Utils.Tactics
+     Theory.
+
 From Imp2Vir Require Import Fin Imp.
 
 From Imp2Vir Require Import Utils Relabel Vec Unique CvirCombinators CvirCombinatorsWF CompileExpr Imp2Cvir.
@@ -25,7 +27,7 @@ From Imp2Vir Require Import Utils Relabel Vec Unique CvirCombinators CvirCombina
 (* Denotation of a [cvir] construct. *)
 
 Definition denote_cvir_gen {ni no} (ir : cvir ni no) vi vo vt (bid bid' : fin ni) :=
-  denote_ocfg (convert_typ nil (blocks ir vi vo vt)) (nth vi bid', nth vi bid).
+  denote_ocfg (convert_typ nil (blocks ir vi vo vt)) (nth vi bid, nth vi bid').
 
 (*
 NOTE: we should be able to take any three disjoint sets
@@ -37,7 +39,17 @@ lemmas about it would assume that they are disjoint.
 We currently suspect that the later formulation might be
 necessary to express generic lemmas, even if "at the top level"
 we will always use the canonical naming. It is not yet clear though.
-*)
+ *)
+Open Scope nat.
+Program Definition cast_fin0 (ni no x : nat) (H1 : (x <? ni+no)%nat = true) (H2 :(ni <=? x)%nat = true ) :
+  Fin.fin no := fi' (ni-x).
+Next Obligation.
+  apply Nat.ltb_lt in H1 ;
+  apply Nat.leb_le in H2 ;
+  lia.
+Qed.
+
+Import ITreeNotations.
 
 Definition build_map a b := map Anon (map Z.of_nat (seq a b)).
 
@@ -52,6 +64,77 @@ Definition denote_cvir {ni no} (ir : cvir ni no) bid bid' :=
   let vo := build_map ni no in
   let vt := build_map (ni + no) (n_int ir) in
   denote_cvir_gen ir vi vo vt bid bid'.
+
+Program Definition try_cast_target {E : Type -> Type} `{FailureE -< E} (ni no n : nat) : itree E (Fin.fin no) :=
+  match Nat.compare n (ni+no) with
+  | Lt => match Nat.compare n ni with
+         | Gt | Datatypes.Eq => ret (cast_fin0 ni no n _ _)
+         | _ => raise "a remplir"
+         end
+  | _ => raise "a remplir"
+  end.
+Next Obligation.
+  symmetry in Heq_anonymous0 ;
+  rewrite <- nat_compare_lt in Heq_anonymous0.
+  apply Nat.ltb_lt ; auto.
+Qed.
+Next Obligation.
+  symmetry in Heq_anonymous ;
+  rewrite <- nat_compare_gt in Heq_anonymous.
+  apply Nat.leb_le ; apply Nat.lt_le_incl.
+  auto.
+Qed.
+Next Obligation.
+  symmetry in Heq_anonymous0 ;
+  rewrite <- nat_compare_lt in Heq_anonymous0.
+  apply Nat.ltb_lt ; auto.
+Qed.
+Next Obligation.
+  symmetry in Heq_anonymous.
+  apply nat_compare_eq in Heq_anonymous.
+  apply Nat.leb_le ; subst n ; auto.
+Qed.
+Next Obligation.
+  intuition ; discriminate.
+Qed.
+
+
+Program Definition create_fin k n (H : k < n) : fin n := fi' k.
+
+Program Definition try_cast_from {E : Type -> Type} `{FailureE -< E} (ni no nt n : nat) : itree E (Fin.fin (ni+no+nt)) :=
+  match Nat.compare n (ni+no+nt) with
+  | Datatypes.Lt => ret (create_fin n (ni+no+nt) _)
+  | _ => raise "a remplir"
+  end.
+Next Obligation.
+  symmetry in Heq_anonymous.
+  apply nat_compare_lt in Heq_anonymous.
+  assumption.
+Qed.
+
+Program Definition denote_cvir' {ni no} (ir : cvir ni no) bid bid' :=
+  res <- denote_cvir ir bid bid' ;;
+   match res with
+   | inr v => ret (inr v)
+   | inl (Anon from, Anon target) =>
+       target <- try_cast_target ni no (Z.to_nat target) ;;
+       from <- try_cast_target ni no (Z.to_nat from) ;;
+       (* from <- try_cast_from ni no (n_int ir) (Z.to_nat from) ;;  *)
+       ret (inl (from,target))
+    | _ => raise "A remplir"
+   end.
+Next Obligation.
+  intuition ; inversion H.
+Qed.
+Next Obligation.
+  intuition ; inversion H.
+Qed.
+Next Obligation.
+  intuition ; inversion H.
+Qed.
+Next Obligation.
+  intuition ; inversion H.
+Qed.
 
 (* In particular: can we have a reasoning principle to prove that two
   cvir are related?
@@ -174,17 +257,25 @@ Proof.
   tauto.
 Qed.
 
-From Coq Require Import Morphisms.
-Require Import ITree.Basics.HeterogeneousRelations.
-Import ITreeNotations.
-(*Import SemNotations.*)
-
+Lemma unique_vector_build_map0:
+  forall f n, unique_vector (build_map f n).
+Proof.
+  unfold unique_vector.
+  intros.
+  rewrite 2 nth_build_map in H.
+  inv H.
+  apply Nat2Z.inj in H1.
+  destruct i1,i2 ; subst ; simpl in *.
+Admitted.
 
 Lemma unique_vector_build_map :
   forall fi fo ft ni no nt,
   (fi + ni <= fo)%nat ->
   (fo + no <= ft)%nat ->
   unique_vector (build_map fi ni ++ build_map fo no ++ build_map ft nt).
+Proof.
+  unfold unique_vector.
+  intros.
 Admitted.
 
 Lemma unique_vector_build_map' :
@@ -197,6 +288,12 @@ Proof.
   apply unique_vector_assoc.
   apply unique_vector_build_map; lia.
 Qed.
+
+
+From Coq Require Import Morphisms.
+Require Import ITree.Basics.HeterogeneousRelations.
+Import ITreeNotations.
+(*Import SemNotations.*)
 
 Theorem cvir_relabel : forall {ni no} (ir : cvir ni no) vi vi' vo vo' vt vt',
   cvir_relabel_WF ir ->
@@ -314,75 +411,81 @@ Proof.
     apply unique_vector_build_map'; lia.
   }
   cbn in WF3. rewrite !firstn_build_map, !skipn_build_map in WF3.
+
   (* case analysis on which subgraph we are in: *)
-  - unfold denote_cvir, denote_cvir_gen.
-    unfold merge_cvir.
-    cbn.
-    rewrite !firstn_build_map.
-    rewrite !skipn_build_map.
-    (* the invariant on the block identifiers we encounter during the computation *)
-    (* maybe stating a higher level property on build_map or seq would be simpler? *)
-    set (I := (fun (bid bid' : block_id) =>
+  unfold denote_cvir, denote_cvir_gen.
+  unfold merge_cvir.
+  cbn.
+  rewrite !firstn_build_map.
+  rewrite !skipn_build_map.
+  (* the invariant on the block identifiers we encounter during the computation *)
+  (* maybe stating a higher level property on build_map or seq would be simpler? *)
+  set (I := (fun (bid bid' : block_id) =>
       bid = bid' /\
       exists k, bid = Anon (Z.of_nat k) /\
-      ((k >= 0 /\ k < 0+ni1) \/ (k >= ni1+ni2 /\ k < ni1+ni2+no1) \/ (k >= ni1+ni2+(no1+no2) /\ k < ni1+ni2+(no1+no2)+n_int ir1)))%nat).
-    set (I' := (fun (fto fto' : block_id * block_id) =>
+        ((k >= 0 /\ k < 0+ni1) (* in inputs *)
+          \/ (k >= ni1+ni2 /\ k < ni1+ni2+no1) (* in outputs*)
+         \/ (k >= ni1+ni2+(no1+no2) /\ k < ni1+ni2+(no1+no2)+n_int ir1) (* in internals *)
+            ))%nat).
+  set (I' := (fun (fto fto' : block_id * block_id) =>
       fto = fto' /\
       I (snd fto) (snd fto'))).
     (* we apply [eutt_iter_gen] with this invariant *)
-    apply (@KTreeFacts.eutt_iter_gen _ _ _ I').
-    + (* We need to prove that it is indeed an invariant *)
-      simpl bind.
-      intros [? ?b1] [? ?b2] HI.
-      destruct HI as (? & ? & ? & ?). inv H. clear H0.
-      unfold convert_typ, ConvertTyp_list, tfmap, TFunctor_list' in *.
-      rewrite !find_block_map'; try tauto.
-      unfold option_map.
-      repeat break_match; try discriminate.
-      * apply find_block_app_wf in Heqo2; try assumption.
-        destruct Heqo2. 2: {
-          apply find_block_Some_In_inputs in H. destruct H1. simpl in H0. subst b2.
-          apply cvir_inputs_build_map in H; try assumption. lia.
-        }
-        rewrite H in Heqo1. inv Heqo1.
-        rewrite Heqo in Heqo0. inv Heqo0.
-        apply eutt_clo_bind with (UU := sum_rel I eq).
-        unfold denote_block.
-        apply eutt_eq_bind. intros _.
-        apply eutt_eq_bind. intros _.
-        apply eutt_translate_gen.
-        (* hard part: the terminator *)
-        apply denote_terminator_has_post_block_id. {
-          intros.
-          unfold I.
-          split; try reflexivity.
-          inv Heqo.
-          fold (ConvertTyp_block nil b3) in H0. rewrite convert_typ_successors in H0.
-          apply cvir_outputs_build_map'; try assumption.
-          eapply successors_outputs; try eassumption.
-          apply find_block_In' in H. assumption.
-        }
+  apply (@KTreeFacts.eutt_iter_gen _ _ _ I').
+
+  + (* We need to prove that it is indeed an invariant *)
+    simpl bind.
+    intros [? ?b1] [? ?b2] HI.
+    destruct HI as (? & ? & ? & ?). inv H. clear H0.
+    unfold convert_typ, ConvertTyp_list, tfmap, TFunctor_list' in *.
+    rewrite !find_block_map'; try tauto.
+    unfold option_map.
+    repeat break_match; try discriminate.
+    * apply find_block_app_wf in Heqo2; try assumption.
+      destruct Heqo2. 2: {
+                      apply find_block_Some_In_inputs in H. destruct H1. simpl in H0. subst b2.
+                      apply cvir_inputs_build_map in H; try assumption. lia.
+                    }
+                    rewrite H in Heqo1. inv Heqo1.
+      rewrite Heqo in Heqo0. inv Heqo0.
+      apply eutt_clo_bind with (UU := sum_rel I eq).
+      unfold denote_block.
+      apply eutt_eq_bind. intros _.
+      apply eutt_eq_bind. intros _.
+      apply eutt_translate_gen.
+      (* hard part: the terminator *)
+      apply denote_terminator_has_post_block_id. {
         intros.
-        repeat break_match; apply eutt_Ret; try easy.
-        -- left. unfold I', I. inv H0. unfold I in H4. simpl. split; f_equal; tauto.
-        -- right. now inv H0.
-      * exfalso.
-        clear Heqo Heqo0.
-        eapply find_block_app_wf in Heqo2; [| assumption ].
-        destruct Heqo2; try now rewrite H in Heqo1.
-        apply find_block_Some_In_inputs in H.
-        destruct H1. simpl in H0. inv H0.
-        apply cvir_inputs_build_map in H; try assumption. lia.
-      * eapply find_block_some_app in Heqo1.
-        now rewrite Heqo1 in Heqo2.
-      * apply eutt_Ret.
-        now right.
-    + unfold I', I.
-      rewrite !nth_build_map.
-      destruct bid.
-      intuition.
-      exists x.
-      intuition.
+        unfold I.
+        split; try reflexivity.
+        inv Heqo.
+        fold (ConvertTyp_block nil b3) in H0. rewrite convert_typ_successors in H0.
+        apply cvir_outputs_build_map'; try assumption.
+        eapply successors_outputs; try eassumption.
+        apply find_block_In' in H. assumption.
+      }
+      intros.
+      repeat break_match; apply eutt_Ret; try easy.
+      -- left. unfold I', I. inv H0. unfold I in H4. simpl. split; f_equal; tauto.
+      -- right. now inv H0.
+    * exfalso.
+      clear Heqo Heqo0.
+      eapply find_block_app_wf in Heqo2; [| assumption ].
+      destruct Heqo2; try now rewrite H in Heqo1.
+      apply find_block_Some_In_inputs in H.
+      destruct H1. simpl in H0. inv H0.
+      apply cvir_inputs_build_map in H; try assumption. lia.
+    * eapply find_block_some_app in Heqo1.
+      now rewrite Heqo1 in Heqo2.
+    * apply eutt_Ret.
+      now right.
+
+  + unfold I', I.
+    rewrite !nth_build_map.
+    destruct bid.
+    intuition.
+    exists x.
+    intuition.
 Qed.
 
 Theorem denote_cvir_merge_r' : forall ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid,
@@ -431,52 +534,230 @@ Proof.
   apply unique_vector_build_map; lia.
 Qed.
 
-(* Theorem merge_cvir_correct : forall *)
-(*   ni1 no1 ni2 no2 (ir1 : cvir ni1 no1) (ir2 : cvir ni2 no2) bid bid', *)
-(*   cvir_WF ir1 -> *)
-(*   cvir_WF ir2 -> *)
-(*   eutt eq *)
-(*     (denote_cvir (merge_cvir ir1 ir2) bid bid') *)
-(*     (bimap (denote_cvir ir1 bid bid) (denote_cvir ir2 bid' bid')). *)
-
-(* NOTE shouldn't it be in Fin.v ? *)
-Definition sym_fin {n1 n2 n3 : nat} (f : fin (n1 + (n2 + n3))) : fin (n1 + (n3 + n2)) :=
-  match split_fin_sum _ _ f with
-  | inl l => L (n3 + n2) l
-  | inr r => R n1 (
-    match split_fin_sum _ _ r with
-    | inl l => R _ l
-    | inr r => L _ r
-    end
-  )
-  end.
-
 Theorem denote_cvir_sym_i : forall {ni1 ni2 ni3 no : nat} (ir : cvir (ni1 + (ni2 + ni3)) no) bid bid',
-  cvir_WF ir ->
   eutt eq
     (denote_cvir ir bid bid')
-    (denote_cvir (sym_i_cvir ir) (sym_fin bid) (sym_fin bid)).
+    (denote_cvir (sym_i_cvir ir) (sym_fin bid) (sym_fin bid')).
 Proof.
   intros.
-  unfold cvir_WF in H ; intuition.
+  (* unfold cvir_WF in H ; intuition. *)
   unfold denote_cvir, denote_cvir_gen, sym_i_cvir, sym_fin.
   cbn.
   rewrite !skipn_build_map.
   rewrite !firstn_build_map.
   cbn.
   destruct (split_fin_sum _ _ _) eqn:?.
-  apply split_fin_sum_inl in Heqs. subst bid.
+  apply split_fin_sum_inl in Heqs.
 Admitted.
 
-(* NOTE denote_cvir_block ? *)
-(* NOTE denote_cvir_branch ? *)
-(* NOTE denote_cvir_sym ? *)
-(* NOTE denote_cvir_cast ? *)
+
+Lemma cast_eq_refl: forall {A n} (v : Vec.t A n), cast v eq_refl = v.
+Proof.
+  intros.
+  destruct v ; subst ; simpl.
+  unfold cast; simpl.
+Admitted.
+
+(* Lemma fi_proj: forall {n} (f : Fin.fin n), f = (fi' (proj1_sig f)). *)
+
+
+Theorem denote_cvir_cast_i :
+  forall {ni ni' no : nat} (ir : cvir ni no) (H : ni = ni') bid bid',
+  eutt eq
+    (denote_cvir (cast_i_cvir ir H) (cast_fin bid H) (cast_fin bid' H))
+    (denote_cvir ir bid bid').
+Proof.
+  intros.
+  unfold denote_cvir, denote_cvir_gen, cast_i_cvir, cast_fin.
+  subst ni ; cbn.
+  (* Set Printing All. *)
+  rewrite !cast_eq_refl.
+  destruct bid as [bid Hbid], bid' as [bid' Hbid'] ; subst; cbn.
+Admitted.
+
+Theorem denote_reorder_input_cvir : forall {ni no : nat} f ( f' : fin ni -> fin ni)
+                                      {reorder_f : Reorder f}
+                                      (ir : cvir ni no)
+                                      bid_from bid_src,
+  eutt eq
+    (denote_cvir ir bid_from bid_src)
+    (denote_cvir (reorder_input_cvir ir f) bid_from (f' bid_src)). (* FIXME bid_src should change respecting the function f ! *)
+Proof.
+  intros.
+  cbn.
+  unfold reorder_input_cvir.
+Admitted.
+
+
+Theorem denote_cvir_swap : forall {ni no: nat} (i : Fin.fin (S ni)) (ir : cvir ni no) bid_from bid_src,
+  cvir_WF ir ->
+  eutt eq
+    (denote_cvir (swap_input_cvir i ir) bid_from (swap_i_fin i bid_src))
+    (denote_cvir ir bid_from bid_src).
+Proof.
+  intros.
+  unfold cvir_WF in H ; intuition.
+  unfold swap_input_cvir.
+  rewrite <- denote_reorder_input_cvir with (f' :=  swap_i_fin i).
+  reflexivity.
+Admitted.
+
+
+Open Scope itree_scope.
+
+Definition mk_anon {n} (bid : Fin.fin n) : block_id :=
+  (Anon (Z.of_nat (proj1_sig bid))).
+
+Lemma hd_build_map : forall a b,
+  hd (build_map a (S b)) = (Anon (Z.of_nat a)).
+Proof.
+  auto.
+Qed.
+
+Lemma tl_build_map : forall a b,
+  tl (build_map a (S b)) = (build_map (S a) b).
+Proof.
+  unfold tl.
+  induction a ; intros ; simpl.
+  - unfold build_map.
+    unfold map ; simpl.
+Admitted.
+
+(* ⟦block_cvir c⟧_{cvir} ≈ ⟦block_cvir c⟧_{code} ;; ret (inl (bid_from,bid_src)) *)
+Lemma denote_cvir_block : forall (c : code typ) bid_from bid_src,
+  eutt eq
+       (denote_cvir (block_cvir c) bid_from bid_src)
+       ((denote_code (convert_typ nil c)) ;; ret (inl (Anon 0%Z , Anon 1%Z))).
+Proof.
+intros.
+unfold block_cvir.
+unfold denote_cvir.
+unfold denote_cvir_gen.
+simpl.
+rewrite !hd_build_map; simpl.
+destruct bid_src.
+assert ( H : x = 0%nat ). { lia. } subst x.
+unfold nth; simpl in *.
+unfold denote_ocfg.
+Admitted.
+
+Lemma denote_cvir_branch : forall (c : code typ) (e : texp typ) bid_from bid_src,
+  eutt eq
+       (denote_cvir (branch_cvir c e) bid_from bid_src)
+       (denote_code (convert_typ nil c) ;;
+         dt <- translate exp_to_instr (denote_terminator (convert_typ nil (TERM_Br e (Anon 1%Z) (Anon 2%Z)))) ;;
+          match dt with
+          | inr dv => ret (inr dv)
+          | inl b_target => ret (inl (B:= uvalue) (mk_anon bid_src, b_target))
+          end).
+Proof.
+intros.
+unfold branch_cvir, denote_cvir, denote_cvir_gen. simpl.
+flatten_goal.
+rewrite !tl_build_map; simpl.
+rewrite !hd_build_map; simpl.
+destruct bid_src.
+assert ( H : x = 0%nat ). { lia. } subst x.
+unfold nth; simpl in *.
+Admitted.
+
+
+
+Lemma fin_S_n : forall {n} (k : Fin.fin (S (S n))),
+  ((proj1_sig k-1) < (S n)).
+Proof.
+  intros.
+  destruct k ; simpl; lia.
+Qed.
+
+Theorem denote_join_cvir : forall (ni no : nat) (ir : cvir ni (S (S no))) bid_from bid_src,
+    eutt eq
+         (denote_cvir' (join_cvir ir) bid_from bid_src)
+         (d <- (denote_cvir' ir bid_from bid_src) ;;
+           match d with
+           | inr dv => ret (inr dv)
+           | inl (bid_from, bid_target) =>
+               match (proj1_sig bid_target) with
+               | 0 => ret (inl
+                            ((create_fin ((proj1_sig bid_from)-1) (S no) (fin_S_n bid_from)),
+                             (create_fin 0 (S no) (Nat.lt_0_succ no))))
+               | _ => ret (inl
+                            ((create_fin ((proj1_sig bid_from)-1) (S no) (fin_S_n bid_from)),
+                             (create_fin ((proj1_sig bid_target)-1) (S no) (fin_S_n bid_target))))
+               end
+           end).
+Proof.
+  intros.
+Admitted.
+
+Lemma fin_plus_n : forall {n0 n} (k : Fin.fin (n0+n)),
+  ((proj1_sig k-n0) < n).
+Proof.
+  intros.
+Admitted.
+
+(* Theorem denote_loop_cvir : forall {ni no : nat} (n : nat) (ir : cvir (n+ni) (n+no)) bid_from bid_src, *)
+(*   eutt eq *)
+(*   (denote_cvir' (loop_cvir n ir) bid_from bid_src) *)
+(*   ((iter (C := Kleisli _ ) *)
+(*       (fun '(bid_f, bid_s) => *)
+(*    d <- denote_cvir' ir bid_f bid_s ;; *)
+(*     match d with *)
+(*     | inr dv => ret (inr ((inr dv) : (fin no * fin no + uvalue))) (* exit the iter with (_ + dv) *) *)
+(*     | inl (b_from, b_target) => *)
+(*         (if ((proj1_sig b_target) <? n) *)
+(*          then ret (inl ((inl (b_from, b_target) ): (fin (n+no) * fin (n+no) + uvalue))) (* iter again, entering by the k-th input, where k=b_target *) *)
+(*          else ret (inr (inl *)
+(*                           ((create_fin ((proj1_sig b_from)-n) no (fin_plus_n b_from)), *)
+(*                             (create_fin ((proj1_sig b_target)-n) no (fin_plus_n b_target))) : (fin no * fin no + uvalue)))) (* exit the iter, by the (ni+k) label, where k=b_target *) *)
+(*     end)) (R n bid_from, R n bid_src)). *)
+
+(* Fail Theorem denote_loop_open_cvir : TODO. *)
+
+(* NOTE i'm pretty sure that's not true, because I have to link the target_id of
+ (denote ir1) with the src of (denote ir2) *)
+Theorem denote_seq_cvir : forall {ni n no : nat}
+                            (ir1 : cvir ni n) (ir2 : cvir n no)
+                            bid_from1 bid_src1 bid_from2 bid_src2,
+  eutt eq
+       (denote_cvir (seq_cvir ir1 ir2) bid_from1 bid_src1)
+       (denote_cvir ir1 bid_from1 bid_src1 ;; denote_cvir ir2 bid_from2 bid_src2).
+Proof.
+  unfold seq_cvir.
+  intros.
+Admitted.
+
+Theorem denote_seq_cvir' : forall {ni n no : nat}
+                            (ir1 : cvir ni n) (ir2 : cvir n no)
+                            (bid_from1 bid_src1 : fin ni),
+  eutt eq
+       (denote_cvir' (seq_cvir ir1 ir2) bid_from1 bid_src1)
+       (b1 <- (denote_cvir' ir1 bid_from1 bid_src1) ;;
+         match b1 with
+         | inr dv => ret (inr dv)
+         | inl (bid_from2,bid_target) =>
+             denote_cvir' ir2 bid_from2 bid_target
+         end).
+Proof.
+  unfold seq_cvir.
+  unfold denote_cvir'; simpl.
+  intros.
+Admitted.
+
+(* Theorem denote_join_cvir : forall { ni no } *)
+(*                              (ir : cvir ni (S (S no))) *)
+(*                              bid_from, *)
+(*   eutt eq *)
+(*        (denote_cvir (join_cvir ir) bid_from bid_from) *)
+(*        (tmp <- denote_cvir ir bid_from bid_from ;; *)
+(*         match tmp with *)
+(*         | inl (b_from,b_src) => ret (inl (b_from, b_src)) *)
+(*         | inr dv => denote_cvir ir bid_from bid_from *)
+(*         end). *)
+(* Admitted. *)
+
+
 (* NOTE denote_cvir_focus ? *)
-(* NOTE denote_cvir_loop ? *)
-(* NOTE denote_cvir_loop_open ? *)
-(* NOTE denote_cvir_seq ? *)
-(* NOTE denote_cvir_join ? *)
 
 
 (* Relation between Imp env and vellvm env *)
@@ -496,20 +777,6 @@ Definition Rimpvir
   Prop :=
   Rmem vmap (fst env1) (fst (snd env2)) (fst env2).
 
-(* NOTE it misses the induction hypothesus on l and r *)
-Theorem compile_seq_correct : forall next_reg l r env next_reg' env' ir mem bid genv lenv vmem,
-  compile next_reg (Seq l r) env = Some(next_reg', env', ir) ->
-  eutt (Rimpvir env)
-  (interp_imp (denote_imp (Seq l r)) mem)
-  (interp_cfg3 (denote_cvir ir f0 bid) genv lenv vmem).
-Abort.
-
-Fail Theorem compile_assign_correct : TODO.
-Fail Theorem compile_if_correct : TODO.
-Fail Theorem compile_while_correct : TODO.
-Fail Theorem compile_skip_correct : TODO.
-
-
 Import ITreeNotations.
 Import SemNotations.
 
@@ -525,12 +792,11 @@ Theorem compile_correct : forall (next_reg : int) env (p : stmt)
 
   eutt (Rimpvir env')
        (interp_imp (denote_imp p) mem)
-       (interp_cfg3 (denote_cvir ir f0 bid) genv lenv vmem).
+       (interp_cfg3 (denote_cvir ir bid bid) genv lenv vmem).
 
 Proof.
   induction p ; intros.
   - (* Assign *)
-    simpl.
     simpl in *.
     break_match_hyp ; inv H0.
     destruct p ;  destruct p.
@@ -538,32 +804,24 @@ Proof.
     unfold compile_assign in *.
     cbn in *.
     break_match_hyp ; inv Heqo.
-    destruct p. inv H1.
+    break_let. inv H1.
     break_match_hyp ; inv H2.
-    (* unfold compile_expr in Heqo0. *)
-    (* cbn in *. *)
-    (* destruct e. *)
-    (* Focus 2. *)
-    (* inv Heqo0. *)
-    (* cbn. *)
     (* rewrite interp_imp_bind. *)
-    (* unfold interp_imp. *)
-    (* unfold MapDefault.interp_map. *)
-    (* unfold State.interp_state. *)
-    (* rewrite interp_ret. *)
-
-    (* need denote_block_cvir here *)
-    admit. admit.
-
+    + rewrite denote_cvir_block ; cbn.
+      vstep3. vstep3.
+      rewrite interp_cfg3_map_monad. cbn.
+      admit.
+    + admit.
+  (* rewrite denote_cvir_block. *)
   - (* Seq *)
-    simpl. simpl in *.
+    simpl in *.
     break_match_hyp ; inv H0.
     destruct p ;  destruct p.
     break_match_hyp ; inv H2.
     destruct p ;  destruct p.
     inv H1.
     rewrite interp_imp_bind.
-    (* need denote_seq_cvir here *)
+    rewrite denote_seq_cvir.
     admit.
 
   - (* If *)
@@ -572,6 +830,8 @@ Proof.
     break_match_hyp ; inv H2. destruct p ; destruct p.
     break_match_hyp ; inv H1. destruct p ; destruct p.
     inv H2.
+    rewrite interp_imp_bind.
+    (* rewrite denote_join_cvir. *)
     (* need denote_seq_cvir, denote_join_cvir, denote_branch_cvir here *)
 
     admit.
@@ -584,15 +844,13 @@ Proof.
 
     admit.
   - (* Skip *)
-    simpl.
     simpl in *.
     inv H0.
-
     cbn.
-    unfold denote_cvir, denote_cvir_gen.
-    cbn. simpl.
-    unfold tfmap.
-
-    (* need denote_block_cvir here *)
-    admit.
+    destruct bid. assert (Hx : x = 0%nat). { lia. }
+    subst x.
+    rewrite denote_cvir_block ; cbn.
+    repeat vstep3.
+    rewrite interp_imp_ret.
+    apply eutt_Ret ; eauto.
 Admitted.

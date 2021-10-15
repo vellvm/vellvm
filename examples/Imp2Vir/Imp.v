@@ -291,7 +291,7 @@ Section Example_Sequence.
   Definition trivial_seq (n : nat) : stmt :=
     input ← n;;;
     input ← input+1;;;
-    input ← input-1;;;
+    (* input ← input-1;;; *)
     output ← input.
 
 End Example_Sequence.
@@ -463,6 +463,19 @@ Section InterpImpProperties.
     simpl.
     reflexivity.
   Qed.
+
+  (** [interp_imp] commutes with [ret]. *)
+  Lemma interp_imp_ret: forall {R} (g : env) (v : R),
+      (interp_imp (A:= R) (Ret v : itree (ImpState +' E') R) g) ≅ (Ret (g,v)).
+  Proof.
+    intros.
+    unfold interp_imp.
+    unfold interp_map.
+    repeat rewrite interp_ret.
+    repeat rewrite interp_state_ret.
+    reflexivity.
+  Qed.
+
 
 End InterpImpProperties.
 

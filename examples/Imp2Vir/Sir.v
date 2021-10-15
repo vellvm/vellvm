@@ -79,7 +79,7 @@ Fixpoint compile (next_reg : int) (s : stmt) (env: StringMap.t int)
 
 Definition fact_ir := (compile 0 (fact "a" "b" 5) (StringMap.empty int)).
 
-Eval compute in fact_ir.
+(* Eval compute in fact_ir. *)
 
 Fixpoint compile_sir (next_block : int) (s : sir) : int * (terminator typ -> ocfg typ) :=
   match s with
@@ -115,7 +115,7 @@ Definition fact_ll := match fact_ir with
 | Some(_,_,l) => compile_sir 0 l
 end.
 
-Eval compute in fact_ll.
+(* Eval compute in fact_ll. *)
 
 Property anon_blk_id :
   forall (l : sir) (b : block typ) (n : int) (term : terminator typ),
