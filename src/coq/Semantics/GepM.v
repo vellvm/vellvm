@@ -9,7 +9,7 @@ From Vellvm Require Import
      Semantics.Memory.Sizeof
      Utils.Error.
 
-Module Type GEPM(Addr:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(SIZEOF)).
+Module Type GEPM(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
   Import LLVMEvents.
   Import DV.
 

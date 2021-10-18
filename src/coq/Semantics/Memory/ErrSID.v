@@ -31,7 +31,7 @@ Import Basics.Basics.Monads.
 Import MonadNotation.
 
 (* TODO: Provenance is an issue... *)
-Module ERRSID (Addr:ADDRESS) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(SIZEOF)) (PROV:PROVENANCE(Addr)).
+Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)) (PROV:PROVENANCE(Addr)).
   Import LLVMEvents.
   Import PROV.
 
@@ -47,7 +47,7 @@ Module ERRSID (Addr:ADDRESS) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)
     refine (fmap (fun v => (prov, (sid, inr (inr v)))) mt : M (Provenance * (store_id * UB (ERR T)))%type).
   Defined.
 
-  #[global] Instance UBM_ErrSID_T {M : Type -> Type} `{HM :  Monad M} : UBM (ErrSID_T M) :=
+  #[global] Instance RAISE_UB_ErrSID_T {M : Type -> Type} `{HM :  Monad M} : RAISE_UB (ErrSID_T M) :=
     { raise_ub := fun A e => lift (raise_ub e);
     }.
 
@@ -80,7 +80,7 @@ Module ERRSID (Addr:ADDRESS) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)
     := match e with
        | inl msg =>
          (* TODO: can this be inferred...? *)
-         @raise_ub ErrSID (@UBM_E_MT _ _ _ (@UBM_MonadExc (eitherT UB_MESSAGE (stateT store_id (stateT Provenance ident))) _)) _ msg
+         @raise_ub ErrSID (@RAISE_UB_E_MT _ _ _ (@RAISE_UB_MonadExc (eitherT UB_MESSAGE (stateT store_id (stateT Provenance ident))) _)) _ msg
        | inr x => ret x
        end.
 

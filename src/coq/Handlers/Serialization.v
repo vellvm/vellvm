@@ -55,7 +55,7 @@ Module Type Concretize (Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM
 End Concretize.
 *)
 
-Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(SIZEOF)(LLVMIO)).
+Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(IP)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(IP)(SIZEOF)(LLVMIO)).
 
   Import LLVMIO.
   Import SIZEOF.
@@ -66,7 +66,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
   Import GEP.
   Open Scope list.
 
-  Module BYTE := Byte Addr SIZEOF LLVMIO BYTE_IMPL.
+  Module BYTE := Byte Addr IP SIZEOF LLVMIO BYTE_IMPL.
   Export BYTE.
 
   (* Variable ptr_size : nat. *)
@@ -93,7 +93,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
          | UVALUE_I8 x
          | UVALUE_I32 x
          | UVALUE_I64 x => Z.eqb (unsigned x) i
-         | UVALUE_IPTR x => Z.eqb x i
+         | UVALUE_IPTR x => Z.eqb (IP.to_Z x) i
          | _ => false
          end.
 
@@ -103,7 +103,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
          | DVALUE_I8 x => unsigned x
          | DVALUE_I32 x => unsigned x
          | DVALUE_I64 x => unsigned x
-         | DVALUE_IPTR x => x (* TODO: unsigned???? *)
+         | DVALUE_IPTR x => IP.to_Z x (* TODO: unsigned???? *)
          | _ => 0
          end.
 
@@ -248,7 +248,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
     Fixpoint default_dvalue_of_dtyp (dt : dtyp) : err dvalue :=
       match dt with
       | DTYPE_I sz => default_dvalue_of_dtyp_i sz
-      | DTYPE_IPTR => ret (DVALUE_IPTR 0)
+      | DTYPE_IPTR => ret (DVALUE_IPTR IP.zero)
       | DTYPE_Pointer => ret (DVALUE_Addr Addr.null)
       | DTYPE_Void => ret DVALUE_None
       | DTYPE_Half => failwith "Unimplemented default type: half"
@@ -524,29 +524,47 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
                                    | Poison dt => Poison dt
                                    | Unpoisoned v => mab v
                                     end
-           }.
+        }.
 
-      Definition ErrPoison := eitherT string Poisonable.
+      (* TODO: move to error? *)
+      Class RAISE_POISON (M : Type -> Type) :=
+        { raise_poison : forall {A}, dtyp -> M A }.
 
-      Definition ErrPoison_to_err_or_ub_dvalue (ep : ErrPoison dvalue) : err_or_ub dvalue
-        := match unEitherT ep with
-           | Unpoisoned edv =>
-             err_to_err_or_ub edv
-           | Poison dt => ret (DVALUE_Poison dt)
+      (* TODO: Move and clean up *)
+      Definition lift_err_RAISE_ERROR {A} {M} `{Monad M} `{RAISE_ERROR M} (e : err A) : M A
+        := match e with
+           | inl x => raise_error x
+           | inr x => ret x
            end.
 
-      Definition err_to_ErrPoison {A} (e : err A) : ErrPoison A
-        := match e with
-           | inl x => failwith x
-           | inr x => ret x
+      Definition ErrOOMPoison := eitherT string (eitherT unit Poisonable).
+
+      Global Instance RAISE_ERROR_ErrOOMPoison : RAISE_ERROR ErrOOMPoison
+        := { raise_error := fun _ msg => mkEitherT (mkEitherT (Unpoisoned (inr (inl msg)))) }.
+
+      Global Instance RAISE_POISON_ErrOOMPoison : RAISE_POISON ErrOOMPoison
+        := { raise_poison := fun _ dt => mkEitherT (mkEitherT (Poison dt)) }.
+
+      Global Instance RAISE_OOM_ErrOOMPoison : RAISE_OOM ErrOOMPoison
+        := { raise_oom := fun _ => mkEitherT (mkEitherT (Unpoisoned (inl tt))) }.
+
+      Definition ErrOOMPoison_handle_poison_dv {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_OOM M} (ep : ErrOOMPoison dvalue) : M dvalue
+        := match unEitherT (unEitherT ep) with
+           | Unpoisoned edv =>
+               match edv with
+               | inl tt => raise_oom
+               | inr (inl msg) => raise_error msg
+               | inr (inr val) => ret val
+               end
+           | Poison dt => ret (DVALUE_Poison dt)
            end.
 
       (* Walk through a list *)
       (* Returns field index + number of bytes remaining *)
-      Fixpoint extract_field_byte_helper {M} `{Monad M} (fields : list dtyp) (field_idx : N) (byte_idx : N) : eitherT string M (dtyp * (N * N))
+      Fixpoint extract_field_byte_helper {M} `{Monad M} `{RAISE_ERROR M} (fields : list dtyp) (field_idx : N) (byte_idx : N) : M (dtyp * (N * N))%type
         := match fields with
            | [] =>
-             raise "No fields left for byte-indexing..."
+               raise_error "No fields left for byte-indexing..."
            | (x::xs) =>
              let sz := sizeof_dtyp x
              in if N.ltb byte_idx sz
@@ -554,7 +572,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
                 else extract_field_byte_helper xs (N.succ field_idx) (byte_idx - sz)
            end.
 
-      Definition extract_field_byte {M} `{Monad M} (fields : list dtyp) (byte_idx : N) : eitherT string M (dtyp * (N * N))
+      Definition extract_field_byte {M} `{Monad M} `{RAISE_ERROR M} (fields : list dtyp) (byte_idx : N) : M (dtyp * (N * N))%type
         := extract_field_byte_helper fields 0 byte_idx.
 
       (* TODO: move this? *)
@@ -573,89 +591,91 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
          size depends on the type.
        *)
       Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia | solve_dvalue_measure].
-      Program Fixpoint dvalue_extract_byte (dv : dvalue) (dt : dtyp) (idx : Z) {measure (dvalue_measure dv)}: ErrPoison Z
+      Program Fixpoint dvalue_extract_byte {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} (dv : dvalue) (dt : dtyp) (idx : Z) {measure (dvalue_measure dv)} : M Z
         := match dv with
            | DVALUE_I1 x
            | DVALUE_I8 x
            | DVALUE_I32 x
            | DVALUE_I64 x =>
-             ret (extract_byte_vint x idx)
+               ret (extract_byte_vint x idx)
            | DVALUE_IPTR x =>
-             ret (extract_byte_Z x idx)
+               ret (extract_byte_Z (IP.to_Z x) idx)
            | DVALUE_Addr addr =>
-             (* Note: this throws away provenance *)
-             ret (extract_byte_Z (ptr_to_int addr) idx)
+               (* Note: this throws away provenance *)
+               ret (extract_byte_Z (ptr_to_int addr) idx)
            | DVALUE_Float f =>
-             ret (extract_byte_Z (unsigned (Float32.to_bits f)) idx)
+               ret (extract_byte_Z (unsigned (Float32.to_bits f)) idx)
            | DVALUE_Double d =>
-             ret (extract_byte_Z (unsigned (Float.to_bits d)) idx)
-           | DVALUE_Poison dt => lift (Poison dt)
+               ret (extract_byte_Z (unsigned (Float.to_bits d)) idx)
+           | DVALUE_Poison dt => raise_poison dt
            | DVALUE_None =>
-             (* TODO: Not sure if this should be an error, poison, or what. *)
-             raise "dvalue_extract_byte on DVALUE_None"
+               (* TODO: Not sure if this should be an error, poison, or what. *)
+               raise_error "dvalue_extract_byte on DVALUE_None"
+
            (* TODO: Take padding into account. *)
            | DVALUE_Struct fields =>
-             match dt with
-             | DTYPE_Struct dts =>
-               (* Step to field which contains the byte we want *)
-               @bind ErrPoison _ _ _ (extract_field_byte dts (Z.to_N idx))
-                    (fun '(fdt, (field_idx, byte_idx)) =>
-                       match List.nth_error fields (N.to_nat field_idx) with
-                       | Some f =>
-                         (* call dvalue_extract_byte recursively on the field *)
-                         dvalue_extract_byte f fdt (Z.of_N byte_idx )
-                       | None =>
-                         raise "dvalue_extract_byte: more fields in DVALUE_Struct than in dtyp."
-                       end)
-             | _ => raise "dvalue_extract_byte: type mismatch on DVALUE_Struct."
-             end
+               match dt with
+               | DTYPE_Struct dts =>
+                   (* Step to field which contains the byte we want *)
+                   '(fdt, (field_idx, byte_idx)) <- extract_field_byte dts (Z.to_N idx);;
+                   match List.nth_error fields (N.to_nat field_idx) with
+                   | Some f =>
+                       (* call dvalue_extract_byte recursively on the field *)
+                       dvalue_extract_byte f fdt (Z.of_N byte_idx )
+                   | None =>
+                       raise_error "dvalue_extract_byte: more fields in DVALUE_Struct than in dtyp."
+                   end
+               | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Struct."
+               end
+
            | DVALUE_Packed_struct fields =>
-             match dt with
-             | DTYPE_Packed_struct dts =>
-               (* Step to field which contains the byte we want *)
-               @bind ErrPoison _ _ _ (extract_field_byte dts (Z.to_N idx))
-                     (fun '(fdt, (field_idx, byte_idx)) =>
-                        match List.nth_error fields (N.to_nat field_idx) with
-                        | Some f =>
-                          (* call dvalue_extract_byte recursively on the field *)
-                          dvalue_extract_byte f fdt (Z.of_N byte_idx )
-                        | None =>
-                          raise "dvalue_extract_byte: more fields in DVALUE_Packed_struct than in dtyp."
-                        end)
-             | _ => raise "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
-             end
+               match dt with
+               | DTYPE_Packed_struct dts =>
+                   (* Step to field which contains the byte we want *)
+                   '(fdt, (field_idx, byte_idx)) <- extract_field_byte dts (Z.to_N idx);;
+                   match List.nth_error fields (N.to_nat field_idx) with
+                   | Some f =>
+                       (* call dvalue_extract_byte recursively on the field *)
+                       dvalue_extract_byte f fdt (Z.of_N byte_idx )
+                   | None =>
+                       raise_error "dvalue_extract_byte: more fields in DVALUE_Packed_struct than in dtyp."
+                   end
+               | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
+               end
+
            | DVALUE_Array elts =>
-             match dt with
-             | DTYPE_Array sz dt =>
-               let elmt_sz  := sizeof_dtyp dt in
-               let elmt_idx := N.div (Z.to_N idx) elmt_sz in
-               let byte_idx := (Z.to_N idx) mod elmt_sz in
-               match List.nth_error elts (N.to_nat elmt_idx) with
-               | Some elmt =>
-                 (* call dvalue_extract_byte recursively on the field *)
-                 dvalue_extract_byte elmt dt (Z.of_N byte_idx)
-               | None =>
-                 raise "dvalue_extract_byte: more fields in dvalue than in dtyp."
+               match dt with
+               | DTYPE_Array sz dt =>
+                   let elmt_sz  := sizeof_dtyp dt in
+                   let elmt_idx := N.div (Z.to_N idx) elmt_sz in
+                   let byte_idx := (Z.to_N idx) mod elmt_sz in
+                   match List.nth_error elts (N.to_nat elmt_idx) with
+                   | Some elmt =>
+                       (* call dvalue_extract_byte recursively on the field *)
+                       dvalue_extract_byte elmt dt (Z.of_N byte_idx)
+                   | None =>
+                       raise_error "dvalue_extract_byte: more fields in dvalue than in dtyp."
+                   end
+               | _ =>
+                   raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
                end
-             | _ =>
-               raise "dvalue_extract_byte: type mismatch on DVALUE_Array."
-             end
+
            | DVALUE_Vector elts =>
-             match dt with
-             | DTYPE_Vector sz dt =>
-               let elmt_sz  := sizeof_dtyp dt in
-               let elmt_idx := N.div (Z.to_N idx) elmt_sz in
-               let byte_idx := (Z.to_N idx) mod elmt_sz in
-               match List.nth_error elts (N.to_nat elmt_idx) with
-               | Some elmt =>
-                 (* call dvalue_extract_byte recursively on the field *)
-                 dvalue_extract_byte elmt dt (Z.of_N byte_idx)
-               | None =>
-                 raise "dvalue_extract_byte: more fields in dvalue than in dtyp."
+               match dt with
+               | DTYPE_Vector sz dt =>
+                   let elmt_sz  := sizeof_dtyp dt in
+                   let elmt_idx := N.div (Z.to_N idx) elmt_sz in
+                   let byte_idx := (Z.to_N idx) mod elmt_sz in
+                   match List.nth_error elts (N.to_nat elmt_idx) with
+                   | Some elmt =>
+                       (* call dvalue_extract_byte recursively on the field *)
+                       dvalue_extract_byte elmt dt (Z.of_N byte_idx)
+                   | None =>
+                       raise_error "dvalue_extract_byte: more fields in dvalue than in dtyp."
+                   end
+               | _ =>
+                   raise_error "dvalue_extract_byte: type mismatch on DVALUE_Vector."
                end
-             | _ =>
-               raise "dvalue_extract_byte: type mismatch on DVALUE_Vector."
-             end
            end.
 
       (* Taking a byte out of a dvalue...
@@ -666,14 +686,14 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
       | DVALUE_ExtractByte (dv : dvalue) (dt : dtyp) (idx : N) : dvalue_byte
       .
 
-      Definition dvalue_byte_value (db : dvalue_byte) : ErrPoison Z
+      Definition dvalue_byte_value {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} (db : dvalue_byte) : M Z
         := match db with
            | DVALUE_ExtractByte dv dt idx =>
              dvalue_extract_byte dv dt (Z.of_N idx)
            end.
 
       Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
-      Program Fixpoint dvalue_bytes_to_dvalue (dbs : list dvalue_byte) (dt : dtyp) {measure (dtyp_measure dt)} : ErrPoison dvalue
+      Program Fixpoint dvalue_bytes_to_dvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_POISON M} `{RAISE_OOM M} (dbs : list dvalue_byte) (dt : dtyp) {measure (dtyp_measure dt)} : M dvalue
         := match dt with
            | DTYPE_I sz =>
              zs <- map_monad dvalue_byte_value dbs;;
@@ -686,11 +706,12 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
                ret (DVALUE_I32 (concat_bytes_Z_vint zs))
              | 64 =>
                ret (DVALUE_I64 (concat_bytes_Z_vint zs))
-             | _ => raise "Unsupported integer size."
+             | _ => raise_error "Unsupported integer size."
              end
            | DTYPE_IPTR =>
              zs <- map_monad dvalue_byte_value dbs;;
-             ret (DVALUE_IPTR (concat_bytes_Z zs))
+             val <- lift_OOM (IP.from_Z (concat_bytes_Z zs));;
+             ret (DVALUE_IPTR val)
            | DTYPE_Pointer =>
              (* TODO: not sure if this should be wildcard provenance.
                 TODO: not sure if this should truncate iptr value...
@@ -698,9 +719,9 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
              zs <- map_monad dvalue_byte_value dbs;;
              ret (DVALUE_Addr (int_to_ptr (concat_bytes_Z zs) wildcard_prov))
            | DTYPE_Void =>
-             raise "dvalue_bytes_to_dvalue on void type."
+             raise_error "dvalue_bytes_to_dvalue on void type."
            | DTYPE_Half =>
-             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_Half."
+             raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Half."
            | DTYPE_Float =>
              zs <- map_monad dvalue_byte_value dbs;;
              ret (DVALUE_Float (Float32.of_bits (concat_bytes_Z_vint zs)))
@@ -708,23 +729,23 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
              zs <- map_monad dvalue_byte_value dbs;;
              ret (DVALUE_Double (Float.of_bits (concat_bytes_Z_vint zs)))
            | DTYPE_X86_fp80 =>
-             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_fp80."
+             raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_fp80."
            | DTYPE_Fp128 =>
-             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_Fp128."
+             raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Fp128."
            | DTYPE_Ppc_fp128 =>
-             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_Ppc_fp128."
+             raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Ppc_fp128."
            | DTYPE_Metadata =>
-             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_Metadata."
+             raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Metadata."
            | DTYPE_X86_mmx =>
-             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
+             raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
            | DTYPE_Array sz t =>
              let sz := sizeof_dtyp t in
-             elt_bytes <- err_to_ErrPoison (split_every sz dbs);;
+             elt_bytes <- lift_err_RAISE_ERROR (split_every sz dbs);;
              elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
              ret (DVALUE_Array elts)
            | DTYPE_Vector sz t =>
              let sz := sizeof_dtyp t in
-             elt_bytes <- err_to_ErrPoison (split_every sz dbs);;
+             elt_bytes <- lift_err_RAISE_ERROR (split_every sz dbs);;
              elts <- map_monad (fun es => dvalue_bytes_to_dvalue es t) elt_bytes;;
              ret (DVALUE_Vector elts)
            | DTYPE_Struct fields =>
@@ -740,7 +761,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
                | DVALUE_Struct fs =>
                  ret (DVALUE_Struct (f::fs))
                | _ =>
-                 raise "dvalue_bytes_to_dvalue: DTYPE_Struct recursive call did not return a struct."
+                 raise_error "dvalue_bytes_to_dvalue: DTYPE_Struct recursive call did not return a struct."
                end
              end
            | DTYPE_Packed_struct fields =>
@@ -756,11 +777,11 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
                | DVALUE_Packed_struct fs =>
                  ret (DVALUE_Packed_struct (f::fs))
                | _ =>
-                 raise "dvalue_bytes_to_dvalue: DTYPE_Packed_struct recursive call did not return a struct."
+                 raise_error "dvalue_bytes_to_dvalue: DTYPE_Packed_struct recursive call did not return a struct."
                end
              end
            | DTYPE_Opaque =>
-             raise "dvalue_bytes_to_dvalue: unsupported DTYPE_Opaque."
+             raise_error "dvalue_bytes_to_dvalue: unsupported DTYPE_Opaque."
            end.
       Next Obligation.
         pose proof dtyp_measure_gt_0 dt.
@@ -1060,9 +1081,14 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
 
       Section Concretize.
         Context (M : Type -> Type).
-        Context {Monad : Monad M}.
+        Context {HM : Monad M}.
         Variable undef_handler : dtyp -> M dvalue.
-        Variable lift_ue : forall {A}, err_or_ub A -> M A.
+        Context (ERR_M : Type -> Type). (* Monad encapsulating errors, ub, oom *)
+        Context {HM_ERR : Monad ERR_M}.
+        Context {ERR : RAISE_ERROR ERR_M}.
+        Context {UB : RAISE_UB ERR_M}.
+        Context {OOM : RAISE_OOM ERR_M}.
+        Variable lift_ue : forall {A}, ERR_M A -> M A.
 
         (* TODO: satisfy the termination checker here. *)
         (* M will be err_or_ub / MPropT err_or_ub? *)
@@ -1103,6 +1129,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
           | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
                                                      dv2 <- concretize_uvalueM v2 ;;
                                                      lift_ue (eval_fcmp cmp dv1 dv2)
+
           | UVALUE_Conversion conv t_from v t_to    =>
             dv <- concretize_uvalueM v ;;
             match get_conv_case conv t_from dv t_to with
@@ -1128,7 +1155,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
 
           | UVALUE_ExtractValue uv idxs =>
             str <- concretize_uvalueM uv;;
-            let fix loop str idxs : err_or_ub dvalue :=
+            let fix loop str idxs : ERR_M dvalue :=
                 match idxs with
                 | [] => ret str
                 | i :: tl =>
@@ -1214,95 +1241,96 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
         with
         extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : M dvalue
           := dvbs <- concretize_uvalue_bytes uvs;;
-             lift_ue (ErrPoison_to_err_or_ub_dvalue (dvalue_bytes_to_dvalue dvbs dt)).
+             lift_ue (ErrOOMPoison_handle_poison_dv (dvalue_bytes_to_dvalue dvbs dt)).
 
         Lemma concretize_uvalueM_equation :
           forall u,
             concretize_uvalueM u =
-            match u with
-            | UVALUE_Addr a                          => ret (DVALUE_Addr a)
-            | UVALUE_I1 x                            => ret (DVALUE_I1 x)
-            | UVALUE_I8 x                            => ret (DVALUE_I8 x)
-            | UVALUE_I32 x                           => ret (DVALUE_I32 x)
-            | UVALUE_I64 x                           => ret (DVALUE_I64 x)
-            | UVALUE_IPTR x                          => ret (DVALUE_IPTR x)
-            | UVALUE_Double x                        => ret (DVALUE_Double x)
-            | UVALUE_Float x                         => ret (DVALUE_Float x)
-            | UVALUE_Undef t                         => undef_handler t
-            | UVALUE_Poison t                        => ret (DVALUE_Poison t)
-            | UVALUE_None                            => ret DVALUE_None
-            | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalueM fields ;;
-                                                       ret (DVALUE_Struct dfields)
-            | UVALUE_Packed_struct fields            => 'dfields <- map_monad concretize_uvalueM fields ;;
-                                                       ret (DVALUE_Packed_struct dfields)
-            | UVALUE_Array elts                      => 'delts <- map_monad concretize_uvalueM elts ;;
-                                                       ret (DVALUE_Array delts)
-            | UVALUE_Vector elts                     => 'delts <- map_monad concretize_uvalueM elts ;;
-                                                       ret (DVALUE_Vector delts)
-            | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalueM v1 ;;
-                                                       dv2 <- concretize_uvalueM v2 ;;
-                                                       lift_ue (eval_iop iop dv1 dv2)
-            | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
-                                                       dv2 <- concretize_uvalueM v2 ;;
-                                                       lift_ue (eval_icmp cmp dv1 dv2)
-            | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalueM v1 ;;
-                                                       dv2 <- concretize_uvalueM v2 ;;
-                                                       lift_ue (eval_fop fop dv1 dv2)
-            | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
-                                                       dv2 <- concretize_uvalueM v2 ;;
-                                                       lift_ue (eval_fcmp cmp dv1 dv2)
-            | UVALUE_Conversion conv t_from v t_to    =>
-              dv <- concretize_uvalueM v ;;
-              match get_conv_case conv t_from dv t_to with
-              | Conv_PtoI x =>
-                match x, t_to with
-                | DVALUE_Addr addr, DTYPE_I sz =>
-                  lift_ue (coerce_integer_to_int sz (ptr_to_int addr))
-                | _, _ =>
-                  lift_ue (raise_error "Invalid PTOI conversion")
-                end
-              | Conv_ItoP x => ret (DVALUE_Addr (int_to_ptr (dvalue_int_unsigned x) wildcard_prov))
-              | Conv_Pure x => ret x
-              | Conv_Illegal s => lift_ue (raise_error s)
+          match u with
+          | UVALUE_Addr a                          => ret (DVALUE_Addr a)
+          | UVALUE_I1 x                            => ret (DVALUE_I1 x)
+          | UVALUE_I8 x                            => ret (DVALUE_I8 x)
+          | UVALUE_I32 x                           => ret (DVALUE_I32 x)
+          | UVALUE_I64 x                           => ret (DVALUE_I64 x)
+          | UVALUE_IPTR x                          => ret (DVALUE_IPTR x)
+          | UVALUE_Double x                        => ret (DVALUE_Double x)
+          | UVALUE_Float x                         => ret (DVALUE_Float x)
+          | UVALUE_Undef t                         => undef_handler t
+          | UVALUE_Poison t                        => ret (DVALUE_Poison t)
+          | UVALUE_None                            => ret DVALUE_None
+          | UVALUE_Struct fields                   => 'dfields <- map_monad concretize_uvalueM fields ;;
+                                                     ret (DVALUE_Struct dfields)
+          | UVALUE_Packed_struct fields            => 'dfields <- map_monad concretize_uvalueM fields ;;
+                                                     ret (DVALUE_Packed_struct dfields)
+          | UVALUE_Array elts                      => 'delts <- map_monad concretize_uvalueM elts ;;
+                                                     ret (DVALUE_Array delts)
+          | UVALUE_Vector elts                     => 'delts <- map_monad concretize_uvalueM elts ;;
+                                                     ret (DVALUE_Vector delts)
+          | UVALUE_IBinop iop v1 v2                => dv1 <- concretize_uvalueM v1 ;;
+                                                     dv2 <- concretize_uvalueM v2 ;;
+                                                     lift_ue (eval_iop iop dv1 dv2)
+          | UVALUE_ICmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
+                                                     dv2 <- concretize_uvalueM v2 ;;
+                                                     lift_ue (eval_icmp cmp dv1 dv2)
+          | UVALUE_FBinop fop fm v1 v2             => dv1 <- concretize_uvalueM v1 ;;
+                                                     dv2 <- concretize_uvalueM v2 ;;
+                                                     lift_ue (eval_fop fop dv1 dv2)
+          | UVALUE_FCmp cmp v1 v2                  => dv1 <- concretize_uvalueM v1 ;;
+                                                     dv2 <- concretize_uvalueM v2 ;;
+                                                     lift_ue (eval_fcmp cmp dv1 dv2)
+
+          | UVALUE_Conversion conv t_from v t_to    =>
+            dv <- concretize_uvalueM v ;;
+            match get_conv_case conv t_from dv t_to with
+            | Conv_PtoI x =>
+              match x, t_to with
+              | DVALUE_Addr addr, DTYPE_I sz =>
+                lift_ue (coerce_integer_to_int sz (ptr_to_int addr))
+              | _, _ =>
+                lift_ue (raise_error "Invalid PTOI conversion")
               end
+            | Conv_ItoP x => ret (DVALUE_Addr (int_to_ptr (dvalue_int_unsigned x) wildcard_prov))
+            | Conv_Pure x => ret x
+            | Conv_Illegal s => lift_ue (raise_error s)
+            end
 
-            | UVALUE_GetElementPtr t ua uvs =>
-              da <- concretize_uvalueM ua;;
-              dvs <- map_monad concretize_uvalueM uvs;;
-              match handle_gep t da dvs with
-              | inr dv  => ret dv
-              | inl err => lift_ue (raise_error err)
-              end
+          | UVALUE_GetElementPtr t ua uvs =>
+            da <- concretize_uvalueM ua;;
+            dvs <- map_monad concretize_uvalueM uvs;;
+            match handle_gep t da dvs with
+            | inr dv  => ret dv
+            | inl err => lift_ue (raise_error err)
+            end
 
-            | UVALUE_ExtractValue uv idxs =>
-              str <- concretize_uvalueM uv;;
-              let fix loop str idxs : err_or_ub dvalue :=
-                  match idxs with
-                  | [] => ret str
-                  | i :: tl =>
-                    v <- index_into_str_dv str i ;;
-                    loop v tl
-                  end in
-              lift_ue (loop str idxs)
+          | UVALUE_ExtractValue uv idxs =>
+            str <- concretize_uvalueM uv;;
+            let fix loop str idxs : ERR_M dvalue :=
+                match idxs with
+                | [] => ret str
+                | i :: tl =>
+                  v <- index_into_str_dv str i ;;
+                  loop v tl
+                end in
+            lift_ue (loop str idxs)
 
-            | UVALUE_Select cond v1 v2 =>
-              dcond <- concretize_uvalueM cond;;
-              uv <- lift_ue (eval_select dcond v1 v2);;
-              concretize_uvalueM uv
+          | UVALUE_Select cond v1 v2 =>
+            dcond <- concretize_uvalueM cond;;
+            uv <- lift_ue (eval_select dcond v1 v2);;
+            concretize_uvalueM uv
 
-            | UVALUE_ConcatBytes bytes dt =>
-              match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
-              | true, Some uv => concretize_uvalueM uv
-              | _, _ => extractbytes_to_dvalue bytes dt
-              end
+          | UVALUE_ConcatBytes bytes dt =>
+            match N.eqb (N.of_nat (length bytes)) (sizeof_dtyp dt), all_extract_bytes_from_uvalue bytes with
+            | true, Some uv => concretize_uvalueM uv
+            | _, _ => extractbytes_to_dvalue bytes dt
+            end
 
-            | UVALUE_ExtractByte byte dt idx sid =>
-              (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
-              lift_ue (raise_error "Attempting to concretize UVALUE_ExtractByte, should not happen.")
+          | UVALUE_ExtractByte byte dt idx sid =>
+            (* TODO: maybe this is just an error? ExtractByte should be guarded by ConcatBytes? *)
+            lift_ue (raise_error "Attempting to concretize UVALUE_ExtractByte, should not happen.")
 
-            | _ => lift_ue (raise_error ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u))
+          | _ => lift_ue (raise_error ("concretize_uvalueM: Attempting to convert a partially non-reduced uvalue to dvalue. Should not happen: " ++ uvalue_constructor_string u))
 
-            end.
+          end.
         Proof.
           intros u.
           unfold concretize_uvalueM.
@@ -1314,8 +1342,11 @@ Module Make(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTION
 
       Arguments concretize_uvalueM {_ _}.
 
-      Definition concretize_uvalue (uv : uvalue) : err_or_ub dvalue
-        := concretize_uvalueM (fun dt => err_to_err_or_ub (default_dvalue_of_dtyp dt)) (fun _ x => x) uv.
+      Program Definition concretize_uvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
+                 (uv : uvalue) : M dvalue
+        := concretize_uvalueM _ _ _ _ _ _ (fun _ x => x) uv.
+
+             (fun dt => err_to_err_or_ub (default_dvalue_of_dtyp dt)) (fun _ x => x) uv.
 
       Definition concretize_u (uv : uvalue) : RefineProp dvalue.
         refine (concretize_uvalueM

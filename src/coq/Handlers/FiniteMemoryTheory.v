@@ -269,31 +269,6 @@ Section Serialization_Theory.
   (*   rewrite fold_sum_acc. reflexivity. *)
   (* Qed. *)
 
-  Lemma map_monad_length :
-    forall {A B M} `{HM: Monad M} `{EQM : Monad.Eq1 M} `{LAWS : @Monad.MonadLawsE M EQM HM} `{MRET : @MonadReturns M HM EQM} `{EQRET : @Eq1_ret_inv M EQM HM} (xs : list A) (f : A -> M B) res,
-      MReturns res (map_monad f xs) ->
-      length xs = length res.
-  Proof.
-    intros A B M HM EQ LAWS MRET EQRET xs.
-    induction xs; intros f res Hmap.
-    - cbn in Hmap.
-      apply MReturns_ret_inv in Hmap; subst; auto.
-    - rewrite map_monad_unfold in Hmap.
-      destruct LAWS.
-      destruct MRET.
-
-      pose proof Hmap as RET.
-      apply MReturns_bind_inv in RET as (b & Hb & RET).
-      apply MReturns_bind_inv in RET as (bs & Hbs & RET).
-
-      apply MReturns_ret_inv in RET.
-      subst.
-
-      apply IHxs in Hbs.
-      cbn.
-      lia.
-  Qed.
-
   Lemma map_monad_ErrSID_length :
     forall {A B} (xs : list A) (f : A -> ErrSID B) sid prov res,
       ErrSID_evals_to (map_monad f xs) sid prov res ->

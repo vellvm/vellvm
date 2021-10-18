@@ -12,6 +12,7 @@
 Require Import String.
 Require Import OrderedType OrderedTypeEx.
 Require Import ZArith.
+Require Import Vellvm.Utils.Error.
 (* end hide *)
 
 (** * Signature for addresses
@@ -27,6 +28,18 @@ Module Type ADDRESS.
   (* Debug *)
   Parameter show_addr : addr -> string.
 End ADDRESS.
+
+Module Type INTPTR.
+  Parameter intptr : Set.
+  Parameter zero : intptr.
+
+  Parameter eq_dec : forall (a b : intptr), {a = b} + {a <> b}.
+  Parameter eqb : forall (a b : intptr), bool.
+
+  Parameter to_Z : forall (a : intptr), Z.
+  Parameter to_unsigned : forall (a : intptr), Z.
+  Parameter from_Z : Z -> OOM intptr.
+End INTPTR.
 
 (* TODO: move this? *)
 Module Type PTOI(Addr:MemoryAddress.ADDRESS).  

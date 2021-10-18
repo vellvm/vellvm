@@ -11,14 +11,18 @@ From Vellvm Require Import
      Utils.Monads
      Utils.NMaps
      Utils.OptionUtil
-     Utils.ListUtil.
+     Utils.ListUtil
+     Utils.Error
+     Utils.Util
+     Utils.MonadReturnsLaws
+     Utils.MapMonadExtra.
 
 Import Basics.Basics.Monads.
 
 Import ListNotations.
 Import MonadNotation.
 
-Module Type ByteImpl(Addr:ADDRESS)(SIZEOF:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZEOF)).
+Module Type ByteImpl(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
   Import LLVMEvents.
   Import DV.
 
@@ -48,7 +52,7 @@ Module Type ByteImpl(Addr:ADDRESS)(SIZEOF:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(
       sbyte_to_extractbyte (uvalue_sbyte uv dt idx sid) =  UVALUE_ExtractByte uv dt idx sid.
 End ByteImpl.
 
-Module Byte(Addr:ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(SIZEOF))(Byte:ByteImpl(Addr)(SIZEOF)(LLVMEvents)).
+Module Byte(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(Byte:ByteImpl(Addr)(IP)(SIZEOF)(LLVMEvents)).
   Export Byte.
   Import LLVMEvents.
   Import DV.
@@ -79,8 +83,11 @@ Module Byte(Addr:ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(SIZE
          end
        end.
 
-  Definition to_ubytes (uv :  uvalue) (dt : dtyp) (sid : store_id) : list SByte
-    := map (fun n => uvalue_sbyte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq 0 (N.to_nat (sizeof_dtyp dt))).
+  Definition to_ubytes (uv :  uvalue) (dt : dtyp) (sid : store_id) : OOM (list SByte)
+    := map_monad
+         (fun n => n' <- IP.from_Z (Z.of_N n);;
+                ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid))
+         (Nseq 0 (N.to_nat (sizeof_dtyp dt))).
 
   Fixpoint all_extract_bytes_from_uvalue_helper (idx' : Z) (sid' : store_id) (dt' : dtyp) (parent : uvalue) (bytes : list uvalue) : option uvalue
     := match bytes with
@@ -112,12 +119,14 @@ Module Byte(Addr:ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(SIZE
       end.
 
   Lemma to_ubytes_sizeof :
-    forall uv dt sid,
-      N.of_nat (length (to_ubytes uv dt sid)) = sizeof_dtyp dt.
+    forall uv dt sid bytes,
+      MReturns bytes (to_ubytes uv dt sid) ->
+      N.of_nat (length bytes) = sizeof_dtyp dt.
   Proof.
-    intros uv dt sid.
-    unfold to_ubytes.
-    rewrite map_length. rewrite Nseq_length.
+    intros uv dt sid bytes TO.
+    unfold to_ubytes in TO.
+    apply map_monad_length in TO. rewrite Nseq_length in TO.
+    rewrite <- TO.
     apply Nnat.N2Nat.id.
   Qed.
 End Byte.

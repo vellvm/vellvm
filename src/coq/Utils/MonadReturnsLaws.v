@@ -50,9 +50,6 @@ Section Laws.
    }.
 End Laws.
 
-Set Printing Implicit.
-Unset Printing Notations.
-
 Section MReturns_ProperFlip.
   Context (M : Type -> Type).
   Context {Monad : Monad M}.
@@ -81,6 +78,18 @@ Arguments MReturns_bind {M _ _ _ _}.
 Arguments MReturns_bind_inv {M _ _ _ _}.
 Arguments MReturns_ret {M _ _ _ _}.
 Arguments MReturns_ret_inv {M _ _ _ _}.
+
+Section NoFailsRet.
+  Context (M : Type -> Type).
+  Context {Monad : Monad M}.
+  Context {Eq1 : @Eq1 M}.
+  Context {MRET : @MonadReturns M Monad Eq1}.
+
+  Class NoFailsRet :=
+    { EqRet_NoFail : forall {A} (a : A) (ma : M A), eq1 ma (ret a) -> ~ MFails ma }.
+
+End NoFailsRet.
+
 
 Section Sum.
   Context {E : Type}.
@@ -186,7 +195,7 @@ Section Sum.
     intros Hret; unfold SumReturns in *; subst; auto.
   Qed.
 
-  Instance MonadReturns_Sum : MonadReturns (sum E )
+  Instance MonadReturns_Sum : MonadReturns (sum E)
     := { MReturns := fun A => SumReturns;
          MFails := fun A => SumFails;
          MReturns_MFails := fun A => SumReturns_SumFails;
@@ -196,8 +205,17 @@ Section Sum.
          MReturns_bind_inv := fun A B => SumReturns_bind_inv;
          MReturns_ret := fun A => SumReturns_ret;
          MReturns_ret_inv := fun A => SumReturns_ret_inv
-       }.
+    }.
 
+  Instance NoFailsRet_Sum : NoFailsRet (sum E).
+  Proof.
+    split.
+    intros A a ma H.
+    destruct ma; inversion H; subst.
+    intros CONTRA.
+    inversion CONTRA.
+    inversion H0.
+  Qed.
 End Sum.
 
 
@@ -326,6 +344,17 @@ Section EitherT.
          MReturns_ret_inv := fun A => EitherTReturns_ret_inv
        }.
 
+  Instance NoFailsRet_EitherT `{NFR : @NoFailsRet M HM EQM MRET} : NoFailsRet (eitherT E M).
+  Proof.
+    split.
+    intros A a ma H.
+    destruct ma.
+    cbn in H.
+    cbn.
+    unfold EitherTFails.
+    cbn.
+    eapply EqRet_NoFail; eauto.
+  Qed.
 End EitherT.
 
 (* TODO: Move this *)

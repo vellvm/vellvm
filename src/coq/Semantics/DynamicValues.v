@@ -30,7 +30,9 @@ From Vellvm Require Import
      Syntax
      Syntax.DataLayout
      Semantics.MemoryAddress
-     Semantics.Memory.Sizeof.
+     Semantics.Memory.Sizeof
+     Utils.MonadEq1Laws
+     Utils.MonadReturnsLaws.
 
 Require Import Integers Floats.
 
@@ -181,9 +183,10 @@ Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
 (* Sizeof is needed for uvalue_has_dtyp for ConcatBytes case *)
-Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(SIZEOF:Sizeof).
+Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.MemoryAddress.INTPTR)(SIZEOF:Sizeof).
 
   Import SIZEOF.
+  Import IP.
 
   (* The set of dynamic values manipulated by an LLVM program. *)
  Unset Elimination Schemes.
@@ -193,7 +196,7 @@ Inductive dvalue : Set :=
 | DVALUE_I8 (x:int8)
 | DVALUE_I32 (x:int32)
 | DVALUE_I64 (x:int64)
-| DVALUE_IPTR (x:Z) (* TODO: should this be unsigned...? *)
+| DVALUE_IPTR (x:intptr)
 | DVALUE_Double (x:ll_double)
 | DVALUE_Float (x:ll_float)
 | DVALUE_Poison (t:dtyp)
@@ -285,7 +288,7 @@ Inductive uvalue : Type :=
 | UVALUE_I8 (x:int8)
 | UVALUE_I32 (x:int32)
 | UVALUE_I64 (x:int64)
-| UVALUE_IPTR (x:Z) (* TODO: Should this be unsigned? *)
+| UVALUE_IPTR (x:intptr)
 | UVALUE_Double (x:ll_double)
 | UVALUE_Float (x:ll_float)
 | UVALUE_Undef (t:dtyp)
@@ -754,7 +757,7 @@ Section DecidableEquality.
     - destruct (Int64.eq_dec x1 x2).
       * left; subst; reflexivity.
       * right; intros H; inversion H. contradiction.
-    - destruct (Z.eq_dec x1 x2).
+    - destruct (IP.eq_dec x1 x2).
       * left; subst; reflexivity.
       * right; intros H; inversion H. contradiction.
     - destruct (Float.eq_dec x1 x2).
@@ -865,7 +868,7 @@ Section DecidableEquality.
     - destruct (Int8.eq_dec x1 x2)...
     - destruct (Int32.eq_dec x1 x2)...
     - destruct (Int64.eq_dec x1 x2)...
-    - destruct (Z.eq_dec x1 x2)...
+    - destruct (IP.eq_dec x1 x2)...
     - destruct (Float.eq_dec x1 x2)...
     - destruct (Float32.eq_dec x1 x2)...
     - destruct (dtyp_eq_dec t1 t2)...
@@ -998,13 +1001,125 @@ Class VInt I : Type :=
     max_signed : Z;
 
     (* Conversion *)
-    to_dvalue : I -> dvalue;
     unsigned : I -> Z;
     signed : I -> Z;
 
     repr : Z -> I;
   }.
 
+  Class ToDvalue I : Type :=
+    { to_dvalue : I -> dvalue;
+    }.
+
+  Global Instance ToDvalue_intptr : ToDvalue intptr :=
+    { to_dvalue := DVALUE_IPTR }.
+
+  (* Integers that can run out of memory... Necessary for handling
+     finite memory compilation. *)
+  Class VMemInt I : Type :=
+    {
+      (* Comparisons *)
+      mequ : I -> I -> bool;
+      mcmp : comparison -> I -> I -> bool;
+      mcmpu : comparison -> I -> I -> bool;
+
+      (* Constants *)
+      mbitwidth : nat;
+      mzero : I;
+      mone : I;
+
+      (* Arithmetic *)
+      madd : I -> I -> OOM I;
+      madd_carry : I -> I -> I -> I;
+      madd_overflow : I -> I -> I -> I;
+
+      msub : I -> I -> OOM I;
+      msub_borrow : I -> I -> I -> I;
+      msub_overflow : I -> I -> I -> I;
+
+      mmul : I -> I -> OOM I;
+
+      mdivu : I -> I -> I; (* Can this overflow? *)
+      mdivs : I -> I -> OOM I;
+
+      mmodu : I -> I -> I; (* Can this overflow / underflow *)
+      mmods : I -> I -> OOM I; (* I suspect this can sort of overflow in the division by -1 case... Even though it really can't *)
+
+      mshl : I -> I -> OOM I;
+      mshr : I -> I -> I;  (* Can this overflow? *)
+      mshru : I -> I -> I; (* Can this overflow? *)
+
+      mnegative : I -> OOM I;
+
+      (* Logic *)
+      mand : I -> I -> I;
+      mor : I -> I -> I;
+      mxor : I -> I -> I;
+
+      (* Bounds, possibly unbounded *)
+      mmin_signed : option Z;
+      mmax_signed : option Z;
+
+      (* Conversion *)
+      munsigned : I -> Z;
+      msigned : I -> Z;
+
+      mrepr : Z -> OOM I; (* Not sure if we should even have this *)
+    }.
+
+  Global Instance VIntVMemInt {I} `{VInt I} : VMemInt I :=
+    {
+      (* Comparisons *)
+      mequ := equ;
+      mcmp := cmp;
+      mcmpu := cmpu;
+
+      (* Constants *)
+      mbitwidth := bitwidth;
+      mzero := zero;
+      mone := one;
+
+      (* Arithmetic *)
+      madd := fun x y => ret (add x y);
+      madd_carry := add_carry;
+      madd_overflow := add_overflow;
+
+      msub := fun x y => ret (sub x y);
+      msub_borrow := sub_borrow;
+      msub_overflow := sub_overflow;
+
+      mmul := fun x y => ret (mul x y);
+
+      mdivu := divu;
+      mdivs := fun x y => ret (divs x y);
+
+      mmodu := modu;
+      mmods := fun x y => ret (mods x y);
+
+      mshl := fun x y => ret (shl x y);
+      mshr := shr;
+      mshru := shru;
+
+      mnegative := fun x => ret (negative x);
+
+      (* Logic *)
+      mand := and;
+      mor := or;
+      mxor := xor;
+
+      (* Bounds, possibly unbounded *)
+      mmin_signed := ret (min_signed);
+      mmax_signed := ret (max_signed);
+
+      (* Conversion *)
+      munsigned := unsigned;
+      msigned := signed;
+
+      mrepr := fun x => NoOom (repr x)
+    }.
+
+  #[global] Instance ToDvalue_Int1 : ToDvalue Int1.int :=
+    { to_dvalue := DVALUE_I1 }.
 
   #[global] Instance VInt1 : VInt Int1.int :=
   {
@@ -1051,13 +1166,14 @@ Class VInt I : Type :=
     max_signed := Int1.max_signed;
 
     (* Conversion *)
-    to_dvalue := DVALUE_I1;
     unsigned := Int1.unsigned;
     signed := Int1.signed;
 
     repr := Int1.repr;
   }.
 
+  #[global] Instance ToDvalue_Int8 : ToDvalue Int8.int :=
+    { to_dvalue := DVALUE_I8 }.
 
   #[global] Instance VInt8 : VInt Int8.int :=
   {
@@ -1104,13 +1220,14 @@ Class VInt I : Type :=
     max_signed := Int8.max_signed;
 
     (* Conversion *)
-    to_dvalue := DVALUE_I8;
     unsigned := Int8.unsigned;
     signed := Int8.signed;
 
     repr := Int8.repr;
   }.
 
+  #[global] Instance ToDvalue_Int32 : ToDvalue Int32.int :=
+    { to_dvalue := DVALUE_I32 }.
 
   #[global] Instance VInt32 : VInt Int32.int :=
   {
@@ -1157,12 +1274,14 @@ Class VInt I : Type :=
     max_signed := Int32.max_signed;
 
     (* Conversion *)
-    to_dvalue := DVALUE_I32;
     unsigned := Int32.unsigned;
     signed := Int32.signed;
 
     repr := Int32.repr;
   }.
+
+  #[global] Instance ToDvalue_Int64 : ToDvalue Int64.int :=
+    { to_dvalue := DVALUE_I64 }.
 
   #[global] Instance VInt64 : VInt Int64.int :=
   {
@@ -1209,7 +1328,6 @@ Class VInt I : Type :=
     max_signed := Int64.max_signed;
 
     (* Conversion *)
-    to_dvalue := DVALUE_I64;
     unsigned := Int64.unsigned;
     signed := Int64.signed;
 
@@ -1223,7 +1341,7 @@ Class VInt I : Type :=
        | UVALUE_I8 x
        | UVALUE_I32 x
        | UVALUE_I64 x => Z.eqb (unsigned x) i
-       | UVALUE_IPTR x => Z.eqb x i
+       | UVALUE_IPTR x => Z.eqb (IP.to_Z x) i
        | _ => false
        end.
 
@@ -1233,7 +1351,7 @@ Class VInt I : Type :=
        | DVALUE_I8 x => unsigned x
        | DVALUE_I32 x => unsigned x
        | DVALUE_I64 x => unsigned x
-       | DVALUE_IPTR x => x (* TODO: unsigned???? *)
+       | DVALUE_IPTR x => IP.to_unsigned x
        | _ => 0
        end.
 
@@ -1261,7 +1379,7 @@ Class VInt I : Type :=
   Definition undef_i64 : uvalue := UVALUE_Undef (DTYPE_I 64).
   Definition undef_int {Int} `{VInt Int} : uvalue  := UVALUE_Undef (DTYPE_I (N.of_nat bitwidth)).
 
-  Definition to_uvalue {Int} `{VInt Int} (i : Int) : uvalue := dvalue_to_uvalue (to_dvalue i).
+  Definition to_uvalue {Int} `{ToDvalue Int} (i : Int) : uvalue := dvalue_to_uvalue (to_dvalue i).
 
   Section CONVERSIONS.
 
@@ -1519,111 +1637,143 @@ Class VInt I : Type :=
      operations that we use for integer types with different bitwidths.
 
      *)
-    Definition eval_int_op {Int} `{VInt Int} (iop:ibinop) (x y: Int) : UB dvalue :=
+
+    Definition to_dvalue_OOM {Int} `{ToDvalue Int} {M} `{Monad M} `{RAISE_OOM M}
+               (i : OOM Int) : M dvalue
+      := res <- lift_OOM i;;
+         ret (to_dvalue res).
+
+    Definition eval_int_op {M} {Int} `{Monad M} `{RAISE_UB M} `{RAISE_OOM M} `{VMemInt Int} `{ToDvalue Int} (iop:ibinop) (x y: Int) : M dvalue :=
       match iop with
       (* Following to cases are probably right since they use CompCert *)
       | Add nuw nsw =>
-        ret (if orb (andb nuw (equ (add_carry x y zero) one))
-                    (andb nsw (equ (add_overflow x y zero) one))
-             then (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth))) else to_dvalue (add x y))
+          if orb (andb nuw (mequ (madd_carry x y mzero) mone))
+                 (andb nsw (mequ (madd_overflow x y mzero) mone))
+          then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+          else to_dvalue_OOM (madd x y)
 
     | Sub nuw nsw =>
-      ret (if orb (andb nuw (equ (sub_borrow x y zero) one))
-                  (andb nsw (equ (sub_overflow x y zero) one))
-           then (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth))) else to_dvalue (sub x y))
+        if orb (andb nuw (mequ (msub_borrow x y mzero) mone))
+               (andb nsw (mequ (msub_overflow x y mzero) mone))
+        then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+        else to_dvalue_OOM (msub x y)
 
     | Mul nuw nsw =>
       (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
-      if (bitwidth ~=? 1)%nat then ret (to_dvalue (mul x y))
-      else
-        let res := mul x y in
-        let res_s' := ((signed x) * (signed y))%Z in
-        if orb (andb nuw ((unsigned x) * (unsigned y) >?
-                      unsigned res))
-             (andb nsw (orb (min_signed >? res_s')
-                            (res_s' >? max_signed)))
-      then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth))) else ret (to_dvalue res)
+        if (bitwidth ~=? 1)%nat
+        then to_dvalue_OOM (mmul x y)
+        else
+          res <- lift_OOM (mmul x y);;
+
+          let res_u' := ((munsigned x) * (munsigned y))%Z in
+          let res_s' := ((msigned x) * (msigned y))%Z in
+
+          let min_s_bound := match fmap (fun m => m >? res_s') mmin_signed with
+                             | None => false
+                             | Some x => x
+                             end in
+          let max_s_bound := match fmap (fun m => res_s' >? m) mmax_signed with
+                             | None => false
+                             | Some x => x
+                             end in
+
+          if orb (andb nuw (res_u' >? munsigned res))
+                 (andb nsw (orb min_s_bound max_s_bound))
+          then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+          else ret (to_dvalue res)
 
     | Shl nuw nsw =>
-      let bz := Z.of_nat bitwidth in
-      let res := shl x y in
-      let res_u := unsigned res in
-      let res_u' := Z.shiftl (unsigned x) (unsigned y) in
+      let bz := Z.of_nat mbitwidth in
+
+      res <- lift_OOM (mshl x y);;
+      let res_u := munsigned res in
+      let res_u' := Z.shiftl (munsigned x) (munsigned y) in
+
       (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
          then there is overflow. *)
-      if (unsigned y) >=? bz then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth)))
-      else if orb (andb nuw (res_u' >? res_u))
-                  (andb nsw (negb (Z.shiftr (unsigned x)
-                                            (bz - unsigned y)
-                                   =? (unsigned (negative res))
-                                      * (Z.pow 2 (unsigned y) - 1))%Z))
-           then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth))) else ret (to_dvalue res)
+      if (munsigned y) >=? bz
+      then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+      else
+        if andb nuw (res_u' >? res_u)
+        then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+        else
+          (* Need to separate this out because mnegative can OOM *)
+          if nsw
+          then
+            (* TODO: should this OOM here? *)
+            nres <- lift_OOM (mnegative res);;
+            if (negb (Z.shiftr (munsigned x)
+                               (bz - munsigned y)
+                      =? (munsigned nres)
+                         * (Z.pow 2 (munsigned y) - 1))%Z)
+            then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+            else ret (to_dvalue res)
+          else ret (to_dvalue res)
 
     | UDiv ex =>
-      if (unsigned y =? 0)%Z
+      if (munsigned y =? 0)%Z
       then raise_ub "Unsigned division by 0."
-      else if andb ex (negb ((unsigned x) mod (unsigned y) =? 0))%Z
-           then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth)))
-           else ret (to_dvalue (divu x y))
-
+      else if andb ex (negb ((munsigned x) mod (munsigned y) =? 0))%Z
+           then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+           else ret (to_dvalue (mdivu x y))
 
     | SDiv ex =>
       (* What does signed i1 mean? *)
-      if (signed y =? 0)%Z
+      if (msigned y =? 0)%Z
       then raise_ub "Signed division by 0."
-      else if andb ex (negb ((signed x) mod (signed y) =? 0))%Z
-           then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth)))
-           else ret (to_dvalue (divs x y))
+      else if andb ex (negb ((msigned x) mod (msigned y) =? 0))%Z
+           then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+           else to_dvalue_OOM (mdivs x y)
 
     | LShr ex =>
-      let bz := Z.of_nat bitwidth in
-      if (unsigned y) >=? bz then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth)))
-      else if andb ex (negb ((unsigned x)
-                               mod (Z.pow 2 (unsigned y)) =? 0))%Z
-           then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth))) else ret (to_dvalue (shru x y))
+      let bz := Z.of_nat mbitwidth in
+      if (munsigned y) >=? bz then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+      else if andb ex (negb ((munsigned x)
+                               mod (Z.pow 2 (munsigned y)) =? 0))%Z
+           then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth))) else ret (to_dvalue (mshru x y))
 
     | AShr ex =>
-      let bz := Z.of_nat bitwidth in
-      if (unsigned y) >=? bz then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth)))
-      else if andb ex (negb ((unsigned x)
-                               mod (Z.pow 2 (unsigned y)) =? 0))%Z
-           then ret (DVALUE_Poison (DTYPE_I (N.of_nat bitwidth))) else ret (to_dvalue (shr x y))
+      let bz := Z.of_nat mbitwidth in
+      if (munsigned y) >=? bz then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+      else if andb ex (negb ((munsigned x)
+                               mod (Z.pow 2 (munsigned y)) =? 0))%Z
+           then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth))) else ret (to_dvalue (mshr x y))
 
     | URem =>
-      if (unsigned y =? 0)%Z
+      if (munsigned y =? 0)%Z
       then raise_ub "Unsigned mod 0."
-      else ret (to_dvalue (modu x y))
+      else ret (to_dvalue (mmodu x y))
 
     | SRem =>
-      if (signed y =? 0)%Z
+      if (msigned y =? 0)%Z
       then raise_ub "Signed mod 0."
-      else ret (to_dvalue (mods x y))
+      else to_dvalue_OOM (mmods x y)
 
     | And =>
-      ret (to_dvalue (and x y))
+      ret (to_dvalue (mand x y))
 
     | Or =>
-      ret (to_dvalue (or x y))
+      ret (to_dvalue (mor x y))
 
     | Xor =>
-      ret (to_dvalue (xor x y))
+      ret (to_dvalue (mxor x y))
     end.
   Arguments eval_int_op _ _ _ : simpl nomatch.
 
   (* Evaluate the given iop on the given arguments according to the bitsize *)
-  Definition integer_op (bits:N) (iop:ibinop) (x y:inttyp bits) : err_or_ub dvalue :=
+  Definition integer_op {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} (bits:N) (iop:ibinop) (x y:inttyp bits) : M dvalue :=
     match bits, x, y with
-    | 1, x, y  => UB_to_err_or_ub (eval_int_op iop x y)
-    | 8, x, y  => UB_to_err_or_ub (eval_int_op iop x y)
-    | 32, x, y => UB_to_err_or_ub (eval_int_op iop x y)
-    | 64, x, y => UB_to_err_or_ub (eval_int_op iop x y)
+    | 1, x, y  => eval_int_op iop x y
+    | 8, x, y  => eval_int_op iop x y
+    | 32, x, y => eval_int_op iop x y
+    | 64, x, y => eval_int_op iop x y
     | _, _, _  => raise_error "unsupported bitsize"
     end.
   Arguments integer_op _ _ _ _ : simpl nomatch.
 
   (* Convert written integer constant to corresponding integer with bitsize bits.
      Takes the integer modulo 2^bits. *)
-  Definition coerce_integer_to_int (bits:N) (i:Z) : err_or_ub dvalue :=
+  Definition coerce_integer_to_int {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} (bits:N) (i:Z) : M dvalue :=
     match bits with
     | 1  => ret (DVALUE_I1 (repr i))
     | 8  => ret (DVALUE_I8 (repr i))
@@ -1647,14 +1797,14 @@ Class VInt I : Type :=
   (* Integer iop evaluation, called from eval_iop.
      Here the values must be integers. Helper defined
      in order to prevent eval_iop from being recursive. *)
-  Definition eval_iop_integer_h iop v1 v2 : err_or_ub dvalue :=
+  Definition eval_iop_integer_h {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} iop v1 v2 : M dvalue :=
     match v1, v2 with
-    | DVALUE_I1 i1, DVALUE_I1 i2    => UB_to_err_or_ub (eval_int_op iop i1 i2)
-    | DVALUE_I8 i1, DVALUE_I8 i2    => UB_to_err_or_ub (eval_int_op iop i1 i2)
-    | DVALUE_I32 i1, DVALUE_I32 i2  => UB_to_err_or_ub (eval_int_op iop i1 i2)
-    | DVALUE_I64 i1, DVALUE_I64 i2  => UB_to_err_or_ub (eval_int_op iop i1 i2)
-    | DVALUE_Poison t, _              => ret (DVALUE_Poison t)
-    | _, DVALUE_Poison t              =>
+    | DVALUE_I1 i1, DVALUE_I1 i2    => eval_int_op iop i1 i2
+    | DVALUE_I8 i1, DVALUE_I8 i2    => eval_int_op iop i1 i2
+    | DVALUE_I32 i1, DVALUE_I32 i2  => eval_int_op iop i1 i2
+    | DVALUE_I64 i1, DVALUE_I64 i2  => eval_int_op iop i1 i2
+    | DVALUE_Poison t, _            => ret (DVALUE_Poison t)
+    | _, DVALUE_Poison t            =>
       if iop_is_div iop
       then raise_ub "Division by poison."
       else ret (DVALUE_Poison t)
@@ -1675,7 +1825,7 @@ Class VInt I : Type :=
 
    *)
 
-  Definition eval_iop iop v1 v2 : err_or_ub dvalue :=
+  Definition eval_iop {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} iop v1 v2 : M dvalue :=
     match v1, v2 with
     | (DVALUE_Vector elts1), (DVALUE_Vector elts2) =>
       val <- vec_loop (eval_iop_integer_h iop) (List.combine elts1 elts2) ;;
@@ -1700,7 +1850,7 @@ Class VInt I : Type :=
     then DVALUE_I1 (Int1.one) else DVALUE_I1 (Int1.zero).
   Arguments eval_int_icmp _ _ _ : simpl nomatch.
 
-  Definition eval_icmp icmp v1 v2 : err_or_ub dvalue :=
+  Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} icmp v1 v2 : M dvalue :=
     match v1, v2 with
     | DVALUE_I1 i1, DVALUE_I1 i2 => ret (eval_int_icmp icmp i1 i2)
     | DVALUE_I8 i1, DVALUE_I8 i2 => ret (eval_int_icmp icmp i1 i2)
@@ -1719,7 +1869,7 @@ Class VInt I : Type :=
     end.
   Arguments eval_icmp _ _ _ : simpl nomatch.
 
-  Definition double_op (fop:fbinop) (v1:ll_double) (v2:ll_double) : err_or_ub dvalue :=
+  Definition double_op {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} (fop:fbinop) (v1:ll_double) (v2:ll_double) : M dvalue :=
     match fop with
     | FAdd => ret (DVALUE_Double (b64_plus FT_Rounding v1 v2))
     | FSub => ret (DVALUE_Double (b64_minus FT_Rounding v1 v2))
@@ -1730,7 +1880,7 @@ Class VInt I : Type :=
     | FRem => raise_error "unimplemented double operation"
     end.
 
-  Definition float_op (fop:fbinop) (v1:ll_float) (v2:ll_float) : err_or_ub dvalue :=
+  Definition float_op {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} (fop:fbinop) (v1:ll_float) (v2:ll_float) : M dvalue :=
     match fop with
     | FAdd => ret (DVALUE_Float (b32_plus FT_Rounding v1 v2))
     | FSub => ret (DVALUE_Float (b32_minus FT_Rounding v1 v2))
@@ -1741,7 +1891,7 @@ Class VInt I : Type :=
     | FRem => raise_error "unimplemented float operation"
     end.
 
-  Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : err_or_ub dvalue :=
+  Definition eval_fop {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} (fop:fbinop) (v1:dvalue) (v2:dvalue) : M dvalue :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2   => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
@@ -1809,7 +1959,7 @@ Class VInt I : Type :=
     then DVALUE_I1 Int1.one else DVALUE_I1 Int1.zero.
     Arguments double_cmp _ _ _ : simpl nomatch.
 
-  Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : err_or_ub dvalue :=
+  Definition eval_fcmp {M} `{Monad M} `{RAISE_ERROR M} (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : M dvalue :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2 => ret (float_cmp fcmp f1 f2)
     | DVALUE_Double f1, DVALUE_Double f2 => ret (double_cmp fcmp f1 f2)
@@ -1821,19 +1971,16 @@ Class VInt I : Type :=
     | _, _ => raise_error "ill_typed-fcmp"
     end.
 
-  Set Printing Implicit.
-  Print eval_fcmp.
-
   End ARITHMETIC.
 
   (* Same deal as above with the helper *)
   (* The pattern matching generates hundreds of subgoals, hence the factorization of the typeclass inference *)
-  Definition eval_select_h (cnd : dvalue) (v1 v2 : uvalue) : err_or_ub (uvalue) :=
+  Definition eval_select_h {M} `{HM: Monad M} `{ERR: RAISE_ERROR M} `{RAISE_UB M} (cnd : dvalue) (v1 v2 : uvalue) : M uvalue :=
     let raise_error_local :=
-        @raise_error err_or_ub
-                     (@VErrorM_err_or_ub) uvalue
+        @raise_error M
+                     ERR uvalue
     in
-    let ret_local := @ret err_or_ub _ uvalue in
+    let ret_local := @ret M _ uvalue in
     match v1, v2 with
     | UVALUE_Poison t, _ => ret_local (UVALUE_Poison t)
     | _, UVALUE_Poison t => ret_local (UVALUE_Poison t)
@@ -1846,7 +1993,8 @@ Class VInt I : Type :=
       end
     end.
 
-  Definition eval_select cnd v1 v2 : err_or_ub (uvalue) :=
+  Definition eval_select {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M}
+             cnd v1 v2 : M (uvalue) :=
     match cnd, v1, v2 with
     | (DVALUE_Vector es), (UVALUE_Vector es1), (UVALUE_Vector es2) =>
       (* vec needs to loop over es, es1, and es2. Is there a way to
@@ -1867,7 +2015,7 @@ Class VInt I : Type :=
 
   (* Helper function for indexing into a structured datatype
      for extractvalue and insertvalue *)
-  Definition index_into_str (v:uvalue) (idx:LLVMAst.int) : err_or_ub (uvalue) :=
+  Definition index_into_str {M} `{Monad M} `{RAISE_ERROR M} (v:uvalue) (idx:LLVMAst.int) : M uvalue :=
     let fix loop elts i :=
         match elts with
         | [] => raise_error "index out of bounds"
@@ -1884,7 +2032,7 @@ Class VInt I : Type :=
 
   (* Helper function for indexing into a structured datatype
      for extractvalue and insertvalue *)
-  Definition index_into_str_dv (v:dvalue) (idx:LLVMAst.int) : err_or_ub (dvalue) :=
+  Definition index_into_str_dv {M} `{Monad M} `{RAISE_ERROR M} (v:dvalue) (idx:LLVMAst.int) : M dvalue :=
     let fix loop elts i :=
         match elts with
         | [] => raise_error "index out of bounds"
@@ -1900,7 +2048,7 @@ Class VInt I : Type :=
   Arguments index_into_str_dv _ _ : simpl nomatch.
 
   (* Helper function for inserting into a structured datatype for insertvalue *)
-  Definition insert_into_str (str:dvalue) (v:dvalue) (idx:LLVMAst.int) : err_or_ub dvalue :=
+  Definition insert_into_str {M} `{Monad M} `{RAISE_ERROR M} (str:dvalue) (v:dvalue) (idx:LLVMAst.int) : M dvalue :=
     let fix loop (acc elts:list dvalue) (i:LLVMAst.int) :=
         match elts with
         | [] => raise_error "index out of bounds"
@@ -3159,62 +3307,123 @@ Class VInt I : Type :=
       intros dts H; inversion H; cbn; auto.
   Qed.
 
-  Lemma eval_iop_integer_h_dtyp :
-    forall dx dy dv sz op,
-      dvalue_has_dtyp dx (DTYPE_I sz) ->
-      dvalue_has_dtyp dy (DTYPE_I sz) ->
-      eval_iop_integer_h op dx dy = ret dv ->
-      dvalue_has_dtyp dv (DTYPE_I sz).
-  Proof.
-    intros dx dy dv sz op TYPx TYPy EVAL.
-    inversion TYPx; inversion TYPy; subst;
-      destruct op;
-      cbn in EVAL;
-      repeat break_match_hyp;
-      inversion EVAL;
-      constructor; try solve_no_void.
-  Qed.
+  Section EvalIopLemmas.
+    Context (M : Type -> Type).
+    Context {Eq1 : @Monad.Eq1 M}.
+    Context {Monad : Monad M}.
+    Context {RET_INV : @Eq1_ret_inv M Eq1 Monad}.
+    Context {Eq1EQV : @Monad.Eq1Equivalence M Monad Eq1}.
+    Context {RETS : @MonadReturns M Monad Eq1}.
+    Context {NFR : @NoFailsRet M Monad Eq1 RETS}.
+    Context {ERR : RAISE_ERROR M}.
+    Context {UB : RAISE_UB M}.
+    Context {OOM : RAISE_OOM M}.
+    Context {FERR : MFails_ERROR M}.
+    Context {FUB : MFails_UB M}.
+    Context {FOOM : MFails_OOM M}.
 
-  Lemma eval_iop_dtyp_i :
-    forall dx dy dv sz op,
-      dvalue_has_dtyp dx (DTYPE_I sz) ->
-      dvalue_has_dtyp dy (DTYPE_I sz) ->
-      eval_iop op dx dy = ret dv ->
-      dvalue_has_dtyp dv (DTYPE_I sz).
-  Proof.
-    intros dx dy dv sz op TYPx TYPy EVAL.
-    unfold eval_iop in EVAL.
-    inversion TYPx; inversion TYPy; subst; try lia.
-    all: eapply eval_iop_integer_h_dtyp in EVAL; eauto.
-  Qed.
+    Lemma eval_iop_integer_h_dtyp :
+      forall dx dy dv sz op,
+        dvalue_has_dtyp dx (DTYPE_I sz) ->
+        dvalue_has_dtyp dy (DTYPE_I sz) ->
+        Monad.eq1 (eval_iop_integer_h op dx dy) (@ret M _ _ dv) ->
+        dvalue_has_dtyp dv (DTYPE_I sz).
+    Proof.
+      intros dx dy dv sz op TYPx TYPy EVAL.
+      inversion TYPx; inversion TYPy; subst;
+        destruct op;
+        cbn in EVAL;
+        repeat break_match_hyp;
 
-  Lemma eval_iop_integer_h_dtyp_iptr :
-    forall dx dy dv op,
-      dvalue_has_dtyp dx DTYPE_IPTR ->
-      dvalue_has_dtyp dy DTYPE_IPTR ->
-      eval_iop_integer_h op dx dy = ret dv ->
-      dvalue_has_dtyp dv DTYPE_IPTR.
-  Proof.
-    intros dx dy dv op TYPx TYPy EVAL.
-    inversion TYPx; inversion TYPy; subst;
-      destruct op;
-      cbn in EVAL;
-      repeat break_match_hyp;
-      inversion EVAL;
-      constructor; try solve_no_void.
-  Qed.
+        try solve
+            [first [ apply eq1_ret_ret in EVAL; [| solve [eauto]]
+            | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+              apply MReturns_bind_inv in EVAL as (res & MA & RET);
+              apply MReturns_ret_inv in RET
+            | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+              apply MReturns_bind_inv in EVAL as (res & MA & RET);
+              break_match_hyp;
+              apply MReturns_ret_inv in RET
+            | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+              apply MReturns_bind_inv in EVAL as (res & MA & RET);
+              repeat break_match_hyp;
+              [ apply MReturns_ret_inv in RET
+              | cbn in RET;
+                apply MReturns_bind_inv in RET as (res' & MA' & RET);
+                repeat break_match_hyp;
+                apply MReturns_ret_inv in RET
+              ]
+                ]; subst; constructor; solve_no_void].
 
-  Lemma eval_iop_dtyp_iptr :
-    forall dx dy dv op,
-      dvalue_has_dtyp dx DTYPE_IPTR ->
-      dvalue_has_dtyp dy DTYPE_IPTR ->
-      eval_iop op dx dy = ret dv ->
-      dvalue_has_dtyp dv DTYPE_IPTR.
-  Proof.
-    intros dx dy dv op TYPx TYPy EVAL.
-    unfold eval_iop in EVAL.
-    inversion TYPx; inversion TYPy; subst; try lia.
-    all: eapply eval_iop_integer_h_dtyp_iptr in EVAL; eauto.
-  Qed.
+      all:
+        eapply EqRet_NoFail in EVAL; eauto;
+        exfalso; apply EVAL;
+          first [apply mfails_ub | apply mfails_error | apply mfails_oom] ; eauto.
+    Qed.
 
+    Lemma eval_iop_dtyp_i :
+      forall dx dy dv sz op,
+        dvalue_has_dtyp dx (DTYPE_I sz) ->
+        dvalue_has_dtyp dy (DTYPE_I sz) ->
+        Monad.eq1 (eval_iop op dx dy) (ret dv) ->
+        dvalue_has_dtyp dv (DTYPE_I sz).
+    Proof.
+      intros dx dy dv sz op TYPx TYPy EVAL.
+      unfold eval_iop in EVAL.
+      inversion TYPx; inversion TYPy; subst; try lia.
+      all: eapply eval_iop_integer_h_dtyp in EVAL; eauto.
+    Qed.
+
+    Lemma eval_iop_integer_h_dtyp_iptr :
+      forall dx dy dv op,
+        dvalue_has_dtyp dx DTYPE_IPTR ->
+        dvalue_has_dtyp dy DTYPE_IPTR ->
+        Monad.eq1 (eval_iop_integer_h op dx dy) (ret dv) ->
+        dvalue_has_dtyp dv DTYPE_IPTR.
+    Proof.
+      intros dx dy dv op TYPx TYPy EVAL.
+      inversion TYPx; inversion TYPy; subst;
+        destruct op;
+        cbn in EVAL;
+        repeat break_match_hyp;
+
+        try solve
+            [first [ apply eq1_ret_ret in EVAL; [| solve [eauto]]
+            | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+              apply MReturns_bind_inv in EVAL as (res & MA & RET);
+              apply MReturns_ret_inv in RET
+            | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+              apply MReturns_bind_inv in EVAL as (res & MA & RET);
+              break_match_hyp;
+              apply MReturns_ret_inv in RET
+            | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+              apply MReturns_bind_inv in EVAL as (res & MA & RET);
+              repeat break_match_hyp;
+              [ apply MReturns_ret_inv in RET
+              | cbn in RET;
+                apply MReturns_bind_inv in RET as (res' & MA' & RET);
+                repeat break_match_hyp;
+                apply MReturns_ret_inv in RET
+              ]
+                ]; subst; constructor; solve_no_void].
+
+      all:
+        eapply EqRet_NoFail in EVAL; eauto;
+        exfalso; apply EVAL;
+          first [apply mfails_ub | apply mfails_error | apply mfails_oom] ; eauto.
+    Qed.
+
+    Lemma eval_iop_dtyp_iptr :
+      forall dx dy dv op,
+        dvalue_has_dtyp dx DTYPE_IPTR ->
+        dvalue_has_dtyp dy DTYPE_IPTR ->
+        Monad.eq1 (eval_iop op dx dy) (ret dv) ->
+        dvalue_has_dtyp dv DTYPE_IPTR.
+    Proof.
+      intros dx dy dv op TYPx TYPy EVAL.
+      unfold eval_iop in EVAL.
+      inversion TYPx; inversion TYPy; subst; try lia.
+      all: eapply eval_iop_integer_h_dtyp_iptr in EVAL; eauto.
+    Qed.
+  End EvalIopLemmas.
 End DVALUE.

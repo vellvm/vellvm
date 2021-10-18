@@ -25,7 +25,9 @@ From ITree Require Import
      ITree
      Events.Exception.
 
-From Vellvm.Utils Require Import MonadReturnsLaws.
+From Vellvm.Utils Require Import
+     MonadReturnsLaws
+     MonadEq1Laws.
 
 Import Monad.
 
@@ -54,6 +56,180 @@ Definition failwith {A:Type} {F} `{Monad F} `{MonadExc string F} (s:string) : F 
 #[export] Hint Unfold failwith: core.
 Arguments failwith _ _ _ _: simpl nomatch.
 
+(* A computation that can run out of memory. *)
+Variant OOM (A:Type) : Type :=
+  | NoOom : A -> OOM A
+  | Oom : OOM A.
+Arguments NoOom {_} _.
+Arguments Oom {_}.
+
+Global Instance MonadOOM : Monad OOM.
+Proof.
+  split.
+  - refine (fun _ x => NoOom x).
+  - refine (fun A B ma k =>
+              match ma with
+              | NoOom a => k a
+              | _ => Oom
+              end
+           ).
+Defined.
+
+Global Instance FunctorOOM : Functor OOM.
+Proof.
+  split.
+  - refine (fun A B f ma =>
+              match ma with
+              | NoOom a => NoOom (f a)
+              | _ => Oom
+              end).
+Defined.
+
+Section OOMLaws.
+  Global Instance MonadEq1OOM : Eq1 OOM.
+  Proof.
+    unfold Eq1.
+    refine (fun _ a b =>
+              match a, b with
+              | NoOom a, NoOom b => a = b
+              | Oom, Oom => True
+              | _, _ => False
+              end).
+  Defined.
+
+  Global Instance MonadEq1Eqv : Eq1Equivalence OOM.
+  Proof.
+    split.
+    - unfold eq1, Reflexive.
+      intros x; destruct x; cbn; auto.
+    - unfold eq1, Symmetric.
+      intros x y; destruct x, y; cbn; auto.
+    - unfold eq1, Transitive.
+      intros x y z; destruct x, y, z; cbn; auto.
+      intros H H0.
+      congruence.
+      intros H H0.
+      contradiction.
+  Defined.
+
+  Global Instance MonadLawsEOOM : @MonadLawsE OOM MonadEq1OOM MonadOOM.
+  Proof.
+    split.
+    - reflexivity.
+    - intros A x.
+      destruct x; cbn; auto.
+    - intros A B C x f g.
+      destruct x; cbn; auto.
+      reflexivity.
+    - intros A B.
+      unfold Proper, respectful.
+      intros x y H x0 y0 H0.
+      unfold pointwise_relation in H0.
+      destruct x, y; cbn; eauto; inversion H; subst; auto.
+  Defined.
+
+  Definition OOMReturns {A} (x : A) (ma : OOM A) : Prop
+    := match ma with
+       | NoOom y => x = y
+       | Oom => False
+       end.
+
+  Definition OOMFails {A} (ma : OOM A) : Prop
+    := match ma with
+       | NoOom x => False
+       | Oom => True
+       end.
+
+  Lemma OOMFails_OOMReturns :
+    forall {A} (ma : OOM A),
+      OOMFails ma -> forall a, ~ OOMReturns a ma.
+  Proof.
+    intros A ma H a.
+    intros CONTRA.
+    destruct ma; auto.
+  Qed.
+
+  Lemma OOMReturns_OOMFails :
+    forall {A} (ma : OOM A) (a : A),
+      OOMReturns a ma -> ~ OOMFails ma.
+  Proof.
+    intros A ma a H.
+    destruct ma; auto.
+  Qed.
+
+  Lemma OOMFails_ret :
+    forall {A} (a : A),
+      ~ OOMFails (ret a).
+  Proof.
+    intros A a.
+    cbn; auto.
+  Qed.
+
+  Lemma OOMReturns_bind :
+    forall {A B} (a : A) (b : B) (ma : OOM A) (k : A -> OOM B),
+      OOMReturns a ma -> OOMReturns b (k a) -> OOMReturns b (bind ma k).
+  Proof.
+    intros A B a b ma k RETA RETB.
+    destruct ma; cbn; auto.
+    inversion RETA; subst; auto.
+  Qed.
+
+  Lemma OOMReturns_bind_inv :
+    forall {A B} (ma : OOM A) (k : A -> OOM B) (b : B),
+      OOMReturns b (bind ma k) -> exists a : A , OOMReturns a ma /\ OOMReturns b (k a).
+  Proof.
+    intros A B ma k b RET.
+    cbn in RET.
+    destruct ma; cbn in RET; try contradiction.
+    exists a.
+    split; cbn; auto.
+  Qed.
+
+  Lemma OOMReturns_ret :
+    forall {A} (a : A) (ma : OOM A),
+      ~OOMFails ma -> eq1 ma (ret a) -> OOMReturns a ma.
+  Proof.
+    intros A a ma NFAIL EQ.
+    destruct ma; cbn in *; auto.
+  Qed.
+
+  Lemma OOMReturns_ret_inv :
+    forall {A} (x y : A),
+      OOMReturns x (ret y) -> x = y.
+  Proof.
+    intros A x y RET.
+    cbn in RET; auto.
+  Qed.
+
+  Global Instance OOMReturns_Proper {A} {a : A} : Proper (eq1 ==> Basics.impl) (OOMReturns a).
+  Proof.
+    unfold Proper, respectful.
+    do 2 red.
+    intros x y EQ RET.
+    destruct x, y; cbn in *; subst; auto.
+    contradiction.
+  Qed.
+                                                         
+  Global Instance MonadReturnsOOM : @MonadReturns OOM MonadOOM MonadEq1OOM
+    := { MReturns := fun A => OOMReturns;
+         MFails := fun A => OOMFails;
+         MReturns_MFails := fun A => OOMReturns_OOMFails;
+         MFails_MReturns := fun A => OOMFails_OOMReturns;
+         MFails_ret := fun A => OOMFails_ret;
+         MReturns_bind := fun A B => OOMReturns_bind;
+         MReturns_bind_inv := fun A B => OOMReturns_bind_inv;
+         MReturns_ret := fun A => OOMReturns_ret;
+         MReturns_ret_inv := fun A => OOMReturns_ret_inv
+       }.
+
+  Global Instance EQRET_OOM : @Eq1_ret_inv OOM MonadEq1OOM MonadOOM.
+  Proof.
+    split.
+    intros A x y H.
+    cbn in H. auto.
+  Qed.
+End OOMLaws.
+
 Inductive UB_MESSAGE :=
 | UB_message : string -> UB_MESSAGE
 .
@@ -68,24 +244,53 @@ Notation ERR := (sum ERR_MESSAGE).
 #[global] Instance Exception_UB : MonadExc UB_MESSAGE UB := Exception_either UB_MESSAGE.
 #[global] Instance Exception_ERR : MonadExc ERR_MESSAGE ERR := Exception_either ERR_MESSAGE.
 
-Class VErrorM (M : Type -> Type) : Type :=
+Class RAISE_ERROR (M : Type -> Type) : Type :=
   { raise_error : forall {A}, string -> M A }.
 
-Class UBM (M : Type -> Type) : Type :=
+Class RAISE_UB (M : Type -> Type) : Type :=
   { raise_ub : forall {A}, string -> M A }.
 
-#[global] Instance VErrorM_E_MT {M : Type -> Type} {MT : (Type -> Type) -> Type -> Type} `{MonadT (MT M) M} `{VErrorM M} : VErrorM (MT M) :=
+Class RAISE_OOM (M : Type -> Type) : Type :=
+  { raise_oom : forall {A}, M A }.
+
+
+Section MFails_Exceptions.
+  Context (M : Type -> Type).
+  Context {Monad : Monad M}.
+  Context {Eq1 : @Eq1 M}.
+  Context {MRET : @MonadReturns M Monad Eq1}.
+  Context {ERR : RAISE_ERROR M}.
+  Context {UB : RAISE_UB M}.
+  Context {OOM : RAISE_OOM M}.
+
+  Class MFails_ERROR :=
+    { mfails_error : forall {A} s, MFails (@raise_error M ERR A s) }.
+
+  Class MFails_UB :=
+    { mfails_ub : forall {A} s, MFails (@raise_ub M UB A s) }.
+
+  Class MFails_OOM :=
+    { mfails_oom : forall {A}, MFails (@raise_oom M OOM A) }.  
+End MFails_Exceptions.
+
+Definition lift_OOM {M : Type -> Type} `{Monad M} `{RAISE_OOM M} {A} (ma : OOM A)
+  := match ma with
+     | NoOom a => ret a
+     | Oom => raise_oom
+     end.
+
+#[global] Instance RAISE_ERROR_E_MT {M : Type -> Type} {MT : (Type -> Type) -> Type -> Type} `{MonadT (MT M) M} `{RAISE_ERROR M} : RAISE_ERROR (MT M) :=
   { raise_error := fun A e => lift (raise_error e);
   }.
 
-#[global] Instance UBM_E_MT {M : Type -> Type} {MT : (Type -> Type) -> Type -> Type} `{MonadT (MT M) M} `{UBM M} : UBM (MT M) :=
+#[global] Instance RAISE_UB_E_MT {M : Type -> Type} {MT : (Type -> Type) -> Type -> Type} `{MonadT (MT M) M} `{RAISE_UB M} : RAISE_UB (MT M) :=
   { raise_ub := fun A e => lift (raise_ub e);
   }.
 
-#[global] Instance VErrorM_MonadExc {M} `{MonadExc ERR_MESSAGE M} : VErrorM M
+#[global] Instance RAISE_ERROR_MonadExc {M} `{MonadExc ERR_MESSAGE M} : RAISE_ERROR M
   := { raise_error := fun _ msg => MonadExc.raise (ERR_message msg) }.
 
-#[global] Instance UBM_MonadExc {M} `{MonadExc UB_MESSAGE M} : UBM M
+#[global] Instance RAISE_UB_MonadExc {M} `{MonadExc UB_MESSAGE M} : RAISE_UB M
   := { raise_ub := fun _ msg => MonadExc.raise (UB_message msg) }.
 
 #[global] Instance Exception_UB_string : MonadExc string UB :=
@@ -124,26 +329,32 @@ Definition lift_ERR {M A} `{MonadExc ERR_MESSAGE M} `{Monad M} (e : ERR A) : (M 
      | inr x => ret x
      end.
 
-Inductive err_or_ub A :=
-  ERR_OR_UB { unERR_OR_UB : eitherT ERR_MESSAGE UB A }.
-Arguments ERR_OR_UB {_} _.
-Arguments unERR_OR_UB {_} _.
+Inductive err_oom_ub A :=
+  ERR_OOM_UB { unERR_OOM_UB : eitherT ERR_MESSAGE (eitherT unit UB) A }.
+Arguments ERR_OOM_UB {_} _.
+Arguments unERR_OOM_UB {_} _.
 
-#[global] Instance EqM_err_or_ub : Monad.Eq1 err_or_ub.
+#[global] Instance EqM_err_oom_ub : Monad.Eq1 err_oom_ub.
 Proof.
   (* refine (fun T mt1 mt2 => _). *)
   (* destruct mt1, mt2. *)
   (* apply (Monad.eq1 unERR_OR_UB0 unERR_OR_UB1). *)
   
   refine (fun T mt1 mt2 => _).
-  destruct mt1 as [[[ub_mt1 | [err_mt1 | t1]]]].
+  destruct mt1 as [[[[ub_mt1 | [oom_mt1 | [err_mt1 | t1]]]]]].
   - (* UB *)
     exact True.
+  - (* OOM *)
+    destruct mt2 as [[[[ub_mt2 | [oom_mt2 | [err_mt2 | t2]]]]]].
+    (* OOM only refines to OOM *)
+    2: { exact True. }
+    all: exact False.    
   - (* Error *)
     exact True.
   - (* Success *)
-    destruct mt2 as [[[ub_mt2 | [err_mt2 | t2]]]].
+    destruct mt2 as [[[[ub_mt2 | [oom_mt2 | [err_mt2 | t2]]]]]].
     + exact False.
+    + exact True. (* OOM refines everything *)
     + exact False.
     + exact (t1 = t2).
 Defined.
@@ -151,133 +362,159 @@ Defined.
 Import MonadNotation.
 Import Utils.Monads.
 
-#[global] Instance Monad_err_or_ub : Monad err_or_ub.
+#[global] Instance Monad_err_oom_ub : Monad err_oom_ub.
 Proof.
   split.
-  - exact (fun T t => ERR_OR_UB (ret t)).
+  - exact (fun T t => ERR_OOM_UB (ret t)).
   - exact (fun A B ema k =>
              match ema with
-             | ERR_OR_UB ma =>
-               ERR_OR_UB (bind ma (fun a => unERR_OR_UB (k a)))
+             | ERR_OOM_UB ma =>
+               ERR_OOM_UB (bind ma (fun a => unERR_OOM_UB (k a)))
              end).
 Defined.
 
-#[global] Instance Functor_err_or_ub : Functor err_or_ub.
+#[global] Instance Functor_err_oom_ub : Functor err_oom_ub.
 Proof.
   split.
   - exact (fun A B f ema =>
-             ERR_OR_UB (fmap f (unERR_OR_UB ema))).
+             ERR_OOM_UB (fmap f (unERR_OOM_UB ema))).
 Defined.
 
-#[global] Instance MonadLawsE_err_or_ub : MonadLawsE err_or_ub.
+#[global] Instance MonadLawsE_err_oom_ub : MonadLawsE err_oom_ub.
 Proof.
   split.
   - intros A B f x.
     cbn.
-    destruct (f x) as [[[[ub_msg] | [[err_msg] | fx]]]]; cbn; auto.
+    destruct (f x) as [[[[[ub_msg] | [oom_msg | [[err_msg] | fx]]]]]]; cbn; auto.
   - intros A x.
-    destruct x as [[[[ub_msg] | [[err_msg] | x]]]]; cbn; auto.
+    destruct x as [[[[[ub_msg] | [oom_msg | [[err_msg] | x]]]]]]; cbn; auto.
   - intros A B C x f g.
     cbn.
-    destruct x as [[[[ub_msg] | [[err_msg] | x]]]]; cbn; auto.
-    destruct (f x) as [[[[ub_msg] | [[err_msg] | fx]]]]; cbn; auto.
-    destruct (g fx) as [[[[ub_msg] | [[err_msg] | gfx]]]]; cbn; auto.
+    destruct x as [[[[[ub_msg] | [oom_msg | [[err_msg] | x]]]]]]; cbn; auto.
+    destruct (f x) as [[[[[ub_msg] | [oom_msg | [[err_msg] | fx]]]]]]; cbn; auto.
+    destruct (g fx) as [[[[[ub_msg] | [oom_msg | [[err_msg] | gfx]]]]]]; cbn; auto.
   - intros A B.
     unfold Proper, respectful.
     intros x y H x0 y0 H0.
-    destruct x as [[[[ub_msg] | [[err_msg] | x]]]]; cbn; auto.
-    destruct y as [[[[ub_msg] | [[err_msg] | y]]]]; cbn; auto; inversion H.
+    destruct x as [[[[[ub_msg] | [oom_msg | [[err_msg] | x]]]]]]; cbn; auto;
+    destruct y as [[[[[ub_msg] | [oom_msg' | [[err_msg] | y]]]]]]; cbn; auto; inversion H.
+
+    { destruct (x0 x).
+      cbn.
+      destruct unERR_OOM_UB0.
+      cbn.
+      destruct unEitherT.
+      cbn.
+      destruct unEitherT.
+      auto.
+      destruct s; auto.
+      destruct s; auto.
+    }
+
     subst.
 
-    destruct (x0 y) as [[[[ub_msg] | [[err_msg] | x0y]]]] eqn:Hx0y; cbn; auto.
+    destruct (x0 y) as [[[[[ub_msg] | [oom_msg | [[err_msg] | x0y]]]]]] eqn:Hx0y; cbn; auto.
+
+    { unfold pointwise_relation in H0.
+      specialize (H0 y).
+      unfold EqM_err_oom_ub in *.
+      cbn in *.
+
+      unfold eq1 in H0.
+      rewrite Hx0y in H0.
+      destruct (y0 y) as [[[[[ub_msg] | [oom_msg' | [[err_msg] | y0y]]]]]]; cbn; auto.
+    }
+
     unfold pointwise_relation in H0.
     specialize (H0 y).
 
-    unfold EqM_err_or_ub in *.
+    unfold EqM_err_oom_ub in *.
     cbn in *.
 
     unfold eq1 in H0.
     rewrite Hx0y in H0.
-    destruct (y0 y) as [[[[ub_msg] | [[err_msg] | y0y]]]]; cbn; auto.
+    destruct (y0 y) as [[[[[ub_msg] | [oom_msg' | [[err_msg] | y0y]]]]]]; cbn; auto.
 Defined.
 
 
-#[global] Instance VErrorM_err_or_ub : VErrorM err_or_ub
-  := { raise_error := fun _ msg => ERR_OR_UB (raise_error msg) }.
+#[global] Instance RAISE_ERROR_err_oom_ub : RAISE_ERROR err_oom_ub
+  := { raise_error := fun _ msg => ERR_OOM_UB (raise_error msg) }.
 
-#[global] Instance UBM_err_or_ub : UBM err_or_ub
-  := { raise_ub := fun _ msg => ERR_OR_UB (raise_ub msg) }.
+#[global] Instance RAISE_UB_err_oom_ub : RAISE_UB err_oom_ub
+  := { raise_ub := fun _ msg => ERR_OOM_UB (raise_ub msg) }.
 
-Lemma unERR_OR_UB_bind :
-  forall {A B} (ma : err_or_ub A) (k : A -> err_or_ub B),
-    Monad.eq1 (unERR_OR_UB (x <- ma;; k x)) (x <- unERR_OR_UB ma;; (unERR_OR_UB (k x))).
+Lemma unERR_OOM_UB_bind :
+  forall {A B} (ma : err_oom_ub A) (k : A -> err_oom_ub B),
+    Monad.eq1 (unERR_OOM_UB (x <- ma;; k x)) (x <- unERR_OOM_UB ma;; (unERR_OOM_UB (k x))).
 Proof.
   intros A B ma k.
   cbn.
-  destruct ma as [[[ub_a | [err_a | a]]]]; cbn; reflexivity.
+  destruct ma as [[[[ub_a | [oom_a | [err_a | a]]]]]]; cbn; reflexivity.
 Qed.
 
 Section MonadReturns.
-  Definition ErrOrUBReturns {A} (a : A) (ma : err_or_ub A) : Prop
+  Definition ErrOOMUBReturns {A} (a : A) (ma : err_oom_ub A) : Prop
     := match ma with
-       | ERR_OR_UB ea =>
-         match unEitherT ea with
+       | ERR_OOM_UB ea =>
+         match unEitherT (unEitherT ea) with
          | inl (UB_message msg) => False
-         | inr (inl (ERR_message msg)) => False
-         | inr (inr a') => a' = a
+         | inr (inl _) => True (* OOM *)
+         | inr (inr (inl (ERR_message msg))) => False
+         | inr (inr (inr a')) => a' = a
          end
        end.
 
-  Definition ErrOrUBFails {A} (ma : err_or_ub A) : Prop
+  Definition ErrOOMUBFails {A} (ma : err_oom_ub A) : Prop
     := match ma with
-       | ERR_OR_UB ea =>
-         match unEitherT ea with
+       | ERR_OOM_UB ea =>
+         match unEitherT (unEitherT ea) with
          | inl (UB_message msg) => True
-         | inr (inl (ERR_message msg)) => True
-         | inr (inr a') => False
+         | inr (inl _) => False (* OOM *)
+         | inr (inr (inl (ERR_message msg))) => True
+         | inr (inr (inr a')) => False
          end
        end.
 
-  Lemma ErrOrUBFails_ErrOrUBReturns : forall {A} (ma : err_or_ub A),
-      ErrOrUBFails ma -> forall a, ~ ErrOrUBReturns a ma.
+  Lemma ErrOOMUBFails_ErrOOMUBReturns : forall {A} (ma : err_oom_ub A),
+      ErrOOMUBFails ma -> forall a, ~ ErrOOMUBReturns a ma.
   Proof.
     intros A ma FAILS a.
-    destruct ma as [[[[ub_msg] | [[err_msg] | a']]]]; cbn in FAILS; auto.
+    destruct ma as [[[[[ub_msg] | [oom_msg | [[err_msg] | a']]]]]]; cbn in FAILS; auto.
   Qed.
 
-  Lemma ErrOrUBReturns_ErrOrUBFails : forall {A} (ma : err_or_ub A) (a : A),
-      ErrOrUBReturns a ma -> ~ ErrOrUBFails ma.
+  Lemma ErrOOMUBReturns_ErrOOMUBFails : forall {A} (ma : err_oom_ub A) (a : A),
+      ErrOOMUBReturns a ma -> ~ ErrOOMUBFails ma.
   Proof.
     intros A ma a RETS.
-    destruct ma as [[[[ub_msg] | [[err_msg] | a']]]]; cbn in RETS; auto.
+    destruct ma as [[[[[ub_msg] | [oom_msg | [[err_msg] | a']]]]]]; cbn in RETS; auto.
   Qed.
 
-  Lemma ErrOrUBFails_ret : forall {A} (a : A),
-      ~ ErrOrUBFails (ret a).
+  Lemma ErrOOMUBFails_ret : forall {A} (a : A),
+      ~ ErrOOMUBFails (ret a).
   Proof.
     intros A a CONTRA.
     inversion CONTRA.
   Qed.
 
-  Lemma ErrOrUBReturns_bind :
-    forall {A B} (a : A) (b : B) (ma : err_or_ub A) (k : A -> err_or_ub B),
-      ErrOrUBReturns a ma -> ErrOrUBReturns b (k a) -> ErrOrUBReturns b (bind ma k).
+  Lemma ErrOOMUBReturns_bind :
+    forall {A B} (a : A) (b : B) (ma : err_oom_ub A) (k : A -> err_oom_ub B),
+      ErrOOMUBReturns a ma -> ErrOOMUBReturns b (k a) -> ErrOOMUBReturns b (bind ma k).
   Proof.
     intros * Ha Hb.
-    unfold ErrOrUBReturns in *.
-    destruct ma as [[[[ub_msg] | [[err_msg] | a']]]]; cbn in *; try solve [inversion Ha].
+    unfold ErrOOMUBReturns in *.
+    destruct ma as [[[[[ub_msg] | [oom_msg | [[err_msg] | a']]]]]]; cbn in *; try solve [inversion Ha].
     subst.
     destruct (k a); auto.
   Qed.
 
-  Lemma ErrOrUBReturns_bind_inv :
-    forall {A B} (ma : err_or_ub A) (k : A -> err_or_ub B) (b : B),
-      ErrOrUBReturns b (bind ma k) -> exists a : A , ErrOrUBReturns a ma /\ ErrOrUBReturns b (k a).
+  Lemma ErrOOMUBReturns_bind_inv :
+    forall {A B} (ma : err_oom_ub A) (k : A -> err_oom_ub B) (b : B),
+      ErrOOMUBReturns b (bind ma k) -> exists a : A , ErrOOMUBReturns a ma /\ ErrOOMUBReturns b (k a).
   Proof.
     intros * Hb.
-    unfold ErrOrUBReturns in *.
-    destruct ma as [[[[ub_msg] | [[err_msg] | a']]]]; cbn in *; try solve [inversion Hb].
-    destruct (k a') as [[[[ub_msg] | [[err_msg] | a'']]]] eqn:Hk'; cbn in *; try solve [inversion Hb].
+    unfold ErrOOMUBReturns in *.
+    destruct ma as [[[[[ub_msg] | [oom_msg | [[err_msg] | a']]]]]]; cbn in *; try solve [inversion Hb].
+    destruct (k a') as [[[[[ub_msg] | [oom_msg | [[err_msg] | a'']]]]]] eqn:Hk'; cbn in *; try solve [inversion Hb].
     subst.
     exists a'.
     split; auto.
@@ -285,157 +522,69 @@ Section MonadReturns.
     cbn; auto.
   Qed.
 
-  Lemma ErrOrUBReturns_ret :
-    forall {A} (a : A) (ma : err_or_ub A),
-      ~ErrOrUBFails ma -> Monad.eq1 ma (ret a) -> ErrOrUBReturns a ma.
+  Lemma ErrOOMUBReturns_ret :
+    forall {A} (a : A) (ma : err_oom_ub A),
+      ~ErrOOMUBFails ma -> Monad.eq1 ma (ret a) -> ErrOOMUBReturns a ma.
   Proof.
     intros * FAILS Hma.    
-    destruct ma as [[[[ub_msg] | [[err_msg] | a']]]]; cbn in FAILS; auto; try contradiction.
+    destruct ma as [[[[[ub_msg] | [oom_msg | [[err_msg] | a']]]]]]; cbn in FAILS; auto; try contradiction.
   Qed.
 
-  Lemma ErrOrUBReturns_ret_inv :
+  Lemma ErrOOMUBReturns_ret_inv :
     forall {A} (x y : A),
-      ErrOrUBReturns x (ret y) -> x = y.
+      ErrOOMUBReturns x (ret y) -> x = y.
   Proof.
     intros * H.
-    unfold ErrOrUBReturns in H.
+    unfold ErrOOMUBReturns in H.
     inversion H; auto.
   Qed.
 
-  #[global] Instance ErrOrUBReturns_Proper : forall {A} (a : A),
-      Proper (eq1 ==> Basics.impl) (ErrOrUBReturns a).
+  #[global] Instance ErrOOMUBReturns_Proper : forall {A} (a : A),
+      Proper (eq1 ==> Basics.impl) (ErrOOMUBReturns a).
   Proof.
     intros A a.
     unfold Proper, respectful.
     intros x y H.
-    unfold ErrOrUBReturns in *.
+    unfold ErrOOMUBReturns in *.
     
-    destruct x as [[[[ub_x] | [[err_x] | x]]]];
-      destruct y as [[[[ub_y] | [[err_y] | y]]]]; inversion H; subst; cbn; auto; try (intros CONTRA; contradiction).
+    destruct x as [[[[[ub_x] | [oom_x | [[err_x] | x]]]]]];
+      destruct y as [[[[[ub_y] | [oom_y | [[err_y] | y]]]]]]; inversion H; subst; cbn; auto; try (intros CONTRA; contradiction).
 
+    inversion H.
     intros YA; auto.
   Qed.
 
-  #[global] Instance MonadReturns_ErrOrUB : MonadReturns err_or_ub
-    := { MReturns := fun A => ErrOrUBReturns;
-         MFails := fun A => ErrOrUBFails;
-         MReturns_MFails := fun A => ErrOrUBReturns_ErrOrUBFails;
-         MFails_MReturns := fun A => ErrOrUBFails_ErrOrUBReturns;
-         MFails_ret := fun A => ErrOrUBFails_ret;
-         MReturns_bind := fun A B => ErrOrUBReturns_bind;
-         MReturns_bind_inv := fun A B => ErrOrUBReturns_bind_inv;
-         MReturns_ret := fun A => ErrOrUBReturns_ret;
-         MReturns_ret_inv := fun A => ErrOrUBReturns_ret_inv
+  #[global] Instance MonadReturns_ErrOOMUB : MonadReturns err_oom_ub
+    := { MReturns := fun A => ErrOOMUBReturns;
+         MFails := fun A => ErrOOMUBFails;
+         MReturns_MFails := fun A => ErrOOMUBReturns_ErrOOMUBFails;
+         MFails_MReturns := fun A => ErrOOMUBFails_ErrOOMUBReturns;
+         MFails_ret := fun A => ErrOOMUBFails_ret;
+         MReturns_bind := fun A B => ErrOOMUBReturns_bind;
+         MReturns_bind_inv := fun A B => ErrOOMUBReturns_bind_inv;
+         MReturns_ret := fun A => ErrOOMUBReturns_ret;
+         MReturns_ret_inv := fun A => ErrOOMUBReturns_ret_inv
        }.
 
 End MonadReturns.
 
-(* Instance MonadLaws_eitherT {E} {M} `{HM: Monad M} `{MEQ1 : Monad.Eq1 M} `{MEQ1V : @Monad.Eq1Equivalence M HM MEQ1} `{LAWS: @Monad.MonadLawsE M MEQ1 HM} `{MRETS : @MonadReturns M HM MEQ1} `{MRETSINV : @MonadReturns_Proper_inv M HM MEQ1 MRETS} : Monad.MonadLawsE (eitherT E M). *)
-(* destruct LAWS. *)
-
-(* constructor. *)
-(* - repeat intro. cbn. destruct (f x) as [fx] eqn:Hfx. cbn. unfold Monad.eq1, EqM_eitherT. *)
-(*   cbn. *)
-(*   etransitivity; eauto. *)
-(*   rewrite Hfx. *)
-(*   cbn. *)
-(*   reflexivity. *)
-(* - repeat intro. cbn. destruct x as [x'] eqn:Hx. subst. cbn. unfold Monad.eq1, EqM_eitherT. *)
-(*   cbn. *)
-(*   replace (fun xM : E + A => *)
-(*         match xM with *)
-(*         | inl x => ret (inl x) *)
-(*         | inr x => ret (inr x) *)
-(*         end) with (fun xM : E + A => ret xM). *)
-(*   etransitivity; eauto. *)
-(*   reflexivity. *)
-
-(*   apply functional_extensionality. *)
-(*   intros x. *)
-(*   destruct x; auto. *)
-(* - repeat intro. cbn. destruct x as [x'] eqn:Hx. *)
-(*   unfold Monad.eq1, EqM_eitherT. cbn. *)
-(*   rewrite bind_bind. *)
-
-(*   destruct MRETS. *)
-(*   destruct MRETSINV. *)
-
-(*   eapply MReturns_Proper_inv. *)
-(*   split. *)
-(*   + intros H. *)
-(*     eapply MReturns_bind_inv in H as (xv & Hxv & RET). *)
-(*     eapply MReturns_bind; eauto. *)
-(*     destruct xv; eauto. *)
-(*     rewrite bind_ret_l in RET; eauto. *)
-(*   + intros H. *)
-(*     eapply MReturns_bind_inv in H as (xv & Hxv & RET). *)
-(*     eapply MReturns_bind; eauto. *)
-(*     destruct xv; eauto. *)
-(*     rewrite bind_ret_l; eauto. *)
-
-(* - repeat intro. *)
-(*   destruct x as [x'] eqn:Hx. *)
-(*   destruct y as [y'] eqn:Hy. *)
-(*   unfold Monad.eq1, EqM_eitherT. *)
-(*   cbn in *. *)
-
-(*   destruct MRETS. *)
-(*   destruct MRETSINV. *)
-
-(*   subst. *)
-(*   unfold Monad.eq1, EqM_eitherT in H. *)
-(*   cbn in H. *)
-(*   rewrite <- H. *)
-
-(*   eapply MReturns_Proper_inv. *)
-(*   split. *)
-(*   + intros RETS. *)
-(*     eapply MReturns_bind_inv in RETS as (xv & Hxv & RETS). *)
-
-(*     destruct xv; eauto. *)
-(*     cbn in *. *)
-(*     eapply MReturns_bind; eauto. *)
-(*     eapply MReturns_bind; eauto. *)
-(*     cbn. *)
-
-(*     unfold Morphisms.pointwise_relation in H0. *)
-(*     specialize (H0 a). *)
-
-(*     unfold Monad.eq1, EqM_eitherT in H0. *)
-(*     rewrite H0 in RETS; eauto. *)
-(*   + intros RETS. *)
-(*     eapply MReturns_bind_inv in RETS as (xv & Hxv & RETS). *)
-
-(*     destruct xv; eauto. *)
-(*     cbn in *. *)
-(*     eapply MReturns_bind; eauto. *)
-(*     eapply MReturns_bind; eauto. *)
-(*     cbn. *)
-
-(*     unfold Morphisms.pointwise_relation in H0. *)
-(*     specialize (H0 a). *)
-
-(*     unfold Monad.eq1, EqM_eitherT in H0. *)
-(*     rewrite H0; eauto. *)
-(* Defined. *)
-
-Definition err_to_err_or_ub {A} (e : err A) : err_or_ub A
+Definition err_to_err_oom_ub {A} (e : err A) : err_oom_ub A
   := match e with
      | inr a => ret a
      | inl e => raise_error e
      end.
 
-Definition UB_to_err_or_ub {A} (ub : UB A) : err_or_ub A
-  := ERR_OR_UB (lift ub).
+Definition UB_to_err_oom_ub {A} (ub : UB A) : err_oom_ub A
+  := ERR_OOM_UB (lift ub).
 
-Ltac inv_err_or_ub :=
+Ltac inv_err_oom_ub :=
   match goal with
-  | h: {| unERR_OR_UB := {| unEitherT := inl _ |} |} =
-       {| unERR_OR_UB := {| unEitherT := inl _ |} |} |- _ => inv h
-  | h: {| unERR_OR_UB := {| unEitherT := inr _ |} |} =
-       {| unERR_OR_UB := {| unEitherT := inr _ |} |} |- _ => inv h
-  | h: {| unERR_OR_UB := {| unEitherT := inr _ |} |} =
-       {| unERR_OR_UB := {| unEitherT := inl _ |} |} |- _ => inv h
-  | h: {| unERR_OR_UB := {| unEitherT := inl _ |} |} =
-       {| unERR_OR_UB := {| unEitherT := inr _ |} |} |- _ => inv h
+  | h: {| unERR_OOM_UB := {| unEitherT := inl _ |} |} =
+       {| unERR_OOM_UB := {| unEitherT := inl _ |} |} |- _ => inv h
+  | h: {| unERR_OOM_UB := {| unEitherT := inr _ |} |} =
+       {| unERR_OOM_UB := {| unEitherT := inr _ |} |} |- _ => inv h
+  | h: {| unERR_OOM_UB := {| unEitherT := inr _ |} |} =
+       {| unERR_OOM_UB := {| unEitherT := inl _ |} |} |- _ => inv h
+  | h: {| unERR_OOM_UB := {| unEitherT := inl _ |} |} =
+       {| unERR_OOM_UB := {| unEitherT := inr _ |} |} |- _ => inv h
   end.
