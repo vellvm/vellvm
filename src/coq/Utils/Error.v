@@ -577,9 +577,11 @@ Section err_ub_oom.
     (* apply (Monad.eq1 unERR_UB_OOM0 unERR_UB_OOM1). *)
     
     refine (fun T mt1 mt2 => _).
-    destruct mt1 as [[[[[[oom_mt1 | [ub_mt1 | [err_mt1 | t1]]]]]]]].
+
+    (* mt1 should be a refinement of mt2 *)
+    destruct mt2 as [[[[[[oom_mt2 | [ub_mt2 | [err_mt2 | t2]]]]]]]].
     - (* OOM can only refine to OOM *)
-      destruct mt2 as [[[[[[oom_mt2 | [ub_mt2 | [err_mt2 | t2]]]]]]]].
+      destruct mt1 as [[[[[[oom_mt1 | [ub_mt1 | [err_mt1 | t1]]]]]]]].
       + exact True.
       + exact False.
       + exact False.
@@ -589,7 +591,7 @@ Section err_ub_oom.
     - (* Error *)
       exact True.
     - (* Success *)
-      destruct mt2 as [[[[[[oom_mt2 | [ub_mt2 | [err_mt2 | t2]]]]]]]].
+      destruct mt1 as [[[[[[oom_mt1 | [ub_mt1 | [err_mt1 | t1]]]]]]]].
       + (* OOM refines everything *)
         exact True.
       + exact False.
@@ -632,11 +634,11 @@ Section err_ub_oom.
       unfold Proper, respectful.
       intros x y H x0 y0 H0.
 
-      destruct x as [[[[[[oom_x | [ub_x | [err_x | x]]]]]]]]; cbn; auto.
-      destruct y as [[[[[[oom_y | [ub_y | [err_y | y]]]]]]]]; cbn; auto; inversion H.
+      destruct y as [[[[[[[oom_y] | [[ub_y] | [[err_y] | y]]]]]]]]; cbn; auto.
+      destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x]]]]]]]]; cbn; auto; inversion H.
+      destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x]]]]]]]]; cbn; auto; inversion H.
 
-      destruct y as [[[[[[oom_y | [ub_y | [err_y | y]]]]]]]]; cbn; auto; inversion H.
-      destruct (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (x0 x)))));
+      destruct (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (y0 y)))));
       destruct unIdent; auto; destruct s; auto; destruct s; auto.
       
       subst.
@@ -679,8 +681,8 @@ Section err_ub_oom.
          | ERR_UB_OOM ea =>
              match IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT ea))) with
              | inl (OOM_message msg) => False
-             | inr (inl (UB_message msg)) => False
-             | inr (inr (inl (ERR_message msg))) => False
+             | inr (inl (UB_message msg)) => True
+             | inr (inr (inl (ERR_message msg))) => True
              | inr (inr (inr a')) => a' = a
              end
          end.
@@ -690,8 +692,8 @@ Section err_ub_oom.
          | ERR_UB_OOM ea =>
              match IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT ea))) with
              | inl (OOM_message msg) => True
-             | inr (inl (UB_message msg)) => True
-             | inr (inr (inl (ERR_message msg))) => True
+             | inr (inl (UB_message msg)) => False
+             | inr (inr (inl (ERR_message msg))) => False
              | inr (inr (inr a')) => False
              end
          end.
@@ -723,7 +725,7 @@ Section err_ub_oom.
     Proof.
       intros * Ha Hb.
       unfold ErrUBOOMReturns in *.
-      destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | ma]]]]]]]]; cbn in *; try solve [inversion Ha].
+      destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | ma]]]]]]]]; cbn in *; try solve [inversion Ha]; auto.
       subst.
       destruct (k a); auto.
     Qed.
@@ -737,6 +739,9 @@ Section err_ub_oom.
       destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]];
         cbn in *; try solve [inversion Hb].
 
+      eexists. split; eauto.
+
+      exi
       destruct (k a) as [[[[[[[oom_ka] | [[ub_ka] | [[err_ka] | ka]]]]]]]] eqn:Hk;
         inversion Hb; cbn in *; subst.
       exists a.
@@ -770,14 +775,18 @@ Section err_ub_oom.
       unfold Proper, respectful.
       intros x y H.
       red.
-      unfold ErrUBOOMReturns in *.
 
-      destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x]]]]]]]];      
+      destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x]]]]]]]];
         destruct y as [[[[[[[oom_y] | [[ub_y] | [[err_y] | y]]]]]]]];
-        inversion H; subst; cbn; auto; try (intros CONTRA; contradiction);
+        inversion H; auto; try (intros CONTRA; contradiction);
 
-        intros YA; subst; auto.
+        intros YA.
 
+      apply ErrUBOOMReturns_ErrUBOOMFails in YA.
+      cbn in YA.
+
+
+      admit.
       cbn in H.
     Qed.
 
@@ -800,9 +809,6 @@ Section err_ub_oom.
        | inr a => ret a
        | inl e => raise_error e
        end.
-
-  Definition UB_to_err_ub_oom {A} (ub : UB A) : err_ub_oom A
-    := ERR_UB_OOM (lift ub).
 End err_ub_oom.
 
 Ltac inv_err_or_ub :=

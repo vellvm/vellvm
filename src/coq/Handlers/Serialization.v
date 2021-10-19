@@ -841,7 +841,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
       
       #[global] Instance Monad_RefineProp : Monad RefineProp :=
         {|
-        ret := fun _ x y => Monad.eq1 (ret x) y;
+        ret := fun _ x y => Monad.eq1 y (ret x);
         bind := @bind_RefineProp
         |}.
 
@@ -1319,7 +1319,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
       Definition concretize_u (uv : uvalue) : RefineProp dvalue.
         refine (concretize_uvalueM
                   (fun dt => _)
-                  (eitherT ERR_MESSAGE (eitherT UB_MESSAGE (eitherT OOM_MESSAGE IdentityMonad.ident))) (* Err / oom / ub monad *)
+                  err_ub_oom
                   _
                   _
                   _
