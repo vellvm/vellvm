@@ -3336,29 +3336,37 @@ Class VInt I : Type :=
         repeat break_match_hyp;
 
         try solve
-            [first [ apply eq1_ret_ret in EVAL; [| solve [eauto]]
-            | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
-              apply MReturns_bind_inv in EVAL as (res & MA & RET);
-              apply MReturns_ret_inv in RET
-            | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
-              apply MReturns_bind_inv in EVAL as (res & MA & RET);
-              break_match_hyp;
-              apply MReturns_ret_inv in RET
-            | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
-              apply MReturns_bind_inv in EVAL as (res & MA & RET);
-              repeat break_match_hyp;
-              [ apply MReturns_ret_inv in RET
-              | cbn in RET;
-                apply MReturns_bind_inv in RET as (res' & MA' & RET);
-                repeat break_match_hyp;
-                apply MReturns_ret_inv in RET
-              ]
-                ]; subst; constructor; solve_no_void].
+            [first
+               [ apply eq1_ret_ret in EVAL; [| solve [eauto]]
+               | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+                 apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
+                 [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
+                 | apply MReturns_ret_inv in RET
+                 ]
+               | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+                 apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
+                 [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
+                 | break_match_hyp; apply MReturns_ret_inv in RET
+                 ]
+               | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+                 apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
+                   [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
+                   | repeat break_match_hyp;
+                     [ apply MReturns_ret_inv in RET
+                     | cbn in RET;
+                       apply MReturns_bind_inv in RET as [FAILS | (res' & MA' & RET)];
+                       [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
+                       | repeat break_match_hyp;
+                         apply MReturns_ret_inv in RET
+                       ]
+                     ]
+                   ]
+               ]; subst; constructor; solve_no_void].
 
       all:
         eapply EqRet_NoFail in EVAL; eauto;
         exfalso; apply EVAL;
-          first [apply mfails_ub | apply mfails_error | apply mfails_oom] ; eauto.
+          first [apply mfails_ub | apply mfails_error | apply mfails_oom]; eauto.
     Qed.
 
     Lemma eval_iop_dtyp_i :

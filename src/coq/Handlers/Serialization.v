@@ -838,7 +838,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
                 pa ma /\
                 Monad.eq1 (Monad.bind ma k') mb /\
                 (forall a, MReturns a ma -> k a (k' a))).
-      
+
       #[global] Instance Monad_RefineProp : Monad RefineProp :=
         {|
         ret := fun _ x y => Monad.eq1 y (ret x);
@@ -869,7 +869,9 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
         split; cbn; eauto.
         cbn.
         split.
-        + destruct ma as [[[[[ooma | [erra | a]]]]]] eqn:Hma; cbn; intuition; inversion H0; subst; auto.
+        + destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma;
+            cbn; intuition; inversion H0; subst; auto.
+        + intros a XA; subst; auto.
       Qed.
 
       Lemma RefineProp_bind_ret_r :

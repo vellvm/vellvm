@@ -35,7 +35,7 @@ Section Laws.
           MReturns b (bind ma k) -> (MFails ma \/ exists a : A , MReturns a ma /\ MReturns b (k a));
 
       MReturns_ret : forall {A} (a : A) (ma : M A),
-          ~MFails ma -> eq1 (ret a) ma -> MReturns a ma;
+          ~MFails ma -> eq1 ma (ret a) -> MReturns a ma;
 
       MReturns_ret_inv : forall {A} (x y : A),
           MReturns x (ret y) -> x = y;
@@ -59,7 +59,7 @@ Section ExtraLaws.
   (* Won't work when a refinement can fail and not return something *)
   Class MonadReturnsProper :=
     { MReturns_Proper :> forall {A} (a : A),
-          Proper (eq1 ==> Basics.impl) (MReturns a)
+          Proper ((fun x y => eq1 y x) ==> Basics.impl) (MReturns a)
     }.
 
   (* These won't work with UB / Error refinement relations *)
@@ -92,8 +92,9 @@ Section MReturns_ProperFlip.
 
   Class MonadReturns_ProperFlip :=
     { MReturns_ProperFlip :> forall {A} (a : A),
-        Proper (eq1 ==> fun A B => Basics.impl B A) (MReturns a)
+        Proper (eq1 ==> Basics.impl) (MReturns a)
     }.
+
 End MReturns_ProperFlip.
 
 Arguments MReturns_ProperFlip {M _ _ _ _}.
@@ -192,7 +193,7 @@ Section Sum.
 
   Lemma SumReturns_ret :
     forall {A} (a : A) (ma : sum E A),
-      ~SumFails ma -> eq1 (ret a) ma -> SumReturns a ma.
+      ~SumFails ma -> eq1 ma (ret a) -> SumReturns a ma.
   Proof.
     intros * Hma.
     intros H.
@@ -339,7 +340,7 @@ Section Ident.
 
   Lemma IdentReturns_ret :
     forall {A} (a : A) (ma : ident A),
-      ~IdentFails ma -> eq1 (ret a) ma -> IdentReturns a ma.
+      ~IdentFails ma -> eq1 ma (ret a) -> IdentReturns a ma.
   Proof.
     intros * NFAILS Hma.
     destruct ma as [a'].
@@ -493,7 +494,7 @@ Section EitherT.
 
   Lemma EitherTReturns_ret :
     forall {A} (a : A) (ma : eitherT E M A),
-      ~EitherTFails ma -> eq1 (ret a) ma -> EitherTReturns a ma.
+      ~EitherTFails ma -> eq1 ma (ret a) -> EitherTReturns a ma.
   Proof.
     intros * NFAILS Hma.
     eapply MReturns_ret; eauto.
@@ -514,7 +515,7 @@ Section EitherT.
   Qed.
 
   #[global] Instance EitherTReturns_Proper : forall {A} (a : A),
-      Proper (eq1 ==> Basics.impl) (EitherTReturns a).
+      Proper ((fun x y => eq1 y x) ==> Basics.impl) (EitherTReturns a).
   Proof.
     intros A a.
     unfold Proper, respectful.
@@ -524,7 +525,7 @@ Section EitherT.
   Qed.
 
   #[global] Instance EitherTReturns_ProperFlip : forall {A} (a : A),
-      Proper (eq1 ==> fun A B => Basics.impl B A) (EitherTReturns a).
+      Proper (eq1 ==> Basics.impl) (EitherTReturns a).
   Proof.
     intros A a.
     unfold Proper, respectful.
