@@ -509,7 +509,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
              byte + (Z.shiftl (concat_bytes_Z bytes) 8)
            end.
 
-      (* TODO: Move this? *)
+      (* TODO: Move this??? *)
       Inductive Poisonable (A : Type) : Type :=
       | Unpoisoned : A -> Poisonable A
       | Poison : forall (dt : dtyp), Poisonable A
@@ -521,39 +521,29 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
       Global Instance MonadPoisonable : Monad Poisonable
         := { ret  := @Unpoisoned;
              bind := fun _ _ ma mab => match ma with
-                                   | Poison dt => Poison dt
-                                   | Unpoisoned v => mab v
+                                    | Poison dt => Poison dt
+                                    | Unpoisoned v => mab v
                                     end
         }.
 
-      (* TODO: move to error? *)
       Class RAISE_POISON (M : Type -> Type) :=
         { raise_poison : forall {A}, dtyp -> M A }.
 
-      (* TODO: Move and clean up *)
-      Definition lift_err_RAISE_ERROR {A} {M} `{Monad M} `{RAISE_ERROR M} (e : err A) : M A
-        := match e with
-           | inl x => raise_error x
-           | inr x => ret x
-           end.
+      Global Instance RAISE_POISON_Poisonable : RAISE_POISON Poisonable :=
+        { raise_poison := fun A dt => Poison dt }.
 
-      Definition ErrOOMPoison := eitherT string (eitherT unit Poisonable).
+      #[global] Instance RAISE_POISON_E_MT {M : Type -> Type} {MT : (Type -> Type) -> Type -> Type} `{MonadT (MT M) M} `{RAISE_POISON M} : RAISE_POISON (MT M) :=
+        { raise_poison := fun A dt => lift (raise_poison dt);
+        }.
 
-      Global Instance RAISE_ERROR_ErrOOMPoison : RAISE_ERROR ErrOOMPoison
-        := { raise_error := fun _ msg => mkEitherT (mkEitherT (Unpoisoned (inr (inl msg)))) }.
-
-      Global Instance RAISE_POISON_ErrOOMPoison : RAISE_POISON ErrOOMPoison
-        := { raise_poison := fun _ dt => mkEitherT (mkEitherT (Poison dt)) }.
-
-      Global Instance RAISE_OOM_ErrOOMPoison : RAISE_OOM ErrOOMPoison
-        := { raise_oom := fun _ => mkEitherT (mkEitherT (Unpoisoned (inl tt))) }.
+      Definition ErrOOMPoison := eitherT ERR_MESSAGE (eitherT OOM_MESSAGE Poisonable).
 
       Definition ErrOOMPoison_handle_poison_dv {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_OOM M} (ep : ErrOOMPoison dvalue) : M dvalue
         := match unEitherT (unEitherT ep) with
            | Unpoisoned edv =>
                match edv with
-               | inl tt => raise_oom
-               | inr (inl msg) => raise_error msg
+               | inl (OOM_message msg) => raise_oom msg
+               | inr (inl (ERR_message msg)) => raise_error msg
                | inr (inr val) => ret val
                end
            | Poison dt => ret (DVALUE_Poison dt)
@@ -1342,16 +1332,19 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
 
       Arguments concretize_uvalueM {_ _}.
 
-      Program Definition concretize_uvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
+      Definition concretize_uvalue {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
                  (uv : uvalue) : M dvalue
-        := concretize_uvalueM _ _ _ _ _ _ (fun _ x => x) uv.
-
-             (fun dt => err_to_err_or_ub (default_dvalue_of_dtyp dt)) (fun _ x => x) uv.
+        := concretize_uvalueM (fun dt => lift_err_RAISE_ERROR (default_dvalue_of_dtyp dt)) _ _ _ _ _ (fun _ x => x) uv.
 
       Definition concretize_u (uv : uvalue) : RefineProp dvalue.
         refine (concretize_uvalueM
-             (fun dt => _)
-             (fun _ x => _) uv).
+                  (fun dt => _)
+                  (eitherT ERR_MESSAGE (eitherT UB_MESSAGE (eitherT OOM_MESSAGE IdentityMonad.ident))) (* Err / oom / ub monad *)
+                  _
+                  _
+                  _
+                  _
+                  (fun _ x => _) uv).
 
         (* Undef handler *)
         { unfold RefineProp.

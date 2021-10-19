@@ -59,7 +59,7 @@ Arguments failwith _ _ _ _: simpl nomatch.
 (* A computation that can run out of memory. *)
 Variant OOM (A:Type) : Type :=
   | NoOom : A -> OOM A
-  | Oom : OOM A.
+  | Oom : string -> OOM A.
 Arguments NoOom {_} _.
 Arguments Oom {_}.
 
@@ -70,7 +70,7 @@ Proof.
   - refine (fun A B ma k =>
               match ma with
               | NoOom a => k a
-              | _ => Oom
+              | Oom s => Oom s
               end
            ).
 Defined.
@@ -81,7 +81,7 @@ Proof.
   - refine (fun A B f ma =>
               match ma with
               | NoOom a => NoOom (f a)
-              | _ => Oom
+              | Oom s => Oom s
               end).
 Defined.
 
@@ -92,7 +92,7 @@ Section OOMLaws.
     refine (fun _ a b =>
               match a, b with
               | NoOom a, NoOom b => a = b
-              | Oom, Oom => True
+              | Oom s1, Oom s2 => True
               | _, _ => False
               end).
   Defined.
@@ -131,13 +131,13 @@ Section OOMLaws.
   Definition OOMReturns {A} (x : A) (ma : OOM A) : Prop
     := match ma with
        | NoOom y => x = y
-       | Oom => False
+       | Oom s => False
        end.
 
   Definition OOMFails {A} (ma : OOM A) : Prop
     := match ma with
        | NoOom x => False
-       | Oom => True
+       | Oom s => True
        end.
 
   Lemma OOMFails_OOMReturns :
@@ -238,6 +238,10 @@ Inductive ERR_MESSAGE :=
 | ERR_message : string -> ERR_MESSAGE
 .
 
+Inductive OOM_MESSAGE :=
+| OOM_message : string -> OOM_MESSAGE
+.
+
 Notation UB := (sum UB_MESSAGE).
 Notation ERR := (sum ERR_MESSAGE).
 
@@ -251,8 +255,7 @@ Class RAISE_UB (M : Type -> Type) : Type :=
   { raise_ub : forall {A}, string -> M A }.
 
 Class RAISE_OOM (M : Type -> Type) : Type :=
-  { raise_oom : forall {A}, M A }.
-
+  { raise_oom : forall {A}, string -> M A }.
 
 Section MFails_Exceptions.
   Context (M : Type -> Type).
@@ -270,14 +273,8 @@ Section MFails_Exceptions.
     { mfails_ub : forall {A} s, MFails (@raise_ub M UB A s) }.
 
   Class MFails_OOM :=
-    { mfails_oom : forall {A}, MFails (@raise_oom M OOM A) }.  
+    { mfails_oom : forall {A} s, MFails (@raise_oom M OOM A s) }.
 End MFails_Exceptions.
-
-Definition lift_OOM {M : Type -> Type} `{Monad M} `{RAISE_OOM M} {A} (ma : OOM A)
-  := match ma with
-     | NoOom a => ret a
-     | Oom => raise_oom
-     end.
 
 #[global] Instance RAISE_ERROR_E_MT {M : Type -> Type} {MT : (Type -> Type) -> Type -> Type} `{MonadT (MT M) M} `{RAISE_ERROR M} : RAISE_ERROR (MT M) :=
   { raise_error := fun A e => lift (raise_error e);
@@ -287,11 +284,18 @@ Definition lift_OOM {M : Type -> Type} `{Monad M} `{RAISE_OOM M} {A} (ma : OOM A
   { raise_ub := fun A e => lift (raise_ub e);
   }.
 
+#[global] Instance RAISE_OOM_E_MT {M : Type -> Type} {MT : (Type -> Type) -> Type -> Type} `{MonadT (MT M) M} `{RAISE_OOM M} : RAISE_OOM (MT M) :=
+  { raise_oom := fun A e => lift (raise_oom e);
+  }.
+
 #[global] Instance RAISE_ERROR_MonadExc {M} `{MonadExc ERR_MESSAGE M} : RAISE_ERROR M
   := { raise_error := fun _ msg => MonadExc.raise (ERR_message msg) }.
 
 #[global] Instance RAISE_UB_MonadExc {M} `{MonadExc UB_MESSAGE M} : RAISE_UB M
   := { raise_ub := fun _ msg => MonadExc.raise (UB_message msg) }.
+
+#[global] Instance RAISE_OOM_MonadExc {M} `{MonadExc OOM_MESSAGE M} : RAISE_OOM M
+  := { raise_oom := fun _ msg => MonadExc.raise (OOM_message msg) }.
 
 #[global] Instance Exception_UB_string : MonadExc string UB :=
   {| MonadExc.raise := fun _ msg => inl (UB_message msg);
@@ -328,6 +332,19 @@ Definition lift_ERR {M A} `{MonadExc ERR_MESSAGE M} `{Monad M} (e : ERR A) : (M 
      | inl e => MonadExc.raise e
      | inr x => ret x
      end.
+
+Definition lift_err_RAISE_ERROR {A} {M} `{Monad M} `{RAISE_ERROR M} (e : err A) : M A
+  := match e with
+     | inl x => raise_error x
+     | inr x => ret x
+     end.
+
+Definition lift_OOM {M : Type -> Type} `{Monad M} `{RAISE_OOM M} {A} (ma : OOM A) : M A
+  := match ma with
+     | NoOom a => ret a
+     | Oom s => raise_oom s
+     end.
+
 
 Inductive err_or_ub A :=
   ERR_OR_UB { unERR_OR_UB : eitherT ERR_MESSAGE UB A }.
