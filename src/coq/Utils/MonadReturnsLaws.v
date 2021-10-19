@@ -8,18 +8,9 @@ From ExtLib Require Import
      Data.Monads.IdentityMonad
      Structures.Monads.
 
-From Vellvm.Utils Require Import MonadExcLaws PropT.
+From Vellvm.Utils Require Import MonadExcLaws PropT Monads.
 
 Local Open Scope monad_scope.
-
-(* TODO: move this? *)
-Instance Eq1_Ident : Eq1 IdentityMonad.ident :=
-  { eq1 := fun A a b =>
-             match a, b with
-             | mkIdent a', mkIdent b' =>
-                 a' = b'
-             end
-  }.
 
 Set Primitive Projections.
 
@@ -205,7 +196,7 @@ Section Sum.
     intros Hret; unfold SumReturns in *; subst; auto.
   Qed.
 
-  Instance MonadReturns_Sum : MonadReturns (sum E)
+  Global Instance MonadReturns_Sum : MonadReturns (sum E)
     := { MReturns := fun A => SumReturns;
          MFails := fun A => SumFails;
          MReturns_MFails := fun A => SumReturns_SumFails;
@@ -217,7 +208,7 @@ Section Sum.
          MReturns_ret_inv := fun A => SumReturns_ret_inv
     }.
 
-  Instance NoFailsRet_Sum : NoFailsRet (sum E).
+  Global Instance NoFailsRet_Sum : NoFailsRet (sum E).
   Proof.
     split.
     intros A a ma H.
@@ -296,7 +287,7 @@ Section Ident.
   Proof.
     intros * NFAILS Hma.
     destruct ma as [a'].
-    inversion Hma; subst.
+    inversion Hma; subst; cbn;
     auto.
   Qed.
 
@@ -332,7 +323,7 @@ Section Ident.
     auto.
   Qed.
 
-  Instance MonadReturns_Ident : MonadReturns (ident)
+  Global Instance MonadReturns_Ident : MonadReturns ident
     := { MReturns := fun A => IdentReturns;
          MFails := fun A => IdentFails;
          MReturns_MFails := fun A => IdentReturns_IdentFails;
@@ -344,7 +335,7 @@ Section Ident.
          MReturns_ret_inv := fun A => IdentReturns_ret_inv
        }.
 
-  Instance NoFailsRet_Ident : NoFailsRet (ident).
+  Global Instance NoFailsRet_Ident : NoFailsRet (ident).
   Proof.
     split.
     intros A a ma H.
@@ -465,7 +456,7 @@ Section EitherT.
     auto.
   Qed.
 
-  Instance MonadReturns_EitherT : MonadReturns (eitherT E M)
+  Global Instance MonadReturns_EitherT : MonadReturns (eitherT E M)
     := { MReturns := fun A => EitherTReturns;
          MFails := fun A => EitherTFails;
          MReturns_MFails := fun A => EitherTReturns_EitherTFails;
@@ -477,7 +468,7 @@ Section EitherT.
          MReturns_ret_inv := fun A => EitherTReturns_ret_inv
        }.
 
-  Instance NoFailsRet_EitherT `{NFR : @NoFailsRet M HM EQM MRET} : NoFailsRet (eitherT E M).
+  Global Instance NoFailsRet_EitherT `{NFR : @NoFailsRet M HM EQM MRET} : NoFailsRet (eitherT E M).
   Proof.
     split.
     intros A a ma H.
@@ -499,7 +490,7 @@ End Inhabited.
 
 (* TODO: Move this *)
 Require Import ZArith.
-Instance Inhabited_N : Inhabited N
+Global Instance Inhabited_N : Inhabited N
   := { has_value := 0%N }.
 
 Section StateT.

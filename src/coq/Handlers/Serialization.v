@@ -831,7 +831,6 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
            end.
 
 
-      Notation err_ub_oom := (eitherT ERR_MESSAGE (eitherT UB_MESSAGE (eitherT OOM_MESSAGE IdentityMonad.ident))).
       Definition RefineProp (X : Type) : Type := err_ub_oom X -> Prop.
 
       Definition bind_RefineProp {A B : Type} (pa : RefineProp A) (k : A -> RefineProp B) : RefineProp B
@@ -847,6 +846,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
         |}.
 
       From ITree Require Import Basics.Monad.
+      Import IdentityMonad.
 
       #[global] Instance EQM_RefineProp : Eq1 RefineProp.
       Proof.
@@ -864,13 +864,12 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
         intros ma H.
         unfold bind_RefineProp.
 
-        exists ({| unERR_OR_UB := {| unEitherT := inr (inr x) |} |}).
+        exists (ret x). (* (mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr x))))))). *)
         exists (fun _ => ma).
-        split; eauto.
+        split; cbn; eauto.
         cbn.
         split.
-        + destruct ma as [[[uba | [erra | a]]]] eqn:Hma; cbn; auto.
-        + intros; subst; auto.
+        + destruct ma as [[[[[ooma | [erra | a]]]]]] eqn:Hma; cbn; intuition; inversion H0; subst; auto.
       Qed.
 
       Lemma RefineProp_bind_ret_r :
@@ -903,7 +902,11 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
         intros ec H.
         destruct H as (ea & k' & paea & ea_eq_ec & REST).
 
-        destruct ea as [[[uba | [erra | a]]]] eqn:Hma; cbn; auto.
+        destruct ea as [[[[[ooma | [uba | [erra | a]]]]]]] eqn:Hma; cbn; auto.
+
+        { (* oom *)
+          admit.
+        }
 
         { (* The 'a' action raises ub *)
           exists (raise_ub "blah").
@@ -917,6 +920,8 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
             apply paea.
             cbn.
             split; auto.
+            
+            admit.
             intros.
             destruct uba; inversion H.
           }
