@@ -5,11 +5,21 @@ From ITree Require Import
      Basics.Monad.
 
 From ExtLib Require Import
+     Data.Monads.IdentityMonad
      Structures.Monads.
 
 From Vellvm.Utils Require Import MonadExcLaws PropT.
 
 Local Open Scope monad_scope.
+
+(* TODO: move this? *)
+Instance Eq1_Ident : Eq1 IdentityMonad.ident :=
+  { eq1 := fun A a b =>
+             match a, b with
+             | mkIdent a', mkIdent b' =>
+                 a' = b'
+             end
+  }.
 
 Set Primitive Projections.
 
@@ -218,6 +228,129 @@ Section Sum.
   Qed.
 End Sum.
 
+Section Ident.
+  Import IdentityMonad.
+
+  Definition IdentReturns {A} (a : A) (ma : ident A) : Prop
+    := match ma with
+       | mkIdent a' => a = a'
+       end.
+
+  Definition IdentFails {A} (ma : ident A) : Prop
+    := False.
+
+  Lemma IdentFails_IdentReturns :
+    forall {A} (ma : ident A),
+      IdentFails ma -> forall a, ~ IdentReturns a ma.
+  Proof.
+    intros A ma FAILS a.
+    unfold IdentFails in FAILS.
+    intros CONTRA.
+    contradiction.
+  Qed.
+
+  Lemma IdentReturns_IdentFails :
+    forall {A} (ma : ident A) (a : A),
+      IdentReturns a ma -> ~ IdentFails ma.
+  Proof.
+    intros A ma a RETS.
+    auto.
+  Qed.
+
+  Lemma IdentFails_ret :
+    forall {A} (a : A),
+      ~ IdentFails (ret a).
+  Proof.
+    intros A a.
+    auto.
+  Qed.
+
+  Lemma IdentReturns_bind :
+    forall {A B} (a : A) (b : B) (ma : ident A) (k : A -> ident B),
+      IdentReturns a ma -> IdentReturns b (k a) -> IdentReturns b (bind ma k).
+  Proof.
+    intros * Ha Hb.
+    destruct ma as [a'].
+    inversion Ha; subst.
+    destruct (k a') as [ka'] eqn:Hka'.
+    inversion Hb; subst.
+    cbn.
+    rewrite Hka'.
+    cbn.
+    reflexivity.
+  Qed.
+
+  Lemma IdentReturns_bind_inv :
+    forall {A B} (ma : ident A) (k : A -> ident B) (b : B),
+      IdentReturns b (bind ma k) -> exists a : A , IdentReturns a ma /\ IdentReturns b (k a).
+  Proof.
+    intros * Hb.
+    unfold IdentReturns in *.
+    destruct ma as [a]; cbn in *.
+    exists a; split; auto.
+  Qed.
+
+  Lemma IdentReturns_ret :
+    forall {A} (a : A) (ma : ident A),
+      ~IdentFails ma -> eq1 ma (ret a) -> IdentReturns a ma.
+  Proof.
+    intros * NFAILS Hma.
+    destruct ma as [a'].
+    inversion Hma; subst.
+    auto.
+  Qed.
+
+  Lemma IdentReturns_ret_inv :
+    forall {A} (x y : A),
+      IdentReturns x (ret y) -> x = y.
+  Proof.
+    intros * H.
+    unfold IdentReturns in H.
+    cbn in H.
+    auto.
+  Qed.
+
+  #[global] Instance IdentReturns_Proper : forall {A} (a : A),
+      Proper (eq1 ==> Basics.impl) (IdentReturns a).
+  Proof.
+    intros A a.
+    unfold Proper, respectful.
+    intros x y H.
+    intros Hret; unfold IdentReturns in *.
+    destruct x, y; inversion H; subst.
+    auto.
+  Qed.
+
+  #[global] Instance IdentReturns_ProperFlip : forall {A} (a : A),
+      Proper (eq1 ==> fun A B => Basics.impl B A) (IdentReturns a).
+  Proof.
+    intros A a.
+    unfold Proper, respectful.
+    intros x y H.
+    destruct x, y; inversion H; subst; cbn; auto.
+    red.
+    auto.
+  Qed.
+
+  Instance MonadReturns_Ident : MonadReturns (ident)
+    := { MReturns := fun A => IdentReturns;
+         MFails := fun A => IdentFails;
+         MReturns_MFails := fun A => IdentReturns_IdentFails;
+         MFails_MReturns := fun A => IdentFails_IdentReturns;
+         MFails_ret := fun A => IdentFails_ret;
+         MReturns_bind := fun A B => IdentReturns_bind;
+         MReturns_bind_inv := fun A B => IdentReturns_bind_inv;
+         MReturns_ret := fun A => IdentReturns_ret;
+         MReturns_ret_inv := fun A => IdentReturns_ret_inv
+       }.
+
+  Instance NoFailsRet_Ident : NoFailsRet (ident).
+  Proof.
+    split.
+    intros A a ma H.
+    auto.
+  Qed.
+End Ident.
 
 Section EitherT.
   Import EitherMonad.

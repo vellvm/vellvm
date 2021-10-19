@@ -831,36 +831,11 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
            end.
 
 
-      (* Change this to take an undef handler... *)
-      (* dtyp -> r *)
-      (* lift dvalue to r too? dvalue -> r ? *)
-      (*
-        default_dvalue_of_dtyp : dtyp -> err dvalue
-
-        pick_dtyp : dtyp -> (dvalue -> Prop)
-
-
-        Inductive concretize_u : uvalue -> err_or_ub dvalue -> Prop :=
-        Fixpoint concretize_uvalue (u : uvalue) {struct u} : err_or_ub dvalue :=
-
-        
-
-        Maybe it should be a monad???
-
-
-        M (err_or_ub dvalue)
-
-        Identity for actual concretization...
-
-        M X = X -> Prop otherwise...
-
-        Is X -> Prop a monad?
-       *)
-
-      Definition RefineProp (X : Type) : Type := err_or_ub X -> Prop.
+      Notation err_ub_oom := (eitherT ERR_MESSAGE (eitherT UB_MESSAGE (eitherT OOM_MESSAGE IdentityMonad.ident))).
+      Definition RefineProp (X : Type) : Type := err_ub_oom X -> Prop.
 
       Definition bind_RefineProp {A B : Type} (pa : RefineProp A) (k : A -> RefineProp B) : RefineProp B
-        := (fun mb => exists (ma : err_or_ub A) (k' : A -> err_or_ub B),
+        := (fun mb => exists (ma : err_ub_oom A) (k' : A -> err_ub_oom B),
                 pa ma /\
                 Monad.eq1 (Monad.bind ma k') mb /\
                 (forall a, MReturns a ma -> k a (k' a))).
@@ -1362,7 +1337,10 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
 
           (* Is x or ue the thing that should be the refinement? *)
           (* I think ue is the refinement *)
-          destruct x as [[[ubx | [errx | x]]]].
+          destruct x as [[[[[oomx | [ubx | [errx | x]]]]]]].
+          - (* OOM *)
+            (* OOM only refines OOM *)
+            destruct ue as [[[[[oomue | [ubue | [errue | ue]]]]]]].
           - (* UB *)
             exact True.
           - (* ERR *)
