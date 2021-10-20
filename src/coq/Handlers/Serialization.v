@@ -434,8 +434,8 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
     Qed.
 
     Section Concretize.
- 
-      
+
+
 
       Variable endianess : Endianess.
 
@@ -837,7 +837,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
         := (fun mb => exists (ma : err_ub_oom A) (k' : A -> err_ub_oom B),
                 pa ma /\
                 Monad.eq1 (Monad.bind ma k') mb /\
-                (forall a, MReturns a ma -> k a (k' a))).
+                (MFails ma \/ forall a, MReturns a ma -> k a (k' a))).
 
       #[global] Instance Monad_RefineProp : Monad RefineProp :=
         {|
@@ -847,7 +847,6 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
 
       From ITree Require Import Basics.Monad.
       Import IdentityMonad.
-
       #[global] Instance EQM_RefineProp : Eq1 RefineProp.
       Proof.
         unfold Eq1.
@@ -871,7 +870,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
         split.
         + destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma;
             cbn; intuition; inversion H0; subst; auto.
-        + intros a XA; subst; auto.
+        + right; intros a XA; subst; auto.
       Qed.
 
       Lemma RefineProp_bind_ret_r :
@@ -888,7 +887,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
         split; eauto.
         split.
         + apply bind_ret_r.
-        + reflexivity.  
+        + right; reflexivity.
       Qed.
 
       Lemma RefineProp_bind_bind :
@@ -904,10 +903,26 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
         intros ec H.
         destruct H as (ea & k' & paea & ea_eq_ec & REST).
 
-        destruct ea as [[[[[ooma | [uba | [erra | a]]]]]]] eqn:Hma; cbn; auto.
+        destruct ea as [[[[[[[oom_ea] | [[ub_ea] | [[err_ea] | a]]]]]]]] eqn:Hea.
 
         { (* oom *)
-          admit.
+          cbn in *.
+
+          exists (raise_oom "").
+          exists (fun b => ec).
+          split.
+
+          { eexists.
+            exists (fun a => raise_oom "").
+
+            split.
+            apply paea.
+            cbn.
+            split; eauto.
+          }
+
+          cbn.
+          split; intros; eauto; try contradiction.
         }
 
         { (* The 'a' action raises ub *)
@@ -922,23 +937,9 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
             apply paea.
             cbn.
             split; auto.
-            
-            admit.
-            intros.
-            destruct uba; inversion H.
           }
 
-          split.
-
-          break_match.
-          cbn.
-          destruct unERR_OR_UB.
-          destruct unEitherT; cbn; auto.
-          destruct s; cbn; auto.
-
-          destruct ec as [[[uba' | [erra' | a']]]] eqn:Hma'; cbn; auto.
-          intros b H.
-          inversion H.
+          split; auto.
         }
 
         { (* The 'a' action raises a failure *)
@@ -953,24 +954,13 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
             apply paea.
             cbn.
             split; auto.
-            intros.
-            destruct erra; inversion H.
           }
 
-          split.
-
-          break_match.
-          cbn.
-          destruct unERR_OR_UB.
-          destruct unEitherT; cbn; auto.
-          destruct s; cbn; auto.
-
-          destruct ec as [[[uba' | [erra' | a']]]] eqn:Hma'; cbn; auto.
-          intros b H.
-          inversion H.
+          split; auto.
         }
 
         { (* The 'a' action actually returns a value *)
+          destruct REST as [CONTRA | REST]; [contradiction|].
           specialize (REST a).
           forward REST; [reflexivity|].
           destruct REST as (mb & kb & fmb & eqkb & RETS).
@@ -981,30 +971,35 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
           split.
           { exists ea.
             exists (fun _ => mb).
-            
+
             split; subst; auto.
             split.
-            destruct mb as [[[ubb | [errb | b]]]] eqn:Hmb; cbn; split; auto.
+            destruct mb as [[[[[[[oom_mb] | [[ub_mb] | [[err_mb] | b]]]]]]]] eqn:Hmb; cbn; split; auto.
 
+            right.
             intros a' RETSa.
             cbn in RETSa; subst; auto.
           }
 
           split.
-          { destruct mb as [[[ubb | [errb | b]]]] eqn:Hmb; cbn; auto.
-            destruct (kb b) as [[[ubkbb | [errkbb | kbb]]]] eqn:Hkbb; cbn in eqkb; subst; cbn; auto.
+          { destruct mb as [[[[[[[oom_mb] | [[ub_mb] | [[err_mb] | b]]]]]]]] eqn:Hmb; cbn; auto.
+            { destruct ec as [[[[[[[oom_ec] | [[ub_ec] | [[err_ec] | ec]]]]]]]]; auto;
 
-            rewrite Hkbb in eqkb; cbn in eqkb.
-            destruct (k' a) as [[[ubk'a | [errk'a | k'a]]]] eqn:Hk'a; cbn in ea_eq_ec; try contradiction.
-            subst.
+              cbn in ea_eq_ec;
+                destruct (k' a) as [[[[[[[oom_k'a] | [[ub_k'a] | [[err_k'a] | k'a]]]]]]]] eqn:Hk'a; cbn in ea_eq_ec; try contradiction.
+            }
 
-            destruct ec as [[[ubc | [errc | c]]]] eqn:Hmc; cbn; cbn in ea_eq_ec; auto;
-              rewrite Hk'a in ea_eq_ec; cbn in ea_eq_ec; try contradiction.
+            { destruct (kb b) as [[[[[[[oom_kbb] | [[ub_kbb] | [[err_kbb] | kbb]]]]]]]] eqn:Hkbb; cbn in eqkb; subst; cbn; auto; subst; rewrite Hkbb in eqkb; cbn in eqkb;
 
-            auto.
+              destruct ec as [[[[[[[oom_ec] | [[ub_ec] | [[err_ec] | ec]]]]]]]]; auto;
+
+              cbn in ea_eq_ec, eqkb;
+              destruct (k' a) as [[[[[[[oom_k'a] | [[ub_k'a] | [[err_k'a] | k'a]]]]]]]]; cbn in ea_eq_ec; try contradiction;
+
+              subst; auto.
+            }
           }
 
-          intros b RETSb.
           auto.
         }
       Qed.
@@ -1032,6 +1027,10 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
         exists k'.
         split; auto.
         split; auto.
+
+        destruct REST as [FAILS|REST]; auto.
+
+        right.
         intros a Rets.
         specialize (REST a Rets).
 
@@ -1157,7 +1156,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
 
         with
 
-        (* Take a UVALUE_ExtractByte, and replace the uvalue with a given dvalue... 
+        (* Take a UVALUE_ExtractByte, and replace the uvalue with a given dvalue...
 
          Note: this also concretizes the index.
          *)
@@ -1173,7 +1172,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
         (* Concretize the uvalues in a list of UVALUE_ExtractBytes...
 
          *)
-        (* Pick out uvalue bytes that are the same + have same sid 
+        (* Pick out uvalue bytes that are the same + have same sid
 
          Concretize these identical uvalues...
          *)
@@ -1209,7 +1208,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
             | Some dvbs => ret dvbs
             | None => lift_ue (raise_error "concretize_uvalue_bytes: missing indices.")
             end
-              
+
         with
         extractbytes_to_dvalue (uvs : list uvalue) (dt : dtyp) {struct uvs} : M dvalue
           := dvbs <- concretize_uvalue_bytes uvs;;
@@ -1330,8 +1329,8 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
 
         (* Undef handler *)
         { unfold RefineProp.
-         refine (fun edv => match unERR_OR_UB edv with
-                    | mkEitherT (inr (inr dv)) =>
+         refine (fun edv => match unERR_UB_OOM edv with
+                    | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
                       (* As long as the dvalue has the same type, it's a refinement *)
                       dvalue_has_dtyp dv dt
                     | _ => False
@@ -1344,15 +1343,20 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
 
           (* Is x or ue the thing that should be the refinement? *)
           (* I think ue is the refinement *)
-          destruct x as [[[[[oomx | [ubx | [errx | x]]]]]]].
+          destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x]]]]]]]].
           - (* OOM *)
             (* OOM only refines OOM *)
-            destruct ue as [[[[[oomue | [ubue | [errue | ue]]]]]]].
+            destruct ue as [[[[[[[oom_ue] | [[ub_ue] | [[err_ue] | ue]]]]]]]].
+            + exact True.
+            + exact False.
+            + exact False.
+            + exact False.
           - (* UB *)
             exact True.
           - (* ERR *)
             exact True.
-          - destruct ue as [[[ubue | [errue | ue]]]].
+          - destruct ue as [[[[[[[oom_ue] | [[ub_ue] | [[err_ue] | ue]]]]]]]].
+            + exact True. (* OOM refines everything *)
             + exact False.
             + exact False.
             + exact (x = ue).
@@ -1360,42 +1364,39 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
       Defined.
 
       Definition concretize_u_succeeds (uv : uvalue) : RefineProp dvalue.
-        refine (concretize_uvalueM (fun dt => _) (fun _ x => _) uv).
+        refine (concretize_uvalueM (fun dt => _)
+                                   err_ub_oom
+                                   _
+                                   _
+                                   _
+                                   _
+                                   (fun _ x => _) uv).
 
         (* Undef handler *)
         { unfold RefineProp.
-          refine (fun edv => match unERR_OR_UB edv with
-                          | mkEitherT (inr (inr dv)) =>
-                              (* As long as the dvalue has the same type, it's a refinement *)
-                              dvalue_has_dtyp dv dt
-                          | _ => False
-                          end).
+          refine (fun edv => match unERR_UB_OOM edv with
+                    | mkEitherT (mkEitherT (mkEitherT (mkIdent (inr (inr (inr dv)))))) =>
+                      (* As long as the dvalue has the same type, it's a refinement *)
+                      dvalue_has_dtyp dv dt
+                    | _ => False
+                    end).
         }
 
         (* lift_ue *)
         { unfold RefineProp.
           intros ue.
 
-          destruct x as [[[ubx | [errx | x]]]].
-          - (* UB *)
-            exact False.
-          - (* ERR *)
-            exact False.
-          - destruct ue as [[[ubue | [errue | ue]]]].
-            + exact False.
-            + exact False.
-            + (* This is the only case where concretize succeeds without failure anywhere *)
-              exact (x = ue).
+          exact (~MFails x /\ ~MFails ue).
         }
       Defined.
-  
+
       Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
 
       Definition concretize_fails (uv : uvalue) : Prop
         := concretize_u uv (raise_ub "").
 
       Definition concretize_succeeds (uv : uvalue) : Prop
-        := ~ concretize_fails uv.                                                       
+        := ~ concretize_fails uv.
 
       Lemma concretize_equation : forall (uv: uvalue) (dv : dvalue),
           concretize uv dv = concretize_u uv (ret dv).
@@ -1432,23 +1433,25 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
         unfold bind_RefineProp.
 
         eexists.
-        exists (fun x => match unEitherT (unERR_OR_UB e2) with
-           | inl (UB_message ub) => raise_ub ub (* inl v0 *)
-           | inr (inl (ERR_message err)) => raise_error err (* inr (inl x0) *)
-           | inr (inr x0) => eval_iop iop x x0
-           end).
+        exists (fun x => match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM e2)))) with
+                 | inl (OOM_message oom) => raise_oom oom
+                 | inr (inl (UB_message ub)) => raise_ub ub
+                 | inr (inr (inl (ERR_message err))) => raise_error err
+                 | inr (inr (inr x0)) => eval_iop iop x x0
+                 end).
         split; eauto.
         split.
 
         { (* Monad.eq1 mb (x <- ma;; k' x) *)
           unfold bind.
           cbn.
-          destruct e1 as [[[[ub_message] | [[err_message] | e1]]]]; cbn; try reflexivity.
-          destruct e2 as [[[[ub_message] | [[err_message] | e2]]]]; cbn; try reflexivity.
+          destruct e1 as [[[[[[[oom_e1] | [[ub_e1] | [[err_e1] | e1]]]]]]]]; cbn; try reflexivity.
+          destruct e2 as [[[[[[[oom_e2] | [[ub_e2] | [[err_e2] | e2]]]]]]]]; cbn; try reflexivity.
 
-          destruct (eval_iop iop e1 e2) as [[[[ub_message] | [[err_message] | res]]]]; reflexivity.
+          destruct (eval_iop iop e1 e2) as [[[[[[[oom_eval_iopiope1e2] | [[ub_eval_iopiope1e2] | [[err_eval_iopiope1e2] | eval_iopiope1e2]]]]]]]]; reflexivity.
         }
 
+        right.
         intros dv1 Re1.
 
         eexists.
@@ -1459,15 +1462,16 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
         { (* Monad.eq1 mb (x <- ma;; k' x) *)
           unfold bind.
           cbn.
-          destruct e2 as [[[[ub_message] | [[err_message] | e2]]]]; cbn; try reflexivity.
+          destruct e2 as [[[[[[[oom_e2] | [[ub_e2] | [[err_e2] | e2]]]]]]]]; cbn; try reflexivity.
 
           unfold Monad.eq1, EqM_err_or_ub.
-          destruct (eval_iop iop dv1 e2) as [[[[ub_message] | [[err_message] | res]]]]; reflexivity.
+          destruct (eval_iop iop dv1 e2) as [[[[[[[oom_eval_iopiopdv1e2] | [[ub_eval_iopiopdv1e2] | [[err_eval_iopiopdv1e2] | eval_iopiopdv1e2]]]]]]]]; reflexivity.
         }
 
+        right.
         intros dv2 Re2.
-        destruct (eval_iop iop dv1 dv2) as [[[[ub_message] | [[err_message] | res]]]]; reflexivity.
+        destruct (eval_iop iop dv1 dv2) as [[[[[[[oom_eval_iopiopdv1dv2] | [[ub_eval_iopiopdv1dv2] | [[err_eval_iopiopdv1dv2] | eval_iopiopdv1dv2]]]]]]]]; reflexivity.
       Qed.
-      
+
     End Concretize.
 End Make.
