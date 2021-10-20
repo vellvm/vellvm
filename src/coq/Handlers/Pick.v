@@ -45,17 +45,17 @@ Import MonadNotation.
   - The executable one interprets [undef] as 0 at the type
 *)
 
-Module Make(A:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(SIZEOF))(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(SIZEOF)(LLVMIO))(BYTE_IMPL : ByteImpl(A)(SIZEOF)(LLVMIO)).
+Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(IP)(SIZEOF))(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(IP)(SIZEOF)(LLVMIO))(BYTE_IMPL : ByteImpl(A)(IP)(SIZEOF)(LLVMIO)).
 
-  Module Conc := Serialization.Make A SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
+  Module Conc := Serialization.Make A IP SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
   Import Conc.
   Import LLVMIO.
 
   Section PickPropositional.
 
     (* The parameter [C] is currently not used *)
-    Inductive Pick_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E}: PickE ~> PropT E :=
-    | PickD: forall uv C res t,  concretize_u uv res -> t ≈ (lift_err_or_ub ret res) -> Pick_handler (pick uv C) t.
+    Inductive Pick_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E}: PickE ~> PropT E := 
+    | PickD: forall uv C res t,  concretize_u uv res -> t ≈ (lift_err_ub_oom ret res) -> Pick_handler (pick uv C) t.
 
     Section PARAMS_MODEL.
       Variable (E F: Type -> Type).
@@ -66,7 +66,7 @@ Module Make(A:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(A
       Definition F_trigger_prop : F ~> PropT (E +' F) :=
         fun R e => fun t => t = r <- trigger e ;; ret r.
 
-      Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
+      Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
         forall (T:Type) (RR: T -> T -> Prop), itree (E +' PickE +' F) T -> PropT (E +' F) T :=
         interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)).
 
@@ -152,9 +152,9 @@ Module Make(A:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(A
         (* Qed. *)
     Admitted.
 
-    Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} : PickE ~> itree E :=
+    Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : PickE ~> itree E :=
       fun T p => match p with
-              | pick u P => lift_err_or_ub ret (concretize_uvalue u)
+              | pick u P => lift_err_ub_oom ret (concretize_uvalue u)
               end.
 
     Section PARAMS_INTERP.
@@ -166,7 +166,7 @@ Module Make(A:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(A
       Definition F_trigger : F ~> itree (E +' F) :=
         fun R e => r <- trigger e ;; ret r.
 
-      Definition exec_undef `{FailureE -< E +' F} `{UBE -< E +' F} :
+      Definition exec_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
         itree (E +' PickE +' F) ~> itree (E +' F) :=
         interp (case_ E_trigger
                (case_ concretize_picks F_trigger)).

@@ -150,6 +150,47 @@ Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type
   Definition show_addr (a : addr) := Show.show a.
 End Addr.
 
+Module BigIP : MemoryAddress.INTPTR.
+  Definition intptr := Z.
+  Definition zero := 0%Z.
+
+  Definition eq_dec := Z.eq_dec.
+  Definition eqb := Z.eqb.
+
+  Definition to_Z (x : intptr) := x.
+
+  (* TODO: negatives.... ???? *)
+  Definition to_unsigned := to_Z.
+  Definition from_Z (x : Z) : OOM intptr := ret x.
+
+  Lemma from_Z_to_Z :
+    forall (z : Z) (i : intptr),
+      from_Z z = NoOom i ->
+      to_Z i = z.
+  Proof.
+    intros z i FROM.
+    inversion FROM; auto.
+  Qed.
+
+  Lemma from_Z_0 :
+    from_Z 0 = NoOom zero.
+  Proof.
+    auto.
+  Qed.
+End BigIP.
+
+Module Type INTPTR.
+  Parameter intptr : Set.
+  Parameter zero : intptr.
+
+  Parameter eq_dec : forall (a b : intptr), {a = b} + {a <> b}.
+  Parameter eqb : forall (a b : intptr), bool.
+
+  Parameter to_Z : forall (a : intptr), Z.
+  Parameter to_unsigned : forall (a : intptr), Z.
+  Parameter from_Z : Z -> OOM intptr.
+End INTPTR.
+
 Module FinPTOI : PTOI(Addr).
   Definition ptr_to_int (ptr : Addr.addr) := fst ptr.
 End FinPTOI.
@@ -298,7 +339,7 @@ Module FinSizeof : Sizeof.
   Qed.
 End FinSizeof.
 
-Module FinByte (LLVMEvents:LLVM_INTERACTIONS(Addr)(FinSizeof)) : ByteImpl(Addr)(FinSizeof)(LLVMEvents).
+Module FinByte (LLVMEvents:LLVM_INTERACTIONS(Addr)(BigIP)(FinSizeof)) : ByteImpl(Addr)(BigIP)(FinSizeof)(LLVMEvents).
   Import LLVMEvents.
   Import DV.
 
@@ -337,7 +378,7 @@ End FinByte.
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
     indexed on [Z].
  *)
-Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)).
+Module Make(Addr : MemoryAddress.ADDRESS)(IP : MemoryAddress.INTPTR)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(IP)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(IP)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(IP)(SIZE)(LLVMEvents)).
   Import LLVMEvents.
   Import DV.
   Import PTOI.
@@ -348,10 +389,10 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
   Import Addr.
   Import PROV.
 
-  Module BYTE := Byte Addr SIZE LLVMEvents BYTE_IMPL.
+  Module BYTE := Byte Addr IP SIZE LLVMEvents BYTE_IMPL.
   Import BYTE.
 
-  Module ESID := ERRSID Addr SIZE LLVMEvents PROV.
+  Module ESID := ERRSID Addr IP SIZE LLVMEvents PROV.
   Import ESID.
 
   Module PROV_F := PROV_FUNCS Addr PROV.
@@ -436,11 +477,12 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
   Definition sbytes_of_int (e : Endianess) (count:nat) (z:Z) : list SByte :=
     List.map Byte (bytes_of_int e count z). *)
 
-    Definition uvalue_bytes_little_endian (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
-      := map (fun n => UVALUE_ExtractByte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq 0 ptr_size).
+  Definition uvalue_bytes_little_endian (uv :  uvalue) (dt : dtyp) (sid : store_id) : OOM (list uvalue)
+    := map_monad (fun n => n' <- IP.from_Z (Z.of_N n);;
+                        ret (UVALUE_ExtractByte uv dt (UVALUE_IPTR n') sid)) (Nseq 0 ptr_size).
 
-   Definition uvalue_bytes (e : Endianess) (uv :  uvalue) (dt : dtyp) (sid : store_id) : list uvalue
-      := correct_endianess e (uvalue_bytes_little_endian uv dt sid).
+   Definition uvalue_bytes (e : Endianess) (uv :  uvalue) (dt : dtyp) (sid : store_id) : OOM (list uvalue)
+      := fmap (correct_endianess e) (uvalue_bytes_little_endian uv dt sid).
 
     (* Is a uvalue a concrete integer equal to i? *)
     Definition uvalue_int_eq_Z (uv : uvalue) (i : Z)
@@ -449,7 +491,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
          | UVALUE_I8 x
          | UVALUE_I32 x
          | UVALUE_I64 x => Z.eqb (unsigned x) i
-         | UVALUE_IPTR x => Z.eqb x i
+         | UVALUE_IPTR x => Z.eqb (IP.to_Z x) i
          | _ => false
          end.
 
@@ -459,7 +501,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
          | DVALUE_I8 x => unsigned x
          | DVALUE_I32 x => unsigned x
          | DVALUE_I64 x => unsigned x
-         | DVALUE_IPTR x => x (* TODO: unsigned???? *)
+         | DVALUE_IPTR x => (IP.to_unsigned x) (* TODO: unsigned???? *)
          | _ => 0
          end.
 
@@ -733,7 +775,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
        | UVALUE_InsertValue _ _ _
        | UVALUE_Select _ _ _ =>
          sid <- fresh_sid;;
-         ret (to_ubytes uv dt sid)
+         lift_OOM (to_ubytes uv dt sid)
 
        (* Undef values, these can possibly be aggregates *)
        | UVALUE_Undef _ =>
@@ -761,7 +803,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
            ret (concat field_bytes)
          | _ =>
            sid <- fresh_sid;;
-           ret (to_ubytes uv dt sid)
+           lift_OOM (to_ubytes uv dt sid)
          end
 
        (* Poison values, possibly aggregates *)
@@ -790,7 +832,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
            ret (concat field_bytes)
          | _ =>
            sid <- fresh_sid;;
-           ret (to_ubytes uv dt sid)
+           lift_OOM (to_ubytes uv dt sid)
          end
 
        (* TODO: each field gets a separate store id... Is that sensible? *)
@@ -885,7 +927,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
        | UVALUE_InsertValue _ _ _
        | UVALUE_Select _ _ _ =>
          sid <- fresh_sid;;
-         ret (to_ubytes uv dt sid)
+         lift_OOM (to_ubytes uv dt sid)
 
        (* Undef values, these can possibly be aggregates *)
        | UVALUE_Undef _ =>
@@ -913,7 +955,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
            ret (concat field_bytes)
          | _ =>
            sid <- fresh_sid;;
-           ret (to_ubytes uv dt sid)
+           lift_OOM (to_ubytes uv dt sid)
          end
 
        (* Poison values, possibly aggregates *)
@@ -942,7 +984,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
            ret (concat field_bytes)
          | _ =>
            sid <- fresh_sid;;
-           ret (to_ubytes uv dt sid)
+           lift_OOM (to_ubytes uv dt sid)
          end
 
        (* TODO: each field gets a separate store id... Is that sensible? *)
@@ -1140,7 +1182,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
     (*  TODO: Is DTYPE_Void fine here? *)
     Definition SUndef : ErrSID SByte :=
       sid <- fresh_sid;;
-      ret (uvalue_sbyte (UVALUE_Undef DTYPE_Void) DTYPE_Void (UVALUE_IPTR 0) sid).
+      ret (uvalue_sbyte (UVALUE_Undef DTYPE_Void) DTYPE_Void (UVALUE_IPTR IP.zero) sid).
 
     (** ** Reading values from memory *)
     Definition read_memory (mem : memory) (address : addr) (t : dtyp) : err uvalue :=
@@ -1403,7 +1445,8 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
            (fun n mf x =>
               '(m, addrs) <- mf (N.succ x);;
               sid <- fresh_sid;;
-              let undef := uvalue_sbyte (UVALUE_Undef t) t (UVALUE_IPTR (Z.of_N x)) sid in
+              x' <- lift_OOM (IP.from_Z (Z.of_N x));;
+              let undef := uvalue_sbyte (UVALUE_Undef t) t (UVALUE_IPTR x') sid in
               let new_addr := addr + Z.of_N x in
               ret (IM.add new_addr (undef, aid) m, (addr::addrs)))
            sz) 0%N.
@@ -1493,6 +1536,9 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
   Definition mem_state_raiseUB {E A} `{UBE -< E} (msg : string) : MemStateT (itree E) A
     := mem_state_lift_itree (raiseUB msg).
 
+  Definition mem_state_raiseOOM {E A} `{OOME -< E} (msg : string) : MemStateT (itree E) A
+    := mem_state_lift_itree (raiseOOM msg).
+
   Definition mem_state_raise {E A} `{FailureE -< E} (msg : string) : MemStateT (itree E) A
     := mem_state_lift_itree (raise msg).
 
@@ -1544,16 +1590,18 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
   Definition mem_state_modify_memory_stack {M} `{Monad M} (f : memory_stack -> memory_stack) : MemStateT M unit
     := modify (MemState_modify_memory_stack f);; ret tt.
 
-  Definition mem_state_lift_ErrSID {E} `{FailureE -< E} `{UBE -< E} {A} (e : ErrSID A) : MemStateT (itree E) A
+  Definition mem_state_lift_ErrSID {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A} (e : ErrSID A) : MemStateT (itree E) A
     :=
       sid <- mem_state_get_sid;;
       pr <-  mem_state_get_prov;;
       match runErrSID e sid pr with
-      | (inl (UB_message msg), sid, pr) =>
+      | (inl (OOM_message msg), sid, pr) =>
+          mem_state_raiseOOM msg
+      | (inr (inl (UB_message msg)), sid, pr) =>
         mem_state_raiseUB msg
-      | (inr (inl (ERR_message msg)), sid, pr) =>
+      | (inr (inr (inl (ERR_message msg))), sid, pr) =>
         mem_state_raise msg
-      | (inr (inr x), sid, pr) =>
+      | (inr (inr (inr x)), sid, pr) =>
         mem_state_put_sid sid;;
         mem_state_put_prov pr;;
         ret x
@@ -1603,7 +1651,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
   (** ** Memory Handler
       Implementation of the memory model per se as a memory handler to the [MemoryE] interface.
    *)
-  Definition handle_memory {E} `{FailureE -< E} `{UBE -< E} : MemoryE ~> MemStateT (itree E) :=
+  Definition handle_memory {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : MemoryE ~> MemStateT (itree E) :=
     fun T e =>
       match e with
       | MemPush =>
@@ -1663,7 +1711,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
         | UVALUE_I1  i =>
           ret (UVALUE_Addr (int_to_ptr (unsigned i) wildcard_prov))
         | UVALUE_IPTR i =>
-          ret (UVALUE_Addr (int_to_ptr i wildcard_prov))
+          ret (UVALUE_Addr (int_to_ptr (IP.to_unsigned i) wildcard_prov))
         | _ => ret (UVALUE_Conversion Inttoptr t_from x DTYPE_Pointer)
         end
 
@@ -1674,8 +1722,11 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
           addr' <- mem_state_lift_err_or_ub addr;;
           ret (dvalue_to_uvalue addr')
         | UVALUE_Addr ptr, DTYPE_IPTR =>
-          let addr := ptr_to_int ptr in
-          ret (UVALUE_IPTR addr)
+            match IP.from_Z (ptr_to_int ptr) with
+            | Oom msg => mem_state_raiseOOM msg
+            | NoOom addr =>
+                ret (UVALUE_IPTR addr)
+            end
         | _, _ =>
           ret (UVALUE_Conversion Ptrtoint DTYPE_Pointer a t)
         end
@@ -1700,7 +1751,7 @@ Module Make(Addr : MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACT
 
   Section PARAMS.
     Variable (E F G : Type -> Type).
-    Context `{FailureE -< F} `{UBE -< F} `{PickE -< F}.
+    Context `{FailureE -< F} `{UBE -< F} `{PickE -< F} `{OOME -< F}.
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
 

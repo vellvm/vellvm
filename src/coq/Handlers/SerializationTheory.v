@@ -5,6 +5,7 @@ From ExtLib Require Import
      Structures.Monads.
 
 From Vellvm Require Import
+     Utils.Util
      Utils.Tactics
      Utils.ListUtil
      Utils.Error
@@ -18,7 +19,10 @@ From Vellvm Require Import
      Semantics.Memory.MemBytes
      Semantics.Memory.ErrSID.
 
-Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(SIZEOF)(LLVMIO)).
+Import MonadNotation.
+Import MonadReturnsLaws.
+
+Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(IP)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(IP)(SIZEOF)(LLVMIO)).
 
   Import LLVMIO.
   Import SIZEOF.
@@ -28,10 +32,10 @@ Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_I
   Import DV.
   Import GEP.
 
-  Module SER := Serialization.Make Addr SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
+  Module SER := Serialization.Make Addr IP SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
   Import SER.
 
-  Module BYTE := Byte Addr SIZEOF LLVMIO BYTE_IMPL.
+  Module BYTE := Byte Addr IP SIZEOF LLVMIO BYTE_IMPL.
   Export BYTE.
 
   Import BYTE.
@@ -86,23 +90,69 @@ Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_I
   Lemma to_ubytes_all_bytes_from_uvalue_helper' :
     forall len uv dt sid sbytes start,
       is_supported dt ->
-      map (fun n : N => uvalue_sbyte uv dt (UVALUE_IPTR (Z.of_N n)) sid) (Nseq start len) = sbytes ->
+      map_monad (fun n : N =>
+                   n' <- IP.from_Z (Z.of_N n);;
+                   ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid)) (Nseq start len) = NoOom sbytes ->
       all_bytes_from_uvalue_helper (Z.of_N start) sid uv sbytes = Some uv.
   Proof.
     induction len;
       intros uv dt sid sbytes start SUP TO.
     - inv TO; reflexivity.
-    - inv TO.
-      rewrite Nseq_S.
-      rewrite map_app.
-      apply all_bytes_helper_app; eauto.
-      + solve_guards_all_bytes.
+    - rewrite Nseq_S in TO.
+      assert (Monad.eq1 (map_monad
+                (fun n : N => n' <- IP.from_Z (Z.of_N n);; ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid))
+                (Nseq start len ++ start + N.of_nat len :: nil)) (NoOom sbytes)) as EQ1.
+      { unfold Monad.eq1, MonadEq1OOM.
+        rewrite TO.
+        auto.
+      }
+
+      setoid_rewrite -> map_monad_app in EQ1.
+      destruct (map_monad
+             (fun n : N => n' <- IP.from_Z (Z.of_N n);; ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid))
+             (Nseq start len)) eqn:Hfirst; [|inversion EQ1].
+      destruct (map_monad
+             (fun n : N => n' <- IP.from_Z (Z.of_N n);; ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid))
+             (start + N.of_nat len :: nil)) eqn:Hlast; [|inversion EQ1].
+
+      cbn in EQ1; subst.
+      apply all_bytes_helper_app.
+      + eauto.
+      + cbn in Hlast.
+        break_match_hyp; inversion Hlast; subst.
+        cbn.
+        break_match_hyp; inversion Heqo; subst.
+        rewrite sbyte_to_extractbyte_of_uvalue_sbyte.
+        cbn.
+
+        apply IP.from_Z_to_Z in Heqo0.
+        rewrite Heqo0.
+        assert (len = Datatypes.length l) as Hlen.
+
+        { assert (MReturns l (map_monad
+                                (fun n : N => n' <- IP.from_Z (Z.of_N n);; ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid))
+                                (Nseq start len))) as RETS.
+          { rewrite Hfirst.
+            reflexivity.
+          }
+
+          apply MapMonadExtra.map_monad_length in RETS.
+          rewrite Nseq_length in RETS.
+          auto.
+        }
+
+        subst.
+        rewrite Z.eqb_refl.
+        rewrite eq_dec_eq.
+        rewrite N.eqb_refl.
+        cbn.
+        reflexivity.
   Qed.
 
   Lemma to_ubytes_all_bytes_from_uvalue_helper :
     forall uv dt sid sbytes,
       is_supported dt ->
-      to_ubytes uv dt sid = sbytes ->
+      to_ubytes uv dt sid = NoOom sbytes ->
       all_bytes_from_uvalue_helper 0 sid uv sbytes = Some uv.
   Proof.  
     intros uv dt sid sbytes SUP TO.
@@ -112,45 +162,108 @@ Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_I
   Qed.
 
   Lemma to_ubytes_sizeof_dtyp :
-    forall uv dt sid,  
-      N.of_nat (List.length (to_ubytes uv dt sid)) = sizeof_dtyp dt.
+    forall uv dt sid sbytes,
+      to_ubytes uv dt sid = NoOom sbytes ->
+      N.of_nat (List.length sbytes) = sizeof_dtyp dt.
   Proof.
-    intros uv dt sid.
-    unfold to_ubytes.
-    rewrite map_length, Nseq_length.
+    intros uv dt sid sbytes TOUBYTES.
+    unfold to_ubytes in *.
+    assert (MReturns sbytes (map_monad
+               (fun n : N =>
+                n' <- IP.from_Z (Z.of_N n);; ret (uvalue_sbyte uv dt (UVALUE_IPTR n') sid))
+               (Nseq 0 (N.to_nat (sizeof_dtyp dt))))) as RETS.
+    { rewrite TOUBYTES; reflexivity.
+    }
+
+    apply MapMonadExtra.map_monad_length in RETS.
+    rewrite Nseq_length in RETS.
     lia.
   Qed.
 
   Lemma from_ubytes_to_ubytes :
-    forall uv dt sid,
+    forall uv dt sid sbytes,
       is_supported dt ->
       sizeof_dtyp dt > 0 ->
-      from_ubytes (to_ubytes uv dt sid) dt = uv.
+      to_ubytes uv dt sid = NoOom sbytes ->
+      from_ubytes sbytes dt = uv.
   Proof.
-    intros uv dt sid SUP SIZE.
+    intros uv dt sid sbytes SUP SIZE TOUBYTES.
 
     unfold from_ubytes.
     unfold all_bytes_from_uvalue.
 
-    rewrite to_ubytes_sizeof_dtyp.
+    erewrite to_ubytes_sizeof_dtyp; eauto.
     rewrite N.eqb_refl.
 
     break_inner_match.
     - (* Contradiction by size *)
-      pose proof to_ubytes_sizeof_dtyp uv dt sid.
-      rewrite Heql in H.
+      subst.
+      pose proof to_ubytes_sizeof_dtyp uv dt sid nil TOUBYTES.
 
       cbn in *.
       lia.
     - pose proof sbyte_to_extractbyte_inv s as (uvb & dtb & idxb & sidb & SBYTE).
       rewrite SBYTE.
       cbn in *.
+      subst.
 
-      unfold to_ubytes in Heql.
       remember (sizeof_dtyp dt) as sz.
       destruct sz; [inv SIZE|].
       cbn in *.
       pose proof Pos2Nat.is_succ p as [sz Hsz].
+
+      rewrite SBYTE.
+      rewrite eq_dec_eq.
+      rewrite N.eqb_refl.
+
+      cbn.
+      unfold to_ubytes in TOUBYTES.
+      rewrite <- Heqsz in TOUBYTES.
+      cbn in TOUBYTES.
+      rewrite Hsz in TOUBYTES.
+      cbn in TOUBYTES.
+      
+      rewrite Nseq_S in TOUBYTES.
+      assert (Monad.eq1
+                (map_monad
+                   (fun n : N =>
+                      match IP.from_Z (Z.of_N n) with
+                      | NoOom a => NoOom (uvalue_sbyte uv dt (UVALUE_IPTR a) sid)
+                      | Oom s => Oom s
+                      end) (Nseq 0 sz ++ 0 + N.of_nat sz :: nil)) (NoOom (s :: l))) as EQ1.
+      { unfold Monad.eq1, MonadEq1OOM.
+        rewrite TOUBYTES.
+        auto.
+      }
+
+      setoid_rewrite -> map_monad_app in EQ1.
+      destruct (map_monad
+                  (fun n : N =>
+                     match IP.from_Z (Z.of_N n) with
+                     | NoOom a => NoOom (uvalue_sbyte uv dt (UVALUE_IPTR a) sid)
+                     | Oom s => Oom s
+                     end) (Nseq 0 sz)) eqn:Hfirst; [|inversion EQ1].
+      destruct (map_monad
+                  (fun n : N =>
+                     match IP.from_Z (Z.of_N n) with
+                     | NoOom a => NoOom (uvalue_sbyte uv dt (UVALUE_IPTR a) sid)
+                     | Oom s => Oom s
+                     end) (0 + N.of_nat sz :: nil)) eqn:Hlast; [|inversion EQ1].
+
+      cbn in EQ1; subst.
+      cbn in Hfirst.
+
+      apply map_monad_app in EQ1.
+
+      break_inner_match.
+
+
+      cbn.
+      
+      2: {
+        cbn.
+      }
+
       rewrite Hsz in Heql.
       rewrite <- cons_Nseq in Heql.
 

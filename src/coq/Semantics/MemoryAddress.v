@@ -39,6 +39,14 @@ Module Type INTPTR.
   Parameter to_Z : forall (a : intptr), Z.
   Parameter to_unsigned : forall (a : intptr), Z.
   Parameter from_Z : Z -> OOM intptr.
+
+  Parameter from_Z_to_Z :
+    forall (z : Z) (i : intptr),
+      from_Z z = NoOom i ->
+      to_Z i = z.
+
+  Parameter from_Z_0 :
+    from_Z 0 = NoOom zero.
 End INTPTR.
 
 (* TODO: move this? *)

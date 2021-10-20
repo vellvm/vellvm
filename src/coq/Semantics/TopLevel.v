@@ -216,4 +216,3 @@ Definition model_gen
      Finally, the official model assumes no user-defined intrinsics.
  *)
 Definition model := model_gen (DTYPE_I 32%N) "main" main_args.
-

@@ -143,7 +143,7 @@ From Vellvm Require Import
    it until [TopLevel] either.
    We are hence exposing the specialization here, but it is slightly awkward.
  *)
-Module Make (A : ADDRESS)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(SIZEOF)).
+Module Make (A : ADDRESS)(IP : INTPTR)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
   Definition lstack := @stack (list (raw_id * LLVMEvents.DV.uvalue)).
 End Make.
 

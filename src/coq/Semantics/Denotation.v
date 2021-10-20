@@ -104,9 +104,9 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(A)(SIZEOF))(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(SIZEOF)(LLVMEvents))(BYTE_IMPL : ByteImpl(A)(SIZEOF)(LLVMEvents)).
+Module Denotation(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(A)(IP)(SIZEOF))(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(IP)(SIZEOF)(LLVMEvents))(BYTE_IMPL : ByteImpl(A)(IP)(SIZEOF)(LLVMEvents)).
 
-  Module Conc := Serialization.Make A SIZEOF LLVMEvents PTOI PROVENANCE ITOP GEP BYTE_IMPL.
+  Module Conc := Serialization.Make A IP SIZEOF LLVMEvents PTOI PROVENANCE ITOP GEP BYTE_IMPL.
 
   Import LLVMEvents.
   Import Conc.
@@ -204,7 +204,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
     | EXP_Integer x =>
       match top with
       | None                => raise "denote_exp given untyped EXP_Integer"
-      | Some (DTYPE_I bits) => lift_err_or_ub ret (fmap dvalue_to_uvalue (coerce_integer_to_int bits x))
+      | Some (DTYPE_I bits) => lift_err_ub_oom ret (fmap dvalue_to_uvalue (coerce_integer_to_int bits x))
       | Some typ            => raise ("bad type for constant int: " ++ to_string typ)
       end
 
@@ -291,14 +291,14 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
         dv2 <- concretize_or_pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2) ;;
         uvalue_to_dvalue_binop2
           (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-          (fun v1 v2 => translate FUB_to_exp
-                                  (lift_err_or_ub ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
+          (fun v1 v2 => translate FUBO_to_exp
+                                  (lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
           v1 dv2
       else
         uvalue_to_dvalue_binop
           (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-          (fun v1 v2 => translate FUB_to_exp
-                                  (lift_err_or_ub ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
+          (fun v1 v2 => translate FUBO_to_exp
+                                  (lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
           v1 v2
 
     | OP_ICmp cmp dt op1 op2 =>
@@ -306,7 +306,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
       v2 <- denote_exp (Some dt) op2 ;;
       uvalue_to_dvalue_binop
         (fun v1 v2 => ret (UVALUE_ICmp cmp v1 v2))
-        (fun v1 v2 => lift_err_or_ub ret (fmap dvalue_to_uvalue (eval_icmp cmp v1 v2)))
+        (fun v1 v2 => lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_icmp cmp v1 v2)))
         v1 v2
 
     | OP_FBinop fop fm dt op1 op2 =>
@@ -318,16 +318,16 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
         uvalue_to_dvalue_binop2
           (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
           (fun v1 v2 =>
-             translate FUB_to_exp
-                       (lift_err_or_ub ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
+             translate FUBO_to_exp
+                       (lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
           v1 dv2
       else
         uvalue_to_dvalue_binop
           (fun v1 v2 =>
              ret (UVALUE_FBinop fop fm v1 v2))
           (fun v1 v2 =>
-             translate FUB_to_exp
-                       (lift_err_or_ub ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
+             translate FUBO_to_exp
+                       (lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
           v1 v2
 
     | OP_FCmp fcmp dt op1 op2 =>
@@ -335,7 +335,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
       v2 <- denote_exp (Some dt) op2 ;;
       uvalue_to_dvalue_binop
         (fun v1 v2 => ret (UVALUE_FCmp fcmp v1 v2))
-        (fun v1 v2 => lift_err_or_ub ret (fmap dvalue_to_uvalue (eval_fcmp fcmp v1 v2)))
+        (fun v1 v2 => lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_fcmp fcmp v1 v2)))
         v1 v2
 
     | OP_Conversion conv dt1 op dt2 =>
@@ -424,7 +424,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
 
     | OP_ExtractValue (dt, str) idxs =>
       str <- denote_exp (Some dt) str;;
-      let fix loop str idxs : err_or_ub uvalue :=
+      let fix loop str idxs : err_ub_oom uvalue :=
           match idxs with
           | [] => ret str
           | i :: tl =>
@@ -435,7 +435,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
       | UVALUE_Struct _
       | UVALUE_Packed_struct _
       | UVALUE_Array _ =>
-        lift_err_or_ub ret (loop str idxs)
+        lift_err_ub_oom ret (loop str idxs)
       | _ =>
         ret (UVALUE_ExtractValue str idxs)
       end
@@ -462,7 +462,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
       v2   <- denote_exp (Some dt2) op2 ;;
       match uvalue_to_dvalue cndv with
       | inl e => ret (UVALUE_Select cndv v1 v2)
-      | inr dcndv => lift_err_or_ub ret (eval_select dcndv v1 v2)
+      | inr dcndv => lift_err_ub_oom ret (eval_select dcndv v1 v2)
       end
 
     | OP_Freeze (dt, e) =>
@@ -596,7 +596,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERA
       if dvalue_is_poison selector
       then raiseUB "Switching on poison."
       else (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
-        switches <- lift_err_or_ub ret
+        switches <- lift_err_ub_oom ret
                                       (map_monad
                                          (fun '((TInt_Literal sz x),id) => s <- (coerce_integer_to_int sz x);; ret (s,id))
                                          dests);;
