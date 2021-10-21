@@ -24,7 +24,6 @@ From Vellvm.Handlers Require Export
      Stack
      Intrinsics
      FiniteMemory
-     FiniteMemoryTheory
      Pick
      UndefinedBehaviour
      Serialization.
@@ -32,10 +31,10 @@ From Vellvm.Handlers Require Export
 From Vellvm.Semantics Require Import Memory.Sizeof Memory.MemBytes GepM.
 
 (* Handlers get instantiated over the domain of addresses provided by the memory model *)
-Module LLVMEvents := LLVMEvents.Make(FiniteMemory.Addr)(FiniteMemory.FinSizeof).
-Module Global := Global.Make FiniteMemory.Addr FiniteMemory.FinSizeof LLVMEvents.
-Module Local  := Local.Make  FiniteMemory.Addr FiniteMemory.FinSizeof LLVMEvents.
-Module Stack  := Stack.Make  FiniteMemory.Addr FiniteMemory.FinSizeof LLVMEvents.
+Module LLVMEvents := LLVMEvents.Make(FiniteMemory.Addr)(FiniteMemory.BigIP)(FiniteMemory.FinSizeof).
+Module Global := Global.Make FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof LLVMEvents.
+Module Local  := Local.Make  FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof LLVMEvents.
+Module Stack  := Stack.Make  FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof LLVMEvents.
 
 Require Import List ZArith String.
 Import ListNotations.
@@ -50,7 +49,7 @@ From ExtLib Require Import
 
 Import MonadNotation.
 
-Module GEP : GEPM(FiniteMemory.Addr)(FiniteMemory.FinSizeof)(LLVMEvents).
+Module GEP : GEPM(FiniteMemory.Addr)(FiniteMemory.BigIP)(FiniteMemory.FinSizeof)(LLVMEvents).
   Import Addr.
   Import LLVMEvents.
   Import DV.
@@ -132,15 +131,16 @@ Module GEP : GEPM(FiniteMemory.Addr)(FiniteMemory.FinSizeof)(LLVMEvents).
     end.
 End GEP.
 
-Module Intrinsics := Intrinsics.Make FiniteMemory.Addr FiniteMemory.FinSizeof LLVMEvents.
+Module Intrinsics := Intrinsics.Make FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof LLVMEvents.
 
 Module Byte := FinByte LLVMEvents.
-Module MemTheory := FiniteMemoryTheory.Make FiniteMemory.Addr FiniteMemory.FinSizeof LLVMEvents FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP GEP Byte.
 
 
-Module SER := Serialization.Make(FiniteMemory.Addr)(FiniteMemory.FinSizeof)(LLVMEvents)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(GEP)(Byte).
+Module SER := Serialization.Make(FiniteMemory.Addr)(FiniteMemory.BigIP)(FiniteMemory.FinSizeof)(LLVMEvents)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(GEP)(Byte).
 
-Module Pick := Pick.Make FiniteMemory.Addr FinSizeof LLVMEvents FinPTOI FinPROV FinITOP GEP Byte.
+Module MEM := FiniteMemory.Make(FiniteMemory.Addr)(FiniteMemory.BigIP)(FiniteMemory.FinSizeof)(LLVMEvents)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(GEP)(Byte).
 
-Export LLVMEvents LLVMEvents.DV Global Local Stack MemTheory MemTheory.Mem Pick Intrinsics
-       UndefinedBehaviour.
+Module Pick := Pick.Make FiniteMemory.Addr FiniteMemory.BigIP FinSizeof LLVMEvents FinPTOI FinPROV FinITOP GEP Byte.
+
+Export LLVMEvents LLVMEvents.DV Global Local Stack Pick Intrinsics
+       MEM UndefinedBehaviour.
