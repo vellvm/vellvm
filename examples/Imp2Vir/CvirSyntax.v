@@ -223,6 +223,213 @@ Definition eval_top (cir : icvir) :=
 
 Notation conv := (convert_typ []).
 
+Lemma norepet_singleton : forall {A} (x : A),
+  Coqlib.list_norepet [x].
+Proof.
+  intros.
+  apply Coqlib.list_norepet_cons ; auto.
+  apply Coqlib.list_norepet_nil.
+Qed.
+
+(** -- Well-Formness -- *)
+
+Lemma getInputs_invariant :
+ forall σ σ' l, getInputs σ = (σ', l) -> σ = σ'.
+Proof.
+  unfold getInputs.
+  intros.
+  flatten_all.
+  inv H. reflexivity.
+Qed.
+
+Lemma getOutputs_invariant :
+ forall σ σ' l, getOutputs σ = (σ', l) -> σ = σ'.
+Proof.
+  unfold getOutputs.
+  intros.
+  flatten_all.
+  inv H. reflexivity.
+Qed.
+
+(* Ltac unfold_freshness := *)
+(*   repeat ( *)
+(*   match goal with *)
+(*   | h: context[(_,_) = (_,_)] |- _ => inv h *)
+(*   | h: context[getInputs _ = (_,_)] |- _ => apply getInputs_invariant in h ; try subst *)
+(*   | h: context[getOutputs _ = (_,_)] |- _ => apply getOutputs_invariant in h ; try subst *)
+(*   | h: context[setInputs _ _ = (_,_)] |- _ => *)
+(*     unfold setInputs in h ; try (flatten_hyp h) ; inv h *)
+(*   | h: context[setOutputs _ _ = (_,_)] |- _ => *)
+(*     unfold setOutputs in h ; try (flatten_hyp h) ; inv h *)
+(*   | |- _ => idtac *)
+(*   end ; simpl in * *)
+(*     ). *)
+
+Ltac unfold_freshness :=
+  repeat (
+  match goal with
+  | h: context[(_,_) = (_,_)] |- _ => inv h
+  | h: context[getInputs _ = (_,_)] |- _ =>
+    unfold getInputs in h ; try (flatten_hyp h) ; inv h ; subst
+  | h: context[getOutputs _ = (_,_)] |- _ =>
+    unfold getOutputs in h ; try (flatten_hyp h) ; inv h ; subst
+  | h: context[setInputs _ _ = (_,_)] |- _ =>
+    unfold setInputs in h ; try (flatten_hyp h) ; inv h ; subst
+  | h: context[setOutputs _ _ = (_,_)] |- _ =>
+    unfold setOutputs in h ; try (flatten_hyp h) ; inv h ; subst
+  | |- _ => idtac
+  end ; simpl in *
+    ).
+
+
+(* NOTE this lemma is too strong: we want that the invariant holds for an arbitrary number
+        of getLab calls *)
+Lemma freshness_get_label : forall (σ σ' σ'' : FST) l l',
+  getLab σ = (σ', l) ->
+  getLab σ' = (σ'', l') ->
+  (l <> l')%nat.
+Proof.
+  intros.
+  destruct σ,  σ'.
+  unfold getLab in *.
+  inv H; inv H0. unfold name,mk_anon.
+  intro; injection H; lia.
+Qed.
+
+Theorem ins_outs_disjoints : forall (ir : icvir) (σ s s' s'' : FST) li lo b,
+  (eval ir σ) = (s,b) ->
+  getInputs s = (s',li) ->
+  getOutputs s' = (s'',lo) ->
+  Coqlib.list_disjoint li lo.
+Proof.
+  induction ir ; intros.
+  - (* Block *)
+    destruct b;
+    simpl in H;
+    repeat flatten_hyp H.
+    + apply (freshness_get_label σ f f0 b b1) in Heq; auto.
+      unfold_freshness.
+      unfold Coqlib.list_disjoint ; intros ; simpl in H, H0.
+      intuition; now subst.
+    + unfold_freshness.
+      unfold Coqlib.list_disjoint ; intros ; simpl in H0 ; contradiction.
+    + unfold_freshness.
+      unfold Coqlib.list_disjoint ; intros ; simpl in H0 ; contradiction.
+    + apply (freshness_get_label σ f f0 b b1) in Heq; auto.
+      unfold_freshness.
+      apply (freshness_get_label f f0 {|
+            inputs_visibles := inputs_visibles0;
+            outputs_visibles := outputs_visibles0;
+            counter_reg := counter_reg0;
+            counter_bid := counter_bid1
+          |} b1 b2) in Heq0; auto.
+      unfold Coqlib.list_disjoint ; intros ; simpl in H, H0.
+      assert ( b <> b2). { admit. }
+      intuition; now subst.
+  - (* PermuteInputs *)
+    simpl in H ; repeat flatten_hyp H.
+    apply (IHir σ f f0 f1 li lo l);
+    try (assumption) ;
+    try (
+    inv H;
+    unfold_freshness; reflexivity).
+  - (* PermuteOutputs *) admit.
+  - (* Loop *)
+    simpl in H ; repeat flatten_hyp H.
+    assert (Hdisjoint : Coqlib.list_disjoint l0 l1).
+    {apply (IHir σ f f0 f1 l0 l1 l); assumption. }
+    unfold_freshness.
+    (* l0 ## l1 => (skipn n l0)##(skipn n l1)*)
+    admit.
+  - (* Merge *)
+    simpl in H ; repeat flatten_hyp H.
+    assert (Hdisjoint1 : Coqlib.list_disjoint l0 l1).
+    {apply (IHir1 σ f f0 f1 l0 l1 l); assumption. }
+    assert (Hdisjoint2 : Coqlib.list_disjoint l3 l4).
+    {apply (IHir2 f1 f2 f3 f4 l3 l4 l2); assumption. }
+    unfold_freshness.
+    apply Util.list_disjoint_app_l ; split ;
+    apply Util.list_disjoint_app_r ; split; (try assumption).
+    admit. admit.
+  - (* Join *)
+    simpl in H ; repeat flatten_hyp H.
+    assert (Hdisjoint : Coqlib.list_disjoint l0 l1).
+    {apply (IHir σ f f0 f1 l0 l1 l); assumption. }
+    (* we should ensure something about the new bid *)
+    unfold_freshness.
+Admitted.
+
+Theorem uniqueness : forall (ir : icvir) (σ : FST),
+  wf_ocfg_bid (snd ((eval ir) σ)).
+Proof.
+  induction ir ; intros.
+  - (* Block *)
+    destruct b ; simpl ;
+    repeat flatten_all ; simpl ;
+    unfold wf_ocfg_bid;
+    unfold inputs;
+    simpl ; apply norepet_singleton.
+  - (* PermuteInputs *)
+    simpl ;
+    repeat flatten_all ; simpl.
+    specialize (IHir σ).
+    rewrite Heq in IHir. simpl in IHir.
+    (* we need to prove that ocfg_relabel preserve the uniqueness if
+       - the mapping is injective (1)
+       - the list of block was unique (OK)
+
+      For 1, we need to prove that cycle is injective, thus the mapping will
+      be injective
+     *)
+    admit.
+  - (* PermuteOutputs *)
+    simpl ; repeat flatten_all ; simpl.
+    specialize (IHir σ). rewrite Heq in IHir. simpl in IHir.
+    (* Similar as PermuteInputs*)
+    admit.
+  - (* Loop n *)
+    simpl ; repeat flatten_all ; simpl.
+    specialize (IHir σ). rewrite Heq in IHir. simpl in IHir.
+    (* Same as PermuteInput, but prove that
+    (mk_map (firstn n l0) (firstn n l1)) is injective *)
+    admit.
+  - (* Merge *)
+    simpl ; repeat flatten_all ; simpl.
+    unfold_freshness.
+    set (σ' := {|
+             inputs_visibles := l0;
+             outputs_visibles := l1;
+             counter_reg := counter_reg1;
+             counter_bid := counter_bid1
+           |}) ; replace ( {|
+             inputs_visibles := l0;
+             outputs_visibles := l1;
+             counter_reg := counter_reg1;
+             counter_bid := counter_bid1
+           |} ) with σ' in * ; auto.
+    specialize ( IHir1 σ ).
+    specialize ( IHir2 σ' ).
+    rewrite Heq in IHir1; rewrite Heq2 in IHir2 ; simpl in *.
+    unfold wf_ocfg_bid in *.
+    rewrite ScopeTheory.inputs_app.
+    apply Coqlib.list_norepet_append ; auto.
+    (* disjointness between the ID produces by the monad *)
+    admit.
+  -  (* Join *)
+    simpl ; repeat flatten_all ; simpl.
+    (* Steps:
+        1. For each evaluation, the list of exposed inputs and outputs are
+           disjoints
+        2. l1 contains only outputs. Using (1), l1 ## inputs l.
+        3. first n l1 ⊆ l1, thus (first n l1) ## inputs l.
+        4. ocfg_relabel do not rename inputs, thus it suffice to prove
+          (wf_ocfg_bid l) (with is an hypothesis)
+     *)
+    admit.
+Admitted.
+
+(** -- Semantics -- *)
+
 From Vellvm Require Import Semantics.
 Import ITreeNotations.
 
