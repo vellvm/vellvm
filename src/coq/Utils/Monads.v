@@ -8,7 +8,7 @@ From ExtLib Require Import
      Data.Monads.IdentityMonad.
 
 From ITree Require Import
-     Basics.Monad.
+     Basics.Monad Basics.MonadState.
 
 From Vellvm Require Import
      Utils.Util.
@@ -83,17 +83,20 @@ Qed.
 Global Instance EqM_eitherT {E} {M} `{Monad.Eq1 M} : Monad.Eq1 (eitherT E M)
   := fun (a : Type) x y => Monad.eq1 (unEitherT x) (unEitherT y).
 
-Global Instance EqMProps_eitherT {E} {M} `{Monad.Eq1Equivalence M} : Monad.Eq1Equivalence (eitherT E M).
-constructor; intuition;
-repeat intro.
-- unfold Monad.eq1, EqM_eitherT.
-  reflexivity.
-- unfold Monad.eq1, EqM_eitherT.
-  symmetry.
-  auto.
-- unfold Monad.eq1, EqM_eitherT.
-  etransitivity; eauto.
-Defined.
+Global Instance Eq1Equivalence_eitherT :
+  forall {M : Type -> Type} {H : Monad M} {H0 : Monad.Eq1 M} E,
+    Monad.Eq1Equivalence M -> Monad.Eq1Equivalence (eitherT E M).
+Proof.
+  constructor; intuition;
+  repeat intro.
+  - unfold Monad.eq1, EqM_eitherT.
+    reflexivity.
+  - unfold Monad.eq1, EqM_eitherT.
+    symmetry.
+    auto.
+  - unfold Monad.eq1, EqM_eitherT.
+    etransitivity; eauto.
+Qed.
 
 (* TODO: move this *)
 Global Instance Eq1_ident : Monad.Eq1 IdentityMonad.ident
@@ -137,13 +140,13 @@ Proof.
   destruct ma; reflexivity.
 Qed.
 
-Global Instance MonadLawsE_either {E} {M} `{HM : Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM} `{@Monad.MonadLawsE M EQM _} : Monad.MonadLawsE (eitherT E M).
+Global Instance MonadLaws_eitherT {E} {M} `{HM : Monad M} `{EQM : Eq1 M} `{EQV : @Eq1Equivalence M HM EQM} `{@Monad.MonadLawsE M EQM _} : Monad.MonadLawsE (eitherT E M).
 Proof.
   split; intros *.
   - cbn.
     destruct H.
     do 2 red.
-    cbn.
+    cbn. intros.
 
     rewrite bind_ret_l.
     reflexivity.
@@ -205,3 +208,5 @@ Proof.
     destruct a; eauto.
     reflexivity.
 Defined.
+
+Existing Instance MonadState.MonadLawsE_stateTM.
