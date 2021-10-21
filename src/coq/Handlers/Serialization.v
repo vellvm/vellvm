@@ -841,7 +841,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
 
       #[global] Instance Monad_RefineProp : Monad RefineProp :=
         {|
-        ret := fun _ x y => Monad.eq1 y (ret x);
+        ret := fun _ x y => Monad.eq1 (ret x) y;
         bind := @bind_RefineProp
         |}.
 

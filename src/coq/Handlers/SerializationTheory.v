@@ -714,21 +714,25 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
       cbn in CONC.
       unfold bind_RefineProp in CONC.
       destruct CONC as (ma & k' & pama & eqm & REST).
-      destruct ma as [[[uba | [erra | a]]]] eqn:Hma; cbn; auto; try contradiction.
+      destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma;
+        cbn; auto; try contradiction.
       subst.
 
+      destruct REST as [FAILS | REST].
+      inversion FAILS.
       specialize (REST nil).
       forward REST; [reflexivity|].
 
-      destruct (k' nil) as [[[ubk' | [errk' | k'nil]]]] eqn:Hk'nil; cbn; auto; try contradiction.
-      subst.
+      destruct (k' nil) as [[[[[[[oom_k'nil] | [[ub_k'nil] | [[err_k'nil] | k'nil]]]]]]]] eqn:Hk'nil;
+        cbn; auto; try contradiction;
+      subst;
 
+      cbn in eqm;
+      rewrite Hk'nil in eqm;
       cbn in eqm.
-      rewrite Hk'nil in eqm.
-      cbn in eqm.
-      subst.
+      contradiction.
 
-      constructor.
+      subst; constructor.
     }
     { (* Non-nil structs *)
       do 2 red in CONC.
@@ -767,18 +771,22 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
       destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
 
       eapply eval_iop_dtyp_i.
+      1-4: admit. (* Waaah *)
       eapply IHDTYP1; eauto.
       eapply IHDTYP2; eauto.
-      eauto.
+      rewrite EVAL.
+      reflexivity.
     }
 
     { apply concretize_ibinop_inv in CONC; auto.
       destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
 
       eapply eval_iop_dtyp_iptr.
+      1-4: admit. (* Waaah *)
       eapply IHDTYP1; eauto.
       eapply IHDTYP2; eauto.
-      eauto.
+      rewrite EVAL.
+      reflexivity.
     }
 
     (* Integer Comparisons *)
@@ -853,13 +861,14 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
     intros uv dt sid prov sbytes TYP SUP SIZE SER.
     induction TYP.
 
-    rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto.
+    (* rewrite serialize_sbytes_equation in SER; *)
+    (*   cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto. *)
 
-    1-5: match goal with
-          (* Try easy case first for speedup *)
-          | |- _ = inr ?x =>
-            tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
-          end.
+    (* 1-5: match goal with *)
+    (*       (* Try easy case first for speedup *) *)
+    (*       | |- _ = inr ?x => *)
+    (*         tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto)) *)
+    (*       end. *)
 
     (* Poison arrays *)
     { admit.

@@ -5,9 +5,11 @@ From ITree Require Import
      Basics.Monad.
 
 From ExtLib Require Import
-     Structures.Monads.
+     Structures.Monads
+     Data.Monads.EitherMonad
+     Data.Monads.IdentityMonad.
 
-From Vellvm.Utils Require Import MonadExcLaws.
+From Vellvm.Utils Require Import Monads MonadExcLaws.
 
 Section Laws.
 
@@ -23,6 +25,21 @@ Section Laws.
 End Laws.
 
 Open Scope monad_scope.
+
+Section Ident.
+  Lemma eq1_ret_ret_ident :
+    forall {A} (x y : A), (ret x : ident A) ≈ ret y -> x = y.
+  Proof.
+    intros A x y EQ.
+    unfold Monad.eq1, Eq1_either in EQ.
+    inversion EQ.
+    reflexivity.
+  Qed.
+
+  Global Instance Eq1_ret_inv_ident : Eq1_ret_inv ident :=
+    { eq1_ret_ret := fun a => eq1_ret_ret_ident }.
+
+End Ident.
 
 Section Either.
   Variable E : Type.
