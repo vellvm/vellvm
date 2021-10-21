@@ -238,91 +238,23 @@ Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEO
   Qed.
 End MemBytesTheory.
 
-Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(SIZEOF)(LLVMIO)).
+Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(IP)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(IP)(SIZEOF)(LLVMIO)).
 
   Import LLVMIO.
 
-  Module MBT := MemBytesTheory Addr SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
+  Module MBT := MemBytesTheory Addr IP SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
   Import MBT.
   Import MBT.SER.
   Import BYTE.
   Import SIZEOF.
 
-  Module Mem := FiniteMemory.Make Addr SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
+  Module Mem := FiniteMemory.Make Addr IP SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
   Import Mem.
 
-  Module ESID := ERRSID Addr SIZEOF LLVMIO PROVENANCE.
+  Module ESID := ERRSID Addr IP SIZEOF LLVMIO PROVENANCE.
   Import ESID.
 
   Import DynamicTypes.
-
-  Lemma to_ubytes_all_bytes_from_uvalue_helper :
-    forall uv dt sid sbytes,
-      is_supported dt ->
-      to_ubytes uv dt sid = sbytes ->
-      all_bytes_from_uvalue_helper 0 sid uv sbytes = Some uv.
-  Proof.  
-    intros uv dt sid sbytes SUP TO.
-
-    change 0%Z with (Z.of_N 0).
-    eapply to_ubytes_all_bytes_from_uvalue_helper'; eauto.    
-  Qed.
-
-  Lemma to_ubytes_sizeof_dtyp :
-    forall uv dt sid,  
-      N.of_nat (List.length (to_ubytes uv dt sid)) = sizeof_dtyp dt.
-  Proof.
-    intros uv dt sid.
-    unfold to_ubytes.
-    rewrite map_length, Nseq_length.
-    lia.
-  Qed.
-
-  Lemma from_ubytes_to_ubytes :
-    forall uv dt sid,
-      is_supported dt ->
-      sizeof_dtyp dt > 0 ->
-      from_ubytes (to_ubytes uv dt sid) dt = uv.
-  Proof.
-    intros uv dt sid SUP SIZE.
-
-    unfold from_ubytes.
-    unfold all_bytes_from_uvalue.
-
-    rewrite to_ubytes_sizeof_dtyp.
-    rewrite N.eqb_refl.
-
-    break_inner_match.
-    - (* Contradiction by size *)
-      pose proof to_ubytes_sizeof_dtyp uv dt sid as ALLBYTES.
-      rewrite Heql in ALLBYTES.
-
-      cbn in *.
-      lia.
-    - pose proof sbyte_to_extractbyte_inv s as (uv' & dt' & idx' & sid' & SBYTE).
-      cbn in *.
-      rewrite SBYTE.
-
-      unfold to_ubytes in Heql.
-      remember (sizeof_dtyp dt) as sz.
-      destruct sz; [inv SIZE|].
-      cbn in *.
-      pose proof Pos2Nat.is_succ p as [sz Hsz].
-      rewrite Hsz in Heql.
-      rewrite <- cons_Nseq in Heql.
-
-      cbn in Heql.
-      inv Heql.
-      cbn.
-
-      solve_guards_all_bytes.
-      rewrite sbyte_to_extractbyte_of_uvalue_sbyte in SBYTE.
-      inv SBYTE.
-
-      cbn.
-      change 1%Z with (Z.of_N 1).
-      erewrite to_ubytes_all_bytes_from_uvalue_helper'; eauto.
-  Qed.
 
   (* TODO: move this *)
   Ltac tactic_on_non_aggregate_uvalues x t :=
@@ -385,7 +317,30 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
     cbn in CONC.
     destruct CONC as (ma & k' & pama & eqm & REST).
 
-    destruct ma as [[[uba | [erra | a]]]] eqn:Hma; cbn; auto.
+    destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma.
+
+    (* First thing is oom... *)
+    { cbn in SUCC.
+      unfold concretize_succeeds, concretize_fails in SUCC.
+      red in SUCC.
+
+      exfalso.
+      apply SUCC.
+
+      red. rewrite concretize_uvalueM_equation.
+      cbn.
+
+      unfold bind_RefineProp.
+
+      eexists.
+      exists ret.
+
+      split; [apply pama|].
+      split; auto.
+
+      left.
+      reflexivity.
+    }
 
     (* First thing is ub... *)
     (* This should be ruled out by SUCC *)
@@ -406,10 +361,6 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
 
       split; [apply pama|].
       split; auto.
-
-      intros a H.
-      cbn in H.
-      destruct uba; contradiction.
     }
 
     (* First thing is failure... *)
@@ -431,12 +382,10 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
 
       split; [apply pama|].
       split; auto.
-
-      intros a H.
-      cbn in H.
-      destruct erra; contradiction.
     }
 
+    destruct REST as [FAILS | REST].
+    inversion FAILS.
     specialize (REST a).
     forward REST; [reflexivity|].
 
@@ -447,7 +396,35 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
     cbn in SUCC.
     unfold bind_RefineProp in SUCC.
 
-    destruct mb as [[[ubb | [errb | b]]]] eqn:Hmb; cbn; auto.
+    destruct mb as [[[[[[[oom_mb] | [[ub_mb] | [[err_mb] | b]]]]]]]] eqn:Hmb.
+
+    (* y raises OOM *)
+    { exfalso.
+      apply SUCC.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      
+      split; [apply pama|].
+      split; cbn; auto.
+
+      right.
+      intros a0 H; subst.
+
+      eexists.
+      exists ret.
+
+      split; [apply pbmb|].
+      cbn.
+      split; auto.
+
+      cbn in eqmb.
+      cbn in *.
+
+      destruct (k' a0) as [[[[[[[oom_k'a0] | [[ub_k'a0] | [[err_k'a0] | k'a0]]]]]]]];
+        cbn in *; contradiction.
+    }
 
     (* y raises UB *)
     { exfalso.
@@ -460,6 +437,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
       split; [apply pama|].
       split; cbn; auto.
 
+      right.
       intros a0 H; subst.
 
       eexists.
@@ -467,10 +445,6 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
 
       split; [apply pbmb|].
       split; auto.
-
-      intros a H.
-      cbn in H.
-      destruct ubb; contradiction.
     }
 
     (* y fails *)
@@ -484,6 +458,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
       split; [apply pama|].
       split; cbn; auto.
 
+      right.
       intros a0 H; subst.
 
       eexists.
@@ -491,20 +466,49 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
 
       split; [apply pbmb|].
       split; auto.
-
-      intros a H.
-      cbn in H.
-      destruct errb; contradiction.
     }
 
     (* Both x and y successfully concretized.
 
          Now eval_iop must succeed too.
      *)
+    destruct REST as [FAILS | REST].
+    inversion FAILS.
     specialize (REST b).
     forward REST; [reflexivity|].
 
-    destruct (eval_iop op a b) as [[[ubz | [errz | z]]]] eqn:Hmz; cbn; auto.
+    destruct (eval_iop op a b) as [[[[[[[oom_z] | [[ub_z] | [[err_z] | z]]]]]]]] eqn:Hmz.
+
+    (* Eval raises OOM *)
+    { exfalso.
+      apply SUCC.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split; [apply pama|].
+      split; cbn; auto.
+
+      right.
+      intros a0 H; subst.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split; [apply pbmb|].
+      split; cbn; auto.
+
+      right.
+      intros a H; subst.
+
+      rewrite Hmz.
+      destruct (kb a) as [[[[[[[oom_kba] | [[ub_kba] | [[err_kba] | kba]]]]]]]] eqn:Hkba;
+        cbn in *; try contradiction.
+      rewrite Hkba in eqmb.
+      cbn in eqmb.
+      destruct (k' a0) as [[[[[[[oom_k'a0] | [[ub_k'a0] | [[err_k'a0] | k'a0]]]]]]]] eqn:Hk'a0;
+        cbn in eqm; contradiction.
+    }
 
     (* Eval raises ub *)
     { exfalso.
@@ -516,6 +520,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
       split; [apply pama|].
       split; cbn; auto.
 
+      right.
       intros a0 H; subst.
 
       eexists.
@@ -524,6 +529,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
       split; [apply pbmb|].
       split; cbn; auto.
 
+      right.
       intros a H; subst.
 
       rewrite Hmz.
@@ -540,6 +546,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
       split; [apply pama|].
       split; cbn; auto.
 
+      right.
       intros a0 H; subst.
 
       eexists.
@@ -548,6 +555,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
       split; [apply pbmb|].
       split; cbn; auto.
 
+      right.
       intros a H; subst.
 
       rewrite Hmz.
@@ -557,10 +565,12 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
     cbn in eqmb.
     cbn in eqm.
 
-    destruct (kb b) as [[[ubkbb | [errkbb | kbb]]]] eqn:Hkbb; try contradiction; subst.
+    destruct (kb b) as [[[[[[[oom_kbb] | [[ub_kbb] | [[err_kbb] | kbb]]]]]]]] eqn:Hkbb;
+      try contradiction; subst.
     cbn in eqmb.
-    
-    destruct (k' a) as [[[ubka | [errka | ka]]]] eqn:Hka; try contradiction; subst.
+
+    destruct (k' a) as [[[[[[[oom_k'a] | [[ub_k'a] | [[err_k'a] | k'a]]]]]]]] eqn:Hk'a;
+      try contradiction; subst.
     cbn in eqm; subst.
 
     exists a. exists b.
@@ -577,8 +587,6 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
       apply CONC.
 
       split; cbn; auto.
-      intros a0 CONTRA.
-      contradiction.
     }
 
     { unfold concretize_succeeds, concretize_fails, concretize_u.
@@ -591,6 +599,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
       split; [apply pama|].
       split; cbn; auto.
 
+      right.
       intros a0 H; subst.
 
       eexists.
@@ -600,10 +609,15 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: L
       apply CONC.
 
       split; cbn; auto.
-
-      intros a CONTRA.
-      contradiction.
     }
+
+    rewrite Hmz.
+    cbn.
+
+    destruct (k' a) as [[[[[[[oom_k'a] | [[ub_k'a] | [[err_k'a] | k'a]]]]]]]] eqn:Hk'a;
+      cbn in eqm; try contradiction.
+    cbn in eqmb.
+    subst; auto.
   Qed.
 
   Lemma concretize_succeeds_poison :
