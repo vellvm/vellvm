@@ -1,4 +1,5 @@
 From Coq Require Import
+     Lia
      (* Arith *)
      (* Strings.String *)
      Lists.List
@@ -8,6 +9,16 @@ From Vellvm Require Import Syntax Semantics .
 From Imp2Vir Require Import Relabel.
 
 Import ListNotations.
+
+From ExtLib Require Import
+     Structures.Monads.
+From ITree Require Import
+     ITree
+     ITreeFacts
+     Eq.
+
+From Vellvm Require Import Tactics.
+
 
 Section CvirSyntax.
 
@@ -35,6 +46,16 @@ Definition eq_bid b b' :=
   | _,_ => false
   end.
 
+Fixpoint find_nth_error' (l : list block_id) (x : block_id) (n : nat) : option nat :=
+  match l with
+  | [] => None
+  | h::t =>  if eq_bid x h then Some n else find_nth_error' t x (n+1)
+  end.
+
+Definition find_nth_error (l : list block_id) (x : block_id) : option nat :=
+  find_nth_error' l x 0.
+
+
 Fixpoint find_nth' (l : list block_id) (x : block_id) (n : nat) : nat:=
   match l with
   | [] => 0
@@ -43,13 +64,14 @@ Fixpoint find_nth' (l : list block_id) (x : block_id) (n : nat) : nat:=
 
 Definition find_nth (l : list block_id) (x : block_id) := find_nth' l x 0.
 
-Lemma nth_no_error : forall {A} (l : list A) k,
-  l <> [] ->
-  nth_error l (Nat.modulo k (length l)) <> None.
+Lemma nth_error_none : forall {A} (l : list A) k,
+  nth_error l (Nat.modulo k (length l)) = None -> l = [].
 Proof.
   intros.
-  induction l; [contradiction|].
-Admitted.
+  induction l ; auto.
+  rewrite nth_error_None in H.
+  simpl in H. lia.
+Qed.
 
 Definition mk_anon (n : nat) := Anon (Z.of_nat n).
 
@@ -75,14 +97,6 @@ Definition Sequence (c1 c2 : icvir) : icvir :=
 (*   let body := Join 2 (Merge ct cf) in *)
 (*   Sequence cond body. *)
 
-From ExtLib Require Import
-     Structures.Monads.
-From ITree Require Import
-     ITree
-     ITreeFacts
-     Eq.
-
-From Vellvm Require Import Tactics.
 
 Record FST := mk_FST
   {
@@ -103,7 +117,8 @@ Definition fresh : Type -> Type := fun X => FST -> (FST * X).
   |}.
 Import MonadNotation.  
 
-Variable (name : nat -> block_id).
+(* Variable (name : nat -> block_id). *)
+Definition name := mk_anon.
 
 Definition getReg : fresh block_id :=
   fun '(mk_FST i o r b) =>
@@ -162,17 +177,15 @@ Fixpoint eval (cir : icvir) : fresh (list (block typ)) :=
     g <- eval ir;;
     ins <- getInputs ;;
     outs <- getOutputs ;;
-    setInputs (cycle ins);;
-    setOutputs outs;;
-    ret g
+    let rename_map := (mk_map ins (cycle ins)) in
+    ret (ocfg_relabel rename_map g)
 
   | PermuteOutputs ir => (* Note: has been simplified. General Case? *)
     g <- eval ir;;
     ins <- getInputs ;;
     outs <- getOutputs ;;
-    setInputs ins;;
-    setOutputs (cycle outs);;
-    ret g
+    let rename_map := (mk_map outs (cycle outs)) in
+    ret (ocfg_relabel rename_map g)
 
   | Join k ir =>
     g <- eval ir;;
@@ -230,11 +243,11 @@ Proof.
   intros.
   unfold sem.
   simpl. repeat flatten_all.
-  simpl.
-  inv Heq.
-  inv Heq1.
-  simpl in Heq4 ; inv Heq4.
-  clear.
+  unfold_freshness.
+  clear -Heq1.
+  unfold getLab in Heq1.
+  unfold denote_ocfg.
+  (* it seems to be false (because of the fto...) *)
 Admitted.
 
 (* TODO blockRet *)
@@ -256,11 +269,14 @@ Proof.
   intros.
   unfold sem.
   simpl.
-  repeat flatten_all ; simpl ;
-  (inv Heq0;
-  inv Heq2).
+  repeat flatten_all ;
+  unfold_freshness ;
+  rewrite Heq3 in Heq9 ; clear Heq3 ; inv Heq9.
 Admitted.
 
+(* Permute is WRONG:
+   we can't just permute the list, we have to apply the relabeling in the CFG
+ *)
 Lemma permuteInput_sound :
  forall (ir : icvir) (σ : FST) (fto : block_id * block_id),
  eutt eq
@@ -269,20 +285,23 @@ Lemma permuteInput_sound :
        let inputs := inputs_visibles σ' in
        let outputs := outputs_visibles σ' in
        let (from, src) := fto in
-       let i := find_nth inputs src in
-       let nsrc := nth_error inputs ((i+1) mod (length inputs)) in
-       match nsrc with
-       | None => t (from, src) (* impossible because of mod *)
-       | Some nsrc => t (from, nsrc)
-end).
+       let i := find_nth_error inputs src in
+       match i with
+       | None => t fto
+       | Some i =>
+         (let nsrc := nth_error inputs ((i+1) mod (length inputs)) in
+          match nsrc with
+          | None => t (from, src) (* impossible because of mod *)
+          | Some nsrc => t (from, nsrc)
+          end)
+       end ).
 Proof.
   intros.
   unfold sem.
   simpl.
-  repeat flatten_goal.
-  Focus 2.
-  apply nth_no_error in Heq2. contradiction. admit.
-  cbn.
+  repeat flatten_all ; simpl ;
+  unfold_freshness.
+  2:{apply nth_error_none in Heq5. rewrite Heq5 in Heq4. cbn in Heq4 ; discriminate. }
 Admitted.
 
 
@@ -290,10 +309,7 @@ Lemma loop_sound :
   forall (ir : icvir) (k : nat) (σ : FST) (fto : block_id * block_id),
   eutt eq
        (snd (sem (Loop k ir) σ) fto)
-       (let (σ', t) := sem ir σ in
-        let inputs := inputs_visibles σ' in
-        let outputs := outputs_visibles σ' in
-        (iter (C := Kleisli _)
+       (iter (C := Kleisli _)
                (fun '(from,src) =>
                   let (σ', t) := sem ir σ in
                   let inputs := inputs_visibles σ' in
@@ -306,28 +322,29 @@ Lemma loop_sound :
                      if (Nat.ltb i k)
                      then (
                         match nth_error inputs (i mod (length inputs)) with
-                        | None => ret (inl (src,target)) (* TODO : raise an error *)
+                        | None => ret (inl (src,target)) (* TODO : raise an error ? *)
                         | Some ntarget => ret (inl (src,ntarget))
                         end)
                      else
                        ret (inr (inl (src,target))))
                   end)
-               fto)).
+               fto).
 Proof.
   intros.
   unfold sem.
   simpl.
-  repeat flatten_goal.
+  repeat flatten_all ;
+  unfold_freshness.
+
+  rewrite unfold_iter_ktree.
+  unfold denote_ocfg at 1.
 Admitted.
 
-Lemma join_sound : Prop.
-  refine (
+Lemma join_sound :
   forall (ir : icvir) (k : nat) (σ : FST) (fto : block_id * block_id),
   eutt eq
-       (snd (sem (Join k ir) σ) fto) _).
-  refine
+       (snd (sem (Join k ir) σ) fto)
        (let (σ', t) := sem ir σ in
-        let inputs := inputs_visibles σ' in
         let outputs := outputs_visibles σ' in
         fto' <- t fto ;; (* : fto' : (bid*bid + dvalue)*)
         match fto' with
@@ -335,9 +352,18 @@ Lemma join_sound : Prop.
         | inl (src,target) =>
           let i := find_nth outputs target in
           if (Nat.ltb i k)
-          then ret (inl (src,_)) (* target new label *)
+          then ret (inl (src,(snd ((new_lab <- getLab ;; ret new_lab) σ)))) (* target new label *)
           else ret (inl (src,target)) (* no change *)
         end).
+Proof.
+  intros.
+  unfold sem.
+  simpl.
+  repeat flatten_all.
+  simpl.
+  unfold_freshness.
+  (* unfold getLab in H0. *)
+  (* unfold getLab in Heq6. *)
 Admitted.
 
 Lemma seq_sound : forall (ir1 ir2 : icvir) σ fto,
@@ -356,6 +382,13 @@ Proof.
   rewrite loop_sound.
   simpl.
   repeat flatten_goal.
+  assert (Hi0 : i0 = snd (sem ir1 σ)).
+  { rewrite Heq0 ; reflexivity. }
+  subst i0.
+  unfold sem in Heq.
+  simpl in Heq.
+  repeat flatten_all.
+  unfold_freshness.
 Admitted.
 
 

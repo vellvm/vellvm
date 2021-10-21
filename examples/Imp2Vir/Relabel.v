@@ -39,6 +39,11 @@ Definition blk_id_relabel m bid : block_id :=
   | None => bid
   end.
 
+
+Import ListNotations.
+Compute blk_id_relabel [(Anon 0%Z, Anon 2%Z);(Anon 1%Z, Anon 2%Z)] (Anon 0%Z).
+
+
 Theorem blk_id_relabel_find : forall {m} {bid bid'},
   alist_find bid m = Some bid' -> blk_id_relabel m bid = bid'.
 Proof.
