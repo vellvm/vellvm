@@ -180,6 +180,34 @@ Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEO
     lia.
   Qed.
 
+  Lemma to_ubytes_first_byte :
+    forall uv dt sid s l,
+      to_ubytes uv dt sid = NoOom (s :: l) ->
+      s = uvalue_sbyte uv dt (UVALUE_IPTR IP.zero) sid.
+  Proof.
+    intros uv dt sid s l TO.
+    unfold to_ubytes in TO.
+
+    assert (N.to_nat (sizeof_dtyp dt) > 0)%nat.
+    { destruct (N.to_nat (sizeof_dtyp dt)) eqn:Hsz.
+      - cbn in TO. inversion TO.
+      - lia.
+    }
+
+    assert (exists n, N.to_nat (sizeof_dtyp dt) = S n) as (n & Hsn).
+    { destruct (N.to_nat (sizeof_dtyp dt)) eqn:Hsz.
+      lia.
+      eexists; auto.
+    }
+
+    rewrite Hsn in TO.
+    cbn in TO.
+
+    rewrite IP.from_Z_0 in TO.
+    break_match_hyp; inversion TO; subst.
+    auto.
+  Qed.
+
   Lemma from_ubytes_to_ubytes :
     forall uv dt sid sbytes,
       is_supported dt ->
@@ -202,83 +230,11 @@ Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEO
 
       cbn in *.
       lia.
-    - pose proof sbyte_to_extractbyte_inv s as (uvb & dtb & idxb & sidb & SBYTE).
-      rewrite SBYTE.
-      cbn in *.
+    - pose proof TOUBYTES as FIRST.
+      apply to_ubytes_first_byte in FIRST.
       subst.
-
-      remember (sizeof_dtyp dt) as sz.
-      destruct sz; [inv SIZE|].
-      cbn in *.
-      pose proof Pos2Nat.is_succ p as [sz Hsz].
-
-      rewrite SBYTE.
-      rewrite eq_dec_eq.
-      rewrite N.eqb_refl.
-
-      cbn.
-      unfold to_ubytes in TOUBYTES.
-      rewrite <- Heqsz in TOUBYTES.
-      cbn in TOUBYTES.
-      rewrite Hsz in TOUBYTES.
-      cbn in TOUBYTES.
-      
-      rewrite Nseq_S in TOUBYTES.
-      assert (Monad.eq1
-                (map_monad
-                   (fun n : N =>
-                      match IP.from_Z (Z.of_N n) with
-                      | NoOom a => NoOom (uvalue_sbyte uv dt (UVALUE_IPTR a) sid)
-                      | Oom s => Oom s
-                      end) (Nseq 0 sz ++ 0 + N.of_nat sz :: nil)) (NoOom (s :: l))) as EQ1.
-      { unfold Monad.eq1, MonadEq1OOM.
-        rewrite TOUBYTES.
-        auto.
-      }
-
-      setoid_rewrite -> map_monad_app in EQ1.
-      destruct (map_monad
-                  (fun n : N =>
-                     match IP.from_Z (Z.of_N n) with
-                     | NoOom a => NoOom (uvalue_sbyte uv dt (UVALUE_IPTR a) sid)
-                     | Oom s => Oom s
-                     end) (Nseq 0 sz)) eqn:Hfirst; [|inversion EQ1].
-      destruct (map_monad
-                  (fun n : N =>
-                     match IP.from_Z (Z.of_N n) with
-                     | NoOom a => NoOom (uvalue_sbyte uv dt (UVALUE_IPTR a) sid)
-                     | Oom s => Oom s
-                     end) (0 + N.of_nat sz :: nil)) eqn:Hlast; [|inversion EQ1].
-
-      cbn in EQ1; subst.
-      cbn in Hfirst.
-
-      apply map_monad_app in EQ1.
-
-      break_inner_match.
-
-
-      cbn.
-      
-      2: {
-        cbn.
-      }
-
-      rewrite Hsz in Heql.
-      rewrite <- cons_Nseq in Heql.
-
-      cbn in Heql.
-      inv Heql.
-      rewrite sbyte_to_extractbyte_of_uvalue_sbyte in SBYTE.
-      inv SBYTE.
       rewrite sbyte_to_extractbyte_of_uvalue_sbyte.
-      cbn.
-
-      solve_guards_all_bytes.
-
-      cbn.
-      change 1%Z with (Z.of_N 1).
-      erewrite to_ubytes_all_bytes_from_uvalue_helper'; eauto.
+      erewrite to_ubytes_all_bytes_from_uvalue_helper; eauto.
   Qed.
 End MemBytesTheory.
 

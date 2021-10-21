@@ -47,6 +47,9 @@ Module Type INTPTR.
 
   Parameter from_Z_0 :
     from_Z 0 = NoOom zero.
+
+  Parameter to_Z_0 :
+    to_Z zero = 0%Z.
 End INTPTR.
 
 (* TODO: move this? *)

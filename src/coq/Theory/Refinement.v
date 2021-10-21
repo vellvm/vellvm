@@ -26,9 +26,9 @@ From ExtLib Require Import
 From Coq Require Import Relations RelationClasses.
 (* end hide *)
 
-Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(A)(SIZE))(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(A)(SIZE)(LLVMEvents)).
+Module Make (A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(A)(IP)(SIZE))(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(IP)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(A)(IP)(SIZE)(LLVMEvents)).
 
-  Module Conc := Serialization.Make A SIZE LLVMEvents PTOI PROVENANCE ITOP GEP BYTE_IMPL.
+  Module Conc := Serialization.Make A IP SIZE LLVMEvents PTOI PROVENANCE ITOP GEP BYTE_IMPL.
 
 Import LLVMEvents.
 Import DV.

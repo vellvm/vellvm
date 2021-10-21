@@ -177,19 +177,13 @@ Module BigIP : MemoryAddress.INTPTR.
   Proof.
     auto.
   Qed.
+
+  Lemma to_Z_0 :
+    to_Z zero = 0.
+  Proof.
+    auto.
+  Qed.
 End BigIP.
-
-Module Type INTPTR.
-  Parameter intptr : Set.
-  Parameter zero : intptr.
-
-  Parameter eq_dec : forall (a b : intptr), {a = b} + {a <> b}.
-  Parameter eqb : forall (a b : intptr), bool.
-
-  Parameter to_Z : forall (a : intptr), Z.
-  Parameter to_unsigned : forall (a : intptr), Z.
-  Parameter from_Z : Z -> OOM intptr.
-End INTPTR.
 
 Module FinPTOI : PTOI(Addr).
   Definition ptr_to_int (ptr : Addr.addr) := fst ptr.
