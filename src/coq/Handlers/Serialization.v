@@ -30,31 +30,6 @@ Require Import Lia.
 Import ListNotations.
 Import MonadNotation.
 
-(*
-Module Type Concretize (Addr:MemoryAddress.ADDRESS)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(SIZEOF)).
-  Import LLVMIO.
-  Parameter concretize : uvalue -> dvalue -> Prop.
-  Parameter concretize_u : uvalue -> err_or_ub dvalue -> Prop.
-  Parameter concretize_uvalue : uvalue -> err_or_ub dvalue.
-
-  Parameter Concretize_Undef : forall dt dv,
-      dvalue_has_dtyp dv dt ->
-      concretize_u (UVALUE_Undef dt) (ret dv).
-
-  Parameter Concretize_IBinop : forall iop uv1 e1 uv2 e2,
-      concretize_u uv1 e1 ->
-      concretize_u uv2 e2 ->
-      concretize_u (UVALUE_IBinop iop uv1 uv2)
-                   (dv1 <- e1 ;;
-                    dv2 <- e2 ;;
-                    (eval_iop iop dv1 dv2)).
-
-  Parameter concretize_equation : forall (uv: uvalue) (dv : dvalue),
-      concretize uv dv = concretize_u uv (ret dv).
-
-End Concretize.
-*)
-
 Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(IP)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(IP)(SIZEOF)(LLVMIO)).
 
   Import LLVMIO.

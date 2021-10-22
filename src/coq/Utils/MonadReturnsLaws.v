@@ -28,6 +28,17 @@ Section Laws.
       MFails_ret : forall {A} (a : A),
           ~ MFails (ret a);
 
+      MFails_bind_ma : forall {A B} (ma : M A) (k : A -> M B),
+        MFails ma -> MFails (bind ma k);
+
+      MFails_bind_k : forall {A B} (ma : M A) (a : A) (k : A -> M B),
+        MReturns a ma ->
+        MFails (k a) ->
+        MFails (bind ma k);
+
+      MFails_bind_inv : forall {A B} (ma : M A) (k : A -> M B),
+        MFails (bind ma k) -> MFails ma \/ (exists a, MReturns a ma /\ MFails (k a));
+
       MReturns_bind : forall {A B} (a : A) (b : B) (ma : M A) (k : A -> M B),
           MReturns a ma -> MReturns b (k a) -> MReturns b (bind ma k);
 
@@ -162,6 +173,43 @@ Section Sum.
     inversion H.
   Qed.
 
+  Lemma SumFails_bind_ma : forall {A B} (ma : sum E A) (k : A -> sum E B),
+      SumFails ma -> SumFails (bind ma k).
+  Proof.
+    intros A B ma k FAILS.
+    inversion FAILS; subst.
+    cbn.
+    unfold SumFails.
+    eexists; eauto.
+  Qed.
+
+  Lemma SumFails_bind_k : forall {A B} (ma : sum E A) (a : A) (k : A -> sum E B),
+      SumReturns a ma ->
+      SumFails (k a) ->
+      SumFails (bind ma k).
+  Proof.
+    intros A B ma a k RETS FAILS.
+    inversion FAILS;
+      inversion RETS;
+      subst.
+
+    cbn.
+    auto.
+  Qed.
+
+  Lemma SumFails_bind_inv : forall {A B} (ma : sum E A) (k : A -> sum E B),
+      SumFails (bind ma k) ->
+      SumFails ma \/ (exists a, SumReturns a ma /\ SumFails (k a)).
+  Proof.
+    intros A B ma k FAILS.
+    inversion FAILS.
+    destruct ma; cbn in *; inversion H; subst.
+    - left; eexists; eauto.
+    - right.
+      exists a; split; eauto.
+      constructor.
+  Qed.
+
   Lemma SumReturns_bind :
     forall {A B} (a : A) (b : B) (ma : sum E A) (k : A -> sum E B),
       SumReturns a ma -> SumReturns b (k a) -> SumReturns b (bind ma k).
@@ -243,6 +291,9 @@ Section Sum.
     := { MReturns := fun A => SumReturns;
          MFails := fun A => SumFails;
          MFails_ret := fun A => SumFails_ret;
+         MFails_bind_ma := fun A B => SumFails_bind_ma;
+         MFails_bind_k := fun A B => SumFails_bind_k;
+         MFails_bind_inv := fun A B => SumFails_bind_inv;
          MReturns_bind := fun A B => SumReturns_bind;
          MReturns_bind_inv := fun A B => SumReturns_bind_inv;
          MReturns_ret := fun A => SumReturns_ret;
@@ -303,6 +354,30 @@ Section Ident.
   Proof.
     intros A a.
     auto.
+  Qed.
+
+  Lemma IdentFails_bind_ma : forall {A B} (ma : ident A) (k : A -> ident B),
+      IdentFails ma -> IdentFails (bind ma k).
+  Proof.
+    intros A B ma k FAILS.
+    inversion FAILS.
+  Qed.
+
+  Lemma IdentFails_bind_k : forall {A B} (ma : ident A) (a : A) (k : A -> ident B),
+      IdentReturns a ma ->
+      IdentFails (k a) ->
+      IdentFails (bind ma k).
+  Proof.
+    intros A B ma a k RETS FAILS.
+    inversion FAILS.
+  Qed.
+
+  Lemma IdentFails_bind_inv : forall {A B} (ma : ident A) (k : A -> ident B),
+      IdentFails (bind ma k) ->
+      IdentFails ma \/ (exists a, IdentReturns a ma /\ IdentFails (k a)).
+  Proof.
+    intros A B ma k FAILS.
+    inversion FAILS.
   Qed.
 
   Lemma IdentReturns_bind :
@@ -384,6 +459,9 @@ Section Ident.
     := { MReturns := fun A => IdentReturns;
          MFails := fun A => IdentFails;
          MFails_ret := fun A => IdentFails_ret;
+         MFails_bind_ma := fun A B => IdentFails_bind_ma;
+         MFails_bind_k := fun A B => IdentFails_bind_k;
+         MFails_bind_inv := fun A B => IdentFails_bind_inv;
          MReturns_bind := fun A B => IdentReturns_bind;
          MReturns_bind_inv := fun A B => IdentReturns_bind_inv;
          MReturns_ret := fun A => IdentReturns_ret;
@@ -455,6 +533,34 @@ Section EitherT.
     intros A a.
     unfold EitherTFails.
     apply MFails_ret.
+  Qed.
+
+  Lemma EitherTFails_bind_ma : forall {A B} (ma : eitherT E M A) (k : A -> eitherT E M B),
+      EitherTFails ma -> EitherTFails (bind ma k).
+  Proof.
+    intros A B ma k FAILS.
+    apply MFails_bind_ma; eauto.
+  Qed.
+
+  Lemma EitherTFails_bind_k : forall {A B} (ma : eitherT E M A) (a : A) (k : A -> eitherT E M B),
+      EitherTReturns a ma ->
+      EitherTFails (k a) ->
+      EitherTFails (bind ma k).
+  Proof.
+    intros A B ma a k RETS FAILS.
+    eapply MFails_bind_k; eauto.
+  Qed.
+
+  Lemma EitherTFails_bind_inv : forall {A B} (ma : eitherT E M A) (k : A -> eitherT E M B),
+      EitherTFails (bind ma k) ->
+      EitherTFails ma \/ (exists a, EitherTReturns a ma /\ EitherTFails (k a)).
+  Proof.
+    intros A B ma k FAILS.
+    apply MFails_bind_inv in FAILS as [FAILS | ([e | a] & RETS & FAILS)].
+    - left; eauto.
+    - apply MFails_ret in FAILS.
+      contradiction.
+    - right; eexists; split; eauto.
   Qed.
 
   Lemma EitherTReturns_bind :
@@ -540,6 +646,9 @@ Section EitherT.
     := { MReturns := fun A => EitherTReturns;
          MFails := fun A => EitherTFails;
          MFails_ret := fun A => EitherTFails_ret;
+         MFails_bind_ma := fun A B => EitherTFails_bind_ma;
+         MFails_bind_k := fun A B => EitherTFails_bind_k;
+         MFails_bind_inv := fun A B => EitherTFails_bind_inv;
          MReturns_bind := fun A B => EitherTReturns_bind;
          MReturns_bind_inv := fun A B => EitherTReturns_bind_inv;
          MReturns_ret := fun A => EitherTReturns_ret;

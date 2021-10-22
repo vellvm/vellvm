@@ -58,4 +58,3 @@ Section PARAMS_INTERP.
     interp (case_ E_trigger (case_ UB_exec F_trigger)).
 
 End PARAMS_INTERP.
-

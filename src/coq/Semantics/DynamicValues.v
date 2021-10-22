@@ -31,6 +31,7 @@ From Vellvm Require Import
      Syntax.DataLayout
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
+     Semantics.VellvmIntegers
      Utils.MonadEq1Laws
      Utils.MonadReturnsLaws.
 
@@ -1014,59 +1015,6 @@ Class VInt I : Type :=
   Global Instance ToDvalue_intptr : ToDvalue intptr :=
     { to_dvalue := DVALUE_IPTR }.
 
-  (* Integers that can run out of memory... Necessary for handling
-     finite memory compilation. *)
-  Class VMemInt I : Type :=
-    {
-      (* Comparisons *)
-      mequ : I -> I -> bool;
-      mcmp : comparison -> I -> I -> bool;
-      mcmpu : comparison -> I -> I -> bool;
-
-      (* Constants *)
-      mbitwidth : nat;
-      mzero : I;
-      mone : I;
-
-      (* Arithmetic *)
-      madd : I -> I -> OOM I;
-      madd_carry : I -> I -> I -> I;
-      madd_overflow : I -> I -> I -> I;
-
-      msub : I -> I -> OOM I;
-      msub_borrow : I -> I -> I -> I;
-      msub_overflow : I -> I -> I -> I;
-
-      mmul : I -> I -> OOM I;
-
-      mdivu : I -> I -> I; (* Can this overflow? *)
-      mdivs : I -> I -> OOM I;
-
-      mmodu : I -> I -> I; (* Can this overflow / underflow *)
-      mmods : I -> I -> OOM I; (* I suspect this can sort of overflow in the division by -1 case... Even though it really can't *)
-
-      mshl : I -> I -> OOM I;
-      mshr : I -> I -> I;  (* Can this overflow? *)
-      mshru : I -> I -> I; (* Can this overflow? *)
-
-      mnegative : I -> OOM I;
-
-      (* Logic *)
-      mand : I -> I -> I;
-      mor : I -> I -> I;
-      mxor : I -> I -> I;
-
-      (* Bounds, possibly unbounded *)
-      mmin_signed : option Z;
-      mmax_signed : option Z;
-
-      (* Conversion *)
-      munsigned : I -> Z;
-      msigned : I -> Z;
-
-      mrepr : Z -> OOM I; (* Not sure if we should even have this *)
-    }.
-
   Global Instance VIntVMemInt {I} `{VInt I} : VMemInt I :=
     {
       (* Comparisons *)
@@ -1115,8 +1063,15 @@ Class VInt I : Type :=
       munsigned := unsigned;
       msigned := signed;
 
-      mrepr := fun x => NoOom (repr x)
+      mrepr := fun x => NoOom (repr x);
+
+      (* dtyp *)
+      mdtyp_of_int := DTYPE_I (N.of_nat bitwidth)
     }.
+
+    Global Instance VMemInt_intptr' : VMemInt intptr.
+    apply VMemInt_intptr.
+    Defined.
 
   #[global] Instance ToDvalue_Int1 : ToDvalue Int1.int :=
     { to_dvalue := DVALUE_I1 }.
@@ -1649,18 +1604,18 @@ Class VInt I : Type :=
       | Add nuw nsw =>
           if orb (andb nuw (mequ (madd_carry x y mzero) mone))
                  (andb nsw (mequ (madd_overflow x y mzero) mone))
-          then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+          then ret (DVALUE_Poison mdtyp_of_int)
           else to_dvalue_OOM (madd x y)
 
     | Sub nuw nsw =>
         if orb (andb nuw (mequ (msub_borrow x y mzero) mone))
                (andb nsw (mequ (msub_overflow x y mzero) mone))
-        then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+        then ret (DVALUE_Poison mdtyp_of_int)
         else to_dvalue_OOM (msub x y)
 
     | Mul nuw nsw =>
       (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
-        if (bitwidth ~=? 1)%nat
+        if (mbitwidth ~=? 1)%nat
         then to_dvalue_OOM (mmul x y)
         else
           res <- lift_OOM (mmul x y);;
@@ -1679,7 +1634,7 @@ Class VInt I : Type :=
 
           if orb (andb nuw (res_u' >? munsigned res))
                  (andb nsw (orb min_s_bound max_s_bound))
-          then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+          then ret (DVALUE_Poison mdtyp_of_int)
           else ret (to_dvalue res)
 
     | Shl nuw nsw =>
@@ -1692,10 +1647,10 @@ Class VInt I : Type :=
       (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
          then there is overflow. *)
       if (munsigned y) >=? bz
-      then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+      then ret (DVALUE_Poison mdtyp_of_int)
       else
         if andb nuw (res_u' >? res_u)
-        then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+        then ret (DVALUE_Poison mdtyp_of_int)
         else
           (* Need to separate this out because mnegative can OOM *)
           if nsw
@@ -1706,7 +1661,7 @@ Class VInt I : Type :=
                                (bz - munsigned y)
                       =? (munsigned nres)
                          * (Z.pow 2 (munsigned y) - 1))%Z)
-            then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+            then ret (DVALUE_Poison mdtyp_of_int)
             else ret (to_dvalue res)
           else ret (to_dvalue res)
 
@@ -1714,7 +1669,7 @@ Class VInt I : Type :=
       if (munsigned y =? 0)%Z
       then raise_ub "Unsigned division by 0."
       else if andb ex (negb ((munsigned x) mod (munsigned y) =? 0))%Z
-           then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+           then ret (DVALUE_Poison mdtyp_of_int)
            else ret (to_dvalue (mdivu x y))
 
     | SDiv ex =>
@@ -1722,22 +1677,22 @@ Class VInt I : Type :=
       if (msigned y =? 0)%Z
       then raise_ub "Signed division by 0."
       else if andb ex (negb ((msigned x) mod (msigned y) =? 0))%Z
-           then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+           then ret (DVALUE_Poison mdtyp_of_int)
            else to_dvalue_OOM (mdivs x y)
 
     | LShr ex =>
       let bz := Z.of_nat mbitwidth in
-      if (munsigned y) >=? bz then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+      if (munsigned y) >=? bz then ret (DVALUE_Poison mdtyp_of_int)
       else if andb ex (negb ((munsigned x)
                                mod (Z.pow 2 (munsigned y)) =? 0))%Z
-           then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth))) else ret (to_dvalue (mshru x y))
+           then ret (DVALUE_Poison mdtyp_of_int) else ret (to_dvalue (mshru x y))
 
     | AShr ex =>
       let bz := Z.of_nat mbitwidth in
-      if (munsigned y) >=? bz then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth)))
+      if (munsigned y) >=? bz then ret (DVALUE_Poison mdtyp_of_int)
       else if andb ex (negb ((munsigned x)
                                mod (Z.pow 2 (munsigned y)) =? 0))%Z
-           then ret (DVALUE_Poison (DTYPE_I (N.of_nat mbitwidth))) else ret (to_dvalue (mshr x y))
+           then ret (DVALUE_Poison mdtyp_of_int) else ret (to_dvalue (mshr x y))
 
     | URem =>
       if (munsigned y =? 0)%Z
@@ -1773,13 +1728,17 @@ Class VInt I : Type :=
 
   (* Convert written integer constant to corresponding integer with bitsize bits.
      Takes the integer modulo 2^bits. *)
-  Definition coerce_integer_to_int {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} (bits:N) (i:Z) : M dvalue :=
+  Definition coerce_integer_to_int {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} (bits:option N) (i:Z) : M dvalue :=
     match bits with
-    | 1  => ret (DVALUE_I1 (repr i))
-    | 8  => ret (DVALUE_I8 (repr i))
-    | 32 => ret (DVALUE_I32 (repr i))
-    | 64 => ret (DVALUE_I64 (repr i))
-    | _  => raise_error "unsupported integer size"
+    | Some 1  => ret (DVALUE_I1 (repr i))
+    | Some 8  => ret (DVALUE_I8 (repr i))
+    | Some 32 => ret (DVALUE_I32 (repr i))
+    | Some 64 => ret (DVALUE_I64 (repr i))
+    | None    =>
+        i' <- lift_OOM (mrepr i);;
+        ret (DVALUE_IPTR i')
+    | _       =>
+        raise_error "unsupported integer size"
     end.
   Arguments coerce_integer_to_int _ _ : simpl nomatch.
 
@@ -1799,16 +1758,19 @@ Class VInt I : Type :=
      in order to prevent eval_iop from being recursive. *)
   Definition eval_iop_integer_h {M} `{Monad M} `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} iop v1 v2 : M dvalue :=
     match v1, v2 with
-    | DVALUE_I1 i1, DVALUE_I1 i2    => eval_int_op iop i1 i2
-    | DVALUE_I8 i1, DVALUE_I8 i2    => eval_int_op iop i1 i2
-    | DVALUE_I32 i1, DVALUE_I32 i2  => eval_int_op iop i1 i2
-    | DVALUE_I64 i1, DVALUE_I64 i2  => eval_int_op iop i1 i2
-    | DVALUE_Poison t, _            => ret (DVALUE_Poison t)
-    | _, DVALUE_Poison t            =>
+    | DVALUE_I1 i1, DVALUE_I1 i2
+    | DVALUE_I8 i1, DVALUE_I8 i2
+    | DVALUE_I32 i1, DVALUE_I32 i2
+    | DVALUE_I64 i1, DVALUE_I64 i2
+    | DVALUE_IPTR i1, DVALUE_IPTR i2 =>
+        eval_int_op iop i1 i2
+    | DVALUE_Poison t, _             =>
+        ret (DVALUE_Poison t)
+    | _, DVALUE_Poison t             =>
       if iop_is_div iop
       then raise_ub "Division by poison."
       else ret (DVALUE_Poison t)
-    | _, _                          => raise_error "ill_typed-iop"
+    | _, _                           => raise_error "ill_typed-iop"
     end.
   Arguments eval_iop_integer_h _ _ _ : simpl nomatch.
 
@@ -1834,28 +1796,29 @@ Class VInt I : Type :=
     end.
   Arguments eval_iop _ _ _ : simpl nomatch.
 
-  Definition eval_int_icmp {Int} `{VInt Int} icmp (x y : Int) : dvalue :=
+  Definition eval_int_icmp {Int} `{VMemInt Int} icmp (x y : Int) : dvalue :=
     if match icmp with
-       | Eq => cmp Ceq x y
-       | Ne => cmp Cne x y
-       | Ugt => cmpu Cgt x y
-       | Uge => cmpu Cge x y
-       | Ult => cmpu Clt x y
-       | Ule => cmpu Cle x y
-       | Sgt => cmp Cgt x y
-       | Sge => cmp Cge x y
-       | Slt => cmp Clt x y
-       | Sle => cmp Cle x y
+       | Eq => mcmp Ceq x y
+       | Ne => mcmp Cne x y
+       | Ugt => mcmpu Cgt x y
+       | Uge => mcmpu Cge x y
+       | Ult => mcmpu Clt x y
+       | Ule => mcmpu Cle x y
+       | Sgt => mcmp Cgt x y
+       | Sge => mcmp Cge x y
+       | Slt => mcmp Clt x y
+       | Sle => mcmp Cle x y
        end
     then DVALUE_I1 (Int1.one) else DVALUE_I1 (Int1.zero).
   Arguments eval_int_icmp _ _ _ : simpl nomatch.
 
   Definition eval_icmp {M} `{Monad M} `{RAISE_ERROR M} icmp v1 v2 : M dvalue :=
     match v1, v2 with
-    | DVALUE_I1 i1, DVALUE_I1 i2 => ret (eval_int_icmp icmp i1 i2)
-    | DVALUE_I8 i1, DVALUE_I8 i2 => ret (eval_int_icmp icmp i1 i2)
-    | DVALUE_I32 i1, DVALUE_I32 i2 => ret (eval_int_icmp icmp i1 i2)
-    | DVALUE_I64 i1, DVALUE_I64 i2 => ret (eval_int_icmp icmp i1 i2)
+    | DVALUE_I1 i1, DVALUE_I1 i2
+    | DVALUE_I8 i1, DVALUE_I8 i2
+    | DVALUE_I32 i1, DVALUE_I32 i2
+    | DVALUE_I64 i1, DVALUE_I64 i2
+    | DVALUE_IPTR i1, DVALUE_IPTR i2 => ret (eval_int_icmp icmp i1 i2)
     | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
     | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
     | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
@@ -3311,6 +3274,7 @@ Class VInt I : Type :=
     Context (M : Type -> Type).
     Context {Eq1 : @Monad.Eq1 M}.
     Context {Monad : Monad M}.
+    Context {MonadLaws : Monad.MonadLawsE M}.
     Context {RET_INV : @Eq1_ret_inv M Eq1 Monad}.
     Context {Eq1EQV : @Monad.Eq1Equivalence M Monad Eq1}.
     Context {RETS : @MonadReturns M Monad Eq1}.
@@ -3394,26 +3358,77 @@ Class VInt I : Type :=
         destruct op;
         cbn in EVAL;
         repeat break_match_hyp;
-
+        pose proof EVAL as CONTRA;
         try solve
-            [first [ apply eq1_ret_ret in EVAL; [| solve [eauto]]
-            | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
-              apply MReturns_bind_inv in EVAL as (res & MA & RET);
-              apply MReturns_ret_inv in RET
-            | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
-              apply MReturns_bind_inv in EVAL as (res & MA & RET);
-              break_match_hyp;
-              apply MReturns_ret_inv in RET
-            | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
-              apply MReturns_bind_inv in EVAL as (res & MA & RET);
-              repeat break_match_hyp;
-              [ apply MReturns_ret_inv in RET
-              | cbn in RET;
-                apply MReturns_bind_inv in RET as (res' & MA' & RET);
-                repeat break_match_hyp;
-                apply MReturns_ret_inv in RET
-              ]
-                ]; subst; constructor; solve_no_void].
+            [first [ apply eq1_ret_ret in EVAL;
+                     subst;
+                     [ try (unfold VMemInt_intptr';
+                            rewrite VMemInt_intptr_dtyp)
+                     | solve [eauto]
+                     ]
+
+                   | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+                     apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
+                     [eapply EqRet_NoFail in CONTRA; eauto;
+                      exfalso; apply CONTRA;
+                      apply MFails_bind_ma; eauto
+                     | apply MReturns_ret_inv in RET;
+                       cbn in RET
+                     ]
+
+                   | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+                     apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
+                     [eapply EqRet_NoFail in CONTRA; eauto;
+                      exfalso; apply CONTRA;
+                      apply MFails_bind_ma; eauto
+                     | apply MReturns_ret_inv in RET;
+                       cbn in RET
+                     ]
+
+                   | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+                     apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
+                     [ eapply EqRet_NoFail in CONTRA; eauto;
+                       exfalso; apply CONTRA;
+                       apply MFails_bind_ma; eauto
+                     | clear CONTRA;
+                       break_match_hyp;
+                       apply MReturns_ret_inv in RET;
+                       cbn in RET
+                     ]
+
+                   | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+                     apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
+                     [ eapply EqRet_NoFail in CONTRA; eauto;
+                       exfalso; apply CONTRA;
+                       apply MFails_bind_ma; eauto
+                     | repeat match goal with
+                              | H : MReturns _ (if ?c then _ else _) |- _ =>
+                                  destruct c eqn:?
+                              end;
+                       [ apply MReturns_ret_inv in RET; cbn in RET
+                       | cbn in RET;
+                         apply MReturns_bind_inv in RET as [FAILS | (res' & MA' & RET)];
+                         [eapply EqRet_NoFail in CONTRA; eauto;
+                          exfalso; apply CONTRA;
+                          eapply MFails_bind_k; eauto;
+                          break_match;
+                          [ match goal with
+                            | H: true = false |- _ =>
+                                inversion H
+                            end
+                          |]; eapply MFails_bind_ma; eauto
+                         |]
+                       ];
+                       try (match goal with
+                            | H : MReturns _ (if ?c then _ else _) |- _ =>
+                                destruct c eqn:?
+                            end;
+                            apply MReturns_ret_inv in RET; cbn in RET)
+                    ]
+                ]; subst;
+             try (unfold VMemInt_intptr';
+                  rewrite VMemInt_intptr_dtyp);
+             constructor; solve_no_void].
 
       all:
         eapply EqRet_NoFail in EVAL; eauto;

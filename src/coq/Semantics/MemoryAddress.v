@@ -12,7 +12,11 @@
 Require Import String.
 Require Import OrderedType OrderedTypeEx.
 Require Import ZArith.
-Require Import Vellvm.Utils.Error.
+
+From Vellvm Require Import
+     Syntax.DynamicTypes
+     Semantics.VellvmIntegers
+     Utils.Error.
 (* end hide *)
 
 (** * Signature for addresses
@@ -33,6 +37,8 @@ Module Type INTPTR.
   Parameter intptr : Set.
   Parameter zero : intptr.
 
+  Parameter VMemInt_intptr : VMemInt intptr.
+
   Parameter eq_dec : forall (a b : intptr), {a = b} + {a <> b}.
   Parameter eqb : forall (a b : intptr), bool.
 
@@ -50,6 +56,9 @@ Module Type INTPTR.
 
   Parameter to_Z_0 :
     to_Z zero = 0%Z.
+
+  Parameter VMemInt_intptr_dtyp :
+    @mdtyp_of_int intptr VMemInt_intptr = DTYPE_IPTR.
 End INTPTR.
 
 (* TODO: move this? *)
