@@ -2634,7 +2634,7 @@ End Memory_Stack_Theory.
 
 Section PARAMS.
   Variable (E F G : Type -> Type).
-  Context `{FailureE -< F} `{UBE -< F} `{PickE -< F}.
+  Context `{FailureE -< F} `{UBE -< F} `{PickE -< F} `{OOME -< F}.
   Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
   Notation Effout := (E +' F).
   Notation interp_memory := (@interp_memory E F _ _ _).
@@ -2723,8 +2723,8 @@ Section PARAMS.
       intros ?; tau_steps; reflexivity.
     Qed.
 
-    #[global] Instance eutt_interp_memory {R} :
-      Proper (eutt Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@interp_memory R).
+    #[global] Instance eutt_interp_memory {R} {R2} :
+      Proper (eutt Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@interp_memory R R2).
     Proof.
       repeat intro.
       unfold interp_memory.
@@ -3366,6 +3366,6 @@ Section PARAMS.
 End PARAMS.
 End MEMORY_THEORY.
 
-Module Make(Addr:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)) <: MEMORY_THEORY(Addr)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
-Include MEMORY_THEORY(Addr)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
+Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(IP)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(IP)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(IP)(SIZE)(LLVMEvents)) <: MEMORY_THEORY(Addr)(IP)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
+Include MEMORY_THEORY(Addr)(IP)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
 End Make.
