@@ -861,14 +861,25 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
     intros uv dt sid prov sbytes TYP SUP SIZE SER.
     induction TYP.
 
-    (* rewrite serialize_sbytes_equation in SER; *)
-    (*   cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto. *)
+    Ltac solve_deserialize_local :=
+      match goal with
+      | SER : ErrSID_evals_to _ _ _ _ |- _
+        => rewrite serialize_sbytes_equation in SER;
+          cbn in SER; inv SER; cbn;
+          erewrite from_ubytes_to_ubytes; eauto;
+          cbn in *;
+          match goal with
+          | H: context [BYTE.to_ubytes ?uv ?dt ?sid] |- _
+            => destruct (BYTE.to_ubytes uv dt sid) eqn:?;
+                       inversion H; subst; eauto  
+          end
+      end.
 
-    (* 1-5: match goal with *)
-    (*       (* Try easy case first for speedup *) *)
-    (*       | |- _ = inr ?x => *)
-    (*         tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto)) *)
-    (*       end. *)
+    1-6: match goal with
+          (* Try easy case first for speedup *)
+          | |- _ = inr ?x =>
+              tactic_on_non_aggregate_uvalues x ltac:(try solve_deserialize_local)
+          end.
 
     (* Poison arrays *)
     { admit.
@@ -900,7 +911,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
       | |- _ = inr (UVALUE_Poison DynamicTypes.DTYPE_Void) =>
         cbn in NV; contradiction
       | |- _ = inr (UVALUE_Poison ?x) =>
-        tactic_on_non_aggregate_dtyps x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
+        tactic_on_non_aggregate_dtyps x ltac:(try solve_deserialize_local)
       end.
 
       all: exfalso;
@@ -941,7 +952,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
       | |- _ = inr (UVALUE_Undef DynamicTypes.DTYPE_Void) =>
         cbn in NV; contradiction
       | |- _ = inr (UVALUE_Undef ?x) =>
-        tactic_on_non_aggregate_dtyps x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
+        tactic_on_non_aggregate_dtyps x ltac:(try solve_deserialize_local)
       end.
 
       all: exfalso;
@@ -954,7 +965,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
     match goal with
     (* Try easy case first for speedup *)
     | |- _ = inr ?x =>
-      tactic_on_non_aggregate_uvalues x ltac:(try (rewrite serialize_sbytes_equation in SER; cbn in SER; inv SER; cbn; rewrite from_ubytes_to_ubytes; eauto))
+      tactic_on_non_aggregate_uvalues x ltac:(try solve_deserialize_local)
     end.    
 
 (*     { destruct t. *)
