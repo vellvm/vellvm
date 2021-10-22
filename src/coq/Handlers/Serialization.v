@@ -1082,7 +1082,9 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
             | Conv_PtoI x =>
               match x, t_to with
               | DVALUE_Addr addr, DTYPE_I sz =>
-                lift_ue (coerce_integer_to_int sz (ptr_to_int addr))
+                lift_ue (coerce_integer_to_int (Some sz) (ptr_to_int addr))
+              | DVALUE_Addr addr, DTYPE_IPTR =>
+                lift_ue (coerce_integer_to_int None (ptr_to_int addr))
               | _, _ =>
                 lift_ue (raise_error "Invalid PTOI conversion")
               end
@@ -1231,7 +1233,9 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
             | Conv_PtoI x =>
               match x, t_to with
               | DVALUE_Addr addr, DTYPE_I sz =>
-                lift_ue (coerce_integer_to_int sz (ptr_to_int addr))
+                lift_ue (coerce_integer_to_int (Some sz) (ptr_to_int addr))
+              | DVALUE_Addr addr, DTYPE_IPTR =>
+                lift_ue (coerce_integer_to_int None (ptr_to_int addr))
               | _, _ =>
                 lift_ue (raise_error "Invalid PTOI conversion")
               end
@@ -1439,7 +1443,7 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
           cbn.
           destruct e2 as [[[[[[[oom_e2] | [[ub_e2] | [[err_e2] | e2]]]]]]]]; cbn; try reflexivity.
 
-          unfold Monad.eq1, EqM_err_or_ub.
+          unfold Monad.eq1.
           destruct (eval_iop iop dv1 e2) as [[[[[[[oom_eval_iopiopdv1e2] | [[ub_eval_iopiopdv1e2] | [[err_eval_iopiopdv1e2] | eval_iopiopdv1e2]]]]]]]]; reflexivity.
         }
 

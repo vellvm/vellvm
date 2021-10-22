@@ -127,16 +127,6 @@ Set Contextual Implicit.
   Definition lift_pure_err {A} {E} `{FailureE -< E} (m:err A) : itree E A :=
     lift_err ret m.
 
-  Definition lift_err_or_ub {A B} {E} `{FailureE -< E} `{UBE -< E} (f : A -> itree E B) (m:err_or_ub A) : itree E B :=
-    match m with
-    | ERR_OR_UB (mkEitherT m) =>
-      match m with
-      | inl (UB_message x) => raiseUB x
-      | inr (inl (ERR_message x)) => raise x
-      | inr (inr x) => f x
-      end
-    end.
-
   Definition lift_err_ub_oom {A B} {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} (f : A -> itree E B) (m:err_ub_oom A) : itree E B :=
     match m with
     | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>

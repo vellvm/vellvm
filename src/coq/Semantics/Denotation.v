@@ -204,7 +204,8 @@ Module Denotation(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeo
     | EXP_Integer x =>
       match top with
       | None                => raise "denote_exp given untyped EXP_Integer"
-      | Some (DTYPE_I bits) => lift_err_ub_oom ret (fmap dvalue_to_uvalue (coerce_integer_to_int bits x))
+      | Some (DTYPE_I bits) => lift_err_ub_oom ret (fmap dvalue_to_uvalue (coerce_integer_to_int (Some bits) x))
+      | Some DTYPE_IPTR     => lift_err_ub_oom ret (fmap dvalue_to_uvalue (coerce_integer_to_int None x))
       | Some typ            => raise ("bad type for constant int: " ++ to_string typ)
       end
 
@@ -598,7 +599,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeo
       else (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
         switches <- lift_err_ub_oom ret
                                       (map_monad
-                                         (fun '((TInt_Literal sz x),id) => s <- (coerce_integer_to_int sz x);; ret (s,id))
+                                         (fun '((TInt_Literal sz x),id) => s <- (coerce_integer_to_int (Some sz) x);; ret (s,id))
                                          dests);;
         lift_err (fun b => ret (inl b)) (select_switch selector default_br switches)
 
