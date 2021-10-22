@@ -35,6 +35,7 @@ Open Scope itree.
 Import ITreeNotations.
 Import SemNotations.
 Import EitherMonad.
+Import IdentityMonad.
 
 (* end hide *)
 
@@ -326,6 +327,13 @@ Section Outputs.
     f_equal.
   Qed.
 
+  Lemma unIdent_eta : forall {A} (x : ident A), {|unIdent := unIdent x|} = x.
+  Proof.
+    intros.
+    destruct x.
+    f_equal.
+  Qed.
+
   Lemma denote_terminator_exits_in_outputs :
     forall term,
       ⟦ term ⟧t ⤳ sum_pred (fun id => In id (terminator_outputs term)) TT.
@@ -344,10 +352,14 @@ Section Outputs.
       apply has_post_bind; intros ?.
       break_match_goal;
         try (apply raise_has_all_posts || apply raiseUB_has_all_posts).
-      unfold lift_err_or_ub.
-      do 3 break_match_goal; break_match_goal.
+      unfold lift_err_ub_oom.
+      do 5 break_match_goal; do 2 break_match_goal.
+      unfold raiseOOM; go; apply has_post_bind; intros [].
+      break_match_goal.
       unfold raiseUB; go; apply has_post_bind; intros [].
-      break_match_goal; unfold raise; go; apply has_post_bind; intros [].
+      break_match_goal.
+      break_match_goal.
+      unfold raise; go; apply has_post_bind; intros [].
       go.
       subst.
       assert (List.map snd brs = List.map snd l).
@@ -356,7 +368,10 @@ Section Outputs.
         - intros ? eq; inv eq; reflexivity.
         - intros ? eq; inv eq.
 
-          repeat (break_match_hyp; cbn in *; try inv_err_or_ub).
+          repeat (break_match_hyp; cbn in *; try inv_err_ub_oom).
+
+          inversion Heqe0; subst.
+          inversion Heqs.
 
           inversion Heqe0; subst.
           inversion Heqs.
@@ -370,10 +385,10 @@ Section Outputs.
           cbn.
           
           f_equal; apply IH.
-          rewrite <- Heqs1.
-          Set Nested Proofs Allowed.
+          rewrite <- Heqs2.
 
-          rewrite unEither_eta.
+          rewrite unIdent_eta.
+          repeat rewrite unEither_eta.
           reflexivity.
       }
       rewrite H.

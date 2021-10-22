@@ -779,3 +779,10 @@ Ltac inv_err_or_ub :=
   | h: {| unERR_OR_UB := {| unEitherT := inl _ |} |} =
        {| unERR_OR_UB := {| unEitherT := inr _ |} |} |- _ => inv h
   end.
+
+Ltac inv_err_ub_oom :=
+  match goal with
+  | h: {| unERR_UB_OOM := {| unEitherT := {| unEitherT := {| unEitherT := {| IdentityMonad.unIdent := _ |} |} |} |} |}
+       = {| unERR_UB_OOM := {| unEitherT := {| unEitherT := {| unEitherT := {| IdentityMonad.unIdent := _ |} |} |} |} |} |- _ =>
+      inv h
+  end.

@@ -24,6 +24,7 @@ From Vellvm.Handlers Require Export
      Stack
      Intrinsics
      FiniteMemory
+     FiniteMemoryTheory
      Pick
      UndefinedBehaviour
      Serialization.
@@ -140,7 +141,9 @@ Module SER := Serialization.Make(FiniteMemory.Addr)(FiniteMemory.BigIP)(FiniteMe
 
 Module MEM := FiniteMemory.Make(FiniteMemory.Addr)(FiniteMemory.BigIP)(FiniteMemory.FinSizeof)(LLVMEvents)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(GEP)(Byte).
 
+Module MEMORY_THEORY := FiniteMemoryTheory.Make(FiniteMemory.Addr)(FiniteMemory.BigIP)(FiniteMemory.FinSizeof)(LLVMEvents)(FiniteMemory.FinPTOI)(FiniteMemory.FinPROV)(FiniteMemory.FinITOP)(GEP)(Byte).
+
 Module Pick := Pick.Make FiniteMemory.Addr FiniteMemory.BigIP FinSizeof LLVMEvents FinPTOI FinPROV FinITOP GEP Byte.
 
 Export LLVMEvents LLVMEvents.DV Global Local Stack Pick Intrinsics
-       MEM UndefinedBehaviour.
+       MEM MEMORY_THEORY UndefinedBehaviour.
