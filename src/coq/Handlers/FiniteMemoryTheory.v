@@ -67,7 +67,7 @@ Set Contextual Implicit.
     Reasoning principles for VIR's main memory model.
 *)
 
-Module Type MEMORY_THEORY (Addr:MemoryAddress.ADDRESS) (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)).
+Module Type MEMORY_THEORY (Addr:MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(IP)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(IP)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(IP)(SIZE)(LLVMEvents)).
   (** ** Theory of the general operations over the finite maps we manipulate *)
   Import LLVMEvents.
   Import DV.
@@ -78,136 +78,31 @@ Module Type MEMORY_THEORY (Addr:MemoryAddress.ADDRESS) (SIZE:Sizeof)(LLVMEvents:
   Import GEP.
   Import Addr.
 
-  Module BYTE := Byte Addr SIZE LLVMEvents BYTE_IMPL.
+  Module BYTE := Byte Addr IP SIZE LLVMEvents BYTE_IMPL.
   Import BYTE.
 
   Open Scope list.
 
-  Module Mem := FiniteMemory.Make(Addr)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
+  Module Mem := FiniteMemory.Make(Addr)(IP)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
   Export Mem.
 
-  Module ESID := ERRSID Addr SIZE LLVMEvents PROV.
+  Module ESID := ERRSID Addr IP SIZE LLVMEvents PROV.
   Import ESID.
 
-  Module MBT := MemBytesTheory Addr SIZE LLVMEvents PTOI PROV ITOP GEP BYTE_IMPL.
+  Module MBT := MemBytesTheory Addr IP SIZE LLVMEvents PTOI PROV ITOP GEP BYTE_IMPL.
   Import MBT.
 
-  Module ST := SerializationTheory Addr SIZE LLVMEvents PTOI PROV ITOP GEP BYTE_IMPL.
+  Module ST := SerializationTheory Addr IP SIZE LLVMEvents PTOI PROV ITOP GEP BYTE_IMPL.
   Import ST.
 
-  (* TODO: move this? *)
-  Definition ErrSID_evals_to {A} (e : ErrSID A) sid pr (x : A) : Prop
-    := evalErrSID e sid pr = inr (inr x).
-
-  (* TODO: move this? *)
-  Definition ErrSID_runs_to {A} (e : ErrSID A) sid pr (x : A) sid' pr': Prop
-    := runErrSID e sid pr = (inr (inr x), sid', pr').
-
   Definition ErrSID_MemState_runs_to (e : MemState -> ErrSID memory_stack) (m m' : MemState) : Prop
-    := runErrSID (e m) (ms_sid m) (ms_prov m) = (inr (inr (ms_memory_stack m')), ms_sid m', ms_prov m').
+    := runErrSID (e m) (ms_sid m) (ms_prov m) = (inr (inr (inr (ms_memory_stack m'))), ms_sid m', ms_prov m').
 
   Definition ErrSID_MemState_ms_runs_to (e : memory_stack -> ErrSID memory_stack) (m m' : MemState) : Prop
-    := runErrSID (e (ms_memory_stack m)) (ms_sid m) (ms_prov m) = (inr (inr (ms_memory_stack m')), ms_sid m', ms_prov m').
-
-  (* TODO: move these lemmas? *)
-  Lemma ErrSID_evals_to_bind :
-    forall {A X} sid prov (m : ErrSID X) k (res : A),
-      ErrSID_evals_to (bind m k) sid prov res ->
-      exists sid' prov' x,
-        ErrSID_runs_to m sid prov x sid' prov' /\
-        ErrSID_evals_to (k x) sid' prov' res.
-  Proof.
-    intros A X sid prov m k res EVAL.
-    
-    cbn in EVAL.
-    inversion EVAL as [EVAL'].
-    clear EVAL.
-    rename EVAL' into EVAL.
-    cbn in EVAL.
-
-    unfold ErrSID_runs_to.
-    unfold runErrSID.
-    cbn.
-
-    destruct (IdentityMonad.unIdent (unEitherT (unEitherT m) sid prov)) as (p, p0) eqn:BLAH.
-    destruct p0.
-    cbn in *.
-
-    destruct s0; cbn in *; inversion EVAL.
-    destruct s0; cbn in *; inversion EVAL.
-
-    do 3 eexists.
-    split.
-    { 
-      reflexivity.
-    }
-    {
-      unfold ErrSID_evals_to.
-      cbn.
-      auto.
-    }
-  Qed.
-
-  Lemma ErrSID_runs_to_bind :
-    forall {A X} sid prov (m : ErrSID X) k (res : A) sid_final prov_final,
-      ErrSID_runs_to (bind m k) sid prov res sid_final prov_final ->
-      exists sid' prov' x,
-        ErrSID_runs_to m sid prov x sid' prov' /\
-        ErrSID_runs_to (k x) sid' prov' res sid_final prov_final.
-  Proof.
-    intros A X sid prov m k res sid_final prov_final EVAL.
-    
-    cbn in EVAL.
-    inversion EVAL as [EVAL'].
-    clear EVAL.
-    rename EVAL' into EVAL.
-    cbn in EVAL.
-
-    unfold ErrSID_runs_to.
-    unfold runErrSID in *.
-    cbn.
-
-    destruct (IdentityMonad.unIdent (unEitherT (unEitherT m) sid prov)) as (p, p0) eqn:BLAH.
-    destruct p0.
-    cbn in *.
-    rewrite BLAH in EVAL.
-
-    destruct s0; cbn in *; inversion EVAL.
-    destruct s0; cbn in *; inversion EVAL.
-
-    do 3 eexists.
-    split.
-    { 
-      reflexivity.
-    }
-    {
-      unfold ErrSID_evals_to.
-      cbn.
-      auto.
-    }
-  Qed.
-
-  Lemma ErrSID_runs_to_ErrSID_evals_to :
-    forall {X} sid prov sid' prov' (m : ErrSID X) (res : X),
-      ErrSID_runs_to m sid prov res sid' prov' ->
-      ErrSID_evals_to m sid prov res.
-  Proof.
-    intros X sid prov sid' prov' m res H.
-    unfold ErrSID_runs_to in H.
-    unfold ErrSID_evals_to.
-    cbn.
-    unfold runErrSID in H.
-    cbn in H.
-    match goal with
-    |  H: _ |- fst (snd ?x) = _
-       => destruct x
-    end.
-    cbn in H.
-    inversion H.
-    reflexivity.
-  Qed.
+    := runErrSID (e (ms_memory_stack m)) (ms_sid m) (ms_prov m) = (inr (inr (inr (ms_memory_stack m'))), ms_sid m', ms_prov m').
 
 Section Serialization_Theory.
+  Import MEMORY_THEORY.Mem.BYTE.
 
   Variable endianess : Endianess.
   (** Length properties *)
@@ -360,48 +255,6 @@ Section Serialization_Theory.
       }
   Qed.
 
- Instance proper_eq1_runs_to : forall {A}, Proper (@Monad.eq1 (eitherT ERR_MESSAGE (eitherT UB_MESSAGE _)) _ A ==> eq ==> eq ==> eq ==> eq  ==> eq ==> iff) (ErrSID_runs_to).
-  Proof.
-    repeat intro; subst. rename H into EQ.
-
-    unfold Monad.eq1, Eq1_eitherT in EQ.
-    split; intros RUNS.
-    - unfold Monad.eq1 in EQ.
-      unfold MonadState.Eq1_stateTM in EQ.
-      unfold pointwise_relation in EQ.
-      unfold Monad.eq1 in EQ.
-      unfold Eq1_ident in EQ.
-
-      cbn in EQ.
-      unfold unEitherT in EQ.
-      destruct x as [x].
-      destruct y as [y].
-      destruct x as [x].
-      destruct y as [y].
-
-      unfold ErrSID_runs_to, runErrSID, runErrSID_T in *.
-      cbn in *.
-      rewrite <- EQ.
-      auto.
-    - unfold Monad.eq1 in EQ.
-      unfold MonadState.Eq1_stateTM in EQ.
-      unfold pointwise_relation in EQ.
-      unfold Monad.eq1 in EQ.
-      unfold Eq1_ident in EQ.
-
-      cbn in EQ.
-      unfold unEitherT in EQ.
-      destruct x as [x].
-      destruct y as [y].
-      destruct x as [x].
-      destruct y as [y].
-
-      unfold ErrSID_runs_to, runErrSID, runErrSID_T in *.
-      cbn in *.
-      rewrite EQ.
-      auto.
-  Qed.
-
   Lemma sizeof_serialized :
     forall uv dt sid prov bytes,
       uvalue_has_dtyp uv dt ->
@@ -414,7 +267,24 @@ Section Serialization_Theory.
     generalize dependent bytes.
     induction TYP; intros bytes' prov sid' BYTES;
       rewrite serialize_sbytes_equation in BYTES.
-    1-6: inversion BYTES; apply to_ubytes_sizeof.
+
+    Ltac solve_length_local :=
+      match goal with
+      | BYTES : ErrSID_evals_to _ _ _ _ |- _ =>
+          cbn in BYTES; inv BYTES; cbn in *;
+          match goal with
+          | H: context [to_ubytes ?uv ?dt ?sid] |- _
+            => destruct (to_ubytes uv dt sid) eqn:?;
+                       inversion H; subst; eauto
+          end;
+          eapply to_ubytes_sizeof;
+          match goal with
+          | H: to_ubytes _ _ _ = _ |- _ =>
+              rewrite H; cbn; eauto
+          end
+      end.
+
+    1-6: solve_length_local.
 
     (* Poison, could be aggregate *)
 
@@ -561,9 +431,9 @@ Section Serialization_Theory.
     (* Poison, non-aggregate *)
     { destruct H as (NV & NSTRUCT & NPACKED & NARRAY & NVECTOR).
       destruct t;
-        solve [inversion BYTES; apply to_ubytes_sizeof
-              | exfalso; intuition; eauto
-              ].
+        solve [ exfalso; intuition; eauto
+              | solve_length_local
+          ].
     }
 
     (* Undef, could be aggregate *)
@@ -711,12 +581,12 @@ Section Serialization_Theory.
     (* Undef, non-aggregate *)
     { destruct H as (NV & NSTRUCT & NPACKED & NARRAY & NVECTOR).
       destruct t;
-        solve [inversion BYTES; apply to_ubytes_sizeof
-              | exfalso; intuition; eauto
-              ].
+        solve [ exfalso; intuition; eauto
+              | solve_length_local
+          ].
     }
 
-    1-2: inversion BYTES; apply to_ubytes_sizeof.
+    1-2: solve_length_local.
 
     (* Void *)
     { inversion BYTES;
@@ -906,7 +776,7 @@ Section Serialization_Theory.
         lia.
     }
 
-    1-38: solve [inversion BYTES; apply to_ubytes_sizeof].
+    1-38: solve [solve_length_local].
 
     apply ErrSID_evals_to_bind in BYTES as (sid'' & prov'' & bytes'' & EXTRACT & BYTES).
 
@@ -3499,4 +3369,3 @@ End MEMORY_THEORY.
 Module Make(Addr:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(SIZE)(LLVMEvents)) <: MEMORY_THEORY(Addr)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
 Include MEMORY_THEORY(Addr)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
 End Make.
- 

@@ -855,7 +855,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
       uvalue_has_dtyp uv dt ->
       is_supported dt ->
       sizeof_dtyp dt > 0 ->
-      ErrSID_evals_to (serialize_sbytes uv dt) sbytes sid prov ->
+      ErrSID_evals_to (serialize_sbytes uv dt) sid prov sbytes ->
       deserialize_sbytes sbytes dt = inr uv.
   Proof.
     intros uv dt sid prov sbytes TYP SUP SIZE SER.
@@ -1203,7 +1203,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
      *)
     Lemma deserialize_serialize : forall val dt sid prov bytes,
         uvalue_has_dtyp val dt ->
-        ErrSID_evals_to (serialize_sbytes val dt) bytes sid prov ->
+        ErrSID_evals_to (serialize_sbytes val dt) sid prov bytes ->
         deserialize_sbytes bytes dt = inr val.
     Proof.
       intros val dt sid prov bytes TYP SER.
