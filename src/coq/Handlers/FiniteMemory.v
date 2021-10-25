@@ -265,6 +265,149 @@ Module BigIP : MemoryAddress.INTPTR.
 
 End BigIP.
 
+Module IP64Bit : MemoryAddress.INTPTR.
+  Definition intptr := int64.
+  Definition zero := Int64.zero.
+
+  Definition eq_dec := Int64.eq_dec.
+  Definition eqb := Int64.eq.
+
+  Definition to_Z (x : intptr) := Int64.signed x.
+
+  (* TODO: negatives.... ???? *)
+  Definition to_unsigned := to_Z.
+  Definition from_Z (x : Z) : OOM intptr :=
+    if (x <=? Int64.max_signed)%Z && (x >=? Int64.min_signed)%Z
+    then ret (Int64.repr x)
+    else Oom "IP64Bit from_Z oom.".
+
+  Lemma from_Z_to_Z :
+    forall (z : Z) (i : intptr),
+      from_Z z = NoOom i ->
+      to_Z i = z.
+  Proof.
+    intros z i FROM.
+    unfold from_Z in FROM.
+    break_match_hyp; inversion FROM.
+    unfold to_Z.
+    apply Integers.Int64.signed_repr.
+    lia.
+  Qed.
+
+  Lemma from_Z_0 :
+    from_Z 0 = NoOom zero.
+  Proof.
+    auto.
+  Qed.
+
+  Lemma to_Z_0 :
+    to_Z zero = 0.
+  Proof.
+    auto.
+  Qed.
+
+  Instance VMemInt_intptr : VMemInt intptr
+    :=
+    { (* Comparisons *)
+      mequ := Int64.eq;
+      mcmp := Int64.cmp;
+      mcmpu := Int64.cmpu;
+
+      (* Constants *)
+      mbitwidth := Some 64%nat;
+      mzero := Int64.zero;
+      mone := Int64.one;
+
+      (* Arithmetic *)
+      madd := fun x y =>
+               if (Int64.eq (Int64.add_overflow x y Int64.zero) Int64.one)
+               then Oom "IP64Bit addition overflow."
+               else ret (Int64.add x y);
+      madd_carry := Int64.add_carry;
+      madd_overflow := Int64.add_overflow;
+
+      msub := fun x y =>
+               if (Int64.eq (Int64.sub_overflow x y Int64.zero) Int64.one)
+               then Oom "IP64Bit addition overflow."
+               else ret (Int64.sub x y);
+      msub_borrow := Int64.sub_borrow;
+      msub_overflow := Int64.sub_overflow;
+
+      mmul :=
+      fun x y =>
+        let res_s' := ((Int64.signed x) * (Int64.signed y))%Z in
+
+        let min_s_bound := Int64.min_signed >? res_s' in
+        let max_s_bound := res_s' >? Int64.max_signed in
+
+        if (orb min_s_bound max_s_bound)
+        then Oom "IP64Bit multiplication overflow."
+        else NoOom (Int64.mul x y);
+
+      mdivu := Int64.divu;
+      mdivs :=
+      fun x y =>
+        if (Int64.signed x =? Int64.max_signed) && (Int64.signed y =? (-1)%Z)
+        then Oom "IP64Bit signed division overflow."
+        else ret (Int64.divs x y);
+
+      mmodu := Int64.modu;
+      mmods :=
+      (* TODO: is this overflow check needed? *)
+      fun x y =>
+        if (Int64.signed x =? Int64.max_signed) && (Int64.signed y =? (-1)%Z)
+        then Oom "IP64Bit signed modulo overflow."
+        else ret (Int64.mods x y);
+
+      mshl :=
+      fun x y =>
+        let res := Int64.shl x y in
+        if Int64.signed res =? Int64.min_signed
+        then Oom "IP64Bit left shift overflow (res is min signed, should not happen)."
+        else
+          let nres := Int64.negative res in
+          if (negb (Z.shiftr (Int64.unsigned x)
+                             (64%Z - Int64.unsigned y)
+                    =? (Int64.unsigned nres)
+                       * (Z.pow 2 (Int64.unsigned y) - 1))%Z)
+          then Oom "IP64Bit left shift overflow."
+          else ret res;
+      mshr := Int64.shr;
+      mshru := Int64.shru;
+
+      mnegative :=
+      fun x =>
+        if (Int64.signed x =? Int64.min_signed)
+        then Oom "IP64Bit taking negative of smallest number."
+        else ret (Int64.negative x);
+
+      (* Logic *)
+      mand := Int64.and;
+      mor := Int64.or;
+      mxor := Int64.xor;
+
+      (* Bounds *)
+      mmin_signed := ret Int64.min_signed;
+      mmax_signed := ret Int64.max_signed;
+
+      (* Conversion *)
+      munsigned := Int64.unsigned;
+      msigned := Int64.signed;
+
+      mrepr := from_Z;
+
+      mdtyp_of_int := DTYPE_IPTR
+    }.
+
+  Lemma VMemInt_intptr_dtyp :
+    @mdtyp_of_int intptr VMemInt_intptr = DTYPE_IPTR.
+  Proof.
+    cbn. reflexivity.
+  Qed.
+
+End IP64Bit.
+
+
 Module FinPTOI : PTOI(Addr).
   Definition ptr_to_int (ptr : Addr.addr) := fst ptr.
 End FinPTOI.
