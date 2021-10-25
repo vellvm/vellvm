@@ -369,27 +369,21 @@ Section Outputs.
         - intros ? eq; inv eq.
 
           repeat (break_match_hyp; cbn in *; try inv_err_ub_oom).
+          all: try (subst;
+            destruct unERR_UB_OOM1;
+            destruct unERR_UB_OOM0;
+            repeat destruct unEitherT0;
+            destruct unIdent; inversion Heqs2;
+            destruct unERR_UB_OOM;
+            repeat destruct unEitherT0;
+            destruct unIdent; inversion Heqs;
+            subst;
+            inversion Heqe0).
 
-          inversion Heqe0; subst.
-          inversion Heqs.
-
-          inversion Heqe0; subst.
-          inversion Heqs.
-
-          inversion Heqe0; subst.
-          inversion Heqs.
-
-          inversion Heqe0; subst.
-          inversion Heqs.
-
-          cbn.
-          
-          f_equal; apply IH.
-          rewrite <- Heqs2.
-
-          rewrite unIdent_eta.
-          repeat rewrite unEither_eta.
-          reflexivity.
+          all: subst;
+            cbn;
+            apply f_equal;
+            auto.
       }
       rewrite H.
       clear.

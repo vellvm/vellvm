@@ -1023,7 +1023,7 @@ Class VInt I : Type :=
       mcmpu := cmpu;
 
       (* Constants *)
-      mbitwidth := bitwidth;
+      mbitwidth := ret bitwidth;
       mzero := zero;
       mone := one;
 
@@ -1598,6 +1598,12 @@ Class VInt I : Type :=
       := res <- lift_OOM i;;
          ret (to_dvalue res).
 
+    Definition option_pred {A} (pred : A -> bool) (ma : option A) : bool
+      := match ma with
+         | Some x => pred x
+         | None => false
+         end.
+
     Definition eval_int_op {M} {Int} `{Monad M} `{RAISE_UB M} `{RAISE_OOM M} `{VMemInt Int} `{ToDvalue Int} (iop:ibinop) (x y: Int) : M dvalue :=
       match iop with
       (* Following to cases are probably right since they use CompCert *)
@@ -1615,7 +1621,7 @@ Class VInt I : Type :=
 
     | Mul nuw nsw =>
       (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
-        if (mbitwidth ~=? 1)%nat
+        if (option_pred (fun bw => Nat.eqb bw 1) mbitwidth)
         then to_dvalue_OOM (mmul x y)
         else
           res <- lift_OOM (mmul x y);;
@@ -1638,15 +1644,13 @@ Class VInt I : Type :=
           else ret (to_dvalue res)
 
     | Shl nuw nsw =>
-      let bz := Z.of_nat mbitwidth in
-
       res <- lift_OOM (mshl x y);;
       let res_u := munsigned res in
       let res_u' := Z.shiftl (munsigned x) (munsigned y) in
 
       (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
          then there is overflow. *)
-      if (munsigned y) >=? bz
+      if option_pred (fun bw => munsigned y >=? Z.of_nat bw) mbitwidth
       then ret (DVALUE_Poison mdtyp_of_int)
       else
         if andb nuw (res_u' >? res_u)
@@ -1655,14 +1659,19 @@ Class VInt I : Type :=
           (* Need to separate this out because mnegative can OOM *)
           if nsw
           then
-            (* TODO: should this OOM here? *)
-            nres <- lift_OOM (mnegative res);;
-            if (negb (Z.shiftr (munsigned x)
-                               (bz - munsigned y)
-                      =? (munsigned nres)
-                         * (Z.pow 2 (munsigned y) - 1))%Z)
-            then ret (DVALUE_Poison mdtyp_of_int)
-            else ret (to_dvalue res)
+            match mbitwidth with
+            | None =>
+                ret (to_dvalue res)
+            | Some bw =>
+                (* TODO: should this OOM here? *)
+                nres <- lift_OOM (mnegative res);;
+                if (negb (Z.shiftr (munsigned x)
+                                   (Z.of_nat bw - munsigned y)
+                          =? (munsigned nres)
+                             * (Z.pow 2 (munsigned y) - 1))%Z)
+                then ret (DVALUE_Poison mdtyp_of_int)
+                else ret (to_dvalue res)
+            end
           else ret (to_dvalue res)
 
     | UDiv ex =>
@@ -1681,15 +1690,15 @@ Class VInt I : Type :=
            else to_dvalue_OOM (mdivs x y)
 
     | LShr ex =>
-      let bz := Z.of_nat mbitwidth in
-      if (munsigned y) >=? bz then ret (DVALUE_Poison mdtyp_of_int)
+      if option_pred (fun bw => (munsigned y) >=? Z.of_nat bw) mbitwidth
+      then ret (DVALUE_Poison mdtyp_of_int)
       else if andb ex (negb ((munsigned x)
                                mod (Z.pow 2 (munsigned y)) =? 0))%Z
            then ret (DVALUE_Poison mdtyp_of_int) else ret (to_dvalue (mshru x y))
 
     | AShr ex =>
-      let bz := Z.of_nat mbitwidth in
-      if (munsigned y) >=? bz then ret (DVALUE_Poison mdtyp_of_int)
+      if option_pred (fun bw => (munsigned y) >=? Z.of_nat bw) mbitwidth
+      then ret (DVALUE_Poison mdtyp_of_int)
       else if andb ex (negb ((munsigned x)
                                mod (Z.pow 2 (munsigned y)) =? 0))%Z
            then ret (DVALUE_Poison mdtyp_of_int) else ret (to_dvalue (mshr x y))

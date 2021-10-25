@@ -55,6 +55,7 @@ From Vellvm Require Import
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
+     Semantics.VellvmIntegers
      Semantics.DynamicValues
      Semantics.Denotation
      Semantics.MemoryAddress
@@ -183,6 +184,85 @@ Module BigIP : MemoryAddress.INTPTR.
   Proof.
     auto.
   Qed.
+
+  Definition mequ_Z (x y : Z) : bool :=
+    Z.eqb x y.
+
+  Definition mcmp_Z (c : comparison) (x y : Z) : bool := 
+    match c with
+    | Ceq => Z.eqb x y
+    | Cne => Zneq_bool x y
+    | Clt => Z.ltb x y
+    | Cle => Z.leb x y
+    | Cgt => Z.gtb x y
+    | Cge => Z.geb x y
+    end.
+
+  Definition mcmpu_Z (c : comparison) (x y : Z) : bool := 
+    match c with
+    | Ceq => Z.eqb x y
+    | Cne => Zneq_bool x y
+    | Clt => Z.ltb x y
+    | Cle => Z.leb x y
+    | Cgt => Z.gtb x y
+    | Cge => Z.geb x y
+    end.
+
+  Instance VMemInt_intptr : VMemInt intptr
+    :=
+    { mequ  := mequ_Z;
+      mcmp  := mcmp_Z;
+      mcmpu := mcmpu_Z;
+
+      mbitwidth := None;
+      mzero     := 0%Z;
+      mone      := 1%Z;
+
+      madd := fun x y => ret (Z.add x y);
+      (* No overflows *)
+      madd_carry := fun x y c => 0%Z;
+      madd_overflow := fun x y c => 0%Z;
+
+      msub := fun x y => ret (Z.sub x y);
+      (* No overflows *)
+      msub_borrow := fun x y c => 0%Z;
+      msub_overflow := fun x y c => 0%Z;
+
+      mmul := fun x y => ret (Z.mul x y);
+
+      mdivu := fun x y => Z.div x y;
+      mdivs := fun x y => ret (Z.div x y);
+
+      mmodu := fun x y => Z.modulo x y;
+      mmods := fun x y => ret (Z.modulo x y);
+
+      mshl := fun x y => ret (Z.shiftl x y);
+      mshr := fun x y => Z.shiftr x y;
+      mshru := fun x y => Z.shiftr x y;
+
+      mnegative := fun x => ret (0 - x)%Z;
+
+      mand := Z.land;
+      mor := Z.lor;
+      mxor := Z.lxor;
+
+      mmin_signed := None;
+      mmax_signed := None;
+
+      munsigned := fun x => x;
+      msigned := fun x => x;
+
+      mrepr := fun x => ret x;
+
+      mdtyp_of_int := DTYPE_IPTR
+    }.
+
+  Lemma VMemInt_intptr_dtyp :
+    @mdtyp_of_int intptr VMemInt_intptr = DTYPE_IPTR.
+  Proof.
+    cbn. reflexivity.
+  Qed.
+
 End BigIP.
 
 Module FinPTOI : PTOI(Addr).
@@ -1601,11 +1681,12 @@ Module Make(Addr : MemoryAddress.ADDRESS)(IP : MemoryAddress.INTPTR)(SIZE:Sizeof
         ret x
       end.
 
-  Definition mem_state_lift_err_or_ub {E} `{FailureE -< E} `{UBE -< E} {A} (e : err_or_ub A) : MemStateT (itree E) A
-    := match unEitherT (unERR_OR_UB e) with
-       | inl (UB_message ub) => mem_state_raiseUB ub
-       | inr (inl (ERR_message err)) => mem_state_raise err
-       | inr (inr x) => ret x
+  Definition mem_state_lift_err_ub_oom {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A} (e : err_ub_oom A) : MemStateT (itree E) A
+    := match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM e)))) with
+       | inl (OOM_message oom) => mem_state_raiseOOM oom
+       | inr (inl (UB_message ub)) => mem_state_raiseUB ub
+       | inr (inr (inl (ERR_message err))) => mem_state_raise err
+       | inr (inr (inr x)) => ret x
        end.
 
       Fixpoint uvalue_to_string (u : uvalue) : string
@@ -1712,8 +1793,8 @@ Module Make(Addr : MemoryAddress.ADDRESS)(IP : MemoryAddress.INTPTR)(SIZE:Sizeof
       | PtoI t a =>
         match a, t with
         | UVALUE_Addr ptr, DTYPE_I sz =>
-          let addr := coerce_integer_to_int sz (ptr_to_int ptr) in
-          addr' <- mem_state_lift_err_or_ub addr;;
+          let addr := coerce_integer_to_int (Some sz) (ptr_to_int ptr) in
+          addr' <- mem_state_lift_err_ub_oom addr;;
           ret (dvalue_to_uvalue addr')
         | UVALUE_Addr ptr, DTYPE_IPTR =>
             match IP.from_Z (ptr_to_int ptr) with

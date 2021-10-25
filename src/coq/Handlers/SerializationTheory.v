@@ -782,7 +782,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
       destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
 
       eapply eval_iop_dtyp_iptr.
-      1-4: admit. (* Waaah *)
+      1-3: admit. (* Waaah *)
       eapply IHDTYP1; eauto.
       eapply IHDTYP2; eauto.
       rewrite EVAL.

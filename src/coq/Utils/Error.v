@@ -634,7 +634,30 @@ End err_ub_oom.
 
 Ltac inv_err_ub_oom :=
   match goal with
-  | h: {| unERR_UB_OOM := {| unEitherT := {| unEitherT := {| unEitherT := {| IdentityMonad.unIdent := _ |} |} |} |} |}
-       = {| unERR_UB_OOM := {| unEitherT := {| unEitherT := {| unEitherT := {| IdentityMonad.unIdent := _ |} |} |} |} |} |- _ =>
+  | h: {| unERR_UB_OOM := {| unEitherT := {| unEitherT := {| unEitherT := {| IdentityMonad.unIdent := inl _ |} |} |} |} |}
+       = {| unERR_UB_OOM := {| unEitherT := {| unEitherT := {| unEitherT := {| IdentityMonad.unIdent := inl _ |} |} |} |} |} |- _ =>
+      inv h
+  | h: {| unERR_UB_OOM := {| unEitherT := {| unEitherT := {| unEitherT := {| IdentityMonad.unIdent := inr _ |} |} |} |} |}
+       = {| unERR_UB_OOM := {| unEitherT := {| unEitherT := {| unEitherT := {| IdentityMonad.unIdent := inr _ |} |} |} |} |} |- _ =>
+      inv h
+  | h: {| unERR_UB_OOM := {| unEitherT := {| unEitherT := {| unEitherT := {| IdentityMonad.unIdent := inl _ |} |} |} |} |}
+       = {| unERR_UB_OOM := {| unEitherT := {| unEitherT := {| unEitherT := {| IdentityMonad.unIdent := inr _ |} |} |} |} |} |- _ =>
+      inv h
+  | h: {| unERR_UB_OOM := {| unEitherT := {| unEitherT := {| unEitherT := {| IdentityMonad.unIdent := inr _ |} |} |} |} |}
+       = {| unERR_UB_OOM := {| unEitherT := {| unEitherT := {| unEitherT := {| IdentityMonad.unIdent := inl _ |} |} |} |} |} |- _ =>
       inv h
   end.
+
+(*
+-Ltac inv_err_or_ub :=
+-  match goal with
+-  | h: {| unERR_OR_UB := {| unEitherT := inl _ |} |} =
+-       {| unERR_OR_UB := {| unEitherT := inl _ |} |} |- _ => inv h
+-  | h: {| unERR_OR_UB := {| unEitherT := inr _ |} |} =
+-       {| unERR_OR_UB := {| unEitherT := inr _ |} |} |- _ => inv h
+-  | h: {| unERR_OR_UB := {| unEitherT := inr _ |} |} =
+-       {| unERR_OR_UB := {| unEitherT := inl _ |} |} |- _ => inv h
+-  | h: {| unERR_OR_UB := {| unEitherT := inl _ |} |} =
+-       {| unERR_OR_UB := {| unEitherT := inr _ |} |} |- _ => inv h
+-  end.
+*)

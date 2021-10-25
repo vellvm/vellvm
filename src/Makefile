@@ -31,6 +31,7 @@ COQFILESSYNTAX := Syntax/DataLayout Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
 
 COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/Memory/Sizeof Semantics/GepM Semantics/Memory/MemBytes\
 		Semantics/Memory/Overlaps Semantics/Memory/FiniteProvenance Semantics/Memory/StoreId\
+		Semantics/VellvmIntegers Semantics/Memory/ErrSID \
 		Semantics/DynamicValues Semantics/LLVMEvents\
 		Semantics/IntrinsicsDefinitions\
 		Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
