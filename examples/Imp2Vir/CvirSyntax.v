@@ -1,3 +1,4 @@
+(* DEPRECIATED *)
 From Coq Require Import
      Lia
      (* Arith *)
@@ -75,28 +76,7 @@ Qed.
 
 Definition mk_anon (n : nat) := Anon (Z.of_nat n).
 
-Variant block_typ : Type :=
-  | Simple
-  | Return ( _ : texp typ )
-  | Void
-  | Branch ( _ : texp typ ).
-
-Inductive icvir : Type :=
-| Block (_ : block_typ) ( _ : code typ )
-| PermuteInputs (_ : icvir)  (* Do we want more generally an arbitrary permutation? *)
-| PermuteOutputs (_ : icvir)
-| Loop (_ : nat) (_ : icvir)
-| Merge (_ : icvir) (_ : icvir)
-| Join (_ : nat) (_ : icvir).
-
-Definition Sequence (c1 c2 : icvir) : icvir :=
-  Loop 1 (PermuteInputs (Merge c1 c2)).
-
-(* Definition If (e : texp typ) (ct cf : icvir) := *)
-(*   let cond := Block (Branch e) [] in *)
-(*   let body := Join 2 (Merge ct cf) in *)
-(*   Sequence cond body. *)
-
+(** -- Freshness monad -- *)
 
 Record FST := mk_FST
   {
@@ -141,6 +121,96 @@ Definition getInputs : fresh (list block_id) :=
 Definition getOutputs : fresh (list block_id) :=
   fun '(mk_FST i o r b) =>
     (mk_FST i o r b, o).
+
+(** -- Invariants -- *)
+
+Lemma getInputs_invariant :
+ forall σ σ' l, getInputs σ = (σ', l) -> σ = σ'.
+Proof.
+  unfold getInputs.
+  intros.
+  flatten_all.
+  inv H. reflexivity.
+Qed.
+
+Lemma getOutputs_invariant :
+ forall σ σ' l, getOutputs σ = (σ', l) -> σ = σ'.
+Proof.
+  unfold getOutputs.
+  intros.
+  flatten_all.
+  inv H. reflexivity.
+Qed.
+
+(* Ltac unfold_freshness := *)
+(*   repeat ( *)
+(*   match goal with *)
+(*   | h: context[(_,_) = (_,_)] |- _ => inv h *)
+(*   | h: context[getInputs _ = (_,_)] |- _ => apply getInputs_invariant in h ; try subst *)
+(*   | h: context[getOutputs _ = (_,_)] |- _ => apply getOutputs_invariant in h ; try subst *)
+(*   | h: context[setInputs _ _ = (_,_)] |- _ => *)
+(*     unfold setInputs in h ; try (flatten_hyp h) ; inv h *)
+(*   | h: context[setOutputs _ _ = (_,_)] |- _ => *)
+(*     unfold setOutputs in h ; try (flatten_hyp h) ; inv h *)
+(*   | |- _ => idtac *)
+(*   end ; simpl in * *)
+(*     ). *)
+
+Ltac unfold_freshness :=
+  repeat (
+  match goal with
+  | h: context[(_,_) = (_,_)] |- _ => inv h
+  | h: context[getInputs _ = (_,_)] |- _ =>
+    unfold getInputs in h ; try (flatten_hyp h) ; inv h ; subst
+  | h: context[getOutputs _ = (_,_)] |- _ =>
+    unfold getOutputs in h ; try (flatten_hyp h) ; inv h ; subst
+  | h: context[setInputs _ _ = (_,_)] |- _ =>
+    unfold setInputs in h ; try (flatten_hyp h) ; inv h ; subst
+  | h: context[setOutputs _ _ = (_,_)] |- _ =>
+    unfold setOutputs in h ; try (flatten_hyp h) ; inv h ; subst
+  | |- _ => idtac
+  end ; simpl in *
+    ).
+
+
+(* NOTE this lemma is too strong: we want that the invariant holds for an arbitrary number
+        of getLab calls *)
+Lemma freshness_get_label : forall (σ σ' σ'' : FST) l l',
+  getLab σ = (σ', l) ->
+  getLab σ' = (σ'', l') ->
+  (l <> l')%nat.
+Proof.
+  intros.
+  destruct σ,  σ'.
+  unfold getLab in *.
+  inv H; inv H0. unfold name,mk_anon.
+  intro; injection H; lia.
+Qed.
+
+
+
+(** -- ICVIR syntax -- *)
+Variant block_typ : Type :=
+  | Simple
+  | Return ( _ : texp typ )
+  | Void
+  | Branch ( _ : texp typ ).
+
+Inductive icvir : Type :=
+| Block (_ : block_typ) ( _ : code typ )
+| PermuteInputs (_ : icvir)  (* Do we want more generally an arbitrary permutation? *)
+| PermuteOutputs (_ : icvir)
+| Loop (_ : nat) (_ : icvir)
+| Merge (_ : icvir) (_ : icvir)
+| Join (_ : nat) (_ : icvir).
+
+Definition Sequence (c1 c2 : icvir) : icvir :=
+  Loop 1 (PermuteInputs (Merge c1 c2)).
+
+(* Definition If (e : texp typ) (ct cf : icvir) := *)
+(*   let cond := Block (Branch e) [] in *)
+(*   let body := Join 2 (Merge ct cf) in *)
+(*   Sequence cond body. *)
 
 
 Fixpoint eval (cir : icvir) : fresh (list (block typ)) :=
@@ -232,69 +302,6 @@ Proof.
 Qed.
 
 (** -- Well-Formness -- *)
-
-Lemma getInputs_invariant :
- forall σ σ' l, getInputs σ = (σ', l) -> σ = σ'.
-Proof.
-  unfold getInputs.
-  intros.
-  flatten_all.
-  inv H. reflexivity.
-Qed.
-
-Lemma getOutputs_invariant :
- forall σ σ' l, getOutputs σ = (σ', l) -> σ = σ'.
-Proof.
-  unfold getOutputs.
-  intros.
-  flatten_all.
-  inv H. reflexivity.
-Qed.
-
-(* Ltac unfold_freshness := *)
-(*   repeat ( *)
-(*   match goal with *)
-(*   | h: context[(_,_) = (_,_)] |- _ => inv h *)
-(*   | h: context[getInputs _ = (_,_)] |- _ => apply getInputs_invariant in h ; try subst *)
-(*   | h: context[getOutputs _ = (_,_)] |- _ => apply getOutputs_invariant in h ; try subst *)
-(*   | h: context[setInputs _ _ = (_,_)] |- _ => *)
-(*     unfold setInputs in h ; try (flatten_hyp h) ; inv h *)
-(*   | h: context[setOutputs _ _ = (_,_)] |- _ => *)
-(*     unfold setOutputs in h ; try (flatten_hyp h) ; inv h *)
-(*   | |- _ => idtac *)
-(*   end ; simpl in * *)
-(*     ). *)
-
-Ltac unfold_freshness :=
-  repeat (
-  match goal with
-  | h: context[(_,_) = (_,_)] |- _ => inv h
-  | h: context[getInputs _ = (_,_)] |- _ =>
-    unfold getInputs in h ; try (flatten_hyp h) ; inv h ; subst
-  | h: context[getOutputs _ = (_,_)] |- _ =>
-    unfold getOutputs in h ; try (flatten_hyp h) ; inv h ; subst
-  | h: context[setInputs _ _ = (_,_)] |- _ =>
-    unfold setInputs in h ; try (flatten_hyp h) ; inv h ; subst
-  | h: context[setOutputs _ _ = (_,_)] |- _ =>
-    unfold setOutputs in h ; try (flatten_hyp h) ; inv h ; subst
-  | |- _ => idtac
-  end ; simpl in *
-    ).
-
-
-(* NOTE this lemma is too strong: we want that the invariant holds for an arbitrary number
-        of getLab calls *)
-Lemma freshness_get_label : forall (σ σ' σ'' : FST) l l',
-  getLab σ = (σ', l) ->
-  getLab σ' = (σ'', l') ->
-  (l <> l')%nat.
-Proof.
-  intros.
-  destruct σ,  σ'.
-  unfold getLab in *.
-  inv H; inv H0. unfold name,mk_anon.
-  intro; injection H; lia.
-Qed.
 
 Theorem ins_outs_disjoints : forall (ir : icvir) (σ s s' s'' : FST) li lo b,
   (eval ir σ) = (s,b) ->
@@ -481,9 +488,6 @@ Proof.
   rewrite Heq3 in Heq9 ; clear Heq3 ; inv Heq9.
 Admitted.
 
-(* Permute is WRONG:
-   we can't just permute the list, we have to apply the relabeling in the CFG
- *)
 Lemma permuteInput_sound :
  forall (ir : icvir) (σ : FST) (fto : block_id * block_id),
  eutt eq
