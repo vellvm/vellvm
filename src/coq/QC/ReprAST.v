@@ -138,6 +138,10 @@ Section ReprInstances.
     end.
   Next Obligation.
     cbn.
+    lia.
+  Qed.
+  Next Obligation.
+    cbn.
     pose proof (list_sum_map dtyp_measure fld fields HIn).
     lia.
   Qed.
@@ -169,6 +173,10 @@ Section ReprInstances.
     | TYPE_Vector sz t          => "(TYPE_Vector (" ++ repr sz ++ ") (" ++ repr_typ t ++ ")"
     | TYPE_Identified id        => "(TYPE_Identified " ++ repr id ++ ")"
     end.
+  Next Obligation.
+    cbn in *.
+    lia.
+  Qed.
   Next Obligation.
     cbn in *.
     lia.
