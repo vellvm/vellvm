@@ -9,6 +9,7 @@ From Vellvm Require Import
      Utils.Tactics
      Utils.ListUtil
      Utils.Error
+     Utils.RefineProp
      Handlers.FiniteMemory
      Handlers.Serialization
      Semantics.LLVMEvents
