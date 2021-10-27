@@ -27,6 +27,7 @@ From Vellvm.Handlers Require Export
      FiniteMemoryTheory
      Pick
      UndefinedBehaviour
+     OOM
      Serialization.
 
 From Vellvm.Semantics Require Import Memory.Sizeof Memory.MemBytes GepM.
