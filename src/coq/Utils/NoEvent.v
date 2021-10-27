@@ -959,7 +959,7 @@ Section DeterministicSingleton.
   Proof.
   Admitted.
 
-  Variable remove_pick_ub : itree (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE +' OOME) ~> itree (ExternalCallE +' DebugE +' FailureE +' OOME).
+  Variable remove_pick_ub : itree (ExternalCallE +' PickE +' UBE +' OOME +' DebugE +' FailureE) ~> itree (ExternalCallE +' OOME +' DebugE +' FailureE).
   Variable deterministic_vellvm : forall R, itree L0 R -> Prop.
   (* Definition deterministic_vellvm *)
   Lemma deterministc_llvm_is_singleton : forall R RR t g sl mem,
