@@ -57,6 +57,166 @@ Definition cfg_for_loop (b e step : nat) (body : ocfg) (inb : block_id) : ocfg.
 Admitted.
 
 
+(** Semantic *)
+From Vellvm Require Import
+     Semantics
+     Tactics
+     Theory.SymbolicInterpreter.
+
+From ITree Require Import
+     ITree
+     ITreeFacts
+     Eq.
+
+Import ITreeNotations.
+
+Notation conv := (convert_typ []).
+Definition denote_cfg g from to := denote_ocfg (conv g) (from,to).
+
+From Vellvm Require Import Syntax.ScopeTheory.
+
+Definition eq_bid b b' :=
+  match b,b' with
+  | Name s, Name s' => String.eqb s s'
+  | Anon n, Anon n' => @RelDec.eq_dec int eq_dec_int n n'
+  | Raw n, Raw n' => @RelDec.eq_dec int eq_dec_int n n'
+  | _,_ => false
+  end.
+
+Lemma eqb_bid_eq : forall b b', eq_bid b b' = true <-> b=b'.
+Proof.
+  intros.
+  split.
+  - destruct b,b' ;
+      try (intros ; simpl in H ; discriminate) ;
+      simpl ; intros ; f_equal ;
+      try (now apply String.eqb_eq) ;
+      try (now apply Z.eqb_eq).
+  - intros ; subst.
+    destruct b' ; simpl ;
+      try (now apply String.eqb_eq) ;
+      try (now apply Z.eqb_eq).
+Qed.
+
+Lemma eqb_bid_neq : forall b b', eq_bid b b' = false <-> b<>b'.
+Proof.
+  intros.
+  split.
+  - destruct b,b' ;
+      try (intros ; simpl in H ; discriminate) ;
+      simpl ; intros ; intro ;
+      try (apply String.eqb_neq in H);
+      try (apply Z.eqb_neq in H);
+        inv H0 ; contradiction.
+  - intros ; subst.
+    destruct b,b' ; simpl ; auto;
+    try (apply String.eqb_neq) ;
+      try (apply Z.eqb_neq) ;
+      intro ; subst ;
+    contradiction.
+Qed.
+
+Lemma eq_bid_comm : forall b b', eq_bid b b' = eq_bid b' b.
+  intros.
+  destruct b,b' ; simpl ; auto ;
+    try (now apply String.eqb_sym) ;
+    try (now apply Z.eqb_sym).
+Qed.
+
+Lemma eq_bid_refl : forall b, eq_bid b b = true.
+  intros.
+  destruct b ; simpl ; auto ;
+    try (now apply String.eqb_refl) ;
+    try (now apply Z.eqb_refl).
+Qed.
+
+Lemma eqv_dec_p_eq : forall b b' r,
+    eq_bid b b' = r <-> (if Eqv.eqv_dec_p b b' then true else false) = r.
+  intros.
+  destruct r eqn:R.
+  - destruct (Eqv.eqv_dec_p b b') eqn:E.
+    + unfold Eqv.eqv,eqv_raw_id in e ; subst.
+      now rewrite eq_bid_refl.
+    + unfold Eqv.eqv,eqv_raw_id in n.
+      rewrite eqb_bid_eq.
+      split ; intros ; subst. contradiction. inversion H.
+  - destruct (Eqv.eqv_dec_p b b') eqn:E.
+    + unfold Eqv.eqv,eqv_raw_id in e ; subst.
+    now rewrite eq_bid_refl.
+    + unfold Eqv.eqv,eqv_raw_id in n ; subst.
+      rewrite eqb_bid_neq.
+      split ; intros ; auto.
+Qed.
+
+Lemma eqv_dec_p_refl : forall (b : block_id),
+    (if Eqv.eqv_dec_p b b then true else false) = true.
+Proof.
+  intros.
+  destruct (Eqv.eqv_dec_p b b) ; auto.
+  unfold Eqv.eqv,eqv_raw_id in n ; auto.
+Qed.
+
+Lemma denote_cfg_block : forall (c : code) (input output : block_id) from to,
+    input <> output ->
+    eutt eq
+         (denote_cfg (cfg_block c input output) from to)
+         (if (eq_bid to input)
+          then ret tt ;; denote_code (conv c) ;; ret (inl (input,output))
+          else ret (inl (from,to))) .
+Proof.
+  intros.
+  unfold denote_cfg.
+  destruct (eq_bid to input) eqn:E.
+  apply eqb_bid_eq in E ; subst.
+  - unfold cfg_block.
+    unfold denote_ocfg.
+    set (b := (conv
+                  {|
+                     blk_id := input;
+                     blk_phis := [];
+                     blk_code := c;
+                     blk_term := TERM_Br_1 output;
+                     blk_comments := None
+                  |})).
+    setoid_rewrite DenotationTheory.denote_ocfg_unfold_in with (bk := b).
+    + subst b.
+      setoid_rewrite DenotationTheory.denote_block_unfold_cont.
+      unfold Traversal.endo, Traversal.Endo_id.
+      simpl.
+      unfold tfmap, TFunctor_list ; simpl.
+      rewrite DenotationTheory.denote_no_phis.
+      rewrite eutt_eq_bind.
+      reflexivity.
+      intros. simpl.
+      rewrite eutt_eq_bind .
+      reflexivity.
+      intros. simpl.
+      rewrite translate_ret.
+      unfold Traversal.endo, Traversal.Endo_id.
+      assert (Hbind_ret : forall {E R1 R2} (k : R1 -> itree E R2) v
+               , (x <- Ret v ;; k x) ≈ k v).
+      { admit. (* easy, monad laws*) }
+      rewrite Hbind_ret.
+      setoid_rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+      reflexivity.
+      simpl.
+      unfold Traversal.endo, Traversal.Endo_id.
+      rewrite <- eqb_bid_neq in H.
+      rewrite eqv_dec_p_eq in H.
+      unfold block_id in *.
+      rewrite H. reflexivity.
+    + cbn ; rewrite eqv_dec_p_refl ; reflexivity.
+  - unfold cfg_block.
+    unfold denote_ocfg.
+    setoid_rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+    reflexivity.
+    rewrite eq_bid_comm in E.
+    apply eqv_dec_p_eq in E.
+    simpl.
+    unfold Traversal.endo, Traversal.Endo_id.
+    unfold block_id in *. now rewrite E.
+Admitted.
+
 
 
 (** Compiler IMP *)
