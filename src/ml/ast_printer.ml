@@ -89,6 +89,7 @@ and typ : Format.formatter -> LLVMAst.typ -> unit =
   fun ppf ->
   function
   | TYPE_I i              -> fprintf ppf "(TYPE_I %d%%Z)" (n_to_int i)
+  | TYPE_IPTR             -> fprintf ppf "TYPE_IPTR"
   | TYPE_Pointer t        -> fprintf ppf "(TYPE_Pointer %a)" typ t ;
   | TYPE_Void             -> fprintf ppf "TYPE_Void"
   | TYPE_Function (t, tl) -> fprintf ppf "(TYPE_Function %a [%a])" typ t (pp_print_list ~pp_sep:pp_sc_space typ) tl

@@ -187,6 +187,7 @@ and typ : Format.formatter -> LLVMAst.typ -> unit =
   fun ppf ->
   function
   | TYPE_I i              -> fprintf ppf "i%d" (n_to_int i)
+  | TYPE_IPTR             -> fprintf ppf "iptr"
   | TYPE_Pointer t        -> fprintf ppf "%a*" typ t ;
   | TYPE_Void             -> fprintf ppf "void"
   | TYPE_Half             -> fprintf ppf "half"
