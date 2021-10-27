@@ -57,6 +57,89 @@ Definition cfg_for_loop (b e step : nat) (body : ocfg) (inb : block_id) : ocfg.
 Admitted.
 
 
+(** WF properties *)
+
+Lemma inputs_app : forall (g1 g2 : ocfg), inputs (g1++g2) = inputs g1 ++ inputs g2.
+Proof.
+  intros.
+  unfold inputs.
+  apply Coqlib.list_append_map.
+Qed.
+
+Lemma inputs_seq : forall (g1 g2 : ocfg) (out1 in2 :  block_id),
+    inputs (cfg_seq g1 g2 out1 in2) =
+      inputs g1 ++ [out1] ++ inputs g2.
+Proof.
+  intros.
+  unfold cfg_seq.
+  apply inputs_app.
+Qed.
+
+Definition WF_Seq (g1 g2 : ocfg) :=
+  forall (out1 : block_id),
+    wf_ocfg_bid g1 /\
+      wf_ocfg_bid g2 /\
+      no_duplicate_bid g1 g2 /\
+      free_in_cfg g1 out1 /\
+      free_in_cfg g2 out1.
+
+Lemma wf_ocfg_seq : forall (g1 g2 : ocfg) (out1 in2 : block_id),
+    WF_Seq g1 g2 -> wf_ocfg_bid (cfg_seq g1 g2 out1 in2).
+Proof.
+  unfold WF_Seq.
+  unfold wf_ocfg_bid, free_in_cfg.
+  intros.
+  specialize (H out1). destruct H as [? [? [? [? ?]]]].
+  simpl.
+  rewrite inputs_seq.
+  apply Coqlib.list_norepet_append ; auto.
+  apply Coqlib.list_norepet_cons ; auto.
+  apply Util.list_disjoint_app_r ; intuition.
+  apply Util.list_disjoint_singleton_right ; auto.
+Qed.
+
+
+Lemma In_singleton : forall {A} (x y : A),
+    In x [y] -> x=y.
+Proof.
+  intros.
+  cbn in H; intuition.
+Qed.
+
+Lemma List_norepet_singleton : forall {A} (x : A),
+    Coqlib.list_norepet [x].
+Proof.
+  intros.
+  apply Coqlib.list_norepet_cons ; auto.
+  apply Coqlib.list_norepet_nil.
+Qed.
+
+
+Lemma wf_while_loop :
+  forall (code_expr : code) (cond : exp) (body : ocfg) (input inB output outB : block_id),
+    wf_ocfg_bid body ->
+    ~ In input (inputs body) ->
+    ~ In outB (inputs body) ->
+    input <> outB ->
+    wf_ocfg_bid (cfg_while_loop code_expr cond body input inB output outB).
+Proof.
+  unfold wf_ocfg_bid.
+  intros.
+  unfold cfg_while_loop.
+  simpl.
+  rewrite inputs_app.
+  simpl.
+  apply Coqlib.list_norepet_cons ; auto.
+  - rewrite in_app_iff.
+    intuition.
+    apply In_singleton in H4 ; subst ; auto.
+  - apply Coqlib.list_norepet_app ; auto.
+    intuition. apply List_norepet_singleton.
+    apply Util.list_disjoint_singleton_right ; auto.
+Qed.
+
+
+
 (** Semantic *)
 From Vellvm Require Import
      Semantics
@@ -157,7 +240,7 @@ Proof.
 Qed.
 
 Lemma denote_cfg_block : forall (c : code) (input output : block_id) from to,
-    input <> output ->
+    input <> output -> (* TODO should be a WF property of block *)
     eutt eq
          (denote_cfg (cfg_block c input output) from to)
          (if (eq_bid to input)
@@ -170,7 +253,7 @@ Proof.
   apply eqb_bid_eq in E ; subst.
   - unfold cfg_block.
     unfold denote_ocfg.
-    set (b := (conv
+    setoid_rewrite DenotationTheory.denote_ocfg_unfold_in with (bk := (conv
                   {|
                      blk_id := input;
                      blk_phis := [];
@@ -178,9 +261,7 @@ Proof.
                      blk_term := TERM_Br_1 output;
                      blk_comments := None
                   |})).
-    setoid_rewrite DenotationTheory.denote_ocfg_unfold_in with (bk := b).
-    + subst b.
-      setoid_rewrite DenotationTheory.denote_block_unfold_cont.
+    + setoid_rewrite DenotationTheory.denote_block_unfold_cont.
       unfold Traversal.endo, Traversal.Endo_id.
       simpl.
       unfold tfmap, TFunctor_list ; simpl.
@@ -193,10 +274,7 @@ Proof.
       intros. simpl.
       rewrite translate_ret.
       unfold Traversal.endo, Traversal.Endo_id.
-      assert (Hbind_ret : forall {E R1 R2} (k : R1 -> itree E R2) v
-               , (x <- Ret v ;; k x) ≈ k v).
-      { admit. (* easy, monad laws*) }
-      rewrite Hbind_ret.
+      rewrite bind_ret_l.
       setoid_rewrite DenotationTheory.denote_ocfg_unfold_not_in.
       reflexivity.
       simpl.
@@ -215,6 +293,100 @@ Proof.
     simpl.
     unfold Traversal.endo, Traversal.Endo_id.
     unfold block_id in *. now rewrite E.
+Qed.
+
+
+
+Lemma denote_cfg_seq : forall g1 g2 out1 in2 from to,
+    WF_Seq g1 g2 ->
+    to <> out1 -> (* Can i suppose that ? If there is a loop... *)
+    eutt eq
+         (denote_cfg (cfg_seq g1 g2 out1 in2) from to)
+         (d <- denote_cfg g1 from to ;;
+          match d with
+          | inr dv => ret (inr dv)
+          | inl (src, target) => denote_cfg g2 src target
+          end).
+Proof.
+  intros.
+  unfold denote_cfg.
+  assert (H' : WF_Seq g1 g2) by assumption.
+  apply (wf_ocfg_seq g1 g2 out1 in2) in H'.
+  unfold WF_Seq in H; specialize (H out1); intuition.
+  repeat (
+        match goal with
+        | h:context[wf_ocfg_bid _] |- _ => apply wf_ocfg_bid_convert_typ
+            with (env := []) in h
+        | h:context[free_in_cfg _ _] |- _ => apply free_in_convert_typ with (env := [])
+            in h
+        end).
+  unfold cfg_seq.
+  assert (Hdis : In to (inputs g1)
+                 \/ In to (inputs g2)
+                 \/ ~ (In to (inputs (g1++g2)))).
+  { admit.}
+  destruct Hdis as [ ? | [ ? | ? ]].
+  - (* the entry is in g1 *)
+    rewrite DenotationTheory.denote_ocfg_unfold_in.
+    + rewrite DenotationTheory.denote_ocfg_unfold_in.
+      * simpl.
+        rewrite bind_bind.
+        rewrite eutt_eq_bind.
+        reflexivity.
+        intros ; simpl.
+        destruct u eqn:U.
+        ** (* jump to the next block *)
+          (* There is 2 cases, b = out1 and b <> out1.
+             If (b=out1), we have to denote the empty block + g2
+             If (b<>out1), ... maybe we will need to differenciate
+             the cases where b ∈ g2 and b ∉ g2 ? *)
+          admit.
+        ** (* return a value *) now rewrite bind_ret_l.
+      * admit.
+      (* NOTE I need a way to reason with find_block and convert_typ *)
+    + apply find_block_in_inputs in H4.
+      destruct H4.
+      rewrite (convert_typ_list_app g1 _ []).
+      apply find_block_app_l_wf.
+      now unfold cfg_seq in H' ; rewrite (convert_typ_list_app g1 _ []) in H'.
+      (* unfold convert_typ, ConvertTyp_list, tfmap, TFunctor_list'. *)
+      (* unfold tfmap, TFunctor_block at 1. *)
+      (* unfold Traversal.endo, Traversal.Endo_id. *)
+      (* NOTE I need a way to reason with find_block and convert_typ *)
+      (* apply H4. *)
+      admit.
+  - (* /to/ is in g2 *)
+    rewrite DenotationTheory.denote_ocfg_unfold_in.
+    + admit.
+    + apply find_block_in_inputs in H4.
+      destruct H4.
+      rewrite (convert_typ_list_app g1 _ []).
+      apply find_block_app_r_wf.
+      now unfold cfg_seq in H' ; rewrite (convert_typ_list_app g1 _ []) in H'.
+      rewrite (convert_typ_list_app _ g2 []).
+      apply find_block_app_r_wf. admit. (* easy *)
+      (* NOTE same way than previously *)
+      (* apply H4 *)
+      admit.
+  - (* /to/ is not in the ocfg - identity*)
+    rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+    + rewrite inputs_app in H4.
+      assert (H4' : ~ (In to (inputs g1 ++ inputs g2) )) by assumption.
+      apply Util.not_in_app_l in H4 ; apply Util.not_in_app_r in H4'.
+      fold (@free_in_cfg typ g1 to) in H4.
+      fold (@free_in_cfg typ g2 to) in H4'.
+      apply free_in_convert_typ with (env := []) in H4,H4'.
+      rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+      * rewrite bind_ret_l. (* TODO lemma admitted *)
+        rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+        reflexivity. now apply find_block_free_id.
+      * now apply find_block_free_id.
+    + apply find_block_free_id. apply free_in_convert_typ with (env := []).
+      rewrite inputs_app in H4. apply free_in_cfg_app.
+      split.
+      now apply Util.not_in_app_l in H4.
+      apply free_in_cfg_app ; unfold free_in_cfg.
+      simpl; intuition.
 Admitted.
 
 
