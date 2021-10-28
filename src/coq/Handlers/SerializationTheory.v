@@ -700,7 +700,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
         cbn.
         reflexivity.
       }
-      
+
       inversion IHDTYP; subst.
       inversion IHDTYP0; subst.
 
@@ -746,7 +746,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
       epose proof RefineProp_Proper_bind.
       Import Morphisms.
       unfold Proper, respectful in H.
-      eapply H in CONC.
+      eapply H in CONC; cycle 1.
 
       admit.
       admit.
@@ -758,7 +758,8 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
     admit.
 
     (* Arrays *)
-    { admit.
+    {
+      admit.
 
     }
 
@@ -767,28 +768,40 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
 
     }
 
+    Ltac ret_inv :=
+      match goal with
+      | |- MonadEq1Laws.Eq1_ret_inv _ =>
+            let H := fresh "H" in
+            constructor; intros * H; subst; inv H; auto
+      end.
+
+    Ltac euo_crush :=
+      match goal with
+      | |- MonadEq1Laws.Eq1_ret_inv _ => ret_inv
+      | |- NoFailsRet err_ub_oom => constructor; intros;
+                                    eapply MReturns_MFails; apply MReturns_ret; eauto
+      | |- MFails_ERROR err_ub_oom => constructor; intros; constructor
+      | |- MFails_UB err_ub_oom => constructor; intros; constructor
+      end.
+
     (* Binops *)
     { apply concretize_ibinop_inv in CONC; auto.
       destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
 
-      eapply eval_iop_dtyp_i.
-      1-4: admit. (* Waaah *)
+      eapply eval_iop_dtyp_i; try euo_crush.
       eapply IHDTYP1; eauto.
       eapply IHDTYP2; eauto.
       rewrite EVAL.
-      reflexivity.
-    }
+      reflexivity. }
 
     { apply concretize_ibinop_inv in CONC; auto.
       destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
 
-      eapply eval_iop_dtyp_iptr.
-      1-3: admit. (* Waaah *)
+      eapply eval_iop_dtyp_iptr; try euo_crush.
       eapply IHDTYP1; eauto.
       eapply IHDTYP2; eauto.
       rewrite EVAL.
-      reflexivity.
-    }
+      reflexivity.  }
 
     (* Integer Comparisons *)
     admit.
@@ -845,7 +858,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
     (* Select *)
     admit.
     admit.
-    
+
     (* ConcatBytes *)
     admit.
   Admitted.
