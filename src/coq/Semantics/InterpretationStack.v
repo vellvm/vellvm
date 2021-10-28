@@ -55,7 +55,7 @@ Section InterpreterMCFG.
     let L2_trace       := interp_local_stack L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     let L4_trace       := model_undef RR L3_trace in
-    model_UB RR L4_trace.
+    PropT_itree_map (@model_OOM _ _ _) L4_trace. 
 
   Definition interp_mcfg6 {R} RR (t: itree L0 R) g l m :=
     let uvalue_trace   := interp_intrinsics t in
@@ -63,9 +63,8 @@ Section InterpreterMCFG.
     let L2_trace       := interp_local_stack L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     let L4_trace       := model_undef RR L3_trace in
-    let L5_trace       := model_UB RR L4_trace in
-    model_OOM RR L5_trace.
-
+    let L5_trace       := PropT_itree_map (@model_OOM _ _ _) L4_trace in
+    model_UB RR L5_trace.
 
   (* The interpreter stray away from the model starting from the fourth layer: we pick an arbitrary valid path of execution *)
   Definition interp_mcfg4_exec {R} (t: itree L0 R) g l m :=
@@ -82,7 +81,8 @@ Section InterpreterMCFG.
     let L2_trace       := interp_local_stack L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     let L4_trace       := exec_undef L3_trace in
-    exec_UB L4_trace.
+    let L5_trace       := exec_OOM L4_trace in
+    L5_trace.
 
   Definition interp_mcfg6_exec {R} (t: itree L0 R) g l m :=
     let uvalue_trace   := interp_intrinsics t in
@@ -90,8 +90,9 @@ Section InterpreterMCFG.
     let L2_trace       := interp_local_stack L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     let L4_trace       := exec_undef L3_trace in
-    let L5_trace       := exec_UB L4_trace in
-    exec_OOM L5_trace.
+    let L5_trace       := exec_OOM L4_trace in
+    let L6_trace       := exec_UB L5_trace in
+    L6_trace.
 
 End InterpreterMCFG.
 
@@ -143,7 +144,7 @@ Section InterpreterCFG.
     let L2_trace       := interp_local L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     let L4_trace       := model_undef RR L3_trace in
-    model_UB RR L4_trace.
+    PropT_itree_map (@model_OOM _ _ _) L4_trace.
 
   Definition interp_cfg6 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) :=
     let L0_trace       := interp_intrinsics t in
@@ -151,8 +152,8 @@ Section InterpreterCFG.
     let L2_trace       := interp_local L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     let L4_trace       := model_undef RR L3_trace in
-    let L5_trace       := model_UB RR L4_trace in
-    model_OOM RR L5_trace.
+    let L5_trace       := PropT_itree_map (@model_OOM _ _ _) L4_trace in
+    model_UB RR L5_trace.
 
 End InterpreterCFG.
 

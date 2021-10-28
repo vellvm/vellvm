@@ -167,6 +167,9 @@ Section PropMonad.
 
   Definition subtree {E} {A B} (ta : itree E A) (tb : itree E B) := exists (k : A -> itree E B), tb ≈ bind ta k.
 
+  Definition PropT_itree_map {E F X} (f : itree E X -> itree F X) (pe : PropT E X) : PropT F X
+    := fun tf => exists te, pe te /\ f te ≈ tf.
+
   (* Definition 5.1 *)
   Definition bind_PropT {E} :=
     fun A B (specA : PropT E A) (K: A -> PropT E B) (tb: itree E B) =>

@@ -90,9 +90,13 @@ Set Contextual Implicit.
     : itree E X 
     := v <- trigger (ThrowUB e);; match v: void with end.
 
-  (* Out of memory / abort. Carries a string for a message *)
+  (* Out of memory / abort. Carries a string for a message. *)
   Variant OOME : Type -> Type :=
   | ThrowOOM : string -> OOME void.
+
+  (* Out of memory / abort. Differs from OOME in that there is no message string. *)
+  Variant OOME_NOMSG : Type -> Type :=
+  | ThrowOOM_NOMSG : OOME_NOMSG void.
 
   (** Since the output type of [ThrowUB] is [void], we can make it an action
     with any return type. *)
@@ -215,9 +219,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
   Definition LLVMEnvE := (LocalE raw_id uvalue).
   Definition LLVMStackE := (StackE raw_id uvalue).
 
-  Definition conv_E := MemoryE +' PickE +' UBE +' OOME +' DebugE +' FailureE.
+  Definition conv_E := MemoryE +' PickE +' OOME +' UBE +' DebugE +' FailureE.
   Definition lookup_E := LLVMGEnvE +' LLVMEnvE.
-  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' UBE +' OOME +' DebugE +' FailureE.
+  Definition exp_E := LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' OOME +' UBE +' DebugE +' FailureE.
 
   Definition LU_to_exp : lookup_E ~> exp_E :=
     fun T e =>
@@ -234,7 +238,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
     fun T e => inr1 (inr1 e).
 
   (* Core effects. *)
-  Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' OOME +' DebugE +' FailureE.
+  Definition L0' := CallE +' ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' OOME +' UBE +' DebugE +' FailureE.
 
   Definition instr_to_L0' : instr_E ~> L0' :=
     fun T e =>
@@ -253,18 +257,18 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
     fun T e =>
       match e with
       | inl1 x => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 x))))))
-      | inr1 x => inr1 (inr1 (inr1 (inr1 (inl1 x))))
+      | inr1 x => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 x)))))
       end.
 
   Definition FUBO_to_exp : (FailureE +' UBE +' OOME) ~> exp_E :=
     fun T e =>
       match e with
       | inl1 x => inr1 (inr1 (inr1 (inr1 (inr1 (inr1 (inr1 x))))))
-      | inr1 (inl1 x) => inr1 (inr1 (inr1 (inr1 (inl1 x))))
-      | inr1 (inr1 x) => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 x)))))
+      | inr1 (inl1 x) => inr1 (inr1 (inr1 (inr1 (inr1 (inl1 x)))))
+      | inr1 (inr1 x) => inr1 (inr1 (inr1 (inr1 (inl1 x))))
       end.
 
-  Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' OOME +' DebugE +' FailureE.
+  Definition L0 := ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' OOME +' UBE +' DebugE +' FailureE.
 
   Definition exp_to_L0 : exp_E ~> L0 :=
     fun T e =>
@@ -275,27 +279,29 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
       end.
 
   (* For multiple CFG, after interpreting [GlobalE] *)
-  Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' OOME +' DebugE +' FailureE.
+  Definition L1 := ExternalCallE +' IntrinsicE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' OOME +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] *)
-  Definition L2 := ExternalCallE +' IntrinsicE +' MemoryE +' PickE +' UBE +' OOME +' DebugE +' FailureE.
+  Definition L2 := ExternalCallE +' IntrinsicE +' MemoryE +' PickE +' OOME +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics *)
-  Definition L3 := ExternalCallE +' PickE +' UBE +' OOME +' DebugE +' FailureE.
+  Definition L3 := ExternalCallE +' PickE +' OOME +' UBE +' DebugE +' FailureE.
 
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickE]*)
-  Definition L4 := ExternalCallE +' UBE +' OOME +' DebugE +' FailureE.
+  Definition L4 := ExternalCallE +' OOME +' UBE +' DebugE +' FailureE.
 
   Definition L5 := ExternalCallE +' OOME +' DebugE +' FailureE.
 
-  Definition L6 := ExternalCallE +' DebugE +' FailureE.
+  Definition L6 := ExternalCallE +' OOME_NOMSG +' DebugE +' FailureE.
+
+  Definition L6_exec := ExternalCallE +' DebugE +' FailureE.
 
   Definition FUBO_to_L4 : (FailureE +' UBE +' OOME) ~> L4:=
     fun T e =>
       match e with
       | inl1 x => inr1 (inr1 (inr1 (inr1 x)))
-      | inr1 (inl1 x) => inr1 (inl1 x)
-      | inr1 (inr1 x) => inr1 (inr1 (inl1 x))
+      | inr1 (inl1 x) => inr1 (inr1 (inl1 x))
+      | inr1 (inr1 x) => inr1 (inl1 x)
       end
     .
 

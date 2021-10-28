@@ -37,7 +37,7 @@ COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/Memory/Sizeof Semantics/G
 		Semantics/IntrinsicsDefinitions\
 		Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
 		Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack\
-		Handlers/Pick Handlers/UndefinedBehaviour\
+		Handlers/Pick Handlers/UndefinedBehaviour Handlers/OOM\
 		Handlers/Serialization Handlers/SerializationTheory\
 		Handlers/FiniteMemory Handlers/FiniteMemoryTheory\
 		Handlers/Handlers\
