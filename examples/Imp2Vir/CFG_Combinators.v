@@ -190,12 +190,35 @@ Proof.
   unfold Eqv.eqv,eqv_raw_id in n ; auto.
 Qed.
 
+Lemma find_block_none_singleton :
+  forall c b b' output, b<>b' <->
+   find_block
+   (conv
+      [{|
+         blk_id := b;
+         blk_phis := [];
+         blk_code := c;
+         blk_term := TERM_Br_1 output;
+         blk_comments := None
+         |}]) b' = None.
+Proof.
+  intros.
+  split; intros.
+  - apply find_block_not_in_inputs.
+    simpl; intuition.
+  - simpl in H.
+    unfold endo, Endo_id in H.
+    destruct (if Eqv.eqv_dec_p b b' then true else false) eqn:E.
+    + discriminate.
+    + now rewrite <- eqv_dec_p_eq in E ; rewrite <- eqb_bid_neq.
+Qed.
+
 Lemma denote_cfg_block : forall (c : code) (input output : block_id) from to,
     input <> output -> (* TODO should be a WF property of block *)
     eutt eq
          (denote_cfg (cfg_block c input output) from to)
          (if (eq_bid to input)
-          then ret tt ;; denote_code (conv c) ;; ret (inl (input,output))
+          then denote_code (conv c) ;; ret (inl (input,output))
           else ret (inl (from,to))) .
 Proof.
   intros.
@@ -217,23 +240,15 @@ Proof.
       simpl.
       unfold tfmap, TFunctor_list ; simpl.
       rewrite DenotationTheory.denote_no_phis.
+      rewrite bind_ret_l.
       rewrite eutt_eq_bind.
       reflexivity.
       intros. simpl.
-      rewrite eutt_eq_bind .
-      reflexivity.
-      intros. simpl.
       rewrite translate_ret.
-      unfold Traversal.endo, Traversal.Endo_id.
       rewrite bind_ret_l.
-      setoid_rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+      rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+      2: { now apply find_block_none_singleton. }
       reflexivity.
-      simpl.
-      unfold Traversal.endo, Traversal.Endo_id.
-      rewrite <- eqb_bid_neq in H.
-      rewrite eqv_dec_p_eq in H.
-      unfold block_id in *.
-      rewrite H. reflexivity.
     + cbn ; rewrite eqv_dec_p_refl ; reflexivity.
   - unfold cfg_block.
     unfold denote_ocfg.
@@ -253,18 +268,6 @@ Lemma no_reentrance_convert_typ:
     no_reentrance g1 g2 -> no_reentrance (convert_typ env g1) (convert_typ env g2).
 Admitted.
 
-Lemma find_block_none_singleton :
-  forall b b' output, b<>b' <->
-   find_block
-   (conv
-      [{|
-         blk_id := b;
-         blk_phis := [];
-         blk_code := [];
-         blk_term := TERM_Br_1 output;
-         blk_comments := None
-         |}]) b' = None.
-Proof. Admitted.
 
 Lemma denote_cfg_join : forall (g : ocfg) (output out1 out2 : block_id) from to,
     free_in_cfg g output ->
