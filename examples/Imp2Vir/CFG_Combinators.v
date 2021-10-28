@@ -191,14 +191,14 @@ Proof.
 Qed.
 
 Lemma find_block_none_singleton :
-  forall c b b' output, b<>b' <->
+  forall c term phis b b' , b<>b' <->
    find_block
    (conv
       [{|
          blk_id := b;
-         blk_phis := [];
+         blk_phis := phis;
          blk_code := c;
-         blk_term := TERM_Br_1 output;
+         blk_term := term;
          blk_comments := None
          |}]) b' = None.
 Proof.
@@ -261,6 +261,50 @@ Proof.
     unfold block_id in *. now rewrite E.
 Qed.
 
+Lemma denote_cfg_ret : forall (c : code) (e : exp) (input : block_id) from to,
+    eutt eq
+         (denote_cfg (cfg_ret c e input) from to)
+         (if (eq_bid to input)
+          then denote_code (conv c) ;;
+               d <- translate exp_to_instr
+                             (denote_terminator (conv (TERM_Ret e))) ;;
+              match d with
+              | inr dv => ret (inr dv)
+              | inl target => ret (inl (input,target))
+              end
+          else ret (inl (from,to))).
+Proof.
+  intros.
+  unfold cfg_ret.
+  unfold denote_cfg.
+  (* Two cases: enter the block (input = to) or not (input <> to) *)
+  flatten_all.
+  - (* to = input - denote the block *)
+    apply eqb_bid_eq in Heq ; subst.
+    rewrite DenotationTheory.denote_ocfg_unfold_in.
+    2: { simpl ; now rewrite eqv_dec_p_refl.}
+    setoid_rewrite DenotationTheory.denote_block_unfold.
+    simpl.
+    rewrite bind_bind.
+    rewrite DenotationTheory.denote_no_phis.
+    rewrite bind_ret_l.
+    rewrite bind_bind.
+    rewrite eutt_eq_bind ; [reflexivity|].
+    intros ; cbn.
+    flatten_all.
+    rewrite translate_bind.
+    rewrite bind_bind.
+    rewrite bind_bind.
+    rewrite eutt_eq_bind ; [reflexivity|].
+    intros ; cbn.
+    setoid_rewrite translate_ret.
+    setoid_rewrite bind_ret_l ; reflexivity.
+  - (* t <> input - identity *)
+    apply eqb_bid_neq in Heq.
+    rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+    2: { now apply find_block_none_singleton,not_eq_sym. }
+    reflexivity.
+Qed.
 
 
 Lemma no_reentrance_convert_typ:
