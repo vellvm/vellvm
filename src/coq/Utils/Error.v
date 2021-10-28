@@ -222,9 +222,9 @@ Section OOMLaws.
 
   Lemma OOMReturns_ret :
     forall {A} (a : A) (ma : OOM A),
-      ~OOMFails ma -> eq1 ma (ret a) -> OOMReturns a ma.
+      eq1 ma (ret a) -> OOMReturns a ma.
   Proof.
-    intros A a ma NFAIL EQ.
+    intros A a ma EQ.
     destruct ma; cbn in *; auto.
   Qed.
 
@@ -594,9 +594,9 @@ Section err_ub_oom.
 
     Lemma ErrUBOOMReturns_ret :
       forall {A} (a : A) (ma : err_ub_oom A),
-        ~ErrUBOOMFails ma -> Monad.eq1 ma (ret a) -> ErrUBOOMReturns a ma.
+        Monad.eq1 ma (ret a) -> ErrUBOOMReturns a ma.
     Proof.
-      intros * FAILS Hma.
+      intros * Hma.
       destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | ma]]]]]]]];
         cbn in *; auto; try contradiction.
     Qed.

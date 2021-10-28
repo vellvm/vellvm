@@ -3311,17 +3311,12 @@ Class VInt I : Type :=
         try solve
             [first
                [ apply eq1_ret_ret in EVAL; [| solve [eauto]]
-               | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
-                 apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
-                 [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
-                 | apply MReturns_ret_inv in RET
-                 ]
-               | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+               | apply MReturns_ret in EVAL;
                  apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
                  [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
                  | break_match_hyp; apply MReturns_ret_inv in RET
                  ]
-               | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+               | apply MReturns_ret in EVAL;
                  apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
                    [ cbn in FAILS; apply MFails_ret in FAILS; contradiction
                    | repeat break_match_hyp;
@@ -3337,9 +3332,14 @@ Class VInt I : Type :=
                ]; subst; constructor; solve_no_void].
 
       all:
-        eapply EqRet_NoFail in EVAL; eauto;
+        try solve [eapply EqRet_NoFail in EVAL; eauto;
         exfalso; apply EVAL;
-          first [apply mfails_ub | apply mfails_error | apply mfails_oom]; eauto.
+        first [apply mfails_ub | apply mfails_error | apply mfails_oom]; eauto].
+      all : apply MReturns_ret in EVAL;
+              apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
+                          [ cbn in FAILS; apply MFails_ret in FAILS; contradiction |];
+                          apply MReturns_ret_inv in RET; subst; constructor.
+      all : constructor.
     Qed.
 
     Lemma eval_iop_dtyp_i :
@@ -3376,7 +3376,7 @@ Class VInt I : Type :=
                      | solve [eauto]
                      ]
 
-                   | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+                   | apply MReturns_ret in EVAL;
                      apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
                      [eapply EqRet_NoFail in CONTRA; eauto;
                       exfalso; apply CONTRA;
@@ -3385,7 +3385,7 @@ Class VInt I : Type :=
                        cbn in RET
                      ]
 
-                   | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+                   | apply MReturns_ret in EVAL;
                      apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
                      [eapply EqRet_NoFail in CONTRA; eauto;
                       exfalso; apply CONTRA;
@@ -3394,7 +3394,7 @@ Class VInt I : Type :=
                        cbn in RET
                      ]
 
-                   | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+                   | apply MReturns_ret in EVAL;
                      apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
                      [ eapply EqRet_NoFail in CONTRA; eauto;
                        exfalso; apply CONTRA;
@@ -3405,7 +3405,7 @@ Class VInt I : Type :=
                        cbn in RET
                      ]
 
-                   | apply MReturns_ret in EVAL; [|eapply EqRet_NoFail;eauto];
+                   | apply MReturns_ret in EVAL;
                      apply MReturns_bind_inv in EVAL as [FAILS | (res & MA & RET)];
                      [ eapply EqRet_NoFail in CONTRA; eauto;
                        exfalso; apply CONTRA;
@@ -3440,9 +3440,9 @@ Class VInt I : Type :=
              constructor; solve_no_void].
 
       all:
-        eapply EqRet_NoFail in EVAL; eauto;
+        try solve [eapply EqRet_NoFail in EVAL; eauto;
         exfalso; apply EVAL;
-          first [apply mfails_ub | apply mfails_error | apply mfails_oom] ; eauto.
+        first [apply mfails_ub | apply mfails_error | apply mfails_oom] ; eauto].
     Qed.
 
     Lemma eval_iop_dtyp_iptr :
