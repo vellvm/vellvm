@@ -556,7 +556,7 @@ Module FinSizeof : Sizeof.
   Qed.
 End FinSizeof.
 
-Module FinByte (LLVMEvents:LLVM_INTERACTIONS(Addr)(BigIP)(FinSizeof)) : ByteImpl(Addr)(BigIP)(FinSizeof)(LLVMEvents).
+Module FinByte (IP : MemoryAddress.INTPTR) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(FinSizeof)) : ByteImpl(Addr)(IP)(FinSizeof)(LLVMEvents).
   Import LLVMEvents.
   Import DV.
 

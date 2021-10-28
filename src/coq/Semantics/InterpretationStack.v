@@ -157,8 +157,12 @@ Section InterpreterCFG.
 
 End InterpreterCFG.
 
+(* Infinite Denotation *)
 Module D := Denotation Addr BigIP FinSizeof LLVMEvents FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP GEP Byte.
 Export D.
+
+(* Finite, 64-bit iptr, denotation *)
+Module D64 := Denotation Addr IP64Bit FinSizeof LLVMEvents64 FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP GEP64 Byte64.
 
 Module SemNotations.
 
