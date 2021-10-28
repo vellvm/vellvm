@@ -33,15 +33,15 @@ From Vellvm.Handlers Require Export
 From Vellvm.Semantics Require Import Memory.Sizeof Memory.MemBytes GepM.
 
 (* Handlers get instantiated over the domain of addresses provided by the memory model *)
+Module LLVMEvents64 := LLVMEvents.Make(FiniteMemory.Addr)(FiniteMemory.IP64Bit)(FiniteMemory.FinSizeof).
+Module Global64 := Global.Make FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof LLVMEvents64.
+Module Local64  := Local.Make  FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof LLVMEvents64.
+Module Stack64  := Stack.Make  FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof LLVMEvents64.
+
 Module LLVMEvents := LLVMEvents.Make(FiniteMemory.Addr)(FiniteMemory.BigIP)(FiniteMemory.FinSizeof).
 Module Global := Global.Make FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof LLVMEvents.
 Module Local  := Local.Make  FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof LLVMEvents.
 Module Stack  := Stack.Make  FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof LLVMEvents.
-
-(* Module LLVMEvents64 := LLVMEvents.Make(FiniteMemory.Addr)(FiniteMemory.IP64Bit)(FiniteMemory.FinSizeof). *)
-(* Module Global64 := Global.Make FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof LLVMEvents64. *)
-(* Module Local64  := Local.Make  FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof LLVMEvents64. *)
-(* Module Stack64  := Stack.Make  FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof LLVMEvents64. *)
 
 Require Import List ZArith String.
 Import ListNotations.
