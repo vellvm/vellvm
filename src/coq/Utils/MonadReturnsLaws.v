@@ -46,7 +46,7 @@ Section Laws.
           MReturns b (bind ma k) -> (MFails ma \/ exists a : A , MReturns a ma /\ MReturns b (k a));
 
       MReturns_ret : forall {A} (a : A) (ma : M A),
-          ~MFails ma -> eq1 ma (ret a) -> MReturns a ma;
+          eq1 ma (ret a) -> MReturns a ma;
 
       MReturns_ret_inv : forall {A} (x y : A),
           MReturns x (ret y) -> x = y;
@@ -72,6 +72,9 @@ Section ExtraLaws.
     { MReturns_Proper :> forall {A} (a : A),
           Proper ((fun x y => eq1 y x) ==> Basics.impl) (MReturns a)
     }.
+
+  Class MFailsProper :=
+    { MFails_Proper :> forall A, Proper (eq1 (A:=A) ==> Basics.impl) MFails }.
 
   (* These won't work with UB / Error refinement relations *)
   Class MonadReturnsFails :=
@@ -241,10 +244,9 @@ Section Sum.
 
   Lemma SumReturns_ret :
     forall {A} (a : A) (ma : sum E A),
-      ~SumFails ma -> eq1 ma (ret a) -> SumReturns a ma.
+      eq1 ma (ret a) -> SumReturns a ma.
   Proof.
-    intros * Hma.
-    intros H.
+    intros * H.
     cbn in *.    
     unfold SumReturns.
     do 2 red in H.
@@ -415,9 +417,9 @@ Section Ident.
 
   Lemma IdentReturns_ret :
     forall {A} (a : A) (ma : ident A),
-      ~IdentFails ma -> eq1 ma (ret a) -> IdentReturns a ma.
+      eq1 ma (ret a) -> IdentReturns a ma.
   Proof.
-    intros * NFAILS Hma.
+    intros * Hma.
     destruct ma as [a'].
     inversion Hma; subst; cbn;
     auto.
@@ -600,9 +602,9 @@ Section EitherT.
 
   Lemma EitherTReturns_ret :
     forall {A} (a : A) (ma : eitherT E M A),
-      ~EitherTFails ma -> eq1 ma (ret a) -> EitherTReturns a ma.
+      eq1 ma (ret a) -> EitherTReturns a ma.
   Proof.
-    intros * NFAILS Hma.
+    intros * Hma.
     eapply MReturns_ret; eauto.
   Qed.
 
@@ -615,8 +617,7 @@ Section EitherT.
     eapply MReturns_ret_inv; eauto.
     eapply MReturns_ret_inv in H.
     inversion H.
-    apply MReturns_ret.
-    apply MFails_ret.
+    apply MReturns_ret. 
     reflexivity.
   Qed.
 
@@ -674,6 +675,7 @@ Section EitherT.
     cbn.
     eapply EqRet_NoFail; eauto.
   Qed.
+
 End EitherT.
 
 (* TODO: Move this *)
@@ -753,7 +755,7 @@ Section StateT.
     - unfold runStateT.
       eapply MReturns_bind; eauto.
       cbn.
-      apply MReturns_ret; [apply MFails_ret|reflexivity].
+      apply MReturns_ret; [reflexivity].
     - unfold runStateT.
       eapply MReturns_bind; eauto.
   Qed.

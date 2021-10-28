@@ -298,6 +298,276 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
       tactic_on_non_aggregate_uvalues x ltac:(cbn in H; inv H)
     end.
 
+  Lemma concretize_icmp_inv:
+    forall op x y dv,
+      concretize_succeeds (UVALUE_ICmp op x y) ->
+      concretize (UVALUE_ICmp op x y) dv ->
+      exists dx dy,
+        concretize_succeeds x /\
+        concretize x dx /\
+        concretize_succeeds y /\
+        concretize y dy /\
+        eval_icmp op dx dy = ret dv.
+  Proof.
+    intros op x y dv SUCC CONC.
+
+    rewrite concretize_equation in CONC.
+    red in CONC.
+    rewrite concretize_uvalueM_equation in CONC.
+
+    cbn in CONC.
+    destruct CONC as (ma & k' & pama & eqm & REST).
+
+    destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma.
+    (* First thing is oom... *)
+    { cbn in SUCC.
+      unfold concretize_succeeds, concretize_fails in SUCC.
+      red in SUCC.
+      exfalso. apply SUCC.
+
+      red. rewrite concretize_uvalueM_equation. cbn.
+      unfold bind_RefineProp.
+      eexists. exists ret.
+
+      split; [apply pama|].
+      split; auto. left. reflexivity.
+    }
+
+    (* First thing is ub... *)
+    (* This should be ruled out by SUCC *)
+    { cbn in SUCC.
+      unfold concretize_succeeds, concretize_fails in SUCC.
+      red in SUCC.
+
+      exfalso. apply SUCC.
+
+      red. rewrite concretize_uvalueM_equation. cbn.
+      unfold bind_RefineProp.
+
+      eexists. exists ret.
+
+      split; [apply pama|].
+      split; auto.
+    }
+
+    (* First thing is failure... *)
+    (* This should be ruled out by SUCC *)
+    { cbn in SUCC.
+      unfold concretize_succeeds, concretize_fails in SUCC.
+      red in SUCC.
+
+      exfalso. apply SUCC.
+
+      red. rewrite concretize_uvalueM_equation. cbn.
+
+      unfold bind_RefineProp. eexists. exists ret.
+
+      split; [apply pama|].
+      split; auto.
+    }
+
+    destruct REST as [FAILS | REST].
+    inversion FAILS.
+    specialize (REST a).
+    forward REST; [reflexivity|].
+
+    destruct REST as (mb & kb & pbmb & eqmb & REST).
+
+    unfold concretize_succeeds, concretize_fails, concretize_u in SUCC.
+    rewrite concretize_uvalueM_equation in SUCC.
+    cbn in SUCC.
+    unfold bind_RefineProp in SUCC.
+
+    destruct mb as [[[[[[[oom_mb] | [[ub_mb] | [[err_mb] | b]]]]]]]] eqn:Hmb.
+
+    (* y raises OOM *)
+    { exfalso.
+      apply SUCC.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split; [apply pama|]. split; cbn; auto.
+
+      right. intros a0 H; subst.
+      eexists. exists ret.
+      split; [apply pbmb|]. cbn. split; auto.
+
+      cbn in eqmb. cbn in *.
+
+      destruct (k' a0) as [[[[[[[oom_k'a0] | [[ub_k'a0] | [[err_k'a0] | k'a0]]]]]]]];
+        cbn in *; contradiction.
+    }
+
+    (* y raises UB *)
+    { exfalso. apply SUCC.
+
+      eexists. exists (fun _ => raise_ub "").
+      split; [apply pama|]. split; cbn; auto.
+      right. intros a0 H; subst. eexists.
+      exists ret.
+      split; [apply pbmb|].
+      split; auto.
+    }
+
+    (* y fails *)
+    { exfalso. apply SUCC.
+
+      eexists. exists (fun _ => raise_ub "").
+      split; [apply pama|]. split; cbn; auto.
+
+      right. intros a0 H; subst.
+      eexists. exists ret.
+
+      split; [apply pbmb|].
+      split; auto.
+    }
+
+    (* Both x and y successfully concretized.
+
+         Now eval_iop must succeed too.
+     *)
+    destruct REST as [FAILS | REST].
+    inversion FAILS.
+    specialize (REST b).
+    forward REST; [reflexivity|].
+
+    destruct (eval_icmp op a b) as [[[[[[[oom_z] | [[ub_z] | [[err_z] | z]]]]]]]] eqn:Hmz.
+
+    (* Eval raises OOM *)
+    { exfalso. apply SUCC.
+
+      eexists. exists (fun _ => raise_ub "").
+
+      split; [apply pama|]. split; cbn; auto.
+
+      right. intros a0 H; subst.
+
+      eexists. exists (fun _ => raise_ub "").
+
+      split; [apply pbmb|].
+      split; cbn; auto.
+
+      right.
+      intros a H; subst.
+
+      rewrite Hmz.
+      destruct (kb a) as [[[[[[[oom_kba] | [[ub_kba] | [[err_kba] | kba]]]]]]]] eqn:Hkba;
+        cbn in *; try contradiction.
+      rewrite Hkba in eqmb.
+      cbn in eqmb.
+      destruct (k' a0) as [[[[[[[oom_k'a0] | [[ub_k'a0] | [[err_k'a0] | k'a0]]]]]]]] eqn:Hk'a0;
+        cbn in eqm; contradiction.
+    }
+
+    (* Eval raises ub *)
+    { exfalso. apply SUCC.
+
+      eexists. exists (fun _ => raise_ub "").
+
+      split; [apply pama|].
+      split; cbn; auto.
+
+      right.
+      intros a0 H; subst.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split; [apply pbmb|].
+      split; cbn; auto.
+
+      right.
+      intros a H; subst.
+
+      rewrite Hmz.
+      reflexivity.
+    }
+
+    (* Eval fails *)
+    { exfalso.
+      apply SUCC.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split; [apply pama|].
+      split; cbn; auto.
+
+      right.
+      intros a0 H; subst.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split; [apply pbmb|].
+      split; cbn; auto.
+
+      right.
+      intros a H; subst.
+
+      rewrite Hmz.
+      reflexivity.
+    }
+
+    cbn in eqmb.
+    cbn in eqm.
+
+    destruct (kb b) as [[[[[[[oom_kbb] | [[ub_kbb] | [[err_kbb] | kbb]]]]]]]] eqn:Hkbb;
+      try contradiction; subst.
+    cbn in eqmb.
+
+    destruct (k' a) as [[[[[[[oom_k'a] | [[ub_k'a] | [[err_k'a] | k'a]]]]]]]] eqn:Hk'a;
+      try contradiction; subst.
+    cbn in eqm; subst.
+
+    exists a. exists b.
+    repeat split; auto.
+
+    { unfold concretize_succeeds, concretize_fails, concretize_u.
+      intros CONC.
+      apply SUCC.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split.
+      apply CONC.
+
+      split; cbn; auto.
+    }
+
+    { unfold concretize_succeeds, concretize_fails, concretize_u.
+      intros CONC.
+      apply SUCC.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split; [apply pama|].
+      split; cbn; auto.
+
+      right.
+      intros a0 H; subst.
+
+      eexists.
+      exists (fun _ => raise_ub "").
+
+      split.
+      apply CONC.
+
+      split; cbn; auto.
+    }
+
+    rewrite Hmz.
+    cbn.
+
+    destruct (k' a) as [[[[[[[oom_k'a] | [[ub_k'a] | [[err_k'a] | k'a]]]]]]]] eqn:Hk'a;
+      cbn in eqm; try contradiction.
+    cbn in eqmb.
+    subst; auto.
+  Qed.
+
   Lemma concretize_ibinop_inv:
     forall op x y dv,
       concretize_succeeds (UVALUE_IBinop op x y) ->
@@ -700,7 +970,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
         cbn.
         reflexivity.
       }
-      
+
       inversion IHDTYP; subst.
       inversion IHDTYP0; subst.
 
@@ -746,7 +1016,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
       epose proof RefineProp_Proper_bind.
       Import Morphisms.
       unfold Proper, respectful in H.
-      eapply H in CONC.
+      eapply H in CONC; cycle 1.
 
       admit.
       admit.
@@ -758,7 +1028,8 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
     admit.
 
     (* Arrays *)
-    { admit.
+    {
+      admit.
 
     }
 
@@ -767,28 +1038,40 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
 
     }
 
+    Ltac ret_inv :=
+      match goal with
+      | |- MonadEq1Laws.Eq1_ret_inv _ =>
+            let H := fresh "H" in
+            constructor; intros * H; subst; inv H; auto
+      end.
+
+    Ltac euo_crush :=
+      match goal with
+      | |- MonadEq1Laws.Eq1_ret_inv _ => ret_inv
+      | |- NoFailsRet err_ub_oom => constructor; intros;
+                                    eapply MReturns_MFails; apply MReturns_ret; eauto
+      | |- MFails_ERROR err_ub_oom => constructor; intros; constructor
+      | |- MFails_UB err_ub_oom => constructor; intros; constructor
+      end.
+
     (* Binops *)
     { apply concretize_ibinop_inv in CONC; auto.
       destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
 
-      eapply eval_iop_dtyp_i.
-      1-4: admit. (* Waaah *)
+      eapply eval_iop_dtyp_i; try euo_crush.
       eapply IHDTYP1; eauto.
       eapply IHDTYP2; eauto.
       rewrite EVAL.
-      reflexivity.
-    }
+      reflexivity. }
 
     { apply concretize_ibinop_inv in CONC; auto.
       destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
 
-      eapply eval_iop_dtyp_iptr.
-      1-3: admit. (* Waaah *)
+      eapply eval_iop_dtyp_iptr; try euo_crush.
       eapply IHDTYP1; eauto.
       eapply IHDTYP2; eauto.
       rewrite EVAL.
-      reflexivity.
-    }
+      reflexivity.  }
 
     (* Integer Comparisons *)
     admit.
@@ -845,7 +1128,7 @@ Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(
     (* Select *)
     admit.
     admit.
-    
+
     (* ConcatBytes *)
     admit.
   Admitted.
