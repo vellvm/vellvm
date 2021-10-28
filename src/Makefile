@@ -36,6 +36,7 @@ COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/Memory/Sizeof Semantics/G
 		Semantics/DynamicValues Semantics/LLVMEvents\
 		Semantics/IntrinsicsDefinitions\
 		Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
+		Semantics/Lang Semantics/InfiniteToFinite\
 		Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack\
 		Handlers/Pick Handlers/UndefinedBehaviour Handlers/OOM\
 		Handlers/Serialization Handlers/SerializationTheory\
