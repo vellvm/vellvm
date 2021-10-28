@@ -75,30 +75,6 @@ Proof.
   apply inputs_app.
 Qed.
 
-Definition WF_Seq (g1 g2 : ocfg) :=
-  forall (out1 : block_id),
-    wf_ocfg_bid g1 /\
-      wf_ocfg_bid g2 /\
-      no_duplicate_bid g1 g2 /\
-      free_in_cfg g1 out1 /\
-      free_in_cfg g2 out1.
-
-Lemma wf_ocfg_seq : forall (g1 g2 : ocfg) (out1 in2 : block_id),
-    WF_Seq g1 g2 -> wf_ocfg_bid (cfg_seq g1 g2 out1 in2).
-Proof.
-  unfold WF_Seq.
-  unfold wf_ocfg_bid, free_in_cfg.
-  intros.
-  specialize (H out1). destruct H as [? [? [? [? ?]]]].
-  simpl.
-  rewrite inputs_seq.
-  apply Coqlib.list_norepet_append ; auto.
-  apply Coqlib.list_norepet_cons ; auto.
-  apply Util.list_disjoint_app_r ; intuition.
-  apply Util.list_disjoint_singleton_right ; auto.
-Qed.
-
-
 Lemma In_singleton : forall {A} (x y : A),
     In x [y] -> x=y.
 Proof.
@@ -113,31 +89,6 @@ Proof.
   apply Coqlib.list_norepet_cons ; auto.
   apply Coqlib.list_norepet_nil.
 Qed.
-
-
-Lemma wf_while_loop :
-  forall (code_expr : code) (cond : exp) (body : ocfg) (input inB output outB : block_id),
-    wf_ocfg_bid body ->
-    ~ In input (inputs body) ->
-    ~ In outB (inputs body) ->
-    input <> outB ->
-    wf_ocfg_bid (cfg_while_loop code_expr cond body input inB output outB).
-Proof.
-  unfold wf_ocfg_bid.
-  intros.
-  unfold cfg_while_loop.
-  simpl.
-  rewrite inputs_app.
-  simpl.
-  apply Coqlib.list_norepet_cons ; auto.
-  - rewrite in_app_iff.
-    intuition.
-    apply In_singleton in H4 ; subst ; auto.
-  - apply Coqlib.list_norepet_app ; auto.
-    intuition. apply List_norepet_singleton.
-    apply Util.list_disjoint_singleton_right ; auto.
-Qed.
-
 
 
 (** Semantic *)
@@ -297,97 +248,297 @@ Qed.
 
 
 
+Lemma no_reentrance_convert_typ:
+  forall (env : list (ident * typ)) [g1 g2 : ocfg],
+    no_reentrance g1 g2 -> no_reentrance (convert_typ env g1) (convert_typ env g2).
+Admitted.
+
+Lemma find_block_none_singleton :
+  forall b b' output, b<>b' <->
+   find_block
+   (conv
+      [{|
+         blk_id := b;
+         blk_phis := [];
+         blk_code := [];
+         blk_term := TERM_Br_1 output;
+         blk_comments := None
+         |}]) b' = None.
+Proof. Admitted.
+
+Lemma denote_cfg_join : forall (g : ocfg) (output out1 out2 : block_id) from to,
+    free_in_cfg g output ->
+    output <> out1 ->
+    output <> out2 ->
+    out1 <> out2 ->
+    eutt eq
+         (denote_cfg (cfg_join g output out1 out2) from to)
+         (d <- denote_cfg g from to ;;
+          match d with
+          | inr dv => ret (inr dv)
+          | inl (src,target) =>
+              if (eq_bid target out1)
+              then ret (inl (out1, output))
+              else if (eq_bid target out2)
+                   then ret (inl (out2, output))
+                   else ret (inl (src,target))
+          end).
+Proof.
+  intros.
+  unfold denote_cfg.
+  unfold cfg_join.
+  rewrite (convert_typ_list_app g _ []).
+  rewrite DenotationTheory.denote_ocfg_app.
+  2: {
+     apply no_reentrance_convert_typ.
+     unfold no_reentrance.
+     cbn.
+     repeat (apply Coqlib.list_disjoint_cons_l ; auto).
+     apply Util.list_disjoint_nil_l.}
+  apply eutt_eq_bind.
+  intros.
+  destruct u as [ (src,target) | dv ] ; [| reflexivity].
+  (* the result of the denotation of g is a jump to target, coming from src *)
+  rewrite convert_typ_list_app.
+  rewrite DenotationTheory.denote_ocfg_app.
+  2: {apply no_reentrance_convert_typ. unfold no_reentrance. cbn.
+      now apply Util.list_disjoint_singletons.
+  }
+  (* We have 3 cases: target = out1, target = out2 and neither of them *)
+  flatten_goal.
+  - (* Jump to out1 *)
+    rewrite eqb_bid_eq in Heq ; subst.
+    rewrite DenotationTheory.denote_ocfg_unfold_in
+      with (bk:=
+              {|
+                 blk_id := out1;
+                 blk_phis := [];
+                 blk_code := [];
+                 blk_term := TERM_Br_1 output;
+                 blk_comments := None
+              |}).
+    2: { cbn; rewrite eqv_dec_p_refl; reflexivity. }
+    + rewrite bind_bind.
+      (* I need a lemma which denote automatically the empty block *)
+      rewrite DenotationTheory.denote_block_unfold.
+      simpl.
+      rewrite DenotationTheory.denote_no_phis.
+      setoid_rewrite DenotationTheory.denote_code_nil.
+      setoid_rewrite translate_ret.
+      repeat (rewrite bind_ret_l).
+      rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+      2: { now apply find_block_none_singleton,not_eq_sym. } (* easy because out1 <> output *)
+      rewrite bind_ret_l.
+      rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+      2: { now apply find_block_none_singleton,not_eq_sym. } (* easy because out2 <> output  *)
+      reflexivity.
+  - flatten_goal.
+    + (* Jump to out2 *)
+      rewrite eqb_bid_eq in Heq0 ; subst.
+      rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+      2: { now apply find_block_none_singleton. } (* easy because out1 <> out2 *)
+      rewrite bind_ret_l.
+      rewrite DenotationTheory.denote_ocfg_unfold_in
+        with (bk:=
+                {|
+                   blk_id := out2;
+                   blk_phis := [];
+                   blk_code := [];
+                   blk_term := TERM_Br_1 output;
+                   blk_comments := None
+                |}).
+      2: { cbn; rewrite eqv_dec_p_refl; reflexivity. }
+      rewrite DenotationTheory.denote_block_unfold.
+      simpl.
+      rewrite DenotationTheory.denote_no_phis.
+      setoid_rewrite DenotationTheory.denote_code_nil.
+      setoid_rewrite translate_ret.
+      repeat (rewrite bind_ret_l).
+      rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+      2: { now apply find_block_none_singleton,not_eq_sym. } (* easy because out2 <> output  *)
+      reflexivity.
+    + (* Neither out1 or out2 *)
+      apply eqb_bid_neq in Heq,Heq0.
+      rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+      2: { now apply find_block_none_singleton,not_eq_sym. } (* easy because target <> out1  *)
+      rewrite bind_ret_l.
+      rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+      2: { now apply find_block_none_singleton,not_eq_sym.  } (* easy because target <> out2  *)
+      reflexivity.
+Qed.
+
+
+(* TODO I think that some steps can be automatize, eg.
+ - denote_ocfg_unfold_not_in (find_block proof)
+ - denote_ocfg_unfold_in (find_block proof)
+ - denote_ocfg_app (no_reentrance_proof) *)
 Lemma denote_cfg_seq : forall g1 g2 out1 in2 from to,
-    WF_Seq g1 g2 ->
-    to <> out1 -> (* Can i suppose that ? If there is a loop... *)
+    (* TODO I am not sure of the way to add theses hypothesis in the WF proofs *)
+    wf_ocfg_bid g1 ->
+    wf_ocfg_bid g2 ->
+    no_duplicate_bid g1 g2 ->
+    no_reentrance g1 g2 ->
+    free_in_cfg g1 out1 ->
+    free_in_cfg g2 out1 ->
+    free_in_cfg g1 in2 ->
+    ~ In out1 (outputs g2) ->
+    out1 <> in2 -> (* mandatory, or cfg_seq will create a new block with an existing ID *)
+    to <> out1 -> (* can I relaxe this hypothesis ? *)
     eutt eq
          (denote_cfg (cfg_seq g1 g2 out1 in2) from to)
          (d <- denote_cfg g1 from to ;;
           match d with
           | inr dv => ret (inr dv)
-          | inl (src, target) => denote_cfg g2 src target
+          | inl (src, target) =>
+              if eq_bid target out1
+              then denote_cfg g2 out1 in2
+              else denote_cfg g2 src target
           end).
 Proof.
   intros.
   unfold denote_cfg.
-  assert (H' : WF_Seq g1 g2) by assumption.
-  apply (wf_ocfg_seq g1 g2 out1 in2) in H'.
-  unfold WF_Seq in H; specialize (H out1); intuition.
-  repeat (
-        match goal with
-        | h:context[wf_ocfg_bid _] |- _ => apply wf_ocfg_bid_convert_typ
-            with (env := []) in h
-        | h:context[free_in_cfg _ _] |- _ => apply free_in_convert_typ with (env := [])
-            in h
-        end).
   unfold cfg_seq.
   assert (Hdis : In to (inputs g1)
                  \/ In to (inputs g2)
                  \/ ~ (In to (inputs (g1++g2)))).
-  { admit.}
+  { rewrite inputs_app ; rewrite in_app_iff.
+    apply or_assoc ; apply Classical_Prop.classic. }
   destruct Hdis as [ ? | [ ? | ? ]].
-  - (* the entry is in g1 *)
-    rewrite DenotationTheory.denote_ocfg_unfold_in.
-    + rewrite DenotationTheory.denote_ocfg_unfold_in.
-      * simpl.
-        rewrite bind_bind.
-        rewrite eutt_eq_bind.
-        reflexivity.
-        intros ; simpl.
-        destruct u eqn:U.
-        ** (* jump to the next block *)
-          (* There is 2 cases, b = out1 and b <> out1.
-             If (b=out1), we have to denote the empty block + g2
-             If (b<>out1), ... maybe we will need to differenciate
-             the cases where b ∈ g2 and b ∉ g2 ? *)
-          admit.
-        ** (* return a value *) now rewrite bind_ret_l.
-      * admit.
-      (* NOTE I need a way to reason with find_block and convert_typ *)
-    + apply find_block_in_inputs in H4.
-      destruct H4.
-      rewrite (convert_typ_list_app g1 _ []).
-      apply find_block_app_l_wf.
-      now unfold cfg_seq in H' ; rewrite (convert_typ_list_app g1 _ []) in H'.
-      (* unfold convert_typ, ConvertTyp_list, tfmap, TFunctor_list'. *)
-      (* unfold tfmap, TFunctor_block at 1. *)
-      (* unfold Traversal.endo, Traversal.Endo_id. *)
-      (* NOTE I need a way to reason with find_block and convert_typ *)
-      (* apply H4. *)
-      admit.
-  - (* /to/ is in g2 *)
-    rewrite DenotationTheory.denote_ocfg_unfold_in.
-    + admit.
-    + apply find_block_in_inputs in H4.
-      destruct H4.
-      rewrite (convert_typ_list_app g1 _ []).
-      apply find_block_app_r_wf.
-      now unfold cfg_seq in H' ; rewrite (convert_typ_list_app g1 _ []) in H'.
+  
+  - (* ENTRY IN g1 *)
+    rewrite (convert_typ_list_app g1 _ []).
+    rewrite DenotationTheory.denote_ocfg_app.
+    2: {
+    apply no_reentrance_convert_typ ;
+    rewrite no_reentrance_app_r.
+    split; auto.
+    unfold no_reentrance; cbn.
+    apply Util.list_disjoint_singleton_left ;
+      now fold (free_in_cfg g1 in2).
+    }
+    rewrite eutt_eq_bind. reflexivity.
+    intros ; simpl.
+    destruct u as [ (src,target) | dv ] eqn:U ; try (reflexivity).
+
+    + (* jump to the next block *)
+      assert (target = out1 \/ target <> out1). { apply Classical_Prop.classic. }
+      rewrite Util.list_cons_app.
       rewrite (convert_typ_list_app _ g2 []).
-      apply find_block_app_r_wf. admit. (* easy *)
-      (* NOTE same way than previously *)
-      (* apply H4 *)
-      admit.
-  - (* /to/ is not in the ocfg - identity*)
-    rewrite DenotationTheory.denote_ocfg_unfold_not_in.
-    + rewrite inputs_app in H4.
-      assert (H4' : ~ (In to (inputs g1 ++ inputs g2) )) by assumption.
-      apply Util.not_in_app_l in H4 ; apply Util.not_in_app_r in H4'.
-      fold (@free_in_cfg typ g1 to) in H4.
-      fold (@free_in_cfg typ g2 to) in H4'.
-      apply free_in_convert_typ with (env := []) in H4,H4'.
-      rewrite DenotationTheory.denote_ocfg_unfold_not_in.
-      * rewrite bind_ret_l. (* TODO lemma admitted *)
+      rewrite DenotationTheory.denote_ocfg_app.
+      2: {
+         apply no_reentrance_convert_typ.
+         unfold no_reentrance; cbn.
+         now apply Util.list_disjoint_singleton_right.}
+      destruct H10.
+      * (* b = out1 ; we jump to the new block which is empty *)
+        subst.
+        assert (eq_bid out1 out1 = true) by (now apply eqb_bid_eq).
+        rewrite H10.
+        (* cbn. *)
+                rewrite DenotationTheory.denote_ocfg_unfold_in
+        with (bk := {|
+       blk_id := out1;
+       blk_phis := [];
+       blk_code := [];
+       blk_term := TERM_Br_1 in2;
+       blk_comments := None
+     |}).
+        ** rewrite bind_bind.
+           rewrite DenotationTheory.denote_block_unfold.
+           rewrite DenotationTheory.denote_no_phis.
+           setoid_rewrite DenotationTheory.denote_code_nil.
+           simpl.
+           setoid_rewrite translate_ret.
+           (* repeat (rewrite bind_ret_l). *)
+           rewrite bind_ret_l.
+           rewrite bind_ret_l.
+           rewrite bind_ret_l.
+           rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+           *** rewrite bind_ret_l. reflexivity.
+           *** apply find_block_not_in_inputs. simpl.
+               unfold endo, Endo_id. intuition.
+        ** cbn.
+           rewrite eqv_dec_p_refl.
+           reflexivity.
+      * (* b <> out1 ; we skip the empty block *)
         rewrite DenotationTheory.denote_ocfg_unfold_not_in.
-        reflexivity. now apply find_block_free_id.
-      * now apply find_block_free_id.
+        ** rewrite <- eqb_bid_neq in H10. rewrite H10.
+           rewrite bind_ret_l  ; reflexivity.
+        ** apply find_block_not_in_inputs.
+           simpl. unfold endo, Endo_id. intuition.
+
+  - (* ENTRY IN g2 *)
+    rewrite (convert_typ_list_app g1 _ []).
+    rewrite DenotationTheory.denote_ocfg_app.
+    2: {
+    apply no_reentrance_convert_typ ;
+    rewrite no_reentrance_app_r.
+    split; auto.
+    unfold no_reentrance; cbn.
+    apply Util.list_disjoint_singleton_left ;
+      now fold (free_in_cfg g1 in2).
+    }
+    + (* Skip g1 *)
+      rewrite DenotationTheory.denote_ocfg_unfold_not_in ;
+        try (apply find_block_free_id ;
+             match goal with
+             | h:context[no_duplicate_bid _ _] |- _ =>
+                 (unfold no_duplicate_bid in h ;
+                  apply Coqlib.list_disjoint_sym in h)
+             end ;
+             unfold free_in_cfg ;
+             apply Coqlib.list_disjoint_notin with (l1 := (inputs g2)) ;
+             [ rewrite inputs_convert_typ ; assumption | assumption]).
+      rewrite DenotationTheory.denote_ocfg_unfold_not_in ;
+        try (apply find_block_free_id ;
+             match goal with
+             | h:context[no_duplicate_bid _ _] |- _ =>
+                 (unfold no_duplicate_bid in h ;
+                  apply Coqlib.list_disjoint_sym in h)
+             end ;
+             unfold free_in_cfg ;
+             apply Coqlib.list_disjoint_notin with (l1 := (inputs g2)) ;
+             [ rewrite inputs_convert_typ ; assumption | assumption]).
+      repeat (rewrite bind_ret_l).
+      rewrite convert_typ_list_app ; rewrite DenotationTheory.denote_ocfg_app.
+      2: {
+         apply no_reentrance_convert_typ.
+         unfold no_reentrance; cbn.
+         now apply Util.list_disjoint_singleton_right.
+      }
+      * (* since to <> out1, return the identity and jump in g2 *)
+        rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+        ** assert (eq_bid to out1 = false) by (now apply eqb_bid_neq).
+           rewrite H10.
+           rewrite bind_ret_l ; reflexivity.
+        ** rewrite find_block_not_in_inputs; auto.
+           simpl. intuition.
+
+  - (* NO ENTRY - Identity*)
+    rewrite DenotationTheory.denote_ocfg_unfold_not_in.
+    + match goal with
+      | h:context[ ~ (In ?t (inputs (?x++?y))) ] |- _ =>
+          rewrite inputs_app in h ;
+          let h' := fresh "H" in
+          pose proof h as h' ;
+          apply Util.not_in_app_l in h ;
+          apply Util.not_in_app_r in h' ;
+          apply free_in_convert_typ with (env := []) in h,h'
+      end.
+      rewrite DenotationTheory.denote_ocfg_unfold_not_in;
+        try (now apply find_block_free_id).
+      * rewrite bind_ret_l.
+        assert (eq_bid to out1 = false) by (now apply eqb_bid_neq).
+        rewrite H11.
+        now rewrite DenotationTheory.denote_ocfg_unfold_not_in;
+        try (now apply find_block_free_id).
     + apply find_block_free_id. apply free_in_convert_typ with (env := []).
-      rewrite inputs_app in H4. apply free_in_cfg_app.
+      rewrite inputs_app in H9. apply free_in_cfg_app.
       split.
-      now apply Util.not_in_app_l in H4.
+      now apply Util.not_in_app_l in H9.
       apply free_in_cfg_app ; unfold free_in_cfg.
-      simpl; intuition.
-Admitted.
+      simpl ; intuition.
+Qed.
 
 
 
