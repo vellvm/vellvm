@@ -13,7 +13,13 @@ Section CFG_Combinators.
 
 Notation code := (code typ).
 Notation ocfg := (ocfg typ).
-Notation exp := (texp typ).
+Notation conv := (convert_typ []).
+
+Definition texp_break (e : texp typ) : dtyp * exp dtyp :=
+  let (t,e) := e in
+  ((typ_to_dtyp [] t), (conv e)).
+
+Notation texp := (texp typ).
 
 (** Combinators over OCFG *)
 
@@ -23,15 +29,15 @@ Definition cfg_block (c : code) (input output : block_id) : ocfg :=
   [mk_block input [] c (TERM_Br_1 output) None].
 
 (* Define an ocfg containing a unique block, labeled with /input/ and returning the expression /e/ *)
-Definition cfg_ret (c : code) (e : exp) (input : block_id) : ocfg :=
+Definition cfg_ret (c : code) (e : texp) (input : block_id) : ocfg :=
   [mk_block input [] c (TERM_Ret e) None].
-
 
 (* Given 2 ocfg and an expression /e/, conditionnal branch over theses graphs,
  and jumping to output *)
-Definition cfg_branch (code_expr : code) (cond : exp)
-           (gT gF : ocfg) (input inT inF : block_id) : ocfg :=
-  let cond_block := [mk_block input [] code_expr (TERM_Br cond inT inF) None] in
+Definition cfg_branch (cond : texp)
+           (gT gF : ocfg)
+           (input inT inF : block_id) : ocfg :=
+  let cond_block := [mk_block input [] [] (TERM_Br cond inT inF) None] in
   cond_block++gT++gF.
 
 (* Given 2 ocfg, make them jump into the same block *)
@@ -45,7 +51,6 @@ Definition cfg_seq (g1 g2 : ocfg) (out1 in2 : block_id) : ocfg :=
   let dead_block := [mk_block out1 [] [] (TERM_Br_1 in2) None] in
   g1 ++ dead_block ++ g2.
 
-(* Naive version ; maybe we could use cfg_block + cfg_branch + cfg_seq *)
 Definition cfg_while_loop (code_expr : code) (cond : exp)
            (body : ocfg) (input inB output outB: block_id) : ocfg :=
   let dead_block := [mk_block outB [] [] (TERM_Br_1 input) None] in
@@ -104,9 +109,9 @@ From ITree Require Import
 
 Import ITreeNotations.
 
-Notation conv := (convert_typ []).
 Definition denote_cfg g from to := denote_ocfg (conv g) (from,to).
 
+From Coq Require Import String.
 From Vellvm Require Import Syntax.ScopeTheory.
 
 Definition eq_bid b b' :=
@@ -238,7 +243,6 @@ Proof.
     + setoid_rewrite DenotationTheory.denote_block_unfold_cont.
       unfold Traversal.endo, Traversal.Endo_id.
       simpl.
-      unfold tfmap, TFunctor_list ; simpl.
       rewrite DenotationTheory.denote_no_phis.
       rewrite bind_ret_l.
       rewrite eutt_eq_bind.
@@ -261,17 +265,14 @@ Proof.
     unfold block_id in *. now rewrite E.
 Qed.
 
-Lemma denote_cfg_ret : forall (c : code) (e : exp) (input : block_id) from to,
+Lemma denote_cfg_ret : forall (c : code) (e : texp) (input : block_id) from to,
     eutt eq
          (denote_cfg (cfg_ret c e input) from to)
          (if (eq_bid to input)
-          then denote_code (conv c) ;;
-               d <- translate exp_to_instr
-                             (denote_terminator (conv (TERM_Ret e))) ;;
-              match d with
-              | inr dv => ret (inr dv)
-              | inl target => ret (inl (input,target))
-              end
+          then let (t,e) := e in
+             denote_code (conv c) ;;
+               v <- translate exp_to_instr (denote_exp (Some (typ_to_dtyp [] t)) (conv e)) ;;
+                ret (inr v)
           else ret (inl (from,to))).
 Proof.
   intros.
@@ -289,12 +290,14 @@ Proof.
     rewrite DenotationTheory.denote_no_phis.
     rewrite bind_ret_l.
     rewrite bind_bind.
+    flatten_goal.
+    flatten_goal.
     rewrite eutt_eq_bind ; [reflexivity|].
     intros ; cbn.
-    flatten_all.
     rewrite translate_bind.
     rewrite bind_bind.
-    rewrite bind_bind.
+    unfold tfmap,TFunctor_texp in Heq.
+    inv Heq.
     rewrite eutt_eq_bind ; [reflexivity|].
     intros ; cbn.
     setoid_rewrite translate_ret.
@@ -383,7 +386,7 @@ Proof.
     + (* Jump to out2 *)
       rewrite eqb_bid_eq in Heq0 ; subst.
       rewrite DenotationTheory.denote_ocfg_unfold_not_in.
-      2: { now apply find_block_none_singleton. } (* easy because out1 <> out2 *)
+      2: { apply eqb_bid_neq in Heq ; now apply find_block_none_singleton,not_eq_sym. }
       rewrite bind_ret_l.
       rewrite DenotationTheory.denote_ocfg_unfold_in
         with (bk:=
@@ -402,15 +405,15 @@ Proof.
       setoid_rewrite translate_ret.
       repeat (rewrite bind_ret_l).
       rewrite DenotationTheory.denote_ocfg_unfold_not_in.
-      2: { now apply find_block_none_singleton,not_eq_sym. } (* easy because out2 <> output  *)
+      2: { now apply find_block_none_singleton,not_eq_sym. }
       reflexivity.
     + (* Neither out1 or out2 *)
       apply eqb_bid_neq in Heq,Heq0.
       rewrite DenotationTheory.denote_ocfg_unfold_not_in.
-      2: { now apply find_block_none_singleton,not_eq_sym. } (* easy because target <> out1  *)
+      2: { now apply find_block_none_singleton,not_eq_sym. }
       rewrite bind_ret_l.
       rewrite DenotationTheory.denote_ocfg_unfold_not_in.
-      2: { now apply find_block_none_singleton,not_eq_sym.  } (* easy because target <> out2  *)
+      2: { now apply find_block_none_singleton,not_eq_sym. }
       reflexivity.
 Qed.
 
@@ -450,7 +453,7 @@ Proof.
                  \/ ~ (In to (inputs (g1++g2)))).
   { rewrite inputs_app ; rewrite in_app_iff.
     apply or_assoc ; apply Classical_Prop.classic. }
-  destruct Hdis as [ ? | [ ? | ? ]].
+  destruct Hdis as [ Hdis | [ Hdis | Hdis ]].
   
   - (* ENTRY IN g1 *)
     rewrite (convert_typ_list_app g1 _ []).
@@ -468,7 +471,7 @@ Proof.
     destruct u as [ (src,target) | dv ] eqn:U ; try (reflexivity).
 
     + (* jump to the next block *)
-      assert (target = out1 \/ target <> out1). { apply Classical_Prop.classic. }
+      assert (Htarget : target = out1 \/ target <> out1). { apply Classical_Prop.classic. }
       rewrite Util.list_cons_app.
       rewrite (convert_typ_list_app _ g2 []).
       rewrite DenotationTheory.denote_ocfg_app.
@@ -476,13 +479,12 @@ Proof.
          apply no_reentrance_convert_typ.
          unfold no_reentrance; cbn.
          now apply Util.list_disjoint_singleton_right.}
-      destruct H10.
+      destruct Htarget as [ Htarget | Htarget  ].
       * (* b = out1 ; we jump to the new block which is empty *)
         subst.
-        assert (eq_bid out1 out1 = true) by (now apply eqb_bid_eq).
-        rewrite H10.
-        (* cbn. *)
-                rewrite DenotationTheory.denote_ocfg_unfold_in
+        assert (Heqb : eq_bid out1 out1 = true) by (now apply eqb_bid_eq).
+        rewrite Heqb.
+        rewrite DenotationTheory.denote_ocfg_unfold_in
         with (bk := {|
        blk_id := out1;
        blk_phis := [];
@@ -509,7 +511,7 @@ Proof.
            reflexivity.
       * (* b <> out1 ; we skip the empty block *)
         rewrite DenotationTheory.denote_ocfg_unfold_not_in.
-        ** rewrite <- eqb_bid_neq in H10. rewrite H10.
+        ** rewrite <- eqb_bid_neq in Htarget. rewrite Htarget.
            rewrite bind_ret_l  ; reflexivity.
         ** apply find_block_not_in_inputs.
            simpl. unfold endo, Endo_id. intuition.
@@ -555,8 +557,8 @@ Proof.
       }
       * (* since to <> out1, return the identity and jump in g2 *)
         rewrite DenotationTheory.denote_ocfg_unfold_not_in.
-        ** assert (eq_bid to out1 = false) by (now apply eqb_bid_neq).
-           rewrite H10.
+        ** assert (Hneqb : eq_bid to out1 = false) by (now apply eqb_bid_neq).
+           rewrite Hneqb.
            rewrite bind_ret_l ; reflexivity.
         ** rewrite find_block_not_in_inputs; auto.
            simpl. intuition.
@@ -575,14 +577,14 @@ Proof.
       rewrite DenotationTheory.denote_ocfg_unfold_not_in;
         try (now apply find_block_free_id).
       * rewrite bind_ret_l.
-        assert (eq_bid to out1 = false) by (now apply eqb_bid_neq).
-        rewrite H11.
+        assert (Hneqb : eq_bid to out1 = false) by (now apply eqb_bid_neq).
+        rewrite Hneqb.
         now rewrite DenotationTheory.denote_ocfg_unfold_not_in;
         try (now apply find_block_free_id).
     + apply find_block_free_id. apply free_in_convert_typ with (env := []).
-      rewrite inputs_app in H9. apply free_in_cfg_app.
+      rewrite inputs_app in Hdis. apply free_in_cfg_app.
       split.
-      now apply Util.not_in_app_l in H9.
+      now apply Util.not_in_app_l in Hdis.
       apply free_in_cfg_app ; unfold free_in_cfg.
       simpl ; intuition.
 Qed.
@@ -593,9 +595,14 @@ Qed.
 From Imp2Vir Require Import Imp.
 
 Require Import CompileExpr.
-
+Print Scopes.
+Open Scope monad_scope.
 Import MonadNotation.
 Variable (name : nat -> block_id).
+Hypothesis (nameInj_eq : forall n n', n = n' -> name n = name n' ).
+Hypothesis (nameInj_neq : forall n n', n <> n' -> name n <> name n' ).
+(* Definition mk_anon (n : nat) := Anon (Z.of_nat n). *)
+(* Definition name := mk_anon. *)
 
 (* Could be a fresh/state monad *)
 
@@ -629,8 +636,10 @@ Fixpoint compile_imp (next_reg : int) (next_lab : nat) (s : stmt) (env: StringMa
     let '(gT, inT, outT) := irT in
     let '(gF, inF, outF) := irF in
     let input := name next_lab in
-    let output := name (next_lab+1) in
-    let g := cfg_branch expr_code (texp_i1 cond_reg) gT gF input inT inF in
+    let out0 := name (next_lab+1) in
+    let output := name (next_lab+2) in
+    let g0 := cfg_block expr_code input out0 in
+    let g := cfg_branch (texp_i1 cond_reg) gT gF out0 inT inF in
     let g := cfg_join g output outT outF in
       ret (next_reg, (next_lab+2)%nat, env, (g, input, output))
 
@@ -639,7 +648,8 @@ Fixpoint compile_imp (next_reg : int) (next_lab : nat) (s : stmt) (env: StringMa
     '(next_reg, next_lab, _, irB) <- compile_imp (cond_reg + 1) next_lab b env;;
     let '(gB, inB, outB) := irB in
     let input := name next_lab in
-    let output := name (next_lab+1) in
+    let out0 := name (next_lab+1) in
+    let output := name (next_lab+2) in
     let g := cfg_while_loop expr_code (texp_i1 cond_reg) gB input inB output outB in
     ret (next_reg, (next_lab+2)%nat, env, (g, input, output))
   end.
