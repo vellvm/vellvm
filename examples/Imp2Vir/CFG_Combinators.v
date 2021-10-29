@@ -51,7 +51,7 @@ Definition cfg_seq (g1 g2 : ocfg) (out1 in2 : block_id) : ocfg :=
   let dead_block := [mk_block out1 [] [] (TERM_Br_1 in2) None] in
   g1 ++ dead_block ++ g2.
 
-Definition cfg_while_loop (code_expr : code) (cond : exp)
+Definition cfg_while_loop (code_expr : code) (cond : texp)
            (body : ocfg) (input inB output outB: block_id) : ocfg :=
   let dead_block := [mk_block outB [] [] (TERM_Br_1 input) None] in
   let cond_block := [mk_block input [] code_expr (TERM_Br cond inB output) None] in
@@ -769,6 +769,116 @@ Compute if_ir.
 Compute nested_if_ir.
 Compute nested_if2_ir.
 Compute fact_ir.
+
+
+(** Correctness compiler *)
+
+From Coq Require Import Lia.
+
+From ExtLib Require Import FMapAList.
+
+From Vellvm Require Import
+     Handlers.Handlers
+     Syntax.ScopeTheory
+     Utils.AListFacts
+     Utils.PostConditions
+     Utils.Tactics
+     Theory.
+
+
+
+(* Relation between Imp env and vellvm env *)
+
+Definition Rmem (vmap : StringMap.t int)(env : Imp.env) (venv : local_env) (vmem : memory_stack) : Prop :=
+  forall k v, alist_find k env = Some v <-> (
+    exists reg, StringMap.find k vmap = Some reg /\
+      exists addr, alist_find (Anon reg) venv = Some (UVALUE_Addr addr) /\
+        exists v32, read vmem addr (DTYPE_I (Npos 32%positive)) = inr (UVALUE_I32 v32) /\
+          Int32.intval v32 = Z.of_nat v
+  ).
+
+Definition Rimpvir
+  (vmap : StringMap.t int)
+  (env1 : Imp.env * unit)
+  (env2 : memory_stack * (local_env * (global_env * (block_id * block_id + uvalue)))) :
+  Prop :=
+  Rmem vmap (fst env1) (fst (snd env2)) (fst env2).
+
+Import ITreeNotations.
+Import SemNotations.
+
+(* Fixpoint compile_imp (next_reg : int) (next_lab : nat) (s : stmt) (env: StringMap.t int) *)
+(*   : option (int * nat * (StringMap.t int) * (ocfg * block_id * block_id)) := *)
+
+Theorem compile_correct : forall (next_reg : int) (next_label : nat) env (p : stmt)
+                            (next_reg' : int) (next_label' : nat)
+                            env' (o : ocfg) (input output : block_id)
+                            mem from to genv lenv vmem,
+
+  (* The environments of Imp and Cvir are related *)
+  Rmem env mem lenv vmem ->
+  (* The compilation of p with env produce a new env' and an ir *)
+  compile_imp next_reg next_label p env = Some(next_reg', next_label', env', (o,input,output)) ->
+
+  eutt (Rimpvir env')
+       (interp_imp (denote_imp p) mem)
+       (interp_cfg3 (denote_cfg o from to) genv lenv vmem).
+Proof.
+  intros.
+  induction p.
+  - (* Assign *)
+    simpl in *.
+    repeat (flatten_all) ; [| discriminate H0].
+    inv H0.
+    rewrite denote_cfg_block.
+    2: {apply nameInj_neq ; lia. }
+    rewrite interp_imp_bind.
+    flatten_goal.
+    admit.
+    (* NOTE how is that possible to have the same  *)
+      setoid_rewrite interp_cfg3_ret.
+    admit.
+  - (* Seq *) admit.
+  - (* If *) admit.
+  - (* While *) admit.
+  - (* Skip *)
+    simpl in *.
+    inv H0.
+    rewrite denote_cfg_block.
+    2: { apply nameInj_neq ; lia.}
+    rewrite interp_imp_ret.
+    destruct (eq_bid to (name next_label)).
+    + rewrite denote_code_nil.
+      rewrite bind_ret_l.
+      simpl.
+      rewrite interp_cfg3_ret.
+      apply eutt_Ret.
+      constructor.
+      * intros.
+        simpl in H0. apply H,H0.
+      * intros.
+        destruct H0 as [reg [Hreg [ addr [Haddr [val [HValRead HValInt]]]]]].
+        simpl in *.
+        unfold Rmem in H.
+        apply H.
+        exists reg; intuition.
+        exists addr; intuition.
+        exists val; intuition.
+    + simpl.
+      rewrite interp_cfg3_ret.
+      apply eutt_Ret.
+      constructor.
+      * intros.
+        simpl in H0. apply H,H0.
+      * intros.
+        destruct H0 as [reg [Hreg [ addr [Haddr [val [HValRead HValInt]]]]]].
+        simpl in *.
+        unfold Rmem in H.
+        apply H.
+        exists reg; intuition.
+        exists addr; intuition.
+        exists val; intuition.
+Admitted.
 
 
 End CFG_Combinators.
