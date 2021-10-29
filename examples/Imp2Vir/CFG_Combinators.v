@@ -309,6 +309,97 @@ Proof.
     reflexivity.
 Qed.
 
+Lemma denote_cfg_branch :
+  forall (cond : texp) (gT gF : ocfg) (input inT inF from input : block_id),
+    input <> inT ->
+    input <> inF ->
+    no_reentrance (conv gT) (conv gF) ->
+    eutt eq
+         (denote_cfg (cfg_branch cond gT gF input inT inF) from input)
+         (let (dt,e) := texp_break cond in
+          dv <- translate exp_to_instr (
+                            uv <-  (denote_exp (Some dt) e) ;;
+                            concretize_or_pick uv True) ;;
+          match dv with
+          | DVALUE_I1 comparison_bit =>
+              if equ comparison_bit Int1.one then
+                 denote_cfg gT input inT
+              else
+                 denote_cfg gT input inF
+          | DVALUE_Poison => raiseUB "Branching on poison."
+          | _ => raise "Br got non-bool value"
+          end).
+Proof.
+  intros.
+  unfold cfg_branch, denote_cfg.
+  From Vellvm Require Import Theory.
+  rewrite (convert_typ_list_app _ (gT++gF) _).
+  rewrite denote_ocfg_app.
+  rewrite denote_ocfg_unfold_in with
+    (bk := conv {|
+                 blk_id := input0;
+                  blk_phis := [];
+                   blk_code := [];
+                    blk_term := TERM_Br cond inT inF;
+                     blk_comments := None
+              |}).
+  2: {
+     simpl. rewrite eqv_dec_p_refl. reflexivity.
+  }
+  setoid_rewrite DenotationTheory.denote_block_unfold.
+  simpl.
+  rewrite DenotationTheory.denote_no_phis.
+  setoid_rewrite DenotationTheory.denote_code_nil.
+  repeat (rewrite bind_ret_l).
+  (* unfold texp_break in Heq ; flatten_hyp Heq ; inv Heq. *)
+  flatten_all.
+  flatten_all.
+  unfold texp_break in Heq0.
+  flatten_all.
+  unfold tfmap,TFunctor_texp in Heq.
+  unfold conv in Heq0.
+  unfold ConvertTyp_exp in Heq0.
+  rewrite Heq in Heq0.
+  inv Heq0. clear Heq.
+  setoid_rewrite translate_bind.
+  repeat (rewrite bind_bind).
+  rewrite eutt_eq_bind ; [reflexivity|].
+  intros ; simpl.
+  setoid_rewrite translate_bind.
+  repeat (rewrite bind_bind).
+  rewrite eutt_eq_bind ; [reflexivity|].
+  intros ; simpl.
+  destruct u0 ;
+    try (rewrite exp_to_instr_raise ; admit) ;
+    try (rewrite exp_to_instr_raiseUB ; admit).
+  destruct (Int1.eq x Int1.one) ;
+    rewrite translate_ret ;
+    rewrite bind_ret_l.
+  - (* Side True*)
+    rewrite Util.list_cons_app.
+    rewrite denote_ocfg_unfold_not_in.
+    2: { rewrite app_nil_r ; now rewrite <- find_block_none_singleton.}
+    rewrite bind_ret_l.
+    rewrite convert_typ_list_app.
+    rewrite denote_ocfg_app ; try assumption.
+    assert (HinT : In inT (inputs gT) \/ ~ In inT (inputs gT))
+      by (apply Classical_Prop.classic).
+    destruct HinT as [ HinT | HinT ].
+    + (* inT is in gT *) admit.
+    + (* inT is not in gT *)
+Admitted.
+
+
+Lemma denote_cfg_while_loop : Prop.
+  refine (
+        forall expr_code cond body input inB output outB from to,
+          eutt eq
+               (denote_cfg (cfg_while_loop expr_code cond body input inB output outB)
+                           from to)
+               (if (eq_bid to input)
+                then _
+                else ret (inl (from,to)))).
+Admitted.
 
 Lemma no_reentrance_convert_typ:
   forall (env : list (ident * typ)) [g1 g2 : ocfg],
@@ -428,11 +519,12 @@ Lemma denote_cfg_seq : forall g1 g2 out1 in2 from to,
     wf_ocfg_bid g2 ->
     no_duplicate_bid g1 g2 ->
     no_reentrance g1 g2 ->
-    free_in_cfg g1 out1 ->
-    free_in_cfg g2 out1 ->
-    free_in_cfg g1 in2 ->
+    (* In to (inputs g1) -> *)
+    free_in_cfg g1 out1 -> (* cfg_seq cannot create a new block with an existing ID *)
+    free_in_cfg g2 out1 -> (* cfg_seq cannot create a new block with an existing ID *)
+    free_in_cfg g1 in2 -> (* in2 should be an input of g2, not g1 *)
     ~ In out1 (outputs g2) ->
-    out1 <> in2 -> (* mandatory, or cfg_seq will create a new block with an existing ID *)
+    out1 <> in2 -> (* cfg_seq cannot create a new block with an existing ID *)
     to <> out1 -> (* can I relaxe this hypothesis ? *)
     eutt eq
          (denote_cfg (cfg_seq g1 g2 out1 in2) from to)
