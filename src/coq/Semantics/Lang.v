@@ -75,8 +75,3 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (PTOI : PTOI ADDR) 
          MEM MEMORY_THEORY UndefinedBehaviour SER D.
 End Make.
 
-(* LLVM Instance with big integers for intptr *)
-Module LLVMLang := Make FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP.
-
-(* LLVM Instance with 64-bit intptr values *)
-Module LLVMLang64 := Make FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP.

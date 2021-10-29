@@ -290,7 +290,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickE]*)
   Definition L4 := ExternalCallE +' OOME +' UBE +' DebugE +' FailureE.
 
-  Definition L5 := ExternalCallE +' OOME +' DebugE +' FailureE.
+  Definition L5 := ExternalCallE +' OOME_NOMSG +' UBE +' DebugE +' FailureE.
+
+  Definition L5_exec := ExternalCallE +' UBE +' DebugE +' FailureE.
 
   Definition L6 := ExternalCallE +' OOME_NOMSG +' DebugE +' FailureE.
 
