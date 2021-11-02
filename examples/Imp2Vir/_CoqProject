@@ -4,19 +4,26 @@
 -R ../../lib/QuickChick/src QuickChick
 -R ../../lib/flocq-quickchick FlocqQuickChick
 
-# ITree tutorial
-Utils_tutorial.v
-Fin.v
-Imp.v
+## Anonymous CVIR
+# Utils_tutorial.v
+# Fin.v
 
-# own sources
-Utils.v
+# Sir.v
+# Vec.v
+# Unique.v
+# Relabel.v
+# CvirCombinators.v
+# CvirCombinatorsWF.v
+# CompileExpr.v
+# Imp2Cvir.v
+# Semantics.v
+
+
+## High Level Combinators on CFG
+Imp.v
 CompileExpr.v
-Sir.v
-Vec.v
-Unique.v
-Relabel.v
-CvirCombinators.v
-CvirCombinatorsWF.v
-Imp2Cvir.v
-Semantics.v
+
+CFGC_Utils.v
+CFGC_Combinators.v
+CFGC_DenotationsCombinators.v
+CFGC_Imp2Vir.v
