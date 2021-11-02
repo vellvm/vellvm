@@ -65,7 +65,8 @@ From Vellvm Require Import
      Semantics.Memory.FiniteProvenance
      Semantics.Memory.ErrSID
      Semantics.Memory.Overlaps
-     Semantics.LLVMEvents.
+     Semantics.LLVMEvents
+     Semantics.LLVMParams.
 
 Require Import Ceres.Ceres.
 
@@ -595,6 +596,771 @@ End FinByte.
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
     indexed on [Z].
  *)
+Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (GEP : GEPM LP.ADDR LP.IP LP.SIZEOF Events) (BYTE_IMPL : ByteImpl LP.ADDR LP.IP LP.SIZEOF Events).
+  Import Events.
+  Import DV.
+  Import LP.
+  Import PTOI.
+  Import PROV.
+  Import ITOP.
+  Import SIZEOF.
+  Import GEP.
+  Import ADDR.
+  Import PROV.
+
+  Module BYTE := Byte ADDR IP SIZEOF Events BYTE_IMPL.
+  Import BYTE.
+
+  Module ESID := ERRSID ADDR IP SIZEOF Events PROV.
+  Import ESID.
+
+  Module PROV_F := PROV_FUNCS ADDR PROV.
+  Import PROV_F.
+
+  Module OVER := Overlaps ADDR PTOI SIZEOF.
+  Export OVER.
+
+  (* TODO: Make these parameters? *)
+  (* Variable ptr_size : nat. *)
+  (* Variable datalayout : DataLayout. *)
+  Parameter ptr_size : nat.
+
+  (* Definition endianess : Endianess *)
+  (*   := dl_endianess datalayout. *)
+  Parameter endianess : Endianess.
+
+  Section Datatype_Definition.
+    (** ** Memory
+        The actual type of memory.
+     *)
+    Parameter memory : Type.
+
+    (** ** Stack frames
+      A frame contains the list of block ids that need to be freed when popped,
+      i.e. when the function returns.
+      A [frame_stack] is a list of such frames.
+     *)
+    Parameter mem_frame : Type.
+    Parameter frame_stack : Type.
+
+    (** ** Memory stack
+      The full notion of state manipulated by the monad is a pair of a [memory] and a [mem_stack].
+     *)
+    Definition memory_stack : Type := memory * frame_stack.
+    (* Parameter memory_stack : Type. *)
+
+  End Datatype_Definition.
+
+  Section Serialization.
+
+   (** ** Serialization
+       Conversion back and forth between values and their byte representation
+   *)
+
+    (** ** Reading values in memory
+      Given an offset in [mem_block], we decode a [uvalue] at [dtyp] [t] by looking up the
+      appropriate number of [SByte] and deserializing them.
+     *)
+
+    (* TODO: revive this *)
+    (* Definition fp_alignment (bits : N) : option Alignment := *)
+    (*   let fp_map := dl_floating_point_alignments datalayout *)
+    (*   in NM.find bits fp_map. *)
+
+    (*  TODO: revive this *)
+    (* Definition int_alignment (bits : N) : option Alignment := *)
+    (*   let int_map := dl_integer_alignments datalayout *)
+    (*   in match NM.find bits int_map with *)
+    (*      | Some align => Some align *)
+    (*      | None => *)
+    (*        let keys  := map fst (NM.elements int_map) in *)
+    (*        let bits' := nextOrMaximumOpt N.leb bits keys  *)
+    (*        in match bits' with *)
+    (*           | Some bits => NM.find bits int_map *)
+    (*           | None => None *)
+    (*           end *)
+    (*      end. *)
+
+    (* TODO: Finish this function *)
+    (* Fixpoint dtyp_alignment (dt : dtyp) : option Alignment := *)
+    (*   match dt with *)
+    (*   | DTYPE_I sz => *)
+    (*     int_alignment sz *)
+    (*   | DTYPE_IPTR => *)
+    (*     (* TODO: should these have the same alignments as pointers? *) *)
+    (*     int_alignment (N.of_nat ptr_size * 4)%N *)
+    (*   | DTYPE_Pointer => *)
+    (*     (* TODO: address spaces? *) *)
+    (*     Some (ps_alignment (head (dl_pointer_alignments datalayout))) *)
+    (*   | DTYPE_Void => *)
+    (*     None *)
+    (*   | DTYPE_Half => *)
+    (*     fp_alignment 16 *)
+    (*   | DTYPE_Float => *)
+    (*     fp_alignment 32 *)
+    (*   | DTYPE_Double => *)
+    (*     fp_alignment 64 *)
+    (*   | DTYPE_X86_fp80 => *)
+    (*     fp_alignment 80 *)
+    (*   | DTYPE_Fp128 => *)
+    (*     fp_alignment 128 *)
+    (*   | DTYPE_Ppc_fp128 => *)
+    (*     fp_alignment 128 *)
+    (*   | DTYPE_Metadata => *)
+    (*     None *)
+    (*   | DTYPE_X86_mmx => _ *)
+    (*   | DTYPE_Array sz t => *)
+    (*     dtyp_alignment t *)
+    (*   | DTYPE_Struct fields => _ *)
+    (*   | DTYPE_Packed_struct fields => _ *)
+    (*   | DTYPE_Opaque => _ *)
+    (*   | DTYPE_Vector sz t => _ *)
+    (*   end. *)
+
+
+    (* TODO: should these be here? *)
+    Parameter extract_byte_to_sbyte : uvalue -> ERR SByte.
+
+    Parameter sbyte_sid_match : SByte -> SByte -> bool.
+    Parameter replace_sid : store_id -> SByte -> SByte.
+
+    Parameter filter_sid_matches : SByte -> list (N * SByte) -> list (N * SByte) * list (N * SByte).
+
+    (* TODO: should I move this? *)
+    Parameter re_sid_ubytes_helper : list (N * SByte) -> NMap SByte -> ErrSID (NMap SByte).
+    Parameter re_sid_ubytes : list SByte -> ErrSID (list SByte).
+
+    Ltac solve_dtyp_measure :=
+      cbn;
+      first [ lia
+            | match goal with
+              | _ : _ |- context [(dtyp_measure ?t + fold_right _ _ _)%nat]
+                => pose proof (dtyp_measure_gt_0 t); unfold list_sum; lia
+              end
+            | match goal with
+              | HIn : In ?x ?xs |- context [ list_sum (map ?f _)] =>
+                pose proof (list_sum_map f x xs HIn)
+              end;
+              cbn in *; lia
+            ].
+
+    Ltac solve_uvalue_measure :=
+      cbn;
+      first [ lia
+            | match goal with
+              | _ : _ |- context [(uvalue_measure ?t + fold_right _ _ _)%nat]
+                => pose proof (uvalue_measure_gt_0 t); unfold list_sum; lia
+              end
+            | match goal with
+              | HIn : In ?x ?xs |- context [ list_sum (map ?f _)] =>
+                pose proof (list_sum_map f x xs HIn)
+              end;
+              cbn in *; lia
+            ].
+
+    Ltac solve_uvalue_dtyp_measure :=
+      red; cbn;
+      repeat match goal with
+             | Hin : In _ (repeatN _ _) |- _ =>
+               apply In_repeatN in Hin; subst
+             end;
+      solve [ apply right_lex; solve_dtyp_measure
+            | apply left_lex; solve_uvalue_measure
+            ].
+
+    Parameter serialize_sbytes : uvalue -> dtyp -> ErrSID (list SByte).
+
+    Parameter serialize_sbytes_equation : forall (uv : uvalue) (dt : dtyp),
+      serialize_sbytes uv dt =
+      match uv with
+       (* Base types *)
+       | UVALUE_Addr _
+       | UVALUE_I1 _
+       | UVALUE_I8 _
+       | UVALUE_I32 _
+       | UVALUE_I64 _
+       | UVALUE_IPTR _
+       | UVALUE_Float _
+       | UVALUE_Double _
+
+       (* Expressions *)
+       | UVALUE_IBinop _ _ _
+       | UVALUE_ICmp _ _ _
+       | UVALUE_FBinop _ _ _ _
+       | UVALUE_FCmp _ _ _
+       | UVALUE_Conversion _ _ _ _
+       | UVALUE_GetElementPtr _ _ _
+       | UVALUE_ExtractElement _ _
+       | UVALUE_InsertElement _ _ _
+       | UVALUE_ShuffleVector _ _ _
+       | UVALUE_ExtractValue _ _
+       | UVALUE_InsertValue _ _ _
+       | UVALUE_Select _ _ _ =>
+         sid <- fresh_sid;;
+         lift_OOM (to_ubytes uv dt sid)
+
+       (* Undef values, these can possibly be aggregates *)
+       | UVALUE_Undef _ =>
+         match dt with
+         | DTYPE_Struct [] =>
+           ret []
+         | DTYPE_Struct (t::ts) =>
+           f_bytes <- serialize_sbytes (UVALUE_Undef t) t;; (* How do I know this is smaller? *)
+           fields_bytes <- serialize_sbytes (UVALUE_Undef (DTYPE_Struct ts)) (DTYPE_Struct ts);;
+           ret (f_bytes ++ fields_bytes)%list
+
+         | DTYPE_Packed_struct [] =>
+           ret []
+         | DTYPE_Packed_struct (t::ts) =>
+           f_bytes <- serialize_sbytes (UVALUE_Undef t) t;; (* How do I know this is smaller? *)
+           fields_bytes <- serialize_sbytes (UVALUE_Undef (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
+           ret (f_bytes ++ fields_bytes)%list
+
+         | DTYPE_Array sz t =>
+           field_bytes <- map_monad_In (repeatN sz (UVALUE_Undef t)) (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+
+         | DTYPE_Vector sz t =>
+           field_bytes <- map_monad_In (repeatN sz (UVALUE_Undef t)) (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+         | _ =>
+           sid <- fresh_sid;;
+           lift_OOM (to_ubytes uv dt sid)
+         end
+
+       (* Poison values, possibly aggregates *)
+       | UVALUE_Poison _ =>
+         match dt with
+         | DTYPE_Struct [] =>
+           ret []
+         | DTYPE_Struct (t::ts) =>
+           f_bytes <- serialize_sbytes (UVALUE_Poison t) t;; (* How do I know this is smaller? *)
+           fields_bytes <- serialize_sbytes (UVALUE_Poison (DTYPE_Struct ts)) (DTYPE_Struct ts);;
+           ret (f_bytes ++ fields_bytes)%list
+
+         | DTYPE_Packed_struct [] =>
+           ret []
+         | DTYPE_Packed_struct (t::ts) =>
+           f_bytes <- serialize_sbytes (UVALUE_Poison t) t;; (* How do I know this is smaller? *)
+           fields_bytes <- serialize_sbytes (UVALUE_Poison (DTYPE_Packed_struct ts)) (DTYPE_Packed_struct ts);;
+           ret (f_bytes ++ fields_bytes)%list
+
+         | DTYPE_Array sz t =>
+           field_bytes <- map_monad_In (repeatN sz (UVALUE_Poison t)) (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+
+         | DTYPE_Vector sz t =>
+           field_bytes <- map_monad_In (repeatN sz (UVALUE_Poison t)) (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+         | _ =>
+           sid <- fresh_sid;;
+           lift_OOM (to_ubytes uv dt sid)
+         end
+
+       (* TODO: each field gets a separate store id... Is that sensible? *)
+       (* Padded aggregate types *)
+       | UVALUE_Struct [] =>
+         ret []
+       | UVALUE_Struct (f::fields) =>
+         (* TODO: take padding into account *)
+         match dt with
+         | DTYPE_Struct (t::ts) =>
+           f_bytes <- serialize_sbytes f t;;
+           fields_bytes <- serialize_sbytes (UVALUE_Struct fields) (DTYPE_Struct ts);;
+           ret (f_bytes ++ fields_bytes)%list
+         | _ =>
+           raise_error "serialize_sbytes: UVALUE_Struct field / type mismatch."
+         end
+
+       (* Packed aggregate types *)
+       | UVALUE_Packed_struct [] =>
+         ret []
+       | UVALUE_Packed_struct (f::fields) =>
+         (* TODO: take padding into account *)
+         match dt with
+         | DTYPE_Packed_struct (t::ts) =>
+           f_bytes <- serialize_sbytes f t;;
+           fields_bytes <- serialize_sbytes (UVALUE_Packed_struct fields) (DTYPE_Packed_struct ts);;
+           ret (f_bytes ++ fields_bytes)%list
+         | _ =>
+           raise_error "serialize_sbytes: UVALUE_Packed_struct field / type mismatch."
+         end
+
+       | UVALUE_Array elts =>
+         match dt with
+         | DTYPE_Array sz t =>
+           field_bytes <- map_monad_In elts (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+         | _ =>
+           raise_error "serialize_sbytes: UVALUE_Array with incorrect type."
+         end
+       | UVALUE_Vector elts =>
+         match dt with
+         | DTYPE_Vector sz t =>
+           field_bytes <- map_monad_In elts (fun elt Hin => serialize_sbytes elt t);;
+           ret (concat field_bytes)
+         | _ =>
+           raise_error "serialize_sbytes: UVALUE_Array with incorrect type."
+         end
+
+       | UVALUE_None => ret nil
+
+       (* Byte manipulation. *)
+       | UVALUE_ExtractByte uv dt' idx sid =>
+         raise_error "serialize_sbytes: UVALUE_ExtractByte not guarded by UVALUE_ConcatBytes."
+
+       | UVALUE_ConcatBytes bytes t =>
+         (* TODO: should provide *new* sids... May need to make this function in a fresh sid monad *)
+         bytes' <- lift_ERR (map_monad extract_byte_to_sbyte bytes);;
+         re_sid_ubytes bytes'
+       end.
+
+  (* deserialize_sbytes takes a list of SBytes and turns them into a uvalue.
+
+     This relies on the similar, but different, from_ubytes function
+     which given a set of bytes checks if all of the bytes are from
+     the same uvalue, and if so returns the original uvalue, and
+     otherwise returns a UVALUE_ConcatBytes value instead.
+
+     The reason we also have deserialize_sbytes is in order to deal
+     with aggregate data types.
+'   *)
+    Parameter deserialize_sbytes : list SByte -> dtyp -> err uvalue.
+  End Serialization.
+
+  Section Logical_Operations.
+
+    Parameter memory_empty : memory.
+    Parameter SUndef : ErrSID SByte.
+
+    (** ** Reading values from memory *)
+    Parameter read_memory : memory -> addr -> dtyp -> err uvalue.
+
+    (** ** Writing values to memory *)
+    Parameter write_allowed : memory -> addr -> nat -> err (list AllocationId).
+    Parameter write_allowed_errsid : memory -> addr -> nat -> ErrSID (list AllocationId).
+    Parameter write_memory : memory -> addr -> uvalue -> dtyp -> ErrSID memory.
+
+    (** ** Array element lookup
+      A [memory] can be seen as storing an array of elements of [dtyp] [t], from which we retrieve
+      the [i]th [uvalue].
+      The [size] argument has no effect, but we need to provide one to the array type.
+     *)
+    Parameter get_array_cell_memory : memory -> addr -> nat -> N -> dtyp -> ErrSID uvalue.
+
+    (** ** Array element writing
+      Treat a [memory] as though it is an array storing elements of
+      type [t], and write the value [v] to index [i] in this array.
+
+      - [t] should be the type of [v].
+      - [size] does nothing, but we need to provide one for the array type.
+    *)
+    Parameter write_array_cell_memory : memory -> addr -> nat -> N -> dtyp -> uvalue -> ErrSID memory.
+
+    (** ** Array lookups -- mem_block
+      Retrieve the values stored at position [from] to position [from + len - 1] in an array stored in a [memory].
+     *)
+    Parameter get_array_memory
+      : memory -> addr -> nat -> nat -> N -> dtyp -> ErrSID (list uvalue)
+    .
+
+    (** ** Array writes -- mem_block
+      Write all of the values in [vs] to an array stored in a [memory], starting from index [from].
+
+      - [t] should be the type of each [v] in [vs]
+     *)
+    Parameter write_array_memory'
+      : memory -> addr -> nat -> N -> dtyp -> list uvalue -> ErrSID memory
+    .
+
+    Parameter write_array_memory
+      : memory -> addr -> nat -> dtyp -> list uvalue -> ErrSID memory
+    .
+
+  End Logical_Operations.
+
+
+  Section Memory_Operations.
+
+    (** Check if the block for an address is allocated.
+
+        Note: This does not check that the address is in range of the
+        block. *)
+    (* TODO: should this check if everything is in range...? *)
+    Parameter allocated : addr -> memory_stack -> Prop.
+
+      (* LLVM 5.0 memcpy
+         According to the documentation: http://releases.llvm.org/5.0.0/docs/LangRef.html#llvm-memcpy-intrinsic
+         this operation can never fail?  It doesn't return any status code...
+       *)
+
+      (** ** MemCopy
+          Implementation of the [memcpy] intrinsics.
+       *)
+    Parameter handle_memcpy : list dvalue -> memory -> err memory.
+
+  End Memory_Operations.
+
+  Section Frame_Stack_Operations.
+
+    (* The initial frame stack is not an empty stack, but a singleton stack containing an empty frame *)
+    Parameter frame_empty : frame_stack.
+
+    (** ** Free
+        [free_frame f m] deallocates the frame [f] from the memory [m].
+        This acts on both representations of the memory:
+        - on the logical memory, it simply removes all keys indicated by the frame;
+        - on the concrete side, for each element of the frame, we lookup in the logical memory
+        if it is bounded to a logical block, and if so if this logical block contains an associated
+        concrete block. If so, we delete this association from the concrete memory.
+     *)
+    Parameter free_byte : Iptr -> memory -> memory.
+    Parameter free_frame_memory : mem_frame -> memory -> memory.
+
+    Parameter equivs
+      : frame_stack -> frame_stack -> Prop.
+
+    Parameter equivs_Equiv : Equivalence equivs.
+
+  End Frame_Stack_Operations.
+
+  Section Memory_Stack_Operations.
+
+   (** ** Top-level interface
+       Ideally, outside of this module, the [memory_stack] datatype should be abstract and all interactions should go
+       through this interface.
+    *)
+
+    (** ** The empty memory
+        Both the concrete and logical views of the memory are empty maps, i.e. nothing is allocated.
+        It is a matter of convention, by we consider the empty memory to contain a single empty frame
+        in its stack, rather than an empty stack.
+     *)
+    Parameter empty_memory_stack : memory_stack.
+
+    (** ** Fresh key getters *)
+
+    (* Get the next key in the memory *)
+    Parameter next_memory_key : memory_stack -> Z.
+
+    (** ** Array lookups -- memory_stack
+      Retrieve the values stored at position [from] to position [from + len - 1] in an array stored at address [a] in memory.
+     *)
+    Parameter get_array : memory_stack -> addr -> nat -> nat -> N -> dtyp -> ErrSID (list uvalue).
+
+    Parameter get_array_cell : memory_stack -> addr -> nat -> dtyp -> ErrSID uvalue.
+    (** ** Array writes -- memory_stack
+     *)
+
+    Parameter write_array
+      : memory_stack ->
+        addr -> nat -> dtyp -> list uvalue -> ErrSID memory_stack.
+
+    Parameter write_array_cell
+      : memory_stack -> addr -> nat -> dtyp -> uvalue -> ErrSID memory_stack.
+
+    Parameter free_frame : memory_stack -> err memory_stack.
+
+    Parameter push_fresh_frame : memory_stack -> memory_stack.
+
+    Parameter add_to_frame : memory_stack -> Z -> memory_stack.
+
+    Parameter add_all_to_frame : memory_stack -> list Z -> memory_stack.
+
+    Parameter allocate_undef_bytes_size : memory -> Z -> AllocationId -> N -> N -> dtyp -> ErrSID (memory * list Z).
+
+    Parameter allocate_undef_bytes : memory -> Z -> AllocationId -> dtyp -> ErrSID (memory * list Z).
+
+    (* TODO: make 'addr' nondeterministic, see issue #170 *)
+    Parameter allocate
+      : memory_stack -> dtyp -> ErrSID (memory_stack * addr)
+    .
+
+    Parameter read : memory_stack -> addr -> dtyp -> err uvalue.
+
+    Parameter write : memory_stack -> addr -> uvalue -> dtyp -> ErrSID memory_stack.
+
+    (* Test whether a given address belong to the current main frame,
+       and hence if it will be collected when the current function returns
+     *)
+    Parameter in_frame : addr -> memory_stack -> Prop.
+
+    Parameter ext_memory : memory_stack -> addr -> dtyp -> uvalue -> memory_stack -> Prop.
+
+    Parameter same_reads : memory_stack -> memory_stack -> Prop.
+
+    Parameter allocate_spec : memory_stack -> dtyp -> memory_stack -> addr -> Prop.
+
+    Record write_spec (m1 : memory_stack) (a : addr) (v : dvalue) (m2 : memory_stack) : Prop :=
+      {
+      was_allocated : allocated a m1;
+      is_written    : forall τ, is_supported τ ->
+                           dvalue_has_dtyp v τ ->
+                           ext_memory m1 a τ (dvalue_to_uvalue v) m2
+      }.
+
+    Record read_spec (m : memory_stack) (a : addr) (τ : dtyp) (v : uvalue) : Prop :=
+      {
+      is_read : read m a τ = inr v
+      }.
+
+  End Memory_Stack_Operations.
+
+  Record MemState :=
+    mkMemState
+      { ms_memory_stack : memory_stack;
+        ms_sid : store_id;
+        ms_prov : Provenance
+      }.
+
+  Definition emptyMemState : MemState :=
+    mkMemState empty_memory_stack 0%N initial_provenance.
+
+  Definition MemStateT M := stateT MemState M.
+
+  Definition mem_state_lift_itree {E A} (t : itree E A) : MemStateT (itree E) A
+    := lift t.
+
+  Definition mem_state_raiseUB {E A} `{UBE -< E} (msg : string) : MemStateT (itree E) A
+    := mem_state_lift_itree (raiseUB msg).
+
+  Definition mem_state_raiseOOM {E A} `{OOME -< E} (msg : string) : MemStateT (itree E) A
+    := mem_state_lift_itree (raiseOOM msg).
+
+  Definition mem_state_raise {E A} `{FailureE -< E} (msg : string) : MemStateT (itree E) A
+    := mem_state_lift_itree (raise msg).
+
+  Definition mem_state_lift_err {E} `{FailureE -< E} {A} (e : err A) : MemStateT (itree E) A
+    := mem_state_lift_itree (lift_pure_err e).
+
+  Definition mem_state_get_sid {M} `{Monad M} : MemStateT M store_id
+    := fmap ms_sid MonadState.get.
+
+  Definition MemState_set_sid (sid : store_id) (ms : MemState) : MemState
+    := match ms with
+       | mkMemState ms_memory_stack ms_sid ms_prov =>
+         mkMemState ms_memory_stack sid ms_prov
+       end.
+
+  Definition MemState_set_prov (prov : Provenance) (ms : MemState) : MemState
+    := match ms with
+       | mkMemState ms_memory_stack ms_sid ms_prov =>
+         mkMemState ms_memory_stack ms_sid prov
+       end.
+
+  Definition MemState_set_memory_stack (m : memory_stack) (ms : MemState) : MemState
+    := match ms with
+       | mkMemState ms_memory_stack ms_sid ms_prov =>
+         mkMemState m ms_sid ms_prov
+       end.
+
+  Definition mem_state_put_sid {M} `{Monad M} (sid : store_id) : MemStateT M unit
+    := modify (MemState_set_sid sid);; ret tt.
+
+  Definition mem_state_put_prov {M} `{Monad M} (prov : Provenance) : MemStateT M unit
+    := modify (MemState_set_prov prov);; ret tt.
+
+  Definition mem_state_put_memory_stack {M} `{Monad M} (m : memory_stack) : MemStateT M unit
+    := modify (MemState_set_memory_stack m);; ret tt.
+
+  Definition mem_state_get_prov {M} `{Monad M} : MemStateT M Provenance
+    := fmap ms_prov MonadState.get.
+
+  Definition mem_state_get_memory_stack {M} `{Monad M} : MemStateT M memory_stack
+    := fmap ms_memory_stack MonadState.get.
+
+  Definition MemState_modify_memory_stack {M} `{Monad M} (f : memory_stack -> memory_stack) (ms : MemState) : MemState
+    := match ms with
+       | mkMemState ms_memory_stack ms_sid ms_prov =>
+         mkMemState (f ms_memory_stack) ms_sid ms_prov
+       end.
+
+  Definition mem_state_modify_memory_stack {M} `{Monad M} (f : memory_stack -> memory_stack) : MemStateT M unit
+    := modify (MemState_modify_memory_stack f);; ret tt.
+
+  Definition mem_state_lift_ErrSID {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A} (e : ErrSID A) : MemStateT (itree E) A
+    :=
+      sid <- mem_state_get_sid;;
+      pr <-  mem_state_get_prov;;
+      match runErrSID e sid pr with
+      | (inl (OOM_message msg), sid, pr) =>
+          mem_state_raiseOOM msg
+      | (inr (inl (UB_message msg)), sid, pr) =>
+        mem_state_raiseUB msg
+      | (inr (inr (inl (ERR_message msg))), sid, pr) =>
+        mem_state_raise msg
+      | (inr (inr (inr x)), sid, pr) =>
+        mem_state_put_sid sid;;
+        mem_state_put_prov pr;;
+        ret x
+      end.
+
+  Definition mem_state_lift_err_ub_oom {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A} (e : err_ub_oom A) : MemStateT (itree E) A
+    := match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM e)))) with
+       | inl (OOM_message oom) => mem_state_raiseOOM oom
+       | inr (inl (UB_message ub)) => mem_state_raiseUB ub
+       | inr (inr (inl (ERR_message err))) => mem_state_raise err
+       | inr (inr (inr x)) => ret x
+       end.
+
+      Fixpoint uvalue_to_string (u : uvalue) : string
+        := match u with
+           | UVALUE_Addr a => "UVALUE_Addr"
+           | UVALUE_I1 x => "UVALUE_I1"
+           | UVALUE_I8 x => "UVALUE_I8"
+           | UVALUE_I32 x => "UVALUE_I32"
+           | UVALUE_I64 x => "UVALUE_I64"
+           | UVALUE_IPTR x => "UVALUE_IPTR"
+           | UVALUE_Double x => "UVALUE_Double"
+           | UVALUE_Float x => "UVALUE_Float"
+           | UVALUE_Undef t => "UVALUE_Undef"
+           | UVALUE_Poison t => "UVALUE_Poison"
+           | UVALUE_None => "UVALUE_None"
+           | UVALUE_Struct fields => "UVALUE_Struct"
+           | UVALUE_Packed_struct fields => "UVALUE_Packed_struct"
+           | UVALUE_Array elts => "UVALUE_Array"
+           | UVALUE_Vector elts => "UVALUE_Vector"
+           | UVALUE_IBinop iop v1 v2 => "UVALUE_IBinop"
+           | UVALUE_ICmp cmp v1 v2 => "UVALUE_ICmp"
+           | UVALUE_FBinop fop fm v1 v2 => "UVALUE_FBinop"
+           | UVALUE_FCmp cmp v1 v2 => "UVALUE_FCmp"
+           | UVALUE_Conversion conv t_from v t_to => "UVALUE_Conversion"
+           | UVALUE_GetElementPtr t ptrval idxs => "UVALUE_GetElementPtr"
+           | UVALUE_ExtractElement vec idx => "UVALUE_ExtractElement"
+           | UVALUE_InsertElement vec elt idx => "UVALUE_InsertElement"
+           | UVALUE_ShuffleVector vec1 vec2 idxmask => "UVALUE_ShuffleVector"
+           | UVALUE_ExtractValue vec idxs => "UVALUE_ExtractValue"
+           | UVALUE_InsertValue vec elt idxs => "UVALUE_InsertValue"
+           | UVALUE_Select cnd v1 v2 => "UVALUE_Select"
+           | UVALUE_ExtractByte uv dt idx sid => "UVALUE_ExtractByte " ++ uvalue_to_string uv ++ " typ " ++ uvalue_to_string idx ++ " " ++ Show.show sid
+           | UVALUE_ConcatBytes uvs dt => "UVALUE_ConcatBytes " ++ Show.show (map uvalue_to_string uvs)
+           end.
+
+
+  (** ** Memory Handler
+      Implementation of the memory model per se as a memory handler to the [MemoryE] interface.
+   *)
+  Definition handle_memory {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : MemoryE ~> MemStateT (itree E) :=
+    fun T e =>
+      match e with
+      | MemPush =>
+        mem_state_modify_memory_stack push_fresh_frame;;
+        ret tt
+
+      | MemPop =>
+        m <- mem_state_get_memory_stack;;
+        'm' <- mem_state_lift_err (free_frame m);;
+        mem_state_put_memory_stack m';;
+        ret tt
+
+      | Alloca t =>
+        m <- mem_state_get_memory_stack;;
+        '(m',a) <- mem_state_lift_ErrSID (allocate m t);;
+        mem_state_put_memory_stack m';;
+        ret (DVALUE_Addr a)
+
+      | Load t dv =>
+         match dv with
+         | DVALUE_Addr ptr =>
+           m <- mem_state_get_memory_stack;;
+           match read m ptr t with
+           | inr v => ret v
+           | inl s => mem_state_raiseUB s
+           end
+        | _ => mem_state_raise "Attempting to load from a non-address dvalue"
+        end
+
+      | Store dt da v =>
+        m <- mem_state_get_memory_stack;;
+        match da with
+        | DVALUE_Addr ptr =>
+          'm' <- mem_state_lift_ErrSID (write m ptr v dt);;
+          mem_state_put_memory_stack m';;
+          ret tt
+        | _ => mem_state_raise ("Attempting to store to a non-address dvalue: " ++ (to_string da))
+        end
+
+      | GEP dt ua uvs =>
+        match (dvs <- map_monad uvalue_to_dvalue uvs;; da <- uvalue_to_dvalue ua;; ret (da, dvs)) with
+        | inr (da, dvs) =>
+          (* If everything is well defined, just use handle_gep... *)
+          a' <- mem_state_lift_err (handle_gep dt da dvs);;
+          ret (dvalue_to_uvalue a')
+        | inl _ =>
+          (* Otherwise build a UVALUE_GEP *)
+          ret (UVALUE_GetElementPtr dt ua uvs)
+        end
+
+      | ItoP t_from x =>
+        (* TODO: should this take signedness into account...? *)
+        match x with
+        | UVALUE_I64 i
+        | UVALUE_I32 i
+        | UVALUE_I8  i
+        | UVALUE_I1  i =>
+          ret (UVALUE_Addr (int_to_ptr (unsigned i) wildcard_prov))
+        | UVALUE_IPTR i =>
+          ret (UVALUE_Addr (int_to_ptr (IP.to_unsigned i) wildcard_prov))
+        | _ => ret (UVALUE_Conversion Inttoptr t_from x DTYPE_Pointer)
+        end
+
+      | PtoI t a =>
+        match a, t with
+        | UVALUE_Addr ptr, DTYPE_I sz =>
+          let addr := coerce_integer_to_int (Some sz) (ptr_to_int ptr) in
+          addr' <- mem_state_lift_err_ub_oom addr;;
+          ret (dvalue_to_uvalue addr')
+        | UVALUE_Addr ptr, DTYPE_IPTR =>
+            match IP.from_Z (ptr_to_int ptr) with
+            | Oom msg => mem_state_raiseOOM msg
+            | NoOom addr =>
+                ret (UVALUE_IPTR addr)
+            end
+        | _, _ =>
+          ret (UVALUE_Conversion Ptrtoint DTYPE_Pointer a t)
+        end
+      end.
+
+  Definition handle_intrinsic {E} `{FailureE -< E} `{PickE -< E} `{UBE -< E} : IntrinsicE ~> MemStateT (itree E) :=
+    fun T e =>
+      match e with
+      | Intrinsic t name args =>
+        (* Pick all arguments, they should all be unique. *)
+        if string_dec name "llvm.memcpy.p0i8.p0i8.i32" then  (* FIXME: use reldec typeclass? *)
+          '(m, s) <- mem_state_get_memory_stack;;
+          match handle_memcpy args m with
+          | inl err => mem_state_raiseUB err
+          | inr m' =>
+            mem_state_put_memory_stack (m', s);;
+            ret DVALUE_None
+          end
+        else
+          mem_state_raise ("Unknown intrinsic: " ++ name)
+      end.
+
+  Section PARAMS.
+    Variable (E F G : Type -> Type).
+    Context `{FailureE -< F} `{UBE -< F} `{PickE -< F} `{OOME -< F}.
+    Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
+    Notation Effout := (E +' F).
+
+    Definition E_trigger : forall R, E R -> (MemStateT (itree Effout) R) :=
+      fun R e => mem_state_lift_itree (trigger e).
+
+    Definition F_trigger : forall R, F R -> (MemStateT (itree Effout) R) :=
+      fun R e => mem_state_lift_itree (trigger e).
+
+    Definition interp_memory_h := case_ E_trigger (case_ handle_intrinsic  (case_ handle_memory F_trigger)).
+
+    Definition interp_memory :
+      itree Effin ~> MemStateT (itree Effout) :=
+      interp_state interp_memory_h.
+
+  End PARAMS.
+
+End FinMemory.
+
+
 Module Make(Addr : MemoryAddress.ADDRESS)(IP : MemoryAddress.INTPTR)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(IP)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(IP)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(IP)(SIZE)(LLVMEvents)).
   Import LLVMEvents.
   Import DV.
@@ -733,41 +1499,6 @@ Module Make(Addr : MemoryAddress.ADDRESS)(IP : MemoryAddress.INTPTR)(SIZE:Sizeof
     (* Definition fp_alignment (bits : N) : option Alignment := *)
     (*   let fp_map := dl_floating_point_alignments datalayout *)
     (*   in NM.find bits fp_map. *)
-
-    Definition option_pick_large {A} (leq : A -> A -> bool) (a b : option A) : option A
-      := match a, b with
-         | Some x, Some y =>
-           if leq x y then b else a
-         | Some a, _      => Some a
-         | _, Some b      => Some b
-         | None, None     => None
-         end.
-
-    Definition option_pick_small {A} (leq : A -> A -> bool) (a b : option A) : option A
-      := match a, b with
-         | Some x, Some y =>
-           if leq x y then a else b
-         | Some a, _      => Some a
-         | _, Some b      => Some b
-         | None, None     => None
-         end.
-
-    Definition maximumBy {A} (leq : A -> A -> bool) (def : A) (l : list A) : A :=
-      fold_left (fun a b => if leq a b then b else a) l def.
-
-    Definition maximumByOpt {A} (leq : A -> A -> bool) (l : list A) : option A :=
-      fold_left (option_pick_large leq) (map Some l) None.
-
-    Definition nextLargest {A} (leq : A -> A -> bool) (n : A) (def : A) (l : list A) : A :=
-      fold_left (fun a b => if leq n a && leq a b then a else b) l def.
-
-    Definition nextOrMaximum {A} (leq : A -> A -> bool) (n : A) (def : A) (l : list A) : A :=
-      let max := maximumBy leq def l
-      in fold_left (fun a b => if leq n b && leq a b then a else b) l max.
-
-    Definition nextOrMaximumOpt {A} (leq : A -> A -> bool) (n : A) (l : list A) : option A :=
-      let max := maximumByOpt leq l
-      in fold_left (fun a b => if leq n b then option_pick_small leq a (Some b) else a) l max.
 
     (*  TODO: revive this *)
     (* Definition int_alignment (bits : N) : option Alignment := *)

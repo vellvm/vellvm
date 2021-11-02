@@ -440,3 +440,38 @@ Proof.
   intros X x xs f Hfx Hfxs.
   constructor; auto.
 Qed.
+
+Definition option_pick_large {A} (leq : A -> A -> bool) (a b : option A) : option A
+  := match a, b with
+     | Some x, Some y =>
+         if leq x y then b else a
+     | Some a, _      => Some a
+     | _, Some b      => Some b
+     | None, None     => None
+     end.
+
+Definition option_pick_small {A} (leq : A -> A -> bool) (a b : option A) : option A
+  := match a, b with
+     | Some x, Some y =>
+         if leq x y then a else b
+     | Some a, _      => Some a
+     | _, Some b      => Some b
+     | None, None     => None
+     end.
+
+Definition maximumBy {A} (leq : A -> A -> bool) (def : A) (l : list A) : A :=
+  fold_left (fun a b => if leq a b then b else a) l def.
+
+Definition maximumByOpt {A} (leq : A -> A -> bool) (l : list A) : option A :=
+  fold_left (option_pick_large leq) (map Some l) None.
+
+Definition nextLargest {A} (leq : A -> A -> bool) (n : A) (def : A) (l : list A) : A :=
+  fold_left (fun a b => if leq n a && leq a b then a else b)%bool l def.
+
+Definition nextOrMaximum {A} (leq : A -> A -> bool) (n : A) (def : A) (l : list A) : A :=
+  let max := maximumBy leq def l
+  in fold_left (fun a b => if leq n b && leq a b then a else b)%bool l max.
+
+Definition nextOrMaximumOpt {A} (leq : A -> A -> bool) (n : A) (l : list A) : option A :=
+  let max := maximumByOpt leq l
+  in fold_left (fun a b => if leq n b then option_pick_small leq a (Some b) else a) l max.

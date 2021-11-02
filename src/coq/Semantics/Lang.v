@@ -2,6 +2,7 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Semantics.Memory.MemBytes
+     Semantics.LLVMParams
      Semantics.GepM
      Semantics.LLVMEvents
      Semantics.Denotation
@@ -15,7 +16,9 @@ From Vellvm Require Import
      Handlers.FiniteMemory
      Handlers.FiniteMemoryTheory.
 
-Module Type Lang (ADDR : ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV).
+Module Type Lang (LP: LLVMParams).
+  Import LP.
+
   (* Events *)
   Declare Module Events : LLVMEvents.LLVM_INTERACTIONS ADDR IP SIZEOF.
 
@@ -45,7 +48,9 @@ Module Type Lang (ADDR : ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (PTOI : PTOI A
          MEM MEMORY_THEORY UndefinedBehaviour SER D.
 End Lang.
 
-Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV) <: Lang ADDR IP SIZEOF PTOI PROV ITOP.
+Module Make (LP : LLVMParams) <: Lang LP.
+  Import LP.
+
   (* Events *)
   Module Events := LLVMEvents.Make ADDR IP SIZEOF.
 
@@ -74,4 +79,3 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (PTOI : PTOI ADDR) 
   Export Events Events.DV Global Local Stack Pick Intrinsics
          MEM MEMORY_THEORY UndefinedBehaviour SER D.
 End Make.
-

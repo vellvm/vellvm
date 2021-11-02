@@ -12,7 +12,8 @@ From Vellvm Require Import
      Semantics.Denotation
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
-     Semantics.Lang.
+     Semantics.Lang
+     Semantics.LLVMParams.
 
 From Vellvm.Handlers Require Export
      Global
@@ -28,15 +29,18 @@ From Vellvm.Handlers Require Export
 
 (* end hide *)
 
-Module Type InterpreterStack (ADDR : ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV) (LLVM : Lang ADDR IP SIZEOF PTOI PROV ITOP).
-  Import LLVM.Events.
-  Import LLVM.Intrinsics.
-  Import LLVM.MEM.
-  Import LLVM.Pick.
-  Import LLVM.Global.
-  Import LLVM.Local.
-  Import LLVM.Stack.
-  Import LLVM.D.
+Module Type InterpreterStack.
+  Declare Module LP : LLVMParams.
+  Module LLVM := Lang.Make LP.
+
+  Export LLVM.Events.
+  Export LLVM.Intrinsics.
+  Export LLVM.MEM.
+  Export LLVM.Pick.
+  Export LLVM.Global.
+  Export LLVM.Local.
+  Export LLVM.Stack.
+  Export LLVM.D.
 
   Section InterpreterMCFG.
 
@@ -244,15 +248,20 @@ Module Type InterpreterStack (ADDR : ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (P
 End InterpreterStack.
 
 
-Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZEOF : Sizeof) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV) (LLVM : Lang ADDR IP SIZEOF PTOI PROV ITOP) : InterpreterStack ADDR IP SIZEOF PTOI PROV ITOP LLVM.
-  Import LLVM.Events.
-  Import LLVM.Intrinsics.
-  Import LLVM.MEM.
-  Import LLVM.Pick.
-  Import LLVM.Global.
-  Import LLVM.Local.
-  Import LLVM.Stack.
-  Import LLVM.D.
+Module Make (LP' : LLVMParams) : InterpreterStack.
+  Module LP := LP'.
+  Export LP.
+
+  Module LLVM := Lang.Make LP.
+
+  Export LLVM.Events.
+  Export LLVM.Intrinsics.
+  Export LLVM.MEM.
+  Export LLVM.Pick.
+  Export LLVM.Global.
+  Export LLVM.Local.
+  Export LLVM.Stack.
+  Export LLVM.D.
 
   
   Section InterpreterMCFG.
