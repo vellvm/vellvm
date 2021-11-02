@@ -22,11 +22,6 @@ From Vellvm Require Import
      Tactics
      SymbolicInterpreter.
 
-(* From ExtLib Require Import *)
-(*      Structures.Monads *)
-(*      Data.Monads.EitherMonad. *)
-(* Import MonadNotation. *)
-
 
 From Imp2Vir Require Import Utils CFG_Combinators.
 
@@ -37,7 +32,7 @@ Notation texp := (texp typ).
 Definition denote_cfg g from to := denote_ocfg (conv g) (from,to).
 
 
-(* Tactics *)
+(** Tactics *)
 Lemma denote_void_block : forall bid target src com,
     denote_block
        {|
@@ -143,11 +138,55 @@ Ltac step_singleton_in :=
                  blk_comments := comm
                  |})
              ; [| cbn; rewrite eqv_dec_p_refl; reflexivity ]
-             ; rewrite denote_void_block_conv
+             ; try (rewrite denote_void_block_conv)
              ; try (rewrite bind_bind)
              ; try (rewrite bind_ret_l)
   end.
 
+(* tactics for convert_typ *)
+(* repeat ( *)
+(*       match goal with *)
+(*       | h:context[wf_ocfg_bid _] |- _ => apply wf_ocfg_bid_convert_typ *)
+(*           with (env := []) in h *)
+(*       | h:context[free_in_cfg _ _] |- _ => apply free_in_convert_typ with (env := []) *)
+(*           in h *)
+(*       end). *)
+
+
+
+Lemma find_block_some_conv :
+  forall g bid bk,
+    find_block g bid = Some bk <->
+    find_block (conv g) bid = Some (conv bk).
+Proof.
+  intros.
+  assert ( Hconv: blk_id (conv bk) = blk_id bk ) by apply blk_id_convert_typ.
+Admitted.
+
+Lemma find_block_none_conv :
+  forall g bid,
+    find_block g bid = None <->
+    find_block (conv g) bid = None.
+Admitted.
+
+
+Lemma no_reentrance_conv :
+  forall g1 g2,
+    no_reentrance g1 g2 <-> no_reentrance (conv g1) (conv g2).
+Proof.
+  intros.
+Admitted.
+
+Lemma independent_flows_conv :
+  forall g1 g2,
+    independent_flows g1 g2 <-> independent_flows (conv g1) (conv g2).
+Proof.
+  intros.
+Admitted.
+
+
+
+(** Denotation Combinators *)
 
 
 Lemma denote_cfg_block : forall (c : code) (input output : block_id) from,
@@ -211,12 +250,24 @@ Proof.
   setoid_rewrite translate_ret.
   setoid_rewrite bind_ret_l ; reflexivity.
 Qed.
+Ltac find_block_conv :=
+  match goal with
+  | h:context[ find_block _ _ = None ] |- _ =>
+      apply find_block_none_conv in h
+  | h:context[ find_block _ _ = Some _ ] |- _ =>
+      apply find_block_some_conv in h
+  end.
+
 
 Lemma denote_cfg_branch :
   forall (cond : texp) (gT gF : ocfg) (input inT inF from input : block_id),
     input <> inT ->
     input <> inF ->
-    no_reentrance (conv gT) (conv gF) ->
+    free_in_cfg gF inT ->
+    free_in_cfg gT inF ->
+    independent_flows gT gF ->
+    ~ In input (outputs gT) ->
+    ~ In input (outputs gF) ->
     eutt eq
          (denote_cfg (cfg_branch cond gT gF input inT inF) from input)
          (let (dt,e) := texp_break cond in
@@ -228,27 +279,37 @@ Lemma denote_cfg_branch :
               if equ comparison_bit Int1.one then
                  denote_cfg gT input inT
               else
-                 denote_cfg gT input inF
+                 denote_cfg gF input inF
           | DVALUE_Poison => raiseUB "Branching on poison."
           | _ => raise "Br got non-bool value"
           end).
 Proof.
   intros.
   unfold cfg_branch, denote_cfg.
-  From Vellvm Require Import Theory.
   rewrite (convert_typ_list_app _ (gT++gF) _).
   rewrite denote_ocfg_app.
+  2: {
+     unfold no_reentrance ; simpl.
+     rewrite convert_typ_outputs.
+     unfold endo, Endo_id.
+     rewrite Util.list_disjoint_singleton_right.
+     unfold not in *.
+     intro.
+     match goal with
+        | h:context[In _ (outputs (_++_))] |- _ =>
+     rewrite outputs_app in h ; apply in_app_or in h
+        end.
+     intuition.
+     }
   rewrite denote_ocfg_unfold_in with
     (bk := conv {|
                  blk_id := input0;
                   blk_phis := [];
-                   blk_code := [];
-                    blk_term := TERM_Br cond inT inF;
-                     blk_comments := None
+                  blk_code := [];
+                  blk_term := TERM_Br cond inT inF;
+                  blk_comments := None
               |}).
-  2: {
-     simpl. rewrite eqv_dec_p_refl. reflexivity.
-  }
+  2: {simpl; rewrite eqv_dec_p_refl; reflexivity.}
   setoid_rewrite denote_block_unfold.
   simpl.
   rewrite denote_no_phis.
@@ -272,25 +333,48 @@ Proof.
   repeat (rewrite bind_bind).
   rewrite eutt_eq_bind ; [reflexivity|].
   intros ; simpl.
-  destruct u0 ;
-    try (rewrite exp_to_instr_raise ; admit) ;
-    try (rewrite exp_to_instr_raiseUB ; admit).
-  destruct (Int1.eq x Int1.one) ;
-    rewrite translate_ret ;
-    rewrite bind_ret_l.
-  - (* Side True*)
-    rewrite Util.list_cons_app.
-    rewrite denote_ocfg_unfold_not_in.
-    2: { rewrite app_nil_r ; now rewrite <- find_block_none_singleton. }
-    rewrite bind_ret_l.
-    rewrite convert_typ_list_app.
-    rewrite denote_ocfg_app ; try assumption.
-    assert (HinT : In inT (inputs gT) \/ ~ In inT (inputs gT))
-      by (apply Classical_Prop.classic).
-    destruct HinT as [ HinT | HinT ].
-    + (* inT is in gT *) admit.
-    + (* inT is not in gT *)
-Admitted.
+  destruct u0 eqn:U0 ;
+    try (
+        try (rewrite exp_to_instr_raise; unfold raise) ;
+        try (rewrite exp_to_instr_raiseUB; unfold raiseUB) ;
+rewrite bind_bind;
+rewrite eutt_eq_bind ; [reflexivity|] ;
+intros ; simpl ;
+flatten_goal ).
+  assert ( no_reentrance (conv gT) (conv gF) ) by
+  (now apply no_reentrance_conv, independent_flows_no_reentrance_l).
+  - destruct (Int1.eq x Int1.one);
+      rewrite translate_ret ;
+      rewrite bind_ret_l;
+      unfold endo, Endo_id ;
+      step_singleton_not_in ;
+      rewrite bind_ret_l ;
+      rewrite convert_typ_list_app ;
+      rewrite denote_ocfg_app ; try assumption.
+    + (* Side inT *)
+      match goal with
+         | h:context[independent_flows _ _] |- _ =>
+             apply independent_flows_conv in h
+      end.
+      assert (HinT : In inT (inputs gT) \/ ~ In inT (inputs gT))
+        by (apply Classical_Prop.classic).
+      destruct HinT as [ HinT | HinT ].
+      * rewrite <- denote_ocfg_app ; try assumption.
+        apply denote_ocfg_flow_left ; try (assumption).
+        simpl ; now rewrite convert_typ_inputs.
+      * apply find_block_not_in_inputs in HinT.
+        find_block_conv.
+        rewrite denote_ocfg_unfold_not_in ; [|assumption].
+        rewrite bind_ret_l.
+        rewrite denote_ocfg_unfold_not_in ;
+          [| now apply find_block_free_id, free_in_convert_typ].
+        rewrite denote_ocfg_unfold_not_in ; [| assumption].
+        reflexivity.
+    + (* Side inF *)
+      rewrite denote_ocfg_unfold_not_in;
+        [| now apply find_block_free_id, free_in_convert_typ ].
+      now rewrite bind_ret_l.
+Qed.
 
 
 Lemma denote_cfg_while_loop : Prop.
@@ -307,9 +391,6 @@ Lemma no_reentrance_convert_typ:
     no_reentrance g1 g2 -> no_reentrance (convert_typ env g1) (convert_typ env g2).
 Admitted.
 
-
-(* CF monad Either *)
-(* CF vred_C3*)
 Lemma denote_cfg_join : forall (g : ocfg) (output out1 out2 : block_id) from to,
     free_in_cfg g output ->
     output <> out1 ->
@@ -371,15 +452,6 @@ Qed.
 
 
 
-
-(* tactics for convert_typ *)
-(* repeat ( *)
-(*       match goal with *)
-(*       | h:context[wf_ocfg_bid _] |- _ => apply wf_ocfg_bid_convert_typ *)
-(*           with (env := []) in h *)
-(*       | h:context[free_in_cfg _ _] |- _ => apply free_in_convert_typ with (env := []) *)
-(*           in h *)
-(*       end). *)
 
 
 (* - to ∈ input
