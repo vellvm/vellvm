@@ -72,6 +72,112 @@ Proof.
 Qed.
 
 (** WF properties *)
-(* TODO *)
+
+Lemma wf_cfg_block :
+  forall c input output,
+    wf_ocfg_bid (cfg_block c input output).
+Proof.
+  intros.
+  unfold wf_ocfg_bid ; simpl.
+  apply List_norepet_singleton.
+Qed.
+
+Lemma wf_cfg_ret :
+  forall c e input,
+    wf_ocfg_bid (cfg_ret c e input).
+Proof.
+  intros.
+  unfold wf_ocfg_bid ; simpl.
+  apply List_norepet_singleton.
+Qed.
+Lemma wf_cfg_seq :
+  forall g1 g2 out1 in2,
+    wf_ocfg_bid g1 ->
+    wf_ocfg_bid g2 ->
+    no_duplicate_bid g1 g2 ->
+    free_in_cfg g1 out1 ->
+    free_in_cfg g2 out1 ->
+    wf_ocfg_bid (cfg_seq g1 g2 out1 in2).
+Proof.
+  intros * WF_G1 WF_G2 SEP_G1_G2 FREE_G1_OUT1 FREE_G2_OUT1.
+  unfold cfg_seq, wf_ocfg_bid.
+  unfold free_in_cfg in *.
+  rewrite 2 inputs_app ; simpl.
+  rewrite Util.list_cons_app.
+  rewrite Coqlib.list_norepet_app ; intuition.
+  - rewrite Coqlib.list_norepet_app ; intuition.
+    apply List_norepet_singleton.
+    unfold Coqlib.list_disjoint.
+    intros * Hsing contra ?; subst.
+    apply In_singleton in Hsing ; subst.
+    now apply FREE_G2_OUT1 in contra.
+  - unfold Coqlib.list_disjoint.
+    intros * H contra ?; subst.
+    apply in_app_or in contra.
+    destruct contra as [ Hsing | contra0 ].
+    + apply In_singleton in Hsing ; subst ; now apply FREE_G1_OUT1 in H.
+    + unfold no_duplicate_bid,Coqlib.list_disjoint in SEP_G1_G2.
+      now apply (SEP_G1_G2 y y) in H.
+Qed.
+
+Lemma wf_cfg_join :
+  forall output out1 out2 g,
+    out1 <> out2 ->
+    free_in_cfg g out1 ->
+    free_in_cfg g out2 ->
+    wf_ocfg_bid g ->
+    wf_ocfg_bid (cfg_join g output out1 out2).
+Proof.
+  intros * SEP_OUTS FREE_G_OUT1 FREE_G_OUT2 WF_G.
+  unfold cfg_join, wf_ocfg_bid.
+  rewrite inputs_app ; simpl.
+  apply Coqlib.list_norepet_append ; try assumption.
+  apply Coqlib.list_norepet_cons.
+  - intro contra ; apply In_singleton in contra ; now subst.
+  - apply List_norepet_singleton.
+  - repeat (apply Coqlib.list_disjoint_cons_r ; [|assumption]).
+    apply Util.list_disjoint_nil_r.
+Qed.
+
+
+Lemma wf_cfg_branch :
+  forall cond gT gF input inT inF,
+    wf_ocfg_bid gT ->
+    wf_ocfg_bid gF ->
+    no_duplicate_bid gT gF ->
+    free_in_cfg gT input ->
+    free_in_cfg gF input ->
+    wf_ocfg_bid (cfg_branch cond gT gF input inT inF).
+Proof.
+  intros * WF_GT WF_GF SEP_GT_GF FREE_GT_INPUT FREE_GF_INPUT.
+  unfold cfg_branch, wf_ocfg_bid.
+  repeat (rewrite inputs_app ; simpl).
+  apply Coqlib.list_norepet_cons.
+  - intro contra; apply in_app_or in contra ; intuition.
+  - apply Coqlib.list_norepet_append; assumption.
+Qed.
+
+Lemma wf_cfg_while_loop:
+  forall code_expr cond body input inB output outB,
+    input <> outB ->
+    free_in_cfg body input ->
+    free_in_cfg body outB ->
+    wf_ocfg_bid body ->
+    wf_ocfg_bid (cfg_while_loop code_expr cond body input inB output outB).
+Proof.
+  intros * NEQ_INPUT_OUTB FREE_BODY_INPUT FREE_BODY_OUTB WF_BODY.
+  unfold cfg_while_loop, wf_ocfg_bid.
+  repeat (rewrite inputs_app ; simpl).
+  apply Coqlib.list_norepet_cons.
+  - intro contra; apply in_app_or in contra ; intuition.
+    apply In_singleton in H ; now subst.
+  - apply Coqlib.list_norepet_append.
+    + assumption.
+    + apply List_norepet_singleton.
+    + repeat (apply Coqlib.list_disjoint_cons_r ; [|assumption]).
+      apply Util.list_disjoint_nil_r.
+Qed.
+
+
 
 End CFG_Combinators.

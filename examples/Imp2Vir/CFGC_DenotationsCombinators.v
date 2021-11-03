@@ -486,7 +486,7 @@ Proof.
      split; auto.
      unfold no_reentrance; cbn.
       apply Util.list_disjoint_singleton_left
-      ; now fold (free_in_cfg g1 in2).}
+      ; now fold (free_in_cfg g1 in2). }
   (* denote g1 in both case *)
   rewrite eutt_eq_bind ; [simpl; reflexivity|].
   intros ; simpl.

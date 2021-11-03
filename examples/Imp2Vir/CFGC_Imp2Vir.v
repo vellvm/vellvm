@@ -14,7 +14,7 @@ From Vellvm Require Import
      SurfaceSyntax .
 Import VIR_Notations.
 
-From Imp2Vir Require Import Imp CompileExpr CFG_Combinators.
+From Imp2Vir Require Import Imp CompileExpr CFGC_Combinators.
 
 
 Section Imp2Vir.
@@ -162,6 +162,43 @@ Compute fact_ir.
 
 
 
+(** WF compiler *)
+From Vellvm Require Import Utils.Tactics.
+
+Theorem wf_compiler_aux : forall s reg label env input output cfg nreg nlabel nenv ,
+  compile_imp reg label s env =
+      Some (nreg, nlabel, nenv, (cfg,input,output)) -> wf_ocfg_bid cfg.
+Proof.
+  intros s.
+  induction s ; intros.
+  - (* Assign *)
+  cbn in H.
+  repeat flatten_all ;
+  inv H ; inv Heq ; inv Heq4 ;
+  apply wf_cfg_block.
+  - (* Seq *)
+    cbn in H; repeat flatten_all ; try discriminate ; inv H.
+    apply IHs1 in Heq.
+    apply IHs2 in Heq3.
+    apply wf_cfg_seq ; try assumption.
+    admit. admit. admit. (* I need an invariant on the compiler *)
+  - (* If *)
+    simpl in H. repeat (flatten_hyp H) ; try discriminate.
+    inv H.
+    apply wf_cfg_join ; try assumption.
+    admit. admit. admit. (* I need an invariant on the compiler *)
+    apply IHs1 in Heq1. apply IHs2 in Heq5.
+    apply wf_cfg_branch ; try assumption.
+    admit. admit. admit. (* I need an invariant on the compiler *)
+  - (* While *)
+    simpl in H; repeat flatten_all ; try discriminate ; inv H.
+    apply IHs in Heq1.
+    apply wf_cfg_while_loop ; try assumption.
+    admit. admit. admit. (* I need an invariant on the compiler *)
+  - (* Skip *)
+    cbn in H ; inv H ; apply wf_cfg_block.
+Admitted.
+
 
 
 (** Correctness compiler *)
@@ -169,7 +206,6 @@ Compute fact_ir.
 From Coq Require Import Lia.
 From ExtLib Require Import FMapAList.
 From Vellvm Require Import
-     Utils.Tactics
      Semantics
      Theory.
 Import SemNotations.
@@ -179,7 +215,7 @@ From ITree Require Import
      ITreeFacts.
 Import ITreeNotations.
 
-From Imp2Vir Require Import DenotationsCombinators.
+From Imp2Vir Require Import CFGC_DenotationsCombinators.
 
 (* Relation between Imp env and vellvm env *)
 

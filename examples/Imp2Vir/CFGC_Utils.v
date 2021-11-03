@@ -95,10 +95,12 @@ Qed.
 (* Misc lemmas on list *)
 
 Lemma In_singleton : forall {A} (x y : A),
-    In x [y] -> x=y.
+    In x [y] <-> x=y.
 Proof.
   intros.
+  split ; intro.
   cbn in H; intuition.
+  subst; apply in_eq.
 Qed.
 
 Lemma List_norepet_singleton : forall {A} (x : A),
