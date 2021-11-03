@@ -51,91 +51,7 @@ Open Scope string_scope.
    monad; and an executable one, that arbitrarily interpret under-defined values
    by setting its bits to 0.
  *)
-
 Module Type LLVMTopLevel (IS : InterpreterStack).
-  Export IS.
-
-  Import SemNotations.
-
-  (** * Initialization
-    The initialization phase allocates and initializes globals,
-    and allocates function pointers. This initialization phase is internalized
-    in [Vellvm], it is an [itree] as any other.
-   *)
-
-  Parameter allocate_global : global dtyp -> itree L0 unit.
-  Parameter allocate_globals : list (global dtyp) -> itree L0 unit.
-
-  (* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
-
-  (* Returns `true` only if both function are named and have the same name.  *)
-  Parameter function_name_eq : function_id -> function_id -> bool.
-
-  Parameter allocate_declaration : declaration dtyp -> itree L0 unit.
-  Parameter allocate_declarations : list (declaration dtyp) -> itree L0 unit.
-
-  Parameter initialize_global : global dtyp -> itree exp_E unit.
-  Parameter initialize_globals : list (global dtyp) -> itree exp_E unit.
-
-  Parameter build_global_environment : CFG.mcfg dtyp -> itree L0 unit.
-
-  Parameter function_env : Type.
-  Parameter address_one_function : definition dtyp (CFG.cfg dtyp) -> itree L0 (dvalue * function_denotation).
-
-  Notation res_L1 := (global_env * uvalue)%type.
-  Notation res_L2 := (local_env * lstack * res_L1)%type.
-  Notation res_L3 := (MemState * res_L2)%type.
-  Notation res_L4 := (MemState * (local_env * lstack * (global_env * uvalue)))%type.
-
-  (**
-     Full denotation of a Vellvm program as an interaction tree:
-     * initialize the global environment;
-     * point wise denote each function;
-     * retrieve the address of the entry point function;
-     * tie the mutually recursive know and run it starting from the 
-     * entry point
-     *
-     * This code should be semantically equivalent to running the following
-     * LLVM snippet after initializing the global configuration:
-     *
-     *  %ans = call ret_typ entry (args)
-     *  ret ret_typ %ans
-     *)
-  Parameter denote_vellvm :
-    dtyp ->
-    string ->
-    list uvalue ->
-    CFG.mcfg dtyp ->
-    itree L0 uvalue.
-
-  Parameter main_args : list uvalue.
-
-  Parameter denote_vellvm_main : CFG.mcfg dtyp -> itree L0 uvalue.
-
-  Parameter interpreter_gen :
-    dtyp ->
-    string ->
-    list uvalue ->
-    list (toplevel_entity typ (block typ * list (block typ))) ->
-    itree L6_exec res_L4.
-
-  Parameter interpreter :
-    list (toplevel_entity typ (block typ * list (block typ))) ->
-    itree L6_exec res_L4.
-
-  Parameter model_gen :
-    dtyp ->
-    string ->
-    list uvalue ->
-    list (toplevel_entity typ (block typ * list (block typ))) ->
-    PropT L6 (MemState * (local_env * lstack * (global_env * uvalue))).
-
-  Parameter model :
-    list (toplevel_entity typ (block typ * list (block typ))) ->
-    PropT L6 res_L4.
-End LLVMTopLevel.
-
-Module Make (IS : InterpreterStack) : LLVMTopLevel IS.
   Export IS.
   Export IS.LLVM.Events.
   Export IS.LLVM.D.
@@ -311,6 +227,11 @@ Module Make (IS : InterpreterStack) : LLVMTopLevel IS.
      Finally, the official model assumes no user-defined intrinsics.
    *)
   Definition model := model_gen (DTYPE_I 32%N) "main" main_args.
+End LLVMTopLevel.
+
+Module Make (IS : InterpreterStack) : LLVMTopLevel IS.
+  Include LLVMTopLevel IS.
 End Make.
 
 Module TopLevelBigIntptr := Make InterpreterStackBigIntptr.
+

@@ -12,7 +12,7 @@
 ;; open Driver
 ;; open Assert
 ;; open DynamicValues
-;; open Handlers.LLVMEvents
+;; open InterpretationStack.InterpreterStackBigIntptr.LLVM.Events
 
 (* Vellvm test cases -------------------------------------------------------- *)
 

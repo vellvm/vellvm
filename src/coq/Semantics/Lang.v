@@ -23,12 +23,11 @@ Module FMP (LP' : LLVMParams) (Events' : LLVM_INTERACTIONS LP'.ADDR LP'.IP LP'.S
   Module BYTE_IMPL := BYTE'.
 End FMP.
 
-
 Module Type Lang (LP: LLVMParams).
   Import LP.
 
   (* Events *)
-  Declare Module Events : LLVMEvents.LLVM_INTERACTIONS ADDR IP SIZEOF.
+  Module Events := LLVMEvents.Make ADDR IP SIZEOF.
 
   (* Handlers *)
   Module Global     := Global.Make ADDR IP SIZEOF Events.
@@ -38,7 +37,7 @@ Module Type Lang (LP: LLVMParams).
 
   (* Memory *)
   Module GEP  := GepM.Make ADDR IP SIZEOF Events PTOI PROV ITOP.
-  Declare Module Byte : ByteImpl ADDR IP SIZEOF Events.
+  Module Byte := FiniteMemory.FinByte ADDR IP SIZEOF Events.
 
   Module FMP := FMP LP Events GEP Byte.
 
@@ -46,7 +45,7 @@ Module Type Lang (LP: LLVMParams).
   Module Pick := Pick.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
 
   Module MEM  := FiniteMemory.Make LP Events FMP.
-  Declare Module MEMORY_THEORY : FiniteMemoryTheory.MEMORY_THEORY LP Events FMP MEM.
+  Module MEMORY_THEORY := FiniteMemoryTheory.Make LP Events FMP MEM.
 
   (* Serialization *)
   Module SER := Serialization.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.

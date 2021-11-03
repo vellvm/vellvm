@@ -946,8 +946,7 @@ Definition interp_from_prop {E F} T (RR: T -> T -> Prop) (h : E ~> PropT F) : Pr
       Pt t' /\
       (interp_prop (case_ h trigger_prop') _ RR t' t).
 
-Module DeterministicSingleton.
-  Declare Module IS : InterpreterStack.
+Module DeterministicSingleton (IS : InterpreterStack).
   Export IS.
 
   Lemma deterministic_is_singleton' : 

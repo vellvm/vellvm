@@ -1,5 +1,5 @@
 module LL = LLVMAst
-open Handlers.LLVMEvents
+open InterpretationStack.InterpreterStackBigIntptr.LLVM.Events
 open QCheck
 module Z = Camlcoq.Z
 module G = QCheck.Gen

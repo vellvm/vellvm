@@ -8,11 +8,11 @@
  *   3 of the License, or (at your option) any later version.                 *
  ---------------------------------------------------------------------------- *)
 
-open Handlers.MEMORY_THEORY.Mem
-open Handlers.Local
-open Handlers.Stack
-open Handlers.Global
-open Handlers.LLVMEvents
+open InterpretationStack.InterpreterStackBigIntptr.LLVM.MEM
+open InterpretationStack.InterpreterStackBigIntptr.LLVM.Local
+open InterpretationStack.InterpreterStackBigIntptr.LLVM.Stack
+open InterpretationStack.InterpreterStackBigIntptr.LLVM.Global
+open InterpretationStack.InterpreterStackBigIntptr.LLVM.Events
 
 open Format
 open ITreeDefinition
@@ -36,7 +36,7 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
   let pp_comma_space ppf () = pp_print_string ppf ", " in
   fun ppf ->
   function
-  | UVALUE_Addr   x -> pp_addr ppf x
+  | UVALUE_Addr   x -> fprintf ppf "UVALUE_Addr"
   | UVALUE_I1     x -> fprintf ppf "UVALUE_I1(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int1.unsigned x))
   | UVALUE_I8     x -> fprintf ppf "UVALUE_I8(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
   | UVALUE_I32    x -> fprintf ppf "UVALUE_I32(%d)" (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
@@ -117,4 +117,4 @@ let rec step (m : ('a coq_L6_exec, coq_MemState * ((local_env * lstack) * (globa
     tuple of a single block, and a possibly empty list of blocks.
  *)
 let interpret (prog:(LLVMAst.typ, (LLVMAst.typ LLVMAst.block * (LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.uvalue, string) result =
-  step (TopLevel.interpreter prog)
+  step (TopLevel.TopLevelBigIntptr.interpreter prog)
