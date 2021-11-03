@@ -5,7 +5,10 @@ From Coq Require Import
 Import ListNotations.
 
 From ExtLib Require Import Structures.Monads.
+(* From ExtLib Require Import Data.Monads.EitherMonad. *)
 Import MonadNotation.
+
+
 
 From ITree Require Import
      ITree
@@ -23,7 +26,7 @@ From Vellvm Require Import
      SymbolicInterpreter.
 
 
-From Imp2Vir Require Import Utils CFG_Combinators.
+From Imp2Vir Require Import CFGC_Utils CFGC_Combinators.
 
 Notation code := (code typ).
 Notation ocfg := (ocfg typ).
@@ -38,10 +41,9 @@ Lemma denote_void_block : forall bid target src com,
        {|
           blk_id := bid;
            blk_phis := [];
-            blk_code := [];
-             blk_term := TERM_Br_1 target;
-              blk_comments := com
-       |} src
+           blk_code := [];
+           blk_term := TERM_Br_1 target;
+           blk_comments := com |} src
        ≈ Ret (inl target).
 Proof.
   intros.
@@ -54,15 +56,13 @@ Proof.
 Qed.
 
 Lemma denote_void_block_conv : forall bid target src com,
-    denote_block (conv
-       {|
-          blk_id := bid;
-           blk_phis := [];
-            blk_code := [];
-             blk_term := TERM_Br_1 target;
-              blk_comments := com
-       |}) src
-                 ≈ Ret (inl target).
+    denote_block
+       (conv {| blk_id := bid;
+                 blk_phis := [];
+                 blk_code := [];
+                 blk_term := TERM_Br_1 target;
+                 blk_comments := com |}) src
+       ≈ Ret (inl target).
 Proof.
   intros.
   unfold conv.
@@ -79,14 +79,13 @@ Lemma denote_ocfg_singleton_not_in :
   forall bid phis code term comm from to,
     bid <> to ->
     denote_ocfg
-    (conv
-       [{|
-          blk_id := bid;
-          blk_phis := phis;
-          blk_code := code;
-          blk_term := term;
-          blk_comments := comm
-        |}]) (from, to) ≈ Ret (inl (from,to)).
+       (conv
+           [{| blk_id := bid;
+                blk_phis := phis;
+                blk_code := code;
+                blk_term := term;
+                blk_comments := comm
+            |}]) (from, to) ≈ Ret (inl (from,to)).
 Proof.
   intros.
   rewrite denote_ocfg_unfold_not_in.
@@ -97,46 +96,44 @@ Qed.
 Ltac step_singleton_not_in :=
   match goal with
   | h:context[ ?b1 <> ?b2 ] |-
-      context[ denote_ocfg (conv [{|
-          blk_id := ?b1;
-          blk_phis := _;
-          blk_code := _;
-          blk_term := _;
-          blk_comments := _
-        |}]) (_, ?b2)
-        ] => rewrite denote_ocfg_singleton_not_in ; [| assumption]
+      context[ denote_ocfg
+                  (conv [{| blk_id := ?b1;
+                          blk_phis := _;
+                          blk_code := _;
+                          blk_term := _;
+                          blk_comments := _ |}])
+                  (_, ?b2)] =>
+      rewrite denote_ocfg_singleton_not_in
+      ; [| assumption]
   | h:context[ ?b2 <> ?b1 ] |-
-      context[ denote_ocfg (conv [{|
-          blk_id := ?b1;
-          blk_phis := _;
-          blk_code := _;
-          blk_term := _;
-          blk_comments := _
-        |}]) (_, ?b2)
-        ] => rewrite denote_ocfg_singleton_not_in
-            ; [| now apply not_eq_sym ]
-            ; try (rewrite bind_ret_l)
-            ; try (reflexivity)
+      context[ denote_ocfg
+                  (conv [{| blk_id := ?b1;
+                          blk_phis := _;
+                          blk_code := _;
+                          blk_term := _;
+                          blk_comments := _ |}])
+                  (_, ?b2)] =>
+      rewrite denote_ocfg_singleton_not_in
+      ; [| now apply not_eq_sym ]
+      ; try (rewrite bind_ret_l)
+      ; try (reflexivity)
   end.
 
 Ltac step_singleton_in :=
   match goal with
-  |  |- context[ denote_ocfg (conv [{|
-          blk_id := ?b;
-          blk_phis := ?p;
-          blk_code := ?c;
-          blk_term := ?t;
-          blk_comments := ?comm
-        |}]) (_, ?b)
+  |  |- context[ denote_ocfg
+                   (conv [{| blk_id := ?b;
+                           blk_phis := ?p;
+                           blk_code := ?c;
+                           blk_term := ?t;
+                           blk_comments := ?comm |}])
+                   (_, ?b)
          ] => rewrite denote_ocfg_unfold_in with
-       (bk:=
-              conv {|
-                 blk_id := b;
-                 blk_phis := p;
-                 blk_code := c;
-                 blk_term := t;
-                 blk_comments := comm
-                 |})
+       (bk:= conv {| blk_id := b;
+                   blk_phis := p;
+                   blk_code := c;
+                   blk_term := t;
+                   blk_comments := comm |})
              ; [| cbn; rewrite eqv_dec_p_refl; reflexivity ]
              ; try (rewrite denote_void_block_conv)
              ; try (rewrite bind_bind)
@@ -167,6 +164,8 @@ Lemma find_block_none_conv :
   forall g bid,
     find_block g bid = None <->
     find_block (conv g) bid = None.
+Proof.
+  intros.
 Admitted.
 
 
@@ -175,14 +174,28 @@ Lemma no_reentrance_conv :
     no_reentrance g1 g2 <-> no_reentrance (conv g1) (conv g2).
 Proof.
   intros.
-Admitted.
+  unfold no_reentrance.
+  now rewrite convert_typ_outputs, convert_typ_inputs.
+Qed.
+
+Lemma no_duplicate_bid_conv :
+  forall g1 g2,
+    no_duplicate_bid g1 g2 <-> no_duplicate_bid (conv g1) (conv g2).
+Proof.
+  intros.
+  unfold no_duplicate_bid.
+  now rewrite 2 convert_typ_inputs.
+Qed.
 
 Lemma independent_flows_conv :
   forall g1 g2,
     independent_flows g1 g2 <-> independent_flows (conv g1) (conv g2).
 Proof.
   intros.
-Admitted.
+  unfold independent_flows.
+  rewrite <- 2 no_reentrance_conv.
+  now rewrite no_duplicate_bid_conv.
+Qed.
 
 
 
@@ -193,19 +206,17 @@ Lemma denote_cfg_block : forall (c : code) (input output : block_id) from,
     input <> output -> (* TODO should be a WF property of block *)
     eutt eq
          (denote_cfg (cfg_block c input output) from input)
-          (denote_code (conv c) ;; ret (inl (input,output))).
+         (denote_code (conv c) ;; ret (inl (input,output))).
 Proof.
   intros.
   unfold cfg_block, denote_cfg.
   setoid_rewrite denote_ocfg_unfold_in with
     (bk := (conv
-               {|
-                  blk_id := input;
+               {| blk_id := input;
                    blk_phis := [];
-                    blk_code := c;
-                     blk_term := TERM_Br_1 output;
-                      blk_comments := None
-               |})).
+                   blk_code := c;
+                   blk_term := TERM_Br_1 output;
+                   blk_comments := None |})).
   2: { cbn ; rewrite eqv_dec_p_refl ; reflexivity. }
   setoid_rewrite denote_block_unfold_cont.
   unfold Traversal.endo, Traversal.Endo_id ; simpl.
@@ -224,9 +235,9 @@ Lemma denote_cfg_ret : forall (c : code) (e : texp) (input : block_id) from,
     eutt eq
          (denote_cfg (cfg_ret c e input) from input)
          (let (t,e) := e in
-         denote_code (conv c) ;;
-         v <- translate exp_to_instr (denote_exp (Some (typ_to_dtyp [] t)) (conv e)) ;;
-         ret (inr v)).
+          denote_code (conv c) ;;
+          v <- translate exp_to_instr (denote_exp (Some (typ_to_dtyp [] t)) (conv e)) ;;
+          ret (inr v)).
 Proof.
   intros.
   unfold cfg_ret, denote_cfg.
@@ -272,8 +283,8 @@ Lemma denote_cfg_branch :
          (denote_cfg (cfg_branch cond gT gF input inT inF) from input)
          (let (dt,e) := texp_break cond in
           dv <- translate exp_to_instr (
-                            uv <-  (denote_exp (Some dt) e) ;;
-                            concretize_or_pick uv True) ;;
+                             uv <-  (denote_exp (Some dt) e) ;;
+                             concretize_or_pick uv True) ;;
           match dv with
           | DVALUE_I1 comparison_bit =>
               if equ comparison_bit Int1.one then
@@ -296,11 +307,11 @@ Proof.
      unfold not in *.
      intro.
      match goal with
-        | h:context[In _ (outputs (_++_))] |- _ =>
-     rewrite outputs_app in h ; apply in_app_or in h
-        end.
+     | h:context[In _ (outputs (_++_))] |- _ =>
+         rewrite outputs_app in h ; apply in_app_or in h
+     end.
      intuition.
-     }
+  }
   rewrite denote_ocfg_unfold_in with
     (bk := conv {|
                  blk_id := input0;
@@ -309,7 +320,7 @@ Proof.
                   blk_term := TERM_Br cond inT inF;
                   blk_comments := None
               |}).
-  2: {simpl; rewrite eqv_dec_p_refl; reflexivity.}
+  2: {simpl; rewrite eqv_dec_p_refl; reflexivity. }
   setoid_rewrite denote_block_unfold.
   simpl.
   rewrite denote_no_phis.
@@ -335,26 +346,26 @@ Proof.
   intros ; simpl.
   destruct u0 eqn:U0 ;
     try (
-        try (rewrite exp_to_instr_raise; unfold raise) ;
-        try (rewrite exp_to_instr_raiseUB; unfold raiseUB) ;
-rewrite bind_bind;
-rewrite eutt_eq_bind ; [reflexivity|] ;
-intros ; simpl ;
-flatten_goal ).
+          try (rewrite exp_to_instr_raise; unfold raise)
+          ; try (rewrite exp_to_instr_raiseUB; unfold raiseUB)
+          ; rewrite bind_bind
+          ; rewrite eutt_eq_bind ; [reflexivity|]
+          ; intros ; simpl
+          ; flatten_goal ).
   assert ( no_reentrance (conv gT) (conv gF) ) by
   (now apply no_reentrance_conv, independent_flows_no_reentrance_l).
-  - destruct (Int1.eq x Int1.one);
-      rewrite translate_ret ;
-      rewrite bind_ret_l;
-      unfold endo, Endo_id ;
-      step_singleton_not_in ;
-      rewrite bind_ret_l ;
-      rewrite convert_typ_list_app ;
-      rewrite denote_ocfg_app ; try assumption.
+  - destruct (Int1.eq x Int1.one)
+    ; rewrite translate_ret
+    ; rewrite bind_ret_l
+    ; unfold endo, Endo_id
+    ; step_singleton_not_in
+    ; rewrite bind_ret_l
+    ; rewrite convert_typ_list_app
+    ; rewrite denote_ocfg_app ; try assumption.
     + (* Side inT *)
       match goal with
-         | h:context[independent_flows _ _] |- _ =>
-             apply independent_flows_conv in h
+      | h:context[independent_flows _ _] |- _ =>
+          apply independent_flows_conv in h
       end.
       assert (HinT : In inT (inputs gT) \/ ~ In inT (inputs gT))
         by (apply Classical_Prop.classic).
@@ -376,20 +387,6 @@ flatten_goal ).
       now rewrite bind_ret_l.
 Qed.
 
-
-Lemma denote_cfg_while_loop : Prop.
-  refine (
-        forall expr_code cond body input inB output outB from,
-          eutt eq
-               (denote_cfg (cfg_while_loop expr_code cond body input inB output outB)
-                           from input)
-                _).
-Admitted.
-
-Lemma no_reentrance_convert_typ:
-  forall (env : list (ident * typ)) [g1 g2 : ocfg],
-    no_reentrance g1 g2 -> no_reentrance (convert_typ env g1) (convert_typ env g2).
-Admitted.
 
 Lemma denote_cfg_join : forall (g : ocfg) (output out1 out2 : block_id) from to,
     free_in_cfg g output ->
@@ -414,7 +411,7 @@ Proof.
   rewrite (convert_typ_list_app g _ []).
   rewrite denote_ocfg_app.
   2: {
-     apply no_reentrance_convert_typ.
+     apply no_reentrance_conv.
      unfold no_reentrance.
      cbn.
      repeat (apply Coqlib.list_disjoint_cons_l ; auto).
@@ -425,9 +422,8 @@ Proof.
   (* the result of the denotation of g is a jump to target, coming from src *)
   rewrite convert_typ_list_app.
   rewrite denote_ocfg_app.
-  2: {apply no_reentrance_convert_typ. unfold no_reentrance. cbn.
-      now apply Util.list_disjoint_singletons.
-  }
+  2: {apply no_reentrance_conv; unfold no_reentrance; cbn;
+      now apply Util.list_disjoint_singletons. }
   (* We have 3 cases: target = out1, target = out2 and neither of them *)
   flatten_goal.
   - (* Jump to out1 *)
@@ -451,19 +447,13 @@ Qed.
 
 
 
+(* NOTE
+- to ∈ input
+- ((out1 ) ∪ (output g1)) ∩ (output g2) = ∅ *)
 
 
-
-(* - to ∈ input
-   - ((out1 ) ∪ (output g1)) ∩ (output g2) = ∅ *)
-
-
-
-
-(* TODO I think that some steps can be automatize, eg.
- - denote_ocfg_app (no_reentrance_proof) *)
+(* TODO can I automatize \denote_ocfg_app\ (no_reentrance_proof) *)
 Lemma denote_cfg_seq : forall g1 g2 out1 in2 from to,
-    (* TODO I am not sure of the way to add theses hypothesis in the WF proofs *)
     wf_ocfg_bid g1 ->
     wf_ocfg_bid g2 ->
     no_duplicate_bid g1 g2 ->
@@ -492,14 +482,11 @@ Proof.
   destruct Hdis as [ Hdis | Hdis ] ; [|contradiction].
   rewrite (convert_typ_list_app g1 _ []).
   rewrite denote_ocfg_app.
-  2: {
-     apply no_reentrance_convert_typ ;
-     rewrite no_reentrance_app_r.
+  2: {apply no_reentrance_conv ; rewrite no_reentrance_app_r.
      split; auto.
      unfold no_reentrance; cbn.
-     apply Util.list_disjoint_singleton_left ;
-       now fold (free_in_cfg g1 in2).
-  }
+      apply Util.list_disjoint_singleton_left
+      ; now fold (free_in_cfg g1 in2).}
   (* denote g1 in both case *)
   rewrite eutt_eq_bind ; [simpl; reflexivity|].
   intros ; simpl.
@@ -509,14 +496,14 @@ Proof.
   rewrite (convert_typ_list_app _ g2 []).
   rewrite denote_ocfg_app.
   2: {
-     apply no_reentrance_convert_typ.
+     apply no_reentrance_conv.
      unfold no_reentrance; cbn.
      now apply Util.list_disjoint_singleton_right. }
 
   (* jump to the next block - two cases *)
   assert (Htarget : target = out1 \/ target <> out1)
     by (apply Classical_Prop.classic) ;
-  destruct Htarget as [ Htarget | Htarget ].
+    destruct Htarget as [ Htarget | Htarget ].
   - (* b = out1 ; we jump to the new block which is empty *)
     subst.
     assert (Heqb : eq_bid out1 out1 = true) by (now apply eqb_bid_eq) ;

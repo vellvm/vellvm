@@ -250,7 +250,7 @@ Proof.
 Qed.
 
 (* TODO generelize typ to T *)
-Lemma inputs_app : forall (g1 g2 : ocfg typ), inputs (g1++g2) = inputs g1 ++ inputs g2.
+Lemma inputs_app : forall {T} (g1 g2 : ocfg T), inputs (g1++g2) = inputs g1 ++ inputs g2.
 Proof.
   intros.
   unfold inputs.

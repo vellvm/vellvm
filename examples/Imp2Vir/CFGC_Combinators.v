@@ -3,7 +3,7 @@ Import ListNotations.
 
 From Vellvm Require Import Syntax.
 
-From Imp2Vir Require Import Utils.
+From Imp2Vir Require Import CFGC_Utils.
 
 Section CFG_Combinators.
 
@@ -50,8 +50,8 @@ Definition cfg_seq (g1 g2 : ocfg) (out1 in2 : block_id) : ocfg :=
 (* While *)
 Definition cfg_while_loop (code_expr : code) (cond : texp)
            (body : ocfg) (input inB output outB: block_id) : ocfg :=
-  let dead_block := [mk_block outB [] [] (TERM_Br_1 input) None] in
   let cond_block := [mk_block input [] code_expr (TERM_Br cond inB output) None] in
+  let dead_block := [mk_block outB [] [] (TERM_Br_1 input) None] in
   cond_block++body++dead_block.
 
 (* Dedicated combinators for /for_loops/ *)
@@ -66,9 +66,10 @@ Lemma inputs_seq : forall (g1 g2 : ocfg) (out1 in2 :  block_id),
 Proof.
   intros.
   unfold cfg_seq.
-  apply inputs_app.
+  rewrite (inputs_app g1 _).
+  rewrite (inputs_app _ g2).
+  reflexivity.
 Qed.
-
 
 (** WF properties *)
 (* TODO *)
