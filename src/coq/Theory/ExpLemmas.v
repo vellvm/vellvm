@@ -35,13 +35,13 @@ Import ITreeNotations.
   - Proof rules specifying the behavior of expressions, allowing for symbolic execution in refinement proofs.
   - A proof that expressions that do not perform conversion are "pure", i.e. do not modify any part of the state.
  *)
-Module ExpLemmas.
-  Module CFGT := CFGTheory.
+Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
+  Module CFGT := CFGTheory IS TOP.
 
   Export CFGT.
   Export TOP.
-  Export TOP.IS.
-  Export TOP.IS.LLVM.
+  Export IS.
+  Export IS.LLVM.
 
   Module CFGL := CFG_LEVEL LP LLVM.
   Export CFGL.

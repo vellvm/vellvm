@@ -1962,3 +1962,7 @@ End FinMemory.
 Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (FMP : FinMemoryParams LP Events) : FinMemory LP Events FMP.
   Include FinMemory LP Events FMP.
 End Make.
+
+Module LLVMParamsBigIntptr := LLVMParams.Make FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP.
+
+Module LLVMParams64BitIntptr := LLVMParams.Make FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP.

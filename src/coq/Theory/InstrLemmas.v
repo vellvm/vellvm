@@ -25,13 +25,14 @@ Open Scope itree_scope.
 
 Import ITreeNotations.
 
-Module InstrLemmas.
-  Module CFGT := CFGTheory.
+Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
+  Module CFGT := CFGTheory IS TOP.
+
 
   Export CFGT.
   Export TOP.
-  Export TOP.IS.
-  Export TOP.IS.LLVM.
+  Export IS.
+  Export IS.LLVM.
 
   Import SemNotations.
   (* end hide *)

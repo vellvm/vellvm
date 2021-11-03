@@ -31,13 +31,14 @@ Import ListNotations.
 Import AlistNotations.
 Import ITreeNotations.
 
-Module LocalFrame.
-  Module CFGT := CFGTheory.
+
+Module LocalFrame (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
+  Module CFGT := CFGTheory IS TOP.
 
   Export CFGT.
   Export TOP.
-  Export TOP.IS.
-  Export TOP.IS.LLVM.
+  Export IS.
+  Export IS.LLVM.
 
   Import SemNotations.
   (* end hide *)

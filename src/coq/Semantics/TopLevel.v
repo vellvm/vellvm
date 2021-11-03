@@ -52,9 +52,7 @@ Open Scope string_scope.
    by setting its bits to 0.
  *)
 
-Module Type LLVMTopLevel.
-  Declare Module IS : InterpreterStack.
-
+Module Type LLVMTopLevel (IS : InterpreterStack).
   Export IS.
 
   Import SemNotations.
@@ -137,9 +135,7 @@ Module Type LLVMTopLevel.
     PropT L6 res_L4.
 End LLVMTopLevel.
 
-Module Make (IS' : InterpreterStack) : LLVMTopLevel.
-  Module IS := IS'.
-
+Module Make (IS : InterpreterStack) : LLVMTopLevel IS.
   Export IS.
   Export IS.LLVM.Events.
   Export IS.LLVM.D.
@@ -316,3 +312,5 @@ Module Make (IS' : InterpreterStack) : LLVMTopLevel.
    *)
   Definition model := model_gen (DTYPE_I 32%N) "main" main_args.
 End Make.
+
+Module TopLevelBigIntptr := Make InterpreterStackBigIntptr.

@@ -467,3 +467,6 @@ Module Make (LP' : LLVMParams) : InterpreterStack.
 
   End SemNotations.
 End Make.
+
+Module InterpreterStackBigIntptr := Make LLVMParamsBigIntptr.
+Module InterpreterStack64BitIntptr := Make LLVMParams64BitIntptr.

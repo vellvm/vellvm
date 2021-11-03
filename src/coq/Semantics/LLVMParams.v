@@ -20,9 +20,3 @@ Module Make (ADDR' : ADDRESS) (IP' : INTPTR) (SIZEOF' : Sizeof) (PTOI' : PTOI AD
   Module PROV := PROV'.
   Module ITOP := ITOP'.
 End Make.
-
-(*
-Module LLVMParamsBigIntptr := Make FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP.
-
-Module LLVMParams64BitIntptr := Make FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP.
-*)

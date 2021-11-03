@@ -16,12 +16,11 @@ From Vellvm Require Import
 
 Import ITreeNotations.
 
-Module MCFGTheory.
-  Declare Module TOP : LLVMTopLevel.
+Module MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   Export TOP.
-  Export TOP.IS.
-  Export TOP.IS.LLVM.
+  Export IS.
+  Export IS.LLVM.
 
   Import SemNotations.
   (* end hide *)

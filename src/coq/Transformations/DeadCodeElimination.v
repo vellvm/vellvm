@@ -33,8 +33,7 @@ Import ITreeNotations.
 
     TODO: prove a VIR reasoning principle for such proofs that do not require to build the simulation manually.
  *)
-Module DeadCodeElimination.
-  Module BF := BlockFusion.
+Module DeadCodeElimination (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : DenotationTheory IS TOP) (BF : BlockFusion IS TOP DT).
   Export BF.
   Export IS.
   Import SemNotations.

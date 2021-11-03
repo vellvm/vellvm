@@ -50,12 +50,10 @@ In particular, notice that since [interp] is a iterative-monad morphism that res
 [eutt eq], these equations get transported at all levels of interpretations.
 
 *)
-Module DenotationTheory.
-  Declare Module TOP : LLVMTopLevel.
-
+Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Export TOP.
-  Export TOP.IS.
-  Export TOP.IS.LLVM.
+  Export IS.
+  Export IS.LLVM.
 
   Import SemNotations.
 
@@ -636,3 +634,7 @@ Module DenotationTheory.
   Qed.
   Transparent denote_block.
 End DenotationTheory.
+
+Module Make (IS : InterpreterStack) (TOP : LLVMTopLevel IS) : DenotationTheory IS TOP.
+  Include DenotationTheory IS TOP.
+End Make.

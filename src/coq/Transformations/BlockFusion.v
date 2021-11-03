@@ -41,13 +41,11 @@ Open Scope bool.
   two blocks [b1] and [b2] together when [b1] performs a direct jump to
   [b2], and [b1] is the only entry point to [b2].
 *)
-Module BlockFusion.
-  Module DT := DenotationTheory.
-
+Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : DenotationTheory IS TOP).
   Export DT.
   Export TOP.
-  Export TOP.IS.
-  Export TOP.IS.LLVM.
+  Export IS.
+  Export IS.LLVM.
 
   Import SemNotations.
 
@@ -769,3 +767,7 @@ Module BlockFusion.
 
   End BlockFusionCorrect.
 End BlockFusion.
+
+Module Make (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : DenotationTheory IS TOP) : BlockFusion IS TOP DT.
+  Include BlockFusion IS TOP DT.
+End Make.

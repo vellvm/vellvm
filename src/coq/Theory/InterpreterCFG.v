@@ -24,12 +24,10 @@ Import ITreeNotations.
 (** * General facts on the CFG-level interpretation
   A collection of elementary facts about the interpretation when considering an intra-function piece of syntax 
 *)
-Module CFGTheory.
-  Declare Module TOP : LLVMTopLevel.
-
+Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Export TOP.
-  Export TOP.IS.
-  Export TOP.IS.LLVM.
+  Export IS.
+  Export IS.LLVM.
 
   Import SemNotations.
 
