@@ -517,3 +517,181 @@ Proof.
     rewrite <- eqb_bid_neq in Htarget;  rewrite Htarget.
     reflexivity.
 Qed.
+
+
+
+(* NOTE I'll probably need additional WF hypothesis *)
+Lemma denote_cfg_while_loop :
+  forall expr_code cond body input inB output outB from,
+    input <> output ->
+    input <> inB ->
+    input <> outB ->
+    output <> inB ->
+    output <> outB ->
+    free_in_cfg body input ->
+    free_in_cfg body output ->
+    free_in_cfg body outB ->
+    wf_ocfg_bid body ->
+    eutt eq
+         (denote_cfg (cfg_while_loop expr_code cond body input inB output outB)
+                     from input)
+         (iter (C:= Kleisli _)
+               (fun '(from,to) =>
+                   if eq_bid to input
+                   then
+                      (* if to = input, denote the block of condition *)
+                      (let (dt,e) := texp_break cond in
+                       denote_code (conv expr_code) ;;
+                       dv <- translate exp_to_instr
+                                      (uv <-  (denote_exp (Some dt) e) ;;
+                                       concretize_or_pick uv True) ;;
+                       match dv with
+                       | DVALUE_I1 comparison_bit =>
+                           if equ comparison_bit Int1.one
+                           then
+                              (* enter in the body *)
+                              (b <- denote_cfg body from to ;;
+                               (* if the target is outB,
+                                  iter again and jump into the cond_block *)
+                               match b with
+                               | inr dv => Ret (inr (inr dv))
+                               | inl (src, target) =>
+                                   if eq_bid outB target
+                                   then Ret (inl (outB,input))
+                                   else Ret (inr (inl (src,target)))
+                               end)
+                           else Ret (inr (inl (input, output)))
+                       | DVALUE_Poison => raiseUB "Branching on poison."
+                       | _ => raise "Br got non-bool value"
+                       end)
+                  (* if to <> input, identity *)
+                   else Ret (inr ( inl (from,to)))
+               ) (from,input)).
+
+Proof.
+  intros * NEQ_INPUT_OUTPUT
+              NEQ_INPUT_INB NEQ_INPUT_OUTB NEQ_OUTPUT_INB
+              NEQ_OUTPUT_OUTB FREE_IN_BODY_INPUT FREE_IN_BODY_OUTPUT
+              FREE_IN_BODY_OUTB WF_BODY .
+  unfold denote_cfg.
+  unfold cfg_while_loop.
+  unfold iter,Iter_Kleisli, Basics.iter, MonadIter_itree.
+  rewrite unfold_iter.
+  rewrite eq_bid_refl.
+  flatten_goal.
+  rewrite bind_bind.
+  unfold denote_ocfg.
+  setoid_rewrite unfold_iter.
+  simpl.
+  rewrite eqv_dec_p_refl.
+  rewrite bind_bind.
+  setoid_rewrite denote_block_unfold.
+  simpl.
+  unfold tfmap, TFunctor_list ; simpl.
+  rewrite denote_no_phis, bind_ret_l.
+  repeat (rewrite bind_bind).
+  rewrite eutt_eq_bind ; [reflexivity|].
+  intros ; simpl.
+  repeat flatten_goal.
+  unfold endo, Endo_id.
+  repeat (rewrite translate_bind).
+  repeat (rewrite bind_bind).
+  unfold texp_break in Heq.
+  flatten_all.
+  unfold TFunctor_texp in Heq0.
+  unfold conv,ConvertTyp_exp in Heq.
+  rewrite Heq in Heq0 ; clear Heq ; inv Heq0.
+  rewrite eutt_eq_bind ; [reflexivity|].
+  intros ; simpl.
+  repeat (rewrite translate_bind).
+  repeat (rewrite bind_bind).
+  rewrite eutt_eq_bind ; [reflexivity|].
+  intros ; simpl.
+  repeat (rewrite bind_bind).
+  simpl.
+  destruct u1 ;
+    try (rewrite exp_to_instr_raise) ;
+    try (rewrite exp_to_instr_raiseUB).
+    all: match goal with
+    | |- context[_ <- raise _ ;; _] => admit
+    | |- context[_ <- raiseUB _ ;; _] => admit
+    | |- _ => idtac
+    end.
+  (* NOTE all raise should have the same proof - same with raiseUB but using the
+     lemmas for raiseUB instead of those for raise *)
+  - destruct (Int1.eq x Int1.one) eqn:E.
+    + (* the condition is true *)
+      rewrite translate_ret.
+      repeat (rewrite bind_ret_l).
+      repeat (rewrite bind_bind).
+      rewrite tau_eutt.
+      setoid_rewrite unfold_iter.
+      match goal with
+      | h:context[input <> inB] |- _ =>
+          rewrite <- eqb_bid_neq,eqv_dec_p_eq in h ; setoid_rewrite h
+      end.
+      rewrite bind_bind.
+      apply free_in_convert_typ with (env:= []), find_block_free_id in
+        FREE_IN_BODY_INPUT.
+      setoid_rewrite FREE_IN_BODY_INPUT.
+      repeat (rewrite bind_ret_l).
+      rewrite <- eqb_bid_neq, eq_bid_comm in NEQ_INPUT_OUTB ;
+        setoid_rewrite NEQ_INPUT_OUTB.
+      repeat (rewrite bind_ret_l).
+
+      admit.
+    + (* the condition is false *)
+      rewrite translate_ret.
+      repeat (rewrite bind_ret_l).
+      repeat (rewrite bind_bind).
+      rewrite tau_eutt.
+      rewrite unfold_iter.
+      (* TODO i can probably have a tactics which do that automatically,
+      ie find the right hypothesis and transform it automatically *)
+      match goal with
+      | h:context[input <> output] |- _ =>
+          rewrite <- eqb_bid_neq,eqv_dec_p_eq in h ; setoid_rewrite h
+      end.
+
+      (* rewrite convert_typ_list_app. *)
+      (* rewrite find_block_none_app *)
+      flatten_goal.
+      * (* contradiction => Heq is False *)
+        assert ( contra:
+                 (find_block (conv body) output = Some b )
+                 \/ (find_block
+                       (conv [{| blk_id := outB;
+                                  blk_phis := [];
+                                  blk_code := [];
+                                  blk_term := TERM_Br_1 input;
+                                  blk_comments := None
+                              |}]) output = Some b)
+               ).
+
+        { apply find_block_app_wf ; [| now rewrite <- (convert_typ_list_app body _ [])].
+          unfold wf_ocfg_bid in *.
+          rewrite inputs_app.
+          rewrite convert_typ_inputs ; simpl.
+          unfold endo, Endo_id.
+          apply Coqlib.list_norepet_append ; try assumption.
+          now apply List_norepet_singleton.
+          apply Coqlib.list_disjoint_cons_r ; [| assumption].
+          apply Util.list_disjoint_nil_r.
+        }
+        rewrite bind_bind.
+        destruct contra as [contra | contra].
+        ** match goal with
+           | h:context[free_in_cfg body output] |- _ =>
+               apply find_block_free_id in h
+           end.
+           find_block_conv.
+           now setoid_rewrite FREE_IN_BODY_OUTPUT in contra.
+        ** simpl in *.
+           now match goal with
+               | h:context[output <> outB] |- _ =>
+                   rewrite <- eqb_bid_neq , eq_bid_comm in h
+                   ; rewrite eqv_dec_p_eq in h
+                   ; setoid_rewrite h in contra
+               end.
+      * rewrite bind_ret_l. reflexivity.
+Admitted.
