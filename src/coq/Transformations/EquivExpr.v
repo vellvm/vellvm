@@ -25,7 +25,7 @@ From Vellvm Require Import
      Utils.PostConditions.
 
 Import ITreeNotations.
-Import SemNotations.
+(* Import SemNotations. *)
 
 (* end hide *)
 

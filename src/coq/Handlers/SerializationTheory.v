@@ -13,6 +13,7 @@ From Vellvm Require Import
      Handlers.FiniteMemory
      Handlers.Serialization
      Semantics.LLVMEvents
+     Semantics.LLVMParams
      Semantics.Denotation
      Semantics.MemoryAddress
      Semantics.GepM
@@ -23,20 +24,22 @@ From Vellvm Require Import
 Import MonadNotation.
 Import MonadReturnsLaws.
 
-Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(IP)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(IP)(SIZEOF)(LLVMIO)).
+Module MemBytesTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (FMP : FinMemoryParams LP Events).
+  Import FMP.
+  Import LP.
 
-  Import LLVMIO.
+  Import Events.
   Import SIZEOF.
   Import PTOI.
-  Import PROVENANCE.
+  Import PROV.
   Import ITOP.
   Import DV.
   Import GEP.
 
-  Module SER := Serialization.Make Addr IP SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
+  Module SER := Serialization.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP BYTE_IMPL.
   Import SER.
 
-  Module BYTE := Byte Addr IP SIZEOF LLVMIO BYTE_IMPL.
+  Module BYTE := Byte ADDR IP SIZEOF Events BYTE_IMPL.
   Export BYTE.
 
   Import BYTE.
@@ -239,20 +242,22 @@ Module MemBytesTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEO
   Qed.
 End MemBytesTheory.
 
-Module SerializationTheory(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(Addr)(IP)(SIZEOF))(PTOI:PTOI(Addr))(PROVENANCE:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROVENANCE))(GEP:GEPM(Addr)(IP)(SIZEOF)(LLVMIO))(BYTE_IMPL:ByteImpl(Addr)(IP)(SIZEOF)(LLVMIO)).
+Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (FMP : FinMemoryParams LP Events).
+  Import FMP.
+  Import LP.
 
-  Import LLVMIO.
+  Import Events.
 
-  Module MBT := MemBytesTheory Addr IP SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
+  Module MBT := MemBytesTheory LP Events FMP.
   Import MBT.
   Import MBT.SER.
   Import BYTE.
   Import SIZEOF.
 
-  Module Mem := FiniteMemory.Make Addr IP SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
+  Module Mem := FiniteMemory.Make LP Events FMP.
   Import Mem.
 
-  Module ESID := ERRSID Addr IP SIZEOF LLVMIO PROVENANCE.
+  Module ESID := ERRSID ADDR IP SIZEOF Events PROV.
   Import ESID.
 
   Import DynamicTypes.

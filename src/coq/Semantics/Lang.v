@@ -16,6 +16,14 @@ From Vellvm Require Import
      Handlers.FiniteMemory
      Handlers.FiniteMemoryTheory.
 
+Module FMP (LP' : LLVMParams) (Events' : LLVM_INTERACTIONS LP'.ADDR LP'.IP LP'.SIZEOF) (GEP' : GEPM LP'.ADDR LP'.IP LP'.SIZEOF Events') (BYTE' : ByteImpl LP'.ADDR LP'.IP LP'.SIZEOF Events') : FinMemoryParams LP' Events'.
+  Module LP := LP'.
+  Module Events := Events'.
+  Module GEP := GEP'.
+  Module BYTE_IMPL := BYTE'.
+End FMP.
+
+
 Module Type Lang (LP: LLVMParams).
   Import LP.
 
@@ -32,11 +40,13 @@ Module Type Lang (LP: LLVMParams).
   Module GEP  := GepM.Make ADDR IP SIZEOF Events PTOI PROV ITOP.
   Declare Module Byte : ByteImpl ADDR IP SIZEOF Events.
 
+  Module FMP := FMP LP Events GEP Byte.
+
   (* Pick handler (depends on memory) *)
   Module Pick := Pick.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
 
-  Module MEM  := FiniteMemory.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
-  Declare Module MEMORY_THEORY : FiniteMemoryTheory.MEMORY_THEORY ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
+  Module MEM  := FiniteMemory.Make LP Events FMP.
+  Declare Module MEMORY_THEORY : FiniteMemoryTheory.MEMORY_THEORY LP Events FMP MEM.
 
   (* Serialization *)
   Module SER := Serialization.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
@@ -49,33 +59,5 @@ Module Type Lang (LP: LLVMParams).
 End Lang.
 
 Module Make (LP : LLVMParams) <: Lang LP.
-  Import LP.
-
-  (* Events *)
-  Module Events := LLVMEvents.Make ADDR IP SIZEOF.
-
-  (* Handlers *)
-  Module Global     := Global.Make ADDR IP SIZEOF Events.
-  Module Local      := Local.Make ADDR IP SIZEOF Events.
-  Module Stack      := Stack.Make ADDR IP SIZEOF Events.
-  Module Intrinsics := Intrinsics.Make ADDR IP SIZEOF Events.
-
-  (* Memory *)
-  Module GEP  := GepM.Make ADDR IP SIZEOF Events PTOI PROV ITOP.
-  Module Byte := FinByte ADDR IP SIZEOF Events.
-
-  (* Pick handler (depends on memory) *)
-  Module Pick := Pick.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
-
-  Module MEM  := FiniteMemory.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
-  Module MEMORY_THEORY := FiniteMemoryTheory.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
-
-  (* Serialization *)
-  Module SER := Serialization.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
-
-  (* Denotation *)
-  Module D := Denotation ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
-
-  Export Events Events.DV Global Local Stack Pick Intrinsics
-         MEM MEMORY_THEORY UndefinedBehaviour SER D.
+  Include Lang LP.
 End Make.

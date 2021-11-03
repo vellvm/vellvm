@@ -17,7 +17,6 @@ From Vellvm Require Import
      Theory.Refinement.
 
 Import ITreeNotations.
-Import SemNotations.
 
 Import ListNotations.
 

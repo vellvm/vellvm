@@ -39,6 +39,7 @@ From Vellvm Require Import
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
+     Semantics.LLVMParams
      Semantics.DynamicValues
      Semantics.Denotation
      Semantics.MemoryAddress
@@ -67,32 +68,34 @@ Set Contextual Implicit.
     Reasoning principles for VIR's main memory model.
 *)
 
-Module Type MEMORY_THEORY (Addr:MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR) (SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(IP)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(IP)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(IP)(SIZE)(LLVMEvents)).
+Module Type MEMORY_THEORY (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (FMP : FinMemoryParams LP Events) (Mem : FinMemory LP Events FMP).
+  Import FMP.
+  Import LP.
+
   (** ** Theory of the general operations over the finite maps we manipulate *)
-  Import LLVMEvents.
+  Import Events.
   Import DV.
   Import PTOI.
   Import PROV.
   Import ITOP.
-  Import SIZE.
+  Import SIZEOF.
   Import GEP.
-  Import Addr.
+  Import ADDR.
 
-  Module BYTE := Byte Addr IP SIZE LLVMEvents BYTE_IMPL.
+  Module BYTE := Byte ADDR IP SIZEOF Events BYTE_IMPL.
   Import BYTE.
 
   Open Scope list.
 
-  Module Mem := FiniteMemory.Make(Addr)(IP)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
   Export Mem.
 
-  Module ESID := ERRSID Addr IP SIZE LLVMEvents PROV.
+  Module ESID := ERRSID ADDR IP SIZEOF Events PROV.
   Import ESID.
 
-  Module MBT := MemBytesTheory Addr IP SIZE LLVMEvents PTOI PROV ITOP GEP BYTE_IMPL.
+  Module MBT := MemBytesTheory LP Events FMP.
   Import MBT.
 
-  Module ST := SerializationTheory Addr IP SIZE LLVMEvents PTOI PROV ITOP GEP BYTE_IMPL.
+  Module ST := SerializationTheory LP Events FMP.
   Import ST.
 
   Definition ErrSID_MemState_runs_to (e : MemState -> ErrSID memory_stack) (m m' : MemState) : Prop
@@ -102,7 +105,7 @@ Module Type MEMORY_THEORY (Addr:MemoryAddress.ADDRESS) (IP:MemoryAddress.INTPTR)
     := runErrSID (e (ms_memory_stack m)) (ms_sid m) (ms_prov m) = (inr (inr (inr (ms_memory_stack m'))), ms_sid m', ms_prov m').
 
   Section Serialization_Theory.
-    Import MEMORY_THEORY.Mem.BYTE.
+    Import Mem.BYTE.
 
     Variable endianess : Endianess.
     (** Length properties *)
@@ -2763,9 +2766,9 @@ Section PARAMS.
       cbn.
       (* TODO: Can I avoid this unfolding? *)
       unfold ErrSID_MemState_ms_runs_to in Hwrite.
-      unfold MEMORY_THEORY.Mem.ESID.runErrSID.
+      unfold Mem.ESID.runErrSID.
       unfold runErrSID in Hwrite.
-      unfold runErrSID_T, MEMORY_THEORY.Mem.ESID.runErrSID_T in *.
+      unfold runErrSID_T, Mem.ESID.runErrSID_T in *.
       rewrite Hwrite.
       repeat rewrite bind_ret_l; cbn.
       destruct m, m'; cbn.
@@ -2798,9 +2801,9 @@ Section PARAMS.
       repeat rewrite bind_ret_l; cbn.
       (* TODO: Can I avoid this unfolding? *)
       unfold ErrSID_runs_to in *.
-      unfold MEMORY_THEORY.Mem.ESID.runErrSID.
+      unfold Mem.ESID.runErrSID.
       unfold runErrSID in ALLOC.
-      unfold runErrSID_T, MEMORY_THEORY.Mem.ESID.runErrSID_T in *.
+      unfold runErrSID_T, Mem.ESID.runErrSID_T in *.
       rewrite ALLOC. 
       repeat rewrite bind_ret_l; cbn.
       repeat rewrite bind_ret_l; cbn.
@@ -3366,6 +3369,6 @@ Section PARAMS.
 End PARAMS.
 End MEMORY_THEORY.
 
-Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(Addr)(IP)(SIZE))(PTOI:PTOI(Addr))(PROV:PROVENANCE(Addr))(ITOP:ITOP(Addr)(PROV))(GEP : GEPM(Addr)(IP)(SIZE)(LLVMEvents))(BYTE_IMPL : ByteImpl(Addr)(IP)(SIZE)(LLVMEvents)) <: MEMORY_THEORY(Addr)(IP)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
-Include MEMORY_THEORY(Addr)(IP)(SIZE)(LLVMEvents)(PTOI)(PROV)(ITOP)(GEP)(BYTE_IMPL).
+Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (FMP : FinMemoryParams LP Events) (Mem : FinMemory LP Events FMP) <: MEMORY_THEORY LP Events FMP Mem.
+Include MEMORY_THEORY LP Events FMP Mem.
 End Make.

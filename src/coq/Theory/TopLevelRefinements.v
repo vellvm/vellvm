@@ -36,7 +36,8 @@ Require Import Paco.paco.
 
 Import ListNotations.
 Import ITree.Basics.Basics.Monads.
-Import SemNotations.
+
+(* Import SemNotations. *)
 
 (* Module R := Refinement.Make Memory.Addr LLVMEvents. *)
 (* Import R.  *)

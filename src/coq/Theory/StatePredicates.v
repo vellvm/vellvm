@@ -2,7 +2,9 @@
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics.
+     Semantics
+     Semantics.LLVMParams
+     Semantics.Lang.
 (* end hide *)
 
 (** * Utilities to build predicates and relations over VIR's state *)
@@ -18,7 +20,10 @@ Definition conj_rel {T} (R1 R2: rel T) : rel T :=
 
 Infix "×" := conj_rel (at level 30, right associativity).
 
-Section CFG_LEVEL.
+Module CFG_LEVEL (LP : LLVMParams) (LLVM : Lang LP).
+  Import LP.
+  Import LLVM.
+  Import MEM.
 
   Definition state_cfg : Type := MemState * (local_env * global_env).
 
@@ -39,8 +44,7 @@ Section CFG_LEVEL.
     fun '(m,(l,(g,_))) => P (m,(l,g)).
   Definition lift_state_cfgR {T : Type} (P : state_cfgR) : @state_cfg_TR T :=
     fun '(m,(l,(g,_))) '(m',(l',(g',_))) => P (m,(l,g)) (m',(l',g')).
-
-End CFG_LEVEL.
   
-Notation "↑" :=  lift_state_cfgP.
+  Notation "↑" :=  lift_state_cfgP.
+End CFG_LEVEL.
 

@@ -20,6 +20,9 @@ Module MCFGTheory.
   Declare Module TOP : LLVMTopLevel.
 
   Export TOP.
+  Export TOP.IS.
+  Export TOP.IS.LLVM.
+
   Import SemNotations.
   (* end hide *)
 
@@ -97,21 +100,7 @@ Module MCFGTheory.
     rewrite interp_intrinsics_bind.
     rewrite interp_global_bind.
     rewrite interp_local_stack_bind.
-    pose proof interp_memory_bind.
-    Import LLVM.MEMORY_THEORY.Mem.
-    cbn.
-    rewrite Vellvm.Theory.InterpreterMCFG.MCFGTheory.TOP.IS.LLVM.MEMORY_THEORY.interp_memory_bind.
     go.
-
-
-    pose proof Vellvm.Handlers.Handlers.MEMORY_THEORY.interp_memory_bind.
-    pose proof Vellvm.Theory.InterpreterMCFG.MCFGTheory.TOP.IS.LLVM.MEMORY_THEORY.interp_memory_bind.
-    pose proof Vellvm.Handlers.Handlers.MEMORY_THEORY64.interp_memory_bind.
-
-    About Vellvm.Handlers.Handlers.MEMORY_THEORY.interp_memory_bind.
-    About Vellvm.Theory.InterpreterMCFG.MCFGTheory.TOP.IS.LLVM.MEMORY_THEORY.interp_memory_bind.
-    About Vellvm.Handlers.Handlers.MEMORY_THEORY64.interp_memory_bind.
-
     apply eutt_eq_bind; intros (? & ? & ? & ?); reflexivity.
   Qed.
 
@@ -216,3 +205,4 @@ Module MCFGTheory.
   (*   Unshelve. *)
   (*   auto. *)
   (* Qed. *)
+End MCFGTheory.
