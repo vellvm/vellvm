@@ -542,16 +542,6 @@ Module Make(Addr:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)
       Definition extract_field_byte {M} `{Monad M} `{RAISE_ERROR M} (fields : list dtyp) (byte_idx : N) : M (dtyp * (N * N))%type
         := extract_field_byte_helper fields 0 byte_idx.
 
-      (* TODO: move this? *)
-      Ltac solve_dvalue_measure :=
-        match goal with
-        | H: Some ?f = List.nth_error ?fields _ |- context [dvalue_measure ?f]
-          => symmetry in H; apply nth_error_In in H;
-            pose proof list_sum_map dvalue_measure _ _ H;
-            cbn; lia
-        end.
-
-
       (* Need the type of the dvalue in order to know how big fields and array elements are.
 
          It's not possible to use the dvalue alone, as DVALUE_Poison's
