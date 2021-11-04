@@ -519,7 +519,6 @@ Proof.
 Qed.
 
 
-
 (* NOTE I'll probably need additional WF hypothesis *)
 Lemma denote_cfg_while_loop :
   forall expr_code cond body input inB output outB from,
@@ -532,6 +531,7 @@ Lemma denote_cfg_while_loop :
     free_in_cfg body output ->
     free_in_cfg body outB ->
     wf_ocfg_bid body ->
+    In inB (inputs body) -> (* can I relax this hypothesis ? *)
     eutt eq
          (denote_cfg (cfg_while_loop expr_code cond body input inB output outB)
                      from input)
@@ -550,7 +550,7 @@ Lemma denote_cfg_while_loop :
                            if equ comparison_bit Int1.one
                            then
                               (* enter in the body *)
-                              (b <- denote_cfg body from to ;;
+                              (b <- denote_cfg body input inB ;;
                                (* if the target is outB,
                                   iter again and jump into the cond_block *)
                                match b with
@@ -572,91 +572,148 @@ Proof.
   intros * NEQ_INPUT_OUTPUT
               NEQ_INPUT_INB NEQ_INPUT_OUTB NEQ_OUTPUT_INB
               NEQ_OUTPUT_OUTB FREE_IN_BODY_INPUT FREE_IN_BODY_OUTPUT
-              FREE_IN_BODY_OUTB WF_BODY .
-  unfold denote_cfg.
-  unfold cfg_while_loop.
+              FREE_IN_BODY_OUTB WF_BODY INB_IN_BODY.
+  unfold denote_cfg, cfg_while_loop.
   unfold iter,Iter_Kleisli, Basics.iter, MonadIter_itree.
+
+  (* Denotation of the 1st iteration of the loop *)
   rewrite unfold_iter.
+
+  (* 1: jump to the input block, ie. the condition block *)
+  (* 1.1: Denote the code used in order to compute the expression *)
+  (* Bring the /denote code/ on the top of the right side of the equation *)
   rewrite eq_bid_refl.
   flatten_goal.
   rewrite bind_bind.
-  unfold denote_ocfg.
-  setoid_rewrite unfold_iter.
-  simpl.
+
+  (* Bring the /denote code/ on the top of the left side of the equation *)
+  unfold denote_ocfg ; setoid_rewrite unfold_iter ; simpl.
   rewrite eqv_dec_p_refl.
   rewrite bind_bind.
   setoid_rewrite denote_block_unfold.
-  simpl.
-  unfold tfmap, TFunctor_list ; simpl.
-  rewrite denote_no_phis, bind_ret_l.
-  repeat (rewrite bind_bind).
-  rewrite eutt_eq_bind ; [reflexivity|].
-  intros ; simpl.
+  unfold tfmap, TFunctor_list ; simpl ; rewrite denote_no_phis.
+  rewrite bind_ret_l,bind_bind.
+  rewrite eutt_eq_bind ; [reflexivity| intros ; simpl ].
+
+  (* 1.2: Denote the terminator - branch *)
+  (* 1.2.a: denote the expression *)
+  (* Bring the /denote_expression/ in the top of each side of the equation *)
   repeat flatten_goal.
-  unfold endo, Endo_id.
-  repeat (rewrite translate_bind).
-  repeat (rewrite bind_bind).
-  unfold texp_break in Heq.
-  flatten_all.
-  unfold TFunctor_texp in Heq0.
-  unfold conv,ConvertTyp_exp in Heq.
-  rewrite Heq in Heq0 ; clear Heq ; inv Heq0.
-  rewrite eutt_eq_bind ; [reflexivity|].
-  intros ; simpl.
-  repeat (rewrite translate_bind).
-  repeat (rewrite bind_bind).
-  rewrite eutt_eq_bind ; [reflexivity|].
-  intros ; simpl.
-  repeat (rewrite bind_bind).
-  simpl.
+  rewrite 2 translate_bind ; rewrite 3 bind_bind.
+  (* Some type conversion to manage *)
+  unfold texp_break in Heq ; flatten_hyp Heq
+  ; rewrite typ_to_dtyp_pair in Heq ; rewrite Heq in Heq0
+  ; inv Heq0 ; clear Heq.
+  rewrite eutt_eq_bind ; [reflexivity|intros ; simpl].
+
+  (* 1.2.b: concretize or pick *)
+  rewrite translate_bind ; rewrite 2 bind_bind.
+  rewrite eutt_eq_bind ; [reflexivity| intros ; simpl].
+
+  (* 1.3: destruct the value:
+     - if it isn't a boolean value, raise an exception
+     - if it is a boolean value, jump to the correct block
+   *)
   destruct u1 ;
     try (rewrite exp_to_instr_raise) ;
     try (rewrite exp_to_instr_raiseUB).
-    all: match goal with
-    | |- context[_ <- raise _ ;; _] => admit
-    | |- context[_ <- raiseUB _ ;; _] => admit
-    | |- _ => idtac
-    end.
+  (* TODO: temporarely, admit the exception cases *)
   (* NOTE all raise should have the same proof - same with raiseUB but using the
      lemmas for raiseUB instead of those for raise *)
+  all: match goal with
+       | |- context[_ <- raise _ ;; _] => admit
+       | |- context[_ <- raiseUB _ ;; _] => admit
+       | |- _ => idtac
+       end.
+
+  (* 1.4: destruct the boolean value:
+     - if the condition is true, jump into the body
+     - if the condition is false, jump into the output block
+   *)
   - destruct (Int1.eq x Int1.one) eqn:E.
     + (* the condition is true *)
-      rewrite translate_ret.
-      repeat (rewrite bind_ret_l).
-      repeat (rewrite bind_bind).
-      rewrite tau_eutt.
+      rewrite translate_ret ; rewrite 2 bind_ret_l
+      ; rewrite bind_bind ; rewrite tau_eutt.
+
+      (* 2: jump in body, entering by the block inB *)
+      (* 2.0: on the left side, we are iterating on the whole ocfg,
+              thus we have to ignore the block /input/ *)
       setoid_rewrite unfold_iter.
       match goal with
       | h:context[input <> inB] |- _ =>
           rewrite <- eqb_bid_neq,eqv_dec_p_eq in h ; setoid_rewrite h
       end.
+      (* 2.1: jump to /inB/, which is is the cfg /body/ -->
+        maybe this hypothesis can be relaxed *)
       rewrite bind_bind.
-      apply free_in_convert_typ with (env:= []), find_block_free_id in
-        FREE_IN_BODY_INPUT.
-      setoid_rewrite FREE_IN_BODY_INPUT.
-      repeat (rewrite bind_ret_l).
-      rewrite <- eqb_bid_neq, eq_bid_comm in NEQ_INPUT_OUTB ;
-        setoid_rewrite NEQ_INPUT_OUTB.
-      repeat (rewrite bind_ret_l).
+      (* on both sides, the denotation of the block is the same *)
+      rewrite eutt_eq_bind ; [| intro ; simpl].
 
-      admit.
+      * (* There is some work in order to show that the denotation of
+         the block inB is the same:
+         On the left side, we have the cfg /body (+) outB/
+         since in the right side, we have only /body/ *)
+        (* TODO clean up the part of the proof *)
+
+        (* 2.1.a: jump in block inB in the right side *)
+        assert ( INB_IN_BODY' : In inB (inputs body)) by assumption.
+        apply find_block_in_inputs in INB_IN_BODY ; destruct INB_IN_BODY as
+          [inBk HinB] ; apply find_block_some_conv in HinB.
+        destruct (find_block (conv body) inB) eqn:HinBody
+        ; unfold conv,ConvertTyp_list,block_id,tfmap,TFunctor_list',
+          tfmap,TFunctor_block,tfmap,endo,Endo_id in HinB, HinBody
+        ; rewrite HinBody in HinB
+        ; clear HinBody
+        ; inv HinB.
+
+        (* 2.1.b: jump in block inB in the left side *)
+        pose proof (find_block_app_l_wf inB (b:=inBk) body [{|
+                              blk_id := outB;
+                               blk_phis := [];
+                               blk_code := [];
+                               blk_term := TERM_Br_1 input;
+                               blk_comments := None
+                           |}]).
+        rewrite 2 find_block_some_conv in H.
+        unfold conv,ConvertTyp_list,block_id,tfmap,TFunctor_list',
+          tfmap,TFunctor_block,tfmap,endo,Endo_id in H.
+        unfold ConvertTyp_list, tfmap, TFunctor_list',tfmap,TFunctor_block at 1.
+        unfold tfmap, endo, Endo_id.
+        rewrite H.
+        (* now, we have the same denotation of the block in both sides *)
+        reflexivity.
+        (* Remaining goals due to the use of /find_block_app_l_wf/ *)
+        admit. (* easy because outB is free in body *)
+        admit. (* easy thanks to INB_IN_BODY' *)
+
+      * (* since we have denoted inB, we have to continue the denotation of the body *)
+        simpl.
+        (* u1 = denotation of one iteration of the body entering by inB *)
+        destruct u1.
+      ** (* inl - continue to iterates in the body *) admit.
+      ** (* inr - stop the iteration and leave the denotation of the body *)
+        admit.
+
     + (* the condition is false *)
-      rewrite translate_ret.
-      repeat (rewrite bind_ret_l).
-      repeat (rewrite bind_bind).
-      rewrite tau_eutt.
+      (* 5: jump into the block output, which is fresh *)
+      (* 5.1: in the right side, directly jumps out of the iteration *)
+      rewrite bind_ret_l.
+
+      (* 5.2: in the left side, iter again on the whole cfg *)
+      rewrite translate_ret ; rewrite 2 bind_ret_l ; rewrite tau_eutt.
       rewrite unfold_iter.
       (* TODO i can probably have a tactics which do that automatically,
       ie find the right hypothesis and transform it automatically *)
+      (* 5.2.a: ignore the block input *)
       match goal with
       | h:context[input <> output] |- _ =>
           rewrite <- eqb_bid_neq,eqv_dec_p_eq in h ; setoid_rewrite h
       end.
 
-      (* rewrite convert_typ_list_app. *)
-      (* rewrite find_block_none_app *)
+      (* 5.3: by contradiction, suppose that output is in body
+                or output = outB *)
       flatten_goal.
-      * (* contradiction => Heq is False *)
+      * (* contradiction *)
         assert ( contra:
                  (find_block (conv body) output = Some b )
                  \/ (find_block
@@ -678,20 +735,22 @@ Proof.
           apply Coqlib.list_disjoint_cons_r ; [| assumption].
           apply Util.list_disjoint_nil_r.
         }
-        rewrite bind_bind.
         destruct contra as [contra | contra].
-        ** match goal with
+        ** (* 5.3.a : suppose that it exists a block named output in body *)
+          match goal with
            | h:context[free_in_cfg body output] |- _ =>
                apply find_block_free_id in h
            end.
            find_block_conv.
            now setoid_rewrite FREE_IN_BODY_OUTPUT in contra.
-        ** simpl in *.
+        ** (* 5.3.b : suppose that output = outB *)
+          simpl in *.
            now match goal with
                | h:context[output <> outB] |- _ =>
                    rewrite <- eqb_bid_neq , eq_bid_comm in h
                    ; rewrite eqv_dec_p_eq in h
                    ; setoid_rewrite h in contra
                end.
-      * rewrite bind_ret_l. reflexivity.
+      * (* 5.4: ignore the body *)
+        rewrite bind_ret_l. reflexivity.
 Admitted.

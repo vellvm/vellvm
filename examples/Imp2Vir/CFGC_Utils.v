@@ -258,3 +258,11 @@ Proof.
   unfold inputs.
   apply Coqlib.list_append_map.
 Qed.
+
+Lemma typ_to_dtyp_pair :
+  forall (t : typ) (e : exp typ),
+    (typ_to_dtyp [] t, convert_typ [] e) = tfmap (typ_to_dtyp []) (t, e).
+Proof.
+  intros.
+  now unfold tfmap, TFunctor_texp, convert_typ, ConvertTyp_exp, tfmap.
+Qed.
