@@ -52,16 +52,21 @@ End PARAMS_MODEL.
 Definition UB_exec {E} `{FailureE -< E}: UBE ~> itree E := fun _ e => match e with | ThrowUB s => raise ("Undefined Behaviour: " ++ s) end.
 
 Section PARAMS_INTERP.
-  Variable (E F: Type -> Type).
+  Variable (E F G: Type -> Type).
+  Notation Effin := (E +' F +' UBE +' G).
+  Notation Effout := (E +' F +' G).
 
-  Definition E_trigger :  E ~> itree (E +' F) :=
+  Definition E_trigger :  E ~> itree Effout :=
     fun R e => r <- trigger e ;; ret r.
 
-  Definition F_trigger : F ~> itree (E +' F) :=
+  Definition F_trigger : F ~> itree Effout :=
     fun R e => r <- trigger e ;; ret r.
 
-  Definition exec_UB `{FailureE -< E +' F}:
-    itree (E +' UBE +' F) ~> itree (E +' F) :=
-    interp (case_ E_trigger (case_ UB_exec F_trigger)).
+  Definition G_trigger : G ~> itree Effout :=
+    fun R e => r <- trigger e ;; ret r.
+
+  Definition exec_UB `{FailureE -< Effout}:
+    itree Effin ~> itree Effout :=
+    interp (case_ E_trigger (case_ F_trigger (case_ UB_exec G_trigger))).
 
 End PARAMS_INTERP.

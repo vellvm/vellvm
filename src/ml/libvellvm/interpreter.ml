@@ -72,7 +72,7 @@ let debug (msg:string) =
     Calling `step` could either loop forever, return an error,
     or return the uvalue result returned from the itree.
  *)
-let rec step (m : ('a coq_L6_exec, coq_MemState * ((local_env * lstack) * (global_env * DV.uvalue))) itree) : (DV.uvalue, string) result =
+let rec step (m : ('a coq_L5, coq_MemState * ((local_env * lstack) * (global_env * DV.uvalue))) itree) : (DV.uvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -86,13 +86,17 @@ let rec step (m : ('a coq_L6_exec, coq_MemState * ((local_env * lstack) * (globa
   | VisF (Sum.Coq_inl1 (ExternalCall(_, _, _)), _) ->
      Error "Uninterpreted Call"
 
-  (* The debugE effect *)
+  (* The OOME effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inl1 msg), k) ->
+     Error ("Out of Memory: " ^ (Camlcoq.camlstring_of_coqstring msg))
+
+  (* The DebugE effect *)
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg)), k) ->
      (debug (Camlcoq.camlstring_of_coqstring msg);
       step (k (Obj.magic DV.UVALUE_None)))
 
-  (* The failE effect is a failure *)
-  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 _), _) ->
+  (* The FailureE effect is a failure *)
+  | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 _)), _) ->
      Error "Failure effect"
 
   (* The UndefinedBehaviourE effect is a failure *)

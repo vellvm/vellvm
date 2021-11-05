@@ -98,10 +98,6 @@ Set Contextual Implicit.
   Variant OOME : Type -> Type :=
   | ThrowOOM : string -> OOME void.
 
-  (* Out of memory / abort. Differs from OOME in that there is no message string. *)
-  Variant OOME_NOMSG : Type -> Type :=
-  | ThrowOOM_NOMSG : OOME_NOMSG void.
-
   (** Since the output type of [ThrowUB] is [void], we can make it an action
     with any return type. *)
   Definition raiseOOM {E : Type -> Type} `{OOME -< E} {X}
@@ -109,17 +105,8 @@ Set Contextual Implicit.
     : itree E X 
     := v <- trigger (ThrowOOM e);; match v: void with end.
 
-  Definition raiseOOM_NOMSG {E : Type -> Type} `{OOME_NOMSG -< E} {X}
-             (e : string)
-    : itree E X
-    := v <- trigger (ThrowOOM_NOMSG);; match v: void with end.
-
   #[global] Instance RAISE_OOM_ITREE_OOME {E : Type -> Type} `{OOME -< E} : RAISE_OOM (itree E) :=
   { raise_oom := fun A => raiseOOM
-  }.
-
-  #[global] Instance RAISE_OOM_ITREE_OOME_NOMSG {E : Type -> Type} `{OOME_NOMSG -< E} : RAISE_OOM (itree E) :=
-  { raise_oom := fun A => raiseOOM_NOMSG
   }.
 
   (* Debug is identical to the "Trace" effect from the itrees library,
@@ -311,13 +298,9 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
   (* For multiple CFG, after interpreting [LocalE] and [MemoryE] and [IntrinsicE] that are memory intrinsics and [PickE]*)
   Definition L4 := ExternalCallE +' OOME +' UBE +' DebugE +' FailureE.
 
-  Definition L5 := ExternalCallE +' OOME_NOMSG +' UBE +' DebugE +' FailureE.
+  Definition L5 := ExternalCallE +' OOME +' DebugE +' FailureE.
 
-  Definition L5_exec := ExternalCallE +' UBE +' DebugE +' FailureE.
-
-  Definition L6 := ExternalCallE +' OOME_NOMSG +' DebugE +' FailureE.
-
-  Definition L6_exec := ExternalCallE +' DebugE +' FailureE.
+  Definition L6 := ExternalCallE +' OOME +' DebugE +' FailureE.
 
   Definition FUBO_to_L4 : (FailureE +' UBE +' OOME) ~> L4:=
     fun T e =>
@@ -330,7 +313,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
 
   End Events.
 
-  #[export] Hint Unfold L0 L0' L1 L2 L3 L4 L5 : core.
+  #[export] Hint Unfold L0 L0' L1 L2 L3 L4 L5 L6 : core.
 
 End LLVM_INTERACTIONS.
 

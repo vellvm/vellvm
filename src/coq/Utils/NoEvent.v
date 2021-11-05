@@ -960,7 +960,7 @@ Module DeterministicSingleton (IS : InterpreterStack).
   Proof.
   Admitted.
 
-  Variable remove_pick_ub : itree (ExternalCallE +' PickE +' OOME +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' OOME_NOMSG +' DebugE +' FailureE).
+  Variable remove_pick_ub : itree (ExternalCallE +' PickE +' OOME +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' OOME +' DebugE +' FailureE).
   Variable deterministic_vellvm : forall R, itree L0 R -> Prop.
   (* Definition deterministic_vellvm *)
   Lemma deterministc_llvm_is_singleton : forall R RR t g sl mem,

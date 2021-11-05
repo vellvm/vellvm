@@ -176,12 +176,6 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
   Module DVCrev := DVConvertMake LP2 LP1 AC2 E2 E1.
   Import DVC.
 
-  Definition OOM_to_OOME_NOMSG {E} `{OOME_NOMSG -< E} (m : OOM (E void)) : E void
-    := match m with
-       | NoOom e => e
-       | Oom msg => subevent _ ThrowOOM_NOMSG
-       end.
-
   Require Import String.
 
   Definition L6_convert : Handler E1.L6 E2.L6.
@@ -223,5 +217,5 @@ Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
   Module E1 := IS1.LLVM.Events.
   Module E2 := IS2.LLVM.Events.
 
-  Definition refine_oom (source : itree E1.L6 
+  (* Definition refine_oom (source : itree E1.L6  *)
 End InfiniteToFinite.

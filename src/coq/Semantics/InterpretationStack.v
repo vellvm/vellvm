@@ -85,8 +85,7 @@ Module Type InterpreterStack.
       let L2_trace       := interp_local_stack L1_trace l in
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := model_undef RR L3_trace in
-      let L5_trace_no_msgs := PropT_itree_map (@remove_OOM_msg _ _ _) L4_trace in
-      let L5_trace := model_OOM L5_trace_no_msgs in
+      let L5_trace       := model_UB RR L4_trace in
       L5_trace.
 
     Definition interp_mcfg6 {R} RR (t: itree L0 R) g l m : PropT L6 (MemState * (local_env * stack * (global_env * R))) :=
@@ -95,8 +94,8 @@ Module Type InterpreterStack.
       let L2_trace       := interp_local_stack L1_trace l in
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := model_undef RR L3_trace in
-      let L5_trace       := PropT_itree_map (@model_OOM _ _ _) L4_trace in
-      model_UB RR L5_trace.
+      let L5_trace       := model_UB RR L4_trace in
+      model_OOM L5_trace.
 
     (* The interpreter stray away from the model starting from the fourth layer: we pick an arbitrary valid path of execution *)
     Definition interp_mcfg4_exec {R} (t: itree L0 R) g l m : itree L4 (MemState * (local_env * stack * (global_env * R))) :=
@@ -107,24 +106,14 @@ Module Type InterpreterStack.
       let L4_trace       := exec_undef L3_trace in
       L4_trace.
 
-    Definition interp_mcfg5_exec {R} (t: itree L0 R) g l m : itree L5_exec (MemState * (local_env * stack * (global_env * R))) :=
+    Definition interp_mcfg5_exec {R} (t: itree L0 R) g l m : itree L5 (MemState * (local_env * stack * (global_env * R))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := exec_undef L3_trace in
-      let L5_trace       := exec_OOM L4_trace in
+      let L5_trace       := exec_UB L4_trace in
       L5_trace.
-
-    Definition interp_mcfg6_exec {R} (t: itree L0 R) g l m : itree L6_exec (MemState * (local_env * stack * (global_env * R))) :=
-      let uvalue_trace   := interp_intrinsics t in
-      let L1_trace       := interp_global uvalue_trace g in
-      let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory L2_trace m in
-      let L4_trace       := exec_undef L3_trace in
-      let L5_trace       := exec_OOM L4_trace in
-      let L6_trace       := exec_UB L5_trace in
-      L6_trace.
 
   End InterpreterMCFG.
 
@@ -170,22 +159,23 @@ Module Type InterpreterStack.
       let L4_trace       := model_undef RR L3_trace in
       L4_trace.
 
-    Definition interp_cfg5 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' OOME_NOMSG +' UBE +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg5 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' OOME +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := model_undef RR L3_trace in
-      PropT_itree_map (@model_OOM _ _ _) L4_trace.
+      let L5_trace       := model_UB RR L4_trace in
+      L5_trace.
 
-    Definition interp_cfg6 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' OOME_NOMSG +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg6 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' OOME +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := model_undef RR L3_trace in
-      let L5_trace       := PropT_itree_map (@model_OOM _ _ _) L4_trace in
-      model_UB RR L5_trace.
+      let L5_trace       := model_UB RR L4_trace in
+      model_OOM L5_trace.
 
   End InterpreterCFG.
 
@@ -308,7 +298,8 @@ Module Make (LP' : LLVMParams) : InterpreterStack.
       let L2_trace       := interp_local_stack L1_trace l in
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := model_undef RR L3_trace in
-      PropT_itree_map (@model_OOM _ _ _) L4_trace. 
+      let L5_trace       := model_UB RR L4_trace in
+      L5_trace.
 
     Definition interp_mcfg6 {R} RR (t: itree L0 R) g l m : PropT L6 (MemState * (local_env * stack * (global_env * R))) :=
       let uvalue_trace   := interp_intrinsics t in
@@ -316,8 +307,8 @@ Module Make (LP' : LLVMParams) : InterpreterStack.
       let L2_trace       := interp_local_stack L1_trace l in
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := model_undef RR L3_trace in
-      let L5_trace       := PropT_itree_map (@model_OOM _ _ _) L4_trace in
-      model_UB RR L5_trace.
+      let L5_trace       := model_UB RR L4_trace in
+      model_OOM L5_trace.
 
     (* The interpreter stray away from the model starting from the fourth layer: we pick an arbitrary valid path of execution *)
     Definition interp_mcfg4_exec {R} (t: itree L0 R) g l m : itree L4 (MemState * (local_env * stack * (global_env * R))) :=
@@ -328,24 +319,14 @@ Module Make (LP' : LLVMParams) : InterpreterStack.
       let L4_trace       := exec_undef L3_trace in
       L4_trace.
 
-    Definition interp_mcfg5_exec {R} (t: itree L0 R) g l m : itree L5_exec (MemState * (local_env * stack * (global_env * R))) :=
+    Definition interp_mcfg5_exec {R} (t: itree L0 R) g l m : itree L5 (MemState * (local_env * stack * (global_env * R))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := exec_undef L3_trace in
-      let L5_trace       := exec_OOM L4_trace in
+      let L5_trace       := exec_UB L4_trace in
       L5_trace.
-
-    Definition interp_mcfg6_exec {R} (t: itree L0 R) g l m : itree L6_exec (MemState * (local_env * stack * (global_env * R))) :=
-      let uvalue_trace   := interp_intrinsics t in
-      let L1_trace       := interp_global uvalue_trace g in
-      let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory L2_trace m in
-      let L4_trace       := exec_undef L3_trace in
-      let L5_trace       := exec_OOM L4_trace in
-      let L6_trace       := exec_UB L5_trace in
-      L6_trace.
 
   End InterpreterMCFG.
 
@@ -391,22 +372,23 @@ Module Make (LP' : LLVMParams) : InterpreterStack.
       let L4_trace       := model_undef RR L3_trace in
       L4_trace.
 
-    Definition interp_cfg5 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' OOME_NOMSG +' UBE +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg5 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' OOME +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := model_undef RR L3_trace in
-      PropT_itree_map (@model_OOM _ _ _) L4_trace.
+      let L5_trace       := model_UB RR L4_trace in
+      L5_trace.
 
-    Definition interp_cfg6 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' OOME_NOMSG +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg6 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' OOME +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := model_undef RR L3_trace in
-      let L5_trace       := PropT_itree_map (@model_OOM _ _ _) L4_trace in
-      model_UB RR L5_trace.
+      let L5_trace       := model_UB RR L4_trace in
+      model_OOM L5_trace.
 
   End InterpreterCFG.
 

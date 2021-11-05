@@ -33,13 +33,7 @@ From Vellvm Require Import
 Section PARAMS_MODEL.
   Variable (E F: Type -> Type).
   Notation Effin := (E +' OOME +' F).
-  Notation Effout := (E +' OOME_NOMSG +' F).
-
-  Definition E_trigger_model : E ~> itree Effout :=
-    fun R e => r <- trigger e ;; ret r.
-
-  Definition F_trigger_model : F ~> itree Effout :=
-    fun R e => r <- trigger e ;; ret r.
+  Notation Effout := (E +' OOME +' F).
 
   Definition E_trigger_model_prop : E ~> PropT Effout :=
     fun R e => fun t => t = r <- trigger e ;; ret r.
@@ -47,20 +41,8 @@ Section PARAMS_MODEL.
   Definition F_trigger_model_prop : F ~> PropT Effout :=
     fun R e => fun t => t = r <- trigger e ;; ret r.
 
-  Definition OOM_msg_handler : OOME ~> itree Effout
-    := fun T oome =>
-         match oome with
-         | ThrowOOM x => trigger ThrowOOM_NOMSG
-         end.
-
-  Definition remove_OOM_msg_h : Effin ~> itree Effout
-    := case_ E_trigger_model (case_ OOM_msg_handler F_trigger_model).
-
-  Definition remove_OOM_msg : itree Effin ~> itree Effout
-    := interp remove_OOM_msg_h.
-
   (* Semantics of OOM *)
-  Definition OOM_handler : OOME_NOMSG ~> PropT Effout
+  Definition OOM_handler : OOME ~> PropT Effout
     := fun T oome source => True.
 
   Definition model_OOM_handler : Effout ~> PropT Effout
