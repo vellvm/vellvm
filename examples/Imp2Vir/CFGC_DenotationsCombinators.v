@@ -26,7 +26,7 @@ From Vellvm Require Import
      SymbolicInterpreter.
 
 
-From Imp2Vir Require Import CFGC_Utils CFGC_Combinators.
+From Imp2Vir Require Import CFGC_Utils CFGC_Combinators Imp.
 
 Notation code := (code typ).
 Notation ocfg := (ocfg typ).
@@ -165,7 +165,12 @@ Ltac compute_eqv_dec :=
 
 (** Denotation Combinators *)
 
+(* 
 
+denote_cfg bks : id -> id -> itree E (V + id*id) ~ id -> id -> EitherT V (itree E) id*id
+
+
+*)
 Lemma denote_cfg_block : forall (c : code) (input output : block_id) from,
     input <> output -> (* TODO should be a WF property of block *)
     eutt eq
@@ -487,7 +492,28 @@ Ltac show_iter_body :=
     apply boxv_iter in EQ
   end.
 
-Lemma denote_cfg_while_loop :
+  (* 
+Definition my_seq {E} (c : block_id -> block_id -> itree E (dvalue + block_id * block_id))
+  (k : block_id -> block_id -> itree E (dvalue + block_id * block_id))
+  (t ;; k) f i := vob <- t f i;; match vob with | inl v => inl v | inr (b,b') => k b b' end *)
+
+Definition evaluate_conditional (code : code) (cond : texp) : itree instr_E bool :=
+          let (dt,e) := texp_break cond in
+          dv <- translate exp_to_instr (
+                             uv <-  (denote_exp (Some dt) e) ;;
+                             concretize_or_pick uv True) ;;
+          match dv with
+          | DVALUE_I1 comparison_bit =>
+              if equ comparison_bit Int1.one then
+                 Ret true
+              else
+                 Ret false
+          | DVALUE_Poison => raiseUB "Branching on poison."
+          | _ => raise "Br got non-bool value"
+          end.
+
+(* Precondition probablement nécessaire : denote_cfg body input inB ~> {fun vob -> exists bfrom, vob = inl (bfrom, inB)} *)
+Lemma denote_cfg_while_loop : 
   forall expr_code cond body input inB output outB from,
     input <> output ->
     input <> inB ->
@@ -498,10 +524,21 @@ Lemma denote_cfg_while_loop :
     free_in_cfg body output ->
     free_in_cfg body outB ->
     wf_ocfg_bid body ->
-    In inB (inputs body) -> (* can I relax this hypothesis ? *)
+    In inB (inputs body) -> (* can I relax this hypothesis ? *) 
     eutt eq
          (denote_cfg (cfg_while_loop expr_code cond body input inB output outB)
-                     from input)
+                     from input) 
+         (iter (C := Kleisli _) 
+            (fun '(from, to) => 
+              b <- evaluate_conditional expr_code cond;; 
+              if b : bool 
+              then vob <- denote_cfg body input inB;; 
+                   match vob with
+                   | inr v => Ret (inr (inr v))
+                   | inl b => Ret (inl b) 
+                   end
+        else Ret (inr (inl (input,output)))) (from, input)).
+(*
          (iter (C:= Kleisli _)
                (fun '(from,to) =>
                    if eq_bid to input
@@ -723,4 +760,5 @@ Proof.
                end.
       * (* 5.4: ignore the body *)
         rewrite bind_ret_l. reflexivity.
+*)
 Admitted.
