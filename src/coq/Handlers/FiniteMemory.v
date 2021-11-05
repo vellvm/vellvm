@@ -617,7 +617,7 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
   Module BYTE := Byte ADDR IP SIZEOF Events BYTE_IMPL.
   Import BYTE.
 
-  Module ESID := ERRSID ADDR IP SIZEOF Events PROV.
+  Module ESID := ERRSID ADDR IP SIZEOF PROV.
   Import ESID.
 
   Module PROV_F := PROV_FUNCS ADDR PROV.
@@ -894,44 +894,6 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
       apply wf_lexprod; intros;
       apply Wf_nat.lt_wf.
     Qed.
-
-    Ltac solve_dtyp_measure :=
-      cbn;
-      first [ lia
-            | match goal with
-              | _ : _ |- context [(dtyp_measure ?t + fold_right _ _ _)%nat]
-                => pose proof (dtyp_measure_gt_0 t); unfold list_sum; lia
-              end
-            | match goal with
-              | HIn : In ?x ?xs |- context [ list_sum (map ?f _)] =>
-                pose proof (list_sum_map f x xs HIn)
-              end;
-              cbn in *; lia
-            ].
-
-    Ltac solve_uvalue_measure :=
-      cbn;
-      first [ lia
-            | match goal with
-              | _ : _ |- context [(uvalue_measure ?t + fold_right _ _ _)%nat]
-                => pose proof (uvalue_measure_gt_0 t); unfold list_sum; lia
-              end
-            | match goal with
-              | HIn : In ?x ?xs |- context [ list_sum (map ?f _)] =>
-                pose proof (list_sum_map f x xs HIn)
-              end;
-              cbn in *; lia
-            ].
-
-    Ltac solve_uvalue_dtyp_measure :=
-      red; cbn;
-      repeat match goal with
-             | Hin : In _ (repeatN _ _) |- _ =>
-               apply In_repeatN in Hin; subst
-             end;
-      solve [ apply right_lex; solve_dtyp_measure
-            | apply left_lex; solve_uvalue_measure
-            ].
 
     (* This is mostly to_ubytes, except it will also unwrap concatbytes *)
   Obligation Tactic := try Tactics.program_simpl; try solve [solve_uvalue_dtyp_measure | intuition; try (inversion H); try (inversion H0)].

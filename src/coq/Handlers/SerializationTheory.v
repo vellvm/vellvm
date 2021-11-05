@@ -257,7 +257,7 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
   Module Mem := FiniteMemory.Make LP Events FMP.
   Import Mem.
 
-  Module ESID := ERRSID ADDR IP SIZEOF Events PROV.
+  Module ESID := ERRSID ADDR IP SIZEOF PROV.
   Import ESID.
 
   Import DynamicTypes.

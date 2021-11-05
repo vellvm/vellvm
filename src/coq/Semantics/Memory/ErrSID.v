@@ -12,6 +12,7 @@ From Vellvm Require Import
      Utils.Error
      Utils.UBAndErrors
      Semantics.MemoryAddress
+     Semantics.DynamicValues
      Semantics.LLVMEvents
      Semantics.Memory.FiniteProvenance
      Semantics.Memory.Sizeof
@@ -34,8 +35,7 @@ Import Basics.Basics.Monads.
 Import MonadNotation.
 
 (* TODO: Provenance is an issue... *)
-Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)) (PROV:PROVENANCE(Addr)).
-  Import LLVMEvents.
+Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr)).
   Import PROV.
 
   (* Need failure, UB, state for store_ids, and state for provenances *)

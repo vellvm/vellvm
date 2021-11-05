@@ -10,7 +10,14 @@
 
 (* begin hide *)
 From Coq Require Import
-     ZArith DecidableClass List String Omega Bool.Bool Lia.
+     Relations
+     ZArith
+     DecidableClass
+     List
+     String
+     Omega
+     Bool.Bool
+     Lia.
 
 Import BinInt.
 
@@ -51,6 +58,8 @@ Set Contextual Implicit.
 Open Scope N_scope.
 (* end hide *)
 
+
+Definition store_id := N.
 
 (** * Dynamic values
     Definition of the dynamic values manipulated by VIR.
@@ -290,8 +299,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     Qed.
   End DvalueInd.
 
-  Definition store_id := N.
-
   (* The set of dynamic values manipulated by an LLVM program. *)
   Unset Elimination Schemes.
   Inductive uvalue : Type :=
@@ -381,6 +388,45 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     destruct uv; cbn; auto.
     all: apply Nat.lt_0_succ.
   Qed.
+
+  Ltac solve_dtyp_measure :=
+    cbn;
+    first [ lia
+          | match goal with
+            | _ : _ |- context [(dtyp_measure ?t + fold_right _ _ _)%nat]
+              => pose proof (dtyp_measure_gt_0 t); unfold list_sum; lia
+            end
+          | match goal with
+            | HIn : In ?x ?xs |- context [ list_sum (map ?f _)] =>
+                pose proof (list_sum_map f x xs HIn)
+            end;
+            cbn in *; lia
+      ].
+
+  Ltac solve_uvalue_measure :=
+    cbn;
+    first [ lia
+          | match goal with
+            | _ : _ |- context [(uvalue_measure ?t + fold_right _ _ _)%nat]
+              => pose proof (uvalue_measure_gt_0 t); unfold list_sum; lia
+            end
+          | match goal with
+            | HIn : In ?x ?xs |- context [ list_sum (map ?f _)] =>
+                pose proof (list_sum_map f x xs HIn)
+            end;
+            cbn in *; lia
+      ].
+
+  Ltac solve_uvalue_dtyp_measure :=
+    red; cbn;
+    repeat match goal with
+           | Hin : In _ (repeatN _ _) |- _ =>
+               apply In_repeatN in Hin; subst
+           end;
+    solve [ apply right_lex; solve_dtyp_measure
+          | apply left_lex; solve_uvalue_measure
+      ].
+
 
   Definition dvalue_is_poison (dv : dvalue) : bool :=
     match dv with

@@ -89,7 +89,7 @@ Module Type MEMORY_THEORY (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR 
 
   Export Mem.
 
-  Module ESID := ERRSID ADDR IP SIZEOF Events PROV.
+  Module ESID := ERRSID ADDR IP SIZEOF PROV.
   Import ESID.
 
   Module MBT := MemBytesTheory LP Events FMP.

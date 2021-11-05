@@ -90,6 +90,10 @@ Set Contextual Implicit.
     : itree E X 
     := v <- trigger (ThrowUB e);; match v: void with end.
 
+  #[global] Instance RAISE_UB_ITREE_UB {E : Type -> Type} `{UBE -< E} : RAISE_UB (itree E) :=
+  { raise_ub := fun A e => raiseUB e
+  }.
+
   (* Out of memory / abort. Carries a string for a message. *)
   Variant OOME : Type -> Type :=
   | ThrowOOM : string -> OOME void.
@@ -104,6 +108,19 @@ Set Contextual Implicit.
              (e : string)
     : itree E X 
     := v <- trigger (ThrowOOM e);; match v: void with end.
+
+  Definition raiseOOM_NOMSG {E : Type -> Type} `{OOME_NOMSG -< E} {X}
+             (e : string)
+    : itree E X
+    := v <- trigger (ThrowOOM_NOMSG);; match v: void with end.
+
+  #[global] Instance RAISE_OOM_ITREE_OOME {E : Type -> Type} `{OOME -< E} : RAISE_OOM (itree E) :=
+  { raise_oom := fun A => raiseOOM
+  }.
+
+  #[global] Instance RAISE_OOM_ITREE_OOME_NOMSG {E : Type -> Type} `{OOME_NOMSG -< E} : RAISE_OOM (itree E) :=
+  { raise_oom := fun A => raiseOOM_NOMSG
+  }.
 
   (* Debug is identical to the "Trace" effect from the itrees library,
    but debug is probably a less confusing name for us. *)
@@ -121,6 +138,10 @@ Set Contextual Implicit.
 
   Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
     v <- trigger (Throw _ (print_msg msg));; match v: void with end.
+
+  #[global] Instance RAISE_ERR_ITREE_FAILUREE {E : Type -> Type} `{FailureE -< E} : RAISE_ERROR (itree E) :=
+  { raise_error := fun A e => raise e
+  }.
     
   Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m:err A) : itree E B :=
     match m with
