@@ -14,6 +14,7 @@ From Vellvm Require Import
      Semantics.LLVMParams
      Utils.Error
      Utils.Monads
+     Utils.PropT
      Utils.ListUtil.
 
 From ExtLib Require Import
@@ -170,7 +171,7 @@ Module DVConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1
 
 End DVConvertMake.
 
-Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
+Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
   (* TODO: should this be a parameter? *)
   Module DVC := DVConvertMake LP1 LP2 AC E1 E2.
   Module DVCrev := DVConvertMake LP2 LP1 AC2 E2 E1.
@@ -178,7 +179,7 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
 
   Require Import String.
 
-  Definition L6_convert : Handler E1.L6 E2.L6.
+  Definition L5_convert : Handler E1.L5 E2.L5.
   Proof.
     refine (fun A e => _).
 
@@ -217,5 +218,15 @@ Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
   Module E1 := IS1.LLVM.Events.
   Module E2 := IS2.LLVM.Events.
 
-  (* Definition refine_oom (source : itree E1.L6  *)
+  Module EC := EventConvert IS1.LP IS2.LP AC1 AC2 E1 E2.
+  Import EC.
+
+  (* TODO: move this? *)
+  Definition L5_convert_tree {T} (t : itree E1.L5 T) : itree E2.L5 T := interp L5_convert t.
+
+  Definition refine_oom {T} (sources : PropT E1.L5 T) (target : itree E2.L5 T) : Prop
+    := exists (source : itree E1.L5 T),
+      sources source ->
+      model_OOM_h (L5_convert_tree source) target.
+
 End InfiniteToFinite.
