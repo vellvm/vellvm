@@ -467,6 +467,25 @@ Proof.
     reflexivity.
 Qed.
 
+Variant hidden_iter  (T: Type) : Type := boxh_iter (t: T).
+Variant visible_iter (T: Type) : Type := boxv_iter (t: T).
+Ltac hide_iter_body :=
+  match goal with
+  | |- context[ITree.iter ?g] =>
+      let VG := fresh "VBODY" in
+      let G := fresh "BODY" in
+      remember g as G eqn:VG
+      ; apply boxh_iter in VG
+  end.
+Notation "'hidden_iter' G" := (hidden_iter (G = _)) (only printing, at level 10).
+
+Ltac show_iter_body :=
+  match goal with
+  | h: hidden_iter _ |- _ =>
+    let EQ := fresh "HBODY" in
+    destruct h as [EQ];
+    apply boxv_iter in EQ
+  end.
 
 Lemma denote_cfg_while_loop :
   forall expr_code cond body input inB output outB from,
@@ -526,7 +545,7 @@ Proof.
 
   (* Denotation of the 1st iteration of the loop *)
   rewrite unfold_iter.
-
+  hide_iter_body.
   (* 1: jump to the input block, ie. the condition block *)
   (* 1.1: Denote the code used in order to compute the expression *)
   (* Bring the /denote code/ on the top of the right side of the equation *)
@@ -536,6 +555,7 @@ Proof.
 
   (* Bring the /denote code/ on the top of the left side of the equation *)
   unfold denote_ocfg ; setoid_rewrite unfold_iter ; simpl.
+  hide_iter_body.
   rewrite eqv_dec_p_refl.
   rewrite bind_bind.
   setoid_rewrite denote_block_unfold.
@@ -565,6 +585,8 @@ Proof.
   destruct u1 ;
     try (rewrite exp_to_instr_raise) ;
     try (rewrite exp_to_instr_raiseUB).
+  (* - rewrite <- bind_bind. rewrite eutt_eq_bind. reflexivity. *)
+
   (* TODO: temporarely, admit the exception cases *)
   (* NOTE all raise should have the same proof - same with raiseUB but using the
      lemmas for raiseUB instead of those for raise *)
@@ -587,7 +609,7 @@ Proof.
       (* 2.0: on the left side, we are iterating on the whole ocfg,
               thus we have to ignore the block /input/ *)
       setoid_rewrite unfold_iter.
-      compute_eqv_dec.
+      destruct VBODY0 ; subst BODY0 ; compute_eqv_dec ; hide_iter_body.
       (* 2.1: jump to /inB/, which is is the cfg /body/ -->
         maybe this hypothesis can be relaxed *)
       rewrite bind_bind.
@@ -645,8 +667,7 @@ Proof.
         (* u1 = denotation of one iteration of the body entering by inB *)
         destruct u1.
       ** (* inl - continue to iterates in the body *) admit.
-      ** (* inr - stop the iteration and leave the denotation of the body *)
-        admit.
+      ** (* inr - stop the iteration and leave denotation of the body *) admit.
 
     + (* the condition is false *)
       (* 5: jump into the block output, which is fresh *)
@@ -657,7 +678,7 @@ Proof.
       rewrite translate_ret ; rewrite 2 bind_ret_l ; rewrite tau_eutt.
       rewrite unfold_iter.
       (* 5.2.a: ignore the block input *)
-      compute_eqv_dec.
+      destruct VBODY0 ; subst BODY0 ; compute_eqv_dec ; hide_iter_body.
       (* 5.3: by contradiction, suppose that output is in body
                 or output = outB *)
       flatten_goal.
