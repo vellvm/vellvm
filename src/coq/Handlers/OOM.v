@@ -27,6 +27,9 @@ Open Scope monad_scope.
   Definition of the propositional and executable handlers for out of memory (abort).
 *)
 
+From Vellvm Require Import
+     Utils.PropT.
+
 Section PARAMS_MODEL.
   Variable (E F: Type -> Type).
   Notation Effin := (E +' OOME +' F).
@@ -38,17 +41,36 @@ Section PARAMS_MODEL.
   Definition F_trigger_model : F ~> itree Effout :=
     fun R e => r <- trigger e ;; ret r.
 
-  Definition OOM_handler : OOME ~> itree Effout
+  Definition E_trigger_model_prop : E ~> PropT Effout :=
+    fun R e => fun t => t = r <- trigger e ;; ret r.
+
+  Definition F_trigger_model_prop : F ~> PropT Effout :=
+    fun R e => fun t => t = r <- trigger e ;; ret r.
+
+  Definition OOM_msg_handler : OOME ~> itree Effout
     := fun T oome =>
          match oome with
          | ThrowOOM x => trigger ThrowOOM_NOMSG
          end.
 
-  Definition model_OOM_h : Effin ~> itree Effout
-    := case_ E_trigger_model (case_ OOM_handler F_trigger_model).
+  Definition remove_OOM_msg_h : Effin ~> itree Effout
+    := case_ E_trigger_model (case_ OOM_msg_handler F_trigger_model).
 
-  Definition model_OOM : itree Effin ~> itree Effout
-    := interp model_OOM_h.
+  Definition remove_OOM_msg : itree Effin ~> itree Effout
+    := interp remove_OOM_msg_h.
+
+  (* Semantics of OOM *)
+  Definition OOM_handler : OOME_NOMSG ~> PropT Effout
+    := fun T oome source => True.
+
+  Definition model_OOM_handler : Effout ~> PropT Effout
+    := case_ E_trigger_model_prop (case_ OOM_handler F_trigger_model_prop).
+
+  Definition model_OOM_h {T} (source target : itree Effout T) : Prop
+    := interp model_OOM_handler target source.
+
+  Definition model_OOM {T} (sources : PropT Effout T) (target : itree Effout T) : Prop
+    := exists source, sources source /\ model_OOM_h source target.
 
 End PARAMS_MODEL.
 

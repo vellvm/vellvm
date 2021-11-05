@@ -26,16 +26,20 @@ From ITree Require Import
 
 Import MonadNotation.
 
-Module Type AddrConvert (LP1 : LLVMParams) (LP2 : LLVMParams).
-  Parameter addr_convert : LP1.ADDR.addr -> OOM LP2.ADDR.addr.
+Module Type AddrConvert (ADDR1 : ADDRESS) (ADDR2 : ADDRESS).
+  Parameter addr_convert : ADDR1.addr -> OOM ADDR2.addr.
 End AddrConvert.
 
-Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1 LP2) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
+Module FinAddrConvert : AddrConvert FiniteMemory.Addr FiniteMemory.Addr.
+  Definition addr_convert (a : FiniteMemory.Addr.addr) : OOM FiniteMemory.Addr.addr := ret a.
+End FinAddrConvert.
+
+Module Type DVConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
   Parameter dvalue_convert : Events1.DV.dvalue -> OOM Events2.DV.dvalue.
   Parameter uvalue_convert : Events1.DV.uvalue -> OOM Events2.DV.uvalue.
 End DVConvert.
 
-Module DVConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1 LP2) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) : DVConvert LP1 LP2 AC Events1 Events2.
+Module DVConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (Events1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (Events2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF) : DVConvert LP1 LP2 AC Events1 Events2.
   Import AC.
 
   Module DV1 := Events1.DV.
@@ -166,7 +170,7 @@ Module DVConvertMake (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1
 
 End DVConvertMake.
 
-Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1 LP2) (AC2 : AddrConvert LP2 LP1) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
+Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.ADDR LP2.ADDR) (AC2 : AddrConvert LP2.ADDR LP1.ADDR) (E1 : LLVM_INTERACTIONS LP1.ADDR LP1.IP LP1.SIZEOF) (E2 : LLVM_INTERACTIONS LP2.ADDR LP2.IP LP2.SIZEOF).
   (* TODO: should this be a parameter? *)
   Module DVC := DVConvertMake LP1 LP2 AC E1 E2.
   Module DVCrev := DVConvertMake LP2 LP1 AC2 E2 E1.
@@ -215,8 +219,9 @@ Module Type EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert
   Defined.  
 End EventConvert.
 
-Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2).
+Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2).
+  Module E1 := IS1.LLVM.Events.
+  Module E2 := IS2.LLVM.Events.
 
-  Check LLVM1.model.
-  About euttEv.
+  Definition refine_oom (source : itree E1.L6 
 End InfiniteToFinite.

@@ -85,7 +85,9 @@ Module Type InterpreterStack.
       let L2_trace       := interp_local_stack L1_trace l in
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := model_undef RR L3_trace in
-      PropT_itree_map (@model_OOM _ _ _) L4_trace. 
+      let L5_trace_no_msgs := PropT_itree_map (@remove_OOM_msg _ _ _) L4_trace in
+      let L5_trace := model_OOM L5_trace_no_msgs in
+      L5_trace.
 
     Definition interp_mcfg6 {R} RR (t: itree L0 R) g l m : PropT L6 (MemState * (local_env * stack * (global_env * R))) :=
       let uvalue_trace   := interp_intrinsics t in
