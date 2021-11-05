@@ -140,6 +140,19 @@ Ltac step_singleton_in :=
              ; try (rewrite bind_ret_l)
   end.
 
+
+Ltac compute_eqv_dec :=
+  match goal with
+  | h:(?b1 <> ?b2) |-
+      context[if Eqv.eqv_dec_p ?b1 ?b2 then true else false]
+    => rewrite <- eqb_bid_neq, eqv_dec_p_eq in h ; setoid_rewrite h
+  | h:(?b1 <> ?b2) |-
+      context[if Eqv.eqv_dec_p (endo ?b1) (endo ?b2) then true else false]
+    => rewrite <- eqb_bid_neq, eqv_dec_p_eq in h ; setoid_rewrite h
+  end.
+
+
+
 (* tactics for convert_typ *)
 (* repeat ( *)
 (*       match goal with *)
@@ -148,55 +161,6 @@ Ltac step_singleton_in :=
 (*       | h:context[free_in_cfg _ _] |- _ => apply free_in_convert_typ with (env := []) *)
 (*           in h *)
 (*       end). *)
-
-
-
-Lemma find_block_some_conv :
-  forall g bid bk,
-    find_block g bid = Some bk <->
-    find_block (conv g) bid = Some (conv bk).
-Proof.
-  intros.
-  assert ( Hconv: blk_id (conv bk) = blk_id bk ) by apply blk_id_convert_typ.
-Admitted.
-
-Lemma find_block_none_conv :
-  forall g bid,
-    find_block g bid = None <->
-    find_block (conv g) bid = None.
-Proof.
-  intros.
-Admitted.
-
-
-Lemma no_reentrance_conv :
-  forall g1 g2,
-    no_reentrance g1 g2 <-> no_reentrance (conv g1) (conv g2).
-Proof.
-  intros.
-  unfold no_reentrance.
-  now rewrite convert_typ_outputs, convert_typ_inputs.
-Qed.
-
-Lemma no_duplicate_bid_conv :
-  forall g1 g2,
-    no_duplicate_bid g1 g2 <-> no_duplicate_bid (conv g1) (conv g2).
-Proof.
-  intros.
-  unfold no_duplicate_bid.
-  now rewrite 2 convert_typ_inputs.
-Qed.
-
-Lemma independent_flows_conv :
-  forall g1 g2,
-    independent_flows g1 g2 <-> independent_flows (conv g1) (conv g2).
-Proof.
-  intros.
-  unfold independent_flows.
-  rewrite <- 2 no_reentrance_conv.
-  now rewrite no_duplicate_bid_conv.
-Qed.
-
 
 
 (** Denotation Combinators *)
@@ -222,13 +186,10 @@ Proof.
   unfold Traversal.endo, Traversal.Endo_id ; simpl.
   rewrite denote_no_phis.
   rewrite bind_ret_l.
-  rewrite eutt_eq_bind ; [reflexivity|].
-  intros; simpl.
+  rewrite eutt_eq_bind ; [reflexivity| intros; simpl].
   rewrite translate_ret.
   rewrite bind_ret_l.
-  rewrite denote_ocfg_unfold_not_in.
-  2: { now apply find_block_none_singleton. }
-  reflexivity.
+  now step_singleton_not_in.
 Qed.
 
 Lemma denote_cfg_ret : forall (c : code) (e : texp) (input : block_id) from,
@@ -242,32 +203,20 @@ Proof.
   intros.
   unfold cfg_ret, denote_cfg.
   flatten_goal.
-  rewrite denote_ocfg_unfold_in.
-  2: { simpl ; now rewrite eqv_dec_p_refl. }
+  step_singleton_in.
   setoid_rewrite denote_block_unfold.
   simpl.
   rewrite bind_bind.
   rewrite denote_no_phis.
   rewrite bind_ret_l.
   rewrite bind_bind.
-  rewrite eutt_eq_bind ; [reflexivity|].
-  intros ; cbn.
+  rewrite eutt_eq_bind ; [reflexivity| intros ; cbn].
   rewrite translate_bind.
   rewrite bind_bind.
-  unfold tfmap,TFunctor_texp in Heq.
-  inv Heq.
-  rewrite eutt_eq_bind ; [reflexivity|].
-  intros ; cbn.
+  rewrite eutt_eq_bind ; [reflexivity| intros ; cbn].
   setoid_rewrite translate_ret.
   setoid_rewrite bind_ret_l ; reflexivity.
 Qed.
-Ltac find_block_conv :=
-  match goal with
-  | h:context[ find_block _ _ = None ] |- _ =>
-      apply find_block_none_conv in h
-  | h:context[ find_block _ _ = Some _ ] |- _ =>
-      apply find_block_some_conv in h
-  end.
 
 
 Lemma denote_cfg_branch :
@@ -519,7 +468,6 @@ Proof.
 Qed.
 
 
-(* NOTE I'll probably need additional WF hypothesis *)
 Lemma denote_cfg_while_loop :
   forall expr_code cond body input inB output outB from,
     input <> output ->
@@ -639,10 +587,7 @@ Proof.
       (* 2.0: on the left side, we are iterating on the whole ocfg,
               thus we have to ignore the block /input/ *)
       setoid_rewrite unfold_iter.
-      match goal with
-      | h:context[input <> inB] |- _ =>
-          rewrite <- eqb_bid_neq,eqv_dec_p_eq in h ; setoid_rewrite h
-      end.
+      compute_eqv_dec.
       (* 2.1: jump to /inB/, which is is the cfg /body/ -->
         maybe this hypothesis can be relaxed *)
       rewrite bind_bind.
@@ -653,12 +598,13 @@ Proof.
          the block inB is the same:
          On the left side, we have the cfg /body (+) outB/
          since in the right side, we have only /body/ *)
-        (* TODO clean up the part of the proof *)
 
+        (* TODO clean up this part of the proof *)
         (* 2.1.a: jump in block inB in the right side *)
-        assert ( INB_IN_BODY' : In inB (inputs body)) by assumption.
-        apply find_block_in_inputs in INB_IN_BODY ; destruct INB_IN_BODY as
-          [inBk HinB] ; apply find_block_some_conv in HinB.
+        apply find_block_in_inputs in INB_IN_BODY
+        ; destruct INB_IN_BODY as [inBk HinB].
+        assert (HinB': find_block body inB = Some inBk) by assumption.
+        apply find_block_some_conv in HinB.
         destruct (find_block (conv body) inB) eqn:HinBody
         ; unfold conv,ConvertTyp_list,block_id,tfmap,TFunctor_list',
           tfmap,TFunctor_block,tfmap,endo,Endo_id in HinB, HinBody
@@ -667,24 +613,32 @@ Proof.
         ; inv HinB.
 
         (* 2.1.b: jump in block inB in the left side *)
-        pose proof (find_block_app_l_wf inB (b:=inBk) body [{|
-                              blk_id := outB;
-                               blk_phis := [];
-                               blk_code := [];
-                               blk_term := TERM_Br_1 input;
-                               blk_comments := None
-                           |}]).
-        rewrite 2 find_block_some_conv in H.
+        pose proof
+             (find_block_app_l_wf
+                 inB (b:= (conv inBk)) (conv body)
+                 (conv [{| blk_id := outB;
+                            blk_phis := [];
+                            blk_code := [];
+                            blk_term := TERM_Br_1 input;
+                            blk_comments := None |}])).
+        rewrite <- (convert_typ_list_app body _) in H.
+        rewrite find_block_some_conv with (bk := inBk) in H ;
+          [|assumption].
         unfold conv,ConvertTyp_list,block_id,tfmap,TFunctor_list',
           tfmap,TFunctor_block,tfmap,endo,Endo_id in H.
         unfold ConvertTyp_list, tfmap, TFunctor_list',tfmap,TFunctor_block at 1.
         unfold tfmap, endo, Endo_id.
-        rewrite H.
-        (* now, we have the same denotation of the block in both sides *)
-        reflexivity.
-        (* Remaining goals due to the use of /find_block_app_l_wf/ *)
-        admit. (* easy because outB is free in body *)
-        admit. (* easy thanks to INB_IN_BODY' *)
+        rewrite H ; try reflexivity.
+        { (* easy because outB is free in body *)
+           apply wf_ocfg_bid_convert_typ.
+           unfold wf_ocfg_bid.
+           rewrite inputs_app ; simpl.
+           apply Coqlib.list_norepet_append
+           ; [assumption | now apply List_norepet_singleton| ].
+           apply Coqlib.list_disjoint_cons_r
+           ; [now apply Util.list_disjoint_nil_r|assumption].
+        }
+      (* now, we have the same denotation of the block in both sides *)
 
       * (* since we have denoted inB, we have to continue the denotation of the body *)
         simpl.
@@ -702,14 +656,8 @@ Proof.
       (* 5.2: in the left side, iter again on the whole cfg *)
       rewrite translate_ret ; rewrite 2 bind_ret_l ; rewrite tau_eutt.
       rewrite unfold_iter.
-      (* TODO i can probably have a tactics which do that automatically,
-      ie find the right hypothesis and transform it automatically *)
       (* 5.2.a: ignore the block input *)
-      match goal with
-      | h:context[input <> output] |- _ =>
-          rewrite <- eqb_bid_neq,eqv_dec_p_eq in h ; setoid_rewrite h
-      end.
-
+      compute_eqv_dec.
       (* 5.3: by contradiction, suppose that output is in body
                 or output = outB *)
       flatten_goal.
@@ -725,7 +673,8 @@ Proof.
                               |}]) output = Some b)
                ).
 
-        { apply find_block_app_wf ; [| now rewrite <- (convert_typ_list_app body _ [])].
+        { apply find_block_app_wf
+          ; [| now rewrite <- (convert_typ_list_app body _ [])].
           unfold wf_ocfg_bid in *.
           rewrite inputs_app.
           rewrite convert_typ_inputs ; simpl.

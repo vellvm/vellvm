@@ -251,7 +251,70 @@ Proof.
   apply convert_typ_terminator_outputs.
 Qed.
 
-(* TODO generelize typ to T *)
+Notation conv := (convert_typ []).
+
+Lemma find_block_some_conv :
+  forall g bid bk,
+    find_block g bid = Some bk ->
+    find_block (conv g) bid = Some (conv bk).
+Proof.
+  intros.
+  unfold conv in *.
+  unfold ConvertTyp_list, tfmap, TFunctor_list'.
+  apply (find_block_map_some' _ g bid bk) ; [|assumption].
+  apply blk_id_convert_typ.
+Qed.
+
+Lemma find_block_none_conv :
+  forall g bid,
+    find_block g bid = None ->
+    find_block (conv g) bid = None.
+Proof.
+  intros.
+  unfold conv in *.
+  unfold ConvertTyp_list, tfmap, TFunctor_list'.
+  apply (find_block_map_none' _ g bid) ; [|assumption].
+  apply blk_id_convert_typ.
+Qed.
+
+
+Ltac find_block_conv :=
+  match goal with
+  | h:context[ find_block _ _ = None ] |- _ =>
+      apply find_block_none_conv in h
+  | h:context[ find_block _ _ = Some _ ] |- _ =>
+      apply find_block_some_conv in h
+  end.
+
+
+Lemma no_reentrance_conv :
+  forall g1 g2,
+    no_reentrance g1 g2 <-> no_reentrance (conv g1) (conv g2).
+Proof.
+  intros.
+  unfold no_reentrance.
+  now rewrite convert_typ_outputs, convert_typ_inputs.
+Qed.
+
+Lemma no_duplicate_bid_conv :
+  forall g1 g2,
+    no_duplicate_bid g1 g2 <-> no_duplicate_bid (conv g1) (conv g2).
+Proof.
+  intros.
+  unfold no_duplicate_bid.
+  now rewrite 2 convert_typ_inputs.
+Qed.
+
+Lemma independent_flows_conv :
+  forall g1 g2,
+    independent_flows g1 g2 <-> independent_flows (conv g1) (conv g2).
+Proof.
+  intros.
+  unfold independent_flows.
+  rewrite <- 2 no_reentrance_conv.
+  now rewrite no_duplicate_bid_conv.
+Qed.
+
 Lemma inputs_app : forall {T} (g1 g2 : ocfg T), inputs (g1++g2) = inputs g1 ++ inputs g2.
 Proof.
   intros.
