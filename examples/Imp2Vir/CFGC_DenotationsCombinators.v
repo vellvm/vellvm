@@ -142,13 +142,13 @@ Ltac step_singleton_in :=
 
 
 Ltac compute_eqv_dec :=
+  unfold endo,Endo_id ;
   match goal with
   | h:(?b1 <> ?b2) |-
       context[if Eqv.eqv_dec_p ?b1 ?b2 then true else false]
     => rewrite <- eqb_bid_neq, eqv_dec_p_eq in h ; setoid_rewrite h
-  | h:(?b1 <> ?b2) |-
-      context[if Eqv.eqv_dec_p (endo ?b1) (endo ?b2) then true else false]
-    => rewrite <- eqb_bid_neq, eqv_dec_p_eq in h ; setoid_rewrite h
+  |  |- context[if Eqv.eqv_dec_p ?b1 ?b1 then true else false]
+    => setoid_rewrite eqv_dec_p_refl
   end.
 
 
@@ -472,11 +472,66 @@ Proof.
     reflexivity.
 Qed.
 
+  (* TODO Either Monad
+Definition my_seq {E} (c : block_id -> block_id -> itree E (dvalue + block_id * block_id))
+  (k : block_id -> block_id -> itree E (dvalue + block_id * block_id))
+  (t ;; k) f i := vob <- t f i;; match vob with | inl v => inl v | inr (b,b') => k b b' end *)
+
+Definition evaluate_conditional (c : code) (cond : texp) : itree instr_E bool :=
+  denote_code (conv c) ;;
+  let (dt,e) := texp_break cond in
+  dv <- translate exp_to_instr (
+                    uv <-  (denote_exp (Some dt) e) ;;
+                    concretize_or_pick uv True) ;;
+  match dv with
+  | DVALUE_I1 comparison_bit =>
+      if equ comparison_bit Int1.one then
+         Ret true
+      else
+         Ret false
+  | DVALUE_Poison => raiseUB "Branching on poison."
+  | _ => raise "Br got non-bool value"
+  end.
+
+
+Require Import Paco.paco.
+Import SemNotations.
+Require Import DenotationTheory.
+Import DenoteTactics.
+
+
+Lemma denote_no_phis : forall x,
+    ⟦ [] ⟧Φs x ≅ Ret tt.
+Proof.
+  intros.
+  cbn. go.
+  cbn; go.
+  reflexivity.
+Qed.
+
+Lemma translate_trigger {E F G} `{E -< F} :
+  forall X (e: E X) (h: F ~> G),
+    translate h (trigger e) ≅ trigger (h _ (subevent X e)).
+Proof.
+  intros; unfold trigger; rewrite translate_vis; setoid_rewrite translate_ret; reflexivity.
+Qed.
+
+Lemma exp_to_instr_raise : forall T s,
+    translate exp_to_instr (raise (A := T) s) ≅ raise s.
+Proof.
+  unfold raise; intros.
+Admitted.
+
 Variant hidden_iter  (T: Type) : Type := boxh_iter (t: T).
 Variant visible_iter (T: Type) : Type := boxv_iter (t: T).
 Ltac hide_iter_body :=
   match goal with
   | |- context[ITree.iter ?g] =>
+      let VG := fresh "VBODY" in
+      let G := fresh "BODY" in
+      remember g as G eqn:VG
+      ; apply boxh_iter in VG
+  | h: context[ITree.iter ?g] |- _ =>
       let VG := fresh "VBODY" in
       let G := fresh "BODY" in
       remember g as G eqn:VG
@@ -487,32 +542,137 @@ Notation "'hidden_iter' G" := (hidden_iter (G = _)) (only printing, at level 10)
 Ltac show_iter_body :=
   match goal with
   | h: hidden_iter _ |- _ =>
-    let EQ := fresh "HBODY" in
-    destruct h as [EQ];
-    apply boxv_iter in EQ
+      let EQ := fresh "HBODY" in
+      destruct h as [EQ];
+apply boxv_iter in EQ
   end.
 
-  (* 
-Definition my_seq {E} (c : block_id -> block_id -> itree E (dvalue + block_id * block_id))
-  (k : block_id -> block_id -> itree E (dvalue + block_id * block_id))
-  (t ;; k) f i := vob <- t f i;; match vob with | inl v => inl v | inr (b,b') => k b b' end *)
+Ltac unhide_iter :=
+  match goal with
+  | h: hidden_iter (?body = _) |- _ =>
+      destruct h ; subst body
+  | h: visible_iter (?body = _) |- _ =>
+      destruct h ; subst body
+  end.
 
-Definition evaluate_conditional (code : code) (cond : texp) : itree instr_E bool :=
-          let (dt,e) := texp_break cond in
-          dv <- translate exp_to_instr (
-                             uv <-  (denote_exp (Some dt) e) ;;
-                             concretize_or_pick uv True) ;;
-          match dv with
-          | DVALUE_I1 comparison_bit =>
-              if equ comparison_bit Int1.one then
-                 Ret true
-              else
-                 Ret false
-          | DVALUE_Poison => raiseUB "Branching on poison."
-          | _ => raise "Br got non-bool value"
-          end.
 
-(* Precondition probablement nécessaire : denote_cfg body input inB ~> {fun vob -> exists bfrom, vob = inl (bfrom, inB)} *)
+Variant hidden_cfg  (T: Type) : Type := boxh_cfg (t: T).
+Variant visible_cfg (T: Type) : Type := boxv_cfg (t: T).
+Ltac hide_cfg :=
+  match goal with
+  | h: context[denote_ocfg ?cfg _] |- _ =>
+      remember cfg as G eqn:VG;
+apply boxh_cfg in VG
+  | h : visible_cfg _ |- _ =>
+      let EQ := fresh "VG" in
+      destruct h as [EQ];
+apply boxh_cfg in EQ
+  | |- context[denote_ocfg ?cfg _] =>
+      remember cfg as G eqn:VG;
+apply boxh_cfg in VG
+  end.
+Ltac show_cfg :=
+  match goal with
+  | h: hidden_cfg _ |- _ =>
+      let EQ := fresh "HG" in
+      destruct h as [EQ];
+apply boxv_cfg in EQ
+  end.
+Notation "'hidden' G" := (hidden_cfg (G = _)) (only printing, at level 10).
+
+Variant hidden_blk  (T: Type) : Type := boxh_blk (t: T).
+Variant visible_blk (T: Type) : Type := boxv_blk (t: T).
+
+
+Ltac hide_blk bid :=
+  match goal with
+  | h: context[
+            {| blk_id := bid;
+             blk_phis := ?phis;
+             blk_code := ?code;
+             blk_term := ?term;
+             blk_comments := ?comm |}
+         ] |- _ =>
+      let Vblk := fresh "Vblk" in
+      let blk := fresh "blk" in
+      remember  {| blk_id := bid;
+                 blk_phis := phis;
+                 blk_code := code;
+                 blk_term := term;
+                 blk_comments := comm |} as blk eqn:Vblk
+      ; apply boxh_blk in Vblk
+  | |- context[
+           {| blk_id := bid;
+            blk_phis := ?phis;
+            blk_code := ?code;
+            blk_term := ?term;
+            blk_comments := ?comm |}
+        ] =>
+      let Vblk := fresh "Vblk" in
+      let blk := fresh "blk" in
+      remember  {| blk_id := bid;
+                 blk_phis := phis;
+                 blk_code := code;
+                 blk_term := term;
+                 blk_comments := comm |} as blk eqn:Vblk
+      ; apply boxh_blk in Vblk
+
+  end.
+Notation "'hidden_blk' blk" := (hidden_blk (blk = _)) (only printing, at level 10).
+
+Ltac show_blk bid :=
+  match goal with
+  | h: hidden_blk ( _ = {| blk_id := bid;
+                         blk_phis := _;
+                         blk_code := _;
+                         blk_term := _;
+                         blk_comments := _ |}) |- _ =>
+      let EQ := fresh "Hblk" in
+      destruct h as [EQ];
+apply boxv_blk in EQ
+  end.
+
+Ltac unhide_blk bid :=
+  match goal with
+  | h: hidden_blk ( ?blk = {| blk_id := bid;
+                            blk_phis := _;
+                            blk_code := _;
+                            blk_term := _;
+                            blk_comments := _ |}) |- _  =>
+      destruct h ; subst blk
+  | h: visible_blk ( ?blk = {| blk_id := bid;
+                             blk_phis := _;
+                             blk_code := _;
+                             blk_term := _;
+                             blk_comments := _ |}) |- _  =>
+      destruct h ; subst blk
+  end.
+
+
+Hint Rewrite @bind_ret_l : rwbind.
+Hint Rewrite @bind_bind : rwbind.
+Hint Rewrite @translate_ret : rwtranslate.
+Hint Rewrite @translate_bind : rwtranslate.
+Hint Rewrite @translate_trigger : rwtranslate.
+
+Ltac bstep := autorewrite with rwbind.
+Ltac tstep := autorewrite with rwtranslate.
+Ltac go := autorewrite with rwtranslate rwbind.
+
+Ltac unfold_iter_cat :=
+  try (unfold iter,Iter_Kleisli, Basics.iter , MonadIter_itree in * ).
+
+Ltac conv_block :=
+  unfold tfmap, TFunctor_list, TFunctor_block ; simpl
+  ; unfold tfmap, TFunctor_list ; simpl
+  ; unfold endo, Endo_id.
+
+
+Notation "g1 '⩭' g2" := (euttG _ _ _ _ _ g1 g2) (only printing, at level 10).
+Require Import Utils.PostConditions.
+
+(* Precondition probablement nécessaire :
+    denote_cfg body input inB ⤳ (fun vob => exists bfrom, vob = inl (bfrom, inB)) *)
 Lemma denote_cfg_while_loop : 
   forall expr_code cond body input inB output outB from,
     input <> output ->
@@ -524,7 +684,8 @@ Lemma denote_cfg_while_loop :
     free_in_cfg body output ->
     free_in_cfg body outB ->
     wf_ocfg_bid body ->
-    In inB (inputs body) -> (* can I relax this hypothesis ? *) 
+    In inB (inputs body) -> (* can I relax this hypothesis ? *)
+    denote_cfg body input inB ⤳ (fun vob => exists bfrom, vob = inl (bfrom, inB)) ->
     eutt eq
          (denote_cfg (cfg_while_loop expr_code cond body input inB output outB)
                      from input) 
@@ -537,228 +698,156 @@ Lemma denote_cfg_while_loop :
                    | inr v => Ret (inr (inr v))
                    | inl b => Ret (inl b) 
                    end
-        else Ret (inr (inl (input,output)))) (from, input)).
-(*
-         (iter (C:= Kleisli _)
-               (fun '(from,to) =>
-                   if eq_bid to input
-                   then
-                      (* if to = input, denote the block of condition *)
-                      (let (dt,e) := texp_break cond in
-                       denote_code (conv expr_code) ;;
-                       dv <- translate exp_to_instr
-                                      (uv <-  (denote_exp (Some dt) e) ;;
-                                       concretize_or_pick uv True) ;;
-                       match dv with
-                       | DVALUE_I1 comparison_bit =>
-                           if equ comparison_bit Int1.one
-                           then
-                              (* enter in the body *)
-                              (b <- denote_cfg body input inB ;;
-                               (* if the target is outB,
-                                  iter again and jump into the cond_block *)
-                               match b with
-                               | inr dv => Ret (inr (inr dv))
-                               | inl (src, target) =>
-                                   if eq_bid outB target
-                                   then Ret (inl (outB,input))
-                                   else Ret (inr (inl (src,target)))
-                               end)
-                           else Ret (inr (inl (input, output)))
-                       | DVALUE_Poison => raiseUB "Branching on poison."
-                       | _ => raise "Br got non-bool value"
-                       end)
-                  (* if to <> input, identity *)
-                   else Ret (inr ( inl (from,to)))
-               ) (from,input)).
+              else Ret (inr (inl (input,output)))) (from, input)).
 
 Proof.
   intros * NEQ_INPUT_OUTPUT
               NEQ_INPUT_INB NEQ_INPUT_OUTB NEQ_OUTPUT_INB
               NEQ_OUTPUT_OUTB FREE_IN_BODY_INPUT FREE_IN_BODY_OUTPUT
-              FREE_IN_BODY_OUTB WF_BODY INB_IN_BODY.
+              FREE_IN_BODY_OUTB WF_BODY INB_IN_BODY POSTCOND_BODY.
   unfold denote_cfg, cfg_while_loop.
-  unfold iter,Iter_Kleisli, Basics.iter, MonadIter_itree.
+  (* For the sake of my mental-health, I hide some part of the goal *)
+  hide_blk input.
+  hide_blk outB.
+  unfold_iter_cat.
+  hide_iter_body.
+
+  (* We proceed by co-induction *)
+  einit.
+  ecofix CIH.
+
+  (* ecofix made too much simplifications *)
+  replace
+     (⟦ tfmap (typ_to_dtyp []) blk :: conv (body ++ [blk0]) ⟧bs (from, input))
+    with
+    (⟦ conv ([blk] ++ body ++ [blk0]) ⟧bs (from, input)) in CIHL,CIHH
+      by
+    ltac:
+      (rewrite (convert_typ_list_app _ (body++_) [])
+       ; unfold conv,ConvertTyp_list
+       ; now simpl).
 
   (* Denotation of the 1st iteration of the loop *)
   rewrite unfold_iter.
+  unhide_iter ; hide_iter_body.
+  bstep.
+
+  unfold denote_ocfg ; unfold_iter_cat.
+  rewrite unfold_iter.
   hide_iter_body.
+
   (* 1: jump to the input block, ie. the condition block *)
+  (* Bring the block on the top of the left side of the equation *)
+  unhide_blk input.
+  simpl ; compute_eqv_dec.
+  (* On the right side, evaluate the expression *)
+  unfold evaluate_conditional at 1.
+  conv_block.
+  unfold denote_block; simpl.
+  hide_blk input.
+
+  (* 1.0 : skip the phis *)
+  rewrite denote_no_phis.
+  bstep.
+
   (* 1.1: Denote the code used in order to compute the expression *)
-  (* Bring the /denote code/ on the top of the right side of the equation *)
-  rewrite eq_bid_refl.
-  flatten_goal.
-  rewrite bind_bind.
+  unfold conv at 1, ConvertTyp_code at 1, tfmap at 2.
+  ebind ; econstructor ; [reflexivity | intros ; simpl ; subst].
 
-  (* Bring the /denote code/ on the top of the left side of the equation *)
-  unfold denote_ocfg ; setoid_rewrite unfold_iter ; simpl.
-  hide_iter_body.
-  rewrite eqv_dec_p_refl.
-  rewrite bind_bind.
-  setoid_rewrite denote_block_unfold.
-  unfold tfmap, TFunctor_list ; simpl ; rewrite denote_no_phis.
-  rewrite bind_ret_l,bind_bind.
-  rewrite eutt_eq_bind ; [reflexivity| intros ; simpl ].
+  (* 1.2: denote the expression *)
+  repeat flatten_all.
+  go.
+  (* manage the conversion of the expression *)
+  assert (Heq1 : (d,e)=(d0,e0)) by
+  ltac:(
+     unfold texp_break in * ; flatten_all ;
+     unfold TFunctor_texp, conv, ConvertTyp_exp,
+       tfmap, Endo_id, LLVMAst.texp in * ;
+     now rewrite Heq in Heq0
+     ) ; inv Heq1 ; clear Heq Heq0.
+  ebind ; econstructor ; [reflexivity | intros ; simpl ; subst].
+  go.
 
-  (* 1.2: Denote the terminator - branch *)
-  (* 1.2.a: denote the expression *)
-  (* Bring the /denote_expression/ in the top of each side of the equation *)
-  repeat flatten_goal.
-  rewrite 2 translate_bind ; rewrite 3 bind_bind.
-  (* Some type conversion to manage *)
-  unfold texp_break in Heq ; flatten_hyp Heq
-  ; rewrite typ_to_dtyp_pair in Heq ; rewrite Heq in Heq0
-  ; inv Heq0 ; clear Heq.
-  rewrite eutt_eq_bind ; [reflexivity|intros ; simpl].
+  (* 1.3: concretize_or_pick *)
+  ebind ; econstructor ; [reflexivity | intros ; simpl ; subst].
+  go.
 
-  (* 1.2.b: concretize or pick *)
-  rewrite translate_bind ; rewrite 2 bind_bind.
-  rewrite eutt_eq_bind ; [reflexivity| intros ; simpl].
+  (* 1.4: destruct the value of the expression *)
+  flatten_all ; go.
 
-  (* 1.3: destruct the value:
-     - if it isn't a boolean value, raise an exception
-     - if it is a boolean value, jump to the correct block
-   *)
-  destruct u1 ;
-    try (rewrite exp_to_instr_raise) ;
-    try (rewrite exp_to_instr_raiseUB).
-  (* - rewrite <- bind_bind. rewrite eutt_eq_bind. reflexivity. *)
-
-  (* TODO: temporarely, admit the exception cases *)
-  (* NOTE all raise should have the same proof - same with raiseUB but using the
-     lemmas for raiseUB instead of those for raise *)
+  (* 1.4.a: if it is not a boolean, it raises an exception ;
+            temporary, admit theses cases *)
   all: match goal with
-       | |- context[_ <- raise _ ;; _] => admit
-       | |- context[_ <- raiseUB _ ;; _] => admit
+       | |- context[_ <- translate _ (raise _) ;; _] => admit
+       | |- context[_ <- translate _ (raiseUB _) ;; _] => admit
        | |- _ => idtac
        end.
+ (* 1.4.b: it is a boolean *)
+  - flatten_all.
+    + (* 2: the condition is true - jump in body *)
+      go.
+      rewrite tau_euttge.
+      rewrite unfold_iter at 1.
+      (* NOTE: I guess I should use POSTCOND_BODY,
+               but I don't know how to use it *)
+      unhide_iter; hide_iter_body.
+      unhide_blk input
+      ; simpl find_block ; compute_eqv_dec
+      ; hide_blk input.
 
-  (* 1.4: destruct the boolean value:
-     - if the condition is true, jump into the body
-     - if the condition is false, jump into the output block
-   *)
-  - destruct (Int1.eq x Int1.one) eqn:E.
-    + (* the condition is true *)
-      rewrite translate_ret ; rewrite 2 bind_ret_l
-      ; rewrite bind_bind ; rewrite tau_eutt.
+      (* 2.1: Enter in the block InB in both sides *)
+      apply find_block_in_inputs in INB_IN_BODY ;
+        destruct INB_IN_BODY as [inBk HinBk].
+      apply find_block_some_conv in HinBk.
+      setoid_rewrite unfold_iter at 1.
+      unfold conv in HinBk.
+      setoid_rewrite HinBk.
+      setoid_rewrite (convert_typ_list_app body _ []).
+      apply find_block_some_app with
+        (bks2:= (conv [blk0])) in HinBk.
+      setoid_rewrite HinBk.
+      bstep.
+      setoid_rewrite bind_bind at 1.
+      setoid_rewrite bind_bind at 1.
+      setoid_rewrite bind_bind at 5.
 
-      (* 2: jump in body, entering by the block inB *)
-      (* 2.0: on the left side, we are iterating on the whole ocfg,
-              thus we have to ignore the block /input/ *)
-      setoid_rewrite unfold_iter.
-      destruct VBODY0 ; subst BODY0 ; compute_eqv_dec ; hide_iter_body.
-      (* 2.1: jump to /inB/, which is is the cfg /body/ -->
-        maybe this hypothesis can be relaxed *)
-      rewrite bind_bind.
-      (* on both sides, the denotation of the block is the same *)
-      rewrite eutt_eq_bind ; [| intro ; simpl].
+      (* 2.2: denote the block *)
+      ebind ; econstructor ; [reflexivity | intros ; simpl ; subst].
+      bstep.
+      ebind ; econstructor ; [reflexivity | intros ; simpl ; subst].
+      ebind ; econstructor ; [reflexivity | intros ; simpl ; subst].
 
-      * (* There is some work in order to show that the denotation of
-         the block inB is the same:
-         On the left side, we have the cfg /body (+) outB/
-         since in the right side, we have only /body/ *)
-
-        (* TODO clean up this part of the proof *)
-        (* 2.1.a: jump in block inB in the right side *)
-        apply find_block_in_inputs in INB_IN_BODY
-        ; destruct INB_IN_BODY as [inBk HinB].
-        assert (HinB': find_block body inB = Some inBk) by assumption.
-        apply find_block_some_conv in HinB.
-        destruct (find_block (conv body) inB) eqn:HinBody
-        ; unfold conv,ConvertTyp_list,block_id,tfmap,TFunctor_list',
-          tfmap,TFunctor_block,tfmap,endo,Endo_id in HinB, HinBody
-        ; rewrite HinBody in HinB
-        ; clear HinBody
-        ; inv HinB.
-
-        (* 2.1.b: jump in block inB in the left side *)
-        pose proof
-             (find_block_app_l_wf
-                 inB (b:= (conv inBk)) (conv body)
-                 (conv [{| blk_id := outB;
-                            blk_phis := [];
-                            blk_code := [];
-                            blk_term := TERM_Br_1 input;
-                            blk_comments := None |}])).
-        rewrite <- (convert_typ_list_app body _) in H.
-        rewrite find_block_some_conv with (bk := inBk) in H ;
-          [|assumption].
-        unfold conv,ConvertTyp_list,block_id,tfmap,TFunctor_list',
-          tfmap,TFunctor_block,tfmap,endo,Endo_id in H.
-        unfold ConvertTyp_list, tfmap, TFunctor_list',tfmap,TFunctor_block at 1.
-        unfold tfmap, endo, Endo_id.
-        rewrite H ; try reflexivity.
-        { (* easy because outB is free in body *)
-           apply wf_ocfg_bid_convert_typ.
-           unfold wf_ocfg_bid.
-           rewrite inputs_app ; simpl.
-           apply Coqlib.list_norepet_append
-           ; [assumption | now apply List_norepet_singleton| ].
-           apply Coqlib.list_disjoint_cons_r
-           ; [now apply Util.list_disjoint_nil_r|assumption].
-        }
-      (* now, we have the same denotation of the block in both sides *)
-
-      * (* since we have denoted inB, we have to continue the denotation of the body *)
-        simpl.
-        (* u1 = denotation of one iteration of the body entering by inB *)
-        destruct u1.
-      ** (* inl - continue to iterates in the body *) admit.
-      ** (* inr - stop the iteration and leave denotation of the body *) admit.
-
-    + (* the condition is false *)
-      (* 5: jump into the block output, which is fresh *)
-      (* 5.1: in the right side, directly jumps out of the iteration *)
-      rewrite bind_ret_l.
-
-      (* 5.2: in the left side, iter again on the whole cfg *)
-      rewrite translate_ret ; rewrite 2 bind_ret_l ; rewrite tau_eutt.
-      rewrite unfold_iter.
-      (* 5.2.a: ignore the block input *)
-      destruct VBODY0 ; subst BODY0 ; compute_eqv_dec ; hide_iter_body.
-      (* 5.3: by contradiction, suppose that output is in body
-                or output = outB *)
+      (* 2.3: destruct the result of the block inB *)
       flatten_goal.
-      * (* contradiction *)
-        assert ( contra:
-                 (find_block (conv body) output = Some b )
-                 \/ (find_block
-                       (conv [{| blk_id := outB;
-                                  blk_phis := [];
-                                  blk_code := [];
-                                  blk_term := TERM_Br_1 input;
-                                  blk_comments := None
-                              |}]) output = Some b)
-               ).
+      * (* 2.4: the result of the denotation is a jump to another block *)
+        go.
+        admit.
+      * (* 2.5: the result of the denoatation is a value *) go. eret.
 
-        { apply find_block_app_wf
-          ; [| now rewrite <- (convert_typ_list_app body _ [])].
-          unfold wf_ocfg_bid in *.
-          rewrite inputs_app.
-          rewrite convert_typ_inputs ; simpl.
-          unfold endo, Endo_id.
-          apply Coqlib.list_norepet_append ; try assumption.
-          now apply List_norepet_singleton.
-          apply Coqlib.list_disjoint_cons_r ; [| assumption].
-          apply Util.list_disjoint_nil_r.
-        }
-        destruct contra as [contra | contra].
-        ** (* 5.3.a : suppose that it exists a block named output in body *)
-          match goal with
-           | h:context[free_in_cfg body output] |- _ =>
-               apply find_block_free_id in h
-           end.
-           find_block_conv.
-           now setoid_rewrite FREE_IN_BODY_OUTPUT in contra.
-        ** (* 5.3.b : suppose that output = outB *)
-          simpl in *.
-           now match goal with
-               | h:context[output <> outB] |- _ =>
-                   rewrite <- eqb_bid_neq , eq_bid_comm in h
-                   ; rewrite eqv_dec_p_eq in h
-                   ; setoid_rewrite h in contra
-               end.
-      * (* 5.4: ignore the body *)
-        rewrite bind_ret_l. reflexivity.
-*)
+    + (* 3: the condition is false - jump in output *)
+      (* Ignore each sub-graphs in the left side *)
+      go.
+      rewrite tau_euttge.
+      setoid_rewrite unfold_iter at 1.
+      unhide_iter ; hide_iter_body.
+      unhide_blk input.
+
+      (* 3.1: ignore the block input *)
+      simpl find_block at 1 ; compute_eqv_dec.
+
+      (*3.2: ignore *)
+      assert
+         (Hfind: find_block (ConvertTyp_list [] (body ++ [blk0])) output = None)
+        by
+      ltac:
+        ( unhide_blk outB
+          ; apply find_block_none_conv
+          ; rewrite find_block_none_app
+          ; simpl
+          ; rewrite <- eqb_bid_neq,eq_bid_comm in NEQ_OUTPUT_OUTB
+          ; rewrite eqv_dec_p_eq in NEQ_OUTPUT_OUTB
+          ; [setoid_rewrite NEQ_OUTPUT_OUTB; reflexivity
+            | apply find_block_free_id ; assumption]).
+      setoid_rewrite Hfind.
+      simpl ; bstep. eret.
 Admitted.
