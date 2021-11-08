@@ -48,11 +48,11 @@ Section PARAMS_MODEL.
   Definition model_OOM_handler : Effout ~> PropT Effout
     := case_ E_trigger_model_prop (case_ OOM_handler F_trigger_model_prop).
 
-  Definition model_OOM_h {T} (source target : itree Effout T) : Prop
-    := interp model_OOM_handler target source.
+  Definition model_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Prop
+    := interp_prop model_OOM_handler _ RR target source.
 
-  Definition model_OOM {T} (sources : PropT Effout T) (target : itree Effout T) : Prop
-    := exists source, sources source /\ model_OOM_h source target.
+  Definition model_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop
+    := exists source, sources source /\ model_OOM_h RR source target.
 
 End PARAMS_MODEL.
 

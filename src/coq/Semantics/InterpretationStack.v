@@ -95,7 +95,7 @@ Module Type InterpreterStack.
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := model_undef RR L3_trace in
       let L5_trace       := model_UB RR L4_trace in
-      model_OOM L5_trace.
+      model_OOM RR L5_trace.
 
     (* The interpreter stray away from the model starting from the fourth layer: we pick an arbitrary valid path of execution *)
     Definition interp_mcfg4_exec {R} (t: itree L0 R) g l m : itree L4 (MemState * (local_env * stack * (global_env * R))) :=
@@ -175,7 +175,7 @@ Module Type InterpreterStack.
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := model_undef RR L3_trace in
       let L5_trace       := model_UB RR L4_trace in
-      model_OOM L5_trace.
+      model_OOM RR L5_trace.
 
   End InterpreterCFG.
 
@@ -308,7 +308,7 @@ Module Make (LP' : LLVMParams) : InterpreterStack.
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := model_undef RR L3_trace in
       let L5_trace       := model_UB RR L4_trace in
-      model_OOM L5_trace.
+      model_OOM RR L5_trace.
 
     (* The interpreter stray away from the model starting from the fourth layer: we pick an arbitrary valid path of execution *)
     Definition interp_mcfg4_exec {R} (t: itree L0 R) g l m : itree L4 (MemState * (local_env * stack * (global_env * R))) :=
@@ -388,7 +388,7 @@ Module Make (LP' : LLVMParams) : InterpreterStack.
       let L3_trace       := interp_memory L2_trace m in
       let L4_trace       := model_undef RR L3_trace in
       let L5_trace       := model_UB RR L4_trace in
-      model_OOM L5_trace.
+      model_OOM RR L5_trace.
 
   End InterpreterCFG.
 

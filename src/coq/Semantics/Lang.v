@@ -41,14 +41,14 @@ Module Type Lang (LP: LLVMParams).
 
   Module FMP := FMP LP Events GEP Byte.
 
-  (* Pick handler (depends on memory) *)
-  Module Pick := Pick.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
-
   Module MEM  := FiniteMemory.Make LP Events FMP.
   Module MEMORY_THEORY := FiniteMemoryTheory.Make LP Events FMP MEM.
 
   (* Serialization *)
   Module SER := Serialization.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
+
+  (* Pick handler (depends on memory / serialization) *)
+  Module Pick := Pick.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
 
   (* Denotation *)
   Module D := Denotation ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
