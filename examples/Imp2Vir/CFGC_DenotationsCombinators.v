@@ -680,19 +680,6 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma translate_trigger {E F G} `{E -< F} :
-  forall X (e: E X) (h: F ~> G),
-    translate h (trigger e) ≅ trigger (h _ (subevent X e)).
-Proof.
-  intros; unfold trigger; rewrite translate_vis; setoid_rewrite translate_ret; reflexivity.
-Qed.
-
-Lemma exp_to_instr_raise : forall T s,
-    translate exp_to_instr (raise (A := T) s) ≅ raise s.
-Proof.
-  unfold raise; intros.
-Admitted.
-
 
 Notation "g1 '⩭' g2" := (euttG _ _ _ _ _ g1 g2) (only printing, at level 10).
 Require Import Utils.PostConditions.
@@ -801,54 +788,67 @@ Proof.
   (* 1.4: destruct the value of the expression *)
   flatten_all ; go.
 
-  (* 1.4.a: if it is not a boolean, it raises an exception ;
-            temporary, admit theses cases *)
+  (* 1.4.a: if it is not a boolean, it raises an exception ; easy *)
   all: match goal with
-       | |- context[_ <- translate _ (raise _) ;; _] => admit
-       | |- context[_ <- translate _ (raiseUB _) ;; _] => admit
+       | |- context[_ <- translate _ (raise _) ;; _] =>
+           unfold raise
+           ; rewrite translate_bind
+           ; bstep ; ebind ; econstructor
+           ; [now rewrite translate_trigger| intros []]
+       | |- context[_ <- translate _ (raiseUB _) ;; _] =>
+           unfold raiseUB
+           ; rewrite translate_bind
+           ; bstep ; ebind ; econstructor
+           ; [now rewrite translate_trigger| intros []]
        | |- _ => idtac
        end.
+
  (* 1.4.b: it is a boolean *)
   - flatten_all.
     + (* 2: the condition is true - jump in body *)
       go.
       rewrite tau_euttge.
-      rewrite unfold_iter at 1.
-      (* NOTE: I guess I should use POSTCOND_BODY,
-               but I don't know how to use it *)
-      unhide_iter; hide_iter_body.
-      unhide_blk input
-      ; simpl find_block ; compute_eqv_dec
-      ; hide_blk input.
+      (* some rewriting aiming to simplify  *)
+      unhide_iter.
+      match goal with
+      | |- euttG _ _ _ _ _ ?g _ =>
+          replace g with
+          (denote_ocfg (conv ([blk] ++ body ++ [blk0])) (input, inB))
+          by
+          ltac:(now unfold denote_ocfg; unfold_iter_cat)
+      end.
+       match goal with
+      | |- euttG _ _ _ _ _ _ (_ <- ?g ;; _) =>
+          replace g with
+          (denote_ocfg (conv body) (input, inB))
+          by
+          ltac:(now unfold denote_ocfg; unfold_iter_cat)
+       end.
+      (* TODO explain the proof *)
+      rewrite <- bind_ret_r.
+      ebind ; econstructor ; [|admit].
+      pose proof ( H_APP :=
+              denote_ocfg_prefix
+                 (bks := (conv ([blk] ++ body ++ [blk0])))
+                 (conv [blk]) (conv body) (conv [blk0]) input inB
+                 ).
+      rewrite H_APP ;
+        [| now rewrite (convert_typ_list_app _ (body++_))
+           ; rewrite (convert_typ_list_app body _)
+        | pose proof (WF_WHILE := wf_cfg_while_loop
+                                     expr_code cond body input inB output outB)
+          ; apply wf_ocfg_bid_convert_typ with (env := []) in WF_WHILE
+          ; try assumption
+          ; try (unfold cfg_while_loop in WF_WHILE
+                 ; unhide_blk input; unhide_blk outB
+                 ; apply WF_WHILE)
+        ] ; clear H_APP.
+      setoid_rewrite <- bind_ret_r at 4.
+      (* TODO I'd like to use POSTCOND_BODY before the ebind ... *)
+      apply has_post_post_strong in POSTCOND_BODY.
+      (* apply POSTCOND_BODY. *)
+      admit.
 
-      (* 2.1: Enter in the block InB in both sides *)
-      apply find_block_in_inputs in INB_IN_BODY ;
-        destruct INB_IN_BODY as [inBk HinBk].
-      apply find_block_some_conv in HinBk.
-      setoid_rewrite unfold_iter at 1.
-      unfold conv in HinBk.
-      setoid_rewrite HinBk.
-      setoid_rewrite (convert_typ_list_app body _ []).
-      apply find_block_some_app with
-        (bks2:= (conv [blk0])) in HinBk.
-      setoid_rewrite HinBk.
-      bstep.
-      setoid_rewrite bind_bind at 1.
-      setoid_rewrite bind_bind at 1.
-      setoid_rewrite bind_bind at 5.
-
-      (* 2.2: denote the block *)
-      ebind ; econstructor ; [reflexivity | intros ; simpl ; subst].
-      bstep.
-      ebind ; econstructor ; [reflexivity | intros ; simpl ; subst].
-      ebind ; econstructor ; [reflexivity | intros ; simpl ; subst].
-
-      (* 2.3: destruct the result of the block inB *)
-      flatten_goal.
-      * (* 2.4: the result of the denotation is a jump to another block *)
-        go.
-        admit.
-      * (* 2.5: the result of the denoatation is a value *) go. eret.
 
     + (* 3: the condition is false - jump in output *)
       (* Ignore each sub-graphs in the left side *)
