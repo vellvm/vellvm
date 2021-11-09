@@ -5,7 +5,7 @@ From Coq Require Import
 Import ListNotations.
 
 From ExtLib Require Import Structures.Monads.
-(* From ExtLib Require Import Data.Monads.EitherMonad. *)
+From ExtLib Require Import Data.Monads.EitherMonad.
 Import MonadNotation.
 
 
@@ -36,6 +36,191 @@ Definition denote_cfg g from to := denote_ocfg (conv g) (from,to).
 
 
 (** Tactics *)
+
+Variant hidden_iter  (T: Type) : Type := boxh_iter (t: T).
+Variant visible_iter (T: Type) : Type := boxv_iter (t: T).
+Ltac hide_iter_body :=
+  match goal with
+  | |- context[ITree.iter ?g] =>
+      let VG := fresh "VBODY" in
+      let G := fresh "BODY" in
+      remember g as G eqn:VG
+      ; apply boxh_iter in VG
+  | h: context[ITree.iter ?g] |- _ =>
+      let VG := fresh "VBODY" in
+      let G := fresh "BODY" in
+      remember g as G eqn:VG
+      ; apply boxh_iter in VG
+  end.
+Notation "'hidden_iter' G" := (hidden_iter (G = _)) (only printing, at level 10).
+
+Ltac show_iter_body :=
+  match goal with
+  | h: hidden_iter _ |- _ =>
+      let EQ := fresh "HBODY" in
+      destruct h as [EQ];
+apply boxv_iter in EQ
+  end.
+
+Ltac unhide_iter :=
+  match goal with
+  | h: hidden_iter (?body = _) |- _ =>
+      destruct h ; subst body
+  | h: visible_iter (?body = _) |- _ =>
+      destruct h ; subst body
+  end.
+
+
+Ltac hidden_iter_apply lemma :=
+  match goal with
+  | h: hidden_iter (?body = _) |- _ =>
+      unhide_iter
+      ; apply lemma
+      ; hide_iter_body
+  | h: visible_iter (?body = _) |- _ =>
+      unhide_iter
+      ; apply lemma
+      ; hide_iter_body
+  end.
+
+Ltac hidden_iter_rewrite lemma :=
+  match goal with
+  | h: hidden_iter (?body = _) |- _ =>
+      unhide_iter
+      ; setoid_rewrite lemma
+      ; hide_iter_body
+  | h: visible_iter (?body = _) |- _ =>
+      unhide_iter
+      ; setoid_rewrite lemma
+      ; hide_iter_body
+  end.
+
+Ltac hidden_iter_tactic tactic :=
+  match goal with
+  | h: hidden_iter (?body = _) |- _ =>
+      unhide_iter
+      ; tactic
+      ; hide_iter_body
+  | h: visible_iter (?body = _) |- _ =>
+      unhide_iter
+      ; tactic
+      ; hide_iter_body
+  end.
+
+
+Variant hidden_cfg  (T: Type) : Type := boxh_cfg (t: T).
+Variant visible_cfg (T: Type) : Type := boxv_cfg (t: T).
+Ltac hide_cfg :=
+  match goal with
+  | h: context[denote_ocfg ?cfg _] |- _ =>
+      remember cfg as G eqn:VG;
+apply boxh_cfg in VG
+  | h : visible_cfg _ |- _ =>
+      let EQ := fresh "VG" in
+      destruct h as [EQ];
+apply boxh_cfg in EQ
+  | |- context[denote_ocfg ?cfg _] =>
+      remember cfg as G eqn:VG;
+apply boxh_cfg in VG
+  end.
+Ltac show_cfg :=
+  match goal with
+  | h: hidden_cfg _ |- _ =>
+      let EQ := fresh "HG" in
+      destruct h as [EQ];
+apply boxv_cfg in EQ
+  end.
+Notation "'hidden' G" := (hidden_cfg (G = _)) (only printing, at level 10).
+
+Variant hidden_blk  (T: Type) : Type := boxh_blk (t: T).
+Variant visible_blk (T: Type) : Type := boxv_blk (t: T).
+
+
+Ltac hide_blk bid :=
+  match goal with
+  | h: context[
+            {| blk_id := bid;
+             blk_phis := ?phis;
+             blk_code := ?code;
+             blk_term := ?term;
+             blk_comments := ?comm |}
+         ] |- _ =>
+      let Vblk := fresh "Vblk" in
+      let blk := fresh "blk" in
+      remember  {| blk_id := bid;
+                 blk_phis := phis;
+                 blk_code := code;
+                 blk_term := term;
+                 blk_comments := comm |} as blk eqn:Vblk
+      ; apply boxh_blk in Vblk
+  | |- context[
+           {| blk_id := bid;
+            blk_phis := ?phis;
+            blk_code := ?code;
+            blk_term := ?term;
+            blk_comments := ?comm |}
+        ] =>
+      let Vblk := fresh "Vblk" in
+      let blk := fresh "blk" in
+      remember  {| blk_id := bid;
+                 blk_phis := phis;
+                 blk_code := code;
+                 blk_term := term;
+                 blk_comments := comm |} as blk eqn:Vblk
+      ; apply boxh_blk in Vblk
+
+  end.
+Notation "'hidden_blk' blk" := (hidden_blk (blk = _)) (only printing, at level 10).
+
+Ltac show_blk bid :=
+  match goal with
+  | h: hidden_blk ( _ = {| blk_id := bid;
+                         blk_phis := _;
+                         blk_code := _;
+                         blk_term := _;
+                         blk_comments := _ |}) |- _ =>
+      let EQ := fresh "Hblk" in
+      destruct h as [EQ];
+apply boxv_blk in EQ
+  end.
+
+Ltac unhide_blk bid :=
+  match goal with
+  | h: hidden_blk ( ?blk = {| blk_id := bid;
+                            blk_phis := _;
+                            blk_code := _;
+                            blk_term := _;
+                            blk_comments := _ |}) |- _  =>
+      destruct h ; subst blk
+  | h: visible_blk ( ?blk = {| blk_id := bid;
+                             blk_phis := _;
+                             blk_code := _;
+                             blk_term := _;
+                             blk_comments := _ |}) |- _  =>
+      destruct h ; subst blk
+  end.
+
+
+Hint Rewrite @bind_ret_l : rwbind.
+Hint Rewrite @bind_bind : rwbind.
+Hint Rewrite @translate_ret : rwtranslate.
+Hint Rewrite @translate_bind : rwtranslate.
+Hint Rewrite @translate_trigger : rwtranslate.
+
+Ltac bstep := autorewrite with rwbind.
+Ltac tstep := autorewrite with rwtranslate.
+Ltac go := autorewrite with rwtranslate rwbind.
+
+Ltac unfold_iter_cat :=
+  try (unfold iter,Iter_Kleisli, Basics.iter , MonadIter_itree in * ).
+
+Ltac conv_block :=
+  try (unfold conv,ConvertTyp_block)
+  ; try (unfold tfmap, TFunctor_list, TFunctor_block ; simpl )
+  ; try (unfold tfmap, TFunctor_list ; simpl )
+  ; try (unfold endo, Endo_id).
+
+
 Lemma denote_void_block : forall bid target src com,
     denote_block
        {|
@@ -50,8 +235,8 @@ Proof.
   rewrite denote_block_unfold.
   rewrite denote_no_phis.
   setoid_rewrite denote_code_nil.
-  setoid_rewrite translate_ret.
-  repeat (rewrite bind_ret_l).
+  simpl.
+  go.
   reflexivity.
 Qed.
 
@@ -65,13 +250,7 @@ Lemma denote_void_block_conv : forall bid target src com,
        ≈ Ret (inl target).
 Proof.
   intros.
-  unfold conv.
-  unfold ConvertTyp_block.
-  unfold tfmap, TFunctor_block.
-  simpl.
-  unfold tfmap, TFunctor_list.
-  simpl.
-  unfold endo, Endo_id.
+  conv_block.
   now apply denote_void_block.
 Qed.
 
@@ -115,7 +294,7 @@ Ltac step_singleton_not_in :=
                   (_, ?b2)] =>
       rewrite denote_ocfg_singleton_not_in
       ; [| now apply not_eq_sym ]
-      ; try (rewrite bind_ret_l)
+      ; try (bstep)
       ; try (reflexivity)
   end.
 
@@ -136,8 +315,7 @@ Ltac step_singleton_in :=
                    blk_comments := comm |})
              ; [| cbn; rewrite eqv_dec_p_refl; reflexivity ]
              ; try (rewrite denote_void_block_conv)
-             ; try (rewrite bind_bind)
-             ; try (rewrite bind_ret_l)
+             ; try bstep
   end.
 
 
@@ -165,17 +343,21 @@ Ltac compute_eqv_dec :=
 
 (** Denotation Combinators *)
 
-(* 
+Definition denote_cfg' (bks : ocfg) (from to : block_id) :
+  eitherT (block_id*block_id) (itree instr_E) uvalue :=
+  mkEitherT (denote_ocfg (conv bks) (from,to)).
 
-denote_cfg bks : id -> id -> itree E (V + id*id) ~ id -> id -> EitherT V (itree E) id*id
+(* TODO Either Monad
+Definition my_seq {E} (c : block_id -> block_id -> itree E (dvalue + block_id * block_id))
+  (k : block_id -> block_id -> itree E (dvalue + block_id * block_id))
+  (t ;; k) f i := vob <- t f i;; match vob with | inl v => inl v | inr (b,b') => k b b' end *)
 
 
-*)
 Lemma denote_cfg_block : forall (c : code) (input output : block_id) from,
     input <> output -> (* TODO should be a WF property of block *)
     eutt eq
-         (denote_cfg (cfg_block c input output) from input)
-         (denote_code (conv c) ;; ret (inl (input,output))).
+    (denote_cfg (cfg_block c input output) from input)
+    (denote_code (conv c) ;; ret (inl (input,output))).
 Proof.
   intros.
   unfold cfg_block, denote_cfg.
@@ -190,10 +372,9 @@ Proof.
   setoid_rewrite denote_block_unfold_cont.
   unfold Traversal.endo, Traversal.Endo_id ; simpl.
   rewrite denote_no_phis.
-  rewrite bind_ret_l.
+  bstep.
   rewrite eutt_eq_bind ; [reflexivity| intros; simpl].
-  rewrite translate_ret.
-  rewrite bind_ret_l.
+  go.
   now step_singleton_not_in.
 Qed.
 
@@ -211,16 +392,14 @@ Proof.
   step_singleton_in.
   setoid_rewrite denote_block_unfold.
   simpl.
-  rewrite bind_bind.
+  bstep.
   rewrite denote_no_phis.
-  rewrite bind_ret_l.
-  rewrite bind_bind.
+  bstep.
   rewrite eutt_eq_bind ; [reflexivity| intros ; cbn].
-  rewrite translate_bind.
-  rewrite bind_bind.
+  go.
   rewrite eutt_eq_bind ; [reflexivity| intros ; cbn].
-  setoid_rewrite translate_ret.
-  setoid_rewrite bind_ret_l ; reflexivity.
+  go.
+  reflexivity.
 Qed.
 
 
@@ -279,17 +458,15 @@ Proof.
   simpl.
   rewrite denote_no_phis.
   setoid_rewrite denote_code_nil.
-  repeat (rewrite bind_ret_l).
+  bstep.
   (* unfold texp_break in Heq ; flatten_hyp Heq ; inv Heq. *)
   flatten_all.
   flatten_all.
   unfold texp_break in Heq0.
   flatten_all.
-  unfold tfmap,TFunctor_texp in Heq.
-  unfold conv in Heq0.
-  unfold ConvertTyp_exp in Heq0.
-  rewrite Heq in Heq0.
-  inv Heq0. clear Heq.
+  rewrite typ_to_dtyp_pair in Heq0
+  ; rewrite Heq0 in Heq
+  ; inv Heq ; clear Heq0.
   setoid_rewrite translate_bind.
   repeat (rewrite bind_bind).
   rewrite eutt_eq_bind ; [reflexivity|].
@@ -309,11 +486,10 @@ Proof.
   assert ( no_reentrance (conv gT) (conv gF) ) by
   (now apply no_reentrance_conv, independent_flows_no_reentrance_l).
   - destruct (Int1.eq x Int1.one)
-    ; rewrite translate_ret
-    ; rewrite bind_ret_l
+    ; go
     ; unfold endo, Endo_id
     ; step_singleton_not_in
-    ; rewrite bind_ret_l
+    ; bstep
     ; rewrite convert_typ_list_app
     ; rewrite denote_ocfg_app ; try assumption.
     + (* Side inT *)
@@ -330,7 +506,7 @@ Proof.
       * apply find_block_not_in_inputs in HinT.
         find_block_conv.
         rewrite denote_ocfg_unfold_not_in ; [|assumption].
-        rewrite bind_ret_l.
+        bstep.
         rewrite denote_ocfg_unfold_not_in ;
           [| now apply find_block_free_id, free_in_convert_typ].
         rewrite denote_ocfg_unfold_not_in ; [| assumption].
@@ -338,7 +514,7 @@ Proof.
     + (* Side inF *)
       rewrite denote_ocfg_unfold_not_in;
         [| now apply find_block_free_id, free_in_convert_typ ].
-      now rewrite bind_ret_l.
+      now bstep.
 Qed.
 
 
@@ -472,11 +648,6 @@ Proof.
     reflexivity.
 Qed.
 
-  (* TODO Either Monad
-Definition my_seq {E} (c : block_id -> block_id -> itree E (dvalue + block_id * block_id))
-  (k : block_id -> block_id -> itree E (dvalue + block_id * block_id))
-  (t ;; k) f i := vob <- t f i;; match vob with | inl v => inl v | inr (b,b') => k b b' end *)
-
 Definition evaluate_conditional (c : code) (cond : texp) : itree instr_E bool :=
   denote_code (conv c) ;;
   let (dt,e) := texp_break cond in
@@ -521,151 +692,6 @@ Lemma exp_to_instr_raise : forall T s,
 Proof.
   unfold raise; intros.
 Admitted.
-
-Variant hidden_iter  (T: Type) : Type := boxh_iter (t: T).
-Variant visible_iter (T: Type) : Type := boxv_iter (t: T).
-Ltac hide_iter_body :=
-  match goal with
-  | |- context[ITree.iter ?g] =>
-      let VG := fresh "VBODY" in
-      let G := fresh "BODY" in
-      remember g as G eqn:VG
-      ; apply boxh_iter in VG
-  | h: context[ITree.iter ?g] |- _ =>
-      let VG := fresh "VBODY" in
-      let G := fresh "BODY" in
-      remember g as G eqn:VG
-      ; apply boxh_iter in VG
-  end.
-Notation "'hidden_iter' G" := (hidden_iter (G = _)) (only printing, at level 10).
-
-Ltac show_iter_body :=
-  match goal with
-  | h: hidden_iter _ |- _ =>
-      let EQ := fresh "HBODY" in
-      destruct h as [EQ];
-apply boxv_iter in EQ
-  end.
-
-Ltac unhide_iter :=
-  match goal with
-  | h: hidden_iter (?body = _) |- _ =>
-      destruct h ; subst body
-  | h: visible_iter (?body = _) |- _ =>
-      destruct h ; subst body
-  end.
-
-
-Variant hidden_cfg  (T: Type) : Type := boxh_cfg (t: T).
-Variant visible_cfg (T: Type) : Type := boxv_cfg (t: T).
-Ltac hide_cfg :=
-  match goal with
-  | h: context[denote_ocfg ?cfg _] |- _ =>
-      remember cfg as G eqn:VG;
-apply boxh_cfg in VG
-  | h : visible_cfg _ |- _ =>
-      let EQ := fresh "VG" in
-      destruct h as [EQ];
-apply boxh_cfg in EQ
-  | |- context[denote_ocfg ?cfg _] =>
-      remember cfg as G eqn:VG;
-apply boxh_cfg in VG
-  end.
-Ltac show_cfg :=
-  match goal with
-  | h: hidden_cfg _ |- _ =>
-      let EQ := fresh "HG" in
-      destruct h as [EQ];
-apply boxv_cfg in EQ
-  end.
-Notation "'hidden' G" := (hidden_cfg (G = _)) (only printing, at level 10).
-
-Variant hidden_blk  (T: Type) : Type := boxh_blk (t: T).
-Variant visible_blk (T: Type) : Type := boxv_blk (t: T).
-
-
-Ltac hide_blk bid :=
-  match goal with
-  | h: context[
-            {| blk_id := bid;
-             blk_phis := ?phis;
-             blk_code := ?code;
-             blk_term := ?term;
-             blk_comments := ?comm |}
-         ] |- _ =>
-      let Vblk := fresh "Vblk" in
-      let blk := fresh "blk" in
-      remember  {| blk_id := bid;
-                 blk_phis := phis;
-                 blk_code := code;
-                 blk_term := term;
-                 blk_comments := comm |} as blk eqn:Vblk
-      ; apply boxh_blk in Vblk
-  | |- context[
-           {| blk_id := bid;
-            blk_phis := ?phis;
-            blk_code := ?code;
-            blk_term := ?term;
-            blk_comments := ?comm |}
-        ] =>
-      let Vblk := fresh "Vblk" in
-      let blk := fresh "blk" in
-      remember  {| blk_id := bid;
-                 blk_phis := phis;
-                 blk_code := code;
-                 blk_term := term;
-                 blk_comments := comm |} as blk eqn:Vblk
-      ; apply boxh_blk in Vblk
-
-  end.
-Notation "'hidden_blk' blk" := (hidden_blk (blk = _)) (only printing, at level 10).
-
-Ltac show_blk bid :=
-  match goal with
-  | h: hidden_blk ( _ = {| blk_id := bid;
-                         blk_phis := _;
-                         blk_code := _;
-                         blk_term := _;
-                         blk_comments := _ |}) |- _ =>
-      let EQ := fresh "Hblk" in
-      destruct h as [EQ];
-apply boxv_blk in EQ
-  end.
-
-Ltac unhide_blk bid :=
-  match goal with
-  | h: hidden_blk ( ?blk = {| blk_id := bid;
-                            blk_phis := _;
-                            blk_code := _;
-                            blk_term := _;
-                            blk_comments := _ |}) |- _  =>
-      destruct h ; subst blk
-  | h: visible_blk ( ?blk = {| blk_id := bid;
-                             blk_phis := _;
-                             blk_code := _;
-                             blk_term := _;
-                             blk_comments := _ |}) |- _  =>
-      destruct h ; subst blk
-  end.
-
-
-Hint Rewrite @bind_ret_l : rwbind.
-Hint Rewrite @bind_bind : rwbind.
-Hint Rewrite @translate_ret : rwtranslate.
-Hint Rewrite @translate_bind : rwtranslate.
-Hint Rewrite @translate_trigger : rwtranslate.
-
-Ltac bstep := autorewrite with rwbind.
-Ltac tstep := autorewrite with rwtranslate.
-Ltac go := autorewrite with rwtranslate rwbind.
-
-Ltac unfold_iter_cat :=
-  try (unfold iter,Iter_Kleisli, Basics.iter , MonadIter_itree in * ).
-
-Ltac conv_block :=
-  unfold tfmap, TFunctor_list, TFunctor_block ; simpl
-  ; unfold tfmap, TFunctor_list ; simpl
-  ; unfold endo, Endo_id.
 
 
 Notation "g1 '⩭' g2" := (euttG _ _ _ _ _ g1 g2) (only printing, at level 10).
@@ -751,7 +777,7 @@ Proof.
   bstep.
 
   (* 1.1: Denote the code used in order to compute the expression *)
-  unfold conv at 1, ConvertTyp_code at 1, tfmap at 2.
+  unfold  ConvertTyp_code at 1, tfmap at 2.
   ebind ; econstructor ; [reflexivity | intros ; simpl ; subst].
 
   (* 1.2: denote the expression *)
