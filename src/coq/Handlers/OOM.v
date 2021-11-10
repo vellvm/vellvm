@@ -60,10 +60,13 @@ Section PARAMS_INTERP.
   Variable (E F: Type -> Type).
   Context `{FailureE -< F}.
   Notation Effin := (E +' OOME +' F).
-  Notation Effout := (E +' F).
+  Notation Effout := (E +' OOME +' F).
 
-  Definition OOM_exec {E} `{FailureE -< E}: OOME ~> itree E :=
+  Definition OOM_exec_fail {E} `{FailureE -< E}: OOME ~> itree E :=
     fun _ e => match e with | ThrowOOM s => raise ("Abort (OOM): " ++ s) end.
+
+  Definition OOM_exec {E} `{OOME -< E} : OOME ~> itree E :=
+    fun R e => r <- trigger e;; ret r.
 
   Definition E_trigger :  E ~> itree Effout :=
     fun R e => r <- trigger e ;; ret r.

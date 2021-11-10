@@ -305,6 +305,67 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       intros. auto.
     Qed.
 
+    Lemma OOM_handler_correct:
+      forall E F, handler_correct (@OOM_handler E F) OOM_exec.
+    Proof.
+      intros E F.
+      unfold OOM_handler. unfold OOM_exec.
+      unfold handler_correct.
+      intros. auto.
+    Qed.
+
+  Lemma interp_prop_correct_exec':
+    forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),
+      handler_correct h_spec h ->
+      forall R RR `{Reflexive _ RR} t t', t ≈ t' -> interp_prop h_spec R RR t (interp h t').
+  Proof.
+    intros.
+    revert t t' H1.
+    pcofix CIH.
+    intros t t' eq.
+    pstep.
+    red.
+    unfold interp, Basics.iter, MonadIter_itree.
+    rewrite (itree_eta t) in eq. 
+    destruct (observe t).
+    - econstructor. reflexivity. rewrite <- eq. rewrite unfold_iter. cbn. rewrite Eq.bind_ret_l. cbn.  reflexivity.
+    - econstructor. right.
+      eapply CIH. rewrite tau_eutt in eq. rewrite eq. reflexivity.
+    - econstructor. 
+      2 : { rewrite <- eq. rewrite unfold_iter. cbn.
+            unfold ITree.map. rewrite Eq.bind_bind.
+            setoid_rewrite Eq.bind_ret_l at 1. cbn. setoid_rewrite tau_eutt.
+            reflexivity. }
+      apply H.
+      intros a. cbn.  
+      right.
+      unfold interp, Basics.iter, MonadIter_itree in CIH. unfold fmap, Functor_itree, ITree.map in CIH.
+      specialize (CIH (k a) (k a)).
+      apply CIH.
+      reflexivity.
+  Qed.
+
+  Lemma interp_prop_correct_exec_flip:
+    forall {E} (h_spec: E ~> PropT E) (h: E ~> itree E),
+      handler_correct h_spec h ->
+      forall R RR `{Reflexive _ RR} t t', t ≈ t' -> interp_prop h_spec R RR (interp h t') t.
+  Proof.
+    intros.
+    revert t' t H1.
+    pcofix CIH.
+    intros t' t eq.
+    pstep.
+    red.
+    unfold interp, Basics.iter, MonadIter_itree.
+    rewrite (itree_eta t') in eq.
+    replace t' with ({| _observe := observe t' |}) by admit.
+    destruct (observe t'); cbn.
+    - cbn. econstructor. reflexivity. rewrite <- eq. reflexivity.
+    - econstructor. right.
+      eapply CIH. rewrite tau_eutt in eq. rewrite eq. reflexivity.
+  Admitted.
+
+
     Set Printing Implicit.
     Lemma refine_UB
       : forall E F G `{LLVMEvents.FailureE -< E +' F +' G} T TT (HR: Reflexive TT)
@@ -358,6 +419,26 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       assumption. reflexivity.
     Qed.
 
+    Lemma refine_oom
+      : forall E F T TT (HR: Reflexive TT)
+               (x : _ -> Prop)
+               (y : itree (E +' OOME +' F) T),
+        x y -> model_OOM TT x (exec_OOM y).
+    Proof.
+      intros E F T TT HR x y H0.
+      unfold model_OOM, model_OOM_h.
+      unfold exec_OOM.
+      exists y. split. assumption.
+      apply interp_prop_correct_exec_flip.
+      intros.
+      apply case_prop_handler_correct.
+      unfold handler_correct. intros. reflexivity.
+      apply case_prop_handler_correct.
+      apply OOM_handler_correct.
+      unfold handler_correct. intros. reflexivity.
+      assumption. reflexivity.
+    Qed.
+
     (** *)
     (*    Theorem 5.8: We prove that the interpreter belongs to the model. *)
     (*    *)
@@ -367,7 +448,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       unfold model, model_gen.
       unfold interpreter, interpreter_gen.
       unfold ℑs5.
-      unfold interp_mcfg5_exec.
+      unfold interp_mcfg6_exec.
+      apply refine_oom. auto.
       apply refine_UB. auto.
       apply refine_undef. auto.
     Qed.

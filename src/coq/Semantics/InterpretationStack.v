@@ -115,6 +115,16 @@ Module Type InterpreterStack.
       let L5_trace       := exec_UB L4_trace in
       L5_trace.
 
+    Definition interp_mcfg6_exec {R} (t: itree L0 R) g l m : itree L5 (MemState * (local_env * stack * (global_env * R))) :=
+      let uvalue_trace   := interp_intrinsics t in
+      let L1_trace       := interp_global uvalue_trace g in
+      let L2_trace       := interp_local_stack L1_trace l in
+      let L3_trace       := interp_memory L2_trace m in
+      let L4_trace       := exec_undef L3_trace in
+      let L5_trace       := exec_UB L4_trace in
+      let L6_trace       := exec_OOM L5_trace in
+      L6_trace.
+
   End InterpreterMCFG.
 
   Section InterpreterCFG.
@@ -327,6 +337,16 @@ Module Make (LP' : LLVMParams) : InterpreterStack.
       let L4_trace       := exec_undef L3_trace in
       let L5_trace       := exec_UB L4_trace in
       L5_trace.
+
+    Definition interp_mcfg6_exec {R} (t: itree L0 R) g l m : itree L5 (MemState * (local_env * stack * (global_env * R))) :=
+      let uvalue_trace   := interp_intrinsics t in
+      let L1_trace       := interp_global uvalue_trace g in
+      let L2_trace       := interp_local_stack L1_trace l in
+      let L3_trace       := interp_memory L2_trace m in
+      let L4_trace       := exec_undef L3_trace in
+      let L5_trace       := exec_UB L4_trace in
+      let L6_trace       := exec_OOM L5_trace in
+      L6_trace.
 
   End InterpreterMCFG.
 
