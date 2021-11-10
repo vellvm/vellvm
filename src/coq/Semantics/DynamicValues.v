@@ -3513,4 +3513,235 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       all: eapply eval_iop_integer_h_dtyp_iptr in EVAL; eauto.
     Qed.
   End EvalIopLemmas.
+
+  Definition default_dvalue_of_dtyp_i (sz : N) : err dvalue:=
+    (if (sz =? 64) then ret (DVALUE_I64 (repr 0))
+     else if (sz =? 32) then ret (DVALUE_I32 (repr 0))
+          else if (sz =? 8) then ret (DVALUE_I8 (repr 0))
+               else if (sz =? 1) then ret (DVALUE_I1 (repr 0))
+                    else failwith
+                           "Illegal size for generating default dvalue of DTYPE_I").
+
+
+  (* Handler for PickE which concretizes everything to 0 *)
+  Fixpoint default_dvalue_of_dtyp (dt : dtyp) : err dvalue :=
+    match dt with
+    | DTYPE_I sz => default_dvalue_of_dtyp_i sz
+    | DTYPE_IPTR => ret (DVALUE_IPTR IP.zero)
+    | DTYPE_Pointer => ret (DVALUE_Addr A.null)
+    | DTYPE_Void => ret DVALUE_None
+    | DTYPE_Half => failwith "Unimplemented default type: half"
+    | DTYPE_Float => ret (DVALUE_Float Float32.zero)
+    | DTYPE_Double => ret (DVALUE_Double (Float32.to_double Float32.zero))
+    | DTYPE_X86_fp80 => failwith "Unimplemented default type: x86_fp80"
+    | DTYPE_Fp128 => failwith "Unimplemented default type: fp128"
+    | DTYPE_Ppc_fp128 => failwith "Unimplemented default type: ppc_fp128"
+    | DTYPE_Metadata => failwith "Unimplemented default type: metadata"
+    | DTYPE_X86_mmx => failwith "Unimplemented default type: x86_mmx"
+    | DTYPE_Opaque => failwith "Unimplemented default type: opaque"
+    | DTYPE_Array sz t =>
+        if (0 <=? sz) then
+          v <- default_dvalue_of_dtyp t ;;
+          (ret (DVALUE_Array (repeat v (N.to_nat sz))))
+        else
+          failwith ("Negative array length for generating default value" ++
+                                                                         "of DTYPE_Array or DTYPE_Vector")
+
+    (* Matching valid Vector types... *)
+    (* Currently commented out unsupported ones *)
+    (* | DTYPE_Vector sz (DTYPE_Half) => *)
+    (*   if (0 <=? sz) then *)
+    (*     (ret (DVALUE_Vector *)
+    (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
+    (*   else *)
+    (*     failwith ("Negative array length for generating default value" ++ *)
+    (*     "of DTYPE_Array or DTYPE_Vector") *)
+    | DTYPE_Vector sz (DTYPE_Float) =>
+        if (0 <=? sz) then
+          (ret (DVALUE_Vector
+                  (repeat (DVALUE_Float Float32.zero) (N.to_nat sz))))
+        else
+          failwith ("Negative array length for generating default value" ++
+                                                                         "of DTYPE_Array or DTYPE_Vector")
+    | DTYPE_Vector sz (DTYPE_Double) =>
+        if (0 <=? sz) then
+          (ret (DVALUE_Vector
+                  (repeat (DVALUE_Double (Float32.to_double Float32.zero))
+                          (N.to_nat sz))))
+        else
+          failwith ("Negative array length for generating default value" ++
+                                                                         "of DTYPE_Array or DTYPE_Vector")
+    (* | DTYPE_Vector sz (DTYPE_X86_fp80) => *)
+    (*   if (0 <=? sz) then *)
+    (*     (ret (DVALUE_Vector *)
+    (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
+    (*   else *)
+    (*     failwith ("Negative array length for generating default value" ++ *)
+    (*     "of DTYPE_Array or DTYPE_Vector") *)
+    (* | DTYPE_Vector sz (DTYPE_Fp128) => *)
+    (*   if (0 <=? sz) then *)
+    (*     (ret (DVALUE_Vector *)
+    (*             (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))) *)
+    (*   else *)
+    (*     failwith ("Negative array length for generating default value" ++ *)
+    (*     "of DTYPE_Array or DTYPE_Vector") *)
+    | DTYPE_Vector sz (DTYPE_I n) =>
+        if (0 <=? sz) then
+          v <- default_dvalue_of_dtyp_i n ;;
+          (ret (DVALUE_Vector (repeat v (N.to_nat sz))))
+        else
+          failwith ("Negative array length for generating default value" ++
+                                                                         "of DTYPE_Array or DTYPE_Vector")
+    | DTYPE_Vector _ _ => failwith ("Non-valid vector type when" ++
+                                                                "generating default vector")
+    | DTYPE_Struct fields =>
+        v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
+        ret (DVALUE_Struct v)
+    | DTYPE_Packed_struct fields =>
+        v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
+        ret (DVALUE_Packed_struct v)
+    end.
+
+  Ltac do_it := constructor; cbn; auto; fail.
+
+  Lemma dvalue_default : forall t v,
+      inr v = (default_dvalue_of_dtyp t) ->
+      dvalue_has_dtyp v t.
+  Proof.
+    intros t v. revert v.
+    induction t; try do_it;
+      try (intros; subst; inversion H; constructor).
+    - intros. subst. cbn in H.
+      unfold default_dvalue_of_dtyp_i in H.
+      destruct (@IX_supported_dec a).
+      * inversion i; subst; cbn in H; inversion H; constructor; auto.
+      * rewrite unsupported_cases in H; auto. inversion H.
+    - intros. subst. inversion H. clear H.
+      induction sz.
+      + cbn in H1.
+        destruct (default_dvalue_of_dtyp t) eqn: HT. inv H1. inv H1.
+        pose proof DVALUE_Array_typ.
+        specialize (H nil (N.to_nat 0) t).
+        rewrite Nnat.N2Nat.id in H.
+        apply H. auto. auto.
+      + cbn in H1.
+        destruct (default_dvalue_of_dtyp t) eqn: HT. inv H1. inv H1.
+        pose proof DVALUE_Array_typ as ARR.
+        specialize (ARR (repeat d (Pos.to_nat p)) (N.to_nat (N.pos p)) t).
+        rewrite Nnat.N2Nat.id in ARR.
+        cbn in *.
+        apply ARR.
+        * apply forall_repeat_true.
+          apply IHt. reflexivity.
+        * apply repeat_length.
+    - revert H. induction fields.
+      + intros. inv H0. constructor.
+      + intros.
+        assert (forall u : dtyp,
+                   In u fields ->
+                   forall v : dvalue,
+                     inr v = default_dvalue_of_dtyp u -> dvalue_has_dtyp v u).
+        { intros. apply H. apply in_cons. auto. auto. }
+        specialize (IHfields H1). clear H1.
+        Opaque map_monad.
+        (* Reduce H0 *)
+        cbn in H0.
+        rewrite list_cons_app in H0.
+        rewrite map_monad_app in H0. cbn in H0.
+        Transparent map_monad.
+        unfold map_monad at 1 in H0.
+        Opaque map_monad. cbn in H0.
+        destruct (default_dvalue_of_dtyp a) eqn: A_DEFAULT.
+        inv H0.
+        destruct (map_monad default_dvalue_of_dtyp fields) eqn: FIELDS.
+        inv H0.
+        inv H0. constructor. apply H. apply in_eq.
+        symmetry. auto.
+        apply IHfields. cbn. rewrite FIELDS. reflexivity.
+    - revert H. induction fields.
+      + intros. inv H0. constructor.
+      + intros.
+        assert (forall u : dtyp,
+                   In u fields ->
+                   forall v : dvalue,
+                     inr v = default_dvalue_of_dtyp u -> dvalue_has_dtyp v u).
+        { intros. apply H. apply in_cons. auto. auto. }
+        specialize (IHfields H1). clear H1.
+        Opaque map_monad.
+        (* Reduce H0 *)
+        cbn in H0.
+        rewrite list_cons_app in H0.
+        rewrite map_monad_app in H0. cbn in H0.
+        Transparent map_monad.
+        unfold map_monad at 1 in H0.
+        Opaque map_monad. cbn in H0.
+        destruct (default_dvalue_of_dtyp a) eqn: A_DEFAULT.
+        inv H0.
+        destruct (map_monad default_dvalue_of_dtyp fields) eqn: FIELDS.
+        inv H0.
+        inv H0. constructor. apply H. apply in_eq.
+        symmetry. auto.
+        apply IHfields. cbn. rewrite FIELDS. reflexivity.
+    - intros. subst. inversion H. clear H.
+      revert H1. revert v. revert IHt. revert t.
+      induction sz.
+      + intros. cbn in H1.
+        pose proof DVALUE_Vector_typ.
+        specialize (H nil (N.to_nat 0)).
+        rewrite Nnat.N2Nat.id in H.
+        destruct t; inv H1;
+          try
+            (apply H;
+             [constructor | constructor |
+               unfold vector_dtyp; intuition]).
+        destruct (default_dvalue_of_dtyp_i sz) eqn: HI; inv H2.
+        apply H. constructor. auto. unfold vector_dtyp. left.
+        exists sz. reflexivity.
+      + intros. cbn in H1.
+        destruct t; inv H1;
+          try (
+              rewrite <- positive_nat_N;
+              constructor; [apply forall_repeat_true ; constructor |
+                             apply repeat_length |
+                             unfold vector_dtyp ; intuition ]).
+        destruct (default_dvalue_of_dtyp_i sz) eqn: SZ; inv H0.
+        pose proof DVALUE_Vector_typ.
+        rewrite <- positive_nat_N. apply H.
+        apply forall_repeat_true. apply IHt. symmetry. auto.
+        apply repeat_length.
+        left. exists sz. reflexivity.
+  Qed.
+
+  Definition uvalue_constructor_string (u : uvalue) : string
+    := match u with
+       | UVALUE_Addr a => "UVALUE_Addr"
+       | UVALUE_I1 x => "UVALUE_I1"
+       | UVALUE_I8 x => "UVALUE_I8"
+       | UVALUE_I32 x => "UVALUE_I32"
+       | UVALUE_I64 x => "UVALUE_I64"
+       | UVALUE_IPTR x => "UVALUE_IPTR"
+       | UVALUE_Double x => "UVALUE_Double"
+       | UVALUE_Float x => "UVALUE_Float"
+       | UVALUE_Undef t => "UVALUE_Undef"
+       | UVALUE_Poison t => "UVALUE_Poison"
+       | UVALUE_None => "UVALUE_None"
+       | UVALUE_Struct fields => "UVALUE_Struct"
+       | UVALUE_Packed_struct fields => "UVALUE_Packed_struct"
+       | UVALUE_Array elts => "UVALUE_Array"
+       | UVALUE_Vector elts => "UVALUE_Vector"
+       | UVALUE_IBinop iop v1 v2 => "UVALUE_IBinop"
+       | UVALUE_ICmp cmp v1 v2 => "UVALUE_ICmp"
+       | UVALUE_FBinop fop fm v1 v2 => "UVALUE_FBinop"
+       | UVALUE_FCmp cmp v1 v2 => "UVALUE_FCmp"
+       | UVALUE_Conversion conv t_from v t_to => "UVALUE_Conversion"
+       | UVALUE_GetElementPtr t ptrval idxs => "UVALUE_GetElementPtr"
+       | UVALUE_ExtractElement vec idx => "UVALUE_ExtractElement"
+       | UVALUE_InsertElement vec elt idx => "UVALUE_InsertElement"
+       | UVALUE_ShuffleVector vec1 vec2 idxmask => "UVALUE_ShuffleVector"
+       | UVALUE_ExtractValue vec idxs => "UVALUE_ExtractValue"
+       | UVALUE_InsertValue vec elt idxs => "UVALUE_InsertValue"
+       | UVALUE_Select cnd v1 v2 => "UVALUE_Select"
+       | UVALUE_ExtractByte uv dt idx sid => "UVALUE_ExtractByte"
+       | UVALUE_ConcatBytes uvs dt => "UVALUE_ConcatBytes"
+       end.
 End DVALUE.

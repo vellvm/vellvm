@@ -34,6 +34,7 @@ COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/Memory/Sizeof Semantics/G
 		Semantics/Memory/Overlaps Semantics/Memory/FiniteProvenance Semantics/Memory/StoreId\
 		Semantics/VellvmIntegers Semantics/Memory/ErrSID \
 		Semantics/DynamicValues Semantics/LLVMEvents Semantics/LLVMParams\
+		Semantics/MemoryParams Semantics/SerializationParams\
 		Semantics/IntrinsicsDefinitions\
 		Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
 		Semantics/Lang Semantics/InfiniteToFinite\

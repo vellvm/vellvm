@@ -234,71 +234,71 @@ Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
 
   From Coq Require Import RelationClasses.
 
-  Lemma refine_oom
-    : forall E F `{LLVMEvents.FailureE -< E +' F} T TT (HR: Reflexive TT)
-        (x : _ -> Prop)
-        (y : itree (E +' OOME +' F) T),
-      x y -> model_OOM TT x y.
-  Proof.
-    intros E F H T TT HR x y H0.
-    unfold model_OOM.
-    exists y. split. assumption.
-    unfold model_OOM_h.
-    apply interp_prop.
-    apply case_prop_handler_correct.
-    unfold handler_correct. intros. reflexivity.
-    apply case_prop_handler_correct.
-    apply UB_handler_correct.
-    unfold handler_correct. intros. reflexivity.
-    assumption. reflexivity.
-  Qed.
+  (* Lemma refine_oom *)
+  (*   : forall E F `{LLVMEvents.FailureE -< E +' F} T TT (HR: Reflexive TT) *)
+  (*       (x : _ -> Prop) *)
+  (*       (y : itree (E +' OOME +' F) T), *)
+  (*     x y -> model_OOM TT x y. *)
+  (* Proof. *)
+  (*   intros E F H T TT HR x y H0. *)
+  (*   unfold model_OOM. *)
+  (*   exists y. split. assumption. *)
+  (*   unfold model_OOM_h. *)
+  (*   apply interp_prop. *)
+  (*   apply case_prop_handler_correct. *)
+  (*   unfold handler_correct. intros. reflexivity. *)
+  (*   apply case_prop_handler_correct. *)
+  (*   apply UB_handler_correct. *)
+  (*   unfold handler_correct. intros. reflexivity. *)
+  (*   assumption. reflexivity. *)
+  (* Qed. *)
 
-  Lemma refine_oom_oom_void :
-    forall (source : itree E1.L5 void) (msg : string),
-      refine_oom eq source (trigger (ThrowOOM msg)).
-  Proof.
-    intros source msg.
-    cbn.
-    unfold refine_oom.
+  (* Lemma refine_oom_oom_void : *)
+  (*   forall (source : itree E1.L5 void) (msg : string), *)
+  (*     refine_oom eq source (trigger (ThrowOOM msg)). *)
+  (* Proof. *)
+  (*   intros source msg. *)
+  (*   cbn. *)
+  (*   unfold refine_oom. *)
 
-    red.
+  (*   red. *)
 
-    Import InterpFacts.
-    Require Import PropT.
+  (*   Import InterpFacts. *)
+  (*   Require Import PropT. *)
 
-    cbn.
+  (*   cbn. *)
 
-    rewrite interp_prop_trigger.
+  (*   rewrite interp_prop_trigger. *)
 
 
-  Qed.
+  (* Qed. *)
 
-  Lemma refine_oom_oom :
-    forall {T : Type} (RR : relation T) (sources : PropT E1.L5 T) (t : itree E1.L5 T) (msg : string),
-      refine_oom RR sources (raise_oom msg).
-  Proof.
-    intros T RR sources t msg.
-    cbn.
-    unfold refine_oom.
-    exists t.
-    intros SOURCES.
+  (* Lemma refine_oom_oom : *)
+  (*   forall {T : Type} (RR : relation T) (sources : PropT E1.L5 T) (t : itree E1.L5 T) (msg : string), *)
+  (*     refine_oom RR sources (raise_oom msg). *)
+  (* Proof. *)
+  (*   intros T RR sources t msg. *)
+  (*   cbn. *)
+  (*   unfold refine_oom. *)
+  (*   exists t. *)
+  (*   intros SOURCES. *)
 
-    red.
+  (*   red. *)
 
-    unfold L5_convert_tree.
-    Import InterpFacts.
-    unfold raiseOOM.
-    Require Import PropT.
+  (*   unfold L5_convert_tree. *)
+  (*   Import InterpFacts. *)
+  (*   unfold raiseOOM. *)
+  (*   Require Import PropT. *)
 
-    Check (trigger (ThrowOOM msg)).
-    rewrite Eq.bind_trigger.
-    rewrite bind_trigger.
-    rewrite interp_prop _bind.
-    setoid_rewrite interp_interp.
-    epose proof interp_interp.
+  (*   Check (trigger (ThrowOOM msg)). *)
+  (*   rewrite Eq.bind_trigger. *)
+  (*   rewrite bind_trigger. *)
+  (*   rewrite interp_prop _bind. *)
+  (*   setoid_rewrite interp_interp. *)
+  (*   epose proof interp_interp. *)
 
-    rewrite interp_ret.
-    exists t.
-  Qed.
+  (*   rewrite interp_ret. *)
+  (*   exists t. *)
+  (* Qed. *)
 
 End InfiniteToFinite.

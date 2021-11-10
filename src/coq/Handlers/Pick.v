@@ -28,6 +28,9 @@ From Vellvm Require Import
      Semantics.Memory.Sizeof
      Semantics.Memory.MemBytes
      Semantics.LLVMEvents
+     Semantics.LLVMParams
+     Semantics.MemoryParams
+     Semantics.SerializationParams
      Handlers.Serialization.
 
 Require Import List.
@@ -44,12 +47,12 @@ Import MonadNotation.
   - The propositional one capture in [Prop] all possible values
   - The executable one interprets [undef] as 0 at the type
 *)
-
-Module Make(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF: Sizeof)(LLVMIO: LLVM_INTERACTIONS(A)(IP)(SIZEOF))(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(IP)(SIZEOF)(LLVMIO))(BYTE_IMPL : ByteImpl(A)(IP)(SIZEOF)(LLVMIO)).
-
-  Module Conc := Serialization.Make A IP SIZEOF LLVMIO PTOI PROVENANCE ITOP GEP BYTE_IMPL.
-  Import Conc.
-  Import LLVMIO.
+Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SP : SerializationParams LP Events MP).
+  Import SP.
+  Import SER.
+  Import MP.
+  Import LP.
+  Import Events.
 
   Section PickPropositional.
 

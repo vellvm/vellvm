@@ -19,13 +19,18 @@ From Vellvm Require Import
      Semantics.GepM
      Semantics.Memory.Sizeof
      Semantics.Memory.MemBytes
-     Semantics.Memory.ErrSID.
+     Semantics.Memory.ErrSID
+     Semantics.LLVMParams
+     Semantics.MemoryParams
+     Semantics.SerializationParams.
 
 Import MonadNotation.
 Import MonadReturnsLaws.
 
-Module MemBytesTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (FMP : FinMemoryParams LP Events).
-  Import FMP.
+Module MemBytesTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SP : SerializationParams LP Events MP).
+  Import SP.
+  Import SER.
+  Import MP.
   Import LP.
 
   Import Events.
@@ -35,9 +40,6 @@ Module MemBytesTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
   Import ITOP.
   Import DV.
   Import GEP.
-
-  Module SER := Serialization.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP BYTE_IMPL.
-  Import SER.
 
   Module BYTE := Byte ADDR IP SIZEOF Events BYTE_IMPL.
   Export BYTE.
@@ -242,19 +244,20 @@ Module MemBytesTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
   Qed.
 End MemBytesTheory.
 
-Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (FMP : FinMemoryParams LP Events).
-  Import FMP.
+Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SP : SerializationParams LP Events MP).
+  Import SP.
+  Import SER.
+  Import MP.
   Import LP.
 
   Import Events.
 
-  Module MBT := MemBytesTheory LP Events FMP.
+  Module MBT := MemBytesTheory LP Events MP SP.
   Import MBT.
-  Import MBT.SER.
   Import BYTE.
   Import SIZEOF.
 
-  Module Mem := FiniteMemory.Make LP Events FMP.
+  Module Mem := FiniteMemory.Make LP Events MP.
   Import Mem.
 
   Module ESID := ERRSID ADDR IP SIZEOF PROV.
@@ -916,15 +919,29 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
     intros uv dv dt DTYP SUCC CONC.
     generalize dependent dv.
     induction DTYP; intros dv CONC.
-    1-8: inversion CONC; subst; solve [auto | constructor; try solve_no_void].
+    unfold concretize in CONC.
+    cbn in CONC.
+    unfold concretize_u in CONC.
+    cbn in CONC.
+    rewrite concretize_uvalueM_equation in CONC.
+    cbn in CONC. inversion CONC. subst; solve [auto | constructor; try solve_no_void].
+
+    Ltac unfold_concretize H :=
+      unfold concretize, concretize_u in H;
+      rewrite concretize_uvalueM_equation in H.
+
+    Ltac invert_concretize H :=
+      unfold_concretize H; inversion H.
+
+    1-7: invert_concretize CONC; subst; solve [auto | constructor; try solve_no_void].
 
     (* Poison structs *)
-    { inversion CONC.
+    { invert_concretize CONC.
       constructor.
       rewrite NO_VOID_equation.
       cbn. auto.
     }
-    { inversion CONC.
+    { invert_concretize CONC.
       constructor.
 
       subst.
@@ -933,14 +950,14 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
       specialize (IHDTYP (concretize_succeeds_poison _) (DVALUE_Poison dt)).
       forward IHDTYP.
       { do 2 red.
-        cbn.
+        rewrite concretize_uvalueM_equation; cbn.
         reflexivity.
       }
 
       specialize (IHDTYP0 (concretize_succeeds_poison _) (DVALUE_Poison (DTYPE_Struct dts))).
       forward IHDTYP0.
       { do 2 red.
-        cbn.
+        rewrite concretize_uvalueM_equation; cbn.
         reflexivity.
       }
       
@@ -951,12 +968,12 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
     }
 
     (* Poison packed structs *)
-    { inversion CONC.
+    { invert_concretize CONC.
       constructor.
       rewrite NO_VOID_equation.
       cbn. auto.
     }
-    { inversion CONC.
+    { invert_concretize CONC.
       constructor.
 
       subst.
@@ -965,14 +982,14 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
       specialize (IHDTYP (concretize_succeeds_poison _) (DVALUE_Poison dt)).
       forward IHDTYP.
       { do 2 red.
-        cbn.
+        rewrite concretize_uvalueM_equation; cbn.
         reflexivity.
       }
 
       specialize (IHDTYP0 (concretize_succeeds_poison _) (DVALUE_Poison (DTYPE_Packed_struct dts))).
       forward IHDTYP0.
       { do 2 red.
-        cbn.
+        rewrite concretize_uvalueM_equation; cbn.
         reflexivity.
       }
 
@@ -982,11 +999,11 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
       solve_no_void.
     }
 
-    1-11: inversion CONC; subst; solve [auto | constructor; try solve_no_void].
+    1-11: invert_concretize CONC; subst; solve [auto | constructor; try solve_no_void].
 
     (* Structs *)
     { (* Nil structs *)
-      do 2 red in CONC.
+      unfold_concretize CONC.
       cbn in CONC.
       unfold bind_RefineProp in CONC.
       destruct CONC as (ma & k' & pama & eqm & REST).
@@ -1011,8 +1028,7 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
       subst; constructor.
     }
     { (* Non-nil structs *)
-      do 2 red in CONC.
-      rewrite concretize_uvalueM_equation in CONC.
+      unfold_concretize CONC.
       cbn in CONC.
 
       (* Urgggghhh... Missing proper instance, I think *)

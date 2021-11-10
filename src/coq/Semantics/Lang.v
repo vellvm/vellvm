@@ -6,6 +6,8 @@ From Vellvm Require Import
      Semantics.GepM
      Semantics.LLVMEvents
      Semantics.Denotation
+     Semantics.MemoryParams
+     Semantics.SerializationParams
 
      Handlers.Global
      Handlers.Local
@@ -15,13 +17,6 @@ From Vellvm Require Import
      Handlers.UndefinedBehaviour
      Handlers.FiniteMemory
      Handlers.FiniteMemoryTheory.
-
-Module FMP (LP' : LLVMParams) (Events' : LLVM_INTERACTIONS LP'.ADDR LP'.IP LP'.SIZEOF) (GEP' : GEPM LP'.ADDR LP'.IP LP'.SIZEOF Events') (BYTE' : ByteImpl LP'.ADDR LP'.IP LP'.SIZEOF Events') : FinMemoryParams LP' Events'.
-  Module LP := LP'.
-  Module Events := Events'.
-  Module GEP := GEP'.
-  Module BYTE_IMPL := BYTE'.
-End FMP.
 
 Module Type Lang (LP: LLVMParams).
   Import LP.
@@ -39,22 +34,23 @@ Module Type Lang (LP: LLVMParams).
   Module GEP  := GepM.Make ADDR IP SIZEOF Events PTOI PROV ITOP.
   Module Byte := FiniteMemory.FinByte ADDR IP SIZEOF Events.
 
-  Module FMP := FMP LP Events GEP Byte.
+  Module MP := MemoryParams.Make LP Events GEP Byte.
 
-  Module MEM  := FiniteMemory.Make LP Events FMP.
-  Module MEMORY_THEORY := FiniteMemoryTheory.Make LP Events FMP MEM.
+  Module MEM  := FiniteMemory.Make LP Events MP.
 
   (* Serialization *)
-  Module SER := Serialization.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
+  Module SP := SerializationParams.Make LP Events MP.
+  
+  Module MEMORY_THEORY := FiniteMemoryTheory.Make LP Events MP SP MEM.
 
   (* Pick handler (depends on memory / serialization) *)
-  Module Pick := Pick.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
+  Module Pick := Pick.Make LP Events MP SP.
 
   (* Denotation *)
-  Module D := Denotation ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
+  Module D := Denotation LP Events MP SP.
 
   Export Events Events.DV Global Local Stack Pick Intrinsics
-         MEM MEMORY_THEORY UndefinedBehaviour SER D.
+         MEM MEMORY_THEORY UndefinedBehaviour SP.SER D.
 End Lang.
 
 Module Make (LP : LLVMParams) <: Lang LP.

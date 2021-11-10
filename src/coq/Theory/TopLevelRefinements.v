@@ -41,6 +41,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Export TOP.
   Export IS.
   Export IS.LLVM.
+  Export IS.LLVM.SP.SER.
 
   Import SemNotations.
 
@@ -327,25 +328,23 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Qed.
 
     Lemma Pick_handler_correct :
-      forall E `{LLVMEvents.FailureE -< E} `{LLVMEvents.UBE -< E} `{LLVMEvents.OOME -< E},
+      forall E `{FailureE -< E} `{UBE -< E} `{OOME -< E},
         handler_correct (@Pick_handler E _ _ _) concretize_picks.
     Proof.
       unfold handler_correct.
       intros.
       destruct e.
       cbn. apply PickD with (res := concretize_uvalue u).
-      - replace concretize_uvalue with Pick.Conc.concretize_uvalue.
-        apply Pick.concretize_u_concretize_uvalue.
-        reflexivity.
+      - apply Pick.concretize_u_concretize_uvalue.
       - reflexivity.
     Qed.
     
     Lemma refine_undef
-      : forall (E F:Type -> Type) T TT (HR: Reflexive TT)  `{LLVMEvents.UBE -< F} `{LLVMEvents.FailureE -< F}
+      : forall (E F:Type -> Type) T TT (HR: Reflexive TT)  `{UBE -< F} `{FailureE -< F} `{OOME -< F}
                (x : itree _ T),
-        model_undef TT x (@exec_undef E F _ _ _ x).
+        model_undef TT x (@exec_undef E F _ _ _ _ x).
     Proof.
-      intros E F H H0 T TT HR x.
+      intros E F H H0 T TT HR OOM x.
       cbn in *.
       unfold model_undef.
       unfold exec_undef.
@@ -369,7 +368,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       unfold interpreter, interpreter_gen.
       unfold ℑs5.
       unfold interp_mcfg5_exec.
-      apply refine_UB.  auto.
+      apply refine_UB. auto.
       apply refine_undef. auto.
     Qed.
 

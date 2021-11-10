@@ -46,6 +46,8 @@ From Vellvm Require Import
      Semantics.Memory.Sizeof
      Semantics.Memory.MemBytes
      Semantics.Memory.ErrSID
+     Semantics.MemoryParams
+     Semantics.SerializationParams
      Handlers.SerializationTheory
      Semantics.GepM
      Semantics.LLVMEvents
@@ -68,8 +70,10 @@ Set Contextual Implicit.
     Reasoning principles for VIR's main memory model.
 *)
 
-Module Type MEMORY_THEORY (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (FMP : FinMemoryParams LP Events) (Mem : FinMemory LP Events FMP).
-  Import FMP.
+Module Type MEMORY_THEORY (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SP : SerializationParams LP Events MP) (Mem : FinMemory LP Events MP).
+  Import SP.
+  Import SER.
+  Import MP.
   Import LP.
 
   (** ** Theory of the general operations over the finite maps we manipulate *)
@@ -92,10 +96,10 @@ Module Type MEMORY_THEORY (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR 
   Module ESID := ERRSID ADDR IP SIZEOF PROV.
   Import ESID.
 
-  Module MBT := MemBytesTheory LP Events FMP.
+  Module MBT := MemBytesTheory LP Events MP SP.
   Import MBT.
 
-  Module ST := SerializationTheory LP Events FMP.
+  Module ST := SerializationTheory LP Events MP SP.
   Import ST.
 
   Definition ErrSID_MemState_runs_to (e : MemState -> ErrSID memory_stack) (m m' : MemState) : Prop
@@ -3369,6 +3373,6 @@ Section PARAMS.
 End PARAMS.
 End MEMORY_THEORY.
 
-Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (FMP : FinMemoryParams LP Events) (Mem : FinMemory LP Events FMP) <: MEMORY_THEORY LP Events FMP Mem.
-Include MEMORY_THEORY LP Events FMP Mem.
+Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SP : SerializationParams LP Events MP) (Mem : FinMemory LP Events MP) <: MEMORY_THEORY LP Events MP SP Mem.
+Include MEMORY_THEORY LP Events MP SP Mem.
 End Make.

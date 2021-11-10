@@ -65,6 +65,7 @@ From Vellvm Require Import
      Semantics.Memory.FiniteProvenance
      Semantics.Memory.ErrSID
      Semantics.Memory.Overlaps
+     Semantics.MemoryParams
      Semantics.LLVMEvents
      Semantics.LLVMParams.
 
@@ -591,18 +592,13 @@ Module FinByte (ADDR : MemoryAddress.ADDRESS) (IP : MemoryAddress.INTPTR) (SIZEO
 
 End FinByte.
 
-Module Type FinMemoryParams (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF).
-  Declare Module GEP : GEPM LP.ADDR LP.IP LP.SIZEOF Events.
-  Declare Module BYTE_IMPL : ByteImpl LP.ADDR LP.IP LP.SIZEOF Events.
-End FinMemoryParams.
-
 (** ** Memory model
     Implementation of the memory model, i.e. a handler for [MemoryE].
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
     indexed on [Z].
  *)
-Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (FMP : FinMemoryParams LP Events).
-  Import FMP.
+Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events).
+  Import MP.
   Import LP.
   Import Events.
   Import DV.
@@ -705,27 +701,6 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
 
    Definition uvalue_bytes (e : Endianess) (uv :  uvalue) (dt : dtyp) (sid : store_id) : OOM (list uvalue)
       := fmap (correct_endianess e) (uvalue_bytes_little_endian uv dt sid).
-
-    (* Is a uvalue a concrete integer equal to i? *)
-    Definition uvalue_int_eq_Z (uv : uvalue) (i : Z)
-      := match uv with
-         | UVALUE_I1 x
-         | UVALUE_I8 x
-         | UVALUE_I32 x
-         | UVALUE_I64 x => Z.eqb (unsigned x) i
-         | UVALUE_IPTR x => Z.eqb (IP.to_Z x) i
-         | _ => false
-         end.
-
-    Definition dvalue_int_unsigned (dv : dvalue) : Z
-      := match dv with
-         | DVALUE_I1 x => unsigned x
-         | DVALUE_I8 x => unsigned x
-         | DVALUE_I32 x => unsigned x
-         | DVALUE_I64 x => unsigned x
-         | DVALUE_IPTR x => (IP.to_unsigned x) (* TODO: unsigned???? *)
-         | _ => 0
-         end.
 
     (* TODO: move this *)
     Definition dtyp_eqb (dt1 dt2 : dtyp) : bool
@@ -1921,8 +1896,8 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
 
 End FinMemory.
 
-Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (FMP : FinMemoryParams LP Events) : FinMemory LP Events FMP.
-  Include FinMemory LP Events FMP.
+Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) : FinMemory LP Events MP.
+  Include FinMemory LP Events MP.
 End Make.
 
 Module LLVMParamsBigIntptr := LLVMParams.Make FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP.

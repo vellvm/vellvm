@@ -35,6 +35,9 @@ From Vellvm Require Import
      Semantics.Memory.Sizeof
      Semantics.Memory.MemBytes
      Semantics.LLVMEvents
+     Semantics.LLVMParams
+     Semantics.MemoryParams
+     Semantics.SerializationParams
      Handlers.Serialization.
 
 Require Import Ceres.Ceres.
@@ -104,12 +107,12 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(A)(IP)(SIZEOF))(PTOI:PTOI(A))(PROVENANCE:PROVENANCE(A))(ITOP:ITOP(A)(PROVENANCE))(GEP:GEPM(A)(IP)(SIZEOF)(LLVMEvents))(BYTE_IMPL : ByteImpl(A)(IP)(SIZEOF)(LLVMEvents)).
-
-  Module Conc := Serialization.Make A IP SIZEOF LLVMEvents PTOI PROVENANCE ITOP GEP BYTE_IMPL.
-
-  Import LLVMEvents.
-  Import Conc.
+Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SP : SerializationParams LP Events MP).
+  Import SP.
+  Import SER.
+  Import MP.
+  Import LP.
+  Import Events.
 
   Definition eval_conv_pure_h conv (t1:dtyp) (x:dvalue) (t2:dtyp) : itree conv_E dvalue :=
     match get_conv_case conv t1 x t2 with
@@ -237,7 +240,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(IP:MemoryAddress.INTPTR)(SIZEOF:Sizeo
       | false => ret (UVALUE_I1 zero)
       end
 
-    | EXP_Null => ret (UVALUE_Addr A.null)
+    | EXP_Null => ret (UVALUE_Addr ADDR.null)
 
     | EXP_Zero_initializer =>
       match top with

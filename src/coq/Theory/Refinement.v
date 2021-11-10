@@ -32,10 +32,8 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Import LLVM.
   Import LLVM.MEM.
 
-  Module Conc := Serialization.Make ADDR IP SIZEOF Events PTOI PROV ITOP GEP Byte.
-
   Import DV.
-  Import Conc.
+  Import LLVM.SP.SER.
 
   (* Refinement relation for uvalues *)
   (* Definition 5.6 UValue refinement *)
