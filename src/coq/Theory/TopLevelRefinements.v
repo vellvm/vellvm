@@ -359,10 +359,38 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     unfold interp, Basics.iter, MonadIter_itree.
     rewrite (itree_eta t') in eq.
     replace t' with ({| _observe := observe t' |}) by admit.
-    destruct (observe t'); cbn.
+    destruct (observe t') eqn:T'; cbn.
     - cbn. econstructor. reflexivity. rewrite <- eq. reflexivity.
     - econstructor. right.
       eapply CIH. rewrite tau_eutt in eq. rewrite eq. reflexivity.
+    - unfold handler_correct in H.
+      set (f := (fun t0 : itree (fun H1 : Type => E H1) R =>
+           match observe t0 with
+           | RetF r0 => Ret (inr r0)
+           | TauF t1 => Ret (inl t1)
+           | @VisF _ _ _ X0 e0 k0 => ITree.map (fun x : X0 => inl (k0 x)) (h X0 e0)
+           end)).
+
+      set (x := (Vis e k)).
+      replace (ITree.iter f x) with (ITree.bind (f x)
+                                                (fun lr =>
+                                                   match lr with
+                                                   | inl l => Tau (ITree.iter f l)
+                                                   | inr r => Ret r
+                                                   end)) by admit.
+
+      subst f.
+      subst x.
+      cbn.
+
+      (* I know (h X e) is in h_spec *)
+      (* l = (r <- h X e;; ret (inl (k r))) *)
+      match goal with
+      | H : _ |- context [ ITree.bind (ITree.map ?f ?t) ?k ]
+        => replace (ITree.bind (ITree.map f t) k) with (ITree.bind t (fun x => k (f x))) by admit
+      end.
+
+      pose proof (H X e).      
   Admitted.
 
 

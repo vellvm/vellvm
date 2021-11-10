@@ -394,6 +394,58 @@ Inductive err_ub_oom A :=
 Arguments ERR_UB_OOM {_} _.
 Arguments unERR_UB_OOM {_} _.
 
+Notation OOM_unERR_UB_OOM oom_msg :=
+  ({| unERR_UB_OOM :=
+     {|
+       EitherMonad.unEitherT :=
+       {|
+         EitherMonad.unEitherT :=
+         {|
+           EitherMonad.unEitherT := {| IdentityMonad.unIdent := inl (OOM_message oom_msg) |}
+         |}
+       |}
+     |}
+   |}).
+
+Notation UB_unERR_UB_OOM ub_msg :=
+  ({| unERR_UB_OOM :=
+     {|
+       EitherMonad.unEitherT :=
+       {|
+         EitherMonad.unEitherT :=
+         {|
+           EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inl (UB_message ub_msg)) |}
+         |}
+       |}
+     |}
+   |}).
+
+Notation ERR_unERR_UB_OOM err_msg :=
+  ({| unERR_UB_OOM :=
+     {|
+       EitherMonad.unEitherT :=
+       {|
+         EitherMonad.unEitherT :=
+         {|
+           EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inl (ERR_message err_msg))) |}
+         |}
+       |}
+     |}
+   |}).
+
+Notation success_unERR_UB_OOM v :=
+  ({| unERR_UB_OOM :=
+     {|
+       EitherMonad.unEitherT :=
+       {|
+         EitherMonad.unEitherT :=
+         {|
+           EitherMonad.unEitherT := {| IdentityMonad.unIdent := inr (inr (inr v)) |}
+         |}
+       |}
+     |}
+   |}).
+
 Import MonadNotation.
 Import Utils.Monads.
 

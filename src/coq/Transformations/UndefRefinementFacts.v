@@ -14,7 +14,9 @@ From Vellvm Require Import
      CFG
      DynamicTypes
      PropT
-     Syntax.Traversal.
+     Syntax.Traversal
+     Semantics.LLVMParams
+     Semantics.Lang.
 
 From Vellvm.Semantics Require Import
      Memory.Sizeof
@@ -64,14 +66,14 @@ Require Import Relations.
 Import MemoryAddress.
 
 
-Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS(A)(SIZE))(PTOI:PTOI(A))(PROV:PROVENANCE(A))(ITOP:ITOP(A)(PROV))(GEP:GEPM(A)(SIZE)(LLVMEvents))(BYTE_IMPL:ByteImpl(A)(SIZE)(LLVMEvents)).
+Module Make (LP : LLVMParams) (LLVM : Lang LP).
+  Import LLVM.SP.SER.
+  Import LLVM.Events.
 
-  Module Conc := Serialization.Make A SIZE LLVMEvents PTOI PROV ITOP GEP BYTE_IMPL.
-
-  Module Ref := Refinement.Make A SIZE LLVMEvents PTOI PROV ITOP GEP BYTE_IMPL.
+  Module Ref := Refinement.Make LP LLVM.
   Import Ref.
-  Import LLVMEvents.
-  Import Conc.
+
+  Import RefineProp.
 
   (* -------------------------------------------------------- *)
   (* Facts about multiplication and undef                     *)
@@ -96,16 +98,16 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
       red in CONC.
       rewrite concretize_uvalueM_equation in CONC.
 
-      destruct CONC as ([ma] & k' & CONC' & mbeq & REST).
+      destruct CONC as (ma & k' & CONC' & mbeq & REST).
 
       cbn in mbeq.
-      destruct ma as [[uba | [erra | a]]] eqn:Hma.
-      - (* UB from uv1 *)
+      destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma.
+      - (* OOM from uv1 *)
         do 2 red.
         rewrite concretize_uvalueM_equation.
 
         cbn.
-        unfold bind_MPropT.
+        unfold bind_RefineProp.
 
         eexists.
         eexists.
@@ -116,16 +118,14 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
         apply CONC'.
 
         split; auto.
-        intros a Rets.
-        cbn in Rets.
-        destruct uba.
-        inversion Rets.
-      - (* Failure in uv1 *)
+
+        left; cbn; auto.
+      - (* UB in uv1 *)
         do 2 red.
         rewrite concretize_uvalueM_equation.
 
         cbn.
-        unfold bind_MPropT.
+        unfold bind_RefineProp.
 
         eexists.
         eexists.
@@ -136,17 +136,43 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
         apply CONC'.
 
         split; auto.
-        intros a Rets.
-        cbn in Rets.
-        destruct erra.
-        inversion Rets.
+      - (* Failure in uv1 *)
+        do 2 red.
+        rewrite concretize_uvalueM_equation.
+
+        cbn.
+        unfold bind_RefineProp.
+
+        eexists.
+        eexists.
+
+        split.
+
+        (* ma = inl (inl err) *)
+        apply CONC'.
+
+        split; auto.        
       - (* uv1 succeeds *)
         do 2 red.
         rewrite concretize_uvalueM_equation.
 
+        destruct REST as [FAILS | REST].
+        solve [inversion FAILS].
+
         (* Get fate of uv2 *)
-        assert (@MReturns _ _ _ MonadReturns_ErrOrUB dvalue a
-                          {| unERR_OR_UB := {| EitherMonad.unEitherT := inr (inr a) |} |}) as ARet by reflexivity.
+        assert (@MReturns _ _ _ MonadReturns_ErrUBOOM dvalue a
+                          {| unERR_UB_OOM :=
+                            {|
+                              EitherMonad.unEitherT :=
+                              {|
+                                EitherMonad.unEitherT :=
+                                {|
+                                  EitherMonad.unEitherT :=
+                                  {| IdentityMonad.unIdent := inr (inr (inr a)) |}
+                                |}
+                              |}
+                            |}
+                          |}) as ARet by reflexivity.
         specialize (REST a ARet).
 
         (* Get past evaluation of uv1 *)
@@ -157,10 +183,30 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
         apply CONC'.
 
         split; cbn; auto.
+        right.
         intros a0 H0; subst.
 
-        destruct REST as ([mb] & k'' & CONC'' & mceq & REST).
-        destruct mb as [[ubb | [errb | b]]] eqn:Hmb.
+        destruct REST as (mb & k'' & CONC'' & mceq & REST).
+        destruct mb as [[[[[[[oom_mb] | [[ub_mb] | [[err_mb] | b]]]]]]]] eqn:Hmb.
+        + (* OOM from uv2 *)
+
+          unfold bind_RefineProp.
+
+          (* Evaluation of uv2 *)
+          eexists.
+          eexists.
+
+          split.
+          apply CONC''.
+
+          Set Printing Notations.
+          cbn in mceq.
+          destruct (k' a0) as [[[[[[[oom_k'a0] | [[ub_k'a0] | [[err_k'a0] | k'a0]]]]]]]] eqn:Hk'a0; try contradiction.
+
+          cbn in *.
+          rewrite Hk'a0 in mbeq.
+          cbn in mbeq.
+          contradiction.
         + (* UB from uv2 *)
 
           (* Evaluation of uv2 *)
@@ -171,8 +217,6 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
           apply CONC''.
 
           split; cbn; auto.
-          intros a H0.
-          destruct ubb; contradiction.
         + (* Failure from uv2 *)
 
           (* Evaluation of uv2 *)
@@ -183,14 +227,13 @@ Module Make (A:MemoryAddress.ADDRESS)(SIZE:Sizeof)(LLVMEvents: LLVM_INTERACTIONS
           apply CONC''.
 
           split; cbn; auto.
-          intros a H0.
-          destruct errb; contradiction.
         + (* uv2 succeeds *)
           eexists.
           exists (fun _ => ret dv).
           split; [eauto|].
           split; cbn; auto.
 
+          right.
           intros a H0; subst.
 
           assert (@MReturns  _ _ _ MonadReturns_ErrOrUB dvalue a
