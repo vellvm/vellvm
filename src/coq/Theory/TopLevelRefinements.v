@@ -181,23 +181,10 @@ Section REFINEMENT.
       refine_L4 Pt1 Pt2 -> refine_L5 Pt1 Pt2.
          (* (model_UB refine_res3 Pt1) (model_UB refine_res3 Pt2). *)
   Proof.
-    (*
     intros Pt1 Pt2 HR t2 HM.
-    exists t2; split; [| right; reflexivity].
     apply HR in HM as (t1 & HPt1 & HPT1).
-    eapply interp_prop_Proper_eq with (RR := refine_res3); eauto.
-    apply HPT1.
-
-    (* destruct HM as (t2' & HPt2 & HPT2). *)
-    apply HR in HPt2; destruct HPt2 as (t1' & HPt1 & HPT1).
-    exists t1'; split; auto.
-    match type of HPT2 with | PropT.interp_prop ?h' ?t _ _ _ => remember h' as h end.
-    eapply interp_prop_Proper_eq with (RR := refine_res3); eauto.
-    - typeclasses eauto.
-    - typeclasses eauto.
-  Qed.
-*)
-  Admitted.
+    exists t1; split; auto.
+ Qed.
 
   Variable ret_typ : dtyp.
   Variable entry : string.
