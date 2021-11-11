@@ -69,6 +69,7 @@ Import MemoryAddress.
 Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Import LLVM.SP.SER.
   Import LLVM.Events.
+  Import LLVM.MEMORY_THEORY.ST.
 
   Module Ref := Refinement.Make LP LLVM.
   Import Ref.
@@ -236,19 +237,43 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
           right.
           intros a H0; subst.
 
-          assert (@MReturns  _ _ _ MonadReturns_ErrOrUB dvalue a
-                             {| unERR_OR_UB := {| EitherMonad.unEitherT := inr (inr a) |} |}) as ARet' by reflexivity.
+          assert (@MReturns  _ _ _ MonadReturns_ErrUBOOM dvalue a (success_unERR_UB_OOM a)) as ARet' by reflexivity.
+
+          destruct REST as [FAILS | REST].
+          solve [inversion FAILS].
           specialize (REST a ARet').
 
           cbn in mceq.
-          destruct (eval_iop iop a0 a) as [[[ubop | [errop | op_res]]]] eqn:Hop; auto.
-          destruct (k'' a) as [[[ubk''a | [errk''a | k''a_res]]]] eqn:Hk''a; auto; inversion REST; subst; auto.
+          destruct (eval_iop iop a0 a) as [[[[[[[oom_eval_iopiopa0a] | [[ub_eval_iopiopa0a] | [[err_eval_iopiopa0a] | eval_iopiopa0a]]]]]]]] eqn:Heval_iopiopa0a; auto.
 
-          (* No UB / failure... *)
-          destruct (k' a0) as [[[ubk'a0 | [errk'a0 | k'a0_res]]]] eqn:Hk'a0; cbn in mceq, mbeq; subst; try contradiction.
-          rewrite Hk'a0 in mbeq.
-          cbn in mbeq.
-          contradiction.
+          * destruct (k'' a) as [[[[[[[oom_k''a] | [[ub_k''a] | [[err_k''a] | k''a]]]]]]]] eqn:Hk''a;
+              auto; inversion REST; subst; auto.
+
+            (* No UB / failure... *)
+            destruct (k' a0) as [[[[[[[oom_k'a0] | [[ub_k'a0] | [[err_k'a0] | k'a0]]]]]]]] eqn:Hk'a0;
+              cbn in mceq, mbeq; subst; try contradiction.
+
+            rewrite Hk'a0 in mbeq;
+              cbn in mbeq;
+              contradiction.
+
+          * destruct (k'' a) as [[[[[[[oom_k''a] | [[ub_k''a] | [[err_k''a] | k''a]]]]]]]] eqn:Hk''a;
+              auto; inversion REST; subst; auto.
+
+            -- cbn in mceq.
+
+               (* No UB / failure... *)
+               destruct (k' a0) as [[[[[[[oom_k'a0] | [[ub_k'a0] | [[err_k'a0] | k'a0]]]]]]]] eqn:Hk'a0;
+                 cbn in mceq, mbeq; subst; try contradiction.
+
+               rewrite Hk'a0 in mbeq.
+               cbn in mbeq.
+               contradiction.
+            -- cbn in *.
+
+               (* No UB / failure... *)
+               destruct (k' a0) as [[[[[[[oom_k'a0] | [[ub_k'a0] | [[err_k'a0] | k'a0]]]]]]]] eqn:Hk'a0;
+                 cbn in mceq, mbeq; subst; try contradiction.
     }
 
     (* Structs *)
@@ -257,16 +282,18 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         rewrite concretize_uvalueM_equation in CONC.
         cbn in CONC.
 
-        destruct CONC as ([ma] & k' & CONC' & mbeq & REST).
-        destruct ma as [[uba | [erra | a]]] eqn:Hma; try contradiction.
+        destruct CONC as (ma & k' & CONC' & mbeq & REST).
+        destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma; try contradiction.
         subst.
 
         cbn in mbeq.
-        
+
+        destruct REST as [FAILS | REST].
+        solve [inversion FAILS].
         specialize (REST []).
         forward REST; [reflexivity|].
-        
-        destruct (k' []) as [[[ubk' | [errk' | k'nil]]]] eqn:Hk'; contradiction.
+
+        destruct (k' nil) as [[[[[[[oom_k'nil] | [[ub_k'nil] | [[err_k'nil] | k'nil]]]]]]]] eqn:Hk'nil; contradiction.
       - (* Multiple fields *)
         do 2 red.
         rewrite concretize_uvalueM_equation.
@@ -286,18 +313,18 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
 
         epose proof Monad.bind_bind _ _ _ conc_a' conc_rest' (fun x => ret (DVALUE_Struct x)).
 
-        Unset Printing Notations.
-        Set Printing Implicit.
-        assert ((y <- conc_a';; x <- conc_rest' y;; (@ret err_or_ub Monad_err_or_ub dvalue (DVALUE_Struct x))) (@ret err_or_ub Monad_err_or_ub dvalue dv)).
-        replace ((x <- (x <- conc_a';; conc_rest' x);; ret (DVALUE_Struct x)) (ret dv)) with ((y <- conc_a';; x <- conc_rest' y;; ret (DVALUE_Struct x)) (ret dv)).
-        (fun b => conc_rest'). (ret (b :: bs)).
+        (* Unset Printing Notations. *)
+        (* Set Printing Implicit. *)
+        (* assert ((y <- conc_a';; x <- conc_rest' y;; (@ret err_or_ub Monad_err_or_ub dvalue (DVALUE_Struct x))) (@ret err_or_ub Monad_err_or_ub dvalue dv)). *)
+        (* replace ((x <- (x <- conc_a';; conc_rest' x);; ret (DVALUE_Struct x)) (ret dv)) with ((y <- conc_a';; x <- conc_rest' y;; ret (DVALUE_Struct x)) (ret dv)). *)
+        (* (fun b => conc_rest'). (ret (b :: bs)). *)
         
-        erewrite 
+        (* erewrite  *)
 
-        pose proof _ _ _ m
-        rewrite Monad.bind_bind.
-        rewrite map_monad_cons.
-
+        (* pose proof _ _ _ m *)
+        (* rewrite Monad.bind_bind. *)
+        (* rewrite map_monad_cons. *)
+        admit.
     }
     
   Abort.
@@ -318,18 +345,19 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     cbn.
 
     match goal with
-    | |- bind_MPropT ?pa ?k ?mb =>
+    | |- bind_RefineProp ?pa ?k ?mb =>
       idtac pa;
         idtac k
     end.
     
-    unfold bind_MPropT.
+    unfold bind_RefineProp.
     cbn.
     exists (ret (DVALUE_Poison dt)).
     exists (fun poison_res => ret poison_res). (* k' *)
 
     (* pa ma *)
     split.
+    rewrite concretize_uvalueM_equation.
     reflexivity.
 
     (* Monad.eq1 mb (x <- ma;; k' x) *)
@@ -337,6 +365,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     cbn.
     reflexivity.
 
+    right.
     intros poison_res MRets_poison.
 
     (* Goal is from k a (k' a) *)
@@ -359,37 +388,103 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     split; cbn; inversion MRets_poison; subst.
     reflexivity.
 
+    right.
     intros dv2' MRets_dv2.
     inversion MRets_dv2; subst.
     cbn. reflexivity.
 
     auto.
   Qed.
-  
+
+  Lemma concretize_succeeds_dec :
+    forall uv,
+      concretize_fails uv \/ concretize_succeeds uv.
+  Proof.
+    intros uv; induction uv;
+      try solve [unfold concretize_succeeds, concretize_fails; right;
+             intros CONTRA;
+             red in CONTRA;
+             rewrite concretize_uvalueM_equation in CONTRA;
+             cbn in CONTRA;
+             contradiction
+        ].
+    - induction fields.
+      + unfold concretize_succeeds, concretize_fails; right.
+        intros CONTRA.
+        red in CONTRA.
+        rewrite concretize_uvalueM_equation in CONTRA.
+        cbn in CONTRA.
+
+        unfold bind_RefineProp in CONTRA.
+        destruct CONTRA as (ma & k' & CONC' & mbeq & REST).
+        destruct REST as [FAILS | REST].
+        * destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma;
+            cbn in *; contradiction.
+        * destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma;
+            cbn in *; contradiction.        
+        contradiction.
+  Qed.
+    
   Instance proper_refine_uvalue_ibinop {op v2 rv} : Proper ((fun x y => refine_uvalue y x) ==> (fun (x y : Prop) => x -> y)) (fun v1 => refine_uvalue (UVALUE_IBinop op v1 v2) rv).
   Proof.    
     unfold Proper, respectful.
     intros x y Ryx Ribop.
 
     transitivity (UVALUE_IBinop op x v2); auto.
-    
+
     inversion Ryx; subst.
-    - constructor; auto.
+    - (* y could be refined to poison, so x can be any value of the same type *)
+      rename H into HPoison.
+      rename H0 into XTYP.
+
+      (* If `(UVALUE_IBinop op x v2)` concretizes to some dvalue `dv`,
+         then `(UVALUE_IBinop op y v2)` can also be concretized to the
+         same dvalue. *)
+      constructor; auto.
       intros dv Conc.
 
-      apply concretize_ibinop_inv in Conc as (dv1 & dv2 & Conc1 & Conc2 & EVAL).
+      (* Invert the concretization of x *)
+      apply concretize_ibinop_inv in Conc as (dv1 & dv2 & Succ1 & Conc1 & Succ2 & Conc2 & EVAL).
 
-      (* Concretize of poison has to be poison...
-
-         x doesn't have to be poison here.
-
-       *)
+      epose proof Concretize_IBinop op y (ret dv1) v2 (ret dv2) _ Conc2.
+      cbn in H.
 
       rewrite concretize_equation.
+      rewrite <- EVAL.
+      cbn.
+      replace (        {|
+          unERR_UB_OOM :=
+            {|
+              EitherMonad.unEitherT :=
+                {|
+                  EitherMonad.unEitherT :=
+                    {|
+                      EitherMonad.unEitherT :=
+                        EitherMonad.unEitherT
+                          (EitherMonad.unEitherT
+                             (EitherMonad.unEitherT (unERR_UB_OOM (eval_iop op dv1 dv2))))
+                    |}
+                |}
+            |}
+                |}) with (eval_iop op dv1 dv2) in H by
+          (destruct (eval_iop op dv1 dv2) as [[[[[[[oom_eval_iopopdv1dv2] | [[ub_eval_iopopdv1dv2] | [[err_eval_iopopdv1dv2] | eval_iopopdv1dv2]]]]]]]] eqn:Heval_iopopdv1dv2; eauto).
+
+      auto.
+
+
+      destruct (eval_iop op dv1 dv2); cbn.
       pose proof Concretize_IBinop op.
       epose proof Concretize_IBinop op (UVALUE_Poison dt) _ v2 _.
-    
-    constructor.
+
+      red.
+      rewrite concretize_uvalueM_equation.
+      cbn.
+
+      unfold bind_RefineProp.
+      eexists (ret (DVALUE_Poison dt)).
+      eexists.
+      cbn.
+      constructor.
     - intros CONTRA. subst.
       apply refine_poison in Ribop. inversion Ribop.
     - intros dv0 Conc.

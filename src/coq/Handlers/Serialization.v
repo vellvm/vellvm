@@ -221,9 +221,16 @@ Module Type Serialization (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR 
 
   Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
 
+  (* Concretization encounters UB / Failure.
+
+     Note, this does mean that `concretize_u uv (ret dv)` should hold
+     for any `dv`. This just means that UB or Failure was encountered
+     during concretization.
+   *)
   Definition concretize_fails (uv : uvalue) : Prop
     := concretize_u uv (raise_ub "").
 
+  (* Concretization succeeds without UB / Error *)
   Definition concretize_succeeds (uv : uvalue) : Prop
     := ~ concretize_fails uv.
 
