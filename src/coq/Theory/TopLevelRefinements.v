@@ -282,35 +282,6 @@ Section REFINEMENT.
     | |- context[match ?x with | _ => _ end] => let Heq := fresh "Heq" in destruct x eqn:Heq
     end.
 
-
-(*
-  Lemma UB_handler_correct: handler_correct UB_handler UB_exec.
-  Proof.
-    unfold UB_handler. unfold UB_exec.
-    unfold handler_correct.
-    intros. auto.
-  Qed.  
-
-  Lemma refine_UB
-    : forall E F `{LLVMEvents.FailureE -< E +' F} T TT (HR: Reflexive TT)
-        (x : _ -> Prop)
-        (y : itree (E +' LLVMEvents.UBE +' F) T),
-      x y -> model_UB TT x (exec_UB y).
-  Proof.
-    intros E F H T TT HR x y H0.
-    unfold model_UB. unfold exec_UB.
-    exists y. split. assumption.
-    apply interp_prop_correct_exec.
-    intros.
-    apply case_prop_handler_correct.
-    unfold handler_correct. intros. reflexivity.
-    apply case_prop_handler_correct.
-    apply UB_handler_correct.
-    unfold handler_correct. intros. reflexivity.
-    assumption. reflexivity.
-  Qed.
-*)
-
   Lemma Pick_handler_correct :
     forall E `{LLVMEvents.FailureE -< E} `{LLVMEvents.UBE -< E},
       handler_correct (@Pick_handler E _ _) concretize_picks.
