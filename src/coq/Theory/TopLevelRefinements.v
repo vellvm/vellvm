@@ -350,17 +350,14 @@ Section REFINEMENT.
   Theorem interpreter_sound: forall p, 
     refine_L5 (model p) (build_singleton (interpreter p)).
   Proof.
-    (*
     intros p.
-    unfold model, model_gen.
-    unfold interpreter, interpreter_gen.
-    unfold ℑs4.
-    unfold interp_mcfg4_exec.
-    apply refine_UB.  auto.
-    apply refine_undef. auto.
-  Qed.
-*)
-  Admitted.
+    intros ? [].
+    exists (interpreter p).
+    split.
+    - apply refine_undef. auto.
+    - right.
+      reflexivity.
+ Qed.
 
 End REFINEMENT.
 
