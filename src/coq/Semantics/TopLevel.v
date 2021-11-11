@@ -183,9 +183,9 @@ Definition interpreter_gen
            (entry : string)
            (args : list uvalue)
            (prog: list (toplevel_entity typ (block typ * list (block typ))))
-  : itree L5 res_L4 :=
+  : itree L4 res_L4 :=
   let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-  interp_mcfg5_exec t [] ([],[]) empty_memory_stack.
+  interp_mcfg4_exec t [] ([],[]) empty_memory_stack.
 
 (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts 
@@ -209,7 +209,7 @@ Definition model_gen
            (entry : string)
            (args : list uvalue)
            (prog: list (toplevel_entity typ (block typ * list (block typ))))
-  : PropT L5 (memory_stack * (local_env * lstack * (global_env * uvalue))) :=
+  : PropT L4 (memory_stack * (local_env * lstack * (global_env * uvalue))) :=
   let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
   ℑs eq t [] ([],[]) empty_memory_stack. 
 

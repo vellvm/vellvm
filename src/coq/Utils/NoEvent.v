@@ -961,9 +961,11 @@ Section DeterministicSingleton.
 
   Variable remove_pick_ub : itree (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' DebugE +' FailureE).
   Variable deterministic_vellvm : forall R, itree L0 R -> Prop.
+
+    (*
   (* Definition deterministic_vellvm *)
   Lemma deterministc_llvm_is_singleton : forall R RR t g sl mem,
-      deterministic_vellvm t ->
+      deterministic_vellvm t -> 
       is_singleton (interp_mcfg5 (R := R) RR t g sl mem) (remove_pick_ub (interp_mcfg3 (R := R) t g sl mem)).
 
   (*
@@ -973,5 +975,5 @@ Section DeterministicSingleton.
     "inject (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) t ≈ interp_mcfg3 (denote_llvm p)"
    *)
   Proof. Admitted.
-
+*)
 End DeterministicSingleton.

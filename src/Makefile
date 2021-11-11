@@ -32,7 +32,7 @@ COQFILESSYNTAX := Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
 COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/DynamicValues Semantics/LLVMEvents\
 		Semantics/IntrinsicsDefinitions\
 		Handlers/Intrinsics Handlers/Local Handlers/Global Handlers/Stack\
-		Handlers/Pick Handlers/UndefinedBehaviour Handlers/Memory Handlers/MemoryTheory\
+		Handlers/Pick Handlers/Memory Handlers/MemoryTheory\
 		Handlers/Handlers\
 		Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
 		Semantics
