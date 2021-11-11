@@ -415,14 +415,38 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         rewrite concretize_uvalueM_equation in CONTRA.
         cbn in CONTRA.
 
+        (* Move this *)
+        Ltac destruct_err_ub_oom v :=
+          let oom_name := fresh "OOM" in
+          let ub_name := fresh "UB" in
+          let err_name := fresh "ERR" in
+          let success_name := fresh "SUCCESS" in
+          let H_name := fresh "H_ERR" in
+          destruct v as [[[[[[[oom_name] | [[ub_name] | [[err_name] | success_name]]]]]]]] eqn:H_name.
+
+
         unfold bind_RefineProp in CONTRA.
         destruct CONTRA as (ma & k' & CONC' & mbeq & REST).
         destruct REST as [FAILS | REST].
-        * destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma;
+        * destruct_err_ub_oom ma;
             cbn in *; contradiction.
-        * destruct ma as [[[[[[[oom_ma] | [[ub_ma] | [[err_ma] | a]]]]]]]] eqn:Hma;
-            cbn in *; contradiction.        
-        contradiction.
+        * destruct_err_ub_oom ma; cbn in *; try contradiction.
+          specialize (REST SUCCESS eq_refl).
+          destruct_err_ub_oom (k' SUCCESS); cbn in *; contradiction.
+      + unfold concretize_succeeds, concretize_fails; right.
+        intros CONTRA.
+        red in CONTRA.
+        rewrite concretize_uvalueM_equation in CONTRA.
+        cbn in CONTRA.
+
+        destruct CONTRA as (ma & k' & CONC' & mbeq & REST).
+        destruct CONC' as (ma' & k'' & CONC'' & mbeq' & REST').
+        destruct REST as [FAILS | REST].
+        * destruct_err_ub_oom ma;
+            cbn in *; try contradiction.
+
+          subst.
+    - 
   Qed.
     
   Instance proper_refine_uvalue_ibinop {op v2 rv} : Proper ((fun x y => refine_uvalue y x) ==> (fun (x y : Prop) => x -> y)) (fun v1 => refine_uvalue (UVALUE_IBinop op v1 v2) rv).

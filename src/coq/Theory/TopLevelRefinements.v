@@ -457,7 +457,18 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       unfold model_OOM, model_OOM_h.
       unfold exec_OOM.
       exists y. split. assumption.
-      apply interp_prop_correct_exec_flip.
+      Set Printing Notations.
+      Unset Printing Implicit.
+
+      unfold case_.
+      unfold Case_sum1_Handler.
+      unfold Handler.case_.
+      cbn.
+
+      
+      setoid_rewrite Eq.bind_ret_r. ITree.bind_ret_r.
+      
+      apply interp_prop_correct_exec _flip.
       intros.
       apply case_prop_handler_correct.
       unfold handler_correct. intros. reflexivity.
@@ -470,6 +481,11 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     (** *)
     (*    Theorem 5.8: We prove that the interpreter belongs to the model. *)
     (*    *)
+
+    (* refine (model p1) (model p2) 
+
+       refine := forall t, model p2 t -> model p1 t
+     *)
     Theorem interpreter_sound: forall p, model p (interpreter p).
     Proof.
       intros p.

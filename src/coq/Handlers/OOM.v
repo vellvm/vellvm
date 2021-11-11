@@ -66,7 +66,7 @@ Section PARAMS_INTERP.
     fun _ e => match e with | ThrowOOM s => raise ("Abort (OOM): " ++ s) end.
 
   Definition OOM_exec {E} `{OOME -< E} : OOME ~> itree E :=
-    fun R e => r <- trigger e;; ret r.
+    fun R e => trigger e.
 
   Definition E_trigger :  E ~> itree Effout :=
     fun R e => r <- trigger e ;; ret r.
@@ -76,6 +76,6 @@ Section PARAMS_INTERP.
 
   Definition exec_OOM :
     itree Effin ~> itree Effout :=
-    interp (case_ E_trigger (case_ OOM_exec F_trigger)).
+    interp ITree.trigger.
 
 End PARAMS_INTERP.
