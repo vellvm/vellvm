@@ -672,24 +672,90 @@ Proof.
 Qed.
 
 
-Notation "g1 '⩭' g2" := (euttG _ _ _ _ _ g1 g2) (only printing, at level 10).
+(* Notation "g1 '⩭' g2" := (euttG _ _ _ _ _ g1 g2) (only printing, at level 10). *)
 Require Import Utils.PostConditions.
+
+Lemma denote_ocfg_prefix' :
+  forall prefix bks' postfix bks (from to: block_id),
+    bks = (prefix ++ bks' ++ postfix) ->
+    wf_ocfg_bid bks ->
+    ⟦ bks ⟧bs (from, to) ≈
+           'x <- ⟦ bks' ⟧bs (from, to);;
+    match x with
+    | inl x => Tau (⟦ bks ⟧bs x)
+    | inr x => Ret (inr x)
+    end
+.
+Proof.
+  intros.
+  setoid_rewrite denote_ocfg_prefix with
+    (bks':= bks')
+    (bks:= bks)
+  ; try eassumption.
+  rewrite eutt_eq_bind ; [reflexivity| intros ; simpl].
+  destruct u ; [now rewrite tau_eutt | reflexivity].
+Qed.
+
+Lemma denote_ocfg_prefix'' :
+  forall prefix bks' postfix bks (from to: block_id),
+    bks = (prefix ++ bks' ++ postfix) ->
+    wf_ocfg_bid bks ->
+    ⟦ bks ⟧bs (from, to) ≅
+           'x <- ⟦ bks' ⟧bs (from, to);;
+    match x with
+    | inl x => Tau (⟦ bks ⟧bs x)
+    | inr x => Ret (inr x)
+    end
+.
+Proof.
+  intros * ->; revert from to.
+  ginit.
+  gcofix CIH.
+  (* clear CIHH. *)
+  intros * WF.
+  destruct (find_block bks' to) as [bk |] eqn:EQ.
+  - unfold denote_ocfg at 1 3.
+    setoid_rewrite KTreeFacts.unfold_iter_ktree.
+    cbn; rewrite !bind_bind.
+    assert (find_block (prefix ++ bks' ++ postfix) to = Some bk).
+    {
+      erewrite find_block_app_r_wf; eauto.
+      erewrite find_block_app_l_wf; eauto.
+      eapply wf_ocfg_bid_app_r; eauto.
+    }
+    do 2 match_rewrite.
+    repeat (setoid_rewrite bind_bind).
+  (*   eapply euttG_bind; econstructor; [reflexivity | intros [] ? <-]. *)
+  (*   + rewrite !bind_ret_l; cbn. *)
+  (*     rewrite bind_tau; etau. *)
+  (*   + rewrite !bind_ret_l. *)
+  (*     reflexivity. *)
+  (* - edrop. *)
+  (*   rewrite (denote_ocfg_unfold_not_in bks'); auto. *)
+  (*   rewrite bind_ret_l. *)
+  (*   reflexivity. *)
+Admitted.
+
+Lemma denote_code_nil :
+  ⟦ [] ⟧c ≅ Ret tt.
+Proof.
+  intros.
+  cbn.
+  go.
+  reflexivity.
+Qed.
+
+
 
 (* Precondition probablement nécessaire :
     denote_cfg body input inB ⤳ (fun vob => exists bfrom, vob = inl (bfrom, inB)) *)
 Lemma denote_cfg_while_loop : 
   forall expr_code cond body input inB output outB from,
-    input <> output ->
-    input <> inB ->
-    input <> outB ->
-    output <> inB ->
-    output <> outB ->
-    free_in_cfg body input ->
-    free_in_cfg body output ->
-    free_in_cfg body outB ->
-    wf_ocfg_bid body ->
-    In inB (inputs body) -> (* can I relax this hypothesis ? *)
-    denote_cfg body input inB ⤳ (fun vob => exists bfrom, vob = inl (bfrom, inB)) ->
+    wf_while expr_code cond body input inB output outB ->
+    (forall bfrom, denote_cfg body bfrom inB ⤳
+                         (fun vob => exists bfrom, vob = inl (bfrom, input))) ->
+    (* (forall bfrom, denote_cfg body bfrom inB ⤳ *)
+    (*                      (fun vob => exists bfrom, vob = inl (bfrom, inB))) -> *)
     eutt eq
          (denote_cfg (cfg_while_loop expr_code cond body input inB output outB)
                      from input) 
@@ -829,34 +895,49 @@ Proof.
       end.
 
       (* TODO explain the proof *)
-      rewrite <- bind_ret_r.
-      ebind ; econstructor ; [|admit].
       pose proof ( H_APP :=
-              denote_ocfg_prefix
-                 (bks := (conv ([blk] ++ body ++ [blk0])))
-                 (conv [blk]) (conv body) (conv [blk0]) input inB
-                 ).
-      rewrite H_APP ;
-        [| now rewrite (convert_typ_list_app _ (body++_))
+              denote_ocfg_prefix''
+                 (conv [blk]) (conv body) (conv [blk0])
+                 (conv ([blk] ++ body ++ [blk0]))
+                 input inB).
+      match goal with
+      | h:context[?x = ?y -> _ -> _] |- _=>
+          assert (HeqConv : (x = y)) by
+        ltac:(
+           now rewrite (convert_typ_list_app _ (body++_))
            ; rewrite (convert_typ_list_app body _)
-        | pose proof (WF_WHILE := wf_cfg_while_loop
-                                     expr_code cond body input inB output outB)
-          ; apply wf_ocfg_bid_convert_typ with (env := []) in WF_WHILE
-          ; try assumption
-          ; try (unfold cfg_while_loop in WF_WHILE
-                 ; unhide_blk input; unhide_blk outB
-                 ; apply WF_WHILE)
-        ] ; clear H_APP.
-      setoid_rewrite <- bind_ret_r at 4.
-      (* TODO I'd like to use POSTCOND_BODY before the ebind ... *)
-      apply has_post_post_strong in POSTCOND_BODY.
-      (* apply POSTCOND_BODY. *)
-      admit.
+        )
+      end.
+      pose proof (WF_WHILE := wf_bid_cfg_while_loop
+                                 expr_code cond body input inB output outB)
+      ; apply wf_ocfg_bid_convert_typ with (env := []) in WF_WHILE
+      ; try assumption.
+      apply H_APP in HeqConv ;
+        try (unfold cfg_while_loop in WF_WHILE
+             ; unhide_blk input
+             ; unhide_blk outB
+             ; assumption).
+      clear H_APP WF_WHILE.
+      unfold denote_cfg in POSTCOND_BODY.
+      clear -POSTCOND_BODY HeqConv Vblk Vblk0 VBODY CIHL.
+      rewrite HeqConv.
+      ebind ; econstructor.
+      specialize (POSTCOND_BODY input)
+      ; rewrite has_post_post_strong in POSTCOND_BODY.
+      apply POSTCOND_BODY.
+
+      intros ; simpl.
+      destruct H as [-> [bfrom ->]].
+      bstep.
+      rewrite Util.list_cons_app.
+      etau.
+
+      (* admit. *)
 
 
     + (* 3: the condition is false - jump in output *)
       (* Ignore each sub-graphs in the left side *)
-      go.
+      tstep ; bstep.
       rewrite tau_euttge.
       setoid_rewrite unfold_iter at 1.
       unhide_iter ; hide_iter_body.
