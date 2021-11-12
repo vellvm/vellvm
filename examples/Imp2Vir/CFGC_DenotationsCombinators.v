@@ -185,6 +185,7 @@ apply boxv_blk in EQ
   end.
 
 Ltac unhide_blk bid :=
+  try (
   match goal with
   | h: hidden_blk ( ?blk = {| blk_id := bid;
                             blk_phis := _;
@@ -198,7 +199,7 @@ Ltac unhide_blk bid :=
                              blk_term := _;
                              blk_comments := _ |}) |- _  =>
       destruct h ; subst blk
-  end.
+  end ).
 
 
 Hint Rewrite @bind_ret_l : rwbind.
@@ -354,12 +355,12 @@ Definition my_seq {E} (c : block_id -> block_id -> itree E (dvalue + block_id * 
 
 
 Lemma denote_cfg_block : forall (c : code) (input output : block_id) from,
-    input <> output -> (* TODO should be a WF property of block *)
+    wf_block c input output->
     eutt eq
     (denote_cfg (cfg_block c input output) from input)
     (denote_code (conv c) ;; ret (inl (input,output))).
 Proof.
-  intros.
+  intros * WF_BLOCK ; unfold wf_block in WF_BLOCK.
   unfold cfg_block, denote_cfg.
   setoid_rewrite denote_ocfg_unfold_in with
     (bk := (conv
@@ -404,20 +405,14 @@ Qed.
 
 
 Lemma denote_cfg_branch :
-  forall (cond : texp) (gT gF : ocfg) (input inT inF from input : block_id),
-    input <> inT ->
-    input <> inF ->
-    free_in_cfg gF inT ->
-    free_in_cfg gT inF ->
-    independent_flows gT gF ->
-    ~ In input (outputs gT) ->
-    ~ In input (outputs gF) ->
+  forall (cond : texp) (gT gF : ocfg) (input inT inF from : block_id),
+    wf_branch cond gT gF input inT inF ->
     eutt eq
          (denote_cfg (cfg_branch cond gT gF input inT inF) from input)
          (let (dt,e) := texp_break cond in
           dv <- translate exp_to_instr (
-                             uv <-  (denote_exp (Some dt) e) ;;
-                             concretize_or_pick uv True) ;;
+                            uv <-  (denote_exp (Some dt) e) ;;
+                            concretize_or_pick uv True) ;;
           match dv with
           | DVALUE_I1 comparison_bit =>
               if equ comparison_bit Int1.one then
@@ -428,7 +423,9 @@ Lemma denote_cfg_branch :
           | _ => raise "Br got non-bool value"
           end).
 Proof.
-  intros.
+  intros * WF_BRANCH
+  ; unfold wf_branch in WF_BRANCH
+  ; destruct WF_BRANCH as [? [? [? [? [? [? ?]]]]]].
   unfold cfg_branch, denote_cfg.
   rewrite (convert_typ_list_app _ (gT++gF) _).
   rewrite denote_ocfg_app.
@@ -447,7 +444,7 @@ Proof.
   }
   rewrite denote_ocfg_unfold_in with
     (bk := conv {|
-                 blk_id := input0;
+                 blk_id := input;
                   blk_phis := [];
                   blk_code := [];
                   blk_term := TERM_Br cond inT inF;
@@ -519,9 +516,7 @@ Qed.
 
 
 Lemma denote_cfg_join : forall (g : ocfg) (output out1 out2 : block_id) from to,
-    free_in_cfg g output ->
-    output <> out1 ->
-    output <> out2 ->
+    wf_join g output out1 out2 ->
     eutt eq
          (denote_cfg (cfg_join g output out1 out2) from to)
          (d <- denote_cfg g from to ;;
@@ -535,7 +530,9 @@ Lemma denote_cfg_join : forall (g : ocfg) (output out1 out2 : block_id) from to,
                    else ret (inl (src,target))
           end).
 Proof.
-  intros.
+  intros * WF_JOIN ;
+    unfold wf_join in WF_JOIN ;
+    destruct WF_JOIN as [? [? ?]].
   unfold denote_cfg.
   unfold cfg_join.
   rewrite (convert_typ_list_app g _ []).
@@ -584,15 +581,7 @@ Qed.
 
 (* TODO can I automatize \denote_ocfg_app\ (no_reentrance_proof) *)
 Lemma denote_cfg_seq : forall g1 g2 out1 in2 from to,
-    wf_ocfg_bid g1 ->
-    wf_ocfg_bid g2 ->
-    no_duplicate_bid g1 g2 ->
-    no_reentrance g1 g2 ->
-    free_in_cfg g1 out1 -> (* cfg_seq cannot create a new block with an existing ID *)
-    free_in_cfg g2 out1 -> (* cfg_seq cannot create a new block with an existing ID *)
-    free_in_cfg g1 in2 -> (* in2 should be an input of g2, not g1 *)
-    ~ In out1 (outputs g2) ->
-    out1 <> in2 -> (* cfg_seq cannot create a new block with an existing ID *)
+    wf_seq g1 g2 out1 in2 ->
     In to (inputs g1) ->
     eutt eq
          (denote_cfg (cfg_seq g1 g2 out1 in2) from to)
@@ -605,7 +594,9 @@ Lemma denote_cfg_seq : forall g1 g2 out1 in2 from to,
               else denote_cfg g2 src target
           end).
 Proof.
-  intros.
+  intros * WF_SEQ ENTRY_POINT
+  ; unfold wf_seq in WF_SEQ
+  ; destruct WF_SEQ as [? [? [? [? [? [? [? [? ?]]]]]]]].
   unfold denote_cfg.
   unfold cfg_seq.
   assert (Hdis : In to (inputs g1) \/ ~ (In to (inputs g1))) by (apply Classical_Prop.classic).
@@ -712,12 +703,20 @@ Lemma denote_cfg_while_loop :
                    | inl b => Ret (inl b) 
                    end
               else Ret (inr (inl (input,output)))) (from, input)).
-
 Proof.
-  intros * NEQ_INPUT_OUTPUT
-              NEQ_INPUT_INB NEQ_INPUT_OUTB NEQ_OUTPUT_INB
-              NEQ_OUTPUT_OUTB FREE_IN_BODY_INPUT FREE_IN_BODY_OUTPUT
-              FREE_IN_BODY_OUTB WF_BODY INB_IN_BODY POSTCOND_BODY.
+  intros * WF_WHILE POSTCOND_BODY
+  ; unfold wf_while in WF_WHILE.
+  destruct WF_WHILE as
+    [NEQ_INPUT_OUTPUT
+        [NEQ_INPUT_INB
+            [NEQ_INPUT_OUTB
+                [NEQ_OUTPUT_INB
+                    [NEQ_OUTPUT_OUTB
+                        [FREE_IN_BODY_INPUT
+                            [FREE_IN_BODY_OUTPUT
+                                [FREE_IN_BODY_OUTB
+                                    [WF_BODY INB_IN_BODY]]]]]]]]].
+  revert from.
   unfold denote_cfg, cfg_while_loop.
   (* For the sake of my mental-health, I hide some part of the goal *)
   hide_blk input.
@@ -728,17 +727,22 @@ Proof.
   (* We proceed by co-induction *)
   einit.
   ecofix CIH.
+  intros.
 
   (* ecofix made too much simplifications *)
-  replace
-     (⟦ tfmap (typ_to_dtyp []) blk :: conv (body ++ [blk0]) ⟧bs (from, input))
-    with
-    (⟦ conv ([blk] ++ body ++ [blk0]) ⟧bs (from, input)) in CIHL,CIHH
-      by
-    ltac:
-      (rewrite (convert_typ_list_app _ (body++_) [])
-       ; unfold conv,ConvertTyp_list
-       ; now simpl).
+  repeat (
+  match goal with
+  | h:context[(⟦ tfmap (typ_to_dtyp []) blk :: conv (body ++ [blk0])⟧bs )]|- _ =>
+      replace
+         (⟦ tfmap (typ_to_dtyp []) blk :: conv (body ++ [blk0]) ⟧bs)
+      with
+      (⟦ conv ([blk] ++ body ++ [blk0]) ⟧bs) in h
+        by
+      ltac:
+  (rewrite (convert_typ_list_app _ (body++_) [])
+   ; unfold conv,ConvertTyp_list
+   ; now simpl)
+  end).
 
   (* Denotation of the 1st iteration of the loop *)
   rewrite unfold_iter.
@@ -769,7 +773,7 @@ Proof.
 
   (* 1.2: denote the expression *)
   repeat flatten_all.
-  go.
+  rewrite !translate_bind ; rewrite !bind_bind.
   (* manage the conversion of the expression *)
   assert (Heq1 : (d,e)=(d0,e0)) by
   ltac:(
@@ -779,14 +783,13 @@ Proof.
      now rewrite Heq in Heq0
      ) ; inv Heq1 ; clear Heq Heq0.
   ebind ; econstructor ; [reflexivity | intros ; simpl ; subst].
-  go.
+  rewrite !translate_bind; rewrite !bind_bind.
 
   (* 1.3: concretize_or_pick *)
   ebind ; econstructor ; [reflexivity | intros ; simpl ; subst].
-  go.
 
   (* 1.4: destruct the value of the expression *)
-  flatten_all ; go.
+  flatten_all.
 
   (* 1.4.a: if it is not a boolean, it raises an exception ; easy *)
   all: match goal with
@@ -803,10 +806,10 @@ Proof.
        | |- _ => idtac
        end.
 
- (* 1.4.b: it is a boolean *)
+  (* 1.4.b: it is a boolean *)
   - flatten_all.
     + (* 2: the condition is true - jump in body *)
-      go.
+      tstep ; bstep.
       rewrite tau_euttge.
       (* some rewriting aiming to simplify  *)
       unhide_iter.
@@ -815,15 +818,16 @@ Proof.
           replace g with
           (denote_ocfg (conv ([blk] ++ body ++ [blk0])) (input, inB))
           by
-          ltac:(now unfold denote_ocfg; unfold_iter_cat)
+        ltac:(now unfold denote_ocfg; unfold_iter_cat)
       end.
-       match goal with
+      match goal with
       | |- euttG _ _ _ _ _ _ (_ <- ?g ;; _) =>
           replace g with
           (denote_ocfg (conv body) (input, inB))
           by
-          ltac:(now unfold denote_ocfg; unfold_iter_cat)
-       end.
+        ltac:(now unfold denote_ocfg; unfold_iter_cat)
+      end.
+
       (* TODO explain the proof *)
       rewrite <- bind_ret_r.
       ebind ; econstructor ; [|admit].

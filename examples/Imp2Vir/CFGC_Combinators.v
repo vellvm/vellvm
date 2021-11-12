@@ -73,7 +73,7 @@ Qed.
 
 (** WF properties *)
 
-Lemma wf_cfg_block :
+Lemma wf_bid_cfg_block :
   forall c input output,
     wf_ocfg_bid (cfg_block c input output).
 Proof.
@@ -82,7 +82,7 @@ Proof.
   apply List_norepet_singleton.
 Qed.
 
-Lemma wf_cfg_ret :
+Lemma wf_bid_cfg_ret :
   forall c e input,
     wf_ocfg_bid (cfg_ret c e input).
 Proof.
@@ -90,7 +90,8 @@ Proof.
   unfold wf_ocfg_bid ; simpl.
   apply List_norepet_singleton.
 Qed.
-Lemma wf_cfg_seq :
+
+Lemma wf_bid_cfg_seq :
   forall g1 g2 out1 in2,
     wf_ocfg_bid g1 ->
     wf_ocfg_bid g2 ->
@@ -120,7 +121,7 @@ Proof.
       now apply (SEP_G1_G2 y y) in H.
 Qed.
 
-Lemma wf_cfg_join :
+Lemma wf_bid_cfg_join :
   forall output out1 out2 g,
     out1 <> out2 ->
     free_in_cfg g out1 ->
@@ -140,7 +141,7 @@ Proof.
 Qed.
 
 
-Lemma wf_cfg_branch :
+Lemma wf_bid_cfg_branch :
   forall cond gT gF input inT inF,
     wf_ocfg_bid gT ->
     wf_ocfg_bid gF ->
@@ -157,7 +158,7 @@ Proof.
   - apply Coqlib.list_norepet_append; assumption.
 Qed.
 
-Lemma wf_cfg_while_loop:
+Lemma wf_bid_cfg_while_loop:
   forall code_expr cond body input inB output outB,
     input <> outB ->
     free_in_cfg body input ->
@@ -179,5 +180,45 @@ Proof.
 Qed.
 
 
+
+Definition wf_block (c : code) (input output : block_id) : Prop :=
+  input <> output.
+Definition wf_ret (c : code) (e : texp) (input : block_id) : Prop := True.
+Definition wf_seq (g1 g2 : ocfg) (out1 in2 : block_id) : Prop :=
+  wf_ocfg_bid g1 /\
+    wf_ocfg_bid g2 /\
+    no_duplicate_bid g1 g2 /\
+    no_reentrance g1 g2 /\
+    free_in_cfg g1 out1 /\ (* cfg_seq cannot create a new block with an existing ID *)
+    free_in_cfg g2 out1 /\ (* cfg_seq cannot create a new block with an existing ID *)
+    free_in_cfg g1 in2 /\ (* in2 should be an input of g2, not g1 *)
+    ~ In out1 (outputs g2) /\
+    out1 <> in2.
+
+Definition wf_join (body : ocfg) (output out1 out2 : block_id) : Prop :=
+  free_in_cfg body output /\
+    output <> out1 /\
+    output <> out2.
+
+Definition wf_branch (cond : texp) (gT gF : ocfg) (input inT inF : block_id) : Prop :=
+  input <> inT /\
+    input <> inF /\
+    free_in_cfg gF inT /\
+    free_in_cfg gT inF /\
+    independent_flows gT gF /\
+    ~ In input (outputs gT) /\
+    ~ In input (outputs gF).
+
+Definition wf_while (expr_code : code) (cond : texp) (body : ocfg) (input inB output outB : block_id) : Prop :=
+  input <> output /\
+    input <> inB /\
+    input <> outB /\
+    output <> inB /\
+    output <> outB /\
+    free_in_cfg body input /\
+    free_in_cfg body output /\
+    free_in_cfg body outB /\
+    wf_ocfg_bid body /\
+    In inB (inputs body).
 
 End CFG_Combinators.
