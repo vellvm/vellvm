@@ -414,6 +414,72 @@ Proof.
   - rewrite interp_tau. rewrite interp_tau. estep.
 Qed.
 
+Lemma no_event_l_interp : 
+  forall {E F X} (t : itree (E +' F) X), 
+    no_event_l t -> 
+    forall (h : E ~> itree (E +' F)) , 
+      t ≈ interp (case_ h inr_) t.
+Proof.
+  intros E F X.
+  intros t H h.
+  revert t H.
+  einit.
+  ecofix CIH.
+  intros.
+  rewrite (itree_eta t).
+  pinversion H0.
+  - rewrite interp_ret. reflexivity.
+  - rewrite interp_tau. estep.
+  - clear - CIHH H0 H1 H.
+    rewrite interp_vis. cbn.
+    unfold inr_, Inr_sum1_Handler, Handler.inr_, Handler.htrigger.
+    rewrite bind_trigger.
+    estep; intros.
+    rewrite tau_eutt.
+    ebase. right. eapply CIHH. apply H1.
+Qed.
+
+Lemma no_event_r_interp :
+  forall {E F X} (t : itree (E +' F) X),
+    no_event_r t ->
+    forall (h : F ~> itree (E +' F)), t ≈ interp (case_ inl_ h) t.
+Proof.
+  intros E F X.
+  intros t H h.
+  revert t H.
+  einit.
+  ecofix CIH.
+  intros.
+  rewrite (itree_eta t).
+  pinversion H0.
+  - rewrite interp_ret. reflexivity.
+  - rewrite interp_tau. estep.
+  - clear - CIHH H0 H1 H.
+    rewrite interp_vis. cbn.
+    unfold inl_, Inl_sum1_Handler, Handler.inl_, Handler.htrigger.
+    rewrite bind_trigger.
+    estep; intros.
+    rewrite tau_eutt.
+    ebase. right. eapply CIHH. apply H1.
+Qed.
+
+Lemma no_event_interp :
+  forall {E X} (t : itree E X),
+    no_event t ->
+    forall h, t ≈ interp h t.
+Proof.
+  intros E X.
+  intros t H h.
+  revert t H.
+  einit.
+  ecofix CIH.
+  intros.
+  rewrite (itree_eta t).
+  pinversion H0.
+  - rewrite interp_ret. reflexivity.
+  - rewrite interp_tau. estep.
+Qed.
+
 (** By expressing that [elim] is an inverse to the signature injection: *)
 
 (* Injection to the left *)
