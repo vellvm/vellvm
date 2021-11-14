@@ -277,28 +277,30 @@ End eqit_closure.
 #[export] Hint Resolve no_event_l_eqit_clo_wcompat : paco.
 #[export] Hint Resolve no_event_r_eqit_clo_wcompat : paco.
 
-Instance Proper_no_event_eqit {E X} : Proper (eq_itree eq ==> iff) (@no_event E X).
+(* In particular [eq_itree] is hence a congruence for [no_event] *)
+Instance no_event_l_eq_itree {E F X} : Proper (eq_itree eq ==> iff) (@no_event_l E F X).
 Proof.
   repeat red. intros. split; intros.
   ginit. rewrite <- H. gfinal; auto.
   ginit. rewrite H. gfinal; auto.
 Qed.    
 
-Instance Proper_no_event_l_eqit {E F X} : Proper (eq_itree eq ==> iff) (@no_event_l E F X).
+Instance no_event_r_eq_itree {E F X} : Proper (eq_itree eq ==> iff) (@no_event_r E F X).
 Proof.
   repeat red. intros. split; intros.
   ginit. rewrite <- H. gfinal; auto.
   ginit. rewrite H. gfinal; auto.
 Qed.    
 
-Instance Proper_no_event_r_eqit {E F X} : Proper (eq_itree eq ==> iff) (@no_event_r E F X).
+Instance no_event_eq_itree {E X} : Proper (eq_itree eq ==> iff) (@no_event E X).
 Proof.
   repeat red. intros. split; intros.
   ginit. rewrite <- H. gfinal; auto.
   ginit. rewrite H. gfinal; auto.
 Qed.    
 
-Instance Proper_no_event_l {E F X} : Proper (eutt eq ==> iff) (@no_event_l E F X).
+(* But although not a valid up-to, [eutt] is also a congruence for [no_event] *)
+Instance no_event_l_eutt {E F X} : Proper (eutt eq ==> iff) (@no_event_l E F X).
 Proof.
   do 2 red.
   repeat red. intros. split; intros.
@@ -348,7 +350,7 @@ Proof.
       * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
 Qed.    
 
-Instance Proper_no_event_r {E F X} : Proper (eutt eq ==> iff) (@no_event_r E F X).
+Instance no_event_r_eutt {E F X} : Proper (eutt eq ==> iff) (@no_event_r E F X).
 Proof.
   do 2 red.
   repeat red. intros. split; intros.
@@ -400,7 +402,7 @@ Proof.
       * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
 Qed.    
  
-Instance Proper_no_event {E X} : Proper (eutt eq ==> iff) (@no_event E X).
+Instance no_event_eutt {E X} : Proper (eutt eq ==> iff) (@no_event E X).
 Proof.
   repeat red. intros. split; intros.
   - revert x y H H0.
@@ -980,6 +982,8 @@ Qed.
 Lemma no_event_inject_l :
   forall {E F X} (t : itree F X), no_event t -> no_event (@inject_l E F _ t).
 Proof.
+  intros.
+  apply inject_no_event_l.
   ginit.
   intros * H.
   rewrite (itree_eta t).
