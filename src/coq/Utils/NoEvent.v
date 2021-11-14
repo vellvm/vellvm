@@ -124,27 +124,35 @@ Qed.
 
 Definition no_event {E X} := paco1 (@no_eventF_ E X) bot1.
 
+(** up-to eq_itree closure
+  Coinductive proofs about no_event can be performed up-to `eq_itree`.
+
+  Note that up-to eutt is not valid:
+    Tau (Vis e k) 
+        |  no_eventF
+        v
+      Vis e k ~~ Tau (Vis e k)
+
+  Up-to euttge is valid as well.  
+  *)
 Section eqit_closure.
 
-  Inductive eq_itree_clo {E R} (r : itree E R -> Prop)
+  Inductive eqit_clo {E R} (r : itree E R -> Prop)
     : itree E R -> Prop :=
-  | eq_itree_clo_intro t t' (EQVl: eq_itree eq t t') (REL: r t')
-    : eq_itree_clo r t.
-  Hint Constructors eq_itree_clo: core.
+  | eqit_clo_intro b t t' (EQVl: eqit eq b false t t') (REL: r t')
+    : eqit_clo r t.
+  Hint Constructors eqit_clo: core.
 
-  Lemma eq_itree_clo_mon {E R} r1 r2 t
-        (IN: eq_itree_clo r1 t)
+  Lemma eqit_clo_mon {E R} r1 r2 t
+        (IN: eqit_clo r1 t)
         (LE: r1 <1= r2):
-    @eq_itree_clo E R r2 t.
+    @eqit_clo E R r2 t.
   Proof.
     destruct IN. econstructor; eauto.
   Qed.
 
-  Hint Resolve eq_itree_clo_mon : paco.
-
-
-  Lemma no_event_eq_itree_clo_wcompat {E R} :
-    wcompatible1 (@no_eventF_ E R) eq_itree_clo.
+  Lemma no_event_eqit_clo_wcompat {E R} :
+    wcompatible1 (@no_eventF_ E R) eqit_clo.
   Proof.
     econstructor.
     pmonauto.
@@ -153,33 +161,35 @@ Section eqit_closure.
     punfold EQVl.
     unfold_eqit.
     unfold no_eventF_ in *.
-    inv REL.
-    - genobs x0 ox0.
-      genobs t' ot'.
-      inv EQVl; intuition.
-      rewrite <- H0 in H1; inv H1.
-      rewrite <- H0 in H1; inv H1.
-    - genobs x0 ox0.
-      genobs t' ot'.
-      inv EQVl; intuition.
-      + rewrite <- H in H2; inv H2.
-        constructor.
-        pclearbot.
-        gclo.
-        econstructor; cycle -1; eauto with paco.
-      + rewrite <- H in H2; inv H2.
+    induction EQVl; auto.
+    - inv REL.
+      constructor.
+      pclearbot.
+      gclo; econstructor; cycle -1; eauto with paco.
+    - inv REL.
+    - constructor.
+      gstep; auto.
+    - congruence.
   Qed.
 
   #[global] Instance eq_itree_no_event_cong {E R} r rg :
-    Proper ((eq_itree eq) ==> flip impl) (gpaco1 (@no_eventF_ E R) eq_itree_clo r rg).
+    Proper ((eq_itree eq) ==> flip impl) (gpaco1 (@no_eventF_ E R) eqit_clo r rg).
   Proof.
     repeat intro.
     gclo.
     econstructor; cycle -1; eauto.
   Qed.
 
-  Lemma no_event_r_eq_itree_clo_wcompat {E F R} :
-    wcompatible1 (@no_event_rF_ E F R) eq_itree_clo.
+  #[global] Instance euttge_no_event_cong {E R} r rg :
+    Proper ((euttge eq) ==> flip impl) (gpaco1 (@no_eventF_ E R) eqit_clo r rg).
+  Proof.
+    repeat intro.
+    gclo.
+    econstructor; cycle -1; eauto.
+  Qed.
+
+  Lemma no_event_r_eqit_clo_wcompat {E F R} :
+    wcompatible1 (@no_event_rF_ E F R) eqit_clo.
   Proof.
     econstructor.
     pmonauto.
@@ -188,44 +198,39 @@ Section eqit_closure.
     punfold EQVl.
     unfold_eqit.
     unfold no_event_rF_ in *.
-    inv REL.
-    - genobs x0 ox0.
-      genobs t' ot'.
-      inv EQVl; intuition.
-      rewrite <- H0 in H1; inv H1.
-      rewrite <- H0 in H1; inv H1.
-    - genobs x0 ox0.
-      genobs t' ot'.
-      inv EQVl; intuition.
-      + rewrite <- H in H2; inv H2.
-        constructor.
-        pclearbot.
-        gclo.
-        econstructor; cycle -1; eauto with paco.
-      + congruence.
-    - genobs x0 ox0.
-      genobs t' ot'.
-      inv EQVl; intuition.
-      + congruence.
-      + rewrite <- H in H2; inv H2. 
-        dependent induction H5.
-        constructor.
-        pclearbot.
-        intros.
-        gclo.
-        econstructor; cycle -1; eauto with paco.
+    induction EQVl; auto.
+    - inv REL.
+      constructor.
+      pclearbot.
+      gclo; econstructor; cycle -1; eauto with paco.
+    - destruct e.
+      + constructor.
+        dependent induction REL.
+        pclearbot; intros; gclo; econstructor; cycle -1; eauto with paco.
+      + inv REL. 
+    - constructor.
+      gstep; auto.
+    - congruence.
   Qed.
 
   #[global] Instance eq_itree_no_event_r_cong {E F R} r rg :
-    Proper ((eq_itree eq) ==> flip impl) (gpaco1 (@no_event_rF_ E F R) eq_itree_clo r rg).
+    Proper ((eq_itree eq) ==> flip impl) (gpaco1 (@no_event_rF_ E F R) eqit_clo r rg).
   Proof.
     repeat intro.
     gclo.
     econstructor; cycle -1; eauto.
   Qed.
 
-  Lemma no_event_l_eq_itree_clo_wcompat {E F R} :
-    wcompatible1 (@no_event_lF_ E F R) eq_itree_clo.
+  #[global] Instance euttge_no_event_r_cong {E F R} r rg :
+    Proper ((euttge eq) ==> flip impl) (gpaco1 (@no_event_rF_ E F R) eqit_clo r rg).
+  Proof.
+    repeat intro.
+    gclo.
+    econstructor; cycle -1; eauto.
+  Qed.
+
+  Lemma no_event_l_eqit_clo_wcompat {E F R} :
+    wcompatible1 (@no_event_lF_ E F R) eqit_clo.
   Proof.
     econstructor.
     pmonauto.
@@ -234,36 +239,31 @@ Section eqit_closure.
     punfold EQVl.
     unfold_eqit.
     unfold no_event_lF_ in *.
-    inv REL.
-    - genobs x0 ox0.
-      genobs t' ot'.
-      inv EQVl; intuition.
-      rewrite <- H0 in H1; inv H1.
-      rewrite <- H0 in H1; inv H1.
-    - genobs x0 ox0.
-      genobs t' ot'.
-      inv EQVl; intuition.
-      + rewrite <- H in H2; inv H2.
-        constructor.
-        pclearbot.
-        gclo.
-        econstructor; cycle -1; eauto with paco.
-      + congruence.
-    - genobs x0 ox0.
-      genobs t' ot'.
-      inv EQVl; intuition.
-      + congruence.
-      + rewrite <- H in H2; inv H2. 
-        dependent induction H5.
-        constructor.
-        pclearbot.
-        intros.
-        gclo.
-        econstructor; cycle -1; eauto with paco.
+    induction EQVl; auto.
+    - inv REL.
+      constructor.
+      pclearbot.
+      gclo; econstructor; cycle -1; eauto with paco.
+    - destruct e.
+      + inv REL. 
+      + constructor.
+        dependent induction REL.
+        pclearbot; intros; gclo; econstructor; cycle -1; eauto with paco.
+    - constructor.
+      gstep; auto.
+    - congruence.
   Qed.
 
   #[global] Instance eq_itree_no_event_l_cong {E F R} r rg :
-    Proper ((eq_itree eq) ==> flip impl) (gpaco1 (@no_event_lF_ E F R) eq_itree_clo r rg).
+    Proper ((eq_itree eq) ==> flip impl) (gpaco1 (@no_event_lF_ E F R) eqit_clo r rg).
+  Proof.
+    repeat intro.
+    gclo.
+    econstructor; cycle -1; eauto.
+  Qed.
+
+  #[global] Instance euttge_no_event_l_cong {E F R} r rg :
+    Proper ((euttge eq) ==> flip impl) (gpaco1 (@no_event_lF_ E F R) eqit_clo r rg).
   Proof.
     repeat intro.
     gclo.
@@ -271,11 +271,11 @@ Section eqit_closure.
   Qed.
 
 End eqit_closure.
-#[export] Hint Resolve eq_itree_clo_mon : paco.
-#[export] Hint Constructors eq_itree_clo: core.
-#[export] Hint Resolve no_event_eq_itree_clo_wcompat : paco.
-#[export] Hint Resolve no_event_l_eq_itree_clo_wcompat : paco.
-#[export] Hint Resolve no_event_r_eq_itree_clo_wcompat : paco.
+#[export] Hint Resolve eqit_clo_mon : paco.
+#[export] Hint Constructors eqit_clo: core.
+#[export] Hint Resolve no_event_eqit_clo_wcompat : paco.
+#[export] Hint Resolve no_event_l_eqit_clo_wcompat : paco.
+#[export] Hint Resolve no_event_r_eqit_clo_wcompat : paco.
 
 Instance Proper_no_event_eqit {E X} : Proper (eq_itree eq ==> iff) (@no_event E X).
 Proof.
@@ -950,48 +950,6 @@ Proof.
   intros x y EQ.
   rewrite EQ. reflexivity.
 Qed.  
-
-(* We should be able to have a more general closure up to [eutt RR]. *)
-(*    I am however having trouble proving the weak compatibility in this case. *)
-(*  *)
-Section eutt_closure.
-
-  Context {E : Type -> Type} {R : Type} {RR : R -> R -> Prop}.
-
-  Inductive eutt_clo  (r : itree E R -> Prop)
-    : itree E R -> Prop :=
-  | eutt_clo_intro t t' (EQVl: eutt RR t t') (REL: r t')
-    : eutt_clo r t.
-  Hint Constructors eutt_clo: core.
-
-  Lemma eutt_clo_mon r1 r2 t
-        (IN: eutt_clo r1 t)
-        (LE: r1 <1= r2):
-    eutt_clo r2 t.
-  Proof.
-    destruct IN. econstructor; eauto.
-  Qed.
-
-  Hint Resolve eutt_clo_mon : paco.
- 
-  Lemma eutt_clo_wcompat :
-    wcompatible1 no_eventF_ eutt_clo.
-  Proof.
-  Admitted.
-
-  (* Global *) Instance geuttgen_cong_eutt r rg :
-    Proper ((eutt RR) ==> flip impl) (gpaco1 no_eventF_ eutt_clo r rg).
-  Proof.
-    repeat intro.
-    gclo.
-    econstructor; cycle -1; eauto.
-  Qed.
-
-End  eutt_closure.
-(* Hint Resolve eutt_clo_mon : paco. *)
-(* Hint Constructors eutt_clo: core. *)
-(* Hint Resolve eutt_clo_wcompat : paco. *)
-
 
 Lemma no_event_translate :
   forall {E F X} (m : E ~> F) (t : itree E X), no_event t -> no_event (translate m t).
