@@ -1,7 +1,8 @@
 (* begin hide *)
 From Coq Require Import
      RelationClasses
-     Morphisms.
+     Morphisms
+     Program.Equality.
 
 From Paco Require Import paco.
 From ITree Require Import
@@ -66,6 +67,237 @@ Lemma inj_pair2 :
         end).
   Qed.
 
+(* The right part of the signature is absent *)
+Variant no_event_rF {E F X} (R: itree (E +' F) X -> Prop): itree' (E +' F) X -> Prop :=
+| no_event_r_ret: forall (x: X), no_event_rF R (RetF x)
+| no_event_r_tau: forall t, R t -> no_event_rF R (TauF t)
+| no_event_r_vis: forall {Y} (e: E Y) k, (forall x, R (k x)) -> no_event_rF R (VisF (inl1 e) k).
+
+#[export] Hint Constructors no_event_rF : core.
+
+Lemma no_event_rF_mono : forall {E F X} (R1 R2 : itree (E +' F) X -> Prop) (LE : R1 <1= R2),
+    no_event_rF R1 <1= no_event_rF R2.
+Proof.
+  intros.
+  induction PR; auto.
+Qed.  
+
+Definition no_event_rF_ {E F X} R (t : itree (E +' F) X) := no_event_rF R (observe t).
+#[export] Hint Unfold no_event_rF_ : core.
+
+Lemma no_event_rF__mono : forall E F X, (monotone1 (@no_event_rF_ E F X)).
+Proof.
+  do 2 red.
+  intros.
+  eapply no_event_rF_mono; eauto.
+Qed.  
+
+#[export] Hint Resolve no_event_rF_mono : paco.
+
+Definition no_event_r {E F X} := paco1 (@no_event_rF_ E F X) bot1. 
+
+(* The tree contains no event *)
+Variant no_eventF {E X} (R: itree E X -> Prop): itree' E X -> Prop :=
+| no_event_ret: forall (x: X), no_eventF R (RetF x)
+| no_event_tau: forall t, R t -> no_eventF R (TauF t).
+
+#[export] Hint Constructors no_eventF : core.
+
+Lemma no_eventF_mono : forall {E X} (R1 R2 : itree E X -> Prop) (LE : R1 <1= R2),
+    no_eventF R1 <1= no_eventF R2.
+Proof.
+  intros.
+  induction PR; auto.
+Qed.  
+
+Definition no_eventF_ {E X} R (t : itree E X) := no_eventF R (observe t).
+#[export] Hint Unfold no_eventF_ : core.
+
+Lemma no_eventF__mono : forall E X, (monotone1 (@no_eventF_ E X)).
+Proof.
+  do 2 red.
+  intros.
+  eapply no_eventF_mono; eauto.
+Qed.  
+
+#[export] Hint Resolve no_eventF_mono : paco.
+
+Definition no_event {E X} := paco1 (@no_eventF_ E X) bot1.
+
+Section eqit_closure.
+
+  Inductive eq_itree_clo {E R} (r : itree E R -> Prop)
+    : itree E R -> Prop :=
+  | eq_itree_clo_intro t t' (EQVl: eq_itree eq t t') (REL: r t')
+    : eq_itree_clo r t.
+  Hint Constructors eq_itree_clo: core.
+
+  Lemma eq_itree_clo_mon {E R} r1 r2 t
+        (IN: eq_itree_clo r1 t)
+        (LE: r1 <1= r2):
+    @eq_itree_clo E R r2 t.
+  Proof.
+    destruct IN. econstructor; eauto.
+  Qed.
+
+  Hint Resolve eq_itree_clo_mon : paco.
+
+
+  Lemma no_event_eq_itree_clo_wcompat {E R} :
+    wcompatible1 (@no_eventF_ E R) eq_itree_clo.
+  Proof.
+    econstructor.
+    pmonauto.
+    intros.
+    inv PR.
+    punfold EQVl.
+    unfold_eqit.
+    unfold no_eventF_ in *.
+    inv REL.
+    - genobs x0 ox0.
+      genobs t' ot'.
+      inv EQVl; intuition.
+      rewrite <- H0 in H1; inv H1.
+      rewrite <- H0 in H1; inv H1.
+    - genobs x0 ox0.
+      genobs t' ot'.
+      inv EQVl; intuition.
+      + rewrite <- H in H2; inv H2.
+        constructor.
+        pclearbot.
+        gclo.
+        econstructor; cycle -1; eauto with paco.
+      + rewrite <- H in H2; inv H2.
+  Qed.
+
+  #[global] Instance eq_itree_no_event_cong {E R} r rg :
+    Proper ((eq_itree eq) ==> flip impl) (gpaco1 (@no_eventF_ E R) eq_itree_clo r rg).
+  Proof.
+    repeat intro.
+    gclo.
+    econstructor; cycle -1; eauto.
+  Qed.
+
+  Lemma no_event_r_eq_itree_clo_wcompat {E F R} :
+    wcompatible1 (@no_event_rF_ E F R) eq_itree_clo.
+  Proof.
+    econstructor.
+    pmonauto.
+    intros.
+    inv PR.
+    punfold EQVl.
+    unfold_eqit.
+    unfold no_event_rF_ in *.
+    inv REL.
+    - genobs x0 ox0.
+      genobs t' ot'.
+      inv EQVl; intuition.
+      rewrite <- H0 in H1; inv H1.
+      rewrite <- H0 in H1; inv H1.
+    - genobs x0 ox0.
+      genobs t' ot'.
+      inv EQVl; intuition.
+      + rewrite <- H in H2; inv H2.
+        constructor.
+        pclearbot.
+        gclo.
+        econstructor; cycle -1; eauto with paco.
+      + congruence.
+    - genobs x0 ox0.
+      genobs t' ot'.
+      inv EQVl; intuition.
+      + congruence.
+      + rewrite <- H in H2; inv H2. 
+        dependent induction H5.
+        constructor.
+        pclearbot.
+        intros.
+        gclo.
+        econstructor; cycle -1; eauto with paco.
+  Qed.
+
+  #[global] Instance eq_itree_no_event_r_cong {E F R} r rg :
+    Proper ((eq_itree eq) ==> flip impl) (gpaco1 (@no_event_rF_ E F R) eq_itree_clo r rg).
+  Proof.
+    repeat intro.
+    gclo.
+    econstructor; cycle -1; eauto.
+  Qed.
+
+  Lemma no_event_l_eq_itree_clo_wcompat {E F R} :
+    wcompatible1 (@no_event_lF_ E F R) eq_itree_clo.
+  Proof.
+    econstructor.
+    pmonauto.
+    intros.
+    inv PR.
+    punfold EQVl.
+    unfold_eqit.
+    unfold no_event_lF_ in *.
+    inv REL.
+    - genobs x0 ox0.
+      genobs t' ot'.
+      inv EQVl; intuition.
+      rewrite <- H0 in H1; inv H1.
+      rewrite <- H0 in H1; inv H1.
+    - genobs x0 ox0.
+      genobs t' ot'.
+      inv EQVl; intuition.
+      + rewrite <- H in H2; inv H2.
+        constructor.
+        pclearbot.
+        gclo.
+        econstructor; cycle -1; eauto with paco.
+      + congruence.
+    - genobs x0 ox0.
+      genobs t' ot'.
+      inv EQVl; intuition.
+      + congruence.
+      + rewrite <- H in H2; inv H2. 
+        dependent induction H5.
+        constructor.
+        pclearbot.
+        intros.
+        gclo.
+        econstructor; cycle -1; eauto with paco.
+  Qed.
+
+  #[global] Instance eq_itree_no_event_l_cong {E F R} r rg :
+    Proper ((eq_itree eq) ==> flip impl) (gpaco1 (@no_event_lF_ E F R) eq_itree_clo r rg).
+  Proof.
+    repeat intro.
+    gclo.
+    econstructor; cycle -1; eauto.
+  Qed.
+
+End eqit_closure.
+#[export] Hint Resolve eq_itree_clo_mon : paco.
+#[export] Hint Constructors eq_itree_clo: core.
+#[export] Hint Resolve no_event_eq_itree_clo_wcompat : paco.
+#[export] Hint Resolve no_event_l_eq_itree_clo_wcompat : paco.
+#[export] Hint Resolve no_event_r_eq_itree_clo_wcompat : paco.
+
+Instance Proper_no_event_eqit {E X} : Proper (eq_itree eq ==> iff) (@no_event E X).
+Proof.
+  repeat red. intros. split; intros.
+  ginit. rewrite <- H. gfinal; auto.
+  ginit. rewrite H. gfinal; auto.
+Qed.    
+
+Instance Proper_no_event_l_eqit {E F X} : Proper (eq_itree eq ==> iff) (@no_event_l E F X).
+Proof.
+  repeat red. intros. split; intros.
+  ginit. rewrite <- H. gfinal; auto.
+  ginit. rewrite H. gfinal; auto.
+Qed.    
+
+Instance Proper_no_event_r_eqit {E F X} : Proper (eq_itree eq ==> iff) (@no_event_r E F X).
+Proof.
+  repeat red. intros. split; intros.
+  ginit. rewrite <- H. gfinal; auto.
+  ginit. rewrite H. gfinal; auto.
+Qed.    
+
 Instance Proper_no_event_l {E F X} : Proper (eutt eq ==> iff) (@no_event_l E F X).
 Proof.
   do 2 red.
@@ -115,35 +347,6 @@ Proof.
         pstep. red. eapply IHeqitF. econstructor. intros. apply H. reflexivity. apply Heqoy.
       * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
 Qed.    
-
-(* The right part of the signature is absent *)
-Variant no_event_rF {E F X} (R: itree (E +' F) X -> Prop): itree' (E +' F) X -> Prop :=
-| no_event_r_ret: forall (x: X), no_event_rF R (RetF x)
-| no_event_r_tau: forall t, R t -> no_event_rF R (TauF t)
-| no_event_r_vis: forall {Y} (e: E Y) k, (forall x, R (k x)) -> no_event_rF R (VisF (inl1 e) k).
-
-#[export] Hint Constructors no_event_rF : core.
-
-Lemma no_event_rF_mono : forall {E F X} (R1 R2 : itree (E +' F) X -> Prop) (LE : R1 <1= R2),
-    no_event_rF R1 <1= no_event_rF R2.
-Proof.
-  intros.
-  induction PR; auto.
-Qed.  
-
-Definition no_event_rF_ {E F X} R (t : itree (E +' F) X) := no_event_rF R (observe t).
-#[export] Hint Unfold no_event_rF_ : core.
-
-Lemma no_event_rF__mono : forall E F X, (monotone1 (@no_event_rF_ E F X)).
-Proof.
-  do 2 red.
-  intros.
-  eapply no_event_rF_mono; eauto.
-Qed.  
-
-#[export] Hint Resolve no_event_rF_mono : paco.
-
-Definition no_event_r {E F X} := paco1 (@no_event_rF_ E F X) bot1. 
 
 Instance Proper_no_event_r {E F X} : Proper (eutt eq ==> iff) (@no_event_r E F X).
 Proof.
@@ -196,36 +399,7 @@ Proof.
         pstep. red. eapply IHeqitF. econstructor. intros. apply H. reflexivity. apply Heqoy.
       * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
 Qed.    
-
-
-(* The tree contains no event *)
-Variant no_eventF {E X} (R: itree E X -> Prop): itree' E X -> Prop :=
-| no_event_ret: forall (x: X), no_eventF R (RetF x)
-| no_event_tau: forall t, R t -> no_eventF R (TauF t).
-
-#[export] Hint Constructors no_eventF : core.
-
-Lemma no_eventF_mono : forall {E X} (R1 R2 : itree E X -> Prop) (LE : R1 <1= R2),
-    no_eventF R1 <1= no_eventF R2.
-Proof.
-  intros.
-  induction PR; auto.
-Qed.  
-
-Definition no_eventF_ {E X} R (t : itree E X) := no_eventF R (observe t).
-#[export] Hint Unfold no_eventF_ : core.
-
-Lemma no_eventF__mono : forall E X, (monotone1 (@no_eventF_ E X)).
-Proof.
-  do 2 red.
-  intros.
-  eapply no_eventF_mono; eauto.
-Qed.  
-
-#[export] Hint Resolve no_eventF_mono : paco.
-
-Definition no_event {E X} := paco1 (@no_eventF_ E X) bot1. 
-
+ 
 Instance Proper_no_event {E X} : Proper (eutt eq ==> iff) (@no_event E X).
 Proof.
   repeat red. intros. split; intros.
@@ -265,42 +439,6 @@ Proof.
       * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
 Qed.    
 
-Instance Proper_no_event_eqit {E X} : Proper (eq_itree eq ==> iff) (@no_event E X).
-Proof.
-  repeat red. intros. split; intros.
-  - revert x y H H0.
-    pcofix CIH.
-    intros x y H0 H1. 
-    + punfold H0. red in H0.
-      punfold H1. red in H1.
-      genobs x ox.
-      genobs y oy.
-      pstep. red.
-      revert x Heqox y Heqoy.
-      induction H0; inversion H1; intros; subst.
-      * rewrite <- Heqoy. econstructor.
-      * rewrite <- Heqoy. econstructor. pclearbot. right. eapply CIH. 2:  { apply H0. }  apply REL.
-      * inversion CHECK.
-      * inversion CHECK.
-      * inversion CHECK.
-  - revert x y H H0.
-    pcofix CIH.
-    intros x y H0 H1. 
-    + punfold H0. red in H0.
-      punfold H1. red in H1.
-      genobs x ox.
-      genobs y oy.
-      pstep. red.
-      revert x Heqox y Heqoy.
-      induction H0; inversion H1; intros; subst.
-      * rewrite <- Heqox. econstructor.
-      * rewrite <- Heqox. econstructor. pclearbot. right. eapply CIH. 2:  { apply H0. }  apply REL.
-      * inversion CHECK.
-      * inversion CHECK.
-      * inversion CHECK.
-Qed.    
-
-
 (* Sanity check, trees with empty signature should have no event *)
 Lemma no_event_empty {X} : forall (t: itree void1 X), no_event t.
 Proof.
@@ -314,8 +452,31 @@ Proof.
   - econstructor. right. apply CIH.
   - inversion e.
 Qed.    
-  
 
+Lemma no_event_l_empty {E X} : forall (t: itree (void1 +' E) X), no_event_l t.
+Proof.
+  pcofix CIH.
+  intros t.
+  pstep.
+  red.
+  genobs t obt.
+  destruct obt; auto.
+  destruct e; auto. 
+  inversion v.
+Qed.    
+ 
+Lemma no_event_r_empty {E X} : forall (t: itree (E +' void1) X), no_event_r t.
+Proof.
+  pcofix CIH.
+  intros t.
+  pstep.
+  red.
+  genobs t obt.
+  destruct obt; auto.
+  destruct e; auto. 
+  inversion v.
+Qed.    
+ 
 (** * Signature elimination
   In order to eliminate a signature from the type,
   we need to handle it into an itree over the remaining signature.
@@ -486,19 +647,63 @@ Qed.
 Definition inject_l {E F}: itree F ~> itree (E +' F) :=
   translate inr_.
 
+(* Injection to the right *)
+Definition inject_r {E F}: itree E ~> itree (E +' F) :=
+  translate inl_.
+
+(* Injection *)
+Definition inject {E}: itree void1 ~> itree E :=
+  translate (fun _ (e : void1 _) => match e with end).
+
 (* For some reason the new definition of [ecofix] in itrees loops here.
   We redefine the old one for now.
 *)
 Require Import Paco.pacotac_internal.
 
- Tactic Notation "ecofix" ident(CIH) "with" ident(gL) ident(gH) :=
+Tactic Notation "ecofix" ident(CIH) "with" ident(gL) ident(gH) :=
    repeat red;
    paco_pre2;
    eapply euttG_cofix;
    paco_post2 CIH with gL;
    paco_post2 CIH with gH.
 
- Tactic Notation "ecofix" ident(CIH) := ecofix CIH with gL gH.
+Tactic Notation "ecofix" ident(CIH) := ecofix CIH with gL gH.
+
+Lemma inject_no_event_l : forall {E F X} t,
+  no_event_l (@inject_l E F X t).
+Proof.
+  intros E F X.
+  ginit; gcofix CIH; intros t.
+  setoid_rewrite unfold_translate. 
+  gstep.
+  desobs t ot; cbn; constructor.
+  - gbase; apply CIH.
+  - intros ?; gbase; apply CIH.
+Qed. 
+
+Lemma inject_no_event_r : forall {E F X} t,
+  no_event_r (@inject_r E F X t).
+Proof.
+  intros E F X.
+  ginit; gcofix CIH; intros t.
+  setoid_rewrite unfold_translate. 
+  gstep.
+  desobs t ot; cbn; constructor.
+  - gbase; apply CIH.
+  - intros ?; gbase; apply CIH.
+Qed. 
+
+Lemma inject_no_event : forall {E X} t,
+  no_event (@inject E X t).
+Proof.
+  intros E X.
+  ginit; gcofix CIH; intros t.
+  unfold inject; setoid_rewrite unfold_translate. 
+  gstep.
+  desobs t ot; cbn; try constructor.
+  - gbase; apply CIH.
+  - inversion e.
+Qed. 
 
 (* [elim_l] is _always_ a left inverse to [inject_l] *)
 Lemma elim_inject_l :
@@ -543,10 +748,6 @@ Proof.
     left. apply CIH0. apply H1.
 Qed.
 
-(* Injection to the left *)
-Definition inject_r {E F}: itree E ~> itree (E +' F) :=
-  translate inl_.
-
 (* [elim_r] is _always_ a left inverse to [inject_r] *)
 Lemma elim_inject_r :
   forall {E F X} (t : itree E X),
@@ -588,10 +789,6 @@ Proof.
     left. apply CIH0. apply H1.
 Qed.
 
-
-(* Injection *)
-Definition inject {E}: itree void1 ~> itree E :=
-  translate (fun _ (e : void1 _) => match e with end).
 
 (* [elim] is _always_ a left inverse to [inject] *)
 Lemma elim_inject :
@@ -753,67 +950,6 @@ Proof.
   intros x y EQ.
   rewrite EQ. reflexivity.
 Qed.  
-
-Section eqit_closure.
-
-  Context {E : Type -> Type} {R : Type}.
-
-  (* SAZ: My straightforward attempts at proving the next few lemmas fail. *)
-  Inductive eq_itree_clo  (r : itree E R -> Prop)
-    : itree E R -> Prop :=
-  | eq_itree_clo_intro t t' (EQVl: eq_itree eq t t') (REL: r t')
-    : eq_itree_clo r t.
-  Hint Constructors eq_itree_clo: core.
-
-  Lemma eq_itree_clo_mon r1 r2 t
-        (IN: eq_itree_clo r1 t)
-        (LE: r1 <1= r2):
-    eq_itree_clo r2 t.
-  Proof.
-    destruct IN. econstructor; eauto.
-  Qed.
-
-  Hint Resolve eq_itree_clo_mon : paco.
-
-  Lemma eq_itree_clo_wcompat :
-    wcompatible1 no_eventF_ eq_itree_clo.
-  Proof.
-    econstructor.
-    pmonauto.
-    intros.
-    inv PR.
-    punfold EQVl.
-    unfold_eqit.
-    unfold no_eventF_ in *.
-    inv REL.
-    - genobs x0 ox0.
-      genobs t' ot'.
-      inv EQVl; intuition.
-      rewrite <- H0 in H1; inv H1.
-      rewrite <- H0 in H1; inv H1.
-    - genobs x0 ox0.
-      genobs t' ot'.
-      inv EQVl; intuition.
-      + rewrite <- H in H2; inv H2.
-        constructor.
-        pclearbot.
-        gclo.
-        econstructor; cycle -1; eauto with paco.
-      + rewrite <- H in H2; inv H2.
-  Qed.
-
-  #[global] Instance geuttgen_cong_eqit r rg :
-    Proper ((eq_itree eq) ==> flip impl) (gpaco1 no_eventF_ eq_itree_clo r rg).
-  Proof.
-    repeat intro.
-    gclo.
-    econstructor; cycle -1; eauto.
-  Qed.
-
-End eqit_closure.
-#[export] Hint Resolve eq_itree_clo_mon : paco.
-#[export] Hint Constructors eq_itree_clo: core.
-#[export] Hint Resolve eq_itree_clo_wcompat : paco.
 
 (* We should be able to have a more general closure up to [eutt RR]. *)
 (*    I am however having trouble proving the weak compatibility in this case. *)
