@@ -696,45 +696,95 @@ Proof.
   destruct u ; [now rewrite tau_eutt | reflexivity].
 Qed.
 
-Lemma denote_ocfg_prefix'' :
+
+Lemma denote_ocfg_unfold_not_in': forall bks bid_from bid_src,
+    find_block bks bid_src = None ->
+    ⟦ bks ⟧bs (bid_from, bid_src) ≅ Ret (inl (bid_from,bid_src)).
+Proof.
+  intros * GET_BK.
+  unfold denote_ocfg.
+  rewrite KTreeFacts.unfold_iter_ktree.
+  rewrite GET_BK; cbn.
+  rewrite bind_ret_l.
+  reflexivity.
+Qed.
+
+
+Ltac gbind :=
+    gupaco
+    ; apply eqit_clo_bind
+    ; [ apply eqit_idclo_mono
+      | now intros * PR
+        ; rewrite Combinators.compose_id_right in PR
+        ; rewrite Combinators.compose_id_left
+      | now intros
+      | eapply pbc_intro_h ; [ reflexivity |] ].
+
+
+Ltac refold_ocfg :=
+        match goal with
+        | |- context G[iter (fun '(bid_from, bid_src) =>
+                           match find_block ?g bid_src with
+                           | _ => _
+                           end)] =>
+            let G' := context G[(denote_ocfg g)] in
+            (change G')
+        | |- context G[ITree.iter (fun '(bid_from, bid_src) =>
+                           match find_block ?g bid_src with
+                           | _ => _
+                           end)] =>
+            let G' := context G[(denote_ocfg g)] in
+            (change G')
+
+    end.
+
+
+Opaque denote_block.
+Lemma denote_ocfg_prefix :
   forall prefix bks' postfix bks (from to: block_id),
     bks = (prefix ++ bks' ++ postfix) ->
     wf_ocfg_bid bks ->
     ⟦ bks ⟧bs (from, to) ≅
-           'x <- ⟦ bks' ⟧bs (from, to);;
+           x <- ⟦ bks' ⟧bs (from, to);;
     match x with
-    | inl x => Tau (⟦ bks ⟧bs x)
-    | inr x => Ret (inr x)
-    end
-.
+    | inl ft => (⟦ bks ⟧bs ft)
+    | inr v => Ret (inr v)
+    end.
 Proof.
-  intros * ->; revert from to.
+  intros * -> ; revert from to.
   ginit.
   gcofix CIH.
-  (* clear CIHH. *)
   intros * WF.
   destruct (find_block bks' to) as [bk |] eqn:EQ.
-  - unfold denote_ocfg at 1 3.
-    setoid_rewrite KTreeFacts.unfold_iter_ktree.
-    cbn; rewrite !bind_bind.
+  - cbn.
+    setoid_rewrite KTreeFacts.unfold_iter_ktree ;
+    repeat refold_ocfg ; cbn.
+    rewrite !bind_bind.
     assert (find_block (prefix ++ bks' ++ postfix) to = Some bk).
     {
-      erewrite find_block_app_r_wf; eauto.
-      erewrite find_block_app_l_wf; eauto.
-      eapply wf_ocfg_bid_app_r; eauto.
+       erewrite find_block_app_r_wf; eauto.
+       erewrite find_block_app_l_wf; eauto.
+       eapply wf_ocfg_bid_app_r; eauto.
     }
     do 2 match_rewrite.
     repeat (setoid_rewrite bind_bind).
-  (*   eapply euttG_bind; econstructor; [reflexivity | intros [] ? <-]. *)
-  (*   + rewrite !bind_ret_l; cbn. *)
-  (*     rewrite bind_tau; etau. *)
-  (*   + rewrite !bind_ret_l. *)
-  (*     reflexivity. *)
-  (* - edrop. *)
-  (*   rewrite (denote_ocfg_unfold_not_in bks'); auto. *)
-  (*   rewrite bind_ret_l. *)
-  (*   reflexivity. *)
+    gbind ; intros [] ? <-.
+    + rewrite !bind_ret_l.
+      rewrite bind_tau.
+      gstep ; apply EqTau.
+      gbase.
+      apply CIH.
+      assumption.
+    + rewrite !bind_ret_l.
+      gstep.
+      now apply EqRet.
+  - rewrite (denote_ocfg_unfold_not_in' bks'); auto.
+    rewrite bind_ret_l.
+    gstep.
+    apply Reflexive_eqit__eq.
+    apply Reflexive_eqit_gen_eq.
 Admitted.
+Transparent denote_block.
 
 Lemma denote_code_nil :
   ⟦ [] ⟧c ≅ Ret tt.
@@ -876,27 +926,16 @@ Proof.
   - flatten_all.
     + (* 2: the condition is true - jump in body *)
       tstep ; bstep.
-      rewrite tau_euttge.
+      (* rewrite tau_euttge. *)
       (* some rewriting aiming to simplify  *)
       unhide_iter.
-      match goal with
-      | |- euttG _ _ _ _ _ ?g _ =>
-          replace g with
-          (denote_ocfg (conv ([blk] ++ body ++ [blk0])) (input, inB))
-          by
-        ltac:(now unfold denote_ocfg; unfold_iter_cat)
-      end.
-      match goal with
-      | |- euttG _ _ _ _ _ _ (_ <- ?g ;; _) =>
-          replace g with
-          (denote_ocfg (conv body) (input, inB))
-          by
-        ltac:(now unfold denote_ocfg; unfold_iter_cat)
-      end.
+      repeat refold_ocfg.
+      replace (ConvertTyp_list [] body) with (conv body) by reflexivity.
 
       (* TODO explain the proof *)
+      (* 2.1 - Use denote_ocfg_prefix and prove the hypothesis *)
       pose proof ( H_APP :=
-              denote_ocfg_prefix''
+              denote_ocfg_prefix
                  (conv [blk]) (conv body) (conv [blk0])
                  (conv ([blk] ++ body ++ [blk0]))
                  input inB).
@@ -918,22 +957,27 @@ Proof.
              ; unhide_blk outB
              ; assumption).
       clear H_APP WF_WHILE.
-      unfold denote_cfg in POSTCOND_BODY.
-      clear -POSTCOND_BODY HeqConv Vblk Vblk0 VBODY CIHL.
+
+      clear -POSTCOND_BODY HeqConv Vblk Vblk0 VBODY CIHL INB_IN_BODY.
+
+      (* 2.2 - Since InB is in body, denote only the body *)
       rewrite HeqConv.
+      rewrite tau_euttge.
+      (* apply find_block_in_inputs in INB_IN_BODY *)
+      (* ; destruct INB_IN_BODY as [inBbk INB_IN_BODY] *)
+      (* ; apply find_block_some_conv in INB_IN_BODY . *)
+      (* setoid_rewrite INB_IN_BODY. *)
       ebind ; econstructor.
+      unfold denote_cfg in POSTCOND_BODY ;
       specialize (POSTCOND_BODY input)
       ; rewrite has_post_post_strong in POSTCOND_BODY.
       apply POSTCOND_BODY.
-
       intros ; simpl.
       destruct H as [-> [bfrom ->]].
       bstep.
       rewrite Util.list_cons_app.
-      etau.
-
-      (* admit. *)
-
+      admit.
+      (* etau. *)
 
     + (* 3: the condition is false - jump in output *)
       (* Ignore each sub-graphs in the left side *)
