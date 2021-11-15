@@ -643,6 +643,56 @@ Proof.
   - rewrite interp_tau. estep.
 Qed.
 
+Section EqmR.
+
+  Variable (M : Type -> Type). 
+  Context `{Functor.Functor M}.
+  Context `{Monad M}.
+  Context `{MonadIter M}.
+  Variable (eqmR : forall {R1 R2}, (R1 -> R2 -> Prop) -> M R1 -> M R2 -> Prop).
+
+(* eutt_iter' generalized to an arbitrary [eqmR] *)
+  Axiom eqmR_iter : forall I1 I2 R1 R2 
+   (RI : I1 -> I2 -> Prop)
+   (RR : R1 -> R2 -> Prop)
+   (body1 : I1 -> M (I1 + R1)%type) (i1 : I1)
+   (body2 : I2 -> M (I2 + R2)%type) (i2 : I2)
+   (BODYREL: forall j1 j2,
+     RI j1 j2 ->
+     eqmR (HeterogeneousRelations.sum_rel RI RR) (body1 j1) (body2 j2)
+   )
+   (INIT: RI i1 i2),
+  eqmR RR (Basics.iter body1 i1) (Basics.iter body2 i2). 
+  
+Lemma no_event_interp' :
+  forall {E X} 
+  (t : itree E X),
+    no_event t ->
+    forall (h1 h2 : E ~> M), 
+    eqmR eq (interp h1 t) (interp h2 t).
+Proof.
+  intros * NOE h1 h2. 
+  unfold interp.
+
+  apply eqmR_iter with (fun t1 t2 => t1 ≅ t2 /\ no_event t1).
+  2: split; [reflexivity | assumption].
+  clear t NOE.
+  intros t1 t2 [EQ NOE1]. 
+  assert (NOE2: no_event t2) by now rewrite <- EQ.
+  punfold EQ.
+  rewrite itree_eta in NOE1, NOE2. 
+  inv EQ; try congruence.
+  - admit. (* true by eqmR ret  *)
+  - rewrite <- H3, tau_eutt in NOE1.
+    rewrite <- H4, tau_eutt in NOE2.
+    admit. (* true by eqmR ret  *)
+  - rewrite <- H3 in NOE1.
+    punfold NOE1.
+    inv NOE1.
+Admitted.
+
+End EqmR.
+
 (** By expressing that [elim] is an inverse to the signature injection: *)
 
 (* Injection to the left *)
