@@ -22,7 +22,7 @@ COQFILESNUMERIC := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits N
 
 COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/ListUtil Utils/IntMaps Utils/NMaps Utils/Error\
 		Utils/Monads Utils/StateMonads Utils/MonadReturnsLaws Utils/PropT Utils/RefineProp\
-		Utils/PostConditions Utils/NoFailure Utils/TFor Utils/NonEmpty Utils/Default Utils/OptionUtil Utils/MapMonadExtra\
+		Utils/PostConditions Utils/TFor Utils/NoFailure Utils/NonEmpty Utils/Default Utils/OptionUtil Utils/MapMonadExtra\
 		Utilities
 
 COQFILESSYNTAX := Syntax/DataLayout Syntax/LLVMAst Syntax/AstLib Syntax/CFG\
