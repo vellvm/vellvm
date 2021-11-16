@@ -28,6 +28,11 @@ From Vellvm Require Import
 
 From Imp2Vir Require Import CFGC_Utils CFGC_Combinators Imp.
 
+Require Import Paco.paco.
+Import SemNotations.
+Require Import DenotationTheory.
+Import DenoteTactics.
+
 Notation code := (code typ).
 Notation ocfg := (ocfg typ).
 Notation conv := (convert_typ []).
@@ -221,6 +226,61 @@ Ltac conv_block :=
   ; try (unfold tfmap, TFunctor_list ; simpl )
   ; try (unfold endo, Endo_id).
 
+Lemma denote_ocfg_unfold_not_in': forall bks bid_from bid_src,
+    find_block bks bid_src = None ->
+    ⟦ bks ⟧bs (bid_from, bid_src) ≅ Ret (inl (bid_from,bid_src)).
+Proof.
+  intros * GET_BK.
+  unfold denote_ocfg.
+  rewrite KTreeFacts.unfold_iter_ktree.
+  rewrite GET_BK; cbn.
+  rewrite bind_ret_l.
+  reflexivity.
+Qed.
+
+Ltac refold_ocfg :=
+        match goal with
+        | |- context G[iter (fun '(bid_from, bid_src) =>
+                           match find_block ?g bid_src with
+                           | _ => _
+                           end)] =>
+            let G' := context G[(denote_ocfg g)] in
+            (change G')
+        | |- context G[ITree.iter (fun '(bid_from, bid_src) =>
+                           match find_block ?g bid_src with
+                           | _ => _
+                           end)] =>
+            let G' := context G[(denote_ocfg g)] in
+            (change G')
+        end.
+
+Lemma denote_no_phis : forall x,
+    ⟦ [] ⟧Φs x ≅ Ret tt.
+Proof.
+  intros.
+  cbn. go.
+  cbn; go.
+  reflexivity.
+Qed.
+
+Lemma denote_block_unfold :
+  forall id phis c t s origin,
+    ⟦ mk_block id phis c t s ⟧b origin ≅
+    ⟦ phis ⟧Φs origin;;
+    ⟦ c ⟧c;;
+    translate exp_to_instr ⟦ t ⟧t.
+Proof.
+  intros; cbn; reflexivity.
+Qed.
+
+Lemma denote_code_nil :
+  ⟦ [] ⟧c ≅ Ret tt.
+Proof.
+  intros.
+  cbn.
+  go.
+  reflexivity.
+Qed.
 
 Lemma denote_void_block : forall bid target src com,
     denote_block
@@ -230,7 +290,7 @@ Lemma denote_void_block : forall bid target src com,
            blk_code := [];
            blk_term := TERM_Br_1 target;
            blk_comments := com |} src
-       ≈ Ret (inl target).
+       ≅ Ret (inl target).
 Proof.
   intros.
   rewrite denote_block_unfold.
@@ -248,7 +308,7 @@ Lemma denote_void_block_conv : forall bid target src com,
                  blk_code := [];
                  blk_term := TERM_Br_1 target;
                  blk_comments := com |}) src
-       ≈ Ret (inl target).
+       ≅ Ret (inl target).
 Proof.
   intros.
   conv_block.
@@ -329,17 +389,6 @@ Ltac compute_eqv_dec :=
   |  |- context[if Eqv.eqv_dec_p ?b1 ?b1 then true else false]
     => setoid_rewrite eqv_dec_p_refl
   end.
-
-
-
-(* tactics for convert_typ *)
-(* repeat ( *)
-(*       match goal with *)
-(*       | h:context[wf_ocfg_bid _] |- _ => apply wf_ocfg_bid_convert_typ *)
-(*           with (env := []) in h *)
-(*       | h:context[free_in_cfg _ _] |- _ => apply free_in_convert_typ with (env := []) *)
-(*           in h *)
-(*       end). *)
 
 
 (** Denotation Combinators *)
@@ -582,7 +631,7 @@ Qed.
 (* TODO can I automatize \denote_ocfg_app\ (no_reentrance_proof) *)
 Lemma denote_cfg_seq : forall g1 g2 out1 in2 from to,
     wf_seq g1 g2 out1 in2 ->
-    In to (inputs g1) ->
+    In to (inputs g1) -> (* to <> out1 ? *)
     eutt eq
          (denote_cfg (cfg_seq g1 g2 out1 in2) from to)
          (d <- denote_cfg g1 from to ;;
@@ -656,87 +705,8 @@ Definition evaluate_conditional (c : code) (cond : texp) : itree instr_E bool :=
   end.
 
 
-Require Import Paco.paco.
-Import SemNotations.
-Require Import DenotationTheory.
-Import DenoteTactics.
-
-
-Lemma denote_no_phis : forall x,
-    ⟦ [] ⟧Φs x ≅ Ret tt.
-Proof.
-  intros.
-  cbn. go.
-  cbn; go.
-  reflexivity.
-Qed.
-
-
 (* Notation "g1 '⩭' g2" := (euttG _ _ _ _ _ g1 g2) (only printing, at level 10). *)
 Require Import Utils.PostConditions.
-
-Lemma denote_ocfg_prefix' :
-  forall prefix bks' postfix bks (from to: block_id),
-    bks = (prefix ++ bks' ++ postfix) ->
-    wf_ocfg_bid bks ->
-    ⟦ bks ⟧bs (from, to) ≈
-           'x <- ⟦ bks' ⟧bs (from, to);;
-    match x with
-    | inl x => Tau (⟦ bks ⟧bs x)
-    | inr x => Ret (inr x)
-    end
-.
-Proof.
-  intros.
-  setoid_rewrite denote_ocfg_prefix with
-    (bks':= bks')
-    (bks:= bks)
-  ; try eassumption.
-  rewrite eutt_eq_bind ; [reflexivity| intros ; simpl].
-  destruct u ; [now rewrite tau_eutt | reflexivity].
-Qed.
-
-
-Lemma denote_ocfg_unfold_not_in': forall bks bid_from bid_src,
-    find_block bks bid_src = None ->
-    ⟦ bks ⟧bs (bid_from, bid_src) ≅ Ret (inl (bid_from,bid_src)).
-Proof.
-  intros * GET_BK.
-  unfold denote_ocfg.
-  rewrite KTreeFacts.unfold_iter_ktree.
-  rewrite GET_BK; cbn.
-  rewrite bind_ret_l.
-  reflexivity.
-Qed.
-
-
-Ltac gbind :=
-    gupaco
-    ; apply eqit_clo_bind
-    ; [ apply eqit_idclo_mono
-      | now intros * PR
-        ; rewrite Combinators.compose_id_right in PR
-        ; rewrite Combinators.compose_id_left
-      | now intros
-      | eapply pbc_intro_h ; [ reflexivity |] ].
-
-
-Ltac refold_ocfg :=
-        match goal with
-        | |- context G[iter (fun '(bid_from, bid_src) =>
-                           match find_block ?g bid_src with
-                           | _ => _
-                           end)] =>
-            let G' := context G[(denote_ocfg g)] in
-            (change G')
-        | |- context G[ITree.iter (fun '(bid_from, bid_src) =>
-                           match find_block ?g bid_src with
-                           | _ => _
-                           end)] =>
-            let G' := context G[(denote_ocfg g)] in
-            (change G')
-
-    end.
 
 
 Opaque denote_block.
@@ -768,7 +738,7 @@ Proof.
     }
     do 2 match_rewrite.
     repeat (setoid_rewrite bind_bind).
-    gbind ; intros [] ? <-.
+    guclo eqit_clo_bind ; econstructor ; [reflexivity | intros [] ? <-].
     + rewrite !bind_ret_l.
       rewrite bind_tau.
       gstep ; apply EqTau.
@@ -783,42 +753,30 @@ Proof.
     gstep.
     apply Reflexive_eqit__eq.
     apply Reflexive_eqit_gen_eq.
-Admitted.
+Qed.
 Transparent denote_block.
 
-Lemma denote_code_nil :
-  ⟦ [] ⟧c ≅ Ret tt.
-Proof.
-  intros.
-  cbn.
-  go.
-  reflexivity.
-Qed.
 
-
-
-(* Precondition probablement nécessaire :
-    denote_cfg body input inB ⤳ (fun vob => exists bfrom, vob = inl (bfrom, inB)) *)
-Lemma denote_cfg_while_loop : 
+Lemma denote_cfg_while_loop :
   forall expr_code cond body input inB output outB from,
     wf_while expr_code cond body input inB output outB ->
     (forall bfrom, denote_cfg body bfrom inB ⤳
-                         (fun vob => exists bfrom, vob = inl (bfrom, input))) ->
+                         (fun vob => exists bfrom, vob = inl (bfrom, outB))) ->
     (* (forall bfrom, denote_cfg body bfrom inB ⤳ *)
     (*                      (fun vob => exists bfrom, vob = inl (bfrom, inB))) -> *)
     eutt eq
          (denote_cfg (cfg_while_loop expr_code cond body input inB output outB)
                      from input) 
          (iter (C := Kleisli _) 
-            (fun '(from, to) => 
+            (fun (_ : unit) =>
               b <- evaluate_conditional expr_code cond;; 
               if b : bool 
-              then vob <- denote_cfg body input inB;; 
+              then vob <- denote_cfg body input inB;;
                    match vob with
                    | inr v => Ret (inr (inr v))
-                   | inl b => Ret (inl b) 
+                   | inl _ => Ret (inl tt)
                    end
-              else Ret (inr (inl (input,output)))) (from, input)).
+              else Ret (inr (inl (input,output)))) tt).
 Proof.
   intros * WF_WHILE POSTCOND_BODY
   ; unfold wf_while in WF_WHILE.
@@ -882,6 +840,7 @@ Proof.
   (* 1.0 : skip the phis *)
   rewrite denote_no_phis.
   bstep.
+  show_iter_body.
 
   (* 1.1: Denote the code used in order to compute the expression *)
   unfold  ConvertTyp_code at 1, tfmap at 2.
@@ -926,7 +885,9 @@ Proof.
   - flatten_all.
     + (* 2: the condition is true - jump in body *)
       tstep ; bstep.
-      (* rewrite tau_euttge. *)
+      show_iter_body.
+
+      rewrite tau_euttge.
       (* some rewriting aiming to simplify  *)
       unhide_iter.
       repeat refold_ocfg.
@@ -956,17 +917,11 @@ Proof.
              ; unhide_blk input
              ; unhide_blk outB
              ; assumption).
-      clear H_APP WF_WHILE.
+      clear H_APP.
 
-      clear -POSTCOND_BODY HeqConv Vblk Vblk0 VBODY CIHL INB_IN_BODY.
 
       (* 2.2 - Since InB is in body, denote only the body *)
       rewrite HeqConv.
-      rewrite tau_euttge.
-      (* apply find_block_in_inputs in INB_IN_BODY *)
-      (* ; destruct INB_IN_BODY as [inBbk INB_IN_BODY] *)
-      (* ; apply find_block_some_conv in INB_IN_BODY . *)
-      (* setoid_rewrite INB_IN_BODY. *)
       ebind ; econstructor.
       unfold denote_cfg in POSTCOND_BODY ;
       specialize (POSTCOND_BODY input)
@@ -976,15 +931,57 @@ Proof.
       destruct H as [-> [bfrom ->]].
       bstep.
       rewrite Util.list_cons_app.
-      admit.
-      (* etau. *)
+      unfold denote_ocfg.
+      unfold_iter_cat.
+      rewrite unfold_iter at 1.
+      rewrite (convert_typ_list_app _ (body++_)), (convert_typ_list_app body _).
+      assert (
+            find_block (conv [blk] ++ conv body ++ conv [blk0]) outB
+            = Some (conv blk0)
+         ).
+      {
+         unfold cfg_while_loop in WF_WHILE.
+         rewrite (find_block_app_r_wf outB (conv [blk]) (conv body ++ conv [blk0]) (b:= conv blk0)).
+         reflexivity.
+         rewrite <- (convert_typ_list_app body _), <- (convert_typ_list_app _ (body++_)).
+         now unhide_blk input ; unhide_blk outB.
+         rewrite (find_block_app_r_wf
+                     outB (conv body) (conv [blk0]) (b:= conv blk0)).
+         reflexivity.
+         rewrite (convert_typ_list_app _ (body++_)), (convert_typ_list_app body _) in WF_WHILE.
+         apply (wf_ocfg_bid_app_r (conv _) ((conv body) ++ (conv _))) in WF_WHILE.
+         now unhide_blk outB.
+         now unhide_blk outB ; simpl ; compute_eqv_dec.
+      }
+      setoid_rewrite H.
+      clear H WF_WHILE.
+      unhide_blk outB.
+      rewrite denote_void_block_conv.
+      refold_ocfg.
+      hide_blk outB.
+      simpl.
+      bstep.
+      (* rewriting about conv *)
+      match goal with
+      | |- context[(⟦ tfmap (typ_to_dtyp []) blk :: (conv body) ++ (conv [blk0])⟧bs )] =>
+          replace
+             (⟦ tfmap (typ_to_dtyp []) blk :: (conv body) ++ (conv [blk0])⟧bs)
+          with
+          (⟦ conv ([blk] ++ body ++ [blk0]) ⟧bs)
+          by
+        ltac:
+     (rewrite (convert_typ_list_app _ (body++_) []), (convert_typ_list_app body _ [])
+      ; unfold conv,ConvertTyp_list
+      ; now simpl)
+      end.
+      etau.
 
     + (* 3: the condition is false - jump in output *)
       (* Ignore each sub-graphs in the left side *)
       tstep ; bstep.
       rewrite tau_euttge.
       setoid_rewrite unfold_iter at 1.
-      unhide_iter ; hide_iter_body.
+      inv HBODY ; hide_iter_body.
       unhide_blk input.
 
       (* 3.1: ignore the block input *)
@@ -1005,4 +1002,4 @@ Proof.
             | apply find_block_free_id ; assumption]).
       setoid_rewrite Hfind.
       simpl ; bstep. eret.
-Admitted.
+Qed.
