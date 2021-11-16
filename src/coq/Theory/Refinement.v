@@ -143,7 +143,15 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Definition refine_L4 : relation ((itree L4 (MemState * (local_env * stack * (global_env * uvalue)))) -> Prop)
     := fun ts ts' => forall t', ts' t' -> exists t, ts t /\ eutt refine_res3 t t'.
 
-  Definition refine_L5 : relation ((itree L5 (MemState * (local_env * stack * (global_env * uvalue)))) -> Prop)
-    := fun ts ts' => forall t', ts' t' -> exists t, ts t /\ eutt refine_res3 t t'.
+  Inductive contains_UB {R} : itree L4 R -> Prop :=
+  | CrawlTau  : forall t, contains_UB t -> contains_UB (Tau t)
+  | CrawlVis1 : forall Y (e : ExternalCallE Y) x k, contains_UB (k x) -> contains_UB (vis e k)
+  | CrawlVis2 : forall Y (e : (DebugE +' FailureE) Y) x k, contains_UB (k x) -> contains_UB (vis e k)
+  | FindUB    : forall s, contains_UB (raiseUB s).
+
+  Definition refine_L5 : relation ((itree L4 (MemState * (local_env * stack * (global_env * uvalue)))) -> Prop)
+    := fun ts ts' => 
+         forall t', ts' t' -> 
+               exists t, ts t /\ (contains_UB t \/ eutt refine_res3 t t').
 
 End Make.

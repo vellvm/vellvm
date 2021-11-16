@@ -193,9 +193,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (entry : string)
              (args : list uvalue)
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
-    : itree L5 res_L4 :=
+    : itree L4 res_L4 :=
     let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-    interp_mcfg6_exec t [] ([],[]) emptyMemState.
+    interp_mcfg4_exec t [] ([],[]) emptyMemState.
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts 
@@ -219,7 +219,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (entry : string)
              (args : list uvalue)
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
-    : PropT L6 (MemState * (local_env * lstack * (global_env * uvalue))) :=
+    : PropT L4 (MemState * (local_env * lstack * (global_env * uvalue))) :=
     let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
     ℑs eq t [] ([],[]) emptyMemState. 
 

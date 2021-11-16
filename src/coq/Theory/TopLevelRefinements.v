@@ -46,32 +46,32 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Import SemNotations.
 
   Module R := Refinement.Make LP LLVM.
-  Import R.
+  Import R. 
   (* end hide *)
 
-  (** *)
-  (*    This file is currently a holdall. *)
-  (*    In here, we have: *)
-  (*    * partial interpreters to each levels; *)
-  (*    * hierarchies of refinements of mcfgs and proofs of inclusions; *)
-  (*    * lemmas for each partial interpreter of commutation with bind and ret; *)
-  (*    * some misc proper instances; *)
-  (*    * admitted statement of inclusion of the intepreter into the model; *)
-  (*  **)
+  (**
+   This file is currently a holdall.
+   In here, we have:
+   * partial interpreters to each levels;
+   * hierarchies of refinements of mcfgs and proofs of inclusions;
+   * lemmas for each partial interpreter of commutation with bind and ret;
+   * some misc proper instances;
+   * admitted statement of inclusion of the intepreter into the model;
+   **)
 
-  (** The module _Refinement.Make_ defines a series of refinements between *)
-  (*     [itree]s at the various signatures of events a Vellvm goes through during *)
-  (*     the chain of interpretations leading to the definition of the model. *)
-  (*     These refinements state set inclusion of the concretization of the *)
-  (*     returned under-defined values, but impose no constraints on the states. *)
+  (** The module _Refinement.Make_ defines a series of refinements between
+    [itree]s at the various signatures of events a Vellvm goes through during
+    the chain of interpretations leading to the definition of the model.
+    These refinements state set inclusion of the concretization of the
+    returned under-defined values, but impose no constraints on the states.
 
-  (*     In this module, we show that these refinements define a chain of growing *)
-  (*     relations when composed with the bits of interpretations relating each *)
-  (*     level. *)
+    In this module, we show that these refinements define a chain of growing
+    relations when composed with the bits of interpretations relating each
+    level.
 
-  (*     Finally, this allows us to lift these relations on [itree]s to a growing *)
-  (*     chain of relations on [mcfg typ]. *)
-  (*  *)
+    Finally, this allows us to lift these relations on [itree]s to a growing
+    chain of relations on [mcfg typ].
+   *)
 
   (** BEGIN TO MOVE *)
   Lemma subrelation_R_TT:
@@ -99,7 +99,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Import AlistNotations.
-  Lemma alist_find_eq_dec_local_env :
+  Lemma alist_find_eq_dec_local_env : 
     forall k (m1 m2 : local_env),
       {m2 @ k = m1 @ k} + {m2 @ k <> m1 @ k}.
   Proof.
@@ -135,15 +135,15 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   Section REFINEMENT.
     
-    (** We first prove that the [itree] refinement at level [i] entails the *)
-    (*     refinement at level [i+1] after running the [i+1] level of interpretation *)
-    (*    *)
+    (** We first prove that the [itree] refinement at level [i] entails the
+    refinement at level [i+1] after running the [i+1] level of interpretation
+     *)
 
-    (* Lemma 5.7  *)
-    (*      See the related definition of [refine_L0] in Refinement.v. (Search for Lemma 5.7) *)
+    (* Lemma 5.7 
+     See the related definition of [refine_L0] in Refinement.v. (Search for Lemma 5.7)
 
-    (*      The similar results mentioned in the paper are listed below. *)
-    (*   *)
+     The similar results mentioned in the paper are listed below.
+     *)
     Lemma refine_01: forall t1 t2 g,
         refine_L0 t1 t2 -> refine_L1 (interp_global t1 g) (interp_global t2 g).
     Proof.
@@ -183,20 +183,15 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - reflexivity.
     Qed.
 
+    (* The inclusion of refinement relations between 4 and 5 changes now *)
     Lemma refine_45 : forall Pt1 Pt2,
-        refine_L4 Pt1 Pt2 -> refine_L5 (model_UB refine_res3 Pt1) (model_UB refine_res3 Pt2).
+        refine_L4 Pt1 Pt2 -> refine_L5 Pt1 Pt2.
+    (* (model_UB refine_res3 Pt1) (model_UB refine_res3 Pt2). *)
     Proof.
       intros Pt1 Pt2 HR t2 HM.
-      exists t2; split; [| reflexivity].
-      destruct HM as (t2' & HPt2 & HPT2).
-      apply HR in HPt2; destruct HPt2 as (t1' & HPt1 & HPT1).
-      exists t1'; split; auto.
-      match type of HPT2 with | PropT.interp_prop ?h' ?t _ _ _ => remember h' as h end.
-      eapply interp_prop_Proper_eq with (RR := refine_res3); eauto.
-      - typeclasses eauto.
-      - typeclasses eauto.
+      apply HR in HM as (t1 & HPt1 & HPT1).
+      exists t1; split; auto.
     Qed.
-
 
     Variable ret_typ : dtyp.
     Variable entry : string.
@@ -204,10 +199,10 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Definition denote_vellvm_init := denote_vellvm ret_typ entry args.
     
-    (** *)
-    (*    In particular, we can therefore define top-level models *)
-    (*    short-circuiting the interpretation early. *)
-    (*    *)
+    (**
+   In particular, we can therefore define top-level models
+   short-circuiting the interpretation early.
+     *)
 
     Definition model_to_L1  (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
@@ -225,15 +220,11 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       let L0_trace := denote_vellvm_init prog in
       ℑs4 (refine_res3) L0_trace [] ([],[]) emptyMemState.
 
-    Definition model_to_L5 (prog: mcfg dtyp) :=
-      let L0_trace := denote_vellvm_init prog in
-      ℑs5 (refine_res3) L0_trace [] ([],[]) emptyMemState.
-
-    (** *)
-    (*    Which leads to five notion of equivalence of [mcfg]s. *)
-    (*    Note that all reasoning is conducted after conversion to [mcfg] and *)
-    (*    normalization of types. *)
-    (*    *)
+    (**
+   Which leads to five notion of equivalence of [mcfg]s.
+   Note that all reasoning is conducted after conversion to [mcfg] and
+   normalization of types.
+     *)
     Definition refine_mcfg_L1 (p1 p2: mcfg dtyp): Prop :=
       R.refine_L1 (model_to_L1 p1) (model_to_L1 p2).
 
@@ -247,12 +238,12 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       R.refine_L4 (model_to_L4 p1) (model_to_L4 p2).
 
     Definition refine_mcfg  (p1 p2: mcfg dtyp): Prop :=
-      R.refine_L5 (model_to_L5 p1) (model_to_L5 p2).
+      R.refine_L5 (model_to_L4 p1) (model_to_L4 p2).
 
-    (** *)
-    (*    The chain of refinements is monotone, legitimating the ability to *)
-    (*    conduct reasoning before interpretation when suitable. *)
-    (*    *)
+    (**
+   The chain of refinements is monotone, legitimating the ability to
+   conduct reasoning before interpretation when suitable.
+     *)
     Lemma refine_mcfg_L1_correct: forall p1 p2,
         refine_mcfg_L1 p1 p2 -> refine_mcfg p1 p2.
     Proof.
@@ -298,128 +289,10 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       | |- context[match ?x with | _ => _ end] => let Heq := fresh "Heq" in destruct x eqn:Heq
       end.
 
-    Lemma UB_handler_correct: handler_correct UB_handler UB_exec.
-    Proof.
-      unfold UB_handler. unfold UB_exec.
-      unfold handler_correct.
-      intros. auto.
-    Qed.
-
-    Lemma OOM_handler_correct:
-      forall E F, handler_correct (@OOM_handler E F) OOM_exec.
-    Proof.
-      intros E F.
-      unfold OOM_handler. unfold OOM_exec.
-      unfold handler_correct.
-      intros. auto.
-    Qed.
-
-  Lemma interp_prop_correct_exec':
-    forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),
-      handler_correct h_spec h ->
-      forall R RR `{Reflexive _ RR} t t', t ≈ t' -> interp_prop h_spec R RR t (interp h t').
-  Proof.
-    intros.
-    revert t t' H1.
-    pcofix CIH.
-    intros t t' eq.
-    pstep.
-    red.
-    unfold interp, Basics.iter, MonadIter_itree.
-    rewrite (itree_eta t) in eq. 
-    destruct (observe t).
-    - econstructor. reflexivity. rewrite <- eq. rewrite unfold_iter. cbn. rewrite Eq.bind_ret_l. cbn.  reflexivity.
-    - econstructor. right.
-      eapply CIH. rewrite tau_eutt in eq. rewrite eq. reflexivity.
-    - econstructor. 
-      2 : { rewrite <- eq. rewrite unfold_iter. cbn.
-            unfold ITree.map. rewrite Eq.bind_bind.
-            setoid_rewrite Eq.bind_ret_l at 1. cbn. setoid_rewrite tau_eutt.
-            reflexivity. }
-      apply H.
-      intros a. cbn.  
-      right.
-      unfold interp, Basics.iter, MonadIter_itree in CIH. unfold fmap, Functor_itree, ITree.map in CIH.
-      specialize (CIH (k a) (k a)).
-      apply CIH.
-      reflexivity.
-  Qed.
-
-  Lemma interp_prop_correct_exec_flip:
-    forall {E} (h_spec: E ~> PropT E) (h: E ~> itree E),
-      handler_correct h_spec h ->
-      forall R RR `{Reflexive _ RR} t t', t ≈ t' -> interp_prop h_spec R RR (interp h t') t.
-  Proof.
-    intros.
-    revert t' t H1.
-    pcofix CIH.
-    intros t' t eq.
-    pstep.
-    red.
-    unfold interp, Basics.iter, MonadIter_itree.
-    rewrite (itree_eta t') in eq.
-    replace t' with ({| _observe := observe t' |}) by admit.
-    destruct (observe t') eqn:T'; cbn.
-    - cbn. econstructor. reflexivity. rewrite <- eq. reflexivity.
-    - econstructor. right.
-      eapply CIH. rewrite tau_eutt in eq. rewrite eq. reflexivity.
-    - unfold handler_correct in H.
-      set (f := (fun t0 : itree (fun H1 : Type => E H1) R =>
-           match observe t0 with
-           | RetF r0 => Ret (inr r0)
-           | TauF t1 => Ret (inl t1)
-           | @VisF _ _ _ X0 e0 k0 => ITree.map (fun x : X0 => inl (k0 x)) (h X0 e0)
-           end)).
-
-      set (x := (Vis e k)).
-      replace (ITree.iter f x) with (ITree.bind (f x)
-                                                (fun lr =>
-                                                   match lr with
-                                                   | inl l => Tau (ITree.iter f l)
-                                                   | inr r => Ret r
-                                                   end)) by admit.
-
-      subst f.
-      subst x.
-      cbn.
-
-      (* I know (h X e) is in h_spec *)
-      (* l = (r <- h X e;; ret (inl (k r))) *)
-      match goal with
-      | H : _ |- context [ ITree.bind (ITree.map ?f ?t) ?k ]
-        => replace (ITree.bind (ITree.map f t) k) with (ITree.bind t (fun x => k (f x))) by admit
-      end.
-
-      pose proof (H X e).      
-  Admitted.
-
-
-    Set Printing Implicit.
-    Lemma refine_UB
-      : forall E F G `{LLVMEvents.FailureE -< E +' F +' G} T TT (HR: Reflexive TT)
-               (x : _ -> Prop)
-               (y : itree (E +' F +' UBE +' G) T),
-        x y -> model_UB TT x (exec_UB y).
-    Proof.
-      intros E F G H T TT HR x y H0.
-      unfold model_UB. unfold exec_UB.
-      exists y. split. assumption.
-      apply interp_prop_correct_exec.
-      intros.
-      apply case_prop_handler_correct.
-      unfold handler_correct. intros. reflexivity.
-      apply case_prop_handler_correct.
-      unfold handler_correct. intros. reflexivity.
-      apply case_prop_handler_correct.
-      apply UB_handler_correct.
-      unfold handler_correct. intros. reflexivity.
-      assumption. reflexivity.
-    Qed.
-
     Lemma Pick_handler_correct :
       forall E `{FailureE -< E} `{UBE -< E} `{OOME -< E},
         handler_correct (@Pick_handler E _ _ _) concretize_picks.
-    Proof.
+    Proof.  
       unfold handler_correct.
       intros.
       destruct e.
@@ -447,62 +320,28 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       assumption. reflexivity.
     Qed.
 
-    Lemma refine_oom
-      : forall E F T TT (HR: Reflexive TT)
-               (x : _ -> Prop)
-               (y : itree (E +' OOME +' F) T),
-        x y -> model_OOM TT x (exec_OOM y).
-    Proof.
-      intros E F T TT HR x y H0.
-      unfold model_OOM, model_OOM_h.
-      unfold exec_OOM.
-      exists y. split. assumption.
-      Set Printing Notations.
-      Unset Printing Implicit.
-
-      unfold case_.
-      unfold Case_sum1_Handler.
-      unfold Handler.case_.
-      cbn.
-
-      
-      setoid_rewrite Eq.bind_ret_r. ITree.bind_ret_r.
-      
-      apply interp_prop_correct_exec _flip.
-      intros.
-      apply case_prop_handler_correct.
-      unfold handler_correct. intros. reflexivity.
-      apply case_prop_handler_correct.
-      apply OOM_handler_correct.
-      unfold handler_correct. intros. reflexivity.
-      assumption. reflexivity.
-    Qed.
-
-    (** *)
-    (*    Theorem 5.8: We prove that the interpreter belongs to the model. *)
-    (*    *)
-
-    (* refine (model p1) (model p2) 
-
-       refine := forall t, model p2 t -> model p1 t
+    Definition build_singleton {A} : A -> A -> Prop := eq.
+    
+    (**
+   Theorem 5.8: We prove that the interpreter belongs to the model.
      *)
-    Theorem interpreter_sound: forall p, model p (interpreter p).
+    Theorem interpreter_sound: forall p, 
+        refine_L5 (model p) (build_singleton (interpreter p)).
     Proof.
       intros p.
-      unfold model, model_gen.
-      unfold interpreter, interpreter_gen.
-      unfold ℑs5.
-      unfold interp_mcfg6_exec.
-      apply refine_oom. auto.
-      apply refine_UB. auto.
-      apply refine_undef. auto.
+      intros ? [].
+      exists (interpreter p).
+      split.
+      - apply refine_undef. auto.
+      - right.
+        reflexivity.
     Qed.
 
   End REFINEMENT.
 
-  (** *)
-  (*    Each interpreter commutes with [bind] and [ret]. *)
-  (*  **)
+  (**
+   Each interpreter commutes with [bind] and [ret].
+   **)
 
   (** We hence can also commute them at the various levels of interpretation *)
 
@@ -531,10 +370,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     let L2_trace       := interp_local L1_trace l in
     let L3_trace       := interp_memory L2_trace m in
     let L4_trace       := model_undef eq L3_trace in
-    let L5_trace       := model_UB eq L4_trace in
-    L5_trace.
+    L4_trace.
 
-  Definition model_to_L5_cfg (prog: cfg dtyp) :=
+  Definition model_to_L4_cfg (prog: cfg dtyp) :=
     let trace := denote_cfg prog in
     interp_cfg trace [] [] emptyMemState.
 
