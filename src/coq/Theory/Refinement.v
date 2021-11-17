@@ -16,7 +16,8 @@ From Vellvm Require Import
      Semantics.Memory.Sizeof
      Semantics.Memory.MemBytes
      Semantics.LLVMParams
-     Semantics.Lang.
+     Semantics.Lang
+     Handlers.OOM.
 
 From ExtLib Require Import
      Structures.Monads
@@ -150,8 +151,16 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   | FindUB    : forall s, contains_UB (raiseUB s).
 
   Definition refine_L5 : relation ((itree L4 (MemState * (local_env * stack * (global_env * uvalue)))) -> Prop)
-    := fun ts ts' => 
-         forall t', ts' t' -> 
+    := fun ts ts' =>
+         (* For any tree in the target set *)
+         forall t', ts' t' ->
+               (* There is a tree in the source set that either
+                  exhibits UB, or is eutt our target tree *)
                exists t, ts t /\ (contains_UB t \/ eutt refine_res3 t t').
+
+  Definition refine_L6 : relation ((itree L4 (MemState * (local_env * stack * (global_env * uvalue)))) -> Prop)
+    := fun ts ts' =>
+         forall t', ts' t' ->
+               exists t, ts t /\ (contains_UB t \/ refine_OOM_h refine_res3 t t').
 
 End Make.
