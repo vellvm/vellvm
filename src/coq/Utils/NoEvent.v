@@ -1171,9 +1171,6 @@ Section DeterministicSingleton.
   Proof.
   Admitted.
 
-  Variable remove_pick_ub : itree (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' DebugE +' FailureE).
-  Variable deterministic_vellvm : forall R, itree L0 R -> Prop.
-
     (*
   (* Definition deterministic_vellvm *)
   Lemma deterministc_llvm_is_singleton : forall R RR t g sl mem,
@@ -1189,3 +1186,13 @@ Section DeterministicSingleton.
   Proof. Admitted.
 *)
 End DeterministicSingleton.
+
+Require Import MemoryAddress.
+Require Import Sizeof.
+
+Module PICK_REMOVE (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS ADDR IP SIZE).
+  Import Events.
+
+  Variable remove_pick_ub : itree (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE) ~> itree (ExternalCallE +' DebugE +' FailureE).
+  Variable deterministic_vellvm : forall R, itree L0 R -> Prop.
+End PICK_REMOVE.
