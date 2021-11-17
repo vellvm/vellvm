@@ -14,10 +14,10 @@ From Vellvm Require Import
      SurfaceSyntax .
 Import VIR_Notations.
 
-From Imp2Vir Require Import Imp CompileExpr CFGC_Combinators.
+From Imp2Vir Require Import Imp CFGC_Combinators.
 
 
-Section Imp2Vir.
+(* Section Imp2Vir. *)
 
 (** Compiler IMP *)
 Notation ocfg := (ocfg typ).
@@ -36,9 +36,10 @@ Record FST :=
   mk_FST
     {
       counter_bid : nat ;
+      counter_reg : int ;
     }.
 
-Definition fresh_init : FST := mk_FST 0.
+Definition fresh_init : FST := mk_FST 0 0%Z.
 
 Definition fresh : Type -> Type := fun X => FST -> (FST * X).
 
@@ -49,7 +50,11 @@ Definition fresh : Type -> Type := fun X => FST -> (FST * X).
  |}.
 
 Definition freshLabel : fresh block_id :=
-  fun '(mk_FST bid) => (mk_FST (S bid) , name bid).
+  fun '(mk_FST bid reg) => (mk_FST (S bid) reg , name bid).
+
+Definition freshReg : fresh int :=
+  fun '(mk_FST bid reg) => (mk_FST bid (reg+1) , reg).
+
 
 (* TODO it is probable already defined somewhere in Vellvm *)
 Definition OptionT (m : Type -> Type) : Type -> Type :=
@@ -66,66 +71,172 @@ Definition OptionT (m : Type -> Type) : Type -> Type :=
                end
   |}.
 
+From Coq Require Import
+     FSets.FMapList
+     Lists.List
+     Strings.String
+     Structures.OrderedTypeEx
+     ZArith.
+Import ListNotations.
 
-Fixpoint compile_imp (next_reg : int) (s : stmt) (env: StringMap.t int) :
-  OptionT fresh ( int * (StringMap.t int) * ocfg * block_id * block_id) :=
+Module Import StringMap := Coq.FSets.FMapList.Make(String_as_OT).
+
+From ExtLib Require Import
+     Structures.Monads
+     Data.Monads.OptionMonad.
+Import MonadNotation.
+
+
+
+Section CompileExpr.
+
+Definition texp_i1 (reg : int) : texp typ :=
+  (TYPE_I 1, EXP_Ident (ID_Local (Anon reg)))
+.
+
+Definition texp_i32 (reg : int) : texp typ :=
+  (TYPE_I 32, EXP_Ident (ID_Local (Anon reg)))
+.
+
+Definition texp_ptr (addr : int) : texp typ :=
+  (TYPE_Pointer (TYPE_I 32), EXP_Ident (ID_Local (Anon addr)))
+.
+
+Definition compile_binop (reg1 reg2 reg:int) (op: ibinop): code typ :=
+  [(IId (Anon reg),
+    INSTR_Op (OP_IBinop op (TYPE_I 32)
+      (EXP_Ident (ID_Local (Anon reg1)))
+      (EXP_Ident (ID_Local (Anon reg2)))))].
+
+(** Expressions are compiled straightforwardly.
+    The argument [next_reg] is the number of registers already introduced to compile
+    the expression, and is used for the name of the next one.
+    The result of the computation [compile_expr l e env] always ends up stored in [l].
+ *)
+
+Fixpoint compile_expr (e: expr) (env: StringMap.t int):
+  OptionT fresh (int * code typ) :=
+  match e with
+  | Var x =>
+      (match (find x env) with
+       | None => ret (None)
+       | Some addr =>
+           next_reg <- freshReg ;;
+           ret (Some (next_reg,
+                       [(IId (Anon next_reg)
+                          , INSTR_Load false (TYPE_I 32) (texp_ptr addr) None)]))
+       end)
+  | Lit n =>
+      next_reg <- freshReg ;;
+      ret (Some (next_reg,
+                  ([(IId (Anon next_reg),
+                      INSTR_Op
+                        (OP_IBinop
+                           (LLVMAst.Add false false)
+                           (TYPE_I 32)
+                           (EXP_Integer (Z.of_nat n))
+                           (EXP_Integer (Z.of_nat 0))))])))
+  | Plus e1 e2 =>
+      ('(reg1, instrs1) <- compile_expr e1 env;;
+       '(reg2, instrs2) <- compile_expr e2 env;;
+       ret (reg2, instrs1 ++ instrs2 ++ compile_binop reg1 reg2 reg2 (LLVMAst.Add false false)))
+  | Minus e1 e2 =>
+      ('(reg1, instrs1) <- compile_expr e1 env;;
+       '(reg2, instrs2) <- compile_expr e2 env;;
+       ret (reg2, instrs1 ++ instrs2 ++ compile_binop reg1 reg2 reg2 (LLVMAst.Sub false false)))
+  | Mult e1 e2 =>
+      ('(reg1, instrs1) <- compile_expr e1 env;;
+       '(reg2, instrs2) <- compile_expr e2 env;;
+       ret (reg2, instrs1 ++ instrs2 ++ compile_binop reg1 reg2 reg2 (LLVMAst.Mul false false)))
+  end.
+
+Open Scope Z_scope.
+Definition compile_assign (x: Imp.var) (e: expr) (env : StringMap.t int)
+  : OptionT fresh ((StringMap.t int) * code typ) :=
+  '(expr_reg, ir) <- compile_expr e env ;;
+  match (find x env) with
+  | Some id =>
+      reg <- freshReg ;;
+      ret (Some
+             (env, ir ++ [(IVoid reg,
+                            INSTR_Store false
+                                        (texp_i32 expr_reg) (texp_ptr id) None)]))
+  | None =>
+      reg1 <- freshReg ;;
+      reg2 <- freshReg ;;
+      ret (Some
+             (add x reg1 env,
+               ir ++ [(IId (Anon reg1), INSTR_Alloca (TYPE_I 32) None None)] ++
+                  [(IVoid reg2, INSTR_Store false (texp_i32 expr_reg) (texp_ptr reg1) None)]
+          ))
+  end.
+
+Definition compile_cond (e : expr) (env : StringMap.t int)
+  : OptionT fresh (int * (StringMap.t int) * code typ) :=
+  '(expr_reg, ir) <- compile_expr e env;;
+  reg <- freshReg ;;
+  ret (Some (reg, env, ir ++
+               [(IId (Anon (expr_reg + 1)),
+                  INSTR_Op (OP_ICmp Ne (TYPE_I 32) (EXP_Ident (ID_Local (Anon expr_reg))) (EXP_Integer 0))
+      )])).
+Close Scope Z_scope.
+
+End CompileExpr.
+
+
+
+Fixpoint compile_imp (s : stmt) (env: StringMap.t int) :
+  OptionT fresh ( (StringMap.t int) * ocfg * block_id * block_id) :=
   match s with
   | Skip =>
       (input <- freshLabel ;;
        output <- freshLabel ;;
        let g := cfg_block [] input output in
-       ret (Some (next_reg, env, g, input, output)))
+       ret (Some (env, g, input, output)))
   | Assign x e =>
-      (match compile_assign next_reg x e env with
-       | None => (ret None)
-       | Some (next_reg, env, c) =>
-           input <- freshLabel ;;
-           output <- freshLabel ;;
-           let g := cfg_block c input output in
-           ret (Some (next_reg, env, g, input, output))
-       end)
+      ('(env, c) <- compile_assign x e env ;;
+       input <- freshLabel ;;
+       output <- freshLabel ;;
+       let g := cfg_block c input output in
+       ret (Some (env, g, input, output)))
   | Seq l r =>
-      ( '(next_reg1, env1, g1, in1, out1) <- compile_imp next_reg l env;;
-        '(next_reg2, env2, g2, in2, out2) <- compile_imp next_reg1 r env1;;
-        ret (next_reg2,env2,(cfg_seq g1 g2 out1 in2), in1, out2))
+      ( '(env1, g1, in1, out1) <- compile_imp l env;;
+        '(env2, g2, in2, out2) <- compile_imp r env1;;
+        ret (env2, (cfg_seq g1 g2 out1 in2), in1, out2))
   | If e l r =>
-      (match compile_cond next_reg e env with
-       | None => ret None
-       | Some (cond_reg, expr_code) =>
-           '(next_reg1, env1, gT, inT, outT) <- compile_imp (cond_reg + 1) l env;;
-           '(next_reg2, env2, gF, inF, outF) <- compile_imp next_reg1 r env1;;
-           input <- freshLabel ;;
-           input_body <- freshLabel ;;
-           out_code <- freshLabel ;;
-           output <- freshLabel ;;
-           let g_code := cfg_block expr_code input out_code in
-           let g_body := cfg_branch (texp_i1 cond_reg) gT gF input_body inT inF in
-           let g_body := cfg_join g_body output outT outF in
-           let g := cfg_seq g_code g_body out_code input_body in
-           ret (Some (next_reg2, env2, g, input, output))
-       end)
+      ('(cond_reg, env, expr_code) <- compile_cond e env ;;
+       reg <- freshReg ;;
+       '(env1, gT, inT, outT) <- compile_imp l env;;
+       '(env2, gF, inF, outF) <- compile_imp r env1;;
+       input <- freshLabel ;;
+       input_body <- freshLabel ;;
+       out_code <- freshLabel ;;
+       output <- freshLabel ;;
+       let g_code := cfg_block expr_code input out_code in
+       let g_body := cfg_branch (texp_i1 cond_reg) gT gF input_body inT inF in
+       let g_body := cfg_join g_body output outT outF in
+       let g := cfg_seq g_code g_body out_code input_body in
+       ret (Some (env2, g, input, output)))
   | While e b =>
-      (match compile_cond next_reg e env with
-       | None => ret None
-       | Some (cond_reg, expr_code) =>
-           '(next_reg1, env1, gB, inB, outB) <- compile_imp (cond_reg + 1) b env ;;
-           input <- freshLabel ;;
-           out0 <- freshLabel ;;
-           output <- freshLabel ;;
-           let g := cfg_while_loop expr_code (texp_i1 cond_reg) gB input inB output outB in
-           ret (Some (next_reg1, env1, g, input, output))
-       end)
+      ('(cond_reg, env, expr_code) <- compile_cond e env ;;
+       '(env1, gB, inB, outB) <- compile_imp b env ;;
+       input <- freshLabel ;;
+       out0 <- freshLabel ;;
+       output <- freshLabel ;;
+       let g := cfg_while_loop expr_code (texp_i1 cond_reg) gB input inB output outB in
+       ret (Some (env1, g, input, output))
+      )
   end.
 
 Definition compile (s : stmt) :=
   snd (
-      ('(_, _, g, _, _) <- compile_imp 0 s (StringMap.empty int);;
+      ('( _, g, _, _) <- compile_imp s (StringMap.empty int);;
        (ret g))
         fresh_init).
 
 
 (** Examples *)
-Definition fact_ir := (compile (fact "a" "b" 5)).
+Definition fact_ir := (compile (Imp.fact "a" "b" 5)).
 Definition infinite_loop_ir := (compile (infinite_loop)).
 Definition if_ir := (compile (trivial_if "a" "b" 0)).
 Definition seq_ir := (compile (trivial_seq "a" "b" 42)).
@@ -144,9 +255,9 @@ Compute nested_if2_ir.
 (** WF compiler *)
 From Vellvm Require Import Utils.Tactics.
 
-Theorem wf_compiler_aux : forall s reg env σ σ' input output cfg nreg nenv ,
-  (compile_imp reg s env) σ =
-      (σ', Some (nreg, nenv, cfg, input, output)) -> wf_ocfg_bid cfg.
+Theorem wf_compiler_aux : forall s env σ σ' input output cfg nenv ,
+  (compile_imp s env) σ =
+      (σ', Some (nenv, cfg, input, output)) -> wf_ocfg_bid cfg.
 Proof.
   intros s.
   induction s ; intros.
@@ -158,7 +269,7 @@ Proof.
   - (* Seq *)
     cbn in H; repeat flatten_all ; try discriminate ; inv H.
     apply IHs1 in Heq.
-    apply IHs2 in Heq5.
+    apply IHs2 in Heq4.
     apply wf_bid_cfg_seq ; try assumption.
     admit. admit. admit. (* I need an invariant on the compiler *)
   - (* If *)
@@ -168,12 +279,12 @@ Proof.
     admit. 2 :{ admit. } 2 :{ admit. } 2 :{ admit. }
     apply wf_bid_cfg_join ; try assumption.
     admit. admit. admit. (* I need an invariant on the compiler *)
-    apply IHs1 in Heq1. apply IHs2 in Heq7.
+    apply IHs1 in Heq4. apply IHs2 in Heq9.
     apply wf_bid_cfg_branch ; try assumption.
     admit. admit. admit. (* I need an invariant on the compiler *)
   - (* While *)
     simpl in H; repeat flatten_all ; try discriminate ; inv H.
-    apply IHs in Heq1.
+    apply IHs in Heq3.
     apply wf_bid_cfg_while_loop ; try assumption.
     admit. admit. admit. (* I need an invariant on the compiler *)
   - (* Skip *)
@@ -215,16 +326,15 @@ Definition Rimpvir
   Prop :=
   Rmem vmap (fst env1) (fst (snd env2)) (fst env2).
 
-Theorem compile_correct : forall (next_reg : int) (σ : FST) env (p : stmt)
-                            (next_reg' : int) (σ' : FST)
+Theorem compile_correct : forall (σ : FST) env (p : stmt) (σ' : FST)
                             env' (o : ocfg) (input output : block_id)
                             mem from to genv lenv vmem,
 
   (* The environments of Imp and Vir are related *)
   Rmem env mem lenv vmem ->
   (* The compilation of p with env produce a new env' and an ir *)
-  (compile_imp next_reg p env) σ =
-      (σ', Some (next_reg', env', o, input, output))  ->
+  (compile_imp p env) σ =
+      (σ', Some (env', o, input, output))  ->
   eutt (Rimpvir env')
        (interp_imp (denote_imp p) mem)
        (interp_cfg3 (denote_cfg o from to) genv lenv vmem).
@@ -290,4 +400,4 @@ Proof.
 Admitted.
 
 
-End Imp2Vir.
+(* End Imp2Vir. *)
