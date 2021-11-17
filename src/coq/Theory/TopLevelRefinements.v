@@ -46,7 +46,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Import SemNotations.
 
   Module R := Refinement.Make LP LLVM.
-  Import R. 
+  Import R.
   (* end hide *)
 
   (**
@@ -99,7 +99,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Import AlistNotations.
-  Lemma alist_find_eq_dec_local_env : 
+  Lemma alist_find_eq_dec_local_env :
     forall k (m1 m2 : local_env),
       {m2 @ k = m1 @ k} + {m2 @ k <> m1 @ k}.
   Proof.
@@ -134,12 +134,12 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (** END TO MOVE *)
 
   Section REFINEMENT.
-    
+
     (** We first prove that the [itree] refinement at level [i] entails the
     refinement at level [i+1] after running the [i+1] level of interpretation
      *)
 
-    (* Lemma 5.7 
+    (* Lemma 5.7
      See the related definition of [refine_L0] in Refinement.v. (Search for Lemma 5.7)
 
      The similar results mentioned in the paper are listed below.
@@ -193,12 +193,30 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       exists t1; split; auto.
     Qed.
 
+    Lemma eutt_refine_oom_h :
+      forall {T} {E F} (RR : relation T) (t1 t2 : itree (E +' OOME +' F) T),
+        eutt RR t1 t2 ->
+        refine_OOM_h RR t1 t2.
+    Proof.
+    Admitted.
+
+    Lemma refine_56 : forall Pt1 Pt2,
+        refine_L5 Pt1 Pt2 -> refine_L6 Pt1 Pt2.
+    Proof.
+      intros Pt1 Pt2 HR t2 HM.
+      apply HR in HM as (t1 & HPt1 & [UB | HPT1]);
+        exists t1; split; auto;
+        right; apply eutt_refine_oom_h; auto.
+    Qed.
+
+    Hint Resolve refine_12 refine_23 refine_34 refine_45 refine_56 : refine_xx.
+
     Variable ret_typ : dtyp.
     Variable entry : string.
     Variable args : list uvalue.
 
     Definition denote_vellvm_init := denote_vellvm ret_typ entry args.
-    
+
     (**
    In particular, we can therefore define top-level models
    short-circuiting the interpretation early.
@@ -237,9 +255,26 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Definition refine_mcfg_L4 (p1 p2: mcfg dtyp): Prop :=
       R.refine_L4 (model_to_L4 p1) (model_to_L4 p2).
 
-    Definition refine_mcfg  (p1 p2: mcfg dtyp): Prop :=
+    Definition refine_mcfg_L5 (p1 p2: mcfg dtyp): Prop :=
       R.refine_L5 (model_to_L4 p1) (model_to_L4 p2).
 
+    Definition refine_mcfg_L6 (p1 p2: mcfg dtyp): Prop :=
+      R.refine_L6 (model_to_L4 p1) (model_to_L4 p2).
+
+    Definition refine_mcfg  (p1 p2: mcfg dtyp): Prop :=
+      refine_mcfg_L6 p1 p2.
+
+    Hint Unfold refine_mcfg refine_mcfg_L1 refine_mcfg_L2
+         refine_mcfg_L3 refine_mcfg_L4 refine_mcfg_L5
+         refine_mcfg_L6 : refine_xx.
+
+    (* Apparently auto's use of simple apply fails here *)
+    Hint Extern 1 (refine_L4 (model_to_L4 _) (model_to_L4 _))
+         => apply refine_34 : refine_xx.
+
+    Ltac solve_refine :=
+      auto 9 with refine_xx.
+    
     (**
    The chain of refinements is monotone, legitimating the ability to
    conduct reasoning before interpretation when suitable.
@@ -247,29 +282,43 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Lemma refine_mcfg_L1_correct: forall p1 p2,
         refine_mcfg_L1 p1 p2 -> refine_mcfg p1 p2.
     Proof.
-      intros p1 p2 HR.
-      apply refine_45, refine_34, refine_23, refine_12, HR.
+      intros p1 p2 HR;
+        solve_refine.
     Qed.
 
     Lemma refine_mcfg_L2_correct: forall p1 p2,
         refine_mcfg_L2 p1 p2 -> refine_mcfg p1 p2.
     Proof.
-      intros p1 p2 HR.
-      apply refine_45, refine_34, refine_23, HR.
+      intros p1 p2 HR;
+        solve_refine.
     Qed.
 
     Lemma refine_mcfg_L3_correct: forall p1 p2,
         refine_mcfg_L3 p1 p2 -> refine_mcfg p1 p2.
     Proof.
-      intros p1 p2 HR.
-      apply refine_45, refine_34, HR.
+      intros p1 p2 HR;
+        solve_refine.
     Qed.
 
     Lemma refine_mcfg_L4_correct: forall p1 p2,
         refine_mcfg_L4 p1 p2 -> refine_mcfg p1 p2.
     Proof.
-      intros p1 p2 HR.
-      apply refine_45, HR.
+      intros p1 p2 HR;
+        solve_refine.
+    Qed.
+
+    Lemma refine_mcfg_L5_correct: forall p1 p2,
+        refine_mcfg_L5 p1 p2 -> refine_mcfg p1 p2.
+    Proof.
+      intros p1 p2 HR;
+        solve_refine.
+    Qed.
+
+    Lemma refine_mcfg_L6_correct: forall p1 p2,
+        refine_mcfg_L6 p1 p2 -> refine_mcfg p1 p2.
+    Proof.
+      intros p1 p2 HR;
+        solve_refine.
     Qed.
 
     (* MOVE *)
@@ -292,7 +341,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Lemma Pick_handler_correct :
       forall E `{FailureE -< E} `{UBE -< E} `{OOME -< E},
         handler_correct (@Pick_handler E _ _ _) concretize_picks.
-    Proof.  
+    Proof.
       unfold handler_correct.
       intros.
       destruct e.
@@ -300,7 +349,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - apply Pick.concretize_u_concretize_uvalue.
       - reflexivity.
     Qed.
-    
+
     Lemma refine_undef
       : forall (E F:Type -> Type) T TT (HR: Reflexive TT)  `{UBE -< F} `{FailureE -< F} `{OOME -< F}
                (x : itree _ T),
@@ -321,12 +370,12 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Qed.
 
     Definition build_singleton {A} : A -> A -> Prop := eq.
-    
+
     (**
    Theorem 5.8: We prove that the interpreter belongs to the model.
      *)
-    Theorem interpreter_sound: forall p, 
-        refine_L5 (model p) (build_singleton (interpreter p)).
+    Theorem interpreter_sound: forall p,
+        refine_L6 (model p) (build_singleton (interpreter p)).
     Proof.
       intros p.
       intros ? [].
@@ -334,6 +383,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       split.
       - apply refine_undef. auto.
       - right.
+        apply eutt_refine_oom_h.
         reflexivity.
     Qed.
 
