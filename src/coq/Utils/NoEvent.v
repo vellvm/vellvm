@@ -1032,8 +1032,6 @@ Qed.
 Lemma no_event_inject_l :
   forall {E F X} (t : itree F X), no_event t -> no_event (@inject_l E F _ t).
 Proof.
-  intros.
-  apply inject_no_event_l.
   ginit.
   intros * H.
   rewrite (itree_eta t).
