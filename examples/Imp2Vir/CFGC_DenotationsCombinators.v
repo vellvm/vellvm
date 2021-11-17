@@ -2,19 +2,15 @@
 From Coq Require Import
      String
      List.
-Import ListNotations.
 
-From ExtLib Require Import Structures.Monads.
-From ExtLib Require Import Data.Monads.EitherMonad.
-Import MonadNotation.
-
-
+From ExtLib Require Import
+     Structures.Monads
+     Data.Monads.EitherMonad.
 
 From ITree Require Import
      ITree
      ITreeFacts
      Eq.
-Import ITreeNotations.
 
 From Vellvm Require Import
      Semantics
@@ -25,12 +21,16 @@ From Vellvm Require Import
      Tactics
      SymbolicInterpreter.
 
+Require Import Utils.PostConditions.
+Require Import Paco.paco.
 
 From Imp2Vir Require Import CFGC_Utils CFGC_Combinators Imp.
 
-Require Import Paco.paco.
+Section CFGC_DenotationCombinators.
+Import ListNotations.
+Import MonadNotation.
+Import ITreeNotations.
 Import SemNotations.
-Require Import DenotationTheory.
 Import DenoteTactics.
 
 Notation code := (code typ).
@@ -41,7 +41,8 @@ Definition denote_cfg g from to := denote_ocfg (conv g) (from,to).
 
 
 (** Tactics *)
-
+(** Hidden tactics *)
+(** Hide iter body *)
 Variant hidden_iter  (T: Type) : Type := boxh_iter (t: T).
 Variant visible_iter (T: Type) : Type := boxv_iter (t: T).
 Ltac hide_iter_body :=
@@ -75,71 +76,9 @@ Ltac unhide_iter :=
       destruct h ; subst body
   end.
 
-
-Ltac hidden_iter_apply lemma :=
-  match goal with
-  | h: hidden_iter (?body = _) |- _ =>
-      unhide_iter
-      ; apply lemma
-      ; hide_iter_body
-  | h: visible_iter (?body = _) |- _ =>
-      unhide_iter
-      ; apply lemma
-      ; hide_iter_body
-  end.
-
-Ltac hidden_iter_rewrite lemma :=
-  match goal with
-  | h: hidden_iter (?body = _) |- _ =>
-      unhide_iter
-      ; setoid_rewrite lemma
-      ; hide_iter_body
-  | h: visible_iter (?body = _) |- _ =>
-      unhide_iter
-      ; setoid_rewrite lemma
-      ; hide_iter_body
-  end.
-
-Ltac hidden_iter_tactic tactic :=
-  match goal with
-  | h: hidden_iter (?body = _) |- _ =>
-      unhide_iter
-      ; tactic
-      ; hide_iter_body
-  | h: visible_iter (?body = _) |- _ =>
-      unhide_iter
-      ; tactic
-      ; hide_iter_body
-  end.
-
-
-Variant hidden_cfg  (T: Type) : Type := boxh_cfg (t: T).
-Variant visible_cfg (T: Type) : Type := boxv_cfg (t: T).
-Ltac hide_cfg :=
-  match goal with
-  | h: context[denote_ocfg ?cfg _] |- _ =>
-      remember cfg as G eqn:VG;
-apply boxh_cfg in VG
-  | h : visible_cfg _ |- _ =>
-      let EQ := fresh "VG" in
-      destruct h as [EQ];
-apply boxh_cfg in EQ
-  | |- context[denote_ocfg ?cfg _] =>
-      remember cfg as G eqn:VG;
-apply boxh_cfg in VG
-  end.
-Ltac show_cfg :=
-  match goal with
-  | h: hidden_cfg _ |- _ =>
-      let EQ := fresh "HG" in
-      destruct h as [EQ];
-apply boxv_cfg in EQ
-  end.
-Notation "'hidden' G" := (hidden_cfg (G = _)) (only printing, at level 10).
-
+(** Hide block *)
 Variant hidden_blk  (T: Type) : Type := boxh_blk (t: T).
 Variant visible_blk (T: Type) : Type := boxv_blk (t: T).
-
 
 Ltac hide_blk bid :=
   match goal with
@@ -206,38 +145,6 @@ Ltac unhide_blk bid :=
       destruct h ; subst blk
   end ).
 
-
-Hint Rewrite @bind_ret_l : rwbind.
-Hint Rewrite @bind_bind : rwbind.
-Hint Rewrite @translate_ret : rwtranslate.
-Hint Rewrite @translate_bind : rwtranslate.
-Hint Rewrite @translate_trigger : rwtranslate.
-
-Ltac bstep := autorewrite with rwbind.
-Ltac tstep := autorewrite with rwtranslate.
-Ltac go := autorewrite with rwtranslate rwbind.
-
-Ltac unfold_iter_cat :=
-  try (unfold iter,Iter_Kleisli, Basics.iter , MonadIter_itree in * ).
-
-Ltac conv_block :=
-  try (unfold conv,ConvertTyp_block)
-  ; try (unfold tfmap, TFunctor_list, TFunctor_block ; simpl )
-  ; try (unfold tfmap, TFunctor_list ; simpl )
-  ; try (unfold endo, Endo_id).
-
-Lemma denote_ocfg_unfold_not_in': forall bks bid_from bid_src,
-    find_block bks bid_src = None ->
-    ⟦ bks ⟧bs (bid_from, bid_src) ≅ Ret (inl (bid_from,bid_src)).
-Proof.
-  intros * GET_BK.
-  unfold denote_ocfg.
-  rewrite KTreeFacts.unfold_iter_ktree.
-  rewrite GET_BK; cbn.
-  rewrite bind_ret_l.
-  reflexivity.
-Qed.
-
 Ltac refold_ocfg :=
         match goal with
         | |- context G[iter (fun '(bid_from, bid_src) =>
@@ -254,24 +161,27 @@ Ltac refold_ocfg :=
             (change G')
         end.
 
-Lemma denote_no_phis : forall x,
-    ⟦ [] ⟧Φs x ≅ Ret tt.
-Proof.
-  intros.
-  cbn. go.
-  cbn; go.
-  reflexivity.
-Qed.
+(** Bind and translate rewritings *)
+Hint Rewrite @bind_ret_l : rwbind.
+Hint Rewrite @bind_bind : rwbind.
+Hint Rewrite @translate_ret : rwtranslate.
+Hint Rewrite @translate_bind : rwtranslate.
+Hint Rewrite @translate_trigger : rwtranslate.
 
-Lemma denote_block_unfold :
-  forall id phis c t s origin,
-    ⟦ mk_block id phis c t s ⟧b origin ≅
-    ⟦ phis ⟧Φs origin;;
-    ⟦ c ⟧c;;
-    translate exp_to_instr ⟦ t ⟧t.
-Proof.
-  intros; cbn; reflexivity.
-Qed.
+Ltac bstep := autorewrite with rwbind.
+Ltac tstep := autorewrite with rwtranslate.
+Ltac go := autorewrite with rwtranslate rwbind.
+
+(* Unfold `CategoryOps.iter` from into `ITree.iter` *)
+Ltac unfold_iter_cat :=
+  try (unfold iter,Iter_Kleisli, Basics.iter , MonadIter_itree in * ).
+
+(** Denotations tactics *)
+Ltac conv_block :=
+  try (unfold conv,ConvertTyp_block)
+  ; try (unfold tfmap, TFunctor_list, TFunctor_block ; simpl )
+  ; try (unfold tfmap, TFunctor_list ; simpl )
+  ; try (unfold endo, Endo_id).
 
 Lemma denote_code_nil :
   ⟦ [] ⟧c ≅ Ret tt.
@@ -293,9 +203,9 @@ Lemma denote_void_block : forall bid target src com,
        ≅ Ret (inl target).
 Proof.
   intros.
-  rewrite denote_block_unfold.
-  rewrite denote_no_phis.
-  setoid_rewrite denote_code_nil.
+  rewrite denote_block_unfold_eq_itree.
+  rewrite denote_no_phis_eq_itree.
+  setoid_rewrite denote_code_nil_eq_itree.
   simpl.
   go.
   reflexivity.
@@ -706,64 +616,12 @@ Definition evaluate_conditional (c : code) (cond : texp) : itree instr_E bool :=
 
 
 (* Notation "g1 '⩭' g2" := (euttG _ _ _ _ _ g1 g2) (only printing, at level 10). *)
-Require Import Utils.PostConditions.
-
-
-Opaque denote_block.
-Lemma denote_ocfg_prefix :
-  forall prefix bks' postfix bks (from to: block_id),
-    bks = (prefix ++ bks' ++ postfix) ->
-    wf_ocfg_bid bks ->
-    ⟦ bks ⟧bs (from, to) ≅
-           x <- ⟦ bks' ⟧bs (from, to);;
-    match x with
-    | inl ft => (⟦ bks ⟧bs ft)
-    | inr v => Ret (inr v)
-    end.
-Proof.
-  intros * -> ; revert from to.
-  ginit.
-  gcofix CIH.
-  intros * WF.
-  destruct (find_block bks' to) as [bk |] eqn:EQ.
-  - cbn.
-    setoid_rewrite KTreeFacts.unfold_iter_ktree ;
-    repeat refold_ocfg ; cbn.
-    rewrite !bind_bind.
-    assert (find_block (prefix ++ bks' ++ postfix) to = Some bk).
-    {
-       erewrite find_block_app_r_wf; eauto.
-       erewrite find_block_app_l_wf; eauto.
-       eapply wf_ocfg_bid_app_r; eauto.
-    }
-    do 2 match_rewrite.
-    repeat (setoid_rewrite bind_bind).
-    guclo eqit_clo_bind ; econstructor ; [reflexivity | intros [] ? <-].
-    + rewrite !bind_ret_l.
-      rewrite bind_tau.
-      gstep ; apply EqTau.
-      gbase.
-      apply CIH.
-      assumption.
-    + rewrite !bind_ret_l.
-      gstep.
-      now apply EqRet.
-  - rewrite (denote_ocfg_unfold_not_in' bks'); auto.
-    rewrite bind_ret_l.
-    gstep.
-    apply Reflexive_eqit__eq.
-    apply Reflexive_eqit_gen_eq.
-Qed.
-Transparent denote_block.
-
 
 Lemma denote_cfg_while_loop :
   forall expr_code cond body input inB output outB from,
     wf_while expr_code cond body input inB output outB ->
     (forall bfrom, denote_cfg body bfrom inB ⤳
                          (fun vob => exists bfrom, vob = inl (bfrom, outB))) ->
-    (* (forall bfrom, denote_cfg body bfrom inB ⤳ *)
-    (*                      (fun vob => exists bfrom, vob = inl (bfrom, inB))) -> *)
     eutt eq
          (denote_cfg (cfg_while_loop expr_code cond body input inB output outB)
                      from input) 
@@ -838,7 +696,7 @@ Proof.
   hide_blk input.
 
   (* 1.0 : skip the phis *)
-  rewrite denote_no_phis.
+  rewrite denote_no_phis_eq_itree.
   bstep.
   show_iter_body.
 
@@ -893,12 +751,12 @@ Proof.
       repeat refold_ocfg.
       replace (ConvertTyp_list [] body) with (conv body) by reflexivity.
 
-      (* TODO explain the proof *)
       (* 2.1 - Use denote_ocfg_prefix and prove the hypothesis *)
+      (* TODO find a more elegant way to express this hypothesis *)
       pose proof ( H_APP :=
-              denote_ocfg_prefix
+              denote_ocfg_prefix_eq_itree
                  (conv [blk]) (conv body) (conv [blk0])
-                 (conv ([blk] ++ body ++ [blk0]))
+                 (bks := (conv ([blk] ++ body ++ [blk0])))
                  input inB).
       match goal with
       | h:context[?x = ?y -> _ -> _] |- _=>
@@ -919,23 +777,27 @@ Proof.
              ; assumption).
       clear H_APP.
 
+      unfold denote_cfg in POSTCOND_BODY ;
+      specialize (POSTCOND_BODY input)
+      ; rewrite has_post_post_strong in POSTCOND_BODY.
 
       (* 2.2 - Since InB is in body, denote only the body *)
       rewrite HeqConv.
       ebind ; econstructor.
-      unfold denote_cfg in POSTCOND_BODY ;
-      specialize (POSTCOND_BODY input)
-      ; rewrite has_post_post_strong in POSTCOND_BODY.
+      (* Both body are related by POSTCOND_BODY *)
       apply POSTCOND_BODY.
       intros ; simpl.
       destruct H as [-> [bfrom ->]].
+      (* 2.3 - In the lefy side, jump into the block [outB] *)
       bstep.
       rewrite Util.list_cons_app.
       unfold denote_ocfg.
       unfold_iter_cat.
       rewrite unfold_iter at 1.
       rewrite (convert_typ_list_app _ (body++_)), (convert_typ_list_app body _).
-      assert (
+
+      (* Find the block [outB] *)
+      assert ( HoutB :
             find_block (conv [blk] ++ conv body ++ conv [blk0]) outB
             = Some (conv blk0)
          ).
@@ -953,8 +815,10 @@ Proof.
          now unhide_blk outB.
          now unhide_blk outB ; simpl ; compute_eqv_dec.
       }
-      setoid_rewrite H.
-      clear H WF_WHILE.
+      setoid_rewrite HoutB ; clear HoutB.
+      clear WF_WHILE.
+
+      (* 2.4 - denote the block outB, which is an empty *)
       unhide_blk outB.
       rewrite denote_void_block_conv.
       refold_ocfg.
@@ -974,6 +838,8 @@ Proof.
       ; unfold conv,ConvertTyp_list
       ; now simpl)
       end.
+      (* 2.5 - In the left side, jump into the block [input] :
+         use the co-inductive hypothesis *)
       etau.
 
     + (* 3: the condition is false - jump in output *)
@@ -1003,3 +869,4 @@ Proof.
       setoid_rewrite Hfind.
       simpl ; bstep. eret.
 Qed.
+End CFGC_DenotationCombinators.

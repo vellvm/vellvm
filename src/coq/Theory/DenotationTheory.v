@@ -64,14 +64,19 @@ End DenoteTactics.
 Import DenoteTactics.
 
 (** [denote_code] *)
-
-Lemma denote_code_nil :
-  ⟦ [] ⟧c ≈ Ret tt.
+Lemma denote_code_nil_eq_itree :
+  ⟦ [] ⟧c ≅ Ret tt.
 Proof.
   intros.
   cbn.
   go.
   reflexivity.
+Qed.
+
+Lemma denote_code_nil :
+  ⟦ [] ⟧c ≈ Ret tt.
+Proof.
+  now rewrite denote_code_nil_eq_itree.
 Qed.
 
 Lemma denote_code_app :
@@ -156,14 +161,20 @@ Proof.
   rewrite assoc_tl; auto; reflexivity.
 Qed.
 
-Lemma denote_no_phis : forall x,
-    ⟦ [] ⟧Φs x ≈ Ret tt.
+Lemma denote_no_phis_eq_itree : forall x,
+    ⟦ [] ⟧Φs x ≅ Ret tt.
 Proof.
   intros.
   cbn. go.
   cbn; go.
   unfold denote_phis; cbn.
   reflexivity.
+Qed.
+
+Lemma denote_no_phis : forall x,
+    ⟦ [] ⟧Φs x ≈ Ret tt.
+Proof.
+  now intros ; rewrite denote_no_phis_eq_itree.
 Qed.
 
 (** [denote_block] *)
@@ -177,6 +188,16 @@ Lemma denote_block_unfold_cont :
 Proof.
   intros; cbn; repeat setoid_rewrite bind_bind.
   reflexivity.
+Qed.
+
+Lemma denote_block_unfold_eq_itree :
+  forall id phis c t s origin,
+    ⟦ mk_block id phis c t s ⟧b origin ≅
+    ⟦ phis ⟧Φs origin;;
+    ⟦ c ⟧c;;
+    translate exp_to_instr ⟦ t ⟧t.
+Proof.
+  intros; cbn; reflexivity.
 Qed.
 
 Lemma denote_block_unfold :
@@ -605,6 +626,49 @@ Proof.
     rewrite bind_ret_l.
     reflexivity.
 Qed.
+
+Require Import Paco.paco.
+Lemma denote_ocfg_prefix_eq_itree :
+  forall prefix bks' postfix bks (from to: block_id),
+    bks = (prefix ++ bks' ++ postfix) ->
+    wf_ocfg_bid bks ->
+    ⟦ bks ⟧bs (from, to) ≅
+           x <- ⟦ bks' ⟧bs (from, to);;
+    match x with
+    | inl ft => (⟦ bks ⟧bs ft)
+    | inr v => Ret (inr v)
+    end.
+Proof.
+  intros * -> ; revert from to.
+  ginit.
+  gcofix CIH.
+  intros * WF.
+  destruct (find_block bks' to) as [bk |] eqn:EQ.
+  - cbn.
+    setoid_rewrite KTreeFacts.unfold_iter_ktree ; cbn.
+    rewrite !bind_bind.
+    assert (find_block (prefix ++ bks' ++ postfix) to = Some bk).
+    {
+       erewrite find_block_app_r_wf; eauto.
+       erewrite find_block_app_l_wf; eauto.
+       eapply wf_ocfg_bid_app_r; eauto.
+    }
+    do 2 match_rewrite.
+    repeat (setoid_rewrite bind_bind).
+    guclo eqit_clo_bind ; econstructor ; [reflexivity | intros [] ? <-].
+    + rewrite !bind_ret_l.
+      rewrite bind_tau.
+      gstep ; apply EqTau.
+      gbase.
+      apply CIH.
+      assumption.
+    + rewrite !bind_ret_l.
+      gstep.
+      now apply EqRet.
+  - rewrite (denote_ocfg_unfold_not_in_eq_itree bks'); auto.
+    rewrite bind_ret_l.
+    gstep.
+    apply Reflexive_eqit__eq.
+    apply Reflexive_eqit_gen_eq.
+Qed.
 Transparent denote_block.
-
-

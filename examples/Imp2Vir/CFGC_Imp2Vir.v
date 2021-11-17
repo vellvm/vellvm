@@ -1,8 +1,10 @@
 From Coq Require Import
      Lists.List
      Strings.String
+     FSets.FMapList
+     Structures.OrderedTypeEx
      ZArith.
-Import ListNotations.
+Module Import StringMap := Coq.FSets.FMapList.Make(String_as_OT).
 
 From ExtLib Require Import
      Structures.Monads
@@ -12,23 +14,21 @@ Import MonadNotation.
 From Vellvm Require Import
      Syntax
      SurfaceSyntax .
-Import VIR_Notations.
 
 From Imp2Vir Require Import Imp CFGC_Combinators.
 
 
-(* Section Imp2Vir. *)
-
-(** Compiler IMP *)
+Import ListNotations.
+Import VIR_Notations.
 Notation ocfg := (ocfg typ).
 
+Section FreshnessMonad.
 
 (* Variable (name : nat -> block_id). *)
 (* Hypothesis (nameInj_eq : forall n n', n = n' -> name n = name n' ). *)
 (* Hypothesis (nameInj_neq : forall n n', n <> n' -> name n <> name n' ). *)
 Definition mk_anon (n : nat) := Anon (Z.of_nat n).
 Definition name := mk_anon.
-
 
 
 (* Could be a fresh/state monad *)
@@ -71,48 +71,26 @@ Definition OptionT (m : Type -> Type) : Type -> Type :=
                end
   |}.
 
-From Coq Require Import
-     FSets.FMapList
-     Lists.List
-     Strings.String
-     Structures.OrderedTypeEx
-     ZArith.
-Import ListNotations.
-
-Module Import StringMap := Coq.FSets.FMapList.Make(String_as_OT).
-
-From ExtLib Require Import
-     Structures.Monads
-     Data.Monads.OptionMonad.
-Import MonadNotation.
+End FreshnessMonad.
 
 
 
 Section CompileExpr.
 
 Definition texp_i1 (reg : int) : texp typ :=
-  (TYPE_I 1, EXP_Ident (ID_Local (Anon reg)))
-.
+  (TYPE_I 1, EXP_Ident (ID_Local (Anon reg))) .
 
 Definition texp_i32 (reg : int) : texp typ :=
-  (TYPE_I 32, EXP_Ident (ID_Local (Anon reg)))
-.
+  (TYPE_I 32, EXP_Ident (ID_Local (Anon reg))) .
 
 Definition texp_ptr (addr : int) : texp typ :=
-  (TYPE_Pointer (TYPE_I 32), EXP_Ident (ID_Local (Anon addr)))
-.
+  (TYPE_Pointer (TYPE_I 32), EXP_Ident (ID_Local (Anon addr))) .
 
 Definition compile_binop (reg1 reg2 reg:int) (op: ibinop): code typ :=
   [(IId (Anon reg),
     INSTR_Op (OP_IBinop op (TYPE_I 32)
       (EXP_Ident (ID_Local (Anon reg1)))
       (EXP_Ident (ID_Local (Anon reg2)))))].
-
-(** Expressions are compiled straightforwardly.
-    The argument [next_reg] is the number of registers already introduced to compile
-    the expression, and is used for the name of the next one.
-    The result of the computation [compile_expr l e env] always ends up stored in [l].
- *)
 
 Fixpoint compile_expr (e: expr) (env: StringMap.t int):
   OptionT fresh (int * code typ) :=
@@ -184,6 +162,7 @@ Close Scope Z_scope.
 End CompileExpr.
 
 
+Section Imp2Vir.
 
 Fixpoint compile_imp (s : stmt) (env: StringMap.t int) :
   OptionT fresh ( (StringMap.t int) * ocfg * block_id * block_id) :=
@@ -235,6 +214,7 @@ Definition compile (s : stmt) :=
         fresh_init).
 
 
+Section Examples.
 (** Examples *)
 Definition fact_ir := (compile (Imp.fact "a" "b" 5)).
 Definition infinite_loop_ir := (compile (infinite_loop)).
@@ -249,11 +229,28 @@ Compute if_ir.
 Compute seq_ir.
 Compute nested_if_ir.
 Compute nested_if2_ir.
-
+End Examples.
 
 
 (** WF compiler *)
-From Vellvm Require Import Utils.Tactics.
+Section Theory.
+
+From Coq Require Import Lia.
+From ExtLib Require Import FMapAList.
+From Vellvm Require Import
+     Semantics
+     Theory
+     Utils.Tactics.
+
+From ITree Require Import
+     ITree
+     ITreeFacts.
+
+Import SemNotations.
+Import ITreeNotations.
+
+From Imp2Vir Require Import CFGC_DenotationsCombinators.
+
 
 Theorem wf_compiler_aux : forall s env σ σ' input output cfg nenv ,
   (compile_imp s env) σ =
@@ -292,22 +289,7 @@ Proof.
 Admitted.
 
 
-
 (** Correctness compiler *)
-
-From Coq Require Import Lia.
-From ExtLib Require Import FMapAList.
-From Vellvm Require Import
-     Semantics
-     Theory.
-Import SemNotations.
-
-From ITree Require Import
-     ITree
-     ITreeFacts.
-Import ITreeNotations.
-
-From Imp2Vir Require Import CFGC_DenotationsCombinators.
 
 (* Relation between Imp env and vellvm env *)
 
@@ -398,6 +380,6 @@ Proof.
         exists addr; intuition.
         exists val; intuition.
 Admitted.
+End Theory.
 
-
-(* End Imp2Vir. *)
+End Imp2Vir.
