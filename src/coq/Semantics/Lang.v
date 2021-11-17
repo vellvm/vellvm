@@ -14,7 +14,6 @@ From Vellvm Require Import
      Handlers.Stack
      Handlers.Intrinsics
      Handlers.Pick
-     Handlers.UndefinedBehaviour
      Handlers.FiniteMemory
      Handlers.FiniteMemoryTheory.
 
@@ -50,7 +49,7 @@ Module Type Lang (LP: LLVMParams).
   Module D := Denotation LP Events MP SP.
 
   Export Events Events.DV Global Local Stack Pick Intrinsics
-         MEM MEMORY_THEORY UndefinedBehaviour SP.SER D.
+         MEM MEMORY_THEORY SP.SER D.
 End Lang.
 
 Module Make (LP : LLVMParams) <: Lang LP.

@@ -23,7 +23,6 @@ From Vellvm.Handlers Require Export
      FiniteMemory
      FiniteMemoryTheory
      Pick
-     UndefinedBehaviour
      OOM
      Serialization.
 

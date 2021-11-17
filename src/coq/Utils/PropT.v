@@ -443,6 +443,65 @@ Section PropMonad.
       + eapply IHeq. reflexivity. reflexivity.   punfold HS.
   Qed.
 
+    Lemma interp_prop_refl_h :
+      forall {T E} (RR : relation T) `{REF: Reflexive _ RR} (t1 t2 : itree E T) (h : forall X : Type, E X -> PropT E X),
+      (forall {X : Type} (e : E X), h X e (trigger e)) ->
+      t1 ≈ t2 ->
+      interp_prop h _ RR t1 t2.
+    Proof.
+      intros T E RR REF t1 t2 h H.
+      generalize dependent t2.
+      generalize dependent t1.
+      pcofix CIH.
+      intros t1 t2 EQ.
+      pose proof (itree_eta t1).
+      destruct (observe t1) eqn:Ht1.
+      - pstep.
+        red.
+        rewrite Ht1.
+        econstructor.
+        reflexivity.
+        rewrite <- EQ.
+        rewrite H0.
+        reflexivity.
+      - pstep.
+        red.
+        rewrite Ht1.
+        econstructor.
+        right.
+        apply CIH.
+        rewrite <- tau_eutt.
+        rewrite <- H0.
+        auto.
+      - pstep.
+        red.
+        rewrite Ht1.
+        econstructor.
+        apply H.
+        2: {
+          intros a RET.
+          right.
+          apply CIH.
+          reflexivity.
+        }
+
+        setoid_rewrite bind_trigger.
+        rewrite <- EQ.
+        rewrite H0.
+
+        reflexivity.
+    Qed.
+      
+    Lemma interp_prop_refl :
+      forall {T E} (RR : relation T) `{REF: Reflexive _ RR} (t : itree E T) (h : forall X : Type, E X -> PropT E X),
+      (forall {X : Type} (e : E X), h X e (trigger e)) ->
+      interp_prop h _ RR t t.
+    Proof.
+      intros T E RR REF t h h_spec.
+      apply interp_prop_refl_h; eauto.
+      reflexivity.
+    Qed.
+
   (* Lemma 5.4: interp_prop_correct - note that the paper presents a slightly simpler formulation where t = t' *)
   Lemma interp_prop_correct_exec:
     forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),

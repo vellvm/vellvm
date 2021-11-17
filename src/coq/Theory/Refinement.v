@@ -47,13 +47,13 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Definition uvalue_eq (uv1 uv2 : uvalue) : Prop
     := refine_uvalue uv1 uv2 /\ refine_uvalue uv2 uv1.
 
-  Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
+  Global Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
   Proof.
     repeat intro.
     destruct x; (apply RefineConcrete; solve [auto]).
   Qed.
 
-  Instance uvalue_eq_Reflexive : Reflexive uvalue_eq.
+  Global Instance uvalue_eq_Reflexive : Reflexive uvalue_eq.
   Proof.
     repeat intro.
     split; reflexivity.
@@ -70,7 +70,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     - inversion REF; subst.
   Admitted.
 
-  Instance refine_uvalue_Transitive : Transitive refine_uvalue.
+  Global Instance refine_uvalue_Transitive : Transitive refine_uvalue.
   Proof.
     repeat intro.
     inversion H; subst.
@@ -90,19 +90,19 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         auto.
   Qed.
 
-  Instance uvalue_eq_Transitive : Transitive uvalue_eq.
+  Global Instance uvalue_eq_Transitive : Transitive uvalue_eq.
   Proof.
     intros x y z [Rxy Ryx] [Ryz Rzy].
     split; etransitivity; eauto.
   Qed.
 
-  Instance uvalue_eq_Symmetric : Symmetric uvalue_eq.
+  Global Instance uvalue_eq_Symmetric : Symmetric uvalue_eq.
   Proof.
     intros x y [Rxy Ryx].
     split; auto.
   Qed.
 
-  Instance uvalue_eq_Equivalence : Equivalence uvalue_eq.
+  Global Instance uvalue_eq_Equivalence : Equivalence uvalue_eq.
   Proof.
     split.
     - apply uvalue_eq_Reflexive.
@@ -113,6 +113,12 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Infix"×" := prod_rel (at level 90, left associativity).
 
   Definition TT {A} : relation A := fun _ _ => True.
+
+  Global Instance TT_Reflexive {A} : Reflexive (@TT A).
+  Proof.
+    intro.
+    reflexivity.
+  Qed.
 
   (* Lemma 5.7 - uses this definition of refinement 
    note that refine_uvalue is the basic Uvalue refinement given by Definition 5.6 *)

@@ -193,20 +193,14 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       exists t1; split; auto.
     Qed.
 
-    Lemma eutt_refine_oom_h :
-      forall {T} {E F} (RR : relation T) (t1 t2 : itree (E +' OOME +' F) T),
-        eutt RR t1 t2 ->
-        refine_OOM_h RR t1 t2.
-    Proof.
-    Admitted.
-
     Lemma refine_56 : forall Pt1 Pt2,
         refine_L5 Pt1 Pt2 -> refine_L6 Pt1 Pt2.
     Proof.
       intros Pt1 Pt2 HR t2 HM.
       apply HR in HM as (t1 & HPt1 & [UB | HPT1]);
         exists t1; split; auto;
-        right; apply eutt_refine_oom_h; auto.
+        right; apply eutt_refine_oom_h; auto;
+        typeclasses eauto.
     Qed.
 
     Hint Resolve refine_12 refine_23 refine_34 refine_45 refine_56 : refine_xx.
@@ -383,7 +377,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       split.
       - apply refine_undef. auto.
       - right.
-        apply eutt_refine_oom_h.
+        apply eutt_refine_oom_h; try typeclasses eauto.
         reflexivity.
     Qed.
 

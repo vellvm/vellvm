@@ -1,7 +1,9 @@
 (* begin hide *)
 From Coq Require Import
      Relations
-     String.
+     String
+     RelationClasses
+     Morphisms.
 
 From ExtLib Require Import
      Structures.Monads.
@@ -45,8 +47,8 @@ Section PARAMS_MODEL.
   Definition OOM_handler : OOME ~> PropT Effout
     := fun T oome source => True.
 
-  Definition refine_OOM_handler : Effout ~> PropT Effout
-    := case_ E_trigger_model_prop (case_ OOM_handler F_trigger_model_prop).
+  Definition refine_OOM_handler {E} `{OOME -< E} : E ~> PropT E
+    := fun T e => fun t => t = trigger e.
 
   Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Prop
     := interp_prop refine_OOM_handler _ (Basics.flip RR) target source.
@@ -79,3 +81,24 @@ Section PARAMS_INTERP.
     interp ITree.trigger.
 
 End PARAMS_INTERP.
+
+Lemma eutt_refine_oom_h :
+  forall {T} {E F} (RR : relation T) `{REF: Reflexive _ RR} `{TRANS : Transitive _ RR}
+    (t1 t2 : itree (E +' OOME +' F) T),
+    eutt RR t1 t2 ->
+    refine_OOM_h RR t1 t2.
+Proof.
+  intros T E F RR REF TRANS t1 t2 H.
+  apply eutt_flip in H.
+  unfold refine_OOM_h.
+  cbn.
+
+  pose proof interp_prop_Proper_eq.
+  unfold Proper, respectful in H0.
+
+  eapply H0; eauto.
+
+  apply interp_prop_refl; eauto.
+  unfold refine_OOM_handler.
+  reflexivity.
+Qed.
