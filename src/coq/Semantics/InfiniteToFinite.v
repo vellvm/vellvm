@@ -15,6 +15,7 @@ From Vellvm Require Import
      Semantics.TopLevel
      Semantics.DynamicValues
      Semantics.LLVMParams
+     Theory.TopLevelRefinements
      Utils.Error
      Utils.Monads
      Utils.PropT
@@ -182,6 +183,46 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
 
   Require Import String.
 
+  Definition L4_convert : Handler E1.L4 E2.L4.
+  Proof.
+    refine (fun A e => _).
+
+    refine (match e with
+            | inl1 (E1.ExternalCall dt f args) =>
+                _
+            | inr1 (inl1 e0) =>
+                raise_oom ""
+            | inr1 (inr1 (inl1 e0)) =>
+                _ (* UBE *)
+            | inr1 (inr1 (inr1 (inl1 e0))) =>
+                _ (* DebugE *)
+            | inr1 (inr1 (inr1 (inr1 e0))) =>
+                _ (* FailureE *)
+            end).
+
+    (* External Calls *)
+    refine (f' <- lift_OOM (uvalue_convert f);;
+            args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+            dv <- trigger (E2.ExternalCall dt f' args');;
+            _).
+
+    inversion e0.
+    apply (lift_OOM (DVCrev.dvalue_convert dv)).
+
+    (* UBE *)
+    inversion e0.
+    apply (raise_ub "").
+
+    (* DebugE *)
+    inversion e0.
+    apply (debug H).
+
+    (* FailureE *)
+    inversion e0.
+    unfold FailureE in e0.
+    apply (raise_error "").
+  Defined.
+
   Definition L5_convert : Handler E1.L5 E2.L5.
   Proof.
     refine (fun A e => _).
@@ -214,10 +255,44 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
     inversion e0.
     unfold FailureE in e0.
     apply (raise_error "").
-  Defined.  
+  Defined.
+
+  Definition L6_convert : Handler E1.L6 E2.L6.
+  Proof.
+    refine (fun A e => _).
+
+    refine (match e with
+            | inl1 (E1.ExternalCall dt f args) =>
+                _
+            | inr1 (inl1 e0) =>
+                raise_oom ""
+            | inr1 (inr1 (inl1 e0)) =>
+                _
+            | inr1 (inr1 (inr1 e0)) =>
+                _
+            end).
+
+    (* External Calls *)
+    refine (f' <- lift_OOM (uvalue_convert f);;
+            args' <- lift_OOM (map_monad_In args (fun elt Hin => dvalue_convert elt));;
+            dv <- trigger (E2.ExternalCall dt f' args');;
+            _).
+
+    inversion e0.
+    apply (lift_OOM (DVCrev.dvalue_convert dv)).
+
+    (* DebugE *)
+    inversion e0.
+    apply (debug H).
+
+    (* FailureE *)
+    inversion e0.
+    unfold FailureE in e0.
+    apply (raise_error "").
+  Defined.
 End EventConvert.
 
-Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2).
+Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2).
   Module E1 := IS1.LLVM.Events.
   Module E2 := IS2.LLVM.Events.
 
@@ -225,12 +300,22 @@ Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
   Import EC.
 
   (* TODO: move this? *)
+  Definition L4_convert_tree {T} (t : itree E1.L4 T) : itree E2.L4 T := interp L4_convert t.
   Definition L5_convert_tree {T} (t : itree E1.L5 T) : itree E2.L5 T := interp L5_convert t.
+  Definition L6_convert_tree {T} (t : itree E1.L6 T) : itree E2.L6 T := interp L6_convert t.
 
-  (*
-  Definition refine_oom {T} (RR : relation T) (source : itree E1.L5 T) (target : itree E2.L5 T) : Prop
-    := model_OOM_h RR (L5_convert_tree source) target.
-   *)
+  (* Relate trees at L4 with proper refinement relation... *)
+  Import LLVM2.
+  Import TLR.
+  Import TLR.R.
+
+  Definition L4_convert_PropT {T} (ts : PropT E1.L4 T) : PropT E2.L4 T
+    := fun t_e2 => exists t_e1,
+           ts t_e1 /\ t_e2 = L4_convert_tree t_e1.
+
+  Definition refine_E1E2_L6 (srcs : PropT E1.L4 res_L4) (tgts : PropT E2.L4 res_L4) : Prop
+    := refine_L6 (L4_convert_PropT srcs) tgts.
+
 
   From Coq Require Import RelationClasses.
 
