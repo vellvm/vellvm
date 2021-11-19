@@ -92,6 +92,24 @@ Proof.
   unfold Eqv.eqv,eqv_raw_id in n ; auto.
 Qed.
 
+Lemma eqv_dec_p_eq_true : forall {T} b b' (xT xF : T),
+    eq_bid b b' = true -> (if Eqv.eqv_dec_p b b' then xT else xF) = xT.
+Proof.
+  intros ; destruct (Eqv.eqv_dec_p b b') eqn:E.
+  - reflexivity.
+  - unfold Eqv.eqv,eqv_raw_id in n ; subst.
+    rewrite eqb_bid_eq in H. now apply n in H.
+Qed.
+
+Lemma eqv_dec_p_eq_false : forall {T} b b' (xT xF : T),
+    eq_bid b b' = false -> (if Eqv.eqv_dec_p b b' then xT else xF) = xF.
+Proof.
+   intros ; destruct (Eqv.eqv_dec_p b b') eqn:E.
+  - unfold Eqv.eqv,eqv_raw_id in e ; subst.
+    rewrite eqb_bid_neq in H. contradiction.
+  - reflexivity.
+Qed.
+
 (* Misc lemmas on list *)
 
 Lemma In_singleton : forall {A} (x y : A),
@@ -111,7 +129,27 @@ Proof.
   apply Coqlib.list_norepet_nil.
 Qed.
 
+Fixpoint remove (x : block_id) (l : list block_id) :=
+  match l with
+  | [] => []
+  | h::t => if (eq_bid x h) then remove x t else h::(remove x t)
+  end.
 
+Lemma remove_ListRemove :
+  forall b l, remove b l = List.remove Eqv.eqv_dec_p b l.
+Proof.
+  intros.
+  induction l ; try reflexivity.
+  simpl.
+  destruct (eq_bid b a) eqn:E ;
+  match goal with
+    | |- context[if (_ ?b1 ?b2) then ?xT else ?xF] =>
+        try apply (eqv_dec_p_eq_true b1 b2 xT xF) in E
+        ; try apply (eqv_dec_p_eq_false b1 b2 xT xF) in E
+  end ; setoid_rewrite E.
+  - assumption.
+  - now f_equal.
+Qed.
 
 
 (* Misc lemmas related to vellvm *)

@@ -26,4 +26,5 @@ CompileExpr.v
 CFGC_Utils.v
 CFGC_Combinators.v
 CFGC_DenotationsCombinators.v
+CFGC_Interface.v
 CFGC_Imp2Vir.v

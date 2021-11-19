@@ -15,7 +15,7 @@ From Vellvm Require Import
      Syntax
      SurfaceSyntax .
 
-From Imp2Vir Require Import Imp CFGC_Combinators.
+From Imp2Vir Require Import Imp CFGC_Combinators CFGC_Interface.
 
 
 Import ListNotations.
@@ -23,38 +23,6 @@ Import VIR_Notations.
 Notation ocfg := (ocfg typ).
 
 Section FreshnessMonad.
-
-(* Variable (name : nat -> block_id). *)
-(* Hypothesis (nameInj_eq : forall n n', n = n' -> name n = name n' ). *)
-(* Hypothesis (nameInj_neq : forall n n', n <> n' -> name n <> name n' ). *)
-Definition mk_anon (n : nat) := Anon (Z.of_nat n).
-Definition name := mk_anon.
-
-
-(* Could be a fresh/state monad *)
-Record FST :=
-  mk_FST
-    {
-      counter_bid : nat ;
-      counter_reg : int ;
-    }.
-
-Definition fresh_init : FST := mk_FST 0 0%Z.
-
-Definition fresh : Type -> Type := fun X => FST -> (FST * X).
-
-#[global] Instance freshM : Monad fresh :=
- {|
-   ret := fun _ x s => (s,x);
-   bind := fun _ _ c k s => let '(s',x) := c s in k x s'
- |}.
-
-Definition freshLabel : fresh block_id :=
-  fun '(mk_FST bid reg) => (mk_FST (S bid) reg , name bid).
-
-Definition freshReg : fresh int :=
-  fun '(mk_FST bid reg) => (mk_FST bid (reg+1) , reg).
-
 
 (* TODO it is probable already defined somewhere in Vellvm *)
 Definition OptionT (m : Type -> Type) : Type -> Type :=
@@ -72,8 +40,6 @@ Definition OptionT (m : Type -> Type) : Type -> Type :=
   |}.
 
 End FreshnessMonad.
-
-
 
 Section CompileExpr.
 
@@ -96,7 +62,7 @@ Fixpoint compile_expr (e: expr) (env: StringMap.t int):
   OptionT fresh (int * code typ) :=
   match e with
   | Var x =>
-      (match (find x env) with
+      (match (StringMap.find x env) with
        | None => ret (None)
        | Some addr =>
            next_reg <- freshReg ;;
@@ -132,7 +98,7 @@ Open Scope Z_scope.
 Definition compile_assign (x: Imp.var) (e: expr) (env : StringMap.t int)
   : OptionT fresh ((StringMap.t int) * code typ) :=
   '(expr_reg, ir) <- compile_expr e env ;;
-  match (find x env) with
+  match (StringMap.find x env) with
   | Some id =>
       reg <- freshReg ;;
       ret (Some
@@ -143,7 +109,7 @@ Definition compile_assign (x: Imp.var) (e: expr) (env : StringMap.t int)
       reg1 <- freshReg ;;
       reg2 <- freshReg ;;
       ret (Some
-             (add x reg1 env,
+             (StringMap.add x reg1 env,
                ir ++ [(IId (Anon reg1), INSTR_Alloca (TYPE_I 32) None None)] ++
                   [(IVoid reg2, INSTR_Store false (texp_i32 expr_reg) (texp_ptr reg1) None)]
           ))
@@ -164,52 +130,53 @@ End CompileExpr.
 
 Section Imp2Vir.
 
+Definition default_bid := Anon 0.
+
 Fixpoint compile_imp (s : stmt) (env: StringMap.t int) :
-  OptionT fresh ( (StringMap.t int) * ocfg * block_id * block_id) :=
+  OptionT fresh ( (StringMap.t int) * dcfg ) :=
   match s with
   | Skip =>
-      (input <- freshLabel ;;
-       output <- freshLabel ;;
-       let g := cfg_block [] input output in
-       ret (Some (env, g, input, output)))
+      dg <- mk_block [] ;;
+      ret (Some (env, dg))
   | Assign x e =>
       ('(env, c) <- compile_assign x e env ;;
-       input <- freshLabel ;;
-       output <- freshLabel ;;
-       let g := cfg_block c input output in
-       ret (Some (env, g, input, output)))
+       dg <- mk_block c ;;
+       ret (Some (env, dg)))
   | Seq l r =>
-      ( '(env1, g1, in1, out1) <- compile_imp l env;;
-        '(env2, g2, in2, out2) <- compile_imp r env1;;
-        ret (env2, (cfg_seq g1 g2 out1 in2), in1, out2))
+      ( '(env1, dg1) <- compile_imp l env;;
+        '(env2, dg2) <- compile_imp r env1;;
+        let out1 := List.hd default_bid (fst (outs dg1)) in
+        let in2 := List.hd default_bid (fst (ins dg2)) in
+        'g <- mk_seq dg1 dg2 out1 in2 ;;
+        ret (Some (env2, g)))
   | If e l r =>
       ('(cond_reg, env, expr_code) <- compile_cond e env ;;
        reg <- freshReg ;;
-       '(env1, gT, inT, outT) <- compile_imp l env;;
-       '(env2, gF, inF, outF) <- compile_imp r env1;;
-       input <- freshLabel ;;
-       input_body <- freshLabel ;;
-       out_code <- freshLabel ;;
-       output <- freshLabel ;;
-       let g_code := cfg_block expr_code input out_code in
-       let g_body := cfg_branch (texp_i1 cond_reg) gT gF input_body inT inF in
-       let g_body := cfg_join g_body output outT outF in
-       let g := cfg_seq g_code g_body out_code input_body in
-       ret (Some (env2, g, input, output)))
+       '(env1, dgT) <- compile_imp l env;;
+       '(env2, dgF) <- compile_imp r env1;;
+       dgCond <- mk_block expr_code ;;
+       let inT := List.hd default_bid (fst (ins dgT)) in
+       let inF := List.hd default_bid (fst (ins dgF)) in
+       dgBody <- mk_branch (texp_i1 cond_reg) dgT dgF inT inF ;;
+       let outT := List.hd default_bid (fst (outs dgT)) in
+       let outF := List.hd default_bid (fst (outs dgF)) in
+       dgBody <- mk_join dgBody outT outF ;;
+       let inCond := List.hd default_bid (fst (ins dgCond)) in
+       let outBody := List.hd default_bid (fst (outs dgBody)) in
+       dg <- mk_seq dgCond dgBody inCond outBody ;;
+       ret (Some (env2, dg)))
   | While e b =>
       ('(cond_reg, env, expr_code) <- compile_cond e env ;;
-       '(env1, gB, inB, outB) <- compile_imp b env ;;
-       input <- freshLabel ;;
-       out0 <- freshLabel ;;
-       output <- freshLabel ;;
-       let g := cfg_while_loop expr_code (texp_i1 cond_reg) gB input inB output outB in
-       ret (Some (env1, g, input, output))
-      )
+       '(env1, dgB) <- compile_imp b env ;;
+       let inB := List.hd default_bid (fst (ins dgB)) in
+       let outB := List.hd default_bid (fst (outs dgB)) in
+       'dg <- mk_while expr_code (texp_i1 cond_reg) dgB inB outB ;;
+       ret (Some (env1, dg)))
   end.
 
 Definition compile (s : stmt) :=
   snd (
-      ('( _, g, _, _) <- compile_imp s (StringMap.empty int);;
+      ('( _, (make_dcfg g _ _)) <- compile_imp s (StringMap.empty int);;
        (ret g))
         fresh_init).
 
@@ -251,42 +218,31 @@ Import ITreeNotations.
 
 From Imp2Vir Require Import CFGC_DenotationsCombinators.
 
-
-Theorem wf_compiler_aux : forall s env σ σ' input output cfg nenv ,
+(* TODO: wf_dcfg instead of wf_ocfg_bid and
+          improve wf_dcfg such that it contains
+          wf_ocfg_bid. *)
+Theorem wf_compiler_aux : forall s env σ σ' cfg nenv ,
   (compile_imp s env) σ =
-      (σ', Some (nenv, cfg, input, output)) -> wf_ocfg_bid cfg.
+      (σ', Some (nenv, cfg)) -> wf_ocfg_bid (graph cfg).
 Proof.
   intros s.
   induction s ; intros.
   - (* Assign *)
-  cbn in H.
-  repeat flatten_all ;
-  inv H ; inv Heq ; inv Heq4 ;
-  apply wf_bid_cfg_block.
+    cbn in H.
+    repeat flatten_all ;
+    inv H ; inv Heq; inv Heq2 ;
+    apply wf_bid_cfg_block.
   - (* Seq *)
-    cbn in H; repeat flatten_all ; try discriminate ; inv H.
-    apply IHs1 in Heq.
-    apply IHs2 in Heq4.
-    apply wf_bid_cfg_seq ; try assumption.
-    admit. admit. admit. (* I need an invariant on the compiler *)
+    admit.
   - (* If *)
-    simpl in H. repeat (flatten_hyp H) ; try discriminate.
-    inv H.
-    apply wf_bid_cfg_seq ; try assumption.
-    admit. 2 :{ admit. } 2 :{ admit. } 2 :{ admit. }
-    apply wf_bid_cfg_join ; try assumption.
-    admit. admit. admit. (* I need an invariant on the compiler *)
-    apply IHs1 in Heq4. apply IHs2 in Heq9.
-    apply wf_bid_cfg_branch ; try assumption.
-    admit. admit. admit. (* I need an invariant on the compiler *)
+    admit.
   - (* While *)
-    simpl in H; repeat flatten_all ; try discriminate ; inv H.
-    apply IHs in Heq3.
-    apply wf_bid_cfg_while_loop ; try assumption.
-    admit. admit. admit. (* I need an invariant on the compiler *)
+    admit. (* I need an invariant on the compiler *)
   - (* Skip *)
-    cbn in H ; inv H ; repeat flatten_all ; inv H1 ; apply wf_bid_cfg_block.
+    cbn in H ; inv H ; repeat flatten_all ; inv H1.
+    inv Heq ; apply wf_bid_cfg_block.
 Admitted.
+
 
 
 (** Correctness compiler *)
@@ -309,17 +265,17 @@ Definition Rimpvir
   Rmem vmap (fst env1) (fst (snd env2)) (fst env2).
 
 Theorem compile_correct : forall (σ : FST) env (p : stmt) (σ' : FST)
-                            env' (o : ocfg) (input output : block_id)
+                            env' (o : dcfg) (input output : block_id)
                             mem from to genv lenv vmem,
 
   (* The environments of Imp and Vir are related *)
   Rmem env mem lenv vmem ->
   (* The compilation of p with env produce a new env' and an ir *)
   (compile_imp p env) σ =
-      (σ', Some (env', o, input, output))  ->
+      (σ', Some (env', o))  ->
   eutt (Rimpvir env')
        (interp_imp (denote_imp p) mem)
-       (interp_cfg3 (denote_cfg o from to) genv lenv vmem).
+       (interp_cfg3 (denote_cfg (graph o) from to) genv lenv vmem).
 Proof.
   intros.
   induction p.
@@ -329,27 +285,11 @@ Proof.
     inv H0.
     assert ( I_to : to = input ) by admit. (* I need to introduce an invariant here *)
     rewrite I_to ; clear I_to.
-    rewrite denote_cfg_block.
-    2: {  admit. }
-    rewrite interp_imp_bind.
-    unfold compile_assign in Heq.
-    repeat (flatten_all).
-    inv Heq.
-    repeat (flatten_all).
-    inv H1.
-    simpl in *.
-    (* NOTE I probably need a theorem about compile_expr*)
-    (* setoid_rewrite interp_cfg3_ret. *)
-    admit.
-    admit.
     admit.
   - (* Seq *)
     simpl in *.
     repeat (flatten_all) ; try discriminate.
     inv H0.
-    rewrite denote_cfg_seq.
-    admit.
-    admit.
     admit.
   - (* If *) admit.
   - (* While *) admit.
@@ -360,25 +300,7 @@ Proof.
     assert ( I_to : to = input ) by admit.
     (* I probably need to introduce an invariant here *)
     rewrite I_to ; clear I_to.
-    rewrite denote_cfg_block.
-    2: { admit. }
-    rewrite interp_imp_ret.
-    rewrite denote_code_nil.
-    setoid_rewrite bind_ret_l.
-    simpl.
-    rewrite interp_cfg3_ret.
-    apply eutt_Ret.
-    constructor.
-      * intros.
-        simpl in H0. apply H,H0.
-      * intros.
-        destruct H0 as [reg [Hreg [ addr [Haddr [val [HValRead HValInt]]]]]].
-        simpl in *.
-        unfold Rmem in H.
-        apply H.
-        exists reg; intuition.
-        exists addr; intuition.
-        exists val; intuition.
+    admit.
 Admitted.
 End Theory.
 

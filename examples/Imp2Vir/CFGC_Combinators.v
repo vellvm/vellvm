@@ -185,40 +185,40 @@ Definition wf_block (c : code) (input output : block_id) : Prop :=
   input <> output.
 Definition wf_ret (c : code) (e : texp) (input : block_id) : Prop := True.
 Definition wf_seq (g1 g2 : ocfg) (out1 in2 : block_id) : Prop :=
-  wf_ocfg_bid g1 /\
-    wf_ocfg_bid g2 /\
-    no_duplicate_bid g1 g2 /\
-    no_reentrance g1 g2 /\
-    free_in_cfg g1 out1 /\ (* cfg_seq cannot create a new block with an existing ID *)
-    free_in_cfg g2 out1 /\ (* cfg_seq cannot create a new block with an existing ID *)
-    free_in_cfg g1 in2 /\ (* in2 should be an input of g2, not g1 *)
-    ~ In out1 (outputs g2) /\
-    out1 <> in2.
+  wf_ocfg_bid g1
+  /\ wf_ocfg_bid g2
+  /\ no_duplicate_bid g1 g2
+  /\ no_reentrance g1 g2
+  /\ free_in_cfg g1 out1 (* cfg_seq cannot create a new block with an existing ID *)
+  /\ free_in_cfg g2 out1 (* cfg_seq cannot create a new block with an existing ID *)
+  /\ free_in_cfg g1 in2 (* in2 should be an input of g2, not g1 *)
+  /\ ~ In out1 (outputs g2)
+  /\ out1 <> in2.
 
 Definition wf_join (body : ocfg) (output out1 out2 : block_id) : Prop :=
-  free_in_cfg body output /\
-    output <> out1 /\
-    output <> out2.
+  free_in_cfg body output
+  /\ output <> out1
+  /\ output <> out2.
 
 Definition wf_branch (cond : texp) (gT gF : ocfg) (input inT inF : block_id) : Prop :=
-  input <> inT /\
-    input <> inF /\
-    free_in_cfg gF inT /\
-    free_in_cfg gT inF /\
-    independent_flows gT gF /\
-    ~ In input (outputs gT) /\
-    ~ In input (outputs gF).
+  input <> inT
+  /\ input <> inF
+  /\ free_in_cfg gF inT
+  /\ free_in_cfg gT inF
+  /\ independent_flows gT gF
+  /\ ~ In input (outputs gT)
+  /\ ~ In input (outputs gF).
 
 Definition wf_while (expr_code : code) (cond : texp) (body : ocfg) (input inB output outB : block_id) : Prop :=
-  input <> output /\
-    input <> inB /\
-    input <> outB /\
-    output <> inB /\
-    output <> outB /\
-    free_in_cfg body input /\
-    free_in_cfg body output /\
-    free_in_cfg body outB /\
-    wf_ocfg_bid body /\
-    In inB (inputs body).
+  input <> output
+  /\ input <> inB
+  /\ input <> outB
+  /\ output <> inB
+  /\ output <> outB
+  /\ free_in_cfg body input
+  /\ free_in_cfg body output
+  /\ free_in_cfg body outB
+  /\ wf_ocfg_bid body
+  /\ In inB (inputs body).
 
 End CFG_Combinators.
