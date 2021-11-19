@@ -312,10 +312,9 @@ Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
   Definition L4_convert_PropT {T} (ts : PropT E1.L4 T) : PropT E2.L4 T
     := fun t_e2 => exists t_e1,
            ts t_e1 /\ t_e2 = L4_convert_tree t_e1.
-
+ 
   Definition refine_E1E2_L6 (srcs : PropT E1.L4 res_L4) (tgts : PropT E2.L4 res_L4) : Prop
     := refine_L6 (L4_convert_PropT srcs) tgts.
-
 
   From Coq Require Import RelationClasses.
 
