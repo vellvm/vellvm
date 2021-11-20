@@ -24,14 +24,14 @@ Notation ocfg := (ocfg typ).
 
 Record dcfg : Type :=
   make_dcfg { graph : ocfg ;
-    ins : (list block_id * nat) ;
-    outs : (list block_id * nat) }.
+    ins : list block_id ;
+    outs : list block_id }.
 
 Definition mk_dcfg g (ins outs : list block_id)
   : dcfg :=
   {| graph := g;
-    ins := (ins, List.length ins) ;
-    outs := (outs, List.length outs) |}.
+    ins := ins ;
+    outs := outs |}.
 
 Section FreshnessMonad.
 
@@ -39,13 +39,11 @@ Section FreshnessMonad.
   Definition name := mk_anon.
 
   Definition wf_inputs (g : dcfg) : Prop :=
-    snd (ins g) = List.length (fst (ins g))
-    /\ List.incl (fst (ins g)) (inputs (graph g)).
+    List.incl (ins g) (inputs (graph g)).
 
   Definition wf_outputs (g : dcfg) : Prop :=
-    snd (outs g) = List.length (fst (outs g))
-    /\ List.incl (fst (outs g)) (outputs (graph g))
-    /\ Coqlib.list_disjoint (fst (outs g)) (inputs (graph g)) .
+    List.incl (outs g) (outputs (graph g))
+    /\ Coqlib.list_disjoint (outs g) (inputs (graph g)) .
 
   Definition wf_graph (g : dcfg) : Prop :=
     wf_ocfg_bid (graph g).
@@ -70,11 +68,10 @@ Section FreshnessMonad.
       {
         counter_bid : nat ;
         counter_reg : int ;
-        g : dcfg
       }.
 
   Definition fresh_init : FST :=
-    mk_FST 0 0%Z empty_dcfg.
+    mk_FST 0 0%Z.
 
   Definition fresh : Type -> Type := fun X => FST -> (FST * X).
   #[global] Instance freshM : Monad fresh :=
@@ -84,14 +81,10 @@ Section FreshnessMonad.
     |}.
 
   Definition freshLabel : fresh block_id :=
-    fun '(mk_FST bid reg g) => (mk_FST (S bid) reg g , name bid).
+    fun '(mk_FST bid reg) => (mk_FST (S bid) reg, name bid).
 
   Definition freshReg : fresh int :=
-    fun '(mk_FST bid reg g) => (mk_FST bid (reg+1)%Z g, reg).
-
-  Definition setGraph g' : fresh unit :=
-    fun '(mk_FST bid reg g) => (mk_FST bid reg g', tt).
-
+    fun '(mk_FST bid reg) => (mk_FST bid (reg+1)%Z, reg).
 End FreshnessMonad.
 
 Section InterfaceCombinators.
@@ -112,8 +105,8 @@ Section InterfaceCombinators.
     ret (mk_dcfg g [input] []).
 
   Definition mk_seq (g1 g2 : dcfg) (out1 in2 : block_id) : fresh dcfg :=
-    let '(make_dcfg g1 (ins1, _) (outs1, _)) := g1 in
-    let '(make_dcfg g2 (ins2, _) (outs2, _)) := g2 in
+    let '(make_dcfg g1 ins1 outs1) := g1 in
+    let '(make_dcfg g2 ins2 outs2) := g2 in
     let g := cfg_seq g1 g2 out1 in2 in
     let ins := ins1++(remove in2 ins2) in
     let outs := (remove out1 outs1)++outs2 in
@@ -122,7 +115,7 @@ Section InterfaceCombinators.
 
   Definition mk_join (g0: dcfg) (out1 out2 : block_id) : fresh dcfg :=
     output <- freshLabel ;;
-    let '(make_dcfg g0 (ins0, _) (outs0, _)) := g0 in
+    let '(make_dcfg g0 ins0 outs0) := g0 in
     let g := cfg_join g0 output out1 out2 in
     let outs := (remove out1 outs0) in
     let outs := (remove out2 outs) in
@@ -133,8 +126,8 @@ Section InterfaceCombinators.
   Definition mk_branch (cond : texp) (gT gF : dcfg)
              (inT inF : block_id) : fresh dcfg :=
     input <- freshLabel ;;
-    let '(make_dcfg gT (insT, _) (outsT, _)) := gT in
-    let '(make_dcfg gF (insF, _) (outsF, _)) := gF in
+    let '(make_dcfg gT insT outsT) := gT in
+    let '(make_dcfg gF insF outsF) := gF in
     let g := cfg_branch cond gT gF input inT inF in
     let ins := [input]
                  ++ (remove inT insT)
@@ -148,7 +141,7 @@ Section InterfaceCombinators.
              (inB outB : block_id) : fresh dcfg :=
     input <- freshLabel ;;
     output <- freshLabel ;;
-    let '(make_dcfg gBody (insBody, _) (outsBody, _)) := gBody in
+    let '(make_dcfg gBody insBody outsBody) := gBody in
     let g := cfg_while_loop expr_code cond gBody input inB output outB in
     let ins := [input] ++ (remove inB insBody) in
     let outs := [output] ++ (remove outB outsBody) in
@@ -229,15 +222,12 @@ Proof.
   unfold wf_dcfg, wf_inputs, wf_outputs, mk_seq, wf_graph, wf_ocfg_bid.
   destruct σ ; cbn.
   unfold wf_dcfg, wf_inputs, wf_outputs, wf_graph, wf_ocfg_bid in WF_G1, WF_G2.
-  destruct WF_G1 as [[LEN_INS_G1 INPUTS_G1]
-                       [[LEN_OUT_G1 [OUTPUTS_G1 DISJOINTS_G1]] WF_BID_G1]].
-  destruct WF_G2 as [[LEN_INS_G2 INPUTS_G2]
-                       [[LEN_OUT_G2 [OUTPUTS_G2 DISJOINTS_G2]] WF_BID_G2]].
+  destruct WF_G1 as [INPUTS_G1 [[OUTPUTS_G1 DISJOINTS_G1] WF_BID_G1]].
+  destruct WF_G2 as [INPUTS_G2 [[OUTPUTS_G2 DISJOINTS_G2] WF_BID_G2]].
   unfold incl in *.
   simpl in *.
   intuition ;
     repeat flatten_all.
-  - inv Heq0. reflexivity.
   - unfold cfg_seq.
     simpl in *.
     break_list_goal.
@@ -249,7 +239,6 @@ Proof.
     + right ; right.
       apply INPUTS_G2.
       now in_list.
-  - inv Heq0. reflexivity.
   - unfold cfg_seq.
     simpl in *.
     break_list_goal.
@@ -299,13 +288,12 @@ Proof.
   unfold wf_dcfg, wf_inputs, wf_outputs, mk_seq, wf_graph, wf_ocfg_bid.
   destruct σ ; cbn.
   unfold wf_dcfg, wf_inputs, wf_outputs, wf_graph, wf_ocfg_bid in WF_G.
-  destruct WF_G as [[LEN_INS_G INPUTS_G]
-                       [[LEN_OUT_G [OUTPUTS_G DISJOINTS_G]] WF_BID_G]].
+  destruct WF_G as [INPUTS_G [[OUTPUTS_G DISJOINTS_G] WF_BID_G]].
   unfold incl in *.
   repeat flatten_all.
   simpl in *.
   intuition.
-  - inv Heq0.
+  - inv Heq.
     apply INPUTS_G in H.
     unfold cfg_join.
     break_list_goal.
@@ -316,7 +304,7 @@ Proof.
     simpl ; intuition.
   - unfold cfg_join.
     break_list_goal.
-    inv Heq1 ; clear H.
+    inv Heq ; clear H.
     left.
     apply OUTPUTS_G.
     repeat in_list.
@@ -357,10 +345,8 @@ Proof.
   unfold wf_dcfg, wf_inputs, wf_outputs, mk_seq, wf_graph, wf_ocfg_bid.
   destruct σ ; cbn.
   unfold wf_dcfg, wf_inputs, wf_outputs, wf_graph, wf_ocfg_bid in WF_GT, WF_GF.
-  destruct WF_GT as [[LEN_INS_GT INPUTS_GT]
-                       [[LEN_OUT_GT [OUTPUTS_GT DISJOINTS_GT]] WF_BID_GT]].
-  destruct WF_GF as [[LEN_INS_GF INPUTS_GF]
-                       [[LEN_OUT_GF [OUTPUTS_GF DISJOINTS_GF]] WF_BID_GF]].
+  destruct WF_GT as [INPUTS_GT [[OUTPUTS_GT DISJOINTS_GT] WF_BID_GT]].
+  destruct WF_GF as [INPUTS_GF [[OUTPUTS_GF DISJOINTS_GF] WF_BID_GF]].
   unfold incl in *.
   simpl in *.
   intuition ;
@@ -374,7 +360,7 @@ Proof.
     end
     ; [left ; apply INPUTS_GT | right ; apply INPUTS_GF]
     ; now in_list.
-  - inv Heq1 ; clear H0.
+  - inv Heq ; clear H0.
     break_list_goal.
     break_list_hyp.
     right.
@@ -408,13 +394,12 @@ Proof.
   unfold wf_dcfg, wf_inputs, wf_outputs, mk_seq, wf_graph, wf_ocfg_bid.
   destruct σ ; cbn.
   unfold wf_dcfg, wf_inputs, wf_outputs, wf_graph, wf_ocfg_bid in WF_G.
-  destruct WF_G as [[LEN_INS_G INPUTS_G]
-                       [[LEN_OUT_G [OUTPUTS_G DISJOINTS_G]] WF_BID_G]].
+  destruct WF_G as [INPUTS_G [[OUTPUTS_G DISJOINTS_G] WF_BID_G]].
   unfold incl in *.
   repeat flatten_all.
   simpl in *.
   intuition.
-  - inv Heq0.
+  - inv Heq.
     right.
     do 2 break_list_goal ; simpl.
     left.
@@ -424,7 +409,7 @@ Proof.
     clear.
     do 2 (break_list_goal ; simpl).
     left ; cbn ; intuition.
-  - inv Heq1.
+  - inv Heq.
     break_list_goal ; simpl.
     right.
     break_list_goal ; simpl.
