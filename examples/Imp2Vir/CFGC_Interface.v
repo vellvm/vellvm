@@ -22,45 +22,13 @@ Import ListNotations.
 Import VIR_Notations.
 Notation ocfg := (ocfg typ).
 
-Record dcfg : Type :=
-  make_dcfg { graph : ocfg ;
-    ins : list block_id ;
-    outs : list block_id }.
-
-Definition mk_dcfg g (ins outs : list block_id)
-  : dcfg :=
-  {| graph := g;
-    ins := ins ;
-    outs := outs |}.
-
 Section FreshnessMonad.
 
-  Definition mk_anon (n : nat) := Anon (Z.of_nat n).
   Definition name := mk_anon.
-
-  Definition wf_inputs (g : dcfg) : Prop :=
-    List.incl (ins g) (inputs (graph g)).
-
-  Definition wf_outputs (g : dcfg) : Prop :=
-    List.incl (outs g) (outputs (graph g))
-    /\ Coqlib.list_disjoint (outs g) (inputs (graph g)) .
-
-  Definition wf_graph (g : dcfg) : Prop :=
-    wf_ocfg_bid (graph g).
-
-  Definition wf_dcfg (g : dcfg) : Prop :=
-    wf_inputs g
-    /\ wf_outputs g
-    /\ wf_graph g .
-  
-  Definition empty_dcfg : dcfg := (mk_dcfg [] [] []).
-
-  Lemma empty_wf : wf_dcfg empty_dcfg.
+  Lemma neq_name : forall n1 n2, name n1 <> name n2 <-> n1 <> n2.
   Proof.
-    unfold empty_dcfg, wf_dcfg, wf_inputs, wf_outputs, wf_graph, wf_ocfg_bid.
-    intuition ; simpl.
-    apply Util.list_disjoint_nil_r.
-    apply Coqlib.list_norepet_nil.
+    intros.
+    unfold name. now apply neq_mk_anon.
   Qed.
 
   Record FST :=
@@ -85,12 +53,25 @@ Section FreshnessMonad.
 
   Definition freshReg : fresh int :=
     fun '(mk_FST bid reg) => (mk_FST bid (reg+1)%Z, reg).
+
 End FreshnessMonad.
+
 
 Section InterfaceCombinators.
 
   Notation code := (code typ).
   Notation texp := (texp typ).
+
+  Record dcfg : Type :=
+    make_dcfg { graph : ocfg ;
+                ins : list block_id ;
+                outs : list block_id }.
+
+  Definition mk_dcfg g (ins outs : list block_id)
+    : dcfg :=
+    {| graph := g;
+      ins := ins ;
+      outs := outs |}.
 
   Definition mk_block (c : code) : fresh dcfg :=
     input <- freshLabel ;;
@@ -150,24 +131,77 @@ Section InterfaceCombinators.
 
 End InterfaceCombinators.
 
+Section CFG_LANG.
+  Inductive cfg_lang : Type :=
+  | CBlock ( c : code typ )
+  | CSeq (g1 g2 : cfg_lang )
+  | CBranch (cond : texp typ) (gT gF : cfg_lang)
+  | CJoin (g0: cfg_lang)
+  | CWhile (exp_code : code typ) (cond : texp typ) (gB : cfg_lang) .
+
+  Definition default_bid := Anon 0%Z.
+
+  Fixpoint evaluate (cfg : cfg_lang) : fresh dcfg :=
+    match cfg with
+    | CBlock c =>
+        mk_block c
+    | CSeq g1 g2 =>
+        ( dg1 <- evaluate g1 ;;
+          dg2 <- evaluate g2 ;;
+          let out1 := List.hd default_bid (outs dg1) in
+          let in2 := List.hd default_bid (ins dg2) in
+          mk_seq dg1 dg2 out1 in2)
+    | CBranch cond gT gF =>
+        dgT <- evaluate gT ;;
+        dgF <- evaluate gF ;;
+        let inT := List.hd default_bid (ins dgT) in
+        let inF := List.hd default_bid (ins dgF) in
+        mk_branch cond dgT dgF inT inF
+    | CJoin g =>
+        dgB <- evaluate g ;;
+        let out1 := List.hd default_bid (outs dgB) in
+        let out2 := List.hd default_bid (List.tl (outs dgB)) in
+        mk_join dgB out1 out2
+    | CWhile expr_code cond gB =>
+        dgB <- evaluate gB ;;
+        let inB := List.hd default_bid (ins dgB) in
+        let outB := List.hd default_bid (outs dgB) in
+        mk_while expr_code cond dgB inB outB
+    end.
+
+End CFG_LANG.
+
+
 From Vellvm Require Import Utils.Tactics.
 
-Lemma neq_name : forall n1 n2, name n1 <> name n2 <-> n1 <> n2.
+From Coq Require Import Lia.
+Require Import Coqlib.
+Require Import Util.
+
+Definition independent_flows_dcfg g1 g2 :=
+  independent_flows (graph g1) (graph g2).
+
+Definition wf_inputs (g : dcfg) : Prop :=
+  List.incl (ins g) (inputs (graph g)).
+
+Definition wf_outputs (g : dcfg) : Prop :=
+  List.incl (outs g) (outputs (graph g))
+  /\ list_disjoint (outs g) (inputs (graph g)) .
+
+Definition wf_graph (g : dcfg) : Prop :=
+  wf_ocfg_bid (graph g).
+
+Definition wf_dcfg (g : dcfg) : Prop :=
+  wf_inputs g
+  /\ wf_outputs g
+  /\ wf_graph g .
+
+Lemma wf_dcfg_ocfg : forall dg, wf_dcfg dg -> wf_ocfg_bid (graph dg).
 Proof.
   intros.
-  unfold name, mk_anon.
-  split ; intro.
-  - intros ->. now destruct H.
-  - apply inj_neq in H.
-    unfold Zne in H.
-    intro.
-    injection H0.
-    intro.
-    rewrite H1 in H .
-    contradiction.
+  unfold wf_dcfg, wf_graph in H ; intuition.
 Qed.
 
-From Coq Require Import Lia.
 Lemma wf_mk_block : forall σ c, wf_dcfg (snd ((mk_block c) σ )).
 Proof.
   intros.
@@ -178,53 +212,26 @@ Proof.
   ; try reflexivity
   ; try (cbn in * ; assumption)
   ; try apply List_norepet_singleton.
-  apply Util.list_disjoint_singletons.
+  apply list_disjoint_singletons.
   rewrite neq_name. lia.
 Qed.
 
-Ltac break_list_hyp :=
-  match goal with
-    | h: List.In _ (_ ++ _) |- _ => repeat (apply in_app_or in h)
-  end.
-
-Ltac break_list_goal :=
-  try (rewrite Util.list_cons_app) ;
-  try (
-  match goal with
-  | |- context[inputs (_ ++ _)] =>
-      repeat (rewrite !ScopeTheory.inputs_app)
-  | |- context[outputs (_ ++ _)] =>
-      repeat (rewrite !ScopeTheory.outputs_app)
-  end ) ;
-  try (
-  match goal with
-  | |- context[List.In _ (_ ++ _)] => repeat (apply in_or_app)
-  end).
-
-Lemma in_remove : forall l x y, List.In x (remove y l) -> List.In x l.
-Proof. intros.
-       rewrite remove_ListRemove in H
-       ; apply in_remove in H.
-       intuition.
-Qed.
-
-Ltac in_list :=
-  match goal with
-  | h: List.In _ _  |- _ => apply in_remove in h
-  end.
-
 Lemma wf_mk_seq : forall σ g1 g2 out1 in2,
+    independent_flows_dcfg g1 g2 ->
+    (outs g1) ⊍ (outs g2) ->
+    List.In out1 (outs g1) ->
+    List.In in2 (ins g2) ->
     wf_dcfg g1 -> (* recursive use of the interface *)
     wf_dcfg g2 ->
     wf_dcfg (snd ((mk_seq g1 g2 out1 in2) σ )).
 Proof.
-  intros *  WF_G1 WF_G2.
+  intros *  FLOWS DISJOINTS_OUTPUTS OUT IN WF_G1 WF_G2.
   unfold wf_dcfg, wf_inputs, wf_outputs, mk_seq, wf_graph, wf_ocfg_bid.
   destruct σ ; cbn.
   unfold wf_dcfg, wf_inputs, wf_outputs, wf_graph, wf_ocfg_bid in WF_G1, WF_G2.
   destruct WF_G1 as [INPUTS_G1 [[OUTPUTS_G1 DISJOINTS_G1] WF_BID_G1]].
   destruct WF_G2 as [INPUTS_G2 [[OUTPUTS_G2 DISJOINTS_G2] WF_BID_G2]].
-  unfold incl in *.
+  unfold incl.
   simpl in *.
   intuition ;
     repeat flatten_all.
@@ -238,7 +245,7 @@ Proof.
     + left. now apply INPUTS_G1.
     + right ; right.
       apply INPUTS_G2.
-      now in_list.
+      now in_list_rem.
   - unfold cfg_seq.
     simpl in *.
     break_list_goal.
@@ -247,38 +254,71 @@ Proof.
     | h: List.In _ _ \/ List.In _ _ |- _ => destruct h
     end.
     + left. apply OUTPUTS_G1.
-      now in_list.
+      now in_list_rem.
     + right ; apply in_or_app ; right.
       now apply OUTPUTS_G2.
   - unfold cfg_seq.
     simpl in *.
     break_list_goal.
-    (* NOTE i'm stuck here, because I can't say anything about
-       for instance, the disjointness between l2 and (input graph0)
-     *)
-    admit.
+    apply list_disjoint_app_r.
+    split
+    ; [ apply list_disjoint_app_l
+      | apply list_disjoint_app_r
+        ; split
+        ; apply list_disjoint_app_l
+      ] ; try split ; try assumption.
+    + now apply remove_disjoint.
+    + simpl.
+      unfold independent_flows_dcfg in FLOWS
+      ; simpl in FLOWS
+      ; unfold independent_flows in FLOWS
+      ; unfold no_reentrance in FLOWS.
+      destruct FLOWS as [FLOWS  [_ _]].
+      eapply incl_disjoint ; try eassumption.
+    + apply remove_disjoint_remove ; simpl.
+      rewrite eq_bid_refl.
+      apply list_disjoint_nil_r.
+    + simpl.
+      unfold independent_flows_dcfg in FLOWS
+      ; simpl in FLOWS
+      ; unfold independent_flows in FLOWS
+      ; unfold no_reentrance in FLOWS.
+      apply list_disjoint_cons_r ; [apply list_disjoint_nil_r|].
+      eapply list_disjoint_notin ; eassumption.
+    + simpl.
+      unfold independent_flows_dcfg in FLOWS
+      ; simpl in FLOWS
+      ; unfold independent_flows in FLOWS
+      ; unfold no_reentrance in FLOWS.
+      apply remove_disjoint.
+      destruct FLOWS as [_ [FLOWS _]].
+      eapply incl_disjoint ; try eassumption.
   - unfold cfg_seq.
     simpl in *.
     break_list_goal.
     simpl.
-    apply Coqlib.list_norepet_append ; try assumption.
-    break_list_goal.
-    apply Coqlib.list_norepet_append ; try assumption.
-    apply List_norepet_singleton.
-    (* NOTE: Coqlib.list_disjoint [out1] (inputs G2) *)
-    (* a property I'd really like to have, via independent_flows, but how ? *)
-    admit.
-    apply Coqlib.list_disjoint_cons_r.
-    (* NOTE: Coqlib.list_disjoint (inputs G1) (inputs G2) *)
-    admit.
-    (* I need 2 things:
-       - new hypothesis (out1 ∈ (fst (outs dg)))
-          --> the programmer will have to prove that, but easy if he uses the
-              interface correctly
-       - new wf property on dcfg, st ∀ bk ∈ (fst (outs dg)), bk ∉ (graph dg)
-     *)
-    admit.
-Abort.
+    apply Coqlib.list_norepet_append
+    ; try assumption
+    ; unfold independent_flows_dcfg in FLOWS
+    ; simpl in FLOWS
+    ; unfold independent_flows in FLOWS
+    ; unfold no_reentrance in FLOWS.
+    + break_list_goal.
+      apply Coqlib.list_norepet_append ; try assumption.
+      apply List_norepet_singleton.
+      destruct FLOWS as [_ [FLOWS _]].
+      apply Util.list_disjoint_singleton_left.
+      clear IN INPUTS_G1 WF_BID_G1 INPUTS_G2 OUTPUTS_G2 WF_BID_G2.
+      eapply Coqlib.list_disjoint_notin.
+      2:{ eassumption. }
+      eapply incl_disjoint ; eassumption.
+    + destruct FLOWS as [_ [_ FLOWS]] ; unfold no_duplicate_bid in FLOWS.
+      apply Coqlib.list_disjoint_cons_r ; try assumption.
+      apply Util.list_disjoint_singleton_left.
+      clear -DISJOINTS_G1 OUT.
+      apply Util.list_disjoint_singleton_left.
+      eapply Coqlib.list_disjoint_notin ; eassumption.
+Admitted.
 
 Lemma wf_mk_join : forall σ g out1 out2,
     wf_dcfg g ->
@@ -304,10 +344,10 @@ Proof.
     simpl ; intuition.
   - unfold cfg_join.
     break_list_goal.
-    inv Heq ; clear H.
+    inv Heq.
     left.
     apply OUTPUTS_G.
-    repeat in_list.
+    repeat in_list_rem.
     assumption.
   - unfold cfg_join.
     break_list_goal.
@@ -333,8 +373,8 @@ Proof.
        - new wf property on dcfg, st ∀ bk ∈ (fst (outs dg)), bk ∉ (graph dg)
      *)
     admit.
-Abort.
-    
+Admitted.
+
 Lemma wf_mk_branch : forall σ cond gT gF inT inF,
     wf_dcfg gT ->
     wf_dcfg gF ->
@@ -359,8 +399,8 @@ Proof.
     | h: List.In _ _ \/ List.In _ _ |- _ => destruct h
     end
     ; [left ; apply INPUTS_GT | right ; apply INPUTS_GF]
-    ; now in_list.
-  - inv Heq ; clear H0.
+    ; now in_list_rem.
+  - inv Heq.
     break_list_goal.
     break_list_hyp.
     right.
@@ -384,13 +424,14 @@ Proof.
     apply Util.list_disjoint_singleton_left.
     (* freshness (name counter_bid0) *)
     admit.
-Abort.
+Admitted.
 
 Lemma wf_mk_while : forall σ expr_code cond gB inB outB,
+    List.In outB (outs gB) ->
     wf_dcfg gB ->
     wf_dcfg (snd ((mk_while expr_code cond gB inB outB) σ)).
 Proof.
-  intros * WF_G.
+  intros * OUTPUT WF_G.
   unfold wf_dcfg, wf_inputs, wf_outputs, mk_seq, wf_graph, wf_ocfg_bid.
   destruct σ ; cbn.
   unfold wf_dcfg, wf_inputs, wf_outputs, wf_graph, wf_ocfg_bid in WF_G.
@@ -404,7 +445,7 @@ Proof.
     do 2 break_list_goal ; simpl.
     left.
     apply INPUTS_G.
-    now in_list.
+    now in_list_rem.
   - rewrite H0.
     clear.
     do 2 (break_list_goal ; simpl).
@@ -415,36 +456,200 @@ Proof.
     break_list_goal ; simpl.
     left.
     apply OUTPUTS_G.
-    now in_list.
+    now in_list_rem.
   - break_list_goal.
     simpl in *.
-    apply Coqlib.list_disjoint_cons_l.
-    apply Coqlib.list_disjoint_cons_r.
-    (* lemma on remove - easy *)
-    admit.
-    (* freshness (name counter_bid0) *)
-    admit.
-    (* freshness (name counter_bid0) *)
-    admit.
+    apply list_disjoint_cons_l.
+    + apply list_disjoint_cons_r.
+      * apply remove_disjoint_remove ; cbn.
+        rewrite CFGC_Utils.remove_app.
+        apply list_disjoint_app_r.
+        split ;
+          [apply remove_disjoint_remove
+           ; apply remove_disjoint ; assumption
+          | simpl ; rewrite eq_bid_refl
+            ; apply list_disjoint_nil_r].
+      * (* freshness (name counter_bid0) *)
+        admit.
+    + (* freshness (name counter_bid0) *)
+      admit.
+  (* NOTE: for freshness, I need hypothesis about intervals of
+         block_id in graphs *)
   - break_list_goal.
     simpl in *.
     break_list_goal.
-    apply Coqlib.list_norepet_append ; try assumption.
+    apply list_norepet_append ; try assumption.
     apply List_norepet_singleton.
-    apply Coqlib.list_norepet_append ; try assumption.
+    apply list_norepet_append ; try assumption.
     apply List_norepet_singleton.
-    apply Util.list_disjoint_singleton_right.
-    (* NOTE: ~ List.In outB (inputs gB)
-       - outB ∈ (outs gB)
-       - disjonction (inputs gB) (outs gB)
-     *)
-    admit.
-    apply Util.list_disjoint_singleton_left.
-    intro.
-    break_list_hyp.
+    apply list_disjoint_singleton_right.
+    eapply list_disjoint_notin ; eassumption.
+    apply list_disjoint_singleton_left.
     (* NOTE: freshness (name counter_bid0) *)
     admit.
-Abort.
+Admitted.
+
+
+
+Require Import Datatypes.
+
+Theorem inv_len_inputs : forall (σ: FST) (c : cfg_lang) (dg : dcfg),
+    snd ((evaluate c) σ) = dg ->
+    (length (ins dg) >= 1)%nat.
+Proof.
+  intros *. revert σ dg.
+  induction c ; intros ; simpl in *.
+  - rewrite <- H.
+    unfold mk_block.
+    simpl.
+    repeat flatten_all ; cbn.
+    lia.
+  - repeat flatten_all ; cbn.
+    rewrite <- H.
+    unfold mk_seq.
+    simpl.
+    repeat flatten_all ; cbn.
+    rewrite app_length.
+    inv Heq.
+    assert ((length ins0 >= 1)%nat) by
+      (match goal with
+       | h: evaluate c1 σ = (_,?dg) |- _ =>
+           assert (snd (evaluate c1 σ) = dg) by now rewrite h
+       end ;
+       apply IHc1 in H;
+       now simpl in H).
+    lia.
+  - repeat flatten_all ; cbn.
+    rewrite <- H.
+    unfold mk_branch ; simpl.
+    repeat flatten_all ; cbn.
+    lia.
+  - repeat flatten_all ; cbn.
+    rewrite <- H.
+    unfold mk_join ; simpl.
+    repeat flatten_all ; cbn.
+    match goal with
+    | h: evaluate c σ = (_,?dg) |- _ =>
+        assert (snd (evaluate c σ) = dg) by now rewrite h
+    end.
+    apply IHc in H0 ; simpl in H0.
+    assumption.
+  - repeat flatten_all ; cbn.
+    rewrite <- H.
+    unfold mk_while ; simpl.
+    repeat flatten_all ; cbn.
+    lia.
+Qed.
+
+Theorem inv_len_outputs : forall (σ: FST) (c : cfg_lang) (dg : dcfg),
+    snd ((evaluate c) σ) = dg ->
+    (length (outs dg) >= 1)%nat.
+Proof.
+  intros *. revert σ dg.
+  induction c ; intros ; simpl in *.
+  - rewrite <- H.
+    unfold mk_block.
+    simpl.
+    repeat flatten_all ; cbn.
+    lia.
+  - repeat flatten_all ; cbn.
+    rewrite <- H.
+    unfold mk_seq.
+    simpl.
+    repeat flatten_all ; cbn.
+    rewrite app_length.
+    inv Heq0.
+    assert ((length outs1 >= 1)%nat) by
+      (match goal with
+       | h: evaluate c2 ?f = (_,?dg) |- _ =>
+           assert (snd (evaluate c2 f) = dg) by now rewrite h
+       end ;
+       apply IHc2 in H ;
+       now simpl in H).
+    lia.
+  - repeat flatten_all ; cbn.
+    rewrite <- H.
+    unfold mk_branch ; simpl.
+    repeat flatten_all ; cbn.
+    rewrite app_length.
+    inv Heq0.
+    assert ((length outs1 >= 1)%nat) by
+      (match goal with
+       | h: evaluate c2 ?f = (_,?dg) |- _ =>
+           assert (snd (evaluate c2 f) = dg) by now rewrite h
+       end ;
+       apply IHc2 in H ;
+       now simpl in H).
+    lia.
+  - repeat flatten_all ; cbn.
+    rewrite <- H.
+    unfold mk_join ; simpl.
+    repeat flatten_all ; cbn.
+    lia.
+  - repeat flatten_all ; cbn.
+    rewrite <- H.
+    unfold mk_while ; simpl.
+    repeat flatten_all ; cbn.
+    lia.
+Qed.
+
+
+Theorem inv_independent_flows :
+  forall (σ1 σ2 σ3: FST) (c1 c2 : cfg_lang) (dg1 dg2 : dcfg),
+    (evaluate c1) σ1 = (σ2, dg1) ->
+    (evaluate c2) σ2 = (σ3, dg2) ->
+    independent_flows_dcfg dg1 dg2.
+Proof.
+  intros.
+  unfold independent_flows_dcfg, independent_flows.
+Admitted.
+
+Theorem inv_disjoint_outputs :
+  forall (σ1 σ2 σ3: FST) (c1 c2 : cfg_lang) (dg1 dg2 : dcfg),
+    (evaluate c1) σ1 = (σ2, dg1) ->
+    (evaluate c2) σ2 = (σ3, dg2) ->
+    (outs dg1) ⊍ (outs dg2).
+Proof.
+  intros.
+Admitted.
+
+Theorem wf_evaluate : forall (σ: FST) (c : cfg_lang) (dg : dcfg),
+    snd ((evaluate c) σ) = dg ->
+    wf_dcfg dg.
+Proof.
+  intros *. revert σ dg.
+  induction c ; intros ; simpl in *.
+  - rewrite <- H.
+    apply wf_mk_block.
+  - repeat flatten_all.
+    rewrite <- H.
+    apply wf_mk_seq.
+    + eapply inv_independent_flows ; eassumption.
+    (* PROVE INVARIANT INDEPENDENT FLOWS  *)
+    + eapply inv_disjoint_outputs ; eassumption.
+    (* PROVE INVARIANT DISJOINT FLOWS *)
+    + apply hd_In.
+      apply (inv_len_outputs σ c1 d). now rewrite Heq.
+    + apply hd_In.
+      apply (inv_len_inputs f c2 d0). now rewrite Heq0.
+    + eapply IHc1. now erewrite Heq.
+    + eapply IHc2. now erewrite Heq0.
+  - repeat flatten_all.
+    rewrite <- H.
+    apply wf_mk_branch.
+    + eapply IHc1. now erewrite Heq.
+    + eapply IHc2. now erewrite Heq0.
+  - repeat flatten_all.
+    rewrite <- H.
+    apply wf_mk_join.
+    eapply IHc. now erewrite Heq.
+  - repeat flatten_all.
+    rewrite <- H.
+    apply wf_mk_while.
+    + apply hd_In.
+      apply (inv_len_outputs σ c d). now rewrite Heq.
+    + eapply IHc. now erewrite Heq.
+Qed.
 
 
 Lemma wf_mk_block_bind :
@@ -467,7 +672,7 @@ Proof.
   intuition ; subst ;
     repeat (
         match goal with
-        | h:context[List.In _ [_]] |- _ => apply CFGC_Utils.In_singleton in h
+        | h:context[List.In _ [_]] |- _ => apply In_singleton in h
         end
       )
   ; rewrite H0 in H ; clear H0
@@ -479,31 +684,5 @@ Proof.
     now apply contra in H.
 Qed.
 
-(* NOTE: Now, I want a similar lemma, but with X states between
-         the 1st mk_block and the 2nd mk_block *)
-
-(* NOTE: Now, I want a similar lemma, but I can ALSO use other operations,
-         such mk_seq (instead of mk_block) *)
-
-(* Lemma wf_mk_seq_wf_seq : forall g1 g2 out1 in2, *)
-(*     List.In out1 (fst (outs g1)) -> (* easy to ensure *) *)
-(*     List.In in2 (fst (ins g2)) -> *)
-(*     wf_dcfg g1 -> (* recursive use of the interface *) *)
-(*     wf_dcfg g2 -> *)
-(*     wf_seq (graph g1) (graph g2) out1 in2. *)
-(* Proof. *)
-(*   intros * CORRECT_OUT1 CORRECT_IN2 WF_G1 WF_G2. *)
-(*   unfold wf_dcfg, wf_inputs, wf_outputs in WF_G1, WF_G2. *)
-(*   destruct WF_G1 as [[LEN_INS_G1 INPUTS_G1] [LEN_OUT_G1 OUTPUTS_G1]]. *)
-(*   destruct WF_G2 as [[LEN_INS_G2 INPUTS_G2] [LEN_OUT_G2 OUTPUTS_G2]]. *)
-(*   unfold wf_seq. *)
-
-(*
-In order to use the interface, the function compile should
-work with dcfg instead of ocfg.
-It remains some properties to prove, as
-`List.In out1 (fst (outs g1))`, but if the user uses the interface
-correctly, this is very easy to ensure.
-In this example, the user should pick out1 using the information
-in the DCFG (the outputs here).
- *)
+Definition denote_dcfg (dg : dcfg) := denote_cfg (graph dg).
+Definition denote_cfg_lang (g : cfg_lang) (σ : FST) := denote_dcfg (snd ((evaluate g) σ)).

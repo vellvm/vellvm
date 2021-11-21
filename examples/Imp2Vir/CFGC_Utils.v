@@ -19,6 +19,22 @@ Definition eq_bid b b' :=
   | _,_ => false
   end.
 
+Definition mk_anon (n : nat) := Anon (Z.of_nat n).
+Lemma neq_mk_anon : forall n1 n2, mk_anon n1 <> mk_anon n2 <-> n1 <> n2.
+Proof.
+  intros.
+  unfold mk_anon.
+  split ; intro.
+  - intros ->. now destruct H.
+  - apply inj_neq in H.
+    unfold Zne in H.
+    intro.
+    injection H0.
+    intro.
+    rewrite H1 in H .
+    contradiction.
+Qed.
+
 Lemma eqb_bid_eq : forall b b', eq_bid b b' = true <-> b=b'.
 Proof.
   intros.
@@ -121,6 +137,16 @@ Proof.
   subst; apply in_eq.
 Qed.
 
+Lemma hd_In : forall {A} (d : A) (l : list A),
+    (length l >= 1)%nat ->
+    In (hd d l) l.
+Proof.
+  intros.
+  induction l.
+  now simpl in H.
+  simpl ; now left.
+Qed.
+
 Lemma List_norepet_singleton : forall {A} (x : A),
     Coqlib.list_norepet [x].
 Proof.
@@ -150,6 +176,86 @@ Proof.
   - assumption.
   - now f_equal.
 Qed.
+
+Lemma in_remove : forall l x y, List.In x (remove y l) -> List.In x l.
+Proof. intros.
+       rewrite remove_ListRemove in H
+       ; apply in_remove in H.
+       intuition.
+Qed.
+
+Ltac in_list_rem :=
+  match goal with
+  | h: List.In _ _  |- _ => apply in_remove in h
+  end.
+
+Require Import Coqlib.
+Require Import Util.
+
+Lemma incl_disjoint : forall {A} (l1 sl1 l2 : list A),
+    List.incl sl1 l1 ->
+    list_disjoint l1 l2 ->
+    list_disjoint sl1 l2.
+Proof.
+  intros.
+  unfold incl in H.
+  induction sl1.
+  - apply list_disjoint_nil_l.
+  - admit.
+Admitted.
+
+Lemma remove_disjoint : forall (x : block_id) (l1 l2 : list block_id),
+    l1 ⊍ l2 -> (CFGC_Utils.remove x l1) ⊍ l2.
+Proof.
+  intros.
+  induction l1.
+  now simpl.
+  simpl.
+  destruct (eq_bid x a).
+  - apply IHl1. now apply list_disjoint_cons_left in H.
+  - apply list_disjoint_cons_l_iff in H ; destruct H.
+    apply list_disjoint_cons_l.
+    now apply IHl1. assumption.
+Qed.
+
+Lemma remove_disjoint_remove : forall (x : block_id) (l1 l2 : list block_id),
+    (CFGC_Utils.remove x l1) ⊍ (CFGC_Utils.remove x l2) <->
+    (CFGC_Utils.remove x l1) ⊍ l2.
+Proof.
+  intros.
+Admitted.
+
+Lemma remove_app:
+  forall (x : block_id) (l1 l2 : list block_id),
+  CFGC_Utils.remove x (l1 ++ l2) = CFGC_Utils.remove x l1 ++ CFGC_Utils.remove x l2.
+Proof.
+  intros.
+  rewrite !remove_ListRemove.
+  apply remove_app.
+Qed.
+
+Ltac break_list_hyp :=
+  match goal with
+    | h: List.In _ (_ ++ _) |- _ => repeat (apply in_app_or in h)
+  end.
+
+Ltac break_list_goal :=
+  try (rewrite Util.list_cons_app) ;
+  try (
+  match goal with
+  | |- context[inputs (_ ++ _)] =>
+      repeat (rewrite !ScopeTheory.inputs_app)
+  | |- context[outputs (_ ++ _)] =>
+      repeat (rewrite !ScopeTheory.outputs_app)
+  end ) ;
+  try (
+  match goal with
+  | |- context[List.In _ (_ ++ _)] => repeat (apply in_or_app)
+  end).
+
+Ltac break_list_all :=
+  repeat break_list_hyp ;
+  repeat break_list_goal.
 
 
 (* Misc lemmas related to vellvm *)

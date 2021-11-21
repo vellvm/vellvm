@@ -15,14 +15,14 @@ From Vellvm Require Import
      Syntax
      SurfaceSyntax .
 
-From Imp2Vir Require Import Imp CFGC_Combinators CFGC_Interface.
+From Imp2Vir Require Import Imp CFGC_Combinators CFGC_Interface CFGC_Utils.
 
 
 Import ListNotations.
 Import VIR_Notations.
 Notation ocfg := (ocfg typ).
 
-Section FreshnessMonad.
+Section MonadTransformer.
 
 (* TODO it is probable already defined somewhere in Vellvm *)
 Definition OptionT (m : Type -> Type) : Type -> Type :=
@@ -39,7 +39,7 @@ Definition OptionT (m : Type -> Type) : Type -> Type :=
                end
   |}.
 
-End FreshnessMonad.
+End MonadTransformer.
 
 Section CompileExpr.
 
@@ -130,55 +130,44 @@ End CompileExpr.
 
 Section Imp2Vir.
 
-Definition default_bid := Anon 0.
+Definition default_bid := Anon 0%Z.
 
 Fixpoint compile_imp (s : stmt) (env: StringMap.t int) :
-  OptionT fresh ( (StringMap.t int) * dcfg ) :=
+  OptionT fresh ( (StringMap.t int) * cfg_lang ) :=
   match s with
-  | Skip =>
-      dg <- mk_block [] ;;
-      ret (Some (env, dg))
   | Assign x e =>
-      ('(env, c) <- compile_assign x e env ;;
-       dg <- mk_block c ;;
-       ret (Some (env, dg)))
+      '(env, c) <- compile_assign x e env ;;
+      ret (env, CBlock c)
   | Seq l r =>
-      ( '(env1, dg1) <- compile_imp l env;;
-        '(env2, dg2) <- compile_imp r env1;;
-        let out1 := List.hd default_bid (fst (outs dg1)) in
-        let in2 := List.hd default_bid (fst (ins dg2)) in
-        'g <- mk_seq dg1 dg2 out1 in2 ;;
-        ret (Some (env2, g)))
+      '(env1, c1) <- compile_imp l env;;
+      '(env2, c2) <- compile_imp r env1;;
+      ret (env2, CSeq c1 c2)
   | If e l r =>
-      ('(cond_reg, env, expr_code) <- compile_cond e env ;;
-       reg <- freshReg ;;
-       '(env1, dgT) <- compile_imp l env;;
-       '(env2, dgF) <- compile_imp r env1;;
-       dgCond <- mk_block expr_code ;;
-       let inT := List.hd default_bid (fst (ins dgT)) in
-       let inF := List.hd default_bid (fst (ins dgF)) in
-       dgBody <- mk_branch (texp_i1 cond_reg) dgT dgF inT inF ;;
-       let outT := List.hd default_bid (fst (outs dgT)) in
-       let outF := List.hd default_bid (fst (outs dgF)) in
-       dgBody <- mk_join dgBody outT outF ;;
-       let inCond := List.hd default_bid (fst (ins dgCond)) in
-       let outBody := List.hd default_bid (fst (outs dgBody)) in
-       dg <- mk_seq dgCond dgBody inCond outBody ;;
-       ret (Some (env2, dg)))
+      '(cond_reg, env, expr_code) <- compile_cond e env ;;
+      '(env1, cT) <- compile_imp l env;;
+      '(env2, cF) <- compile_imp r env1;;
+      let ccond := CBlock expr_code in
+      let cbody := CBranch (texp_i1 cond_reg) cT cF in
+      let c := CSeq ccond cbody in
+      ret (env2, c)
   | While e b =>
-      ('(cond_reg, env, expr_code) <- compile_cond e env ;;
-       '(env1, dgB) <- compile_imp b env ;;
-       let inB := List.hd default_bid (fst (ins dgB)) in
-       let outB := List.hd default_bid (fst (outs dgB)) in
-       'dg <- mk_while expr_code (texp_i1 cond_reg) dgB inB outB ;;
-       ret (Some (env1, dg)))
+      '(cond_reg, env, expr_code) <- compile_cond e env ;;
+      '(env1, cB) <- compile_imp b env ;;
+      ret (env1, CWhile expr_code (texp_i1 cond_reg) cB)
+
+  | Skip => ret (Some (env, CBlock []))
   end.
 
 Definition compile (s : stmt) :=
-  snd (
-      ('( _, (make_dcfg g _ _)) <- compile_imp s (StringMap.empty int);;
-       (ret g))
-        fresh_init).
+  let '(σ, c) :=
+    ('( _, c) <- compile_imp s (StringMap.empty int);;
+     (ret c)) fresh_init in
+  match c with
+  | None => None
+  | Some c =>
+      let '(_, dg) := (evaluate c) σ in
+      Some (graph dg)
+  end.
 
 
 Section Examples.
@@ -196,6 +185,7 @@ Compute if_ir.
 Compute seq_ir.
 Compute nested_if_ir.
 Compute nested_if2_ir.
+
 End Examples.
 
 
@@ -218,32 +208,34 @@ Import ITreeNotations.
 
 From Imp2Vir Require Import CFGC_DenotationsCombinators.
 
-(* TODO: wf_dcfg instead of wf_ocfg_bid and
-          improve wf_dcfg such that it contains
-          wf_ocfg_bid. *)
-Theorem wf_compiler_aux : forall s env σ σ' cfg nenv ,
-  (compile_imp s env) σ =
-      (σ', Some (nenv, cfg)) -> wf_ocfg_bid (graph cfg).
+Lemma wf_compiler_aux : forall s env σ σ' cfg nenv ,
+  (compile_imp s env) σ = (σ', Some (nenv, cfg)) ->
+  wf_dcfg (snd ((evaluate cfg) σ')).
 Proof.
   intros s.
-  induction s ; intros.
-  - (* Assign *)
-    cbn in H.
-    repeat flatten_all ;
-    inv H ; inv Heq; inv Heq2 ;
-    apply wf_bid_cfg_block.
-  - (* Seq *)
-    admit.
-  - (* If *)
-    admit.
-  - (* While *)
-    admit. (* I need an invariant on the compiler *)
-  - (* Skip *)
-    cbn in H ; inv H ; repeat flatten_all ; inv H1.
-    inv Heq ; apply wf_bid_cfg_block.
-Admitted.
+  induction s
+  ; intros
+  ; cbn in H
+  ; repeat flatten_all
+  ; eapply wf_evaluate
+  ; reflexivity.
+Qed.
 
-
+Theorem wf_compiler : forall s g,
+  compile s = Some g ->
+  wf_ocfg_bid g.
+Proof.
+  intros.
+  unfold compile in H.
+  repeat flatten_all ; try discriminate.
+  inv H.
+  inv Heq.
+  repeat flatten_all ; try discriminate.
+  apply wf_dcfg_ocfg.
+  apply wf_compiler_aux in Heq.
+  inv H0.
+  now rewrite Heq1 in Heq.
+Qed.
 
 (** Correctness compiler *)
 
@@ -264,18 +256,31 @@ Definition Rimpvir
   Prop :=
   Rmem vmap (fst env1) (fst (snd env2)) (fst env2).
 
-Theorem compile_correct : forall (σ : FST) env (p : stmt) (σ' : FST)
-                            env' (o : dcfg) (input output : block_id)
-                            mem from to genv lenv vmem,
+(* TODO import theses tactics *)
+(** Bind and translate rewritings *)
+Hint Rewrite @bind_ret_l : rwbind.
+Hint Rewrite @bind_bind : rwbind.
+Hint Rewrite @translate_ret : rwtranslate.
+Hint Rewrite @translate_bind : rwtranslate.
+Hint Rewrite @translate_trigger : rwtranslate.
+
+Ltac bstep := autorewrite with rwbind.
+Ltac tstep := autorewrite with rwtranslate.
+Ltac go := autorewrite with rwtranslate rwbind.
+
+
+Theorem compile_correct :
+  forall (σ σ' : FST) env env'  (p : stmt) (o : cfg_lang)
+    (input output : block_id)
+    mem from to genv lenv vmem,
 
   (* The environments of Imp and Vir are related *)
   Rmem env mem lenv vmem ->
   (* The compilation of p with env produce a new env' and an ir *)
-  (compile_imp p env) σ =
-      (σ', Some (env', o))  ->
+  (compile_imp p env) σ = (σ', Some (env', o))  ->
   eutt (Rimpvir env')
        (interp_imp (denote_imp p) mem)
-       (interp_cfg3 (denote_cfg (graph o) from to) genv lenv vmem).
+       (interp_cfg3 (denote_cfg_lang o σ' from to) genv lenv vmem).
 Proof.
   intros.
   induction p.
@@ -297,10 +302,33 @@ Proof.
     simpl in *.
     repeat flatten_all.
     inv H0.
-    assert ( I_to : to = input ) by admit.
-    (* I probably need to introduce an invariant here *)
-    rewrite I_to ; clear I_to.
-    admit.
+    unfold denote_cfg_lang, denote_dcfg, mk_block ; cbn.
+    repeat flatten_all ; simpl.
+    destruct (eq_bid b to) eqn:E.
+    2 : {
+      rewrite eqb_bid_neq in E.
+      admit. (* sohuld be identity here *)
+    }
+    rewrite eqb_bid_eq in E ; subst.
+    rewrite denote_cfg_block .
+    + setoid_rewrite denote_code_nil.
+      simpl.
+      bstep.
+      rewrite interp_imp_ret.
+      rewrite interp_cfg3_ret.
+      apply eutt_Ret.
+      constructor.
+      * intros.
+        simpl in H0. apply H,H0.
+      * intros.
+        destruct H0 as [reg [Hreg [ addr [Haddr [val [HValRead HValInt]]]]]].
+        simpl in *.
+        unfold Rmem in H.
+        apply H.
+        exists reg; intuition.
+        exists addr; intuition.
+        exists val; intuition.
+    + admit. (* The interface should ensure this kind of properties *)
 Admitted.
 End Theory.
 
