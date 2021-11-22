@@ -9,15 +9,44 @@ From Vellvm Require Import
 
 Open Scope nat_scope.
 
-(* Definition and lemmas about equality between block_id *)
+(* Definition and lemmas about relation between block_id *)
 
 Definition eq_bid b b' :=
   match b,b' with
   | Name s, Name s' => String.eqb s s'
   | Anon n, Anon n' => @RelDec.eq_dec int eq_dec_int n n'
   | Raw n, Raw n' => @RelDec.eq_dec int eq_dec_int n n'
-  | _,_ => false
+  | _ , _ => false
+    end.
+
+(* Anon _ <= Raw _ <= Name _*)
+Definition leb_bid b b' :=
+  match b,b' with
+  | Name s, Name s' => true
+  | Anon n, Anon n' => (n <=? n')%Z
+  | Raw n, Raw n' => (n <=? n')%Z
+  | Anon _, Name _ => true
+  | Anon _, Raw _ => true
+  | Raw _, Anon _ => false
+  | Name _, Anon _ => false
+  | Name _, Raw _ => false
+  | Raw _, Name _ => true
   end.
+
+Definition le_bid (b b': block_id) : Prop :=
+  leb_bid b b' = true.
+
+Lemma le_bid_anon : forall b b' n n',
+    b = Anon n ->
+    b' = Anon n' ->
+    le_bid b b' <-> (n <= n')%Z.
+Proof.
+  intros.
+  subst.
+  unfold le_bid.
+  cbn.
+  symmetry ; apply Zle_is_le_bool.
+Qed.
 
 Definition mk_anon (n : nat) := Anon (Z.of_nat n).
 Lemma neq_mk_anon : forall n1 n2, mk_anon n1 <> mk_anon n2 <-> n1 <> n2.
@@ -252,11 +281,6 @@ Ltac break_list_goal :=
   match goal with
   | |- context[List.In _ (_ ++ _)] => repeat (apply in_or_app)
   end).
-
-Ltac break_list_all :=
-  repeat break_list_hyp ;
-  repeat break_list_goal.
-
 
 (* Misc lemmas related to vellvm *)
 

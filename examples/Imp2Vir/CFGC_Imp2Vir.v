@@ -295,6 +295,11 @@ Proof.
     simpl in *.
     repeat (flatten_all) ; try discriminate.
     inv H0.
+    unfold denote_cfg_lang,denote_dcfg.
+    simpl.
+    unfold mk_seq.
+    repeat (flatten_all); simpl in *.
+    rewrite denote_cfg_seq.
     admit.
   - (* If *) admit.
   - (* While *) admit.
