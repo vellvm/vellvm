@@ -42,9 +42,11 @@ Import ITreeNotations.
     We will naturally want to define ways to iterate rewrites locally
     rather than over the whole structure.
  *)
-Module Type ExuivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : DenotationTheory IS TOP).
+Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : DenotationTheory IS TOP).
   Import IS.
   Import SemNotations.
+
+  Import DT.
 
   Module CFGT := CFGTheory IS TOP.
   Import CFGT.
@@ -191,45 +193,10 @@ Module Type ExuivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
                            coerce_integer_to_int (Some sz) x0)
                         (endo brs))).
           { rewrite <- EQbrs. reflexivity. }
-          Check (map_monad
-                   (fun '((TInt_Literal sz x),id) => s <- (coerce_integer_to_int (Some sz) x);; @ret err_ub_oom Monad_err_ub_oom (dvalue * block_id) (s,id))
-                   brs). : err_ub_oom (list (dvalue * block_id)).
-          Check (lift_err_ub_oom (fun x : list (dvalue * block_id) => Ret x)
-                (map_monad
-                   (fun '((TInt_Literal sz x),id) => s <- (coerce_integer_to_int (Some sz) x);; ret (s,id))
-                   brs)) : itree instr_E (list (dvalue * block_id)).
-               lift_err (fun b => ret (inl b)) (select_switch selector default_br switches).
 
-          Check lift_err_ub_oom (fun x : list (dvalue * block_id) => Ret x) (map_monad
-                                                      (fun '(TInt_Literal sz x, id) =>
-                                                         x' <- coerce_integer_to_int (Some sz) x;; ret (x', id)) brs).
-
-          assert (EQ:
-                   ℑ3
-                     (translate exp_to_instr
-                                (switches <-
-                                   lift_err_ub_oom (fun x : list (dvalue * block_id) => Ret x)
-                                                   (map_monad
-                                                      (fun '(TInt_Literal sz x, id) =>
-                                                         coerce_integer_to_int (Some sz) x) brs);; lift_err (fun b : block_id => Ret (@inl block_id uvalue b)) (select_switch d0 default_dest switches)))
-                     g1 l1 m1
-                     ≈ ℑ3
-                     (translate exp_to_instr
-                                (switches <-
-                                   lift_err_ub_oom (fun x : list (dvalue * block_id) => Ret x)
-                                                     (map_monad
-                                                        (fun '(TInt_Literal sz x, id) =>
-                                                           {|
-                                                             EitherMonad.unEitherT := match EitherMonad.unEitherT (coerce_integer_to_int sz x) with
-                                                                                      | inl v => inl v
-                                                                                      | inr (inl x0) => inr (inl x0)
-                                                                                      | inr (inr x0) => inr (inr (x0, id))
-                                                                                      end |}) (endo brs));;
-                                 lift_err (fun b : block_id => Ret (inl b)) (select_switch d0 (endo default_dest) switches))) g1 l1 m1).
-          {
-            rewrite !translate_bind,!interp_cfg3_bind; apply eutt_clo_bind with (UU := eq); [| intro3; reflexivity].
-            setoid_rewrite EQ1. reflexivity. }
-          break_match_goal; try apply EQ; reflexivity.
+          setoid_rewrite <- EQbrs.
+          unfold endo, Endo_id.
+          reflexivity.
       Qed.
 
       Lemma exp_optim_correct_code : forall c g l m,
@@ -341,7 +308,7 @@ Module Type ExuivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
       Qed.
 
       Lemma interp_cfg3_ret_eq_itree:
-        forall (R : Type) (g : global_env) (l : local_env) (m : memory_stack) (x : R),
+        forall (R : Type) (g : global_env) (l : local_env) (m : MemState) (x : R),
           ℑ3 (Ret x) g l m ≅ Ret3 g l m x.
       Proof.
         intros.
@@ -471,3 +438,4 @@ Module Type ExuivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
     cbn.
   Admitted.
 
+End EquivExpr.

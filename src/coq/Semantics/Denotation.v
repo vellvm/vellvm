@@ -207,8 +207,8 @@ Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP
     | EXP_Integer x =>
       match top with
       | None                => raise "denote_exp given untyped EXP_Integer"
-      | Some (DTYPE_I bits) => lift_err_ub_oom ret (fmap dvalue_to_uvalue (coerce_integer_to_int (Some bits) x))
-      | Some DTYPE_IPTR     => lift_err_ub_oom ret (fmap dvalue_to_uvalue (coerce_integer_to_int None x))
+      | Some (DTYPE_I bits) => fmap dvalue_to_uvalue (coerce_integer_to_int (Some bits) x)
+      | Some DTYPE_IPTR     => fmap dvalue_to_uvalue (coerce_integer_to_int None x)
       | Some typ            => raise ("bad type for constant int: " ++ to_string typ)
       end
 
@@ -295,14 +295,13 @@ Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP
         dv2 <- concretize_or_pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2) ;;
         uvalue_to_dvalue_binop2
           (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-          (fun v1 v2 => translate FUBO_to_exp
-                                  (lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
+          (fun v1 v2 => translate FUBO_to_exp (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
           v1 dv2
       else
         uvalue_to_dvalue_binop
           (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
           (fun v1 v2 => translate FUBO_to_exp
-                                  (lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2))))
+                                  (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
           v1 v2
 
     | OP_ICmp cmp dt op1 op2 =>
@@ -310,7 +309,7 @@ Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP
       v2 <- denote_exp (Some dt) op2 ;;
       uvalue_to_dvalue_binop
         (fun v1 v2 => ret (UVALUE_ICmp cmp v1 v2))
-        (fun v1 v2 => lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_icmp cmp v1 v2)))
+        (fun v1 v2 => fmap dvalue_to_uvalue (eval_icmp cmp v1 v2))
         v1 v2
 
     | OP_FBinop fop fm dt op1 op2 =>
@@ -323,7 +322,7 @@ Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP
           (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
           (fun v1 v2 =>
              translate FUBO_to_exp
-                       (lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
+                       (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
           v1 dv2
       else
         uvalue_to_dvalue_binop
@@ -331,7 +330,7 @@ Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP
              ret (UVALUE_FBinop fop fm v1 v2))
           (fun v1 v2 =>
              translate FUBO_to_exp
-                       (lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2))))
+                       (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
           v1 v2
 
     | OP_FCmp fcmp dt op1 op2 =>
@@ -339,7 +338,7 @@ Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP
       v2 <- denote_exp (Some dt) op2 ;;
       uvalue_to_dvalue_binop
         (fun v1 v2 => ret (UVALUE_FCmp fcmp v1 v2))
-        (fun v1 v2 => lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_fcmp fcmp v1 v2)))
+        (fun v1 v2 => fmap dvalue_to_uvalue (eval_fcmp fcmp v1 v2))
         v1 v2
 
     | OP_Conversion conv dt1 op dt2 =>
@@ -466,7 +465,7 @@ Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP
       v2   <- denote_exp (Some dt2) op2 ;;
       match uvalue_to_dvalue cndv with
       | inl e => ret (UVALUE_Select cndv v1 v2)
-      | inr dcndv => lift_err_ub_oom ret (eval_select dcndv v1 v2)
+      | inr dcndv => eval_select dcndv v1 v2
       end
 
     | OP_Freeze (dt, e) =>
@@ -600,10 +599,11 @@ Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP
       if dvalue_is_poison selector
       then raiseUB "Switching on poison."
       else (* We evaluate all the selectors. Note that they are enforced to be constants, we could reflect this in the syntax and avoid this step *)
-        switches <- lift_err_ub_oom ret
-                                      (map_monad
-                                         (fun '((TInt_Literal sz x),id) => s <- (coerce_integer_to_int (Some sz) x);; ret (s,id))
-                                         dests);;
+        switches <- map_monad
+                     (fun '((TInt_Literal sz x),id) =>
+                        s <- (coerce_integer_to_int (Some sz) x);;
+                        ret (s,id))
+                     dests;;
         lift_err (fun b => ret (inl b)) (select_switch selector default_br switches)
 
     | TERM_Unreachable => raiseUB "IMPOSSIBLE: unreachable in reachable position" 

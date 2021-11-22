@@ -19,7 +19,8 @@ From Vellvm Require Import
      Syntax
      Semantics
      Syntax.ScopeTheory
-     Utils.PostConditions.
+     Utils.PostConditions
+     Utils.ITreeRaise.
 
 #[export] Remove Hints Eqv.EqvWF_Build : typeclass_instances.
 
@@ -339,11 +340,27 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       f_equal.
     Qed.
 
+    Lemma select_switch_in :
+      forall x default_dest brs id,
+        select_switch x default_dest brs = inr id ->
+        id = default_dest \/ In id (List.map snd brs).
+    Proof.
+      intros x default_dest brs id SELECT.
+      induction brs.
+      - inversion SELECT; auto.
+      - cbn in SELECT.
+        break_match_hyp.
+        break_match_hyp; inversion SELECT;
+          break_match_hyp; inversion SELECT;
+          subst;
+          break_match_hyp; inversion SELECT; subst; cbn; tauto.
+    Qed.
+
     Lemma denote_terminator_exits_in_outputs :
       forall term,
         ⟦ term ⟧t ⤳ sum_pred (fun id => In id (terminator_outputs term)) TT.
     Proof.
-      intros []; cbn; try (apply raise_has_all_posts || apply eutt_Ret; cbn; eauto).
+      intros term; destruct term eqn:Hterm; cbn; try (apply raise_has_all_posts || apply eutt_Ret; cbn; eauto).
       - destruct v.  
         apply has_post_bind; intros ?.
         apply eutt_Ret; cbn; eauto.
@@ -357,48 +374,68 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         apply has_post_bind; intros ?.
         break_match_goal;
           try (apply raise_has_all_posts || apply raiseUB_has_all_posts).
-        unfold lift_err_ub_oom.
-        do 5 break_match_goal; do 2 break_match_goal.
-        unfold raiseOOM; go; apply has_post_bind; intros [].
-        break_match_goal.
-        unfold raiseUB; go; apply has_post_bind; intros [].
-        break_match_goal.
-        break_match_goal.
-        unfold raise; go; apply has_post_bind; intros [].
-        go.
-        subst.
-        assert (List.map snd brs = List.map snd l).
-        {
-          revert l Heqe0; induction brs as [| br brs IH].
-          - intros ? eq; inv eq; reflexivity.
-          - intros ? eq; inv eq.
 
-            repeat (break_match_hyp; cbn in *; try inv_err_ub_oom).
-            all: try (subst;
-                      destruct unERR_UB_OOM1;
-                      destruct unERR_UB_OOM0;
-                      repeat destruct unEitherT0;
-                      destruct unIdent; inversion Heqs2;
-                      destruct unERR_UB_OOM;
-                      repeat destruct unEitherT0;
-                      destruct unIdent; inversion Heqs;
-                      subst;
-                      inversion Heqe0).
+        clear Hterm.
+        clear term.
 
-            all: subst;
-              cbn;
-              apply f_equal;
-              auto.
-        }
-        rewrite H.
-        clear.
-        induction l as [| br brs IH].
-        + cbn; intros.
-          apply eutt_Ret; red; auto.
-        + cbn; intros.
-          repeat (cbn; break_match_goal; try apply raise_has_all_posts).
-          all: try apply eutt_Ret; red; auto.
-          all: try subst; eapply has_post_weaken; [apply IH | intros [] ?; cbn in *; intuition].
+        eapply has_post_bind_strong with
+          (S := fun switches =>
+                  Forall
+                    (fun id => In id (List.map snd brs))
+                    (List.map snd switches)).
+
+        + induction brs; cbn.
+          * apply eutt_Ret. cbn.
+            apply Forall_nil.
+          * break_match_goal; subst.
+            break_match_goal; subst.
+          
+            repeat break_match_goal;
+              try (cbn; go; setoid_rewrite raise_bind_itree; apply raise_has_all_posts).
+
+            -- (* 64 *)
+              go.
+              eapply eutt_clo_bind; eauto.
+              intros u1 u2 H.
+              apply eutt_Ret.
+              cbn.
+              cbn in H.
+              apply Forall_cons; eauto.
+              apply Forall_impl with (P := fun id => In id (List.map snd brs)); eauto.
+            -- 
+              go.
+              eapply eutt_clo_bind; eauto.
+              intros u1 u2 H.
+              apply eutt_Ret.
+              cbn.
+              cbn in H.
+              apply Forall_cons; eauto.
+              apply Forall_impl with (P := fun id => In id (List.map snd brs)); eauto.
+            --
+              go.
+              eapply eutt_clo_bind; eauto.
+              intros u1 u2 H.
+              apply eutt_Ret.
+              cbn.
+              cbn in H.
+              apply Forall_cons; eauto.
+              apply Forall_impl with (P := fun id => In id (List.map snd brs)); eauto.
+            --
+              go.
+              eapply eutt_clo_bind; eauto.
+              intros u1 u2 H.
+              apply eutt_Ret.
+              cbn.
+              cbn in H.
+              apply Forall_cons; eauto.
+              apply Forall_impl with (P := fun id => In id (List.map snd brs)); eauto.
+        + intros x1 H.
+          destruct (select_switch x0 default_dest x1) eqn:HSwitch; cbn.
+          apply raise_has_all_posts.
+          apply select_switch_in in HSwitch.
+          apply eutt_Ret; cbn.
+          destruct HSwitch; auto; right.
+          eapply Forall_forall in H; eauto.
       - apply raiseUB_has_all_posts.
     Qed.
 
