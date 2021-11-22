@@ -268,6 +268,7 @@ Ltac bstep := autorewrite with rwbind.
 Ltac tstep := autorewrite with rwtranslate.
 Ltac go := autorewrite with rwtranslate rwbind.
 
+Ltac flatten := repeat (flatten_all ; simpl in *) .
 
 Theorem compile_correct :
   forall (σ σ' : FST) env env'  (p : stmt) (o : cfg_lang)
@@ -288,9 +289,13 @@ Proof.
     simpl in *.
     repeat (flatten_all) ; [| discriminate H0].
     inv H0.
-    assert ( I_to : to = input ) by admit. (* I need to introduce an invariant here *)
-    rewrite I_to ; clear I_to.
+    unfold denote_cfg_lang, denote_dcfg, mk_block ; cbn.
+    repeat flatten_all ; simpl.
+    replace b with to by admit.
+    rewrite denote_cfg_block.
     admit.
+    admit. (* The interface ensure this kind of properties *)
+
   - (* Seq *)
     simpl in *.
     repeat (flatten_all) ; try discriminate.
@@ -301,8 +306,24 @@ Proof.
     repeat (flatten_all); simpl in *.
     rewrite denote_cfg_seq.
     admit.
-  - (* If *) admit.
-  - (* While *) admit.
+    eapply wf_evaluate_wf_seq ; eassumption.
+    (* List.In to (inputs graph) *) admit.
+
+  - (* If *) admit. (* very tedious, because several combinators *)
+  - (* While *) 
+    simpl in *.
+    repeat (flatten_all) ; try discriminate.
+    inv H0.
+    unfold denote_cfg_lang,denote_dcfg.
+    simpl.
+    unfold mk_while.
+    flatten.
+    replace to with b by admit.
+    setoid_rewrite denote_cfg_while_loop.
+    admit.
+    eapply wf_evaluate_wf_while ; eassumption.
+    (* has_post *) admit.
+
   - (* Skip *)
     simpl in *.
     repeat flatten_all.

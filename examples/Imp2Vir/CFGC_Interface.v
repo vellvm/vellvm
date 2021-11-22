@@ -1131,7 +1131,97 @@ Proof.
     + eapply IHc. now erewrite Heq.
 Admitted.
 
+Theorem wf_evaluate_wf_seq : forall σ0 σ1 σ2 c1 c2 graph1 ins1 outs1 graph2 ins2 outs2,
+    evaluate c1 σ0 = (σ1, {| graph := graph1; ins := ins1; outs := outs1 |}) ->
+    evaluate c2 σ1 = (σ2, {| graph := graph2; ins := ins2; outs := outs2 |}) ->
+    wf_seq graph1 graph2 (hd default_bid outs1) (hd default_bid ins2).
+Proof.
+  intros * E1 E2.
+  pose proof wf_evaluate as WF_EVAL.
+  pose proof inv_independent_flows as INV_INDE_FLOWS.
+  unfold independent_flows_dcfg, independent_flows in INV_INDE_FLOWS.
+  assert (E1' := E1).
+  assert (E2' := E2).
+  do 2 intro_snd_evaluate.
+  apply WF_EVAL in E1', E2' ; clear WF_EVAL.
+  eapply INV_INDE_FLOWS in E2 ; try eapply E1 ; clear INV_INDE_FLOWS.
+  unfold wf_seq, wf_dcfg, wf_inputs,
+    wf_outputs, wf_graph, wf_name, free_in_cfg, no_reentrance in *
+  ; simpl in *.
+  intuition.
+  (* In (hd default_bid outs1) (inputs graph1) *)
+  (* (hd default_bid outs1) ∈ outs1
+    ∧ outs1 ⊍ inputs graph1 *)
+  admit.
+  (* In (hd default_bid outs1) (inputs graph2) *)
+  (* (hd default_bid outs1) ∈ outs1
+    ∧ outs1 ⊆ (outputs graph1)
+    ∧ outputs graph1 ⊍ inputs graph2 *)
+  admit.
+  (* In (hd default_bid ins2) (inputs graph1) *)
+  admit.
+  (* In (hd default_bid outs1) (ouputs graph2) *)
+  admit.
+  (* hd default_bid outs1 = hd default_bid ins2 *)
+  (* outs1 ⊆ outputs graph1
+     ∧ ins2 ⊆ inputs graph2
+     ∧ outputs graph1 ⊍ inputs graph2
+   *)
+  admit.
+Admitted.
+
+Lemma freshLabel_ord : forall f1 f2 f3 b1 b2,
+    freshLabel f1 = (f2, b1) ->
+    freshLabel f2 = (f3, b2) ->
+    le_bid b1 b2.
+Proof.
+  intros.
+  unfold freshLabel in *.
+  repeat flatten_all ; simpl in *.
+  inv H. inv H0.
+  admit.
+Admitted.
+
+Lemma freshLabel_fresh : forall f1 f2 f3 b1 b2,
+    freshLabel f1 = (f2, b1) ->
+    freshLabel f2 = (f3, b2) ->
+    b1 <> b2.
+Proof.
+  intros.
+  unfold freshLabel in *.
+  repeat flatten_all ; simpl in *.
+  inv H. inv H0.
+  admit.
+Admitted.
+
+Theorem wf_evaluate_wf_while :
+  forall f0 f1 f2 f3 c graph ins outs b1 b2 code cond,
+    evaluate c f0 = (f1, {| graph := graph; ins := ins; outs := outs |}) ->
+    freshLabel f1 = (f2, b1) ->
+    freshLabel f2 = (f3, b2) ->
+    wf_while code cond graph
+             b1 (hd CFGC_Interface.default_bid ins)
+             b2 (hd CFGC_Interface.default_bid outs).
+Proof.
+  intros * E FRESH1 FRESH2.
+  pose proof wf_evaluate as WF_EVAL.
+  unfold wf_while.
+  intuition.
+  - pose proof freshLabel_fresh as WF_FRESH.
+    eapply WF_FRESH in FRESH2 ; [| eapply FRESH1].
+    contradiction.
+  - (* b1 = hd default_bid ins0 - freshness b1 *) admit.
+  - (* b1 = hd default_bid outs0 - freshness b1 *) admit.
+  - (* b2 = hd default_bid ins0 - freshness b2 *) admit.
+  - (* b2 = hd default_bid outs0 - freshness b2 *) admit.
+  - (* free_in_cfg graph0 b1 - freshness b1 *) admit.
+  - (* free_in_cfg graph0 b2 - freshness b2 *) admit.
+  - (* free_in_cfg graph0 (hd default_bid outs0) - disjonction *) admit.
+  - (* WF graph0 *)admit.
+  - (* In (hd default_bid ins0) (inputs graph0) *) admit.
+Admitted.
 
 
+Require Import CFGC_DenotationsCombinators.
 Definition denote_dcfg (dg : dcfg) := denote_cfg (graph dg).
 Definition denote_cfg_lang (g : cfg_lang) (σ : FST) := denote_dcfg (snd ((evaluate g) σ)).
