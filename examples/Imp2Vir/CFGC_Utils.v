@@ -48,6 +48,47 @@ Proof.
   symmetry ; apply Zle_is_le_bool.
 Qed.
 
+Fixpoint max_bid' (l : list block_id) b :=
+  match l with
+  | [] => b
+  | h :: t => if leb_bid b h then max_bid' t h else max_bid' t b
+  end.
+
+Fixpoint min_bid' (l : list block_id) b :=
+  match l with
+  | [] => b
+  | h :: t => if leb_bid b h then min_bid' t b else min_bid' t h
+  end.
+
+Definition max_bid (l : list block_id) :=
+  max_bid' l (hd (Anon 0%Z) l).
+
+Definition min_bid (l : list block_id) :=
+  min_bid' l (hd (Anon 0%Z) l).
+
+Lemma leb_bid_refl : forall a, leb_bid a a = true.
+Admitted.
+
+
+Lemma max_bid_spec : forall l,
+    (length l >= 1)%nat ->
+    Forall (fun b => le_bid b (max_bid l)) l.
+Proof.
+  induction l ; try (now simpl).
+  intros.
+  apply Forall_cons.
+  unfold le_bid.
+  unfold max_bid ; simpl.
+  rewrite leb_bid_refl.
+Admitted.
+
+Lemma min_bid_spec : forall l,
+    (length l >= 1)%nat ->
+        Forall (fun b => le_bid (min_bid l) b) l.
+Admitted.
+
+
+
 Definition mk_anon (n : nat) := Anon (Z.of_nat n).
 Lemma neq_mk_anon : forall n1 n2, mk_anon n1 <> mk_anon n2 <-> n1 <> n2.
 Proof.
@@ -262,6 +303,25 @@ Proof.
   rewrite !remove_ListRemove.
   apply remove_app.
 Qed.
+
+Lemma list_norepet_remove : forall l a,
+    list_norepet l ->
+    list_norepet (CFGC_Utils.remove a l).
+Proof.
+  intros.
+  induction l ; try auto.
+  simpl.
+  destruct (eq_bid a a0) ;
+    [| apply list_norepet_cons ;
+       [intro
+        ; apply CFGC_Utils.in_remove in H0
+        ; now inversion H|]]
+  ; apply IHl
+  ; rewrite list_cons_app in H
+  ; eapply list_norepet_append_right
+  ; eassumption.
+Qed.
+
 
 Ltac break_list_hyp :=
   match goal with

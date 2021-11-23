@@ -220,7 +220,6 @@ Section CFG_LANG.
 End CFG_LANG.
 
 
-
 Require Import Coqlib.
 Require Import Util.
 
@@ -265,7 +264,6 @@ Ltac intro_snd_evaluate :=
   | h: evaluate ?c ?σ = (_,?dg) |- _ =>
       apply snd_intro in h
   end.
-
 
 
 Require Import Datatypes.
@@ -475,102 +473,6 @@ Proof.
     in_list_rem ; apply H0 in H1 ; intuition.
 Qed.
 
-
-Theorem inv_name_anon : forall (σ: FST) (c : cfg_lang) (dg : dcfg),
-    snd ((evaluate c) σ) = dg ->
-    wf_name dg.
-Proof.
-  intros *. revert σ dg.
-  unfold wf_name.
-  pose proof inv_wf_inputs_outputs as INV_IN_OUT ;
-    unfold wf_inputs in INV_IN_OUT.
-  induction c ; intros ; simpl in H.
-  - admit.
-  - unfold mk_seq in H
-    ; repeat flatten_all
-    ; simpl in *.
-    inv H ; simpl.
-    unfold cfg_seq ; simpl.
-    repeat flatten_all ; simpl in *.
-    repeat intro_snd_evaluate.
-    match goal with
-    | h:context[snd (evaluate ?c ?σ) = ?dg] |- _ =>
-        let B := fresh "H" in
-        assert (B : snd (evaluate c σ) =  dg) by now rewrite h
-        (* ; apply INV_IN_OUT in B *)
-    end.
-    apply INV_IN_OUT in H ; destruct H.
-    apply IHc2 in Heq0 ; simpl in Heq0.
-   match goal with
-    | h:context[snd (evaluate ?c ?σ) = ?dg] |- _ =>
-        let B := fresh "H" in
-        assert (B : snd (evaluate c σ) =  dg) by now rewrite h
-        (* ; apply INV_IN_OUT in B *)
-    end.
-    apply INV_IN_OUT in H1 ; destruct H1.
-    apply IHc1 in Heq ; simpl in Heq.
-    simpl in *.
-    split
-    ; break_list_goal
-    (* ; rewrite !Forall_app *)
-    ; intuition
-    ; cbn
-    ; break_list_goal
-    ; rewrite !List.Forall_app
-    ; intuition
-    ; [apply incl_Forall with (l1 := outs0) | apply incl_Forall with (l1 := ins1)]
-    ; unfold incl ; intros
-    ; try (
-          match goal with | h: In _ [_] |- _ => apply In_singleton in h end
-          ; subst ; apply hd_In
-        ).
-    admit. (* true by invariant on length outs *)
-    eapply incl_Forall ; try eassumption.
-    admit. (* true by invariant on length ins *)
-    eapply incl_Forall ; try eassumption.
-  - admit.
-  - admit.
-  - admit.
-Admitted.
-
-Fixpoint max_bid' (l : list block_id) b :=
-  match l with
-  | [] => b
-  | h :: t => if leb_bid b h then max_bid' t h else max_bid' t b
-  end.
-
-Fixpoint min_bid' (l : list block_id) b :=
-  match l with
-  | [] => b
-  | h :: t => if leb_bid b h then min_bid' t b else min_bid' t h
-  end.
-
-Definition max_bid (l : list block_id) :=
-  max_bid' l (hd (Anon 0) l).
-
-Definition min_bid (l : list block_id) :=
-  min_bid' l (hd (Anon 0) l).
-
-Lemma leb_bid_refl : forall a, leb_bid a a = true.
-Admitted.
-
-
-Lemma max_bid_spec : forall l,
-    (length l >= 1)%nat ->
-    Forall (fun b => le_bid b (max_bid l)) l.
-Proof.
-  induction l ; try (now simpl).
-  intros.
-  apply Forall_cons.
-  unfold le_bid.
-  unfold max_bid ; simpl.
-  rewrite leb_bid_refl.
-Admitted.
-
-Lemma min_bid_spec : forall l,
-    (length l >= 1)%nat ->
-        Forall (fun b => le_bid (min_bid l) b) l.
-Admitted.
 
 Definition max_label (dg : dcfg) (max : block_id) :=
   max_bid (inputs (graph dg) ++ outputs (graph dg)) = max.
@@ -831,8 +733,7 @@ Proof.
   - unfold cfg_seq.
     simpl in *.
     apply list_norepet_append.
-    (* lemma with remove, but easy *)
-    admit.
+    now apply list_norepet_remove.
     assumption.
     now eapply remove_disjoint.
   - unfold cfg_seq ; simpl in *.
@@ -862,17 +763,13 @@ Proof.
   - simpl in *.
     unfold cfg_seq ; simpl.
     repeat intro_snd_evaluate.
-    (* apply IHc1 in Heq ; simpl in Heq. *)
-    (* apply IHc2 in Heq0 ; simpl in Heq0. *)
     break_list_goal
     ; rewrite !Forall_app
     ; intuition
     ; cbn.
-    eapply incl_Forall.
-    (* In out1 (outs _) => incl [out1] (outs _)*)
-    (* NOTE easy but tedious *)
-    admit.
-    admit.
+    apply incl_Forall with (l1 := outs0).
+    apply incl_cons ; [ assumption | apply incl_nil_l ].
+    eapply incl_Forall ; eassumption.
   - simpl in *.
     unfold cfg_seq ; simpl.
     repeat intro_snd_evaluate.
@@ -880,11 +777,10 @@ Proof.
     ; rewrite !Forall_app
     ; intuition
     ; cbn.
-    eapply incl_Forall.
-    (* NOTE easy but tedious *)
-    admit.
-    admit.
-Admitted.
+    apply incl_Forall with (l1 := ins1).
+    apply incl_cons ; [ assumption | apply incl_nil_l ].
+    eapply incl_Forall ; eassumption.
+Qed.
 
 Lemma wf_mk_join : forall σ g out1 out2,
     out1 <> out2 ->
@@ -921,15 +817,31 @@ Proof.
     break_list_goal.
     simpl in *.
     apply Coqlib.list_disjoint_cons_l.
-    apply remove_disjoint_remove.
-    (* easy but tedious *)
-    admit.
-    (* freshness of (name counter_bid0)*)
-    admit.
+    + apply list_disjoint_app_r.
+      split.
+      * now do 2 apply remove_disjoint.
+      * apply remove_disjoint_remove.
+        rewrite list_cons_app.
+        rewrite CFGC_Utils.remove_app.
+        simpl.
+        rewrite eq_bid_refl.
+        apply eqb_bid_neq in NEQ_OUTS ; rewrite eq_bid_comm,NEQ_OUTS ; simpl.
+        apply remove_disjoint.
+        apply remove_disjoint_remove.
+        rewrite list_cons_app.
+        rewrite CFGC_Utils.remove_app.
+        simpl.
+        rewrite eq_bid_refl.
+        simpl ; now apply list_disjoint_nil_r.
+    + admit. (* freshness of (name counter_bid0)*)
   - unfold cfg_join.
     break_list_goal.
     simpl in *.
-    admit. (* NOTE easy but tedious + freshness counter_bid0 *)
+    apply list_norepet_cons.
+    + intro contra.
+      do 2 apply CFGC_Utils.in_remove in contra.
+      admit. (* freshness counter_bid0 *)
+    + now do 2 apply list_norepet_remove.
   - unfold cfg_join.
     break_list_goal.
     simpl in *.
@@ -940,18 +852,36 @@ Proof.
     apply incl_disjoint with (l1 := outs0) ; try assumption.
     apply incl_cons ; try assumption.
     apply incl_cons ; try assumption ; try apply incl_nil_l.
-  - admit. (* NOTE easy but tedious *)
-  - admit. (* NOTE easy but tedious *)
+  - unfold cfg_join ; simpl.
+    break_list_goal
+    ; rewrite !Forall_app
+    ; intuition
+    ; cbn.
+    apply incl_Forall with (l1 := outs0).
+    apply incl_cons ; [ assumption | apply incl_nil_l ].
+    eapply incl_Forall ; eassumption.
+    apply incl_Forall with (l1 := outs0).
+    apply incl_cons ; [ assumption | apply incl_nil_l ].
+    eapply incl_Forall ; eassumption.
+  - unfold cfg_join ; simpl.
+    break_list_goal
+    ; rewrite !Forall_app
+    ; intuition
+    ; cbn.
+    apply Forall_cons ; [ apply is_anon_name | apply Forall_nil ].
+    apply Forall_cons ; [ apply is_anon_name | apply Forall_nil ].
 Admitted.
 
 Lemma wf_mk_branch : forall σ cond gT gF inT inF,
     independent_flows_dcfg gT gF ->
     (outs gT) ⊍ (outs gF) ->
+    List.In inT (ins gT) ->
+    List.In inF (ins gF) ->
     wf_dcfg gT ->
     wf_dcfg gF ->
     wf_dcfg (snd ((mk_branch cond gT gF inT inF) σ)).
 Proof.
-  intros *  INDEPENDENT_FLOWS DISJOINT_OUTS WF_GT WF_GF.
+  intros *  INDEPENDENT_FLOWS DISJOINT_OUTS IN_T IN_F WF_GT WF_GF.
   unfold wf_dcfg, wf_inputs, wf_outputs, mk_seq, wf_graph, wf_ocfg_bid, wf_name.
   destruct σ ; cbn.
   unfold wf_dcfg, wf_inputs, wf_outputs, wf_graph, wf_ocfg_bid, wf_name in WF_GT, WF_GF.
@@ -1009,16 +939,35 @@ Proof.
     + apply Util.list_disjoint_singleton_left.
     (* freshness (name counter_bid0) *)
     admit.
-  - admit.
-  - admit.
+  - break_list_goal
+    ; rewrite !Forall_app
+    ; intuition
+    ; cbn
+    ; apply Forall_cons ; [ apply is_anon_name | apply Forall_nil ].
+  - break_list_goal
+    ; rewrite !Forall_app
+    ; intuition
+    ; cbn.
+    rewrite list_cons_app.
+    apply Forall_app.
+    split.
+    eapply incl_Forall
+    ; unfold incl
+    ; [intros * HIN ; apply In_singleton in HIN ; subst a ; eassumption|] .
+    eapply incl_Forall ; eassumption.
+    eapply incl_Forall
+    ; unfold incl
+    ; [intros * HIN ; apply In_singleton in HIN ; subst a ; eassumption|] .
+    eapply incl_Forall ; eassumption.
 Admitted.
 
 Lemma wf_mk_while : forall σ expr_code cond gB inB outB,
     List.In outB (outs gB) ->
+    List.In inB (ins gB) ->
     wf_dcfg gB ->
     wf_dcfg (snd ((mk_while expr_code cond gB inB outB) σ)).
 Proof.
-  intros * OUTPUT WF_G.
+  intros * OUTPUT INPUT WF_G.
   unfold wf_dcfg, wf_inputs, wf_outputs, mk_seq, wf_graph, wf_ocfg_bid, wf_name.
   destruct σ ; cbn.
   unfold wf_dcfg, wf_inputs, wf_outputs, wf_graph, wf_ocfg_bid, wf_name in WF_G.
@@ -1060,14 +1009,13 @@ Proof.
         admit.
     + (* freshness (name counter_bid0) *)
       admit.
-  (* NOTE: for freshness, I need hypothesis about intervals of
-         block_id in graphs *)
+  (* NOTE: for freshness, I need hypothesis about intervals of block_id in graphs *)
   - break_list_goal.
     simpl in *.
     break_list_goal.
     apply list_norepet_append ; try assumption.
     apply List_norepet_singleton.
-    admit. (* easy but tedious *)
+    now apply list_norepet_remove.
     apply list_disjoint_singleton_left.
     admit. (* freshness counter_bid0 *)
   - break_list_goal.
@@ -1082,8 +1030,29 @@ Proof.
     apply list_disjoint_singleton_left.
     (* NOTE: freshness (name counter_bid0) *)
     admit.
-  - admit.
-  - admit.
+  - break_list_goal
+    ; rewrite !Forall_app
+    ; intuition
+    ; cbn.
+    apply Forall_cons ; [ apply is_anon_name | apply Forall_nil ].
+    eapply incl_Forall
+    ; unfold incl
+    ; [intros * HIN ; apply In_singleton in HIN ; subst a ; eassumption|] .
+    eapply incl_Forall ; eassumption.
+  - break_list_goal
+    ; rewrite !Forall_app
+    ; intuition
+    ; cbn.
+    break_list_goal
+    ; rewrite !Forall_app
+    ; intuition
+    ; cbn.
+    eapply incl_Forall
+    ; unfold incl
+    ; [intros * HIN ; apply In_singleton in HIN ; subst a ; eassumption|] .
+    eapply incl_Forall ; eassumption.
+    apply Forall_cons ; [ apply is_anon_name | apply Forall_nil ].
+    apply Forall_cons ; [ apply is_anon_name | apply Forall_nil ].
 Admitted.
 
 
@@ -1113,6 +1082,10 @@ Proof.
     apply wf_mk_branch.
     + eapply inv_independent_flows ; eassumption.
     + eapply inv_disjoint_outputs ; eassumption.
+    + apply hd_In.
+      apply (inv_len_inputs σ c1 d). now rewrite Heq.
+    + apply hd_In.
+      apply (inv_len_inputs f c2 d0). now rewrite Heq0.
     + eapply IHc1. now erewrite Heq.
     + eapply IHc2. now erewrite Heq0.
   - repeat flatten_all.
@@ -1128,6 +1101,8 @@ Proof.
     apply wf_mk_while.
     + apply hd_In.
       apply (inv_len_outputs σ c d). now rewrite Heq.
+    + apply hd_In.
+      apply (inv_len_inputs σ c d). now rewrite Heq.
     + eapply IHc. now erewrite Heq.
 Admitted.
 
