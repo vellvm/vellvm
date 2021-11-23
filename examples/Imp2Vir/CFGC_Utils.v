@@ -1,6 +1,7 @@
 From Coq Require Import
      List
-     ZArith.
+     ZArith
+     Lia.
 Import ListNotations.
 From Vellvm Require Import
      Syntax
@@ -11,42 +12,74 @@ Open Scope nat_scope.
 
 (* Definition and lemmas about relation between block_id *)
 
-Definition eq_bid b b' :=
+Definition eqb_bid b b' :=
   match b,b' with
   | Name s, Name s' => String.eqb s s'
   | Anon n, Anon n' => @RelDec.eq_dec int eq_dec_int n n'
   | Raw n, Raw n' => @RelDec.eq_dec int eq_dec_int n n'
   | _ , _ => false
-    end.
-
-(* Anon _ <= Raw _ <= Name _*)
-Definition leb_bid b b' :=
-  match b,b' with
-  | Name s, Name s' => true
-  | Anon n, Anon n' => (n <=? n')%Z
-  | Raw n, Raw n' => (n <=? n')%Z
-  | Anon _, Name _ => true
-  | Anon _, Raw _ => true
-  | Raw _, Anon _ => false
-  | Name _, Anon _ => false
-  | Name _, Raw _ => false
-  | Raw _, Name _ => true
   end.
 
-Definition le_bid (b b': block_id) : Prop :=
-  leb_bid b b' = true.
-
-Lemma le_bid_anon : forall b b' n n',
-    b = Anon n ->
-    b' = Anon n' ->
-    le_bid b b' <-> (n <= n')%Z.
+Lemma eqb_bid_eq : forall b b', eqb_bid b b' = true <-> b=b'.
 Proof.
   intros.
-  subst.
-  unfold le_bid.
-  cbn.
-  symmetry ; apply Zle_is_le_bool.
+  split.
+  - destruct b,b' ;
+      try (intros ; simpl in H ; discriminate) ;
+      simpl ; intros ; f_equal ;
+      try (now apply String.eqb_eq) ;
+      try (now apply Z.eqb_eq).
+  - intros ; subst.
+    destruct b' ; simpl ;
+      try (now apply String.eqb_eq) ;
+      try (now apply Z.eqb_eq).
 Qed.
+
+Lemma eqb_bid_neq : forall b b', eqb_bid b b' = false <-> b<>b'.
+Proof.
+  intros.
+  split.
+  - destruct b,b' ;
+      try (intros ; simpl in H ; discriminate) ;
+      simpl ; intros ; intro ;
+      try (apply String.eqb_neq in H);
+      try (apply Z.eqb_neq in H);
+      inv H0 ; contradiction.
+  - intros ; subst.
+    destruct b,b' ; simpl ; auto;
+      try (apply String.eqb_neq) ;
+      try (apply Z.eqb_neq) ;
+      intro ; subst ;
+      contradiction.
+Qed.
+
+Lemma eqb_bid_comm : forall b b', eqb_bid b b' = eqb_bid b' b.
+  intros.
+  destruct b,b' ; simpl ; auto ;
+    try (now apply String.eqb_sym) ;
+    try (now apply Z.eqb_sym).
+Qed.
+
+Lemma eqb_bid_refl : forall b, eqb_bid b b = true.
+  intros.
+  destruct b ; simpl ; auto ;
+    try (now apply String.eqb_refl) ;
+    try (now apply Z.eqb_refl).
+Qed.
+
+Definition ltb_bid b b' :=
+  match b,b' with
+  | Anon n, Anon n' => (n <? n')%Z
+  | _, _ => false
+  end.
+
+Definition lt_bid (b b': block_id) : Prop :=
+  ltb_bid b b' = true.
+
+Definition leb_bid b b' :=
+  orb (ltb_bid b b') (eqb_bid b b').
+
+Definition le_bid b b' := (leb_bid b b' = true).
 
 Fixpoint max_bid' (l : list block_id) b :=
   match l with
@@ -66,26 +99,175 @@ Definition max_bid (l : list block_id) :=
 Definition min_bid (l : list block_id) :=
   min_bid' l (hd (Anon 0%Z) l).
 
+Lemma ltb_bid_irrefl : forall a, ltb_bid a a = false.
+  intros.
+  unfold ltb_bid.
+  destruct a ; try reflexivity.
+  apply Z.ltb_irrefl.
+Qed.
+
+Lemma lt_bid_irrefl : forall a, ~ lt_bid a a.
+  intros.
+  unfold lt_bid.
+  rewrite ltb_bid_irrefl.
+  auto.
+Qed.
+
+Lemma lt_bid_trans : forall b1 b2 b3, lt_bid b1 b2 -> lt_bid b2 b3 -> lt_bid b1 b3.
+Proof.
+  intros.
+  unfold lt_bid, ltb_bid in *.
+  destruct b1,b2,b3 ; try auto ; try discriminate.
+  rewrite Z.ltb_lt in *. eapply Z.lt_trans ; eassumption.
+Qed.
+
 Lemma leb_bid_refl : forall a, leb_bid a a = true.
+  intros.
+  unfold leb_bid.
+  destruct a
+  ; simpl
+  ; try (now rewrite String.eqb_refl)
+  ; try ( rewrite Z.eqb_refl )
+  ; try reflexivity.
+  apply Bool.orb_true_r.
+Qed.
+
+Lemma le_bid_refl : forall a, le_bid a a.
+  intros.
+  unfold le_bid.
+  apply leb_bid_refl.
+Qed.
+
+Lemma le_bid_trans : forall b1 b2 b3, le_bid b1 b2 -> le_bid b2 b3 -> le_bid b1 b3.
+Proof.
+  intros.
+  unfold le_bid, leb_bid in *.
+  admit. (* easy but I'm lazy for now *)
+Admitted.
+
+Lemma lt_le : forall b1 b2, lt_bid b1 b2 -> le_bid b1 b2.
+Proof.
+  intros.
+  unfold le_bid, leb_bid, lt_bid in *.
+  now rewrite H.
+Qed.
+
+Lemma lt_bid_trans_le : forall b1 b2 b3, le_bid b1 b2 -> lt_bid b2 b3 -> lt_bid b1 b3.
+Proof.
+  admit. (* easy but I'm lazy for now *)
+Admitted.
+
+Lemma lt_bid_trans_le2 : forall b1 b2 b3, lt_bid b1 b2 -> le_bid b2 b3 -> lt_bid b1 b3.
+Proof.
+  admit. (* easy but I'm lazy for now *)
 Admitted.
 
 
-Lemma max_bid_spec : forall l,
-    (length l >= 1)%nat ->
-    Forall (fun b => le_bid b (max_bid l)) l.
+
+
+Lemma lt_bid_neq : forall b1 b2, lt_bid b1 b2 -> b1 <> b2.
 Proof.
-  induction l ; try (now simpl).
+  repeat intro ; subst.
+  now apply lt_bid_irrefl in H.
+Qed.
+
+Lemma lt_bid_neq' : forall b1 b2, lt_bid b1 b2 -> b2 <> b1.
+Proof.
+  repeat intro ; subst.
+  now apply lt_bid_irrefl in H.
+Qed.
+
+Lemma max_bid'_cons : forall x d l,
+    le_bid x d ->
+    le_bid x (max_bid' l d).
+Proof.
+  induction l ; intros ; simpl.
+  assumption.
+  destruct (leb_bid d a).
+  - admit.
+  - now apply IHl.
+Admitted.
+
+Corollary max_bid'_cons_refl : forall x l,
+    le_bid x (max_bid' l x).
+Proof.
   intros.
-  apply Forall_cons.
-  unfold le_bid.
+  apply max_bid'_cons.
+  apply leb_bid_refl.
+Qed.
+
+Lemma max_bid_cons : forall x l,
+    le_bid x (max_bid (x :: l)).
+Proof.
+  intros.
   unfold max_bid ; simpl.
   rewrite leb_bid_refl.
+  apply max_bid'_cons_refl.
+Qed.
+
+Lemma Forall_cons_cons:
+  forall {A : Type} {P : A -> Prop} (x y : A) {l},
+    P y -> Forall P (x::l) -> Forall P (x :: y :: l).
+Proof.
+  intros.
+  apply Forall_cons ;
+  apply List.Forall_cons_iff in H0 ;
+    intuition.
+Qed.
+
+(* NOTE HERE something goes wrong with the induction ?*)
+Lemma max_bid_spec : forall l x,
+    Forall (fun b => le_bid b (max_bid (x::l))) (x::l).
+Proof.
+  induction l ; intros.
+  - apply Forall_cons ; [| apply Forall_nil].
+    unfold max_bid ; simpl.
+    rewrite leb_bid_refl.
+    apply le_bid_refl.
+  - admit.
 Admitted.
+
+
+Lemma max_bid_spec' : forall h l max,
+    (max_bid (h::l)) = max ->
+    Forall (fun b => le_bid b max) (h::l).
+Proof.
+  intros.
+  rewrite <- H.
+  apply max_bid_spec.
+Qed.
+
+Lemma non_nil : forall {T} (l : list T),
+    (length l >= 1)%nat ->
+    exists h t, l = h::t.
+Proof.
+  intros.
+  induction l.
+  simpl in H ; lia.
+  eexists.
+  eexists. reflexivity.
+Qed.
+
+Lemma max_bid_spec_nn : forall l max,
+    (length l >= 1)%nat ->
+    (max_bid l) = max ->
+    Forall (fun b => le_bid b max) l.
+  intros.
+  apply non_nil in H ; destruct H as [ h [t ->] ].
+  now apply max_bid_spec'.
+Qed.
 
 Lemma min_bid_spec : forall l,
     (length l >= 1)%nat ->
-        Forall (fun b => le_bid (min_bid l) b) l.
+    Forall (fun b => le_bid (min_bid l) b) l.
 Admitted.
+
+Lemma min_bid_spec_nn : forall l min,
+    (length l >= 1)%nat ->
+    (min_bid l) = min ->
+    Forall (fun b => le_bid min b) l.
+Admitted.
+
 
 
 
@@ -105,66 +287,66 @@ Proof.
     contradiction.
 Qed.
 
-Lemma eqb_bid_eq : forall b b', eq_bid b b' = true <-> b=b'.
+Definition name := mk_anon.
+Lemma neq_name : forall n1 n2, name n1 <> name n2 <-> n1 <> n2.
 Proof.
   intros.
-  split.
-  - destruct b,b' ;
-      try (intros ; simpl in H ; discriminate) ;
-      simpl ; intros ; f_equal ;
-      try (now apply String.eqb_eq) ;
-      try (now apply Z.eqb_eq).
-  - intros ; subst.
-    destruct b' ; simpl ;
-      try (now apply String.eqb_eq) ;
-      try (now apply Z.eqb_eq).
+  unfold name. now apply neq_mk_anon.
 Qed.
 
-Lemma eqb_bid_neq : forall b b', eq_bid b b' = false <-> b<>b'.
+Definition is_anon (b : block_id) : Prop :=
+  exists n, b = Anon n.
+
+Lemma is_anon_name : forall n, is_anon (name n).
 Proof.
   intros.
-  split.
-  - destruct b,b' ;
-      try (intros ; simpl in H ; discriminate) ;
-      simpl ; intros ; intro ;
-      try (apply String.eqb_neq in H);
-      try (apply Z.eqb_neq in H);
-        inv H0 ; contradiction.
-  - intros ; subst.
-    destruct b,b' ; simpl ; auto;
-    try (apply String.eqb_neq) ;
-      try (apply Z.eqb_neq) ;
-      intro ; subst ;
-    contradiction.
+  unfold name, mk_anon.
+  unfold is_anon.
+  now eexists.
 Qed.
 
-Lemma eq_bid_comm : forall b b', eq_bid b b' = eq_bid b' b.
+Definition next_anon (b : block_id) :=
+  match b with
+  | Name s => Name s
+  | Raw n => Raw (n+1)%Z
+  | Anon n => Anon (n+1)%Z
+  end.
+
+Lemma next_anon_name : forall n, next_anon (name n) = name (n+1).
+Proof.
   intros.
-  destruct b,b' ; simpl ; auto ;
-    try (now apply String.eqb_sym) ;
-    try (now apply Z.eqb_sym).
+  unfold next_anon, name, mk_anon.
+  rewrite Nat2Z.inj_add.
+  reflexivity.
 Qed.
 
-Lemma eq_bid_refl : forall b, eq_bid b b = true.
-  intros.
-  destruct b ; simpl ; auto ;
-    try (now apply String.eqb_refl) ;
-    try (now apply Z.eqb_refl).
-Qed.
+Lemma ord_list : forall l f,
+    lt_bid (max_bid l) f ->
+    ~ In f l.
+Proof.
+  induction l as [| x l' Hl' ] ; intros.
+  - apply in_nil.
+  - (* pose proof max_bid_spec'. *)
+    apply not_in_cons.
+    split.
+    + apply lt_bid_neq'. eapply lt_bid_trans_le ; try eassumption. apply max_bid'_cons_refl.
+    + eapply Hl'.
+Admitted.
+
 
 Lemma eqv_dec_p_eq : forall b b' r,
-    eq_bid b b' = r <-> (if Eqv.eqv_dec_p b b' then true else false) = r.
+    eqb_bid b b' = r <-> (if Eqv.eqv_dec_p b b' then true else false) = r.
   intros.
   destruct r eqn:R.
   - destruct (Eqv.eqv_dec_p b b') eqn:E.
     + unfold Eqv.eqv,eqv_raw_id in e ; subst.
-      now rewrite eq_bid_refl.
+      now rewrite eqb_bid_refl.
     + unfold Eqv.eqv,eqv_raw_id in n.
       rewrite eqb_bid_eq.
       split ; intros ; subst. contradiction. inversion H.
   - destruct (Eqv.eqv_dec_p b b') eqn:E.
     + unfold Eqv.eqv,eqv_raw_id in e ; subst.
-    now rewrite eq_bid_refl.
+      now rewrite eqb_bid_refl.
     + unfold Eqv.eqv,eqv_raw_id in n ; subst.
       rewrite eqb_bid_neq.
       split ; intros ; auto.
@@ -179,7 +361,7 @@ Proof.
 Qed.
 
 Lemma eqv_dec_p_eq_true : forall {T} b b' (xT xF : T),
-    eq_bid b b' = true -> (if Eqv.eqv_dec_p b b' then xT else xF) = xT.
+    eqb_bid b b' = true -> (if Eqv.eqv_dec_p b b' then xT else xF) = xT.
 Proof.
   intros ; destruct (Eqv.eqv_dec_p b b') eqn:E.
   - reflexivity.
@@ -188,9 +370,9 @@ Proof.
 Qed.
 
 Lemma eqv_dec_p_eq_false : forall {T} b b' (xT xF : T),
-    eq_bid b b' = false -> (if Eqv.eqv_dec_p b b' then xT else xF) = xF.
+    eqb_bid b b' = false -> (if Eqv.eqv_dec_p b b' then xT else xF) = xF.
 Proof.
-   intros ; destruct (Eqv.eqv_dec_p b b') eqn:E.
+  intros ; destruct (Eqv.eqv_dec_p b b') eqn:E.
   - unfold Eqv.eqv,eqv_raw_id in e ; subst.
     rewrite eqb_bid_neq in H. contradiction.
   - reflexivity.
@@ -228,7 +410,7 @@ Qed.
 Fixpoint remove (x : block_id) (l : list block_id) :=
   match l with
   | [] => []
-  | h::t => if (eq_bid x h) then remove x t else h::(remove x t)
+  | h::t => if (eqb_bid x h) then remove x t else h::(remove x t)
   end.
 
 Lemma remove_ListRemove :
@@ -237,12 +419,12 @@ Proof.
   intros.
   induction l ; try reflexivity.
   simpl.
-  destruct (eq_bid b a) eqn:E ;
-  match goal with
+  destruct (eqb_bid b a) eqn:E ;
+    match goal with
     | |- context[if (_ ?b1 ?b2) then ?xT else ?xF] =>
         try apply (eqv_dec_p_eq_true b1 b2 xT xF) in E
         ; try apply (eqv_dec_p_eq_false b1 b2 xT xF) in E
-  end ; setoid_rewrite E.
+    end ; setoid_rewrite E.
   - assumption.
   - now f_equal.
 Qed.
@@ -281,7 +463,7 @@ Proof.
   induction l1.
   now simpl.
   simpl.
-  destruct (eq_bid x a).
+  destruct (eqb_bid x a).
   - apply IHl1. now apply list_disjoint_cons_left in H.
   - apply list_disjoint_cons_l_iff in H ; destruct H.
     apply list_disjoint_cons_l.
@@ -290,14 +472,14 @@ Qed.
 
 Lemma remove_disjoint_remove : forall (x : block_id) (l1 l2 : list block_id),
     (CFGC_Utils.remove x l1) ⊍ (CFGC_Utils.remove x l2) <->
-    (CFGC_Utils.remove x l1) ⊍ l2.
+(CFGC_Utils.remove x l1) ⊍ l2.
 Proof.
   intros.
 Admitted.
 
 Lemma remove_app:
   forall (x : block_id) (l1 l2 : list block_id),
-  CFGC_Utils.remove x (l1 ++ l2) = CFGC_Utils.remove x l1 ++ CFGC_Utils.remove x l2.
+    CFGC_Utils.remove x (l1 ++ l2) = CFGC_Utils.remove x l1 ++ CFGC_Utils.remove x l2.
 Proof.
   intros.
   rewrite !remove_ListRemove.
@@ -311,7 +493,7 @@ Proof.
   intros.
   induction l ; try auto.
   simpl.
-  destruct (eq_bid a a0) ;
+  destruct (eqb_bid a a0) ;
     [| apply list_norepet_cons ;
        [intro
         ; apply CFGC_Utils.in_remove in H0
@@ -325,36 +507,67 @@ Qed.
 
 Ltac break_list_hyp :=
   match goal with
-    | h: List.In _ (_ ++ _) |- _ => repeat (apply in_app_or in h)
+  | h: List.In _ (_ ++ _) |- _ => repeat (apply in_app_or in h)
   end.
 
 Ltac break_list_goal :=
   try (rewrite Util.list_cons_app) ;
   try (
-  match goal with
-  | |- context[inputs (_ ++ _)] =>
-      repeat (rewrite !ScopeTheory.inputs_app)
-  | |- context[outputs (_ ++ _)] =>
-      repeat (rewrite !ScopeTheory.outputs_app)
-  end ) ;
+        match goal with
+        | |- context[inputs (_ ++ _)] =>
+            repeat (rewrite !ScopeTheory.inputs_app)
+        | |- context[outputs (_ ++ _)] =>
+            repeat (rewrite !ScopeTheory.outputs_app)
+        end ) ;
   try (
-  match goal with
-  | |- context[List.In _ (_ ++ _)] => repeat (apply in_or_app)
-  end).
+        match goal with
+        | |- context[List.In _ (_ ++ _)] => repeat (apply in_or_app)
+        end).
+
+Lemma length_incl : forall {T} (l sl : list T) n,
+    (length sl >= n)%nat ->
+    incl sl l ->
+    (length l >= n)%nat.
+Proof.
+  (* intros. *)
+  induction sl ; intros.
+  - simpl in * ; lia .
+  - simpl in *.
+Admitted.
+
+Lemma not_in_app : forall {T} {x : T} l1 l2,
+    ~ In x (l1++l2) <-> ~ In x l1 /\ ~ In x l2.
+Proof.
+  intros.
+  intuition.
+  apply in_app in H0.
+  destruct H0 ; [ now apply H1 | now apply H2].
+Qed.
+
+Lemma not_in_incl : forall {T} l l' (x : T),
+    incl l' l ->
+    ~ In x l ->
+    ~ In x l'.
+Proof.
+  intros.
+  unfold incl in H.
+  intro. apply H in H1. contradiction.
+Qed.
+
 
 (* Misc lemmas related to vellvm *)
 
 Lemma find_block_none_singleton :
   forall c term phis comm b b' , b<>b' <->
-   find_block
+find_block
    (convert_typ []
-      [{|
-         blk_id := b;
-         blk_phis := phis;
-         blk_code := c;
-         blk_term := term;
-         blk_comments := comm
-         |}]) b' = None.
+                [{|
+                      blk_id := b;
+                   blk_phis := phis;
+                   blk_code := c;
+                   blk_term := term;
+                   blk_comments := comm
+                   |}]) b' = None.
 Proof.
   intros.
   split; intros.
@@ -412,8 +625,8 @@ Qed.
 
 Lemma find_app :
   forall {A} (l1 l2 : list A) f x,
-  List.find f (l1 ++ l2) = Some x ->
-  List.find f l1 = Some x \/ List.find f l2 = Some x.
+    List.find f (l1 ++ l2) = Some x ->
+    List.find f l1 = Some x \/ List.find f l2 = Some x.
 Proof.
   intros.
   induction l1.
@@ -426,9 +639,9 @@ Qed.
 
 Lemma find_block_app_wf :
   forall {T : Set} (x : block_id) [b : block T] (bs1 bs2 : ocfg T),
-  wf_ocfg_bid (bs1 ++ bs2)%list ->
-  find_block (bs1 ++ bs2) x = Some b ->
-  find_block bs1 x = Some b \/ find_block bs2 x = Some b .
+    wf_ocfg_bid (bs1 ++ bs2)%list ->
+    find_block (bs1 ++ bs2) x = Some b ->
+    find_block bs1 x = Some b \/ find_block bs2 x = Some b .
 Proof.
   intros.
   unfold find_block in H0.
@@ -436,8 +649,8 @@ Proof.
 Qed.
 
 Lemma outputs_successors : forall {typ} (cfg : ocfg typ) o,
-  List.In o (outputs cfg) ->
-  exists bk, List.In bk cfg /\ List.In o (successors bk).
+    List.In o (outputs cfg) ->
+    exists bk, List.In bk cfg /\ List.In o (successors bk).
 Proof.
   induction cfg; intros.
   - destruct H.
@@ -450,9 +663,9 @@ Proof.
 Qed.
 
 Lemma successors_outputs : forall {typ} (cfg : ocfg typ) o bk,
-  List.In bk cfg ->
-  List.In o (successors bk) ->
-  List.In o (outputs cfg).
+    List.In bk cfg ->
+    List.In o (successors bk) ->
+    List.In o (outputs cfg).
 Proof.
   induction cfg; intros.
   - destruct H.
@@ -464,7 +677,7 @@ Proof.
 Qed.
 
 Lemma convert_typ_inputs : forall bk,
-  inputs (convert_typ nil bk) = inputs bk.
+    inputs (convert_typ nil bk) = inputs bk.
 Proof.
   intros.
   unfold inputs, convert_typ, ConvertTyp_list, tfmap, TFunctor_list'.
@@ -473,7 +686,7 @@ Proof.
 Qed.
 
 Lemma convert_typ_successors : forall (bk : block typ),
-  successors (convert_typ nil bk) = successors bk.
+    successors (convert_typ nil bk) = successors bk.
 Proof.
   intros.
   apply convert_typ_terminator_outputs.

@@ -3,7 +3,8 @@ From Coq Require Import
      Strings.String
      FSets.FMapList
      Structures.OrderedTypeEx
-     ZArith.
+     ZArith
+     Lia.
 Module Import StringMap := Coq.FSets.FMapList.Make(String_as_OT).
 
 From ExtLib Require Import
@@ -13,35 +14,19 @@ Import MonadNotation.
 
 From Vellvm Require Import
      Syntax
-     SurfaceSyntax .
+     SurfaceSyntax
+     Utils.Tactics.
 
 From Imp2Vir Require Import Imp CFGC_Combinators CFGC_Utils.
 
+Require Import Coqlib.
+Require Import Util.
 
 Import ListNotations.
 Import VIR_Notations.
 Notation ocfg := (ocfg typ).
 
 Section FreshnessMonad.
-
-  Definition name := mk_anon.
-  Lemma neq_name : forall n1 n2, name n1 <> name n2 <-> n1 <> n2.
-  Proof.
-    intros.
-    unfold name. now apply neq_mk_anon.
-  Qed.
-
-  Definition is_anon (b : block_id) : Prop :=
-    exists n, b = Anon n.
-
-  Lemma is_anon_name : forall n, is_anon (name n).
-  Proof.
-    intros.
-    unfold name, mk_anon.
-    unfold is_anon.
-    now eexists.
-  Qed.
-
   Record FST :=
     mk_FST
       {
@@ -65,9 +50,34 @@ Section FreshnessMonad.
   Definition freshReg : fresh int :=
     fun '(mk_FST bid reg) => (mk_FST bid (reg+1)%Z, reg).
 
+  Lemma freshLabel_ord : forall f1 f2 f3 b1 b2,
+      freshLabel f1 = (f2, b1) ->
+      freshLabel f2 = (f3, b2) ->
+      lt_bid b1 b2.
+  Proof.
+    intros.
+    unfold freshLabel in *.
+    repeat flatten_all ; simpl in *.
+    inv H. inv H0.
+    admit. (* obviously true *)
+  Admitted.
+
+  Lemma freshLabel_fresh : forall f1 f2 f3 b1 b2,
+      freshLabel f1 = (f2, b1) ->
+      freshLabel f2 = (f3, b2) ->
+      b1 <> b2.
+  Proof.
+    intros.
+    unfold freshLabel in *.
+    repeat flatten_all ; simpl in *.
+    inv H. inv H0.
+    apply neq_name.
+    lia.
+  Qed.
+
 End FreshnessMonad.
 
-
+Import CFGC_Utils.
 Section InterfaceCombinators.
 
   Notation code := (code typ).
@@ -180,48 +190,8 @@ Section CFG_LANG.
         mk_while expr_code cond dgB inB outB
     end.
 
-  Fixpoint len_entry_exit (cfg : cfg_lang) : (nat * nat) :=
-    match cfg with
-    | CBlock c => (1,1)
-    | CSeq c1 c2 =>
-        let '(i1,e1) := len_entry_exit c1 in
-        let '(i2,e2) := len_entry_exit c2 in
-        (i1+i2, e1+e2)
-    | CBranch _ c1 c2 =>
-        let '(i1,e1) := len_entry_exit c1 in
-        let '(i2,e2) := len_entry_exit c2 in
-        (i1+i2-1, e1+e2)
-    | CJoin c =>
-        let '(i,e) := len_entry_exit c in
-        (i, e-1)
-    | CWhile _ _ c => len_entry_exit c
-    end.
-
-  Definition wf_cfg_lang c :=
-    forall i e,
-    len_entry_exit c = (i,e) ->
-    i >= 1 /\ e >= 1.
-  From Vellvm Require Import Utils.Tactics.
-  From Coq Require Import Lia.
-
-  Lemma t :
-    forall c c1 i e,
-      c = CJoin c1 ->
-      wf_cfg_lang c ->
-      len_entry_exit c1 = (i,e) ->
-      e >= 2.
-  Admitted.
-
-
-  (* TODO I want to ensure that,
-     for CJoin c, len_entry_exit c = (i,e) -> e >= 2 (else it is not WF)
-   *)
-
 End CFG_LANG.
 
-
-Require Import Coqlib.
-Require Import Util.
 
 Definition independent_flows_dcfg g1 g2 :=
   independent_flows (graph g1) (graph g2).
@@ -253,7 +223,6 @@ Proof.
   unfold wf_dcfg, wf_graph in H ; intuition.
 Qed.
 
-
 Lemma snd_intro : forall {A B : Type} (p : A * B) x y, p = (x, y) -> snd p = y.
 Proof.
   intros. now inv H.
@@ -265,6 +234,8 @@ Ltac intro_snd_evaluate :=
       apply snd_intro in h
   end.
 
+
+(** Invariants through the function evaluate *)
 
 Require Import Datatypes.
 Theorem inv_len_inputs : forall (σ: FST) (c : cfg_lang) (dg : dcfg),
@@ -483,13 +454,15 @@ Definition min_label (dg : dcfg) (min : block_id) :=
 Definition interval_label (dg : dcfg) (min max : block_id) :=
   max_label dg max /\ min_label dg min.
 
+Open Scope Z_scope.
+(* NOTE HERE induction ?*)
 Lemma inv_counter_bid :
   forall σ σ' (cb cb' : nat) (cr cr' : int) (c : cfg_lang) (dg : dcfg) min max,
     σ = {| counter_bid := cb; counter_reg := cr |} ->
     σ' = {| counter_bid := cb'; counter_reg := cr' |} ->
     interval_label dg min max ->
     (evaluate c) σ = (σ', dg) ->
-    le_bid (name cb') max.
+    name cb' = next_anon max.
 Proof.
   induction c ; intros ; subst ; simpl in *.
   - unfold mk_block in *.
@@ -499,17 +472,54 @@ Proof.
     unfold cfg_block in H1.
     unfold max_label, min_label in H1.
     cbn in *.
-    rewrite Z.leb_refl in *.
+    rewrite leb_bid_refl in *.
+    unfold leb_bid in *. simpl in *.
     match goal with
-    | h:context[ ?x <=? ?y ] |- _ =>
+    | h:context[ ?x <? ?y ] |- _ =>
         let H := fresh "H" in
-        assert (H : x <=? y = true) by admit
+        assert (H : x <? y = true) by admit
         ; rewrite H in * ; clear H
     end.
     destruct H1 ; subst.
-    unfold le_bid.
-    admit. (* obviously true *)
+    rewrite orb_true_l.
+    rewrite next_anon_name.
+    rewrite <- Nat.add_1_l.
+    now rewrite Nat.add_comm.
+  - unfold mk_seq in *.
+    repeat flatten_all ; simpl in *.
+    inv H2.
+    admit.
+  - unfold mk_branch in *.
+    repeat flatten_all ; simpl in *.
+    repeat flatten_all ; simpl in *.
+    inv H2.
+    admit.
+  - unfold mk_join in *.
+    repeat flatten_all ; simpl in *.
+    repeat flatten_all ; simpl in *.
+    inv H2.
+    admit.
+  - unfold mk_while in *.
+    repeat flatten_all ; simpl in *.
+    repeat flatten_all ; simpl in *.
+    inv H2.
+    admit.
 Admitted.
+
+Lemma inv_counter_bid' :
+  forall σ σ' (cb cb' : nat) (cr cr' : int) (c : cfg_lang) (dg : dcfg) min max,
+    σ = {| counter_bid := cb; counter_reg := cr |} ->
+    σ' = {| counter_bid := cb'; counter_reg := cr' |} ->
+    interval_label dg min max ->
+    (evaluate c) σ = (σ', dg) ->
+    lt_bid max (name cb').
+Proof.
+  intros.
+  eapply inv_counter_bid in H2 ; try eassumption.
+  rewrite H2.
+  admit. (* true if (is_anon max = true) *)
+Admitted.
+
 
 Lemma inv_min_label :
   forall σ σ' (cb cb' : nat) (cr cr' : int) (c : cfg_lang) (dg : dcfg) min max,
@@ -527,13 +537,14 @@ Proof.
     unfold cfg_block in H1.
     unfold max_label, min_label in H1.
     cbn in *.
-    rewrite Z.leb_refl in *.
+    rewrite leb_bid_refl in *.
+    unfold leb_bid in * ; simpl in *.
     match goal with
-    | h:context[ ?x <=? ?y ] |- _ =>
+    | h:context[ ?x <? ?y ] |- _ =>
         let H := fresh "H" in
-        assert (H : x <=? y = true) by admit
+        assert (H : x <? y = true) by admit
         ; rewrite H in * ; clear H
-    end.
+    end ; simpl in *.
     intuition.
   - unfold mk_seq in H2
     ; repeat flatten_all ; simpl in *.
@@ -548,10 +559,10 @@ Admitted.
     (evaluate c2) σ2 = (σ3, dg2) ->
     interval_label dg1 min1 max1 ->
     interval_label dg2 min2 max2 ->
-    le_bid max1 min2.
+    lt_bid max1 min2.
 Proof.
   induction c1 ; intros.
-  - (* CBlock, CBlock *)
+  - (* CBlock *)
     simpl in *.
     unfold mk_block in *.
     unfold freshLabel in *.
@@ -566,40 +577,51 @@ Proof.
     simpl in *.
     unfold max_bid, min_bid in *.
     simpl in *.
-    rewrite Z.leb_refl in *.
+    rewrite leb_bid_refl in * ; simpl in *.
+    unfold leb_bid in *; simpl in *.
     match goal with
-    | h:context[ ?x <=? ?y ] |- _ =>
+    | h:context[ ?x <? ?y ] |- _ =>
         let H := fresh "H" in
-        assert (H : x <=? y = true) by admit
+        assert (H : x <? y = true) by admit
         ; rewrite H in * ; clear H
-    end.
+    end ; simpl in *.
     intuition ; subst.
-    eapply inv_counter_bid.
+    destruct σ3
+    ; eapply inv_min_label in H3 ; try reflexivity ; try eassumption.
+    rewrite H3.
+    admit (* obviously true *).
+  - (* CSeq *)
+    simpl in *.
+    unfold mk_seq in *.
+    repeat flatten_all ; simpl in *.
+    admit.
 Admitted.
 
 Lemma inv_interval_independant :
   forall dg1 dg2 min1 max1 min2 max2,
+    (length (inputs (graph dg1) ++ outputs (graph dg1)) >= 1)%nat ->
+    (length (inputs (graph dg2) ++ outputs (graph dg2)) >= 1)%nat ->
     interval_label dg1 min1 max1 ->
     interval_label dg2 min2 max2 ->
-    le_bid max1 min2 ->
+    lt_bid max1 min2 ->
     independent_flows_dcfg dg1 dg2 /\ (outs dg1) ⊍ (outs dg2).
 Proof.
-  intros.
+  intros * HL1 HL2 INT_G1 INT_G2 LE.
   unfold independent_flows_dcfg, independent_flows,
     interval_label, max_label, min_label in *.
   destruct dg1, dg2.
   simpl in *.
   unfold no_reentrance, no_duplicate_bid.
-  assert ((length (inputs graph0 ++ outputs graph0) >= 1)%nat) by admit. (* true using the invariant*)
-  assert ((length (inputs graph1 ++ outputs graph1) >= 1)%nat) by admit. (* true using the invariant*)
-  apply max_bid_spec in H3.
-  apply min_bid_spec in H2.
-  destruct H, H0.
-  rewrite H4, H0 in *.
-  rewrite Forall_app in H2,H3.
+  destruct INT_G1 as [ MAX_G1 _ ], INT_G2 as [ _ MIN_G2 ].
+  eapply max_bid_spec_nn in HL1 ; try eassumption.
+  eapply min_bid_spec_nn in HL2 ; try eassumption.
+  rewrite Forall_app in HL1,HL2.
   intuition.
+  - admit.
+  - admit.
+  - admit.
+  - admit.
 Admitted.
-
 
 Theorem inv_independent_flows :
   forall (σ1 σ2 σ3: FST) (c1 c2 : cfg_lang) (dg1 dg2 : dcfg),
@@ -612,7 +634,18 @@ Proof.
   unfold independent_flows_dcfg, independent_flows in *.
   pose proof (inv_interval_name σ1 σ2 σ3 c1 c2 dg1 dg2).
   eapply H1 in H2
-  ; try intuition.
+  ; try intuition
+  ; try
+      ( assert (H' := H) ; assert (H0' := H0)
+        ; do 4 intro_snd_evaluate
+        ; apply inv_len_outputs in H
+        ; apply inv_len_inputs in H0
+        ; apply inv_wf_inputs_outputs in H', H0'
+        ; unfold wf_inputs in H0'
+        ; destruct H' as [ _ H' ], H0' as [ H0' _ ]
+        ; rewrite app_length
+        ; eapply length_incl in H', H0' ; try eassumption
+        ; lia).
   all : eexists.
   all : eexists.
 Qed.
@@ -628,11 +661,24 @@ Proof.
   unfold independent_flows_dcfg, independent_flows in *.
   pose proof (inv_interval_name σ1 σ2 σ3 c1 c2 dg1 dg2).
   eapply H1 in H2
-  ; try intuition.
+  ; try intuition
+  ; try
+      ( assert (H' := H) ; assert (H0' := H0)
+        ; do 4 intro_snd_evaluate
+        ; apply inv_len_outputs in H
+        ; apply inv_len_inputs in H0
+        ; apply inv_wf_inputs_outputs in H', H0'
+        ; unfold wf_inputs in H0'
+        ; destruct H' as [ _ H' ], H0' as [ H0' _ ]
+        ; rewrite app_length
+        ; eapply length_incl in H', H0' ; try eassumption
+        ; lia).
   all : eexists.
   all : eexists.
 Qed.
 
+
+(** WF lemmas on the interface *)
 
 Lemma wf_mk_block : forall σ c, wf_dcfg (snd ((mk_block c) σ )).
 Proof.
@@ -713,7 +759,7 @@ Proof.
       destruct FLOWS as [FLOWS  [_ _]].
       eapply incl_disjoint ; try eassumption.
     + apply remove_disjoint_remove ; simpl.
-      rewrite eq_bid_refl.
+      rewrite eqb_bid_refl.
       apply list_disjoint_nil_r.
     + simpl.
       unfold independent_flows_dcfg in FLOWS
@@ -824,23 +870,27 @@ Proof.
         rewrite list_cons_app.
         rewrite CFGC_Utils.remove_app.
         simpl.
-        rewrite eq_bid_refl.
-        apply eqb_bid_neq in NEQ_OUTS ; rewrite eq_bid_comm,NEQ_OUTS ; simpl.
+        rewrite eqb_bid_refl.
+        apply eqb_bid_neq in NEQ_OUTS ; rewrite eqb_bid_comm,NEQ_OUTS ; simpl.
         apply remove_disjoint.
         apply remove_disjoint_remove.
         rewrite list_cons_app.
         rewrite CFGC_Utils.remove_app.
         simpl.
-        rewrite eq_bid_refl.
+        rewrite eqb_bid_refl.
         simpl ; now apply list_disjoint_nil_r.
-    + admit. (* freshness of (name counter_bid0)*)
+    + (* freshness of (name counter_bid0)*)
+      (* ~ In (name cb) (inputs graph0) /\ ~ In (name cb) (outputs graph0) *)
+      admit.
   - unfold cfg_join.
     break_list_goal.
     simpl in *.
     apply list_norepet_cons.
     + intro contra.
       do 2 apply CFGC_Utils.in_remove in contra.
-      admit. (* freshness counter_bid0 *)
+      (* freshness counter_bid0 *)
+      (* ~ In (name cb) (inputs graph0) /\ ~ In (name cb) (outputs graph0) *)
+      admit.
     + now do 2 apply list_norepet_remove.
   - unfold cfg_join.
     break_list_goal.
@@ -927,6 +977,7 @@ Proof.
     eapply incl_disjoint ; [unfold incl ; intros ; eassumption
                            | try assumption ; try  now apply list_disjoint_sym].
     (* freshness (name counter_bid0)*)
+    (* ~ In (name cb) (outputs graph0) /\ ~ In (name cb) (outputs graph1) *)
     admit.
   - apply list_norepet_append ; assumption.
   - break_list_goal.
@@ -937,6 +988,7 @@ Proof.
       ; simpl in *.
       intuition.
     + apply Util.list_disjoint_singleton_left.
+    (* ~ In (name cb) (inputs graph0) /\ ~ In (name cb) (inputs graph1) *)
     (* freshness (name counter_bid0) *)
     admit.
   - break_list_goal
@@ -1003,13 +1055,14 @@ Proof.
         split ;
           [apply remove_disjoint_remove
            ; apply remove_disjoint ; assumption
-          | simpl ; rewrite eq_bid_refl
+          | simpl ; rewrite eqb_bid_refl
             ; apply list_disjoint_nil_r].
       * (* freshness (name counter_bid0) *)
+        (* ~ In (name cb) (outputs graph0) *)
         admit.
     + (* freshness (name counter_bid0) *)
+      (* ~ In (name (S cb)) (outputs graph0) /\ ~ In (name (S cb)) (inputs graph0) *)
       admit.
-  (* NOTE: for freshness, I need hypothesis about intervals of block_id in graphs *)
   - break_list_goal.
     simpl in *.
     break_list_goal.
@@ -1017,6 +1070,7 @@ Proof.
     apply List_norepet_singleton.
     now apply list_norepet_remove.
     apply list_disjoint_singleton_left.
+    (* ~ In (name (S cb)) (outputs graph0) *)
     admit. (* freshness counter_bid0 *)
   - break_list_goal.
     simpl in *.
@@ -1028,8 +1082,14 @@ Proof.
     apply list_disjoint_singleton_right.
     eapply list_disjoint_notin ; eassumption.
     apply list_disjoint_singleton_left.
-    (* NOTE: freshness (name counter_bid0) *)
+    apply not_in_app.
+    split.
+    admit. (* should be an hypothesis *)
+    intro. apply In_singleton in H.
+    subst.
+    apply OUTPUTS_G in OUTPUT. (* (not OUTPUT) should be an hypothesis hypothesis *)
     admit.
+    (* NOTE: freshness (name counter_bid0) *)
   - break_list_goal
     ; rewrite !Forall_app
     ; intuition
@@ -1055,7 +1115,7 @@ Proof.
     apply Forall_cons ; [ apply is_anon_name | apply Forall_nil ].
 Admitted.
 
-
+(* WF EVALUATE *)
 Theorem wf_evaluate : forall (σ: FST) (c : cfg_lang) (dg : dcfg),
     snd ((evaluate c) σ) = dg ->
     wf_dcfg dg.
@@ -1106,6 +1166,8 @@ Proof.
     + eapply IHc. now erewrite Heq.
 Admitted.
 
+
+(** Recover the hypothesis we need to use the denotation lemmas *)
 Theorem wf_evaluate_wf_seq : forall σ0 σ1 σ2 c1 c2 graph1 ins1 outs1 graph2 ins2 outs2,
     evaluate c1 σ0 = (σ1, {| graph := graph1; ins := ins1; outs := outs1 |}) ->
     evaluate c2 σ1 = (σ2, {| graph := graph2; ins := ins2; outs := outs2 |}) ->
@@ -1145,29 +1207,54 @@ Proof.
   admit.
 Admitted.
 
-Lemma freshLabel_ord : forall f1 f2 f3 b1 b2,
-    freshLabel f1 = (f2, b1) ->
-    freshLabel f2 = (f3, b2) ->
-    le_bid b1 b2.
+Lemma evaluate_fresh : forall f1 f2 f3 b c dg min max,
+    (evaluate c) f1 = (f2, dg) ->
+    freshLabel f2 = (f3, b) ->
+    interval_label dg min max ->
+    ~ List.In b (inputs (graph dg)++outputs (graph dg)).
 Proof.
   intros.
-  unfold freshLabel in *.
-  repeat flatten_all ; simpl in *.
-  inv H. inv H0.
+  destruct f1, f2.
+  assert (H1' := H1).
+  eapply inv_counter_bid' in H1 ; try apply H ; try reflexivity.
+  unfold interval_label in H1'; destruct H1' as [ LOWER_BOUND _ ].
+  unfold max_label in LOWER_BOUND.
+  unfold freshLabel in H0 ; inversion H0 ; subst b.
+  apply ord_list ; rewrite LOWER_BOUND ; assumption.
+Qed.
+
+Lemma lt_bid_S : forall n m,
+    lt_bid m (name n) -> lt_bid m (name (S n)).
+Proof.
+  intros.
+  unfold name, mk_anon in *.
+  unfold lt_bid, ltb_bid in *.
+  destruct m ; auto.
   admit.
 Admitted.
 
-Lemma freshLabel_fresh : forall f1 f2 f3 b1 b2,
-    freshLabel f1 = (f2, b1) ->
-    freshLabel f2 = (f3, b2) ->
-    b1 <> b2.
+Lemma evaluate_fresh' : forall f1 f2 f3 f4 b1 b2 c dg min max,
+    (evaluate c) f1 = (f2, dg) ->
+    freshLabel f2 = (f3, b1) ->
+    freshLabel f3 = (f4, b2) ->
+    interval_label dg min max ->
+    ~ List.In b2 (inputs (graph dg)++outputs (graph dg)).
 Proof.
   intros.
-  unfold freshLabel in *.
-  repeat flatten_all ; simpl in *.
-  inv H. inv H0.
-  admit.
-Admitted.
+  destruct f1, f2, f3.
+  assert (H2' := H2).
+  eapply inv_counter_bid' in H2 ; try apply H ; try reflexivity.
+  unfold interval_label in H2' ; destruct H2' as [ LOWER_BOUND _ ].
+  unfold max_label in LOWER_BOUND.
+  unfold freshLabel in H0,H1. inversion H0; inversion H1. subst b1 b2.
+  destruct H1.
+  subst counter_bid2.
+  eapply ord_list.
+  eapply evaluate_fresh in H ; try eassumption.
+  rewrite LOWER_BOUND.
+  now apply lt_bid_S.
+  eexists.  all :eexists.
+Qed.
 
 Theorem wf_evaluate_wf_while :
   forall f0 f1 f2 f3 c graph ins outs b1 b2 code cond,
@@ -1181,21 +1268,106 @@ Proof.
   intros * E FRESH1 FRESH2.
   pose proof wf_evaluate as WF_EVAL.
   unfold wf_while.
-  intuition.
-  - pose proof freshLabel_fresh as WF_FRESH.
-    eapply WF_FRESH in FRESH2 ; [| eapply FRESH1].
-    contradiction.
-  - (* b1 = hd default_bid ins0 - freshness b1 *) admit.
-  - (* b1 = hd default_bid outs0 - freshness b1 *) admit.
-  - (* b2 = hd default_bid ins0 - freshness b2 *) admit.
-  - (* b2 = hd default_bid outs0 - freshness b2 *) admit.
-  - (* free_in_cfg graph0 b1 - freshness b1 *) admit.
-  - (* free_in_cfg graph0 b2 - freshness b2 *) admit.
-  - (* free_in_cfg graph0 (hd default_bid outs0) - disjonction *) admit.
-  - (* WF graph0 *)admit.
-  - (* In (hd default_bid ins0) (inputs graph0) *) admit.
-Admitted.
+  repeat split.
+  - eapply freshLabel_fresh ; eassumption.
 
+  - pose proof evaluate_fresh
+    ; assert (E' := E)
+    ; assert (E'' := E)
+    ; eapply H in E ; try eassumption ; [|eexists; eexists]
+    ; apply not_in_app_l in E
+    ; do 2 intro_snd_evaluate
+    ; apply WF_EVAL in E'
+    ; unfold wf_dcfg in E' ; destruct E' as [ E' _]
+    ; unfold wf_inputs in E'
+    ; eapply not_in_incl in E ; try eassumption ; simpl in E
+    ; unfold not in E
+    ; intro ; subst
+    ; apply inv_len_inputs in E'' ; simpl in E''
+    ; eapply hd_In in E'' ; apply E in E'' ; apply E''.
+
+  - pose proof evaluate_fresh
+    ; assert (E' := E)
+    ; assert (E'' := E)
+    ; eapply H in E ; try eassumption ; [|eexists; eexists]
+    ; apply not_in_app_r in E
+    ; do 2 intro_snd_evaluate
+    ; apply WF_EVAL in E'
+    ; unfold wf_dcfg in E' ; destruct E' as [ _ [E' _]]
+    ; unfold wf_outputs in E' ; destruct E' as [ E' _ ] ; simpl in E'
+    ; eapply not_in_incl in E ; try eassumption ; simpl in E
+    ; unfold not in E
+    ; intro ; subst
+    ; apply inv_len_outputs in E'' ; simpl in E''
+    ; eapply hd_In in E'' ; apply E in E'' ; apply E''.
+
+  - pose proof evaluate_fresh'
+    ; assert (E' := E)
+    ; assert (E'' := E)
+    ; eapply H in E ; try eassumption ; [|eexists; eexists]
+    ; apply not_in_app_l in E
+    ; do 2 intro_snd_evaluate
+    ; apply WF_EVAL in E'
+    ; unfold wf_dcfg in E' ; destruct E' as [ E' _ ]
+    ; unfold wf_inputs in E'
+    ; eapply not_in_incl in E ; try eassumption ; simpl in E
+    ; unfold not in E
+    ; intro ; subst
+    ; apply inv_len_inputs in E'' ; simpl in E''
+    ; eapply hd_In in E'' ; apply E in E'' ; apply E''.
+
+  - pose proof evaluate_fresh'
+    ; assert (E' := E)
+    ; assert (E'' := E)
+    ; eapply H in E ; try eassumption ; [|eexists; eexists]
+    ; apply not_in_app_r in E
+    ; do 2 intro_snd_evaluate
+    ; apply WF_EVAL in E'
+    ; unfold wf_dcfg in E' ; destruct E' as [ _ [E' _]]
+    ; unfold wf_outputs in E' ; destruct E' as [ E' _ ] ; simpl in E'
+    ; eapply not_in_incl in E ; try eassumption ; simpl in E
+    ; unfold not in E
+    ; intro ; subst
+    ; apply inv_len_outputs in E'' ; simpl in E''
+    ; eapply hd_In in E'' ; apply E in E'' ; apply E''.
+
+  - unfold free_in_cfg ;
+    pose proof evaluate_fresh
+    ; assert (E' := E)
+    ; eapply H in E ; try eassumption ; [|eexists; eexists]
+    ; apply not_in_app_l in E ; assumption.
+
+  - unfold free_in_cfg
+    ; pose proof evaluate_fresh'
+    ; assert (E' := E)
+    ; eapply H in E ; try eassumption ; [|eexists; eexists]
+    ; apply not_in_app_l in E ; assumption.
+
+  - unfold free_in_cfg
+    ; assert (E' := E)
+    ; assert (E'' := E)
+    ; do 2 intro_snd_evaluate
+    ; apply WF_EVAL in E'
+    ; unfold wf_dcfg in E' ; destruct E' as [ _ [E' _]]
+    ; unfold wf_outputs in E' ; destruct E' as [ _ [ E' _ ]] ; simpl in E'
+    ; apply inv_len_outputs in E'' ; simpl in E''
+    ; intro ; simpl
+    ; apply hd_In with (d := default_bid) in E''.
+    eapply list_disjoint_notin in E' ; eapply E' in H ; eauto.
+
+  - intro_snd_evaluate ; apply WF_EVAL in E
+    ; apply wf_dcfg_ocfg in E ; now simpl in E.
+
+  - pose proof inv_len_inputs.
+    assert (E' := E).
+    do 2 intro_snd_evaluate.
+    apply WF_EVAL in E' ; unfold wf_dcfg, wf_inputs in E'
+    ; destruct E' as [ E' _ ] ; simpl in E'.
+    unfold incl in E'.
+    apply E' ; clear E'.
+    apply H in E ; simpl in E.
+    now apply hd_In.
+Qed.
 
 Require Import CFGC_DenotationsCombinators.
 Definition denote_dcfg (dg : dcfg) := denote_cfg (graph dg).

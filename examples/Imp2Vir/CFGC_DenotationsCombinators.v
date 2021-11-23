@@ -482,9 +482,9 @@ Lemma denote_cfg_join : forall (g : ocfg) (output out1 out2 : block_id) from to,
           match d with
           | inr dv => ret (inr dv)
           | inl (src,target) =>
-              if (eq_bid target out1)
+              if (eqb_bid target out1)
               then ret (inl (out1, output))
-              else if (eq_bid target out2)
+              else if (eqb_bid target out2)
                    then ret (inl (out2, output))
                    else ret (inl (src,target))
           end).
@@ -548,7 +548,7 @@ Lemma denote_cfg_seq : forall g1 g2 out1 in2 from to,
           match d with
           | inr dv => ret (inr dv)
           | inl (src, target) =>
-              if eq_bid target out1
+              if eqb_bid target out1
               then denote_cfg g2 out1 in2
               else denote_cfg g2 src target
           end).
@@ -586,7 +586,7 @@ Proof.
     destruct Htarget as [ Htarget | Htarget ].
   - (* b = out1 ; we jump to the new block which is empty *)
     subst.
-    assert (Heqb : eq_bid out1 out1 = true) by (now apply eqb_bid_eq) ;
+    assert (Heqb : eqb_bid out1 out1 = true) by (now apply eqb_bid_eq) ;
       rewrite Heqb.
     step_singleton_in.
     (* jump to in2 - which is not out1*)
@@ -862,7 +862,7 @@ Proof.
           ; apply find_block_none_conv
           ; rewrite find_block_none_app
           ; simpl
-          ; rewrite <- eqb_bid_neq,eq_bid_comm in NEQ_OUTPUT_OUTB
+          ; rewrite <- eqb_bid_neq,eqb_bid_comm in NEQ_OUTPUT_OUTB
           ; rewrite eqv_dec_p_eq in NEQ_OUTPUT_OUTB
           ; [setoid_rewrite NEQ_OUTPUT_OUTB; reflexivity
             | apply find_block_free_id ; assumption]).
