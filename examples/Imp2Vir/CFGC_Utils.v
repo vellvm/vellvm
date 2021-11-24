@@ -205,6 +205,15 @@ Proof.
   apply max_bid'_cons_refl.
 Qed.
 
+Lemma max_bid_in : forall l,
+    l <> [] ->
+    In (max_bid l) l.
+Proof.
+  unfold max_bid.
+  induction l ; try contradiction ; intros.
+Admitted.
+
+
 Lemma Forall_cons_cons:
   forall {A : Type} {P : A -> Prop} (x y : A) {l},
     P y -> Forall P (x::l) -> Forall P (x :: y :: l).
@@ -318,6 +327,26 @@ Proof.
   unfold next_anon, name, mk_anon.
   rewrite Nat2Z.inj_add.
   reflexivity.
+Qed.
+
+Lemma lt_bid_S : forall n m,
+    lt_bid m (name n) -> lt_bid m (name (S n)).
+Proof.
+  intros.
+  unfold name, mk_anon in *.
+  unfold lt_bid, ltb_bid in *.
+  destruct m ; auto.
+  admit.
+Admitted.
+
+Lemma lt_bid_next : forall b, is_anon b -> lt_bid b (next_anon b).
+Proof.
+  intros.
+  unfold next_anon, is_anon in *.
+  destruct H ; subst.
+  unfold lt_bid.
+  unfold ltb_bid.
+  lia.
 Qed.
 
 Lemma ord_list : forall l f,
@@ -554,6 +583,16 @@ Proof.
   intro. apply H in H1. contradiction.
 Qed.
 
+Lemma incl_In :
+  forall {T} l sl (y: T), incl sl l -> In y sl -> In y l.
+Proof.
+  intros.
+  induction l.
+  - apply incl_l_nil in H ; subst ; contradiction.
+  - apply in_cons.
+    apply IHl.
+    admit.
+Admitted.
 
 (* Misc lemmas related to vellvm *)
 
