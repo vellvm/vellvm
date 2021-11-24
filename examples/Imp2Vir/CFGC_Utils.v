@@ -536,7 +536,7 @@ Qed.
 
 Ltac break_list_hyp :=
   match goal with
-  | h: List.In _ (_ ++ _) |- _ => repeat (apply in_app_or in h)
+  | h: context[List.In _ (_ ++ _)] |- _ => repeat (apply in_app_or in h)
   end.
 
 Ltac break_list_goal :=
@@ -593,6 +593,39 @@ Proof.
     apply IHl.
     admit.
 Admitted.
+
+(* ADMITTED *)
+Lemma list_norepet_cons' : forall {T} (l : list T) x,
+    list_norepet (x :: l) -> list_norepet l.
+Admitted.
+
+(* ADMITTED *) (* NOTE it probably lacks the hypothesis l <> [] *)
+Lemma length_remove_hd_no_repet :
+  forall l d,
+    list_norepet l ->
+    length (CFGC_Utils.remove (hd d l) l) = ((length l)-1)%nat.
+Proof.
+  intros.
+  induction l. now simpl.
+  simpl in *.
+  rewrite eqb_bid_refl.
+  apply list_norepet_cons' in H.
+  apply IHl in H.
+  simpl in H.
+Admitted.
+
+Ltac clone_hyp h :=
+  let H := fresh "C" in
+  assert (C := h).
+
+Ltac capply t h s :=
+  assert (s := h)
+  ; apply t in s.
+
+Ltac fcapply h t :=
+  let H := fresh "H" in
+  assert (H := h)
+  ; apply t in H.
 
 (* Misc lemmas related to vellvm *)
 

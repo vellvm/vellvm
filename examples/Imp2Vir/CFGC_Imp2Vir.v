@@ -133,7 +133,7 @@ Section Imp2Vir.
 Definition default_bid := Anon 0%Z.
 
 Fixpoint compile_imp (s : stmt) (env: StringMap.t int) :
-  OptionT fresh ( (StringMap.t int) * cfg_lang ) :=
+  OptionT fresh ( (StringMap.t int) * cfg_lang) :=
   match s with
   | Assign x e =>
       '(env, c) <- compile_assign x e env ;;
@@ -142,20 +142,18 @@ Fixpoint compile_imp (s : stmt) (env: StringMap.t int) :
       '(env1, c1) <- compile_imp l env;;
       '(env2, c2) <- compile_imp r env1;;
       ret (env2, CSeq c1 c2)
+  | While e b =>
+      '(cond_reg, env, expr_code) <- compile_cond e env ;;
+      '(env1, cB) <- compile_imp b env ;;
+      ret (env1, CWhile expr_code (texp_i1 cond_reg) cB)
+  | Skip => ret (Some (env, CBlock []))
   | If e l r =>
       '(cond_reg, env, expr_code) <- compile_cond e env ;;
       '(env1, cT) <- compile_imp l env;;
       '(env2, cF) <- compile_imp r env1;;
       let ccond := CBlock expr_code in
-      let cbody := CBranch (texp_i1 cond_reg) cT cF in
-      let c := CSeq ccond cbody in
-      ret (env2, c)
-  | While e b =>
-      '(cond_reg, env, expr_code) <- compile_cond e env ;;
-      '(env1, cB) <- compile_imp b env ;;
-      ret (env1, CWhile expr_code (texp_i1 cond_reg) cB)
-
-  | Skip => ret (Some (env, CBlock []))
+      let cbody := CIfThenElse (texp_i1 cond_reg) cT cF in
+      ret (env2, CSeq ccond cbody )
   end.
 
 Definition compile (s : stmt) :=
@@ -212,13 +210,12 @@ Lemma wf_compiler_aux : forall s env σ σ' cfg nenv ,
   (compile_imp s env) σ = (σ', Some (nenv, cfg)) ->
   wf_dcfg (snd ((evaluate cfg) σ')).
 Proof.
-  intros s.
   induction s
   ; intros
   ; cbn in H
   ; repeat flatten_all
-  ; eapply wf_evaluate
-  ; reflexivity.
+  ; eapply wf_evaluate'
+  ; try reflexivity.
 Qed.
 
 Theorem wf_compiler : forall s g,
@@ -318,7 +315,7 @@ Proof.
     simpl.
     unfold mk_while.
     flatten.
-    replace to with b by admit.
+    replace to with b by admit. (* NOTE HERE *)
     setoid_rewrite denote_cfg_while_loop.
     admit.
     eapply wf_evaluate_wf_while ; eassumption.
@@ -329,8 +326,8 @@ Proof.
     repeat flatten_all.
     inv H0.
     unfold denote_cfg_lang, denote_dcfg, mk_block ; cbn.
-    repeat flatten_all ; simpl.
-    destruct (eq_bid b to) eqn:E.
+    repeat flatten_all ; simpl. (* NOTE HERE *)
+    destruct (eqb_bid b to) eqn:E.
     2 : {
       rewrite eqb_bid_neq in E.
       admit. (* sohuld be identity here *)
