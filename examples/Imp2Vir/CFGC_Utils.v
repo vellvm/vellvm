@@ -162,7 +162,29 @@ Proof.
   admit. (* easy but I'm lazy for now *)
 Admitted.
 
+Lemma le_min_max' : forall l dmin dmax,
+    le_bid dmin dmax -> le_bid (min_bid' l dmin) (max_bid' l dmax).
+Proof.
+  intros.
+  induction l.
+  - now simpl.
+  - simpl.
+    destruct ( leb_bid dmin a ) eqn:Emin, ( leb_bid dmax a ) eqn:Emax.
+    + admit.
+    + admit.
+    + admit.
+    + admit.
+Admitted.
 
+
+Lemma le_min_max : forall l, le_bid (min_bid l) (max_bid l).
+Proof.
+  intros.
+  unfold min_bid, max_bid.
+  induction l.
+  - simpl. apply le_bid_refl.
+  - simpl. rewrite le_bid_refl.
+Admitted.
 
 
 Lemma lt_bid_neq : forall b1 b2, lt_bid b1 b2 -> b1 <> b2.
@@ -356,6 +378,21 @@ Admitted.
 
 Lemma lt_bid_name : forall (n n' : nat),
    (n < n')%nat -> lt_bid (name n) (name n').
+Admitted.
+
+(* probably requires l1 ≠ [] and l2 ≠ [] *)
+Lemma max_bid_app : forall l1 l2,
+    lt_bid (max_bid l1) (max_bid l2) -> max_bid (l1++l2) = max_bid l1.
+Proof.
+  intros.
+  unfold max_bid.
+Admitted.
+
+(* probably requires l1 ≠ [] and l2 ≠ [] *)
+Lemma max_bid_sym : forall l1 l2,
+    max_bid (l1++l2) = max_bid (l2++l1).
+Proof.
+  intros.
 Admitted.
 
 
