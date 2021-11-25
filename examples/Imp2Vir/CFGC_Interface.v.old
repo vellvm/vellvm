@@ -1672,14 +1672,3 @@ Require Import CFGC_DenotationsCombinators.
 Definition denote_dcfg (dg : dcfg) := denote_cfg (graph dg).
 Definition denote_cfg_lang { n m } (g : cfg_lang n m) (σ : FST) :=
   denote_dcfg (snd ((evaluate g) σ)).
-
-
-(* TODO :
-- Add the hypothesis of freshness to the lemmas wf_mk_combinators (+ fix uses )
-- Write and prove all the needed wf_evaluate_wf_combinator
-  (ie. see the compiler to know which one I need)
-- End the proof of the counter_bid ( inv_max_label, inv_min_label )
-- I need a way to have a property st. we know that if (CJoin c),
-  c have always at least 2 outputs
-- Correctness compiler
- *)

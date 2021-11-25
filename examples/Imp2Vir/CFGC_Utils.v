@@ -349,6 +349,16 @@ Proof.
   lia.
 Qed.
 
+Lemma name_neq : forall cb cb',
+    cb <> cb' -> (name cb <> name cb').
+Proof.
+Admitted.
+
+Lemma lt_bid_name : forall (n n' : nat),
+   (n < n')%nat -> lt_bid (name n) (name n').
+Admitted.
+
+
 Lemma ord_list : forall l f,
     lt_bid (max_bid l) f ->
     ~ In f l.

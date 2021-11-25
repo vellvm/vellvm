@@ -50,7 +50,6 @@ Section FreshnessMonad.
   Definition freshReg : fresh int :=
     fun '(mk_FST bid reg) => (mk_FST bid (reg+1)%Z, reg).
 
-  (* ADMITTED *)
   Lemma freshLabel_ord : forall f1 f2 f3 b1 b2,
       freshLabel f1 = (f2, b1) ->
       freshLabel f2 = (f3, b2) ->
@@ -60,8 +59,9 @@ Section FreshnessMonad.
     unfold freshLabel in *.
     repeat flatten_all ; simpl in *.
     inv H. inv H0.
-    admit. (* obviously true *)
-  Admitted.
+    unfold lt_bid, ltb_bid, name, mk_anon.
+    apply Zaux.Zlt_bool_true. lia.
+  Qed.
 
   Lemma freshLabel_fresh : forall f1 f2 f3 b1 b2,
       freshLabel f1 = (f2, b1) ->
@@ -656,7 +656,7 @@ Lemma wf_mk_seq : forall σ g1 g2 out1 in2,
     (outs g1) ⊍ (outs g2) ->
     List.In out1 (outs g1) ->
     List.In in2 (ins g2) ->
-    wf_dcfg g1 -> (* recursive use of the interface *)
+    wf_dcfg g1 ->
     wf_dcfg g2 ->
     wf_dcfg (snd ((mk_seq g1 g2 out1 in2) σ )).
 Proof.
@@ -863,15 +863,17 @@ Proof.
           [ apply is_anon_name | apply Forall_nil]].
 Admitted.
 
-Lemma wf_mk_while : forall σ expr_code cond gB inB outB,
+Lemma wf_mk_while : forall cb cr expr_code cond gB inB outB max,
     List.In outB (outs gB) ->
     List.In inB (ins gB) ->
+    max_label gB max ->
+    lt_bid max (name cb) ->
     wf_dcfg gB ->
-    wf_dcfg (snd ((mk_while expr_code cond gB inB outB) σ)).
+    wf_dcfg (snd ((mk_while expr_code cond gB inB outB) {| counter_bid := cb; counter_reg := cr |})).
 Proof.
-  intros * OUTPUT INPUT WF_G.
+  intros * OUTPUT INPUT MAX_GB LT_MAX_CB WF_G.
   unfold wf_dcfg, wf_inputs, wf_outputs, mk_seq, wf_graph, wf_ocfg_bid, wf_name.
-  destruct σ ; cbn.
+  cbn.
   unfold wf_dcfg, wf_inputs, wf_outputs, wf_graph, wf_ocfg_bid, wf_name in WF_G.
   destruct WF_G as [INPUTS_G [[OUTPUTS_G [DISJOINTS_G NO_REP_G]] [WF_BID_G [NAME_IN_G NAME_OUT_G]]]].
   unfold incl in *.
@@ -907,12 +909,40 @@ Proof.
            ; apply remove_disjoint ; assumption
           | simpl ; rewrite eqb_bid_refl
             ; apply list_disjoint_nil_r].
-      * (* freshness (name counter_bid0) *)
-        (* ~ In (name cb) (outputs graph0) *)
-        admit.
+      * unfold max_label in * ; simpl in *.
+        subst.
+        apply ord_list in LT_MAX_CB.
+        apply not_in_app_r in LT_MAX_CB.
+        intro.
+        apply in_remove, OUTPUTS_G in H.
+        contradiction.
     + (* freshness (name counter_bid0) *)
-      (* ~ In (name (S cb)) (outputs graph0) /\ ~ In (name (S cb)) (inputs graph0) *)
-      admit.
+      intro.
+      rewrite list_cons_app in H ; rewrite !in_app_iff in H.
+      destruct H as [? | [? | ?]].
+      * apply In_singleton in H.
+        injection H ; lia.
+      * unfold max_label in * ; simpl in *.
+        assert ( lt_bid max (name (S cb)) ) by
+          ltac:(eapply lt_bid_trans
+                ; try eassumption
+                ; apply lt_bid_name ; lia).
+        subst.
+        apply ord_list in H0.
+        apply not_in_app_l in H0.
+        contradiction.
+      * apply In_singleton in H.
+        subst.
+        unfold max_label in * ; simpl in *.
+        assert ( lt_bid max (name (S cb)) ) by
+          ltac:(eapply lt_bid_trans
+                ; try eassumption
+                ; apply lt_bid_name ; lia).
+        subst.
+        apply ord_list in H.
+        apply not_in_app_r in H.
+        apply OUTPUTS_G in OUTPUT.
+        contradiction.
   - break_list_goal.
     simpl in *.
     break_list_goal.
@@ -920,8 +950,16 @@ Proof.
     apply List_norepet_singleton.
     now apply list_norepet_remove.
     apply list_disjoint_singleton_left.
-    (* ~ In (name (S cb)) (outputs graph0) *)
-    admit. (* freshness counter_bid0 *)
+    unfold max_label in * ; simpl in *.
+        assert ( lt_bid max (name (S cb)) ) by
+          ltac:(eapply lt_bid_trans
+                ; try eassumption
+                ; apply lt_bid_name ; lia).
+    subst.
+    apply ord_list in H.
+    apply not_in_app_r in H.
+    intro. apply in_remove, OUTPUTS_G in H0.
+    contradiction.
   - break_list_goal.
     simpl in *.
     break_list_goal.
@@ -934,12 +972,19 @@ Proof.
     apply list_disjoint_singleton_left.
     apply not_in_app.
     split.
-    admit. (* should be an hypothesis *)
-    intro. apply In_singleton in H.
-    subst.
-    apply OUTPUTS_G in OUTPUT. (* (not OUTPUT) should be an hypothesis hypothesis *)
-    admit.
-  (* NOTE: freshness (name counter_bid0) *)
+    + unfold max_label in * ; simpl in *.
+      subst.
+      apply ord_list in LT_MAX_CB.
+      apply not_in_app_l in LT_MAX_CB.
+      assumption.
+    + intro. apply In_singleton in H.
+      subst.
+      apply OUTPUTS_G in OUTPUT.
+      unfold max_label in * ; simpl in *.
+      subst.
+      apply ord_list in LT_MAX_CB.
+      apply not_in_app_r in LT_MAX_CB.
+      contradiction.
   - break_list_goal
     ; rewrite !Forall_app
     ; intuition
@@ -963,7 +1008,7 @@ Proof.
     eapply incl_Forall ; eassumption.
     apply Forall_cons ; [ apply is_anon_name | apply Forall_nil ].
     apply Forall_cons ; [ apply is_anon_name | apply Forall_nil ].
-Admitted.
+Qed.
 
 (* WF EVALUATE *)
 
@@ -1014,9 +1059,13 @@ Proof.
     + eapply IHc2 ; eassumption.
   - repeat flatten_all.
     apply snd_intro in H ; subst.
-    apply wf_mk_while.
+    destruct f.
+    eapply wf_mk_while.
     + apply hd_In ; eapply (inv_len_outputs σ _ c d) ; eassumption.
     + apply hd_In ; eapply (inv_len_inputs σ _ c d) ; eassumption.
+    + eexists.
+    + destruct σ ; eapply inv_max_label ; try eassumption. eexists.
+      now unfold max_label. eexists.
     + eapply IHc ; eassumption.
 Qed.
 
@@ -1268,11 +1317,11 @@ Definition denote_cfg_lang (g : cfg_lang) (σ : FST) :=
 
 
 (* TODO :
-- Add the hypothesis of freshness to the lemmas wf_mk_combinators (+ fix uses )
+- Proof wf_mk_ite (maybe add hypothesis)
 - Write and prove all the needed wf_evaluate_wf_combinator
   (ie. see the compiler to know which one I need)
-- End the proof of the counter_bid ( inv_max_label, inv_min_label )
-- I need a way to have a property st. we know that if (CJoin c),
-  c have always at least 2 outputs
+  + it misses wf_join and wf_branch !
+- End the proof of the counter_bid (inv_max_label, inv_min_label) +
+  meta-theory on intervals
 - Correctness compiler
  *)
