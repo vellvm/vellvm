@@ -138,12 +138,21 @@ Lemma le_bid_refl : forall a, le_bid a a.
   apply leb_bid_refl.
 Qed.
 
+Lemma ltb_bid_true : forall b1 b2, ltb_bid b1 b2 = true <-> lt_bid b1 b2.
+Proof.
+  intros.
+  unfold lt_bid ; tauto.
+Qed.
+
 Lemma le_bid_trans : forall b1 b2 b3, le_bid b1 b2 -> le_bid b2 b3 -> le_bid b1 b3.
 Proof.
   intros.
   unfold le_bid, leb_bid in *.
-  admit. (* easy but I'm lazy for now *)
-Admitted.
+  apply Bool.orb_true_iff in H,H0 ; apply Bool.orb_true_iff.
+  rewrite ltb_bid_true in * ; rewrite eqb_bid_eq in *.
+  intuition ; try (subst ; intuition).
+  left ; eapply lt_bid_trans ; eassumption.
+Qed.
 
 Lemma lt_le : forall b1 b2, lt_bid b1 b2 -> le_bid b1 b2.
 Proof.
@@ -154,13 +163,23 @@ Qed.
 
 Lemma lt_bid_trans_le : forall b1 b2 b3, le_bid b1 b2 -> lt_bid b2 b3 -> lt_bid b1 b3.
 Proof.
-  admit. (* easy but I'm lazy for now *)
-Admitted.
+  intros.
+  unfold le_bid, leb_bid in *.
+  apply Bool.orb_true_iff in H ; destruct H as [H | H] ;
+  try rewrite ltb_bid_true in * ; try (rewrite eqb_bid_eq in * ; subst).
+  - eapply lt_bid_trans ; eassumption.
+  - assumption.
+Qed.
 
 Lemma lt_bid_trans_le2 : forall b1 b2 b3, lt_bid b1 b2 -> le_bid b2 b3 -> lt_bid b1 b3.
 Proof.
-  admit. (* easy but I'm lazy for now *)
-Admitted.
+  intros.
+  unfold le_bid, leb_bid in *.
+  apply Bool.orb_true_iff in H0 ; destruct H0 as [H0 | H0] ;
+  try rewrite ltb_bid_true in * ; try (rewrite eqb_bid_eq in * ; subst).
+  - eapply lt_bid_trans ; eassumption.
+  - assumption.
+Qed.
 
 Lemma le_min_max' : forall l dmin dmax,
     le_bid dmin dmax -> le_bid (min_bid' l dmin) (max_bid' l dmax).
@@ -181,9 +200,10 @@ Lemma le_min_max : forall l, le_bid (min_bid l) (max_bid l).
 Proof.
   intros.
   unfold min_bid, max_bid.
-  induction l.
+  destruct l.
   - simpl. apply le_bid_refl.
   - simpl. rewrite le_bid_refl.
+    apply le_min_max'. apply le_bid_refl.
 Admitted.
 
 
@@ -218,15 +238,6 @@ Proof.
   apply leb_bid_refl.
 Qed.
 
-Lemma max_bid_cons : forall x l,
-    le_bid x (max_bid (x :: l)).
-Proof.
-  intros.
-  unfold max_bid ; simpl.
-  rewrite leb_bid_refl.
-  apply max_bid'_cons_refl.
-Qed.
-
 Lemma max_bid_in : forall l,
     l <> [] ->
     In (max_bid l) l.
@@ -234,17 +245,6 @@ Proof.
   unfold max_bid.
   induction l ; try contradiction ; intros.
 Admitted.
-
-
-Lemma Forall_cons_cons:
-  forall {A : Type} {P : A -> Prop} (x y : A) {l},
-    P y -> Forall P (x::l) -> Forall P (x :: y :: l).
-Proof.
-  intros.
-  apply Forall_cons ;
-  apply List.Forall_cons_iff in H0 ;
-    intuition.
-Qed.
 
 (* NOTE HERE something goes wrong with the induction ?*)
 Lemma max_bid_spec : forall l x,
@@ -298,8 +298,6 @@ Lemma min_bid_spec_nn : forall l min,
     (min_bid l) = min ->
     Forall (fun b => le_bid min b) l.
 Admitted.
-
-
 
 
 Definition mk_anon (n : nat) := Anon (Z.of_nat n).
@@ -358,8 +356,10 @@ Proof.
   unfold name, mk_anon in *.
   unfold lt_bid, ltb_bid in *.
   destruct m ; auto.
-  admit.
-Admitted.
+  rewrite Nat2Z.inj_succ.
+  rewrite Zaux.Zlt_bool_true ; auto.
+  lia.
+Qed.
 
 Lemma lt_bid_next : forall b, is_anon b -> lt_bid b (next_anon b).
 Proof.
@@ -374,27 +374,21 @@ Qed.
 Lemma name_neq : forall cb cb',
     cb <> cb' -> (name cb <> name cb').
 Proof.
-Admitted.
+  intros. intro.
+  unfold name,mk_anon in H0.
+  injection H0 ; intro.
+  rewrite Nat2Z.inj_iff in H1.
+  subst. contradiction.
+Qed.
 
 Lemma lt_bid_name : forall (n n' : nat),
-   (n < n')%nat -> lt_bid (name n) (name n').
-Admitted.
-
-(* probably requires l1 ≠ [] and l2 ≠ [] *)
-Lemma max_bid_app : forall l1 l2,
-    lt_bid (max_bid l1) (max_bid l2) -> max_bid (l1++l2) = max_bid l1.
+    (n < n')%nat -> lt_bid (name n) (name n').
 Proof.
   intros.
-  unfold max_bid.
-Admitted.
-
-(* probably requires l1 ≠ [] and l2 ≠ [] *)
-Lemma max_bid_sym : forall l1 l2,
-    max_bid (l1++l2) = max_bid (l2++l1).
-Proof.
-  intros.
-Admitted.
-
+  unfold lt_bid, name, mk_anon.
+  simpl.
+  lia.
+Qed.
 
 Lemma ord_list : forall l f,
     lt_bid (max_bid l) f ->
@@ -525,12 +519,22 @@ Lemma incl_disjoint : forall {A} (l1 sl1 l2 : list A),
     list_disjoint l1 l2 ->
     list_disjoint sl1 l2.
 Proof.
-  intros.
-  unfold incl in H.
-  induction sl1.
-  - apply list_disjoint_nil_l.
-  - admit.
-Admitted.
+  intros * INCL DIS.
+  unfold incl in INCL.
+  induction l2.
+  - apply list_disjoint_nil_r.
+  - apply list_disjoint_cons_r.
+    + unfold list_disjoint ; repeat intro.
+      apply INCL in H.
+      apply list_disjoint_cons_right in DIS.
+      unfold list_disjoint in DIS.
+      eapply DIS in H0 ; [|eassumption].
+      contradiction.
+    + intro. apply INCL in H.
+      unfold list_disjoint in DIS.
+      apply DIS with (y:=a) in H ; [contradiction|].
+      apply in_cns ; intuition.
+Qed.
 
 Lemma remove_disjoint : forall (x : block_id) (l1 l2 : list block_id),
     l1 ⊍ l2 -> (CFGC_Utils.remove x l1) ⊍ l2.
@@ -546,12 +550,55 @@ Proof.
     now apply IHl1. assumption.
 Qed.
 
+Lemma remove_spec : forall a l, ~ In a (CFGC_Utils.remove a l).
+Proof.
+  induction l.
+  - simpl ; auto.
+  - simpl.
+    destruct (eqb_bid a a0) eqn:E.
+    + assumption.
+    + apply not_in_cons. rewrite eqb_bid_neq in E.
+      intuition.
+Qed.
+
+Lemma remove_notin : forall a l, ~ In a l -> (CFGC_Utils.remove a l) = l.
+Proof.
+  intros.
+  rewrite remove_ListRemove.
+  now apply notin_remove.
+Qed.
+
+
 Lemma remove_disjoint_remove : forall (x : block_id) (l1 l2 : list block_id),
     (CFGC_Utils.remove x l1) ⊍ (CFGC_Utils.remove x l2) <->
 (CFGC_Utils.remove x l1) ⊍ l2.
 Proof.
-  intros.
-Admitted.
+  induction l2 ; intros ; split ; simpl ; intros
+  ; try apply list_disjoint_nil_r
+  ; destruct (eqb_bid x a) eqn:E
+  ; try (rewrite eqb_bid_eq in E ; subst)
+  ; try (rewrite eqb_bid_neq in E).
+  - apply list_disjoint_cons_r.
+    apply IHl2 ; assumption.
+    apply remove_spec.
+  - apply list_disjoint_sym in H
+    ; apply list_disjoint_cons_l_iff in H
+    ; destruct H
+    ; apply list_disjoint_sym in H.
+    apply list_disjoint_cons_r
+    ; [ apply IHl2 |]
+    ; assumption.
+  - apply list_disjoint_sym, remove_disjoint
+    ; apply list_disjoint_sym.
+    now apply list_disjoint_cons_right in H.
+  - apply list_disjoint_sym in H
+    ; apply list_disjoint_cons_l_iff in H
+    ; destruct H
+    ; apply list_disjoint_sym in H.
+    apply list_disjoint_cons_r
+    ; [ apply IHl2 |]
+    ; assumption.
+Qed.
 
 Lemma remove_app:
   forall (x : block_id) (l1 l2 : list block_id),
@@ -608,7 +655,7 @@ Proof.
   (* intros. *)
   induction sl ; intros.
   - simpl in * ; lia .
-  - simpl in *.
+  - simpl in *. apply IHsl.
 Admitted.
 
 Lemma not_in_app : forall {T} {x : T} l1 l2,
@@ -634,19 +681,40 @@ Lemma incl_In :
   forall {T} l sl (y: T), incl sl l -> In y sl -> In y l.
 Proof.
   intros.
-  induction l.
-  - apply incl_l_nil in H ; subst ; contradiction.
-  - apply in_cons.
-    apply IHl.
-    admit.
-Admitted.
+  now apply H.
+Qed.
 
-(* ADMITTED *)
 Lemma list_norepet_cons' : forall {T} (l : list T) x,
     list_norepet (x :: l) -> list_norepet l.
-Admitted.
+Proof.
+  intros.
+  rewrite Util.list_cons_app in H.
+  eapply list_norepet_append_right ; eassumption.
+Qed.
 
-(* ADMITTED *) (* NOTE it probably lacks the hypothesis l <> [] *)
+Require Import Datatypes.
+
+Lemma remove_no_repet :
+  forall a l,
+    list_norepet (a::l) -> (CFGC_Utils.remove a (a::l)) = l.
+Proof.
+  intros.
+  simpl.
+  rewrite eqb_bid_refl.
+  pose proof (remove_spec a l).
+  assert (~ In a l).
+  {
+     intro.
+     rewrite Util.list_cons_app in H ; apply list_norepet_app in H
+     ; destruct H as [_ [_ ?]].
+     unfold list_disjoint in H.
+     assert (In a [a]) by (apply in_cns ; intuition).
+     eapply H in H2 ; [|eassumption] ; contradiction.
+  }
+  apply remove_notin in H1.
+  assumption.
+Qed.
+
 Lemma length_remove_hd_no_repet :
   forall l d,
     list_norepet l ->
@@ -654,12 +722,11 @@ Lemma length_remove_hd_no_repet :
 Proof.
   intros.
   induction l. now simpl.
-  simpl in *.
-  rewrite eqb_bid_refl.
-  apply list_norepet_cons' in H.
-  apply IHl in H.
-  simpl in H.
-Admitted.
+  apply remove_no_repet in H.
+  replace (hd d (a :: l)) with a by now simpl.
+  rewrite H.
+  simpl ; lia.
+Qed.
 
 Ltac clone_hyp h :=
   let H := fresh "C" in
