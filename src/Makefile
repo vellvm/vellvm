@@ -21,7 +21,8 @@ CP=cp
 COQFILESNUMERIC := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats
 
 COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/ListUtil Utils/IntMaps Utils/NMaps Utils/Error\
-		Utils/Monads Utils/StateMonads Utils/MonadReturnsLaws Utils/PropT Utils/RefineProp\
+		Utils/Monads Utils/StateMonads Utils/MonadEq1Laws Utils/MonadExcLaws\
+		Utils/MonadReturnsLaws Utils/PropT Utils/RefineProp\
 		Utils/ITreeRaise\
 		Utils/PostConditions Utils/TFor Utils/NoFailure Utils/NonEmpty Utils/Default Utils/OptionUtil Utils/MapMonadExtra\
 		Utilities

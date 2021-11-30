@@ -16,7 +16,7 @@ From Vellvm Require Import
 
 Import ITreeNotations.
 
-Module MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
+Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   Export TOP.
   Export IS.
@@ -205,3 +205,9 @@ Module MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (*   auto. *)
   (* Qed. *)
 End MCFGTheory.
+
+Module Make (IS : InterpreterStack) (TOP : LLVMTopLevel IS) : MCFGTheory IS TOP.
+  Include MCFGTheory IS TOP.
+End Make.
+
+Module MCFGTheoryBigIntptr := Make InterpreterStackBigIntptr TopLevelBigIntptr.

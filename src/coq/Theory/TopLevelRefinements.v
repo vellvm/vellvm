@@ -46,7 +46,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Import SemNotations.
 
   Module R := Refinement.Make LP LLVM.
-  Import R.
+  Export R.
   (* end hide *)
 
   (**
@@ -424,3 +424,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt  (TT × (TT × (TT × refine_uvalue))) t t'.
 
 End TopLevelRefinements.
+
+Module Make (IS : InterpreterStack) (TOP : LLVMTopLevel IS) : TopLevelRefinements IS TOP.
+  Include TopLevelRefinements IS TOP.
+End Make.
+
+Module TopLevelRefinementsBigIntptr := Make InterpreterStackBigIntptr TopLevelBigIntptr.

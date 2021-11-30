@@ -39,37 +39,50 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
   Import PROV.
 
   (* Need failure, UB, state for store_ids, and state for provenances *)
-  Definition ErrSID_T M := eitherT ERR_MESSAGE (eitherT UB_MESSAGE (eitherT OOM_MESSAGE (stateT store_id (stateT Provenance M)))).
+  Inductive ErrSID_T M A := mkErrSID_T { unErrSID_T : @err_ub_oom_T (stateT store_id (stateT Provenance M)) A }.
   Definition ErrSID := ErrSID_T ident.
 
-  (* I can make this work using ltac, but  for some reason I can't write the definition directly... *)
-  #[global] Instance ErrSID_T_MT {M : Type -> Type} `{HM: Monad M} : MonadT (ErrSID_T M) M.
+  Arguments unErrSID_T {_ _} _.
+  Arguments mkErrSID_T {_ _} _.
+
+  #[global] Instance Monad_ErrSID_T {M} `{HM : Monad M} : Monad (ErrSID_T M).
   Proof.
-    constructor.
-    refine (fun T mt => mkEitherT (mkEitherT (mkEitherT (fun sid prov => _)))).
-    refine (fmap (fun v => (prov, (sid, inr (inr (inr v))))) mt : M (Provenance * (store_id * (OOM_MESSAGE + UB (ERR T))))%type).
+    split.
+    - exact (fun T t => mkErrSID_T (ret t)).
+    - exact (fun A B ma amb =>
+               mkErrSID_T (a <- unErrSID_T ma;;
+                           unErrSID_T (amb a))).
   Defined.
 
-  #[global] Instance RAISE_UB_ErrSID_T {M : Type -> Type} `{HM :  Monad M} : RAISE_UB (ErrSID_T M) :=
-    { raise_ub := fun A e => lift (raise_ub e);
-    }.
+  #[global] Instance Monad_EQ1_ErrSID_T : Monad.Eq1 ErrSID.
+  Proof.
+    unfold Monad.Eq1.
+    refine
+      (fun T e1 e2 =>
+         match e1, e2 with
+         | mkErrSID_T (ERR_UB_OOM e1), mkErrSID_T (ERR_UB_OOM e2) =>
+             Monad.eq1 e1 e2
+         end
+      ).              
+  Defined.
 
-  #[global] Instance RAISE_ERROR_ErrSID_T {M : Type -> Type} `{HM :  Monad M} : RAISE_ERROR (ErrSID_T M) :=
-    { raise_error := fun A e => raise_error e;
-    }.
+  #[global] Instance RAISE_ERROR_ErrSID_T {M : Type -> Type} `{Monad M} : RAISE_ERROR (ErrSID_T M)
+    := { raise_error := fun _ msg => mkErrSID_T (raise_error msg) }.
 
-  #[global] Instance RAISE_OOM_ErrSID_T {M : Type -> Type} `{HM :  Monad M} : RAISE_OOM (ErrSID_T M) :=
-    { raise_oom := fun A e => lift (lift (raise_oom e));
-    }.
+  #[global] Instance RAISE_UB_ErrSID_T {M : Type -> Type} `{Monad M} : RAISE_UB (ErrSID_T M)
+    := { raise_ub := fun _ msg => mkErrSID_T (raise_ub msg) }.
+
+  #[global] Instance RAISE_OOM_ErrSID_T {M : Type -> Type} `{Monad M} : RAISE_OOM (ErrSID_T M)
+    := { raise_oom := fun _ msg => mkErrSID_T (raise_oom msg) }.
 
   Definition evalErrSID_T {A} {M} `{Monad M} (m : ErrSID_T M A) (sid : store_id) (prov : Provenance) : M (OOM_MESSAGE + UB (ERR A))%type
-    := evalStateT (evalStateT (unEitherT (unEitherT (unEitherT m))) sid) prov.
+    := evalStateT (evalStateT (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (unErrSID_T m))))) sid) prov.
 
   Definition evalErrSID {A} (m : ErrSID A) (sid : store_id) (prov : Provenance) : OOM_MESSAGE + UB (ERR A)
     := unIdent (evalErrSID_T m sid prov).
 
   Definition runErrSID_T {A} {M} `{Monad M} (m : ErrSID_T M A) (sid : store_id) (prov : Provenance) : M ((OOM_MESSAGE + UB (ERR A)) * store_id * Provenance)%type
-    := runStateT (runStateT (unEitherT (unEitherT (unEitherT m))) sid) prov.
+    := runStateT (runStateT (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (unErrSID_T m))))) sid) prov.
 
   Definition runErrSID {A} (m : ErrSID A) (sid : store_id) (prov : Provenance) : (OOM_MESSAGE + UB (ERR A)) * store_id * Provenance%type
     := unIdent (runErrSID_T m sid prov).
@@ -81,10 +94,10 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
     := runErrSID e sid pr = (inr (inr (inr x)), sid', pr').
 
   Definition fresh_sid : ErrSID store_id
-    := lift (lift (modify N.succ)).
+    := mkErrSID_T (lift (modify N.succ)).
 
   Definition fresh_provenance : ErrSID Provenance
-    := lift (lift (lift (lift (modify next_provenance)))).
+    := mkErrSID_T (lift (lift (modify next_provenance))).
 
   Definition fresh_allocation_id : ErrSID AllocationId
     := prov <- fresh_provenance;;
@@ -106,7 +119,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
             ErrSID_evals_to (k x) sid' prov' res.
     Proof.
       intros A X sid prov m k res EVAL.
-      
+
       cbn in EVAL.
       inversion EVAL as [EVAL'].
       clear EVAL.
@@ -117,9 +130,19 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
       unfold runErrSID.
       cbn.
 
-      destruct (IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT m)) sid prov)) as (p, p0) eqn:BLAH.
+      destruct (IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (unErrSID_T m)))) sid prov)) as (p, p0) eqn:BLAH.
       destruct p0.
       cbn in *.
+
+      destruct m; cbn in *; inversion EVAL.
+      destruct unErrSID_T0.
+      rename unERR_UB_OOM into foo.
+      destruct foo; cbn in *; inversion EVAL.
+      destruct unEitherT; cbn in *; inversion EVAL.
+      destruct unEitherT; cbn in *; inversion EVAL.
+      destruct unEitherT; cbn in *; inversion EVAL.
+      destruct unIdent; cbn in *; inversion EVAL.
+      inversion BLAH; subst; cbn in *.
 
       destruct s0; cbn in *; inversion EVAL.
       destruct s0; cbn in *; inversion EVAL.
@@ -127,7 +150,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
 
       do 3 eexists.
       split.
-      { 
+      {
         reflexivity.
       }
       {
@@ -145,7 +168,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
             ErrSID_runs_to (k x) sid' prov' res sid_final prov_final.
     Proof.
       intros A X sid prov m k res sid_final prov_final EVAL.
-      
+
       cbn in EVAL.
       inversion EVAL as [EVAL'].
       clear EVAL.
@@ -156,10 +179,19 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
       unfold runErrSID in *.
       cbn.
 
-      destruct (IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT m)) sid prov)) as (p, p0) eqn:BLAH.
+      destruct (IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (unErrSID_T m)))) sid prov)) as (p, p0) eqn:BLAH.
       destruct p0.
       cbn in *.
-      rewrite BLAH in EVAL.
+
+      destruct m; cbn in *; inversion EVAL.
+      destruct unErrSID_T0.
+      rename unERR_UB_OOM into foo.
+      destruct foo; cbn in *; inversion EVAL.
+      destruct unEitherT; cbn in *; inversion EVAL.
+      destruct unEitherT; cbn in *; inversion EVAL.
+      destruct unEitherT; cbn in *; inversion EVAL.
+      destruct unIdent; cbn in *; inversion EVAL.
+      inversion BLAH; subst; cbn in *.
 
       destruct s0; cbn in *; inversion EVAL.
       destruct s0; cbn in *; inversion EVAL.
@@ -167,7 +199,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
 
       do 3 eexists.
       split.
-      { 
+      {
         reflexivity.
       }
       {
@@ -197,7 +229,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
       reflexivity.
     Qed.
 
-    Global Instance proper_eq1_runs_to : forall {A}, Proper (@Monad.eq1 (eitherT ERR_MESSAGE (eitherT UB_MESSAGE _)) _ A ==> eq ==> eq ==> eq ==> eq  ==> eq ==> iff) (ErrSID_runs_to).
+    Global Instance proper_eq1_runs_to : forall {A}, Proper (@Monad.eq1 _ _ A ==> eq ==> eq ==> eq ==> eq  ==> eq ==> iff) (ErrSID_runs_to).
     Proof.
       repeat intro; subst. rename H into EQ.
 

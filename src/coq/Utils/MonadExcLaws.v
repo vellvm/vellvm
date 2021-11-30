@@ -28,11 +28,15 @@ Section Laws.
 
   Local Open Scope monad_scope.
 
-  Class MonadExcLaws : Prop :=
-    { raise_bind : forall A B (f : A -> M B) (x : E), bind (raise x) f ≈ raise x;
-      raise_catch : forall A (handler : E -> M A) (x : E) , catch (raise x) handler ≈ handler x
-    }.
+  Class RaiseBind : Prop :=
+    { raise_bind : forall A B (f : A -> M B) (x : E), bind (raise x) f ≈ raise x }.
 
+  Class RaiseCatch : Prop :=
+    { raise_catch : forall A (handler : E -> M A) (x : E) , catch (raise x) handler ≈ handler x }.
+
+  Class MonadExcLaws `{RB : RaiseBind} `{RC : RaiseCatch} : Prop.
+  Global Instance MonadExcLaws_rb_rc `{RB : RaiseBind} `{RC : RaiseCatch} : MonadExcLaws.
+  Defined.
 End Laws.
 
 Arguments raise_bind {M _ _ _ _ _}.
@@ -70,10 +74,11 @@ Section Either.
     reflexivity.
   Qed.
 
-  Global Instance MonadExcLaws_either : MonadExcLaws (sum E) E :=
-    { raise_bind := raise_bind_either;
-      raise_catch := raise_catch_either;
-    }.
+  Global Instance RaiseBind_either : RaiseBind (sum E) E :=
+    { raise_bind := raise_bind_either }.
+
+  Global Instance RaiseCatch_either : RaiseCatch (sum E) E :=
+    { raise_catch := raise_catch_either }.
 
 End Either.
 
@@ -148,11 +153,10 @@ Section EitherT.
     apply H0.
   Qed.
 
-  Global Instance MonadExcLaws_eitherT : MonadExcLaws (eitherT E M) E :=
-    { raise_bind := raise_bind_eitherT;
-      raise_catch := raise_catch_eitherT;
-    }.
+  Global Instance RaiseBind_eitherT : RaiseBind (eitherT E M) E :=
+    { raise_bind := raise_bind_eitherT }.
+
+  Global Instance RaiseCatch_eitherT : RaiseCatch (eitherT E M) E :=
+    { raise_catch := raise_catch_eitherT }.
 
 End EitherT.
-
-

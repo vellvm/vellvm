@@ -827,7 +827,7 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
     Definition re_sid_ubytes (bytes : list SByte) : ErrSID (list SByte)
       := let len := length bytes in
          byte_map <- re_sid_ubytes_helper (zip (Nseq 0 len) bytes) (@NM.empty _);;
-         trywith (ERR_message "re_sid_ubytes: missing indices.") (NM_find_many (Nseq 0 len) byte_map).
+         trywith_error "re_sid_ubytes: missing indices." (NM_find_many (Nseq 0 len) byte_map).
 
     Definition sigT_of_prod {A B : Type} (p : A * B) : {_ : A & B} :=
       let (a, b) := p in existT (fun _ : A => B) a b.
@@ -1013,7 +1013,7 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
 
        | UVALUE_ConcatBytes bytes t =>
          (* TODO: should provide *new* sids... May need to make this function in a fresh sid monad *)
-         bytes' <- lift_ERR (map_monad extract_byte_to_sbyte bytes);;
+         bytes' <- lift_ERR_RAISE_ERROR (map_monad extract_byte_to_sbyte bytes);;
          re_sid_ubytes bytes'
        end.
   Next Obligation.
@@ -1165,7 +1165,7 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
 
        | UVALUE_ConcatBytes bytes t =>
          (* TODO: should provide *new* sids... May need to make this function in a fresh sid monad *)
-         bytes' <- lift_ERR (map_monad extract_byte_to_sbyte bytes);;
+         bytes' <- lift_ERR_RAISE_ERROR (map_monad extract_byte_to_sbyte bytes);;
          re_sid_ubytes bytes'
        end.
   Proof.
@@ -1366,10 +1366,10 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
     Definition get_array_cell_memory (mem : memory) (address : addr) (i : nat) (size : N) (t : dtyp) : ErrSID uvalue :=
       let addr := ptr_to_int address in
       let pr := address_provenance address in
-      'offset <- lift_ERR (err_to_ERR
-                            (handle_gep_h (DTYPE_Array size t)
-                                          addr
-                                          [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]));;
+      'offset <- lift_err_RAISE_ERROR
+                  (handle_gep_h (DTYPE_Array size t)
+                                addr
+                                [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]);;
       err_to_ub (read_memory mem (int_to_ptr offset pr) t).
 
     (** ** Array element writing
@@ -1382,10 +1382,10 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
     Definition write_array_cell_memory (mem : memory) (address : addr) (i : nat) (size : N) (t : dtyp) (v : uvalue) : ErrSID memory :=
       let addr := ptr_to_int address in
       let pr := address_provenance address in
-      'offset <- lift_ERR (err_to_ERR
-                            (handle_gep_h (DTYPE_Array size t)
-                                          addr
-                                          [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]));;
+      'offset <- lift_err_RAISE_ERROR
+                  (handle_gep_h (DTYPE_Array size t)
+                                addr
+                                [DVALUE_I64 (DynamicValues.Int64.repr (Z.of_nat i))]);;
       write_memory mem (int_to_ptr offset pr) v t.
 
     (** ** Array lookups -- mem_block
@@ -1893,7 +1893,6 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
       interp_state interp_memory_h.
 
   End PARAMS.
-
 End FinMemory.
 
 Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) : FinMemory LP Events MP.

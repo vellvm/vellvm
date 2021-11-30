@@ -306,8 +306,168 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
       tactic_on_non_aggregate_uvalues x ltac:(cbn in H; inv H)
     end.
 
+  Lemma eval_icmp_err_ub_oom_to_M :
+    forall {M} `{HM : Monad M} `{HME : RAISE_ERROR M} op a b res,
+      @eval_icmp err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+                 (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) op a b =
+        success_unERR_UB_OOM res ->
+      @eval_icmp M HM HME op a b = @ret M HM dvalue res.
+  Proof.
+    intros M HM HME op a b res EVAL.
+    destruct op; cbn in *;
+      destruct a, b; cbn in *; inversion EVAL;
+      first [ break_match; inversion EVAL; reflexivity
+            | auto
+        ].
+  Qed.
+
+  Require Import Monads.
+  From Vellvm.Utils Require Import Monads MonadExcLaws MonadEq1Laws.
+  From ITree Require Import
+       Basics.Monad.
+
+  Require Import Morphisms.
+
+  Lemma to_dvalue_OOM_NoOom :
+    forall {Int} `{TD : ToDvalue Int} {M}
+      `{HM : Monad M}
+      `{HMO : RAISE_OOM M}
+      `{EQM : Monad.Eq1 M}
+      `{LAWS : @Monad.MonadLawsE M EQM HM}
+      (v : Int),
+      to_dvalue_OOM (NoOom v) ≈ @ret M HM dvalue (to_dvalue v).
+  Proof.
+    intros Int TD M HM HMO EQM LAWS v.
+    unfold to_dvalue_OOM. cbn.
+    destruct LAWS.
+    eapply bind_ret_l.
+  Qed.
+
+Lemma eval_iop_integer_h_err_ub_oom_to_M :
+    forall {M} `{HM : Monad M}
+      `{HME : RAISE_ERROR M}
+      `{HMU : RAISE_UB M}
+      `{HMO : RAISE_OOM M}
+      `{EQM : Monad.Eq1 M}
+      `{LAWS : @Monad.MonadLawsE M EQM HM}
+      `{REF : Reflexive (M dvalue) (@eq1 M EQM dvalue)}
+      `{TRANS : Transitive (M dvalue) (@eq1 M EQM dvalue)}
+      op a b res,
+      @eval_iop_integer_h err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+                 (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) _ _ op a b =
+        success_unERR_UB_OOM res ->
+      @eval_iop_integer_h M HM HME HMU HMO op a b ≈ @ret M HM dvalue res.
+  Proof.
+    intros M HM HME HMU HMO EQM LAWS REF TRANS op a b res EVAL.
+    destruct op; cbn in *.
+
+    Ltac solve_iop a b :=
+      destruct a, b; cbn in *;
+      inversion EVAL; auto;
+      try first
+          [ repeat break_match; inversion EVAL; cbn; auto;
+            unfold to_dvalue_OOM; cbn;
+            match goal with
+            | H: _ |- context [x <- ret ?v;; ret (?c x)]
+              => eapply (bind_ret_l _ _ (fun x => ret (c x)))
+            end
+          | repeat break_match; inversion EVAL; cbn; auto;
+            unfold to_dvalue_OOM; cbn;
+            unfold lift_OOM;
+
+            break_match; subst;
+            inversion Heqs; inversion Heqe; subst;
+            inversion Heqs; subst;
+
+            match goal with
+            | H: _ |- context [x <- ret ?v;; ret (?c x)]
+              => eapply (bind_ret_l _ _ (fun x => ret (c x)))
+            end
+          ].
+
+    - solve_iop a b.
+    - solve_iop a b.
+    - Opaque to_dvalue.
+      destruct a, b; cbn in *; inversion EVAL; auto.
+      apply to_dvalue_OOM_NoOom.
+
+      Ltac solve_bind_res :=
+        rewrite bind_ret_l;
+        repeat break_match_goal; inversion EVAL; subst; auto.
+
+      + rewrite bind_ret_l.
+        repeat (break_match_goal; inversion EVAL; subst).
+
+        setoid_rewrite Heqb in H1.
+        inversion H1.
+        reflexivity.
+
+        setoid_rewrite Heqb in H1.
+        inversion H1.
+        reflexivity.
+      + solve_bind_res. 
+      + solve_bind_res.
+      + repeat break_match_goal;
+          solve [ destruct (VellvmIntegers.mmul x x0); cbn in *; inversion EVAL;
+                  apply to_dvalue_OOM_NoOom
+                | unfold lift_OOM; break_match_goal; cbn in *; inversion EVAL;
+                  rewrite bind_ret_l; repeat break_match_goal; inversion EVAL;
+                  subst; solve [auto]
+            ].
+    - destruct a, b; cbn in *; inversion EVAL; auto.
+
+      + rewrite bind_ret_l.
+        cbn.
+        break_match_goal.
+        cbn in *.
+        inversion H0.
+        reflexivity.
+  Admitted.
+
+  Lemma eval_iop_err_ub_oom_to_M :
+    forall {M} `{HM : Monad M}
+      `{HME : RAISE_ERROR M}
+      `{HMU : RAISE_UB M}
+      `{HMO : RAISE_OOM M}
+      `{EQM : Monad.Eq1 M}
+      `{LAWS : @Monad.MonadLawsE M EQM HM}
+      `{REF : Reflexive (M dvalue) (@eq1 M EQM dvalue)}
+      `{TRANS : Transitive (M dvalue) (@eq1 M EQM dvalue)}
+      op a b res,
+      @eval_iop err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
+                 (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) _ _ op a b =
+        success_unERR_UB_OOM res ->
+      @eval_iop M HM HME HMU HMO op a b ≈ @ret M HM dvalue res.
+  Proof.
+    intros M HM HME HMU HMO EQM LAWS REF TRANS op a b res EVAL.
+    destruct op.
+
+    - destruct a, b; inversion EVAL; unfold eval_iop;
+        try apply eval_iop_integer_h_err_ub_oom_to_M; auto.
+      + clear H0.
+        generalize dependent res.
+        unfold eval_iop.
+        remember (combine elts elts0) as l.
+        clear Heql.
+        induction l; intros res EVAL.
+        * cbn.
+          rewrite bind_ret_l. inversion EVAL. reflexivity.
+        * Set Nested Proofs Allowed.
+          Lemma vec_loop_cons :
+            forall {M} `{HM : Monad M} {A} (f : A -> A -> M A) (e1 e2 : A) (elts : list (A * A)),
+              vec_loop f ((e1, e2) :: elts) = rest <- vec_loop f elts;; val <- f e1 e2;; ret (val :: rest).
+          Proof.
+          Admitted.
+
+          Opaque vec_loop.
+          destruct a.
+          cbn.
+          rewrite vec_loop_cons.
+          rewrite vec_loop_cons in EVAL.
+  Admitted.
+
   Lemma concretize_icmp_inv:
-    forall op x y dv,
+    forall {M} `{HM: Monad M} `{HME: RAISE_ERROR M} op x y dv,
       concretize_succeeds (UVALUE_ICmp op x y) ->
       concretize (UVALUE_ICmp op x y) dv ->
       exists dx dy,
@@ -315,9 +475,9 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
         concretize x dx /\
         concretize_succeeds y /\
         concretize y dy /\
-        eval_icmp op dx dy = ret dv.
+        @eval_icmp M HM HME op dx dy = ret dv.
   Proof.
-    intros op x y dv SUCC CONC.
+    intros M HM HME op x y dv SUCC CONC.
 
     rewrite concretize_equation in CONC.
     red in CONC.
@@ -567,6 +727,7 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
       split; cbn; auto.
     }
 
+    apply eval_icmp_err_ub_oom_to_M.
     rewrite Hmz.
     cbn.
 
@@ -577,17 +738,24 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
   Qed.
 
   Lemma concretize_ibinop_inv:
-    forall op x y dv,
+    forall {M} `{HM: Monad M} `{HME: RAISE_ERROR M}
+      `{HMU: RAISE_UB M}
+      `{HMO: RAISE_OOM M}
+      `{EQM : Eq1 M}
+      `{LAWS : @Monad.MonadLawsE M EQM HM}
+      `{REF : Reflexive (M dvalue) (@eq1 M EQM dvalue)}
+      `{TRANS : Transitive (M dvalue) (@eq1 M EQM dvalue)}
+      op x y dv,
       concretize_succeeds (UVALUE_IBinop op x y) ->
       concretize (UVALUE_IBinop op x y) dv ->
       exists dx dy,
         concretize_succeeds x /\
-          concretize x dx /\
-          concretize_succeeds y /\
-          concretize y dy /\
-          eval_iop op dx dy = ret dv.
+        concretize x dx /\
+        concretize_succeeds y /\
+        concretize y dy /\
+        @eval_iop M HM HME _ _ op dx dy ≈ ret dv.
   Proof.
-    intros op x y dv SUCC CONC.
+    intros M HM HME HMU HMO EQM LAWS REF TRANS op x y dv SUCC CONC.
 
     rewrite concretize_equation in CONC.
     red in CONC.
@@ -890,13 +1058,12 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
       split; cbn; auto.
     }
 
-    rewrite Hmz.
-    cbn.
-
+    cbn in *.
     destruct (k' a) as [[[[[[[oom_k'a] | [[ub_k'a] | [[err_k'a] | k'a]]]]]]]] eqn:Hk'a;
       cbn in eqm; try contradiction.
     cbn in eqmb.
     subst; auto.
+    eapply eval_iop_err_ub_oom_to_M; auto.
   Qed.
 
   Lemma concretize_succeeds_poison :

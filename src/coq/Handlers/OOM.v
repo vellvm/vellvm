@@ -91,7 +91,6 @@ Proof.
   intros T E F RR REF TRANS t1 t2 H.
   apply eutt_flip in H.
   unfold refine_OOM_h.
-  cbn.
 
   pose proof interp_prop_Proper_eq.
   unfold Proper, respectful in H0.

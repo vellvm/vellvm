@@ -301,6 +301,24 @@ Class RAISE_UB (M : Type -> Type) : Type :=
 Class RAISE_OOM (M : Type -> Type) : Type :=
   { raise_oom : forall {A}, string -> M A }.
 
+Definition trywith_error {A} {M} `{Monad M} `{RAISE_ERROR M} (e:string) (o:option A) : M A :=
+    match o with
+    | Some x => ret x
+    | None => raise_error e
+    end.
+
+Definition trywith_ub {A} {M} `{Monad M} `{RAISE_UB M} (e:string) (o:option A) : M A :=
+    match o with
+    | Some x => ret x
+    | None => raise_ub e
+    end.
+
+Definition trywith_oom {A} {M} `{Monad M} `{RAISE_OOM M} (e:string) (o:option A) : M A :=
+    match o with
+    | Some x => ret x
+    | None => raise_oom e
+    end.
+
 Section MFails_Exceptions.
   Context (M : Type -> Type).
   Context {Monad : Monad M}.
@@ -383,16 +401,34 @@ Definition lift_err_RAISE_ERROR {A} {M} `{Monad M} `{RAISE_ERROR M} (e : err A) 
      | inr x => ret x
      end.
 
+Definition lift_ERR_RAISE_ERROR {A} {M} `{Monad M} `{RAISE_ERROR M} (e : ERR A) : M A
+  := match e with
+     | inl (ERR_message x) => raise_error x
+     | inr x => ret x
+     end.
+
 Definition lift_OOM {M : Type -> Type} `{Monad M} `{RAISE_OOM M} {A} (ma : OOM A) : M A
   := match ma with
      | NoOom a => ret a
      | Oom s => raise_oom s
      end.
 
-Inductive err_ub_oom A :=
-  ERR_UB_OOM { unERR_UB_OOM : eitherT ERR_MESSAGE (eitherT UB_MESSAGE (eitherT OOM_MESSAGE IdentityMonad.ident)) A }.
-Arguments ERR_UB_OOM {_} _.
-Arguments unERR_UB_OOM {_} _.
+Inductive err_ub_oom_T (m : Type -> Type) (A : Type) : Type
+  := ERR_UB_OOM { unERR_UB_OOM : eitherT ERR_MESSAGE (eitherT UB_MESSAGE (eitherT OOM_MESSAGE m)) A }.
+
+Definition err_ub_oom : Type -> Type
+  := err_ub_oom_T IdentityMonad.ident.
+
+Arguments ERR_UB_OOM {_ _} _.
+Arguments unERR_UB_OOM {_ _} _.
+
+#[global] Instance err_ub_oom_T_MT {M : Type -> Type} `{HM: Monad M} : MonadT (err_ub_oom_T M) M.
+Proof.
+  constructor.
+  intros T mt.
+  refine (ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT _)))).
+  exact (fmap (fun v => inr (inr (inr v))) mt).
+Defined.
 
 Notation OOM_unERR_UB_OOM oom_msg :=
   ({| unERR_UB_OOM :=
@@ -449,7 +485,10 @@ Notation success_unERR_UB_OOM v :=
 Import MonadNotation.
 Import Utils.Monads.
 
-Section err_ub_oom.
+Section err_ub_oom_monad.
+  Variable (M : Type -> Type).
+  Context {HM : Monad M}.
+
   #[global] Instance EqM_err_ub_oom : Monad.Eq1 err_ub_oom.
   Proof.
     (* refine (fun T mt1 mt2 => _). *)
@@ -479,7 +518,7 @@ Section err_ub_oom.
       + exact (t1 = t2).
   Defined.
 
-  #[global] Instance Monad_err_ub_oom : Monad err_ub_oom.
+  #[global] Instance Monad_err_ub_oom : Monad (err_ub_oom_T M).
   Proof.
     split.
     - exact (fun T t => ERR_UB_OOM (ret t)).
@@ -490,13 +529,15 @@ Section err_ub_oom.
                end).
   Defined.
 
-  #[global] Instance Functor_err_ub_oom : Functor err_ub_oom.
+  #[global] Instance Functor_err_ub_oom : Functor (err_ub_oom_T M).
   Proof.
     split.
     - exact (fun A B f ema =>
                ERR_UB_OOM (fmap f (unERR_UB_OOM ema))).
   Defined.
+End err_ub_oom_monad.
 
+Section err_ub_oom_extra.
   #[global] Instance MonadLawsE_err_ub_oom : MonadLawsE err_ub_oom.
   Proof.
     split.
@@ -537,13 +578,13 @@ Section err_ub_oom.
   Defined.
 
 
-  #[global] Instance RAISE_ERROR_err_ub_oom : RAISE_ERROR err_ub_oom
+  #[global] Instance RAISE_ERROR_err_ub_oom {M : Type -> Type} `{Monad M} : RAISE_ERROR (err_ub_oom_T M)
     := { raise_error := fun _ msg => ERR_UB_OOM (raise_error msg) }.
 
-  #[global] Instance RAISE_UB_err_ub_oom : RAISE_UB err_ub_oom
+  #[global] Instance RAISE_UB_err_ub_oom_T {M : Type -> Type} `{Monad M} : RAISE_UB (err_ub_oom_T M)
     := { raise_ub := fun _ msg => ERR_UB_OOM (raise_ub msg) }.
 
-  #[global] Instance RAISE_OOM_err_ub_oom : RAISE_OOM err_ub_oom
+  #[global] Instance RAISE_OOM_err_ub_oom_T {M : Type -> Type} `{Monad M} : RAISE_OOM (err_ub_oom_T M)
     := { raise_oom := fun _ msg => ERR_UB_OOM (raise_oom msg) }.
 
   Lemma unERR_UB_OOM_bind :
@@ -682,7 +723,7 @@ Section err_ub_oom.
        | inr a => ret a
        | inl e => raise_error e
        end.
-End err_ub_oom.
+End err_ub_oom_extra.
 
 Ltac inv_err_ub_oom :=
   match goal with

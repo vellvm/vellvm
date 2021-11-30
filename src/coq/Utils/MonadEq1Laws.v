@@ -2,7 +2,9 @@ From Coq Require Import
      Morphisms.
 
 From ITree Require Import
-     Basics.Monad.
+     Basics.Basics
+     Basics.Monad
+     ITree.
 
 From ExtLib Require Import
      Structures.Monads
@@ -82,3 +84,20 @@ Section EitherT.
     { eq1_ret_ret := fun a => eq1_ret_ret_eitherT }.
 
 End EitherT.
+
+Section ITree.
+  Variable E : Type -> Type.
+  Require Import ITree.Core.ITreeMonad.
+
+  Lemma eq1_ret_ret_itree :
+    forall {A} (x y : A), (ret x : itree E A) ≈ ret y -> x = y.
+  Proof.
+    intros A x y EQ.
+    eapply Eq.eutt_inv_Ret.
+    cbn in EQ.
+    eapply EQ.
+  Qed.
+
+  Global Instance Eq1_ret_inv_itree : Eq1_ret_inv (itree E) :=
+    { eq1_ret_ret := fun a => eq1_ret_ret_itree }.
+End ITree.
