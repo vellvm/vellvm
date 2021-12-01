@@ -15,7 +15,7 @@ From Vellvm Require Import
      Syntax
      SurfaceSyntax .
 
-From Imp2Vir Require Import Imp CFGC_Combinators CFGC_Interface CFGC_Utils.
+From Imp2Vir Require Import Imp CFGC_Combinators CFGC_CFLang CFGC_Utils.
 
 
 Import ListNotations.
@@ -133,7 +133,7 @@ Section Imp2Vir.
 Definition default_bid := Anon 0%Z.
 
 Fixpoint compile_imp (s : stmt) (env: StringMap.t int) :
-  OptionT fresh ( (StringMap.t int) * cfg_lang) :=
+  OptionT fresh ( (StringMap.t int) * CFLang) :=
   match s with
   | Assign x e =>
       '(env, c) <- compile_assign x e env ;;
@@ -268,7 +268,7 @@ Ltac go := autorewrite with rwtranslate rwbind.
 Ltac flatten := repeat (flatten_all ; simpl in *) .
 
 Theorem compile_correct :
-  forall (σ σ' : FST) env env'  (p : stmt) (o : cfg_lang)
+  forall (σ σ' : FST) env env'  (p : stmt) (o : CFLang) (dg : dcfg)
     (input output : block_id)
     mem from to genv lenv vmem,
 
@@ -276,19 +276,22 @@ Theorem compile_correct :
   Rmem env mem lenv vmem ->
   (* The compilation of p with env produce a new env' and an ir *)
   (compile_imp p env) σ = (σ', Some (env', o))  ->
+  dg = (snd ((evaluate o) σ')) ->
+  List.In to (inputs (graph dg)) ->
   eutt (Rimpvir env')
        (interp_imp (denote_imp p) mem)
-       (interp_cfg3 (denote_cfg_lang o σ' from to) genv lenv vmem).
+       (interp_cfg3 (denote_dcfg dg from to) genv lenv vmem).
 Proof.
-  intros.
+  intros ; subst.
   induction p.
   - (* Assign *)
     simpl in *.
     repeat (flatten_all) ; [| discriminate H0].
-    inv H0.
-    unfold denote_cfg_lang, denote_dcfg, mk_block ; cbn.
-    repeat flatten_all ; simpl.
-    replace b with to by admit.
+    inv_pair ; simpl in *.
+    unfold denote_cflang, denote_dcfg, mk_block in *; cbn.
+    repeat flatten_all ; simpl in *.
+    repeat flatten_all ; simpl in *.
+    inv_pair. destruct H2 ; try contradiction ; subst.
     rewrite denote_cfg_block.
     admit.
     admit. (* The interface ensure this kind of properties *)
@@ -296,25 +299,41 @@ Proof.
   - (* Seq *)
     simpl in *.
     repeat (flatten_all) ; try discriminate.
-    inv H0.
-    unfold denote_cfg_lang,denote_dcfg.
-    simpl.
-    unfold mk_seq.
-    repeat (flatten_all); simpl in *.
+    inv_pair.
+    unfold denote_cflang,denote_dcfg in *.
+    repeat flatten_all ; simpl in *.
+    unfold mk_seq in *.
+    repeat flatten_all ; simpl in *.
     rewrite denote_cfg_seq.
     admit.
     eapply wf_evaluate_wf_seq ; eassumption.
+    unfold cfg_seq in H2.
+    rewrite inputs_app in H2.
     (* List.In to (inputs graph) *) admit.
 
-  - (* If *) admit. (* very tedious, because several combinators *)
-  - (* While *) 
+  - (* If *)  (* very tedious, because several combinators *)
     simpl in *.
     repeat (flatten_all) ; try discriminate.
-    inv H0.
-    unfold denote_cfg_lang,denote_dcfg.
+    inv_pair.
+    unfold denote_cflang, denote_dcfg.
     simpl.
-    unfold mk_while.
-    flatten.
+    repeat (flatten_all).
+    unfold mk_seq.
+    repeat (flatten_all); simpl in *.
+    rewrite denote_cfg_seq. (* issue here *)
+    admit. 
+    eapply wf_evaluate_wf_seq ; admit.
+    (* List.In to (inputs graph) *) admit.
+  - (* While *)
+    simpl in *.
+    repeat (flatten_all) ; try discriminate.
+    inv_pair.
+    unfold denote_cflang,denote_dcfg.
+    repeat flatten_all ; simpl in *.
+    repeat flatten_all ; simpl in *.
+    unfold mk_while in *.
+    repeat flatten_all ; simpl in *.
+    repeat flatten_all ; simpl in *.
     replace to with b by admit. (* NOTE HERE *)
     setoid_rewrite denote_cfg_while_loop.
     admit.
@@ -325,7 +344,7 @@ Proof.
     simpl in *.
     repeat flatten_all.
     inv H0.
-    unfold denote_cfg_lang, denote_dcfg, mk_block ; cbn.
+    unfold denote_cflang, denote_dcfg, mk_block ; cbn.
     repeat flatten_all ; simpl. (* NOTE HERE *)
     destruct (eqb_bid b to) eqn:E.
     2 : {

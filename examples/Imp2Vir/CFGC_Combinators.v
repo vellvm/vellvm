@@ -17,8 +17,7 @@ Definition texp_break (e : texp) : dtyp * exp dtyp :=
   ((typ_to_dtyp [] t), (conv e)).
 
 
-(** Combinators over OCFG *)
-
+(** Combinators over arbitrary OCFG *)
 
 (* Define an ocfg containing a unique block, labeled with /input/ and jumping to /output/ *)
 Definition cfg_block (c : code) (input output : block_id) : ocfg :=

@@ -17,10 +17,11 @@ From Vellvm Require Import
      SurfaceSyntax
      Utils.Tactics.
 
-From Imp2Vir Require Import Imp CFGC_Combinators CFGC_Utils.
+From Imp2Vir Require Import Imp CFGC_Utils CFGC_Combinators CFGC_DenotationsCombinators.
 
 Require Import Coqlib.
 Require Import Util.
+Require Import Datatypes.
 
 Import ListNotations.
 Import VIR_Notations.
@@ -78,7 +79,6 @@ Section FreshnessMonad.
 
 End FreshnessMonad.
 
-Import CFGC_Utils.
 Section InterfaceCombinators.
 
   Notation code := (code typ).
@@ -106,8 +106,8 @@ Section InterfaceCombinators.
     let '(make_dcfg g1 ins1 outs1) := g1 in
     let '(make_dcfg g2 ins2 outs2) := g2 in
     let g := cfg_seq g1 g2 out1 in2 in
-    let ins := ins1++(remove in2 ins2) in
-    let outs := (remove out1 outs1)++outs2 in
+    let ins := ins1++(remove_bid in2 ins2) in
+    let outs := (remove_bid out1 outs1)++outs2 in
     let dg := mk_dcfg g ins outs in
     ret dg.
 
@@ -120,12 +120,12 @@ Section InterfaceCombinators.
     let gBody := cfg_branch cond gT gF input inT inF in
     let g := cfg_join gBody output outT outF in
     let ins := [input]
-                 ++ (remove inT insT)
-                 ++ (remove inF insF)
+                 ++ (remove_bid inT insT)
+                 ++ (remove_bid inF insF)
     in
     let outs := [output]
-                 ++ (remove outT outsT)
-                 ++ (remove outF outsF)
+                 ++ (remove_bid outT outsT)
+                 ++ (remove_bid outF outsF)
     in
     let dg := mk_dcfg g ins outs in
     ret dg.
@@ -136,23 +136,23 @@ Section InterfaceCombinators.
     output <- freshLabel ;;
     let '(make_dcfg gBody insBody outsBody) := gBody in
     let g := cfg_while_loop expr_code cond gBody input inB output outB in
-    let ins := [input] ++ (remove inB insBody) in
-    let outs := [output] ++ (remove outB outsBody) in
+    let ins := [input] ++ (remove_bid inB insBody) in
+    let outs := [output] ++ (remove_bid outB outsBody) in
     let dg := mk_dcfg g ins outs in
     ret dg.
 
 End InterfaceCombinators.
 
-Section CFG_LANG.
-  Inductive cfg_lang : Type :=
+Section CFLANG.
+  Inductive CFLang : Type :=
   | CBlock ( c : code typ )
-  | CSeq (g1 g2 : cfg_lang )
-  | CIfThenElse (cond : texp typ) (gT gF : cfg_lang)
-  | CWhile (exp_code : code typ) (cond : texp typ) (gB : cfg_lang).
+  | CSeq (g1 g2 : CFLang )
+  | CIfThenElse (cond : texp typ) (gT gF : CFLang)
+  | CWhile (exp_code : code typ) (cond : texp typ) (gB : CFLang).
 
   Definition default_bid := Anon 0%Z.
 
-  Fixpoint evaluate (cfg : cfg_lang) : fresh dcfg :=
+  Fixpoint evaluate (cfg : CFLang) : fresh dcfg :=
     match cfg with
     | CBlock c => mk_block c
     | CSeq g1 g2 =>
@@ -176,7 +176,7 @@ Section CFG_LANG.
         mk_while expr_code cond dgB inB outB
     end.
 
-End CFG_LANG.
+End CFLANG.
 
 
 Definition independent_flows_dcfg g1 g2 :=
@@ -203,6 +203,12 @@ Definition wf_dcfg (g : dcfg) : Prop :=
   /\ wf_graph g
   /\ wf_name g.
 
+Definition max_label (dg : dcfg) (max : block_id) :=
+  max_bid (inputs (graph dg) ++ outputs (graph dg)) = max.
+
+Definition min_label (dg : dcfg) (min : block_id) :=
+  min_bid (inputs (graph dg) ++ outputs (graph dg)) = min.
+
 Lemma wf_dcfg_ocfg : forall dg, wf_dcfg dg -> wf_ocfg_bid (graph dg).
 Proof.
   intros.
@@ -214,21 +220,9 @@ Proof.
   intros. now inv H.
 Qed.
 
-
 (** Invariants through the function evaluate *)
 
-Require Import Datatypes.
-
-Lemma add_l : forall n m p, n = m -> p+n=p+m.
-  intros ; lia.
-Qed.
-
-Ltac inv_pair :=
-  match goal with
-  | h : (_,_) = (_, _) |- _ => inv h
-  end.
-
-Ltac induction_cfg_lang c :=
+Ltac induction_CFLang c :=
   induction c ; intros ; simpl in *
 ; [ unfold mk_block, freshLabel in *
   | unfold mk_seq,freshLabel in * ; repeat flatten_all ; simpl in *
@@ -242,12 +236,12 @@ Ltac induction_cfg_lang c :=
   ] ; simpl in *.
 
 
-Theorem inv_len_inputs : forall (σ σ': FST) (c : cfg_lang) (dg : dcfg),
+Theorem inv_len_inputs : forall (σ σ': FST) (c : CFLang) (dg : dcfg),
     (evaluate c) σ = (σ', dg) ->
     (length (ins dg) >= 1)%nat.
 Proof.
   intros *. revert σ σ' dg.
-  induction_cfg_lang c.
+  induction_CFLang c.
   - lia.
   - rewrite app_length.
     apply IHc1 in Heq ; simpl in *.
@@ -256,12 +250,12 @@ Proof.
   - lia.
 Qed.
 
-Theorem inv_len_outputs : forall (σ σ' : FST) (c : cfg_lang) (dg : dcfg),
+Theorem inv_len_outputs : forall (σ σ' : FST) (c : CFLang) (dg : dcfg),
     (evaluate c) σ = (σ', dg) ->
     (length (outs dg) >= 1)%nat.
 Proof.
   intros *. revert σ σ' dg.
-  induction_cfg_lang c.
+  induction_CFLang c.
   - lia.
   - rewrite app_length.
     apply IHc2 in Heq0 ; simpl in *.
@@ -270,13 +264,13 @@ Proof.
   - lia.
 Qed.
 
-Theorem inv_wf_inputs_outputs : forall (σ σ': FST) (c : cfg_lang) (dg : dcfg),
+Theorem inv_wf_inputs_outputs : forall (σ σ': FST) (c : CFLang) (dg : dcfg),
     (evaluate c) σ = (σ', dg) ->
     wf_inputs dg /\ List.incl (outs dg) (outputs (graph dg)).
 Proof.
   intros *. revert σ σ' dg.
   unfold wf_inputs.
-  induction_cfg_lang c.
+  induction_CFLang c.
   - split ; apply incl_refl.
   - apply IHc1 in Heq ; simpl in Heq.
     apply IHc2 in Heq0 ; simpl in Heq.
@@ -323,12 +317,6 @@ Proof.
     in_list_rem ; apply H0 in H1 ; intuition.
 Qed.
 
-Definition max_label (dg : dcfg) (max : block_id) :=
-  max_bid (inputs (graph dg) ++ outputs (graph dg)) = max.
-
-Definition min_label (dg : dcfg) (min : block_id) :=
-  min_bid (inputs (graph dg) ++ outputs (graph dg)) = min.
-
 Definition interval_label (dg : dcfg) (min max : block_id) :=
   max_label dg max /\ min_label dg min.
 
@@ -337,7 +325,7 @@ Open Scope Z_scope.
 (* NOTE important - easy but tedious *)
 
 (* ADMITTED *)
-Theorem inv_name_anon : forall (σ σ': FST) (c : cfg_lang) (dg : dcfg),
+Theorem inv_name_anon : forall (σ σ': FST) (c : CFLang) (dg : dcfg),
     (evaluate c) σ = (σ', dg) ->
     wf_name dg.
 Proof.
@@ -345,7 +333,7 @@ Proof.
   unfold wf_name.
   pose proof inv_wf_inputs_outputs as INV_IN_OUT ;
     unfold wf_inputs in INV_IN_OUT.
-  induction_cfg_lang c.
+  induction_CFLang c.
   - admit.
   - capply INV_IN_OUT Heq0 H ; destruct H.
     apply IHc2 in Heq0 ; simpl in Heq0.
@@ -375,26 +363,22 @@ Admitted.
 
 
 (* TODO important invariant here - some work todo *)
-
+(* NOTE should I relax this hypothesis ? *)
 (* ADMITTED *)
 Lemma inv_counter_bid :
-  forall (c : cfg_lang) (cb cb' : nat) (cr cr' : int) (dg : dcfg) min max,
+  forall (c : CFLang) (cb cb' : nat) (cr cr' : int) (dg : dcfg) min max,
     (evaluate c) {| counter_bid := cb; counter_reg := cr |}
     = ({| counter_bid := cb'; counter_reg := cr' |}, dg) ->
     interval_label dg min max ->
     name cb' = next_anon max.
 Proof.
-  induction_cfg_lang c.
+  induction_CFLang c.
   - unfold interval_label, max_label, min_label in *.
     cbn in *.
-    rewrite leb_bid_refl in *.
-    unfold leb_bid in *. simpl in *.
-    match goal with
-    | h:context[ ?x <? ?y ] |- _ =>
-        let H := fresh "H" in
-        assert (H : x <? y = true) by admit
-        ; rewrite H in * ; clear H
-    end; simpl in *.
+    rewrite max_refl,min_refl in *.
+    rewrite max_name, min_name in H0.
+    replace (Nat.max cb (S cb)) with (S cb) in H0 by lia.
+    replace (Nat.min cb (S cb)) with (cb) in H0 by lia.
     destruct H0 ; subst.
     rewrite next_anon_name.
     rewrite <- Nat.add_1_l.
@@ -419,23 +403,19 @@ Admitted.
 
 (* ADMITTED *)
 Lemma inv_label_max' :
-  forall (c : cfg_lang) (cb cb' : nat) (cr cr' : int) (dg : dcfg) min max,
+  forall (c : CFLang) (cb cb' : nat) (cr cr' : int) (dg : dcfg) min max,
     (evaluate c) {| counter_bid := cb; counter_reg := cr |}
     = ({| counter_bid := cb'; counter_reg := cr' |}, dg) ->
     interval_label dg min max ->
     lt_bid max (name cb').
 Proof.
-  induction_cfg_lang c.
+  induction_CFLang c.
   - unfold interval_label, max_label, min_label in *.
     cbn in *.
-    rewrite leb_bid_refl in *.
-    unfold leb_bid in *. simpl in *.
-    match goal with
-    | h:context[ ?x <? ?y ] |- _ =>
-        let H := fresh "H" in
-        assert (H : x <? y = true) by admit
-        ; rewrite H in * ; clear H
-    end; simpl in *.
+    rewrite max_refl,min_refl in *.
+    rewrite max_name, min_name in H0.
+    replace (Nat.max cb (S cb)) with (S cb) in H0 by lia.
+    replace (Nat.min cb (S cb)) with (cb) in H0 by lia.
     destruct H0 ; subst.
     apply lt_bid_name ; lia.
   - destruct f.
@@ -461,7 +441,7 @@ Admitted.
 
 
 Lemma inv_max_label :
-  forall (cb cb' : nat) (cr cr' : int) (c : cfg_lang) (dg : dcfg) min max,
+  forall (cb cb' : nat) (cr cr' : int) (c : CFLang) (dg : dcfg) min max,
     interval_label dg min max ->
     (evaluate c) {| counter_bid := cb; counter_reg := cr |}
     = ({| counter_bid := cb'; counter_reg := cr' |}, dg) ->
@@ -491,44 +471,34 @@ Proof.
   now apply INV_ANON_OUT.
 Qed.
 
-(* TODO important invariant here - some work todo *)
-
 (* ADMITTED *)
 Lemma inv_min_label :
-  forall (c : cfg_lang) (cb cb' : nat) (cr cr' : int) (dg : dcfg) min max,
+  forall (c : CFLang) (cb cb' : nat) (cr cr' : int) (dg : dcfg) min max,
     (evaluate c) {| counter_bid := cb; counter_reg := cr |}
     = ({| counter_bid := cb'; counter_reg := cr' |}, dg) ->
     interval_label dg min max ->
     min = name cb.
 Proof.
-  induction_cfg_lang c.
+  induction_CFLang c.
   - unfold interval_label, max_label, min_label in *.
     cbn in *.
-    rewrite leb_bid_refl in *.
-    unfold leb_bid in * ; simpl in *.
-    match goal with
-    | h:context[ ?x <? ?y ] |- _ =>
-        let H := fresh "H" in
-        assert (H : x <? y = true) by admit
-        ; rewrite H in * ; clear H
-    end ; simpl in *.
+    rewrite max_refl,min_refl in *.
+    rewrite max_name, min_name in H0.
+    replace (Nat.max cb (S cb)) with (S cb) in H0 by lia.
+    replace (Nat.min cb (S cb)) with (cb) in H0 by lia.
     intuition.
   - destruct f ; eapply IHc1 in Heq. eassumption.
     eapply IHc2 in Heq0.
     all: eexists.
-    all: try eexists. (* it's still some work to do here *)
+    all: try eexists.
+    (* TODO it's still some work to do here *)
     (* NOTE similar than inv_counter_bid *)
 Admitted.
 
 (* NOTE relies on inv_counter_bid' and  inv_min_label *)
 
-Ltac ceapply t h s :=
-  assert (s := h)
-  ; eapply t in s.
-
-
 Theorem inv_interval_name :
-  forall  (c1 c2 : cfg_lang) (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg) min1 max1 min2 max2,
+  forall  (c1 c2 : CFLang) (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg) min1 max1 min2 max2,
     interval_label dg1 min1 max1 ->
     interval_label dg2 min2 max2 ->
     (evaluate c1) σ1 = (σ2, dg1) ->
@@ -544,7 +514,7 @@ Proof.
   now subst.
 Qed.
 
-Ltac auto_apply :=
+Ltac auto_apply_In :=
   match goal with
   | h1 : context [ In _ (?f ?g) -> _ ] |- _ =>
       match goal with
@@ -579,7 +549,7 @@ Proof.
   ; subst
   ; remember (inputs graph1 ++ outputs graph1) as dg1
   ; remember (inputs graph0 ++ outputs graph0) as dg0
-  ; repeat auto_apply.
+  ; repeat auto_apply_In.
   - eapply le_bid_trans in H4 ; try eassumption.
     eapply lt_bid_trans_le in LE ; try eassumption.
     now apply lt_bid_irrefl in LE.
@@ -597,9 +567,8 @@ Proof.
     now apply lt_bid_irrefl in LE.
 Qed.
 
-
 Theorem inv_independent_flows :
-  forall (c1 c2 : cfg_lang)
+  forall (c1 c2 : CFLang)
     (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg),
     wf_dcfg dg1 ->
     wf_dcfg dg2 ->
@@ -628,7 +597,7 @@ Proof.
 Qed.
 
 Theorem inv_disjoint_outputs :
-  forall (c1 c2 : cfg_lang)
+  forall (c1 c2 : CFLang)
     (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg),
     wf_dcfg dg1 ->
     wf_dcfg dg2 ->
@@ -657,7 +626,7 @@ Proof.
 Qed.
 
 Corollary inv_disjoint_outs :
-  forall (c1 c2 : cfg_lang)
+  forall (c1 c2 : CFLang)
     (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg),
     wf_dcfg dg1 ->
     wf_dcfg dg2 ->
@@ -676,7 +645,6 @@ Proof.
 Qed.
 
 (** WF lemmas on the interface *)
-
 Lemma wf_mk_block : forall σ c, wf_dcfg (snd ((mk_block c) σ )).
 Proof.
   intros.
@@ -937,7 +905,7 @@ Proof.
       destruct contra as [ contra | contra ]
       ; [injection contra; lia|].
       rewrite in_app_iff in contra ; destruct contra as [ contra | contra ]
-      ; apply in_remove in contra.
+      ; apply CFGC_Utils.in_remove in contra.
       * assert ( In (name cb) g1 ) by
           (subst g1 ; apply in_app_iff ; right ; now apply OUTPUTS_GT).
         eapply lt_bid_trans_le in LT_CB; try eassumption.
@@ -952,7 +920,7 @@ Proof.
     apply list_norepet_cons.
     + intro contra.
       rewrite in_app_iff in contra ; destruct contra as [ contra | contra ]
-      ; apply in_remove in contra.
+      ; apply CFGC_Utils.in_remove in contra.
       * assert ( In (name (S cb)) g1 ) by (subst g1 ; apply in_app_iff ; intuition).
         apply lt_bid_S in LT_CB.
         eapply lt_bid_trans_le in LT_CB; try eassumption.
@@ -1097,7 +1065,7 @@ Proof.
         apply ord_list in LT_MAX_CB.
         apply not_in_app_r in LT_MAX_CB.
         intro.
-        apply in_remove, OUTPUTS_G in H.
+        apply CFGC_Utils.in_remove, OUTPUTS_G in H.
         contradiction.
     + (* freshness (name counter_bid0) *)
       intro.
@@ -1141,7 +1109,7 @@ Proof.
     subst.
     apply ord_list in H.
     apply not_in_app_r in H.
-    intro. apply in_remove, OUTPUTS_G in H0.
+    intro. apply CFGC_Utils.in_remove, OUTPUTS_G in H0.
     contradiction.
   - break_list_goal.
     simpl in *.
@@ -1194,7 +1162,7 @@ Proof.
 Qed.
 
 (* WF EVALUATE *)
-Theorem wf_evaluate : forall (σ σ' : FST) (c : cfg_lang) (dg : dcfg),
+Theorem wf_evaluate : forall (σ σ' : FST) (c : CFLang) (dg : dcfg),
     (evaluate c) σ = (σ', dg) ->
     wf_dcfg dg.
 Proof.
@@ -1261,7 +1229,7 @@ Proof.
 Qed.
 
 
-Lemma snd_elim : forall (c : cfg_lang) σ dg,
+Lemma snd_elim : forall (c : CFLang) σ dg,
     snd (evaluate c σ) = dg -> exists σ', (evaluate c σ) = (σ', dg).
 Proof.
   intros *.
@@ -1282,7 +1250,7 @@ Proof.
     now eexists.
 Qed.
 
-Corollary wf_evaluate' : forall (σ : FST) (c : cfg_lang) (dg : dcfg),
+Corollary wf_evaluate' : forall (σ : FST) (c : CFLang) (dg : dcfg),
     snd ((evaluate c) σ) = dg ->
     wf_dcfg dg.
 Proof.
@@ -1295,7 +1263,7 @@ Qed.
 (** Recover the hypothesis we need to use the denotation lemmas *)
 
 Theorem wf_evaluate_wf_seq :
-  forall (c1 c2 : cfg_lang)
+  forall (c1 c2 : CFLang)
     σ0 σ1 σ2 graph1 ins1 outs1 graph2 ins2 outs2,
     evaluate c1 σ0 = (σ1, {| graph := graph1; ins := ins1; outs := outs1 |}) ->
     evaluate c2 σ1 = (σ2, {| graph := graph2; ins := ins2; outs := outs2 |}) ->
@@ -1354,7 +1322,7 @@ Proof.
 Qed.
 
 Lemma evaluate_fresh :
-  forall f1 f2 f3 b ( c : cfg_lang) dg min max,
+  forall f1 f2 f3 b ( c : CFLang) dg min max,
     (evaluate c) f1 = (f2, dg) ->
     freshLabel f2 = (f3, b) ->
     interval_label dg min max ->
@@ -1371,7 +1339,7 @@ Proof.
 Qed.
 
 Lemma evaluate_fresh' :
-  forall f1 f2 f3 f4 b1 b2 ( c : cfg_lang ) dg min max,
+  forall f1 f2 f3 f4 b1 b2 ( c : CFLang ) dg min max,
     (evaluate c) f1 = (f2, dg) ->
     freshLabel f2 = (f3, b1) ->
     freshLabel f3 = (f4, b2) ->
@@ -1395,7 +1363,7 @@ Proof.
 Qed.
 
 Theorem wf_evaluate_wf_while :
-  forall f0 f1 f2 f3 ( c : cfg_lang ) graph ins outs b1 b2 code cond,
+  forall f0 f1 f2 f3 ( c : CFLang ) graph ins outs b1 b2 code cond,
     evaluate c f0 = (f1, {| graph := graph; ins := ins; outs := outs |}) ->
     freshLabel f1 = (f2, b1) ->
     freshLabel f2 = (f3, b2) ->
@@ -1501,9 +1469,8 @@ Proof.
     now apply hd_In.
 Qed.
 
-Require Import CFGC_DenotationsCombinators.
 Definition denote_dcfg (dg : dcfg) := denote_cfg (graph dg).
-Definition denote_cfg_lang (g : cfg_lang) (σ : FST) :=
+Definition denote_cflang (g : CFLang) (σ : FST) :=
   denote_dcfg (snd ((evaluate g) σ)).
 
 
