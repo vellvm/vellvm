@@ -124,8 +124,8 @@ Section InterfaceCombinators.
                  ++ (remove_bid inF insF)
     in
     let outs := [output]
-                 ++ (remove_bid outT outsT)
-                 ++ (remove_bid outF outsF)
+                  ++ (remove_bid outT outsT)
+                  ++ (remove_bid outF outsF)
     in
     let dg := mk_dcfg g ins outs in
     ret dg.
@@ -224,15 +224,15 @@ Qed.
 
 Ltac induction_CFLang c :=
   induction c ; intros ; simpl in *
-; [ unfold mk_block, freshLabel in *
-  | unfold mk_seq,freshLabel in * ; repeat flatten_all ; simpl in *
-  | unfold mk_ite ,freshLabel in * ; repeat flatten_all ; simpl in *
-  | unfold mk_while,freshLabel in * ; repeat flatten_all ; simpl in *]
+  ; [ unfold mk_block, freshLabel in *
+    | unfold mk_seq,freshLabel in * ; repeat flatten_all ; simpl in *
+    | unfold mk_ite ,freshLabel in * ; repeat flatten_all ; simpl in *
+    | unfold mk_while,freshLabel in * ; repeat flatten_all ; simpl in *]
   ; simpl in * ; repeat flatten_all ; repeat inv_pair ; simpl in * ;
   [ unfold cfg_block in *
-    | unfold cfg_seq in *
-    | unfold cfg_branch, cfg_join in *
-    | unfold cfg_while_loop in *
+  | unfold cfg_seq in *
+  | unfold cfg_branch, cfg_join in *
+  | unfold cfg_while_loop in *
   ] ; simpl in *.
 
 
@@ -420,8 +420,8 @@ Proof.
     apply lt_bid_name ; lia.
   - destruct f.
     eapply IHc1 in Heq ;
-    eapply IHc2 in Heq0 ;
-    try eassumption.
+      eapply IHc2 in Heq0 ;
+      try eassumption.
     all: eexists.
     shelve.
     all: eexists.
@@ -569,7 +569,7 @@ Qed.
 
 Theorem inv_independent_flows :
   forall (c1 c2 : CFLang)
-    (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg),
+         (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg),
     wf_dcfg dg1 ->
     wf_dcfg dg2 ->
     (evaluate c1) σ1 = (σ2, dg1) ->
@@ -598,7 +598,7 @@ Qed.
 
 Theorem inv_disjoint_outputs :
   forall (c1 c2 : CFLang)
-    (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg),
+         (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg),
     wf_dcfg dg1 ->
     wf_dcfg dg2 ->
     (evaluate c1) σ1 = (σ2, dg1) ->
@@ -627,7 +627,7 @@ Qed.
 
 Corollary inv_disjoint_outs :
   forall (c1 c2 : CFLang)
-    (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg),
+         (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg),
     wf_dcfg dg1 ->
     wf_dcfg dg2 ->
     (evaluate c1) σ1 = (σ2, dg1) ->
@@ -1102,10 +1102,10 @@ Proof.
     now apply list_norepet_remove.
     apply list_disjoint_singleton_left.
     unfold max_label in * ; simpl in *.
-        assert ( lt_bid max (name (S cb)) ) by
-          ltac:(eapply lt_bid_trans
-                ; try eassumption
-                ; apply lt_bid_name ; lia).
+    assert ( lt_bid max (name (S cb)) ) by
+      ltac:(eapply lt_bid_trans
+            ; try eassumption
+            ; apply lt_bid_name ; lia).
     subst.
     apply ord_list in H.
     apply not_in_app_r in H.
@@ -1276,7 +1276,7 @@ Proof.
   capply WF_EVAL E1 E1'.
   capply WF_EVAL E2 E2'.
   ceapply INV_INDE_FLOWS E2 INV_INDE ;
-  try eapply E1 ; try eassumption ; clear INV_INDE_FLOWS.
+    try eapply E1 ; try eassumption ; clear INV_INDE_FLOWS.
   unfold wf_seq, wf_dcfg, wf_inputs,
     wf_outputs, wf_graph, wf_name, free_in_cfg, no_reentrance in *
   ; simpl in *.
@@ -1469,9 +1469,95 @@ Proof.
     now apply hd_In.
 Qed.
 
+
 Definition denote_dcfg (dg : dcfg) := denote_cfg (graph dg).
 Definition denote_cflang (g : CFLang) (σ : FST) :=
   denote_dcfg (snd ((evaluate g) σ)).
+
+(** Denotations equations *)
+From ITree Require Import
+     ITree
+     ITreeFacts
+     Eq.
+
+From Vellvm Require Import
+     Semantics
+     Syntax
+     ScopeTheory
+     Theory
+     DenotationTheory
+     Tactics
+     SymbolicInterpreter.
+
+Require Import Utils.PostConditions.
+
+Import MonadNotation.
+Import ITreeNotations.
+(* Import SemNotations. *)
+
+Import CFGC_DenotationsCombinators.
+
+(** Bind and translate rewritings *)
+Hint Rewrite @bind_ret_l : rwbind.
+Hint Rewrite @bind_bind : rwbind.
+Hint Rewrite @translate_ret : rwtranslate.
+Hint Rewrite @translate_bind : rwtranslate.
+Hint Rewrite @translate_trigger : rwtranslate.
+
+Ltac bstep := autorewrite with rwbind.
+Ltac tstep := autorewrite with rwtranslate.
+Ltac go := autorewrite with rwtranslate rwbind.
+
+Lemma denote_cblock : forall σ (c : code typ) g ins outs (to from : block_id),
+    In to ins ->
+    (snd ((evaluate (CFGC_CFLang.CBlock c)) σ)) =
+      {| graph := g; ins := ins ; outs := outs |} ->
+    eutt eq
+         (denote_cflang (CFGC_CFLang.CBlock c) σ from to)
+         (denote_code (conv c) ;; ret (inl (to,(hd default_bid outs)))).
+Proof.
+  intros.
+  destruct σ ; simpl in *.
+  unfold denote_cflang, denote_dcfg ; simpl in *.
+  unfold cfg_block, mk_dcfg in H0; inv H0.
+  apply In_singleton in H ; subst.
+  rewrite denote_cfg_block.
+  apply eutt_eq_bind ; intro. reflexivity.
+  unfold wf_block.
+  apply name_neq ; lia.
+Qed.
+
+Lemma denote_cseq : forall σ1 σ2 σ3 (c1 c2 : CFLang)
+                      g1 ins1 outs1
+                      g2 ins2 outs2
+                      (to target from : block_id),
+    ((evaluate c1) σ1) = (σ2, {| graph := g1; ins := ins1 ; outs := outs1 |}) ->
+    ((evaluate c2) σ2) = (σ3, {| graph := g2; ins := ins2 ; outs := outs2 |}) ->
+    In to (inputs g1) ->
+    eutt eq
+         (denote_cflang (CSeq c1 c2) σ1 from to)
+         (d <- denote_cfg g1 from to ;;
+          match d with
+          | inr dv => ret (inr dv)
+          | inl (src, target) =>
+              if eqb_bid target (hd default_bid outs1)
+              then denote_cfg g2 (hd default_bid outs1) (hd default_bid ins2)
+              else denote_cfg g2 src target
+          end).
+Proof.
+  intros.
+  unfold denote_cflang, denote_dcfg.
+  simpl.
+  unfold mk_seq.
+  repeat flatten_all ; simpl in *.
+  repeat inv_pair.
+  rewrite Heq0 in H0 ; inv H0.
+  rewrite denote_cfg_seq ; try assumption.
+  apply eutt_eq_bind ; intros.
+  repeat flatten_all ; try reflexivity.
+  eapply wf_evaluate_wf_seq ; eassumption.
+Qed.
+
 
 
 (* TODO :
