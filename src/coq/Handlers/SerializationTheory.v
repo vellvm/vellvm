@@ -420,49 +420,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
         cbn in *.
         inversion H0.
         reflexivity.
-  Admitted.
-
-  Lemma eval_iop_err_ub_oom_to_M :
-    forall {M} `{HM : Monad M}
-      `{HME : RAISE_ERROR M}
-      `{HMU : RAISE_UB M}
-      `{HMO : RAISE_OOM M}
-      `{EQM : Monad.Eq1 M}
-      `{LAWS : @Monad.MonadLawsE M EQM HM}
-      `{REF : Reflexive (M dvalue) (@eq1 M EQM dvalue)}
-      `{TRANS : Transitive (M dvalue) (@eq1 M EQM dvalue)}
-      op a b res,
-      @eval_iop err_ub_oom (@Monad_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident)
-                 (@RAISE_ERROR_err_ub_oom IdentityMonad.ident IdentityMonad.Monad_ident) _ _ op a b =
-        success_unERR_UB_OOM res ->
-      @eval_iop M HM HME HMU HMO op a b ≈ @ret M HM dvalue res.
-  Proof.
-    intros M HM HME HMU HMO EQM LAWS REF TRANS op a b res EVAL.
-    destruct op.
-
-    - destruct a, b; inversion EVAL; unfold eval_iop;
-        try apply eval_iop_integer_h_err_ub_oom_to_M; auto.
-      + clear H0.
-        generalize dependent res.
-        unfold eval_iop.
-        remember (combine elts elts0) as l.
-        clear Heql.
-        induction l; intros res EVAL.
-        * cbn.
-          rewrite bind_ret_l. inversion EVAL. reflexivity.
-        * Set Nested Proofs Allowed.
-          Lemma vec_loop_cons :
-            forall {M} `{HM : Monad M} {A} (f : A -> A -> M A) (e1 e2 : A) (elts : list (A * A)),
-              vec_loop f ((e1, e2) :: elts) = rest <- vec_loop f elts;; val <- f e1 e2;; ret (val :: rest).
-          Proof.
-          Admitted.
-
-          Opaque vec_loop.
-          destruct a.
-          cbn.
-          rewrite vec_loop_cons.
-          rewrite vec_loop_cons in EVAL.
-  Admitted.
+  Abort.
 
   Lemma concretize_icmp_inv:
     forall {M} `{HM: Monad M} `{HME: RAISE_ERROR M} op x y dv,
@@ -589,10 +547,10 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
       split; auto.
     }
 
-    (* Both x and y successfully concretized.
+    (* Both x and y successfully concretized. *)
 
-         Now eval_iop must succeed too.
-     *)
+  (*        Now eval_iop must succeed too. *)
+  (*    *)
     destruct REST as [FAILS | REST].
     inversion FAILS.
     specialize (REST b).
@@ -736,14 +694,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
   Qed.
 
   Lemma concretize_ibinop_inv:
-    forall {M} `{HM: Monad M} `{HME: RAISE_ERROR M}
-      `{HMU: RAISE_UB M}
-      `{HMO: RAISE_OOM M}
-      `{EQM : Eq1 M}
-      `{LAWS : @Monad.MonadLawsE M EQM HM}
-      `{REF : Reflexive (M dvalue) (@eq1 M EQM dvalue)}
-      `{TRANS : Transitive (M dvalue) (@eq1 M EQM dvalue)}
-      op x y dv,
+    forall op x y dv,
       concretize_succeeds (UVALUE_IBinop op x y) ->
       concretize (UVALUE_IBinop op x y) dv ->
       exists dx dy,
@@ -751,9 +702,9 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
         concretize x dx /\
         concretize_succeeds y /\
         concretize y dy /\
-        @eval_iop M HM HME _ _ op dx dy ≈ ret dv.
+        @eval_iop err_ub_oom _ _ _ _ op dx dy = ret dv.
   Proof.
-    intros M HM HME HMU HMO EQM LAWS REF TRANS op x y dv SUCC CONC.
+    intros op x y dv SUCC CONC.
 
     rewrite concretize_equation in CONC.
     red in CONC.
@@ -1061,7 +1012,6 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
       cbn in eqm; try contradiction.
     cbn in eqmb.
     subst; auto.
-    eapply eval_iop_err_ub_oom_to_M; auto.
   Qed.
 
   Lemma concretize_succeeds_poison :
@@ -1241,7 +1191,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
       end.
 
     (* Binops *)
-    { eapply @concretize_ibinop_inv with (M:=err_ub_oom) in CONC; eauto; try typeclasses eauto.
+    { eapply concretize_ibinop_inv in CONC; eauto.
       destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
 
       eapply eval_iop_dtyp_i; try euo_crush.
@@ -1251,7 +1201,7 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
       reflexivity.
     }
 
-    { eapply @concretize_ibinop_inv with (M:=err_ub_oom) in CONC; auto; try typeclasses eauto.
+    { eapply concretize_ibinop_inv in CONC; auto.
       destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
 
       eapply eval_iop_dtyp_iptr; try euo_crush.
