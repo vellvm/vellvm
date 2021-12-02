@@ -325,7 +325,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         ⟦ e1 at τ ⟧e3 g l m ≈ Ret3 g l m b ->
         uvalue_to_dvalue a = inr av ->
         uvalue_to_dvalue b = inr bv ->
-        @eval_iop (itree (FailureE +' UBE +' OOME)) _ _ _ _ op av bv  = ret x ->
+        @eval_iop err_ub_oom _ _ _ _ op av bv  = ret x ->
         ⟦ OP_IBinop op τ e0 e1 ⟧e3 g l m ≈ Ret3 g l m (dvalue_to_uvalue x).
     Proof.
       intros * A B AV BV EVAL.
@@ -342,7 +342,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       rewrite AV, BV.
       cbn.
       setoid_rewrite EVAL.
-      setoid_rewrite map_ret.
+      cbn.
       go.
       reflexivity.
     Qed.
@@ -353,7 +353,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         ⟦ e1 at τ ⟧e3 g l m ≈ Ret3 g l m b ->
         uvalue_to_dvalue a = inr av ->
         uvalue_to_dvalue b = inr bv ->
-        @eval_fop (itree (FailureE +' UBE +' OOME)) _ _ _ op av bv  = ret x ->
+        @eval_fop err_ub_oom _ _ _ op av bv  = ret x ->
         ⟦ OP_FBinop op params τ e0 e1 ⟧e3 g l m ≈ Ret3 g l m (dvalue_to_uvalue x).
     Proof.
       intros * A B AV BV EVAL.
@@ -370,7 +370,6 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       rewrite AV, BV.
       cbn.
       rewrite EVAL.
-      setoid_rewrite map_ret.
       cbn. 
       go.
       reflexivity.
@@ -382,7 +381,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         ⟦ e1 at τ ⟧e3 g l m ≈ Ret3 g l m b ->
         uvalue_to_dvalue a = inr av ->
         uvalue_to_dvalue b = inr bv ->
-        @eval_fcmp (itree exp_E) _ _ op av bv  = ret x ->
+        @eval_fcmp err_ub_oom _ _ op av bv  = ret x ->
         ⟦ OP_FCmp op τ e0 e1 ⟧e3 g l m ≈ Ret3 g l m (dvalue_to_uvalue x).
     Proof.
       intros * A B AV BV EVAL.
@@ -396,7 +395,6 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       rewrite AV, BV.
       cbn.
       setoid_rewrite EVAL.
-      setoid_rewrite map_ret.
       cbn.
       go.
       reflexivity.
@@ -408,7 +406,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         ⟦ e1 at τ ⟧e3 g l m ≈ Ret3 g l m b ->
         uvalue_to_dvalue a = inr av ->
         uvalue_to_dvalue b = inr bv ->
-        @eval_icmp (itree exp_E) _ _ op av bv  = ret x ->
+        @eval_icmp err_ub_oom _ _ op av bv  = ret x ->
         ⟦ OP_ICmp op τ e0 e1 ⟧e3 g l m ≈ Ret3 g l m (dvalue_to_uvalue x).
     Proof.
       intros * A B AV BV EVAL.
@@ -422,7 +420,6 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       rewrite AV, BV.
       cbn.
       rewrite EVAL.
-      setoid_rewrite map_ret.
       cbn.
       go.
       reflexivity.

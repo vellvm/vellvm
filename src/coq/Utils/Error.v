@@ -518,6 +518,23 @@ Section err_ub_oom_monad.
       + exact (t1 = t2).
   Defined.
 
+  #[global] Instance Reflexive_err_ub_oom_eq1 {A : Type} : Reflexive (@eq1 err_ub_oom _ A).
+  Proof.
+    unfold Reflexive.
+    intros x.
+    destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x']]]]]]]] eqn:Hx; cbn; auto.
+  Defined.
+
+  #[global] Instance Transitive_err_ub_oom_eq1 {A : Type} : Transitive (@eq1 err_ub_oom _ A).
+  Proof.
+    unfold Transitive.
+    intros x y z XY YZ.
+    destruct x as [[[[[[[oom_x] | [[ub_x] | [[err_x] | x']]]]]]]] eqn:Hx;
+      destruct y as [[[[[[[oom_y] | [[ub_y] | [[err_y] | y']]]]]]]] eqn:Hy;
+      destruct z as [[[[[[[oom_z] | [[ub_z] | [[err_z] | z']]]]]]]] eqn:Hz;
+      cbn in *; subst; auto; try contradiction.    
+  Defined.  
+
   #[global] Instance Monad_err_ub_oom : Monad (err_ub_oom_T M).
   Proof.
     split.

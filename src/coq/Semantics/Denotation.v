@@ -295,13 +295,12 @@ Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP
         dv2 <- concretize_or_pick v2 (forall dv2, concretize v2 dv2 -> dvalue_not_zero dv2) ;;
         uvalue_to_dvalue_binop2
           (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-          (fun v1 v2 => translate FUBO_to_exp (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
+          (fun v1 v2 => lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
           v1 dv2
       else
         uvalue_to_dvalue_binop
           (fun v1 v2 => ret (UVALUE_IBinop iop v1 v2))
-          (fun v1 v2 => translate FUBO_to_exp
-                                  (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
+          (fun v1 v2 => lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_iop iop v1 v2)))
           v1 v2
 
     | OP_ICmp cmp dt op1 op2 =>
@@ -309,7 +308,7 @@ Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP
       v2 <- denote_exp (Some dt) op2 ;;
       uvalue_to_dvalue_binop
         (fun v1 v2 => ret (UVALUE_ICmp cmp v1 v2))
-        (fun v1 v2 => fmap dvalue_to_uvalue (eval_icmp cmp v1 v2))
+        (fun v1 v2 => lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_icmp cmp v1 v2)))
         v1 v2
 
     | OP_FBinop fop fm dt op1 op2 =>
@@ -320,17 +319,13 @@ Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP
         dv2 <- concretize_or_pick v2 (forall dv2, concretize v2 dv2 -> dvalue_is_zero dv2) ;;
         uvalue_to_dvalue_binop2
           (fun v1 v2 => ret (UVALUE_FBinop fop fm v1 v2))
-          (fun v1 v2 =>
-             translate FUBO_to_exp
-                       (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
+          (fun v1 v2 => lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
           v1 dv2
       else
         uvalue_to_dvalue_binop
           (fun v1 v2 =>
              ret (UVALUE_FBinop fop fm v1 v2))
-          (fun v1 v2 =>
-             translate FUBO_to_exp
-                       (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
+          (fun v1 v2 => lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_fop fop v1 v2)))
           v1 v2
 
     | OP_FCmp fcmp dt op1 op2 =>
@@ -338,7 +333,7 @@ Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP
       v2 <- denote_exp (Some dt) op2 ;;
       uvalue_to_dvalue_binop
         (fun v1 v2 => ret (UVALUE_FCmp fcmp v1 v2))
-        (fun v1 v2 => fmap dvalue_to_uvalue (eval_fcmp fcmp v1 v2))
+        (fun v1 v2 => lift_err_ub_oom ret (fmap dvalue_to_uvalue (eval_fcmp fcmp v1 v2)))
         v1 v2
 
     | OP_Conversion conv dt1 op dt2 =>

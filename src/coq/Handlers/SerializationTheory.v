@@ -259,9 +259,7 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
 
   Module Mem := FiniteMemory.Make LP Events MP.
   Import Mem.
-
-  Module ESID := ERRSID ADDR IP SIZEOF PROV.
-  Import ESID.
+  Import Mem.ESID.
 
   Import DynamicTypes.
 
@@ -1243,23 +1241,25 @@ Lemma eval_iop_integer_h_err_ub_oom_to_M :
       end.
 
     (* Binops *)
-    { apply concretize_ibinop_inv in CONC; auto.
+    { eapply @concretize_ibinop_inv with (M:=err_ub_oom) in CONC; eauto; try typeclasses eauto.
       destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
 
       eapply eval_iop_dtyp_i; try euo_crush.
       eapply IHDTYP1; eauto.
       eapply IHDTYP2; eauto.
       rewrite EVAL.
-      reflexivity. }
+      reflexivity.
+    }
 
-    { apply concretize_ibinop_inv in CONC; auto.
+    { eapply @concretize_ibinop_inv with (M:=err_ub_oom) in CONC; auto; try typeclasses eauto.
       destruct CONC as (dx & dy & SUCCx & CONCx & SUCCy & CONCy & EVAL).
 
       eapply eval_iop_dtyp_iptr; try euo_crush.
       eapply IHDTYP1; eauto.
       eapply IHDTYP2; eauto.
       rewrite EVAL.
-      reflexivity.  }
+      reflexivity.
+    }
 
     (* Integer Comparisons *)
     admit.

@@ -18,7 +18,9 @@ From Vellvm Require Import
      Semantics.Memory.Sizeof
      Utils.StateMonads
      Utils.Monads
-     Utils.MonadExcLaws.
+     Utils.MonadExcLaws
+     Utils.MonadReturnsLaws
+     Utils.Raise.
 
 From ITree Require Import
      ITree
@@ -54,7 +56,7 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
                            unErrSID_T (amb a))).
   Defined.
 
-  #[global] Instance Monad_EQ1_ErrSID_T : Monad.Eq1 ErrSID.
+  #[global] Instance Monad_EQ1_ErrSID_T {M} `{HME : Monad.Eq1 M} : Monad.Eq1 (ErrSID_T M).
   Proof.
     unfold Monad.Eq1.
     refine
@@ -63,7 +65,130 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
          | mkErrSID_T (ERR_UB_OOM e1), mkErrSID_T (ERR_UB_OOM e2) =>
              Monad.eq1 e1 e2
          end
-      ).              
+      ).
+  Defined.
+
+  #[global] Instance MonadLawsE_ErrSID
+    : Monad.MonadLawsE ErrSID.
+  Proof.
+    split.
+    - (* bind_ret_l *)
+      intros A B f x.
+      cbn.
+      destruct (f x) as [[[[[e]]]]].
+      reflexivity.
+    - (* bind_ret_r *)
+      intros A x.
+      cbn.
+      destruct x as [[[[[e]]]]].
+      cbn.
+
+      unfold unIdent.
+      unfold Monad.eq1, EqM_eitherT; cbn.
+      unfold Monad.eq1, MonadState.Eq1_stateTM; cbn.
+      unfold pointwise_relation.
+
+      intros s.
+      unfold Monad.eq1.
+      intros pr.
+      unfold Eq1_ident.
+
+      destruct (e s pr) as [[pr' [s' e']]]; cbn.
+      destruct e' as [e_OOM | [e_UB | [[e_ERR] | a]]]; auto.
+    - (* bind_bind *)
+      intros A B C x f g.
+      
+      cbn.
+      destruct x as [[[[[e]]]]].
+      cbn.
+
+      unfold unIdent.
+      unfold Monad.eq1, EqM_eitherT; cbn.
+      unfold Monad.eq1, MonadState.Eq1_stateTM; cbn.
+      unfold pointwise_relation.
+
+      intros s.
+      unfold Monad.eq1.
+      intros pr.
+      unfold Eq1_ident.
+
+      destruct (e s pr) as [[pr' [s' e']]]; cbn.
+      destruct e' as [e_OOM | [e_UB | [[e_ERR] | a]]]; cbn; auto.
+
+      destruct (f a) as [FA].
+      destruct FA as [[[[FA]]]].
+      cbn.
+      destruct (FA s' pr') as [[pr'' [s'' e'']]].
+      destruct e'' as [e''_OOM | [e''_UB | [[e''_ERR] | a']]]; cbn; auto.
+    - (* Proper bind *)
+      unfold Proper, respectful.
+      intros A B x y XY x0 y0 POINTWISE.
+      unfold pointwise_relation in POINTWISE.
+
+      destruct x as [[[[[x]]]]].
+      destruct y as [[[[[y]]]]].
+      cbn in *.
+
+      unfold Monad.eq1, EqM_eitherT; cbn.
+      unfold Monad.eq1, MonadState.Eq1_stateTM; cbn.
+      unfold pointwise_relation.
+
+      intros s.
+      unfold Monad.eq1.
+      intros pr.
+      unfold Eq1_ident.
+
+      unfold Monad.eq1, EqM_eitherT, Monad.eq1, MonadState.Eq1_stateTM, pointwise_relation, Monad.eq1, MonadState.Eq1_stateTM, pointwise_relation, Eq1_ident in XY.
+      cbn in XY.
+
+      unfold unIdent.
+      destruct (x s pr) as [[prx [sx x']]] eqn:Hx; cbn.
+      destruct (y s pr) as [[pry [sy y']]] eqn:Hy; cbn.
+      destruct x' as [x_OOM | [x_UB | [[x_ERR] | x']]]; cbn; auto;
+        destruct y' as [y_OOM | [y_UB | [[y_ERR] | y']]]; cbn; auto;
+      assert (x s pr = y s pr) as XY' by auto;
+        rewrite Hx, Hy in XY';
+        inversion XY'; auto.
+
+      unfold Monad.eq1, Monad_EQ1_ErrSID_T in POINTWISE.
+      specialize (POINTWISE y').
+      destruct (x0 y') as [[x0y']].
+      destruct (y0 y') as [[y0y']].
+      specialize (POINTWISE sy pry).
+      apply POINTWISE.
+  Defined.
+
+  #[global] Instance Reflexive_EQ1_ErrSID {A} : Reflexive (@Monad.eq1 ErrSID _ A).
+  Proof.
+    unfold Reflexive.
+    intros x.
+    destruct x.
+    cbn.
+    destruct unErrSID_T0.
+    reflexivity.
+  Defined.
+
+  #[global] Instance Transitive_EQ1_ErrSID {A} : Transitive (@Monad.eq1 ErrSID _ A).
+  Proof.
+    unfold Transitive.
+    intros x y z XY YZ.
+    destruct x, y, z; cbn in *.
+    destruct unErrSID_T0, unErrSID_T1, unErrSID_T2; cbn in *.
+    congruence.
+  Defined.
+
+  #[global] Instance Symmetric_EQ1_ErrSID {A} : Symmetric (@Monad.eq1 ErrSID _ A).
+  Proof.
+    unfold Symmetric.
+    intros x y XY.
+    destruct x, y; cbn in *.
+    destruct unErrSID_T0, unErrSID_T1; cbn in *.
+    congruence.
+  Defined.
+
+  #[global] Instance Eq1Equivalence_EQ1_ErrSID : Monad.Eq1Equivalence ErrSID.
+  Proof.
+    split; typeclasses eauto.
   Defined.
 
   #[global] Instance RAISE_ERROR_ErrSID_T {M : Type -> Type} `{Monad M} : RAISE_ERROR (ErrSID_T M)
@@ -74,6 +199,13 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
 
   #[global] Instance RAISE_OOM_ErrSID_T {M : Type -> Type} `{Monad M} : RAISE_OOM (ErrSID_T M)
     := { raise_oom := fun _ msg => mkErrSID_T (raise_oom msg) }.
+
+  #[global] Instance RaiseBindM_ErrSID : RaiseBindM ErrSID string (@raise_error ErrSID _).
+  Proof.
+    split.
+    intros A B f x.
+    reflexivity.
+  Defined.
 
   Definition evalErrSID_T {A} {M} `{Monad M} (m : ErrSID_T M A) (sid : store_id) (prov : Provenance) : M (OOM_MESSAGE + UB (ERR A))%type
     := evalStateT (evalStateT (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (unErrSID_T m))))) sid) prov.

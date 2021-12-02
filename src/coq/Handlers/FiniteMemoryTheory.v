@@ -36,6 +36,7 @@ From Vellvm Require Import
      Utils.MonadEq1Laws
      Utils.MonadReturnsLaws
      Utils.UBAndErrors
+     Utils.Raise
      Syntax.LLVMAst
      Syntax.DynamicTypes
      Syntax.DataLayout
@@ -92,9 +93,7 @@ Module Type MEMORY_THEORY (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR 
   Open Scope list.
 
   Export Mem.
-
-  Module ESID := ERRSID ADDR IP SIZEOF PROV.
-  Import ESID.
+  Import Mem.ESID.
 
   Module MBT := MemBytesTheory LP Events MP SP.
   Import MBT.
@@ -259,6 +258,35 @@ Module Type MEMORY_THEORY (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR 
           rewrite <- IHxs.
           destruct (map_monad f xs) eqn:Hfxs;
             cbn; rewrite bind_ret_l; reflexivity.
+        }
+    Qed.
+
+    Lemma map_monad_lift_ERR_RAISE_ERROR :
+      forall {A B M} `{HM : Monad M}  `{EQ : Monad.Eq1 M} `{EQV : @Monad.Eq1Equivalence M HM EQ}
+        `{RE : RAISE_ERROR M}
+        `{RBM : @RaiseBindM M HM EQ string (@raise_error M RE)}
+        `{@Monad.MonadLawsE M EQ HM} (xs : list A) (f : A -> ERR B),
+        Monad.eq1 (@lift_ERR_RAISE_ERROR _ M HM RE (map_monad f xs)) (map_monad (fun x => lift_ERR_RAISE_ERROR (f x)) xs).
+    Proof.
+      intros A B M HM EQ EQV RE RBM LAWS xs.
+      induction xs; intros f.
+      - cbn. reflexivity.
+      - cbn.
+
+        { cbn.
+          pose proof (EQV  (list B)).
+          destruct H.
+          destruct (f a); cbn.
+          - destruct e.
+            rewrite rbm_raise_bind; auto.
+          - destruct LAWS.
+            setoid_rewrite <- IHxs.
+            destruct (map_monad f xs) eqn:Hmap; cbn.
+            + destruct e.
+              rewrite bind_ret_l.
+              rewrite rbm_raise_bind; auto.
+            + repeat rewrite bind_ret_l.
+              reflexivity.
         }
     Qed.
 
@@ -787,7 +815,7 @@ Module Type MEMORY_THEORY (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR 
 
       apply ErrSID_evals_to_bind in BYTES as (sid'' & prov'' & bytes'' & EXTRACT & BYTES).
 
-      setoid_rewrite map_monad_lift_ERR in EXTRACT.
+      rewrite map_monad_lift_ERR_RAISE_ERROR in EXTRACT.
 
       apply ErrSID_runs_to_ErrSID_evals_to in EXTRACT.
       apply map_monad_ErrSID_length in EXTRACT.
@@ -3376,5 +3404,3 @@ End MEMORY_THEORY.
 Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SP : SerializationParams LP Events MP) (Mem : FinMemory LP Events MP) <: MEMORY_THEORY LP Events MP SP Mem.
 Include MEMORY_THEORY LP Events MP SP Mem.
 End Make.
-
-
