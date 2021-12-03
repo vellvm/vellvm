@@ -51,17 +51,59 @@ Section FreshnessMonad.
   Definition freshReg : fresh int :=
     fun '(mk_FST bid reg) => (mk_FST bid (reg+1)%Z, reg).
 
+  Definition le_fresh (σ1 σ2 : FST) : Prop :=
+    let '(mk_FST cb1 cr1) := σ1 in
+    let '(mk_FST cb2 cr2) := σ2 in
+    (cb1 <= cb2)%nat /\ cr1 <= cr2.
+
+  Definition lt_fresh (σ1 σ2 : FST) : Prop :=
+    let '(mk_FST cb1 cr1) := σ1 in
+    let '(mk_FST cb2 cr2) := σ2 in
+    ((cb1 < cb2)%nat /\ cr1 <= cr2).
+
+  Lemma lt_fresh_trans : forall f1 f2 f3,
+      lt_fresh f1 f2 -> lt_fresh f2 f3 -> lt_fresh f1 f3.
+  Proof.
+    intros.
+    unfold lt_fresh in *.
+    repeat flatten_all ; simpl in *.
+    lia.
+  Qed.
+
+  Lemma freshLabel_lt : forall σ1 σ2 b,
+      freshLabel σ1 = (σ2, b) -> lt_fresh σ1 σ2.
+  Proof.
+    intros.
+    unfold freshLabel in H.
+    repeat flatten_all ; simpl in *.
+    repeat flatten_all ; simpl in *.
+    inv H.
+    lia.
+  Qed.
+
+  Lemma lt_fresh_bid : forall σ1 σ1' σ2 σ2' b1 b2,
+      lt_fresh σ1 σ2 ->
+      freshLabel σ1 = (σ1', b1) ->
+      freshLabel σ2 = (σ2', b2) ->
+      lt_bid b1 b2.
+  Proof.
+    intros.
+    unfold freshLabel in *.
+    repeat flatten_all ; simpl in *.
+    repeat inv_pair.
+    destruct H as [? _]
+    ; unfold lt_bid, ltb_bid, name, mk_anon
+    ; lia.
+  Qed.
+
   Lemma freshLabel_ord : forall f1 f2 f3 b1 b2,
       freshLabel f1 = (f2, b1) ->
       freshLabel f2 = (f3, b2) ->
       lt_bid b1 b2.
   Proof.
     intros.
-    unfold freshLabel in *.
-    repeat flatten_all ; simpl in *.
-    inv H. inv H0.
-    unfold lt_bid, ltb_bid, name, mk_anon.
-    apply Zaux.Zlt_bool_true. lia.
+    capply freshLabel_lt H LT.
+    eapply lt_fresh_bid ; eassumption.
   Qed.
 
   Lemma freshLabel_fresh : forall f1 f2 f3 b1 b2,
@@ -209,6 +251,75 @@ Definition max_label (dg : dcfg) (max : block_id) :=
 Definition min_label (dg : dcfg) (min : block_id) :=
   min_bid (inputs (graph dg) ++ outputs (graph dg)) = min.
 
+Definition interval_label (dg : dcfg) (min max : block_id) :=
+  max_label dg max /\ min_label dg min.
+
+Lemma max_label_app :
+  forall g1 ins1 outs1 g2 ins2 outs2 ins outs MAX1 MAX2,
+    le_bid MAX1 MAX2 ->
+    max_label {| graph := g1; ins := ins1; outs := outs1 |} MAX1 ->
+    max_label {| graph := g2; ins := ins2; outs := outs2 |} MAX2 ->
+    max_label {| graph := g1++g2; ins := ins; outs := outs |} MAX2.
+Proof.
+  intros.
+  unfold max_label in * ; simpl in *.
+  rewrite max_bid_app in *.
+  do 2 break_list_goal.
+  rewrite 2 max_bid_app.
+  rewrite max_max_commmute.
+  rewrite H0.
+  rewrite H1.
+  unfold max.
+  now rewrite <- leb_bid_true in H ; rewrite H.
+Qed.
+
+Lemma min_label_app :
+  forall g1 ins1 outs1 g2 ins2 outs2 ins outs MIN1 MIN2,
+    le_bid MIN1 MIN2 ->
+    min_label {| graph := g1; ins := ins1; outs := outs1 |} MIN1 ->
+    min_label {| graph := g2; ins := ins2; outs := outs2 |} MIN2 ->
+    min_label {| graph := g1++g2; ins := ins; outs := outs |} MIN1.
+Proof.
+  intros.
+  unfold min_label in * ; simpl in *.
+  rewrite min_bid_app in *.
+  do 2 break_list_goal.
+  rewrite 2 min_bid_app.
+  rewrite min_min_commmute.
+  rewrite H0.
+  rewrite H1.
+  unfold min.
+  now rewrite <- leb_bid_true in H ; rewrite H.
+Qed.
+
+Lemma le_min_max_label : forall g min max,
+    min_label g min ->
+    max_label g max ->
+    le_bid min max.
+Proof.
+  intros ; unfold min_label,max_label in *
+  ; subst.
+  apply le_min_max.
+Qed.
+
+Lemma max_label_inj :
+  forall dg max1 max2, max_label dg max1 -> max_label dg max2 -> max1=max2.
+Proof.
+  intros.
+  unfold max_label in *.
+  now rewrite H in H0.
+Qed.
+
+Lemma min_label_inj :
+  forall dg max1 max2, min_label dg max1 -> min_label dg max2 -> max1=max2.
+Proof.
+  intros.
+  unfold min_label in *.
+  now rewrite H in H0.
+Qed.
+
+
+
 Lemma wf_dcfg_ocfg : forall dg, wf_dcfg dg -> wf_ocfg_bid (graph dg).
 Proof.
   intros.
@@ -317,9 +428,6 @@ Proof.
     in_list_rem ; apply H0 in H1 ; intuition.
 Qed.
 
-Definition interval_label (dg : dcfg) (min max : block_id) :=
-  max_label dg max /\ min_label dg min.
-
 Open Scope Z_scope.
 
 (* NOTE important - easy but tedious *)
@@ -362,83 +470,78 @@ Proof.
 Admitted.
 
 
-(* TODO important invariant here - some work todo *)
-(* NOTE should I relax this hypothesis ? *)
-(* ADMITTED *)
-Lemma inv_counter_bid :
-  forall (c : CFLang) (cb cb' : nat) (cr cr' : int) (dg : dcfg) min max,
-    (evaluate c) {| counter_bid := cb; counter_reg := cr |}
-    = ({| counter_bid := cb'; counter_reg := cr' |}, dg) ->
-    interval_label dg min max ->
-    name cb' = next_anon max.
+
+(* TODO - One of the most important theorem *)
+Theorem inv_interval_label :
+  forall (c : CFLang) cb1 cr1 cb2 cr2 (dg : dcfg),
+    (evaluate c) {| counter_bid := cb1; counter_reg := cr1 |} =
+      ({| counter_bid := cb2; counter_reg := cr2 |}, dg) ->
+    (exists max, (max_label dg max /\ lt_bid max (name cb2))) /\
+    (exists min, (min_label dg min /\ le_bid (name cb1) min)).
 Proof.
   induction_CFLang c.
-  - unfold interval_label, max_label, min_label in *.
-    cbn in *.
-    rewrite max_refl,min_refl in *.
-    rewrite max_name, min_name in H0.
-    replace (Nat.max cb (S cb)) with (S cb) in H0 by lia.
-    replace (Nat.min cb (S cb)) with (cb) in H0 by lia.
-    destruct H0 ; subst.
-    rewrite next_anon_name.
-    rewrite <- Nat.add_1_l.
-    now rewrite Nat.add_comm.
+  - split ; eexists.
+    + unfold max_label in *.
+      cbn in *.
+      rewrite max_refl in *.
+      split. apply max_name.
+      replace (Nat.max cb1 (S cb1)) with (S cb1) by lia.
+      apply lt_bid_name. lia.
+    + unfold min_label in *.
+      cbn in *.
+      rewrite min_refl in *.
+      split. apply min_name.
+      replace (Nat.min cb1 (S cb1)) with cb1 by lia.
+      apply le_bid_refl.
   - destruct f.
-    eapply IHc1 in Heq.
-    eapply IHc2 in Heq0.
-    eassumption.
-    all: eexists.
-    unfold interval_label, max_label in H0 ; destruct H0 as [MAX_LABEL _]
-    ; simpl in *.
-    rewrite list_cons_app in MAX_LABEL ;
-      rewrite !inputs_app, !ScopeTheory.outputs_app in MAX_LABEL; simpl in *.
-    unfold max_label ; simpl.
-    unfold max_bid in *.
-    admit. (* there is some work to do here *)
-    all : eexists.
+    ceapply IHc1 Heq IH1 ; clear IHc1 Heq
+    ; ceapply IHc2 Heq0 IH2 ; clear IHc2 Heq0
+    ; try eassumption.
+    destruct IH1 as [[MAX1 [MAX_SPEC1 LT1]] [MIN1 [MIN_SPEC1 LE1]]]
+    ; destruct IH2 as [[MAX2 [MAX_SPEC2 LT2]] [MIN2 [MIN_SPEC2 LE2]]].
+    split.
+    + exists MAX2. split ; auto.
+      apply lt_le in LT1, LT2.
+      eapply max_label_app ; try eassumption.
+      eapply le_bid_trans in LE2 ; try eassumption.
+      eapply le_bid_trans ; try eassumption.
+      eapply le_min_max_label ; try eassumption.
+      rewrite list_cons_app.
+      eapply max_label_app ; try eassumption.
+      2 : { unfold max_label ; cbn.
+            rewrite max_refl.
+            replace
+              (max (hd default_bid outs0) (hd default_bid ins1))
+              with (hd default_bid ins1) by admit.
+            eexists.
+      }
+      assert (In (hd default_bid ins1) (inputs graph1)) by admit.
+      unfold max_label in MAX_SPEC2 ; simpl in MAX_SPEC2.
+      apply max_bid_spec' in MAX_SPEC2.
+      rewrite Forall_forall in MAX_SPEC2.
+      assert (In (hd default_bid ins1) (inputs graph1 ++ outputs graph1))
+             by ( apply in_app_iff ; intuition).
+      now apply MAX_SPEC2 in H0.
+    + exists MIN1. split ; auto.
+      apply lt_le in LT1, LT2.
+      eapply min_label_app with (MIN2 := (hd default_bid outs0) )
+      ; try assumption.
+      * assert (In (hd default_bid outs0) (inputs graph0)) by admit.
+        assert (In (hd default_bid outs0) (inputs graph0 ++ outputs graph0))
+             by ( apply in_app_iff ; intuition).
+      unfold min_label in MIN_SPEC1 ; simpl in MIN_SPEC1.
+      apply min_bid_spec' in MIN_SPEC1.
+      rewrite Forall_forall in MIN_SPEC1.
+        now apply MIN_SPEC1 in H0.
+      * rewrite list_cons_app.
+        eapply min_label_app ; try eassumption.
+        admit.
+        unfold min_label ; cbn.
+        rewrite min_refl.
+        admit.
   - admit.
   - admit.
 Admitted.
-
-
-(* ADMITTED *)
-Lemma inv_label_max' :
-  forall (c : CFLang) (cb cb' : nat) (cr cr' : int) (dg : dcfg) min max,
-    (evaluate c) {| counter_bid := cb; counter_reg := cr |}
-    = ({| counter_bid := cb'; counter_reg := cr' |}, dg) ->
-    interval_label dg min max ->
-    lt_bid max (name cb').
-Proof.
-  induction_CFLang c.
-  - unfold interval_label, max_label, min_label in *.
-    cbn in *.
-    rewrite max_refl,min_refl in *.
-    rewrite max_name, min_name in H0.
-    replace (Nat.max cb (S cb)) with (S cb) in H0 by lia.
-    replace (Nat.min cb (S cb)) with (cb) in H0 by lia.
-    destruct H0 ; subst.
-    apply lt_bid_name ; lia.
-  - destruct f.
-    eapply IHc1 in Heq ;
-      eapply IHc2 in Heq0 ;
-      try eassumption.
-    all: eexists.
-    shelve.
-    all: eexists.
-    Unshelve. simpl in *.
-    eapply IHc2 in Heq0 ; try eassumption ; try eexists ; try eexists.
-    simpl in *.
-    unfold max_label ; simpl.
-    unfold interval_label, max_label in H0 ; destruct H0 as [? _].
-    simpl in H ;
-      rewrite list_cons_app in H ;
-      rewrite !inputs_app, !ScopeTheory.outputs_app in H ; simpl in *.
-    admit. (* there is some work to do here *)
-    all : eexists.
-  - admit.
-  - admit.
-Admitted.
-
 
 Lemma inv_max_label :
   forall (cb cb' : nat) (cr cr' : int) (c : CFLang) (dg : dcfg) min max,
@@ -448,54 +551,26 @@ Lemma inv_max_label :
     lt_bid max (name cb').
 Proof.
   intros.
-  capply inv_name_anon H0 INV_ANON.
-  capply inv_len_inputs H0 LEN_OUTS.
-  capply inv_len_outputs H0 LEN_INS.
-  capply inv_wf_inputs_outputs H0 INS.
-  unfold wf_name in INV_ANON.
-  destruct INS as [INCL_IN INCL_OUT] ; unfold wf_inputs in *.
-  eapply inv_counter_bid in H0 ; try eassumption.
-  rewrite H0.
-  apply lt_bid_next.
-  destruct H as [H _]; unfold max_label in H.
-  assert (In max (inputs (graph dg) ++ outputs (graph dg))).
-  rewrite <- H. apply max_bid_in. intro.
-  apply length_zero_iff_nil in H1.
-  rewrite app_length in H1.
-  eapply length_incl in LEN_INS ; try eassumption.
-  lia.
-  apply in_app_or in H1 ; destruct H1
-  ; destruct INV_ANON as [INV_ANON_IN INV_ANON_OUT]
-  ; rewrite Forall_forall in INV_ANON_IN, INV_ANON_OUT.
-  now apply INV_ANON_IN.
-  now apply INV_ANON_OUT.
+  unfold interval_label in H ; destruct H.
+  apply inv_interval_label in H0 ; destruct H0 as [[MAX [? ?]] [MIN [? ?]]].
+  eapply max_label_inj in H ; try eassumption ; subst.
+  eapply min_label_inj in H3 ; eassumption.
 Qed.
 
-(* ADMITTED *)
 Lemma inv_min_label :
   forall (c : CFLang) (cb cb' : nat) (cr cr' : int) (dg : dcfg) min max,
+    interval_label dg min max ->
     (evaluate c) {| counter_bid := cb; counter_reg := cr |}
     = ({| counter_bid := cb'; counter_reg := cr' |}, dg) ->
-    interval_label dg min max ->
-    min = name cb.
+    le_bid (name cb) min.
 Proof.
-  induction_CFLang c.
-  - unfold interval_label, max_label, min_label in *.
-    cbn in *.
-    rewrite max_refl,min_refl in *.
-    rewrite max_name, min_name in H0.
-    replace (Nat.max cb (S cb)) with (S cb) in H0 by lia.
-    replace (Nat.min cb (S cb)) with (cb) in H0 by lia.
-    intuition.
-  - destruct f ; eapply IHc1 in Heq. eassumption.
-    eapply IHc2 in Heq0.
-    all: eexists.
-    all: try eexists.
-    (* TODO it's still some work to do here *)
-    (* NOTE similar than inv_counter_bid *)
-Admitted.
-
-(* NOTE relies on inv_counter_bid' and  inv_min_label *)
+  intros.
+  unfold interval_label in H ; destruct H.
+  apply inv_interval_label in H0 ; destruct H0 as [[MAX [? ?]] [MIN [? ?]]].
+  eapply max_label_inj in H ; try eassumption ; subst.
+  eapply min_label_inj in H1 ; try eassumption ; subst.
+  assumption.
+Qed.
 
 Theorem inv_interval_name :
   forall  (c1 c2 : CFLang) (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg) min1 max1 min2 max2,
@@ -508,10 +583,8 @@ Proof.
   intros.
   destruct σ1, σ2, σ3.
   ceapply inv_max_label H MAX1 ; try eassumption.
-  ceapply inv_min_label H MIN1 ; try eassumption.
-  ceapply inv_max_label H0 MAX2 ; try eassumption.
   ceapply inv_min_label H0 MIN2 ; try eassumption.
-  now subst.
+  eapply lt_bid_trans_le2 ; eassumption.
 Qed.
 
 Ltac auto_apply_In :=
@@ -1194,14 +1267,6 @@ Proof.
       ; eapply inv_disjoint_outs ; try eassumption.
     + apply hd_In ; eapply (inv_len_inputs σ _ c1 d) ; eassumption.
     + apply hd_In ; eapply (inv_len_inputs f _ c2 d0) ; eassumption.
-    (* + capply IHc1 Heq WF_D ; capply IHc2 Heq0 WF_F. *)
-    (*   capply inv_len_outputs Heq LEN_D; capply inv_len_outputs Heq0 LEN_D0. *)
-    (*   apply (hd_In default_bid) in LEN_D, LEN_D0. *)
-    (*   intro contra ; rewrite contra in * ; clear contra. *)
-    (*   ceapply inv_disjoint_outs Heq0 DISJOINT_D ; *)
-    (*     [| | eassumption | eassumption] ; [| assumption]. *)
-    (*   unfold list_disjoint in DISJOINT_D. *)
-    (*   eapply DISJOINT_D in LEN_D0 ; try eauto. *)
     + capply inv_len_outputs Heq LEN_D ; now apply hd_In.
     + capply inv_len_outputs Heq0 LEN_D0 ; now apply hd_In.
     + eexists.

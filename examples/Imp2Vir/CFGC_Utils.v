@@ -280,6 +280,12 @@ Lemma leb_bid_refl : forall a, leb_bid a a = true.
   apply Bool.orb_true_r.
 Qed.
 
+Lemma leb_bid_true : forall b1 b2, leb_bid b1 b2 = true <-> le_bid b1 b2.
+Proof.
+  intros.
+  unfold le_bid ; tauto.
+Qed.
+
 Lemma le_bid_refl : forall a, le_bid a a.
   intros.
   unfold le_bid.
@@ -514,9 +520,23 @@ Proof.
   now apply max_bid_spec'.
 Qed.
 
+Lemma min_bid_app :
+  forall l1 l2 : list block_id,
+    min_bid (l1 ++ l2) = min (min_bid l1) (min_bid l2).
+Admitted.
+
 Theorem min_bid_spec : forall l,
     Forall (fun b => le_bid (min_bid l) b) l.
 Admitted.
+
+Lemma min_bid_spec' : forall l m,
+    (min_bid l) = m ->
+    Forall (fun b => le_bid m b) l.
+Proof.
+  intros.
+  rewrite <- H.
+  apply min_bid_spec.
+Qed.
 
 Lemma min_bid_spec_nn : forall l min,
     (length l >= 1)%nat ->
@@ -525,6 +545,50 @@ Lemma min_bid_spec_nn : forall l min,
 Proof.
   intros * ? <-.
   apply min_bid_spec.
+Admitted.
+
+Lemma max_max_commmute :
+  forall n1 n2 m1 m2, max (max n1 n2) (max m1 m2) = max (max n1 m1) (max n2 m2).
+Proof.
+  intros.
+  unfold max.
+  destruct (leb_bid n1 n2) eqn:LE_N
+  ; destruct (leb_bid m1 m2) eqn:LE_M
+  ; destruct (leb_bid n1 m1) eqn:LE_1
+  ; destruct (leb_bid n2 m2) eqn:LE_2
+  ; destruct (leb_bid m1 n2) eqn:M1_N2
+  ; destruct (leb_bid m2 n1) eqn:M2_N1
+  ; destruct (leb_bid n1 m2) eqn:N1_M2
+  ; destruct (leb_bid n1 m1) eqn:N2_M1
+  ; try (rewrite LE_M)
+  ; try (rewrite LE_N)
+  ; try (rewrite LE_1)
+  ; try (rewrite LE_2)
+  ; try reflexivity
+  ; rewrite leb_bid_true in *
+  ; admit.
+Admitted.
+
+Lemma min_min_commmute :
+  forall n1 n2 m1 m2, min (min n1 n2) (min m1 m2) = min (min n1 m1) (min n2 m2).
+Proof.
+  intros.
+  unfold min.
+  destruct (leb_bid n1 n2) eqn:LE_N
+  ; destruct (leb_bid m1 m2) eqn:LE_M
+  ; destruct (leb_bid n1 m1) eqn:LE_1
+  ; destruct (leb_bid n2 m2) eqn:LE_2
+  ; destruct (leb_bid m1 n2) eqn:M1_N2
+  ; destruct (leb_bid m2 n1) eqn:M2_N1
+  ; destruct (leb_bid n1 m2) eqn:N1_M2
+  ; destruct (leb_bid n1 m1) eqn:N2_M1
+  ; try (rewrite LE_M)
+  ; try (rewrite LE_N)
+  ; try (rewrite LE_1)
+  ; try (rewrite LE_2)
+  ; try reflexivity
+  ; rewrite leb_bid_true in *
+  ; admit.
 Admitted.
 
 
@@ -614,6 +678,15 @@ Lemma lt_bid_name : forall (n n' : nat),
 Proof.
   intros.
   unfold lt_bid, name, mk_anon.
+  simpl.
+  lia.
+Qed.
+
+Lemma le_bid_name : forall (n n' : nat),
+    (n <= n')%nat -> le_bid (name n) (name n').
+Proof.
+  intros.
+  unfold le_bid, leb_bid, name, mk_anon.
   simpl.
   lia.
 Qed.
