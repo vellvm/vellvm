@@ -170,6 +170,7 @@ Definition compile (s : stmt) :=
 
 Section Examples.
 (** Examples *)
+Open Scope string_scope.
 Definition fact_ir := (compile (Imp.fact "a" "b" 5)).
 Definition infinite_loop_ir := (compile (infinite_loop)).
 Definition if_ir := (compile (trivial_if "a" "b" 0)).

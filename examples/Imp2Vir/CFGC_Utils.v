@@ -205,21 +205,37 @@ Lemma eqb_bid_refl : forall b, eqb_bid b b = true.
 Qed.
 
 (* Less than  *)
-
+Require Import String.
+Require Import Coq.Structures.OrderedTypeEx.
 Definition ltb_bid b b' :=
   match b,b' with
   | Anon n, Anon n' => (n <? n')%Z
-  | _, _ => false
+  | Raw n, Raw n' => (n <? n')%Z
+  | Name s , Name s' =>
+      match String_as_OT.cmp s s' with
+      | Lt => true
+      | _ => false
+      end
+  | Anon _ , Raw _ => true
+  | Raw _ , Name _ => true
+  | Anon _ , Name _ => true
+  | _ , _ => false
   end.
 
 Definition lt_bid (b b': block_id) : Prop :=
   ltb_bid b b' = true.
 
+Lemma cmp_refl : forall s, String_as_OT.cmp s s = Eq.
+Proof.
+  intros.
+  now apply String_as_OT.cmp_eq.
+Qed.
+
 Lemma ltb_bid_irrefl : forall a, ltb_bid a a = false.
   intros.
   unfold ltb_bid.
-  destruct a ; try reflexivity.
-  apply Z.ltb_irrefl.
+  destruct a ; try reflexivity ; try lia.
+  now rewrite cmp_refl.
 Qed.
 
 Lemma lt_bid_irrefl : forall a, ~ lt_bid a a.
@@ -233,8 +249,14 @@ Lemma lt_bid_trans : forall b1 b2 b3, lt_bid b1 b2 -> lt_bid b2 b3 -> lt_bid b1 
 Proof.
   intros.
   unfold lt_bid, ltb_bid in *.
-  destruct b1,b2,b3 ; try auto ; try discriminate.
-  rewrite Z.ltb_lt in *. eapply Z.lt_trans ; eassumption.
+  destruct b1,b2,b3 ; try ( auto ; discriminate).
+  destruct ( String_as_OT.cmp s s0) eqn:E1 ; try discriminate.
+  destruct ( String_as_OT.cmp s0 s1) eqn:E2 ; try discriminate.
+  apply String_as_OT.cmp_lt in E1,E2.
+  eapply String_as_OT.lt_trans in E2 ; try eassumption.
+  now apply String_as_OT.cmp_lt in E2 ; rewrite E2.
+  lia.
+  lia.
 Qed.
 
 Lemma ltb_bid_true : forall b1 b2, ltb_bid b1 b2 = true <-> lt_bid b1 b2.
@@ -255,13 +277,42 @@ Proof.
   now apply lt_bid_irrefl in H.
 Qed.
 
-(* NOTE need x and y to be Anon *)
-Lemma lt_assym : forall x y, ltb_bid x y = false -> ltb_bid y x = true.
+Lemma lt_string_contra : forall s1 s2,
+    String_as_OT.lt s1 s2 ->
+    ~ String_as_OT.lt s2 s1.
+Proof.
+  intros.
+  induction s1.
+  induction s2.
+  - apply String_as_OT.cmp_lt in H.
+    rewrite cmp_refl in H ; discriminate.
+  - intro. admit.
+  - intro. admit.
+Admitted.
+
+Lemma ltb_assym : forall x y ,
+    ltb_bid x y = false -> ltb_bid y x = true \/ eqb_bid x y = true.
 Proof.
   intros.
   unfold ltb_bid in *.
   destruct x, y; auto.
-Admitted.
+  destruct (String_as_OT.cmp s s0) eqn:S_S0
+  ; destruct (String_as_OT.cmp s0 s) eqn:S0_S
+  ; intuition
+  ; try (match goal with
+         | h: String_as_OT.cmp _ _ = Eq |- _ =>
+             apply String_as_OT.cmp_eq in h ; subst
+         end
+         ; cbn ; rewrite eqb_eq ; intuition).
+  apply OrderedTypeEx.String_as_OT.compare_helper_gt in S_S0, S0_S.
+  apply lt_string_contra in S_S0 ; contradiction.
+  all :
+    (rewrite eqb_bid_eq
+  ; destruct ((n =? n0)%Z) eqn:E
+  ; [ rewrite Z.eqb_eq in E ; subst ; now right
+    | left ; lia
+    ]).
+Qed.
 
 (* Less or equal than *)
 Definition leb_bid b b' :=
@@ -277,7 +328,8 @@ Lemma leb_bid_refl : forall a, leb_bid a a = true.
   ; try (now rewrite String.eqb_refl)
   ; try ( rewrite Z.eqb_refl )
   ; try reflexivity.
-  apply Bool.orb_true_r.
+  rewrite eqb_refl.
+  all : apply Bool.orb_true_r.
 Qed.
 
 Lemma leb_bid_true : forall b1 b2, leb_bid b1 b2 = true <-> le_bid b1 b2.
@@ -329,13 +381,15 @@ Proof.
   - assumption.
 Qed.
 
-(*NOTE probably need x and y to be Anon *)
 Lemma not_le_lt : forall x y, leb_bid x y = false -> ltb_bid y x = true.
 Proof.
   intros.
   unfold leb_bid in H.
   apply Bool.orb_false_elim in H ; destruct H.
-Admitted.
+  apply ltb_assym in H ; destruct H ; auto.
+  rewrite H in H0 ; discriminate.
+Qed.
+Close Scope string_scope.
 
 (* Max and min for block_id *)
 
@@ -473,8 +527,7 @@ Proof.
   assert (lt_bid y z ) by (now unfold lt_bid) ; clear E.
   apply lt_le.
   eapply lt_bid_trans_le in H0 ; eassumption.
-Admitted.
-
+Qed.
 
 Theorem max_bid_spec : forall l,
     Forall (fun b => le_bid b (max_bid l)) l.
@@ -500,6 +553,7 @@ Proof.
   apply max_bid_spec.
 Qed.
 
+Require Import List.
 Lemma non_nil : forall {T} (l : list T),
     (length l >= 1)%nat ->
     exists h t, l = h::t.
@@ -547,50 +601,121 @@ Proof.
   apply min_bid_spec.
 Admitted.
 
+
+Lemma lt_bid_false :
+  forall x y, lt_bid x y -> lt_bid y x -> False.
+Proof.
+  intros.
+  unfold lt_bid,ltb_bid in *.
+  destruct x,y ; try discriminate.
+  destruct (String_as_OT.cmp s s0) eqn:S_S0
+  ; destruct (String_as_OT.cmp s0 s) eqn:S0_S
+  ; try discriminate.
+  rewrite String_as_OT.cmp_lt in *.
+  apply lt_string_contra in S_S0 ; contradiction.
+  lia.
+  lia.
+Qed.
+
+Lemma le_bid_eq :
+  forall x y, le_bid x y -> le_bid y x -> x=y.
+Proof.
+  intros.
+  unfold le_bid,leb_bid in *.
+  apply orb_true_iff in H,H0.
+  rewrite ltb_bid_true in *.
+  rewrite eqb_bid_eq in *.
+  intuition.
+  apply lt_bid_false in H1 ; try auto ; try contradiction.
+Qed.
+
+Lemma le_lt_bid :
+  forall x y, le_bid x y -> lt_bid y x -> False.
+Proof.
+  intros.
+  unfold le_bid, leb_bid in H.
+  apply orb_true_iff in H.
+  rewrite ltb_bid_true in *.
+  rewrite eqb_bid_eq in *.
+  destruct H.
+  apply lt_bid_false in H ; auto.
+  subst.
+  now apply lt_bid_irrefl in H0.
+Qed.
+
+Lemma leb_bid_neq :
+  forall x y, leb_bid x y = false -> x <> y.
+Proof.
+  repeat intro ; subst.
+  now rewrite leb_bid_refl in H.
+Qed.
+
+Ltac eq_neq_le_bid :=
+  repeat (match goal with
+          | h:context[leb_bid _ _ = false] |- _=>
+              apply not_le_lt in h
+              ; rewrite ltb_bid_true in h
+     | h:context[leb_bid _ _ = true] |- _=> rewrite leb_bid_true in h
+          end).
+
 Lemma max_max_commmute :
   forall n1 n2 m1 m2, max (max n1 n2) (max m1 m2) = max (max n1 m1) (max n2 m2).
 Proof.
   intros.
   unfold max.
-  destruct (leb_bid n1 n2) eqn:LE_N
-  ; destruct (leb_bid m1 m2) eqn:LE_M
-  ; destruct (leb_bid n1 m1) eqn:LE_1
-  ; destruct (leb_bid n2 m2) eqn:LE_2
+  destruct (leb_bid n1 n2) eqn:N1_N2
+  ; destruct (leb_bid n2 m2) eqn:N2_M2
+  ; destruct (leb_bid m1 m2) eqn:M1_M2
+  ; destruct (leb_bid n1 m1) eqn:N1_M1
   ; destruct (leb_bid m1 n2) eqn:M1_N2
   ; destruct (leb_bid m2 n1) eqn:M2_N1
   ; destruct (leb_bid n1 m2) eqn:N1_M2
-  ; destruct (leb_bid n1 m1) eqn:N2_M1
-  ; try (rewrite LE_M)
-  ; try (rewrite LE_N)
-  ; try (rewrite LE_1)
-  ; try (rewrite LE_2)
+  ; destruct (leb_bid n2 m1) eqn:N2_M1
+  ; try (rewrite N1_N2)
+  ; try (rewrite M1_M2)
+  ; try (rewrite N2_M2)
+  ; try (rewrite M1_N2)
   ; try reflexivity
-  ; rewrite leb_bid_true in *
-  ; admit.
-Admitted.
+  ; eq_neq_le_bid
+  ; try discriminate
+  ; repeat (match goal with
+    | h : lt_bid _ _ |- _ => apply lt_le in h
+    end)
+  ; try (apply le_bid_eq
+         ; try assumption
+         ; try (eapply le_bid_trans ; eassumption)
+         ; try now apply lt_le).
+Qed.
 
 Lemma min_min_commmute :
   forall n1 n2 m1 m2, min (min n1 n2) (min m1 m2) = min (min n1 m1) (min n2 m2).
 Proof.
   intros.
   unfold min.
-  destruct (leb_bid n1 n2) eqn:LE_N
-  ; destruct (leb_bid m1 m2) eqn:LE_M
-  ; destruct (leb_bid n1 m1) eqn:LE_1
-  ; destruct (leb_bid n2 m2) eqn:LE_2
+  destruct (leb_bid n1 n2) eqn:N1_N2
+  ; destruct (leb_bid n2 m2) eqn:N2_M2
+  ; destruct (leb_bid m1 m2) eqn:M1_M2
+  ; destruct (leb_bid n1 m1) eqn:N1_M1
   ; destruct (leb_bid m1 n2) eqn:M1_N2
   ; destruct (leb_bid m2 n1) eqn:M2_N1
   ; destruct (leb_bid n1 m2) eqn:N1_M2
-  ; destruct (leb_bid n1 m1) eqn:N2_M1
-  ; try (rewrite LE_M)
-  ; try (rewrite LE_N)
-  ; try (rewrite LE_1)
-  ; try (rewrite LE_2)
+  ; destruct (leb_bid n2 m1) eqn:N2_M1
+  ; try (rewrite N1_N2)
+  ; try (rewrite M1_M2)
+  ; try (rewrite N2_M2)
+  ; try (rewrite M1_N2)
   ; try reflexivity
-  ; rewrite leb_bid_true in *
-  ; admit.
-Admitted.
-
+  ; eq_neq_le_bid
+  ; try discriminate
+  ; repeat (match goal with
+    | h : lt_bid _ _ |- _ => apply lt_le in h
+    end)
+  ; try (apply le_bid_eq
+         ; try assumption
+         ; try (eapply le_bid_trans ; eassumption)
+         ; try now apply lt_le)
+  ; try (eapply le_bid_trans ; [| eassumption] ; eassumption).
+Qed.
 
 Definition mk_anon (n : nat) := Anon (Z.of_nat n).
 Lemma neq_mk_anon : forall n1 n2, mk_anon n1 <> mk_anon n2 <-> n1 <> n2.
