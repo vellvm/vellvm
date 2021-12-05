@@ -1660,12 +1660,56 @@ Proof.
 Qed.
 
 
+Lemma denote_cwhile : forall σ1
+                        cb2 cr2
+                        expr_code cond body gB insB outsB from input,
+    input = (name cb2) ->
+    (forall bfrom,
+        denote_cfg gB bfrom (hd default_bid insB) ⤳
+                   (fun vob => exists bfrom, vob = inl (bfrom, (hd default_bid outsB)))) ->
+    ((evaluate body) σ1) =
+      ({| counter_bid := cb2; counter_reg := cr2 |},
+        {| graph := gB; ins := insB ; outs := outsB |})
+    ->
+    eutt eq
+
+         (denote_cflang (CWhile expr_code cond body) σ1 from input)
+
+         (iter (C := Kleisli _)
+               (fun (_ : unit) =>
+                  b <- evaluate_conditional expr_code cond;;
+                  if b : bool
+                  then vob <- denote_cfg gB input (hd default_bid insB);;
+                       match vob with
+                       | inr v => Ret (inr (inr v))
+                       | inl _ => Ret (inl tt)
+                       end
+                  else Ret (inr (inl (input,(name (S cb2)))))) tt).
+
+Proof.
+  intros * -> POST_COND EVAL.
+  unfold denote_cflang, denote_dcfg.
+  simpl.
+  unfold mk_while.
+  repeat flatten_all ; simpl in *.
+  repeat flatten_all ; simpl in *.
+  inv EVAL.
+  repeat inv_pair.
+  eapply wf_evaluate_wf_while
+    with (code := expr_code) (cond := cond) in Heq ; try eassumption.
+  unfold freshLabel in *.
+  repeat flatten_all ; simpl in * ; inv_pair.
+  repeat flatten_all ; simpl in * ; inv_pair.
+  rewrite denote_cfg_while_loop ; try assumption ; clear Heq.
+  reflexivity.
+Qed.
+
 
 (* TODO :
 - Write and prove all the needed wf_evaluate_wf_combinator
-  (ie. see the compiler to know which one I need)
-  + it misses wf_join and wf_branch !
+(ie. see the compiler to know which one I need)
++ it misses wf_join and wf_branch !
 - End the proof of the counter_bid (inv_max_label, inv_min_label) +
-  meta-theory on intervals (check HELIX to help)
+meta-theory on intervals (check HELIX to help)
 - Correctness compiler
  *)
