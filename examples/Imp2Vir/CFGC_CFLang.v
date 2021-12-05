@@ -493,12 +493,33 @@ Proof.
       split. apply min_name.
       replace (Nat.min cb1 (S cb1)) with cb1 by lia.
       apply le_bid_refl.
-  - destruct f.
-    ceapply IHc1 Heq IH1 ; clear IHc1 Heq
-    ; ceapply IHc2 Heq0 IH2 ; clear IHc2 Heq0
+  - ceapply inv_wf_inputs_outputs Heq WF_DG1
+    ; unfold wf_inputs in WF_DG1 ; simpl in WF_DG1
+    ; destruct WF_DG1 as [INCL_INS1 INCL_OUTS1].
+    ceapply inv_wf_inputs_outputs Heq0 WF_DG2
+    ; unfold wf_inputs in WF_DG2 ; simpl in WF_DG2
+    ; destruct WF_DG2 as [INCL_INS2 INCL_OUTS2].
+    destruct f.
+    ceapply IHc1 Heq IH1 ; clear IHc1
+    ; ceapply IHc2 Heq0 IH2 ; clear IHc2
     ; try eassumption.
     destruct IH1 as [[MAX1 [MAX_SPEC1 LT1]] [MIN1 [MIN_SPEC1 LE1]]]
     ; destruct IH2 as [[MAX2 [MAX_SPEC2 LT2]] [MIN2 [MIN_SPEC2 LE2]]].
+
+    assert (IN_INS : In (hd default_bid ins1) (inputs graph1)).
+    { assert ( In (hd default_bid ins1) ins1 ) by
+        (apply hd_In
+         ; now ceapply inv_len_inputs Heq0 LI0
+         ; simpl in LI0).
+      now apply INCL_INS2.
+    }
+    assert (IN_OUTS : In (hd default_bid outs0) (outputs graph0)).
+    { assert ( In (hd default_bid outs0) outs0 ) by
+        (apply hd_In
+         ; now ceapply inv_len_outputs Heq LO
+         ; simpl in LO).
+      now apply INCL_OUTS1.
+    }
     split.
     + exists MAX2. split ; auto.
       apply lt_le in LT1, LT2.
@@ -512,30 +533,54 @@ Proof.
             rewrite max_refl.
             replace
               (max (hd default_bid outs0) (hd default_bid ins1))
-              with (hd default_bid ins1) by admit.
+              with (hd default_bid ins1).
             eexists.
+            assert (LE_HDs: le_bid (hd default_bid outs0) (hd default_bid ins1)).
+            2 : {now unfold max ; unfold le_bid in LE_HDs ; rewrite LE_HDs. }
+            assert (In (hd default_bid ins1) (inputs graph1 ++ outputs graph1))
+              by ( apply in_app_iff ; intuition).
+            assert (In (hd default_bid outs0) (inputs graph0 ++ outputs graph0))
+              by ( apply in_app_iff ; intuition).
+            unfold max_label, min_label in * ; simpl in *.
+            apply max_bid_spec_intro in MAX_SPEC1, MAX_SPEC2
+            ; apply min_bid_spec_intro in MIN_SPEC1, MIN_SPEC2
+            ; rewrite Forall_forall in *.
+            apply MIN_SPEC2 in H.
+            apply MAX_SPEC1 in H0.
+            repeat (eapply le_bid_trans ; try eassumption).
       }
-      assert (In (hd default_bid ins1) (inputs graph1)) by admit.
       unfold max_label in MAX_SPEC2 ; simpl in MAX_SPEC2.
-      apply max_bid_spec' in MAX_SPEC2.
+      apply max_bid_spec_intro in MAX_SPEC2.
       rewrite Forall_forall in MAX_SPEC2.
       assert (In (hd default_bid ins1) (inputs graph1 ++ outputs graph1))
-             by ( apply in_app_iff ; intuition).
-      now apply MAX_SPEC2 in H0.
+        by ( apply in_app_iff ; intuition).
+      now apply MAX_SPEC2 in H.
     + exists MIN1. split ; auto.
       apply lt_le in LT1, LT2.
       eapply min_label_app with (MIN2 := (hd default_bid outs0) )
       ; try assumption.
-      * assert (In (hd default_bid outs0) (inputs graph0)) by admit.
-        assert (In (hd default_bid outs0) (inputs graph0 ++ outputs graph0))
-             by ( apply in_app_iff ; intuition).
-      unfold min_label in MIN_SPEC1 ; simpl in MIN_SPEC1.
-      apply min_bid_spec' in MIN_SPEC1.
-      rewrite Forall_forall in MIN_SPEC1.
-        now apply MIN_SPEC1 in H0.
+      * assert (In (hd default_bid outs0) (inputs graph0 ++ outputs graph0))
+          by ( apply in_app_iff ; intuition).
+        unfold min_label in MIN_SPEC1 ; simpl in MIN_SPEC1.
+        apply min_bid_spec_intro in MIN_SPEC1.
+        rewrite Forall_forall in MIN_SPEC1.
+        now apply MIN_SPEC1 in H.
       * rewrite list_cons_app.
         eapply min_label_app ; try eassumption.
-        admit.
+        unfold min_label in MIN_SPEC1 ; simpl in MIN_SPEC1.
+        apply min_bid_spec_intro in MIN_SPEC1.
+        rewrite Forall_forall in MIN_SPEC1.
+        assert (In (hd default_bid outs0) (inputs graph0 ++ outputs graph0))
+          by ( apply in_app_iff ; intuition).
+        apply MIN_SPEC1 in H.
+        assert (le_bid MAX1 MIN2) by
+          (eapply le_bid_trans ; try eassumption).
+        assert ( le_bid (hd default_bid outs0) MAX1 ) by admit.
+        (* (hd default_bid outs0) ∈ (outputs graph0)
+           and ∀ b ∈ (outputs graph0), le_bid b MAX1, because
+           max_label graph0 MAX1
+         *)
+        repeat (eapply le_bid_trans ; try eassumption).
         unfold min_label ; cbn.
         rewrite min_refl.
         admit.
@@ -598,23 +643,21 @@ Ltac auto_apply_In :=
 Lemma inv_interval_independant :
   forall dg1 dg2 min1 max1 min2 max2,
     wf_dcfg dg1 -> wf_dcfg dg2 ->
-    (length (inputs (graph dg1) ++ outputs (graph dg1)) >= 1)%nat ->
-    (length (inputs (graph dg2) ++ outputs (graph dg2)) >= 1)%nat ->
     interval_label dg1 min1 max1 ->
     interval_label dg2 min2 max2 ->
     lt_bid max1 min2 ->
     independent_flows_dcfg dg1 dg2 /\ (outputs (graph dg1)) ⊍ (outputs (graph dg2)).
 Proof.
-  intros * WF_G1 WF_G2 HL1 HL2 INT_G1 INT_G2 LE.
+  intros * WF_G1 WF_G2 INT_G1 INT_G2 LE.
   unfold independent_flows_dcfg, independent_flows,
     interval_label, max_label, min_label in *.
   destruct dg1, dg2.
   simpl in *.
   unfold no_reentrance, no_duplicate_bid.
   destruct INT_G1 as [ MAX_G1 _ ], INT_G2 as [ _ MIN_G2 ].
-  eapply max_bid_spec_nn in HL1 ; try eassumption.
-  eapply min_bid_spec_nn in HL2 ; try eassumption.
-  rewrite Forall_app in HL1,HL2.
+  eapply max_bid_spec_intro in MAX_G1 ; try eassumption.
+  eapply min_bid_spec_intro in MIN_G2 ; try eassumption.
+  rewrite Forall_app in MAX_G1,MIN_G2.
   intuition
   ; rewrite Forall_forall in *
   ; unfold list_disjoint
@@ -642,7 +685,7 @@ Qed.
 
 Theorem inv_independent_flows :
   forall (c1 c2 : CFLang)
-         (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg),
+    (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg),
     wf_dcfg dg1 ->
     wf_dcfg dg2 ->
     (evaluate c1) σ1 = (σ2, dg1) ->
@@ -655,23 +698,19 @@ Proof.
   pose proof (inv_interval_name c1 c2 σ1 σ2 σ3 dg1 dg2).
   eapply H1 in H2
   ; try intuition
-  ; try
-      ( assert (H' := H) ; assert (H0' := H0)
-        ; apply inv_len_outputs in H
-        ; apply inv_len_inputs in H0
-        ; apply inv_wf_inputs_outputs in H', H0'
-        ; unfold wf_inputs in H0'
-        ; destruct H' as [ _ H' ], H0' as [ H0' _ ]
-        ; rewrite app_length
-        ; eapply length_incl in H', H0' ; try eassumption
-        ; lia).
+  ; try ( apply inv_wf_inputs_outputs in H', H0'
+          ; unfold wf_inputs in H0'
+          ; destruct H' as [ _ H' ], H0' as [ H0' _ ]
+          ; rewrite app_length
+          ; eapply length_incl in H', H0' ; try eassumption
+          ; lia).
   all : eexists.
   all : eexists.
 Qed.
 
 Theorem inv_disjoint_outputs :
   forall (c1 c2 : CFLang)
-         (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg),
+    (σ1 σ2 σ3: FST) (dg1 dg2 : dcfg),
     wf_dcfg dg1 ->
     wf_dcfg dg2 ->
     (evaluate c1) σ1 = (σ2, dg1) ->
@@ -685,10 +724,7 @@ Proof.
   eapply H1 in H2
   ; try intuition
   ; try
-      ( assert (H' := H) ; assert (H0' := H0)
-        ; apply inv_len_outputs in H
-        ; apply inv_len_inputs in H0
-        ; apply inv_wf_inputs_outputs in H', H0'
+      ( apply inv_wf_inputs_outputs in H', H0'
         ; unfold wf_inputs in H0'
         ; destruct H' as [ _ H' ], H0' as [ H0' _ ]
         ; rewrite app_length
@@ -955,22 +991,22 @@ Proof.
         ** assert ( In (name (S cb)) g1 ) by (subst g1 ; apply in_app_iff ; intuition).
            apply lt_bid_S in LT_CB.
            eapply lt_bid_trans_le in LT_CB; try eassumption.
-           now apply ord_list in LT_CB.
+           now apply notin_lt_max in LT_CB.
         ** assert ( In (name (S cb)) g2 ) by (subst g2 ; apply in_app_iff ; intuition).
            apply lt_bid_S in LT_CB.
-           now apply ord_list in LT_CB.
+           now apply notin_lt_max in LT_CB.
       * rewrite in_cns in contra ; destruct contra as [ contra | contra ].
         ** rewrite contra in * ; clear contra.
            assert ( In (name (S cb)) g1 ) by
              (subst g1 ; apply in_app_iff ; right ; now apply OUTPUTS_GT).
            apply lt_bid_S in LT_CB.
            eapply lt_bid_trans_le in LT_CB; try eassumption.
-           now apply ord_list in LT_CB.
+           now apply notin_lt_max in LT_CB.
         ** rewrite in_cns in contra ; destruct contra as [ contra | contra ]
            ; [ rewrite contra in * ; clear contra | now apply in_nil in contra].
            assert ( In (name (S cb)) g2 ) by (subst g2 ; apply in_app_iff ; intuition).
            apply lt_bid_S in LT_CB.
-           now apply ord_list in LT_CB.
+           now apply notin_lt_max in LT_CB.
     + unfold max_label in * ; simpl in * ; subst
       ; remember (inputs graph0 ++ outputs graph0) as g1
       ; remember (inputs graph1 ++ outputs graph1) as g2.
@@ -982,10 +1018,10 @@ Proof.
       * assert ( In (name cb) g1 ) by
           (subst g1 ; apply in_app_iff ; right ; now apply OUTPUTS_GT).
         eapply lt_bid_trans_le in LT_CB; try eassumption.
-        now apply ord_list in LT_CB.
+        now apply notin_lt_max in LT_CB.
       * assert ( In (name cb) g2 ) by
           (subst g2 ; apply in_app_iff ; right ; now apply OUTPUTS_GF).
-        now apply ord_list in LT_CB.
+        now apply notin_lt_max in LT_CB.
   - (* WF_OUTPUTS - list_norepet (outs g) *)
     unfold max_label in * ; simpl in * ; subst
     ; remember (inputs graph0 ++ outputs graph0) as g1
@@ -997,10 +1033,10 @@ Proof.
       * assert ( In (name (S cb)) g1 ) by (subst g1 ; apply in_app_iff ; intuition).
         apply lt_bid_S in LT_CB.
         eapply lt_bid_trans_le in LT_CB; try eassumption.
-        now apply ord_list in LT_CB.
+        now apply notin_lt_max in LT_CB.
       * assert ( In (name (S cb)) g2 ) by (subst g2 ; apply in_app_iff ; intuition).
         apply lt_bid_S in LT_CB.
-        now apply ord_list in LT_CB.
+        now apply notin_lt_max in LT_CB.
     + apply list_norepet_app.
       repeat split ; try apply list_norepet_remove ; try assumption.
       now apply remove_disjoint, list_disjoint_sym,
@@ -1015,18 +1051,18 @@ Proof.
       * apply in_app_iff in contra ; destruct contra as [contra | contra].
         ** assert ( In (name cb) g1 ) by (subst g1 ; apply in_app_iff ; intuition).
            eapply lt_bid_trans_le in LT_CB; try eassumption.
-           now apply ord_list in LT_CB.
+           now apply notin_lt_max in LT_CB.
         ** assert ( In (name cb) g2 ) by (subst g2 ; apply in_app_iff ; intuition).
-           now apply ord_list in LT_CB.
+           now apply notin_lt_max in LT_CB.
       * apply in_cns in contra ; destruct contra as [contra | contra]
         ; [ rewrite contra in * ; clear contra|].
         ** assert ( In (name cb) g1 ) by (subst g1 ; apply in_app_iff ; intuition).
            eapply lt_bid_trans_le in LT_CB; try eassumption.
-           now apply ord_list in LT_CB.
+           now apply notin_lt_max in LT_CB.
         ** apply in_cns in contra ; destruct contra as [contra | contra]
            ; [ rewrite contra in * ; clear contra| now apply in_nil in contra].
            assert ( In (name cb) g2 ) by (subst g2 ; apply in_app_iff ; intuition).
-           now apply ord_list in LT_CB.
+           now apply notin_lt_max in LT_CB.
     + break_list_goal ; simpl.
       unfold independent_flows_dcfg, independent_flows,
         no_reentrance, no_duplicate_bid in INDEPENDENT_FLOWS
@@ -1135,7 +1171,7 @@ Proof.
             ; apply list_disjoint_nil_r].
       * unfold max_label in * ; simpl in *.
         subst.
-        apply ord_list in LT_MAX_CB.
+        apply notin_lt_max in LT_MAX_CB.
         apply not_in_app_r in LT_MAX_CB.
         intro.
         apply CFGC_Utils.in_remove, OUTPUTS_G in H.
@@ -1152,7 +1188,7 @@ Proof.
                 ; try eassumption
                 ; apply lt_bid_name ; lia).
         subst.
-        apply ord_list in H0.
+        apply notin_lt_max in H0.
         apply not_in_app_l in H0.
         contradiction.
       * apply In_singleton in H.
@@ -1163,7 +1199,7 @@ Proof.
                 ; try eassumption
                 ; apply lt_bid_name ; lia).
         subst.
-        apply ord_list in H.
+        apply notin_lt_max in H.
         apply not_in_app_r in H.
         apply OUTPUTS_G in OUTPUT.
         contradiction.
@@ -1180,7 +1216,7 @@ Proof.
             ; try eassumption
             ; apply lt_bid_name ; lia).
     subst.
-    apply ord_list in H.
+    apply notin_lt_max in H.
     apply not_in_app_r in H.
     intro. apply CFGC_Utils.in_remove, OUTPUTS_G in H0.
     contradiction.
@@ -1198,7 +1234,7 @@ Proof.
     split.
     + unfold max_label in * ; simpl in *.
       subst.
-      apply ord_list in LT_MAX_CB.
+      apply notin_lt_max in LT_MAX_CB.
       apply not_in_app_l in LT_MAX_CB.
       assumption.
     + intro. apply In_singleton in H.
@@ -1206,7 +1242,7 @@ Proof.
       apply OUTPUTS_G in OUTPUT.
       unfold max_label in * ; simpl in *.
       subst.
-      apply ord_list in LT_MAX_CB.
+      apply notin_lt_max in LT_MAX_CB.
       apply not_in_app_r in LT_MAX_CB.
       contradiction.
   - break_list_goal
@@ -1400,7 +1436,7 @@ Proof.
   unfold interval_label in H1'; destruct H1' as [ LOWER_BOUND _ ].
   unfold max_label in LOWER_BOUND.
   unfold freshLabel in H0 ; inversion H0 ; subst b.
-  apply ord_list ; rewrite LOWER_BOUND ; assumption.
+  apply notin_lt_max ; rewrite LOWER_BOUND ; assumption.
 Qed.
 
 Lemma evaluate_fresh' :
@@ -1420,7 +1456,7 @@ Proof.
   unfold freshLabel in H0,H1. inversion H0; inversion H1. subst b1 b2.
   destruct H1.
   subst counter_bid2.
-  eapply ord_list.
+  eapply notin_lt_max.
   eapply evaluate_fresh in H ; try eassumption.
   rewrite LOWER_BOUND.
   now apply lt_bid_S.

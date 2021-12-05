@@ -127,16 +127,17 @@ Proof.
       apply in_cns ; intuition.
 Qed.
 
-
+(* NOTE it probably lacks an hypothesis, such as
+    (list_norepet sl) *)
 Lemma length_incl : forall {T} (l sl : list T) n,
     (length sl >= n)%nat ->
     incl sl l ->
     (length l >= n)%nat.
 Proof.
-  (* intros. *)
-  induction sl ; intros.
-  - simpl in * ; lia .
-  - simpl in *. apply IHsl.
+  induction l ; intros.
+  - apply incl_l_nil in H0. subst ; lia.
+  - simpl in *.
+    apply IHl in H. lia.
 Admitted.
 
 Lemma list_norepet_cons' : forall {T} (l : list T) x,
@@ -277,18 +278,15 @@ Proof.
   now apply lt_bid_irrefl in H.
 Qed.
 
-Lemma lt_string_contra : forall s1 s2,
-    String_as_OT.lt s1 s2 ->
-    ~ String_as_OT.lt s2 s1.
+
+Lemma not_lt_string_refl : forall s1 s2,
+    String_as_OT.lt s1 s2 -> String_as_OT.lt s2 s1 -> False.
 Proof.
   intros.
-  induction s1.
-  induction s2.
-  - apply String_as_OT.cmp_lt in H.
-    rewrite cmp_refl in H ; discriminate.
-  - intro. admit.
-  - intro. admit.
-Admitted.
+  eapply String_as_OT.lt_trans in H ; try eassumption.
+  apply String_as_OT.lt_not_eq in H.
+  now destruct H.
+Qed.
 
 Lemma ltb_assym : forall x y ,
     ltb_bid x y = false -> ltb_bid y x = true \/ eqb_bid x y = true.
@@ -305,12 +303,12 @@ Proof.
          end
          ; cbn ; rewrite eqb_eq ; intuition).
   apply OrderedTypeEx.String_as_OT.compare_helper_gt in S_S0, S0_S.
-  apply lt_string_contra in S_S0 ; contradiction.
+  exfalso ; eapply not_lt_string_refl ; eassumption.
   all :
     (rewrite eqb_bid_eq
-  ; destruct ((n =? n0)%Z) eqn:E
-  ; [ rewrite Z.eqb_eq in E ; subst ; now right
-    | left ; lia
+     ; destruct ((n =? n0)%Z) eqn:E
+     ; [ rewrite Z.eqb_eq in E ; subst ; now right
+       | left ; lia
     ]).
 Qed.
 
@@ -426,31 +424,6 @@ Proof.
   unfold min ; now rewrite leb_bid_refl.
 Qed.
 
-Lemma le_min_max' : forall l dmin dmax,
-    le_bid dmin dmax -> le_bid (min_bid' l dmin) (max_bid' l dmax).
-Proof.
-  intros.
-  induction l.
-  - now simpl.
-  - simpl.
-    destruct ( leb_bid dmin a ) eqn:Emin, ( leb_bid dmax a ) eqn:Emax.
-    + admit.
-    + admit.
-    + admit.
-    + admit.
-Admitted.
-
-
-Lemma le_min_max : forall l, le_bid (min_bid l) (max_bid l).
-Proof.
-  intros.
-  unfold min_bid, max_bid.
-  induction l.
-  - simpl ; apply le_bid_refl.
-  - simpl ; rewrite min_refl, max_refl.
-    apply le_min_max'.  apply le_bid_refl.
-Qed.
-
 Lemma max_bid'_cons : forall l x d,
     le_bid x d ->
     le_bid x (max_bid' l d).
@@ -475,23 +448,6 @@ Proof.
   apply leb_bid_refl.
 Qed.
 
-Lemma max_bid_in : forall l,
-    l <> [] ->
-    In (max_bid l) l.
-Proof.
-  unfold max_bid.
-  induction l ; try contradiction ; intros.
-  destruct l.
-  - simpl. rewrite max_refl. now left.
-  - simpl in *.
-    rewrite max_refl in *.
-    unfold max in *.
-    destruct (leb_bid a b) eqn:E.
-    + right. apply IHl. admit. (* easy *)
-    + assert (b::l <> []) by admit. apply IHl in H0.
-      destruct H0. admit. admit.
-Admitted.
-
 Lemma le_bid_max_cons_eq : forall x l, le_bid x (max_bid (x::l)).
 Proof.
   intros.
@@ -505,6 +461,16 @@ Lemma max_bid_app : forall l1 l2,
 Proof.
   intros.
   unfold max.
+  destruct (leb_bid (max_bid l1) (max_bid l2)) eqn:MAX.
+  - (* (max l1) <= (max l2) *)
+    induction l1 ; simpl.
+    reflexivity.
+    admit.
+  - (* (max l2) <= (max l1) *)
+    induction l2 ; simpl.
+    now rewrite app_nil_r.
+    apply not_le_lt in MAX. rewrite ltb_bid_true in MAX.
+    admit.
 Admitted.
 
 Lemma max_bid_app' : forall l1 l2,
@@ -544,7 +510,7 @@ Proof.
       now apply le_bid_max_trans.
 Qed.
 
-Lemma max_bid_spec' : forall l max,
+Lemma max_bid_spec_intro : forall l max,
     (max_bid l) = max ->
     Forall (fun b => le_bid b max) l.
 Proof.
@@ -565,25 +531,74 @@ Proof.
   eexists. reflexivity.
 Qed.
 
-Lemma max_bid_spec_nn : forall l max,
-    (length l >= 1)%nat ->
-    (max_bid l) = max ->
-    Forall (fun b => le_bid b max) l.
+Lemma min_bid'_cons : forall l x d,
+    le_bid d x ->
+    le_bid (min_bid' l d) x.
 Proof.
-  intros * ? <-.
-  now apply max_bid_spec'.
+  induction l ; intros ; simpl.
+  assumption.
+  unfold min ; destruct (leb_bid d a) eqn:E.
+  - now apply IHl.
+  - apply IHl.
+    unfold leb_bid in E.
+    apply orb_false_iff in E ; destruct E.
+    apply ltb_assym in H0 ; destruct H0.
+    rewrite ltb_bid_true in H0.
+    apply lt_le in H0. eapply le_bid_trans ; eassumption.
+    rewrite H0 in H1 ; discriminate.
 Qed.
+
+Corollary min_bid'_cons_refl : forall x l,
+    le_bid (min_bid' l x) x.
+Proof.
+  intros.
+  apply min_bid'_cons.
+  apply le_bid_refl.
+Qed.
+
+Lemma le_bid_min_cons_eq :
+forall (x : raw_id) (l : list raw_id), le_bid (min_bid (x :: l)) x.
+Proof.
+  intros.
+  cbn.
+  rewrite min_refl.
+  apply min_bid'_cons_refl.
+Qed.
+
 
 Lemma min_bid_app :
   forall l1 l2 : list block_id,
     min_bid (l1 ++ l2) = min (min_bid l1) (min_bid l2).
 Admitted.
 
+Lemma le_bid_min_trans : forall x y z,
+    le_bid y x ->
+    le_bid (min z y) x.
+Proof.
+  intros.
+  unfold min.
+  destruct (leb_bid z y) eqn:E ; try assumption.
+  rewrite leb_bid_true in E.
+  eapply le_bid_trans ; eassumption.
+Qed.
+
 Theorem min_bid_spec : forall l,
     Forall (fun b => le_bid (min_bid l) b) l.
-Admitted.
+Proof.
+  induction l ; intros.
+  - apply Forall_nil.
+  - apply Forall_cons.
+    + apply le_bid_min_cons_eq.
+    + rewrite Forall_forall in *.
+      intros * IN ; apply IHl in IN.
+      rewrite Util.list_cons_app.
+      rewrite min_bid_app. cbn.
+      rewrite min_refl.
+      now apply le_bid_min_trans.
+Qed.
 
-Lemma min_bid_spec' : forall l m,
+
+Lemma min_bid_spec_intro : forall l m,
     (min_bid l) = m ->
     Forall (fun b => le_bid m b) l.
 Proof.
@@ -592,14 +607,35 @@ Proof.
   apply min_bid_spec.
 Qed.
 
-Lemma min_bid_spec_nn : forall l min,
-    (length l >= 1)%nat ->
-    (min_bid l) = min ->
-    Forall (fun b => le_bid min b) l.
+Lemma le_min_max' : forall l dmin dmax,
+    le_bid dmin dmax -> le_bid (min_bid' l dmin) (max_bid' l dmax).
 Proof.
-  intros * ? <-.
-  apply min_bid_spec.
-Admitted.
+  induction l.
+  - now simpl.
+  - intros.
+    simpl.
+    unfold min, max.
+    apply IHl.
+    destruct ( leb_bid dmin a ) eqn:Emin, ( leb_bid dmax a ) eqn:Emax
+    ; try rewrite leb_bid_true in *
+    ; try assumption.
+    + apply le_bid_refl.
+    + apply not_le_lt in Emin,Emax.
+      rewrite ltb_bid_true in Emax.
+      now apply lt_le.
+Qed.
+
+Lemma le_min_max : forall l, le_bid (min_bid l) (max_bid l).
+Proof.
+  intros.
+  unfold min_bid, max_bid.
+  induction l.
+  - simpl ; apply le_bid_refl.
+  - simpl ; rewrite min_refl, max_refl.
+    apply le_min_max'.  apply le_bid_refl.
+Qed.
+
+
 
 
 Lemma lt_bid_false :
@@ -612,7 +648,7 @@ Proof.
   ; destruct (String_as_OT.cmp s0 s) eqn:S0_S
   ; try discriminate.
   rewrite String_as_OT.cmp_lt in *.
-  apply lt_string_contra in S_S0 ; contradiction.
+  eapply not_lt_string_refl ; eassumption.
   lia.
   lia.
 Qed.
@@ -818,24 +854,55 @@ Qed.
 
 Lemma max_name : forall n1 n2, max (name n1) (name n2) = name (Max.max n1 n2).
 Proof.
-Admitted.
+  intros.
+  unfold max.
+  destruct (leb_bid (name n1) (name n2)) eqn:E.
+  - unfold leb_bid in E.
+    unfold name, mk_anon in *.
+    apply orb_true_iff in E ; destruct E as [E | E]
+    ; [ unfold ltb_bid in E
+      | apply eqb_bid_eq in E ; injection E ; intros]
+    ; now replace (Z.of_nat (Nat.max n1 n2)) with (Z.of_nat n2) by lia.
+  - apply not_le_lt in E.
+    unfold ltb_bid in E.
+    unfold name, mk_anon in *.
+    now replace (Z.of_nat (Nat.max n1 n2)) with (Z.of_nat n1) by lia.
+Qed.
 
 Lemma min_name : forall n1 n2, min (name n1) (name n2) = name (Min.min n1 n2).
 Proof.
+  intros.
+  unfold min.
+  destruct (leb_bid (name n1) (name n2)) eqn:E.
+  - unfold leb_bid in E.
+    unfold name, mk_anon in *.
+    apply orb_true_iff in E ; destruct E as [E | E]
+    ; [ unfold ltb_bid in E
+      | apply eqb_bid_eq in E ; injection E ; intros]
+    ; now replace (Z.of_nat (Nat.min n1 n2)) with (Z.of_nat n1) by lia.
+  - apply not_le_lt in E.
+    unfold ltb_bid in E.
+    unfold name, mk_anon in *.
+    now replace (Z.of_nat (Nat.min n1 n2)) with (Z.of_nat n2) by lia.
+Qed.
+
+Lemma le_max_cons : forall x l, le_bid (max_bid l) (max_bid (x :: l)).
+Proof.
+  intros.
 Admitted.
 
-Theorem ord_list : forall l f,
-    lt_bid (max_bid l) f ->
-    ~ In f l.
+Theorem notin_lt_max : forall l f,
+    lt_bid (max_bid l) f -> ~ In f l.
 Proof.
   induction l as [| x l' Hl' ] ; intros.
   - apply in_nil.
-  - (* pose proof max_bid_spec'. *)
-    apply not_in_cons.
+  - apply not_in_cons.
     split.
     + apply lt_bid_neq'. eapply lt_bid_trans_le ; try eassumption. apply max_bid'_cons_refl.
     + eapply Hl'.
-Admitted.
+      eapply lt_bid_trans_le ; try eassumption.
+      apply le_max_cons.
+Qed.
 
 Lemma eqv_dec_p_eq : forall b b' r,
     eqb_bid b b' = r <-> (if Eqv.eqv_dec_p b b' then true else false) = r.
