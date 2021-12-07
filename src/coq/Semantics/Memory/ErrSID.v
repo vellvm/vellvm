@@ -232,6 +232,27 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
       | _ => False
       end.
 
+  Lemma ErrSID_succeeds_ErrSID_runs_to :
+    forall {A} (e : ErrSID A),
+      ErrSID_succeeds e ->
+      forall sid pr, exists x sid' pr',
+        ErrSID_runs_to e sid pr x sid' pr'.
+  Proof.
+    intros A e ESID sid pr. 
+    destruct e as [[[[[e]]]]].
+    unfold ErrSID_succeeds in ESID.
+    specialize (ESID sid pr).
+    unfold ErrSID_runs_to.
+    unfold runErrSID, runErrSID_T.
+    cbn in *.
+
+    destruct (e sid pr) as [(pr' & sid' & res)].
+    destruct res as [OOM | [UB | [ERR | res]]];
+      cbn in *; try contradiction.
+
+    do 3 eexists; reflexivity.
+  Qed.
+
   Definition fresh_sid : ErrSID store_id
     := mkErrSID_T (lift (modify N.succ)).
 

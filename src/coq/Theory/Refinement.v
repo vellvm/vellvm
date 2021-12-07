@@ -120,6 +120,23 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     reflexivity.
   Qed.
 
+  Global Instance TT_Transitive {A} : Transitive (@TT A).
+  Proof.
+    intro.
+    auto.
+  Qed.
+
+  Global Instance TT_Symmetric {A} : Symmetric (@TT A).
+  Proof.
+    intro.
+    auto.
+  Qed.
+
+  Global Instance TT_Equivalence {A} : Equivalence (@TT A).
+  Proof.
+    split; typeclasses eauto.
+  Qed.
+
   (* Lemma 5.7 - uses this definition of refinement 
    note that refine_uvalue is the basic Uvalue refinement given by Definition 5.6 *)
   (* Refinement of uninterpreted mcfg *)

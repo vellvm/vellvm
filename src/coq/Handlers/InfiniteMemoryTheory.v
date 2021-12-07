@@ -21,6 +21,7 @@ Module Type InfiniteMemoryTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS L
     forall ms dt,
       dt <> DTYPE_Void ->
       ErrSID_succeeds (allocate ms dt).
+
 End InfiniteMemoryTheory.
 
 Module BigIntptrInfiniteMemoryTheory : InfiniteMemoryTheory InterpreterStackBigIntptr.LP InterpreterStackBigIntptr.LLVM.Events InterpreterStackBigIntptr.LLVM.MP InterpreterStackBigIntptr.LLVM.MEM.
@@ -117,4 +118,5 @@ Module BigIntptrInfiniteMemoryTheory : InfiniteMemoryTheory InterpreterStackBigI
       break_match;
       auto with MEM_SUC.
   Qed.
+
 End BigIntptrInfiniteMemoryTheory.
