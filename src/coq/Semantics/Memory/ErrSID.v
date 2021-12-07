@@ -225,6 +225,13 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
   Definition ErrSID_runs_to {A} (e : ErrSID A) sid pr (x : A) sid' pr': Prop
     := runErrSID e sid pr = (inr (inr (inr x)), sid', pr').
 
+  Definition ErrSID_succeeds {A} (e : ErrSID A) : Prop
+    := forall sid pr,
+      match evalErrSID e sid pr with
+      | inr (inr (inr _)) => True
+      | _ => False
+      end.
+
   Definition fresh_sid : ErrSID store_id
     := mkErrSID_T (lift (modify N.succ)).
 
@@ -234,6 +241,72 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
   Definition fresh_allocation_id : ErrSID AllocationId
     := prov <- fresh_provenance;;
        ret (provenance_to_allocation_id prov).
+
+  Lemma fresh_sid_succeeds :
+    ErrSID_succeeds fresh_sid.
+  Proof.
+    intros sid pr.
+    reflexivity.
+  Qed.
+
+  Lemma fresh_provenance_succeeds :
+    ErrSID_succeeds fresh_provenance.
+  Proof.
+    intros sid pr.
+    reflexivity.
+  Qed.
+
+  Lemma fresh_allocation_id_succeeds :
+    ErrSID_succeeds fresh_allocation_id.
+  Proof.
+    intros sid pr.
+    reflexivity.
+  Qed.
+
+  Lemma ErrSID_succeeds_bind :
+    forall {A B} (ma : ErrSID A) (k : A -> ErrSID B),
+    ErrSID_succeeds ma ->
+    (forall sid pr a, ErrSID_evals_to ma sid pr a -> ErrSID_succeeds (k a)) ->
+    ErrSID_succeeds (bind ma k).
+  Proof.
+    intros A B ma k MA KA.
+    cbn.
+
+    destruct ma as [[[[[a]]]]]; cbn in *.
+    unfold IdentityMonad.unIdent.
+
+    intros sid pr; cbn.
+    specialize (MA sid pr); cbn in *.
+
+    destruct (a sid pr) as [[pr' [sid' [OOM_a | [UB_a | [ERR_a | a']]]]]] eqn:Hasidpr;
+      cbn in *; try contradiction.
+
+    specialize (KA sid pr a').
+    assert (ErrSID_succeeds (k a')) as KA'.
+    { apply KA.
+      unfold ErrSID_evals_to.
+      cbn.
+      unfold IdentityMonad.unIdent.
+      rewrite Hasidpr.
+      cbn.
+      reflexivity.
+    }
+
+    specialize (KA' sid' pr').
+    destruct (k a') as [[[[[ka']]]]]; cbn.
+    destruct (ka' sid' pr') as [[pr'' [sid'' [OOM_ka' | [UB_ka' | [ERR_ka' | ka]]]]]] eqn:Hka';
+      cbn in *; rewrite Hka' in KA'; cbn in *; try contradiction.
+
+    auto.
+  Qed.
+
+  Lemma ErrSID_succeeds_ret :
+    forall {A} (x : A),
+    ErrSID_succeeds (ret x).
+  Proof.
+    intros A x.
+    unfold ErrSID_succeeds; cbn; auto.
+  Qed.
 
   Definition err_to_ub {A} (e : err A) : ErrSID A
     := match e with

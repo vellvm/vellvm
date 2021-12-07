@@ -153,7 +153,9 @@ Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type
   Definition show_addr (a : addr) := Show.show a.
 End Addr.
 
-Module BigIP : MemoryAddress.INTPTR.
+Module BigIP : MemoryAddress.INTPTR with
+Definition intptr := Z with
+Definition from_Z := (fun (x : Z) => ret x : OOM Z).
   Definition intptr := Z.
   Definition zero := 0%Z.
 
@@ -266,6 +268,22 @@ Module BigIP : MemoryAddress.INTPTR.
   Qed.
 
 End BigIP.
+
+Module BigIP_BIG : MemoryAddress.INTPTR_BIG BigIP.
+  Import BigIP.
+
+  Lemma from_Z_safe :
+    forall z,
+      match from_Z z with
+      | NoOom _ => True
+      | Oom _ => False
+      end.
+  Proof.
+    intros z.
+    unfold from_Z.
+    reflexivity.
+  Qed.
+End BigIP_BIG.
 
 Module IP64Bit : MemoryAddress.INTPTR.
   Definition intptr := int64.
@@ -1563,6 +1581,7 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
     (* Where does this address come from? *)
     (* Should I make sure that the bytes pointed to by this address
        have not been allocated to? *)
+    (* x is the starting index for the bytes *)
     Definition allocate_undef_bytes_size (m : memory) (addr : Z) (aid : AllocationId) (sz : N) (x : N) (t :  dtyp) : ErrSID (memory * list Z)
       := (N.recursion
            (fun (x : N) => ret (m, []))
@@ -1573,7 +1592,7 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
               let undef := uvalue_sbyte (UVALUE_Undef t) t (UVALUE_IPTR x') sid in
               let new_addr := addr + Z.of_N x in
               ret (IM.add new_addr (undef, aid) m, (addr::addrs)))
-           sz) 0%N.
+           sz) x.
 
     Definition allocate_undef_bytes (m : memory) (addr : Z) (aid : AllocationId) (t :  dtyp) : ErrSID (memory * list Z)
       := allocate_undef_bytes_size m addr aid (sizeof_dtyp t) 0%N t.
@@ -1899,6 +1918,6 @@ Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEO
   Include FinMemory LP Events MP.
 End Make.
 
-Module LLVMParamsBigIntptr := LLVMParams.Make FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP.
+Module LLVMParamsBigIntptr := LLVMParams.MakeBig FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP BigIP_BIG.
 
 Module LLVMParams64BitIntptr := LLVMParams.Make FiniteMemory.Addr FiniteMemory.IP64Bit FiniteMemory.FinSizeof FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP.

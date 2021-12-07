@@ -18,7 +18,7 @@ From Vellvm Require Import
      Handlers.FiniteMemoryTheory.
 
 Module Type Lang (LP: LLVMParams).
-  Import LP.
+  Export LP.
 
   (* Events *)
   Module Events := LLVMEvents.Make ADDR IP SIZEOF.

@@ -61,8 +61,19 @@ Module Type INTPTR.
     @mdtyp_of_int intptr VMemInt_intptr = DTYPE_IPTR.
 End INTPTR.
 
+Module Type INTPTR_BIG (IP : INTPTR).
+  Import IP.
+
+  Parameter from_Z_safe :
+    forall z,
+      match from_Z z with
+      | NoOom _ => True
+      | Oom _ => False
+      end.
+End INTPTR_BIG.
+
 (* TODO: move this? *)
-Module Type PTOI(Addr:MemoryAddress.ADDRESS).  
+Module Type PTOI(Addr:MemoryAddress.ADDRESS).
   Parameter ptr_to_int : Addr.addr -> Z.
 End PTOI.
 
