@@ -205,7 +205,7 @@ Lemma eqb_bid_refl : forall b, eqb_bid b b = true.
     try (now apply Z.eqb_refl).
 Qed.
 
-(* Less than  *)
+(* Less than - Name _ < Raw _ < Anon _   *)
 Require Import String.
 Require Import Coq.Structures.OrderedTypeEx.
 Definition ltb_bid b b' :=
@@ -217,9 +217,9 @@ Definition ltb_bid b b' :=
       | Lt => true
       | _ => false
       end
-  | Anon _ , Raw _ => true
-  | Raw _ , Name _ => true
-  | Anon _ , Name _ => true
+  | Raw _ , Anon _ => true
+  | Name _ , Raw _ => true
+  | Name _ , Anon _ => true
   | _ , _ => false
   end.
 
@@ -352,6 +352,21 @@ Proof.
   left ; eapply lt_bid_trans ; eassumption.
 Qed.
 
+Lemma le_bid_antisym : forall x y, le_bid x y -> le_bid y x -> x=y.
+Proof.
+  intros.
+  unfold le_bid,leb_bid in *.
+  rewrite orb_true_iff in *.
+  destruct H,H0 ;
+    try (
+    match goal with
+    | h: eqb_bid _ _ = true |- _ =>
+        now rewrite eqb_bid_eq in h
+    end).
+  - eapply lt_bid_trans in H ; try eassumption.
+    now apply lt_bid_irrefl in H.
+Qed.
+
 Lemma lt_le : forall b1 b2, lt_bid b1 b2 -> le_bid b1 b2.
 Proof.
   intros.
@@ -387,6 +402,18 @@ Proof.
   apply ltb_assym in H ; destruct H ; auto.
   rewrite H in H0 ; discriminate.
 Qed.
+
+Definition bot := Name "".
+
+Lemma le_bid_bot : forall b, le_bid bot b.
+Proof.
+  intros.
+  destruct b ; unfold le_bid ; auto.
+  induction s.
+  apply leb_bid_refl.
+  unfold leb_bid.
+  apply Bool.orb_true_iff ; intuition.
+Qed.
 Close Scope string_scope.
 
 (* Max and min for block_id *)
@@ -407,10 +434,13 @@ Fixpoint min_bid' (l : list block_id) b :=
   end.
 
 Definition max_bid (l : list block_id) :=
-  max_bid' l (hd (Anon 0%Z) l).
+  match (hd_error l) with
+  | None => bot
+  | Some h => max_bid' l h
+  end.
 
 Definition min_bid (l : list block_id) :=
-  min_bid' l (hd (Anon 0%Z) l).
+  min_bid' l (hd bot l).
 
 Lemma max_refl : forall x, max x x = x.
 Proof.
@@ -423,6 +453,58 @@ Proof.
   intros.
   unfold min ; now rewrite leb_bid_refl.
 Qed.
+
+Ltac eq_neq_le_bid :=
+  repeat (match goal with
+          | h:context[leb_bid _ _ = false] |- _=>
+              apply not_le_lt in h
+              ; rewrite ltb_bid_true in h
+     | h:context[leb_bid _ _ = true] |- _=> rewrite leb_bid_true in h
+          end).
+
+Lemma max_comm : forall x y, max x y = max y x.
+Proof.
+  intros.
+  unfold max.
+  destruct (leb_bid x y) eqn:X_Y
+  ; destruct (leb_bid y x) eqn:Y_X
+  ; auto.
+  apply le_bid_antisym ; assumption.
+  apply not_le_lt in X_Y, Y_X
+  ; eapply lt_bid_trans in X_Y ; try eassumption.
+  now apply lt_bid_irrefl in X_Y.
+Qed.
+
+Lemma max_assoc : forall x y z,
+    max x (max y z) = max y (max x z).
+Proof.
+  intros.
+  unfold max.
+  destruct (leb_bid y z) eqn:Y_Z
+  ; destruct (leb_bid x z) eqn:X_Z
+  ; destruct (leb_bid x y) eqn:X_Y
+  ; destruct (leb_bid y x) eqn:Y_X
+  ; try (rewrite Y_Z)
+  ; try (rewrite X_Z)
+  ; try (rewrite X_Y)
+  ; try (rewrite Y_X)
+  ; try reflexivity
+  ; eq_neq_le_bid
+  ; try discriminate
+  ; repeat (match goal with
+    | h : lt_bid _ _ |- _ => apply lt_le in h
+    end)
+  ; try (apply le_bid_eq
+         ; try assumption
+         ; try (eapply le_bid_trans ; eassumption)
+         ; try now apply lt_le)
+  ; try (apply le_bid_antisym ; assumption).
+  - eapply le_bid_trans in X_Z ; try eassumption.
+    apply le_bid_antisym ; assumption.
+  - eapply le_bid_trans in Y_Z ; try eassumption.
+    apply le_bid_antisym ; assumption.
+Qed.
+
 
 Lemma max_bid'_cons : forall l x d,
     le_bid x d ->
@@ -456,21 +538,84 @@ Proof.
   apply max_bid'_cons_refl.
 Qed.
 
+Lemma max_bid_bot_l : forall b, max bot b = b.
+Proof.
+  intros.
+  unfold max.
+  pose proof (BOT:= le_bid_bot b) ; unfold le_bid in BOT
+  ; rewrite BOT ; clear BOT.
+  reflexivity.
+Qed.
+
+Lemma leb_bid_bot_r : forall b, le_bid b bot -> b = bot.
+Proof.
+  intros.
+  pose proof (BOT:= le_bid_bot b).
+  apply le_bid_antisym ; assumption.
+Qed.
+
+Lemma max_bid_bot_r : forall b, max b bot = b.
+Proof.
+  intros.
+  unfold max.
+  destruct ( leb_bid b bot ) eqn:E ; auto.
+  rewrite leb_bid_true in E.
+  apply leb_bid_bot_r in E. auto.
+Qed.
+
+Lemma max_bid'_app : forall l1 l2 x y,
+    max_bid' (l1 ++ l2) (max x y) = max (max_bid' l1 x) (max_bid' l2 y).
+Proof.
+  intros l1 l2.
+  induction l1 as [| z l1 IH] ; intros.
+  - cbn.
+    generalize dependent y.
+    induction l2 ; intros.
+    + reflexivity.
+    + cbn. rewrite <- IHl2.
+      replace (max (max x y) a) with (max x (max y a)).
+      reflexivity.
+      rewrite (max_comm _ a).
+      rewrite max_assoc.
+      now rewrite (max_comm a _).
+  -  cbn.
+     replace (max (max x y) z) with (max (max x z) y).
+     rewrite IH. reflexivity.
+     rewrite max_comm.
+     rewrite (max_comm x z).
+     rewrite max_assoc.
+     rewrite max_comm.
+     now rewrite (max_comm y x).
+Qed.
+
+Lemma max_bid'_app_l : forall l1 l2 x y,
+    le_bid y x ->
+    max_bid' (l1 ++ l2) x = max (max_bid' l1 x) (max_bid' l2 y).
+Proof.
+  intros.
+  replace x with (max x y) at 1.
+  apply max_bid'_app.
+  unfold max.
+  destruct (leb_bid x y) eqn:E ; auto.
+  apply le_bid_antisym ; try assumption.
+Qed.
+
+Lemma max_bid'_app_r : forall l1 l2 x y,
+    le_bid x y ->
+    max_bid' (l1 ++ l2) y = max (max_bid' l1 x) (max_bid' l2 y).
+Proof.
+  intros.
+  replace y with (max x y) at 1.
+  apply max_bid'_app.
+  unfold max.
+  now apply leb_bid_true in H ; rewrite H.
+Qed.
+
 Lemma max_bid_app : forall l1 l2,
     max_bid (l1++l2) = max (max_bid l1) (max_bid l2).
 Proof.
   intros.
-  unfold max.
-  destruct (leb_bid (max_bid l1) (max_bid l2)) eqn:MAX.
-  - (* (max l1) <= (max l2) *)
-    induction l1 ; simpl.
-    reflexivity.
-    admit.
-  - (* (max l2) <= (max l1) *)
-    induction l2 ; simpl.
-    now rewrite app_nil_r.
-    apply not_le_lt in MAX. rewrite ltb_bid_true in MAX.
-    admit.
+  unfold max_bid.
 Admitted.
 
 Lemma max_bid_app' : forall l1 l2,
@@ -685,14 +830,6 @@ Proof.
   repeat intro ; subst.
   now rewrite leb_bid_refl in H.
 Qed.
-
-Ltac eq_neq_le_bid :=
-  repeat (match goal with
-          | h:context[leb_bid _ _ = false] |- _=>
-              apply not_le_lt in h
-              ; rewrite ltb_bid_true in h
-     | h:context[leb_bid _ _ = true] |- _=> rewrite leb_bid_true in h
-          end).
 
 Lemma max_max_commmute :
   forall n1 n2 m1 m2, max (max n1 n2) (max m1 m2) = max (max n1 m1) (max n2 m2).
