@@ -232,6 +232,13 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
       | _ => False
       end.
 
+  Definition ErrSID_OOMs {A} (e : ErrSID A) : Prop
+    := forall sid pr,
+      match evalErrSID e sid pr with
+      | inl _ => True
+      | _ => False
+      end.
+
   Lemma ErrSID_succeeds_ErrSID_runs_to :
     forall {A} (e : ErrSID A),
       ErrSID_succeeds e ->
@@ -327,6 +334,61 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
   Proof.
     intros A x.
     unfold ErrSID_succeeds; cbn; auto.
+  Qed.
+
+  Lemma ErrSID_OOMs_bind :
+    forall {A B} (ma : ErrSID A) (k : A -> ErrSID B),
+    ErrSID_OOMs ma ->
+    ErrSID_OOMs (bind ma k).
+  Proof.
+    intros A B ma k MA.
+    cbn.
+
+    destruct ma as [[[[[a]]]]]; cbn in *.
+    unfold IdentityMonad.unIdent.
+
+    intros sid pr; cbn.
+    specialize (MA sid pr); cbn in *.
+
+    destruct (a sid pr) as [[pr' [sid' [OOM_a | [UB_a | [ERR_a | a']]]]]] eqn:Hasidpr;
+      cbn in *; try contradiction; auto.
+  Qed.
+
+  Lemma ErrSID_OOMs_continuation_bind :
+    forall {A B} (ma : ErrSID A) (k : A -> ErrSID B),
+      ErrSID_succeeds ma ->
+      (forall sid pr a, ErrSID_evals_to ma sid pr a -> ErrSID_OOMs (k a)) ->
+      ErrSID_OOMs (bind ma k).
+  Proof.
+    intros A B ma k MA KA.
+    cbn.
+
+    destruct ma as [[[[[a]]]]]; cbn in *.
+    unfold IdentityMonad.unIdent.
+
+    intros sid pr; cbn.
+    specialize (MA sid pr); cbn in *.
+
+    destruct (a sid pr) as [[pr' [sid' [OOM_a | [UB_a | [ERR_a | a']]]]]] eqn:Hasidpr;
+      cbn in *; try contradiction.
+
+    specialize (KA sid pr a').
+    assert (ErrSID_OOMs (k a')) as KA'.
+    { apply KA.
+      unfold ErrSID_evals_to.
+      cbn.
+      unfold IdentityMonad.unIdent.
+      rewrite Hasidpr.
+      cbn.
+      reflexivity.
+    }
+
+    specialize (KA' sid' pr').
+    destruct (k a') as [[[[[ka']]]]]; cbn.
+    destruct (ka' sid' pr') as [[pr'' [sid'' [OOM_ka' | [UB_ka' | [ERR_ka' | ka]]]]]] eqn:Hka';
+      cbn in *; rewrite Hka' in KA'; cbn in *; try contradiction.
+
+    auto.          
   Qed.
 
   Definition err_to_ub {A} (e : err A) : ErrSID A

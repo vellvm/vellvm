@@ -677,3 +677,4 @@ Module Make (IS : InterpreterStack) (TOP : LLVMTopLevel IS) : DenotationTheory I
 End Make.
 
 Module DenotationTheoryBigIntptr := Make InterpreterStackBigIntptr TopLevelBigIntptr.
+Module DenotationTheory64BitIntptr := Make InterpreterStack64BitIntptr TopLevel64BitIntptr.

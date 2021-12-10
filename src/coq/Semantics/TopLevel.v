@@ -234,3 +234,4 @@ Module Make (IS : InterpreterStack) : LLVMTopLevel IS.
 End Make.
 
 Module TopLevelBigIntptr := Make InterpreterStackBigIntptr.
+Module TopLevel64BitIntptr := Make InterpreterStack64BitIntptr.

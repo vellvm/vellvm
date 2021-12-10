@@ -55,6 +55,24 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
              | |- context [ITree.bind (Ret _) _] => rewrite bind_ret_l
              end.
 
+    Ltac go_in H :=
+      repeat match goal with
+             | |- context [interp_intrinsics (ITree.bind _ _)] => rewrite interp_intrinsics_bind in H
+             | |- context [interp_global (ITree.bind _ _)] => rewrite interp_global_bind in H
+             | |- context [interp_local_stack (ITree.bind _ _)] => rewrite interp_local_stack_bind in H
+             | |- context [interp_memory (ITree.bind _ _)] => rewrite interp_memory_bind in H
+             | |- context [interp_intrinsics (trigger _)] => rewrite interp_intrinsics_trigger in H; cbn in H; rewrite ?subevent_subevent in H
+             | |- context [interp_global (trigger _)] => rewrite interp_global_trigger in H; cbn in H; rewrite ?subevent_subevent in H
+             | |- context [interp_local_stack (trigger _)] => rewrite interp_local_stack_trigger in H; cbn in H; rewrite ?subevent_subevent in H
+             | |- context [ITree.bind (ITree.bind _ _) _] => rewrite bind_bind in H
+             | |- context [interp_intrinsics (Ret _)] => rewrite interp_intrinsics_ret in H
+             | |- context [interp_global (Ret _)] => rewrite interp_global_ret in H
+             | |- context [interp_local_stack (Ret _)] => rewrite interp_local_stack_ret in H
+             | |- context [interp_memory (Ret _)] => rewrite interp_memory_ret in H
+             | |- context [ITree.bind (Ret _) _] => rewrite bind_ret_l in H
+             end.
+
+
   End MCFGTactics.
 
   Import MCFGTactics.
@@ -211,3 +229,4 @@ Module Make (IS : InterpreterStack) (TOP : LLVMTopLevel IS) : MCFGTheory IS TOP.
 End Make.
 
 Module MCFGTheoryBigIntptr := Make InterpreterStackBigIntptr TopLevelBigIntptr.
+Module MCFGTheory64BitIntptr := Make InterpreterStack64BitIntptr TopLevel64BitIntptr.

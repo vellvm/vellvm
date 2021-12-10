@@ -1927,6 +1927,183 @@ Section Memory_Stack_Theory.
     (*       eapply NU; eauto. *)
     (* Qed. *)
 
+  Lemma allocate_undef_bytes_size_succeeds_or_OOMs :
+    forall m f a dt x,
+      ErrSID_succeeds
+        (allocate_undef_bytes_size m (next_memory_key (m, f)) a
+                                   (sizeof_dtyp dt) x
+                                   dt) \/
+        ErrSID_OOMs
+          (allocate_undef_bytes_size m (next_memory_key (m, f)) a
+                                     (sizeof_dtyp dt) x
+                                     dt).
+  Proof.
+    intros m f a dt.
+    Require Import Coq.NArith.BinNat.
+    Import N.
+    induction (sizeof_dtyp dt) using peano_ind; intros x.
+    - destruct (allocate_undef_bytes_size m (next_memory_key (m, f)) a (sizeof_dtyp dt) x dt) as [alloc] eqn:Halloc.
+      cbn in Halloc; inversion Halloc.
+      left. intros sid pr; cbn; auto.
+    - specialize IHn with (succ x).
+      destruct (IP.from_Z (Z.of_N x)) eqn:HZ;
+        destruct IHn as [IH_SUC | IH_OOM].
+      + (* Success *)
+        left.
+        unfold allocate_undef_bytes_size in *.
+
+        match goal with
+        | H : _ |- context [recursion ?a ?f ?n ?x]
+          =>
+            let AA := fresh AA in
+            assert (a = a) as AA by reflexivity;
+            pose proof (@recursion_succ (N -> ErrSID (memory * list Z)) Logic.eq a f AA) as REC
+        end.
+
+        unfold Morphisms.Proper, Morphisms.respectful in REC.
+        rewrite REC; [| repeat intros; subst; reflexivity].
+        clear REC.
+
+        apply ErrSID_succeeds_bind; auto.
+
+        intros sid pr a0 EVALS.
+        destruct a0.
+
+        apply ErrSID_succeeds_bind; [apply fresh_sid_succeeds|].
+        intros sid0 pr0 a0 H.
+        apply ErrSID_succeeds_bind.
+        { rewrite HZ.
+          cbn.
+          unfold ErrSID_succeeds.
+          cbn.
+          auto.
+        }
+
+        intros sid1 pr1 a1 EVALS'.
+        apply ErrSID_succeeds_ret.
+      + (* OOM allocating first bytes *)
+        right.
+        unfold allocate_undef_bytes_size in *.
+
+        match goal with
+        | H : _ |- context [recursion ?a ?f ?n ?x]
+          =>
+            let AA := fresh AA in
+            assert (a = a) as AA by reflexivity;
+            pose proof (@recursion_succ (N -> ErrSID (memory * list Z)) Logic.eq a f AA) as REC
+        end.
+
+        unfold Morphisms.Proper, Morphisms.respectful in REC.
+        rewrite REC; [| repeat intros; subst; reflexivity].
+        clear REC.
+
+        apply ErrSID_OOMs_bind; auto.
+      + (* OOM from higher byte index *)
+        right.
+
+        unfold allocate_undef_bytes_size in *.
+
+        match goal with
+        | H : _ |- context [recursion ?a ?f ?n ?x]
+          =>
+            let AA := fresh AA in
+            assert (a = a) as AA by reflexivity;
+            pose proof (@recursion_succ (N -> ErrSID (memory * list Z)) Logic.eq a f AA) as REC
+        end.
+
+        unfold Morphisms.Proper, Morphisms.respectful in REC.
+        rewrite REC; [| repeat intros; subst; reflexivity].
+        clear REC.
+
+        apply ErrSID_OOMs_continuation_bind; auto.
+        intros sid pr a0 H.
+        destruct a0.
+        apply ErrSID_OOMs_continuation_bind; [apply fresh_sid_succeeds |].
+        intros sid0 pr0 a0 H0.
+
+        apply ErrSID_OOMs_bind; auto.
+        rewrite HZ.
+        cbn.
+        unfold ErrSID_OOMs; intros *; cbn; auto.
+      +(* OOM allocating first bytes *)
+        right.
+        unfold allocate_undef_bytes_size in *.
+
+        match goal with
+        | H : _ |- context [recursion ?a ?f ?n ?x]
+          =>
+            let AA := fresh AA in
+            assert (a = a) as AA by reflexivity;
+            pose proof (@recursion_succ (N -> ErrSID (memory * list Z)) Logic.eq a f AA) as REC
+        end.
+
+        unfold Morphisms.Proper, Morphisms.respectful in REC.
+        rewrite REC; [| repeat intros; subst; reflexivity].
+        clear REC.
+
+        apply ErrSID_OOMs_bind; auto.
+  Qed.
+
+  Lemma allocate_undef_bytes_succeeds_or_OOMs :
+    forall m f a dt,
+      ErrSID_succeeds
+        (allocate_undef_bytes m (next_memory_key (m, f)) a dt) \/
+        ErrSID_OOMs
+          (allocate_undef_bytes m (next_memory_key (m, f)) a dt).
+  Proof.
+    intros m f a dt.
+    unfold allocate_undef_bytes.
+    apply allocate_undef_bytes_size_succeeds_or_OOMs.
+  Qed.
+
+  Lemma allocate_succeeds_or_OOMs :
+    forall ms dt,
+      dt <> DTYPE_Void ->
+      ErrSID_succeeds (allocate ms dt) \/ ErrSID_OOMs (allocate ms dt).
+  Proof.
+    intros [m f] dt NV.
+    destruct dt eqn:HDT; try contradiction.
+
+    - unfold allocate.
+
+      assert
+        (forall aid,
+            ErrSID_succeeds
+              (x <- allocate_undef_bytes m (next_memory_key (m, f)) aid (DTYPE_I sz);;
+               (let (m', addrs) := x in
+                ret
+                  (add_all_to_frame (m', f) addrs,
+                    int_to_ptr (next_memory_key (m, f)) (allocation_id_to_prov aid)))) \/
+              ErrSID_OOMs
+                (x <- allocate_undef_bytes m (next_memory_key (m, f)) aid (DTYPE_I sz);;
+                 (let (m', addrs) := x in
+                  ret
+                    (add_all_to_frame (m', f) addrs,
+                      int_to_ptr (next_memory_key (m, f)) (allocation_id_to_prov aid))))).
+      { admit.
+
+      }
+
+      
+      pose proof fresh_allocation_id_succeeds.
+      Opaque fresh_allocation_id.
+      cbn.
+      split.
+      pose proof (allocate_undef_bytes_succeeds_or_OOMs m f a dt).
+
+
+      
+      apply ErrSID_succeeds_bind.
+      auto with MEM_SUC;
+      intros * ?;
+      apply ErrSID_succeeds_bind;
+      auto with MEM_SUC;
+      intros * ?;
+      break_match;
+      auto with MEM_SUC.
+
+  Qed.
+
     (* Lemma allocate_succeeds : forall m1 τ, *)
     (*     non_void τ -> *)
     (*     exists m2 a, allocate m1 τ = inr (m2, a). *)
