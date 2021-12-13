@@ -26,8 +26,7 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
-     Basics.Basics
-     ITrace.EuttEv.
+     Basics.Basics.
 
 Import MonadNotation.
 
