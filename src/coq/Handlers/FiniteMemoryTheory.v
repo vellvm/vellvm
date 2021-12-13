@@ -1928,28 +1928,29 @@ Section Memory_Stack_Theory.
     (* Qed. *)
 
   Lemma allocate_undef_bytes_size_succeeds_or_OOMs :
-    forall m f a dt x,
-      ErrSID_succeeds
+    forall m f dt x,
+      (forall a, ErrSID_succeeds
         (allocate_undef_bytes_size m (next_memory_key (m, f)) a
                                    (sizeof_dtyp dt) x
-                                   dt) \/
-        ErrSID_OOMs
-          (allocate_undef_bytes_size m (next_memory_key (m, f)) a
+                                   dt)) \/
+        (forall a, ErrSID_OOMs
+                (allocate_undef_bytes_size m (next_memory_key (m, f)) a
                                      (sizeof_dtyp dt) x
-                                     dt).
+                                     dt)).
   Proof.
-    intros m f a dt.
+    intros m f dt.
     Require Import Coq.NArith.BinNat.
     Import N.
     induction (sizeof_dtyp dt) using peano_ind; intros x.
-    - destruct (allocate_undef_bytes_size m (next_memory_key (m, f)) a (sizeof_dtyp dt) x dt) as [alloc] eqn:Halloc.
+    - left. intros a.
+      destruct (allocate_undef_bytes_size m (next_memory_key (m, f)) a (sizeof_dtyp dt) x dt) as [alloc] eqn:Halloc.
       cbn in Halloc; inversion Halloc.
-      left. intros sid pr; cbn; auto.
+      intros sid pr; cbn; auto.
     - specialize IHn with (succ x).
       destruct (IP.from_Z (Z.of_N x)) eqn:HZ;
         destruct IHn as [IH_SUC | IH_OOM].
       + (* Success *)
-        left.
+        left. intros a.
         unfold allocate_undef_bytes_size in *.
 
         match goal with
@@ -1982,7 +1983,7 @@ Section Memory_Stack_Theory.
         intros sid1 pr1 a1 EVALS'.
         apply ErrSID_succeeds_ret.
       + (* OOM allocating first bytes *)
-        right.
+        right. intros a.
         unfold allocate_undef_bytes_size in *.
 
         match goal with
@@ -1999,7 +2000,7 @@ Section Memory_Stack_Theory.
 
         apply ErrSID_OOMs_bind; auto.
       + (* OOM from higher byte index *)
-        right.
+        right. intros a.
 
         unfold allocate_undef_bytes_size in *.
 
@@ -2026,7 +2027,7 @@ Section Memory_Stack_Theory.
         cbn.
         unfold ErrSID_OOMs; intros *; cbn; auto.
       +(* OOM allocating first bytes *)
-        right.
+        right. intros a.
         unfold allocate_undef_bytes_size in *.
 
         match goal with
@@ -2045,13 +2046,13 @@ Section Memory_Stack_Theory.
   Qed.
 
   Lemma allocate_undef_bytes_succeeds_or_OOMs :
-    forall m f a dt,
-      ErrSID_succeeds
-        (allocate_undef_bytes m (next_memory_key (m, f)) a dt) \/
-        ErrSID_OOMs
-          (allocate_undef_bytes m (next_memory_key (m, f)) a dt).
+    forall m f dt,
+      (forall a, ErrSID_succeeds
+        (allocate_undef_bytes m (next_memory_key (m, f)) a dt)) \/
+        (forall a, ErrSID_OOMs
+          (allocate_undef_bytes m (next_memory_key (m, f)) a dt)).
   Proof.
-    intros m f a dt.
+    intros m f dt.
     unfold allocate_undef_bytes.
     apply allocate_undef_bytes_size_succeeds_or_OOMs.
   Qed.
@@ -2064,44 +2065,40 @@ Section Memory_Stack_Theory.
     intros [m f] dt NV.
     destruct dt eqn:HDT; try contradiction.
 
-    - unfold allocate.
+    all: unfold allocate;
 
       assert
-        (forall aid,
+        ((forall aid,
             ErrSID_succeeds
-              (x <- allocate_undef_bytes m (next_memory_key (m, f)) aid (DTYPE_I sz);;
+              (x <- allocate_undef_bytes m (next_memory_key (m, f)) aid dt;;
                (let (m', addrs) := x in
                 ret
                   (add_all_to_frame (m', f) addrs,
-                    int_to_ptr (next_memory_key (m, f)) (allocation_id_to_prov aid)))) \/
+                    int_to_ptr (next_memory_key (m, f)) (allocation_id_to_prov aid))))) \/
+           (forall aid,
               ErrSID_OOMs
-                (x <- allocate_undef_bytes m (next_memory_key (m, f)) aid (DTYPE_I sz);;
+                (x <- allocate_undef_bytes m (next_memory_key (m, f)) aid dt;;
                  (let (m', addrs) := x in
                   ret
                     (add_all_to_frame (m', f) addrs,
-                      int_to_ptr (next_memory_key (m, f)) (allocation_id_to_prov aid))))).
-      { admit.
-
-      }
-
-      
-      pose proof fresh_allocation_id_succeeds.
-      Opaque fresh_allocation_id.
-      cbn.
-      split.
-      pose proof (allocate_undef_bytes_succeeds_or_OOMs m f a dt).
-
-
-      
-      apply ErrSID_succeeds_bind.
-      auto with MEM_SUC;
-      intros * ?;
-      apply ErrSID_succeeds_bind;
-      auto with MEM_SUC;
-      intros * ?;
-      break_match;
-      auto with MEM_SUC.
-
+                      int_to_ptr (next_memory_key (m, f)) (allocation_id_to_prov aid)))))) as [SUC | FAIL];
+        [pose proof allocate_undef_bytes_succeeds_or_OOMs m f dt as [SUC | FAIL];
+         [ left; intros aid;
+          apply ErrSID_succeeds_bind; auto;
+          intros sid pr [m' ls] H;
+          apply ErrSID_succeeds_ret
+         | right; intros aid;
+           apply ErrSID_OOMs_bind; auto
+         ]
+        | left;
+          apply ErrSID_succeeds_bind;
+          [apply fresh_allocation_id_succeeds|];
+          intros sid pr a H; subst; auto
+        | right;
+          apply ErrSID_OOMs_continuation_bind;
+          [apply fresh_allocation_id_succeeds|];
+          intros sid pr a H; subst; auto
+        ].
   Qed.
 
     (* Lemma allocate_succeeds : forall m1 τ, *)
