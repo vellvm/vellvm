@@ -173,4 +173,3 @@ From Vellvm Require Import
 Module Make (A : ADDRESS)(IP : INTPTR)(SIZEOF : Sizeof)(LLVMEvents : LLVM_INTERACTIONS(A)(IP)(SIZEOF)).
   Definition local_env := FMapAList.alist raw_id LLVMEvents.DV.uvalue.
 End Make.
-

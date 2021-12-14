@@ -22,13 +22,15 @@ From Vellvm Require Import
      Utils.ListUtil.
 
 From ExtLib Require Import
-     Structures.Monads.
+     Structures.Monads
+     Structures.Functor.
 
 From ITree Require Import
      ITree
      Basics.Basics.
 
 Import MonadNotation.
+Import ListNotations.
 
 Module Type AddrConvert (ADDR1 : ADDRESS) (ADDR2 : ADDRESS).
   Parameter addr_convert : ADDR1.addr -> OOM ADDR2.addr.
@@ -295,8 +297,9 @@ Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
   Module E1 := IS1.LLVM.Events.
   Module E2 := IS2.LLVM.Events.
 
-  Module EC := EventConvert IS1.LP IS2.LP AC1 AC2 E1 E2.
+  Module EC := EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LLVM.Events E2.
   Import EC.
+  Import EC.DVC.
 
   (* TODO: move this? *)
   Definition L4_convert_tree {T} (t : itree E1.L4 T) : itree E2.L4 T := interp L4_convert t.
@@ -308,12 +311,36 @@ Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
   Import TLR.
   Import TLR.R.
 
-  Definition L4_convert_PropT {T} (ts : PropT E1.L4 T) : PropT E2.L4 T
+  Definition L4_convert_PropT {A B} (f : A -> OOM B) (ts : PropT IS1.LLVM.Events.L4 A) : PropT E2.L4 B
     := fun t_e2 => exists t_e1,
-           ts t_e1 /\ t_e2 = L4_convert_tree t_e1.
+           ts t_e1 /\ t_e2 = L4_convert_tree (uv <- t_e1;; lift_OOM (f uv)).
+
+  (* Ideally we would convert memstates / local envs / local stacks /
+     global envs... But for now we can get away with placeholders for
+     these because the refine_res3 relation used by refine_L6 ignores
+     these.
+   *)
+  Definition res_L4_convert_unsafe (res : LLVM1.res_L4) : OOM LLVM2.res_L4
+    := match res with
+       | (ms, ((lenv, lstack), (genv, uv))) =>
+           uv' <- uvalue_convert uv;;
+           ret (IS2.LLVM.MEM.emptyMemState, (([], []), ([], uv')))
+       end.
  
-  Definition refine_E1E2_L6 (srcs : PropT E1.L4 res_L4) (tgts : PropT E2.L4 res_L4) : Prop
-    := refine_L6 (L4_convert_PropT srcs) tgts.
+  Definition refine_E1E2_L6 (srcs : PropT IS1.LLVM.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
+    :=
+    (* res_L4_convert_unsafe should be fine here because refine_L6
+       ignores all of the placeholder values *)
+    refine_L6 (L4_convert_PropT res_L4_convert_unsafe srcs) tgts.
+
+  (* TODO: not sure about name... *)
+  Definition model_E1E2
+             (p1 p2 : list
+                        (LLVMAst.toplevel_entity
+                           LLVMAst.typ
+                           (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ))))
+    : Prop :=
+    refine_E1E2_L6 (LLVM1.model p1) (LLVM2.model p2).
 
   From Coq Require Import RelationClasses.
 
