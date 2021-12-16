@@ -3540,12 +3540,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DTYPE_X86_mmx => failwith "Unimplemented default type: x86_mmx"
     | DTYPE_Opaque => failwith "Unimplemented default type: opaque"
     | DTYPE_Array sz t =>
-        if (0 <=? sz) then
-          v <- default_dvalue_of_dtyp t ;;
-          (ret (DVALUE_Array (repeat v (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-                                                                         "of DTYPE_Array or DTYPE_Vector")
+        v <- default_dvalue_of_dtyp t ;;
+        (ret (DVALUE_Array (repeat v (N.to_nat sz))))
 
     (* Matching valid Vector types... *)
     (* Currently commented out unsupported ones *)
@@ -3557,20 +3553,12 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     (*     failwith ("Negative array length for generating default value" ++ *)
     (*     "of DTYPE_Array or DTYPE_Vector") *)
     | DTYPE_Vector sz (DTYPE_Float) =>
-        if (0 <=? sz) then
-          (ret (DVALUE_Vector
-                  (repeat (DVALUE_Float Float32.zero) (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-                                                                         "of DTYPE_Array or DTYPE_Vector")
+        ret (DVALUE_Vector
+               (repeat (DVALUE_Float Float32.zero) (N.to_nat sz)))
     | DTYPE_Vector sz (DTYPE_Double) =>
-        if (0 <=? sz) then
-          (ret (DVALUE_Vector
-                  (repeat (DVALUE_Double (Float32.to_double Float32.zero))
-                          (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-                                                                         "of DTYPE_Array or DTYPE_Vector")
+        ret (DVALUE_Vector
+               (repeat (DVALUE_Double (Float32.to_double Float32.zero))
+                       (N.to_nat sz)))
     (* | DTYPE_Vector sz (DTYPE_X86_fp80) => *)
     (*   if (0 <=? sz) then *)
     (*     (ret (DVALUE_Vector *)
@@ -3586,12 +3574,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     (*     failwith ("Negative array length for generating default value" ++ *)
     (*     "of DTYPE_Array or DTYPE_Vector") *)
     | DTYPE_Vector sz (DTYPE_I n) =>
-        if (0 <=? sz) then
-          v <- default_dvalue_of_dtyp_i n ;;
-          (ret (DVALUE_Vector (repeat v (N.to_nat sz))))
-        else
-          failwith ("Negative array length for generating default value" ++
-                                                                         "of DTYPE_Array or DTYPE_Vector")
+        v <- default_dvalue_of_dtyp_i n ;;
+        ret (DVALUE_Vector (repeat v (N.to_nat sz)))
     | DTYPE_Vector _ _ => failwith ("Non-valid vector type when" ++
                                                                 "generating default vector")
     | DTYPE_Struct fields =>

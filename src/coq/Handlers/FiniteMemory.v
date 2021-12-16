@@ -150,6 +150,20 @@ Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type
     - right. intros H. inversion H; subst. apply n. reflexivity.
   Qed.
 
+  Lemma different_addrs :
+    forall (a : addr), exists (b : addr), a <> b.
+  Proof.
+    intros a.
+    destruct a.
+    destruct i.
+    - exists (Z.pos 1, p).
+      intros CONTRA; inversion CONTRA.
+    - exists (0, p).
+      intros CONTRA; inversion CONTRA.
+    - exists (Z.pos 1, p).
+      intros CONTRA; inversion CONTRA.
+  Qed.
+
   Definition show_addr (a : addr) := Show.show a.
 End Addr.
 

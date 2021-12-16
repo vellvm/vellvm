@@ -28,6 +28,7 @@ Module Type ADDRESS.
   Parameter addr : Set.
   Parameter null : addr.
   Parameter eq_dec : forall (a b : addr), {a = b} + {a <> b}.
+  Parameter different_addrs : forall (a : addr), exists (b : addr), a <> b.
 
   (* Debug *)
   Parameter show_addr : addr -> string.

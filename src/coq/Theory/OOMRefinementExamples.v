@@ -165,12 +165,65 @@ Module Finite.
   (* Add allocation in finite language *)
   Lemma add_alloc :
     forall g l s m,
-      refine_L6 (interp_mcfg4 TT t_ret g (l, s) m) (interp_mcfg4 TT t_alloc g (l, s) m).
+      refine_L6 (interp_mcfg4 refine_res3 t_ret g (l, s) m) (interp_mcfg4 refine_res3 t_alloc g (l, s) m).
   Proof.
     intros g l s m.
     unfold refine_L6.
     intros t' INTERP.
     Require Import String.
+    
+    cbn in INTERP.
+    unfold interp_mcfg4 in INTERP.
+
+    unfold model_undef in INTERP.
+    go_in INTERP.
+
+    rewrite interp_memory_trigger in INTERP.
+    cbn in INTERP.
+    go_in INTERP.
+    cbn in INTERP.
+
+    (* I basically need to show that t' is the same as t_alloc, but
+       with a different effects signature..
+
+       I.e., it either OOMs or it returns UVALUE_None
+     *)
+    pose proof (@allocate_succeeds_or_OOMs (ms_memory_stack m) (DTYPE_I 64)) as SUCFAIL.
+    forward SUCFAIL; [intros contra; inversion contra|].
+
+    destruct SUCFAIL as [ALLOC_SUC | ALLOC_OOM].
+    - apply ErrSID_succeeds_ErrSID_runs_to with (sid:=ms_sid m) (pr := ms_prov m) in ALLOC_SUC.
+      destruct ALLOC_SUC as ((ms' & addr) & sid'' & pr'' & RUNS).
+      unfold ErrSID_runs_to in RUNS.
+      rewrite RUNS in INTERP.
+      cbn in INTERP.
+      go_in INTERP.
+      cbn in INTERP.
+      go_in INTERP.
+      cbn in INTERP.
+
+      apply interp_prop_ret_inv in INTERP.
+      destruct INTERP as ((ms'' & (lenv & ls & res)) & REF & RES).
+      inversion REF; subst.
+      inversion H4; subst.
+      inversion H6; subst.
+      
+      
+      inversion H8; subst.
+      admit.
+      cbn in REF.
+      
+      cbn in REF.
+      
+      destruct r2 as .
+        rewrite RES.
+
+        cbn.
+
+        (* Won't work... *)
+        (* Just need to lift some of this proof and go back and change the existential, I think *)
+        
+
     exists (SemNotations.Ret3 g (l, s) m UVALUE_None).
     split.
     - cbn.
@@ -182,50 +235,55 @@ Module Finite.
       unfold Proper, respectful in *.
 
       eapply interp_prop_ret_pure; typeclasses eauto.
-    -
-      
-      right.
+    - right.
       Import OOM.
 
       unfold refine_OOM_h.
-      cbn in INTERP.
-      unfold interp_mcfg4 in INTERP.
-
 
       Require Import Stack.
       Require Import Global.
       cbn.
-    Ltac go_in H :=
-      repeat match goal with
-             | H: context [interp_intrinsics (ITree.bind _ _)] |- _ => rewrite interp_intrinsics_bind in H
-             | H: context [interp_global (ITree.bind _ _)] |- _ => rewrite interp_global_bind in H
-             | H: context [interp_local_stack (ITree.bind _ _)] |- _ => rewrite interp_local_stack_bind in H
-             | H: context [interp_memory (ITree.bind _ _)] |- _ => rewrite interp_memory_bind in H
-             | H: context [interp_intrinsics (trigger _)] |- _ => rewrite interp_intrinsics_trigger in H; cbn in H; rewrite ?subevent_subevent in H
-             | H: context [interp_global (trigger _)] |- _ => rewrite interp_global_trigger in H; cbn in H; rewrite ?subevent_subevent in H
-             | H: context [interp_local_stack (trigger _)] |- _ => rewrite interp_local_stack_trigger in H; cbn in H; rewrite ?subevent_subevent in H
-             | H: context [ITree.bind (ITree.bind _ _) _] |- _ => rewrite bind_bind in H
-             | H: context [interp_intrinsics (Ret _)] |- _ => rewrite interp_intrinsics_ret in H
-             | H: context [interp_global (Ret _)] |- _ => rewrite interp_global_ret in H
-             | H: context [interp_local_stack (Ret _)] |- _ => rewrite interp_local_stack_ret in H
-             | H: context [interp_memory (Ret _)] |- _ => rewrite interp_memory_ret in H
-             | H: context [ITree.bind (Ret _) _] |- _ => rewrite bind_ret_l in H
-             end.
-
-      go_in INTERP.
-
-      unfold model_undef in INTERP.
-
+      
       (* I basically need to show that t' is the same as t_alloc, but
          with a different effects signature..
 
          I.e., it either OOMs or it returns UVALUE_None
        *)
+      pose proof (@allocate_succeeds_or_OOMs (ms_memory_stack m) (DTYPE_I 64)) as SUCFAIL.
+      forward SUCFAIL; [intros contra; inversion contra|].
+
+      destruct SUCFAIL as [ALLOC_SUC | ALLOC_OOM].
+
+      + apply ErrSID_succeeds_ErrSID_runs_to with (sid:=ms_sid m) (pr := ms_prov m) in ALLOC_SUC.
+        destruct ALLOC_SUC as ((ms' & addr) & sid'' & pr'' & RUNS).
+        unfold ErrSID_runs_to in RUNS.
+        rewrite RUNS in INTERP.
+        cbn in INTERP.
+        go_in INTERP.
+        cbn in INTERP.
+        go_in INTERP.
+        cbn in INTERP.
+
+        apply interp_prop_ret_inv in INTERP.
+        destruct INTERP as (r2 & _ & RES).
+        rewrite RES.
+
+        cbn.
+
+        (* Won't work... *)
+        (* Just need to lift some of this proof and go back and change the existential, I think *)
+        
+        rewrite bind_ret_l in INTERP.
+        rewrite H
+          unfold ErrSID_succeeds in ALLOC_SUC.
+
+      + rewrite interp_intrinsics_trigger in INTERP.
+
+
+      go_in INTERP.
 
       epose proof interp_prop_Proper_eq.
 
-      destruct (runErrSID (allocate (ms_memory_stack m) (DTYPE_I 64)) (ms_sid m) (ms_prov m))
-        as [[res sid'] pr'].
       eapply interp_prop_Proper_eq in INTERP; try typeclasses eauto.
       2 : {
         go.

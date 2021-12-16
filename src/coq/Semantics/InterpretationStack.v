@@ -198,7 +198,7 @@ Module Type InterpreterStackBig <: InterpreterStack.
   Include InterpreterStack_common LP.
 End InterpreterStackBig.
 
-Module Make (LP' : LLVMParams) : InterpreterStack.
+Module Make (LP' : LLVMParams) : InterpreterStack with Module LP := LP'.
   Module LP := LP'.
   Export LP.
 
@@ -360,7 +360,7 @@ Module Make (LP' : LLVMParams) : InterpreterStack.
   End SemNotations.
 End Make.
 
-Module MakeBig (LP' : LLVMParamsBig) : InterpreterStackBig.
+Module MakeBig (LP' : LLVMParamsBig) : InterpreterStackBig with Module LP := LP'.
   Module LP := LP'.
   Export LP.
 

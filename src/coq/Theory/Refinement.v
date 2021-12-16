@@ -110,6 +110,80 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     - apply uvalue_eq_Transitive.
   Qed.
 
+  (* TODO: move this? *)
+  Ltac red_concretize :=
+    unfold concretize, concretize_u; rewrite concretize_uvalueM_equation.
+  Ltac red_concretize_in H :=
+    unfold concretize, concretize_u in H; rewrite concretize_uvalueM_equation in H.
+
+  Lemma refine_uvalue_concrete :
+    forall dt uv uvr,
+      is_concrete uv = true ->
+      (* Need this to rule out bogus integer sizes *)
+      uvalue_has_dtyp uv dt ->
+      is_supported dt ->
+      refine_uvalue uv uvr ->
+      uv = uvr.
+  Proof.
+    intros dt uv uvr CONC DTYP SUP_DTYP REF.
+    induction uv;
+      cbn in CONC;
+      try solve [inversion CONC].
+    - inversion REF; subst.
+      + unfold concretize, concretize_u in H.
+        rewrite concretize_uvalueM_equation in H.
+        inversion H.
+      + remember (uvalue_to_dvalue uvr) as edvr;
+          destruct uvr; cbn in Heqedvr;
+          try match goal with
+              | DV : _ = inr ?dv |- _ =>
+                  specialize (H dv)
+              end;
+          try solve [forward H;
+                 [unfold concretize, concretize_u;
+                  rewrite concretize_uvalueM_equation;
+                  reflexivity|];
+
+                 unfold concretize, concretize_u in H;
+                 rewrite concretize_uvalueM_equation in H;
+                 inversion H; subst; reflexivity
+            ].
+
+        -- pose proof REF as DTYP';
+           eapply refine_uvalue_dtyp in DTYP'; eauto;
+           inversion DTYP'; subst;
+
+           inversion SUP_DTYP;
+           match goal with
+           | Ht : ?dt = dt |- _ =>
+               remember (default_dvalue_of_dtyp dt) as DEF eqn:HDEF;
+               cbn in HDEF
+           end;
+             try solve [
+                 match goal with
+                 | HDEF : _ = inr ?def |- _ =>
+                     specialize (H def)
+                 end;
+                 forward H;
+                 [red_concretize; cbn; subst; constructor|];
+                 red_concretize_in H;
+                 inversion H
+               | subst;
+                 pose proof (ADDR.different_addrs a) as (b & DIFF_ADDR);
+                 specialize (H (DVALUE_Addr b));
+                 forward H;
+                 [red_concretize; cbn; constructor|];
+
+                 red_concretize_in H; inversion H;
+                 subst; contradiction
+               ].
+
+           ++
+             break_match_hyp.
+             --- admit.
+             --- admit.
+  Admitted.
+
   Infix"×" := prod_rel (at level 90, left associativity).
 
   Definition TT {A} : relation A := fun _ _ => True.
@@ -185,5 +259,25 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     := fun ts ts' =>
          forall t', ts' t' ->
                exists t, ts t /\ (contains_UB t \/ refine_OOM_h refine_res3 t t').
+
+  (* Instance Transitive_refine_L6 : Transitive refine_L6. *)
+  (* Proof. *)
+  (*   unfold Transitive. *)
+  (*   intros x y z XY YZ. *)
+
+  (*   unfold refine_L6 in *. *)
+  (*   intros t' zt'. *)
+
+  (*   specialize (YZ  t' zt') as (t'' & yt'' & yref). *)
+  (*   specialize (XY t'' yt'') as (t''' & xt''' & xref). *)
+  (*   exists t'''; split; auto. *)
+
+  (*   destruct xref as [UBX | REF_OOMX]; auto. *)
+  (*   right. *)
+
+  (*   destruct yref as [UBY | REF_OOMY]. *)
+
+  (*   apply eutt_refine_oom_h; try typeclasses eauto. *)
+  (* Qed. *)
 
 End Make.

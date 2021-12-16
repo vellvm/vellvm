@@ -24,7 +24,7 @@ Module Type LLVMParamsBig <: LLVMParams.
   Declare Module IP_BIG : INTPTR_BIG IP.
 End LLVMParamsBig.  
 
-Module Make (ADDR' : ADDRESS) (IP' : INTPTR) (SIZEOF' : Sizeof) (PTOI' : PTOI ADDR') (PROV' : PROVENANCE ADDR') (ITOP' : ITOP ADDR' PROV') : LLVMParams.
+Module Make (ADDR' : ADDRESS) (IP' : INTPTR) (SIZEOF' : Sizeof) (PTOI' : PTOI ADDR') (PROV' : PROVENANCE ADDR') (ITOP' : ITOP ADDR' PROV') : LLVMParams with Module ADDR := ADDR'.
   Module ADDR := ADDR'.
   Module IP := IP'.
   Module SIZEOF := SIZEOF'.
@@ -33,7 +33,7 @@ Module Make (ADDR' : ADDRESS) (IP' : INTPTR) (SIZEOF' : Sizeof) (PTOI' : PTOI AD
   Module ITOP := ITOP'.
 End Make.
 
-Module MakeBig (ADDR' : ADDRESS) (IP' : INTPTR) (SIZEOF' : Sizeof) (PTOI' : PTOI ADDR') (PROV' : PROVENANCE ADDR') (ITOP' : ITOP ADDR' PROV') (IP_BIG' : INTPTR_BIG IP') : LLVMParamsBig.
+Module MakeBig (ADDR' : ADDRESS) (IP' : INTPTR) (SIZEOF' : Sizeof) (PTOI' : PTOI ADDR') (PROV' : PROVENANCE ADDR') (ITOP' : ITOP ADDR' PROV') (IP_BIG' : INTPTR_BIG IP') : LLVMParamsBig with Module ADDR := ADDR'.
   Module ADDR := ADDR'.
   Module IP := IP'.
   Module SIZEOF := SIZEOF'.

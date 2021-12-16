@@ -388,8 +388,8 @@ Section PropMonad.
   Qed.
 
   #[global] Instance interp_prop_Proper3
-         {E F} (h_spec : E ~> PropT F) R RR :
-    Proper(eq_itree eq ==> eq  ==> iff) (interp_prop h_spec R RR).
+         {E F} {a b} (h_spec : E ~> PropT F) R RR :
+    Proper(eqit eq a b ==> eq  ==> iff) (interp_prop h_spec R RR).
   Proof.
     do 4 red.
     intros; split.

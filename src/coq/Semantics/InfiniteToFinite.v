@@ -293,7 +293,7 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
   Defined.
 End EventConvert.
 
-Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2).
+Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2).
   Module E1 := IS1.LLVM.Events.
   Module E2 := IS2.LLVM.Events.
 
@@ -334,7 +334,7 @@ Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
     refine_L6 (L4_convert_PropT res_L4_convert_unsafe srcs) tgts.
 
   (* TODO: not sure about name... *)
-  Definition model_E1E2
+  Definition model_E1E2_L6
              (p1 p2 : list
                         (LLVMAst.toplevel_entity
                            LLVMAst.typ
@@ -342,73 +342,72 @@ Module InfiniteToFinite (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 :
     : Prop :=
     refine_E1E2_L6 (LLVM1.model p1) (LLVM2.model p2).
 
-  From Coq Require Import RelationClasses.
+End LangRefine.
 
-  (* Lemma refine_oom *)
-  (*   : forall E F `{LLVMEvents.FailureE -< E +' F} T TT (HR: Reflexive TT) *)
-  (*       (x : _ -> Prop) *)
-  (*       (y : itree (E +' OOME +' F) T), *)
-  (*     x y -> model_OOM TT x y. *)
-  (* Proof. *)
-  (*   intros E F H T TT HR x y H0. *)
-  (*   unfold model_OOM. *)
-  (*   exists y. split. assumption. *)
-  (*   unfold model_OOM_h. *)
-  (*   apply interp_prop. *)
-  (*   apply case_prop_handler_correct. *)
-  (*   unfold handler_correct. intros. reflexivity. *)
-  (*   apply case_prop_handler_correct. *)
-  (*   apply UB_handler_correct. *)
-  (*   unfold handler_correct. intros. reflexivity. *)
-  (*   assumption. reflexivity. *)
-  (* Qed. *)
+Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr FinAddrConvert FinAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr.
+  Include LangRefine InterpreterStackBigIntptr InterpreterStack64BitIntptr FinAddrConvert FinAddrConvert TopLevelBigIntptr TopLevel64BitIntptr TopLevelRefinements64BitIntptr.
 
-  (* Lemma refine_oom_oom_void : *)
-  (*   forall (source : itree E1.L5 void) (msg : string), *)
-  (*     refine_oom eq source (trigger (ThrowOOM msg)). *)
-  (* Proof. *)
-  (*   intros source msg. *)
-  (*   cbn. *)
-  (*   unfold refine_oom. *)
+  From Vellvm Require Import InterpreterMCFG.
 
-  (*   red. *)
+  Import MCFGTheoryBigIntptr.
+  Import MCFGTheory64BitIntptr.
 
-  (*   Import InterpFacts. *)
-  (*   Require Import PropT. *)
+  Module TLR_INF := TopLevelRefinementsBigIntptr.
+  Module TLR_FIN := TopLevelRefinements64BitIntptr.
 
-  (*   cbn. *)
+  Lemma refine_E1E2_L6_compose :
+    forall ti1 ti2 tf2 tf1,
+      TLR_INF.R.refine_L6 ti1 ti2 ->
+      refine_E1E2_L6 ti2 tf2 ->
+      TLR_FIN.R.refine_L6 tf2 tf1 ->
+      refine_E1E2_L6 ti1 tf1.
+  Proof.
+    intros ti1 ti2 tf2 tf1 RINF RITOF RFIN.
 
-  (*   rewrite interp_prop_trigger. *)
+    unfold refine_E1E2_L6 in *.
+    Require Import Coq.Classes.RelationClasses.
 
+  Qed.
 
-  (* Qed. *)
+  Lemma model_E1E2_L6_sound :
+    forall (p : list
+             (LLVMAst.toplevel_entity
+                LLVMAst.typ
+                (LLVMAst.block LLVMAst.typ * list (LLVMAst.block LLVMAst.typ)))),
+      model_E1E2_L6 p p.
+  Proof.
+    intros p.
+    unfold model_E1E2_L6.
+    intros t' m_fin.
+    exists t'.
+    split.
+    - unfold L4_convert_PropT.
+      (* t_e1 is a tree in the model of the program in the infinite
+         semantics, and t_e1 "agrees" with the behavior (t') in the
+         finite semantics.
 
-  (* Lemma refine_oom_oom : *)
-  (*   forall {T : Type} (RR : relation T) (sources : PropT E1.L5 T) (t : itree E1.L5 T) (msg : string), *)
-  (*     refine_oom RR sources (raise_oom msg). *)
-  (* Proof. *)
-  (*   intros T RR sources t msg. *)
-  (*   cbn. *)
-  (*   unfold refine_oom. *)
-  (*   exists t. *)
-  (*   intros SOURCES. *)
+         "Agrees" in this context means that t' is equivalent to t_e1
+         with the events converted, and the resulting uvalue converted.
+       *)
+      induction p.
+      + unfold TopLevelBigIntptr.model, TopLevelBigIntptr.model_gen.
+        cbn.
+        From Vellvm Require Import Tactics.
+        eexists.
 
-  (*   red. *)
+        From ITree Require Import
+             ITree
+             Basics.Monad
+             Events.StateFacts
+             Eq.Eq.
 
-  (*   unfold L5_convert_tree. *)
-  (*   Import InterpFacts. *)
-  (*   unfold raiseOOM. *)
-  (*   Require Import PropT. *)
-
-  (*   Check (trigger (ThrowOOM msg)). *)
-  (*   rewrite Eq.bind_trigger. *)
-  (*   rewrite bind_trigger. *)
-  (*   rewrite interp_prop _bind. *)
-  (*   setoid_rewrite interp_interp. *)
-  (*   epose proof interp_interp. *)
-
-  (*   rewrite interp_ret. *)
-  (*   exists t. *)
-  (* Qed. *)
-
+        (* This rewrite is taking forever... wtf. *)
+        rewrite bind_ret_l.
+        repeat rewrite bind_ret_l.
+        
+        MCFGTheoryBigIntptr.MCFGTactics.go.
+    - right.
+      apply eutt_refine_oom_h; try typeclasses eauto.
+      reflexivity.
+  Qed.
 End InfiniteToFinite.

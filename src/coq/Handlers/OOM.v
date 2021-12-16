@@ -101,3 +101,110 @@ Proof.
   unfold refine_OOM_handler.
   reflexivity.
 Qed.
+
+(* Instance Transitive_refine_OOM_h {E F T} {RR} : Transitive (@refine_OOM_h E F T RR). *)
+(* Proof. *)
+(*   unfold Transitive. *)
+(*   intros x y z XY YZ. *)
+
+(*   epose proof interp_prop_Proper3. *)
+(*   epose proof interp_prop_Proper2. *)
+(*   epose proof interp_prop_Proper. *)
+(*   unfold Proper, respectful in *. *)
+
+
+(*   pose proof (itree_eta x) as Ix. *)
+(*   pose proof (itree_eta y) as Iy. *)
+(*   pose proof (itree_eta z) as Iz. *)
+
+(*   unfold refine_OOM_h in *. *)
+(*   eapply H. *)
+(*   3: eapply XY. *)
+(*   all:eauto. *)
+  
+  
+(*   destruct (observe z) eqn:Hz. *)
+(*   - pstep. red. *)
+
+(*     destruct (observe y) eqn:Hy. *)
+(*     + unfold refine_OOM_h in *. *)
+
+(*       assert (y = ret r1) by admit. *)
+(*       rewrite H in YZ. *)
+(*       rewrite H in XY. *)
+(*       clear H. *)
+
+(*       assert (z = ret r0) by admit. *)
+(*       rewrite H in YZ. *)
+(*       clear H. *)
+
+(*       apply interp_prop_ret_inv in XY as (rx & RRx & REST). *)
+(*       unfold flip in RRx. *)
+
+(*       apply  *)
+(*       replace y with (ret r1) in YZ. *)
+(*       rewrite Ix in XY. *)
+
+
+(*        to *)
+      
+(*       unfold interp_prop in *. *)
+(*   epose proof interp_prop_Proper. *)
+(*   unfold Proper, respectful in H. *)
+(*   generalize dependent x. *)
+(*   generalize depy, z. *)
+(*   pcofix  *)
+(*   unfold Basics.flip, Basics.impl in H. *)
+(*   eapply H. *)
+(*   admit. *)
+(*   admit. *)
+(* Qed. *)
+
+(* Instance Transitive_refine_OOM_h {E F T} {RR} : Transitive (@refine_OOM_h E F T RR). *)
+(* Proof. *)
+(*   unfold Transitive. *)
+(*   Require Import Paco.paco. *)
+
+(*   pcofix CIH. *)
+(*   intros x y z XY YZ. *)
+
+(*   pose proof (itree_eta x) as Ix. *)
+(*   pose proof (itree_eta y) as Iy. *)
+(*   pose proof (itree_eta z) as Iz. *)
+
+(*   destruct (observe z) eqn:Hz. *)
+(*   - pstep. red. *)
+
+(*     destruct (observe y) eqn:Hy. *)
+(*     + unfold refine_OOM_h in *. *)
+
+(*       assert (y = ret r1) by admit. *)
+(*       rewrite H in YZ. *)
+(*       rewrite H in XY. *)
+(*       clear H. *)
+
+(*       assert (z = ret r0) by admit. *)
+(*       rewrite H in YZ. *)
+(*       clear H. *)
+
+(*       apply interp_prop_ret_inv in XY as (rx & RRx & REST). *)
+(*       unfold flip in RRx. *)
+
+(*       apply  *)
+(*       replace y with (ret r1) in YZ. *)
+(*       rewrite Ix in XY. *)
+
+
+(*        to *)
+      
+(*       unfold interp_prop in *. *)
+(*   epose proof interp_prop_Proper. *)
+(*   unfold Proper, respectful in H. *)
+(*   generalize dependent x. *)
+(*   generalize depy, z. *)
+(*   pcofix  *)
+(*   unfold Basics.flip, Basics.impl in H. *)
+(*   eapply H. *)
+(*   admit. *)
+(*   admit. *)
+(* Qed. *)
