@@ -209,7 +209,7 @@ From Imp2Vir Require Import CFGC_DenotationsCombinators.
 
 Lemma wf_compiler_aux : forall s env σ σ' cfg nenv ,
   (compile_imp s env) σ = (σ', Some (nenv, cfg)) ->
-  wf_dcfg (snd ((evaluate cfg) σ')).
+  wf_scfg (snd ((evaluate cfg) σ')).
 Proof.
   induction s
   ; intros
@@ -229,7 +229,7 @@ Proof.
   inv H.
   inv Heq.
   repeat flatten_all ; try discriminate.
-  apply wf_dcfg_ocfg.
+  apply wf_scfg_ocfg.
   apply wf_compiler_aux in Heq.
   inv H0.
   now rewrite Heq1 in Heq.
@@ -269,7 +269,7 @@ Ltac go := autorewrite with rwtranslate rwbind.
 Ltac flatten := repeat (flatten_all ; simpl in *) .
 
 Theorem compile_correct :
-  forall (σ σ' : FST) env env'  (p : stmt) (o : CFLang) (dg : dcfg)
+  forall (p : stmt) (σ σ' : FST) env env' (o : CFLang) (dg : scfg)
     (input output : block_id)
     mem from to genv lenv vmem,
 
@@ -281,97 +281,96 @@ Theorem compile_correct :
   List.In to (inputs (graph dg)) ->
   eutt (Rimpvir env')
        (interp_imp (denote_imp p) mem)
-       (interp_cfg3 (denote_dcfg dg from to) genv lenv vmem).
+       (interp_cfg3 (denote_cflang o σ' from to) genv lenv vmem).
 Proof.
-  intros ; subst.
-  induction p.
+  induction p ; intros.
   - (* Assign *)
     simpl in *.
     repeat (flatten_all) ; [| discriminate H0].
-    inv_pair ; simpl in *.
-    unfold denote_cflang, denote_dcfg, mk_block in *; cbn.
-    repeat flatten_all ; simpl in *.
-    repeat flatten_all ; simpl in *.
-    inv_pair. destruct H2 ; try contradiction ; subst.
-    rewrite denote_cfg_block.
+    destruct dg.
+    inv_pair.
+    erewrite (denote_cblock σ' c graph ins outs to from) ; try eauto.
+    shelve.
+    cbn in H1.
+    simpl in * ; repeat (flatten_all).
+    unfold freshLabel, mk_scfg in *
+    ; simpl in * ; repeat (flatten_all)
+    ; repeat inv_pair
+    ; inv H1.
+    simpl in H2.
+    destruct H2 ; [ subst | contradiction ].
+    now apply In_singleton.
+    Unshelve.
     admit.
-    admit. (* The interface ensure this kind of properties *)
 
   - (* Seq *)
     simpl in *.
     repeat (flatten_all) ; try discriminate.
-    inv_pair.
-    unfold denote_cflang,denote_dcfg in *.
-    repeat flatten_all ; simpl in *.
-    unfold mk_seq in *.
-    repeat flatten_all ; simpl in *.
-    rewrite denote_cfg_seq.
+    destruct dg.
+    inv H0.
+    inv H1.
+    repeat flatten_all.
+    destruct s,s0.
+    erewrite denote_cseq ; try eassumption.
     admit.
-    eapply wf_evaluate_wf_seq ; eassumption.
-    unfold cfg_seq in H2.
-    rewrite inputs_app in H2.
     (* List.In to (inputs graph) *) admit.
 
   - (* If *)  (* very tedious, because several combinators *)
     simpl in *.
     repeat (flatten_all) ; try discriminate.
     inv_pair.
-    unfold denote_cflang, denote_dcfg.
-    simpl.
-    repeat (flatten_all).
-    unfold mk_seq.
-    repeat (flatten_all); simpl in *.
-    rewrite denote_cfg_seq. (* issue here *)
-    admit. 
-    eapply wf_evaluate_wf_seq ; admit.
-    (* List.In to (inputs graph) *) admit.
+    erewrite denote_cseq ; try eassumption.
+    admit. admit. admit.
+
   - (* While *)
     simpl in *.
     repeat (flatten_all) ; try discriminate.
-    inv_pair.
-    unfold denote_cflang,denote_dcfg.
-    repeat flatten_all ; simpl in *.
-    repeat flatten_all ; simpl in *.
-    unfold mk_while in *.
-    repeat flatten_all ; simpl in *.
-    repeat flatten_all ; simpl in *.
-    replace to with b by admit. (* NOTE HERE *)
-    setoid_rewrite denote_cfg_while_loop.
+    destruct dg.
+    inv H0. inv H1.
+    repeat flatten_all.
+    destruct s ; simpl in *.
+    destruct f0.
+    erewrite denote_cwhile ; try eassumption.
+    2: { admit. (* How to have the hypothesis 'to = name counter_bid ? *)}
+    2: { intros. admit. (* How to have the PostCondition ? *) }
     admit.
-    eapply wf_evaluate_wf_while ; eassumption.
-    (* has_post *) admit.
 
   - (* Skip *)
     simpl in *.
-    repeat flatten_all.
-    inv H0.
-    unfold denote_cflang, denote_dcfg, mk_block ; cbn.
-    repeat flatten_all ; simpl. (* NOTE HERE *)
-    destruct (eqb_bid b to) eqn:E.
-    2 : {
-      rewrite eqb_bid_neq in E.
-      admit. (* sohuld be identity here *)
-    }
-    rewrite eqb_bid_eq in E ; subst.
-    rewrite denote_cfg_block .
-    + setoid_rewrite denote_code_nil.
-      simpl.
-      bstep.
-      rewrite interp_imp_ret.
-      rewrite interp_cfg3_ret.
-      apply eutt_Ret.
-      constructor.
-      * intros.
-        simpl in H0. apply H,H0.
-      * intros.
-        destruct H0 as [reg [Hreg [ addr [Haddr [val [HValRead HValInt]]]]]].
-        simpl in *.
-        unfold Rmem in H.
-        apply H.
-        exists reg; intuition.
-        exists addr; intuition.
-        exists val; intuition.
-    + admit. (* The interface should ensure this kind of properties *)
+    inversion H0.
+    subst σ env o.
+    destruct dg ; symmetry in H1.
+    inv_pair.
+    destruct σ'.
+    set ( σ' := {| counter_bid := counter_bid; counter_reg := counter_reg |} ).
+    erewrite (denote_cblock σ' [] graph ins outs _ _)
+    ; try eassumption
+    ; [ setoid_rewrite denote_code_nil
+        ; simpl
+        ; bstep
+        ; rewrite interp_imp_ret
+        ; rewrite interp_cfg3_ret
+        ; apply eutt_Ret
+        ; constructor
+        ;[ intros ; simpl in H0 ; apply H,H0
+         | intros
+           ; destruct H0 as [reg [Hreg [ addr [Haddr [val [HValRead HValInt]]]]]]
+           ; simpl in *
+           ; unfold Rmem in H
+           ; apply H
+        ; exists reg; intuition
+        ; exists addr; intuition
+        ; exists val; intuition
+        ]
+      | ]
+    ; cbn in H1
+    ; simpl in * ; repeat (flatten_all)
+    ; unfold freshLabel, mk_scfg in *
+    ; simpl in * ; repeat (flatten_all)
+    ; inv H1.
+    unfold cfg_block in H2 ; simpl in H2.
+    destruct H2 ; [subst | contradiction].
+    now apply In_singleton.
 Admitted.
 End Theory.
 
