@@ -21,9 +21,9 @@ From Coq Require Import
 
 From ITree Require Import
      ITree
+     ITreeFacts
      Basics.Basics
      Events.Exception
-     Eq.Eq
      Events.StateFacts
      Events.State.
 

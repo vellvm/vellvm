@@ -8,9 +8,7 @@ Require Import ZArith.
 
 From ITree Require Import
      ITree
-     Basics.Monad
-     Eq.Eq
-     TranslateFacts.
+     ITreeFacts.
 
 From Vellvm Require Import
      Utilities

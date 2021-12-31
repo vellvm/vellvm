@@ -6,9 +6,7 @@ From ExtLib Require Import
      Structures.Monad.
 
 From ITree Require Import
-     ITree
-     Eq.Eq
-     TranslateFacts.
+     ITreeFacts.
 
 From Vellvm Require Import
      Utilities

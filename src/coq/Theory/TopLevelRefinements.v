@@ -3,11 +3,9 @@ From ITree Require Import
      ITree
      ITreeFacts
      Basics.HeterogeneousRelations
+     Basics.MonadState
      Events.State
-     Events.StateFacts
-     InterpFacts
-     KTreeFacts
-     Eq.Eq.
+     Events.StateFacts.
 
 From Vellvm Require Import
      Utilities
@@ -27,10 +25,6 @@ From Coq Require Import
      Morphisms
      Relations
      List.
-
-From ITree Require Import
-     Basics.Monad
-     Basics.MonadState.
 
 Require Import Paco.paco.
 

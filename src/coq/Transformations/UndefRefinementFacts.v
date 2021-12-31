@@ -23,8 +23,8 @@ From Vellvm.Handlers Require Import
 
 From ITree Require Import
      ITree
+     ITreeFacts
      Basics
-     Eq.Eq
      Events.State.
 
 From ExtLib Require Import
@@ -34,7 +34,6 @@ From ExtLib Require Import
      Programming.Eqv.
 
 Import EqvNotation.
-
 
 Import ITree.Basics.Basics.Monads.
 

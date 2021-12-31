@@ -13,11 +13,8 @@ From Coq Require Import
 
 From ITree Require Import
      ITree
+     ITreeFacts
      Basics.HeterogeneousRelations
-     Eq.Eq
-     Interp.Interp
-     Interp.InterpFacts
-     Interp.TranslateFacts
      Basics.MonadState
      Events.StateFacts.
 

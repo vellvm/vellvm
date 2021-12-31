@@ -9,10 +9,7 @@ Require Import Coq.micromega.Lia.
 
 From ITree Require Import
      ITree
-     Basics.Monad
-     Eq.Eq
-     TranslateFacts
-     Interp.InterpFacts
+     ITreeFacts
      Events.State
      Events.StateFacts.
 

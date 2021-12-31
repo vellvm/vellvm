@@ -1,7 +1,6 @@
 (* begin hide *)
 From ITree Require Import
-     Eq.Eq
-     ITree
+     ITree ITreeFacts
      FailFacts
      Events.Exception.
 
@@ -74,7 +73,7 @@ Proof.
   unfold iter, CategoryKleisli.Iter_Kleisli, Basics.iter, MonadIter_stateT0, Basics.iter, MonadIter_itree in *; cbn.
   einit. ecofix CIH; intros.
   rewrite 2 unfold_iter; cbn.
-  rewrite !Eq.bind_bind.
+  rewrite !bind_bind.
   setoid_rewrite bind_ret_l.
   rewrite StateFacts.interp_state_bind.
   ebind; econstructor; eauto.
@@ -93,7 +92,7 @@ Proof.
   unfold Basics.iter, failT_iter, Basics.iter, MonadIter_itree in *; cbn.
   einit. ecofix CIH; intros *.
   rewrite 2 unfold_iter; cbn.
-  rewrite !Eq.bind_bind.
+  rewrite !bind_bind.
   rewrite interp_fail_bind.
   ebind; econstructor; eauto.
   reflexivity.

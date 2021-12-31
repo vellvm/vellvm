@@ -4,9 +4,7 @@ From Coq Require Import
 
 From ITree Require Import
      ITree
-     Basics.Monad
-     Eq.Eq
-     TranslateFacts
+     ITreeFacts
      Events.State.
 
 From Vellvm Require Import
@@ -469,7 +467,7 @@ Proof.
 Qed.
 
 Lemma local_frame_phis : forall phis f g l m,
-    ⟦ phis ⟧Φs3 f g l m ⤳ lift_pred_L3 _ (local_has_changed l (map fst phis)).
+    ⟦ phis ⟧Φs3 f g l m ⤳ lift_pred_L3 _ (local_has_changed l (List.map fst phis)).
 Proof.
   intros.
   cbn.
@@ -477,7 +475,7 @@ Proof.
   rewrite interp_cfg3_map_monad.
   apply has_post_bind_strong
     with (S := andP (lift_state_cfgP (pure_P g l m))
-                   (lift_pure_cfgP (fun l => forall x, In x (map fst l) -> In x (map fst phis)))).
+                   (lift_pure_cfgP (fun l => forall x, In x (List.map fst l) -> In x (List.map fst phis)))).
   - induction phis as [| [x []] phis IH].
     + cbn; apply eutt_Ret; split; cbn; auto.
     + cbn; go.
@@ -500,7 +498,7 @@ Proof.
     cbn in *.
     go.
     rewrite interp_cfg3_map_monad.
-    apply has_post_bind_strong with (S := fun '(_, (l', (_, _))) => local_has_changed l (map fst phis) l').
+    apply has_post_bind_strong with (S := fun '(_, (l', (_, _))) => local_has_changed l (List.map fst phis) l').
     2: _intros; go; apply eutt_Ret; cbn; auto.
     apply map_monad_eutt_state3_ind; [intros [] ? ? ? ? ? | red; auto].
     eapply has_post_weaken; [apply LocalWrite_local_change |].
