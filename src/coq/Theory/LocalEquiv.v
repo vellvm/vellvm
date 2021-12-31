@@ -4,9 +4,7 @@ From Coq Require Import
 
 From ITree Require Import
      ITree
-     Basics.Monad
-     Eq.Eq
-     TranslateFacts
+     ITreeFacts
      Events.State.
 
 From Vellvm Require Import

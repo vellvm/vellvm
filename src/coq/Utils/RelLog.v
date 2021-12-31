@@ -1,7 +1,7 @@
 From ITree Require Import
      ITree
-     Basics
-     Eq.Eq.
+     ITreeFacts
+     Basics.
 
 Import ITreeNotations.
 

@@ -12,7 +12,7 @@ Require Import ZArith.
 
 From ITree Require Import
      ITree
-     Interp.Recursion
+     ITreeFacts
      Events.Exception.
 
 Require Import ExtrOcamlBasic.
@@ -178,9 +178,7 @@ QuickChick (vellvm_agrees_with_clang shrunk_program).
   
 
 From ITree Require Import
-     ITree
-     Eq.Eq
-     TranslateFacts.
+     ITreeFacts.
 
 From Vellvm Require Import
      Utils.Tactics

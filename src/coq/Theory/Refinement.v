@@ -1,9 +1,8 @@
 (* begin hide *)
 From ITree Require Import
-     ITree
+     ITreeFacts
      Basics
-     Basics.HeterogeneousRelations
-     Eq.Eq.
+     Basics.HeterogeneousRelations.
 
 From Vellvm Require Import
      Utilities
