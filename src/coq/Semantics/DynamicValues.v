@@ -3576,8 +3576,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DTYPE_Vector sz (DTYPE_I n) =>
         v <- default_dvalue_of_dtyp_i n ;;
         ret (DVALUE_Vector (repeat v (N.to_nat sz)))
-    | DTYPE_Vector _ _ => failwith ("Non-valid vector type when" ++
-                                                                "generating default vector")
+    | DTYPE_Vector _ _ => failwith ("Non-valid vector type when generating default vector")
     | DTYPE_Struct fields =>
         v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
         ret (DVALUE_Struct v)

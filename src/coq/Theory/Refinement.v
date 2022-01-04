@@ -116,6 +116,34 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Ltac red_concretize_in H :=
     unfold concretize, concretize_u in H; rewrite concretize_uvalueM_equation in H.
 
+  Ltac normalize_array_vector_dtyp :=
+    match goal with
+    | H : _ |- dvalue_has_dtyp _ (DTYPE_Array (BinNat.N.of_nat) _) =>
+        idtac
+    | H : _ |- dvalue_has_dtyp _ (DTYPE_Array ?sz _) =>
+        rewrite <- (Nnat.N2Nat.id sz)
+    | H : _ |- dvalue_has_dtyp _ (DTYPE_Vector (BinNat.N.of_nat) _) =>
+        idtac
+    | H : _ |- dvalue_has_dtyp _ (DTYPE_Vector ?sz _) =>
+        rewrite <- (Nnat.N2Nat.id sz)
+    end.
+
+  Hint Resolve forall_repeat_true : DVALUE_HAS_DTYP.
+  Hint Constructors dvalue_has_dtyp : DVALUE_HAS_DTYP.
+  Hint Rewrite Nnat.Nat2N.id : DVALUE_HAS_DTYP.
+  Hint Resolve List.repeat_length : DVALUE_HAS_DTYP.
+
+  Ltac solve_dvalue_has_dtyp :=
+    try normalize_array_vector_dtyp;
+    solve [autorewrite with DVALUE_HAS_DTYP; auto with DVALUE_HAS_DTYP].
+
+  Ltac solve_concretize :=
+    red_concretize; cbn; subst; solve_dvalue_has_dtyp.
+
+  Ltac invert_concretize H :=
+    red_concretize_in H; cbn in H; subst; inversion H; subst; auto.
+
+
   Lemma refine_uvalue_concrete :
     forall dt uv uvr,
       is_concrete uv = true ->
@@ -130,23 +158,14 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       cbn in CONC;
       try solve [inversion CONC].
     - inversion REF; subst.
-      + unfold concretize, concretize_u in H.
-        rewrite concretize_uvalueM_equation in H.
-        inversion H.
+      + red_concretize_in H; inversion H.
       + remember (uvalue_to_dvalue uvr) as edvr;
           destruct uvr; cbn in Heqedvr;
           try match goal with
               | DV : _ = inr ?dv |- _ =>
                   specialize (H dv)
               end;
-          try solve [forward H;
-                 [unfold concretize, concretize_u;
-                  rewrite concretize_uvalueM_equation;
-                  reflexivity|];
-
-                 unfold concretize, concretize_u in H;
-                 rewrite concretize_uvalueM_equation in H;
-                 inversion H; subst; reflexivity
+          try solve [forward H; [solve_concretize| invert_concretize H]
             ].
 
         -- pose proof REF as DTYP';
@@ -164,10 +183,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
                  | HDEF : _ = inr ?def |- _ =>
                      specialize (H def)
                  end;
-                 forward H;
-                 [red_concretize; cbn; subst; constructor|];
-                 red_concretize_in H;
-                 inversion H
+                 forward H; [solve_concretize | invert_concretize H]
                | subst;
                  pose proof (ADDR.different_addrs a) as (b & DIFF_ADDR);
                  specialize (H (DVALUE_Addr b));
@@ -178,7 +194,107 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
                  subst; contradiction
                ].
 
-           ++
+           ++ break_match_hyp.
+
+              Set Nested Proofs Allowed.
+              Lemma is_supported_has_default_dvalue :
+                forall dt,
+                  is_supported dt ->
+                  exists dv, default_dvalue_of_dtyp dt = inr dv.
+              Proof.
+                induction dt; intros SUPPORTED;
+                  try
+                    solve
+                    [ inversion SUPPORTED; eexists; cbn; subst; reflexivity
+                    | inversion SUPPORTED; subst;
+                      destruct IHdt; eauto;
+                      eexists; cbn; rewrite H; auto
+                    ].
+
+                - inversion SUPPORTED; subst.
+                  induction fields.
+                  + cbn; eexists; auto.
+                  + match goal with
+                    | H: List.Forall is_supported _ |- _ =>
+                        let SUP_a := fresh SUP_a in
+                        let SUP_fields := fresh SUP_fields in
+                        apply List.Forall_cons_iff in H; destruct H as [SUP_a SUP_fields]
+                    end.
+
+                    pose proof H a as A; destruct A; cbn; auto.
+                    rewrite H0.
+
+                    cbn in IHfields.
+                    destruct IHfields; eauto.
+                    intros.
+                    apply H; cbn; auto.
+                    constructor; auto.
+                    break_inner_match; inversion H1.
+                    eexists. reflexivity.
+                - inversion SUPPORTED; subst.
+                  induction fields.
+                  + cbn; eexists; auto.
+                  + match goal with
+                    | H: List.Forall is_supported _ |- _ =>
+                        let SUP_a := fresh SUP_a in
+                        let SUP_fields := fresh SUP_fields in
+                        apply List.Forall_cons_iff in H; destruct H as [SUP_a SUP_fields]
+                    end.
+
+                    pose proof H a as A; destruct A; cbn; auto.
+                    rewrite H0.
+
+                    cbn in IHfields.
+                    destruct IHfields; eauto.
+                    intros.
+                    apply H; cbn; auto.
+                    constructor; auto.
+                    break_inner_match; inversion H1.
+                    eexists. reflexivity.
+                - inversion SUPPORTED; subst.
+                  destruct IHdt; eauto.
+                  cbn.
+                  destruct dt; inversion H1; inversion H2; subst; cbn;
+                  eexists; try reflexivity.
+                  cbn in H.
+              Qed.
+              --- 
+              
+           
+           ++ inversion H0; try rewrite <- H3 in HDEF; cbn in HDEF.
+              all:
+                try
+                  (match goal with
+                   | HDEF : _ = inr ?def |- _ =>
+                       specialize (H def)
+                   end;
+                   forward H; [solve_concretize | invert_concretize H]).
+
+              rewrite <- H4 in HDEF; cbn in HDEF.
+              --- 
+                 match goal with
+                 | HDEF : _ = inr ?def |- _ =>
+                     specialize (H def)
+                 end;
+                 forward H; [solve_concretize | invert_concretize H].
+
+               | subst;
+                 pose proof (ADDR.different_addrs a) as (b & DIFF_ADDR);
+                 specialize (H (DVALUE_Addr b));
+                 forward H;
+                 [red_concretize; cbn; constructor|];
+
+                 red_concretize_in H; inversion H;
+                 subst; contradiction
+                                 ].
+                             cbn.
+
+
+              cbn in HDEF.
+              subst.
+              subst.
+              subst.
+              ---  
              break_match_hyp.
              --- admit.
              --- admit.
