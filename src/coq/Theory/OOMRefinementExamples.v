@@ -204,28 +204,79 @@ Module Finite.
 
       apply interp_prop_ret_inv in INTERP.
       destruct INTERP as ((ms'' & (lenv & ls & res)) & REF & RES).
+
       inversion REF; subst.
       inversion H4; subst.
       inversion H6; subst.
+
       
+      (* Any dv that res concretizes to, UVALUE_None can also
+         concretize to...
+
+         This doesn't necessarily tell me that 
+       *)
+
+      exists (ret (ms'', (lenv, (ls, res)))).
+      cbn.
+      split.
+
+      { unfold interp_mcfg4.
+        go.
+
+        (* TODO: lemma about model_undef? *)
+        unfold model_undef.
+        apply interp_prop_ret_refine.
+        repeat split; eauto.
+      }
+
+      right.
       
-      inversion H8; subst.
+      apply OOM.eutt_refine_oom_h.
+      typeclasses eauto.
+      typeclasses eauto.
+
+      rewrite RES.
+      reflexivity.
+    - unfold ErrSID_OOMs in ALLOC_OOM.
+      specialize (ALLOC_OOM (ms_sid m) (ms_prov m)).
+      break_match_hyp; inversion ALLOC_OOM.
+
+      destruct (runErrSID (allocate (ms_memory_stack m) (DTYPE_I 64)) (ms_sid m) (ms_prov m)) eqn:Halloc.
+      destruct p.
+      assert (s0 = inl o). admit.
+      subst.
+      destruct o.
+      cbn in *.
+      go_in INTERP.
+
+      setoid_rewrite Raise.raiseOOM_bind_itree in INTERP.
+
+      eexists.
+
+      split.
+
+      { unfold interp_mcfg4.
+        go.
+
+        unfold model_undef.
+        apply interp_prop_ret_pure.
+        typeclasses eauto.
+      }
+
+      right.
+
+      (* TODO: Lemma to get this information from INTERP *)
+      assert (t' = LLVMEvents.raiseOOM s0).
       admit.
-      cbn in REF.
-      
-      cbn in REF.
-      
-      destruct r2 as .
-        rewrite RES.
 
-        cbn.
+      rewrite H.
 
-        (* Won't work... *)
-        (* Just need to lift some of this proof and go back and change the existential, I think *)
-        
+      (* TODO: Lemma about refine_OOM_h and raiseOOM *)
+      cbn.
+      unfold OOM.refine_OOM_h.
 
-    exists (SemNotations.Ret3 g (l, s) m UVALUE_None).
-    split.
+      cbn.
+      constructor.
     - cbn.
       unfold interp_mcfg4.
       unfold model_undef.

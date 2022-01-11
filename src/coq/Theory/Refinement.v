@@ -143,7 +143,78 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Ltac invert_concretize H :=
     red_concretize_in H; cbn in H; subst; inversion H; subst; auto.
 
+  Lemma is_supported_has_default_dvalue :
+    forall dt,
+      is_supported dt ->
+      exists dv, default_dvalue_of_dtyp dt = inr dv.
+  Proof.
+    induction dt; intros SUPPORTED;
+      try
+        solve
+        [ inversion SUPPORTED; eexists; cbn; subst; reflexivity
+        | inversion SUPPORTED; subst;
+          destruct IHdt; eauto;
+          eexists; cbn; rewrite H; auto
+        ].
 
+    - inversion SUPPORTED; subst.
+      induction fields.
+      + cbn; eexists; auto.
+      + match goal with
+        | H: List.Forall is_supported _ |- _ =>
+            let SUP_a := fresh SUP_a in
+            let SUP_fields := fresh SUP_fields in
+            apply List.Forall_cons_iff in H; destruct H as [SUP_a SUP_fields]
+        end.
+
+        pose proof H a as A; destruct A; cbn; auto.
+        rewrite H0.
+
+        cbn in IHfields.
+        destruct IHfields; eauto.
+        intros.
+        apply H; cbn; auto.
+        constructor; auto.
+        break_inner_match; inversion H1.
+        eexists. reflexivity.
+    - inversion SUPPORTED; subst.
+      induction fields.
+      + cbn; eexists; auto.
+      + match goal with
+        | H: List.Forall is_supported _ |- _ =>
+            let SUP_a := fresh SUP_a in
+            let SUP_fields := fresh SUP_fields in
+            apply List.Forall_cons_iff in H; destruct H as [SUP_a SUP_fields]
+        end.
+
+        pose proof H a as A; destruct A; cbn; auto.
+        rewrite H0.
+
+        cbn in IHfields.
+        destruct IHfields; eauto.
+        intros.
+        apply H; cbn; auto.
+        constructor; auto.
+        break_inner_match; inversion H1.
+        eexists. reflexivity.
+    - inversion SUPPORTED; subst.
+      destruct IHdt; eauto.
+      cbn.
+      destruct dt; inversion H1; inversion H2; subst; cbn;
+        eexists; try reflexivity;
+        repeat
+          match goal with
+          | H : exists n, _ |- _ =>
+              destruct H as (n & Ht)
+          | H : _ \/ _ |- _
+            => destruct H as [Ht | Ht]
+          end; try inversion Ht.
+
+      Unshelve.
+      all: eapply DVALUE_None.
+  Qed.
+
+  (*
   Lemma refine_uvalue_concrete :
     forall dt uv uvr,
       is_concrete uv = true ->
@@ -158,147 +229,130 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       cbn in CONC;
       try solve [inversion CONC].
     - inversion REF; subst.
-      + red_concretize_in H; inversion H.
-      + remember (uvalue_to_dvalue uvr) as edvr;
+      + (* Concretizes to poison... UVALUE_Addr can never concretize
+           to poison, so this case can be dismissed. *)
+        red_concretize_in H; inversion H.
+      + (* If uvr can be concretized to a dvalue dv, then UVALUE_Addr
+           a can also be concretized to dv *)
+
+        (* The only dvalue that we should be able to concretize to is
+           the one given by uvalue_to_dvalue... *)
+        remember (uvalue_to_dvalue uvr) as edvr;
           destruct uvr; cbn in Heqedvr;
           try match goal with
               | DV : _ = inr ?dv |- _ =>
                   specialize (H dv)
               end;
           try solve [forward H; [solve_concretize| invert_concretize H]
+            ];
+
+          pose proof REF as DTYP';
+          eapply refine_uvalue_dtyp in DTYP'; eauto;
+          inversion DTYP; subst;
+          inversion DTYP'; subst;
+
+          try solve [
+              pose proof (ADDR.different_addrs a) as (b & DIFF_ADDR);
+              specialize (H (DVALUE_Addr b));
+              forward H;
+              [red_concretize; cbn; constructor|];
+              red_concretize_in H; inversion H;
+              subst; contradiction
             ].
 
-        -- pose proof REF as DTYP';
-           eapply refine_uvalue_dtyp in DTYP'; eauto;
-           inversion DTYP'; subst;
+        -- (*
+             In our hypothesis we have that a GEP expression is a
+             refinement of an Addr.
 
-           inversion SUP_DTYP;
-           match goal with
-           | Ht : ?dt = dt |- _ =>
-               remember (default_dvalue_of_dtyp dt) as DEF eqn:HDEF;
-               cbn in HDEF
-           end;
-             try solve [
-                 match goal with
-                 | HDEF : _ = inr ?def |- _ =>
-                     specialize (H def)
-                 end;
-                 forward H; [solve_concretize | invert_concretize H]
-               | subst;
-                 pose proof (ADDR.different_addrs a) as (b & DIFF_ADDR);
-                 specialize (H (DVALUE_Addr b));
-                 forward H;
-                 [red_concretize; cbn; constructor|];
+             In this branch of the proof GEP is a refinement because
+             for every dvalue that the GEP concretizes to, the Addr
+             also concretizes to that dvalue...
 
-                 red_concretize_in H; inversion H;
-                 subst; contradiction
-               ].
+             UVALUE_Addr a can only concretize to DVALUE_Addr a.
 
-           ++ break_match_hyp.
+             Can UVALUE_GetElementPtr t uvr idxs always concretize to
+             DVALUE_Addr a?
 
-              Set Nested Proofs Allowed.
-              Lemma is_supported_has_default_dvalue :
-                forall dt,
-                  is_supported dt ->
-                  exists dv, default_dvalue_of_dtyp dt = inr dv.
-              Proof.
-                induction dt; intros SUPPORTED;
-                  try
-                    solve
-                    [ inversion SUPPORTED; eexists; cbn; subst; reflexivity
-                    | inversion SUPPORTED; subst;
-                      destruct IHdt; eauto;
-                      eexists; cbn; rewrite H; auto
-                    ].
+             
+            *)
+          induction idxs.
+          
+          pose proof (ADDR.different_addrs a) as (b & DIFF_ADDR).
+          specialize (H (DVALUE_Addr b)).
+          forward H.
 
-                - inversion SUPPORTED; subst.
-                  induction fields.
-                  + cbn; eexists; auto.
-                  + match goal with
-                    | H: List.Forall is_supported _ |- _ =>
-                        let SUP_a := fresh SUP_a in
-                        let SUP_fields := fresh SUP_fields in
-                        apply List.Forall_cons_iff in H; destruct H as [SUP_a SUP_fields]
-                    end.
+          unfold concretize, concretize_u; rewrite concretize_uvalueM_equation.
+          cbn.
 
-                    pose proof H a as A; destruct A; cbn; auto.
-                    rewrite H0.
+          Set Nested Proofs Allowed.
+          Lemma concretize_ibinop_inv:
+            forall op x y dv,
+              concretize
+              concretize_succeeds (UVALUE_IBinop op x y) ->
+              concretize (UVALUE_IBinop op x y) dv ->
+              exists dx dy,
+                concretize_succeeds x /\
+                  concretize x dx /\
+                  concretize_succeeds y /\
+                  concretize y dy /\
+                  @eval_iop err_ub_oom _ _ _ _ op dx dy = ret dv.
+          Proof.
+            
 
-                    cbn in IHfields.
-                    destruct IHfields; eauto.
-                    intros.
-                    apply H; cbn; auto.
-                    constructor; auto.
-                    break_inner_match; inversion H1.
-                    eexists. reflexivity.
-                - inversion SUPPORTED; subst.
-                  induction fields.
-                  + cbn; eexists; auto.
-                  + match goal with
-                    | H: List.Forall is_supported _ |- _ =>
-                        let SUP_a := fresh SUP_a in
-                        let SUP_fields := fresh SUP_fields in
-                        apply List.Forall_cons_iff in H; destruct H as [SUP_a SUP_fields]
-                    end.
+            da <- concretize_uvalueM ua;;
+            dvs <- map_monad concretize_uvalueM uvs;;
+            match handle_gep t da dvs with
+            | inr dv  => ret dv
+            | inl err => lift_ue (raise_error err)
+            end
 
-                    pose proof H a as A; destruct A; cbn; auto.
-                    rewrite H0.
+          Qed.
 
-                    cbn in IHfields.
-                    destruct IHfields; eauto.
-                    intros.
-                    apply H; cbn; auto.
-                    constructor; auto.
-                    break_inner_match; inversion H1.
-                    eexists. reflexivity.
-                - inversion SUPPORTED; subst.
-                  destruct IHdt; eauto.
-                  cbn.
-                  destruct dt; inversion H1; inversion H2; subst; cbn;
-                  eexists; try reflexivity.
-                  cbn in H.
-              Qed.
-              --- 
-              
-           
-           ++ inversion H0; try rewrite <- H3 in HDEF; cbn in HDEF.
-              all:
-                try
-                  (match goal with
-                   | HDEF : _ = inr ?def |- _ =>
-                       specialize (H def)
-                   end;
-                   forward H; [solve_concretize | invert_concretize H]).
+          
+          (* uvr is the thing being indexed... *)
 
-              rewrite <- H4 in HDEF; cbn in HDEF.
-              --- 
-                 match goal with
-                 | HDEF : _ = inr ?def |- _ =>
-                     specialize (H def)
-                 end;
-                 forward H; [solve_concretize | invert_concretize H].
-
-               | subst;
-                 pose proof (ADDR.different_addrs a) as (b & DIFF_ADDR);
-                 specialize (H (DVALUE_Addr b));
-                 forward H;
-                 [red_concretize; cbn; constructor|];
-
-                 red_concretize_in H; inversion H;
-                 subst; contradiction
-                                 ].
-                             cbn.
+          red_concretize.
+          cbn.
+            [red_concretize; cbn; constructor|];
+            red_concretize_in H; inversion H;
+            subst; contradiction
 
 
-              cbn in HDEF.
-              subst.
-              subst.
-              subst.
-              ---  
-             break_match_hyp.
-             --- admit.
-             --- admit.
-  Admitted.
+          
+           subst.
+        -- (* Case where uvr = undef *)
+          pose proof REF as DTYP';
+            eapply refine_uvalue_dtyp in DTYP'; eauto;
+            inversion DTYP; subst;
+            inversion DTYP'; subst;
+
+            try solve [
+                remember (default_dvalue_of_dtyp DTYPE_Pointer) as DEF eqn:HDEF;          
+                subst;
+                pose proof (ADDR.different_addrs a) as (b & DIFF_ADDR);
+                specialize (H (DVALUE_Addr b));
+                forward H;
+                [red_concretize; cbn; constructor|];
+                red_concretize_in H; inversion H;
+                subst; contradiction
+              ].
+        --  pose proof REF as DTYP';
+            eapply refine_uvalue_dtyp in DTYP'; eauto.
+            inversion DTYP; subst.
+            inversion DTYP'; subst.
+
+
+          remember (default_dvalue_of_dtyp DTYPE_Pointer) as DEF eqn:HDEF;          
+            subst;
+            pose proof (ADDR.different_addrs a) as (b & DIFF_ADDR);
+            specialize (H (DVALUE_Addr b));
+            forward H;
+            [red_concretize; cbn; constructor|];
+            
+            red_concretize_in H; inversion H;
+            subst; contradiction.
+
+  Admitted. *)
 
   Infix"×" := prod_rel (at level 90, left associativity).
 

@@ -39,6 +39,7 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Semantics.VellvmIntegers
+     Utils.Monads
      Utils.MonadEq1Laws
      Utils.MonadReturnsLaws.
 
@@ -3524,6 +3525,8 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
 
 
   (* Handler for PickE which concretizes everything to 0 *)
+  (* If this succeeds the dvalue returned should agree with
+     dvalue_has_dtyp for the sake of the dvalue_default lemma. *)
   Fixpoint default_dvalue_of_dtyp (dt : dtyp) : err dvalue :=
     match dt with
     | DTYPE_I sz => default_dvalue_of_dtyp_i sz
@@ -3576,7 +3579,11 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     | DTYPE_Vector sz (DTYPE_I n) =>
         v <- default_dvalue_of_dtyp_i n ;;
         ret (DVALUE_Vector (repeat v (N.to_nat sz)))
-    | DTYPE_Vector _ _ => failwith ("Non-valid vector type when generating default vector")
+
+    | DTYPE_Vector sz DTYPE_Pointer =>
+        ret (DVALUE_Vector (repeat (DVALUE_Addr A.null) (N.to_nat sz)))
+
+    | DTYPE_Vector _ _ => failwith ("Non-valid or unsupported vector type when generating default vector")
     | DTYPE_Struct fields =>
         v <- @map_monad err _ dtyp dvalue default_dvalue_of_dtyp fields;;
         ret (DVALUE_Struct v)

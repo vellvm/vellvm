@@ -458,6 +458,22 @@ Section PropMonad.
       reflexivity.
     Qed.
 
+    Lemma interp_prop_ret_refine :
+      forall {T E F} (RR : relation T) (x y : T) (h : forall X : Type, E X -> PropT F X),
+        RR x y ->
+        interp_prop h _ RR (ret x) (ret y).
+    Proof.
+      intros T E F RR x y h RRxy.
+      generalize dependent y.
+      generalize dependent x.
+      pcofix CIH.
+      intros x y RRxy.
+      pstep.
+      cbn.
+      econstructor; eauto.
+      reflexivity.
+    Qed.
+
     Lemma interp_prop_refl_h :
       forall {T E} (RR : relation T) `{REF: Reflexive _ RR} (t1 t2 : itree E T) (h : forall X : Type, E X -> PropT E X),
       (forall {X : Type} (e : E X), h X e (trigger e)) ->

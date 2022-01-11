@@ -38,17 +38,26 @@ Section PARAMS_MODEL.
   Notation Effout := (E +' OOME +' F).
 
   Definition E_trigger_model_prop : E ~> PropT Effout :=
-    fun R e => fun t => t = r <- trigger e ;; ret r.
+    fun R e => fun t => t = trigger e.
 
   Definition F_trigger_model_prop : F ~> PropT Effout :=
-    fun R e => fun t => t = r <- trigger e ;; ret r.
+    fun R e => fun t => t = trigger e.
 
-  (* Semantics of OOM *)
+  (* Semantics of OOM
+
+     If the target tree has an out of memory event, then it is a
+     refinement of any source.
+
+     I.e., when refining a program the behaviour of the target should
+     agree with the source at all points, but may abort, running out
+     of memory at any point.
+   *)
   Definition OOM_handler : OOME ~> PropT Effout
+    (* Any tree is accepted as long as OOM is raised *)
     := fun T oome source => True.
 
-  Definition refine_OOM_handler {E} `{OOME -< E} : E ~> PropT E
-    := fun T e => fun t => t = trigger e.
+  Definition refine_OOM_handler : Effin ~> PropT Effout
+    := case_ E_trigger_model_prop (case_ OOM_handler F_trigger_model_prop).
 
   Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Prop
     := interp_prop refine_OOM_handler _ (Basics.flip RR) target source.
@@ -99,8 +108,48 @@ Proof.
 
   apply interp_prop_refl; eauto.
   unfold refine_OOM_handler.
-  reflexivity.
+  intros X [e | [e | e]]; cbn; reflexivity.
 Qed.
+
+Lemma refine_oom_h_raise_oom :
+  forall {T} {E F} (RR : relation T)
+    (source : itree (E +' OOME +' F) T)
+    (oom_msg : string),
+    refine_OOM_h RR source (raiseOOM oom_msg).
+Proof.
+  intros T E F RR source oom_msg.
+  unfold refine_OOM_h.
+
+  unfold raiseOOM.
+  rewrite bind_trigger.
+
+  Require Import Paco.paco.
+  red.
+  pstep.
+  econstructor.
+
+  (* Instantiate ta *)
+  unshelve (instantiate (1:=_)).
+  exact (source;; trigger (ThrowOOM "")).
+  - cbn.
+    unfold OOM_handler.
+    auto.
+  - cbn.
+    rewrite bind_bind.
+    rewrite <- bind_ret_r at 1.
+
+    eapply eutt_clo_bind with (UU := fun u1 u2 => True).
+    eapply Reflexive_eqit.
+    admit.
+
+
+    reflexivity.
+    admit.
+    admit.
+  - intros a H.
+    inversion a.
+Qed.
+  
 
 (* Instance Transitive_refine_OOM_h {E F T} {RR} : Transitive (@refine_OOM_h E F T RR). *)
 (* Proof. *)
