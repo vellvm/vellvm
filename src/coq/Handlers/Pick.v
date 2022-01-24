@@ -71,7 +71,15 @@ Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEO
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
         forall (T:Type) (RR: T -> T -> Prop), itree (E +' PickE +' F) T -> PropT (E +' F) T :=
-        interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)).
+        interp_prop 
+          (fun A T R
+             (e : (E +' PickE +' F) A)
+             (ta : itree (E +' F) A)
+             (k : A -> itree (E +' F) R)
+             (t2 : itree (E +' F) R) =>
+             ((case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)) _ e ta) /\
+               t2 ≈ ITree.bind ta k
+          ).
 
     End PARAMS_MODEL.
 

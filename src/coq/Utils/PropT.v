@@ -225,10 +225,12 @@ Section PropMonad.
     |}.
 
   (* Definition 5.3: Handler Correctness *)
-  Definition handler_correct {E F} (h_spec: E ~> PropT F) (h: E ~> itree F) :=
-    (forall T e, h_spec T e (h T e)).
+  Definition handler_correct {E F}
+             (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
+             (h: E ~> itree F) : Prop :=
+    (forall A T R e k t2, h_spec A T R e (h T e) k t2).
 
-  Inductive interp_PropTF {E F} (h_spec : forall T, E T -> itree F T -> Prop)
+  Inductive interp_PropTF {E F} (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
             {R : Type} (RR : relation R) (sim : itree E R -> itree F R -> Prop)
             : itree' E R -> itree F R -> Prop := 
   | Interp_PropT_Ret : forall r1 r2 (REL: RR r1 r2)
@@ -240,8 +242,7 @@ Section PropMonad.
                     
   | Interp_PropT_Vis : forall A (e : E A) (k1 : A -> itree E R)
                          (t2 : itree F R)
-                         (ta :itree F A)  (k2 : A -> itree F R) (HTA: h_spec A e ta)
-                         (eq2 : t2 ≈ (bind ta k2))
+                         (ta :itree F A)  (k2 : A -> itree F R) (HTA: h_spec A A R e ta k2 t2)
                          (HK : forall (a : A), Returns a ta ->  sim (k1 a) (k2 a)), 
       interp_PropTF h_spec RR sim (VisF e k1) t2.
 
@@ -268,13 +269,13 @@ Section PropMonad.
   Hint Resolve interp_PropT__mono : paco.  
 
   (* Definition 5.2 *)
-  Definition interp_prop {E F} (h_spec : E ~> PropT F) :
+  Definition interp_prop {E F} (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop) :
     forall R (RR: relation R), itree E R -> PropT F R :=
       fun R (RR: relation R) =>  paco2 (interp_PropT_ E F h_spec R RR) bot2.
 
   (* Figure 7: Interpreter law for Ret *)
   Lemma interp_prop_ret :
-    forall R E F (h_spec : E ~> PropT F)
+    forall R E F (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
       (r : R)
     , Eq1_PropT _ (interp_prop h_spec R eq (ret r)) (ret r).
   Proof.
@@ -294,9 +295,12 @@ Section PropMonad.
   Qed.      
 
   #[global] Instance interp_PropTF_Proper
-         {E F} (h_spec : E ~> PropT F) R RR (t : itree' E R)
+   {E F}
+   (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
+   R RR (t : itree' E R)
          (sim : itree E R -> itree F R -> Prop)
          (HS: forall t, Proper(eutt eq ==> flip impl) (sim t))
+         (HHS : forall A T R e t k, Proper(eutt eq ==> flip impl) (h_spec A T R e t k))
     : 
     Proper(eutt eq ==> iff) (interp_PropTF h_spec RR sim t).
   Proof.
@@ -306,15 +310,19 @@ Section PropMonad.
     - inversion H0; subst; econstructor; eauto.
       + rewrite <- H. assumption.
       + specialize (HS t1). rewrite <- H. assumption.
-      + rewrite <- H. assumption.
-        
+      + (* h_spec now depends on the tree `t2`, so we need to show that it respects x ≈ y *)
+        (* Not a guarantee, depends on what h_spec is... So we need a proper instance for that *)
+        rewrite <- H; auto.
     - inversion H0; subst; econstructor; eauto.
       rewrite H. assumption. specialize (HS t1). rewrite H. assumption.
       rewrite H. assumption.
   Qed.
 
   #[global] Instance interp_prop_Proper
-         {E F} (h_spec : E ~> PropT F) R RR (t : itree E R) :
+   {E F}
+   (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
+   R RR (t : itree E R)
+   (HHS : forall A T R e t k, Proper(eutt eq ==> flip impl) (h_spec A T R e t k)) :
     Proper(eq_itree Logic.eq ==> iff) (interp_prop h_spec R RR t).
   Proof.
     do 2 red.
@@ -328,7 +336,7 @@ Section PropMonad.
       inversion HI; subst; econstructor; eauto.
       + rewrite <- eq. assumption.
       + pclearbot. right. eapply CIH; eauto.
-      + rewrite <- eq. apply eq2.
+      + rewrite <- eq. eauto.
       + intros. specialize (HK a H0). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
     - revert t x y H.
       pcofix CIH.
@@ -338,12 +346,15 @@ Section PropMonad.
       inversion HI; subst; econstructor; eauto.
       + rewrite eq. assumption.
       + pclearbot. right. eapply CIH; eauto.
-      + rewrite eq. apply eq2.
+      + rewrite eq. eauto.
       + intros. specialize (HK a H0). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
   Qed.
   
   #[global] Instance interp_prop_Proper2
-         {E F} (h_spec : E ~> PropT F) R RR (t : itree E R) :
+   {E F}
+   (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
+   R RR (t : itree E R)
+   (HHS : forall A T R e t k, Proper(eutt eq ==> flip impl) (h_spec A T R e t k)) :
     Proper(eutt Logic.eq ==> iff) (interp_prop h_spec R RR t).
   Proof.
     do 2 red.
@@ -357,7 +368,7 @@ Section PropMonad.
       inversion HI; subst; econstructor; eauto.
       + rewrite <- eq. assumption.
       + pclearbot. right. eapply CIH; eauto.
-      + rewrite <- eq. apply eq2.
+      + rewrite <- eq. eauto.
       + intros. specialize (HK a H0). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
     - revert t x y H.
       pcofix CIH.
@@ -367,7 +378,7 @@ Section PropMonad.
       inversion HI; subst; econstructor; eauto.
       + rewrite eq. assumption.
       + pclearbot. right. eapply CIH; eauto.
-      + rewrite eq. apply eq2.
+      + rewrite eq. eauto.
       + intros. specialize (HK a H0). pclearbot. right. eapply CIH. 2 : { apply HK. } reflexivity.
   Qed.
 
@@ -388,7 +399,9 @@ Section PropMonad.
   Qed.
 
   #[global] Instance interp_prop_Proper3
-         {E F} {a b} (h_spec : E ~> PropT F) R RR :
+   {E F} {a b}
+   (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
+   R RR :
     Proper(eqit eq a b ==> eq  ==> iff) (interp_prop h_spec R RR).
   Proof.
     do 4 red.
@@ -444,7 +457,8 @@ Section PropMonad.
   Qed.
 
     Lemma interp_prop_ret_pure :
-      forall {T E F} (RR : relation T) `{REF: Reflexive _ RR} (x : T) (h : forall X : Type, E X -> PropT F X),
+      forall {T E F} (RR : relation T) `{REF: Reflexive _ RR} (x : T)
+        (h : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop),
       interp_prop h _ RR (ret x) (ret x).
     Proof.
       intros T E F RR REF x h.
@@ -459,7 +473,8 @@ Section PropMonad.
     Qed.
 
     Lemma interp_prop_ret_refine :
-      forall {T E F} (RR : relation T) (x y : T) (h : forall X : Type, E X -> PropT F X),
+      forall {T E F} (RR : relation T) (x y : T)
+        (h : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop),
         RR x y ->
         interp_prop h _ RR (ret x) (ret y).
     Proof.
@@ -475,8 +490,9 @@ Section PropMonad.
     Qed.
 
     Lemma interp_prop_refl_h :
-      forall {T E} (RR : relation T) `{REF: Reflexive _ RR} (t1 t2 : itree E T) (h : forall X : Type, E X -> PropT E X),
-      (forall {X : Type} (e : E X), h X e (trigger e)) ->
+      forall {T E} (RR : relation T) `{REF: Reflexive _ RR} (t1 t2 : itree E T)
+        (h : forall A T R, E T -> itree E T -> (A -> itree E R) -> itree E R -> Prop),
+      (forall {X : Type} (e : E X) k ta, h X X T e (trigger e) k ta) ->
       t1 ≈ t2 ->
       interp_prop h _ RR t1 t2.
     Proof.
@@ -509,23 +525,19 @@ Section PropMonad.
         rewrite Ht1.
         econstructor.
         apply H.
-        2: {
+
+        {
           intros a RET.
           right.
           apply CIH.
           reflexivity.
         }
-
-        setoid_rewrite bind_trigger.
-        rewrite <- EQ.
-        rewrite H0.
-
-        reflexivity.
     Qed.
       
     Lemma interp_prop_refl :
-      forall {T E} (RR : relation T) `{REF: Reflexive _ RR} (t : itree E T) (h : forall X : Type, E X -> PropT E X),
-      (forall {X : Type} (e : E X), h X e (trigger e)) ->
+      forall {T E} (RR : relation T) `{REF: Reflexive _ RR} (t : itree E T)
+        (h : forall A T R, E T -> itree E T -> (A -> itree E R) -> itree E R -> Prop),
+      (forall {X : Type} (e : E X) k ta, h X X T e (trigger e) k ta) ->
       interp_prop h _ RR t t.
     Proof.
       intros T E RR REF t h h_spec.
@@ -535,7 +547,9 @@ Section PropMonad.
 
   (* Lemma 5.4: interp_prop_correct - note that the paper presents a slightly simpler formulation where t = t' *)
   Lemma interp_prop_correct_exec:
-    forall {E F} (h_spec: E ~> PropT F) (h: E ~> itree F),
+    forall {E F}
+      (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
+      (h: E ~> itree F),
       handler_correct h_spec h ->
       forall R RR `{Reflexive _ RR} t t', t ≈ t' -> interp_prop h_spec R RR t (interp h t').
   Proof.
@@ -551,11 +565,7 @@ Section PropMonad.
     - econstructor. reflexivity. rewrite <- eq. rewrite unfold_iter. cbn. rewrite Eq.bind_ret_l. cbn.  reflexivity.
     - econstructor. right.
       eapply CIH. rewrite tau_eutt in eq. rewrite eq. reflexivity.
-    - econstructor. 
-      2 : { rewrite <- eq. rewrite unfold_iter. cbn.
-            unfold ITree.map. rewrite Eq.bind_bind.
-            setoid_rewrite Eq.bind_ret_l at 1. cbn. setoid_rewrite tau_eutt.
-            reflexivity. }
+    - econstructor.
       apply H.
       intros a. cbn.  
       right.
@@ -568,7 +578,8 @@ Section PropMonad.
   (* Lemma 5.5 - note that the paper presents this lemma after unfolding the definition of Proper.
    *)
   Instance interp_prop_Proper_eq :
-    forall R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR) E F (h_spec : E ~> PropT F),
+    forall R (RR : relation R) (HR: Reflexive RR) (HT : Transitive RR) E F
+    (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop),
       Proper (@eutt _ _ _ RR ==> eq ==> flip Basics.impl) (@interp_prop E _ h_spec R RR).
   Proof.
     intros.
@@ -603,7 +614,6 @@ Section PropMonad.
       subst.
       econstructor.
       apply HTA.
-      apply eq2.
       intros a Ha. specialize (REL a). specialize (HK a Ha). red in REL. pclearbot.
       right. eapply CIH. apply REL. apply HK.
     - econstructor.
@@ -661,45 +671,47 @@ Section PropMonad.
 
   (* Figure 7: interp Trigger law *)
   (* morally, we should only work with "proper" triggers everywhere *)
-  Lemma interp_prop_trigger :
-    forall E F (h_spec : E ~> PropT F) R (e : E R)
-      (HP : forall T, Proper (eq ==> Eq1_PropT T) (h_spec T))
-    , Eq1_PropT _ (interp_prop h_spec R eq (trigger e)) (h_spec R e).
-  Proof.
-    intros.
-    red.
-    split; [| split].
-    - intros; split; intros.
-      + unfold trigger in H0. red in H0.
-        pinversion H0; subst.
-        apply inj_pair2 in H3. apply inj_pair2 in H4.
-        subst.
-        unfold subevent, resum, ReSum_id, Id_IFun, id_ in HTA.
-        rewrite eq2 in H.
-        assert (x <- ta ;; k2 x ≈ ta).
-        { rewrite <- (Eq.bind_ret_r ta).
-          apply eutt_clo_bind with (UU := fun u1 u2 => u1 = u2 /\ Returns u1 ta).
-          rewrite Eq.bind_ret_r. apply eutt_Returns.
-          intros. destruct H1. subst. specialize (HK u2 H2). pclearbot. pinversion HK. subst. assumption.
-        }
-        rewrite H1 in H.
-        specialize (HP R e e eq_refl).  unfold Eq1_PropT in HP. destruct HP as (P & _ & _).
-        rewrite P. apply HTA. symmetry. assumption.
-      + unfold trigger, subevent, resum, ReSum_id, Id_IFun, id_.
-        red. pstep. eapply Interp_PropT_Vis with (k2 := (fun x : R => Ret x)).
-        * apply H0.
-        * unfold bind, Monad_itree. rewrite Eq.bind_ret_r. assumption.
-        * intros a. left. pstep. red. econstructor. reflexivity.  reflexivity.
-    - do 4 red. intros; split; intros.
-      rewrite <- H. assumption.
-      rewrite H. assumption.
-    - do 4 red.
-      intros; split; intros.
-      specialize (HP R e e eq_refl). destruct HP as (P & _ & _).
-      rewrite P; eauto. symmetry. assumption.
-      specialize (HP R e e eq_refl). destruct HP as (P & _ & _).
-      rewrite P; eauto. 
-  Qed.
+  (* Lemma interp_prop_trigger : *)
+  (*   forall E F *)
+  (*     (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop) *)
+  (*     R (e : E R) *)
+  (*     (HP : forall A T R k t2, Proper (eq ==> Eq1_PropT T) (fun e ift => h_spec A T R e ift k t2)) *)
+  (*   , (forall k t2, Eq1_PropT _ (interp_prop h_spec R eq (trigger e)) (fun ifr => h_spec R R R e ifr k t2)). *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   red. *)
+  (*   split; [| split]. *)
+  (*   - intros; split; intros. *)
+  (*     + unfold trigger in H0. red in H0. *)
+  (*       pinversion H0; subst. *)
+  (*       apply inj_pair2 in H3. apply inj_pair2 in H4. *)
+  (*       subst. *)
+  (*       unfold subevent, resum, ReSum_id, Id_IFun, id_ in HTA. *)
+  (*       rewrite eq2 in H. *)
+  (*       assert (x <- ta ;; k2 x ≈ ta). *)
+  (*       { rewrite <- (Eq.bind_ret_r ta). *)
+  (*         apply eutt_clo_bind with (UU := fun u1 u2 => u1 = u2 /\ Returns u1 ta). *)
+  (*         rewrite Eq.bind_ret_r. apply eutt_Returns. *)
+  (*         intros. destruct H1. subst. specialize (HK u2 H2). pclearbot. pinversion HK. subst. assumption. *)
+  (*       } *)
+  (*       rewrite H1 in H. *)
+  (*       specialize (HP R e e eq_refl).  unfold Eq1_PropT in HP. destruct HP as (P & _ & _). *)
+  (*       rewrite P. apply HTA. symmetry. assumption. *)
+  (*     + unfold trigger, subevent, resum, ReSum_id, Id_IFun, id_. *)
+  (*       red. pstep. eapply Interp_PropT_Vis with (k2 := (fun x : R => Ret x)). *)
+  (*       * apply H0. *)
+  (*       * unfold bind, Monad_itree. rewrite Eq.bind_ret_r. assumption. *)
+  (*       * intros a. left. pstep. red. econstructor. reflexivity.  reflexivity. *)
+  (*   - do 4 red. intros; split; intros. *)
+  (*     rewrite <- H. assumption. *)
+  (*     rewrite H. assumption. *)
+  (*   - do 4 red. *)
+  (*     intros; split; intros. *)
+  (*     specialize (HP R e e eq_refl). destruct HP as (P & _ & _). *)
+  (*     rewrite P; eauto. symmetry. assumption. *)
+  (*     specialize (HP R e e eq_refl). destruct HP as (P & _ & _). *)
+  (*     rewrite P; eauto.  *)
+  (* Qed. *)
 
   (*  Interesting observations about interp_prop:
 
@@ -714,7 +726,9 @@ Section PropMonad.
       Answer: all of them!
    *)
   Lemma interp_prop_spin_accepts_anything :
-    forall E F (h_spec : E ~> PropT F) R RR (t : itree F R),
+    forall E F
+      (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
+      R RR (t : itree F R),
       interp_prop h_spec R RR ITree.spin t.
   Proof.
     intros.
@@ -724,8 +738,11 @@ Section PropMonad.
 
   (* Figure 7: Structural law for tau *)
   Lemma interp_prop_tau :
-    forall E F (h_spec : E ~> PropT F) R RR
-      (t_spec : itree E R),
+    forall E F
+      (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
+      R RR
+      (t_spec : itree E R)
+      (HHS : forall A T R e t k, Proper(eutt eq ==> flip impl) (h_spec A T R e t k)),
       Eq1_PropT _ (interp_prop h_spec R RR t_spec) (interp_prop h_spec R RR (Tau t_spec)).
   Proof.
     intros.
@@ -741,7 +758,9 @@ Section PropMonad.
   Qed.
 
   Lemma interp_prop_ret_inv :
-    forall E F (h_spec : E ~> PropT F) R RR
+    forall E F
+      (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
+      R RR
       (r1 : R)
       (t : itree F R)
       (H : interp_prop h_spec R RR (ret r1) t),
@@ -754,13 +773,15 @@ Section PropMonad.
   Qed.
 
   Lemma interp_prop_vis_inv :
-    forall E F (h_spec : E ~> PropT F) R RR S
+    forall E F
+      (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
+      R RR S
       (e : E S)
       (k : S -> itree E R)
       (t : itree F R)
       (H : interp_prop h_spec R RR (vis e k) t), 
     exists  ms, exists (ks : S -> itree F R),
-        h_spec S e ms /\ t ≈ (bind ms ks).
+        h_spec _ S _ e ms ks t.
   Proof.
     intros.
     punfold H.
@@ -768,11 +789,13 @@ Section PropMonad.
     apply inj_pair2 in H2.
     apply inj_pair2 in H3.
     subst.
-    exists ta. exists k2. split; auto.
+    exists ta. exists k2. auto.
   Qed.
 
   Lemma interp_prop_tau_inv :
-    forall E F (h_spec : E ~> PropT F) R RR 
+    forall E F
+      (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
+      R RR 
       (s : itree E R)
       (t : itree F R)
       (H : interp_prop h_spec R RR (Tau s) t), 
@@ -800,37 +823,51 @@ Section PropMonad.
     intros.
     eapply Returns_ret_inv_. reflexivity. cbn in H. apply H.
   Qed.
-  
+ 
   Lemma case_prop_handler_correct:
     forall {E1 E2 F}
-      (h1_spec: E1 ~> PropT F)
-      (h2_spec: E2 ~> PropT F)
+      (h1_spec : forall A T R, E1 T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
+      (h2_spec : forall A T R, E2 T -> itree F T -> (A -> itree F R) -> itree F R -> Prop)
       (h1: E1 ~> itree F)
       (h2: E2 ~> itree F)
       (C1: handler_correct h1_spec h1)
       (C2: handler_correct h2_spec h2),
-      handler_correct (case_ h1_spec h2_spec) (case_ h1 h2).
+      handler_correct
+        (fun (A T R : Type)
+           e12
+           ta
+           k
+           t2
+         =>
+           ((case_
+              ((fun (T : Type) (e : E1 T) (t : itree F T) => h1_spec A T R e t k t2) : forall T, E1 T -> itree F T -> Prop)
+              ((fun (T : Type) (e : E2 T) (t : itree F T) => h2_spec A T R e t k t2) : forall T, E2 T -> itree F T -> Prop)) _ e12 ta))
+        (case_ h1 h2).
   Proof.
     intros E1 E2 F h1_spec h2_spec h1 h2 C1 C2.
     unfold handler_correct in *.
-    intros T e.
+    intros A T R e k t2.
     destruct e. apply C1. apply C2.
   Qed.
 
   Definition prop_compose :=
     fun {F G : Type -> Type } {T : Type} (TT : relation T)
-      (g_spec : F ~> PropT G) (PF: PropT F T) (g:itree G T) =>
+      (g_spec : forall A T R, F T -> itree G T -> (A -> itree G R) -> itree G R -> Prop)
+      (PF: PropT F T) (g:itree G T) =>
       exists f : itree F T, PF f /\ (interp_prop g_spec) T TT f g.
 
 
-  Definition handler_correct_prop
-             {E F G}
-             (h_spec: E ~> PropT F) (h: E ~> itree F)
-             (g_spec: F ~> PropT G) (g: F ~> itree G)
-    :=
-      (forall T TT e,
-          (prop_compose TT g_spec (h_spec T e))
-            (interp g (h T e))).
+  (* I don't understand this... *)
+  (* Definition handler_correct_prop *)
+  (*            {E F G} *)
+  (*            (h_spec : forall A T R, E T -> itree F T -> (A -> itree F R) -> itree F R -> Prop) *)
+  (*            (h: E ~> itree F) *)
+  (*            (g_spec : forall A T R, F T -> itree G T -> (A -> itree G R) -> itree G R -> Prop) *)
+  (*            (g: F ~> itree G) *)
+  (*   := *)
+  (*     (forall T TT e, *)
+  (*         (prop_compose TT g_spec (fun ift => h_spec _ T _ e ift)) *)
+  (*           (interp g (h T e))). *)
 
   
   Definition singletonT {E}: itree E ~> PropT E :=
