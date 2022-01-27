@@ -37,30 +37,37 @@ Section PARAMS_MODEL.
   Notation Effin := (E +' OOME +' F).
   Notation Effout := (E +' OOME +' F).
 
-  Definition E_trigger_model_prop : E ~> PropT Effout :=
-    fun R e => fun t => t = trigger e.
+  (* TODO: compose these instead of using match below *)
+  (* Definition E_trigger_model_prop {T R} (k : T -> itree Effout R) (t2 : itree Effout R) : (E T -> PropT Effout T) := *)
+  (*   fun e => fun t => ((t ≅ trigger e) /\ (t2 ≈ bind t k)). *)
 
-  Definition F_trigger_model_prop : F ~> PropT Effout :=
-    fun R e => fun t => t = trigger e.
+  (* Definition F_trigger_model_prop {T R} (k : T -> itree Effout R) (t2 : itree Effout R) : (F T -> PropT Effout T) := *)
+  (*   fun e => fun t => ((t ≅ trigger e) /\ (t2 ≈ bind t k)). *)
 
-  (* Semantics of OOM
+  (* (* Semantics of OOM *)
 
-     If the target tree has an out of memory event, then it is a
-     refinement of any source.
+  (*    If the target tree has an out of memory event, then it is a *)
+  (*    refinement of any source. *)
 
-     I.e., when refining a program the behaviour of the target should
-     agree with the source at all points, but may abort, running out
-     of memory at any point.
-   *)
-  Definition OOM_handler : OOME ~> PropT Effout
-    (* Any tree is accepted as long as OOM is raised *)
-    := fun T oome source => True.
-
-  Definition refine_OOM_handler : Effin ~> PropT Effout
-    := case_ E_trigger_model_prop (case_ OOM_handler F_trigger_model_prop).
+  (*    I.e., when refining a program the behaviour of the target should *)
+  (*    agree with the source at all points, but may abort, running out *)
+  (*    of memory at any point. *)
+  (*  *) *)
+  (* Definition OOM_handler : OOME ~> PropT Effout *)
+  (*   (* Any tree is accepted as long as OOM is raised *) *)
+  (*   := fun T oome source => True. *)
 
   Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Prop
-    := interp_prop refine_OOM_handler _ (Basics.flip RR) target source.
+    := interp_prop
+         (fun T R (e : Effin T) ta k t2 =>
+            (* Had problems getting case_ to work, typeclasses don't
+               work out now that we don't use ~> *)
+            match e with
+            | inl1 e => ta ≅ trigger e /\ (t2 ≈ bind ta k)
+            | inr1 (inl1 oom) => True
+            | inr1 (inr1 f) => ta ≅ trigger f /\ (t2 ≈ bind ta k)
+            end
+         ) _ (Basics.flip RR) target source.
 
   Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop
     := exists source, sources source /\ refine_OOM_h RR source target.
@@ -107,8 +114,11 @@ Proof.
   eapply H0; eauto.
 
   apply interp_prop_refl; eauto.
-  unfold refine_OOM_handler.
-  intros X [e | [e | e]]; cbn; reflexivity.
+  intros X [e | [e | e]] k ta; cbn; split.
+  reflexivity.
+  admit.
+  reflexivity.
+  admit.  
 Qed.
 
 Lemma refine_oom_h_raise_oom :
