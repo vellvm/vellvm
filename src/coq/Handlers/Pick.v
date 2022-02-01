@@ -69,19 +69,19 @@ Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEO
       Definition F_trigger_prop : F ~> PropT (E +' F) :=
         fun R e => fun t => t = r <- trigger e ;; ret r.
 
+      Definition pick_k_spec
+                 {T R : Type}
+                 (e : (E +' PickE +' F) T)
+                 (ta : itree (E +' F) T)
+                 (k1 : T -> itree (E +' PickE +' F) R)
+                 (k2 : T -> itree (E +' F) R)
+                 (t2 : itree (E +' F) R) : Prop
+        := t2 ≈ bind ta k2.
+
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
         forall (T:Type) (RR: T -> T -> Prop), itree (E +' PickE +' F) T -> PropT (E +' F) T :=
-        interp_prop 
-          (fun T R
-             (e : (E +' PickE +' F) T)
-             (ta : itree (E +' F) T)
-             (k : T -> itree (E +' F) R)
-             (t2 : itree (E +' F) R) =>
-             ((case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)) _ e ta) /\
-               t2 ≈ ITree.bind ta k
-          ).
+        interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)) (@pick_k_spec).
 
-      Set Printing Implicit.
     End PARAMS_MODEL.
 
   End PickPropositional.
