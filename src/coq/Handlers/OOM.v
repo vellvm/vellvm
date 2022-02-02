@@ -37,14 +37,13 @@ Section PARAMS_MODEL.
   Notation Effin := (E +' OOME +' F).
   Notation Effout := (E +' OOME +' F).
 
-  (* TODO: compose these instead of using match below *)
-  (* Definition E_trigger_model_prop {T R} (k : T -> itree Effout R) (t2 : itree Effout R) : (E T -> PropT Effout T) := *)
-  (*   fun e => fun t => ((t ≅ trigger e) /\ (t2 ≈ bind t k)). *)
+  Definition E_trigger_model_prop : E ~> PropT Effout :=
+    fun R e => fun t => t = trigger e.
 
-  (* Definition F_trigger_model_prop {T R} (k : T -> itree Effout R) (t2 : itree Effout R) : (F T -> PropT Effout T) := *)
-  (*   fun e => fun t => ((t ≅ trigger e) /\ (t2 ≈ bind t k)). *)
+  Definition F_trigger_model_prop : F ~> PropT Effout :=
+    fun R e => fun t => t = trigger e.
 
-  (* (* Semantics of OOM *)
+  (* Semantics of OOM *)
 
   (*    If the target tree has an out of memory event, then it is a *)
   (*    refinement of any source. *)
@@ -52,22 +51,43 @@ Section PARAMS_MODEL.
   (*    I.e., when refining a program the behaviour of the target should *)
   (*    agree with the source at all points, but may abort, running out *)
   (*    of memory at any point. *)
-  (*  *) *)
-  (* Definition OOM_handler : OOME ~> PropT Effout *)
-  (*   (* Any tree is accepted as long as OOM is raised *) *)
-  (*   := fun T oome source => True. *)
+  (*  *)
+  Definition OOM_handler : OOME ~> PropT Effout
+    (* Any tree is accepted as long as OOM is raised *)
+    := fun T oome source => True.
+
+  Definition oom_k_spec
+             {T R : Type}
+             (e : Effin T)
+             (ta : itree Effout T)
+             (k1 : T -> itree Effin R)
+             (k2 : T -> itree Effout R)
+             (t2 : itree Effout R) : Prop
+    :=
+    match e with
+    | inl1 e => t2 ≈ bind ta k2
+    | inr1 (inl1 oom) => True
+    | inr1 (inr1 f) => t2 ≈ bind ta k2
+    end.
+
+  Global Instance oom_k_spec_proper {T R : Type} {RR : R -> R -> Prop} {b a : bool} :
+    Proper
+      (eq ==>
+          eq ==>
+          (fun k1 k2 : T -> itree Effout R =>
+             forall x : T, eqit RR b a (k1 x) (k2 x)) ==> eq ==> eq ==> iff)
+      oom_k_spec.
+  Proof.
+    unfold Proper, respectful.
+    intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2 x3 y3 H3; subst.
+    split; cbn; auto.
+  Qed.
+
+  Definition refine_OOM_handler : Effin ~> PropT Effout
+    := case_ E_trigger_model_prop (case_ OOM_handler F_trigger_model_prop).
 
   Definition refine_OOM_h {T} (RR : relation T) (source target : itree Effout T) : Prop
-    := interp_prop
-         (fun T R (e : Effin T) ta k t2 =>
-            (* Had problems getting case_ to work, typeclasses don't
-               work out now that we don't use ~> *)
-            match e with
-            | inl1 e => ta ≅ trigger e /\ (t2 ≈ bind ta k)
-            | inr1 (inl1 oom) => True
-            | inr1 (inr1 f) => ta ≅ trigger f /\ (t2 ≈ bind ta k)
-            end
-         ) _ (Basics.flip RR) target source.
+    := interp_prop refine_OOM_handler (@oom_k_spec) T (Basics.flip RR) target source.
 
   Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop
     := exists source, sources source /\ refine_OOM_h RR source target.
@@ -113,21 +133,24 @@ Proof.
 
   eapply H0; eauto.
 
+  { intros T0 R RR0 b a x y H1 x0 y0 H2 x1 y1 H3 x2 y2 H4 x3 y3 H5; subst.
+    split; auto.
+  }
+
   apply interp_prop_refl; eauto.
-  intros X [e | [e | e]] k ta; cbn; split.
-  reflexivity.
-  admit.
-  reflexivity.
-  admit.  
+  - intros X [e | [e | e]]; cbn; reflexivity.
+  - intros X [e | [e | e]] k t0; cbn; auto.
 Qed.
 
 Lemma refine_oom_h_raise_oom :
   forall {T} {E F} (RR : relation T)
+    `{REF : Reflexive T RR}
+    `{TRANS : Transitive T RR}
     (source : itree (E +' OOME +' F) T)
     (oom_msg : string),
     refine_OOM_h RR source (raiseOOM oom_msg).
 Proof.
-  intros T E F RR source oom_msg.
+  intros T E F RR REF TRANS source oom_msg.
   unfold refine_OOM_h.
 
   unfold raiseOOM.
@@ -145,19 +168,11 @@ Proof.
     unfold OOM_handler.
     auto.
   - cbn.
-    rewrite bind_bind.
-    rewrite <- bind_ret_r at 1.
-
-    eapply eutt_clo_bind with (UU := fun u1 u2 => True).
-    eapply Reflexive_eqit.
-    admit.
-
-
-    reflexivity.
-    admit.
-    admit.
-  - intros a H.
-    inversion a.
+    intros a H.
+    destruct a.
+    Unshelve.
+    intros [].
+  - cbn; auto.
 Qed.
   
 

@@ -541,7 +541,7 @@ Section PropMonad.
         (h : E ~> PropT E)
         (k_spec : forall T R, E T -> itree E T -> (T -> itree E R) -> (T -> itree E R) -> itree E R -> Prop),
         (forall {X : Type} (e : E X), h X e (trigger e)) ->
-        (forall {X : Type} (e : E X) ta k1 k2 t2, k_spec X T e ta k1 k2 t2 <-> t2 ≈ bind ta k2) ->
+        (forall {X : Type} (e : E X) k t2, t2 ≈ ITree.bind (trigger (inl1 e)) k -> k_spec X T e (trigger e) k k t2) ->
       t1 ≈ t2 ->
       interp_prop h k_spec _ RR t1 t2.
     Proof.
@@ -589,9 +589,9 @@ Section PropMonad.
       forall {T E} (RR : relation T) `{REF: Reflexive _ RR} (t : itree E T)
         (h : forall X : Type, E X -> PropT E X)
         (k_spec : forall T R, E T -> itree E T -> (T -> itree E R) -> (T -> itree E R) -> itree E R -> Prop),
-      (forall {X : Type} (e : E X), h X e (trigger e)) ->
-      (forall {X : Type} (e : E X) ta k1 k2 t2, k_spec X T e ta k1 k2 t2 <-> t2 ≈ bind ta k2) ->
-      interp_prop h k_spec _ RR t t.
+        (forall {X : Type} (e : E X), h X e (trigger e)) ->
+        (forall {X : Type} (e : E X) k t2, t2 ≈ ITree.bind (trigger (inl1 e)) k -> k_spec X T e (trigger e) k k t2) ->
+        interp_prop h k_spec _ RR t t.
     Proof.
       intros T E RR REF t h k_spec H_SPEC K_SPEC.
       apply interp_prop_refl_h; eauto.
