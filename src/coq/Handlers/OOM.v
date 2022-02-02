@@ -83,6 +83,13 @@ Section PARAMS_MODEL.
     split; cbn; auto.
   Qed.
 
+  Definition oom_k_spec_correct_trigger :
+    k_spec_correct (fun (T : Type) (e : Effout T) => trigger e) (@oom_k_spec).
+  Proof.
+    unfold k_spec_correct.
+    intros T R [e | [e | e]] k1 k2 t2 H; cbn; auto.
+  Qed.
+
   Definition refine_OOM_handler : Effin ~> PropT Effout
     := case_ E_trigger_model_prop (case_ OOM_handler F_trigger_model_prop).
 
@@ -139,7 +146,7 @@ Proof.
 
   apply interp_prop_refl; eauto.
   - intros X [e | [e | e]]; cbn; reflexivity.
-  - intros X [e | [e | e]] k t0; cbn; auto.
+  - apply oom_k_spec_correct_trigger.
 Qed.
 
 Lemma refine_oom_h_raise_oom :

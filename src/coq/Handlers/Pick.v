@@ -3,7 +3,10 @@ From Coq Require Import
      ZArith
      String
      List
-     Lia.
+     Lia
+     Relations
+     RelationClasses
+     Morphisms.
 
 From ExtLib Require Import
      Structures.Monads
@@ -77,6 +80,19 @@ Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEO
                  (k2 : T -> itree (E +' F) R)
                  (t2 : itree (E +' F) R) : Prop
         := t2 ≈ bind ta k2.
+
+      Global Instance pick_k_spec_proper {T R : Type} {RR : R -> R -> Prop} {b a : bool} :
+        Proper
+          (eq ==>
+              eq ==>
+              (fun k1 k2 : T -> itree (E +' PickE +' F) R =>
+                 forall x : T, eqit RR b a (k1 x) (k2 x)) ==> eq ==> eq ==> iff)
+          pick_k_spec.
+      Proof.
+        unfold Proper, respectful.
+        intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2 x3 y3 H3; subst.
+        split; cbn; auto.
+      Qed.
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
         forall (T:Type) (RR: T -> T -> Prop), itree (E +' PickE +' F) T -> PropT (E +' F) T :=

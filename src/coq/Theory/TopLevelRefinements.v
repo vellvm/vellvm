@@ -173,11 +173,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       exists t; split.
       - unfold model_undef in *.
         unfold L3 in *.
-        match goal with |- PropT.interp_prop ?x _ _ _ _ => remember x as h end.
-        eapply interp_prop_Proper_eq in Ht.
-        apply Ht.
-        + apply prod_rel_refl; typeclasses eauto.
-        + apply prod_rel_trans; typeclasses eauto.
+        eapply interp_prop_Proper_eq in Ht; try typeclasses eauto.
+        + apply Ht.
         + assumption.
         + reflexivity.
       - reflexivity.
@@ -353,8 +350,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       cbn in *.
       unfold model_undef.
       unfold exec_undef.
-      apply interp_prop_correct_exec.
-      apply case_prop_handler_correct.
+      eapply interp_prop_correct_exec.
+      Unshelve.
+      4: apply case_prop_handler_correct.
       unfold handler_correct. intros. reflexivity.
       apply case_prop_handler_correct.
       apply Pick_handler_correct.

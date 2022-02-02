@@ -230,12 +230,9 @@ Section PropMonad.
 
   Definition k_spec_correct
              {E F}
-             (h_spec : E ~> PropT F)
              (h: E ~> itree F)
-             (HC : handler_correct h_spec h)
-
              (k_spec : forall T R, E T -> itree F T -> (T -> itree E R) -> (T -> itree F R) -> itree F R -> Prop) : Prop
-    := forall T R e k1 k2 t2, k_spec T R e (h T e) k1 k2 t2 <-> t2 ≈ bind (h T e) k2.
+    := forall T R e k1 k2 t2, t2 ≈ bind (h T e) k2 -> k_spec T R e (h T e) k1 k2 t2.
 
   Inductive interp_PropTF {E F}
             (h_spec : E ~> PropT F)
@@ -541,9 +538,9 @@ Section PropMonad.
         (h : E ~> PropT E)
         (k_spec : forall T R, E T -> itree E T -> (T -> itree E R) -> (T -> itree E R) -> itree E R -> Prop),
         (forall {X : Type} (e : E X), h X e (trigger e)) ->
-        (forall {X : Type} (e : E X) k t2, t2 ≈ ITree.bind (trigger (inl1 e)) k -> k_spec X T e (trigger e) k k t2) ->
-      t1 ≈ t2 ->
-      interp_prop h k_spec _ RR t1 t2.
+        (k_spec_correct (fun T e => trigger e) k_spec) ->
+        t1 ≈ t2 ->
+        interp_prop h k_spec _ RR t1 t2.
     Proof.
       intros T E RR REF t1 t2 h k_spec H_SPEC K_SPEC EQ.
       generalize dependent t2.
@@ -590,7 +587,7 @@ Section PropMonad.
         (h : forall X : Type, E X -> PropT E X)
         (k_spec : forall T R, E T -> itree E T -> (T -> itree E R) -> (T -> itree E R) -> itree E R -> Prop),
         (forall {X : Type} (e : E X), h X e (trigger e)) ->
-        (forall {X : Type} (e : E X) k t2, t2 ≈ ITree.bind (trigger (inl1 e)) k -> k_spec X T e (trigger e) k k t2) ->
+        (k_spec_correct (fun T e => trigger e) k_spec) ->
         interp_prop h k_spec _ RR t t.
     Proof.
       intros T E RR REF t h k_spec H_SPEC K_SPEC.
@@ -605,7 +602,7 @@ Section PropMonad.
       (k_spec : forall T R, E T -> itree F T -> (T -> itree E R) -> (T -> itree F R) -> itree F R -> Prop)
       (h: E ~> itree F)
       (HC : handler_correct h_spec h)
-      (KC : k_spec_correct h_spec h HC k_spec),
+      (KC : k_spec_correct h k_spec),
       forall R RR `{Reflexive _ RR} t t', t ≈ t' -> interp_prop h_spec k_spec R RR t (interp h t').
   Proof.
     intros E F h_spec k_spec h HC KC R RR H t t' H1.
@@ -905,6 +902,39 @@ Section PropMonad.
     intros.
     eapply Returns_ret_inv_. reflexivity. cbn in H. apply H.
   Qed.
+  Lemma case_prop_handler_correct:
+    forall {E1 E2 F}
+      (h1_spec: E1 ~> PropT F)
+      (h2_spec: E2 ~> PropT F)
+      (h1: E1 ~> itree F)
+      (h2: E2 ~> itree F)
+      (C1: handler_correct h1_spec h1)
+      (C2: handler_correct h2_spec h2),
+      handler_correct (case_ h1_spec h2_spec) (case_ h1 h2).
+  Proof.
+    intros E1 E2 F h1_spec h2_spec h1 h2 C1 C2.
+    unfold handler_correct in *.
+    intros T e.
+    destruct e. apply C1. apply C2.
+  Qed.
+
+  (*
+  Lemma case_prop_handler_correct:
+    forall {E1 E2 F}
+      (h1_spec: E1 ~> PropT F)
+      (h2_spec: E2 ~> PropT F)
+      (h1: E1 ~> itree F)
+      (h2: E2 ~> itree F)
+      (C1: handler_correct h1_spec h1)
+      (C2: handler_correct h2_spec h2),
+      handler_correct (case_ h1_spec h2_spec) (case_ h1 h2).
+  Proof.
+    intros E1 E2 F h1_spec h2_spec h1 h2 C1 C2.
+    unfold handler_correct in *.
+    intros T e.
+    destruct e. apply C1. apply C2.
+  Qed.
+*)
 
   (*
   Lemma case_prop_handler_correct:
