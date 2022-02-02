@@ -350,15 +350,14 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       cbn in *.
       unfold model_undef.
       unfold exec_undef.
-      eapply interp_prop_correct_exec.
-      Unshelve.
-      4: apply case_prop_handler_correct.
-      unfold handler_correct. intros. reflexivity.
-      apply case_prop_handler_correct.
-      apply Pick_handler_correct.
+      eapply interp_prop_correct_exec; eauto; try reflexivity.
+      - apply case_prop_handler_correct.
+        unfold handler_correct. intros. reflexivity.
+        apply case_prop_handler_correct.
+        apply Pick_handler_correct.
 
-      unfold handler_correct. intros. reflexivity.
-      assumption. reflexivity.
+        unfold handler_correct. intros. reflexivity.
+      - apply pick_k_spec_correct_pick_exec_h.
     Qed.
 
     Definition build_singleton {A} : A -> A -> Prop := eq.

@@ -194,10 +194,24 @@ Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEO
       Definition F_trigger : F ~> itree (E +' F) :=
         fun R e => r <- trigger e ;; ret r.
 
+      Definition pick_exec_h `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
+        (E +' PickE +' F) ~> itree (E +' F) :=
+        case_ E_trigger
+              (case_ concretize_picks F_trigger).
+
+      Definition pick_k_spec_correct_pick_exec_h
+                 `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
+        k_spec_correct (@pick_exec_h _ _ _) (@pick_k_spec _ _).
+      Proof.
+        unfold k_spec_correct.
+        intros T R e k1 k2 t2 H2.
+        unfold pick_k_spec.
+        auto.
+      Qed.
+
       Definition exec_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
         itree (E +' PickE +' F) ~> itree (E +' F) :=
-        interp (case_ E_trigger
-               (case_ concretize_picks F_trigger)).
+        interp pick_exec_h.
 
     End PARAMS_INTERP.
 
