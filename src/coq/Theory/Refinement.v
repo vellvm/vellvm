@@ -417,6 +417,24 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   | CrawlVis2 : forall Y (e : (DebugE +' FailureE) Y) x k, contains_UB (k x) -> contains_UB (vis e k)
   | FindUB    : forall s, contains_UB (raiseUB s).
 
+  Require Import Morphisms.
+  Require Import Paco.paco.
+
+  Instance proper_contains_UB {R} {RR : relation R} : Proper (eutt RR ==> flip impl) contains_UB.
+  Proof.
+  Admitted.
+
+  Lemma contains_UB_eutt :
+    forall R (RR : relation R) t1 t2,
+      contains_UB t1 ->
+      eutt RR t2 t1 ->
+      contains_UB t2.
+  Proof.
+    intros R RR t1 t2 UB EQ.
+    rewrite EQ.
+    eauto.
+  Qed.
+
   Definition refine_L5 : relation ((itree L4 (MemState * (local_env * stack * (global_env * uvalue)))) -> Prop)
     := fun ts ts' =>
          (* For any tree in the target set *)
@@ -429,6 +447,32 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     := fun ts ts' =>
          forall t', ts' t' ->
                exists t, ts t /\ (contains_UB t \/ refine_OOM_h refine_res3 t t').
+
+  Instance Transitive_refine_L5 : Transitive refine_L5.
+  Proof.
+    unfold Transitive.
+    intros tx ty tz XY YZ.
+
+    intros rz TZ.
+    specialize (YZ rz TZ).
+    destruct YZ as (ry & TY & [UB_ry | YZ]).
+
+    - (* UB in ty *)
+      specialize (XY ry TY).
+      destruct XY as (rx & TX & [UB_rx | XY]).
+
+      + (* UB in tx *)
+        exists rx; split; auto.
+      + exists rx; split; auto.
+        left. eapply contains_UB_eutt; eauto.
+    - specialize (XY ry TY).
+      destruct XY as (rx & TX & [UB_rx | XY]).
+
+      + (* UB in tx *)
+        exists rx; split; auto.
+      + exists rx; split; auto.
+        right. rewrite XY. eauto.
+  Qed.
 
   (* Instance Transitive_refine_L6 : Transitive refine_L6. *)
   (* Proof. *)

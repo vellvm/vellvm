@@ -1114,7 +1114,7 @@ Section PropMonad.
   econstructor; eauto with paco.
   Qed.
 
-  Lemma eutt_ret_vis_abs: forall {X Y E} (x: X) (e: E Y) k, Ret x ≈ Vis e k -> False.
+  Lemma eutt_ret_vis_abs: forall {X Y E} {RR : relation X} (x: X) (e: E Y) k, eutt RR (Ret x) (Vis e k) -> False.
   Proof.
     intros.
     punfold H; inv H.
