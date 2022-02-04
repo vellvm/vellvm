@@ -5,7 +5,6 @@ From Coq Require Import
      String
      Setoid
      Morphisms
-     Omega
      Classes.RelationClasses.
 
 From ExtLib Require Import

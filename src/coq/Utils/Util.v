@@ -501,7 +501,7 @@ Inductive rtc {A} (R:A -> A -> Prop) : A -> A -> Prop :=
 | rtc_refl : forall a, rtc R a a
 | rtc_step : forall a b c, R a b -> rtc R b c -> rtc R a c.
 
-Instance rtc_Transitive {A} {R} : Transitive (@rtc A R).
+#[global] Instance rtc_Transitive {A} {R} : Transitive (@rtc A R).
 Proof.
   unfold Transitive; intros.
   induction H. auto. econstructor; eauto.

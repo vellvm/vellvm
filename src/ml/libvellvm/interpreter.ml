@@ -62,7 +62,7 @@ let debug (msg:string) =
     Calling `step` could either loop forever, return an error,
     or return the uvalue result returned from the itree.
  *)
-let rec step (m : ('a coq_L5, memory_stack * ((local_env * lstack) * (global_env * DV.uvalue))) itree) : (DV.uvalue, string) result =
+let rec step (m : ('a coq_L4, memory_stack * ((local_env * lstack) * (global_env * DV.uvalue))) itree) : (DV.uvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)

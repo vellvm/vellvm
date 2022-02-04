@@ -1,6 +1,6 @@
 (* begin hide *)
 From Coq Require Import
-     ZArith DecidableClass List String Omega Bool.Bool.
+     ZArith DecidableClass List String Bool.Bool.
 
 Import BinInt.
 

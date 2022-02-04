@@ -176,20 +176,15 @@ Section REFINEMENT.
     - reflexivity.
   Qed.
 
+  (* The inclusion of refinement relations between 4 and 5 changes now *)
   Lemma refine_45 : forall Pt1 Pt2,
-      refine_L4 Pt1 Pt2 -> refine_L5 (model_UB refine_res3 Pt1) (model_UB refine_res3 Pt2).
+      refine_L4 Pt1 Pt2 -> refine_L5 Pt1 Pt2.
+         (* (model_UB refine_res3 Pt1) (model_UB refine_res3 Pt2). *)
   Proof.
     intros Pt1 Pt2 HR t2 HM.
-    exists t2; split; [| reflexivity].
-    destruct HM as (t2' & HPt2 & HPT2).
-    apply HR in HPt2; destruct HPt2 as (t1' & HPt1 & HPT1).
-    exists t1'; split; auto.
-    match type of HPT2 with | PropT.interp_prop ?h' ?t _ _ _ => remember h' as h end.
-    eapply interp_prop_Proper_eq with (RR := refine_res3); eauto.
-    - typeclasses eauto.
-    - typeclasses eauto.
-  Qed.
-
+    apply HR in HM as (t1 & HPt1 & HPT1).
+    exists t1; split; auto.
+ Qed.
 
   Variable ret_typ : dtyp.
   Variable entry : string.
@@ -218,10 +213,6 @@ Section REFINEMENT.
     let L0_trace := denote_vellvm_init prog in
     ℑs4 (refine_res3) L0_trace [] ([],[]) empty_memory_stack.
 
-  Definition model_to_L5 (prog: mcfg dtyp) :=
-    let L0_trace := denote_vellvm_init prog in
-    ℑs5 (refine_res3) L0_trace [] ([],[]) empty_memory_stack.
-
   (**
    Which leads to five notion of equivalence of [mcfg]s.
    Note that all reasoning is conducted after conversion to [mcfg] and
@@ -240,7 +231,7 @@ Section REFINEMENT.
     R.refine_L4 (model_to_L4 p1) (model_to_L4 p2).
 
   Definition refine_mcfg  (p1 p2: mcfg dtyp): Prop :=
-    R.refine_L5 (model_to_L5 p1) (model_to_L5 p2).
+    R.refine_L5 (model_to_L4 p1) (model_to_L4 p2).
 
   (**
    The chain of refinements is monotone, legitimating the ability to
@@ -291,32 +282,6 @@ Section REFINEMENT.
     | |- context[match ?x with | _ => _ end] => let Heq := fresh "Heq" in destruct x eqn:Heq
     end.
 
-  Lemma UB_handler_correct: handler_correct UB_handler UB_exec.
-  Proof.
-    unfold UB_handler. unfold UB_exec.
-    unfold handler_correct.
-    intros. auto.
-  Qed.  
-
-  Lemma refine_UB
-    : forall E F `{LLVMEvents.FailureE -< E +' F} T TT (HR: Reflexive TT)
-        (x : _ -> Prop)
-        (y : itree (E +' LLVMEvents.UBE +' F) T),
-      x y -> model_UB TT x (exec_UB y).
-  Proof.
-    intros E F H T TT HR x y H0.
-    unfold model_UB. unfold exec_UB.
-    exists y. split. assumption.
-    apply interp_prop_correct_exec.
-    intros.
-    apply case_prop_handler_correct.
-    unfold handler_correct. intros. reflexivity.
-    apply case_prop_handler_correct.
-    apply UB_handler_correct.
-    unfold handler_correct. intros. reflexivity.
-    assumption. reflexivity.
-  Qed.
-
   Lemma Pick_handler_correct :
     forall E `{LLVMEvents.FailureE -< E} `{LLVMEvents.UBE -< E},
       handler_correct (@Pick_handler E _ _) concretize_picks.
@@ -348,19 +313,22 @@ Section REFINEMENT.
     assumption. reflexivity.
   Qed.
 
+  Definition build_singleton {A} : A -> A -> Prop := eq.
+  
   (**
    Theorem 5.8: We prove that the interpreter belongs to the model.
    *)
-  Theorem interpreter_sound: forall p, model p (interpreter p).
+  Theorem interpreter_sound: forall p, 
+    refine_L5 (model p) (build_singleton (interpreter p)).
   Proof.
     intros p.
-    unfold model, model_gen.
-    unfold interpreter, interpreter_gen.
-    unfold ℑs5.
-    unfold interp_mcfg5_exec.
-    apply refine_UB.  auto.
-    apply refine_undef. auto.
-  Qed.
+    intros ? [].
+    exists (interpreter p).
+    split.
+    - apply refine_undef. auto.
+    - right.
+      reflexivity.
+ Qed.
 
 End REFINEMENT.
 
@@ -395,10 +363,9 @@ Definition interp_cfg {R: Type} (trace: itree instr_E R) g l m :=
   let L2_trace       := interp_local L1_trace l in
   let L3_trace       := interp_memory L2_trace m in
   let L4_trace       := model_undef eq L3_trace in
-  let L5_trace       := model_UB eq L4_trace in
-  L5_trace.
+  L4_trace.
 
-Definition model_to_L5_cfg (prog: cfg dtyp) :=
+Definition model_to_L4_cfg (prog: cfg dtyp) :=
   let trace := denote_cfg prog in
   interp_cfg trace [] [] empty_memory_stack.
 

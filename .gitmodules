@@ -1,9 +1,0 @@
-[submodule "lib/coq2html"]
-	path = lib/coq2html
-	url = https://github.com/xavierleroy/coq2html.git
-[submodule "lib/QuickChick"]
-	path = lib/QuickChick
-	url = https://github.com/QuickChick/QuickChick.git
-[submodule "lib/flocq-quickchick"]
-	path = lib/flocq-quickchick
-	url = https://github.com/Chobbes/flocq-quickchick.git

@@ -1,7 +1,7 @@
 (* begin hide *)
 Require Import Equalities.
 
-From Coq Require Import ZArith List String Omega.
+From Coq Require Import ZArith List String.
 
 From Vellvm Require Import
      Utilities
