@@ -177,12 +177,12 @@ Qed.
 
 Module ExpTactics.
 
-  Hint Rewrite @bind_ret_l : rwexp.
-  Hint Rewrite @translate_ret : rwexp.
-  Hint Rewrite @interp_cfg3_ret : rwexp.
-  Hint Rewrite @translate_bind : rwexp.
-  Hint Rewrite @interp_cfg3_bind : rwexp.
-  Hint Rewrite @translate_trigger : rwexp.
+  #[export] Hint Rewrite @bind_ret_l : rwexp.
+  #[export] Hint Rewrite @translate_ret : rwexp.
+  #[export] Hint Rewrite @interp_cfg3_ret : rwexp.
+  #[export] Hint Rewrite @translate_bind : rwexp.
+  #[export] Hint Rewrite @interp_cfg3_bind : rwexp.
+  #[export] Hint Rewrite @translate_trigger : rwexp.
 
   Ltac simplify_translations :=
     do 2 try first [
@@ -225,7 +225,7 @@ End ExpTactics.
 Import ExpTactics.
 
 Section ExpLemmas.
-  
+
   Lemma denote_exp_GR :forall g l m id v τ,
       Maps.lookup id g = Some v ->
       ⟦ EXP_Ident (ID_Global id) at τ ⟧e3 g l m
@@ -538,7 +538,7 @@ Section ExpPure.
       translate FUB_to_exp (raise (A := T) s) ≈ raise s.
   Proof.
     unfold raise; intros.
-    go. 
+    go.
     apply eutt_eq_bind; intros [].
   Qed.
 
@@ -546,7 +546,7 @@ Section ExpPure.
       translate exp_to_instr (raise (A := T) s) ≈ raise s.
   Proof.
     unfold raise; intros.
-    go. 
+    go.
     apply eutt_eq_bind; intros [].
   Qed.
 
@@ -554,7 +554,7 @@ Section ExpPure.
       translate exp_to_instr (trigger (pick uv P)) ≈ trigger (pick uv P).
   Proof.
     intros.
-    go. 
+    go.
     reflexivity.
   Qed.
 
@@ -575,7 +575,7 @@ Section ExpPure.
   Proof.
     induction l as [| a l IH].
     - cbn; go; reflexivity.
-    - cbn; go. 
+    - cbn; go.
       apply eutt_eq_bind; intros ?.
       go.
       rewrite IH.
@@ -609,7 +609,7 @@ Section ExpPure.
 
   (* END TO MOVE *)
 
-  Lemma interp_cfg3_map_monad {A B} g l m (xs : list A) (ts : A -> itree _ B) : 
+  Lemma interp_cfg3_map_monad {A B} g l m (xs : list A) (ts : A -> itree _ B) :
     ℑ3 (map_monad ts xs) g l m ≈
                      map_monad (m := Monads.stateT _ (Monads.stateT _ (Monads.stateT _ (itree _))))
                      (fun a => ℑ3 (ts a)) xs g l m.
@@ -637,14 +637,14 @@ Section ExpPure.
       simpl.
       setoid_rewrite has_post_post_strong in IH.
       eapply eutt_clo_bind; [apply IH |]; auto.
-      intros; apply HB; cbn; auto. 
-      intros [s' ?] [] [EQ ?]; inv EQ; cbn; apply eutt_Ret; auto. 
+      intros; apply HB; cbn; auto.
+      intros [s' ?] [] [EQ ?]; inv EQ; cbn; apply eutt_Ret; auto.
   Qed.
 
   Lemma map_monad_eutt_state2_ind :
     forall {E S1 S2 A B} (I : S1 -> S2 -> Prop)
            (f : A -> Monads.stateT S1 (Monads.stateT S2 (itree E)) B)
-           (l : list A) (s1 : S1) (s2 : S2), 
+           (l : list A) (s1 : S1) (s2 : S2),
       (forall a s1 s2, In a l -> I s1 s2 -> (f a s1 s2) ⤳ fun '(s2',(s1',_)) => I s1' s2') ->
       I s1 s2 ->
       map_monad f l s1 s2 ⤳ fun '(s2',(s1',_)) => I s1' s2'.
@@ -658,13 +658,13 @@ Section ExpPure.
       setoid_rewrite has_post_post_strong in IH.
       eapply eutt_clo_bind; [apply IH |]; auto.
       intros; apply HB; cbn; auto.
-      intros (s1' & s2' & ?) (? & ? & ?) [EQ ?]; inv EQ; cbn; apply eutt_Ret; auto. 
+      intros (s1' & s2' & ?) (? & ? & ?) [EQ ?]; inv EQ; cbn; apply eutt_Ret; auto.
   Qed.
 
   Lemma map_monad_eutt_state3_ind :
     forall {E S1 S2 S3 A B} (I : S1 -> S2 -> S3 -> Prop)
            (f : A -> Monads.stateT S1 (Monads.stateT S2 (Monads.stateT S3 (itree E))) B)
-           (l : list A) (s1 : S1) (s2 : S2) (s3 : S3), 
+           (l : list A) (s1 : S1) (s2 : S2) (s3 : S3),
       (forall a s1 s2 s3, In a l -> I s1 s2 s3 -> (f a s1 s2 s3) ⤳ fun '(s3', (s2',(s1',_))) => I s1' s2' s3') ->
       I s1 s2 s3 ->
       map_monad f l s1 s2 s3 ⤳ fun '(s3', (s2',(s1',_))) => I s1' s2' s3'.
@@ -678,7 +678,7 @@ Section ExpPure.
       setoid_rewrite has_post_post_strong in IH.
       eapply eutt_clo_bind; [apply IH |]; auto.
       intros; apply HB; cbn; auto.
-      intros (s1' & s2' & s3' & ?) (? & ? & ? & ?) [EQ ?]; inv EQ; cbn; apply eutt_Ret; auto. 
+      intros (s1' & s2' & s3' & ?) (? & ? & ? & ?) [EQ ?]; inv EQ; cbn; apply eutt_Ret; auto.
   Qed.
 
   Ltac trivial_cases :=
@@ -691,16 +691,16 @@ Section ExpPure.
                                      apply failure_is_pure
                end |
 
-               
+
                match goal with
-                 |- context [raiseUB] => rewrite ?FUB_to_exp_raiseUB, ?exp_to_instr_raiseUB; 
+                 |- context [raiseUB] => rewrite ?FUB_to_exp_raiseUB, ?exp_to_instr_raiseUB;
                                        apply UB_is_pure
                end |
-               
+
                match goal with
                  |- context [pick] => rewrite ?exp_to_instr_pick;
                                     apply pick_is_pure
-               end 
+               end
 
               ].
 
@@ -763,7 +763,7 @@ Section ExpPure.
   | no_conv_Freeze : forall t x, no_conv x -> no_conv (OP_Freeze (t, x)).
 
 
-  Lemma expr_are_pure : forall (o : option dtyp) e, 
+  Lemma expr_are_pure : forall (o : option dtyp) e,
    no_conv e ->
    pure ⟦ e at? o ⟧e3.
   Proof with trivial_cases.
@@ -775,19 +775,19 @@ Section ExpPure.
         destruct (Maps.lookup id g) eqn:EQ.
         * step.
           go...
-          
+
         * step...
-         
-      + go. 
+
+      + go.
         destruct (Maps.lookup id l) eqn:EQ.
-        * step... 
         * step...
-          
+        * step...
+
     - destruct o; cbn...
       destruct d; simpl...
       unfold denote_exp, lift_undef_or_err.
       cbn.
-      break_match_goal... 
+      break_match_goal...
       break_match_goal...
       go...
 
@@ -821,7 +821,7 @@ Section ExpPure.
           apply has_post_weaken with (↑ (pure_P g l m)).
           apply (H _ IN). inv NO_CONV. eauto.
           intro_pure; cbn; auto.
-        * intro_pure; cbn; auto. 
+        * intro_pure; cbn; auto.
       + intro_pure.
         go...
 
@@ -1041,7 +1041,7 @@ Section ExpPure.
             break_match_goal...
             unfold lift_err.
             break_match_goal...
-            cbn; go... 
+            cbn; go...
           }
           intro_pure.
           rewrite translate_bind, interp_cfg3_bind.
@@ -1054,11 +1054,11 @@ Section ExpPure.
               break_match_goal...
               unfold lift_err.
               break_match_goal...
-              cbn; go... 
+              cbn; go...
             * intro_pure; cbn; auto.
           }
           intro_pure; cbn; auto.
-          unfold ITree.map; go. 
+          unfold ITree.map; go.
           (* GEP... *)
           unfold interp_cfg3.
           rewrite interp_intrinsics_trigger.
@@ -1073,9 +1073,9 @@ Section ExpPure.
           rewrite !bind_bind.
           destruct d0; cbn; try (unfold raise; rewrite bind_bind; apply has_post_bind; intros []).
           break_match_goal; cbn; try (unfold raise; rewrite bind_bind; apply has_post_bind; intros []).
-          go. 
+          go.
           rewrite interp_local_ret, interp_memory_ret, bind_ret_l.
-          rewrite translate_ret, interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret. 
+          rewrite translate_ret, interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret.
           go...
 
         * unfold ITree.map; destruct p; cbn.
@@ -1096,7 +1096,7 @@ Section ExpPure.
           break_match_goal; cbn; try (unfold raise; rewrite bind_bind; apply has_post_bind; intros []).
           rewrite !bind_ret_l.
           rewrite interp_local_ret, interp_memory_ret, bind_ret_l.
-          rewrite translate_ret, interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret. 
+          rewrite translate_ret, interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret.
           go...
 
     - auto...
@@ -1119,7 +1119,7 @@ Section ExpPure.
         break_match_goal...
         break_match_goal...
         go...
-        
+
     - auto...
 
     - destruct cnd,v1,v2; cbn.
@@ -1128,10 +1128,10 @@ Section ExpPure.
       eapply has_post_bind_strong; [apply IHe | ]; auto.
       intro_pure.
       go.
-      eapply has_post_bind_strong; [apply IHe0 |]; auto. 
+      eapply has_post_bind_strong; [apply IHe0 |]; auto.
       intro_pure.
       go.
-      eapply has_post_bind_strong; [apply IHe1 |]; auto. 
+      eapply has_post_bind_strong; [apply IHe1 |]; auto.
       intro_pure.
       break_match_goal.
       go...
@@ -1140,7 +1140,7 @@ Section ExpPure.
       break_match_goal...
       break_match_goal...
       go...
-      
+
     - destruct v; cbn.
       inv NO_CONV.
       go.
@@ -1160,7 +1160,7 @@ Section ExpPure.
       }
       intros (? & ? & ? & ?) (-> & -> & ->).
       go...
-      
+
   Qed.
 
 End ExpPure.

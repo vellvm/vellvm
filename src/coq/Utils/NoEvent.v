@@ -278,21 +278,21 @@ End eqit_closure.
 #[export] Hint Resolve no_event_r_eqit_clo_wcompat : paco.
 
 (* In particular [eq_itree] is hence a congruence for [no_event] *)
-Instance no_event_l_eq_itree {E F X} : Proper (eq_itree eq ==> iff) (@no_event_l E F X).
+#[global] Instance no_event_l_eq_itree {E F X} : Proper (eq_itree eq ==> iff) (@no_event_l E F X).
 Proof.
   repeat red. intros. split; intros.
   ginit. rewrite <- H. gfinal; auto.
   ginit. rewrite H. gfinal; auto.
 Qed.
 
-Instance no_event_r_eq_itree {E F X} : Proper (eq_itree eq ==> iff) (@no_event_r E F X).
+#[global] Instance no_event_r_eq_itree {E F X} : Proper (eq_itree eq ==> iff) (@no_event_r E F X).
 Proof.
   repeat red. intros. split; intros.
   ginit. rewrite <- H. gfinal; auto.
   ginit. rewrite H. gfinal; auto.
 Qed.
 
-Instance no_event_eq_itree {E X} : Proper (eq_itree eq ==> iff) (@no_event E X).
+#[global] Instance no_event_eq_itree {E X} : Proper (eq_itree eq ==> iff) (@no_event E X).
 Proof.
   repeat red. intros. split; intros.
   ginit. rewrite <- H. gfinal; auto.
@@ -300,7 +300,7 @@ Proof.
 Qed.
 
 (* But although not a valid up-to, [eutt] is also a congruence for [no_event] *)
-Instance no_event_l_eutt {E F X} : Proper (eutt eq ==> iff) (@no_event_l E F X).
+#[global] Instance no_event_l_eutt {E F X} : Proper (eutt eq ==> iff) (@no_event_l E F X).
 Proof.
   do 2 red.
   repeat red. intros. split; intros.
@@ -350,7 +350,7 @@ Proof.
       * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
 Qed.
 
-Instance no_event_r_eutt {E F X} : Proper (eutt eq ==> iff) (@no_event_r E F X).
+#[global] Instance no_event_r_eutt {E F X} : Proper (eutt eq ==> iff) (@no_event_r E F X).
 Proof.
   do 2 red.
   repeat red. intros. split; intros.
@@ -402,7 +402,7 @@ Proof.
       * eapply IHeqitF. pclearbot. punfold H2. reflexivity. reflexivity.
 Qed.
 
-Instance no_event_eutt {E X} : Proper (eutt eq ==> iff) (@no_event E X).
+#[global] Instance no_event_eutt {E X} : Proper (eutt eq ==> iff) (@no_event E X).
 Proof.
   repeat red. intros. split; intros.
   - revert x y H H0.
@@ -678,7 +678,7 @@ Proof.
   ginit; gcofix CIH; intros t.
   setoid_rewrite unfold_translate.
   gstep.
-  desobs t ot; cbn; constructor.
+  destruct (observe t); cbn; constructor.
   - gbase; apply CIH.
   - intros ?; gbase; apply CIH.
 Qed.
@@ -690,7 +690,7 @@ Proof.
   ginit; gcofix CIH; intros t.
   setoid_rewrite unfold_translate.
   gstep.
-  desobs t ot; cbn; constructor.
+  destruct (observe t); cbn; constructor.
   - gbase; apply CIH.
   - intros ?; gbase; apply CIH.
 Qed.
@@ -702,7 +702,7 @@ Proof.
   ginit; gcofix CIH; intros t.
   unfold inject; setoid_rewrite unfold_translate.
   gstep.
-  desobs t ot; cbn; try constructor.
+  destruct (observe t); cbn; try constructor.
   - gbase; apply CIH.
   - inversion e.
 Qed.
@@ -946,7 +946,7 @@ Proof.
     pstep. red. unfold inject_r. rewrite Heqi in H0. apply H0.
 Qed.
 
-Instance Proper_inject_l {E F X} : Proper (eq_itree eq ==> eq_itree eq) (@inject_l E F X).
+#[global] Instance Proper_inject_l {E F X} : Proper (eq_itree eq ==> eq_itree eq) (@inject_l E F X).
 Proof.
   do 3 red.
   intros x y EQ.

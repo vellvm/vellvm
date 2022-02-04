@@ -19,6 +19,7 @@ From ITree Require Import
      ITree.
 
 From Flocq.IEEE754 Require Import
+     BinarySingleNaN
      Binary
      Bits.
 
@@ -219,14 +220,14 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
   Definition Float_maxnum (a b: float): float :=
     match a, b with
-    | B754_nan _ _ _, _ | _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl64 a b)
+    | B754_nan _ _ _ _ _, _ | _, B754_nan _ _ _ _ _ => build_nan _ _ (binop_nan_pl64 a b)
     | _, _ =>
       if Float.cmp Clt a b then b else a
     end.
 
   Definition Float32_maxnum (a b: float32): float32 :=
     match a, b with
-    | B754_nan _ _ _, _ | _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl32 a b)
+    | B754_nan _ _ _ _ _, _ | _, B754_nan _ _ _ _ _ => build_nan _ _ (binop_nan_pl32 a b)
     | _, _ =>
       if Float32.cmp Clt a b then b else a
     end.
@@ -247,14 +248,14 @@ Module Make(A:MemoryAddress.ADDRESS)(LLVMIO: LLVM_INTERACTIONS(A)).
 
   Definition Float_minimum (a b: float): float :=
     match a, b with
-    | B754_nan _ _ _, _ | _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl64 a b)
+    | B754_nan _ _ _ _ _, _ | _, B754_nan _ _ _ _ _ => build_nan _ _ (binop_nan_pl64 a b)
     | _, _ =>
       if Float.cmp Clt a b then a else b
     end.
 
   Definition Float32_minimum (a b: float32): float32 :=
     match a, b with
-    | B754_nan _ _ _, _ | _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl32 a b)
+    | B754_nan _ _ _ _ _, _ | _, B754_nan _ _ _ _ _ => build_nan _ _ (binop_nan_pl32 a b)
     | _, _ =>
       if Float32.cmp Clt a b then a else b
     end.

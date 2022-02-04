@@ -73,7 +73,7 @@ Set Contextual Implicit.
     with any return type. *)
   Definition raiseUB {E : Type -> Type} `{UBE -< E} {X}
              (e : string)
-    : itree E X 
+    : itree E X
     := v <- trigger (ThrowUB e);; match v: void with end.
 
   (* Debug is identical to the "Trace" effect from the itrees library,
@@ -91,8 +91,8 @@ Set Contextual Implicit.
   Definition print_msg (msg : string) : unit := tt.
 
   Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
-    v <- trigger (Throw _ (print_msg msg));; match v: void with end.
-    
+    v <- trigger (Throw (print_msg msg));; match v: void with end.
+
   Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m:err A) : itree E B :=
     match m with
     | inl x => raise x

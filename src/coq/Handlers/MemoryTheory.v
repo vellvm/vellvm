@@ -467,7 +467,7 @@ Section Map_Theory.
       (lookup_all_index off serialized_length
                         (add_all_index
                            (serialized_bytes)
-                           off bytes) SUndef) ++ 
+                           off bytes) SUndef) ++
                                               (lookup_all_index (off + Z.of_N serialized_length) rest_length
                                                                 (add_all_index
                                                                    (rest_bytes)
@@ -482,7 +482,7 @@ Section Map_Theory.
       reflexivity.
     - cbn in LEN.
       subst.
-      
+
       rewrite <- N.succ_pos_pred.
       rewrite <- app_comm_cons.
       cbn.
@@ -1259,7 +1259,7 @@ Section Memory_Stack_Theory.
       rewrite Z.add_comm.
       rewrite Z.mul_comm.
       rewrite Z_div_plus.
-      rewrite Zdiv_small with (x:=y) by lia.
+      rewrite Zdiv_small with (a:=y) by lia.
       all: lia.
     Qed.
 
@@ -1375,7 +1375,7 @@ Section Memory_Stack_Theory.
         rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app.
 
         cbn in FIELDS; inversion FIELDS; subst; cbn.
-        
+
         replace (N.to_nat (sizeof_dtyp ft)) with (Datatypes.length f_bytes + 0)%nat by lia.
         rewrite firstn_app_2; cbn.
         rewrite app_nil_r.
@@ -1420,7 +1420,7 @@ Section Memory_Stack_Theory.
         rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app.
 
         cbn in FIELDS; inversion FIELDS; subst; cbn.
-        
+
         replace (N.to_nat (sizeof_dtyp ft)) with (Datatypes.length f_bytes + 0)%nat by lia.
         rewrite firstn_app_2; cbn.
         rewrite app_nil_r.
@@ -1445,7 +1445,7 @@ Section Memory_Stack_Theory.
     Proof.
       induction sz;
         intros elt elts ft elt_bytes elts_bytes SUP UNDEF_BYTES UNDEF_ELTS SIZE ELT ELTS.
-      
+
       - rewrite <- all_not_sundef_deserialized in ELT; auto.
         rewrite <- all_not_sundef_deserialized in ELTS; auto.
         rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app.
@@ -1463,7 +1463,7 @@ Section Memory_Stack_Theory.
         rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app.
 
         cbn in ELTS; inversion ELTS; subst; cbn.
-        
+
         replace (N.to_nat (sizeof_dtyp ft)) with (Datatypes.length elt_bytes + 0)%nat by lia.
         rewrite Pos2Nat.inj_succ.
         rewrite firstn_app_2; cbn.
@@ -1489,7 +1489,7 @@ Section Memory_Stack_Theory.
     Proof.
       induction sz;
         intros elt elts ft elt_bytes elts_bytes SUP UNDEF_BYTES UNDEF_ELTS SIZE ELT ELTS.
-      
+
       - rewrite <- all_not_sundef_deserialized in ELT; auto.
         rewrite <- all_not_sundef_deserialized in ELTS; auto.
         rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app.
@@ -1507,7 +1507,7 @@ Section Memory_Stack_Theory.
         rewrite <- all_not_sundef_deserialized; auto using all_not_sundef_app.
 
         cbn in ELTS; inversion ELTS; subst; cbn.
-        
+
         replace (N.to_nat (sizeof_dtyp ft)) with (Datatypes.length elt_bytes + 0)%nat by lia.
         rewrite Pos2Nat.inj_succ.
         rewrite firstn_app_2; cbn.
@@ -1612,15 +1612,15 @@ Section Memory_Stack_Theory.
                  end.
           subst.
           rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
-          rewrite Zdiv_small with (x:=z0) in * by lia.
+          rewrite Zdiv_small with (a:=z0) in * by lia.
           rewrite Z.add_0_l in *.
           subst.
           rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
-          rewrite Zdiv_small with (x:=z2) in * by lia.
+          rewrite Zdiv_small with (a:=z2) in * by lia.
           rewrite Z.add_0_l in *.
           subst.
           rewrite Z.add_comm, Z.mul_comm, Z_div_plus in * by lia.
-          rewrite Zdiv_small with (x:=z4) in * by lia.
+          rewrite Zdiv_small with (a:=z4) in * by lia.
           rewrite Z.add_0_l in *.
           subst.
           lia.
@@ -2882,7 +2882,7 @@ Section Memory_Stack_Theory.
           rewrite <- Z.mul_sub_distr_r.
           apply Zmult_le_compat_r; lia.
         }
-        
+
         lia.
     Qed.
 
