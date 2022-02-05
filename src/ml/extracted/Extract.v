@@ -69,9 +69,12 @@ Extract Inlined Constant Flocq.Core.Defs.F2R => "(fun _ -> assert false)".
 Extract Inlined Constant Flocq.IEEE754.Binary.FF2R => "(fun _ -> assert false)".
 Extract Inlined Constant Flocq.IEEE754.Binary.B2R => "(fun _ -> assert false)".
 Extract Inlined Constant Binary.BSN.round_mode => "(fun _ -> assert false)".
+Extract Inlined Constant Flocq.IEEE754.BinarySingleNaN.round_mode => "(fun _ -> assert false)".
 Extract Inlined Constant Flocq.Calc.Bracket.inbetween_loc => "(fun _ -> assert false)".
 
 Extract Inlined Constant Archi.ppc64 => "false".
+Extract Inlined Constant Reals.ClassicalDedekindReals.sig_forall_dec => "(fun _ -> assert false)".
+Extract Inlined Constant Reals.ClassicalDedekindReals.sig_not_dec => "false".
 
 Set Extraction AccessOpaque.
 (* NOTE: assumes that this file is compiled from /src *)
