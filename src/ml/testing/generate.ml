@@ -38,7 +38,7 @@ let rec gen_uvalue : LL.typ -> DV.uvalue G.t = function
      let gen_t = gen_uvalue ty in
      let list_ts = G.list_size (g_const (sz |> Camlcoq.N.to_int32 |> Int32.to_int)) gen_t in
      list_ts >>= (fun l -> G.return @@ DV.UVALUE_Vector l)
-  | LL.TYPE_Array (sz, ty) ->  
+  | LL.TYPE_Array (sz, ty) ->
      let open G in
      let gen_t = gen_uvalue ty in
      let list_ts = G.list_size (g_const (sz |> Camlcoq.N.to_int32 |> Int32.to_int)) gen_t in
@@ -46,7 +46,7 @@ let rec gen_uvalue : LL.typ -> DV.uvalue G.t = function
   | _ -> failwith "generating values of this type is not implemented"
 
 
-let gen_args : LL.typ list -> (DV.uvalue) list G.t = fun ts -> ts |> List.map (fun t -> gen_uvalue t) |> G.flatten_l 
+let gen_args : LL.typ list -> (DV.uvalue) list G.t = fun ts -> ts |> List.map (fun t -> gen_uvalue t) |> G.flatten_l
 
 let generate_args : LL.typ list -> (LL.typ * DV.uvalue) list = fun t_args ->
   let vals = G.generate1 (gen_args t_args) in

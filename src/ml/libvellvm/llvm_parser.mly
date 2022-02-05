@@ -3,11 +3,11 @@ open LLVMAst
 open ParserHelper
 open ParseUtil
 
-(* normalize_float_size : 
+(* normalize_float_size :
    - LLVM floating point literals need different interpretations depending
      on their types.
 
-   - This function converts a string into either a 
+   - This function converts a string into either a
      EXP_Double 64-bit literal, or
      EXP_Float 32-bit literal depending on the type annotation t
  *)
@@ -16,7 +16,7 @@ let normalize_float_literal (t:typ) (d:string) =
   | TYPE_Double -> EXP_Double (coqfloat_of_string d)
   | TYPE_Float  ->
        let v = coqfloat_of_string d in
-         if can_convert_float_to_float32 v 
+         if can_convert_float_to_float32 v
            then EXP_Float (coqfloat32_of_string d)
          else
            let dbg = (match v with
@@ -98,112 +98,112 @@ let is_externally_initialized l =
 %token<Camlcoq.Z.t> INTEGER
 %token<string> FLOAT
 %token<Floats.float> HEXCONSTANT
-%token KW_NULL 
-%token KW_UNDEF 
-%token KW_TRUE 
-%token KW_FALSE 
-%token KW_ZEROINITIALIZER 
+%token KW_NULL
+%token KW_UNDEF
+%token KW_TRUE
+%token KW_FALSE
+%token KW_ZEROINITIALIZER
 %token KW_C
 
 %token<string> LABEL
 
-%token KW_DEFINE 
-%token KW_DECLARE 
-%token KW_TARGET 
-%token KW_DATALAYOUT 
-%token KW_TRIPLE 
+%token KW_DEFINE
+%token KW_DECLARE
+%token KW_TARGET
+%token KW_DATALAYOUT
+%token KW_TRIPLE
 %token KW_SOURCE_FILENAME
-%token KW_PRIVATE 
-%token KW_INTERNAL 
+%token KW_PRIVATE
+%token KW_INTERNAL
 
-%token KW_AVAILABLE_EXTERNALLY 
-%token KW_LINKONCE 
-%token KW_WEAK 
-%token KW_COMMON 
-%token KW_APPENDING 
-%token KW_EXTERN_WEAK 
-%token KW_LINKONCE_ODR 
-%token KW_WEAK_ODR 
-%token KW_EXTERNAL 
-%token KW_DLLIMPORT 
+%token KW_AVAILABLE_EXTERNALLY
+%token KW_LINKONCE
+%token KW_WEAK
+%token KW_COMMON
+%token KW_APPENDING
+%token KW_EXTERN_WEAK
+%token KW_LINKONCE_ODR
+%token KW_WEAK_ODR
+%token KW_EXTERNAL
+%token KW_DLLIMPORT
 %token KW_DLLEXPORT
-%token KW_DEFAULT 
-%token KW_HIDDEN 
+%token KW_DEFAULT
+%token KW_HIDDEN
 %token KW_PROTECTED
 
-%token KW_CCC 
-%token KW_FASTCC 
-%token KW_COLDCC 
+%token KW_CCC
+%token KW_FASTCC
+%token KW_COLDCC
 %token KW_CC
 %token KW_UNNAMED_ADDR
-%token KW_TYPE 
-%token KW_X 
+%token KW_TYPE
+%token KW_X
 %token KW_OPAQUE
-%token KW_GLOBAL 
-%token KW_ADDRSPACE 
-%token KW_CONSTANT 
-%token KW_SECTION 
-%token KW_THREAD_LOCAL 
-%token KW_LOCALDYNAMIC 
-%token KW_INITIALEXEC 
-%token KW_LOCALEXEC 
+%token KW_GLOBAL
+%token KW_ADDRSPACE
+%token KW_CONSTANT
+%token KW_SECTION
+%token KW_THREAD_LOCAL
+%token KW_LOCALDYNAMIC
+%token KW_INITIALEXEC
+%token KW_LOCALEXEC
 %token KW_EXTERNALLY_INITIALIZED
-%token KW_ZEROEXT 
-%token KW_SIGNEXT 
-%token KW_INREG 
-%token KW_BYVAL 
-%token KW_SRET 
-%token KW_NOALIAS 
-%token KW_NOCAPTURE 
+%token KW_ZEROEXT
+%token KW_SIGNEXT
+%token KW_INREG
+%token KW_BYVAL
+%token KW_SRET
+%token KW_NOALIAS
+%token KW_NOCAPTURE
 %token KW_NEST
 
 %token KW_ALIGNSTACK
-%token KW_ALLOCSIZE 
-%token KW_ALWAYSINLINE 
-%token KW_BUILTIN 
+%token KW_ALLOCSIZE
+%token KW_ALWAYSINLINE
+%token KW_BUILTIN
 %token KW_COLD
 %token KW_CONVERGENT
 %token KW_HOT
 %token KW_INACCESSIBLEMEMONLY
 %token KW_INACCESSIBLEMEM_OR_ARGMEMONLY
-%token KW_INLINEHINT 
-%token KW_JUMPTABLE 
-%token KW_MINSIZE 
-%token KW_NAKED 
+%token KW_INLINEHINT
+%token KW_JUMPTABLE
+%token KW_MINSIZE
+%token KW_NAKED
 %token KW_NO_JUMP_TABLES
-%token KW_NOBUILTIN 
+%token KW_NOBUILTIN
 %token KW_NODUPLICATE
 %token KW_NOFREE
-%token KW_NOIMPLICITFLOAT 
-%token KW_NOINLINE 
+%token KW_NOIMPLICITFLOAT
+%token KW_NOINLINE
 %token KW_NOMERGE
-%token KW_NONLAZYBIND 
-%token KW_NOREDZONE 
+%token KW_NONLAZYBIND
+%token KW_NOREDZONE
 %token KW_INDIRECT_TLS_SEG_REFS
 %token KW_NORETURN
 %token KW_NORECURSE
 %token KW_WILLRETURN
 %token KW_NOSYNC
-%token KW_NOUNWIND 
+%token KW_NOUNWIND
 %token KW_NULL_POINTER_IS_VALID
 %token KW_OPTFORFUZZING
-%token KW_OPTNONE 
-%token KW_OPTSIZE 
-%token KW_READNONE 
-%token KW_READONLY 
+%token KW_OPTNONE
+%token KW_OPTSIZE
+%token KW_READNONE
+%token KW_READONLY
 %token KW_WRITEONLY
 %token KW_ARGMEMONLY
 %token KW_RETURNS_TWICE
 %token KW_SAFESTACK
-%token KW_SANITIZE_ADDRESS 
-%token KW_SANITIZE_MEMORY 
-%token KW_SANITIZE_THREAD 
+%token KW_SANITIZE_ADDRESS
+%token KW_SANITIZE_MEMORY
+%token KW_SANITIZE_THREAD
 %token KW_SANITIZE_HWADDRESS
 %token KW_SANITIZE_MEMTAG
 %token KW_SPECULATIVE_LOAD_HARDENING
 %token KW_SPECULATABLE
-%token KW_SSP 
-%token KW_SSPREQ 
+%token KW_SSP
+%token KW_SSPREQ
 %token KW_SSPSTRONG
 %token KW_STRICTFP
 %token KW_UWTABLE
@@ -211,120 +211,120 @@ let is_externally_initialized l =
 %token KW_SHADOWCALLSTACK
 %token KW_MUSTPROGRESS
 
-%token KW_DEREFERENCEABLE 
+%token KW_DEREFERENCEABLE
 %token KW_INALLOCA
-%token KW_RETURNED 
+%token KW_RETURNED
 %token KW_NONNULL
 
 
 %token KW_ALIGN
 %token KW_GC
 
-%token KW_ADD 
-%token KW_FADD 
-%token KW_SUB 
-%token KW_FSUB 
-%token KW_MUL 
-%token KW_FMUL 
-%token KW_UDIV 
-%token KW_SDIV 
-%token KW_FDIV 
-%token KW_UREM 
-%token KW_SREM 
-%token KW_FREM 
-%token KW_SHL 
-%token KW_LSHR 
-%token KW_ASHR 
-%token KW_AND 
-%token KW_OR 
-%token KW_XOR 
-%token KW_ICMP 
-%token KW_FCMP 
-%token KW_PHI 
-%token KW_CALL 
-%token KW_TRUNC 
-%token KW_ZEXT 
-%token KW_SEXT 
-%token KW_FPTRUNC 
-%token KW_FPEXT 
-%token KW_UITOFP 
-%token KW_SITOFP 
-%token KW_FPTOUI 
-%token KW_FPTOSI 
-%token KW_INTTOPTR 
-%token KW_PTRTOINT 
-%token KW_BITCAST 
-%token KW_SELECT 
-%token KW_FREEZE 
-%token KW_VAARG 
-%token KW_RET 
-%token KW_BR 
-%token KW_SWITCH 
-%token KW_INDIRECTBR 
-%token KW_INVOKE 
-%token KW_RESUME 
-%token KW_UNREACHABLE 
-%token KW_ALLOCA 
-%token KW_LOAD 
-%token KW_STORE 
-%token KW_ATOMICCMPXCHG 
-%token KW_ATOMICRMW 
-%token KW_FENCE 
-%token KW_GETELEMENTPTR 
-%token KW_INBOUNDS 
-%token KW_EXTRACTELEMENT 
-%token KW_INSERTELEMENT 
-%token KW_SHUFFLEVECTOR 
-%token KW_EXTRACTVALUE 
-%token KW_INSERTVALUE 
+%token KW_ADD
+%token KW_FADD
+%token KW_SUB
+%token KW_FSUB
+%token KW_MUL
+%token KW_FMUL
+%token KW_UDIV
+%token KW_SDIV
+%token KW_FDIV
+%token KW_UREM
+%token KW_SREM
+%token KW_FREM
+%token KW_SHL
+%token KW_LSHR
+%token KW_ASHR
+%token KW_AND
+%token KW_OR
+%token KW_XOR
+%token KW_ICMP
+%token KW_FCMP
+%token KW_PHI
+%token KW_CALL
+%token KW_TRUNC
+%token KW_ZEXT
+%token KW_SEXT
+%token KW_FPTRUNC
+%token KW_FPEXT
+%token KW_UITOFP
+%token KW_SITOFP
+%token KW_FPTOUI
+%token KW_FPTOSI
+%token KW_INTTOPTR
+%token KW_PTRTOINT
+%token KW_BITCAST
+%token KW_SELECT
+%token KW_FREEZE
+%token KW_VAARG
+%token KW_RET
+%token KW_BR
+%token KW_SWITCH
+%token KW_INDIRECTBR
+%token KW_INVOKE
+%token KW_RESUME
+%token KW_UNREACHABLE
+%token KW_ALLOCA
+%token KW_LOAD
+%token KW_STORE
+%token KW_ATOMICCMPXCHG
+%token KW_ATOMICRMW
+%token KW_FENCE
+%token KW_GETELEMENTPTR
+%token KW_INBOUNDS
+%token KW_EXTRACTELEMENT
+%token KW_INSERTELEMENT
+%token KW_SHUFFLEVECTOR
+%token KW_EXTRACTVALUE
+%token KW_INSERTVALUE
 %token KW_LANDINGPAD
 
-%token KW_NNAN 
-%token KW_NINF 
-%token KW_NSZ 
-%token KW_ARCP 
+%token KW_NNAN
+%token KW_NINF
+%token KW_NSZ
+%token KW_ARCP
 %token KW_FAST
 %token<Camlcoq.N.t> I
-%token KW_VOID 
-%token KW_HALF 
-%token KW_FLOAT 
-%token KW_DOUBLE 
-%token KW_X86_FP80 
-%token KW_FP128 
-%token KW_PPC_FP128 
-%token KW_LABEL 
-%token KW_METADATA 
+%token KW_VOID
+%token KW_HALF
+%token KW_FLOAT
+%token KW_DOUBLE
+%token KW_X86_FP80
+%token KW_FP128
+%token KW_PPC_FP128
+%token KW_LABEL
+%token KW_METADATA
 %token KW_X86_MMX
 
-%token KW_UNWIND 
+%token KW_UNWIND
 %token KW_TO
-%token KW_NUW 
+%token KW_NUW
 %token KW_NSW
 %token KW_EXACT
-%token KW_EQ 
-%token KW_NE 
-%token KW_SGT 
-%token KW_SGE 
-%token KW_SLT 
+%token KW_EQ
+%token KW_NE
+%token KW_SGT
+%token KW_SGE
+%token KW_SLT
 %token KW_SLE
-%token KW_UGT 
-%token KW_UGE 
-%token KW_ULT 
+%token KW_UGT
+%token KW_UGE
+%token KW_ULT
 %token KW_ULE
-%token KW_OEQ 
-%token KW_OGT 
-%token KW_OGE 
-%token KW_OLT 
-%token KW_OLE 
-%token KW_ONE 
-%token KW_ORD 
-%token KW_UNO 
-%token KW_UEQ 
+%token KW_OEQ
+%token KW_OGT
+%token KW_OGE
+%token KW_OLT
+%token KW_OLE
+%token KW_ONE
+%token KW_ORD
+%token KW_UNO
+%token KW_UEQ
 %token KW_UNE
 %token KW_TAIL
 %token KW_VOLATILE
-%token KW_NOUNDEF 
-%token KW_IMMARG 
+%token KW_NOUNDEF
+%token KW_IMMARG
 
 
 %token<LLVMAst.raw_id> METADATA_ID
@@ -349,10 +349,10 @@ toplevel_entity:
   | KW_TARGET KW_TRIPLE EQ s=STRING     { TLE_Target (str s)             }
   | KW_SOURCE_FILENAME EQ s=STRING      { TLE_Source_filename (str s)    }
 
-  (* It's not clear what the rules for named identifiers are.  It 
+  (* It's not clear what the rules for named identifiers are.  It
      seems that they don't follow the "anonymous" rules of sequentiality
      and they also seem to live in another name space.
-   *) 
+   *)
   | i=lident EQ KW_TYPE t=typ           { TLE_Type_decl (ID_Local i, t)  }
   | g=global_decl                       { TLE_Global g                   }
   | i=METADATA_ID EQ m=tle_metadata     { TLE_Metadata (i, m)            }
@@ -400,7 +400,7 @@ global_decl:
           g_externally_initialized = is_externally_initialized attrs;
           g_section = get_section opt;
           g_align = get_align opt; } }
-  
+
   | g_ident=gident EQ
     g_linkage=nonexternal_linkage?
     attrs=global_attr*
@@ -458,7 +458,7 @@ declaration:
     LPAREN dc_args=separated_list(csep, dc_arg) RPAREN
     post_attrs=df_post_attr*
 
-    { 
+    {
       {
 	 dc_type        = TYPE_Function(df_ret_typ, List.map fst dc_args);
          dc_param_attrs = (df_ret_attrs, List.map snd dc_args);
@@ -475,22 +475,22 @@ declaration:
     }
 
 
-(* Dealing with anonymous identifiers 
+(* Dealing with anonymous identifiers
 
    Each function definition in LLVM IR can have so-called "anonymous" local identifiers
    some of which can be omitted from the concrete syntax of the program.
 
-   These identifiers are either 
-       - temporaries (a.k.a. registers) of the name %NNN, found as function arguments or 
+   These identifiers are either
+       - temporaries (a.k.a. registers) of the name %NNN, found as function arguments or
          on the left-hand-sides of instruction definitions, or
        - block labels (without the '%') that are numbered
 
    All "anonymous" identifiers, whether omitted or not, must be bound consecutively (in
-   program order).  This means that a parser for an LLVM IR function 
+   program order).  This means that a parser for an LLVM IR function
    Block labels, function arguments, and local temporaries all share the same counter.
 
    So-called "void" instructions, that _don't_ have a binding occurrence (i.e. to the left of an =)
-   but we still generate a unique identifier for them for use in the semantics.   
+   but we still generate a unique identifier for them for use in the semantics.
 *)
 
 (* Correctly parsing a CFG definition while generating / checking anonymous
@@ -540,8 +540,8 @@ definition:
 	  | Some _ -> failwith "void function has defined left-hand-side"
 	else
 	  (IId (check_or_generate_id lopt), i)
-      in	
-	
+      in
+
       let process_block (lopt, (phis, instrs), blk_term) =
 	  let blk_id   = check_or_generate_label lopt in
 	  let blk_phis = List.map process_lhs_phi phis in
@@ -557,7 +557,7 @@ definition:
 	| entry::body -> (entry, body)
       in
       { df_prototype = {
-          dc_type = TYPE_Function (df_ret_typ, 
+          dc_type = TYPE_Function (df_ret_typ,
                                    List.map (fun x -> fst (fst x)) args) ;
           dc_param_attrs = (df_ret_attrs,
                            List.map (fun x -> snd (fst x)) args) ;
@@ -595,16 +595,16 @@ The post-processing takes place after the whole cfg has been parsed as part of
 the declatation parser production.
 
 I would prefer the terminology "sequential, possibly implicit identifiers"
-to "anonymous". 
+to "anonymous".
 *)
 
 %inline
 instr_lhs:
   | /* empty */
-    { None   }   
+    { None   }
 
   | l=bound_lident EQ
-    { Some l }   
+    { Some l }
 
 (* A block label behaves like the lhs of an instruction (except, strangely, it
   isn't written with a leading % except when used as a label value in a
@@ -643,7 +643,7 @@ phi_table_entry:
   | LSQUARE v=exp COMMA l=lident RSQUARE { (l, v) }
 
 block:
-  blk_id   = block_label 
+  blk_id   = block_label
   body     = block_phis_and_instrs
   blk_term = terminated(terminator, EOL+)
     {
@@ -651,7 +651,7 @@ block:
     }
 
 
-df_blocks: 
+df_blocks:
   | blks=block+
     { blks }
 
@@ -1019,7 +1019,7 @@ expr_val:
 exp:
   | eo=expr_op { fun _ -> eo }
   | ev=expr_val { ev }
-  
+
 %inline instr:
   | eo=instr_op { INSTR_Op eo }
 
@@ -1049,8 +1049,8 @@ exp:
 
 branch_label:
   KW_LABEL o=LOCAL  { lexed_id_to_raw_id o }
-  
-terminator:  
+
+terminator:
   | KW_RET tv=texp
     { TERM_Ret tv }
 
