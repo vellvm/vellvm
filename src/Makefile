@@ -6,7 +6,7 @@ COQLIBDIR = ../lib
 MLDIR = ml
 EXTRACTDIR = ml/extracted
 
-OPAMPKGS=coq coq-ext-lib coq-paco coq-ceres coq-flocq coq-itree dune menhir ocamlbuild
+OPAMPKGS=coq coq-ext-lib coq-paco coq-ceres coq-flocq coq-itree dune menhir ocamlbuild qcheck
 
 COQINCLUDES=$(foreach d, $(COQDIR), -R $(d) Vellvm) -R $(EXTRACTDIR) Extract
 COQC="$(COQBIN)coqc" -q $(COQINCLUDES) $(COQCOPTS)
