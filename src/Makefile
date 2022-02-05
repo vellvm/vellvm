@@ -105,6 +105,7 @@ $(EXE): extracted ml/dune ml/extracted/dune ml/testing/dune
 
 vellvm: $(EXE)
 	cp $(EXE) vellvm
+	chmod u+w vellvm
 
 .PHONY: test
 test: vellvm
