@@ -1,5 +1,30 @@
-From Coq Require Import
-     Morphisms String.
+From Coq Require Import Extraction.
+Extraction Language OCaml.
+Extraction Blacklist String List Char Core Z Format.
+
+From Vellvm Require Import
+     Semantics.
+
+(* camlstring_of_coqstring is from Camlcoq *)
+Extract Constant print_msg => "let camlstring_of_coqstring (s: char list) =
+  let r = Bytes.create (List.length s) in
+  let rec fill pos = function
+  | [] -> r
+  | c :: s -> Bytes.set r pos c; fill (pos + 1) s
+  in Bytes.to_string (fill 0 s)
+in fun msg -> print_string (camlstring_of_coqstring msg ^ ""\n"")".
+
+(* These three unrealized axiom somehow are on our path. Can it be avoided? Why are they here? *)
+Extract Inlined Constant Archi.ppc64 => "false".
+Extract Inlined Constant Reals.ClassicalDedekindReals.sig_forall_dec => "(fun _ -> assert false)".
+Extract Inlined Constant Reals.ClassicalDedekindReals.sig_not_dec => "false".
+
+(* Weird, it's mostly undocumented, the only bit says that the default is to honor opacity, and the observed behavior seems to be the opposite. Does it matter for us? What do we want? *)
+Unset Extraction AccessOpaque.
+Recursive Extraction Library TopLevel.
+
+(*
+From Coq Require Import Morphisms String.
 
 Require Import List.
 Import ListNotations.
@@ -30,8 +55,6 @@ Require ExtrOcamlBasic.
 Require ExtrOcamlString.
 Require ExtrOcamlIntConv.
 
-Extraction Language OCaml.
-Extraction Blacklist String List Char Core Z Format.
 
 
 (* strings ------------------------------------------------------------------ *)
@@ -50,15 +73,6 @@ Extract Constant shift =>
 Extract Inlined Constant ascii_dec => "(=)".
 Extract Inductive string => "string" [ "str_nil" "str_cons" ].
 *)
-
-(* camlstring_of_coqstring is from Camlcoq *)
-Extract Constant print_msg => "let camlstring_of_coqstring (s: char list) =
-  let r = Bytes.create (List.length s) in
-  let rec fill pos = function
-  | [] -> r
-  | c :: s -> Bytes.set r pos c; fill (pos + 1) s
-  in Bytes.to_string (fill 0 s)
-in fun msg -> print_string (camlstring_of_coqstring msg ^ ""\n"")".
 
 (* OCaml pervasive types ---------------------------------------------------- *)
 (* Extract Inlined Constant LLVMAst.int => "int". *)
@@ -84,3 +98,6 @@ Extraction Library ExtrOcamlIntConv.
 Recursive Extraction Library TopLevel.
 Extraction Library Transform.
 Extraction Library ParserHelper.
+
+ *)
+

@@ -6,7 +6,7 @@
 
 (coq.extraction
  (prelude Extract)
- (extracted_modules vellvmtest)
+ (extracted_modules Ascii TopLevel)
  (theories Vellvm)
 )
 
