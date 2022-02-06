@@ -1,5 +1,0 @@
--Q coq Vellvm
--R coq Vellvm
--I ../lib/QuickChick/src
--R ../lib/QuickChick/src QuickChick
--R ../lib/flocq-quickchick FlocqQuickChick
