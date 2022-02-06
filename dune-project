@@ -1,5 +1,7 @@
 (lang dune 2.8)
 (using coq 0.2)
+(using menhir 2.0)
+
 (name coq-vellvm)
 
 (license "GPLv3")
