@@ -3,7 +3,13 @@
   (flags (:standard -g -w -20-32-33-39)))
  (release
   (flags (:standard -O3 -w -20-32-33-39))))
-  
+
+(coq.extraction
+ (prelude Extract)
+ (extracted_modules vellvmtest)
+ (theories Vellvm)
+)
+
 (library
   (name extracted)
   (wrapped false)
