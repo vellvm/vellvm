@@ -494,62 +494,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         pfold; rewrite <- H
     end.
 
-  Instance proper_eq_itree_contains_UB {R : Type} {RR : relation R} :
-    Proper (@eq_itree _ R R RR ==> iff) contains_UB.
-  Proof.
-    unfold Proper, respectful.
-    intros x y EQ.
-    split.
-    { generalize dependent RR.
-      generalize dependent y.
-      generalize dependent x.
-      pcofix CIH.
-      intros x y RR EQ UB.
-
-      (*
-      pinversion EQ.
-      admit.
-      - inv_contains_UB.
-        pclearbot.
-        pfold.
-        punfold H2.
-        rewrite <- H.
-        constructor. right.
-        eapply CIH.
-        apply REL.
-        red.
-        pfold.
-        apply H2.
-       *)
-      
-      pinversion EQ; subst;
-        inv_contains_UB;
-        inv_existT;
-        try solve [
-            pclearbot;
-            pfold_contains_UB;
-            econstructor; right; eauto
-          ];
-        inversion CHECK.
-    }
-
-    { generalize dependent RR.
-      generalize dependent x.
-      generalize dependent y.
-      pcofix CIH.
-      intros x y RR EQ UB.
-      pinversion EQ; subst;
-        inv_contains_UB;
-        inv_existT;
-        try solve [
-            pclearbot;
-            pfold_contains_UB;
-            econstructor; right; eauto
-          ];
-        inversion CHECK.
-    }
-  Qed.
-
   Lemma ret_not_contains_UB {R} {RR : relation R} :
     forall t rv a b, eqit RR a b t (ret rv) -> ~ contains_UB t.
   Proof.
@@ -569,7 +513,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       + reflexivity.
   Qed.
 
-  Instance proper_contains_UB {R} {RR : relation R} : Proper (eutt RR ==> iff) contains_UB.
+  Instance proper_eqit_contains_UB {R} {RR : relation R} (a b : bool) : Proper (eqit RR a b ==> iff) contains_UB.
   Proof.
     unfold Proper, respectful.
     intros x y EQ.
@@ -587,7 +531,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         try solve [
             pfold_contains_UB;
             econstructor; right; eauto
-          ].
+          ]; inversion CHECK; subst.
 
       - (* Left tau, nothing about y *)
         clear UB.
@@ -609,8 +553,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
           rewrite H2 in H1.
           eapply CIH.
           2: pfold; apply H1.
-
-          do 2 red.
 
           punfold REL.
           red in REL.
@@ -647,7 +589,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         constructor.
         right.
         eapply CIH.
-        do 2 red.
         pfold.
         red.
         apply REL.
@@ -668,7 +609,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         try solve [
             pfold_contains_UB;
             econstructor; right; eauto
-          ].
+          ]; inversion CHECK; subst.
 
       - (* Left and right tau *)
         pfold_contains_UB.
@@ -706,8 +647,6 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
           rewrite H2 in H0.
           eapply CIH.
           2: pfold; apply H0.
-
-          do 2 red.
 
           punfold REL.
           red in REL.
