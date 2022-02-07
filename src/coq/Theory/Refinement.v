@@ -655,213 +655,77 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         auto.
     }
 
-
-
-
-
     { generalize dependent RR.
-      generalize dependent y.
       generalize dependent x.
+      generalize dependent y.
       pcofix CIH.
-      intros x y RR EQ UB.
-
-      Ltac inv_existT :=
-        repeat match goal with
-               | H: existT _ _ _ = existT _ _ _ |- _ =>
-                   apply inj_pair2 in H; inversion H; subst
-               end.
-
-      Ltac inv_contains_UB :=
-        match goal with
-        | UB : contains_UB ?x,
-            H : _ = observe ?x |- _ =>
-            punfold UB; rewrite <- H in UB;
-            inversion UB; subst
-        | UB : contains_UB ?x
-          |- _ =>
-            punfold UB;
-            inversion UB; subst
-        end.
-
-      Ltac pfold_contains_UB :=
-        match goal with
-        | H : _ = observe ?y |- paco1 _ _ ?y =>
-            pfold; rewrite <- H
-        end.
+      intros y x RR EQ UB.
 
       pinversion EQ; subst;
         inv_contains_UB;
         inv_existT;
+        pclearbot;
         try solve [
-            pclearbot;
             pfold_contains_UB;
             econstructor; right; eauto
           ].
 
-      - pclearbot.
-        pfold.
-        admit.
-      - admit.
-      - pclearbot.
+      - (* Left and right tau *)
         pfold_contains_UB.
-        econstructor.
-        left.
+        constructor; right; eapply CIH;
+          pfold; eauto.
+      - (* Left tau, external call on the right *)
+        pfold_contains_UB.
+        constructor; right; eapply CIH;
+          pfold; eauto.
+      - (* Left tau, debug or failure on the right *)
+        pfold_contains_UB.
+        constructor; right; eapply CIH;
+          pfold; eauto.
+      - (* UB *)
+        pfold_contains_UB.
+        constructor; right; eapply CIH;
+          pfold; eauto.
+      - (* Left tau, nothing about x on the right. *)
+        clear UB.
+        punfold H0.
 
-        
-        match goal with
-        | H : _ = observe ?y |- paco1 _ _ ?y =>
-            pfold; rewrite <- H
-        end;
-        econstructor; right; eauto.
+        genobs x xo.
+        genobs t2 t2o.
 
-
-      
-      pinversion EQ; subst;
-        punfold UB;
-        try solve [rewrite <- H0 in UB;
-                   inversion UB; subst].
-      - rewrite <- H0 in UB.
-        inversion UB; subst.
-        pclearbot.
-        pfold.        
-        punfold H2.
-        rewrite <- H.
-        constructor.
-        right. eapply CIH. eapply REL.
-        red.
+        (* revert H0. *)
+        clear H1.
+        revert t2 Heqt2o Heqxo.
         pfold.
-        auto.
-      - rewrite <- H0 in UB;
-          inversion UB; subst.
 
-        all:
-          apply inj_pair2 in H3;
-          apply inj_pair2 in H4;
-          subst;
+        induction REL; intros t2' Heqt2o Heqxo; pose proof True as H1; inversion Heqt2o; inversion Heqxo; subst.
+        + inversion H0.
+        + inversion H0; subst; pclearbot.
+          constructor.
+          right.
+          rewrite H2 in H0.
+          eapply CIH.
+          2: pfold; apply H0.
 
-          pclearbot;
-          pfold;
-          rewrite <- H;
-          econstructor;
-          right; eauto.
-      - rewrite <- H0 in UB.
-        hinduction UB before CIH.
-        + intros y t2 RR EQ CHECK REL H0.
+          do 2 red.
+
+          punfold REL.
+          red in REL.
           pfold.
-          inversion H0; subst.
+          red.
+          rewrite <- H2.
+          constructor.
+          constructor.
+          eauto.
+        + inversion H0; subst; inv_existT; subst; pclearbot;
+            econstructor; right; eauto.
+        + constructor.
+          right.
+          eapply CIH; eauto.
           pfold.
-          pclearbot.
-          punfold H.
-
-
-        pcofix CIH2.
-        pfold.
-
-        pfold.
-        rewrite <- H0 in UB.
-        inversion UB; subst.
-        pclearbot.
-
-        clear.
-
-        rewrite <- REL.
-        destruct (observe y).
-        + inversion REL; subst.
-          * punfold H1. rewrite <- H2 in H1.
-            inversion H1.
-          * punfold H1. rewrite <- H2 in H1.
-            inversion H1; subst.
-            pclearbot.
-            punfold H3.
- to            
-        pclearbot.
-
-        assert (eutt RR t1 y) as EUTT.
-        admit.
-        specialize (CIH _ _ _ EUTT H1).
-        punfold H2.
-
-        genobs y yo.
-        clear EQ.
-        clear Heqyo.
-        clear y.
-        generalize dependent yo.
-        pcofix CIH2.
-        destruct (observe y).
-        + exfalso.
-          induction (observe t1).
-          * inversion H2.
-          * inversion H2; subst; pclearbot.
-            apply contains_UB_tau in H3.
-            
-        + inversion H2.
-        + inversion H2; subst.
-          pclearbot.
-
-          apply contains_UB_tau in H3.
-          pose proof contains_UB_tau t.
-          unfold contains_UB in H0.
-          cbn in H0.
-          destruct H0.
-
-          eapply H0 in H2.
-
-          inversion H2; subst.
-
-          destruct (observe y).
-          * rewrite <- REL.
-
-          inversion H2; subst.
-        punfold H2.
-        pfold.
-        rewrite <- REL.
-        destruct (observe t1); inversion H2; subst.
-        + pclearbot.
-
-      - inversion CHECK.
-    }
-
-    { generalize dependent x.
-      generalize dependent y.
-      pcofix CIH.
-      intros x y EQ UB.
-      pinversion EQ; subst;
-        punfold UB;
-        try (rewrite <- H in UB;
-             inversion UB; subst).
-      - pclearbot.
-        pfold.
-        rewrite <- H0.
-        constructor.
-        right. eauto.
-      - apply inj_pair2 in H3.
-        apply inj_pair2 in H4.
-        subst.
-
-        pclearbot.
-        pfold.
-        rewrite <- H0.
-        econstructor.
-        right. eauto.
-      - apply inj_pair2 in H3.
-        apply inj_pair2 in H4.
-        subst.
-
-        pclearbot.
-        pfold.
-        rewrite <- H0.
-        econstructor.
-        right. eauto.
-      - apply inj_pair2 in H3.
-        apply inj_pair2 in H4.
-        subst.
-
-        pclearbot.
-        pfold.
-        rewrite <- H0.
-        econstructor.
-      - inversion CHECK.
-      - inversion CHECK.
+          auto.
+        + inversion H0; subst; pclearbot.
+          punfold H4.
     }
   Qed.
 
