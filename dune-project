@@ -1,5 +1,5 @@
 (lang dune 2.8)
-(using coq 0.2)
+(using coq 0.3)
 (using menhir 2.0)
 
 (name coq-vellvm)
