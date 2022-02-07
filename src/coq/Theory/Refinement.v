@@ -506,6 +506,22 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       pcofix CIH.
       intros x y RR EQ UB.
 
+      (*
+      pinversion EQ.
+      admit.
+      - inv_contains_UB.
+        pclearbot.
+        pfold.
+        punfold H2.
+        rewrite <- H.
+        constructor. right.
+        eapply CIH.
+        apply REL.
+        red.
+        pfold.
+        apply H2.
+       *)
+      
       pinversion EQ; subst;
         inv_contains_UB;
         inv_existT;
@@ -574,47 +590,45 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
           ].
 
       - (* Left tau, nothing about y *)
-        (*
-        assert (paco1 (fun (CUB : rel1 (itree L4 R)) (t : itree L4 R) => contains_UB' CUB (observe t)) r (Tau y)).
-        {
+        clear UB.
+        punfold H1.
+
+        genobs y yo.
+        genobs t1 t1o.
+
+        (* revert H0. *)
+        clear H0.
+        revert t1 Heqt1o Heqyo.
+        pfold.
+
+        induction REL; intros t1' Heqt1o Heqyo; pose proof True as H0; inversion Heqt1o; inversion Heqyo; subst.
+        + inversion H1.
+        + inversion H1; subst; pclearbot.
+          constructor.
+          right.
+          rewrite H2 in H1.
+          eapply CIH.
+          2: pfold; apply H1.
+
+          do 2 red.
+
+          punfold REL.
+          red in REL.
           pfold.
-          constructor. right; eapply CIH;
-            pfold; eauto.
-
-          punfold H1.
-        }
-
-        pfold.
-        pinversion H; subst.
-
-        destruct H3.
-        punfold H2.
-
-        pcofix CIH2.
-        rename r into blah.
-         *)
-
-        pfold.
-        induction (observe y).
-        + (* I know t1 is eutt ret r0, which means it can't contain
-             UB, so H1 is a contradiction... *)
-          eapply ret_not_contains_UB in EQ.
-          pinversion H1.
-          * constructor. (* Another tau... *)
-            rewrite <- H in REL.
-            rewrite <- H in H1.
-            inversion H1; subst.
-            pclearbot.
-          punfold H1.
-          inversion H1.
-
-          
-          admit.
-        + subst.
-          constructor; right; eapply CIH;
-            pfold; eauto.
           red.
-        admit.
+          rewrite <- H2.
+          constructor.
+          constructor.
+          eauto.
+        + inversion H1; subst; inv_existT; subst; pclearbot;
+            econstructor; right; eauto.
+        + inversion H1; subst; pclearbot.
+          punfold H4.
+        + constructor.
+          right.
+          eapply CIH; eauto.
+          pfold.
+          auto.
       - (* Left and right tau *)
         pfold_contains_UB.
         constructor; right; eapply CIH;
@@ -626,7 +640,19 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       - (* Right tau, debug or failure event on the left *)
         pfold_contains_UB.
         constructor; right; eapply CIH;
-          pfold; eauto.        
+          pfold; eauto.
+      - (* UB *)
+        pfold.
+        rewrite <- H1.
+        constructor.
+        right.
+        eapply CIH.
+        do 2 red.
+        pfold.
+        red.
+        apply REL.
+        pfold.
+        auto.
     }
 
 
