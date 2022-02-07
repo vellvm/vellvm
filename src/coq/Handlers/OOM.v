@@ -99,6 +99,13 @@ Section PARAMS_MODEL.
   Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop
     := exists source, sources source /\ refine_OOM_h RR source target.
 
+  Instance refine_OOM_h_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h RR).
+  Proof.
+    (* y is eutt x, except it might run out of memory earlier *)
+    (* z is eutt y, except it might run out of memory earlier *)
+
+    (* Follows that z is eutt x, but might run out of memory earlier *)
+  Admitted.
 End PARAMS_MODEL.
 
 Section PARAMS_INTERP.

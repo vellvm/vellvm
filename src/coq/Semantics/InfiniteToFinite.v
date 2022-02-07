@@ -355,7 +355,106 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Module TLR_INF := TopLevelRefinementsBigIntptr.
   Module TLR_FIN := TopLevelRefinements64BitIntptr.
 
+  (*
+    If
+
+    - ti2 is a refinement of ti1
+    - tf2 refines ti2
+    - tf1 refines tf2 at finite level
+
+    Not sure that this is true.
+
+    If ti1 -i> ti2
+
+    and ti2 -if> tf2
+
+    And tf2 -f> tf1...
+
+    Does it really follow that ti1 -if> tf1?
+
+    In theory I can refine ti1 to ti2, and to tf1 through
+    tf2... BUT... Does this mean I can refine ti1 directly to tf1?
+
+    In theory ti2 has fewer behaviours than ti1, and so if I can refine it to tf2, then I can also refine ti1 to tf2.
+   *)
   Lemma refine_E1E2_L6_compose :
+    forall tx ty tz,
+      TLR_INF.R.refine_L6 tx ty ->
+      refine_E1E2_L6 ty tz ->
+      refine_E1E2_L6 tx tz.
+  Proof.
+    intros tx ty tz XY_INF YZ_FIN.
+
+    unfold refine_E1E2_L6 in *.
+    unfold TLR_INF.R.refine_L6 in *.
+    unfold TLR_FIN.R.refine_L6 in *.
+
+    intros ubz TZ.
+
+    specialize (YZ_FIN ubz TZ).
+    destruct YZ_FIN as (uby_fin & blah & [UB | RFIN]).
+    unfold L4_convert_PropT in blah.
+    - (* t'' contains UB *)
+      (* This means that ti2 contains UB, and can be refined to anything.
+
+         Because ti2 is a refinement of ti1, this means that ti1 must
+         also contain UB, and be able to be refined to anything.
+       *)
+
+      specialize (RINF t_e1 Hti2t_e1).
+      destruct RINF as (t''' & Hti1t''' & [UB' | INF]).
+
+      + eexists.
+        split.
+        2: { left. eauto. }
+
+        unfold L4_convert_PropT in *.
+
+        exists t'''.
+        split.
+        * auto.
+        * subst. 
+          auto.
+
+      
+      destruct ti2t'' as 
+    - (* t'' doesn't contain UB *)
+    exists t'.
+  Qed.
+
+
+
+  Instance Transitive_refine_L6 : Transitive refine_L6.
+  Proof.
+    unfold Transitive.
+    intros tx ty tz XY YZ.
+
+    intros rz TZ.
+    specialize (YZ rz TZ).
+    destruct YZ as (ry & TY & [UB_ry | YZ]).
+
+    - (* UB in ty *)
+      specialize (XY ry TY).
+      destruct XY as (rx & TX & [UB_rx | XY]).
+
+      + (* UB in tx *)
+        exists rx; split; auto.
+      + exists rx; split; auto.
+        left. unfold refine_OOM_h in XY.
+        eapply contains_UB_refine_OOM_h; eauto.
+    - specialize (XY ry TY).
+      destruct XY as (rx & TX & [UB_rx | XY]).
+
+      + (* UB in tx *)
+        exists rx; split; auto.
+      + exists rx; split; auto.
+        right. 
+        eapply refine_OOM_h_transitive; eauto.
+        typeclasses eauto.
+  Abort.
+
+
+  Lemma refine_E1E2_L6_transitive :
     forall ti1 ti2 tf2 tf1,
       TLR_INF.R.refine_L6 ti1 ti2 ->
       refine_E1E2_L6 ti2 tf2 ->
@@ -366,6 +465,12 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
     unfold refine_E1E2_L6 in *.
     Require Import Coq.Classes.RelationClasses.
+    unfold TLR_FIN.R.refine_L6 in *.
+    unfold TLR_INF.R.refine_L6 in *.
+
+    intros t' H.
+    eexists.
+    split.
 
   Qed.
 

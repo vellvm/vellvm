@@ -411,17 +411,439 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Definition refine_L4 : relation ((itree L4 (MemState * (local_env * stack * (global_env * uvalue)))) -> Prop)
     := fun ts ts' => forall t', ts' t' -> exists t, ts t /\ eutt refine_res3 t t'.
 
-  Inductive contains_UB {R} : itree L4 R -> Prop :=
-  | CrawlTau  : forall t, contains_UB t -> contains_UB (Tau t)
-  | CrawlVis1 : forall Y (e : ExternalCallE Y) x k, contains_UB (k x) -> contains_UB (vis e k)
-  | CrawlVis2 : forall Y (e : (DebugE +' FailureE) Y) x k, contains_UB (k x) -> contains_UB (vis e k)
-  | FindUB    : forall s, contains_UB (raiseUB s).
+  Inductive contains_UB' {R} (CUB : itree L4 R -> Prop) : itree' L4 R -> Prop :=
+  | CrawlTau  : forall t, CUB t -> contains_UB' CUB (TauF t)
+  | CrawlVis1 : forall Y (e : ExternalCallE Y) x (k : Y -> itree L4 R), CUB (k x) -> contains_UB' CUB (VisF (subevent _ e) k)
+  | CrawlVis2 : forall Y (e : (DebugE +' FailureE) Y) x (k : Y -> itree L4 R), CUB (k x) -> contains_UB' CUB (VisF (subevent _ e) k)
+  | FindUB    : forall s k, contains_UB' CUB (VisF (subevent _ (ThrowUB s)) k).
 
   Require Import Morphisms.
   Require Import Paco.paco.
 
-  Instance proper_contains_UB {R} {RR : relation R} : Proper (eutt RR ==> flip impl) contains_UB.
+  Definition contains_UB {R} : itree L4 R -> Prop
+    := paco1 (fun CUB t => contains_UB' CUB (observe t)) bot1.
+  Hint Unfold contains_UB : Core.
+
+  Lemma contains_UB_mon {R} : monotone1 (fun (CUB : rel1 (itree L4 R)) (t : itree L4 R) => contains_UB' CUB (observe t)).
   Proof.
+    unfold monotone1.
+    intros x0 r r' IN LE.
+    induction (observe x0).
+    - inversion IN.
+    - inversion IN; subst; constructor; eauto.
+    - inversion IN;
+        try apply inj_pair2 in H1;
+        try apply inj_pair2 in H2;
+        subst;
+        try econstructor; eauto.
+
+      apply inj_pair2 in H1.
+      apply inj_pair2 in H2.
+      subst.
+
+      econstructor.
+  Qed.
+  Hint Resolve contains_UB_mon : paco.
+
+  (* TODO: move this *)
+  Lemma eqitree_inv_Tau_l {E R} (t t' : itree E R) :
+    Tau t ≅ t' -> exists t0, observe t' = TauF t0 /\ t ≅ t0.
+  Proof.
+    intros; punfold H; inv H; try inv CHECK; pclearbot; eauto.
+  Qed.
+
+  Lemma contains_UB_tau {R} (t : itree L4 R):
+    contains_UB t <-> contains_UB (Tau t).
+  Proof.
+    split; intros UB.
+    { pfold.
+      punfold UB.
+      constructor.
+      left.
+      pfold.
+      apply UB.
+    }
+
+    { pfold.
+      pinversion UB; subst.
+      punfold H0.
+    }
+  Qed.
+
+  Ltac inv_existT :=
+    repeat match goal with
+           | H: existT _ _ _ = existT _ _ _ |- _ =>
+               apply inj_pair2 in H; inversion H; subst
+           end.
+
+  Ltac inv_contains_UB :=
+    match goal with
+    | UB : contains_UB ?x,
+        H : _ = observe ?x |- _ =>
+        punfold UB; rewrite <- H in UB;
+        inversion UB; subst
+    | UB : contains_UB ?x
+      |- _ =>
+        punfold UB;
+        inversion UB; subst
+    end.
+
+  Ltac pfold_contains_UB :=
+    match goal with
+    | H : _ = observe ?y |- paco1 _ _ ?y =>
+        pfold; rewrite <- H
+    end.
+
+  Instance proper_eq_itree_contains_UB {R : Type} {RR : relation R} :
+    Proper (@eq_itree _ R R RR ==> iff) contains_UB.
+  Proof.
+    unfold Proper, respectful.
+    intros x y EQ.
+    split.
+    { generalize dependent RR.
+      generalize dependent y.
+      generalize dependent x.
+      pcofix CIH.
+      intros x y RR EQ UB.
+
+      pinversion EQ; subst;
+        inv_contains_UB;
+        inv_existT;
+        try solve [
+            pclearbot;
+            pfold_contains_UB;
+            econstructor; right; eauto
+          ];
+        inversion CHECK.
+    }
+
+    { generalize dependent RR.
+      generalize dependent x.
+      generalize dependent y.
+      pcofix CIH.
+      intros x y RR EQ UB.
+      pinversion EQ; subst;
+        inv_contains_UB;
+        inv_existT;
+        try solve [
+            pclearbot;
+            pfold_contains_UB;
+            econstructor; right; eauto
+          ];
+        inversion CHECK.
+    }
+  Qed.
+
+  Lemma ret_not_contains_UB {R} {RR : relation R} :
+    forall t rv a b, eqit RR a b t (ret rv) -> ~ contains_UB t.
+  Proof.
+    intros t rv a b EQ CUB.
+    punfold EQ.
+    unfold eqit_ in EQ.
+    punfold CUB.
+    remember (observe t) as to.
+    remember (observe (ret rv)) as ro.
+    revert t Heqto Heqro.
+    induction EQ; intros t TO RO; inversion TO; inversion RO; subst.
+    - inversion CUB.
+    - eapply IHEQ.
+      + inversion CUB; subst; pclearbot.
+        punfold H2.
+      + reflexivity.
+      + reflexivity.
+  Qed.
+
+  Instance proper_contains_UB {R} {RR : relation R} : Proper (eutt RR ==> iff) contains_UB.
+  Proof.
+    unfold Proper, respectful.
+    intros x y EQ.
+    split.
+    { generalize dependent RR.
+      generalize dependent y.
+      generalize dependent x.
+      pcofix CIH.
+      intros x y RR EQ UB.
+
+      pinversion EQ; subst;
+        inv_contains_UB;
+        inv_existT;
+        pclearbot;
+        try solve [
+            pfold_contains_UB;
+            econstructor; right; eauto
+          ].
+
+      - (* Left tau, nothing about y *)
+        (*
+        assert (paco1 (fun (CUB : rel1 (itree L4 R)) (t : itree L4 R) => contains_UB' CUB (observe t)) r (Tau y)).
+        {
+          pfold.
+          constructor. right; eapply CIH;
+            pfold; eauto.
+
+          punfold H1.
+        }
+
+        pfold.
+        pinversion H; subst.
+
+        destruct H3.
+        punfold H2.
+
+        pcofix CIH2.
+        rename r into blah.
+         *)
+
+        pfold.
+        induction (observe y).
+        + (* I know t1 is eutt ret r0, which means it can't contain
+             UB, so H1 is a contradiction... *)
+          eapply ret_not_contains_UB in EQ.
+          pinversion H1.
+          * constructor. (* Another tau... *)
+            rewrite <- H in REL.
+            rewrite <- H in H1.
+            inversion H1; subst.
+            pclearbot.
+          punfold H1.
+          inversion H1.
+
+          
+          admit.
+        + subst.
+          constructor; right; eapply CIH;
+            pfold; eauto.
+          red.
+        admit.
+      - (* Left and right tau *)
+        pfold_contains_UB.
+        constructor; right; eapply CIH;
+          pfold; eauto.
+      - (* Right tau, external call on the left *)
+        pfold_contains_UB.
+        constructor; right; eapply CIH;
+          pfold; eauto.
+      - (* Right tau, debug or failure event on the left *)
+        pfold_contains_UB.
+        constructor; right; eapply CIH;
+          pfold; eauto.        
+    }
+
+
+
+
+
+    { generalize dependent RR.
+      generalize dependent y.
+      generalize dependent x.
+      pcofix CIH.
+      intros x y RR EQ UB.
+
+      Ltac inv_existT :=
+        repeat match goal with
+               | H: existT _ _ _ = existT _ _ _ |- _ =>
+                   apply inj_pair2 in H; inversion H; subst
+               end.
+
+      Ltac inv_contains_UB :=
+        match goal with
+        | UB : contains_UB ?x,
+            H : _ = observe ?x |- _ =>
+            punfold UB; rewrite <- H in UB;
+            inversion UB; subst
+        | UB : contains_UB ?x
+          |- _ =>
+            punfold UB;
+            inversion UB; subst
+        end.
+
+      Ltac pfold_contains_UB :=
+        match goal with
+        | H : _ = observe ?y |- paco1 _ _ ?y =>
+            pfold; rewrite <- H
+        end.
+
+      pinversion EQ; subst;
+        inv_contains_UB;
+        inv_existT;
+        try solve [
+            pclearbot;
+            pfold_contains_UB;
+            econstructor; right; eauto
+          ].
+
+      - pclearbot.
+        pfold.
+        admit.
+      - admit.
+      - pclearbot.
+        pfold_contains_UB.
+        econstructor.
+        left.
+
+        
+        match goal with
+        | H : _ = observe ?y |- paco1 _ _ ?y =>
+            pfold; rewrite <- H
+        end;
+        econstructor; right; eauto.
+
+
+      
+      pinversion EQ; subst;
+        punfold UB;
+        try solve [rewrite <- H0 in UB;
+                   inversion UB; subst].
+      - rewrite <- H0 in UB.
+        inversion UB; subst.
+        pclearbot.
+        pfold.        
+        punfold H2.
+        rewrite <- H.
+        constructor.
+        right. eapply CIH. eapply REL.
+        red.
+        pfold.
+        auto.
+      - rewrite <- H0 in UB;
+          inversion UB; subst.
+
+        all:
+          apply inj_pair2 in H3;
+          apply inj_pair2 in H4;
+          subst;
+
+          pclearbot;
+          pfold;
+          rewrite <- H;
+          econstructor;
+          right; eauto.
+      - rewrite <- H0 in UB.
+        hinduction UB before CIH.
+        + intros y t2 RR EQ CHECK REL H0.
+          pfold.
+          inversion H0; subst.
+          pfold.
+          pclearbot.
+          punfold H.
+
+
+        pcofix CIH2.
+        pfold.
+
+        pfold.
+        rewrite <- H0 in UB.
+        inversion UB; subst.
+        pclearbot.
+
+        clear.
+
+        rewrite <- REL.
+        destruct (observe y).
+        + inversion REL; subst.
+          * punfold H1. rewrite <- H2 in H1.
+            inversion H1.
+          * punfold H1. rewrite <- H2 in H1.
+            inversion H1; subst.
+            pclearbot.
+            punfold H3.
+ to            
+        pclearbot.
+
+        assert (eutt RR t1 y) as EUTT.
+        admit.
+        specialize (CIH _ _ _ EUTT H1).
+        punfold H2.
+
+        genobs y yo.
+        clear EQ.
+        clear Heqyo.
+        clear y.
+        generalize dependent yo.
+        pcofix CIH2.
+        destruct (observe y).
+        + exfalso.
+          induction (observe t1).
+          * inversion H2.
+          * inversion H2; subst; pclearbot.
+            apply contains_UB_tau in H3.
+            
+        + inversion H2.
+        + inversion H2; subst.
+          pclearbot.
+
+          apply contains_UB_tau in H3.
+          pose proof contains_UB_tau t.
+          unfold contains_UB in H0.
+          cbn in H0.
+          destruct H0.
+
+          eapply H0 in H2.
+
+          inversion H2; subst.
+
+          destruct (observe y).
+          * rewrite <- REL.
+
+          inversion H2; subst.
+        punfold H2.
+        pfold.
+        rewrite <- REL.
+        destruct (observe t1); inversion H2; subst.
+        + pclearbot.
+
+      - inversion CHECK.
+    }
+
+    { generalize dependent x.
+      generalize dependent y.
+      pcofix CIH.
+      intros x y EQ UB.
+      pinversion EQ; subst;
+        punfold UB;
+        try (rewrite <- H in UB;
+             inversion UB; subst).
+      - pclearbot.
+        pfold.
+        rewrite <- H0.
+        constructor.
+        right. eauto.
+      - apply inj_pair2 in H3.
+        apply inj_pair2 in H4.
+        subst.
+
+        pclearbot.
+        pfold.
+        rewrite <- H0.
+        econstructor.
+        right. eauto.
+      - apply inj_pair2 in H3.
+        apply inj_pair2 in H4.
+        subst.
+
+        pclearbot.
+        pfold.
+        rewrite <- H0.
+        econstructor.
+        right. eauto.
+      - apply inj_pair2 in H3.
+        apply inj_pair2 in H4.
+        subst.
+
+        pclearbot.
+        pfold.
+        rewrite <- H0.
+        econstructor.
+      - inversion CHECK.
+      - inversion CHECK.
+    }
+  Qed.
+
+  Instance proper_refine_OOM_h {R} {RR : relation R} : Proper (refine_OOM_h RR ==> flip impl) contains_UB.
+  Proof.
+    unfold Proper, respectful.
+    intros x y REF.
+    unfold refine_OOM_h in REF.
   Admitted.
 
   Lemma contains_UB_eutt :
@@ -432,6 +854,17 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Proof.
     intros R RR t1 t2 UB EQ.
     rewrite EQ.
+    eauto.
+  Qed.
+
+  Lemma contains_UB_refine_OOM_h :
+    forall R (RR : relation R) x y,
+      contains_UB y ->
+      refine_OOM_h RR x y ->
+      contains_UB x.
+  Proof.
+    intros R RR x y UB REF.
+    rewrite REF.
     eauto.
   Qed.
 
@@ -474,24 +907,33 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
         right. rewrite XY. eauto.
   Qed.
 
-  (* Instance Transitive_refine_L6 : Transitive refine_L6. *)
-  (* Proof. *)
-  (*   unfold Transitive. *)
-  (*   intros x y z XY YZ. *)
+  Instance Transitive_refine_L6 : Transitive refine_L6.
+  Proof.
+    unfold Transitive.
+    intros tx ty tz XY YZ.
 
-  (*   unfold refine_L6 in *. *)
-  (*   intros t' zt'. *)
+    intros rz TZ.
+    specialize (YZ rz TZ).
+    destruct YZ as (ry & TY & [UB_ry | YZ]).
 
-  (*   specialize (YZ  t' zt') as (t'' & yt'' & yref). *)
-  (*   specialize (XY t'' yt'') as (t''' & xt''' & xref). *)
-  (*   exists t'''; split; auto. *)
+    - (* UB in ty *)
+      specialize (XY ry TY).
+      destruct XY as (rx & TX & [UB_rx | XY]).
 
-  (*   destruct xref as [UBX | REF_OOMX]; auto. *)
-  (*   right. *)
+      + (* UB in tx *)
+        exists rx; split; auto.
+      + exists rx; split; auto.
+        left. unfold refine_OOM_h in XY.
+        eapply contains_UB_refine_OOM_h; eauto.
+    - specialize (XY ry TY).
+      destruct XY as (rx & TX & [UB_rx | XY]).
 
-  (*   destruct yref as [UBY | REF_OOMY]. *)
-
-  (*   apply eutt_refine_oom_h; try typeclasses eauto. *)
-  (* Qed. *)
+      + (* UB in tx *)
+        exists rx; split; auto.
+      + exists rx; split; auto.
+        right. 
+        eapply refine_OOM_h_transitive; eauto.
+        typeclasses eauto.
+  Qed.
 
 End Make.
