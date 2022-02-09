@@ -56,6 +56,7 @@ COQFILESQC := Syntax/TypeUtil QC/Utils QC/GenAST QC/ShowAST QC/ReprAST QC/QCVell
 
 COQFILESTHEORY := Syntax/ScopeTheory\
 		Theory/StatePredicates\
+		Theory/ContainsUB\
 		Theory/Refinement Theory/InterpreterMCFG Theory/InterpreterCFG\
 		Theory/ExpLemmas Theory/InstrLemmas Theory/DenotationTheory\
 		Theory/LocalFrame\
