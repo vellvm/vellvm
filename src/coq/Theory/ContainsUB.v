@@ -406,13 +406,22 @@ Section bind_lemmas.
       eapply FindUB; reflexivity.
   Qed.
 
+  (* Not true, what if `t` spins? *)
+  Lemma bind_contains_UB_k :
+    forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
+      (forall x, contains_UB (k x)) ->
+      contains_UB (ITree.bind t k).
+  Proof.
+    intros R T t k CUB.
+  Abort.
+
   Lemma bind_contains_UB' :
     forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
       contains_UB (ITree.bind t k) ->
       (forall x, ~ contains_UB (k x)) ->
       contains_UB t.
   Proof.
-
+    intros R T t k UB NUB.
   Admitted.
 End bind_lemmas.
 
@@ -429,6 +438,7 @@ Section interp_lemmas.
     forall {R} (e : UBE R),
       contains_UB (handler _ ((inr1 (inr1 (inl1 e))) : Eff1 R)).
 
+  (* This isn't true. What if the handler spins? *)
   Lemma interp_contains_UB :
     forall {R} (t : itree Eff1 R),
       contains_UB t ->
@@ -436,33 +446,20 @@ Section interp_lemmas.
       contains_UB (interp handler t).
   Proof.
     intros R t UB KEEP.
+    Import InterpFacts.
+    induction UB;
+      try solve [rewrite H;
+                 rewrite InterpFacts.interp_tau;
+                 rewrite tau_eutt; eauto].
+
+    - rewrite H.
+      rewrite interp_vis.
+      remember (handler Y (subevent Y e)) as te.
+      
+      apply bind_contains_UB.
 
     unfold handler_keeps_UB in KEEP.
-
-    rewrite (itree_eta t).
-    genobs t to.
-    revert t to Heqto UB.
-    pcofix CIH; intros t to Heqto UB.
-
-    pinversion UB; clear UB.
-    - (* Tau *)
-      admit.
-    - (* Vis E + F *)
-      admit.
-    - (* Vis G *)
-      admit.
-    - (* UB *)
-      rewrite <- H0 in Heqto.
-      subst.
-      pfold.
-
-      unfold handler_keeps_UB in KEEP.
-      pose proof (KEEP _ (ThrowUB s)).
-      rewrite <- InterpFacts.interp_trigger in H.
-
-      punfold H.
-      cbn in H.
-  Admitted.
+  Abort.
 End interp_lemmas.
 
 
@@ -494,7 +491,7 @@ Section refine_OOM_h_lemmas.
         punfold EQ; red in EQ.
         genobs t2 t2o.
         revert t2 Heqt2o.
-        induction EQ; intros t2' Heqt2o e' k H UB IHUB.
+        induction EQ; rename t2 into x; intros t2 Heqt2o e' k H UB IHUB.
 
         punfold H; red in H.
         rewrite <- Heqt2o in H.
@@ -504,181 +501,111 @@ Section refine_OOM_h_lemmas.
         rewrite <- Heqt2o in H.
         inversion H; inversion CHECK.
 
-        destruct e as [e | [oome | [ube | g]]]; cbn in KS.
+        punfold H; red in H.
+        rewrite <- Heqt2o in H.
+        dependent induction H.
+
+        cbn in KS;
+          cbn in HTA; red in HTA; try rewrite HTA in KS.
+        destruct e' as [e | oome]; cbn in KS; cbn in HTA; red in HTA.
         + rewrite KS.
-          
+          rewrite HTA.
 
-        admit.
-        destruct s; cbn in KS.
-        pose proof oom_k_spec_correct_trigger as KSC.
-        unfold k_spec_correct in KSC.
+          assert (ta ≈ vis e (fun x => ret x)) as TAvis.
+          { rewrite HTA.
+            reflexivity.
+          }
 
-
-          punfold H; red in H.
-          rewrite <- Heqt2o in H.
-          inversion H.
-
-        unfold refine_OOM_h in *.
-
-        rewrite H in EQ.
-        punfold EQ; cbn in EQ; red in EQ.
-        induction EQ.
-        + pinversion H; inv_existT.
-          admit.
-          rewrite eq2.
-          apply IHUB.
-          pinversion EQ; inv_existT.
-
-        apply IHUB.
-
-
-
-        punfold EQ; red in EQ.
-        { remember (observe t2) as t2o.
-          remember (observe x) as xo.
-          revert e k t2 x H UB IHUB Heqt2o Heqxo.
-          induction EQ; intros e' k t2' x H UB IHUB Heqt2o Heqxo.
-          punfold H; red in H.
-          rewrite <- Heqt2o in H.
-          inversion H.
-
-          punfold H; red in H.
-          rewrite <- Heqt2o in H.
-          cbn in H.
-          inversion H; inversion CHECK.
-
-          - punfold H; red in H.
-            rewrite <- Heqt2o in H.
-            cbn in H.
-            dependent induction H.
-
-            eapply CrawlVis1 with (k0:=k1) (e:=subevent T e').
-            { symmetry.
-              pfold; red.
-              rewrite <- Heqxo.
-              constructor; eauto.
-              intros v'.
-              red. left.
-              apply Reflexive_eqit. typeclasses eauto.
-            }
-
-            apply IHUB.
-            pclearbot.
-            rewrite <- REL0.
-            eauto.
-          - punfold H; red in H.
-            cbn in H.
-            dependent induction H.
-            eapply CrawlTau with (t2 := t1).
-
-            pfold; red; rewrite <- Heqxo.
+          eapply ReturnsVis with (a := v) in TAvis.
+          2: {
+            econstructor.
             cbn.
-            constructor; left.
-            apply Reflexive_eqit. typeclasses eauto.
-            eapply IHEQ; eauto.
-            pfold; red; rewrite <- x.
-            cbn; constructor; eauto.
-          - punfold H; red in H.
-            rewrite <- Heqt2o in H.
-            cbn in H.
-            inversion H; inversion CHECK0.
-        }
+            reflexivity.
+          }
+
+          rewrite bind_trigger.
+          eapply CrawlVis1 with (e0 := (resum IFun T e)) (k0 := k2).
+          reflexivity.
+          eapply IHUB.
+          unfold refine_OOM_h.
+          pclearbot.
+          rewrite <- REL.
+
+          specialize (HK v TAvis).
+          pclearbot.
+          unfold interp_prop.
+          apply HK.
+        + (* t2 has OOM *)
+          clear KS.
+          clear HTA.
+          inversion oome; subst.
+          contradiction.
       - rename Y into T.
-        intros y EQ.
+        rename x into v.
+        intros x EQ.
+        revert e k H UB IHUB.
         punfold EQ; red in EQ.
-        { remember (observe t2) as t2o.
-          remember (observe y) as yo.
-          revert e k t2 y H UB IHUB Heqt2o Heqyo.
-          induction EQ; intros e' k t2' y H UB IHUB Heqt2o Heqyo.
+        genobs t2 t2o.
+        revert t2 Heqt2o.
+        induction EQ; rename t2 into x; intros t2 Heqt2o e' k H UB IHUB.
 
-          punfold H; red in H.
-          rewrite <- Heqt2o in H.
-          inversion H.
+        punfold H; red in H.
+        rewrite <- Heqt2o in H.
+        inversion H.
 
-          punfold H; red in H.
-          rewrite <- Heqt2o in H.
-          cbn in H.
-          inversion H; inversion CHECK.
+        punfold H; red in H.
+        rewrite <- Heqt2o in H.
+        inversion H; inversion CHECK.
 
-          - punfold H; red in H.
-            rewrite <- Heqt2o in H.
-            cbn in H.
-            dependent induction H.
+        punfold H; red in H.
+        rewrite <- Heqt2o in H.
+        dependent induction H.
 
-            eapply CrawlVis2 with (k0:=k1).
-            { symmetry.
-              pfold; red.
-              rewrite <- Heqyo.
-              cbn.
-              econstructor; eauto.
-              intros v.
-              red. left.
-              apply Reflexive_eqit. typeclasses eauto.
-            }
+        cbn in KS;
+          cbn in HTA; red in HTA; try rewrite HTA in KS.
+        + rewrite KS.
 
-            apply IHUB.
-            pclearbot.
-            rewrite <- REL0.
-            eauto.
-          - punfold H; red in H.
-            cbn in H.
-            dependent induction H.
-            eapply CrawlTau with (t2 := t1).
+          assert (ta ≈ vis e' (fun x => ret x)) as TAvis.
+          { rewrite HTA.
+            reflexivity.
+          }
 
-            pfold; red; rewrite <- Heqyo.
+          eapply ReturnsVis with (a := v) in TAvis.
+          2: {
+            econstructor.
             cbn.
-            constructor; left.
-            apply Reflexive_eqit. typeclasses eauto.
-            eapply IHEQ; eauto.
-            pfold; red; rewrite <- x.
-            cbn; constructor; eauto.
-          - punfold H; red in H.
-            rewrite <- Heqt2o in H.
-            cbn in H.
-            inversion H; inversion CHECK0.
-        }
+            reflexivity.
+          }
+
+          rewrite bind_trigger.
+          eapply CrawlVis2 with (e := (resum IFun T e')) (k0 := k2).
+          reflexivity.
+          eapply IHUB.
+          unfold refine_OOM_h.
+          pclearbot.
+          rewrite <- REL.
+
+          specialize (HK v TAvis).
+          pclearbot.
+          unfold interp_prop.
+          apply HK.
       - intros y EQ.
         punfold H; red in H.
         dependent induction H.
         punfold EQ; red in EQ.
         rewrite <- x in EQ.
         dependent induction EQ.
-        + eapply FindUB.
-          pfold; red.
-          rewrite <- x.
-          cbn.
-          econstructor; intros [].
-        + eapply CrawlTau with (t3:=t1).
-          pfold; red; rewrite <- x; cbn.
-          constructor. left.
-          apply Reflexive_eqit. typeclasses eauto.
 
-          eapply IHEQ; eauto.          
+        cbn in KS.
+        cbn in HTA; red in HTA.
+        subst ta.
+
+        rewrite KS.
+        rewrite bind_trigger.
+        eapply FindUB with (s0 := s) (k0:=k2).
+        reflexivity.
     }
-
-    Unshelve.
-
-    all: intros [].
   Qed.
-
-  Proof.
-    unfold Proper, respectful.
-    intros x y REF UB.
-    
-    { generalize dependent RR.
-      generalize dependent x.
-      generalize dependent y.
-      pcofix CIH.
-      intros y UB x RR REF.
-
-      pinversion REF; subst;
-        inv_contains_UB;
-        inv_observes;
-        inv_existT;
-        pclearbot.
-
-      all: admit.
-  Admitted.
 
   Lemma contains_UB_refine_OOM_h :
     forall R (RR : relation R) (x y : itree Eff R),
