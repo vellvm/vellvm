@@ -381,51 +381,6 @@ Section contains_UB_lemmas.
 
 End contains_UB_lemmas.
 
-Section refine_OOM_h_lemmas.
-  Context {E G : Type -> Type}.
-  Local Notation Eff := (E +' OOME +' UBE +' G).
-
-  (* Only the <- direction is true *)
-  Global Instance proper_refine_OOM_h
-           {R} {RR : relation R} : Proper (@refine_OOM_h E (UBE +' G) _ RR ==> flip impl) contains_UB.
-  Proof.
-    unfold Proper, respectful.
-    intros x y REF UB.
-    
-    { generalize dependent RR.
-      generalize dependent x.
-      generalize dependent y.
-      pcofix CIH.
-      intros y UB x RR REF.
-
-      pinversion REF; subst;
-        inv_contains_UB;
-        inv_observes;
-        inv_existT;
-        pclearbot.
-
-      all: admit.
-  Admitted.
-
-  Lemma contains_UB_refine_OOM_h :
-    forall R (RR : relation R) (x y : itree Eff R),
-      contains_UB y ->
-      refine_OOM_h RR x y ->
-      contains_UB x.
-  Proof.
-    intros R RR x y UB REF.
-    rewrite REF.
-    eauto.
-  Qed.
-End refine_OOM_h_lemmas.
-
-(* TODO: move this *)
-Lemma eqitree_inv_Tau_l {E R} (t t' : itree E R) :
-  Tau t ≅ t' -> exists t0, observe t' = TauF t0 /\ t ≅ t0.
-Proof.
-  intros; punfold H; inv H; try inv CHECK; pclearbot; eauto.
-Qed.
-
 Section bind_lemmas.
   Context {E F G : Type -> Type}.
   Local Notation Eff := (E +' F +' UBE +' G).
@@ -436,7 +391,20 @@ Section bind_lemmas.
       contains_UB (ITree.bind t k).
   Proof.
     intros R T t k CUB.
-  Admitted.
+    induction CUB.
+    - rewrite H.
+      rewrite tau_eutt.
+      eauto.
+    - rewrite H.
+      rewrite bind_vis.
+      eapply CrawlVis1; [reflexivity | cbn; eauto].
+    - rewrite H.
+      rewrite bind_vis.
+      eapply CrawlVis2; [reflexivity | cbn; eauto].
+    - rewrite H.
+      rewrite bind_vis.
+      eapply FindUB; reflexivity.
+  Qed.
 
   Lemma bind_contains_UB' :
     forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
@@ -496,3 +464,237 @@ Section interp_lemmas.
       cbn in H.
   Admitted.
 End interp_lemmas.
+
+
+Section refine_OOM_h_lemmas.
+  Context {E G : Type -> Type}.
+  Local Notation Eff := (E +' OOME +' UBE +' G).
+
+  Hint Resolve interp_PropT__mono : paco.
+
+  (* Only the <- direction is true *)
+  Global Instance proper_refine_OOM_h
+           {R} {RR : relation R} : Proper (@refine_OOM_h E (UBE +' G) _ RR ==> flip impl) contains_UB.
+    unfold Proper, respectful.
+    intros x y EQ UB.
+
+    { revert x EQ.
+      induction UB.
+      - intros x EQ.
+        apply IHUB.
+
+        unfold refine_OOM_h in *.
+        rewrite H in EQ.
+        apply interp_prop_tau_inv in EQ.
+        auto.
+      - rename Y into T.
+        rename x into v.
+        intros x EQ.
+        revert e k H UB IHUB.
+        punfold EQ; red in EQ.
+        genobs t2 t2o.
+        revert t2 Heqt2o.
+        induction EQ; intros t2' Heqt2o e' k H UB IHUB.
+
+        punfold H; red in H.
+        rewrite <- Heqt2o in H.
+        inversion H.
+
+        punfold H; red in H.
+        rewrite <- Heqt2o in H.
+        inversion H; inversion CHECK.
+
+        destruct e as [e | [oome | [ube | g]]]; cbn in KS.
+        + rewrite KS.
+          
+
+        admit.
+        destruct s; cbn in KS.
+        pose proof oom_k_spec_correct_trigger as KSC.
+        unfold k_spec_correct in KSC.
+
+
+          punfold H; red in H.
+          rewrite <- Heqt2o in H.
+          inversion H.
+
+        unfold refine_OOM_h in *.
+
+        rewrite H in EQ.
+        punfold EQ; cbn in EQ; red in EQ.
+        induction EQ.
+        + pinversion H; inv_existT.
+          admit.
+          rewrite eq2.
+          apply IHUB.
+          pinversion EQ; inv_existT.
+
+        apply IHUB.
+
+
+
+        punfold EQ; red in EQ.
+        { remember (observe t2) as t2o.
+          remember (observe x) as xo.
+          revert e k t2 x H UB IHUB Heqt2o Heqxo.
+          induction EQ; intros e' k t2' x H UB IHUB Heqt2o Heqxo.
+          punfold H; red in H.
+          rewrite <- Heqt2o in H.
+          inversion H.
+
+          punfold H; red in H.
+          rewrite <- Heqt2o in H.
+          cbn in H.
+          inversion H; inversion CHECK.
+
+          - punfold H; red in H.
+            rewrite <- Heqt2o in H.
+            cbn in H.
+            dependent induction H.
+
+            eapply CrawlVis1 with (k0:=k1) (e:=subevent T e').
+            { symmetry.
+              pfold; red.
+              rewrite <- Heqxo.
+              constructor; eauto.
+              intros v'.
+              red. left.
+              apply Reflexive_eqit. typeclasses eauto.
+            }
+
+            apply IHUB.
+            pclearbot.
+            rewrite <- REL0.
+            eauto.
+          - punfold H; red in H.
+            cbn in H.
+            dependent induction H.
+            eapply CrawlTau with (t2 := t1).
+
+            pfold; red; rewrite <- Heqxo.
+            cbn.
+            constructor; left.
+            apply Reflexive_eqit. typeclasses eauto.
+            eapply IHEQ; eauto.
+            pfold; red; rewrite <- x.
+            cbn; constructor; eauto.
+          - punfold H; red in H.
+            rewrite <- Heqt2o in H.
+            cbn in H.
+            inversion H; inversion CHECK0.
+        }
+      - rename Y into T.
+        intros y EQ.
+        punfold EQ; red in EQ.
+        { remember (observe t2) as t2o.
+          remember (observe y) as yo.
+          revert e k t2 y H UB IHUB Heqt2o Heqyo.
+          induction EQ; intros e' k t2' y H UB IHUB Heqt2o Heqyo.
+
+          punfold H; red in H.
+          rewrite <- Heqt2o in H.
+          inversion H.
+
+          punfold H; red in H.
+          rewrite <- Heqt2o in H.
+          cbn in H.
+          inversion H; inversion CHECK.
+
+          - punfold H; red in H.
+            rewrite <- Heqt2o in H.
+            cbn in H.
+            dependent induction H.
+
+            eapply CrawlVis2 with (k0:=k1).
+            { symmetry.
+              pfold; red.
+              rewrite <- Heqyo.
+              cbn.
+              econstructor; eauto.
+              intros v.
+              red. left.
+              apply Reflexive_eqit. typeclasses eauto.
+            }
+
+            apply IHUB.
+            pclearbot.
+            rewrite <- REL0.
+            eauto.
+          - punfold H; red in H.
+            cbn in H.
+            dependent induction H.
+            eapply CrawlTau with (t2 := t1).
+
+            pfold; red; rewrite <- Heqyo.
+            cbn.
+            constructor; left.
+            apply Reflexive_eqit. typeclasses eauto.
+            eapply IHEQ; eauto.
+            pfold; red; rewrite <- x.
+            cbn; constructor; eauto.
+          - punfold H; red in H.
+            rewrite <- Heqt2o in H.
+            cbn in H.
+            inversion H; inversion CHECK0.
+        }
+      - intros y EQ.
+        punfold H; red in H.
+        dependent induction H.
+        punfold EQ; red in EQ.
+        rewrite <- x in EQ.
+        dependent induction EQ.
+        + eapply FindUB.
+          pfold; red.
+          rewrite <- x.
+          cbn.
+          econstructor; intros [].
+        + eapply CrawlTau with (t3:=t1).
+          pfold; red; rewrite <- x; cbn.
+          constructor. left.
+          apply Reflexive_eqit. typeclasses eauto.
+
+          eapply IHEQ; eauto.          
+    }
+
+    Unshelve.
+
+    all: intros [].
+  Qed.
+
+  Proof.
+    unfold Proper, respectful.
+    intros x y REF UB.
+    
+    { generalize dependent RR.
+      generalize dependent x.
+      generalize dependent y.
+      pcofix CIH.
+      intros y UB x RR REF.
+
+      pinversion REF; subst;
+        inv_contains_UB;
+        inv_observes;
+        inv_existT;
+        pclearbot.
+
+      all: admit.
+  Admitted.
+
+  Lemma contains_UB_refine_OOM_h :
+    forall R (RR : relation R) (x y : itree Eff R),
+      contains_UB y ->
+      refine_OOM_h RR x y ->
+      contains_UB x.
+  Proof.
+    intros R RR x y UB REF.
+    rewrite REF.
+    eauto.
+  Qed.
+End refine_OOM_h_lemmas.
+
+(* TODO: move this *)
+Lemma eqitree_inv_Tau_l {E R} (t t' : itree E R) :
+  Tau t ≅ t' -> exists t0, observe t' = TauF t0 /\ t ≅ t0.
+Proof.
+  intros; punfold H; inv H; try inv CHECK; pclearbot; eauto.
+Qed.
