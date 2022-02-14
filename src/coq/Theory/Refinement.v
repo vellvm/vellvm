@@ -444,7 +444,7 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
       + (* UB in tx *)
         exists rx; split; auto.
       + exists rx; split; auto.
-        left. eapply contains_UB_eutt; eauto.
+        left. rewrite XY. eauto.
     - specialize (XY ry TY).
       destruct XY as (rx & TX & [UB_rx | XY]).
 
