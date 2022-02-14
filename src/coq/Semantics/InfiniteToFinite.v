@@ -16,6 +16,7 @@ From Vellvm Require Import
      Semantics.DynamicValues
      Semantics.LLVMParams
      Theory.TopLevelRefinements
+     Theory.ContainsUB
      Utils.Error
      Utils.Monads
      Utils.PropT
@@ -388,6 +389,71 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     unfold refine_E1E2_L6 in *.
     unfold TLR_INF.R.refine_L6 in *.
     unfold TLR_FIN.R.refine_L6 in *.
+
+    intros rz TZ.
+    specialize (YZ_FIN rz TZ).
+    destruct YZ_FIN as (ry_fin & TY_FIN & [UB_ry_fin | YZ]).
+
+    - (* UB in ty *)
+      unfold L4_convert_PropT in TY_FIN.
+      destruct TY_FIN as (ry_inf & TY_INF & ry_fin_inf).
+
+      specialize (XY_INF ry_inf TY_INF).
+      destruct XY_INF as (rx_inf & TX_INF & [UB_rx_inf | XY_INF]);
+        set (rx_fin := L4_convert_tree (uv <- rx_inf;; lift_OOM (res_L4_convert_unsafe uv))).
+      + (* UB in tx *)
+        exists rx_fin.
+        split.
+        * exists rx_inf; split; eauto.
+        * left.
+          subst rx_fin.
+          apply interp_contains_UB.
+
+          (* TODO: factor this out *)
+          2: {
+            clear.
+            red.
+            intros R [s].
+            Require Import Paco.paco.
+            pfold.
+            cbn.
+            constructor.
+          }
+
+          apply bind_contains_UB; eauto.
+      + (* UB not necessarily in tx *)
+        exists rx_fin.
+        split.
+        * exists rx_inf; split; eauto.
+         * left.
+          subst rx_fin.
+          subst ry_fin.
+
+          (* TODO: Move TT *)
+          eapply contains_UB_refine_OOM_h with (RR:=TLR_INF.R.TT); eauto.
+          Set Printing Implicit.
+          unfold E1.L4.
+          set (x:=(L4_convert_tree (uv <- rx_inf;; lift_OOM (res_L4_convert_unsafe uv)))).
+          set (y:=(L4_convert_tree (uv <- rx_inf;; lift_OOM (res_L4_convert_unsafe uv)))).
+
+          pose proof refine_OOM_h_reflexive.
+          unfold RelationClasses.Reflexive in H.
+
+
+          refine_oom_h_reflexivity.
+         setoid_reflexivity.
+          
+    - specialize (XY ry TY).
+      destruct XY as (rx & TX & [UB_rx | XY]).
+
+      + (* UB in tx *)
+        exists rx; split; auto.
+      + exists rx; split; auto.
+        right. 
+        eapply refine_OOM_h_transitive; eauto.
+        typeclasses eauto.
+  Qed
+
 
     intros ubz TZ.
 

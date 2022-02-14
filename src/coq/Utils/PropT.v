@@ -697,6 +697,27 @@ Section PropMonad.
       pinversion HS.
   Qed.
 
+    Lemma interp_prop_trans :
+      forall {T E} (RR : relation T) `{REF: Reflexive _ RR} `{TRANS: Transitive _ RR} (x y z : itree E T)
+        (h : forall X : Type, E X -> PropT E X)
+        (k_spec : forall T R, E T -> itree E T -> (T -> itree E R) -> (T -> itree E R) -> itree E R -> Prop),
+        (forall {X : Type} (e : E X), h X e (trigger e)) ->
+        (k_spec_correct (fun T e => trigger e) k_spec) ->
+        interp_prop h k_spec _ RR x y ->
+        interp_prop h k_spec _ RR y z ->
+        interp_prop h k_spec _ RR x z.
+    Proof.
+      intros T E RR REF TRANS x y z h k_spec H_SPEC K_SPEC XY YZ.
+      revert x y z XY YZ.
+      pcofix CIH; intros x y z XY YZ.
+
+      punfold XY; punfold YZ; pfold; red in XY, YZ |- *.
+      genobs x xo.
+      genobs y yo.
+      genobs z zo.
+    Abort.
+
+
   #[global] Instance Returns_eutt {E A} a: Proper (eutt eq ==> iff) (@Returns E A a).
   Proof.
     repeat intro; split; intros HRet.

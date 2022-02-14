@@ -99,12 +99,26 @@ Section PARAMS_MODEL.
   Definition refine_OOM {T} (RR : relation T) (sources : PropT Effout T) (target : itree Effout T) : Prop
     := exists source, sources source /\ refine_OOM_h RR source target.
 
-  Instance refine_OOM_h_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h RR).
+  Global Instance refine_OOM_h_reflexive {R} {RR : relation R} `{Reflexive _ RR} : Reflexive (refine_OOM_h RR).
+  Proof.
+    unfold Reflexive.
+
+    unfold refine_OOM_h. intros x.
+    apply interp_prop_refl; try typeclasses eauto.
+    - intros X [e | [oom | f]]; reflexivity.
+    - apply oom_k_spec_correct_trigger.
+  Qed.
+
+  Global Instance refine_OOM_h_transitive {R} {RR : relation R} `{Transitive _ RR} : Transitive (refine_OOM_h RR).
   Proof.
     (* y is eutt x, except it might run out of memory earlier *)
     (* z is eutt y, except it might run out of memory earlier *)
 
     (* Follows that z is eutt x, but might run out of memory earlier *)
+    unfold Transitive.
+    intros x y z H0 H1.
+
+    (* Might be able to have something more general with interp_prop... *)
   Admitted.
 End PARAMS_MODEL.
 
