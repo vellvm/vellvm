@@ -419,14 +419,13 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
     := fun ts ts' =>
          (* For any tree in the target set *)
          forall t', ts' t' ->
-               (* There is a tree in the source set that either
-                  exhibits UB, or is eutt our target tree *)
-               exists t, ts t /\ (contains_UB t \/ eutt refine_res3 t t').
+               (* There is a tree in the source set that is eutt our target tree *)
+               exists t, ts t /\ eutt refine_res3 t t'.
 
   Definition refine_L6 : relation ((itree L4 (MemState * (local_env * stack * (global_env * uvalue)))) -> Prop)
     := fun ts ts' =>
          forall t', ts' t' ->
-               exists t, ts t /\ (contains_UB t \/ refine_OOM_h refine_res3 t t').
+               exists t, ts t /\ refine_OOM_h refine_res3 t t'.
 
   Instance Transitive_refine_L5 : Transitive refine_L5.
   Proof.
@@ -435,23 +434,12 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
 
     intros rz TZ.
     specialize (YZ rz TZ).
-    destruct YZ as (ry & TY & [UB_ry | YZ]).
+    destruct YZ as (ry & TY & YZ).
+    specialize (XY ry TY).
+    destruct XY as (rx & TX & XY).
 
-    - (* UB in ty *)
-      specialize (XY ry TY).
-      destruct XY as (rx & TX & [UB_rx | XY]).
-
-      + (* UB in tx *)
-        exists rx; split; auto.
-      + exists rx; split; auto.
-        left. rewrite XY. eauto.
-    - specialize (XY ry TY).
-      destruct XY as (rx & TX & [UB_rx | XY]).
-
-      + (* UB in tx *)
-        exists rx; split; auto.
-      + exists rx; split; auto.
-        right. rewrite XY. eauto.
+    exists rx; split; auto.
+    rewrite XY. eauto.
   Qed.
 
   Instance Transitive_refine_L6 : Transitive refine_L6.
@@ -461,26 +449,12 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
 
     intros rz TZ.
     specialize (YZ rz TZ).
-    destruct YZ as (ry & TY & [UB_ry | YZ]).
+    destruct YZ as (ry & TY & YZ).
+    specialize (XY ry TY).
+    destruct XY as (rx & TX & XY).
 
-    - (* UB in ty *)
-      specialize (XY ry TY).
-      destruct XY as (rx & TX & [UB_rx | XY]).
-
-      + (* UB in tx *)
-        exists rx; split; auto.
-      + exists rx; split; auto.
-        left. unfold refine_OOM_h in XY.
-        eapply contains_UB_refine_OOM_h; eauto.
-    - specialize (XY ry TY).
-      destruct XY as (rx & TX & [UB_rx | XY]).
-
-      + (* UB in tx *)
-        exists rx; split; auto.
-      + exists rx; split; auto.
-        right. 
-        eapply refine_OOM_h_transitive; eauto.
-        typeclasses eauto.
+    exists rx; split; auto.
+    rewrite XY. eauto.
   Qed.
 
 End Make.

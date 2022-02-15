@@ -318,7 +318,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Definition L4_convert_PropT {A B} (f : A -> OOM B) (ts : PropT IS1.LLVM.Events.L4 A) : PropT E2.L4 B
     := fun t_e2 => exists t_e1,
-           ts t_e1 /\ (contains_UB t_e1 \/ t_e2 = L4_convert_tree (uv <- t_e1;; lift_OOM (f uv))).
+           ts t_e1 /\ t_e2 = L4_convert_tree (uv <- t_e1;; lift_OOM (f uv)).
 
   (* Ideally we would convert memstates / local envs / local stacks /
      global envs... But for now we can get away with placeholders for
@@ -360,6 +360,8 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Module TLR_INF := TopLevelRefinementsBigIntptr.
   Module TLR_FIN := TopLevelRefinements64BitIntptr.
 
+  Hint Resolve interp_PropT__mono : paco.
+
   (*
     If
 
@@ -396,7 +398,92 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
     intros rz TZ.
     specialize (YZ_FIN rz TZ).
-    destruct YZ_FIN as (ry_fin & TY_FIN & [UB_ry_fin | YZ]).
+    destruct YZ_FIN as (ry_fin & TY_FIN & YZ).
+
+    unfold L4_convert_PropT in TY_FIN.
+    destruct TY_FIN as (ry_inf & TY_INF & ry_fin_inf).
+
+    specialize (XY_INF ry_inf TY_INF).
+    destruct XY_INF as (rx_inf & TX_INF & XY_INF).
+
+    set (rx_fin := L4_convert_tree (uv <- rx_inf;; lift_OOM (res_L4_convert_unsafe uv))).
+    exists rx_fin.
+    split.
+    - unfold L4_convert_PropT.
+      exists rx_inf; split; auto.
+    - rewrite <- YZ.
+      subst ry_fin.
+      subst rx_fin.
+
+      (* There's probably a more general lemma hiding here *)
+      unfold L4_convert_tree.
+      Require Import Paco.paco.
+
+      Set Nested Proofs Allowed.
+
+      Lemma refine_OOM_h_L4_convert_tree :
+        forall T x_inf y_inf RR,
+          refine_OOM_h RR x_inf y_inf ->
+          refine_OOM_h RR (@L4_convert_tree T x_inf) (@L4_convert_tree T y_inf).
+      Proof.
+        intros T x_inf y_inf RR H.
+      Admitted.
+
+      Import Morphisms.
+
+      Lemma refine_OOM_h_bind :
+        forall {T R E F} (x y : itree (E +' OOME +' F) T) (RR1 : relation T) (RR2 : relation R) k,
+          (forall r1 r2, RR1 r1 r2 -> refine_OOM_h RR2 (k r1) (k r2)) ->
+          refine_OOM_h RR1 x y ->
+          refine_OOM_h RR2 (a <- x;; k a) (a <- y;; k a).
+      Proof.
+        intros T R E F x y RR1 RR2 k RK H.
+        pinversion H; subst.
+        - cbn.
+          unfold refine_OOM_h.
+          eapply interp_prop_Proper3.
+          + unfold Proper, respectful, flip, impl.
+            intros T0 R0 RR b a x0 y0 H0 x1 y1 H2 x2 y2 H3 x3 y3 H4 x4 y4 H5; subst.
+            split; intros KSEPC;
+            destruct y0 as [e | [e | e]]; cbn in *; auto.
+          + rewrite unfold_bind.
+            rewrite <- H1.
+            reflexivity.
+          + reflexivity.
+          + eapply interp_prop_Proper2.
+            * unfold Proper, respectful, flip, impl.
+              intros A R0 e ta k1 k2 x0 y0 EQ KSPEC; subst.
+              destruct e as [e | [e | e]]; cbn in *; try rewrite EQ; auto.
+            * setoid_rewrite eq2.
+              rewrite bind_ret_l.
+              reflexivity.
+            * apply RK.
+              auto.
+      Admitted.
+
+      apply refine_OOM_h_L4_convert_tree.
+      eapply refine_OOM_h_bind; eauto.
+
+      intros r1 r2 H.
+      unfold TLR_INF.R.refine_res3, TLR_INF.R.refine_res2, TLR_INF.R.refine_res1 in H.
+
+
+      apply refine_blah.
+      setoid_rewrite XY_INF.
+      
+      setoid_rewrite unfold_bind.
+      pinversion XY_INF.
+      + subst t2.
+        pfold; red.
+        rewrite eq2.
+      unfold refine_OOM_h in XY_INF.
+      setoid_rewrite interp_bind.
+etransitivity; eauto.
+    
+    destruct XY as (rx & TX & XY).
+
+    exists rx; split; auto.
+    rewrite XY. eauto.
 
     - (* UB in ty *)
       unfold L4_convert_PropT in TY_FIN.

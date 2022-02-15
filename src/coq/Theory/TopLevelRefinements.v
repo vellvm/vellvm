@@ -194,9 +194,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         refine_L5 Pt1 Pt2 -> refine_L6 Pt1 Pt2.
     Proof.
       intros Pt1 Pt2 HR t2 HM.
-      apply HR in HM as (t1 & HPt1 & [UB | HPT1]);
+      apply HR in HM as (t1 & HPt1 & HPT1);
         exists t1; split; auto;
-        right; apply eutt_refine_oom_h; auto;
+        apply eutt_refine_oom_h; auto;
         typeclasses eauto.
     Qed.
 
@@ -360,6 +360,18 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - apply pick_k_spec_correct_pick_exec_h.
     Qed.
 
+    (* TODO: probably a bad name... model_UB_exec is just... id *)
+    Lemma refine_UB
+      : forall (E F G : Type -> Type) T
+          (xs : PropT (E +' F +' UBE +' G) T) x,
+        xs x ->
+        model_UB xs x.
+    Proof.
+      intros E F G T xs x XS.
+      red.
+      left; auto.
+    Qed.
+
     Definition build_singleton {A} : A -> A -> Prop := eq.
 
     (**
@@ -372,9 +384,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       intros ? [].
       exists (interpreter p).
       split.
-      - apply refine_undef. auto.
-      - right.
-        apply eutt_refine_oom_h; try typeclasses eauto.
+      - apply refine_UB.
+        apply refine_undef. auto.
+      - apply eutt_refine_oom_h; try typeclasses eauto.
         reflexivity.
     Qed.
 

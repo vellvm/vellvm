@@ -9,18 +9,11 @@ From ITree Require Import
 From Vellvm Require Import
      Utilities
      Syntax
-     Semantics
-     Semantics.MemoryAddress
-     Semantics.GepM
-     Semantics.Memory.Sizeof
-     Semantics.Memory.MemBytes
-     Semantics.LLVMParams
-     Semantics.Lang
+     Semantics.LLVMEvents
      Handlers.OOM.
 
 From ExtLib Require Import
      Structures.Monads
-     Data.Monads.EitherMonad
      Structures.Functor.
 
 From Coq Require Import Relations RelationClasses.
