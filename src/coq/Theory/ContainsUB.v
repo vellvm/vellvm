@@ -407,13 +407,13 @@ Section bind_lemmas.
   Qed.
 
   Lemma bind_contains_UB_k :
-    forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
-      (forall x, contains_UB (k x)) ->
+    forall {R T} (t : itree Eff R) (k : R -> itree Eff T) (a : R),
       (* Need to make sure `t` doesn't spin. *)
-      (exists a, Returns a t) ->
+      Returns a t ->
+      contains_UB (k a) ->
       contains_UB (ITree.bind t k).
   Proof.
-    intros R T t k CUB [rt RET].
+    intros R T t k a RET CUB.
     induction RET.
     - rewrite H; rewrite bind_ret_l; auto.
     - rewrite H; rewrite tau_eutt; eauto.
@@ -463,7 +463,51 @@ Section interp_lemmas.
     forall {R} (e : UBE R),
       contains_UB (handler _ ((inr1 (inr1 (inl1 e))) : Eff1 R)).
 
-  (* This isn't true. What if the handler spins? *)
+  (* We want a lemma about `interp` preserving `contains_UB`.
+
+    It seems like we could say something like:
+
+      Definition handler_keeps_UB := forall {R} (e : UBE R),
+        contains_UB (handler _ ((inr1 (inr1 (inl1 e))) : Eff1 R)).
+    
+    Unfortunately, this isn't good enough to ensure:
+
+      contains_UB (interp handler t).
+
+    `handler_keeps_UB` isn't enough because there are other events
+    besides `UBE` that `handler` interprets into itrees. Let's say I
+    have some event `e : E bool`, and I have the following itree:
+
+      maybe_UB :=
+        b <- trigger e;;
+        if b then raiseUB "UB happens!"else (ret 0)
+
+    Depending on how `e` is handled the resulting tree may or may not
+    have UB. If we look at the relevant constructor for `contains_UB`:
+    
+      | CrawlVis1 : forall Y (e : (E +' F) Y) x k t2, t2 ≅ (vis e k)
+        -> contains_UB (k x) -> contains_UB t2
+
+    We see that `maybe_UB` contains UB because there exists `x = true`
+    that will make the continuation contain UB.
+
+    However, if we have a `handler` which interprets `e` as `ret
+    false`, then:
+
+      interp handler maybe_UB :=
+        ret false;;
+        if b then raiseUB "UB happens!"else (ret 0)
+
+    Which is of course just:
+
+      interp handler maybe_UB := ret 0
+
+    Which clearly contains no UB events.
+
+    Another cause of problems is if the handler might produce a
+    divergent itree.
+   *)
+
   Lemma interp_contains_UB :
     forall {R} (t : itree Eff1 R),
       contains_UB t ->
@@ -473,22 +517,10 @@ Section interp_lemmas.
   Proof.
     intros R t UB KEEP RET.
     Import InterpFacts.
-    induction UB;
+    induction UB.
       try solve [rewrite H;
                  rewrite InterpFacts.interp_tau;
                  rewrite tau_eutt; eauto].
-
-    - rewrite H.
-      rewrite interp_vis.
-      remember (handler Y (subevent Y e)) as te.
-      
-      apply bind_contains_UB.
-      
-
-      unfold handler_keeps_UB in KEEP.
-
-      destruct e as [e | e].
-      + cbn in *.
   Abort.
 End interp_lemmas.
 
