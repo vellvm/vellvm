@@ -318,7 +318,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
 
   Definition L4_convert_PropT {A B} (f : A -> OOM B) (ts : PropT IS1.LLVM.Events.L4 A) : PropT E2.L4 B
     := fun t_e2 => exists t_e1,
-           ts t_e1 /\ t_e2 = L4_convert_tree (uv <- t_e1;; lift_OOM (f uv)).
+           ts t_e1 /\ (contains_UB t_e1 \/ t_e2 = L4_convert_tree (uv <- t_e1;; lift_OOM (f uv))).
 
   (* Ideally we would convert memstates / local envs / local stacks /
      global envs... But for now we can get away with placeholders for
@@ -428,9 +428,39 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
              `rx_fin` is still a refinement of `rx_inf`...
            *)
-          left.
+          { clear TX_INF.
+            subst rx_fin. induction UB_rx_inf.
+            - destruct IHUB_rx_inf as [IHUB_UB | IHUB_REF].
+              + left. setoid_rewrite interp_bind.
+                rewrite H.
+                rewrite tau_eutt.
+                rewrite <- interp_bind.
+                eauto.
+              + right.
+                unfold refine_OOM_h in *.
+                eapply interp_prop_Proper2; eauto.
+                Import Morphisms.
+                * unfold Proper, respectful, Basics.flip, Basics.impl.
+                  intros A R e ta k1 k2 x y EQ KSPEC.
+                  destruct e as [e | [e | [e | [e | e]]]]; cbn in *;
+                  auto; rewrite EQ; auto.
+                * setoid_rewrite interp_bind.
+                  rewrite H.
+                  rewrite tau_eutt.
+                  reflexivity.
+            - destruct e as [call_e | oom_e].
+              + (* CallE *)
+                right.
+                destruct call_e.
+                admit.
+              + (* OOME *)
+                admit.
+            - admit.
+            - admit.
+          }
+          right.
           subst rx_fin.
-          setoid_rewrite interp_bind.
+
           apply bind_contains_UB.
 
           (* Interp lemma *)
