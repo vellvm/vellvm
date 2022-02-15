@@ -406,14 +406,39 @@ Section bind_lemmas.
       eapply FindUB; reflexivity.
   Qed.
 
-  (* Not true, what if `t` spins? *)
   Lemma bind_contains_UB_k :
     forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
       (forall x, contains_UB (k x)) ->
+      (* Need to make sure `t` doesn't spin. *)
+      (exists a, Returns a t) ->
       contains_UB (ITree.bind t k).
   Proof.
-    intros R T t k CUB.
-  Abort.
+    intros R T t k CUB [rt RET].
+    induction RET.
+    - rewrite H; rewrite bind_ret_l; auto.
+    - rewrite H; rewrite tau_eutt; eauto.
+    - destruct e as [e | [f | [ube | g]]].
+      + rewrite H.
+        rewrite bind_vis.
+        eapply CrawlVis1 with (e0 := (inl1 e)) (k1 := (fun x0 : X => ITree.bind (k0 x0) k)).
+        reflexivity.
+        eauto.
+      + rewrite H.
+        rewrite bind_vis.
+        eapply CrawlVis1 with (e := (inr1 f)) (k1 := (fun x0 : X => ITree.bind (k0 x0) k)).
+        reflexivity.
+        eauto.
+      + rewrite H.
+        rewrite bind_vis.
+        destruct ube.
+        eapply FindUB with (s0:=s) (k1:=(fun x0 : void => ITree.bind (k0 x0) k)).
+        reflexivity.
+      + rewrite H.
+        rewrite bind_vis.
+        eapply CrawlVis2 with (e := g) (k1 := (fun x0 : X => ITree.bind (k0 x0) k)).
+        reflexivity.
+        eauto.      
+  Qed.
 
   Lemma bind_contains_UB' :
     forall {R T} (t : itree Eff R) (k : R -> itree Eff T),
@@ -443,9 +468,10 @@ Section interp_lemmas.
     forall {R} (t : itree Eff1 R),
       contains_UB t ->
       handler_keeps_UB ->
+      (forall {T} (e : Eff1 T), exists a, Returns a (handler T e)) ->
       contains_UB (interp handler t).
   Proof.
-    intros R t UB KEEP.
+    intros R t UB KEEP RET.
     Import InterpFacts.
     induction UB;
       try solve [rewrite H;
@@ -457,8 +483,12 @@ Section interp_lemmas.
       remember (handler Y (subevent Y e)) as te.
       
       apply bind_contains_UB.
+      
 
-    unfold handler_keeps_UB in KEEP.
+      unfold handler_keeps_UB in KEEP.
+
+      destruct e as [e | e].
+      + cbn in *.
   Abort.
 End interp_lemmas.
 
