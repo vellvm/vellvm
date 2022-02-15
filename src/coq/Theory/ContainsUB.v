@@ -1,5 +1,5 @@
 Require Import String.
-Definition blah := 2.
+
 From ITree Require Import
      ITree
      Basics

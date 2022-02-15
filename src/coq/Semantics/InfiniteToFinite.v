@@ -28,7 +28,11 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
-     Basics.Basics.
+     Basics
+     Basics.HeterogeneousRelations
+     Eq.Eq.
+
+Import InterpFacts.
 
 Import MonadNotation.
 Import ListNotations.
@@ -405,8 +409,68 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
         exists rx_fin.
         split.
         * exists rx_inf; split; eauto.
-        * left.
+        *
+          (* rx_fin may or may not have UB.
+
+             rx_fin may run out of memory before encountering UB.
+
+             If rx_inf is like:
+
+               externalcall f args;;
+               UB
+
+             Then if, say, args contains `DVALUE_IPTR 2^1000` the
+             L4_convert handler will raise OOM when converting this to
+             a finite IPTR value.
+
+             Because of this `rx_fin` will always raise OOM prior to
+             encountering UB.
+
+             `rx_fin` is still a refinement of `rx_inf`...
+           *)
+          left.
           subst rx_fin.
+          setoid_rewrite interp_bind.
+          apply bind_contains_UB.
+
+          (* Interp lemma *)
+          { clear tx ty TX_INF TY_INF.
+            clear tz TZ.
+            clear ry_inf ry_fin_inf rz ry_fin UB_ry_fin.
+
+            induction UB_rx_inf.
+            - rewrite H.
+              rewrite tau_eutt.
+              eauto.
+            - rewrite H.
+              rewrite interp_vis.
+              destruct e as [call_e | oom_e].
+              
+              + destruct call_e.cbn; destruct call_e; cbn.
+                destruct (EC.DVC.uvalue_convert f).
+                * (* NoOom *)
+                  admit.
+                * (* OOM *)
+                  rewrite bind_bind.
+                  cbn.
+                  unfold raiseOOM.
+                  rewrite bind_bind.
+                  rewrite bind_trigger.
+                rewrite bind_bind.
+                eapply bind_contains_UB_k.
+                { constructor. cbn.
+              eapply IHUB_rx_inf.
+
+            rewrite unfold_interp.
+            genobs rx_inf rx_inf_obs.
+            destruct rx_inf_obs.
+            
+
+
+          }
+
+          
+          
           apply interp_contains_UB.
 
           (* TODO: factor this out *)
