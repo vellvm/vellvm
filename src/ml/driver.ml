@@ -91,7 +91,7 @@ let process_ll_file path file =
       | Ok dv ->
         Printf.printf "Program terminated with: " ;
         let ppf = std_formatter in
-        Interpreter.pp_uvalue ppf dv ;
+        Interpreter.pp_dvalue ppf dv ;
         pp_force_newline ppf ();
         pp_print_flush ppf ()
 

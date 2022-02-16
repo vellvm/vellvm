@@ -27,11 +27,11 @@ let make_test ll_ast t : string * assertion  =
   | Assertion.EQTest (expected, dtyp, entry, args) ->
     let str =
       let expected_str =
-        Interpreter.pp_uvalue Format.str_formatter expected;
+        Interpreter.pp_dvalue Format.str_formatter expected;
         Format.flush_str_formatter ()
       in
       let args_str: doc =
-        Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter  args;
+        Format.pp_print_list ~pp_sep:(fun f () -> Format.pp_print_string f ", ") Interpreter.pp_uvalue Format.str_formatter args;
         Format.flush_str_formatter()
       in
       Printf.sprintf "%s = %s(%s)" expected_str entry args_str
@@ -40,10 +40,10 @@ let make_test ll_ast t : string * assertion  =
     in
     str, (Assert.assert_eqf result (Ok expected))
   | Assertion.POISONTest (dtyp, entry, args) ->
-     let expected = InterpretationStack.InterpreterStackBigIntptr.LLVM.Events.DV.UVALUE_Poison dtyp in
+     let expected = InterpretationStack.InterpreterStackBigIntptr.LLVM.Events.DV.DVALUE_Poison dtyp in
      let str =
        let expected_str =
-         Interpreter.pp_uvalue Format.str_formatter expected;
+         Interpreter.pp_dvalue Format.str_formatter expected;
          Format.flush_str_formatter ()
        in
       let args_str =
@@ -64,12 +64,12 @@ let make_test ll_ast t : string * assertion  =
      let str =
        let src_str =
          match res_src () with
-         | Ok v -> Interpreter.pp_uvalue Format.str_formatter v; Format.flush_str_formatter ()
+         | Ok v -> Interpreter.pp_dvalue Format.str_formatter v; Format.flush_str_formatter ()
          | Error e -> e
        in
        let tgt_str =
          match res_tgt () with
-         | Ok v -> Interpreter.pp_uvalue Format.str_formatter v; Format.flush_str_formatter ()
+         | Ok v -> Interpreter.pp_dvalue Format.str_formatter v; Format.flush_str_formatter ()
          | Error e -> e
        in
       let args_str: doc =
@@ -80,7 +80,7 @@ let make_test ll_ast t : string * assertion  =
      in
      str,  (Assert.assert_eqf (fun () ->
                let s,t = res_src (), res_tgt() in
-               begin match s, t with | Ok sv, Ok tv -> Ok (Assertion.eq_uvalue sv tv)
+               begin match s, t with | Ok sv, Ok tv -> Ok (Assertion.eq_dvalue sv tv)
                                | Error el, _ -> Error el
                                | _, Error er -> Error er
                end

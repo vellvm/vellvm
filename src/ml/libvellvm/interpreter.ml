@@ -52,6 +52,22 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
   | UVALUE_Vector        l -> fprintf ppf "UVALUE_Vector(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
   | _ -> fprintf ppf "todo"
 
+let rec pp_dvalue : Format.formatter -> DV.dvalue -> unit =
+  let open Camlcoq in
+  let pp_comma_space ppf () = pp_print_string ppf ", " in
+  fun ppf ->
+  function
+  | DVALUE_Addr   x -> fprintf ppf "DVALUE_Addr"
+  | DVALUE_I1     x -> fprintf ppf "DVALUE_I1(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int1.unsigned x))
+  | DVALUE_I8     x -> fprintf ppf "DVALUE_I8(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
+  | DVALUE_I32    x -> fprintf ppf "DVALUE_I32(%d)" (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
+  | DVALUE_I64    x -> fprintf ppf "DVALUE_I64(%s)" (Int64.to_string (Z.to_int64 (DynamicValues.Int64.unsigned x)))
+  | DVALUE_Double x -> fprintf ppf "DVALUE_Double(%s)" (string_of_float_full (camlfloat_of_coqfloat x))
+  | DVALUE_Float  x -> fprintf ppf "DVALUE_Float(%s)"  (string_of_float_full (camlfloat_of_coqfloat32 x))
+  | DVALUE_Poison _ -> fprintf ppf "DVALUE_Poison"
+  | DVALUE_None     -> fprintf ppf "DVALUE_None"
+  | _ -> fprintf ppf "todo"
+
 let debug_flag = ref false
 
 (** Print a debug message to stdout if the `debug_flag` is enabled.
@@ -70,9 +86,9 @@ let debug (msg:string) =
     TopLevel.interpreter function extracted from Coq.
 
     Calling `step` could either loop forever, return an error,
-    or return the uvalue result returned from the itree.
+    or return the dvalue result returned from the itree.
  *)
-let rec step (m : ('a coq_L4, coq_MemState * ((local_env * lstack) * (global_env * DV.uvalue))) itree) : (DV.uvalue, string) result =
+let rec step (m : ('a coq_L4, coq_MemState * ((local_env * lstack) * (global_env * DV.dvalue))) itree) : (DV.dvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -93,7 +109,7 @@ let rec step (m : ('a coq_L4, coq_MemState * ((local_env * lstack) * (global_env
   (* The DebugE effect *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inl1 msg)), k) ->
      (debug (Camlcoq.camlstring_of_coqstring msg);
-      step (k (Obj.magic DV.UVALUE_None)))
+      step (k (Obj.magic DV.DVALUE_None)))
 
   (* The FailureE effect is a failure *)
   | VisF (Sum.Coq_inr1 (Sum.Coq_inr1 (Sum.Coq_inr1 _)), _) ->
@@ -115,10 +131,10 @@ let rec step (m : ('a coq_L4, coq_MemState * ((local_env * lstack) * (global_env
 
 
 (** Interpret an LLVM program, returning a result that contains either the
-    uvalue result returned by the LLVM program, or an error message.
+    dvalue result returned by the LLVM program, or an error message.
 
     Note: programs consist of a non-empty list of blocks, represented by a
     tuple of a single block, and a possibly empty list of blocks.
  *)
-let interpret (prog:(LLVMAst.typ, (LLVMAst.typ LLVMAst.block * (LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.uvalue, string) result =
+let interpret (prog:(LLVMAst.typ, (LLVMAst.typ LLVMAst.block * (LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
   step (TopLevel.TopLevelBigIntptr.interpreter prog)

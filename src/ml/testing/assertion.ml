@@ -11,79 +11,74 @@ type raw_assertion_string =
   | Poison' of { fcall: string}
 
 type test =
-  | EQTest of DV.uvalue * DynamicTypes.dtyp * string * DV.uvalue list
+  | EQTest of DV.dvalue * DynamicTypes.dtyp * string * DV.uvalue list
   | POISONTest of DynamicTypes.dtyp * string * DV.uvalue list
   (* Find a better name for this *)
   (* retty, args for src, (t, args) for arguments to source and test *)
   | SRCTGTTest of DynamicTypes.dtyp * (LLVMAst.typ * DV.uvalue) list
 
-(* UVALUE equality *)
+(* DVALUE equality *)
 (* TODO: implement this in ASTLib and use extraction *)
-let rec eq_uvalue (l: DV.uvalue) (r: DV.uvalue) : bool =
+let rec eq_dvalue (l: DV.dvalue) (r: DV.dvalue) : bool =
   match l, r with
-  | UVALUE_I1 l', UVALUE_I1 r' ->
+  | DVALUE_I1 l', DVALUE_I1 r' ->
      let bitwidth = Camlcoq.Z.of_uint 1 in
      let pow = BinInt.Z.pow BinInt.Z.two bitwidth in
      let fixed = fun i -> Camlcoq.Z.modulo i pow in
      Camlcoq.Z.eq (fixed l') (fixed r')
-  | UVALUE_I8 l', UVALUE_I8 r' ->
+  | DVALUE_I8 l', DVALUE_I8 r' ->
      let bitwidth = Camlcoq.Z.of_uint 8 in
      let pow = BinInt.Z.pow BinInt.Z.two bitwidth in
      let fixed = fun i -> Camlcoq.Z.modulo i pow in
      Camlcoq.Z.eq (fixed l') (fixed r')
-  | UVALUE_I32 l', UVALUE_I32 r' ->
+  | DVALUE_I32 l', DVALUE_I32 r' ->
      let bitwidth = Camlcoq.Z.of_uint 32 in
      let pow = BinInt.Z.pow BinInt.Z.two bitwidth in
      let fixed = fun i -> Camlcoq.Z.modulo i pow in
      Camlcoq.Z.eq (fixed l') (fixed r')
-  | UVALUE_I64 l', UVALUE_I64 r' ->
+  | DVALUE_I64 l', DVALUE_I64 r' ->
      let bitwidth = Camlcoq.Z.of_uint 64 in
      let pow = BinInt.Z.pow BinInt.Z.two bitwidth in
      let fixed = fun i -> Camlcoq.Z.modulo i pow in
      Camlcoq.Z.eq (fixed l') (fixed r')
-  | UVALUE_Addr l', UVALUE_Addr r' -> l' = r'
-  | UVALUE_Double l', UVALUE_Double r' -> l' = r'
-  | UVALUE_Float l', UVALUE_Float r' -> l' = r'
-  | UVALUE_Undef l', UVALUE_Undef r' -> l' = r'
-  | UVALUE_Poison l', UVALUE_Poison r' -> l' = r'
-  | UVALUE_None, UVALUE_None -> true
-  | UVALUE_Struct ul, UVALUE_Struct ur ->
-     List.for_all2 eq_uvalue ul ur
-  | UVALUE_Packed_struct ul, UVALUE_Packed_struct ur ->
-     List.for_all2 eq_uvalue ul ur
-  | UVALUE_Array ul, UVALUE_Array ur ->
-     List.for_all2 eq_uvalue ul ur
-  | UVALUE_Vector ul, UVALUE_Vector ur ->
-     List.for_all2 eq_uvalue ul ur
-  | UVALUE_IBinop (bl, l1, l2), UVALUE_IBinop (br, r1, r2) ->
-     bl = br && eq_uvalue l1 r1 && eq_uvalue l2 r2
-  | UVALUE_ICmp (bl, l1, l2), UVALUE_ICmp (br, r1, r2) ->
-     bl = br && eq_uvalue l1 r1 && eq_uvalue l2 r2
-  | UVALUE_FBinop (fl, ml, l1, l2), UVALUE_FBinop (fr, mr, r1, r2) ->
-     fl = fr && ml = mr && eq_uvalue l1 r1 && eq_uvalue l2 r2
-  | UVALUE_FCmp (bl, l1, l2), UVALUE_FCmp (br, r1, r2) ->
-     bl = br && eq_uvalue l1 r1 && eq_uvalue l2 r2
-  | UVALUE_Conversion (t, t_from, l, tl), UVALUE_Conversion (t', t_from', r, tr) ->
-     t = t' && t_from = t_from' && eq_uvalue l r && tl = tr
-  | UVALUE_GetElementPtr (ctl, l', ls), UVALUE_GetElementPtr(ctr, r', rs) ->
-     ctl = ctr && eq_uvalue l' r' && List.for_all2 eq_uvalue ls rs
-  | UVALUE_ExtractElement (a,b), UVALUE_ExtractElement (c,d) ->
-     eq_uvalue a c && eq_uvalue b d
-  | UVALUE_InsertElement (l1, l2, l3), UVALUE_InsertElement (r1,r2,r3) ->
-     eq_uvalue l1 r1 && eq_uvalue l2 r2 && eq_uvalue l3 r3
-  | UVALUE_ShuffleVector (l1, l2, l3), UVALUE_ShuffleVector (r1,r2,r3) ->
-     eq_uvalue l1 r1 && eq_uvalue l2 r2 && eq_uvalue l3 r3
-  | UVALUE_ExtractValue (l, ls), UVALUE_ExtractValue (r, rs) ->
-     eq_uvalue l r && ls = rs
-  | UVALUE_InsertValue (l1, l2, ls), UVALUE_InsertValue (r1, r2, rs) ->
-     eq_uvalue l1 r1 && eq_uvalue l2 r2 && ls = rs
-  | UVALUE_Select (l1, l2, l3), UVALUE_Select (r1,r2,r3) ->
-     eq_uvalue l1 r1 && eq_uvalue l2 r2 && eq_uvalue l3 r3
+  | DVALUE_Addr l', DVALUE_Addr r' -> l' = r'
+  | DVALUE_Double l', DVALUE_Double r' -> l' = r'
+  | DVALUE_Float l', DVALUE_Float r' -> l' = r'
+  | DVALUE_Poison l', DVALUE_Poison r' -> l' = r'
+  | DVALUE_None, DVALUE_None -> true
+  | DVALUE_Struct ul, DVALUE_Struct ur ->
+     List.for_all2 eq_dvalue ul ur
+  | DVALUE_Packed_struct ul, DVALUE_Packed_struct ur ->
+     List.for_all2 eq_dvalue ul ur
+  | DVALUE_Array ul, DVALUE_Array ur ->
+     List.for_all2 eq_dvalue ul ur
+  | DVALUE_Vector ul, DVALUE_Vector ur ->
+     List.for_all2 eq_dvalue ul ur
   | _ -> false
 
-(*  Directly converts a piece of syntax to a uvalue without going through semantic interpretation.
+(*  Directly converts a piece of syntax to a dvalue without going through semantic interpretation.
     Only works on literals.
  *)
+
+let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV.dvalue =
+  match typ, exp with
+  (* Allow null pointers literals *)
+  | TYPE_Pointer _, EXP_Null -> DVALUE_Addr InterpretationStack.InterpreterStackBigIntptr.LP.ADDR.null
+  | TYPE_I i, EXP_Integer x ->
+    begin match (Camlcoq.N.to_int i) with
+    | 1 -> DVALUE_I1 x
+    | 8 -> DVALUE_I8 x
+    | 32 -> DVALUE_I32 x
+    | 64 -> DVALUE_I64 x
+    | _ -> failwith "Assertion includes ill-typed or unsupported expression"
+    end
+  | TYPE_Float, EXP_Float f -> DVALUE_Float f
+  | TYPE_Double, EXP_Double f -> DVALUE_Double f
+  | TYPE_Array _, EXP_Array elts -> DVALUE_Array (List.map texp_to_dvalue elts)
+  | TYPE_Struct _, EXP_Struct elts -> DVALUE_Struct (List.map texp_to_dvalue elts)
+  | TYPE_Packed_struct _, EXP_Packed_struct elts -> DVALUE_Packed_struct (List.map texp_to_dvalue elts)
+  | TYPE_Vector _, EXP_Vector elts -> DVALUE_Vector (List.map texp_to_dvalue elts)
+  | _,_ -> failwith "Assertion includes unsupported expression"
 
 let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV.uvalue =
   match typ, exp with
@@ -104,6 +99,7 @@ let rec texp_to_uvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
   | TYPE_Packed_struct _, EXP_Packed_struct elts -> UVALUE_Packed_struct (List.map texp_to_uvalue elts)
   | TYPE_Vector _, EXP_Vector elts -> UVALUE_Vector (List.map texp_to_uvalue elts)
   | _,_ -> failwith "Assertion includes unsupported expression"
+
 
 let rec typ_to_dtyp (typ : LLVMAst.typ) : DynamicTypes.dtyp =
   match typ with
@@ -181,7 +177,7 @@ and parse_eq_assertion (line:string) : test list =
     let l = Llvm_lexer.parse_texp (Lexing.from_string lhs) in
     (* let _ = print_endline "PARSED LHS" in         *)
     let r = Llvm_lexer.parse_test_call (Lexing.from_string rhs) in
-    let uv = texp_to_uvalue l in
+    let uv = texp_to_dvalue l in
     let dt = typ_to_dtyp (fst l) in
     let (fn, args) = instr_to_call_data r in
     [ EQTest(uv, dt, fn, args) ]
