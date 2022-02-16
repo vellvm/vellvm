@@ -180,14 +180,20 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       - reflexivity.
     Qed.
 
-    (* The inclusion of refinement relations between 4 and 5 changes now *)
     Lemma refine_45 : forall Pt1 Pt2,
-        refine_L4 Pt1 Pt2 -> refine_L5 Pt1 Pt2.
-    (* (model_UB refine_res3 Pt1) (model_UB refine_res3 Pt2). *)
+        refine_L4 Pt1 Pt2 -> refine_L5 (model_UB Pt1) (model_UB Pt2).
     Proof.
       intros Pt1 Pt2 HR t2 HM.
-      apply HR in HM as (t1 & HPt1 & HPT1).
-      exists t1; split; auto.
+      destruct HM as [Pt2_t2 | [ub [Pt2_ub UB]]].
+      - specialize (HR t2 Pt2_t2) as [t1 [Pt1_t1 EQ]].
+        exists t1.
+        split; auto.
+        left; auto.
+      - specialize (HR ub Pt2_ub) as [ub1 [Pt1_ub1 EQ]].
+        exists t2.
+        split; try reflexivity.
+        right. exists ub1; split; auto.
+        rewrite EQ; auto.
     Qed.
 
     Lemma refine_56 : forall Pt1 Pt2,
@@ -229,6 +235,10 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       let L0_trace := denote_vellvm_init prog in
       ℑs4 (refine_res3) L0_trace [] ([],[]) emptyMemState.
 
+    Definition model_to_L5 (prog: mcfg dtyp) :=
+      let L0_trace := denote_vellvm_init prog in
+      ℑs5 (refine_res3) L0_trace [] ([],[]) emptyMemState.
+
     (**
    Which leads to five notion of equivalence of [mcfg]s.
    Note that all reasoning is conducted after conversion to [mcfg] and
@@ -247,10 +257,10 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       R.refine_L4 (model_to_L4 p1) (model_to_L4 p2).
 
     Definition refine_mcfg_L5 (p1 p2: mcfg dtyp): Prop :=
-      R.refine_L5 (model_to_L4 p1) (model_to_L4 p2).
+      R.refine_L5 (model_to_L5 p1) (model_to_L5 p2).
 
     Definition refine_mcfg_L6 (p1 p2: mcfg dtyp): Prop :=
-      R.refine_L6 (model_to_L4 p1) (model_to_L4 p2).
+      R.refine_L6 (model_to_L5 p1) (model_to_L5 p2).
 
     Definition refine_mcfg  (p1 p2: mcfg dtyp): Prop :=
       refine_mcfg_L6 p1 p2.
@@ -262,6 +272,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     (* Apparently auto's use of simple apply fails here *)
     Hint Extern 1 (refine_L4 (model_to_L4 _) (model_to_L4 _))
          => apply refine_34 : refine_xx.
+
+    Hint Extern 1 (refine_L5 (model_to_L5 _) (model_to_L5 _))
+         => apply refine_45 : refine_xx.
 
     Ltac solve_refine :=
       auto 9 with refine_xx.
