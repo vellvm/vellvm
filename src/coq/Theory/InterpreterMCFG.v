@@ -37,6 +37,8 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Arguments defs_assoc: simpl never.
 
   Module MCFGTactics.
+    Import TranslateFacts.
+
     (* Note: does not commute triggers for memory since those are more involved, we rely on specific lemmas *)
     Ltac go :=
       repeat match goal with
@@ -53,6 +55,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
              | |- context [interp_local_stack (Ret _)] => rewrite interp_local_stack_ret
              | |- context [interp_memory (Ret _)] => rewrite interp_memory_ret
              | |- context [ITree.bind (Ret _) _] => rewrite bind_ret_l
+             | |- context [translate _ (Ret _)] => rewrite translate_ret
              end.
 
     Ltac go_in H :=
@@ -70,6 +73,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
              | H: context [interp_local_stack (Ret _)] |- _ => rewrite interp_local_stack_ret in H
              | H: context [interp_memory (Ret _)] |- _ => rewrite interp_memory_ret in H
              | H: context [ITree.bind (Ret _) _] |- _ => rewrite bind_ret_l in H
+             | H: context [translate _ (Ret _)] |- _ => rewrite translate_ret in H
              end.
 
   End MCFGTactics.

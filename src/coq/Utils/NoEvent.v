@@ -1138,38 +1138,38 @@ E gets interepreted into a non-deterministic computation : PropT ??
 F gets "preserved" 
  *)
 
-Lemma deterministic_is_singleton : 
-  forall {E F X} (RX : relation X)
-    (t : itree (E +' F) X)
-    (h : E ~> PropT F),
-    no_event_l t -> 
-    is_singleton
-      (interp_prop (case_ h trigger_prop') X RX t)
-      (elim_l t).
-Proof.
+(* Lemma deterministic_is_singleton :  *)
+(*   forall {E F X} (RX : relation X) *)
+(*     (t : itree (E +' F) X) *)
+(*     (h : E ~> PropT F), *)
+(*     no_event_l t ->  *)
+(*     is_singleton *)
+(*       (interp_prop (case_ h trigger_prop') X RX t) *)
+(*       (elim_l t). *)
+(* Proof. *)
 
-Admitted.
+(* Admitted. *)
 
 (* t --pick> {t} --UB> {t} *)
 
-Definition interp_from_prop {E F} T (RR: T -> T -> Prop) (h : E ~> PropT F) : PropT (E +' F) T -> PropT F T :=
-  fun Pt (t : itree F T) =>
-    exists (t' : itree (E +' F) T) ,
-      Pt t' /\
-      (interp_prop (case_ h trigger_prop') _ RR t' t).
+(* Definition interp_from_prop {E F} T (RR: T -> T -> Prop) (h : E ~> PropT F) : PropT (E +' F) T -> PropT F T := *)
+(*   fun Pt (t : itree F T) => *)
+(*     exists (t' : itree (E +' F) T) , *)
+(*       Pt t' /\ *)
+(*       (interp_prop (case_ h trigger_prop') _ RR t' t). *)
 
 Section DeterministicSingleton.
 
-  Lemma deterministic_is_singleton' : 
-    forall {E F X} (RX : relation X)
-      (ts : PropT (E +' F) X)
-      (t : itree (E +' F) X)
-      (h : E ~> PropT F),
-      is_singleton ts t ->
-      no_event_l t -> 
-      is_singleton (interp_from_prop RX h ts) (elim_l t).
-  Proof.
-  Admitted.
+  (* Lemma deterministic_is_singleton' :  *)
+  (*   forall {E F X} (RX : relation X) *)
+  (*     (ts : PropT (E +' F) X) *)
+  (*     (t : itree (E +' F) X) *)
+  (*     (h : E ~> PropT F), *)
+  (*     is_singleton ts t -> *)
+  (*     no_event_l t ->  *)
+  (*     is_singleton (interp_from_prop RX h ts) (elim_l t). *)
+  (* Proof. *)
+  (* Admitted. *)
 
     (*
   (* Definition deterministic_vellvm *)

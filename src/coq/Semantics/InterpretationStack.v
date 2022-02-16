@@ -164,7 +164,7 @@ Module Type InterpreterStack_common (LP : LLVMParams).
     Notation ℑs2 := interp_mcfg2.
     Notation ℑs3 := interp_mcfg3.
     Notation ℑs4 := interp_mcfg4.
-    Notation ℑs5  := interp_mcfg5.
+    Notation ℑs5 := interp_mcfg5.
     Notation ℑs  := interp_mcfg5.
 
     Notation Ret1 g x     := (Ret (g,x)).

@@ -426,29 +426,32 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
           refine_OOM_h RR x_inf y_inf ->
           refine_OOM_h RR (@L4_convert_tree T x_inf) (@L4_convert_tree T y_inf).
       Proof.
-        intros T x_inf y_inf RR H.
-        unfold L4_convert_tree.
-        Require Import Coq.Program.Equality.
+        intros T x y RR REF.
+        unfold L4_convert_tree in *.
         unfold refine_OOM_h in *.
         rewrite unfold_interp.
 
-        punfold H; red in H.
-        remember (observe y_inf) as y_inf_obs.
-        setoid_rewrite <- Heqy_inf_obs.
+        punfold REF; red in REF.
+        genobs y yo.
+        setoid_rewrite <- Heqyo.
+        clear Heqyo.
+        clear y.
 
-        revert y_inf Heqy_inf_obs.
-        
-        pcofix CIH.
-        inversion H; subst; intros y_inf Heqy_inf_obs.
-        - pfold; cbn; red.
+        revert x REF.
+        pcofix CIH; intros x REF.
+
+        Require Import Coq.Program.Equality.
+        dependent induction REF.
+        - cbn. pstep; red.
           econstructor; eauto.
           rewrite eq2.
           rewrite interp_ret; reflexivity.
-        - pclearbot.
-          pfold; cbn; red.
-          cbn.
+        - pclearbot. punfold HS.
+          red in HS.
+
+          pfold; red.
           constructor.
-          right.
+          left.
       Admitted.
 
       Import Morphisms.
@@ -498,7 +501,6 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
       reflexivity.
   Qed.
 
-
   Lemma refine_E1E2_L6_transitive :
     forall ti1 ti2 tf2 tf1,
       TLR_INF.R.refine_L6 ti1 ti2 ->
@@ -517,6 +519,23 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     eexists.
     split.
 
+  Admitted.
+
+  (* TODO: move this *)
+  Instance Proper_model_UB :
+    forall E F G T,
+      Proper ((eq ==> iff) ==> eq ==> flip impl) (@model_UB E F G T).
+  Proof.
+    intros E F G T.
+    unfold Proper, respectful, flip, impl.
+    intros x y IFF x0 y0 EQ UB.
+    unfold model_UB in *.
+    destruct UB as [Y | [uby [Y UBY]]].
+    - left. eapply IFF; eauto.
+    - right.
+      exists uby.
+      split; eauto.
+      eapply IFF; eauto.
   Qed.
 
   Lemma model_E1E2_L6_sound :
@@ -529,7 +548,11 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
     intros p.
     unfold model_E1E2_L6.
     intros t' m_fin.
-    exists t'.
+    exists (L4_convert_tree
+    (uv <-
+     LLVMEvents.raise
+       ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "");;
+     lift_OOM (res_L4_convert_unsafe uv))).
     split.
     - unfold L4_convert_PropT.
       (* t_e1 is a tree in the model of the program in the infinite
@@ -541,9 +564,11 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
        *)
       induction p.
       + unfold TopLevelBigIntptr.model, TopLevelBigIntptr.model_gen.
-        cbn.
         From Vellvm Require Import Tactics.
-        eexists.
+        exists (LLVMEvents.raise
+             ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "")).
+        set (raise := (LLVMEvents.raise
+                  ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") ""))).
 
         From ITree Require Import
              ITree
@@ -551,13 +576,42 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
              Events.StateFacts
              Eq.Eq.
 
-        (* This rewrite is taking forever... wtf. *)
-        rewrite bind_ret_l.
-        repeat rewrite bind_ret_l.
+        unfold model in m_fin.
+        unfold model_gen in m_fin.
+        cbn in m_fin.
+        unfold interp_mcfg5 in m_fin.
+        repeat rewrite bind_ret_l in m_fin.
+        Import TranslateFacts.
+        rewrite translate_ret in m_fin.
+        repeat rewrite bind_ret_l in m_fin.
+
         
+        split.
+        left.
+        cbn.
+        unfold InterpreterStackBigIntptr.interp_mcfg5.
         MCFGTheoryBigIntptr.MCFGTactics.go.
-    - right.
-      apply eutt_refine_oom_h; try typeclasses eauto.
-      reflexivity.
-  Qed.
+        unfold LLVMEvents.raise.
+        MCFGTheoryBigIntptr.MCFGTactics.go.
+        rewrite InterpreterStackBigIntptr.LLVM.MEMORY_THEORY.interp_memory_trigger.
+        cbn.
+        MCFGTheoryBigIntptr.MCFGTactics.go.
+        rewrite bind_trigger.
+        MCFGTheoryBigIntptr.MCFGTactics.go.
+
+        match goal with
+        | H: _ |-  InterpreterStackBigIntptr.LLVM.Pick.model_undef eq ?t _ =>
+            assert (t ≈ LLVMEvents.raise ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "")) as Ht
+        end.
+        admit.
+
+        rewrite Ht.
+        unfold InterpreterStackBigIntptr.LLVM.Pick.model_undef.
+        subst raise.
+        admit.
+        reflexivity.
+      + admit.
+    - apply eutt_refine_oom_h; try typeclasses eauto.
+      admit.
+  Abort.
 End InfiniteToFinite.
