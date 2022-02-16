@@ -140,10 +140,10 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
    In order to limit bloated type signature, we name the successive return types.
    *)
 
-  Notation res_L1 := (global_env * uvalue)%type.
+  Notation res_L1 := (global_env * dvalue)%type.
   Notation res_L2 := (local_env * lstack * res_L1)%type.
   Notation res_L3 := (MemState * res_L2)%type.
-  Notation res_L4 := (MemState * (local_env * lstack * (global_env * uvalue)))%type.
+  Notation res_L4 := (MemState * (local_env * lstack * (global_env * dvalue)))%type.
 
   (**
      Full denotation of a Vellvm program as an interaction tree:
@@ -163,11 +163,12 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (ret_typ : dtyp)
              (entry : string)
              (args : list uvalue)
-             (mcfg : CFG.mcfg dtyp) : itree L0 uvalue :=
+             (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'addr <- trigger (GlobalRead (Name entry)) ;;
-    denote_mcfg defns ret_typ (dvalue_to_uvalue addr) args.
+    'rv <- denote_mcfg defns ret_typ (dvalue_to_uvalue addr) args ;;
+    trigger (pick rv True).
 
 
   (* main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them 
@@ -181,7 +182,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
                            DV.UVALUE_Addr null
     ].
 
-  Definition denote_vellvm_main (mcfg : CFG.mcfg dtyp) : itree L0 uvalue :=
+  Definition denote_vellvm_main (mcfg : CFG.mcfg dtyp) : itree L0 dvalue :=
     denote_vellvm (DTYPE_I (32)%N) "main" main_args mcfg.
 
   (**
@@ -219,7 +220,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (entry : string)
              (args : list uvalue)
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
-    : PropT L4 (MemState * (local_env * lstack * (global_env * uvalue))) :=
+    : PropT L4 (MemState * (local_env * lstack * (global_env * dvalue))) :=
     let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
     ℑs eq t [] ([],[]) emptyMemState. 
 
