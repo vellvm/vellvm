@@ -327,9 +327,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
    *)
   Definition res_L4_convert_unsafe (res : LLVM1.res_L4) : OOM LLVM2.res_L4
     := match res with
-       | (ms, ((lenv, lstack), (genv, uv))) =>
-           uv' <- uvalue_convert uv;;
-           ret (IS2.LLVM.MEM.emptyMemState, (([], []), ([], uv')))
+       | (ms, ((lenv, lstack), (genv, dv))) =>
+           dv' <- dvalue_convert dv;;
+           ret (IS2.LLVM.MEM.emptyMemState, (([], []), ([], dv')))
        end.
  
   Definition refine_E1E2_L6 (srcs : PropT IS1.LLVM.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
@@ -427,6 +427,28 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
           refine_OOM_h RR (@L4_convert_tree T x_inf) (@L4_convert_tree T y_inf).
       Proof.
         intros T x_inf y_inf RR H.
+        unfold L4_convert_tree.
+        Require Import Coq.Program.Equality.
+        unfold refine_OOM_h in *.
+        rewrite unfold_interp.
+
+        punfold H; red in H.
+        remember (observe y_inf) as y_inf_obs.
+        setoid_rewrite <- Heqy_inf_obs.
+
+        revert y_inf Heqy_inf_obs.
+        
+        pcofix CIH.
+        inversion H; subst; intros y_inf Heqy_inf_obs.
+        - pfold; cbn; red.
+          econstructor; eauto.
+          rewrite eq2.
+          rewrite interp_ret; reflexivity.
+        - pclearbot.
+          pfold; cbn; red.
+          cbn.
+          constructor.
+          right.
       Admitted.
 
       Import Morphisms.
@@ -466,239 +488,15 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
       intros r1 r2 H.
       unfold TLR_INF.R.refine_res3, TLR_INF.R.refine_res2, TLR_INF.R.refine_res1 in H.
-
-
-      apply refine_blah.
-      setoid_rewrite XY_INF.
-      
-      setoid_rewrite unfold_bind.
-      pinversion XY_INF.
-      + subst t2.
-        pfold; red.
-        rewrite eq2.
-      unfold refine_OOM_h in XY_INF.
-      setoid_rewrite interp_bind.
-etransitivity; eauto.
-    
-    destruct XY as (rx & TX & XY).
-
-    exists rx; split; auto.
-    rewrite XY. eauto.
-
-    - (* UB in ty *)
-      unfold L4_convert_PropT in TY_FIN.
-      destruct TY_FIN as (ry_inf & TY_INF & ry_fin_inf).
-
-      specialize (XY_INF ry_inf TY_INF).
-      destruct XY_INF as (rx_inf & TX_INF & [UB_rx_inf | XY_INF]);
-        set (rx_fin := L4_convert_tree (uv <- rx_inf;; lift_OOM (res_L4_convert_unsafe uv))).
-      + (* UB in tx *)
-        exists rx_fin.
-        split.
-        * exists rx_inf; split; eauto.
-        *
-          (* rx_fin may or may not have UB.
-
-             rx_fin may run out of memory before encountering UB.
-
-             If rx_inf is like:
-
-               externalcall f args;;
-               UB
-
-             Then if, say, args contains `DVALUE_IPTR 2^1000` the
-             L4_convert handler will raise OOM when converting this to
-             a finite IPTR value.
-
-             Because of this `rx_fin` will always raise OOM prior to
-             encountering UB.
-
-             `rx_fin` is still a refinement of `rx_inf`...
-           *)
-          { clear TX_INF.
-            subst rx_fin. induction UB_rx_inf.
-            - destruct IHUB_rx_inf as [IHUB_UB | IHUB_REF].
-              + left. setoid_rewrite interp_bind.
-                rewrite H.
-                rewrite tau_eutt.
-                rewrite <- interp_bind.
-                eauto.
-              + right.
-                unfold refine_OOM_h in *.
-                eapply interp_prop_Proper2; eauto.
-                Import Morphisms.
-                * unfold Proper, respectful, Basics.flip, Basics.impl.
-                  intros A R e ta k1 k2 x y EQ KSPEC.
-                  destruct e as [e | [e | [e | [e | e]]]]; cbn in *;
-                  auto; rewrite EQ; auto.
-                * setoid_rewrite interp_bind.
-                  rewrite H.
-                  rewrite tau_eutt.
-                  reflexivity.
-            - destruct e as [call_e | oom_e].
-              + (* CallE *)
-                right.
-                destruct call_e.
-                admit.
-              + (* OOME *)
-                admit.
-            - admit.
-            - admit.
-          }
-          right.
-          subst rx_fin.
-
-          apply bind_contains_UB.
-
-          (* Interp lemma *)
-          { clear tx ty TX_INF TY_INF.
-            clear tz TZ.
-            clear ry_inf ry_fin_inf rz ry_fin UB_ry_fin.
-
-            induction UB_rx_inf.
-            - rewrite H.
-              rewrite tau_eutt.
-              eauto.
-            - rewrite H.
-              rewrite interp_vis.
-              destruct e as [call_e | oom_e].
-              
-              + destruct call_e.cbn; destruct call_e; cbn.
-                destruct (EC.DVC.uvalue_convert f).
-                * (* NoOom *)
-                  admit.
-                * (* OOM *)
-                  rewrite bind_bind.
-                  cbn.
-                  unfold raiseOOM.
-                  rewrite bind_bind.
-                  rewrite bind_trigger.
-                rewrite bind_bind.
-                eapply bind_contains_UB_k.
-                { constructor. cbn.
-              eapply IHUB_rx_inf.
-
-            rewrite unfold_interp.
-            genobs rx_inf rx_inf_obs.
-            destruct rx_inf_obs.
-            
-
-
-          }
-
-          
-          
-          apply interp_contains_UB.
-
-          (* TODO: factor this out *)
-          2: {
-            clear.
-            red.
-            intros R [s].
-            Require Import Paco.paco.
-            pfold.
-            cbn.
-            constructor.
-          }
-
-          apply bind_contains_UB; eauto.
-      + (* UB not necessarily in tx *)
-        exists rx_fin.
-        split.
-        * exists rx_inf; split; eauto.
-         * left.
-          subst rx_fin.
-          subst ry_fin.
-
-          (* TODO: Move TT *)
-          eapply contains_UB_refine_OOM_h with (RR:=TLR_INF.R.TT); eauto.
-          Set Printing Implicit.
-          unfold E1.L4.
-          set (x:=(L4_convert_tree (uv <- rx_inf;; lift_OOM (res_L4_convert_unsafe uv)))).
-          set (y:=(L4_convert_tree (uv <- rx_inf;; lift_OOM (res_L4_convert_unsafe uv)))).
-
-          pose proof refine_OOM_h_reflexive.
-          unfold RelationClasses.Reflexive in H.
-
-
-          refine_oom_h_reflexivity.
-         setoid_reflexivity.
-          
-    - specialize (XY ry TY).
-      destruct XY as (rx & TX & [UB_rx | XY]).
-
-      + (* UB in tx *)
-        exists rx; split; auto.
-      + exists rx; split; auto.
-        right. 
-        eapply refine_OOM_h_transitive; eauto.
-        typeclasses eauto.
-  Qed
-
-
-    intros ubz TZ.
-
-    specialize (YZ_FIN ubz TZ).
-    destruct YZ_FIN as (uby_fin & blah & [UB | RFIN]).
-    unfold L4_convert_PropT in blah.
-    - (* t'' contains UB *)
-      (* This means that ti2 contains UB, and can be refined to anything.
-
-         Because ti2 is a refinement of ti1, this means that ti1 must
-         also contain UB, and be able to be refined to anything.
-       *)
-
-      specialize (RINF t_e1 Hti2t_e1).
-      destruct RINF as (t''' & Hti1t''' & [UB' | INF]).
-
-      + eexists.
-        split.
-        2: { left. eauto. }
-
-        unfold L4_convert_PropT in *.
-
-        exists t'''.
-        split.
-        * auto.
-        * subst. 
-          auto.
-
-      
-      destruct ti2t'' as 
-    - (* t'' doesn't contain UB *)
-    exists t'.
+      destruct r1 as [r1a [[r1b1 r1b2] [r1c dv1]]].
+      destruct r2 as [r2a [[r2b1 r2b2] [r2c dv2]]].
+      inversion H; subst.
+      inversion H5; subst.
+      inversion H7; subst.
+      inversion H7; subst.
+      cbn.
+      reflexivity.
   Qed.
-
-
-
-  Instance Transitive_refine_L6 : Transitive refine_L6.
-  Proof.
-    unfold Transitive.
-    intros tx ty tz XY YZ.
-
-    intros rz TZ.
-    specialize (YZ rz TZ).
-    destruct YZ as (ry & TY & [UB_ry | YZ]).
-
-    - (* UB in ty *)
-      specialize (XY ry TY).
-      destruct XY as (rx & TX & [UB_rx | XY]).
-
-      + (* UB in tx *)
-        exists rx; split; auto.
-      + exists rx; split; auto.
-        left. unfold refine_OOM_h in XY.
-        eapply contains_UB_refine_OOM_h; eauto.
-    - specialize (XY ry TY).
-      destruct XY as (rx & TX & [UB_rx | XY]).
-
-      + (* UB in tx *)
-        exists rx; split; auto.
-      + exists rx; split; auto.
-        right. 
-        eapply refine_OOM_h_transitive; eauto.
-        typeclasses eauto.
-  Abort.
 
 
   Lemma refine_E1E2_L6_transitive :
