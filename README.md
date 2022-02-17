@@ -129,12 +129,20 @@ Our current test-suite of LLVM programs for which we compare our semantics again
     * menhir     (installed via, e.g. `opam install menhir`)
     * qcheck     (installed via, e.g. `opam install qcheck`)
 
-Compilation:
+#### Compilation:
 
 1. Clone the vellvm git repo with the `--recurse-submodule` option
 2. Install all external dependencies
    - Note: you should be able to install all of the opam libraries  with `make opam` in the `src/` directory.
 3. Run `make` in the `src/` directory: it will first compile the quickchick library, then vir, and finally extract the OCaml executable
+
+### Installing with nix
+
+[First, enable nix flakes.](https://nixos.wiki/wiki/Flakes#Installing_flakes)
+
+When using this flake make sure to enable submodules. For instance, if
+you clone the project you can get a dev shell with
+`nix develop '?.submodules=1'`.
 
 # Running
 
