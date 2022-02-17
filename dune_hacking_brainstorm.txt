@@ -1,0 +1,11 @@
+We know that:
+
+   - The extracted_modules field from the stanza currently expects all dependencies
+   - We know it's reflected in the definition of Dir_contents.load_text_files (which is called by Dir_contents.get) as it straight up returns this static list
+   - We think that there is something weird going on with Coq_rules.extraction_rules accessing what looks like a second time this list explicitly to define [ml_targets]: isn't this redundant with the construction of [cctx] via [Context.create]?
+
+   - As far as we understand, what we would need:
+     + call coq_dep on the prelude somewhere, gets this list back and use this in lieu of the static list either just for the context and replace the current definition of [ml_targets] by accessing the data in the context, or in both?
+     + the extracted files are a subset of the dependencies in general: how can we narrow it down?
+
+  - Down the road: problem with BlackList and Capitalization?
