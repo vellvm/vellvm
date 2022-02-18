@@ -1,0 +1,107 @@
+In the program:
+
+#+begin_src c
+  i32* ptr = alloca i64;
+  i32 x = ptoi ptr;
+#+end_src
+
+~x~ will be a ~uvalue~ integer value that ranges between all of the
+free locations in memory that can fit an ~i64~.
+
+** Memory in Prop
+
+One solution is that the memory model is in ~Prop~, and so the
+pointers returned by ~alloca~ can really just be "physical" integer
+addresses into the memory model, and ~ptoi~ is basically a noop.
+
+** Abstract pointers and allocation handlers
+
+Alternatively the memory model returns abstract pointer values and
+then we raise a ~PtoI~ event (handled *not* by the memory handler, but
+some *separate* allocation handler). This allocation handler can be in
+~Prop~ and can have an executable version.  In theory this would mean
+that simple loads / stores work fine concretely, but...  I don't think
+this can work, though, because things end up needing to emit events
+from previous stages...
+
+- GEP remains a memory event????
+  + Remove UVALUE_GetElementPtr? Can't... Have to have delayed evaluation of them...
+    * Pick needs to emit GEP events, or know how to do GEP on abstract pointer values.
+  + What do we do about uvalue parameters to GEP?
+- PToI and IToP become "allocation" or "cast" events with a separate
+  handler.
+  + These also need to take uvalue arguments, which mean they need to
+    emit pick events or do concretization on their own.
+  + Pick needs to be able to raise PToI and IToP events, though...
+    #+begin_src c
+      ptr = itop (y + undef);
+      x = ptoi ptr + undef;
+      return x;
+    #+end_src
+
+This also brings back separate logical and concrete memory, so I'm a
+little nervous. All memory is still infinite, so while ~PtoI~
+represents a concrete allocation, the concrete memory is also
+infinite, so that allocation can't technically fail. ~PtoI~ will never
+fail for ~intptr~ types, and ~ItoP~ will never fail... Might be fine.
+
+** Some kind of assertion event
+
+The memory model emits ~assert~ events that somehow constrain the set
+of values... Maybe ~alloca~ just returns ~undef~ and we ~assert~ that
+it concretizes to a free address...
+
+This wouldn't be executable, so we'd need a separate memory handler
+that spits out a real address instead of ~undef~...
+
+Or maybe ~alloca~ returns a logical address, and ~ptoi~ returns an
+~undef~ and raises an ~assert~ that it concretizes to a free physical
+address...
+
+Will need separate concrete and logical memory as above.
+
+I don't really understand the particulars of how this one would work
+yet. ~assert~ would need to have knowledge about the state of memory...
+
+Maybe if I have a program like this...
+
+#+begin_src c
+  p1 = alloca;
+  p2 = alloca;
+#+end_src
+
+I'd end up with assertions like...
+
+#+begin_src coq
+  Variable check_memory_state_description : MemoryStateDescription -> Prop.
+
+  (* Get a new memory state description where `ptr` is allocated *)
+  Variable allocated : ptr -> MemoryStateDescription -> MemoryStateDescription.
+
+  Variant Assert :=
+    | assert : MemoryStateDescription -> MemoryStateDescription.
+
+  assert (fun msd : MemoryStateDescription => allocated p1 msd)
+  assert (fun msd : MemoryStateDescription => allocated p2 msd)
+#+end_src
+
+And the assert handler would be something like...
+
+#+begin_src coq
+  Definition assert_handler (a : Assert) : stateT MemoryStateDescription (itree E)
+    := fun (ms : MemoryStateDescription) =>
+         match a with
+         | (assert assertion) =>
+             assertion ms
+         end.
+
+  Definition model_asserts : itree (Assert +' E) ~> PropT E
+    := fun t t' =>
+         let it := runStateT (interp assert_handler t) (* : itree E (MemoryStateDescription, T) *)
+         in
+         t' ≈ fmap snd it /\
+           (* Probably less silly way to do this... *)
+           (eutt (fun _ msd => check_memory_state_description msd) it it)
+#+end_src
+
+Does this get run before pick...? After? Does it matter?
