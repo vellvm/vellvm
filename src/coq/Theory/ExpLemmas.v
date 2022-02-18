@@ -319,6 +319,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     (*   reflexivity. *)
     (* Qed. *)
 
+    (*
     Lemma denote_ibinop_concrete :
       forall (op : ibinop) τ e0 e1 g l m x a av b bv,
         ⟦ e0 at τ ⟧e3 g l m ≈ Ret3 g l m a ->
@@ -425,6 +426,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       reflexivity.
     Qed.
 
+     *)
   End ExpLemmas.
 
   Section ExpPure.
