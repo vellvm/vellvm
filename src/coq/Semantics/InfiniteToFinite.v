@@ -384,7 +384,7 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
     In theory ti2 has fewer behaviours than ti1, and so if I can refine it to tf2, then I can also refine ti1 to tf2.
    *)
-  Lemma refine_E1E2_L6_compose :
+  Lemma refine_E1E2_L6_compose_inf_to_fin :
     forall tx ty tz,
       TLR_INF.R.refine_L6 tx ty ->
       refine_E1E2_L6 ty tz ->
@@ -501,6 +501,19 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
       reflexivity.
   Qed.
 
+  Lemma refine_E1E2_L6_compose_fin_to_inf :
+    forall tx ty tz,
+      refine_E1E2_L6 tx ty ->
+      TLR_FIN.R.refine_L6 ty tz ->
+      refine_E1E2_L6 tx tz.
+  Proof.
+    intros tx ty tz XY_INF YZ_FIN.
+
+    unfold refine_E1E2_L6 in *.
+    unfold TLR_INF.R.refine_L6 in *.
+    unfold TLR_FIN.R.refine_L6 in *.
+  Abort.
+
   Lemma refine_E1E2_L6_transitive :
     forall ti1 ti2 tf2 tf1,
       TLR_INF.R.refine_L6 ti1 ti2 ->
@@ -522,22 +535,6 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
   Admitted.
 
   (* TODO: move this *)
-  Instance Proper_model_UB :
-    forall E F G T,
-      Proper ((eq ==> iff) ==> eq ==> flip impl) (@model_UB E F G T).
-  Proof.
-    intros E F G T.
-    unfold Proper, respectful, flip, impl.
-    intros x y IFF x0 y0 EQ UB.
-    unfold model_UB in *.
-    destruct UB as [Y | [uby [Y UBY]]].
-    - left. eapply IFF; eauto.
-    - right.
-      exists uby.
-      split; eauto.
-      eapply IFF; eauto.
-  Qed.
-
   Lemma model_E1E2_L6_sound :
     forall (p : list
              (LLVMAst.toplevel_entity
