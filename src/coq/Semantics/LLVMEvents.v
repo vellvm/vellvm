@@ -181,11 +181,7 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
     | Alloca  : forall (t:dtyp),                               (MemoryE dvalue)
     | Load    : forall (t:dtyp) (a:dvalue),                    (MemoryE uvalue)
     (* Store address should be unique... *)
-    | Store   : forall (t:dtyp) (a:dvalue) (v:uvalue),         (MemoryE unit)
-    | GEP     : forall (t:dtyp) (v:uvalue) (vs:list uvalue),   (MemoryE uvalue)
-    | ItoP    : forall (t:dtyp) (i:uvalue),                    (MemoryE uvalue)
-    | PtoI    : forall (t:dtyp) (a:uvalue),                    (MemoryE uvalue)
-  .
+    | Store   : forall (t:dtyp) (a:dvalue) (v:uvalue),         (MemoryE unit).
 
   (* An event resolving the non-determinism induced by undef. The argument _P_
    is intended to be a predicate over the set of dvalues _u_ can take such that

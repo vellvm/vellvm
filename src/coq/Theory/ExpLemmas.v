@@ -731,22 +731,6 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       apply eutt_eq_bind; intros [].
     Qed.
 
-    Lemma conv_to_exp_ItoP : forall t z,
-        translate exp_to_instr (translate conv_to_exp (trigger (ItoP t z))) ≈ trigger (ItoP t z).
-    Proof.
-      intros.
-      go.
-      reflexivity.
-    Qed.
-
-    Lemma conv_to_exp_PtoI : forall z t_to,
-        translate exp_to_instr (translate conv_to_exp (trigger (PtoI t_to z))) ≈ trigger (PtoI t_to z).
-    Proof.
-      intros.
-      go.
-      reflexivity.
-    Qed.
-
     (* Lemma expr_are_pure : forall (o : option dtyp) e, pure ⟦ e at? o ⟧e3. *)
     (* Proof with trivial_cases. *)
     (*   intros; unfold pure. *)

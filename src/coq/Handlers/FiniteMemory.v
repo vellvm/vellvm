@@ -1849,45 +1849,6 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
         | _ => mem_state_raise ("Attempting to store to a non-address dvalue: " ++ (to_string da))
         end
 
-      | GEP dt ua uvs =>
-        match (dvs <- map_monad uvalue_to_dvalue uvs;; da <- uvalue_to_dvalue ua;; ret (da, dvs)) with
-        | inr (da, dvs) =>
-          (* If everything is well defined, just use handle_gep... *)
-          a' <- mem_state_lift_err (handle_gep dt da dvs);;
-          ret (dvalue_to_uvalue a')
-        | inl _ =>
-          (* Otherwise build a UVALUE_GEP *)
-          ret (UVALUE_GetElementPtr dt ua uvs)
-        end
-
-      | ItoP t_from x =>
-        (* TODO: should this take signedness into account...? *)
-        match x with
-        | UVALUE_I64 i
-        | UVALUE_I32 i
-        | UVALUE_I8  i
-        | UVALUE_I1  i =>
-          ret (UVALUE_Addr (int_to_ptr (unsigned i) wildcard_prov))
-        | UVALUE_IPTR i =>
-          ret (UVALUE_Addr (int_to_ptr (IP.to_unsigned i) wildcard_prov))
-        | _ => ret (UVALUE_Conversion Inttoptr t_from x DTYPE_Pointer)
-        end
-
-      | PtoI t a =>
-        match a, t with
-        | UVALUE_Addr ptr, DTYPE_I sz =>
-          let addr := coerce_integer_to_int (Some sz) (ptr_to_int ptr) in
-          addr' <- mem_state_lift_err_ub_oom addr;;
-          ret (dvalue_to_uvalue addr')
-        | UVALUE_Addr ptr, DTYPE_IPTR =>
-            match IP.from_Z (ptr_to_int ptr) with
-            | Oom msg => mem_state_raiseOOM msg
-            | NoOom addr =>
-                ret (UVALUE_IPTR addr)
-            end
-        | _, _ =>
-          ret (UVALUE_Conversion Ptrtoint DTYPE_Pointer a t)
-        end
       end.
 
   Definition handle_intrinsic {E} `{FailureE -< E} `{PickE -< E} `{UBE -< E} : IntrinsicE ~> MemStateT (itree E) :=
