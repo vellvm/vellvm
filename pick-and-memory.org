@@ -97,7 +97,7 @@ And the assert handler would be something like...
 
   Definition model_asserts : itree (Assert +' E) ~> PropT E
     := fun t t' =>
-         let it := runStateT (interp assert_handler t) (* : itree E (MemoryStateDescription, T) *)
+         let it := runStateT (interp assert_handler t) empty_msd (* : itree E (MemoryStateDescription, T) *)
          in
          t' ≈ fmap snd it /\
            (* Probably less silly way to do this... *)
