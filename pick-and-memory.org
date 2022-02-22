@@ -105,3 +105,193 @@ And the assert handler would be something like...
 #+end_src
 
 Does this get run before pick...? After? Does it matter?
+
+* Reframing the memory problem...
+
+Hmmmm. So, like, lemme see if I can reframe our problem a bit. Memory
+is non-deterministic, in some sense that means interactions with it
+should end up in ~PropT~, because we will have a set of different
+possible executions from interacting with memory. We don't like ~PropT~,
+so it might be nice if we could somehow delay thinking about the
+non-determinism, and isolate it to the operations that are /actually/
+non-deterministic. If we just had ~alloca / load / store~ we would have
+a deterministic memory model, but because we can take physical
+addresses with ~ptoi~ we get information about the layout of memory, and
+the layout of memory should be non-deterministic.
+
+So there's a couple questions about where our source of non-determinism comes from:
+
+- ~alloca~ can be non-deterministic and ~ptoi~ would just be a
+  noop. This is how we more naturally think of things --- allocation
+  is where we reserve a physical location, and that physical location
+  could be any previously free spot in memory.
+-  Instead we could have ~ptoi~ make the non-deterministic choice, but
+  then we need some way to make sure it locks in the choice for future
+  calls to ~ptoi~ (should be doable if ~ptoi~ is an event?)
+
+Because we're trying to delay non-determinism as much as possible,
+instead of interpreting ~alloca~ or ~ptoi~ into ~PropT~ we're punting
+around the idea of delaying non-determinism until we handle ~pick~
+events, and so we are thinking of just reusing ~pick~ itself, and then
+raising some kind of ~assert~ event that would constrain the values that
+we get back from ~pick~. This is basically identical to the old pick
+propositions, except maybe we'll have different levels of ~asserts~ and
+they'll have access to the state for each level of interpretation, so
+we can have one level of ~assert~ that has access to the memory.
+
+** Alloca is non-deterministic
+
+Using ~asserts~ if we wanted to put the nondeterminism in ~alloca~ we
+mostly do something like this:
+
+#+begin_src coq
+  uv <- trigger alloca;; v <- pick uv;; assert (fresh v);; LWr x v
+#+end_src
+
+However, it's not enough to just do ~assert (fresh v)~ , ~v~ needs to
+interact with the memory state somehow... So, maybe ~alloca~ is actually
+implemented as:
+
+#+begin_src coq
+  v <- pick undef;;
+  assert (fun m => fresh v m);;
+  phys_allocate v size
+#+end_src
+
+where ~phys_allocate~ is an event that takes a physical address and
+stores it in the concrete memory model (right now it has to be an
+event so the assertions can check the resulting concrete memory)... In
+fact, this could be cleaned up to just be:
+
+#+begin_src coq
+  v <- pick undef;;
+  phys_allocate v size
+#+end_src
+
+where ~phys_allocate~ raises ~UB~ if there's a collision, and then we
+don't even need assertions, and technically this can all just be in
+~stateT concrete_memory~ or something, because really there's one
+meaningful implementation of ~phys_allocate~. Here ~ptoi~ and ~itop~ are
+simple ~noops~.
+
+** Ptoi is non-deterministic
+
+If we want to delay nondeterminism until ~ptoi~ happens... We need
+separate logical and concrete memory again. Then ~alloca~ will just
+return a logical address (instead of a concrete physical address as
+before), these can just be numbers drawn sequentially. Then:
+
+#+begin_src coq
+  ptoi addr = v <- pick undef;; phys_allocate v size addr.
+#+end_src
+
+~phys_allocate~ will raise ~UB~ if ~v~ isn't a valid location, and
+~phys_allocate~ must also take the logical address ~addr~ into account
+and register it somewhere because ~itop~ will need to look up the
+logical address from the concrete memory.
+
+** A note about ItoP
+
+~itop~ can take a ~uvalue~ as an argument that /should not/ be ~picked~.
+
+If I have ~itop x~ and ~x~ is a ~uvalue~ that represents a set of
+values, like say ~x = {(int)ptr1, (int)ptr2}~, it must be the case
+that ~itop x = {ptr1, ptr2}~. This is vital if the result of ~itop~ is
+used in a ~load~ or ~store~ address --- we need to assert that these
+~uvalues~ serialize to a unique address.
+
+We have two possible cases for our memory model, as above:
+
+- In case 1, ~alloca~ is non-deterministic: this is easy because
+  ~ptoi / itop~ are basically just ~noops~.
+- In case 2, ~ptoi~ is non-deterministic: ~itop x~ needs do some kind of
+  nondeterministic lookup on the concrete memory to find a set of
+  possible logical addresses. ~x~ should not be picked yet, so we have
+  to return some ~uvalue~ that contains enough information to delay this
+  computation --- so, we need a ~UVALUE_IToP~ constructor and it needs
+  to contain the whole concrete memory... Which might be okay.
+
+* What should we do?
+
+Ideally we get the behaviour from making ~ptoi~ non-deterministic. In
+this case ~alloca / load / store / GEP~ can all be deterministic, and
+we can reason about programs that use this subset of operations
+without going into ~PropT~. In this case ~ptoi / itop~ would be
+handled by a separate set of events that we could interpret
+later. ~MemPush / MemPop~ have to deal with both the concrete and
+logical memory, and it may be the case that we should duplicate these
+events -- having a version that deals with logical memory, and a
+version that deals with concrete memory.
+
+In summary, to do this we need to:
+
+- Separate ~ptoi / itop~ into a different set of concrete memory events.
+- Duplicate ~MemPush / MemPop~ into the concrete memory events.
+- Add separate logical / concrete memory structures again
+  + This is a fairly big change, but might not be /too/ bad... We
+    started with both, and I removed the concrete memory model when it
+    ended up being a duplicate...
+  + Currently memory looks like this:
+
+    #+begin_src coq
+      Inductive UByte :=
+      | mkUByte (uv : uvalue) (dt : dtyp) (idx : uvalue) (sid : store_id) : UByte.
+
+      Definition SByte := UByte.
+
+      (* Memory consists of bytes which have a provenance associated with them. *)
+      Definition mem_byte := (SByte * AllocationId)%type.
+      Definition memory := IntMap mem_byte.
+    #+end_src
+
+    + Logical memory technically won't need ~AllocationIds~ associated
+      with each byte (though ~store_ids~ are still necessary for
+      properly handling ~undef~ values in memory). It will be a map
+      from ~AllocationIds~ to blocks of ~SBytes~.
+    + Concrete memory will just be an ~IntMap~ of
+      ~AllocationIds~... Or maybe
+      ~(AllocationId * OffsetIntoLogicalBlock)~ pairs.
+      This would make this a map of concrete addresses to logical addresses,
+      which could be nice for ~itop~.
+      * May want some additional structure for keeping track of which
+        logical pointers exist in concrete memory (and where) to make
+        sure we don't have to walk over every byte in concrete memory
+        for ~ptoi~...
+- ~uvalue~ will need a new constructor, something like:
+
+  #+begin_src coq
+    | UVALUE_ItoP     (dt_from : dtyp) (x : uvalue) (m : ConcreteMemory.concrete_memory)
+  #+end_src
+
+  + Need to be careful that there's no cyclic dependencies between ~uvalue~ and ~ConcreteMemory~
+  + Need to expose some ~concrete_memory -> logical_pointer~ function
+    for ~Serialization.v~ for ~concretize_uvalueM~ (used in ~pick~
+    handling / maybe ~denote_exp~ to evaluate ~uvalues~).
+  
+** Concerns
+
+The memory model becomes a much more complicated split thing. It's not
+as easy to audit the specification, and these changes *do not* make
+the memory model more expressive / accurate. I.e., this more
+complicated handling of logical + concrete memory should actually be
+equivalent to the original formulation where all memory is
+concrete. The only reason to do this is that the original formulation
+would have to be interpreted into ~PropT~ in order to handle address
+allocation non-determinism, and with this alternative formulation we
+should be able to separate ~alloca / load / store / GEP~ from ~ptoi /
+itop~ in order to delay having to reason in ~PropT~. Ultimately, after
+interpreting all events, we should get the same set of itrees for both
+implementations...
+
+I can see why this is valuable, and why we might want to make this
+change. It does feel dissatisfying to have to complicate the spec to
+make for easier reasoning at different levels of interpretation. I'm
+not sure there's a better way to organize things to avoid this,
+though?
+
+Separating the memory events does force every possible memory model to
+provide both logical memory and concrete memory. In theory we could
+have the current entirely concrete model for handling ~alloca / load /
+store / GEP~, and then use ~unit~ for the type of ~concrete_memory~,
+and ~ptoi~ and ~itop~ could be handled by just unwrapping the logical
+address (which is really a physical address).
