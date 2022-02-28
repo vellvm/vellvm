@@ -15,38 +15,38 @@ From Vellvm Require Import
      Handlers.Intrinsics
      Handlers.Pick
      Handlers.FiniteMemory
-     Handlers.FiniteMemoryTheory.
+     Handlers.MemoryModel
+     Handlers.MemoryInterpreters
+     Handlers.MemoryModelTheory.
 
 Module Type Lang (LP: LLVMParams).
   Export LP.
 
-  (* Events *)
-  Module Events := LLVMEvents.Make ADDR IP SIZEOF.
-
   (* Handlers *)
-  Module Global     := Global.Make ADDR IP SIZEOF Events.
-  Module Local      := Local.Make ADDR IP SIZEOF Events.
-  Module Stack      := Stack.Make ADDR IP SIZEOF Events.
-  Module Intrinsics := Intrinsics.Make ADDR IP SIZEOF Events.
+  Module Global     := Global.Make ADDR IP SIZEOF LP.Events.
+  Module Local      := Local.Make ADDR IP SIZEOF LP.Events.
+  Module Stack      := Stack.Make ADDR IP SIZEOF LP.Events.
+  Module Intrinsics := Intrinsics.Make ADDR IP SIZEOF LP.Events.
 
   (* Memory *)
-  Module GEP  := GepM.Make ADDR IP SIZEOF Events PTOI PROV ITOP.
-  Module Byte := FiniteMemory.FinByte ADDR IP SIZEOF Events.
+  Declare Module GEP  : GEPM ADDR IP SIZEOF LP.Events.
+  Declare Module Byte : ByteImpl ADDR IP SIZEOF LP.Events.
 
-  Module MP := MemoryParams.Make LP Events GEP Byte.
+  Module MP := MemoryParams.Make LP GEP Byte.
 
-  Module MEM  := FiniteMemory.Make LP Events MP.
+  Declare Module MEM : MemoryModel LP MP.
+  Module MEMINTERP := MemoryInterpreters.Make LP MP MEM.
 
   (* Serialization *)
-  Module SP := SerializationParams.Make LP Events MP.
+  Module SP := SerializationParams.Make LP MP.
   
-  Module MEMORY_THEORY := FiniteMemoryTheory.Make LP Events MP SP MEM.
+  Declare Module MEMORY_THEORY : MemoryModelTheory LP MP SP MEM MEMINTERP.
 
   (* Pick handler (depends on memory / serialization) *)
-  Module Pick := Pick.Make LP Events MP SP.
+  Module Pick := Pick.Make LP MP SP.
 
   (* Denotation *)
-  Module D := Denotation LP Events MP SP.
+  Module D := Denotation LP MP SP.
 
   Export Events Events.DV Global Local Stack Pick Intrinsics
          MEM MEMORY_THEORY SP.SER D.

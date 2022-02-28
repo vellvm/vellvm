@@ -28,13 +28,12 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Export TOP.
   Export IS.
   Export IS.LLVM.
-
   Import SemNotations.
 
   (* TO MOVE *)
   Arguments Intrinsics.F_trigger/.
   Arguments String.append : simpl never.
-  Arguments allocate : simpl never.
+  (* Arguments allocate : simpl never. *)
   Arguments defs_assoc: simpl never.
 
   Module CFGTactics.

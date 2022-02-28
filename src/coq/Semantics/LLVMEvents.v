@@ -188,7 +188,8 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
    if it is not satisfied, the only possible execution is to raise _UB_.
    *)
   Variant PickE : Type -> Type :=
-  | pick (u:uvalue) (P : Prop) : PickE dvalue.
+     PickSubset (X Y : Type) (Pre : Prop) (x : X) (Post : Y -> Prop) : PickE Y.
+
   (* Need to change handler to actually use prop, need to parameterize... *)
 
   (* Variant PickE (X : Type) : Type := *)
@@ -211,8 +212,6 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
 
   Definition unique_prop (uv : uvalue) : Prop
     := True.
-
-  Definition pickAll (p : uvalue -> PickE dvalue) := map_monad (fun uv => trigger (p uv)).
 
   (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
   (* TODO: The events and handlers are parameterized by the types of key and value.

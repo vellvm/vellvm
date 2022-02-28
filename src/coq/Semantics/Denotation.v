@@ -107,7 +107,7 @@ Open Scope N_scope.
     itrees in the second phase.
  *)
 
-Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SP : SerializationParams LP Events MP).
+Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams LP MP).
   Import SP.
   Import SER.
   Import MP.
@@ -165,7 +165,7 @@ Module Denotation (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP
   Definition concretize_or_pick {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) (P : Prop) : itree E dvalue :=
     if is_concrete uv
     then lift_err ret (uvalue_to_dvalue uv)
-    else trigger (pick uv P).
+    else trigger (pick P uv).
   
   (* Pick a possibly poison value, treating poison as nondeterminism.
      This is used for freeze. *)

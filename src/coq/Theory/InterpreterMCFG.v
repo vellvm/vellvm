@@ -33,7 +33,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (* COMMON WITH CFG *)
   Arguments Intrinsics.F_trigger/.
   Arguments String.append : simpl never.
-  Arguments allocate : simpl never.
+  (* Arguments allocate : simpl never. *)
   Arguments defs_assoc: simpl never.
 
   Module MCFGTactics.

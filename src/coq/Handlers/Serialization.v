@@ -36,7 +36,7 @@ Import IdentityMonad.
 Import ListNotations.
 Import MonadNotation.
 
-Module Type SerializationBase (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events).
+Module Type SerializationBase (LP : LLVMParams) (MP : MemoryParams LP).
   Import MP.
   Import LP.
   Import PTOI.
@@ -149,7 +149,7 @@ Module Type SerializationBase (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.A
         end.
 End SerializationBase.
 
-Module Type Serialization (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SER : SerializationBase LP Events MP) <: SerializationBase LP Events MP.
+Module Type Serialization (LP : LLVMParams) (MP : MemoryParams LP) (SER : SerializationBase LP MP) <: SerializationBase LP MP.
   Include SER.
   Import MP.
   Import LP.
@@ -309,9 +309,12 @@ Module Type Serialization (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR 
     intros dv2 Re2.
     destruct (eval_iop iop dv1 dv2) as [[[[[[[oom_eval_iopiopdv1dv2] | [[ub_eval_iopiopdv1dv2] | [[err_eval_iopiopdv1dv2] | eval_iopiopdv1dv2]]]]]]]]; reflexivity.
   Qed.
+
+  Definition pick (Pre : Prop) (uv : uvalue) : PickE dvalue :=
+    PickSubset Pre uv (fun dv => concretize_u uv (ret dv)).
 End Serialization.
 
-Module MakeBase (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) : SerializationBase LP Events MP.
+Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP MP.
   Import MP.
   Import LP.
   Import Events.
@@ -1036,6 +1039,6 @@ Module MakeBase (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.S
   End Concretize.
 End MakeBase.
 
-Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SER : SerializationBase LP Events MP) : Serialization LP Events MP SER.
-  Include Serialization LP Events MP SER.
+Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SER : SerializationBase LP MP) : Serialization LP MP SER.
+  Include Serialization LP MP SER.
 End Make.

@@ -71,7 +71,7 @@ Set Contextual Implicit.
     Reasoning principles for VIR's main memory model.
 *)
 
-Module Type MEMORY_THEORY (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SP : SerializationParams LP Events MP) (Mem : FinMemory LP Events MP).
+Module Type MEMORY_THEORY (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams LP MP) (Mem : FinMemory LP MP).
   Import SP.
   Import SER.
   Import MP.
@@ -95,10 +95,10 @@ Module Type MEMORY_THEORY (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR 
   Export Mem.
   Import Mem.ESID.
 
-  Module MBT := MemBytesTheory LP Events MP SP.
+  Module MBT := MemBytesTheory LP MP SP.
   Import MBT.
 
-  Module ST := SerializationTheory LP Events MP SP.
+  Module ST := SerializationTheory LP MP SP.
   Import ST.
 
   Definition ErrSID_MemState_runs_to (e : MemState -> ErrSID memory_stack) (m m' : MemState) : Prop
@@ -3575,6 +3575,6 @@ Section PARAMS.
 End PARAMS.
 End MEMORY_THEORY.
 
-Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SP : SerializationParams LP Events MP) (Mem : FinMemory LP Events MP) <: MEMORY_THEORY LP Events MP SP Mem.
-Include MEMORY_THEORY LP Events MP SP Mem.
+Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams LP MP) (Mem : FinMemory LP MP) <: MEMORY_THEORY LP MP SP Mem.
+Include MEMORY_THEORY LP MP SP Mem.
 End Make.

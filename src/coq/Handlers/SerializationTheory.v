@@ -27,7 +27,7 @@ From Vellvm Require Import
 Import MonadNotation.
 Import MonadReturnsLaws.
 
-Module MemBytesTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SP : SerializationParams LP Events MP).
+Module MemBytesTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams LP MP).
   Import SP.
   Import SER.
   Import MP.
@@ -244,7 +244,7 @@ Module MemBytesTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
   Qed.
 End MemBytesTheory.
 
-Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SP : SerializationParams LP Events MP).
+Module SerializationTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams LP MP).
   Import SP.
   Import SER.
   Import MP.
@@ -252,12 +252,12 @@ Module SerializationTheory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR
 
   Import Events.
 
-  Module MBT := MemBytesTheory LP Events MP SP.
+  Module MBT := MemBytesTheory LP MP SP.
   Import MBT.
   Import BYTE.
   Import SIZEOF.
 
-  Module Mem := FiniteMemory.Make LP Events MP.
+  Module Mem := FiniteMemory.Make LP MP.
   Import Mem.
   Import Mem.ESID.
 

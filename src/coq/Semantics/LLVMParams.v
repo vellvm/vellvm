@@ -1,4 +1,5 @@
 From Vellvm Require Import
+     Semantics.LLVMEvents
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof.
 
@@ -10,6 +11,8 @@ Module Type LLVMParams.
   Declare Module PTOI : PTOI ADDR.
   Declare Module PROV : PROVENANCE ADDR.
   Declare Module ITOP : ITOP ADDR PROV.
+
+  Module Events := LLVMEvents.Make ADDR IP SIZEOF.
 End LLVMParams.
 
 Module Type LLVMParamsBig <: LLVMParams.
@@ -19,6 +22,8 @@ Module Type LLVMParamsBig <: LLVMParams.
   Declare Module PTOI : PTOI ADDR.
   Declare Module PROV : PROVENANCE ADDR.
   Declare Module ITOP : ITOP ADDR PROV.
+
+  Module Events := LLVMEvents.Make ADDR IP SIZEOF.
 
   (* Additional module *)
   Declare Module IP_BIG : INTPTR_BIG IP.
@@ -31,6 +36,7 @@ Module Make (ADDR' : ADDRESS) (IP' : INTPTR) (SIZEOF' : Sizeof) (PTOI' : PTOI AD
   Module PTOI := PTOI'.
   Module PROV := PROV'.
   Module ITOP := ITOP'.
+  Module Events := LLVMEvents.Make ADDR IP SIZEOF.
 End Make.
 
 Module MakeBig (ADDR' : ADDRESS) (IP' : INTPTR) (SIZEOF' : Sizeof) (PTOI' : PTOI ADDR') (PROV' : PROVENANCE ADDR') (ITOP' : ITOP ADDR' PROV') (IP_BIG' : INTPTR_BIG IP') : LLVMParamsBig with Module ADDR := ADDR'.
@@ -40,5 +46,6 @@ Module MakeBig (ADDR' : ADDRESS) (IP' : INTPTR) (SIZEOF' : Sizeof) (PTOI' : PTOI
   Module PTOI := PTOI'.
   Module PROV := PROV'.
   Module ITOP := ITOP'.
+  Module Events := LLVMEvents.Make ADDR IP SIZEOF.
   Module IP_BIG := IP_BIG'.
 End MakeBig.

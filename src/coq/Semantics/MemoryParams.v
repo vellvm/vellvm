@@ -4,12 +4,12 @@ From Vellvm Require Import
      Semantics.GepM
      Semantics.Memory.MemBytes.
 
-Module Type MemoryParams (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF).
-  Declare Module GEP : GEPM LP.ADDR LP.IP LP.SIZEOF Events.
-  Declare Module BYTE_IMPL : ByteImpl LP.ADDR LP.IP LP.SIZEOF Events.
+Module Type MemoryParams (LP : LLVMParams).
+  Declare Module GEP : GEPM LP.ADDR LP.IP LP.SIZEOF LP.Events.
+  Declare Module BYTE_IMPL : ByteImpl LP.ADDR LP.IP LP.SIZEOF LP.Events.
 End MemoryParams.
 
-Module Make (LP' : LLVMParams) (Events' : LLVM_INTERACTIONS LP'.ADDR LP'.IP LP'.SIZEOF) (GEP' : GEPM LP'.ADDR LP'.IP LP'.SIZEOF Events') (BYTE_IMPL' : ByteImpl LP'.ADDR LP'.IP LP'.SIZEOF Events') : MemoryParams LP' Events'.
+Module Make (LP' : LLVMParams) (GEP' : GEPM LP'.ADDR LP'.IP LP'.SIZEOF LP'.Events) (BYTE_IMPL' : ByteImpl LP'.ADDR LP'.IP LP'.SIZEOF LP'.Events) : MemoryParams LP'.
   Module GEP := GEP'.
   Module BYTE_IMPL := BYTE_IMPL'.
 End Make.

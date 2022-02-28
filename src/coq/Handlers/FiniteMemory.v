@@ -629,7 +629,7 @@ End FinByte.
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
     indexed on [Z].
  *)
-Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events).
+Module Type FinMemory (LP : LLVMParams) (MP : MemoryParams LP).
   Import MP.
   Import LP.
   Import Events.
@@ -656,10 +656,8 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
 
   Open Scope list.
 
-  (* TODO: Make these parameters? *)
-  (* Variable ptr_size : nat. *)
-  (* Variable datalayout : DataLayout. *)
-  Definition ptr_size : nat := 8.
+  Module SIZEOF_H := Sizeof_helpers SIZEOF.
+  Import SIZEOF_H.
 
   (* Definition endianess : Endianess *)
   (*   := dl_endianess datalayout. *)
@@ -729,7 +727,7 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
 
   Definition uvalue_bytes_little_endian (uv :  uvalue) (dt : dtyp) (sid : store_id) : OOM (list uvalue)
     := map_monad (fun n => n' <- IP.from_Z (Z.of_N n);;
-                        ret (UVALUE_ExtractByte uv dt (UVALUE_IPTR n') sid)) (Nseq 0 ptr_size).
+                        ret (UVALUE_ExtractByte uv dt (UVALUE_IPTR n') sid)) (Nseq 0 (N.to_nat ptr_size)).
 
    Definition uvalue_bytes (e : Endianess) (uv :  uvalue) (dt : dtyp) (sid : store_id) : OOM (list uvalue)
       := fmap (correct_endianess e) (uvalue_bytes_little_endian uv dt sid).
@@ -1452,7 +1450,7 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
 
         Note: This does not check that the address is in range of the
         block. *)
-    (* TODO: should this check if everything is in range...? *)
+    (* TODO:2 should this check if everything is in range...? *)
     Definition allocated (a : addr) (m : memory_stack) : Prop :=
       member (ptr_to_int a) (fst m).
 
@@ -1889,8 +1887,8 @@ Module Type FinMemory (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.I
   End PARAMS.
 End FinMemory.
 
-Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) : FinMemory LP Events MP.
-  Include FinMemory LP Events MP.
+Module Make (LP : LLVMParams) (MP : MemoryParams LP) : FinMemory LP MP.
+  Include FinMemory LP MP.
 End Make.
 
 Module LLVMParamsBigIntptr := LLVMParams.MakeBig FiniteMemory.Addr FiniteMemory.BigIP FiniteMemory.FinSizeof FiniteMemory.FinPTOI FiniteMemory.FinPROV FiniteMemory.FinITOP BigIP_BIG.

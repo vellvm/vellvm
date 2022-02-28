@@ -21,7 +21,8 @@ From Vellvm.Handlers Require Export
      Stack
      Intrinsics
      FiniteMemory
-     FiniteMemoryTheory
+     MemoryModel
+     MemoryModelTheory
      Pick
      OOM
      Serialization
@@ -32,9 +33,10 @@ From Vellvm.Handlers Require Export
 Module Type InterpreterStack_common (LP : LLVMParams).
   Module LLVM := Lang.Make LP.
 
-  Export LLVM.Events.
+  Export LP.Events.
   Export LLVM.Intrinsics.
   Export LLVM.MEM.
+  Export LLVM.MEMINTERP.
   Export LLVM.Pick.
   Export LLVM.Global.
   Export LLVM.Local.
@@ -225,9 +227,10 @@ Module Make (LP' : LLVMParams) : InterpreterStack with Module LP := LP'.
 
   Module LLVM := Lang.Make LP.
 
-  Export LLVM.Events.
+  Export LP.Events.
   Export LLVM.Intrinsics.
   Export LLVM.MEM.
+  Export LLVM.MEMINTERP.
   Export LLVM.Pick.
   Export LLVM.Global.
   Export LLVM.Local.
@@ -407,9 +410,10 @@ Module MakeBig (LP' : LLVMParamsBig) : InterpreterStackBig with Module LP := LP'
 
   Module LLVM := Lang.Make LP.
 
-  Export LLVM.Events.
+  Export LP.Events.
   Export LLVM.Intrinsics.
   Export LLVM.MEM.
+  Export LLVM.MEMINTERP.
   Export LLVM.Pick.
   Export LLVM.Global.
   Export LLVM.Local.

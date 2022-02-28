@@ -53,7 +53,7 @@ Open Scope string_scope.
  *)
 Module Type LLVMTopLevel (IS : InterpreterStack).
   Export IS.
-  Export IS.LLVM.Events.
+  Export IS.LP.Events.
   Export IS.LLVM.D.
   Export IS.LLVM.MEM.
   Export IS.LLVM.Local.
@@ -196,7 +196,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : itree L4 res_L4 :=
     let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-    interp_mcfg4_exec t [] ([],[]) emptyMemState.
+    interp_mcfg4_exec t [] ([],[]) initial_memory_state.
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts 
@@ -222,7 +222,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L4 (MemState * (local_env * lstack * (global_env * dvalue))) :=
     let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-    ℑs eq t [] ([],[]) emptyMemState. 
+    ℑs eq t [] ([],[]) initial_memory_state. 
 
   (**
      Finally, the official model assumes no user-defined intrinsics.

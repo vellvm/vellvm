@@ -50,7 +50,7 @@ Import MonadNotation.
   - The propositional one capture in [Prop] all possible values
   - The executable one interprets [undef] as 0 at the type
 *)
-Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEOF) (MP : MemoryParams LP Events) (SP : SerializationParams LP Events MP).
+Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams LP MP).
   Import SP.
   Import SER.
   Import MP.
@@ -59,9 +59,12 @@ Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEO
 
   Section PickPropositional.
 
-    (* The parameter [C] is currently not used *)
-    Inductive Pick_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E}: PickE ~> PropT E := 
-    | PickD: forall uv C res t,  concretize_u uv res -> t ≈ (lift_err_ub_oom ret res) -> Pick_handler (pick uv C) t.
+    Inductive Pick_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E}: PickE ~> PropT E :=
+    | PickUB  : forall X Y Pre Post x t,
+        ~ Pre -> Pick_handler (@PickSubset X Y Pre x Post) t
+
+    | PickRet : forall X Y Pre (Post : Y -> Prop) res x t,
+        Post res -> t ≈ ret res -> Pick_handler (@PickSubset X Y Pre x Post) t.
 
     Section PARAMS_MODEL.
       Variable (E F: Type -> Type).
@@ -181,9 +184,11 @@ Module Make (LP : LLVMParams) (Events : LLVM_INTERACTIONS LP.ADDR LP.IP LP.SIZEO
     Admitted.
 
     Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : PickE ~> itree E :=
-      fun T p => match p with
-              | pick u P => lift_err_ub_oom ret (concretize_uvalue u)
-              end.
+      fun T p =>
+        match p with
+        | PickSubset uvalue dvalue Pre u Post =>
+            lift_err_ub_oom ret (concretize_uvalue u)
+        end.
 
     Section PARAMS_INTERP.
       Variable (E F: Type -> Type).

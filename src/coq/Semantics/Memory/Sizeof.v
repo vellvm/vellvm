@@ -39,3 +39,10 @@ Module Type Sizeof.
       sizeof_dtyp (DTYPE_Vector sz t) = (sz * sizeof_dtyp t)%N.
 
 End Sizeof.
+
+(* Derived functions / constants on Sizeof. *)
+Module Sizeof_helpers(SIZEOF:Sizeof).
+  Import SIZEOF.
+
+  Definition ptr_size : N := sizeof_dtyp DTYPE_Pointer.
+End Sizeof_helpers.
