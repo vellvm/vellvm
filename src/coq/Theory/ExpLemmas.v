@@ -476,7 +476,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
           | h: Maps.lookup _ _ = None |- _ =>
               rewrite interp_cfg3_LR_fail; [rewrite ?bind_ret_l | eauto]
           end
-      | |- context [trigger (pick _ _)] => rewrite interp_cfg3_pick
+      | |- context [trigger (pick_uvalue _ _)] => rewrite interp_cfg3_pick
       | |- context [trigger (ThrowUB _)] => rewrite interp_cfg3_UB
       end.
 
@@ -491,7 +491,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     (*   break_match_goal; cbn in *; eauto. *)
     (* Qed. *)
 
-    Lemma pick_is_pure : forall u P, pure (ℑ3 (trigger (pick u P))).
+    Lemma pick_is_pure : forall u P, pure (ℑ3 (trigger (pick_uvalue P u))).
     Proof.
       intros.
       unfold pure; intros.
@@ -569,7 +569,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Qed.
 
     Lemma exp_to_instr_pick : forall P uv,
-        translate exp_to_instr (trigger (pick uv P)) ≈ trigger (pick uv P).
+        translate exp_to_instr (trigger (pick_uvalue P uv)) ≈ trigger (pick_uvalue P uv).
     Proof.
       intros.
       go. 
@@ -716,7 +716,7 @@ Module ExpLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
                   end |
                   
                   match goal with
-                    |- context [pick] => rewrite ?exp_to_instr_pick;
+                    |- context [pick_uvalue] => rewrite ?exp_to_instr_pick;
                                          apply pick_is_pure
                   end 
 

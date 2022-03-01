@@ -299,10 +299,10 @@ Module EventConvert (LP1 : LLVMParams) (LP2 : LLVMParams) (AC : AddrConvert LP1.
 End EventConvert.
 
 Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : AddrConvert IS1.LP.ADDR IS2.LP.ADDR) (AC2 : AddrConvert IS2.LP.ADDR IS1.LP.ADDR) (LLVM1 : LLVMTopLevel IS1) (LLVM2 : LLVMTopLevel IS2) (TLR : TopLevelRefinements IS2 LLVM2).
-  Module E1 := IS1.LLVM.Events.
-  Module E2 := IS2.LLVM.Events.
+  Module E1 := IS1.LP.Events.
+  Module E2 := IS2.LP.Events.
 
-  Module EC := EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LLVM.Events E2.
+  Module EC := EventConvert IS1.LP IS2.LP AC1 AC2 IS1.LP.Events E2.
   Import EC.
   Import EC.DVC.
 
@@ -316,7 +316,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
   Import TLR.
   Import TLR.R.
 
-  Definition L4_convert_PropT {A B} (f : A -> OOM B) (ts : PropT IS1.LLVM.Events.L4 A) : PropT E2.L4 B
+  Definition L4_convert_PropT {A B} (f : A -> OOM B) (ts : PropT IS1.LP.Events.L4 A) : PropT E2.L4 B
     := fun t_e2 => exists t_e1,
            ts t_e1 /\ t_e2 = L4_convert_tree (uv <- t_e1;; lift_OOM (f uv)).
 
@@ -329,10 +329,10 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     := match res with
        | (ms, ((lenv, lstack), (genv, dv))) =>
            dv' <- dvalue_convert dv;;
-           ret (IS2.LLVM.MEM.emptyMemState, (([], []), ([], dv')))
+           ret (IS2.LLVM.MEM.initial_memory_state, (([], []), ([], dv')))
        end.
  
-  Definition refine_E1E2_L6 (srcs : PropT IS1.LLVM.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
+  Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
     :=
     (* res_L4_convert_unsafe should be fine here because refine_L6
        ignores all of the placeholder values *)
@@ -590,7 +590,7 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
         MCFGTheoryBigIntptr.MCFGTactics.go.
         unfold LLVMEvents.raise.
         MCFGTheoryBigIntptr.MCFGTactics.go.
-        rewrite InterpreterStackBigIntptr.LLVM.MEMORY_THEORY.interp_memory_trigger.
+        rewrite InterpreterStackBigIntptr.LLVM.MEMORY_ITREE_THEORY.interp_memory_trigger.
         cbn.
         MCFGTheoryBigIntptr.MCFGTactics.go.
         rewrite bind_trigger.

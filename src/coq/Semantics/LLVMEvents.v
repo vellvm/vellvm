@@ -188,31 +188,8 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS) (IP:MemoryAddress.I
    if it is not satisfied, the only possible execution is to raise _UB_.
    *)
   Variant PickE : Type -> Type :=
-     PickSubset (X Y : Type) (Pre : Prop) (x : X) (Post : Y -> Prop) : PickE Y.
-
-  (* Need to change handler to actually use prop, need to parameterize... *)
-
-  (* Variant PickE (X : Type) : Type := *)
-  (* | pick (x:X) (P : X -> Prop) : PickE dvalue. *)
-
-
-  (* Variant PickE (X Y : Type) : Type := *)
-  (* | pick (x:X) (P : X -> Y -> Prop) : PickE X Y. *)
-
-  (* Variant PickE (X Y : Type) : Type := *)
-  (* | pick (x:X) (concrete_handler : X -> Y) (pick_handler : X -> Y -> Prop) : PickE X Y. *)
-
-  (* Variant PickE (X Y : Type) : Type := *)
-  (* | pick (x:X) : PickE X Y. (* Predicate is just part of handler?  Different pick event for each kind of choice we make... *) *)
-
-  (*
-  X = uvalue / memory
-  Y = dvalue / address
-   *)
-
-  Definition unique_prop (uv : uvalue) : Prop
-    := True.
-
+  | pick_uvalue (Pre : Prop) (u:uvalue) : PickE dvalue.
+    
   (* The signatures for computations that we will use during the successive stages of the interpretation of LLVM programs *)
   (* TODO: The events and handlers are parameterized by the types of key and value.
      It's weird for it to be the case if the events are concretely instantiated right here.

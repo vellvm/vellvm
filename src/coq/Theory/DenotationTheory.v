@@ -27,8 +27,6 @@ From Vellvm Require Import
 Set Implicit Arguments.
 Set Strict Implicit.
 
-Import ListNotations.
-
 Import MonadNotation.
 Open Scope list_scope.
 Open Scope monad_scope.
@@ -36,6 +34,7 @@ Open Scope itree.
 Import ITreeNotations.
 Import EitherMonad.
 Import IdentityMonad.
+Import ListNotations.
 
 (* end hide *)
 
@@ -57,6 +56,8 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Export IS.LLVM.
 
   Import SemNotations.
+
+  Open Scope list_scope.
 
   Module DenoteTactics.
 

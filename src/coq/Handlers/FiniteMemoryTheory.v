@@ -1112,9 +1112,8 @@ Section Memory_Stack_Theory.
       no_overlap_dtyp a1 τ1 a2 τ2.
   Proof.
     intros a1 τ1 a2 τ2 H.
-    unfold overlaps_dtyp, overlaps in H.
-    unfold no_overlap_dtyp, no_overlap.
-    lia.
+    unfold no_overlap_dtyp.
+    destruct (overlaps_dtyp a1 τ1 a2 τ2); eauto.
   Qed.
 
   Lemma no_overlap__not_overlaps :
@@ -1123,9 +1122,8 @@ Section Memory_Stack_Theory.
       ~ overlaps_dtyp a1 τ1 a2 τ2.
   Proof.
     intros a1 τ1 a2 τ2 H.
-    unfold no_overlap_dtyp, no_overlap in H.
-    unfold overlaps_dtyp, overlaps.
-    lia.
+    unfold no_overlap_dtyp in H.
+    destruct (overlaps_dtyp a1 τ1 a2 τ2); intuition.
   Qed.
 
   Lemma no_overlap_dec :
@@ -1133,15 +1131,8 @@ Section Memory_Stack_Theory.
       {no_overlap ptr1 s1 ptr2 s2} + {~ (no_overlap ptr1 s1 ptr2 s2)}.
   Proof.
     intros a1 a2 s1 s2.
-    unfold no_overlap.
-    cbn.
-
-    destruct (Int.Z_as_Int.gt_le_dec (ptr_to_int a1) (ptr_to_int a2 + s2 - 1)).
-    { left. auto. }
-
-    destruct (Int.Z_as_Int.gt_le_dec (ptr_to_int a2) (ptr_to_int a1 + s1 - 1)).
-    { left. auto. }
-
+    destruct (no_overlap a1 s1 a2 s2).
+    left. auto.
     right. intuition.
   Qed.
 

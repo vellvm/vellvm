@@ -310,8 +310,6 @@ Module Type Serialization (LP : LLVMParams) (MP : MemoryParams LP) (SER : Serial
     destruct (eval_iop iop dv1 dv2) as [[[[[[[oom_eval_iopiopdv1dv2] | [[ub_eval_iopiopdv1dv2] | [[err_eval_iopiopdv1dv2] | eval_iopiopdv1dv2]]]]]]]]; reflexivity.
   Qed.
 
-  Definition pick (Pre : Prop) (uv : uvalue) : PickE dvalue :=
-    PickSubset Pre uv (fun dv => concretize_u uv (ret dv)).
 End Serialization.
 
 Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP MP.

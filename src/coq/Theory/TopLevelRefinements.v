@@ -42,6 +42,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Export IS.
   Export IS.LLVM.
   Export IS.LLVM.SP.SER.
+  Export IS.LLVM.MEM.
 
   Import SemNotations.
 
@@ -229,15 +230,15 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Definition model_to_L3 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs3 L0_trace [] ([],[]) emptyMemState.
+      ℑs3 L0_trace [] ([],[]) initial_memory_state.
 
     Definition model_to_L4 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs4 (refine_res3) L0_trace [] ([],[]) emptyMemState.
+      ℑs4 (refine_res3) L0_trace [] ([],[]) initial_memory_state.
 
     Definition model_to_L5 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs5 (refine_res3) L0_trace [] ([],[]) emptyMemState.
+      ℑs5 (refine_res3) L0_trace [] ([],[]) initial_memory_state.
 
     (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -349,9 +350,11 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       unfold handler_correct.
       intros.
       destruct e.
-      cbn. apply PickD with (res := concretize_uvalue u).
-      - apply Pick.concretize_u_concretize_uvalue.
-      - reflexivity.
+      cbn. apply PickUvalue with (res := concretize_uvalue u).
+      - right.
+        split.
+        + apply Pick.concretize_u_concretize_uvalue.
+        + reflexivity.
     Qed.
 
     Lemma refine_undef
@@ -440,9 +443,9 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   Definition model_to_L4_cfg (prog: cfg dtyp) :=
     let trace := denote_cfg prog in
-    interp_cfg trace [] [] emptyMemState.
+    interp_cfg trace [] [] initial_memory_state.
 
-  Definition refine_cfg_ret: relation (PropT L5 (memory_stack * (local_env * (global_env * uvalue)))) :=
+  Definition refine_cfg_ret: relation (PropT L5 (MemState * (local_env * (global_env * uvalue)))) :=
     fun ts ts' => forall t, ts t -> exists t', ts' t' /\ eutt  (TT × (TT × (TT × refine_uvalue))) t t'.
 
 End TopLevelRefinements.

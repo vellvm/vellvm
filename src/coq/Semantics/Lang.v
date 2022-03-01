@@ -40,6 +40,7 @@ Module Type Lang (LP: LLVMParams).
   (* Serialization *)
   Module SP := SerializationParams.Make LP MP.
   
+  Module MEMORY_ITREE_THEORY := MemoryModelITreeTheory LP MP SP MEM MEMINTERP.
   Declare Module MEMORY_THEORY : MemoryModelTheory LP MP SP MEM MEMINTERP.
 
   (* Pick handler (depends on memory / serialization) *)
@@ -49,7 +50,7 @@ Module Type Lang (LP: LLVMParams).
   Module D := Denotation LP MP SP.
 
   Export Events Events.DV Global Local Stack Pick Intrinsics
-         MEM MEMORY_THEORY SP.SER D.
+         MEM MEMORY_ITREE_THEORY MEMORY_THEORY SP.SER D.
 End Lang.
 
 Module Make (LP : LLVMParams) <: Lang LP.

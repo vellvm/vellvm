@@ -165,7 +165,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
   Definition concretize_or_pick {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) (P : Prop) : itree E dvalue :=
     if is_concrete uv
     then lift_err ret (uvalue_to_dvalue uv)
-    else trigger (pick P uv).
+    else trigger (pick_uvalue P uv).
   
   (* Pick a possibly poison value, treating poison as nondeterminism.
      This is used for freeze. *)
@@ -174,6 +174,9 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
     | UVALUE_Poison dt => concretize_or_pick (UVALUE_Undef dt) True
     | _             => concretize_or_pick uv True
     end.
+
+  Definition unique_prop (uv : uvalue) : Prop
+    := exists x, forall dv, concretize uv dv -> dv = x.
 
   Definition pickUnique {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) : itree E dvalue
     := concretize_or_pick uv (unique_prop uv).

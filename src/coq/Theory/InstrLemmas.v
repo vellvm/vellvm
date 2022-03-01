@@ -73,7 +73,7 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     - exists nil. reflexivity.
     - assert (List.In a (a :: fields)) as IN by intuition.
 
-      change (a :: fields) with ([a] ++ fields) in ALL.
+      change (a :: fields) with ([a] ++ fields)%list in ALL.
       rewrite forallb_app in ALL.
       apply andb_prop in ALL as (CONC_A & CONC_FIELDS).
 
@@ -90,7 +90,7 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       pose proof (IHfields HCONV CONC_FIELDS) as (dfields & CONV_DFIELDS).
       exists (dv :: dfields).
 
-      change (a :: fields) with ([a] ++ fields).
+      change (a :: fields) with ([a] ++ fields)%list.
       rewrite map_monad_app.
       cbn.
       rewrite CONV_A.
@@ -142,7 +142,7 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Lemma interp_cfg3_concretize_or_pick_not_concrete :
     forall (uv : uvalue) (dv : dvalue) P g l m,
       is_concrete uv = false ->
-      ℑ3 (concretize_or_pick uv P) g l m ≈ 'dv <- trigger (pick uv P) ;; Ret3 g l m dv.
+      ℑ3 (concretize_or_pick uv P) g l m ≈ 'dv <- trigger (pick_uvalue P uv) ;; Ret3 g l m dv.
   Proof.
     intros uv dv P g ρ m NCONC.
     unfold concretize_or_pick.
@@ -197,7 +197,7 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Lemma denote_instr_load :
     forall (i : raw_id) volatile τ τp ptr align g l l' m a uv,
       ⟦ ptr at τp ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) ->
-      read (ms_memory_stack m) a τ = inr uv ->
+      read m a τ = inr uv ->
       ⟦ (IId i, INSTR_Load volatile τ (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g (Maps.add i uv l') m tt.
   Proof.
     intros * EXP READ.
@@ -213,10 +213,11 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma denote_instr_store :
-    forall (i : int) volatile τv val τp ptr align uv a g l l' l'' m m',
+    forall {M} `{MemMonad MemState M}
+      (i : int) volatile τv val τp ptr align uv a g l l' l'' m m',
       ⟦ val at τv ⟧e3 g l m ≈ Ret3 g l' m uv ->
       ⟦ ptr at τp ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_Addr a) ->
-      ErrSID_MemState_ms_runs_to (fun ms : memory_stack => write ms a uv τv) m m' ->
+      MemMonad_runs_to (write a uv τv) m = Some (m', tt) ->
       ⟦ (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g l'' m' tt.
   Proof.
     intros * EXP PTR WRITE.

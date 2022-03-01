@@ -47,7 +47,7 @@ Module LocalFrame (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     fun l2 => forall x, ~ In x defs -> l1 @ x = l2 @ x.
 
   Definition lift_pred_L3 (T : Type) (P : local_env -> Prop) :
-    (memory_stack * (local_env * (global_env * T))) -> Prop :=
+    (MemState * (local_env * (global_env * T))) -> Prop :=
     fun '(_,(l,_)) => P l.
 
   Lemma raise_has_all_posts3 : forall {R} s g l m Q,

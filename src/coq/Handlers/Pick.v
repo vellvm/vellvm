@@ -60,11 +60,10 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
   Section PickPropositional.
 
     Inductive Pick_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E}: PickE ~> PropT E :=
-    | PickUB  : forall X Y Pre Post x t,
-        ~ Pre -> Pick_handler (@PickSubset X Y Pre x Post) t
-
-    | PickRet : forall X Y Pre (Post : Y -> Prop) res x t,
-        Post res -> t ≈ ret res -> Pick_handler (@PickSubset X Y Pre x Post) t.
+    | PickUvalue  : forall Pre uv res t,
+        ~ Pre \/ (concretize_u uv res /\ t ≈ lift_err_ub_oom ret res) -> Pick_handler (pick_uvalue Pre uv) t.
+    (* | PickRet : forall X Y Pre (Post : Y -> Prop) res x t, *)
+    (*     Post res -> t ≈ ret res -> Pick_handler (@PickSubset X Y Pre x Post) t. *)
 
     Section PARAMS_MODEL.
       Variable (E F: Type -> Type).
@@ -186,7 +185,7 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
     Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : PickE ~> itree E :=
       fun T p =>
         match p with
-        | PickSubset uvalue dvalue Pre u Post =>
+        | pick_uvalue Pre u =>
             lift_err_ub_oom ret (concretize_uvalue u)
         end.
 

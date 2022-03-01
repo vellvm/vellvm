@@ -235,7 +235,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma interp_cfg3_pick : forall u P m l g,
-      ℑ3 (trigger (pick u P)) g l m ≈ v <- trigger (pick u P);; Ret3 g l m v.
+      ℑ3 (trigger (pick_uvalue P u)) g l m ≈ v <- trigger (pick_uvalue P u);; Ret3 g l m v.
   Proof.
     intros.
     unfold interp_cfg3.
@@ -261,7 +261,7 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma interp_cfg3_Load : forall t a g l m val,
-      read (ms_memory_stack m) a t = inr val ->
+      read m a t = inr val ->
       ℑ3 (trigger (Load t (DVALUE_Addr a))) g l m ≈ Ret3 g l m val.
   Proof.
     intros * READ.
@@ -273,8 +273,8 @@ Module CFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Qed.
 
   Lemma interp_cfg3_store :
-    forall (m m' : MemState) (val : uvalue) (dt : dtyp) (a : addr) g l,
-      ErrSID_MemState_ms_runs_to (fun ms : memory_stack => write ms a val dt) m m' ->
+    forall {M} `{MemMonad MemState M} (m m' : MemState) (val : uvalue) (dt : dtyp) (a : addr) g l,
+      MemMonad_runs_to (write a val dt) m = Some (m', tt) ->
       ℑ3 (trigger (Store dt (DVALUE_Addr a) val)) g l m ≈ Ret3 g l m' tt.
   Proof.
     intros * WRITE.

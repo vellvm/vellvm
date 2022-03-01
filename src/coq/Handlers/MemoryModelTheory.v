@@ -1,11 +1,13 @@
 From Vellvm.Syntax Require Import
-     DataLayout.
+     DataLayout
+     DynamicTypes.
 
 From Vellvm.Semantics Require Import
      MemoryParams
      SerializationParams
      LLVMParams
-     LLVMEvents.
+     LLVMEvents
+     Memory.ErrSID.
 
 From Vellvm.Handlers Require Import
      MemoryModel
@@ -25,11 +27,11 @@ Set Implicit Arguments.
 Set Contextual Implicit.
 
 
-Module Type MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams LP MP) (MM : MemoryModel LP MP) (MI : MemoryInterpreter LP MP MM).
+Module MemoryModelITreeTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams LP MP) (MM : MemoryModel LP MP) (MI : MemoryInterpreter LP MP MM).
+  Import LP.ADDR.
   Import LP.Events.
   Import MI.
   Import MM.
-
 
   Section PARAMS.
     Variable (E F G : Type -> Type).
@@ -133,6 +135,39 @@ Module Type MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Ser
           end.
         reflexivity.
       Qed.
+
+    End Structural_Lemmas.
+  End PARAMS.
+End MemoryModelITreeTheory.
+
+Module Type MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams LP MP) (MM : MemoryModel LP MP) (MI : MemoryInterpreter LP MP MM).
+  Import LP.ADDR.
+  Import LP.Events.
+  Import MI.
+  Import MM.
+
+  Section PARAMS.
+    Variable (E F G : Type -> Type).
+    Context `{FailureE -< F} `{UBE -< F} `{PickE -< F} `{OOME -< F}.
+    Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
+    Notation Effout := (E +' F).
+    Notation interp_memory := (@interp_memory E F _ _ _).
+
+    Section Structural_Lemmas.
+      Parameter interp_memory_load :
+        forall (m : MemState) (t : dtyp) (val : uvalue) (a : addr),
+          read m a t = inr val ->
+          interp_memory (trigger (Load t (DVALUE_Addr a))) m ≈ Ret (m, val).
+
+      Parameter interp_memory_store :
+        forall {M} `{MemMonad MemState M} (m m' : MemState) (val : uvalue) (dt : dtyp) (a : addr),
+          MemMonad_runs_to (write a val dt) m = Some (m', tt) ->
+          interp_memory (trigger (Store dt (DVALUE_Addr a) val)) m ≈ Ret (m', tt).
+
+      Parameter interp_memory_alloca :
+        forall {M} `{MemMonad MemState M} (m m' : MemState) (t : dtyp) (a : addr),
+          MemMonad_runs_to (allocate t) m = Some (m', a) ->
+          interp_memory (trigger (Alloca t)) m ≈ Ret (m', DVALUE_Addr a).
     End Structural_Lemmas.
   End PARAMS.
 End MemoryModelTheory.

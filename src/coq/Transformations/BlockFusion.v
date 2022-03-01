@@ -49,6 +49,8 @@ Module Type BlockFusion (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : De
 
   Import SemNotations.
 
+  Open Scope list_scope.
+
   Section RemoveBlock.
 
     Fixpoint remove_block {T} (G : ocfg T) (b : block_id) : ocfg T :=

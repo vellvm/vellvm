@@ -651,8 +651,10 @@ Module Type FinMemory (LP : LLVMParams) (MP : MemoryParams LP).
   Module PROV_F := PROV_FUNCS ADDR PROV.
   Import PROV_F.
 
-  Module OVER := Overlaps ADDR PTOI SIZEOF.
+  Module OVER := PTOIOverlaps ADDR PTOI SIZEOF.
   Export OVER.
+  Module OVER_H := OverlapHelpers ADDR SIZEOF OVER.
+  Export OVER_H.
 
   Open Scope list.
 
@@ -1476,7 +1478,7 @@ Module Type FinMemory (LP : LLVMParams) (MP : MemoryParams LP).
           (* From LLVM Docs : The 'llvm.memcpy.*' intrinsics copy a block of *)
       (*        memory from the source location to the destination location, *)
       (*        which are not allowed to overlap. *)
-          if (no_overlap_b dst mem_block_size
+          if (no_overlap dst mem_block_size
                            src mem_block_size) then
             (* Check that everything in src / dst is actually
                allocated, and that provenances match up. *)
