@@ -117,7 +117,7 @@ Our current test-suite of LLVM programs for which we compare our semantics again
   - External Coq libraries: 
     * ext-lib    (installed via, e.g. `opam install coq-ext-lib`)
     * paco       (installed via, e.g. `opam install coq-paco`)
-    * itrees     (installed via, e.g. `opam install coq-itrees`)
+    * itrees     (installed via, e.g. `opam install coq-itree`)
     * flocq      (installed via, e.g. `opam install coq-flocq`) 
     * ceres      (installed via, e.g. `opam install coq-ceres`)
     * mathcomp   (installed via, e.g. `opam install coq-mathcomp-ssreflect`)
