@@ -295,3 +295,172 @@ have the current entirely concrete model for handling ~alloca / load /
 store / GEP~, and then use ~unit~ for the type of ~concrete_memory~,
 and ~ptoi~ and ~itop~ could be handled by just unwrapping the logical
 address (which is really a physical address).
+
+* Modified pick
+
+Another idea is to add a ~pick_addr : MemState -> addr -> PickE Z~
+constructor that takes a ~MemState~ and an ~addr~ and produces a
+concrete address ~Z~ with no overlap. In theory this can be pretty
+generic and not even need ~MemState~ because the concrete address
+layout should be straightforward (it's a list of addresses, just have
+to pick a free spot)... Using ~MemState~ and ~addr~ means we would
+have to look up the ~addr~ in ~MemState~ and be able to calculate the
+size of the allocation... Maybe this should be ~pick_addr :
+ConcreteMemorySpace -> dtyp -> PickE Z~ or something instead.
+
+Anyway, ~pick_addr~ could then be triggered, and we can use the result
+to register the location in concrete memory in the ~MemState~... Using
+something like this:
+
+#+begin_src coq
+  (** Operations for interacting with the concrete layout of memory. *)
+  Parameter reserve_block : MemState -> LP.IP.intptr -> N -> option MemState.
+#+end_src
+
+So we could have ~alloca~ be something like this:
+
+#+begin_src coq
+  allocate dtyp =
+             a <- allocate_logical_addr;;
+             ms <- get_mem_state;;
+             c <- trigger (pick_addr ms addr);;
+             match reserve_block ms c with
+             | None => raise_error "Bad allocation of concrete address."
+             | Some ms' => put_mem_state ms'
+             end
+#+end_src
+
+Or we could delay allocation of concrete addresses to avoid pick
+events in allocate using:
+
+#+begin_src coq
+  ptoi a =
+         ms <- get_mem_state;;
+         c <- trigger (pick_addr ms addr);;
+         match reserve_block ms c with
+         | None => raise_error "Bad allocation of concrete address."
+         | Some ms' =>
+             put_mem_state ms';;
+             ret c
+         end
+#+end_src
+
+But now there's a problem with specifying how memory behaves... Previously we had lemmas like this:
+
+#+begin_src coq
+  Lemma interp_memory_alloca :
+    forall (m m' : MemState) (t : dtyp) (a : addr),
+      ErrSID_runs_to (allocate (ms_memory_stack m) t) (ms_sid m) (ms_prov m) (ms_memory_stack m', a) (ms_sid m') (ms_prov m') ->
+      interp_memory (trigger (Alloca t)) m ≈ Ret (m', DVALUE_Addr a).
+#+end_src
+
+These kinds of lemmas allow us to rewrite memory events when
+interpreted into the state monad, giving us a returned value and a new
+memory, with some constraints from ~allocate~ and ~allocate_spec~.
+
+If we want to allow flexibility for where address allocation
+nondeterminism is introduced, we have to allow for ~pick_addr~ events
+to occur in either ~Alloca~ or ~PtoI~ events. As such neither of these
+events can be rewritten to a simple return value, because their
+implementation may involve raising this pick event.
+
+This also highlights a problem with generalizing the memory model
+interface. The old (horribly named) ~ErrSID~ monad is this:
+
+#+begin_src coq
+  (* Need failure, UB, state for store_ids, and state for provenances *)
+  Inductive ErrSID_T M A := mkErrSID_T { unErrSID_T : @err_ub_oom_T (stateT store_id (stateT Provenance M)) A }.
+  Definition ErrSID := ErrSID_T ident.
+#+end_src
+
+It's a monad that allows for failure, ub, oom, and has state for
+~store_id~ and ~Provenance~. All of our memory operation are specified
+in terms of functions on the ~MemoryState~ under this monad.
+
+Let's rename ~ErrSID~ to ~MemMonad~, and consider it to be a monad
+with all of the necessary capabilities to model memory. It could be
+something kind of like this:
+
+#+begin_src coq
+  Class MemMonad (MemState : Type) (Provenance : Type) (M : Type -> Type)
+        `{MonadProvenance Provenance M} `{MonadStoreID M} `{MonadMemState MemState M}
+        `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} `{RAISE_PICK M} : Type
+    :=
+    { MemMonad_runs_to {A} (ma : M A) (ms : MemState) : option (MemState * A);
+      MemMonad_lift_stateT
+        {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A}
+        (ma : M A) : stateT MemState (itree E) A;
+    }.
+#+end_src
+
+This is exactly the same as ~ErrSID~ was (though, more typeclassy),
+but with the addition of a new typeclass, ~RAISE_PICK~... Which is
+needed to capture non-determinism.
+
+Ideally I want a lemma like this:
+
+#+begin_src coq
+  Lemma interp_memory_alloca :
+    forall (m m' : MemState) (t : dtyp) (a : addr),
+      MemMonad_runs_to (allocate t) m = Some (m', a) ->
+      interp_memory (trigger (Alloca t)) m ≈ Ret (m', DVALUE_Addr a).
+#+end_src
+
+Without nondeterminism, the above here would be perfectly reasonable.
+
+With nondeterminism, however... ~MemMonad_runs_to (allocate t) m =
+Some (m', a)~ doesn't really make sense... We could potentially
+allocate in a bunch of different ways, so ~m'~ and ~a~ could vary
+wildly. So maybe we need:
+
+#+begin_src coq
+  MemMonad_runs_to {A} (ma : M A) (ms ms' : MemState) (a : A) : Prop
+#+end_src
+
+Allowing this to specify a set of valid memory states and results.
+
+ #+begin_src coq
+  Lemma interp_memory_alloca :
+    forall (m m' : MemState) (t : dtyp) (a : addr),
+      MemMonad_runs_to (allocate t) m m' a ->
+      interp_memory (trigger (Alloca t)) m ≈ Ret (m', DVALUE_Addr a).
+#+end_src
+
+This would be great, but note that ~interp_memory~ is currently just a wrapper around ~interp_state~...
+
+#+begin_src coq
+  Definition interp_memory :
+    itree Effin ~> MemStateT (itree Effout) :=
+    interp_state interp_memory_h.
+#+end_src
+
+and the ~interp_memory_alloca~ above is also just using regular
+~eutt~. These things are both deterministic, i.e., if ~interp_memory
+(trigger (Alloca t)) m~ is ~eutt~ a ~Ret (m', DVALUE_Addr a)~, then
+~m'~ and ~a~ must be unique...
+
+Maybe if I just have a concrete memory I could do something like this:
+
+#+begin_src coq
+  Lemma interp_memory_alloca :
+    forall (m m' : MemState) (t : dtyp) (a : addr),
+      MemMonad_runs_to (allocate t) m m' a ->
+      interp_memory (trigger (Alloca t)) m ≈ c <- pick_addr m t;; m' register_block c m;; Ret (m', DVALUE_Addr a).
+#+end_src
+
+But this makes the lemmas depend on the implementation of the memory
+model. For instance a memory model with nondeterminism in ~alloca~
+needs a lemma with a pick, but if nondeterminism is delayed until
+~ptoi~ the ~alloca~ lemma can simply use a return, and the ~ptoi~
+lemma instead will need the pick.
+
+Alternatively, if the memory events themselves were interpreted
+prepositionally, then the lemmas could actually have a clean and
+uniform interface, something like this:
+
+#+begin_src coq
+  Lemma interp_memory_alloca :
+    forall (m m' : MemState) (t : dtyp) (a : addr),
+      MemMonad_runs_to (allocate t) m m' a ->
+      refine_memory (interp_memory_prop (trigger (Alloca t)) m) (Ret (m', DVALUE_Addr a)).
+#+end_src
