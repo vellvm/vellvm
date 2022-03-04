@@ -32,7 +32,7 @@ Variant refine_uvalue: uvalue -> uvalue -> Prop :=
 .
 #[export] Hint Constructors refine_uvalue : core.
 
-Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
+#[global] Instance refine_uvalue_Reflexive : Reflexive refine_uvalue.
 Proof.
   repeat intro.
   destruct x; try (apply RefineConcrete;[intro; inversion H|auto];fail).
@@ -48,7 +48,7 @@ Proof.
     reflexivity.
 Qed.
 
-Instance refine_uvalue_Transitive : Transitive refine_uvalue.
+#[global] Instance refine_uvalue_Transitive : Transitive refine_uvalue.
 Proof.
   repeat intro.
   inversion H; subst.
