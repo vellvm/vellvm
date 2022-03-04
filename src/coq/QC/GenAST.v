@@ -35,6 +35,14 @@ From Coq Require Import
 
 Open Scope Z_scope.
 
+
+(* Disable guard checking. This file is only used for generating test
+    cases. Some of our generation functions terminate in non-trivial
+    ways, but since they're only used to generate test cases (and are
+    not used in proofs) it's not terribly important to prove that they
+    actually terminate.  *)
+Unset Guard Checking.
+
 Section Helpers.
   Fixpoint is_sized_type_h (t : dtyp) : bool
     := match t with
@@ -208,6 +216,12 @@ Section GenerationState.
 
   Definition get_blocks (gs : GenState) : nat
     := gs.(num_blocks).
+
+  #[global] Instance MGEN : Monad GenLLVM.
+  unfold GenLLVM.
+  apply Monad_stateT.
+  typeclasses eauto.
+  Defined.
 
   Definition new_raw_id : GenLLVM raw_id
     := n <- gets get_raw;;
@@ -526,13 +540,6 @@ Section ExpGenerators.
   (* TODO: Need a restricted version of the type generator for this? *)
   (* TODO: look up named types from the context *)
   (* TODO: generate conversions? *)
-
- (* Disable guard checking. This file is only used for generating test
-    cases. Some of our generation functions terminate in non-trivial
-    ways, but since they're only used to generate test cases (and are
-    not used in proofs) it's not terribly important to prove that they
-    actually terminate.  *)
-  Unset Guard Checking.
 
   (* TODO: Move this*)
   Fixpoint dtyp_eq (a : dtyp) (b : dtyp) {struct a} : bool
