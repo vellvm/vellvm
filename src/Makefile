@@ -75,7 +75,7 @@ interp: .depend
 
 .PHONY: coq
 coq: .depend
-	$(MAKE) quickchick $(VOFILES)
+	$(MAKE) $(VOFILES)
 
 .PHONY: qc-tests
 qc-tests: rm-qc-test-vo coq $(QCVOFILES)
