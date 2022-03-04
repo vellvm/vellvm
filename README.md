@@ -17,6 +17,10 @@ a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of 
  - [DeepSpec](http://deepspec.org)
  - [LLVM](http://llvm.org)
 
+### Related publication:
+ - "Modular, Compositional, and Executable Formal Semantics for LLVM IR" ([ICFP'21](https://icfp21.sigplan.org/details/icfp-2021-papers/6/Modular-Compositional-and-Executable-Formal-Semantics-for-LLVM-IR)),
+    Yannick Zakowski, Calvin Beck, Irene Yoon, Ilia Zaichuk, Vadim Zaliva, Steve Zdancewic
+
 # Participants
  - Steve Zdancewic
  - Yannick Zakowski
@@ -34,8 +38,8 @@ a verified front-end for the [Helix](https://github.com/vzaliva/helix) chain of 
  - Christine Rizkallah 
  - Robert Zajac
  - Richard Zhang 
- - Jianzhou Zhao
-
+ - Jianzhou Zhao 
+  
 ---
 
 # Structure of the development
@@ -117,7 +121,7 @@ Our current test-suite of LLVM programs for which we compare our semantics again
   - External Coq libraries: 
     * ext-lib    (installed via, e.g. `opam install coq-ext-lib`)
     * paco       (installed via, e.g. `opam install coq-paco`)
-    * itrees     (installed via, e.g. `opam install coq-itree`)
+    * itrees     (installed via, e.g. `opam install coq-itrees`)
     * flocq      (installed via, e.g. `opam install coq-flocq`) 
     * ceres      (installed via, e.g. `opam install coq-ceres`)
     * mathcomp   (installed via, e.g. `opam install coq-mathcomp-ssreflect`)
@@ -129,20 +133,12 @@ Our current test-suite of LLVM programs for which we compare our semantics again
     * menhir     (installed via, e.g. `opam install menhir`)
     * qcheck     (installed via, e.g. `opam install qcheck`)
 
-#### Compilation:
+Compilation:
 
 1. Clone the vellvm git repo with the `--recurse-submodule` option
 2. Install all external dependencies
    - Note: you should be able to install all of the opam libraries  with `make opam` in the `src/` directory.
 3. Run `make` in the `src/` directory: it will first compile the quickchick library, then vir, and finally extract the OCaml executable
-
-### Installing with nix
-
-[First, enable nix flakes.](https://nixos.wiki/wiki/Flakes#Installing_flakes)
-
-When using this flake make sure to enable submodules. For instance, if
-you clone the project you can get a dev shell with
-`nix develop '?.submodules=1'`.
 
 # Running
 

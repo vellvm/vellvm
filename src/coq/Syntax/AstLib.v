@@ -1,17 +1,8 @@
-(* -------------------------------------------------------------------------- *
- *                     Vellvm - the Verified LLVM project                     *
- *                                                                            *
- *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
- *                                                                            *
- *   This file is distributed under the terms of the GNU General Public       *
- *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
- ---------------------------------------------------------------------------- *)
-
 (* begin hide *)
 From Coq Require Import
+     Decimal
      ZArith.ZArith List
-     String Omega.
+     String.
 
 From Vellvm Require Import
      Utilities
@@ -25,15 +16,11 @@ Import ListNotations.
 
 Import EqvNotation.
 
-(* TODO: The show instances I added in Vellvm.Show, which are copied
-   from here, segfault for some reason when extracted. Seems wrong to
-   import QuickChick here, but it will work for now. *)
-Require Import QuickChick.Show.
 (* end hide *)
 
 (* Equalities --------------------------------------------------------------- *)
-Instance eq_dec_int : RelDec (@eq int) := Data.Z.RelDec_zeq.
-Instance eqv_int : Eqv int := (@eq int).
+#[global] Instance eq_dec_int : RelDec (@eq int) := Data.Z.RelDec_zeq.
+#[global] Instance eqv_int : Eqv int := (@eq int).
 
 (* These should be moved to part of the standard library, or at least to ExtLib *)
 Module AsciiOrd <: UsualOrderedType.
@@ -254,8 +241,8 @@ Module RawIDOrd <: UsualOrderedType.
 
 End RawIDOrd.
 
-Instance eq_dec_raw_id : RelDec (@eq raw_id) := RelDec_from_dec (@eq raw_id) RawIDOrd.eq_dec.
-Instance eqv_raw_id : Eqv raw_id := (@eq raw_id).
+#[global] Instance eq_dec_raw_id : RelDec (@eq raw_id) := RelDec_from_dec (@eq raw_id) RawIDOrd.eq_dec.
+#[global] Instance eqv_raw_id : Eqv raw_id := (@eq raw_id).
 #[export] Hint Unfold eqv_raw_id: core.
 
 Module InstrIDDec <: MiniDecidableType.
@@ -276,8 +263,8 @@ Module InstrIDDec <: MiniDecidableType.
 End InstrIDDec.
 Module InstrID := Make_UDT(InstrIDDec).
 
-Instance eq_dec_instr_id : RelDec (@eq instr_id) := RelDec_from_dec (@eq instr_id) InstrID.eq_dec.
-Instance eqv_instr_id : Eqv instr_id := (@eq instr_id).
+#[global] Instance eq_dec_instr_id : RelDec (@eq instr_id) := RelDec_from_dec (@eq instr_id) InstrID.eq_dec.
+#[global] Instance eqv_instr_id : Eqv instr_id := (@eq instr_id).
 
 Module IdentDec <: MiniDecidableType.
   Definition t := ident.
@@ -465,7 +452,7 @@ Section ExpInd.
         fix IHelts 1. intros [|u elts']. intros. inversion H.
         intros u' [<-|Hin]. apply IH. eapply IHelts. apply Hin.
       }
-      
+
     - apply IH_Undef.
     - apply IH_Struct.
       { revert fields.
@@ -638,7 +625,7 @@ Section hiding_notation.
     Fixpoint serialize_exp' (v : exp T) :=
       match v with
       | EXP_Ident id => to_sexp id
-      | EXP_Integer x => Atom (show x)
+      | EXP_Integer x => Atom (show_Z x)
       | EXP_Bool b => to_sexp b
       | EXP_Null => Atom "null"
       | EXP_Zero_initializer => Atom "zero initializer"
@@ -744,7 +731,7 @@ Section hiding_notation.
 End hiding_notation.
 
 
-(* Utility function to determine whether a typ is void or is a function type returning void. 
+(* Utility function to determine whether a typ is void or is a function type returning void.
    This is needed in the parser to determine whether a function call instruction should
    generate an "anonymous" id or a "void" id.
 
@@ -793,4 +780,3 @@ Lemma Name_inj : forall s1 s2,
 Proof.
   intros * EQ; inv EQ; auto.
 Qed.
-

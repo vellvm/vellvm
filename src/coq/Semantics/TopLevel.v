@@ -1,13 +1,3 @@
-(* -------------------------------------------------------------------------- *
- *                     Vellvm - the Verified LLVM project                     *
- *                                                                            *
- *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
- *                                                                            *
- *   This file is distributed under the terms of the GNU General Public       *
- *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
- ---------------------------------------------------------------------------- *)
-
 (** * Plugging the pieces together: executable and propositional semantics for Vellvm *)
 
 (* begin hide *)
@@ -65,9 +55,9 @@ Definition allocate_global (g:global dtyp) : itree L0 unit :=
 Definition allocate_globals (gs:list (global dtyp)) : itree L0 unit :=
   map_monad_ allocate_global gs.
 
-(* Who is in charge of allocating the addresses for external functions declared in this mcfg? *)
-
-(* Returns `true` only if both function are named and have the same name.  *)
+(* Returns `true` only if both function are named and have
+     the same name.
+ *)
 Definition function_name_eq (a b:function_id) : bool :=
   match a, b with
   | Name aname, Name bname => eqb aname bname
