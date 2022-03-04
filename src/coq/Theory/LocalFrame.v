@@ -774,4 +774,3 @@ Proof.
     cbn in *.
     auto.
 Qed.
-
