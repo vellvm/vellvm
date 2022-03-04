@@ -93,7 +93,8 @@ coqinterp: $(COQFILESVIR:%=coq/%.vo)
 
 .PHONY: quickchick
 quickchick:
-	make -C $(QUICKCHICKDIR)
+	$(MAKE) -C $(QUICKCHICKDIR) compat
+	$(MAKE) -C $(QUICKCHICKDIR)
 
 .PHONY: update-quickchick
 update-quickchick:
