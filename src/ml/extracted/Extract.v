@@ -78,8 +78,6 @@ Extract Inlined Constant Bracket.inbetween_loc => "fun _ -> assert false".
 Extract Inlined Constant Generic_fmt.round => "fun _ -> assert false".
 
 Extract Inlined Constant Archi.ppc64 => "false".
-(* Extract Inlined Constant Reals.ClassicalDedekindReals.sig_forall_dec => "(fun _ -> assert false)". *)
-(* Extract Inlined Constant Reals.ClassicalDedekindReals.sig_not_dec => "false". *)
 
 Set Extraction AccessOpaque.
 (* NOTE: assumes that this file is compiled from /src *)

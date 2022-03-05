@@ -106,9 +106,9 @@ Our current test-suite of LLVM programs for which we compare our semantics again
 # Installing / Compiling Vellvm
 
 ### Assumes: 
-  - Coq: version 8.13 (installed via *opam*, see below)
+  - Coq: version 8.15 (installed via *opam*, see below)
   - OCaml: version 4.12.0 (installed via *opam*, see below)
-  - opam: version 2.0.5.
+  - opam: version 2.0.8.
     It is available via [homebrew](https://brew.sh/) on Mac, and most system's package managers on Linux, e.g. `sudo apt-get install opam`.
     If this is the first time you are using opam you need to initialize it: 
     + On Linux: `opam init`
@@ -121,7 +121,7 @@ Our current test-suite of LLVM programs for which we compare our semantics again
   - External Coq libraries: 
     * ext-lib    (installed via, e.g. `opam install coq-ext-lib`)
     * paco       (installed via, e.g. `opam install coq-paco`)
-    * itrees     (installed via, e.g. `opam install coq-itrees`)
+    * itrees     (installed via, e.g. `opam install coq-itree`)
     * flocq      (installed via, e.g. `opam install coq-flocq`) 
     * ceres      (installed via, e.g. `opam install coq-ceres`)
     * mathcomp   (installed via, e.g. `opam install coq-mathcomp-ssreflect`)
