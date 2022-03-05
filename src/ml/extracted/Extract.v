@@ -65,13 +65,21 @@ in fun msg -> print_string (camlstring_of_coqstring msg ^ ""\n"")".
 (* Extract Inlined Constant LLVMAst.float => "float". *)
 
 (* Cutting the dependency to R. *)
-Extract Inlined Constant Flocq.Core.Defs.F2R => "(fun _ -> assert false)".
-Extract Inlined Constant Flocq.IEEE754.Binary.FF2R => "(fun _ -> assert false)".
-Extract Inlined Constant Flocq.IEEE754.Binary.B2R => "(fun _ -> assert false)".
-Extract Inlined Constant Flocq.IEEE754.Binary.BSN.round_mode => "(fun _ -> assert false)".
-Extract Inlined Constant Flocq.Calc.Bracket.inbetween_loc => "(fun _ -> assert false)".
+Extract Inlined Constant Defs.F2R => "fun _ -> assert false".
+Extract Inlined Constant Binary.FF2R => "fun _ -> assert false".
+Extract Inlined Constant Binary.B2R => "fun _ -> assert false".
+Extract Inlined Constant BinarySingleNaN.round_mode => "fun _ -> assert false".
+Extract Inlined Constant BinarySingleNaN.SF2R => "fun _ -> assert false".
+Extract Inlined Constant BinarySingleNaN.B2R => "fun _ -> assert false".
+Extract Inlined Constant Binary.BSN.round_mode => "fun _ -> assert false".
+Extract Inlined Constant Binary.BSN.SF2R => "fun _ -> assert false".
+Extract Inlined Constant Binary.BSN.B2R => "fun _ -> assert false".
+Extract Inlined Constant Bracket.inbetween_loc => "fun _ -> assert false".
+Extract Inlined Constant Generic_fmt.round => "fun _ -> assert false".
 
 Extract Inlined Constant Archi.ppc64 => "false".
+(* Extract Inlined Constant Reals.ClassicalDedekindReals.sig_forall_dec => "(fun _ -> assert false)". *)
+(* Extract Inlined Constant Reals.ClassicalDedekindReals.sig_not_dec => "false". *)
 
 Set Extraction AccessOpaque.
 (* NOTE: assumes that this file is compiled from /src *)
