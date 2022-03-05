@@ -118,7 +118,7 @@ Proof.
 Qed.
 
 #[export] Hint Unfold TT : core.
-Instance TT_equiv :
+#[global] Instance TT_equiv :
   forall A, Equivalence (@TT A).
 Proof.
   intros A; split; repeat intro; auto.

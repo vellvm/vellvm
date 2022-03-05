@@ -15,7 +15,6 @@ From Coq Require Import
      String
      Setoid
      Morphisms
-     Omega
      Classes.RelationClasses.
 
 From ExtLib Require Import
@@ -102,7 +101,7 @@ Set Contextual Implicit.
   Definition print_msg (msg : string) : unit := tt.
 
   Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
-    v <- trigger (Throw _ (print_msg msg));; match v: void with end.
+    v <- trigger (Throw (print_msg msg));; match v: void with end.
     
   Definition lift_err {A B} {E} `{FailureE -< E} (f : A -> itree E B) (m:err A) : itree E B :=
     match m with
