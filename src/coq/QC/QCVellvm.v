@@ -30,11 +30,11 @@ Inductive MlResult a e :=
 Extract Inductive MlResult => "result" [ "Ok" "Error" ].
 
 Unset Guard Checking.
-Fixpoint step (t : ITreeDefinition.itree L5 TopLevel.res_L4) : MlResult DV.uvalue string
+Fixpoint step (t : ITreeDefinition.itree L4 TopLevel.res_L4) : MlResult DV.uvalue string
   := match observe t with
      | RetF (_,(_,(_,x))) => MlOk _ string x
      | TauF t => step t
-     | VisF _ e k => MlError _ string "Uninterpreted event"
+     | VisF e k => MlError _ string "Uninterpreted event"
      end.
 Set Guard Checking.
 
@@ -72,7 +72,7 @@ Definition vellvm_agrees_with_clang (prog : list (toplevel_entity typ (block typ
   := 
     (* collect (show prog) *)
             match interpret prog, run_llc prog with
-            | MlOk (UVALUE_I8 x), UVALUE_I8 y =>
+            | MlOk _ _ (UVALUE_I8 x), UVALUE_I8 y =>
               whenFail ("Vellvm: " ++ show (unsigned x) ++ " | Clang: " ++ show (unsigned y) ++ " | Ast: " ++ ReprAST.repr prog) (equ x y)
             | _, _ => checker true
             end.
