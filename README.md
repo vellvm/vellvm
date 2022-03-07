@@ -126,6 +126,7 @@ Our current test-suite of LLVM programs for which we compare our semantics again
     * ceres      (installed via, e.g. `opam install coq-ceres`)
     * mathcomp   (installed via, e.g. `opam install coq-mathcomp-ssreflect`)
     * simple-io  (installed via, e.g. `opam install coq-simple-io`)
+    * quickcheck (installed via, e.g. `opam install coq-quickchick`)
 
   - Additional opam packages: 
     * ocamlbuild (installed via, e.g. `opam install ocamlbuild`)
