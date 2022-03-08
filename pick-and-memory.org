@@ -445,7 +445,7 @@ Maybe if I just have a concrete memory I could do something like this:
   Lemma interp_memory_alloca :
     forall (m m' : MemState) (t : dtyp) (a : addr),
       MemMonad_runs_to (allocate t) m m' a ->
-      interp_memory (trigger (Alloca t)) m ≈ c <- pick_addr m t;; m' register_block c m;; Ret (m', DVALUE_Addr a).
+      interp_memory (trigger (Alloca t)) m ≈ c <- pick_addr m t;; m' <- register_block c m;; Ret (m', DVALUE_Addr a).
 #+end_src
 
 But this makes the lemmas depend on the implementation of the memory

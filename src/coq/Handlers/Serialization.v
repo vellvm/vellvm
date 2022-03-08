@@ -221,6 +221,10 @@ Module Type Serialization (LP : LLVMParams) (MP : MemoryParams LP) (SER : Serial
 
   Definition concretize (uv: uvalue) (dv : dvalue) := concretize_u uv (ret dv).
 
+  (* TODO: should the post condition be concretize uv dv ? *)
+  Definition pick_uvalue (Pre : Prop) (uv : uvalue) : PickUvalueE {dv : dvalue | True}
+    := pick Pre uv.
+
   (* Concretization encounters UB / Failure.
 
      Note, this does mean that `concretize_u uv (ret dv)` should hold

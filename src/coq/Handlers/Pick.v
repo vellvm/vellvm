@@ -59,11 +59,51 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
 
   Section PickPropositional.
 
-    Inductive Pick_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E}: PickE ~> PropT E :=
-    | PickUvalue  : forall Pre uv res t,
-        ~ Pre \/ (concretize_u uv res /\ t ≈ lift_err_ub_oom ret res) -> Pick_handler (pick_uvalue Pre uv) t.
-    (* | PickRet : forall X Y Pre (Post : Y -> Prop) res x t, *)
-    (*     Post res -> t ≈ ret res -> Pick_handler (@PickSubset X Y Pre x Post) t. *)
+    Inductive Pick_handler {X Y Post} {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : @PickE X Y Post ~> PropT E :=
+    | PickUB  : forall Pre x t,
+        ~Pre -> Pick_handler (pick Pre x) t
+    | PickRet : forall Pre x (res : Y) (t : itree E {y : Y | Post x y}),
+        Post x res -> Pick_handler (pick Pre x) t.
+
+    Require Import ExtLib.Data.Monads.EitherMonad.
+    Require Import ExtLib.Data.Monads.IdentityMonad.
+    Require Import ExtLib.Structures.Functor.
+
+    Program Definition lift_err_ub_oom_post {A B} {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} (m:err_ub_oom A) (Post : B -> Prop) (f : forall (a : A), m = ret a -> itree E {b : B | Post b}) : itree E {b : B | Post b} :=
+      match m with
+      | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
+          match m with
+          | inl (OOM_message x) => raiseOOM x
+          | inr (inl (UB_message x)) => raiseUB x
+          | inr (inr (inl (ERR_message x))) => raise x
+          | inr (inr (inr x)) => f x _
+          end
+      end.
+
+    Arguments lift_err_ub_oom_post {_ _ _ _ _ _} _ _ _.
+
+    Program Definition lift_err_ub_oom_post_ret
+            {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E}
+            {X Y} (f : X -> Y) (res : err_ub_oom X) (Post : Y -> Prop)
+            (P : forall (y : Y), fmap f res = ret y -> Post y)
+      : itree E {y : Y | Post y}
+      := lift_err_ub_oom_post res Post _.
+    Next Obligation.
+      cbn in *.
+      apply ret.
+      econstructor; eauto.
+    Defined.
+
+    Arguments lift_err_ub_oom_post_ret {_ _ _ _ _ _} _ _ _.
+
+    Inductive PickUvalue_handler {E} `{FE:FailureE -< E} `{FO:UBE -< E} `{OO: OOME -< E} : PickUvalueE ~> PropT E :=
+    | PickUV_UB  : forall Pre uv t,
+        ~Pre -> PickUvalue_handler (pick Pre uv) t
+    | PickUV_Ret : forall Pre uv (res : err_ub_oom dvalue)
+                     (t : itree E {dv : dvalue | True})
+                     (Conc : concretize_u uv res),
+        t ≈ lift_err_ub_oom_post_ret id res (fun _ => True) (fun (dv : dvalue) (_ : fmap id res = ret dv) => I) ->
+        PickUvalue_handler (pick Pre uv) t.
 
     Section PARAMS_MODEL.
       Variable (E F: Type -> Type).
@@ -74,22 +114,22 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
       Definition F_trigger_prop : F ~> PropT (E +' F) :=
         fun R e => fun t => t = r <- trigger e ;; ret r.
 
-      Definition pick_k_spec
+      Definition pick_uvalue_k_spec
                  {T R : Type}
-                 (e : (E +' PickE +' F) T)
+                 (e : (E +' PickUvalueE +' F) T)
                  (ta : itree (E +' F) T)
-                 (k1 : T -> itree (E +' PickE +' F) R)
+                 (k1 : T -> itree (E +' PickUvalueE +' F) R)
                  (k2 : T -> itree (E +' F) R)
                  (t2 : itree (E +' F) R) : Prop
         := t2 ≈ bind ta k2.
 
-      Global Instance pick_k_spec_proper {T R : Type} {RR : R -> R -> Prop} {b a : bool} :
+      Global Instance pick_uvalue_k_spec_proper {T R : Type} {RR : R -> R -> Prop} {b a : bool} :
         Proper
           (eq ==>
               eq ==>
-              (fun k1 k2 : T -> itree (E +' PickE +' F) R =>
+              (fun k1 k2 : T -> itree (E +' PickUvalueE +' F) R =>
                  forall x : T, eqit RR b a (k1 x) (k2 x)) ==> eq ==> eq ==> iff)
-          pick_k_spec.
+          pick_uvalue_k_spec.
       Proof.
         unfold Proper, respectful.
         intros x y H x0 y0 H0 x1 y1 H1 x2 y2 H2 x3 y3 H3; subst.
@@ -97,8 +137,8 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
       Qed.
 
       Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
-        forall (T:Type) (RR: T -> T -> Prop), itree (E +' PickE +' F) T -> PropT (E +' F) T :=
-        interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)) (@pick_k_spec).
+        forall (T:Type) (RR: T -> T -> Prop), itree (E +' PickUvalueE +' F) T -> PropT (E +' F) T :=
+        interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)) (@pick_uvalue_k_spec).
 
     End PARAMS_MODEL.
 
@@ -182,11 +222,14 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
         (* Qed. *)
     Admitted.
 
-    Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : PickE ~> itree E :=
+    Require Import ExtLib.Structures.Functor.
+
+    Definition concretize_picks {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : PickUvalueE ~> itree E :=
       fun T p =>
         match p with
-        | pick_uvalue Pre u =>
-            lift_err_ub_oom ret (concretize_uvalue u)
+        | pick Pre u =>
+            let res_t := concretize_uvalue u in
+            fmap (fun dv => exist _ dv I) res_t
         end.
 
     Section PARAMS_INTERP.
@@ -205,11 +248,11 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
 
       Definition pick_k_spec_correct_pick_exec_h
                  `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
-        k_spec_correct (@pick_exec_h _ _ _) (@pick_k_spec _ _).
+        k_spec_correct (@pick_exec_h _ _ _) (@pick_uvalue_k_spec _ _).
       Proof.
         unfold k_spec_correct.
         intros T R e k1 k2 t2 H2.
-        unfold pick_k_spec.
+        unfold pick_uvalue_k_spec.
         auto.
       Qed.
 

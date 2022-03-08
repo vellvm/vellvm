@@ -165,7 +165,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
   Definition concretize_or_pick {E : Type -> Type} `{PickE -< E} `{FailureE -< E} (uv : uvalue) (P : Prop) : itree E dvalue :=
     if is_concrete uv
     then lift_err ret (uvalue_to_dvalue uv)
-    else trigger (pick_uvalue P uv).
+    else dv <- trigger (pick_uvalue P uv);; ret (proj1_sig dv).
   
   (* Pick a possibly poison value, treating poison as nondeterminism.
      This is used for freeze. *)
