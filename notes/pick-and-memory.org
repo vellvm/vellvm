@@ -464,3 +464,35 @@ uniform interface, something like this:
       MemMonad_runs_to (allocate t) m m' a ->
       refine_memory (interp_memory_prop (trigger (Alloca t)) m) (Ret (m', DVALUE_Addr a)).
 #+end_src
+
+* Pick with postconditions
+
+We have moved towards a dependently typed pick event:
+
+#+begin_src coq
+  Variant PickE {X Y} {Post : X -> Y -> Prop} : Type -> Type :=
+    | pick (Pre : Prop) (x : X) : PickE ({y : Y | Post x y}).
+#+end_src
+
+We can now know that the value returned by a pick satisfies the
+postcondition. For the memory model this means we can have something
+like this:
+
+#+begin_src coq
+  Parameter free_concrete_space :
+    forall (ms : MemState) (phys_addr : Z) (sz : N), bool.
+
+  Definition PickConcreteMemoryE :=
+    @PickE (MemState * (addr * dtyp)) Z
+           (fun '(ms, (a, dt)) phys_addr =>
+              free_concrete_space ms phys_addr (sizeof_dtyp dt) = true).
+#+end_src
+
+Thus whenever we pick a concrete address in memory, we can know that
+it is free... So we should be able to prove certain things without
+interpreting the pick event. For instance if we know the address is
+free we should be able to determine that storing to that address
+should not have an impact on any of the other values in memory. If we
+didn't have the dependently typed picks, then the returned concrete
+address could be any possible ~Z~, and we would end up with cases
+where it overlaps with existing blocks in memory.
