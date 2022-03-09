@@ -1,0 +1,115 @@
+* PropT and stateT
+
+The memory model is non-deterministic and stateful.
+
+The executable memory model is just stateful, and so the executable memory handler has type:
+
+#+begin_src coq
+  Definition MemStateT M := stateT MemState M.
+
+  Definition handle_memory
+             {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} :
+    MemoryE ~> MemStateT (itree E)
+#+end_src
+
+And we end up with a chain of interpreters that looks like:
+
+#+begin_src coq
+  Definition interp_mcfg3 {R} (t: itree L0 R) g l m : itree L3 (MemState * (local_env * stack * (global_env * R))) :=
+    let uvalue_trace   := interp_intrinsics t in
+    let L1_trace       := interp_global uvalue_trace g in
+    let L2_trace       := interp_local_stack L1_trace l in
+    let L3_trace       := interp_memory L2_trace m in
+    L3_trace.
+#+end_src
+
+Note:
+
+#+begin_src coq
+  Definition interp_memory :
+    itree Effin ~> MemStateT (itree Effout) :=
+    interp_state interp_memory_h.
+#+end_src
+
+#+begin_src coq
+  Definition interp_state {E M S}
+             {FM : Functor M} {MM : Monad M}
+             {IM : MonadIter M} (h : E ~> stateT S M) :
+    itree E ~> stateT S M := interp h.
+#+end_src
+
+~interp_state~ really just forces the type of ~M~ in ~interp~ to be a ~stateT~:
+
+#+begin_src coq
+  interp :
+  forall {E M : Type -> Type},
+  Functor M ->
+  Monad M -> MonadIter M -> (forall T : Type, E T -> M T) -> forall T : Type, itree E T -> M T
+#+end_src
+
+And ~stateT~ is literally just a function:
+
+#+begin_src coq
+  stateT = 
+  fun (s : Type) (m : Type -> Type) (a : Type) => s -> m (s * a)%type
+#+end_src
+
+** But seriously...
+
+Memory is both stateful and nondeterministic. That means I need to have some combination of ~Prop~ and ~stateT~ going on.
+
+On one hand I want to ultimately end up with a ~PropT L6 res_L6~ or
+whatever... So it seems like it would make sense to have a ~stateT
+(PropT E)~ or something... I.e., a ~MemState -> (MemState * PropT E T)~
+
+However, because the memory state itself is nondeterministic, this
+doesn't make sense... I should have a bunch of diverging possible
+memory states at the end.
+
+Therefore, it seems like what I want is... ~(MemState -> itree E
+(MemState * T)) -> Prop~ which is really just:
+
+- ~stateT MemState (itree E) T -> Prop~
+- or ~MemStateT (itree E) T -> Prop~
+
+  #+begin_src coq
+    fun (mst : MemState -> itree E (MemState *T)) =>
+      forall ms : MemState, t = mst ms
+
+  #+end_src
+  
+
+This doesn't fit the mold for ~PropT~, though.
+
+
+If I want to handle load in ~PropT~...
+
+#+begin_src coq
+  (* Does not propagate mem *)
+  Definition handle_alloca (sz : N) (mem : MemoryState) (t : itree E Addr) : Prop
+    := forall a, free a sz mem /\ t ≈ ret a.
+
+
+  Definition handle_alloca' (sz : N) (mem : MemoryState) (mts : MemoryStateT (itree E) Addr) : Prop
+    := forall a mem',
+      (* Fails if chunk of memory is not free *)
+      Some mem' = register_block a sz mem /\
+      mts mem ≈ ret (mem', a).
+
+  Definition handle_alloca' (sz : N) (mts : MemoryStateT (itree E) Addr) : Prop
+    := forall a mem mem',
+      (* Fails if chunk of memory is not free *)
+      Some mem' = register_block a sz mem /\
+      mts mem ≈ ret (mem', a).
+
+  Definition run_prop_memory (init_mem : MemoryState) (MP : MemoryStateT (itree E) T -> Prop) : (itree E (MemoryState * T) -> Prop)
+    :=
+    fun (t : itree E (MemoryState * T)) =>
+      exists mts, MP mts /\ t ≈ mts init_mem.
+
+  (* Or maybe... *)
+  Definition run_prop_memory (MP : MemoryStateT (itree E) T -> Prop) : (itree E (MemoryState * T) -> Prop)
+    :=
+    fun (t : itree E (MemoryState * T)) =>
+      exists mts, MP mts /\ exists init_mem, t ≈ mts init_mem.
+#+end_src
