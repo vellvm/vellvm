@@ -465,6 +465,58 @@ uniform interface, something like this:
       refine_memory (interp_memory_prop (trigger (Alloca t)) m) (Ret (m', DVALUE_Addr a)).
 #+end_src
 
+* Delaying concrete allocation to PtoI consequences
+
+We keep toying around with the idea of deferring nondeterminism in the
+memory model for as long as possible, because then we can do more of
+our reasoning outside of ~PropT~. The best way to do this is to
+separate memory into concrete and logical memory just like the
+quasi-concrete model. Then ~alloca / load / store~ remain
+deterministic operations, and ~ptoi~ will cause a concrete address to
+be allocated. Unfortunately, this has some implications.
+
+Ideally we want to think of memory as a possibly finite array of
+bytes. When you allocate memory you reserve some bytes in this array,
+and the index to these bytes in the array will be the physical
+address. If we can't find a big enough contiguous block of free bytes
+in memory, then we run out of memory at allocation time. Ptoi is
+basically just noop, and I believe this is the mental model that most
+people have in terms of how memory works.
+
+However, if we delay nondeterminism until ptoi time things are
+slightly different. ~ptoi~ is no longer a noop, and will essentially
+become the thing that actually does allocation. It is then possible
+for ~ptoi~ to run out of memory because it can't find a place to
+allocate something, and ~alloca~ will no longer ever run out of memory
+if we have unlimited abstract pointers (in theory you could still have
+a finite amount of abstract pointers, and in that case you would run
+out of memory, but only after allocating the maximum number of
+possible objects (e.g., one for each byte in memory)). Because of this
+the memory model with delayed nondeterminism will have different
+semantics than the simpler model where alloca is nondeterministic...
+
+In the nondeterministic ~alloca~ model we should always run out of
+memory sooner than in the nondeterministic ~ptoi~ model... So the ND
+~alloca~ model should be a refinement of the ND ~ptoi~ model...
+
+So, which model should we use, and does it matter? The ~alloca~ model
+seems simpler, and to more accurately model finite memory, but the
+~ptoi~ model may allow for simpler reasoning if we can avoid going
+into ~PropT~ to reason about simple programs that don't care about the
+physical layout of objects in memory.
+
+Ultimately the point of all of these memory model changes was to
+consider memory to be infinite at the level of LLVM. The behaviour of
+the programs that we care about is the behaviour under infinite
+memory, and the idea is that we will do all of our reasoning about
+optimizations at this level, and then we will lower these infinite
+programs to finite ones which will have the same behavior except for
+the possibility of running out of memory at any point. To this end, I
+think both options for the memory model should be fine...? There may
+be different sets of optimizations that can be justified at the finite
+level for these different models, however, but I'm not sure we will
+actually do any optimizations with finite memory (maybe to get rid of bounds checks?).
+
 * Pick with postconditions
 
 We have moved towards a dependently typed pick event:
