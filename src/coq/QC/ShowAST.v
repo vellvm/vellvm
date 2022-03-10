@@ -326,6 +326,15 @@ Section ShowInstances.
     show := show_block "    "
     |}.
 
+  Definition show_typ_instr (typ_instr: typ * instr typ) : string :=
+    let (t, i) := typ_instr in
+    "(" ++ (show t) ++ ", " ++ (show i) ++ ")".
+
+  Global Instance showTypInstr: Show (typ * instr typ) :=
+    {|
+    show := show_typ_instr
+    |}.
+  
   Definition show_arg (arg : local_id * typ) : string
     := let '(i, t) := arg in
        show t ++ " %" ++ show i.

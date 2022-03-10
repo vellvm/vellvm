@@ -986,7 +986,6 @@ Definition genType: G (typ) :=
     := t <- gen_sized_typ;;
        e <- gen_exp t;;
        ret (t, e).
-Print filter_type.
   Definition gen_op (t : typ) : GenLLVM (exp typ)
     := sized_LLVM
          (fun sz =>
@@ -1005,8 +1004,6 @@ Print filter_type.
        ret (t, e).
 
 End ExpGenerators.
-Sample (run_GenLLVM gen_gep).
-Sample genAggreTypeWOFn.
 
 Section InstrGenerators.
 
@@ -1333,3 +1330,4 @@ Section InstrGenerators.
     := fmap ret gen_main_tle.
 
 End InstrGenerators.
+Sample (run_GenLLVM gen_store).
