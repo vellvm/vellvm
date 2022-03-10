@@ -517,6 +517,58 @@ be different sets of optimizations that can be justified at the finite
 level for these different models, however, but I'm not sure we will
 actually do any optimizations with finite memory (maybe to get rid of bounds checks?).
 
+** Delayed nondeterminism in allocations and undef values...
+
+Suppose we have a non-deterministic pointer ~p~:
+
+#+begin_src c
+  double* p = select undef p1 p2
+#+end_src
+
+And suppose we cast this pointer to an integer and compare it...
+
+#+begin_src c
+  i64 ip = (i64) p;
+  i1 c = ip == ip
+#+end_src
+
+If ~(i64) p1 != (i64) p2~ then it should be possible for ~c~ to be
+~false~. If a physical address is not allocated until a ~ptoi~ is
+executed, then casts have an effect on memory.
+
+In vellvm:
+
+#+begin_src coq
+  Definition p := UVALUE_Select undef (UVALUE_addr p1) (UVALUE_addr p2).
+  Definition ip := UVALUE_Conversion Ptrtoint DTYPE_Pointer (UVALUE_Select undef (UVALUE_addr p1) (UVALUE_addr p2)) (DTYPE_I 64);
+  Definition c := (UVALUE_ICmp Eq ip ip)
+#+end_src
+
+How do we handle ~pick~ for ~c~?
+
+1. When the conversion happens, we ~pick~ the ~select~ and raise ~PtoI~ events...
+   - No good, because ~c = true~ always then.
+2. Defer everything until ~pick~ event. Then raise ~PtoI~ events in ~pick~...
+   - The memory handler is run before ~pick~, so this is a no-go.
+3. We consider ~PtoI~ to just be some kind of ~pick_addr~ event, and
+   we carry around a ~MemState~ that we pick a concrete address from
+   in ~pick~...
+   - Need to update the ~MemState~ because if we call ~PtoI~ on ~p1~ /
+     ~p2~ in the future it should get the same integer value.
+4. Make sure concrete addresses are chosen during allocation, so ~PtoI~ becomes a noop.
+   - This should actually work, but means we do not delay address
+     allocation nondeterminism until ~PtoI~. It has to be in ~alloca~,
+     which means that ~alloca~ will either need to be nondeterministic
+     itself, or raise a nondeterministic ~pick_addr~ event.
+     +  ~pick_addr~ event: we would not be able to remove a dead ~alloca~
+         until ~pick~ is handled. We may still be able to do some
+         reasoning about store forwarding / ~ptoi~ and ~itop~ round trips
+         with dependently typed picks.
+     + Memory in ~PropT~: immediately in ~PropT~, but allows simpler
+       memory model, cleaner theory about memory, and
+       ~alloca~ elimination is justifiable before
+       interpreting picks (might not matter because we're already in ~PropT~).
+
 * Pick with postconditions
 
 We have moved towards a dependently typed pick event:
