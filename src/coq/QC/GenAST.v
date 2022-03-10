@@ -467,6 +467,20 @@ Section TypGenerators.
                       ]
     end.
 
+  Program Fixpoint gen_typ_non_void_size_wo_fn (sz : nat) {measure sz} : GenLLVM typ :=
+  match sz with
+  | 0%nat => gen_typ_non_void_0
+  | (S sz') => oneOf_LLVM
+                    [ gen_typ_non_void_0
+                    (* Might want to restrict the size to something reasonable *)
+                    (* TODO: Make sure length of Array >= 0, and length of vector >= 1 *)
+                    ; ret TYPE_Array <*> lift genN <*> gen_sized_typ_size sz'
+                    ; ret TYPE_Vector <*> lift genN <*> gen_sized_typ_size sz'
+                    ; ret TYPE_Struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
+                    ; ret TYPE_Packed_struct <*> nonemptyListOf_LLVM (gen_sized_typ_size sz')
+                    ]
+  end.
+
   (* TODO: look up identifiers *)
   (* Types for operation expressions *)
   Definition gen_op_typ : GenLLVM typ :=
@@ -785,6 +799,68 @@ Proof. Abort. (* Cannnot simpl to prove that it works*)
 Definition genAggreType : G (typ) :=
   run_GenLLVM (gen_typ_non_void_size 3).
 
+Definition genAggreTypeWOFn : G (typ) :=
+  run_GenLLVM (gen_typ_non_void_size_wo_fn 3).
+
+Search N.
+
+(** Will find all the pointer type inside the pointer type
+Currently for simplicity we only have pointer to non-aggregate data type
+If allowing aggregate type pointer then will need mutual induction*)
+Fixpoint findPtr_from_ptr (t_ptr : typ) : list typ:=
+  match t_ptr with
+  | TYPE_Pointer t => [t_ptr] ++ findPtr_from_ptr t
+  | _ => []
+  end.
+
+(* Main function for finding all the pointers.
+The function does not guarantee a set of results but more like a list of results
+However, we can go around it while using the choose-like operator in QC*)
+Fixpoint findPtr (t_struct: typ) : list typ:=
+  match t_struct with 
+  | TYPE_Array sz t => if BinNatDef.N.ltb 0 sz then findPtr_from_ptr t else []
+  | TYPE_Vector sz t => if BinNatDef.N.ltb 0 sz then findPtr_from_ptr t else []
+  | TYPE_Struct fields => 
+    match fields with 
+    | [] => []
+    | hd::tl => (findPtr hd) ++ (findPtr (TYPE_Struct tl))
+    end
+  | TYPE_Packed_struct fields => 
+    match fields with 
+      | [] => []
+      | hd::tl => (findPtr hd) ++ (findPtr (TYPE_Struct tl))
+    end
+  | _ => [] 
+  end.
+Search filter.
+Print filter.
+Search nat.
+(*filter (fun '(i,t) => is_sized_type aliases t) aliases in*)
+Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(i,t) => Init.Nat.ltb 1 (Coq.Lists.List.length (findPtr t)) ) ctx.
+(*
+Print genAggreType.
+Check gen_typ_non_void_size.
+Search instr.
+Search GenLLVM.*)
+Search N.
+Definition gen_gep : GenLLVM (typ * instr typ):=
+  ctx <- get_ctx;;
+  let ptrs_in_context := filter_ptr_typs ctx in
+  '(ptr_variable, t) <- (oneOf_LLVM (map ret ptrs_in_context));;
+  let ptrs_in_typ := findPtr t in
+  ptr_in_typ <- oneOf_LLVM (map ret ptrs_in_typ);;
+  let paths_in_typ := get_index_paths_to_typ ptr_in_typ t in
+  path_in_typ <- oneOf_LLVM (map ret paths_in_typ);;
+  let path_in_int := map (fun x => Z.of_N x) path_in_typ in
+   (* Refer to function get_int_typ*)
+  ret (t, INSTR_Op (OP_GetElementPtr t 
+                    (TYPE_Pointer t, EXP_Ident ptr_variable) 
+                    ([(TYPE_I 64, EXP_Ident (ID_Local (Anon 0)))] ++ (map (fun x => (TYPE_I 64, EXP_Integer x)) path_in_int)))).
+  
+
+
+
 Definition genTypHelper (n: nat): G (typ) :=
   run_GenLLVM (gen_typ_non_void_size n).
 
@@ -934,6 +1010,9 @@ Print filter_type.
        ret (t, e).
 
 End ExpGenerators.
+
+Sample gen_gep.
+Sample genAggreTypeWOFn.
 
 Section InstrGenerators.
 
@@ -1258,6 +1337,8 @@ Section InstrGenerators.
 
   Definition gen_llvm :GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     := fmap ret gen_main_tle.
+
+Search GenLLVM.
 
 End InstrGenerators.
 Sample (genType).
