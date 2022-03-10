@@ -758,7 +758,7 @@ Fixpoint get_array_index (ls : list (list N)) (sz : nat) : list (list N) :=
   (get_array_index ls z) ++ (map (fun x => (N.of_nat z)::x) ls)
   end.
 
-
+(* Function that will get all the paths available in t_from with destination t_in*)
 Fixpoint get_index_paths_to_typ (t_in t_from : typ) {struct t_from} : list (list N) :=
   let this_stage := if (normalized_typ_eq t_in t_from) then [[]] else [] in
   let other_stage :=
@@ -796,9 +796,8 @@ Example test4:
 get_index_paths_to_typ TYPE_Metadata (TYPE_Struct [TYPE_Metadata; TYPE_Array 3 TYPE_Metadata]) = [[0%N]; [1%N;0%N]; [1%N;1%N]; [1%N;2%N]].
 Proof. Abort. (* Cannnot simpl to prove that it works*)
 
-Definition genAggreType : G (typ) :=
-  run_GenLLVM (gen_typ_non_void_size 3).
 
+(*Random functions, please ignore*)
 Definition genAggreTypeWOFn : G (typ) :=
   run_GenLLVM (gen_typ_non_void_size_wo_fn 3).
 
@@ -832,7 +831,7 @@ Fixpoint findPtr (t_struct: typ) : list typ:=
   | _ => [] 
   end.
 
-(*filter (fun '(i,t) => is_sized_type aliases t) aliases in*)
+(*filter all the (ident, typ) in ctx such that typ contains ptr in*)
 Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
   filter (fun '(i,t) => Init.Nat.ltb 1 (Coq.Lists.List.length (findPtr t)) ) ctx.
 (*
