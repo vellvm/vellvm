@@ -802,7 +802,6 @@ Definition genAggreType : G (typ) :=
 Definition genAggreTypeWOFn : G (typ) :=
   run_GenLLVM (gen_typ_non_void_size_wo_fn 3).
 
-Search N.
 
 (** Will find all the pointer type inside the pointer type
 Currently for simplicity we only have pointer to non-aggregate data type
@@ -832,9 +831,7 @@ Fixpoint findPtr (t_struct: typ) : list typ:=
     end
   | _ => [] 
   end.
-Search filter.
-Print filter.
-Search nat.
+
 (*filter (fun '(i,t) => is_sized_type aliases t) aliases in*)
 Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
   filter (fun '(i,t) => Init.Nat.ltb 1 (Coq.Lists.List.length (findPtr t)) ) ctx.
@@ -843,7 +840,6 @@ Print genAggreType.
 Check gen_typ_non_void_size.
 Search instr.
 Search GenLLVM.*)
-Search N.
 Definition gen_gep : GenLLVM (typ * instr typ):=
   ctx <- get_ctx;;
   let ptrs_in_context := filter_ptr_typs ctx in
@@ -1010,8 +1006,7 @@ Print filter_type.
        ret (t, e).
 
 End ExpGenerators.
-
-Sample gen_gep.
+Sample (run_GenLLVM gen_gep).
 Sample genAggreTypeWOFn.
 
 Section InstrGenerators.
@@ -1338,7 +1333,4 @@ Section InstrGenerators.
   Definition gen_llvm :GenLLVM (list (toplevel_entity typ (block typ * list (block typ))))
     := fmap ret gen_main_tle.
 
-Search GenLLVM.
-
 End InstrGenerators.
-Sample (genType).
