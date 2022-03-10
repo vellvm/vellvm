@@ -30,13 +30,14 @@ From Vellvm.Handlers Require Export
 
 (* end hide *)
 
-Module Type InterpreterStack_common (LP : LLVMParams).
-  Module LLVM := Lang.Make LP.
+Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
+  Module LLVM := Lang.Make LP MEM.
 
   Export LP.Events.
   Export LLVM.Intrinsics.
-  Export LLVM.MEM.
-  Export LLVM.MEMINTERP.
+  Export MEM.MEM_MODEL.
+  Export MEM.MEM_INTERP.
+  Export MEM.GEP.
   Export LLVM.Pick.
   Export LLVM.Global.
   Export LLVM.Local.
@@ -213,24 +214,28 @@ End InterpreterStack_common.
 
 Module Type InterpreterStack.
   Declare Module LP : LLVMParams.
-  Include InterpreterStack_common LP.
+  Declare Module MEM : Memory LP.
+  Include InterpreterStack_common LP MEM.
 End InterpreterStack.
 
 Module Type InterpreterStackBig <: InterpreterStack.
   Declare Module LP : LLVMParamsBig.
-  Include InterpreterStack_common LP.
+  Declare Module MEM : Memory LP.
+  Include InterpreterStack_common LP MEM.
 End InterpreterStackBig.
 
-Module Make (LP' : LLVMParams) : InterpreterStack with Module LP := LP'.
+Module Make (LP' : LLVMParams) (MEM' : Memory LP') : InterpreterStack
+with Module LP := LP' with Module MEM := MEM'.
   Module LP := LP'.
-  Export LP.
+  Module MEM := MEM'.
+  Export LP MEM.
 
-  Module LLVM := Lang.Make LP.
+  Module LLVM := Lang.Make LP MEM.
 
   Export LP.Events.
   Export LLVM.Intrinsics.
-  Export LLVM.MEM.
-  Export LLVM.MEMINTERP.
+  Export MEM_MODEL.
+  Export MEM_INTERP.
   Export LLVM.Pick.
   Export LLVM.Global.
   Export LLVM.Local.
@@ -404,22 +409,24 @@ Module Make (LP' : LLVMParams) : InterpreterStack with Module LP := LP'.
   End SemNotations.
 End Make.
 
-Module MakeBig (LP' : LLVMParamsBig) : InterpreterStackBig with Module LP := LP'.
+Module MakeBig (LP' : LLVMParams) (MEM' : Memory LP') : InterpreterStack
+with Module LP := LP' with Module MEM := MEM'.
   Module LP := LP'.
-  Export LP.
+  Module MEM := MEM'.
+  Export LP MEM.
 
-  Module LLVM := Lang.Make LP.
+  Module LLVM := Lang.Make LP MEM.
 
   Export LP.Events.
   Export LLVM.Intrinsics.
-  Export LLVM.MEM.
-  Export LLVM.MEMINTERP.
+  Export MEM_MODEL.
+  Export MEM_INTERP.
   Export LLVM.Pick.
   Export LLVM.Global.
   Export LLVM.Local.
   Export LLVM.Stack.
   Export LLVM.D.
-  
+
   Section InterpreterMCFG.
 
     (**

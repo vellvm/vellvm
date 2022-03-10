@@ -23,7 +23,7 @@ Module Type MemoryInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MM : Mem
 
   Section Interpreters.
     Variable (E F G : Type -> Type).
-    Context `{FailureE -< F} `{UBE -< F} `{PickE -< F} `{OOME -< F}.
+    Context `{FailureE -< F} `{UBE -< F} `{PickConcreteMemoryE -< F} `{OOME -< F}.
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
 
@@ -33,7 +33,21 @@ Module Type MemoryInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MM : Mem
     Definition F_trigger : forall R, F R -> (MemStateT (itree Effout) R) :=
       fun R e => lift (trigger e).
 
-    Definition interp_memory_h := case_ E_trigger (case_ handle_intrinsic  (case_ handle_memory F_trigger)).
+    (* TODO: get rid of this silly hack. *)
+    Definition my_handle_memory :
+      forall T : Type, MemoryE T -> MemStateT (itree Effout) T.
+    Proof.
+      apply handle_memory.
+    Defined.
+
+    Definition my_handle_intrinsic :
+      forall T : Type, IntrinsicE T -> MemStateT (itree Effout) T.
+    Proof.
+      apply handle_intrinsic.
+    Defined.
+      
+    Definition interp_memory_h 
+      := case_ E_trigger (case_ my_handle_intrinsic (case_ my_handle_memory F_trigger)).
 
     Definition interp_memory :
       itree Effin ~> MemStateT (itree Effout) :=

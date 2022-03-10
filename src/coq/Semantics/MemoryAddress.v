@@ -17,6 +17,12 @@ From Vellvm Require Import
      Syntax.DynamicTypes
      Semantics.VellvmIntegers
      Utils.Error.
+
+From ExtLib Require Import
+     Structures.Monads.
+
+Import MonadNotation.
+Open Scope monad_scope.
 (* end hide *)
 
 (** * Signature for addresses
@@ -78,6 +84,15 @@ Module Type PTOI(Addr:MemoryAddress.ADDRESS).
   Parameter ptr_to_int : Addr.addr -> Z.
 End PTOI.
 
+
+(* TODO: Should provenance just be a typeclass? *)
+(* Monad class *)
+Class MonadProvenance (Provenance : Type) (M : Type -> Type) : Type :=
+  { fresh_provenance : M Provenance;
+    get_provenance : M Provenance;
+    put_provenance : Provenance -> M unit;
+  }.
+
 (* TODO: move this?
    TODO: Have I crammed too much into this?
  *)
@@ -124,6 +139,7 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
   Parameter show_provenance : Provenance -> string.
   Parameter show_allocation_id : AllocationId -> string.
 End PROVENANCE.
+
 
 (* Derived functions on provenances. *)
 Module PROV_FUNCS(Addr:MemoryAddress.ADDRESS)(PROV:PROVENANCE(Addr)).

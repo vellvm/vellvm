@@ -19,40 +19,50 @@ From Vellvm Require Import
      Handlers.MemoryInterpreters
      Handlers.MemoryModelTheory.
 
-Module Type Lang (LP: LLVMParams).
-  Export LP.
+  Module Type Memory (LP: LLVMParams).
+    Import LP.
 
-  (* Handlers *)
-  Module Global     := Global.Make ADDR IP SIZEOF LP.Events.
-  Module Local      := Local.Make ADDR IP SIZEOF LP.Events.
-  Module Stack      := Stack.Make ADDR IP SIZEOF LP.Events.
-  Module Intrinsics := Intrinsics.Make ADDR IP SIZEOF LP.Events.
+    Declare Module GEP  : GEPM ADDR IP SIZEOF Events.
+    Declare Module Byte : ByteImpl ADDR IP SIZEOF Events.
 
-  (* Memory *)
-  Declare Module GEP  : GEPM ADDR IP SIZEOF LP.Events.
-  Declare Module Byte : ByteImpl ADDR IP SIZEOF LP.Events.
+    Module MP := MemoryParams.Make LP GEP Byte.
 
-  Module MP := MemoryParams.Make LP GEP Byte.
+    Declare Module MEM_MODEL : MemoryModel LP MP.
+    Module MEM_INTERP := MemoryInterpreters.Make LP MP MEM_MODEL.
 
-  Declare Module MEM : MemoryModel LP MP.
-  Module MEMINTERP := MemoryInterpreters.Make LP MP MEM.
+    (* Serialization *)
+    Module SP := SerializationParams.Make LP MP.
 
-  (* Serialization *)
-  Module SP := SerializationParams.Make LP MP.
+    (* Memory Theory *)
+    Module MEMORY_ITREE_THEORY := MemoryModelITreeTheory LP MP SP MEM_MODEL MEM_INTERP.
+    Declare Module MEMORY_THEORY : MemoryModelTheory LP MP SP MEM_MODEL MEM_INTERP.
+
+    Export GEP Byte MP MEM_MODEL MEM_INTERP SP MEMORY_ITREE_THEORY MEMORY_THEORY.
+  End Memory.
   
-  Module MEMORY_ITREE_THEORY := MemoryModelITreeTheory LP MP SP MEM MEMINTERP.
-  Declare Module MEMORY_THEORY : MemoryModelTheory LP MP SP MEM MEMINTERP.
+  Module Type Lang (LP: LLVMParams).
+    Export LP.
 
-  (* Pick handler (depends on memory / serialization) *)
-  Module Pick := Pick.Make LP MP SP.
+    (* Handlers *)
+    Module Global     := Global.Make ADDR IP SIZEOF LP.Events.
+    Module Local      := Local.Make ADDR IP SIZEOF LP.Events.
+    Module Stack      := Stack.Make ADDR IP SIZEOF LP.Events.
+    Module Intrinsics := Intrinsics.Make ADDR IP SIZEOF LP.Events.
 
-  (* Denotation *)
-  Module D := Denotation LP MP SP.
+    (* Memory *)
+    Declare Module MEM : Memory LP.
+    Export MEM.
 
-  Export Events Events.DV Global Local Stack Pick Intrinsics
-         MEM MEMORY_ITREE_THEORY MEMORY_THEORY SP.SER D.
-End Lang.
+    (* Pick handler (depends on memory / serialization) *)
+    Module Pick := Pick.Make LP MP SP.
 
-Module Make (LP : LLVMParams) <: Lang LP.
-  Include Lang LP.
-End Make.
+    (* Denotation *)
+    Module D := Denotation LP MP SP.
+
+    Export Events Events.DV Global Local Stack Pick Intrinsics
+           MEMORY_ITREE_THEORY MEMORY_THEORY SP.SER D.
+  End Lang.
+
+  Module Make (LP : LLVMParams) (MEM' : Memory LP) <: Lang LP with Module MEM := MEM'.
+    Include Lang LP with Module MEM := MEM'.
+  End Make.

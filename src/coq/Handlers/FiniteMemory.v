@@ -67,7 +67,8 @@ From Vellvm Require Import
      Semantics.Memory.Overlaps
      Semantics.MemoryParams
      Semantics.LLVMEvents
-     Semantics.LLVMParams.
+     Semantics.LLVMParams
+     Handlers.MemoryModel.
 
 Require Import Ceres.Ceres.
 
@@ -494,6 +495,7 @@ Module FinPROV : PROVENANCE(Addr) with Definition Prov := Prov.
   Definition show_prov (pr : Prov) := Show.show pr.
   Definition show_provenance (pr : Provenance) := Show.show pr.
   Definition show_allocation_id (aid : AllocationId) := Show.show aid.
+
 End FinPROV.
 
 Module FinITOP : ITOP(Addr)(FinPROV).
@@ -629,7 +631,7 @@ End FinByte.
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
     indexed on [Z].
  *)
-Module Type FinMemory (LP : LLVMParams) (MP : MemoryParams LP).
+Module FinMemory (LP : LLVMParams) (MP : MemoryParams LP) : MemoryModel LP MP.
   Import MP.
   Import LP.
   Import Events.
@@ -1543,6 +1545,137 @@ Module Type FinMemory (LP : LLVMParams) (MP : MemoryParams LP).
      *)
     Definition empty_memory_stack : memory_stack := (memory_empty, frame_empty).
 
+
+  Record MemState' :=
+    mkMemState
+      { ms_memory_stack : memory_stack;
+        ms_sid : store_id;
+        ms_prov : Provenance
+      }.
+
+  (* The kernel does not recognize yet that a parameter can be
+  instantiated by an inductive type. Hint: you can rename the
+  inductive type and give a definition to map the old name to the new
+  name.
+  *)
+  Definition MemState := MemState'.
+
+  Definition initial_memory_state : MemState :=
+    mkMemState empty_memory_stack 0%N initial_provenance.
+
+  Definition MemStateT M := stateT MemState M.
+
+  Definition mem_state_lift_itree {E A} (t : itree E A) : MemStateT (itree E) A
+    := lift t.
+
+  Definition mem_state_raiseUB {E A} `{UBE -< E} (msg : string) : MemStateT (itree E) A
+    := mem_state_lift_itree (raiseUB msg).
+
+  Definition mem_state_raiseOOM {E A} `{OOME -< E} (msg : string) : MemStateT (itree E) A
+    := mem_state_lift_itree (raiseOOM msg).
+
+  Definition mem_state_raise {E A} `{FailureE -< E} (msg : string) : MemStateT (itree E) A
+    := mem_state_lift_itree (raise msg).
+
+  Definition mem_state_lift_err {E} `{FailureE -< E} {A} (e : err A) : MemStateT (itree E) A
+    := mem_state_lift_itree (lift_pure_err e).
+
+  Definition mem_state_get_sid {M} `{Monad M} : MemStateT M store_id
+    := fmap ms_sid MonadState.get.
+
+  Definition MemState_set_sid (sid : store_id) (ms : MemState) : MemState
+    := match ms with
+       | mkMemState ms_memory_stack ms_sid ms_prov =>
+         mkMemState ms_memory_stack sid ms_prov
+       end.
+
+  Definition MemState_set_prov (prov : Provenance) (ms : MemState) : MemState
+    := match ms with
+       | mkMemState ms_memory_stack ms_sid ms_prov =>
+         mkMemState ms_memory_stack ms_sid prov
+       end.
+
+  Definition MemState_set_memory_stack (m : memory_stack) (ms : MemState) : MemState
+    := match ms with
+       | mkMemState ms_memory_stack ms_sid ms_prov =>
+         mkMemState m ms_sid ms_prov
+       end.
+
+  Definition mem_state_put_sid {M} `{Monad M} (sid : store_id) : MemStateT M unit
+    := modify (MemState_set_sid sid);; ret tt.
+
+  Definition mem_state_put_prov {M} `{Monad M} (prov : Provenance) : MemStateT M unit
+    := modify (MemState_set_prov prov);; ret tt.
+
+  Definition mem_state_put_memory_stack {M} `{Monad M} (m : memory_stack) : MemStateT M unit
+    := modify (MemState_set_memory_stack m);; ret tt.
+
+  Definition mem_state_get_prov {M} `{Monad M} : MemStateT M Provenance
+    := fmap ms_prov MonadState.get.
+
+  Definition mem_state_get_memory_stack {M} `{Monad M} : MemStateT M memory_stack
+    := fmap ms_memory_stack MonadState.get.
+
+  Definition MemState_modify_memory_stack {M} `{Monad M} (f : memory_stack -> memory_stack) (ms : MemState) : MemState
+    := match ms with
+       | mkMemState ms_memory_stack ms_sid ms_prov =>
+         mkMemState (f ms_memory_stack) ms_sid ms_prov
+       end.
+
+  Definition mem_monad_put_memory_stack (m : memory_stack) : MemMonad unit
+    := modify_mem_state (MemState_set_memory_stack m);; ret tt.
+
+  Definition mem_monad_modify_memory_stack {M} `{Monad M} `{MemMonad MemState Provenance M}
+             (f : memory_stack -> memory_stack) : M unit
+    := modify_mem_state (MemState_modify_memory_stack f);; ret tt.
+
+  Definition mem_state_modify_memory_stack {M} `{Monad M}
+             (f : memory_stack -> memory_stack) : MemStateT M unit
+    := modify (MemState_modify_memory_stack f);; ret tt.
+
+  Definition mem_state_lift_ErrSID {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A} (e : ErrSID A) : MemStateT (itree E) A
+    :=
+      sid <- mem_state_get_sid;;
+      pr <-  mem_state_get_prov;;
+      match runErrSID e sid pr with
+      | (inl (OOM_message msg), sid, pr) =>
+          mem_state_raiseOOM msg
+      | (inr (inl (UB_message msg)), sid, pr) =>
+        mem_state_raiseUB msg
+      | (inr (inr (inl (ERR_message msg))), sid, pr) =>
+        mem_state_raise msg
+      | (inr (inr (inr x)), sid, pr) =>
+        mem_state_put_sid sid;;
+        mem_state_put_prov pr;;
+        ret x
+      end.
+
+  (* TODO: move this? *)
+  Definition mem_monad_lift_ErrSID {M} `{Monad M} `{MemMonad MemState Provenance M} {A} (e : ErrSID A) : M A
+    :=
+    sid <- get_sid;;
+    pr <-  get_provenance;;
+    match runErrSID e sid pr with
+    | (inl (OOM_message msg), sid, pr) =>
+        raise_oom msg
+    | (inr (inl (UB_message msg)), sid, pr) =>
+        raise_ub msg
+    | (inr (inr (inl (ERR_message msg))), sid, pr) =>
+        raise_error msg
+    | (inr (inr (inr x)), sid, pr) =>
+        put_sid sid;;
+        put_provenance pr;;
+        ret x
+    end.
+
+  Definition mem_state_lift_err_ub_oom {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A} (e : err_ub_oom A) : MemStateT (itree E) A
+    := match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM e)))) with
+       | inl (OOM_message oom) => mem_state_raiseOOM oom
+       | inr (inl (UB_message ub)) => mem_state_raiseUB ub
+       | inr (inr (inl (ERR_message err))) => mem_state_raise err
+       | inr (inr (inr x)) => ret x
+       end.
+
     (** ** Fresh key getters *)
 
     (* Get the next key in the memory *)
@@ -1612,16 +1745,21 @@ Module Type FinMemory (LP : LLVMParams) (MP : MemoryParams LP).
       := allocate_undef_bytes_size m addr aid (sizeof_dtyp t) 0%N t.
 
     (* TODO: make 'addr' nondeterministic, see issue #170 *)
-    Definition allocate (ms : memory_stack) (t : dtyp) : ErrSID (memory_stack * addr) :=
+    Definition allocate
+               {M : Type -> Type} `{Monad M}
+               `{MemMonad MemState Provenance M}
+               (t : dtyp) : M addr
+      :=
       match t with
       | DTYPE_Void => raise_ub "Allocation of type void"
       | _ =>
-        let '(m, fs) := ms in
-        aid <- fresh_allocation_id;;
-        let addr := next_memory_key ms in
-        '(m', addrs) <- allocate_undef_bytes m addr aid t;;
-        let ms' := add_all_to_frame (m', fs) addrs in
-        ret (ms', (int_to_ptr addr (allocation_id_to_prov aid)))
+          mem <- get_mem_state;;
+          aid <- mem_monad_lift_ErrSID fresh_allocation_id;;
+          let addr := next_memory_key (ms_memory_stack mem) in
+          let '(m, fs) := ms_memory_stack mem in
+          '(m', addrs) <- (mem_monad_lift_ErrSID (allocate_undef_bytes m addr aid t));;
+          let ms' := add_all_to_frame (m', fs) addrs in
+          ret (int_to_ptr addr (allocation_id_to_prov aid))
       end.
 
     Definition read (ms : memory_stack) (ptr : addr) (t : dtyp) : err uvalue :=
@@ -1675,103 +1813,6 @@ Module Type FinMemory (LP : LLVMParams) (MP : MemoryParams LP).
 
   End Memory_Stack_Operations.
 
-  Record MemState :=
-    mkMemState
-      { ms_memory_stack : memory_stack;
-        ms_sid : store_id;
-        ms_prov : Provenance
-      }.
-
-  Definition emptyMemState : MemState :=
-    mkMemState empty_memory_stack 0%N initial_provenance.
-
-  Definition MemStateT M := stateT MemState M.
-
-  Definition mem_state_lift_itree {E A} (t : itree E A) : MemStateT (itree E) A
-    := lift t.
-
-  Definition mem_state_raiseUB {E A} `{UBE -< E} (msg : string) : MemStateT (itree E) A
-    := mem_state_lift_itree (raiseUB msg).
-
-  Definition mem_state_raiseOOM {E A} `{OOME -< E} (msg : string) : MemStateT (itree E) A
-    := mem_state_lift_itree (raiseOOM msg).
-
-  Definition mem_state_raise {E A} `{FailureE -< E} (msg : string) : MemStateT (itree E) A
-    := mem_state_lift_itree (raise msg).
-
-  Definition mem_state_lift_err {E} `{FailureE -< E} {A} (e : err A) : MemStateT (itree E) A
-    := mem_state_lift_itree (lift_pure_err e).
-
-  Definition mem_state_get_sid {M} `{Monad M} : MemStateT M store_id
-    := fmap ms_sid MonadState.get.
-
-  Definition MemState_set_sid (sid : store_id) (ms : MemState) : MemState
-    := match ms with
-       | mkMemState ms_memory_stack ms_sid ms_prov =>
-         mkMemState ms_memory_stack sid ms_prov
-       end.
-
-  Definition MemState_set_prov (prov : Provenance) (ms : MemState) : MemState
-    := match ms with
-       | mkMemState ms_memory_stack ms_sid ms_prov =>
-         mkMemState ms_memory_stack ms_sid prov
-       end.
-
-  Definition MemState_set_memory_stack (m : memory_stack) (ms : MemState) : MemState
-    := match ms with
-       | mkMemState ms_memory_stack ms_sid ms_prov =>
-         mkMemState m ms_sid ms_prov
-       end.
-
-  Definition mem_state_put_sid {M} `{Monad M} (sid : store_id) : MemStateT M unit
-    := modify (MemState_set_sid sid);; ret tt.
-
-  Definition mem_state_put_prov {M} `{Monad M} (prov : Provenance) : MemStateT M unit
-    := modify (MemState_set_prov prov);; ret tt.
-
-  Definition mem_state_put_memory_stack {M} `{Monad M} (m : memory_stack) : MemStateT M unit
-    := modify (MemState_set_memory_stack m);; ret tt.
-
-  Definition mem_state_get_prov {M} `{Monad M} : MemStateT M Provenance
-    := fmap ms_prov MonadState.get.
-
-  Definition mem_state_get_memory_stack {M} `{Monad M} : MemStateT M memory_stack
-    := fmap ms_memory_stack MonadState.get.
-
-  Definition MemState_modify_memory_stack {M} `{Monad M} (f : memory_stack -> memory_stack) (ms : MemState) : MemState
-    := match ms with
-       | mkMemState ms_memory_stack ms_sid ms_prov =>
-         mkMemState (f ms_memory_stack) ms_sid ms_prov
-       end.
-
-  Definition mem_state_modify_memory_stack {M} `{Monad M} (f : memory_stack -> memory_stack) : MemStateT M unit
-    := modify (MemState_modify_memory_stack f);; ret tt.
-
-  Definition mem_state_lift_ErrSID {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A} (e : ErrSID A) : MemStateT (itree E) A
-    :=
-      sid <- mem_state_get_sid;;
-      pr <-  mem_state_get_prov;;
-      match runErrSID e sid pr with
-      | (inl (OOM_message msg), sid, pr) =>
-          mem_state_raiseOOM msg
-      | (inr (inl (UB_message msg)), sid, pr) =>
-        mem_state_raiseUB msg
-      | (inr (inr (inl (ERR_message msg))), sid, pr) =>
-        mem_state_raise msg
-      | (inr (inr (inr x)), sid, pr) =>
-        mem_state_put_sid sid;;
-        mem_state_put_prov pr;;
-        ret x
-      end.
-
-  Definition mem_state_lift_err_ub_oom {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A} (e : err_ub_oom A) : MemStateT (itree E) A
-    := match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM e)))) with
-       | inl (OOM_message oom) => mem_state_raiseOOM oom
-       | inr (inl (UB_message ub)) => mem_state_raiseUB ub
-       | inr (inr (inl (ERR_message err))) => mem_state_raise err
-       | inr (inr (inr x)) => ret x
-       end.
-
       Fixpoint uvalue_to_string (u : uvalue) : string
         := match u with
            | UVALUE_Addr a => "UVALUE_Addr"
@@ -1809,12 +1850,12 @@ Module Type FinMemory (LP : LLVMParams) (MP : MemoryParams LP).
   (** ** Memory Handler
       Implementation of the memory model per se as a memory handler to the [MemoryE] interface.
    *)
-  Definition handle_memory {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} : MemoryE ~> MemStateT (itree E) :=
+  Definition handle_memory {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} 
+    : MemoryE ~> MemStateT (itree E) :=
     fun T e =>
       match e with
       | MemPush =>
-        mem_state_modify_memory_stack push_fresh_frame;;
-        ret tt
+          mem_state_modify_memory_stack push_fresh_frame
 
       | MemPop =>
         m <- mem_state_get_memory_stack;;
@@ -1823,10 +1864,12 @@ Module Type FinMemory (LP : LLVMParams) (MP : MemoryParams LP).
         ret tt
 
       | Alloca t =>
-        m <- mem_state_get_memory_stack;;
-        '(m',a) <- mem_state_lift_ErrSID (allocate m t);;
-        mem_state_put_memory_stack m';;
+        a <- MemMonad_lift_stateT (allocate t);;
         ret (DVALUE_Addr a)
+      | _ =>
+          raise_error "blah"
+      end.
+
 
       | Load t dv =>
          match dv with

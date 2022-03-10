@@ -35,7 +35,7 @@ Module MemoryModelITreeTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Ser
 
   Section PARAMS.
     Variable (E F G : Type -> Type).
-    Context `{FailureE -< F} `{UBE -< F} `{PickE -< F} `{OOME -< F}.
+    Context `{FailureE -< F} `{UBE -< F} `{PickConcreteMemoryE -< F} `{OOME -< F}.
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
     Notation interp_memory := (@interp_memory E F _ _ _).
@@ -145,29 +145,54 @@ Module Type MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Ser
   Import LP.Events.
   Import MI.
   Import MM.
+  Import LP.PROV.
 
   Section PARAMS.
     Variable (E F G : Type -> Type).
-    Context `{FailureE -< F} `{UBE -< F} `{PickE -< F} `{OOME -< F}.
+    Context `{FailureE -< F} `{UBE -< F} `{PickConcreteMemoryE -< F} `{OOME -< F}.
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
     Notation interp_memory := (@interp_memory E F _ _ _).
 
     Section Structural_Lemmas.
       Parameter interp_memory_load :
-        forall (m : MemState) (t : dtyp) (val : uvalue) (a : addr),
-          read m a t = inr val ->
+        forall {M} `{MemMonad MemState Provenance M}
+          (m : MemState) (t : dtyp) (val : uvalue) (a : addr),
+          MemMonad_runs_to (read a t) m = Some (m, val) ->
           interp_memory (trigger (Load t (DVALUE_Addr a))) m ≈ Ret (m, val).
 
       Parameter interp_memory_store :
-        forall {M} `{MemMonad MemState M} (m m' : MemState) (val : uvalue) (dt : dtyp) (a : addr),
+        forall {M} `{MemMonad MemState Provenance M}
+          (m m' : MemState) (val : uvalue) (dt : dtyp) (a : addr),
           MemMonad_runs_to (write a val dt) m = Some (m', tt) ->
           interp_memory (trigger (Store dt (DVALUE_Addr a) val)) m ≈ Ret (m', tt).
 
       Parameter interp_memory_alloca :
-        forall {M} `{MemMonad MemState M} (m m' : MemState) (t : dtyp) (a : addr),
+        forall {M} `{MemMonad MemState Provenance M}
+          (m m' : MemState) (t : dtyp) (a : addr),
           MemMonad_runs_to (allocate t) m = Some (m', a) ->
           interp_memory (trigger (Alloca t)) m ≈ Ret (m', DVALUE_Addr a).
+
+      Require Import ZArith.
+      Definition pick_phys_addr (ms : MemState) (ptr : addr) (dt : dtyp) : PickConcreteMemoryE {phys : Z | concrete_memory_pick_post (ms, (ptr, dt)) phys}
+        := pick True (ms, (ptr, dt)).
+
+      From ExtLib Require Import
+           Structures.Monads.
+      Import MonadNotation.
+      Open Scope monad_scope.
+
+      (* Predicate taking tree, m', and a.... *)
+      Parameter interp_memory_ptoi :
+        forall {M} `{MemMonad MemState Provenance M}
+          (m m' : MemState) (t : dtyp) (a : addr) (i : Z),
+          (* MemMonad_runs_to (ptoi t a) m = Some (m', i) -> *)
+          (* Intptr will really be something else *)
+          interp_memory (trigger (PtoI t a)) m ≈
+                        c <- trigger (pick_phys_addr m a t);;
+                        let i := proj1_sig c in
+                        Ret (m', DVALUE_IPTR i).
+
     End Structural_Lemmas.
   End PARAMS.
 End MemoryModelTheory.

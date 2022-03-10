@@ -138,4 +138,11 @@ Module MemoryStateHelpers (LP : LLVMParams) (OVER : Overlaps LP.ADDR) (MS : Memo
     {
       is_read : read m a τ = inr v
     }.
+
+  Record ptoi_spec (m1 : MemState) (a : addr) (τ : dtyp) (m2 : MemState) (phys_addr : Z) : Prop :=
+    {
+      (* If there's already a concrete address associated with addr... It must be the same. *)
+      ptoi_already_exists : forall c, has_concrete a m1 c -> m1 = m2 /\ c = phys_addr;
+      ptoi_new : (forall c, ~ has_concrete a m1 c) -> (exists c, has_concrete a m2 c
+    }
 End MemoryStateHelpers.

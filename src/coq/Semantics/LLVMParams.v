@@ -11,7 +11,7 @@ Module Type LLVMParams.
   Declare Module PTOI : PTOI ADDR.
   Declare Module PROV : PROVENANCE ADDR.
   Declare Module ITOP : ITOP ADDR PROV.
-
+  
   Module Events := LLVMEvents.Make ADDR IP SIZEOF.
 End LLVMParams.
 
