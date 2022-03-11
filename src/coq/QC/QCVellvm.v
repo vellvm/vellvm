@@ -30,13 +30,18 @@ Inductive MlResult a e :=
 Extract Inductive MlResult => "result" [ "Ok" "Error" ].
 
 Unset Guard Checking.
-Fixpoint step (t : ITreeDefinition.itree L5 TopLevel.res_L4) : MlResult DV.uvalue string
-  := match observe t with
-     | RetF (_,(_,(_,x))) => MlOk _ string x
-     | TauF t => step t
-     | VisF _ e k => MlError _ string "Uninterpreted event"
+(* Hack to make coq reduce this *)
+Fixpoint step' (hack : unit) (t : ITreeDefinition.itree L4 TopLevel.res_L4) {struct hack} : MlResult DV.uvalue string
+  := match hack with
+     | tt => match observe t with
+            | RetF (_,(_,(_,x))) => MlOk _ string x
+            | TauF t => step tt t
+            | VisF e k => MlError _ string "Uninterpreted event"
+            end
      end.
 Set Guard Checking.
+
+Definition step := step' tt.
 
 (** Top level interpreter to run LLVM programs. Yields either a uvalue, or an error string. *)
 Definition interpret (prog : list (toplevel_entity typ (block typ * list (block typ)))) : MlResult uvalue string

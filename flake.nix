@@ -13,9 +13,22 @@
         lib = pkgs.lib;
         coq = pkgs.coq;
 
+        coqPkgs = pkgs.coqPackages.overrideScope'
+          (self: super:
+            { ITree = super.ITree.overrideAttrs
+              (s : { version = "DeepSpec:78bf12c326e52f4d64bf03c43b937f7397559cbf";
+                     src = fetchTarball {
+                       url = "https://github.com/DeepSpec/InteractionTrees/archive/78bf12c326e52f4d64bf03c43b937f7397559cbf.zip";
+                       sha256 = "0sfrrkrhr51qnc6rpxr2mq4fvhvwbgp453r5q4nafba32lhfima2";
+                     };
+                   });
+            });
+
         version = "vellvm:master";
       in {
         defaultPackage =
-          (pkgs.callPackage ./release.nix (coq.ocamlPackages // pkgs.coqPackages // { inherit coq version; })).vellvm;
+          (pkgs.callPackage ./release.nix (coq.ocamlPackages // coqPkgs // { inherit coq version; })).vellvm;
       });
 }
+
+  
