@@ -25,7 +25,6 @@ Require Import ExtLib.Data.Monads.StateMonad.
 
 From Vellvm Require Import LLVMAst Utilities AstLib Syntax.CFG Syntax.TypeUtil Syntax.TypToDtyp DynamicTypes Semantics.TopLevel QC.Utils.
 Require Import Integers Floats.
-From Vellvm Require Import ShowAST.
 Require Import List.
 
 Import ListNotations.
@@ -120,8 +119,6 @@ Section Helpers.
       ret (Z.of_nat n).
 End Helpers.
 Check show Decimal.int.
-Sample genPosZ.
-Sample genPosInt.
 Section GenerationState.
   Record GenState :=
     mkGenState
@@ -751,108 +748,71 @@ Section ExpGenerators.
        | _ => lift failGen
        end.
 
-Fixpoint get_array_index (ls : list (list N)) (sz : nat) : list (list N) :=
+
+Fixpoint get_index_paths_from_AoV (sz: nat) (t: typ) (sub_paths: list (typ * list N)) (pre_path: list N): list (typ * list N) :=
   match sz with 
   | 0%nat => []
-  | S z =>
-  (get_array_index ls z) ++ (map (fun x => (N.of_nat z)::x) ls)
+  | S z => [(t, pre_path ++ [N.of_nat z])] ++ 
+          map (fun '(t, p) => (t, pre_path ++ [N.of_nat z] ++ p)) sub_paths ++ get_index_paths_from_AoV z t sub_paths pre_path
   end.
 
-(* Function that will get all the paths available in t_from with destination t_in*)
-Fixpoint get_index_paths_to_typ (t_in t_from : typ) {struct t_from} : list (list N) :=
-  let this_stage := if (normalized_typ_eq t_in t_from) then [[]] else [] in
-  let other_stage :=
-    match t_from with 
-    | TYPE_Array sz t => let lss := get_index_paths_to_typ t_in t in
-    get_array_index lss (N.to_nat sz)
-    | TYPE_Vector sz t => let lss := get_index_paths_to_typ t_in t in
-    get_array_index lss (N.to_nat sz)
-    | TYPE_Struct fields=> get_index_paths_from_struct t_in fields 0
-    | TYPE_Packed_struct fields=> get_index_paths_from_struct t_in fields 0
-    | _ => []
-    end in
-    this_stage ++ other_stage with 
-    get_index_paths_from_struct (t_in : typ) (fields : list typ) (current_index : N) {struct fields} : list (list N) :=
-    match fields with 
-    | nil => nil 
-    | h::t => let head_list := get_index_paths_to_typ t_in h in
-    let tail_list := get_index_paths_from_struct t_in fields (current_index + 1%N) in
-    (map (fun x => 0%N::x) head_list) ++ tail_list
-    end.
+(* Adding prepath because *)
 
-Example test1:
-get_index_paths_to_typ TYPE_Metadata TYPE_Metadata = [[]].
-Proof. simpl. reflexivity. Qed.
-
-Example test2:
-get_index_paths_to_typ TYPE_Metadata (TYPE_Array 5 TYPE_Metadata)  = [[0%N];[1%N];[2%N];[3%N];[4%N]].
-Proof. simpl. reflexivity. Qed.
-
-Example test3:
-get_index_paths_to_typ TYPE_Metadata (TYPE_Array 3 (TYPE_Array 2 TYPE_Metadata)) = [[0%N;0%N]; [0%N;1%N]; [1%N;0%N]; [1%N;1%N]; [2%N;0%N]; [2%N;1%N]].
-Proof. simpl. reflexivity. Qed.
-
-Example test4:
-get_index_paths_to_typ TYPE_Metadata (TYPE_Struct [TYPE_Metadata; TYPE_Array 3 TYPE_Metadata]) = [[0%N]; [1%N;0%N]; [1%N;1%N]; [1%N;2%N]].
-Proof. Abort. (* Cannnot simpl to prove that it works*)
-
-
-(*Random functions, please ignore*)
-Definition genAggreTypeWOFn : G (typ) :=
-  run_GenLLVM (gen_typ_non_void_size_wo_fn 3).
-
-
-(** Will find all the pointer type inside the pointer type
-Currently for simplicity we only have pointer to non-aggregate data type
-If allowing aggregate type pointer then will need mutual induction*)
-Fixpoint findPtr_from_ptr (t_ptr : typ) : list typ:=
-  match t_ptr with
-  | TYPE_Pointer t => [t_ptr] ++ findPtr_from_ptr t
-  | _ => []
+Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list N) {struct t_from}: list (typ * list (N)) :=
+  let cur_path := pre_path ++ [0%N] in
+  match t_from with
+  | TYPE_Array sz t => 
+  let sub_paths := get_index_paths_aux t [] in
+  get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path
+  | TYPE_Vector sz t => let sub_paths := get_index_paths_aux t [] in
+  get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path
+  | TYPE_Struct fields => get_index_paths_from_struct fields pre_path 0
+  | TYPE_Packed_struct fields => get_index_paths_from_struct fields pre_path 0
+  | TYPE_Pointer ty => [(ty, cur_path)] ++ get_index_paths_aux ty cur_path
+  | _ => nil
+  end with 
+  get_index_paths_from_struct (fields: list typ) (pre_path: list N) (current_index : N) {struct fields}: list (typ * list N) := 
+  match fields with
+  | nil => nil
+  | h::t => let head_list := map (fun '(t, p) => (t, pre_path ++ [current_index] ++ p)) (get_index_paths_aux h []) in
+  let tail_list := get_index_paths_from_struct t pre_path (current_index + 1%N) in
+  [(h, pre_path ++ [current_index])] ++ head_list ++ tail_list
   end.
-
-(* Main function for finding all the pointers.
-The function does not guarantee a set of results but more like a list of results
-However, we can go around it while using the choose-like operator in QC*)
-Fixpoint findPtr (t_struct: typ) : list typ:=
-  match t_struct with 
-  | TYPE_Array sz t => if BinNatDef.N.ltb 0 sz then findPtr_from_ptr t else []
-  | TYPE_Vector sz t => if BinNatDef.N.ltb 0 sz then findPtr_from_ptr t else []
-  | TYPE_Struct fields => 
-    match fields with 
-    | [] => []
-    | hd::tl => (findPtr hd) ++ (findPtr (TYPE_Struct tl))
-    end
-  | TYPE_Packed_struct fields => 
-    match fields with 
-      | [] => []
-      | hd::tl => (findPtr hd) ++ (findPtr (TYPE_Struct tl))
-    end
-  | _ => [] 
-  end.
-
-(*filter all the (ident, typ) in ctx such that typ contains ptr in*)
-Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
-  filter (fun '(i,t) => Init.Nat.ltb 1 (Coq.Lists.List.length (findPtr t)) ) ctx.
+  Definition get_index_paths (t_from: typ) : list (typ * list (N)) :=
+    get_index_paths_aux t_from [].
 (*
-Print genAggreType.
-Check gen_typ_non_void_size.
-Search instr.
-Search GenLLVM.*)
-Definition gen_gep : GenLLVM (typ * instr typ):=
+  Example t2:
+  get_index_paths (TYPE_Array 3 (TYPE_Struct [TYPE_Metadata; (TYPE_Array 5 TYPE_Metadata)])) = [].
+  Proof. Abort.
+Example t1:
+get_index_paths TYPE_Metadata = [].
+Proof. Abort.*)
+
+(*filter all the (ident, typ) in ctx such that typ is a ptr*)
+Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_,t) => match t with
+                        | TYPE_Pointer _ => true
+                        | _ => false
+  end) ctx.
+
+Definition gen_gep : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
   let ptrs_in_context := filter_ptr_typs ctx in
-  '(ptr_variable, t) <- (oneOf_LLVM (map ret ptrs_in_context));;
-  let ptrs_in_typ := findPtr t in
-  ptr_in_typ <- oneOf_LLVM (map ret ptrs_in_typ);;
-  let paths_in_typ := get_index_paths_to_typ ptr_in_typ t in
-  path_in_typ <- oneOf_LLVM (map ret paths_in_typ);;
-  let path_in_int := map (fun x => Z.of_N x) path_in_typ in
+  '(ptr_variable, tptr) <- (oneOf_LLVM (map ret ptrs_in_context));;
+  let get_typ_from_ptr (ptr: typ) : typ :=
+  match ptr with 
+  | TYPE_Pointer t => t 
+  | _ => ptr  (* Not gonna happened*)
+  end in
+  let t_in_ptr := get_typ_from_ptr tptr in
+  let paths_in_ptr := get_index_paths tptr in
+  '(t, path) <- oneOf_LLVM (map ret paths_in_ptr);;
+  let path_for_gep := map (fun x => (TYPE_I 64, EXP_Integer (Z.of_N x))) path in 
    (* Refer to function get_int_typ*)
-  ret (t, INSTR_Op (OP_GetElementPtr t 
-                    (TYPE_Pointer t, EXP_Ident ptr_variable) 
-                    ([(TYPE_I 64, EXP_Ident (ID_Local (Anon 0)))] ++ (map (fun x => (TYPE_I 64, EXP_Integer x)) path_in_int)))).
+  ret (t, INSTR_Op (OP_GetElementPtr t_in_ptr 
+                    (tptr, EXP_Ident ptr_variable) path_for_gep)).
   
+
 
 
 
@@ -1330,4 +1290,3 @@ Section InstrGenerators.
     := fmap ret gen_main_tle.
 
 End InstrGenerators.
-Sample (run_GenLLVM gen_store).
