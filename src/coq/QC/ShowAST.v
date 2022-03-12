@@ -219,7 +219,8 @@ Section ShowInstances.
       | OP_ICmp cmp t v1 v2 =>
         "icmp " ++ show cmp ++ " " ++ show t ++ " " ++ show_exp v1 ++ ", " ++ show_exp v2
       | OP_GetElementPtr t ptrval idxs =>
-        "todo: getelementptr"
+      let (tptr, exp) := ptrval in
+      "getelementptr " ++ show t ++ ", " ++ show tptr ++ " " ++ show_exp exp ++ fold_left (fun str '(ty, ex) => ", " ++ show ty ++ " "++ show_exp ex ++ str) idxs ""
       | OP_Select (tc, cnd) (t1, v1) (t2, v2) =>
         "select " ++ show tc ++ " " ++ show_exp cnd ++ ", " ++ show t1 ++ " " ++ show_exp v1  ++ ", " ++ show t2 ++ " " ++ show_exp v2
       | _ => "show_exp todo"

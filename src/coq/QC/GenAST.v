@@ -1035,6 +1035,7 @@ Section InstrGenerators.
       (* TODO: Generate calls *)
       ; gen_load
       ; gen_store
+      ; gen_gep
       (* TODO: Generate atomic operations and other instructions *)
       ].
 
