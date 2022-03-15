@@ -379,6 +379,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
     (* Load *)
     | (IId id, INSTR_Load _ dt (du,ptr) _) =>
       ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
+      (* Load addresses must be unique *)
       da <- pickUnique ua;;
       uv <- trigger (Load dt da);;
       trigger (LocalWrite id uv)
@@ -387,7 +388,7 @@ Module Denotation (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationPa
     | (IVoid _, INSTR_Store _ (dt, val) (du, ptr) _) =>
       uv <- translate exp_to_instr (denote_exp (Some dt) val) ;;
       ua <- translate exp_to_instr (denote_exp (Some du) ptr) ;;
-      (* TODO: should I make sure address is unique here...? *)
+      (* Store addresses must be unique *)
       da <- pickUnique ua ;;
       match da with
       | DVALUE_Poison dt => raiseUB "Store to poisoned address."
