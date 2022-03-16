@@ -206,9 +206,6 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
   Definition MemPropT (X: Type): Type :=
     MemState -> err (OOM (MemState * X)%type) -> Prop.
 
-  Import Monad.
-  Import MonadReturnsLaws.
-
   Instance MemPropT_Monad : Monad MemPropT.
   Proof.
     split.
@@ -477,11 +474,6 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
            end.    
 
     (*** Aggregate things *)
-    Record write_bytes_spec (ms1 : MemState) (ptr : addr) (bytes : list SByte) (ms2 : MemState) : Prop :=
-      {
-        write_bytes_allowed : True;
-        write_bytes_written : True;
-      }.
 
     Import MP.GEP.
     Require Import List.
@@ -494,15 +486,18 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Definition intptr_seq (start : Z) (len : nat) : OOM (list IP.intptr)
       := Util.map_monad (IP.from_Z) (Zseq start len).
 
-    (* Check (handle_gep_addr (DTYPE_I 8) [DVALUE_IPTR 0]). *)
-    Check Util.map_monad_ (fun '(ptr, byte) => write_byte_spec_MemPropT ptr byte).
-    Definition write_bytes (ptr : addr) (bytes : list SByte) : MemPropT unit :=
-      foldM (fun ix byte =>
-               ip_ix <- lift_OOM (IP.from_Z ix);;
-               match handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ip_ix] with
-               | 
-               _
-            ) 0%Z bytes.
+    Definition write_bytes_spec (ptr : addr) (bytes : list SByte) : MemPropT unit :=
+      (* Want OOM / errors to happen before any writes *)
+      ixs <- lift_OOM (intptr_seq 0 (length bytes));;
+      ptrs <- lift_err_RAISE_ERROR
+               (Util.map_monad
+                  (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
+                  ixs);;
+
+      let ptr_bytes := zip ptrs bytes in
+
+      (* Actually perform writes *)
+      foldM (fun _ '(ptr, byte) => write_byte_spec_MemPropT ptr byte) tt ptr_bytes.
     
     
     Definition memprop_bind {A B} (ma : MemState -> A -> MemState -> Prop) (k : MemState -> (MemState -> B -> MemState -> Prop)) : MemState -> B -> MemState -> Prop
