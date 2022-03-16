@@ -242,6 +242,17 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
       + exact True.
   Defined.
 
+  Instance MemPropT_RAISE_OOM : RAISE_OOM MemPropT.
+  Proof.
+    split.
+    - intros A msg.
+      unfold MemPropT.
+      intros ms OOM.
+      destruct OOM.
+      + exact False. (* Must run out of memory *)
+      + exact True. (* Don't care about message *)
+  Defined.
+
   Definition MemPropT_assert {X} (assertion : Prop) : MemPropT X
     := fun ms ms'x =>
          match ms'x with
@@ -448,10 +459,22 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Require Import List.
     Import ListNotations.
     Import LP.
+    Import ListUtil.
+    Import Utils.Monads.
 
-    ip_seq
-    Check (handle_gep_addr (DTYPE_I 8) [DVALUE_IPTR 0]).
+    (* TODO: Move this? *)
+    Definition intptr_seq (start : Z) (len : nat) : OOM (list IP.intptr)
+      := Util.map_monad (IP.from_Z) (Zseq start len).
+
+    (* Check (handle_gep_addr (DTYPE_I 8) [DVALUE_IPTR 0]). *)
     Check Util.map_monad_ (fun '(ptr, byte) => write_byte_spec_MemPropT ptr byte).
+    Definition write_bytes (ptr : addr) (bytes : list SByte) : MemPropT unit :=
+      foldM (fun ix byte =>
+               ip_ix <- lift_OOM (IP.from_Z ix);;
+               match handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ip_ix] with
+               | 
+               _
+            ) 0%Z bytes.
     
     
     Definition memprop_bind {A B} (ma : MemState -> A -> MemState -> Prop) (k : MemState -> (MemState -> B -> MemState -> Prop)) : MemState -> B -> MemState -> Prop
