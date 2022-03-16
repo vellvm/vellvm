@@ -107,6 +107,9 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
     | DVALUE_I64 i :: vs' =>
       ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (unsigned i)) vs' ;;
       ret (int_to_ptr ptr' prov)
+    | DVALUE_IPTR i :: vs' =>
+      ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (IP.to_Z i)) vs' ;;
+      ret (int_to_ptr ptr' prov)
     | _ => failwith "non-I32 index"
     end.
 
