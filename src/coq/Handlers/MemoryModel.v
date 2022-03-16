@@ -203,13 +203,8 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
   Import LP.SIZEOF.
 
   Parameter MemState : Type.
-  Definition MemPropT (E: Type -> Type) (X: Type): Type :=
-    MemState -> itree E X -> MemState -> Prop.
-
-  Definition lift_itree_memPropT {E} : itree E ~> MemPropT E
-    := fun T t => (fun ms t' ms' => ms = ms' /\ t ≈ t').
-
-  Arguments lift_itree_memPropT {_ _} _.
+  Definition MemPropT (X: Type): Type :=
+    MemState -> (MemState * X) -> Prop.
 
   Instance MemPropT_Monad {E} : Monad (MemPropT E).
   Proof.
@@ -217,20 +212,16 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     - (* ret *)
       intros T x.
       unfold MemPropT.
-      intros ms t ms'.
-      exact (ms = ms' /\ t ≈ ret x).
+      intros ms [ms' res].
+      exact (ms = ms' /\ x = res).
     - (* bind *)
       intros A B ma amb.
       unfold MemPropT in *.
 
-      intros ms tb ms''.
-      refine (exists ta k ms',
-                ma ms ta ms' /\
-                  tb ≈ bind ta k /\
-                  _).
-
-      refine (forall a, Returns a ta -> _ : Prop).
-      refine (amb a ms' (k a) ms'').
+      intros ms [ms'' b].
+      refine (exists a k ms',
+                 ma ms (ms', a) /\
+                   amb a ms' (ms'', k a)).
   Defined.
 
   Instance MemPropT_MonadMemState {E} : MonadMemState MemState (MemPropT E).
@@ -238,12 +229,12 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     split.
     - (* get_mem_state *)
       unfold MemPropT.
-      intros ms t ms'.
-      exact (ms = ms' /\ t ≈ ret ms).
+      intros ms [ms' a].
+      exact (ms = ms' /\ a = ms).
     - (* put_mem_state *)
       unfold MemPropT.
-      intros ms_to_put ms t ms'.
-      exact (ms_to_put = ms' /\ t ≈ ret tt).
+      intros ms_to_put ms [ms' t].
+      exact (ms_to_put = ms').
   Defined.
 
   Section Handlers.
@@ -261,35 +252,11 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Parameter addr_allocated_prop : addr -> MemM bool.
 
     Definition byte_allocated m ptr := MemMonad_runs_to_prop (addr_allocated_prop ptr) m (ret (m, true)).
-    Parameter disjoint_ptr_byte : addr -> addr -> Prop.
-
     Definition allocations_preserved (m1 : MemState) (m2 : MemState) :=
       forall ptr, byte_allocated m1 ptr ->
              byte_allocated m2 ptr.
-      
-    Record read_byte_spec (m : MemState) (ptr : addr) (byte : SByte) : Prop :=
-      { read_byte_allocated : byte_allocated m ptr;
-        read_byte_value : MemMonad_runs_to_prop (read_byte_prop ptr) m (ret (m, byte));
-      }.
 
-    Record set_byte_memory (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
-      {
-        new_lu : read_byte_spec m2 ptr byte;
-        old_lu : forall ptr' byte',
-          disjoint_ptr_byte ptr ptr' ->
-          (read_byte_spec m1 ptr' byte' <-> read_byte_spec m2 ptr' byte');
-      }.
-
-    (* I'll need something like this *)
-    Parameter write_byte_allowed_allocated :
-      forall m ptr, write_byte_allowed m ptr -> byte_allocated m ptr.
-
-    Record write_byte_spec (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
-      {
-        byte_write_succeeds : write_byte_allowed m1 ptr;
-        byte_written : set_byte_memory m1 ptr byte m2;
-        write_byte_preserves_allocations : allocations_preserved m1 m2;
-      }.
+    Parameter disjoint_ptr_byte : addr -> addr -> Prop.
 
     Parameter Frame : Type.
     Parameter ptr_in_frame : Frame -> addr -> Prop.
@@ -299,6 +266,15 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Parameter pop_frame_stack : FrameStack -> FrameStack -> Prop.
     (* Parameter push_frame_stack : FrameStack -> Frame -> FrameStack -> Prop. *)
 
+    Parameter mem_state_frame_stack : MemState -> FrameStack -> Prop.
+
+    (*** Reading from memory *)
+    Record read_byte_spec (m : MemState) (ptr : addr) (byte : SByte) : Prop :=
+      { read_byte_allocated : byte_allocated m ptr;
+        read_byte_value : MemMonad_runs_to_prop (read_byte_prop ptr) m (ret (m, byte));
+      }.
+
+    (*** Framestack operations *)
     Definition empty_frame (f : Frame) : Prop :=
       forall ptr, ~ ptr_in_frame f ptr.
 
@@ -320,14 +296,12 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
         new_frame : peek_frame_stack fs2 f;
       }.
 
-    Parameter mem_state_frame_stack : MemState -> FrameStack -> Prop.
-
     Definition ptr_in_current_frame (ms : MemState) (ptr : addr) : Prop
       := forall fs, mem_state_frame_stack ms fs ->
                forall f, peek_frame_stack fs f ->
                     ptr_in_frame f ptr.
 
-    (* mempush *)
+    (** mempush *)
     Record mempush_spec (m1 : MemState) (m2 : MemState) : Prop :=
       {
         (* All allocations are preserved *)
@@ -348,7 +322,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
           mem_state_frame_stack m2 fs2;
       }.
 
-    (* mempop *)
+    (** mempop *)
     Record mempop_spec (m1 : MemState) (m2 : MemState) : Prop :=
       {
         (* all bytes in popped frame are freed. *)
@@ -367,7 +341,6 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
           (~ ptr_in_current_frame m1 ptr) ->
           read_byte_spec m1 ptr byte <-> read_byte_spec m2 ptr byte;
 
-        (* TODO: frame *)
         pop_frame :
         forall fs1 fs2,
           mem_state_frame_stack m1 fs1 ->
@@ -383,7 +356,33 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
         pop_frame_stack fs1 fs1_pop ->
         push_frame_stack_spec fs1_pop f' fs2.
 
-    (* allocate with initial byte *)
+    (*** Writing to memory *)
+    Record set_byte_memory (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
+      {
+        new_lu : read_byte_spec m2 ptr byte;
+        old_lu : forall ptr' byte',
+          disjoint_ptr_byte ptr ptr' ->
+          (read_byte_spec m1 ptr' byte' <-> read_byte_spec m2 ptr' byte');
+      }.
+
+    (* I'll need something like this? *)
+    Parameter write_byte_allowed_allocated :
+      forall m ptr, write_byte_allowed m ptr -> byte_allocated m ptr.
+
+    Record write_byte_spec (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
+      {
+        byte_write_succeeds : write_byte_allowed m1 ptr;
+        byte_written : set_byte_memory m1 ptr byte m2;
+        write_byte_preserves_allocations : allocations_preserved m1 m2;
+
+        (* TODO: preserves frame stack *)
+        write_byte_preserves_frame_stack :
+        forall fs,
+          mem_state_frame_stack m1 fs ->
+          mem_state_frame_stack m2 fs;
+      }.
+
+    (*** Allocating bytes in memory *)
     Record allocate_byte_spec (m1 : MemState) (t : dtyp) (init_byte : SByte) (m2 : MemState) (ptr : addr) : Prop :=
       {
         was_fresh_byte : ~ byte_allocated m1 ptr;
@@ -401,6 +400,22 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
           mem_state_frame_stack m2 fs2;
       }.
 
+    (*** Aggregate things *)
+    Record write_bytes_spec (ms1 : MemState) (ptr : addr) (bytes : list SByte) (ms2 : MemState) : Prop :=
+      {
+        write_bytes_allowed : True;
+        write_bytes_written : True;
+      }.
+
+    Definition memprop_bind {A B} (ma : MemState -> A -> MemState -> Prop) (k : MemState -> (MemState -> B -> MemState -> Prop)) : MemState -> B -> MemState -> Prop
+      := fun ms_init b ms_final =>
+           forall ms' a, ma ms_init a ms' ->
+                    (k ms')
+    .
+
+    Require Import List.
+    @fold_left (MemState * Prop) (list SByte) (fun '(ms, P) byte => )
+    write_byte_spec
     
     Parameter write_bytes_prop : MemState -> addr -> list SByte -> MemState -> Prop.
     Parameter read_bytes_prop : MemState -> addr -> list SByte -> Prop.
