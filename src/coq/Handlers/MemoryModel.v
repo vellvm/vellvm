@@ -204,7 +204,10 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
 
   Parameter MemState : Type.
   Definition MemPropT (X: Type): Type :=
-    MemState -> OOM (MemState * X) -> Prop.
+    MemState -> err (OOM (MemState * X)%type) -> Prop.
+
+  Import Monad.
+  Import MonadReturnsLaws.
 
   Instance MemPropT_Monad : Monad MemPropT.
   Proof.
@@ -212,19 +215,28 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     - (* ret *)
       intros T x.
       unfold MemPropT.
-      intros ms [[ms' res] | ].
+      intros ms [err_msg | [[ms' res] | oom_msg]].
+      + exact False. (* error is not a valid behavior here *)
       + exact (ms = ms' /\ x = res).
-      + (* Always allow OOM *)
-        exact True.
+      + exact True. (* Allow OOM to refine anything *)
     - (* bind *)
       intros A B ma amb.
       unfold MemPropT in *.
 
-      intros ms [[ms'' b] | ].
-      + refine (exists a k ms',
-                   ma ms (NoOom (ms', a)) /\
-                     amb a ms' (NoOom (ms'', k a))).
-      + exact True.
+      intros ms [err_msg | [[ms'' b] | oom_msg]].
+      + (* an error is valid when ma errors, or the continuation errors... *)
+        refine
+          ((exists err, ma ms (inl err)) \/
+           (exists ms' a, 
+               ma ms (inr (NoOom (ms', a))) ->
+               (exists err, amb a ms' (inl err)))).
+      + (* No errors, no OOM *)
+        refine
+          (exists ms' a k,
+              ma ms (inr (NoOom (ms', a))) ->
+              amb a ms' (inr (NoOom (ms'', k a)))).
+      + (* OOM is always valid *)
+        exact True.
   Defined.
 
   Instance MemPropT_MonadMemState : MonadMemState MemState MemPropT.
@@ -232,12 +244,14 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     split.
     - (* get_mem_state *)
       unfold MemPropT.
-      intros ms [[ms' a] | ].
+      intros ms [err_msg | [[ms' a] | oom_msg]].
+      + exact True.
       + exact (ms = ms' /\ a = ms).
       + exact True.
     - (* put_mem_state *)
       unfold MemPropT.
-      intros ms_to_put ms [[ms' t] | ].
+      intros ms_to_put ms [err_msg | [[ms' t] | oom_msg]].
+      + exact True.
       + exact (ms_to_put = ms').
       + exact True.
   Defined.
@@ -247,18 +261,32 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     split.
     - intros A msg.
       unfold MemPropT.
-      intros ms OOM.
-      destruct OOM.
+      intros ms [err | [_ | oom]].
+      + exact False. (* Must run out of memory, can't error *)
       + exact False. (* Must run out of memory *)
       + exact True. (* Don't care about message *)
+  Defined.
+
+  Instance MemPropT_RAISE_ERROR : RAISE_ERROR MemPropT.
+  Proof.
+    split.
+    - intros A msg.
+      unfold MemPropT.
+      intros ms [err | [_ | oom]].
+      + exact True. (* Any error will do *)
+      + exact False. (* Must error *)
+      + exact False. (* Must error *)
   Defined.
 
   Definition MemPropT_assert {X} (assertion : Prop) : MemPropT X
     := fun ms ms'x =>
          match ms'x with
-         | NoOom (ms', x) =>
+         | inl _ =>
+             assertion
+         | inr (NoOom (ms', x)) =>
              ms = ms' /\ assertion
-         | Oom s => assertion
+         | inr (Oom s) =>
+             assertion
          end.
 
   Section Handlers.
@@ -274,7 +302,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     (* Parameters of the memory state module *)
     Parameter read_byte_MemPropT : addr -> MemPropT SByte.
     Definition read_byte_prop (ms : MemState) (ptr : addr) (byte : SByte) : Prop
-      := read_byte_MemPropT ptr ms (NoOom (ms, byte)).
+      := read_byte_MemPropT ptr ms (inr (NoOom (ms, byte))).
 
     Parameter addr_allocated_prop : addr -> MemPropT bool.
 
@@ -284,7 +312,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
       MemPropT_assert (b = true).
 
     Definition byte_allocated (ms : MemState) (ptr : addr) : Prop
-      := byte_allocated_MemPropT ptr ms (NoOom (ms, tt)).
+      := byte_allocated_MemPropT ptr ms (inr (NoOom (ms, tt))).
 
     Definition allocations_preserved (m1 m2 : MemState) : Prop :=
       forall ptr, byte_allocated m1 ptr <-> byte_allocated m2 ptr.
@@ -418,8 +446,8 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Definition write_byte_spec_MemPropT (ptr : addr) (byte : SByte) : MemPropT unit
       := fun m1 res =>
            match res with
-           | NoOom (m2, _) => write_byte_spec m1 ptr byte m2
-           | _ => True
+           | inr (NoOom (m2, _)) => write_byte_spec m1 ptr byte m2
+           | _ => True (* Allowed to run out of memory or fail *)
            end.
 
     (*** Allocating bytes in memory *)
@@ -443,9 +471,9 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Definition allocate_spec_MemPropT (t : dtyp) (init_byte : SByte) : MemPropT addr
       := fun m1 res =>
            match res with
-           | NoOom (m2, ptr) =>
+           | inr (NoOom (m2, ptr)) =>
                allocate_byte_succeeds_spec m1 t init_byte m2 ptr
-           | _ => True
+           | _ => True (* Allowed to run out of memory or fail *)
            end.    
 
     (*** Aggregate things *)
