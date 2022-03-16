@@ -70,7 +70,7 @@ Module Type MemoryModel (LP : LLVMParams) (MP : MemoryParams LP).
   Import LP.SIZEOF.
 
   Import LP.PROV.
-  (* TODO: Should DataLayout be here? 
+  (* TODO: Should DataLayout be here?
 
      It might make sense to move DataLayout to another module, some of
      the parameters in the DataLayout may be relevant to other
@@ -224,7 +224,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
       + (* an error is valid when ma errors, or the continuation errors... *)
         refine
           ((exists err, ma ms (inl err)) \/
-           (exists ms' a, 
+           (exists ms' a,
                ma ms (inr (NoOom (ms', a))) ->
                (exists err, amb a ms' (inl err)))).
       + (* No errors, no OOM *)
@@ -286,6 +286,17 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
              assertion
          end.
 
+  Definition MemPropT_assert_post {X} (Post : X -> Prop) : MemPropT X
+    := fun ms ms'x =>
+         match ms'x with
+         | inl _ =>
+             True
+         | inr (NoOom (ms', x)) =>
+             ms = ms' /\ Post x
+         | inr (Oom s) =>
+             True
+         end.
+
   Section Handlers.
     Variable (E F: Type -> Type).
     Context `{FailureE -< E}.
@@ -331,6 +342,13 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
       { read_byte_allocated : byte_allocated ms ptr;
         read_byte_value : read_byte_prop ms ptr byte;
       }.
+
+    Definition read_byte_spec_MemPropT (ptr : addr) : MemPropT SByte:=
+      fun m1 res =>
+           match res with
+           | inr (NoOom (m2, byte)) => m1 = m2 /\ read_byte_spec m1 ptr byte
+           | _ => True (* Allowed to run out of memory or fail *)
+           end.
 
     (*** Framestack operations *)
     Definition empty_frame (f : Frame) : Prop :=
@@ -379,6 +397,13 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
           mem_state_frame_stack m2 fs2;
       }.
 
+    Definition mempush_spec_MemPropT : MemPropT unit :=
+      fun m1 res =>
+        match res with
+        | inr (NoOom (m2, _)) => mempush_spec m1 m2
+        | _ => True (* Allowed to run out of memory or fail *)
+        end.
+
     (** mempop *)
     Record mempop_spec (m1 : MemState) (m2 : MemState) : Prop :=
       {
@@ -405,6 +430,13 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
           pop_frame_stack fs1 fs2 ->
           mem_state_frame_stack m2 fs2;
       }.
+
+    Definition mempop_spec_MemPropT : MemPropT unit :=
+      fun m1 res =>
+        match res with
+        | inr (NoOom (m2, _)) => mempop_spec m1 m2
+        | _ => True (* Allowed to run out of memory or fail *)
+        end.
 
     (* Add a pointer onto the current frame in the frame stack *)
     Definition add_ptr_to_frame_stack (fs1 : FrameStack) (ptr : addr) (fs2 : FrameStack) : Prop :=
@@ -448,11 +480,16 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
            end.
 
     (*** Allocating bytes in memory *)
+
+    (* This spec could be wrong... 
+
+       What if I can 
+     *)
     Record allocate_byte_succeeds_spec (m1 : MemState) (t : dtyp) (init_byte : SByte) (m2 : MemState) (ptr : addr) : Prop :=
       {
         was_fresh_byte : ~ byte_allocated m1 ptr;
         now_byte_allocated : byte_allocated m2 ptr;
-        undef_byte_written : set_byte_memory m1 ptr init_byte m2;
+        init_byte_written : set_byte_memory m1 ptr init_byte m2;
         old_allocations_preserved :
         forall ptr',
           disjoint_ptr_byte ptr ptr' ->
@@ -465,13 +502,13 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
           mem_state_frame_stack m2 fs2;
       }.
 
-    Definition allocate_spec_MemPropT (t : dtyp) (init_byte : SByte) : MemPropT addr
+    Definition allocate_byte_spec_MemPropT (t : dtyp) (init_byte : SByte) : MemPropT addr
       := fun m1 res =>
            match res with
            | inr (NoOom (m2, ptr)) =>
                allocate_byte_succeeds_spec m1 t init_byte m2 ptr
            | _ => True (* Allowed to run out of memory or fail *)
-           end.    
+           end.
 
     (*** Aggregate things *)
 
@@ -486,70 +523,71 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Definition intptr_seq (start : Z) (len : nat) : OOM (list IP.intptr)
       := Util.map_monad (IP.from_Z) (Zseq start len).
 
-    Definition write_bytes_spec (ptr : addr) (bytes : list SByte) : MemPropT unit :=
-      (* Want OOM / errors to happen before any writes *)
-      ixs <- lift_OOM (intptr_seq 0 (length bytes));;
-      ptrs <- lift_err_RAISE_ERROR
-               (Util.map_monad
-                  (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
-                  ixs);;
+    Definition get_consecutive_ptrs (ptr : addr) (len : nat) : MemPropT (list addr) :=
+      ixs <- lift_OOM (intptr_seq 0 len);;
+      lift_err_RAISE_ERROR
+        (Util.map_monad
+           (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
+           ixs).
 
+    Definition write_bytes_spec (ptr : addr) (bytes : list SByte) : MemPropT unit :=
+      ptrs <- get_consecutive_ptrs ptr (length bytes);;
       let ptr_bytes := zip ptrs bytes in
 
       (* Actually perform writes *)
-      foldM (fun _ '(ptr, byte) => write_byte_spec_MemPropT ptr byte) tt ptr_bytes.
-    
-    
-    Definition memprop_bind {A B} (ma : MemState -> A -> MemState -> Prop) (k : MemState -> (MemState -> B -> MemState -> Prop)) : MemState -> B -> MemState -> Prop
-      := fun ms_init b ms_final =>
-           forall ms' a, ma ms_init a ms' ->
-                    (k ms')
-    .
+      Util.map_monad_ (fun '(ptr, byte) => write_byte_spec_MemPropT ptr byte) ptr_bytes.
 
-    Require Import List.
-    @fold_left (MemState * Prop) (list SByte) (fun '(ms, P) byte => )
-    write_byte_spec
-    
-    Parameter write_bytes_prop : MemState -> addr -> list SByte -> MemState -> Prop.
-    Parameter read_bytes_prop : MemState -> addr -> list SByte -> Prop.
-    Parameter write_succeeds : MemState -> addr -> list SByte -> Prop.
+    Definition read_bytes_spec (ptr : addr) (len : nat) : MemPropT (list SByte) :=
+      ptrs <- get_consecutive_ptrs ptr len;;
 
-    Record write_bytes_spec (m1 : MemState) (ptr : addr) (bytes : list SByte) (m2 : MemState) : Prop :=
-      {
-        succeeds : write_succeeds m1 ptr bytes;
-        new_lu : length bytes <> 0 -> read_bytes_prop m2 ptr bytes
-      }.
-    
-    Parameter read_bytes_prop : MemState -> list SByte -> MemState -> Prop.
+      (* Actually perform reads *)
+      Util.map_monad (fun ptr => read_byte_spec_MemPropT ptr) ptrs.
 
-    Record read_bytes_spec (m1 : MemState) (bytes : list SByte) (m2 
-    (* Actually need allocate_spec etc for all of these *)
-    Parameter push_fresh_frame_prop : MemState -> MemState -> Prop.
+    (* TODO: double check that this is correct.
 
-    Record push_fresh_frame_spec (m1 : MemState) (m2 : MemState) : Prop :=
-      {
-        
-      }.
+       A little worried about how the assert works out + possible
+       get_consecutive_ptrs failures.
+     *)
+    Definition allocate_bytes_spec (t : dtyp) (init_bytes : list SByte) : MemPropT addr :=
+      match init_bytes with
+      | nil =>
+          fun m1 res =>
+            match res with
+            | inr (NoOom (m2, ptr)) =>
+                m1 = m2
+            | _ => True (* Allowed to run out of memory or fail *)
+            end
+      | _ =>
+          ptrs <- Util.map_monad (allocate_byte_spec_MemPropT t) init_bytes;;
 
-    Parameter free_frame_spec : MemState -> err MemState.
-    Parameter allocate_spec : MemState -> MemState.
+          match ptrs with
+          | nil => fun m1 res => True (* Bogus case, shouldn't happen *)
+          | (ptr::_) =>
+              consec_ptrs <- get_consecutive_ptrs ptr (length ptrs);;
+              MemPropT_assert (ptrs = consec_ptrs)
+          end
+      end.
 
-    Variable m : MemState.
-    Definition handle_memory_prop : MemoryE ~> MemPropT E
+    (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
+    Definition allocate_dtyp_spec (t : dtyp) : MemPropT addr.
+    Admitted.
+
+    Definition handle_memory_prop : MemoryE ~> MemPropT
       := fun T m =>
            match m with
            (* Unimplemented *)
-           | MemPush => modify_mem_state push_fresh_frame;; ret tt
+           | MemPush =>
+               mempush_spec_MemPropT
            | MemPop =>
-               m <- get_mem_state;;
-               m' <- lift_itree_memPropT (lift_pure_err (free_frame m));;
-               put_mem_state m'
-           | Alloca t => ret DVALUE_None
-           | Load t a => ret UVALUE_None
-           | Store t a v => ret tt
-           | GEP t v vs => ret UVALUE_None
-           | ItoP t i => ret UVALUE_None
-           | PtoI t a => ret UVALUE_None
+               mempop_spec_MemPropT
+           | Alloca t =>
+               allocate_dtyp_spec t
+           | Load t a =>
+               (* TODO: make sure this checks provenance *)
+               read_uvalue_spec t a
+           | Store t a v =>
+               (* TODO: should use write_allowed, but make sure this respects provenance + store ids *)
+               write_uvalue_spec t a v
            end.
   End Handlers.
 End MemoryModelSpec.
