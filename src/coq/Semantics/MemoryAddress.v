@@ -87,8 +87,8 @@ End PTOI.
 
 (* TODO: Should provenance just be a typeclass? *)
 (* Monad class *)
-Class MonadProvenance (Provenance : Type) (M : Type -> Type) : Type :=
-  { fresh_provenance : M Provenance;
+Class MonadAllocationId (AllocationId : Type) (M : Type -> Type) : Type :=
+  { fresh_allocation_id : M AllocationId;
   }.
 
 (* TODO: move this?

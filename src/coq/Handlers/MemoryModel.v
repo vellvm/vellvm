@@ -48,9 +48,9 @@ Definition modify_mem_state {M MemState} `{Monad M} `{MonadMemState MemState M} 
   ret ms.
 
 (* TODO: Add RAISE_PICK or something... May need to be in a module *)
-Class MemMonad (MemState : Type) (Provenance : Type) (M : Type -> Type)
+Class MemMonad (MemState : Type) (AllocationId : Type) (M : Type -> Type)
       `{Monad M}
-      `{MonadProvenance Provenance M} `{MonadStoreID M} `{MonadMemState MemState M}
+      `{MonadAllocationId AllocationId M} `{MonadStoreID M} `{MonadMemState MemState M}
       `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} : Type
   :=
   {
@@ -85,8 +85,8 @@ Module Type MemoryModel (LP : LLVMParams) (MP : MemoryParams LP).
 
   Definition MemStateT := stateT MemState.
 
-  Instance MemStateT_MonadProvenance {M} :
-    MonadProvenance Provenance (MemStateT M).
+  Instance MemStateT_MonadAllocationId {M} :
+    MonadAllocationId AllocationId (MemStateT M).
   Proof.
   Admitted.
 
@@ -127,7 +127,7 @@ Module Type MemoryModel (LP : LLVMParams) (MP : MemoryParams LP).
 
   Instance MemStateT_itree_MemMonad
            {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} `{PickConcreteMemoryE -< E}
-    : MemMonad MemState Provenance (MemStateT (itree E)).
+    : MemMonad MemState AllocationId (MemStateT (itree E)).
   Admitted.
 
   (* (** MemMonad *) *)
@@ -307,24 +307,25 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     (** Addresses *)
     Parameter disjoint_ptr_byte : addr -> addr -> Prop.
 
-    (** Reads and writes *)
-    Parameter read_byte_allowed : MemState -> addr -> Prop. (* Provenance check *)
-    Parameter write_byte_allowed : MemState -> addr -> Prop.
-
+    (** Reads *)
     Parameter read_byte_MemPropT : addr -> MemPropT SByte.
     Definition read_byte_prop (ms : MemState) (ptr : addr) (byte : SByte) : Prop
       := read_byte_MemPropT ptr ms (inr (NoOom (ms, byte))).
 
     (** Allocations *)
-    Parameter addr_allocated_prop : addr -> MemPropT bool.
+    (* Is a byte allocated with a given AllocationId? *)
+    Parameter addr_allocated_prop : addr -> AllocationId -> MemPropT bool.
 
-    Definition byte_allocated_MemPropT (ptr : addr) : MemPropT unit :=
+    Definition byte_allocated_MemPropT (ptr : addr) (aid : AllocationId) : MemPropT unit :=
       m <- get_mem_state;;
-      b <- addr_allocated_prop ptr;;
+      b <- addr_allocated_prop ptr aid;;
       MemPropT_assert (b = true).
 
-    Definition byte_allocated (ms : MemState) (ptr : addr) : Prop
-      := byte_allocated_MemPropT ptr ms (inr (NoOom (ms, tt))).
+    Definition byte_allocated (ms : MemState) (ptr : addr) (aid : AllocationId) : Prop
+      := byte_allocated_MemPropT ptr aid ms (inr (NoOom (ms, tt))).
+
+    Definition byte_not_allocated (ms : MemState) (ptr : addr) : Prop
+      := forall (aid : AllocationId), ~ byte_allocated ms ptr aid.
 
     (** Frame stacks *)
     Parameter Frame : Type.
@@ -336,13 +337,16 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
 
     Parameter mem_state_frame_stack : MemState -> FrameStack -> Prop.
 
-    (** Provenances / store ids *)
-    Parameter used_provenance : MemState -> Provenance -> Prop.
+    (** Allocation ids / store ids *)
+    Parameter used_allocation_id : MemState -> AllocationId -> Prop.
     Parameter used_store_id : MemState -> store_id -> Prop.
 
     (*** Predicates *)
 
     (** Reads *)
+    Definition read_byte_allowed (ms : MemState) (ptr : addr) : Prop :=
+      exists aid, byte_allocated ms ptr aid /\ access_allowed (address_provenance ptr) aid = true.
+
     Definition read_byte_allowed_all_preserved (m1 m2 : MemState) : Prop :=
       forall ptr,
         read_byte_allowed m1 ptr <-> read_byte_allowed m2 ptr.
@@ -355,22 +359,25 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
       read_byte_allowed_all_preserved m1 m2 /\ read_byte_prop_all_preserved m1 m2.
 
     (** Writes *)
+    Definition write_byte_allowed (ms : MemState) (ptr : addr) : Prop :=
+      exists aid, byte_allocated ms ptr aid /\ access_allowed (address_provenance ptr) aid = true.
+
     Definition write_byte_allowed_all_preserved (m1 m2 : MemState) : Prop :=
       forall ptr,
         write_byte_allowed m1 ptr <-> write_byte_allowed m2 ptr.
       
     (** Allocations *)
     Definition allocations_preserved (m1 m2 : MemState) : Prop :=
-      forall ptr, byte_allocated m1 ptr <-> byte_allocated m2 ptr.
+      forall ptr aid, byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid.
     
-    (** Provenances *)
-    Definition extend_provenances (ms : MemState) (new_prov : Provenance) (ms' : MemState) : Prop
-      := (forall p, used_provenance ms p -> used_provenance ms' p) /\
-           ~ used_provenance ms new_prov /\
-           used_provenance ms' new_prov.
+    (** Provenances / allocation ids *)
+    Definition extend_allocation_ids (ms : MemState) (new_aid : AllocationId) (ms' : MemState) : Prop
+      := (forall aid, used_allocation_id ms aid -> used_allocation_id ms' aid) /\
+           ~ used_allocation_id ms new_aid /\
+           used_allocation_id ms' new_aid.
 
-    Definition preserve_provenances (ms ms' : MemState) : Prop
-      := forall p, used_provenance ms p <-> used_provenance ms' p.
+    Definition preserve_allocation_ids (ms ms' : MemState) : Prop
+      := forall p, used_allocation_id ms p <-> used_allocation_id ms' p.
 
     (** Store ids *)
     Definition extend_store_ids (ms : MemState) (new_sid : store_id) (ms' : MemState) : Prop
@@ -386,16 +393,35 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
       := forall fs,
         mem_state_frame_stack m1 fs <-> mem_state_frame_stack m2 fs.
 
-    (*** Provenance operations *)
-    Instance MemPropT_MonadProvenance : MonadProvenance Provenance MemPropT.
+    (*** Other helpers *)
+    Import MP.GEP.
+    Require Import List.
+    Import ListNotations.
+    Import LP.
+    Import ListUtil.
+    Import Utils.Monads.
+
+    (* TODO: Move this? *)
+    Definition intptr_seq (start : Z) (len : nat) : OOM (list IP.intptr)
+      := Util.map_monad (IP.from_Z) (Zseq start len).
+
+    Definition get_consecutive_ptrs (ptr : addr) (len : nat) : MemPropT (list addr) :=
+      ixs <- lift_OOM (intptr_seq 0 len);;
+      lift_err_RAISE_ERROR
+        (Util.map_monad
+           (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
+           ixs).
+
+    (*** Allocation id operations *)
+    Instance MemPropT_MonadAllocationId : MonadAllocationId AllocationId MemPropT.
     Proof.
       split.
-      - (* fresh_provenance *)
+      - (* fresh_allocation_id *)
         unfold MemPropT.
-        intros ms [err | [[ms' new_prov] | oom]].
+        intros ms [err | [[ms' new_aid] | oom]].
         + exact True.
         + exact
-            ( extend_provenances ms new_prov ms' /\
+            ( extend_allocation_ids ms new_aid ms' /\
                 preserve_store_ids ms ms' /\
                 read_byte_preserved ms ms' /\
                 write_byte_allowed_all_preserved ms ms' /\
@@ -415,7 +441,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
         + exact True.
         + exact
             ( extend_store_ids ms new_sid ms' /\
-                preserve_provenances ms ms' /\
+                preserve_allocation_ids ms ms' /\
                 read_byte_preserved ms ms' /\
                 write_byte_allowed_all_preserved ms ms' /\
                 allocations_preserved ms ms' /\
@@ -426,8 +452,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
 
     (*** Reading from memory *)
     Record read_byte_spec (ms : MemState) (ptr : addr) (byte : SByte) : Prop :=
-      { read_byte_allocated : byte_allocated ms ptr;
-        read_byte_allowed_spec : read_byte_allowed ms ptr;
+      { read_byte_allowed_spec : read_byte_allowed ms ptr;
         read_byte_value : read_byte_prop ms ptr byte;
       }.
 
@@ -472,7 +497,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
         mempush_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
         mempush_op_allocations : allocations_preserved m1 m2;
         mempush_op_store_ids : preserve_store_ids m1 m2;
-        mempush_op_provenances : preserve_provenances m1 m2;
+        mempush_op_allocation_ids : preserve_allocation_ids m1 m2;
       }.
 
     Record mempush_spec (m1 : MemState) (m2 : MemState) : Prop :=
@@ -499,7 +524,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Record mempop_operation_invariants (m1 : MemState) (m2 : MemState) :=
       {
         mempop_op_store_ids : preserve_store_ids m1 m2;
-        mempop_op_provenances : preserve_provenances m1 m2;
+        mempop_op_allocation_ids : preserve_allocation_ids m1 m2;
       }.
 
     Record mempop_spec (m1 : MemState) (m2 : MemState) : Prop :=
@@ -508,13 +533,13 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
         bytes_freed :
         forall ptr,
           ptr_in_current_frame m1 ptr ->
-          ~byte_allocated m2 ptr;
+          byte_not_allocated m2 ptr;
 
         (* Bytes not allocated in the popped frame have the same allocation status as before *)
         non_frame_bytes_preserved :
-        forall ptr,
+        forall ptr aid,
           (~ ptr_in_current_frame m1 ptr) ->
-          byte_allocated m1 ptr <-> byte_allocated m2 ptr;
+          byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid;
 
         (* Bytes not allocated in the popped frame are the same when read *)
         non_frame_bytes_read :
@@ -548,6 +573,15 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
         pop_frame_stack fs1 fs1_pop ->
         push_frame_stack_spec fs1_pop f' fs2.
 
+    Fixpoint add_ptrs_to_frame_stack (fs1 : FrameStack) (ptrs : list addr) (fs2 : FrameStack) : Prop :=
+      match ptrs with
+      | nil => fs1 = fs2
+      | (ptr :: ptrs) =>
+          forall fs',
+            add_ptrs_to_frame_stack fs1 ptrs fs' ->
+            add_ptr_to_frame_stack fs' ptr fs2
+      end.
+
     (*** Writing to memory *)
     Record set_byte_memory (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
       {
@@ -557,10 +591,6 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
           (read_byte_spec m1 ptr' byte' <-> read_byte_spec m2 ptr' byte');
       }.
 
-    (* I'll need something like this? *)
-    Parameter write_byte_allowed_allocated :
-      forall m ptr, write_byte_allowed m ptr -> byte_allocated m ptr.
-
     Record write_byte_operation_invariants (m1 m2 : MemState) : Prop :=
       {
         write_byte_op_preserves_allocations : allocations_preserved m1 m2;
@@ -568,7 +598,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
         write_byte_op_read_allowed : read_byte_allowed_all_preserved m1 m2;
         write_byte_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
         write_byte_op_store_ids : preserve_store_ids m1 m2;
-        write_byte_op_provenances : preserve_provenances m1 m2;
+        write_byte_op_allocation_ids : preserve_allocation_ids m1 m2;
       }.
 
     Record write_byte_spec (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
@@ -587,54 +617,91 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
            end.
 
     (*** Allocating bytes in memory *)
-
-    Record allocate_byte_succeeds_spec (m1 : MemState) (t : dtyp) (init_byte : SByte) (m2 : MemState) (ptr : addr) : Prop :=
+    Record allocate_bytes_succeeds_spec (m1 : MemState) (t : dtyp) (init_bytes : list SByte) (aid : AllocationId) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
       {
-        was_fresh_byte : ~ byte_allocated m1 ptr;
-        now_byte_allocated : byte_allocated m2 ptr;
-        init_byte_written : set_byte_memory m1 ptr init_byte m2;
+        (* The allocated pointers are consecutive in memory. *)
+        (* m1 doesn't really matter here. *)
+        allocate_bytes_consecutive : get_consecutive_ptrs ptr (length init_bytes) m1 (inr (NoOom (m1, ptrs)));
 
-        old_allocations_preserved :
+        (* Provenance *)
+        address_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov aid;
+
+        (* Allocation ids *)
+        allocate_bytes_aid_fresh : ~ used_allocation_id m1 aid;
+        allocate_bytes_aid : used_allocation_id m2 aid;
+        allocate_bytes_aids_preserved :
+        forall aid',
+          aid <> aid' ->
+          (used_allocation_id m1 aid' <-> used_allocation_id m2 aid');
+
+        (* byte_allocated *)
+        allocate_bytes_was_fresh_byte : forall ptr, In ptr ptrs -> byte_not_allocated m1 ptr;
+        allocate_bytes_now_byte_allocated : forall ptr, In ptr ptrs -> byte_allocated m2 ptr aid;
+        allocate_bytes_preserves_old_allocations :
+        forall ptr aid,
+          ~ In ptr ptrs ->
+          (byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid);
+
+        (* read permissions *)
+        alloc_bytes_new_reads_allowed :
+        forall p, In p ptrs ->
+             read_byte_allowed m2 p;
+             
+        alloc_bytes_old_reads_allowed :
         forall ptr',
-          disjoint_ptr_byte ptr ptr' ->
-          (byte_allocated m1 ptr' <-> byte_allocated m2 ptr');
+          (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+          read_byte_allowed m1 ptr' <-> read_byte_allowed m2 ptr';
 
-        add_to_frame :
+        (* reads *)
+        alloc_bytes_new_reads :
+        forall p ix byte,
+          Util.Nth ptrs ix p ->
+          Util.Nth init_bytes ix byte ->
+          read_byte_prop m2 p byte;
+
+        alloc_bytes_old_reads :
+        forall ptr' byte,
+          (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+          read_byte_prop m1 ptr' byte <-> read_byte_prop m2 ptr' byte;
+
+        (* write permissions *)
+        alloc_bytes_new_writes_allowed :
+        forall p, In p ptrs ->
+             write_byte_allowed m2 p;
+             
+        alloc_bytes_old_writes_allowed :
+        forall ptr',
+          (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+          write_byte_allowed m1 ptr' <-> write_byte_allowed m2 ptr';
+
+        (* Add allocated bytes onto the stack frame *)
+        allocate_bytes_add_to_frame :
         forall fs1 fs2,
           mem_state_frame_stack m1 fs1 ->
-          add_ptr_to_frame_stack fs1 ptr fs2 ->
+          add_ptrs_to_frame_stack fs1 ptrs fs2 ->
           mem_state_frame_stack m2 fs2;
+
+        (* Store ids are preserved. *)
+        allocate_bytes_store_ids :
+        preserve_store_ids m1 m2;
       }.
 
-    (* Allocate a single byte. Note: no restrictions on provenance for ptr *)
-    Definition allocate_byte_spec_MemPropT (t : dtyp) (init_byte : SByte) : MemPropT addr
+    Definition allocate_bytes_spec_MemPropT' (t : dtyp) (init_bytes : list SByte) (aid : AllocationId)
+      : MemPropT (addr * list addr)
       := fun m1 res =>
            match res with
-           | inr (NoOom (m2, ptr)) =>
-                allocate_byte_succeeds_spec m1 t init_byte m2 ptr
+           | inr (NoOom (m2, (ptr, ptrs))) =>
+               allocate_bytes_succeeds_spec m1 t init_bytes aid m2 ptr ptrs
            | _ => True (* Allowed to run out of memory or fail *)
            end.
 
+    Definition allocate_bytes_spec_MemPropT (t : dtyp) (init_bytes : list SByte)
+      : MemPropT addr
+      := aid <- fresh_allocation_id;;
+         '(ptr, _) <- allocate_bytes_spec_MemPropT' t init_bytes aid;;
+         ret ptr.
+
     (*** Aggregate things *)
-
-    Import MP.GEP.
-    Require Import List.
-    Import ListNotations.
-    Import LP.
-    Import ListUtil.
-    Import Utils.Monads.
-
-    (* TODO: Move this? *)
-    Definition intptr_seq (start : Z) (len : nat) : OOM (list IP.intptr)
-      := Util.map_monad (IP.from_Z) (Zseq start len).
-
-    Definition get_consecutive_ptrs (ptr : addr) (len : nat) : MemPropT (list addr) :=
-      ixs <- lift_OOM (intptr_seq 0 len);;
-      lift_err_RAISE_ERROR
-        (Util.map_monad
-           (fun ix => handle_gep_addr (DTYPE_I 8) ptr [DVALUE_IPTR ix])
-           ixs).
-
     Definition write_bytes_spec (ptr : addr) (bytes : list SByte) : MemPropT unit :=
       ptrs <- get_consecutive_ptrs ptr (length bytes);;
       let ptr_bytes := zip ptrs bytes in
@@ -647,31 +714,6 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
 
       (* Actually perform reads *)
       Util.map_monad (fun ptr => read_byte_spec_MemPropT ptr) ptrs.
-
-    (* TODO: double check that this is correct.
-
-       A little worried about how the assert works out + possible
-       get_consecutive_ptrs failures.
-     *)
-    Definition allocate_bytes_spec (t : dtyp) (init_bytes : list SByte) : MemPropT addr :=
-      match init_bytes with
-      | nil =>
-          fun m1 res =>
-            match res with
-            | inr (NoOom (m2, ptr)) =>
-                m1 = m2
-            | _ => True (* Allowed to run out of memory or fail *)
-            end
-      | _ =>
-          ptrs <- Util.map_monad (allocate_byte_spec_MemPropT t) init_bytes;;
-
-          match ptrs with
-          | nil => fun m1 res => True (* Bogus case, shouldn't happen *)
-          | (ptr::_) =>
-              consec_ptrs <- get_consecutive_ptrs ptr (length ptrs);;
-              MemPropT_assert (ptrs = consec_ptrs)
-          end
-      end.
 
     (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
     Definition allocate_dtyp_spec (t : dtyp) : MemPropT addr.
