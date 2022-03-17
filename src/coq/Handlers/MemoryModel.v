@@ -317,8 +317,6 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Definition read_byte_prop (ms : MemState) (ptr : addr) (byte : SByte) : Prop
       := read_byte_MemPropT ptr ms (inr (NoOom (ms, byte))).
 
-    Parameter write_byte_prop : MemState -> addr -> SByte -> MemState -> Prop.
-
     (** Allocations *)
     Parameter addr_allocated_prop : addr -> MemPropT bool.
 
@@ -346,6 +344,23 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
 
     (*** Predicates *)
 
+    (** Reads *)
+    Definition read_byte_allowed_all_preserved (m1 m2 : MemState) : Prop :=
+      forall ptr,
+        read_byte_allowed m1 ptr <-> read_byte_allowed m2 ptr.
+
+    Definition read_byte_prop_all_preserved (m1 m2 : MemState) : Prop :=
+      forall ptr byte,
+        read_byte_prop m1 ptr byte <-> read_byte_prop m2 ptr byte.
+
+    Definition read_byte_preserved (m1 m2 : MemState) : Prop :=
+      read_byte_allowed_all_preserved m1 m2 /\ read_byte_prop_all_preserved m1 m2.
+
+    (** Writes *)
+    Definition write_byte_allowed_all_preserved (m1 m2 : MemState) : Prop :=
+      forall ptr,
+        write_byte_allowed m1 ptr <-> write_byte_allowed m2 ptr.
+      
     (** Allocations *)
     Definition allocations_preserved (m1 m2 : MemState) : Prop :=
       forall ptr, byte_allocated m1 ptr <-> byte_allocated m2 ptr.
@@ -368,6 +383,11 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Definition preserve_store_ids (ms ms' : MemState) : Prop
       := forall sid, used_store_id ms sid <-> used_store_id ms' sid.
 
+    (** Frame stack *)
+    Definition frame_stack_preserved (m1 m2 : MemState) : Prop
+      := forall fs,
+        mem_state_frame_stack m1 fs <-> mem_state_frame_stack m2 fs.
+
     (*** Provenance operations *)
     Instance MemPropT_MonadProvenance : MonadProvenance Provenance MemPropT.
     Proof.
@@ -376,10 +396,13 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
         unfold MemPropT.
         intros ms [err | [[ms' new_prov] | oom]].
         + exact True.
-        + (* TODO: Preserves allocations, reads, store ids, stack frame *)
-          exact
+        + exact
             ( extend_provenances ms new_prov ms' /\
-                preserve_store_ids ms ms'
+                preserve_store_ids ms ms' /\
+                read_byte_preserved ms ms' /\
+                write_byte_allowed_all_preserved ms ms' /\
+                allocations_preserved ms ms' /\
+                frame_stack_preserved ms ms'
             ).
         + exact True.
       - (* get_provenance *)
@@ -439,9 +462,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
         allocations_preserved m1 m2;
 
         (* All reads are preserved *)
-        mempush_lu : forall ptr byte,
-          read_byte_spec m1 ptr byte <->
-            read_byte_spec m2 ptr byte;
+        mempush_lu : 
 
         fresh_frame :
         forall fs1 fs2 f,
@@ -499,10 +520,6 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
         add_ptr_to_frame f ptr f' ->
         pop_frame_stack fs1 fs1_pop ->
         push_frame_stack_spec fs1_pop f' fs2.
-
-    Definition frame_stack_preserved (m1 m2 : MemState) : Prop
-      := forall fs,
-        mem_state_frame_stack m1 fs <-> mem_state_frame_stack m2 fs.
 
     (*** Writing to memory *)
     Record set_byte_memory (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
