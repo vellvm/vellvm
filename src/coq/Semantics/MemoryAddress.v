@@ -89,8 +89,6 @@ End PTOI.
 (* Monad class *)
 Class MonadProvenance (Provenance : Type) (M : Type -> Type) : Type :=
   { fresh_provenance : M Provenance;
-    get_provenance : M Provenance;
-    put_provenance : Provenance -> M unit;
   }.
 
 (* TODO: move this?
