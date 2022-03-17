@@ -304,14 +304,22 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Variable MemM : Type -> Type.
     Context `{MemM_MemMonad : MemMonad MemState Provenance MemM}.
 
-    Parameter write_byte_allowed : MemState -> addr -> Prop.
-    Parameter write_byte_prop : MemState -> addr -> SByte -> MemState -> Prop.
+    (*** Primitives *)
 
-    (* Parameters of the memory state module *)
+    (** Addresses *)
+    Parameter disjoint_ptr_byte : addr -> addr -> Prop.
+
+    (** Reads and writes *)
+    Parameter read_byte_allowed : MemState -> addr -> Prop. (* Provenance check *)
+    Parameter write_byte_allowed : MemState -> addr -> Prop.
+
     Parameter read_byte_MemPropT : addr -> MemPropT SByte.
     Definition read_byte_prop (ms : MemState) (ptr : addr) (byte : SByte) : Prop
       := read_byte_MemPropT ptr ms (inr (NoOom (ms, byte))).
 
+    Parameter write_byte_prop : MemState -> addr -> SByte -> MemState -> Prop.
+
+    (** Allocations *)
     Parameter addr_allocated_prop : addr -> MemPropT bool.
 
     Definition byte_allocated_MemPropT (ptr : addr) : MemPropT unit :=
@@ -322,24 +330,70 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Definition byte_allocated (ms : MemState) (ptr : addr) : Prop
       := byte_allocated_MemPropT ptr ms (inr (NoOom (ms, tt))).
 
-    Definition allocations_preserved (m1 m2 : MemState) : Prop :=
-      forall ptr, byte_allocated m1 ptr <-> byte_allocated m2 ptr.
-
-    Parameter disjoint_ptr_byte : addr -> addr -> Prop.
-
+    (** Frame stacks *)
     Parameter Frame : Type.
     Parameter ptr_in_frame : Frame -> addr -> Prop.
 
     Parameter FrameStack : Type.
     Parameter peek_frame_stack : FrameStack -> Frame -> Prop.
     Parameter pop_frame_stack : FrameStack -> FrameStack -> Prop.
-    (* Parameter push_frame_stack : FrameStack -> Frame -> FrameStack -> Prop. *)
 
     Parameter mem_state_frame_stack : MemState -> FrameStack -> Prop.
+
+    (** Provenances / store ids *)
+    Parameter used_provenance : MemState -> Provenance -> Prop.
+    Parameter used_store_id : MemState -> store_id -> Prop.
+
+    (*** Predicates *)
+
+    (** Allocations *)
+    Definition allocations_preserved (m1 m2 : MemState) : Prop :=
+      forall ptr, byte_allocated m1 ptr <-> byte_allocated m2 ptr.
+    
+    (** Provenances *)
+    Definition extend_provenances (ms : MemState) (new_prov : Provenance) (ms' : MemState) : Prop
+      := (forall p, used_provenance ms p -> used_provenance ms' p) /\
+           ~ used_provenance ms new_prov /\
+           used_provenance ms' new_prov.
+
+    Definition preserve_provenances (ms ms' : MemState) : Prop
+      := forall p, used_provenance ms p <-> used_provenance ms' p.
+
+    (** Store ids *)
+    Definition extend_store_ids (ms : MemState) (new_sid : store_id) (ms' : MemState) : Prop
+      := (forall p, used_store_id ms p -> used_store_id ms' p) /\
+           ~ used_store_id ms new_sid /\
+           used_store_id ms' new_sid.
+
+    Definition preserve_store_ids (ms ms' : MemState) : Prop
+      := forall sid, used_store_id ms sid <-> used_store_id ms' sid.
+
+    (*** Provenance operations *)
+    Instance MemPropT_MonadProvenance : MonadProvenance Provenance MemPropT.
+    Proof.
+      split.
+      - (* fresh_provenance *)
+        unfold MemPropT.
+        intros ms [err | [[ms' new_prov] | oom]].
+        + exact True.
+        + (* TODO: Preserves allocations, reads, store ids, stack frame *)
+          exact
+            ( extend_provenances ms new_prov ms' /\
+                preserve_store_ids ms ms'
+            ).
+        + exact True.
+      - (* get_provenance *)
+      - (* put_provenance *)
+    Admitted.
+
+    (*** Store id operations *)
+    Instance MemPropT_MonadStoreID : MonadStoreID MemPropT.
+    Admitted.
 
     (*** Reading from memory *)
     Record read_byte_spec (ms : MemState) (ptr : addr) (byte : SByte) : Prop :=
       { read_byte_allocated : byte_allocated ms ptr;
+        read_byte_allowed_spec : read_byte_allowed ms ptr;
         read_byte_value : read_byte_prop ms ptr byte;
       }.
 
@@ -481,15 +535,12 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
 
     (*** Allocating bytes in memory *)
 
-    (* This spec could be wrong... 
-
-       What if I can 
-     *)
     Record allocate_byte_succeeds_spec (m1 : MemState) (t : dtyp) (init_byte : SByte) (m2 : MemState) (ptr : addr) : Prop :=
       {
         was_fresh_byte : ~ byte_allocated m1 ptr;
         now_byte_allocated : byte_allocated m2 ptr;
         init_byte_written : set_byte_memory m1 ptr init_byte m2;
+
         old_allocations_preserved :
         forall ptr',
           disjoint_ptr_byte ptr ptr' ->
@@ -502,11 +553,12 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
           mem_state_frame_stack m2 fs2;
       }.
 
+    (* Allocate a single byte. Note: no restrictions on provenance for ptr *)
     Definition allocate_byte_spec_MemPropT (t : dtyp) (init_byte : SByte) : MemPropT addr
       := fun m1 res =>
            match res with
            | inr (NoOom (m2, ptr)) =>
-               allocate_byte_succeeds_spec m1 t init_byte m2 ptr
+                allocate_byte_succeeds_spec m1 t init_byte m2 ptr
            | _ => True (* Allowed to run out of memory or fail *)
            end.
 
