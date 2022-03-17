@@ -35,8 +35,6 @@ Open Scope monad_scope.
 Definition store_id := N.
 Class MonadStoreID (M : Type -> Type) : Type :=
   { fresh_sid : M store_id;
-    get_sid : M store_id;
-    put_sid : store_id -> M unit;
   }.
 
 Class MonadMemState (MemState : Type) (M : Type -> Type) : Type :=
@@ -405,13 +403,26 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
                 frame_stack_preserved ms ms'
             ).
         + exact True.
-      - (* get_provenance *)
-      - (* put_provenance *)
-    Admitted.
+    Defined.
 
     (*** Store id operations *)
     Instance MemPropT_MonadStoreID : MonadStoreID MemPropT.
-    Admitted.
+    Proof.
+      split.
+      - (* fresh_sid *)
+        unfold MemPropT.
+        intros ms [err | [[ms' new_sid] | oom]].
+        + exact True.
+        + exact
+            ( extend_store_ids ms new_sid ms' /\
+                preserve_provenances ms ms' /\
+                read_byte_preserved ms ms' /\
+                write_byte_allowed_all_preserved ms ms' /\
+                allocations_preserved ms ms' /\
+                frame_stack_preserved ms ms'
+            ).
+        + exact True.
+    Defined.
 
     (*** Reading from memory *)
     Record read_byte_spec (ms : MemState) (ptr : addr) (byte : SByte) : Prop :=
@@ -453,23 +464,28 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
       := forall fs, mem_state_frame_stack ms fs ->
                forall f, peek_frame_stack fs f ->
                     ptr_in_frame f ptr.
-
+      
     (** mempush *)
+    Record mempush_operation_invariants (m1 : MemState) (m2 : MemState) :=
+      {
+        mempush_op_reads : read_byte_preserved m1 m2;
+        mempush_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
+        mempush_op_allocations : allocations_preserved m1 m2;
+        mempush_op_store_ids : preserve_store_ids m1 m2;
+        mempush_op_provenances : preserve_provenances m1 m2;
+      }.
+
     Record mempush_spec (m1 : MemState) (m2 : MemState) : Prop :=
       {
-        (* All allocations are preserved *)
-        mempush_allocations :
-        allocations_preserved m1 m2;
-
-        (* All reads are preserved *)
-        mempush_lu : 
-
         fresh_frame :
         forall fs1 fs2 f,
           mem_state_frame_stack m1 fs1 ->
           empty_frame f ->
           push_frame_stack_spec fs1 f fs2 ->
           mem_state_frame_stack m2 fs2;
+
+        mempush_invariants :
+        mempush_operation_invariants m1 m2;
       }.
 
     Definition mempush_spec_MemPropT : MemPropT unit :=
@@ -480,6 +496,12 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
         end.
 
     (** mempop *)
+    Record mempop_operation_invariants (m1 : MemState) (m2 : MemState) :=
+      {
+        mempop_op_store_ids : preserve_store_ids m1 m2;
+        mempop_op_provenances : preserve_provenances m1 m2;
+      }.
+
     Record mempop_spec (m1 : MemState) (m2 : MemState) : Prop :=
       {
         (* all bytes in popped frame are freed. *)
@@ -488,22 +510,27 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
           ptr_in_current_frame m1 ptr ->
           ~byte_allocated m2 ptr;
 
-        (* Bytes not allocated in the current frame have the same allocation status as before *)
+        (* Bytes not allocated in the popped frame have the same allocation status as before *)
         non_frame_bytes_preserved :
         forall ptr,
           (~ ptr_in_current_frame m1 ptr) ->
           byte_allocated m1 ptr <-> byte_allocated m2 ptr;
 
+        (* Bytes not allocated in the popped frame are the same when read *)
         non_frame_bytes_read :
         forall ptr byte,
           (~ ptr_in_current_frame m1 ptr) ->
           read_byte_spec m1 ptr byte <-> read_byte_spec m2 ptr byte;
 
+        (* Set new framestack *)
         pop_frame :
         forall fs1 fs2,
           mem_state_frame_stack m1 fs1 ->
           pop_frame_stack fs1 fs2 ->
           mem_state_frame_stack m2 fs2;
+
+        (* Invariants *)
+        mempop_invariants : mempop_operation_invariants m1 m2;
       }.
 
     Definition mempop_spec_MemPropT : MemPropT unit :=
