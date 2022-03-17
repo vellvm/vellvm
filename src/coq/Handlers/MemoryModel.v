@@ -769,7 +769,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
                | DVALUE_Addr a =>
                    write_uvalue_spec t a v
                | _ =>
-                   (* UB if loading from something that isn't an address *)
+                   (* UB if writing something to somewhere that isn't an address *)
                    fun _ _ => False
                end
            end.
