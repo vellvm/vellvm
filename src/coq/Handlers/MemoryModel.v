@@ -561,13 +561,22 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Parameter write_byte_allowed_allocated :
       forall m ptr, write_byte_allowed m ptr -> byte_allocated m ptr.
 
+    Record write_byte_operation_invariants (m1 m2 : MemState) : Prop :=
+      {
+        write_byte_op_preserves_allocations : allocations_preserved m1 m2;
+        write_byte_op_preserves_frame_stack : frame_stack_preserved m1 m2;
+        write_byte_op_read_allowed : read_byte_allowed_all_preserved m1 m2;
+        write_byte_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
+        write_byte_op_store_ids : preserve_store_ids m1 m2;
+        write_byte_op_provenances : preserve_provenances m1 m2;
+      }.
+
     Record write_byte_spec (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
       {
         byte_write_succeeds : write_byte_allowed m1 ptr;
         byte_written : set_byte_memory m1 ptr byte m2;
 
-        write_byte_preserves_allocations : allocations_preserved m1 m2;
-        write_byte_preserves_frame_stack : frame_stack_preserved m1 m2;
+        write_byte_invariants : write_byte_operation_invariants m1 m2;
       }.
 
     Definition write_byte_spec_MemPropT (ptr : addr) (byte : SByte) : MemPropT unit
