@@ -365,11 +365,11 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Definition write_byte_allowed_all_preserved (m1 m2 : MemState) : Prop :=
       forall ptr,
         write_byte_allowed m1 ptr <-> write_byte_allowed m2 ptr.
-      
+
     (** Allocations *)
     Definition allocations_preserved (m1 m2 : MemState) : Prop :=
       forall ptr aid, byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid.
-    
+
     (** Provenances / allocation ids *)
     Definition extend_allocation_ids (ms : MemState) (new_aid : AllocationId) (ms' : MemState) : Prop
       := (forall aid, used_allocation_id ms aid -> used_allocation_id ms' aid) /\
@@ -489,7 +489,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
       := forall fs, mem_state_frame_stack ms fs ->
                forall f, peek_frame_stack fs f ->
                     ptr_in_frame f ptr.
-      
+
     (** mempush *)
     Record mempush_operation_invariants (m1 : MemState) (m2 : MemState) :=
       {
@@ -646,7 +646,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
         alloc_bytes_new_reads_allowed :
         forall p, In p ptrs ->
              read_byte_allowed m2 p;
-             
+
         alloc_bytes_old_reads_allowed :
         forall ptr',
           (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
@@ -668,7 +668,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
         alloc_bytes_new_writes_allowed :
         forall p, In p ptrs ->
              write_byte_allowed m2 p;
-             
+
         alloc_bytes_old_writes_allowed :
         forall ptr',
           (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
@@ -702,6 +702,19 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
          ret ptr.
 
     (*** Aggregate things *)
+
+    (** Reading uvalues *)
+    Definition read_bytes_spec (ptr : addr) (len : nat) : MemPropT (list SByte) :=
+      ptrs <- get_consecutive_ptrs ptr len;;
+
+      (* Actually perform reads *)
+      Util.map_monad (fun ptr => read_byte_spec_MemPropT ptr) ptrs.
+
+    Definition read_uvalue_spec (dt : dtyp) (ptr : addr) : MemPropT uvalue :=
+      bytes <- read_bytes_spec ptr (N.to_nat (sizeof_dtyp dt));;
+      ret (from_ubytes bytes dt).
+
+    (** Writing uvalues *)
     Definition write_bytes_spec (ptr : addr) (bytes : list SByte) : MemPropT unit :=
       ptrs <- get_consecutive_ptrs ptr (length bytes);;
       let ptr_bytes := zip ptrs bytes in
@@ -709,16 +722,29 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
       (* Actually perform writes *)
       Util.map_monad_ (fun '(ptr, byte) => write_byte_spec_MemPropT ptr byte) ptr_bytes.
 
-    Definition read_bytes_spec (ptr : addr) (len : nat) : MemPropT (list SByte) :=
-      ptrs <- get_consecutive_ptrs ptr len;;
+    Definition write_uvalue_spec (dt : dtyp) (ptr : addr) (uv : uvalue) : MemPropT unit :=
+      sid <- fresh_sid;;
+      bytes <- lift_OOM (to_ubytes uv dt sid);;
+      write_bytes_spec ptr bytes.
 
-      (* Actually perform reads *)
-      Util.map_monad (fun ptr => read_byte_spec_MemPropT ptr) ptrs.
+    (** Allocating dtyps *)
+    Definition generate_undef_bytes (dt : dtyp) (sid : store_id) : OOM (list SByte) :=
+      N.recursion
+        (fun (x : N) => ret [])
+        (fun n mf x =>
+           rest_bytes <- mf (N.succ x);;
+           x' <- IP.from_Z (Z.of_N x);;
+           let byte := uvalue_sbyte (UVALUE_Undef dt) dt (UVALUE_IPTR x') sid in
+           ret (byte :: rest_bytes))
+        (sizeof_dtyp dt) 0%N.
 
     (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
-    Definition allocate_dtyp_spec (t : dtyp) : MemPropT addr.
-    Admitted.
+    Definition allocate_dtyp_spec (dt : dtyp) : MemPropT addr :=
+      sid <- fresh_sid;;
+      bytes <- lift_OOM (generate_undef_bytes dt sid);;
+      allocate_bytes_spec_MemPropT dt bytes.
 
+    (*** Handling memory events *)
     Definition handle_memory_prop : MemoryE ~> MemPropT
       := fun T m =>
            match m with
@@ -728,13 +754,24 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
            | MemPop =>
                mempop_spec_MemPropT
            | Alloca t =>
-               allocate_dtyp_spec t
+               addr <- allocate_dtyp_spec t;;
+               ret (DVALUE_Addr addr)
            | Load t a =>
-               (* TODO: make sure this checks provenance *)
-               read_uvalue_spec t a
+               match a with
+               | DVALUE_Addr a =>
+                   read_uvalue_spec t a
+               | _ =>
+                   (* UB if loading from something that isn't an address *)
+                   fun _ _ => False
+               end
            | Store t a v =>
-               (* TODO: should use write_allowed, but make sure this respects provenance + store ids *)
-               write_uvalue_spec t a v
+               match a with
+               | DVALUE_Addr a =>
+                   write_uvalue_spec t a v
+               | _ =>
+                   (* UB if loading from something that isn't an address *)
+                   fun _ _ => False
+               end
            end.
   End Handlers.
 End MemoryModelSpec.
