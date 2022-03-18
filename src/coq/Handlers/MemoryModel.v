@@ -204,34 +204,60 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
   Definition MemPropT (X: Type): Type :=
     MemState -> err (OOM (MemState * X)%type) -> Prop.
 
+  (* Instance MemPropT_Monad : Monad MemPropT. *)
+  (* Proof. *)
+  (*   split. *)
+  (*   - (* ret *) *)
+  (*     intros T x. *)
+  (*     unfold MemPropT. *)
+  (*     intros ms [err_msg | [[ms' res] | oom_msg]]. *)
+  (*     + exact False. (* error is not a valid behavior here *) *)
+  (*     + exact (ms = ms' /\ x = res). *)
+  (*     + exact True. (* Allow OOM to refine anything *) *)
+  (*   - (* bind *) *)
+  (*     intros A B ma amb. *)
+  (*     unfold MemPropT in *. *)
+
+  (*     intros ms [err_msg | [[ms'' b] | oom_msg]]. *)
+  (*     + (* an error is valid when ma errors, or the continuation errors... *) *)
+  (*       refine *)
+  (*         ((exists err, ma ms (inl err)) \/ *)
+  (*          (exists ms' a, *)
+  (*              ma ms (inr (NoOom (ms', a))) -> *)
+  (*              (exists err, amb a ms' (inl err)))). *)
+  (*     + (* No errors, no OOM *) *)
+  (*       refine *)
+  (*         (exists ms' a k, *)
+  (*             ma ms (inr (NoOom (ms', a))) -> *)
+  (*             amb a ms' (inr (NoOom (ms'', k a)))). *)
+  (*     + (* OOM is always valid *) *)
+  (*       exact True. *)
+  (* Defined. *)
+
+  (* To triple check, but the following makes more sense to me *)
   Instance MemPropT_Monad : Monad MemPropT.
   Proof.
     split.
     - (* ret *)
-      intros T x.
-      unfold MemPropT.
-      intros ms [err_msg | [[ms' res] | oom_msg]].
-      + exact False. (* error is not a valid behavior here *)
-      + exact (ms = ms' /\ x = res).
-      + exact True. (* Allow OOM to refine anything *)
+      refine (fun _ v s r => match r with
+                          | inl _ => False
+                          | inr (NoOom (s',r')) => s' = s /\ r' = v
+                          | inr (Oom _) => True
+                          end).
     - (* bind *)
-      intros A B ma amb.
-      unfold MemPropT in *.
-
-      intros ms [err_msg | [[ms'' b] | oom_msg]].
-      + (* an error is valid when ma errors, or the continuation errors... *)
-        refine
-          ((exists err, ma ms (inl err)) \/
-           (exists ms' a,
-               ma ms (inr (NoOom (ms', a))) ->
-               (exists err, amb a ms' (inl err)))).
-      + (* No errors, no OOM *)
-        refine
-          (exists ms' a k,
-              ma ms (inr (NoOom (ms', a))) ->
-              amb a ms' (inr (NoOom (ms'', k a)))).
-      + (* OOM is always valid *)
-        exact True.
+      refine (fun A B ma amb sa r =>
+                match r with
+                | inl err            =>
+                    ma sa (inl err) \/
+                      (exists sab a, ma sa (inr (NoOom (sab, a))) /\
+                                  (exists err, amb a sab (inl err)))
+                | inr (NoOom (sb,r)) =>
+                    exists sab a,
+                    ma    sa  (inr (NoOom (sab, a))) /\
+                      amb a sab (inr (NoOom (sb, r)))
+                | inr (Oom _)         => True
+                end
+             ).
   Defined.
 
   Instance MemPropT_MonadMemState : MonadMemState MemState MemPropT.
@@ -250,6 +276,7 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
       + exact (ms_to_put = ms').
       + exact True.
   Defined.
+
 
   Instance MemPropT_RAISE_OOM : RAISE_OOM MemPropT.
   Proof.
