@@ -189,6 +189,10 @@ Module Type MemoryModel (LP : LLVMParams) (MP : MemoryParams LP).
    End Handlers.
 End MemoryModel.
 
+Module MemoryState (LP : LLVMParams) (MP : MemoryParams LP).
+
+End MemoryState.
+
 Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
   Import LP.Events.
   Import LP.ADDR.
@@ -302,10 +306,11 @@ Module MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
     Variable MemM : Type -> Type.
     Context `{MemM_MemMonad : MemMonad MemState Provenance MemM}.
 
-    (*** Primitives *)
-
     (** Addresses *)
-    Parameter disjoint_ptr_byte : addr -> addr -> Prop.
+    Definition disjoint_ptr_byte (a b : addr) :=
+      ~ ptr_overlap a b.
+
+    (*** Primitives *)
 
     (** Reads *)
     Parameter read_byte_MemPropT : addr -> MemPropT SByte.

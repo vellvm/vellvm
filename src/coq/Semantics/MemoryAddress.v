@@ -33,8 +33,19 @@ Open Scope monad_scope.
 Module Type ADDRESS.
   Parameter addr : Set.
   Parameter null : addr.
+
+  (* Coq's logical equality on the pointer data type *)
   Parameter eq_dec : forall (a b : addr), {a = b} + {a <> b}.
   Parameter different_addrs : forall (a : addr), exists (b : addr), a <> b.
+
+  (* Semantic equivalence of pointers in the memory model, i.e.,
+     whether or not these pointers point to the same byte in memory, even
+     if the `addr` type itself is different (for instance due to extra
+     provenance information)
+   *)
+  Parameter ptr_overlap : forall (a b : addr), Prop.
+  Parameter ptr_overlap_dec : forall (a b : addr), {ptr_overlap a b} + {~ptr_overlap a b}.
+  Parameter ptr_overlap_refl : forall a, ptr_overlap a a.
 
   (* Debug *)
   Parameter show_addr : addr -> string.
