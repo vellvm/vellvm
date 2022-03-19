@@ -2,7 +2,7 @@
   description = "Vellvm, a formal specification and interpreter for LLVM";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-21.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/master";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -22,6 +22,14 @@
                        sha256 = "0sfrrkrhr51qnc6rpxr2mq4fvhvwbgp453r5q4nafba32lhfima2";
                      };
                    });
+
+              coq-ext-lib = super.coq-ext-lib.overrideAttrs
+              (s : { version = "0.11.3";
+                     src = fetchTarball {
+                       url = "https://github.com/coq-community/coq-ext-lib/archive/refs/tags/v0.11.3.zip";
+                       sha256 = "1w99nzpk72lffxis97k235axss5lmzhy5z3lga2i0si95mbpil42";
+                     };
+                   });
             });
 
         version = "vellvm:master";
@@ -30,5 +38,3 @@
           (pkgs.callPackage ./release.nix (coq.ocamlPackages // coqPkgs // { inherit coq version; })).vellvm;
       });
 }
-
-  
