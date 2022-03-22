@@ -1,4 +1,4 @@
-From Coq Require Import List ZArith.
+From Coq Require Import String List ZArith.
 
 From ExtLib Require Import Structures.Monads.
 
@@ -129,4 +129,10 @@ Module Byte(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS
     rewrite <- TO.
     apply Nnat.N2Nat.id.
   Qed.
+
+  Definition sbyte_sid (byte : SByte) : err store_id :=
+    match sbyte_to_extractbyte byte with
+    | UVALUE_ExtractByte uv dt idx sid => inr sid
+    | _ => inl "Invalid sbyte, did not convert to extractbyte."%string
+    end.
 End Byte.

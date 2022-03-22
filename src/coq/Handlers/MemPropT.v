@@ -1,4 +1,6 @@
-From Coq Require Import ZArith.
+From Coq Require Import
+     Strings.String
+     ZArith.
 
 From ExtLib Require Import
      Structures.Monad.
@@ -145,6 +147,13 @@ Proof.
     + exact True. (* Any error will do *)
     + exact False. (* Must error *)
     + exact False. (* Must error *)
+Defined.
+
+Instance MemPropT_RAISE_UB {MemState : Type} : RAISE_UB (MemPropT MemState).
+Proof.
+  split.
+  intros A ub_msg.
+  refine (fun ms res => False /\ ub_msg = ""%string).
 Defined.
 
 Definition MemPropT_assert {MemState X} (assertion : Prop) : MemPropT MemState X

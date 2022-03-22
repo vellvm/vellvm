@@ -54,13 +54,10 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
   (*** Internal state of memory *)
   Parameter MemState : Type.
-  Parameter initial_memory_state : MemState.
 
   (* Type for frames and frame stacks *)
   Parameter Frame : Type.
   Parameter FrameStack : Type.
-
-  Parameter initial_frame : Frame.
 
   (* TODO: Should DataLayout be here?
 
@@ -426,7 +423,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         allocate_bytes_consecutive : get_consecutive_ptrs ptr (length init_bytes) m1 (inr (NoOom (m1, ptrs)));
 
         (* Provenance *)
-        address_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov aid;
+        allocate_bytes_address_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov aid;
 
         (* Allocation ids *)
         allocate_bytes_aid_fresh : ~ used_allocation_id_prop m1 aid;
@@ -486,6 +483,10 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         (* Store ids are preserved. *)
         allocate_bytes_store_ids :
         preserve_store_ids m1 m2;
+
+        (* Type is valid *)
+        allocate_bytes_typ :
+        t <> DTYPE_Void;
       }.
 
     Definition allocate_bytes_spec_MemPropT' (t : dtyp) (init_bytes : list SByte) (aid : AllocationId)
@@ -502,28 +503,6 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       := aid <- fresh_allocation_id;;
          '(ptr, _) <- allocate_bytes_spec_MemPropT' t init_bytes aid;;
          ret ptr.
-
-    (*** Initial memory state *)
-    Record initial_memory_state_prop : Prop :=
-      {
-        initial_memory_no_allocations :
-        forall ptr aid,
-          ~ byte_allocated initial_memory_state ptr aid;
-
-        initial_memory_frame_stack :
-        forall fs,
-          mem_state_frame_stack_prop initial_memory_state fs ->
-          empty_frame_stack fs;
-
-        initial_memory_no_reads :
-        forall ptr byte,
-          ~ read_byte_prop initial_memory_state ptr byte
-      }.
-
-    Record initial_frame_prop : Prop :=
-      {
-        initial_frame_is_empty : empty_frame initial_frame;
-      }.
 
     (*** Aggregate things *)
 
@@ -596,12 +575,15 @@ Module MakeMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Memo
   Include MemoryModelSpec LP MP MMSP.
 End MakeMemoryModelSpec.
 
-Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP).
+Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   Import LP.
   Import LP.ADDR.
   Import LP.SIZEOF.
   Import LP.PROV.
   Import MP.
+
+  (** Specification of the memory model *)
+  Declare Module MMSP : MemoryModelSpecPrimitives LP MP.
   Import MMSP.
   Import MMSP.MemByte.
 
@@ -611,6 +593,10 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) (
   Section MemoryPrimatives.
     Context {MemM : Type -> Type}.
     Context `{MemMonad MemState AllocationId MemM}.
+
+    (*** Data types *)
+    Parameter initial_memory_state : MemState.
+    Parameter initial_frame : Frame.
 
     (*** Primitives on memory *)
     (** Reads *)
@@ -716,25 +702,50 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) (
     Parameter used_store_id_correct :
       forall ms aid,
         used_store_id_prop ms aid <-> used_store_id ms aid = true.
+
+    (*** Initial memory state *)
+    Record initial_memory_state_prop : Prop :=
+      {
+        initial_memory_no_allocations :
+        forall ptr aid,
+          ~ byte_allocated initial_memory_state ptr aid;
+
+        initial_memory_frame_stack :
+        forall fs,
+          mem_state_frame_stack_prop initial_memory_state fs ->
+          empty_frame_stack fs;
+
+        initial_memory_no_reads :
+        forall ptr byte,
+          ~ read_byte_prop initial_memory_state ptr byte
+      }.
+
+    Record initial_frame_prop : Prop :=
+      {
+        initial_frame_is_empty : empty_frame initial_frame;
+      }.
+
+    Parameter initial_memory_state_correct : initial_memory_state_prop.
+    Parameter initial_frame_correct : initial_frame_prop.
   End MemoryPrimatives.
 End MemoryModelExecPrimitives.
 
-Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MMEP : MemoryModelExecPrimitives LP MP MMSP).
+Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP).
   Import LP.
   Import LP.ADDR.
   Import LP.SIZEOF.
   Import LP.PROV.
   Import LP.Events.
   Import MP.
+  Import MMEP.
   Import MMSP.
   Import MMSP.MemByte.
-  Import MMEP.
   Import MMEP.MemSpec.
   Import MemHelpers.
 
   (*** Handling memory events *)
   Section Handlers.
-    Variable MemM : Type -> Type.
+    Context {MemM : Type -> Type}.
     Context `{MemMonad MemState AllocationId MemM}.
 
     (** Reading uvalues *)
