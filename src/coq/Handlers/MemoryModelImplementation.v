@@ -957,6 +957,98 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             spec ms (inr (NoOom (ms', res)))
         end.
 
+    (* TODO: Move these tactics *)
+    Ltac MemMonad_go :=
+      repeat match goal with
+             | |- context [MemMonad_run (bind _ _)] => rewrite MemMonad_run_bind
+             | |- context [MemMonad_run get_mem_state] => rewrite MemMonad_get_mem_state
+             | |- context [MemMonad_run (ret _)] => rewrite MemMonad_run_ret
+             | |- context [MemMonad_run (raise_ub _)] => rewrite MemMonad_run_raise_ub
+             end.
+
+    Ltac break_memory_lookup :=
+      match goal with
+      | |- context [match IM.find ?intptr ?memory with _ => _ end] =>
+          let Hlookup := fresh "Hlookup" in
+          let byte := fresh "byte" in
+          let aid := fresh "aid" in
+          destruct (IM.find intptr memory) as [[byte aid] | ]eqn:Hlookup
+      end.
+
+    Ltac MemMonad_break :=
+      first
+        [ break_memory_lookup
+        | match goal with
+          | |- context [MemMonad_run (if ?X then _ else _)] =>
+              let Hcond := fresh "Hcond" in
+              destruct X eqn:Hcond
+          end
+        ].
+
+    Ltac MemMonad_inv_break :=
+      match goal with
+      | H: Some _ = Some _ |- _ =>
+          inv H
+      | H: None = Some _ |- _ =>
+          inv H
+      | H: Some _ = None |- _ =>
+          inv H
+      end; cbn in *.
+
+    Ltac MemMonad_subst_if :=
+      match goal with
+      | H: ?X = true |- context [if ?X then _ else _] =>
+          rewrite H
+      | H: ?X = false |- context [if ?X then _ else _] =>
+          rewrite H
+      end.
+
+    Ltac intros_mempropt_contra :=
+      intros [?err | [[?ms' ?res] | ?oom]];
+      match goal with
+      | |- ~ _ =>
+          let CONTRA := fresh "CONTRA" in
+          let err := fresh "err" in
+          intros CONTRA;
+          destruct CONTRA as [err [CONTRA | CONTRA]]; auto;
+          destruct CONTRA as (? & ? & (? & ?) & CONTRA); subst
+      | |- ~ _ =>
+          let CONTRA := fresh "CONTRA" in
+          let err := fresh "err" in
+          intros CONTRA;
+          destruct CONTRA as (? & ? & (? & ?) & CONTRA); subst
+      end.
+
+    Ltac subst_mempropt :=
+      repeat
+        match goal with
+        | Hlup: IM.find ?addr ?mem = _,
+            H: context [match IM.find ?addr ?mem with _ => _ end] |- _
+          => rewrite Hlup in H; cbn in H
+        | HC: ?X = _,
+            H: context [if ?X then _ else _] |- _
+          => rewrite HC in H; cbn in H
+        end.
+
+    Ltac solve_mempropt_contra :=
+      intros_mempropt_contra;
+      repeat
+        (first
+           [ progress subst_mempropt
+           | tauto
+        ]).
+
+    Ltac MemMonad_solve :=
+      repeat
+        (first
+           [ progress (MemMonad_go; cbn)
+           | MemMonad_break; try MemMonad_inv_break; cbn
+           | solve_mempropt_contra
+           | MemMonad_subst_if; cbn
+           | repeat eexists
+           | tauto
+        ]).
+
     (** Correctness of the main operations on memory *)
     Lemma read_byte_correct :
       forall ptr, exec_correct (read_byte ptr) (read_byte_MemPropT ptr).
@@ -967,63 +1059,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       unfold read_byte.
       cbn.
 
-      rewrite MemMonad_run_bind.
-      rewrite MemMonad_get_mem_state.
-      cbn.
-      break_inner_match.
-      - (* Found address in memory *)
-        cbn. destruct m.
-        break_inner_match; cbn.
-        + (* Access allowed *)
-          rewrite MemMonad_run_ret. cbn.
-          do 2 eexists.
-          split.
-          * split; reflexivity.
-          * rewrite Heqo; cbn.
-            rewrite Heqb.
-            split; auto.
-        + (* Access not allowed *)
-          rewrite MemMonad_run_raise_ub.
-          cbn.
-          intros [err | [[ms' res] | oom]].
-          * intros CONTRA.
-            destruct CONTRA as [err' [CONTRA | CONTRA]]; auto.
-            destruct CONTRA as (sab & a' & (sabeq & a'eq) & CONTRA).
-            subst.
-            rewrite Heqo in CONTRA; cbn in CONTRA.
-            rewrite Heqb in CONTRA. destruct CONTRA as [[ ] _ ].
-          * intros CONTRA.
-            destruct CONTRA as (sab & a' & (sabeq & a'eq) & CONTRA).
-            subst.
-            rewrite Heqo in CONTRA; cbn in CONTRA.
-            rewrite Heqb in CONTRA.
-            destruct CONTRA as [[ ] _].
-          * intros CONTRA.
-            destruct CONTRA as [msg' [CONTRA | CONTRA]]; auto.
-            destruct CONTRA as (sab & a' & (sabeq & a'eq) & CONTRA).
-            subst.
-            rewrite Heqo in CONTRA; cbn in CONTRA.
-            rewrite Heqb in CONTRA. destruct CONTRA as [[ ] _ ].
-      - (* Reading from unallocated memory *)
-        rewrite MemMonad_run_raise_ub. cbn.
-        intros [err | [[ms' res] | oom]].
-        * intros CONTRA.
-          destruct CONTRA as [err' [CONTRA | CONTRA]]; auto.
-          destruct CONTRA as (sab & a' & (sabeq & a'eq) & CONTRA).
-          subst.
-          rewrite Heqo in CONTRA; cbn in CONTRA.
-          destruct CONTRA as [[ ] _ ].
-        * intros CONTRA.
-          destruct CONTRA as (sab & a' & (sabeq & a'eq) & CONTRA).
-          subst.
-          rewrite Heqo in CONTRA; cbn in CONTRA.
-          destruct CONTRA as [[ ] _].
-        * intros CONTRA.
-          destruct CONTRA as [msg' [CONTRA | CONTRA]]; auto.
-          destruct CONTRA as (sab & a' & (sabeq & a'eq) & CONTRA).
-          subst.
-          rewrite Heqo in CONTRA; cbn in CONTRA.
-          destruct CONTRA as [[ ] _ ].
+      MemMonad_solve.
     Qed.
 
     Parameter write_byte_correct :
