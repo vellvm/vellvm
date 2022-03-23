@@ -58,7 +58,7 @@ Class MemMonad (MemState : Type) (AllocationId : Type) (M : Type -> Type)
 
     (** Run bind / ret laws *)
     MemMonad_run_bind
-      {A B} (ma : M A) (k : A -> M B) (ms ms' : MemState) :
+      {A B} (ma : M A) (k : A -> M B) (ms : MemState) :
     MemMonad_run (x <- ma;; k x) ms =
       match IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (MemMonad_run ma ms))))) with
       | inl (OOM_message oom_msg) =>
@@ -155,39 +155,46 @@ Proof.
     refine (fun _ v s r => match r with
                         | inl _ => False
                         | inr (NoOom (s',r')) => s' = s /\ r' = v
-                        | inr (Oom _) => True
+                        | inr (Oom _) => False
                         end).
   - (* bind *)
     refine (fun A B ma amb sa r =>
               match r with
               | inl err            =>
-                  ma sa (inl err) \/
-                    (exists sab a, ma sa (inr (NoOom (sab, a))) /\
-                                (exists err, amb a sab (inl err)))
+                  exists err,
+                  (ma sa (inl err) \/
+                     (exists sab a, ma sa (inr (NoOom (sab, a))) /\
+                                 (amb a sab (inl err))))
               | inr (NoOom (sb,r)) =>
                   exists sab a,
-                  ma    sa  (inr (NoOom (sab, a))) /\
+                  ma sa (inr (NoOom (sab, a))) /\
                     amb a sab (inr (NoOom (sb, r)))
-              | inr (Oom _)         => True
+              | inr (Oom msg)         =>
+                  exists msg',
+                  (ma sa (inr (Oom msg')) \/
+                     (exists sab a, ma sa (inr (NoOom (sab, a))) /\
+                                 (amb a sab (inr (Oom msg')))))
+                  
               end
            ).
 Defined.
 
 Instance MemPropT_MonadMemState {MemState : Type} : MonadMemState MemState (MemPropT MemState).
 Proof.
+  (* Operations must actually succeed *)
   split.
   - (* get_mem_state *)
     unfold MemPropT.
     intros ms [err_msg | [[ms' a] | oom_msg]].
-    + exact True.
+    + exact False.
     + exact (ms = ms' /\ a = ms).
-    + exact True.
+    + exact False.
   - (* put_mem_state *)
     unfold MemPropT.
     intros ms_to_put ms [err_msg | [[ms' t] | oom_msg]].
-    + exact True.
+    + exact False.
     + exact (ms_to_put = ms').
-    + exact True.
+    + exact False.
 Defined.
 
 Instance MemPropT_RAISE_OOM {MemState : Type} : RAISE_OOM (MemPropT MemState).

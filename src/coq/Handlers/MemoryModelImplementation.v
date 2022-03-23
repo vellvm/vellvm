@@ -965,11 +965,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       intros ptr ms.
       destruct ms.
       unfold read_byte.
-      (*
-      unfold read_byte_MemPropT.
-      unfold get_mem_state.
-      unfold MemPropT_MonadMemState.
-       *)
       cbn.
 
       rewrite MemMonad_run_bind.
@@ -991,13 +986,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           rewrite MemMonad_run_raise_ub.
           cbn.
           intros [err | [[ms' res] | oom]].
-          * intros [BLAH | BLAH].
-            admit.
-            destruct BLAH as (sab & a' & (sabeq & a'eq) & BLAH).
+          * intros CONTRA.
+            destruct CONTRA as [err' [CONTRA | CONTRA]]; auto.
+            destruct CONTRA as (sab & a' & (sabeq & a'eq) & CONTRA).
             subst.
-            destruct BLAH as (err' & BLAH).
-            rewrite Heqo in BLAH; cbn in BLAH.
-            rewrite Heqb in BLAH. destruct BLAH as [[ ] _ ].
+            rewrite Heqo in CONTRA; cbn in CONTRA.
+            rewrite Heqb in CONTRA. destruct CONTRA as [[ ] _ ].
           * intros CONTRA.
             destruct CONTRA as (sab & a' & (sabeq & a'eq) & CONTRA).
             subst.
@@ -1005,9 +999,31 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             rewrite Heqb in CONTRA.
             destruct CONTRA as [[ ] _].
           * intros CONTRA.
-      - break_inner_match.
-      
-      destruct (read_byte ptr).
+            destruct CONTRA as [msg' [CONTRA | CONTRA]]; auto.
+            destruct CONTRA as (sab & a' & (sabeq & a'eq) & CONTRA).
+            subst.
+            rewrite Heqo in CONTRA; cbn in CONTRA.
+            rewrite Heqb in CONTRA. destruct CONTRA as [[ ] _ ].
+      - (* Reading from unallocated memory *)
+        rewrite MemMonad_run_raise_ub. cbn.
+        intros [err | [[ms' res] | oom]].
+        * intros CONTRA.
+          destruct CONTRA as [err' [CONTRA | CONTRA]]; auto.
+          destruct CONTRA as (sab & a' & (sabeq & a'eq) & CONTRA).
+          subst.
+          rewrite Heqo in CONTRA; cbn in CONTRA.
+          destruct CONTRA as [[ ] _ ].
+        * intros CONTRA.
+          destruct CONTRA as (sab & a' & (sabeq & a'eq) & CONTRA).
+          subst.
+          rewrite Heqo in CONTRA; cbn in CONTRA.
+          destruct CONTRA as [[ ] _].
+        * intros CONTRA.
+          destruct CONTRA as [msg' [CONTRA | CONTRA]]; auto.
+          destruct CONTRA as (sab & a' & (sabeq & a'eq) & CONTRA).
+          subst.
+          rewrite Heqo in CONTRA; cbn in CONTRA.
+          destruct CONTRA as [[ ] _ ].
     Qed.
 
     Parameter write_byte_correct :
