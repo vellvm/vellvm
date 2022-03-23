@@ -44,7 +44,7 @@ COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/Memory/Sizeof Semantics/G
 		Handlers/Pick Handlers/UndefinedBehaviour Handlers/OOM\
 		Handlers/Serialization Handlers/SerializationTheory\
 		Handlers/MemoryState Handlers/MemPropT\
-		Handlers/MemoryModel Handlers/MemoryInterpreters Handlers/MemoryModelTheory\
+		Handlers/MemoryModel Handlers/MemoryModelImplementation Handlers/MemoryInterpreters Handlers/MemoryModelTheory\
 		Handlers/FiniteMemory Handlers/FiniteMemoryTheory\
 		Handlers/MemoryHelpers\
 		Handlers/Handlers\

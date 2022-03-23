@@ -56,6 +56,15 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
                            unErrSID_T (amb a))).
   Defined.
 
+  #[global] Instance MonadT_ErrSID_T {M} `{HM : Monad M} : MonadT (ErrSID_T M) M.
+  Proof.
+    split.
+    intros A ma.
+    refine (mkErrSID_T _).
+    repeat apply lift.
+    auto.
+  Defined.
+  
   #[global] Instance Monad_EQ1_ErrSID_T {M} `{HME : Monad.Eq1 M} : Monad.Eq1 (ErrSID_T M).
   Proof.
     unfold Monad.Eq1.
@@ -260,13 +269,13 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
     do 3 eexists; reflexivity.
   Qed.
 
-  Definition fresh_sid : ErrSID store_id
+  Definition fresh_sid {M} `{Monad M} : ErrSID_T M store_id
     := mkErrSID_T (lift (modify N.succ)).
 
-  Definition fresh_provenance : ErrSID Provenance
+  Definition fresh_provenance {M} `{Monad M} : ErrSID_T M Provenance
     := mkErrSID_T (lift (lift (modify next_provenance))).
 
-  Definition fresh_allocation_id : ErrSID AllocationId
+  Definition fresh_allocation_id {M} `{Monad M} : ErrSID_T M AllocationId
     := prov <- fresh_provenance;;
        ret (provenance_to_allocation_id prov).
 

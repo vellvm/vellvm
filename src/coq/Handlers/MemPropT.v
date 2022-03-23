@@ -23,8 +23,16 @@ Open Scope monad_scope.
 
 (* Move this ? *)
 Definition store_id := N.
-Class MonadStoreID (M : Type -> Type) : Type :=
+Class MonadStoreId (M : Type -> Type) : Type :=
   { fresh_sid : M store_id;
+  }.
+
+Class StoreIdFreshness (S : Type) : Type :=
+  { used_store_id : S -> store_id -> Prop;
+  }.
+
+Class AllocationIdFreshness (AllocationId : Type) (S : Type) : Type :=
+  { used_allocation_id : S -> AllocationId -> Prop;
   }.
 
 Class MonadMemState (MemState : Type) (M : Type -> Type) : Type :=
@@ -38,13 +46,68 @@ Definition modify_mem_state {M MemState} `{Monad M} `{MonadMemState MemState M} 
   ret ms.
 
 (* TODO: Add RAISE_PICK or something... May need to be in a module *)
+Import EitherMonad.
 Class MemMonad (MemState : Type) (AllocationId : Type) (M : Type -> Type)
       `{Monad M}
-      `{MonadAllocationId AllocationId M} `{MonadStoreID M} `{MonadMemState MemState M}
+      `{MonadAllocationId AllocationId M} `{MonadStoreId M} `{MonadMemState MemState M}
+      `{StoreIdFreshness MemState} `{AllocationIdFreshness AllocationId MemState}
       `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} : Type
   :=
   {
-    MemMonad_runs_to {A} (ma : M A) (ms : MemState) : err_ub_oom (MemState * A);
+    MemMonad_run {A} (ma : M A) (ms : MemState) : err_ub_oom (MemState * A);
+
+    (** Run bind / ret laws *)
+    MemMonad_run_bind
+      {A B} (ma : M A) (k : A -> M B) (ms ms' : MemState) :
+    MemMonad_run (x <- ma;; k x) ms =
+      match IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (MemMonad_run ma ms))))) with
+      | inl (OOM_message oom_msg) =>
+          raise_oom oom_msg
+      | inr (inl (UB_message ub_msg)) =>
+          raise_ub ub_msg
+      | inr (inr (inl (ERR_message err_msg))) =>
+          raise_error err_msg
+      | inr (inr (inr (ms', res))) =>
+          MemMonad_run (k res) ms'
+      end;
+
+    MemMonad_run_ret
+      {A} (x : A) (ms : MemState) :
+    MemMonad_run (ret x) ms = ret (ms, x);
+
+    (** MonadMemState properties *)
+    MemMonad_get_mem_state
+      (ms : MemState) :
+    MemMonad_run (get_mem_state) ms = ret (ms, ms);
+
+    MemMonad_put_mem_state
+      (ms ms' : MemState) :
+    MemMonad_run (put_mem_state ms') ms = ret (ms', tt);
+
+    (** Fresh store id property *)
+    MemMonad_run_fresh_sid
+      (sid : store_id) (ms : MemState) :
+    MemMonad_run (fresh_sid) ms = ret (ms, sid) /\ ~ used_store_id ms sid;
+
+    (** Fresh allocation id property *)
+    MemMonad_run_fresh_allocation_id
+      (aid : AllocationId) (ms : MemState) :
+    MemMonad_run (fresh_allocation_id) ms = ret (ms, aid) /\ ~ used_allocation_id ms aid;
+
+    (** Exceptions *)
+    MemMonad_run_raise_oom :
+    forall {A} ms oom_msg,
+      MemMonad_run (@raise_oom _ _ A oom_msg) ms = raise_oom oom_msg;
+
+    MemMonad_run_raise_ub :
+    forall {A} ms ub_msg,
+      MemMonad_run (@raise_ub _ _ A ub_msg) ms = raise_ub ub_msg;
+
+    MemMonad_run_raise_error :
+    forall {A} ms error_msg,
+      MemMonad_run (@raise_error _ _ A error_msg) ms = raise_error error_msg;
+
+    (** StateT *)
     MemMonad_lift_stateT
       {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A}
       (ma : M A) : stateT MemState (itree E) A;

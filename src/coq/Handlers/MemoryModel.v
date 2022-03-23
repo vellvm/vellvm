@@ -231,7 +231,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     Defined.
 
     (*** Store id operations *)
-    Instance MemPropT_MonadStoreID : MonadStoreID (MemPropT MemState).
+    Instance MemPropT_MonadStoreID : MonadStoreId (MemPropT MemState).
     Proof.
       split.
       - (* fresh_sid *)
@@ -606,30 +606,17 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     Parameter write_byte : addr -> SByte -> MemM unit.
 
     (** Allocations *)
-    Parameter addr_allocated : addr -> AllocationId -> MemM bool. (* TODO: do we need this? *)
     Parameter allocate_bytes : dtyp -> list SByte -> MemM addr.
 
     (** Frame stacks *)
-    (* Check if an address is allocated in a frame *)
-    Parameter ptr_in_frame : Frame -> addr -> bool.
-
-    (* Check for the current frame *)
-    Parameter peek_frame_stack : FrameStack -> Frame.
-    Parameter push_frame_stack : FrameStack -> Frame -> FrameStack.
-    Parameter pop_frame_stack : FrameStack -> err FrameStack.
-
-    Parameter mem_state_frame_stack : MemState -> FrameStack.
-    Parameter mem_state_set_frame_stack : MemState -> FrameStack -> MemState.
-
-    (** Allocation ids / store ids *)
-    Parameter used_allocation_id : MemState -> AllocationId -> bool.
-    Parameter used_store_id : MemState -> store_id -> bool.
+    Parameter mempush : MemM unit.
+    Parameter mempop : MemM unit.
 
     (*** Correctness *)
     Import EitherMonad.
     Definition exec_correct {X} (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
       forall ms,
-        match IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (MemMonad_runs_to exec ms))))) with
+        match IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (MemMonad_run exec ms))))) with
         | inl (OOM_message oom_msg) =>
             spec ms (inr (Oom oom_msg))
         | inr (inl (UB_message ub_msg)) =>
@@ -647,61 +634,15 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     Parameter write_byte_correct :
       forall ptr byte, exec_correct (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
 
-    (* TODO: do I need this at all? *)
-    Parameter addr_allocated_correct :
-      forall ptr aid, exec_correct (addr_allocated ptr aid) (addr_allocated_prop ptr aid).
-
     Parameter allocate_bytes_correct :
       forall dt init_bytes, exec_correct (allocate_bytes dt init_bytes) (allocate_bytes_spec_MemPropT dt init_bytes).
 
     (** Correctness of frame stack operations *)
-    Parameter ptr_in_frame_correct :
-      forall frame ptr,
-        ptr_in_frame_prop frame ptr <->
-        ptr_in_frame frame ptr = true.
+    Parameter mempush_correct :
+      exec_correct mempush mempush_spec_MemPropT.
 
-    Parameter peek_frame_stack_correct :
-      forall frame_stack frame,
-        peek_frame_stack_prop frame_stack frame <->
-          peek_frame_stack frame_stack = frame.
-
-    Parameter push_frame_stack_correct :
-      forall frame_stack frame_stack' frame,
-        push_frame_stack_spec frame_stack frame frame_stack' <->
-          push_frame_stack frame_stack frame = frame_stack'.
-
-    Parameter pop_frame_stack_correct :
-      forall frame_stack frame,
-        pop_frame_stack_prop frame_stack frame <->
-          pop_frame_stack frame_stack = inr frame.
-
-    Parameter mem_state_frame_stack_correct :
-      forall ms fs,
-        mem_state_frame_stack_prop ms fs <->
-          mem_state_frame_stack ms = fs.
-
-    Record mem_state_set_frame_stack_invariants (m1 : MemState) (m2 : MemState) :=
-      {
-        mem_state_set_frame_stack_op_reads : read_byte_preserved m1 m2;
-        mem_state_set_frame_stack_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
-        mem_state_set_frame_stack_op_allocations : allocations_preserved m1 m2;
-        mem_state_set_frame_stack_op_store_ids : preserve_store_ids m1 m2;
-        mem_state_set_frame_stack_op_allocation_ids : preserve_allocation_ids m1 m2;
-      }.
-
-    Parameter mem_state_set_frame_stack_correct :
-      forall ms ms' fs,
-        (mem_state_frame_stack_prop ms' fs /\ mem_state_set_frame_stack_invariants ms ms') <->
-          mem_state_set_frame_stack ms fs = ms'.
-
-    (** Allocation ids / store ids *)
-    Parameter used_allocation_id_correct :
-      forall ms aid,
-        used_allocation_id_prop ms aid <-> used_allocation_id ms aid = true.
-
-    Parameter used_store_id_correct :
-      forall ms aid,
-        used_store_id_prop ms aid <-> used_store_id ms aid = true.
+    Parameter mempop_correct :
+      exec_correct mempop mempop_spec_MemPropT.
 
     (*** Initial memory state *)
     Record initial_memory_state_prop : Prop :=
@@ -786,17 +727,9 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
            match m with
            (* Unimplemented *)
            | MemPush =>
-               ms <- get_mem_state;;
-               let fs := mem_state_frame_stack ms in
-               let fs' := push_frame_stack fs initial_frame in
-               let ms' := mem_state_set_frame_stack ms fs' in
-               put_mem_state ms'
+               mempush
            | MemPop =>
-               ms <- get_mem_state;;
-               let fs := mem_state_frame_stack ms in
-               fs' <- lift_err_RAISE_ERROR (pop_frame_stack fs);;
-               let ms' := mem_state_set_frame_stack ms fs' in
-               put_mem_state ms'
+               mempop
            | Alloca t =>
                addr <- allocate_dtyp t;;
                ret (DVALUE_Addr addr)

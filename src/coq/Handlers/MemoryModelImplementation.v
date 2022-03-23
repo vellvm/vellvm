@@ -10,6 +10,7 @@ From Vellvm.Semantics Require Import
      Memory.FiniteProvenance
      Memory.Sizeof
      Memory.MemBytes
+     Memory.ErrSID
      VellvmIntegers.
 
 From Vellvm Require Import
@@ -27,7 +28,8 @@ From Vellvm.Utils Require Import
 
 From ExtLib Require Import
      Structures.Monads
-     Structures.Functor.
+     Structures.Functor
+     Data.Monads.StateMonad.
 
 From Coq Require Import
      ZArith
@@ -39,7 +41,6 @@ Import ListNotations.
 Import ListUtil.
 Import Utils.Monads.
 
-Import Basics.Basics.Monads.
 Import MonadNotation.
 Open Scope monad_scope.
 
@@ -742,6 +743,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Import MemSpec.
   Import MemHelpers.
 
+  Module ESID := ERRSID ADDR IP SIZEOF PROV.
+
   Section MemoryPrimatives.
     Context {MemM : Type -> Type}.
     (* Context `{Monad MemM}. *)
@@ -866,18 +869,84 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       | Snoc s f => inr s
       end.
 
-    Parameter mem_state_frame_stack : MemState -> FrameStack.
-    Parameter mem_state_set_frame_stack : MemState -> FrameStack -> MemState.
+    Definition mem_state_set_frame_stack (ms : MemState) (fs : FrameStack) : MemState :=
+      let (mem, _) := ms_memory_stack ms in
+      mkMemState (mem, fs) ms.(ms_sid) ms.(ms_prov).
 
-    (** Allocation ids / store ids *)
-    Parameter used_allocation_id : MemState -> AllocationId -> bool.
-    Parameter used_store_id : MemState -> store_id -> bool.
+    Definition mempush : MemM unit :=
+      ms <- get_mem_state;;
+      let fs := mem_state_frame_stack ms in
+      let fs' := push_frame_stack fs initial_frame in
+      let ms' := mem_state_set_frame_stack ms fs' in
+      put_mem_state ms'.
+
+    Definition free_byte
+               (b : Iptr)
+               (m : memory) : memory
+      := delete b m.
+
+    Definition free_frame_memory (f : Frame) (m : memory) : memory :=
+      fold_left (fun m key => free_byte key m) f m.
+
+    Definition mempop : MemM unit :=
+      ms <- get_mem_state;;
+      let (mem, fs) := ms_memory_stack ms in
+      let f := peek_frame_stack fs in
+      fs' <- lift_err_RAISE_ERROR (pop_frame_stack fs);;
+      let mem' := free_frame_memory f mem in
+      let ms' := mkMemState (mem', fs') ms.(ms_sid) ms.(ms_prov) in
+      put_mem_state ms'.
 
     (*** Correctness *)
+    (* Import ESID. *)
+    (* Definition MemStateM := ErrSID_T (state MemState). *)
+
+    (* Instance MemStateM_MonadAllocationId : MonadAllocationId AllocationId MemStateM. *)
+    (* Proof. *)
+    (*   split. *)
+    (*   apply ESID.fresh_allocation_id. *)
+    (* Defined. *)
+
+    (* Instance MemStateM_MonadStoreID : MonadStoreId MemStateM. *)
+    (* Proof. *)
+    (*   split. *)
+    (*   apply ESID.fresh_sid. *)
+    (* Defined. *)
+
+    (* Instance MemStateM_MonadMemState : MonadMemState MemState MemStateM. *)
+    (* Proof. *)
+    (*   split. *)
+    (*   - apply (lift MonadState.get). *)
+    (*   - intros ms. *)
+    (*     apply (lift (MonadState.put ms)). *)
+    (* Defined. *)
+    
+    (* Instance ErrSIDMemMonad : MemMonad MemState AllocationId (ESID.ErrSID_T (state MemState)). *)
+    (* Proof. *)
+    (*   split. *)
+    (*   - (* MemMonad_runs_to *) *)
+    (*     intros A ma ms. *)
+    (*     destruct ms eqn:Hms. *)
+    (*     pose proof (runState (runErrSID_T ma ms_sid0 ms_prov0) ms). *)
+    (*     destruct X as [[[res sid'] pr'] ms']. *)
+    (*     unfold err_ub_oom. *)
+    (*     constructor. *)
+    (*     repeat split. *)
+    (*     destruct res. *)
+    (*     left. apply o. *)
+    (*     destruct s. *)
+    (*     right. left. apply u. *)
+    (*     destruct s. *)
+    (*     right. right. left. apply e. *)
+    (*     repeat right. apply (ms', a). *)
+    (*   - (* MemMonad_lift_stateT *) *)
+    (*     admit. *)
+    (* Admitted. *)
+
     Import EitherMonad.
     Definition exec_correct {X} (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
       forall ms,
-        match IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (MemMonad_runs_to exec ms))))) with
+        match IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (MemMonad_run exec ms))))) with
         | inl (OOM_message oom_msg) =>
             spec ms (inr (Oom oom_msg))
         | inr (inl (UB_message ub_msg)) =>
@@ -889,67 +958,70 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         end.
 
     (** Correctness of the main operations on memory *)
-    Parameter read_byte_correct :
+    Lemma read_byte_correct :
       forall ptr, exec_correct (read_byte ptr) (read_byte_MemPropT ptr).
+    Proof.
+      unfold exec_correct.
+      intros ptr ms.
+      destruct ms.
+      unfold read_byte.
+      (*
+      unfold read_byte_MemPropT.
+      unfold get_mem_state.
+      unfold MemPropT_MonadMemState.
+       *)
+      cbn.
+
+      rewrite MemMonad_run_bind.
+      rewrite MemMonad_get_mem_state.
+      cbn.
+      break_inner_match.
+      - (* Found address in memory *)
+        cbn. destruct m.
+        break_inner_match; cbn.
+        + (* Access allowed *)
+          rewrite MemMonad_run_ret. cbn.
+          do 2 eexists.
+          split.
+          * split; reflexivity.
+          * rewrite Heqo; cbn.
+            rewrite Heqb.
+            split; auto.
+        + (* Access not allowed *)
+          rewrite MemMonad_run_raise_ub.
+          cbn.
+          intros [err | [[ms' res] | oom]].
+          * intros [BLAH | BLAH].
+            admit.
+            destruct BLAH as (sab & a' & (sabeq & a'eq) & BLAH).
+            subst.
+            destruct BLAH as (err' & BLAH).
+            rewrite Heqo in BLAH; cbn in BLAH.
+            rewrite Heqb in BLAH. destruct BLAH as [[ ] _ ].
+          * intros CONTRA.
+            destruct CONTRA as (sab & a' & (sabeq & a'eq) & CONTRA).
+            subst.
+            rewrite Heqo in CONTRA; cbn in CONTRA.
+            rewrite Heqb in CONTRA.
+            destruct CONTRA as [[ ] _].
+          * intros CONTRA.
+      - break_inner_match.
+      
+      destruct (read_byte ptr).
+    Qed.
 
     Parameter write_byte_correct :
       forall ptr byte, exec_correct (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
-
-    (* TODO: do I need this at all? *)
-    Parameter addr_allocated_correct :
-      forall ptr aid, exec_correct (addr_allocated ptr aid) (addr_allocated_prop ptr aid).
 
     Parameter allocate_bytes_correct :
       forall dt init_bytes, exec_correct (allocate_bytes dt init_bytes) (allocate_bytes_spec_MemPropT dt init_bytes).
 
     (** Correctness of frame stack operations *)
-    Parameter ptr_in_frame_correct :
-      forall frame ptr,
-        ptr_in_frame_prop frame ptr <->
-        ptr_in_frame frame ptr = true.
+    Parameter mempush_correct :
+      exec_correct mempush mempush_spec_MemPropT.
 
-    Parameter peek_frame_stack_correct :
-      forall frame_stack frame,
-        peek_frame_stack_prop frame_stack frame <->
-          peek_frame_stack frame_stack = frame.
-
-    Parameter push_frame_stack_correct :
-      forall frame_stack frame_stack' frame,
-        push_frame_stack_spec frame_stack frame frame_stack' <->
-          push_frame_stack frame_stack frame = frame_stack'.
-
-    Parameter pop_frame_stack_correct :
-      forall frame_stack frame,
-        pop_frame_stack_prop frame_stack frame <->
-          pop_frame_stack frame_stack = inr frame.
-
-    Parameter mem_state_frame_stack_correct :
-      forall ms fs,
-        mem_state_frame_stack_prop ms fs <->
-          mem_state_frame_stack ms = fs.
-
-    Record mem_state_set_frame_stack_invariants (m1 : MemState) (m2 : MemState) :=
-      {
-        mem_state_set_frame_stack_op_reads : read_byte_preserved m1 m2;
-        mem_state_set_frame_stack_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
-        mem_state_set_frame_stack_op_allocations : allocations_preserved m1 m2;
-        mem_state_set_frame_stack_op_store_ids : preserve_store_ids m1 m2;
-        mem_state_set_frame_stack_op_allocation_ids : preserve_allocation_ids m1 m2;
-      }.
-
-    Parameter mem_state_set_frame_stack_correct :
-      forall ms ms' fs,
-        (mem_state_frame_stack_prop ms' fs /\ mem_state_set_frame_stack_invariants ms ms') <->
-          mem_state_set_frame_stack ms fs = ms'.
-
-    (** Allocation ids / store ids *)
-    Parameter used_allocation_id_correct :
-      forall ms aid,
-        used_allocation_id_prop ms aid <-> used_allocation_id ms aid = true.
-
-    Parameter used_store_id_correct :
-      forall ms aid,
-        used_store_id_prop ms aid <-> used_store_id ms aid = true.
+    Parameter mempop_correct :
+      exec_correct mempop mempop_spec_MemPropT.
 
     (*** Initial memory state *)
     Record initial_memory_state_prop : Prop :=
