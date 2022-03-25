@@ -89,9 +89,8 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
   Parameter mem_state_frame_stack_prop : MemState -> FrameStack -> Prop.
 
-  (** Allocation ids / store ids *)
+  (** Allocation ids / store ids*)
   Parameter used_allocation_id_prop : MemState -> AllocationId -> Prop.
-  Parameter used_store_id_prop : MemState -> store_id -> Prop.
 End MemoryModelSpecPrimitives.
 
 Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP).
@@ -199,13 +198,11 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     := forall p, used_allocation_id_prop ms p <-> used_allocation_id_prop ms' p.
 
   (** Store ids *)
-  Definition extend_store_ids (ms : MemState) (new_sid : store_id) (ms' : MemState) : Prop
-    := (forall p, used_store_id_prop ms p -> used_store_id_prop ms' p) /\
-         ~ used_store_id_prop ms new_sid /\
-         used_store_id_prop ms' new_sid.
+  Definition used_store_id_prop (ms : MemState) (sid : store_id) : Prop
+    := exists ptr byte, read_byte_prop ms ptr byte /\ sbyte_sid byte = inr sid.
 
-  Definition preserve_store_ids (ms ms' : MemState) : Prop
-    := forall sid, used_store_id_prop ms sid <-> used_store_id_prop ms' sid.
+  Definition fresh_store_id (ms : MemState) (new_sid : store_id) : Prop
+    := ~ used_store_id_prop ms new_sid.
 
   (** Frame stack *)
   Definition frame_stack_preserved (m1 m2 : MemState) : Prop
@@ -222,7 +219,6 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       + exact True.
       + exact
           ( extend_allocation_ids ms new_aid ms' /\
-              preserve_store_ids ms ms' /\
               read_byte_preserved ms ms' /\
               write_byte_allowed_all_preserved ms ms' /\
               allocations_preserved ms ms' /\
@@ -240,7 +236,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       intros ms [err | [[ms' new_sid] | oom]].
       + exact True.
       + exact
-          ( extend_store_ids ms new_sid ms' /\
+          ( fresh_store_id ms' new_sid /\
               preserve_allocation_ids ms ms' /\
               read_byte_preserved ms ms' /\
               write_byte_allowed_all_preserved ms ms' /\
@@ -296,7 +292,6 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       mempush_op_reads : read_byte_preserved m1 m2;
       mempush_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
       mempush_op_allocations : allocations_preserved m1 m2;
-      mempush_op_store_ids : preserve_store_ids m1 m2;
       mempush_op_allocation_ids : preserve_allocation_ids m1 m2;
     }.
 
@@ -323,7 +318,6 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   (** mempop *)
   Record mempop_operation_invariants (m1 : MemState) (m2 : MemState) :=
     {
-      mempop_op_store_ids : preserve_store_ids m1 m2;
       mempop_op_allocation_ids : preserve_allocation_ids m1 m2;
     }.
 
@@ -397,7 +391,6 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       write_byte_op_preserves_frame_stack : frame_stack_preserved m1 m2;
       write_byte_op_read_allowed : read_byte_allowed_all_preserved m1 m2;
       write_byte_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
-      write_byte_op_store_ids : preserve_store_ids m1 m2;
       write_byte_op_allocation_ids : preserve_allocation_ids m1 m2;
     }.
 
@@ -480,10 +473,6 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
         mem_state_frame_stack_prop m1 fs1 ->
         add_ptrs_to_frame_stack fs1 ptrs fs2 ->
         mem_state_frame_stack_prop m2 fs2;
-
-      (* Store ids are preserved. *)
-      allocate_bytes_store_ids :
-      preserve_store_ids m1 m2;
 
       (* Type is valid *)
       allocate_bytes_typ :

@@ -1427,16 +1427,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 eexists; split.
                 --- apply ALLOC_PRESERVED; eauto.
                 --- auto.
-            -- (* Preserve store ids *)
-              unfold preserve_store_ids.
-              unfold used_store_id_prop.
-              intros ?sid.
-              unfold_mem_state_memory.
-              split; intros ?USED_SID.
-              ++ 
-
-              tauto.
-              admit.
             -- (* Preserve allocation ids *)
               admit.
         + (* Access forbidden *)
