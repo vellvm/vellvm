@@ -38,15 +38,6 @@ Module Type ADDRESS.
   Parameter eq_dec : forall (a b : addr), {a = b} + {a <> b}.
   Parameter different_addrs : forall (a : addr), exists (b : addr), a <> b.
 
-  (* Semantic equivalence of pointers in the memory model, i.e.,
-     whether or not these pointers point to the same byte in memory, even
-     if the `addr` type itself is different (for instance due to extra
-     provenance information)
-   *)
-  Parameter ptr_overlap : forall (a b : addr), Prop.
-  Parameter ptr_overlap_dec : forall (a b : addr), {ptr_overlap a b} + {~ptr_overlap a b}.
-  Parameter ptr_overlap_refl : forall a, ptr_overlap a a.
-
   (* Debug *)
   Parameter show_addr : addr -> string.
 End ADDRESS.
@@ -92,7 +83,8 @@ End INTPTR_BIG.
 
 (* TODO: move this? *)
 Module Type PTOI(Addr:MemoryAddress.ADDRESS).
-  Parameter ptr_to_int : Addr.addr -> Z.
+  Import Addr.
+  Parameter ptr_to_int : addr -> Z.
 End PTOI.
 
 
@@ -142,6 +134,10 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
   (* Provenance allocation *)
   Parameter initial_provenance : Provenance.
   Parameter next_provenance : Provenance -> Provenance.
+
+  (* Lemmas *)
+  Parameter aid_access_allowed_refl :
+    forall aid, aid_access_allowed aid aid = true.
 
   (* Debug *)
   Parameter show_prov : Prov -> string.

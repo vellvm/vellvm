@@ -131,19 +131,6 @@ Module Addr : MemoryAddress.ADDRESS with Definition addr := (Iptr * Prov) % type
   Qed.
 
   Definition show_addr (a : addr) := Show.show a.
-
-  Definition ptr_overlap (a b : addr)
-    := fst a = fst b.
-
-  Definition ptr_overlap_dec (a b : addr) : {ptr_overlap a b} + {~ptr_overlap a b}
-    := Z.eq_dec (fst a) (fst b).
-
-  Lemma ptr_overlap_refl :
-    forall a, ptr_overlap a a.
-  Proof.
-    intros a.
-    destruct a; cbn; reflexivity.
-  Qed.
 End Addr.
 
 Module BigIP : MemoryAddress.INTPTR with
@@ -469,11 +456,20 @@ Module FinPROV : PROVENANCE(Addr) with Definition Prov := Prov.
   Definition initial_provenance : Provenance
     := 0%N.
 
+  Lemma aid_access_allowed_refl :
+    forall aid, aid_access_allowed aid aid = true.
+  Proof.
+    intros aid.
+    unfold aid_access_allowed.
+    destruct aid; auto.
+    rewrite N.eqb_refl.
+    auto.
+  Qed.
+
   (* Debug *)
   Definition show_prov (pr : Prov) := Show.show pr.
   Definition show_provenance (pr : Provenance) := Show.show pr.
   Definition show_allocation_id (aid : AllocationId) := Show.show aid.
-
 End FinPROV.
 
 Module FinITOP : ITOP(Addr)(FinPROV).
@@ -650,7 +646,36 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
      *)
     Definition memory_stack : Type := memory * FrameStack.
 
+    (** Some operations on memory *)
+    Definition set_byte_raw (mem : memory) (phys_addr : Z) (byte : mem_byte) : memory :=
+      IM.add phys_addr byte mem.
+
+    Definition read_byte_raw (mem : memory) (phys_addr : Z) : option mem_byte :=
+      IM.find phys_addr mem.
+
+    Lemma set_byte_raw_eq :
+      forall (mem : memory) (byte : mem_byte) (x y : Z),
+        x = y ->
+        read_byte_raw (set_byte_raw mem x byte) y = Some byte.
+    Proof.
+      intros mem byte x y XY.
+      apply IP.F.add_eq_o; auto.
+    Qed.
+
+    Lemma set_byte_raw_neq :
+      forall (mem : memory) (byte : mem_byte) (x y : Z),
+        x <> y ->
+        read_byte_raw (set_byte_raw mem x byte) y = read_byte_raw mem y.
+    Proof.
+      intros mem byte x y XY.
+      apply IP.F.add_neq_o; auto.
+    Qed.
+
   End Datatype_Definition.
+
+  (* Convenient to make these opaque so they don't get unfolded *)
+  #[global] Opaque set_byte_raw.
+  #[global] Opaque read_byte_raw.
 
   Record MemState' :=
     mkMemState
@@ -677,7 +702,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     let pr := address_provenance ptr in
     ms <- get_mem_state;;
     let mem := mem_state_memory ms in
-    match IM.find addr mem with
+    match read_byte_raw mem addr with
     | None => raise_ub "Reading from unallocated memory."
     | Some byte =>
         let aid := snd byte in
@@ -690,7 +715,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
   Definition addr_allocated_prop (ptr : addr) (aid : AllocationId) : MemPropT MemState bool :=
     ms <- get_mem_state;;
-    match IM.find (ptr_to_int ptr) (mem_state_memory ms) with
+    match read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) with
     | None => ret false
     | Some (byte, aid') =>
         ret (aid_access_allowed aid aid')
@@ -719,12 +744,12 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Definition used_allocation_id_prop (ms : MemState) (aid : AllocationId) : Prop :=
     exists ptr byte,
       let mem := mem_state_memory ms in
-      IM.find ptr mem = Some (byte, aid).
+      read_byte_raw mem ptr = Some (byte, aid).
 
   Definition used_store_id_prop (ms : MemState) (sid : store_id) : Prop :=
     exists ptr byte aid,
       let mem := mem_state_memory ms in
-      IM.find ptr mem = Some (byte, aid) /\
+      read_byte_raw mem ptr = Some (byte, aid) /\
         sbyte_sid byte = inr sid.
 End FiniteMemoryModelSpecPrimitives.
 
@@ -743,8 +768,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Import MemSpec.
   Import MemHelpers.
 
-  Module ESID := ERRSID ADDR IP SIZEOF PROV.
-
+  (* Convenient to make these opaque so they don't get unfolded *)
   Section MemoryPrimatives.
     Context {MemM : Type -> Type}.
     (* Context `{Monad MemM}. *)
@@ -778,7 +802,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       let pr := address_provenance ptr in
       ms <- get_mem_state;;
       let mem := mem_state_memory ms in
-      match IM.find addr mem with
+      match read_byte_raw mem addr with
       | None => raise_ub "Reading from unallocated memory."
       | Some (byte, aid) =>
           if access_allowed pr aid
@@ -789,19 +813,18 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               ("Read from memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation id: " ++ Show.show (show_allocation_id aid) ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem)))
       end.
 
-
     (** Writes *)
     Definition write_byte (ptr : addr) (byte : SByte) : MemM unit :=
       let addr := ptr_to_int ptr in
       let pr := address_provenance ptr in
       ms <- get_mem_state;;
       let mem := mem_state_memory ms in
-      match IM.find addr mem with
+      match read_byte_raw mem addr with
       | None => raise_ub "Writing to unallocated memory"
       | Some (_, aid) =>
           if access_allowed pr aid
           then
-            let mem' := add addr (byte, aid) mem in
+            let mem' := set_byte_raw mem addr (byte, aid) in
             let fs := mem_state_frame_stack ms in
             put_mem_state (mkMemState (mem', fs) ms.(ms_sid) ms.(ms_prov))
           else raise_ub 
@@ -811,7 +834,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (** Allocations *)
     Definition addr_allocated (ptr : addr) (aid : AllocationId) : MemM bool :=
       ms <- get_mem_state;;
-      match IM.find (ptr_to_int ptr) (mem_state_memory ms) with
+      match read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) with
       | None => ret false
       | Some (byte, aid') =>
           ret (aid_access_allowed aid aid')
@@ -962,17 +985,18 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       repeat match goal with
              | |- context [MemMonad_run (bind _ _)] => rewrite MemMonad_run_bind
              | |- context [MemMonad_run get_mem_state] => rewrite MemMonad_get_mem_state
+             | |- context [MemMonad_run (put_mem_state _)] => rewrite MemMonad_put_mem_state
              | |- context [MemMonad_run (ret _)] => rewrite MemMonad_run_ret
              | |- context [MemMonad_run (raise_ub _)] => rewrite MemMonad_run_raise_ub
              end.
 
     Ltac break_memory_lookup :=
       match goal with
-      | |- context [match IM.find ?intptr ?memory with _ => _ end] =>
+      | |- context [match read_byte_raw ?memory ?intptr with _ => _ end] =>
           let Hlookup := fresh "Hlookup" in
           let byte := fresh "byte" in
           let aid := fresh "aid" in
-          destruct (IM.find intptr memory) as [[byte aid] | ]eqn:Hlookup
+          destruct (read_byte_raw memory intptr) as [[byte aid] | ] eqn:Hlookup
       end.
 
     Ltac MemMonad_break :=
@@ -1022,12 +1046,18 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Ltac subst_mempropt :=
       repeat
         match goal with
-        | Hlup: IM.find ?addr ?mem = _,
-            H: context [match IM.find ?addr ?mem with _ => _ end] |- _
+        | Hlup: read_byte_raw ?mem ?addr = _,
+            H: context [match read_byte_raw ?mem ?addr with _ => _ end] |- _
           => rewrite Hlup in H; cbn in H
+        | Hlup: read_byte_raw ?mem ?addr = _ |-
+            context [match read_byte_raw ?mem ?addr with _ => _ end]
+          => rewrite Hlup; cbn
         | HC: ?X = _,
             H: context [if ?X then _ else _] |- _
           => rewrite HC in H; cbn in H
+        | HC: ?X = _ |-
+            context [if ?X then _ else _]
+          => rewrite HC; cbn
         end.
 
     Ltac solve_mempropt_contra :=
@@ -1049,6 +1079,120 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
            | tauto
         ]).
 
+    Ltac unfold_mem_state_memory :=
+      unfold mem_state_memory;
+      unfold fst;
+      unfold ms_memory_stack.
+
+    Ltac unfold_mem_state_memory_in H :=
+      unfold mem_state_memory in H;
+      unfold fst in H;
+      unfold ms_memory_stack in H.
+
+    Ltac solve_byte_allocated :=
+      repeat eexists;
+      first [ cbn; (* This was unfold_mem_state_memory, but I think with read_byte_raw / write_byte raw opaque it's fine to cbn *)
+              rewrite set_byte_raw_eq; [|solve [eauto]]
+            | subst_mempropt
+        ];
+      split; try reflexivity;
+      rewrite aid_access_allowed_refl; auto.
+
+
+    Ltac solve_write_byte_allowed :=
+      eexists; split; [| solve [eauto]]; solve_byte_allocated.
+
+    Ltac solve_read_byte_allowed :=
+      solve_write_byte_allowed.
+
+    Ltac solve_read_byte_prop :=
+      repeat eexists;
+      first [ cbn; (*unfold_mem_state_memory; *)
+              rewrite set_byte_raw_eq; [|solve [eauto]]
+            | subst_mempropt
+        ];
+      cbn; subst_mempropt;
+      split; auto.
+
+    (* Ltac solve_set_byte_memory := *)
+    (*   split; [solve_read_byte_allowed | solve_read_byte_prop | solve_disjoint_read_bytes]. *)
+
+    Ltac solve_read_byte_spec :=
+      split; [solve_read_byte_allowed | solve_read_byte_prop].
+
+    Ltac solve_frame_stack_preserved :=
+      solve [
+          let PROP := fresh "PROP" in
+          intros ?fs; split; intros PROP; inv PROP; reflexivity
+        ].
+
+    Lemma byte_allocated_set_byte_raw_eq :
+      forall ptr aid new new_aid m1 m2,
+        byte_allocated m1 ptr aid ->
+        mem_state_memory m2 = set_byte_raw (mem_state_memory m1) (ptr_to_int ptr) (new, new_aid) ->
+        byte_allocated m2 ptr new_aid.
+    Proof.
+      intros ptr aid new new_aid m1 m2 [aid' [ms [GET ALLOCATED]]] MEM.
+      inversion GET; subst.
+      cbn in ALLOCATED.
+      destruct ALLOCATED as (ms' & b & ALLOCATED).
+      destruct ALLOCATED as [ALLOCATED [C1 C2]]; subst.
+      destruct ALLOCATED as [ms'' [ms''' [[C1 C2] ALLOCATED]]]; subst.
+
+      repeat eexists.
+      rewrite MEM.
+      rewrite set_byte_raw_eq; auto.
+      cbn; split; auto.
+      rewrite aid_access_allowed_refl.
+      auto.
+    Qed.
+
+    Lemma byte_allocated_set_byte_raw_neq :
+      forall ptr aid new_ptr new new_aid m1 m2,
+        byte_allocated m1 ptr aid ->
+        disjoint_ptr_byte ptr new_ptr ->
+        mem_state_memory m2 = set_byte_raw (mem_state_memory m1) (ptr_to_int new_ptr) (new, new_aid) ->
+        byte_allocated m2 ptr aid.
+    Proof.
+      intros ptr aid new_ptr new new_aid m1 m2 [aid' [ms [GET ALLOCATED]]] DISJOINT MEM.
+      inversion GET; subst.
+      cbn in ALLOCATED.
+      destruct ALLOCATED as (ms' & b & ALLOCATED).
+      destruct ALLOCATED as [ALLOCATED [C1 C2]]; subst.
+      destruct ALLOCATED as [ms'' [ms''' [[C1 C2] ALLOCATED]]]; subst.
+
+      repeat eexists.
+      rewrite MEM.
+      unfold mem_byte in *.
+      rewrite set_byte_raw_neq; auto.
+      break_match.
+      break_match.
+      destruct ALLOCATED.
+      cbn; split; auto.
+      destruct ALLOCATED.
+      inv H10.
+    Qed.
+
+    Lemma byte_allocated_set_byte_raw :
+      forall ptr aid ptr_new new m1 m2,
+        byte_allocated m1 ptr aid ->
+        mem_state_memory m2 = set_byte_raw (mem_state_memory m1) (ptr_to_int ptr_new) new ->
+        exists aid2, byte_allocated m2 ptr aid2.
+    Proof.
+      intros ptr aid ptr_new new m1 m2 ALLOCATED MEM.
+      pose proof (Z.eq_dec (ptr_to_int ptr) (ptr_to_int ptr_new)) as [EQ | NEQ].
+      - (* EQ *)
+        destruct new.
+        rewrite <- EQ in MEM.
+        eexists.
+        eapply byte_allocated_set_byte_raw_eq; eauto.
+      - (* NEQ *)
+        destruct new.
+        subst.
+        eexists.
+        eapply byte_allocated_set_byte_raw_neq; eauto.
+    Qed.
+
     (** Correctness of the main operations on memory *)
     Lemma read_byte_correct :
       forall ptr, exec_correct (read_byte ptr) (read_byte_MemPropT ptr).
@@ -1062,8 +1206,246 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       MemMonad_solve.
     Qed.
 
-    Parameter write_byte_correct :
+    Lemma write_byte_correct :
       forall ptr byte, exec_correct (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
+    Proof.
+      unfold exec_correct.
+      intros ptr byte ms.
+      destruct ms.
+      unfold write_byte.
+      cbn.
+
+      MemMonad_go; cbn.
+      MemMonad_break; cbn.
+      - (* Allocated *)
+        MemMonad_break; cbn.
+        + (* Access allowed *)
+	  MemMonad_go; cbn.
+
+          split.
+          * (* Write allowed *)
+            solve_write_byte_allowed.
+          * (* set_byte_memory, should make a tactic to solve this too *)
+            split.
+            -- (* read_byte_spec *)
+              solve_read_byte_spec.
+            -- (* Old reads *)
+              intros ptr' byte' H9.
+              split.
+              ++ (* read byte spec *)
+                 intros H10.
+                 split.
+                 ** (* read byte allowed *)
+                   destruct H10.
+                    destruct read_byte_value0 as (ms & a & MS & RB).
+                   cbn in MS.
+                   destruct MS as [MS1 MS2].
+                   subst.
+                   unfold_mem_state_memory.
+                   unfold_mem_state_memory_in Hlookup.
+                   unfold_mem_state_memory_in RB.
+                   (* Lookup in RB *)
+                   break_match_hyp.
+                   destruct m.
+                   ---
+                     repeat eexists.
+                     cbn.
+                     rewrite set_byte_raw_neq; auto.
+                     unfold mem_byte in Heqo.
+                     subst_mempropt.
+
+                     split; auto.
+                     rewrite aid_access_allowed_refl; auto.
+
+                     cbn in RB.
+                     break_match_hyp; tauto.
+                   --- (* read byte allowed... *)
+                     repeat eexists.
+                     unfold_mem_state_memory.
+                     rewrite set_byte_raw_neq; auto.
+                     unfold mem_byte in Heqo.
+                     subst_mempropt.
+
+                     split; cbn in *; tauto.
+                     cbn in *; tauto.
+                 ** (* read byte prop *)
+                   destruct H10.
+                   destruct read_byte_value0 as (ms & a & MS & RB).
+                   cbn in MS.
+                   destruct MS as [MS1 MS2].
+                   subst.
+                   unfold_mem_state_memory.
+                   unfold_mem_state_memory_in Hlookup.
+                   unfold_mem_state_memory_in RB.
+                   (* Lookup in RB *)
+                   break_match_hyp.
+                   destruct m.
+                   --- repeat eexists.
+                       unfold_mem_state_memory.
+                       unfold_mem_state_memory_in Hlookup.
+                       rewrite set_byte_raw_neq; auto.
+                       unfold mem_byte in Heqo.
+                       subst_mempropt.
+                       cbn in RB.
+
+                       break_match.
+                       destruct RB; subst.
+                       split; tauto.
+                       tauto.
+                   --- cbn in RB. tauto.
+              ++ (* Other direction for old reads... *)
+                intros H10.
+                destruct H10.
+                split.
+                ** (* read_byte_allowed *)
+                  admit.
+                ** (* read_byte_prop *)
+                  admit.
+          * (* write_byte_operation_invariants, also a tactic *)
+            assert (  allocations_preserved
+    {| ms_memory_stack := ms_memory_stack0; ms_sid := ms_sid0; ms_prov := ms_prov0 |}
+    {|
+      ms_memory_stack :=
+        (set_byte_raw
+           (mem_state_memory
+              {| ms_memory_stack := ms_memory_stack0; ms_sid := ms_sid0; ms_prov := ms_prov0 |})
+           (ptr_to_int ptr) (byte, aid)
+          ,
+        mem_state_frame_stack
+          {| ms_memory_stack := ms_memory_stack0; ms_sid := ms_sid0; ms_prov := ms_prov0 |});
+      ms_sid := ms_sid0;
+      ms_prov := ms_prov0
+    |}) as ALLOC_PRESERVED.
+
+            {
+              unfold allocations_preserved.
+              cbn.
+              intros ptr_after aid_after.
+              split.
+              { repeat eexists.
+                unfold_mem_state_memory.
+                pose proof Z.eq_dec (ptr_to_int ptr_after) (ptr_to_int ptr) as [EQ | NEQ].
+                { rewrite EQ.
+                  rewrite set_byte_raw_eq; auto.
+                  split; auto.
+
+                  repeat destruct H9.
+                  repeat destruct H10.
+                  repeat destruct H9.
+                  destruct H10; subst.
+                  rewrite EQ in H12.
+                  rewrite Hlookup in H12.
+                  tauto.
+                }
+                { rewrite set_byte_raw_neq; auto.
+
+                  repeat destruct H9.
+                  repeat destruct H10.
+                  repeat destruct H9.
+                  destruct H10; subst.
+                  unfold mem_byte in *.
+                  unfold_mem_state_memory_in H12.
+                  break_match.
+                  break_match.
+                  split; tauto.
+
+                  tauto.
+                }
+              }
+
+              { repeat eexists.
+                repeat destruct H9.
+                repeat destruct H10.
+                repeat destruct H9.
+                destruct H10; subst.
+                unfold_mem_state_memory_in H12.
+                unfold_mem_state_memory_in Hlookup.
+                pose proof Z.eq_dec (ptr_to_int ptr_after) (ptr_to_int ptr) as [EQ | NEQ].
+                { rewrite EQ.
+                  rewrite EQ in H12.
+                  rewrite set_byte_raw_eq in H12; auto.
+                  inv H12.
+                  unfold_mem_state_memory.
+                  rewrite Hlookup.
+                  tauto.
+                }
+                { rewrite set_byte_raw_neq in H12; auto.
+                  unfold mem_byte in *.
+                  unfold_mem_state_memory.
+                  break_match.
+                  break_match.
+                  tauto.
+                  tauto.
+                }
+              }
+            }.
+
+            split.
+            -- (* Allocations preserved *)
+              apply ALLOC_PRESERVED.
+            -- (* Frame stack preserved *)
+              solve_frame_stack_preserved.
+            -- (* Read byte allowed preserved *)
+              unfold read_byte_allowed_all_preserved.
+              intros ?ptr_after; split.
+              ***
+                let ALLOCATED := fresh "ALLOCATED" in
+                let ALLOWED := fresh "ALLOWED" in
+                let aid := fresh "aid" in
+                intros [aid [ALLOCATED ALLOWED]].
+
+                eexists; split.
+                --- apply ALLOC_PRESERVED; eauto.
+                --- auto.
+              ***
+                let ALLOCATED := fresh "ALLOCATED" in
+                let ALLOWED := fresh "ALLOWED" in
+                let aid := fresh "aid" in
+                intros [aid [ALLOCATED ALLOWED]].
+
+                eexists; split.
+                --- apply ALLOC_PRESERVED; eauto.
+                --- auto.
+            -- (* Write byte allowed preserved *)
+              unfold write_byte_allowed_all_preserved.
+              intros ?ptr_after; split.
+              ***
+                let ALLOCATED := fresh "ALLOCATED" in
+                let ALLOWED := fresh "ALLOWED" in
+                let aid := fresh "aid" in
+                intros [aid [ALLOCATED ALLOWED]].
+
+                eexists; split.
+                --- apply ALLOC_PRESERVED; eauto.
+                --- auto.
+              ***
+                let ALLOCATED := fresh "ALLOCATED" in
+                let ALLOWED := fresh "ALLOWED" in
+                let aid := fresh "aid" in
+                intros [aid [ALLOCATED ALLOWED]].
+
+                eexists; split.
+                --- apply ALLOC_PRESERVED; eauto.
+                --- auto.
+            -- (* Preserve store ids *)
+              unfold preserve_store_ids.
+              unfold used_store_id_prop.
+              intros ?sid.
+              unfold_mem_state_memory.
+              split; intros ?USED_SID.
+              ++ 
+
+              tauto.
+              admit.
+            -- (* Preserve allocation ids *)
+              admit.
+        + (* Access forbidden *)
+        MemMonad_solve.
+        admit. 
+      - (* Unallocated memory *)
+        MemMonad_solve.
+        admit.
+    Qed.
 
     Parameter allocate_bytes_correct :
       forall dt init_bytes, exec_correct (allocate_bytes dt init_bytes) (allocate_bytes_spec_MemPropT dt init_bytes).

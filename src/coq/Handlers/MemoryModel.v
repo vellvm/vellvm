@@ -131,6 +131,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Import LP.ADDR.
   Import LP.SIZEOF.
   Import LP.PROV.
+  Import LP.PTOI.
   Import MMSP.
 
   Require Import MemBytes.
@@ -155,420 +156,420 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Definition byte_not_allocated (ms : MemState) (ptr : addr) : Prop
     := forall (aid : AllocationId), ~ byte_allocated ms ptr aid.
 
-    (** Addresses *)
-    Definition disjoint_ptr_byte (a b : addr) :=
-      ~ ptr_overlap a b.
+  (** Addresses *)
+  Definition disjoint_ptr_byte (a b : addr) :=
+    ptr_to_int a <> ptr_to_int b.
 
-    (*** Predicates *)
+  (*** Predicates *)
 
-    (** Reads *)
-    Definition read_byte_allowed (ms : MemState) (ptr : addr) : Prop :=
-      exists aid, byte_allocated ms ptr aid /\ access_allowed (address_provenance ptr) aid = true.
+  (** Reads *)
+  Definition read_byte_allowed (ms : MemState) (ptr : addr) : Prop :=
+    exists aid, byte_allocated ms ptr aid /\ access_allowed (address_provenance ptr) aid = true.
 
-    Definition read_byte_allowed_all_preserved (m1 m2 : MemState) : Prop :=
-      forall ptr,
-        read_byte_allowed m1 ptr <-> read_byte_allowed m2 ptr.
+  Definition read_byte_allowed_all_preserved (m1 m2 : MemState) : Prop :=
+    forall ptr,
+      read_byte_allowed m1 ptr <-> read_byte_allowed m2 ptr.
 
-    Definition read_byte_prop_all_preserved (m1 m2 : MemState) : Prop :=
-      forall ptr byte,
-        read_byte_prop m1 ptr byte <-> read_byte_prop m2 ptr byte.
+  Definition read_byte_prop_all_preserved (m1 m2 : MemState) : Prop :=
+    forall ptr byte,
+      read_byte_prop m1 ptr byte <-> read_byte_prop m2 ptr byte.
 
-    Definition read_byte_preserved (m1 m2 : MemState) : Prop :=
-      read_byte_allowed_all_preserved m1 m2 /\ read_byte_prop_all_preserved m1 m2.
+  Definition read_byte_preserved (m1 m2 : MemState) : Prop :=
+    read_byte_allowed_all_preserved m1 m2 /\ read_byte_prop_all_preserved m1 m2.
 
-    (** Writes *)
-    Definition write_byte_allowed (ms : MemState) (ptr : addr) : Prop :=
-      exists aid, byte_allocated ms ptr aid /\ access_allowed (address_provenance ptr) aid = true.
+  (** Writes *)
+  Definition write_byte_allowed (ms : MemState) (ptr : addr) : Prop :=
+    exists aid, byte_allocated ms ptr aid /\ access_allowed (address_provenance ptr) aid = true.
 
-    Definition write_byte_allowed_all_preserved (m1 m2 : MemState) : Prop :=
-      forall ptr,
-        write_byte_allowed m1 ptr <-> write_byte_allowed m2 ptr.
+  Definition write_byte_allowed_all_preserved (m1 m2 : MemState) : Prop :=
+    forall ptr,
+      write_byte_allowed m1 ptr <-> write_byte_allowed m2 ptr.
 
-    (** Allocations *)
-    Definition allocations_preserved (m1 m2 : MemState) : Prop :=
-      forall ptr aid, byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid.
+  (** Allocations *)
+  Definition allocations_preserved (m1 m2 : MemState) : Prop :=
+    forall ptr aid, byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid.
 
-    (** Provenances / allocation ids *)
-    Definition extend_allocation_ids (ms : MemState) (new_aid : AllocationId) (ms' : MemState) : Prop
-      := (forall aid, used_allocation_id_prop ms aid -> used_allocation_id_prop ms' aid) /\
-           ~ used_allocation_id_prop ms new_aid /\
-           used_allocation_id_prop ms' new_aid.
+  (** Provenances / allocation ids *)
+  Definition extend_allocation_ids (ms : MemState) (new_aid : AllocationId) (ms' : MemState) : Prop
+    := (forall aid, used_allocation_id_prop ms aid -> used_allocation_id_prop ms' aid) /\
+         ~ used_allocation_id_prop ms new_aid /\
+         used_allocation_id_prop ms' new_aid.
 
-    Definition preserve_allocation_ids (ms ms' : MemState) : Prop
-      := forall p, used_allocation_id_prop ms p <-> used_allocation_id_prop ms' p.
+  Definition preserve_allocation_ids (ms ms' : MemState) : Prop
+    := forall p, used_allocation_id_prop ms p <-> used_allocation_id_prop ms' p.
 
-    (** Store ids *)
-    Definition extend_store_ids (ms : MemState) (new_sid : store_id) (ms' : MemState) : Prop
-      := (forall p, used_store_id_prop ms p -> used_store_id_prop ms' p) /\
-           ~ used_store_id_prop ms new_sid /\
-           used_store_id_prop ms' new_sid.
+  (** Store ids *)
+  Definition extend_store_ids (ms : MemState) (new_sid : store_id) (ms' : MemState) : Prop
+    := (forall p, used_store_id_prop ms p -> used_store_id_prop ms' p) /\
+         ~ used_store_id_prop ms new_sid /\
+         used_store_id_prop ms' new_sid.
 
-    Definition preserve_store_ids (ms ms' : MemState) : Prop
-      := forall sid, used_store_id_prop ms sid <-> used_store_id_prop ms' sid.
+  Definition preserve_store_ids (ms ms' : MemState) : Prop
+    := forall sid, used_store_id_prop ms sid <-> used_store_id_prop ms' sid.
 
-    (** Frame stack *)
-    Definition frame_stack_preserved (m1 m2 : MemState) : Prop
-      := forall fs,
-        mem_state_frame_stack_prop m1 fs <-> mem_state_frame_stack_prop m2 fs.
+  (** Frame stack *)
+  Definition frame_stack_preserved (m1 m2 : MemState) : Prop
+    := forall fs,
+      mem_state_frame_stack_prop m1 fs <-> mem_state_frame_stack_prop m2 fs.
 
-    (*** Allocation id operations *)
-    Instance MemPropT_MonadAllocationId : MonadAllocationId AllocationId (MemPropT MemState).
-    Proof.
-      split.
-      - (* fresh_allocation_id *)
-        unfold MemPropT.
-        intros ms [err | [[ms' new_aid] | oom]].
-        + exact True.
-        + exact
-            ( extend_allocation_ids ms new_aid ms' /\
-                preserve_store_ids ms ms' /\
-                read_byte_preserved ms ms' /\
-                write_byte_allowed_all_preserved ms ms' /\
-                allocations_preserved ms ms' /\
-                frame_stack_preserved ms ms'
-            ).
-        + exact True.
-    Defined.
+  (*** Allocation id operations *)
+  Instance MemPropT_MonadAllocationId : MonadAllocationId AllocationId (MemPropT MemState).
+  Proof.
+    split.
+    - (* fresh_allocation_id *)
+      unfold MemPropT.
+      intros ms [err | [[ms' new_aid] | oom]].
+      + exact True.
+      + exact
+          ( extend_allocation_ids ms new_aid ms' /\
+              preserve_store_ids ms ms' /\
+              read_byte_preserved ms ms' /\
+              write_byte_allowed_all_preserved ms ms' /\
+              allocations_preserved ms ms' /\
+              frame_stack_preserved ms ms'
+          ).
+      + exact True.
+  Defined.
 
-    (*** Store id operations *)
-    Instance MemPropT_MonadStoreID : MonadStoreId (MemPropT MemState).
-    Proof.
-      split.
-      - (* fresh_sid *)
-        unfold MemPropT.
-        intros ms [err | [[ms' new_sid] | oom]].
-        + exact True.
-        + exact
-            ( extend_store_ids ms new_sid ms' /\
-                preserve_allocation_ids ms ms' /\
-                read_byte_preserved ms ms' /\
-                write_byte_allowed_all_preserved ms ms' /\
-                allocations_preserved ms ms' /\
-                frame_stack_preserved ms ms'
-            ).
-        + exact True.
-    Defined.
+  (*** Store id operations *)
+  Instance MemPropT_MonadStoreID : MonadStoreId (MemPropT MemState).
+  Proof.
+    split.
+    - (* fresh_sid *)
+      unfold MemPropT.
+      intros ms [err | [[ms' new_sid] | oom]].
+      + exact True.
+      + exact
+          ( extend_store_ids ms new_sid ms' /\
+              preserve_allocation_ids ms ms' /\
+              read_byte_preserved ms ms' /\
+              write_byte_allowed_all_preserved ms ms' /\
+              allocations_preserved ms ms' /\
+              frame_stack_preserved ms ms'
+          ).
+      + exact True.
+  Defined.
 
-    (*** Reading from memory *)
-    Record read_byte_spec (ms : MemState) (ptr : addr) (byte : SByte) : Prop :=
-      { read_byte_allowed_spec : read_byte_allowed ms ptr;
-        read_byte_value : read_byte_prop ms ptr byte;
-      }.
+  (*** Reading from memory *)
+  Record read_byte_spec (ms : MemState) (ptr : addr) (byte : SByte) : Prop :=
+    { read_byte_allowed_spec : read_byte_allowed ms ptr;
+      read_byte_value : read_byte_prop ms ptr byte;
+    }.
 
-    Definition read_byte_spec_MemPropT (ptr : addr) : MemPropT MemState SByte :=
-      fun m1 res =>
-           match res with
-           | inr (NoOom (m2, byte)) => m1 = m2 /\ read_byte_spec m1 ptr byte
-           | _ => True (* Allowed to run out of memory or fail *)
-           end.
-
-    (*** Framestack operations *)
-    Definition empty_frame (f : Frame) : Prop :=
-      forall ptr, ~ ptr_in_frame_prop f ptr.
-
-    Record add_ptr_to_frame (f1 : Frame) (ptr : addr) (f2 : Frame) : Prop :=
-      {
-        old_frame_lu : forall ptr', ptr_in_frame_prop f1 ptr' -> ptr_in_frame_prop f2 ptr';
-        new_frame_lu : ptr_in_frame_prop f2 ptr;
-      }.
-
-    Record empty_frame_stack (fs : FrameStack) : Prop :=
-      {
-        no_pop : (forall f, ~ pop_frame_stack_prop fs f);
-        empty_fs_empty_frame : forall f, peek_frame_stack_prop fs f -> empty_frame f;
-      }.
-
-    Record push_frame_stack_spec (fs1 : FrameStack) (f : Frame) (fs2 : FrameStack) : Prop :=
-      {
-        can_pop : pop_frame_stack_prop fs2 fs1;
-        new_frame : peek_frame_stack_prop fs2 f;
-      }.
-
-    Definition ptr_in_current_frame (ms : MemState) (ptr : addr) : Prop
-      := forall fs, mem_state_frame_stack_prop ms fs ->
-               forall f, peek_frame_stack_prop fs f ->
-                    ptr_in_frame_prop f ptr.
-
-    (** mempush *)
-    Record mempush_operation_invariants (m1 : MemState) (m2 : MemState) :=
-      {
-        mempush_op_reads : read_byte_preserved m1 m2;
-        mempush_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
-        mempush_op_allocations : allocations_preserved m1 m2;
-        mempush_op_store_ids : preserve_store_ids m1 m2;
-        mempush_op_allocation_ids : preserve_allocation_ids m1 m2;
-      }.
-
-    Record mempush_spec (m1 : MemState) (m2 : MemState) : Prop :=
-      {
-        fresh_frame :
-        forall fs1 fs2 f,
-          mem_state_frame_stack_prop m1 fs1 ->
-          empty_frame f ->
-          push_frame_stack_spec fs1 f fs2 ->
-          mem_state_frame_stack_prop m2 fs2;
-
-        mempush_invariants :
-        mempush_operation_invariants m1 m2;
-      }.
-
-    Definition mempush_spec_MemPropT : MemPropT MemState unit :=
-      fun m1 res =>
-        match res with
-        | inr (NoOom (m2, _)) => mempush_spec m1 m2
-        | _ => True (* Allowed to run out of memory or fail *)
-        end.
-
-    (** mempop *)
-    Record mempop_operation_invariants (m1 : MemState) (m2 : MemState) :=
-      {
-        mempop_op_store_ids : preserve_store_ids m1 m2;
-        mempop_op_allocation_ids : preserve_allocation_ids m1 m2;
-      }.
-
-    Record mempop_spec (m1 : MemState) (m2 : MemState) : Prop :=
-      {
-        (* all bytes in popped frame are freed. *)
-        bytes_freed :
-        forall ptr,
-          ptr_in_current_frame m1 ptr ->
-          byte_not_allocated m2 ptr;
-
-        (* Bytes not allocated in the popped frame have the same allocation status as before *)
-        non_frame_bytes_preserved :
-        forall ptr aid,
-          (~ ptr_in_current_frame m1 ptr) ->
-          byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid;
-
-        (* Bytes not allocated in the popped frame are the same when read *)
-        non_frame_bytes_read :
-        forall ptr byte,
-          (~ ptr_in_current_frame m1 ptr) ->
-          read_byte_spec m1 ptr byte <-> read_byte_spec m2 ptr byte;
-
-        (* Set new framestack *)
-        pop_frame :
-        forall fs1 fs2,
-          mem_state_frame_stack_prop m1 fs1 ->
-          pop_frame_stack_prop fs1 fs2 ->
-          mem_state_frame_stack_prop m2 fs2;
-
-        (* Invariants *)
-        mempop_invariants : mempop_operation_invariants m1 m2;
-      }.
-
-    Definition mempop_spec_MemPropT : MemPropT MemState unit :=
-      fun m1 res =>
-        match res with
-        | inr (NoOom (m2, _)) => mempop_spec m1 m2
-        | _ => True (* Allowed to run out of memory or fail *)
-        end.
-
-    (* Add a pointer onto the current frame in the frame stack *)
-    Definition add_ptr_to_frame_stack (fs1 : FrameStack) (ptr : addr) (fs2 : FrameStack) : Prop :=
-      forall f f' fs1_pop,
-        peek_frame_stack_prop fs1 f ->
-        add_ptr_to_frame f ptr f' ->
-        pop_frame_stack_prop fs1 fs1_pop ->
-        push_frame_stack_spec fs1_pop f' fs2.
-
-    Fixpoint add_ptrs_to_frame_stack (fs1 : FrameStack) (ptrs : list addr) (fs2 : FrameStack) : Prop :=
-      match ptrs with
-      | nil => fs1 = fs2
-      | (ptr :: ptrs) =>
-          forall fs',
-            add_ptrs_to_frame_stack fs1 ptrs fs' ->
-            add_ptr_to_frame_stack fs' ptr fs2
+  Definition read_byte_spec_MemPropT (ptr : addr) : MemPropT MemState SByte :=
+    fun m1 res =>
+      match res with
+      | inr (NoOom (m2, byte)) => m1 = m2 /\ read_byte_spec m1 ptr byte
+      | _ => True (* Allowed to run out of memory or fail *)
       end.
 
-    (*** Writing to memory *)
-    Record set_byte_memory (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
-      {
-        new_lu : read_byte_spec m2 ptr byte;
-        old_lu : forall ptr' byte',
-          disjoint_ptr_byte ptr ptr' ->
-          (read_byte_spec m1 ptr' byte' <-> read_byte_spec m2 ptr' byte');
-      }.
+  (*** Framestack operations *)
+  Definition empty_frame (f : Frame) : Prop :=
+    forall ptr, ~ ptr_in_frame_prop f ptr.
 
-    Record write_byte_operation_invariants (m1 m2 : MemState) : Prop :=
-      {
-        write_byte_op_preserves_allocations : allocations_preserved m1 m2;
-        write_byte_op_preserves_frame_stack : frame_stack_preserved m1 m2;
-        write_byte_op_read_allowed : read_byte_allowed_all_preserved m1 m2;
-        write_byte_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
-        write_byte_op_store_ids : preserve_store_ids m1 m2;
-        write_byte_op_allocation_ids : preserve_allocation_ids m1 m2;
-      }.
+  Record add_ptr_to_frame (f1 : Frame) (ptr : addr) (f2 : Frame) : Prop :=
+    {
+      old_frame_lu : forall ptr', ptr_in_frame_prop f1 ptr' -> ptr_in_frame_prop f2 ptr';
+      new_frame_lu : ptr_in_frame_prop f2 ptr;
+    }.
 
-    Record write_byte_spec (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
-      {
-        byte_write_succeeds : write_byte_allowed m1 ptr;
-        byte_written : set_byte_memory m1 ptr byte m2;
+  Record empty_frame_stack (fs : FrameStack) : Prop :=
+    {
+      no_pop : (forall f, ~ pop_frame_stack_prop fs f);
+      empty_fs_empty_frame : forall f, peek_frame_stack_prop fs f -> empty_frame f;
+    }.
 
-        write_byte_invariants : write_byte_operation_invariants m1 m2;
-      }.
+  Record push_frame_stack_spec (fs1 : FrameStack) (f : Frame) (fs2 : FrameStack) : Prop :=
+    {
+      can_pop : pop_frame_stack_prop fs2 fs1;
+      new_frame : peek_frame_stack_prop fs2 f;
+    }.
 
-    Definition write_byte_spec_MemPropT (ptr : addr) (byte : SByte) : MemPropT MemState unit
-      := fun m1 res =>
-           match res with
-           | inr (NoOom (m2, _)) => write_byte_spec m1 ptr byte m2
-           | _ => True (* Allowed to run out of memory or fail *)
+  Definition ptr_in_current_frame (ms : MemState) (ptr : addr) : Prop
+    := forall fs, mem_state_frame_stack_prop ms fs ->
+             forall f, peek_frame_stack_prop fs f ->
+                  ptr_in_frame_prop f ptr.
+
+  (** mempush *)
+  Record mempush_operation_invariants (m1 : MemState) (m2 : MemState) :=
+    {
+      mempush_op_reads : read_byte_preserved m1 m2;
+      mempush_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
+      mempush_op_allocations : allocations_preserved m1 m2;
+      mempush_op_store_ids : preserve_store_ids m1 m2;
+      mempush_op_allocation_ids : preserve_allocation_ids m1 m2;
+    }.
+
+  Record mempush_spec (m1 : MemState) (m2 : MemState) : Prop :=
+    {
+      fresh_frame :
+      forall fs1 fs2 f,
+        mem_state_frame_stack_prop m1 fs1 ->
+        empty_frame f ->
+        push_frame_stack_spec fs1 f fs2 ->
+        mem_state_frame_stack_prop m2 fs2;
+
+      mempush_invariants :
+      mempush_operation_invariants m1 m2;
+    }.
+
+  Definition mempush_spec_MemPropT : MemPropT MemState unit :=
+    fun m1 res =>
+      match res with
+      | inr (NoOom (m2, _)) => mempush_spec m1 m2
+      | _ => True (* Allowed to run out of memory or fail *)
+      end.
+
+  (** mempop *)
+  Record mempop_operation_invariants (m1 : MemState) (m2 : MemState) :=
+    {
+      mempop_op_store_ids : preserve_store_ids m1 m2;
+      mempop_op_allocation_ids : preserve_allocation_ids m1 m2;
+    }.
+
+  Record mempop_spec (m1 : MemState) (m2 : MemState) : Prop :=
+    {
+      (* all bytes in popped frame are freed. *)
+      bytes_freed :
+      forall ptr,
+        ptr_in_current_frame m1 ptr ->
+        byte_not_allocated m2 ptr;
+
+      (* Bytes not allocated in the popped frame have the same allocation status as before *)
+      non_frame_bytes_preserved :
+      forall ptr aid,
+        (~ ptr_in_current_frame m1 ptr) ->
+        byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid;
+
+      (* Bytes not allocated in the popped frame are the same when read *)
+      non_frame_bytes_read :
+      forall ptr byte,
+        (~ ptr_in_current_frame m1 ptr) ->
+        read_byte_spec m1 ptr byte <-> read_byte_spec m2 ptr byte;
+
+      (* Set new framestack *)
+      pop_frame :
+      forall fs1 fs2,
+        mem_state_frame_stack_prop m1 fs1 ->
+        pop_frame_stack_prop fs1 fs2 ->
+        mem_state_frame_stack_prop m2 fs2;
+
+      (* Invariants *)
+      mempop_invariants : mempop_operation_invariants m1 m2;
+    }.
+
+  Definition mempop_spec_MemPropT : MemPropT MemState unit :=
+    fun m1 res =>
+      match res with
+      | inr (NoOom (m2, _)) => mempop_spec m1 m2
+      | _ => True (* Allowed to run out of memory or fail *)
+      end.
+
+  (* Add a pointer onto the current frame in the frame stack *)
+  Definition add_ptr_to_frame_stack (fs1 : FrameStack) (ptr : addr) (fs2 : FrameStack) : Prop :=
+    forall f f' fs1_pop,
+      peek_frame_stack_prop fs1 f ->
+      add_ptr_to_frame f ptr f' ->
+      pop_frame_stack_prop fs1 fs1_pop ->
+      push_frame_stack_spec fs1_pop f' fs2.
+
+  Fixpoint add_ptrs_to_frame_stack (fs1 : FrameStack) (ptrs : list addr) (fs2 : FrameStack) : Prop :=
+    match ptrs with
+    | nil => fs1 = fs2
+    | (ptr :: ptrs) =>
+        forall fs',
+          add_ptrs_to_frame_stack fs1 ptrs fs' ->
+          add_ptr_to_frame_stack fs' ptr fs2
+    end.
+
+  (*** Writing to memory *)
+  Record set_byte_memory (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
+    {
+      new_lu : read_byte_spec m2 ptr byte;
+      old_lu : forall ptr' byte',
+        disjoint_ptr_byte ptr ptr' ->
+        (read_byte_spec m1 ptr' byte' <-> read_byte_spec m2 ptr' byte');
+    }.
+
+  Record write_byte_operation_invariants (m1 m2 : MemState) : Prop :=
+    {
+      write_byte_op_preserves_allocations : allocations_preserved m1 m2;
+      write_byte_op_preserves_frame_stack : frame_stack_preserved m1 m2;
+      write_byte_op_read_allowed : read_byte_allowed_all_preserved m1 m2;
+      write_byte_op_write_allowed : write_byte_allowed_all_preserved m1 m2;
+      write_byte_op_store_ids : preserve_store_ids m1 m2;
+      write_byte_op_allocation_ids : preserve_allocation_ids m1 m2;
+    }.
+
+  Record write_byte_spec (m1 : MemState) (ptr : addr) (byte : SByte) (m2 : MemState) : Prop :=
+    {
+      byte_write_succeeds : write_byte_allowed m1 ptr;
+      byte_written : set_byte_memory m1 ptr byte m2;
+
+      write_byte_invariants : write_byte_operation_invariants m1 m2;
+    }.
+
+  Definition write_byte_spec_MemPropT (ptr : addr) (byte : SByte) : MemPropT MemState unit
+    := fun m1 res =>
+         match res with
+         | inr (NoOom (m2, _)) => write_byte_spec m1 ptr byte m2
+         | _ => True (* Allowed to run out of memory or fail *)
+         end.
+
+  (*** Allocating bytes in memory *)
+  Record allocate_bytes_succeeds_spec (m1 : MemState) (t : dtyp) (init_bytes : list SByte) (aid : AllocationId) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
+    {
+      (* The allocated pointers are consecutive in memory. *)
+      (* m1 doesn't really matter here. *)
+      allocate_bytes_consecutive : get_consecutive_ptrs ptr (length init_bytes) m1 (inr (NoOom (m1, ptrs)));
+
+      (* Provenance *)
+      allocate_bytes_address_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov aid;
+
+      (* Allocation ids *)
+      allocate_bytes_aid_fresh : ~ used_allocation_id_prop m1 aid;
+      allocate_bytes_aid : used_allocation_id_prop m2 aid;
+      allocate_bytes_aids_preserved :
+      forall aid',
+        aid <> aid' ->
+        (used_allocation_id_prop m1 aid' <-> used_allocation_id_prop m2 aid');
+
+      (* byte_allocated *)
+      allocate_bytes_was_fresh_byte : forall ptr, In ptr ptrs -> byte_not_allocated m1 ptr;
+      allocate_bytes_now_byte_allocated : forall ptr, In ptr ptrs -> byte_allocated m2 ptr aid;
+      allocate_bytes_preserves_old_allocations :
+      forall ptr aid,
+        ~ In ptr ptrs ->
+        (byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid);
+
+      (* read permissions *)
+      alloc_bytes_new_reads_allowed :
+      forall p, In p ptrs ->
+           read_byte_allowed m2 p;
+
+      alloc_bytes_old_reads_allowed :
+      forall ptr',
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+        read_byte_allowed m1 ptr' <-> read_byte_allowed m2 ptr';
+
+      (* reads *)
+      alloc_bytes_new_reads :
+      forall p ix byte,
+        Util.Nth ptrs ix p ->
+        Util.Nth init_bytes ix byte ->
+        read_byte_prop m2 p byte;
+
+      alloc_bytes_old_reads :
+      forall ptr' byte,
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+        read_byte_prop m1 ptr' byte <-> read_byte_prop m2 ptr' byte;
+
+      (* write permissions *)
+      alloc_bytes_new_writes_allowed :
+      forall p, In p ptrs ->
+           write_byte_allowed m2 p;
+
+      alloc_bytes_old_writes_allowed :
+      forall ptr',
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
+        write_byte_allowed m1 ptr' <-> write_byte_allowed m2 ptr';
+
+      (* Add allocated bytes onto the stack frame *)
+      allocate_bytes_add_to_frame :
+      forall fs1 fs2,
+        mem_state_frame_stack_prop m1 fs1 ->
+        add_ptrs_to_frame_stack fs1 ptrs fs2 ->
+        mem_state_frame_stack_prop m2 fs2;
+
+      (* Store ids are preserved. *)
+      allocate_bytes_store_ids :
+      preserve_store_ids m1 m2;
+
+      (* Type is valid *)
+      allocate_bytes_typ :
+      t <> DTYPE_Void;
+    }.
+
+  Definition allocate_bytes_spec_MemPropT' (t : dtyp) (init_bytes : list SByte) (aid : AllocationId)
+    : MemPropT MemState (addr * list addr)
+    := fun m1 res =>
+         match res with
+         | inr (NoOom (m2, (ptr, ptrs))) =>
+             allocate_bytes_succeeds_spec m1 t init_bytes aid m2 ptr ptrs
+         | _ => True (* Allowed to run out of memory or fail *)
+         end.
+
+  Definition allocate_bytes_spec_MemPropT (t : dtyp) (init_bytes : list SByte)
+    : MemPropT MemState addr
+    := aid <- fresh_allocation_id;;
+       '(ptr, _) <- allocate_bytes_spec_MemPropT' t init_bytes aid;;
+       ret ptr.
+
+  (*** Aggregate things *)
+
+  (** Reading uvalues *)
+  Definition read_bytes_spec (ptr : addr) (len : nat) : MemPropT MemState (list SByte) :=
+    (* TODO: should this OOM, or should this count as walking outside of memory and be UB? *)
+    ptrs <- get_consecutive_ptrs ptr len;;
+
+    (* Actually perform reads *)
+    Util.map_monad (fun ptr => read_byte_spec_MemPropT ptr) ptrs.
+
+  Definition read_uvalue_spec (dt : dtyp) (ptr : addr) : MemPropT MemState uvalue :=
+    bytes <- read_bytes_spec ptr (N.to_nat (sizeof_dtyp dt));;
+    ret (from_ubytes bytes dt).
+
+  (** Writing uvalues *)
+  Definition write_bytes_spec (ptr : addr) (bytes : list SByte) : MemPropT MemState unit :=
+    ptrs <- get_consecutive_ptrs ptr (length bytes);;
+    let ptr_bytes := zip ptrs bytes in
+
+    (* Actually perform writes *)
+    Util.map_monad_ (fun '(ptr, byte) => write_byte_spec_MemPropT ptr byte) ptr_bytes.
+
+  Definition write_uvalue_spec (dt : dtyp) (ptr : addr) (uv : uvalue) : MemPropT MemState unit :=
+    sid <- fresh_sid;;
+    bytes <- lift_OOM (to_ubytes uv dt sid);;
+    write_bytes_spec ptr bytes.
+
+  (** Allocating dtyps *)
+  (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
+  Definition allocate_dtyp_spec (dt : dtyp) : MemPropT MemState addr :=
+    sid <- fresh_sid;;
+    bytes <- lift_OOM (generate_undef_bytes dt sid);;
+    allocate_bytes_spec_MemPropT dt bytes.
+
+  (*** Handling memory events *)
+  Section Handlers.
+    Definition handle_memory_prop : MemoryE ~> MemPropT MemState
+      := fun T m =>
+           match m with
+           (* Unimplemented *)
+           | MemPush =>
+               mempush_spec_MemPropT
+           | MemPop =>
+               mempop_spec_MemPropT
+           | Alloca t =>
+               addr <- allocate_dtyp_spec t;;
+               ret (DVALUE_Addr addr)
+           | Load t a =>
+               match a with
+               | DVALUE_Addr a =>
+                   read_uvalue_spec t a
+               | _ =>
+                   (* UB if loading from something that isn't an address *)
+                   fun _ _ => False
+               end
+           | Store t a v =>
+               match a with
+               | DVALUE_Addr a =>
+                   write_uvalue_spec t a v
+               | _ =>
+                   (* UB if writing something to somewhere that isn't an address *)
+                   fun _ _ => False
+               end
            end.
-
-    (*** Allocating bytes in memory *)
-    Record allocate_bytes_succeeds_spec (m1 : MemState) (t : dtyp) (init_bytes : list SByte) (aid : AllocationId) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
-      {
-        (* The allocated pointers are consecutive in memory. *)
-        (* m1 doesn't really matter here. *)
-        allocate_bytes_consecutive : get_consecutive_ptrs ptr (length init_bytes) m1 (inr (NoOom (m1, ptrs)));
-
-        (* Provenance *)
-        allocate_bytes_address_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov aid;
-
-        (* Allocation ids *)
-        allocate_bytes_aid_fresh : ~ used_allocation_id_prop m1 aid;
-        allocate_bytes_aid : used_allocation_id_prop m2 aid;
-        allocate_bytes_aids_preserved :
-        forall aid',
-          aid <> aid' ->
-          (used_allocation_id_prop m1 aid' <-> used_allocation_id_prop m2 aid');
-
-        (* byte_allocated *)
-        allocate_bytes_was_fresh_byte : forall ptr, In ptr ptrs -> byte_not_allocated m1 ptr;
-        allocate_bytes_now_byte_allocated : forall ptr, In ptr ptrs -> byte_allocated m2 ptr aid;
-        allocate_bytes_preserves_old_allocations :
-        forall ptr aid,
-          ~ In ptr ptrs ->
-          (byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid);
-
-        (* read permissions *)
-        alloc_bytes_new_reads_allowed :
-        forall p, In p ptrs ->
-             read_byte_allowed m2 p;
-
-        alloc_bytes_old_reads_allowed :
-        forall ptr',
-          (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
-          read_byte_allowed m1 ptr' <-> read_byte_allowed m2 ptr';
-
-        (* reads *)
-        alloc_bytes_new_reads :
-        forall p ix byte,
-          Util.Nth ptrs ix p ->
-          Util.Nth init_bytes ix byte ->
-          read_byte_prop m2 p byte;
-
-        alloc_bytes_old_reads :
-        forall ptr' byte,
-          (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
-          read_byte_prop m1 ptr' byte <-> read_byte_prop m2 ptr' byte;
-
-        (* write permissions *)
-        alloc_bytes_new_writes_allowed :
-        forall p, In p ptrs ->
-             write_byte_allowed m2 p;
-
-        alloc_bytes_old_writes_allowed :
-        forall ptr',
-          (forall p, In p ptrs -> disjoint_ptr_byte p ptr') ->
-          write_byte_allowed m1 ptr' <-> write_byte_allowed m2 ptr';
-
-        (* Add allocated bytes onto the stack frame *)
-        allocate_bytes_add_to_frame :
-        forall fs1 fs2,
-          mem_state_frame_stack_prop m1 fs1 ->
-          add_ptrs_to_frame_stack fs1 ptrs fs2 ->
-          mem_state_frame_stack_prop m2 fs2;
-
-        (* Store ids are preserved. *)
-        allocate_bytes_store_ids :
-        preserve_store_ids m1 m2;
-
-        (* Type is valid *)
-        allocate_bytes_typ :
-        t <> DTYPE_Void;
-      }.
-
-    Definition allocate_bytes_spec_MemPropT' (t : dtyp) (init_bytes : list SByte) (aid : AllocationId)
-      : MemPropT MemState (addr * list addr)
-      := fun m1 res =>
-           match res with
-           | inr (NoOom (m2, (ptr, ptrs))) =>
-               allocate_bytes_succeeds_spec m1 t init_bytes aid m2 ptr ptrs
-           | _ => True (* Allowed to run out of memory or fail *)
-           end.
-
-    Definition allocate_bytes_spec_MemPropT (t : dtyp) (init_bytes : list SByte)
-      : MemPropT MemState addr
-      := aid <- fresh_allocation_id;;
-         '(ptr, _) <- allocate_bytes_spec_MemPropT' t init_bytes aid;;
-         ret ptr.
-
-    (*** Aggregate things *)
-
-    (** Reading uvalues *)
-    Definition read_bytes_spec (ptr : addr) (len : nat) : MemPropT MemState (list SByte) :=
-      (* TODO: should this OOM, or should this count as walking outside of memory and be UB? *)
-      ptrs <- get_consecutive_ptrs ptr len;;
-
-      (* Actually perform reads *)
-      Util.map_monad (fun ptr => read_byte_spec_MemPropT ptr) ptrs.
-
-    Definition read_uvalue_spec (dt : dtyp) (ptr : addr) : MemPropT MemState uvalue :=
-      bytes <- read_bytes_spec ptr (N.to_nat (sizeof_dtyp dt));;
-      ret (from_ubytes bytes dt).
-
-    (** Writing uvalues *)
-    Definition write_bytes_spec (ptr : addr) (bytes : list SByte) : MemPropT MemState unit :=
-      ptrs <- get_consecutive_ptrs ptr (length bytes);;
-      let ptr_bytes := zip ptrs bytes in
-
-      (* Actually perform writes *)
-      Util.map_monad_ (fun '(ptr, byte) => write_byte_spec_MemPropT ptr byte) ptr_bytes.
-
-    Definition write_uvalue_spec (dt : dtyp) (ptr : addr) (uv : uvalue) : MemPropT MemState unit :=
-      sid <- fresh_sid;;
-      bytes <- lift_OOM (to_ubytes uv dt sid);;
-      write_bytes_spec ptr bytes.
-
-    (** Allocating dtyps *)
-    (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
-    Definition allocate_dtyp_spec (dt : dtyp) : MemPropT MemState addr :=
-      sid <- fresh_sid;;
-      bytes <- lift_OOM (generate_undef_bytes dt sid);;
-      allocate_bytes_spec_MemPropT dt bytes.
-
-    (*** Handling memory events *)
-    Section Handlers.
-      Definition handle_memory_prop : MemoryE ~> MemPropT MemState
-        := fun T m =>
-             match m with
-             (* Unimplemented *)
-             | MemPush =>
-                 mempush_spec_MemPropT
-             | MemPop =>
-                 mempop_spec_MemPropT
-             | Alloca t =>
-                 addr <- allocate_dtyp_spec t;;
-                 ret (DVALUE_Addr addr)
-             | Load t a =>
-                 match a with
-                 | DVALUE_Addr a =>
-                     read_uvalue_spec t a
-                 | _ =>
-                     (* UB if loading from something that isn't an address *)
-                     fun _ _ => False
-                 end
-             | Store t a v =>
-                 match a with
-                 | DVALUE_Addr a =>
-                     write_uvalue_spec t a v
-                 | _ =>
-                     (* UB if writing something to somewhere that isn't an address *)
-                     fun _ _ => False
-                 end
-             end.
-    End Handlers.
+  End Handlers.
 End MemoryModelSpec.
 
 Module MakeMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) <: MemoryModelSpec LP MP MMSP.
