@@ -768,8 +768,7 @@ Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list N) {struct t_from}:
   get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path
   | TYPE_Struct fields => get_index_paths_from_struct fields pre_path 0
   | TYPE_Packed_struct fields => get_index_paths_from_struct fields pre_path 0
-  | TYPE_Pointer ty => [(ty, cur_path)] ++ get_index_paths_aux ty cur_path
-  | _ => nil
+  | _ => []
   end with 
   get_index_paths_from_struct (fields: list typ) (pre_path: list N) (current_index : N) {struct fields}: list (typ * list N) := 
   match fields with
@@ -778,15 +777,28 @@ Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list N) {struct t_from}:
   let tail_list := get_index_paths_from_struct t pre_path (current_index + 1%N) in
   [(h, pre_path ++ [current_index])] ++ head_list ++ tail_list
   end.
+
+
   Definition get_index_paths (t_from: typ) : list (typ * list (N)) :=
     get_index_paths_aux t_from [].
+
 (*
+Example t1:
+get_index_paths_aux (TYPE_Pointer TYPE_Metadata) [] = [].
+Proof. simpl. Abort.
+Example t2: get_index_paths_aux (TYPE_Array 3 (TYPE_Struct [TYPE_Metadata; (TYPE_Array 5 TYPE_Metadata)])) [] = [].
+  Proof. simpl. Abort.
+Example t3:
+get_index_paths_aux (TYPE_Array 3 (TYPE_Struct [TYPE_Pointer TYPE_Metadata; (TYPE_Array 5 TYPE_Metadata)])) [] = [].
+Proof. simpl. Abort.
+
   Example t2:
   get_index_paths (TYPE_Array 3 (TYPE_Struct [TYPE_Metadata; (TYPE_Array 5 TYPE_Metadata)])) = [].
-  Proof. Abort.
+  Proof. 
 Example t1:
 get_index_paths TYPE_Metadata = [].
-Proof. Abort.*)
+Proof. Abort.
+*)
 
 (*filter all the (ident, typ) in ctx such that typ is a ptr*)
 Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
@@ -804,13 +816,13 @@ Definition gen_gep : GenLLVM (typ * instr typ) :=
   | TYPE_Pointer t => t 
   | _ => ptr  (* Not gonna happened*)
   end in
-  let t_in_ptr := get_typ_from_ptr tptr in
-  let paths_in_ptr := get_index_paths tptr in
-  '(t, path) <- oneOf_LLVM (map ret paths_in_ptr);;
-  let path_for_gep := map (fun x => (TYPE_I 64, EXP_Integer (Z.of_N x))) path in 
+  let t_in_ptr := get_typ_from_ptr tptr in (* Getting the inner type in the pointer*)
+  let paths_in_ptr := get_index_paths t_in_ptr in (* Inner paths: Paths after removing the outer pointer*)
+  '(t, path) <- oneOf_LLVM (map ret paths_in_ptr);; (* Select one path from the paths*)
+  let path_for_gep := map (fun x => (TYPE_I 64, EXP_Integer (Z.of_N x))) path in (* Turning the path to integer*)
    (* Refer to function get_int_typ*)
-  ret (t, INSTR_Op (OP_GetElementPtr t_in_ptr 
-                    (tptr, EXP_Ident ptr_variable) path_for_gep)).
+  ret (TYPE_Pointer t, INSTR_Op (OP_GetElementPtr t_in_ptr 
+                    (tptr, EXP_Ident ptr_variable) ([(TYPE_I 64, EXP_Integer (0%Z))] ++ path_for_gep))).
   
 
 
