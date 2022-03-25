@@ -752,8 +752,7 @@ Section ExpGenerators.
 Fixpoint get_index_paths_from_AoV (sz: nat) (t: typ) (sub_paths: list (typ * list N)) (pre_path: list N): list (typ * list N) :=
   match sz with 
   | 0%nat => []
-  | S z => [(t, pre_path ++ [N.of_nat z])] ++ 
-          map (fun '(t, p) => (t, pre_path ++ [N.of_nat z] ++ p)) sub_paths ++ get_index_paths_from_AoV z t sub_paths pre_path
+  | S z => map (fun '(t, p) => (t, pre_path ++ [N.of_nat z] ++ p)) sub_paths ++ get_index_paths_from_AoV z t sub_paths pre_path
   end.
 
 (* Adding prepath because *)
@@ -763,26 +762,28 @@ Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list N) {struct t_from}:
   match t_from with
   | TYPE_Array sz t => 
   let sub_paths := get_index_paths_aux t [] in
-  get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path
+  [(t_from, pre_path)] ++ get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path
   | TYPE_Vector sz t => let sub_paths := get_index_paths_aux t [] in
-  get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path
-  | TYPE_Struct fields => get_index_paths_from_struct fields pre_path 0
-  | TYPE_Packed_struct fields => get_index_paths_from_struct fields pre_path 0
-  | _ => []
+  [(t_from, pre_path)] ++ get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path
+  | TYPE_Struct fields => [(t_from, pre_path)] ++ get_index_paths_from_struct fields pre_path 0
+  | TYPE_Packed_struct fields => [(t_from, pre_path)] ++ get_index_paths_from_struct fields pre_path 0
+  | t => [(t, pre_path)]
   end with 
   get_index_paths_from_struct (fields: list typ) (pre_path: list N) (current_index : N) {struct fields}: list (typ * list N) := 
   match fields with
   | nil => nil
   | h::t => let head_list := map (fun '(t, p) => (t, pre_path ++ [current_index] ++ p)) (get_index_paths_aux h []) in
   let tail_list := get_index_paths_from_struct t pre_path (current_index + 1%N) in
-  [(h, pre_path ++ [current_index])] ++ head_list ++ tail_list
+  head_list ++ tail_list
   end.
-
-
   Definition get_index_paths (t_from: typ) : list (typ * list (N)) :=
-    get_index_paths_aux t_from [].
+    map (fun '(t, path) => (t, [0%N] ++ path)) (get_index_paths_aux t_from []).
 
-(*
+    (*
+Example t4:
+get_index_paths_aux (TYPE_Struct [TYPE_Array 3 TYPE_Metadata; TYPE_Metadata]) [] = [].
+Proof. simpl. Abort.
+
 Example t1:
 get_index_paths_aux (TYPE_Pointer TYPE_Metadata) [] = [].
 Proof. simpl. Abort.
@@ -822,7 +823,7 @@ Definition gen_gep : GenLLVM (typ * instr typ) :=
   let path_for_gep := map (fun x => (TYPE_I 64, EXP_Integer (Z.of_N x))) path in (* Turning the path to integer*)
    (* Refer to function get_int_typ*)
   ret (TYPE_Pointer t, INSTR_Op (OP_GetElementPtr t_in_ptr 
-                    (tptr, EXP_Ident ptr_variable) ([(TYPE_I 64, EXP_Integer (0%Z))] ++ path_for_gep))).
+                    (tptr, EXP_Ident ptr_variable) path_for_gep)).
   
 
 
