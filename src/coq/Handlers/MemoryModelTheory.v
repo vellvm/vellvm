@@ -147,6 +147,11 @@ Module Type MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Ser
   Import MM.
   Import LP.PROV.
 
+  Require Import MemBytes.
+  Module MemByte := Byte LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL.
+  Import MemByte.
+  Import LP.SIZEOF.
+
   Section PARAMS.
     Variable (E F G : Type -> Type).
     Context `{FailureE -< F} `{UBE -< F} `{PickConcreteMemoryE -< F} `{OOME -< F}.
@@ -154,23 +159,52 @@ Module Type MemoryModelTheory (LP : LLVMParams) (MP : MemoryParams LP) (SP : Ser
     Notation Effout := (E +' F).
     Notation interp_memory := (@interp_memory E F _ _ _).
 
+    Require Import ZArith.
+    Require Import Error.
+
+    Variable MemM : Type -> Type.
+    Context `{MemM_MemMonad : MemMonad MemState Provenance MemM}.
+
+    Parameter read_bytes :
+      forall (ptr : addr) (sz : N),
+        MemM (list SByte).
+
+    Parameter write_bytes :
+      forall (ptr : addr) (bytes : list SByte),
+        MemM unit.
+
+    From ExtLib Require Import
+         Structures.Monads.
+
+    Import MonadNotation.
+
+    Definition read (ptr : addr) (dt : dtyp) : MemM uvalue
+      := bytes <- read_bytes ptr (sizeof_dtyp dt);;
+         ret (from_ubytes bytes dt).
+
+    Definition write (ptr : addr) (uv : uvalue) (dt : dtyp) : MemM unit
+      := sid <- fresh_sid;;
+         bytes <- lift_OOM (to_ubytes uv dt sid);;
+         write_bytes ptr bytes.
+
     Section Structural_Lemmas.
+      (* Should it be any refinement? *)
       Parameter interp_memory_load :
         forall {M} `{MemMonad MemState Provenance M}
           (m : MemState) (t : dtyp) (val : uvalue) (a : addr),
-          MemMonad_runs_to (read a t) m = Some (m, val) ->
-          interp_memory (trigger (Load t (DVALUE_Addr a))) m ≈ Ret (m, val).
+          MemMonad_runs_to_prop (read a t) m m val ->
+          interp_memory (trigger (Load t (DVALUE_Addr a))) m ≈ read.
 
       Parameter interp_memory_store :
         forall {M} `{MemMonad MemState Provenance M}
           (m m' : MemState) (val : uvalue) (dt : dtyp) (a : addr),
-          MemMonad_runs_to (write a val dt) m = Some (m', tt) ->
+          MemMonad_runs_to_prop (write a val dt) m m' tt ->
           interp_memory (trigger (Store dt (DVALUE_Addr a) val)) m ≈ Ret (m', tt).
 
       Parameter interp_memory_alloca :
         forall {M} `{MemMonad MemState Provenance M}
           (m m' : MemState) (t : dtyp) (a : addr),
-          MemMonad_runs_to (allocate t) m = Some (m', a) ->
+          MemMonad_runs_to_prop (allocate t) m m' a ->
           interp_memory (trigger (Alloca t)) m ≈ Ret (m', DVALUE_Addr a).
 
       Require Import ZArith.
