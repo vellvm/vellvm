@@ -5,6 +5,7 @@ From Vellvm.Syntax Require Import
 From Vellvm.Semantics Require Import
      MemoryAddress
      MemoryParams
+     Memory.Overlaps
      LLVMParams
      LLVMEvents.
 
@@ -132,6 +133,11 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Import LP.PROV.
   Import LP.PTOI.
   Import MMSP.
+
+  Module OVER := PTOIOverlaps ADDR PTOI SIZEOF.
+  Import OVER.
+  Module OVER_H := OverlapHelpers ADDR SIZEOF OVER.
+  Import OVER_H.
 
   Require Import MemBytes.
 
@@ -513,6 +519,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     ptrs <- get_consecutive_ptrs ptr (length bytes);;
     let ptr_bytes := zip ptrs bytes in
 
+    (* TODO: double check that this is correct... Should we check if all writes are allowed first? *)
     (* Actually perform writes *)
     Util.map_monad_ (fun '(ptr, byte) => write_byte_spec_MemPropT ptr byte) ptr_bytes.
 
@@ -527,6 +534,26 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     sid <- fresh_sid;;
     bytes <- lift_OOM (generate_undef_bytes dt sid);;
     allocate_bytes_spec_MemPropT dt bytes.
+
+  (** memcpy spec *)
+  Definition memcpy_spec (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemPropT MemState unit :=
+    if Z.ltb len 0
+    then
+      raise_ub "memcpy given negative length."
+    else
+      (* From LangRef: The ‘llvm.memcpy.*’ intrinsics copy a block of
+       memory from the source location to the destination location, which
+       must either be equal or non-overlapping.
+       *)
+      if orb (no_overlap dst len src len)
+             (Z.eqb (ptr_to_int src) (ptr_to_int dst))
+      then
+        src_bytes <- read_bytes_spec src (Z.to_nat len);;
+
+        (* TODO: Double check that this is correct... Should we check if all writes are allowed first? *)
+        write_bytes_spec dst src_bytes
+      else
+        raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
 
   (*** Handling memory events *)
   Section Handlers.
@@ -558,6 +585,46 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
                    fun _ _ => False
                end
            end.
+
+    Definition handle_memcpy_prop (args : list dvalue) : MemPropT MemState unit :=
+      match args with
+      | DVALUE_Addr dst ::
+                    DVALUE_Addr src ::
+                    DVALUE_I32 len ::
+                    DVALUE_I32 align :: (* alignment ignored *)
+                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+          memcpy_spec src dst (unsigned len) (Z.to_N (unsigned align)) (equ volatile one)
+      | DVALUE_Addr dst ::
+                    DVALUE_Addr src ::
+                    DVALUE_I64 len ::
+                    DVALUE_I64 align :: (* alignment ignored *)
+                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+          memcpy_spec src dst (unsigned len) (Z.to_N (unsigned align)) (equ volatile one)
+      | DVALUE_Addr dst ::
+                    DVALUE_Addr src ::
+                    DVALUE_IPTR len ::
+                    DVALUE_IPTR align :: (* alignment ignored *)
+                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+          memcpy_spec src dst (IP.to_Z len) (Z.to_N (IP.to_Z align)) (equ volatile one)
+      | _ => raise_error "Unsupported arguments to memcpy."
+      end.
+
+    Definition handle_intrinsic_prop : IntrinsicE ~> MemPropT MemState
+      := fun T e =>
+           match e with
+           | Intrinsic t name args =>
+               (* Pick all arguments, they should all be unique. *)
+               (* TODO: add more variants to memcpy *)
+               (* FIXME: use reldec typeclass? *)
+               if orb (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i32"))
+                      (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i64"))
+               then  
+                 handle_memcpy_prop args;;
+                 ret DVALUE_None
+               else
+                 raise_error ("Unknown intrinsic: " ++ name)
+           end.
+
   End Handlers.
 End MemoryModelSpec.
 
@@ -582,7 +649,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
   Section MemoryPrimatives.
     Context {MemM : Type -> Type}.
-    Context `{MemMonad MemState AllocationId MemM}.
+    Context `{MM : MemMonad MemState AllocationId MemM}.
 
     (*** Data types *)
     Parameter initial_memory_state : MemState.
@@ -590,17 +657,20 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
     (*** Primitives on memory *)
     (** Reads *)
-    Parameter read_byte : addr -> MemM SByte.
+    Parameter read_byte :
+      forall `{MemMonad MemState AllocationId MemM}, addr -> MemM SByte.
 
     (** Writes *)
-    Parameter write_byte : addr -> SByte -> MemM unit.
+    Parameter write_byte :
+      forall `{MemMonad MemState AllocationId MemM}, addr -> SByte -> MemM unit.
 
     (** Allocations *)
-    Parameter allocate_bytes : dtyp -> list SByte -> MemM addr.
+    Parameter allocate_bytes :
+      forall `{MemMonad MemState AllocationId MemM}, dtyp -> list SByte -> MemM addr.
 
     (** Frame stacks *)
-    Parameter mempush : MemM unit.
-    Parameter mempop : MemM unit.
+    Parameter mempush : forall `{MemMonad MemState AllocationId MemM}, MemM unit.
+    Parameter mempop : forall `{MemMonad MemState AllocationId MemM}, MemM unit.
 
     (*** Correctness *)
     Import EitherMonad.
@@ -666,6 +736,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
   Import LP.ADDR.
   Import LP.SIZEOF.
   Import LP.PROV.
+  Import LP.PTOI.
   Import LP.Events.
   Import MP.
   Import MMEP.
@@ -673,6 +744,11 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
   Import MMSP.MemByte.
   Import MMEP.MemSpec.
   Import MemHelpers.
+
+  Module OVER := PTOIOverlaps ADDR PTOI SIZEOF.
+  Import OVER.
+  Module OVER_H := OverlapHelpers ADDR SIZEOF OVER.
+  Import OVER_H.
 
   (*** Handling memory events *)
   Section Handlers.
@@ -712,7 +788,27 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       bytes <- lift_OOM (generate_undef_bytes dt sid);;
       allocate_bytes dt bytes.
 
-    Definition handle_memory_prop : MemoryE ~> MemM
+    (** Handle memcpy *)
+    Definition memcpy (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemM unit :=
+      if Z.ltb len 0
+      then
+        raise_ub "memcpy given negative length."
+      else
+        (* From LangRef: The ‘llvm.memcpy.*’ intrinsics copy a block of
+       memory from the source location to the destination location, which
+       must either be equal or non-overlapping.
+         *)
+        if orb (no_overlap dst len src len)
+               (Z.eqb (ptr_to_int src) (ptr_to_int dst))
+        then
+          src_bytes <- read_bytes src (Z.to_nat len);;
+
+          (* TODO: Double check that this is correct... Should we check if all writes are allowed first? *)
+          write_bytes dst src_bytes
+        else
+          raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
+
+    Definition handle_memory : MemoryE ~> MemM
       := fun T m =>
            match m with
            (* Unimplemented *)
@@ -738,5 +834,48 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
                    raise_ub "Store to somewhere that is not an address."
                end
            end.
+
+    Definition handle_memcpy (args : list dvalue) : MemM unit :=
+      match args with
+      | DVALUE_Addr dst ::
+                    DVALUE_Addr src ::
+                    DVALUE_I32 len ::
+                    DVALUE_I32 align :: (* alignment ignored *)
+                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+          memcpy src dst (unsigned len) (Z.to_N (unsigned align)) (equ volatile one)
+      | DVALUE_Addr dst ::
+                    DVALUE_Addr src ::
+                    DVALUE_I64 len ::
+                    DVALUE_I64 align :: (* alignment ignored *)
+                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+          memcpy src dst (unsigned len) (Z.to_N (unsigned align)) (equ volatile one)
+      | DVALUE_Addr dst ::
+                    DVALUE_Addr src ::
+                    DVALUE_IPTR len ::
+                    DVALUE_IPTR align :: (* alignment ignored *)
+                    DVALUE_I1 volatile :: [] (* volatile ignored *)  =>
+          memcpy src dst (IP.to_Z len) (Z.to_N (IP.to_Z align)) (equ volatile one)
+      | _ => raise_error "Unsupported arguments to memcpy."
+      end.
+
+    Definition handle_intrinsic : IntrinsicE ~> MemM
+      := fun T e =>
+           match e with
+           | Intrinsic t name args =>
+               (* Pick all arguments, they should all be unique. *)
+               (* TODO: add more variants to memcpy *)
+               (* FIXME: use reldec typeclass? *)
+               if orb (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i32"))
+                      (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i64"))
+               then  
+                 handle_memcpy args;;
+                 ret DVALUE_None
+               else
+                 raise_error ("Unknown intrinsic: " ++ name)
+           end.
   End Handlers.
 End MemoryModelExec.
+
+Module MakeMemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) <: MemoryModelExec LP MP MMEP.
+  Include MemoryModelExec LP MP MMEP.
+End MakeMemoryModelExec.
