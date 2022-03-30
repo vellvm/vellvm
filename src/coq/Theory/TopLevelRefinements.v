@@ -41,8 +41,13 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Export TOP.
   Export IS.
   Export IS.LLVM.
-  Export IS.LLVM.SP.SER.
+  Export IS.LLVM.MEM.SP.SER.
   Export IS.LLVM.MEM.
+  Import MEM.MEM_MODEL.
+  Import MEM.MMEP.
+  Import MEM.MMEP.MMSP.
+  Import MEM.MEM_EXEC_INTERP.
+  Import MEM.MEM_SPEC_INTERP.
 
   Import SemNotations.
 
@@ -135,6 +140,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   (** END TO MOVE *)
 
   Section REFINEMENT.
+    Context {MemM : Type -> Type}.
+    Context `{MM : MemMonad MemState AllocationId MemM}.
 
     (** We first prove that the [itree] refinement at level [i] entails the
     refinement at level [i+1] after running the [i+1] level of interpretation
@@ -148,34 +155,46 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     Lemma refine_01: forall t1 t2 g,
         refine_L0 t1 t2 -> refine_L1 (interp_global t1 g) (interp_global t2 g).
     Proof.
-      intros t1 t2 g H.
+      intros t1 t2 g REF.
       apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
     Qed.
 
     Lemma refine_12 : forall t1 t2 l,
         refine_L1 t1 t2 -> refine_L2 (interp_local_stack t1 l) (interp_local_stack t2 l).
     Proof.
-      intros t1 t2 l H.
+      intros t1 t2 l REF.
       apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
     Qed.
 
     Lemma refine_23 : forall t1 t2 m,
-        refine_L2 t1 t2 -> refine_L3 (interp_memory t1 m) (interp_memory t2 m).
+        refine_L2 t1 t2 -> refine_L3 (interp_memory_prop refine_res2 t1 m) (interp_memory_prop refine_res2 t2 m).
     Proof.
-      intros t1 t2 m H.
-      apply eutt_tt_to_eq_prod, eutt_interp_state; auto.
+      intros t1 t2 ms REF t Ht.
+      exists t; split.
+      - unfold interp_memory_prop in *.
+        unfold L3 in *.
+        eapply interp_prop_Proper_eq in Ht; try typeclasses eauto.
+        + apply  Ht.
+        + assumption.
+        + reflexivity.
+      - reflexivity.
     Qed.
 
     (* Things are different for L4 and L5: we get into the [Prop] monad. *)
     Lemma refine_34 : forall t1 t2,
         refine_L3 t1 t2 -> refine_L4 (model_undef refine_res3 t1) (model_undef refine_res3 t2).
     Proof.
-      intros t1 t2 H t Ht.
+      intros t1 t2 REF t Ht.
       exists t; split.
       - unfold model_undef in *.
-        unfold L3 in *.
-        eapply interp_prop_Proper_eq in Ht; try typeclasses eauto.
-        + apply Ht.
+        unfold refine_L3 in *.
+        destruct Ht as [t_pre [T2 MODEL]].
+        specialize (REF _ T2).
+        destruct REF as [t_pre1 [T1 EUTT]].
+        exists t_pre1; split; auto.        
+        eapply interp_prop_Proper_eq in MODEL; try typeclasses eauto.
+        + unfold model_undef_h.
+          apply MODEL.
         + assumption.
         + reflexivity.
       - reflexivity.
@@ -230,15 +249,15 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Definition model_to_L3 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs3 L0_trace [] ([],[]) initial_memory_state.
+      ℑs3 (refine_res2) L0_trace [] ([],[]) initial_memory_state.
 
     Definition model_to_L4 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs4 (refine_res3) L0_trace [] ([],[]) initial_memory_state.
+      ℑs4 (refine_res2) (refine_res3) L0_trace [] ([],[]) initial_memory_state.
 
     Definition model_to_L5 (prog: mcfg dtyp) :=
       let L0_trace := denote_vellvm_init prog in
-      ℑs5 (refine_res3) L0_trace [] ([],[]) initial_memory_state.
+      ℑs5 (refine_res2) (refine_res3) L0_trace [] ([],[]) initial_memory_state.
 
     (**
    Which leads to five notion of equivalence of [mcfg]s.
@@ -343,34 +362,85 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       | |- context[match ?x with | _ => _ end] => let Heq := fresh "Heq" in destruct x eqn:Heq
       end.
 
-    Lemma Pick_handler_correct :
+    (* TODO: prove and move this? *)
+    Import EitherMonad.
+    Import IdentityMonad.
+    Lemma concretize_uvalue_err_ub_oom_to_itree :
+      forall u {E} `{OOME -< E} `{FailureE -< E} `{UBE -< E},
+        match concretize_uvalue u with
+        | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent m)))) =>
+            match m with
+            | inl (OOM_message x) => @concretize_uvalue (itree E) _ _ _ _ u ≈ raiseOOM x
+            | inr (inl (UB_message x)) => concretize_uvalue u ≈ raiseUB x
+            | inr (inr (inl (ERR_message x))) => concretize_uvalue u ≈ raise x
+            | inr (inr (inr x)) => concretize_uvalue u ≈ ret x
+            end
+        end.
+    Proof.
+      intros u E OOM FAIL UB.
+      repeat break_match; subst;
+        unfold concretize_uvalue in *.
+      - induction u; cbn;
+          rewrite concretize_uvalueM_equation;
+          rewrite concretize_uvalueM_equation in Heqe;
+          try solve
+              [ inv Heqe
+              | destruct (default_dvalue_of_dtyp t); cbn in *; inv Heqe
+              ].
+        all: admit.
+      - admit.
+      - admit.
+      - admit.
+    Admitted.
+
+    Lemma PickUvalue_handler_correct :
       forall E `{FailureE -< E} `{UBE -< E} `{OOME -< E},
-        handler_correct (@Pick_handler E _ _ _) concretize_picks.
+        handler_correct (@PickUvalue_handler E _ _ _) concretize_picks.
     Proof.
       unfold handler_correct.
       intros.
-      destruct e.
-      cbn. apply PickUvalue with (res := concretize_uvalue u).
-      - right.
-        split.
-        + apply Pick.concretize_u_concretize_uvalue.
-        + reflexivity.
+      destruct e as [Pre u].
+      cbn. apply PickUV_Ret with (res := concretize_uvalue u).
+      - apply concretize_u_concretize_uvalue.
+      - pose proof concretize_uvalue_err_ub_oom_to_itree u as CONC.
+        repeat break_match_hyp;
+          cbn;
+          match goal with
+          | H: concretize_uvalue ?u ≈ raiseOOM ?s |- _ =>
+              rewrite H;
+              rewrite Raise.raiseOOM_map_itree;
+              reflexivity
+          | H: concretize_uvalue ?u ≈ raiseUB ?s |- _ =>
+              rewrite H;
+              rewrite Raise.raiseUB_map_itree;
+              reflexivity
+          | H: concretize_uvalue ?u ≈ raise ?s |- _ =>
+              rewrite H;
+              rewrite Raise.raise_map_itree;
+              reflexivity
+          | H: concretize_uvalue ?u ≈ ret ?s |- _ =>
+              rewrite H;
+              cbn;
+              rewrite map_ret;
+              reflexivity
+              end.
     Qed.
 
     Lemma refine_undef
       : forall (E F:Type -> Type) T TT (HR: Reflexive TT)  `{UBE -< F} `{FailureE -< F} `{OOME -< F}
-               (x : itree _ T),
-        model_undef TT x (@exec_undef E F _ _ _ _ x).
+               (xs : PropT _ T),
+        forall x, xs x -> model_undef TT xs (@exec_undef E F _ _ _ _ x).
     Proof.
-      intros E F H H0 T TT HR OOM x.
+      intros E F T TT REL UB FAIL OOM xs x XS.
       cbn in *.
       unfold model_undef.
       unfold exec_undef.
+      exists x; split; auto.      
       eapply interp_prop_correct_exec; eauto; try reflexivity.
       - apply case_prop_handler_correct.
         unfold handler_correct. intros. reflexivity.
         apply case_prop_handler_correct.
-        apply Pick_handler_correct.
+        apply PickUvalue_handler_correct.
 
         unfold handler_correct. intros. reflexivity.
       - apply pick_k_spec_correct_pick_exec_h.
@@ -401,7 +471,8 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       exists (interpreter p).
       split.
       - apply refine_UB.
-        apply refine_undef. auto.
+        apply refine_undef; auto.
+        apply interp_memory_correct.
       - apply eutt_refine_oom_h; try typeclasses eauto.
         reflexivity.
     Qed.
@@ -437,7 +508,7 @@ Module Type TopLevelRefinements (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     let uvalue_trace   := interp_intrinsics trace in
     let L1_trace       := interp_global uvalue_trace g in
     let L2_trace       := interp_local L1_trace l in
-    let L3_trace       := interp_memory L2_trace m in
+    let L3_trace       := interp_memory_prop eq L2_trace m in
     let L4_trace       := model_undef eq L3_trace in
     L4_trace.
 

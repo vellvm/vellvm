@@ -44,11 +44,11 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (** Helper lemmas that should probably be moved *)
   (* TODO: Move this *)
-  Lemma interp_cfg3_concretize_or_pick_concrete :
-    forall (uv : uvalue) (dv : dvalue) P g l m,
+  Lemma interp_cfg2_concretize_or_pick_concrete :
+    forall (uv : uvalue) (dv : dvalue) P g l,
       is_concrete uv = true ->
       uvalue_to_dvalue uv = inr dv ->
-      ℑ3 (concretize_or_pick uv P) g l m ≈ Ret3 g l m dv.
+      ℑ2 (concretize_or_pick uv P) g l ≈ Ret2 g l dv.
   Proof.
     intros * CONC CONV.
     unfold concretize_or_pick.
@@ -56,7 +56,7 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     cbn.
     unfold lift_err.
     rewrite CONV.
-    rewrite interp_cfg3_ret.
+    rewrite interp_cfg2_ret.
     reflexivity.
   Qed.
 
@@ -127,27 +127,27 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
   (* TODO: Move this *)
   Lemma interp_cfg3_concretize_or_pick_concrete_exists :
-    forall (uv : uvalue) P g l m,
+    forall (uv : uvalue) P g l,
       is_concrete uv = true ->
-      exists dv, uvalue_to_dvalue uv = inr dv /\ ℑ3 (concretize_or_pick uv P) g l m ≈ Ret3 g l m dv.
+      exists dv, uvalue_to_dvalue uv = inr dv /\ ℑ2 (concretize_or_pick uv P) g l ≈ Ret2 g l dv.
   Proof.
-    intros uv P g ρ m CONC.
+    intros uv P g ρ CONC.
     pose proof is_concrete_uvalue_to_dvalue uv CONC as (dv & CONV).
     exists dv.
     split; auto.
-    apply interp_cfg3_concretize_or_pick_concrete; auto.
+    apply interp_cfg2_concretize_or_pick_concrete; auto.
   Qed.
 
   (* TODO; Move this *)
-  Lemma interp_cfg3_concretize_or_pick_not_concrete :
-    forall (uv : uvalue) (dv : dvalue) P g l m,
+  Lemma interp_cfg2_concretize_or_pick_not_concrete :
+    forall (uv : uvalue) (dv : dvalue) P g l,
       is_concrete uv = false ->
-      ℑ3 (concretize_or_pick uv P) g l m ≈ 'dv <- trigger (pick_uvalue P uv) ;; Ret3 g l m dv.
+      ℑ2 (concretize_or_pick uv P) g l ≈ 'dv <- trigger (pick_uvalue P uv) ;; Ret2 g l (proj1_sig dv).
   Proof.
-    intros uv dv P g ρ m NCONC.
+    intros uv dv P g ρ NCONC.
     unfold concretize_or_pick.
     rewrite NCONC.
-    rewrite interp_cfg3_pick.
+    setoid_rewrite interp_cfg2_pick_proj1_sig.
     reflexivity.
   Qed.
 
@@ -157,9 +157,9 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
 
     Hint Rewrite @bind_ret_l : rwexp.
     Hint Rewrite @translate_ret : rwexp.
-    Hint Rewrite @interp_cfg3_ret : rwexp.
+    Hint Rewrite @interp_cfg2_ret : rwexp.
     Hint Rewrite @translate_bind : rwexp.
-    Hint Rewrite @interp_cfg3_bind : rwexp.
+    Hint Rewrite @interp_cfg2_bind : rwexp.
     Hint Rewrite @translate_trigger : rwexp.
 
     Ltac go := autorewrite with rwexp.
@@ -169,21 +169,21 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
       | |- context [trigger (GlobalRead _)] =>
           match goal with
           | h: Maps.lookup _ _ = Some _ |- _ =>
-              rewrite interp_cfg3_GR; [rewrite ?bind_ret_l | eauto]
+              rewrite interp_cfg2_GR; [rewrite ?bind_ret_l | eauto]
           | h: Maps.lookup _ _ = None |- _ =>
-              rewrite interp_cfg3_GR_fail; [rewrite ?bind_ret_l | eauto]
+              rewrite interp_cfg2_GR_fail; [rewrite ?bind_ret_l | eauto]
           end
       | |- context [trigger (LocalRead _)] =>
           match goal with
           | h: Maps.lookup _ _ = Some _ |- _ =>
-              rewrite interp_cfg3_LR; [rewrite ?bind_ret_l | eauto]
+              rewrite interp_cfg2_LR; [rewrite ?bind_ret_l | eauto]
           | h: Maps.lookup _ _ = None |- _ =>
-              rewrite interp_cfg3_LR_fail; [rewrite ?bind_ret_l | eauto]
+              rewrite interp_cfg2_LR_fail; [rewrite ?bind_ret_l | eauto]
           end
-      | |- context [trigger (Load _ _)] => rewrite interp_cfg3_Load; [rewrite ?bind_ret_l | eauto]
-      | |- context [trigger (Store _ _)] => rewrite interp_cfg3_store; [rewrite ?bind_ret_l | eauto]
-      | |- context [trigger (LocalWrite _ _)] => rewrite interp_cfg3_LW
-      | |- context [trigger (GlobalWrite _ _)] => rewrite interp_cfg3_GW
+      (* | |- context [trigger (Load _ _)] => rewrite interp_cfg3_Load; [rewrite ?bind_ret_l | eauto] *)
+      (* | |- context [trigger (Store _ _)] => rewrite interp_cfg3_store; [rewrite ?bind_ret_l | eauto] *)
+      | |- context [trigger (LocalWrite _ _)] => rewrite interp_cfg2_LW
+      | |- context [trigger (GlobalWrite _ _)] => rewrite interp_cfg2_GW
       end.
 
   End InstrTactics.
@@ -194,46 +194,46 @@ Module InstrLemmas (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
    However there is no reason to put this burden on the hypothesis, it is easier to use this way.
    Arguably we could do the same for [g] and [m] but haven't felt the need for it so far.
    *)
-  Lemma denote_instr_load :
-    forall (i : raw_id) volatile τ τp ptr align g l l' m a uv,
-      ⟦ ptr at τp ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) ->
-      read m a τ = inr uv ->
-      ⟦ (IId i, INSTR_Load volatile τ (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g (Maps.add i uv l') m tt.
-  Proof.
-    intros * EXP READ.
-    cbn.
-    go.
-    rewrite EXP.
-    go.
-    cbn.
-    go.
-    step.
-    step.
-    reflexivity.
-  Qed.
+  (* Lemma denote_instr_load : *)
+  (*   forall (i : raw_id) volatile τ τp ptr align g l l' m a uv, *)
+  (*     ⟦ ptr at τp ⟧e3 g l m ≈ Ret3 g l' m (UVALUE_Addr a) -> *)
+  (*     read m a τ = inr uv -> *)
+  (*     ⟦ (IId i, INSTR_Load volatile τ (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g (Maps.add i uv l') m tt. *)
+  (* Proof. *)
+  (*   intros * EXP READ. *)
+  (*   cbn. *)
+  (*   go. *)
+  (*   rewrite EXP. *)
+  (*   go. *)
+  (*   cbn. *)
+  (*   go. *)
+  (*   step. *)
+  (*   step. *)
+  (*   reflexivity. *)
+  (* Qed. *)
 
-  Lemma denote_instr_store :
-    forall {M} `{MemMonad MemState M}
-      (i : int) volatile τv val τp ptr align uv a g l l' l'' m m',
-      ⟦ val at τv ⟧e3 g l m ≈ Ret3 g l' m uv ->
-      ⟦ ptr at τp ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_Addr a) ->
-      MemMonad_runs_to (write a uv τv) m = Some (m', tt) ->
-      ⟦ (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g l'' m' tt.
-  Proof.
-    intros * EXP PTR WRITE.
-    cbn.
-    go.
-    rewrite EXP.
-    go.
+  (* Lemma denote_instr_store : *)
+  (*   forall {M} `{MemMonad MemState M} *)
+  (*     (i : int) volatile τv val τp ptr align uv a g l l' l'' m m', *)
+  (*     ⟦ val at τv ⟧e3 g l m ≈ Ret3 g l' m uv -> *)
+  (*     ⟦ ptr at τp ⟧e3 g l' m ≈ Ret3 g l'' m (UVALUE_Addr a) -> *)
+  (*     MemMonad_runs_to (write a uv τv) m = Some (m', tt) -> *)
+  (*     ⟦ (IVoid i, INSTR_Store volatile (τv, val) (τp, ptr) align) ⟧i3 g l m ≈ Ret3 g l'' m' tt. *)
+  (* Proof. *)
+  (*   intros * EXP PTR WRITE. *)
+  (*   cbn. *)
+  (*   go. *)
+  (*   rewrite EXP. *)
+  (*   go. *)
 
-    go.
-    rewrite PTR.
-    go.
-    cbn.
-    go.
-    rewrite interp_cfg3_store; eauto.
-    reflexivity.
-  Qed.
+  (*   go. *)
+  (*   rewrite PTR. *)
+  (*   go. *)
+  (*   cbn. *)
+  (*   go. *)
+  (*   rewrite interp_cfg3_store; eauto. *)
+  (*   reflexivity. *)
+  (* Qed. *)
 
   (* Lemma denote_instr_store_exists : *)
   (*   forall (i : int) volatile τv val τp ptr align uv dv a g l l' l'' m aids, *)

@@ -136,10 +136,13 @@ Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SP : SerializationParams L
         split; cbn; auto.
       Qed.
 
-      Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
+      Definition model_undef_h `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F} :
         forall (T:Type) (RR: T -> T -> Prop), itree (E +' PickUvalueE +' F) T -> PropT (E +' F) T :=
-        interp_prop (case_ E_trigger_prop (case_ Pick_handler F_trigger_prop)) (@pick_uvalue_k_spec).
+        interp_prop (case_ E_trigger_prop (case_ PickUvalue_handler F_trigger_prop)) (@pick_uvalue_k_spec).
 
+      Definition model_undef `{FailureE -< E +' F} `{UBE -< E +' F} `{OOME -< E +' F}
+                 {T} (RR : T -> T -> Prop) (ts : PropT (E +' PickUvalueE +' F) T) : PropT (E +' F) T:=
+        fun t_picked => exists t_pre, ts t_pre /\ model_undef_h RR t_pre t_picked.
     End PARAMS_MODEL.
 
   End PickPropositional.

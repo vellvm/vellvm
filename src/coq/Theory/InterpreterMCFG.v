@@ -21,6 +21,10 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Export TOP.
   Export IS.
   Export IS.LLVM.
+  Import MEM.MEM_MODEL.
+  Import MEM.MMEP.MMSP.
+  Import MEM.MEM_EXEC_INTERP.
+  Import MEM.MEM_SPEC_INTERP.
 
   Import SemNotations.
   (* end hide *)
@@ -45,7 +49,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
              | |- context [interp_intrinsics (ITree.bind _ _)] => rewrite interp_intrinsics_bind
              | |- context [interp_global (ITree.bind _ _)] => rewrite interp_global_bind
              | |- context [interp_local_stack (ITree.bind _ _)] => rewrite interp_local_stack_bind
-             | |- context [interp_memory (ITree.bind _ _)] => rewrite interp_memory_bind
+             (* | |- context [interp_memory (ITree.bind _ _)] => rewrite interp_memory_bind *)
              | |- context [interp_intrinsics (trigger _)] => rewrite interp_intrinsics_trigger; cbn; rewrite ?subevent_subevent
              | |- context [interp_global (trigger _)] => rewrite interp_global_trigger; cbn; rewrite ?subevent_subevent
              | |- context [interp_local_stack (trigger _)] => rewrite interp_local_stack_trigger; cbn; rewrite ?subevent_subevent
@@ -53,7 +57,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
              | |- context [interp_intrinsics (Ret _)] => rewrite interp_intrinsics_ret
              | |- context [interp_global (Ret _)] => rewrite interp_global_ret
              | |- context [interp_local_stack (Ret _)] => rewrite interp_local_stack_ret
-             | |- context [interp_memory (Ret _)] => rewrite interp_memory_ret
+             (* | |- context [interp_memory (Ret _)] => rewrite interp_memory_ret *)
              | |- context [ITree.bind (Ret _) _] => rewrite bind_ret_l
              | |- context [translate _ (Ret _)] => rewrite translate_ret
              end.
@@ -63,7 +67,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
              | H: context [interp_intrinsics (ITree.bind _ _)] |- _ => rewrite interp_intrinsics_bind in H
              | H: context [interp_global (ITree.bind _ _)] |- _ => rewrite interp_global_bind in H
              | H: context [interp_local_stack (ITree.bind _ _)] |- _ => rewrite interp_local_stack_bind in H
-             | H: context [interp_memory (ITree.bind _ _)] |- _ => rewrite interp_memory_bind in H
+             (* | H: context [interp_memory (ITree.bind _ _)] |- _ => rewrite interp_memory_bind in H *)
              | H: context [interp_intrinsics (trigger _)] |- _ => rewrite interp_intrinsics_trigger in H; cbn in H; rewrite ?subevent_subevent in H
              | H: context [interp_global (trigger _)] |- _ => rewrite interp_global_trigger in H; cbn in H; rewrite ?subevent_subevent in H
              | H: context [interp_local_stack (trigger _)] |- _ => rewrite interp_local_stack_trigger in H; cbn in H; rewrite ?subevent_subevent in H
@@ -71,7 +75,7 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
              | H: context [interp_intrinsics (Ret _)] |- _ => rewrite interp_intrinsics_ret in H
              | H: context [interp_global (Ret _)] |- _ => rewrite interp_global_ret in H
              | H: context [interp_local_stack (Ret _)] |- _ => rewrite interp_local_stack_ret in H
-             | H: context [interp_memory (Ret _)] |- _ => rewrite interp_memory_ret in H
+             (* | H: context [interp_memory (Ret _)] |- _ => rewrite interp_memory_ret in H *)
              | H: context [ITree.bind (Ret _) _] |- _ => rewrite bind_ret_l in H
              | H: context [translate _ (Ret _)] |- _ => rewrite translate_ret in H
              end.
@@ -110,25 +114,25 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     go; reflexivity.
   Qed.
 
-  Lemma interp3_bind :
-    forall {R S} (t: itree L0 R) (k: R -> itree L0 S) g l m,
-      ℑs3 (t >>= k) g l m ≈ '(m',(l',(g',x))) <- ℑs3 t g l m;; ℑs3 (k x) g' l' m'.
-  Proof.
-    intros.
-    unfold ℑs3.
+  (* Lemma interp3_bind : *)
+  (*   forall {R S} (t: itree L0 R) (k: R -> itree L0 S) g l m, *)
+  (*     ℑs3 (t >>= k) g l m ≈ '(m',(l',(g',x))) <- ℑs3 t g l m;; ℑs3 (k x) g' l' m'. *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   unfold ℑs3. *)
 
-    rewrite interp_intrinsics_bind.
-    rewrite interp_global_bind.
-    rewrite interp_local_stack_bind.
-    go.
-    apply eutt_eq_bind; intros (? & ? & ? & ?); reflexivity.
-  Qed.
+  (*   rewrite interp_intrinsics_bind. *)
+  (*   rewrite interp_global_bind. *)
+  (*   rewrite interp_local_stack_bind. *)
+  (*   go. *)
+  (*   apply eutt_eq_bind; intros (? & ? & ? & ?); reflexivity. *)
+  (* Qed. *)
 
-  Lemma interp3_ret : forall (R : Type) g l m (x : R), ℑs3 (Ret x) g l m ≈ Ret3 g l m x.
-  Proof.
-    intros; unfold ℑs3.
-    go; reflexivity.
-  Qed.
+  (* Lemma interp3_ret : forall (R : Type) g l m (x : R), ℑs3 (Ret x) g l m ≈ Ret3 g l m x. *)
+  (* Proof. *)
+  (*   intros; unfold ℑs3. *)
+  (*   go; reflexivity. *)
+  (* Qed. *)
 
   #[global] Instance eutt_interp1 {T}:
     Proper (eutt eq ==> eq ==> eutt eq) (@ℑs1 T).
@@ -148,49 +152,49 @@ Module Type MCFGTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     reflexivity.
   Qed.
 
-  #[global] Instance eutt_interp3 {T}:
-    Proper (eutt eq ==> eq ==> eq ==> eq ==> eutt eq) (@ℑs3 T).
-  Proof.
-    repeat intro.
-    unfold ℑs3.
-    subst; rewrite H.
-    reflexivity.
-  Qed.
+  (* #[global] Instance eutt_interp3 {T}: *)
+  (*   Proper (eutt eq ==> eq ==> eq ==> eq ==> eutt eq) (@ℑs3 T). *)
+  (* Proof. *)
+  (*   repeat intro. *)
+  (*   unfold ℑs3. *)
+  (*   subst; rewrite H. *)
+  (*   reflexivity. *)
+  (* Qed. *)
 
-  Lemma interp3_vis: 
-    forall T R (e : L0 T) (k : T -> itree L0 R) g l m,
-      ℑs3 (Vis e k) g l m ≈ 
-          '(m, (l, (g, x))) <- ℑs3 (trigger e) g l m;; ℑs3 (k x) g l m.
-  Proof.
-    intros.
-    unfold ℑs3.
-    rewrite interp_intrinsics_vis.
-    go.
-    apply eutt_eq_bind.
-    intros (? & ? & ? & ?).
-    go.
-    reflexivity.
-  Qed.
+  (* Lemma interp3_vis:  *)
+  (*   forall T R (e : L0 T) (k : T -> itree L0 R) g l m, *)
+  (*     ℑs3 (Vis e k) g l m ≈  *)
+  (*         '(m, (l, (g, x))) <- ℑs3 (trigger e) g l m;; ℑs3 (k x) g l m. *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   unfold ℑs3. *)
+  (*   rewrite interp_intrinsics_vis. *)
+  (*   go. *)
+  (*   apply eutt_eq_bind. *)
+  (*   intros (? & ? & ? & ?). *)
+  (*   go. *)
+  (*   reflexivity. *)
+  (* Qed. *)
 
-  Lemma interp3_bind_trigger :
-    forall T R (e : L0 T) (k : T -> itree L0 R) g l m,
-      ℑs3 (trigger e >>= k) g l m ≈ 
-          '(m, (l, (g, x))) <- ℑs3 (trigger e) g l m;; ℑs3 (k x) g l m.
-  Proof.
-    intros.
-    rewrite bind_trigger.
-    rewrite interp3_vis at 1.
-    reflexivity.
-  Qed.
+  (* Lemma interp3_bind_trigger : *)
+  (*   forall T R (e : L0 T) (k : T -> itree L0 R) g l m, *)
+  (*     ℑs3 (trigger e >>= k) g l m ≈  *)
+  (*         '(m, (l, (g, x))) <- ℑs3 (trigger e) g l m;; ℑs3 (k x) g l m. *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   rewrite bind_trigger. *)
+  (*   rewrite interp3_vis at 1. *)
+  (*   reflexivity. *)
+  (* Qed. *)
 
-  Lemma interp3_GW : forall id g l m v,
-      ℑs3 (trigger (GlobalWrite id v)) g l m ≈ Ret3 (Maps.add id v g) l m tt.
-  Proof.
-    intros.
-    unfold ℑs3.
-    go.
-    reflexivity.
-  Qed.
+  (* Lemma interp3_GW : forall id g l m v, *)
+  (*     ℑs3 (trigger (GlobalWrite id v)) g l m ≈ Ret3 (Maps.add id v g) l m tt. *)
+  (* Proof. *)
+  (*   intros. *)
+  (*   unfold ℑs3. *)
+  (*   go. *)
+  (*   reflexivity. *)
+  (* Qed. *)
 
   (* Lemma interp_cfg3_LM : forall t a prov g l (m : MemState) v, *)
   (*     deserialize_sbytes (lookup_all_index a (sizeof_dtyp t) bytes SUndef) t = v -> *)

@@ -329,7 +329,7 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
     := match res with
        | (ms, ((lenv, lstack), (genv, dv))) =>
            dv' <- dvalue_convert dv;;
-           ret (IS2.LLVM.MEM.initial_memory_state, (([], []), ([], dv')))
+           ret (IS2.LLVM.MEM.MMEP.initial_memory_state, (([], []), ([], dv')))
        end.
  
   Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
@@ -577,38 +577,38 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
         unfold model_gen in m_fin.
         cbn in m_fin.
         unfold interp_mcfg5 in m_fin.
-        repeat rewrite bind_ret_l in m_fin.
-        Import TranslateFacts.
-        rewrite translate_ret in m_fin.
-        repeat rewrite bind_ret_l in m_fin.
+    (*     repeat rewrite bind_ret_l in m_fin. *)
+    (*     Import TranslateFacts. *)
+    (*     rewrite translate_ret in m_fin. *)
+    (*     repeat rewrite bind_ret_l in m_fin. *)
 
         
-        split.
-        left.
-        cbn.
-        unfold InterpreterStackBigIntptr.interp_mcfg5.
-        MCFGTheoryBigIntptr.MCFGTactics.go.
-        unfold LLVMEvents.raise.
-        MCFGTheoryBigIntptr.MCFGTactics.go.
-        rewrite InterpreterStackBigIntptr.LLVM.MEMORY_ITREE_THEORY.interp_memory_trigger.
-        cbn.
-        MCFGTheoryBigIntptr.MCFGTactics.go.
-        rewrite bind_trigger.
-        MCFGTheoryBigIntptr.MCFGTactics.go.
+    (*     split. *)
+    (*     left. *)
+    (*     cbn. *)
+    (*     unfold InterpreterStackBigIntptr.interp_mcfg5. *)
+    (*     MCFGTheoryBigIntptr.MCFGTactics.go. *)
+    (*     unfold LLVMEvents.raise. *)
+    (*     MCFGTheoryBigIntptr.MCFGTactics.go. *)
+    (*     rewrite InterpreterStackBigIntptr.LLVM.MEMORY_ITREE_THEORY.interp_memory_trigger. *)
+    (*     cbn. *)
+    (*     MCFGTheoryBigIntptr.MCFGTactics.go. *)
+    (*     rewrite bind_trigger. *)
+    (*     MCFGTheoryBigIntptr.MCFGTactics.go. *)
 
-        match goal with
-        | H: _ |-  InterpreterStackBigIntptr.LLVM.Pick.model_undef eq ?t _ =>
-            assert (t ≈ LLVMEvents.raise ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "")) as Ht
-        end.
-        admit.
+    (*     match goal with *)
+    (*     | H: _ |-  InterpreterStackBigIntptr.LLVM.Pick.model_undef eq ?t _ => *)
+    (*         assert (t ≈ LLVMEvents.raise ("Could not look up global id " ++ CeresString.DString.of_string ("" ++ "main") "")) as Ht *)
+    (*     end. *)
+    (*     admit. *)
 
-        rewrite Ht.
-        unfold InterpreterStackBigIntptr.LLVM.Pick.model_undef.
-        subst raise.
-        admit.
-        reflexivity.
-      + admit.
-    - apply eutt_refine_oom_h; try typeclasses eauto.
-      admit.
+    (*     rewrite Ht. *)
+    (*     unfold InterpreterStackBigIntptr.LLVM.Pick.model_undef. *)
+    (*     subst raise. *)
+    (*     admit. *)
+    (*     reflexivity. *)
+    (*   + admit. *)
+    (* - apply eutt_refine_oom_h; try typeclasses eauto. *)
+    (*   admit. *)
   Abort.
 End InfiniteToFinite.

@@ -2834,7 +2834,7 @@ End Memory_Stack_Theory.
 
 Section PARAMS.
   Variable (E F G : Type -> Type).
-  Context `{FailureE -< F} `{UBE -< F} `{PickE -< F} `{OOME -< F}.
+  Context `{FailureE -< F} `{UBE -< F} `{PickUvalueE -< F} `{OOME -< F}.
   Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
   Notation Effout := (E +' F).
   Notation interp_memory := (@interp_memory E F _ _ _).
@@ -2923,6 +2923,7 @@ Section PARAMS.
       intros ?; tau_steps; reflexivity.
     Qed.
 
+    (*
     #[global] Instance eutt_interp_memory {R} {R2} :
       Proper (eutt Logic.eq ==> Logic.eq ==> eutt Logic.eq) (@interp_memory R R2).
     Proof.
@@ -3007,7 +3008,7 @@ Section PARAMS.
       destruct m, m'; cbn.
       reflexivity.
     Qed.
-
+*)
  (*    Lemma interp_memory_alloca_exists : *)
  (*      forall (m : memory_stack) (t : dtyp), *)
  (*        non_void t -> *)

@@ -39,6 +39,9 @@ Module LocalFrame (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
   Export TOP.
   Export IS.
   Export IS.LLVM.
+  Import IS.LLVM.MEM.
+  Import MMEP.
+  Import MMSP.
 
   Import SemNotations.
   (* end hide *)
@@ -50,54 +53,54 @@ Module LocalFrame (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
     (MemState * (local_env * (global_env * T))) -> Prop :=
     fun '(_,(l,_)) => P l.
 
-  Lemma raise_has_all_posts3 : forall {R} s g l m Q,
-      ℑ3 (raise (A := R) s) g l m ⤳ Q.
-  Proof.
-    unfold raise; intros.
-    rewrite interp_cfg3_bind.
-    cbn.
-    unfold interp_cfg3.
-    rewrite interp_intrinsics_trigger.
-    cbn.
-    unfold Intrinsics.F_trigger; cbn.
-    rewrite subevent_subevent.
-    rewrite interp_global_trigger; cbn.
-    rewrite subevent_subevent.
-    rewrite interp_local_bind, interp_local_trigger; cbn.
-    rewrite subevent_subevent, bind_bind.
-    rewrite interp_memory_bind, interp_memory_trigger; cbn.
-    rewrite subevent_subevent, !bind_bind.
-    apply has_post_bind; intros [].
-  Qed.
+  (* Lemma raise_has_all_posts3 : forall {R} s g l m Q, *)
+  (*     ℑ3 (raise (A := R) s) g l m ⤳ Q. *)
+  (* Proof. *)
+  (*   unfold raise; intros. *)
+  (*   rewrite interp_cfg3_bind. *)
+  (*   cbn. *)
+  (*   unfold interp_cfg3. *)
+  (*   rewrite interp_intrinsics_trigger. *)
+  (*   cbn. *)
+  (*   unfold Intrinsics.F_trigger; cbn. *)
+  (*   rewrite subevent_subevent. *)
+  (*   rewrite interp_global_trigger; cbn. *)
+  (*   rewrite subevent_subevent. *)
+  (*   rewrite interp_local_bind, interp_local_trigger; cbn. *)
+  (*   rewrite subevent_subevent, bind_bind. *)
+  (*   rewrite interp_memory_bind, interp_memory_trigger; cbn. *)
+  (*   rewrite subevent_subevent, !bind_bind. *)
+  (*   apply has_post_bind; intros []. *)
+  (* Qed. *)
 
-  Lemma raiseUB_has_all_posts3 : forall {R} s g l m Q,
-      ℑ3 (raiseUB (X := R) s) g l m ⤳ Q.
-  Proof.
-    unfold raiseUB; intros.
-    rewrite interp_cfg3_bind.
-    cbn.
-    unfold interp_cfg3.
-    rewrite interp_intrinsics_trigger.
-    cbn.
-    unfold Intrinsics.F_trigger; cbn.
-    rewrite subevent_subevent.
-    rewrite interp_global_trigger; cbn.
-    rewrite subevent_subevent.
-    rewrite interp_local_bind, interp_local_trigger; cbn.
-    rewrite subevent_subevent, bind_bind.
-    rewrite interp_memory_bind, interp_memory_trigger; cbn.
-    rewrite subevent_subevent, !bind_bind.
-    apply has_post_bind; intros [].
-  Qed.
+  (* Lemma raiseUB_has_all_posts3 : forall {R} s g l m Q, *)
+  (*     ℑ3 (raiseUB (X := R) s) g l m ⤳ Q. *)
+  (* Proof. *)
+  (*   unfold raiseUB; intros. *)
+  (*   rewrite interp_cfg3_bind. *)
+  (*   cbn. *)
+  (*   unfold interp_cfg3. *)
+  (*   rewrite interp_intrinsics_trigger. *)
+  (*   cbn. *)
+  (*   unfold Intrinsics.F_trigger; cbn. *)
+  (*   rewrite subevent_subevent. *)
+  (*   rewrite interp_global_trigger; cbn. *)
+  (*   rewrite subevent_subevent. *)
+  (*   rewrite interp_local_bind, interp_local_trigger; cbn. *)
+  (*   rewrite subevent_subevent, bind_bind. *)
+  (*   rewrite interp_memory_bind, interp_memory_trigger; cbn. *)
+  (*   rewrite subevent_subevent, !bind_bind. *)
+  (*   apply has_post_bind; intros []. *)
+  (* Qed. *)
 
-  Ltac case_eq_id x id :=
-    let EQ := fresh "EQ" in
-    let NEQ := fresh "NEQ" in
-    destruct (Eqv.eqv_dec_p x id) as [EQ | NEQ];
-    [repeat red in EQ; subst | unfold Eqv.eqv, eqv_raw_id in NEQ].
+  (* Ltac case_eq_id x id := *)
+  (*   let EQ := fresh "EQ" in *)
+  (*   let NEQ := fresh "NEQ" in *)
+  (*   destruct (Eqv.eqv_dec_p x id) as [EQ | NEQ]; *)
+  (*   [repeat red in EQ; subst | unfold Eqv.eqv, eqv_raw_id in NEQ]. *)
 
-  Arguments alist_find : simpl never.
-  #[export] Hint Unfold In : core.
+  (* Arguments alist_find : simpl never. *)
+  (* #[export] Hint Unfold In : core. *)
 
   (* Lemma pickUnique_is_pure: forall v, pure (ℑ3 (pickUnique v)). *)
   (* Proof. *)

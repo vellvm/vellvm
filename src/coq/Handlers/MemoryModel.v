@@ -756,19 +756,19 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
     Context `{MemMonad MemState AllocationId MemM}.
 
     (** Reading uvalues *)
-    Definition read_bytes (ptr : addr) (len : nat) : MemM (list SByte) :=
+    Definition read_bytes `{MemMonad MemState AllocationId MemM} (ptr : addr) (len : nat) : MemM (list SByte) :=
       (* TODO: this should maybe be UB and not OOM??? *)
       ptrs <- get_consecutive_ptrs ptr len;;
 
       (* Actually perform reads *)
       Util.map_monad (fun ptr => read_byte ptr) ptrs.
 
-    Definition read_uvalue (dt : dtyp) (ptr : addr) : MemM uvalue :=
+    Definition read_uvalue `{MemMonad MemState AllocationId MemM} (dt : dtyp) (ptr : addr) : MemM uvalue :=
       bytes <- read_bytes ptr (N.to_nat (sizeof_dtyp dt));;
       ret (from_ubytes bytes dt).
 
     (** Writing uvalues *)
-    Definition write_bytes (ptr : addr) (bytes : list SByte) : MemM unit :=
+    Definition write_bytes `{MemMonad MemState AllocationId MemM} (ptr : addr) (bytes : list SByte) : MemM unit :=
       (* TODO: Should this be UB instead of OOM? *)
       ptrs <- get_consecutive_ptrs ptr (length bytes);;
       let ptr_bytes := zip ptrs bytes in
@@ -776,20 +776,20 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       (* Actually perform writes *)
       Util.map_monad_ (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
 
-    Definition write_uvalue (dt : dtyp) (ptr : addr) (uv : uvalue) : MemM unit :=
+    Definition write_uvalue `{MemMonad MemState AllocationId MemM} (dt : dtyp) (ptr : addr) (uv : uvalue) : MemM unit :=
       sid <- fresh_sid;;
       bytes <- lift_OOM (to_ubytes uv dt sid);;
       write_bytes ptr bytes.
 
     (** Allocating dtyps *)
     (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
-    Definition allocate_dtyp (dt : dtyp) : MemM addr :=
+    Definition allocate_dtyp `{MemMonad MemState AllocationId MemM} (dt : dtyp) : MemM addr :=
       sid <- fresh_sid;;
       bytes <- lift_OOM (generate_undef_bytes dt sid);;
       allocate_bytes dt bytes.
 
     (** Handle memcpy *)
-    Definition memcpy (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemM unit :=
+    Definition memcpy `{MemMonad MemState AllocationId MemM} (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemM unit :=
       if Z.ltb len 0
       then
         raise_ub "memcpy given negative length."
@@ -808,7 +808,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
         else
           raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
 
-    Definition handle_memory : MemoryE ~> MemM
+    Definition handle_memory `{MemMonad MemState AllocationId MemM} : MemoryE ~> MemM
       := fun T m =>
            match m with
            (* Unimplemented *)
@@ -835,7 +835,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
                end
            end.
 
-    Definition handle_memcpy (args : list dvalue) : MemM unit :=
+    Definition handle_memcpy `{MemMonad MemState AllocationId MemM} (args : list dvalue) : MemM unit :=
       match args with
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
@@ -858,7 +858,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
-    Definition handle_intrinsic : IntrinsicE ~> MemM
+    Definition handle_intrinsic `{MemMonad MemState AllocationId MemM} : IntrinsicE ~> MemM
       := fun T e =>
            match e with
            | Intrinsic t name args =>

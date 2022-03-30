@@ -8,10 +8,14 @@ From ExtLib Require Import
 From ITree Require Import
      ITree
      Basics.Basics
+     Eq.Eq
      Events.StateFacts
      Events.State.
 
 From Vellvm Require Import Error.
+
+From Vellvm.Utils Require Import
+     PropT.
 
 From Vellvm.Semantics Require Import
      MemoryAddress
@@ -247,3 +251,14 @@ Definition MemPropT_assert_post {MemState X} (Post : X -> Prop) : MemPropT MemSt
        | inr (Oom s) =>
            True
        end.
+
+Definition MemPropT_lift_PropT {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : stateT MemState (PropT E) X.
+Proof.
+  unfold PropT, MemPropT, stateT in *.
+  intros ms t.
+  specialize (m ms).
+  refine ((exists msg, t ≈ raise_ub msg) <-> (forall res, ~ m res) /\
+          (exists msg, t ≈ raise_error msg) <-> (exists msg, m (inl msg)) /\
+          (exists msg, t ≈ raise_oom msg) <-> (exists msg, m (inr (Oom msg))) /\
+          forall res, t ≈ ret res <-> m (inr (NoOom res))).
+Defined.

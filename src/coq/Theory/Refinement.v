@@ -36,9 +36,13 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Import LP.
   Import LLVM.
   Import LLVM.MEM.
+  Import MEM.MEM_MODEL.
+  Import MEM.MMEP.MMSP.
+  Import MEM.MEM_EXEC_INTERP.
+  Import MEM.MEM_SPEC_INTERP.
 
   Import DV.
-  Import LLVM.SP.SER.
+  Import LLVM.MEM.SP.SER.
 
   (* Refinement relation for uvalues *)
   (* Definition 5.6 UValue refinement *)
@@ -408,8 +412,8 @@ Module Make (LP : LLVMParams) (LLVM : Lang LP).
   Definition refine_res3 : relation (MemState * (local_env * stack * (global_env * dvalue)))
     := TT × refine_res2.
 
-  Definition refine_L3 : relation (itree L3 (MemState * (local_env * stack * (global_env * dvalue))))
-    := eutt refine_res3.
+  Definition refine_L3 : relation (itree L3 (MemState * (local_env * stack * (global_env * dvalue))) -> Prop)
+    := fun ts ts' => forall t', ts' t' -> exists t, ts t /\ eutt refine_res3 t t'.
 
   (* Refinement for after interpreting pick. *)
   Definition refine_L4 : relation ((itree L4 (MemState * (local_env * stack * (global_env * dvalue)))) -> Prop)

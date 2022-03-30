@@ -491,6 +491,16 @@ Module FinPROV : PROVENANCE(Addr) with Definition Prov := Prov.
   Definition initial_provenance : Provenance
     := 0%N.
 
+  Lemma aid_access_allowed_refl :
+    forall aid, aid_access_allowed aid aid = true.
+  Proof.
+    intros aid.
+    unfold aid_access_allowed.
+    destruct aid; auto.
+    rewrite N.eqb_refl.
+    auto.
+  Qed.
+
   (* Debug *)
   Definition show_prov (pr : Prov) := Show.show pr.
   Definition show_provenance (pr : Provenance) := Show.show pr.
@@ -629,9 +639,9 @@ End FinByte.
 (** ** Memory model
     Implementation of the memory model, i.e. a handler for [MemoryE].
     The memory itself, [memory], is a finite map (using the standard library's AVLs)
-    indexed on [Z].
- *)
-Module FinMemory (LP : LLVMParams) (MP : MemoryParams LP) : MemoryModel LP MP.
+    indexed on [Z]. 
+*)
+Module Type FinMemory (LP : LLVMParams) (MP : MemoryParams LP).
   Import MP.
   Import LP.
   Import Events.
@@ -1622,13 +1632,6 @@ Module FinMemory (LP : LLVMParams) (MP : MemoryParams LP) : MemoryModel LP MP.
          mkMemState (f ms_memory_stack) ms_sid ms_prov
        end.
 
-  Definition mem_monad_put_memory_stack (m : memory_stack) : MemMonad unit
-    := modify_mem_state (MemState_set_memory_stack m);; ret tt.
-
-  Definition mem_monad_modify_memory_stack {M} `{Monad M} `{MemMonad MemState Provenance M}
-             (f : memory_stack -> memory_stack) : M unit
-    := modify_mem_state (MemState_modify_memory_stack f);; ret tt.
-
   Definition mem_state_modify_memory_stack {M} `{Monad M}
              (f : memory_stack -> memory_stack) : MemStateT M unit
     := modify (MemState_modify_memory_stack f);; ret tt.
@@ -1649,24 +1652,6 @@ Module FinMemory (LP : LLVMParams) (MP : MemoryParams LP) : MemoryModel LP MP.
         mem_state_put_prov pr;;
         ret x
       end.
-
-  (* TODO: move this? *)
-  Definition mem_monad_lift_ErrSID {M} `{Monad M} `{MemMonad MemState Provenance M} {A} (e : ErrSID A) : M A
-    :=
-    sid <- get_sid;;
-    pr <-  get_provenance;;
-    match runErrSID e sid pr with
-    | (inl (OOM_message msg), sid, pr) =>
-        raise_oom msg
-    | (inr (inl (UB_message msg)), sid, pr) =>
-        raise_ub msg
-    | (inr (inr (inl (ERR_message msg))), sid, pr) =>
-        raise_error msg
-    | (inr (inr (inr x)), sid, pr) =>
-        put_sid sid;;
-        put_provenance pr;;
-        ret x
-    end.
 
   Definition mem_state_lift_err_ub_oom {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A} (e : err_ub_oom A) : MemStateT (itree E) A
     := match unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM e)))) with
@@ -1745,21 +1730,16 @@ Module FinMemory (LP : LLVMParams) (MP : MemoryParams LP) : MemoryModel LP MP.
       := allocate_undef_bytes_size m addr aid (sizeof_dtyp t) 0%N t.
 
     (* TODO: make 'addr' nondeterministic, see issue #170 *)
-    Definition allocate
-               {M : Type -> Type} `{Monad M}
-               `{MemMonad MemState Provenance M}
-               (t : dtyp) : M addr
-      :=
+    Definition allocate (ms : memory_stack) (t : dtyp) : ErrSID (memory_stack * addr) :=
       match t with
       | DTYPE_Void => raise_ub "Allocation of type void"
       | _ =>
-          mem <- get_mem_state;;
-          aid <- mem_monad_lift_ErrSID fresh_allocation_id;;
-          let addr := next_memory_key (ms_memory_stack mem) in
-          let '(m, fs) := ms_memory_stack mem in
-          '(m', addrs) <- (mem_monad_lift_ErrSID (allocate_undef_bytes m addr aid t));;
-          let ms' := add_all_to_frame (m', fs) addrs in
-          ret (int_to_ptr addr (allocation_id_to_prov aid))
+        let '(m, fs) := ms in
+        aid <- fresh_allocation_id;;
+        let addr := next_memory_key ms in
+        '(m', addrs) <- allocate_undef_bytes m addr aid t;;
+        let ms' := add_all_to_frame (m', fs) addrs in
+        ret (ms', (int_to_ptr addr (allocation_id_to_prov aid)))
       end.
 
     Definition read (ms : memory_stack) (ptr : addr) (t : dtyp) : err uvalue :=
@@ -1864,12 +1844,10 @@ Module FinMemory (LP : LLVMParams) (MP : MemoryParams LP) : MemoryModel LP MP.
         ret tt
 
       | Alloca t =>
-        a <- MemMonad_lift_stateT (allocate t);;
+        m <- mem_state_get_memory_stack;;
+        '(m',a) <- mem_state_lift_ErrSID (allocate m t);;
+        mem_state_put_memory_stack m';;
         ret (DVALUE_Addr a)
-      | _ =>
-          raise_error "blah"
-      end.
-
 
       | Load t dv =>
          match dv with
@@ -1894,7 +1872,7 @@ Module FinMemory (LP : LLVMParams) (MP : MemoryParams LP) : MemoryModel LP MP.
 
       end.
 
-  Definition handle_intrinsic {E} `{FailureE -< E} `{PickE -< E} `{UBE -< E} : IntrinsicE ~> MemStateT (itree E) :=
+  Definition handle_intrinsic {E} `{FailureE -< E} `{UBE -< E} : IntrinsicE ~> MemStateT (itree E) :=
     fun T e =>
       match e with
       | Intrinsic t name args =>
@@ -1913,7 +1891,7 @@ Module FinMemory (LP : LLVMParams) (MP : MemoryParams LP) : MemoryModel LP MP.
 
   Section PARAMS.
     Variable (E F G : Type -> Type).
-    Context `{FailureE -< F} `{UBE -< F} `{PickE -< F} `{OOME -< F}.
+    Context `{FailureE -< F} `{UBE -< F} `{OOME -< F}.
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
 

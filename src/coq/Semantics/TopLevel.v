@@ -56,6 +56,13 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
   Export IS.LP.Events.
   Export IS.LLVM.D.
   Export IS.LLVM.MEM.
+  Export IS.LLVM.MEM.MEM_MODEL.
+  Import IS.LLVM.MEM.SP.SER.
+  Import MMEP.MMSP.
+  Import MMEP.
+  Import MEM_EXEC_INTERP.
+  Import MEM_SPEC_INTERP.
+  Export GEP.
   Export IS.LLVM.Local.
   Export IS.LLVM.Global.
   Export IS.LLVM.Stack.
@@ -168,8 +175,8 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
     'addr <- trigger (GlobalRead (Name entry)) ;;
     'rv <- denote_mcfg defns ret_typ (dvalue_to_uvalue addr) args ;;
-    trigger (pick_uvalue True rv).
-
+    dv_pred <- trigger (pick_uvalue True rv);;
+    ret (proj1_sig dv_pred).
 
   (* main_args and denote_vellvm_main may not be needed anymore, but I'm keeping them 
      For backwards compatibility.
@@ -190,6 +197,8 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
      the resulting [itree].
    *)
   Definition interpreter_gen
+             {MemM : Type -> Type}
+             `{MemMonad MemState AllocationId MemM}
              (ret_typ : dtyp)
              (entry : string)
              (args : list uvalue)
@@ -202,7 +211,9 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
      Finally, the reference interpreter assumes no user-defined intrinsics and starts 
      from "main" using bogus initial inputs.
    *)
-  Definition interpreter := interpreter_gen (DTYPE_I 32%N) "main" main_args.
+  Definition interpreter {MemM : Type -> Type}
+             `{MemMonad MemState AllocationId MemM}
+    := interpreter_gen (DTYPE_I 32%N) "main" main_args.
 
   (**
      We now turn to the definition of our _model_ of vellvm's semantics. The
@@ -222,7 +233,7 @@ Module Type LLVMTopLevel (IS : InterpreterStack).
              (prog: list (toplevel_entity typ (block typ * list (block typ))))
     : PropT L4 (MemState * (local_env * lstack * (global_env * dvalue))) :=
     let t := denote_vellvm ret_typ entry args (convert_types (mcfg_of_tle prog)) in
-    ℑs eq t [] ([],[]) initial_memory_state. 
+    ℑs eq eq t [] ([],[]) initial_memory_state. 
 
   (**
      Finally, the official model assumes no user-defined intrinsics.

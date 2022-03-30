@@ -7,10 +7,12 @@ From Vellvm.Semantics Require Import
      MemoryParams
      LLVMParams
      LLVMEvents
+     Lang
      Memory.FiniteProvenance
      Memory.Sizeof
      Memory.MemBytes
      Memory.ErrSID
+     GepM
      VellvmIntegers.
 
 From Vellvm Require Import
@@ -45,7 +47,8 @@ Import MonadNotation.
 Open Scope monad_scope.
 
 From Vellvm.Handlers Require Import
-     MemoryModel.
+     MemoryModel
+     MemoryInterpreters.
 
 #[local] Open Scope Z_scope.
 
@@ -172,7 +175,7 @@ Definition from_Z := (fun (x : Z) => ret x : OOM Z).
   Definition mequ_Z (x y : Z) : bool :=
     Z.eqb x y.
 
-  Definition mcmp_Z (c : comparison) (x y : Z) : bool := 
+  Definition mcmp_Z (c : comparison) (x y : Z) : bool :=
     match c with
     | Ceq => Z.eqb x y
     | Cne => Zneq_bool x y
@@ -182,7 +185,7 @@ Definition from_Z := (fun (x : Z) => ret x : OOM Z).
     | Cge => Z.geb x y
     end.
 
-  Definition mcmpu_Z (c : comparison) (x y : Z) : bool := 
+  Definition mcmpu_Z (c : comparison) (x y : Z) : bool :=
     match c with
     | Ceq => Z.eqb x y
     | Cne => Zneq_bool x y
@@ -609,7 +612,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Import PTOI.
   Import ITOP.
 
-  Require Import MemBytes.
+  Import MemBytes.
   Module MemByte := Byte LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL.
   Import MemByte.
   Import LP.SIZEOF.
@@ -709,7 +712,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         if access_allowed pr aid
         then ret (fst byte)
         else
-          raise_ub 
+          raise_ub
             ("Read from memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation id: " ++ Show.show (show_allocation_id aid) ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem)))
     end.
 
@@ -797,7 +800,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
     (*** Primitives on memory *)
     (** Reads *)
-    Definition read_byte (ptr : addr) : MemM SByte :=
+    Definition read_byte `{MemMonad MemState AllocationId MemM} (ptr : addr) : MemM SByte :=
       let addr := ptr_to_int ptr in
       let pr := address_provenance ptr in
       ms <- get_mem_state;;
@@ -809,12 +812,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           then ret byte
 
           else
-            raise_ub 
+            raise_ub
               ("Read from memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation id: " ++ Show.show (show_allocation_id aid) ++ " memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem)))
       end.
 
     (** Writes *)
-    Definition write_byte (ptr : addr) (byte : SByte) : MemM unit :=
+    Definition write_byte `{MemMonad MemState AllocationId MemM} (ptr : addr) (byte : SByte) : MemM unit :=
       let addr := ptr_to_int ptr in
       let pr := address_provenance ptr in
       ms <- get_mem_state;;
@@ -827,12 +830,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             let mem' := set_byte_raw mem addr (byte, aid) in
             let fs := mem_state_frame_stack ms in
             put_mem_state (mkMemState (mem', fs) ms.(ms_sid) ms.(ms_prov))
-          else raise_ub 
+          else raise_ub
                  ("Trying to write to memory with invalid provenance -- addr: " ++ Show.show addr ++ ", addr prov: " ++ show_prov pr ++ ", memory allocation id: " ++ show_allocation_id aid ++ " Memory: " ++ Show.show (map (fun '(key, (_, aid)) => (key, show_allocation_id aid)) (IM.elements mem)))
       end.
 
     (** Allocations *)
-    Definition addr_allocated (ptr : addr) (aid : AllocationId) : MemM bool :=
+    Definition addr_allocated `{MemMonad MemState AllocationId MemM} (ptr : addr) (aid : AllocationId) : MemM bool :=
       ms <- get_mem_state;;
       match read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) with
       | None => ret false
@@ -850,7 +853,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Definition add_all_to_frame (m : memory_stack) (ks : list Z) : memory_stack
       := fold_left (fun ms k => add_to_frame ms k) ks m.
 
-    Definition allocate_bytes (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
+    Definition allocate_bytes `{MemMonad MemState AllocationId MemM} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
       match dt with
       | DTYPE_Void => raise_ub "Allocation of type void"
       | _ =>
@@ -896,7 +899,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       let (mem, _) := ms_memory_stack ms in
       mkMemState (mem, fs) ms.(ms_sid) ms.(ms_prov).
 
-    Definition mempush : MemM unit :=
+    Definition mempush `{MemMonad MemState AllocationId MemM} : MemM unit :=
       ms <- get_mem_state;;
       let fs := mem_state_frame_stack ms in
       let fs' := push_frame_stack fs initial_frame in
@@ -911,7 +914,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Definition free_frame_memory (f : Frame) (m : memory) : memory :=
       fold_left (fun m key => free_byte key m) f m.
 
-    Definition mempop : MemM unit :=
+    Definition mempop `{MemMonad MemState AllocationId MemM} : MemM unit :=
       ms <- get_mem_state;;
       let (mem, fs) := ms_memory_stack ms in
       let f := peek_frame_stack fs in
@@ -943,7 +946,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (*   - intros ms. *)
     (*     apply (lift (MonadState.put ms)). *)
     (* Defined. *)
-    
+
     (* Instance ErrSIDMemMonad : MemMonad MemState AllocationId (ESID.ErrSID_T (state MemState)). *)
     (* Proof. *)
     (*   split. *)
@@ -1378,7 +1381,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   tauto.
                 }
               }
-            }.
+            }
 
             split.
             -- (* Allocations preserved *)
@@ -1428,14 +1431,74 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 --- apply ALLOC_PRESERVED; eauto.
                 --- auto.
             -- (* Preserve allocation ids *)
-              admit.
-        + (* Access forbidden *)
+              unfold preserve_allocation_ids.
+              unfold used_allocation_id_prop.
+
+              intros aid'.
+              split; intros [?phys_addr [?byte ?PROP]].
+              ++ destruct (Z.eq_dec phys_addr (ptr_to_int ptr)) as [EQ | NEQ].
+                 ** (* Know aid' = aid by Hlookup *)
+                   repeat eexists; cbn.
+                   rewrite set_byte_raw_eq; eauto.
+                   subst.
+                   rewrite Hlookup in PROP.
+                   inv PROP.
+                   eauto.
+                 ** repeat eexists; cbn.
+                    rewrite set_byte_raw_neq; eauto.
+              ++ destruct (Z.eq_dec phys_addr (ptr_to_int ptr)) as [EQ | NEQ].
+                 ** (* Know aid' = aid by Hlookup *)
+                   repeat eexists; cbn.
+                   cbn in PROP.
+                   unfold_mem_state_memory.
+                   unfold_mem_state_memory_in PROP.
+                   unfold_mem_state_memory_in Hlookup.
+                   subst.
+
+                   rewrite set_byte_raw_eq in PROP; inv PROP; eauto.
+                 ** repeat eexists; cbn.
+                    cbn in PROP.
+                    unfold_mem_state_memory.
+                    unfold_mem_state_memory_in PROP.
+                    unfold_mem_state_memory_in Hlookup.
+
+                    rewrite set_byte_raw_neq in PROP; eauto.
+      + (* Access forbidden *)
+
+        (* Executable has encountered UB...
+
+           That means UB must occur in the prop model.
+        *)
         MemMonad_solve.
-        admit. 
+        intros [?err | [[?ms' ?res] | ?oom]].
+
+        * intros CONTRA.
+          cbn in CONTRA.
+          destruct CONTRA.
+
+    (* Ltac intros_mempropt_contra := *)
+    (*   intros [?err | [[?ms' ?res] | ?oom]]; *)
+    (*   match goal with *)
+    (*   | |- ~ _ => *)
+    (*       let CONTRA := fresh "CONTRA" in *)
+    (*       let err := fresh "err" in *)
+    (*       intros CONTRA; *)
+    (*       destruct CONTRA as [err [CONTRA | CONTRA]]; auto; *)
+    (*       destruct CONTRA as (? & ? & (? & ?) & CONTRA); subst *)
+    (*   | |- ~ _ => *)
+    (*       let CONTRA := fresh "CONTRA" in *)
+    (*       let err := fresh "err" in *)
+    (*       intros CONTRA; *)
+    (*       destruct CONTRA as (? & ? & (? & ?) & CONTRA); subst *)
+    (*   end. *)
+
+          admit.
+        * admit.
+        * admit.
       - (* Unallocated memory *)
         MemMonad_solve.
         admit.
-    Qed.
+    Admitted.
 
     Parameter allocate_bytes_correct :
       forall dt init_bytes, exec_correct (allocate_bytes dt init_bytes) (allocate_bytes_spec_MemPropT dt init_bytes).
@@ -1478,5 +1541,36 @@ End FiniteMemoryModelExecPrimitives.
 Module MakeFiniteMemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP).
   Module FMSP := FiniteMemoryModelSpecPrimitives LP MP.
   Module FMS := MakeMemoryModelSpec LP MP FMSP.
+
+  Export FMSP FMS.
 End MakeFiniteMemoryModelSpec.
 
+Module MakeFiniteMemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP).
+  Module FMEP := FiniteMemoryModelExecPrimitives LP MP.
+  Module FME := MakeMemoryModelExec LP MP FMEP.
+End MakeFiniteMemoryModelExec.
+
+Module MakeFiniteMemory (LP : LLVMParams) : Memory LP.
+  Import LP.
+
+  Module GEP := GepM.Make ADDR IP SIZEOF Events PTOI PROV ITOP.
+  Module Byte := FinByte ADDR IP SIZEOF Events.
+
+  Module MP := MemoryParams.Make LP GEP Byte.
+
+  Module MMEP := FiniteMemoryModelExecPrimitives LP MP.
+  Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
+  Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL.
+  Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec.
+
+  (* Serialization *)
+  Module SP := SerializationParams.Make LP MP.
+
+  Export GEP Byte MP MEM_MODEL SP.
+End MakeFiniteMemory.
+
+Module LLVMParamsBigIntptr := LLVMParams.MakeBig Addr BigIP FinSizeof FinPTOI FinPROV FinITOP BigIP_BIG.
+Module LLVMParams64BitIntptr := LLVMParams.Make Addr IP64Bit FinSizeof FinPTOI FinPROV FinITOP.
+
+Module MemoryBigIntptr := MakeFiniteMemory LLVMParamsBigIntptr.
+Module Memory64BitIntptr := MakeFiniteMemory LLVMParams64BitIntptr.

@@ -78,141 +78,133 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
 
     Section ExpOptimCorrect.
 
-      Variable opt_correct: forall e τ g l m, ⟦ e at? τ ⟧e3 g l m ≈ ⟦ opt e at? τ ⟧e3 g l m.
+      Variable opt_correct: forall e τ g l, ⟦ e at? τ ⟧e2 g l ≈ ⟦ opt e at? τ ⟧e2 g l.
       Variable opt_respect_int: forall e, intrinsic_exp e = intrinsic_exp (opt e).
 
+      Ltac intro2 := first [intros (? & ? & ?) ? <- | intros (? & ? & ?)].
       Ltac intro3 := first [intros (? & ? & ? & ?) ? <- | intros (? & ? & ? & ?)].
 
-      Lemma exp_optim_correct_instr : forall x i g l m,
-          ⟦ (x,i) ⟧i3 g l m ≈ ⟦ (x, endo i) ⟧i3 g l m.
+      Lemma exp_optim_correct_instr : forall x i g l,
+          ⟦ (x,i) ⟧i2 g l ≈ ⟦ (x, endo i) ⟧i2 g l.
       Proof.
         intros *.
         destruct i; try reflexivity.
         - destruct x; simpl; try reflexivity.
           unfold denote_op.
-          rewrite !interp_cfg3_bind.
+          rewrite !interp_cfg2_bind.
           rewrite opt_correct; reflexivity.
         - destruct x; simpl.
           + destruct fn.
             simpl.
-            rewrite !interp_cfg3_bind.
+            rewrite !interp_cfg2_bind.
             apply eutt_clo_bind with (UU := eq).
-            * revert g l m.
+            * revert g l.
               induction args as [| a args IH]; intros; [reflexivity |].
               cbn.
-              rewrite !interp_cfg3_bind; apply eutt_clo_bind with (UU := eq).
+              rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
               destruct a; cbn; rewrite opt_correct; reflexivity.
-              intro3.
-              rewrite !interp_cfg3_bind; apply eutt_clo_bind with (UU := eq); [apply IH |].
-              intro3.
+              intro2.
+              rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq); [apply IH |].
+              intro2.
               reflexivity.
-            * intro3.
-              rewrite !interp_cfg3_bind; apply eutt_clo_bind with (UU := eq).
+            * intro2.
+              rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
               rewrite opt_respect_int.
               unfold endo, opt_exp_endo_exp.
               break_match_goal; [reflexivity |].
-              rewrite !interp_cfg3_bind, opt_correct; reflexivity.
-              intro3.
+              rewrite !interp_cfg2_bind, opt_correct; reflexivity.
+              intro2.
               reflexivity.
           + destruct fn.
             simpl.
-            rewrite !interp_cfg3_bind.
+            rewrite !interp_cfg2_bind.
             apply eutt_clo_bind with (UU := eq).
-            * revert g l m.
+            * revert g l.
               induction args as [| a args IH]; intros; [reflexivity |].
               cbn.
-              rewrite !interp_cfg3_bind; apply eutt_clo_bind with (UU := eq).
+              rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
               destruct a; cbn; rewrite opt_correct; reflexivity.
-              intro3.
-              rewrite !interp_cfg3_bind; apply eutt_clo_bind with (UU := eq); [apply IH |].
-              intro3.
+              intro2.
+              rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq); [apply IH |].
+              intro2.
               reflexivity.
-            * intro3.
-              rewrite !interp_cfg3_bind; apply eutt_clo_bind with (UU := eq).
+            * intro2.
+              rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
               rewrite opt_respect_int.
               unfold endo, opt_exp_endo_exp.
               break_match_goal; [reflexivity |].
-              rewrite !interp_cfg3_bind, opt_correct; reflexivity.
-              intro3.
+              rewrite !interp_cfg2_bind, opt_correct; reflexivity.
+              intro2.
               reflexivity.
         - destruct x; cbn; try reflexivity.
           destruct ptr; cbn.
-          rewrite !interp_cfg3_bind; apply eutt_clo_bind with (UU := eq).
+          rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
           rewrite opt_correct; reflexivity.
-          intro3.
-          rewrite !interp_cfg3_bind; apply eutt_eq_bind.
-          intro3.
+          intro2.
+          rewrite !interp_cfg2_bind; apply eutt_eq_bind.
+          intro2.
           reflexivity.
         - destruct x; cbn; try reflexivity.
           destruct ptr, val; cbn.
-          rewrite !interp_cfg3_bind; apply eutt_clo_bind with (UU := eq).
+          rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
           rewrite opt_correct; reflexivity.
-          intro3.
-          rewrite !interp_cfg3_bind, opt_correct; apply eutt_eq_bind.
-          intro3.
-          rewrite !interp_cfg3_bind; apply eutt_clo_bind with (UU := eq).
+          intro2.
+          rewrite !interp_cfg2_bind, opt_correct; apply eutt_eq_bind.
+          intro2.
+          rewrite !interp_cfg2_bind; apply eutt_clo_bind with (UU := eq).
           reflexivity.
-          intro3.
+          intro2.
           reflexivity.
       Qed.
       
-      Lemma exp_optim_correct_term : forall t g l m,
-          ⟦ t ⟧t3 g l m ≈ ⟦ endo t ⟧t3 g l m.
+      Lemma exp_optim_correct_term : forall t g l,
+          ⟦ t ⟧t2 g l ≈ ⟦ endo t ⟧t2 g l.
       Proof.
         intros *.
         destruct t; try reflexivity.
         - destruct v.
           cbn.
-          rewrite !translate_bind, !interp_cfg3_bind.
+          rewrite !translate_bind, !interp_cfg2_bind.
           rewrite opt_correct; apply eutt_eq_bind.
-          intro3; reflexivity.
+          intro2; reflexivity.
         - destruct v; cbn.
-          rewrite !translate_bind, !interp_cfg3_bind.
+          rewrite !translate_bind, !interp_cfg2_bind.
           rewrite opt_correct; apply eutt_eq_bind.
-          intro3.
-          rewrite !translate_bind, !interp_cfg3_bind.
+          intro2.
+          rewrite !translate_bind, !interp_cfg2_bind.
           apply eutt_eq_bind.
-          intro3.
+          intro2.
           break_match_goal; try reflexivity.
         - destruct v.
           cbn.
-          rewrite !translate_bind, !interp_cfg3_bind.
+          rewrite !translate_bind, !interp_cfg2_bind.
           rewrite opt_correct; apply eutt_eq_bind.
-          intro3.
-          rewrite !translate_bind, !interp_cfg3_bind.
+          intro2.
+          rewrite !translate_bind, !interp_cfg2_bind.
           apply eutt_eq_bind.
-          intro3.
+          intro2.
           assert (EQbrs: (brs = endo brs)).
           { induction brs; cbn; try reflexivity. rewrite <- IHbrs. destruct a; cbn. unfold endo, Endo_id, Endo_tint_literal, id. reflexivity. }
-          assert (EQ1:
-                   (map_monad
-                      (fun '(TInt_Literal sz x0, id) =>
-                         coerce_integer_to_int (Some sz) x0) brs) =
-                     (map_monad
-                        (fun '(TInt_Literal sz x0, id) =>
-                           coerce_integer_to_int (Some sz) x0)
-                        (endo brs))).
-          { rewrite <- EQbrs. reflexivity. }
 
           setoid_rewrite <- EQbrs.
           unfold endo, Endo_id.
           reflexivity.
       Qed.
 
-      Lemma exp_optim_correct_code : forall c g l m,
-          ⟦ c ⟧c3 g l m ≈ ⟦ endo c ⟧c3 g l m.
+      Lemma exp_optim_correct_code : forall c g l,
+          ⟦ c ⟧c2 g l ≈ ⟦ endo c ⟧c2 g l.
       Proof.
         induction c as [| i c IH]; intros; [reflexivity |].
         unfold endo; simpl.
-        rewrite 2denote_code_cons, 2interp_cfg3_bind.
+        rewrite 2denote_code_cons, 2interp_cfg2_bind.
         apply eutt_clo_bind with (UU := eq).
         destruct i as [[] ?]; apply exp_optim_correct_instr.
-        intro3.
+        intro2.
         apply IH.
       Qed.
 
-      Lemma exp_optim_correct_phi : forall phi f g l m,
-          ℑ3 (translate exp_to_instr ⟦ phi ⟧Φ (f)) g l m ≈ ℑ3 (translate exp_to_instr ⟦ endo phi ⟧Φ (f)) g l m.
+      Lemma exp_optim_correct_phi : forall phi f g l,
+          ℑ2 (translate exp_to_instr ⟦ phi ⟧Φ (f)) g l ≈ ℑ2 (translate exp_to_instr ⟦ endo phi ⟧Φ (f)) g l.
       Proof.
         intros [id []] f.
         induction args as [| [] args IH]; intros; [reflexivity |].
@@ -221,13 +213,13 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
         - unfold endo,Endo_id in Heqo0.
           break_match_hyp.
           + inv Heqo; inv Heqo0.
-            rewrite 2translate_bind, 2interp_cfg3_bind.
-            apply eutt_clo_bind with (UU := eq); [| intro3].
+            rewrite 2translate_bind, 2interp_cfg2_bind.
+            apply eutt_clo_bind with (UU := eq); [| intro2].
             rewrite opt_correct; reflexivity.
             reflexivity.
           +
-            rewrite 2translate_bind, 2interp_cfg3_bind.
-            apply eutt_clo_bind with (UU := eq); [rewrite opt_correct | intro3; reflexivity].
+            rewrite 2translate_bind, 2interp_cfg2_bind.
+            apply eutt_clo_bind with (UU := eq); [rewrite opt_correct | intro2; reflexivity].
             assert (e1 = endo e0).
             { clear - Heqo Heqo0.
               revert Heqo Heqo0.
@@ -259,125 +251,125 @@ Module Type EquivExpr (IS : InterpreterStack) (TOP : LLVMTopLevel IS) (DT : Deno
           reflexivity.
       Qed.
       
-      Lemma exp_optim_correct_phis : forall phis f g l m,
-          ⟦ phis ⟧Φs3 f g l m ≈ ⟦ endo phis ⟧Φs3 f g l m.
+      Lemma exp_optim_correct_phis : forall phis f g l,
+          ⟦ phis ⟧Φs2 f g l ≈ ⟦ endo phis ⟧Φs2 f g l.
       Proof.
         intros.
         unfold endo; simpl.
         cbn.
-        rewrite !interp_cfg3_bind.
-        apply eutt_clo_bind with (UU := eq); [| intro3].
+        rewrite !interp_cfg2_bind.
+        apply eutt_clo_bind with (UU := eq); [| intro2].
         {
-          revert g l m.
+          revert g l.
           induction phis as [| phi phis IH]; intros; [reflexivity |].
           cbn.
-          rewrite !interp_cfg3_bind.
-          apply eutt_clo_bind with (UU := eq); [| intro3].
+          rewrite !interp_cfg2_bind.
+          apply eutt_clo_bind with (UU := eq); [| intro2].
           apply exp_optim_correct_phi.
-          rewrite !interp_cfg3_bind.
-          apply eutt_clo_bind with (UU := eq); [| intro3; reflexivity].
+          rewrite !interp_cfg2_bind.
+          apply eutt_clo_bind with (UU := eq); [| intro2; reflexivity].
           apply IH.
         }
         reflexivity.
       Qed.
 
       Arguments denote_block : simpl never.
-      Lemma exp_optim_correct_block : forall bk f g l m,
-          ⟦ bk ⟧b3 f g l m ≈ ⟦ endo bk ⟧b3 f g l m.
+      Lemma exp_optim_correct_block : forall bk f g l,
+          ⟦ bk ⟧b2 f g l ≈ ⟦ endo bk ⟧b2 f g l.
       Proof.
         intros *.
         destruct bk; unfold endo, Endo_block; cbn.
         rewrite !denote_block_unfold.
-        rewrite 2interp_cfg3_bind.
+        rewrite 2interp_cfg2_bind.
         apply eutt_clo_bind with (UU := eq).
         apply exp_optim_correct_phis.
-        intro3.
-        rewrite 2interp_cfg3_bind.
+        intro2.
+        rewrite 2interp_cfg2_bind.
         apply eutt_clo_bind with (UU := eq).
         apply exp_optim_correct_code.
-        intro3.
+        intro2.
         apply exp_optim_correct_term.
       Qed.
 
-      #[global] Instance eq_itree_interp_cfg3: forall {T : Type}, Proper (eq_itree eq ==> eq ==> eq ==> eq ==> eq_itree eq) (@ℑ3 T).
+      #[global] Instance eq_itree_interp_cfg2: forall {T : Type}, Proper (eq_itree eq ==> eq ==> eq ==> eq_itree eq) (@ℑ2 T).
       Proof.
         repeat intro.
-        unfold ℑ3.
+        unfold ℑ2.
         subst; rewrite H.
         reflexivity.
       Qed.
 
-      Lemma interp_cfg3_ret_eq_itree:
-        forall (R : Type) (g : global_env) (l : local_env) (m : MemState) (x : R),
-          ℑ3 (Ret x) g l m ≅ Ret3 g l m x.
+      Lemma interp_cfg2_ret_eq_itree:
+        forall (R : Type) (g : global_env) (l : local_env) (x : R),
+          ℑ2 (Ret x) g l ≅ Ret2 g l x.
       Proof.
         intros.
-        unfold interp_cfg3.
-        rewrite interp_intrinsics_ret, interp_global_ret, interp_local_ret, interp_memory_ret.
+        unfold interp_cfg2.
+        rewrite interp_intrinsics_ret, interp_global_ret, interp_local_ret.
         reflexivity.
       Qed.
 
-      Lemma interp_cfg3_bind_eq_itree :
-        forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g l m,
-          ℑ3 (t >>= k) g l m ≅
-             '(m',(l',(g',x))) <- ℑ3 t g l m ;; ℑ3 (k x) g' l' m'.
+      Lemma interp_cfg2_bind_eq_itree :
+        forall {R S} (t: itree instr_E R) (k: R -> itree instr_E S) g l,
+          ℑ2 (t >>= k) g l ≅
+             '(l',(g',x)) <- ℑ2 t g l ;; ℑ2 (k x) g' l'.
       Proof.
         intros.
-        unfold ℑ3.
-        rewrite interp_intrinsics_bind, interp_global_bind, interp_local_bind, interp_memory_bind.
-        eapply eq_itree_clo_bind; [reflexivity | intro3; reflexivity].
+        unfold ℑ2.
+        rewrite interp_intrinsics_bind, interp_global_bind, interp_local_bind.
+        eapply eq_itree_clo_bind; [reflexivity | intro2; reflexivity].
       Qed.
 
-      Lemma interp_cfg3_Tau :
-        forall {R} (t: itree instr_E R) g l m,
-          ℑ3 (Tau t) g l m ≅ Tau (ℑ3 t g l m).
+      Lemma interp_cfg2_Tau :
+        forall {R} (t: itree instr_E R) g l,
+          ℑ2 (Tau t) g l ≅ Tau (ℑ2 t g l).
       Proof.
         intros.
-        unfold ℑ3.
-        rewrite interp_intrinsics_Tau, interp_global_Tau, interp_local_Tau, interp_memory_Tau.
+        unfold ℑ2.
+        rewrite interp_intrinsics_Tau, interp_global_Tau, interp_local_Tau.
         reflexivity.
       Qed.
 
       Lemma denote_ocfg_proper :
-        forall bks1 bks2 fto g l m,
+        forall bks1 bks2 fto g l,
           (forall b, find_block bks1 b = None <-> find_block bks2 b = None) ->
-          (forall f g l m b bk1 bk2,
+          (forall f g l b bk1 bk2,
               find_block bks1 b = Some bk1 ->
               find_block bks2 b = Some bk2 ->
-              ⟦ bk1 ⟧b3 f g l m ≈ ⟦ bk2 ⟧b3 f g l m) ->
-          ⟦ bks1 ⟧bs3 fto g l m ≈ ⟦ bks2 ⟧bs3 fto g l m.
+              ⟦ bk1 ⟧b2 f g l ≈ ⟦ bk2 ⟧b2 f g l) ->
+          ⟦ bks1 ⟧bs2 fto g l ≈ ⟦ bks2 ⟧bs2 fto g l.
       Proof.
         intros * BIJ EQ.
         einit.
         destruct fto as [f to].
-        revert g l m f to.
+        revert g l f to.
         ecofix CIH.
         intros.
         destruct (find_block bks1 to) eqn:LU1.
         - destruct (find_block bks2 to) eqn:LU2; [| apply BIJ in LU2; rewrite LU2 in LU1; inv LU1].
           rewrite 2denote_ocfg_unfold_in_eq_itree; eauto.
-          rewrite 2interp_cfg3_bind_eq_itree.
+          rewrite 2interp_cfg2_bind_eq_itree.
           ebind; econstructor.
           eapply EQ; eauto.
-          intro3.
+          intro2.
           destruct s.
-          + rewrite 2interp_cfg3_Tau.
+          + rewrite 2interp_cfg2_Tau.
             estep.
-          + rewrite interp_cfg3_ret_eq_itree.
+          + rewrite interp_cfg2_ret_eq_itree.
             reflexivity.
         - pose proof LU1 as LU2; apply BIJ in LU2.
-          rewrite 2denote_ocfg_unfold_not_in_eq_itree, interp_cfg3_ret_eq_itree; auto.
+          rewrite 2denote_ocfg_unfold_not_in_eq_itree, interp_cfg2_ret_eq_itree; auto.
           reflexivity.
       Qed.
 
       Lemma exp_optim_correct :
-        forall G g l m, ⟦ G ⟧cfg3 g l m ≈ ⟦ opt_exp_cfg G ⟧cfg3 g l m.
+        forall G g l, ⟦ G ⟧cfg2 g l ≈ ⟦ opt_exp_cfg G ⟧cfg2 g l.
       Proof.
         intros.
         unfold denote_cfg.
         cbn.
-        rewrite !interp_cfg3_bind.
-        eapply eutt_clo_bind with (UU := eq); [| intro3; reflexivity].
+        rewrite !interp_cfg2_bind.
+        eapply eutt_clo_bind with (UU := eq); [| intro2; reflexivity].
         apply denote_ocfg_proper.
         - intros.
           remember (blks G) as bks.

@@ -47,6 +47,18 @@ Section Failure.
     destruct u1.
   Qed.
 
+  Lemma raise_map_itree :
+    forall A B (f : A -> B) x,
+      ITree.map f (raise x) ≈ raise x.
+  Proof.
+    intros A B f x.
+    unfold raise.
+    rewrite map_bind.
+    eapply eutt_clo_bind.
+    reflexivity.
+    intros [].
+  Qed.
+
   Global Instance RaiseBindM_Fail : RaiseBindM (itree E) string (fun T => raise) :=
     { rbm_raise_bind := raise_bind_itree
     }.
@@ -70,6 +82,18 @@ Section OOM.
     destruct u1.
   Qed.
 
+  Lemma raiseOOM_map_itree :
+    forall A B (f : A -> B) x,
+      ITree.map f (raiseOOM x) ≈ raiseOOM x.
+  Proof.
+    intros A B f x.
+    unfold raiseOOM, raise.
+    rewrite map_bind.
+    eapply eutt_clo_bind.
+    reflexivity.
+    intros [].
+  Qed.
+
   Global Instance RaiseBindM_OOM : RaiseBindM (itree E) string (fun T => raiseOOM) :=
     { rbm_raise_bind := raiseOOM_bind_itree
     }.
@@ -91,6 +115,18 @@ Section UB.
     reflexivity.
     intros u1 u2 H.
     destruct u1.
+  Qed.
+
+  Lemma raiseUB_map_itree :
+    forall A B (f : A -> B) x,
+      ITree.map f (raiseUB x) ≈ raiseUB x.
+  Proof.
+    intros A B f x.
+    unfold raiseUB, raise.
+    rewrite map_bind.
+    eapply eutt_clo_bind.
+    reflexivity.
+    intros [].
   Qed.
 
   Global Instance RaiseBindM_UB : RaiseBindM (itree E) string (fun T => raiseUB) :=

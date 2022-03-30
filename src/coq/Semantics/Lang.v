@@ -16,8 +16,7 @@ From Vellvm Require Import
      Handlers.Pick
      Handlers.FiniteMemory
      Handlers.MemoryModel
-     Handlers.MemoryInterpreters
-     Handlers.MemoryModelTheory.
+     Handlers.MemoryInterpreters.
 
   Module Type Memory (LP: LLVMParams).
     Import LP.
@@ -27,17 +26,15 @@ From Vellvm Require Import
 
     Module MP := MemoryParams.Make LP GEP Byte.
 
-    Declare Module MEM_MODEL : MemoryModel LP MP.
-    Module MEM_INTERP := MemoryInterpreters.Make LP MP MEM_MODEL.
+    Declare Module MMEP : MemoryModelExecPrimitives LP MP.
+    Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
+    Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL.
+    Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec.
 
     (* Serialization *)
     Module SP := SerializationParams.Make LP MP.
 
-    (* Memory Theory *)
-    Module MEMORY_ITREE_THEORY := MemoryModelITreeTheory LP MP SP MEM_MODEL MEM_INTERP.
-    Declare Module MEMORY_THEORY : MemoryModelTheory LP MP SP MEM_MODEL MEM_INTERP.
-
-    Export GEP Byte MP MEM_MODEL MEM_INTERP SP MEMORY_ITREE_THEORY MEMORY_THEORY.
+    Export GEP Byte MP MEM_MODEL SP.
   End Memory.
   
   Module Type Lang (LP: LLVMParams).
@@ -60,7 +57,7 @@ From Vellvm Require Import
     Module D := Denotation LP MP SP.
 
     Export Events Events.DV Global Local Stack Pick Intrinsics
-           MEMORY_ITREE_THEORY MEMORY_THEORY SP.SER D.
+           SP.SER D.
   End Lang.
 
   Module Make (LP : LLVMParams) (MEM' : Memory LP) <: Lang LP with Module MEM := MEM'.

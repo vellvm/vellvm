@@ -261,7 +261,7 @@ Section PropMonad.
       interp_PropTF h_spec k_spec RR sim (VisF e k1) t2.
 
   Hint Constructors interp_PropTF : core.
-  
+
   Lemma interp_PropTF_mono E F h_spec k_spec R RR  (t0 : itree' E R) (t1 : itree F R) sim sim'
         (IN : interp_PropTF h_spec k_spec RR sim t0 t1)
         (LE : sim <2= sim') : 

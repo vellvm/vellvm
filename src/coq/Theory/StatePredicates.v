@@ -24,6 +24,8 @@ Module CFG_LEVEL (LP : LLVMParams) (LLVM : Lang LP).
   Import LP.
   Import LLVM.
   Import MEM.
+  Import MEM.MMEP.
+  Import MEM.MMEP.MMSP.
 
   Definition state_cfg : Type := MemState * (local_env * global_env).
 
@@ -47,4 +49,3 @@ Module CFG_LEVEL (LP : LLVMParams) (LLVM : Lang LP).
   
   Notation "↑" :=  lift_state_cfgP.
 End CFG_LEVEL.
-
