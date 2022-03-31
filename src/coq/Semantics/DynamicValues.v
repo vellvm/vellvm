@@ -1,13 +1,3 @@
-(* -------------------------------------------------------------------------- *
- *                     Vellvm - the Verified LLVM project                     *
- *                                                                            *
- *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
- *                                                                            *
- *   This file is distributed under the terms of the GNU General Public       *
- *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
- ---------------------------------------------------------------------------- *)
-
 (* begin hide *)
 From Coq Require Import
      Relations
@@ -22,6 +12,13 @@ From Coq Require Import
 Import BinInt.
 
 Require Import Ceres.Ceres.
+
+Require Import Integers Floats.
+
+From Flocq.IEEE754 Require Import
+     Bits
+     BinarySingleNaN
+     Binary.
 
 From ExtLib Require Import
      Core.RelDec
@@ -42,12 +39,6 @@ From Vellvm Require Import
      Utils.Monads
      Utils.MonadEq1Laws
      Utils.MonadReturnsLaws.
-
-Require Import Integers Floats.
-
-From Flocq.IEEE754 Require Import
-     Bits
-     Binary.
 
 Import EqvNotation.
 Import MonadNotation.
@@ -3227,7 +3218,6 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
             apply NV.
             left; auto.
             apply IHfields.
-
             eapply NO_VOID_Struct_cons; eauto.
             eapply Forall_HIn_cons; eauto.
         }

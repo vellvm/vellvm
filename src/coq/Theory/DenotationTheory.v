@@ -38,7 +38,7 @@ Import ListNotations.
 
 (* end hide *)
 
-(** * Structural equations at the representation level 
+(** * Structural equations at the representation level
 
 We prove here the equational theory that holds independently of the
 interpretation of events.
@@ -504,7 +504,7 @@ Module Type DenotationTheory (IS : InterpreterStack) (TOP : LLVMTopLevel IS).
         split; auto.
         destruct HYP as [abs | POST]; auto.
         apply find_block_in_inputs in abs as [? abs]; cbn in abs; rewrite abs in Heq; inv Heq.
-    Qed.  
+    Qed.
 
     Lemma denote_ocfg_exits_in_outputs :
       forall bks fto,

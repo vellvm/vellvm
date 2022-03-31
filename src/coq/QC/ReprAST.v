@@ -558,7 +558,7 @@ Section ReprInstances.
   Definition repr_definition (defn : definition typ (block typ * list (block typ))) : string
     :=
       match defn with
-      | mk_definition df_prototype df_args df_instrs =>
+      | mk_definition _ df_prototype df_args df_instrs =>
         "(mk_definition _ " ++ repr df_prototype ++ " "
                             ++ repr df_args ++ " "
                             ++ repr df_instrs ++ ")"

@@ -1,14 +1,3 @@
-(* -------------------------------------------------------------------------- *
- *                     Vellvm - the Verified LLVM project                     *
- *                                                                            *
- *     Copyright (c) 2017 Dmitri Garbuzov <dmitri@sease.upenn.edu>            *
- *     Copyright (c) 2017 Steve Zdancewic <stevez@cis.upenn.edu>              *
- *                                                                            *
- *   This file is distributed under the terms of the GNU General Public       *
- *   License as published by the Free Software Foundation, either version     *
- *   3 of the License, or (at your option) any later version.                 *
- ---------------------------------------------------------------------------- *)
-
 From Vellvm Require Import
      Utils.Tactics.
 
@@ -515,7 +504,7 @@ Inductive rtc {A} (R:A -> A -> Prop) : A -> A -> Prop :=
 | rtc_refl : forall a, rtc R a a
 | rtc_step : forall a b c, R a b -> rtc R b c -> rtc R a c.
 
-Instance rtc_Transitive {A} {R} : Transitive (@rtc A R).
+#[global] Instance rtc_Transitive {A} {R} : Transitive (@rtc A R).
 Proof.
   unfold Transitive; intros.
   induction H. auto. econstructor; eauto.

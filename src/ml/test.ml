@@ -253,6 +253,9 @@ let larger_memory_tests =
   ; "../tests/ll/extract_value_undef.ll", 0
   ]
 
+let c_tests =
+  [ "../tests/c/average.ll", 2 ]
+
 let other_tests =
   arith_tests @ calling_convention_tests @ memory_tests @ phi_tests @ terminator_tests @ bitcast_tests
 
@@ -408,6 +411,10 @@ let suite = [Test ("Poison",
                        (f, fun () -> run_dvalue_test (i64_test (i64_of_int i)) f))
                      (larger_memory_tests));
 
+             Test ("C Tests",
+                   List.map (fun (f, i) ->
+                       (f, fun () -> run_uvalue_test (i32_test (i32_of_int i)) f))
+                     (c_tests));
              
              (* Test ("Parsing-Must-fail",
               *       List.map (fun (f, p) ->
