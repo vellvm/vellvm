@@ -593,51 +593,51 @@ Qed.
 (** We then specialize these definitions to equality modulo
   $2^{wordsize}$ #2<sup>wordsize</sup>#. *)
 
-#[global] Hint Resolve modulus_pos: ints.
+Global Hint Resolve modulus_pos: ints.
 
 Definition eqm := eqmod modulus.
 
 Lemma eqm_refl: forall x, eqm x x.
 Proof (eqmod_refl modulus).
-#[global] Hint Resolve eqm_refl: ints.
+Global Hint Resolve eqm_refl: ints.
 
 Lemma eqm_refl2:
   forall x y, x = y -> eqm x y.
 Proof (eqmod_refl2 modulus).
-#[global] Hint Resolve eqm_refl2: ints.
+Global Hint Resolve eqm_refl2: ints.
 
 Lemma eqm_sym: forall x y, eqm x y -> eqm y x.
 Proof (eqmod_sym modulus).
-#[global] Hint Resolve eqm_sym: ints.
+Global Hint Resolve eqm_sym: ints.
 
 Lemma eqm_trans: forall x y z, eqm x y -> eqm y z -> eqm x z.
 Proof (eqmod_trans modulus).
-#[global] Hint Resolve eqm_trans: ints.
+Global Hint Resolve eqm_trans: ints.
 
 Lemma eqm_small_eq:
   forall x y, eqm x y -> 0 <= x < modulus -> 0 <= y < modulus -> x = y.
 Proof (eqmod_small_eq modulus).
-#[global] Hint Resolve eqm_small_eq: ints.
+Global Hint Resolve eqm_small_eq: ints.
 
 Lemma eqm_add:
   forall a b c d, eqm a b -> eqm c d -> eqm (a + c) (b + d).
 Proof (eqmod_add modulus).
-#[global] Hint Resolve eqm_add: ints.
+Global Hint Resolve eqm_add: ints.
 
 Lemma eqm_neg:
   forall x y, eqm x y -> eqm (-x) (-y).
 Proof (eqmod_neg modulus).
-#[global] Hint Resolve eqm_neg: ints.
+Global Hint Resolve eqm_neg: ints.
 
 Lemma eqm_sub:
   forall a b c d, eqm a b -> eqm c d -> eqm (a - c) (b - d).
 Proof (eqmod_sub modulus).
-#[global] Hint Resolve eqm_sub: ints.
+Global Hint Resolve eqm_sub: ints.
 
 Lemma eqm_mult:
   forall a b c d, eqm a c -> eqm b d -> eqm (a * b) (c * d).
 Proof (eqmod_mult modulus).
-#[global] Hint Resolve eqm_mult: ints.
+Global Hint Resolve eqm_mult: ints.
 
 (** ** Properties of the coercions between [Z] and [int] *)
 
@@ -652,7 +652,7 @@ Lemma eqm_unsigned_repr:
 Proof.
   unfold eqm; intros. rewrite unsigned_repr_eq. apply eqmod_mod. auto with ints.
 Qed.
-#[global] Hint Resolve eqm_unsigned_repr: ints.
+Global Hint Resolve eqm_unsigned_repr: ints.
 
 Lemma eqm_unsigned_repr_l:
   forall a b, eqm a b -> eqm (unsigned (repr a)) b.
@@ -660,7 +660,7 @@ Proof.
   intros. apply eqm_trans with a.
   apply eqm_sym. apply eqm_unsigned_repr. auto.
 Qed.
-#[global] Hint Resolve eqm_unsigned_repr_l: ints.
+Global Hint Resolve eqm_unsigned_repr_l: ints.
 
 Lemma eqm_unsigned_repr_r:
   forall a b, eqm a b -> eqm a (unsigned (repr b)).
@@ -668,7 +668,7 @@ Proof.
   intros. apply eqm_trans with b. auto.
   apply eqm_unsigned_repr.
 Qed.
-#[global] Hint Resolve eqm_unsigned_repr_r: ints.
+Global Hint Resolve eqm_unsigned_repr_r: ints.
 
 Lemma eqm_signed_unsigned:
   forall x, eqm (signed x) (unsigned x).
@@ -683,7 +683,7 @@ Theorem unsigned_range:
 Proof.
   destruct i. simpl. lia.
 Qed.
-#[global] Hint Resolve unsigned_range: ints.
+Global Hint Resolve unsigned_range: ints.
 
 Theorem unsigned_range_2:
   forall i, 0 <= unsigned i <= max_unsigned.
@@ -691,7 +691,7 @@ Proof.
   intro; unfold max_unsigned.
   generalize (unsigned_range i). lia.
 Qed.
-#[global] Hint Resolve unsigned_range_2: ints.
+Global Hint Resolve unsigned_range_2: ints.
 
 Theorem signed_range:
   forall i, min_signed <= signed i <= max_signed.
@@ -710,7 +710,7 @@ Proof.
   destruct i; simpl. unfold repr. apply mkint_eq.
   rewrite Z_mod_modulus_eq. apply Zmod_small; lia.
 Qed.
-#[global] Hint Resolve repr_unsigned: ints.
+Global Hint Resolve repr_unsigned: ints.
 
 Lemma repr_signed:
   forall i, repr (signed i) = i.
@@ -718,7 +718,7 @@ Proof.
   intros. transitivity (repr (unsigned i)).
   apply eqm_samerepr. apply eqm_signed_unsigned. auto with ints.
 Qed.
-#[global] Hint Resolve repr_signed: ints.
+Global Hint Resolve repr_signed: ints.
 
 Opaque repr.
 
@@ -733,7 +733,7 @@ Proof.
   intros. rewrite unsigned_repr_eq.
   apply Zmod_small. unfold max_unsigned in H. lia.
 Qed.
-#[global] Hint Resolve unsigned_repr: ints.
+Global Hint Resolve unsigned_repr: ints.
 
 Theorem signed_repr:
   forall z, min_signed <= z <= max_signed -> signed (repr z) = z.
@@ -1634,7 +1634,7 @@ Proof.
   intros. unfold mone. rewrite testbit_repr; auto. apply Ztestbit_m1. lia.
 Qed.
 
-#[global] Hint Rewrite bits_zero bits_mone : ints.
+Hint Rewrite bits_zero bits_mone : ints.
 
 Ltac bit_solve :=
   intros; apply same_bits_eq; intros; autorewrite with ints; auto with bool.
@@ -1710,7 +1710,7 @@ Proof.
   intros. unfold not. rewrite bits_xor; auto. rewrite bits_mone; auto.
 Qed.
 
-#[global] Hint Rewrite bits_and bits_or bits_xor bits_not: ints.
+Hint Rewrite bits_and bits_or bits_xor bits_not: ints.
 
 Theorem and_commut: forall x y, and x y = and y x.
 Proof.
@@ -2118,7 +2118,7 @@ Proof.
   lia.
 Qed.
 
-#[global] Hint Rewrite bits_shl bits_shru bits_shr: ints.
+Hint Rewrite bits_shl bits_shru bits_shr: ints.
 
 Theorem shl_zero: forall x, shl x zero = x.
 Proof.
@@ -2446,7 +2446,7 @@ Proof.
     lia. lia. lia. lia.
 Qed.
 
-#[global] Hint Rewrite bits_rol bits_ror: ints.
+Hint Rewrite bits_rol bits_ror: ints.
 
 Theorem shl_rolm:
   forall x n,
@@ -3237,7 +3237,7 @@ Proof.
   lia. auto.
 Qed.
 
-#[global] Hint Rewrite bits_zero_ext bits_sign_ext: ints.
+Hint Rewrite bits_zero_ext bits_sign_ext: ints.
 
 Theorem zero_ext_above:
   forall n x, n >= zwordsize -> zero_ext n x = x.
@@ -4960,7 +4960,7 @@ Strategy 0 [Wordsize_64.wordsize].
 
 Notation int64 := Int64.int.
 
-#[global] Opaque Int.repr Int64.repr Byte.repr.
+Global Opaque Int.repr Int64.repr Byte.repr.
 
 (** * Specialization to offsets in pointer values *)
 
@@ -5224,7 +5224,7 @@ Qed.
 
 End AGREE64.
 
-#[global] Hint Resolve
+Global Hint Resolve
   agree32_repr agree32_of_int agree32_of_ints agree32_of_int_eq agree32_of_ints_eq
   agree32_to_int agree32_to_int_eq agree32_neg agree32_add agree32_sub agree32_mul agree32_divs
   agree64_repr agree64_of_int agree64_of_int_eq
@@ -5236,21 +5236,21 @@ Strategy 0 [Wordsize_Ptrofs.wordsize].
 
 Notation ptrofs := Ptrofs.int.
 
-#[global] Opaque Ptrofs.repr.
+Global Opaque Ptrofs.repr.
 
-#[global] Hint Resolve Int.modulus_pos Int.eqm_refl Int.eqm_refl2 Int.eqm_sym Int.eqm_trans
+Global Hint Resolve Int.modulus_pos Int.eqm_refl Int.eqm_refl2 Int.eqm_sym Int.eqm_trans
   Int.eqm_small_eq Int.eqm_add Int.eqm_neg Int.eqm_sub Int.eqm_mult
   Int.eqm_unsigned_repr Int.eqm_unsigned_repr_l Int.eqm_unsigned_repr_r
   Int.unsigned_range Int.unsigned_range_2
   Int.repr_unsigned Int.repr_signed Int.unsigned_repr : ints.
 
-#[global] Hint Resolve Int64.modulus_pos Int64.eqm_refl Int64.eqm_refl2 Int64.eqm_sym Int64.eqm_trans
+Global Hint Resolve Int64.modulus_pos Int64.eqm_refl Int64.eqm_refl2 Int64.eqm_sym Int64.eqm_trans
   Int64.eqm_small_eq Int64.eqm_add Int64.eqm_neg Int64.eqm_sub Int64.eqm_mult
   Int64.eqm_unsigned_repr Int64.eqm_unsigned_repr_l Int64.eqm_unsigned_repr_r
   Int64.unsigned_range Int64.unsigned_range_2
   Int64.repr_unsigned Int64.repr_signed Int64.unsigned_repr : ints.
 
-#[global] Hint Resolve Ptrofs.modulus_pos Ptrofs.eqm_refl Ptrofs.eqm_refl2 Ptrofs.eqm_sym Ptrofs.eqm_trans
+Global Hint Resolve Ptrofs.modulus_pos Ptrofs.eqm_refl Ptrofs.eqm_refl2 Ptrofs.eqm_sym Ptrofs.eqm_trans
   Ptrofs.eqm_small_eq Ptrofs.eqm_add Ptrofs.eqm_neg Ptrofs.eqm_sub Ptrofs.eqm_mult
   Ptrofs.eqm_unsigned_repr Ptrofs.eqm_unsigned_repr_l Ptrofs.eqm_unsigned_repr_r
   Ptrofs.unsigned_range Ptrofs.unsigned_range_2

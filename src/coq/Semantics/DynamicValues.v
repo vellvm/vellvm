@@ -5,7 +5,6 @@ From Coq Require Import
      DecidableClass
      List
      String
-     Omega
      Bool.Bool
      Lia.
 
@@ -1061,10 +1060,10 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
     { to_dvalue : I -> dvalue;
     }.
 
-  Global Instance ToDvalue_intptr : ToDvalue intptr :=
+  #[global] Instance ToDvalue_intptr : ToDvalue intptr :=
     { to_dvalue := DVALUE_IPTR }.
 
-  Global Instance VIntVMemInt {I} `{VInt I} : VMemInt I :=
+  #[global] Instance VIntVMemInt {I} `{VInt I} : VMemInt I :=
     {
       (* Comparisons *)
       mequ := equ;
@@ -1118,7 +1117,7 @@ Module DVALUE(A:Vellvm.Semantics.MemoryAddress.ADDRESS)(IP:Vellvm.Semantics.Memo
       mdtyp_of_int := DTYPE_I (N.of_nat bitwidth)
     }.
 
-  Global Instance VMemInt_intptr' : VMemInt intptr.
+  #[global] Instance VMemInt_intptr' : VMemInt intptr.
   apply VMemInt_intptr.
   Defined.
 

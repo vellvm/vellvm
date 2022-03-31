@@ -417,6 +417,8 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
 
   (* Assign fresh sids to ubytes while preserving entanglement *)
 
+  (* TODO: address termination checker here *)
+  Unset Guard Checking.
   Section Concretize.
 
 
@@ -502,7 +504,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
     Arguments Unpoisoned {A} a.
     Arguments Poison {A}.
 
-    Global Instance MonadPoisonable : Monad Poisonable
+    #[global] Instance MonadPoisonable : Monad Poisonable
       := { ret  := @Unpoisoned;
            bind := fun _ _ ma mab => match ma with
                                      | Poison dt => Poison dt
@@ -513,7 +515,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
     Class RAISE_POISON (M : Type -> Type) :=
       { raise_poison : forall {A}, dtyp -> M A }.
 
-    Global Instance RAISE_POISON_Poisonable : RAISE_POISON Poisonable :=
+    #[global] Instance RAISE_POISON_Poisonable : RAISE_POISON Poisonable :=
       { raise_poison := fun A dt => Poison dt }.
 
     #[global] Instance RAISE_POISON_E_MT {M : Type -> Type} {MT : (Type -> Type) -> Type -> Type} `{MonadT (MT M) M} `{RAISE_POISON M} : RAISE_POISON (MT M) :=
@@ -771,6 +773,7 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
     Definition filter_uvalue_sid_matches (byte : uvalue) (uvs : list (N * uvalue)) : (list (N * uvalue) * list (N * uvalue))
       := filter_split (fun '(n, uv) => uvalue_sid_match byte uv) uvs.
 
+    (* TODO: satisfy termination checker *)
     Section Concretize.
       Context (M : Type -> Type).
       Context {HM : Monad M}.
@@ -784,7 +787,6 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
 
       (* TODO: satisfy the termination checker here. *)
       (* M will be err_or_ub / MPropT err_or_ub? *)
-      Unset Guard Checking.
       (* Define a sum type f a, g b.... a + b. Mutual recursive
            function as one big function with sum type to select between
            which "function" is being called *)
@@ -1033,12 +1035,13 @@ Module MakeBase (LP : LLVMParams) (MP : MemoryParams LP) : SerializationBase LP 
         destruct u; try reflexivity.
       Qed.
 
-      Set Guard Checking.
     End Concretize.
 
     Arguments concretize_uvalueM {_ _}.
 
   End Concretize.
+
+  Set Guard Checking.
 End MakeBase.
 
 Module Make (LP : LLVMParams) (MP : MemoryParams LP) (SER : SerializationBase LP MP) : Serialization LP MP SER.

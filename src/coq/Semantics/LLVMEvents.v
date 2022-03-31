@@ -123,7 +123,7 @@ Set Contextual Implicit.
   Definition print_msg (msg : string) : unit := tt.
 
   Definition raise {E} {A} `{FailureE -< E} (msg : string) : itree E A :=
-    v <- trigger (Throw _ (print_msg msg));; match v: void with end.
+    v <- trigger (Throw (print_msg msg));; match v: void with end.
 
   #[global] Instance RAISE_ERR_ITREE_FAILUREE {E : Type -> Type} `{FailureE -< E} : RAISE_ERROR (itree E) :=
   { raise_error := fun A e => raise e

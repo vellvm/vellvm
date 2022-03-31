@@ -80,7 +80,7 @@ Section contains_UB.
             cbn in H.
             dependent induction H.
 
-            eapply CrawlVis1 with (k0:=k2) (e:=subevent T e').
+            eapply CrawlVis1 with (k:=k2) (e:=subevent T e').
             { symmetry.
               pfold; red.
               rewrite <- Heqyo.
@@ -133,7 +133,7 @@ Section contains_UB.
             cbn in H.
             dependent induction H.
 
-            eapply CrawlVis2 with (k0:=k2).
+            eapply CrawlVis2 with (k:=k2).
             { symmetry.
               pfold; red.
               rewrite <- Heqyo.
@@ -213,7 +213,7 @@ Section contains_UB.
             cbn in H.
             dependent induction H.
 
-            eapply CrawlVis1 with (k0:=k1) (e:=subevent T e').
+            eapply CrawlVis1 with (k:=k1) (e:=subevent T e').
             { symmetry.
               pfold; red.
               rewrite <- Heqxo.
@@ -230,7 +230,7 @@ Section contains_UB.
           - punfold H; red in H.
             cbn in H.
             dependent induction H.
-            eapply CrawlTau with (t2 := t1).
+            eapply CrawlTau with (t1 := t1).
 
             pfold; red; rewrite <- Heqxo.
             cbn.
@@ -266,7 +266,7 @@ Section contains_UB.
             cbn in H.
             dependent induction H.
 
-            eapply CrawlVis2 with (k0:=k1).
+            eapply CrawlVis2 with (k:=k1).
             { symmetry.
               pfold; red.
               rewrite <- Heqyo.
@@ -284,7 +284,7 @@ Section contains_UB.
           - punfold H; red in H.
             cbn in H.
             dependent induction H.
-            eapply CrawlTau with (t2 := t1).
+            eapply CrawlTau with (t1 := t1).
 
             pfold; red; rewrite <- Heqyo.
             cbn.
@@ -309,7 +309,7 @@ Section contains_UB.
           rewrite <- x.
           cbn.
           econstructor; intros [].
-        + eapply CrawlTau with (t3:=t1).
+        + eapply CrawlTau with (t1:=t1).
           pfold; red; rewrite <- x; cbn.
           constructor. left.
           apply Reflexive_eqit. typeclasses eauto.
@@ -413,22 +413,22 @@ Section bind_lemmas.
     - destruct e as [e | [f | [ube | g]]].
       + rewrite H.
         rewrite bind_vis.
-        eapply CrawlVis1 with (e0 := (inl1 e)) (k1 := (fun x0 : X => ITree.bind (k0 x0) k)).
+        eapply CrawlVis1 with (e := (inl1 e)) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
         reflexivity.
         eauto.
       + rewrite H.
         rewrite bind_vis.
-        eapply CrawlVis1 with (e := (inr1 f)) (k1 := (fun x0 : X => ITree.bind (k0 x0) k)).
+        eapply CrawlVis1 with (e := (inr1 f)) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
         reflexivity.
         eauto.
       + rewrite H.
         rewrite bind_vis.
         destruct ube.
-        eapply FindUB with (s0:=s) (k1:=(fun x0 : void => ITree.bind (k0 x0) k)).
+        eapply FindUB with (s:=s) (k:=(fun x0 : void => ITree.bind (k0 x0) k)).
         reflexivity.
       + rewrite H.
         rewrite bind_vis.
-        eapply CrawlVis2 with (e := g) (k1 := (fun x0 : X => ITree.bind (k0 x0) k)).
+        eapply CrawlVis2 with (e := g) (k := (fun x0 : X => ITree.bind (k0 x0) k)).
         reflexivity.
         eauto.      
   Qed.
@@ -579,7 +579,7 @@ Section refine_OOM_h_lemmas.
           }
 
           rewrite bind_trigger.
-          eapply CrawlVis1 with (e0 := (resum IFun T e)) (k0 := k2).
+          eapply CrawlVis1 with (e := (resum IFun T e)) (k := k2).
           reflexivity.
           eapply IHUB.
           unfold refine_OOM_h.
@@ -633,7 +633,7 @@ Section refine_OOM_h_lemmas.
           }
 
           rewrite bind_trigger.
-          eapply CrawlVis2 with (e := (resum IFun T e')) (k0 := k2).
+          eapply CrawlVis2 with (e := (resum IFun T e')) (k := k2).
           reflexivity.
           eapply IHUB.
           unfold refine_OOM_h.
@@ -657,7 +657,7 @@ Section refine_OOM_h_lemmas.
 
         rewrite KS.
         rewrite bind_trigger.
-        eapply FindUB with (s0 := s) (k0:=k2).
+        eapply FindUB with (s := s) (k:=k2).
         reflexivity.
     }
   Qed.

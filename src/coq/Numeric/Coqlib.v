@@ -23,7 +23,9 @@ Require Export ZArith.
 Require Export Znumtheory.
 Require Export List.
 Require Export Bool.
-Require Export Lia.
+
+Require Import Coq.micromega.Lia.
+Global Set Asymmetric Patterns.
 
 (** * Useful tactics *)
 
@@ -45,7 +47,11 @@ Ltac decEq :=
       cut (A <> B); [intro; congruence | try discriminate]
   end.
 
-Ltac byContradiction := exfalso.
+Ltac byContradiction :=
+  cut False; [contradiction|idtac].
+
+Ltac liaContradiction :=
+  cut False; [contradiction|lia].
 
 Lemma modusponens: forall (P Q: Prop), P -> (P -> Q) -> Q.
 Proof. auto. Qed.
@@ -176,7 +182,7 @@ Proof (Pos.lt_irrefl).
 
 Global Hint Resolve Ple_refl Plt_Ple Ple_succ Plt_strict: coqlib.
 
-Ltac extlia := unfold Plt, Ple in *; lia.
+Ltac xliaContradiction := exfalso; lia.
 
 (** Peano recursion over positive numbers. *)
 
@@ -279,7 +285,7 @@ Lemma zlt_true:
 Proof.
   intros. case (zlt x y); intros.
   auto.
-  extlia.
+  liaContradiction.
 Qed.
 
 Lemma zlt_false:
@@ -287,7 +293,7 @@ Lemma zlt_false:
   x >= y -> (if zlt x y then a else b) = b.
 Proof.
   intros. case (zlt x y); intros.
-  extlia.
+  liaContradiction.
   auto.
 Qed.
 
@@ -299,7 +305,7 @@ Lemma zle_true:
 Proof.
   intros. case (zle x y); intros.
   auto.
-  extlia.
+  liaContradiction.
 Qed.
 
 Lemma zle_false:
@@ -307,7 +313,7 @@ Lemma zle_false:
   x > y -> (if zle x y then a else b) = b.
 Proof.
   intros. case (zle x y); intros.
-  extlia.
+  liaContradiction.
   auto.
 Qed.
 
@@ -406,12 +412,42 @@ Qed.
 
 (** Properties of Euclidean division and modulus. *)
 
+Lemma Zdiv_small:
+  forall x y, 0 <= x < y -> x / y = 0.
+Proof.
+  intros. assert (y > 0). lia.
+  assert (forall a b,
+    0 <= a < y ->
+    0 <= y * b + a < y ->
+    b = 0).
+  intros.
+  assert (b = 0 \/ b > 0 \/ (-b) > 0). lia.
+  elim H3; intro.
+  auto.
+  elim H4; intro.
+  assert (y * b >= y * 1). apply Zmult_ge_compat_l. lia. lia.
+  liaContradiction.
+  assert (y * (-b) >= y * 1). apply Zmult_ge_compat_l. lia. lia.
+  rewrite <- Zopp_mult_distr_r in H6. liaContradiction.
+  apply H1 with (x mod y).
+  apply Z_mod_lt. auto.
+  rewrite <- Z_div_mod_eq. auto. auto.
+Qed.
+
+Lemma Zmod_small:
+  forall x y, 0 <= x < y -> x mod y = x.
+Proof.
+  intros. assert (y > 0). lia.
+  generalize (Z_div_mod_eq x y H0).
+  rewrite (Zdiv_small x y H). lia.
+Qed.
+
 Lemma Zmod_unique:
   forall x y a b,
   x = a * y + b -> 0 <= b < y -> x mod y = b.
 Proof.
   intros. subst x. rewrite Z.add_comm.
-  rewrite Z_mod_plus. apply Z.mod_small. auto. lia.
+  rewrite Z_mod_plus. apply Zmod_small. auto. lia.
 Qed.
 
 Lemma Zdiv_unique:
@@ -426,7 +462,30 @@ Lemma Zdiv_Zdiv:
   forall a b c,
   b > 0 -> c > 0 -> (a / b) / c = a / (b * c).
 Proof.
-  intros. apply Z.div_div; lia.
+  intros.
+  generalize (Z_div_mod_eq a b H). generalize (Z_mod_lt a b H). intros.
+  generalize (Z_div_mod_eq (a/b) c H0). generalize (Z_mod_lt (a/b) c H0). intros.
+  set (q1 := a / b) in *. set (r1 := a mod b) in *.
+  set (q2 := q1 / c) in *. set (r2 := q1 mod c) in *.
+  symmetry. apply Zdiv_unique with (r2 * b + r1).
+  rewrite H2. rewrite H4. ring.
+  split.
+  assert (0 <= r2 * b). apply Z.mul_nonneg_nonneg. lia. lia. lia.
+  assert ((r2 + 1) * b <= c * b).
+  apply Zmult_le_compat_r. lia. lia.
+  replace ((r2 + 1) * b) with (r2 * b + b) in H5 by ring.
+  replace (c * b) with (b * c) in H5 by ring.
+  lia.
+Qed.
+
+Lemma Zmult_le_compat_l_neg :
+  forall n m p:Z, n >= m -> p <= 0 -> p * n <= p * m.
+Proof.
+  intros.
+  assert ((-p) * n >= (-p) * m). apply Zmult_ge_compat_l. auto. lia.
+  replace (p * n) with (- ((-p) * n)) by ring.
+  replace (p * m) with (- ((-p) * m)) by ring.
+  lia.
 Qed.
 
 Lemma Zdiv_interval_1:
@@ -458,9 +517,9 @@ Proof.
   intros.
   assert (lo <= a / b < hi+1).
   apply Zdiv_interval_1. lia. lia. auto.
-  assert (lo * b <= lo * 1) by (apply Z.mul_le_mono_nonpos_l; lia).
+  assert (lo * b <= lo * 1). apply Zmult_le_compat_l_neg. lia. lia.
   replace (lo * 1) with lo in H3 by ring.
-  assert ((hi + 1) * 1 <= (hi + 1) * b) by (apply Z.mul_le_mono_nonneg_l; lia).
+  assert ((hi + 1) * 1 <= (hi + 1) * b). apply Zmult_le_compat_l. lia. lia.
   replace ((hi + 1) * 1) with (hi + 1) in H4 by ring.
   lia.
   lia.
@@ -471,10 +530,41 @@ Lemma Zmod_recombine:
   a > 0 -> b > 0 ->
   x mod (a * b) = ((x/b) mod a) * b + (x mod b).
 Proof.
-  intros. rewrite (Z.mul_comm a b). rewrite Z.rem_mul_r by lia. ring. 
+  intros.
+  set (xb := x/b).
+  apply Zmod_unique with (xb/a).
+  generalize (Z_div_mod_eq x b H0); fold xb; intro EQ1.
+  generalize (Z_div_mod_eq xb a H); intro EQ2.
+  rewrite EQ2 in EQ1.
+  eapply eq_trans. eexact EQ1. ring.
+  generalize (Z_mod_lt x b H0). intro.
+  generalize (Z_mod_lt xb a H). intro.
+  assert (0 <= xb mod a * b <= a * b - b).
+    split. apply Z.mul_nonneg_nonneg; lia.
+    replace (a * b - b) with ((a - 1) * b) by ring.
+    apply Zmult_le_compat; lia.
+  lia.
 Qed.
 
 (** Properties of divisibility. *)
+
+Lemma Zdivides_trans:
+  forall x y z, (x | y) -> (y | z) -> (x | z).
+Proof.
+  intros x y z [a A] [b B]; subst. exists (a*b); ring.
+Qed.
+
+Definition Zdivide_dec:
+  forall (p q: Z), p > 0 -> { (p|q) } + { ~(p|q) }.
+Proof.
+  intros. destruct (zeq (Z.modulo q p) 0).
+  left. exists (q / p).
+  transitivity (p * (q / p) + (q mod p)). apply Z_div_mod_eq; auto.
+  transitivity (p * (q / p)). lia. ring.
+  right; red; intros. elim n. apply Z_div_exact_1; auto.
+  inv H0. rewrite Z_div_mult; auto. ring.
+Defined.
+Global Opaque Zdivide_dec.
 
 Lemma Zdivide_interval:
   forall a b c,
@@ -488,19 +578,42 @@ Qed.
 
 (** Conversion from [Z] to [nat]. *)
 
-Lemma Z_to_nat_neg:
-  forall n, n <= 0 -> Z.to_nat n = O.
+Definition nat_of_Z: Z -> nat := Z.to_nat.
+
+Lemma nat_of_Z_of_nat:
+  forall n, nat_of_Z (Z.of_nat n) = n.
+Proof.
+  exact Nat2Z.id.
+Qed.
+
+Lemma nat_of_Z_max:
+  forall z, Z.of_nat (nat_of_Z z) = Z.max z 0.
+Proof.
+  intros. unfold Z.max. destruct z; simpl; auto.
+  change (Z.of_nat (Z.to_nat (Zpos p)) = Zpos p).
+  apply Z2Nat.id. compute; intuition congruence.
+Qed.
+
+Lemma nat_of_Z_eq:
+  forall z, z >= 0 -> Z.of_nat (nat_of_Z z) = z.
+Proof.
+  unfold nat_of_Z; intros. apply Z2Nat.id. lia.
+Qed.
+
+Lemma nat_of_Z_neg:
+  forall n, n <= 0 -> nat_of_Z n = O.
 Proof.
   destruct n; unfold Z.le; simpl; auto. congruence.
 Qed.
 
-Lemma Z_to_nat_max:
-  forall z, Z.of_nat (Z.to_nat z) = Z.max z 0.
+Lemma nat_of_Z_plus:
+  forall p q,
+  p >= 0 -> q >= 0 ->
+  nat_of_Z (p + q) = (nat_of_Z p + nat_of_Z q)%nat.
 Proof.
-  intros. destruct (zle 0 z).
-- rewrite Z2Nat.id by auto. extlia.
-- rewrite Z_to_nat_neg by lia. extlia.
+  unfold nat_of_Z; intros. apply Z2Nat.inj_add; lia.
 Qed.
+
 
 (** Alignment: [align n amount] returns the smallest multiple of [amount]
   greater than or equal to [n]. *)
@@ -521,60 +634,6 @@ Qed.
 Lemma align_divides: forall x y, y > 0 -> (y | align x y).
 Proof.
   intros. unfold align. apply Z.divide_factor_r.
-Qed.
-
-Lemma align_lt: forall x y, y > 0 -> align x y < x + y.
-Proof.
-  intros. unfold align.
-  generalize (Z_div_mod_eq (x + y - 1) y H); intro.
-  generalize (Z_mod_lt (x + y - 1) y H); intro.
-  lia.
-Qed.
-
-Lemma align_same:
-  forall x y, y > 0 -> (y | x) -> align x y = x.
-Proof.
-  unfold align; intros. destruct H0 as [k E].
-  replace (x  + y - 1) with (x + (y - 1)) by lia.
-  rewrite E, Z.div_add_l, Z.div_small by lia.
-  lia.
-Qed.
-
-(** Floor: [floor n amount] returns the greatest multiple of [amount]
-    less than or equal to [n]. *)
-
-Definition floor (n: Z) (amount: Z) := (n / amount) * amount.
-
-Lemma floor_interval:
-  forall x y, y > 0 -> floor x y <= x < floor x y + y.
-Proof.
-  unfold floor; intros.
-  generalize (Z_div_mod_eq x y H) (Z_mod_lt x y H).
-  set (q := x / y). set (r := x mod y). intros. lia.
-Qed.
-
-Lemma floor_divides:
-  forall x y, y > 0 -> (y | floor x y).
-Proof.
-  unfold floor; intros. exists (x / y); auto.
-Qed.
-
-Lemma floor_same:
-  forall x y, y > 0 -> (y | x) -> floor x y = x.
-Proof.
-  unfold floor; intros. rewrite (Zdivide_Zdiv_eq y x) at 2; auto; lia.
-Qed.
-
-Lemma floor_align_interval:
-  forall x y, y > 0 ->
-  floor x y <= align x y <= floor x y + y.
-Proof.
-  unfold floor, align; intros.
-  replace (x / y * y + y) with ((x + 1 * y) / y * y).
-  assert (A: forall a b, a <= b -> a / y * y <= b / y * y).
-  { intros. apply Z.mul_le_mono_nonneg_r. lia. apply Z.div_le_mono; lia. }
-  split; apply A; lia.
-  rewrite Z.div_add by lia. lia.
 Qed.
 
 (** * Definitions and theorems on the data types [option], [sum] and [list] *)
@@ -825,32 +884,6 @@ Proof.
   exists (a0 :: l1); exists l2; intuition. simpl; congruence.
 Qed.
 
-(** Properties of [List.app] (concatenation) *)
-
-Lemma list_append_injective_l:
-  forall (A: Type) (l1 l2 l1' l2': list A),
-  l1 ++ l2 = l1' ++ l2' -> List.length l1 = List.length l1' -> l1 = l1' /\ l2 = l2'.
-Proof.
-  intros until l2'. revert l1 l1'. induction l1 as [ | a l1]; destruct l1' as [ | a' l1']; simpl; intros.
-- auto.
-- discriminate.
-- discriminate.
-- destruct (IHl1 l1'). congruence. congruence. split; congruence.
-Qed.
-
-Lemma list_append_injective_r:
-  forall (A: Type) (l1 l2 l1' l2': list A),
-  l1 ++ l2 = l1' ++ l2' -> List.length l2 = List.length l2' -> l1 = l1' /\ l2 = l2'.
-Proof.
-  intros.
-  assert (X: rev l2 = rev l2' /\ rev l1 = rev l1').
-  { apply list_append_injective_l.
-    rewrite <- ! rev_app_distr. congruence.
-    rewrite ! rev_length; auto. }
-  rewrite <- (rev_involutive l1), <- (rev_involutive l1'), <- (rev_involutive l2), <- (rev_involutive l2').
-  intuition congruence.
-Qed.
-
 (** Folding a function over a list *)
 
 Section LIST_FOLD.
@@ -1090,14 +1123,6 @@ Proof.
   generalize list_norepet_app; firstorder.
 Qed.
 
-Lemma list_norepet_rev:
-  forall (A: Type) (l: list A), list_norepet l -> list_norepet (List.rev l).
-Proof.
-  induction 1; simpl.
-- constructor.
-- apply list_norepet_append_commut. simpl. constructor; auto. rewrite <- List.in_rev; auto.
-Qed.
-
 (** [is_tail l1 l2] holds iff [l2] is of the form [l ++ l1] for some [l]. *)
 
 Inductive is_tail (A: Type): list A -> list A -> Prop :=
@@ -1230,6 +1255,26 @@ Lemma list_map_drop:
 Proof.
   induction n; simpl; intros. auto.
   destruct l; simpl; auto.
+Qed.
+
+(** A list of [n] elements, all equal to [x]. *)
+
+Fixpoint list_repeat {A: Type} (n: nat) (x: A) {struct n} :=
+  match n with
+  | O => nil
+  | S m => x :: list_repeat m x
+  end.
+
+Lemma length_list_repeat:
+  forall (A: Type) n (x: A), length (list_repeat n x) = n.
+Proof.
+  induction n; simpl; intros. auto. decEq; auto.
+Qed.
+
+Lemma in_list_repeat:
+  forall (A: Type) n (x: A) y, In y (list_repeat n x) -> y = x.
+Proof.
+  induction n; simpl; intros. elim H. destruct H; auto.
 Qed.
 
 (** * Definitions and theorems over boolean types *)
