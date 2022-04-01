@@ -1560,8 +1560,8 @@ Module MakeFiniteMemory (LP : LLVMParams) : Memory LP.
 
   Module MMEP := FiniteMemoryModelExecPrimitives LP MP.
   Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
-  Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL.
   Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec.
+  Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
 
   (* Serialization *)
   Module SP := SerializationParams.Make LP MP.

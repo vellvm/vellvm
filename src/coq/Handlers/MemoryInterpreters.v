@@ -104,7 +104,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
   End Interpreters.
 End MemorySpecInterpreter.
 
-Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) (MM : MemoryModelExec LP MP MMEP).
+Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) (MM : MemoryModelExec LP MP MMEP) (SPEC_INTERP : MemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec).
   Import MM.
   Import MMEP.
   Import MMEP.MMSP.
@@ -113,7 +113,6 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
   Import LP.PROV.
 
   (** Specification of the memory model *)
-  Declare Module SPEC_INTERP : MemorySpecInterpreter LP MP MMSP MemSpec.
   Import SPEC_INTERP.
   Import MMSP.
   Import MMSP.MemByte.
@@ -157,10 +156,11 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
   End Interpreters.
 End MemoryExecInterpreter.
 
+
 Module MakeMemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : MemoryModelSpecPrimitives LP MP) (MS : MemoryModelSpec LP MP MMSP) <: MemorySpecInterpreter LP MP MMSP MS.
   Include MemorySpecInterpreter LP MP MMSP MS.
 End MakeMemorySpecInterpreter.
 
-Module MakeMemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) (ME : MemoryModelExec LP MP MMEP) <: MemoryExecInterpreter LP MP MMEP ME.
-  Include MemoryExecInterpreter LP MP MMEP ME.
+Module MakeMemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : MemoryModelExecPrimitives LP MP) (ME : MemoryModelExec LP MP MMEP) (SPEC_INTERP : MemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec) <: MemoryExecInterpreter LP MP MMEP ME SPEC_INTERP.
+  Include MemoryExecInterpreter LP MP MMEP ME SPEC_INTERP.
 End MakeMemoryExecInterpreter.

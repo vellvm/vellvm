@@ -14,7 +14,6 @@ From Vellvm Require Import
      Handlers.Stack
      Handlers.Intrinsics
      Handlers.Pick
-     Handlers.FiniteMemory
      Handlers.MemoryModel
      Handlers.MemoryInterpreters.
 
@@ -28,8 +27,8 @@ From Vellvm Require Import
 
     Declare Module MMEP : MemoryModelExecPrimitives LP MP.
     Module MEM_MODEL := MakeMemoryModelExec LP MP MMEP.
-    Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL.
     Module MEM_SPEC_INTERP := MakeMemorySpecInterpreter LP MP MMEP.MMSP MMEP.MemSpec.
+    Module MEM_EXEC_INTERP := MakeMemoryExecInterpreter LP MP MMEP MEM_MODEL MEM_SPEC_INTERP.
 
     (* Serialization *)
     Module SP := SerializationParams.Make LP MP.

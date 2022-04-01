@@ -20,10 +20,9 @@ CP=cp
 
 COQFILESNUMERIC := Numeric/Archi Numeric/Coqlib Numeric/Integers Numeric/Zbits Numeric/IEEE754_extra Numeric/Floats
 
-COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/ListUtil Utils/IntMaps Utils/NMaps Utils/Error\
+COQFILESUTILS := Utils/ParserHelper Utils/Tactics Utils/Util Utils/AListFacts Utils/Error Utils/ListUtil Utils/IntMaps Utils/NMaps\
 		Utils/Monads Utils/StateMonads Utils/MonadEq1Laws Utils/MonadExcLaws\
 		Utils/MonadReturnsLaws Utils/PropT Utils/RefineProp\
-		Utils/ITreeRaise Utils/Raise\
 		Utils/PostConditions Utils/TFor Utils/NoFailure Utils/NonEmpty Utils/Default Utils/OptionUtil Utils/MapMonadExtra\
 		Utilities
 
@@ -36,6 +35,7 @@ COQFILESSEMANTICS := Semantics/MemoryAddress Semantics/Memory/Sizeof Semantics/G
 		Semantics/Memory/Overlaps Semantics/Memory/FiniteProvenance Semantics/Memory/StoreId\
 		Semantics/VellvmIntegers Semantics/Memory/ErrSID \
 		Semantics/DynamicValues Semantics/LLVMEvents Semantics/LLVMParams\
+		Utils/ITreeRaise Utils/Raise\
 		Semantics/MemoryParams Semantics/SerializationParams\
 		Semantics/IntrinsicsDefinitions\
 		Semantics/Denotation Semantics/InterpretationStack Semantics/TopLevel\
