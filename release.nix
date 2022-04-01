@@ -2,7 +2,7 @@
   mkCoqDerivation,
   version ? null,
   coq,
-  dune_2,
+  dune_3,
   # All of these ocaml packages should probably come from the coq
   # version, or there will be disagreements between compiler versions.
   ocaml ? coq.ocaml,
@@ -10,6 +10,7 @@
   findlib ? coq.ocamlPackagse.findlib,
   menhir ? coq.ocamlPackages.menhir,
   qcheck ? coq.ocamlPackages.qcheck,
+  cppo ? coq.ocamlPackages.cppo,
   mathcomp, mathcomp-ssreflect, coq-ext-lib, paco, ITree, flocq, ceres, simple-io, zarith, ... }:
 
 { vellvm =
@@ -22,7 +23,7 @@
 
       propagatedBuildInputs =
         [ coq
-          dune_2
+          dune_3
         ] ++
         # Coq libraries
         [ mathcomp
@@ -42,6 +43,7 @@
           findlib
           menhir
           qcheck
+          cppo
         ];
 
       src = ./.;
