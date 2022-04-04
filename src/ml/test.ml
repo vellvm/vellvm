@@ -12,7 +12,7 @@
 ;; open Driver
 ;; open Assert
 ;; open DynamicValues
-;; open InterpretationStack.InterpreterStackBigIntptr.LLVM.Events
+;; open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
 (* Vellvm test cases -------------------------------------------------------- *)
 
@@ -413,7 +413,7 @@ let suite = [Test ("Poison",
 
              Test ("C Tests",
                    List.map (fun (f, i) ->
-                       (f, fun () -> run_uvalue_test (i32_test (i32_of_int i)) f))
+                       (f, fun () -> run_dvalue_test (i32_test (i32_of_int i)) f))
                      (c_tests));
              
              (* Test ("Parsing-Must-fail",

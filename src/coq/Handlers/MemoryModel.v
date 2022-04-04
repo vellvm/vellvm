@@ -649,7 +649,8 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
   Section MemoryPrimatives.
     Context {MemM : Type -> Type}.
-    Context `{MM : MemMonad MemState AllocationId MemM}.
+    Context {ExtraState : Type}.
+    Context `{MM : MemMonad MemState ExtraState AllocationId MemM}.
 
     (*** Data types *)
     Parameter initial_memory_state : MemState.
@@ -658,32 +659,32 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     (*** Primitives on memory *)
     (** Reads *)
     Parameter read_byte :
-      forall `{MemMonad MemState AllocationId MemM}, addr -> MemM SByte.
+      forall `{MemMonad MemState ExtraState AllocationId MemM}, addr -> MemM SByte.
 
     (** Writes *)
     Parameter write_byte :
-      forall `{MemMonad MemState AllocationId MemM}, addr -> SByte -> MemM unit.
+      forall `{MemMonad MemState ExtraState AllocationId MemM}, addr -> SByte -> MemM unit.
 
     (** Allocations *)
     Parameter allocate_bytes :
-      forall `{MemMonad MemState AllocationId MemM}, dtyp -> list SByte -> MemM addr.
+      forall `{MemMonad MemState ExtraState AllocationId MemM}, dtyp -> list SByte -> MemM addr.
 
     (** Frame stacks *)
-    Parameter mempush : forall `{MemMonad MemState AllocationId MemM}, MemM unit.
-    Parameter mempop : forall `{MemMonad MemState AllocationId MemM}, MemM unit.
+    Parameter mempush : forall `{MemMonad MemState ExtraState AllocationId MemM}, MemM unit.
+    Parameter mempop : forall `{MemMonad MemState ExtraState AllocationId MemM}, MemM unit.
 
     (*** Correctness *)
     Import EitherMonad.
     Definition exec_correct {X} (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
-      forall ms,
-        match IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (MemMonad_run exec ms))))) with
+      forall ms st,
+        match IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (MemMonad_run exec ms st))))) with
         | inl (OOM_message oom_msg) =>
             spec ms (inr (Oom oom_msg))
         | inr (inl (UB_message ub_msg)) =>
             forall res, ~ spec ms res
         | inr (inr (inl (ERR_message err_msg))) =>
             spec ms (inl err_msg)
-        | inr (inr (inr (ms', res))) =>
+        | inr (inr (inr (st', (ms', res)))) =>
             spec ms (inr (NoOom (ms', res)))
         end.
 
@@ -753,22 +754,23 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
   (*** Handling memory events *)
   Section Handlers.
     Context {MemM : Type -> Type}.
-    Context `{MemMonad MemState AllocationId MemM}.
+    Context {ExtraState : Type}.
+    Context `{MemMonad MemState ExtraState AllocationId MemM}.
 
     (** Reading uvalues *)
-    Definition read_bytes `{MemMonad MemState AllocationId MemM} (ptr : addr) (len : nat) : MemM (list SByte) :=
+    Definition read_bytes `{MemMonad MemState ExtraState AllocationId MemM} (ptr : addr) (len : nat) : MemM (list SByte) :=
       (* TODO: this should maybe be UB and not OOM??? *)
       ptrs <- get_consecutive_ptrs ptr len;;
 
       (* Actually perform reads *)
       Util.map_monad (fun ptr => read_byte ptr) ptrs.
 
-    Definition read_uvalue `{MemMonad MemState AllocationId MemM} (dt : dtyp) (ptr : addr) : MemM uvalue :=
+    Definition read_uvalue `{MemMonad MemState ExtraState AllocationId MemM} (dt : dtyp) (ptr : addr) : MemM uvalue :=
       bytes <- read_bytes ptr (N.to_nat (sizeof_dtyp dt));;
       ret (from_ubytes bytes dt).
 
     (** Writing uvalues *)
-    Definition write_bytes `{MemMonad MemState AllocationId MemM} (ptr : addr) (bytes : list SByte) : MemM unit :=
+    Definition write_bytes `{MemMonad MemState ExtraState AllocationId MemM} (ptr : addr) (bytes : list SByte) : MemM unit :=
       (* TODO: Should this be UB instead of OOM? *)
       ptrs <- get_consecutive_ptrs ptr (length bytes);;
       let ptr_bytes := zip ptrs bytes in
@@ -776,20 +778,20 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       (* Actually perform writes *)
       Util.map_monad_ (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
 
-    Definition write_uvalue `{MemMonad MemState AllocationId MemM} (dt : dtyp) (ptr : addr) (uv : uvalue) : MemM unit :=
+    Definition write_uvalue `{MemMonad MemState ExtraState AllocationId MemM} (dt : dtyp) (ptr : addr) (uv : uvalue) : MemM unit :=
       sid <- fresh_sid;;
       bytes <- lift_OOM (to_ubytes uv dt sid);;
       write_bytes ptr bytes.
 
     (** Allocating dtyps *)
     (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
-    Definition allocate_dtyp `{MemMonad MemState AllocationId MemM} (dt : dtyp) : MemM addr :=
+    Definition allocate_dtyp `{MemMonad MemState ExtraState AllocationId MemM} (dt : dtyp) : MemM addr :=
       sid <- fresh_sid;;
       bytes <- lift_OOM (generate_undef_bytes dt sid);;
       allocate_bytes dt bytes.
 
     (** Handle memcpy *)
-    Definition memcpy `{MemMonad MemState AllocationId MemM} (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemM unit :=
+    Definition memcpy `{MemMonad MemState ExtraState AllocationId MemM} (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemM unit :=
       if Z.ltb len 0
       then
         raise_ub "memcpy given negative length."
@@ -808,7 +810,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
         else
           raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
 
-    Definition handle_memory `{MemMonad MemState AllocationId MemM} : MemoryE ~> MemM
+    Definition handle_memory `{MemMonad MemState ExtraState AllocationId MemM} : MemoryE ~> MemM
       := fun T m =>
            match m with
            (* Unimplemented *)
@@ -835,7 +837,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
                end
            end.
 
-    Definition handle_memcpy `{MemMonad MemState AllocationId MemM} (args : list dvalue) : MemM unit :=
+    Definition handle_memcpy `{MemMonad MemState ExtraState AllocationId MemM} (args : list dvalue) : MemM unit :=
       match args with
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
@@ -858,7 +860,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
-    Definition handle_intrinsic `{MemMonad MemState AllocationId MemM} : IntrinsicE ~> MemM
+    Definition handle_intrinsic `{MemMonad MemState ExtraState AllocationId MemM} : IntrinsicE ~> MemM
       := fun T e =>
            match e with
            | Intrinsic t name args =>

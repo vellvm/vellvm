@@ -3,7 +3,7 @@
      See README.md for more details. *)
 open LLVMAst
 open TopLevel
-open InterpretationStack.InterpreterStackBigIntptr.LLVM.Events
+open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
 
 type raw_assertion_string =

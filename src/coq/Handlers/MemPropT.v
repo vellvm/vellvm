@@ -27,12 +27,39 @@ Open Scope monad_scope.
 
 (* Move this ? *)
 Definition store_id := N.
+
 Class MonadStoreId (M : Type -> Type) : Type :=
   { fresh_sid : M store_id;
   }.
 
+(* M could use MemState, sid, sid_set, etc... *)
 Class StoreIdFreshness (S : Type) : Type :=
   { used_store_id : S -> store_id -> Prop;
+    (* fresh_sid : M store_id; *)
+
+    (* run_sid_freshness {A} : M A -> S -> (S * A); *)
+
+    (* (* Doesn't match up with current usage... *)
+
+    (*    E.g., when allocating or writing to memory we call fresh_sid, *)
+    (*    then use that to create bytes, and then store those bytes in *)
+    (*    memory. The problem is if `used_store_id` is in terms of *)
+    (*    `MemState` the laws won't hold until the bytes are actually *)
+    (*    stored in `MemState` after the write... *)
+    (*  *) *)
+    (* fresh_sid_now_used : *)
+    (* forall s s' sid, *)
+    (*   run_sid_freshness fresh_sid s = (s', sid) -> *)
+
+    (*   (* Was not used *) *)
+    (*   forall s'', run_sid_freshness (used_store_id sid) s = (s'', false) /\ *)
+
+    (*   (* Freshly allocated one is now used *) *)
+    (*   forall s'', run_sid_freshness (used_store_id sid) s' = (s'', true) /\ *)
+
+    (*   (* Whether other sids are used is preserved *) *)
+    (*   forall sid' s'' s''' usedp, *)
+    (*     (sid' <> sid -> run_sid_freshness (used_store_id sid') s = (s'', usedp) -> run_sid_freshness (used_store_id sid') s' = (s''', usedp)); *)
   }.
 
 Class AllocationIdFreshness (AllocationId : Type) (S : Type) : Type :=
@@ -51,70 +78,72 @@ Definition modify_mem_state {M MemState} `{Monad M} `{MonadMemState MemState M} 
 
 (* TODO: Add RAISE_PICK or something... May need to be in a module *)
 Import EitherMonad.
-Class MemMonad (MemState : Type) (AllocationId : Type) (M : Type -> Type)
+Class MemMonad (MemState : Type) (ExtraState : Type) (AllocationId : Type) (M : Type -> Type)
       `{Monad M}
       `{MonadAllocationId AllocationId M} `{MonadStoreId M} `{MonadMemState MemState M}
       `{StoreIdFreshness MemState} `{AllocationIdFreshness AllocationId MemState}
       `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} : Type
   :=
   {
-    MemMonad_run {A} (ma : M A) (ms : MemState) : err_ub_oom (MemState * A);
+    MemMonad_run {A} (ma : M A) (ms : MemState) (st : ExtraState) : err_ub_oom (ExtraState * (MemState * A));
 
     (** Run bind / ret laws *)
     MemMonad_run_bind
-      {A B} (ma : M A) (k : A -> M B) (ms : MemState) :
-    MemMonad_run (x <- ma;; k x) ms =
-      match IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (MemMonad_run ma ms))))) with
+      {A B} (ma : M A) (k : A -> M B) (ms : MemState) (st : ExtraState) :
+    MemMonad_run (x <- ma;; k x) ms st =
+      match IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (MemMonad_run ma ms st))))) with
       | inl (OOM_message oom_msg) =>
           raise_oom oom_msg
       | inr (inl (UB_message ub_msg)) =>
           raise_ub ub_msg
       | inr (inr (inl (ERR_message err_msg))) =>
           raise_error err_msg
-      | inr (inr (inr (ms', res))) =>
-          MemMonad_run (k res) ms'
+      | inr (inr (inr (st', (ms', res)))) =>
+          MemMonad_run (k res) ms' st'
       end;
 
     MemMonad_run_ret
-      {A} (x : A) (ms : MemState) :
-    MemMonad_run (ret x) ms = ret (ms, x);
+      {A} (x : A) (ms : MemState) st :
+    MemMonad_run (ret x) ms st = ret (st, (ms, x));
 
     (** MonadMemState properties *)
     MemMonad_get_mem_state
-      (ms : MemState) :
-    MemMonad_run (get_mem_state) ms = ret (ms, ms);
+      (ms : MemState) st :
+    MemMonad_run (get_mem_state) ms st = ret (st, (ms, ms));
 
     MemMonad_put_mem_state
-      (ms ms' : MemState) :
-    MemMonad_run (put_mem_state ms') ms = ret (ms', tt);
+      (ms ms' : MemState) st :
+    MemMonad_run (put_mem_state ms') ms st = ret (st, (ms', tt));
 
     (** Fresh store id property *)
     MemMonad_run_fresh_sid
-      (sid : store_id) (ms : MemState) :
-    MemMonad_run (fresh_sid) ms = ret (ms, sid) /\ ~ used_store_id ms sid;
+      (ms : MemState) st :
+    exists st' sid',
+      MemMonad_run (fresh_sid) ms st  = ret (st', (ms, sid')) /\ ~ used_store_id ms sid';
 
     (** Fresh allocation id property *)
     MemMonad_run_fresh_allocation_id
-      (aid : AllocationId) (ms : MemState) :
-    MemMonad_run (fresh_allocation_id) ms = ret (ms, aid) /\ ~ used_allocation_id ms aid;
+      (ms : MemState) st :
+    exists st' aid',
+      MemMonad_run (fresh_allocation_id) ms st = ret (st', (ms, aid')) /\ ~ used_allocation_id ms aid';
 
     (** Exceptions *)
     MemMonad_run_raise_oom :
-    forall {A} ms oom_msg,
-      MemMonad_run (@raise_oom _ _ A oom_msg) ms = raise_oom oom_msg;
+    forall {A} ms oom_msg st,
+      MemMonad_run (@raise_oom _ _ A oom_msg) ms st = raise_oom oom_msg;
 
     MemMonad_run_raise_ub :
-    forall {A} ms ub_msg,
-      MemMonad_run (@raise_ub _ _ A ub_msg) ms = raise_ub ub_msg;
+    forall {A} ms ub_msg st,
+      MemMonad_run (@raise_ub _ _ A ub_msg) ms st = raise_ub ub_msg;
 
     MemMonad_run_raise_error :
-    forall {A} ms error_msg,
-      MemMonad_run (@raise_error _ _ A error_msg) ms = raise_error error_msg;
+    forall {A} ms error_msg st,
+      MemMonad_run (@raise_error _ _ A error_msg) ms st = raise_error error_msg;
 
     (** StateT *)
-    MemMonad_lift_stateT
-      {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A}
-      (ma : M A) : stateT MemState (itree E) A;
+    (* MemMonad_lift_stateT *)
+    (*   {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A} *)
+    (*   (ma : M A) : stateT MemState (itree E) A; *)
   }.
 
 
@@ -252,7 +281,8 @@ Definition MemPropT_assert_post {MemState X} (Post : X -> Prop) : MemPropT MemSt
            True
        end.
 
-Definition MemPropT_lift_PropT {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : stateT MemState (PropT E) X.
+Definition MemPropT_lift_PropT {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : 
+  stateT MemState (PropT E) X.
 Proof.
   unfold PropT, MemPropT, stateT in *.
   intros ms t.
@@ -261,4 +291,16 @@ Proof.
           (exists msg, t ≈ raise_error msg) <-> (exists msg, m (inl msg)) /\
           (exists msg, t ≈ raise_oom msg) <-> (exists msg, m (inr (Oom msg))) /\
           forall res, t ≈ ret res <-> m (inr (NoOom res))).
+Defined.
+
+Definition MemPropT_lift_PropT_fresh {MemState Provenance X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : 
+  stateT store_id (stateT Provenance (stateT MemState (PropT E))) X.
+Proof.
+  unfold PropT, MemPropT, stateT in *.
+  intros sid pr ms t.
+  specialize (m ms).
+  refine ((exists msg, t ≈ raise_ub msg) <-> (forall res, ~ m res) /\
+          (exists msg, t ≈ raise_error msg) <-> (exists msg, m (inl msg)) /\
+          (exists msg, t ≈ raise_oom msg) <-> (exists msg, m (inr (Oom msg))) /\
+          forall sid pr ms x, t ≈ ret (ms, (pr, (sid, x))) <-> m (inr (NoOom (ms, x)))).
 Defined.

@@ -49,7 +49,8 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
 
   Section InterpreterMCFG.
     Context {MemM : Type -> Type}.
-    Context `{MemMonad MemState AllocationId MemM}.
+    Context {ExtraState : Type}.
+    Context `{MemMonad MemState ExtraState AllocationId MemM}.
 
     (**
    Partial interpretations of the trees produced by the denotation of _VIR_ programs.
@@ -71,41 +72,41 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let L2_trace       := interp_local_stack L1_trace l in
       L2_trace.
 
-    Definition interp_mcfg3 {R} RR (t: itree L0 R) g l m : PropT L3 (MemState * (local_env * stack * (global_env * R))) :=
+    Definition interp_mcfg3 {R} RR (t: itree L0 R) g l sid pr m : PropT L3 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * R))))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory_prop RR L2_trace m in
+      let L3_trace       := interp_memory_prop RR L2_trace sid pr m in
       L3_trace.
 
-    Definition interp_mcfg3_exec {R} (t: itree L0 R) g l m : itree L3 (MemState * (local_env * stack * (global_env * R))) :=
+    Definition interp_mcfg3_exec {R} (t: itree L0 R) g l sid pr m : itree L3 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * R))))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory L2_trace m in
+      let L3_trace       := interp_memory L2_trace sid pr m in
       L3_trace.
 
-    Definition interp_mcfg4 {R} RR_mem RR_pick (t: itree L0 R) g l m : PropT L4 (MemState * (local_env * stack * (global_env * R))) :=
+    Definition interp_mcfg4 {R} RR_mem RR_pick (t: itree L0 R) g l sid pr m : PropT L4 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * R))))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace m in
+      let L3_trace       := interp_memory_prop RR_mem L2_trace sid pr m in
       let L4_trace       := model_undef RR_pick L3_trace in
       L4_trace.
 
-    Definition interp_mcfg4_exec {R} (t: itree L0 R) g l m : itree L4 (MemState * (local_env * stack * (global_env * R))) :=
+    Definition interp_mcfg4_exec {R} (t: itree L0 R) g l sid pr m : itree L4 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * R))))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory L2_trace m in
+      let L3_trace       := interp_memory L2_trace sid pr m in
       let L4_trace       := exec_undef L3_trace in
       L4_trace.
 
-    Definition interp_mcfg5 {R} RR_mem RR_pick (t: itree L0 R) g l m : PropT L4 (MemState * (local_env * stack * (global_env * R))) :=
+    Definition interp_mcfg5 {R} RR_mem RR_pick (t: itree L0 R) g l sid pr m : PropT L4 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * R))))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace m in
+      let L3_trace       := interp_memory_prop RR_mem L2_trace sid pr m in
       let L4_trace       := model_undef RR_pick L3_trace in
       let L5_trace       := model_UB L4_trace in
       L5_trace.
@@ -113,7 +114,8 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
 
   Section InterpreterCFG.
     Context {MemM : Type -> Type}.
-    Context `{MemMonad MemState AllocationId MemM}.
+    Context {ExtraState : Type}.
+    Context `{MemMonad MemState ExtraState AllocationId MemM}.
 
     (**
    Partial interpretations of the trees produced by the
@@ -140,41 +142,41 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
       let L2_trace       := interp_local L1_trace l in
       L2_trace.
 
-    Definition interp_cfg3 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' PickE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg3 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) sid pr (m: MemState) : PropT (CallE +' PickE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (Provenance * (store_id * (local_env * (global_env * R))))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory_prop RR L2_trace m in
+      let L3_trace       := interp_memory_prop RR L2_trace sid pr m in
       L3_trace.
 
-    Definition interp_cfg3_exec {R} (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : itree (CallE +' PickE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg3_exec {R} (t: itree instr_E R) (g: global_env) (l: local_env) sid pr (m: MemState) : itree (CallE +' PickE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (Provenance * (store_id * (local_env * (global_env * R))))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory L2_trace m in
+      let L3_trace       := interp_memory L2_trace sid pr m in
       L3_trace.
 
-    Definition interp_cfg4 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg4 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) sid pr (m: MemState) : PropT (CallE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (Provenance * (store_id * (local_env * (global_env * R))))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace m in
+      let L3_trace       := interp_memory_prop RR_mem L2_trace sid pr m in
       let L4_trace       := model_undef RR_pick L3_trace in
       L4_trace.
 
-    Definition interp_cfg4_exec {R} (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : itree (CallE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg4_exec {R} (t: itree instr_E R) (g: global_env) (l: local_env) sid pr (m: MemState) : itree (CallE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (Provenance * (store_id * (local_env * (global_env * R))))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory L2_trace m in
+      let L3_trace       := interp_memory L2_trace sid pr m in
       let L4_trace       := exec_undef L3_trace in
       L4_trace.
 
-    Definition interp_cfg5 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg5 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) sid pr (m: MemState) : PropT (CallE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (Provenance * (store_id * (local_env * (global_env * R))))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace m in
+      let L3_trace       := interp_memory_prop RR_mem L2_trace sid pr m in
       let L4_trace       := model_undef RR_pick L3_trace in
       let L5_trace       := model_UB L4_trace in
       L5_trace.
@@ -200,6 +202,7 @@ Module Type InterpreterStack_common (LP : LLVMParams) (MEM : Memory LP).
     Notation Ret1 g x     := (Ret (g,x)).
     Notation Ret2 g l x   := (Ret (l,(g,x))).
     Notation Ret3 g l m x := (Ret (m,(l,(g,x)))).
+    Notation Ret5 g l sid pr m x := (Ret (m,(pr,(sid,(l,(g,x)))))).
 
     Notation "⟦ e 'at?' t '⟧e'" :=  (denote_exp t e).
     Notation "⟦ e 'at' t '⟧e'" :=   (denote_exp (Some t) e).
@@ -296,7 +299,8 @@ with Module LP := LP' with Module MEM := MEM'.
 
   Section InterpreterMCFG.
     Context {MemM : Type -> Type}.
-    Context `{MemMonad MemState AllocationId MemM}.
+    Context {ExtraState : Type}.
+    Context `{MemMonad MemState ExtraState AllocationId MemM}.
 
     (**
    Partial interpretations of the trees produced by the denotation of _VIR_ programs.
@@ -318,41 +322,41 @@ with Module LP := LP' with Module MEM := MEM'.
       let L2_trace       := interp_local_stack L1_trace l in
       L2_trace.
 
-    Definition interp_mcfg3 {R} RR (t: itree L0 R) g l m : PropT L3 (MemState * (local_env * stack * (global_env * R))) :=
+    Definition interp_mcfg3 {R} RR (t: itree L0 R) g l sid pr m : PropT L3 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * R))))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory_prop RR L2_trace m in
+      let L3_trace       := interp_memory_prop RR L2_trace sid pr m in
       L3_trace.
 
-    Definition interp_mcfg3_exec {R} (t: itree L0 R) g l m : itree L3 (MemState * (local_env * stack * (global_env * R))) :=
+    Definition interp_mcfg3_exec {R} (t: itree L0 R) g l sid pr m : itree L3 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * R))))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory L2_trace m in
+      let L3_trace       := interp_memory L2_trace sid pr m in
       L3_trace.
 
-    Definition interp_mcfg4 {R} RR_mem RR_pick (t: itree L0 R) g l m : PropT L4 (MemState * (local_env * stack * (global_env * R))) :=
+    Definition interp_mcfg4 {R} RR_mem RR_pick (t: itree L0 R) g l sid pr m : PropT L4 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * R))))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace m in
+      let L3_trace       := interp_memory_prop RR_mem L2_trace sid pr m in
       let L4_trace       := model_undef RR_pick L3_trace in
       L4_trace.
 
-    Definition interp_mcfg4_exec {R} (t: itree L0 R) g l m : itree L4 (MemState * (local_env * stack * (global_env * R))) :=
+    Definition interp_mcfg4_exec {R} (t: itree L0 R) g l sid pr m : itree L4 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * R))))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory L2_trace m in
+      let L3_trace       := interp_memory L2_trace sid pr m in
       let L4_trace       := exec_undef L3_trace in
       L4_trace.
 
-    Definition interp_mcfg5 {R} RR_mem RR_pick (t: itree L0 R) g l m : PropT L4 (MemState * (local_env * stack * (global_env * R))) :=
+    Definition interp_mcfg5 {R} RR_mem RR_pick (t: itree L0 R) g l sid pr m : PropT L4 (MemState * (Provenance * (store_id * (local_env * stack * (global_env * R))))) :=
       let uvalue_trace   := interp_intrinsics t in
       let L1_trace       := interp_global uvalue_trace g in
       let L2_trace       := interp_local_stack L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace m in
+      let L3_trace       := interp_memory_prop RR_mem L2_trace sid pr m in
       let L4_trace       := model_undef RR_pick L3_trace in
       let L5_trace       := model_UB L4_trace in
       L5_trace.
@@ -360,7 +364,8 @@ with Module LP := LP' with Module MEM := MEM'.
 
   Section InterpreterCFG.
     Context {MemM : Type -> Type}.
-    Context `{MemMonad MemState AllocationId MemM}.
+    Context {ExtraState : Type}.
+    Context `{MemMonad MemState ExtraState AllocationId MemM}.
 
     (**
    Partial interpretations of the trees produced by the
@@ -380,48 +385,48 @@ with Module LP := LP' with Module MEM := MEM'.
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       L1_trace.
-
-    Definition interp_cfg2 {R} (t: itree instr_E R) (g: global_env) (l: local_env) : itree (CallE +' IntrinsicE +' MemoryE +' PickE +' OOME +' UBE +' DebugE +' FailureE) (local_env * (global_env * R)) :=
+    
+Definition interp_cfg2 {R} (t: itree instr_E R) (g: global_env) (l: local_env) : itree (CallE +' IntrinsicE +' MemoryE +' PickE +' OOME +' UBE +' DebugE +' FailureE) (local_env * (global_env * R)) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
       L2_trace.
 
-    Definition interp_cfg3 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' PickE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg3 {R} RR (t: itree instr_E R) (g: global_env) (l: local_env) sid pr (m: MemState) : PropT (CallE +' PickE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (Provenance * (store_id * (local_env * (global_env * R))))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory_prop RR L2_trace m in
+      let L3_trace       := interp_memory_prop RR L2_trace sid pr m in
       L3_trace.
 
-    Definition interp_cfg3_exec {R} (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : itree (CallE +' PickE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg3_exec {R} (t: itree instr_E R) (g: global_env) (l: local_env) sid pr (m: MemState) : itree (CallE +' PickE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (Provenance * (store_id * (local_env * (global_env * R))))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory L2_trace m in
+      let L3_trace       := interp_memory L2_trace sid pr m in
       L3_trace.
 
-    Definition interp_cfg4 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg4 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) sid pr (m: MemState) : PropT (CallE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (Provenance * (store_id * (local_env * (global_env * R))))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace m in
+      let L3_trace       := interp_memory_prop RR_mem L2_trace sid pr m in
       let L4_trace       := model_undef RR_pick L3_trace in
       L4_trace.
 
-    Definition interp_cfg4_exec {R} (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : itree (CallE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg4_exec {R} (t: itree instr_E R) (g: global_env) (l: local_env) sid pr (m: MemState) : itree (CallE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (Provenance * (store_id * (local_env * (global_env * R))))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory L2_trace m in
+      let L3_trace       := interp_memory L2_trace sid pr m in
       let L4_trace       := exec_undef L3_trace in
       L4_trace.
 
-    Definition interp_cfg5 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) (m: MemState) : PropT (CallE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (local_env * (global_env * R))) :=
+    Definition interp_cfg5 {R} RR_mem RR_pick (t: itree instr_E R) (g: global_env) (l: local_env) sid pr (m: MemState) : PropT (CallE +' OOME +' UBE +' DebugE +' FailureE) (MemState * (Provenance * (store_id * (local_env * (global_env * R))))) :=
       let L0_trace       := interp_intrinsics t in
       let L1_trace       := interp_global L0_trace g in
       let L2_trace       := interp_local L1_trace l in
-      let L3_trace       := interp_memory_prop RR_mem L2_trace m in
+      let L3_trace       := interp_memory_prop RR_mem L2_trace sid pr m in
       let L4_trace       := model_undef RR_pick L3_trace in
       let L5_trace       := model_UB L4_trace in
       L5_trace.
@@ -447,6 +452,7 @@ with Module LP := LP' with Module MEM := MEM'.
     Notation Ret1 g x     := (Ret (g,x)).
     Notation Ret2 g l x   := (Ret (l,(g,x))).
     Notation Ret3 g l m x := (Ret (m,(l,(g,x)))).
+    Notation Ret5 g l sid pr m x := (Ret (m,(pr,(sid,(l,(g,x)))))).
 
     Notation "⟦ e 'at?' t '⟧e'" :=  (denote_exp t e).
     Notation "⟦ e 'at' t '⟧e'" :=   (denote_exp (Some t) e).

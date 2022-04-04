@@ -12,13 +12,13 @@ open InterpretationStack.InterpreterStackBigIntptr.LLVM.MEM
 open InterpretationStack.InterpreterStackBigIntptr.LLVM.Local
 open InterpretationStack.InterpreterStackBigIntptr.LLVM.Stack
 open InterpretationStack.InterpreterStackBigIntptr.LLVM.Global
-open InterpretationStack.InterpreterStackBigIntptr.LLVM.Events
+open InterpretationStack.InterpreterStackBigIntptr.LP.Events
 
 open Format
 open ITreeDefinition
 
 (* TODO: probably should be part of ADDRESS module interface*)
-let pp_addr : Format.formatter -> FiniteMemory.Addr.addr -> unit
+let pp_addr : Format.formatter -> MemoryModelImplementation.Addr.addr -> unit
   = fun ppf _ -> fprintf ppf "UVALUE_Addr(?)"
 
 (* Converts `float` to a `string` at max precision.
@@ -88,7 +88,7 @@ let debug (msg:string) =
     Calling `step` could either loop forever, return an error,
     or return the dvalue result returned from the itree.
  *)
-let rec step (m : ('a coq_L4, coq_MemState * ((local_env * lstack) * (global_env * DV.dvalue))) itree) : (DV.dvalue, string) result =
+let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * ((local_env * lstack) * (global_env * DV.dvalue))) itree) : (DV.dvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -137,4 +137,4 @@ let rec step (m : ('a coq_L4, coq_MemState * ((local_env * lstack) * (global_env
     tuple of a single block, and a possibly empty list of blocks.
  *)
 let interpret (prog:(LLVMAst.typ, (LLVMAst.typ LLVMAst.block * (LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
-  step (TopLevel.TopLevelBigIntptr.interpreter prog)
+  step (TopLevel.TopLevelBigIntptr.interpreter (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) prog)

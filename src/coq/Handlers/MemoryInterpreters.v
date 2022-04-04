@@ -32,6 +32,9 @@ From Vellvm.Utils Require Import
 Import Basics.Basics.Monads.
 Import MonadNotation.
 
+Import MemoryAddress.
+Import Error.
+
 Set Implicit Arguments.
 Set Contextual Implicit.
 
@@ -39,6 +42,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
   Import MM.
   Import MMSP.
   Import LP.Events.
+  Import LP.PROV.
 
   Section Interpreters.
     Variable (E F : Type -> Type).
@@ -47,15 +51,83 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Notation Effout := (E +' F).
 
     Definition MemStateT M := stateT MemState M.
+    Definition MemStateFreshT M := stateT store_id (stateT Provenance (MemStateT M)).
 
-    Definition E_trigger : forall R, E R -> (MemStateT (PropT Effout) R) :=
+    Definition MemStateFreshT_from_MemStateT {M X} `{Monad M} (mst : MemStateT M X) : MemStateFreshT M X :=
+      fun sid pr => x <- mst;; ret (pr, (sid, x)).
+
+    (** MemMonad Instances *)
+    #[global] Instance MemStateFreshT_MonadAllocationId M `{Monad M} : MonadAllocationId AllocationId (MemStateFreshT M).
+    Proof.
+      split.
+      unfold MemStateFreshT.
+      apply (lift (pr <- get;;
+                   let pr' := next_provenance pr in
+                   put pr';;
+                   ret (provenance_to_allocation_id pr'))).
+    Defined.
+
+    #[global] Instance MemStateFreshT_MonadStoreId M `{Monad M} : MonadStoreId (MemStateFreshT M).
+    Proof.
+      split.
+      unfold MemStateFreshT.
+      apply (sid <- get;;
+             let sid' := BinNatDef.N.succ sid in
+             put sid';;
+             ret sid').
+    Defined.
+
+    #[global] Instance MemStateFreshT_MonadMemState M `{Monad M} : MonadMemState MemState (MemStateFreshT M).
+    Proof.
+      split.
+      - apply (lift (lift get)).
+      - intros ms; apply (lift (lift (put ms))).
+    Defined.
+
+    #[global] Instance MemState_StoreIdFreshness : StoreIdFreshness MemState.
+    Proof.
+      split.
+      apply used_store_id_prop.
+    Defined.
+
+    #[global] Instance MemState_AllocationIdFreshness : AllocationIdFreshness AllocationId MemState.
+    Proof.
+      split.
+      - (* Is a store id used in a memstate *)
+        apply MMSP.used_allocation_id_prop.
+    Defined.
+
+    #[global] Instance MemStateFreshT_MonadT {M} `{Monad M} : MonadT (MemStateFreshT M) M.
+    Proof.
+      unfold MemStateFreshT.
+      unfold MemStateT.
+      split.
+      - intros t X.
+        intros sid pr ms.
+        apply (res <- X;; ret (ms, (pr, (sid, res)))).
+    Defined.
+
+    #[global] Instance MemStateFreshT_MemMonad M `{Monad M}
+             `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
+      : MemMonad MemState (store_id * Provenance) AllocationId (MemStateFreshT M).
+    Proof.
+    Admitted.
+
+
+    Definition E_trigger' : forall R, E R -> (MemStateT (PropT Effout) R) :=
       fun R e m => fun t => t ≈ r <- trigger e;; ret (m, r).
 
-    Definition F_trigger : forall R, F R -> (MemStateT (PropT Effout) R) :=
+    Definition F_trigger' : forall R, F R -> (MemStateT (PropT Effout) R) :=
       fun R e m => fun t => t ≈ r <- trigger e;; ret (m, r).
+
+    Definition E_trigger : forall R, E R -> (MemStateFreshT (PropT Effout) R) :=
+      fun R e sid pr m => fun t => t ≈ r <- trigger e;; ret (m, (pr, (sid, r))).
+
+    Definition F_trigger : forall R, F R -> (MemStateFreshT (PropT Effout) R) :=
+      fun R e sid pr m => fun t => t ≈ r <- trigger e;; ret (m, (pr, (sid, r))).
 
     (* TODO: get rid of this silly hack. *)
-    Definition my_handle_memory_prop :
+    Definition my_handle_memory_prop' :
       forall T : Type, MemoryE T -> MemStateT (PropT Effout) T.
     Proof.
       intros T MemE.
@@ -63,7 +135,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       eapply handle_memory_prop; auto.
     Defined.
 
-    Definition my_handle_intrinsic_prop :
+    Definition my_handle_intrinsic_prop' :
       forall T : Type, IntrinsicE T -> MemStateT (PropT Effout) T.
     Proof.
       intros T IntE.
@@ -71,7 +143,26 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       eapply handle_intrinsic_prop; auto.
     Defined.
 
-    Definition interp_memory_prop_h : forall T, Effin T -> MemStateT (PropT Effout) T
+    Definition my_handle_memory_prop :
+      forall T : Type, MemoryE T -> MemStateFreshT (PropT Effout) T.
+    Proof.
+      intros T MemE.
+      eapply MemPropT_lift_PropT_fresh.
+      eapply handle_memory_prop; auto.
+    Defined.
+
+    Definition my_handle_intrinsic_prop :
+      forall T : Type, IntrinsicE T -> MemStateFreshT (PropT Effout) T.
+    Proof.
+      intros T IntE.
+      eapply MemPropT_lift_PropT_fresh.
+      eapply handle_intrinsic_prop; auto.
+    Defined.
+
+    Definition interp_memory_prop_h' : forall T, Effin T -> MemStateT (PropT Effout) T
+      := case_ E_trigger' (case_ my_handle_intrinsic_prop' (case_ my_handle_memory_prop' F_trigger')).
+
+    Definition interp_memory_prop_h : forall T, Effin T -> MemStateFreshT (PropT Effout) T
       := case_ E_trigger (case_ my_handle_intrinsic_prop (case_ my_handle_memory_prop F_trigger)).
 
     (* TODO: I find the lack of interp_prop here disturbing... *)
@@ -84,7 +175,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
                (t2 : itree Effout R) : Prop
       := t2 ≈ (bind ta k2).
 
-    Global Instance memory_k_spec_proper {T R : Type} {RR : R -> R -> Prop} {b a : bool} :
+    #[global] Instance memory_k_spec_proper {T R : Type} {RR : R -> R -> Prop} {b a : bool} :
       Proper
         (eq ==>
             eq ==>
@@ -97,10 +188,17 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       split; cbn; auto.
     Qed.
 
-    Definition interp_memory_prop {R} (RR : R -> R -> Prop) :
+    Definition interp_memory_prop' {R} (RR : R -> R -> Prop) :
       itree Effin R -> MemStateT (PropT Effout) R :=
       fun (t : itree Effin R) (ms : MemState) (t' : itree Effout (MemState * R)) =>
-        interp_prop (fun T e t => exists ms', @interp_memory_prop_h T e ms (fmap (fun x => (ms', x)) t)) (@memory_k_spec) R RR t (fmap snd t').
+        interp_prop (fun T e t => exists ms', @interp_memory_prop_h' T e ms (fmap (fun x => (ms', x)) t)) (@memory_k_spec) R RR t (fmap snd t').
+
+    (* Things line up a lot better if interp_memory_prop has the same
+       type signature as interp_memory... *)
+    Definition interp_memory_prop {R} (RR : R -> R -> Prop) :
+      itree Effin R -> MemStateFreshT (PropT Effout) R :=
+      fun (t : itree Effin R) (sid : store_id) (pr : Provenance) (ms : MemState) (t' : itree Effout (MemState * (Provenance * (store_id * R)))) =>
+        interp_prop (fun T (e : Effin T) (t : itree Effout T) => exists (sid' : store_id) (pr' : Provenance) (ms' : MemState), @interp_memory_prop_h T e sid pr ms (fmap (fun (x : T) => (ms', (pr', (sid', x)))) t)) (@memory_k_spec) R RR t ((fmap (fun '(_, (_, (_, x))) => x) t') : itree Effout R).
   End Interpreters.
 End MemorySpecInterpreter.
 
@@ -123,32 +221,95 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
 
-    Definition E_trigger : E ~> MemStateT (itree Effout) :=
-      fun R e m => r <- trigger e;; ret (m, r).
+    (** MemMonad Instances *)
+    #[global] Instance MemStateFreshT_MonadAllocationId M `{Monad M} : MonadAllocationId AllocationId (MemStateFreshT M).
+    Proof.
+      split.
+      unfold MemStateFreshT.
+      apply (lift (pr <- get;;
+                   let pr' := next_provenance pr in
+                   put pr';;
+                   ret (provenance_to_allocation_id pr'))).
+    Defined.
 
-    Definition F_trigger : F ~> MemStateT (itree Effout) :=
-      fun R e m => r <- trigger e;; ret (m, r).
+    #[global] Instance MemStateFreshT_MonadStoreId M `{Monad M} : MonadStoreId (MemStateFreshT M).
+    Proof.
+      split.
+      unfold MemStateFreshT.
+      apply (sid <- get;;
+             let sid' := BinNatDef.N.succ sid in
+             put sid';;
+             ret sid').
+    Defined.
+
+    #[global] Instance MemStateFreshT_MonadMemState M `{Monad M} : MonadMemState MemState (MemStateFreshT M).
+    Proof.
+      split.
+      - apply (lift (lift get)).
+      - intros ms; apply (lift (lift (put ms))).
+    Defined.
+
+    #[global] Instance MemState_StoreIdFreshness : StoreIdFreshness MemState.
+    Proof.
+      split.
+      apply MemSpec.used_store_id_prop.
+    Defined.
+
+    #[global] Instance MemState_AllocationIdFreshness : AllocationIdFreshness AllocationId MemState.
+    Proof.
+      split.
+      - (* Is a store id used in a memstate *)
+        apply MMSP.used_allocation_id_prop.
+    Defined.
+
+    #[global] Instance MemStateFreshT_MonadT {M} `{Monad M} : MonadT (MemStateFreshT M) M.
+    Proof.
+      unfold MemStateFreshT.
+      unfold MemStateT.
+      split.
+      - intros t X.
+        intros sid pr ms.
+        apply (res <- X;; ret (ms, (pr, (sid, res)))).
+    Defined.
+
+    #[global] Instance MemStateFreshT_MemMonad M `{Monad M}
+             `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
+      : MemMonad MemState (store_id * Provenance) AllocationId (MemStateFreshT M).
+    Proof.
+    Admitted.
+
+    (** Handlers *)
+    Definition E_trigger : E ~> MemStateFreshT (itree Effout) :=
+      fun R e sid aid m => r <- trigger e;; ret (m, (aid, (sid, r))).
+
+    Definition F_trigger : F ~> MemStateFreshT (itree Effout) :=
+      fun R e sid aid m => r <- trigger e;; ret (m, (aid, (sid, r))).
 
     (* TODO: get rid of this silly hack. *)
-    Definition my_handle_memory {MemM} `{MemMonad MemState AllocationId MemM} : MemoryE ~> MemStateT (itree Effout) :=
-      fun T e ms => lift_err_ub_oom ret (MemMonad_run (handle_memory T e) ms).
+    Definition my_handle_memory : MemoryE ~> MemStateFreshT (itree Effout) :=
+      handle_memory.
 
-    Definition my_handle_intrinsic {MemM} `{MemMonad MemState AllocationId MemM} : IntrinsicE ~> MemStateT (itree Effout) :=
-      fun T e ms => lift_err_ub_oom ret (MemMonad_run (handle_intrinsic T e) ms).
+    Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (itree Effout) :=
+      handle_intrinsic.
 
-    Definition interp_memory_h {MemM} `{MemMonad MemState AllocationId MemM} : Effin ~> MemStateT (itree Effout)
+    Definition interp_memory_h : Effin ~> MemStateFreshT (itree Effout)
       := case_ E_trigger (case_ my_handle_intrinsic (case_ my_handle_memory F_trigger)).
 
     (* TODO: I find the lack of interp_prop here disturbing... *)
-    Definition interp_memory {MemM} `{MemMonad MemState AllocationId MemM} :
-      itree Effin ~> MemStateT (itree Effout) :=
+    Definition interp_memory :
+      itree Effin ~> MemStateFreshT (itree Effout) :=
       interp_state interp_memory_h.
 
+    (* fmap throws away extra sid / provenance from state
+       handler. This is fine because interp_memory_prop should include
+       propositions that make sure ids and provenances are fresh when
+       necessary.
+     *)
     Lemma interp_memory_correct :
-      forall {MemM} `{MM : MemMonad MemState AllocationId MemM} {T} t ms,
-        interp_memory_prop eq t ms (@interp_memory MemM _ _ _ _ _ _ _ _ _ MM T t ms).
+      forall {T} t (ms : MemState) (sid : store_id) (pr : Provenance),
+        interp_memory_prop eq t sid pr ms (@interp_memory T t sid pr ms).
     Proof.
-      intros MemM H2 H3 H4 H5 H6 H7 H8 H9 H10 MM T t ms.
+      intros T t ms sid pr.
       unfold interp_memory_prop.
       unfold interp_memory.
       unfold interp_state.

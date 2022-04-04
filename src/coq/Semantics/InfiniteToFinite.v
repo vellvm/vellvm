@@ -2,7 +2,8 @@ From Coq Require Import
      Relations
      String
      List
-     Lia.
+     Lia
+     ZArith.
 
 From Vellvm Require Import
      Semantics.InterpretationStack
@@ -327,9 +328,9 @@ Module Type LangRefine (IS1 : InterpreterStack) (IS2 : InterpreterStack) (AC1 : 
    *)
   Definition res_L4_convert_unsafe (res : LLVM1.res_L4) : OOM LLVM2.res_L4
     := match res with
-       | (ms, ((lenv, lstack), (genv, dv))) =>
+       | (ms, (pr, (sid, ((lenv, lstack), (genv, dv))))) =>
            dv' <- dvalue_convert dv;;
-           ret (IS2.LLVM.MEM.MMEP.initial_memory_state, (([], []), ([], dv')))
+           ret (MMEP.initial_memory_state, (initial_provenance, (0, (([], []), ([], dv')))))
        end.
  
   Definition refine_E1E2_L6 (srcs : PropT IS1.LP.Events.L4 LLVM1.res_L4) (tgts : PropT E2.L4 LLVM2.res_L4) : Prop
@@ -491,12 +492,14 @@ Module InfiniteToFinite : LangRefine InterpreterStackBigIntptr InterpreterStack6
 
       intros r1 r2 H.
       unfold TLR_INF.R.refine_res3, TLR_INF.R.refine_res2, TLR_INF.R.refine_res1 in H.
-      destruct r1 as [r1a [[r1b1 r1b2] [r1c dv1]]].
-      destruct r2 as [r2a [[r2b1 r2b2] [r2c dv2]]].
+      destruct r1 as [r1a [r1pr [r1sid [[r1b1 r1b2] [r1c dv1]]]]].
+      destruct r2 as [r2a [r2pr [r2sid [[r2b1 r2b2] [r2c dv2]]]]].
       inversion H; subst.
       inversion H5; subst.
       inversion H7; subst.
       inversion H7; subst.
+      inversion H9; subst.
+      inversion H13; subst.
       cbn.
       reflexivity.
   Qed.
