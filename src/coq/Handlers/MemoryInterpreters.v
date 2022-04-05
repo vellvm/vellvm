@@ -1,5 +1,7 @@
 From Coq Require Import
-     Morphisms.
+     Morphisms
+     ZArith
+     Lia.
 
 From Vellvm.Semantics Require Import
      MemoryParams
@@ -107,12 +109,123 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         apply (res <- X;; ret (ms, (pr, (sid, res)))).
     Defined.
 
-    #[global] Instance MemStateFreshT_MemMonad M `{Monad M}
-             `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
-      : MemMonad MemState (store_id * Provenance) AllocationId (MemStateFreshT M).
-    Proof.
-    Admitted.
+    Definition MemStateFreshT_State := (store_id * Provenance)%type.
 
+    (* M may be PropT or itree... *)
+    Definition MemStateFreshT_run {A} {Eff} `{FailureE -< Eff} `{OOME -< Eff} `{UBE -< Eff} (ma : MemStateFreshT (itree Eff) A) (ms : MemState) (st : MemStateFreshT_State) : itree Eff (MemStateFreshT_State * (MemState * A)).
+    Proof.
+      unfold MemStateFreshT in *.
+      destruct st as [s p].
+      specialize (ma s p ms).
+      unfold MemStateFreshT_State.
+      eapply fmap; [ |eauto].
+      intros [ms' [p' [s' x]]].
+      apply (s', p', (ms', x)).
+    Defined.
+
+    Definition MemStateFreshT_valid_state (ms : MemState) (st : MemStateFreshT_State) : Prop
+      := let '(sid, pr) := st in
+         (forall sid', used_store_id ms sid' -> (sid' < sid)%N) /\
+           (* TODO: freshness of aids... *)
+           (forall aid, used_allocation_id ms aid -> False).
+
+    #[global] Instance MemStateFreshT_MemMonad {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
+      : MemMonad MemState MemStateFreshT_State AllocationId (MemStateFreshT (itree Eff)) (itree Eff).
+    Proof.
+      esplit with
+        (MemMonad_run := fun A => @MemStateFreshT_run A Eff FAIL OOM UB)
+        (MemMonad_valid_state := MemStateFreshT_valid_state).
+
+      (* TODO: didn't need valid for ret / bind laws... *)
+      - (* run bind *)
+        intros A B ma k ms st VALID.
+        unfold MemStateFreshT_run.
+        destruct st.
+        cbn.
+        rewrite map_bind.
+        rewrite bind_map.
+        eapply eutt_clo_bind.
+        reflexivity.
+        intros u1 u2 H2; subst.
+        destruct u2 as [ms' [pr' [sid' x]]].
+        cbn.
+        reflexivity.
+      - (* run ret *)
+        intros A x ms st VALID.
+        cbn.
+        destruct st.
+        cbn.
+        rewrite map_ret.
+        reflexivity.
+      - (* get_mem_state *)
+        intros ms [sid pr].
+        cbn.
+        rewrite map_bind.
+        repeat rewrite bind_ret_l.
+        rewrite map_ret.
+        cbn.
+        reflexivity.
+      - (* put_mem_state *)
+        intros ms ms' [sid pr].
+        cbn.
+        rewrite map_bind.
+        repeat rewrite bind_ret_l.
+        rewrite map_ret.
+        cbn.
+        reflexivity.
+      - (* fresh_sid *)
+        intros ms [sid pr] VALID.
+        do 2 eexists.
+        cbn.
+        rewrite map_bind.
+        rewrite bind_ret_l.
+        rewrite map_bind.
+        rewrite bind_ret_l.
+        rewrite map_ret.
+        cbn.
+        split; [reflexivity|].
+
+        cbn in VALID.
+        destruct VALID as [SID AID].
+
+        intros USED.
+        apply SID in USED.
+        lia.
+      - (* fresh_allocation_id *)
+        intros ms [sid pr] VALID.
+        do 2 eexists.
+        cbn.
+        rewrite map_bind.
+        repeat rewrite bind_ret_l.
+        rewrite map_ret.
+        cbn.
+        split; [reflexivity|].
+
+        cbn in VALID.
+        destruct VALID as [SID AID].
+
+        intros USED.
+        apply AID in USED.
+        auto. (* TODO: Need to fix this statement *)
+      - (* raise_oom *)
+        intros A ms oom_msg [sid pr].
+        cbn.
+        rewrite map_bind.
+        setoid_rewrite Raise.raiseOOM_bind_itree.
+        reflexivity.
+      - (* raise_ub *)
+        intros A ms oom_msg [sid pr].
+        cbn.
+        rewrite map_bind.
+        setoid_rewrite Raise.raiseUB_bind_itree.
+        reflexivity.
+      - (* raise_error *)
+        intros A ms oom_msg [sid pr].
+        cbn.
+        rewrite map_bind.
+        setoid_rewrite Raise.raise_bind_itree.
+        reflexivity.
+    Defined.
 
     Definition E_trigger' : forall R, E R -> (MemStateT (PropT Effout) R) :=
       fun R e m => fun t => t ≈ r <- trigger e;; ret (m, r).
@@ -214,6 +327,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
   Import SPEC_INTERP.
   Import MMSP.
   Import MMSP.MemByte.
+  Import MemSpec.
 
   Section Interpreters.
     Variable (E F : Type -> Type).
@@ -221,6 +335,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     Notation Effin := (E +' IntrinsicE +' MemoryE +' F).
     Notation Effout := (E +' F).
 
+    (* TODO: Why do I have to duplicate this >_<? *)
     (** MemMonad Instances *)
     #[global] Instance MemStateFreshT_MonadAllocationId M `{Monad M} : MonadAllocationId AllocationId (MemStateFreshT M).
     Proof.
@@ -252,7 +367,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     #[global] Instance MemState_StoreIdFreshness : StoreIdFreshness MemState.
     Proof.
       split.
-      apply MemSpec.used_store_id_prop.
+      apply used_store_id_prop.
     Defined.
 
     #[global] Instance MemState_AllocationIdFreshness : AllocationIdFreshness AllocationId MemState.
@@ -272,11 +387,123 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         apply (res <- X;; ret (ms, (pr, (sid, res)))).
     Defined.
 
-    #[global] Instance MemStateFreshT_MemMonad M `{Monad M}
-             `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
-      : MemMonad MemState (store_id * Provenance) AllocationId (MemStateFreshT M).
+    Definition MemStateFreshT_State := (store_id * Provenance)%type.
+
+    (* M may be PropT or itree... *)
+    Definition MemStateFreshT_run {A} {Eff} `{FailureE -< Eff} `{OOME -< Eff} `{UBE -< Eff} (ma : MemStateFreshT (itree Eff) A) (ms : MemState) (st : MemStateFreshT_State) : itree Eff (MemStateFreshT_State * (MemState * A)).
     Proof.
-    Admitted.
+      unfold MemStateFreshT in *.
+      destruct st as [s p].
+      specialize (ma s p ms).
+      unfold MemStateFreshT_State.
+      eapply fmap; [ |eauto].
+      intros [ms' [p' [s' x]]].
+      apply (s', p', (ms', x)).
+    Defined.
+
+    Definition MemStateFreshT_valid_state (ms : MemState) (st : MemStateFreshT_State) : Prop
+      := let '(sid, pr) := st in
+         (forall sid', used_store_id ms sid' -> (sid' < sid)%N) /\
+           (* TODO: freshness of aids... *)
+           (forall aid, used_allocation_id ms aid -> False).
+
+    #[global] Instance MemStateFreshT_MemMonad {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
+      : MemMonad MemState MemStateFreshT_State AllocationId (MemStateFreshT (itree Eff)) (itree Eff).
+    Proof.
+      esplit with
+        (MemMonad_run := fun A => @MemStateFreshT_run A Eff FAIL OOM UB)
+        (MemMonad_valid_state := MemStateFreshT_valid_state).
+
+      (* TODO: didn't need valid for ret / bind laws... *)
+      - (* run bind *)
+        intros A B ma k ms st VALID.
+        unfold MemStateFreshT_run.
+        destruct st.
+        cbn.
+        rewrite map_bind.
+        rewrite bind_map.
+        eapply eutt_clo_bind.
+        reflexivity.
+        intros u1 u2 H2; subst.
+        destruct u2 as [ms' [pr' [sid' x]]].
+        cbn.
+        reflexivity.
+      - (* run ret *)
+        intros A x ms st VALID.
+        cbn.
+        destruct st.
+        cbn.
+        rewrite map_ret.
+        reflexivity.
+      - (* get_mem_state *)
+        intros ms [sid pr].
+        cbn.
+        rewrite map_bind.
+        repeat rewrite bind_ret_l.
+        rewrite map_ret.
+        cbn.
+        reflexivity.
+      - (* put_mem_state *)
+        intros ms ms' [sid pr].
+        cbn.
+        rewrite map_bind.
+        repeat rewrite bind_ret_l.
+        rewrite map_ret.
+        cbn.
+        reflexivity.
+      - (* fresh_sid *)
+        intros ms [sid pr] VALID.
+        do 2 eexists.
+        cbn.
+        rewrite map_bind.
+        rewrite bind_ret_l.
+        rewrite map_bind.
+        rewrite bind_ret_l.
+        rewrite map_ret.
+        cbn.
+        split; [reflexivity|].
+
+        cbn in VALID.
+        destruct VALID as [SID AID].
+
+        intros USED.
+        apply SID in USED.
+        lia.
+      - (* fresh_allocation_id *)
+        intros ms [sid pr] VALID.
+        do 2 eexists.
+        cbn.
+        rewrite map_bind.
+        repeat rewrite bind_ret_l.
+        rewrite map_ret.
+        cbn.
+        split; [reflexivity|].
+
+        cbn in VALID.
+        destruct VALID as [SID AID].
+
+        intros USED.
+        apply AID in USED.
+        auto. (* TODO: Need to fix this statement *)
+      - (* raise_oom *)
+        intros A ms oom_msg [sid pr].
+        cbn.
+        rewrite map_bind.
+        setoid_rewrite Raise.raiseOOM_bind_itree.
+        reflexivity.
+      - (* raise_ub *)
+        intros A ms oom_msg [sid pr].
+        cbn.
+        rewrite map_bind.
+        setoid_rewrite Raise.raiseUB_bind_itree.
+        reflexivity.
+      - (* raise_error *)
+        intros A ms oom_msg [sid pr].
+        cbn.
+        rewrite map_bind.
+        setoid_rewrite Raise.raise_bind_itree.
+        reflexivity.
+    Defined.
 
     (** Handlers *)
     Definition E_trigger : E ~> MemStateFreshT (itree Effout) :=
@@ -287,10 +514,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory : MemoryE ~> MemStateFreshT (itree Effout) :=
-      handle_memory.
+      @handle_memory (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (itree Effout) :=
-      handle_intrinsic.
+      @handle_intrinsic (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition interp_memory_h : Effin ~> MemStateFreshT (itree Effout)
       := case_ E_trigger (case_ my_handle_intrinsic (case_ my_handle_memory F_trigger)).

@@ -78,74 +78,71 @@ Definition modify_mem_state {M MemState} `{Monad M} `{MonadMemState MemState M} 
 
 (* TODO: Add RAISE_PICK or something... May need to be in a module *)
 Import EitherMonad.
-Class MemMonad (MemState : Type) (ExtraState : Type) (AllocationId : Type) (M : Type -> Type)
-      `{Monad M}
+Import Monad.
+Class MemMonad (MemState : Type) (ExtraState : Type) (AllocationId : Type) (M : Type -> Type) (RunM : Type -> Type)
+      `{Monad M} `{Monad RunM} `{Eq1 RunM}
       `{MonadAllocationId AllocationId M} `{MonadStoreId M} `{MonadMemState MemState M}
       `{StoreIdFreshness MemState} `{AllocationIdFreshness AllocationId MemState}
-      `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M} : Type
+      `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
+      `{RAISE_ERROR RunM} `{RAISE_UB RunM} `{RAISE_OOM RunM}
+  : Type
   :=
   {
-    MemMonad_run {A} (ma : M A) (ms : MemState) (st : ExtraState) : err_ub_oom (ExtraState * (MemState * A));
+    MemMonad_run {A} (ma : M A) (ms : MemState) (st : ExtraState)
+    : RunM (ExtraState * (MemState * A))%type;
+
+    (** Whether a piece of extra state is valid for a given execution *)
+    MemMonad_valid_state : MemState -> ExtraState -> Prop;
 
     (** Run bind / ret laws *)
     MemMonad_run_bind
-      {A B} (ma : M A) (k : A -> M B) (ms : MemState) (st : ExtraState) :
-    MemMonad_run (x <- ma;; k x) ms st =
-      match IdentityMonad.unIdent (unEitherT (unEitherT (unEitherT (unERR_UB_OOM (MemMonad_run ma ms st))))) with
-      | inl (OOM_message oom_msg) =>
-          raise_oom oom_msg
-      | inr (inl (UB_message ub_msg)) =>
-          raise_ub ub_msg
-      | inr (inr (inl (ERR_message err_msg))) =>
-          raise_error err_msg
-      | inr (inr (inr (st', (ms', res)))) =>
-          MemMonad_run (k res) ms' st'
-      end;
+      {A B} (ma : M A) (k : A -> M B) (ms : MemState) (st : ExtraState) (VALID : MemMonad_valid_state ms st):
+    eq1 (MemMonad_run (x <- ma;; k x) ms st)
+        ('(st', (ms', x)) <- MemMonad_run ma ms st;; MemMonad_run (k x) ms' st');
 
     MemMonad_run_ret
-      {A} (x : A) (ms : MemState) st :
-    MemMonad_run (ret x) ms st = ret (st, (ms, x));
+      {A} (x : A) (ms : MemState) st (VALID : MemMonad_valid_state ms st):
+    eq1 (MemMonad_run (ret x) ms st) (ret (st, (ms, x)));
 
     (** MonadMemState properties *)
     MemMonad_get_mem_state
       (ms : MemState) st :
-    MemMonad_run (get_mem_state) ms st = ret (st, (ms, ms));
+    eq1 (MemMonad_run (get_mem_state) ms st) (ret (st, (ms, ms)));
 
     MemMonad_put_mem_state
       (ms ms' : MemState) st :
-    MemMonad_run (put_mem_state ms') ms st = ret (st, (ms', tt));
+    eq1 (MemMonad_run (put_mem_state ms') ms st) (ret (st, (ms', tt)));
 
     (** Fresh store id property *)
     MemMonad_run_fresh_sid
-      (ms : MemState) st :
+      (ms : MemState) st (VALID : MemMonad_valid_state ms st):
     exists st' sid',
-      MemMonad_run (fresh_sid) ms st  = ret (st', (ms, sid')) /\ ~ used_store_id ms sid';
+      eq1 (MemMonad_run (fresh_sid) ms st) (ret (st', (ms, sid'))) /\ ~ used_store_id ms sid';
 
     (** Fresh allocation id property *)
     MemMonad_run_fresh_allocation_id
-      (ms : MemState) st :
+      (ms : MemState) st (VALID : MemMonad_valid_state ms st):
     exists st' aid',
-      MemMonad_run (fresh_allocation_id) ms st = ret (st', (ms, aid')) /\ ~ used_allocation_id ms aid';
+      eq1 (MemMonad_run (fresh_allocation_id) ms st) (ret (st', (ms, aid'))) /\ ~ used_allocation_id ms aid';
 
     (** Exceptions *)
     MemMonad_run_raise_oom :
     forall {A} ms oom_msg st,
-      MemMonad_run (@raise_oom _ _ A oom_msg) ms st = raise_oom oom_msg;
+      eq1 (MemMonad_run (@raise_oom _ _ A oom_msg) ms st) (raise_oom oom_msg);
 
     MemMonad_run_raise_ub :
     forall {A} ms ub_msg st,
-      MemMonad_run (@raise_ub _ _ A ub_msg) ms st = raise_ub ub_msg;
+      eq1 (MemMonad_run (@raise_ub _ _ A ub_msg) ms st) (raise_ub ub_msg);
 
     MemMonad_run_raise_error :
     forall {A} ms error_msg st,
-      MemMonad_run (@raise_error _ _ A error_msg) ms st = raise_error error_msg;
+      eq1 (MemMonad_run (@raise_error _ _ A error_msg) ms st) (raise_error error_msg);
+  }.
 
     (** StateT *)
     (* MemMonad_lift_stateT *)
     (*   {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} {A} *)
     (*   (ma : M A) : stateT MemState (itree E) A; *)
-  }.
-
 
 Definition MemPropT (MemState : Type) (X : Type) : Type
   := MemState -> err (OOM (MemState * X)%type) -> Prop.
