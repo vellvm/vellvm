@@ -36,7 +36,7 @@ let make_test ll_ast t : string * assertion  =
       in
       Printf.sprintf "%s = %s(%s)" expected_str entry args_str
     in
-    let result () = Interpreter.step (TopLevel.TopLevelBigIntptr.interpreter_gen (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) dtyp (Camlcoq.coqstring_of_camlstring entry) args ll_ast) 
+    let result () = Interpreter.step (TopLevel.TopLevelBigIntptr.interpreter_gen dtyp (Camlcoq.coqstring_of_camlstring entry) args ll_ast)
     in
     str, (Assert.assert_eqf result (Ok expected))
   | Assertion.POISONTest (dtyp, entry, args) ->
@@ -53,14 +53,14 @@ let make_test ll_ast t : string * assertion  =
       Printf.sprintf "%s = %s(%s)" expected_str entry args_str
      in
 
-     let result () = Interpreter.step(TopLevel.TopLevelBigIntptr.interpreter_gen (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) dtyp (Camlcoq.coqstring_of_camlstring entry) args ll_ast)
+     let result () = Interpreter.step(TopLevel.TopLevelBigIntptr.interpreter_gen dtyp (Camlcoq.coqstring_of_camlstring entry) args ll_ast)
      in 
      str, (Assert.assert_eqf result (Ok expected))
          
   | Assertion.SRCTGTTest (expected_rett, generated_args) ->
      let (_t_args, v_args) = List.split generated_args in
-     let res_src () = Interpreter.step(TopLevel.TopLevelBigIntptr.interpreter_gen (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) expected_rett (Camlcoq.coqstring_of_camlstring "src") v_args ll_ast) in
-     let res_tgt () = Interpreter.step(TopLevel.TopLevelBigIntptr.interpreter_gen (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) expected_rett (Camlcoq.coqstring_of_camlstring "tgt") v_args ll_ast) in
+     let res_src () = Interpreter.step(TopLevel.TopLevelBigIntptr.interpreter_gen expected_rett (Camlcoq.coqstring_of_camlstring "src") v_args ll_ast) in
+     let res_tgt () = Interpreter.step(TopLevel.TopLevelBigIntptr.interpreter_gen expected_rett (Camlcoq.coqstring_of_camlstring "tgt") v_args ll_ast) in
      let str =
        let src_str =
          match res_src () with
@@ -194,5 +194,3 @@ let _ =
 
   with Ran_tests true -> exit 0
      | Ran_tests false -> exit 1
-
-

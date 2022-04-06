@@ -126,6 +126,7 @@ $(EXTRACTDIR)/STAMP: $(VOFILES) $(EXTRACTDIR)/Extract.v
 	rm -f $(EXTRACTDIR)/*.ml $(EXTRACTDIR)/*.mli
 	$(COQEXEC) $(EXTRACTDIR)/Extract.v
 	patch -p0 < CRelationClasses.mli.patch
+	./fix-extraction.sh
 	touch $(EXTRACTDIR)/STAMP
 
 %.vo: %.v

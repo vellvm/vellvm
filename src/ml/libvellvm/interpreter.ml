@@ -41,6 +41,7 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
   | UVALUE_I8     x -> fprintf ppf "UVALUE_I8(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
   | UVALUE_I32    x -> fprintf ppf "UVALUE_I32(%d)" (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
   | UVALUE_I64    x -> fprintf ppf "UVALUE_I64(%s)" (Int64.to_string (Z.to_int64 (DynamicValues.Int64.unsigned x)))
+  | UVALUE_IPTR   x -> fprintf ppf "UVALUE_IPTR(%d)" (Camlcoq.Z.to_int (InterpretationStack.InterpreterStackBigIntptr.LP.IP.to_Z x))
   | UVALUE_Double x -> fprintf ppf "UVALUE_Double(%s)" (string_of_float_full (camlfloat_of_coqfloat x))
   | UVALUE_Float  x -> fprintf ppf "UVALUE_Float(%s)"  (string_of_float_full (camlfloat_of_coqfloat32 x))
   | UVALUE_Poison _ -> fprintf ppf "UVALUE_Poison"
@@ -50,7 +51,7 @@ let rec pp_uvalue : Format.formatter -> DV.uvalue -> unit =
   | UVALUE_Packed_struct l -> fprintf ppf "UVALUE_Packet_struct(%a)" (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
   | UVALUE_Array         l -> fprintf ppf "UVALUE_Array(%a)"         (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
   | UVALUE_Vector        l -> fprintf ppf "UVALUE_Vector(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_uvalue) l
-  | _ -> fprintf ppf "todo"
+  | _ -> fprintf ppf "pp_uvalue: todo"
 
 let rec pp_dvalue : Format.formatter -> DV.dvalue -> unit =
   let open Camlcoq in
@@ -62,11 +63,16 @@ let rec pp_dvalue : Format.formatter -> DV.dvalue -> unit =
   | DVALUE_I8     x -> fprintf ppf "DVALUE_I8(%d)"  (Camlcoq.Z.to_int (DynamicValues.Int8.unsigned x))
   | DVALUE_I32    x -> fprintf ppf "DVALUE_I32(%d)" (Camlcoq.Z.to_int (DynamicValues.Int32.unsigned x))
   | DVALUE_I64    x -> fprintf ppf "DVALUE_I64(%s)" (Int64.to_string (Z.to_int64 (DynamicValues.Int64.unsigned x)))
+  | DVALUE_IPTR   x -> fprintf ppf "DVALUE_IPTR(%d)" (Camlcoq.Z.to_int (InterpretationStack.InterpreterStackBigIntptr.LP.IP.to_Z x))
   | DVALUE_Double x -> fprintf ppf "DVALUE_Double(%s)" (string_of_float_full (camlfloat_of_coqfloat x))
   | DVALUE_Float  x -> fprintf ppf "DVALUE_Float(%s)"  (string_of_float_full (camlfloat_of_coqfloat32 x))
   | DVALUE_Poison _ -> fprintf ppf "DVALUE_Poison"
   | DVALUE_None     -> fprintf ppf "DVALUE_None"
-  | _ -> fprintf ppf "todo"
+  | DVALUE_Struct        l -> fprintf ppf "DVALUE_Struct(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l
+  | DVALUE_Packed_struct l -> fprintf ppf "DVALUE_Packet_struct(%a)" (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l
+  | DVALUE_Array         l -> fprintf ppf "DVALUE_Array(%a)"         (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l
+  | DVALUE_Vector        l -> fprintf ppf "DVALUE_Vector(%a)"        (pp_print_list ~pp_sep:pp_comma_space pp_dvalue) l
+  | _ -> fprintf ppf "pp_dvalue: todo"
 
 let debug_flag = ref false
 
@@ -88,7 +94,7 @@ let debug (msg:string) =
     Calling `step` could either loop forever, return an error,
     or return the dvalue result returned from the itree.
  *)
-let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * ((local_env * lstack) * (global_env * DV.dvalue))) itree) : (DV.dvalue, string) result =
+let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * (InterpretationStack.InterpreterStackBigIntptr.LP.PROV.coq_Provenance * (MemPropT.store_id * ((local_env * lstack) * (global_env * DV.dvalue))))) itree) : (DV.dvalue, string) result =
   let open ITreeDefinition in
   match observe m with
   (* Internal steps compute as nothing *)
@@ -96,7 +102,7 @@ let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * ((local_env * lstack) * (
 
   (* SAZ: Could inspect the memory or stack here too. *)
   (* We finished the computation *)
-  | RetF (_,(_,(_,v))) -> Ok v
+  | RetF (_,(_,(_,(_,(_,v))))) -> Ok v
 
   (* The ExternalCallE effect *)
   | VisF (Sum.Coq_inl1 (ExternalCall(_, _, _)), _) ->
@@ -137,4 +143,4 @@ let rec step (m : ('a coq_L4, MMEP.MMSP.coq_MemState * ((local_env * lstack) * (
     tuple of a single block, and a possibly empty list of blocks.
  *)
 let interpret (prog:(LLVMAst.typ, (LLVMAst.typ LLVMAst.block * (LLVMAst.typ LLVMAst.block) list)) LLVMAst.toplevel_entity list) : (DV.dvalue, string) result =
-  step (TopLevel.TopLevelBigIntptr.interpreter (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) (Obj.magic true) prog)
+  step (TopLevel.TopLevelBigIntptr.interpreter prog)
