@@ -31,6 +31,8 @@ From ExtLib Require Import
 From Vellvm.Utils Require Import
      PropT.
 
+Require Import Paco.paco.
+
 Import Basics.Basics.Monads.
 Import MonadNotation.
 
@@ -213,6 +215,10 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         rewrite map_bind.
         setoid_rewrite Raise.raiseOOM_bind_itree.
         reflexivity.
+      - (* raise_oom_inv *)
+        intros A x oom_msg.
+        intros EQ.
+        pinversion EQ.
       - (* raise_ub *)
         intros A ms oom_msg [sid pr].
         cbn.
@@ -225,6 +231,10 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         rewrite map_bind.
         setoid_rewrite Raise.raise_bind_itree.
         reflexivity.
+      - (* raise_error_inv *)
+        intros A x error_msg.
+        intros EQ.
+        pinversion EQ.
     Defined.
 
     Definition E_trigger' : forall R, E R -> (MemStateT (PropT Effout) R) :=
@@ -491,6 +501,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         rewrite map_bind.
         setoid_rewrite Raise.raiseOOM_bind_itree.
         reflexivity.
+      - (* raise_oom_inv *)
+        intros A x oom_msg.
+        intros EQ.
+        pinversion EQ.
       - (* raise_ub *)
         intros A ms oom_msg [sid pr].
         cbn.
@@ -503,6 +517,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         rewrite map_bind.
         setoid_rewrite Raise.raise_bind_itree.
         reflexivity.
+      - (* raise_error_inv *)
+        intros A x error_msg.
+        intros EQ.
+        pinversion EQ.
     Defined.
 
     (** Handlers *)

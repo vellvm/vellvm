@@ -15,6 +15,7 @@ From ITree Require Import
 From Vellvm Require Import Error.
 
 From Vellvm.Utils Require Import
+     MonadEq1Laws
      PropT.
 
 From Vellvm.Semantics Require Import
@@ -91,6 +92,7 @@ Class MemMonad (MemState : Type) (ExtraState : Type) (AllocationId : Type) (M : 
   { MemMonad_eq1_runm :> Eq1 RunM;
     MemMonad_runm_monadlaws :> MonadLawsE RunM;
     MemMonad_eq1_runm_equiv {A} :> Equivalence (@eq1 _ MemMonad_eq1_runm A);
+    MemMonad_eq1_runm_eq1laws :> Eq1_ret_inv RunM;
 
     MemMonad_eq1_runm_proper :>
         (forall A, Proper ((@eq1 _ MemMonad_eq1_runm) A ==> (@eq1 _ MemMonad_eq1_runm) A ==> iff) ((@eq1 _ MemMonad_eq1_runm) A));
@@ -137,6 +139,10 @@ Class MemMonad (MemState : Type) (ExtraState : Type) (AllocationId : Type) (M : 
     forall {A} ms oom_msg st,
       eq1 (MemMonad_run (@raise_oom _ _ A oom_msg) ms st) (raise_oom oom_msg);
 
+    MemMonad_eq1_raise_oom_inv :
+    forall {A} x oom_msg,
+      ~ ((@eq1 _ MemMonad_eq1_runm) A (ret x) (raise_oom oom_msg));
+
     MemMonad_run_raise_ub :
     forall {A} ms ub_msg st,
       eq1 (MemMonad_run (@raise_ub _ _ A ub_msg) ms st) (raise_ub ub_msg);
@@ -144,6 +150,10 @@ Class MemMonad (MemState : Type) (ExtraState : Type) (AllocationId : Type) (M : 
     MemMonad_run_raise_error :
     forall {A} ms error_msg st,
       eq1 (MemMonad_run (@raise_error _ _ A error_msg) ms st) (raise_error error_msg);
+
+    MemMonad_eq1_raise_error_inv :
+    forall {A} x error_msg,
+      ~ ((@eq1 _ MemMonad_eq1_runm) A (ret x) (raise_error error_msg));
   }.
 
     (** StateT *)
