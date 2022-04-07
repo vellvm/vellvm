@@ -79,15 +79,22 @@ Definition modify_mem_state {M MemState} `{Monad M} `{MonadMemState MemState M} 
 (* TODO: Add RAISE_PICK or something... May need to be in a module *)
 Import EitherMonad.
 Import Monad.
+Import Morphisms.
 Class MemMonad (MemState : Type) (ExtraState : Type) (AllocationId : Type) (M : Type -> Type) (RunM : Type -> Type)
-      `{Monad M} `{Monad RunM} `{Eq1 RunM}
+      `{Monad M} `{Monad RunM}
       `{MonadAllocationId AllocationId M} `{MonadStoreId M} `{MonadMemState MemState M}
       `{StoreIdFreshness MemState} `{AllocationIdFreshness AllocationId MemState}
       `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
       `{RAISE_ERROR RunM} `{RAISE_UB RunM} `{RAISE_OOM RunM}
   : Type
   :=
-  {
+  { MemMonad_eq1_runm :> Eq1 RunM;
+    MemMonad_runm_monadlaws :> MonadLawsE RunM;
+    MemMonad_eq1_runm_equiv {A} :> Equivalence (@eq1 _ MemMonad_eq1_runm A);
+
+    MemMonad_eq1_runm_proper :>
+        (forall A, Proper ((@eq1 _ MemMonad_eq1_runm) A ==> (@eq1 _ MemMonad_eq1_runm) A ==> iff) ((@eq1 _ MemMonad_eq1_runm) A));
+
     MemMonad_run {A} (ma : M A) (ms : MemState) (st : ExtraState)
     : RunM (ExtraState * (MemState * A))%type;
 
@@ -284,10 +291,10 @@ Proof.
   unfold PropT, MemPropT, stateT in *.
   intros ms t.
   specialize (m ms).
-  refine ((exists msg, t ≈ raise_ub msg) <-> (forall res, ~ m res) /\
-          (exists msg, t ≈ raise_error msg) <-> (exists msg, m (inl msg)) /\
-          (exists msg, t ≈ raise_oom msg) <-> (exists msg, m (inr (Oom msg))) /\
-          forall res, t ≈ ret res <-> m (inr (NoOom res))).
+  refine (((exists msg, t ≈ raise_ub msg) <-> (forall res, ~ m res)) /\
+          ((exists msg, t ≈ raise_error msg) <-> (exists msg, m (inl msg))) /\
+          ((exists msg, t ≈ raise_oom msg) <-> (exists msg, m (inr (Oom msg)))) /\
+          (forall res, t ≈ ret res <-> m (inr (NoOom res)))).
 Defined.
 
 Definition MemPropT_lift_PropT_fresh {MemState Provenance X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : 
@@ -296,8 +303,8 @@ Proof.
   unfold PropT, MemPropT, stateT in *.
   intros sid pr ms t.
   specialize (m ms).
-  refine ((exists msg, t ≈ raise_ub msg) <-> (forall res, ~ m res) /\
-          (exists msg, t ≈ raise_error msg) <-> (exists msg, m (inl msg)) /\
-          (exists msg, t ≈ raise_oom msg) <-> (exists msg, m (inr (Oom msg))) /\
-          forall sid pr ms x, t ≈ ret (ms, (pr, (sid, x))) <-> m (inr (NoOom (ms, x)))).
+  refine (((exists msg, t ≈ raise_ub msg) <-> (forall res, ~ m res)) /\
+          ((exists msg, t ≈ raise_error msg) <-> (exists msg, m (inl msg))) /\
+          ((exists msg, t ≈ raise_oom msg) <-> (exists msg, m (inr (Oom msg)))) /\
+          (forall sid pr ms x, t ≈ ret (ms, (pr, (sid, x))) <-> m (inr (NoOom (ms, x))))).
 Defined.

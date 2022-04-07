@@ -867,7 +867,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       mem_state_frame_stack_prop m1 fs <-> mem_state_frame_stack_prop m2 fs.
 
   (*** Allocation id operations *)
-  Instance MemPropT_MonadAllocationId : MonadAllocationId AllocationId (MemPropT MemState).
+  #[global] Instance MemPropT_MonadAllocationId : MonadAllocationId AllocationId (MemPropT MemState).
   Proof.
     split.
     - (* fresh_allocation_id *)
@@ -885,7 +885,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Defined.
 
   (*** Store id operations *)
-  Instance MemPropT_MonadStoreID : MonadStoreId (MemPropT MemState).
+  #[global] Instance MemPropT_MonadStoreID : MonadStoreId (MemPropT MemState).
   Proof.
     split.
     - (* fresh_sid *)

@@ -41,7 +41,8 @@ From Coq Require Import
      ZArith
      Strings.String
      List
-     Lia.
+     Lia
+     RelationClasses.
 
 Import ListNotations.
 Import ListUtil.
@@ -973,15 +974,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (*     admit. *)
     (* Admitted. *)
 
-    Import EitherMonad.
-    Definition exec_correct {MemM Eff ExtraState} `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
+    Import Monad.
+    Definition exec_correct {MemM Eff ExtraState} `{MM: MemMonad MemState ExtraState AllocationId MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X) : Prop :=
       forall ms st,
-        (@MemMonad_valid_state MemState ExtraState AllocationId MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
+        (@MemMonad_valid_state MemState ExtraState AllocationId MemM (itree Eff) _ _ _ _ _ _ _ _ _ _ _ _ _ _ ms st) ->
         let t := MemMonad_run exec ms st in
-        ((exists msg, t ≈ raise_ub msg) <-> (forall res, ~ spec ms res) /\
-          (exists msg, t ≈ raise_error msg) <-> (exists msg, spec ms (inl msg)) /\
-          (exists msg, t ≈ raise_oom msg) <-> (exists msg, spec ms (inr (Oom msg))) /\
-          forall st' ms' x, t ≈ ret (st', (ms', x)) <-> spec ms (inr (NoOom (ms', x)))).
+        let eqi := (@eq1 _ (@MemMonad_eq1_runm _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ MM)) in
+        (((exists msg, eqi _ t (raise_ub msg)) <-> (forall res, ~ spec ms res)) /\
+         ((exists msg, eqi _ t (raise_error msg)) <-> (exists msg, spec ms (inl msg))) /\
+         ((exists msg, eqi _ t (raise_oom msg)) <-> (exists msg, spec ms (inr (Oom msg)))) /\
+           (forall st' ms' x, eqi _ t (ret (st', (ms', x))) <-> spec ms (inr (NoOom (ms', x))))).
 
     (* TODO: Move these tactics *)
     Ltac MemMonad_go :=
@@ -1204,12 +1206,250 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       forall ptr, exec_correct (read_byte ptr) (read_byte_MemPropT ptr).
     Proof.
       unfold exec_correct.
-      intros ptr ms st.
-      destruct ms.
-      unfold read_byte.
-      cbn.
+      intros ptr ms st VALID.
+      split; [| split; [| split]].
+      - (* UB *)
+        split.
+        + intros [msg RUN].
+          intros res CONTRA.
+          unfold read_byte in RUN.
+          unfold read_byte_MemPropT in CONTRA.
 
-      MemMonad_solve.
+          (* TODO: What is going on with the `Type` goals here? *)
+          rewrite MemMonad_run_bind in RUN; eauto.
+          rewrite MemMonad_get_mem_state in RUN; eauto.
+          rewrite bind_ret_l in RUN; auto.
+
+          break_match_hyp.
+          { (* Reading from allocated memory *)
+            break_match_hyp; subst.
+            break_match_hyp; subst.
+            { (* Access allowed *)
+              cbn in CONTRA.
+              destruct res as [err | [[ms' sbyte] | oom]];
+                firstorder; subst;
+                rewrite Heqo in *;
+                cbn in *;
+                rewrite Heqb in *;
+                firstorder.
+
+              subst.
+              rewrite MemMonad_run_ret in RUN; eauto.
+              (* TODO: Need extra lemma in MemMonad typeclass *)
+              admit.
+            }
+
+            { (* Access denied *)
+              rewrite MemMonad_run_raise_ub in RUN; eauto.
+              cbn in CONTRA.
+              destruct res as [err | [[ms' sbyte] | oom]];
+                firstorder; subst;
+                rewrite Heqo in *;
+                cbn in *;
+                rewrite Heqb in *;
+                firstorder.              
+            }
+          }
+          { (* Reading from unallocated memory *)
+            cbn in CONTRA.
+            destruct res as [err | [[ms' sbyte] | oom]];
+              firstorder; subst;
+              rewrite Heqo in *;
+              firstorder.
+          }
+        + intros CONTRA.
+
+          (* Have to destruct up front because of annoying eexists issue *)
+          (* Maybe could make raise_ub msg1 ≈ raise_ub msg2 or something to avoid this *)
+          destruct (read_byte_raw (mem_state_memory ms) (ptr_to_int ptr)) as [[sbyte aid]|] eqn:READ.
+          destruct (access_allowed (address_provenance ptr) aid) eqn:ACCESS.
+
+          { (* Success *)
+            exfalso.
+            specialize (CONTRA (inr (NoOom (ms, sbyte)))).
+            apply CONTRA.
+            repeat eexists; cbn.
+            rewrite READ; cbn.
+            rewrite ACCESS; cbn.
+            auto.
+          }
+
+          { (* UB due to provenance *)
+            eexists.
+            unfold read_byte.
+            rewrite MemMonad_run_bind; auto.
+            rewrite MemMonad_get_mem_state.
+            rewrite bind_ret_l.
+            rewrite READ.
+            rewrite ACCESS.
+            rewrite MemMonad_run_raise_ub.
+            reflexivity.
+          }
+
+          { (* UB due to accessing unallocated memory *)
+            eexists.
+            unfold read_byte.
+            rewrite MemMonad_run_bind; auto.
+            rewrite MemMonad_get_mem_state.
+            rewrite bind_ret_l.
+            rewrite READ.
+            rewrite MemMonad_run_raise_ub.
+            reflexivity.
+          }
+      - (* Error *)
+        split.
+        + intros [msg RUN].
+          unfold read_byte in RUN.
+
+          rewrite MemMonad_run_bind in RUN; auto.
+          
+          
+          intros res CONTRA.
+          unfold read_byte in RUN.
+          unfold read_byte_MemPropT in CONTRA.
+
+          (* TODO: What is going on with the `Type` goals here? *)
+          rewrite MemMonad_run_bind in RUN; eauto.
+          rewrite MemMonad_get_mem_state in RUN; eauto.
+          rewrite bind_ret_l in RUN; auto.
+
+          break_match_hyp.
+          { (* Reading from allocated memory *)
+            break_match_hyp; subst.
+            break_match_hyp; subst.
+            { (* Access allowed *)
+              cbn in CONTRA.
+              destruct res as [err | [[ms' sbyte] | oom]];
+                firstorder; subst;
+                rewrite Heqo in *;
+                cbn in *;
+                rewrite Heqb in *;
+                firstorder.
+
+              subst.
+              rewrite MemMonad_run_ret in RUN; eauto.
+              (* TODO: Need extra lemma in MemMonad typeclass *)
+              admit.
+            }
+
+            { (* Access denied *)
+              rewrite MemMonad_run_raise_ub in RUN; eauto.
+              cbn in CONTRA.
+              destruct res as [err | [[ms' sbyte] | oom]];
+                firstorder; subst;
+                rewrite Heqo in *;
+                cbn in *;
+                rewrite Heqb in *;
+                firstorder.              
+            }
+          }
+          { (* Reading from unallocated memory *)
+            cbn in CONTRA.
+            destruct res as [err | [[ms' sbyte] | oom]];
+              firstorder; subst;
+              rewrite Heqo in *;
+              firstorder.
+          }
+        + intros CONTRA.
+
+          (* Have to destruct up front because of annoying eexists issue *)
+          (* Maybe could make raise_ub msg1 ≈ raise_ub msg2 or something to avoid this *)
+          destruct (read_byte_raw (mem_state_memory ms) (ptr_to_int ptr)) as [[sbyte aid]|] eqn:READ.
+          destruct (access_allowed (address_provenance ptr) aid) eqn:ACCESS.
+
+          { (* Success *)
+            exfalso.
+            specialize (CONTRA (inr (NoOom (ms, sbyte)))).
+            apply CONTRA.
+            repeat eexists; cbn.
+            rewrite READ; cbn.
+            rewrite ACCESS; cbn.
+            auto.
+          }
+
+          { (* UB due to provenance *)
+            eexists.
+            unfold read_byte.
+            rewrite MemMonad_run_bind; auto.
+            rewrite MemMonad_get_mem_state.
+            rewrite bind_ret_l.
+            rewrite READ.
+            rewrite ACCESS.
+            rewrite MemMonad_run_raise_ub.
+            reflexivity.
+          }
+
+          { (* UB due to accessing unallocated memory *)
+            eexists.
+            unfold read_byte.
+            rewrite MemMonad_run_bind; auto.
+            rewrite MemMonad_get_mem_state.
+            rewrite bind_ret_l.
+            rewrite READ.
+            rewrite MemMonad_run_raise_ub.
+            reflexivity.
+          }
+        split.
+
+
+      -
+          cbn in RUN.
+          
+          epose proof (@MemMonad_eq1_runm_proper2 MemState ExtraState AllocationId MemM (itree Eff) H H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12) as PROPER.
+          Print Instances Proper.
+          Print HintDb typeclass_instances.
+
+          apply PROPER in RUN.
+          unfold Basics.impl in RUN.
+          match goal with
+          | RUN : context [ (MemMonad_run (bind get_mem_state ?k)) ?ms ?st ] |- _ =>
+              epose proof (H13 get_mem_state k ms st VALID) as BIND
+          end.
+
+          specialize (RUN _ _ BIND).
+          cbn in RUN.
+          forward RUN.
+          cbn.
+          epose proof (@MemMonad_eq1_runm_equiv MemState ExtraState AllocationId MemM (itree Eff) H H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 (prod ExtraState (prod MemState SByte)) _ eq eq_equivalence) as EQUIV.
+          reflexivity.
+
+          setoid_rewrite MemMonad_run_bind in RUN.
+          set (eqi := @eq1 (itree Eff)
+          (@MemMonad_eq1_runm MemState ExtraState AllocationId MemM (itree Eff) H H0 H1 H2 H3 H4 H5 H6
+                              H7 H8 H9 H10 H11 H12)).
+
+          set (eqi2 := fun {A} => eqi A).
+          epose proof Returns_eutt.
+          assert (forall A, Proper (eqi A ==> eqi A ==> iff) (eqi A)).
+          admit.
+
+          apply H15 in RUN.
+          unfold respectful in RUN.
+          epose proof (H13 get_mem_state _ ms st VALID).
+          specialize (RUN _ _ H16).
+          destruct RUN.
+          rewrite H13 in RUN.
+          apply H15 in RUN.
+          rewrite H13 in RUN.
+          unfold eq1 in *.
+          unfold MemMonad_eq1_runm in *.
+          unfold MemMonad_eq
+
+          H12) as run_bind.
+          unfold Monad.eq1 in run_bind.
+            in RUN.
+          rewrite MemMonad_get_mem_state in RUN.
+          setoid_rewrite <- MemMonad_run_raise_ub in RUN.
+          unfold MemMonad_run in RUN.
+          
+          cbn in CONTRA.
+        admit.
+      - (* Error *)
+        admit.
+      - (* OOM *)
+        admit.
+      - (* Success *)
+        admit.
     Admitted.
 
     Lemma write_byte_correct :

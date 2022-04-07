@@ -134,7 +134,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Proof.
       esplit with
         (MemMonad_run := fun A => @MemStateFreshT_run A Eff FAIL OOM UB)
-        (MemMonad_valid_state := MemStateFreshT_valid_state).
+        (MemMonad_valid_state := MemStateFreshT_valid_state); try solve [typeclasses eauto].
 
       (* TODO: didn't need valid for ret / bind laws... *)
       - (* run bind *)
@@ -412,7 +412,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     Proof.
       esplit with
         (MemMonad_run := fun A => @MemStateFreshT_run A Eff FAIL OOM UB)
-        (MemMonad_valid_state := MemStateFreshT_valid_state).
+        (MemMonad_valid_state := MemStateFreshT_valid_state); try solve [typeclasses eauto].
 
       (* TODO: didn't need valid for ret / bind laws... *)
       - (* run bind *)
@@ -514,10 +514,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory : MemoryE ~> MemStateFreshT (itree Effout) :=
-      @handle_memory (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      @handle_memory (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition my_handle_intrinsic : IntrinsicE ~> MemStateFreshT (itree Effout) :=
-      @handle_intrinsic (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
+      @handle_intrinsic (MemStateFreshT (itree Effout)) _ MemStateFreshT_State _ _ _ _ _ _ _ _ _ _ _ _ _ MemStateFreshT_MemMonad.
 
     Definition interp_memory_h : Effin ~> MemStateFreshT (itree Effout)
       := case_ E_trigger (case_ my_handle_intrinsic (case_ my_handle_memory F_trigger)).
