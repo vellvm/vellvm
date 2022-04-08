@@ -475,6 +475,48 @@ Module FinPROV : PROVENANCE(Addr) with Definition Prov := Prov.
     auto.
   Qed.
 
+  Lemma provenance_eq_dec :
+    forall (pr pr' : Provenance),
+      {pr = pr'} + {pr <> pr'}.
+  Proof.
+    unfold Provenance.
+    unfold FiniteProvenance.Provenance.
+    intros pr pr'.
+    apply N.eq_dec.
+  Defined.
+
+  Lemma provenance_eq_dec_refl :
+    forall (pr : Provenance),
+      true = provenance_eq_dec pr pr.
+  Proof.
+    intros pr.
+    destruct provenance_eq_dec; cbn; auto.
+    exfalso; auto.
+  Qed.
+
+  Lemma aid_eq_dec :
+    forall (aid aid' : AllocationId),
+      {aid = aid'} + {aid <> aid'}.
+  Proof.
+    intros aid aid'.
+    destruct aid, aid'; auto.
+    pose proof provenance_eq_dec p p0.
+    destruct H; subst; auto.
+    right.
+    intros CONTRA. inv CONTRA; contradiction.
+    right; intros CONTRA; inv CONTRA.
+    right; intros CONTRA; inv CONTRA.
+  Qed.
+
+  Lemma aid_eq_dec_refl :
+    forall (aid : AllocationId),
+      true = aid_eq_dec aid aid.
+  Proof.
+    intros aid.
+    destruct (aid_eq_dec aid aid); cbn; auto.
+    exfalso; auto.
+  Qed.
+
   (* Debug *)
   Definition show_prov (pr : Prov) := Show.show pr.
   Definition show_provenance (pr : Provenance) := Show.show pr.
@@ -725,7 +767,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     match read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) with
     | None => ret false
     | Some (byte, aid') =>
-        ret (aid_access_allowed aid aid')
+        ret (proj_sumbool (aid_eq_dec aid aid'))
     end.
 
   Definition ptr_in_frame_prop (f : Frame) (ptr : addr) : Prop :=
@@ -846,7 +888,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       match read_byte_raw (mem_state_memory ms) (ptr_to_int ptr) with
       | None => ret false
       | Some (byte, aid') =>
-          ret (aid_access_allowed aid aid')
+          ret (proj_sumbool (aid_eq_dec aid aid'))
       end.
 
     Definition add_to_frame (m : memory_stack) (k : Z) : memory_stack :=
@@ -1112,8 +1154,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             | subst_mempropt
         ];
       split; try reflexivity;
-      rewrite aid_access_allowed_refl; auto.
-
+      first [rewrite aid_access_allowed_refl | apply aid_eq_dec_refl]; auto.
 
     Ltac solve_write_byte_allowed :=
       eexists; split; [| solve [eauto]]; solve_byte_allocated.
@@ -1155,12 +1196,12 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       destruct ALLOCATED as [ALLOCATED [C1 C2]]; subst.
       destruct ALLOCATED as [ms'' [ms''' [[C1 C2] ALLOCATED]]]; subst.
 
+      cbn in GET.
       repeat eexists.
       rewrite MEM.
       rewrite set_byte_raw_eq; auto.
       cbn; split; auto.
-      rewrite aid_access_allowed_refl.
-      auto.
+      apply aid_eq_dec_refl.
     Qed.
 
     Lemma byte_allocated_set_byte_raw_neq :
@@ -1288,301 +1329,493 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         solve_read_byte_MemPropT_contra READ ACCESS.
       - (* UB from accessing unallocated memory *)
         left.
+        unfold read_byte_MemPropT.
         solve_read_byte_MemPropT_contra READ ACCESS.
 
         Unshelve.
         all: exact (""%string).
     Qed.
 
+    (* TODO: move this? *)
+    Lemma disjoint_ptr_byte_dec :
+      forall p1 p2,
+        {disjoint_ptr_byte p1 p2} + { ~ disjoint_ptr_byte p1 p2}.
+    Proof.
+      intros p1 p2.
+      unfold disjoint_ptr_byte.
+      pose proof Z.eq_dec (ptr_to_int p1) (ptr_to_int p2) as [EQ | NEQ].
+      - rewrite EQ.
+        right.
+        intros CONTRA.
+        contradiction.
+      - left; auto.
+    Qed.
+
     Lemma write_byte_correct :
       forall ptr byte, exec_correct (write_byte ptr byte) (write_byte_spec_MemPropT ptr byte).
     Proof.
       unfold exec_correct.
-      intros ptr byte ms st.
-      destruct ms.
-      unfold write_byte.
-      cbn.
+      intros ptr byte ms st VALID.
 
-      MemMonad_go; cbn.
-    Admitted.
-    (*   MemMonad_break; cbn. *)
-    (*   - (* Allocated *) *)
-    (*     MemMonad_break; cbn. *)
-    (*     + (* Access allowed *) *)
-    (*       MemMonad_go; cbn. *)
+      (* Need to destruct ahead of time so we know if UB happens *)
+      destruct (read_byte_raw (mem_state_memory ms) (ptr_to_int ptr)) as [[sbyte aid]|] eqn:READ.
+      destruct (access_allowed (address_provenance ptr) aid) eqn:ACCESS.
 
-    (*       split. *)
-    (*       * (* Write allowed *) *)
-    (*         solve_write_byte_allowed. *)
-    (*       * (* set_byte_memory, should make a tactic to solve this too *) *)
-    (*         split. *)
-    (*         -- (* read_byte_spec *) *)
-    (*           solve_read_byte_spec. *)
-    (*         -- (* Old reads *) *)
-    (*           intros ptr' byte' H9. *)
-    (*           split. *)
-    (*           ++ (* read byte spec *) *)
-    (*              intros H10. *)
-    (*              split. *)
-    (*              ** (* read byte allowed *) *)
-    (*                destruct H10. *)
-    (*                 destruct read_byte_value0 as (ms & a & MS & RB). *)
-    (*                cbn in MS. *)
-    (*                destruct MS as [MS1 MS2]. *)
-    (*                subst. *)
-    (*                unfold_mem_state_memory. *)
-    (*                unfold_mem_state_memory_in Hlookup. *)
-    (*                unfold_mem_state_memory_in RB. *)
-    (*                (* Lookup in RB *) *)
-    (*                break_match_hyp. *)
-    (*                destruct m. *)
-    (*                --- *)
-    (*                  repeat eexists. *)
-    (*                  cbn. *)
-    (*                  rewrite set_byte_raw_neq; auto. *)
-    (*                  unfold mem_byte in Heqo. *)
-    (*                  subst_mempropt. *)
+      - (* Success *)
+        right.
 
-    (*                  split; auto. *)
-    (*                  rewrite aid_access_allowed_refl; auto. *)
+        cbn.
+        split; [| split].
 
-    (*                  cbn in RB. *)
-    (*                  break_match_hyp; tauto. *)
-    (*                --- (* read byte allowed... *) *)
-    (*                  repeat eexists. *)
-    (*                  unfold_mem_state_memory. *)
-    (*                  rewrite set_byte_raw_neq; auto. *)
-    (*                  unfold mem_byte in Heqo. *)
-    (*                  subst_mempropt. *)
+        + (* Error *)
+          eexists. exists ""%string.
+          intros RUN.
 
-    (*                  split; cbn in *; tauto. *)
-    (*                  cbn in *; tauto. *)
-    (*              ** (* read byte prop *) *)
-    (*                destruct H10. *)
-    (*                destruct read_byte_value0 as (ms & a & MS & RB). *)
-    (*                cbn in MS. *)
-    (*                destruct MS as [MS1 MS2]. *)
-    (*                subst. *)
-    (*                unfold_mem_state_memory. *)
-    (*                unfold_mem_state_memory_in Hlookup. *)
-    (*                unfold_mem_state_memory_in RB. *)
-    (*                (* Lookup in RB *) *)
-    (*                break_match_hyp. *)
-    (*                destruct m. *)
-    (*                --- repeat eexists. *)
-    (*                    unfold_mem_state_memory. *)
-    (*                    unfold_mem_state_memory_in Hlookup. *)
-    (*                    rewrite set_byte_raw_neq; auto. *)
-    (*                    unfold mem_byte in Heqo. *)
-    (*                    subst_mempropt. *)
-    (*                    cbn in RB. *)
+          unfold write_byte in RUN.
 
-    (*                    break_match. *)
-    (*                    destruct RB; subst. *)
-    (*                    split; tauto. *)
-    (*                    tauto. *)
-    (*                --- cbn in RB. tauto. *)
-    (*           ++ (* Other direction for old reads... *) *)
-    (*             intros H10. *)
-    (*             destruct H10. *)
-    (*             split. *)
-    (*             ** (* read_byte_allowed *) *)
-    (*               admit. *)
-    (*             ** (* read_byte_prop *) *)
-    (*               admit. *)
-    (*       * (* write_byte_operation_invariants, also a tactic *) *)
-    (*         assert (  allocations_preserved *)
-    (* {| ms_memory_stack := ms_memory_stack0 |} *)
-    (* {| *)
-    (*   ms_memory_stack := *)
-    (*     (set_byte_raw *)
-    (*        (mem_state_memory *)
-    (*           {| ms_memory_stack := ms_memory_stack0 |}) *)
-    (*        (ptr_to_int ptr) (byte, aid) *)
-    (*       , *)
-    (*     mem_state_frame_stack *)
-    (*       {| ms_memory_stack := ms_memory_stack0 |}) *)
-    (* |}) as ALLOC_PRESERVED. *)
+          rewrite MemMonad_run_bind in RUN; [| solve_MemMonad_valid_state].
+          rewrite MemMonad_get_mem_state in RUN.
+          rewrite bind_ret_l in RUN.
+          
+          rewrite READ in RUN.
+          rewrite ACCESS in RUN.
 
-    (*         { *)
-    (*           unfold allocations_preserved. *)
-    (*           cbn. *)
-    (*           intros ptr_after aid_after. *)
-    (*           split. *)
-    (*           { repeat eexists. *)
-    (*             unfold_mem_state_memory. *)
-    (*             pose proof Z.eq_dec (ptr_to_int ptr_after) (ptr_to_int ptr) as [EQ | NEQ]. *)
-    (*             { rewrite EQ. *)
-    (*               rewrite set_byte_raw_eq; auto. *)
-    (*               split; auto. *)
+          rewrite MemMonad_put_mem_state in RUN.
+          apply MemMonad_eq1_raise_error_inv in RUN; auto.
+        + (* OOM *)
+          eexists. exists ""%string.
+          intros RUN.
 
-    (*               repeat destruct H9. *)
-    (*               repeat destruct H10. *)
-    (*               repeat destruct H9. *)
-    (*               destruct H10; subst. *)
-    (*               rewrite EQ in H12. *)
-    (*               rewrite Hlookup in H12. *)
-    (*               tauto. *)
-    (*             } *)
-    (*             { rewrite set_byte_raw_neq; auto. *)
+          unfold write_byte in RUN.
 
-    (*               repeat destruct H9. *)
-    (*               repeat destruct H10. *)
-    (*               repeat destruct H9. *)
-    (*               destruct H10; subst. *)
-    (*               unfold mem_byte in *. *)
-    (*               unfold_mem_state_memory_in H12. *)
-    (*               break_match. *)
-    (*               break_match. *)
-    (*               split; tauto. *)
+          rewrite MemMonad_run_bind in RUN; [| solve_MemMonad_valid_state].
+          rewrite MemMonad_get_mem_state in RUN.
+          rewrite bind_ret_l in RUN.
+          
+          rewrite READ in RUN.
+          rewrite ACCESS in RUN.
 
-    (*               tauto. *)
-    (*             } *)
-    (*           } *)
+          rewrite MemMonad_put_mem_state in RUN.
+          apply MemMonad_eq1_raise_oom_inv in RUN; auto.
+        + (* Success *)
+          intros st' ms' x RUN.
 
-    (*           { repeat eexists. *)
-    (*             repeat destruct H9. *)
-    (*             repeat destruct H10. *)
-    (*             repeat destruct H9. *)
-    (*             destruct H10; subst. *)
-    (*             unfold_mem_state_memory_in H12. *)
-    (*             unfold_mem_state_memory_in Hlookup. *)
-    (*             pose proof Z.eq_dec (ptr_to_int ptr_after) (ptr_to_int ptr) as [EQ | NEQ]. *)
-    (*             { rewrite EQ. *)
-    (*               rewrite EQ in H12. *)
-    (*               rewrite set_byte_raw_eq in H12; auto. *)
-    (*               inv H12. *)
-    (*               unfold_mem_state_memory. *)
-    (*               rewrite Hlookup. *)
-    (*               tauto. *)
-    (*             } *)
-    (*             { rewrite set_byte_raw_neq in H12; auto. *)
-    (*               unfold mem_byte in *. *)
-    (*               unfold_mem_state_memory. *)
-    (*               break_match. *)
-    (*               break_match. *)
-    (*               tauto. *)
-    (*               tauto. *)
-    (*             } *)
-    (*           } *)
-    (*         } *)
+          unfold write_byte in RUN.
 
-    (*         split. *)
-    (*         -- (* Allocations preserved *) *)
-    (*           apply ALLOC_PRESERVED. *)
-    (*         -- (* Frame stack preserved *) *)
-    (*           solve_frame_stack_preserved. *)
-    (*         -- (* Read byte allowed preserved *) *)
-    (*           unfold read_byte_allowed_all_preserved. *)
-    (*           intros ?ptr_after; split. *)
-    (*           *** *)
-    (*             let ALLOCATED := fresh "ALLOCATED" in *)
-    (*             let ALLOWED := fresh "ALLOWED" in *)
-    (*             let aid := fresh "aid" in *)
-    (*             intros [aid [ALLOCATED ALLOWED]]. *)
+          rewrite MemMonad_run_bind in RUN; [| solve_MemMonad_valid_state].
+          rewrite MemMonad_get_mem_state in RUN.
+          rewrite bind_ret_l in RUN.
+          
+          rewrite READ in RUN.
+          rewrite ACCESS in RUN.
 
-    (*             eexists; split. *)
-    (*             --- apply ALLOC_PRESERVED; eauto. *)
-    (*             --- auto. *)
-    (*           *** *)
-    (*             let ALLOCATED := fresh "ALLOCATED" in *)
-    (*             let ALLOWED := fresh "ALLOWED" in *)
-    (*             let aid := fresh "aid" in *)
-    (*             intros [aid [ALLOCATED ALLOWED]]. *)
+          rewrite MemMonad_put_mem_state in RUN.
+          apply eq1_ret_ret in RUN; [inv RUN | typeclasses eauto].
 
-    (*             eexists; split. *)
-    (*             --- apply ALLOC_PRESERVED; eauto. *)
-    (*             --- auto. *)
-    (*         -- (* Write byte allowed preserved *) *)
-    (*           unfold write_byte_allowed_all_preserved. *)
-    (*           intros ?ptr_after; split. *)
-    (*           *** *)
-    (*             let ALLOCATED := fresh "ALLOCATED" in *)
-    (*             let ALLOWED := fresh "ALLOWED" in *)
-    (*             let aid := fresh "aid" in *)
-    (*             intros [aid [ALLOCATED ALLOWED]]. *)
+          split.
+          * (* Write is allowed *)
+            solve_write_byte_allowed.
+          * (* Byte is set in new memory *)
+            split.
+            -- (* Read byte spec *)
+              solve_read_byte_spec.
+            -- (* Disjoint bytes are preserved *)
+              intros ptr' byte' DISJOINT.
+              split; intros READBYTE.
+              { split.
+                - (* TODO: solve_read_byte_allowed *)
+                  apply read_byte_allowed_spec in READBYTE.
+                  (* TODO: is there a way to avoid having to do these destructs before eexists? *)
+                  destruct READBYTE as [aid' [ALLOCATED ALLOWED]].
+                  unfold byte_allocated, byte_allocated_MemPropT in ALLOCATED.
+                  cbn in ALLOCATED.
+                  destruct ALLOCATED as [ms' [ms'' [[EQ1 EQ2] ALLOCATED]]]; subst.
+                  destruct ALLOCATED as [ms'' [a [ALLOCATED [EQ1 EQ2]]]]; subst.
+                  destruct ALLOCATED as [ms'' [ms''' [[EQ1 EQ2] ALLOCATED]]]; subst.
+                  break_match_hyp.
+                  break_match_hyp.
+                  { (* Read of ptr' succeeds *)
+                    destruct ALLOCATED as [_ AIDEQ].
 
-    (*             eexists; split. *)
-    (*             --- apply ALLOC_PRESERVED; eauto. *)
-    (*             --- auto. *)
-    (*           *** *)
-    (*             let ALLOCATED := fresh "ALLOCATED" in *)
-    (*             let ALLOWED := fresh "ALLOWED" in *)
-    (*             let aid := fresh "aid" in *)
-    (*             intros [aid [ALLOCATED ALLOWED]]. *)
+                    eexists; split.
+                    { (* TODO: solve_byte_allocated *)
+                      cbn.
+                      repeat eexists.
+                      cbn.
+                      rewrite set_byte_raw_neq; [| solve [eauto]].
 
-    (*             eexists; split. *)
-    (*             --- apply ALLOC_PRESERVED; eauto. *)
-    (*             --- auto. *)
-    (*         -- (* Preserve allocation ids *) *)
-    (*           unfold preserve_allocation_ids. *)
-    (*           unfold used_allocation_id_prop. *)
+                      break_match.
+                      - break_match; split; inv Heqo; auto.
+                        apply AIDEQ.
+                      - inv Heqo.
+                    }
+                    { (* TODO: solve_access_allowed *)
+                      eapply ALLOWED.
+                    }
+                  }
 
-    (*           intros aid'. *)
-    (*           split; intros [?phys_addr [?byte ?PROP]]. *)
-    (*           ++ destruct (Z.eq_dec phys_addr (ptr_to_int ptr)) as [EQ | NEQ]. *)
-    (*              ** (* Know aid' = aid by Hlookup *) *)
-    (*                repeat eexists; cbn. *)
-    (*                rewrite set_byte_raw_eq; eauto. *)
-    (*                subst. *)
-    (*                rewrite Hlookup in PROP. *)
-    (*                inv PROP. *)
-    (*                eauto. *)
-    (*              ** repeat eexists; cbn. *)
-    (*                 rewrite set_byte_raw_neq; eauto. *)
-    (*           ++ destruct (Z.eq_dec phys_addr (ptr_to_int ptr)) as [EQ | NEQ]. *)
-    (*              ** (* Know aid' = aid by Hlookup *) *)
-    (*                repeat eexists; cbn. *)
-    (*                cbn in PROP. *)
-    (*                unfold_mem_state_memory. *)
-    (*                unfold_mem_state_memory_in PROP. *)
-    (*                unfold_mem_state_memory_in Hlookup. *)
-    (*                subst. *)
+                  { (* Read fails *)
+                    destruct ALLOCATED as [_ EQ].
+                    inv EQ.
+                  }
+                - (* TODO: solve_read_byte_prop. *)
+                  apply read_byte_value in READBYTE.
+                  (* TODO: is there a way to avoid having to do these destructs before eexists? *)
+                  unfold read_byte_prop, read_byte_MemPropT in *.
+                  cbn in READBYTE. cbn.
+                  destruct READBYTE as [ms' [ms'' [[EQ1 EQ2] READBYTE]]]; subst.
 
-    (*                rewrite set_byte_raw_eq in PROP; inv PROP; eauto. *)
-    (*              ** repeat eexists; cbn. *)
-    (*                 cbn in PROP. *)
-    (*                 unfold_mem_state_memory. *)
-    (*                 unfold_mem_state_memory_in PROP. *)
-    (*                 unfold_mem_state_memory_in Hlookup. *)
+                  repeat eexists.
+                  cbn.
+                  rewrite set_byte_raw_neq; [| solve [eauto]].
+                  break_match; [break_match|].
+                  { destruct READBYTE; split; auto.
+                  }
+                  { firstorder.
+                  }
+                  { firstorder.
+                  }
+              }
 
-    (*                 rewrite set_byte_raw_neq in PROP; eauto. *)
-    (*   + (* Access forbidden *) *)
+              { split.
+                - (* TODO: solve_read_byte_allowed *)
+                  apply read_byte_allowed_spec in READBYTE.
+                  (* TODO: is there a way to avoid having to do these destructs before eexists? *)
+                  destruct READBYTE as [aid' [ALLOCATED ALLOWED]].
+                  unfold byte_allocated, byte_allocated_MemPropT in ALLOCATED.
+                  cbn in ALLOCATED.
+                  destruct ALLOCATED as [ms' [ms'' [[EQ1 EQ2] ALLOCATED]]]; subst.
+                  destruct ALLOCATED as [ms'' [a [ALLOCATED [EQ1 EQ2]]]]; subst.
+                  destruct ALLOCATED as [ms'' [ms''' [[EQ1 EQ2] ALLOCATED]]]; subst.
+                  break_match_hyp.
+                  break_match_hyp.
+                  { (* Read of ptr' succeeds *)
+                    destruct ALLOCATED as [_ AIDEQ].
 
-    (*     (* Executable has encountered UB... *)
+                    eexists; split.
+                    { (* TODO: solve_byte_allocated *)
+                      cbn.
+                      repeat eexists.
+                      cbn.
+                      cbn in Heqo.
+                      rewrite set_byte_raw_neq in Heqo; [| solve [eauto]].
 
-    (*        That means UB must occur in the prop model. *)
-    (*     *) *)
-    (*     MemMonad_solve. *)
-    (*     intros [?err | [[?ms' ?res] | ?oom]]. *)
+                      break_match.
+                      - break_match; split; inv Heqo; auto.
+                        apply AIDEQ.
+                      - inv Heqo.
+                    }
+                    { (* TODO: solve_access_allowed *)
+                      eapply ALLOWED.
+                    }
+                  }
 
-    (*     * intros CONTRA. *)
-    (*       cbn in CONTRA. *)
-    (*       destruct CONTRA. *)
+                  { (* Read fails *)
+                    destruct ALLOCATED as [_ EQ].
+                    inv EQ.
+                  }
+                - (* TODO: solve_read_byte_prop. *)
+                  apply read_byte_value in READBYTE.
+                  (* TODO: is there a way to avoid having to do these destructs before eexists? *)
+                  unfold read_byte_prop, read_byte_MemPropT in *.
+                  cbn in READBYTE. cbn.
+                  destruct READBYTE as [ms' [ms'' [[EQ1 EQ2] READBYTE]]]; subst.
 
-    (* (* Ltac intros_mempropt_contra := *) *)
-    (* (*   intros [?err | [[?ms' ?res] | ?oom]]; *) *)
-    (* (*   match goal with *) *)
-    (* (*   | |- ~ _ => *) *)
-    (* (*       let CONTRA := fresh "CONTRA" in *) *)
-    (* (*       let err := fresh "err" in *) *)
-    (* (*       intros CONTRA; *) *)
-    (* (*       destruct CONTRA as [err [CONTRA | CONTRA]]; auto; *) *)
-    (* (*       destruct CONTRA as (? & ? & (? & ?) & CONTRA); subst *) *)
-    (* (*   | |- ~ _ => *) *)
-    (* (*       let CONTRA := fresh "CONTRA" in *) *)
-    (* (*       let err := fresh "err" in *) *)
-    (* (*       intros CONTRA; *) *)
-    (* (*       destruct CONTRA as (? & ? & (? & ?) & CONTRA); subst *) *)
-    (* (*   end. *) *)
+                  repeat eexists.
+                  cbn in READBYTE.
+                  rewrite set_byte_raw_neq in READBYTE; [| solve [eauto]].
+                  break_match; [break_match|].
+                  { destruct READBYTE; split; auto.
+                  }
+                  { firstorder.
+                  }
+                  { firstorder.
+                  }
+              }
+          * (* TODO: solve_write_byte_operation_invariants *)
+            split.
+            -- (* Allocations preserved *)
+              (* TODO: solve_allocations_preserved *)
+              unfold allocations_preserved.
+              intros addr aid'.
+              split.
+              { (* TODO: solve_byte_allocated *)                
+                intros ALLOC.
 
-    (*       admit. *)
-    (*     * admit. *)
-    (*     * admit. *)
-    (*   - (* Unallocated memory *) *)
-    (*     MemMonad_solve. *)
-    (*     admit. *)
-    (* Admitted. *)
+                Ltac solve_byte_allocated ::=
+                  repeat eexists;
+                  first [ cbn; (* This was unfold_mem_state_memory, but I think with read_byte_raw / write_byte raw opaque it's fine to cbn *)
+                          rewrite set_byte_raw_eq; [|solve [eauto]]
+                        | subst_mempropt
+                    ];
+                  split; try reflexivity;
+                  first [rewrite aid_access_allowed_refl | apply aid_eq_dec_refl]; auto.
+
+                repeat eexists.
+                cbn.
+                match goal with
+                | |- context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] =>
+                    pose proof Z.eq_dec p1 p2 as [NDISJOINT | DISJOINT]
+                end.
+
+                - rewrite set_byte_raw_eq; [| solve [eauto]].
+                  split; auto.
+                  destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+                  rename ms' into ms.
+                  destruct ALLOC as [ms' [b [ALLOC [EQ1 EQ2]]]]; subst.
+                  destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+                  rewrite NDISJOINT in *.
+                  rewrite READ in *.
+                  destruct ALLOC; auto.
+                - rewrite set_byte_raw_neq; [| solve [eauto]].
+                  destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+                  rename ms' into ms.
+                  destruct ALLOC as [ms' [b [ALLOC [EQ1 EQ2]]]]; subst.
+                  destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+
+                  break_match.
+                  + break_match.
+                    destruct ALLOC; auto.
+                  + destruct ALLOC as [_ CONTRA].
+                    inv CONTRA.
+              }
+{ (* TODO: solve_byte_allocated *)                
+                intros ALLOC.
+
+                Ltac solve_byte_allocated ::=
+                  repeat eexists;
+                  first [ cbn; (* This was unfold_mem_state_memory, but I think with read_byte_raw / write_byte raw opaque it's fine to cbn *)
+                          rewrite set_byte_raw_eq; [|solve [eauto]]
+                        | subst_mempropt
+                    ];
+                  split; try reflexivity;
+                  first [rewrite aid_access_allowed_refl | apply aid_eq_dec_refl]; auto.
+
+                repeat eexists.
+                cbn.
+                cbn in ALLOC.
+                destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+                destruct ALLOC as [ms' [b [ALLOC [EQ1 EQ2]]]]; subst.
+                destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+                cbn in ALLOC.
+
+                match goal with
+                | ALLOC : context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] |- _ =>
+                    pose proof Z.eq_dec p1 p2 as [NDISJOINT | DISJOINT]
+                end.
+
+                - rewrite NDISJOINT in *.
+                  rewrite set_byte_raw_eq in ALLOC; [| solve [eauto]].
+                  rewrite READ in *.
+                  tauto.
+                - rewrite set_byte_raw_neq in ALLOC; [| solve [eauto]].
+                  break_match.
+                  + break_match. tauto.
+                  + tauto.
+              }
+            -- (* Frame stack preserved *)
+              solve_frame_stack_preserved.
+            -- (* TODO: solve_read_byte_allowed_all_preserved *)
+              unfold read_byte_allowed_all_preserved.
+              intros addr.
+              split; intros [aid' [ALLOC ALLOWED]]; exists aid'.
+              { split; repeat eexists; cbn.
+                - match goal with
+                  | |- context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] =>
+                      pose proof Z.eq_dec p1 p2 as [NDISJOINT | DISJOINT]
+                  end.
+                  + rewrite NDISJOINT in *.
+                    rewrite set_byte_raw_eq; [| solve [eauto]].
+                    split; auto.
+                    unfold byte_allocated, byte_allocated_MemPropT in ALLOC.
+                    cbn in ALLOC.
+                    destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    break_match_hyp.
+                    break_match_hyp.
+                    inversion READ; subst.
+                    tauto.
+                    destruct ALLOC as [_ CONTRA].
+                    inv CONTRA.
+                  + rewrite set_byte_raw_neq; [| solve [eauto]].
+                    unfold byte_allocated, byte_allocated_MemPropT in ALLOC.
+                    cbn in ALLOC.
+                    destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    break_match_hyp.
+                    break_match_hyp.
+                    inversion READ; subst.
+                    tauto.
+                    destruct ALLOC as [_ CONTRA].
+                    inv CONTRA.
+                - auto.
+              }
+              { split; repeat eexists; cbn.
+                - cbn in ALLOC.
+                  destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+                  destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                  destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                  cbn in ALLOC.
+                  match goal with
+                  | ALLOC : context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] |- _ =>
+                      pose proof Z.eq_dec p1 p2 as [NDISJOINT | DISJOINT]
+                  end.
+                  + rewrite NDISJOINT in *.
+                    rewrite set_byte_raw_eq in ALLOC; [| solve [eauto]].
+                    rewrite READ in *.
+                    tauto.
+                  + rewrite set_byte_raw_neq in ALLOC; [| solve [eauto]].
+                    break_match_hyp.
+                    break_match_hyp.
+                    tauto.
+                    tauto.
+                - auto.
+              }
+            -- (* TODO: solve_write_byte_allowed_all_preserved *)
+              intros addr.
+              split; intros [aid' [ALLOC ALLOWED]]; exists aid'.
+              { split; repeat eexists; cbn.
+                - match goal with
+                  | |- context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] =>
+                      pose proof Z.eq_dec p1 p2 as [NDISJOINT | DISJOINT]
+                  end.
+                  + rewrite NDISJOINT in *.
+                    rewrite set_byte_raw_eq; [| solve [eauto]].
+                    split; auto.
+                    unfold byte_allocated, byte_allocated_MemPropT in ALLOC.
+                    cbn in ALLOC.
+                    destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    break_match_hyp.
+                    break_match_hyp.
+                    inversion READ; subst.
+                    tauto.
+                    destruct ALLOC as [_ CONTRA].
+                    inv CONTRA.
+                  + rewrite set_byte_raw_neq; [| solve [eauto]].
+                    unfold byte_allocated, byte_allocated_MemPropT in ALLOC.
+                    cbn in ALLOC.
+                    destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    break_match_hyp.
+                    break_match_hyp.
+                    inversion READ; subst.
+                    tauto.
+                    destruct ALLOC as [_ CONTRA].
+                    inv CONTRA.
+                - auto.
+              }
+              { split; repeat eexists; cbn.
+                - cbn in ALLOC.
+                  destruct ALLOC as [ms' [ms'' [[EQ1 EQ2] ALLOC]]]; subst.
+                  destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                  destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                  cbn in ALLOC.
+                  match goal with
+                  | ALLOC : context [ read_byte_raw (set_byte_raw _ ?p1 _) ?p2 ] |- _ =>
+                      pose proof Z.eq_dec p1 p2 as [NDISJOINT | DISJOINT]
+                  end.
+                  + rewrite NDISJOINT in *.
+                    rewrite set_byte_raw_eq in ALLOC; [| solve [eauto]].
+                    rewrite READ in *.
+                    tauto.
+                  + rewrite set_byte_raw_neq in ALLOC; [| solve [eauto]].
+                    break_match_hyp.
+                    break_match_hyp.
+                    tauto.
+                    tauto.
+                - auto.
+              }
+            -- (* TODO: solve_preserve_allocation_ids *)
+              unfold preserve_allocation_ids.
+              unfold used_allocation_id_prop.
+              intros aid'.
+              split; intros [addr [sbyte' READ']]; cbn in *.
+              { pose proof Z.eq_dec (ptr_to_int ptr) addr as [NDISJOINT | DISJOINT];
+                  exists addr; eexists.
+                - rewrite NDISJOINT in *.
+                  rewrite READ in *.
+                  inv READ'.
+                  rewrite set_byte_raw_eq; [| solve [eauto]].
+                  reflexivity.
+                - rewrite set_byte_raw_neq; [| solve [eauto]]; eauto.
+              }
+              { pose proof Z.eq_dec (ptr_to_int ptr) addr as [NDISJOINT | DISJOINT];
+                  exists addr; eexists.
+                - rewrite NDISJOINT in *.
+                  rewrite READ in *.
+                  rewrite set_byte_raw_eq in READ'; [| solve [eauto]].
+                  inv READ'.
+                  reflexivity.
+                - rewrite set_byte_raw_neq in READ'; [| solve [eauto]]; eauto.
+              }
+      - (* UB due to provenance *)
+        left.
+        Ltac solve_write_byte_MemPropT_contra READ ACCESS :=
+          intros [err | [[ms' sbyte'] | oom]] CONTRA;
+          solve [firstorder; subst; cbn in *;
+                 try rewrite READ in *; cbn in *;
+                 try rewrite ACCESS in *; cbn in *;
+                 firstorder].
+
+        intros [err | [[ms' sbyte'] | oom]] CONTRA.
+        { (* ERROR *)
+          firstorder.
+        }
+        { (* Access not allowed *)
+          inversion CONTRA.
+          unfold write_byte_allowed in *.
+          unfold byte_allocated, byte_allocated_MemPropT in *.
+          unfold addr_allocated_prop in *.
+          destruct byte_write_succeeds0 as [aid' [ALLOC ALLOWED]].
+
+          cbn in ALLOC.
+          destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+          rename ms'' into ms.
+          destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+          destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+          rewrite READ in *.
+          destruct ALLOC as [EQ AID_ALLOWED].
+
+          destruct (aid_eq_dec aid' aid); inv AID_ALLOWED.
+          rewrite ACCESS in ALLOWED; inv ALLOWED.
+        }
+        { (* OOM *)
+          firstorder.
+        }
+      - (* UB from accessing unallocated memory *)
+        left.
+        intros [err | [[ms' sbyte'] | oom]] CONTRA.
+        { (* ERROR *)
+          firstorder.
+        }
+        { (* Accessing unallocated memory *)
+          inversion CONTRA.
+          unfold write_byte_allowed in *.
+          unfold byte_allocated, byte_allocated_MemPropT in *.
+          unfold addr_allocated_prop in *.
+          destruct byte_write_succeeds0 as [aid' [ALLOC ALLOWED]].
+
+          cbn in ALLOC.
+          destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+          rename ms'' into ms.
+          destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+          destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+          rewrite READ in *.
+          destruct ALLOC as [EQ AID_ALLOWED].
+          inv AID_ALLOWED.
+        }
+        { (* OOM *)
+          firstorder.
+        }
+
+        Unshelve.
+        all: exact ""%string.
+    Qed.
 
     Parameter allocate_bytes_correct :
       forall dt init_bytes, exec_correct (allocate_bytes dt init_bytes) (allocate_bytes_spec_MemPropT dt init_bytes).

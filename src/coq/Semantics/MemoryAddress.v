@@ -12,6 +12,7 @@
 Require Import String.
 Require Import OrderedType OrderedTypeEx.
 Require Import ZArith.
+Require Import Coqlib.
 
 From Vellvm Require Import
      Syntax.DynamicTypes
@@ -138,6 +139,22 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
   (* Lemmas *)
   Parameter aid_access_allowed_refl :
     forall aid, aid_access_allowed aid aid = true.
+
+  Parameter provenance_eq_dec :
+    forall (pr pr' : Provenance),
+      {pr = pr'} + {pr <> pr'}.
+
+  Parameter provenance_eq_dec_refl :
+    forall (pr : Provenance),
+      true = (provenance_eq_dec pr pr).
+
+  Parameter aid_eq_dec :
+    forall (aid aid' : AllocationId),
+      {aid = aid'} + {aid <> aid'}.
+
+  Parameter aid_eq_dec_refl :
+    forall (aid : AllocationId),
+      true = (aid_eq_dec aid aid).
 
   (* Debug *)
   Parameter show_prov : Prov -> string.

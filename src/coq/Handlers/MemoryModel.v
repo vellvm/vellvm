@@ -1063,7 +1063,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     := fun m1 res =>
          match res with
          | inr (NoOom (m2, _)) => write_byte_spec m1 ptr byte m2
-         | _ => True (* Allowed to run out of memory or fail *)
+         | _ => False (* Not allowed to run out of memory or fail *)
          end.
 
   (*** Allocating bytes in memory *)
