@@ -748,58 +748,46 @@ Section ExpGenerators.
        | _ => lift failGen
        end.
 
-
-Fixpoint get_index_paths_from_AoV (sz: nat) (t: typ) (sub_paths: list (typ * list N)) (pre_path: list N): list (typ * list N) :=
+(* Generator GEP part *)
+(* Get index paths from array or vector*)
+Fixpoint get_index_paths_from_AoV (sz: nat) (t: typ) (sub_paths: list (typ * list Z)) (pre_path: list Z): list (typ * list Z) :=
   match sz with 
   | 0%nat => []
-  | S z => map (fun '(t, p) => (t, pre_path ++ [N.of_nat z] ++ p)) sub_paths ++ get_index_paths_from_AoV z t sub_paths pre_path
+  | S z => map (fun '(t, p) => (t, pre_path ++ [Z.of_nat z] ++ p)) sub_paths ++ get_index_paths_from_AoV z t sub_paths pre_path
   end.
 
-(* Adding prepath because *)
-
-Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list N) {struct t_from}: list (typ * list (N)) :=
-  let cur_path := pre_path ++ [0%N] in
+(* Can work after extracting the pointer inside*)
+Fixpoint get_index_paths_aux (t_from : typ) (pre_path : list Z) {struct t_from}: list (typ * list (Z)) :=
   match t_from with
   | TYPE_Array sz t => 
-  let sub_paths := get_index_paths_aux t [] in
-  [(t_from, pre_path)] ++ get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path
+  let sub_paths := get_index_paths_aux t [] in (* Get index path from the first element*)
+  [(t_from, pre_path)] (* The path to the array *)
+    ++ get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path (* Assemble them into 1*)
   | TYPE_Vector sz t => let sub_paths := get_index_paths_aux t [] in
   [(t_from, pre_path)] ++ get_index_paths_from_AoV (N.to_nat sz) t sub_paths pre_path
   | TYPE_Struct fields => [(t_from, pre_path)] ++ get_index_paths_from_struct fields pre_path 0
   | TYPE_Packed_struct fields => [(t_from, pre_path)] ++ get_index_paths_from_struct fields pre_path 0
   | t => [(t, pre_path)]
   end with 
-  get_index_paths_from_struct (fields: list typ) (pre_path: list N) (current_index : N) {struct fields}: list (typ * list N) := 
+  get_index_paths_from_struct (fields: list typ) (pre_path: list Z) (current_index : Z) {struct fields}: list (typ * list Z) := 
   match fields with
   | nil => nil
   | h::t => let head_list := map (fun '(t, p) => (t, pre_path ++ [current_index] ++ p)) (get_index_paths_aux h []) in
-  let tail_list := get_index_paths_from_struct t pre_path (current_index + 1%N) in
+  let tail_list := get_index_paths_from_struct t pre_path (current_index + 1%Z) in
   head_list ++ tail_list
   end.
-  Definition get_index_paths (t_from: typ) : list (typ * list (N)) :=
-    map (fun '(t, path) => (t, [0%N] ++ path)) (get_index_paths_aux t_from []).
-
-    (*
-Example t4:
-get_index_paths_aux (TYPE_Struct [TYPE_Array 3 TYPE_Metadata; TYPE_Metadata]) [] = [].
-Proof. simpl. Abort.
-
-Example t1:
-get_index_paths_aux (TYPE_Pointer TYPE_Metadata) [] = [].
-Proof. simpl. Abort.
-Example t2: get_index_paths_aux (TYPE_Array 3 (TYPE_Struct [TYPE_Metadata; (TYPE_Array 5 TYPE_Metadata)])) [] = [].
-  Proof. simpl. Abort.
-Example t3:
-get_index_paths_aux (TYPE_Array 3 (TYPE_Struct [TYPE_Pointer TYPE_Metadata; (TYPE_Array 5 TYPE_Metadata)])) [] = [].
-Proof. simpl. Abort.
-
-  Example t2:
-  get_index_paths (TYPE_Array 3 (TYPE_Struct [TYPE_Metadata; (TYPE_Array 5 TYPE_Metadata)])) = [].
-  Proof. 
-Example t1:
-get_index_paths TYPE_Metadata = [].
-Proof. Abort.
-*)
+  Definition get_index_paths_ptr (t_from: typ) : list (typ * list (Z)) :=
+    map (fun '(t, path) => (t, [0%Z] ++ path)) (get_index_paths_aux t_from nil).
+Search filter.
+  Definition get_index_paths_agg (t_from: typ) : list (typ * list (Z)) :=
+    let edited_path := map (fun '(t, path) => match path with 
+                            | hd::tl => (t, tl)
+                            | _ => (t, path)
+    end) (get_index_paths_aux t_from nil) in 
+    filter (fun '(_,path) => match path with 
+                              | nil => false
+                              | _ => true
+    end) edited_path.
 
 (*filter all the (ident, typ) in ctx such that typ is a ptr*)
 Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
@@ -811,20 +799,36 @@ Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
 Definition gen_gep : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
   let ptrs_in_context := filter_ptr_typs ctx in
-  '(ptr_variable, tptr) <- (oneOf_LLVM (map ret ptrs_in_context));;
+  '(id, tptr) <- (oneOf_LLVM (map ret ptrs_in_context));;
   let get_typ_from_ptr (ptr: typ) : typ :=
   match ptr with 
   | TYPE_Pointer t => t 
   | _ => ptr  (* Not gonna happened*)
   end in
   let t_in_ptr := get_typ_from_ptr tptr in (* Getting the inner type in the pointer*)
-  let paths_in_ptr := get_index_paths t_in_ptr in (* Inner paths: Paths after removing the outer pointer*)
+  let paths_in_ptr := get_index_paths_ptr t_in_ptr in (* Inner paths: Paths after removing the outer pointer*)
   '(t, path) <- oneOf_LLVM (map ret paths_in_ptr);; (* Select one path from the paths*)
-  let path_for_gep := map (fun x => (TYPE_I 64, EXP_Integer (Z.of_N x))) path in (* Turning the path to integer*)
+  let path_for_gep := map (fun x => (TYPE_I 32, EXP_Integer (x))) path in (* Turning the path to integer*)
    (* Refer to function get_int_typ*)
   ret (TYPE_Pointer t, INSTR_Op (OP_GetElementPtr t_in_ptr 
-                    (tptr, EXP_Ident ptr_variable) path_for_gep)).
-  
+                    (tptr, EXP_Ident id) path_for_gep)).
+
+Definition gen_extractvalue : GenLLVM (typ * instr typ) :=
+  ctx <- get_ctx;;
+  let filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ):=
+    filter (fun '(_, t) => match t with 
+                            | TYPE_Array _ _ => true 
+                            | TYPE_Vector _ _ => true 
+                            | TYPE_Struct _ => true 
+                            | TYPE_Packed_struct _ => true 
+                            | _ => false 
+    end ) ctx in
+  let agg_in_context := filter_agg_typs ctx in
+  '(id, tagg) <- (oneOf_LLVM (map ret agg_in_context));;
+  let paths_in_agg := get_index_paths_agg tagg in 
+  '(t, path_for_extractvalue) <- oneOf_LLVM (map ret paths_in_agg);;
+  ret (t, INSTR_Op (OP_ExtractValue (tagg, EXP_Ident id) path_for_extractvalue)).
+
 
 
 
@@ -1049,6 +1053,7 @@ Section InstrGenerators.
       ; gen_load
       ; gen_store
       ; gen_gep
+      ; gen_extractvalue
       (* TODO: Generate atomic operations and other instructions *)
       ].
 
