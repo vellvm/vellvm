@@ -91,8 +91,8 @@ End PTOI.
 
 (* TODO: Should provenance just be a typeclass? *)
 (* Monad class *)
-Class MonadAllocationId (AllocationId : Type) (M : Type -> Type) : Type :=
-  { fresh_allocation_id : M AllocationId;
+Class MonadProvenance (Provenance : Type) (M : Type -> Type) : Type :=
+  { fresh_provenance : M Provenance;
   }.
 
 (* TODO: move this?
@@ -136,6 +136,9 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
   Parameter initial_provenance : Provenance.
   Parameter next_provenance : Provenance -> Provenance.
 
+  (* Way easier to keep track of provenances in use if they're ordered... *)
+  Parameter provenance_le : Provenance -> Provenance -> Prop.
+
   (* Lemmas *)
   Parameter aid_access_allowed_refl :
     forall aid, aid_access_allowed aid aid = true.
@@ -155,6 +158,17 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
   Parameter aid_eq_dec_refl :
     forall (aid : AllocationId),
       true = (aid_eq_dec aid aid).
+
+  Parameter provenance_le_trans : Transitive provenance_le.
+  Parameter provenance_le_refl : Reflexive provenance_le.
+
+  Parameter provenance_le_next_provenance :
+    forall pr,
+      provenance_le pr (next_provenance pr).
+
+  Parameter provenance_le_next_provenance_antisym :
+    forall pr,
+      ~ provenance_le (next_provenance pr) pr.
 
   (* Debug *)
   Parameter show_prov : Prov -> string.

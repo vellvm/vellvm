@@ -412,6 +412,15 @@ Definition err_ub_oom : Type -> Type
 Arguments ERR_UB_OOM {_ _} _.
 Arguments unERR_UB_OOM {_ _} _.
 
+Definition run_err_ub_oom_T {M : Type -> Type} {A} (euo : err_ub_oom_T M A) : M (OOM_MESSAGE + (UB_MESSAGE + (ERR_MESSAGE + A)))%type :=
+       match euo with
+       | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT x))) =>
+           x
+       end.
+
+Definition run_err_ub_oom {A} (euo : err_ub_oom A) : (OOM_MESSAGE + (UB_MESSAGE + (ERR_MESSAGE + A)))%type :=
+  IdentityMonad.unIdent (run_err_ub_oom_T euo).
+
 #[global] Instance err_ub_oom_T_MT {M : Type -> Type} `{HM: Monad M} : MonadT (err_ub_oom_T M) M.
 Proof.
   constructor.

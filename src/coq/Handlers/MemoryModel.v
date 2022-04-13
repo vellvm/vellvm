@@ -100,8 +100,12 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
   Parameter mem_state_frame_stack_prop : MemState -> FrameStack -> Prop.
 
-  (** Allocation ids / store ids*)
-  Parameter used_allocation_id_prop : MemState -> AllocationId -> Prop.
+  (** Provenances *)
+  Parameter used_provenance_prop : MemState -> Provenance -> Prop. (* Has a provenance *ever* been used. *)
+  Parameter get_fresh_provenance : MemState -> Provenance. (* Allocate a new fresh provenance *)
+  Parameter get_fresh_provenance_fresh :
+    forall (ms : MemState),
+      ~ used_provenance_prop ms (get_fresh_provenance ms).
 End MemoryModelSpecPrimitives.
 
 Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL).
@@ -799,7 +803,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
   Import MemHelpers.
 
   Definition read_byte_prop (ms : MemState) (ptr : addr) (byte : SByte) : Prop
-    := read_byte_MemPropT ptr ms (inr (NoOom (ms, byte))).
+    := read_byte_MemPropT ptr ms (ret (ms, byte)).
 
   Definition byte_allocated_MemPropT (ptr : addr) (aid : AllocationId) : MemPropT MemState unit :=
     m <- get_mem_state;;
@@ -807,7 +811,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     MemPropT_assert (b = true).
 
   Definition byte_allocated (ms : MemState) (ptr : addr) (aid : AllocationId) : Prop
-    := byte_allocated_MemPropT ptr aid ms (inr (NoOom (ms, tt))).
+    := byte_allocated_MemPropT ptr aid ms (ret (ms, tt)).
 
   Definition byte_not_allocated (ms : MemState) (ptr : addr) : Prop
     := forall (aid : AllocationId), ~ byte_allocated ms ptr aid.
@@ -846,13 +850,13 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     forall ptr aid, byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid.
 
   (** Provenances / allocation ids *)
-  Definition extend_allocation_ids (ms : MemState) (new_aid : AllocationId) (ms' : MemState) : Prop
-    := (forall aid, used_allocation_id_prop ms aid -> used_allocation_id_prop ms' aid) /\
-         ~ used_allocation_id_prop ms new_aid /\
-         used_allocation_id_prop ms' new_aid.
+  Definition extend_provenance (ms : MemState) (new_pr : Provenance) (ms' : MemState) : Prop
+    := (forall pr, used_provenance_prop ms pr -> used_provenance_prop ms' pr) /\
+         ~ used_provenance_prop ms new_pr /\
+         used_provenance_prop ms' new_pr.
 
   Definition preserve_allocation_ids (ms ms' : MemState) : Prop
-    := forall p, used_allocation_id_prop ms p <-> used_allocation_id_prop ms' p.
+    := forall p, used_provenance_prop ms p <-> used_provenance_prop ms' p.
 
   (** Store ids *)
   Definition used_store_id_prop (ms : MemState) (sid : store_id) : Prop
@@ -866,22 +870,35 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     := forall fs,
       mem_state_frame_stack_prop m1 fs <-> mem_state_frame_stack_prop m2 fs.
 
-  (*** Allocation id operations *)
-  #[global] Instance MemPropT_MonadAllocationId : MonadAllocationId AllocationId (MemPropT MemState).
+  (*** Provenance operations *)
+  #[global] Instance MemPropT_MonadProvenance : MonadProvenance Provenance (MemPropT MemState).
   Proof.
+    (* Need to be careful with allocation ids / provenances (more so than store ids)
+
+       They can never be reused. E.g., if you have a pointer `p` with
+       allocation id `aid`, and that block is freed, you can't reuse
+       `aid` without causing problems. If you allocate a new block
+       with `aid` again, then `p` may still be around and may be able
+       to access the block.
+
+       Therefore the MemState has to have some idea of what allocation
+       ids have been used in the past, not just the allocation ids
+       that are *currently* in use.
+    *)
     split.
-    - (* fresh_allocation_id *)
+    - (* fresh_provenance *)
       unfold MemPropT.
-      intros ms [err | [[ms' new_aid] | oom]].
+      intros ms [[[[[[[oom_res] | [[ub_res] | [[err_res] | [ms' new_pr]]]]]]]]].
+      + exact True.
+      + exact False.
       + exact True.
       + exact
-          ( extend_allocation_ids ms new_aid ms' /\
+          ( extend_provenance ms new_pr ms' /\
               read_byte_preserved ms ms' /\
               write_byte_allowed_all_preserved ms ms' /\
               allocations_preserved ms ms' /\
               frame_stack_preserved ms ms'
           ).
-      + exact True.
   Defined.
 
   (*** Store id operations *)
@@ -890,7 +907,9 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
     split.
     - (* fresh_sid *)
       unfold MemPropT.
-      intros ms [err | [[ms' new_sid] | oom]].
+      intros ms [[[[[[[oom_res] | [[ub_res] | [[err_res] | [ms' new_sid]]]]]]]]].
+      + exact True.
+      + exact False.
       + exact True.
       + exact
           ( fresh_store_id ms' new_sid /\
@@ -900,7 +919,6 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
               allocations_preserved ms ms' /\
               frame_stack_preserved ms ms'
           ).
-      + exact True.
   Defined.
 
   (*** Reading from memory *)
@@ -911,9 +929,15 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Definition read_byte_spec_MemPropT (ptr : addr) : MemPropT MemState SByte :=
     fun m1 res =>
-      match res with
-      | inr (NoOom (m2, byte)) => m1 = m2 /\ read_byte_spec m1 ptr byte
-      | _ => True (* Allowed to run out of memory or fail *)
+      match run_err_ub_oom res with
+      | inl (OOM_message x) =>
+          True
+      | inr (inl (UB_message x)) =>
+          forall byte, ~ read_byte_spec m1 ptr byte
+      | inr (inr (inl (ERR_message x))) =>
+          True
+      | inr (inr (inr (m2, byte))) =>
+          m1 = m2 /\ read_byte_spec m1 ptr byte
       end.
 
   (*** Framestack operations *)
@@ -967,9 +991,15 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Definition mempush_spec_MemPropT : MemPropT MemState unit :=
     fun m1 res =>
-      match res with
-      | inr (NoOom (m2, _)) => mempush_spec m1 m2
-      | _ => True (* Allowed to run out of memory or fail *)
+      match run_err_ub_oom res with
+      | inl (OOM_message x) =>
+          True
+      | inr (inl (UB_message x)) =>
+          forall m2, ~ mempush_spec m1 m2
+      | inr (inr (inl (ERR_message x))) =>
+          True
+      | inr (inr (inr (m2, tt))) =>
+          mempush_spec m1 m2
       end.
 
   (** mempop *)
@@ -1011,9 +1041,15 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Definition mempop_spec_MemPropT : MemPropT MemState unit :=
     fun m1 res =>
-      match res with
-      | inr (NoOom (m2, _)) => mempop_spec m1 m2
-      | _ => True (* Allowed to run out of memory or fail *)
+      match run_err_ub_oom res with
+      | inl (OOM_message x) =>
+          True
+      | inr (inl (UB_message x)) =>
+          forall m2, ~ mempop_spec m1 m2
+      | inr (inr (inl (ERR_message x))) =>
+          True
+      | inr (inr (inr (m2, tt))) =>
+          mempop_spec m1 m2
       end.
 
   (* Add a pointer onto the current frame in the frame stack *)
@@ -1061,32 +1097,33 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Definition write_byte_spec_MemPropT (ptr : addr) (byte : SByte) : MemPropT MemState unit
     := fun m1 res =>
-         match res with
-         | inr (NoOom (m2, _)) => write_byte_spec m1 ptr byte m2
-         | _ => False (* Not allowed to run out of memory or fail *)
+         match run_err_ub_oom res with
+         | inl (OOM_message x) =>
+             True
+         | inr (inl (UB_message x)) =>
+             forall m2, ~ write_byte_spec m1 ptr byte m2
+         | inr (inr (inl (ERR_message x))) =>
+             True
+         | inr (inr (inr (m2, tt))) =>
+             write_byte_spec m1 ptr byte m2
          end.
 
   (*** Allocating bytes in memory *)
-  Record allocate_bytes_succeeds_spec (m1 : MemState) (t : dtyp) (init_bytes : list SByte) (aid : AllocationId) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
+  Record allocate_bytes_succeeds_spec (m1 : MemState) (t : dtyp) (init_bytes : list SByte) (pr : Provenance) (m2 : MemState) (ptr : addr) (ptrs : list addr) : Prop :=
     {
       (* The allocated pointers are consecutive in memory. *)
       (* m1 doesn't really matter here. *)
-      allocate_bytes_consecutive : get_consecutive_ptrs ptr (length init_bytes) m1 (inr (NoOom (m1, ptrs)));
+      allocate_bytes_consecutive : get_consecutive_ptrs ptr (length init_bytes) m1 (ret (m1, ptrs));
 
       (* Provenance *)
-      allocate_bytes_address_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov aid;
-
-      (* Allocation ids *)
-      allocate_bytes_aid_fresh : ~ used_allocation_id_prop m1 aid;
-      allocate_bytes_aid : used_allocation_id_prop m2 aid;
-      allocate_bytes_aids_preserved :
-      forall aid',
-        aid <> aid' ->
-        (used_allocation_id_prop m1 aid' <-> used_allocation_id_prop m2 aid');
+      allocate_bytes_address_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr);
+      allocate_bytes_provenances_preserved :
+      forall pr',
+        (used_provenance_prop m1 pr' <-> used_provenance_prop m2 pr');
 
       (* byte_allocated *)
       allocate_bytes_was_fresh_byte : forall ptr, In ptr ptrs -> byte_not_allocated m1 ptr;
-      allocate_bytes_now_byte_allocated : forall ptr, In ptr ptrs -> byte_allocated m2 ptr aid;
+      allocate_bytes_now_byte_allocated : forall ptr, In ptr ptrs -> byte_allocated m2 ptr (provenance_to_allocation_id pr);
       allocate_bytes_preserves_old_allocations :
       forall ptr aid,
         ~ In ptr ptrs ->
@@ -1136,19 +1173,24 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       t <> DTYPE_Void;
     }.
 
-  Definition allocate_bytes_spec_MemPropT' (t : dtyp) (init_bytes : list SByte) (aid : AllocationId)
+  Definition allocate_bytes_spec_MemPropT' (t : dtyp) (init_bytes : list SByte) (prov : Provenance)
     : MemPropT MemState (addr * list addr)
     := fun m1 res =>
-         match res with
-         | inr (NoOom (m2, (ptr, ptrs))) =>
-             allocate_bytes_succeeds_spec m1 t init_bytes aid m2 ptr ptrs
-         | _ => True (* Allowed to run out of memory or fail *)
+         match run_err_ub_oom res with
+         | inl (OOM_message x) =>
+             True
+         | inr (inl (UB_message x)) =>
+             forall m2 ptr ptrs, ~ allocate_bytes_succeeds_spec m1 t init_bytes prov m2 ptr ptrs
+         | inr (inr (inl (ERR_message x))) =>
+             True
+         | inr (inr (inr (m2, (ptr, ptrs)))) =>
+             allocate_bytes_succeeds_spec m1 t init_bytes prov m2 ptr ptrs
          end.
 
   Definition allocate_bytes_spec_MemPropT (t : dtyp) (init_bytes : list SByte)
     : MemPropT MemState addr
-    := aid <- fresh_allocation_id;;
-       '(ptr, _) <- allocate_bytes_spec_MemPropT' t init_bytes aid;;
+    := prov <- fresh_provenance;;
+       '(ptr, _) <- allocate_bytes_spec_MemPropT' t init_bytes prov;;
        ret ptr.
 
   (*** Aggregate things *)
@@ -1222,17 +1264,13 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
                match a with
                | DVALUE_Addr a =>
                    read_uvalue_spec t a
-               | _ =>
-                   (* UB if loading from something that isn't an address *)
-                   fun _ _ => False
+               | _ => raise_ub "Loading from something that isn't an address."
                end
            | Store t a v =>
                match a with
                | DVALUE_Addr a =>
                    write_uvalue_spec t a v
-               | _ =>
-                   (* UB if writing something to somewhere that isn't an address *)
-                   fun _ _ => False
+               | _ => raise_ub "Writing something to somewhere that isn't an address."
                end
            end.
 
@@ -1301,7 +1339,7 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     Context {MemM : Type -> Type}.
     Context {Eff : Type -> Type}.
     Context {ExtraState : Type}.
-    Context `{MM : MemMonad MemState ExtraState AllocationId MemM (itree Eff)}.
+    Context `{MM : MemMonad MemState ExtraState Provenance MemM (itree Eff)}.
 
     (*** Data types *)
     Parameter initial_memory_state : MemState.
@@ -1310,22 +1348,22 @@ Module Type MemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
     (*** Primitives on memory *)
     (** Reads *)
     Parameter read_byte :
-      forall `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)}, addr -> MemM SByte.
+      forall `{MemMonad MemState ExtraState Provenance MemM (itree Eff)}, addr -> MemM SByte.
 
     (** Writes *)
     Parameter write_byte :
-      forall `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)}, addr -> SByte -> MemM unit.
+      forall `{MemMonad MemState ExtraState Provenance MemM (itree Eff)}, addr -> SByte -> MemM unit.
 
     (** Allocations *)
     Parameter allocate_bytes :
-      forall `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)}, dtyp -> list SByte -> MemM addr.
+      forall `{MemMonad MemState ExtraState Provenance MemM (itree Eff)}, dtyp -> list SByte -> MemM addr.
 
     (** Frame stacks *)
-    Parameter mempush : forall `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)}, MemM unit.
-    Parameter mempop : forall `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)}, MemM unit.
+    Parameter mempush : forall `{MemMonad MemState ExtraState Provenance MemM (itree Eff)}, MemM unit.
+    Parameter mempop : forall `{MemMonad MemState ExtraState Provenance MemM (itree Eff)}, MemM unit.
 
     (*** Correctness *)
-    Parameter exec_correct : forall {MemM Eff ExtraState} `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X), Prop.
+    Parameter exec_correct : forall {MemM Eff ExtraState} `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} {X} (exec : MemM X) (spec : MemPropT MemState X), Prop.
 
     (** Correctness of the main operations on memory *)
     Parameter read_byte_correct :
@@ -1395,22 +1433,22 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
     Context {MemM : Type -> Type}.
     Context {Eff : Type -> Type}.
     Context {ExtraState : Type}.
-    Context `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)}.
+    Context `{MemMonad MemState ExtraState Provenance MemM (itree Eff)}.
 
     (** Reading uvalues *)
-    Definition read_bytes `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)} (ptr : addr) (len : nat) : MemM (list SByte) :=
+    Definition read_bytes `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} (ptr : addr) (len : nat) : MemM (list SByte) :=
       (* TODO: this should maybe be UB and not OOM??? *)
       ptrs <- get_consecutive_ptrs ptr len;;
 
       (* Actually perform reads *)
       Util.map_monad (fun ptr => read_byte ptr) ptrs.
 
-    Definition read_uvalue `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)} (dt : dtyp) (ptr : addr) : MemM uvalue :=
+    Definition read_uvalue `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} (dt : dtyp) (ptr : addr) : MemM uvalue :=
       bytes <- read_bytes ptr (N.to_nat (sizeof_dtyp dt));;
       lift_err_RAISE_ERROR (deserialize_sbytes bytes dt).
 
     (** Writing uvalues *)
-    Definition write_bytes `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)} (ptr : addr) (bytes : list SByte) : MemM unit :=
+    Definition write_bytes `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} (ptr : addr) (bytes : list SByte) : MemM unit :=
       (* TODO: Should this be UB instead of OOM? *)
       ptrs <- get_consecutive_ptrs ptr (length bytes);;
       let ptr_bytes := zip ptrs bytes in
@@ -1418,19 +1456,19 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       (* Actually perform writes *)
       Util.map_monad_ (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
 
-    Definition write_uvalue `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)} (dt : dtyp) (ptr : addr) (uv : uvalue) : MemM unit :=
+    Definition write_uvalue `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} (dt : dtyp) (ptr : addr) (uv : uvalue) : MemM unit :=
       bytes <- serialize_sbytes uv dt;;
       write_bytes ptr bytes.
 
     (** Allocating dtyps *)
     (* Need to make sure MemPropT has provenance and sids to generate the bytes. *)
-    Definition allocate_dtyp `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)} (dt : dtyp) : MemM addr :=
+    Definition allocate_dtyp `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} (dt : dtyp) : MemM addr :=
       sid <- fresh_sid;;
       bytes <- lift_OOM (generate_undef_bytes dt sid);;
       allocate_bytes dt bytes.
 
     (** Handle memcpy *)
-    Definition memcpy `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)} (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemM unit :=
+    Definition memcpy `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} (src dst : addr) (len : Z) (align : N) (volatile : bool) : MemM unit :=
       if Z.ltb len 0
       then
         raise_ub "memcpy given negative length."
@@ -1449,7 +1487,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
         else
           raise_ub "memcpy with overlapping or non-equal src and dst memory locations.".
 
-    Definition handle_memory `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)} : MemoryE ~> MemM
+    Definition handle_memory `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} : MemoryE ~> MemM
       := fun T m =>
            match m with
            (* Unimplemented *)
@@ -1476,7 +1514,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
                end
            end.
 
-    Definition handle_memcpy `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)} (args : list dvalue) : MemM unit :=
+    Definition handle_memcpy `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} (args : list dvalue) : MemM unit :=
       match args with
       | DVALUE_Addr dst ::
                     DVALUE_Addr src ::
@@ -1499,7 +1537,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
       | _ => raise_error "Unsupported arguments to memcpy."
       end.
 
-    Definition handle_intrinsic `{MemMonad MemState ExtraState AllocationId MemM (itree Eff)} : IntrinsicE ~> MemM
+    Definition handle_intrinsic `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} : IntrinsicE ~> MemM
       := fun T e =>
            match e with
            | Intrinsic t name args =>

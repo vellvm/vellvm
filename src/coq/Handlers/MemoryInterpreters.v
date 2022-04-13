@@ -55,20 +55,18 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     Notation Effout := (E +' F).
 
     Definition MemStateT M := stateT MemState M.
-    Definition MemStateFreshT M := stateT store_id (stateT Provenance (MemStateT M)).
+    Definition MemStateFreshT M := stateT store_id (MemStateT M).
 
     Definition MemStateFreshT_from_MemStateT {M X} `{Monad M} (mst : MemStateT M X) : MemStateFreshT M X :=
-      fun sid pr => x <- mst;; ret (pr, (sid, x)).
+      fun sid => x <- mst;; ret (sid, x).
 
     (** MemMonad Instances *)
-    #[global] Instance MemStateFreshT_MonadAllocationId M `{Monad M} : MonadAllocationId AllocationId (MemStateFreshT M).
+    #[global] Instance MemStateFreshT_Provenance M `{Monad M} : MonadProvenance Provenance (MemStateFreshT M).
     Proof.
       split.
       unfold MemStateFreshT.
-      apply (lift (pr <- get;;
-                   let pr' := next_provenance pr in
-                   put pr';;
-                   ret (provenance_to_allocation_id pr'))).
+      apply (lift (ms <- get;;
+                   ret (get_fresh_provenance ms))).
     Defined.
 
     #[global] Instance MemStateFreshT_MonadStoreId M `{Monad M} : MonadStoreId (MemStateFreshT M).
@@ -84,8 +82,8 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
     #[global] Instance MemStateFreshT_MonadMemState M `{Monad M} : MonadMemState MemState (MemStateFreshT M).
     Proof.
       split.
-      - apply (lift (lift get)).
-      - intros ms; apply (lift (lift (put ms))).
+      - apply (lift get).
+      - intros ms; apply (lift (put ms)).
     Defined.
 
     #[global] Instance MemState_StoreIdFreshness : StoreIdFreshness MemState.
@@ -94,11 +92,11 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       apply used_store_id_prop.
     Defined.
 
-    #[global] Instance MemState_AllocationIdFreshness : AllocationIdFreshness AllocationId MemState.
+    #[global] Instance MemState_ProvenanceFreshness : ProvenanceFreshness Provenance MemState.
     Proof.
       split.
-      - (* Is a store id used in a memstate *)
-        apply MMSP.used_allocation_id_prop.
+      - (* Is a provenance used in a memstate *)
+        apply MMSP.used_provenance_prop.
     Defined.
 
     #[global] Instance MemStateFreshT_MonadT {M} `{Monad M} : MonadT (MemStateFreshT M) M.
@@ -107,32 +105,29 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       unfold MemStateT.
       split.
       - intros t X.
-        intros sid pr ms.
-        apply (res <- X;; ret (ms, (pr, (sid, res)))).
+        intros sid ms.
+        apply (res <- X;; ret (ms, (sid, res))).
     Defined.
 
-    Definition MemStateFreshT_State := (store_id * Provenance)%type.
+    Definition MemStateFreshT_State := store_id.
 
     (* M may be PropT or itree... *)
     Definition MemStateFreshT_run {A} {Eff} `{FailureE -< Eff} `{OOME -< Eff} `{UBE -< Eff} (ma : MemStateFreshT (itree Eff) A) (ms : MemState) (st : MemStateFreshT_State) : itree Eff (MemStateFreshT_State * (MemState * A)).
     Proof.
       unfold MemStateFreshT in *.
-      destruct st as [s p].
-      specialize (ma s p ms).
+      specialize (ma st ms).
       unfold MemStateFreshT_State.
       eapply fmap; [ |eauto].
-      intros [ms' [p' [s' x]]].
-      apply (s', p', (ms', x)).
+      intros [ms' [s' x]].
+      apply (s', (ms', x)).
     Defined.
 
     Definition MemStateFreshT_valid_state (ms : MemState) (st : MemStateFreshT_State) : Prop
-      := let '(sid, pr) := st in
-         (forall sid', used_store_id ms sid' -> (sid' < sid)%N) /\
-           (* TODO: freshness of aids... *)
-           (forall aid, used_allocation_id ms aid -> False).
+      := let sid := st in
+         (forall sid', used_store_id ms sid' -> (sid' < sid)%N).
 
     #[global] Instance MemStateFreshT_MemMonad {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
-      : MemMonad MemState MemStateFreshT_State AllocationId (MemStateFreshT (itree Eff)) (itree Eff).
+      : MemMonad MemState MemStateFreshT_State Provenance (MemStateFreshT (itree Eff)) (itree Eff).
     Proof.
       esplit with
         (MemMonad_run := fun A => @MemStateFreshT_run A Eff FAIL OOM UB)
@@ -142,25 +137,22 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       - (* run bind *)
         intros A B ma k ms st VALID.
         unfold MemStateFreshT_run.
-        destruct st.
         cbn.
         rewrite map_bind.
         rewrite bind_map.
         eapply eutt_clo_bind.
         reflexivity.
         intros u1 u2 H2; subst.
-        destruct u2 as [ms' [pr' [sid' x]]].
+        destruct u2 as [ms' [sid' x]].
         cbn.
         reflexivity.
       - (* run ret *)
         intros A x ms st VALID.
         cbn.
-        destruct st.
-        cbn.
         rewrite map_ret.
         reflexivity.
       - (* get_mem_state *)
-        intros ms [sid pr].
+        intros ms sid.
         cbn.
         rewrite map_bind.
         repeat rewrite bind_ret_l.
@@ -168,7 +160,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         cbn.
         reflexivity.
       - (* put_mem_state *)
-        intros ms ms' [sid pr].
+        intros ms ms' sid.
         cbn.
         rewrite map_bind.
         repeat rewrite bind_ret_l.
@@ -176,7 +168,7 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         cbn.
         reflexivity.
       - (* fresh_sid *)
-        intros ms [sid pr] VALID.
+        intros ms sid VALID.
         do 2 eexists.
         cbn.
         rewrite map_bind.
@@ -188,13 +180,16 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         split; [reflexivity|].
 
         cbn in VALID.
-        destruct VALID as [SID AID].
-
-        intros USED.
-        apply SID in USED.
-        lia.
-      - (* fresh_allocation_id *)
-        intros ms [sid pr] VALID.
+        split.
+        + red.
+          intros sid' USED.
+          apply VALID in USED.
+          lia.
+        + intros USED.
+          apply VALID in USED.
+          lia.
+      - (* fresh_provenance *)
+        intros ms sid VALID.
         do 2 eexists.
         cbn.
         rewrite map_bind.
@@ -204,13 +199,11 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         split; [reflexivity|].
 
         cbn in VALID.
-        destruct VALID as [SID AID].
-
-        intros USED.
-        apply AID in USED.
-        auto. (* TODO: Need to fix this statement *)
+        split.
+        + auto.
+        + apply get_fresh_provenance_fresh.
       - (* raise_oom *)
-        intros A ms oom_msg [sid pr].
+        intros A ms oom_msg sid.
         cbn.
         rewrite map_bind.
         setoid_rewrite Raise.raiseOOM_bind_itree.
@@ -220,13 +213,13 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
         intros EQ.
         pinversion EQ.
       - (* raise_ub *)
-        intros A ms oom_msg [sid pr].
+        intros A ms oom_msg sid.
         cbn.
         rewrite map_bind.
         setoid_rewrite Raise.raiseUB_bind_itree.
         reflexivity.
       - (* raise_error *)
-        intros A ms oom_msg [sid pr].
+        intros A ms oom_msg sid.
         cbn.
         rewrite map_bind.
         setoid_rewrite Raise.raise_bind_itree.
@@ -244,10 +237,10 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
       fun R e m => fun t => t ≈ r <- trigger e;; ret (m, r).
 
     Definition E_trigger : forall R, E R -> (MemStateFreshT (PropT Effout) R) :=
-      fun R e sid pr m => fun t => t ≈ r <- trigger e;; ret (m, (pr, (sid, r))).
+      fun R e sid m => fun t => t ≈ r <- trigger e;; ret (m, (sid, r)).
 
     Definition F_trigger : forall R, F R -> (MemStateFreshT (PropT Effout) R) :=
-      fun R e sid pr m => fun t => t ≈ r <- trigger e;; ret (m, (pr, (sid, r))).
+      fun R e sid m => fun t => t ≈ r <- trigger e;; ret (m, (sid, r)).
 
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory_prop' :
@@ -320,8 +313,8 @@ Module Type MemorySpecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMSP
        type signature as interp_memory... *)
     Definition interp_memory_prop {R} (RR : R -> R -> Prop) :
       itree Effin R -> MemStateFreshT (PropT Effout) R :=
-      fun (t : itree Effin R) (sid : store_id) (pr : Provenance) (ms : MemState) (t' : itree Effout (MemState * (Provenance * (store_id * R)))) =>
-        interp_prop (fun T (e : Effin T) (t : itree Effout T) => exists (sid' : store_id) (pr' : Provenance) (ms' : MemState), @interp_memory_prop_h T e sid pr ms (fmap (fun (x : T) => (ms', (pr', (sid', x)))) t)) (@memory_k_spec) R RR t ((fmap (fun '(_, (_, (_, x))) => x) t') : itree Effout R).
+      fun (t : itree Effin R) (sid : store_id) (ms : MemState) (t' : itree Effout (MemState * (store_id * R))) =>
+        interp_prop (fun T (e : Effin T) (t : itree Effout T) => exists (sid' : store_id) (ms' : MemState), @interp_memory_prop_h T e sid ms (fmap (fun (x : T) => (ms', (sid', x))) t)) (@memory_k_spec) R RR t ((fmap (fun '(_, (_, x)) => x) t') : itree Effout R).
   End Interpreters.
 End MemorySpecInterpreter.
 
@@ -347,14 +340,12 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     (* TODO: Why do I have to duplicate this >_<? *)
     (** MemMonad Instances *)
-    #[global] Instance MemStateFreshT_MonadAllocationId M `{Monad M} : MonadAllocationId AllocationId (MemStateFreshT M).
+    #[global] Instance MemStateFreshT_Provenance M `{Monad M} : MonadProvenance Provenance (MemStateFreshT M).
     Proof.
       split.
       unfold MemStateFreshT.
-      apply (lift (pr <- get;;
-                   let pr' := next_provenance pr in
-                   put pr';;
-                   ret (provenance_to_allocation_id pr'))).
+      apply (lift (ms <- get;;
+                   ret (get_fresh_provenance ms))).
     Defined.
 
     #[global] Instance MemStateFreshT_MonadStoreId M `{Monad M} : MonadStoreId (MemStateFreshT M).
@@ -370,8 +361,8 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
     #[global] Instance MemStateFreshT_MonadMemState M `{Monad M} : MonadMemState MemState (MemStateFreshT M).
     Proof.
       split.
-      - apply (lift (lift get)).
-      - intros ms; apply (lift (lift (put ms))).
+      - apply (lift get).
+      - intros ms; apply (lift (put ms)).
     Defined.
 
     #[global] Instance MemState_StoreIdFreshness : StoreIdFreshness MemState.
@@ -380,11 +371,11 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       apply used_store_id_prop.
     Defined.
 
-    #[global] Instance MemState_AllocationIdFreshness : AllocationIdFreshness AllocationId MemState.
+    #[global] Instance MemState_ProvenanceFreshness : ProvenanceFreshness Provenance MemState.
     Proof.
       split.
-      - (* Is a store id used in a memstate *)
-        apply MMSP.used_allocation_id_prop.
+      - (* Is a provenance used in a memstate *)
+        apply MMSP.used_provenance_prop.
     Defined.
 
     #[global] Instance MemStateFreshT_MonadT {M} `{Monad M} : MonadT (MemStateFreshT M) M.
@@ -393,32 +384,29 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       unfold MemStateT.
       split.
       - intros t X.
-        intros sid pr ms.
-        apply (res <- X;; ret (ms, (pr, (sid, res)))).
+        intros sid ms.
+        apply (res <- X;; ret (ms, (sid, res))).
     Defined.
 
-    Definition MemStateFreshT_State := (store_id * Provenance)%type.
+    Definition MemStateFreshT_State := store_id.
 
     (* M may be PropT or itree... *)
     Definition MemStateFreshT_run {A} {Eff} `{FailureE -< Eff} `{OOME -< Eff} `{UBE -< Eff} (ma : MemStateFreshT (itree Eff) A) (ms : MemState) (st : MemStateFreshT_State) : itree Eff (MemStateFreshT_State * (MemState * A)).
     Proof.
       unfold MemStateFreshT in *.
-      destruct st as [s p].
-      specialize (ma s p ms).
+      specialize (ma st ms).
       unfold MemStateFreshT_State.
       eapply fmap; [ |eauto].
-      intros [ms' [p' [s' x]]].
-      apply (s', p', (ms', x)).
+      intros [ms' [s' x]].
+      apply (s', (ms', x)).
     Defined.
 
     Definition MemStateFreshT_valid_state (ms : MemState) (st : MemStateFreshT_State) : Prop
-      := let '(sid, pr) := st in
-         (forall sid', used_store_id ms sid' -> (sid' < sid)%N) /\
-           (* TODO: freshness of aids... *)
-           (forall aid, used_allocation_id ms aid -> False).
+      := let sid := st in
+         (forall sid', used_store_id ms sid' -> (sid' < sid)%N).
 
     #[global] Instance MemStateFreshT_MemMonad {Eff} `{FAIL: FailureE -< Eff} `{OOM: OOME -< Eff} `{UB: UBE -< Eff}
-      : MemMonad MemState MemStateFreshT_State AllocationId (MemStateFreshT (itree Eff)) (itree Eff).
+      : MemMonad MemState MemStateFreshT_State Provenance (MemStateFreshT (itree Eff)) (itree Eff).
     Proof.
       esplit with
         (MemMonad_run := fun A => @MemStateFreshT_run A Eff FAIL OOM UB)
@@ -428,25 +416,22 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
       - (* run bind *)
         intros A B ma k ms st VALID.
         unfold MemStateFreshT_run.
-        destruct st.
         cbn.
         rewrite map_bind.
         rewrite bind_map.
         eapply eutt_clo_bind.
         reflexivity.
         intros u1 u2 H2; subst.
-        destruct u2 as [ms' [pr' [sid' x]]].
+        destruct u2 as [ms' [sid' x]].
         cbn.
         reflexivity.
       - (* run ret *)
         intros A x ms st VALID.
         cbn.
-        destruct st.
-        cbn.
         rewrite map_ret.
         reflexivity.
       - (* get_mem_state *)
-        intros ms [sid pr].
+        intros ms sid.
         cbn.
         rewrite map_bind.
         repeat rewrite bind_ret_l.
@@ -454,7 +439,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         cbn.
         reflexivity.
       - (* put_mem_state *)
-        intros ms ms' [sid pr].
+        intros ms ms' sid.
         cbn.
         rewrite map_bind.
         repeat rewrite bind_ret_l.
@@ -462,7 +447,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         cbn.
         reflexivity.
       - (* fresh_sid *)
-        intros ms [sid pr] VALID.
+        intros ms sid VALID.
         do 2 eexists.
         cbn.
         rewrite map_bind.
@@ -474,13 +459,16 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         split; [reflexivity|].
 
         cbn in VALID.
-        destruct VALID as [SID AID].
-
-        intros USED.
-        apply SID in USED.
-        lia.
-      - (* fresh_allocation_id *)
-        intros ms [sid pr] VALID.
+        split.
+        + red.
+          intros sid' USED.
+          apply VALID in USED.
+          lia.
+        + intros USED.
+          apply VALID in USED.
+          lia.
+      - (* fresh_provenance *)
+        intros ms sid VALID.
         do 2 eexists.
         cbn.
         rewrite map_bind.
@@ -490,13 +478,11 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         split; [reflexivity|].
 
         cbn in VALID.
-        destruct VALID as [SID AID].
-
-        intros USED.
-        apply AID in USED.
-        auto. (* TODO: Need to fix this statement *)
+        split.
+        + auto.
+        + apply get_fresh_provenance_fresh.
       - (* raise_oom *)
-        intros A ms oom_msg [sid pr].
+        intros A ms oom_msg sid.
         cbn.
         rewrite map_bind.
         setoid_rewrite Raise.raiseOOM_bind_itree.
@@ -506,13 +492,13 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
         intros EQ.
         pinversion EQ.
       - (* raise_ub *)
-        intros A ms oom_msg [sid pr].
+        intros A ms oom_msg sid.
         cbn.
         rewrite map_bind.
         setoid_rewrite Raise.raiseUB_bind_itree.
         reflexivity.
       - (* raise_error *)
-        intros A ms oom_msg [sid pr].
+        intros A ms oom_msg sid.
         cbn.
         rewrite map_bind.
         setoid_rewrite Raise.raise_bind_itree.
@@ -525,10 +511,10 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
 
     (** Handlers *)
     Definition E_trigger : E ~> MemStateFreshT (itree Effout) :=
-      fun R e sid aid m => r <- trigger e;; ret (m, (aid, (sid, r))).
+      fun R e sid m => r <- trigger e;; ret (m, (sid, r)).
 
     Definition F_trigger : F ~> MemStateFreshT (itree Effout) :=
-      fun R e sid aid m => r <- trigger e;; ret (m, (aid, (sid, r))).
+      fun R e sid m => r <- trigger e;; ret (m, (sid, r)).
 
     (* TODO: get rid of this silly hack. *)
     Definition my_handle_memory : MemoryE ~> MemStateFreshT (itree Effout) :=
@@ -552,7 +538,7 @@ Module Type MemoryExecInterpreter (LP : LLVMParams) (MP : MemoryParams LP) (MMEP
      *)
     Lemma interp_memory_correct :
       forall {T} t (ms : MemState) (sid : store_id) (pr : Provenance),
-        interp_memory_prop eq t sid pr ms (@interp_memory T t sid pr ms).
+        interp_memory_prop eq t sid ms (@interp_memory T t sid ms).
     Proof.
       intros T t ms sid pr.
       unfold interp_memory_prop.

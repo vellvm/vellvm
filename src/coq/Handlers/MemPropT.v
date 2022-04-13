@@ -67,6 +67,10 @@ Class AllocationIdFreshness (AllocationId : Type) (S : Type) : Type :=
   { used_allocation_id : S -> AllocationId -> Prop;
   }.
 
+Class ProvenanceFreshness (Provenance : Type) (S : Type) : Type :=
+  { used_provenance : S -> Provenance -> Prop;
+  }.
+
 Class MonadMemState (MemState : Type) (M : Type -> Type) : Type :=
   { get_mem_state : M MemState;
     put_mem_state : MemState -> M unit;
@@ -81,10 +85,10 @@ Definition modify_mem_state {M MemState} `{Monad M} `{MonadMemState MemState M} 
 Import EitherMonad.
 Import Monad.
 Import Morphisms.
-Class MemMonad (MemState : Type) (ExtraState : Type) (AllocationId : Type) (M : Type -> Type) (RunM : Type -> Type)
+Class MemMonad (MemState : Type) (ExtraState : Type) (Provenance : Type) (M : Type -> Type) (RunM : Type -> Type)
       `{Monad M} `{Monad RunM}
-      `{MonadAllocationId AllocationId M} `{MonadStoreId M} `{MonadMemState MemState M}
-      `{StoreIdFreshness MemState} `{AllocationIdFreshness AllocationId MemState}
+      `{MonadProvenance Provenance M} `{MonadStoreId M} `{MonadMemState MemState M}
+      `{StoreIdFreshness MemState} `{ProvenanceFreshness Provenance MemState}
       `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
       `{RAISE_ERROR RunM} `{RAISE_UB RunM} `{RAISE_OOM RunM}
   : Type
@@ -126,13 +130,17 @@ Class MemMonad (MemState : Type) (ExtraState : Type) (AllocationId : Type) (M : 
     MemMonad_run_fresh_sid
       (ms : MemState) st (VALID : MemMonad_valid_state ms st):
     exists st' sid',
-      eq1 (MemMonad_run (fresh_sid) ms st) (ret (st', (ms, sid'))) /\ ~ used_store_id ms sid';
+      eq1 (MemMonad_run (fresh_sid) ms st) (ret (st', (ms, sid'))) /\
+        MemMonad_valid_state ms st' /\
+        ~ used_store_id ms sid';
 
-    (** Fresh allocation id property *)
-    MemMonad_run_fresh_allocation_id
+    (** Fresh provenance property *)
+    MemMonad_run_fresh_provenance
       (ms : MemState) st (VALID : MemMonad_valid_state ms st):
-    exists st' aid',
-      eq1 (MemMonad_run (fresh_allocation_id) ms st) (ret (st', (ms, aid'))) /\ ~ used_allocation_id ms aid';
+    exists st' pr',
+      eq1 (MemMonad_run (fresh_provenance) ms st) (ret (st', (ms, pr'))) /\
+        MemMonad_valid_state ms st' /\
+        ~ used_provenance ms pr';
 
     (** Exceptions *)
     MemMonad_run_raise_oom :
@@ -162,7 +170,7 @@ Class MemMonad (MemState : Type) (ExtraState : Type) (AllocationId : Type) (M : 
     (*   (ma : M A) : stateT MemState (itree E) A; *)
 
 Definition MemPropT (MemState : Type) (X : Type) : Type
-  := MemState -> err (OOM (MemState * X)%type) -> Prop.
+  := MemState -> err_ub_oom (MemState * X)%type -> Prop.
 
 (* Instance MemPropT_Monad : Monad MemPropT. *)
 (* Proof. *)
@@ -195,35 +203,47 @@ Definition MemPropT (MemState : Type) (X : Type) : Type
 (* Defined. *)
 
 (* To triple check, but the following makes more sense to me *)
+Import IdentityMonad.
 Instance MemPropT_Monad {MemState : Type} : Monad (MemPropT MemState).
 Proof.
   split.
   - (* ret *)
-    refine (fun _ v s r => match r with
-                        | inl _ => False
-                        | inr (NoOom (s',r')) => s' = s /\ r' = v
-                        | inr (Oom _) => False
-                        end).
+    refine (fun _ v s r =>
+              match r with
+              | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent r)))) =>
+                  match r with
+                  | inl (OOM_message x) => False
+                  | inr (inl (UB_message x)) => False
+                  | inr (inr (inl (ERR_message x))) => False
+                  | inr (inr (inr (s',r'))) => s' = s /\ r' = v
+                  end
+              end).
   - (* bind *)
     refine (fun A B ma amb sa r =>
               match r with
-              | inl err            =>
-                  exists err,
-                  (ma sa (inl err) \/
-                     (exists sab a, ma sa (inr (NoOom (sab, a))) /\
-                                 (amb a sab (inl err))))
-              | inr (NoOom (sb,r)) =>
-                  exists sab a,
-                  ma sa (inr (NoOom (sab, a))) /\
-                    amb a sab (inr (NoOom (sb, r)))
-              | inr (Oom msg)         =>
-                  exists msg',
-                  (ma sa (inr (Oom msg')) \/
-                     (exists sab a, ma sa (inr (NoOom (sab, a))) /\
-                                 (amb a sab (inr (Oom msg')))))
-                  
-              end
-           ).
+              | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent r)))) =>
+                  match r with
+                  | inl (OOM_message x) =>
+                      exists msg',
+                      (ma sa (raise_oom msg') \/
+                         (exists sab a, ma sa (ret (sab, a)) /\
+                                     (amb a sab (raise_oom msg'))))
+                  | inr (inl (UB_message x)) =>
+                      exists msg',
+                      (ma sa (raise_ub msg') \/
+                         (exists sab a, ma sa (ret (sab, a)) /\
+                                     (amb a sab (raise_ub msg'))))
+                  | inr (inr (inl (ERR_message x))) =>
+                      exists msg',
+                      (ma sa (raise_error msg') \/
+                         (exists sab a, ma sa (ret (sab, a)) /\
+                                     (amb a sab (raise_error msg'))))
+                  | inr (inr (inr (s',r'))) =>
+                      exists sab a,
+                      ma sa (ret (sab, a)) /\
+                        amb a sab (ret (s', r'))
+                  end
+              end).
 Defined.
 
 Instance MemPropT_MonadMemState {MemState : Type} : MonadMemState MemState (MemPropT MemState).
@@ -232,16 +252,27 @@ Proof.
   split.
   - (* get_mem_state *)
     unfold MemPropT.
-    intros ms [err_msg | [[ms' a] | oom_msg]].
-    + exact False.
-    + exact (ms = ms' /\ a = ms).
-    + exact False.
+    intros ms res.
+    destruct res as [[[[[[[oom_res] | [[ub_res] | [[err_res] | [ms' a]]]]]]]]] eqn:Hres.
+    + (* OOM *)
+      exact False.
+    + (* UB *)
+      exact False.
+    + (* Error *)
+      exact False.
+    + (* Success *)
+      exact (ms = ms' /\ a = ms).
   - (* put_mem_state *)
     unfold MemPropT.
-    intros ms_to_put ms [err_msg | [[ms' t] | oom_msg]].
-    + exact False.
+    intros ms_to_put ms res.
+    destruct res as [[[[[[[oom_res] | [[ub_res] | [[err_res] | [ms' a]]]]]]]]] eqn:Hres.
+    + (* OOM *)
+      exact False.
+    + (* UB *)
+      exact False.
+    + (* Error *)
+      exact False.
     + exact (ms_to_put = ms').
-    + exact False.
 Defined.
 
 Instance MemPropT_RAISE_OOM {MemState : Type} : RAISE_OOM (MemPropT MemState).
@@ -249,10 +280,16 @@ Proof.
   split.
   - intros A msg.
     unfold MemPropT.
-    intros ms [err | [_ | oom]].
-    + exact False. (* Must run out of memory, can't error *)
-    + exact False. (* Must run out of memory *)
-    + exact True. (* Don't care about message *)
+    intros ms res.
+    destruct res as [[[[[[[oom_res] | [[ub_res] | [[err_res] | [ms' a]]]]]]]]] eqn:Hres.
+    + (* OOM *)
+      exact True. (* Don't care about particular error message, every OOM allowed. *)
+    + (* UB *)
+      exact False. (* Must run out of memory, can't UB *)
+    + (* Error *)
+      exact False. (* Must run out of memory, can't error *)
+    + (* Success *)
+      exact False. (* Must run out of memory *)
 Defined.
 
 Instance MemPropT_RAISE_ERROR {MemState : Type} : RAISE_ERROR (MemPropT MemState).
@@ -260,39 +297,58 @@ Proof.
   split.
   - intros A msg.
     unfold MemPropT.
-    intros ms [err | [_ | oom]].
-    + exact True. (* Any error will do *)
-    + exact False. (* Must error *)
-    + exact False. (* Must error *)
+    intros ms res.
+    destruct res as [[[[[[[oom_res] | [[ub_res] | [[err_res] | [ms' a]]]]]]]]] eqn:Hres.
+    + (* OOM *)
+      exact False. (* Must error *)
+    + (* UB *)
+      exact False. (* Must error *)
+    + (* Error *)
+      exact True. (* Any error message is good *)
+    + (* Success *)
+      exact False. (* Must error. *)
 Defined.
 
 Instance MemPropT_RAISE_UB {MemState : Type} : RAISE_UB (MemPropT MemState).
 Proof.
   split.
   intros A ub_msg.
-  refine (fun ms res => False /\ ub_msg = ""%string).
+    intros ms res.
+    destruct res as [[[[[[[oom_res] | [[ub_res] | [[err_res] | [ms' a]]]]]]]]] eqn:Hres.
+    (* Allow everything because UB *)
+    all: exact True.
 Defined.
 
 Definition MemPropT_assert {MemState X} (assertion : Prop) : MemPropT MemState X
   := fun ms ms'x =>
        match ms'x with
-       | inl _ =>
-           assertion
-       | inr (NoOom (ms', x)) =>
-           ms = ms' /\ assertion
-       | inr (Oom s) =>
-           assertion
+       | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent ms'x)))) =>
+           match ms'x with
+           | inl (OOM_message x) =>
+               assertion
+           | inr (inl (UB_message x)) =>
+               assertion
+           | inr (inr (inl (ERR_message x))) =>
+               assertion
+           | inr (inr (inr (ms',x))) =>
+               ms = ms' /\ assertion
+           end
        end.
 
 Definition MemPropT_assert_post {MemState X} (Post : X -> Prop) : MemPropT MemState X
   := fun ms ms'x =>
        match ms'x with
-       | inl _ =>
-           True
-       | inr (NoOom (ms', x)) =>
-           ms = ms' /\ Post x
-       | inr (Oom s) =>
-           True
+       | ERR_UB_OOM (mkEitherT (mkEitherT (mkEitherT (mkIdent ms'x)))) =>
+           match ms'x with
+           | inl (OOM_message x) =>
+               True
+           | inr (inl (UB_message x)) =>
+               True
+           | inr (inr (inl (ERR_message x))) =>
+               True
+           | inr (inr (inr (ms',x))) =>
+               ms = ms' /\ Post x
+           end
        end.
 
 Definition MemPropT_lift_PropT {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : 
@@ -302,19 +358,19 @@ Proof.
   intros ms t.
   specialize (m ms).
   refine (((exists msg, t ≈ raise_ub msg) <-> (forall res, ~ m res)) /\
-          ((exists msg, t ≈ raise_error msg) <-> (exists msg, m (inl msg))) /\
-          ((exists msg, t ≈ raise_oom msg) <-> (exists msg, m (inr (Oom msg)))) /\
-          (forall res, t ≈ ret res <-> m (inr (NoOom res)))).
+          ((exists msg, t ≈ raise_error msg) <-> (exists msg, m (raise_error msg))) /\
+          ((exists msg, t ≈ raise_oom msg) <-> (exists msg, m (raise_oom msg))) /\
+          (forall res, t ≈ ret res <-> m (ret res))).
 Defined.
 
-Definition MemPropT_lift_PropT_fresh {MemState Provenance X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : 
-  stateT store_id (stateT Provenance (stateT MemState (PropT E))) X.
+Definition MemPropT_lift_PropT_fresh {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : 
+  stateT store_id (stateT MemState (PropT E)) X.
 Proof.
   unfold PropT, MemPropT, stateT in *.
-  intros sid pr ms t.
+  intros sid ms t.
   specialize (m ms).
   refine (((exists msg, t ≈ raise_ub msg) <-> (forall res, ~ m res)) /\
-          ((exists msg, t ≈ raise_error msg) <-> (exists msg, m (inl msg))) /\
-          ((exists msg, t ≈ raise_oom msg) <-> (exists msg, m (inr (Oom msg)))) /\
-          (forall sid pr ms x, t ≈ ret (ms, (pr, (sid, x))) <-> m (inr (NoOom (ms, x))))).
+          ((exists msg, t ≈ raise_error msg) <-> (exists msg, m (raise_error msg))) /\
+          ((exists msg, t ≈ raise_oom msg) <-> (exists msg, m (raise_oom msg))) /\
+          (forall sid ms x, t ≈ ret (ms, (sid, x)) <-> m (ret (ms, x)))).
 Defined.
