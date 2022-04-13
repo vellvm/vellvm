@@ -969,8 +969,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       := fold_left (fun ms k => add_to_frame ms k) ks m.
 
     Definition allocate_bytes `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
-      match dt with
-      | DTYPE_Void => raise_ub "Allocation of type void"
+      match dtyp_eq_dec dt DTYPE_Void with
+      | left _ => raise_ub "Allocation of type void"
       | _ =>
           pr <- fresh_provenance;;
           sid <- fresh_sid;;
@@ -1964,8 +1964,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         - (* Success *)
           intros st_final ms_final alloc_addr RUN.
           unfold allocate_bytes in *.
-          (* TODO: can I use dtyp_eq_dec or something instead...? match in RUN seems problematic *)
-          destruct dt; try contradiction.
+          destruct (dtyp_eq_dec dt DTYPE_Void); try contradiction.
           { cbn in RUN.
             rewrite MemMonad_run_bind in RUN; auto.
 
@@ -2019,7 +2018,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               rewrite MemMonad_run_ret in RUN; auto.
               rewrite bind_ret_l in RUN.
 
-              destruct (generate_undef_bytes (DTYPE_I sz) pr'') as [undef_bytes | OOM] eqn:Hbytes.
+              destruct (generate_undef_bytes dt pr'') as [undef_bytes | OOM] eqn:Hbytes.
 
               2: { (* OOM for undef bytes *)
                 cbn in RUN.
