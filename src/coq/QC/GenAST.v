@@ -789,12 +789,29 @@ Search filter.
                               | _ => true
     end) edited_path.
 
+(*Definition filter_typs_from_ctx (ctx: list (ident * typ)) (list_typ : list typ) : list (ident * typ) := *)
+
+
 (*filter all the (ident, typ) in ctx such that typ is a ptr*)
 Definition filter_ptr_typs (ctx : list (ident * typ)) : list (ident * typ) :=
   filter (fun '(_,t) => match t with
                         | TYPE_Pointer _ => true
                         | _ => false
   end) ctx.
+Search bool.
+Definition filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) => match t with 
+  | TYPE_Array sz _ => N.ltb 0 sz
+  | TYPE_Vector sz _ => N.ltb 0 sz
+  | TYPE_Struct l => negb (seq.nilp l)
+  | TYPE_Packed_struct l => negb (seq.nilp l)
+  | _ => false 
+  end ) ctx.
+
+Definition filter_vec_typs (ctx: list (ident * typ)) : list (ident * typ) :=
+  filter (fun '(_, t) => match t with 
+  | TYPE_Vector sz _ => N.ltb 0 sz
+  | _ => false end) ctx.
 
 Definition gen_gep : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
@@ -815,14 +832,6 @@ Definition gen_gep : GenLLVM (typ * instr typ) :=
 
 Definition gen_extractvalue : GenLLVM (typ * instr typ) :=
   ctx <- get_ctx;;
-  let filter_agg_typs (ctx: list (ident * typ)) : list (ident * typ):=
-    filter (fun '(_, t) => match t with 
-                            | TYPE_Array _ _ => true 
-                            | TYPE_Vector _ _ => true 
-                            | TYPE_Struct _ => true 
-                            | TYPE_Packed_struct _ => true 
-                            | _ => false 
-    end ) ctx in
   let agg_in_context := filter_agg_typs ctx in
   '(id, tagg) <- (oneOf_LLVM (map ret agg_in_context));;
   let paths_in_agg := get_index_paths_agg tagg in 
@@ -830,6 +839,22 @@ Definition gen_extractvalue : GenLLVM (typ * instr typ) :=
   ret (t, INSTR_Op (OP_ExtractValue (tagg, EXP_Ident id) path_for_extractvalue)).
 
 
+
+(* ExtractElement*)
+Search int.
+Definition gen_extractelement : GenLLVM (typ * instr typ) :=
+  ctx <- get_ctx;;
+  let vector_in_context := filter_vec_typs ctx in
+  '(id, tvec) <- (oneOf_LLVM (map ret vector_in_context));;
+  let get_size_ty (vType: typ) :=
+    match tvec with 
+    | TYPE_Vector sz ty => (sz, ty)
+    | _ => (0%N, TYPE_Void)
+    end in
+  let '(sz, t_in_vec) := get_size_ty tvec in
+  let index_list := map (fun x => N.of_nat x) (List.seq 0 (N.to_nat sz)) in
+  index_for_extractelement <- oneOf_LLVM (map ret index_list);;
+  ret (t_in_vec, INSTR_Op (OP_ExtractElement (tvec, EXP_Ident id) (TYPE_I 32%N, EXP_Integer (Z.of_nat (N.to_nat index_for_extractelement))))).
 
 
 
@@ -1041,9 +1066,11 @@ Section InstrGenerators.
      The type is sometimes void for instructions that don't really
      compute a value, like void function calls, stores, etc.
    *)
+  Search list.
   Definition gen_instr : GenLLVM (typ * instr typ) :=
+    ctx <- get_ctx;;
     oneOf_LLVM
-      [ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
+      ([ t <- gen_op_typ;; i <- ret INSTR_Op <*> gen_op t;; ret (t, i)
       ; t <- gen_op_typ;; (* gen_sized_typ;; *)
         (* TODO: generate multiple element allocas. Will involve changing initialization *)
         num_elems <- ret None;; (* gen_opt_LLVM (resize_LLVM 0 gen_int_texp);; *)
@@ -1051,11 +1078,10 @@ Section InstrGenerators.
         ret (TYPE_Pointer t, INSTR_Alloca t num_elems align)
       (* TODO: Generate calls *)
       ; gen_load
-      ; gen_store
-      ; gen_gep
-      ; gen_extractvalue
-      (* TODO: Generate atomic operations and other instructions *)
-      ].
+      ; gen_store] (* TODO: Generate atomic operations and other instructions *)
+      ++ (if seq.nilp (filter_ptr_typs ctx) then [] else [gen_gep])
+      ++ (if seq.nilp (filter_agg_typs ctx) then [] else [gen_extractvalue])
+      ++ (if seq.nilp (filter_vec_typs ctx) then [] else [gen_extractelement])).
 
   (* TODO: Generate instructions with ids *)
   (* Make sure we can add these new ids to the context! *)
