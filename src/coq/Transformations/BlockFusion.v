@@ -6,16 +6,13 @@ From Coq Require Import
 
 Require Import Paco.paco.
 
+From ITree Require Import
+     ITree
+     ITreeFacts.
+
 Require Import List.
 Import ListNotations.
 Require Import ZArith.
-
-From ITree Require Import
-     ITree
-     Basics.Monad
-     Eq.Eq
-     InterpFacts
-     TranslateFacts.
 
 From Vellvm Require Import
      Utilities

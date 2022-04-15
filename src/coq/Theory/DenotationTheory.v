@@ -9,10 +9,7 @@ From ITree Require Import
      ITreeFacts
      Basics.HeterogeneousRelations
      Events.State
-     Events.StateFacts
-     InterpFacts
-     KTreeFacts
-     Eq.Eq.
+     Events.StateFacts.
 
 From Vellvm Require Import
      Utilities

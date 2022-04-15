@@ -6,11 +6,7 @@ From ExtLib Require Import
      Structures.Monads.
 
 From ITree Require Import
-     ITree
-     Eq.Eq
-     Interp.Interp
-     Interp.InterpFacts
-     Interp.TranslateFacts
+     ITreeFacts
      Events.StateKleisli
      Events.StateFacts.
 

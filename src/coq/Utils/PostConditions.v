@@ -3,9 +3,8 @@ Require Import Paco.paco.
 From Coq Require Import Morphisms.
 From ITree Require Import
      ITree
-     Eq.Eq
-     Basics.HeterogeneousRelations
-     Interp.TranslateFacts.
+     ITreeFacts
+     Basics.HeterogeneousRelations.
 Set Implicit Arguments.
 Set Strict Implicit.
 (* end hide *)

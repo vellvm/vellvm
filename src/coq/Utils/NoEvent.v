@@ -7,8 +7,7 @@ From Coq Require Import
 From Paco Require Import paco.
 From ITree Require Import
      ITree
-     ITreeFacts
-     Eq.Eq.
+     ITreeFacts.
 Set Implicit Arguments.
 Set Strict Implicit.
 (* end hide *)

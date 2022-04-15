@@ -137,8 +137,7 @@ Ltac break_sum :=
   end.
 
 From ITree Require Import
-     ITree
-     Eq.Eq.
+     ITree ITreeFacts.
 
 Ltac bind_ret_r1 :=
   match goal with
@@ -160,9 +159,6 @@ Ltac forward H :=
   | ?P -> _ => assert P as H'; [| specialize (H H'); clear H']
   end.
 
-From ITree Require Import
-     ITree
-     Eq.Eq.
 (* Simple specialization of [eqit_Ret] to [eutt] so that users of the library do not need to know about [eqit] *)
 Ltac ret_bind_l_left v :=
   match goal with

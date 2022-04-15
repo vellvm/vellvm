@@ -9,8 +9,7 @@ From Vellvm Require Import
      Utils.PropT.
 
 From ITree Require Import
-     ITree
-     Eq.Eq.
+     ITree ITreeFacts.
 
 Set Implicit Arguments.
 Set Strict Implicit.

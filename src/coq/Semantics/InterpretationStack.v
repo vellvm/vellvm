@@ -1,9 +1,8 @@
 (* begin hide *)
 From ITree Require Import
      ITree
-     Basics.Monad
-     Events.StateFacts
-     Eq.Eq.
+     ITreeFacts
+     Events.StateFacts.
 
 From Vellvm Require Import
      Utilities
