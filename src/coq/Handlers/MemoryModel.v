@@ -102,10 +102,13 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
 
   (** Provenances *)
   Parameter used_provenance_prop : MemState -> Provenance -> Prop. (* Has a provenance *ever* been used. *)
-  Parameter get_fresh_provenance : MemState -> Provenance. (* Allocate a new fresh provenance *)
-  Parameter get_fresh_provenance_fresh :
-    forall (ms : MemState),
-      ~ used_provenance_prop ms (get_fresh_provenance ms).
+
+  (* Allocate a new fresh provenance *)
+  Parameter mem_state_fresh_provenance : MemState -> (Provenance * MemState)%type.
+  Parameter mem_state_fresh_provenance_fresh :
+    forall (ms ms' : MemState) (pr : Provenance),
+      mem_state_fresh_provenance ms = (pr, ms') ->
+      ~ used_provenance_prop ms pr /\ used_provenance_prop ms' pr.
 End MemoryModelSpecPrimitives.
 
 Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL).
@@ -1116,7 +1119,8 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       allocate_bytes_consecutive : get_consecutive_ptrs ptr (length init_bytes) m1 (ret (m1, ptrs));
 
       (* Provenance *)
-      allocate_bytes_address_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr);
+      allocate_bytes_address_provenance : address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr); (* Need this case if `ptrs` is empty (allocating 0 bytes) *)
+      allocate_bytes_addresses_provenance : forall ptr, In ptr ptrs -> address_provenance ptr = allocation_id_to_prov (provenance_to_allocation_id pr);
       allocate_bytes_provenances_preserved :
       forall pr',
         (used_provenance_prop m1 pr' <-> used_provenance_prop m2 pr');
@@ -1171,6 +1175,9 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       (* Type is valid *)
       allocate_bytes_typ :
       t <> DTYPE_Void;
+
+      allocate_bytes_typ_size :
+      sizeof_dtyp t = N.of_nat (length init_bytes);
     }.
 
   Definition allocate_bytes_spec_MemPropT' (t : dtyp) (init_bytes : list SByte) (prov : Provenance)

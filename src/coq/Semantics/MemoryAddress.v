@@ -137,7 +137,7 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
   Parameter next_provenance : Provenance -> Provenance.
 
   (* Way easier to keep track of provenances in use if they're ordered... *)
-  Parameter provenance_le : Provenance -> Provenance -> Prop.
+  Parameter provenance_lt : Provenance -> Provenance -> Prop.
 
   (* Lemmas *)
   Parameter aid_access_allowed_refl :
@@ -159,16 +159,21 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
     forall (aid : AllocationId),
       true = (aid_eq_dec aid aid).
 
-  Parameter provenance_le_trans : Transitive provenance_le.
-  Parameter provenance_le_refl : Reflexive provenance_le.
+  Parameter provenance_lt_trans : Transitive provenance_lt.
 
-  Parameter provenance_le_next_provenance :
+  Parameter provenance_lt_next_provenance :
     forall pr,
-      provenance_le pr (next_provenance pr).
+      provenance_lt pr (next_provenance pr).
 
-  Parameter provenance_le_next_provenance_antisym :
+  Parameter provenance_lt_nrefl :
     forall pr,
-      ~ provenance_le (next_provenance pr) pr.
+      ~ provenance_lt pr pr.
+
+  Parameter provenance_lt_antisym : Antisymmetric Provenance eq provenance_lt.
+
+  Parameter next_provenance_neq :
+    forall pr,
+      pr <> next_provenance pr.
 
   (* Debug *)
   Parameter show_prov : Prov -> string.

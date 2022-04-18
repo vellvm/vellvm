@@ -88,7 +88,7 @@ Import Morphisms.
 Class MemMonad (MemState : Type) (ExtraState : Type) (Provenance : Type) (M : Type -> Type) (RunM : Type -> Type)
       `{Monad M} `{Monad RunM}
       `{MonadProvenance Provenance M} `{MonadStoreId M} `{MonadMemState MemState M}
-      `{StoreIdFreshness MemState} `{ProvenanceFreshness Provenance MemState}
+      `{StoreIdFreshness MemState} `{ProvenanceFreshness Provenance ExtraState}
       `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
       `{RAISE_ERROR RunM} `{RAISE_UB RunM} `{RAISE_OOM RunM}
   : Type
@@ -135,12 +135,14 @@ Class MemMonad (MemState : Type) (ExtraState : Type) (Provenance : Type) (M : Ty
         ~ used_store_id ms sid';
 
     (** Fresh provenance property *)
-    MemMonad_run_fresh_provenance
-      (ms : MemState) st (VALID : MemMonad_valid_state ms st):
-    exists st' pr',
-      eq1 (MemMonad_run (fresh_provenance) ms st) (ret (st', (ms, pr'))) /\
-        MemMonad_valid_state ms st' /\
-        ~ used_provenance ms pr';
+    (* TODO: unclear if this should exist, must change ms. *)
+    (* MemMonad_run_fresh_provenance *)
+    (*   (ms : MemState) st (VALID : MemMonad_valid_state ms st): *)
+    (* exists st' pr', *)
+    (*   eq1 (MemMonad_run (fresh_provenance) ms st) (ret (st', (ms, pr'))) /\ *)
+    (*     MemMonad_valid_state ms st' /\ *)
+    (*     ~ used_provenance st pr' /\ *)
+    (*     used_provenance st' pr'; *)
 
     (** Exceptions *)
     MemMonad_run_raise_oom :
@@ -363,14 +365,14 @@ Proof.
           (forall res, t ≈ ret res <-> m (ret res))).
 Defined.
 
-Definition MemPropT_lift_PropT_fresh {MemState X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : 
-  stateT store_id (stateT MemState (PropT E)) X.
+Definition MemPropT_lift_PropT_fresh {MemState Provenance X} {E} `{UBE -< E} `{OOME -< E} `{FailureE -< E} (m : MemPropT MemState X) : 
+  stateT store_id (stateT Provenance (stateT MemState (PropT E))) X.
 Proof.
   unfold PropT, MemPropT, stateT in *.
-  intros sid ms t.
+  intros sid pr ms t.
   specialize (m ms).
   refine (((exists msg, t ≈ raise_ub msg) <-> (forall res, ~ m res)) /\
           ((exists msg, t ≈ raise_error msg) <-> (exists msg, m (raise_error msg))) /\
           ((exists msg, t ≈ raise_oom msg) <-> (exists msg, m (raise_oom msg))) /\
-          (forall sid ms x, t ≈ ret (ms, (sid, x)) <-> m (ret (ms, x)))).
+          (forall sid ms x, t ≈ ret (ms, (pr, (sid, x))) <-> m (ret (ms, x)))).
 Defined.
