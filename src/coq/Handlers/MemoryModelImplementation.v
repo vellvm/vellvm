@@ -2058,8 +2058,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           destruct (N.eq_dec (sizeof_dtyp dt) (N.of_nat (Datatypes.length init_bytes))) eqn:Hlen.
           2 : {
             rewrite MemMonad_run_raise_ub in RUN.
-            (* Should be contradiction... *)
-            admit.
+            apply rbm_raise_ret_inv in RUN; try tauto.
+            admit. (* Typeclass silliness... *)
           }
 
           { cbn in RUN.

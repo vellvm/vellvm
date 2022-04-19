@@ -15,6 +15,8 @@ From Vellvm Require Import
      Semantics.LLVMEvents
      Utils.MonadExcLaws.
 
+Require Import Paco.paco.
+
 Section Laws.
   Variable M : Type -> Type.
   Context `{HM : Monad M}.
@@ -25,7 +27,10 @@ Section Laws.
   Class RaiseBindM :=
     { rbm_raise_bind :
       forall A B (f : A -> M B) (x : MSG),
-        eq1 (bind (rbm_raise x) f) (rbm_raise x)
+        eq1 (bind (rbm_raise x) f) (rbm_raise x);
+      rbm_raise_ret_inv :
+      forall A (x : MSG) (y : A),
+        ~ eq1 (rbm_raise x) (ret y);
     }.
 End Laws.
 
@@ -59,8 +64,19 @@ Section Failure.
     intros [].
   Qed.
 
+  Lemma raise_ret_inv_itree :
+      forall A x (y : A),
+        ~ (raise x) ≈ (ret y).
+  Proof.
+    intros A x y.
+    intros CONTRA.
+    cbn in CONTRA.
+    pinversion CONTRA.
+  Qed.
+
   Global Instance RaiseBindM_Fail : RaiseBindM (itree E) string (fun T => raise) :=
-    { rbm_raise_bind := raise_bind_itree
+    { rbm_raise_bind := raise_bind_itree;
+      rbm_raise_ret_inv := raise_ret_inv_itree;
     }.
 End Failure.
 
@@ -94,8 +110,19 @@ Section OOM.
     intros [].
   Qed.
 
+  Lemma raiseOOM_ret_inv_itree :
+      forall A x (y : A),
+        ~ (raiseOOM x) ≈ (ret y).
+  Proof.
+    intros A x y.
+    intros CONTRA.
+    cbn in CONTRA.
+    pinversion CONTRA.
+  Qed.
+
   Global Instance RaiseBindM_OOM : RaiseBindM (itree E) string (fun T => raiseOOM) :=
-    { rbm_raise_bind := raiseOOM_bind_itree
+    { rbm_raise_bind := raiseOOM_bind_itree;
+      rbm_raise_ret_inv := raiseOOM_ret_inv_itree;
     }.
 End OOM.
 
@@ -129,7 +156,18 @@ Section UB.
     intros [].
   Qed.
 
+  Lemma raiseUB_ret_inv_itree :
+      forall A x (y : A),
+        ~ (raiseUB x) ≈ (ret y).
+  Proof.
+    intros A x y.
+    intros CONTRA.
+    cbn in CONTRA.
+    pinversion CONTRA.
+  Qed.
+
   Global Instance RaiseBindM_UB : RaiseBindM (itree E) string (fun T => raiseUB) :=
-    { rbm_raise_bind := raiseUB_bind_itree
+    { rbm_raise_bind := raiseUB_bind_itree;
+      rbm_raise_ret_inv := raiseUB_ret_inv_itree;
     }.
 End UB.

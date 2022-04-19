@@ -212,8 +212,15 @@ Module ERRSID (Addr:ADDRESS) (IP:INTPTR) (SIZEOF:Sizeof) (PROV:PROVENANCE(Addr))
   #[global] Instance RaiseBindM_ErrSID : RaiseBindM ErrSID string (@raise_error ErrSID _).
   Proof.
     split.
-    intros A B f x.
-    reflexivity.
+    - intros A B f x.
+      reflexivity.
+    - intros A x y.
+      intros CONTRA.
+      cbn in CONTRA.
+      unfold Monad.eq1 in CONTRA.
+      repeat red in CONTRA.
+      specialize (CONTRA 0 initial_provenance).
+      inversion CONTRA.
   Defined.
 
   Definition evalErrSID_T {A} {M} `{Monad M} (m : ErrSID_T M A) (sid : store_id) (prov : Provenance) : M (OOM_MESSAGE + UB (ERR A))%type
