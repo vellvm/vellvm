@@ -194,10 +194,18 @@ Module PROV_FUNCS(Addr:MemoryAddress.ADDRESS)(PROV:PROVENANCE(Addr)).
 End PROV_FUNCS.
 
 (* TODO: move this? *)
-Module Type ITOP(Addr:MemoryAddress.ADDRESS)(PROV:PROVENANCE(Addr)).
+Module Type ITOP (Addr:MemoryAddress.ADDRESS) (PROV:PROVENANCE(Addr)) (PTOI:PTOI(Addr)).
   Import PROV.
-  Parameter int_to_ptr : Z -> Prov -> Addr.addr.
+  Import PTOI.
+  Import Addr.
+
+  Parameter int_to_ptr : Z -> Prov -> addr.
   Parameter int_to_ptr_provenance :
-    forall (x : Z) (p : Prov) ,
+    forall (x : Z) (p : Prov),
       address_provenance (int_to_ptr x p) = p.
+
+  Parameter int_to_ptr_ptr_to_int :
+    forall (a : addr) (p : Prov),
+      address_provenance a = p ->
+      int_to_ptr (ptr_to_int a) p = a.
 End ITOP.

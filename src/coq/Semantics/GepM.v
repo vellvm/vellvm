@@ -1,4 +1,4 @@
-Require Import ZArith String List.
+Require Import ZArith String List Lia.
 
 From ExtLib Require Import
      Structures.Monad
@@ -24,6 +24,10 @@ Module Type GEPM(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERAC
 
   Parameter handle_gep_addr : dtyp -> Addr.addr -> list dvalue -> err Addr.addr.
 
+  Parameter handle_gep_addr_0 :
+    forall (dt : dtyp) (p : Addr.addr),
+      handle_gep_addr dt p [DVALUE_IPTR IP.zero] = inr p.
+
   Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
     match dv with
     | DVALUE_Addr a => fmap DVALUE_Addr (handle_gep_addr t a vs)
@@ -31,7 +35,7 @@ Module Type GEPM(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERAC
     end.
 End GEPM.
 
-Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS(ADDR)(IP)(SIZE)) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV) <: GEPM(ADDR)(IP)(SIZE)(Events).
+Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS(ADDR)(IP)(SIZE)) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV PTOI) <: GEPM(ADDR)(IP)(SIZE)(Events).
   Import ADDR.
   Import Events.
   Import DV.
@@ -112,6 +116,17 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
       ret (int_to_ptr ptr' prov)
     | _ => failwith "non-I32 index"
     end.
+
+  Lemma handle_gep_addr_0 :
+    forall (dt : dtyp) (p : addr),
+      handle_gep_addr dt p [DVALUE_IPTR IP.zero] = inr p.
+  Proof.
+    intros dt p.
+    cbn.
+    rewrite IP.to_Z_0.
+    replace (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * 0)%Z with (ptr_to_int p) by lia.
+    rewrite int_to_ptr_ptr_to_int; auto.
+  Qed.
 
   Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
     match dv with

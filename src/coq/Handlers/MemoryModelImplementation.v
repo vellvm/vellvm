@@ -419,7 +419,8 @@ Module IP64Bit : MemoryAddress.INTPTR.
 End IP64Bit.
 
 
-Module FinPTOI : PTOI(Addr).
+Module FinPTOI : PTOI(Addr)
+with Definition ptr_to_int := fun (ptr : Addr.addr) => fst ptr.
   Definition ptr_to_int (ptr : Addr.addr) := fst ptr.
 End FinPTOI.
 
@@ -573,9 +574,10 @@ with Definition address_provenance
   Definition show_allocation_id (aid : AllocationId) := Show.show aid.
 End FinPROV.
 
-Module FinITOP : ITOP(Addr)(FinPROV).
+Module FinITOP : ITOP(Addr)(FinPROV)(FinPTOI).
   Import Addr.
   Import FinPROV.
+  Import FinPTOI.
 
   Definition int_to_ptr (i : Z) (pr : Prov) : addr
     := (i, pr).
@@ -586,6 +588,18 @@ Module FinITOP : ITOP(Addr)(FinPROV).
   Proof.
     intros x p.
     reflexivity.
+  Qed.
+
+  Lemma int_to_ptr_ptr_to_int :
+    forall (a : addr) (p : Prov),
+      address_provenance a = p ->
+      int_to_ptr (ptr_to_int a) p = a.
+  Proof.
+    intros a p PROV.
+    unfold int_to_ptr.
+    unfold ptr_to_int.
+    destruct a; cbn.
+    inv PROV; cbn; auto.
   Qed.
 End FinITOP.
 
@@ -720,6 +734,8 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Import LP.PROV.
   Import PTOI.
   Import ITOP.
+  Import MP.
+  Import GEP.
 
   Import MemBytes.
   Module MemByte := Byte LP.ADDR LP.IP LP.SIZEOF LP.Events MP.BYTE_IMPL.
@@ -946,6 +962,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Import MMSP.MemByte.
   Import MemSpec.
   Import MemHelpers.
+  Import MP.
+  Import GEP.
 
   (* Convenient to make these opaque so they don't get unfolded *)
   Section MemoryPrimatives.
@@ -2326,8 +2344,26 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 | Z.neg y' => Z.pos_sub 1 y'
                 end (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov))) = alloc_addr) as EQALLOC.
               {
-                (* TODO: Probably need something about handle_gep_addr_0 *)
-                admit.
+                destruct (Datatypes.length init_bytes) eqn:LENBYTES.
+                { cbn in HSEQ; inv HSEQ.
+                  cbn in *.
+                  inv HMAPM.
+                }
+
+                rewrite intptr_seq_succ in HSEQ.
+                cbn in HSEQ.
+                rewrite IP.from_Z_0 in HSEQ.
+                destruct (intptr_seq 1 n0); inv HSEQ.
+
+                unfold Util.map_monad in HMAPM.
+                inversion HMAPM.
+                inversion HMAPM.
+                break_match_hyp; inv H14.
+                break_match_hyp; inv H15.
+
+                rewrite handle_gep_addr_0 in Heqs.
+                inv Heqs.
+                reflexivity.
               }
 
               split.

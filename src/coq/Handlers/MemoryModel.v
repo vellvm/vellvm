@@ -125,6 +125,19 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
   Definition intptr_seq (start : Z) (len : nat) : OOM (list IP.intptr)
     := Util.map_monad (IP.from_Z) (Zseq start len).
 
+  (* TODO: Move this? *)
+  Lemma intptr_seq_succ :
+    forall off n,
+      intptr_seq off (S n) =
+        hd <- IP.from_Z off;;
+        tail <- intptr_seq (Z.succ off) n;;
+        ret (hd :: tail).
+  Proof.
+    intros off n.
+    cbn.
+    reflexivity.
+  Qed.
+
   Definition get_consecutive_ptrs {M} `{Monad M} `{RAISE_OOM M} `{RAISE_ERROR M} (ptr : addr) (len : nat) : M (list addr) :=
     ixs <- lift_OOM (intptr_seq 0 len);;
     lift_err_RAISE_ERROR
