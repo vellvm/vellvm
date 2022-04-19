@@ -10,23 +10,31 @@ From Vellvm Require Import
      Semantics.MemoryAddress
      Semantics.Memory.Sizeof
      Utils.Error
-     Utils.Monads.
+     Utils.Monads
+     Utils.Tactics.
 
 Import ListNotations.
 Import MonadNotation.
 
-Module Type GEPM(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
+Module Type GEPM (Addr:ADDRESS) (PROV : PROVENANCE Addr) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
   Import LLVMEvents.
   Import DV.
+  Import PROV.
+  Import Addr.
 
   (* TODO: should this be here? *)
   Parameter handle_gep_h : dtyp -> Z -> list dvalue -> err Z.
 
-  Parameter handle_gep_addr : dtyp -> Addr.addr -> list dvalue -> err Addr.addr.
+  Parameter handle_gep_addr : dtyp -> addr -> list dvalue -> err addr.
 
   Parameter handle_gep_addr_0 :
-    forall (dt : dtyp) (p : Addr.addr),
+    forall (dt : dtyp) (p : addr),
       handle_gep_addr dt p [DVALUE_IPTR IP.zero] = inr p.
+
+  Parameter handle_gep_addr_preserves_provenance :
+    forall (dt : dtyp) ixs (p p' : addr),
+      handle_gep_addr dt p ixs = inr p' ->
+      address_provenance p = address_provenance p'.
 
   Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=
     match dv with
@@ -35,7 +43,7 @@ Module Type GEPM(Addr:ADDRESS)(IP:INTPTR)(SIZEOF:Sizeof)(LLVMEvents:LLVM_INTERAC
     end.
 End GEPM.
 
-Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS(ADDR)(IP)(SIZE)) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV PTOI) <: GEPM(ADDR)(IP)(SIZE)(Events).
+Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS(ADDR)(IP)(SIZE)) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV PTOI) <: GEPM(ADDR)(PROV)(IP)(SIZE)(Events).
   Import ADDR.
   Import Events.
   Import DV.
@@ -126,6 +134,29 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
     rewrite IP.to_Z_0.
     replace (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * 0)%Z with (ptr_to_int p) by lia.
     rewrite int_to_ptr_ptr_to_int; auto.
+  Qed.
+
+  Lemma handle_gep_addr_preserves_provenance :
+    forall (dt : dtyp) ixs (p p' : addr),
+      handle_gep_addr dt p ixs = inr p' ->
+      address_provenance p = address_provenance p'.
+  Proof.
+    intros dt ixs.
+    induction ixs;
+      intros p p' GEP;
+      [inversion GEP|].
+
+    cbn in GEP.
+    destruct a; inversion GEP.
+    - break_match_hyp; inv GEP.
+      rewrite int_to_ptr_provenance.
+      reflexivity.
+    - break_match_hyp; inv GEP.
+      rewrite int_to_ptr_provenance.
+      reflexivity.
+    - break_match_hyp; inv GEP.
+      rewrite int_to_ptr_provenance.
+      reflexivity.
   Qed.
 
   Definition handle_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : err dvalue :=

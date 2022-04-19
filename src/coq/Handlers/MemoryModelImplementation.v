@@ -2426,11 +2426,52 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     cbn.
                     split; reflexivity.
                 - (* allocate_bytes_address_provenance *)
-                  (* TODO: Need map_monad lemmas *)
-                  admit.
+                    subst alloc_addr.
+                    apply int_to_ptr_provenance.
                 - (* allocate_bytes_addressses_provenance *)
                   (* TODO: Need map_monad lemmas *)
-                  admit.
+                  Set Nested Proofs Allowed.
+                  (* TODO: move this *)
+                  (* TODO: can I generalize this? *)
+                  Lemma map_monad_err_In :
+                    forall {A B} (f : A -> err B) l res x,
+                      Util.map_monad f l = ret res ->
+                      In x res ->
+                      exists y, f y = ret x.
+                  Proof.
+                    intros A B f l res x MAP IN.
+                    generalize dependent l.
+                    induction res; intros l MAP.
+                    - inversion IN.
+                    - inversion IN; subst.
+                      + destruct l as [_ | h ls].
+                        * cbn in MAP.
+                          inv MAP.
+                        * exists h.
+                          cbn in MAP.
+                          break_match_hyp; [|break_match_hyp]; inv MAP.
+                          reflexivity.
+                      + destruct l as [_ | h ls].
+                        * cbn in MAP.
+                          inv MAP.
+                        * eapply IHres with (l:=ls); eauto.
+                          cbn in MAP.
+                          break_match_hyp; [|break_match_hyp]; inv MAP.
+                          reflexivity.
+                  Qed.
+
+                  assert (@inr string (list addr) = ret) as INR.
+                  reflexivity.
+                  rewrite INR in HMAPM.
+                  clear INR.
+
+                  intros ptr IN.
+                  pose proof map_monad_err_In _ _ _ _ HMAPM IN as MAPIN.
+                  destruct MAPIN as [ip GENPTR].
+
+                  apply handle_gep_addr_preserves_provenance in GENPTR.
+                  rewrite int_to_ptr_provenance in GENPTR.
+                  auto.                      
                 - (* allocate_bytes_provenances_preserved *)
                   intros pr'0.
                   split; eauto. (* TODO: not sure about eauto here *)

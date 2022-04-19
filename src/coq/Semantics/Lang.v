@@ -20,7 +20,7 @@ From Vellvm Require Import
   Module Type Memory (LP: LLVMParams).
     Import LP.
 
-    Declare Module GEP  : GEPM ADDR IP SIZEOF Events.
+    Declare Module GEP  : GEPM ADDR PROV IP SIZEOF Events.
     Declare Module Byte : ByteImpl ADDR IP SIZEOF Events.
 
     Module MP := MemoryParams.Make LP GEP Byte.
