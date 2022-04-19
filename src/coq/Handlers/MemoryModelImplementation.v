@@ -1360,11 +1360,48 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               first [rewrite aid_access_allowed_refl | apply aid_eq_dec_refl]; auto
         ].
 
+    Ltac solve_allocations_preserved :=
+      intros ?ptr ?aid; split; intros ALLOC;
+      solve_byte_allocated.
+
+    Ltac destruct_read_byte_allowed_in READ :=
+      destruct READ as [?aid [?ALLOC ?ALLOWED]].
+
+    Ltac destruct_write_byte_allowed_in WRITE :=
+      destruct WRITE as [?aid [?ALLOC ?ALLOWED]].
+
+    Ltac break_write_byte_allowed_hyps :=
+      repeat
+        match goal with
+        | WRITE : write_byte_allowed _ _ |- _ =>
+            destruct_write_byte_allowed_in WRITE
+        end.
+
+    Ltac break_read_byte_allowed_hyps :=
+      repeat
+        match goal with
+        | READ : read_byte_allowed _ _ |- _ =>
+            destruct_read_byte_allowed_in READ
+        end.
+
+    Ltac break_access_hyps :=
+      break_read_byte_allowed_hyps;
+      break_write_byte_allowed_hyps.
+
+    Ltac solve_access_allowed :=
+      solve [eauto].
+
     Ltac solve_write_byte_allowed :=
-      eexists; split; [| solve [eauto]]; solve_byte_allocated.
+      break_access_hyps; eexists; split; [| solve_access_allowed]; solve_byte_allocated.
 
     Ltac solve_read_byte_allowed :=
       solve_write_byte_allowed.
+
+    Ltac solve_read_byte_allowed_all_preserved :=
+      intros ?ptr; split; intros ?READ; solve_read_byte_allowed.
+
+    Ltac solve_write_byte_allowed_all_preserved :=
+      intros ?ptr; split; intros ?WRITE; solve_write_byte_allowed.
 
     Ltac solve_read_byte_prop :=
       solve [ eapply read_byte_prop_mem_stack; eauto
@@ -1377,6 +1414,15 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               split; auto
         ].
 
+    Ltac solve_read_byte_prop_all_preserved :=
+      split; intros ?READ; solve_read_byte_prop.
+
+    Ltac solve_read_byte_preserved :=
+      split;
+      [ solve_read_byte_allowed_all_preserved
+      | solve_read_byte_prop_all_preserved
+      ].
+
     (* Ltac solve_set_byte_memory := *)
     (*   split; [solve_read_byte_allowed | solve_read_byte_prop | solve_disjoint_read_bytes]. *)
 
@@ -1388,6 +1434,33 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           let PROP := fresh "PROP" in
           intros ?fs; split; intros PROP; inv PROP; reflexivity
         ].
+
+    (* TODO: move this stuff? *)
+    Hint Resolve
+         provenance_lt_trans
+         provenance_lt_next_provenance
+         provenance_lt_nrefl : PROVENANCE_LT.
+
+    Hint Unfold used_provenance_prop : PROVENANCE_LT.
+
+    Ltac solve_used_provenance_prop :=
+      unfold used_provenance_prop in *;
+      eauto with PROVENANCE_LT.
+
+    Ltac solve_extend_provenance :=
+      unfold extend_provenance;
+      split; [|split]; solve_used_provenance_prop.
+
+    Ltac solve_fresh_provenance_invariants :=
+      split;
+      [ solve_extend_provenance
+      | split; [| split; [| split]];
+        [ solve_read_byte_preserved
+        | solve_write_byte_allowed_all_preserved
+        | solve_allocations_preserved
+        | solve_frame_stack_preserved
+        ]
+      ].
 
     Lemma byte_allocated_set_byte_raw_eq :
       forall ptr aid new new_aid m1 m2,
@@ -2161,7 +2234,15 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               { (* Empty ptr list... Not a contradiction, can allocate 0 bytes... MAY not be unique. *)
                 cbn in HMAPM.
                 cbn.
-                assert (init_bytes = []) as INIT_NIL by admit.
+                assert (init_bytes = []) as INIT_NIL.
+                { destruct init_bytes; auto.
+                  cbn in *.
+                  rewrite IP.from_Z_0 in HSEQ.
+                  destruct (Util.map_monad IP.from_Z (Zseq 1 (Datatypes.length init_bytes))); inv HSEQ.
+                  cbn in HMAPM.
+                  rewrite handle_gep_addr_0 in HMAPM.
+                  break_match_hyp; inv HMAPM.
+                }
                 subst.
                 cbn in *; inv HSEQ.
                 cbn in *.
@@ -2177,25 +2258,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 exists ({| ms_memory_stack := (mem, frames); ms_provenance := (next_provenance ms_prov) |}).
                 exists (next_provenance ms_prov).
 
-                split.
-                { (* fresh_provenance *)
-                  split.
-                  - (* Extend provenance *)
-                    unfold extend_provenance.
-                    split; [|split].
-                    + (* Old provenance preserved *)
-                      intros pr USED.
-                      unfold used_provenance_prop in *. cbn in *.
-                      eapply provenance_lt_trans; eauto.
-                      eapply provenance_lt_next_provenance.
-                    + (* New provenance unused *)
-                      unfold used_provenance_prop in *. cbn in *.
-                      eapply provenance_lt_nrefl.
-                    + (* New provenance now allocated *)
-                      unfold used_provenance_prop in *. cbn in *.
-                      eapply provenance_lt_next_provenance.
-                  - admit.
-                }
+                split; [solve_fresh_provenance_invariants|].
 
                 eexists.
                 set (alloc_addr :=
@@ -2276,25 +2339,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               exists ({| ms_memory_stack := (mem, frames); ms_provenance := (next_provenance ms_prov) |}).
               exists (next_provenance ms_prov).
 
-              split.
-              { (* fresh_provenance *)
-                  split.
-                  - (* Extend provenance *)
-                    unfold extend_provenance.
-                    split; [|split].
-                    + (* Old provenance preserved *)
-                      intros pr USED.
-                      unfold used_provenance_prop in *. cbn in *.
-                      eapply provenance_lt_trans; eauto.
-                      eapply provenance_lt_next_provenance.
-                    + (* New provenance unused *)
-                      unfold used_provenance_prop in *. cbn in *.
-                      eapply provenance_lt_nrefl.
-                    + (* New provenance now allocated *)
-                      unfold used_provenance_prop in *. cbn in *.
-                      eapply provenance_lt_next_provenance.
-                  - admit.
-              }
+              split; [solve_fresh_provenance_invariants|].
 
               Open Scope positive.
               exists ({|
