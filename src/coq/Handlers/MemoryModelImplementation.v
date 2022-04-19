@@ -423,7 +423,10 @@ Module FinPTOI : PTOI(Addr).
   Definition ptr_to_int (ptr : Addr.addr) := fst ptr.
 End FinPTOI.
 
-Module FinPROV : PROVENANCE(Addr) with Definition Prov := Prov.
+Module FinPROV : PROVENANCE(Addr)
+with Definition Prov := Prov
+with Definition address_provenance
+    := fun (a : Addr.addr) => snd a.
   Definition Provenance := Provenance.
   Definition AllocationId := AllocationId.
   Definition Prov := Prov.
@@ -571,8 +574,19 @@ Module FinPROV : PROVENANCE(Addr) with Definition Prov := Prov.
 End FinPROV.
 
 Module FinITOP : ITOP(Addr)(FinPROV).
-  Definition int_to_ptr (i : Z) (pr : Prov) : Addr.addr
+  Import Addr.
+  Import FinPROV.
+
+  Definition int_to_ptr (i : Z) (pr : Prov) : addr
     := (i, pr).
+
+  Lemma int_to_ptr_provenance :
+    forall (x : Z) (p : Prov) ,
+      FinPROV.address_provenance (int_to_ptr x p) = p.
+  Proof.
+    intros x p.
+    reflexivity.
+  Qed.
 End FinITOP.
 
 Module FinSizeof : Sizeof.
@@ -2191,7 +2205,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     repeat eexists.
                   - (* allocate_bytes_address_provenance *)
                     subst alloc_addr.
-                    admit. (* TODO: property of int_to_ptr and address_provenance *)
+                    apply int_to_ptr_provenance.
                   - (* allocate_bytes_addresses_provenance *)
                     intros ptr IN.
                     inv IN.
@@ -2311,7 +2325,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                    end
                 | Z.neg y' => Z.pos_sub 1 y'
                 end (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov))) = alloc_addr) as EQALLOC.
-              admit.
+              {
+                (* TODO: Probably need something about handle_gep_addr_0 *)
+                admit.
+              }
 
               split.
               { (* TODO: solve_allocate_bytes_succeeds_spec *)
