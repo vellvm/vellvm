@@ -143,6 +143,10 @@ Module Type PROVENANCE(Addr:MemoryAddress.ADDRESS).
   Parameter aid_access_allowed_refl :
     forall aid, aid_access_allowed aid aid = true.
 
+  Parameter access_allowed_refl :
+    forall aid,
+      access_allowed (allocation_id_to_prov aid) aid = true.
+
   Parameter provenance_eq_dec :
     forall (pr pr' : Provenance),
       {pr = pr'} + {pr <> pr'}.

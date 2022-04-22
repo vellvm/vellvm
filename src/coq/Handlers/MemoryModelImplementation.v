@@ -45,6 +45,7 @@ From Coq Require Import
      Strings.String
      List
      Lia
+     Relations
      RelationClasses.
 
 Import ListNotations.
@@ -484,6 +485,20 @@ with Definition address_provenance
     auto.
   Qed.
 
+  Lemma access_allowed_refl :
+    forall aid,
+      access_allowed (allocation_id_to_prov aid) aid = true.
+  Proof.
+    intros aid.
+    unfold access_allowed.
+    cbn.
+    destruct aid; auto.
+    cbn.
+    rewrite N.eqb_refl.
+    cbn.
+    auto.
+  Qed.
+
   Lemma provenance_eq_dec :
     forall (pr pr' : Provenance),
       {pr = pr'} + {pr <> pr'}.
@@ -726,6 +741,7 @@ Module FinByte (ADDR : MemoryAddress.ADDRESS) (IP : MemoryAddress.INTPTR) (SIZEO
 
 End FinByte.
 
+
 Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) <: MemoryModelSpecPrimitives LP MP.
   Import LP.
   Import LP.Events.
@@ -826,6 +842,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   #[global] Opaque set_byte_raw.
   #[global] Opaque read_byte_raw.
 
+
   Record MemState' :=
     mkMemState
       { ms_memory_stack : memory_stack;
@@ -879,11 +896,68 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
   Definition ptr_in_frame_prop (f : Frame) (ptr : addr) : Prop :=
     In (ptr_to_int ptr) f.
 
+  Definition frame_eqv (f f' : Frame) : Prop :=
+    forall ptr, ptr_in_frame_prop f ptr <-> ptr_in_frame_prop f' ptr.
+
+  #[global] Instance frame_eqv_Equivalence : Equivalence frame_eqv.
+  Proof.
+    split.
+    - intros f ptr.
+      reflexivity.
+    - intros f1 f2 EQV.
+      unfold frame_eqv in *.
+      firstorder.
+    - intros x y z XY YZ.
+      firstorder.
+  Qed.
+
+  Fixpoint FSIn (f : Frame) (fs : FrameStack) : Prop :=
+    match fs with
+    | Singleton f' => f' = f
+    | Snoc fs f' => f' = f \/ FSIn f fs
+    end.
+
+  Fixpoint FSIn_eqv (f : Frame) (fs : FrameStack) : Prop :=
+    match fs with
+    | Singleton f' => frame_eqv f' f
+    | Snoc fs f' => frame_eqv f' f \/ FSIn_eqv f fs
+    end.
+
+  Fixpoint FSNth_rel (R : relation Frame) (fs : FrameStack) (n : nat) (f : Frame) : Prop :=
+    match n with
+    | 0%nat =>
+        match fs with
+        | Singleton f' => R f' f
+        | Snoc fs f' => R f' f
+        end
+    | S n =>
+        match fs with
+        | Singleton f' => False
+        | Snoc fs f' => FSNth_rel R fs n f
+        end
+    end.
+
+  Definition FSNth_eqv := FSNth_rel frame_eqv.
+
+  Definition frame_stack_eqv (fs fs' : FrameStack) : Prop :=
+    forall f n, FSNth_eqv fs n f <-> FSNth_eqv fs' n f.
+
+  #[global] Instance frame_stack_eqv_Equivalence : Equivalence frame_stack_eqv.
+  Proof.
+    split; try firstorder.
+    - intros x y z XY YZ.
+      unfold frame_stack_eqv in *.
+      intros f n.
+      split; intros NTH.
+      + apply YZ; apply XY; auto.
+      + apply XY; apply YZ; auto.
+  Qed.
+
   (* Check for the current frame *)
   Definition peek_frame_stack_prop (fs : FrameStack) (f : Frame) : Prop :=
     match fs with
-    | Singleton f' => f = f'
-    | Snoc s f' => f = f'
+    | Singleton f' => frame_eqv f f'
+    | Snoc s f' => frame_eqv f f'
     end.
 
   Definition pop_frame_stack_prop (fs fs' : FrameStack) : Prop :=
@@ -1040,6 +1114,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           ret (proj_sumbool (aid_eq_dec aid aid'))
       end.
 
+    (* Register a concrete address in a frame *)
     Definition add_to_frame (m : memory_stack) (k : Z) : memory_stack :=
       let '(m,s) := m in
       match s with
@@ -1047,8 +1122,33 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       | Snoc s f => (m, Snoc s (k :: f))
       end.
 
+    (* Register a list of concrete addresses in a frame *)
     Definition add_all_to_frame (m : memory_stack) (ks : list Z) : memory_stack
       := fold_left (fun ms k => add_to_frame ms k) ks m.
+
+    Lemma add_to_frame_preserves_memory :
+      forall ms k,
+        fst (add_to_frame ms k) = fst ms.
+    Proof.
+      intros [m fs] k.
+      destruct fs; auto.
+    Qed.
+
+    Lemma add_all_to_frame_preserves_memory :
+      forall ms ks,
+        fst (add_all_to_frame ms ks) = fst ms.
+    Proof.
+      intros ms ks; revert ms;
+      induction ks; intros ms; auto.
+      cbn in *. unfold add_all_to_frame in IHks.
+      specialize (IHks (add_to_frame ms a)).
+      rewrite add_to_frame_preserves_memory in IHks.
+      auto.
+    Qed.
+
+    (* These should be opaque for convenience *)
+    #[global] Opaque add_all_to_frame.
+    #[global] Opaque next_memory_key.
 
     Definition allocate_bytes `{MemMonad MemState ExtraState Provenance MemM (itree Eff)} (dt : dtyp) (init_bytes : list SByte) : MemM addr :=
       match dtyp_eq_dec dt DTYPE_Void with
@@ -1388,8 +1488,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       break_read_byte_allowed_hyps;
       break_write_byte_allowed_hyps.
 
+    Hint Rewrite int_to_ptr_provenance : PROVENANCE.
+    Hint Resolve access_allowed_refl : ACCESS_ALLOWED.
+
     Ltac solve_access_allowed :=
-      solve [eauto].
+      solve [autorewrite with PROVENANCE; eauto with ACCESS_ALLOWED].
 
     Ltac solve_write_byte_allowed :=
       break_access_hyps; eexists; split; [| solve_access_allowed]; solve_byte_allocated.
@@ -2210,7 +2313,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 auto.
                 admit. (* Should be easy typeclass nonsense *)
               }
-              
+
               (* no oom for undef bytes *)
               cbn in RUN.
               rewrite MemMonad_run_bind in RUN; auto.
@@ -2262,18 +2365,10 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                 eexists.
                 set (alloc_addr :=
-                       int_to_ptr
-                         match IntMaps.maximumBy Z.leb (-1) (map fst (IM.elements (elt:=mem_byte) mem)) with
-                         | 0 => 1
-                         | Z.pos y' => Z.pos match y' with
-                                            | xI q => xO (Pos.succ q)
-                                            | xO q => xI q
-                                            | 1%positive => 2
-                                            end
-                         | Z.neg y' => Z.pos_sub 1 y'
-                         end (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov)))).
+                       int_to_ptr (next_memory_key (mem, frames))
+                                  (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov)))).
                 exists (alloc_addr, []).
- 
+
                 split.
                 2: {
                   split; eauto.
@@ -2344,50 +2439,18 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               Open Scope positive.
               exists ({|
     ms_memory_stack :=
-      fold_left (fun (ms : memory_stack) (k : Z) => add_to_frame ms k) (map ptr_to_int ptrs)
-        match frames with
-        | Singleton f =>
-            (add_all_index
-               (map (fun b : SByte => (b, provenance_to_allocation_id (next_provenance ms_prov)))
-                  undef_bytes)
-               match IntMaps.maximumBy Z.leb (-1)%Z (map fst (IM.elements (elt:=mem_byte) mem)) with
-               | 0%Z => 1
-               | Z.pos y' => Z.pos match y' with
-                                   | q~1 => (Pos.succ q)~0
-                                   | q~0 => q~1
-                                   | 1 => 2
-                                   end
-               | Z.neg y' => Z.pos_sub 1 y'
-               end mem, Singleton (ptr_to_int alloc_addr :: f))
-        | Snoc s f =>
-            (add_all_index
-               (map (fun b : SByte => (b, provenance_to_allocation_id (next_provenance ms_prov)))
-                  undef_bytes)
-               match IntMaps.maximumBy Z.leb (-1)%Z (map fst (IM.elements (elt:=mem_byte) mem)) with
-               | 0%Z => 1
-               | Z.pos y' => Z.pos match y' with
-                                   | q~1 => (Pos.succ q)~0
-                                   | q~0 => q~1
-                                   | 1 => 2
-                                   end
-               | Z.neg y' => Z.pos_sub 1 y'
-               end mem, Snoc s (ptr_to_int alloc_addr :: f))
-        end;
+              add_all_to_frame
+                (add_all_index
+                   (map (fun b : SByte => (b, provenance_to_allocation_id (next_provenance ms_prov)))
+                      undef_bytes) (next_memory_key (mem, frames)) mem, frames)
+                (ptr_to_int alloc_addr :: map ptr_to_int ptrs);
     ms_provenance := next_provenance ms_prov
   |}).
               exists (alloc_addr, (alloc_addr :: ptrs)).
 
               Close Scope positive.
               assert (int_to_ptr
-                match IntMaps.maximumBy Z.leb (-1) (map fst (IM.elements (elt:=mem_byte) mem)) with
-                | 0 => 1
-                | Z.pos y' => Z.pos match y' with
-                                   | xI q => xO (Pos.succ q)
-                                   | xO q => xI q
-                                   | 1%positive => 2
-                                   end
-                | Z.neg y' => Z.pos_sub 1 y'
-                end (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov))) = alloc_addr) as EQALLOC.
+                        (next_memory_key (mem, frames)) (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov))) = alloc_addr) as EQALLOC.
               {
                 destruct (Datatypes.length init_bytes) eqn:LENBYTES.
                 { cbn in HSEQ; inv HSEQ.
@@ -2437,7 +2500,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     forall {A B} (f : A -> err B) l res x,
                       Util.map_monad f l = ret res ->
                       In x res ->
-                      exists y, f y = ret x.
+                      exists y, f y = ret x /\ In y l.
                   Proof.
                     intros A B f l res x MAP IN.
                     generalize dependent l.
@@ -2450,14 +2513,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                         * exists h.
                           cbn in MAP.
                           break_match_hyp; [|break_match_hyp]; inv MAP.
-                          reflexivity.
+                          split; cbn; auto.
                       + destruct l as [_ | h ls].
                         * cbn in MAP.
                           inv MAP.
-                        * eapply IHres with (l:=ls); eauto.
-                          cbn in MAP.
+                        * cbn in MAP.
                           break_match_hyp; [|break_match_hyp]; inv MAP.
-                          reflexivity.
+                          epose proof (IHres H13 ls Heqs0) as [y [HF INy]].
+                          exists y; split; cbn; eauto.
                   Qed.
 
                   assert (@inr string (list addr) = ret) as INR.
@@ -2467,11 +2530,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                   intros ptr IN.
                   pose proof map_monad_err_In _ _ _ _ HMAPM IN as MAPIN.
-                  destruct MAPIN as [ip GENPTR].
+                  destruct MAPIN as [ip [GENPTR INip]].
 
                   apply handle_gep_addr_preserves_provenance in GENPTR.
                   rewrite int_to_ptr_provenance in GENPTR.
-                  auto.                      
+                  auto.
                 - (* allocate_bytes_provenances_preserved *)
                   intros pr'0.
                   split; eauto. (* TODO: not sure about eauto here *)
@@ -2492,19 +2555,99 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   { (* Read succeeds, should be false. *)
                     destruct m.
                     destruct CONTRA as [CONTRA AID].
-                    
+
+                    pose proof map_monad_err_In _ _ _ _ HMAPM IN as MAPIN.
+                    destruct MAPIN as [ip [GENPTR INip]].
+
+                    apply handle_gep_addr_preserves_provenance in GENPTR.
+                    rewrite int_to_ptr_provenance in GENPTR.
+
                     admit.
                   }
 
                   destruct CONTRA as [_ CONTRA].
                   inversion CONTRA.
                 - (* allocate_bytes_now_byte_allocated *)
-                  admit.
+                  (* TODO: solve_byte_allocated *)
+                  intros ptr IN.
+
+                  (* New bytes are allocated because the exist in the add_all_index block *)
+                  pose proof map_monad_err_In _ _ _ _ HMAPM IN as MAPIN.
+                  destruct MAPIN as [ip [GENPTR INip]].
+
+                  repeat eexists.
+                  cbn.
+                  unfold mem_state_memory.
+                  cbn.
+                  rewrite add_all_to_frame_preserves_memory.
+                  cbn.
+
+                  (* TODO: Might be a nicer lemma to write for this *)
+                  erewrite read_byte_raw_add_all_index_in. (* v should be some undef_byte with the right index *)
+                  break_match.
+
+                  split; auto.
+                  + (* Should hold, comes from `a` comes from the map in add_all_index... *)
+                    (* May be better to have an existential read_byte_raw_lemma, like map_monad_err_In... *)
+                    admit.
+                  + (* TODO: need lemma about handle_gep_addr and ptr_to_int
+
+                       also will likely need to know that ip >= 0 from HSEQ.
+                     *)
+                    admit.
+                  + (* TODO: should hold *)
+                    admit.
                 - (* allocate_bytes_preserves_old_allocations *)
-                  admit.
+                  intros ptr aid NIN.
+                  (* TODO: not enough for ptr to not be in ptrs list. Must be disjoint.
+
+                     E.g., problem if provenances are different.
+                   *)
+
+                  split; intros ALLOC.
+                  + repeat eexists; cbn; unfold mem_state_memory; cbn.
+                    rewrite add_all_to_frame_preserves_memory.
+                    cbn.
+
+                    erewrite read_byte_raw_add_all_index_out.
+                    2: admit. (* Bounds *)
+
+                    cbn in ALLOC.
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    cbn in ALLOC.
+
+                    break_match; [break_match|]; split; tauto.
+                  + cbn in ALLOC.
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    cbn in ALLOC.
+
+                    unfold mem_state_memory in ALLOC; cbn in ALLOC.
+                    rewrite add_all_to_frame_preserves_memory in ALLOC; cbn in ALLOC.
+
+                    erewrite read_byte_raw_add_all_index_out in ALLOC.
+                    2: admit. (* Bounds *)
+
+                    repeat eexists.
+                    cbn.
+
+                    break_match; [break_match|]; split; tauto.
                 - (* alloc_bytes_new_reads_allowed *)
-                  admit.
+                  intros p IN.
+                  (* TODO: solve_read_byte_allowed *)
+                  induction IN as [IN | IN]; subst.
+                  + (* TODO: solve_read_byte_allowed *)
+                    eexists.
+                    split.
+                    * (* TODO: solve_byte_allocated *)
+                      admit. (* solve_byte_allocated. *)
+                    * solve_access_allowed.
+                  + admit.
                 - (* alloc_bytes_old_reads_allowed *)
+                  
                   admit.
                 - (* alloc_bytes_new_reads *)
                   admit.
@@ -2515,17 +2658,155 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 - (* alloc_bytes_old_writes_allowed *)
                   admit.
                 - (* alloc_bytes_add_to_frame *)
+                  intros fs1 fs2 OLDFS ADD.
+
+                  unfold mem_state_frame_stack_prop.
+                  cbn.
+                  cbn in ADD.
+
+                  Lemma add_to_frame_add_ptr_to_frame_stack :
+                    forall ptr (ms : memory_stack) (ms' : memory_stack),
+                      add_to_frame ms (ptr_to_int ptr) = ms' ->
+                      add_ptr_to_frame_stack (snd ms) ptr (snd ms').
+                  Proof.
+                    intros ptr [m fs] [m' fs'] ADD.
+                    cbn in *.
+                    red.
+                    intros f f' fs1_pop PEEK ADDPROP POP.
+                    destruct fs; inv POP; inv ADD.
+                    split; cbn; auto.
+
+                    (* peek_frame_stack_prop *)
+                    destruct ADDPROP.
+                    cbn in *; subst.
+                    red in new_frame_lu0.
+
+                    (* Should this be another lemma? *)
+                    unfold frame_eqv.
+                    intros ptr0; split; intros FP; unfold ptr_in_frame_prop in *; cbn in *.
+                    + destruct (Z.eq_dec (ptr_to_int ptr) (ptr_to_int ptr0)); [tauto | right].
+                      apply PEEK.
+                      apply old_frame_lu0; eauto.
+                    + destruct (Z.eq_dec (ptr_to_int ptr) (ptr_to_int ptr0)); [congruence|].
+                      destruct FP; [contradiction|].
+                      apply PEEK in H13.
+                      eapply old_frame_lu0; eauto.
+                  Qed.
+
+                  Lemma add_all_to_frame_nil :
+                    forall ms ms',
+                      add_all_to_frame ms [] = ms' ->
+                      ms = ms'.
+                  Proof.
+                    (* TODO: move to pre opaque *)
+                    Transparent add_all_to_frame.
+                    unfold add_all_to_frame.
+                    Opaque add_all_to_frame.
+                    cbn; eauto.
+                  Qed.
+
+                  Lemma add_all_to_frame_cons_inv :
+                    forall ptr ptrs ms ms'',
+                      add_all_to_frame ms (ptr :: ptrs) = ms'' ->
+                      exists ms',
+                        add_to_frame ms ptr = ms' /\
+                        add_all_to_frame ms' ptrs = ms''.
+                  Proof.
+                    (* TODO: move to pre opaque *)
+                    Transparent add_all_to_frame.
+                    unfold add_all_to_frame.
+                    Opaque add_all_to_frame.
+                    cbn; eauto.
+                  Qed.
+
+                  Lemma add_all_to_frame_cons :
+                    forall ptr ptrs ms ms' ms'',
+                      add_to_frame ms ptr = ms' ->
+                      add_all_to_frame ms' ptrs = ms'' ->
+                      add_all_to_frame ms (ptr :: ptrs) = ms''.
+                  Proof.
+                    (* TODO: move to pre opaque *)
+                    Transparent add_all_to_frame.
+                    unfold add_all_to_frame.
+                    Opaque add_all_to_frame.
+
+                    intros ptr ptrs ms ms' ms'' ADD ADD_ALL.
+                    cbn; subst; eauto.
+                  Qed.
+
+                  Lemma add_ptrs_to_frame_stack_rev :
+                    forall ptrs fs fs' fsr',
+                      add_ptrs_to_frame_stack fs ptrs fs' ->
+                      add_ptrs_to_frame_stack fs (rev ptrs) fsr' ->
+                      frame_stack_eqv fs' fsr'.
+                  Proof.
+                    induction ptrs;
+                      intros fs fs' fsr' ADD ADDREV.
+                    - cbn in *; subst.                      
+                      reflexivity.
+                    - cbn in ADDREV.
+                  Admitted.
+
+                  Lemma add_ptrs_to_frame_stack_rev_inv :
+                    forall ptrs fs fs',
+                      add_ptrs_to_frame_stack fs ptrs fs' ->
+                      exists fsr', add_ptrs_to_frame_stack fs (rev ptrs) fsr' /\
+                                frame_stack_eqv fs' fsr'.
+                  Proof.
+                  Admitted.
+
+                  Lemma add_all_to_frame_add_ptrs_to_frame_stack :
+                    forall ptrs (ms : memory_stack) (ms' : memory_stack),
+                      add_all_to_frame ms (map ptr_to_int ptrs) = ms' ->
+                      add_ptrs_to_frame_stack (snd ms) ptrs (snd ms').
+                  Proof.
+                    induction ptrs;
+                      intros ms ms' ADD_ALL.
+                    - cbn in *.
+                      apply add_all_to_frame_nil in ADD_ALL; subst; auto.
+                    - cbn in *.
+                      intros fs' ADD_PTRS.
+                      apply add_all_to_frame_cons_inv in ADD_ALL.
+                      destruct ADD_ALL as [ms_mid [ADD ADD_ALL]].
+
+                      (* add_ptrs_to_frame_stack adds in the reverse order... *)
+                      apply add_ptrs_to_frame_stack_rev_inv in ADD_PTRS.
+                      destruct ADD_PTRS as [fsr' [ADD_PTRS EQV_REV]].
+
+                      cbn in *.
+                      unfold add_ptr_to_frame_stack.
+                      intros f f' fs1_pop PEEK ADD' POP.
+
+                      split.
+                      + (* POP *)
+                        admit.
+                      + unfold peek_frame_stack_prop in *.
+                        destruct fs'; inv POP.
+                        break_match.
+                        admit.
+                        admit.
+                  Admitted.
+
+                  match goal with
+                  | H: _ |- snd ?x = _ =>
+                      destruct x eqn:Hmem
+                  end.
+
+                  cbn.
+                  apply add_all_to_frame_cons_inv in Hmem.
+                  destruct Hmem as [ms [ADD1 ADDALL']].
+
                   admit.
                 - (* non-void *)
-                  admit.
+                  auto.
                 - (* Length of init bytes matches up *)
-                  admit.
+                  cbn; auto.
               }
               { split.
                 reflexivity.
                 auto.
               }
-            }            
+            }
 
             { (* OOM *)
               cbn in RUN.

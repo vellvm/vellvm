@@ -74,7 +74,7 @@ Section Failure.
     pinversion CONTRA.
   Qed.
 
-  Global Instance RaiseBindM_Fail : RaiseBindM (itree E) string (fun T => raise) :=
+  #[global] Instance RaiseBindM_Fail : RaiseBindM (itree E) string (fun T => raise) :=
     { rbm_raise_bind := raise_bind_itree;
       rbm_raise_ret_inv := raise_ret_inv_itree;
     }.
@@ -120,7 +120,7 @@ Section OOM.
     pinversion CONTRA.
   Qed.
 
-  Global Instance RaiseBindM_OOM : RaiseBindM (itree E) string (fun T => raiseOOM) :=
+  #[global] Instance RaiseBindM_OOM : RaiseBindM (itree E) string (fun T => raiseOOM) :=
     { rbm_raise_bind := raiseOOM_bind_itree;
       rbm_raise_ret_inv := raiseOOM_ret_inv_itree;
     }.
@@ -166,7 +166,7 @@ Section UB.
     pinversion CONTRA.
   Qed.
 
-  Global Instance RaiseBindM_UB : RaiseBindM (itree E) string (fun T => raiseUB) :=
+  #[global] Instance RaiseBindM_UB : RaiseBindM (itree E) string (fun T => raiseUB) :=
     { rbm_raise_bind := raiseUB_bind_itree;
       rbm_raise_ret_inv := raiseUB_ret_inv_itree;
     }.

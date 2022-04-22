@@ -962,7 +962,8 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Record add_ptr_to_frame (f1 : Frame) (ptr : addr) (f2 : Frame) : Prop :=
     {
-      old_frame_lu : forall ptr', ptr_in_frame_prop f1 ptr' -> ptr_in_frame_prop f2 ptr';
+      old_frame_lu : forall ptr', disjoint_ptr_byte ptr ptr' ->
+                             ptr_in_frame_prop f1 ptr' <-> ptr_in_frame_prop f2 ptr';
       new_frame_lu : ptr_in_frame_prop f2 ptr;
     }.
 
