@@ -212,4 +212,8 @@ Module Type ITOP (Addr:MemoryAddress.ADDRESS) (PROV:PROVENANCE(Addr)) (PTOI:PTOI
     forall (a : addr) (p : Prov),
       address_provenance a = p ->
       int_to_ptr (ptr_to_int a) p = a.
+
+  Parameter ptr_to_int_int_to_ptr :
+    forall (x : Z) (p : Prov),
+      ptr_to_int (int_to_ptr x p) = x.
 End ITOP.

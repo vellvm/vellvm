@@ -616,6 +616,14 @@ Module FinITOP : ITOP(Addr)(FinPROV)(FinPTOI).
     destruct a; cbn.
     inv PROV; cbn; auto.
   Qed.
+
+  Lemma ptr_to_int_int_to_ptr :
+    forall (x : Z) (p : Prov),
+      ptr_to_int (int_to_ptr x p) = x.
+  Proof.
+    intros x p.
+    reflexivity.
+  Qed.
 End FinITOP.
 
 Module FinSizeof : Sizeof.
@@ -831,7 +839,25 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
         list_nth_z l (p - z) = Some v ->
         read_byte_raw (add_all_index l z mem) p = Some v.
     Proof.
-      intros mem l z p BOUNDS IN.
+      intros mem l z p v BOUNDS IN.
+      unfold read_byte_raw.
+      eapply lookup_add_all_index_in; eauto.
+    Qed.
+
+    Lemma read_byte_raw_add_all_index_in_exists :
+      forall (mem : memory) l z p,
+        z <= p <= z + Zlength l - 1 ->
+        exists v, list_nth_z l (p - z) = Some v /\
+               read_byte_raw (add_all_index l z mem) p = Some v.
+    Proof.
+      intros mem l z p IN.
+      pose proof range_list_nth_z l (p - z) as H.
+      forward H.
+      lia.
+      destruct H as [v NTH].
+      exists v.
+
+      split; auto.
       unfold read_byte_raw.
       eapply lookup_add_all_index_in; eauto.
     Qed.
@@ -2333,7 +2359,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               inv RUN.
               (* Done extracting information from RUN. *)
 
-              destruct ptrs as [ _ | alloc_addr ptrs].
+              rename ptrs into ptrs_alloced.
+              destruct ptrs_alloced as [ _ | alloc_addr ptrs] eqn:HALLOC_PTRS.
               { (* Empty ptr list... Not a contradiction, can allocate 0 bytes... MAY not be unique. *)
                 cbn in HMAPM.
                 cbn.
@@ -2643,12 +2670,129 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     eexists.
                     split.
                     * (* TODO: solve_byte_allocated *)
-                      admit. (* solve_byte_allocated. *)
+                      repeat eexists.
+                      cbn.
+                      unfold mem_state_memory.
+                      cbn.
+                      rewrite add_all_to_frame_preserves_memory.
+                      cbn in *.
+                      rewrite ptr_to_int_int_to_ptr.
+
+                      match goal with
+                      | H: _ |- context [ read_byte_raw (add_all_index ?l ?z ?mem) ?p ] =>
+                          pose proof read_byte_raw_add_all_index_in_exists mem l z p as ?READ
+                      end.
+
+                      forward READ.
+                      admit. (* Should hold... *)
+
+                      destruct READ as [(byte, aid_byte) [NTH READ]].
+                      rewrite list_nth_z_map in NTH.
+                      unfold option_map in NTH.
+                      break_match_hyp; inv NTH.
+
+                      (* Need this unfold for rewrite >_< *)
+                      unfold mem_byte in *.
+                      rewrite READ.
+
+                      split; auto.
+                      apply aid_eq_dec_refl.
                     * solve_access_allowed.
-                  + admit.
+                  + (* TODO: solve_read_byte_allowed *)
+                    repeat eexists.
+                    cbn.
+                    unfold mem_state_memory.
+                    cbn.
+                    rewrite add_all_to_frame_preserves_memory.
+                    cbn in *.
+                    rewrite ptr_to_int_int_to_ptr.
+
+                    match goal with
+                    | H: _ |- context [ read_byte_raw (add_all_index ?l ?z ?mem) ?p ] =>
+                        pose proof read_byte_raw_add_all_index_in_exists mem l z p as ?READ
+                    end.
+
+                    forward READ.
+                    admit. (* Should hold... *)
+
+                    destruct READ as [(byte, aid_byte) [NTH READ]].
+                    rewrite list_nth_z_map in NTH.
+                    unfold option_map in NTH.
+                    break_match_hyp; inv NTH.
+
+                    (* Need this unfold for rewrite >_< *)
+                    unfold mem_byte in *.
+                    rewrite READ.
+
+                    split; auto.
+                    apply aid_eq_dec_refl.
+
+                    (* Need to look up provenance via IN *)
+                    (* TODO: solve_access_allowed *)
+                    eapply map_monad_err_In in HMAPM.
+                    2: {
+                      cbn; right; eauto.
+                    }
+
+                    destruct HMAPM as [ip [GENPTR INip]].
+                    apply handle_gep_addr_preserves_provenance in GENPTR.
+                    rewrite int_to_ptr_provenance in GENPTR.
+                    rewrite <- GENPTR.
+
+                    solve_access_allowed.    
                 - (* alloc_bytes_old_reads_allowed *)
-                  
-                  admit.
+                  intros ptr' DISJOINT.
+                  split; intros ALLOWED.
+                  + (* TODO: solve_read_byte_allowed. *)
+                    break_access_hyps.
+                    (* TODO: move this into break_access_hyps? *)
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    cbn in ALLOC.
+
+                    break_match; [break_match|]; destruct ALLOC as [EQM AID]; subst; [|inv AID].
+
+                    repeat eexists.
+                    cbn.
+                    unfold mem_state_memory.
+                    cbn.
+                    rewrite add_all_to_frame_preserves_memory.
+
+                    cbn.
+                    rewrite read_byte_raw_add_all_index_out.
+                    2: {
+                      (* lia. *)
+                      admit.
+                    }
+                    rewrite Heqo; eauto.
+
+                    solve_access_allowed.
+                  + (* TODO: solve_read_byte_allowed. *)
+                    break_access_hyps.
+                    (* TODO: move this into break_access_hyps? *)
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    cbn in ALLOC.
+
+                    break_match; [break_match|]; destruct ALLOC as [EQM AID]; subst; [|inv AID].
+
+                    repeat eexists.
+                    cbn.
+                    unfold mem_state_memory in *.
+                    cbn in *.
+                    rewrite add_all_to_frame_preserves_memory in Heqo.
+                    cbn in *.
+
+                    rewrite read_byte_raw_add_all_index_out in Heqo.
+                    2: {
+                      (* lia. *)
+                      admit.
+                    }
+                    rewrite Heqo; eauto.
+
+                    solve_access_allowed.
                 - (* alloc_bytes_new_reads *)
                   admit.
                 - (* alloc_bytes_old_reads *)
