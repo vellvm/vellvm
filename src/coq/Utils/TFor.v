@@ -5,12 +5,14 @@ From Coq Require Import
 
 (* Fake dependency due to [eutt_iter'']. To remove once the lemma is moved to the itree library *)
 From Vellvm Require Import
-     Utils.Tactics
-     Utils.PropT.
+     Utils.Tactics.
 
 From ITree Require Import
      ITree
-     Eq.Eq.
+     Eq.Eqit
+     Basics.MonadPropT
+     Core.KTreeFacts.
+
 
 Set Implicit Arguments.
 Set Strict Implicit.

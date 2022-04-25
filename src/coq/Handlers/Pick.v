@@ -11,13 +11,13 @@ From ExtLib Require Import
 
 From ITree Require Import
      ITree
-     Eq.Eq
-     Events.State.
+     Eq.Eqit
+     Basics.MonadPropT.
 
 From Vellvm Require Import
      Utils.Error
      Utils.Util
-     Utils.PropT
+     Utils.Tactics
      Syntax.LLVMAst
      Syntax.AstLib
      Syntax.DynamicTypes

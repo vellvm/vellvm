@@ -1,9 +1,10 @@
 (* begin hide *)
 Require Import Paco.paco.
 From Coq Require Import Morphisms.
+From Vellvm Require Import Utils.Tactics.
 From ITree Require Import
      ITree
-     Eq.Eq
+     Eq.Eqit
      Basics.HeterogeneousRelations
      Interp.TranslateFacts.
 Set Implicit Arguments.

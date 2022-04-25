@@ -5,7 +5,7 @@ From Coq Require Import
 From ITree Require Import
      ITree
      Basics.Monad
-     Eq.Eq
+     Eq.Eqit
      TranslateFacts
      Events.State.
 
@@ -592,7 +592,7 @@ Qed.
 
 Lemma interp_intrinsics_iter :
   forall {E F R I} `{FailureE -< F } (t: I -> itree (E +' IntrinsicE +' F) (I + R)) x,
-             interp_intrinsics (iter t x) ≈
+             interp_intrinsics (iter (C := ktree _) t x) ≈
              ITree.iter (fun x => interp_intrinsics (t x)) x.
 Proof.
   intros.
@@ -601,34 +601,36 @@ Proof.
   reflexivity.
 Qed.
 
+
+Require Import ITree.Events.StateFacts.
 Lemma interp_global_iter :
   forall {k v map E F G R I} `{Map k v map} `{CeresSerialize.Serialize k} `{FailureE -< G }
     (t: I -> itree (E +' F +' (GlobalE _ _) +' G) (I + R)) x g,
-    interp_global (ITree.iter t x) g ≈
+    interp_global (ITree.iter t x) g ≅
     @Basics.iter _ MonadIter_stateT0 _ _ (fun x g => interp_global (t x) g) x g.
 Proof.
-  intros.
-  apply interp_state_iter.
+  intros. unfold interp_global, interp_global_h.
+  apply interp_state_iter. repeat intro; reflexivity.
 Qed.
 
 Lemma interp_local_iter :
   forall {k v map E F G R I} `{Map k v map} `{CeresSerialize.Serialize k} `{FailureE -< G }
     (t: I -> itree (E +' F +' (LocalE _ _) +' G) (I + R)) x g,
-    interp_local (ITree.iter t x) g ≈
+    interp_local (ITree.iter t x) g ≅
     @Basics.iter _ MonadIter_stateT0 _ _ (fun x g => interp_local (t x) g) x g.
 Proof.
-  intros.
-  apply interp_state_iter.
+  intros. unfold interp_local, interp_local_h.
+  apply interp_state_iter. repeat intro; reflexivity.
 Qed.
 
 Lemma interp_memory_iter :
   forall {E F R I} `{FailureE -< F} `{UBE -< F} `{PickE -< F}
     (t: I -> itree (E +' IntrinsicE +' MemoryE +' F) (I + R)) x m,
-    interp_memory (ITree.iter t x) m ≈
+    interp_memory (ITree.iter t x) m ≅
     @Basics.iter _ MonadIter_stateT0 _ _ (fun x g => interp_memory (t x) g) x m.
 Proof.
   intros.
-  apply interp_state_iter.
+  apply interp_state_iter. repeat intro; reflexivity.
 Qed.
 
 Lemma interp_cfg3_collapse :
@@ -787,3 +789,4 @@ Proof.
     cbn in *.
     auto.
 Qed.
+

@@ -138,7 +138,7 @@ Ltac break_sum :=
 
 From ITree Require Import
      ITree
-     Eq.Eq.
+     Eq.Eqit.
 
 Ltac bind_ret_r1 :=
   match goal with
@@ -162,7 +162,7 @@ Ltac forward H :=
 
 From ITree Require Import
      ITree
-     Eq.Eq.
+     Eq.Eqit.
 (* Simple specialization of [eqit_Ret] to [eutt] so that users of the library do not need to know about [eqit] *)
 Ltac ret_bind_l_left v :=
   match goal with

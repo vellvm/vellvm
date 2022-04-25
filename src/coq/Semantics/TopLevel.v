@@ -7,6 +7,7 @@ From Coq Require Import
 
 From ITree Require Import
      ITree
+     Basics.MonadPropT
      Events.State.
 
 From ExtLib Require Import

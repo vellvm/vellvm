@@ -6,7 +6,7 @@ From ITree Require Import
      ITree
      Basics.Monad
      Events.StateFacts
-     Eq.Eq.
+     Eq.Eqit.
 
 From Vellvm Require Import
      Utilities
@@ -191,5 +191,6 @@ Proof.
   rewrite interp_memory_alloca; eauto.
   go; reflexivity.
   Unshelve.
-  auto.
+  1, 2 : exact (ExternalCallE +' PickE +' UBE +' DebugE +' FailureE).
+  all : typeclasses eauto.
 Qed.

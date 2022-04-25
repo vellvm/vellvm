@@ -3,7 +3,7 @@ From ITree Require Import
      ITree
      Basics.Monad
      Events.StateFacts
-     Eq.Eq.
+     Eq.Eqit.
 
 From Vellvm Require Import
      Utilities

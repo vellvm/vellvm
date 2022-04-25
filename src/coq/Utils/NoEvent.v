@@ -8,7 +8,7 @@ From Paco Require Import paco.
 From ITree Require Import
      ITree
      ITreeFacts
-     Eq.Eq.
+     Eq.Eqit.
 Set Implicit Arguments.
 Set Strict Implicit.
 (* end hide *)
@@ -207,6 +207,7 @@ Section eqit_closure.
       + constructor.
         dependent induction REL.
         pclearbot; intros; gclo; econstructor; cycle -1; eauto with paco.
+        eapply REL0.
       + inv REL.
     - constructor.
       gstep; auto.
@@ -249,6 +250,7 @@ Section eqit_closure.
       + constructor.
         dependent induction REL.
         pclearbot; intros; gclo; econstructor; cycle -1; eauto with paco.
+        eapply REL0.
     - constructor.
       gstep; auto.
     - congruence.

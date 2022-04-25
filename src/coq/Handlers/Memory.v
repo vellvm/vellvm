@@ -23,7 +23,7 @@ From ITree Require Import
      ITree
      Basics.Basics
      Events.Exception
-     Eq.Eq
+     Eq.Eqit
      Events.StateFacts
      Events.State.
 

@@ -3,11 +3,12 @@ From ITree Require Import
      ITree
      ITreeFacts
      Basics.HeterogeneousRelations
+     Basics.MonadPropT
      Events.State
      Events.StateFacts
      InterpFacts
      KTreeFacts
-     Eq.Eq.
+     Eq.Eqit.
 
 From Vellvm Require Import
      Utilities
@@ -166,7 +167,7 @@ Section REFINEMENT.
     exists t; split.
     - unfold model_undef in *.
       unfold L3 in *.
-      match goal with |- PropT.interp_prop ?x _ _ _ _ => remember x as h end.
+      match goal with |- MonadPropT.interp_prop ?x _ _ _ _ => remember x as h end.
       eapply interp_prop_Proper_eq in Ht.
       apply Ht.
       + apply prod_rel_refl; typeclasses eauto.

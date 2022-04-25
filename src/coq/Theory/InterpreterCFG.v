@@ -9,7 +9,7 @@ Require Import ZArith.
 From ITree Require Import
      ITree
      Basics.Monad
-     Eq.Eq.
+     Eq.Eqit.
 
 From Vellvm Require Import
      Utilities
@@ -296,7 +296,8 @@ Proof.
   rewrite interp_memory_alloca; eauto.
   go. reflexivity.
   Unshelve.
-  auto.
+  1,2:exact (PickE +' UBE +' DebugE +' FailureE).
+  all:try typeclasses eauto.
 Qed.
 
 Lemma interp_cfg3_intrinsic :

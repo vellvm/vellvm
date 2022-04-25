@@ -10,13 +10,14 @@ From ExtLib Require Import
 From ITree Require Import
      ITree
      Events.State
-     Eq.Eq
+     Eq.Eqit
      Events.StateFacts
      InterpFacts.
 
 From Vellvm Require Import
      Utils.Util
      Utils.Error
+     Utils.Tactics
      Semantics.LLVMEvents.
 
 Require Import Ceres.Ceres.
