@@ -38,6 +38,8 @@ Module Type Sizeof.
     forall sz t,
       sizeof_dtyp (DTYPE_Vector sz t) = (sz * sizeof_dtyp t)%N.
 
+  Parameter sizeof_dtyp_i8 :
+    sizeof_dtyp (DTYPE_I 8) = 1%N.
 End Sizeof.
 
 (* Derived functions / constants on Sizeof. *)

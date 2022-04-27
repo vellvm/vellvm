@@ -713,6 +713,12 @@ Module FinSizeof : Sizeof.
   Proof.
     reflexivity.
   Qed.
+
+  Lemma sizeof_dtyp_i8 :
+    sizeof_dtyp (DTYPE_I 8) = 1%N.
+  Proof.
+    reflexivity.
+  Qed.
 End FinSizeof.
 
 Module FinByte (ADDR : MemoryAddress.ADDRESS) (IP : MemoryAddress.INTPTR) (SIZEOF : Sizeof) (LLVMEvents:LLVM_INTERACTIONS(ADDR)(IP)(SIZEOF)) : ByteImpl(ADDR)(IP)(SIZEOF)(LLVMEvents).
@@ -1197,8 +1203,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               let aid := provenance_to_allocation_id pr in
               let ptr := (int_to_ptr addr (allocation_id_to_prov aid)) in
               ptrs <- get_consecutive_ptrs ptr (length init_bytes);;
-              undef_bytes <- lift_OOM (generate_undef_bytes dt sid);;
-              let mem' := add_all_index (map (fun b => (b, aid)) undef_bytes) addr mem in
+              let mem' := add_all_index (map (fun b => (b, aid)) init_bytes) addr mem in
               let mem_stack' := add_all_to_frame (mem', fs) (map ptr_to_int ptrs) in
               put_mem_state (mkMemState mem_stack' pr);;
               ret ptr
@@ -2326,26 +2331,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               rewrite MemMonad_run_ret in RUN; auto.
               rewrite bind_ret_l in RUN.
 
-              destruct (generate_undef_bytes dt sid) as [undef_bytes | OOM] eqn:Hbytes.
-
-              2: { (* OOM for undef bytes *)
-                cbn in RUN.
-                rewrite MemMonad_run_bind in RUN; auto.
-                rewrite MemMonad_run_raise_oom in RUN.
-                rewrite rbm_raise_bind in RUN.
-                exfalso.
-                symmetry in RUN.
-                eapply MemMonad_eq1_raise_oom_inv in RUN.
-                auto.
-                admit. (* Should be easy typeclass nonsense *)
-              }
-
-              (* no oom for undef bytes *)
-              cbn in RUN.
-              rewrite MemMonad_run_bind in RUN; auto.
-              rewrite MemMonad_run_ret in RUN; auto.
-              rewrite bind_ret_l in RUN.
-
               rewrite MemMonad_run_bind in RUN; auto.
               rewrite MemMonad_put_mem_state in RUN.
               rewrite bind_ret_l in RUN.
@@ -2378,13 +2363,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 cbn in *.
 
                 (* Size is 0, nothing is allocated... *)
-                (* TODO: lemma *)
-                unfold generate_undef_bytes in Hbytes.
-                rewrite e in Hbytes.
-                erewrite N.recursion_0 in Hbytes.
-                inversion Hbytes; subst.
-                cbn.
-
                 exists ({| ms_memory_stack := (mem, frames); ms_provenance := (next_provenance ms_prov) |}).
                 exists (next_provenance ms_prov).
 
@@ -2469,7 +2447,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               add_all_to_frame
                 (add_all_index
                    (map (fun b : SByte => (b, provenance_to_allocation_id (next_provenance ms_prov)))
-                      undef_bytes) (next_memory_key (mem, frames)) mem, frames)
+                      init_bytes) (next_memory_key (mem, frames)) mem, frames)
                 (ptr_to_int alloc_addr :: map ptr_to_int ptrs);
     ms_provenance := next_provenance ms_prov
   |}).
@@ -2547,6 +2525,42 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                         * cbn in MAP.
                           break_match_hyp; [|break_match_hyp]; inv MAP.
                           epose proof (IHres H13 ls Heqs0) as [y [HF INy]].
+                          exists y; split; cbn; eauto.
+                  Qed.
+
+                  (* TODO: move this *)
+                  (* TODO: can I generalize this? *)
+                  Lemma map_monad_err_Nth :
+                    forall {A B} (f : A -> err B) l res x n,
+                      Util.map_monad f l = ret res ->
+                      Util.Nth res n x ->
+                      exists y, f y = ret x /\ Util.Nth l n y.
+                  Proof.
+                    intros A B f l res x n MAP NTH.
+                    generalize dependent l. generalize dependent n. revert x.
+                    induction res; intros x n NTH l MAP.
+                    - inversion NTH.
+                      rewrite nth_error_nil in *; inv H14.
+                    - cbn in NTH.
+                      induction n.
+                      + cbn in NTH.
+                        inv NTH.
+
+                        destruct l as [_ | h ls].
+                        * cbn in MAP.
+                          inv MAP.
+                        * exists h.
+                          cbn in MAP.
+                          break_match_hyp; [|break_match_hyp]; inv MAP.
+                          split; cbn; auto.
+
+                      + cbn in NTH.
+                        destruct l as [_ | h ls].
+                        * cbn in MAP.
+                          inv MAP.
+                        * cbn in MAP.
+                          break_match_hyp; [|break_match_hyp]; inv MAP.
+                          epose proof (IHres _ _ NTH ls Heqs0) as [y [HF INy]].
                           exists y; split; cbn; eauto.
                   Qed.
 
@@ -2794,7 +2808,123 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                     solve_access_allowed.
                 - (* alloc_bytes_new_reads *)
-                  admit.
+                  intros p ix byte ADDR BYTE.
+                  cbn.
+                  repeat eexists.
+                  unfold mem_state_memory.
+                  cbn.
+                  rewrite add_all_to_frame_preserves_memory.
+                  cbn.
+
+                  match goal with
+                  | H: _ |- context [ read_byte_raw (add_all_index ?l ?z ?mem) ?p ] =>
+                      pose proof read_byte_raw_add_all_index_in_exists mem l z p as ?READ
+                  end.
+
+                  forward READ.
+                  admit. (* bounds *)
+
+                  destruct READ as [(byte', aid_byte) [NTH READ]].
+                  rewrite list_nth_z_map in NTH.
+                  unfold option_map in NTH.
+                  break_match_hyp; inv NTH.
+
+                  (*
+                    ADDR tells me that p is in my pointers list at index `ix`...
+
+                    Should be `next_memory_key ms + ix` basically...
+
+                    So, `ptr_to_int p - next_memory_key (mem, frames) = ix`
+
+                    With that BYTE and Heqo should give me byte = byte'
+                   *)
+                  assert (byte = byte').
+                  { pose proof (map_monad_err_Nth _ _ _ _ _ HMAPM ADDR) as [ix' [GENp NTH_ix']].
+                    apply handle_gep_addr_ix in GENp.
+                    rewrite ptr_to_int_int_to_ptr in GENp.
+                    rewrite GENp in Heqo.
+
+                    (* NTH_ix' -> ix = ix' *)
+                    (* Heqo + BYTE *)
+
+                    (* TODO: Move this *)
+                    Lemma intptr_seq_nth :
+                      forall start len seq ix ixip,
+                        intptr_seq start len = NoOom seq ->
+                        Util.Nth seq ix ixip ->
+                        IP.from_Z (start + (Z.of_nat ix)) = NoOom ixip.
+                    Proof.
+                      intros start len seq. revert start len.
+                      induction seq; intros start len ix ixip SEQ NTH.
+                      - cbn in NTH.
+                        destruct ix; inv NTH.
+                      - cbn in *.
+                        destruct ix.
+                        + cbn in *; inv NTH.
+                          destruct len; cbn in SEQ; inv SEQ.
+                          break_match_hyp; inv H14.
+                          replace (start + 0) with start by lia.
+                          break_match_hyp; cbn in *; inv H15; auto.
+                        + cbn in *; inv NTH.
+                          destruct len as [ | len']; cbn in SEQ; inv SEQ.
+                          break_match_hyp; inv H15.
+                          break_match_hyp; cbn in *; inv H16; auto.
+
+                          replace (start + Z.pos (Pos.of_succ_nat ix)) with
+                            (Z.succ start + Z.of_nat ix) by lia.
+
+                          eapply IHseq with (start := Z.succ start) (len := len'); eauto.
+                    Qed.
+
+                    eapply intptr_seq_nth in NTH_ix'; eauto.
+                    apply IP.from_Z_to_Z in NTH_ix'.
+                    rewrite NTH_ix' in Heqo.
+
+                    rewrite sizeof_dtyp_i8 in Heqo.
+                    replace (next_memory_key (mem, frames) + Z.of_N 1 * ( 0 + Z.of_nat ix) - next_memory_key (mem, frames)) with (Z.of_nat ix) in Heqo by lia.
+
+                    (* TODO: move this *)
+                    Lemma Nth_list_nth_z :
+                      forall {X} (ix : nat) (xs : list X) (x : X),
+                        Util.Nth xs ix x ->
+                        list_nth_z xs (Z.of_nat ix) = Some x.
+                    Proof.
+                      intros X ix xs.
+                      revert ix.
+                      induction xs; intros ix x NTH.
+                      - destruct ix; cbn in NTH; inv NTH.
+                      - cbn in *.
+                        destruct ix.
+                        + cbn in *; inv NTH; auto.
+                        + cbn in NTH.
+                          apply IHxs in NTH.
+                          replace (Z.pred (Z.of_nat (S ix))) with (Z.of_nat ix) by lia.
+                          cbn; auto.
+                    Qed.
+
+                    apply Nth_list_nth_z in BYTE.
+                    rewrite BYTE in Heqo.
+                    inv Heqo; auto.
+                  }
+
+                  subst.
+                  
+                  (* Need this unfold for rewrite >_< *)
+                  unfold mem_byte in *.
+                  rewrite READ.
+
+                  cbn.
+                  break_match.
+                  split; auto.
+
+                  apply Util.Nth_In in ADDR.
+                  pose proof (map_monad_err_In _ _ _ _ HMAPM ADDR) as [ix' [GENp IN_ix']].
+
+                  apply handle_gep_addr_preserves_provenance in GENp.
+                  rewrite <- GENp in Heqb.
+                  rewrite int_to_ptr_provenance in Heqb.
+                  rewrite access_allowed_refl in Heqb.
+                  inv Heqb.
                 - (* alloc_bytes_old_reads *)
                   admit.
                 - (* alloc_bytes_new_writes_allowed *)

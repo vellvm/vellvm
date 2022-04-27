@@ -16,11 +16,13 @@ From Vellvm Require Import
 Import ListNotations.
 Import MonadNotation.
 
-Module Type GEPM (Addr:ADDRESS) (PROV : PROVENANCE Addr) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
+Module Type GEPM (Addr:ADDRESS) (PTOI : PTOI Addr) (PROV : PROVENANCE Addr) (IP:INTPTR) (SIZEOF:Sizeof) (LLVMEvents:LLVM_INTERACTIONS(Addr)(IP)(SIZEOF)).
   Import LLVMEvents.
   Import DV.
   Import PROV.
   Import Addr.
+  Import PTOI.
+  Import SIZEOF.
 
   (* TODO: should this be here? *)
   Parameter handle_gep_h : dtyp -> Z -> list dvalue -> err Z.
@@ -30,6 +32,11 @@ Module Type GEPM (Addr:ADDRESS) (PROV : PROVENANCE Addr) (IP:INTPTR) (SIZEOF:Siz
   Parameter handle_gep_addr_0 :
     forall (dt : dtyp) (p : addr),
       handle_gep_addr dt p [DVALUE_IPTR IP.zero] = inr p.
+
+  Parameter handle_gep_addr_ix :
+    forall (dt : dtyp) (p p' : addr) ix,
+      handle_gep_addr dt p [DVALUE_IPTR ix] = inr p' ->
+      ptr_to_int p' = (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z.
 
   Parameter handle_gep_addr_preserves_provenance :
     forall (dt : dtyp) ixs (p p' : addr),
@@ -43,7 +50,7 @@ Module Type GEPM (Addr:ADDRESS) (PROV : PROVENANCE Addr) (IP:INTPTR) (SIZEOF:Siz
     end.
 End GEPM.
 
-Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS(ADDR)(IP)(SIZE)) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV PTOI) <: GEPM(ADDR)(PROV)(IP)(SIZE)(Events).
+Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERACTIONS(ADDR)(IP)(SIZE)) (PTOI : PTOI ADDR) (PROV : PROVENANCE ADDR) (ITOP : ITOP ADDR PROV PTOI) <: GEPM(ADDR)(PTOI)(PROV)(IP)(SIZE)(Events).
   Import ADDR.
   Import Events.
   Import DV.
@@ -134,6 +141,18 @@ Module Make (ADDR : ADDRESS) (IP : INTPTR) (SIZE : Sizeof) (Events : LLVM_INTERA
     rewrite IP.to_Z_0.
     replace (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * 0)%Z with (ptr_to_int p) by lia.
     rewrite int_to_ptr_ptr_to_int; auto.
+  Qed.
+
+  Lemma handle_gep_addr_ix :
+    forall (dt : dtyp) (p p' : addr) ix,
+      handle_gep_addr dt p [DVALUE_IPTR ix] = inr p' ->
+      ptr_to_int p' = (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * IP.to_Z ix)%Z.
+  Proof.
+    intros dt p p' ix GEP.
+    cbn in *.
+    inv GEP.
+    rewrite ptr_to_int_int_to_ptr.
+    reflexivity.
   Qed.
 
   Lemma handle_gep_addr_preserves_provenance :

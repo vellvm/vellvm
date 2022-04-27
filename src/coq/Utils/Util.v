@@ -914,6 +914,16 @@ Proof.
       destruct (lt_dec (S n) (S (length l))); auto; lia.
 Qed.
 
+Lemma Nth_In :
+  forall {X} (xs : list X) i (x : X),
+    Util.Nth xs i x ->
+    In x xs.
+Proof.
+  intros X xs i x NTH.
+  unfold Util.Nth in *.
+  eapply nth_error_In; eauto.
+Qed.
+
 Lemma interval_Nth : forall m n i (Hlt : i < m - n),
   Nth (interval n m) i (i + n).
 Proof.
