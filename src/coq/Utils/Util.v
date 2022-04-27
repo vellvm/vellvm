@@ -1,6 +1,7 @@
 From Vellvm Require Import
      Utils.Tactics.
 
+Require Coqlib.
 From Coq Require Import
      micromega.Lia
      Ascii
@@ -922,6 +923,24 @@ Proof.
   intros X xs i x NTH.
   unfold Util.Nth in *.
   eapply nth_error_In; eauto.
+Qed.
+
+Lemma Nth_list_nth_z :
+  forall {X} (ix : nat) (xs : list X) (x : X),
+    Util.Nth xs ix x ->
+    Coqlib.list_nth_z xs (Z.of_nat ix) = Some x.
+Proof.
+  intros X ix xs.
+  revert ix.
+  induction xs; intros ix x NTH.
+  - destruct ix; cbn in NTH; inv NTH.
+  - cbn in *.
+    destruct ix.
+    + cbn in *; inv NTH; auto.
+    + cbn in NTH.
+      apply IHxs in NTH.
+      replace (Z.pred (Z.of_nat (S ix))) with (Z.of_nat ix) by lia.
+      cbn; auto.
 Qed.
 
 Lemma interval_Nth : forall m n i (Hlt : i < m - n),

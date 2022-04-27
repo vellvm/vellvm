@@ -2847,35 +2847,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     (* NTH_ix' -> ix = ix' *)
                     (* Heqo + BYTE *)
 
-                    (* TODO: Move this *)
-                    Lemma intptr_seq_nth :
-                      forall start len seq ix ixip,
-                        intptr_seq start len = NoOom seq ->
-                        Util.Nth seq ix ixip ->
-                        IP.from_Z (start + (Z.of_nat ix)) = NoOom ixip.
-                    Proof.
-                      intros start len seq. revert start len.
-                      induction seq; intros start len ix ixip SEQ NTH.
-                      - cbn in NTH.
-                        destruct ix; inv NTH.
-                      - cbn in *.
-                        destruct ix.
-                        + cbn in *; inv NTH.
-                          destruct len; cbn in SEQ; inv SEQ.
-                          break_match_hyp; inv H14.
-                          replace (start + 0) with start by lia.
-                          break_match_hyp; cbn in *; inv H15; auto.
-                        + cbn in *; inv NTH.
-                          destruct len as [ | len']; cbn in SEQ; inv SEQ.
-                          break_match_hyp; inv H15.
-                          break_match_hyp; cbn in *; inv H16; auto.
-
-                          replace (start + Z.pos (Pos.of_succ_nat ix)) with
-                            (Z.succ start + Z.of_nat ix) by lia.
-
-                          eapply IHseq with (start := Z.succ start) (len := len'); eauto.
-                    Qed.
-
                     eapply intptr_seq_nth in NTH_ix'; eauto.
                     apply IP.from_Z_to_Z in NTH_ix'.
                     rewrite NTH_ix' in Heqo.
@@ -2883,26 +2854,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     rewrite sizeof_dtyp_i8 in Heqo.
                     replace (next_memory_key (mem, frames) + Z.of_N 1 * ( 0 + Z.of_nat ix) - next_memory_key (mem, frames)) with (Z.of_nat ix) in Heqo by lia.
 
-                    (* TODO: move this *)
-                    Lemma Nth_list_nth_z :
-                      forall {X} (ix : nat) (xs : list X) (x : X),
-                        Util.Nth xs ix x ->
-                        list_nth_z xs (Z.of_nat ix) = Some x.
-                    Proof.
-                      intros X ix xs.
-                      revert ix.
-                      induction xs; intros ix x NTH.
-                      - destruct ix; cbn in NTH; inv NTH.
-                      - cbn in *.
-                        destruct ix.
-                        + cbn in *; inv NTH; auto.
-                        + cbn in NTH.
-                          apply IHxs in NTH.
-                          replace (Z.pred (Z.of_nat (S ix))) with (Z.of_nat ix) by lia.
-                          cbn; auto.
-                    Qed.
-
-                    apply Nth_list_nth_z in BYTE.
+                    apply Util.Nth_list_nth_z in BYTE.
                     rewrite BYTE in Heqo.
                     inv Heqo; auto.
                   }
@@ -2926,7 +2878,49 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   rewrite access_allowed_refl in Heqb.
                   inv Heqb.
                 - (* alloc_bytes_old_reads *)
-                  admit.
+                  intros ptr' byte DISJOINT.
+                  split; intros READ.
+                  + (* TODO: solve_read_byte_prop *)
+                    cbn.
+                    repeat eexists.
+                    unfold mem_state_memory.
+                    cbn.
+                    rewrite add_all_to_frame_preserves_memory.
+                    cbn.
+
+                    rewrite read_byte_raw_add_all_index_out.
+
+                    2: {
+                      (* Bounds *)
+                      admit.
+                    }
+
+                    (* TODO: ltac to break this up *)
+                    destruct READ as [ms' [ms'' [[EQ1 EQ2] READ]]]; subst.
+                    cbn in READ.
+
+                    break_match; [break_match|]; auto.
+                    tauto.
+                  + (* TODO: solve_read_byte_prop *)
+
+                    (* TODO: ltac to break this up *)
+                    destruct READ as [ms' [ms'' [[EQ1 EQ2] READ]]]; subst.
+                    cbn in READ.
+                    unfold mem_state_memory in READ.
+                    cbn in READ.
+                    rewrite add_all_to_frame_preserves_memory in READ.
+                    cbn in READ.
+
+                    rewrite read_byte_raw_add_all_index_out in READ.
+                    2: {
+                      (* Bounds *)
+                      admit.
+                    }
+
+                    cbn.
+                    repeat eexists.
+                    cbn.
+                    break_match; [break_match|]; tauto.
                 - (* alloc_bytes_new_writes_allowed *)
                   admit.
                 - (* alloc_bytes_old_writes_allowed *)

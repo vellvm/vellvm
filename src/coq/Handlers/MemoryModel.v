@@ -18,7 +18,8 @@ From Vellvm.Utils Require Import
      Error
      PropT
      Util
-     NMaps.
+     NMaps
+     Tactics.
 
 From Vellvm.Numeric Require Import
      Integers.
@@ -137,6 +138,35 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     cbn.
     reflexivity.
   Qed.
+
+  Lemma intptr_seq_nth :
+    forall start len seq ix ixip,
+      intptr_seq start len = NoOom seq ->
+      Util.Nth seq ix ixip ->
+      IP.from_Z (start + (Z.of_nat ix)) = NoOom ixip.
+  Proof.
+    intros start len seq. revert start len.
+    induction seq; intros start len ix ixip SEQ NTH.
+    - cbn in NTH.
+      destruct ix; inv NTH.
+    - cbn in *.
+      destruct ix.
+      + cbn in *; inv NTH.
+        destruct len; cbn in SEQ; inv SEQ.
+        break_match_hyp; inv H0.
+        replace (start + 0)%Z with start by lia.
+        break_match_hyp; cbn in *; inv H1; auto.
+      + cbn in *; inv NTH.
+        destruct len as [ | len']; cbn in SEQ; inv SEQ.
+        break_match_hyp; inv H1.
+        break_match_hyp; cbn in *; inv H2; auto.
+
+        replace (start + Z.pos (Pos.of_succ_nat ix))%Z with
+          (Z.succ start + Z.of_nat ix)%Z by lia.
+
+        eapply IHseq with (start := Z.succ start) (len := len'); eauto.
+  Qed.
+
 
   Definition get_consecutive_ptrs {M} `{Monad M} `{RAISE_OOM M} `{RAISE_ERROR M} (ptr : addr) (len : nat) : M (list addr) :=
     ixs <- lift_OOM (intptr_seq 0 len);;
