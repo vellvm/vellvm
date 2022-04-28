@@ -12,8 +12,10 @@ From ITree Require Import
 
 From Vellvm Require Import
      Utils.Util
+     Utils.Error
      Utils.MonadReturnsLaws
-     Utils.MonadEq1Laws.
+     Utils.MonadEq1Laws
+     Utils.Tactics.
 
 Require Import Lia.
 
@@ -48,4 +50,67 @@ Proof.
     apply IHxs in Hbs.
     cbn.
     lia.
+Qed.
+
+(* TODO: can I generalize this? *)
+Lemma map_monad_err_In :
+  forall {A B} (f : A -> err B) l res x,
+    Util.map_monad f l = ret res ->
+    In x res ->
+    exists y, f y = ret x /\ In y l.
+Proof.
+  intros A B f l res x MAP IN.
+  generalize dependent l.
+  induction res; intros l MAP.
+  - inversion IN.
+  - inversion IN; subst.
+    + destruct l as [_ | h ls].
+      * cbn in MAP.
+        inv MAP.
+      * exists h.
+        cbn in MAP.
+        break_match_hyp; [|break_match_hyp]; inv MAP.
+        split; cbn; auto.
+    + destruct l as [_ | h ls].
+      * cbn in MAP.
+        inv MAP.
+      * cbn in MAP.
+        break_match_hyp; [|break_match_hyp]; inv MAP.
+        epose proof (IHres H ls Heqs0) as [y [HF INy]].
+        exists y; split; cbn; eauto.
+Qed.
+
+(* TODO: can I generalize this? *)
+Lemma map_monad_err_Nth :
+  forall {A B} (f : A -> err B) l res x n,
+    Util.map_monad f l = ret res ->
+    Util.Nth res n x ->
+    exists y, f y = ret x /\ Util.Nth l n y.
+Proof.
+  intros A B f l res x n MAP NTH.
+  generalize dependent l. generalize dependent n. revert x.
+  induction res; intros x n NTH l MAP.
+  - inversion NTH.
+    rewrite nth_error_nil in *; inv H0.
+  - cbn in NTH.
+    induction n.
+    + cbn in NTH.
+      inv NTH.
+
+      destruct l as [_ | h ls].
+      * cbn in MAP.
+        inv MAP.
+      * exists h.
+        cbn in MAP.
+        break_match_hyp; [|break_match_hyp]; inv MAP.
+        split; cbn; auto.
+
+    + cbn in NTH.
+      destruct l as [_ | h ls].
+      * cbn in MAP.
+        inv MAP.
+      * cbn in MAP.
+        break_match_hyp; [|break_match_hyp]; inv MAP.
+        epose proof (IHres _ _ NTH ls Heqs0) as [y [HF INy]].
+        exists y; split; cbn; eauto.
 Qed.

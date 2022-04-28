@@ -29,6 +29,7 @@ From Vellvm.Utils Require Import
      IntMaps
      MonadEq1Laws
      MonadExcLaws
+     MapMonadExtra
      Raise.
 
 From ITree Require Import
@@ -1522,8 +1523,22 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     Hint Rewrite int_to_ptr_provenance : PROVENANCE.
     Hint Resolve access_allowed_refl : ACCESS_ALLOWED.
 
-    Ltac solve_access_allowed :=
-      solve [autorewrite with PROVENANCE; eauto with ACCESS_ALLOWED].
+      Ltac access_allowed_auto :=
+        solve [autorewrite with PROVENANCE; eauto with ACCESS_ALLOWED].
+
+      Ltac solve_access_allowed :=
+        solve [match goal with
+               | HMAPM :
+                 Util.map_monad _ _ = inr ?xs,
+                   IN :
+                   In _ ?xs |- _ =>
+                   let GENPTR := fresh "GENPTR" in
+                   pose proof map_monad_err_In _ _ _ _ HMAPM IN as [?ip [GENPTR ?INip]];
+                   apply handle_gep_addr_preserves_provenance in GENPTR;
+                   rewrite <- GENPTR
+               end; access_allowed_auto
+              | access_allowed_auto
+          ].
 
     Ltac solve_write_byte_allowed :=
       break_access_hyps; eexists; split; [| solve_access_allowed]; solve_byte_allocated.
@@ -2499,70 +2514,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 - (* allocate_bytes_addressses_provenance *)
                   (* TODO: Need map_monad lemmas *)
                   Set Nested Proofs Allowed.
-                  (* TODO: move this *)
-                  (* TODO: can I generalize this? *)
-                  Lemma map_monad_err_In :
-                    forall {A B} (f : A -> err B) l res x,
-                      Util.map_monad f l = ret res ->
-                      In x res ->
-                      exists y, f y = ret x /\ In y l.
-                  Proof.
-                    intros A B f l res x MAP IN.
-                    generalize dependent l.
-                    induction res; intros l MAP.
-                    - inversion IN.
-                    - inversion IN; subst.
-                      + destruct l as [_ | h ls].
-                        * cbn in MAP.
-                          inv MAP.
-                        * exists h.
-                          cbn in MAP.
-                          break_match_hyp; [|break_match_hyp]; inv MAP.
-                          split; cbn; auto.
-                      + destruct l as [_ | h ls].
-                        * cbn in MAP.
-                          inv MAP.
-                        * cbn in MAP.
-                          break_match_hyp; [|break_match_hyp]; inv MAP.
-                          epose proof (IHres H13 ls Heqs0) as [y [HF INy]].
-                          exists y; split; cbn; eauto.
-                  Qed.
-
-                  (* TODO: move this *)
-                  (* TODO: can I generalize this? *)
-                  Lemma map_monad_err_Nth :
-                    forall {A B} (f : A -> err B) l res x n,
-                      Util.map_monad f l = ret res ->
-                      Util.Nth res n x ->
-                      exists y, f y = ret x /\ Util.Nth l n y.
-                  Proof.
-                    intros A B f l res x n MAP NTH.
-                    generalize dependent l. generalize dependent n. revert x.
-                    induction res; intros x n NTH l MAP.
-                    - inversion NTH.
-                      rewrite nth_error_nil in *; inv H14.
-                    - cbn in NTH.
-                      induction n.
-                      + cbn in NTH.
-                        inv NTH.
-
-                        destruct l as [_ | h ls].
-                        * cbn in MAP.
-                          inv MAP.
-                        * exists h.
-                          cbn in MAP.
-                          break_match_hyp; [|break_match_hyp]; inv MAP.
-                          split; cbn; auto.
-
-                      + cbn in NTH.
-                        destruct l as [_ | h ls].
-                        * cbn in MAP.
-                          inv MAP.
-                        * cbn in MAP.
-                          break_match_hyp; [|break_match_hyp]; inv MAP.
-                          epose proof (IHres _ _ NTH ls Heqs0) as [y [HF INy]].
-                          exists y; split; cbn; eauto.
-                  Qed.
 
                   assert (@inr string (list addr) = ret) as INR.
                   reflexivity.
@@ -2630,6 +2581,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   split; auto.
                   + (* Should hold, comes from `a` comes from the map in add_all_index... *)
                     (* May be better to have an existential read_byte_raw_lemma, like map_monad_err_In... *)
+                    
                     admit.
                   + (* TODO: need lemma about handle_gep_addr and ptr_to_int
 
@@ -2922,9 +2874,89 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     cbn.
                     break_match; [break_match|]; tauto.
                 - (* alloc_bytes_new_writes_allowed *)
-                  admit.
+                  intros p IN.
+                  (* TODO: solve_write_byte_allowed. *)
+                  break_access_hyps; eexists; split.
+                  + (* TODO: solve_byte_allocated *)
+                    repeat eexists.
+                    unfold mem_state_memory.
+                    cbn.
+                    rewrite add_all_to_frame_preserves_memory.
+                    cbn.
+
+                  match goal with
+                  | H: _ |- context [ read_byte_raw (add_all_index ?l ?z ?mem) ?p ] =>
+                      pose proof read_byte_raw_add_all_index_in_exists mem l z p as ?READ
+                  end.
+
+                  forward READ.
+                  admit. (* bounds *)
+
+                  destruct READ as [(byte', aid_byte) [NTH READ]].
+                  rewrite list_nth_z_map in NTH.
+                  unfold option_map in NTH.
+                  break_match_hyp; inv NTH.
+
+                  unfold mem_byte in *.
+                  rewrite READ.
+
+                  split; auto.
+                  apply aid_eq_dec_refl.
+                  + solve_access_allowed.
                 - (* alloc_bytes_old_writes_allowed *)
-                  admit.
+                  intros ptr' DISJOINT.
+                  split; intros WRITE.
+                  + (* TODO: solve_write_byte_allowed. *)
+                    break_access_hyps.
+
+                    (* TODO: move this into break_access_hyps? *)
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    cbn in ALLOC.
+
+                    break_match_hyp; [break_match_hyp|]; destruct ALLOC as [EQ1 EQ2]; inv EQ2.
+
+                    repeat eexists; eauto.
+                    cbn.
+                    unfold mem_state_memory.
+                    cbn.
+                    rewrite add_all_to_frame_preserves_memory.
+                    cbn.
+
+                    rewrite read_byte_raw_add_all_index_out.
+                    2: {
+                      (* Bounds *)
+                      admit.
+                    }
+
+                    rewrite Heqo; cbn; split; eauto.
+                  + (* TODO: solve_write_byte_allowed *)
+                    break_access_hyps.
+
+                    (* TODO: move this into break_access_hyps? *)
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                    destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                    cbn in ALLOC.
+                    unfold mem_state_memory in ALLOC.
+                    cbn in ALLOC.
+                    rewrite add_all_to_frame_preserves_memory in ALLOC.
+                    cbn in ALLOC.
+
+                    rewrite read_byte_raw_add_all_index_out in ALLOC.
+                    2: {
+                      (* Bounds *)
+                      admit.
+                    }
+
+                    break_match; [break_match|].
+                    repeat eexists; eauto.
+                    cbn.
+                    unfold mem_byte in *.
+                    rewrite Heqo.
+                    tauto.
+                    destruct ALLOC as [_ CONTRA]; inv CONTRA.
                 - (* alloc_bytes_add_to_frame *)
                   intros fs1 fs2 OLDFS ADD.
 
