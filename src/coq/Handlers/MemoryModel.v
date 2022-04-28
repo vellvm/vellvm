@@ -42,6 +42,7 @@ From Coq Require Import
      List
      Lia
      Relations
+     RelationClasses
      Wellfounded.
 
 Import ListNotations.
@@ -100,6 +101,24 @@ Module Type MemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP).
   Parameter pop_frame_stack_prop : FrameStack -> FrameStack -> Prop.
 
   Parameter mem_state_frame_stack_prop : MemState -> FrameStack -> Prop.
+
+  Definition frame_eqv (f f' : Frame) : Prop :=
+    forall ptr, ptr_in_frame_prop f ptr <-> ptr_in_frame_prop f' ptr.
+
+  #[global] Instance frame_eqv_Equivalence : Equivalence frame_eqv.
+  Proof.
+    split.
+    - intros f ptr.
+      reflexivity.
+    - intros f1 f2 EQV.
+      unfold frame_eqv in *.
+      firstorder.
+    - intros x y z XY YZ.
+      firstorder.
+  Qed.
+
+  Parameter frame_stack_eqv : FrameStack -> FrameStack -> Prop.
+  #[global] Parameter frame_stack_eqv_Equivalence : Equivalence frame_stack_eqv.
 
   (** Provenances *)
   Parameter used_provenance_prop : MemState -> Provenance -> Prop. (* Has a provenance *ever* been used. *)
@@ -1109,7 +1128,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   Fixpoint add_ptrs_to_frame_stack (fs1 : FrameStack) (ptrs : list addr) (fs2 : FrameStack) : Prop :=
     match ptrs with
-    | nil => fs1 = fs2
+    | nil => frame_stack_eqv fs1 fs2
     | (ptr :: ptrs) =>
         forall fs',
           add_ptrs_to_frame_stack fs1 ptrs fs' ->
