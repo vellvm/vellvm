@@ -1120,19 +1120,19 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
 
   (* Add a pointer onto the current frame in the frame stack *)
   Definition add_ptr_to_frame_stack (fs1 : FrameStack) (ptr : addr) (fs2 : FrameStack) : Prop :=
-    forall f f' fs1_pop,
+    forall f,
       peek_frame_stack_prop fs1 f ->
-      add_ptr_to_frame f ptr f' ->
-      pop_frame_stack_prop fs1 fs1_pop ->
-      push_frame_stack_spec fs1_pop f' fs2.
+      exists f', add_ptr_to_frame f ptr f' /\
+              peek_frame_stack_prop fs2 f' /\
+              (forall fs1_pop, pop_frame_stack_prop fs1 fs1_pop <-> pop_frame_stack_prop fs2 fs1_pop).
 
   Fixpoint add_ptrs_to_frame_stack (fs1 : FrameStack) (ptrs : list addr) (fs2 : FrameStack) : Prop :=
     match ptrs with
     | nil => frame_stack_eqv fs1 fs2
     | (ptr :: ptrs) =>
-        forall fs',
-          add_ptrs_to_frame_stack fs1 ptrs fs' ->
-          add_ptr_to_frame_stack fs' ptr fs2
+        exists fs',
+          add_ptrs_to_frame_stack fs1 ptrs fs' /\
+            add_ptr_to_frame_stack fs' ptr fs2
     end.
 
   (*** Writing to memory *)
