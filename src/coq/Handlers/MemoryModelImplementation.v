@@ -3256,7 +3256,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       ptr_in_frame_prop f' ptr' ->
                       ptr_in_frame_prop f ptr' \/ ptr_to_int ptr = ptr_to_int ptr'.
                   Proof.
-                  Admitted.
+                    intros ptr ptr' f f' F F'.
+                    inv F.
+                    pose proof disjoint_ptr_byte_dec ptr ptr' as [DISJOINT | NDISJOINT].
+                    - specialize (old_frame_lu0 _ DISJOINT).
+                      left.
+                      apply old_frame_lu0; auto.
+                    - unfold disjoint_ptr_byte in NDISJOINT.
+                      assert (ptr_to_int ptr = ptr_to_int ptr') as EQ by lia.
+                      right; auto.
+                  Qed.
 
                   Lemma add_ptr_to_frame_eqv :
                     forall ptr f f1 f2,
