@@ -1218,6 +1218,15 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       reflexivity.
   Qed.
 
+  #[global] Instance frame_eqv_cons_Proper :
+    Proper (eq ==> frame_eqv ==> frame_eqv) cons.
+  Proof.
+    unfold Proper, respectful.
+    intros ptr ptr' EQ f1 f2 EQV; subst.
+    unfold frame_eqv in *.
+    cbn in *; intros ptr; split; firstorder.
+  Qed.
+
 End FiniteMemoryModelSpecPrimitives.
 
 Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) : MemoryModelExecPrimitives LP MP.
@@ -3224,86 +3233,53 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       exists fsr', add_ptrs_to_frame_stack fs (rev ptrs) fsr' /\
                                 frame_stack_eqv fs' fsr'.
                   Proof.
-                  Admitted.
+                  Abort.
 
-                  Lemma add_all_to_frame_correct :
-                    forall ptrs (ms : memory_stack) (ms' : memory_stack),
-                      add_all_to_frame ms (map ptr_to_int ptrs) = ms' ->
-                      add_ptrs_to_frame_stack (snd ms) ptrs (snd ms').
+                  Lemma add_to_frame_add_all_to_frame :
+                    forall ptr ms,
+                      add_to_frame ms ptr = add_all_to_frame ms [ptr].
                   Proof.
-                    induction ptrs;
-                      intros ms ms' ADD_ALL.
-                    - cbn in *.
-                      apply add_all_to_frame_nil in ADD_ALL; subst; auto.
-                      reflexivity.
-                    - cbn in *.
-                      (* intros fs' ADD_PTRS. *)
-                      (* apply add_all_to_frame_cons_inv in ADD_ALL. *)
-                      (* destruct ADD_ALL as [ms_mid [ADD ADD_ALL]]. *)
-
-                      (* (* add_ptrs_to_frame_stack adds in the reverse order... *) *)
-                      (* apply add_ptrs_to_frame_stack_rev_inv in ADD_PTRS. *)
-                      (* destruct ADD_PTRS as [fsr' [ADD_PTRS EQV_REV]]. *)
-
-                      (* cbn in *. *)
-                      (* unfold add_ptr_to_frame_stack. *)
-                  Admitted.
-
-                  Lemma add_ptr_to_frame_inv :
-                    forall ptr ptr' f f',
-                      add_ptr_to_frame f ptr f' ->
-                      ptr_in_frame_prop f' ptr' ->
-                      ptr_in_frame_prop f ptr' \/ ptr_to_int ptr = ptr_to_int ptr'.
-                  Proof.
-                    intros ptr ptr' f f' F F'.
-                    inv F.
-                    pose proof disjoint_ptr_byte_dec ptr ptr' as [DISJOINT | NDISJOINT].
-                    - specialize (old_frame_lu0 _ DISJOINT).
-                      left.
-                      apply old_frame_lu0; auto.
-                    - unfold disjoint_ptr_byte in NDISJOINT.
-                      assert (ptr_to_int ptr = ptr_to_int ptr') as EQ by lia.
-                      right; auto.
+                    intros ptr ms.
+                    erewrite add_all_to_frame_cons.
+                    reflexivity.
+                    reflexivity.
+                    symmetry.
+                    apply add_all_to_frame_nil.
+                    reflexivity.
                   Qed.
 
-                  Lemma add_ptr_to_frame_eqv :
-                    forall ptr f f1 f2,
-                      add_ptr_to_frame f ptr f1 ->
-                      add_ptr_to_frame f ptr f2 ->
-                      frame_eqv f1 f2.
+                  Lemma add_to_frame_swap :
+                    forall ptr1 ptr2 ms ms1' ms2' ms1'' ms2'',
+                      add_to_frame ms ptr1 = ms1' ->
+                      add_to_frame ms1' ptr2 = ms1'' ->
+                      add_to_frame ms ptr2 = ms2' ->
+                      add_to_frame ms2' ptr1 = ms2'' ->
+                      frame_stack_eqv (snd ms1'') (snd ms2'').
                   Proof.
-                    intros ptr f f1 f2 F1 F2.
-                    unfold frame_eqv.
-                    intros ptr0.
-                    split; intros IN.
-                    - eapply add_ptr_to_frame_inv in IN; eauto.
-                      destruct IN as [IN | IN].
-                      + destruct F2.
-                        pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT | NDISJOINT].
-                        * eapply old_frame_lu0; eauto.
-                        * unfold disjoint_ptr_byte in NDISJOINT.
-                          assert (ptr_to_int ptr = ptr_to_int ptr0) as EQ by lia.
-                          unfold ptr_in_frame_prop in *.
-                          rewrite <- EQ.
-                          auto.
-                      + destruct F2.
-                        unfold ptr_in_frame_prop in *.
-                        rewrite <- IN.
-                        auto.
-                    - eapply add_ptr_to_frame_inv in IN; eauto.
-                      destruct IN as [IN | IN].
-                      + destruct F1.
-                        pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT | NDISJOINT].
-                        * eapply old_frame_lu0; eauto.
-                        * unfold disjoint_ptr_byte in NDISJOINT.
-                          assert (ptr_to_int ptr = ptr_to_int ptr0) as EQ by lia.
-                          unfold ptr_in_frame_prop in *.
-                          rewrite <- EQ.
-                          auto.
-                      + destruct F1.
-                        unfold ptr_in_frame_prop in *.
-                        rewrite <- IN.
-                        auto.
+                    intros ptr1 ptr2 ms ms1' ms2' ms1'' ms2'' ADD1 ADD1' ADD2 ADD2'.
+                    destruct ms, ms1', ms2', ms1'', ms2''.
+                    cbn in *.
+                    repeat break_match_hyp; subst;
+                      inv ADD1; inv ADD1'; inv ADD2; inv ADD2'.
+
+                    - unfold frame_stack_eqv.
+                      intros f n.
+                      destruct n; cbn; [|tauto].
+
+                      split; intros EQV.
+                      + unfold frame_eqv in *; cbn in *.
+                        intros ptr; split; firstorder.
+                      + unfold frame_eqv in *; cbn in *.
+                        intros ptr; split; firstorder.
+                    - unfold frame_stack_eqv.
+                      intros f n.
+                      destruct n; cbn; [|tauto].
+
+                      split; intros EQV.
+                      + unfold frame_eqv in *; cbn in *.
+                        intros ptr; split; firstorder.
+                      + unfold frame_eqv in *; cbn in *.
+                        intros ptr; split; firstorder.
                   Qed.
 
                   (* TODO: move this *)
@@ -3446,6 +3422,63 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                         reflexivity.
                   Qed.
 
+                  Lemma add_ptr_to_frame_inv :
+                    forall ptr ptr' f f',
+                      add_ptr_to_frame f ptr f' ->
+                      ptr_in_frame_prop f' ptr' ->
+                      ptr_in_frame_prop f ptr' \/ ptr_to_int ptr = ptr_to_int ptr'.
+                  Proof.
+                    intros ptr ptr' f f' F F'.
+                    inv F.
+                    pose proof disjoint_ptr_byte_dec ptr ptr' as [DISJOINT | NDISJOINT].
+                    - specialize (old_frame_lu0 _ DISJOINT).
+                      left.
+                      apply old_frame_lu0; auto.
+                    - unfold disjoint_ptr_byte in NDISJOINT.
+                      assert (ptr_to_int ptr = ptr_to_int ptr') as EQ by lia.
+                      right; auto.
+                  Qed.
+
+                  Lemma add_ptr_to_frame_eqv :
+                    forall ptr f f1 f2,
+                      add_ptr_to_frame f ptr f1 ->
+                      add_ptr_to_frame f ptr f2 ->
+                      frame_eqv f1 f2.
+                  Proof.
+                    intros ptr f f1 f2 F1 F2.
+                    unfold frame_eqv.
+                    intros ptr0.
+                    split; intros IN.
+                    - eapply add_ptr_to_frame_inv in IN; eauto.
+                      destruct IN as [IN | IN].
+                      + destruct F2.
+                        pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT | NDISJOINT].
+                        * eapply old_frame_lu0; eauto.
+                        * unfold disjoint_ptr_byte in NDISJOINT.
+                          assert (ptr_to_int ptr = ptr_to_int ptr0) as EQ by lia.
+                          unfold ptr_in_frame_prop in *.
+                          rewrite <- EQ.
+                          auto.
+                      + destruct F2.
+                        unfold ptr_in_frame_prop in *.
+                        rewrite <- IN.
+                        auto.
+                    - eapply add_ptr_to_frame_inv in IN; eauto.
+                      destruct IN as [IN | IN].
+                      + destruct F1.
+                        pose proof disjoint_ptr_byte_dec ptr ptr0 as [DISJOINT | NDISJOINT].
+                        * eapply old_frame_lu0; eauto.
+                        * unfold disjoint_ptr_byte in NDISJOINT.
+                          assert (ptr_to_int ptr = ptr_to_int ptr0) as EQ by lia.
+                          unfold ptr_in_frame_prop in *.
+                          rewrite <- EQ.
+                          auto.
+                      + destruct F1.
+                        unfold ptr_in_frame_prop in *.
+                        rewrite <- IN.
+                        auto.
+                  Qed.
+
                   Lemma add_ptr_to_frame_stack_eqv_S :
                     forall ptr f f' fs fs',
                       add_ptr_to_frame_stack (Snoc fs f) ptr (Snoc fs' f') ->
@@ -3584,6 +3617,276 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       eapply add_ptr_to_frame_stack_eqv; eauto.
                       rewrite EQV.
                       auto.
+                  Qed.
+
+                  #[global] Instance frame_stack_eqv_add_all_to_frame :
+                    Proper ((fun ms1 ms2 => frame_stack_eqv (snd ms1) (snd ms2)) ==> eq ==> (fun ms1 ms2 => frame_stack_eqv (snd ms1) (snd ms2))) add_all_to_frame.
+                  Proof.
+                    unfold Proper, respectful.
+                    intros ms1 ms2 EQV y x EQ; subst.
+
+                    revert ms1 ms2 EQV.
+                    induction x; intros ms1 ms2 EQV.
+                    Transparent add_all_to_frame.
+                    unfold add_all_to_frame.
+                    cbn in *.
+                    auto.
+                    Opaque add_all_to_frame.
+                    
+                    assert (add_all_to_frame ms1 (a :: x) = add_all_to_frame ms1 (a :: x)) as EQ by reflexivity.
+                    pose proof (@add_all_to_frame_cons_inv _ _ _ _ EQ)
+                      as [ms' [ADD ADD_ALL]].
+
+                    assert (add_all_to_frame ms2 (a :: x) = add_all_to_frame ms2 (a :: x)) as EQ2 by reflexivity.
+                    pose proof (@add_all_to_frame_cons_inv _ _ _ _ EQ2)
+                      as [ms2' [ADD2 ADD_ALL2]].
+                    cbn in *.
+
+                    unfold add_to_frame in *.
+                    destruct ms1 as [m1 fs1].
+                    destruct ms2 as [m2 fs2].
+
+                    subst.
+
+                    cbn in EQV.
+
+                    pose proof (frame_stack_inv _ _ EQV) as [SNOC | SING].
+                    - destruct SNOC as [fs1' [fs2' [f1 [f2 [SNOC1 [SNOC2 [SEQV FEQV]]]]]]].
+                      subst.
+
+                      rewrite <- ADD_ALL.
+                      rewrite <- ADD_ALL2.
+
+                      eapply IHx.
+                      cbn.
+                      unfold frame_stack_eqv.
+                      intros f n.
+                      destruct n.
+                      + cbn. rewrite FEQV. reflexivity.
+                      + cbn. auto.
+                    - destruct SING as [f1 [f2 [SING1 [SING2 FEQV]]]].
+                      subst.
+
+                      rewrite <- ADD_ALL.
+                      rewrite <- ADD_ALL2.
+
+                      eapply IHx.
+                      cbn.
+                      unfold frame_stack_eqv.
+                      intros f n.
+                      destruct n.
+                      + cbn. rewrite FEQV. reflexivity.
+                      + cbn. tauto.
+                  Qed.
+
+                  Lemma add_all_to_frame_cons_swap :
+                    forall ptrs ptr ms ms1' ms1'' ms2' ms2'',
+                      (* Add individual pointer first *)
+                      add_to_frame ms ptr = ms1' ->
+                      add_all_to_frame ms1' ptrs = ms1'' ->
+
+                      (* Add ptrs first *)
+                      add_all_to_frame ms ptrs = ms2' ->
+                      add_to_frame ms2' ptr = ms2'' ->
+
+                      frame_stack_eqv (snd ms1'') (snd ms2'').
+                  Proof.
+                    induction ptrs;
+                      intros ptr ms ms1' ms1'' ms2' ms2'' ADD ADD_ALL ADD_ALL' ADD'.
+
+                    rewrite add_to_frame_add_all_to_frame in *.
+
+                    - apply add_all_to_frame_nil in ADD_ALL, ADD_ALL'; subst.
+                      reflexivity.
+                    - apply add_all_to_frame_cons_inv in ADD_ALL, ADD_ALL'.
+                      destruct ADD_ALL as [msx [ADDx ADD_ALLx]].
+                      destruct ADD_ALL' as [msy [ADDy ADD_ALLy]].
+
+                      subst.
+
+                      (* ms + ptr + a ++ ptrs *)
+                      (* ms + a ++ ptrs + ptr *)
+
+                      (* ptrs ++ (a :: (ptr :: ms))
+
+                         vs
+
+                         ptr :: (ptrs ++ (a :: ms))
+
+                         I have a lemma that's basically...
+
+                         (ptrs ++ (ptr :: ms)) = (ptr :: (ptrs ++ ms))
+
+                         ptr is generic, ptrs is fixed.
+
+                         Can get...
+
+                         ptrs ++ (a :: (ptr :: ms))
+                         a :: (ptrs ++ (ptr :: ms))
+
+                         and then
+
+                         ptr :: (ptrs ++ (a :: ms))
+                         ptrs ++ (ptr :: (a :: ms))
+                         ptrs ++ (a :: (ptr :: ms))
+                         a :: (ptrs ++ (ptr :: ms))
+                       *)
+
+                      (*
+                         ptrs ++ (a :: (ptr :: ms))
+                         a :: (ptrs ++ (ptr :: ms))
+                       *)
+
+                      assert (frame_stack_eqv
+                                (snd (add_all_to_frame (add_to_frame (add_to_frame ms ptr) a) ptrs))
+                                (snd (add_to_frame (add_all_to_frame (add_to_frame ms ptr) ptrs) a))) as EQ1.
+                      { eauto.
+                      }
+
+                      rewrite EQ1.
+
+                      assert (frame_stack_eqv
+                                (snd (add_to_frame (add_all_to_frame (add_to_frame ms a) ptrs) ptr))
+                                (snd (add_to_frame (add_all_to_frame (add_to_frame ms ptr) ptrs) a))) as EQ2.
+                      { assert (frame_stack_eqv
+                                  (snd (add_to_frame (add_all_to_frame (add_to_frame ms a) ptrs) ptr))
+                                  (snd (add_all_to_frame (add_to_frame (add_to_frame ms a) ptr) ptrs))) as EQ.
+                        { symmetry; eauto.
+                        }
+
+                        rewrite EQ.
+                        clear EQ.
+
+                        assert (frame_stack_eqv
+                                  (snd (add_to_frame (add_to_frame ms a) ptr))
+                                  (snd (add_to_frame (add_to_frame ms ptr) a))) as EQ.
+                        { 
+                          eapply add_to_frame_swap; eauto.
+                        }
+
+                        epose proof frame_stack_eqv_add_all_to_frame (add_to_frame (add_to_frame ms a) ptr) (add_to_frame (add_to_frame ms ptr) a) as EQ'.
+                        forward EQ'. apply EQ.
+                        red in EQ'.
+                        specialize (EQ' ptrs ptrs eq_refl).
+                        rewrite EQ'.
+
+                        eauto.
+                      }
+
+                      rewrite EQ2.
+
+                      reflexivity.
+                  Qed.
+
+                  (* Lemma add_ptrs_to_frame_swap : *)
+                  (*   forall ptrs1 ptrs2 ms ms1' ms1'' ms2' ms2'', *)
+                  (*     (* Add ptrs1 first *) *)
+                  (*     add_all_to_frame ms ptrs1 = ms1' -> *)
+                  (*     add_all_to_frame ms1' ptrs2 = ms1'' -> *)
+
+                  (*     (* Add ptrs2 first *) *)
+                  (*     add_all_to_frame ms ptrs2 = ms2' -> *)
+                  (*     add_all_to_frame ms2' ptrs1 = ms2'' -> *)
+
+                  (*     frame_stack_eqv (snd ms1'') (snd ms2''). *)
+                  (* Proof. *)
+                  (*   induction ptrs1; *)
+                  (*     intros ptrs2 ms ms1' ms1'' ms2' ms2'' ADD1 ADD2 ADD3 ADD4. *)
+
+                  (*   - apply add_all_to_frame_nil in ADD1, ADD4; subst. *)
+                  (*     reflexivity. *)
+                  (*   - apply add_all_to_frame_cons_inv in ADD1, ADD4. *)
+                  (*     destruct ADD1 as [msx [ADDx ADD_ALLx]]. *)
+                  (*     destruct ADD4 as [msy [ADDy ADD_ALLy]]. *)
+
+                  (*     revert ptrs2 ms ms1' ms1'' ms2' ms2'' ADDx ADD_ALLx ADD2 ADD3 ADDy ADD_ALLy. *)
+                  (*     induction ptrs2; *)
+                  (*       intros ms ms1' ms1'' ms2' ms2'' ADDx ADD_ALLx ADD2 ADD3 ADDy ADD_ALLy. *)
+
+                  (*     + apply add_all_to_frame_nil in ADD2, ADD3; subst. *)
+                  (*       reflexivity. *)
+                  (*     + apply add_all_to_frame_cons_inv in ADD2, ADD3. *)
+                  (*       destruct ADD2 as [msz [ADDz ADD_ALLz]]. *)
+                  (*       destruct ADD3 as [msw [ADDw ADD_ALLw]]. *)
+
+                  (*       subst. *)
+
+                  (*     epose proof (IHptrs1 _ _ _ _ _ _ ADD_ALLx ADD2). *)
+                  (*     subst. *)
+                  (*     reflexivity. *)
+                  (* Qed. *)
+
+                  Lemma add_to_frame_correct :
+                    forall ptr (ms ms' : memory_stack),
+                      add_to_frame ms (ptr_to_int ptr) = ms' ->
+                      add_ptr_to_frame_stack (snd ms) ptr (snd ms').
+                  Proof.
+                    intros ptr ms ms' ADD.
+                    unfold add_ptr_to_frame_stack.
+                    intros f PEEK.
+                    exists (ptr_to_int ptr :: f).
+                    split; [|split].
+                    - (* add_ptr_to_frame *)
+                      split.
+                      + intros ptr' DISJOINT.
+                        split; intros IN; cbn; auto.
+
+                        destruct IN as [IN | IN];
+                          [contradiction | auto].
+                      + cbn; auto.
+                    - (* peek_frame_stack_prop *)
+                      destruct ms as [m fs].
+                      destruct ms' as [m' fs'].
+                      cbn in *.
+
+                      break_match_hyp; inv ADD;
+                      cbn in *; rewrite PEEK; reflexivity.
+                    - (* pop_frame_stack_prop *)
+                      destruct ms as [m fs].
+                      destruct ms' as [m' fs'].
+                      cbn in *.
+
+                      break_match_hyp; inv ADD.
+                      + intros fs1_pop; split; intros POP; inv POP.
+                      + intros fs1_pop; split; intros POP; cbn in *; auto.
+                  Qed.
+
+                  Lemma add_all_to_frame_correct :
+                    forall ptrs (ms : memory_stack) (ms' : memory_stack),
+                      add_all_to_frame ms (map ptr_to_int ptrs) = ms' ->
+                      add_ptrs_to_frame_stack (snd ms) ptrs (snd ms').
+                  Proof.
+                    induction ptrs;
+                      intros ms ms' ADD_ALL.
+                    - cbn in *.
+                      apply add_all_to_frame_nil in ADD_ALL; subst; auto.
+                      reflexivity.
+                    - cbn in *.
+                      eexists.
+                      split.
+                      + eapply IHptrs.
+                        reflexivity.
+                      + destruct ms as [m fs].
+                        destruct ms' as [m' fs'].
+                        cbn.
+
+                        apply add_all_to_frame_cons_inv in ADD_ALL.
+                        destruct ADD_ALL as [ms' [ADD ADD_ALL]].
+
+                        destruct (add_all_to_frame (m, fs) (map ptr_to_int ptrs)) eqn:ADD_ALL'.
+                        cbn.
+
+                        assert (add_to_frame (m0, f) (ptr_to_int a) = add_to_frame (m0, f) (ptr_to_int a)) as ADD' by reflexivity.
+                        pose proof (add_all_to_frame_cons_swap _ _ _ _ _ _ _ ADD ADD_ALL ADD_ALL' ADD') as EQV.
+                        cbn in EQV.
+                        rewrite EQV.
+                        destruct f.
+                        * replace (Singleton f) with (snd (m0, Singleton f)) by reflexivity.
+                          eapply add_to_frame_correct.
+                          reflexivity.
+                        * replace (Snoc f f0) with (snd (m0, Snoc f f0)) by reflexivity.
+                          eapply add_to_frame_correct.
+                          reflexivity.
                   Qed.
 
                   intros fs1 fs2 OLDFS ADD.
