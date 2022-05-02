@@ -16,7 +16,8 @@ From Vellvm Require Import Error.
 
 From Vellvm.Utils Require Import
      MonadEq1Laws
-     PropT.
+     PropT
+     Raise.
 
 From Vellvm.Semantics Require Import
      MemoryAddress
@@ -86,17 +87,20 @@ Import EitherMonad.
 Import Monad.
 Import Morphisms.
 Class MemMonad (MemState : Type) (ExtraState : Type) (Provenance : Type) (M : Type -> Type) (RunM : Type -> Type)
-      `{Monad M} `{Monad RunM}
-      `{MonadProvenance Provenance M} `{MonadStoreId M} `{MonadMemState MemState M}
-      `{StoreIdFreshness MemState} `{ProvenanceFreshness Provenance ExtraState}
-      `{RAISE_ERROR M} `{RAISE_UB M} `{RAISE_OOM M}
-      `{RAISE_ERROR RunM} `{RAISE_UB RunM} `{RAISE_OOM RunM}
+      `{MM : Monad M} `{MRun: Monad RunM}
+      `{MPROV : MonadProvenance Provenance M} `{MSID : MonadStoreId M} `{MMS: MonadMemState MemState M}
+      `{SIDFRESH : StoreIdFreshness MemState} `{PROVFRESH :ProvenanceFreshness Provenance ExtraState}
+      `{MERR : RAISE_ERROR M} `{MUB : RAISE_UB M} `{MOOM :RAISE_OOM M}
+      `{RunERR : RAISE_ERROR RunM} `{RunUB : RAISE_UB RunM} `{RunOOM :RAISE_OOM RunM}
   : Type
   :=
   { MemMonad_eq1_runm :> Eq1 RunM;
     MemMonad_runm_monadlaws :> MonadLawsE RunM;
     MemMonad_eq1_runm_equiv {A} :> Equivalence (@eq1 _ MemMonad_eq1_runm A);
     MemMonad_eq1_runm_eq1laws :> Eq1_ret_inv RunM;
+    MemMonad_raisebindm_ub :> RaiseBindM RunM string (@raise_ub RunM RunUB);
+    MemMonad_raisebindm_oom :> RaiseBindM RunM string (@raise_oom RunM RunOOM);
+    MemMonad_raisebindm_err :> RaiseBindM RunM string (@raise_error RunM RunERR);
 
     MemMonad_eq1_runm_proper :>
         (forall A, Proper ((@eq1 _ MemMonad_eq1_runm) A ==> (@eq1 _ MemMonad_eq1_runm) A ==> iff) ((@eq1 _ MemMonad_eq1_runm) A));

@@ -2464,7 +2464,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           2 : {
             rewrite MemMonad_run_raise_ub in RUN.
             apply rbm_raise_ret_inv in RUN; try tauto.
-            admit. (* Typeclass silliness... *)
+            typeclasses eauto.
           }
 
           { cbn in RUN.
@@ -2477,7 +2477,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
             rewrite MemMonad_put_mem_state in RUN.
             rewrite bind_ret_l in RUN.
 
-            assert (@MemMonad_valid_state MemState ExtraState Provenance MemM (itree Eff) H H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 ms' st) as VALID'.
+            assert (@MemMonad_valid_state MemState ExtraState Provenance MemM (itree Eff) MM MRun MPROV MSID MMS SIDFRESH PROVFRESH MERR MUB MOOM RunERR RunUB RunOOM H ms' st) as VALID'.
             { (* TODO: ugh, probably need to change something to make sure I know this info *)
               admit.
             }
@@ -2521,7 +2521,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 symmetry in RUN.
                 eapply MemMonad_eq1_raise_error_inv in RUN.
                 auto.
-                admit. (* Should be easy typeclass nonsense *)
+                typeclasses eauto.
               }
 
               (* SUCCESS *)
@@ -2675,8 +2675,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                 unfold Util.map_monad in HMAPM.
                 inversion HMAPM.
                 inversion HMAPM.
-                break_match_hyp; inv H14.
-                break_match_hyp; inv H15.
+                break_match_hyp; inv H1.
+                break_match_hyp; inv H2.
 
                 rewrite handle_gep_addr_0 in Heqs.
                 inv Heqs.
@@ -3925,7 +3925,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               symmetry in RUN.
               eapply MemMonad_eq1_raise_oom_inv in RUN.
               auto.
-              admit. (* Silly typeclass thing *)
+              typeclasses eauto.
             }
           }
       }
