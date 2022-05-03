@@ -871,6 +871,45 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       eapply lookup_add_all_index_in; eauto.
     Qed.
 
+    Lemma InA_In :
+      forall mem ix e,
+        SetoidList.InA (IM.eq_key_elt (elt:=mem_byte)) (ix, e) (IM.elements (elt:=mem_byte) mem) ->
+        In (ix, e) (IM.elements (elt:=mem_byte) mem).
+    Proof.
+      intros mem.
+      induction (IM.elements (elt:=mem_byte) mem);
+        intros ix e INS.
+
+      - exfalso. apply SetoidList.InA_nil in INS; auto.
+      - apply SetoidList.InA_cons in INS.
+        destruct INS as [INS | INS]; firstorder.
+        cbn in *; subst.
+        left; destruct a; reflexivity.
+    Qed.
+
+    Lemma read_byte_raw_next_memory_key :
+      forall (mem : memory) ix,
+        ix >= next_key mem ->
+        read_byte_raw mem ix = None.
+    Proof.
+      intros mem ix H.
+      unfold read_byte_raw.
+      apply IP.F.not_find_in_iff.
+      unfold next_key in *.
+      intros IN.
+      apply IP.F.elements_in_iff in IN.
+      destruct IN as [e IN].
+
+      pose proof (maximumBy_Z_correct (-1) (map fst (IM.elements (elt:=mem_byte) mem)) ix) as LE.
+      forward LE.
+      { apply InA_In in IN.
+        replace ix with (fst (ix, e)) by auto.
+        apply in_map; auto.
+      }
+      apply Zle_bool_imp_le in LE.
+      lia.
+    Qed.
+
   End Datatype_Definition.
 
   (* Convenient to make these opaque so they don't get unfolded *)
@@ -1274,6 +1313,13 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     (* Get the next key in the memory *)
     Definition next_memory_key (m : memory_stack) : Z :=
       next_key (fst m).
+
+    Lemma next_memory_key_next_key :
+      forall m f,
+        next_memory_key (m, f) = next_key m.
+    Proof.
+      auto.
+    Qed.
 
     (*** Primitives on memory *)
     (** Reads *)
@@ -2718,7 +2764,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   auto.
                 - (* allocate_bytes_provenances_preserved *)
                   intros pr'0.
-                  split; eauto. (* TODO: not sure about eauto here *)
+                  split; eauto.
                 - (* allocate_bytes_was_fresh_byte *)
                   intros ptr IN.
 
@@ -2732,18 +2778,23 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   destruct CONTRA as [CONTRA [EQ1 EQ2]]; subst.
                   destruct CONTRA as [ms' [ms'' [[EQ1 EQ2] CONTRA]]]; subst.
                   cbn in CONTRA.
-                  break_match_hyp.
-                  { (* Read succeeds, should be false. *)
-                    destruct m.
-                    destruct CONTRA as [CONTRA AID].
 
+                  rewrite read_byte_raw_next_memory_key in CONTRA.
+                  2: {
                     pose proof map_monad_err_In _ _ _ _ HMAPM IN as MAPIN.
                     destruct MAPIN as [ip [GENPTR INip]].
 
-                    apply handle_gep_addr_preserves_provenance in GENPTR.
-                    rewrite int_to_ptr_provenance in GENPTR.
+                    apply handle_gep_addr_ix in GENPTR.
+                    rewrite ptr_to_int_int_to_ptr in GENPTR.
+                    rewrite GENPTR.
 
-                    admit.
+                    assert (IP.to_Z ip >= 0).
+                    { eapply intptr_seq_ge; eauto.
+                    }
+
+                    rewrite sizeof_dtyp_i8.
+                    rewrite next_memory_key_next_key.
+                    lia.
                   }
 
                   destruct CONTRA as [_ CONTRA].

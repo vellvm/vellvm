@@ -186,6 +186,20 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         eapply IHseq with (start := Z.succ start) (len := len'); eauto.
   Qed.
 
+  Lemma intptr_seq_ge :
+    forall start len seq x,
+      intptr_seq start len = NoOom seq ->
+      In x seq ->
+      (IP.to_Z x >= start)%Z.
+  Proof.
+    intros start len seq x SEQ IN.
+    apply In_nth_error in IN.
+    destruct IN as [n IN].
+
+    pose proof (intptr_seq_nth start len seq n x SEQ IN) as IX.
+    erewrite IP.from_Z_to_Z; eauto.
+    lia.
+  Qed.
 
   Definition get_consecutive_ptrs {M} `{Monad M} `{RAISE_OOM M} `{RAISE_ERROR M} (ptr : addr) (len : nat) : M (list addr) :=
     ixs <- lift_OOM (intptr_seq 0 len);;
