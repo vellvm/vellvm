@@ -130,6 +130,29 @@ Proof.
   congruence.
 Qed.
 
+Lemma in_Zseq :
+  forall len start n,
+    In n (Zseq start len) <-> (start <= n < start + Z.of_nat len)%Z.
+Proof.
+  intros len start.
+  revert start. induction len as [|len IHlen]; simpl; intros start.
+  - intros n. lia.
+  - intros n.
+    split.
+    + intros [IN | IN].
+      * subst. lia.
+      * pose proof (IHlen (Z.succ start) n) as [A B].
+        specialize (A IN).
+        lia.
+    + intros BOUND.
+      destruct (Z.eq_dec start n) as [EQ | NEQ]; auto.
+      right.
+
+      pose proof (IHlen (Z.succ start) n) as [A B].
+      assert ((Z.succ start <= n < Z.succ start + Z.of_nat len)%Z) as BOUND' by lia.
+      specialize (B BOUND').
+      auto.
+Qed.
 
 Fixpoint drop {A} (n : N) (l : list A) : list A
   := match l with

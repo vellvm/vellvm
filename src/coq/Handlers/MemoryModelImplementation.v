@@ -184,6 +184,15 @@ Definition from_Z := (fun (x : Z) => ret x : OOM Z).
     auto.
   Qed.
 
+  Lemma to_Z_inj :
+    forall x y,
+      to_Z x = to_Z y ->
+      x = y.
+  Proof.
+    intros x y.
+    unfold to_Z; auto.
+  Qed.
+
   Definition mequ_Z (x y : Z) : bool :=
     Z.eqb x y.
 
@@ -320,6 +329,26 @@ Module IP64Bit : MemoryAddress.INTPTR.
   Proof.
     auto.
   Qed.
+
+  Require Import ProofIrrelevance.
+
+  Lemma to_Z_inj :
+    forall x y,
+      to_Z x = to_Z y ->
+      x = y.
+  Proof.
+    intros x y EQ.
+    unfold to_Z in *.
+    destruct x, y.
+    unfold Int64.signed, Int64.unsigned in *.
+    cbn in *.
+    break_match_hyp; break_match_hyp; subst.
+    - rewrite (proof_irrelevance _ intrange intrange0); auto.
+    - lia.
+    - lia.
+    - assert (intval = intval0) by lia; subst.
+      rewrite (proof_irrelevance _ intrange intrange0); auto.
+  Admitted. (* This is probably awful because of lia? *)
 
   Instance VMemInt_intptr : VMemInt intptr
     :=
@@ -908,6 +937,22 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
       }
       apply Zle_bool_imp_le in LE.
       lia.
+    Qed.
+
+    Lemma read_byte_raw_lt_next_memory_key :
+      forall (mem : memory) ix v,
+        read_byte_raw mem ix = Some v ->
+        ix < next_key mem.
+    Proof.
+      intros mem ix H.
+      intros FIND.
+      pose proof (Z_lt_le_dec ix (next_key mem)) as [LT | GE]; auto.
+      assert (read_byte_raw mem ix = None) as NONE.
+      { apply read_byte_raw_next_memory_key.
+        lia.
+      }
+      rewrite FIND in NONE.
+      inv NONE.
     Qed.
 
   End Datatype_Definition.
@@ -2814,22 +2859,24 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   rewrite add_all_to_frame_preserves_memory.
                   cbn.
 
-                  (* TODO: Might be a nicer lemma to write for this *)
-                  erewrite read_byte_raw_add_all_index_in. (* v should be some undef_byte with the right index *)
-                  break_match.
+                  match goal with
+                  | H: _ |- context [ read_byte_raw (add_all_index ?l ?z ?mem) ?p ] =>
+                      pose proof read_byte_raw_add_all_index_in_exists mem l z p as ?READ
+                  end.
 
-                  split; auto.
-                  + (* Should hold, comes from `a` comes from the map in add_all_index... *)
-                    (* May be better to have an existential read_byte_raw_lemma, like map_monad_err_In... *)
+                  forward READ.
+                  admit. (* bounds *)
 
-                    admit.
-                  + (* TODO: need lemma about handle_gep_addr and ptr_to_int
+                  destruct READ as [(byte', aid_byte) [NTH READ]].
+                  rewrite list_nth_z_map in NTH.
+                  unfold option_map in NTH.
+                  break_match_hyp; inv NTH.
 
-                       also will likely need to know that ip >= 0 from HSEQ.
-                     *)
-                    admit.
-                  + (* TODO: should hold *)
-                    admit.
+                  (* Need this unfold for rewrite >_< *)
+                  unfold mem_byte in *.
+                  rewrite READ.
+                  split; try tauto.
+                  apply aid_eq_dec_refl.
                 - (* allocate_bytes_preserves_old_allocations *)
                   intros ptr aid NIN.
                   (* TODO: not enough for ptr to not be in ptrs list. Must be disjoint.
@@ -2968,8 +3015,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     cbn.
                     rewrite read_byte_raw_add_all_index_out.
                     2: {
-                      (* lia. *)
-                      admit.
+                      left.
+                      rewrite next_memory_key_next_key.
+                      eapply read_byte_raw_lt_next_memory_key; eauto.
                     }
                     rewrite Heqo; eauto.
 
@@ -2993,9 +3041,147 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                     rewrite read_byte_raw_add_all_index_out in Heqo.
                     2: {
-                      (* lia. *)
-                      admit.
+                      (* If read is in the bounds of add_all_index then that means it's not disjoint...
+
+                       *)
+
+                      (*
+                        If ptr' is such that...
+
+                        ptr' >= next_mem_key and
+                        ptr' < next_mem_key + length
+
+                        then ptr' is in the allocated pointers, and
+                        therefore DISJOINT doesn't hold.
+                       *)
+
+                      (* TODO: move *)
+                      Lemma Zlength_map :
+                      forall {X Y} (l : list X) (f : X -> Y),
+                        Zlength (map f l) = Zlength l.
+                      Proof.
+                        intros X Y.
+                        induction l; intros f.
+                        - reflexivity.
+                        - rewrite map_cons.
+                          repeat rewrite Zlength_cons.
+                          rewrite IHl.
+                          auto.
+                      Qed.
+
+                      rewrite Zlength_map.
+                      pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mem, frames))) as [LTNEXT | GENEXT]; auto.
+                      pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mem, frames) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
+
+                      exfalso.
+
+                      (* TODO: move *)
+                      Lemma exists_in_bounds_le_lt :
+                        forall (lower upper x : Z),
+                          0 <= lower ->
+                          lower <= x < upper ->
+                          exists ix, 0 <= ix < (upper - lower) /\ x = lower + ix.
+                      Proof.
+                        intros lower upper x POS [LE LT].
+                        exists (x - lower).
+                        split; lia.
+                      Qed.
+
+                      pose proof (exists_in_bounds_le_lt (next_memory_key (mem, frames)) (next_memory_key (mem, frames) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
+                      forward BOUNDS.
+                      rewrite next_memory_key_next_key.
+                      apply Z.ge_le.
+                      apply next_key_gt_0.
+                      forward BOUNDS. lia.
+                      destruct BOUNDS as [ix [[BOUNDLE BOUNDLT] EQ]].
+
+                      replace (next_memory_key (mem, frames) + Zlength init_bytes - next_memory_key (mem, frames)) with (Zlength init_bytes) in BOUNDLT by lia.
+
+                      (* Want to use bound in... *)
+                      (* Need to get what ix is as an IP... *)
+                      destruct (IP.from_Z ix) eqn:IX.
+                      2: {
+                         (* HSEQ succeeding should make this a contradiction *)
+                        apply intptr_seq_from_Z with (x := ix) in HSEQ.
+                        destruct HSEQ as [ipx EQ'].
+                        rewrite EQ' in IX.
+                        inv IX.
+
+                        rewrite <- Zlength_correct.
+                        lia.
+                      }
+
+                      pose proof (in_intptr_seq _ _ i _ HSEQ) as [IN BOUNDIN].
+                      apply IP.from_Z_to_Z in IX; subst.
+                      forward BOUNDIN.
+                      rewrite <- Zlength_correct.
+                      lia.
+
+                      set (p := int_to_ptr (ptr_to_int ptr') (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov)))).
+
+                      (* I believe that p is necessarily in the result of HMAPM. *)
+                      assert (In p (int_to_ptr (next_memory_key (mem, frames))
+                                               (allocation_id_to_prov
+                                                  (provenance_to_allocation_id (next_provenance ms_prov))) :: ptrs)) as PIN.
+                      { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
+
+                        (* TODO: move *)
+                        Lemma map_monad_err_In' :
+                          forall {A B : Type} (f : A -> err B) (l : list A) (res : list B) (y : A),
+                            In y l ->
+                            Util.map_monad f l = ret res -> exists x, ret x = f y /\ In x res.
+                        Proof.
+                          intros A B f l.
+                          induction l; intros res y IN MAP.
+                          - inversion IN.
+                          - inversion IN; subst.
+                            + cbn in MAP.
+                              break_match_hyp; inv MAP.
+                              exists b; split; auto.
+
+                              break_match_hyp; inv H1.
+                              left; auto.
+                            + cbn in MAP.
+                              break_match_hyp; inv MAP.
+                              break_match_hyp; inv H2.
+
+                              epose proof (IHl l0 _ H0 eq_refl) as [b' [RET IN']].
+                              exists b'; split; firstorder.
+                        Qed.
+
+                        eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
+
+                        destruct HMAPM as [x [GENPTR IN]].
+                        symmetry in GENPTR.
+                        pose proof GENPTR as GENPTR'.
+                        apply handle_gep_addr_ix in GENPTR.
+                        rewrite sizeof_dtyp_i8 in GENPTR.
+                        replace (Z.of_N 1 * IP.to_Z i) with (IP.to_Z i) in GENPTR by lia.
+                        rewrite ptr_to_int_int_to_ptr in GENPTR.
+                        rewrite <- GENPTR in EQ.
+
+                        subst p.
+                        rewrite EQ.
+                        rewrite int_to_ptr_ptr_to_int; auto.
+
+                        apply handle_gep_addr_preserves_provenance in GENPTR'.
+                        rewrite int_to_ptr_provenance in GENPTR'.
+                        symmetry; auto.
+                      }
+
+                      eapply map_monad_err_In with (x:=p) in HMAPM; auto.
+
+                      (* DISJOINT should be a contradition now *)
+                      exfalso.
+                      (* ?p doesn't have to be ptr', but ptr_to_int ?p = ptr_to_int ptr' *)
+                      eapply DISJOINT with (p:=p).
+                      apply PIN.
+
+                      subst p.
+                      rewrite ptr_to_int_int_to_ptr.
+                      reflexivity.
                     }
+
                     rewrite Heqo; eauto.
 
                     solve_access_allowed.

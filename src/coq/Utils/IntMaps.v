@@ -159,6 +159,17 @@ Section Map_Operations.
     := let keys := map fst (IM.elements m) in
        1 + maximumBy Z.leb (-1)%Z keys.
 
+  Lemma next_key_gt_0 :
+    forall {A} (m : IntMap A),
+      next_key m >= 0.
+  Proof.
+    intros A m.
+    unfold next_key.
+    pose proof maximumBy_Z_def (-1) (map fst (IM.elements (elt:=A) m)).
+    apply Zle_is_le_bool in H.
+    lia.
+  Qed.
+
   Lemma MapsTo_inj : forall {a} k v v' (m : IntMap a),
     IM.MapsTo k v m ->
     IM.MapsTo k v' m ->

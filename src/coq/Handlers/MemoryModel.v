@@ -201,6 +201,71 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
     lia.
   Qed.
 
+  Lemma in_intptr_seq :
+    forall len start n seq,
+      intptr_seq start len = NoOom seq ->
+      In n seq <-> (start <= IP.to_Z n < start + Z.of_nat len)%Z.
+  Proof.
+  intros len start.
+  revert start. induction len as [|len IHlen]; simpl; intros start n seq SEQ.
+  - cbn in SEQ; inv SEQ.
+    split.
+    + intros IN; inv IN.
+    + lia.
+  - cbn in SEQ.
+    break_match_hyp; [|inv SEQ].
+    break_match_hyp; inv SEQ.
+    split.
+    + intros [IN | IN].
+      * subst.
+        apply IP.from_Z_to_Z in Heqo; subst.
+        lia.
+      * pose proof (IHlen (Z.succ start) n l Heqo0) as [A B].
+        specialize (A IN).
+        cbn.
+        lia.
+    + intros BOUND.
+      cbn.
+      destruct (IP.eq_dec i n) as [EQ | NEQ]; auto.
+      right.
+
+      pose proof (IHlen (Z.succ start) n l Heqo0) as [A B].
+      apply IP.from_Z_to_Z in Heqo; subst.
+      assert (IP.to_Z i <> IP.to_Z n).
+      { intros EQ.
+        apply IP.to_Z_inj in EQ; auto.
+      }
+
+      assert ((Z.succ (IP.to_Z i) <= IP.to_Z n < Z.succ (IP.to_Z i) + Z.of_nat len)%Z) as BOUND' by lia.
+      specialize (B BOUND').
+      auto.
+  Qed.
+
+  Lemma intptr_seq_from_Z :
+    forall start len seq,
+      intptr_seq start len = NoOom seq ->
+      (forall x,
+          (start <= x < start + Z.of_nat len)%Z ->
+          exists ipx, IP.from_Z x = NoOom ipx).
+  Proof.
+    intros start len; revert start;
+      induction len;
+      intros start seq SEQ x BOUND.
+
+    - lia.
+    - rewrite intptr_seq_succ in SEQ.
+      cbn in SEQ.
+      break_match_hyp.
+      + destruct (Z.eq_dec x start); subst.
+        exists i; auto.
+
+        break_match_hyp; inv SEQ.
+        eapply IHlen with (x := x) in Heqo0; auto.
+        lia.
+      + inv SEQ.                            
+  Qed.
+
+
   Definition get_consecutive_ptrs {M} `{Monad M} `{RAISE_OOM M} `{RAISE_ERROR M} (ptr : addr) (len : nat) : M (list addr) :=
     ixs <- lift_OOM (intptr_seq 0 len);;
     lift_err_RAISE_ERROR

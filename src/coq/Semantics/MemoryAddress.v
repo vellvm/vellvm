@@ -67,6 +67,11 @@ Module Type INTPTR.
   Parameter to_Z_0 :
     to_Z zero = 0%Z.
 
+  Parameter to_Z_inj :
+    forall x y,
+      to_Z x = to_Z y ->
+      x = y.
+
   Parameter VMemInt_intptr_dtyp :
     @mdtyp_of_int intptr VMemInt_intptr = DTYPE_IPTR.
 End INTPTR.
