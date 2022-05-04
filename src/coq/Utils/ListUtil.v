@@ -154,6 +154,19 @@ Proof.
       auto.
 Qed.
 
+Lemma Zlength_map :
+  forall {X Y} (l : list X) (f : X -> Y),
+    Zlength (map f l) = Zlength l.
+Proof.
+  intros X Y.
+  induction l; intros f.
+  - reflexivity.
+  - rewrite map_cons.
+    repeat rewrite Zlength_cons.
+    rewrite IHl.
+    auto.
+Qed.
+
 Fixpoint drop {A} (n : N) (l : list A) : list A
   := match l with
      | [] => []

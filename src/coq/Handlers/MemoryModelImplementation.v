@@ -2865,7 +2865,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   end.
 
                   forward READ.
-                  admit. (* bounds *)
+                  { (* Bounds *)
+
+                  }
 
                   destruct READ as [(byte', aid_byte) [NTH READ]].
                   rewrite list_nth_z_map in NTH.
@@ -3054,38 +3056,11 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                         then ptr' is in the allocated pointers, and
                         therefore DISJOINT doesn't hold.
                        *)
-
-                      (* TODO: move *)
-                      Lemma Zlength_map :
-                      forall {X Y} (l : list X) (f : X -> Y),
-                        Zlength (map f l) = Zlength l.
-                      Proof.
-                        intros X Y.
-                        induction l; intros f.
-                        - reflexivity.
-                        - rewrite map_cons.
-                          repeat rewrite Zlength_cons.
-                          rewrite IHl.
-                          auto.
-                      Qed.
-
                       rewrite Zlength_map.
                       pose proof (Z_lt_ge_dec (ptr_to_int ptr') (next_memory_key (mem, frames))) as [LTNEXT | GENEXT]; auto.
                       pose proof (Z_ge_lt_dec (ptr_to_int ptr') (next_memory_key (mem, frames) + Zlength init_bytes)) as [LTNEXT' | GENEXT']; auto.
 
                       exfalso.
-
-                      (* TODO: move *)
-                      Lemma exists_in_bounds_le_lt :
-                        forall (lower upper x : Z),
-                          0 <= lower ->
-                          lower <= x < upper ->
-                          exists ix, 0 <= ix < (upper - lower) /\ x = lower + ix.
-                      Proof.
-                        intros lower upper x POS [LE LT].
-                        exists (x - lower).
-                        split; lia.
-                      Qed.
 
                       pose proof (exists_in_bounds_le_lt (next_memory_key (mem, frames)) (next_memory_key (mem, frames) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
                       forward BOUNDS.
@@ -3124,30 +3099,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                                                (allocation_id_to_prov
                                                   (provenance_to_allocation_id (next_provenance ms_prov))) :: ptrs)) as PIN.
                       { clear - HMAPM HSEQ GENEXT GENEXT' i EQ BOUNDIN.
-
-                        (* TODO: move *)
-                        Lemma map_monad_err_In' :
-                          forall {A B : Type} (f : A -> err B) (l : list A) (res : list B) (y : A),
-                            In y l ->
-                            Util.map_monad f l = ret res -> exists x, ret x = f y /\ In x res.
-                        Proof.
-                          intros A B f l.
-                          induction l; intros res y IN MAP.
-                          - inversion IN.
-                          - inversion IN; subst.
-                            + cbn in MAP.
-                              break_match_hyp; inv MAP.
-                              exists b; split; auto.
-
-                              break_match_hyp; inv H1.
-                              left; auto.
-                            + cbn in MAP.
-                              break_match_hyp; inv MAP.
-                              break_match_hyp; inv H2.
-
-                              epose proof (IHl l0 _ H0 eq_refl) as [b' [RET IN']].
-                              exists b'; split; firstorder.
-                        Qed.
 
                         eapply map_monad_err_In' with (y:=i) in HMAPM; auto.
 
@@ -3453,24 +3404,6 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     intros ptr ptrs ms ms' ms'' ADD ADD_ALL.
                     cbn; subst; eauto.
                   Qed.
-
-                  Lemma add_ptrs_to_frame_stack_rev :
-                    forall ptrs fs fs' fsr',
-                      add_ptrs_to_frame_stack fs ptrs fs' ->
-                      add_ptrs_to_frame_stack fs (rev ptrs) fsr' ->
-                      frame_stack_eqv fs' fsr'.
-                  Proof.
-                    induction ptrs;
-                      intros fs fs' fsr' ADD ADDREV.
-                  Abort.
-
-                  Lemma add_ptrs_to_frame_stack_rev_inv :
-                    forall ptrs fs fs',
-                      add_ptrs_to_frame_stack fs ptrs fs' ->
-                      exists fsr', add_ptrs_to_frame_stack fs (rev ptrs) fsr' /\
-                                frame_stack_eqv fs' fsr'.
-                  Proof.
-                  Abort.
 
                   Lemma add_to_frame_add_all_to_frame :
                     forall ptr ms,
@@ -3869,7 +3802,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     cbn in *.
                     auto.
                     Opaque add_all_to_frame.
-                    
+
                     assert (add_all_to_frame ms1 (a :: x) = add_all_to_frame ms1 (a :: x)) as EQ by reflexivity.
                     pose proof (@add_all_to_frame_cons_inv _ _ _ _ EQ)
                       as [ms' [ADD ADD_ALL]].
@@ -3997,7 +3930,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                         assert (frame_stack_eqv
                                   (snd (add_to_frame (add_to_frame ms a) ptr))
                                   (snd (add_to_frame (add_to_frame ms ptr) a))) as EQ.
-                        { 
+                        {
                           eapply add_to_frame_swap; eauto.
                         }
 

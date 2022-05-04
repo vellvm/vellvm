@@ -80,6 +80,29 @@ Proof.
         exists y; split; cbn; eauto.
 Qed.
 
+Lemma map_monad_err_In' :
+  forall {A B : Type} (f : A -> err B) (l : list A) (res : list B) (y : A),
+    In y l ->
+    Util.map_monad f l = ret res -> exists x, ret x = f y /\ In x res.
+Proof.
+  intros A B f l.
+  induction l; intros res y IN MAP.
+  - inversion IN.
+  - inversion IN; subst.
+    + cbn in MAP.
+      break_match_hyp; inv MAP.
+      exists b; split; auto.
+
+      break_match_hyp; inv H0.
+      left; auto.
+    + cbn in MAP.
+      break_match_hyp; inv MAP.
+      break_match_hyp; inv H1.
+
+      epose proof (IHl l0 _ H eq_refl) as [b' [RET IN']].
+      exists b'; split; firstorder.
+Qed.
+
 (* TODO: can I generalize this? *)
 Lemma map_monad_err_Nth :
   forall {A B} (f : A -> err B) l res x n,

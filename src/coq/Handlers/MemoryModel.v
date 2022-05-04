@@ -262,7 +262,7 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
         break_match_hyp; inv SEQ.
         eapply IHlen with (x := x) in Heqo0; auto.
         lia.
-      + inv SEQ.                            
+      + inv SEQ.
   Qed.
 
 
@@ -1455,7 +1455,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
                (* FIXME: use reldec typeclass? *)
                if orb (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i32"))
                       (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i64"))
-               then  
+               then
                  handle_memcpy_prop args;;
                  ret DVALUE_None
                else
@@ -1695,7 +1695,7 @@ Module Type MemoryModelExec (LP : LLVMParams) (MP : MemoryParams LP) (MMEP : Mem
                (* FIXME: use reldec typeclass? *)
                if orb (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i32"))
                       (Coqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i64"))
-               then  
+               then
                  handle_memcpy args;;
                  ret DVALUE_None
                else
