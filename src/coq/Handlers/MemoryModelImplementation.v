@@ -23,6 +23,7 @@ From Vellvm.Handlers Require Import
      MemPropT.
 
 From Vellvm.Utils Require Import
+     Util
      Error
      PropT
      Tactics
@@ -2866,7 +2867,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                   forward READ.
                   { (* Bounds *)
+                    pose proof (map_monad_err_In _ _ _ _ HMAPM IN) as [ix' [GENp IN_ix']].
+                    apply handle_gep_addr_ix in GENp.
+                    rewrite sizeof_dtyp_i8 in GENp.
+                    replace (Z.of_N 1 * IP.to_Z ix') with (IP.to_Z ix') in GENp by lia.
+                    rewrite ptr_to_int_int_to_ptr in GENp.
+                    apply (in_intptr_seq _ _ _ _ HSEQ) in IN_ix'.
 
+                    rewrite Zlength_map.
+                    rewrite <- Zlength_correct in IN_ix'.
+                    lia.
                   }
 
                   destruct READ as [(byte', aid_byte) [NTH READ]].
@@ -2892,7 +2902,9 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     cbn.
 
                     erewrite read_byte_raw_add_all_index_out.
-                    2: admit. (* Bounds *)
+                    2: { (* Bounds out *)
+                      admit.
+                    }
 
                     cbn in ALLOC.
                     destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
@@ -2911,7 +2923,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     rewrite add_all_to_frame_preserves_memory in ALLOC; cbn in ALLOC.
 
                     erewrite read_byte_raw_add_all_index_out in ALLOC.
-                    2: admit. (* Bounds *)
+                    2: admit. (* Bounds out *)
 
                     repeat eexists.
                     cbn.
@@ -2939,7 +2951,29 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                       end.
 
                       forward READ.
-                      admit. (* Should hold... *)
+                      { (* bounds *)
+                        (* Should be a non-empty allocation *)
+                        (* I know this by cons cell result of HMAPM *)
+                        assert (@MonadReturnsLaws.MReturns err _ _ _ (list addr)
+                                                           (int_to_ptr (next_memory_key (mem, frames))
+                                                                       (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov))) :: ptrs)
+                                                           (Util.map_monad
+            (fun ix : IP.intptr =>
+             handle_gep_addr (DTYPE_I 8)
+               (int_to_ptr (next_memory_key (mem, frames))
+                  (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov))))
+               [Events.DV.DVALUE_IPTR ix]) NOOM_seq)) as MAPRET.
+                        { cbn. red.
+                          auto.
+                        }
+
+                        eapply map_monad_length in MAPRET.
+                        cbn in MAPRET.
+                        rewrite Zlength_map.
+                        rewrite Zlength_correct.
+                        apply intptr_seq_len in HSEQ.
+                        lia.
+                      }
 
                       destruct READ as [(byte, aid_byte) [NTH READ]].
                       rewrite list_nth_z_map in NTH.
@@ -2968,7 +3002,23 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     end.
 
                     forward READ.
-                    admit. (* Should hold... *)
+                    { (* Bounds *)
+                      assert (In p (int_to_ptr (next_memory_key (mem, frames))
+                                               (allocation_id_to_prov (provenance_to_allocation_id (next_provenance ms_prov))) :: ptrs)) as IN'.
+                      { right; auto.
+                      }
+
+                      pose proof (map_monad_err_In _ _ _ _ HMAPM IN') as [ix' [GENp IN_ix']].
+                      apply handle_gep_addr_ix in GENp.
+                      rewrite sizeof_dtyp_i8 in GENp.
+                      replace (Z.of_N 1 * IP.to_Z ix') with (IP.to_Z ix') in GENp by lia.
+                      rewrite ptr_to_int_int_to_ptr in GENp.
+                      apply (in_intptr_seq _ _ _ _ HSEQ) in IN_ix'.
+
+                      rewrite Zlength_map.
+                      rewrite <- Zlength_correct in IN_ix'.
+                      lia.
+                    }
 
                     destruct READ as [(byte, aid_byte) [NTH READ]].
                     rewrite list_nth_z_map in NTH.
@@ -3062,7 +3112,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                       exfalso.
 
-                      pose proof (exists_in_bounds_le_lt (next_memory_key (mem, frames)) (next_memory_key (mem, frames) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
+                      pose proof (@exists_in_bounds_le_lt (next_memory_key (mem, frames)) (next_memory_key (mem, frames) + Zlength init_bytes) (ptr_to_int ptr')) as BOUNDS.
                       forward BOUNDS.
                       rewrite next_memory_key_next_key.
                       apply Z.ge_le.
@@ -3151,7 +3201,19 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   end.
 
                   forward READ.
-                  admit. (* bounds *)
+                  { (* Bounds *)
+                    pose proof (Nth_In ADDR) as IN.
+                    pose proof (map_monad_err_In _ _ _ _ HMAPM IN) as [ix' [GENp IN_ix']].
+                    apply handle_gep_addr_ix in GENp.
+                    rewrite sizeof_dtyp_i8 in GENp.
+                    replace (Z.of_N 1 * IP.to_Z ix') with (IP.to_Z ix') in GENp by lia.
+                    rewrite ptr_to_int_int_to_ptr in GENp.
+                    apply (in_intptr_seq _ _ _ _ HSEQ) in IN_ix'.
+
+                    rewrite Zlength_map.
+                    rewrite <- Zlength_correct in IN_ix'.
+                    lia.
+                  }
 
                   destruct READ as [(byte', aid_byte) [NTH READ]].
                   rewrite list_nth_z_map in NTH.
@@ -3220,7 +3282,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     rewrite read_byte_raw_add_all_index_out.
 
                     2: {
-                      (* Bounds *)
+                      (* Bounds out *)
                       admit.
                     }
 
@@ -3242,7 +3304,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                     rewrite read_byte_raw_add_all_index_out in READ.
                     2: {
-                      (* Bounds *)
+                      (* Bounds out *)
                       admit.
                     }
 
@@ -3267,7 +3329,18 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                   end.
 
                   forward READ.
-                  admit. (* bounds *)
+                  { (* Bounds *)
+                    pose proof (map_monad_err_In _ _ _ _ HMAPM IN) as [ix' [GENp IN_ix']].
+                    apply handle_gep_addr_ix in GENp.
+                    rewrite sizeof_dtyp_i8 in GENp.
+                    replace (Z.of_N 1 * IP.to_Z ix') with (IP.to_Z ix') in GENp by lia.
+                    rewrite ptr_to_int_int_to_ptr in GENp.
+                    apply (in_intptr_seq _ _ _ _ HSEQ) in IN_ix'.
+
+                    rewrite Zlength_map.
+                    rewrite <- Zlength_correct in IN_ix'.
+                    lia.
+                  }
 
                   destruct READ as [(byte', aid_byte) [NTH READ]].
                   rewrite list_nth_z_map in NTH.
@@ -3303,7 +3376,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                     rewrite read_byte_raw_add_all_index_out.
                     2: {
-                      (* Bounds *)
+                      (* Bounds out *)
                       admit.
                     }
 
@@ -3323,7 +3396,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
                     rewrite read_byte_raw_add_all_index_out in ALLOC.
                     2: {
-                      (* Bounds *)
+                      (* Bounds out *)
                       admit.
                     }
 

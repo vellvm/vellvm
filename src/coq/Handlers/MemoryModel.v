@@ -265,6 +265,21 @@ Module MemoryHelpers (LP : LLVMParams) (MP : MemoryParams LP) (Byte : ByteModule
       + inv SEQ.
   Qed.
 
+  Lemma intptr_seq_len :
+    forall len start seq,
+      intptr_seq start len = NoOom seq ->
+      length seq = len.
+  Proof.
+    induction len;
+      intros start seq SEQ.
+    - inv SEQ. reflexivity.
+    - rewrite intptr_seq_succ in SEQ.
+      cbn in SEQ.
+      break_match_hyp; [break_match_hyp|]; inv SEQ.
+      cbn.
+      apply IHlen in Heqo0; subst.
+      reflexivity.
+  Qed.
 
   Definition get_consecutive_ptrs {M} `{Monad M} `{RAISE_OOM M} `{RAISE_ERROR M} (ptr : addr) (len : nat) : M (list addr) :=
     ixs <- lift_OOM (intptr_seq 0 len);;
