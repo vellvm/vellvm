@@ -1287,7 +1287,7 @@ Module Type MemoryModelSpec (LP : LLVMParams) (MP : MemoryParams LP) (MMSP : Mem
       allocate_bytes_now_byte_allocated : forall ptr, In ptr ptrs -> byte_allocated m2 ptr (provenance_to_allocation_id pr);
       allocate_bytes_preserves_old_allocations :
       forall ptr aid,
-        ~ In ptr ptrs ->
+        (forall p, In p ptrs -> disjoint_ptr_byte p ptr) ->
         (byte_allocated m1 ptr aid <-> byte_allocated m2 ptr aid);
 
       (* read permissions *)
