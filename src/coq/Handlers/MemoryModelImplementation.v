@@ -2642,7 +2642,7 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                    The other thing is showing that the store_ids in
                    the init_bytes are less than the store id in
                    `st'`... init_bytes is generic, though, so this can
-                   only be guaranteed with a precondition :(.                   
+                   only be guaranteed with a precondition :(.
                  *)
                 admit.
               }
@@ -4704,6 +4704,16 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           reflexivity.
         Qed.
 
+        Lemma mem_state_frame_stack_prop_refl :
+          forall ms fs,
+            mem_state_frame_stack ms = fs ->
+            mem_state_frame_stack_prop ms fs.
+        Proof.
+          intros [[m fsm] pr] fs EQ; subst.
+          red; cbn.
+          reflexivity.
+        Qed.
+
         Lemma mem_state_frame_stack_prop_set_trans :
           forall ms fs fs' fs'',
             frame_stack_eqv fs' fs'' ->
@@ -4975,8 +4985,595 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
           apply preserve_allocation_ids_set_frame_stack.
     Qed.
 
-    Parameter mempop_correct :
+    Lemma mempop_correct :
       exec_correct mempop mempop_spec_MemPropT.
+    Proof.
+      unfold exec_correct.
+      intros ms st VALID.
+
+      right.
+      cbn.
+      split; [do 2 exists ""%string; auto|].
+      split; [do 2 exists ""%string; auto|].
+
+      intros st' ms' [] RUN.
+      unfold mempop in RUN.
+      rewrite MemMonad_run_bind in RUN; auto.
+      rewrite MemMonad_get_mem_state in RUN.
+      rewrite bind_ret_l in RUN.
+      destruct ms as [[mem fs] pr].
+      cbn in RUN.
+      rewrite MemMonad_run_bind in RUN.
+      destruct fs as [f | fs f].
+      - (* Pop singleton, error *)
+        cbn in RUN.
+        rewrite MemMonad_run_raise_error in RUN.
+        rewrite rbm_raise_bind in RUN; [|solve [typeclasses eauto]].
+        symmetry in RUN.
+        apply MemMonad_eq1_raise_error_inv in RUN.
+        contradiction.
+      - (* Pop succeeds *)
+        cbn in RUN.
+        rewrite MemMonad_run_ret in RUN; auto.
+        rewrite bind_ret_l in RUN.
+        rewrite MemMonad_put_mem_state in RUN.
+
+        apply eq1_ret_ret in RUN; [inv RUN | typeclasses eauto].
+
+        (* mempop_spec *)
+        { split.
+          - (* bytes_freed *)
+
+            (* TODO: move *)
+            Lemma free_byte_read_byte_raw :
+              forall m m' ptr,
+                free_byte ptr m = m' ->
+                read_byte_raw m' ptr = None.
+            Proof.
+              intros m m' ptr FREE.
+              Transparent read_byte_raw.
+              unfold read_byte_raw.
+              Opaque read_byte_raw.
+              unfold free_byte in FREE.
+              subst.
+              apply IP.F.remove_eq_o; auto.
+            Qed.
+
+            Lemma free_frame_memory_cons :
+              forall f m m' a,
+                free_frame_memory (a :: f) m = m' ->
+                exists m'',
+                  free_byte a m  = m'' /\
+                    free_frame_memory f m'' = m'.
+            Proof.
+              intros f m m' a FREE.
+              rewrite list_cons_app in FREE.
+              unfold free_frame_memory in *.
+              rewrite fold_left_app in FREE.
+              set (m'' := fold_left (fun (m : memory) (key : Iptr) => free_byte key m) [a] m).
+              exists m''.
+              subst m''.
+              cbn; split; auto.
+            Qed.
+
+            Lemma free_byte_no_add :
+              forall m m' ptr ptr',
+                read_byte_raw m ptr = None ->
+                free_byte ptr' m = m' ->
+                read_byte_raw m' ptr = None.
+            Proof.
+              intros m m' ptr ptr' READ FREE.
+              Transparent read_byte_raw.
+              unfold read_byte_raw in *.
+              Opaque read_byte_raw.
+              unfold free_byte in FREE.
+              subst.
+              rewrite IP.F.remove_o.
+              break_match; auto.
+            Qed.
+
+            Lemma free_frame_memory_no_add :
+              forall f m m' ptr,
+                read_byte_raw m ptr = None ->
+                free_frame_memory f m = m' ->
+                read_byte_raw m' ptr = None.
+            Proof.
+              induction f; intros m m' ptr READ FREE.
+              - inv FREE; auto.
+              - apply free_frame_memory_cons in FREE.
+                destruct FREE as [m'' [FREEBYTE FREE]].
+
+                eapply IHf.
+                eapply free_byte_no_add; eauto.
+                eauto.
+            Qed.
+
+            Lemma free_frame_memory_read_byte_raw :
+              forall (f : Frame) (m m' : memory) ptr,
+                free_frame_memory f m = m' ->
+                ptr_in_frame_prop f ptr ->
+                read_byte_raw m' (ptr_to_int ptr) = None.
+            Proof.
+              induction f;
+                intros m m' ptr FREE IN.
+
+              - inv IN.
+              - apply free_frame_memory_cons in FREE.
+                destruct FREE as [m'' [FREEBYTE FREE]].
+
+                destruct IN as [IN | IN].
+                + subst a.
+                  eapply free_frame_memory_no_add; eauto.
+                  eapply free_byte_read_byte_raw; eauto.
+                + eapply IHf; eauto.
+            Qed.
+
+            Lemma free_byte_byte_not_allocated :
+              forall (ms ms' : MemState) (m m' : memory) (ptr : addr),
+                free_byte (ptr_to_int ptr) m = m' ->
+                mem_state_memory ms = m ->
+                mem_state_memory ms' = m' ->
+                byte_not_allocated ms' ptr.
+            Proof.
+              intros ms ms' m m' ptr FREE MS MS'.
+              intros aid CONTRA.
+              unfold byte_allocated in CONTRA.
+              cbn in CONTRA.
+              destruct CONTRA as [ms'' [ms''' [[EQ1 EQ2] CONTRA]]]; subst.
+              destruct CONTRA as [ms''' [b [CONTRA [EQ1 EQ2]]]]; subst.
+              destruct CONTRA as [ms''' [ms'''' [[EQ1 EQ2] CONTRA]]]; subst.
+              break_match; [|inv CONTRA; inv H1].
+              break_match. subst.
+
+              symmetry in MS'.
+              apply free_byte_read_byte_raw in MS'.
+              rewrite MS' in Heqo.
+              inv Heqo.
+            Qed.
+
+            Lemma free_frame_memory_byte_not_allocated :
+              forall (ms ms' : MemState) (m m' : memory) f (ptr : addr),
+                free_frame_memory f m = m' ->
+                ptr_in_frame_prop f ptr -> 
+                mem_state_memory ms = m ->
+                mem_state_memory ms' = m' ->
+                byte_not_allocated ms' ptr.
+            Proof.
+              intros ms ms' m m' f ptr FREE IN MS MS'.
+              intros aid CONTRA.
+              unfold byte_allocated in CONTRA.
+              cbn in CONTRA.
+              destruct CONTRA as [ms'' [ms''' [[EQ1 EQ2] CONTRA]]]; subst.
+              destruct CONTRA as [ms''' [b [CONTRA [EQ1 EQ2]]]]; subst.
+              destruct CONTRA as [ms''' [ms'''' [[EQ1 EQ2] CONTRA]]]; subst.
+              break_match; [|inv CONTRA; inv H1].
+              break_match. subst.
+
+              symmetry in MS'.
+              eapply free_frame_memory_read_byte_raw in MS'; eauto.
+              rewrite Heqo in MS'.
+              inv MS'.
+            Qed.
+
+
+            (* TODO : solve_byte_not_allocated? *)
+            intros ptr IN.
+
+            unfold ptr_in_current_frame in IN.
+            specialize (IN (Snoc fs f)).
+            forward IN.
+            { apply mem_state_frame_stack_prop_refl.
+              cbn. reflexivity.
+            }
+            specialize (IN f).
+            forward IN.
+            cbn. reflexivity.
+
+            eapply free_frame_memory_byte_not_allocated
+              with (ms := mkMemState (mem, Snoc fs f) pr); eauto.
+          - (* non_frame_bytes_preserved *)
+            intros ptr aid NIN.
+
+            (* TODO move these *)
+            Lemma free_byte_disjoint :
+              forall m m' ptr ptr',
+                free_byte ptr' m = m' ->
+                ptr <> ptr' ->
+                read_byte_raw m' ptr = read_byte_raw m ptr.
+            Proof.
+              intros m m' ptr ptr' FREE NEQ.
+              Transparent read_byte_raw.
+              unfold read_byte_raw in *.
+              Opaque read_byte_raw.
+              unfold free_byte in FREE.
+              subst.
+              rewrite IP.F.remove_neq_o; auto.
+            Qed.
+
+            Lemma free_frame_memory_disjoint :
+              forall f m m' ptr,
+                ~ ptr_in_frame_prop f ptr ->
+                free_frame_memory f m = m' ->
+                read_byte_raw m' (ptr_to_int ptr) = read_byte_raw m (ptr_to_int ptr).
+            Proof.
+              induction f; intros m m' ptr NIN FREE.
+              - inv FREE; auto.
+              - apply free_frame_memory_cons in FREE.
+                destruct FREE as [m'' [FREEBYTE FREE]].
+
+                erewrite IHf with (m:=m'').
+                eapply free_byte_disjoint; eauto.
+                firstorder.
+                firstorder.
+                auto.
+            Qed.
+
+            Lemma free_frame_memory_read_byte_raw_disjoint :
+              forall (f : Frame) (m m' : memory) ptr,
+                free_frame_memory f m = m' ->
+                ~ptr_in_frame_prop f ptr ->
+                read_byte_raw m' (ptr_to_int ptr) = read_byte_raw m (ptr_to_int ptr).
+            Proof.
+              induction f;
+                intros m m' ptr FREE IN.
+
+              - inv FREE. cbn.
+                auto.
+              - apply free_frame_memory_cons in FREE.
+                destruct FREE as [m'' [FREEBYTE FREE]].
+                cbn in IN.
+
+                erewrite free_frame_memory_disjoint with (m:=m''); eauto.
+                erewrite free_byte_disjoint with (m:=m); eauto.
+            Qed.
+
+            Lemma free_byte_byte_disjoint_allocated :
+              forall (ms ms' : MemState) (m m' : memory) (ptr ptr' : addr) aid,
+                free_byte (ptr_to_int ptr) m = m' ->
+                mem_state_memory ms = m ->
+                mem_state_memory ms' = m' ->
+                disjoint_ptr_byte ptr ptr' ->
+                byte_allocated ms ptr' aid <-> byte_allocated ms' ptr' aid.
+            Proof.
+              intros ms ms' m m' ptr ptr' aid FREE MS MS' DISJOINT.
+              split; intro ALLOC.
+              - destruct ms as [[ms fs] pr].
+                cbn in *.
+                destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                cbn in ALLOC.
+                unfold mem_state_memory in ALLOC.
+                cbn in ALLOC.
+
+                repeat eexists.
+                rewrite MS'.
+                erewrite free_byte_disjoint; eauto.
+                break_match.
+                break_match.
+                tauto.
+                tauto.
+              - destruct ms as [[ms fs] pr].
+                cbn in *.
+                destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                destruct ALLOC as [ms''' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                destruct ALLOC as [ms''' [ms'''' [[EQ1 EQ2] ALLOC]]]; subst.
+                cbn in ALLOC.
+
+                rewrite MS' in ALLOC.
+                erewrite free_byte_disjoint in ALLOC; eauto.
+
+                repeat eexists.
+                cbn.
+                break_match.
+                break_match.
+                tauto.
+                tauto.
+            Qed.
+
+            Lemma byte_allocated_mem_state_refl :
+              forall (ms ms' : MemState) (m : memory) (ptr : addr) aid,
+                mem_state_memory ms = m ->
+                mem_state_memory ms' = m ->
+                byte_allocated ms ptr aid <-> byte_allocated ms' ptr aid.
+            Proof.
+              intros ms ms' m ptr aid MEQ1 MEQ2.
+              split; intros ALLOC.
+              - destruct ms as [[ms fs] pr].
+                cbn in *.
+                destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                destruct ALLOC as [ms''' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                destruct ALLOC as [ms''' [ms'''' [[EQ1 EQ2] ALLOC]]]; subst.
+                cbn in ALLOC.
+
+                repeat eexists.
+                break_match.
+                break_match.
+                tauto.
+                tauto.
+              - destruct ms as [[ms fs] pr].
+                cbn in *.
+                destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+                destruct ALLOC as [ms''' [a [ALLOC [EQ1 EQ2]]]]; subst.
+                destruct ALLOC as [ms''' [ms'''' [[EQ1 EQ2] ALLOC]]]; subst.
+                cbn in ALLOC.
+
+                repeat eexists.
+                cbn.
+                break_match.
+                break_match.
+                tauto.
+                tauto.
+            Qed.
+
+            Lemma free_frame_memory_byte_disjoint_allocated :
+              forall f (ms ms' : MemState) (m m' : memory) (ptr : addr) aid,
+                free_frame_memory f m = m' ->
+                ~ptr_in_frame_prop f ptr ->
+                mem_state_memory ms = m ->
+                mem_state_memory ms' = m' ->
+                byte_allocated ms ptr aid <-> byte_allocated ms' ptr aid.
+            Proof.
+              induction f;
+                intros ms ms' m m' ptr aid FREE NIN MS MS'.
+              - inv FREE.
+                cbn in H0.
+                eapply byte_allocated_mem_state_refl; eauto.
+              - apply free_frame_memory_cons in FREE.
+                destruct FREE as [m'' [FREEBYTE FREE]].
+
+                set (aptr := int_to_ptr a nil_prov).
+                erewrite free_byte_byte_disjoint_allocated
+                  with (ptr:=aptr) (ms':= mkMemState (m'', Singleton initial_frame) initial_provenance).
+                2: {
+                  subst aptr. rewrite ptr_to_int_int_to_ptr; eauto.
+                }
+                all: eauto.
+                2: {
+                  subst aptr.
+                  unfold disjoint_ptr_byte.
+                  rewrite ptr_to_int_int_to_ptr.
+                  firstorder.
+                }
+
+                eapply IHf; eauto.
+                firstorder.
+            Qed.
+
+            Lemma peek_frame_stack_prop_frame_eqv :
+              forall fs f f',
+                peek_frame_stack_prop fs f ->
+                peek_frame_stack_prop fs f' ->
+                frame_eqv f f'.
+            Proof.
+              intros fs f f' PEEK1 PEEK2.
+              destruct fs; cbn in *;
+                rewrite <- PEEK2 in PEEK1;
+                auto.
+            Qed.
+
+            Lemma ptr_nin_current_frame :
+              forall ptr ms fs f,
+                ~ ptr_in_current_frame ms ptr ->
+                mem_state_frame_stack_prop ms fs ->
+                peek_frame_stack_prop fs f ->
+                ~ ptr_in_frame_prop f ptr.
+            Proof.
+              intros ptr ms fs f NIN FS PEEK IN.
+              unfold ptr_in_current_frame in NIN.
+              apply NIN.
+              intros fs' FS' f' PEEK'.
+              unfold mem_state_frame_stack_prop in *.
+              rewrite FS in FS'.
+              rewrite <- FS' in PEEK'.
+              erewrite peek_frame_stack_prop_frame_eqv
+                with (f:=f') (f':=f); eauto.
+            Qed.
+                
+            unfold ptr_in_current_frame in NIN.
+            cbn in NIN.
+
+            eapply free_frame_memory_byte_disjoint_allocated; eauto.
+            eapply ptr_nin_current_frame; eauto.
+            unfold mem_state_frame_stack_prop. reflexivity.
+            cbn. reflexivity.
+            cbn. reflexivity.
+          - (* non_frame_bytes_read *)
+            intros ptr byte NIN.
+
+            (* TODO: move *)
+            Lemma free_byte_byte_disjoint_read_byte_allowed :
+              forall (ms ms' : MemState) (m m' : memory) (ptr ptr' : addr),
+                free_byte (ptr_to_int ptr) m = m' ->
+                mem_state_memory ms = m ->
+                mem_state_memory ms' = m' ->
+                disjoint_ptr_byte ptr ptr' ->
+                read_byte_allowed ms ptr' <-> read_byte_allowed ms' ptr'.
+            Proof.
+              intros ms ms' m m' ptr ptr' FREE MS MS' DISJOINT.
+              split; intro READ.
+              - destruct ms as [[ms fs] pr].
+                cbn in *.
+                unfold read_byte_allowed in *.
+                destruct READ as [aid READ].
+                destruct READ as [READ ALLOWED].
+                exists aid.
+                split; eauto.
+                subst ms.
+
+                erewrite <- free_byte_byte_disjoint_allocated; eauto.
+              - destruct ms as [[ms fs] pr].
+                cbn in *.
+                unfold read_byte_allowed in *.
+                destruct READ as [aid READ].
+                destruct READ as [READ ALLOWED].
+                exists aid.
+                split; eauto.
+                subst ms.
+
+                erewrite free_byte_byte_disjoint_allocated; eauto.
+            Qed.
+
+            Lemma free_frame_memory_byte_disjoint_read_byte_allowed :
+              forall f (ms ms' : MemState) (m m' : memory) (ptr : addr),
+                free_frame_memory f m = m' ->
+                ~ptr_in_frame_prop f ptr ->
+                mem_state_memory ms = m ->
+                mem_state_memory ms' = m' ->
+                read_byte_allowed ms ptr <-> read_byte_allowed ms' ptr.
+            Proof.
+              intros f ms ms' m m' ptr FREE DISJOINT MS MS'.
+              split; intro READ.
+              - destruct ms as [[ms fs] pr].
+                cbn in *.
+                unfold read_byte_allowed in *.
+                destruct READ as [aid READ].
+                destruct READ as [READ ALLOWED].
+                exists aid.
+                split; eauto.
+                subst ms.
+
+                erewrite <- free_frame_memory_byte_disjoint_allocated; eauto.
+              - destruct ms as [[ms fs] pr].
+                cbn in *.
+                unfold read_byte_allowed in *.
+                destruct READ as [aid READ].
+                destruct READ as [READ ALLOWED].
+                exists aid.
+                split; eauto.
+                subst ms.
+
+                erewrite free_frame_memory_byte_disjoint_allocated; eauto.
+            Qed.
+
+            Lemma free_byte_byte_disjoint_read_byte_prop :
+              forall (ms ms' : MemState) (m m' : memory) (ptr ptr' : addr) byte,
+                free_byte (ptr_to_int ptr) m = m' ->
+                mem_state_memory ms = m ->
+                mem_state_memory ms' = m' ->
+                disjoint_ptr_byte ptr ptr' ->
+                read_byte_prop ms ptr' byte <-> read_byte_prop ms' ptr' byte.
+            Proof.
+              intros ms ms' m m' ptr ptr' byte FREE MS MS' DISJOINT.
+              split; intro READ.
+              - destruct ms as [[ms fs] pr].
+                cbn in *.
+                destruct READ as [ms'' [ms''' [[EQ1 EQ2] READ]]]; subst.
+                repeat eexists.
+                cbn in *.
+                rewrite MS'.
+                erewrite free_byte_disjoint; eauto.
+                break_match.
+                break_match.
+                all: tauto.
+              - destruct ms as [[ms fs] pr].
+                cbn in *.
+                destruct READ as [ms'' [ms''' [[EQ1 EQ2] READ]]]; subst.
+                repeat eexists.
+                cbn in *.
+                rewrite MS' in READ.
+                erewrite free_byte_disjoint in READ; eauto.
+                break_match.
+                break_match.
+                all: tauto.
+            Qed.
+
+            Lemma free_frame_memory_byte_disjoint_read_byte_prop :
+              forall f (ms ms' : MemState) (m m' : memory) (ptr : addr) byte,
+                free_frame_memory f m = m' ->
+                ~ptr_in_frame_prop f ptr ->
+                mem_state_memory ms = m ->
+                mem_state_memory ms' = m' ->
+                read_byte_prop ms ptr byte <-> read_byte_prop ms' ptr byte.
+            Proof.
+              intros f ms ms' m m' ptr byte FREE DISJOINT MS MS'.
+              split; intro READ.
+              - destruct ms as [[ms fs] pr].
+                cbn in *.
+                destruct READ as [ms'' [ms''' [[EQ1 EQ2] READ]]]; subst.
+                repeat eexists.
+                cbn in *.
+                rewrite MS'.
+                erewrite free_frame_memory_disjoint; eauto.
+                break_match.
+                break_match.
+                all: tauto.
+              - destruct ms as [[ms fs] pr].
+                cbn in *.
+                destruct READ as [ms'' [ms''' [[EQ1 EQ2] READ]]]; subst.
+                repeat eexists.
+                cbn in *.
+                rewrite MS' in READ.
+                erewrite free_frame_memory_disjoint in READ; eauto.
+                break_match.
+                break_match.
+                all: tauto.
+            Qed.
+
+            split; intros READ.
+            + split.
+              * (* read_byte_allowed *)
+                eapply free_frame_memory_byte_disjoint_read_byte_allowed
+                  with (ms := mkMemState (mem, Snoc fs f) pr);
+                  eauto.
+                eapply ptr_nin_current_frame; eauto.
+                all: unfold mem_state_frame_stack_prop; cbn; try reflexivity.
+                cbn. reflexivity.
+                inv READ; solve_read_byte_allowed.
+              * (* read_byte_prop *)
+                eapply free_frame_memory_byte_disjoint_read_byte_prop
+                  with (ms := mkMemState (mem, Snoc fs f) pr);
+                  eauto.
+                eapply ptr_nin_current_frame; eauto.
+                all: unfold mem_state_frame_stack_prop; cbn; try reflexivity.
+                cbn. reflexivity.
+                inv READ; solve_read_byte_prop.
+            + (* read_byte_spec *)
+              split.
+              * (* read_byte_allowed *)
+                eapply free_frame_memory_byte_disjoint_read_byte_allowed
+                  with (ms := mkMemState (mem, Snoc fs f) pr)
+                       (ms' := {|
+                                ms_memory_stack :=
+                                (fold_left (fun (m : memory) (key : Iptr) => free_byte key m) f mem, fs);
+                                ms_provenance := pr
+                              |});
+                  eauto.
+                eapply ptr_nin_current_frame; eauto.
+                all: unfold mem_state_frame_stack_prop; cbn; try reflexivity.
+                cbn. reflexivity.
+                inv READ; solve_read_byte_allowed.
+              * (* read_byte_prop *)
+                eapply free_frame_memory_byte_disjoint_read_byte_prop
+                  with (ms := mkMemState (mem, Snoc fs f) pr)
+                       (ms' := {|
+                                ms_memory_stack :=
+                                (fold_left (fun (m : memory) (key : Iptr) => free_byte key m) f mem, fs);
+                                ms_provenance := pr
+                              |});
+                  eauto.
+                eapply ptr_nin_current_frame; eauto.
+                all: unfold mem_state_frame_stack_prop; cbn; try reflexivity.
+                cbn. reflexivity.
+                inv READ; solve_read_byte_prop.
+          - (* pop_frame *)
+            intros fs1 fs2 FS POP.
+            unfold pop_frame_stack_prop in POP.
+            destruct fs1; [contradiction|].
+            red; cbn.
+            red in FS; cbn in FS.
+            apply frame_stack_snoc_inv_fs in FS.
+            rewrite FS.
+            rewrite POP.
+            reflexivity.
+          - (* mempop_invariants *)
+            split.
+            (* preserve_allocation_ids *)
+            red. unfold used_provenance_prop.
+            cbn. reflexivity.
+        }
+      - auto.
+    Qed.
 
     (*** Initial memory state *)
     Record initial_memory_state_prop : Prop :=
