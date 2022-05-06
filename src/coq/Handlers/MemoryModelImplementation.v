@@ -1087,7 +1087,7 @@ Module FiniteMemoryModelSpecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
     end.
 
   Definition mem_state_frame_stack_prop (ms : MemState) (fs : FrameStack) : Prop :=
-    frame_stack_eqv (snd (ms_memory_stack ms)) fs.
+    frame_stack_eqv (mem_state_frame_stack ms) fs.
 
   (** Provenance / store ids *)
   Definition used_provenance_prop (ms : MemState) (pr : Provenance) : Prop :=
@@ -2571,9 +2571,14 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
             assert (@MemMonad_valid_state MemState ExtraState Provenance MemM (itree Eff) MM MRun MPROV MSID MMS SIDFRESH PROVFRESH MERR MUB MOOM RunERR RunUB RunOOM H ms' st) as VALID'.
             { (* TODO: ugh, probably need to change something to make sure I know this info *)
+              unfold mem_state_fresh_provenance in FRESH.
+              destruct ms.
+              inv FRESH.
               admit.
             }
 
+            unfold fresh_sid in RUN.
+            repeat red in RUN.
             pose proof MemMonad_run_fresh_sid ms' st VALID' as [st' [sid [RUN_FRESH_SID [VALID'' FRESH_SID]]]].
             rewrite MemMonad_run_bind in RUN; [| tauto].
             rewrite RUN_FRESH_SID in RUN.
@@ -2626,6 +2631,19 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               rewrite bind_ret_l in RUN.
               rewrite MemMonad_run_ret in RUN; auto.
               2: { (* TODO: solve_MemMonad_valid_state *)
+                (* VALID'' / VALID' give me that previous states are valid...
+
+                   Need to know that adding init_bytes to memory
+                   results in a valid state at this point.
+
+                   Should be easy to show that the provenance is <=
+                   next_provenance for everything... Which is good.
+
+                   The other thing is showing that the store_ids in
+                   the init_bytes are less than the store id in
+                   `st'`... init_bytes is generic, though, so this can
+                   only be guaranteed with a precondition :(.                   
+                 *)
                 admit.
               }
               cbn in RUN.
@@ -2718,6 +2736,8 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
                     cbn in ADD; subst; auto.
                     unfold mem_state_frame_stack_prop in *.
                     cbn in *.
+                    unfold mem_state_frame_stack.
+                    cbn.
                     rewrite add_all_to_frame_nil_preserves_frames.
                     cbn.
                     rewrite POP.
@@ -4616,11 +4636,263 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
 
       Unshelve.
       all: try exact ""%string.
-    Qed.
+    Admitted.
 
     (** Correctness of frame stack operations *)
-    Parameter mempush_correct :
+    Lemma mempush_correct :
       exec_correct mempush mempush_spec_MemPropT.
+    Proof.
+      unfold exec_correct.
+      intros ms st VALID.
+
+      right.
+      cbn.
+      split; [do 2 exists ""%string; auto|].
+      split; [do 2 exists ""%string; auto|].
+
+      intros st' ms' [] RUN.
+      unfold mempush in RUN.
+      rewrite MemMonad_run_bind in RUN; auto.
+      rewrite MemMonad_get_mem_state in RUN.
+      rewrite bind_ret_l in RUN.
+      rewrite MemMonad_put_mem_state in RUN.
+      apply eq1_ret_ret in RUN; [inv RUN | typeclasses eauto].
+
+      split.
+      - (* fresh_frame *)
+        intros fs1 fs2 f POP EMPTY PUSH.
+
+        (* TODO: Move this *)
+        Lemma initial_frame_empty :
+          empty_frame initial_frame.
+        Proof.
+          unfold empty_frame.
+          intros ptr.
+          unfold initial_frame.
+          cbn.
+          auto.
+        Qed.
+
+        Lemma empty_frame_eqv :
+          forall f1 f2,
+            empty_frame f1 ->
+            empty_frame f2 ->
+            frame_eqv f1 f2.
+        Proof.
+          intros f1 f2 F1 F2.
+          unfold empty_frame in *.
+          unfold frame_eqv.
+          intros ptr; split; intros IN; firstorder.
+        Qed.
+
+        pose proof empty_frame_eqv _ _ EMPTY initial_frame_empty as EQinit.
+
+        (* This:
+
+          (mem_state_set_frame_stack ms (push_frame_stack (mem_state_frame_stack ms) initial_frame))
+
+          Should be equivalent to (f :: fs1).
+         *)
+
+        (* TODO: Move this *)
+        Lemma mem_state_frame_stack_prop_set_refl :
+          forall ms fs,
+            mem_state_frame_stack_prop (mem_state_set_frame_stack ms fs) fs.
+        Proof.
+          intros [[m fsm] pr] fs.
+          red; cbn.
+          reflexivity.
+        Qed.
+
+        Lemma mem_state_frame_stack_prop_set_trans :
+          forall ms fs fs' fs'',
+            frame_stack_eqv fs' fs'' ->
+            mem_state_frame_stack_prop (mem_state_set_frame_stack ms fs) fs' ->
+            mem_state_frame_stack_prop (mem_state_set_frame_stack ms fs) fs''.
+        Proof.
+          intros [[m fsm] pr] fs fs' fs'' EQV MEMPROP.
+          red; cbn.
+          red in MEMPROP; cbn in MEMPROP.
+          rewrite <- EQV.
+          auto.
+        Qed.
+
+        eapply mem_state_frame_stack_prop_set_trans; [|apply mem_state_frame_stack_prop_set_refl].
+
+        (* TODO: Move this *)
+        Lemma push_frame_stack_correct :
+          forall fs1 f fs2,
+            push_frame_stack fs1 f = fs2 ->
+            push_frame_stack_spec fs1 f fs2.
+        Proof.
+          intros fs1 f fs2 PUSH.
+          unfold push_frame_stack in PUSH.
+          subst.
+          split.
+          - (* pop *)
+            cbn. reflexivity.
+          - (* peek *)
+            cbn. reflexivity.
+        Qed.
+
+        (* TODO: move *)
+        #[global] Instance snoc_Proper :
+          Proper (frame_stack_eqv ==> frame_eqv ==> frame_stack_eqv) Snoc.
+        Proof.
+          unfold Proper, respectful.
+          intros x y XY f f' FF.
+          red.
+          intros f0 n.
+          destruct n.
+          - cbn.
+            rewrite FF.
+            reflexivity.
+          - cbn.
+            apply XY.
+        Qed.
+
+        (* TODO: move *)
+        Lemma push_frame_stack_inj :
+          forall fs1 f fs2 fs2',
+            push_frame_stack_spec fs1 f fs2 ->
+            push_frame_stack_spec fs1 f fs2' ->
+            frame_stack_eqv fs2 fs2'.
+        Proof.
+          intros fs1 f fs2 fs2' PUSH1 PUSH2.
+          inv PUSH1.
+          inv PUSH2.
+
+          destruct fs2, fs2'; try contradiction.
+          cbn in *.
+          rewrite <- new_frame0, <- new_frame1.
+          rewrite can_pop0, can_pop1.
+          reflexivity.
+        Qed.
+
+        (* TODO: move *)
+        #[global] Instance push_frame_stack_spec_Proper :
+          Proper (frame_stack_eqv ==> frame_eqv ==> frame_stack_eqv ==> iff) push_frame_stack_spec.
+        Proof.
+          unfold Proper, respectful.
+          intros x y XY f f' TU r s RS; subst.
+
+          split; intros ADD.
+          - inv ADD.
+            split.
+            + rewrite <- RS.
+              rewrite <- XY.
+              auto.
+            + rewrite <- RS.
+              rewrite <- TU.
+              auto.
+          - inv ADD.
+            split.
+            + rewrite RS.
+              rewrite XY.
+              auto.
+            + rewrite RS.
+              rewrite TU.
+              auto.
+        Qed.
+
+        pose proof (eq_refl (push_frame_stack (mem_state_frame_stack ms) initial_frame)) as PUSH_INIT.
+        apply push_frame_stack_correct in PUSH_INIT.
+
+        unfold mem_state_frame_stack_prop in POP.
+        rewrite <- POP in PUSH.
+        rewrite EQinit in PUSH.
+
+        eapply push_frame_stack_inj; eauto.
+      - (* mempush_invariants *)
+        split.
+        + (* read_byte_preserved *)
+          (* TODO: solve_read_byte_preserved. *)
+          split.
+          * (* solve_read_byte_allowed_all_preserved. *)
+            intros ?ptr; split; intros ?READ.
+            -- (* read_byte_allowed *)
+
+              (* TODO: add to solve_read_byte_allowed *)
+              Lemma read_byte_allowed_set_frame_stack :
+                forall ms f ptr,
+                  read_byte_allowed ms ptr <-> read_byte_allowed (mem_state_set_frame_stack ms f) ptr.
+              Proof.
+                intros [[ms prov] fs] f ptr.
+                cbn.
+                unfold read_byte_allowed;
+                  split; intros READ;
+                  cbn in *.
+
+                - destruct READ as [aid READ].
+                  destruct READ as [READ ALLOWED].
+                  destruct READ as [ms' [ms'' [[EQ1 EQ2] READ]]]; subst.
+                  destruct READ as [ms' [b [[ms'' [ms''' [[EQ1' EQ2'] READ]]] [EQ1 EQ2]]]]; subst.
+
+                  exists aid.
+                  repeat eexists; auto.
+
+                  cbn in *.
+                  break_match; [break_match|]; tauto.
+                - destruct READ as [aid READ].
+                  destruct READ as [READ ALLOWED].
+                  destruct READ as [ms' [ms'' [[EQ1 EQ2] READ]]]; subst.
+                  destruct READ as [ms' [b [[ms'' [ms''' [[EQ1' EQ2'] READ]]] [EQ1 EQ2]]]]; subst.
+
+                  exists aid.
+                  repeat eexists; auto.
+
+                  cbn in *.
+                  break_match; [break_match|]; tauto.
+              Qed.
+
+              (* TODO: add to write_byte_allowed *)
+              Lemma write_byte_allowed_set_frame_stack :
+                forall ms f ptr,
+                  write_byte_allowed ms ptr <-> write_byte_allowed (mem_state_set_frame_stack ms f) ptr.
+              Proof.
+                intros [[ms prov] fs] f ptr.
+                cbn.
+                unfold write_byte_allowed;
+                  split; intros WRITE;
+                  cbn in *.
+
+                - destruct WRITE as [aid WRITE].
+                  destruct WRITE as [WRITE ALLOWED].
+                  destruct WRITE as [ms' [ms'' [[EQ1 EQ2] WRITE]]]; subst.
+                  destruct WRITE as [ms' [b [[ms'' [ms''' [[EQ1' EQ2'] WRITE]]] [EQ1 EQ2]]]]; subst.
+
+                  exists aid.
+                  repeat eexists; auto.
+
+                  cbn in *.
+                  break_match; [break_match|]; tauto.
+                - destruct WRITE as [aid WRITE].
+                  destruct WRITE as [WRITE ALLOWED].
+                  destruct WRITE as [ms' [ms'' [[EQ1 EQ2] WRITE]]]; subst.
+                  destruct WRITE as [ms' [b [[ms'' [ms''' [[EQ1' EQ2'] WRITE]]] [EQ1 EQ2]]]]; subst.
+
+                  exists aid.
+                  repeat eexists; auto.
+
+                  cbn in *.
+                  break_match; [break_match|]; tauto.
+              Qed.
+
+
+              apply read_byte_allowed_set_frame_stack; eauto.
+            -- (* read_byte_allowed *)
+              (* TODO: solve_read_byte_allowed *)
+              eapply read_byte_allowed_set_frame_stack; eauto.
+          * (* solve_read_byte_prop_all_preserved. *)
+            admit.
+        + (* write_byte_allowed_all_preserved *)
+          (* TODO: solve_write_byte_allowed_all_preserved. *)
+          admit.
+        + (* allocations_preserved *)
+          admit.
+        + (* preserve_allocation_ids *)
+          admit.
+    Admitted.
 
     Parameter mempop_correct :
       exec_correct mempop mempop_spec_MemPropT.
