@@ -4884,15 +4884,96 @@ Module FiniteMemoryModelExecPrimitives (LP : LLVMParams) (MP : MemoryParams LP) 
               (* TODO: solve_read_byte_allowed *)
               eapply read_byte_allowed_set_frame_stack; eauto.
           * (* solve_read_byte_prop_all_preserved. *)
-            admit.
+
+            (* TODO: add to solve_read_byte_prop_all_preserved. *)
+            Lemma read_byte_prop_set_frame_stack :
+              forall ms f,
+                read_byte_prop_all_preserved ms (mem_state_set_frame_stack ms f).
+            Proof.
+              intros [[ms prov] fs] f.
+              cbn.
+              unfold read_byte_prop_all_preserved, read_byte_prop.
+              split; intros READ;
+                cbn in *.
+
+              - destruct READ as [ms' [ms'' [[EQ1 EQ2] READ]]]; subst.
+                do 2 eexists; split; [tauto|].
+                cbn in *.
+                break_match; auto.
+                break_match; tauto.
+              - destruct READ as [ms' [ms'' [[EQ1 EQ2] READ]]]; subst.
+                do 2 eexists; split; [tauto|].
+                cbn in *.
+                break_match; auto.
+                break_match; tauto.
+            Qed.
+
+            apply read_byte_prop_set_frame_stack.
         + (* write_byte_allowed_all_preserved *)
-          (* TODO: solve_write_byte_allowed_all_preserved. *)
-          admit.
+          (* TODO *)
+            Lemma write_byte_allowed_all_preserved_set_frame_stack :
+              forall ms f,
+                write_byte_allowed_all_preserved ms (mem_state_set_frame_stack ms f).
+            Proof.
+              intros ms f ptr.
+              eapply write_byte_allowed_set_frame_stack.
+            Qed.
+
+            apply write_byte_allowed_all_preserved_set_frame_stack.
         + (* allocations_preserved *)
-          admit.
+          Lemma allocations_preserved_set_frame_stack :
+            forall ms f,
+              allocations_preserved ms (mem_state_set_frame_stack ms f).
+          Proof.
+            intros ms f ptr aid.
+            split; intros ALLOC.
+
+            - destruct ms as [[ms fs] pr].
+              cbn in *.
+              destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+              destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+              destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+              cbn in ALLOC.
+              unfold mem_state_memory in ALLOC.
+              cbn in ALLOC.
+
+              repeat eexists.
+              cbn.
+              break_match; [break_match|]; tauto.
+            - destruct ms as [[ms fs] pr].
+              cbn in *.
+              destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+              destruct ALLOC as [ms'' [a [ALLOC [EQ1 EQ2]]]]; subst.
+              destruct ALLOC as [ms'' [ms''' [[EQ1 EQ2] ALLOC]]]; subst.
+              cbn in ALLOC.
+              unfold mem_state_memory in ALLOC.
+              cbn in ALLOC.
+
+              repeat eexists.
+              cbn.
+              break_match; [break_match|]; tauto.
+          Qed.
+
+        (* TODO: move to solve_allocations_preserved *)
+          apply allocations_preserved_set_frame_stack.
         + (* preserve_allocation_ids *)
-          admit.
-    Admitted.
+          (* TODO: move *)
+          Lemma preserve_allocation_ids_set_frame_stack :
+            forall ms f,
+              preserve_allocation_ids ms (mem_state_set_frame_stack ms f).
+          Proof.
+            intros ms f pr.
+            split; intros USED.
+
+            - destruct ms as [[ms fs] pr'].
+              cbn in *; auto.
+            - destruct ms as [[ms fs] pr'].
+              cbn in *; auto.
+          Qed.
+
+          (* TODO: solve_preserve_allocation_ids *)
+          apply preserve_allocation_ids_set_frame_stack.
+    Qed.
 
     Parameter mempop_correct :
       exec_correct mempop mempop_spec_MemPropT.
