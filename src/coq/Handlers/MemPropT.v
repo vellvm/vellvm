@@ -77,6 +77,14 @@ Class MonadMemState (MemState : Type) (M : Type -> Type) : Type :=
     put_mem_state : MemState -> M unit;
   }.
 
+Class MemStateMem (MemState : Type) (memory : Type) : Type :=
+  { ms_get_memory : MemState -> memory;
+    ms_put_memory : memory -> MemState -> MemState;
+
+    ms_get_put_memory : forall ms mem,
+      ms_get_memory (ms_put_memory mem ms) = mem;
+  }.
+
 Definition modify_mem_state {M MemState} `{Monad M} `{MonadMemState MemState M} (f : MemState -> MemState) : M MemState :=
   ms <- get_mem_state;;
   put_mem_state (f ms);;
@@ -86,10 +94,10 @@ Definition modify_mem_state {M MemState} `{Monad M} `{MonadMemState MemState M} 
 Import EitherMonad.
 Import Monad.
 Import Morphisms.
-Class MemMonad (MemState : Type) (ExtraState : Type) (Provenance : Type) (M : Type -> Type) (RunM : Type -> Type)
+Class MemMonad (MemState : Type) (memory : Type) (ExtraState : Type) (Provenance : Type) (M : Type -> Type) (RunM : Type -> Type)
       `{MM : Monad M} `{MRun: Monad RunM}
-      `{MPROV : MonadProvenance Provenance M} `{MSID : MonadStoreId M} `{MMS: MonadMemState MemState M}
-      `{SIDFRESH : StoreIdFreshness MemState} `{PROVFRESH :ProvenanceFreshness Provenance ExtraState}
+      `{MPROV : MonadProvenance Provenance M} `{MSID : MonadStoreId M} `{MMS: MonadMemState MemState M} `{MemSMem : MemStateMem MemState memory}
+      `{SIDFRESH : StoreIdFreshness MemState} `{PROVFRESH : ProvenanceFreshness Provenance MemState}
       `{MERR : RAISE_ERROR M} `{MUB : RAISE_UB M} `{MOOM :RAISE_OOM M}
       `{RunERR : RAISE_ERROR RunM} `{RunUB : RAISE_UB RunM} `{RunOOM :RAISE_OOM RunM}
   : Type
@@ -140,13 +148,14 @@ Class MemMonad (MemState : Type) (ExtraState : Type) (Provenance : Type) (M : Ty
 
     (** Fresh provenance property *)
     (* TODO: unclear if this should exist, must change ms. *)
-    (* MemMonad_run_fresh_provenance *)
-    (*   (ms : MemState) st (VALID : MemMonad_valid_state ms st): *)
-    (* exists st' pr', *)
-    (*   eq1 (MemMonad_run (fresh_provenance) ms st) (ret (st', (ms, pr'))) /\ *)
-    (*     MemMonad_valid_state ms st' /\ *)
-    (*     ~ used_provenance st pr' /\ *)
-    (*     used_provenance st' pr'; *)
+    MemMonad_run_fresh_provenance
+      (ms : MemState) st (VALID : MemMonad_valid_state ms st):
+    exists ms' pr',
+      eq1 (MemMonad_run (fresh_provenance) ms st) (ret (st, (ms', pr'))) /\
+        MemMonad_valid_state ms' st /\
+        ms_get_memory ms = ms_get_memory ms' /\
+        ~ used_provenance ms pr' /\
+        used_provenance ms' pr';
 
     (** Exceptions *)
     MemMonad_run_raise_oom :
