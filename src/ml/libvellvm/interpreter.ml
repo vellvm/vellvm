@@ -83,7 +83,7 @@ let rec step (m : ('a coq_L4, memory_stack * ((local_env * lstack) * (global_env
   | RetF (_,(_,(_,v))) -> Ok v
 
   (* The ExternalCallE effect *)
-  | VisF (Sum.Coq_inl1 (ExternalCall(_, _, _)), _) ->
+  | VisF (Sum.Coq_inl1 (ExternalCall(_, _, _, _)), _) ->
      Error "Uninterpreted Call"
 
   (* The debugE effect *)

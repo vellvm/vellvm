@@ -151,8 +151,8 @@ Proof.
 Qed.
 
 Lemma Call_is_pure:
-  forall τ f args,
-    pure (ℑ3 (trigger (Call τ f args))).
+  forall τ f args attr,
+    pure (ℑ3 (trigger (Call τ f args attr))).
 Proof.
   unfold pure; intros. unfold ℑ3.
   rewrite interp_intrinsics_trigger.
