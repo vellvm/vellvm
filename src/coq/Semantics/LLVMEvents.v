@@ -131,12 +131,21 @@ Module Type LLVM_INTERACTIONS (ADDR : MemoryAddress.ADDRESS).
   Module DV := DynamicValues.DVALUE(ADDR).
   Export DV.
 
+  (* Function attributes, which are keywords that are specified apart from the
+      function type.
+
+      For a full list of function attributes, see
+        https://llvm.org/docs/LangRef.html#function-attributes  *)
+  Variant FnAttributes : Set :=
+  | ArgMemOnly
+  | ReadOnly.
+
   (* Generic calls, refined by [denote_mcfg] *)
   Variant CallE : Type -> Type :=
-  | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue), CallE uvalue.
+  | Call        : forall (t:dtyp) (f:uvalue) (args:list uvalue) (attr:list FnAttributes), CallE uvalue.
 
   Variant ExternalCallE : Type -> Type :=
-  | ExternalCall        : forall (t:dtyp) (f:uvalue) (args:list dvalue), ExternalCallE dvalue.
+  | ExternalCall        : forall (t:dtyp) (f:uvalue) (args:list dvalue) (attr:list FnAttributes), ExternalCallE dvalue.
 
   (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
   Variant IntrinsicE : Type -> Type :=

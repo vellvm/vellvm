@@ -695,7 +695,7 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
             fmap dvalue_to_uvalue (trigger (Intrinsic dt s dvs))
           | None =>
             fv <- translate exp_to_instr (denote_exp None f) ;;
-            trigger (Call dt fv uvs)
+            trigger (Call dt fv uvs [])
           end
           ;;
           match pt with
@@ -904,16 +904,16 @@ Module Denotation(A:MemoryAddress.ADDRESS)(LLVMEvents:LLVM_INTERACTIONS(A)).
         @mrec CallE (ExternalCallE +' _)
               (fun T call =>
                  match call with
-                 | Call dt fv args =>
+                 | Call dt fv args attr =>
                    dfv <- concretize_or_pick fv True ;; 
                    match (lookup_defn dfv fundefs) with
                    | Some f_den => (* If the call is internal *)
                      f_den args
                    | None =>
                      dargs <- map_monad (fun uv => pickUnique uv) args ;;
-                     fmap dvalue_to_uvalue (trigger (ExternalCall dt fv dargs))
+                     fmap dvalue_to_uvalue (trigger (ExternalCall dt fv dargs attr))
                    end
                  end)
-              _ (Call dt f_value args).
+              _ (Call dt f_value args []).
 
 End Denotation.
